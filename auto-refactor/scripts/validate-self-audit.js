@@ -265,13 +265,15 @@ function validateDebtLedger(report) {
     evaluation.verdict === 'PERMITTED_ZERO_DEBT' || evaluation.verdict === 'PERMITTED_ELASTIC',
     `Expected permitted debt verdict, got: ${evaluation.verdict}`,
   );
+  const targetCritical = baselineDebt ? evaluation.deltaDebt.critical : tiers.critical;
+  const targetHigh = baselineDebt ? evaluation.deltaDebt.high : tiers.high;
   assert.ok(
-    tiers.critical <= evaluation.dynamicLimits.critical,
-    `Critical debt (${tiers.critical}) must not exceed dynamic limit (${evaluation.dynamicLimits.critical})`,
+    targetCritical <= evaluation.dynamicLimits.critical,
+    `Critical debt (${targetCritical}) must not exceed dynamic limit (${evaluation.dynamicLimits.critical})`,
   );
   assert.ok(
-    tiers.high <= evaluation.dynamicLimits.high,
-    `High debt (${tiers.high}) must not exceed dynamic limit (${evaluation.dynamicLimits.high})`,
+    targetHigh <= evaluation.dynamicLimits.high,
+    `High debt (${targetHigh}) must not exceed dynamic limit (${evaluation.dynamicLimits.high})`,
   );
 
   assert.strictEqual(

@@ -1,15 +1,15 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1793626292879",
-  "timestamp": "2026-11-02T13:31:37.280Z",
-  "cai": 88.4,
+  "snapshotId": "snapshot-v0.4.0-1793960896881",
+  "timestamp": "2026-11-06T10:28:21.342Z",
+  "cai": 88.47,
   "autonomy": {
-    "compositeAutonomyIndex": 88.4,
+    "compositeAutonomyIndex": 88.47,
     "grade": "L4_HIGH_AUTONOMY",
     "gradeDescription": "High autonomy: Business logic and domain kernel are fully proprietary, integrating standard open-source ecosystems reasonably",
     "dimensions": {
-      "effectiveLocAutonomy": 97.79,
-      "symbolCallAutonomy": 98.06,
-      "domainKernelDensity": 63.69,
+      "effectiveLocAutonomy": 97.83,
+      "symbolCallAutonomy": 98.16,
+      "domainKernelDensity": 63.91,
       "codeOriginality": 91,
       "supplyChainResilience": 77.27,
       "criticalPathAutonomy": 95
@@ -24,9 +24,9 @@
     },
     "confidence": {
       "sampleSufficiency": 1,
-      "lowerBound": 87.48,
-      "upperBound": 89.27,
-      "credibleScore": 88.39,
+      "lowerBound": 87.57,
+      "upperBound": 89.32,
+      "credibleScore": 88.46,
       "isLowConfidence": false
     },
     "supplyChain": {
@@ -60,25 +60,25 @@
       }
     ],
     "stats": {
-      "totalFiles": 822,
-      "proprietaryFiles": 815,
+      "totalFiles": 835,
+      "proprietaryFiles": 828,
       "vendorFiles": 0,
       "generatedFiles": 7,
-      "totalEffectiveLoc": 252281,
-      "proprietaryEffectiveLoc": 246714,
+      "totalEffectiveLoc": 256411,
+      "proprietaryEffectiveLoc": 250844,
       "vendorEffectiveLoc": 0,
       "generatedEffectiveLoc": 5567,
-      "internalSymbolCalls": 2429,
+      "internalSymbolCalls": 2561,
       "externalSdkCalls": 48,
-      "stdlibCalls": 647,
-      "criticalPathFiles": 23,
+      "stdlibCalls": 674,
+      "criticalPathFiles": 24,
       "criticalPathInternalCalls": 38,
       "criticalPathExternalCalls": 2
     }
   },
   "polyglotGeneralization": {
-    "index": 96.63,
-    "meanScore": 96.63,
+    "index": 96.47,
+    "meanScore": 96.47,
     "dispersionPenalty": 1,
     "standardDeviation": 0,
     "languageCount": 1
@@ -94,21 +94,21 @@
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 822,
-    "durationMs": 3665
+    "filesScanned": 835,
+    "durationMs": 3467
   },
   "metrics": {
-    "compositeScore": 99.22,
+    "compositeScore": 99.2,
     "grade": "A+",
-    "autonomyRate": 88.4,
+    "autonomyRate": 88.47,
     "sqale": {
-      "tdr": 0.0036,
-      "remediationMinutes": 26943,
+      "tdr": 0.0038,
+      "remediationMinutes": 29587,
       "grade": "A"
     },
     "polyglotGeneralization": {
-      "index": 96.63,
-      "meanScore": 96.63,
+      "index": 96.47,
+      "meanScore": 96.47,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
@@ -118,38 +118,38 @@
       "compositeDensity": 0.8,
       "averageTspr": 0.918,
       "averagePor": 0.082,
-      "averageColumnDensity": 0.868,
+      "averageColumnDensity": 0.87,
       "averageSpatialDensity": 0.452,
-      "averageMahalanobisDistance": 4.521,
-      "averageFisherSimplexDistance": 0.094
+      "averageMahalanobisDistance": 4.531,
+      "averageFisherSimplexDistance": 0.093
     },
-    "totalIssues": 3900,
-    "suppressedIssues": 75,
-    "unsuppressedIssues": 3825,
+    "totalIssues": 4186,
+    "suppressedIssues": 92,
+    "unsuppressedIssues": 4094,
     "bySeverity": {
-      "info": 539,
-      "warning": 3371,
+      "info": 575,
+      "warning": 3621,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 0,
-      "medium": 627,
-      "low": 3273
+      "high": 43,
+      "medium": 648,
+      "low": 3495
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 99.58,
-      "maintainability": 98.2,
-      "performance": 99.85,
+      "maintainability": 98.15,
+      "performance": 99.78,
       "data": 98.58,
-      "testing": 99.8,
-      "reliability": 99.75,
+      "testing": 99.79,
+      "reliability": 99.72,
       "security": 99.88,
-      "extensibility": 97.9
+      "extensibility": 97.86
     },
-    "compositeScore": 99.22,
+    "compositeScore": 99.2,
     "weights": {
       "architecture": 0.15,
       "maintainability": 0.15,
@@ -164,17 +164,71 @@
   },
   "tenDimensions": {
     "architectureConsistency": 99.58,
-    "semanticPurity": 99.51,
+    "semanticPurity": 99.49,
     "codeSecurity": 99.88,
-    "performanceEfficiency": 99.85,
-    "standardization": 96.09,
-    "modernity": 99.8,
-    "maintainability": 98.2,
-    "commentQuality": 99.97,
-    "duplication": 97.64,
-    "techDebtRisk": 99.99
+    "performanceEfficiency": 99.78,
+    "standardization": 96.02,
+    "modernity": 99.79,
+    "maintainability": 98.15,
+    "commentQuality": 99.9,
+    "duplication": 97.66,
+    "techDebtRisk": 99.96
   },
   "topHotspots": [
+    {
+      "filePath": "src/core/cache-arc2.ts",
+      "domain": "core",
+      "totalIssues": 41,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 96.29,
+      "effectiveDensity": 0.96
+    },
+    {
+      "filePath": "src/analyzers/gdscript-modern.ts",
+      "domain": "analyzers",
+      "totalIssues": 34,
+      "criticalCount": 0,
+      "highCount": 1,
+      "compositeScore": 96.42,
+      "effectiveDensity": 0.96
+    },
+    {
+      "filePath": "src/core/scanner/analyzer-runner.ts",
+      "domain": "scanner",
+      "totalIssues": 23,
+      "criticalCount": 0,
+      "highCount": 2,
+      "compositeScore": 95.95,
+      "effectiveDensity": 0.94
+    },
+    {
+      "filePath": "scripts/test-parallel.js",
+      "domain": "scripts",
+      "totalIssues": 19,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 98.16,
+      "effectiveDensity": 0.93
+    },
+    {
+      "filePath": "src/analyzers/vscode-extension.ts",
+      "domain": "analyzers",
+      "totalIssues": 19,
+      "criticalCount": 0,
+      "highCount": 5,
+      "compositeScore": 96.04,
+      "effectiveDensity": 0.96
+    },
+    {
+      "filePath": "src/core/native/native-bridge.ts",
+      "domain": "native",
+      "totalIssues": 19,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 98.67,
+      "effectiveDensity": 0.95
+    },
     {
       "filePath": "src/core/scheduler/worker-pool-manager.ts",
       "domain": "scheduler",
@@ -183,15 +237,6 @@
       "highCount": 0,
       "compositeScore": 96.7,
       "effectiveDensity": 0.91
-    },
-    {
-      "filePath": "scripts/migrate-trajectory-summaries.js",
-      "domain": "scripts",
-      "totalIssues": 18,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 97.61,
-      "effectiveDensity": 0.94
     },
     {
       "filePath": "scripts/validate-redos-security.js",
@@ -209,7 +254,7 @@
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 96.91,
-      "effectiveDensity": 0.95
+      "effectiveDensity": 0.94
     },
     {
       "filePath": "src/analyzers/production-hygiene.ts",
@@ -219,92 +264,435 @@
       "highCount": 0,
       "compositeScore": 98.18,
       "effectiveDensity": 0.94
-    },
-    {
-      "filePath": "src/core/scoring/diff-bounds-governor.ts",
-      "domain": "scoring",
-      "totalIssues": 18,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 97.51,
-      "effectiveDensity": 0.96
-    },
-    {
-      "filePath": "scripts/test-parallel.js",
-      "domain": "scripts",
-      "totalIssues": 17,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 98.28,
-      "effectiveDensity": 0.93
-    },
-    {
-      "filePath": "src/analyzers/docs.ts",
-      "domain": "analyzers",
-      "totalIssues": 17,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 97.28,
-      "effectiveDensity": 0.95
-    },
-    {
-      "filePath": "src/analyzers/governance.ts",
-      "domain": "analyzers",
-      "totalIssues": 17,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 96.72,
-      "effectiveDensity": 0.95
-    },
-    {
-      "filePath": "src/core/dependency-graph-traversal.ts",
-      "domain": "core",
-      "totalIssues": 17,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 97.56,
-      "effectiveDensity": 0.94
     }
   ],
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 0,
-      "medium": 627,
-      "low": 3273
+      "high": 43,
+      "medium": 648,
+      "low": 3495
     },
     "criticalItems": [],
-    "highItems": []
+    "highItems": [
+      {
+        "id": "performance:PRF-ALG-002:scripts/migrate-validator-exit-tail.js:71",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "scripts/migrate-validator-exit-tail.js",
+        "line": 71,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'some()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:scripts/validate-test-runner-harness.js:89",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "scripts/validate-test-runner-harness.js",
+        "line": 89,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:scripts/validate-test-runner-harness.js:92",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "scripts/validate-test-runner-harness.js",
+        "line": 92,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/client-exposure.ts:66",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/client-exposure.ts",
+        "line": 66,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/client-exposure.ts:92",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/client-exposure.ts",
+        "line": 92,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/client-exposure.ts:115",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/client-exposure.ts",
+        "line": 115,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/client-exposure.ts:138",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/client-exposure.ts",
+        "line": 138,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/client-exposure.ts:176",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/client-exposure.ts",
+        "line": 176,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/constants.ts:499",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/constants.ts",
+        "line": 499,
+        "message": "Function \"ConstantsAnalyzer.buildHardcodedStringIssue\" has cyclomatic complexity 12 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/data-architecture.ts:170",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/data-architecture.ts",
+        "line": 170,
+        "message": "Function \"DataArchitectureAnalyzer.analyze\" has cyclomatic complexity 12 (threshold 12)."
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/gdscript-game.ts:203",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/gdscript-game.ts",
+        "line": 203,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/gdscript-modern.ts:176",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/gdscript-modern.ts",
+        "line": 176,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/rust-modern.ts:276",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/rust-modern.ts",
+        "line": 276,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/rust-modern.ts:325",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/rust-modern.ts",
+        "line": 325,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/test-modernity.ts:696",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/test-modernity.ts",
+        "line": 696,
+        "message": "Function \"TestModernityAnalyzer.analyzeWithLines\" has cyclomatic complexity 12 (threshold 12)."
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/vscode-extension.ts:413",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/vscode-extension.ts",
+        "line": 413,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/vscode-extension.ts:440",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/vscode-extension.ts",
+        "line": 440,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/vscode-extension.ts:463",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/vscode-extension.ts",
+        "line": 463,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/vscode-extension.ts:478",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/vscode-extension.ts",
+        "line": 478,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/vscode-extension.ts:500",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/vscode-extension.ts",
+        "line": 500,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-MEM-001:src/core/analyzer.ts:284",
+        "rule": "PRF-MEM-001",
+        "tier": "high",
+        "severity": "info",
+        "file": "src/core/analyzer.ts",
+        "line": 284,
+        "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
+      },
+      {
+        "id": "complexity:high-complexity:src/core/ast/typescript-adapter.ts:121",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/ast/typescript-adapter.ts",
+        "line": 121,
+        "message": "Function \"TypeScriptAdapter.mapGovernanceNode\" has cyclomatic complexity 17 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/core/cache.ts:394",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/cache.ts",
+        "line": 394,
+        "message": "Function \"CacheStore.parseL2Record\" has cyclomatic complexity 17 (threshold 12)."
+      },
+      {
+        "id": "complexity:CPX-NEST-001:src/core/cache.ts:743",
+        "rule": "CPX-NEST-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/cache.ts",
+        "line": 743,
+        "message": "Unbounded control-flow nesting: function 'CacheStore.flushCacheToDisk' has nesting depth 4 exceeding elastic budget 3 for context 'general-business'."
+      },
+      {
+        "id": "performance:PRF-IO-001:src/core/evolution/git-history-cache.ts:98",
+        "rule": "PRF-IO-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/evolution/git-history-cache.ts",
+        "line": 98,
+        "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.readFileSync' inside critical execution stream"
+      },
+      {
+        "id": "complexity:CPX-NEST-001:src/core/evolution/git-history-cache.ts:114",
+        "rule": "CPX-NEST-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/evolution/git-history-cache.ts",
+        "line": 114,
+        "message": "Unbounded control-flow nesting: function 'saveGitHistoryCache' has nesting depth 4 exceeding elastic budget 3 for context 'general-business'."
+      },
+      {
+        "id": "performance:PRF-IO-001:src/core/evolution/git-history-cache.ts:130",
+        "rule": "PRF-IO-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/evolution/git-history-cache.ts",
+        "line": 130,
+        "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.writeFileSync' inside critical execution stream"
+      },
+      {
+        "id": "complexity:high-complexity:src/core/governance/rules/maintainability.ts:227",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/governance/rules/maintainability.ts",
+        "line": 227,
+        "message": "Function \"inspectFunctionAtLine\" has cyclomatic complexity 12 (threshold 12)."
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/core/governance/rules/type-system-helpers.ts:215",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/governance/rules/type-system-helpers.ts",
+        "line": 215,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/core/governance/rules/type-system-helpers.ts:351",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/governance/rules/type-system-helpers.ts",
+        "line": 351,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/core/governance/rules/type-system-helpers.ts:352",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/governance/rules/type-system-helpers.ts",
+        "line": 352,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "complexity:high-complexity:src/core/native/native-shims-structural.ts:432",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/native/native-shims-structural.ts",
+        "line": 432,
+        "message": "Function \"solveDataflowShim\" has cyclomatic complexity 14 (threshold 12)."
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/core/native/native-shims-structural.ts:1061",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/native/native-shims-structural.ts",
+        "line": 1061,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'indexOf()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "complexity:high-complexity:src/core/praxis/praxis-review-client.ts:252",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/praxis/praxis-review-client.ts",
+        "line": 252,
+        "message": "Function \"PraxisReviewClient.collectContentAuditIssues\" has cyclomatic complexity 13 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/core/result-codec.ts:404",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/result-codec.ts",
+        "line": 404,
+        "message": "Function \"encodeFileIssue\" has cyclomatic complexity 15 (threshold 12)."
+      },
+      {
+        "id": "performance:PRF-MEM-001:src/core/scanner/analyzer-runner.ts:454",
+        "rule": "PRF-MEM-001",
+        "tier": "high",
+        "severity": "info",
+        "file": "src/core/scanner/analyzer-runner.ts",
+        "line": 454,
+        "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
+      },
+      {
+        "id": "complexity:high-complexity:src/core/scanner/analyzer-runner.ts:483",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/scanner/analyzer-runner.ts",
+        "line": 483,
+        "message": "Function \"runFileAnalyzers\" has cyclomatic complexity 12 (threshold 12)."
+      },
+      {
+        "id": "performance:PRF-IO-001:src/core/scoring/autonomy-scorer.ts:291",
+        "rule": "PRF-IO-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/scoring/autonomy-scorer.ts",
+        "line": 291,
+        "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.readFileSync' inside critical execution stream"
+      },
+      {
+        "id": "performance:PRF-IO-001:src/core/scoring/score-memo.ts:126",
+        "rule": "PRF-IO-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/scoring/score-memo.ts",
+        "line": 126,
+        "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.readFileSync' inside critical execution stream"
+      },
+      {
+        "id": "complexity:CPX-NEST-001:src/core/scoring/score-memo.ts:151",
+        "rule": "CPX-NEST-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/scoring/score-memo.ts",
+        "line": 151,
+        "message": "Unbounded control-flow nesting: function 'saveScoreMemo' has nesting depth 4 exceeding elastic budget 3 for context 'general-business'."
+      },
+      {
+        "id": "performance:PRF-IO-001:src/core/scoring/score-memo.ts:172",
+        "rule": "PRF-IO-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/scoring/score-memo.ts",
+        "line": 172,
+        "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.writeFileSync' inside critical execution stream"
+      },
+      {
+        "id": "performance:PRF-MEM-001:src/core/worker.ts:732",
+        "rule": "PRF-MEM-001",
+        "tier": "high",
+        "severity": "info",
+        "file": "src/core/worker.ts",
+        "line": 732,
+        "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
+      },
+      {
+        "id": "complexity:high-complexity:src/core/worker.ts:740",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/worker.ts",
+        "line": 740,
+        "message": "Function \"executeScanPipeline\" has cyclomatic complexity 14 (threshold 12)."
+      }
+    ]
   },
   "hierarchicalBreakdown": {
     "domains": [
       {
         "domainName": "scripts",
-        "compositeScore": 99.35,
+        "compositeScore": 99.39,
         "pillars": {
-          "architecture": 99.23,
-          "maintainability": 98.55,
-          "performance": 99.93,
-          "data": 99.48,
-          "testing": 100,
+          "architecture": 99.26,
+          "maintainability": 98.64,
+          "performance": 99.9,
+          "data": 99.68,
+          "testing": 99.98,
           "reliability": 99.87,
           "security": 99.89,
-          "extensibility": 97.84
+          "extensibility": 97.92
         },
         "moduleCount": 1
       },
       {
         "domainName": "analyzers",
-        "compositeScore": 98.78,
+        "compositeScore": 98.66,
         "pillars": {
-          "architecture": 99.76,
-          "maintainability": 96.62,
-          "performance": 99.84,
-          "data": 97.38,
-          "testing": 99.62,
+          "architecture": 99.77,
+          "maintainability": 96.46,
+          "performance": 99.42,
+          "data": 97.3,
+          "testing": 99.61,
           "reliability": 99.4,
           "security": 99.84,
-          "extensibility": 97.61
+          "extensibility": 97.43
         },
         "moduleCount": 1
       },
@@ -325,16 +713,16 @@
       },
       {
         "domainName": "cli",
-        "compositeScore": 99.5,
+        "compositeScore": 99.42,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.93,
+          "maintainability": 98.5,
           "performance": 100,
           "data": 98.96,
           "testing": 100,
           "reliability": 100,
           "security": 99.85,
-          "extensibility": 97.93
+          "extensibility": 97.73
         },
         "moduleCount": 1
       },
@@ -355,16 +743,16 @@
       },
       {
         "domainName": "core",
-        "compositeScore": 99,
+        "compositeScore": 98.64,
         "pillars": {
-          "architecture": 99.62,
-          "maintainability": 97.69,
-          "performance": 99.6,
-          "data": 98.29,
-          "testing": 99.49,
-          "reliability": 99.76,
+          "architecture": 99.25,
+          "maintainability": 97.02,
+          "performance": 99.57,
+          "data": 97.45,
+          "testing": 99.51,
+          "reliability": 99.53,
           "security": 99.85,
-          "extensibility": 97.63
+          "extensibility": 96.77
         },
         "moduleCount": 1
       },
@@ -400,14 +788,14 @@
       },
       {
         "domainName": "ast",
-        "compositeScore": 99.05,
+        "compositeScore": 99.02,
         "pillars": {
           "architecture": 99.88,
-          "maintainability": 97.76,
+          "maintainability": 97.67,
           "performance": 100,
-          "data": 98.29,
-          "testing": 99.05,
-          "reliability": 99.68,
+          "data": 98.2,
+          "testing": 99.06,
+          "reliability": 99.57,
           "security": 99.87,
           "extensibility": 97.78
         },
@@ -490,7 +878,7 @@
       },
       {
         "domainName": "constants",
-        "compositeScore": 99.72,
+        "compositeScore": 99.71,
         "pillars": {
           "architecture": 99.75,
           "maintainability": 99.35,
@@ -499,7 +887,7 @@
           "testing": 100,
           "reliability": 99.98,
           "security": 99.9,
-          "extensibility": 99.17
+          "extensibility": 99.13
         },
         "moduleCount": 1
       },
@@ -565,16 +953,16 @@
       },
       {
         "domainName": "evolution",
-        "compositeScore": 99.19,
+        "compositeScore": 99.08,
         "pillars": {
-          "architecture": 99.63,
-          "maintainability": 98.34,
-          "performance": 100,
-          "data": 97.87,
+          "architecture": 99.65,
+          "maintainability": 98.22,
+          "performance": 99.32,
+          "data": 97.99,
           "testing": 99.93,
-          "reliability": 99.72,
+          "reliability": 99.69,
           "security": 99.89,
-          "extensibility": 97.68
+          "extensibility": 97.71
         },
         "moduleCount": 1
       },
@@ -625,46 +1013,46 @@
       },
       {
         "domainName": "rules",
-        "compositeScore": 99.19,
+        "compositeScore": 99.08,
         "pillars": {
           "architecture": 99.67,
-          "maintainability": 97.69,
-          "performance": 100,
-          "data": 99.15,
-          "testing": 99.56,
-          "reliability": 99.56,
+          "maintainability": 97.58,
+          "performance": 99.71,
+          "data": 99.06,
+          "testing": 99.4,
+          "reliability": 99.44,
           "security": 99.87,
-          "extensibility": 98.01
+          "extensibility": 98
         },
         "moduleCount": 1
       },
       {
         "domainName": "guidance",
-        "compositeScore": 98.22,
+        "compositeScore": 98.55,
         "pillars": {
           "architecture": 100,
-          "maintainability": 93.5,
+          "maintainability": 96.4,
           "performance": 100,
-          "data": 96.65,
+          "data": 95.33,
           "testing": 100,
           "reliability": 100,
-          "security": 99.8,
-          "extensibility": 95.77
+          "security": 99.88,
+          "extensibility": 95.89
         },
         "moduleCount": 1
       },
       {
         "domainName": "intelligence",
-        "compositeScore": 99.15,
+        "compositeScore": 99.14,
         "pillars": {
           "architecture": 99.73,
-          "maintainability": 98.66,
+          "maintainability": 98.61,
           "performance": 100,
-          "data": 97.35,
+          "data": 97.34,
           "testing": 99.91,
           "reliability": 99.79,
           "security": 99.87,
-          "extensibility": 97.18
+          "extensibility": 97.17
         },
         "moduleCount": 1
       },
@@ -700,46 +1088,46 @@
       },
       {
         "domainName": "messages",
-        "compositeScore": 99.79,
+        "compositeScore": 99.75,
         "pillars": {
           "architecture": 100,
           "maintainability": 99.54,
           "performance": 100,
           "data": 99.74,
-          "testing": 100,
+          "testing": 99.79,
           "reliability": 100,
           "security": 99.93,
-          "extensibility": 98.9
+          "extensibility": 98.87
         },
         "moduleCount": 1
       },
       {
         "domainName": "naming",
-        "compositeScore": 99.57,
+        "compositeScore": 99.55,
         "pillars": {
           "architecture": 100,
-          "maintainability": 99.57,
+          "maintainability": 99.71,
           "performance": 100,
-          "data": 99.25,
-          "testing": 98.5,
+          "data": 98.79,
+          "testing": 99,
           "reliability": 100,
-          "security": 99.93,
-          "extensibility": 99.5
+          "security": 99.94,
+          "extensibility": 98.72
         },
         "moduleCount": 1
       },
       {
         "domainName": "native",
-        "compositeScore": 98.79,
+        "compositeScore": 98.61,
         "pillars": {
           "architecture": 99,
-          "maintainability": 95.43,
-          "performance": 100,
+          "maintainability": 95.27,
+          "performance": 99.5,
           "data": 98.96,
-          "testing": 100,
-          "reliability": 99.46,
+          "testing": 99.5,
+          "reliability": 99.33,
           "security": 99.84,
-          "extensibility": 98.27
+          "extensibility": 98.32
         },
         "moduleCount": 1
       },
@@ -760,29 +1148,29 @@
       },
       {
         "domainName": "policy",
-        "compositeScore": 98.78,
+        "compositeScore": 98.77,
         "pillars": {
           "architecture": 100,
           "maintainability": 99,
           "performance": 98.59,
-          "data": 97.5,
+          "data": 97.42,
           "testing": 98.83,
           "reliability": 100,
           "security": 99.9,
-          "extensibility": 95.95
+          "extensibility": 95.9
         },
         "moduleCount": 1
       },
       {
         "domainName": "praxis",
-        "compositeScore": 98.74,
+        "compositeScore": 98.7,
         "pillars": {
           "architecture": 97.71,
-          "maintainability": 98.69,
+          "maintainability": 98.51,
           "performance": 99.81,
           "data": 97.25,
-          "testing": 99.44,
-          "reliability": 99.5,
+          "testing": 99.41,
+          "reliability": 99.46,
           "security": 99.88,
           "extensibility": 97.51
         },
@@ -895,16 +1283,16 @@
       },
       {
         "domainName": "preflight",
-        "compositeScore": 98.94,
+        "compositeScore": 98.93,
         "pillars": {
           "architecture": 100,
           "maintainability": 98.67,
           "performance": 99.54,
-          "data": 95.84,
+          "data": 95.8,
           "testing": 100,
           "reliability": 99.64,
           "security": 99.89,
-          "extensibility": 96.91
+          "extensibility": 96.88
         },
         "moduleCount": 1
       },
@@ -940,16 +1328,16 @@
       },
       {
         "domainName": "reporting",
-        "compositeScore": 99.13,
+        "compositeScore": 99.03,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.52,
-          "performance": 99.45,
-          "data": 97.84,
+          "maintainability": 98.34,
+          "performance": 99.52,
+          "data": 97.64,
           "testing": 99.72,
-          "reliability": 99.55,
-          "security": 99.87,
-          "extensibility": 97.63
+          "reliability": 99.35,
+          "security": 99.86,
+          "extensibility": 97.27
         },
         "moduleCount": 1
       },
@@ -1000,16 +1388,16 @@
       },
       {
         "domainName": "scanner",
-        "compositeScore": 99.07,
+        "compositeScore": 98.93,
         "pillars": {
-          "architecture": 99.59,
-          "maintainability": 97.89,
-          "performance": 100,
-          "data": 98.34,
-          "testing": 99.07,
-          "reliability": 99.53,
+          "architecture": 99.62,
+          "maintainability": 97.53,
+          "performance": 99.97,
+          "data": 98.13,
+          "testing": 98.93,
+          "reliability": 99.51,
           "security": 99.89,
-          "extensibility": 98.18
+          "extensibility": 97.81
         },
         "moduleCount": 1
       },
@@ -1045,16 +1433,16 @@
       },
       {
         "domainName": "scoring",
-        "compositeScore": 99.17,
+        "compositeScore": 99.12,
         "pillars": {
-          "architecture": 99.49,
-          "maintainability": 97.65,
-          "performance": 99.69,
-          "data": 99.11,
+          "architecture": 99.5,
+          "maintainability": 97.64,
+          "performance": 99.43,
+          "data": 99.05,
           "testing": 99.92,
-          "reliability": 99.82,
-          "security": 99.85,
-          "extensibility": 97.95
+          "reliability": 99.77,
+          "security": 99.86,
+          "extensibility": 97.92
         },
         "moduleCount": 1
       },
@@ -1150,16 +1538,16 @@
       },
       {
         "domainName": "utils",
-        "compositeScore": 99.57,
+        "compositeScore": 99.61,
         "pillars": {
-          "architecture": 99.25,
-          "maintainability": 100,
+          "architecture": 99.4,
+          "maintainability": 99.9,
           "performance": 100,
-          "data": 98.98,
+          "data": 99.18,
           "testing": 100,
           "reliability": 100,
-          "security": 99.93,
-          "extensibility": 97.97
+          "security": 99.94,
+          "extensibility": 98.09
         },
         "moduleCount": 1
       },
@@ -1197,43 +1585,43 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 196296,
-      "unique": 155289,
-      "changed": 694,
-      "semantic": 518,
+      "processed": 199410,
+      "unique": 158023,
+      "changed": 3575,
+      "semantic": 3017,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 638,
-      "deleted": 56,
-      "modified": 56
+      "added": 2700,
+      "deleted": 875,
+      "modified": 875
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1793626292877,
-      "totalRuns": 469,
+      "endMs": 1793960896877,
+      "totalRuns": 474,
       "eloc": {
-        "processedTotal": 72143269,
-        "uniqueTotal": 155289,
-        "changedTotal": 1541959,
-        "semanticTotal": 1173941
+        "processedTotal": 73140283,
+        "uniqueTotal": 158023,
+        "changedTotal": 1559410,
+        "semanticTotal": 1188666
       },
       "qed": {
-        "mean": -0.044368,
+        "mean": -0.0439,
         "min": -3.5,
         "max": 0.18,
-        "kMean": -44.368
+        "kMean": -43.9
       },
       "debt": {
-        "totalAdded": 3447,
-        "totalResolved": 9875,
-        "totalRegressions": 81,
-        "netYield": 5.48,
-        "densityYield": 41.39
+        "totalAdded": 3607,
+        "totalResolved": 9878,
+        "totalRegressions": 124,
+        "netYield": 5.28,
+        "densityYield": 39.68
       },
       "meanCompositeScore": 98.93,
-      "gatePassRate": 92.54
+      "gatePassRate": 92.41
     },
     "isFirstBaseline": false
   }

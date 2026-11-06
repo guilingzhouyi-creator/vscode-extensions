@@ -1,34 +1,34 @@
 {
   "weekId": "2026-W45",
   "startMs": 1793590728382,
-  "endMs": 1793626292877,
-  "totalRuns": 16,
+  "endMs": 1793960896877,
+  "totalRuns": 21,
   "eloc": {
-    "processedTotal": 3128416,
-    "uniqueTotal": 155289,
-    "changedTotal": 25070,
-    "semanticTotal": 19959
+    "processedTotal": 4125430,
+    "uniqueTotal": 158023,
+    "changedTotal": 42521,
+    "semanticTotal": 34684
   },
   "qed": {
-    "mean": 0.000006,
+    "mean": 0.000004,
     "min": 0,
     "max": 0.000056,
-    "kMean": 0.006
+    "kMean": 0.004
   },
   "debt": {
-    "totalAdded": 18,
-    "totalResolved": 25,
-    "totalRegressions": 4,
-    "netYield": 0.35,
-    "densityYield": 0.05
+    "totalAdded": 178,
+    "totalResolved": 28,
+    "totalRegressions": 47,
+    "netYield": -4.32,
+    "densityYield": -0.95
   },
-  "meanCompositeScore": 99.22,
-  "gatePassRate": 87.5,
+  "meanCompositeScore": 99.21,
+  "gatePassRate": 85.71,
   "stability": {
-    "zeroRegressionRuns": 14,
-    "zeroRegressionStreak": 2,
-    "semanticPurityRatio": 0.7961,
-    "uniqueCoverageRatio": 0.0496,
+    "zeroRegressionRuns": 18,
+    "zeroRegressionStreak": 4,
+    "semanticPurityRatio": 0.8157,
+    "uniqueCoverageRatio": 0.0383,
     "scoreFloor": 99.2,
     "scoreCeiling": 99.23
   }
