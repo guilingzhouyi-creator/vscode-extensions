@@ -8,7 +8,7 @@
 
 use std::fs;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use tempfile::TempDir;
 
 use fractal_git::algorithms::cdc::apply_edits::{apply_edits, EditOp};
 use fractal_git::algorithms::cdc::FastCdcChunker;
@@ -16,14 +16,17 @@ use fractal_git::core::models::{compute_object_oid, ObjectKind, Oid};
 use fractal_git::storage::cas_backend::CasBackend;
 use fractal_git::storage::wal_journal::{WalJournal, WalRecord};
 
-static ADVERSARIAL_COUNTER: AtomicUsize = AtomicUsize::new(200);
-
-fn temp_adversarial_dir(prefix: &str) -> PathBuf {
-    let id = ADVERSARIAL_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let path = std::env::temp_dir().join(format!("taxis_challenger_{prefix}_{}_{}", std::process::id(), id));
-    let _ = fs::remove_dir_all(&path);
-    fs::create_dir_all(&path).expect("create temp dir");
-    path
+fn temp_adversarial_dir(prefix: &str) -> TempDir {
+    let base = std::env::current_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join("target")
+        .join("test_tmp");
+    let _ = fs::create_dir_all(&base);
+    tempfile::Builder::new()
+        .prefix(prefix)
+        .tempdir_in(&base)
+        .or_else(|_| tempfile::tempdir())
+        .expect("create temp dir")
 }
 
 #[test]
@@ -40,7 +43,10 @@ fn test_adversarial_fastcdc_boundary_healing_and_reuse_stress() {
     }
     let original_bytes = file_content.as_bytes();
     let original_chunks = chunker.chunk(original_bytes);
-    assert!(original_chunks.len() >= 10, "Original file should produce >= 10 chunks");
+    assert!(
+        original_chunks.len() >= 10,
+        "Original file should produce >= 10 chunks"
+    );
 
     // Case A: Shift insertion at offset 100 (prefix byte insertion shifting all downstream offsets)
     let shift_insert = b"// INJECTED PADDING PREFIX HEADER LINE FORCING BYTE SHIFTS\n";
@@ -64,11 +70,12 @@ fn test_adversarial_fastcdc_boundary_healing_and_reuse_stress() {
     // Case B: In-place middle block edit (middle function rewritten)
     let mid_offset = original_bytes.len() / 2;
     let edit_mid = vec![EditOp::new(
-        mid_offset, 120,
+        mid_offset,
+        120,
         b"// COMPLETELY OVERWRITTEN FUNCTION BODY IMPLEMENTATION FOR VERIFICATION TEST\n",
     )];
-    let mid_chunks = apply_edits(&chunker, original_bytes, &original_chunks, &edit_mid)
-        .expect("apply mid edit");
+    let mid_chunks =
+        apply_edits(&chunker, original_bytes, &original_chunks, &edit_mid).expect("apply mid edit");
 
     let mut mid_reused = 0;
     for mc in &mid_chunks {
@@ -86,7 +93,8 @@ fn test_adversarial_fastcdc_boundary_healing_and_reuse_stress() {
 
 #[test]
 fn test_adversarial_wal_frame_durability_and_torn_tail_crash_recovery() {
-    let test_dir = temp_adversarial_dir("wal_durability");
+    let tmp = temp_adversarial_dir("wal_durability");
+    let test_dir = tmp.path();
     let wal_path = test_dir.join("durability.wal");
 
     // 1. Write 3 valid transactional commit records to WAL
@@ -99,21 +107,27 @@ fn test_adversarial_wal_frame_durability_and_torn_tail_crash_recovery() {
         wal.append(&WalRecord::CommitTx {
             tx_id: "tx-durability-01".into(),
             commit_oid: fake_oid_1,
-        }).expect("append 1");
+        })
+        .expect("append 1");
         wal.append(&WalRecord::CommitTx {
             tx_id: "tx-durability-02".into(),
             commit_oid: fake_oid_2,
-        }).expect("append 2");
+        })
+        .expect("append 2");
         wal.append(&WalRecord::CommitTx {
             tx_id: "tx-durability-03".into(),
             commit_oid: fake_oid_3,
-        }).expect("append 3");
+        })
+        .expect("append 3");
     }
 
     // 2. Simulate torn-tail write (append 7 garbage bytes representing sudden power loss during write)
     {
         use std::io::Write;
-        let mut file = fs::OpenOptions::new().append(true).open(&wal_path).expect("open wal for corruption");
+        let mut file = fs::OpenOptions::new()
+            .append(true)
+            .open(&wal_path)
+            .expect("open wal for corruption");
         file.write_all(b"CORRUPT").expect("write torn tail");
         file.sync_all().expect("sync");
     }
@@ -122,15 +136,25 @@ fn test_adversarial_wal_frame_durability_and_torn_tail_crash_recovery() {
     let recovered_wal = WalJournal::open(&wal_path).expect("reopen torn wal");
     let replay = recovered_wal.replay().expect("replay torn wal");
 
-    assert_eq!(replay.records.len(), 3, "WAL crash recovery must restore exactly 3 complete transactions");
-    assert_eq!(replay.discarded_tail_bytes, 7, "WAL recovery must identify 7 discarded torn-tail bytes");
+    assert_eq!(
+        replay.records.len(),
+        3,
+        "WAL crash recovery must restore exactly 3 complete transactions"
+    );
+    assert_eq!(
+        replay.discarded_tail_bytes, 7,
+        "WAL recovery must identify 7 discarded torn-tail bytes"
+    );
 
     // 4. Verify Asynchronous CAS Writeback can persist recovered payloads
     let cas = CasBackend::without_cache(test_dir.join("cas"));
     let sample_payload = b"Sample durable Git object content written asynchronously";
-    let persisted_oid = cas.put_block(ObjectKind::Blob, sample_payload).expect("cas writeback");
+    let persisted_oid = cas
+        .put_block(ObjectKind::Blob, sample_payload)
+        .expect("cas writeback");
     let expected_oid = compute_object_oid(ObjectKind::Blob, sample_payload);
-    assert_eq!(persisted_oid, expected_oid, "CAS writeback OID must match computed Git SHA-1");
-
-    let _ = fs::remove_dir_all(&test_dir);
+    assert_eq!(
+        persisted_oid, expected_oid,
+        "CAS writeback OID must match computed Git SHA-1"
+    );
 }

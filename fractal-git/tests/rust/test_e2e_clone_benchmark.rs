@@ -13,10 +13,22 @@ use fractal_git::bench::{
 #[test]
 fn test_workload_fixture_creation_and_parity() {
     let workload = E2eWorkload::resolve_or_create_default().expect("resolve default workload");
-    assert!(workload.bundle_path.exists(), "workload bundle must exist on disk");
-    assert!(workload.bundle_bytes > 0, "workload bundle size must be non-zero");
-    assert_eq!(workload.total_objects, 23, "workload must have authentic dynamic object count");
-    assert_eq!(workload.total_files, 6, "workload must have authentic dynamic file count at HEAD");
+    assert!(
+        workload.bundle_path.exists(),
+        "workload bundle must exist on disk"
+    );
+    assert!(
+        workload.bundle_bytes > 0,
+        "workload bundle size must be non-zero"
+    );
+    assert_eq!(
+        workload.total_objects, 23,
+        "workload must have authentic dynamic object count"
+    );
+    assert_eq!(
+        workload.total_files, 6,
+        "workload must have authentic dynamic file count at HEAD"
+    );
 }
 
 #[test]
@@ -33,8 +45,14 @@ fn test_e2e_single_threaded_clone_and_projection_benchmark() {
         .expect("E2E single-threaded benchmark must complete successfully");
 
     // Phase 1 Assertions: Ingestion & Workspace Creation
-    assert!(report.git_clone_latency_ms > 0, "Git clone latency must be measured");
-    assert!(report.taxis_projection_latency_ms > 0, "Taxis projection latency must be measured");
+    assert!(
+        report.git_clone_latency_ms > 0,
+        "Git clone latency must be measured"
+    );
+    assert!(
+        report.taxis_projection_latency_ms > 0,
+        "Taxis projection latency must be measured"
+    );
     assert!(
         report.clone_speedup_factor >= 1.0,
         "Taxis progressive projection must be faster or equal to Git eager clone"
@@ -95,24 +113,38 @@ fn test_e2e_baseline_serialization_and_ratchet() {
         single_threaded: true,
     };
 
-    let report = E2eBenchmarkRunner::run_benchmark(&options)
-        .expect("benchmark run");
+    let report = E2eBenchmarkRunner::run_benchmark(&options).expect("benchmark run");
 
     // Serialization / Deserialization idempotency
     let serialized = serde_json::to_string_pretty(&report).expect("serialize baseline");
     let deserialized: E2eBenchmarkReport =
         serde_json::from_str(&serialized).expect("deserialize baseline");
     assert_eq!(report.workload_name, deserialized.workload_name);
-    assert_eq!(report.git_clone_latency_ms, deserialized.git_clone_latency_ms);
-    assert_eq!(report.taxis_projection_latency_ms, deserialized.taxis_projection_latency_ms);
-    assert_eq!(report.git_physical_files_created, deserialized.git_physical_files_created);
-    assert_eq!(report.taxis_physical_files_created, deserialized.taxis_physical_files_created);
+    assert_eq!(
+        report.git_clone_latency_ms,
+        deserialized.git_clone_latency_ms
+    );
+    assert_eq!(
+        report.taxis_projection_latency_ms,
+        deserialized.taxis_projection_latency_ms
+    );
+    assert_eq!(
+        report.git_physical_files_created,
+        deserialized.git_physical_files_created
+    );
+    assert_eq!(
+        report.taxis_physical_files_created,
+        deserialized.taxis_physical_files_created
+    );
     assert!((report.clone_speedup_factor - deserialized.clone_speedup_factor).abs() < 1e-4);
     assert!((report.chunk_reuse_ratio_pct - deserialized.chunk_reuse_ratio_pct).abs() < 1e-4);
 
     // Compare with itself (must pass 15% tolerance)
     let self_verdict = report.compare_with_baseline(&deserialized, 15.0);
-    assert!(self_verdict.passed, "identical baseline comparison must pass");
+    assert!(
+        self_verdict.passed,
+        "identical baseline comparison must pass"
+    );
 
     // Artificially regressed report (+50% latency) must fail ratchet
     let mut regressed = report.clone();
@@ -142,7 +174,9 @@ fn test_markdown_and_console_table_rendering() {
     assert!(table.contains("FastCDC Chunk Reuse Ratio"));
 
     let md_table = report.render_markdown_table();
-    assert!(md_table.contains("| Metric Dimension | Git Baseline | Taxis Progressive Projection | Delta / Factor |"));
+    assert!(md_table.contains(
+        "| Metric Dimension | Git Baseline | Taxis Progressive Projection | Delta / Factor |"
+    ));
     assert!(md_table.contains("Workspace Creation Latency"));
     assert!(md_table.contains("Time-to-First-Byte (TTFB)"));
 }

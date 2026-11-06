@@ -31,7 +31,10 @@ pub mod e2e;
 pub mod guard;
 pub mod profile;
 
-pub use e2e::{E2eBenchmarkOptions, E2eBenchmarkReport, E2eBenchmarkRunner, E2eWorkload};
+pub use e2e::{
+    materialize_baseline_from_bundle, E2eBenchmarkOptions, E2eBenchmarkReport, E2eBenchmarkRunner,
+    E2eWorkload,
+};
 pub use profile::{BenchmarkLevel, BenchmarkProfile};
 
 /// Single benchmark metric record.

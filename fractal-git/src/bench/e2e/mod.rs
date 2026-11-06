@@ -26,7 +26,7 @@ pub use projection::{
     resolve_subtree_oid,
 };
 pub use report::E2eBenchmarkReport;
-pub use runner::E2eBenchmarkRunner;
+pub use runner::{materialize_baseline_from_bundle, E2eBenchmarkRunner};
 pub use workload::{
     count_files_in_tree, create_deterministic_git_bundle, git_safe_command,
     inspect_workload_bundle, E2eWorkload,
