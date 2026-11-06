@@ -243,6 +243,7 @@ function tryQueueIncremental(context: QueueIncrementalContext): boolean {
 
 /**
  * Probe a single file against L1 session state and L2 disk cache.
+ * Concurrency: safe per distinct file slot; appends to caller-owned queue arrays on the event loop.
  *
  * @param options - Probe parameters including cache, buckets and target file.
  */
@@ -358,6 +359,7 @@ async function runWithPersistentPool(
             numWorkers: entry.n,
             logger: scanner.logger,
             runAnalyzersFn: (rel, content) => scanner.runAnalyzers(rel, content),
+            retainSourceFn: (rel, content) => scanner.retainSource?.(rel, content),
             hybridK: hybridKValue,
             keepAlive: true,
             fp: poolFp,
@@ -392,6 +394,7 @@ async function runWithTransientPool(
             numWorkers: effWorkers,
             logger: scanner.logger,
             runAnalyzersFn: (rel, content) => scanner.runAnalyzers(rel, content),
+            retainSourceFn: (rel, content) => scanner.retainSource?.(rel, content),
             preloaded: preloadedBufferMap,
         });
     } catch (error) {
@@ -440,6 +443,8 @@ function recordAnalyzedResults(context: RecordAnalyzedContext): number {
 
 /**
  * Analyze the files the probe could not serve from either cache level.
+ * Concurrency: coordinates worker pool or sequential batch execution; not reentrant on the same
+ * session bucket.
  *
  * @param options - Execution context and files scheduled for full analysis.
  * @returns Number of analyzed files and pool warm status.
@@ -503,7 +508,8 @@ async function runSingleIncrementalAnalysis(
     scanner: ScannerContext,
     fileQueueItem: CacheAnalysisQueue['toIncremental'][number],
     incBucket: Map<string, IncrementalFileState>,
-): Promise<{ issues: Issue[]; metric: FileMetric | null }> {
+): Promise<import('./scan-stage').PerFileResult> {
+    scanner.retainSource?.(fileQueueItem.rel, fileQueueItem.content);
     try {
         return await scanner.runAnalyzers(
             fileQueueItem.rel,
@@ -540,6 +546,7 @@ async function runIncrementalRecovery(
 
 /**
  * Analyze the files whose changed line ranges allow subtree reuse.
+ * Concurrency: sequential per-file async execution; mutates caller-supplied incremental bucket.
  *
  * @param options - Incremental execution parameters and files to process.
  * @returns Execution statistics for incremental files.

@@ -84,7 +84,36 @@ export function getRemappedCachedResult(
         };
     });
     const metric = cachedResult.metric ? { ...cachedResult.metric, file: toRel } : null;
-    return { issues, metric };
+    let symbols: typeof cachedResult.symbols;
+    if (cachedResult.symbols) {
+        symbols = {
+            definitions: cachedResult.symbols.definitions.map((def) => ({
+                ...def,
+                file: toRel,
+            })),
+            references: cachedResult.symbols.references.map((ref) => ({
+                ...ref,
+                file: toRel,
+            })),
+        };
+    }
+    const literals = cachedResult.literals
+        ? cachedResult.literals.map((lit) => ({ ...lit, file: toRel }))
+        : undefined;
+    const loopSites = cachedResult.loopSites
+        ? cachedResult.loopSites.map((site) => ({ ...site, file: toRel }))
+        : undefined;
+    const graphEdges = cachedResult.graphEdges
+        ? { ...cachedResult.graphEdges, file: toRel }
+        : undefined;
+    return {
+        issues,
+        metric,
+        ...(symbols ? { symbols } : {}),
+        ...(literals ? { literals } : {}),
+        ...(loopSites ? { loopSites } : {}),
+        ...(graphEdges ? { graphEdges } : {}),
+    };
 }
 
 /** Backward-compatible export alias for remapCachedResult. */
@@ -196,8 +225,8 @@ const STAT_CONCURRENCY = 16;
  * Collect filesystem stat fingerprints across discovered files.
  *
  * Runs concurrently because every caller sits in an async pipeline stage; the previous synchronous
- * loop serialised one blocking `stat` per file, so a 600-file scan paid 600 blocking syscalls on the
- * event loop. Concurrency is bounded so a whole repository cannot exhaust file descriptors.
+ * loop serialised one blocking `stat` per file, so a 600-file scan paid 600 blocking syscalls on
+ * the event loop. Concurrency is bounded so a whole repository cannot exhaust file descriptors.
  *
  * @param absRoot - Absolute project root.
  * @param files - Discovered relative paths.

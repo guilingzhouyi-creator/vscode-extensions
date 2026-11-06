@@ -13,6 +13,7 @@ import type { ScanConfig, ScanReport, Issue, FileMetric } from '../types';
 import type { ResolvedAnalyzer } from '../analyzer-registry';
 import type { IncrementalFileState } from '../diff/incremental-state';
 import type { Logger } from '../logger';
+import type { PerFileResult } from './scan-stage';
 export {
     AnalyzerTriggerCatalog,
     defaultTriggerCatalog,
@@ -35,12 +36,14 @@ export interface ScannerContext {
         content: string,
         seed?: IncrementalFileState,
         options?: Set<string> | RunAnalyzersExecutionOptions,
-    ): Promise<{ issues: Issue[]; metric: FileMetric | null }>;
+    ): Promise<PerFileResult>;
     runInProcess(
         files: string[],
         absRoot: string,
         preloaded?: Map<string, Buffer>,
-    ): Promise<{ issues: Issue[]; metric: FileMetric | null }[]>;
+    ): Promise<PerFileResult[]>;
+    retainSource?(rel: string, content: string): void;
+    ingestFileSummaries?(result: PerFileResult | null | undefined): void;
     buildReport(
         filesScanned: number,
         issues: Issue[],

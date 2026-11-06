@@ -19,6 +19,9 @@ import type { ScanConfig, Issue, FileMetric } from '../types';
 import type { WorkerAnalyzerDesc } from '../analyzer-registry';
 import type { Logger } from '../logger';
 import type { SymbolDefinition, SymbolReference } from '../intelligence/symbolIndex';
+import type { LiteralOccurrence } from '../intelligence/literalIndex';
+import type { LoopSite } from '../intelligence/semanticComplexity';
+import type { ModuleGraphFileSummary } from '../dependency-graph';
 import { decodeResults } from '../result-codec';
 
 /**
@@ -37,6 +40,9 @@ export type WorkerRawResultItem = {
     issues: Issue[];
     metric: FileMetric | null;
     symbols?: WorkerSymbolsPayload;
+    literals?: LiteralOccurrence[];
+    loopSites?: LoopSite[];
+    graphEdges?: ModuleGraphFileSummary;
 };
 
 /**
@@ -44,7 +50,13 @@ export type WorkerRawResultItem = {
  */
 export interface WorkerMessagePayload {
     results: WorkerRawResultItem[];
-    symbolsMap?: { file: string; symbols?: WorkerSymbolsPayload }[];
+    symbolsMap?: {
+        file: string;
+        symbols?: WorkerSymbolsPayload;
+        literals?: LiteralOccurrence[];
+        loopSites?: LoopSite[];
+        graphEdges?: ModuleGraphFileSummary;
+    }[];
 }
 
 const DEFAULT_WORKER_FLUSH_TIMEOUT_MS = 3000;
@@ -245,6 +257,16 @@ export function computeHybridK(config: ScanConfig, filesLen: number, workerCount
     return Math.min(Number(process.env.AR_HYBRID_FILES || baseHybridK) | 0, fairCap);
 }
 
+/** Per-file analysis result returned by worker threads or hybrid main-thread execution. */
+export interface WorkerFileResult {
+    issues: Issue[];
+    metric: FileMetric | null;
+    symbols?: WorkerSymbolsPayload;
+    literals?: LiteralOccurrence[];
+    loopSites?: LoopSite[];
+    graphEdges?: ModuleGraphFileSummary;
+}
+
 /** Base configuration shared across worker pool dispatch and scheduling options. */
 export interface WorkerPoolBaseOptions {
     files: string[];
@@ -253,10 +275,9 @@ export interface WorkerPoolBaseOptions {
     descs: WorkerAnalyzerDesc[];
     numWorkers: number;
     logger: Logger;
-    runAnalyzersFn: (
-        rel: string,
-        content: string,
-    ) => Promise<{ issues: Issue[]; metric: FileMetric | null }>;
+    runAnalyzersFn: (rel: string, content: string) => Promise<WorkerFileResult>;
+    /** Optional hook to retain file source text on the main thread when read. */
+    retainSourceFn?: (rel: string, content: string) => void;
     /** Pre-read file contents (Buffer) — avoids the double-read on the cache path. */
     preloaded?: Map<string, Buffer>;
 }
@@ -281,7 +302,7 @@ interface ReadyBatch {
 }
 
 interface SingleHybridOutcome {
-    result: { issues: Issue[]; metric: FileMetric | null };
+    result: WorkerFileResult;
     error?: unknown;
 }
 
@@ -289,16 +310,15 @@ async function processSingleHybridFile(
     fileItem: { idx: number; rel: string },
     absRoot: string,
     optsPreloaded: Map<string, Buffer> | undefined,
-    runAnalyzersFn: (
-        rel: string,
-        content: string,
-    ) => Promise<{ issues: Issue[]; metric: FileMetric | null }>,
+    runAnalyzersFn: WorkerPoolBaseOptions['runAnalyzersFn'],
+    retainSourceFn?: (rel: string, content: string) => void,
 ): Promise<SingleHybridOutcome> {
     const absPath = path.join(absRoot, fileItem.rel);
     let content: string;
     try {
         const pre = optsPreloaded && optsPreloaded.get(fileItem.rel);
         content = pre ? pre.toString('utf8') : await fs.promises.readFile(absPath, 'utf8');
+        retainSourceFn?.(fileItem.rel, content);
     } catch {
         return { result: { issues: [], metric: null } };
     }
@@ -315,12 +335,10 @@ export interface HybridStageContext {
     batch: { idx: number; rel: string }[];
     absRoot: string;
     preloaded?: Map<string, Buffer>;
-    runAnalyzersFn: (
-        rel: string,
-        content: string,
-    ) => Promise<{ issues: Issue[]; metric: FileMetric | null }>;
+    runAnalyzersFn: WorkerPoolBaseOptions['runAnalyzersFn'];
+    retainSourceFn?: (rel: string, content: string) => void;
     isAborted: () => boolean;
-    onResult: (idx: number, result: { issues: Issue[]; metric: FileMetric | null }) => void;
+    onResult: (idx: number, result: SingleHybridOutcome['result']) => void;
     onError: (err: unknown) => void;
     onProgress?: () => void;
 }
@@ -334,8 +352,17 @@ export interface HybridStageContext {
  * @returns Promise resolving when all batch files finish processing.
  */
 export async function executeHybridStage(ctx: HybridStageContext): Promise<void> {
-    const { batch, absRoot, preloaded, runAnalyzersFn, isAborted, onResult, onError, onProgress } =
-        ctx;
+    const {
+        batch,
+        absRoot,
+        preloaded,
+        runAnalyzersFn,
+        retainSourceFn,
+        isAborted,
+        onResult,
+        onError,
+        onProgress,
+    } = ctx;
     await runParallelMap(batch, HYBRID_CONCURRENCY, async (fileItem) => {
         if (isAborted()) return;
         const { result, error } = await processSingleHybridFile(
@@ -343,6 +370,7 @@ export async function executeHybridStage(ctx: HybridStageContext): Promise<void>
             absRoot,
             preloaded,
             runAnalyzersFn,
+            retainSourceFn,
         );
         if (error) {
             onError(error);
@@ -606,23 +634,26 @@ async function flushWorkerTelemetry(
 
 function buildIndexedWorkerResult(
     resultItem: WorkerRawResultItem,
-    fallbackSymbols: WorkerSymbolsPayload | undefined,
-): { issues: Issue[]; metric: FileMetric | null; symbols?: WorkerSymbolsPayload } {
+    fallbackMeta: NonNullable<WorkerMessagePayload['symbolsMap']>[number] | undefined,
+): WorkerFileResult {
+    const symbols = resultItem.symbols ?? fallbackMeta?.symbols;
+    const literals = resultItem.literals ?? fallbackMeta?.literals;
+    const loopSites = resultItem.loopSites ?? fallbackMeta?.loopSites;
+    const graphEdges = resultItem.graphEdges ?? fallbackMeta?.graphEdges;
     return {
         issues: resultItem.issues || [],
         metric: resultItem.metric || null,
-        symbols: resultItem.symbols ?? fallbackSymbols,
+        ...(symbols ? { symbols } : {}),
+        ...(literals ? { literals } : {}),
+        ...(loopSites ? { loopSites } : {}),
+        ...(graphEdges ? { graphEdges } : {}),
     };
 }
 
 function applyWorkerMessageResults(
     messagePayload: WorkerMessagePayload,
     idxByFile: Map<string, number>,
-    results: ({
-        issues: Issue[];
-        metric: FileMetric | null;
-        symbols?: WorkerSymbolsPayload;
-    } | null)[],
+    results: (WorkerFileResult | null)[],
 ): number {
     const resArr = normalizeWorkerResults(messagePayload.results);
     for (let itemIdx = 0; itemIdx < resArr.length; itemIdx++) {
@@ -631,7 +662,7 @@ function applyWorkerMessageResults(
         if (fileIndex !== undefined) {
             results[fileIndex] = buildIndexedWorkerResult(
                 resultItem,
-                messagePayload.symbolsMap?.[itemIdx]?.symbols,
+                messagePayload.symbolsMap?.[itemIdx],
             );
         }
     }
@@ -645,9 +676,7 @@ function applyWorkerMessageResults(
  * @returns One index-aligned `{ issues, metric }` entry per input file.
  * Concurrency: multi-threaded worker dispatch; safe for single-threaded coordinator.
  */
-export async function dispatchBatches(
-    opts: DispatchOpts,
-): Promise<{ issues: Issue[]; metric: FileMetric | null; symbols?: WorkerSymbolsPayload }[]> {
+export async function dispatchBatches(opts: DispatchOpts): Promise<WorkerFileResult[]> {
     const {
         files,
         absRoot,
@@ -665,43 +694,40 @@ export async function dispatchBatches(
     const workerCount = Math.max(1, Math.min(numWorkers, files.length));
     const idxByFile = new Map<string, number>();
     files.forEach((filePath, fileIndex) => idxByFile.set(filePath, fileIndex));
-    const results: ({
-        issues: Issue[];
-        metric: FileMetric | null;
-        symbols?: WorkerSymbolsPayload;
-    } | null)[] = [];
+    const results: (WorkerFileResult | null)[] = [];
     results.length = files.length;
     results.fill(null);
 
     // AR_TIMING state: per-stage / per-batch pipeline instrumentation (no-op when disabled).
-    const timingTelemetry: WorkerTelemetrySnapshot | null = AR_TIMING
-        ? {
-              poolStart: nowMs(),
-              spawnMs: [] as number[],
-              firstMsgMs: [] as number[],
-              readTotal: 0,
-              readCount: 0,
-              readTimes: [] as number[],
-              dispatchSyncTotal: 0,
-              mergeTotal: 0,
-              timeline: [] as {
-                  seq: number;
-                  worker: number;
-                  dispatch: number; // ms since poolStart
-                  arrive: number; // ms since poolStart, -1 until arrival
-                  rt: number; // round-trip ms
-              }[],
-              lastDispatch: [] as number[], // per worker: timestamp of last postMessage
-              seqCounter: 0,
-              flushing: false,
-              // hybrid phase accounting
-              hybridK,
-              hybridFiles: 0,
-              hybridDone: 0,
-              hybridMs: 0,
-              hybridDoneAtFirstMsg: -1, // hybrid completions when the FIRST worker message arrives
-          }
-        : null;
+    let timingTelemetry: WorkerTelemetrySnapshot | null = null;
+    if (AR_TIMING) {
+        timingTelemetry = {
+            poolStart: nowMs(),
+            spawnMs: [] as number[],
+            firstMsgMs: [] as number[],
+            readTotal: 0,
+            readCount: 0,
+            readTimes: [] as number[],
+            dispatchSyncTotal: 0,
+            mergeTotal: 0,
+            timeline: [] as {
+                seq: number;
+                worker: number;
+                dispatch: number; // ms since poolStart
+                arrive: number; // ms since poolStart, -1 until arrival
+                rt: number; // round-trip ms
+            }[],
+            lastDispatch: [] as number[], // per worker: timestamp of last postMessage
+            seqCounter: 0,
+            flushing: false,
+            // hybrid phase accounting
+            hybridK,
+            hybridFiles: 0,
+            hybridDone: 0,
+            hybridMs: 0,
+            hybridDoneAtFirstMsg: -1, // hybrid completions when the FIRST worker message arrives
+        };
+    }
 
     const workerIdx = opts.workerIdx || new Map<Worker, number>();
 
@@ -778,6 +804,7 @@ export async function dispatchBatches(
             try {
                 const pre = opts.preloaded && opts.preloaded.get(rel);
                 const fileBuffer = pre ? Buffer.from(pre) : await fs.promises.readFile(absPath);
+                opts.retainSourceFn?.(rel, fileBuffer.toString('utf8'));
                 return { file: rel, absPath, buf: toTransferable(fileBuffer) };
             } catch {
                 results[idx] = { issues: [] as Issue[], metric: null as FileMetric | null };
@@ -795,6 +822,7 @@ export async function dispatchBatches(
                 absRoot,
                 preloaded: opts.preloaded,
                 runAnalyzersFn,
+                retainSourceFn: opts.retainSourceFn,
                 isAborted: () => failed,
                 onResult: (fileIndex, scanResult) => {
                     results[fileIndex] = scanResult;
@@ -1003,11 +1031,18 @@ export type RunWorkerPoolOptions = WorkerPoolBaseOptions;
  * @returns One index-aligned `{ issues, metric }` entry per input file.
  * Concurrency: manages worker threads asynchronously; safe for single-threaded caller.
  */
-export async function runWorkerPool(
-    options: RunWorkerPoolOptions,
-): Promise<{ issues: Issue[]; metric: FileMetric | null; symbols?: WorkerSymbolsPayload }[]> {
-    const { files, absRoot, config, descs, numWorkers, logger, runAnalyzersFn, preloaded } =
-        options;
+export async function runWorkerPool(options: RunWorkerPoolOptions): Promise<WorkerFileResult[]> {
+    const {
+        files,
+        absRoot,
+        config,
+        descs,
+        numWorkers,
+        logger,
+        runAnalyzersFn,
+        retainSourceFn,
+        preloaded,
+    } = options;
     if (files.length === 0) return [];
     const workerCount = Math.max(1, Math.min(numWorkers, files.length));
     const hybridK = computeHybridK(config, files.length, workerCount);
@@ -1019,6 +1054,7 @@ export async function runWorkerPool(
         numWorkers: workerCount,
         logger,
         runAnalyzersFn,
+        retainSourceFn,
         hybridK,
         keepAlive: false,
         preloaded,

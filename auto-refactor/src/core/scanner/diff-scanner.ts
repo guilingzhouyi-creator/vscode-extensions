@@ -660,6 +660,11 @@ interface DiffReportContext {
 }
 
 function buildFinalDiffScanReport(ctx: DiffReportContext): ScanReport | DiffDeltaReport {
+    for (const result of ctx.perFile) {
+        if (result) {
+            ctx.scanner.ingestFileSummaries?.(result);
+        }
+    }
     const { issues, fileMetrics } = aggregateScanResults(ctx.perFile);
     const durationMs = Date.now() - ctx.startTimeMs;
     const report = ctx.scanner.buildReport(ctx.filesCount, issues, fileMetrics, durationMs);

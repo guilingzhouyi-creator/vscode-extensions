@@ -148,6 +148,7 @@ export async function executeScanWithCache(
     const fileMetrics: FileMetric[] = [];
     for (const result of perFile) {
         if (!result) continue;
+        scanner.ingestFileSummaries?.(result);
         issues.push(...result.issues);
         if (result.metric) fileMetrics.push(result.metric);
     }

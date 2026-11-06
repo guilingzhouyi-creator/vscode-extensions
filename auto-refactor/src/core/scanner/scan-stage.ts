@@ -46,6 +46,9 @@ export interface PerFileResult {
         definitions: import('../intelligence/symbolIndex').SymbolDefinition[];
         references: import('../intelligence/symbolIndex').SymbolReference[];
     };
+    literals?: import('../intelligence/literalIndex').LiteralOccurrence[];
+    loopSites?: import('../intelligence/semanticComplexity').LoopSite[];
+    graphEdges?: import('../dependency-graph').ModuleGraphFileSummary;
 }
 
 /** Scanner surface the stage selector drives (structurally satisfied by Scanner). */
@@ -57,6 +60,8 @@ export interface ScanStageHost {
     runAnalyzers(rel: string, content: string): Promise<PerFileResult>;
     /** Main-thread scheduler used when no worker pool runs. */
     runInProcess(files: string[], absRoot: string): Promise<PerFileResult[]>;
+    retainSource?(rel: string, content: string): void;
+    ingestFileSummaries?(result: PerFileResult | null | undefined): void;
     recordWorkerSymbols?(
         definitions: import('../intelligence/symbolIndex').SymbolDefinition[],
         references: import('../intelligence/symbolIndex').SymbolReference[],
@@ -124,12 +129,13 @@ export async function runParseAnalyzeStage(
             numWorkers: effWorkers,
             logger: host.logger,
             runAnalyzersFn: host.runAnalyzers.bind(host),
+            retainSourceFn: host.retainSource?.bind(host),
         });
-        if (host.recordWorkerSymbols) {
-            for (const result of perFile) {
-                if (result.symbols) {
-                    host.recordWorkerSymbols(result.symbols.definitions, result.symbols.references);
-                }
+        for (const result of perFile) {
+            if (host.ingestFileSummaries) {
+                host.ingestFileSummaries(result);
+            } else if (host.recordWorkerSymbols && result.symbols) {
+                host.recordWorkerSymbols(result.symbols.definitions, result.symbols.references);
             }
         }
         host.logger.debug(

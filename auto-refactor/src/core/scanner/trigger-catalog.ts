@@ -134,12 +134,20 @@ export const CLASS_TRIGGERS: readonly string[] = Object.freeze([
     'interface ',
 ]);
 
-/** Trigger keywords indicating asynchronous coroutines and promises. */
+/** Trigger keywords indicating asynchronous coroutines, locks, and listener subscriptions. */
 export const ASYNC_TRIGGERS: readonly string[] = Object.freeze([
     'async ',
     'await ',
     'Promise',
     'go ',
+    '.on',
+    '.addListener',
+    '.addEventListener',
+    '.subscribe',
+    'acquire',
+    'lock',
+    'Mutex',
+    'mutex',
 ]);
 
 /** Trigger tokens indicating regular expression patterns and utilities. */
@@ -388,6 +396,8 @@ export class AnalyzerTriggerCatalog {
         this.register('comments', COMMENT_TRIGGERS);
         this.register('secrets', SECRET_TRIGGERS);
         this.register('security', SECURITY_TRIGGERS);
+        this.register('shell-lint', SHELL_LINT_TRIGGERS);
+        this.register('concurrency', ASYNC_TRIGGERS);
     }
 }
 

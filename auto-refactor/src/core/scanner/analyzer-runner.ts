@@ -19,15 +19,18 @@ import type { Analyzer, AnalyzerContext, FileMetric, Issue, ScanConfig } from '.
 import type { ResolvedAnalyzer } from '../analyzer-registry';
 import type { IncrementalFileState } from '../diff/incremental-state';
 import type { Logger } from '../logger';
-import type { ModuleDependencyGraph } from '../dependency-graph';
-import type { SymbolIndex } from '../intelligence/symbolIndex';
+import type { ModuleDependencyGraph, ModuleGraphFileSummary } from '../dependency-graph';
+import { extractModuleGraphSummary } from '../dependency-graph';
+import type { SymbolIndex, SymbolDefinition, SymbolReference } from '../intelligence/symbolIndex';
 import { collectSymbols } from '../intelligence/symbolIndex';
-import type { LiteralIndex } from '../intelligence/literalIndex';
-import type {
-    LanguageAdapter,
-    NodeProjector,
-    NormalizedAst,
-    NormalizedNode,
+import type { LiteralIndex, LiteralOccurrence } from '../intelligence/literalIndex';
+import type { LoopSite } from '../intelligence/semanticComplexity';
+import {
+    OTHER_PLACEHOLDER,
+    type LanguageAdapter,
+    type NodeProjector,
+    type NormalizedAst,
+    type NormalizedNode,
 } from '../ast/multilang';
 import { countLineStats } from '../../utils/linestats';
 import { adapterFor } from '../ast/adapters';
@@ -329,11 +332,19 @@ function indexProjectedNode(
     rel: string,
     node: NormalizedNode,
     caller: string | null,
+    fileSymbols?: { definitions: SymbolDefinition[]; references: SymbolReference[] },
 ): void {
+    if (node === OTHER_PLACEHOLDER || (!node.functionLike && node.children !== undefined)) {
+        return;
+    }
     try {
         const collected = collectSymbols(node, rel, caller);
         host.symbolIndex.addDefinitions(collected.definitions);
         host.symbolIndex.addReferences(collected.references);
+        if (fileSymbols) {
+            fileSymbols.definitions.push(...collected.definitions);
+            fileSymbols.references.push(...collected.references);
+        }
         host.literalIndex.addTree(rel, node);
         host.symbolIndex.markBuiltFrom('projection');
     } catch {
@@ -358,6 +369,7 @@ function runStreamingPhase(
     partition: PlanPartition,
     base: FileContextBase,
     lineBounds?: readonly [number, number],
+    fileSymbols?: { definitions: SymbolDefinition[]; references: SymbolReference[] },
 ): StreamingOutcome {
     const issues: Issue[] = [];
     let metric = new FileMetricCollector();
@@ -372,7 +384,7 @@ function runStreamingPhase(
             ...runStreamingProjected(
                 parse.proj,
                 entries,
-                (node, caller) => indexProjectedNode(host, base.rel, node, caller),
+                (node, caller) => indexProjectedNode(host, base.rel, node, caller, fileSymbols),
                 lineBounds,
             ),
         );
@@ -383,6 +395,10 @@ function runStreamingPhase(
         host.logger.warn(
             `lazy projection failed on ${base.rel}: ${String(error)}; falling back to materialized path`,
         );
+        if (fileSymbols) {
+            fileSymbols.definitions.length = 0;
+            fileSymbols.references.length = 0;
+        }
         // NEVER reuse the outer entries — the interrupted projected traversal has already
         // accumulated state in those analyzer instances (constants' literals, complexity's
         // issues, the metric collector's counters). Rebuild FRESH instances (+ a fresh metric
@@ -413,18 +429,34 @@ function seedIndexes(
     rel: string,
     rootForCtx: NormalizedNode,
     proj: NodeProjector | null,
+    fileSymbols?: { definitions: SymbolDefinition[]; references: SymbolReference[] },
 ): void {
     try {
         const collected =
             proj === null ? collectSymbols(rootForCtx, rel) : { definitions: [], references: [] };
         host.symbolIndex.addDefinitions(collected.definitions);
         host.symbolIndex.addReferences(collected.references);
+        if (proj === null && fileSymbols) {
+            fileSymbols.definitions.push(...collected.definitions);
+            fileSymbols.references.push(...collected.references);
+        }
         host.literalIndex.addTree(rel, rootForCtx);
         if (proj !== null) host.symbolIndex.markBuiltFrom('projection');
         host.literalIndex.markBuiltFrom(proj !== null ? 'projection' : 'materialized');
     } catch {
         /* Best-effort: index building must not abort the scan */
     }
+}
+
+function collectCurrentFileLoopSites(plan: ResolvedAnalyzer[]): LoopSite[] {
+    for (let i = 0; i < plan.length; i++) {
+        if (plan[i].name !== 'complexity') continue;
+        const inst = plan[i].instance as { getCurrentFileLoopSites?: () => LoopSite[] };
+        if (typeof inst.getCurrentFileLoopSites === 'function') {
+            return inst.getCurrentFileLoopSites();
+        }
+    }
+    return [];
 }
 
 /**
@@ -446,7 +478,7 @@ function seedIndexes(
  * @param lineBounds - Optional one-based inclusive line window; when present only findings inside
  *     it are reported, which is how slice-scoped audits avoid re-reporting whole-file issues.
  * Concurrency: asynchronous per-file execution; safe for concurrent execution on separate files.
- * @returns The file's issues and its per-file metric summary.
+ * @returns The file's issues, metric summary, and cross-file summaries.
  */
 export async function runFileAnalyzers(
     host: AnalyzerHost,
@@ -455,14 +487,23 @@ export async function runFileAnalyzers(
     seed?: IncrementalFileState,
     activeAnalyzers?: Set<string>,
     lineBounds?: readonly [number, number],
-): Promise<{ issues: Issue[]; metric: FileMetric | null }> {
+): Promise<{
+    issues: Issue[];
+    metric: FileMetric | null;
+    symbols?: { definitions: SymbolDefinition[]; references: SymbolReference[] };
+    literals?: LiteralOccurrence[];
+    loopSites?: LoopSite[];
+    graphEdges?: ModuleGraphFileSummary;
+}> {
     const cfg = host.config;
     const adapter = adapterFor(rel, cfg.parser);
     const partition = partitionPlan(host.plan, activeAnalyzers);
     seedDependencyGraph(host, rel, content);
     const parse = prepareParse(adapter, content, rel, seed, partition);
     const sourceFile =
-        parse.ast?.sourceFile ?? materializeSourceFile(rel, content, partition.legacy, adapter);
+        parse.proj?.sourceFile ??
+        parse.ast?.sourceFile ??
+        materializeSourceFile(rel, content, partition.legacy, adapter);
     // Compute line stats ONCE per file so every analyzer shares a single pass: the metric
     // collector always needs them, and large-file reads them when enabled.
     const preflightMask = evaluateFilePreflightMask(content, rel, cfg);
@@ -483,10 +524,42 @@ export async function runFileAnalyzers(
     const languageIssue = unsupportedLanguageDiagnostic(rel, cfg);
     if (languageIssue) issues.push(languageIssue);
 
-    const outcome = runStreamingPhase(host, adapter, parse, partition, base, lineBounds);
+    const fileSymbols: { definitions: SymbolDefinition[]; references: SymbolReference[] } = {
+        definitions: [],
+        references: [],
+    };
+    const outcome = runStreamingPhase(
+        host,
+        adapter,
+        parse,
+        partition,
+        base,
+        lineBounds,
+        fileSymbols,
+    );
     issues.push(...outcome.issues);
     issues.push(...runLegacyPhase(host, partition.legacy, outcome, parse, base));
-    seedIndexes(host, rel, parse.rootForCtx, parse.proj);
+    seedIndexes(
+        host,
+        rel,
+        outcome.ast?.root ?? parse.rootForCtx,
+        outcome.ast ? null : parse.proj,
+        fileSymbols,
+    );
 
-    return { issues, metric: outcome.metric.metric };
+    const literals = host.literalIndex.extractFileOccurrences(rel);
+    const loopSites = collectCurrentFileLoopSites(host.plan);
+    const graphEdges =
+        host.graph?.extractFileSummary(rel) ?? extractModuleGraphSummary(rel, content);
+
+    return {
+        issues,
+        metric: outcome.metric.metric,
+        ...(fileSymbols.definitions.length > 0 || fileSymbols.references.length > 0
+            ? { symbols: fileSymbols }
+            : {}),
+        ...(literals.length > 0 ? { literals } : {}),
+        ...(loopSites.length > 0 ? { loopSites } : {}),
+        ...(graphEdges ? { graphEdges } : {}),
+    };
 }

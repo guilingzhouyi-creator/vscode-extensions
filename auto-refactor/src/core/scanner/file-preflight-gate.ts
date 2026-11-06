@@ -30,6 +30,7 @@ const RUST_EXTS = new Set(['.rs']);
 const GDSCRIPT_EXTS = new Set(['.gd']);
 const GO_EXTS = new Set(['.go']);
 const SHELL_EXTS = new Set(['.sh', '.bash', '.zsh', '.ps1', '.psm1', '.psd1']);
+const DOCS_EXTS = new Set(['.md']);
 
 /**
  * Evaluates file content and path to construct a 32-bit active analyzer bitmask.
@@ -70,6 +71,9 @@ export function evaluateFilePreflightMask(
     if (!SHELL_EXTS.has(ext)) {
         mask &= ~(AnalyzerBit.SHELL_LINT | AnalyzerBit.SHELL_SAFETY);
     }
+    if (!DOCS_EXTS.has(ext)) {
+        mask &= ~AnalyzerBit.DOCS;
+    }
 
     // 2. Syntactic trigger pre-filtering
     if (content.length > 0) {
@@ -81,6 +85,9 @@ export function evaluateFilePreflightMask(
         }
         if (!defaultTriggerCatalog.shouldExecuteAnalyzer('complexity', content)) {
             mask &= ~AnalyzerBit.COMPLEXITY;
+        }
+        if (!defaultTriggerCatalog.shouldExecuteAnalyzer('concurrency', content)) {
+            mask &= ~AnalyzerBit.CONCURRENCY;
         }
     }
 
