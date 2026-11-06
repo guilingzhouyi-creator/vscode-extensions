@@ -63,11 +63,15 @@ const T_STRING = 0x05;
 const T_ARRAY = 0x06;
 const T_OBJECT = 0x07;
 
-type FileResult = {
+/** Per-file scan result payload serialized by the PR50 binary transport codec. */
+export type FileResult = {
     file: string;
     issues: Issue[];
     metric: FileMetric | null;
     symbols?: unknown;
+    literals?: unknown;
+    loopSites?: unknown;
+    graphEdges?: unknown;
 };
 
 // ── Binary protocol constants (little-endian PR50 transport) ──
@@ -377,6 +381,79 @@ function decodeOptionalMetricField(reader: Reader): number | undefined {
     return reader.readU8() ? reader.readFloat64() : undefined;
 }
 
+function encodeFileMetric(writer: Writer, metric: FileMetric | null | undefined): void {
+    if (!metric) {
+        writer.writeU8(0);
+        return;
+    }
+    writer.writeU8(1);
+    writer.writeVarint(metric.lines);
+    writer.writeVarint(metric.nonBlankLines);
+    writer.writeVarint(metric.functions);
+    writer.writeVarint(metric.maxNestingDepth);
+    writer.writeVarint(metric.topLevelDeclarations);
+    writer.writeVarint(metric.exportedSymbols);
+    writeOptionalMetricField(writer, metric.effectiveDensity);
+    writeOptionalMetricField(writer, metric.tspr);
+    writeOptionalMetricField(writer, metric.por);
+    writeOptionalMetricField(writer, metric.columnDensity);
+    writeOptionalMetricField(writer, metric.compositeDensity);
+    writeOptionalMetricField(writer, metric.tokensPerEloc);
+}
+
+function encodeFileIssue(writer: Writer, issue: Issue): void {
+    writer.writeString(issue.id ?? '');
+    writer.writeString(issue.analyzer ?? '');
+    writer.writeString(issue.rule ?? '');
+    const severityCode =
+        issue.severity === SEVERITY_INFO ? 0 : issue.severity === SEVERITY_WARNING ? 1 : 2;
+    writer.writeU8(severityCode);
+    writer.writeString(issue.message ?? '');
+    const loc = issue.location;
+    writer.writeString(loc?.file ?? '');
+    writer.writeVarint(loc?.start?.line ?? 0);
+    writer.writeVarint(loc?.start?.column ?? 0);
+    writer.writeVarint(loc?.end?.line ?? 0);
+    writer.writeVarint(loc?.end?.column ?? 0);
+    writer.writeValue(issue.detail);
+    if (issue.suggestion !== undefined) {
+        writer.writeU8(1);
+        writer.writeString(issue.suggestion);
+    } else {
+        writer.writeU8(0);
+    }
+    if (issue.actionable !== undefined) {
+        writer.writeU8(1);
+        writer.writeValue(issue.actionable);
+    } else {
+        writer.writeU8(0);
+    }
+    const extraFields = extractIssueExtraFields(issue);
+    if (extraFields !== undefined) {
+        writer.writeU8(1);
+        writer.writeValue(extraFields);
+    } else {
+        writer.writeU8(0);
+    }
+}
+
+function encodeFileExtras(writer: Writer, fileResult: FileResult): void {
+    if (fileResult.symbols) {
+        writer.writeU8(1);
+        writer.writeValue(fileResult.symbols);
+    } else {
+        writer.writeU8(0);
+    }
+    const extraMask =
+        (fileResult.literals !== undefined ? 1 : 0) |
+        (fileResult.loopSites !== undefined ? 2 : 0) |
+        (fileResult.graphEdges !== undefined ? 4 : 0);
+    writer.writeU8(extraMask);
+    if (fileResult.literals !== undefined) writer.writeValue(fileResult.literals);
+    if (fileResult.loopSites !== undefined) writer.writeValue(fileResult.loopSites);
+    if (fileResult.graphEdges !== undefined) writer.writeValue(fileResult.graphEdges);
+}
+
 /**
  * Encode a batch of per-file results into the PR50 binary transport buffer.
  *
@@ -394,65 +471,12 @@ export function encodeResults(results: FileResult[]): Buffer {
     writer.writeU32(results.length);
     for (const fileResult of results) {
         writer.writeString(fileResult.file);
-        const metric = fileResult.metric;
-        if (metric) {
-            writer.writeU8(1);
-            writer.writeVarint(metric.lines);
-            writer.writeVarint(metric.nonBlankLines);
-            writer.writeVarint(metric.functions);
-            writer.writeVarint(metric.maxNestingDepth);
-            writer.writeVarint(metric.topLevelDeclarations);
-            writer.writeVarint(metric.exportedSymbols);
-            writeOptionalMetricField(writer, metric.effectiveDensity);
-            writeOptionalMetricField(writer, metric.tspr);
-            writeOptionalMetricField(writer, metric.por);
-            writeOptionalMetricField(writer, metric.columnDensity);
-            writeOptionalMetricField(writer, metric.compositeDensity);
-            writeOptionalMetricField(writer, metric.tokensPerEloc);
-        } else {
-            writer.writeU8(0);
-        }
+        encodeFileMetric(writer, fileResult.metric);
         writer.writeVarint(fileResult.issues.length);
         for (const issue of fileResult.issues) {
-            writer.writeString(issue.id);
-            writer.writeString(issue.analyzer);
-            writer.writeString(issue.rule);
-            const severityCode =
-                issue.severity === SEVERITY_INFO ? 0 : issue.severity === SEVERITY_WARNING ? 1 : 2;
-            writer.writeU8(severityCode);
-            writer.writeString(issue.message);
-            writer.writeString(issue.location.file);
-            writer.writeVarint(issue.location.start.line);
-            writer.writeVarint(issue.location.start.column);
-            writer.writeVarint(issue.location.end.line);
-            writer.writeVarint(issue.location.end.column);
-            writer.writeValue(issue.detail);
-            if (issue.suggestion !== undefined) {
-                writer.writeU8(1);
-                writer.writeString(issue.suggestion);
-            } else {
-                writer.writeU8(0);
-            }
-            if (issue.actionable !== undefined) {
-                writer.writeU8(1);
-                writer.writeValue(issue.actionable);
-            } else {
-                writer.writeU8(0);
-            }
-            const extraFields = extractIssueExtraFields(issue);
-            if (extraFields !== undefined) {
-                writer.writeU8(1);
-                writer.writeValue(extraFields);
-            } else {
-                writer.writeU8(0);
-            }
+            encodeFileIssue(writer, issue);
         }
-        if (fileResult.symbols) {
-            writer.writeU8(1);
-            writer.writeValue(fileResult.symbols);
-        } else {
-            writer.writeU8(0);
-        }
+        encodeFileExtras(writer, fileResult);
     }
     return writer.buildResultBuffer();
 }
@@ -548,12 +572,43 @@ function decodeSingleFileResult(reader: Reader): FileResult {
     const issues = decodeFileIssues(reader);
     const hasSymbols = reader.readU8();
     const symbols = hasSymbols ? reader.readValue() : undefined;
+    const extraMask = reader.readU8();
+    const literals = (extraMask & 1) !== 0 ? reader.readValue() : undefined;
+    const loopSites = (extraMask & 2) !== 0 ? reader.readValue() : undefined;
+    const graphEdges = (extraMask & 4) !== 0 ? reader.readValue() : undefined;
     return {
         file,
         issues,
         metric,
         ...(symbols !== undefined ? { symbols } : {}),
+        ...(literals !== undefined ? { literals } : {}),
+        ...(loopSites !== undefined ? { loopSites } : {}),
+        ...(graphEdges !== undefined ? { graphEdges } : {}),
     };
+}
+
+/**
+ * Encode a single per-file result into a standalone PR50 binary payload buffer.
+ *
+ * @param fileResult - Single-file scan result to encode.
+ * @returns Standalone PR50 binary buffer containing the single file record.
+ */
+export function encodeSingleFileResult(fileResult: FileResult): Buffer {
+    return encodeResults([fileResult]);
+}
+
+/**
+ * Decode a standalone PR50 binary payload buffer produced by {@link encodeSingleFileResult}.
+ *
+ * @param buf - Buffer or Uint8Array containing a single-file PR50 payload.
+ * @returns Reconstructed per-file scan result.
+ */
+export function decodeSingleFileResultBuffer(buf: Buffer | Uint8Array): FileResult {
+    const decoded = decodeResults(buf);
+    if (decoded.length === 0) {
+        throw new Error('resultCodec: empty single-file payload');
+    }
+    return decoded[0];
 }
 
 /**

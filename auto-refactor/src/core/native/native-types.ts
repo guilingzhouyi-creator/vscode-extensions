@@ -72,6 +72,7 @@ export interface NativeMaskConfig {
     readonly quoteChars: string;
     readonly multilineTemplates?: boolean;
     readonly regexLiterals?: boolean;
+    readonly htmlComment?: boolean;
 }
 
 /**

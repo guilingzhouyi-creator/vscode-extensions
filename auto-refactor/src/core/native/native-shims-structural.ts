@@ -339,94 +339,89 @@ export function computeDominatorTreeShim(
 }
 
 /**
- * Helper to test whether a set has modified during fixed point iteration.
+ * Collects unique sorted fact names and builds a fact-to-id lookup table.
  */
-function hasSetChanged(oldSet: Set<string>, newSet: Set<string>): boolean {
-    if (oldSet.size !== newSet.size) return true;
-    for (const item of newSet) {
-        if (!oldSet.has(item)) return true;
+function buildFactIndex(
+    gen: Record<string, string[]>,
+    kill: Record<string, string[]>,
+): { factNames: string[]; factToId: Map<string, number> } {
+    const factSet = new Set<string>();
+    for (const list of Object.values(gen)) {
+        for (const item of list) factSet.add(item);
     }
-    return false;
+    for (const list of Object.values(kill)) {
+        for (const item of list) factSet.add(item);
+    }
+    const factNames = Array.from(factSet).sort();
+    const factToId = new Map<string, number>();
+    factNames.forEach((name, idx) => factToId.set(name, idx));
+    return { factNames, factToId };
+}
+
+interface DataflowBitBuffers {
+    readonly wordsPerNode: number;
+    readonly genWords: Uint32Array;
+    readonly killWords: Uint32Array;
+    readonly inWords: Uint32Array;
+    readonly outWords: Uint32Array;
 }
 
 /**
- * Merges sets from adjacent nodes without deep loop nesting.
+ * Solves one step of forward or backward dataflow equation over 32-bit word bitsets.
  */
-function mergeAdjacentSets(neighbors: number[], sets: Array<Set<string>>): Set<string> {
-    const merged = new Set<string>();
-    for (const neighborId of neighbors) {
-        for (const item of sets[neighborId]) {
-            merged.add(item);
-        }
-    }
-    return merged;
-}
-
-/**
- * Applies the transfer equation: Out = Gen U (In - Kill).
- */
-function applyTransfer(
-    baseSet: Set<string>,
-    genSet: Set<string>,
-    killSet: Set<string>,
-): Set<string> {
-    const res = new Set<string>(genSet);
-    for (const val of baseSet) {
-        if (!killSet.has(val)) {
-            res.add(val);
-        }
-    }
-    return res;
-}
-
-/**
- * Solves one step of forward dataflow equation for node i.
- */
-function stepForwardNode(
-    i: number,
-    preds: number[][],
-    genSets: Array<Set<string>>,
-    killSets: Array<Set<string>>,
-    inSets: Array<Set<string>>,
-    outSets: Array<Set<string>>,
+function stepDataflowNodeBits(
+    nodeIdx: number,
+    neighbors: number[],
+    forward: boolean,
+    buffers: DataflowBitBuffers,
 ): boolean {
+    const { wordsPerNode, genWords, killWords, inWords, outWords } = buffers;
+    const base = nodeIdx * wordsPerNode;
     let modified = false;
-    const newIn = mergeAdjacentSets(preds[i], outSets);
-    if (hasSetChanged(inSets[i], newIn)) {
-        inSets[i] = newIn;
-        modified = true;
-    }
-    const newOut = applyTransfer(inSets[i], genSets[i], killSets[i]);
-    if (hasSetChanged(outSets[i], newOut)) {
-        outSets[i] = newOut;
-        modified = true;
+    const primaryWords = forward ? inWords : outWords;
+    const secondaryWords = forward ? outWords : inWords;
+
+    for (let w = 0; w < wordsPerNode; w++) {
+        let mergedWord = 0;
+        for (let nIdx = 0; nIdx < neighbors.length; nIdx++) {
+            mergedWord |= secondaryWords[neighbors[nIdx] * wordsPerNode + w];
+        }
+        if (primaryWords[base + w] !== mergedWord) {
+            primaryWords[base + w] = mergedWord;
+            modified = true;
+        }
+        const transferredWord = genWords[base + w] | (mergedWord & ~killWords[base + w]);
+        if (secondaryWords[base + w] !== transferredWord) {
+            secondaryWords[base + w] = transferredWord;
+            modified = true;
+        }
     }
     return modified;
 }
 
 /**
- * Solves one step of backward dataflow equation for node i.
+ * Decodes a 32-bit word bitset slice into a sorted array of fact strings.
  */
-function stepBackwardNode(
-    i: number,
-    succs: number[][],
-    genSets: Array<Set<string>>,
-    killSets: Array<Set<string>>,
-    inSets: Array<Set<string>>,
-    outSets: Array<Set<string>>,
-): boolean {
-    let modified = false;
-    const newOut = mergeAdjacentSets(succs[i], inSets);
-    if (hasSetChanged(outSets[i], newOut)) {
-        outSets[i] = newOut;
-        modified = true;
+function decodeBitsetRow(
+    words: Uint32Array,
+    baseOffset: number,
+    wordsPerNode: number,
+    factNames: string[],
+): string[] {
+    const result: string[] = [];
+    for (let w = 0; w < wordsPerNode; w++) {
+        let bits = words[baseOffset + w];
+        while (bits !== 0) {
+            const lsb = bits & -bits;
+            const bitPos = 31 - Math.clz32(lsb);
+            const factId = (w << 5) + bitPos;
+            if (factId < factNames.length) {
+                result.push(factNames[factId]);
+            }
+            bits ^= lsb;
+        }
     }
-    const newIn = applyTransfer(outSets[i], genSets[i], killSets[i]);
-    if (hasSetChanged(inSets[i], newIn)) {
-        inSets[i] = newIn;
-        modified = true;
-    }
-    return modified;
+    return result;
 }
 
 /**
@@ -439,11 +434,30 @@ export function solveDataflowShim(params: NativeDataflowParams): NativeDataflowR
     const { allNodeNames, nameToId } = buildNodeIndex(entry, nodes, edges);
     const total = allNodeNames.length;
     const { succs, preds } = buildAdjacencyLists(total, edges, nameToId);
+    const { factNames, factToId } = buildFactIndex(gen, kill);
 
-    const inSets: Array<Set<string>> = Array.from({ length: total }, () => new Set<string>());
-    const outSets: Array<Set<string>> = Array.from({ length: total }, () => new Set<string>());
-    const genSets = allNodeNames.map((name) => new Set(gen[name] ?? []));
-    const killSets = allNodeNames.map((name) => new Set(kill[name] ?? []));
+    const wordsPerNode = Math.max(1, Math.ceil(factNames.length / 32));
+    const totalWords = total * wordsPerNode;
+    const buffers: DataflowBitBuffers = {
+        wordsPerNode,
+        genWords: new Uint32Array(totalWords),
+        killWords: new Uint32Array(totalWords),
+        inWords: new Uint32Array(totalWords),
+        outWords: new Uint32Array(totalWords),
+    };
+
+    for (let i = 0; i < total; i++) {
+        const name = allNodeNames[i];
+        const base = i * wordsPerNode;
+        for (const item of gen[name] ?? []) {
+            const fid = factToId.get(item);
+            if (fid !== undefined) buffers.genWords[base + (fid >>> 5)] |= 1 << (fid & 31);
+        }
+        for (const item of kill[name] ?? []) {
+            const fid = factToId.get(item);
+            if (fid !== undefined) buffers.killWords[base + (fid >>> 5)] |= 1 << (fid & 31);
+        }
+    }
 
     let iterations = 0;
     let changed = true;
@@ -452,10 +466,8 @@ export function solveDataflowShim(params: NativeDataflowParams): NativeDataflowR
         changed = false;
         iterations++;
         for (let i = 0; i < total; i++) {
-            const stepMod = forward
-                ? stepForwardNode(i, preds, genSets, killSets, inSets, outSets)
-                : stepBackwardNode(i, succs, genSets, killSets, inSets, outSets);
-            if (stepMod) {
+            const neighbors = forward ? preds[i] : succs[i];
+            if (stepDataflowNodeBits(i, neighbors, forward, buffers)) {
                 changed = true;
             }
         }
@@ -465,8 +477,9 @@ export function solveDataflowShim(params: NativeDataflowParams): NativeDataflowR
     const outMap: Record<string, string[]> = {};
     for (let i = 0; i < total; i++) {
         const name = allNodeNames[i];
-        inMap[name] = Array.from(inSets[i]).sort();
-        outMap[name] = Array.from(outSets[i]).sort();
+        const base = i * wordsPerNode;
+        inMap[name] = decodeBitsetRow(buffers.inWords, base, wordsPerNode, factNames);
+        outMap[name] = decodeBitsetRow(buffers.outWords, base, wordsPerNode, factNames);
     }
 
     return {

@@ -198,6 +198,7 @@ export class PureJsNativeShim implements INativeCore {
             quoteChars: config.quoteChars,
             multilineTemplates: config.multilineTemplates,
             regexLiterals: config.regexLiterals,
+            htmlComment: config.htmlComment,
         });
     }
 
@@ -703,9 +704,15 @@ function assembleCloneOps(
             // jsShim avoids FFI allocation churn for structured line returns.
             return jsShim.maskSourceCode(content, config);
         },
-        maskSourceCodeCompact: selectBinding(binding.maskSourceCodeCompact, (content, config) =>
-            jsShim.maskSourceCodeCompact(content, config),
-        ),
+        maskSourceCodeCompact: (content: string, config: NativeMaskConfig) => {
+            if (
+                content.length < LARGE_DIFF_BYTES_THRESHOLD ||
+                typeof binding.maskSourceCodeCompact !== 'function'
+            ) {
+                return jsShim.maskSourceCodeCompact(content, config);
+            }
+            return binding.maskSourceCodeCompact(content, config);
+        },
         countDuplicateLines: selectBinding(binding.countDuplicateLines, (content) =>
             jsShim.countDuplicateLines(content),
         ),
@@ -786,9 +793,15 @@ function assembleVectorAndMathOps(
     | 'scanSecretsNative'
 > {
     return {
-        computeShannonEntropy: selectBinding(binding.computeShannonEntropy, (text) =>
-            jsShim.computeShannonEntropy(text),
-        ),
+        computeShannonEntropy: (text: string) => {
+            if (
+                text.length < LARGE_DIFF_BYTES_THRESHOLD ||
+                typeof binding.computeShannonEntropy !== 'function'
+            ) {
+                return jsShim.computeShannonEntropy(text);
+            }
+            return binding.computeShannonEntropy(text);
+        },
         computeStatisticalMoments: selectBinding(binding.computeStatisticalMoments, (values) =>
             jsShim.computeStatisticalMoments(values),
         ),
@@ -797,9 +810,15 @@ function assembleVectorAndMathOps(
             (stdDev, maxSigma, gamma) =>
                 jsShim.calculatePopoviciuDispersionPenalty(stdDev, maxSigma, gamma),
         ),
-        countBracesDetailed: selectBinding(binding.countBracesDetailed, (line) =>
-            jsShim.countBracesDetailed(line),
-        ),
+        countBracesDetailed: (line: string) => {
+            if (
+                line.length < LARGE_DIFF_BYTES_THRESHOLD ||
+                typeof binding.countBracesDetailed !== 'function'
+            ) {
+                return jsShim.countBracesDetailed(line);
+            }
+            return binding.countBracesDetailed(line);
+        },
         computeWarshallTransitiveClosure: selectBinding(
             binding.computeWarshallTransitiveClosure,
             (matrix, size) => jsShim.computeWarshallTransitiveClosure(matrix, size),
@@ -885,6 +904,11 @@ function loadNativeBindingModule(): RawNativeBinding | null {
         const missing = findUnsatisfiedBindingFields(binding);
         if (missing.length > 0) {
             rejectedBindingReason = `addon exports ${missing.join(', ')} as non-callable`;
+            return null;
+        }
+        const declaredVersion = binding.version || binding.VERSION;
+        if (typeof declaredVersion === 'string' && !declaredVersion.startsWith('0.4.0')) {
+            rejectedBindingReason = `addon version mismatch: expected 0.4.0*, got ${declaredVersion}`;
             return null;
         }
         return binding;
@@ -1227,17 +1251,19 @@ export const nativeComputeDominatorTree = (
     entry: string,
     nodes: string[],
     edges: Array<[string, string]>,
-): NativeDominatorTreeResult =>
-    !nodes || nodes.length === 0
-        ? {
-              entry,
-              reachableNodes: [],
-              idom: {},
-              dominanceFrontiers: {},
-              loopHeaders: [],
-              backEdges: [],
-          }
-        : nativeCore.computeDominatorTree(entry, nodes, edges);
+): NativeDominatorTreeResult => {
+    if (!nodes || nodes.length === 0) {
+        return {
+            entry,
+            reachableNodes: [],
+            idom: {},
+            dominanceFrontiers: {},
+            loopHeaders: [],
+            backEdges: [],
+        };
+    }
+    return nativeCore.computeDominatorTree(entry, nodes, edges);
+};
 
 /**
  * Solves dataflow equations to a fixed point.
