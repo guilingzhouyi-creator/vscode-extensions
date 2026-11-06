@@ -34,14 +34,11 @@ impl Hasher for FastByteHasher {
     fn write(&mut self, bytes: &[u8]) {
         const K: u64 = 0x517cc1b727220a95;
         let mut hash = self.0;
-        let mut chunks = bytes.chunks_exact(8);
-        for chunk in &mut chunks {
-            let mut word = [0u8; 8];
-            word.copy_from_slice(chunk);
+        let (chunks, remainder) = bytes.as_chunks::<8>();
+        for &word in chunks {
             let val = u64::from_le_bytes(word);
             hash = (hash.rotate_left(5) ^ val).wrapping_mul(K);
         }
-        let remainder = chunks.remainder();
         if !remainder.is_empty() {
             let mut last = 0u64;
             for (i, &b) in remainder.iter().enumerate() {

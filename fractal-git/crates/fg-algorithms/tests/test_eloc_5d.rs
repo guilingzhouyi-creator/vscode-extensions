@@ -18,7 +18,8 @@ fn test_pure_comments_produce_zero_eloc() {
 
 #[test]
 fn test_substantive_code_metrics() {
-    let code = "pub fn add(operand_a: i32, operand_b: i32) -> i32 {\n    operand_a + operand_b\n}\n";
+    let code =
+        "pub fn add(operand_a: i32, operand_b: i32) -> i32 {\n    operand_a + operand_b\n}\n";
     let metrics = evaluate_file_5d_eloc(code);
     assert_eq!(metrics.substantive_lines, 3);
     assert_eq!(metrics.effective_lines_of_code, 3.0);
@@ -29,10 +30,7 @@ fn test_substantive_code_metrics() {
 fn test_diff_5d_turnover() {
     let added_lines = ["pub fn calculate() -> u32 {", "    42", "}"];
     let deleted_lines = ["// old comment", "pub fn old() {}"];
-    let delta = evaluate_diff_5d_eloc(
-        added_lines.iter().copied(),
-        deleted_lines.iter().copied(),
-    );
+    let delta = evaluate_diff_5d_eloc(added_lines.iter().copied(), deleted_lines.iter().copied());
     assert_eq!(delta.physical_lines_added, 3);
     assert_eq!(delta.effective_lines_added, 3.0);
     assert_eq!(delta.effective_lines_deleted, 1.0);
@@ -46,8 +44,14 @@ fn test_line_semantic_classification() {
     assert_eq!(classify_line(""), LineSemanticKind::Blank);
     assert_eq!(classify_line("   "), LineSemanticKind::Blank);
     assert_eq!(classify_line("// comment"), LineSemanticKind::Comment);
-    assert_eq!(classify_line("/// doc comment"), LineSemanticKind::DocComment);
-    assert_eq!(classify_line("return self.inner.call();"), LineSemanticKind::Trampoline);
+    assert_eq!(
+        classify_line("/// doc comment"),
+        LineSemanticKind::DocComment
+    );
+    assert_eq!(
+        classify_line("return self.inner.call();"),
+        LineSemanticKind::Trampoline
+    );
     assert_eq!(classify_line("{}"), LineSemanticKind::Trampoline);
     assert_eq!(classify_line("let a = 10;"), LineSemanticKind::Substantive);
 }

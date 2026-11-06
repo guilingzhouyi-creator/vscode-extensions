@@ -173,7 +173,8 @@ mod tests {
 
     #[test]
     fn test_identical_content_maps_all_lines() {
-        let mapping = BlameEngine::compute_line_mapping(TEXT_ALPHA_BETA_GAMMA, TEXT_ALPHA_BETA_GAMMA);
+        let mapping =
+            BlameEngine::compute_line_mapping(TEXT_ALPHA_BETA_GAMMA, TEXT_ALPHA_BETA_GAMMA);
         assert_eq!(mapping, vec![Some(0), Some(1), Some(2)]);
     }
 

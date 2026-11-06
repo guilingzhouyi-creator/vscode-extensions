@@ -19,8 +19,20 @@ use fg_core::models::{FileMode, Oid};
 
 use super::three_way::{ConflictEntry, ThreeWayMerge, ThreeWayMergeResult};
 
+struct RenameRemapState<'a> {
+    base: &'a BTreeMap<String, Oid>,
+    ours: &'a BTreeMap<String, Oid>,
+    theirs: &'a BTreeMap<String, Oid>,
+    eff_base: BTreeMap<String, Oid>,
+    eff_ours: BTreeMap<String, Oid>,
+    eff_theirs: BTreeMap<String, Oid>,
+    rename_conflicts: Vec<ConflictEntry>,
+}
+
 /// Rename-aware 3-way tree merge operator.
 pub struct RenameMergeEngine;
+
+type DiffEndpoints<'a> = (Vec<(&'a String, &'a Oid)>, Vec<(&'a String, &'a Oid)>);
 
 impl RenameMergeEngine {
     /// Evaluates a 3-way tree merge incorporating similarity-based rename detection.
@@ -41,31 +53,8 @@ impl RenameMergeEngine {
             return ThreeWayMergeResult::FastForward;
         }
 
-        let mut ours_sources: Vec<(&String, &Oid)> = Vec::new();
-        let mut ours_dests: Vec<(&String, &Oid)> = Vec::new();
-        for (path, oid) in base {
-            if !ours.contains_key(path) {
-                ours_sources.push((path, oid));
-            }
-        }
-        for (path, oid) in ours {
-            if !base.contains_key(path) {
-                ours_dests.push((path, oid));
-            }
-        }
-
-        let mut theirs_sources: Vec<(&String, &Oid)> = Vec::new();
-        let mut theirs_dests: Vec<(&String, &Oid)> = Vec::new();
-        for (path, oid) in base {
-            if !theirs.contains_key(path) {
-                theirs_sources.push((path, oid));
-            }
-        }
-        for (path, oid) in theirs {
-            if !base.contains_key(path) {
-                theirs_dests.push((path, oid));
-            }
-        }
+        let (ours_sources, ours_dests) = Self::collect_diff_endpoints(base, ours);
+        let (theirs_sources, theirs_dests) = Self::collect_diff_endpoints(base, theirs);
 
         if (ours_sources.is_empty() || ours_dests.is_empty())
             && (theirs_sources.is_empty() || theirs_dests.is_empty())
@@ -73,7 +62,8 @@ impl RenameMergeEngine {
             return ThreeWayMerge::merge(base, ours, theirs);
         }
 
-        let ours_renames = Self::collect_renames_for_side(&ours_sources, &ours_dests, &mut get_payload);
+        let ours_renames =
+            Self::collect_renames_for_side(&ours_sources, &ours_dests, &mut get_payload);
         let theirs_renames =
             Self::collect_renames_for_side(&theirs_sources, &theirs_dests, &mut get_payload);
 
@@ -81,129 +71,178 @@ impl RenameMergeEngine {
             return ThreeWayMerge::merge(base, ours, theirs);
         }
 
-        let mut eff_base = base.clone();
-        let mut eff_ours = ours.clone();
-        let mut eff_theirs = theirs.clone();
-        let mut rename_conflicts = Vec::new();
+        let mut state = RenameRemapState {
+            base,
+            ours,
+            theirs,
+            eff_base: base.clone(),
+            eff_ours: ours.clone(),
+            eff_theirs: theirs.clone(),
+            rename_conflicts: Vec::new(),
+        };
 
-        let mut all_sources: BTreeSet<String> = BTreeSet::new();
-        for k in ours_renames.keys() {
-            all_sources.insert(k.clone());
-        }
-        for k in theirs_renames.keys() {
-            all_sources.insert(k.clone());
-        }
+        let all_sources: BTreeSet<String> = ours_renames
+            .keys()
+            .chain(theirs_renames.keys())
+            .cloned()
+            .collect();
 
         for src in all_sources {
-            let b_oid = base.get(&src).copied();
-            let o_dest = ours_renames.get(&src);
-            let t_dest = theirs_renames.get(&src);
-
-            match (o_dest, t_dest) {
-                (Some(o_dst), Some(t_dst)) if o_dst == t_dst => {
-                    eff_base.remove(&src);
-                    eff_ours.remove(&src);
-                    eff_theirs.remove(&src);
-                    if let Some(oid) = b_oid {
-                        eff_base.insert(o_dst.clone(), oid);
-                    }
-                }
-                (Some(o_dst), Some(t_dst)) => {
-                    eff_base.remove(&src);
-                    eff_ours.remove(o_dst);
-                    eff_theirs.remove(t_dst);
-                    rename_conflicts.push(ConflictEntry {
-                        path: format!("{o_dst} (rename/rename conflict: {src} -> {o_dst} vs {t_dst})"),
-                        base_oid: b_oid,
-                        ours_oid: ours.get(o_dst).copied(),
-                        theirs_oid: theirs.get(t_dst).copied(),
-                    });
-                }
-                (Some(o_dst), None) => {
-                    eff_base.remove(&src);
-                    if theirs.contains_key(o_dst) {
-                        eff_ours.remove(o_dst);
-                        rename_conflicts.push(ConflictEntry {
-                            path: format!("{o_dst} (rename/add collision: {src} -> {o_dst})"),
-                            base_oid: b_oid,
-                            ours_oid: ours.get(o_dst).copied(),
-                            theirs_oid: theirs.get(o_dst).copied(),
-                        });
-                    } else {
-                        if let Some(oid) = b_oid {
-                            eff_base.insert(o_dst.clone(), oid);
-                        }
-                        if let Some(&t_oid) = theirs.get(&src) {
-                            eff_theirs.remove(&src);
-                            eff_theirs.insert(o_dst.clone(), t_oid);
-                        } else {
-                            rename_conflicts.push(ConflictEntry {
-                                path: o_dst.clone(),
-                                base_oid: b_oid,
-                                ours_oid: ours.get(o_dst).copied(),
-                                theirs_oid: None,
-                            });
-                        }
-                    }
-                }
-                (None, Some(t_dst)) => {
-                    eff_base.remove(&src);
-                    if ours.contains_key(t_dst) {
-                        eff_theirs.remove(t_dst);
-                        rename_conflicts.push(ConflictEntry {
-                            path: format!("{t_dst} (rename/add collision: {src} -> {t_dst})"),
-                            base_oid: b_oid,
-                            ours_oid: ours.get(t_dst).copied(),
-                            theirs_oid: theirs.get(t_dst).copied(),
-                        });
-                    } else {
-                        if let Some(oid) = b_oid {
-                            eff_base.insert(t_dst.clone(), oid);
-                        }
-                        if let Some(&o_oid) = ours.get(&src) {
-                            eff_ours.remove(&src);
-                            eff_ours.insert(t_dst.clone(), o_oid);
-                        } else {
-                            rename_conflicts.push(ConflictEntry {
-                                path: t_dst.clone(),
-                                base_oid: b_oid,
-                                ours_oid: None,
-                                theirs_oid: theirs.get(t_dst).copied(),
-                            });
-                        }
-                    }
-                }
-                (None, None) => {}
-            }
+            Self::remap_renamed_source(
+                &mut state,
+                &src,
+                (ours_renames.get(&src), theirs_renames.get(&src)),
+            );
         }
 
-        let mut merge_result = ThreeWayMerge::merge(&eff_base, &eff_ours, &eff_theirs);
+        Self::finalize_rename_merge(state)
+    }
+
+    fn collect_diff_endpoints<'a>(
+        base: &'a BTreeMap<String, Oid>,
+        side: &'a BTreeMap<String, Oid>,
+    ) -> DiffEndpoints<'a> {
+        let sources = base
+            .iter()
+            .filter(|(path, _)| !side.contains_key(*path))
+            .collect();
+        let dests = side
+            .iter()
+            .filter(|(path, _)| !base.contains_key(*path))
+            .collect();
+        (sources, dests)
+    }
+
+    fn remap_renamed_source(
+        state: &mut RenameRemapState<'_>,
+        src: &str,
+        dests: (Option<&String>, Option<&String>),
+    ) {
+        let (o_dest, t_dest) = dests;
+        let b_oid = state.base.get(src).copied();
+        match (o_dest, t_dest) {
+            (Some(o_dst), Some(t_dst)) if o_dst == t_dst => {
+                state.eff_base.remove(src);
+                state.eff_ours.remove(src);
+                state.eff_theirs.remove(src);
+                if let Some(oid) = b_oid {
+                    state.eff_base.insert(o_dst.clone(), oid);
+                }
+            }
+            (Some(o_dst), Some(t_dst)) => {
+                state.eff_base.remove(src);
+                state.eff_ours.remove(o_dst);
+                state.eff_theirs.remove(t_dst);
+                state.rename_conflicts.push(ConflictEntry {
+                    path: format!("{o_dst} (rename/rename conflict: {src} -> {o_dst} vs {t_dst})"),
+                    base_oid: b_oid,
+                    ours_oid: state.ours.get(o_dst).copied(),
+                    theirs_oid: state.theirs.get(t_dst).copied(),
+                });
+            }
+            (Some(o_dst), None) => Self::remap_ours_only_rename(state, src, o_dst, b_oid),
+            (None, Some(t_dst)) => Self::remap_theirs_only_rename(state, src, t_dst, b_oid),
+            (None, None) => {}
+        }
+    }
+
+    fn remap_ours_only_rename(
+        state: &mut RenameRemapState<'_>,
+        src: &str,
+        o_dst: &String,
+        b_oid: Option<Oid>,
+    ) {
+        state.eff_base.remove(src);
+        if state.theirs.contains_key(o_dst) {
+            state.eff_ours.remove(o_dst);
+            state.rename_conflicts.push(ConflictEntry {
+                path: format!("{o_dst} (rename/add collision: {src} -> {o_dst})"),
+                base_oid: b_oid,
+                ours_oid: state.ours.get(o_dst).copied(),
+                theirs_oid: state.theirs.get(o_dst).copied(),
+            });
+            return;
+        }
+        if let Some(oid) = b_oid {
+            state.eff_base.insert(o_dst.clone(), oid);
+        }
+        if let Some(&t_oid) = state.theirs.get(src) {
+            state.eff_theirs.remove(src);
+            state.eff_theirs.insert(o_dst.clone(), t_oid);
+        } else {
+            state.rename_conflicts.push(ConflictEntry {
+                path: o_dst.clone(),
+                base_oid: b_oid,
+                ours_oid: state.ours.get(o_dst).copied(),
+                theirs_oid: None,
+            });
+        }
+    }
+
+    fn remap_theirs_only_rename(
+        state: &mut RenameRemapState<'_>,
+        src: &str,
+        t_dst: &String,
+        b_oid: Option<Oid>,
+    ) {
+        state.eff_base.remove(src);
+        if state.ours.contains_key(t_dst) {
+            state.eff_theirs.remove(t_dst);
+            state.rename_conflicts.push(ConflictEntry {
+                path: format!("{t_dst} (rename/add collision: {src} -> {t_dst})"),
+                base_oid: b_oid,
+                ours_oid: state.ours.get(t_dst).copied(),
+                theirs_oid: state.theirs.get(t_dst).copied(),
+            });
+            return;
+        }
+        if let Some(oid) = b_oid {
+            state.eff_base.insert(t_dst.clone(), oid);
+        }
+        if let Some(&o_oid) = state.ours.get(src) {
+            state.eff_ours.remove(src);
+            state.eff_ours.insert(t_dst.clone(), o_oid);
+        } else {
+            state.rename_conflicts.push(ConflictEntry {
+                path: t_dst.clone(),
+                base_oid: b_oid,
+                ours_oid: None,
+                theirs_oid: state.theirs.get(t_dst).copied(),
+            });
+        }
+    }
+
+    fn finalize_rename_merge(state: RenameRemapState<'_>) -> ThreeWayMergeResult {
+        let mut merge_result =
+            ThreeWayMerge::merge(&state.eff_base, &state.eff_ours, &state.eff_theirs);
         if let ThreeWayMergeResult::FastForward = merge_result {
             merge_result = ThreeWayMergeResult::Clean {
-                merged_tree: eff_theirs,
+                merged_tree: state.eff_theirs,
             };
         }
-
-        if !rename_conflicts.is_empty() {
-            match &mut merge_result {
-                ThreeWayMergeResult::Clean { merged_tree } => {
-                    merge_result = ThreeWayMergeResult::Conflicted {
-                        merged_tree: std::mem::take(merged_tree),
-                        conflicts: rename_conflicts,
-                    };
-                }
-                ThreeWayMergeResult::Conflicted { conflicts, .. } => {
-                    conflicts.extend(rename_conflicts);
-                }
-                ThreeWayMergeResult::FastForward => {
-                    merge_result = ThreeWayMergeResult::Conflicted {
-                        merged_tree: BTreeMap::new(),
-                        conflicts: rename_conflicts,
-                    };
+        if state.rename_conflicts.is_empty() {
+            return merge_result;
+        }
+        match merge_result {
+            ThreeWayMergeResult::Clean { merged_tree } => ThreeWayMergeResult::Conflicted {
+                merged_tree,
+                conflicts: state.rename_conflicts,
+            },
+            ThreeWayMergeResult::Conflicted {
+                merged_tree,
+                mut conflicts,
+            } => {
+                conflicts.extend(state.rename_conflicts);
+                ThreeWayMergeResult::Conflicted {
+                    merged_tree,
+                    conflicts,
                 }
             }
+            ThreeWayMergeResult::FastForward => ThreeWayMergeResult::Conflicted {
+                merged_tree: BTreeMap::new(),
+                conflicts: state.rename_conflicts,
+            },
         }
-        merge_result
     }
 
     fn collect_renames_for_side<F>(

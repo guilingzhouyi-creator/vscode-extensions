@@ -241,7 +241,10 @@ impl<'a> Iterator for FastCdcBoundaryIter<'a> {
         if self.offset >= self.input_bytes.len() {
             return None;
         }
-        Some(self.chunker.next_boundary(self.input_bytes, &mut self.offset))
+        Some(
+            self.chunker
+                .next_boundary(self.input_bytes, &mut self.offset),
+        )
     }
 
     #[inline]

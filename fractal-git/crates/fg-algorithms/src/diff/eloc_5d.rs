@@ -39,10 +39,18 @@ pub fn classify_line(line_slice: &str) -> LineSemanticKind {
     if trimmed_line.is_empty() {
         return LineSemanticKind::Blank;
     }
-    if trimmed_line.starts_with("///") || trimmed_line.starts_with("//!") || trimmed_line.starts_with("/**") {
+    if trimmed_line.starts_with("///")
+        || trimmed_line.starts_with("//!")
+        || trimmed_line.starts_with("/**")
+    {
         return LineSemanticKind::DocComment;
     }
-    if trimmed_line.starts_with("//") || trimmed_line.starts_with("/*") || trimmed_line.starts_with('*') || trimmed_line.starts_with("*/") || trimmed_line.starts_with('#') {
+    if trimmed_line.starts_with("//")
+        || trimmed_line.starts_with("/*")
+        || trimmed_line.starts_with('*')
+        || trimmed_line.starts_with("*/")
+        || trimmed_line.starts_with('#')
+    {
         return LineSemanticKind::Comment;
     }
     if is_mechanical_trampoline(trimmed_line) {
@@ -53,8 +61,12 @@ pub fn classify_line(line_slice: &str) -> LineSemanticKind {
 
 #[inline]
 fn is_mechanical_trampoline(trimmed_line: &str) -> bool {
-    let is_short_forwarding_call = (trimmed_line.starts_with("return ") || trimmed_line.starts_with("self.") || trimmed_line.starts_with("this."))
-        && trimmed_line.ends_with(';') && trimmed_line.contains('(') && trimmed_line.len() <= 45;
+    let is_short_forwarding_call = (trimmed_line.starts_with("return ")
+        || trimmed_line.starts_with("self.")
+        || trimmed_line.starts_with("this."))
+        && trimmed_line.ends_with(';')
+        && trimmed_line.contains('(')
+        && trimmed_line.len() <= 45;
     is_short_forwarding_call || trimmed_line == "{}" || trimmed_line == "};"
 }
 
@@ -106,9 +118,15 @@ pub fn evaluate_file_5d_eloc(source_content: &str) -> File5dElocMetrics {
         0.0
     };
     File5dElocMetrics {
-        physical_lines, blank_lines, comment_lines, substantive_lines,
-        effective_lines_of_code, substantive_line_ratio, substance_preservation_ratio,
-        eloc_5d: effective_lines_of_code, tspr: substance_preservation_ratio,
+        physical_lines,
+        blank_lines,
+        comment_lines,
+        substantive_lines,
+        effective_lines_of_code,
+        substantive_line_ratio,
+        substance_preservation_ratio,
+        eloc_5d: effective_lines_of_code,
+        tspr: substance_preservation_ratio,
     }
 }
 
@@ -182,7 +200,8 @@ pub fn evaluate_diff_5d_eloc<'a>(
     }
 
     let substantive_ratio_added = if physical_lines_added > 0 {
-        (physical_lines_added - blank_lines_added - comment_lines_added) as f64 / physical_lines_added as f64
+        (physical_lines_added - blank_lines_added - comment_lines_added) as f64
+            / physical_lines_added as f64
     } else {
         0.0
     };
@@ -195,11 +214,17 @@ pub fn evaluate_diff_5d_eloc<'a>(
         (effective_lines_added + effective_lines_deleted * 0.8).round_to_precision(2);
 
     Diff5dElocDelta {
-        physical_lines_added, physical_lines_deleted,
-        effective_lines_added, effective_lines_deleted,
-        net_turnover_weighted, preservation_ratio_added, substantive_ratio_added,
-        phys_add: physical_lines_added, phys_del: physical_lines_deleted,
-        eloc_5d_add: effective_lines_added, eloc_5d_del: effective_lines_deleted,
+        physical_lines_added,
+        physical_lines_deleted,
+        effective_lines_added,
+        effective_lines_deleted,
+        net_turnover_weighted,
+        preservation_ratio_added,
+        substantive_ratio_added,
+        phys_add: physical_lines_added,
+        phys_del: physical_lines_deleted,
+        eloc_5d_add: effective_lines_added,
+        eloc_5d_del: effective_lines_deleted,
         net_5d_turnover: net_turnover_weighted,
         tspr_add: preservation_ratio_added,
         substantive_ratio_add: substantive_ratio_added,
