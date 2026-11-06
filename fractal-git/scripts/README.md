@@ -22,6 +22,7 @@
 | **`common/resolve-cargo.js`** | 跨平台 (Node.js) | **LF** | 工具链单一真源解析：按 显式覆盖 → rustup shim → rustup toolchain 根（稳定版优先）→ PATH 的顺序定位 cargo，解析到裸 toolchain 二进制时同步钉住 `RUSTC`；与 `scripts/ps1/lib/gate-runtime.ps1` 的 `Resolve-GateCargoCommand` 逐条对应，避免两个运行时对「有没有工具链」给出不同答案 | `node scripts/common/resolve-cargo.js`、`validate-perf-baseline`、`run-audit-report` |
 | **`common/validate-perf-baseline.js`** | 跨平台 (Node.js) | **LF** | 微基准耗时棘轮：以 15% 容差包络对照 `baselines/taxis-perf.baseline.json`，经 `resolve-cargo` 调用而非假定 PATH 可用 (`TB-REGRESSION`) | `node scripts/common/validate-perf-baseline.js` |
 | **`common/run-audit-report.js`** | 跨平台 (Node.js) | **LF** | 质量报告聚合：静态检查 + `cargo test --workspace` 全量回归 + auto-refactor AST 深扫，产出 `reports/audit-latest.json`；未产出解析结果的测试运行计入失败位，使「检查数」与「终态判定」不相矛盾 | `node scripts/common/run-audit-report.js` |
+| **`common/run-hosted-repo-parity.js`** | 跨平台 (Node.js) | **LF** | 托管小项目仓库 Git 与 Taxis 双引擎端到端对拍：验证 `describe --tags`、`log --follow`、`push --dry-run`、真实落盘 `push` 与 `git-export` + `git fsck --full` | `node scripts/common/run-hosted-repo-parity.js` |
 
 > **关于根级 `scripts/build.{ps1,sh}`**：该目录下不提供门面调度跳板。此前的跳板有效代码不足 3 行，仅做参数透传，同时违反 `EXT-DIR-001`（`.ps1` 应归 `ps1/`、`.sh` 应归 `sh/`）与 `ARCH-ABS-001`（单行透传跳板消融），也不满足 `ARCH-FAC-001` 的 $\text{ELOC} \ge 15$ 实质承载门限。请直接调用语言域内的脚本：
 > - Windows: `pwsh -File scripts/ps1/build.ps1`
