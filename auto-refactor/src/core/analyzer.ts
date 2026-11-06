@@ -76,6 +76,7 @@ import {
     printScanTiming,
     runParseAnalyzeStage,
     sortIssues,
+    type PerFileResult,
 } from './scanner/scan-stage';
 import { buildScanReport } from './reporting/reportBuilder';
 import type { ScanWithCacheOptions } from './scanner/cache-scanner';
@@ -153,7 +154,8 @@ export class Scanner implements ScannerContext {
     /**
      * Source text of the files this scan read in-process, kept for the post-scan scoring pass.
      *
-     * Bounded and self-sealing; see {@link RetainedSourceStore} for why retention is all-or-nothing.
+     * Bounded and self-sealing; see {@link RetainedSourceStore} for why retention is
+     * all-or-nothing.
      */
     private readonly retainedSource = new RetainedSourceStore();
 
@@ -255,6 +257,40 @@ export class Scanner implements ScannerContext {
         this.symbolIndex.addReferences(references);
     }
 
+    /**
+     * Retain a file's UTF-8 source text for post-scan consumers without re-reading disk.
+     */
+    public retainSource(rel: string, content: string): void {
+        this.retainedSource.retain(rel, content);
+    }
+
+    /**
+     * Ingest per-file cross-file intelligence summaries (symbols, literals, loopSites, graphEdges)
+     * from worker threads, in-process scans, or L1/L2 warm/diff cache hits.
+     */
+    public ingestFileSummaries(result: PerFileResult | null | undefined): void {
+        if (!result) return;
+        if (result.symbols) {
+            this.symbolIndex.addDefinitions(result.symbols.definitions);
+            this.symbolIndex.addReferences(result.symbols.references);
+        }
+        if (result.literals && result.literals.length > 0) {
+            this.literalIndex.addOccurrences(result.literals, 'projection');
+        }
+        if (result.loopSites && result.loopSites.length > 0) {
+            for (const planItem of this.plan) {
+                if (planItem.name !== 'complexity') continue;
+                const inst = planItem.instance as {
+                    recordLoopSites?: (sites: readonly LoopSite[]) => void;
+                };
+                inst.recordLoopSites?.(result.loopSites);
+            }
+        }
+        if (result.graphEdges) {
+            this.graph.restoreFileSummary(result.graphEdges);
+        }
+    }
+
     getReviewMemory(): ReviewMemoryManager {
         return this.reviewMemory;
     }
@@ -352,7 +388,10 @@ export class Scanner implements ScannerContext {
             );
         }
 
-        const guardedSymbols = extractGuardedRecursiveSymbols(this.symbolIndex, callGraph);
+        const guardedSymbols = extractGuardedRecursiveSymbols(this.symbolIndex, callGraph, {
+            rootDir: this.config.root,
+            retainedSource: this.retainedSourceText(),
+        });
         issues.push(...detectUnboundedRecursion(callGraph, guardedSymbols));
         return issues;
     }

@@ -25,11 +25,12 @@ import {
 } from './ast/traverse';
 import { adapterFor } from './ast/adapters';
 import { unsupportedLanguageDiagnostic } from './ast/language-support';
-import type {
-    LanguageAdapter,
-    NodeProjector,
-    NormalizedAst,
-    NormalizedNode,
+import {
+    OTHER_PLACEHOLDER,
+    type LanguageAdapter,
+    type NodeProjector,
+    type NormalizedAst,
+    type NormalizedNode,
 } from './ast/multilang';
 import { encodeResults, BINARY_RESULT_ENABLED } from './result-codec';
 import {
@@ -37,6 +38,17 @@ import {
     type SymbolDefinition,
     type SymbolReference,
 } from './intelligence/symbolIndex';
+import { LiteralIndex, type LiteralOccurrence } from './intelligence/literalIndex';
+import type { LoopSite } from './intelligence/semanticComplexity';
+import { extractModuleGraphSummary, type ModuleGraphFileSummary } from './dependency-graph';
+import { evaluateFilePreflightMask, isFileAnalyzerActive } from './scanner/file-preflight-gate';
+import {
+    getLanguageIdFromPath,
+    getMaskedSource,
+    computeLineFeatureTape,
+    type MaskedSource,
+    type LineFeatureTape,
+} from './policy/source-mask';
 
 type LineStats = ReturnType<typeof countLineStats>;
 
@@ -336,18 +348,69 @@ function createAnalyzerEntries(context: AnalyzerEntriesContext): StreamingEntry[
         lineStats,
     } = context;
     const tInst0 = AR_TIMING ? nowMs() : 0;
+    const preflightMask = evaluateFilePreflightMask(content, file, config);
+    let maskedSource: MaskedSource | undefined;
+    let featureTape: LineFeatureTape | undefined;
+    let resolvedSourceFile = sourceFile;
+    let lazySfResolved = sourceFile !== undefined;
+
+    const ensureMasked = (): MaskedSource => {
+        if (!maskedSource) {
+            maskedSource = getMaskedSource(content, getLanguageIdFromPath(file));
+        }
+        return maskedSource;
+    };
+    const ensureTape = (): LineFeatureTape => {
+        if (!featureTape) {
+            const ms = ensureMasked();
+            featureTape = computeLineFeatureTape(ms.raw, ms.masked);
+        }
+        return featureTape;
+    };
+    const ensureSf = (): ts.SourceFile | undefined => {
+        if (resolvedSourceFile !== undefined || lazySfResolved) {
+            return resolvedSourceFile;
+        }
+        lazySfResolved = true;
+        if (adapter.id === 'typescript' || adapter.id === 'oxc') {
+            const astModule = loadDynamicModule<{
+                createSourceFile?: (filePath: string, fileContent: string) => ts.SourceFile;
+            }>(MODULE_PATH_AST);
+            resolvedSourceFile = astModule?.createSourceFile?.(file, content);
+        }
+        return resolvedSourceFile;
+    };
+
     const buildContext = (options: Record<string, unknown>): AnalyzerContext => ({
         filePath: file,
         content,
         root: rootForEntries,
         adapter,
-        sourceFile,
+        get sourceFile(): ts.SourceFile | undefined {
+            return ensureSf();
+        },
+        get lines(): readonly string[] {
+            return ensureMasked().raw;
+        },
+        get maskedLines(): readonly string[] {
+            return ensureMasked().masked;
+        },
+        get lineFlags(): Uint32Array {
+            return ensureTape().lineFlags;
+        },
+        get lineIndents(): Uint16Array {
+            return ensureTape().lineIndents;
+        },
         config,
         options,
         lineStats,
     });
 
-    const streamingEntries: StreamingEntry[] = streaming.map((loadedItem) => {
+    const streamingEntries: StreamingEntry[] = [];
+    for (const loadedItem of streaming) {
+        if (!isFileAnalyzerActive(preflightMask, loadedItem.name)) {
+            continue;
+        }
         let analyzerInstance: any;
         const candidate = loadedItem.analyzer as any;
         if (candidate && typeof candidate.resetState === 'function') {
@@ -356,12 +419,16 @@ function createAnalyzerEntries(context: AnalyzerEntriesContext): StreamingEntry[
         } else {
             analyzerInstance = instantiateAnalyzer(loadedItem.mod, loadedItem.name);
         }
-        return {
+        streamingEntries.push({
             analyzer: analyzerInstance as unknown as StreamingEntry['analyzer'],
             ctx: buildContext(loadedItem.options),
-        };
+        });
+    }
+    streamingEntries.push({
+        analyzer: metric,
+        ctx: buildContext({}),
+        exemptFromPruning: true,
     });
-    streamingEntries.push({ analyzer: metric, ctx: buildContext({}) });
     if (AR_TIMING) perf.instantiateTotal += nowMs() - tInst0;
     return streamingEntries;
 }
@@ -390,6 +457,10 @@ interface StreamingExecutionContext {
     config: ScanConfig;
     /** Precomputed line metrics. */
     lineStats: LineStats;
+    /** Optional callback invoked for each projected node. */
+    onProjectedNode?: (node: NormalizedNode, caller: string | null) => void;
+    /** Optional callback invoked when projection falls back to materialized parse. */
+    onProjectionFallback?: (fallbackRoot: NormalizedNode) => void;
 }
 
 /**
@@ -402,8 +473,20 @@ function executeStreamingAnalyzers(context: StreamingExecutionContext): {
     issues: Issue[];
     metricCollector: FileMetricCollector;
 } {
-    const { proj, entries, adapter, ast, content, file, streaming, sourceFile, config, lineStats } =
-        context;
+    const {
+        proj,
+        entries,
+        adapter,
+        ast,
+        content,
+        file,
+        streaming,
+        sourceFile,
+        config,
+        lineStats,
+        onProjectedNode,
+        onProjectionFallback,
+    } = context;
     const issues: Issue[] = [];
     let metricCollector = entries[entries.length - 1]?.analyzer as FileMetricCollector;
 
@@ -413,9 +496,10 @@ function executeStreamingAnalyzers(context: StreamingExecutionContext): {
 
     if (proj) {
         try {
-            issues.push(...runStreamingProjected(proj, entries));
+            issues.push(...runStreamingProjected(proj, entries, onProjectedNode));
         } catch {
             const fallbackAst = adapter.parse(content, file);
+            onProjectionFallback?.(fallbackAst.root);
             metricCollector = new FileMetricCollector();
             const freshEntries = createAnalyzerEntries({
                 streaming,
@@ -541,6 +625,9 @@ interface WorkerResultItem {
     issues: Issue[];
     metric: FileMetric | null;
     symbols?: { definitions: SymbolDefinition[]; references: SymbolReference[] };
+    literals?: LiteralOccurrence[];
+    loopSites?: LoopSite[];
+    graphEdges?: ModuleGraphFileSummary;
 }
 
 function getElapsed(startTimeMs: number): number {
@@ -555,19 +642,6 @@ function resolveAstRoot(ast: NormalizedAst | null, rootForCtx: NormalizedNode): 
     return ast?.root || rootForCtx;
 }
 
-function safeExtractSymbols(
-    proj: NodeProjector | null,
-    rootNode: NormalizedNode,
-    file: string,
-): { definitions: SymbolDefinition[]; references: SymbolReference[] } | undefined {
-    if (proj !== null) return undefined;
-    try {
-        return collectSymbols(rootNode, file);
-    } catch {
-        return undefined;
-    }
-}
-
 interface PipelineRunContext {
     proj: NodeProjector | null;
     ast: NormalizedAst | null;
@@ -580,6 +654,8 @@ interface PipelineRunContext {
     adapter: LanguageAdapter;
     sourceFile: ts.SourceFile | undefined;
     lineStats: LineStats;
+    onProjectedNode?: (node: NormalizedNode, caller: string | null) => void;
+    onProjectionFallback?: (fallbackRoot: NormalizedNode) => void;
 }
 
 function executePipelineAnalyzers(context: PipelineRunContext): {
@@ -598,6 +674,8 @@ function executePipelineAnalyzers(context: PipelineRunContext): {
         adapter,
         sourceFile,
         lineStats,
+        onProjectedNode,
+        onProjectionFallback,
     } = context;
     const metricCollector = new FileMetricCollector();
     const entries = createAnalyzerEntries({
@@ -623,6 +701,8 @@ function executePipelineAnalyzers(context: PipelineRunContext): {
         sourceFile,
         config: cfg,
         lineStats,
+        onProjectedNode,
+        onProjectionFallback,
     });
     const _tStream = getElapsed(tStream0);
 
@@ -644,6 +724,17 @@ function executePipelineAnalyzers(context: PipelineRunContext): {
         issues: [...streamResult.issues, ...legacyIssues],
         metric: streamResult.metricCollector.metric,
     };
+}
+
+function collectWorkerLoopSites(streaming: LoadedAnalyzer[]): LoopSite[] {
+    for (let i = 0; i < streaming.length; i++) {
+        if (streaming[i].name !== 'complexity') continue;
+        const inst = streaming[i].analyzer as { getCurrentFileLoopSites?: () => LoopSite[] };
+        if (typeof inst.getCurrentFileLoopSites === 'function') {
+            return inst.getCurrentFileLoopSites();
+        }
+    }
+    return [];
 }
 
 function executeScanPipeline(
@@ -670,18 +761,28 @@ function executeScanPipeline(
     if (languageIssue) issues.push(languageIssue);
 
     const tSf0 = AR_TIMING ? nowMs() : 0;
-    const sourceFile = resolveSourceFile({
-        ast,
-        legacyCount: legacy.length,
-        adapterId: adapter.id,
-        file,
-        content,
-    });
+    const sourceFile =
+        proj?.sourceFile ??
+        resolveSourceFile({
+            ast,
+            legacyCount: legacy.length,
+            adapterId: adapter.id,
+            file,
+            content,
+        });
     const tSf = getElapsed(tSf0);
 
     const tLine0 = AR_TIMING ? nowMs() : 0;
     const lineStats = countLineStats(content);
     const tLine = getElapsed(tLine0);
+
+    const fileSymbols: { definitions: SymbolDefinition[]; references: SymbolReference[] } = {
+        definitions: [],
+        references: [],
+    };
+    const fileLiterals = new LiteralIndex();
+    let activeProj = proj;
+    let fallbackRoot: NormalizedNode | null = null;
 
     const runResult = executePipelineAnalyzers({
         proj,
@@ -695,6 +796,25 @@ function executeScanPipeline(
         adapter,
         sourceFile,
         lineStats,
+        onProjectedNode: (node, caller) => {
+            if (node === OTHER_PLACEHOLDER || (!node.functionLike && node.children !== undefined)) {
+                return;
+            }
+            try {
+                const collected = collectSymbols(node, file, caller);
+                fileSymbols.definitions.push(...collected.definitions);
+                fileSymbols.references.push(...collected.references);
+                fileLiterals.addTree(file, node);
+            } catch {
+                /* Best-effort */
+            }
+        },
+        onProjectionFallback: (rootNode) => {
+            activeProj = null;
+            fallbackRoot = rootNode;
+            fileSymbols.definitions.length = 0;
+            fileSymbols.references.length = 0;
+        },
     });
     issues.push(...runResult.issues);
 
@@ -707,9 +827,35 @@ function executeScanPipeline(
         legacyDurationMs: 0,
     });
 
-    const astRoot = resolveAstRoot(ast, rootForCtx);
-    const symbols = safeExtractSymbols(proj, astRoot, file);
-    return { file, issues, metric: runResult.metric, symbols };
+    const astRoot = fallbackRoot ?? resolveAstRoot(ast, rootForCtx);
+    try {
+        if (activeProj === null) {
+            const collected = collectSymbols(astRoot, file);
+            fileSymbols.definitions.push(...collected.definitions);
+            fileSymbols.references.push(...collected.references);
+        }
+        fileLiterals.addTree(file, astRoot);
+    } catch {
+        /* Best-effort */
+    }
+
+    const symbols =
+        fileSymbols.definitions.length > 0 || fileSymbols.references.length > 0
+            ? fileSymbols
+            : undefined;
+    const literals = fileLiterals.extractFileOccurrences(file);
+    const loopSites = collectWorkerLoopSites(streaming);
+    const graphEdges = extractModuleGraphSummary(file, content);
+
+    return {
+        file,
+        issues,
+        metric: runResult.metric,
+        symbols,
+        ...(literals.length > 0 ? { literals } : {}),
+        ...(loopSites.length > 0 ? { loopSites } : {}),
+        ...(graphEdges ? { graphEdges } : {}),
+    };
 }
 
 interface RunOneContext {
@@ -789,6 +935,9 @@ function sendWorkerResults(
         const symbolsMap = results.map((resultItem) => ({
             file: resultItem.file,
             symbols: resultItem.symbols,
+            literals: resultItem.literals,
+            loopSites: resultItem.loopSites,
+            graphEdges: resultItem.graphEdges,
         }));
         port.postMessage({ results: buf, symbolsMap }, [buf.buffer as ArrayBuffer]);
     } else {

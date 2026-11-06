@@ -47,6 +47,16 @@ export interface ImportedSymbolRef {
 }
 
 /**
+ * Serializable per-file dependency graph summary for worker IPC and warm/diff cache persistence.
+ */
+export interface ModuleGraphFileSummary {
+    file: string;
+    exportedSymbols: string[];
+    importedModules: string[];
+    namedImports?: ImportedSymbolRef[];
+}
+
+/**
  * Result of a symbol-level impact query: the normalized target, the changed symbols, the
  * downstream files that directly import at least one of them, each impacted import site, and
  * a human-readable refactor plan (empty when no changed symbols were supplied).
@@ -363,6 +373,62 @@ export class ModuleDependencyGraph {
     }
 
     /**
+     * Extract a serializable summary of a registered file's graph edges and named imports.
+     */
+    extractFileSummary(filePath: string): ModuleGraphFileSummary | undefined {
+        const normFile = this.norm(filePath);
+        const info = this.modules.get(normFile);
+        if (!info) return undefined;
+        const namedImports: ImportedSymbolRef[] = [];
+        const targetMap = this.importedSymbolsMap.get(normFile);
+        if (targetMap) {
+            for (const refs of targetMap.values()) {
+                for (let i = 0; i < refs.length; i++) {
+                    namedImports.push(refs[i]);
+                }
+            }
+        }
+        return {
+            file: normalizePath(filePath),
+            exportedSymbols: [...info.exportedSymbols],
+            importedModules: [...info.importedModules],
+            ...(namedImports.length > 0 ? { namedImports } : {}),
+        };
+    }
+
+    /**
+     * Restore a pre-extracted per-file graph summary into this dependency graph.
+     */
+    restoreFileSummary(summary: ModuleGraphFileSummary): void {
+        const normFile = this.norm(summary.file);
+        const existing = this.modules.get(normFile);
+        if (existing) {
+            for (const imp of existing.importedModules) {
+                this.reverseDeps.get(imp)?.delete(normFile);
+            }
+        }
+        const resolvedImports = new Set<string>();
+        for (let i = 0; i < summary.importedModules.length; i++) {
+            const resolved = summary.importedModules[i];
+            resolvedImports.add(resolved);
+            this.getOrCreateReverseSet(resolved).add(normFile);
+        }
+        this.modules.set(normFile, {
+            exportedSymbols: new Set(summary.exportedSymbols),
+            importedModules: resolvedImports,
+        });
+        if (summary.namedImports && summary.namedImports.length > 0) {
+            const targetMap = new Map<string, ImportedSymbolRef[]>();
+            for (let i = 0; i < summary.namedImports.length; i++) {
+                const ref = summary.namedImports[i];
+                const refs = this.getOrCreateTargetRefs(targetMap, ref.sourceFile);
+                refs.push(ref);
+            }
+            this.importedSymbolsMap.set(normFile, targetMap);
+        }
+    }
+
+    /**
      * Whole-graph topological and SCC analysis via nativeCore (Rust Tarjan SCC operator).
      * Returns detected cycle components, Kahn's topological order, and acyclic status.
      */
@@ -585,7 +651,30 @@ export class ModuleDependencyGraph {
     clear(): void {
         this.modules.clear();
         this.reverseDeps.clear();
+        this.importedSymbolsMap.clear();
     }
+}
+
+/**
+ * Standalone helper to extract a file's dependency graph summary without mutating a shared graph.
+ *
+ * @param filePath - Relative or absolute path of the source file.
+ * @param content - Full source text of the file.
+ * @returns Extracted exported symbols and imported module descriptors.
+ */
+export function extractModuleGraphSummary(
+    filePath: string,
+    content: string,
+): ModuleGraphFileSummary {
+    const tempGraph = new ModuleDependencyGraph();
+    tempGraph.registerFromContent(filePath, content);
+    return (
+        tempGraph.extractFileSummary(filePath) ?? {
+            file: normalizePath(filePath),
+            exportedSymbols: [],
+            importedModules: [],
+        }
+    );
 }
 export {
     globToRegex,

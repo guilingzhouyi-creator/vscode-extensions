@@ -5,7 +5,7 @@
  *   enabling zero-heap-allocation filtering and single-cycle bitwise dispatch throughout scanning.
  * Dependencies & Triggers: Consumed by scanner preflight gate, router, and analyzer-runner.
  * Responsibilities:
- *   1. Assign canonical immutable bit flags (1 << 0 to 1 << 30) to all 31 built-in analyzers;
+ *   1. Assign canonical immutable bit flags (1 << 0 to 1 << 31) to all 32 built-in analyzers;
  *   2. Provide ultra-fast bidirectional name-to-bit and bit-to-name lookup tables;
  *   3. Expose pure, allocation-free bitwise arithmetic and masking helpers.
  * Exit Semantics & Design Rationale: Pure constants and inline bitwise arithmetic; zero I/O,
@@ -63,10 +63,12 @@ export const ANALYZER_NAME_TO_BIT: Readonly<Record<string, number>> = Object.fre
     }, {}),
 );
 
-/** Immutable dictionary mapping single bit flags to their canonical analyzer names. */
+/** Immutable dictionary mapping single bit flags (both signed and unsigned) to their canonical analyzer names. */
 export const BIT_TO_ANALYZER_NAME: Readonly<Record<number, string>> = Object.freeze(
     BUILTIN_ANALYZERS.reduce<Record<number, string>>((acc, name, idx) => {
-        acc[1 << idx] = name;
+        const signedBit = 1 << idx;
+        acc[signedBit] = name;
+        acc[signedBit >>> 0] = name;
         return acc;
     }, {}),
 );
