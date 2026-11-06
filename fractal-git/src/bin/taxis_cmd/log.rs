@@ -29,8 +29,7 @@ use fractal_git::constants::cli::CliTag;
 
 use super::commit_walk::{walk_commits, CommitRecord};
 use super::common::{fail_fatal, print_json, reject, CliContext};
-use super::diff;
-use super::log_render::render_log_entries;
+use super::log_render::{render_log_entries, render_show_commit, report_show_json};
 use super::repo_view::RepoView;
 
 /// Default number of commits `log` shows when no limit is given.
@@ -603,60 +602,17 @@ pub(crate) struct ShowRequest {
 
 /// Dispatches `taxis show`.
 pub fn handle_show(ctx: &CliContext) {
-    let mut revision = "HEAD".to_string();
-    let mut part = ShowPart::Patch;
-    let mut context = 3usize;
-    let mut unknown: Vec<String> = Vec::new();
-
-    let mut cursor = 0usize;
-    while cursor < ctx.args.len() {
-        let argument = ctx.args[cursor].as_str();
-        cursor += 1;
-        match argument {
-            "--stat" => part = ShowPart::Stat,
-            "-s" | "--no-patch" => part = ShowPart::HeaderOnly,
-            "--format" | "--pretty" => {
-                if let Some(value) = ctx.args.get(cursor) {
-                    let _ = value;
-                    cursor += 1;
-                }
-            }
-            other if other.starts_with("--format=") || other.starts_with("--pretty=") => {}
-            other if other.starts_with("-U") && other.len() > 2 => {
-                context = other[2..].parse().unwrap_or(3);
-            }
-            other if other.starts_with('-') => unknown.push(other.to_string()),
-            other => revision = other.to_string(),
-        }
-    }
-    if let Some(flag) = unknown.first() {
-        reject(
-            CliTag::ERROR,
-            format!("show does not support the flag '{flag}'"),
-        );
-    }
-
+    let request = parse_show_args(&ctx.args);
     let view = match RepoView::open(ctx) {
         Ok(opened) => opened,
         Err(open_err) => fail_fatal(open_err),
     };
 
-    if revision.contains(':') {
-        let oid = match view.resolve_object_spec(&revision) {
-            Ok(oid) => oid,
-            Err(resolve_err) => reject(CliTag::ERROR, resolve_err),
-        };
-        let object = match view.object(&oid) {
-            Ok(loaded_obj) => loaded_obj,
-            Err(obj_err) => reject(CliTag::ERROR, obj_err),
-        };
-        if object.kind == ObjectKind::Blob {
-            let _ = std::io::stdout().write_all(&object.payload);
-            return;
-        }
+    if try_show_blob_spec(&view, &request.revision) {
+        return;
     }
 
-    let commit = match view.resolve(&revision) {
+    let commit = match view.resolve(&request.revision) {
         Ok(oid) => oid,
         Err(resolve_err) => reject(CliTag::ERROR, resolve_err),
     };
@@ -664,65 +620,71 @@ pub fn handle_show(ctx: &CliContext) {
         Ok(walked) => walked,
         Err(walk_err) => reject(CliTag::ERROR, walk_err),
     };
-    let record = match records.first() {
-        Some(found) => found,
-        None => reject(CliTag::ERROR, "show resolved no commit"),
+    let Some(record) = records.first() else {
+        reject(CliTag::ERROR, "show resolved no commit");
     };
 
     if ctx.json_mode {
-        report_show_json(record, part);
+        report_show_json(record, request.part);
         return;
     }
 
-    println!("commit {}", record.oid.to_hex());
-    if record.parents.len() >= 2 {
-        println!(
-            "Merge: {}",
-            record
-                .parents
-                .iter()
-                .map(|parent| short_oid(parent, abbrev_width(&view)))
-                .collect::<Vec<String>>()
-                .join(" ")
-        );
-    }
-    println!("Author: {} <{}>", record.author_name, record.author_mailbox);
-    println!(
-        "Date:   {}",
-        format_date(record.author_time, record.author_offset_minutes)
-    );
-    println!();
-    for line in record.message.trim_end().lines() {
-        println!("    {line}");
-    }
-    println!();
+    render_show_commit(&view, record, &request);
+}
 
-    if part == ShowPart::HeaderOnly {
-        return;
+fn parse_show_args(args: &[String]) -> ShowRequest {
+    let mut revision = "HEAD".to_string();
+    let mut part = ShowPart::Patch;
+    let mut context = 3usize;
+    let mut cursor = 0usize;
+    while cursor < args.len() {
+        let argument = args[cursor].as_str();
+        cursor += 1;
+        match argument {
+            "--stat" => part = ShowPart::Stat,
+            "-s" | "--no-patch" => part = ShowPart::HeaderOnly,
+            "--format" | "--pretty" => {
+                if args.get(cursor).is_some() {
+                    cursor += 1;
+                }
+            }
+            other if other.starts_with("--format=") || other.starts_with("--pretty=") => {}
+            other if other.starts_with("-U") && other.len() > 2 => {
+                context = other[2..].parse().unwrap_or(3);
+            }
+            other if other.starts_with('-') => {
+                reject(
+                    CliTag::ERROR,
+                    format!("show does not support the flag '{other}'"),
+                );
+            }
+            other => revision = other.to_string(),
+        }
     }
-    // A merge commit has no single patch: what it "changed" depends on which parent it is read
-    // against, and Git therefore prints no patch for one by default. Printing the first-parent diff
-    // instead would attribute the second branch's whole contribution to the merge, and a reader
-    // comparing the output with `git show` would see files that the merge never touched. `--stat`
-    // is the exception: Git does report first-parent statistics there, because a summary has to pick
-    // one baseline and the first parent is the branch that was merged into.
-    if record.parents.len() >= 2 && part == ShowPart::Patch {
-        return;
+    ShowRequest {
+        revision,
+        part,
+        context,
     }
-    let parent = record.parents.first().map(|oid| oid.to_hex());
-    let args = match part {
-        ShowPart::Stat => vec!["--stat".to_string()],
-        _ => vec![format!("-U{context}")],
+}
+
+fn try_show_blob_spec(view: &RepoView, revision: &str) -> bool {
+    if !revision.contains(':') {
+        return false;
+    }
+    let oid = match view.resolve_object_spec(revision) {
+        Ok(oid) => oid,
+        Err(resolve_err) => reject(CliTag::ERROR, resolve_err),
     };
-    // A root commit has no parent, so its left side is the empty tree. Passing the commit's own
-    // tree as the left side would compare the tree against itself and print nothing, which reads as
-    // "this commit changed nothing" — the opposite of what a root commit did.
-    let left = parent.unwrap_or_else(|| diff::EMPTY_TREE_MARKER.to_string());
-    let outcome = diff::run_revision_diff(&view, &left, &record.oid.to_hex(), &args);
-    match outcome {
-        Ok(()) => {}
-        Err(diff_err) => reject(CliTag::ERROR, diff_err),
+    let object = match view.object(&oid) {
+        Ok(loaded_obj) => loaded_obj,
+        Err(obj_err) => reject(CliTag::ERROR, obj_err),
+    };
+    if object.kind == ObjectKind::Blob {
+        let _ = std::io::stdout().write_all(&object.payload);
+        return true;
     }
+    false
 }
 
 /// Renders `log` output as JSON.
@@ -758,34 +720,6 @@ fn report_log_json(records: &[CommitRecord], request: &LogRequest) {
         "revision": request.revision,
         "entry_count": entries.len(),
         "commits": entries,
-    });
-    print_json(&payload);
-}
-
-/// Renders `show` output as JSON.
-fn report_show_json(record: &CommitRecord, part: ShowPart) {
-    let payload = serde_json::json!({
-        "engine": "taxis",
-        "operation": "show",
-        "oid": record.oid.to_hex(),
-        "tree": record.tree.to_hex(),
-        "parents": record.parents.iter().map(|oid| oid.to_hex()).collect::<Vec<String>>(),
-        "author": {
-            "name": record.author_name,
-            "email": record.author_mailbox,
-            "time": record.author_time,
-            "offset": offset_text(record.author_offset_minutes),
-        },
-        "committer": {
-            "name": record.committer_name,
-            "email": record.committer_mailbox,
-            "time": record.committer_time,
-            "offset": offset_text(record.committer_offset_minutes),
-        },
-        "subject": record.subject(),
-        "message": record.message,
-        "patch": matches!(part, ShowPart::Patch),
-        "stat": matches!(part, ShowPart::Stat),
     });
     print_json(&payload);
 }
