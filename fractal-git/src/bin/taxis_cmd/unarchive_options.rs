@@ -103,6 +103,20 @@ fn parse_size_bytes_with_units(raw: &str) -> Result<u64, String> {
         .ok_or_else(|| format!("size '{trimmed}' overflows u64"))
 }
 
+/// Mutable builder state while parsing `taxis unarchive` CLI tokens.
+struct UnarchiveOptionBuilder {
+    archive_path: Option<PathBuf>,
+    dest_dir: Option<PathBuf>,
+    in_place: bool,
+    dry_run: bool,
+    safety_headroom_bytes: u64,
+    batch_window_bytes: Option<u64>,
+    to_odb: bool,
+    branch: Option<String>,
+    tree_only: bool,
+    message: Option<String>,
+}
+
 /// Parses CLI options for `taxis unarchive`.
 pub(super) fn parse_unarchive_options(args: &[String]) -> UnarchiveOptions {
     if args.is_empty() {
@@ -111,106 +125,129 @@ pub(super) fn parse_unarchive_options(args: &[String]) -> UnarchiveOptions {
         );
     }
 
-    let mut archive_path = None;
-    let mut dest_dir = None;
-    let mut in_place = true;
-    let mut dry_run = false;
-    let mut safety_headroom_bytes = DEFAULT_SAFETY_HEADROOM_BYTES;
-    let mut batch_window_bytes = None;
-    let mut to_odb = false;
-    let mut branch = None;
-    let mut tree_only = false;
-    let mut message = None;
+    let mut builder = UnarchiveOptionBuilder {
+        archive_path: None,
+        dest_dir: None,
+        in_place: true,
+        dry_run: false,
+        safety_headroom_bytes: DEFAULT_SAFETY_HEADROOM_BYTES,
+        batch_window_bytes: None,
+        to_odb: false,
+        branch: None,
+        tree_only: false,
+        message: None,
+    };
 
     let mut cursor = 0;
     while cursor < args.len() {
-        match args[cursor].as_str() {
-            "-h" | "--help" | "help" => {
-                print_unarchive_help();
-                std::process::exit(0);
-            }
-            "-C" | "--dest" | "--target" if cursor + 1 < args.len() => {
-                dest_dir = Some(PathBuf::from(&args[cursor + 1]));
-                cursor += 2;
-            }
-            "-m" | "--message" if cursor + 1 < args.len() => {
-                message = Some(args[cursor + 1].clone());
-                cursor += 2;
-            }
-            "-m" | "--message" => fail_usage("--message requires a commit message text"),
-            "--dry-run" => {
-                dry_run = true;
-                cursor += 1;
-            }
-            "--in-place" => {
-                in_place = true;
-                cursor += 1;
-            }
-            "--no-in-place" => {
-                in_place = false;
-                cursor += 1;
-            }
-            "--to-odb" => {
-                to_odb = true;
-                cursor += 1;
-            }
-            "--branch" | "--ref" if cursor + 1 < args.len() => {
-                branch = Some(args[cursor + 1].clone());
-                to_odb = true;
-                cursor += 2;
-            }
-            "--tree-only" => {
-                tree_only = true;
-                to_odb = true;
-                cursor += 1;
-            }
-            "--headroom" if cursor + 1 < args.len() => {
-                safety_headroom_bytes = match parse_size_bytes_with_units(&args[cursor + 1]) {
-                    Ok(headroom_bytes) => headroom_bytes,
-                    Err(reason) => fail_usage(format!("--headroom {}: {reason}", args[cursor + 1])),
-                };
-                cursor += 2;
-            }
-            "--headroom" => fail_usage("--headroom requires a size value (e.g. --headroom 256M)"),
-            "--batch-window" if cursor + 1 < args.len() => {
-                batch_window_bytes = Some(match parse_size_bytes_with_units(&args[cursor + 1]) {
-                    Ok(window_bytes) => window_bytes,
-                    Err(reason) => {
-                        fail_usage(format!("--batch-window {}: {reason}", args[cursor + 1]))
-                    }
-                });
-                cursor += 2;
-            }
-            "--batch-window" => {
-                fail_usage("--batch-window requires a size value (e.g. --batch-window 64M)")
-            }
-            arg if !arg.starts_with('-') && archive_path.is_none() => {
-                archive_path = Some(PathBuf::from(arg));
-                cursor += 1;
-            }
-            other => {
-                fail_usage(format!("unknown option or unexpected argument: '{other}'"));
-            }
-        }
+        cursor += apply_unarchive_option_token(args, cursor, &mut builder);
     }
 
-    let archive = archive_path.unwrap_or_else(|| {
+    let archive = builder.archive_path.unwrap_or_else(|| {
         fail_usage("missing archive file operand");
     });
-
-    let dest = dest_dir.unwrap_or_else(|| PathBuf::from("."));
+    let dest = builder.dest_dir.unwrap_or_else(|| PathBuf::from("."));
 
     UnarchiveOptions {
         archive_path: archive,
         dest_dir: dest,
-        in_place,
-        dry_run,
-        safety_headroom_bytes,
-        batch_window_bytes,
-        to_odb,
-        branch,
-        tree_only,
-        message,
+        in_place: builder.in_place,
+        dry_run: builder.dry_run,
+        safety_headroom_bytes: builder.safety_headroom_bytes,
+        batch_window_bytes: builder.batch_window_bytes,
+        to_odb: builder.to_odb,
+        branch: builder.branch,
+        tree_only: builder.tree_only,
+        message: builder.message,
+    }
+}
+
+/// Applies one CLI token for `taxis unarchive`, returning the number of tokens consumed.
+fn apply_unarchive_option_token(
+    args: &[String],
+    cursor: usize,
+    builder: &mut UnarchiveOptionBuilder,
+) -> usize {
+    match args[cursor].as_str() {
+        "-h" | "--help" | "help" => {
+            print_unarchive_help();
+            std::process::exit(0);
+        }
+        "--dry-run" => {
+            builder.dry_run = true;
+            1
+        }
+        "--in-place" => {
+            builder.in_place = true;
+            1
+        }
+        "--no-in-place" => {
+            builder.in_place = false;
+            1
+        }
+        "--to-odb" => {
+            builder.to_odb = true;
+            1
+        }
+        "--tree-only" => {
+            builder.tree_only = true;
+            builder.to_odb = true;
+            1
+        }
+        other => apply_unarchive_value_token(args, cursor, builder, other),
+    }
+}
+
+/// Applies value-carrying flags or positional archive operand for `taxis unarchive`.
+fn apply_unarchive_value_token(
+    args: &[String],
+    cursor: usize,
+    builder: &mut UnarchiveOptionBuilder,
+    token: &str,
+) -> usize {
+    let next = args.get(cursor + 1);
+    match (token, next) {
+        ("-C" | "--dest" | "--target", Some(val)) => {
+            builder.dest_dir = Some(PathBuf::from(val));
+            2
+        }
+        ("-m" | "--message", Some(val)) => {
+            builder.message = Some(val.clone());
+            2
+        }
+        ("-m" | "--message", None) => fail_usage("--message requires a commit message text"),
+        ("--branch" | "--ref", Some(val)) => {
+            builder.branch = Some(val.clone());
+            builder.to_odb = true;
+            2
+        }
+        ("--headroom", Some(val)) => {
+            builder.safety_headroom_bytes = parse_unarchive_size_flag("--headroom", val);
+            2
+        }
+        ("--headroom", None) => {
+            fail_usage("--headroom requires a size value (e.g. --headroom 256M)")
+        }
+        ("--batch-window", Some(val)) => {
+            builder.batch_window_bytes = Some(parse_unarchive_size_flag("--batch-window", val));
+            2
+        }
+        ("--batch-window", None) => {
+            fail_usage("--batch-window requires a size value (e.g. --batch-window 64M)")
+        }
+        (arg, _) if !arg.starts_with('-') && builder.archive_path.is_none() => {
+            builder.archive_path = Some(PathBuf::from(arg));
+            1
+        }
+        (other, _) => fail_usage(format!("unknown option or unexpected argument: '{other}'")),
+    }
+}
+
+/// Parses a byte-size flag value (`--headroom` or `--batch-window`) or exits with usage error.
+fn parse_unarchive_size_flag(flag_name: &str, raw_value: &str) -> u64 {
+    match parse_size_bytes_with_units(raw_value) {
+        Ok(bytes) => bytes,
+        Err(reason) => fail_usage(format!("{flag_name} {raw_value}: {reason}")),
     }
 }
 

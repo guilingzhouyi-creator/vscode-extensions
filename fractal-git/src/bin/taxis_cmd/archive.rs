@@ -120,11 +120,7 @@ fn write_archive_to_file(
 }
 
 /// Streams generated archive contents directly to standard output for piping.
-fn stream_archive_to_stdout(
-    format: ArchiveFormat,
-    prefix: Option<&str>,
-    entries: &[ArchiveEntry],
-) {
+fn stream_archive_to_stdout(format: ArchiveFormat, prefix: Option<&str>, entries: &[ArchiveEntry]) {
     let stdout = io::stdout();
     let mut handle = stdout.lock();
 
@@ -162,7 +158,13 @@ pub fn handle_archive(ctx: &CliContext) {
 
     let (entries, total_uncompressed_bytes) = collect_archive_entries(&view, files, commit_time);
     let effective_format = determine_archive_format(&opts);
-    dispatch_archive_target(effective_format, &opts, &entries, total_uncompressed_bytes, ctx);
+    dispatch_archive_target(
+        effective_format,
+        &opts,
+        &entries,
+        total_uncompressed_bytes,
+        ctx,
+    );
 }
 
 /// Dispatches archive generation either to a disk file or stdout stream.

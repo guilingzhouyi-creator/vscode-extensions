@@ -115,9 +115,16 @@ fn parse_format_patch_args(args: &[String]) -> FormatPatchOptions {
                 start_number = text.parse().unwrap_or(1);
             }
             other if other.starts_with("--suffix=") => {
-                suffix = other.strip_prefix("--suffix=").unwrap_or(".patch").to_string();
+                suffix = other
+                    .strip_prefix("--suffix=")
+                    .unwrap_or(".patch")
+                    .to_string();
             }
-            other if other.starts_with('-') && other.len() > 1 && other[1..].chars().all(|c| c.is_ascii_digit()) => {
+            other
+                if other.starts_with('-')
+                    && other.len() > 1
+                    && other[1..].chars().all(|c| c.is_ascii_digit()) =>
+            {
                 let count: usize = other[1..].parse().unwrap_or(1);
                 count_limit = Some(count);
             }
@@ -147,17 +154,13 @@ fn resolve_commits_to_format(
     view: &RepoView,
     opts: &FormatPatchOptions,
 ) -> FractalResult<Vec<CommitRecord>> {
-    let head = match view.head_commit()? {
-        Some(oid) => oid,
+    let head = match view.effective_head_commit()? {
+        Some((_, oid)) => oid,
         None => {
-            if let Ok(oid) = view.resolve("refs/fractal/cell/cell-default/main") {
-                oid
-            } else {
-                let starts = super::log::collect_all_starts(view)?;
-                starts.first().copied().ok_or_else(|| {
-                    FractalError::ObjectCodec("cannot format-patch on an unborn HEAD".to_string())
-                })?
-            }
+            let starts = super::log::collect_all_starts(view)?;
+            starts.first().copied().ok_or_else(|| {
+                FractalError::ObjectCodec("cannot format-patch on an unborn HEAD".to_string())
+            })?
         }
     };
 
@@ -174,6 +177,20 @@ fn resolve_commits_to_format(
                 view.resolve(right)?
             };
             (right_oid, Some(left_oid))
+        } else if let Some(limit) = opts.count_limit {
+            let tip = view.resolve(first_spec)?;
+            let mut cur = tip;
+            let mut parents = Vec::new();
+            for _ in 0..limit {
+                let commit_obj = view.object(&cur)?;
+                let rec = parse_commit_record(cur, &commit_obj.payload)?;
+                if rec.parents.is_empty() {
+                    break;
+                }
+                cur = rec.parents[0];
+                parents.push(cur);
+            }
+            (tip, parents.last().copied())
         } else {
             let base_oid = view.resolve(first_spec)?;
             (head, Some(base_oid))
@@ -237,7 +254,11 @@ fn format_single_patch(
 
     // From line
     let _ = writeln!(out, "From {} Mon Sep 17 00:00:00 2001", record.oid.to_hex());
-    let _ = writeln!(out, "From: {} <{}>", record.author_name, record.author_mailbox);
+    let _ = writeln!(
+        out,
+        "From: {} <{}>",
+        record.author_name, record.author_mailbox
+    );
     let date_str = format_rfc2822(record.author_time, record.author_offset_minutes);
     let _ = writeln!(out, "Date: {date_str}");
 
@@ -257,7 +278,11 @@ fn format_single_patch(
     let _ = writeln!(out, "---");
 
     // Diff against first parent or empty tree
-    let parent_rev = record.parents.first().map(|p| p.to_hex()).unwrap_or_else(|| EMPTY_TREE_MARKER.to_string());
+    let parent_rev = record
+        .parents
+        .first()
+        .map(|p| p.to_hex())
+        .unwrap_or_else(|| EMPTY_TREE_MARKER.to_string());
     let diff_req = DiffRequest {
         scope: DiffScope::Revisions,
         context: 3,

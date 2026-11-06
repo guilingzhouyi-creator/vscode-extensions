@@ -68,7 +68,8 @@ pub fn handle_am(ctx: &CliContext) {
         return;
     }
 
-    if ctx.args.contains(&"--resolved".to_string()) || ctx.args.contains(&"--continue".to_string()) {
+    if ctx.args.contains(&"--resolved".to_string()) || ctx.args.contains(&"--continue".to_string())
+    {
         continue_am_session(&view, &state_file);
         return;
     }
@@ -84,7 +85,12 @@ pub fn handle_am(ctx: &CliContext) {
         fail_fatal("no patches found to apply");
     }
 
-    let head_oid = view.head_commit().unwrap_or(None).unwrap_or(Oid::ZERO);
+    let head_oid = view
+        .effective_head_commit()
+        .ok()
+        .flatten()
+        .map(|(_, oid)| oid)
+        .unwrap_or(Oid::ZERO);
     let ref_store = DiskRefStore::new(view.git_dir());
     let target_ref = match ref_store.head() {
         Ok(HeadState::Symbolic { name, .. }) => Some(name),
@@ -120,8 +126,7 @@ fn load_am_payload(args: &[String]) -> Result<Vec<u8>, String> {
 
     let mut combined = Vec::new();
     for path_str in files {
-        let bytes = fs::read(&path_str)
-            .map_err(|e| format!("could not read '{path_str}': {e}"))?;
+        let bytes = fs::read(&path_str).map_err(|e| format!("could not read '{path_str}': {e}"))?;
         combined.extend_from_slice(&bytes);
         if !combined.ends_with(b"\n") {
             combined.push(b'\n');
@@ -304,7 +309,11 @@ fn commit_applied_patch(view: &RepoView, session: &AmSessionState, patch: &Parse
         Err(err) => fail_fatal(format!("tree persistence failed: {err}")),
     };
 
-    let head_oid = view.head_commit().unwrap_or(None);
+    let head_oid = view
+        .effective_head_commit()
+        .ok()
+        .flatten()
+        .map(|(_, oid)| oid);
     let parents = head_oid.into_iter().collect();
 
     let author_sig = GitSignature::new(
@@ -327,13 +336,11 @@ fn commit_applied_patch(view: &RepoView, session: &AmSessionState, patch: &Parse
         Err(err) => fail_fatal(format!("commit persistence failed: {err}")),
     };
 
-    let ref_store = DiskRefStore::new(view.git_dir());
-    if let Some(ref_name) = &session.target_ref {
-        let prev = ref_store.get_ref(ref_name).ok().flatten();
-        let _ = ref_store.update_ref(ref_name, &commit_oid, prev.as_ref());
-    } else {
-        let _ = fs::write(view.git_dir().join("HEAD"), format!("{}\n", commit_oid.to_hex()));
-    }
+    let branch_short = session
+        .target_ref
+        .as_deref()
+        .map(|r| r.strip_prefix("refs/heads/").unwrap_or(r));
+    super::checkout::update_references(view.git_dir(), view.work_root(), commit_oid, branch_short);
 }
 
 /// Saves state and exits with 1 on conflict.
@@ -365,7 +372,10 @@ fn abort_am_session(view: &RepoView, state_file: &Path) {
             let prev = ref_store.get_ref(ref_name).ok().flatten();
             let _ = ref_store.update_ref(ref_name, &orig_oid, prev.as_ref());
         } else {
-            let _ = fs::write(view.git_dir().join("HEAD"), format!("{}\n", orig_oid.to_hex()));
+            let _ = fs::write(
+                view.git_dir().join("HEAD"),
+                format!("{}\n", orig_oid.to_hex()),
+            );
         }
     }
 

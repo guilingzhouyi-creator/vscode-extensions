@@ -48,8 +48,7 @@ pub fn matches_any_pathspec(candidate_path: &str, pathspecs: &[String]) -> bool 
         if normalized_candidate == clean_spec {
             return true;
         }
-        if normalized_candidate.starts_with(clean_spec) {
-            let remaining_slice = &normalized_candidate[clean_spec.len()..];
+        if let Some(remaining_slice) = normalized_candidate.strip_prefix(clean_spec) {
             if remaining_slice.starts_with('/') {
                 return true;
             }
@@ -123,6 +122,95 @@ pub fn commit_modifies_pathspecs(
     }
 
     Ok(false)
+}
+
+/// Evaluates whether a commit modified `current_path` and updates `current_path` across renames (`log --follow`).
+pub fn commit_modifies_followed_path(
+    view: &RepoView,
+    commit_record: &CommitRecord,
+    current_path: &mut String,
+) -> FractalResult<bool> {
+    if commit_record.parents.is_empty() {
+        return Ok(resolve_path_in_tree(view, &commit_record.tree, current_path).is_some());
+    }
+
+    let primary_parent_oid = commit_record.parents[0];
+    let parent_object = view.object(&primary_parent_oid)?;
+    let parent_tree_oid = super::repo_view::parse_commit_tree(&parent_object.payload)?;
+
+    let commit_oid_opt = resolve_path_in_tree(view, &commit_record.tree, current_path);
+    let parent_oid_opt = resolve_path_in_tree(view, &parent_tree_oid, current_path);
+    if commit_oid_opt == parent_oid_opt {
+        return Ok(false);
+    }
+
+    if let (Some(commit_oid), None) = (commit_oid_opt, parent_oid_opt) {
+        if let Some(old_path) = find_renamed_source_path(
+            view,
+            &parent_tree_oid,
+            &commit_record.tree,
+            current_path,
+            commit_oid,
+        ) {
+            *current_path = old_path;
+        }
+    }
+
+    Ok(true)
+}
+
+fn find_renamed_source_path(
+    view: &RepoView,
+    parent_tree_oid: &Oid,
+    commit_tree_oid: &Oid,
+    new_path: &str,
+    new_oid: Oid,
+) -> Option<String> {
+    let mut parent_files = std::collections::BTreeMap::new();
+    let mut commit_files = std::collections::BTreeMap::new();
+    super::tree_view::flatten_tree(view, parent_tree_oid, "", &mut parent_files).ok()?;
+    super::tree_view::flatten_tree(view, commit_tree_oid, "", &mut commit_files).ok()?;
+
+    let clean_new = new_path.trim_start_matches("./").trim_matches('/');
+    let new_entry = commit_files.get(clean_new)?;
+
+    for (old_path, old_entry) in &parent_files {
+        if !commit_files.contains_key(old_path) && old_entry.oid == new_oid {
+            return Some(old_path.clone());
+        }
+    }
+
+    let dest_payload = view.object(&new_oid).ok()?.payload;
+    let mut deleted_items: Vec<(String, super::tree_view::TreeEntry, Vec<u8>)> = Vec::new();
+    for (old_path, old_entry) in &parent_files {
+        if !commit_files.contains_key(old_path) {
+            if let Ok(obj) = view.object(&old_entry.oid) {
+                deleted_items.push((old_path.clone(), *old_entry, obj.payload));
+            }
+        }
+    }
+    if deleted_items.is_empty() {
+        return None;
+    }
+
+    let sources: Vec<fg_algorithms::BlobRef<'_>> = deleted_items
+        .iter()
+        .map(|(path, entry, payload)| fg_algorithms::BlobRef {
+            path: path.as_str(),
+            mode: entry.mode,
+            oid: entry.oid,
+            payload: payload.as_slice(),
+        })
+        .collect();
+    let dests = [fg_algorithms::BlobRef {
+        path: clean_new,
+        mode: new_entry.mode,
+        oid: new_entry.oid,
+        payload: dest_payload.as_slice(),
+    }];
+    let hits = fg_algorithms::detect_renames(&sources, &dests);
+    let hit = (*hits.first()?)?;
+    Some(deleted_items[hit.source].0.clone())
 }
 
 #[cfg(test)]

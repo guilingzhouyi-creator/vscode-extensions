@@ -129,81 +129,19 @@ fn load_patch_payload(files: &[String]) -> FractalResult<Vec<u8>> {
 }
 
 /// Executes patch application in dry-run or write mode.
-pub fn execute_apply(view: &RepoView, patches: &[FilePatch], opts: &ApplyOptions) -> Result<(), String> {
-    let root = view.work_root();
+pub fn execute_apply(
+    view: &RepoView,
+    patches: &[FilePatch],
+    opts: &ApplyOptions,
+) -> Result<(), String> {
     let odb = LooseOdb::new(view.git_dir());
-
     let mut staged_entries = match view.index() {
         Ok(Some(idx)) => idx.entries().to_vec(),
         _ => Vec::new(),
     };
 
     for patch in patches {
-        let target_path = patch
-            .new_path
-            .as_deref()
-            .or(patch.old_path.as_deref())
-            .ok_or_else(|| "patch specifies neither old nor new path".to_string())?;
-
-        let disk_path = root.join(target_path);
-
-        if patch.is_deleted {
-            if !opts.cached && disk_path.exists() && !opts.check_only {
-                let _ = fs::remove_file(&disk_path);
-            }
-            if (opts.cached || opts.index) && !opts.check_only {
-                staged_entries.retain(|e| e.path != target_path);
-            }
-            continue;
-        }
-
-        let existing_content = if opts.cached {
-            staged_entries
-                .iter()
-                .find(|e| e.path == target_path)
-                .and_then(|e| view.object(&e.oid).ok())
-                .map(|o| String::from_utf8_lossy(&o.payload).into_owned())
-                .unwrap_or_default()
-        } else if disk_path.exists() {
-            fs::read_to_string(&disk_path)
-                .map_err(|e| format!("cannot read '{target_path}': {e}"))?
-        } else {
-            String::new()
-        };
-
-        let new_content = apply_hunks_to_content(&existing_content, &patch.hunks, target_path)?;
-
-        if opts.check_only {
-            continue;
-        }
-
-        if !opts.cached {
-            if let Some(parent) = disk_path.parent() {
-                let _ = fs::create_dir_all(parent);
-            }
-            fs::write(&disk_path, new_content.as_bytes())
-                .map_err(|e| format!("could not write to '{target_path}': {e}"))?;
-        }
-
-        if opts.cached || opts.index {
-            let blob_oid = odb
-                .write_object("blob", new_content.as_bytes())
-                .map_err(|e| format!("ODB write failed: {e}"))?;
-
-            staged_entries.retain(|e| e.path != target_path);
-            staged_entries.push(IndexEntry {
-                path: target_path.to_string(),
-                mode: FileMode::RegularFile,
-                oid: blob_oid,
-                stage: IndexStage::Normal,
-                size: new_content.len() as u32,
-                mtime_seconds: 0,
-                mtime_nanos: 0,
-                assume_valid: false,
-                skip_worktree: false,
-                intent_to_add: false,
-            });
-        }
+        apply_single_file_patch(view, patch, (opts, &odb, &mut staged_entries))?;
     }
 
     if (opts.cached || opts.index) && !opts.check_only {
@@ -214,6 +152,89 @@ pub fn execute_apply(view: &RepoView, patches: &[FilePatch], opts: &ApplyOptions
     }
 
     Ok(())
+}
+
+/// Applies one file patch to the worktree and/or staged index.
+fn apply_single_file_patch(
+    view: &RepoView,
+    patch: &FilePatch,
+    state: (&ApplyOptions, &LooseOdb, &mut Vec<IndexEntry>),
+) -> Result<(), String> {
+    let (opts, odb, staged_entries) = state;
+    let target_path = patch
+        .new_path
+        .as_deref()
+        .or(patch.old_path.as_deref())
+        .ok_or_else(|| "patch specifies neither old nor new path".to_string())?;
+    let disk_path = view.work_root().join(target_path);
+
+    if patch.is_deleted {
+        if !opts.cached && disk_path.exists() && !opts.check_only {
+            let _ = fs::remove_file(&disk_path);
+        }
+        if (opts.cached || opts.index) && !opts.check_only {
+            staged_entries.retain(|e| e.path != target_path);
+        }
+        return Ok(());
+    }
+
+    let existing_content =
+        read_apply_target_content(view, (target_path, &disk_path), (opts, staged_entries))?;
+    let new_content = apply_hunks_to_content(&existing_content, &patch.hunks, target_path)?;
+    if opts.check_only {
+        return Ok(());
+    }
+
+    if !opts.cached {
+        if let Some(parent) = disk_path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        fs::write(&disk_path, new_content.as_bytes())
+            .map_err(|e| format!("could not write to '{target_path}': {e}"))?;
+    }
+
+    if opts.cached || opts.index {
+        let blob_oid = odb
+            .write_object("blob", new_content.as_bytes())
+            .map_err(|e| format!("ODB write failed: {e}"))?;
+        staged_entries.retain(|e| e.path != target_path);
+        staged_entries.push(IndexEntry {
+            path: target_path.to_string(),
+            mode: FileMode::RegularFile,
+            oid: blob_oid,
+            stage: IndexStage::Normal,
+            size: new_content.len() as u32,
+            mtime_seconds: 0,
+            mtime_nanos: 0,
+            assume_valid: false,
+            skip_worktree: false,
+            intent_to_add: false,
+        });
+    }
+    Ok(())
+}
+
+/// Reads existing file content from either the staged index (`--cached`) or the working tree.
+fn read_apply_target_content(
+    view: &RepoView,
+    target: (&str, &std::path::Path),
+    state: (&ApplyOptions, &[IndexEntry]),
+) -> Result<String, String> {
+    let (target_path, disk_path) = target;
+    let (opts, staged_entries) = state;
+    if opts.cached {
+        return Ok(staged_entries
+            .iter()
+            .find(|e| e.path == target_path)
+            .and_then(|e| view.object(&e.oid).ok())
+            .map(|o| String::from_utf8_lossy(&o.payload).into_owned())
+            .unwrap_or_default());
+    }
+    if disk_path.exists() {
+        fs::read_to_string(disk_path).map_err(|e| format!("cannot read '{target_path}': {e}"))
+    } else {
+        Ok(String::new())
+    }
 }
 
 /// Applies parsed hunks to a string text.
