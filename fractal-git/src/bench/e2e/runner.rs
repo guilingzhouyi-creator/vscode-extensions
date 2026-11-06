@@ -428,10 +428,7 @@ fn materialize_tree_from_odb(
 
 /// Materializes reference baseline workspace files directly from a Git bundle when external
 /// `git clone` execution is blocked by operating system child process sandbox restrictions.
-pub fn materialize_baseline_from_bundle(
-    bundle_path: &Path,
-    git_dest: &Path,
-) -> FractalResult<()> {
+pub fn materialize_baseline_from_bundle(bundle_path: &Path, git_dest: &Path) -> FractalResult<()> {
     let scratch = create_bench_temp_dir("baseline_scratch")?;
     let git_dir = scratch.join(".git");
     let report = InPlaceBundleConsumer::consume_bundle(
@@ -445,9 +442,7 @@ pub fn materialize_baseline_from_bundle(
         .find(|(n, _)| n == "refs/heads/main" || n == "HEAD" || n == "refs/heads/master")
         .map(|(_, o)| *o)
         .or_else(|| report.references_advanced.first().map(|(_, o)| *o))
-        .ok_or_else(|| {
-            FractalError::CorruptStore("No reference in bundle for baseline".into())
-        })?;
+        .ok_or_else(|| FractalError::CorruptStore("No reference in bundle for baseline".into()))?;
 
     let odb = OdbRouter::open(git_dir.join("objects"))?;
     let commit_obj = odb

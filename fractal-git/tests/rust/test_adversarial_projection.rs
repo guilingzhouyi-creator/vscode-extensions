@@ -40,7 +40,7 @@ fn test_adversarial_oracle_sensitivity_and_zero_write_invariant() {
     let test_dir = tmp.path();
 
     // 1. Oracle Sensitivity Check: empty directory must return (0, 0)
-    let (files, bytes) = count_working_tree_files(&test_dir);
+    let (files, bytes) = count_working_tree_files(test_dir);
     assert_eq!(files, 0, "Empty directory must report 0 files");
     assert_eq!(bytes, 0, "Empty directory must report 0 bytes");
 
@@ -57,7 +57,7 @@ fn test_adversarial_oracle_sensitivity_and_zero_write_invariant() {
     fs::create_dir_all(&git_mock).expect("create git");
     fs::write(git_mock.join("pack.bin"), vec![0xFF; 4096]).expect("write git");
 
-    let (files_detected, bytes_detected) = count_working_tree_files(&test_dir);
+    let (files_detected, bytes_detected) = count_working_tree_files(test_dir);
     assert_eq!(
         files_detected, 2,
         "Oracle must detect exactly 2 non-git files"
@@ -242,7 +242,7 @@ fn test_adversarial_working_tree_cleanliness_after_reads_and_latency_breakdown()
     );
 
     // Verify working tree directory remains completely clean (zero unmanaged files)
-    let (files, bytes) = count_working_tree_files(&temp_dir);
+    let (files, bytes) = count_working_tree_files(temp_dir);
     assert_eq!(files, 0, "Working tree must remain 0 files after reads");
     assert_eq!(bytes, 0, "Working tree must remain 0 bytes after reads");
 }
