@@ -24,18 +24,26 @@ use std::path::Path;
 use crate::error::{NativeError, NativeResult};
 
 /// Maximum size the filesystem accepts for one reparse buffer.
+///
+/// These tokens are Win32 reparse-point values, so they share the `#[cfg(windows)]` gate of the only
+/// code that reads them; on any other host they would be dead weight under `-D warnings`.
+#[cfg(windows)]
 const MAX_REPARSE_BUFFER_LEN: usize = 16 * 1024;
 
 /// `FSCTL_SET_REPARSE_POINT`: attaches a reparse point to an existing directory handle.
+#[cfg(windows)]
 const FSCTL_SET_REPARSE_POINT: u32 = 0x0009_00A4;
 
 /// `IO_REPARSE_TAG_MOUNT_POINT`: the tag that makes a reparse point a junction.
+#[cfg(windows)]
 const IO_REPARSE_TAG_MOUNT_POINT: u32 = 0xA000_0003;
 
 /// Byte length of the reparse buffer header: tag (4) + data length (2) + reserved (2).
+#[cfg(windows)]
 const REPARSE_HEADER_LEN: usize = 8;
 
 /// Byte length of the mount-point field block: four offsets and lengths.
+#[cfg(windows)]
 const MOUNT_POINT_FIELDS_LEN: usize = 8;
 
 /// Reports whether the platform can create a junction.

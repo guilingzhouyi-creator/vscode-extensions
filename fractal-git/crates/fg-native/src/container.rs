@@ -678,10 +678,12 @@ impl ContainerFileLock {
         const LOCK_EX: i32 = 2;
         const LOCK_NB: i32 = 4;
 
+        // Lock-file rendezvous: contents are irrelevant and a peer may hold the inode, so no truncation.
         let file = std::fs::OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .mode(0o644)
             .open(path)?;
 
@@ -941,6 +943,25 @@ mod tests {
         let lock3 =
             ContainerFileLock::acquire(&lock_path, 500).expect("acquire after release succeeds");
         drop(lock3);
+
+        let _ = std::fs::remove_file(&lock_path);
+    }
+
+    #[test]
+    fn container_file_lock_preserves_existing_bytes() {
+        let lock_path = crate::test_support::scratch_path("lock_preserve.txc.lock");
+        let sentinel = b"peer-holds-this-inode";
+        std::fs::write(&lock_path, sentinel).expect("seed the lock file");
+
+        let guard = ContainerFileLock::acquire(&lock_path, 500).expect("acquire must succeed");
+        drop(guard);
+
+        let after = std::fs::read(&lock_path).expect("read back");
+        assert_eq!(
+            after, sentinel,
+            "acquiring an advisory lock must leave a peer's bytes intact; truncating would rewrite \
+             a file another process still has open"
+        );
 
         let _ = std::fs::remove_file(&lock_path);
     }
