@@ -256,8 +256,14 @@ fn optimization_did_not_change_whitelist_behaviour() {
     let accepted = [
         ("临时文件", "whitelisted compound must survive subtraction"),
         ("占位内容", "whitelisted placeholder compound must survive"),
-        ("绝对路径", "whitelisted absolute-path compound must survive"),
-        ("commit template", "a legitimate word containing a short provisional stem must survive"),
+        (
+            "绝对路径",
+            "whitelisted absolute-path compound must survive",
+        ),
+        (
+            "commit template",
+            "a legitimate word containing a short provisional stem must survive",
+        ),
     ];
     for (phrase, reason) in accepted {
         let message = format!(

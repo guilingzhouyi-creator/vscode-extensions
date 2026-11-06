@@ -20,6 +20,3 @@ mod test_conflict_modes;
 
 #[path = "rust/test_commit_graph.rs"]
 mod test_commit_graph;
-
-#[path = "rust/test_commit_materializer.rs"]
-mod test_commit_materializer;

@@ -132,9 +132,10 @@ fn test_committed_baselines_cover_every_metric_per_profile() {
         "../../baselines/taxis-perf.release.baseline.json"
     ))
     .expect("release baseline must parse");
-    let debug: TaxisBenchmarkSuite =
-        serde_json::from_str(include_str!("../../baselines/taxis-perf.debug.baseline.json"))
-            .expect("debug baseline must parse");
+    let debug: TaxisBenchmarkSuite = serde_json::from_str(include_str!(
+        "../../baselines/taxis-perf.debug.baseline.json"
+    ))
+    .expect("debug baseline must parse");
     let expected: Vec<String> = TaxisBenchmarkSuite::run_suite(BenchmarkLevel::All, 1)
         .metrics
         .into_iter()
@@ -146,8 +147,7 @@ fn test_committed_baselines_cover_every_metric_per_profile() {
         (BenchmarkProfile::Debug, &debug),
     ] {
         assert_eq!(
-            suite.profile,
-            profile,
+            suite.profile, profile,
             "baseline must declare its own profile"
         );
         for name in &expected {

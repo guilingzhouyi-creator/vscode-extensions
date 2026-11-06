@@ -229,7 +229,9 @@ fn test_human_control_boundary() {
     let feature_branch = FractalRef::SystemTrunk {
         branch: "feature/auth-v2".into(),
     };
-    assert!(PreReceiveGuard::assert_actor_authorized(&feature_branch, &agent_actor, &policy).is_ok());
+    assert!(
+        PreReceiveGuard::assert_actor_authorized(&feature_branch, &agent_actor, &policy).is_ok()
+    );
 }
 #[test]
 fn test_anti_inflation_commit_telemetry() {

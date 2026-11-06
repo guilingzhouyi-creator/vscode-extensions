@@ -54,7 +54,8 @@ fn typescript_and_gdscript_declarations_are_extracted() {
 
 #[test]
 fn backticked_citations_are_extracted() {
-    let verification = "- 断言 `resolve_commit_slot` 在缺字段时返回错误，并复核 `SectionScan::parse`。";
+    let verification =
+        "- 断言 `resolve_commit_slot` 在缺字段时返回错误，并复核 `SectionScan::parse`。";
     let citations = extract_citations(verification);
     assert!(
         citations.iter().any(|value| value == "resolve_commit_slot"),

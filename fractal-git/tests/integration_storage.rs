@@ -3,6 +3,9 @@
 //! Architecture Role: Consolidates storage, memory pool, and TIPSE in-place engine
 //!   integration tests into a single compiled binary harness, eliminating cargo linker sprawl.
 
+#[path = "rust/support/cli_harness.rs"]
+pub mod cli_harness;
+
 #[path = "rust/test_storage.rs"]
 mod test_storage;
 
