@@ -109,36 +109,56 @@ fn initialize_git_scaffold(git_dir: &Path) -> FractalResult<()> {
     Ok(())
 }
 
-/// Writes all native references into `.git/refs/` hierarchy.
+/// Writes all native references into `.git/refs/` hierarchy, projecting cell branches to `refs/heads/`.
 fn write_git_refs(native_dir: &Path, git_dir: &Path, refs: &RefsSection) -> FractalResult<usize> {
     let mut written = std::collections::BTreeSet::new();
+    let mut projected_heads: Vec<(String, Oid)> = Vec::new();
 
-    // 1. Records from native container REFS section
     for record in refs.records() {
-        let dest = git_dir.join(&record.name);
-        if let Some(parent) = dest.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::write(&dest, format!("{}\n", record.oid.to_hex()))?;
-        written.insert(record.name.clone());
+        write_single_git_ref(git_dir, &record.name, &record.oid, &mut written)?;
+        collect_projected_cell_branch(&record.name, record.oid, &mut projected_heads);
     }
 
-    // 2. Records from native disk ref store (e.g. .taxis/refs/**)
     let refs_dir = native_dir.join("refs");
     if refs_dir.is_dir() {
         let mut disk_refs = RefsSection::new();
         let _ = collect_loose_refs_recursive(&refs_dir, &refs_dir, &mut disk_refs);
         for record in disk_refs.records() {
-            let dest = git_dir.join(&record.name);
-            if let Some(parent) = dest.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            fs::write(&dest, format!("{}\n", record.oid.to_hex()))?;
-            written.insert(record.name.clone());
+            write_single_git_ref(git_dir, &record.name, &record.oid, &mut written)?;
+            collect_projected_cell_branch(&record.name, record.oid, &mut projected_heads);
         }
     }
 
+    for (head_ref, oid) in projected_heads {
+        write_single_git_ref(git_dir, &head_ref, &oid, &mut written)?;
+    }
+
     Ok(written.len())
+}
+
+fn write_single_git_ref(
+    git_dir: &Path,
+    ref_name: &str,
+    oid: &Oid,
+    written: &mut std::collections::BTreeSet<String>,
+) -> FractalResult<()> {
+    let dest = git_dir.join(ref_name);
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(&dest, format!("{}\n", oid.to_hex()))?;
+    written.insert(ref_name.to_string());
+    Ok(())
+}
+
+fn collect_projected_cell_branch(ref_name: &str, oid: Oid, out: &mut Vec<(String, Oid)>) {
+    if let Some(rest) = ref_name.strip_prefix("refs/fractal/cell/") {
+        if let Some((_cell, branch)) = rest.split_once('/') {
+            if !branch.is_empty() {
+                out.push((format!("refs/heads/{branch}"), oid));
+            }
+        }
+    }
 }
 
 /// Exports all objects from native CAS and ODB stores to loose Git objects.
@@ -331,22 +351,54 @@ fn export_index_to_git(
     Ok(0)
 }
 
-/// Writes `.git/HEAD` from native HEAD or HeadState.
+/// Writes `.git/HEAD` from native HEAD or HeadState, ensuring symbolic targets point to a valid `refs/heads/*` ref when available.
 fn write_git_head(native_dir: &Path, git_dir: &Path, head: &HeadState) -> FractalResult<String> {
+    let raw_head = read_raw_native_head(native_dir, head);
+    let resolved_head = normalize_exported_head(git_dir, &raw_head);
+    fs::write(git_dir.join("HEAD"), format!("{resolved_head}\n"))?;
+    Ok(resolved_head)
+}
+
+fn read_raw_native_head(native_dir: &Path, head: &HeadState) -> String {
     let native_head = native_dir.join("HEAD");
     if native_head.is_file() {
         if let Ok(content) = fs::read_to_string(&native_head) {
-            fs::write(git_dir.join("HEAD"), &content)?;
-            return Ok(content.trim().to_string());
+            let trimmed = content.trim();
+            if !trimmed.is_empty() {
+                return trimmed.to_string();
+            }
         }
     }
+    format_head_state(head)
+}
 
-    let head_content = match head {
-        HeadState::Symbolic { target } => format!("ref: {target}\n"),
-        HeadState::Detached { oid } => format!("{}\n", oid.to_hex()),
+fn normalize_exported_head(git_dir: &Path, raw_head: &str) -> String {
+    let Some(target) = raw_head.strip_prefix("ref:").map(str::trim) else {
+        return raw_head.to_string();
     };
-    fs::write(git_dir.join("HEAD"), &head_content)?;
-    Ok(head_content.trim().to_string())
+    if let Some(rest) = target.strip_prefix("refs/fractal/cell/") {
+        if let Some((_cell, branch)) = rest.split_once('/') {
+            let projected = format!("refs/heads/{branch}");
+            if git_dir.join(&projected).is_file() {
+                return format!("ref: {projected}");
+            }
+        }
+    }
+    if git_dir.join(target).is_file() {
+        return format!("ref: {target}");
+    }
+    if git_dir.join("refs/heads/main").is_file() {
+        return "ref: refs/heads/main".to_string();
+    }
+    if let Ok(entries) = fs::read_dir(git_dir.join("refs/heads")) {
+        for entry in entries.flatten() {
+            if entry.path().is_file() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                return format!("ref: refs/heads/{name}");
+            }
+        }
+    }
+    format!("ref: {target}")
 }
 
 /// Projects a native Taxis repository (`.taxis/`) into a Git-compatible repository (`.git/`).
@@ -371,8 +423,8 @@ pub fn export_native_to_git(
     })?;
 
     initialize_git_scaffold(git_dir)?;
-    let head = write_git_head(native_dir, git_dir, &doc.head)?;
     let refs_exported = write_git_refs(native_dir, git_dir, &doc.refs)?;
+    let head = write_git_head(native_dir, git_dir, &doc.head)?;
     let objects_exported = export_cas_objects_to_git(native_dir, git_dir)?;
     let index_entries_exported = export_index_to_git(native_dir, git_dir, &doc.indx)?;
 

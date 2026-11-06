@@ -56,10 +56,9 @@ impl MidxWriter {
                 if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                     if stem.starts_with("pack-")
                         && path.extension().and_then(|ext| ext.to_str()) == Some("idx")
+                        && pack_dir.join(format!("{stem}.pack")).is_file()
                     {
-                        if pack_dir.join(format!("{stem}.pack")).is_file() {
-                            idx_stems.push(stem.to_string());
-                        }
+                        idx_stems.push(stem.to_string());
                     }
                 }
             }

@@ -580,55 +580,11 @@ pub fn extract_targz_forward_hole_punch<P: AsRef<Path>, D: AsRef<Path>>(
     let mut last_punched_offset: u64 = 0;
     let mut header_buf = [0u8; 512];
 
-    loop {
-        match gz.read_exact(&mut header_buf) {
-            Ok(()) => {}
-            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => break,
-            Err(e) => return Err(FractalError::Io(e)),
+    while let Some(member_outcome) = extract_next_targz_member(&mut gz, dest, &mut header_buf)? {
+        if let Some(size) = member_outcome {
+            files_extracted += 1;
+            total_extracted_bytes = total_extracted_bytes.saturating_add(size);
         }
-
-        if header_buf.iter().all(|&b| b == 0) {
-            break;
-        }
-
-        let name_raw = &header_buf[0..100];
-        let name_len = name_raw
-            .iter()
-            .position(|&b| b == 0)
-            .unwrap_or(name_raw.len());
-        let name = String::from_utf8_lossy(&name_raw[..name_len]).to_string();
-
-        let size = parse_tar_octal(&header_buf[124..136]).unwrap_or(0);
-        let typeflag = header_buf[156];
-        let is_dir = typeflag == b'5' || name.ends_with('/');
-
-        let padded_size = size.div_ceil(512) * 512;
-
-        if is_dir {
-            let rel_path = sanitize_relative_path(&name)?;
-            fs::create_dir_all(dest.join(rel_path)).map_err(FractalError::Io)?;
-            continue;
-        }
-
-        let mut payload = vec![0u8; size as usize];
-        gz.read_exact(&mut payload).map_err(FractalError::Io)?;
-
-        // Discard padding bytes
-        let padding_bytes = (padded_size - size) as usize;
-        if padding_bytes > 0 {
-            let mut pad_buf = vec![0u8; padding_bytes];
-            gz.read_exact(&mut pad_buf).map_err(FractalError::Io)?;
-        }
-
-        let rel_path = sanitize_relative_path(&name)?;
-        let target_path = dest.join(rel_path);
-        if let Some(parent) = target_path.parent() {
-            fs::create_dir_all(parent).map_err(FractalError::Io)?;
-        }
-        fs::write(&target_path, &payload).map_err(FractalError::Io)?;
-
-        files_extracted += 1;
-        total_extracted_bytes = total_extracted_bytes.saturating_add(size);
 
         // Periodically punch holes in the consumed raw compressed file
         let current_consumed = gz.get_ref().bytes_read();
@@ -661,6 +617,51 @@ pub fn extract_targz_forward_hole_punch<P: AsRef<Path>, D: AsRef<Path>>(
         total_truncated_bytes: 0,
         final_archive_len: archive_len,
     })
+}
+
+/// Reads and materializes the next tar member from the gzip stream.
+///
+/// Returns `Ok(None)` at end-of-archive, `Ok(Some(None))` for a directory entry,
+/// and `Ok(Some(Some(size)))` for a materialized file entry.
+fn extract_next_targz_member<R: Read>(
+    gz: &mut GzDecoder<R>,
+    dest: &Path,
+    header_buf: &mut [u8; 512],
+) -> FractalResult<Option<Option<u64>>> {
+    match gz.read_exact(header_buf) {
+        Ok(()) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(None),
+        Err(e) => return Err(FractalError::Io(e)),
+    }
+
+    if header_buf.iter().all(|&b| b == 0) {
+        return Ok(None);
+    }
+
+    let fields = parse_tar_header_block(header_buf);
+    let padded_size = fields.size.div_ceil(512) * 512;
+    let rel_path = sanitize_relative_path(&fields.name)?;
+
+    if fields.is_dir {
+        fs::create_dir_all(dest.join(rel_path)).map_err(FractalError::Io)?;
+        return Ok(Some(None));
+    }
+
+    let mut payload = vec![0u8; fields.size as usize];
+    gz.read_exact(&mut payload).map_err(FractalError::Io)?;
+
+    let padding_bytes = (padded_size - fields.size) as usize;
+    if padding_bytes > 0 {
+        let mut pad_buf = vec![0u8; padding_bytes];
+        gz.read_exact(&mut pad_buf).map_err(FractalError::Io)?;
+    }
+
+    let target_path = dest.join(rel_path);
+    if let Some(parent) = target_path.parent() {
+        fs::create_dir_all(parent).map_err(FractalError::Io)?;
+    }
+    fs::write(&target_path, &payload).map_err(FractalError::Io)?;
+    Ok(Some(Some(fields.size)))
 }
 
 #[cfg(test)]

@@ -193,6 +193,19 @@ impl PackIndex {
         Some(Oid::from_bytes(raw))
     }
 
+    /// Collects all object ids in the fanout bucket for `first_byte` whose hex string starts with `hex_prefix`.
+    pub fn match_prefix(&self, first_byte: u8, hex_prefix: &str, out: &mut Vec<Oid>) {
+        let fanout_start = if self.version == 1 { 0 } else { V2_HEADER_LEN };
+        let (low, high) = fanout_range(&self.bytes, fanout_start, first_byte);
+        for index in low..high {
+            if let Some(oid) = self.oid_at(index) {
+                if oid.to_hex().starts_with(hex_prefix) {
+                    out.push(oid);
+                }
+            }
+        }
+    }
+
     /// Returns the pack offset stored at `index`.
     pub fn offset_at(&self, index: usize) -> u64 {
         if self.version == 1 {

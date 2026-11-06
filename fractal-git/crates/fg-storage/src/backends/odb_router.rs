@@ -247,7 +247,7 @@ impl OdbRouter {
             let entry = entry?;
             let dir_name = entry.file_name();
             let dir_str = dir_name.to_string_lossy();
-            if dir_str.len() != 2 || dir_str == "in" || dir_str == "pa" {
+            if dir_str.len() != 2 {
                 continue;
             }
             if !entry.file_type()?.is_dir() {
@@ -266,6 +266,45 @@ impl OdbRouter {
             }
         }
         Ok(())
+    }
+
+    /// Resolves all object ids matching a 4..=40 character hexadecimal prefix using 256-bucket fanout.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FractalError::Io`] on directory read failure.
+    pub fn find_by_hex_prefix(&self, prefix: &str) -> FractalResult<Vec<Oid>> {
+        let lower = prefix.trim().to_ascii_lowercase();
+        if lower.len() < 4 || lower.len() > 40 || !lower.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Ok(Vec::new());
+        }
+        let Ok(first_byte) = u8::from_str_radix(&lower[..2], 16) else {
+            return Ok(Vec::new());
+        };
+        let mut matches = Vec::new();
+        for pack in &self.packs {
+            pack.index.match_prefix(first_byte, &lower, &mut matches);
+        }
+        let bucket_dir = self.objects_dir.join(&lower[..2]);
+        if bucket_dir.is_dir() {
+            let suffix_prefix = &lower[2..];
+            for file_entry in fs::read_dir(&bucket_dir)? {
+                let file_entry = file_entry?;
+                let file_str = file_entry
+                    .file_name()
+                    .to_string_lossy()
+                    .to_ascii_lowercase();
+                if file_str.len() == 38 && file_str.starts_with(suffix_prefix) {
+                    let full_hex = format!("{}{file_str}", &lower[..2]);
+                    if let Ok(oid) = Oid::from_hex(&full_hex) {
+                        matches.push(oid);
+                    }
+                }
+            }
+        }
+        matches.sort();
+        matches.dedup();
+        Ok(matches)
     }
 
     /// Returns `(kind, payload)` for `oid`, or `None` when the object is absent.
