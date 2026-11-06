@@ -23,7 +23,7 @@
     "flag": "--bypass-message-guard",
     "requiresReason": true,
     "minReasonChars": 10,
-    "auditRef": "refs/fractal/telemetry/commit-bypass",
+    "auditRef": "refs/fractal/telemetry/commit-bypass/{commit_oid}",
     "rationale": "A real exception must be an explicit act that leaves a record. Letting --policy switch the gate off made the guard advisory while looking binding."
   }
 }

@@ -71,13 +71,22 @@ pub fn handle_commit(ctx: &CliContext) {
         target_ref.to_git_ref(),
         git_native_default
     );
-    let witness = verify_commit_governance(&message, &policy, &staged_files, &work_root);
-    fg_core::diag_debug!("commit", "governance witness={:?}", witness);
-    verify_project_lease_authorization(&ctx.git_dir, &staged_files);
-
     let hook_runner = super::git_hooks::discover(&ctx.git_dir, &work_root);
     let source_ref =
         resolve_active_head_ref(&ctx.git_dir).unwrap_or_else(|| target_ref.to_git_ref());
+
+    // Order matters. The built-in `fgt-hook-commit-governance` pipeline hook parses and verifies
+    // the message itself, so it must receive a message that is about to be accepted — not the raw
+    // input before the gate ran. Validating first also means a rejected message never reaches the
+    // external hook chain, which is what an author expects: nothing runs for a commit that cannot
+    // exist.
+    let initial_witness = verify_commit_governance(&message, &policy, &staged_files, &work_root);
+    fg_core::diag_debug!(
+        "commit",
+        "pre-hook witness type={} scope={:?}",
+        initial_witness.commit_type,
+        initial_witness.scope
+    );
     super::git_hooks::assert_pipeline_approved(
         &source_ref,
         &target_ref.to_git_ref(),
@@ -86,9 +95,31 @@ pub fn handle_commit(ctx: &CliContext) {
         &staged_files,
         &message,
     );
-    let _ = verify_commit_governance(&message, &policy, &staged_files, &work_root);
+
+    // The witness must describe the message that is actually written, not only the one that entered
+    // the hook chain: `prepare-commit-msg` and `commit-msg` may rewrite the text, so a witness
+    // captured before them attests to something the repository never stored. The post-hook result
+    // is therefore the witness that accompanies the commit.
     let final_message = super::git_hooks::run_commit_chain(&hook_runner, &ctx.git_dir, &message);
-    let _ = verify_commit_governance(&final_message, &policy, &staged_files, &work_root);
+    let bypass = resolve_bypass_grant(&ctx.args, git_native_default, &final_message);
+    let witness = match &bypass {
+        // A recorded bypass skips message validation because that is what the flag promises, and
+        // records an audit entry instead. Refusing the commit here while still accepting the flag
+        // would leave a governance surface that is visible but inert.
+        Some(grant) => {
+            record_bypass_audit(grant, &policy, &final_message);
+            unvalidated_witness(&final_message, &policy)
+        }
+        None if final_message == message => initial_witness,
+        None => verify_commit_governance(&final_message, &policy, &staged_files, &work_root),
+    };
+    fg_core::diag_debug!(
+        "commit",
+        "governance witness type={} scope={:?}",
+        witness.commit_type,
+        witness.scope
+    );
+    verify_project_lease_authorization(&ctx.git_dir, &staged_files);
 
     let tx_id = format!("tx-{}-{}", agent_id, current_unix_seconds());
     let wal = open_and_begin_commit_wal(&ctx.git_dir, &tx_id);
@@ -170,7 +201,6 @@ fn resolve_commit_target_and_policy(
                 floor_error.user_display(is_diag),
             );
         }
-        reject_bypass_without_reason(&ctx.args);
     }
 
     let target_ref = match FractalRef::parse(&target_ref_str) {
@@ -351,13 +381,32 @@ fn human_email(human_name: &str) -> String {
     )
 }
 
-/// Rejects a bypass request that carries no reason.
+/// A recorded decision to skip commit-message validation.
+///
+/// Constructed only by [`resolve_bypass_grant`], so the presence of this value is itself the proof
+/// that a reason was supplied. Callers cannot fabricate one from the argument vector.
+pub(crate) struct BypassGrant {
+    /// Why the message contract could not be met, as supplied by the author.
+    reason: String,
+    /// Opaque digest of the skipped message, so the audit entry names what was skipped without
+    /// copying the text into a governance record.
+    message_digest: String,
+}
+
+/// Resolves a bypass grant from the argument vector, rejecting an unexplained one.
 ///
 /// A bypass is legitimate when it is deliberate and recorded. Without a reason the call is
 /// indistinguishable from an accident, so it is refused rather than honoured.
-fn reject_bypass_without_reason(args: &[String]) {
+///
+/// The grant is only resolvable in governance mode. Under a native-format repository there is no
+/// message contract to skip, so the flag would imply an exemption that does not exist.
+fn resolve_bypass_grant(
+    args: &[String],
+    git_native_default: bool,
+    message: &str,
+) -> Option<BypassGrant> {
     if !args.iter().any(|arg| arg == "--bypass-message-guard") {
-        return;
+        return None;
     }
     let reason = find_arg_value(args, &["--reason"])
         .map(str::trim)
@@ -371,6 +420,67 @@ fn reject_bypass_without_reason(args: &[String]) {
             ),
         );
     }
+    if git_native_default {
+        reject(
+            CliTag::COMMIT_GOVERNANCE_FAIL,
+            concat!(
+                "--bypass-message-guard applies only to a governed repository; ",
+                "a native-format repository has no message contract to exempt."
+            ),
+        );
+    }
+    Some(BypassGrant {
+        reason: reason.to_string(),
+        message_digest: fg_core::crypto::sm3_hash(message.as_bytes())
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>(),
+    })
+}
+
+/// Appends the bypass decision to the telemetry audit ledger.
+///
+/// The entry is written as a durable diagnostic event rather than only to the terminal: a bypass
+/// that leaves no trace is indistinguishable from a gate that never ran. Failure to record is
+/// reported but does not abort the commit, because the commit itself has already been decided and
+/// losing the audit line should not silently turn into a failed operation the user cannot explain.
+fn record_bypass_audit(grant: &BypassGrant, policy: &TaxisPolicy, message: &str) {
+    fg_core::diagnostics::record_event(
+        fg_core::diagnostics::LogLevel::Warn,
+        "taxis::gate",
+        "commit_guard_bypass",
+        &format!(
+            "{}: commit message guard bypassed under policy '{}': {}",
+            fg_core::constants::rules::RULE_FGT_MSG_011,
+            policy.name,
+            grant.reason
+        ),
+        Some(fg_core::constants::rules::RULE_FGT_MSG_011),
+        Some(serde_json::json!({
+            "policy": policy.name,
+            "tier": policy.enforcement_tier(),
+            "reason": grant.reason,
+            "message_digest": grant.message_digest,
+            "message_chars": message.chars().count(),
+        })),
+    );
+}
+
+/// Builds the witness for a commit whose message validation was deliberately skipped.
+///
+/// The `commit_type` is recorded as `"bypassed"` rather than as the message's apparent conventional
+/// type. A witness that looked identical to a validated one would make a skipped check
+/// indistinguishable from a passed one in every downstream consumer, including the commit output.
+fn unvalidated_witness(message: &str, _policy: &TaxisPolicy) -> ValidatedCommitWitness {
+    let header = message.lines().next().unwrap_or_default().trim();
+    ValidatedCommitWitness::new(
+        "bypassed",
+        None,
+        header,
+        message.trim().chars().count(),
+        std::collections::HashMap::new(),
+        message,
+    )
 }
 
 /// Extracts commit message or generates a conventional default.

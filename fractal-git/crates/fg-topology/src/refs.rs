@@ -161,6 +161,12 @@ pub enum FractalRef {
     CellTelemetryLedger { cell_id: String },
     /// Card-level folded milestone quality summary (`refs/fractal/telemetry/cell/{cell_id}/card/{card_id}/summary`).
     CardTelemetrySummary { cell_id: String, card_id: String },
+    /// Commit message-guard bypass receipt (`refs/fractal/telemetry/commit-bypass/{commit_oid}`).
+    ///
+    /// A bypass is an explicit exception to the message contract, so it needs an address that can
+    /// be listed and audited. The trailing component is the commit the exemption was granted for;
+    /// the reason itself lives in the receipt object that component points at.
+    CommitBypassAudit { commit_oid: Oid },
 }
 
 /// Resolved position of the repository's `HEAD`.
@@ -275,6 +281,9 @@ impl FractalRef {
                     REF_TELEMETRY_PREFIX, cell_id, card_id
                 )
             }
+            Self::CommitBypassAudit { commit_oid } => {
+                format!("{}commit-bypass/{}", REF_TELEMETRY_PREFIX, commit_oid)
+            }
         }
     }
 
@@ -339,6 +348,11 @@ impl FractalRef {
             let oid = Oid::from_hex(parts[4]).ok()?;
             return Some(Self::TelemetryCommit { commit_oid: oid });
         }
+        // refs/fractal/telemetry/commit-bypass/<commit_oid> (len: 5)
+        if parts.len() == 5 && parts[3] == "commit-bypass" {
+            let oid = Oid::from_hex(parts[4]).ok()?;
+            return Some(Self::CommitBypassAudit { commit_oid: oid });
+        }
         // refs/fractal/telemetry/cell/<cell_id>/ledger (len: 6)
         if parts.len() == 6 && parts[3] == "cell" && parts[5] == "ledger" {
             return Some(Self::CellTelemetryLedger {
@@ -363,6 +377,7 @@ impl FractalRef {
             Self::TelemetryCommit { .. }
                 | Self::CellTelemetryLedger { .. }
                 | Self::CardTelemetrySummary { .. }
+                | Self::CommitBypassAudit { .. }
         )
     }
 
