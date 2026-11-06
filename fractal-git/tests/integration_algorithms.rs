@@ -20,3 +20,9 @@ mod test_conflict_modes;
 
 #[path = "rust/test_commit_graph.rs"]
 mod test_commit_graph;
+
+#[path = "rust/test_corrected_date_reachability.rs"]
+mod test_corrected_date_reachability;
+
+#[path = "rust/test_commit_graph_ancestry.rs"]
+mod test_commit_graph_ancestry;
