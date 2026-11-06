@@ -22,14 +22,14 @@
 use std::collections::HashSet;
 use std::io::Write;
 
-use fg_core::error::{FractalError, FractalResult};
+use fg_core::error::FractalResult;
 use fg_core::models::{ObjectKind, Oid};
 use fg_topology::DiskRefStore;
 use fractal_git::constants::cli::CliTag;
 
 use super::commit_walk::{walk_commits, CommitRecord};
 use super::common::{fail_fatal, print_json, reject, CliContext};
-use super::log_render::{render_log_entries, render_show_commit, report_show_json};
+use super::log_render::*;
 use super::repo_view::RepoView;
 
 /// Default number of commits `log` shows when no limit is given.
@@ -409,123 +409,6 @@ impl GraphRenderer {
 
         (glyph, cont)
     }
-}
-
-/// Prints one commit in Git's default multi-line form with optional graph prefix.
-fn print_full_entry_with_prefix(
-    record: &CommitRecord,
-    width: usize,
-    glyph: &str,
-    cont: &str,
-) {
-    println!("{glyph}commit {}", record.oid.to_hex());
-    if record.parents.len() >= 2 {
-        println!(
-            "{cont}Merge: {}",
-            record
-                .parents
-                .iter()
-                .map(|parent| short_oid(parent, width))
-                .collect::<Vec<String>>()
-                .join(" ")
-        );
-    }
-    println!("{cont}Author: {} <{}>", record.author_name, record.author_mailbox);
-    println!(
-        "{cont}Date:   {}",
-        format_date(record.author_time, record.author_offset_minutes)
-    );
-    println!("{cont}");
-    for line in record.message.trim_end().lines() {
-        println!("{cont}    {line}");
-    }
-}
-
-/// Renders one `--format` template.
-///
-/// # Errors
-///
-/// Returns [`FractalError::ObjectCodec`] naming an unknown placeholder, so a typo fails instead of
-/// printing a blank column.
-fn render_format(template: &str, record: &CommitRecord, width: usize) -> FractalResult<String> {
-    let mut rendered = String::with_capacity(template.len() + 64);
-    let mut cursor = 0usize;
-    while let Some(start) = template[cursor..].find('%') {
-        let start = cursor + start;
-        rendered.push_str(&template[cursor..start]);
-        let mut end = start + 1;
-        let bytes = template.as_bytes();
-        while end < bytes.len() && bytes[end].is_ascii_alphabetic() {
-            end += 1;
-        }
-        let key = &template[start + 1..end];
-        if key.is_empty() {
-            // `%%` is an escaped percent, and a lone trailing `%` is literal. Git collapses the
-            // escaped form to one character; pushing `%` without consuming the second one leaves
-            // `100%%` in the output where Git prints `100%`.
-            if template[start + 1..].starts_with('%') {
-                rendered.push('%');
-                cursor = start + 2;
-            } else {
-                rendered.push('%');
-                cursor = start + 1;
-            }
-            continue;
-        }
-        rendered.push_str(&resolve_placeholder(key, record, width)?);
-        cursor = end;
-    }
-    rendered.push_str(&template[cursor..]);
-    Ok(rendered)
-}
-
-/// Resolves one `%`-placeholder.
-fn resolve_placeholder(key: &str, record: &CommitRecord, width: usize) -> FractalResult<String> {
-    let value = match key {
-        "H" => record.oid.to_hex(),
-        "h" => short_oid(&record.oid, width),
-        "T" => record.tree.to_hex(),
-        "P" => record
-            .parents
-            .iter()
-            .map(|oid| oid.to_hex())
-            .collect::<Vec<String>>()
-            .join(" "),
-        "an" => record.author_name.clone(),
-        "ae" => record.author_mailbox.clone(),
-        "at" => record.author_time.to_string(),
-        "aI" => format_iso(record.author_time, record.author_offset_minutes),
-        "ad" => format_date(record.author_time, record.author_offset_minutes),
-        "cn" => record.committer_name.clone(),
-        "ce" => record.committer_mailbox.clone(),
-        "ct" => record.committer_time.to_string(),
-        "cI" => format_iso(record.committer_time, record.committer_offset_minutes),
-        "s" => record.subject().to_string(),
-        "B" => record.message.clone(),
-        "n" => "\n".to_string(),
-        other => {
-            return Err(FractalError::ObjectCodec(format!(
-                "unknown log format placeholder '%{other}'; supported: %H %h %T %P %an %ae %at %aI \
-                 %ad %cn %ce %ct %cI %s %B %n"
-            )))
-        }
-    };
-    Ok(value)
-}
-
-/// Width of an abbreviated object id in this repository's output.
-///
-/// Git derives the width from the object count and the resulting collision risk. A constant is
-/// wrong for every repository whose count crosses a power of four: the same binary would print eight
-/// characters in a 20k-object store and seven in a small one, and a caller comparing against
-/// `git log --abbrev-commit` would see a difference on every line.
-fn abbrev_width(view: &RepoView) -> usize {
-    super::abbrev::abbreviation_width(view.approximate_object_count())
-}
-
-/// Returns the leading hex characters of `oid` at `width`.
-fn short_oid(oid: &fg_core::models::Oid, width: usize) -> String {
-    super::abbrev::abbreviate(oid, width)
 }
 
 /// Renders `seconds` in the recorded zone as `Thu Oct 22 21:33:52 2026 +0800`.
