@@ -267,6 +267,14 @@ function projectDimensionDetails(
         const bottlenecks = extractTopBottlenecks(dimensionToLossesMap.get(dimension));
         const qualityGrade = resolveQualityGrade(scoreValue);
 
+        let confidenceField: { confidence: number } | undefined;
+        if (breakdown.confidence !== undefined) {
+            confidenceField = {
+                confidence:
+                    Math.round(breakdown.confidence * ROUND_SCALE_HUNDRED) /
+                    ROUND_SCALE_HUNDRED,
+            };
+        }
         details[dimension] = {
             score: Math.round(scoreValue * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED,
             grade: qualityGrade,
@@ -274,13 +282,7 @@ function projectDimensionDetails(
             ...(weightVal !== undefined
                 ? { weight: Math.round(weightVal * ROUND_SCALE_THOUSAND) / ROUND_SCALE_THOUSAND }
                 : {}),
-            ...(breakdown.confidence !== undefined
-                ? {
-                    confidence:
-                        Math.round(breakdown.confidence * ROUND_SCALE_HUNDRED) /
-                        ROUND_SCALE_HUNDRED,
-                }
-                : {}),
+            ...confidenceField,
             ...bottlenecks,
         };
     });
@@ -435,13 +437,38 @@ function measureHealthQuant(
     const { financial: fin, riskRatios: risk, inequality: ineq, stochastic: stoch } = quantMetrics;
 
     const quant: Record<string, unknown> = {};
-    assignQuantPair(quant, QUANT_KEY_RCR, QUANT_ALIAS_ICR, roundMetric(fin?.rcr ?? fin?.interestCoverageRatio));
+    assignQuantPair(
+        quant,
+        QUANT_KEY_RCR,
+        QUANT_ALIAS_ICR,
+        roundMetric(fin?.rcr ?? fin?.interestCoverageRatio),
+    );
     assignQuantPair(quant, QUANT_KEY_ERQ, QUANT_ALIAS_QSR, roundMetric(risk?.erq ?? risk?.qsr));
-    assignQuantPair(quant, QUANT_KEY_DDR, QUANT_ALIAS_SORTINO, roundMetric(risk?.ddr ?? risk?.sortino));
-    assignQuantPair(quant, QUANT_KEY_EDB95, QUANT_ALIAS_VAR95, roundMetric(risk?.edb95 ?? risk?.var95));
+    assignQuantPair(
+        quant,
+        QUANT_KEY_DDR,
+        QUANT_ALIAS_SORTINO,
+        roundMetric(risk?.ddr ?? risk?.sortino),
+    );
+    assignQuantPair(
+        quant,
+        QUANT_KEY_EDB95,
+        QUANT_ALIAS_VAR95,
+        roundMetric(risk?.edb95 ?? risk?.var95),
+    );
     assignQuantPair(quant, QUANT_KEY_PTD, QUANT_ALIAS_MDD, roundMetric(risk?.ptd ?? risk?.mdd));
-    assignQuantPair(quant, QUANT_KEY_DSI, QUANT_ALIAS_DEBT_GINI, roundMetric(ineq?.dsi ?? ineq?.debtGini));
-    assignQuantPair(quant, QUANT_KEY_RCD, QUANT_ALIAS_DEFECT_ENTROPY, roundMetric(ineq?.rcd ?? ineq?.defectEntropy));
+    assignQuantPair(
+        quant,
+        QUANT_KEY_DSI,
+        QUANT_ALIAS_DEBT_GINI,
+        roundMetric(ineq?.dsi ?? ineq?.debtGini),
+    );
+    assignQuantPair(
+        quant,
+        QUANT_KEY_RCD,
+        QUANT_ALIAS_DEFECT_ENTROPY,
+        roundMetric(ineq?.rcd ?? ineq?.defectEntropy),
+    );
     assignQuantPair(
         quant,
         QUANT_KEY_EHL,
@@ -487,16 +514,19 @@ function computeDimensionSummary(
         }
     });
 
+    let lowestSummary: { lowestDimension: string; lowestScore: number } | undefined;
+    if (lowestDimension) {
+        lowestSummary = {
+            lowestDimension,
+            lowestScore: Math.round(lowestScore * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED,
+        };
+    }
+
     return {
         healthyCount,
         warningCount,
         failingCount,
-        ...(lowestDimension
-            ? {
-                lowestDimension,
-                lowestScore: Math.round(lowestScore * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED,
-            }
-            : {}),
+        ...lowestSummary,
     };
 }
 
@@ -682,7 +712,7 @@ function projectAdjudicationFields(
     const fields: { tier?: 'T1' | 'T2' | 'T3'; conf?: number; also?: readonly string[] } = {};
     const resolvedTier = issue.adjudicatedTier ?? tier;
     if (resolvedTier) fields.tier = resolvedTier;
-    const confidence = issue.evidence?.confidence ?? issue.adjudicatedConfidence;
+    const confidence = issue.adjudicatedConfidence ?? issue.evidence?.confidence;
     if (typeof confidence === 'number' && Number.isFinite(confidence)) {
         fields.conf = Number(confidence.toFixed(2));
     }

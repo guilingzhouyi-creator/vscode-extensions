@@ -543,27 +543,20 @@ function matchSuppression(issue: Issue, index: SuppressionIndex): SuppressionRul
 
 async function resolveFileDirectiveLines(
     file: string | undefined,
+    rootDir: string,
+    retainedSource: ReadonlyMap<string, string> | undefined,
     fileCache: Map<string, string[] | null>,
 ): Promise<string[] | null> {
-    if (!file) {
-        return null;
+    if (!file) return null;
+    if (fileCache.has(file)) return fileCache.get(file) ?? null;
+    let content = retainedSource?.get(file);
+    if (content === undefined) {
+        const fullPath = path.isAbsolute(file) ? file : path.resolve(rootDir, file);
+        content = await fs.promises.readFile(fullPath, 'utf8').catch(() => undefined);
     }
-    if (fileCache.has(file)) {
-        return fileCache.get(file) ?? null;
-    }
-    if (!fs.existsSync(file)) {
-        fileCache.set(file, null);
-        return null;
-    }
-    try {
-        const content = await fs.promises.readFile(file, 'utf8');
-        const lines = INLINE_DIRECTIVE_PATTERN.test(content) ? content.split('\n') : null;
-        fileCache.set(file, lines);
-        return lines;
-    } catch {
-        fileCache.set(file, null);
-        return null;
-    }
+    const lines = content && INLINE_DIRECTIVE_PATTERN.test(content) ? content.split('\n') : null;
+    fileCache.set(file, lines);
+    return lines;
 }
 
 function applySingleIssueSuppression(
@@ -572,6 +565,9 @@ function applySingleIssueSuppression(
     arbiter: FindingConfidenceArbiter,
     index: SuppressionIndex | null,
 ): boolean {
+    if (issue.suppression) {
+        return true;
+    }
     if (fileLines) {
         const inlineCheck = arbiter.checkInlineSuppression(issue, fileLines);
         if (inlineCheck.isSuppressed) {
@@ -607,11 +603,15 @@ function applySingleIssueSuppression(
  *
  * @param report - Scan report undergoing suppression filtering.
  * @param suppressions - Suppression rule collection.
+ * @param rootDir - Workspace root directory for resolving relative file paths.
+ * @param retainedSource - Optional retained source text map from the active scanner.
  * @returns Total count of suppressed issues.
  */
 async function applySuppressions(
     report: ScanReport,
     suppressions: readonly SuppressionRule[],
+    rootDir: string,
+    retainedSource?: ReadonlyMap<string, string>,
 ): Promise<number> {
     const arbiter = new FindingConfidenceArbiter();
     const index = suppressions.length > 0 ? buildSuppressionIndex(suppressions) : null;
@@ -619,7 +619,12 @@ async function applySuppressions(
     const fileCache = new Map<string, string[] | null>();
 
     for (const issue of report.issues) {
-        const fileLines = await resolveFileDirectiveLines(issue.location?.file, fileCache);
+        const fileLines = await resolveFileDirectiveLines(
+            issue.location?.file,
+            rootDir,
+            retainedSource,
+            fileCache,
+        );
         if (applySingleIssueSuppression(issue, fileLines, arbiter, index)) {
             suppressedCount++;
         }
@@ -1150,7 +1155,12 @@ export async function finalizeReport(
 
     const cappedCount = applyAnalyzerSeverityCaps(report, config);
     postScanPasses.push(PASS_SUPPRESSIONS);
-    const suppressedCount = await applySuppressions(report, config.suppressions ?? []);
+    const suppressedCount = await applySuppressions(
+        report,
+        config.suppressions ?? [],
+        config.root,
+        reportScanner?.retainedSourceText(),
+    );
     report.summary.suppressedCount = suppressedCount;
 
     const calibrationStats = await loadEnrichedCalibrationStats({

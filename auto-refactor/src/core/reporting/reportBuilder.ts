@@ -43,6 +43,10 @@ import { CallGraph } from '../intelligence/callGraph';
 import { summarizeUncertainty } from './canonical-issue-builder';
 import { analyzerCoverage } from '../scanner/worker-scheduler';
 import { evaluateProjectAutonomy } from '../scoring/autonomy-scorer';
+import {
+    FindingConfidenceArbiter,
+    INLINE_DIRECTIVE_PATTERN,
+} from '../scoring/finding-confidence-arbiter';
 
 /** Number of hex characters kept from a record hash to form the stored short revision id. */
 const REVISION_ID_LENGTH = 16;
@@ -87,6 +91,7 @@ export interface ReportHost {
     symbolIndex: SymbolIndex;
     literalIndex: LiteralIndex;
     activatedReviewers: ActivatedReviewersSummary;
+    retainedSourceText?: () => ReadonlyMap<string, string>;
 }
 
 /** Severity and analyzer tallies derived from the aggregated issue list. */
@@ -174,20 +179,23 @@ function buildMemoryRecord(
     const codeDomains = extractCodeDomains(undefined, '', fileIssues);
     const revisionHash = sha256Hex(
         metric.file +
-        ':' +
-        (Number.isFinite(score.compositeScore) ? score.compositeScore : UNMEASURED_TOKEN) +
-        ':' +
-        lastAudited,
+            ':' +
+            (Number.isFinite(score.compositeScore) ? score.compositeScore : UNMEASURED_TOKEN) +
+            ':' +
+            lastAudited,
     );
     const revisionId = revisionHash.slice(0, REVISION_ID_LENGTH);
     const existingRecord = host.reviewMemory.getRecord(metric.file);
+    const activeFileIssues = fileIssues.filter(
+        (issueItem) => !issueItem.suppression || issueItem.suppression.downgraded,
+    );
 
     return {
         filePath: metric.file,
         fileHash: calculatedFileHash,
         astDigest,
         codeDomains,
-        ruleHits: fileIssues.map((issueItem) => ({
+        ruleHits: activeFileIssues.map((issueItem) => ({
             id: issueItem.id,
             analyzer: issueItem.analyzer,
             rule: issueItem.rule,
@@ -210,7 +218,7 @@ function buildMemoryRecord(
         },
         fixResults: reconcileFixResults(
             existingRecord?.fixResults,
-            deriveResolvedRules(existingRecord, fileIssues, enabledAnalyzers(cfg)),
+            deriveResolvedRules(existingRecord, activeFileIssues, enabledAnalyzers(cfg)),
             revisionId,
             lastAudited,
             cfg.agentUid || DEFAULT_AGENT_UID,
@@ -325,25 +333,35 @@ function buildSummary(params: BuildSummaryContext): ScanReport['summary'] {
     };
 }
 
+function resolveGovernanceStage(tier: string | undefined): GovernanceProjectProfile['stage'] {
+    if (tier === MATURITY_INDUSTRIAL) {
+        return STAGE_INDUSTRIAL_INFRA;
+    }
+    if (tier === MATURITY_DEMO || tier === MATURITY_PROTOTYPE) {
+        return STAGE_PROTOTYPE;
+    }
+    return STAGE_PRODUCTION;
+}
+
+function resolveGovernanceScale(grade: string | undefined): GovernanceProjectProfile['scale'] {
+    if (grade === SCALE_ENTERPRISE) {
+        return SCALE_MASSIVE;
+    }
+    if (grade === SCALE_GRADE_LARGE) {
+        return SCALE_LARGE;
+    }
+    if (grade === SCALE_GRADE_MEDIUM) {
+        return SCALE_MEDIUM;
+    }
+    return SCALE_SMALL;
+}
+
 /**
  * Map ScanConfig profile, scale, maturity, and archetype to GovernanceProjectProfile.
  */
 function resolveGovernanceProfile(cfg: ScanConfig): GovernanceProjectProfile {
-    const stage: GovernanceProjectProfile['stage'] =
-        cfg.maturityTier === MATURITY_INDUSTRIAL
-            ? STAGE_INDUSTRIAL_INFRA
-            : cfg.maturityTier === MATURITY_DEMO || cfg.maturityTier === MATURITY_PROTOTYPE
-                ? STAGE_PROTOTYPE
-                : STAGE_PRODUCTION;
-
-    const scale: GovernanceProjectProfile['scale'] =
-        cfg.scaleGrade === SCALE_ENTERPRISE
-            ? SCALE_MASSIVE
-            : cfg.scaleGrade === SCALE_GRADE_LARGE
-                ? SCALE_LARGE
-                : cfg.scaleGrade === SCALE_GRADE_MEDIUM
-                    ? SCALE_MEDIUM
-                    : SCALE_SMALL;
+    const stage = resolveGovernanceStage(cfg.maturityTier);
+    const scale = resolveGovernanceScale(cfg.scaleGrade);
 
     let domain: GovernanceProjectProfile['domain'] = DOMAIN_CORE_FRAMEWORK;
     if (cfg.archetype === ARCHETYPE_LIBRARY) domain = DOMAIN_ALGORITHM_LIB;
@@ -351,6 +369,40 @@ function resolveGovernanceProfile(cfg: ScanConfig): GovernanceProjectProfile {
         domain = DOMAIN_BUSINESS_APP;
 
     return { stage, scale, domain };
+}
+
+/**
+ * Pre-apply inline `@refactor-suppress` directives from retained source text before scoring.
+ *
+ * @param issues - Raw issues emitted during the scan stage.
+ * @param retainedSource - Optional map of in-memory file source text keyed by relative path.
+ */
+function preapplyRetainedInlineSuppressions(
+    issues: Issue[],
+    retainedSource?: ReadonlyMap<string, string>,
+): void {
+    if (!retainedSource || retainedSource.size === 0 || issues.length === 0) return;
+    const arbiter = new FindingConfidenceArbiter();
+    const lineCache = new Map<string, string[] | null>();
+    for (const issue of issues) {
+        if (issue.suppression) continue;
+        const file = issue.location?.file;
+        if (!file) continue;
+        let lines = lineCache.get(file);
+        if (lines === undefined) {
+            const content = retainedSource.get(file);
+            lines = content && INLINE_DIRECTIVE_PATTERN.test(content) ? content.split('\n') : null;
+            lineCache.set(file, lines);
+        }
+        if (!lines) continue;
+        const verdict = arbiter.checkInlineSuppression(issue, lines);
+        if (verdict.isSuppressed) {
+            issue.suppression = {
+                reason: verdict.reason || 'Suppressed via inline comment directive',
+                downgraded: false,
+            };
+        }
+    }
 }
 
 /**
@@ -362,6 +414,8 @@ function resolveGovernanceProfile(cfg: ScanConfig): GovernanceProjectProfile {
 export function buildScanReport(params: BuildScanReportContext): ScanReport {
     const host = params.host;
     const cfg = host.config;
+    const retainedSource = host.retainedSourceText?.();
+    preapplyRetainedInlineSuppressions(params.issues, retainedSource);
     const tallies = computeTallyIssues(params.issues);
     const issuesByFile = groupIssuesByFile(params.issues);
     const fileQualityScores = collectFileQuality(host, params.fileMetrics, issuesByFile);
@@ -388,7 +442,7 @@ export function buildScanReport(params: BuildScanReportContext): ScanReport {
         params.fileMetrics,
         params.issues,
         cfg,
-        undefined,
+        retainedSource as Map<string, string> | undefined,
         host.symbolIndex,
     );
 

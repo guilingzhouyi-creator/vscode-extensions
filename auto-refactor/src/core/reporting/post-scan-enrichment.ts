@@ -208,11 +208,16 @@ function accumulateFixResultsList(
         readonly success?: boolean;
     }>,
 ): void {
+    const seenRuleOutcomeInFile = new Set<string>();
     for (const fixItem of fixResults) {
         if (!Array.isArray(fixItem.fixedRules)) continue;
         const succeeded = Boolean(fixItem.success);
         for (const ruleId of fixItem.fixedRules) {
-            if (ruleId) recordRuleFixOutcome(outcomes, ruleId, succeeded);
+            if (!ruleId) continue;
+            const fileOutcomeKey = `${ruleId}\u0000${succeeded ? '1' : '0'}`;
+            if (seenRuleOutcomeInFile.has(fileOutcomeKey)) continue;
+            seenRuleOutcomeInFile.add(fileOutcomeKey);
+            recordRuleFixOutcome(outcomes, ruleId, succeeded);
         }
     }
 }
@@ -536,7 +541,7 @@ function buildActiveFileIssuesMap(
 ): Map<string, Issue[]> {
     const fileIssuesMap = new Map<string, Issue[]>();
     for (const issue of issues) {
-        if (issue.clusteredInto) continue;
+        if (issue.clusteredInto || (issue.suppression && !issue.suppression.downgraded)) continue;
         const filePath = issue.location?.file;
         if (filePath) {
             getOrCreateIssueBucket(fileIssuesMap, filePath).push(issue);

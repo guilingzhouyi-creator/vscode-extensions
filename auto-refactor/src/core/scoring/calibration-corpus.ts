@@ -95,11 +95,23 @@ function mergeFixOutcomes(
 
 function mergeRefutations(
     target: Map<string, { tp: number; fp: number }>,
-    refutedIssues: readonly { rule: string }[],
+    refutedIssues: readonly {
+        rule: string;
+        file?: string;
+        location?: { readonly file?: string };
+    }[],
 ): void {
+    const seenRuleFile = new Set<string>();
     for (let i = 0; i < refutedIssues.length; i++) {
-        const rule = refutedIssues[i]?.rule;
+        const issue = refutedIssues[i];
+        const rule = issue?.rule;
         if (!rule) continue;
+        const filePath = issue.file ?? issue.location?.file;
+        if (filePath) {
+            const dedupKey = `${rule}\u0000${filePath}`;
+            if (seenRuleFile.has(dedupKey)) continue;
+            seenRuleFile.add(dedupKey);
+        }
         const current = target.get(rule) || { tp: 0, fp: 0 };
         current.fp += 1;
         target.set(rule, current);

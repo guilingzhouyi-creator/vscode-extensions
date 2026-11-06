@@ -15,7 +15,18 @@ import {
     AdaptiveExpertBiasRouter,
     type ExpertTelemetrySnapshot,
 } from '../../../src/core/router/adaptive-bias-router';
-import { analyzerNameToBit, AnalyzerBit } from '../../../src/core/constants/analyzer-bitmask';
+import {
+    analyzerNameToBit,
+    AnalyzerBit,
+    BIT_TO_ANALYZER_NAME,
+} from '../../../src/core/constants/analyzer-bitmask';
+import { EXPERT_BY_BIT } from '../../../src/core/experts/expert-catalog';
+import { EXPERT_BASE_SCORES } from '../../../src/core/experts/expert-activation-library';
+import { GroupedExpertDispatcher } from '../../../src/core/experts/grouped-dispatcher';
+import { BUILTIN_FACTORIES } from '../../../src/core/analyzer-registry';
+import { DataArchitectureAnalyzer } from '../../../src/analyzers/data-architecture';
+import { NamingAnalyzer } from '../../../src/analyzers/naming';
+import { DependencyLayoutAnalyzer } from '../../../src/analyzers/dependency-layout';
 
 describe('End-to-End Pipeline Closure & Adaptive Bias Persistence', () => {
     let tmpDir: string;
@@ -132,6 +143,66 @@ describe('End-to-End Pipeline Closure & Adaptive Bias Persistence', () => {
 
             const boostedScore = router.scoreAndRankCandidateBits(complexityBit)[0].score;
             expect(boostedScore).toBeGreaterThan(initialScore);
+        });
+
+        it('resolves bit 31 (CONCURRENCY) across signed and unsigned bitmask representations', () => {
+            const signedBit = AnalyzerBit.CONCURRENCY | 0;
+            const unsignedBit = AnalyzerBit.CONCURRENCY >>> 0;
+
+            expect(BIT_TO_ANALYZER_NAME[signedBit]).toBe('concurrency');
+            expect(BIT_TO_ANALYZER_NAME[unsignedBit]).toBe('concurrency');
+            expect(EXPERT_BY_BIT.get(signedBit)?.id).toBe('concurrency');
+            expect(EXPERT_BY_BIT.get(unsignedBit)?.id).toBe('concurrency');
+            expect(EXPERT_BASE_SCORES[signedBit]).toBe(23);
+            expect(EXPERT_BASE_SCORES[unsignedBit]).toBe(23);
+
+            const router = new AdaptiveExpertBiasRouter();
+            const ranked = router.scoreAndRankCandidateBits(AnalyzerBit.CONCURRENCY);
+            expect(ranked).toHaveLength(1);
+            expect(ranked[0].score).toBe(23);
+
+            const dispatcher = new GroupedExpertDispatcher();
+            const plan = dispatcher.buildDispatchPlan([
+                {
+                    id: 'slice-conc',
+                    filePath: 'src/worker.ts',
+                    activeMask: AnalyzerBit.CONCURRENCY,
+                },
+            ]);
+            expect(plan.batches).toHaveLength(1);
+            expect(plan.batches[0].expertId).toBe('concurrency');
+        });
+
+        it('ensures all 32 built-in analyzers implement resetState() and avoid eager sourceFile getter evaluation', () => {
+            const keys = Object.keys(BUILTIN_FACTORIES);
+            expect(keys).toHaveLength(32);
+            for (const key of keys) {
+                const instance = BUILTIN_FACTORIES[key as keyof typeof BUILTIN_FACTORIES]();
+                expect(typeof instance.resetState).toBe('function');
+            }
+
+            let getterInvocations = 0;
+            const makeLazyCtx = (filePath: string, content: string) => ({
+                filePath,
+                content,
+                options: {},
+                config: { analyzers: {} },
+                get sourceFile() {
+                    getterInvocations++;
+                    return undefined;
+                },
+            });
+
+            new DataArchitectureAnalyzer().finalize(
+                makeLazyCtx('src/service/repo.ts', 'export const x = 1;'),
+            );
+            new NamingAnalyzer().finalize(
+                makeLazyCtx('src/service/model.py', 'def compute_value():\n    return 1\n'),
+            );
+            new DependencyLayoutAnalyzer().finalize(
+                makeLazyCtx('src/service/model.py', 'import os\nx = 1\n'),
+            );
+            expect(getterInvocations).toBe(0);
         });
     });
 });
