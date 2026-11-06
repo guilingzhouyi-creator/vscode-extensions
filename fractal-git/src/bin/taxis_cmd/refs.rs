@@ -183,6 +183,14 @@ fn write_ref(
     }
 }
 
+/// Parsed options for `taxis symbolic-ref`.
+struct SymbolicRefOptions {
+    quiet: bool,
+    short: bool,
+    delete: bool,
+    positional: Vec<String>,
+}
+
 /// Dispatches `taxis symbolic-ref`.
 ///
 /// Only `HEAD` is supported as a symbolic target. Arbitrary symrefs are representable in the store —
@@ -190,49 +198,24 @@ fn write_ref(
 /// would put a second symref implementation beside the reader that has to agree with it. Refusing
 /// by name is honest; a silent write that the resolver ignores would not be.
 pub fn handle_symbolic_ref(ctx: &CliContext) {
-    let mut quiet = false;
-    let mut short = false;
-    let mut delete = false;
-    let mut positional: Vec<String> = Vec::new();
-    let mut cursor = 0;
-    while cursor < ctx.args.len() {
-        let argument = &ctx.args[cursor];
-        match argument.as_str() {
-            "-h" | "--help" => {
-                print_symbolic_ref_help();
-                return;
-            }
-            "-q" | "--quiet" => quiet = true,
-            "--short" => short = true,
-            "-d" | "--delete" => delete = true,
-            "-m" if cursor + 1 < ctx.args.len() => {
-                cursor += 1;
-            }
-            other if other.starts_with('-') && other.len() > 1 => {
-                fail_usage(format!("symbolic-ref: unknown option '{other}'"));
-            }
-            other => positional.push(other.to_string()),
-        }
-        cursor += 1;
-    }
+    let Some(opts) = parse_symbolic_ref_args(&ctx.args) else {
+        print_symbolic_ref_help();
+        return;
+    };
 
-    let Some(name) = positional.first() else {
+    let Some(name) = opts.positional.first() else {
         fail_usage("symbolic-ref requires a reference name");
     };
 
     let view = RepoView::open_or_exit(ctx);
     let ref_store = DiskRefStore::new(view.git_dir());
 
-    if delete {
-        match ref_store.delete_ref(name) {
-            Ok(true) => return,
-            Ok(false) if quiet => return,
-            Ok(false) => reject(CliTag::ERROR, format!("fatal: Cannot delete {name}")),
-            Err(err) => fail_fatal(format!("delete {name}: {err}")),
-        }
+    if opts.delete {
+        delete_symbolic_ref(&ref_store, name, opts.quiet);
+        return;
     }
 
-    if let Some(target) = positional.get(1) {
+    if let Some(target) = opts.positional.get(1) {
         match ref_store.write_symbolic_ref(name, target) {
             Ok(()) => {
                 fg_core::diag_info!("refs", "pointed {name} at {target}");
@@ -242,6 +225,48 @@ pub fn handle_symbolic_ref(ctx: &CliContext) {
         }
     }
 
+    read_and_print_symbolic_ref(&ref_store, name, (opts.short, opts.quiet));
+}
+
+/// Parses command-line options for `taxis symbolic-ref`, returning `None` if `--help` was requested.
+fn parse_symbolic_ref_args(args: &[String]) -> Option<SymbolicRefOptions> {
+    let mut opts = SymbolicRefOptions {
+        quiet: false,
+        short: false,
+        delete: false,
+        positional: Vec::new(),
+    };
+    let mut cursor = 0;
+    while cursor < args.len() {
+        match args[cursor].as_str() {
+            "-h" | "--help" => return None,
+            "-q" | "--quiet" => opts.quiet = true,
+            "--short" => opts.short = true,
+            "-d" | "--delete" => opts.delete = true,
+            "-m" if cursor + 1 < args.len() => cursor += 1,
+            other if other.starts_with('-') && other.len() > 1 => {
+                fail_usage(format!("symbolic-ref: unknown option '{other}'"));
+            }
+            other => opts.positional.push(other.to_string()),
+        }
+        cursor += 1;
+    }
+    Some(opts)
+}
+
+/// Deletes a symbolic reference, honouring `-q`.
+fn delete_symbolic_ref(ref_store: &DiskRefStore, name: &str, quiet: bool) {
+    match ref_store.delete_ref(name) {
+        Ok(true) => {}
+        Ok(false) if quiet => {}
+        Ok(false) => reject(CliTag::ERROR, format!("fatal: Cannot delete {name}")),
+        Err(err) => fail_fatal(format!("delete {name}: {err}")),
+    }
+}
+
+/// Reads and prints a symbolic reference target.
+fn read_and_print_symbolic_ref(ref_store: &DiskRefStore, name: &str, flags: (bool, bool)) {
+    let (short, quiet) = flags;
     match ref_store.read_symbolic_ref(name) {
         Ok(Some(target)) => {
             if short {
@@ -256,9 +281,10 @@ pub fn handle_symbolic_ref(ctx: &CliContext) {
             }
         }
         Ok(None) if quiet => std::process::exit(EXIT_NO_MATCH),
-        Ok(None) => {
-            reject(CliTag::ERROR, format!("fatal: ref {name} is not a symbolic ref"))
-        }
+        Ok(None) => reject(
+            CliTag::ERROR,
+            format!("fatal: ref {name} is not a symbolic ref"),
+        ),
         Err(err) => fail_fatal(format!("read {name}: {err}")),
     }
 }
@@ -319,7 +345,8 @@ fn validate_ref_name(name: &str) -> Result<(), String> {
         ));
     }
     if name.chars().any(|character| {
-        character.is_control() || matches!(character, ' ' | '~' | '^' | ':' | '?' | '*' | '[' | '\\')
+        character.is_control()
+            || matches!(character, ' ' | '~' | '^' | ':' | '?' | '*' | '[' | '\\')
     }) {
         return Err(format!(
             "'{name}' is not a valid ref name: it contains a character Git forbids"
@@ -398,7 +425,10 @@ fn ancestor_reachability(view: &RepoView, tip: &Oid) -> HashSet<Oid> {
 fn best_common_ancestor(view: &RepoView, left: &Oid, right: &Oid) -> Option<Oid> {
     let left_ancestors = ancestor_reachability(view, left);
     let right_ancestors = ancestor_reachability(view, right);
-    let mut common: Vec<Oid> = left_ancestors.intersection(&right_ancestors).copied().collect();
+    let mut common: Vec<Oid> = left_ancestors
+        .intersection(&right_ancestors)
+        .copied()
+        .collect();
     if common.is_empty() {
         return None;
     }
@@ -410,9 +440,9 @@ fn best_common_ancestor(view: &RepoView, left: &Oid, right: &Oid) -> Option<Oid>
     // is strictly closer to both tips, which is what `git merge-base` reports.
     let mut best: Vec<Oid> = Vec::new();
     for candidate in &common {
-        let dominated = common
-            .iter()
-            .any(|other| other != candidate && ancestor_reachability(view, other).contains(candidate));
+        let dominated = common.iter().any(|other| {
+            other != candidate && ancestor_reachability(view, other).contains(candidate)
+        });
         if !dominated {
             best.push(*candidate);
         }

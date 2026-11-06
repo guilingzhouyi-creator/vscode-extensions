@@ -216,42 +216,7 @@ fn handle_bundle_create(ctx: &CliContext, args: &[String]) {
         Err(err) => reject(CliTag::ERROR, format!("open repository: {err}")),
     };
 
-    let mut positive_refs: Vec<(Oid, String)> = Vec::new();
-    let mut negative_oids: Vec<Oid> = Vec::new();
-
-    for rev in rev_args {
-        if let Some(neg) = rev.strip_prefix('^') {
-            match view.resolve(neg) {
-                Ok(oid) => negative_oids.push(oid),
-                Err(err) => reject(
-                    CliTag::ERROR,
-                    format!("resolve prerequisite revision '{neg}': {err}"),
-                ),
-            }
-        } else {
-            match view.resolve(rev) {
-                Ok(oid) => {
-                    let ref_name = match canonical_bundle_ref_name(&view, rev) {
-                        Ok(name) => name,
-                        Err(err) => reject(
-                            CliTag::ERROR,
-                            format!("resolve target reference '{rev}': {err}"),
-                        ),
-                    };
-                    positive_refs.push((oid, ref_name));
-                }
-                Err(err) => reject(
-                    CliTag::ERROR,
-                    format!("resolve target revision '{rev}': {err}"),
-                ),
-            }
-        }
-    }
-
-    if positive_refs.is_empty() {
-        reject(CliTag::ERROR, "no positive revisions specified for bundle");
-    }
-
+    let (positive_refs, negative_oids) = parse_bundle_revisions(&view, rev_args);
     let prerequisites = match prerequisite_entries(&view, &negative_oids) {
         Ok(entries) => entries,
         Err(err) => reject(CliTag::ERROR, format!("resolve prerequisites: {err}")),
@@ -287,22 +252,80 @@ fn handle_bundle_create(ctx: &CliContext, args: &[String]) {
         Err(err) => reject(CliTag::ERROR, format!("write bundle: {err}")),
     };
 
+    render_bundle_create_report(
+        ctx,
+        (&target_file, &positive_refs, &prerequisites),
+        (report.ref_count, report.object_count, report.pack_checksum),
+    );
+}
+
+fn parse_bundle_revisions(view: &RepoView, rev_args: &[String]) -> (Vec<(Oid, String)>, Vec<Oid>) {
+    let mut positive_refs: Vec<(Oid, String)> = Vec::new();
+    let mut negative_oids: Vec<Oid> = Vec::new();
+
+    for rev in rev_args {
+        if let Some(neg) = rev.strip_prefix('^') {
+            match view.resolve(neg) {
+                Ok(oid) => negative_oids.push(oid),
+                Err(err) => reject(
+                    CliTag::ERROR,
+                    format!("resolve prerequisite revision '{neg}': {err}"),
+                ),
+            }
+            continue;
+        }
+        let oid = match view.resolve(rev) {
+            Ok(oid) => oid,
+            Err(err) => reject(
+                CliTag::ERROR,
+                format!("resolve target revision '{rev}': {err}"),
+            ),
+        };
+        let ref_name = match canonical_bundle_ref_name(view, rev) {
+            Ok(name) => name,
+            Err(err) => reject(
+                CliTag::ERROR,
+                format!("resolve target reference '{rev}': {err}"),
+            ),
+        };
+        positive_refs.push((oid, ref_name));
+    }
+
+    if positive_refs.is_empty() {
+        reject(CliTag::ERROR, "no positive revisions specified for bundle");
+    }
+    (positive_refs, negative_oids)
+}
+
+type BundleCreateMeta<'a> = (
+    &'a std::path::Path,
+    &'a [(Oid, String)],
+    &'a [(Oid, String)],
+);
+
+fn render_bundle_create_report(
+    ctx: &CliContext,
+    bundle_meta: BundleCreateMeta<'_>,
+    counts: (usize, usize, Oid),
+) {
+    let (target_file, positive_refs, prerequisites) = bundle_meta;
+    let (ref_count, object_count, pack_checksum) = counts;
     if ctx.json_mode {
         print_json(&serde_json::json!({
             "status": "success",
             "file": target_file.to_string_lossy(),
             "references": positive_refs.iter().map(|(o, r)| serde_json::json!({ "oid": o.to_hex(), "name": r })).collect::<Vec<_>>(),
             "prerequisites": prerequisites.iter().map(|(o, _)| o.to_hex()).collect::<Vec<_>>(),
-            "objects_packaged": report.object_count,
-            "pack_checksum": report.pack_checksum.to_hex(),
+            "objects_packaged": object_count,
+            "pack_checksum": pack_checksum.to_hex(),
         }));
     } else {
         println!(
             "Created bundle '{}' with {} refs and {} objects (pack checksum {})",
             target_file.display(),
-            report.ref_count,
-            report.object_count,
-            &report.pack_checksum.to_hex()[..8]
+            ref_count,
+            object_count,
+            &pack_checksum.to_hex()[..8]
         );
     }
 }

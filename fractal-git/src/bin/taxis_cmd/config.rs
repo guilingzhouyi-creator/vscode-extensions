@@ -102,17 +102,28 @@ pub fn print_config_help() {
     );
 }
 
+#[derive(Default)]
+struct ConfigFlags<'a> {
+    list: bool,
+    wants_get: bool,
+    wants_get_all: bool,
+    wants_add: bool,
+    wants_unset: bool,
+    is_global: bool,
+    explicit_file: Option<PathBuf>,
+    positional: Vec<&'a str>,
+}
+
 /// Parses the argument vector into one [ConfigAction] and target path.
 fn parse_action(ctx: &CliContext) -> (ConfigAction, PathBuf) {
-    let args = &ctx.args;
-    let mut list = false;
-    let mut wants_get = false;
-    let mut wants_get_all = false;
-    let mut wants_add = false;
-    let mut wants_unset = false;
-    let mut is_global = false;
-    let mut explicit_file: Option<PathBuf> = None;
-    let mut positional: Vec<&str> = Vec::new();
+    let flags = parse_config_flags(&ctx.args);
+    let config_path = resolve_config_target(ctx, flags.is_global, flags.explicit_file.clone());
+    let action = build_config_action(&flags);
+    (action, config_path)
+}
+
+fn parse_config_flags(args: &[String]) -> ConfigFlags<'_> {
+    let mut flags = ConfigFlags::default();
     let mut index = 0;
     while index < args.len() {
         let arg = args[index].as_str();
@@ -121,79 +132,76 @@ fn parse_action(ctx: &CliContext) -> (ConfigAction, PathBuf) {
                 print_config_help();
                 exit(0);
             }
-            "--list" | "-l" => list = true,
-            "--get" => wants_get = true,
-            "--get-all" => wants_get_all = true,
-            "--add" => wants_add = true,
-            "--unset" => wants_unset = true,
-            "--replace-all" => {}
-            "--global" => is_global = true,
-            "--local" => {}
-            "-f" if index + 1 < args.len() => {
-                explicit_file = Some(PathBuf::from(&args[index + 1]));
-                index += 1;
-            }
-            "--file" if index + 1 < args.len() => {
-                explicit_file = Some(PathBuf::from(&args[index + 1]));
+            "--list" | "-l" => flags.list = true,
+            "--get" => flags.wants_get = true,
+            "--get-all" => flags.wants_get_all = true,
+            "--add" => flags.wants_add = true,
+            "--unset" => flags.wants_unset = true,
+            "--replace-all" | "--local" => {}
+            "--global" => flags.is_global = true,
+            "-f" | "--file" if index + 1 < args.len() => {
+                flags.explicit_file = Some(PathBuf::from(&args[index + 1]));
                 index += 1;
             }
             other if other.starts_with("--file=") => {
-                explicit_file = Some(PathBuf::from(&other["--file=".len()..]));
+                flags.explicit_file = Some(PathBuf::from(&other["--file=".len()..]));
             }
             other if other.starts_with('-') => {
                 reject(CliTag::ERROR, format!("unknown config flag '{other}'"));
             }
-            other => positional.push(other),
+            other => flags.positional.push(other),
         }
         index += 1;
     }
+    flags
+}
 
-    let config_path = resolve_config_target(ctx, is_global, explicit_file);
-
-    let action = if list {
-        ConfigAction::List
-    } else if wants_get {
-        match positional.first() {
-            Some(spec) => ConfigAction::Get((*spec).to_string()),
-            None => fail_usage("taxis config --get <key>"),
-        }
-    } else if wants_get_all {
-        match positional.first() {
-            Some(spec) => ConfigAction::GetAll((*spec).to_string()),
-            None => fail_usage("taxis config --get-all <key>"),
-        }
-    } else if wants_unset {
-        match positional.first() {
-            Some(spec) => ConfigAction::Unset {
-                spec: (*spec).to_string(),
-                literal: positional.get(1).map(|value| (*value).to_string()),
-            },
-            None => fail_usage("taxis config --unset <key> [<value>]"),
-        }
-    } else if wants_add {
-        match (positional.first(), positional.get(1)) {
-            (Some(spec), Some(value)) => ConfigAction::Set {
-                spec: (*spec).to_string(),
-                value: (*value).to_string(),
-                mode: ConfigWriteMode::Add,
-            },
-            _ => fail_usage("taxis config --add <key> <value>"),
-        }
-    } else {
-        match (positional.first(), positional.get(1)) {
-            (Some(spec), Some(value)) => ConfigAction::Set {
-                spec: (*spec).to_string(),
-                value: (*value).to_string(),
-                mode: ConfigWriteMode::Replace,
-            },
-            (Some(spec), None) => ConfigAction::Get((*spec).to_string()),
-            _ => fail_usage(
-                "taxis config [--global] [--local] [-f <file>] [--list] [--get <key>] [--add] [--unset] [<key> [<value>]]",
-            ),
-        }
-    };
-
-    (action, config_path)
+fn build_config_action(flags: &ConfigFlags<'_>) -> ConfigAction {
+    if flags.list {
+        return ConfigAction::List;
+    }
+    if flags.wants_get {
+        let Some(spec) = flags.positional.first() else {
+            fail_usage("taxis config --get <key>");
+        };
+        return ConfigAction::Get((*spec).to_string());
+    }
+    if flags.wants_get_all {
+        let Some(spec) = flags.positional.first() else {
+            fail_usage("taxis config --get-all <key>");
+        };
+        return ConfigAction::GetAll((*spec).to_string());
+    }
+    if flags.wants_unset {
+        let Some(spec) = flags.positional.first() else {
+            fail_usage("taxis config --unset <key> [<value>]");
+        };
+        return ConfigAction::Unset {
+            spec: (*spec).to_string(),
+            literal: flags.positional.get(1).map(|v| (*v).to_string()),
+        };
+    }
+    if flags.wants_add {
+        let (Some(spec), Some(value)) = (flags.positional.first(), flags.positional.get(1)) else {
+            fail_usage("taxis config --add <key> <value>");
+        };
+        return ConfigAction::Set {
+            spec: (*spec).to_string(),
+            value: (*value).to_string(),
+            mode: ConfigWriteMode::Add,
+        };
+    }
+    match (flags.positional.first(), flags.positional.get(1)) {
+        (Some(spec), Some(value)) => ConfigAction::Set {
+            spec: (*spec).to_string(),
+            value: (*value).to_string(),
+            mode: ConfigWriteMode::Replace,
+        },
+        (Some(spec), None) => ConfigAction::Get((*spec).to_string()),
+        _ => fail_usage(
+            "taxis config [--global] [--local] [-f <file>] [--list] [--get <key>] [--add] [--unset] [<key> [<value>]]",
+        ),
+    }
 }
 
 /// Parses a key specification or terminates with the same status git uses for a bad key.
