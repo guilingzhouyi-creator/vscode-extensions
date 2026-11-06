@@ -199,10 +199,26 @@ pub fn extract_token_trigrams(tokens: &[String]) -> HashMap<String, u32> {
     map
 }
 
+fn extract_token_trigram_hashes(tokens: &[String]) -> HashMap<(u64, u64, u64), u32> {
+    let mut map = HashMap::new();
+    if tokens.len() < 3 {
+        return map;
+    }
+    let hashes: Vec<u64> = tokens.iter().map(|t| compute_string_hash_64(t)).collect();
+    for i in 0..(hashes.len() - 2) {
+        let key = (hashes[i], hashes[i + 1], hashes[i + 2]);
+        *map.entry(key).or_insert(0) += 1;
+    }
+    map
+}
+
 /// Calculate cosine similarity between two token arrays using 3-gram feature vectors
 pub fn calculate_trigram_cosine_similarity(tokens_a: &[String], tokens_b: &[String]) -> f64 {
-    let map_a = extract_token_trigrams(tokens_a);
-    let map_b = extract_token_trigrams(tokens_b);
+    if tokens_a.len() < 3 || tokens_b.len() < 3 {
+        return 0.0;
+    }
+    let map_a = extract_token_trigram_hashes(tokens_a);
+    let map_b = extract_token_trigram_hashes(tokens_b);
     if map_a.is_empty() || map_b.is_empty() {
         return 0.0;
     }
@@ -304,7 +320,7 @@ pub fn detect_clone_blocks(content: &str, min_clone_lines: u32) -> Vec<CloneBloc
     }
 
     let min_k = min_clone_lines as usize;
-    if meaningful_lines.len() < min_k * 2 {
+    if min_k == 0 || meaningful_lines.len() < min_k * 2 {
         return Vec::new();
     }
 
@@ -312,11 +328,21 @@ pub fn detect_clone_blocks(content: &str, min_clone_lines: u32) -> Vec<CloneBloc
     let mut block_map: HashMap<i32, usize> = HashMap::new();
     let mut clones = Vec::new();
 
+    // Precompute 31^(min_k - 1) mod 2^32 for O(1) Rabin-Karp rolling hash update
+    let highest_pow = 31i32.wrapping_pow((min_k - 1) as u32);
+    let mut h: i32 = 0;
+    for item in meaningful_lines.iter().take(min_k) {
+        h = h.wrapping_mul(31).wrapping_add(item.1 as i32);
+    }
+
     for i in 0..=(total.saturating_sub(min_k)) {
-        let mut h: i32 = 0;
-        for k in 0..min_k {
-            let line_hash = meaningful_lines[i + k].1 as i32;
-            h = h.wrapping_mul(31).wrapping_add(line_hash);
+        if i > 0 {
+            let outgoing = (meaningful_lines[i - 1].1 as i32).wrapping_mul(highest_pow);
+            let incoming = meaningful_lines[i + min_k - 1].1 as i32;
+            h = h
+                .wrapping_sub(outgoing)
+                .wrapping_mul(31)
+                .wrapping_add(incoming);
         }
 
         if let Some(&prev_idx) = block_map.get(&h) {
@@ -402,8 +428,8 @@ pub fn find_clone_pairs(signatures: &[Vec<u32>], threshold: f64) -> Vec<ClonePai
         return Vec::new();
     }
 
-    // 1. Group file indices into LSH buckets per band
-    let mut candidates: HashSet<(u32, u32)> = HashSet::new();
+    // 1. Group file indices into LSH buckets per band using packed u64 pair keys
+    let mut candidates: HashSet<u64> = HashSet::new();
     let mut buckets: HashMap<u32, Vec<u32>> = HashMap::new();
 
     for band in 0..num_bands {
@@ -426,9 +452,9 @@ pub fn find_clone_pairs(signatures: &[Vec<u32>], threshold: f64) -> Vec<ClonePai
             if bucket.len() >= 2 {
                 for i in 0..bucket.len() {
                     for j in (i + 1)..bucket.len() {
-                        let a = bucket[i].min(bucket[j]);
-                        let b = bucket[i].max(bucket[j]);
-                        candidates.insert((a, b));
+                        let a = bucket[i].min(bucket[j]) as u64;
+                        let b = bucket[i].max(bucket[j]) as u64;
+                        candidates.insert((a << 32) | b);
                     }
                 }
             }
@@ -438,7 +464,9 @@ pub fn find_clone_pairs(signatures: &[Vec<u32>], threshold: f64) -> Vec<ClonePai
 
     // 2. Verify candidate pairs against similarity threshold
     let mut pairs = Vec::new();
-    for (a, b) in candidates {
+    for pair_key in candidates {
+        let a = (pair_key >> 32) as u32;
+        let b = (pair_key & 0xFFFF_FFFF) as u32;
         let sig_a = &signatures[a as usize];
         let sig_b = &signatures[b as usize];
         let total = sig_a.len().min(sig_b.len());

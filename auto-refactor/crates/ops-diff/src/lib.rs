@@ -91,6 +91,16 @@ fn compute_diff(old: &[&str], new: &[&str]) -> Vec<DiffOp> {
     all_ops
 }
 
+#[inline(always)]
+fn hash_line_fnv1a64(line: &str) -> u64 {
+    let mut hash: u64 = 0xcbf29ce484222325;
+    for &b in line.as_bytes() {
+        hash ^= b as u64;
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    hash
+}
+
 fn compute_myers_diff(old: &[&str], new: &[&str], offset: usize) -> Vec<DiffOp> {
     let n = old.len();
     let m = new.len();
@@ -102,15 +112,21 @@ fn compute_myers_diff(old: &[&str], new: &[&str], offset: usize) -> Vec<DiffOp> 
         return (0..n).map(|i| DiffOp::Delete(offset + i)).collect();
     }
 
+    let old_hashes: Vec<u64> = old.iter().map(|&s| hash_line_fnv1a64(s)).collect();
+    let new_hashes: Vec<u64> = new.iter().map(|&s| hash_line_fnv1a64(s)).collect();
+
     let max = n + m;
     let row_size = 2 * max + 1;
     let mut v = vec![0usize; row_size];
     v[1 + max] = 0;
 
-    let mut trace: Vec<Vec<usize>> = Vec::with_capacity(max + 1);
+    // Flat triangular trace arena: row `d` covers diagonals `-d..=d` (length `2*d + 1`)
+    // and starts at index `d * d` in `trace_arena`.
+    let mut trace_arena: Vec<usize> = Vec::with_capacity((max + 1).min(256).pow(2));
 
     for d in 0..=(max as isize) {
-        trace.push(v.clone());
+        let d_usize = d as usize;
+        trace_arena.extend_from_slice(&v[(max - d_usize)..=(max + d_usize)]);
         let mut k = -d;
         while k <= d {
             let k_idx = (k + max as isize) as usize;
@@ -121,7 +137,7 @@ fn compute_myers_diff(old: &[&str], new: &[&str], offset: usize) -> Vec<DiffOp> 
             };
             let mut y = (x as isize - k) as usize;
 
-            while x < n && y < m && old[x] == new[y] {
+            while x < n && y < m && old_hashes[x] == new_hashes[y] && old[x] == new[y] {
                 x += 1;
                 y += 1;
             }
@@ -129,7 +145,7 @@ fn compute_myers_diff(old: &[&str], new: &[&str], offset: usize) -> Vec<DiffOp> 
             v[k_idx] = x;
 
             if x >= n && y >= m {
-                return backtrack(&trace, old, new, offset, d, max as isize);
+                return backtrack(&trace_arena, old, new, offset, d);
             }
 
             k += 2;
@@ -147,12 +163,11 @@ fn compute_myers_diff(old: &[&str], new: &[&str], offset: usize) -> Vec<DiffOp> 
 }
 
 fn backtrack(
-    trace: &[Vec<usize>],
+    trace_arena: &[usize],
     _old: &[&str],
     _new: &[&str],
     offset: usize,
     d: isize,
-    max: isize,
 ) -> Vec<DiffOp> {
     let mut ops = Vec::new();
 
@@ -160,18 +175,21 @@ fn backtrack(
     let mut curr_y = _new.len();
 
     for step in (1..=d as usize).rev() {
-        let v = &trace[step];
+        let step_isize = step as isize;
+        let row_start = step * step;
         let k = curr_x as isize - curr_y as isize;
 
-        let prev_k = if k == -(step as isize)
-            || (k != (step as isize) && v[(k - 1 + max) as usize] < v[(k + 1 + max) as usize])
+        let prev_k = if k == -step_isize
+            || (k != step_isize
+                && trace_arena[row_start + (k - 1 + step_isize) as usize]
+                    < trace_arena[row_start + (k + 1 + step_isize) as usize])
         {
             k + 1
         } else {
             k - 1
         };
 
-        let prev_x = v[(prev_k + max) as usize];
+        let prev_x = trace_arena[row_start + (prev_k + step_isize) as usize];
         let prev_y = (prev_x as isize - prev_k) as usize;
 
         while curr_x > prev_x && curr_y > prev_y {
