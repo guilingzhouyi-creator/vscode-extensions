@@ -73,14 +73,52 @@ err.txt
 out.txt
 status_summary.txt
 
-# 7. AI 助手偏好记忆、插件下载与临时探针/草稿
+# 7. 智能体运行时、多Agent协同产物、插件下载与临时探针/草稿
 .commandcode/
 .atomcode/
 .workbuddy/
 .cursor/
 .windsurf/
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+CLAUDE-*.md
+PROJECT.md
+PROJECT-*.md
+.chat/
+**/.chat/
+.gemini/
+**/.gemini/
+.antigravity/
+**/.antigravity/
+
+# 7.1 .agents 运行时衍生目录、协同文档与离线安装包
 .agents/plugins/
 WebGames/.agents/
+.agents/teamwork/
+**/.agents/teamwork/
+.agents/plugin-packages/
+**/.agents/plugin-packages/
+.agents/runs/
+**/.agents/runs/
+.agents/sessions/
+**/.agents/sessions/
+.agents/transcripts/
+**/.agents/transcripts/
+.agents/artifacts/
+**/.agents/artifacts/
+.agents/tmp/
+**/.agents/tmp/
+.agents/cache/
+**/.agents/cache/
+**/.agents/**/drafts/
+**/.agents/**/notes/
+**/.agents/**/worklogs/
+**/.agents/**/*.draft.md
+**/.agents/**/*.worklog.md
+**/.agents/**/notes.md
+
+# 7.2 探针、草稿与插件临时安装包
 .dsh-plugin-download/
 dsh-uninstall-*.tsv
 **/.trae-html-share-packages/
