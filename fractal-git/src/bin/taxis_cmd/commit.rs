@@ -20,10 +20,7 @@ use fg_core::models::{
     current_unix_seconds, AuthoritySecret, FileMode, IndexStage, LeaseStatus, Oid,
 };
 use fg_gate::authority::resolve_authority_secret;
-use fg_index::{write_dirc_v2, IndexEntry};
 use fg_native::sections::head::HeadState as NativeHeadState;
-use fg_native::sections::indx::{IndexEntry as NativeIndexEntry, StatCache};
-use fg_native::sections::refs::RefRecord;
 use fg_native::RepoDocument;
 use fg_object::borrowed::GitCommitRef;
 use fg_storage::commit_materializer::{
@@ -36,15 +33,15 @@ use fractal_git::{
     ActorIdentity, AgentPushContext, BlockProvenanceEntry, BlockProvenanceParams,
     CommitMaterializationRequest, CommitMessageGuard, DiskProvenanceStore, DiskRefStore,
     FractalRef, GitSignature, LooseOdb, PolicyFloor, PreReceiveGuard, TaxisPolicy,
-    ValidatedCommitWitness, WalJournal, WalRecord,
+    ValidatedCommitWitness,
 };
 
-use super::checkout::worktree_stat;
+use super::commit_ops::{
+    advance_head_after_commit, open_and_begin_commit_wal, sync_committed_index_and_container,
+    DEFAULT_COMMIT_FILE,
+};
 use super::common::{fail_io, find_all_arg_values, find_arg_value, print_json, reject, CliContext};
 use super::operation::{record_head_operation, HeadOperationSpec};
-
-/// Path handed to the tree builder when the caller supplies no `--file` flag.
-const DEFAULT_COMMIT_FILE: &str = "README.md";
 
 /// Dispatches atomic commit creation with governance and identity checks.
 pub fn handle_commit(ctx: &CliContext) {
@@ -60,121 +57,25 @@ pub fn handle_commit(ctx: &CliContext) {
     let card_id = find_arg_value(&ctx.args, &["--card"]).unwrap_or("card-000");
     let agent_id = find_arg_value(&ctx.args, &["--agent"]).unwrap_or("agent-primary");
     let human_author = find_arg_value(&ctx.args, &["--human"]).map(String::from);
-    let auth_token = find_arg_value(&ctx.args, &["--token"]).map(String::from);
-    let git_native_default = !fg_native::container_path(&ctx.git_dir).is_file()
-        && !has_taxis_governance_flags(&ctx.args);
-    let policy_name = find_arg_value(&ctx.args, &["--policy"]).unwrap_or(if git_native_default {
-        "git-native"
-    } else {
-        "workspace-strict"
-    });
-    let explicit_target = find_arg_value(&ctx.args, &["--target"]);
-    let active_head = resolve_active_head_ref(&ctx.git_dir);
-    // Where an untargeted commit lands.
-    //
-    // Following HEAD is what Git does, but in a Taxis repository HEAD points at the protected trunk,
-    // so `init && add && commit` collided with the human-control boundary on the very first commit:
-    // an agent cannot advance `refs/heads/main` without a minted human token, and the floor forbids
-    // relaxing the policy instead. The result was a repository in which the ordinary commit command
-    // never worked unattended.
-    //
-    // The engineering edition therefore defaults to the agent-writable cell sandbox, which already
-    // existed for exactly this purpose. Trunk protection is untouched: naming `refs/heads/main`
-    // explicitly still demands a human token, so promotion remains a deliberate act rather than
-    // something a default can slip past.
-    let target_ref_str = match explicit_target {
-        Some(t) => t.to_string(),
-        None => {
-            let head_ref = active_head
-                .clone()
-                .unwrap_or_else(|| "refs/fractal/cell/cell-default/main".to_string());
-            engineering_default_target(head_ref, cell_id, !git_native_default)
-        }
-    };
 
-    let mut policy = resolve_commit_policy(policy_name);
-    // A caller may tighten the contract but never relax it. The floor comes from the versioned
-    // manifest, so switching the gate off requires an explicit recorded bypass rather than one
-    // flag. Ungoverned repositories (no native container, no Taxis flags) keep native behaviour
-    // because they carry no Taxis-managed history to protect.
-    if !git_native_default {
-        let floor = PolicyFloor::resolve(&ctx.git_dir);
-        if let Err(floor_error) = floor.assert_permits(&policy) {
-            fg_core::diag_debug!(
-                "governance",
-                "policy floor refusal under policy '{}': {:?}",
-                policy.name,
-                floor_error
-            );
-            let is_diag = fg_core::diagnostics::is_diagnostic_mode();
-            let display_msg = floor_error.user_display(is_diag);
-            reject(CliTag::COMMIT_GOVERNANCE_FAIL, display_msg);
-        }
-        reject_bypass_without_reason(&ctx.args);
-    }
-    let authority_secret = human_author.as_deref().map(|_| {
-        resolve_authority_secret(&ctx.git_dir)
-            .unwrap_or_else(|secret_err| reject(CliTag::AUTHORITY_BREACH, format!("{secret_err}")))
-    });
-    if let Some(secret) = authority_secret.as_ref() {
-        policy.authority_secret = Some(secret.clone());
-    }
-    let actor = if git_native_default {
-        let sig = resolve_git_native_signature(ctx);
-        ActorIdentity::human(sig.name, sig.email, "git-native")
-    } else {
-        resolve_actor_identity(
-            human_author.as_deref(),
-            auth_token,
-            agent_id,
-            cell_id,
-            authority_secret.as_ref(),
-        )
-    };
-    let target_ref = match FractalRef::parse(&target_ref_str) {
-        Some(fref) => fref,
-        None => {
-            if let Some(branch) = target_ref_str.strip_prefix("refs/heads/") {
-                FractalRef::SystemTrunk {
-                    branch: branch.to_string(),
-                }
-            } else {
-                FractalRef::CellMain {
-                    cell_id: cell_id.into(),
-                }
-            }
-        }
-    };
-
-    if let Err(auth_err) = PreReceiveGuard::assert_actor_authorized(&target_ref, &actor, &policy) {
-        reject(
-            CliTag::AUTHORITY_BREACH,
-            format!(
-                "Push to '{}' rejected: {}",
-                target_ref.to_git_ref(),
-                auth_err
-            ),
-        );
-    }
-    fg_core::diag_debug!(
-        "pre_receive",
-        "authorized actor={} target={}",
-        actor.display_name(),
-        target_ref.to_git_ref()
+    let (git_native_default, target_ref, mut policy) =
+        resolve_commit_target_and_policy(ctx, cell_id);
+    let actor = authorize_commit_actor(
+        ctx,
+        (git_native_default, cell_id, agent_id),
+        (&target_ref, &mut policy),
     );
 
     let message = resolve_commit_message(&ctx.args, card_id);
     let staged_files = collect_staged_files(ctx);
     let work_root = super::repo_view::resolve_work_root(&ctx.git_dir);
-    // One record covering the decision inputs. When a commit is refused, the useful question is
-    // "which policy was in force and what did it see", and neither is recoverable afterwards.
     fg_core::diag_debug!(
         "commit",
         "policy={} tier={} staged={} target={} native={}",
-        policy_name,
+        policy.name,
         policy.enforcement_tier(),
         staged_files.len(),
-        target_ref_str,
+        target_ref.to_git_ref(),
         git_native_default
     );
     let witness = verify_commit_governance(&message, &policy, &staged_files, &work_root);
@@ -197,13 +98,7 @@ pub fn handle_commit(ctx: &CliContext) {
     let _ = verify_commit_governance(&final_message, &policy, &staged_files, &work_root);
 
     let tx_id = format!("tx-{}-{}", agent_id, current_unix_seconds());
-    let wal = WalJournal::open(ctx.git_dir.join("journal/commit.wal")).ok();
-    if let Some(ref w) = wal {
-        let _ = w.append(&WalRecord::BeginTx {
-            tx_id: tx_id.clone(),
-            timestamp_ms: current_unix_seconds() as i64 * 1000,
-        });
-    }
+    let wal = open_and_begin_commit_wal(&ctx.git_dir, &tx_id);
 
     let materialized = materialize_staged_files(
         ctx,
@@ -215,127 +110,17 @@ pub fn handle_commit(ctx: &CliContext) {
         &target_ref,
     );
 
-    let declared_files = find_all_arg_values(&ctx.args, &["--file", "--add"]);
-    let index_file = ctx.git_dir.join("index");
-    let used_direct_index = declared_files.is_empty() && index_file.is_file();
-
-    // Synchronize staged index (.taxis/index and doc.indx) preserving existing tracked files
-    let mut index_entry_map = std::collections::BTreeMap::new();
-    if let Ok(existing_index) = fg_index::GitIndex::load(&index_file) {
-        for entry in existing_index.entries() {
-            index_entry_map.insert(entry.path.clone(), entry.clone());
-        }
-    }
-
-    let container_path = fg_native::container_path(&ctx.git_dir);
-    let native_doc = if container_path.is_file() {
-        RepoDocument::load(&container_path).ok()
-    } else {
-        None
-    };
-
-    let mut native_indx = native_doc
-        .as_ref()
-        .map(|d| d.indx.clone())
-        .unwrap_or_else(fg_native::IndxSection::new);
-
-    if !used_direct_index {
-        for (i, path) in staged_files.iter().enumerate() {
-            let blob_oid = materialized.blob_oids.get(i).copied().unwrap_or(Oid::ZERO);
-            let full_path = work_root.join(path);
-            let (size, mtime_sec, mtime_nano) = worktree_stat(&full_path, 0);
-            let mode = materialized
-                .modes
-                .get(i)
-                .copied()
-                .unwrap_or(FileMode::RegularFile);
-
-            if let Some(ref w) = wal {
-                let _ = w.append(&WalRecord::StageFile {
-                    tx_id: tx_id.clone(),
-                    path: path.clone(),
-                    oid: blob_oid,
-                });
-            }
-
-            index_entry_map.insert(
-                path.clone(),
-                IndexEntry {
-                    path: path.clone(),
-                    mode,
-                    oid: blob_oid,
-                    stage: IndexStage::Normal,
-                    size,
-                    mtime_seconds: mtime_sec,
-                    mtime_nanos: mtime_nano,
-                    assume_valid: false,
-                    skip_worktree: false,
-                    intent_to_add: false,
-                },
-            );
-            let _ = native_indx.upsert(NativeIndexEntry {
-                path: path.clone(),
-                mode,
-                oid: blob_oid,
-                stage: IndexStage::Normal,
-                stat: StatCache {
-                    size: u64::from(size),
-                    mtime_secs: i64::from(mtime_sec),
-                    mtime_nanos: mtime_nano,
-                    ctime_secs: i64::from(mtime_sec),
-                    ctime_nanos: mtime_nano,
-                    dev: 0,
-                    ino: 0,
-                    uid: 0,
-                    gid: 0,
-                },
-                flags: 0,
-            });
-        }
-
-        let final_index_entries: Vec<IndexEntry> = index_entry_map.into_values().collect();
-        let _ = write_dirc_v2(&index_file, &final_index_entries);
-    }
-
-    if let Some(ref w) = wal {
-        let _ = w.append(&WalRecord::UpdateRef {
-            tx_id: tx_id.clone(),
-            git_ref: target_ref.to_git_ref(),
-            new_oid: materialized.commit_oid,
-        });
-    }
-
-    // Synchronize native container (doc.refs & doc.indx) if present
-    if let Some(mut doc) = native_doc {
-        let git_ref = target_ref.to_git_ref();
-        let _ = doc.refs.upsert(RefRecord {
-            name: git_ref.clone(),
-            oid: materialized.commit_oid,
-            peeled: None,
-        });
-        doc.indx = native_indx;
-        let _ = doc.save_atomic(&container_path);
-    }
-
-    if let Some(ref w) = wal {
-        let _ = w.append(&WalRecord::CommitTx {
-            tx_id: tx_id.clone(),
-            commit_oid: materialized.commit_oid,
-        });
-        let _ = w.checkpoint();
-    }
-
-    // Ensure HEAD exists on disk if absent, or advances commit OID when detached
-    let ref_store = DiskRefStore::new(&ctx.git_dir);
-    match ref_store.head() {
-        Ok(fg_topology::HeadState::Absent) => {
-            let _ = ref_store.update_head_symbolic(&target_ref.to_git_ref());
-        }
-        Ok(fg_topology::HeadState::Detached(_)) => {
-            let _ = ref_store.update_head_detached(&materialized.commit_oid);
-        }
-        _ => {}
-    }
+    sync_committed_index_and_container(
+        ctx,
+        (&tx_id, wal.as_ref(), &target_ref),
+        (
+            &staged_files,
+            materialized.commit_oid,
+            &materialized.blob_oids,
+            &materialized.modes,
+        ),
+    );
+    advance_head_after_commit(&ctx.git_dir, &target_ref, &materialized.commit_oid);
 
     super::git_hooks::run_post_hook(&hook_runner, "post-commit", &[]);
     record_commit_in_operation_graph(ctx, &materialized.commit_oid, &target_ref, &actor, &witness);
@@ -351,6 +136,116 @@ pub fn handle_commit(ctx: &CliContext) {
         &witness,
         &staged_files,
     );
+}
+
+/// Resolves default/explicit commit target reference and enforces policy floor invariants.
+fn resolve_commit_target_and_policy(
+    ctx: &CliContext,
+    cell_id: &str,
+) -> (bool, FractalRef, TaxisPolicy) {
+    let git_native_default = !fg_native::container_path(&ctx.git_dir).is_file()
+        && !has_taxis_governance_flags(&ctx.args);
+    let policy_name = find_arg_value(&ctx.args, &["--policy"]).unwrap_or(if git_native_default {
+        "git-native"
+    } else {
+        "workspace-strict"
+    });
+    let explicit_target = find_arg_value(&ctx.args, &["--target"]);
+    let active_head = resolve_active_head_ref(&ctx.git_dir);
+    let target_ref_str = match explicit_target {
+        Some(t) => t.to_string(),
+        None => {
+            let head_ref =
+                active_head.unwrap_or_else(|| "refs/fractal/cell/cell-default/main".to_string());
+            engineering_default_target(head_ref, cell_id, !git_native_default)
+        }
+    };
+
+    let policy = resolve_commit_policy(policy_name);
+    if !git_native_default {
+        let floor = PolicyFloor::resolve(&ctx.git_dir);
+        if let Err(floor_error) = floor.assert_permits(&policy) {
+            fg_core::diag_debug!(
+                "governance",
+                "policy floor refusal under policy '{}': {:?}",
+                policy.name,
+                floor_error
+            );
+            let is_diag = fg_core::diagnostics::is_diagnostic_mode();
+            reject(
+                CliTag::COMMIT_GOVERNANCE_FAIL,
+                floor_error.user_display(is_diag),
+            );
+        }
+        reject_bypass_without_reason(&ctx.args);
+    }
+
+    let target_ref = match FractalRef::parse(&target_ref_str) {
+        Some(fref) => fref,
+        None => {
+            if let Some(branch) = target_ref_str.strip_prefix("refs/heads/") {
+                FractalRef::SystemTrunk {
+                    branch: branch.to_string(),
+                }
+            } else {
+                FractalRef::CellMain {
+                    cell_id: cell_id.into(),
+                }
+            }
+        }
+    };
+
+    (git_native_default, target_ref, policy)
+}
+
+/// Resolves the committing actor identity and verifies pre-receive target authorization.
+fn authorize_commit_actor(
+    ctx: &CliContext,
+    actor_meta: (bool, &str, &str),
+    target_and_policy: (&FractalRef, &mut TaxisPolicy),
+) -> ActorIdentity {
+    let (git_native_default, cell_id, agent_id) = actor_meta;
+    let (target_ref, policy) = target_and_policy;
+    let human_author = find_arg_value(&ctx.args, &["--human"]).map(String::from);
+    let auth_token = find_arg_value(&ctx.args, &["--token"]).map(String::from);
+
+    let authority_secret = human_author.as_deref().map(|_| {
+        resolve_authority_secret(&ctx.git_dir)
+            .unwrap_or_else(|secret_err| reject(CliTag::AUTHORITY_BREACH, format!("{secret_err}")))
+    });
+    if let Some(secret) = authority_secret.as_ref() {
+        policy.authority_secret = Some(secret.clone());
+    }
+    let actor = if git_native_default {
+        let sig = resolve_git_native_signature(ctx);
+        ActorIdentity::human(sig.name, sig.email, "git-native")
+    } else {
+        resolve_actor_identity(
+            human_author.as_deref(),
+            auth_token,
+            agent_id,
+            cell_id,
+            authority_secret.as_ref(),
+        )
+    };
+
+    if let Err(auth_err) = PreReceiveGuard::assert_actor_authorized(target_ref, &actor, policy) {
+        reject(
+            CliTag::AUTHORITY_BREACH,
+            format!(
+                "Push to '{}' rejected: {}",
+                target_ref.to_git_ref(),
+                auth_err
+            ),
+        );
+    }
+    fg_core::diag_debug!(
+        "pre_receive",
+        "authorized actor={} target={}",
+        actor.display_name(),
+        target_ref.to_git_ref()
+    );
+    actor
 }
 
 /// Returns true if the reference designates a protected system trunk (`main`, `master`, `trunk`).
@@ -375,10 +270,7 @@ pub(crate) fn is_protected_trunk(ref_name: &str) -> bool {
 fn engineering_default_target(head_ref: String, cell_id: &str, taxis_governed: bool) -> String {
     let edition = fg_core::constants::Edition::CURRENT;
     let is_trunk = is_protected_trunk(&head_ref);
-    if !taxis_governed
-        || !is_trunk
-        || edition != fg_core::constants::Edition::Engineering
-    {
+    if !taxis_governed || !is_trunk || edition != fg_core::constants::Edition::Engineering {
         return head_ref;
     }
 
@@ -393,9 +285,7 @@ fn engineering_default_target(head_ref: String, cell_id: &str, taxis_governed: b
     eprintln!(
         "note: HEAD points at the protected trunk '{head_ref}', which requires a human authority token."
     );
-    eprintln!(
-        "      Committing to sandbox '{sandbox_ref}' instead (engineering edition default)."
-    );
+    eprintln!("      Committing to sandbox '{sandbox_ref}' instead (engineering edition default).");
     eprintln!(
         "      Pass --target {head_ref} with --human/--token to advance the trunk deliberately."
     );
@@ -540,17 +430,20 @@ fn resolve_git_native_signature(ctx: &CliContext) -> GitSignature {
     GitSignature::new("Taxis User", "taxis@local", current_unix_seconds())
 }
 
-/// Collects every path the caller declares as part of this commit, or reads from index.
+/// Collects every path the caller declares as part of this commit, or reads changed paths from index.
 pub(crate) fn collect_staged_files(ctx: &CliContext) -> Vec<String> {
     let declared = find_all_arg_values(&ctx.args, &["--file", "--add"]);
     let work_root = super::repo_view::resolve_work_root(&ctx.git_dir);
     let mut files = std::collections::BTreeSet::new();
+    let mut index_entries: std::collections::BTreeMap<String, (Oid, FileMode)> =
+        std::collections::BTreeMap::new();
 
     let index_file = ctx.git_dir.join("index");
     if let Ok(git_index) = fg_index::GitIndex::load(&index_file) {
         for e in git_index.entries() {
             if work_root.join(&e.path).exists() {
                 files.insert(e.path.clone());
+                index_entries.insert(e.path.clone(), (e.oid, e.mode));
             }
         }
     }
@@ -560,12 +453,37 @@ pub(crate) fn collect_staged_files(ctx: &CliContext) -> Vec<String> {
         for e in doc.indx.entries() {
             if work_root.join(&e.path).exists() {
                 files.insert(e.path.clone());
+                index_entries
+                    .entry(e.path.clone())
+                    .or_insert((e.oid, e.mode));
             }
         }
     }
 
-    for path in declared {
-        files.insert(path.to_string());
+    if !declared.is_empty() {
+        for path in declared {
+            files.insert(path.to_string());
+        }
+        return files.into_iter().collect();
+    }
+
+    if !index_entries.is_empty() {
+        if let Ok(view) = super::repo_view::RepoView::open(ctx) {
+            if let Ok(Some((_, head_oid))) = view.effective_head_commit() {
+                if let Ok(head_tree) = super::tree_view::flatten_commit_tree(&view, &head_oid) {
+                    let changed: Vec<String> = index_entries
+                        .iter()
+                        .filter_map(|(path, (oid, mode))| match head_tree.get(path) {
+                            Some(te) if te.oid == *oid && te.mode == *mode => None,
+                            _ => Some(path.clone()),
+                        })
+                        .collect();
+                    if !changed.is_empty() {
+                        return changed;
+                    }
+                }
+            }
+        }
     }
 
     if !files.is_empty() {
@@ -659,14 +577,14 @@ fn collect_staged_symbols(
             continue;
         };
         let lines: Vec<&str> = content.lines().collect();
-        for symbol in fg_gate::commit_guard::declaration::extract_candidate_symbols_from_lines(&lines)
+        for symbol in
+            fg_gate::commit_guard::declaration::extract_candidate_symbols_from_lines(&lines)
         {
-            if !candidates
-                .iter()
-                .any(|existing: &fg_gate::commit_guard::declaration::CandidateSymbol| {
+            if !candidates.iter().any(
+                |existing: &fg_gate::commit_guard::declaration::CandidateSymbol| {
                     existing.name == symbol.name
-                })
-            {
+                },
+            ) {
                 candidates.push(symbol);
             }
         }
@@ -718,6 +636,15 @@ fn materialize_staged_files(
     let ref_store = DiskRefStore::new(&ctx.git_dir);
     let hook_runner = super::git_hooks::discover(&ctx.git_dir, &work_root);
     let active_head = resolve_active_head_ref(&ctx.git_dir);
+    if target_ref_name.starts_with("refs/fractal/cell/")
+        && ref_store.get_ref(&target_ref_name).ok().flatten().is_none()
+    {
+        if let Some(ref head_ref) = active_head {
+            if let Ok(Some(trunk_oid)) = ref_store.get_ref(head_ref) {
+                let _ = ref_store.update_ref(&target_ref_name, &trunk_oid, None);
+            }
+        }
+    }
     let previous_head = ref_store.get_ref("HEAD").ok().flatten();
     let merge_heads = read_merge_heads(&ctx.git_dir);
     let declared_files = find_all_arg_values(&ctx.args, &["--file", "--add"]);
@@ -865,9 +792,6 @@ fn is_unchanged_commit(
 }
 
 /// Reads every pending `MERGE_HEAD` parent recorded by the three-way merge path.
-///
-/// A multi-line file (octopus merge) yields one parent per line; an unparseable line is
-/// rejected instead of silently degrading a merge commit to a single parent.
 fn read_merge_heads(git_dir: &Path) -> Vec<Oid> {
     let contents = match fs::read_to_string(git_dir.join("MERGE_HEAD")) {
         Ok(contents) => contents,
