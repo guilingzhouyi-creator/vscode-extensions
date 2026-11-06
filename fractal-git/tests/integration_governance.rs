@@ -6,6 +6,8 @@
 #[path = "rust/test_governance.rs"]
 mod test_governance;
 
+#[path = "rust/test_commit_bypass_contract.rs"]
+mod test_commit_bypass_contract;
 #[path = "rust/test_commit_header_metrics.rs"]
 mod test_commit_header_metrics;
 #[path = "rust/test_commit_message_contract.rs"]
@@ -16,6 +18,8 @@ mod test_commit_typography_contract;
 mod test_declaration_anchor;
 #[path = "rust/test_diagnostics.rs"]
 mod test_diagnostics;
+#[path = "rust/test_diagnostics_ring.rs"]
+mod test_diagnostics_ring;
 
 #[path = "rust/test_governance_pipeline.rs"]
 mod test_governance_pipeline;
