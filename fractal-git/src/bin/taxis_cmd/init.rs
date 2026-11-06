@@ -176,7 +176,11 @@ fn parse_request(ctx: &CliContext) -> Result<InitRequest, String> {
             other if other.starts_with('-') => {
                 return Err(format!("unknown init flag '{other}'"));
             }
-            _ => {}
+            other => {
+                if workspace_root.is_none() {
+                    workspace_root = Some(PathBuf::from(other));
+                }
+            }
         }
         argument_cursor += 1;
     }

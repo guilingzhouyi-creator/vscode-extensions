@@ -323,6 +323,13 @@ fn clone_from_bundle(
     let (default_branch, head_oid) =
         select_clone_head(&report.references_advanced, options.branch.as_deref(), None);
     write_cloned_head(&ref_store, &default_branch, head_oid);
+    write_origin_head_symref(
+        dest_git_dir,
+        &options.origin_name,
+        &default_branch,
+        head_oid,
+        options.bare,
+    );
 
     ClonedRefState {
         default_branch,
@@ -351,11 +358,16 @@ fn clone_from_directory(
     };
 
     let object_count = copy_repository_objects(src_view.git_dir(), dest_git_dir);
-    let src_refs = DiskRefStore::new(src_view.git_dir())
+    let mut src_refs = DiskRefStore::new(src_view.git_dir())
         .list_all()
         .unwrap_or_default();
+    synthesize_cell_heads(&mut src_refs);
     let src_head_branch = src_view.head_branch().ok().flatten().map(|(name, _)| name);
-    let src_head_commit = src_view.head_commit().ok().flatten();
+    let src_head_commit = src_view
+        .effective_head_commit()
+        .ok()
+        .flatten()
+        .map(|(_, oid)| oid);
 
     let dest_ref_store = DiskRefStore::new(dest_git_dir);
     for (ref_name, oid) in &src_refs {
@@ -377,12 +389,58 @@ fn clone_from_directory(
         head_oid = src_head_commit;
     }
     write_cloned_head(&dest_ref_store, &default_branch, head_oid);
+    write_origin_head_symref(
+        dest_git_dir,
+        &options.origin_name,
+        &default_branch,
+        head_oid,
+        options.bare,
+    );
 
     ClonedRefState {
         default_branch,
         head_oid,
         object_count,
     }
+}
+
+/// Projects `refs/fractal/cell/<cell>/<branch>` into `refs/heads/<branch>` when `refs/heads/<branch>` is absent.
+fn synthesize_cell_heads(src_refs: &mut Vec<(String, Oid)>) {
+    let mut additions: Vec<(String, Oid)> = Vec::new();
+    for (name, oid) in src_refs.iter() {
+        if let Some(rest) = name.strip_prefix("refs/fractal/cell/") {
+            if let Some((_cell, branch)) = rest.split_once('/') {
+                let head_ref = format!("refs/heads/{branch}");
+                if !branch.is_empty() && !src_refs.iter().any(|(existing, _)| existing == &head_ref)
+                {
+                    additions.push((head_ref, *oid));
+                }
+            }
+        }
+    }
+    for (head_ref, oid) in additions {
+        if !src_refs.iter().any(|(existing, _)| existing == &head_ref) {
+            src_refs.push((head_ref, oid));
+        }
+    }
+}
+
+/// Writes `refs/remotes/<origin>/HEAD` symbolic reference for non-bare clones.
+fn write_origin_head_symref(
+    dest_git_dir: &Path,
+    origin_name: &str,
+    default_branch: &str,
+    head_oid: Option<Oid>,
+    bare: bool,
+) {
+    if bare || head_oid.is_none() {
+        return;
+    }
+    let remote_head_dir = dest_git_dir.join("refs/remotes").join(origin_name);
+    let _ = fs::create_dir_all(&remote_head_dir);
+    let remote_head_file = remote_head_dir.join("HEAD");
+    let content = format!("ref: refs/remotes/{origin_name}/{default_branch}\n");
+    let _ = fs::write(remote_head_file, content);
 }
 
 /// Copies packfiles via CoW (`clone_file_cow`) and writes any unpacked objects via `OdbRouter`.

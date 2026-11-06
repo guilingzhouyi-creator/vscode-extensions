@@ -312,7 +312,7 @@ fn delete_branch(view: &RepoView, name: &str, force: bool, ctx: &CliContext) {
 /// A branch that is already reachable from HEAD only removes worktree rows that can be rebuilt
 /// from the surviving history, so Git deletes it without `-D`; every other branch is refused.
 fn is_branch_merged_into_head(view: &RepoView, branch_oid: &Oid) -> bool {
-    let Some(head_oid) = view.head_commit().ok().flatten() else {
+    let Some((_, head_oid)) = view.effective_head_commit().ok().flatten() else {
         return false;
     };
     let mut parents_of = |oid: &Oid| -> Vec<Oid> {

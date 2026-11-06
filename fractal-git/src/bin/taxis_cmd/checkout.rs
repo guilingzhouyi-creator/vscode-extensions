@@ -55,7 +55,10 @@ pub fn handle_checkout(ctx: &CliContext) {
 
     // Check if path restoration mode: e.g. `checkout -- <paths>` or `checkout <tree-ish> -- <paths>`
     if let Some(dash_idx) = ctx.args.iter().position(|a| a == "--") {
-        let paths: Vec<&str> = ctx.args[dash_idx + 1..].iter().map(|s| s.as_str()).collect();
+        let paths: Vec<&str> = ctx.args[dash_idx + 1..]
+            .iter()
+            .map(|s| s.as_str())
+            .collect();
         if !paths.is_empty() {
             let view = RepoView::open_or_exit(ctx);
             let tree_spec = if dash_idx > 0 && !ctx.args[dash_idx - 1].starts_with('-') {
@@ -85,7 +88,7 @@ pub fn handle_checkout(ctx: &CliContext) {
         Ok(resolved) => resolved,
         Err(resolve_err) => {
             if let Some(ref new_b) = opts.new_branch {
-                if view.head_commit().ok().flatten().is_none() {
+                if view.effective_head_commit().ok().flatten().is_none() {
                     let head_path = view.git_dir().join("HEAD");
                     let sym_target = format!("refs/heads/{new_b}");
                     if let Err(io_err) = fs::write(&head_path, format!("ref: {sym_target}\n")) {
@@ -94,9 +97,7 @@ pub fn handle_checkout(ctx: &CliContext) {
                     let container_path = fg_native::container_path(view.git_dir());
                     if container_path.is_file() {
                         if let Ok(mut doc) = RepoDocument::load(&container_path) {
-                            doc.head = NativeHeadState::Symbolic {
-                                target: sym_target,
-                            };
+                            doc.head = NativeHeadState::Symbolic { target: sym_target };
                             let _ = doc.save_atomic(&container_path);
                         }
                     }
@@ -582,9 +583,34 @@ fn write_references(
 ) -> Option<String> {
     match branch_name {
         Some(branch) => {
-            let reference = format!("refs/heads/{branch}");
-            if let Err(err) = ref_store.update_ref(&reference, &target_commit, None) {
-                return Some(format!("update branch reference '{reference}': {err}"));
+            let reference = if branch.starts_with("refs/") {
+                branch.to_string()
+            } else {
+                format!("refs/heads/{branch}")
+            };
+            let cell_ref = (!branch.starts_with("refs/"))
+                .then(|| format!("refs/fractal/cell/cell-default/{branch}"));
+            let head_ref_exists = ref_store.get_ref(&reference).ok().flatten().is_some();
+            let cell_ref_exists = cell_ref
+                .as_deref()
+                .and_then(|c| ref_store.get_ref(c).ok().flatten())
+                .is_some();
+
+            if !head_ref_exists && cell_ref_exists {
+                if let Some(ref c_ref) = cell_ref {
+                    if let Err(err) = ref_store.update_ref(c_ref, &target_commit, None) {
+                        return Some(format!("update cell reference '{c_ref}': {err}"));
+                    }
+                }
+            } else {
+                if let Err(err) = ref_store.update_ref(&reference, &target_commit, None) {
+                    return Some(format!("update branch reference '{reference}': {err}"));
+                }
+                if cell_ref_exists {
+                    if let Some(ref c_ref) = cell_ref {
+                        let _ = ref_store.update_ref(c_ref, &target_commit, None);
+                    }
+                }
             }
             if let Err(err) = ref_store.update_head_symbolic(&reference) {
                 return Some(format!("update symbolic HEAD '{reference}': {err}"));
@@ -670,9 +696,10 @@ pub(crate) fn update_references(
     let ref_store = DiskRefStore::new(git_dir);
     if let Ok(head_state) = ref_store.head() {
         let prev_name = match head_state {
-            fg_topology::refs::HeadState::Symbolic { name, .. } => {
-                name.strip_prefix("refs/heads/").unwrap_or(&name).to_string()
-            }
+            fg_topology::refs::HeadState::Symbolic { name, .. } => name
+                .strip_prefix("refs/heads/")
+                .unwrap_or(&name)
+                .to_string(),
             fg_topology::refs::HeadState::Detached(oid) => oid.to_hex(),
             fg_topology::refs::HeadState::Absent => String::new(),
         };
@@ -735,14 +762,41 @@ pub(crate) fn update_references(
     if container_path.is_file() {
         if let Ok(mut doc) = RepoDocument::load(&container_path) {
             if let Some(branch) = branch_name {
-                let _ = doc.refs.upsert(RefRecord {
-                    name: format!("refs/heads/{branch}"),
-                    oid: target_commit,
-                    peeled: None,
-                });
-                doc.head = NativeHeadState::Symbolic {
-                    target: format!("refs/heads/{branch}"),
+                let target_ref = if branch.starts_with("refs/") {
+                    branch.to_string()
+                } else {
+                    format!("refs/heads/{branch}")
                 };
+                let cell_ref = (!branch.starts_with("refs/"))
+                    .then(|| format!("refs/fractal/cell/cell-default/{branch}"));
+                let head_in_doc = doc.refs.get(&target_ref).is_some();
+                let cell_in_doc = cell_ref.as_deref().and_then(|c| doc.refs.get(c)).is_some();
+
+                if !head_in_doc && cell_in_doc {
+                    if let Some(c_ref) = cell_ref {
+                        let _ = doc.refs.upsert(RefRecord {
+                            name: c_ref,
+                            oid: target_commit,
+                            peeled: None,
+                        });
+                    }
+                } else {
+                    let _ = doc.refs.upsert(RefRecord {
+                        name: target_ref.clone(),
+                        oid: target_commit,
+                        peeled: None,
+                    });
+                    if cell_in_doc {
+                        if let Some(c_ref) = cell_ref {
+                            let _ = doc.refs.upsert(RefRecord {
+                                name: c_ref,
+                                oid: target_commit,
+                                peeled: None,
+                            });
+                        }
+                    }
+                }
+                doc.head = NativeHeadState::Symbolic { target: target_ref };
             } else {
                 doc.head = NativeHeadState::Detached { oid: target_commit };
             }
