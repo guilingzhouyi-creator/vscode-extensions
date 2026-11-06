@@ -21,25 +21,25 @@
   "dshModes": {
     "wg-construct": {
       "posture": "construct",
-      "name": "治理·施工",
+      "name": "Governance Construct",
       "order": 10,
       "terminal": true
     },
     "wg-refactor": {
       "posture": "refactor",
-      "name": "治理·重构",
+      "name": "Governance Refactor",
       "order": 11,
       "terminal": false
     },
     "wg-review": {
       "posture": "review",
-      "name": "治理·审查",
+      "name": "Governance Review",
       "order": 12,
       "terminal": false
     },
     "wg-explore": {
       "posture": "explore",
-      "name": "治理·探索",
+      "name": "Governance Explore",
       "order": 13,
       "terminal": false
     }
@@ -48,7 +48,7 @@
     "wt-construct": {
       "archetype": "vs-extension",
       "posture": "construct",
-      "description": "workspace-timing (VS Code 扩展) 业务特性开发与功能增量编写专员",
+      "description": "workspace-timing feature development",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-construct"
@@ -56,7 +56,7 @@
     "wt-review": {
       "archetype": "vs-extension",
       "posture": "review",
-      "description": "workspace-timing (VS Code 扩展) 静态审查、分层边界与硬编码分析专员",
+      "description": "workspace-timing review & boundary analysis",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-review"
@@ -64,7 +64,7 @@
     "wt-refactor": {
       "archetype": "vs-extension",
       "posture": "refactor",
-      "description": "workspace-timing (VS Code 扩展) 结构消融、复杂度平铺与性能加固专员",
+      "description": "workspace-timing refactoring & hardening",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-refactor"
@@ -72,7 +72,7 @@
     "wt-explore": {
       "archetype": "vs-extension",
       "posture": "explore",
-      "description": "workspace-timing (VS Code 扩展) 扩展上下文、五层解耦与设计方案探索调查专员",
+      "description": "workspace-timing context & design exploration",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-explore"
@@ -80,7 +80,7 @@
     "ar-construct": {
       "archetype": "cli-engine",
       "posture": "construct",
-      "description": "auto-refactor 新分析器开发、规则扩充与原生算子开发专员",
+      "description": "auto-refactor analyzer & native ops development",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-construct"
@@ -88,7 +88,7 @@
     "ar-review": {
       "archetype": "cli-engine",
       "posture": "review",
-      "description": "auto-refactor 规则等价性、项目中立性与质量模型审查专员",
+      "description": "auto-refactor rules & model review",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-review"
@@ -96,7 +96,7 @@
     "ar-refactor": {
       "archetype": "cli-engine",
       "posture": "refactor",
-      "description": "auto-refactor 算子性能优化、门面规范化与双轨体积控制专员",
+      "description": "auto-refactor operator optimization & size control",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-refactor"
@@ -104,7 +104,7 @@
     "ar-explore": {
       "archetype": "cli-engine",
       "posture": "explore",
-      "description": "auto-refactor 规则拓扑、AST算子与架构变动探索调查专员",
+      "description": "auto-refactor AST operator & topology survey",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-explore"
@@ -112,7 +112,7 @@
     "wg-construct": {
       "archetype": "game-engine",
       "posture": "construct",
-      "description": "WebGames (Godot 4.7/非Web游戏) 游戏系统设计、四阶段方案落地与 GDScript 增量编码专员",
+      "description": "WebGames GDScript gameplay & system implementation",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-construct"
@@ -120,7 +120,7 @@
     "wg-review": {
       "archetype": "game-engine",
       "posture": "review",
-      "description": "WebGames (Godot 4.7/非Web游戏) 游戏逻辑静态分析、GameConfig 单源与表现层架构审查专员",
+      "description": "WebGames logic & GameConfig architecture review",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-review"
@@ -128,7 +128,7 @@
     "wg-refactor": {
       "archetype": "game-engine",
       "posture": "refactor",
-      "description": "WebGames (Godot 4.7/非Web游戏) 循环瞬态分配消除 (ADV-PRF-002)、超大脚本解耦与视图透传消融专员",
+      "description": "WebGames zero-allocation & script decoupling",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-refactor"
@@ -136,7 +136,7 @@
     "wg-explore": {
       "archetype": "game-engine",
       "posture": "explore",
-      "description": "WebGames (Godot 4.7/非Web游戏) 游戏模块、配置图谱与四阶段设计探索调查专员",
+      "description": "WebGames module topology & design exploration",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-explore"
@@ -144,7 +144,7 @@
     "infra-construct": {
       "archetype": "infra-tool",
       "posture": "construct",
-      "description": "全工作区跨平台脚本工程化、构建流水线与门禁功能增量编写专员",
+      "description": "Workspace scripts & CI gate pipeline engineering",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-construct"
@@ -152,7 +152,7 @@
     "infra-review": {
       "archetype": "infra-tool",
       "posture": "review",
-      "description": "全工作区构建脚本、跨平台防御契约与工作目录隔离审查专员",
+      "description": "Build script, taint safety & directory isolation review",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-review"
@@ -160,7 +160,7 @@
     "infra-refactor": {
       "archetype": "infra-tool",
       "posture": "refactor",
-      "description": "全工作区脚本复杂度平铺、同构对齐与平台防御加固专员",
+      "description": "Script complexity reduction & platform hardening",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-refactor"
@@ -168,7 +168,7 @@
     "infra-explore": {
       "archetype": "infra-tool",
       "posture": "explore",
-      "description": "全工作区构建工具链、平台兼容与门禁基准探索调查专员",
+      "description": "Toolchain, compatibility & gate baseline research",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-explore"
@@ -176,7 +176,7 @@
     "infra-guardian": {
       "archetype": "infra-tool",
       "posture": "guardian",
-      "description": "全工作区跨平台脚本工程化、工作目录隔离与双层门禁守卫专员",
+      "description": "Cross-platform gatekeeper & directory defense",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-refactor"
@@ -184,7 +184,7 @@
     "workspace-review": {
       "archetype": "workspace-meta",
       "posture": "review",
-      "description": "全工作区跨项目统一审查、单源规则目录与六大支柱一致性审查专员",
+      "description": "Cross-project 6-pillar consistency & rule review",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-review"
@@ -192,7 +192,7 @@
     "workspace-refactor": {
       "archetype": "workspace-meta",
       "posture": "refactor",
-      "description": "全工作区规则去重、配置收口与元数据治理重构专员",
+      "description": "Workspace rules deduplication & metadata refactoring",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-refactor"
@@ -200,7 +200,7 @@
     "workspace-guardian": {
       "archetype": "workspace-meta",
       "posture": "guardian",
-      "description": "全仓六大支柱统一审查 (audit-all)、单源规则目录与物理卫生总看守",
+      "description": "Workspace 6-pillar audit & physical hygiene guardian",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-refactor"
@@ -208,7 +208,7 @@
     "skill-construct": {
       "archetype": "skill-governance",
       "posture": "construct",
-      "description": "技能集增量编写、样板实现与参考指南扩充专员",
+      "description": "Skills authoring & template implementation",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-construct"
@@ -216,7 +216,7 @@
     "skill-review": {
       "archetype": "skill-governance",
       "posture": "review",
-      "description": "技能集元数据、相对死链、516 规则引用与滞后项审查专员",
+      "description": "Skills metadata, links & rule consistency review",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-review"
@@ -224,7 +224,7 @@
     "skill-refactor": {
       "archetype": "skill-governance",
       "posture": "refactor",
-      "description": "技能集结构消融、冗余清理与双目录同构治理重构专员",
+      "description": "Skills structure deduplication & parity refactoring",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-refactor"
@@ -232,7 +232,7 @@
     "fg-construct": {
       "archetype": "git-kernel",
       "posture": "construct",
-      "description": "fractal-git Crate 拓扑演进、Plumbing 协议实现与 Rust 增量编码专员",
+      "description": "fractal-git crate evolution & Rust plumbing coding",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-construct"
@@ -240,7 +240,7 @@
     "fg-review": {
       "archetype": "git-kernel",
       "posture": "review",
-      "description": "fractal-git 零 panic、unsafe 面积、无锁正确性与 Rust/TS 等价性审查专员",
+      "description": "fractal-git zero-panic, unsafe & lock-free review",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-review"
@@ -248,7 +248,7 @@
     "fg-refactor": {
       "archetype": "git-kernel",
       "posture": "refactor",
-      "description": "fractal-git 循环瞬态分配消除、CAS 热路径与超大模块解耦专员",
+      "description": "fractal-git transient allocation removal & CAS decoupling",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-refactor"
@@ -256,7 +256,7 @@
     "fg-explore": {
       "archetype": "git-kernel",
       "posture": "explore",
-      "description": "fractal-git 对象/索引/存储拓扑、Plumbing 语义与门禁桥接探索调查专员",
+      "description": "fractal-git topology & plumbing semantics survey",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-explore"

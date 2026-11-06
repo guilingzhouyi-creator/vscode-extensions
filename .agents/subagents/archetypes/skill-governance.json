@@ -1,6 +1,6 @@
 {
   "archetype": "skill-governance",
-  "displayName": "技能集工程与元规范治理",
+  "displayName": "Skill Governance & SSOT",
   "rootDirectory": ".",
   "allowedExtensions": [
     ".md",
@@ -36,11 +36,11 @@
     "constraint-driven-development"
   ],
   "rigidAxioms": [
-    "零空文件：全仓严禁创建或遗留 0 字节文件或纯空白字符文件",
-    "单源规则目录 (rule-catalog.json) 收录 516 条规则，规则 ID 零虚构 (RCFG-RULE-DRIFT)",
-    "技能同构等价：.agents/skills/ 与插件包技能目录必须保持 100% 字节等价，修改后必须执行同步",
-    "零黑话纪律：严禁在技能文档、模板或提交中使用施工批次代号 (p[0-9]+, Phase_[0-9]+, ST[0-9]+)",
-    "零高危技术债：全工作区 High/Critical 债务历史性归零 (0 项)，严禁引入技术债反弹"
+    "Standard 4-piece physical structure: Every skill requires SKILL.md, scripts/, references/, and templates/.",
+    "Dual-directory byte parity: .agents/skills/ and plugin mirror must remain 100% byte-for-byte identical.",
+    "JIT progressive disclosure: SKILL.md maintains high density (50-200 words); complex details deferred to subdirectories.",
+    "Rule catalog closure: All referenced rule IDs must exist in rule-catalog.json (RCFG-RULE-DRIFT).",
+    "Zero buzzwords & agent-native clarity: Objective constraints, unambiguous directives, and automated verification."
   ],
   "localVerification": [
     "node scripts/common/validate-skills.js",

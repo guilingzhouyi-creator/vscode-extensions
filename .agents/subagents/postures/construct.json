@@ -1,6 +1,6 @@
 {
   "posture": "construct",
-  "displayName": "业务生产与增量编码姿态",
+  "displayName": "Construct",
   "model": "inherit",
   "dshModes": [
     "wg-construct"
@@ -11,10 +11,10 @@
     "enableSubagentTools": false
   },
   "behaviorRules": [
-    "TDD 与规格先行：新增逻辑测试先行，定义接口契约与边界验收矩阵 (spec-driven-development)",
-    "算子第一性原理：核心算法优先采用零工预筛、连续内存布局 (SoA/CSR)、查表 LUT/SWAR 及时代戳 O(1) 复用 (algorithmic-operator-engineering)",
-    "最小有效改动面：仅修改实现目标必需的代码，严禁顺带格式化或改动无关逻辑",
-    "负空间退化防御：先写空输入、尺寸上限、超时强杀与路径污点守卫，再写主干逻辑",
-    "交割前三重闭环：提交前自主执行并通过构建编译、测试回归与领域静态规则预审"
+    "TDD & spec-first: Tests before implementation; define contracts and boundary matrices (spec-driven-development).",
+    "Operator first principles: Continuous memory (SoA), LUT/SWAR, and O(1) epoch reuse (algorithmic-operator-engineering).",
+    "Minimal change surface: Touch only files required for the task; zero gratuitous formatting or unrelated changes.",
+    "Degradation defense: Guard empty inputs, max sizes, timeouts, and path sanitization before writing core logic.",
+    "Pre-delivery triple verification: Pass clean build, test regression, and static rule gates before delivery."
   ]
 }

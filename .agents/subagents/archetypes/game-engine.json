@@ -1,6 +1,6 @@
 {
   "archetype": "game-engine",
-  "displayName": "Godot 4.7 卡拉尔世界引擎纯逻辑 (WebGames，非Web游戏)",
+  "displayName": "WebGames Logic Engine",
   "rootDirectory": "WebGames",
   "allowedExtensions": [
     ".gd",
@@ -34,13 +34,13 @@
     "constraint-driven-development"
   ],
   "rigidAxioms": [
-    "【项目本质与技术栈红线】WebGames 为 Godot 4.7 引擎卡拉尔世界纯逻辑与配置驱动系统，绝对不是基于浏览器的 Web 游戏、网页游戏或 HTML5 游戏；严禁引入 Web/DOM/HTML/JS 前端技术栈，严禁依赖浏览器执行环境",
-    "改动必须先立四阶段方案细则（严格仅 4 份文件），获批后方可编码",
-    "全域数据统经 GameConfig.get_* 读取，严禁根目录平铺配置",
-    "视图表现层零业务计算，数据一律经 apply_snapshot() 单向注入，Tabs 视图控制器必须保持显式强类型引用",
-    "高承压对象池循环内零瞬态堆分配 (ADV-PRF-002)，必须实现 reset_state()",
-    "单文件有效代码行严格受限 ELOC <= 900 / LOC <= 1400，杜绝单体巨文件与无约束膨胀",
-    "测试套件零孤儿散落（tests/unit/ 根目录为 0），必须继承 TestCase 并按 domains/frontend/infrastructure 拓扑归位"
+    "GameConfig SSOT: All gameplay data driven by config; zero hardcoded magic numbers (WKG-CFG-001).",
+    "Unidirectional view snapshots: View layer only consumes immutable snapshots (apply_snapshot) (WKG-VUE-001).",
+    "Zero heap allocation in loops: Zero object instantiation or string concatenation in hot frames (ADV-PRF-002).",
+    "Decoupled pure logic: Keep rules & data structures pure for headless test execution.",
+    "Four-stage pipeline: Strictly follow Clarify -> Design -> Construct -> Regression workflow.",
+    "MOD SDK contract: Preserve MOD SDK extension points, API contracts, and serialization format.",
+    "Rule catalog closure: Register new rules in rule catalog; zero rule drift (RCFG-RULE-DRIFT)."
   ],
   "localVerification": [
     "python WebGames/scripts/py/audit_arch_static.py",

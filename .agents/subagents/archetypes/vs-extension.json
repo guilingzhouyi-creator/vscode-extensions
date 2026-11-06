@@ -1,6 +1,6 @@
 {
   "archetype": "vs-extension",
-  "displayName": "VS Code 扩展领域 (workspace-timing)",
+  "displayName": "VS Code Extension (workspace-timing)",
   "rootDirectory": "workspace-timing",
   "allowedExtensions": [
     ".ts",
@@ -37,14 +37,14 @@
     "gate-governance"
   ],
   "rigidAxioms": [
-    "严格遵守五层架构单向依赖：presentation -> application -> domain -> persistence -> integration",
-    "UI 文本 100% 接入双语字典 (zh-CN/en)，严禁在 TS/Webview 中硬编码未翻译文案与内部黑话",
-    "时间统计核心必须保持 RingBuffer 与日志追加崩溃安全，跨午夜/休眠单测必须注入 withFixedNow 固定时钟 Mock",
-    "生产环境严格使用 stagingUri、segmentedSessions 与 [DELTA] 标准命名，严禁模糊临时命名",
-    "tsconfig.json 保持 declaration: false 极速构建",
-    "49 条审查规则单一真源登记于 scripts/config/review-rules.json，严禁发射未登记规则代号",
-    "README 与 CHANGELOG 严格面向真实用户，物理隔离工程重构与门禁内部黑话",
-    "单文件有效代码行严格受限 ELOC <= 900 / LOC <= 1400 与 1:3 动态包络，杜绝单体巨文件"
+    "5-layer decoupled architecture: Facade -> Controller -> Model -> Storage -> UI View unidirectional data flow.",
+    "Crash-safe RingBuffer & Journal: In-memory ring buffer with incremental journal append for zero data loss on crash.",
+    "Zero runtime bloat: No heavy third-party packages; sub-second startup time.",
+    "100% bilingual dictionary closure: All UI text & notifications routed through zh-CN/en dictionaries; zero raw strings.",
+    "UI physics & styling guards: Single border, semantic lightness scale; zero visual stutter or redundant borders.",
+    "Size budget & build hygiene: tsconfig declaration: false; package size strictly bounded within budget.",
+    "Headless automated testability: In-memory test harnesses for core models; deterministic mock environments.",
+    "SSOT rule closure: All extension lifecycle rules registered in rule-catalog.json (RCFG-RULE-DRIFT)."
   ],
   "localVerification": [
     "cd workspace-timing && npm run compile",

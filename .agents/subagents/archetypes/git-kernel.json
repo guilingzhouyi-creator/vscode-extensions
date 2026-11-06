@@ -1,11 +1,27 @@
 {
   "archetype": "git-kernel",
-  "displayName": "Rust 内核子系统、Plumbing 等价性与无锁拓扑 (fractal-git)",
+  "displayName": "Fractal-Git Kernel & Plumbing",
   "rootDirectory": "fractal-git",
-  "allowedExtensions": [".rs", ".toml", ".json", ".md", ".js", ".ps1", ".sh"],
+  "allowedExtensions": [
+    ".rs",
+    ".toml",
+    ".json",
+    ".md",
+    ".js",
+    ".ps1",
+    ".sh"
+  ],
   "pathJail": {
-    "allowedPrefixes": ["fractal-git/"],
-    "forbiddenPrefixes": ["workspace-timing/", "auto-refactor/", "WebGames/", "scripts/", ".agents/plugins/"]
+    "allowedPrefixes": [
+      "fractal-git/"
+    ],
+    "forbiddenPrefixes": [
+      "workspace-timing/",
+      "auto-refactor/",
+      "WebGames/",
+      "scripts/",
+      ".agents/plugins/"
+    ]
   },
   "associatedSkills": [
     "fractal-git-dev",
@@ -22,14 +38,14 @@
     "constraint-driven-development"
   ],
   "rigidAxioms": [
-    "10 大内核子系统分层拓扑（fg-core/object/index/algorithms/pools/storage/native/topology/transport/gate）单向依赖，零循环",
-    "Rust 体系规则闭环 (FGT-* + RSM-* + STDLIB-*)：生产路径零裸 unwrap/expect/panic!/unreachable!，错误一律 thiserror 强类型传播",
-    "资深类型设计：Sealed Trait 与 Type-State 编译期状态机，#[repr(transparent)] Newtype 消除原始混淆，#[must_use] 防遗漏",
-    "借用签名与循环零瞬态堆分配：形参禁 &String/&Vec<T> (RSM-STR-001)，fg-pools 时代戳复用池，禁无谓比较 .clone() (RSM-CLONE-001)",
-    "卫语句与控制流平铺：单分支早退用 let-else (RSM-ELSE-001) 控制 CC <= 15 与 Depth <= 4，数值转换用 TryFrom (RSM-CAST-001)",
-    "锁纪律与并发无锁：索引与暂存路径使用 CAS 世代号无锁原语，严禁在热路径引入 Mutex/RwLock (FGT-LCK-001 / FGT-CAS-001)",
-    "每处 unsafe 必须附紧邻 // SAFETY: 三段式证明；unsafe 面积只减不增 (FGT-SAF-001 / RSM-SAF-001)",
-    "Rust 原生内核与 TS 门面保持 100% 字节等价 (FGT-ALG-001)，常数收敛于 fg-core::constants (RCFG-RULE-DRIFT)，Clippy -D warnings 零告警"
+    "10-subsystem unidirectional hierarchy: fg-core/object/index/algorithms/pools/storage/native/topology/transport/gate; zero circular deps.",
+    "Rust rule closure: Zero raw unwrap/expect/panic!/unreachable!; all errors propagate via thiserror (FGT-*, RSM-*).",
+    "Type-state architecture: Sealed traits, compile-time type-state machines, #[repr(transparent)] newtypes, #[must_use].",
+    "Zero transient heap allocation: Ban &String/&Vec<T> params (RSM-STR-001); epoch pool reuse; ban gratuitous .clone() (RSM-CLONE-001).",
+    "Guard clauses & flat control flow: Use let-else (RSM-ELSE-001) for CC <= 15 and Depth <= 4; TryFrom for casts (RSM-CAST-001).",
+    "Lock-free concurrency: CAS epoch lock-free primitives for indexing/staging; zero Mutex/RwLock on hot paths (FGT-LCK-001 / FGT-CAS-001).",
+    "Strict unsafe audit: Every unsafe block requires adjacent // SAFETY: proof; unsafe surface strictly non-increasing (FGT-SAF-001).",
+    "Kernel-facade parity: Rust kernel & TS facade 100% byte equivalent (FGT-ALG-001); constants in fg-core::constants; zero Clippy warnings."
   ],
   "localVerification": [
     "node .agents/skills/rust-engineering/scripts/validate-rust-conformance.js",

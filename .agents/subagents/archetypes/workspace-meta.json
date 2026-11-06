@@ -1,6 +1,6 @@
 {
   "archetype": "workspace-meta",
-  "displayName": "工作区顶层元治理、单源规则与物理卫生",
+  "displayName": "Workspace Meta-Governance",
   "rootDirectory": ".",
   "allowedExtensions": [
     ".json",
@@ -36,10 +36,10 @@
     "gate-governance"
   ],
   "rigidAxioms": [
-    "零空文件：全仓严禁创建或遗留 0 字节文件或纯空白字符文件",
-    "单源规则目录 (rule-catalog.json) 收录 516 条规则 (autoRefactor: 375, workspaceTiming: 49, webGames: 50, globalTooling: 18, fractalGit: 24)，规则 ID 零虚构 (RCFG-RULE-DRIFT)",
-    "提交规范：必须声明 [Project: ...]，有效字数 >= 30，零黑话与纯客观技术事实",
-    "单文件双轨体积 (ELOC <= 900 / LOC <= 1400) 与 AST 切片预算 (CC <= 15, Depth <= 4)"
+    "SSOT rule catalog supreme: All rule IDs must be registered in rule-catalog.json; zero fabricated rule IDs (RCFG-RULE-DRIFT).",
+    "8-dimension physical hygiene: UTF-8 no BOM, LF for non-ps1 / CRLF for .ps1, single EOF newline, space indentation.",
+    "100% green audit-all: scripts/ps1/audit-all.ps1 must pass completely before delivery; zero bypassing gates.",
+    "Document metrics SSOT closure: Metric counts in docs rendered via sync-doc-metrics.js; zero manual drifting (GUARD-DOC-001)."
   ],
   "localVerification": [
     "node scripts/common/validate-physical-hygiene.js",

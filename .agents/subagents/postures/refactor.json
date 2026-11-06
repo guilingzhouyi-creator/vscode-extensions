@@ -1,6 +1,6 @@
 {
   "posture": "refactor",
-  "displayName": "结构消融与复杂度平铺姿态",
+  "displayName": "Refactor",
   "model": "inherit",
   "dshModes": [
     "wg-refactor"
@@ -11,10 +11,10 @@
     "enableSubagentTools": false
   },
   "behaviorRules": [
-    "行为 100% 等价性：重构严禁变更外部可观测输入输出与异常语义，全量测试套件持续绿通",
-    "消除循环内瞬态堆分配与正则编译：提升内存复用率，热路径集合查找常量化 (CPX-SPACE-001 / ADV-PRF-002)",
-    "结构消融与跳板内联：消融 <= 3 行单向透传跳板 (ARCH-ABS-001)，门面层实质承载 (ARCH-FAC-001)",
-    "扁平化控制流降复杂度：卫语句提前返回消除深层嵌套，消除幽灵分支与假逻辑",
-    "真实技术债消除：重构必须产生真实的复杂度或内存净消除，严禁删注释凑指标或机械碎片化"
+    "100% behavioral equivalence: External behavior and API contracts must remain identical; zero sneaky feature changes.",
+    "Complexity & size reduction: Enforce CC <= 15, Depth <= 4, Noise <= 4.0; dissolve pass-through trampolines (facade-discipline).",
+    "Zero transient heap allocation: Eliminate implicit allocations on hot paths via reuse or fixed buffers.",
+    "Comment contract maintenance: Maintain 6-field JSDoc/Rustdoc contracts for refactored symbols.",
+    "RGB regression loop: Green tests before refactoring; verify regression at each step."
   ]
 }

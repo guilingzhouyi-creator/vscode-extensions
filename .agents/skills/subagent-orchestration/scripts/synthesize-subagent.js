@@ -215,20 +215,20 @@ function parseCliArgs(argv) {
 
 function formatExclusiveFilesLine(isReadOnly, exclusiveFiles) {
   if (isReadOnly) {
-    return '- 权限与模式：只读审查模式（enable_write_tools: false，严禁创建或修改任何文件）';
+    return '- Permissions: Read-only mode (enable_write_tools: false; file edits strictly forbidden).';
   }
   if (!exclusiveFiles || !String(exclusiveFiles).trim()) {
-    return '- 独占文件列表：<请在此列出两两正交的独占文件路径>';
+    return '- Exclusive Files: <list mutually orthogonal file paths>';
   }
   const items = String(exclusiveFiles)
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
   if (items.length === 0) {
-    return '- 独占文件列表：<请在此列出两两正交的独占文件路径>';
+    return '- Exclusive Files: <list mutually orthogonal file paths>';
   }
   const numbered = items.map((f, idx) => `  ${idx + 1}. ${f}`).join('\n');
-  return `- 独占文件列表 (Zero-Intersection Path Jail，严禁触碰列表外任何文件)：\n${numbered}`;
+  return `- Exclusive Files (Zero-Intersection Path Jail; touching external files forbidden):\n${numbered}`;
 }
 
 /**
@@ -251,7 +251,7 @@ function resolveSkillDuties(skillNames) {
   return skillNames.map((skillName) => {
     const record = registry?.skills?.[skillName];
     const firstSentence = String(record?.purpose || record?.pitch || '').split(/[。；]/u)[0];
-    return { name: skillName, duty: firstSentence.length > 0 ? firstSentence : '（未登记职责，按技能名判断）' };
+    return { name: skillName, duty: firstSentence.length > 0 ? firstSentence : 'primary domain responsibility' };
   });
 }
 
@@ -269,15 +269,12 @@ function renderSkillActivationContract(archetypeObj) {
   const primary = duties.slice(0, SKILL_ACTIVATION_LIMIT);
   const rest = duties.slice(SKILL_ACTIVATION_LIMIT);
   const lines = primary.map(
-    (item, index) => `  ${index + 1}. \`${item.name}\` — ${item.duty}`,
+    (item, index) => `  ${index + 1}. \`${item.name}\`: ${item.duty}`,
   );
   const restLine = rest.length > 0
-    ? `\n  其余关联技能（命中具体问题时再加载）：${rest.map((item) => `\`${item.name}\``).join('、')}`
+    ? `\n  On-demand: ${rest.map((item) => `\`${item.name}\``).join(', ')}`
     : '';
-  return `行动前必须先读取下列技能的 \`SKILL.md\` 正文并遵守其约束；仅知道技能名不算遵守。
-${lines.join('\n')}${restLine}
-
-禁止加载本契约未列出的技能。技能内容与本契约 Layer 2 冲突时，以 Layer 2 为准。`;
+  return `Read required \`SKILL.md\` before execution (Layer 2 rigid axioms take precedence):\n${lines.join('\n')}${restLine}`;
 }
 
 function buildSystemPrompt(archetypeObj, postureObj) {
@@ -290,52 +287,42 @@ function buildSystemPrompt(archetypeObj, postureObj) {
   const verifyCommands = archetypeObj.localVerification.map((c) => `  $ ${c}`).join('\n');
 
   const verifySection = isReadOnly
-    ? `## 🧪 Layer 4: 本地门禁自检契约 (只读审查姿态)
-只读姿态已物理剥夺写权限，严禁执行产物编译或写入测试；向主 Agent 汇报时必须提供基于 ${totalRules} 规则库与所属领域刚性公理的纯客观文件路径、起始行号与质性技术依据。`
-    : `## 🧪 Layer 4: 本地门禁自检契约 (构建 + 测试 + 静态规则三重闭环)
-交割任务前，必须在所属工作目录下依次执行并通过以下本地验证命令（测试全绿仅为必要底线，绝不等同于符合审查或通过门禁，必须确保编译、测试与静态规则全部绿色）：
+    ? `## Layer 4: Verification (Read-Only)
+Write tools stripped. Report factual evidence: exact file paths, line numbers, and registered SSOT rule IDs.`
+    : `## Layer 4: Local Verification
+Must pass before completion (clean build, test regression, and static rules green):
 ${verifyCommands}`;
 
-  return `# SubAgent System Contract: [${archetypeObj.displayName}] × [${postureObj.displayName}]
-
-> 本提示词由工作区 JIT 合成引擎自动生成，代表当前 SubAgent 必须遵守的刚性执行契约。
-
-## 🏛️ Layer 0: 公理来源与优先级
-平台已无条件注入 \`AGENTS.md\`（工作区治理总枢），其中含物理卫生、复杂度预算、门面设计、
-规则真实性、零高危技术债与会话隔离公理。本契约不重复其条款，仅补充本专员特有约束。
-优先级：Layer 2 领域公理 > 本契约其余各层 > 技能正文；与 \`AGENTS.md\` 冲突时以 \`AGENTS.md\` 为准。
-
-## 🛡️ Layer 1: 物理路径沙箱约束 (Path Jail Guard)
-* 授权操作路径前缀：
+  return `# SubAgent System Contract: [${archetypeObj.archetype}] x [${postureObj.posture}]
+## Layer 0: Precedence
+\`AGENTS.md\` is supreme. Precedence: Layer 2 Domain Axioms > Contract Layers > Skill Docs; conflicts yield to \`AGENTS.md\`.
+## Layer 1: Path Jail Guard
+* Allowed prefixes:
 ${allowedList}
-* 严禁触碰路径前缀（越界操作立即阻断）：
+* Forbidden prefixes (strictly blocked):
 ${forbiddenList}
-* 单源规则目录权威收录 ${totalRules} 条规则，严禁虚构规则 ID (\`RCFG-RULE-DRIFT\`)。
-
-## 🧠 Layer 1.5: 技能激活契约 (Skill Activation)
+* SSOT rule closure required; zero fabricated rule IDs (\`RCFG-RULE-DRIFT\`).
+## Layer 1.5: Skill Activation
 ${renderSkillActivationContract(archetypeObj)}
-
-## ⚖️ Layer 2: 领域刚性公理与技术栈规范
+## Layer 2: Domain Rigid Axioms
 ${axiomList}
-
-## 🎯 Layer 3: 作业姿态与行为限定 (${postureObj.displayName})
+## Layer 3: Posture Invariants (${postureObj.posture})
 ${postureRuleList}
-
 ${verifySection}
 `;
 }
 
 function buildTaskPromptTemplate(params) {
   const { taskGoal, archetypeObj, postureObj, exclusiveFiles = null } = params;
-  const goalText = taskGoal || '<请在此处填写针对性技术任务描述与预期验收条件>';
+  const goalText = taskGoal || '<targeted technical task description and acceptance criteria>';
   const isReadOnly = postureObj?.toolPermissions?.enableWriteTools === false;
   const exclusiveFilesLine = formatExclusiveFilesLine(isReadOnly, exclusiveFiles);
 
   const verifyDirective = isReadOnly
     ? `[Pre-Delivery Verification]
-只读审查模式，严禁写操作；汇报时必须对照 System Contract Layer 4 提供纯客观文件路径、起始行号与质性技术依据。`
+Read-only mode. Provide factual file paths, line numbers, and rule IDs based on Layer 4.`
     : `[Pre-Delivery Verification]
-交割前必须执行并通过 System Contract Layer 4 规定的本地自检命令（构建 + 测试 + 静态规则三重闭环），确保全量通过且零 High/Critical 技术债务。`;
+Execute and pass all Layer 4 verification commands with zero High/Critical debt before delivery.`;
 
   return `[Task Scope & Zero-Intersection Path Jail]
 ${exclusiveFilesLine}
@@ -367,7 +354,7 @@ function synthesizeSingle(params) {
   assertExclusiveFilesInJail(archetypeObj, cliOptions.exclusiveFiles);
 
   const subagentName = cliOptions.name || presetKey || `${archKey}-${postKey}`;
-  const subagentDesc = defaultDesc || `${archetypeObj.displayName} 的 ${postureObj.displayName}`;
+  const subagentDesc = defaultDesc || `${archetypeObj.displayName} (${postureObj.displayName})`;
   const systemPrompt = buildSystemPrompt(archetypeObj, postureObj);
   const taskPrompt = buildTaskPromptTemplate({
     taskGoal: cliOptions.taskGoal,

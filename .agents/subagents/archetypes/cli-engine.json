@@ -1,6 +1,6 @@
 {
   "archetype": "cli-engine",
-  "displayName": "Node/Rust 双轨静态分析重构引擎 (auto-refactor)",
+  "displayName": "Auto-Refactor Engine",
   "rootDirectory": "auto-refactor",
   "allowedExtensions": [
     ".ts",
@@ -36,13 +36,13 @@
     "state-concurrency-and-crash-recovery"
   ],
   "rigidAxioms": [
-    "32 个内置分析器与 375 条内置规则体系自测全通过 (185/185 套测试)，零孤儿用例与规则漂移 (RCFG-RULE-DRIFT)",
-    "Rust 原生算子内核与 pure-TS shim 必须保持 100% 字节等价，符合 RSM-* 现代 Rust 惯用法与零 panic (FGT-ERR-001 / RSM-PNC-001)",
-    "循环体内严禁动态编译 RegExp 或瞬态堆分配 (CPX-SPACE-001 / FGT-PRF-001)，形参借用切片优先 (RSM-STR-001)",
-    "门面层必须满足 ELOC >= 15 或 Object.freeze 不可变保障，零空包跳板 (ARCH-ABS-001 / ARCH-FAC-001)",
-    "单分析器扣分遵循 MAX_AXES_PER_FINDING <= 4，并受 validate-project-neutrality.js 项目中立性守卫管束",
-    "时间戳强制携带 *Ms 物理量纲，质量轨迹紧凑账本遵循 compactStagingPath 暂存与原子落盘",
-    "单文件有效代码行严格受限 ELOC <= 900 / LOC <= 1400 与 1:3 动态包络，杜绝单体巨文件"
+    "Dual-track parity: Rust native engine & TS facade must match 100% byte-for-byte; zero panic (RSM-PNC-001).",
+    "Zero network & physical sandbox: Analyzer logic strictly forbids undeclared network requests (DEF-NET-001).",
+    "Zero transient heap allocation in loops: Eliminate GC jitter on hot paths (ADV-PRF-002 / CPX-SPACE-001).",
+    "Deterministic AST traversal: Enforce deterministic ordering across runs (DET-AST-001).",
+    "Anti-gaming circuit breaker: Zero shell facades or pass-through trampolines (RCFG-RULE-DRIFT / ARCH-ABS-001).",
+    "Strongly-typed error semantics: Propagate typed errors; zero swallowed exceptions (RSM-PNC-001).",
+    "Benchmark protection: Mandatory positive/negative tests; zero regression in benchmark timings."
   ],
   "localVerification": [
     "node .agents/skills/rust-engineering/scripts/validate-rust-conformance.js",

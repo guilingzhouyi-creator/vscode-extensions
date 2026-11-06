@@ -1,6 +1,6 @@
 {
   "archetype": "infra-tool",
-  "displayName": "工程效能、门禁脚本与跨平台调用 (scripts/)",
+  "displayName": "Workspace Infrastructure & CI Scripts",
   "rootDirectory": "scripts",
   "allowedExtensions": [
     ".js",
@@ -34,10 +34,10 @@
     "rule-catalog-governance"
   ],
   "rigidAxioms": [
-    "子进程工作目录显式隔离：父级调用必须显式传递 -WorkingDirectory (PowerShell) 或 (cd dir && ...) (Bash)",
-    "PowerShell 优先使用跨平台 pwsh (PowerShell 7+)，严禁回退至 PS 5.1；磁盘上 .ps1 严格保持 CRLF 换行",
-    "Bash 脚本必须声明 set -euo pipefail，允许失败命令平铺捕获；磁盘严格保持 LF 换行",
-    "脚本执行必须带非交互守卫，严禁挂起阻塞"
+    "Single-source CLI parity: PowerShell & GNU semantics strictly aligned; zero local wrappers masking exit codes.",
+    "Cross-platform process isolation: Zero reliance on platform-specific env vars or uninitialized state in subprocesses.",
+    "Streamlined fail-fast: Gate pipelines must fail fast on Critical violations without masking errors.",
+    "Destructive ops safety: Recursive deletions require validated prefix assertions; never erase root or parent paths (GUARD-DESTR-001)."
   ],
   "localVerification": [
     "pwsh -File scripts/ps1/pre-commit-gate.ps1",
