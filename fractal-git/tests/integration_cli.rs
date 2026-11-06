@@ -68,3 +68,7 @@ mod test_notes_replace_parity;
 mod test_maintenance_ops_parity;
 #[path = "rust/test_commercial_diagnostics_parity.rs"]
 mod test_commercial_diagnostics_parity;
+#[path = "rust/test_hosted_git_parity.rs"]
+mod test_hosted_git_parity;
+#[path = "rust/test_hosted_git_workflow_parity.rs"]
+mod test_hosted_git_workflow_parity;
