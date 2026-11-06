@@ -22,6 +22,15 @@ use fractal_git::{LooseOdb, OdbStore};
 use super::common::{fail_fatal, fail_usage, CliContext};
 use super::repo_view::RepoView;
 
+/// Parsed options for `taxis hash-object`.
+struct HashObjectOptions {
+    object_kind: ObjectKind,
+    kind_name: &'static str,
+    write_to_odb: bool,
+    read_stdin: bool,
+    files: Vec<String>,
+}
+
 /// Dispatches `hash-object`.
 ///
 /// Supported arguments:
@@ -31,64 +40,9 @@ use super::repo_view::RepoView;
 /// - `--no-filters`, `--literally`: Accepted for CLI compatibility with Git.
 /// - `<file>...`: Paths to files to hash.
 pub fn handle_hash_object(ctx: &CliContext) {
-    let mut object_kind = ObjectKind::Blob;
-    let mut kind_name = "blob";
-    let mut write_to_odb = false;
-    let mut read_stdin = false;
-    let mut files = Vec::new();
+    let opts = parse_hash_object_args(&ctx.args);
 
-    let mut cursor = 0;
-    while cursor < ctx.args.len() {
-        let arg = &ctx.args[cursor];
-        match arg.as_str() {
-            "-w" => {
-                write_to_odb = true;
-            }
-            "--stdin" => {
-                read_stdin = true;
-            }
-            "--no-filters" | "--literally" => {
-                // Accepted for compatibility
-            }
-            "-t" => {
-                cursor += 1;
-                if cursor >= ctx.args.len() {
-                    fail_usage("hash-object: missing argument for -t");
-                }
-                let type_arg = &ctx.args[cursor];
-                match type_arg.as_str() {
-                    "blob" => {
-                        object_kind = ObjectKind::Blob;
-                        kind_name = "blob";
-                    }
-                    "commit" => {
-                        object_kind = ObjectKind::Commit;
-                        kind_name = "commit";
-                    }
-                    "tree" => {
-                        object_kind = ObjectKind::Tree;
-                        kind_name = "tree";
-                    }
-                    "tag" => {
-                        object_kind = ObjectKind::Tag;
-                        kind_name = "tag";
-                    }
-                    other => {
-                        fail_usage(format!("hash-object: unknown object type '{other}'"));
-                    }
-                }
-            }
-            other if other.starts_with('-') => {
-                fail_usage(format!("hash-object: unknown option '{other}'"));
-            }
-            other => {
-                files.push(other.to_string());
-            }
-        }
-        cursor += 1;
-    }
-
-    let loose_odb = if write_to_odb {
+    let loose_odb = if opts.write_to_odb {
         let view = match RepoView::open(ctx) {
             Ok(opened) => opened,
             Err(open_err) => fail_fatal(open_err),
@@ -98,15 +52,19 @@ pub fn handle_hash_object(ctx: &CliContext) {
         None
     };
 
-    if read_stdin {
+    if opts.read_stdin {
         let mut buffer = Vec::new();
         if let Err(err) = io::stdin().read_to_end(&mut buffer) {
             fail_fatal(format!("could not read from stdin: {err}"));
         }
-        hash_and_output(&buffer, object_kind, kind_name, loose_odb.as_ref());
+        hash_and_output(
+            &buffer,
+            (opts.object_kind, opts.kind_name),
+            loose_odb.as_ref(),
+        );
     }
 
-    for file_path in &files {
+    for file_path in &opts.files {
         let path = Path::new(file_path);
         let buffer = match fs::read(path) {
             Ok(bytes) => bytes,
@@ -114,17 +72,63 @@ pub fn handle_hash_object(ctx: &CliContext) {
                 fail_fatal(format!("could not open '{file_path}' for reading: {err}"));
             }
         };
-        hash_and_output(&buffer, object_kind, kind_name, loose_odb.as_ref());
+        hash_and_output(
+            &buffer,
+            (opts.object_kind, opts.kind_name),
+            loose_odb.as_ref(),
+        );
+    }
+}
+
+/// Parses command-line options for `taxis hash-object`.
+fn parse_hash_object_args(args: &[String]) -> HashObjectOptions {
+    let mut opts = HashObjectOptions {
+        object_kind: ObjectKind::Blob,
+        kind_name: "blob",
+        write_to_odb: false,
+        read_stdin: false,
+        files: Vec::new(),
+    };
+
+    let mut cursor = 0;
+    while cursor < args.len() {
+        match args[cursor].as_str() {
+            "-w" => opts.write_to_odb = true,
+            "--stdin" => opts.read_stdin = true,
+            "--no-filters" | "--literally" => {}
+            "-t" => {
+                cursor += 1;
+                let Some(type_arg) = args.get(cursor) else {
+                    fail_usage("hash-object: missing argument for -t");
+                };
+                let (kind, name) = resolve_hash_object_kind(type_arg);
+                opts.object_kind = kind;
+                opts.kind_name = name;
+            }
+            other if other.starts_with('-') => {
+                fail_usage(format!("hash-object: unknown option '{other}'"));
+            }
+            other => opts.files.push(other.to_string()),
+        }
+        cursor += 1;
+    }
+    opts
+}
+
+/// Maps a `-t <type>` argument to [`ObjectKind`] and its canonical header string.
+fn resolve_hash_object_kind(type_arg: &str) -> (ObjectKind, &'static str) {
+    match type_arg {
+        "blob" => (ObjectKind::Blob, "blob"),
+        "commit" => (ObjectKind::Commit, "commit"),
+        "tree" => (ObjectKind::Tree, "tree"),
+        "tag" => (ObjectKind::Tag, "tag"),
+        other => fail_usage(format!("hash-object: unknown object type '{other}'")),
     }
 }
 
 /// Hashes payload bytes and optionally writes them to the loose object database.
-fn hash_and_output(
-    payload: &[u8],
-    kind: ObjectKind,
-    kind_name: &str,
-    loose_odb: Option<&LooseOdb>,
-) {
+fn hash_and_output(payload: &[u8], kind_spec: (ObjectKind, &str), loose_odb: Option<&LooseOdb>) {
+    let (kind, kind_name) = kind_spec;
     let oid = if let Some(odb) = loose_odb {
         match odb.write_object(kind_name, payload) {
             Ok(written_oid) => written_oid,

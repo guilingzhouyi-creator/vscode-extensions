@@ -250,69 +250,77 @@ pub fn run_revision_diff(
 fn parse_request(args: &[String]) -> Result<DiffRequest, String> {
     let (options, pathspecs) = super::path_filter::split_args_at_dashdash(args);
     let mut request = DiffRequest {
-        scope: DiffScope::Worktree,
-        context: DEFAULT_CONTEXT,
-        revisions: Vec::new(),
-        pathspecs: Vec::new(),
-        nul_terminated: false,
-        name_only: false,
-        name_status: false,
-        stat_only: false,
-        no_prefix: false,
-        exit_code: false,
-        quiet: false,
+        pathspecs,
+        ..DiffRequest::default()
     };
 
     for argument in &options {
-        match argument.as_str() {
-            "--cached" | "--staged" => request.scope = DiffScope::Staged,
-            "-z" => request.nul_terminated = true,
-            "--name-only" => request.name_only = true,
-            "--name-status" => request.name_status = true,
-            "--stat" => request.stat_only = true,
-            // `--exit-code` and `--quiet` are the only two flags that make a difference a status.
-            // `--quiet` also suppresses the report, so it implies both.
-            "--exit-code" => request.exit_code = true,
-            "--quiet" => {
-                request.exit_code = true;
-                request.quiet = true;
-            }
-            "--no-prefix" => request.no_prefix = true,
-            "--prefix" => request.no_prefix = false,
-            "--no-color" | "--color=never" => {}
-            other if other.starts_with("-U") && other.len() > 2 => {
-                request.context = parse_context(&other[2..])?;
-            }
-            "-U" => request.context = DEFAULT_CONTEXT,
-            other if other.starts_with("--unified=") => {
-                request.context = parse_context(&other["--unified=".len()..])?;
-            }
-            other if other.starts_with('-') && other.len() > 1 => {
-                return Err(format!("diff does not support the flag '{other}'"));
-            }
-            other => request.revisions.push(other.to_string()),
-        }
+        apply_diff_option_token(&mut request, argument)?;
     }
-    request.pathspecs = pathspecs;
 
-    if request.revisions.len() >= 2 {
-        request.scope = DiffScope::Revisions;
-    } else if request.revisions.len() == 1 {
-        // `diff <commit>` compares the commit against the worktree, and `diff --cached <commit>`
-        // compares it against the index. Both differ from the bare forms, which are relative to
-        // `HEAD`; collapsing them into one scope would make `diff <commit>` ignore the worktree.
-        request.scope = match request.scope {
-            DiffScope::Staged => DiffScope::CommitToIndex,
-            _ => DiffScope::CommitToWorktree,
-        };
+    finalize_diff_scope(&mut request)?;
+    Ok(request)
+}
+
+/// Applies one option or revision token to [`DiffRequest`].
+fn apply_diff_option_token(request: &mut DiffRequest, argument: &str) -> Result<(), String> {
+    match argument {
+        "--cached" | "--staged" => request.scope = DiffScope::Staged,
+        "-z" => request.nul_terminated = true,
+        "--name-only" => request.name_only = true,
+        "--name-status" => request.name_status = true,
+        "--stat" => request.stat_only = true,
+        "--exit-code" => request.exit_code = true,
+        "--quiet" => {
+            request.exit_code = true;
+            request.quiet = true;
+        }
+        "--no-prefix" => request.no_prefix = true,
+        "--prefix" => request.no_prefix = false,
+        "--no-color" | "--color=never" => {}
+        "-U" => request.context = DEFAULT_CONTEXT,
+        other => apply_diff_parameterized_or_rev(request, other)?,
     }
+    Ok(())
+}
+
+/// Applies `-U<n>`, `--unified=<n>`, or records a positional revision argument.
+fn apply_diff_parameterized_or_rev(
+    request: &mut DiffRequest,
+    argument: &str,
+) -> Result<(), String> {
+    if let Some(rest) = argument.strip_prefix("-U") {
+        request.context = parse_context(rest)?;
+        return Ok(());
+    }
+    if let Some(rest) = argument.strip_prefix("--unified=") {
+        request.context = parse_context(rest)?;
+        return Ok(());
+    }
+    if argument.starts_with('-') && argument.len() > 1 {
+        return Err(format!("diff does not support the flag '{argument}'"));
+    }
+    request.revisions.push(argument.to_string());
+    Ok(())
+}
+
+/// Resolves the final [`DiffScope`] once all revisions have been collected.
+fn finalize_diff_scope(request: &mut DiffRequest) -> Result<(), String> {
     if request.revisions.len() > 2 {
         return Err(format!(
             "diff accepts at most two revisions, got {}",
             request.revisions.len()
         ));
     }
-    Ok(request)
+    if request.revisions.len() == 2 {
+        request.scope = DiffScope::Revisions;
+    } else if request.revisions.len() == 1 {
+        request.scope = match request.scope {
+            DiffScope::Staged => DiffScope::CommitToIndex,
+            _ => DiffScope::CommitToWorktree,
+        };
+    }
+    Ok(())
 }
 
 /// Parses a context width.
@@ -385,7 +393,10 @@ pub(crate) fn collect_comparisons(
     if !request.pathspecs.is_empty() {
         comparisons.retain(|comparison| {
             super::path_filter::matches_any_pathspec(&comparison.new_path, &request.pathspecs)
-                || super::path_filter::matches_any_pathspec(&comparison.old_path, &request.pathspecs)
+                || super::path_filter::matches_any_pathspec(
+                    &comparison.old_path,
+                    &request.pathspecs,
+                )
         });
     }
     Ok(comparisons)
@@ -447,8 +458,8 @@ impl<'a> Snapshot<'a> {
 ///
 /// Propagates reference and object failures.
 fn head_snapshot(view: &RepoView) -> FractalResult<Snapshot<'_>> {
-    let entries = match view.head_commit()? {
-        Some(commit) => flatten_commit_tree(view, &commit)?,
+    let entries = match view.effective_head_commit()? {
+        Some((_, commit)) => flatten_commit_tree(view, &commit)?,
         None => BTreeMap::new(),
     };
     Ok(Snapshot::objects(view, entries))

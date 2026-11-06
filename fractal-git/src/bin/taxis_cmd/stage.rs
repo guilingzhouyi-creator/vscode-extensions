@@ -384,68 +384,92 @@ fn stage_single_file(
     );
 }
 
+/// Parsed options for `taxis rm`.
+struct RmOptions {
+    cached: bool,
+    recursive: bool,
+    quiet: bool,
+    ignore_unmatch: bool,
+    pathspecs: Vec<String>,
+}
+
 /// Dispatches `taxis rm`.
 pub fn handle_rm(ctx: &CliContext) {
-    let mut cached = false;
-    let mut recursive = false;
-    let mut quiet = false;
-    let mut ignore_unmatch = false;
-    let mut pathspecs = Vec::new();
-    let mut after_double_dash = false;
-
-    for arg in &ctx.args {
-        if after_double_dash {
-            pathspecs.push(normalize_rel_spec(arg));
-            continue;
-        }
-        match arg.as_str() {
-            "--" => after_double_dash = true,
-            "--cached" => cached = true,
-            "--force" => {}
-            "--quiet" => quiet = true,
-            "--ignore-unmatch" => ignore_unmatch = true,
-            other if other.starts_with('-') && !other.starts_with("--") && other.len() > 1 => {
-                for ch in other[1..].chars() {
-                    match ch {
-                        'r' => recursive = true,
-                        'f' => {}
-                        'q' => quiet = true,
-                        _ => fail_usage(format!("rm: unknown option '-{ch}'")),
-                    }
-                }
-            }
-            other if other.starts_with('-') => {
-                fail_usage(format!("rm: unknown option '{other}'"));
-            }
-            other => pathspecs.push(normalize_rel_spec(other)),
-        }
-    }
-
-    if pathspecs.is_empty() {
-        fail_usage("usage: git rm [<options>] [--] <file>...");
-    }
-
+    let opts = parse_rm_args(&ctx.args);
     let view = RepoView::open_or_exit(ctx);
     // Same working-directory rule as `add`: a pathspec typed one level down names a root-relative
     // path only after the caller's prefix is applied, so rebase before matching.
-    let pathspecs = match rebase_specs_to_root(&view, &pathspecs) {
+    let pathspecs = match rebase_specs_to_root(&view, &opts.pathspecs) {
         Ok(rebased) => rebased,
         Err(reason) => fail_fatal(reason),
     };
     let mut index_map = load_index_entries(view.git_dir());
-    let to_remove = resolve_rm_targets(&index_map, &pathspecs, (recursive, ignore_unmatch));
+    let to_remove = resolve_rm_targets(
+        &index_map,
+        &pathspecs,
+        (opts.recursive, opts.ignore_unmatch),
+    );
 
     for path in &to_remove {
         index_map.remove(path);
-        if !cached {
+        if !opts.cached {
             remove_worktree_file_and_empty_parents(view.work_root(), path);
         }
-        if !quiet {
+        if !opts.quiet {
             println!("rm '{path}'");
         }
     }
 
     persist_index_state(view.git_dir(), &index_map);
+}
+
+/// Parses command-line arguments for `taxis rm`.
+fn parse_rm_args(args: &[String]) -> RmOptions {
+    let mut opts = RmOptions {
+        cached: false,
+        recursive: false,
+        quiet: false,
+        ignore_unmatch: false,
+        pathspecs: Vec::new(),
+    };
+    let mut after_double_dash = false;
+
+    for arg in args {
+        if after_double_dash {
+            opts.pathspecs.push(normalize_rel_spec(arg));
+            continue;
+        }
+        match arg.as_str() {
+            "--" => after_double_dash = true,
+            "--cached" => opts.cached = true,
+            "--force" => {}
+            "--quiet" => opts.quiet = true,
+            "--ignore-unmatch" => opts.ignore_unmatch = true,
+            other if other.starts_with('-') && !other.starts_with("--") && other.len() > 1 => {
+                parse_rm_short_flags(&other[1..], &mut opts.recursive, &mut opts.quiet);
+            }
+            other if other.starts_with('-') => {
+                fail_usage(format!("rm: unknown option '{other}'"));
+            }
+            other => opts.pathspecs.push(normalize_rel_spec(other)),
+        }
+    }
+    if opts.pathspecs.is_empty() {
+        fail_usage("usage: git rm [<options>] [--] <file>...");
+    }
+    opts
+}
+
+/// Parses bundled short flags for `taxis rm`.
+fn parse_rm_short_flags(cluster: &str, recursive: &mut bool, quiet: &mut bool) {
+    for ch in cluster.chars() {
+        match ch {
+            'r' => *recursive = true,
+            'f' => {}
+            'q' => *quiet = true,
+            _ => fail_usage(format!("rm: unknown option '-{ch}'")),
+        }
+    }
 }
 
 /// Resolves index paths matched by `taxis rm` pathspecs.
@@ -479,44 +503,10 @@ fn resolve_rm_targets(
 
 /// Dispatches `taxis mv`.
 pub fn handle_mv(ctx: &CliContext) {
-    let mut force = false;
-    let mut positional = Vec::new();
-    let mut after_double_dash = false;
-
-    for arg in &ctx.args {
-        if after_double_dash {
-            positional.push(normalize_rel_spec(arg));
-            continue;
-        }
-        match arg.as_str() {
-            "--" => after_double_dash = true,
-            "--force" => force = true,
-            "--verbose" => {}
-            other if other.starts_with('-') && !other.starts_with("--") && other.len() > 1 => {
-                for ch in other[1..].chars() {
-                    match ch {
-                        'f' => force = true,
-                        'k' | 'v' => {}
-                        _ => fail_usage(format!("mv: unknown option '-{ch}'")),
-                    }
-                }
-            }
-            other if other.starts_with('-') => {
-                fail_usage(format!("mv: unknown option '{other}'"));
-            }
-            other => positional.push(normalize_rel_spec(other)),
-        }
-    }
-
-    if positional.len() != 2 {
-        fail_usage("usage: git mv [<options>] <source>... <destination>");
-    }
-
-    let source = &positional[0];
-    let raw_dest = &positional[1];
+    let (force, source, raw_dest) = parse_mv_args(&ctx.args);
     let view = RepoView::open_or_exit(ctx);
     // Source and destination are both typed relative to the caller's directory.
-    let (source, dest) = match rebase_specs_to_root(&view, &[source.clone(), raw_dest.to_string()]) {
+    let (source, dest) = match rebase_specs_to_root(&view, &[source, raw_dest]) {
         Ok(rebased) if rebased.len() == 2 => (rebased[0].clone(), rebased[1].clone()),
         Ok(_) => fail_fatal("mv: expected exactly two paths"),
         Err(reason) => fail_fatal(reason),
@@ -527,11 +517,65 @@ pub fn handle_mv(ctx: &CliContext) {
     let Some(mut entry) = index_map.remove(&source) else {
         fail_fatal(format!("bad source, source={source}, destination={dest}"));
     };
-    let src_full = match plan_worktree_path(view.work_root(), &source) {
+    let dst_full = execute_mv_rename(view.work_root(), (&source, &dest), force);
+    let (size, mtime_seconds, mtime_nanos) = worktree_stat(&dst_full, entry.size);
+    entry.path = dest.clone();
+    entry.size = size;
+    entry.mtime_seconds = mtime_seconds;
+    entry.mtime_nanos = mtime_nanos;
+    index_map.insert(dest, entry);
+    persist_index_state(view.git_dir(), &index_map);
+}
+
+/// Parses command-line arguments for `taxis mv`.
+fn parse_mv_args(args: &[String]) -> (bool, String, String) {
+    let mut force = false;
+    let mut positional = Vec::new();
+    let mut after_double_dash = false;
+
+    for arg in args {
+        if after_double_dash {
+            positional.push(normalize_rel_spec(arg));
+            continue;
+        }
+        match arg.as_str() {
+            "--" => after_double_dash = true,
+            "--force" => force = true,
+            "--verbose" => {}
+            other if other.starts_with('-') && !other.starts_with("--") && other.len() > 1 => {
+                parse_mv_short_flags(&other[1..], &mut force);
+            }
+            other if other.starts_with('-') => {
+                fail_usage(format!("mv: unknown option '{other}'"));
+            }
+            other => positional.push(normalize_rel_spec(other)),
+        }
+    }
+    if positional.len() != 2 {
+        fail_usage("usage: git mv [<options>] <source>... <destination>");
+    }
+    (force, positional[0].clone(), positional[1].clone())
+}
+
+/// Parses bundled short flags for `taxis mv`.
+fn parse_mv_short_flags(cluster: &str, force: &mut bool) {
+    for ch in cluster.chars() {
+        match ch {
+            'f' => *force = true,
+            'k' | 'v' => {}
+            _ => fail_usage(format!("mv: unknown option '-{ch}'")),
+        }
+    }
+}
+
+/// Validates and renames a working-tree file for `taxis mv`.
+fn execute_mv_rename(work_root: &Path, paths: (&str, &str), force: bool) -> PathBuf {
+    let (source, dest) = paths;
+    let src_full = match plan_worktree_path(work_root, source) {
         Ok(planned) => planned,
         Err(detail) => fail_fatal(detail),
     };
-    let dst_full = match plan_worktree_path(view.work_root(), &dest) {
+    let dst_full = match plan_worktree_path(work_root, dest) {
         Ok(planned) => planned,
         Err(detail) => fail_fatal(detail),
     };
@@ -548,13 +592,7 @@ pub fn handle_mv(ctx: &CliContext) {
     if let Err(err) = fs::rename(&src_full, &dst_full) {
         fail_io("rename working-tree file", err);
     }
-    let (size, mtime_seconds, mtime_nanos) = worktree_stat(&dst_full, entry.size);
-    entry.path = dest.clone();
-    entry.size = size;
-    entry.mtime_seconds = mtime_seconds;
-    entry.mtime_nanos = mtime_nanos;
-    index_map.insert(dest, entry);
-    persist_index_state(view.git_dir(), &index_map);
+    dst_full
 }
 
 /// Resolves the destination relative path when `<destination>` names an existing directory.
@@ -575,79 +613,105 @@ fn resolve_mv_destination(work_root: &Path, source: &str, raw_dest: &str) -> Str
     }
 }
 
+/// Parsed options for `taxis restore`.
+struct RestoreOptions {
+    source_rev: Option<String>,
+    staged: bool,
+    worktree: bool,
+    pathspecs: Vec<String>,
+}
+
 /// Dispatches `taxis restore`.
 pub fn handle_restore(ctx: &CliContext) {
-    let mut source_rev: Option<String> = None;
-    let mut staged = false;
-    let mut worktree = false;
-    let mut pathspecs = Vec::new();
-    let mut after_double_dash = false;
-    let mut cursor = 0;
-
-    while cursor < ctx.args.len() {
-        let arg = &ctx.args[cursor];
-        if after_double_dash {
-            pathspecs.push(normalize_rel_spec(arg));
-            cursor += 1;
-            continue;
-        }
-        match arg.as_str() {
-            "--" => after_double_dash = true,
-            "--staged" => staged = true,
-            "--worktree" => worktree = true,
-            "--quiet" => {}
-            "-s" | "--source" => {
-                cursor += 1;
-                let Some(val) = ctx.args.get(cursor) else {
-                    fail_usage("restore: --source requires a tree-ish argument");
-                };
-                source_rev = Some(val.clone());
-            }
-            other if other.starts_with("--source=") => {
-                source_rev = Some(other["--source=".len()..].to_string());
-            }
-            other if other.starts_with("-s") && other.len() > 2 => {
-                source_rev = Some(other[2..].to_string());
-            }
-            other if other.starts_with('-') && !other.starts_with("--") && other.len() > 1 => {
-                apply_restore_short_flags(&other[1..], &mut staged, &mut worktree);
-            }
-            other if other.starts_with('-') => {
-                fail_usage(format!("restore: unknown option '{other}'"));
-            }
-            other => pathspecs.push(normalize_rel_spec(other)),
-        }
-        cursor += 1;
-    }
-
-    if pathspecs.is_empty() {
-        fail_usage("you must specify path(s) to restore");
-    }
-    if !staged && !worktree {
-        worktree = true;
-    }
-
+    let opts = parse_restore_args(&ctx.args);
     let view = RepoView::open_or_exit(ctx);
     // `restore` takes the same pathspecs as `add`, so it needs the same working-directory rule.
-    let pathspecs = match rebase_specs_to_root(&view, &pathspecs) {
+    let pathspecs = match rebase_specs_to_root(&view, &opts.pathspecs) {
         Ok(rebased) => rebased,
         Err(reason) => fail_fatal(reason),
     };
     let mut index_map = load_index_entries(view.git_dir());
 
-    if staged {
-        let rev = source_rev.as_deref().unwrap_or("HEAD");
+    if opts.staged {
+        let rev = opts.source_rev.as_deref().unwrap_or("HEAD");
         restore_index_from_tree(&view, (rev, &pathspecs), &mut index_map);
         persist_index_state(view.git_dir(), &index_map);
     }
 
-    if worktree {
-        if let Some(ref rev) = source_rev {
-            restore_worktree_from_tree(&view, (rev, &pathspecs, staged), &mut index_map);
+    if opts.worktree {
+        if let Some(ref rev) = opts.source_rev {
+            restore_worktree_from_tree(&view, (rev, &pathspecs, opts.staged), &mut index_map);
         } else {
             restore_worktree_from_index(&view, &pathspecs, &index_map);
         }
     }
+}
+
+/// Parses command-line arguments for `taxis restore`.
+fn parse_restore_args(args: &[String]) -> RestoreOptions {
+    let mut opts = RestoreOptions {
+        source_rev: None,
+        staged: false,
+        worktree: false,
+        pathspecs: Vec::new(),
+    };
+    let mut after_double_dash = false;
+    let mut cursor = 0;
+
+    while cursor < args.len() {
+        let arg = &args[cursor];
+        if after_double_dash {
+            opts.pathspecs.push(normalize_rel_spec(arg));
+            cursor += 1;
+            continue;
+        }
+        cursor += apply_restore_token(args, cursor, &mut opts, &mut after_double_dash);
+    }
+
+    if opts.pathspecs.is_empty() {
+        fail_usage("you must specify path(s) to restore");
+    }
+    if !opts.staged && !opts.worktree {
+        opts.worktree = true;
+    }
+    opts
+}
+
+/// Applies one argument token for `taxis restore`, returning how many tokens were consumed.
+fn apply_restore_token(
+    args: &[String],
+    cursor: usize,
+    opts: &mut RestoreOptions,
+    after_double_dash: &mut bool,
+) -> usize {
+    let arg = &args[cursor];
+    match arg.as_str() {
+        "--" => *after_double_dash = true,
+        "--staged" => opts.staged = true,
+        "--worktree" => opts.worktree = true,
+        "--quiet" => {}
+        "-s" | "--source" => {
+            let Some(val) = args.get(cursor + 1) else {
+                fail_usage("restore: --source requires a tree-ish argument");
+            };
+            opts.source_rev = Some(val.clone());
+            return 2;
+        }
+        other if other.starts_with("--source=") => {
+            opts.source_rev = Some(other["--source=".len()..].to_string());
+        }
+        other if other.starts_with("-s") && other.len() > 2 => {
+            opts.source_rev = Some(other[2..].to_string());
+        }
+        other if other.starts_with('-') && !other.starts_with("--") && other.len() > 1 => {
+            apply_restore_short_flags(&other[1..], &mut opts.staged, &mut opts.worktree);
+        }
+        other if other.starts_with('-') => {
+            fail_usage(format!("restore: unknown option '{other}'"));
+        }
+        other => opts.pathspecs.push(normalize_rel_spec(other)),
+    }
+    1
 }
 
 /// Applies bundled short flags (`-SW`, `-WS`, `-Sq`) for `taxis restore`.
