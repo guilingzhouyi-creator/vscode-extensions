@@ -43,12 +43,23 @@ export interface L2EntryRecord {
     ts: number;
     fm?: number;
     fs?: number;
+    symbols?: {
+        definitions: import('./intelligence/symbolIndex').SymbolDefinition[];
+        references: import('./intelligence/symbolIndex').SymbolReference[];
+    };
+    literals?: import('./intelligence/literalIndex').LiteralOccurrence[];
+    loopSites?: import('./intelligence/semanticComplexity').LoopSite[];
+    graphEdges?: import('./dependency-graph').ModuleGraphFileSummary;
+    rawPr50Slice?: Buffer;
+    decoded?: boolean;
 }
 
 const syncFsReadText = fs.readFileSync.bind(fs);
 const syncFsReadBytes = fs.readFileSync.bind(fs);
 const syncFsWriteText = fs.writeFileSync.bind(fs);
+const syncFsWriteBytes = fs.writeFileSync.bind(fs);
 const syncFsAppendText = fs.appendFileSync.bind(fs);
+const syncFsAppendBytes = fs.appendFileSync.bind(fs);
 const syncFsMkdir = fs.mkdirSync.bind(fs);
 const syncFsStat = fs.statSync.bind(fs);
 const syncFsExists = fs.existsSync.bind(fs);
@@ -65,8 +76,10 @@ export const SyncIoBarrier = {
     readDir: (dirPath: string): fs.Dirent[] => syncFsReaddir(dirPath, { withFileTypes: true }),
     writeText: (filePath: string, data: string): void =>
         syncFsWriteText(filePath, data, ENCODING_UTF8),
+    writeBytes: (filePath: string, data: Buffer): void => syncFsWriteBytes(filePath, data),
     appendText: (filePath: string, data: string): void =>
         syncFsAppendText(filePath, data, ENCODING_UTF8),
+    appendBytes: (filePath: string, data: Buffer): void => syncFsAppendBytes(filePath, data),
     mkdir: (dirPath: string): void => {
         syncFsMkdir(dirPath, { recursive: true });
     },
@@ -149,6 +162,38 @@ export function writeFileAtomic(targetFile: string, fileContent: string): void {
 }
 
 /**
+ * Atomic binary write: .tmp-<pid>-<rand> + rename.
+ *
+ * @param targetFile - Destination file path.
+ * @param buf - Binary payload buffer to write atomically.
+ */
+export function writeBytesAtomic(targetFile: string, buf: Buffer): void {
+    const stagingPath = `${targetFile}.tmp-${process.pid}-${Math.random().toString(RANDOM_STRING_RADIX).slice(2, STAGING_SUFFIX_SLICE_END)}`;
+    SyncIoBarrier.writeBytes(stagingPath, buf);
+    try {
+        SyncIoBarrier.rename(stagingPath, targetFile);
+    } catch (error) {
+        SyncIoBarrier.remove(stagingPath);
+        throw error;
+    }
+}
+
+/**
+ * Appends binary bytes safely to a target file synchronously.
+ *
+ * @param filePath - Target file path to append to.
+ * @param buf - Binary payload buffer to append.
+ */
+export function appendBytesSafe(filePath: string, buf: Buffer): void {
+    if (!buf || buf.length === 0) return;
+    try {
+        SyncIoBarrier.appendBytes(filePath, buf);
+    } catch {
+        /* Best-effort */
+    }
+}
+
+/**
  * Probes whether a directory is writable by attempting a probe file write.
  *
  * @param dir - Directory path to probe.
@@ -213,6 +258,10 @@ export function isValidL2(candidateObj: unknown): candidateObj is {
     ts?: number;
     fm?: number;
     fs?: number;
+    symbols?: L2EntryRecord['symbols'];
+    literals?: L2EntryRecord['literals'];
+    loopSites?: L2EntryRecord['loopSites'];
+    graphEdges?: L2EntryRecord['graphEdges'];
 } {
     const rawRecord = candidateObj as Record<string, unknown> | null;
     return Boolean(
@@ -282,6 +331,10 @@ export function serializeL2(l2Cache: Map<string, L2EntryRecord>): string {
         };
         if (entry.fm !== undefined) lineObj.fm = entry.fm;
         if (entry.fs !== undefined) lineObj.fs = entry.fs;
+        if (entry.symbols !== undefined) lineObj.symbols = entry.symbols;
+        if (entry.literals !== undefined) lineObj.literals = entry.literals;
+        if (entry.loopSites !== undefined) lineObj.loopSites = entry.loopSites;
+        if (entry.graphEdges !== undefined) lineObj.graphEdges = entry.graphEdges;
         lines.push(JSON.stringify(lineObj));
     }
     return lines.join(NEWLINE_CHAR) + (lines.length ? NEWLINE_CHAR : '');
@@ -465,6 +518,46 @@ export async function appendLinesSafeAsync(filePath: string, appendContent: stri
         await appendTextFileAsync(filePath, appendContent);
     } catch {
         /* Best-effort: ignore append failure */
+    }
+}
+
+/**
+ * Atomic binary write asynchronously: .tmp-<pid>-<rand> + rename.
+ *
+ * @param targetFile - Destination file path.
+ * @param buf - Binary payload buffer to write atomically.
+ * @returns Promise resolving when the atomic rename finishes.
+ * Concurrency: safe per distinct targetFile; uses process-unique staging path.
+ */
+export async function writeBytesAtomicAsync(targetFile: string, buf: Buffer): Promise<void> {
+    const stagingPath = `${targetFile}.tmp-${process.pid}-${Math.random().toString(RANDOM_STRING_RADIX).slice(2, STAGING_SUFFIX_SLICE_END)}`;
+    await fs.promises.writeFile(stagingPath, buf);
+    try {
+        await fs.promises.rename(stagingPath, targetFile);
+    } catch (error) {
+        try {
+            await fs.promises.unlink(stagingPath);
+        } catch {
+            /* ignore */
+        }
+        throw error;
+    }
+}
+
+/**
+ * Appends binary bytes safely to a target file asynchronously.
+ *
+ * @param filePath - Target file path to append to.
+ * @param buf - Binary payload buffer to append.
+ * @returns Promise resolving when the append completes.
+ * Concurrency: best-effort append; caller serializes WAL flushes per CacheStore instance.
+ */
+export async function appendBytesSafeAsync(filePath: string, buf: Buffer): Promise<void> {
+    if (!buf || buf.length === 0) return;
+    try {
+        await fs.promises.appendFile(filePath, buf);
+    } catch {
+        /* Best-effort */
     }
 }
 

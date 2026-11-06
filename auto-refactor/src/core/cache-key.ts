@@ -61,8 +61,36 @@ export const CACHE_FORMAT_VERSION = 1;
 export const ANALYZER_VERSIONS: Record<string, number> = {
     constants: 2,
     'large-file': 1,
-    complexity: 1,
+    complexity: 2,
     governance: 1,
+    'dependency-graph': 1,
+    secrets: 1,
+    architecture: 1,
+    performance: 1,
+    comments: 1,
+    hygiene: 1,
+    naming: 1,
+    simplify: 1,
+    'type-safety': 1,
+    'error-handling': 1,
+    concurrency: 1,
+    'api-contracts': 1,
+    'test-quality': 1,
+    'security-pack': 1,
+    i18n: 1,
+    'css-hygiene': 1,
+    accessibility: 1,
+    'production-hygiene': 1,
+    'telemetry-observability': 1,
+    'domain-ddd': 1,
+    'ts-modern': 1,
+    'nodejs-runtime': 1,
+    'react-ui': 1,
+    'python-pack': 1,
+    'rust-pack': 1,
+    'go-pack': 1,
+    'java-pack': 1,
+    'cpp-pack': 1,
 };
 
 /** Adapter implementation versions (informational; bump when adapter logic changes). */
@@ -318,11 +346,11 @@ function collectBuiltinDescs(
 interface CustomAnalyzerCollectorContext {
     readonly customAnalyzers:
         | Array<{
-              name: string;
-              module: string;
-              enabled?: boolean;
-              options?: Record<string, unknown>;
-          }>
+            name: string;
+            module: string;
+            enabled?: boolean;
+            options?: Record<string, unknown>;
+        }>
         | undefined;
     readonly thresholds: ScanConfig['thresholds'];
     readonly baseDir: string | undefined;
