@@ -12,7 +12,7 @@
 | :--- | :--- | :--- | :--- |
 | [**`quality-scoring-model.md`**](./quality-scoring-model.md) | **十维工程质量量化评分模型** | 详细阐述 10 大质量维度定义、双曲密度衰减曲线、加权几何平均、Jeffreys 先验置信度、技术债穿透机制与防刷分数学公理 | `auto-refactor/src/core/scoring/` |
 | [**`script-governance-architecture.md`**](./script-governance-architecture.md) | **仓库级脚本工程治理体系** | 详细阐述语言域 × 职能域正交矩阵、PowerShell / Bash / Node.js 规范契约、同构双实现机制、Tier 1 内存流式门禁与性能短路模型 | `scripts/`、[scripts/README.md](../../scripts/README.md) |
-| [**`rule-catalog-architecture.md`**](./rule-catalog-architecture.md) | **单源规则目录与元治理架构** | 阐明 SSOT 单源真源公理、3-3-3 标准命名拓扑、权威三字母词典、三阶别名网络、516 规则闭包与底层诊断/表现层解耦机制 | `scripts/common/rule-catalog.json` |
+| [**`rule-catalog-architecture.md`**](./rule-catalog-architecture.md) | **单源规则目录与元治理架构** | 阐明 SSOT 单源真源公理、3-3-3 标准命名拓扑、权威三字母词典、三阶别名网络、534 规则闭包与底层诊断/表现层解耦机制 | `scripts/common/rule-catalog.json` |
 | [**`token-frugal-sentence-and-diagnostic-spec.md`**](./token-frugal-sentence-and-diagnostic-spec.md) | **高效 Token 句子压缩与诊断规范** | 阐明五维 Token 压缩协议、行业标准缩写与晦涩缩写边界矩阵、中心化模板字典规范及 >= 70% Token 节约率公理 | `auto-refactor/src/core/reporting/` |
 | [**`workspace-timing-architecture.md`**](./workspace-timing-architecture.md) | **VS Code 扩展五层解耦架构** | 详述 UI/应用/领域/基础设施/工具五层严格解耦、RingBuffer + WAL Journal + JSON 三级崩溃恢复持久化及交互物理学契约 | `workspace-timing/` |
 | [**`webgames-architecture-spec.md`**](./webgames-architecture-spec.md) | **WebGames 配置驱动解耦规范** | 阐释 Godot 4 纯逻辑引擎解耦、全域 `GameConfig` 单源驱动、`apply_snapshot` 单向快照注入、对象池零堆分配与四阶段方案纪律 | `WebGames/` |

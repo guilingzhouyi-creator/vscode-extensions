@@ -36,7 +36,7 @@ flowchart TD
 | **Tier 1**<br/>系统规约 | [**`system-spec/README.md`**](./system-spec/README.md) | **系统性规范与数学公理总索引**：十维质量模型、脚本治理、门禁清单、单源规则元治理、VS Code 扩展五层架构、WebGames 配置驱动规范 | 跨系统统一审查、门禁审计、质量量化数学推导 | `docs/system-spec/` |
 | | [├─ `quality-scoring-model.md`](./system-spec/quality-scoring-model.md) | **十维工程质量量化评分模型**：双曲密度衰减曲线、加权几何平均、Jeffreys 先验置信度、理论安全上限双轨扣分与反刷分数学公理 | 质量评估算法、静态评分引擎调优 | `auto-refactor/src/core/scoring/` |
 | | [├─ `script-governance-architecture.md`](./system-spec/script-governance-architecture.md) | **仓库级脚本工程治理体系**：语言域 × 职能域正交矩阵、PowerShell / Bash 规范契约、Tier 1 内存流式门禁与性能短路模型 | 构建脚本编写、跨平台调用契约 | `scripts/` |
-| | [├─ `rule-catalog-architecture.md`](./system-spec/rule-catalog-architecture.md) | **单源规则目录与元治理架构**：SSOT 唯一真源公理、3-3-3 标准命名拓扑、三阶别名等价网络与 516 条规则双向闭包 | 规则新增与重构、反虚构门禁 | `scripts/common/rule-catalog.json` |
+| | [├─ `rule-catalog-architecture.md`](./system-spec/rule-catalog-architecture.md) | **单源规则目录与元治理架构**：SSOT 唯一真源公理、3-3-3 标准命名拓扑、三阶别名等价网络与 534 条规则双向闭包 | 规则新增与重构、反虚构门禁 | `scripts/common/rule-catalog.json` |
 | | [├─ `workspace-timing-architecture.md`](./system-spec/workspace-timing-architecture.md) | **VS Code 扩展五层解耦架构**：表现/应用/领域/基础设施/工具严格单向流动、RingBuffer + WAL Journal + JSON 三级崩溃恢复持久化 | VS Code 扩展开发、高可靠持久化 | `workspace-timing/` |
 | | [├─ `webgames-architecture-spec.md`](./system-spec/webgames-architecture-spec.md) | **WebGames 配置驱动解耦规范**：全域 `GameConfig` 单源驱动、视图层 `apply_snapshot` 单向快照注入、对象池零堆分配与四阶段方案纪律 | 游戏系统开发、Godot 逻辑解耦 | `WebGames/` |
 | | [└─ `gate-audit-checklist.md`](./system-spec/gate-audit-checklist.md) | **全域门禁审计核查清单**：提交、推送与全量统一审查核查项，失败处置口径与质性复核断言 | 提交前自审、人工/智能体交叉复审 | `scripts/common/gate-step-registry.json` |
