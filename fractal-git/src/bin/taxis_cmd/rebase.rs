@@ -28,10 +28,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use fg_algorithms::merge::{ThreeWayMerge, ThreeWayMergeResult};
-use fg_algorithms::traverse::DagWalker;
-use fg_core::models::{
-    CorrectedCommitDate, FileMode, GitSignature, Oid, RebaseAction, RebaseItem, RebasePlan,
-};
+use fg_core::models::{FileMode, GitSignature, Oid, RebaseAction, RebaseItem, RebasePlan};
 use fg_index::InMemoryIndexTree;
 use fg_object::GitCommit;
 use fg_storage::commit_materializer::{persist_commit_object, persist_index_tree};
@@ -43,7 +40,7 @@ use super::checkout::{
     update_references,
 };
 use super::commit_walk::{parse_commit_record, walk_commits, CommitRecord};
-use super::common::{fail_io, print_json, reject, CliContext};
+use super::common::{fail_fatal, fail_io, print_json, reject, CliContext};
 use super::operation::{record_head_operation, HeadOperationSpec};
 use super::rebase_state::{
     committer_signature, conclude_rebase, format_offset_minutes, handle_rebase_abort,
@@ -457,16 +454,10 @@ pub fn handle_rebase(ctx: &CliContext) {
         .flatten()
         .map(|(branch_name, _)| branch_name);
 
-    let mut get_node = |oid: &Oid| -> Option<(CorrectedCommitDate, Vec<Oid>)> {
-        let commit_obj = view.object(oid).ok()?;
-        let record = parse_commit_record(*oid, &commit_obj.payload).ok()?;
-        Some((
-            CorrectedCommitDate(record.committer_time.max(0) as u64),
-            record.parents,
-        ))
+    let bases = match super::commit_walk::build_ccd_index(&view, &[ours_commit, upstream_commit]) {
+        Ok(index) => index.merge_bases(&ours_commit, &upstream_commit),
+        Err(err) => fail_fatal(format!("build corrected-date index: {err}")),
     };
-
-    let bases = DagWalker::find_merge_bases_with_ccd(&ours_commit, &upstream_commit, &mut get_node);
     if bases.is_empty() {
         reject(
             CliTag::ERROR,

@@ -20,6 +20,7 @@
 
 use std::collections::{BinaryHeap, VecDeque};
 
+use fg_algorithms::traverse::CcdIndex;
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::{FastOidMap, FastOidSet, Oid};
 use fractal_git::TelemetryCommitNode;
@@ -252,6 +253,102 @@ fn decode_commit_message(body: &[u8], encoding: Option<&str>) -> FractalResult<S
 }
 
 /// Walks every commit reachable from starts and returns them in Git's date order.
+///
+/// Materialises a corrected-date index over every commit reachable from `tips`.
+///
+/// Ancestry questions (`merge`, `rebase`, `lineage`) must not be answered from raw committer
+/// timestamps: the O(1) cutoff in the reachability search is only sound when the dates are strictly
+/// monotone along ancestry edges, and Git's one-second timestamp granularity breaks that whenever a
+/// parent and child land in the same second. Building the index here keeps the one correct
+/// derivation in one place instead of repeating a hand-built lookup in each command.
+///
+/// An unreadable commit is returned as an error rather than treated as a root. A root has no
+/// history, so substituting one for a missing parent would silently detach everything below it and
+/// make unrelated histories look related.
+///
+/// # Errors
+///
+/// Returns the underlying [`FractalError`] when a commit cannot be read or parsed, and
+/// [`FractalError::CorruptStore`] when the graph contains a cycle or exceeds the index cap.
+pub fn build_ccd_index(view: &RepoView, tips: &[Oid]) -> FractalResult<CcdIndex> {
+    // A commit-graph already holds every parent edge, so pre-filling from it turns the walk below
+    // into a no-op for commits the graph covers. The graph is a cache, never a source of truth:
+    // anything it does not cover is read from the object store, and a graph that fails to parse
+    // simply yields the empty table. Failing the command because a cache file is unreadable would
+    // make `merge` stop working for a reason unrelated to the merge.
+    let mut table: FastOidMap<(Vec<Oid>, u64)> = FastOidMap::default();
+    prime_from_commit_graph(view, tips, &mut table);
+    let mut pending: Vec<Oid> = tips.to_vec();
+
+    while let Some(oid) = pending.pop() {
+        if table.contains_key(&oid) {
+            continue;
+        }
+        let object = view.object(&oid)?;
+        if object.kind != fg_core::models::ObjectKind::Commit {
+            return Err(FractalError::ObjectCodec(format!(
+                "{} is a {}, not a commit",
+                oid.to_hex(),
+                object.kind.as_str()
+            )));
+        }
+        let record = parse_commit_record(oid, &object.payload)?;
+        pending.extend(record.parents.iter().copied());
+        table.insert(oid, (record.parents, record.committer_time.max(0) as u64));
+    }
+
+    // Parents discovered through the object store also need to be walked, which the loop above
+    // already did. A graph entry never introduces a parent the loop has not queued, because the
+    // graph is read only to short-circuit commits that are already reachable from the tips.
+    let mut owned: std::collections::HashMap<Oid, (Vec<Oid>, u64)> =
+        std::collections::HashMap::with_capacity(table.len());
+    for (oid, value) in table {
+        owned.insert(oid, value);
+    }
+    CcdIndex::from_table(&owned, tips)
+}
+
+/// Fills `table` from `objects/info/commit-graph` when that file exists and parses.
+///
+/// Every entry is admitted only when the graph itself can be read; a partially-written graph is
+/// rejected wholesale rather than trusted entry by entry, because a graph that lost its tail would
+/// otherwise present later commits as roots and detach their history.
+fn prime_from_commit_graph(view: &RepoView, tips: &[Oid], table: &mut FastOidMap<(Vec<Oid>, u64)>) {
+    let graph_path = view.git_dir().join("objects/info/commit-graph");
+    if !graph_path.is_file() {
+        return;
+    }
+    let Ok(reader) = fg_storage::CommitGraphReader::open(&graph_path) else {
+        fg_core::diag_debug!(
+            "commit_walk",
+            "commit-graph at {} is unreadable; falling back to the object store",
+            graph_path.display()
+        );
+        return;
+    };
+
+    let mut pending: Vec<Oid> = tips.to_vec();
+    while let Some(oid) = pending.pop() {
+        if table.contains_key(&oid) {
+            continue;
+        }
+        let Some(entry) = reader
+            .find_position(&oid)
+            .and_then(|position| reader.get_entry(position))
+        else {
+            continue;
+        };
+        pending.extend(entry.parent_oids.iter().copied());
+        table.insert(oid, (entry.parent_oids, entry.timestamp_sec));
+    }
+    fg_core::diag_trace!(
+        "commit_walk",
+        "primed {} commits from the commit-graph",
+        table.len()
+    );
+}
+
+/// Walks every commit reachable from `starts`, newest first.
 ///
 /// The walk implements what git log --date-order promises: no commit is listed before one of its
 /// children, and among the commits that are free to be listed the newest committer timestamp wins,

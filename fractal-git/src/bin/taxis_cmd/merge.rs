@@ -17,17 +17,15 @@
 //! - `FGT-ALG-001`: Algorithmic three-way tree equivalence guard
 //! - `FGT-STO-001`: Storage layer crash safety guard
 
+use super::common::fail_fatal;
 use std::collections::BTreeMap;
 use std::fs;
 
 use fg_algorithms::merge::{
     BlockThreeWayMerge, ConflictEntry, TextThreeWayMerge, ThreeWayMerge, ThreeWayMergeResult,
 };
-use fg_algorithms::traverse::DagWalker;
 use fg_core::constants::git::OBJ_BLOB;
-use fg_core::models::{
-    ConflictPresentationMode, CorrectedCommitDate, FileMode, GitSignature, IndexStage, Oid,
-};
+use fg_core::models::{ConflictPresentationMode, FileMode, GitSignature, IndexStage, Oid};
 use fg_core::traits::OdbStore;
 use fg_index::{InMemoryIndexTree, IndexEntry};
 use fg_object::GitCommit;
@@ -40,7 +38,6 @@ use super::checkout::{
     assert_worktree_cleanliness_for, materialize_files, remove_stale_files, update_dirc_index,
     update_references,
 };
-use super::commit_walk::parse_commit_record;
 use super::common::{fail_io, print_json, reject, CliContext};
 use super::config::RepoConfig;
 use super::operation::{record_head_operation, HeadOperationSpec};
@@ -112,16 +109,15 @@ pub fn handle_merge(ctx: &CliContext) {
         return;
     }
 
-    let mut get_node = |oid: &Oid| -> Option<(CorrectedCommitDate, Vec<Oid>)> {
-        let commit_obj = view.object(oid).ok()?;
-        let record = parse_commit_record(*oid, &commit_obj.payload).ok()?;
-        Some((
-            CorrectedCommitDate(record.committer_time.max(0) as u64),
-            record.parents,
-        ))
+    // Ancestry is answered from a materialised corrected-date index rather than by feeding raw
+    // committer timestamps into the cutoff search: identical timestamps (two commits in the same
+    // second) and backwards clocks both make a raw timestamp veto a true ancestor.
+    let ccd_index = match super::commit_walk::build_ccd_index(&view, &[ours_commit, theirs_commit])
+    {
+        Ok(index) => index,
+        Err(err) => fail_fatal(format!("build corrected-date index: {err}")),
     };
-
-    let bases = DagWalker::find_merge_bases_with_ccd(&ours_commit, &theirs_commit, &mut get_node);
+    let bases = ccd_index.merge_bases(&ours_commit, &theirs_commit);
     // The base set decides everything downstream: empty means unrelated histories, containing
     // `theirs` means nothing to do, containing `ours` means a fast-forward is possible. Recording it
     // once explains the branch taken without logging from inside each branch.

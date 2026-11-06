@@ -15,13 +15,12 @@
 
 use std::collections::HashSet;
 
-use fg_algorithms::traverse::dag_walk::{CorrectedCommitDate, DagWalker};
 use fg_algorithms::PatchGenerator;
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::Oid;
 use sha1::{Digest, Sha1};
 
-use super::commit_walk::{parse_commit_record, walk_commits, CommitRecord};
+use super::commit_walk::{walk_commits, CommitRecord};
 use super::common::{fail_fatal, fail_usage, CliContext};
 use super::diff::{collect_comparisons, DiffRequest, DiffScope, EMPTY_TREE_MARKER};
 use super::diff_render::render_text_to_writer;
@@ -127,15 +126,10 @@ pub fn handle_range_diff(ctx: &CliContext) {
         if left_oid == right_oid {
             (Vec::new(), Vec::new())
         } else {
-            let mut get_node = |oid: &Oid| -> Option<(CorrectedCommitDate, Vec<Oid>)> {
-                let commit_object = view.object(oid).ok()?;
-                let rec = parse_commit_record(*oid, &commit_object.payload).ok()?;
-                Some((
-                    CorrectedCommitDate(rec.committer_time.max(0) as u64),
-                    rec.parents,
-                ))
+            let bases = match super::commit_walk::build_ccd_index(&view, &[left_oid, right_oid]) {
+                Ok(index) => index.merge_bases(&left_oid, &right_oid),
+                Err(err) => fail_fatal(format!("build corrected-date index: {err}")),
             };
-            let bases = DagWalker::find_merge_bases_with_ccd(&left_oid, &right_oid, &mut get_node);
             let base_oid = bases.first().copied().unwrap_or(left_oid);
             let l1 = resolve_commits_between(&view, base_oid, left_oid).unwrap_or_default();
             let l2 = resolve_commits_between(&view, base_oid, right_oid).unwrap_or_default();
