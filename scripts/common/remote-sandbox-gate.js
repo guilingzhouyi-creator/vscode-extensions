@@ -41,7 +41,8 @@ const SLICE_DEFINITIONS = Object.freeze({
       'node scripts/common/validate-docs-consistency.js',
       'node scripts/common/validate-rule-id-closure.js',
       'node scripts/common/validate-gate-feedback.js',
-      'node scripts/common/validate-shell-parity.js'
+      'node scripts/common/validate-shell-parity.js',
+      'node scripts/common/validate-impact-slices.js'
     ]
   }),
   rust: Object.freeze({

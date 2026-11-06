@@ -1521,6 +1521,15 @@
       "canonical": true
     },
     {
+      "id": "FGT-IMPACT-001",
+      "project": "fractal-git",
+      "family": "IMPACT",
+      "severity": "error",
+      "summary": "Impact-slice map guard: a pretest slice may narrow the test targets a change triggers but must never widen a recognised path past its declared set, and an unrecognised crate path must fall back to every target",
+      "namespace": "FGT",
+      "canonical": true
+    },
+    {
       "id": "FGT-IDX-001",
       "project": "fractal-git",
       "family": "IDX",
