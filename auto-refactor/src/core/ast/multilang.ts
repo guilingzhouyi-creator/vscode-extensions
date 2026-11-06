@@ -130,6 +130,8 @@ export interface ProjectionPolicy {
 export interface NodeProjector {
     /** Root raw node (the SourceFile). */
     readonly root: unknown;
+    /** Underlying native TypeScript SourceFile when projected by TsNodeProjector. */
+    readonly sourceFile?: ts.SourceFile;
     /**
      * Projects a raw parser node into a NormalizedNode on demand.
      */

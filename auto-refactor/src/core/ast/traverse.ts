@@ -38,6 +38,8 @@ const RULE_ANALYZER_ERROR = 'analyzer-error';
 const ANALYZER_COMPLEXITY = 'complexity';
 const ANALYZER_CONSTANTS = 'constants';
 const ANALYZER_LARGE_FILE = 'large-file';
+const ANALYZER_SIMPLIFY = 'simplify';
+const ANALYZER_GOVERNANCE = 'governance';
 
 /**
  * Signature for streaming visit and leave AST hooks.
@@ -122,7 +124,15 @@ function dispatchHooks(
     for (let i = 0; i < active.length; i++) {
         const hook = active[i];
         try {
-            hook.fn(node, hook.ctx, scope.parent, scope.grandparent, scope.depth, scope.className, scope.binding);
+            hook.fn(
+                node,
+                hook.ctx,
+                scope.parent,
+                scope.grandparent,
+                scope.depth,
+                scope.className,
+                scope.binding,
+            );
         } catch (error) {
             pushError(hook.name, error, hook.ctx);
         }
@@ -313,10 +323,7 @@ export function runStreaming(
         pushError,
     };
 
-    const visitNode = (
-        node: NormalizedNode,
-        scope: TraversalScope,
-    ): void => {
+    const visitNode = (node: NormalizedNode, scope: TraversalScope): void => {
         const prunable = isSubtreePrunable(node, window);
         if (prunable) {
             stats.pruned += 1;
@@ -660,6 +667,28 @@ export const FAST_PATH_ANALYZERS = new Set([
     'comments',
     'hygiene',
     'naming',
+    'simplify',
+    'governance',
+    'type-safety',
+    'error-handling',
+    'concurrency',
+    'api-contracts',
+    'test-quality',
+    'security-pack',
+    'i18n',
+    'css-hygiene',
+    'accessibility',
+    'production-hygiene',
+    'telemetry-observability',
+    'domain-ddd',
+    'ts-modern',
+    'nodejs-runtime',
+    'react-ui',
+    'python-pack',
+    'rust-pack',
+    'go-pack',
+    'java-pack',
+    'cpp-pack',
 ]);
 
 /**
@@ -686,7 +715,8 @@ export function fastPathEnabled(): boolean {
  */
 export function getPolicyFromAnalyzers(names: string[]): ProjectionPolicy {
     const set = new Set(names);
-    const needComplexity = set.has(ANALYZER_COMPLEXITY);
+    const needComplexity =
+        set.has(ANALYZER_COMPLEXITY) || set.has(ANALYZER_SIMPLIFY) || set.has(ANALYZER_GOVERNANCE);
     const needLiterals = set.has(ANALYZER_CONSTANTS);
     const needNames = needComplexity || set.has(ANALYZER_LARGE_FILE);
     const needPositions = needComplexity || needLiterals;

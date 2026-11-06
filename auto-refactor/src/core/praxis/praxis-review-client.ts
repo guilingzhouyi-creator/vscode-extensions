@@ -35,7 +35,7 @@ import { defaultPerformanceEvaluator } from '../rules/universal-hierarchy/perfor
 import { defaultDataArchitectureEvaluator } from '../intelligence/dataArchitecture';
 import { defaultTestModernityEvaluator, isTestFilePath } from '../intelligence/testModernity';
 import type { IPraxisSliceAuditService } from './sliceAuditService';
-import { defaultPraxisSliceAuditService } from './sliceAuditService';
+import { defaultPraxisSliceAuditService, PraxisSliceAuditService } from './sliceAuditService';
 import type { SparseMoEGateRouter } from '../router/sparseMoEGate';
 import { defaultSparseMoEGateRouter } from '../router/sparseMoEGate';
 import type { PraxisSliceAuditVerdict, SparseRoutingPlan } from '../router/sliceTypes';
@@ -113,8 +113,12 @@ export class PraxisReviewClient implements IPraxisReviewClient {
         this.graph = resolved.graph ?? new SemanticGraph();
         this.defaultCardContext = resolved.defaultCardContext;
         this.diffService = resolved.diffService ?? defaultPraxisGovernanceService;
-        this.sliceService = resolved.sliceService ?? defaultPraxisSliceAuditService;
         this.sparseRouter = resolved.sparseRouter ?? defaultSparseMoEGateRouter;
+        this.sliceService =
+            resolved.sliceService ??
+            (resolved.sparseRouter
+                ? new PraxisSliceAuditService(undefined, this.sparseRouter)
+                : defaultPraxisSliceAuditService);
         this.workspaceManager = resolved.workspaceManager;
         this.enableMoE = resolved.enableMoE ?? true;
         this.includeDualFacedPresentation = resolved.includeDualFacedPresentation ?? true;
@@ -249,16 +253,28 @@ export class PraxisReviewClient implements IPraxisReviewClient {
         filePath: string,
         fileContent: string,
         graph: SemanticGraph,
+        sparsePlan?: SparseRoutingPlan,
     ): Issue[] {
         if (fileContent.length === 0) return [];
+        const activeSet = sparsePlan?.activeAnalyzers
+            ? new Set(sparsePlan.activeAnalyzers)
+            : undefined;
         const issues: Issue[] = [];
-        const perfIssues = defaultPerformanceEvaluator.auditSource(filePath, fileContent);
-        for (let i = 0; i < perfIssues.length; i++) issues.push(perfIssues[i]);
+        if (!activeSet || activeSet.has('performance')) {
+            const perfIssues = defaultPerformanceEvaluator.auditSource(filePath, fileContent);
+            for (let i = 0; i < perfIssues.length; i++) issues.push(perfIssues[i]);
+        }
 
-        const dataIssues = defaultDataArchitectureEvaluator.audit(filePath, fileContent, graph);
-        for (let i = 0; i < dataIssues.length; i++) issues.push(dataIssues[i]);
+        if (!activeSet || activeSet.has('data-architecture')) {
+            const dataIssues = defaultDataArchitectureEvaluator.audit(
+                filePath,
+                fileContent,
+                graph,
+            );
+            for (let i = 0; i < dataIssues.length; i++) issues.push(dataIssues[i]);
+        }
 
-        if (isTestFilePath(filePath)) {
+        if ((!activeSet || activeSet.has('test-modernity')) && isTestFilePath(filePath)) {
             const testIssues = defaultTestModernityEvaluator.auditTestSource(filePath, fileContent);
             for (let i = 0; i < testIssues.length; i++) issues.push(testIssues[i]);
         }
@@ -375,7 +391,12 @@ export class PraxisReviewClient implements IPraxisReviewClient {
             });
             issues.push(...l1Issues);
 
-            const contentIssues = this.collectContentAuditIssues(filePath, fileContent, graph);
+            const contentIssues = this.collectContentAuditIssues(
+                filePath,
+                fileContent,
+                graph,
+                sparsePlan,
+            );
             issues.push(...contentIssues);
 
             const status = this.resolveFileStatus(issues);

@@ -89,6 +89,83 @@ export class TypeScriptAdapter extends BaseAstAdapter {
     }
 
     /**
+     * Build a NormalizedAst directly from an already-parsed TypeScript SourceFile.
+     */
+    fromSourceFile(sourceFile: ts.SourceFile, seed?: ProjectionSeed): NormalizedAst {
+        const root = this.mapNode(sourceFile, undefined, undefined, undefined, sourceFile, seed);
+        return { root, sourceFile };
+    }
+
+    /**
+     * Build a pruned NormalizedNode tree tailored for function- and control-flow-scoped
+     * governance rules without re-parsing or materializing leaf expression positions.
+     */
+    parseGovernanceRoot(sourceFile: ts.SourceFile): NormalizedNode {
+        return (
+            this.mapGovernanceNode(sourceFile, sourceFile, true) ?? {
+                kind: NodeKind.SourceFile,
+            }
+        );
+    }
+
+    private isSkippableGovernanceBranch(tsNode: ts.Node): boolean {
+        return (
+            ts.isToken(tsNode) ||
+            ts.isTypeNode(tsNode) ||
+            ts.isImportDeclaration(tsNode) ||
+            ts.isInterfaceDeclaration(tsNode) ||
+            ts.isTypeAliasDeclaration(tsNode)
+        );
+    }
+
+    private mapGovernanceNode(
+        tsNode: ts.Node,
+        sourceFile: ts.SourceFile,
+        isRoot: boolean,
+    ): NormalizedNode | null {
+        const kind = kindOf(tsNode);
+        const fnLike = isFunctionLike(tsNode);
+        const isClassDefining = ts.isClassDeclaration(tsNode) || ts.isClassExpression(tsNode);
+        const isBinding = introducesBinding(tsNode);
+        const increasesNesting = CONTROL_OR_BLOCK.has(tsNode.kind);
+        const needsPos = fnLike || kind === NodeKind.Function || kind === NodeKind.Method;
+        const keepNode =
+            isRoot ||
+            needsPos ||
+            isClassDefining ||
+            isBinding ||
+            kind === NodeKind.ControlFlow ||
+            increasesNesting;
+
+        let kids: NormalizedNode[] | undefined;
+        ts.forEachChild(tsNode, (childTs) => {
+            if (this.isSkippableGovernanceBranch(childTs)) return;
+            const mapped = this.mapGovernanceNode(childTs, sourceFile, false);
+            if (mapped !== null) {
+                (kids ??= []).push(mapped);
+            }
+        });
+
+        if (!keepNode && kids === undefined) {
+            return null;
+        }
+
+        return {
+            kind,
+            start: needsPos ? posOf(tsNode.getStart(sourceFile), sourceFile) : undefined,
+            end: needsPos ? posOf(tsNode.getEnd(), sourceFile) : undefined,
+            name:
+                needsPos || isClassDefining ? (nameOf(tsNode, sourceFile) ?? undefined) : undefined,
+            functionLike: fnLike,
+            isClassDefining,
+            introducesBinding: isBinding,
+            bindingName: isBinding ? bindingName(tsNode, sourceFile) : null,
+            increasesNesting,
+            children: kids,
+        };
+    }
+
+    /**
      * Build a lazy-projection source for a file.
      *
      * @param content - Full source text of the file.
@@ -134,7 +211,8 @@ export class TypeScriptAdapter extends BaseAstAdapter {
         sourceFile: ts.SourceFile,
     ): string | undefined {
         if (flags.isCall) return calleeNameOf(tsNode, sourceFile) ?? undefined;
-        if (flags.fnLike || flags.isClassDefining || flags.isBinding) return nameOf(tsNode, sourceFile) ?? undefined;
+        if (flags.fnLike || flags.isClassDefining || flags.isBinding)
+            return nameOf(tsNode, sourceFile) ?? undefined;
         if (kind === NodeKind.Variable || kind === NodeKind.Constant) {
             return nameOf(tsNode, sourceFile) ?? undefined;
         }

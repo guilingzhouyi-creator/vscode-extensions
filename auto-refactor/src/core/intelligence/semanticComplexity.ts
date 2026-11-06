@@ -211,15 +211,37 @@ export function isGuardParameter(paramText: string): boolean {
 }
 
 /**
- * Attempts to read file lines safely from disk or in-memory cache.
+ * Options for resolving guarded recursive symbol parameters without relying on `process.cwd()`.
+ */
+export interface GuardedRecursionOptions {
+    /** Repository root directory for resolving relative file paths. */
+    rootDir?: string;
+    /** In-memory retained source text map from Scanner. */
+    retainedSource?: ReadonlyMap<string, string>;
+}
+
+/**
+ * Attempts to read file lines safely from in-memory retained source, cache, or disk.
  */
 function tryReadSourceLines(
     file: string,
     filePathToLinesMap: Map<string, string[]>,
+    options?: GuardedRecursionOptions,
 ): string[] | null {
     if (filePathToLinesMap.has(file)) return filePathToLinesMap.get(file)!;
+    const normFile = file.replace(/\\/g, '/');
+    if (filePathToLinesMap.has(normFile)) return filePathToLinesMap.get(normFile)!;
+
+    const retained = options?.retainedSource?.get(file) ?? options?.retainedSource?.get(normFile);
+    if (retained !== undefined) {
+        const lines = retained.split('\n');
+        filePathToLinesMap.set(file, lines);
+        return lines;
+    }
+
     try {
-        const fullPath = path.isAbsolute(file) ? file : path.resolve(process.cwd(), file);
+        const baseDir = options?.rootDir ? path.resolve(options.rootDir) : process.cwd();
+        const fullPath = path.isAbsolute(file) ? file : path.resolve(baseDir, file);
         if (fs.existsSync(fullPath)) {
             const content = fs.readFileSync(fullPath, 'utf8');
             const lines = content.split('\n');
@@ -355,6 +377,7 @@ function extractArrayParameters(candidateDef: LegacyDefinitionParameters): strin
 function resolveDefinitionParameters(
     def: SymbolDefinition | Record<string, unknown>,
     filePathToLinesMap: Map<string, string[]>,
+    options?: GuardedRecursionOptions,
 ): string[] {
     const candidateDef = def as LegacyDefinitionParameters;
     const arrayParams = extractArrayParameters(candidateDef);
@@ -363,7 +386,7 @@ function resolveDefinitionParameters(
         return splitParameters(candidateDef.signature);
     }
     if (typeof def.file === 'string' && typeof def.line === 'number' && def.line > 0) {
-        const lines = tryReadSourceLines(def.file, filePathToLinesMap);
+        const lines = tryReadSourceLines(def.file, filePathToLinesMap, options);
         if (lines && def.line <= lines.length) {
             const sig = extractParamSignature(lines, def.line - 1);
             if (sig) return splitParameters(sig);
@@ -438,6 +461,7 @@ function resolveSymbolParameters(
     sym: string,
     symbolIndex: SymbolIndex,
     filePathToLinesMap: Map<string, string[]>,
+    options?: GuardedRecursionOptions,
 ): readonly string[] {
     if (hasParameterResolver(symbolIndex)) {
         const custom = symbolIndex.getParameters(sym);
@@ -448,7 +472,7 @@ function resolveSymbolParameters(
         const resolved = symbolIndex.resolve(sym);
         const defs = resolved?.definitions || [];
         for (let i = 0; i < defs.length; i++) {
-            const defParams = resolveDefinitionParameters(defs[i], filePathToLinesMap);
+            const defParams = resolveDefinitionParameters(defs[i], filePathToLinesMap, options);
             if (defParams.length > 0) return defParams;
         }
     }
@@ -471,18 +495,20 @@ function hasGuardParameter(params: readonly string[]): boolean {
  *
  * @param symbolIndex - Repository cross-file symbol index.
  * @param callGraph - Cross-file call graph.
+ * @param options - Optional root directory and retained source map for resolving definitions.
  * @returns Set of guarded recursive symbol names.
  */
 export function extractGuardedRecursiveSymbols(
     symbolIndex: SymbolIndex,
     callGraph: CallGraph,
+    options?: GuardedRecursionOptions,
 ): Set<string> {
     const guarded = new Set<string>();
     const filePathToLinesMap = new Map<string, string[]>();
     const candidateSymbols = collectCandidateSymbols(callGraph, symbolIndex);
 
     for (const sym of candidateSymbols) {
-        const params = resolveSymbolParameters(sym, symbolIndex, filePathToLinesMap);
+        const params = resolveSymbolParameters(sym, symbolIndex, filePathToLinesMap, options);
         if (hasGuardParameter(params)) {
             guarded.add(sym);
         }

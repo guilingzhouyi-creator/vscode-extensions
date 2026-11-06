@@ -255,8 +255,9 @@ const CHAR_LOWER_R = 114;
 const CHAR_LOWER_Z = 122;
 const CHAR_EXCLAMATION = 33;
 const TRIGGER_DIRECT = 1;
-const TRIGGER_RAW_PREFIX = 2;
-const TRIGGER_LT_PREFIX = 3;
+const TRIGGER_RAW_R = 2;
+const TRIGGER_RAW_BC = 3;
+const TRIGGER_LT_PREFIX = 4;
 const HTML_COMMENT_OPEN = '<!--';
 const HTML_COMMENT_CLOSE = '-->';
 const DOUBLE_QUOTE_STR = '"';
@@ -283,11 +284,11 @@ const REGEX_PREFIX_TABLE = (() => {
 export function maskSourceText(content: string, config: SourceMaskConfig): MaskedSource {
     const raw = content.split('\n');
     const len = raw.length;
-    const masked: string[] = [];
-    masked.length = len;
+    const masked = new Array<string>(len);
     const state: MaskState = {
         inBlockComment: false,
-        quote: null,
+        inHtmlComment: false,
+        quoteCode: 0,
         rawString: null,
         triggerTable: getTriggerTable(config),
         close: config.blockComment?.close ?? '',
@@ -505,12 +506,12 @@ interface MaskState {
     /** True while inside an unterminated block comment. */
     inBlockComment: boolean;
     /** True while inside an unterminated HTML comment. */
-    inHtmlComment?: boolean;
-    /** Active quote character, or null when scanning ordinary code. */
-    quote: string | null;
+    inHtmlComment: boolean;
+    /** Active quote character code, or 0 when scanning ordinary code. */
+    quoteCode: number;
     /** Active raw string hash count, or null when scanning ordinary code. */
-    rawString?: number | null;
-    /** Precomputed 128-entry ASCII trigger table for the active config. */
+    rawString: number | null;
+    /** Precomputed 256-entry Latin-1 trigger table for the active config. */
     triggerTable: Uint8Array;
     /** Block-comment closing delimiter, or empty string if none. */
     close: string;
@@ -527,9 +528,9 @@ const TRIGGER_TABLE_CACHE = new WeakMap<SourceMaskConfig, Uint8Array>();
 function populateQuoteTriggers(table: Uint8Array, config: SourceMaskConfig): void {
     if (config.quoteChars.includes(DOUBLE_QUOTE_STR) || config.rawStrings) {
         table[CHAR_DOUBLE_QUOTE] = TRIGGER_DIRECT;
-        table[CHAR_LOWER_B] = TRIGGER_RAW_PREFIX;
-        table[CHAR_LOWER_C] = TRIGGER_RAW_PREFIX;
-        table[CHAR_LOWER_R] = TRIGGER_RAW_PREFIX;
+        table[CHAR_LOWER_B] = TRIGGER_RAW_BC;
+        table[CHAR_LOWER_C] = TRIGGER_RAW_BC;
+        table[CHAR_LOWER_R] = TRIGGER_RAW_R;
     }
     for (let i = 0; i < config.quoteChars.length; i++) {
         const code = config.quoteChars.charCodeAt(i);
@@ -538,11 +539,7 @@ function populateQuoteTriggers(table: Uint8Array, config: SourceMaskConfig): voi
 }
 
 /**
- * Build the 128-entry ASCII lookup table for characters that can open a comment, literal or regex.
- *
- * Entry value `1` marks direct trigger characters; `2` marks raw-string
- * prefix letters (`r`, `b`, `c`) that require an immediately following
- * `"` or `#` (or `r"`/`r#`).
+ * Build the 128-entry lookup table for characters that can open a comment, literal or regex.
  *
  * @param config - Comment and quote syntax of the language.
  * @returns A 128-byte lookup table cached by config identity.
@@ -592,10 +589,9 @@ function checkOpeningRegexLiteral(line: string, index: number): boolean {
 function scanQuotedSpan(
     line: string,
     startIndex: number,
-    quoteChar: string,
+    quoteCode: number,
     state: MaskState,
 ): number {
-    const quoteCode = quoteChar.charCodeAt(0);
     const len = line.length;
     let index = startIndex;
     while (index < len) {
@@ -605,7 +601,7 @@ function scanQuotedSpan(
             continue;
         }
         if (code === quoteCode) {
-            state.quote = null;
+            state.quoteCode = 0;
             return index + 1;
         }
         index++;
@@ -700,8 +696,9 @@ function scanQuoteOrRegex(
         if (char === '`' && !config.multilineTemplates) {
             return index + 1;
         }
-        state.quote = char;
-        return scanQuotedSpan(line, index + 1, char, state);
+        const code = line.charCodeAt(index);
+        state.quoteCode = code;
+        return scanQuotedSpan(line, index + 1, code, state);
     }
     if (config.regexLiterals && char === '/' && checkOpeningRegexLiteral(line, index)) {
         return scanRegexSpan(line, index);
@@ -810,10 +807,10 @@ function scanMultiLineState(
     state: MaskState,
     config: SourceMaskConfig,
 ): number {
-    if (state.quote) {
-        return scanQuotedSpan(line, index, state.quote, state);
+    if (state.quoteCode !== 0) {
+        return scanQuotedSpan(line, index, state.quoteCode, state);
     }
-    if (state.rawString != null) {
+    if (state.rawString !== null) {
         return scanRawStringBody(line, index, state.rawString, state);
     }
     if (state.inBlockComment) {
@@ -838,15 +835,14 @@ function scanQuoteFast(line: string, index: number, state: MaskState): number {
     if (code !== CHAR_SINGLE_QUOTE && code !== CHAR_DOUBLE_QUOTE && code !== CHAR_BACKTICK) {
         return -1;
     }
-    const char = line[index];
-    if (!state.config.quoteChars.includes(char)) {
+    if (state.triggerTable[code] !== TRIGGER_DIRECT) {
         return -1;
     }
     if (code === CHAR_BACKTICK && !state.config.multilineTemplates) {
         return index + 1;
     }
-    state.quote = char;
-    return scanQuotedSpan(line, index + 1, char, state);
+    state.quoteCode = code;
+    return scanQuotedSpan(line, index + 1, code, state);
 }
 
 /**
@@ -952,37 +948,27 @@ function scanNextMaskSpan(
  */
 function isNormalMaskState(state: MaskState): boolean {
     return (
-        state.quote === null &&
+        state.quoteCode === 0 &&
         !state.inBlockComment &&
         !state.inHtmlComment &&
-        state.rawString == null
+        state.rawString === null
     );
 }
 
 /**
- * Fast pre-check for whether `'r'`, `'b'`, or `'c'` is immediately followed by `"` or `#`.
+ * Checks whether an extended (multi-character prefix) trigger entry at `index` hits.
  */
-function isRawStringCandidate(line: string, index: number, code: number): boolean {
-    const rIdx =
-        code === CHAR_LOWER_R
-            ? index
-            : line.charCodeAt(index + 1) === CHAR_LOWER_R
-              ? index + 1
-              : -1;
-    if (rIdx === -1) return false;
-    const next = line.charCodeAt(rIdx + 1);
-    return next === CHAR_DOUBLE_QUOTE || next === CHAR_HASH;
-}
-
-/**
- * Checks whether a trigger table entry at `index` should halt normal-code scanning.
- */
-function isTriggerHit(line: string, index: number, trig: number): boolean {
-    if (trig === TRIGGER_DIRECT) return true;
-    if (trig === TRIGGER_LT_PREFIX) {
-        return line.charCodeAt(index + 1) === CHAR_EXCLAMATION;
+function isExtendedTriggerHit(line: string, index: number, trig: number): boolean {
+    if (trig === TRIGGER_RAW_R) {
+        const next1 = line.charCodeAt(index + 1);
+        return next1 === CHAR_DOUBLE_QUOTE || next1 === CHAR_HASH;
     }
-    return trig === TRIGGER_RAW_PREFIX && isRawStringCandidate(line, index, line.charCodeAt(index));
+    if (trig === TRIGGER_RAW_BC) {
+        if (line.charCodeAt(index + 1) !== CHAR_LOWER_R) return false;
+        const next2 = line.charCodeAt(index + 2);
+        return next2 === CHAR_DOUBLE_QUOTE || next2 === CHAR_HASH;
+    }
+    return line.charCodeAt(index + 1) === CHAR_EXCLAMATION;
 }
 
 /**
@@ -990,18 +976,15 @@ function isTriggerHit(line: string, index: number, trig: number): boolean {
  */
 function advanceToNextTrigger(line: string, startIndex: number, triggerTable: Uint8Array): number {
     const len = line.length;
-    let index = startIndex;
-    while (index < len) {
+    for (let index = startIndex; index < len; index++) {
         const code = line.charCodeAt(index);
-        if (code < ASCII_TABLE_SIZE) {
-            const trig = triggerTable[code];
-            if (trig !== 0 && isTriggerHit(line, index, trig)) {
-                break;
-            }
+        const trig = triggerTable[code & 127];
+        if (trig === 0 || code >= ASCII_TABLE_SIZE) continue;
+        if (trig === TRIGGER_DIRECT || isExtendedTriggerHit(line, index, trig)) {
+            return index;
         }
-        index++;
     }
-    return index;
+    return len;
 }
 
 /**
@@ -1016,15 +999,15 @@ function advanceMaskIndex(line: string, nextPos: number, state: MaskState): numb
  * Checks if a line is completely enclosed inside a multi-line comment block.
  */
 function isFullyCommentedLine(line: string, state: MaskState): boolean {
-    if (state.quote) return false;
+    if (state.quoteCode !== 0) return false;
     const close = state.close;
     if (state.inBlockComment && close.length > 0 && !line.includes(close)) {
         return true;
     }
-    if (state.rawString != null && !line.includes(DOUBLE_QUOTE_STR)) {
+    if (state.rawString !== null && !line.includes(DOUBLE_QUOTE_STR)) {
         return true;
     }
-    return Boolean(state.inHtmlComment && !line.includes(HTML_COMMENT_CLOSE));
+    return state.inHtmlComment && !line.includes(HTML_COMMENT_CLOSE);
 }
 
 const PREALLOC_SPACES_LEN = 512;

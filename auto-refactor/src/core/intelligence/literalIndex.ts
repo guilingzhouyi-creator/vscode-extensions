@@ -59,6 +59,8 @@ export interface LiteralOccurrence {
     role: LiteralRole;
     /** Enclosing declaration name, when it could be attributed. */
     symbol: string | null;
+    /** Raw literal spelling when transported across worker/cache boundaries. */
+    value?: string;
 }
 
 /** One distinct meaning of a value: a usage role together with the declaration using it. */
@@ -205,6 +207,59 @@ export class LiteralIndex {
      */
     markBuiltFrom(source: string): void {
         this.builtFrom = source;
+    }
+
+    /**
+     * Extract all recorded literal occurrences for a single file with their raw `value` attached,
+     * suitable for worker IPC and warm/diff cache persistence.
+     *
+     * @param file - Repository-relative file path.
+     * @returns Array of occurrences with `value` populated.
+     */
+    extractFileOccurrences(file: string): LiteralOccurrence[] {
+        const out: LiteralOccurrence[] = [];
+        for (const [value, sites] of this.byValue) {
+            for (let i = 0; i < sites.length; i++) {
+                const site = sites[i];
+                if (site.file === file) {
+                    out.push({ ...site, value });
+                }
+            }
+        }
+        return out;
+    }
+
+    /**
+     * Re-ingest pre-extracted literal occurrences from worker IPC or warm/diff cache hits.
+     * Idempotent by `(file, line, column, kind, value)`.
+     *
+     * @param occurrences - Pre-extracted occurrences with `value` populated.
+     * @param builtFrom - Optional provenance tag when the index is still unset.
+     */
+    addOccurrences(occurrences: readonly LiteralOccurrence[], builtFrom?: string): void {
+        if (builtFrom && this.builtFrom === 'unset') {
+            this.builtFrom = builtFrom;
+        }
+        for (let i = 0; i < occurrences.length; i++) {
+            const occ = occurrences[i];
+            const value = occ.value ?? '';
+            if (value.length === 0) continue;
+            const key = `${occ.file}|${occ.line}|${occ.column}|${occ.kind}|${value}`;
+            if (this.seen.has(key)) continue;
+            this.seen.add(key);
+            const site: LiteralOccurrence = {
+                file: occ.file,
+                line: occ.line,
+                column: occ.column,
+                kind: occ.kind,
+                role: occ.role || classifyLiteralRole(occ.file, occ.symbol, value, occ.kind),
+                symbol: occ.symbol ?? null,
+            };
+            this.contributingFiles.add(occ.file);
+            const existing = this.byValue.get(value);
+            if (existing === undefined) this.byValue.set(value, [site]);
+            else existing.push(site);
+        }
     }
 
     /**

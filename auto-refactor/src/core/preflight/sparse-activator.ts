@@ -59,6 +59,7 @@ const LANGUAGE_ANALYZER_MATRIX: Record<string, readonly LanguageKind[]> = {
     'gdscript-game': ['gdscript'],
     'go-modern': ['go'],
     'shell-lint': ['shell'],
+    'shell-safety': ['shell'],
     'vscode-extension': ['typescript', 'javascript', 'json'],
 };
 
@@ -321,11 +322,12 @@ export function activateSparseAnalyzers(
         .filter((filePath) => !selectedFiles.includes(filePath));
 
     const totalAvail = config.availableAnalyzers.length;
-    const activationRatio =
-        totalAvail > 0
-            ? Math.round((activatedAnalyzers.length / totalAvail) * SCORE_SCALE_THOUSAND) /
-              SCORE_SCALE_THOUSAND
-            : 0;
+    let activationRatio = 0;
+    if (totalAvail > 0) {
+        activationRatio =
+            Math.round((activatedAnalyzers.length / totalAvail) * SCORE_SCALE_THOUSAND) /
+            SCORE_SCALE_THOUSAND;
+    }
 
     const summaryText =
         `Files Selected: ${selectedFiles.length} / Analyzers Activated: ${activatedAnalyzers.length} ` +

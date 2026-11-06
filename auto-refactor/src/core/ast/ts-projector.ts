@@ -141,19 +141,22 @@ function kindInfoFor(astNode: ts.Node): TsKindInfo {
     const kindMeta = TS_KIND_INFO[astNode.kind];
     if (kindMeta) return kindMeta;
     const kindNum = astNode.kind;
+    let literalVal: 0 | 1 | 2 = 0;
+    if (kindNum === ts.SyntaxKind.NumericLiteral) {
+        literalVal = 1;
+    } else if (
+        kindNum === ts.SyntaxKind.StringLiteral ||
+        kindNum === ts.SyntaxKind.NoSubstitutionTemplateLiteral
+    ) {
+        literalVal = 2;
+    }
     return {
         kind: kindOf(astNode),
         fnLike: isFunctionLike(astNode),
         branch: kindNum === ts.SyntaxKind.BinaryExpression ? 0 : branchWeightOf(astNode),
         increasesNesting: CONTROL_OR_BLOCK.has(kindNum),
         isClassDefining: ts.isClassDeclaration(astNode) || ts.isClassExpression(astNode),
-        literal:
-            kindNum === ts.SyntaxKind.NumericLiteral
-                ? 1
-                : kindNum === ts.SyntaxKind.StringLiteral ||
-                    kindNum === ts.SyntaxKind.NoSubstitutionTemplateLiteral
-                  ? 2
-                  : 0,
+        literal: literalVal,
         special: true,
     };
 }
@@ -174,6 +177,7 @@ interface TsSyntaxFlags {
  */
 export class TsNodeProjector implements NodeProjector {
     readonly root: unknown;
+    readonly sourceFile: ts.SourceFile;
     private readonly sf: ts.SourceFile;
     private readonly policy: ProjectionPolicy;
     private readonly functionSubtrees = new Map<ts.Node, ts.Node[]>();
@@ -188,6 +192,7 @@ export class TsNodeProjector implements NodeProjector {
      */
     constructor(sourceFile: ts.SourceFile, policy: ProjectionPolicy) {
         this.root = sourceFile;
+        this.sourceFile = sourceFile;
         this.sf = sourceFile;
         this.policy = policy;
     }
@@ -279,7 +284,8 @@ export class TsNodeProjector implements NodeProjector {
         astNode: ts.Node,
         isObservable: boolean,
     ): boolean {
-        if (this.isPlaceholderFastPath(kindMeta, flags.isLiteral, flags.isFuncKw, astNode)) return true;
+        if (this.isPlaceholderFastPath(kindMeta, flags.isLiteral, flags.isFuncKw, astNode))
+            return true;
         if (flags.isLiteral) return false;
         return !isObservable;
     }
@@ -361,7 +367,8 @@ export class TsNodeProjector implements NodeProjector {
         const node: NormalizedNode = {
             kind: kindMeta.kind,
             rawKind: this.resolveProjectedRawKind(flags.isFuncKw),
-            text: flags.isLiteral && this.policy.needLiterals ? astNode.getText(this.sf) : undefined,
+            text:
+                flags.isLiteral && this.policy.needLiterals ? astNode.getText(this.sf) : undefined,
             start: pos.start,
             end: pos.end,
             name: this.resolveProjectedName(astNode, isCall, wantsSymbols, declaration),
@@ -504,6 +511,7 @@ export class TsNodeProjector implements NodeProjector {
             node.end = posOf(astNode.getEnd(), this.sf);
         }
         if (this.policy.needComplexity) node.isConstructor = ts.isConstructorDeclaration(astNode);
+        node.parameters = this.extractFnParameters(astNode);
     }
 
     private applyCheapLiteralProps(

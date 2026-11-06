@@ -43,9 +43,13 @@ export const EXPERT_BY_ID: ReadonlyMap<string, MoEExpertProfile> = new Map(
 
 /**
  * Fast O(1) Map lookups for expert profiles by 32-bit single-word bitmask.
+ * Registers both signed (1 << 31) and unsigned ((1 << 31) >>> 0) representations for bit 31 parity.
  */
 export const EXPERT_BY_BIT: ReadonlyMap<number, MoEExpertProfile> = new Map(
-    EXPERT_CATALOG.map((expert) => [expert.bit, expert]),
+    EXPERT_CATALOG.flatMap((expert) => [
+        [expert.bit | 0, expert] as const,
+        [expert.bit >>> 0, expert] as const,
+    ]),
 );
 
 /**

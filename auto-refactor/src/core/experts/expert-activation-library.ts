@@ -214,9 +214,15 @@ export const SPECIALIZED_EXPERTS_BITMASK: number =
 
 /**
  * Pre-computed immutable base score table for every expert bit derived from EXPERT_CATALOG.
+ * Indexes both signed (1 << 31) and unsigned ((1 << 31) >>> 0) keys for bit 31 parity.
  */
 export const EXPERT_BASE_SCORES: Readonly<Record<number, number>> = Object.freeze(
-    Object.fromEntries(EXPERT_CATALOG.map((expert) => [expert.bit, expert.serving.baseScore])),
+    Object.fromEntries(
+        EXPERT_CATALOG.flatMap((expert) => [
+            [expert.bit | 0, expert.serving.baseScore],
+            [expert.bit >>> 0, expert.serving.baseScore],
+        ]),
+    ),
 );
 
 export { dispatchSliceFeatureBitset } from './slice-dispatcher';
