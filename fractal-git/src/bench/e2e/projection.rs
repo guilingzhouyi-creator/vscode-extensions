@@ -49,7 +49,11 @@ pub fn create_bench_temp_dir(prefix: &str) -> FractalResult<PathBuf> {
 ///
 /// # Errors
 /// Returns `FractalError::ObjectCodec` or `FractalError::CorruptStore` if the file cannot be located.
-pub fn find_file_in_tree(odb: &OdbRouter, root_tree_oid: Oid, target_path: &str) -> FractalResult<Oid> {
+pub fn find_file_in_tree(
+    odb: &OdbRouter,
+    root_tree_oid: Oid,
+    target_path: &str,
+) -> FractalResult<Oid> {
     let normalized = target_path.trim_matches('/').replace('\\', "/");
     let segments: Vec<&str> = normalized.split('/').filter(|s| !s.is_empty()).collect();
     if segments.is_empty() {
@@ -61,13 +65,15 @@ pub fn find_file_in_tree(odb: &OdbRouter, root_tree_oid: Oid, target_path: &str)
     let mut current_tree_oid = root_tree_oid;
     for (i, segment) in segments.iter().enumerate() {
         let is_last = i == segments.len() - 1;
-        let tree_obj = odb
-            .read(&current_tree_oid)?
-            .ok_or_else(|| FractalError::CorruptStore(format!("tree object {current_tree_oid} missing")))?;
+        let tree_obj = odb.read(&current_tree_oid)?.ok_or_else(|| {
+            FractalError::CorruptStore(format!("tree object {current_tree_oid} missing"))
+        })?;
         let tree_ref = GitTreeRef::from_bytes(&tree_obj.payload);
-        let entry = tree_ref
-            .find_entry(segment)?
-            .ok_or_else(|| FractalError::ObjectCodec(format!("entry '{segment}' not found in tree {current_tree_oid}")))?;
+        let entry = tree_ref.find_entry(segment)?.ok_or_else(|| {
+            FractalError::ObjectCodec(format!(
+                "entry '{segment}' not found in tree {current_tree_oid}"
+            ))
+        })?;
 
         if is_last {
             return Ok(entry.oid);
@@ -84,7 +90,11 @@ pub fn find_file_in_tree(odb: &OdbRouter, root_tree_oid: Oid, target_path: &str)
 ///
 /// # Errors
 /// Returns `FractalError::ObjectCodec` or `FractalError::CorruptStore` if subtree resolution fails.
-pub fn resolve_subtree_oid(odb: &OdbRouter, root_tree_oid: Oid, dir_path: &str) -> FractalResult<Oid> {
+pub fn resolve_subtree_oid(
+    odb: &OdbRouter,
+    root_tree_oid: Oid,
+    dir_path: &str,
+) -> FractalResult<Oid> {
     let normalized = dir_path.trim_matches('/').replace('\\', "/");
     let segments: Vec<&str> = normalized.split('/').filter(|s| !s.is_empty()).collect();
     if segments.is_empty() {
@@ -93,13 +103,15 @@ pub fn resolve_subtree_oid(odb: &OdbRouter, root_tree_oid: Oid, dir_path: &str) 
 
     let mut current_tree_oid = root_tree_oid;
     for segment in &segments {
-        let tree_obj = odb
-            .read(&current_tree_oid)?
-            .ok_or_else(|| FractalError::CorruptStore(format!("tree object {current_tree_oid} missing")))?;
+        let tree_obj = odb.read(&current_tree_oid)?.ok_or_else(|| {
+            FractalError::CorruptStore(format!("tree object {current_tree_oid} missing"))
+        })?;
         let tree_ref = GitTreeRef::from_bytes(&tree_obj.payload);
-        let entry = tree_ref
-            .find_entry(segment)?
-            .ok_or_else(|| FractalError::ObjectCodec(format!("subtree segment '{segment}' not found in tree {current_tree_oid}")))?;
+        let entry = tree_ref.find_entry(segment)?.ok_or_else(|| {
+            FractalError::ObjectCodec(format!(
+                "subtree segment '{segment}' not found in tree {current_tree_oid}"
+            ))
+        })?;
 
         if !entry.mode.is_tree() {
             return Err(FractalError::ObjectCodec(format!(
@@ -149,10 +161,12 @@ pub fn resolve_blob_from_projected_index(
         if entry.is_sparse_directory() {
             let dir_prefix = staged_path.trim_matches('/');
             let prefix_with_slash = format!("{dir_prefix}/");
-            if normalized.starts_with(&prefix_with_slash) {
-                if best_prefix_match.as_ref().is_none_or(|(best, _)| dir_prefix.len() > best.len()) {
-                    best_prefix_match = Some((dir_prefix, entry.oid));
-                }
+            if normalized.starts_with(&prefix_with_slash)
+                && best_prefix_match
+                    .as_ref()
+                    .is_none_or(|(best, _)| dir_prefix.len() > best.len())
+            {
+                best_prefix_match = Some((dir_prefix, entry.oid));
             }
         }
     }

@@ -96,8 +96,8 @@ mod tests {
 
     #[test]
     fn spec_in_subdirectory_is_prefixed() {
-        let resolved =
-            spec_relative_to_root(root(), &root().join("crates/kernel"), "Cargo.toml").expect("resolve");
+        let resolved = spec_relative_to_root(root(), &root().join("crates/kernel"), "Cargo.toml")
+            .expect("resolve");
         assert_eq!(
             resolved, "crates/kernel/Cargo.toml",
             "a bare name typed one level down names the file below the caller, exactly as git does"

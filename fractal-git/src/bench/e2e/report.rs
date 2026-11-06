@@ -153,10 +153,7 @@ impl E2eBenchmarkReport {
 
         out.push_str(&format!(
             "{:<36} | {:>16} | {:>13} us | {:>12}\n",
-            "FastCDC apply_edits Latency",
-            "N/A",
-            self.edit_chunking_latency_us,
-            "sub-ms"
+            "FastCDC apply_edits Latency", "N/A", self.edit_chunking_latency_us, "sub-ms"
         ));
 
         out.push_str(&format!(
@@ -169,10 +166,7 @@ impl E2eBenchmarkReport {
 
         out.push_str(&format!(
             "{:<36} | {:>16} | {:>13.2} MB | {:>12}\n",
-            "Peak Process Memory (RSS)",
-            "OS variable",
-            self.peak_rss_mb,
-            "FGT-PRF-001"
+            "Peak Process Memory (RSS)", "OS variable", self.peak_rss_mb, "FGT-PRF-001"
         ));
 
         out.push_str("========================================================================================\n");
@@ -183,7 +177,9 @@ impl E2eBenchmarkReport {
     #[must_use]
     pub fn render_markdown_table(&self) -> String {
         let mut out = String::new();
-        out.push_str("| Metric Dimension | Git Baseline | Taxis Progressive Projection | Delta / Factor |\n");
+        out.push_str(
+            "| Metric Dimension | Git Baseline | Taxis Progressive Projection | Delta / Factor |\n",
+        );
         out.push_str("| :--- | :--- | :--- | :--- |\n");
         out.push_str(&format!(
             "| **Workspace Creation Latency** | `{} ms` | `{} ms` | **{:.1}x faster** |\n",

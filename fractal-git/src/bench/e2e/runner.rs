@@ -63,7 +63,8 @@ impl E2eBenchmarkRunner {
         }
 
         // Retain the run with the lowest Taxis projection and WAL commit latency (least noise)
-        sample_reports.sort_by_key(|r| (r.taxis_projection_latency_ms, r.wal_sync_commit_latency_us));
+        sample_reports
+            .sort_by_key(|r| (r.taxis_projection_latency_ms, r.wal_sync_commit_latency_us));
         let mut best = sample_reports.remove(0);
         best.iterations = iters;
         Ok(best)
@@ -94,12 +95,11 @@ impl E2eBenchmarkRunner {
                 "core.fsmonitor=false",
             ]);
         }
-        git_cmd
-            .args([
-                "clone",
-                workload.bundle_path.to_string_lossy().as_ref(),
-                git_dest.to_string_lossy().as_ref(),
-            ]);
+        git_cmd.args([
+            "clone",
+            workload.bundle_path.to_string_lossy().as_ref(),
+            git_dest.to_string_lossy().as_ref(),
+        ]);
 
         let git_output = git_cmd.output().map_err(FractalError::Io)?;
         let git_clone_ok = git_output.status.success();
@@ -144,8 +144,15 @@ impl E2eBenchmarkRunner {
             .iter()
             .find(|(name, _)| name == "refs/heads/main" || name == "HEAD")
             .map(|(_, oid)| *oid)
-            .or_else(|| consume_report.references_advanced.first().map(|(_, oid)| *oid))
-            .ok_or_else(|| FractalError::CorruptStore("No reference found in workload bundle".into()))?;
+            .or_else(|| {
+                consume_report
+                    .references_advanced
+                    .first()
+                    .map(|(_, oid)| *oid)
+            })
+            .ok_or_else(|| {
+                FractalError::CorruptStore("No reference found in workload bundle".into())
+            })?;
 
         let commit_obj = odb
             .read(&head_oid)?
@@ -230,11 +237,17 @@ impl E2eBenchmarkRunner {
         let mid_offset = (total_file_bytes / 2).max(64);
         let end_offset = (total_file_bytes * 3 / 4).max(mid_offset + 64);
 
-        let replacement_1 = b"// Modified line: Progressive chunking FastCDC boundary healing benchmark.\n";
-        let replacement_2 = b"// Inserted function:\npub fn benchmark_incremental_rehash() -> bool { true }\n";
+        let replacement_1 =
+            b"// Modified line: Progressive chunking FastCDC boundary healing benchmark.\n";
+        let replacement_2 =
+            b"// Inserted function:\npub fn benchmark_incremental_rehash() -> bool { true }\n";
 
         let edits = vec![
-            EditOp::new(mid_offset, 32.min(total_file_bytes - mid_offset), replacement_1),
+            EditOp::new(
+                mid_offset,
+                32.min(total_file_bytes - mid_offset),
+                replacement_1,
+            ),
             EditOp::new(end_offset, 0, replacement_2),
         ];
 
@@ -251,8 +264,7 @@ impl E2eBenchmarkRunner {
                 reused_count += 1;
             }
         }
-        let chunk_reuse_ratio_pct =
-            (reused_count as f64 / new_chunks.len().max(1) as f64) * 100.0;
+        let chunk_reuse_ratio_pct = (reused_count as f64 / new_chunks.len().max(1) as f64) * 100.0;
 
         // -----------------------------------------------------------------------------------------
         // Phase 5: Commit & Durability Writeback (WalJournal vs Full Git Commit)

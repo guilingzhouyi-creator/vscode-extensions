@@ -98,8 +98,15 @@ pub fn inspect_workload_bundle(bundle_path: &Path) -> FractalResult<(usize, usiz
             name == "refs/heads/main" || name == "HEAD" || name == "refs/heads/master"
         })
         .map(|(_, oid)| *oid)
-        .or_else(|| consume_report.references_advanced.first().map(|(_, oid)| *oid))
-        .ok_or_else(|| FractalError::CorruptStore("No reference found in workload bundle".into()))?;
+        .or_else(|| {
+            consume_report
+                .references_advanced
+                .first()
+                .map(|(_, oid)| *oid)
+        })
+        .ok_or_else(|| {
+            FractalError::CorruptStore("No reference found in workload bundle".into())
+        })?;
 
     // Defensive resolution: Peel annotated tag if head_oid points to a tag
     let mut commit_oid = head_oid;
@@ -108,12 +115,15 @@ pub fn inspect_workload_bundle(bundle_path: &Path) -> FractalResult<(usize, usiz
         .ok_or_else(|| FractalError::CorruptStore(format!("Object {commit_oid} missing")))?;
     if obj.kind == ObjectKind::Tag {
         if let Ok(tag_text) = std::str::from_utf8(&obj.payload) {
-            if let Some(target_hex) = tag_text.strip_prefix("object ").and_then(|s| s.lines().next()) {
+            if let Some(target_hex) = tag_text
+                .strip_prefix("object ")
+                .and_then(|s| s.lines().next())
+            {
                 if let Ok(peeled) = Oid::from_hex(target_hex) {
                     commit_oid = peeled;
-                    obj = odb
-                        .read(&commit_oid)?
-                        .ok_or_else(|| FractalError::CorruptStore(format!("Commit {commit_oid} missing")))?;
+                    obj = odb.read(&commit_oid)?.ok_or_else(|| {
+                        FractalError::CorruptStore(format!("Commit {commit_oid} missing"))
+                    })?;
                 }
             }
         }
@@ -213,7 +223,8 @@ Features FastCDC content-defined chunking, bit-parallel Myers diff, and lock-fre
     core_code.push_str("    pub struct Oid([u8; 20]);\n\n");
     core_code.push_str("    impl Oid {\n");
     core_code.push_str("        pub const ZERO: Self = Self([0u8; 20]);\n");
-    core_code.push_str("        pub const fn from_bytes(bytes: [u8; 20]) -> Self { Self(bytes) }\n");
+    core_code
+        .push_str("        pub const fn from_bytes(bytes: [u8; 20]) -> Self { Self(bytes) }\n");
     core_code.push_str("        pub fn as_bytes(&self) -> &[u8; 20] { &self.0 }\n");
     core_code.push_str("    }\n");
     core_code.push_str("}\n\n");
@@ -230,9 +241,13 @@ Features FastCDC content-defined chunking, bit-parallel Myers diff, and lock-fre
         .current_dir(&scratch_dir)
         .status();
     let mut c1 = git_safe_command();
-    c1.args(["commit", "-m", "feat(core): initial repository architecture and core models"])
-        .current_dir(&scratch_dir)
-        .envs(commit_env);
+    c1.args([
+        "commit",
+        "-m",
+        "feat(core): initial repository architecture and core models",
+    ])
+    .current_dir(&scratch_dir)
+    .envs(commit_env);
     let _ = c1.status();
 
     // Commit 2: Algorithms subsystem
@@ -254,9 +269,13 @@ pub mod cdc {
         .current_dir(&scratch_dir)
         .status();
     let mut c2 = git_safe_command();
-    c2.args(["commit", "-m", "feat(algorithms): implement FastCDC chunking and Myers diff"])
-        .current_dir(&scratch_dir)
-        .envs(commit_env);
+    c2.args([
+        "commit",
+        "-m",
+        "feat(algorithms): implement FastCDC chunking and Myers diff",
+    ])
+    .current_dir(&scratch_dir)
+    .envs(commit_env);
     let _ = c2.status();
 
     // Commit 3: Storage and documentation
@@ -282,9 +301,13 @@ pub mod cas {
         .current_dir(&scratch_dir)
         .status();
     let mut c3 = git_safe_command();
-    c3.args(["commit", "-m", "perf(storage): lock-free CAS indexing and WAL journal writeback"])
-        .current_dir(&scratch_dir)
-        .envs(commit_env);
+    c3.args([
+        "commit",
+        "-m",
+        "perf(storage): lock-free CAS indexing and WAL journal writeback",
+    ])
+    .current_dir(&scratch_dir)
+    .envs(commit_env);
     let _ = c3.status();
 
     // Tag and create bundle

@@ -31,7 +31,11 @@ pub enum BenchmarkProfile {
 impl BenchmarkProfile {
     /// Profile of the binary currently executing.
     pub fn current() -> Self {
-        if cfg!(debug_assertions) { Self::Debug } else { Self::Release }
+        if cfg!(debug_assertions) {
+            Self::Debug
+        } else {
+            Self::Release
+        }
     }
 
     /// Stable lowercase identifier used in file names and JSON.
