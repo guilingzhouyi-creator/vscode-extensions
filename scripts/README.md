@@ -5,7 +5,7 @@
 > 项目内私有脚本（如 `auto-refactor/scripts/*.js` 的 validate/bench 系列）不在此库，
 > 保留在各项目内部，由各自 `package.json` 引用。
 >
-> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**103 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
+> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**106 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
 
 ---
 
@@ -40,6 +40,8 @@
 | `common/` | Node.js | `validate-rule-id-closure.js` | audit / ssot（门禁引用规则 ID 与目录登记的双向闭包守卫） | `pre-push-gate`、CI |
 | `common/` | Node.js | `validate-scoring-rule-closure.js` | audit / scoring（全仓 SSOT 规则 100% 映射至十维质量空间双向闭包守卫） | `pre-push-gate`、`audit-all`、CI |
 | `common/` | Node.js | `validate-docs-consistency.js` | audit / docs（动态对照 `rule-catalog.json` 真实计数拦截规则总数漂移；含治理文档脚本死链守卫） | `pre-push-gate`、CI |
+| `common/` | Node.js | `validate-impact-slices.js` | audit / test（影响面切片自校验器：按改动路径推导的预测试目标只可收窄、不可越界放宽，未识别路径必须回落到全量目标） | `pre-push-gate` 物理卫生、`audit-all`、CI |
+| `common/` | Node.js | `validate-commit-rule-coverage.js` | audit / ssot（提交层规则覆盖守卫：提交信息门禁的规则 ID 与 SSOT 目录逐项对齐，零孤儿与零虚构） | `pre-push-gate`、CI |
 | `common/` | Node.js | `sync-doc-metrics.js` | audit / metrics（文档规模数字的单源渲染与零漂移守卫：`METRICS:BEGIN/END` 区域由真源求值渲染，`--write` 就地校正，内置反向探针自证检出能力） | `pre-push-gate`、CI、本地 CLI |
 | `common/` | Node.js | `validate-rule-reachability.js` | audit / ssot（error 级规则执行入口可达性守卫） | `pre-push-gate`、CI |
 | `common/` | Node.js | `validate-rule-source-consistency.js` | audit / ssot（规则源跨目录严重级一致性：同一规则 ID 被多个 `rule-sources/*.json` 声明时 severity 必须相同，内置反向探针自证检出能力） | `pre-push-gate`、`audit-all`、CI |
@@ -85,6 +87,9 @@
 | `common/` | JSON | `gate-step-registry.json` | data / ssot（门禁入口、步骤身份、显示顺序与规则归属的单源登记表） | 门禁双实现、`validate-gate-verdicts`、`validate-gate-ordering` |
 | `common/` | JSON | `rule-reachability-exceptions.json` | data / ssot（error 级规则执行入口可达性的显式豁免清单，逐条写明豁免理由） | `validate-rule-reachability` |
 | `common/` | JSON | `rule-catalog.json` | data / ssot（全工作区规则事实真源聚合目录） | 静态审查与门禁工具链 |
+| `common/` | JSON | `impact-slice-map.js` | data / slices（改动路径到预测试目标的影响面映射单源：包、测试与切片身份集中登记，供预测试机与本地切片共用） | `remote-sandbox-gate`、`validate-impact-slices` |
+| `common/` | JSON | `commit-rule-coverage.json` | data / ssot（提交信息门禁规则覆盖矩阵的数据面，登记每条提交层规则被哪些用例覆盖） | `validate-commit-rule-coverage` |
+| `common/` | JSON | `diff-exemptions.json` | data / ledger（差分豁免授予账本：`schemaVersion` 加 `grants` 映射，逐条记录被豁免标识的测量值、floor 与 target，随提交走以便审计复算） | `diff-exemption-ledger`、`gate-differential-bounds` |
 | `common/` | JSON | `rule-lexicon.json` | data / ssot（跨引擎与门禁脚本共享的规则标识符与语义步骤词汇形状单源字典） | 静态审查与提交门禁工具链 |
 | `sh/` | Bash | `pre-commit-gate.sh` | gate（本地提交物理卫生与多项前置检查，含 AST 切片） | `.githooks/pre-commit`、本地 CLI |
 | `ps1/` | PowerShell | `pre-commit-gate.ps1` | gate（pre-commit-gate.sh 同构双实现） | 本地 CLI（Windows） |

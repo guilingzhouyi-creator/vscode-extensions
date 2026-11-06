@@ -1,7 +1,7 @@
 {
   "schema": "fractal-git-rules/v1",
   "generatedAt": "2026-10-24T08:32:58.507Z",
-  "totalRules": 36,
+  "totalRules": 37,
   "rules": [
     {
       "id": "FGT-COR-001",
@@ -14,6 +14,12 @@
       "family": "OBJ",
       "severity": "error",
       "summary": "Git object model serialization guard: Strict standard loose/pack object header format and SHA-1/SHA-256 dual compatibility"
+    },
+    {
+      "id": "FGT-IMPACT-001",
+      "family": "IMPACT",
+      "severity": "error",
+      "summary": "Impact-slice map guard: a pretest slice may narrow the test targets a change triggers but must never widen a recognised path past its declared set, and an unrecognised crate path must fall back to every target"
     },
     {
       "id": "FGT-IDX-001",

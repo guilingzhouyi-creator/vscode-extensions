@@ -1,12 +1,12 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-11-04T14:29:05.059Z",
-  "totalRules": 533,
+  "generatedAt": "2026-11-06T15:28:28.382Z",
+  "totalRules": 534,
   "counts": {
     "autoRefactor": 375,
     "workspaceTiming": 49,
     "webGames": 50,
-    "fractalGit": 36,
+    "fractalGit": 37,
     "globalTooling": 23
   },
   "rules": [
@@ -1521,20 +1521,20 @@
       "canonical": true
     },
     {
-      "id": "FGT-IMPACT-001",
-      "project": "fractal-git",
-      "family": "IMPACT",
-      "severity": "error",
-      "summary": "Impact-slice map guard: a pretest slice may narrow the test targets a change triggers but must never widen a recognised path past its declared set, and an unrecognised crate path must fall back to every target",
-      "namespace": "FGT",
-      "canonical": true
-    },
-    {
       "id": "FGT-IDX-001",
       "project": "fractal-git",
       "family": "IDX",
       "severity": "error",
       "summary": "Lockless in-memory git index concurrency guard: Conflict stage resolution, lock-free slot allocation, and deterministic read-tree/write-tree round-trip equivalence",
+      "namespace": "FGT",
+      "canonical": true
+    },
+    {
+      "id": "FGT-IMPACT-001",
+      "project": "fractal-git",
+      "family": "IMPACT",
+      "severity": "error",
+      "summary": "Impact-slice map guard: a pretest slice may narrow the test targets a change triggers but must never widen a recognised path past its declared set, and an unrecognised crate path must fall back to every target",
       "namespace": "FGT",
       "canonical": true
     },
