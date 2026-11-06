@@ -89,7 +89,8 @@ impl StagedPromotionRequest {
 
     /// Checks if this request is actively pending human approval.
     pub fn is_active_pending(&self, current_time_ms: i64) -> bool {
-        self.status == StagedPromotionStatus::PendingHumanApproval && !self.is_expired(current_time_ms)
+        self.status == StagedPromotionStatus::PendingHumanApproval
+            && !self.is_expired(current_time_ms)
     }
 }
 

@@ -136,7 +136,8 @@ pub const PLANNED_CAPABILITIES: &[PlannedCapability] = &[
     PlannedCapability {
         name: CAPABILITY_NETWORK,
         landing_point: "TransportResolver::resolve in src/bin/taxis_cmd/remote.rs",
-        note: "Add a scheme arm returning a RemoteTransport implementation; the command layer must \
+        note:
+            "Add a scheme arm returning a RemoteTransport implementation; the command layer must \
                not learn about schemes.",
     },
     PlannedCapability {

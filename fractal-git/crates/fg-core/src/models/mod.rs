@@ -12,12 +12,12 @@ pub mod bloom;
 pub mod change_id;
 pub mod commit_witness;
 pub mod context;
+pub mod elevation;
 pub mod file_mode;
 pub mod file_uid;
 pub mod generation;
 pub mod git_object_id;
 pub mod hex;
-pub mod elevation;
 pub mod identity;
 pub mod index_stage;
 pub mod interactive;
@@ -44,6 +44,9 @@ pub use bloom::PathBloomFilter;
 pub use change_id::ChangeId;
 pub use commit_witness::ValidatedCommitWitness;
 pub use context::{AgentCommitMeta, PraxisCardContext};
+pub use elevation::{
+    AutoQualityScoreEnvelope, ElevationAttestation, StagedPromotionRequest, StagedPromotionStatus,
+};
 pub use file_mode::FileMode;
 pub use file_uid::FileUid;
 pub use generation::CorrectedCommitDate;
@@ -59,9 +62,6 @@ pub use project::{
     DEFAULT_PROJECT_MASTER_TTL_SECONDS, DEFAULT_SUBAGENT_TTL_SECONDS,
 };
 pub use provenance::{BlockProvenanceEntry, BlockProvenanceParams, ProvenanceLedger};
-pub use elevation::{
-    AutoQualityScoreEnvelope, ElevationAttestation, StagedPromotionRequest, StagedPromotionStatus,
-};
 pub use quarantine::{
     default_quarantine_dir, IsolateMutationRequest, QuarantineRecord, QuarantineRegistry,
     QuarantineStatus,

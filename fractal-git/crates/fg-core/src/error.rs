@@ -167,10 +167,7 @@ impl FractalError {
                         let items = violations
                             .iter()
                             .map(|v| {
-                                format!(
-                                    "  - {}",
-                                    crate::sanitizer::format_violation_diagnostic(v)
-                                )
+                                format!("  - {}", crate::sanitizer::format_violation_diagnostic(v))
                             })
                             .collect::<Vec<_>>()
                             .join("\n");

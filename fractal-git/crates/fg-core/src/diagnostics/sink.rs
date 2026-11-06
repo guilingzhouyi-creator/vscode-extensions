@@ -108,8 +108,8 @@ mod tests {
         fs::create_dir_all(&tmp).expect("create test tmp");
         let log_file = tmp.join("test.jsonl");
 
-        let mut sink = RotatingLogSink::open(log_file.clone(), Some(80), Some(2))
-            .expect("open rotating sink");
+        let mut sink =
+            RotatingLogSink::open(log_file.clone(), Some(80), Some(2)).expect("open rotating sink");
 
         sink.append_line("{\"msg\":\"first log line that takes some space 12345\"}")
             .expect("write 1");

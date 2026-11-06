@@ -5,8 +5,7 @@
 
 /// Standard initial vector constants defined by GB/T 32918.4-2016 section 4.1.
 const INITIAL_VECTOR_IV: [u32; 8] = [
-    0x7380166f, 0x4914b2b9, 0x172442d7, 0xda8a0600,
-    0xa96f30bc, 0x163138aa, 0xe38dee4d, 0xb0fb0e4e,
+    0x7380166f, 0x4914b2b9, 0x172442d7, 0xda8a0600, 0xa96f30bc, 0x163138aa, 0xe38dee4d, 0xb0fb0e4e,
 ];
 
 /// SM3 input block size in bytes (512 bits / 64 bytes).
@@ -27,17 +26,29 @@ const fn permutation_p1(word: u32) -> u32 {
 
 #[inline(always)]
 const fn boolean_function_ff(word_x: u32, word_y: u32, word_z: u32, round_index: usize) -> u32 {
-    if round_index < 16 { word_x ^ word_y ^ word_z } else { (word_x & word_y) | (word_x & word_z) | (word_y & word_z) }
+    if round_index < 16 {
+        word_x ^ word_y ^ word_z
+    } else {
+        (word_x & word_y) | (word_x & word_z) | (word_y & word_z)
+    }
 }
 
 #[inline(always)]
 const fn boolean_function_gg(word_x: u32, word_y: u32, word_z: u32, round_index: usize) -> u32 {
-    if round_index < 16 { word_x ^ word_y ^ word_z } else { (word_x & word_y) | (!word_x & word_z) }
+    if round_index < 16 {
+        word_x ^ word_y ^ word_z
+    } else {
+        (word_x & word_y) | (!word_x & word_z)
+    }
 }
 
 #[inline(always)]
 const fn round_constant_t(round_index: usize) -> u32 {
-    if round_index < 16 { 0x79cc4519 } else { 0x7a879d8a }
+    if round_index < 16 {
+        0x79cc4519
+    } else {
+        0x7a879d8a
+    }
 }
 
 /// Streaming state machine for GB/T 32918.4 SM3 256-bit cryptographic digest.
@@ -145,22 +156,31 @@ impl Sm3Hasher {
                 ^ message_schedule_w[round_index - 13].rotate_left(7)
                 ^ message_schedule_w[round_index - 6];
         }
-        let (mut reg_a, mut reg_b, mut reg_c, mut reg_d) =
-            (self.intermediate_state[0], self.intermediate_state[1], self.intermediate_state[2], self.intermediate_state[3]);
-        let (mut reg_e, mut reg_f, mut reg_g, mut reg_h) =
-            (self.intermediate_state[4], self.intermediate_state[5], self.intermediate_state[6], self.intermediate_state[7]);
+        let (mut reg_a, mut reg_b, mut reg_c, mut reg_d) = (
+            self.intermediate_state[0],
+            self.intermediate_state[1],
+            self.intermediate_state[2],
+            self.intermediate_state[3],
+        );
+        let (mut reg_e, mut reg_f, mut reg_g, mut reg_h) = (
+            self.intermediate_state[4],
+            self.intermediate_state[5],
+            self.intermediate_state[6],
+            self.intermediate_state[7],
+        );
 
         for round_index in 0..64 {
-            let shift_intermediate_1 = (reg_a
-                .rotate_left(12)
-                .wrapping_add(reg_e)
-                .wrapping_add(round_constant_t(round_index).rotate_left((round_index % 32) as u32)))
+            let shift_intermediate_1 = (reg_a.rotate_left(12).wrapping_add(reg_e).wrapping_add(
+                round_constant_t(round_index).rotate_left((round_index % 32) as u32),
+            ))
             .rotate_left(7);
             let shift_intermediate_2 = shift_intermediate_1 ^ reg_a.rotate_left(12);
             let temp_intermediate_1 = boolean_function_ff(reg_a, reg_b, reg_c, round_index)
                 .wrapping_add(reg_d)
                 .wrapping_add(shift_intermediate_2)
-                .wrapping_add(message_schedule_w[round_index] ^ message_schedule_w[round_index + 4]);
+                .wrapping_add(
+                    message_schedule_w[round_index] ^ message_schedule_w[round_index + 4],
+                );
             let temp_intermediate_2 = boolean_function_gg(reg_e, reg_f, reg_g, round_index)
                 .wrapping_add(reg_h)
                 .wrapping_add(shift_intermediate_1)
@@ -174,10 +194,14 @@ impl Sm3Hasher {
             reg_f = reg_e;
             reg_e = permutation_p0(temp_intermediate_2);
         }
-        self.intermediate_state[0] ^= reg_a; self.intermediate_state[1] ^= reg_b;
-        self.intermediate_state[2] ^= reg_c; self.intermediate_state[3] ^= reg_d;
-        self.intermediate_state[4] ^= reg_e; self.intermediate_state[5] ^= reg_f;
-        self.intermediate_state[6] ^= reg_g; self.intermediate_state[7] ^= reg_h;
+        self.intermediate_state[0] ^= reg_a;
+        self.intermediate_state[1] ^= reg_b;
+        self.intermediate_state[2] ^= reg_c;
+        self.intermediate_state[3] ^= reg_d;
+        self.intermediate_state[4] ^= reg_e;
+        self.intermediate_state[5] ^= reg_f;
+        self.intermediate_state[6] ^= reg_g;
+        self.intermediate_state[7] ^= reg_h;
     }
 }
 

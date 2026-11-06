@@ -160,9 +160,8 @@ mod tests {
 
     #[test]
     fn test_split_rule_id_recognition() {
-        let (rule_opt, msg) = split_rule_id(
-            "FGT-MSG-001: Header length must be at least 15 characters (actual: 10)",
-        );
+        let (rule_opt, msg) =
+            split_rule_id("FGT-MSG-001: Header length must be at least 15 characters (actual: 10)");
         assert_eq!(rule_opt, Some("FGT-MSG-001"));
         assert_eq!(
             msg,

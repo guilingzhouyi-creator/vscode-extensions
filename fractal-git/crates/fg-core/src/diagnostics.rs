@@ -121,10 +121,8 @@ pub fn configure(flag: Option<&str>) {
                 .and_then(|value| LogLevel::parse_str(&value))
         })
         .or_else(|| {
-            if std::env::var_os("TAXIS_DIAGNOSTIC")
-                .is_some_and(|val| val == "1" || val == "true")
-                || std::env::var_os("TAXIS_DEV_MODE")
-                    .is_some_and(|val| val == "1" || val == "true")
+            if std::env::var_os("TAXIS_DIAGNOSTIC").is_some_and(|val| val == "1" || val == "true")
+                || std::env::var_os("TAXIS_DEV_MODE").is_some_and(|val| val == "1" || val == "true")
             {
                 Some(LogLevel::Debug)
             } else {
@@ -173,7 +171,10 @@ pub fn set_active_subcommand(subcommand: &str) {
 
 /// Retrieves the active subcommand name if registered.
 pub fn active_subcommand() -> Option<String> {
-    ACTIVE_SUBCOMMAND.lock().ok().and_then(|guard| guard.clone())
+    ACTIVE_SUBCOMMAND
+        .lock()
+        .ok()
+        .and_then(|guard| guard.clone())
 }
 
 /// Writes one diagnostic record to the passive file sink and to stderr if appropriate.
@@ -246,7 +247,10 @@ pub fn record_event(
 
     if is_diagnostic_mode() {
         if let Some(r) = effective_rule {
-            eprintln!("taxis[{}] {target} [{event}] [{r}]: {clean}", level.as_str());
+            eprintln!(
+                "taxis[{}] {target} [{event}] [{r}]: {clean}",
+                level.as_str()
+            );
         } else {
             eprintln!("taxis[{}] {target} [{event}]: {clean}", level.as_str());
         }

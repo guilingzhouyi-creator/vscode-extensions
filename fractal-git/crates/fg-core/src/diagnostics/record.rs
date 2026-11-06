@@ -60,7 +60,10 @@ mod tests {
     #[test]
     fn trace_id_starts_with_prefix_and_contains_pid() {
         let tid = trace_id();
-        assert!(tid.starts_with("tx-"), "trace ID must start with tx-: {tid}");
+        assert!(
+            tid.starts_with("tx-"),
+            "trace ID must start with tx-: {tid}"
+        );
         let pid = std::process::id();
         assert!(
             tid.contains(&pid.to_string()),

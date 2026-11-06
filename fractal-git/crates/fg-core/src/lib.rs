@@ -12,8 +12,8 @@
 //! Domain Governance Rules: FGT-COR-001 (core domain foundation), FGT-LCK-001, FGT-PRF-001.
 
 pub mod constants;
-pub mod diagnostics;
 pub mod crypto;
+pub mod diagnostics;
 pub mod error;
 pub mod fs_atomic;
 pub mod math;
@@ -29,9 +29,6 @@ pub use constants::{
 pub use crypto::{hmac_sm3, sm3_hash, Sm3Hasher};
 pub use error::{FractalError, FractalResult};
 pub use fs_atomic::write_file_atomic;
-pub use sanitizer::{
-    format_violation_diagnostic, is_rule_id_candidate, sanitize_violation_for_user, split_rule_id,
-};
 pub use math::{
     decode_git_offset_varint, encode_git_offset_varint, jeffreys_beta_from_counts,
     jeffreys_beta_trials, JeffreysPosterior,
@@ -41,12 +38,15 @@ pub use models::{
     ActorIdentity, AgentCommitMeta, AgentPushContext, AuthorityClaims, AuthoritySecret,
     AuthorityTier, AutoQualityScoreEnvelope, BlackboardCollision, BlockProvenanceEntry,
     BlockProvenanceParams, CardBlackboard, ConflictPresentationMode, DiffCoherenceMode,
-    ElevationAttestation, EnforcementTier, FastOidHasher, FastOidMap, FastOidSet, FileMode, FileUid, GitSignature,
-    HashAlgorithm, IndexStage, IntentLease, MutationBudget, Oid, PatchHunkChoice, PatchPlan,
-    PraxisCardContext, ProvenanceLedger, QuarantineRegistry, RebaseAction, RebaseItem, RebasePlan,
-    RepoPath, ReservationStatus, ReservedFileToken, SliceAuthorization, StagedPromotionRequest,
-    StagedPromotionStatus, SubmoduleEntry, SubmoduleUpdateStrategy, SymbolClaim, TaxisPolicy,
-    TypedOid, ValidatedCommitWitness,
+    ElevationAttestation, EnforcementTier, FastOidHasher, FastOidMap, FastOidSet, FileMode,
+    FileUid, GitSignature, HashAlgorithm, IndexStage, IntentLease, MutationBudget, Oid,
+    PatchHunkChoice, PatchPlan, PraxisCardContext, ProvenanceLedger, QuarantineRegistry,
+    RebaseAction, RebaseItem, RebasePlan, RepoPath, ReservationStatus, ReservedFileToken,
+    SliceAuthorization, StagedPromotionRequest, StagedPromotionStatus, SubmoduleEntry,
+    SubmoduleUpdateStrategy, SymbolClaim, TaxisPolicy, TypedOid, ValidatedCommitWitness,
+};
+pub use sanitizer::{
+    format_violation_diagnostic, is_rule_id_candidate, sanitize_violation_for_user, split_rule_id,
 };
 pub use traits::{
     AgentWorktreeHandle, GateVerdict, GateVerifier, OdbStore, ReclamationAudit, RefStore,
