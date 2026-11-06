@@ -20,7 +20,7 @@ flowchart TD
     end
 
     subgraph TAXIS_SOLUTIONS ["Taxis 双专属提交区域与内嵌验证架构"]
-        S1["【区域一：Direct-Bypass 独占空间】<br/>物理 SSD 直通原生 I/O，完全绕过 LayerVFS，&lt;20ms 极速代际回收"]
+        S1["【区域一：Direct-Bypass 独占空间】<br/>物理 SSD 直通原生 I/O，完全绕过 LayerVFS，&lt;20ms 槽位回收"]
         S2["【区域二：密码学独立遥测链】<br/>refs/fractal/telemetry/* 遥测分支，单调只增，单条 NDJSON &lt; 350B"]
         S3["【内核双引擎：TKCV + IKCE】<br/>Linux eBPF 级形式化推导 + 内存隐藏变异盲测评估 + 贝叶斯动态信用"]
     end
@@ -128,7 +128,7 @@ refs/fractal/
 flowchart LR
     L1["第一重：HMAC-SHA1 密码哈希链<br/>绑定 prev 指纹，篡改单字节即链条断裂"]
     L2["第二重：内核独占内存密钥<br/>K_kernel 驻留保护内存，外部沙箱无法伪造签名"]
-    L3["第三重：Git 引用单调只增<br/>verify_telemetry_update_policy 物理拒绝对其回退与删除"]
+    L3["第三重：Git 引用单调只增<br/>verify_telemetry_update_policy 物理拦截回退与删除操作"]
     L4["第四重：OS 物理权限互锁<br/>Windows 只读物理锁 + Linux chattr +a 仅追加属性锁"]
 
     L1 --> L2 --> L3 --> L4
@@ -193,7 +193,7 @@ taxis quarantine discard <quarantine_id>
 
 全套机制已在 `fractal-git` 10 大内核子系统中完整实现并通过工规级验收：
 - **内核子系统单向无环拓扑**：`validate-crate-topology.js` 验证通过；
-- **零瞬态堆分配与安全契约**：`check-zero-alloc-boundary.js` 255 个生产源码文件验证通过；
-- **全量单元与集成测试回归**：930+ 项测试验证通过（0 failed, 0 ignored）；
+- **零瞬态堆分配与安全契约**：`check-zero-alloc-boundary.js` 300 个源码文件验证通过；
+- **全量单元与集成测试回归**：1,100+ 项测试验证通过（0 failed, 0 ignored）；
 - **Clippy 终审**：`-D warnings` 零警告、零错误；
 - **全工作区物理卫生八维**：物理卫生各项规范验证通过。

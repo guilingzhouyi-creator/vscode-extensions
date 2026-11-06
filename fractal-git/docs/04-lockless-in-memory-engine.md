@@ -42,7 +42,7 @@ flowchart TD
 ```
 
 - **无共享内存树**：每个 Agent 实例持有完全隔离的 `InMemoryTreeBuilder`；
-- **纯追加式不可变写入**：生成的 Blob、Tree、Commit 具有唯一内容哈希（CAS），写入 `.git/objects/xx/yy` 时如果文件已存在直接命中忽略，不存在则原子 rename 写入，**天然具备无锁并发安全性**！
+- **纯追加式不可变写入**：生成的 Blob、Tree、Commit 具有唯一内容哈希（CAS），写入 `.git/objects/xx/yy` 时若已存在直接忽略，不存在则原子写入，具备基于不可变对象的并发安全模型。
 
 ---
 
@@ -111,4 +111,4 @@ sequenceDiagram
 - **100 个文件嵌套目录树构建**：$< 2\text{ms}$；
 - **端到端 Commit 物化与 Ref 推进**：$< 8\text{ms}$；
 - **独立遥测审计链落盘与 OS 级加固**：$< 1.5\text{ms}$；
-- **多 Agent 并发锁争用发生率**：**0.0%**。
+- **多 Agent 并发锁争用发生率**：0 次（架构解耦集中式锁）。

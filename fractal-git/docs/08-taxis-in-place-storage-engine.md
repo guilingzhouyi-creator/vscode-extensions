@@ -47,7 +47,7 @@ flowchart TD
 
 ### 1. `fg-algorithms::space_plan`
 - **[`SpacePlanConfig`](../crates/fg-algorithms/src/space_plan/mod.rs#L50-L87)**：支持安全预留空间阈值与自适应批次窗口（16MB ~ 64MB），防范 OS 系统调用抖动。
-- **[`simulate_space_plan`](../crates/fg-algorithms/src/space_plan/mod.rs#L143-L235)**：基于有符号宽整型 (`i128`) 的离散事件时序推演，精确捕捉全流程最低水位（Trough Level），杜绝无符号溢出。
+- **[`simulate_space_plan`](../crates/fg-algorithms/src/space_plan/mod.rs#L143-L235)**：基于有符号宽整型 (`i128`) 的离散事件时序推演，精确捕捉全流程最低水位（Trough Level），规避无符号溢出计算异常。
 - **[`check_headroom`](../crates/fg-algorithms/src/space_plan/mod.rs#L261-L265)**：断言预审可行性，不达标抛出 `FractalError::InsufficientDiskSpace`。
 
 ### 2. `fg-storage::in_place`
@@ -101,7 +101,7 @@ taxis unarchive repo-export.zip --to-odb --tree-only
 | `--to-odb` | 随 `--in-place`（默认截断） | 不创建 | 写 Loose Objects 并推进分支 |
 | `--to-odb --no-in-place` | 只读，字节不变 | 不创建 | 写 Loose Objects 并推进分支 |
 
-- 自由空间探测失败一律 fail-closed（拒绝执行），绝不退化为乐观常量。
+- 自由空间探测失败一律 fail-closed（拒绝执行），不退化为乐观常量。
 - 预审 `check_headroom` 在创建目标目录之前执行，因此被拒绝的命令不会留下空目录。
 - `--headroom` / `--batch-window` 接受 `K`/`M`/`G`/`T` 二进制后缀（1024 进制）或裸字节数；空值、非整数、未知单位与 `u64` 溢出一律按用法错误（退出码 129）拒绝，不再静默回退默认值。
 - 安全冗余默认值单源于 `DEFAULT_SAFETY_HEADROOM_BYTES`（100 MiB = 104857600 字节），帮助文本由该常量渲染，杜绝帮助文案与实现漂移。

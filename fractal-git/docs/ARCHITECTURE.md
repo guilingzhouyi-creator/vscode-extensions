@@ -246,7 +246,35 @@ Fractal Git is strictly architected as 10 focused kernel subsystems with a unidi
 | :--- | :--- | :--- |
 | `taxis init <path>` | Initializes Taxis repository | Establishes `.taxis/`, ODB layout, and telemetry refs |
 | `taxis commit -m <msg>` | Automated pre-review commit | Runs TKCV and IKCE; materializes commit upon gate approval |
+| `taxis bench` | Performance benchmark suite | Runs Level 1~4 benchmarks, persists JSON baseline, and asserts monotonic performance ratchet |
 | `taxis quality trace` | Audits agent telemetry chain | Traverses `refs/fractal/telemetry/*` and validates hash chain |
 | `taxis quality audit` | Runs comprehensive inspection | Evaluates TKCV 5D invariants and micro-mutation kill ratios |
 | `taxis quarantine list` | Lists quarantined candidates | Inspects locked workspaces under `.taxis/quarantine/` |
 | `taxis quarantine resolve` | Resolves or discards quarantine | Unlocks OS ACL and executes clean physical reclamation |
+
+---
+
+## 10. Single-Threaded E2E Benchmark & Progressive Projection Engine
+
+Fractal Git integrates a 5-phase End-to-End single-threaded benchmark harness (`src/bench/e2e/`) comparing standard Git eager materialization against Taxis progressive chunked projection on real-world Git workloads:
+
+```
++---------------------------------------------------------------------------------------------------+
+| Phase 1: Ingestion & Workspace Ready  | In-Place Packfile ingestion + InMemoryIndexTree mount     |
+| Phase 2: Time-To-First-Byte (TTFB)    | On-demand ODB blob retrieval; 100% byte-for-byte parity   |
+| Phase 3: FastCDC Boundary Healing     | 64-bit Gear Hash apply_edits; localized chunk re-indexing |
+| Phase 4: Durability & Writeback       | WalJournal TAXW frame sync + decoupled background CAS put |
+| Phase 5: Resource Footprint           | Peak RSS memory footprint query and TB-REGRESSION ratchet |
++---------------------------------------------------------------------------------------------------+
+```
+
+### 10.1 Key Empirical Measurements (Single-Threaded Baseline)
+
+- **Workspace Creation Latency**: `20 ms` vs standard Git `272 ms` (**13.6x faster**)
+- **Physical Working Tree Disk Writes**: `0 files / 0 KB` vs standard Git `6 files / 58 KB` (**100.0% physical I/O eliminated**)
+- **Time-To-First-Byte (TTFB)**: `20,677 µs` vs standard Git `281,930 µs` (**13.6x faster**)
+- **FastCDC Localized Edit Chunk Reuse**: `81.8%` untouched chunk reuse with `13 µs` re-chunking latency
+- **Durability Commit Latency**: `2,998 µs` (WAL TAXW frame) vs Git full commit `8,041 µs` (**2.7x faster**)
+- **Peak RSS Footprint**: `6.45 MB` strictly conforming to `FGT-PRF-001`
+
+Detailed specification and reproduction procedures: [`10-single-threaded-e2e-benchmark-and-progressive-projection.md`](10-single-threaded-e2e-benchmark-and-progressive-projection.md).

@@ -21,7 +21,8 @@
 | **`crates/fg-transport/`** | 自托管传输协议栈 | 内部 Agent 零拷贝本地 IPC（`IpcMessage`, `IpcCodec` 4 字节帧协议）与标准 Git Smart Protocol v2（`PacketLine` 4 字节 Hex 流式编解码、`ls-refs`, `fetch` 协商）。 | `fg-core`, `fg-object`, `fg-topology` | 严禁侵入存储物理层与代码审查逻辑 |
 | **`crates/fg-gate/`** | 预审门禁与内核验证器 | 协议层门禁拦截（`PreReceiveGuard`）、微秒级物理卫生与冲突标记守卫（`ConflictGuard`）、工作树与配额守卫（`QuotaGovernor`）、TKCV 内核抽象推导验证器（`KernelAstVerifier`，5 维不变式）、IKCE 内核微变异击杀率验证引擎（`KernelCanaryEngine`，击杀率 $K\ge 60\%$）、贝叶斯动态信用控制器（`AgentCreditController`，Jeffreys Beta(0.5, 0.5) 评级）、以及全自动审计钩子（`AutoAuditHook`）。 | `fg-core`, `fg-object`, `fg-topology` | 严禁依赖传输层实现细节或物理存储底层 |
 | **`src/lib.rs` (根)** | 统一门面 (Facade) | 工作区根 Rust 门面，统摄并平铺导出全量 10 大内核子系统，提供高人机工学的一站式 SDK 接口。 | 全量 `crates/fg-*` | — |
-| **`src/bin/taxis.rs`** | 原生 CLI 与 Git 兼容引擎 | Taxis 原生命令行二进制入口（支持 `st/ci/br/di/co/check/gc/serve/quality/quarantine` 简写别名、JSON 机器格式输出及标准 `git <cmd>` 原生透明加速路由）。 | 全量 `crates/fg-*`, `serde_json` | 严禁反向被底层内核子系统依赖 |
+| **`src/bench/`** | 基准性能评测套件 | TB-REGRESSION 微基准测试套件与单串行端到端（E2E）克隆 vs 渐进投影评测流水线（`src/bench/e2e/`）。 | `fg-core`, `fg-storage`, `fg-algorithms`, `fg-index`, `fg-topology` | 严禁在基准热路径引入非受控 I/O 干扰 |
+| **`src/bin/taxis.rs`** | 原生 CLI 与 Git 兼容引擎 | Taxis 原生命令行二进制入口（下设 `taxis_cmd/` 78 个模块化子命令分发器，支持 `bench/st/ci/br/di/co/check/gc/serve/quality/quarantine` 等指令、JSON 输出与基准自动校验）。 | 全量 `crates/fg-*`, `serde_json` | 严禁反向被底层内核子系统依赖 |
 | **`ts/`** | TypeScript 编排与客户端 | 工业化五层分工：`client/` (Praxis Agent SDK 客户端)、`vfs/` (LayerVFS 虚拟文件系统适配器)、`tui/` (一体两面终端渲染器)、`orchestration/` (多 Agent 候选变体评估与择优晋级器)、`cli/` (终端命令)。 | 顶层契约与原生桥 | 严禁在门面外泄露低级指针 |
 | **`scripts/`** | 工程构建与自测脚本 | 跨平台工程构建（`build.ps1` CRLF / `build.sh` LF `set -euo pipefail`）、自测流水线与门禁检查脚本。 | 外部编译器工具链 | 严禁硬编码规范化完整路径或 Windows 盘符 |
 | **`tests/`** | 双轨集成与基准测试 | Rust 内核子系统集成测试套件（`tests/rust/`）与 TypeScript 仿真测试（`tests/ts/`）。 | 被测项目各模块 | 严禁生产代码反向依赖测试夹具 |
@@ -140,5 +141,9 @@ flowchart TD
 - **契约要求**：必须集中在 `fg-gate`，严禁与 `fg-pools` 混淆。触发违规隔离时需与 `fg-topology` 的状态机和检疫目录（`.taxis/quarantine/`）紧密联动。
 
 ### 3.8 场景 H：新增 CLI 命令与 Git 别名映射（如 taxis quality, taxis quarantine）
-- **归属位置**：`src/bin/taxis.rs`
+- **归属位置**：`src/bin/taxis.rs` 与 `src/bin/taxis_cmd/<subcommand>.rs`
 - **契约要求**：必须在 `resolve_canonical_subcommand` 中注册标准别名，并在 `dispatch_command` 的分派表落入对应处理器，优先走分形 CAS 原生实现；尚未实现的 Git 子命令由 `reject_unimplemented` 明确拒绝并列出已实现集合，严禁静默转交系统 `git`，同时维持跨平台沙箱配置防御与 `--json` 机器格式输出支持。
+
+### 3.9 场景 I：新增基准评测维度与性能回归模型
+- **归属位置**：`src/bench/e2e/<dimension>.rs`
+- **契约要求**：必须支持单串行环境隔离，避免在关键计时区触发不可控的 I/O 或操作系统调度噪声；所产出的度量指标必须提供对应的 `TB-REGRESSION` 单调性容差校验与冻结基准序列化支持。

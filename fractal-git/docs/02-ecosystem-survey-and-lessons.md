@@ -66,13 +66,13 @@ flowchart LR
 
 GitHub 上的开源项目 `plasma-ai/fractal` 敏锐地提出了“将代码库看作由 Git Worktrees 构成的递归树”的宏观概念，但其底层技术路线存在重大工程架构缺陷：
 
-| 关键架构维度 | `plasma-ai/fractal` (当前开源方案) | `fractal-git` (本项目架构) | 架构代际差 |
+| 关键架构维度 | `plasma-ai/fractal` (当前开源方案) | `fractal-git` (本项目架构) | 技术机制差异 |
 | :--- | :--- | :--- | :--- |
-| **底层实现栈** | **纯 Python 脚本**（封装原生 `git` CLI） | **Rust 原生内核**（gix plumbing）+ TS 编排 | Python 子进程开销巨大；Rust 微秒级操作，高并发零锁 |
-| **工作区物理机制** | **原生物理 `git worktree add`**<br/>在磁盘真实全量拷贝目录与文件 | **LayerVFS 内存虚拟树 + 稀疏按需投影** | `plasma-ai` 启动数个工作树磁盘瞬间打满；我们 **`<3ms` 零物理拷贝** |
-| **索引与阶段机制** | 原生 Git Index 索引区（易发生锁冲突） | **无锁内存虚拟索引（InMemoryTreeBuilder）** | 消除 `index.lock` 文件锁争用，并发冲突率降为 0 |
-| **质量与安全防线** | **依赖模型自身检查 diff**<br/>（易被幻觉误导，无客观门禁） | **内核验证把关（TKCV 5维推导 <5ms）+ IKCE 隐藏微变异击杀率验证（击杀率 K >= 60%）+ 密码学遥测审计哈希链** | 不依赖模型自觉！形式化与微变异击杀率验证双重一票否决 |
-| **全生命周期回收** | Python 脆弱的 `rm -rf` 脚本 | **Praxis 底层宿主毫秒级物理卸载与 DAG 保全** | 物理磁盘零残留，Git DAG 拓扑全息留存 |
+| **底层实现栈** | **纯 Python 脚本**（封装原生 `git` CLI） | **Rust 原生内核**（gix plumbing）+ TS 编排 | Python 子进程开销较大；Rust 微秒级操作，高并发解耦锁争用 |
+| **工作区物理机制** | **原生物理 `git worktree add`**<br/>在磁盘真实全量拷贝目录与文件 | **LayerVFS 内存虚拟树 + 稀疏按需投影** | 多工作树并发时全量物理复制导致磁盘占用线性增长；采用内存虚拟树与稀疏按需投影，规避全量物理拷贝 |
+| **索引与阶段机制** | 原生 Git Index 索引区（易发生锁冲突） | **无锁内存虚拟索引（InMemoryTreeBuilder）** | 独立内存树实例解耦集中式锁，消除 `index.lock` 文件锁争用 |
+| **质量与安全防线** | **依赖模型自身检查 diff**<br/>（易被幻觉误导，无客观门禁） | **内核验证把关（TKCV 5维推导 <5ms）+ IKCE 隐藏微变异击杀率验证（击杀率 K >= 60%）+ 密码学遥测审计哈希链** | 引入客观形式化推导与微变异击杀率验证，提供确定性自动化门禁 |
+| **全生命周期回收** | Python 脆弱的 `rm -rf` 脚本 | **Praxis 底层宿主毫秒级物理卸载与 DAG 保全** | 物理磁盘无多余残留，Git DAG 拓扑全息留存 |
 
 ---
 
@@ -80,7 +80,7 @@ GitHub 上的开源项目 `plasma-ai/fractal` 敏锐地提出了“将代码库�
 
 `xevrion/hatchzip` 证明了逆向就地解压（In-Place Extraction）的可行性：通过逆向物理偏移提取 ZIP 成员并阶段性截断文件尾部，或利用稀疏文件（Sparse File Hole Punching）释放 TAR 块，从而打破传统解压 $S_{\text{archive}} + S_{\text{extracted}}$ 的双倍空间悬崖。分形 Git 评估其机制并完成系统级升华：
 
-| 架构维度 | `xevrion/hatchzip` (桌面工具) | Taxis In-Place ODB Engine (原位存储引擎) | 演进与超越 |
+| 架构维度 | `xevrion/hatchzip` (桌面工具) | Taxis In-Place ODB Engine (原位存储引擎) | 机制差异与功能扩展 |
 | :--- | :--- | :--- | :--- |
 | **应用定位** | 独立 C/Go 桌面解压程序 | **版本控制内核原位存储子系统** | 深度集成于 Git ODB 管道与 Bundle 传输流 |
 | **容量预审** | 仅做简单静态剩余空间判断 | **SpacePlan 离散事件水位时序推演** | 基于 `i128` 宽整型模拟全流程槽位水位，空间不足提前熔断 |

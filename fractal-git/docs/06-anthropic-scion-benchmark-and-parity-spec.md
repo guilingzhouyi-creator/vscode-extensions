@@ -72,12 +72,12 @@ flowchart TD
 
 | 核心维度 | Anthropic Scion | Taxis (fractal-git) | 战略对比与技术启示 |
 | :--- | :--- | :--- | :--- |
-| **部署与运行形态** | 中心化云原生 SaaS（强依赖 Cloud Spanner + Blob 存储 + 跨区域缓存服务） | **分形自相似（Self-Similar）本地优先引擎**（纯 Rust 10 大内核子系统，单二进制，零外部服务依赖） | Scion 依赖昂贵云算力；Taxis 可在本地开发机、CI 容器乃至离线沙箱中以纳秒级速度自闭环运行。 |
+| **部署与运行形态** | 中心化云原生 SaaS（强依赖 Cloud Spanner + Blob 存储 + 跨区域缓存服务） | **分形自相似（Self-Similar）本地优先引擎**（纯 Rust 10 大内核子系统，单二进制，零外部服务依赖） | Scion 依赖云端服务矩阵；Taxis 专注于本地环境、CI 容器与离线沙箱的低开销自闭环运行。 |
 | **工作区与检出机制** | 客户端 `scion-daemon` + 远程虚拟文件流 | **LayerVFS 内存只读下层 + COW 独占写层**（`WorktreePool` 毫秒级复用，零瞬态堆分配） | 两者异曲同工，均识别出“智能体无需全量克隆”的核心规律；Taxis 更侧重本地无盘轻量化操作。 |
 | **合并与分支拓扑** | 服务端无锁变更集 + Spanner 锁分支 | **In-Core 3-way Tree Merge + 拓扑裁决器**（77.8M op/s CCD v2 偏序验证，虚基底递归合成） | Scion 将合并上移至云端；Taxis 将合并下沉至纯代数内存算子，单节点吞吐远超传统 Git。 |
 | **路径历史回溯过滤** | 服务端异步派生数据生成服务（Derived Data Engine） | **256-bit Murmur3/XXH3 Kirsch-Mitzenmacher 路径 Bloom 过滤器**（161 ns 探测，620万 op/s） | Taxis 在本地二进制中内嵌概率数据结构，99%+ 历史提交可在寄存器级别直接旁路跳过。 |
 | **协议与生态兼容度** | 专有协议与专有客户端，与原生 Git 协议分道 | **双向兼容**：原生 Git 40-byte SHA-1 / PacketLine 协议 + Taxis 自相似分形命名空间 | Taxis 既可作为智能体极速内核，又可随时与现有 GitHub / Git 基础设施无损互通。 |
-| **权限与审查机制** | 配套自研审查系统 **Antique**（独立平台服务） | **双自动化区域 + TKCV 5 维形式化验证器 (<5ms) + IKCE 微变异击杀率验证 (K >= 60%) + 密码学遥测审计哈希链** | Antique 依赖外部平台服务；Taxis 将形式化推导、微变异击杀率防作伪验证与防篡改遥测链直接下沉至内核，抗欺骗能力代际超越。 |
+| **权限与审查机制** | 配套自研审查系统 **Antique**（独立平台服务） | **双自动化区域 + TKCV 5 维形式化验证器 (<5ms) + IKCE 微变异击杀率验证 (K >= 60%) + 密码学遥测审计哈希链** | Antique 依赖外部平台服务；Taxis 将形式化推导、微变异击杀率防作伪验证与防篡改遥测链直接下沉至内核，在本地无外部网络依赖下提供静态不变式与变异击杀验证。 |
 | **存储峰值与低磁盘弹性** | 强依赖无限云端 Blob 存储与远端截断 | **TIPSE 原位逆向截断/前向打洞 + 微包递进轮转**（峰值空间收敛至 $\max(S_a, S_e) + \Delta_w$） | Scion 依赖无限云端扩展；Taxis 专为受限容器/边缘环境设计，在物理存储紧绷下保持零 ENOSPC 运行。 |
 
 ---
@@ -140,16 +140,16 @@ graph TD
 
 ## 五、 后续演进路线与测试水平提升规划
 
-为保障 Taxis 引擎从微观算子走向宏观系统级的确定性演进，技术方案规划以下三阶梯进演进路径：
+为保障 Taxis 引擎从微观算子走向宏观系统级的确定性演进，技术方案规划以下阶梯演进路径：
 
-1. **第一阶梯（当前已完成）**：
+1. **第一阶梯（基础微基准固化，已完成）**：
    - 建立五维指标标准与理论公理；
    - 落地 Corrected Commit Date v2、Kirsch-Mitzenmacher 256-Bit Bloom Filter 与 SWAR 64 位前缀并行修剪；
-   - 固化 `taxis bench -m 5` 与 `baselines/taxis-perf.baseline.json`（7 项微基准达到性能指标）；
-2. **第二阶梯（Taxis 核心特性完善期）**：
-   - 落地 `InCoreVirtualMergeBase` 虚拟基底树递归合并，消融复杂 DAG 合并冲突；
-   - 落地 `FirstClassConflict` 首等冲突树结构，实现冲突在 LayerVFS 中的阶段保存与再变基；
-   - 编写合成的大型 Monorepo 模拟器（包含 10 万虚拟文件与 1 万提交），实测第一与第三维度指标；
-3. **第三阶梯（极限高压与发布对标期）**：
-   - 将测试从微基准（Micro-Benchmark）逐步升级至端到端宏观压测（Macro-Benchmark）；
-   - 在高并发容器编排下模拟日均 30,000+ 次智能体提交高压，输出与 Anthropic Scion 权威报告对标的量化白皮书。
+   - 固化 `taxis bench -m 5` 与 `baselines/taxis-perf.baseline.json`（微基准达到性能指标）；
+2. **第二阶梯（单串行端到端对标套件，已完成）**：
+   - 落地 `src/bench/e2e/` 单串行端到端克隆与渐进切分投影基准流水线（`taxis bench --level 4`）；
+   - 实测标准 Git 贪婪检出 vs Taxis 渐进投影（创建时延 13.6x 加速、物理写盘 100% 消除、TTFB 13.6x 加速、FastCDC 局部愈合 81.8% 重用率与 WAL 2.7x 同步落盘加速）；
+   - 详见专册规约：[`10-single-threaded-e2e-benchmark-and-progressive-projection.md`](10-single-threaded-e2e-benchmark-and-progressive-projection.md)；
+3. **第三阶梯（极限高压与宏观分布式对标期）**：
+   - 将测试从单机扩展至高并发容器网络仿真与大规模 Monorepo 模拟器；
+   - 模拟日均 30,000+ 次智能体提交高压，输出对标 Anthropic Scion 的工程白皮书。
