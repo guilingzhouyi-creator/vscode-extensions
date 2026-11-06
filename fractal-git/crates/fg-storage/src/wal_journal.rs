@@ -328,7 +328,17 @@ impl WalJournal {
         file.write_all(&(body.len() as u32).to_le_bytes())?;
         file.write_all(&crc32c(&body).to_le_bytes())?;
         file.write_all(&body)?;
+        // The only durable point in the append. Recording the record identity *after* `sync_all`
+        // returns is what makes the log trustworthy after a crash: an entry present in the log is
+        // known to be on disk, and an entry absent was never fsynced. Logging before the sync would
+        // make every record look committed, which is the opposite of what recovery needs.
         file.sync_all()?;
+        fg_core::diag_trace!(
+            "fg_storage::wal",
+            "wal append fsynced {} bytes at {}",
+            body.len(),
+            self.journal_path.display()
+        );
         Ok(())
     }
 
@@ -392,9 +402,19 @@ impl WalJournal {
             let body_start = cursor + WAL_FRAME_HEADER_LEN;
             let body_end = body_start.saturating_add(body_len);
             if body_end > bytes.len() {
+                let discarded = bytes.len() - cursor;
+                // A discarded tail is the normal shape of a crash mid-append, not damage. Recording
+                // the byte count is what lets an operator tell "we lost the last write" apart from
+                // "we lost nothing", which is the first question asked after a crash.
+                fg_core::diag_warn!(
+                    "fg_storage::wal",
+                    "wal replay discarded a torn tail of {} bytes at offset {}",
+                    discarded,
+                    cursor
+                );
                 return Ok(WalReplay {
                     records,
-                    discarded_tail_bytes: bytes.len() - cursor,
+                    discarded_tail_bytes: discarded,
                 });
             }
 

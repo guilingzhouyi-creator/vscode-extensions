@@ -213,6 +213,14 @@ pub fn emit(level: LogLevel, target: &str, message: &str) {
 }
 
 /// Records an explicit structured audit event to the file sink and terminal (if diagnostic mode is active).
+///
+/// Unlike [`emit`], this entry point is *not* gated by the severity threshold. The two serve
+/// different purposes and conflating them was a mistake worth naming: [`emit`] carries ambient
+/// narration whose volume the operator chooses, while this function records a decision the system
+/// made — a rejection, a bypass, a governance outcome. Suppressing those under `--log-level off`
+/// would let verbosity silently erase the audit trail, leaving a reader unable to tell "nothing
+/// happened" apart from "it happened and was hidden". Terminal echo is still gated by diagnostic
+/// mode, so the default run stays quiet while the durable record stays complete.
 pub fn record_event(
     level: LogLevel,
     target: &str,

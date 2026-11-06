@@ -287,6 +287,17 @@ pub fn materialize_commit(
         &materialized.commit_oid,
         materialized.parent_oid.as_ref(),
     )?;
+    // The ref update is the commit's point of no return, so it is logged after the update succeeds
+    // rather than before. An entry therefore means "this ref now names this commit", which is the
+    // fact a post-crash audit needs to establish.
+    fg_core::diag_info!(
+        "fg_storage::commit",
+        "ref updated: commit={} tree={} target={} parent={:?}",
+        materialized.commit_oid.to_hex(),
+        materialized.tree_oid.to_hex(),
+        request.target_ref,
+        materialized.parent_oid.map(|oid| oid.to_hex())
+    );
     Ok(materialized)
 }
 

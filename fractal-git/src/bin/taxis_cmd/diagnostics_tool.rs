@@ -8,13 +8,39 @@
 //! - `FGT-COR-001`: Core data model and error contract guard
 
 use std::fs;
-use std::io::{BufRead, BufReader};
+use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
 
 use fg_core::constants::cli::CliTag;
 use fg_core::diagnostics::{active_subcommand, trace_id, DiagnosticRecord};
 
 use super::common::{print_json, reject, CliContext};
+
+/// Bytes read from the end of the log when serving `tail`.
+///
+/// One record is bounded by the sanitized message plus fixed metadata, so a few dozen KiB is far
+/// more than the 20 lines `tail` prints while staying independent of the total log size.
+const TAIL_WINDOW_BYTES: u64 = 64 * 1024;
+
+/// Reads at most `window_bytes` from the end of `file` and splits it into complete lines.
+///
+/// The first line of the window is dropped unless the window began at offset zero, because a
+/// window that starts mid-file almost always starts mid-record; printing that fragment as if it
+/// were a record is worse than omitting it.
+fn read_tail_window(mut file: fs::File, window_bytes: u64) -> std::io::Result<Vec<String>> {
+    let total_len = file.metadata()?.len();
+    let start = total_len.saturating_sub(window_bytes);
+    file.seek(SeekFrom::Start(start))?;
+
+    let mut buffer = String::new();
+    file.take(window_bytes).read_to_string(&mut buffer)?;
+
+    let mut lines: Vec<String> = buffer.lines().map(str::to_string).collect();
+    if start > 0 && !lines.is_empty() {
+        lines.remove(0);
+    }
+    Ok(lines)
+}
 
 /// Resolves the diagnostic log file path for the active repository.
 fn resolve_log_path(ctx: &CliContext) -> PathBuf {
@@ -84,10 +110,18 @@ pub fn handle_diagnostics(ctx: &CliContext) {
                 Err(err) => reject(CliTag::ERROR, format!("open log file: {err}")),
             };
 
-            let reader = BufReader::new(file);
-            let mut lines: Vec<String> = reader.lines().map_while(Result::ok).collect();
-            let limit = 20.min(lines.len());
-            let recent: Vec<String> = lines.split_off(lines.len() - limit);
+            // Only the window that will be printed is read. Reading the whole file and then
+            // discarding everything but the tail couples memory use to log size, which is exactly
+            // the quantity rotation is allowed to grow up to the 5 MiB ceiling — and a user
+            // running `tail` during an incident is asking for the cheapest possible read, not the
+            // most expensive. The window is generous relative to the 20 lines requested so a
+            // partial trailing record cannot crowd real ones out.
+            let recent = match read_tail_window(file, TAIL_WINDOW_BYTES) {
+                Ok(lines) => lines,
+                Err(err) => reject(CliTag::ERROR, format!("read log tail: {err}")),
+            };
+            let limit = 20.min(recent.len());
+            let recent = recent[recent.len() - limit..].to_vec();
 
             if ctx.json_mode {
                 let records: Vec<serde_json::Value> = recent
