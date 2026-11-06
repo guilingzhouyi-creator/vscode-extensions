@@ -1,10 +1,12 @@
 //! Module: fg-algorithms — Graph Traversal Facade
 //! File Path: crates/fg-algorithms/src/traverse/mod.rs
 
+pub mod corrected_date_index;
 pub mod dag_walk;
 pub mod segmented_dag;
 pub mod tree_flatten;
 
+pub use corrected_date_index::{CcdIndex, MAX_INDEXED_COMMITS};
 pub use dag_walk::{DagWalker, FastOidHasher, FastOidSet, SmallParentList};
 pub use segmented_dag::SegmentedCommitDag;
 pub use tree_flatten::{

@@ -430,23 +430,15 @@ impl DagWalker {
         });
 
         let mut candidate_bases: Vec<Oid> = Vec::new();
-        let mut min_common_ccd: Option<u64> = None;
 
         while let Some(item) = queue.pop() {
             let current_flags = flags_map.get(&item.oid).copied().unwrap_or(0);
             let is_common = (current_flags & FLAG_COMMON) == FLAG_COMMON;
 
-            if is_common && min_common_ccd.is_some_and(|min_ccd| item.gen < min_ccd) {
-                continue;
-            }
-
             if is_common && (current_flags & FLAG_STALE) == 0 {
                 if let Some(flags_mut) = flags_map.get_mut(&item.oid) {
                     *flags_mut |= FLAG_RESULT | FLAG_STALE;
                     candidate_bases.push(item.oid);
-                    min_common_ccd = Some(
-                        min_common_ccd.map_or(item.gen, |current_min| current_min.min(item.gen)),
-                    );
                 }
             }
 
