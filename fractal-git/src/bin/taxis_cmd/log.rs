@@ -30,6 +30,7 @@ use fractal_git::constants::cli::CliTag;
 use super::commit_walk::{walk_commits, CommitRecord};
 use super::common::{fail_fatal, print_json, reject, CliContext};
 use super::diff;
+use super::log_render::render_log_entries;
 use super::repo_view::RepoView;
 
 /// Default number of commits `log` shows when no limit is given.
@@ -46,7 +47,7 @@ const EXIT_NO_MATCH: i32 = 128;
 
 /// Which part of `show` to print.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ShowPart {
+pub(crate) enum ShowPart {
     /// Header plus unified patch.
     Patch,
     /// Header plus `--stat` summary.
@@ -66,180 +67,157 @@ pub fn handle_log(ctx: &CliContext) {
         Err(open_err) => fail_fatal(open_err),
     };
 
-    if request.revision_explicit && !request.revision.contains("..") {
-        if view.resolve(&request.revision).is_err() && view.work_root().join(&request.revision).exists() {
-            let path_candidate = request.revision.clone();
-            request.pathspecs.push(path_candidate);
-            request.revision = "HEAD".to_string();
-            request.revision_explicit = false;
-        }
-    }
-
-    let records = if request.all {
-        let starts = match collect_all_starts(&view) {
-            Ok(starts) => starts,
-            Err(collect_err) => reject(CliTag::ERROR, collect_err),
-        };
-        // Git exits cleanly with no output when --all matches nothing, for example
-        // in a repository whose only branches are unborn.
-        if starts.is_empty() {
-            if ctx.json_mode {
-                report_log_json(&[], &request);
-            }
-            return;
-        }
-        match walk_commits(&view, &starts) {
-            Ok(walked) => walked,
-            Err(walk_err) => reject(CliTag::ERROR, walk_err),
-        }
-    } else if request.revision.contains("..") {
-        let Some((from_str, to_str)) = request.revision.split_once("..") else {
-            return;
-        };
-        let from_rev = if from_str.is_empty() { "HEAD" } else { from_str };
-        let to_rev = if to_str.is_empty() { "HEAD" } else { to_str };
-        let to_oid = match view.resolve(to_rev) {
-            Ok(oid) => oid,
-            Err(resolve_err) => {
-                eprintln!("{} {}", CliTag::ERROR, resolve_err);
-                std::process::exit(EXIT_NO_MATCH);
-            }
-        };
-        let from_oid = match view.resolve(from_rev) {
-            Ok(oid) => oid,
-            Err(resolve_err) => {
-                eprintln!("{} {}", CliTag::ERROR, resolve_err);
-                std::process::exit(EXIT_NO_MATCH);
-            }
-        };
-        let walked = match walk_commits(&view, &[to_oid]) {
-            Ok(w) => w,
-            Err(walk_err) => reject(CliTag::ERROR, walk_err),
-        };
-        let excluded: HashSet<Oid> = walk_commits(&view, &[from_oid])
-            .unwrap_or_default()
-            .into_iter()
-            .map(|c| c.oid)
-            .collect();
-        walked.into_iter().filter(|c| !excluded.contains(&c.oid)).collect()
-    } else if !request.revision_explicit {
-        // HEAD is unborn here whenever the first commit landed on a sandbox ref instead of the
-        // checked-out trunk, which the engineering edition now does by default. Reporting "HEAD is
-        // unborn" would be technically true and practically useless: the work exists, and the reader
-        // asked to see history. Falling back to every ref, with a notice, keeps `log` answering the
-        // question that was actually asked.
-        match view.head_commit() {
-            Ok(None) => {
-                let starts = match collect_all_starts(&view) {
-                    Ok(found) => found,
-                    Err(collect_err) => reject(CliTag::ERROR, collect_err),
-                };
-                if !ctx.json_mode {
-                    eprintln!(
-                        "note: HEAD is unborn (no commit on the checked-out branch); showing all refs.\n\
-                         Use `taxis checkout <ref>` or name a revision to inspect one lineage."
-                    );
-                }
-                match walk_commits(&view, &starts) {
-                    Ok(walked) => walked,
-                    Err(walk_err) => reject(CliTag::ERROR, walk_err),
-                }
-            }
-            _ => {
-                let start = match view.resolve(&request.revision) {
-                    Ok(oid) => oid,
-                    Err(resolve_err) => {
-                        eprintln!("{} {}", CliTag::ERROR, resolve_err);
-                        std::process::exit(EXIT_NO_MATCH);
-                    }
-                };
-                match walk_commits(&view, &[start]) {
-                    Ok(walked) => walked,
-                    Err(walk_err) => reject(CliTag::ERROR, walk_err),
-                }
-            }
-        }
-    } else {
-        let start = match view.resolve(&request.revision) {
-            Ok(oid) => oid,
-            Err(resolve_err) => {
-                eprintln!("{} {}", CliTag::ERROR, resolve_err);
-                std::process::exit(EXIT_NO_MATCH);
-            }
-        };
-        match walk_commits(&view, &[start]) {
-            Ok(walked) => walked,
-            Err(walk_err) => reject(CliTag::ERROR, walk_err),
-        }
+    disambiguate_revision_pathspec(&view, &mut request);
+    let Some(records) = load_log_records(ctx, &view, &request) else {
+        return;
     };
-    let filtered_records: Vec<CommitRecord> = if request.pathspecs.is_empty() {
-        records
-    } else {
-        records
-            .into_iter()
-            .filter(|record| {
-                super::path_filter::commit_modifies_pathspecs(&view, record, &request.pathspecs)
-                    .unwrap_or(true)
-            })
-            .collect()
-    };
+    let filtered_records = filter_log_records(&view, records, &request);
     let shown = &filtered_records[..filtered_records.len().min(request.limit)];
-    // The width is a property of the repository, not of the request, so it is resolved once and
-    // threaded to every renderer. Recomputing it per record would be correct but would also let one
-    // renderer forget it.
-    let width = abbrev_width(&view);
-
     if ctx.json_mode {
         report_log_json(shown, &request);
         return;
     }
-    let mut graph_renderer = if request.graph {
-        Some(GraphRenderer::new())
-    } else {
-        None
-    };
-    let diff_args: Vec<String> = match request.diff_mode {
-        Some(LogDiffMode::Stat) => vec!["--stat".into()],
-        Some(LogDiffMode::NameOnly) => vec!["--name-only".into()],
-        Some(LogDiffMode::NameStatus) => vec!["--name-status".into()],
-        None => Vec::new(),
-    };
+    render_log_entries(&view, shown, &request);
+}
 
-    for (index, record) in shown.iter().enumerate() {
-        let (glyph, cont) = match &mut graph_renderer {
-            Some(gr) => gr.next_prefix(record),
-            None => (String::new(), String::new()),
-        };
+fn disambiguate_revision_pathspec(view: &RepoView, request: &mut LogRequest) {
+    if request.revision_explicit
+        && !request.revision.contains("..")
+        && view.resolve(&request.revision).is_err()
+        && view.work_root().join(&request.revision).exists()
+    {
+        let path_candidate = request.revision.clone();
+        request.pathspecs.push(path_candidate);
+        request.revision = "HEAD".to_string();
+        request.revision_explicit = false;
+    }
+}
 
-        match request.format.as_deref() {
-            Some(template) => match render_format(template, record, width) {
-                Ok(text) => println!("{glyph}{text}"),
-                Err(format_err) => reject(CliTag::ERROR, format_err),
-            },
-            None if request.oneline => {
-                println!("{glyph}{} {}", short_oid(&record.oid, width), record.subject())
-            }
-            None => {
-                if index > 0 && !request.graph {
-                    println!();
-                }
-                print_full_entry_with_prefix(record, width, &glyph, &cont);
-            }
+fn load_log_records(
+    ctx: &CliContext,
+    view: &RepoView,
+    request: &LogRequest,
+) -> Option<Vec<CommitRecord>> {
+    if request.all {
+        return load_all_log_records(ctx, view, request);
+    }
+    if request.revision.contains("..") {
+        return load_range_log_records(view, &request.revision);
+    }
+    if !request.revision_explicit && matches!(view.head_commit(), Ok(None)) {
+        return Some(load_unborn_fallback_records(ctx, view));
+    }
+    Some(load_single_revision_records(view, &request.revision))
+}
+
+fn load_all_log_records(
+    ctx: &CliContext,
+    view: &RepoView,
+    request: &LogRequest,
+) -> Option<Vec<CommitRecord>> {
+    let starts = match collect_all_starts(view) {
+        Ok(starts) => starts,
+        Err(collect_err) => reject(CliTag::ERROR, collect_err),
+    };
+    if starts.is_empty() {
+        if ctx.json_mode {
+            report_log_json(&[], request);
         }
+        return None;
+    }
+    match walk_commits(view, &starts) {
+        Ok(walked) => Some(walked),
+        Err(walk_err) => reject(CliTag::ERROR, walk_err),
+    }
+}
 
-        if request.diff_mode.is_some() {
-            let left_holder;
-            let left = match record.parents.first() {
-                Some(p_oid) => {
-                    left_holder = p_oid.to_hex();
-                    left_holder.as_str()
-                }
-                None => diff::EMPTY_TREE_MARKER,
-            };
-            let right = record.oid.to_hex();
-            let _ = diff::run_revision_diff(&view, left, &right, &diff_args);
+fn load_range_log_records(view: &RepoView, revision: &str) -> Option<Vec<CommitRecord>> {
+    let (from_str, to_str) = revision.split_once("..")?;
+    let from_rev = if from_str.is_empty() {
+        "HEAD"
+    } else {
+        from_str
+    };
+    let to_rev = if to_str.is_empty() { "HEAD" } else { to_str };
+    let to_oid = resolve_or_exit_no_match(view, to_rev);
+    let from_oid = resolve_or_exit_no_match(view, from_rev);
+    let walked = match walk_commits(view, &[to_oid]) {
+        Ok(w) => w,
+        Err(walk_err) => reject(CliTag::ERROR, walk_err),
+    };
+    let excluded: HashSet<Oid> = walk_commits(view, &[from_oid])
+        .unwrap_or_default()
+        .into_iter()
+        .map(|c| c.oid)
+        .collect();
+    Some(
+        walked
+            .into_iter()
+            .filter(|c| !excluded.contains(&c.oid))
+            .collect(),
+    )
+}
+
+fn load_unborn_fallback_records(ctx: &CliContext, view: &RepoView) -> Vec<CommitRecord> {
+    let starts = match collect_all_starts(view) {
+        Ok(found) => found,
+        Err(collect_err) => reject(CliTag::ERROR, collect_err),
+    };
+    if !ctx.json_mode {
+        eprintln!(
+            "note: HEAD is unborn (no commit on the checked-out branch); showing all refs.\n\
+             Use `taxis checkout <ref>` or name a revision to inspect one lineage."
+        );
+    }
+    match walk_commits(view, &starts) {
+        Ok(walked) => walked,
+        Err(walk_err) => reject(CliTag::ERROR, walk_err),
+    }
+}
+
+fn load_single_revision_records(view: &RepoView, revision: &str) -> Vec<CommitRecord> {
+    let start = resolve_or_exit_no_match(view, revision);
+    match walk_commits(view, &[start]) {
+        Ok(walked) => walked,
+        Err(walk_err) => reject(CliTag::ERROR, walk_err),
+    }
+}
+
+fn resolve_or_exit_no_match(view: &RepoView, revision: &str) -> Oid {
+    match view.resolve(revision) {
+        Ok(oid) => oid,
+        Err(resolve_err) => {
+            eprintln!("{} {}", CliTag::ERROR, resolve_err);
+            std::process::exit(EXIT_NO_MATCH);
         }
     }
+}
+
+fn filter_log_records(
+    view: &RepoView,
+    records: Vec<CommitRecord>,
+    request: &LogRequest,
+) -> Vec<CommitRecord> {
+    if request.pathspecs.is_empty() {
+        return records;
+    }
+    if request.follow && request.pathspecs.len() == 1 {
+        let mut followed_path = request.pathspecs[0].clone();
+        return records
+            .into_iter()
+            .filter(|record| {
+                super::path_filter::commit_modifies_followed_path(view, record, &mut followed_path)
+                    .unwrap_or(true)
+            })
+            .collect();
+    }
+    records
+        .into_iter()
+        .filter(|record| {
+            super::path_filter::commit_modifies_pathspecs(view, record, &request.pathspecs)
+                .unwrap_or(true)
+        })
+        .collect()
 }
 
 /// Collects every commit tip reachable from the repository references for log --all.
@@ -268,28 +246,29 @@ pub(crate) fn collect_all_starts(view: &RepoView) -> FractalResult<Vec<Oid>> {
 
 /// Output mode for inline commit diffs in `log`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum LogDiffMode {
+pub(crate) enum LogDiffMode {
     Stat,
     NameOnly,
     NameStatus,
 }
 
 /// One parsed `log` invocation.
-struct LogRequest {
-    revision: String,
+pub(crate) struct LogRequest {
+    pub(crate) revision: String,
     /// Whether the caller named a revision, as opposed to defaulting to `HEAD`.
     ///
     /// Tracked because the two cases need different answers when `HEAD` is unborn: an explicit
     /// revision must fail loudly (the name was wrong), while a bare `log` should fall back to the
     /// refs that do hold commits.
-    revision_explicit: bool,
-    limit: usize,
-    all: bool,
-    oneline: bool,
-    format: Option<String>,
-    graph: bool,
-    diff_mode: Option<LogDiffMode>,
-    pathspecs: Vec<String>,
+    pub(crate) revision_explicit: bool,
+    pub(crate) limit: usize,
+    pub(crate) all: bool,
+    pub(crate) oneline: bool,
+    pub(crate) follow: bool,
+    pub(crate) format: Option<String>,
+    pub(crate) graph: bool,
+    pub(crate) diff_mode: Option<LogDiffMode>,
+    pub(crate) pathspecs: Vec<String>,
 }
 
 impl LogRequest {
@@ -302,6 +281,7 @@ impl LogRequest {
             limit: DEFAULT_LOG_LIMIT,
             all: false,
             oneline: false,
+            follow: false,
             format: None,
             graph: false,
             diff_mode: None,
@@ -317,6 +297,7 @@ impl LogRequest {
                 "--name-only" => request.diff_mode = Some(LogDiffMode::NameOnly),
                 "--name-status" => request.diff_mode = Some(LogDiffMode::NameStatus),
                 "--oneline" => request.oneline = true,
+            "--follow" => request.follow = true,
                 "--all" => {
                     request.all = true;
                     request.limit = usize::MAX;
@@ -379,18 +360,18 @@ impl LogRequest {
 }
 
 /// Lightweight ASCII DAG renderer for `log --graph`.
-struct GraphRenderer {
+pub(crate) struct GraphRenderer {
     active_columns: Vec<Oid>,
 }
 
 impl GraphRenderer {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             active_columns: Vec::new(),
         }
     }
 
-    fn next_prefix(&mut self, record: &CommitRecord) -> (String, String) {
+    pub(crate) fn next_prefix(&mut self, record: &CommitRecord) -> (String, String) {
         let col_idx = match self.active_columns.iter().position(|&id| id == record.oid) {
             Some(idx) => idx,
             None => {
@@ -612,6 +593,12 @@ fn civil_from_unix(seconds: i64) -> (i64, u32, u32, u32, u32, u32, u32) {
     let month = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
     let year = if month <= 2 { year + 1 } else { year };
     (year, month, day, hour, minute, second, weekday)
+}
+
+pub(crate) struct ShowRequest {
+    pub(crate) revision: String,
+    pub(crate) part: ShowPart,
+    pub(crate) context: usize,
 }
 
 /// Dispatches `taxis show`.
