@@ -70,16 +70,9 @@ impl Drop for TestDir {
     }
 }
 
-/// Checks if system Git binary is present and executable.
+/// Reports whether a usable system `git` is on PATH (memoised in the shared harness).
 fn system_git_available() -> bool {
-    matches!(
-        Command::new("git")
-            .arg("--version")
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status(),
-        Ok(status) if status.success()
-    )
+    crate::cli_harness::system_git_available()
 }
 
 /// Helper verifying with system git's `git verify-pack -v` if git is executable.

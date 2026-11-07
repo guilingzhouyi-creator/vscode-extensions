@@ -12,6 +12,7 @@
 //!
 //! Domain Governance Rules: FGT-COR-001, FGT-IDX-001, FGT-STO-001, FGT-CLI-001.
 
+use crate::cli_harness::system_git_available;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -42,11 +43,7 @@ fn strip_git_config_env(command: &mut Command) {
 }
 
 fn git_available() -> bool {
-    Command::new("git")
-        .arg("--version")
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
+    system_git_available()
 }
 
 fn skip_without_git(label: &str) -> bool {

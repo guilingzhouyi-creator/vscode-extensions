@@ -10,6 +10,7 @@
 //!
 //! Domain Governance Rules: FGT-COR-001 (differential parity), FGT-CLI-001.
 
+use crate::cli_harness::system_git_available;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
@@ -35,15 +36,6 @@ fn scratch_repo(label: &str) -> PathBuf {
     let _ = fs::remove_dir_all(&path);
     fs::create_dir_all(&path).expect("scratch repository");
     path
-}
-
-/// Returns true when the host provides a `git` binary usable as an interoperability reference baseline.
-fn system_git_available() -> bool {
-    Command::new("git")
-        .arg("--version")
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
 }
 
 /// Runs one git subcommand inside `repo`, failing the test on a non-zero status.

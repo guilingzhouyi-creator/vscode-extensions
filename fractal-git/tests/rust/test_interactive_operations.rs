@@ -19,6 +19,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use crate::cli_harness::system_git_available;
 use fg_core::models::{
     CardBlackboard, Oid, PatchHunkChoice, PatchPlan, RebaseAction, RebaseItem, RebasePlan,
     SymbolClaim,
@@ -81,15 +82,6 @@ fn committer_identity(date_secs: i64) -> Vec<(&'static str, String)> {
         ("GIT_COMMITTER_EMAIL", COMMITTER_EMAIL.to_string()),
         ("GIT_COMMITTER_DATE", format!("{date_secs} +0000")),
     ]
-}
-
-/// Returns true when the host provides a `git` binary usable as an interoperability reference baseline.
-fn system_git_available() -> bool {
-    Command::new("git")
-        .arg("--version")
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
 }
 
 /// Runs one git subcommand inside a repository and returns its captured output.

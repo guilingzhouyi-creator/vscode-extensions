@@ -13,6 +13,7 @@
 //!
 //! Domain Governance Rules: FGT-COR-001 (differential parity), FGT-CLI-001.
 
+use crate::cli_harness::system_git_available;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -57,13 +58,9 @@ fn strip_git_config_env(command: &mut Command) {
     }
 }
 
-/// Reports whether the system git binary can be executed.
+/// Reports whether a usable system `git` is on PATH (memoised in the shared harness).
 fn git_available() -> bool {
-    Command::new("git")
-        .arg("--version")
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
+    system_git_available()
 }
 
 /// Skips the calling test when git is absent, unless the suite must not degrade.

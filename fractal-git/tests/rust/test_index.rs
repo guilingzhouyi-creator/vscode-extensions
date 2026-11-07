@@ -1,7 +1,7 @@
 //! Unit Test: fg-index (InMemoryIndexTree, ConflictStageSlot, IndexStage)
 //! File Path: tests/rust/test_index.rs
 
-use crate::cli_harness::test_temp_dir;
+use crate::cli_harness::{system_git_available, test_temp_dir};
 use fractal_git::core::models::FileMode;
 use fractal_git::core::models::Oid;
 use fractal_git::index::index_file::IndexStat;
@@ -280,13 +280,9 @@ fn test_sparse_directory_collapsing_and_reconstruction() {
     assert_eq!(vendor_child.oid, vendor_subtree_oid);
 }
 
-/// Returns whether a `git` executable is on `PATH`; differential tests skip without one.
+/// Reports whether a usable system `git` is on PATH (memoised in the shared harness).
 fn git_available() -> bool {
-    Command::new("git")
-        .arg("--version")
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
+    system_git_available()
 }
 
 /// Runs `git` in `repo` and returns its raw output.

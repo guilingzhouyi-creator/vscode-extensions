@@ -10,14 +10,6 @@ use std::fs;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-fn system_git_available() -> bool {
-    std::process::Command::new("git")
-        .arg("--version")
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
-}
-
 fn test_temp_path(prefix: &str) -> std::path::PathBuf {
     static COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     let count = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -28,6 +20,8 @@ fn test_temp_path(prefix: &str) -> std::path::PathBuf {
     let _ = std::fs::create_dir_all(&base);
     base.join(format!("{}_{}_{}", prefix, std::process::id(), count))
 }
+
+use crate::cli_harness::system_git_available;
 
 use fg_core::models::{current_unix_seconds, AuthoritySecret};
 use fg_storage::commit_materializer::write_commit_objects_with_parents;

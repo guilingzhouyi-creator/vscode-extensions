@@ -13,6 +13,7 @@
 //!
 //! Domain Governance Rules: FGT-COR-001 (differential parity), FGT-IDX-001.
 
+use crate::cli_harness::system_git_available;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -59,13 +60,9 @@ fn scratch_dir(label: &str) -> PathBuf {
     path
 }
 
-/// Reports whether a usable system git binary is present.
+/// Reports whether a usable system `git` is on PATH (memoised in the shared harness).
 fn git_available() -> bool {
-    Command::new("git")
-        .arg("--version")
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
+    system_git_available()
 }
 
 /// Runs git config --file <config> --get <key>.

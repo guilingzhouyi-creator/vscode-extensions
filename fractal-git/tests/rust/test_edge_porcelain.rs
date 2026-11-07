@@ -15,7 +15,7 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-use crate::cli_harness::test_temp_dir;
+use crate::cli_harness::{system_git_available, test_temp_dir};
 use fg_algorithms::blame::{BlameEngine, BlameLine};
 use fg_algorithms::pack::PackDeltaItem;
 use fg_core::models::{ObjectKind, Oid};
@@ -249,15 +249,6 @@ fn test_bundle_serialization_and_verification() {
     let verified_checksum = BundleEngine::verify_pack_checksum(&mut cursor, header.pack_offset)
         .expect("Checksum matches");
     assert_eq!(verified_checksum, report.pack_checksum);
-}
-
-/// Returns true when the host provides a `git` binary usable as an interoperability reference baseline.
-fn system_git_available() -> bool {
-    Command::new("git")
-        .arg("--version")
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
 }
 
 /// Runs one `git` invocation inside `repo` with deterministic identity configuration.

@@ -3,6 +3,9 @@
 //! Architecture Role: Consolidates governance rules, project lease, worktree boundary,
 //!   and references integration tests into a single compiled binary harness.
 
+#[path = "rust/support/cli_harness.rs"]
+pub mod cli_harness;
+
 #[path = "rust/test_governance.rs"]
 mod test_governance;
 

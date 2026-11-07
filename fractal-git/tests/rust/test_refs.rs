@@ -349,13 +349,9 @@ fn head_writers_record_symbolic_and_detached_targets() {
     let _ = fs::remove_dir_all(&git_dir);
 }
 
-/// Returns true when the host provides a `git` binary usable as an interoperability reference baseline.
+/// Reports whether a usable system git is on PATH (memoised in the shared harness).
 fn system_git_available() -> bool {
-    Command::new("git")
-        .arg("--version")
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
+    crate::cli_harness::system_git_available()
 }
 
 /// Runs one git subcommand inside `repo`, failing the test with the captured output on error.

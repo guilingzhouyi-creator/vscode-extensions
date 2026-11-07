@@ -14,8 +14,9 @@
 #![allow(dead_code)]
 
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::OnceLock;
 use tempfile::TempDir;
 
 static SCRATCH_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -133,3 +134,24 @@ pub fn compliant_commit_msg(subject: &str, symbol_or_file: &str) -> String {
 }
 
 pub use compliant_commit_msg as compliant_msg;
+
+/// Reports whether a usable system `git` binary is on PATH, probing at most once per process.
+///
+/// Thirteen test modules used to define their own copy of this predicate and call it on every
+/// test, so a single `integration_cli` run spawned `git --version` dozens of times for an answer
+/// that cannot change while the process lives. The probe costs roughly the same as a real git
+/// invocation, which made the redundant calls a measurable share of wall clock. Caching the
+/// verdict keeps the same fail-soft semantics — an absent or broken git still reports `false`
+/// rather than panicking — while collapsing the repeated spawns to one.
+pub fn system_git_available() -> bool {
+    static AVAILABLE: OnceLock<bool> = OnceLock::new();
+    *AVAILABLE.get_or_init(|| {
+        Command::new("git")
+            .arg("--version")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map(|status| status.success())
+            .unwrap_or(false)
+    })
+}

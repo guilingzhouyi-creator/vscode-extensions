@@ -10,7 +10,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-use crate::cli_harness::test_temp_dir;
+use crate::cli_harness::{system_git_available, test_temp_dir};
 use fg_algorithms::space_plan::{
     check_headroom, simulate_space_plan, ExtractionUnit, SpacePlanConfig,
 };
@@ -254,14 +254,6 @@ fn test_tipse_low_disk_repack_progressive() {
 
     // Confirm all loose objects have been pruned
     assert!(scan_loose_objects(&git_dir).expect("scan after").is_empty());
-}
-
-fn system_git_available() -> bool {
-    Command::new("git")
-        .arg("--version")
-        .output()
-        .map(|out| out.status.success())
-        .unwrap_or(false)
 }
 
 fn run_git(repo: &Path, args: &[&str]) -> Output {
