@@ -11,34 +11,23 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 use fractal_git::fractal::refs::validate_ref_name;
 use fractal_git::{DiskRefStore, HeadState, Oid, RefStore};
-
-/// Monotonic counter keeping scratch directory names unique within one process.
-static SCRATCH_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 /// Creates a unique repository-shaped scratch directory.
 ///
 /// On Windows the base is `%TEMP%\Low`, matching the convention used by the other storage suites
 /// so that the sandboxed test host can create directories there.
+/// Allocates a scratch directory that already carries an empty `refs` subtree.
+///
+/// The refs suite asserts on a bare store, so the subtree has to exist before the store is
+/// constructed; creating it here keeps every call site free of setup noise while preserving the
+/// original precondition that `refs` is a directory rather than a missing path.
 fn scratch_repo(label: &str) -> PathBuf {
-    let count = SCRATCH_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let base = std::env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join("target")
-        .join("test_tmp");
-    let _ = fs::create_dir_all(&base);
-    let path = base.join(format!(
-        "taxis_refs_{}_{}_{}",
-        label,
-        std::process::id(),
-        count
-    ));
-    let _ = fs::remove_dir_all(&path);
-    fs::create_dir_all(path.join("refs")).expect("scratch refs directory must be creatable");
-    path
+    let dir = crate::cli_harness::scratch_repo("taxis_refs", label);
+    fs::create_dir_all(dir.join("refs")).expect("scratch refs directory must be creatable");
+    dir
 }
 
 /// Builds a distinct object id whose first byte is derived from `seed`.
