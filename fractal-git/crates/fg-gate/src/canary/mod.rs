@@ -1,19 +1,17 @@
 //! Module: fg-gate — Inline Kernel Canary Engine (IKCE)
 //! File Path: crates/fg-gate/src/canary/mod.rs
-//! Architecture Role: Real-time hidden probe blind-test mutation engine (IKCE).
-//!   Breaks Goodhart's Law / fake coverage gaming by applying in-memory micro-mutations
-//!   against Agent-submitted code and verifying that accompanying unit tests actually catch the mutations.
+//! Architecture Role: Static mutation-candidate generation and test hygiene inspection.
+//!   Candidate names and assertion tokens are diagnostics, not proof that tests executed.
 //!
-//! Dependencies & Triggers: Triggered by `AutoAuditHook` during pre-review commit and promotion evaluations.
+//! Dependencies & Triggers: Consumed by the slice entry point of `AutoAuditHook`.
 //! Responsibilities:
-//!   - Synthetic in-memory AST micro-mutations (comparison inversion, boolean flip, off-by-one shifts).
-//!   - Tautological and empty assertion interception (detecting `assert!(true)`, `assert_eq!(x, x)`, etc.).
-//!   - Calculating formal Mutant Kill Rate ($K = \frac{M_{\text{killed}}}{M_{\text{total}}}$).
-//!   - Emitting circuit breaker signals when kill rate falls below safety threshold.
+//!   - Text-based mutation candidates (comparison inversion, boolean flip, boundary shifts).
+//!   - Tautological assertion interception (`assert!(true)`, `assert_eq!(x, x)`, etc.).
+//!   - Explicitly absent execution metrics until a real runner supplies trial evidence.
 //!
 //! Exit Semantics & Design Rationale:
-//!   - Pure in-memory AST slice evaluation without writing temporary files to disk.
-//!   - Kill rates below `min_kill_rate` (default 0.60) or tautological assertions result in hard block.
+//!   - In-memory static inspection does not execute submitted code or tests.
+//!   - Static hygiene success cannot satisfy a policy requiring measured mutation results.
 //!
 //! ### Domain Governance Rules (SSOT):
 //! - `FGT-COR-001`: Core data model and error contract guard
@@ -80,19 +78,19 @@ impl Default for CanaryConfig {
 pub struct CanaryReport {
     /// Total number of valid mutants synthesized.
     pub total_mutants: usize,
-    /// Number of mutants killed (caught) by the test suite.
-    pub killed_mutants: usize,
-    /// Calculated kill rate ($M_{\text{killed}} / M_{\text{total}}$).
-    pub kill_rate: f64,
+    /// Number of mutants killed by an executed test suite; absent for static inspection.
+    pub killed_mutants: Option<usize>,
+    /// Measured kill rate; absent until a runner supplies actual trial results.
+    pub kill_rate: Option<f64>,
     /// Number of tautological assertions detected in test code.
     pub tautological_assert_count: usize,
     /// Diagnostic violation explanations.
     pub violations: Vec<String>,
-    /// Whether the canary blind test passed all quality criteria.
-    pub passed: bool,
+    /// Whether static hygiene checks passed; grants no execution or merge authority.
+    pub static_hygiene_passed: bool,
 }
 
-/// Inline Kernel Canary Engine (IKCE) verifying test efficacy via real-time micro-mutation.
+/// Static candidate and assertion-hygiene inspector; does not execute test suites.
 #[derive(Debug, Clone)]
 pub struct KernelCanaryEngine {
     config: CanaryConfig,
@@ -107,7 +105,7 @@ impl KernelCanaryEngine {
         Self { config }
     }
 
-    /// Evaluates candidate source code against its test suite.
+    /// Inspect candidates and static test hygiene while leaving execution unmeasured.
     pub fn evaluate_slice(&self, source_code: &str, test_code: &str) -> CanaryReport {
         let mut violations = Vec::new();
 
@@ -127,38 +125,16 @@ impl KernelCanaryEngine {
         let mutants = self.generate_mutants(source_code);
         let total_mutants = mutants.len();
 
-        let mut killed_mutants = 0usize;
-        for mutant in &mutants {
-            if self.is_mutant_killed(mutant, test_code) {
-                killed_mutants += 1;
-            }
-        }
-
-        let kill_rate = if total_mutants == 0 {
-            1.0 // No mutable logic detected; treat as passing
-        } else {
-            killed_mutants as f64 / total_mutants as f64
-        };
-
-        if total_mutants > 0 && kill_rate < self.config.min_kill_rate {
-            violations.push(format!(
-                "Mutant kill rate {:.1}% is below required threshold {:.1}% (killed {}/{}) (FGT-MUT-001)",
-                kill_rate * 100.0,
-                self.config.min_kill_rate * 100.0,
-                killed_mutants,
-                total_mutants
-            ));
-        }
-
-        let passed = violations.is_empty();
+        // Candidate generation is static inspection, not execution evidence.
+        let static_hygiene_passed = violations.is_empty();
 
         CanaryReport {
             total_mutants,
-            killed_mutants,
-            kill_rate,
+            killed_mutants: None,
+            kill_rate: None,
             tautological_assert_count: tautology_count,
             violations,
-            passed,
+            static_hygiene_passed,
         }
     }
 
@@ -305,33 +281,6 @@ impl KernelCanaryEngine {
             );
         }
     }
-
-    /// Evaluates whether a given mutant is killed by inspecting test coverage and semantic anchors.
-    fn is_mutant_killed(&self, mutant: &MutantDescriptor, test_code: &str) -> bool {
-        let has_assertion = test_code.contains("assert");
-        if !has_assertion {
-            return false;
-        }
-
-        // If the enclosing function is called in the test suite that has assertions, mutant is exercised
-        if let Some(ref fn_name) = mutant.enclosing_fn {
-            if test_code.contains(fn_name) {
-                return true;
-            }
-        }
-
-        let snippet = &mutant.original_snippet;
-        let tokens: Vec<&str> = snippet
-            .split(|c: char| !c.is_alphanumeric() && c != '_')
-            .filter(|token| token.len() >= 3 && !is_common_keyword(token))
-            .collect();
-
-        if tokens.is_empty() {
-            return false;
-        }
-
-        tokens.iter().any(|token| test_code.contains(token))
-    }
 }
 
 /// Detects self-comparison tautologies such as `assert_eq!(x, x)`.
@@ -388,33 +337,31 @@ fn push_mutant(
     });
 }
 
-/// Helper identifying non-differentiating programming language keywords.
-fn is_common_keyword(word: &str) -> bool {
-    matches!(
-        word,
-        "let"
-            | "mut"
-            | "fn"
-            | "pub"
-            | "return"
-            | "if"
-            | "else"
-            | "for"
-            | "while"
-            | "in"
-            | "match"
-            | "struct"
-            | "impl"
-            | "enum"
-            | "true"
-            | "false"
-            | "self"
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_comment_tokens_do_not_prove_mutant_execution() -> Result<(), serde_json::Error> {
+        let engine = KernelCanaryEngine::new(CanaryConfig::default());
+        let source = "pub fn is_valid(value: i32) -> bool {\n value > 10\n}";
+        let report = engine.evaluate_slice(source, "// assert!(is_valid(11));");
+        assert!(report.total_mutants > 0);
+        let encoded = serde_json::to_value(report)?;
+        assert!(encoded["kill_rate"].is_null());
+        assert!(encoded["killed_mutants"].is_null());
+        Ok(())
+    }
+
+    #[test]
+    fn test_zero_mutation_candidates_are_not_perfect_execution() -> Result<(), serde_json::Error> {
+        let engine = KernelCanaryEngine::new(CanaryConfig::default());
+        let report = engine.evaluate_slice("pub fn noop() {}", "");
+        assert_eq!(report.total_mutants, 0);
+        let encoded = serde_json::to_value(report)?;
+        assert!(encoded["kill_rate"].is_null());
+        Ok(())
+    }
 
     #[test]
     fn test_detect_tautological_assertions() {
@@ -468,8 +415,9 @@ mod tests {
         "#;
 
         let report = engine.evaluate_slice(source, test_code);
-        assert!(report.passed);
-        assert!(report.kill_rate >= 0.60);
+        assert!(report.static_hygiene_passed);
+        assert_eq!(report.kill_rate, None);
+        assert_eq!(report.killed_mutants, None);
     }
 
     #[test]
@@ -488,7 +436,7 @@ mod tests {
         "#;
 
         let report = engine.evaluate_slice(source, fake_test);
-        assert!(!report.passed);
+        assert!(!report.static_hygiene_passed);
         assert!(report.tautological_assert_count > 0);
     }
 }

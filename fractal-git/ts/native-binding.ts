@@ -248,9 +248,30 @@ function insertTreeLeaf(root: DirectoryNode, leaf: StagedTreeLeaf): void {
  * the directory `foo`. Comparison is raw UTF-8 byte order (Buffer.compare), never locale aware.
  */
 function compareCanonicalTreeEntries(left: SerializedTreeEntry, right: SerializedTreeEntry): number {
-    const leftName = left.isDirectory ? `${left.name}/` : left.name;
-    const rightName = right.isDirectory ? `${right.name}/` : right.name;
-    return Buffer.compare(Buffer.from(leftName, 'utf8'), Buffer.from(rightName, 'utf8'));
+    const leftLen = left.name.length;
+    const rightLen = right.name.length;
+    let i = 0;
+    let j = 0;
+    while (i < leftLen && j < rightLen) {
+        const leftCp = left.name.codePointAt(i)!;
+        const rightCp = right.name.codePointAt(j)!;
+        if (leftCp !== rightCp) {
+            return leftCp - rightCp;
+        }
+        i += leftCp > 0xffff ? 2 : 1;
+        j += rightCp > 0xffff ? 2 : 1;
+    }
+    if (i < leftLen) {
+        const leftCp = left.name.codePointAt(i)!;
+        const rightEndByte = right.isDirectory ? 0x2f : -1;
+        return leftCp !== rightEndByte ? leftCp - rightEndByte : 1;
+    }
+    if (j < rightLen) {
+        const rightCp = right.name.codePointAt(j)!;
+        const leftEndByte = left.isDirectory ? 0x2f : -1;
+        return leftEndByte !== rightCp ? leftEndByte - rightCp : -1;
+    }
+    return (left.isDirectory ? 1 : 0) - (right.isDirectory ? 1 : 0);
 }
 
 /**
@@ -370,7 +391,7 @@ function buildCommitPayload(input: CommitPayloadInput): Buffer {
     headerLines.push(`committer ${formatSignature(input.signatures.committer, 'committer')}`);
 
     const trailer = input.agentMeta ? `\n\nPraxis-Agent-Meta: ${JSON.stringify(input.agentMeta)}` : '';
-    const payloadText = `${headerLines.join('\n')}\n\n${input.message}${trailer}\n`;
+    const payloadText = `${headerLines.join('\n')}\n\n${input.message}${trailer}`;
     return Buffer.from(payloadText, 'utf8');
 }
 
@@ -441,6 +462,27 @@ export interface ReclaimWorkspaceOptions {
     readonly deleteRef?: boolean;
 }
 
+function assertSafeReclaimDirectory(physicalDir: string, gitDir: string): string {
+    if (!physicalDir || physicalDir.trim().length === 0) {
+        throw new Error('Invalid physicalDir: path must be non-empty');
+    }
+    const resolvedTarget = path.resolve(physicalDir);
+    const parsedTarget = path.parse(resolvedTarget);
+    if (resolvedTarget === parsedTarget.root) {
+        throw new Error(`Refusing to delete filesystem root: ${resolvedTarget}`);
+    }
+    const resolvedGitDir = path.resolve(gitDir);
+    const repoRoot = path.basename(resolvedGitDir) === '.git' ? path.dirname(resolvedGitDir) : resolvedGitDir;
+    if (
+        resolvedTarget === resolvedGitDir ||
+        resolvedTarget === repoRoot ||
+        resolvedGitDir.startsWith(resolvedTarget + path.sep)
+    ) {
+        throw new Error(`Refusing to delete repository root or ancestor: ${resolvedTarget}`);
+    }
+    return resolvedTarget;
+}
+
 /**
  * Pure-TS physical workspace reclamation engine.
  */
@@ -452,13 +494,16 @@ export function reclaimWorkspacePure(
     const startMs = Date.now();
     let removed = false;
 
-    if (options.physicalDir && fs.existsSync(options.physicalDir)) {
-        fs.rmSync(options.physicalDir, { recursive: true, force: true });
-        removed = true;
+    if (options.physicalDir) {
+        const safePhysicalDir = assertSafeReclaimDirectory(options.physicalDir, gitDir);
+        if (fs.existsSync(safePhysicalDir)) {
+            fs.rmSync(safePhysicalDir, { recursive: true, force: true });
+            removed = true;
+        }
     }
 
     if (options.deleteRef) {
-        const refPath = path.join(gitDir, options.targetRef.gitRef);
+        const refPath = resolveRefPath(gitDir, options.targetRef.gitRef);
         if (fs.existsSync(refPath)) {
             fs.unlinkSync(refPath);
         }

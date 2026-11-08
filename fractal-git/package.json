@@ -18,7 +18,7 @@
     "review": "npm run audit",
     "test": "npm run test:ts",
     "test:rust": "cargo test --workspace",
-    "test:ts": "npm run build && node --test dist/tests/ts/*.test.js"
+    "test:ts": "node scripts/common/sync-quality-evidence.js --check && npm run build && node --test dist/tests/ts/*.test.js"
   },
   "keywords": [
     "git",
@@ -29,5 +29,8 @@
     "praxis"
   ],
   "author": "Google DeepMind Advanced Agentic Coding Pair",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "ajv": "8.20.0"
+  }
 }

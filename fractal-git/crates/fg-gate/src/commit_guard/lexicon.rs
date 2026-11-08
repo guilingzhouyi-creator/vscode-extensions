@@ -468,34 +468,43 @@ fn find_unresolved_marker(lower_line: &str) -> Option<String> {
 }
 
 /// Finds a construction batch codename built from a schedule word plus an ordinal.
+///
+/// A bare codename (`<prefix><ordinal>`) anywhere on the line wins over a two-word
+/// pairing, which is the precedence the two separate passes established: the bare-token pass
+/// completed before the pairing pass started. One walk is enough to honour that, because the
+/// pairing candidate can be remembered and only returned once the walk has proven no bare
+/// codename exists further along.
+///
+/// The previous form ran `split_whitespace` twice and `trim_matches` on every word in each walk,
+/// so each word paid the `char`-predicate trimming cost twice.
 fn find_batch_codename(lower_line: &str) -> Option<String> {
+    let mut previous: Option<&str> = None;
+    let mut pairing: Option<String> = None;
     for raw_word in lower_line.split_whitespace() {
         let cleaned = raw_word.trim_matches(|character: char| !character.is_alphanumeric());
-        if !cleaned.is_empty() && is_batch_token(cleaned) {
+        if cleaned.is_empty() {
+            continue;
+        }
+        // A bare codename outranks any pairing seen earlier.
+        if is_batch_token(cleaned) {
             return Some(cleaned.to_string());
         }
-    }
-    let mut prev_word: Option<&str> = None;
-    for raw_word in lower_line.split_whitespace() {
-        let cleaned = raw_word.trim_matches(|character: char| !character.is_alphanumeric());
-        if let Some(first) = prev_word {
-            if matches!(first, "sprint" | "pass" | "phase" | "段" | "批次")
-                && cleaned.chars().all(|character| character.is_ascii_digit())
-                && !cleaned.is_empty()
-            {
-                return Some(format!("{} {}", first, cleaned));
+        if pairing.is_none() {
+            if let Some(first) = previous {
+                if matches!(first, "sprint" | "pass" | "phase" | "段" | "批次")
+                    && cleaned.chars().all(|character| character.is_ascii_digit())
+                {
+                    pairing = Some(format!("{first} {cleaned}"));
+                }
             }
         }
-        if !cleaned.is_empty() {
-            prev_word = Some(cleaned);
-        }
+        previous = Some(cleaned);
     }
-    None
+    pairing
 }
 
 /// Whether a single token is a bare batch codename.
-fn is_batch_token(token: &str) -> bool {
-    if let Some(rest) = token.strip_prefix("phase") {
+fn is_batch_token(token: &str) -> bool {    if let Some(rest) = token.strip_prefix("phase") {
         return !rest.is_empty() && rest.chars().all(|character| character.is_ascii_digit());
     }
     if let Some(rest) = token.strip_prefix("sprint") {
@@ -554,4 +563,84 @@ pub fn contains_whole_term(haystack: &str, needle: &str) -> bool {
         }
     }
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Reference form of [`find_batch_codename`]: two separate passes, the shape this function
+    /// used before the single-pass rewrite.
+    ///
+    /// Kept only as a test oracle. The shipping version must agree with it on every input,
+    /// including inputs where a bare codename and a schedule-word pairing appear on the same
+    /// word, which is the case the merge order could plausibly get wrong.
+    fn reference_find_batch_codename(lower_line: &str) -> Option<String> {
+        for raw_word in lower_line.split_whitespace() {
+            let cleaned = raw_word.trim_matches(|character: char| !character.is_alphanumeric());
+            if !cleaned.is_empty() && is_batch_token(cleaned) {
+                return Some(cleaned.to_string());
+            }
+        }
+        let mut prev_word: Option<&str> = None;
+        for raw_word in lower_line.split_whitespace() {
+            let cleaned = raw_word.trim_matches(|character: char| !character.is_alphanumeric());
+            if let Some(first) = prev_word {
+                if matches!(first, "sprint" | "pass" | "phase" | "段" | "批次")
+                    && cleaned.chars().all(|character| character.is_ascii_digit())
+                    && !cleaned.is_empty()
+                {
+                    return Some(format!("{} {}", first, cleaned));
+                }
+            }
+            if !cleaned.is_empty() {
+                prev_word = Some(cleaned);
+            }
+        }
+        None
+    }
+
+    #[test]
+    fn single_pass_matches_the_two_pass_reference_on_realistic_lines() {
+        let cases = [
+            "",
+            "plain commit message with no codename",
+            "phase3 rollout",
+            "sprint 2 closed",
+            "phase 10",
+            "段 5 完成",
+            "批次 12",
+            "w1 patch",
+            "w9",
+            "see phase3 and also sprint 2",
+            // Bare codename appears *after* a schedule-word pairing: the two-pass form would
+            // find the bare token first; the one-pass form must not return the pairing instead.
+            "sprint 2 then w3",
+            "phase 7 then sprint4",
+            // Schedule word with no ordinal following it.
+            "phase",
+            "sprint",
+            // Ordinal alone, no schedule word.
+            "42",
+            "release 1.2.3",
+            // Punctuation-only words must not confuse the trimming.
+            "--- phase 4 ---",
+            "!!!",
+            "phase -4",
+            "phase 4x",
+        ];
+        for line in cases {
+            assert_eq!(
+                find_batch_codename(line),
+                reference_find_batch_codename(line),
+                "disagreement on {line:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_bare_codename_still_wins_over_a_pairing_on_the_same_line() {
+        // Two-pass form returns the bare token because pass one completes before pass two starts.
+        assert_eq!(find_batch_codename("sprint 2 then w3"), Some("w3".to_string()));
+    }
 }
