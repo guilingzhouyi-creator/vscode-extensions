@@ -17,233 +17,11 @@ use std::path::PathBuf;
 
 mod taxis_cmd;
 use taxis_cmd::common::{find_arg_value, print_json, reject, CliContext};
-use taxis_cmd::{
-    am, apply, archive, bench, bisect, blackboard, blame, branch, bundle, checkout, cherry_pick,
-    clone, commit, config, daemon, diagnostics_tool, diff, doctor, format_patch, gate_slice,
-    hash_object, index_plumbing, init, inspect, lineage, list_files, log, maintenance,
-    maintenance_ops, merge, notes_replace, operation, pack_plumbing, plumbing_tree, project,
-    projection, promotion, quality, quarantine, read, rebase, reclaim, refs, relocate, remote,
-    repack, reset, rev_list, revert, stage, stash, status, submodule, tag, unarchive, undo, verify,
-    worktree,
-};
 
 use fg_core::models::current_unix_seconds;
 use fg_gate::authority::resolve_authority_secret;
 use fractal_git::constants::cli::CliTag;
-
-/// Specification for one Taxis CLI subcommand and its accepted shorthand aliases.
-struct CommandSpec {
-    canonical: &'static str,
-    aliases: &'static [&'static str],
-    handler: fn(&CliContext),
-}
-
-const fn cmd(
-    canonical: &'static str,
-    aliases: &'static [&'static str],
-    handler: fn(&CliContext),
-) -> CommandSpec {
-    CommandSpec {
-        canonical,
-        aliases,
-        handler,
-    }
-}
-
-const COMMAND_TABLE: &[CommandSpec] = &[
-    cmd("init", &[], init::handle_init),
-    cmd("doctor", &[], doctor::handle_doctor),
-    cmd("relocate", &[], relocate::handle_relocate),
-    cmd("git-export", &["export"], projection::handle_git_export),
-    cmd("git-import", &["import"], projection::handle_git_import),
-    cmd("status", &["st"], status::handle_status),
-    cmd("add", &[], stage::handle_add),
-    cmd("rm", &[], stage::handle_rm),
-    cmd("mv", &[], stage::handle_mv),
-    cmd("restore", &[], stage::handle_restore),
-    cmd("branch", &["br"], branch::handle_branch),
-    cmd("commit", &["ci"], commit::handle_commit),
-    cmd("diff", &["di"], diff::handle_diff),
-    cmd("hash-object", &[], hash_object::handle_hash_object),
-    cmd("write-tree", &[], index_plumbing::handle_write_tree),
-    cmd("commit-tree", &[], index_plumbing::handle_commit_tree),
-    cmd("update-index", &[], index_plumbing::handle_update_index),
-    CommandSpec {
-        canonical: "authority",
-        aliases: &["authority", "auth"],
-        handler: handle_authority,
-    },
-    CommandSpec {
-        canonical: "reclaim",
-        aliases: &["reclaim"],
-        handler: reclaim::handle_reclaim,
-    },
-    CommandSpec {
-        canonical: "gc",
-        aliases: &["gc"],
-        handler: maintenance::handle_gc,
-    },
-    CommandSpec {
-        canonical: "clean",
-        aliases: &["clean"],
-        handler: maintenance::handle_clean,
-    },
-    CommandSpec {
-        canonical: "prune",
-        aliases: &["prune"],
-        handler: maintenance::handle_prune,
-    },
-    CommandSpec {
-        canonical: "fsck",
-        aliases: &["fsck"],
-        handler: maintenance::handle_fsck,
-    },
-    CommandSpec {
-        canonical: "clone",
-        aliases: &["clone"],
-        handler: clone::handle_clone,
-    },
-    CommandSpec {
-        canonical: "repack",
-        aliases: &["repack", "pack-objects"],
-        handler: repack::handle_repack,
-    },
-    CommandSpec {
-        canonical: "remote",
-        aliases: &["remote"],
-        handler: remote::handle_remote,
-    },
-    CommandSpec {
-        canonical: "fetch",
-        aliases: &["fetch"],
-        handler: remote::handle_fetch,
-    },
-    CommandSpec {
-        canonical: "push",
-        aliases: &["push"],
-        handler: remote::handle_push,
-    },
-    CommandSpec {
-        canonical: "pull",
-        aliases: &["pull"],
-        handler: remote::handle_pull,
-    },
-    CommandSpec {
-        canonical: "config",
-        aliases: &["config", "cfg"],
-        handler: config::handle_config,
-    },
-    CommandSpec {
-        canonical: "submodule",
-        aliases: &["submodule", "sub"],
-        handler: submodule::handle_submodule,
-    },
-    CommandSpec {
-        canonical: "project",
-        aliases: &["project", "pj"],
-        handler: project::handle_project,
-    },
-    CommandSpec {
-        canonical: "quality",
-        aliases: &["quality", "trace"],
-        handler: quality::handle_quality,
-    },
-    CommandSpec {
-        canonical: "quarantine",
-        aliases: &["quarantine", "quar"],
-        handler: quarantine::handle_quarantine,
-    },
-    CommandSpec {
-        canonical: "archive",
-        aliases: &["archive"],
-        handler: archive::handle_archive,
-    },
-    CommandSpec {
-        canonical: "unarchive",
-        aliases: &["unarchive", "extract"],
-        handler: unarchive::handle_unarchive,
-    },
-    CommandSpec {
-        canonical: "bundle",
-        aliases: &["bundle"],
-        handler: bundle::handle_bundle,
-    },
-    CommandSpec {
-        canonical: "blame",
-        aliases: &["blame"],
-        handler: blame::handle_blame,
-    },
-    CommandSpec {
-        canonical: "bisect",
-        aliases: &["bisect"],
-        handler: bisect::handle_bisect,
-    },
-    CommandSpec {
-        canonical: "daemon",
-        aliases: &["serve", "daemon"],
-        handler: daemon::handle_daemon,
-    },
-    CommandSpec {
-        canonical: "notes",
-        aliases: &["notes"],
-        handler: notes_replace::handle_notes,
-    },
-    CommandSpec {
-        canonical: "replace",
-        aliases: &["replace"],
-        handler: notes_replace::handle_replace,
-    },
-    CommandSpec {
-        canonical: "commit-graph",
-        aliases: &["commit-graph"],
-        handler: maintenance_ops::handle_commit_graph,
-    },
-    CommandSpec {
-        canonical: "sparse-checkout",
-        aliases: &["sparse-checkout"],
-        handler: maintenance_ops::handle_sparse_checkout,
-    },
-    CommandSpec {
-        canonical: "maintenance",
-        aliases: &["maintenance"],
-        handler: maintenance_ops::handle_maintenance,
-    },
-    CommandSpec {
-        canonical: "rerere",
-        aliases: &["rerere"],
-        handler: maintenance_ops::handle_rerere,
-    },
-    CommandSpec {
-        canonical: "unpack-objects",
-        aliases: &["unpack-objects"],
-        handler: pack_plumbing::handle_unpack_objects,
-    },
-    CommandSpec {
-        canonical: "index-pack",
-        aliases: &["index-pack"],
-        handler: pack_plumbing::handle_index_pack,
-    },
-    CommandSpec {
-        canonical: "multi-pack-index",
-        aliases: &["multi-pack-index", "midx"],
-        handler: pack_plumbing::handle_multi_pack_index,
-    },
-    CommandSpec {
-        canonical: "diagnostics",
-        aliases: &["diagnostics", "diag"],
-        handler: diagnostics_tool::handle_diagnostics,
-    },
-    CommandSpec {
-        canonical: "version",
-        aliases: &["version", "-v", "--version"],
-        handler: handle_version,
-    },
-    CommandSpec {
-        canonical: "help",
-        aliases: &["help", "-h", "--help"],
-        handler: handle_help,
-    },
-];
+use taxis_cmd::dispatch::{dispatch_command, resolve_canonical_subcommand};
 
 fn handle_version(_ctx: &CliContext) {
     print_banner();
@@ -272,15 +50,6 @@ fn handle_version(_ctx: &CliContext) {
 
 fn handle_help(_ctx: &CliContext) {
     print_help();
-}
-
-fn resolve_canonical_subcommand(raw: &str) -> &str {
-    for spec in COMMAND_TABLE {
-        if spec.canonical == raw || spec.aliases.contains(&raw) {
-            return spec.canonical;
-        }
-    }
-    raw
 }
 
 fn print_banner() {
@@ -393,7 +162,6 @@ Slice and horizon flags (accepted by log, show, diff):
 Installation:
   install            Copy this binary onto PATH so `taxis` runs without a full path
   uninstall          Remove the installed copy (refuses to delete the running binary)
-
 Flags:
   --json             Output machine-readable JSON format
   --git-dir <path>   Override .git or .taxis directory location
@@ -494,17 +262,6 @@ fn extract_effective_subcommand(filtered_args: &[String]) -> (&str, Vec<String>)
     }
 }
 
-/// Routes effective canonical subcommand to designated handler function.
-fn dispatch_command(effective_subcommand: &str, ctx: &CliContext) {
-    for spec in COMMAND_TABLE {
-        if spec.canonical == effective_subcommand {
-            (spec.handler)(ctx);
-            return;
-        }
-    }
-    reject_unimplemented(effective_subcommand);
-}
-
 /// Issues and verifies HMAC authority credentials.
 fn handle_authority(ctx: &CliContext) {
     let action = ctx.args.first().map(String::as_str).unwrap_or("help");
@@ -602,24 +359,6 @@ fn verify_authority(ctx: &CliContext) {
         claims.subject, claims.issued_at, claims.expires_at
     );
 }
-/// Rejects a subcommand that has no native implementation.
-fn reject_unimplemented(subcommand: &str) -> ! {
-    reject(
-        CliTag::ERROR,
-        format!(
-            "'{subcommand}' has no native implementation in this build. \
-             Implemented: init, doctor, relocate, git-export, git-import, status, add, rm, mv, restore, branch, commit, diff, hash-object, \
-             write-tree, commit-tree, update-index, rev-parse, cat-file, ls-tree, ls-files, show-ref, for-each-ref, update-ref, symbolic-ref, \
-             merge-base, reflog, grep, shortlog, describe, count-objects, check-attr, var, check-ignore, log, show, checkout, merge, reset, \
-             tag, cherry-pick, revert, format-patch, apply, am, range-diff, cherry, patch-id, merge-tree, stripspace, mktree, read-tree, \
-             mktag, name-rev, verify-commit, verify-tag, stash, rebase, worktree, blackboard, promotion, bench, undo, operation, rev-list, \
-             verify, gate-slice, authority, reclaim, gc, clean, prune, fsck, clone, repack, remote, fetch, push, pull, config, submodule, \
-             project, quality, quarantine, archive, unarchive, bundle, blame, bisect, daemon, notes, replace, commit-graph, sparse-checkout, \
-             maintenance, rerere, unpack-objects, index-pack, multi-pack-index, diagnostics, version, help."
-        ),
-    )
-}
-
 fn main() {
     let raw_args: Vec<String> = env::args().skip(1).collect();
     if raw_args.is_empty() {
