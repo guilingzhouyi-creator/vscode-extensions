@@ -273,7 +273,7 @@ interface RustMultiLineScanContext {
 function scanAsyncLockIssues(context: RustMultiLineScanContext): void {
     const { file, raw, masked, delegate, issues } = context;
     for (let i = 0; i < masked.length; i += 1) {
-        if (!masked[i].includes('async') || !REGEX.SYNTAX.RUST_ASYNC_FN.test(masked[i])) {
+        if (!REGEX.SYNTAX.RUST_ASYNC_FN.test(masked[i])) {
             continue;
         }
         const scope = resolveAsyncFnScope(masked, i);
@@ -322,7 +322,7 @@ function scanUnsafeSafetyProofs(context: RustMultiLineScanContext): void {
         return;
     }
     for (let i = 0; i < masked.length; i += 1) {
-        if (!masked[i].includes('unsafe') || !UNSAFE_KEYWORD_RE.test(masked[i])) {
+        if (!UNSAFE_KEYWORD_RE.test(masked[i])) {
             continue;
         }
         let hasProof = false;

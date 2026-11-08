@@ -85,7 +85,7 @@ const FORM_A11Y_WINDOW_AFTER = 3;
 
 // ── Query Tokens & Format Constants ──
 const REASON_UNREGISTERED = 'unregistered';
-const THEME_CSS_VAR_PREFIX = 'var(--vscode-';
+const THEME_CSS_VAR_RE = /var\(--vscode-/;
 const DEFAULT_FORM_TAG = 'input';
 const LINE_BREAK = '\n';
 
@@ -415,7 +415,7 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         const violations: Array<{ line: number; text: string }> = [];
         for (let i = 0; i < rawLines.length; i++) {
             const raw = rawLines[i];
-            if (!raw.includes('.map')) continue;
+            if (!/\.map/.test(raw)) continue;
             const masked = maskedLines[i];
             const isMapping =
                 MAPPING_TEMPLATE_RAW_RE.test(raw) ||
@@ -442,7 +442,7 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         const violations: Array<{ line: number; text: string; color: string }> = [];
         for (let i = 0; i < rawLines.length; i++) {
             const line = rawLines[i];
-            if (!line.includes('<') || !HTML_TAG_PRECHECK_RE.test(line)) {
+            if (!HTML_TAG_PRECHECK_RE.test(line)) {
                 continue;
             }
             if (isStandaloneSvgLine(line, rawLines, i)) {
@@ -451,7 +451,7 @@ export class VscodeExtensionAnalyzer implements Analyzer {
             const matchResult = COLOR_STYLE_RE.exec(line);
             if (matchResult) {
                 const matchedColor = matchResult[1].toLowerCase();
-                if (MONOCHROME_COLORS.has(matchedColor) && !line.includes(THEME_CSS_VAR_PREFIX)) {
+                if (MONOCHROME_COLORS.has(matchedColor) && !THEME_CSS_VAR_RE.test(line)) {
                     violations.push({ line: i + 1, text: line.trim(), color: matchResult[1] });
                 }
             }
@@ -465,7 +465,6 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         const violations: Array<{ line: number; text: string; prop: string }> = [];
         for (let i = 0; i < rawLines.length; i++) {
             const line = rawLines[i];
-            if (!line.includes('transition')) continue;
             const matchResult = TRANSITION_PROP_RE.exec(line);
             if (matchResult) {
                 violations.push({ line: i + 1, text: line.trim(), prop: matchResult[1] });
@@ -480,7 +479,7 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         const violations: Array<{ line: number; text: string; tag: string }> = [];
         for (let i = 0; i < rawLines.length; i++) {
             const line = rawLines[i];
-            if (!line.includes('<') || !FORM_CONTROL_RE.test(line)) continue;
+            if (!FORM_CONTROL_RE.test(line)) continue;
             if (FORM_HIDDEN_RE.test(line)) continue;
 
             const hasA11y = FORM_A11Y_RE.test(line) || FORM_LABEL_FOR_RE.test(line);
@@ -502,7 +501,6 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         const violations: Array<{ line: number; text: string }> = [];
         for (let i = 0; i < rawLines.length; i++) {
             const line = rawLines[i];
-            if (!line.includes(':') || !line.includes('border')) continue;
             if (JITTER_BORDER_RE.test(line)) {
                 violations.push({ line: i + 1, text: line.trim() });
             }

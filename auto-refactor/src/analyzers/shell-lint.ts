@@ -493,10 +493,23 @@ export class ShellLintAnalyzer implements Analyzer {
 
     private checkErrorActionPreference(lines: string[], emit: ShellEmitter): void {
         let found = false;
-        const maxScan = Math.min(lines.length, MAX_SCAN_LINES);
+        let maxScan = Math.min(lines.length, MAX_SCAN_LINES);
+        let inParamBlock = false;
+        let paramDepth = 0;
         for (let i = 0; i < maxScan; i++) {
             const trimmed = lines[i].trim();
             if (trimmed === '' || trimmed.startsWith(HASH_COMMENT_CHAR)) continue;
+            if (!inParamBlock && /^param\s*\(/i.test(trimmed)) {
+                inParamBlock = true;
+            }
+            if (inParamBlock) {
+                paramDepth = updateParamParenDepth(trimmed, paramDepth);
+                maxScan = Math.min(lines.length, i + 1 + MAX_SCAN_LINES);
+                if (paramDepth <= 0) {
+                    inParamBlock = false;
+                }
+                continue;
+            }
             if (REGEX.SHELL.PS_ERROR_ACTION.test(trimmed)) {
                 found = true;
                 break;

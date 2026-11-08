@@ -63,7 +63,7 @@ function makeExposureIssue(params: ExposureIssueParams): Issue {
 function auditInternalApiEndpoints(file: string, rawLines: readonly string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
-        if (!line.includes('/')) continue;
+        if (!/\//.test(line)) continue;
         for (const pattern of INTERNAL_ENDPOINT_PATTERNS) {
             if (pattern.test(line)) {
                 issues.push(
@@ -89,7 +89,6 @@ function auditInternalApiEndpoints(file: string, rawLines: readonly string[], is
 function auditCssAuthorizationBypass(file: string, rawLines: readonly string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
-        if (!line.includes('style') && !line.includes('hidden')) continue;
         if (REGEX.SECURITY.CSS_AUTH_BYPASS.test(line)) {
             issues.push(
                 makeExposureIssue({
@@ -112,7 +111,6 @@ function auditCssAuthorizationBypass(file: string, rawLines: readonly string[], 
 function auditFeatureFlagCodeSplitting(file: string, rawLines: readonly string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
-        if (!line.includes('if')) continue;
         if (REGEX.SECURITY.FEATURE_FLAG_DEAD_GATE.test(line)) {
             issues.push(
                 makeExposureIssue({
@@ -135,7 +133,6 @@ function auditFeatureFlagCodeSplitting(file: string, rawLines: readonly string[]
 function auditUnreleasedRoutes(file: string, rawLines: readonly string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
-        if (!line.includes('/')) continue;
         if (REGEX.SECURITY.CLIENT_DEBUG_ROUTE.test(line)) {
             issues.push(
                 makeExposureIssue({
@@ -173,7 +170,7 @@ function findSensitiveActionLine(lines: readonly string[], start: number, end: n
 function auditIframeUserActivation(file: string, rawLines: readonly string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
-        if (!line.includes('message') || !REGEX.SECURITY.MESSAGE_LISTENER.test(line)) {
+        if (!REGEX.SECURITY.MESSAGE_LISTENER.test(line)) {
             continue;
         }
         const windowEnd = Math.min(rawLines.length, i + MAX_LISTENER_SCAN_WINDOW);

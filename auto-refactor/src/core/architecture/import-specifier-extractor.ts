@@ -70,7 +70,7 @@ function extractGdScriptSpecifiers(lineText: string, specifiers: SpecifierInfo[]
             specifiers.push({
                 raw,
                 isExternal: false,
-                resolvedPath: raw.replace(/\.(gd|tscn)$/, ''),
+                resolvedPath: raw.replace(/^res:\/\//, '').replace(/\.(gd|tscn)$/, ''),
             });
         }
     }

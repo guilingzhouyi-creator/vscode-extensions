@@ -39,6 +39,7 @@ const RE_AWAIT_KEYWORD = REGEX.DATA.AWAIT_KEYWORD;
 interface LockScopeState {
     isInsideLockScope: boolean;
     lockAcquireLine: number;
+    braceDepth: number;
 }
 
 function checkLockBoundary(
@@ -48,11 +49,13 @@ function checkLockBoundary(
     filePath: string,
     issues: Issue[],
 ): void {
-    if (RE_LOCK_ACQUIRE.test(trimmed)) {
+    if (!state.isInsideLockScope && RE_LOCK_ACQUIRE.test(trimmed)) {
         state.isInsideLockScope = true;
         state.lockAcquireLine = lineIdx + 1;
+        state.braceDepth = 0;
     }
-    if (state.isInsideLockScope && RE_AWAIT_KEYWORD.test(trimmed)) {
+    if (!state.isInsideLockScope) return;
+    if (RE_AWAIT_KEYWORD.test(trimmed)) {
         issues.push(
             createLineIssue(ANALYZER_CONCURRENCY, filePath, {
                 rule: RULE_RSM_LOCK_001,
@@ -63,9 +66,26 @@ function checkLockBoundary(
             }),
         );
         state.isInsideLockScope = false;
+        state.braceDepth = 0;
+        return;
     }
-    if (trimmed.includes('release(') || trimmed.includes('unlock(') || trimmed.includes('}')) {
+    if (trimmed.includes('release(') || trimmed.includes('unlock(')) {
         state.isInsideLockScope = false;
+        state.braceDepth = 0;
+        return;
+    }
+    for (let i = 0; i < trimmed.length; i++) {
+        const ch = trimmed.charCodeAt(i);
+        if (ch === 123) {
+            state.braceDepth++;
+        } else if (ch === 125) {
+            state.braceDepth--;
+            if (state.braceDepth < 0) {
+                state.isInsideLockScope = false;
+                state.braceDepth = 0;
+                return;
+            }
+        }
     }
 }
 
@@ -99,12 +119,16 @@ export class ConcurrencyAnalyzer implements Analyzer {
      */
     public finalize(context: AnalyzerContext): Issue[] {
         const issues: Issue[] = [];
-        const lines = context.lines ?? context.content.split('\n');
+        const lines = context.maskedLines ?? context.lines ?? context.content.split('\n');
 
         let hasListenerAttach = false;
         let hasTeardown = false;
         let attachLineIdx = 0;
-        const lockState: LockScopeState = { isInsideLockScope: false, lockAcquireLine: 1 };
+        const lockState: LockScopeState = {
+            isInsideLockScope: false,
+            lockAcquireLine: 1,
+            braceDepth: 0,
+        };
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];

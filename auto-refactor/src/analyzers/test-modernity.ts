@@ -248,8 +248,9 @@ export class TestModernityAnalyzer implements Analyzer {
         const sites: TestSite[] = [];
         const caseRecords: CaseRecord[] = [];
 
-        if (sourceFile && typeof sourceFile.forEachChild === 'function') {
-            this.analyzeWithAst(sourceFile, ctx, sites, caseRecords);
+        const resolvedSourceFile = sourceFile ?? ctx.sourceFile;
+        if (resolvedSourceFile && typeof resolvedSourceFile.forEachChild === 'function') {
+            this.analyzeWithAst(resolvedSourceFile, ctx, sites, caseRecords);
         }
 
         // If AST traversal yielded nothing (e.g. non-TS file or empty AST),

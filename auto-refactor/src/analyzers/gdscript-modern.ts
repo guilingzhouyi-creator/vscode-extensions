@@ -166,14 +166,18 @@ function scanMultiLineResetState(
     issues: Issue[],
     rule: DeclarativeLineRule,
 ): void {
-    const hasExtends = masked.some(
-        (line) => line.includes('extends') && REGEX.SYNTAX.GDSCRIPT_EXTENDS.test(line),
-    );
+    let hasExtends = false;
+    for (let i = 0; i < masked.length; i += 1) {
+        if (REGEX.SYNTAX.GDSCRIPT_EXTENDS.test(masked[i])) {
+            hasExtends = true;
+            break;
+        }
+    }
     if (!hasExtends) return;
 
     for (let index = 0; index < masked.length; index += 1) {
         const code = masked[index];
-        if (!code.includes('reset_state') || !REGEX.SYNTAX.GDSCRIPT_RESET_STATE_FUNC.test(code)) {
+        if (!REGEX.SYNTAX.GDSCRIPT_RESET_STATE_FUNC.test(code)) {
             continue;
         }
 

@@ -368,7 +368,7 @@ export class TsModernAnalyzer extends DeclarativeModernAnalyzer {
         for (let patternIdx = 0; patternIdx < patterns.typePatterns.length; patternIdx++) {
             lineTyped += countMatches(code, patterns.typePatterns[patternIdx]);
         }
-        return { lineTotal, lineTyped };
+        return { lineTotal, lineTyped: Math.min(lineTotal, lineTyped) };
     }
 
     private computeUsageAcrossLines(

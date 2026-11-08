@@ -87,6 +87,8 @@ export interface LoopScope {
 export interface LineScanState {
     inAsyncFunction: boolean;
     inBlockComment: boolean;
+    asyncBraceDepth: number;
+    asyncIndent: number;
 }
 
 /**

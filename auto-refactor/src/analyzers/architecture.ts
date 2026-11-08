@@ -347,7 +347,8 @@ function matchUserLayer(
     if (!layers) return null;
     const pathSet = buildPathSegmentSet(norm);
     for (const [pattern, layer] of Object.entries(layers)) {
-        if (pathSet.has(pattern)) return layer;
+        const cleanPattern = pattern.replace(/^\/+|\/+$/g, '');
+        if (pathSet.has(cleanPattern)) return layer;
     }
     return null;
 }

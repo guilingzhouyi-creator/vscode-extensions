@@ -26,7 +26,6 @@ import {
 } from '../core/domain-matcher';
 
 const EXT_GD = '.gd';
-const ACCEPTED_EXTENSIONS: readonly string[] = Object.freeze([EXT_GD] as const);
 
 const GD_COMMENT_CHAR = '#';
 const GD_QUOTE_CHARS = '"\'`';
@@ -79,7 +78,7 @@ const FORBIDDEN_TARGETS: readonly (string | RegExp)[] = Object.freeze([
     /\bEventBus\b/,
     'get_node(',
     '$"',
-    "$' ",
+    "\\$'",
 ]);
 
 const GAME_ISOLATION_PATTERN: BoundaryIsolationPattern = Object.freeze({
@@ -200,10 +199,10 @@ function auditSignalConnections(file: string, masked: readonly string[], issues:
     let disconnectCount = 0;
 
     for (const line of masked) {
-        if (line.includes('.connect') && REGEX.SYNTAX.GDSCRIPT_SIGNAL_CONNECT.test(line)) {
+        if (REGEX.SYNTAX.GDSCRIPT_SIGNAL_CONNECT.test(line)) {
             connectCount++;
         }
-        if (line.includes('.disconnect') && REGEX.SYNTAX.GDSCRIPT_SIGNAL_DISCONNECT.test(line)) {
+        if (REGEX.SYNTAX.GDSCRIPT_SIGNAL_DISCONNECT.test(line)) {
             disconnectCount++;
         }
     }
@@ -254,8 +253,7 @@ export class GdscriptGameAnalyzer implements Analyzer {
      */
     analyze(_sourceFile: unknown, ctx: AnalyzerContext): Issue[] {
         const file = ctx.filePath.replace(/\\/g, '/');
-        const hasValidExt = ACCEPTED_EXTENSIONS.some((ext) => file.endsWith(ext));
-        if (!hasValidExt) return [];
+        if (!file.endsWith(EXT_GD)) return [];
         if (isExemptPath(file)) return [];
 
         const content = ctx.content || '';

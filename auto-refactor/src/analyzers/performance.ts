@@ -198,7 +198,12 @@ export class PerformanceAnalyzer implements Analyzer {
 
         let lineStart = 0;
         let lineIdx = 0;
-        const scanState: LineScanState = { inAsyncFunction: false, inBlockComment: false };
+        const scanState: LineScanState = {
+            inAsyncFunction: false,
+            inBlockComment: false,
+            asyncBraceDepth: 0,
+            asyncIndent: -1,
+        };
         const loopStack: LoopScope[] = [];
         const pass: ScanPassContext = { ctx, scanConfig, scanState, loopStack, issues };
 
@@ -228,8 +233,20 @@ export class PerformanceAnalyzer implements Analyzer {
     private scanLineContent(pass: ScanPassContext, nextLine: ScannedLine, lineIdx: number): void {
         const { scanConfig, scanState, loopStack } = pass;
         updateIndentLoops(nextLine.lineText, scanConfig.isIndentBased, loopStack);
+        if (
+            scanConfig.isIndentBased &&
+            scanState.inAsyncFunction &&
+            nextLine.trimmed !== '' &&
+            calculateIndent(nextLine.lineText) <= scanState.asyncIndent &&
+            !this.isAsyncDeclaration(nextLine.trimmed)
+        ) {
+            scanState.inAsyncFunction = false;
+            scanState.asyncIndent = -1;
+        }
         if (this.isAsyncDeclaration(nextLine.trimmed)) {
             scanState.inAsyncFunction = true;
+            scanState.asyncBraceDepth = 0;
+            scanState.asyncIndent = calculateIndent(nextLine.lineText);
         }
 
         this.checkLoopNesting(pass, nextLine, lineIdx);
@@ -267,8 +284,23 @@ export class PerformanceAnalyzer implements Analyzer {
     }
 
     private auditBraces(pass: ScanPassContext, trimmed: string): void {
-        const { scanConfig, loopStack } = pass;
+        const { scanConfig, scanState, loopStack } = pass;
         if (scanConfig.isIndentBased) return;
+        if (scanState.inAsyncFunction) {
+            for (let i = 0; i < trimmed.length; i++) {
+                const ch = trimmed.charCodeAt(i);
+                if (ch === 123) {
+                    scanState.asyncBraceDepth++;
+                } else if (ch === 125) {
+                    scanState.asyncBraceDepth--;
+                    if (scanState.asyncBraceDepth <= 0) {
+                        scanState.inAsyncFunction = false;
+                        scanState.asyncBraceDepth = 0;
+                        break;
+                    }
+                }
+            }
+        }
         updateBraceLoops(trimmed, loopStack);
         if (
             loopStack.length > 0 &&
@@ -324,8 +356,18 @@ export class PerformanceAnalyzer implements Analyzer {
         lineIdx: number,
     ): void {
         if (/^\s*throw\b|\bthrow\s+new\b/.test(trimmed)) return;
-        const isHighRisk = HIGH_RISK_OBJECT_ALLOC_RE.test(trimmed);
-        const isGeneralAlloc = TRANSIENT_ALLOC_RE.test(trimmed);
+        if (/^(?:export\s+)?(?:interface|type)\b/.test(trimmed)) return;
+        if (
+            /^(?:readonly\s+)?[A-Za-z_$][A-Za-z0-9_$]*\??\s*:/.test(trimmed) &&
+            !trimmed.includes('=')
+        ) {
+            return;
+        }
+        const runtimeLine = trimmed
+            .replace(/(?<=[A-Za-z0-9_$>])\[\s*\]/g, '')
+            .replace(/\bas\s+\{[^}]*\}?/g, '');
+        const isHighRisk = HIGH_RISK_OBJECT_ALLOC_RE.test(runtimeLine);
+        const isGeneralAlloc = TRANSIENT_ALLOC_RE.test(runtimeLine);
         if (!isHighRisk && !isGeneralAlloc) return;
 
         const loopDepth = pass.loopStack.length;
