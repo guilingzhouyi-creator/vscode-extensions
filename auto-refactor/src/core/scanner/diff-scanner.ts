@@ -33,6 +33,7 @@ import {
 import { globToRegExp, collectFiles } from '../file-discovery';
 import { loadGitignore } from '../policy/gitignore';
 import type { ScannerContext } from './scanner-context';
+import { ensureProjectCommentLanguage } from './scan-stage';
 import {
     createWarmSession,
     buildCacheFingerprintContext,
@@ -573,6 +574,7 @@ interface PreparedDiffFilesContext {
     readonly hintsMap: Map<string, DiffInput>;
     readonly diffIgnored: number;
     readonly targetFiles: string[];
+    readonly discoveredFiles: string[];
 }
 
 function getPreparedDiffFiles(
@@ -588,7 +590,7 @@ function getPreparedDiffFiles(
     const discoveredSet = new Set(discoveredFiles);
     const { hintsMap, diffIgnored } = filterDiffHints(diffHints, discoveredSet, absRoot);
     const targetFiles: string[] = deltaOnly ? [...hintsMap.keys()].sort() : discoveredFiles;
-    return { hintsMap, diffIgnored, targetFiles };
+    return { hintsMap, diffIgnored, targetFiles, discoveredFiles };
 }
 
 interface ExecuteDiffPipelinesContext {
@@ -698,6 +700,7 @@ export async function executeScanWithDiff(
         `diff scan: ${files.length} file(s) (diffHints=${prepared.hintsMap.size}, ignored=${prepared.diffIgnored}, deltaOnly=${deltaOnly})`,
     );
 
+    await ensureProjectCommentLanguage(scanner, prepared.discoveredFiles, absRoot);
     const fpContext = buildCacheFingerprintContext(cfg, scanner.plan, opts.cacheCustom);
     const session = opts.session || createWarmSession();
     const { sessionBucket, incBucket } = resolveSessionBuckets(session, fpContext.poolFp);

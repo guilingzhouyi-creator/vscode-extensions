@@ -688,6 +688,48 @@ function auditGDScriptClass(className: string, lineIdx: number, pCtx: PolyglotNa
     }
 }
 
+function auditGDScriptImportAlias(
+    aliasName: string,
+    lineIdx: number,
+    pCtx: PolyglotNamingContext,
+): void {
+    if (pCtx.opts.checkTypes !== false && !/^[A-Z][a-zA-Z0-9]*$/.test(aliasName)) {
+        const suggested = toPascalCase(aliasName);
+        pCtx.issues.push(
+            pCtx.mkIssue({
+                line: lineIdx + 1,
+                column: 1,
+                rule: 'NAM-TYP-001',
+                message: `GDScript preload/load alias '${aliasName}' should follow PascalCase convention.`,
+                severity: SEVERITY_WARNING,
+                detail: { name: aliasName, lang: 'gdscript' },
+                suggestion: `Rename preloaded class/resource alias '${aliasName}' to PascalCase convention.`,
+                actionable: buildPolyglotActionable(
+                    aliasName,
+                    'NAM-TYP-001',
+                    lineIdx + 1,
+                    1,
+                    suggested,
+                ),
+            }),
+        );
+    }
+    if (pCtx.opts.checkJargon !== false && hasTransientJargon(aliasName)) {
+        pCtx.issues.push(
+            pCtx.mkIssue({
+                line: lineIdx + 1,
+                column: 1,
+                rule: 'NAM-JRG-002',
+                message: `Preloaded alias '${aliasName}' contains transient construction jargon.`,
+                severity: SEVERITY_WARNING,
+                detail: { name: aliasName, lang: 'gdscript' },
+                suggestion: 'Replace transient process markers with semantic domain naming.',
+                actionable: buildPolyglotActionable(aliasName, 'NAM-JRG-002', lineIdx + 1, 1),
+            }),
+        );
+    }
+}
+
 function auditGDScriptConstant(
     constName: string,
     lineIdx: number,
@@ -789,7 +831,11 @@ function auditGDScriptLine(line: string, lineIdx: number, pCtx: PolyglotNamingCo
 
     const constMatch = REGEX.SYNTAX.GDSCRIPT_CONST.exec(line);
     if (constMatch) {
-        auditGDScriptConstant(constMatch[1], lineIdx, pCtx);
+        if (REGEX.SYNTAX.GDSCRIPT_LOAD_IMPORT.test(line)) {
+            auditGDScriptImportAlias(constMatch[1], lineIdx, pCtx);
+        } else {
+            auditGDScriptConstant(constMatch[1], lineIdx, pCtx);
+        }
         return;
     }
 

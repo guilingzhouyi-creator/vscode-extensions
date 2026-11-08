@@ -174,7 +174,7 @@ async function main() {
     );
     console.log('  ✔ indexOf boundary rule fires on >= 0 and stays silent otherwise');
 
-    // ── 6. Object property values (functions, constants, enum members) do not trigger TSM-TYPE-001 ──
+    // ── 6. Object property values (functions, constants, enum members) do not trigger TSM-TYPE-001
     const propValIssues = await scanFixture(
       root,
       {

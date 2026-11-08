@@ -89,6 +89,10 @@ export const GDSCRIPT_FUNC_DECL_HEADER_PATTERN = /^\s*(?:static\s+)?func\s+[a-zA
 /** Matches GDScript for loop declaration line. */
 export const GDSCRIPT_FOR_DECL_PATTERN = /^\s*for\s+[a-zA-Z_]\w*\s+in\b/;
 
+/** Matches GDScript file-header prologue directives that precede preload imports. */
+export const GDSCRIPT_HEADER_PROLOGUE_PATTERN =
+    /^(?:@tool\b|@icon\s*\(|tool\b|class_name\s+|extends\s+)/;
+
 /** Creates a fresh global scanner for GDScript preload/load calls. */
 export function createGdscriptPreloadScanner(): RegExp {
     return /(?:preload|load)\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
@@ -118,5 +122,6 @@ export const REGEX_GDSCRIPT = Object.freeze({
     LOAD_IMPORT: GDSCRIPT_LOAD_IMPORT_PATTERN,
     FUNC_DECL_HEADER: GDSCRIPT_FUNC_DECL_HEADER_PATTERN,
     FOR_DECL: GDSCRIPT_FOR_DECL_PATTERN,
+    HEADER_PROLOGUE: GDSCRIPT_HEADER_PROLOGUE_PATTERN,
     createGdscriptPreloadScanner: createGdscriptPreloadScanner,
 });

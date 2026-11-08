@@ -40,6 +40,24 @@ function isPolyglotImportLine(trimmed: string, language: string): boolean {
     return REGEX.SYNTAX.TS_IMPORT_LINE.test(trimmed);
 }
 
+/**
+ * Check whether a leading polyglot line is a mandatory file header prologue rather than
+ * operational logic, so subsequent top-of-file imports are not misclassified as misplaced.
+ *
+ * @param trimmed - Trimmed source line.
+ * @param language - Normalized language identifier.
+ * @returns True when the line is a language header prologue preceding imports.
+ */
+function isPolyglotHeaderPrologue(trimmed: string, language: string): boolean {
+    if (language === 'gdscript') {
+        return REGEX.GDSCRIPT.HEADER_PROLOGUE.test(trimmed);
+    }
+    if (language === 'rust') {
+        return trimmed.startsWith('#![') || trimmed.startsWith('//!');
+    }
+    return false;
+}
+
 function buildEnrichedOptions(
     normPath: string,
     filePath: string,
@@ -178,7 +196,7 @@ function findFirstPolyglotDeclarationLine(
         ) {
             continue;
         }
-        if (!isPolyglotImportLine(trimmed, language)) {
+        if (!isPolyglotImportLine(trimmed, language) && !isPolyglotHeaderPrologue(trimmed, language)) {
             return i + 1;
         }
     }

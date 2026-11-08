@@ -11,9 +11,13 @@
  *   byte-stability contract every cache/diff comparison relies on.
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
 import type { FileMetric, Issue, ScanConfig } from '../types';
 import type { ResolvedAnalyzer, WorkerAnalyzerDesc } from '../analyzer-registry';
 import type { Logger } from '../logger';
+import { defaultProjectCommentProfiler } from '../comments/project-comment-profiler';
+import { isFixtureOrMockPath, isTestFilePath } from '../path';
 import { AR_TIMING, effectiveWorkers, nowMs, runWorkerPool } from './worker-scheduler';
 import {
     defaultTriggerCatalog,
@@ -198,4 +202,99 @@ export function printScanTiming(marks: ScanTimingMarks): void {
             `merge+sort=${(sortedAt - parseAnalyzeAt).toFixed(1)}ms ` +
             `report=${(nowMs() - sortedAt).toFixed(1)}ms`,
     );
+}
+
+const COMMENT_SAMPLE_BUDGET = 24;
+const COMMENT_MIN_SAMPLE_TOKENS = 20;
+
+function isPrimaryCommentSample(rel: string): boolean {
+    return !isTestFilePath(rel) && !isFixtureOrMockPath(rel);
+}
+
+function selectCommentSamplePaths(files: readonly string[]): string[] {
+    const primary = files.filter(isPrimaryCommentSample);
+    const pool = primary.length > 0 ? primary : files;
+    if (pool.length <= COMMENT_SAMPLE_BUDGET) {
+        return [...pool];
+    }
+    const picked: string[] = [];
+    const step = pool.length / COMMENT_SAMPLE_BUDGET;
+    for (let i = 0; i < COMMENT_SAMPLE_BUDGET; i++) {
+        picked.push(pool[Math.min(pool.length - 1, Math.floor(i * step))]);
+    }
+    return picked;
+}
+
+async function readCommentSampleMap(
+    samplePaths: readonly string[],
+    absRoot: string,
+    logger?: Logger,
+): Promise<Map<string, string>> {
+    const entries = await Promise.all(
+        samplePaths.map(async (rel) => {
+            try {
+                const content = await fs.promises.readFile(path.join(absRoot, rel), 'utf8');
+                return [rel, content] as const;
+            } catch (err) {
+                logger?.debug(`comment convention sample skipped (${rel}): ${String(err)}`);
+                return null;
+            }
+        }),
+    );
+    const sampleMap = new Map<string, string>();
+    for (const entry of entries) {
+        if (entry) sampleMap.set(entry[0], entry[1]);
+    }
+    return sampleMap;
+}
+
+function hasConfiguredCommentLanguage(
+    commentsPlan: ResolvedAnalyzer,
+    cfg: ScanConfig,
+): boolean {
+    const planLang = commentsPlan.options?.targetDominantLanguage;
+    const cfgLang = cfg.analyzers?.comments?.options?.targetDominantLanguage;
+    return Boolean(planLang || cfgLang);
+}
+
+/**
+ * Infer and bind the project's dominant comment language onto the comments analyzer options
+ * when callers did not pin `targetDominantLanguage`, preventing English-only false positives
+ * on non-English repositories.
+ *
+ * @param host - Scanner execution host exposing config, plan, and logger.
+ * @param discoveredFiles - Deterministically ordered repository-relative file list.
+ * @param absRoot - Absolute project root path.
+ * Concurrency: asynchronous sampler bounded to COMMENT_SAMPLE_BUDGET files via Promise.all;
+ *   runs once before worker dispatch with deterministic input order.
+ */
+export async function ensureProjectCommentLanguage(
+    host: Pick<ScanStageHost, 'config' | 'plan' | 'logger'>,
+    discoveredFiles: readonly string[],
+    absRoot: string,
+): Promise<void> {
+    if (discoveredFiles.length === 0) return;
+    const commentsPlan = host.plan.find((item) => item.name === 'comments');
+    if (!commentsPlan || hasConfiguredCommentLanguage(commentsPlan, host.config)) return;
+
+    const samplePaths = selectCommentSamplePaths(discoveredFiles);
+    const sampleMap = await readCommentSampleMap(samplePaths, absRoot, host.logger);
+    if (sampleMap.size === 0) return;
+
+    const profile = defaultProjectCommentProfiler.profileProject(sampleMap);
+    const totalTokens =
+        profile.overallDistribution.cjkChars + profile.overallDistribution.latinWords;
+    if (totalTokens < COMMENT_MIN_SAMPLE_TOKENS) return;
+
+    commentsPlan.options = {
+        ...(commentsPlan.options || {}),
+        targetDominantLanguage: profile.globalDominantLanguage,
+    };
+    const cfgComments = host.config.analyzers?.comments;
+    if (cfgComments) {
+        cfgComments.options = {
+            ...(cfgComments.options || {}),
+            targetDominantLanguage: profile.globalDominantLanguage,
+        };
+    }
 }

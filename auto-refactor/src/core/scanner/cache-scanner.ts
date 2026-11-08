@@ -22,6 +22,7 @@ import {
 import { globToRegExp, collectFiles } from '../file-discovery';
 import { loadGitignore } from '../policy/gitignore';
 import type { ScannerContext } from './scanner-context';
+import { ensureProjectCommentLanguage } from './scan-stage';
 import {
     createWarmSession,
     buildCacheFingerprintContext,
@@ -66,6 +67,7 @@ export async function executeScanWithCache(
     const files = collectFiles(absRoot, includeRx, excludeRx, giIgnore);
     scanner.logger.info(`discovered ${files.length} file(s) under ${absRoot}`);
 
+    await ensureProjectCommentLanguage(scanner, files, absRoot);
     const fpContext = buildCacheFingerprintContext(cfg, scanner.plan, opts.cacheCustom);
     const session = opts.session || createWarmSession();
     const { sessionBucket, incBucket } = resolveSessionBuckets(session, fpContext.poolFp);

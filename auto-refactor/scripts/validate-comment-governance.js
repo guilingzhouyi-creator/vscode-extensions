@@ -189,6 +189,22 @@ async function testCommentsAnalyzerRules() {
   );
   assert.ok(lngIssue.message.includes('diverges from dominant project convention [en]'));
 
+  // Without targetDominantLanguage established, pure Chinese files must not
+  // trigger fabricated [en] CMT-LNG-001 drift.
+  const issuesStandaloneZh = analyzer.analyze(undefined, {
+    filePath: 'src/core/worker_zh.ts',
+    content: zhDivergentFile,
+    config: { commentLevel: 'standard' },
+    options: {
+      enableLanguageGovernance: true,
+    },
+  });
+  assert.strictEqual(
+    issuesStandaloneZh.some((i) => i.rule === 'CMT-LNG-001'),
+    false,
+    'Unconfigured standalone single-language Chinese file must not fabricate [en] convention drift',
+  );
+
   // Test CMT-LNG-002 (Mixed language incoherence)
   const mixedFile = [
     '// First line in English explaining basic concepts and architecture',

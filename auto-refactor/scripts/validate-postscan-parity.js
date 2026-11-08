@@ -184,13 +184,13 @@ async function main() {
           },
           suppressions: [
             {
-              matchFile: 'scripts/**',
+              matchFile: 'legacy/**',
               matchRule: 'magic-number',
-              reason: 'fixture policy: script fixtures carry input data, not magic numbers',
+              reason: 'policy: legacy adapters carry domain tables, not extractable constants',
             },
           ],
         }),
-        'scripts/tool.ts': 'export function scale(x: number): number {\n  return x * 12345;\n}\n',
+        'legacy/pricing.ts': 'export function scale(x: number): number {\n  return x * 12345;\n}\n',
         'src/app.ts': 'export function scale(x: number): number {\n  return x * 54321;\n}\n',
       });
       const globbed = await scan({
@@ -201,14 +201,14 @@ async function main() {
       });
       const magic = globbed.issues.filter((issue) => issue.rule === 'magic-number');
       // Suppressed findings stay in the report (audit trail), so the live set excludes them.
-      const inScripts = magic.filter(
-        (issue) => issue.location.file.startsWith('scripts/') && !issue.suppression,
+      const inLegacy = magic.filter(
+        (issue) => issue.location.file.startsWith('legacy/') && !issue.suppression,
       );
       const inSrc = magic.filter(
         (issue) => issue.location.file.startsWith('src/') && !issue.suppression,
       );
       assert.strictEqual(inSrc.length, 1, 'the glob policy must not leak outside its directory');
-      assert.strictEqual(inScripts.length, 0, 'the glob policy must silence its directory');
+      assert.strictEqual(inLegacy.length, 0, 'the glob policy must silence its directory');
       assert.strictEqual(
         globbed.summary.suppressedCount,
         1,

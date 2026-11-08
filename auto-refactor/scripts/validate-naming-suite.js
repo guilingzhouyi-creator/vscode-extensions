@@ -160,6 +160,8 @@ const FIXTURES = {
     'class_name bad_gd_class',
     'const bad_gd_const = 5',
     'const MAX_SPEED = 100',
+    'const AccountService = preload("res://account_service.gd")',
+    'const bad_preload_ref = preload("res://bad_ref.gd")',
     'func banana_apple():',
     '    pass',
     'func update_player_state():',
@@ -564,6 +566,18 @@ function verifyGDScriptPolyglotNaming(byRule) {
       (i) => i.location.file.endsWith('.gd') && i.detail && i.detail.name === 'MAX_SPEED',
     ),
     'GDScript MAX_SPEED constant should be valid',
+  );
+  assert.ok(
+    !glbIssues.some(
+      (i) => i.location.file.endsWith('.gd') && i.detail && i.detail.name === 'AccountService',
+    ),
+    'GDScript PascalCase preload binding AccountService should be exempt from NAM-GLB-001',
+  );
+  assert.ok(
+    typIssues.some(
+      (i) => i.location.file.endsWith('.gd') && i.detail && i.detail.name === 'bad_preload_ref',
+    ),
+    'GDScript snake_case preload binding bad_preload_ref should trigger NAM-TYP-001',
   );
 
   const sglIssues = byRule('NAM-SGL-001');

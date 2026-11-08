@@ -148,6 +148,38 @@ describe('File Domain Layout Monotonicity & Parameter Count Bounds', () => {
             const horizonIssue = issues.find((i) => i.rule === 'DEP-ORD-002');
             expect(horizonIssue).toBeUndefined();
         });
+
+        it('allows GDScript @tool, class_name, and extends header prologue before preload imports', () => {
+            const gdCode = [
+                'class_name AccountService',
+                'extends RefCounted',
+                '',
+                'const Repository = preload("res://backend/domains/account/repository.gd")',
+                'static func run() -> void:',
+                '    pass',
+            ].join('\n');
+
+            const ctx = createContext('backend/domains/account/service.gd', gdCode);
+            const issues = depAnalyzer.analyze(undefined as unknown as ts.SourceFile, ctx);
+
+            const horizonIssue = issues.find((i) => i.rule === 'DEP-ORD-002');
+            expect(horizonIssue).toBeUndefined();
+        });
+
+        it('emits DEP-ORD-002 when GDScript preload import appears after scalar const or var', () => {
+            const gdCode = [
+                'class_name AccountService',
+                'extends RefCounted',
+                'const MAX_RETRIES := 3',
+                'const Repository = preload("res://backend/domains/account/repository.gd")',
+            ].join('\n');
+
+            const ctx = createContext('backend/domains/account/service.gd', gdCode);
+            const issues = depAnalyzer.analyze(undefined as unknown as ts.SourceFile, ctx);
+
+            const horizonIssue = issues.find((i) => i.rule === 'DEP-ORD-002');
+            expect(horizonIssue).toBeDefined();
+        });
     });
 
     describe('CONST-LAY-002: Type Definition Order Inversion', () => {

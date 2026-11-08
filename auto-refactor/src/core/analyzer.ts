@@ -72,6 +72,7 @@ import { ALL_BUILTIN_ANALYZERS, routeArchetypeToAnalyzers } from './router/spars
 import { pMap, AR_TIMING, nowMs } from './scanner/worker-scheduler';
 import { runFileAnalyzers } from './scanner/analyzer-runner';
 import {
+    ensureProjectCommentLanguage,
     mergePerFileResults,
     printScanTiming,
     runParseAnalyzeStage,
@@ -485,6 +486,7 @@ export class Scanner implements ScannerContext {
         // AR_TIMING uses performance.now() (module-level nowMs) so all stage deltas share one base.
         const startAt = AR_TIMING ? nowMs() : 0;
 
+        await ensureProjectCommentLanguage(this, files, absRoot);
         const perFile = await runParseAnalyzeStage(this, files, absRoot);
         const parseAnalyzeAt = AR_TIMING ? nowMs() : 0;
 

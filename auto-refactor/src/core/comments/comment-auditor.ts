@@ -45,7 +45,6 @@ const INCOHERENCE_ENTROPY_MIN = 0.5;
 const MIN_WATER_LOGGING_LINES = 4;
 const LOOKAHEAD_BODY_LINES = 30;
 
-const DEFAULT_DOMINANT_LANG = 'en';
 const CHINESE_LANG_ID = 'zh-CN';
 const ENGLISH_LANG_ID = 'en';
 
@@ -204,10 +203,12 @@ export function auditCommentLanguage(
     }
 
     const dist = defaultProjectCommentProfiler.profileSingleFile(content);
-    const targetLang = opts.targetDominantLanguage || DEFAULT_DOMINANT_LANG;
+    const targetLang = opts.targetDominantLanguage;
 
-    auditLineLevelLanguage(content, targetLang, ctx, issues, mkIssue);
-    auditMacroLanguageDrift(dist, targetLang, ctx, issues, mkIssue);
+    if (targetLang) {
+        auditLineLevelLanguage(content, targetLang, ctx, issues, mkIssue);
+        auditMacroLanguageDrift(dist, targetLang, ctx, issues, mkIssue);
+    }
     auditMixedLanguageIncoherence(dist, ctx, issues, mkIssue);
 }
 
