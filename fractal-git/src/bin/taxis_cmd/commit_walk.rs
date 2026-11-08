@@ -361,6 +361,55 @@ fn prime_from_commit_graph(view: &RepoView, tips: &[Oid], table: &mut FastOidMap
 /// Returns FractalError::ObjectCodec when a reachable commit is missing or is not a commit, and
 /// refuses a traversal that exceeds MAX_WALK_COMMITS.
 pub fn walk_commits(view: &RepoView, starts: &[Oid]) -> FractalResult<Vec<CommitRecord>> {
+    Ok(walk_commits_within(view, starts, WalkLimit::Unbounded)?.records)
+}
+
+/// How far a walk may go before it stops reading.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WalkLimit {
+    /// Follow every reachable commit.
+    Unbounded,
+    /// Stop after this many commits have been read.
+    ///
+    /// The walk stops *reading*, not merely *reporting*. Reading the rest and then truncating would
+    /// cost exactly as much as the unbounded walk, which is the cost the limit exists to avoid.
+    MaxCommits(usize),
+}
+
+/// Result of a bounded walk.
+#[derive(Debug, Clone)]
+pub struct CommitWalk {
+    /// Records in date order.
+    pub records: Vec<CommitRecord>,
+    /// Whether parents were left unread because the limit was reached.
+    ///
+    /// Reported rather than inferred. A caller that receives a truncated walk must be able to say
+    /// so; a walk that silently stops looks exactly like a history that genuinely ended there.
+    pub truncated: bool,
+}
+
+/// Walks from `starts` back through history, stopping once `limit` is reached.
+///
+/// A depth limit cannot preserve the date-order invariant the unbounded walk guarantees. That
+/// invariant needs every parent's record before a child may be emitted, so a walk that stopped
+/// early has children whose parents were never read. The commits it did read are still emitted in
+/// date order among themselves, and `truncated` says the sequence is a prefix rather than the whole
+/// history.
+///
+/// # Errors
+///
+/// Returns `FractalError::ObjectCodec` when a reached commit is missing, is not a commit, or when
+/// an unbounded walk exceeds `MAX_WALK_COMMITS`.
+pub fn walk_commits_within(
+    view: &RepoView,
+    starts: &[Oid],
+    limit: WalkLimit,
+) -> FractalResult<CommitWalk> {
+    let budget = match limit {
+        WalkLimit::Unbounded => usize::MAX,
+        WalkLimit::MaxCommits(cap) => cap,
+    };
+
     let mut discovered: FastOidSet = FastOidSet::default();
     let mut queue: VecDeque<Oid> = VecDeque::new();
     for start in starts {
@@ -372,7 +421,15 @@ pub fn walk_commits(view: &RepoView, starts: &[Oid]) -> FractalResult<Vec<Commit
     let mut records: FastOidMap<CommitRecord> = FastOidMap::default();
     let mut child_count: FastOidMap<usize> = FastOidMap::default();
     let mut discovery_order: Vec<Oid> = Vec::new();
+    let mut truncated = false;
     while let Some(oid) = queue.pop_front() {
+        if records.len() >= budget {
+            // The commit just dequeued was never read, so the result is always a prefix — even when
+            // the queue is now empty. A linear history holds one entry at a time, which made the
+            // earlier "is the queue non-empty" test report a complete walk for every truncation.
+            truncated = true;
+            break;
+        }
         if records.len() >= MAX_WALK_COMMITS {
             return Err(FractalError::ObjectCodec(format!(
                 "commit traversal exceeded {MAX_WALK_COMMITS} commits; refusing to continue"
@@ -429,7 +486,10 @@ pub fn walk_commits(view: &RepoView, starts: &[Oid]) -> FractalResult<Vec<Commit
             order.push(record);
         }
     }
-    Ok(order)
+    Ok(CommitWalk {
+        records: order,
+        truncated,
+    })
 }
 
 /// Orders commits the way git log --date-order does: newest commit date first, then discovery order.
