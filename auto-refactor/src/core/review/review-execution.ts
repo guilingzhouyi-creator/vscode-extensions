@@ -34,85 +34,118 @@ export interface ReviewExecution {
     readonly failures: readonly ReviewFailure[];
 }
 
-function nonBlank(value: unknown): value is string {
-    return typeof value === 'string' && value.trim().length > 0;
+const STATUS_PENDING = 'pending';
+const STATUS_RUNNING = 'running';
+const STATUS_COMPLETE = 'complete';
+const STATUS_FAILED = 'failed';
+const STATUS_NOT_REQUIRED = 'not-required';
+const STATUS_EXECUTED = 'executed';
+const STATUS_NOT_APPLICABLE = 'not-applicable';
+const STATUS_QUEUED = 'queued';
+const STATUS_PARTIAL = 'partial';
+
+const VALID_COVERAGE_STATUSES: ReadonlySet<string> = new Set([
+    'supported',
+    STATUS_EXECUTED,
+    STATUS_NOT_APPLICABLE,
+    'unsupported',
+    STATUS_FAILED,
+    'degraded',
+]);
+
+const VALID_TRACK_STATUSES: ReadonlySet<string> = new Set([
+    STATUS_PENDING,
+    STATUS_RUNNING,
+    STATUS_COMPLETE,
+    STATUS_FAILED,
+    STATUS_NOT_REQUIRED,
+]);
+
+const VALID_TERMINATION_STATUSES: ReadonlySet<string> = new Set(['cancelled', 'superseded']);
+
+function isNonBlankText(candidate: unknown): candidate is string {
+    return typeof candidate === 'string' && candidate.trim().length > 0;
 }
 
-function validCoverage(item: ReviewCapabilityCoverage): boolean {
-    if (!item || ![item.analyzer, item.capability, item.language].every(nonBlank)) return false;
-    if (typeof item.required !== 'boolean') return false;
+function isCoverageEntryValid(coverageItem: ReviewCapabilityCoverage): boolean {
     if (
-        !['supported', 'executed', 'not-applicable', 'unsupported', 'failed', 'degraded'].includes(
-            item.status,
+        !coverageItem ||
+        ![coverageItem.analyzer, coverageItem.capability, coverageItem.language].every(
+            isNonBlankText,
         )
-    )
+    ) {
         return false;
-    if (item.reason !== undefined && !nonBlank(item.reason)) return false;
+    }
+    if (typeof coverageItem.required !== 'boolean') return false;
+    if (!VALID_COVERAGE_STATUSES.has(coverageItem.status)) return false;
+    if (coverageItem.reason !== undefined && !isNonBlankText(coverageItem.reason)) return false;
     return (
-        item.policyAllowsNotApplicable === undefined ||
-        typeof item.policyAllowsNotApplicable === 'boolean'
+        coverageItem.policyAllowsNotApplicable === undefined ||
+        typeof coverageItem.policyAllowsNotApplicable === 'boolean'
     );
 }
 
-function validExecution(input: ReviewExecutionInput): boolean {
-    if (!input || !nonBlank(input.reviewId)) return false;
-    if (!Array.isArray(input.coverage) || !input.coverage.every(validCoverage)) return false;
-    const trackStatuses: readonly string[] = [
-        'pending',
-        'running',
-        'complete',
-        'failed',
-        'not-required',
-    ];
+function isExecutionInputValid(input: ReviewExecutionInput): boolean {
+    if (!input || !isNonBlankText(input.reviewId)) return false;
+    if (!Array.isArray(input.coverage) || !input.coverage.every(isCoverageEntryValid)) {
+        return false;
+    }
     if (
         !input.tracks ||
-        ![input.tracks.fast, input.tracks.deep].every((status) => trackStatuses.includes(status))
-    )
+        ![input.tracks.fast, input.tracks.deep].every((status) => VALID_TRACK_STATUSES.has(status))
+    ) {
         return false;
-    if (input.termination !== undefined && !['cancelled', 'superseded'].includes(input.termination))
+    }
+    if (input.termination !== undefined && !VALID_TERMINATION_STATUSES.has(input.termination)) {
         return false;
+    }
     return (
         input.failures === undefined ||
         (Array.isArray(input.failures) &&
             input.failures.every(
                 (failure) =>
                     failure &&
-                    nonBlank(failure.code) &&
-                    nonBlank(failure.message) &&
+                    isNonBlankText(failure.code) &&
+                    isNonBlankText(failure.message) &&
                     (failure.retryable === undefined || typeof failure.retryable === 'boolean'),
             ))
     );
 }
 
-function capabilityComplete(item: ReviewCapabilityCoverage): boolean {
-    if (item.status === 'executed') return true;
+function isCapabilityComplete(coverageItem: ReviewCapabilityCoverage): boolean {
+    if (coverageItem.status === STATUS_EXECUTED) return true;
     return (
-        item.status === 'not-applicable' &&
-        item.policyAllowsNotApplicable === true &&
-        typeof item.reason === 'string' &&
-        item.reason.trim().length > 0
+        coverageItem.status === STATUS_NOT_APPLICABLE &&
+        coverageItem.policyAllowsNotApplicable === true &&
+        typeof coverageItem.reason === 'string' &&
+        coverageItem.reason.trim().length > 0
     );
 }
 
 function hasExecutionFailure(input: ReviewExecutionInput): boolean {
     return (
         (input.failures?.length ?? 0) > 0 ||
-        input.tracks.fast === 'failed' ||
-        input.tracks.deep === 'failed' ||
-        input.coverage.some((item) => item.required && item.status === 'failed')
+        input.tracks.fast === STATUS_FAILED ||
+        input.tracks.deep === STATUS_FAILED ||
+        input.coverage.some(
+            (coverageItem) => coverageItem.required && coverageItem.status === STATUS_FAILED,
+        )
     );
 }
 
-function executionStatus(input: ReviewExecutionInput): ReviewExecutionStatus {
+function resolveExecutionStatus(input: ReviewExecutionInput): ReviewExecutionStatus {
     if (input.termination) return input.termination;
-    const required = input.coverage.filter((item) => item.required);
-    if (hasExecutionFailure(input)) return 'failed';
-    if (input.tracks.fast === 'pending') return 'queued';
-    if (input.tracks.fast === 'running') return 'running';
-    if (input.tracks.deep === 'pending' || input.tracks.deep === 'running') return 'partial';
-    if (required.length === 0 || required.some((item) => !capabilityComplete(item)))
-        return 'partial';
-    return 'complete';
+    const required = input.coverage.filter((coverageItem) => coverageItem.required);
+    if (hasExecutionFailure(input)) return STATUS_FAILED;
+    if (input.tracks.fast === STATUS_PENDING) return STATUS_QUEUED;
+    if (input.tracks.fast === STATUS_RUNNING) return STATUS_RUNNING;
+    if (input.tracks.deep === STATUS_PENDING || input.tracks.deep === STATUS_RUNNING) {
+        return STATUS_PARTIAL;
+    }
+    if (required.length === 0 || required.some((coverageItem) => !isCapabilityComplete(coverageItem))) {
+        return STATUS_PARTIAL;
+    }
+    return STATUS_COMPLETE;
 }
 
 /**
@@ -123,11 +156,11 @@ function executionStatus(input: ReviewExecutionInput): ReviewExecutionStatus {
  * @throws When the review identifier is absent.
  */
 export function createReviewExecution(input: ReviewExecutionInput): ReviewExecution {
-    if (!validExecution(input)) throw new Error('Invalid review execution facts');
+    if (!isExecutionInputValid(input)) throw new Error('Invalid review execution facts');
     return {
         schemaVersion: 1,
         reviewId: input.reviewId,
-        status: executionStatus(input),
+        status: resolveExecutionStatus(input),
         coverage: input.coverage.map((item) => ({ ...item })),
         tracks: { ...input.tracks },
         failures: (input.failures ?? []).map((failure) => ({ ...failure })),

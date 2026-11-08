@@ -41,22 +41,37 @@ interface AnalyzerCalls {
     failure?: string;
 }
 
-function failureMessage(error: unknown): string {
+const REASON_ROUTING_FILTER = 'routing-filter';
+const REASON_NOT_INVOKED = 'not-invoked';
+const REASON_ANALYZER_EXCEPTION = 'analyzer-exception';
+const REASON_LINE_WINDOW = 'line-window';
+const STATUS_COMPLETE = 'complete';
+const STATUS_DEGRADED = 'degraded';
+const STATUS_UNAVAILABLE = 'unavailable';
+const STATUS_UNSUPPORTED = 'unsupported';
+const STATUS_PARTIAL = 'partial';
+const STATUS_FAILED = 'failed';
+const STATUS_NOT_RUN = 'not-run';
+const PRECISION_AST = 'ast';
+const PRECISION_LEXICAL = 'lexical';
+const PRECISION_UNSPECIFIED = 'unspecified';
+
+function formatFailureMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
 }
 
-function observedHook(
+function wrapObservedHook(
     hook: StreamingVisitHook | undefined,
     analyzer: StreamingEntry['analyzer'],
     calls: AnalyzerCalls,
 ): StreamingVisitHook | undefined {
     if (!hook) return undefined;
-    return (node, ctx, parent, grandparent, depth, className, binding) => {
+    return function (...args: Parameters<StreamingVisitHook>): void {
         calls.calls++;
         try {
-            hook.call(analyzer, node, ctx, parent, grandparent, depth, className, binding);
+            hook.apply(analyzer, args);
         } catch (error) {
-            calls.failure ??= failureMessage(error);
+            calls.failure ??= formatFailureMessage(error);
             throw error;
         }
     };
@@ -76,10 +91,13 @@ export class FileExecutionObserver {
     ) {
         for (const item of plan) {
             this.calls.set(item.name, {
-                analyzer: item.name, version: item.instance.version ?? null,
+                analyzer: item.name,
+                version: item.instance.version ?? null,
                 calls: 0,
-                reason: scope.activeAnalyzers && !scope.activeAnalyzers.has(item.name)
-                    ? 'routing-filter' : 'not-invoked',
+                reason:
+                    scope.activeAnalyzers && !scope.activeAnalyzers.has(item.name)
+                        ? REASON_ROUTING_FILTER
+                        : REASON_NOT_INVOKED,
             });
         }
     }
@@ -96,7 +114,7 @@ export class FileExecutionObserver {
 
     fail(name: string, error: unknown): void {
         const calls = this.calls.get(name);
-        if (calls) calls.failure ??= failureMessage(error);
+        if (calls) calls.failure ??= formatFailureMessage(error);
     }
 
     /** Wrap each entry once; hook calls allocate no argument arrays or event objects. */
@@ -107,17 +125,19 @@ export class FileExecutionObserver {
         return {
             name: analyzer.name,
             exemptFromPruning: analyzer.exemptFromPruning,
-            visit: observedHook(analyzer.visit, analyzer, calls),
-            leave: observedHook(analyzer.leave, analyzer, calls),
-            finalize: !finalize ? undefined : (ctx) => {
-                calls.calls++;
-                try {
-                    return finalize.call(analyzer, ctx);
-                } catch (error) {
-                    calls.failure ??= failureMessage(error);
-                    throw error;
-                }
-            },
+            visit: wrapObservedHook(analyzer.visit, analyzer, calls),
+            leave: wrapObservedHook(analyzer.leave, analyzer, calls),
+            finalize: !finalize
+                ? undefined
+                : (ctx) => {
+                      calls.calls++;
+                      try {
+                          return finalize.call(analyzer, ctx);
+                      } catch (error) {
+                          calls.failure ??= formatFailureMessage(error);
+                          throw error;
+                      }
+                  },
         };
     }
 
@@ -126,12 +146,12 @@ export class FileExecutionObserver {
         diagnostics: readonly unknown[] | undefined,
         supported: boolean,
     ): ParserExecutionObservation['status'] {
-        if (!supported) return 'unsupported';
-        if (adapter.precision === 'lexical') return 'degraded';
-        if (adapter.precision === 'ast' && diagnostics) {
-            return diagnostics.length === 0 ? 'complete' : 'degraded';
+        if (!supported) return STATUS_UNSUPPORTED;
+        if (adapter.precision === PRECISION_LEXICAL) return STATUS_DEGRADED;
+        if (adapter.precision === PRECISION_AST && diagnostics) {
+            return diagnostics.length === 0 ? STATUS_COMPLETE : STATUS_DEGRADED;
         }
-        return 'unavailable';
+        return STATUS_UNAVAILABLE;
     }
 
     /** Freeze completed observations after all streaming/batch calls and any parser fallback. */
@@ -146,7 +166,7 @@ export class FileExecutionObserver {
         const status = this.resolveParserStatus(adapter, diagnostics, supported);
         const parser: ParserExecutionObservation = Object.freeze({
             adapter: adapter.id,
-            precision: adapter.precision ?? 'unspecified',
+            precision: adapter.precision ?? PRECISION_UNSPECIFIED,
             status,
             diagnostics: diagnostics?.length ?? null,
         });
@@ -166,14 +186,21 @@ export class FileExecutionObserver {
         parser: ParserExecutionObservation,
     ): AnalyzerExecutionObservation {
         if (calls.failure !== undefined) {
-            return Object.freeze({ ...calls, status: 'failed', reason: 'analyzer-exception' });
+            return Object.freeze({
+                ...calls,
+                status: STATUS_FAILED,
+                reason: REASON_ANALYZER_EXCEPTION,
+            });
         }
-        if (calls.calls === 0) return Object.freeze({ ...calls, status: 'not-run' });
-        const complete = parser.status === 'complete' && !this.scope.lineBounds;
-        const reason = parser.status === 'complete' ? 'line-window' : `parser-${parser.status}`;
+        if (calls.calls === 0) return Object.freeze({ ...calls, status: STATUS_NOT_RUN });
+        const complete = parser.status === STATUS_COMPLETE && !this.scope.lineBounds;
+        const reason =
+            parser.status === STATUS_COMPLETE ? REASON_LINE_WINDOW : `parser-${parser.status}`;
         return Object.freeze({
-            analyzer: calls.analyzer, version: calls.version, calls: calls.calls,
-            status: complete ? 'complete' : 'partial',
+            analyzer: calls.analyzer,
+            version: calls.version,
+            calls: calls.calls,
+            status: complete ? STATUS_COMPLETE : STATUS_PARTIAL,
             ...(complete ? {} : { reason }),
         });
     }

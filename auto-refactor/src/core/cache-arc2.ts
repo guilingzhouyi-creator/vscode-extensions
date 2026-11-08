@@ -58,6 +58,32 @@ export const SECTION_MASK_GRAPH_EDGES = 1 << 5;
 const HASH_PREFIX_BYTES = 16;
 const FNV_OFFSET_BASIS = 0x811c9dc5;
 const FNV_PRIME = 0x01000193;
+const UINT16_MASK = 0xffff;
+const DEFAULT_MAX_AGE_DAYS = 30;
+const HEADER_OFFSET_VERSION = 4;
+const HEADER_OFFSET_KIND = 6;
+const HEADER_OFFSET_RECORD_COUNT = 8;
+const HEADER_OFFSET_STRING_POOL = 12;
+const HEADER_OFFSET_LEGACY_JSONL = 16;
+const HEADER_OFFSET_CREATED_AT = 24;
+const HEADER_OFFSET_MAX_ENTRIES = 32;
+const HEADER_OFFSET_MAX_AGE_DAYS = 36;
+const HEADER_OFFSET_CHECKSUM = 40;
+const SLOT_OFFSET_CONTENT_HASH = 16;
+const SLOT_OFFSET_RESERVED_A = 32;
+const SLOT_OFFSET_MTIME = 40;
+const SLOT_OFFSET_SIZE = 48;
+const SLOT_OFFSET_INO = 56;
+const SLOT_OFFSET_RESERVED_B = 64;
+const SLOT_OFFSET_FLAGS = 72;
+const SLOT_OFFSET_STR_START = 76;
+const FRAME_OFFSET_PAYLOAD_LEN = 4;
+const FRAME_OFFSET_CRC = 8;
+const FRAME_OFFSET_MASK = 12;
+const FRAME_OFFSET_TIMESTAMP = 16;
+const FRAME_META_FIXED_BYTES = 18;
+const U32_BYTES = 4;
+const F64_BYTES = 8;
 
 /** Parsed 64-byte ARC2 container header. */
 export interface Arc2Header {
@@ -117,16 +143,19 @@ export function computeBufferChecksum(buf: Buffer, start = 0, end = buf.length):
 export function encodeArc2Header(init: Arc2HeaderInit): Buffer {
     const header = Buffer.alloc(ARC2_HEADER_BYTES);
     header.writeUInt32LE(ARC2_MAGIC, 0);
-    header.writeUInt16LE(ARC2_VERSION, 4);
-    header.writeUInt16LE(init.kind & 0xffff, 6);
-    header.writeUInt32LE(init.recordCount >>> 0, 8);
-    header.writeUInt32LE((init.stringPoolOffset ?? 0) >>> 0, 12);
-    header.writeUInt32LE((init.legacyJsonlBytes ?? 0) >>> 0, 16);
-    header.writeDoubleLE(init.createdAtMs ?? Date.now(), 24);
-    header.writeUInt32LE((init.maxEntries ?? 100_000) >>> 0, 32);
-    header.writeUInt32LE((init.maxAgeDays ?? 30) >>> 0, 36);
-    const checksum = computeBufferChecksum(header, 0, 40);
-    header.writeUInt32LE(checksum, 40);
+    header.writeUInt16LE(ARC2_VERSION, HEADER_OFFSET_VERSION);
+    header.writeUInt16LE(init.kind & UINT16_MASK, HEADER_OFFSET_KIND);
+    header.writeUInt32LE(init.recordCount >>> 0, HEADER_OFFSET_RECORD_COUNT);
+    header.writeUInt32LE((init.stringPoolOffset ?? 0) >>> 0, HEADER_OFFSET_STRING_POOL);
+    header.writeUInt32LE((init.legacyJsonlBytes ?? 0) >>> 0, HEADER_OFFSET_LEGACY_JSONL);
+    header.writeDoubleLE(init.createdAtMs ?? Date.now(), HEADER_OFFSET_CREATED_AT);
+    header.writeUInt32LE((init.maxEntries ?? 100_000) >>> 0, HEADER_OFFSET_MAX_ENTRIES);
+    header.writeUInt32LE(
+        (init.maxAgeDays ?? DEFAULT_MAX_AGE_DAYS) >>> 0,
+        HEADER_OFFSET_MAX_AGE_DAYS,
+    );
+    const checksum = computeBufferChecksum(header, 0, HEADER_OFFSET_CHECKSUM);
+    header.writeUInt32LE(checksum, HEADER_OFFSET_CHECKSUM);
     return header;
 }
 
@@ -140,23 +169,23 @@ export function encodeArc2Header(init: Arc2HeaderInit): Buffer {
 export function decodeArc2Header(buf: Buffer, expectedKind?: number): Arc2Header | null {
     if (buf.length < ARC2_HEADER_BYTES) return null;
     const magic = buf.readUInt32LE(0);
-    const version = buf.readUInt16LE(4);
-    const kind = buf.readUInt16LE(6);
+    const version = buf.readUInt16LE(HEADER_OFFSET_VERSION);
+    const kind = buf.readUInt16LE(HEADER_OFFSET_KIND);
     if (magic !== ARC2_MAGIC || version !== ARC2_VERSION) return null;
     if (expectedKind !== undefined && kind !== expectedKind) return null;
-    const expectedChecksum = computeBufferChecksum(buf, 0, 40);
-    const headerChecksum = buf.readUInt32LE(40);
+    const expectedChecksum = computeBufferChecksum(buf, 0, HEADER_OFFSET_CHECKSUM);
+    const headerChecksum = buf.readUInt32LE(HEADER_OFFSET_CHECKSUM);
     if (expectedChecksum !== headerChecksum) return null;
     return {
         magic,
         version,
         kind,
-        recordCount: buf.readUInt32LE(8),
-        stringPoolOffset: buf.readUInt32LE(12),
-        legacyJsonlBytes: buf.readUInt32LE(16),
-        createdAtMs: buf.readDoubleLE(24),
-        maxEntries: buf.readUInt32LE(32),
-        maxAgeDays: buf.readUInt32LE(36),
+        recordCount: buf.readUInt32LE(HEADER_OFFSET_RECORD_COUNT),
+        stringPoolOffset: buf.readUInt32LE(HEADER_OFFSET_STRING_POOL),
+        legacyJsonlBytes: buf.readUInt32LE(HEADER_OFFSET_LEGACY_JSONL),
+        createdAtMs: buf.readDoubleLE(HEADER_OFFSET_CREATED_AT),
+        maxEntries: buf.readUInt32LE(HEADER_OFFSET_MAX_ENTRIES),
+        maxAgeDays: buf.readUInt32LE(HEADER_OFFSET_MAX_AGE_DAYS),
         headerChecksum,
     };
 }
@@ -193,14 +222,18 @@ export function serializeArc2L1Index(
 
         const slotOffset = i * ARC2_SLOT_BYTES;
         writeHashPrefix16(slots, slotOffset, relPath);
-        writeHashPrefix16(slots, slotOffset + 16, `${relPath}:${fp.mtimeMs}:${fp.size}`);
-        slots.writeBigUInt64LE(0n, slotOffset + 32);
-        slots.writeDoubleLE(fp.mtimeMs, slotOffset + 40);
-        slots.writeDoubleLE(fp.size, slotOffset + 48);
-        slots.writeDoubleLE(fp.ino !== undefined ? fp.ino : -1, slotOffset + 56);
-        slots.writeBigUInt64LE(0n, slotOffset + 64);
-        slots.writeUInt32LE(0, slotOffset + 72);
-        slots.writeUInt32LE(currentStrOffset >>> 0, slotOffset + 76);
+        writeHashPrefix16(
+            slots,
+            slotOffset + SLOT_OFFSET_CONTENT_HASH,
+            `${relPath}:${fp.mtimeMs}:${fp.size}`,
+        );
+        slots.writeBigUInt64LE(0n, slotOffset + SLOT_OFFSET_RESERVED_A);
+        slots.writeDoubleLE(fp.mtimeMs, slotOffset + SLOT_OFFSET_MTIME);
+        slots.writeDoubleLE(fp.size, slotOffset + SLOT_OFFSET_SIZE);
+        slots.writeDoubleLE(fp.ino !== undefined ? fp.ino : -1, slotOffset + SLOT_OFFSET_INO);
+        slots.writeBigUInt64LE(0n, slotOffset + SLOT_OFFSET_RESERVED_B);
+        slots.writeUInt32LE(0, slotOffset + SLOT_OFFSET_FLAGS);
+        slots.writeUInt32LE(currentStrOffset >>> 0, slotOffset + SLOT_OFFSET_STR_START);
         currentStrOffset += pathBuf.length;
     }
 
@@ -236,13 +269,15 @@ export function loadArc2L1Index(
 
     for (let i = 0; i < header.recordCount; i++) {
         const slotOffset = ARC2_HEADER_BYTES + i * ARC2_SLOT_BYTES;
-        const mtimeMs = buf.readDoubleLE(slotOffset + 40);
-        const size = buf.readDoubleLE(slotOffset + 48);
-        const inoVal = buf.readDoubleLE(slotOffset + 56);
-        const strStart = header.stringPoolOffset + buf.readUInt32LE(slotOffset + 76);
+        const mtimeMs = buf.readDoubleLE(slotOffset + SLOT_OFFSET_MTIME);
+        const size = buf.readDoubleLE(slotOffset + SLOT_OFFSET_SIZE);
+        const inoVal = buf.readDoubleLE(slotOffset + SLOT_OFFSET_INO);
+        const strStart =
+            header.stringPoolOffset + buf.readUInt32LE(slotOffset + SLOT_OFFSET_STR_START);
         const nextStrStart =
             i + 1 < header.recordCount
-                ? header.stringPoolOffset + buf.readUInt32LE(slotOffset + ARC2_SLOT_BYTES + 76)
+                ? header.stringPoolOffset +
+                  buf.readUInt32LE(slotOffset + ARC2_SLOT_BYTES + SLOT_OFFSET_STR_START)
                 : buf.length;
         if (strStart > buf.length || nextStrStart > buf.length || nextStrStart < strStart) {
             return null;
@@ -321,19 +356,19 @@ export function encodeArc2L2Frame(entry: L2EntryRecord): Buffer {
 
     const keyBuf = Buffer.from(entry.k, 'utf8');
     const pathBuf = Buffer.from(entry.p, 'utf8');
-    const metaBytes = 4 + keyBuf.length + 4 + pathBuf.length + 18;
+    const metaBytes = U32_BYTES + keyBuf.length + U32_BYTES + pathBuf.length + FRAME_META_FIXED_BYTES;
     const payloadByteLen = metaBytes + pr50Slice.length;
 
     const frame = Buffer.allocUnsafe(ARC2_FRAME_HEADER_BYTES + payloadByteLen);
     let pos = ARC2_FRAME_HEADER_BYTES;
 
     frame.writeUInt32LE(keyBuf.length, pos);
-    pos += 4;
+    pos += U32_BYTES;
     keyBuf.copy(frame, pos);
     pos += keyBuf.length;
 
     frame.writeUInt32LE(pathBuf.length, pos);
-    pos += 4;
+    pos += U32_BYTES;
     pathBuf.copy(frame, pos);
     pos += pathBuf.length;
 
@@ -342,9 +377,9 @@ export function encodeArc2L2Frame(entry: L2EntryRecord): Buffer {
     frame[pos++] = (hasFm ? 1 : 0) | (hasFs ? 2 : 0);
     frame[pos++] = 0;
     frame.writeDoubleLE(hasFm ? (entry.fm as number) : 0, pos);
-    pos += 8;
+    pos += F64_BYTES;
     frame.writeDoubleLE(hasFs ? (entry.fs as number) : 0, pos);
-    pos += 8;
+    pos += F64_BYTES;
 
     pr50Slice.copy(frame, pos);
 
@@ -354,10 +389,10 @@ export function encodeArc2L2Frame(entry: L2EntryRecord): Buffer {
         ARC2_FRAME_HEADER_BYTES + payloadByteLen,
     );
     frame.writeUInt32LE(ARC2_FRAME_MAGIC, 0);
-    frame.writeUInt32LE(payloadByteLen >>> 0, 4);
-    frame.writeUInt32LE(crc >>> 0, 8);
-    frame.writeUInt32LE(computeSectionMask(entry), 12);
-    frame.writeDoubleLE(entry.ts || Date.now(), 16);
+    frame.writeUInt32LE(payloadByteLen >>> 0, FRAME_OFFSET_PAYLOAD_LEN);
+    frame.writeUInt32LE(crc >>> 0, FRAME_OFFSET_CRC);
+    frame.writeUInt32LE(computeSectionMask(entry), FRAME_OFFSET_MASK);
+    frame.writeDoubleLE(entry.ts || Date.now(), FRAME_OFFSET_TIMESTAMP);
 
     return frame;
 }
@@ -408,16 +443,16 @@ export function serializeArc2L2FramesOnly(entries: Iterable<L2EntryRecord>): Buf
 function validateArc2FrameHeader(
     buf: Buffer,
     offset: number,
-): { ts: number; frameEnd: number } | null {
+): { timestampMs: number; frameEnd: number } | null {
     if (offset + ARC2_FRAME_HEADER_BYTES > buf.length) return null;
     if (buf.readUInt32LE(offset) !== ARC2_FRAME_MAGIC) return null;
-    const payloadByteLen = buf.readUInt32LE(offset + 4);
-    const expectedCrc = buf.readUInt32LE(offset + 8);
-    const ts = buf.readDoubleLE(offset + 16);
+    const payloadByteLen = buf.readUInt32LE(offset + FRAME_OFFSET_PAYLOAD_LEN);
+    const expectedCrc = buf.readUInt32LE(offset + FRAME_OFFSET_CRC);
+    const timestampMs = buf.readDoubleLE(offset + FRAME_OFFSET_TIMESTAMP);
     const frameEnd = offset + ARC2_FRAME_HEADER_BYTES + payloadByteLen;
     if (frameEnd > buf.length) return null;
     const actualCrc = computeBufferChecksum(buf, offset + ARC2_FRAME_HEADER_BYTES, frameEnd);
-    return actualCrc === expectedCrc ? { ts, frameEnd } : null;
+    return actualCrc === expectedCrc ? { timestampMs, frameEnd } : null;
 }
 
 function parseSingleFrame(
@@ -427,36 +462,36 @@ function parseSingleFrame(
 ): { entry: L2EntryRecord; nextOffset: number } | null {
     const header = validateArc2FrameHeader(buf, offset);
     if (!header) return null;
-    const { ts, frameEnd } = header;
+    const { timestampMs, frameEnd } = header;
 
     let pos = offset + ARC2_FRAME_HEADER_BYTES;
-    if (pos + 4 > frameEnd) return null;
+    if (pos + U32_BYTES > frameEnd) return null;
     const keyLen = buf.readUInt32LE(pos);
-    pos += 4;
-    if (pos + keyLen + 4 > frameEnd) return null;
-    const k = buf.toString('utf8', pos, pos + keyLen);
+    pos += U32_BYTES;
+    if (pos + keyLen + U32_BYTES > frameEnd) return null;
+    const entryKey = buf.toString('utf8', pos, pos + keyLen);
     pos += keyLen;
 
     const pathLen = buf.readUInt32LE(pos);
-    pos += 4;
-    if (pos + pathLen + 18 > frameEnd) return null;
-    const p = buf.toString('utf8', pos, pos + pathLen);
+    pos += U32_BYTES;
+    if (pos + pathLen + FRAME_META_FIXED_BYTES > frameEnd) return null;
+    const entryPath = buf.toString('utf8', pos, pos + pathLen);
     pos += pathLen;
 
     const metaFlags = buf[pos++];
     pos += 1;
     const fmVal = buf.readDoubleLE(pos);
-    pos += 8;
+    pos += F64_BYTES;
     const fsVal = buf.readDoubleLE(pos);
-    pos += 8;
+    pos += F64_BYTES;
 
     const rawPr50Slice = buf.subarray(pos, frameEnd);
     const entry: L2EntryRecord = {
-        k,
-        p,
+        k: entryKey,
+        p: entryPath,
         issues: [],
         metric: null,
-        ts,
+        ts: timestampMs,
         ...(metaFlags & 1 ? { fm: fmVal } : {}),
         ...(metaFlags & 2 ? { fs: fsVal } : {}),
         rawPr50Slice,
