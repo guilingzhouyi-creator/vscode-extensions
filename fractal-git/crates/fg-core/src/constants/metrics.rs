@@ -55,3 +55,9 @@ pub const METRIC_FAST_CDC_STREAMING: &str = "fast_cdc_streaming_chunking";
 
 /// Roaring bitmap set intersection and reachability evaluation.
 pub const METRIC_ROARING_BITMAP_OPS: &str = "roaring_bitmap_set_ops";
+
+/// Random-access latency of the quasi-succinct integer index.
+pub const METRIC_ELIAS_FANO_ACCESS: &str = "elias_fano_random_access_32k";
+
+/// `.gitignore` glob rejection on a star-dense pattern.
+pub const METRIC_IGNORE_GLOB_ADVERSARIAL: &str = "ignore_glob_adversarial_many_stars";

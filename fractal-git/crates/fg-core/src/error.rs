@@ -34,6 +34,14 @@ pub enum FractalError {
         reason: String,
     },
 
+    /// Review evidence violates the lossless wire or encoding contract.
+    #[error("Invalid review evidence: {reason}")]
+    InvalidReviewEvidence { reason: String },
+
+    /// Required review execution evidence has not been produced.
+    #[error("Review unavailable: {reason}")]
+    ReviewUnavailable { reason: String },
+
     #[error("Gate rejection: score={score}, violations={violations:?}")]
     GateRejection { score: f64, violations: Vec<String> },
 

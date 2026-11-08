@@ -13,7 +13,7 @@ fg-index = { path = "../fg-index" }
 fg-algorithms = { path = "../fg-algorithms" }
 fg-pools = { path = "../fg-pools" }
 fg-native = { path = "../fg-native" }
-flate2 = "1.0"
+flate2 = { version = "1.0", default-features = false, features = ["zlib-rs"] }
 chrono = { version = "0.4", features = ["serde"] }
 sha1 = "0.10"
 serde = { version = "1.0", features = ["derive"] }

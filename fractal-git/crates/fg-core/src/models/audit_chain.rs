@@ -3,7 +3,9 @@
 //! Architecture Role: Implements the in-kernel cryptographic audit log protocol:
 //!   - Single-line compact NDJSON serialization (< 350 bytes per entry).
 //!   - Lamport monotonic logical clocks (`clk`) eliminating physical clock skew.
-//!   - HMAC-SHA1 Merkle-hash-chain (`prev` -> `sig` cascade) preventing history tampering.
+//!   - HMAC-SHA256 Merkle-hash-chain (`prev` -> `sig` cascade) preventing history tampering.
+//!     The leading byte of `sig` names the algorithm, so a chain sealed with the earlier HMAC-SHA1
+//!     scheme stays verifiable instead of being reported as tampered after an upgrade.
 //!   - `cat_sort_uniq` idempotent merge algorithm for concurrent multi-agent branches.
 //!
 //! SSOT Domain Governance Rules:
@@ -27,7 +29,16 @@ pub const AUDIT_RECORD_BYTE_BUDGET: usize = 350;
 pub const HASH_FINGERPRINT_LEN: usize = 8;
 
 /// Number of hex characters retained for HMAC signatures (16 chars = 64 bits).
+///
+/// The first character names the signing algorithm; the remaining 15 are the digest prefix. The
+/// width is fixed so a record's serialized size does not change with the algorithm.
 pub const SIGNATURE_HEX_LEN: usize = 16;
+
+/// Signature prefix marking an HMAC-SHA1 record sealed before the SHA-256 migration.
+pub const SIG_ALGORITHM_SHA1: u8 = b'1';
+
+/// Signature prefix marking an HMAC-SHA256 record.
+pub const SIG_ALGORITHM_SHA256: u8 = b'2';
 
 const fn is_zero_u32(val: &u32) -> bool {
     *val == 0
@@ -199,33 +210,53 @@ impl AuditRecord {
     }
 
     /// Signs this record using the kernel authority secret and embeds the signature.
+    ///
+    /// The stored signature is the algorithm marker followed by the leading digits of the hex
+    /// digest, truncated so the record stays inside [`AUDIT_RECORD_BYTE_BUDGET`].
     pub fn sign(&mut self, secret: &AuthoritySecret) {
         let payload = self.canonical_payload();
-        let signature_bytes = secret.sign_payload(payload.as_bytes());
+        let signature_bytes = secret.sign_payload_sha256(payload.as_bytes());
         let full_signature_hex = encode_hex(&signature_bytes);
-        self.sig = full_signature_hex[..SIGNATURE_HEX_LEN].to_string();
+        let mut signed = String::with_capacity(SIGNATURE_HEX_LEN);
+        signed.push(SIG_ALGORITHM_SHA256 as char);
+        signed.push_str(&full_signature_hex[..SIGNATURE_HEX_LEN - 1]);
+        self.sig = signed;
     }
 
     /// Verifies whether the embedded signature matches the canonical payload.
+    ///
+    /// The algorithm marker decides which MAC to recompute, so records sealed under either scheme
+    /// verify against the same code path. A marker outside the known set fails closed rather than
+    /// falling back to any default.
     #[must_use]
     pub fn verify_signature(&self, secret: &AuthoritySecret) -> bool {
         if self.sig.len() != SIGNATURE_HEX_LEN {
             return false;
         }
+        let marker = self.sig.as_bytes()[0];
         let payload = self.canonical_payload();
-        let expected_signature = secret.sign_payload(payload.as_bytes());
-        let expected_hex = encode_hex(&expected_signature);
-        ct_eq_bytes(
-            self.sig.as_bytes(),
-            &expected_hex.as_bytes()[..SIGNATURE_HEX_LEN],
-        )
+        let (expected_hex, prefix_len) = match marker {
+            SIG_ALGORITHM_SHA256 => (
+                encode_hex(&secret.sign_payload_sha256(payload.as_bytes())),
+                SIGNATURE_HEX_LEN - 1,
+            ),
+            SIG_ALGORITHM_SHA1 => (
+                encode_hex(&secret.sign_payload(payload.as_bytes())),
+                SIGNATURE_HEX_LEN - 1,
+            ),
+            _ => return false,
+        };
+        let mut expected = String::with_capacity(SIGNATURE_HEX_LEN);
+        expected.push(marker as char);
+        expected.push_str(&expected_hex[..prefix_len]);
+        ct_eq_bytes(self.sig.as_bytes(), expected.as_bytes())
     }
 
     /// Computes the chaining hash fingerprint of this record (used as `prev` for next record).
     #[must_use]
     pub fn compute_record_hash(&self, secret: &AuthoritySecret) -> String {
         let chain_input = format!("{}:{}:{}", self.prev, self.clk, self.sig);
-        let fingerprint_bytes = secret.sign_payload(chain_input.as_bytes());
+        let fingerprint_bytes = secret.sign_payload_sha256(chain_input.as_bytes());
         let full_fingerprint_hex = encode_hex(&fingerprint_bytes);
         full_fingerprint_hex[..HASH_FINGERPRINT_LEN].to_string()
     }
@@ -475,6 +506,40 @@ mod tests {
         let mut tampered_taut = rec;
         tampered_taut.ikce.taut = 2;
         assert!(!tampered_taut.verify_signature(&secret));
+    }
+
+    #[test]
+    fn a_record_sealed_with_sha1_still_verifies_after_the_sha256_migration() {
+        let secret = test_secret();
+        let mut rec = make_test_record(1, "a1b2c3d4", GENESIS_PREV_HASH, "sub-01", 0.45, 96.5);
+
+        // Seal the record the way the pre-migration code did: SHA-1 MAC truncated to sixteen hex
+        // characters with no algorithm marker.
+        let payload = rec.canonical_payload();
+        let legacy_hex = encode_hex(&secret.sign_payload(payload.as_bytes()));
+        let mut legacy_sig = String::from(SIG_ALGORITHM_SHA1 as char);
+        legacy_sig.push_str(&legacy_hex[..SIGNATURE_HEX_LEN - 1]);
+        rec.sig = legacy_sig;
+
+        assert!(rec.verify_signature(&secret));
+        assert_eq!(rec.sig.len(), SIGNATURE_HEX_LEN);
+
+        // The same record sealed under SHA-256 must also verify, through the same call.
+        let mut migrated = rec.clone();
+        migrated.sign(&secret);
+        assert!(migrated.verify_signature(&secret));
+        assert_eq!(migrated.sig.as_bytes()[0], SIG_ALGORITHM_SHA256);
+    }
+
+    #[test]
+    fn a_signature_with_an_unknown_algorithm_marker_fails_closed() {
+        let secret = test_secret();
+        let mut rec = make_test_record(1, "a1b2c3d4", GENESIS_PREV_HASH, "sub-01", 0.45, 96.5);
+        rec.sign(&secret);
+
+        let mut unknown = rec;
+        unknown.sig.replace_range(0..1, "9");
+        assert!(!unknown.verify_signature(&secret));
     }
 
     #[test]

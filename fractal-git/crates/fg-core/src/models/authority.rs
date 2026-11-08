@@ -14,6 +14,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use sha1::{Digest, Sha1};
+use sha2::Sha256;
 
 use super::hex::{decode_fixed_hex, encode_hex, HexDecodeError};
 use crate::error::{FractalError, FractalResult};
@@ -161,9 +162,20 @@ impl AuthoritySecret {
     }
 
     /// Signs an arbitrary binary payload with HMAC-SHA1 using this secret.
+    ///
+    /// Kept so records sealed before the SHA-256 migration can still be verified. New signatures
+    /// must use [`Self::sign_payload_sha256`].
     #[must_use]
     pub fn sign_payload(&self, payload: &[u8]) -> [u8; 20] {
         hmac_sha1(&self.0, payload)
+    }
+
+    /// Signs an arbitrary binary payload with HMAC-SHA256 using this secret.
+    ///
+    /// This is the current signing algorithm for the telemetry chain (`FGT-AUD-001`).
+    #[must_use]
+    pub fn sign_payload_sha256(&self, payload: &[u8]) -> [u8; 32] {
+        hmac_sha256(&self.0, payload)
     }
 
     /// Signs an arbitrary binary payload with HMAC-SM3 (GB/T 32918) using this secret.
@@ -182,6 +194,10 @@ pub fn current_unix_seconds() -> i64 {
 }
 
 /// RFC 2104 HMAC-SHA1 over the given key and message.
+///
+/// Retained for verifying audit records sealed before the chain moved to SHA-256. New records are
+/// signed through [`hmac_sha256`]; this function exists only so an existing chain can still be
+/// checked rather than silently reported as tampered.
 pub fn hmac_sha1(key: &[u8], message: &[u8]) -> [u8; 20] {
     const BLOCK: usize = 64;
     let mut normalized = [0u8; BLOCK];
@@ -206,6 +222,39 @@ pub fn hmac_sha1(key: &[u8], message: &[u8]) -> [u8; 20] {
     outer.update(inner_digest);
     let outer_digest = outer.finalize();
     let mut mac = [0u8; 20];
+    mac.copy_from_slice(&outer_digest);
+    mac
+}
+
+/// RFC 2104 HMAC-SHA256 over the given key and message.
+///
+/// This is the algorithm the telemetry chain signs with. SHA-256 is used rather than SHA-1 because
+/// a truncated SHA-1 MAC gives no more collision resistance than its 64-bit prefix, while the chain
+/// claims to be tamper-evident for the life of the repository.
+pub fn hmac_sha256(key: &[u8], message: &[u8]) -> [u8; 32] {
+    const BLOCK: usize = 64;
+    let mut normalized = [0u8; BLOCK];
+    if key.len() > BLOCK {
+        let digest = Sha256::digest(key);
+        normalized[..digest.len()].copy_from_slice(&digest);
+    } else {
+        normalized[..key.len()].copy_from_slice(key);
+    }
+    let mut inner = Sha256::new();
+    let mut outer = Sha256::new();
+    let mut inner_pad = [0x36u8; BLOCK];
+    let mut outer_pad = [0x5cu8; BLOCK];
+    for index in 0..BLOCK {
+        inner_pad[index] ^= normalized[index];
+        outer_pad[index] ^= normalized[index];
+    }
+    inner.update(inner_pad);
+    inner.update(message);
+    let inner_digest = inner.finalize();
+    outer.update(outer_pad);
+    outer.update(inner_digest);
+    let outer_digest = outer.finalize();
+    let mut mac = [0u8; 32];
     mac.copy_from_slice(&outer_digest);
     mac
 }

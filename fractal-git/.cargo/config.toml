@@ -13,3 +13,26 @@ GIT_CONFIG_KEY_1 = "core.autocrlf"
 GIT_CONFIG_VALUE_1 = "false"
 GIT_CONFIG_KEY_2 = "init.defaultBranch"
 GIT_CONFIG_VALUE_2 = "main"
+
+# Portable baseline instruction set for every x86-64 build of this workspace.
+#
+# The kernel's hot loops lean on three instruction groups the generic `x86-64`
+# target leaves out, so the compiler was emulating all of them:
+#
+#   popcnt        - `u64::count_ones()` was emitted as a ~12-instruction SSE2/SWAR
+#                   sequence rather than one instruction. Elias-Fano select, the
+#                   bit-parallel LCS scorer and Roaring cardinality all pay this.
+#   crc32q        - CRC work walks a 256-entry table one dependent load per byte.
+#   tzcnt / blsr  - `trailing_zeros()` and the `word &= word - 1` rank walk in
+#                   `select_in_word` become single instructions under BMI1.
+#
+# `x86-64-v2` is the microarchitecture level every x86-64 CPU shipped since
+# roughly 2009 implements, so this stays portable across developer machines and
+# CI runners. `target-cpu=native` is deliberately avoided: it would produce
+# binaries that cannot run elsewhere and would make the perf ratchet compare
+# differently-compiled programs between local and CI runs.
+#
+# Non-x86 targets (the aarch64 and x86_64-linux cross builds) do not match this
+# `cfg` and keep the default feature set.
+[target.'cfg(any(target_arch = "x86_64", target_arch = "x86"))']
+rustflags = ["-C", "target-cpu=x86-64-v2"]
