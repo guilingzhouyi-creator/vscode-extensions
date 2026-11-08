@@ -20,6 +20,7 @@
 | [**`09-test-cache-and-telemetry-audit-spec.md`**](09-test-cache-and-telemetry-audit-spec.md) | **专属测试与缓存区、内核验证器与密码学独立遥测审计规约** | 阐明 Direct-Bypass 独占测试与编译缓存直通空间、TKCV 形式化抽象推导器、IKCE 内存微变异击杀率验证引擎、贝叶斯动态信用与 `refs/fractal/telemetry/*` 密码学防篡改遥测审计哈希链及分层树状归约台账。 |
 | [**`10-single-threaded-e2e-benchmark-and-progressive-projection.md`**](10-single-threaded-e2e-benchmark-and-progressive-projection.md) | **单串行端到端基准评测与渐进切分投影规约** | 规范单串行隔离环境下标准 Git 贪婪检出与 Taxis 渐进投影评测流水线；明确时延、物理零写、首字节时延（TTFB）、FastCDC `apply_edits` 局部自愈与微秒级 WAL 同步回写等五阶段技术度量体系与基准对比。 |
 | [**`ALGORITHMIC_OPTIMIZATION_SURVEY.md`**](ALGORITHMIC_OPTIMIZATION_SURVEY.md) | **Taxis 紧凑数据结构与渐进投影算法全景调研报告** | 涵盖 PTHash/RecSplit 最小单射哈希、分层增量 Merkle 拓扑、FastCDC 边界自愈与两阶段日志解耦的前沿与冷门算法全景调研。 |
+| [**`quality-evidence.md`**](quality-evidence.md) | **质量证据 v1 数据契约** | 说明 Rust／TypeScript 共用 schema、规范字节、回执签名范围及旧记录兼容边界；结构校验与可信审批分别验证。 |
 | [**`ARCHITECTURE.md`**](ARCHITECTURE.md) | **系统架构总览与快速规范查阅手册** | 包含 Mermaid 分形拓扑图、生命周期状态转移矩阵、端到端评测集成与核心接口速查表。 |
 | [**`DIRECTORY_SPEC.md`**](DIRECTORY_SPEC.md) | **全域目录职责矩阵与单向依赖扩展指引** | 规范 10 大内核子系统物理职责、单向依赖 DAG 拓扑图与架构扩展路由准则。 |
 
