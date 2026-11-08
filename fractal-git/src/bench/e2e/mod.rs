@@ -15,6 +15,7 @@
 //! - `ARCH-FAC-001`: Substantive facade volume and multi-domain aggregation guard
 
 pub mod options;
+mod phases;
 pub mod projection;
 pub mod report;
 pub mod runner;
