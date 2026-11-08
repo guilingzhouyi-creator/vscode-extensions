@@ -83,6 +83,52 @@ impl std::fmt::Display for LogLevel {
     }
 }
 
+/// A severity threshold as a value, not as process state.
+///
+/// The process-wide threshold below is one `Threshold`; a caller that must not depend on it — a test,
+/// or a subsystem deciding its own verbosity — can build one and pass it instead. Separating the
+/// value from the storage is what makes the level testable: while the only way to ask "is this level
+/// admitted" read a global, two tests running in parallel could hold different thresholds and both
+/// be wrong about the other's answer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Threshold {
+    level: LogLevel,
+}
+
+impl Threshold {
+    /// Creates a threshold admitting `level` and everything more severe.
+    #[must_use]
+    pub const fn at(level: LogLevel) -> Self {
+        Self { level }
+    }
+
+    /// The default used when nothing has been configured.
+    ///
+    /// `Warn` rather than `Info`: an unconfigured run must stay quiet, because stdout carries
+    /// machine-readable output and a stray narration line breaks a JSON consumer.
+    #[must_use]
+    pub const fn ambient() -> Self {
+        Self::at(LogLevel::Warn)
+    }
+
+    /// The level this threshold sits at.
+    #[must_use]
+    pub const fn level(self) -> LogLevel {
+        self.level
+    }
+
+    /// Reports whether a record at `level` would be admitted.
+    #[must_use]
+    pub const fn admits(self, level: LogLevel) -> bool {
+        level.rank() >= self.level.rank()
+    }
+}
+
+impl Default for Threshold {
+    fn default() -> Self {
+        Self::ambient()
+    }
+}
 /// Process-wide severity threshold.
 static THRESHOLD: AtomicU8 = AtomicU8::new(LogLevel::Warn as u8);
 
@@ -95,6 +141,11 @@ pub fn set_level(level: LogLevel) -> LogLevel {
 /// Returns the current threshold.
 pub fn level() -> LogLevel {
     LogLevel::from_rank(THRESHOLD.load(Ordering::Relaxed))
+}
+
+/// Returns the process-wide threshold as a value.
+pub fn current_threshold() -> Threshold {
+    Threshold::at(level())
 }
 
 impl LogLevel {
@@ -143,7 +194,7 @@ pub fn is_diagnostic_mode() -> bool {
 
 /// Whether a record at `level` would be emitted, checked before any formatting happens.
 pub fn enabled(level: LogLevel) -> bool {
-    level.rank() >= THRESHOLD.load(Ordering::Relaxed)
+    current_threshold().admits(level)
 }
 
 static FILE_SINK: Mutex<Option<RotatingLogSink>> = Mutex::new(None);
@@ -179,7 +230,17 @@ pub fn active_subcommand() -> Option<String> {
 
 /// Writes one diagnostic record to the passive file sink and to stderr if appropriate.
 pub fn emit(level: LogLevel, target: &str, message: &str) {
-    if !enabled(level) {
+    emit_with(current_threshold(), level, target, message);
+}
+
+/// Writes one diagnostic record, honouring an explicit threshold instead of the process one.
+///
+/// Provided so a caller whose verbosity is not the process's can be tested without configuring a
+/// global. That is the only way to assert "a debug record under a warn threshold writes nothing"
+/// reliably: with a shared global, a parallel test raising the level makes the assertion pass or
+/// fail depending on scheduling rather than on the code.
+pub fn emit_with(threshold: Threshold, level: LogLevel, target: &str, message: &str) {
+    if !threshold.admits(level) {
         return;
     }
 
@@ -335,6 +396,24 @@ macro_rules! diag_error {
     };
 }
 
+/// Guard that serialises tests which mutate the process-wide threshold.
+///
+/// Process-wide state and parallel tests do not mix: while one test holds the threshold at `Debug`,
+/// another asserting "a debug record under a warning threshold is rejected" reads the raised value
+/// and fails. The lock is exported rather than declared in each test file so the exclusion is
+/// genuinely process-wide; a per-file lock, which is what existed before, only serialises the tests
+/// that happen to live in the same file.
+///
+/// It is a normal function rather than `#[cfg(test)]` because the integration suites live in other
+/// crates and cannot see an item gated to this crate's own tests.
+pub fn threshold_guard() -> std::sync::MutexGuard<'static, ()> {
+    static GUARD: Mutex<()> = Mutex::new(());
+    // A poisoned lock means another test panicked while holding it. The state it protected is a
+    // single atomic, so recovering is safe and refusing to run would turn one failure into many.
+    GUARD
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -354,18 +433,20 @@ mod tests {
     }
 
     #[test]
-    fn threshold_gates_lower_severities() {
-        let previous = set_level(LogLevel::Info);
-        assert!(!enabled(LogLevel::Trace));
-        assert!(!enabled(LogLevel::Debug));
-        assert!(enabled(LogLevel::Info));
-        assert!(enabled(LogLevel::Error));
-        set_level(previous);
+    fn a_threshold_value_gates_lower_severities() {
+        // Asserted on the value, not on the process global. This is the property the global
+        // threshold has; testing it through the global is what made the assertion depend on
+        // whichever other test happened to run at the same time.
+        let threshold = Threshold::at(LogLevel::Info);
+        assert!(!threshold.admits(LogLevel::Trace));
+        assert!(!threshold.admits(LogLevel::Debug));
+        assert!(threshold.admits(LogLevel::Info));
+        assert!(threshold.admits(LogLevel::Error));
     }
 
     #[test]
-    fn off_silences_everything() {
-        let previous = set_level(LogLevel::Off);
+    fn an_off_threshold_admits_nothing() {
+        let threshold = Threshold::at(LogLevel::Off);
         for level in [
             LogLevel::Trace,
             LogLevel::Debug,
@@ -374,10 +455,21 @@ mod tests {
             LogLevel::Error,
         ] {
             assert!(
-                !enabled(level),
-                "{level:?} must be silent when logging is off"
+                !threshold.admits(level),
+                "{level:?} must be silent under off"
             );
         }
+    }
+
+    #[test]
+    fn the_process_global_still_reports_what_was_set() {
+        // The global remains part of the contract, so one test pins it — behind the process-wide
+        // guard, which is what makes the pin stable while other tests run in parallel.
+        let _guard = threshold_guard();
+        let previous = set_level(LogLevel::Debug);
+        assert_eq!(level(), LogLevel::Debug);
+        assert_eq!(current_threshold(), Threshold::at(LogLevel::Debug));
+        assert!(enabled(LogLevel::Debug));
         set_level(previous);
     }
 }

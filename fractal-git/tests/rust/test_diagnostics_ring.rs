@@ -16,10 +16,11 @@
 
 use std::io::Write;
 
-use fg_core::diagnostics::{record_event, set_file_sink, set_level, LogLevel};
+use fg_core::diagnostics::{record_event, set_file_sink, set_level, LogLevel, Threshold};
 
-/// Serialises tests that mutate the process-wide sink and threshold.
-static SINK_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+// What used to be a file-local lock is now `fg_core::diagnostics::threshold_guard`. A lock owned by
+// one test file only serialises the tests in that file, which is not where the conflict was: the
+// threshold is process-wide, and the crate's own unit tests moved it too.
 
 /// Creates a unique scratch directory below the build tree.
 ///
@@ -50,7 +51,7 @@ fn ambient_narration_is_suppressed_but_audit_events_are_not() {
     // disabled threshold must silence it. `record_event` records a decision the system made, so it
     // must survive regardless of verbosity: otherwise `--log-level off` silently erases the very
     // record of what went wrong, and a reader cannot tell "nothing happened" from "it was hidden".
-    let _guard = SINK_LOCK.lock().unwrap_or_else(|err| err.into_inner());
+    let _guard = fg_core::diagnostics::threshold_guard();
     let path = unique_log_path("off_audit");
     set_file_sink(path.clone(), Some(1 << 20), Some(1)).expect("install sink");
 
@@ -84,7 +85,7 @@ fn ambient_narration_is_suppressed_but_audit_events_are_not() {
 fn an_enabled_level_reaches_the_file_sink() {
     // Confirms the sink itself works, so the suppression assertion above cannot pass merely because
     // nothing is ever written.
-    let _guard = SINK_LOCK.lock().unwrap_or_else(|err| err.into_inner());
+    let _guard = fg_core::diagnostics::threshold_guard();
     let path = unique_log_path("on");
     set_file_sink(path.clone(), Some(1 << 20), Some(1)).expect("install sink");
 
@@ -107,10 +108,34 @@ fn an_enabled_level_reaches_the_file_sink() {
 }
 
 #[test]
-fn the_ambient_threshold_admits_only_levels_at_or_above_it() {
-    // Pins the direction that a filter is easy to get backwards: a higher threshold admits fewer
-    // levels, and `off` admits none. Only `emit` is exercised, because that is the gated path.
-    let _guard = SINK_LOCK.lock().unwrap_or_else(|err| err.into_inner());
+fn the_threshold_value_admits_only_levels_at_or_above_it() {
+    // Pins the direction a filter is easy to get backwards: a higher threshold admits fewer levels.
+    //
+    // Asserted on the value rather than through the process global. The previous form set the global
+    // and then read it back, which made the result depend on whether another test in this same
+    // binary had changed it in between — and one had, which is why this test failed intermittently.
+    for (level, admitted) in [
+        (LogLevel::Trace, false),
+        (LogLevel::Debug, false),
+        (LogLevel::Info, false),
+        (LogLevel::Warn, true),
+        (LogLevel::Error, true),
+    ] {
+        assert_eq!(
+            Threshold::ambient().admits(level),
+            admitted,
+            "the ambient threshold must admit {level:?}={admitted}"
+        );
+    }
+    assert!(!Threshold::at(LogLevel::Off).admits(LogLevel::Error));
+}
+
+#[test]
+fn a_filtered_level_writes_nothing_to_the_file_sink() {
+    // The other half, and the one that needs the real `emit` path: a rejected record must not reach
+    // the file. Held under the process-wide guard so the global it configures is not moved by a
+    // parallel test while this one reads it.
+    let _guard = fg_core::diagnostics::threshold_guard();
     let path = unique_log_path("thresholds");
 
     for (threshold, admitted) in [(LogLevel::Debug, true), (LogLevel::Warn, false)] {
@@ -132,7 +157,7 @@ fn the_ambient_threshold_admits_only_levels_at_or_above_it() {
 fn rotation_keeps_one_backup_and_stays_under_the_cap() {
     // Rotation must actually rotate. A sink that never rotates grows without bound, and the
     // durability story for a long-running agent session collapses into "one enormous file".
-    let _guard = SINK_LOCK.lock().unwrap_or_else(|err| err.into_inner());
+    let _guard = fg_core::diagnostics::threshold_guard();
     let path = unique_log_path("rotate");
     let original = set_level(LogLevel::Info);
     set_file_sink(path.clone(), Some(2 * 1024), Some(1)).expect("install sink");

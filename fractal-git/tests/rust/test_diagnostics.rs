@@ -5,7 +5,7 @@
 //! a filtered level must not gate more than one atomic read, and the severity order must be the one
 //! `enabled` relies on, because an inverted order would silently turn error reporting off.
 
-use fg_core::diagnostics::{enabled, level, set_level, LogLevel};
+use fg_core::diagnostics::{enabled, level, set_level, LogLevel, Threshold};
 
 #[test]
 fn severity_order_is_ascending_from_trace_to_off() {
@@ -29,6 +29,9 @@ fn severity_order_is_ascending_from_trace_to_off() {
 
 #[test]
 fn setting_a_level_is_observable_and_reversible() {
+    // Holds the process-wide guard: this test both writes and reads the global threshold, and a
+    // sibling test doing the same in parallel is exactly what made the diagnostics suite flaky.
+    let _guard = fg_core::diagnostics::threshold_guard();
     let original = level();
     let previous = set_level(LogLevel::Debug);
     assert_eq!(
@@ -36,12 +39,17 @@ fn setting_a_level_is_observable_and_reversible() {
         "set_level must report the replaced level"
     );
     assert_eq!(level(), LogLevel::Debug);
+    assert!(
+        enabled(LogLevel::Debug),
+        "the global gate must agree with the level it reports"
+    );
     set_level(original);
     assert_eq!(level(), original);
 }
 
 #[test]
 fn each_level_is_inclusive_of_itself_and_above() {
+    // Pure value assertion: the inclusion rule is a property of the threshold, not of the process.
     for threshold in [
         LogLevel::Trace,
         LogLevel::Debug,
@@ -49,22 +57,22 @@ fn each_level_is_inclusive_of_itself_and_above() {
         LogLevel::Warn,
         LogLevel::Error,
     ] {
-        let original = set_level(threshold);
+        let value = Threshold::at(threshold);
         assert!(
-            enabled(threshold),
+            value.admits(threshold),
             "{threshold:?} must enable its own level"
         );
         assert!(
-            enabled(LogLevel::Error),
+            value.admits(LogLevel::Error),
             "error must always survive a threshold at or below it"
         );
-        set_level(original);
     }
 }
 
 #[test]
 fn off_disables_every_level() {
-    let original = set_level(LogLevel::Off);
+    // Also a value assertion: `Off` is the top of the ordering, so nothing is admitted under it.
+    let value = Threshold::at(LogLevel::Off);
     for candidate in [
         LogLevel::Trace,
         LogLevel::Debug,
@@ -72,9 +80,11 @@ fn off_disables_every_level() {
         LogLevel::Warn,
         LogLevel::Error,
     ] {
-        assert!(!enabled(candidate), "{candidate:?} must be silent when off");
+        assert!(
+            !value.admits(candidate),
+            "{candidate:?} must be silent when off"
+        );
     }
-    set_level(original);
 }
 
 #[test]
