@@ -694,6 +694,11 @@ export class TestModernityAnalyzer implements Analyzer {
         if (flags.isObsolete) currentCase.obsoleteCount++;
     }
 
+    private extractFirstCaptureGroup(match: RegExpExecArray | null, fallback: string): string | undefined {
+        if (!match) return undefined;
+        return match.slice(1).find(Boolean) || fallback;
+    }
+
     private analyzeWithLines(
         ctx: AnalyzerContext,
         sites: TestSite[],
@@ -719,17 +724,11 @@ export class TestModernityAnalyzer implements Analyzer {
             const isMockOnly = REGEX.TEST.MOCK_ONLY_ASSERT.test(line);
             const isObsolete = REGEX.TEST.OBSOLETE_CONTRACT.test(line);
             const floatMatch = REGEX.TEST.FRAGILE_FLOAT_ASSERT.exec(line);
-            const isFragileFloat = floatMatch !== null;
-            const fragileFloatLit = floatMatch
-                ? floatMatch.slice(1).find(Boolean) || 'float'
-                : undefined;
+            const fragileFloatLit = this.extractFirstCaptureGroup(floatMatch, 'float');
             const brittleMatch = REGEX.TEST.BRITTLE_COUNTER_IDENT.test(line)
                 ? REGEX.TEST.NUMERIC_ASSERT.exec(line)
                 : null;
-            const isBrittleOracle = brittleMatch !== null;
-            const brittleOracleLit = brittleMatch
-                ? brittleMatch.slice(1).find(Boolean) || 'scalar'
-                : undefined;
+            const brittleOracleLit = this.extractFirstCaptureGroup(brittleMatch, 'scalar');
 
             if (currentCase) {
                 this.updateCaseCounts(line, currentCase, {
@@ -748,9 +747,9 @@ export class TestModernityAnalyzer implements Analyzer {
                     isTautological,
                     isMockOnly,
                     isObsolete,
-                    isFragileFloat,
+                    isFragileFloat: floatMatch !== null,
                     fragileFloatLit,
-                    isBrittleOracle,
+                    isBrittleOracle: brittleMatch !== null,
                     brittleOracleLit,
                 },
                 sites,

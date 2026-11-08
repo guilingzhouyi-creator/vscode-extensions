@@ -120,6 +120,21 @@ export class TypeScriptAdapter extends BaseAstAdapter {
         );
     }
 
+    private mapGovernanceChildren(
+        tsNode: ts.Node,
+        sourceFile: ts.SourceFile,
+    ): NormalizedNode[] | undefined {
+        let kids: NormalizedNode[] | undefined;
+        ts.forEachChild(tsNode, (childTs) => {
+            if (this.isSkippableGovernanceBranch(childTs)) return;
+            const mapped = this.mapGovernanceNode(childTs, sourceFile, false);
+            if (mapped !== null) {
+                (kids ??= []).push(mapped);
+            }
+        });
+        return kids;
+    }
+
     private mapGovernanceNode(
         tsNode: ts.Node,
         sourceFile: ts.SourceFile,
@@ -139,25 +154,18 @@ export class TypeScriptAdapter extends BaseAstAdapter {
             kind === NodeKind.ControlFlow ||
             increasesNesting;
 
-        let kids: NormalizedNode[] | undefined;
-        ts.forEachChild(tsNode, (childTs) => {
-            if (this.isSkippableGovernanceBranch(childTs)) return;
-            const mapped = this.mapGovernanceNode(childTs, sourceFile, false);
-            if (mapped !== null) {
-                (kids ??= []).push(mapped);
-            }
-        });
-
+        const kids = this.mapGovernanceChildren(tsNode, sourceFile);
         if (!keepNode && kids === undefined) {
             return null;
         }
 
+        const resolvedName =
+            needsPos || isClassDefining ? (nameOf(tsNode, sourceFile) ?? undefined) : undefined;
         return {
             kind,
             start: needsPos ? posOf(tsNode.getStart(sourceFile), sourceFile) : undefined,
             end: needsPos ? posOf(tsNode.getEnd(), sourceFile) : undefined,
-            name:
-                needsPos || isClassDefining ? (nameOf(tsNode, sourceFile) ?? undefined) : undefined,
+            name: resolvedName,
             functionLike: fnLike,
             isClassDefining,
             introducesBinding: isBinding,

@@ -424,6 +424,28 @@ function decodeBitsetRow(
     return result;
 }
 
+function populateNodeGenKillBits(
+    allNodeNames: string[],
+    wordsPerNode: number,
+    gen: Record<string, string[]>,
+    kill: Record<string, string[]>,
+    factToId: Map<string, number>,
+    buffers: DataflowBitBuffers,
+): void {
+    for (let i = 0; i < allNodeNames.length; i++) {
+        const name = allNodeNames[i];
+        const base = i * wordsPerNode;
+        for (const item of gen[name] ?? []) {
+            const fid = factToId.get(item);
+            if (fid !== undefined) buffers.genWords[base + (fid >>> 5)] |= 1 << (fid & 31);
+        }
+        for (const item of kill[name] ?? []) {
+            const fid = factToId.get(item);
+            if (fid !== undefined) buffers.killWords[base + (fid >>> 5)] |= 1 << (fid & 31);
+        }
+    }
+}
+
 /**
  * Solves forward or backward dataflow equations to a fixed point.
  * @param params Dataflow configuration containing entry, edges, direction, gen, and kill.
@@ -446,28 +468,17 @@ export function solveDataflowShim(params: NativeDataflowParams): NativeDataflowR
         outWords: new Uint32Array(totalWords),
     };
 
-    for (let i = 0; i < total; i++) {
-        const name = allNodeNames[i];
-        const base = i * wordsPerNode;
-        for (const item of gen[name] ?? []) {
-            const fid = factToId.get(item);
-            if (fid !== undefined) buffers.genWords[base + (fid >>> 5)] |= 1 << (fid & 31);
-        }
-        for (const item of kill[name] ?? []) {
-            const fid = factToId.get(item);
-            if (fid !== undefined) buffers.killWords[base + (fid >>> 5)] |= 1 << (fid & 31);
-        }
-    }
+    populateNodeGenKillBits(allNodeNames, wordsPerNode, gen, kill, factToId, buffers);
 
     let iterations = 0;
     let changed = true;
+    const activeNeighbors = forward ? preds : succs;
 
     while (changed && iterations < 500) {
         changed = false;
         iterations++;
         for (let i = 0; i < total; i++) {
-            const neighbors = forward ? preds[i] : succs[i];
-            if (stepDataflowNodeBits(i, neighbors, forward, buffers)) {
+            if (stepDataflowNodeBits(i, activeNeighbors[i], forward, buffers)) {
                 changed = true;
             }
         }
@@ -1052,13 +1063,17 @@ export function fastPatternMatchShim(sourceText: string, patterns: string[]): Na
  * @param patterns - Pattern strings to probe.
  * @returns True when at least one pattern occurs.
  */
+function containsNonEmptyPattern(sourceText: string, pattern: string): boolean {
+    if (pattern.length === 0) return false;
+    return sourceText.indexOf(pattern) !== -1;
+}
+
 export function hasAnyPatternShim(sourceText: string, patterns: string[]): boolean {
     if (!sourceText || patterns.length === 0) {
         return false;
     }
     for (const pattern of patterns) {
-        if (pattern.length === 0) continue;
-        if (sourceText.indexOf(pattern) !== -1) return true;
+        if (containsNonEmptyPattern(sourceText, pattern)) return true;
     }
     return false;
 }

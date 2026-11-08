@@ -46,13 +46,12 @@ let parser: TreeSitterParser | null = null;
  *     native bindings, later calls reuse the same instance.
  */
 function pythonParser(): TreeSitterParser {
-    if (!parser) {
-        const Parser = require('tree-sitter');
-        const Python = require('tree-sitter-python');
-        const tsParser = new Parser();
-        tsParser.setLanguage(Python);
-        parser = tsParser as TreeSitterParser;
-    }
+    if (parser !== null) return parser;
+    const Parser = require('tree-sitter'); // @lazy deferred load of optional native binding
+    const Python = require('tree-sitter-python'); // @lazy deferred load of Python grammar
+    const tsParser = new Parser();
+    tsParser.setLanguage(Python);
+    parser = tsParser as TreeSitterParser;
     return parser;
 }
 

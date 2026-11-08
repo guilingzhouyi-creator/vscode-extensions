@@ -212,7 +212,7 @@ export function checkGdFunctionSignature(
 export function checkUnsafeAny(masked: string[], violations: GovernanceViolation[]): void {
     for (let i = 0; i < masked.length; i++) {
         const line = masked[i];
-        if (!line.includes('any') || !REGEX.SYNTAX.TS_ANY_KEYWORD.test(line)) continue;
+        if (!REGEX.SYNTAX.TS_ANY_KEYWORD.test(line)) continue;
         const trimmed = line.trim();
         if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
         if (REGEX.SYNTAX.TS_ANY_TYPE.test(line) && !REGEX.COMMENT.ESLINT_DISABLE.test(line)) {
@@ -325,6 +325,9 @@ function inspectExportedDeclaration(
     }
 }
 
+const EXPORT_FN_KEYWORD_RE = /\bfunction\b/;
+const EXPORT_CONST_KEYWORD_RE = /\bconst\b/;
+
 /**
  * Checks TypeScript source lines for exported functions lacking explicit return types.
  *
@@ -348,8 +351,8 @@ export function checkExportedFunctionReturnTypes(
     for (let i = 0; i < masked.length; i++) {
         const line = masked[i];
         if (!lineHasExportKeyword(line)) continue;
-        const hasFn = line.includes('function');
-        const hasConst = line.includes('const');
+        const hasFn = EXPORT_FN_KEYWORD_RE.test(line);
+        const hasConst = EXPORT_CONST_KEYWORD_RE.test(line);
         if (!hasFn && !hasConst) continue;
         const trimmed = line.trim();
         if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;

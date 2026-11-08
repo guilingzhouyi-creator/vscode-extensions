@@ -224,6 +224,12 @@ function matchFunctionDeclaration(line: string): RegExpMatchArray | null {
     return null;
 }
 
+function isSingleOrEmptyParamSameLine(line: string, openIdx: number, threshold: number): boolean {
+    if (threshold <= 1) return false;
+    const closeOnSameLine = line.indexOf(')', openIdx + 1);
+    return closeOnSameLine !== -1 && line.indexOf(',', openIdx + 1) === -1;
+}
+
 function inspectFunctionAtLine(
     line: string,
     lines: string[],
@@ -238,12 +244,7 @@ function inspectFunctionAtLine(
     if (!funcName || funcName === 'constructor') return;
 
     const openIdx = line.indexOf('(', matchResult.index ?? 0);
-    if (openIdx === -1) return;
-
-    const closeOnSameLine = line.indexOf(')', openIdx + 1);
-    if (closeOnSameLine !== -1 && line.indexOf(',', openIdx + 1) === -1 && threshold > 1) {
-        return;
-    }
+    if (openIdx === -1 || isSingleOrEmptyParamSameLine(line, openIdx, threshold)) return;
 
     const paramText = extractParameterText(lines, lineIndex, openIdx);
     if (!paramText) return;

@@ -41,9 +41,12 @@ export function materializeSourceFile(
     legacy: ResolvedAnalyzer[],
     adapter: LanguageAdapter,
 ): ts.SourceFile | undefined {
-    if (legacy.length === 0) return undefined;
-    if (adapter.id !== 'typescript' && adapter.id !== 'oxc') return undefined;
-    return require('../../utils/ast').createSourceFile(rel, content);
+    const isTsFamily = adapter.id === 'typescript' || adapter.id === 'oxc';
+    if (legacy.length === 0 || !isTsFamily) return undefined;
+    const astModule = require('../../utils/ast') as {
+        createSourceFile: (filePath: string, text: string) => ts.SourceFile;
+    }; // @lazy deferred load
+    return astModule.createSourceFile(rel, content);
 }
 
 /**

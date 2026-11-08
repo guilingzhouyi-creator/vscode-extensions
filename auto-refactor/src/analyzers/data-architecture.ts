@@ -157,6 +157,16 @@ function checkAndPushSite(trimmed: string, meta: SiteMeta, sites: DataAccessSite
     }
 }
 
+function isIterationContextLine(
+    inLoopBefore: boolean,
+    inLoopAfter: boolean,
+    trimmed: string,
+): boolean {
+    if (inLoopBefore) return true;
+    if (inLoopAfter && !REGEX.DATA.LOOP_HEADER.test(trimmed)) return true;
+    return REGEX.DATA.ITERATION_METHOD.test(trimmed);
+}
+
 /**
  * Analyzer detecting database access antipatterns and data architecture violations.
  */
@@ -198,12 +208,7 @@ export class DataArchitectureAnalyzer implements Analyzer {
             const inLoopBefore = loopTracker.inLoop;
             updateLoopTracker(trimmed, currentIndent, loopTracker);
 
-            // Expressions on the loop header itself (e.g. for (const x of coll)) execute once
-            // outside iteration
-            const inIter =
-                inLoopBefore ||
-                (loopTracker.inLoop && !REGEX.DATA.LOOP_HEADER.test(trimmed)) ||
-                REGEX.DATA.ITERATION_METHOD.test(trimmed);
+            const inIter = isIterationContextLine(inLoopBefore, loopTracker.inLoop, trimmed);
             if (!isRegexLiteralLine(trimmed)) {
                 checkAndPushSite(
                     trimmed,

@@ -158,6 +158,25 @@ function isFrontendFile(file: string): boolean {
 
 // --- Multi-line scanner hooks ---
 
+function hasSuperResetInBody(
+    masked: readonly string[],
+    startIdx: number,
+    funcIndent: number,
+): boolean {
+    for (let j = startIdx + 1; j < masked.length; j += 1) {
+        const bodyLine = masked[j];
+        const trimmed = bodyLine.trim();
+        if (trimmed.length === 0 || trimmed.startsWith('#')) continue;
+        if (bodyLine.search(/\S/) <= funcIndent) {
+            return false;
+        }
+        if (REGEX.GDSCRIPT.SUPER_RESET.test(bodyLine)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function scanMultiLineResetState(
     raw: readonly string[],
     masked: readonly string[],
@@ -166,37 +185,17 @@ function scanMultiLineResetState(
     issues: Issue[],
     rule: DeclarativeLineRule,
 ): void {
-    let hasExtends = false;
-    for (let i = 0; i < masked.length; i += 1) {
-        if (REGEX.SYNTAX.GDSCRIPT_EXTENDS.test(masked[i])) {
-            hasExtends = true;
-            break;
-        }
+    if (!masked.some((line) => REGEX.SYNTAX.GDSCRIPT_EXTENDS.test(line))) {
+        return;
     }
-    if (!hasExtends) return;
 
     for (let index = 0; index < masked.length; index += 1) {
         const code = masked[index];
         if (!REGEX.SYNTAX.GDSCRIPT_RESET_STATE_FUNC.test(code)) {
             continue;
         }
-
         const funcIndent = code.search(/\S/);
-        let hasSuper = false;
-        for (let j = index + 1; j < masked.length; j += 1) {
-            const bodyLine = masked[j];
-            if (bodyLine.trim().length === 0 || bodyLine.trim().startsWith('#')) continue;
-            const bodyIndent = bodyLine.search(/\S/);
-            if (bodyIndent <= funcIndent) {
-                break;
-            }
-            if (REGEX.GDSCRIPT.SUPER_RESET.test(bodyLine)) {
-                hasSuper = true;
-                break;
-            }
-        }
-
-        if (!hasSuper) {
+        if (!hasSuperResetInBody(masked, index, funcIndent)) {
             issues.push(delegate.emitIssue(rule, file, index + 1, { line: raw[index].trim() }));
         }
     }

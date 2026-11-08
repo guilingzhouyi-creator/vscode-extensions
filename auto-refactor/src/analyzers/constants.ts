@@ -504,6 +504,30 @@ export class ConstantsAnalyzer implements Analyzer {
         return ignoreSet.has(text) || ignoreSet.has(inner);
     }
 
+    private buildLiteralReplacementPatch(
+        node: NormalizedNode,
+        suggestedName: string,
+        isUsable: boolean,
+    ): {
+        patch?: {
+            range: { startLine: number; startCol: number; endLine: number; endCol: number };
+            replacementText: string;
+        };
+    } {
+        if (!isUsable) return {};
+        return {
+            patch: {
+                range: {
+                    startLine: node.start?.line ?? 1,
+                    startCol: node.start?.column ?? 1,
+                    endLine: node.end?.line ?? 1,
+                    endCol: node.end?.column ?? 1,
+                },
+                replacementText: suggestedName,
+            },
+        };
+    }
+
     private buildHardcodedStringIssue(
         lit: LiteralRecord,
         ctx: AnalyzerContext,
@@ -513,7 +537,7 @@ export class ConstantsAnalyzer implements Analyzer {
         const text = lit.value;
         const inner = stripQuotes(text);
         const classification = classify ? classifyLiteral(text, false) : null;
-        if (classification && classification.isReasonable) return null;
+        if (classification?.isReasonable) return null;
 
         const res = resolveLiteralIssueData({
             literalValue: text,
@@ -555,19 +579,7 @@ export class ConstantsAnalyzer implements Analyzer {
             insertAnchor: { position: 'after_imports' },
             // Same rule as magic numbers: a patch may only exist when the target name means
             // something. `const EXTRACTED_STRING = '/'` would be worse than the inline literal.
-            ...(stringNameIsUsable
-                ? {
-                      patch: {
-                          range: {
-                              startLine: lit.node.start?.line ?? 1,
-                              startCol: lit.node.start?.column ?? 1,
-                              endLine: lit.node.end?.line ?? 1,
-                              endCol: lit.node.end?.column ?? 1,
-                          },
-                          replacementText: res.suggested,
-                      },
-                  }
-                : {}),
+            ...this.buildLiteralReplacementPatch(lit.node, res.suggested, stringNameIsUsable),
             safeToAutomate: stringNameIsUsable,
         };
         return issue;
