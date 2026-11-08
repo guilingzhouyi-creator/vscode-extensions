@@ -455,6 +455,11 @@ class PhysicalHygieneAuditor {
 
     let totalWeightedScore = 0.0;
     const dimensionDetails = {};
+    const surfaceRatio = 1.0 - 1.0 / (1.0 + N / 10000.0);
+    const epistemicCeiling = Math.min(
+      99.9,
+      Math.round((100.0 - (0.2 + 0.3 * surfaceRatio)) * 10) / 10,
+    );
 
     for (const [dim, weight] of Object.entries(weights)) {
       const vCount = this.violations[dim].length;
@@ -465,17 +470,23 @@ class PhysicalHygieneAuditor {
         const scale = scales[dim];
         compliance = Math.max(0.0, 1.0 - vCount / scale);
       }
-      const dimScore = Math.round(compliance * 1000) / 10;
+      const dimScore = Math.min(
+        epistemicCeiling,
+        Math.round(compliance * epistemicCeiling * 10) / 10,
+      );
       dimensionDetails[dim] = {
         weight,
         violationsCount: vCount,
         compliance: Math.round(compliance * 1000) / 1000,
         score: dimScore,
       };
-      totalWeightedScore += weight * (compliance * 100.0);
+      totalWeightedScore += weight * (compliance * epistemicCeiling);
     }
 
-    const finalScore = Math.round(Math.max(15.0, totalWeightedScore) * 10) / 10;
+    const finalScore = Math.min(
+      epistemicCeiling,
+      Math.round(Math.max(15.0, totalWeightedScore) * 10) / 10,
+    );
 
     let totalViolations = 0;
     for (const dim of Object.keys(weights)) {

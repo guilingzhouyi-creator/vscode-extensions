@@ -21,6 +21,7 @@ const path = require('path');
 const { execFileSync, execSync } = require('child_process');
 
 const SCORE_FLOOR = 15.0;
+const THEORETICAL_SCORE_CEILING = 99.75;
 const TARGET_WIDTH = 71;
 
 const DIM_DEFINITIONS = Object.freeze([
@@ -197,7 +198,7 @@ function evaluateHygieneScore(state) {
   if (state.codeGi !== 0) baseHygiene = Math.max(SCORE_FLOOR, baseHygiene - 10.0);
   if (state.codeDensity !== 0) baseHygiene = Math.max(SCORE_FLOOR, baseHygiene - 15.0);
   if (state.codeEloc !== 0) baseHygiene = Math.max(SCORE_FLOOR, baseHygiene - 15.0);
-  return Math.max(SCORE_FLOOR, Number(baseHygiene.toFixed(1)));
+  return Math.max(SCORE_FLOOR, Math.min(THEORETICAL_SCORE_CEILING, Number(baseHygiene.toFixed(1))));
 }
 
 /**
@@ -293,12 +294,21 @@ function evaluateWebGamesScore(state, polyglotBreakdown) {
   const summary = wgData?.summary;
   if (summary) {
     if (Number(summary.checks) > 0) {
-      const ratioWg = Number(summary.byStatus?.PASS || 0) / Number(summary.checks);
+      const passChecksWg = Number(summary.byStatus?.PASS || 0);
+      const totalChecksWg = Number(summary.checks);
+      const jeffreysMeanWg = (passChecksWg + 0.5) / (totalChecksWg + 1.0);
       const warnWg = Number(summary.bySeverity?.warning || 0);
       const errWg = Number(summary.bySeverity?.error || 0);
-      configScore = Math.max(SCORE_FLOOR, Number((100.0 * ratioWg - warnWg * 0.035 - errWg * 5.0).toFixed(1)));
+      const rawWg = THEORETICAL_SCORE_CEILING * jeffreysMeanWg - warnWg * 0.035 - errWg * 5.0;
+      configScore = Math.max(
+        SCORE_FLOOR,
+        Math.min(THEORETICAL_SCORE_CEILING, Number(rawWg.toFixed(1))),
+      );
     } else if (typeof summary.compositeScore === 'number' && summary.compositeScore > 0) {
-      configScore = Math.max(SCORE_FLOOR, Number(summary.compositeScore.toFixed(1)));
+      configScore = Math.max(
+        SCORE_FLOOR,
+        Math.min(THEORETICAL_SCORE_CEILING, Number(summary.compositeScore.toFixed(1))),
+      );
     }
   }
 
@@ -307,7 +317,10 @@ function evaluateWebGamesScore(state, polyglotBreakdown) {
     state.statusWg = 'BLOCK';
     state.failed = true;
   } else {
-    baseWg = Number((0.8 * gdScore + 0.2 * configScore).toFixed(1));
+    baseWg = Math.min(
+      THEORETICAL_SCORE_CEILING,
+      Number((0.8 * gdScore + 0.2 * configScore).toFixed(1)),
+    );
   }
   return state.statusWg === 'PASS' ? baseWg : Math.max(SCORE_FLOOR, Number((baseWg - 60.0).toFixed(1)));
 }
@@ -386,7 +399,7 @@ function computeDynamicDimensions(baseDims, scores) {
     if (baseVal !== null) {
       dimScore = scores.failed ? Math.min(baseVal, dimScore) : baseVal;
     }
-    dynamicDimensions[d.key] = Math.max(SCORE_FLOOR, Math.min(100.0, dimScore));
+    dynamicDimensions[d.key] = Math.max(SCORE_FLOOR, Math.min(THEORETICAL_SCORE_CEILING, dimScore));
   }
   return dynamicDimensions;
 }
@@ -746,10 +759,17 @@ function main() {
 
   const catalogCountConsistent = state.codeCatalog === 0;
   const rulesPassedCount = state.ruleCodes.filter((c) => c === 0).length;
+  const ruleStepTotal = Math.max(1, state.ruleCodes.length);
+  const stepPosterior = (rulesPassedCount + 0.5) / (ruleStepTotal + 1.0);
+  const catalogPosterior =
+    catalogCountConsistent && catalogRuleCount > 0
+      ? (catalogRuleCount + 0.5) / (catalogRuleCount + 1.0)
+      : 0.5;
+  const rawRulesScore = THEORETICAL_SCORE_CEILING * (0.7 * stepPosterior + 0.3 * catalogPosterior);
   const scoreRules =
     state.statusRules === 'PASS' && catalogCountConsistent
-      ? 100.0
-      : Math.max(SCORE_FLOOR, Number((100.0 * (rulesPassedCount / Math.max(1, state.ruleCodes.length))).toFixed(1)));
+      ? Math.max(SCORE_FLOOR, Math.min(THEORETICAL_SCORE_CEILING, Number(rawRulesScore.toFixed(1))))
+      : Math.max(SCORE_FLOOR, Number((rawRulesScore - 60.0).toFixed(1)));
 
   let baseAr = arBase.compositeScore !== null ? Number(arBase.compositeScore) : null;
   if (baseAr === null) {
@@ -757,16 +777,28 @@ function main() {
     state.failed = true;
     baseAr = SCORE_FLOOR;
   }
-  const scoreAr = state.statusAr === 'PASS' ? baseAr : Math.max(SCORE_FLOOR, Number((baseAr - 60.0).toFixed(1)));
-  const scoreWt = evaluateWorkspaceTimingScore(state);
-  const scoreWg = evaluateWebGamesScore(state, polyglotBreakdown);
-  const scoreFg = evaluateFractalGitScore(state);
+  const scoreAr =
+    state.statusAr === 'PASS'
+      ? Math.min(THEORETICAL_SCORE_CEILING, baseAr)
+      : Math.max(SCORE_FLOOR, Number((baseAr - 60.0).toFixed(1)));
+  const scoreWt = Math.min(THEORETICAL_SCORE_CEILING, evaluateWorkspaceTimingScore(state));
+  const scoreWg = Math.min(THEORETICAL_SCORE_CEILING, evaluateWebGamesScore(state, polyglotBreakdown));
+  const scoreFg = Math.min(THEORETICAL_SCORE_CEILING, evaluateFractalGitScore(state));
 
-  const rawWeighted =
-    0.1 * scoreHygiene + 0.1 * scoreRules + 0.25 * scoreAr + 0.2 * scoreWt + 0.2 * scoreWg + 0.15 * scoreFg;
+  const weightedLogSum =
+    0.1 * Math.log(Math.max(SCORE_FLOOR, scoreHygiene)) +
+    0.1 * Math.log(Math.max(SCORE_FLOOR, scoreRules)) +
+    0.25 * Math.log(Math.max(SCORE_FLOOR, scoreAr)) +
+    0.2 * Math.log(Math.max(SCORE_FLOOR, scoreWt)) +
+    0.2 * Math.log(Math.max(SCORE_FLOOR, scoreWg)) +
+    0.15 * Math.log(Math.max(SCORE_FLOOR, scoreFg));
+  const rawGeometric = Math.exp(weightedLogSum);
   const minCorner = Math.min(scoreHygiene, scoreRules, scoreAr, scoreWt, scoreWg, scoreFg);
   const damping = minCorner < 70.0 ? Math.max(0.5, minCorner / 70.0) : 1.0;
-  const workspaceHealthScore = Number((rawWeighted * damping).toFixed(2));
+  const workspaceHealthScore = Math.min(
+    THEORETICAL_SCORE_CEILING,
+    Number((rawGeometric * damping).toFixed(2)),
+  );
   const wsGrade = getGradeTag(workspaceHealthScore).replace('[', '').replace(']', '').trim();
 
   const tenDimensions = computeDynamicDimensions(arBase.tenDimensions, {

@@ -519,6 +519,7 @@ try {
 # ────────────────────────────────────────────────────────────────────────
 # 计算各子系统归一化得分 [0.0 ~ 100.0]（纯客观连续度量，杜绝静态硬编码常数与断崖断层）
 $SCORE_FLOOR = 15.0
+$THEORETICAL_SCORE_CEILING = 99.75
 
 # 门禁失败时的统一扣分幅度。与 SCORE_FLOOR 配合，使「失败」表现为相对劣化而非归零。
 $DEGRADE_PENALTY = 60.0
@@ -548,7 +549,7 @@ if ($codeIso -ne 0) { $baseHygiene = [math]::Max($SCORE_FLOOR, $baseHygiene - $I
 if ($codeGi -ne 0) { $baseHygiene = [math]::Max($SCORE_FLOOR, $baseHygiene - $GITIGNORE_MISSING_PENALTY) }
 if ($codeDensity -ne 0) { $baseHygiene = [math]::Max($SCORE_FLOOR, $baseHygiene - $DENSITY_MISSING_PENALTY) }
 if ($codeEloc -ne 0) { $baseHygiene = [math]::Max($SCORE_FLOOR, $baseHygiene - $ELOC_MISSING_PENALTY) }
-$scoreHygiene = [math]::Max($SCORE_FLOOR, [math]::Round($baseHygiene, 1))
+$scoreHygiene = [math]::Max($SCORE_FLOOR, [math]::Min($THEORETICAL_SCORE_CEILING, [math]::Round($baseHygiene, 1)))
 
 # 2. 单源规则目录基石得分（基于 SSOT 规则目录一致性、反馈词表、闭包、可达性与技能集规范动态判定）
 $ruleCatalogPath = Join-Path $repoRoot "scripts\common\rule-catalog.json"
@@ -573,39 +574,24 @@ $rulesPassedCount = @($ruleStepCodes | Where-Object { $_ -eq 0 }).Count
 # （四份 JSON 快照 + 编译期注册表 + workspace-timing 配置）重算全量规则并与磁盘逐条比对。
 # 仅对 rule-sources 目录求和会系统性少算，纯下界门槛则无法发现规则被系统性删除。
 $catalogCountConsistent = ($codeCatalog -eq 0)
-$scoreRules = if ($statusRules -eq "PASS" -and $catalogCountConsistent) {
-    100.0
-} else {
-    [math]::Max($SCORE_FLOOR, [math]::Round(100.0 * ($rulesPassedCount / [math]::Max(1, $ruleStepTotal)), 1))
-}
+$stepPosterior = ($rulesPassedCount + 0.5) / ([math]::Max(1, $ruleStepTotal) + 1.0)
+$catalogPosterior = if ($catalogCountConsistent -and $catalogRuleCount -gt 0) { ($catalogRuleCount + 0.5) / ($catalogRuleCount + 1.0) } else { 0.5 }
+$rawRulesScore = $THEORETICAL_SCORE_CEILING * (0.7 * $stepPosterior + 0.3 * $catalogPosterior)
+$scoreRules = if ($statusRules -eq "PASS" -and $catalogCountConsistent) { [math]::Max($SCORE_FLOOR, [math]::Min($THEORETICAL_SCORE_CEILING, [math]::Round($rawRulesScore, 1))) } else { [math]::Max($SCORE_FLOOR, [math]::Round($rawRulesScore - $DEGRADE_PENALTY, 1)) }
 
 # 3. auto-refactor 质量基线得分（零硬编码假高分保底，缺失基线报告一律降级至 SCORE_FLOOR 并置 BLOCK）
-$baseAr = $null
-if ($null -ne $compositeScore) {
-    $baseAr = [double]$compositeScore
-} else {
+$baseAr = if ($null -ne $compositeScore) { [double]$compositeScore } else { $null }
+if ($null -eq $baseAr) {
     $arBaselinePath = Join-Path $repoRoot "auto-refactor\reports\self-audit-baseline.json"
     try {
         if (Test-Path $arBaselinePath) {
             $arBaseData = Get-Content -Path $arBaselinePath -Raw -Encoding utf8 | ConvertFrom-Json
-            if ($arBaseData.metrics -and $arBaseData.metrics.compositeScore) {
-                $baseAr = [double]$arBaseData.metrics.compositeScore
-            }
+            if ($arBaseData.metrics -and $arBaseData.metrics.compositeScore) { $baseAr = [double]$arBaseData.metrics.compositeScore }
         }
-    } catch {
-        $baseAr = $null
-    }
+    } catch { $baseAr = $null }
 }
-if ($null -eq $baseAr) {
-    $statusAr = "BLOCK"
-    $failed = $true
-    $baseAr = $SCORE_FLOOR
-}
-$scoreAr = if ($statusAr -eq "PASS") {
-    $baseAr
-} else {
-    [math]::Max($SCORE_FLOOR, [math]::Round($baseAr - $DEGRADE_PENALTY, 1))
-}
+if ($null -eq $baseAr) { $statusAr = "BLOCK"; $failed = $true; $baseAr = $SCORE_FLOOR }
+$scoreAr = if ($statusAr -eq "PASS") { [math]::Min($THEORETICAL_SCORE_CEILING, $baseAr) } else { [math]::Max($SCORE_FLOOR, [math]::Round($baseAr - $DEGRADE_PENALTY, 1)) }
 
 # 4. workspace-timing 审查门禁得分（优先读取最新 auto-refactor-latest.json，零假保底分）
 $baseWt = $null
@@ -658,17 +644,8 @@ if ($null -eq $baseWt) {
     }
 }
 
-if ($null -eq $baseWt) {
-    $statusWt = "BLOCK"
-    $failed = $true
-    $baseWt = $SCORE_FLOOR
-}
-
-$scoreWt = if ($statusWt -eq "PASS") {
-    $baseWt
-} else {
-    [math]::Max($SCORE_FLOOR, [math]::Round($baseWt - $DEGRADE_PENALTY, 1))
-}
+if ($null -eq $baseWt) { $statusWt = "BLOCK"; $failed = $true; $baseWt = $SCORE_FLOOR }
+$scoreWt = if ($statusWt -eq "PASS") { [math]::Min($THEORETICAL_SCORE_CEILING, $baseWt) } else { [math]::Max($SCORE_FLOOR, [math]::Round($baseWt - $DEGRADE_PENALTY, 1)) }
 
 # 5. WebGames 配置架构与游戏源码得分（读取真实 auto-refactor-latest.json 与 audit-latest.json，零假保底分）
 $baseWg = $null
@@ -710,13 +687,13 @@ try {
                 $rawErrWg = if ($null -ne $bySevWg) { Get-SafeProp $bySevWg "error" } else { $null }
                 $errCountWg = if ($null -ne $rawErrWg) { [double]$rawErrWg } else { 0.0 }
 
-                $ratioWg = $passChecksWg / $totalChecksWg
-                $rawConfig = (100.0 * $ratioWg) - ($warnCountWg * 0.035) - ($errCountWg * 5.0)
-                $configScore = [math]::Max($SCORE_FLOOR, [math]::Round($rawConfig, 1))
+                $jeffreysMeanWg = ($passChecksWg + 0.5) / ($totalChecksWg + 1.0)
+                $rawConfig = ($THEORETICAL_SCORE_CEILING * $jeffreysMeanWg) - ($warnCountWg * 0.035) - ($errCountWg * 5.0)
+                $configScore = [math]::Max($SCORE_FLOOR, [math]::Min($THEORETICAL_SCORE_CEILING, [math]::Round($rawConfig, 1)))
             } else {
                 $rawWgComposite = Get-SafeProp $wgSummary "compositeScore"
                 if ($null -ne $rawWgComposite -and [double]$rawWgComposite -gt 0) {
-                    $configScore = [math]::Max($SCORE_FLOOR, [math]::Round([double]$rawWgComposite, 1))
+                    $configScore = [math]::Max($SCORE_FLOOR, [math]::Min($THEORETICAL_SCORE_CEILING, [math]::Round([double]$rawWgComposite, 1)))
                 }
             }
         }
@@ -726,19 +703,8 @@ try {
 }
 
 # 综合得分：GDScript 核心游戏代码占 80% 权重，领域配置驱动表占 20% 权重。
-if ($null -eq $gdScore -or $null -eq $configScore) {
-    $statusWg = "BLOCK"
-    $failed = $true
-    $baseWg = $SCORE_FLOOR
-} else {
-    $baseWg = [math]::Round((0.8 * $gdScore) + (0.2 * $configScore), 1)
-}
-
-$scoreWg = if ($statusWg -eq "PASS") {
-    $baseWg
-} else {
-    [math]::Max($SCORE_FLOOR, [math]::Round($baseWg - $DEGRADE_PENALTY, 1))
-}
+if ($null -eq $gdScore -or $null -eq $configScore) { $statusWg = "BLOCK"; $failed = $true; $baseWg = $SCORE_FLOOR } else { $baseWg = [math]::Min($THEORETICAL_SCORE_CEILING, [math]::Round((0.8 * $gdScore) + (0.2 * $configScore), 1)) }
+$scoreWg = if ($statusWg -eq "PASS") { [math]::Min($THEORETICAL_SCORE_CEILING, $baseWg) } else { [math]::Max($SCORE_FLOOR, [math]::Round($baseWg - $DEGRADE_PENALTY, 1)) }
 
 # 6. fractal-git 质量基线得分（基于 audit-latest.json 真实度量，缺失报告一律置 BLOCK 与 SCORE_FLOOR）
 $baseFg = $null
@@ -788,27 +754,19 @@ try {
     $baseFg = $null
 }
 
-if ($null -eq $baseFg) {
-    $statusFg = "BLOCK"
-    $failed = $true
-    $baseFg = $SCORE_FLOOR
-}
-
-$scoreFg = if ($statusFg -eq "PASS") {
-    $baseFg
-} else {
-    [math]::Max($SCORE_FLOOR, [math]::Round($baseFg - $DEGRADE_PENALTY, 1))
-}
+if ($null -eq $baseFg) { $statusFg = "BLOCK"; $failed = $true; $baseFg = $SCORE_FLOOR }
+$scoreFg = if ($statusFg -eq "PASS") { [math]::Min($THEORETICAL_SCORE_CEILING, $baseFg) } else { [math]::Max($SCORE_FLOOR, [math]::Round($baseFg - $DEGRADE_PENALTY, 1)) }
 
 $exitCode = if ($failed) { 1 } else { 0 }
 $globalStatus = if ($failed) { "🔴 存在违规异常" } else { "🟢 全域质量达标" }
 $globalColor = if ($failed) { "Red" } else { "Green" }
 
-# 全工作区综合健康分（分层加权：基础设施基石层 20% + 核心生产工程层 80%，附带极低分短板熔断阻尼）
-$rawWeighted = (0.10 * $scoreHygiene) + (0.10 * $scoreRules) + (0.25 * $scoreAr) + (0.20 * $scoreWt) + (0.20 * $scoreWg) + (0.15 * $scoreFg)
+# 全工作区综合健康分（分层加权几何平均：基础设施基石层 20% + 核心生产工程层 80%，附带极低分短板熔断阻尼与渐近上限）
+$weightedLogSum = (0.10 * [math]::Log([math]::Max($SCORE_FLOOR, $scoreHygiene))) + (0.10 * [math]::Log([math]::Max($SCORE_FLOOR, $scoreRules))) + (0.25 * [math]::Log([math]::Max($SCORE_FLOOR, $scoreAr))) + (0.20 * [math]::Log([math]::Max($SCORE_FLOOR, $scoreWt))) + (0.20 * [math]::Log([math]::Max($SCORE_FLOOR, $scoreWg))) + (0.15 * [math]::Log([math]::Max($SCORE_FLOOR, $scoreFg)))
+$rawGeometric = [math]::Exp($weightedLogSum)
 $minCorner = [math]::Min($scoreHygiene, [math]::Min($scoreRules, [math]::Min($scoreAr, [math]::Min($scoreWt, [math]::Min($scoreWg, $scoreFg)))))
 $damping = if ($minCorner -lt 70.0) { [math]::Max(0.5, $minCorner / 70.0) } else { 1.0 }
-$workspaceHealthScore = [math]::Round($rawWeighted * $damping, 2)
+$workspaceHealthScore = [math]::Min($THEORETICAL_SCORE_CEILING, [math]::Round($rawGeometric * $damping, 2))
 $wsHealthStr = if ($workspaceHealthScore % 1 -eq 0) { $workspaceHealthScore.ToString("0.0") } else { $workspaceHealthScore.ToString("0.##") }
 $wsGrade = (Get-GradeFromScore $workspaceHealthScore).Trim()
 
@@ -847,7 +805,7 @@ foreach ($d in $dimDefinitions) {
     } else {
         $dyn
     }
-    $dynamicDimensions[$dimKey] = [math]::Max($SCORE_FLOOR, [math]::Min(100.0, [double]$dimScore))
+    $dynamicDimensions[$dimKey] = [math]::Max($SCORE_FLOOR, [math]::Min($THEORETICAL_SCORE_CEILING, [double]$dimScore))
 }
 
 $qualityVectorObj = $dynamicDimensions
