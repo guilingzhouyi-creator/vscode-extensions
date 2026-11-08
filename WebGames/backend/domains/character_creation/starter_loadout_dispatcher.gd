@@ -100,6 +100,7 @@ static func hydrate_starter_loadout_into_profile(
     var raw_items: Array = kit_cfg.get("initial_items", [])
     var display_weapon: String = str(kit_cfg.get("display_weapon", ""))
     var summary_array: Array[Dictionary] = []
+    var empty_spec: Dictionary = {}
 
     for entry in raw_items:
         if not (entry is Dictionary):
@@ -108,7 +109,8 @@ static func hydrate_starter_loadout_into_profile(
         if cid.is_empty():
             continue
         var count: int = maxi(1, int(entry.get("count", 1)))
-        var spec_dict: Dictionary = items_spec_map.get(cid, {})
+        var raw_spec: Variant = items_spec_map.get(cid)
+        var spec_dict: Dictionary = raw_spec if raw_spec is Dictionary else empty_spec
 
         _hydrate_item_batch(
             inventory_agg,

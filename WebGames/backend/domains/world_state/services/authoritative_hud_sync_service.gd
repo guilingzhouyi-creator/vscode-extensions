@@ -2,7 +2,8 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/world_state/services/authoritative_hud_sync_service.gd
 # 架构定位: Domain Service / Aggregation Facade
-# 依赖与触发: 上游: GameBootstrap, WorldGateway, ESC菜单 | 下游: EventBusCore | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, ESC菜单 | 下游: EventBusCore
+# 配置与信号: 配置 config/domains/world_state.json | 信号: EventBus 领域广播
 # 职责说明: 主页 HUD 聚合门面服务，负责拉取轻资产复合快照 (<= 4KB) 及广播事件总线
 # 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
@@ -124,6 +125,23 @@ static func is_human_interacting() -> bool:
 	if _has_human_override:
 		return _human_interacting_override
 	return false
+
+## 7.1 HUD 领域事件信道订阅门面（屏蔽底层 EventBusCore 基础设施，供前端桥接器解耦绑定）
+static func subscribe_hud_channels(
+	on_snapshot: Callable,
+	on_wallet: Callable,
+	on_prologue: Callable,
+	on_world_entered: Callable
+) -> Array:
+	var bus := EventBusCore.get_instance()
+	if bus == null:
+		return []
+	var tokens: Array = []
+	tokens.append(bus.on_channel(EventChannelDefinition.HUD_STATUS_SNAPSHOT, on_snapshot))
+	tokens.append(bus.on_channel(EventChannelDefinition.HUD_WALLET_MUTATED, on_wallet))
+	tokens.append(bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, on_prologue))
+	tokens.append(bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, on_world_entered))
+	return tokens
 
 ## 8. Agent 专用拉轨：从上下文快速派生标准遥测数据包
 static func get_agent_telemetry_packet(

@@ -30,13 +30,15 @@ static func resolve_dto_mapping(backend_dto: Dictionary, entry: Variant) -> Dict
 		return {}
 
 	var result: Dictionary = {}
+	var empty_cfg: Dictionary = {}
 	for fm in entry.field_mapping:
 		if not fm is Dictionary:
 			continue
 		var src_field: String = String(fm.get("backend_field", ""))
 		var tgt_field: String = String(fm.get("view_field", src_field))
 		var trans_kind: String = String(fm.get("transform_kind", "identity"))
-		var trans_cfg: Dictionary = fm.get("transform_config", {}) if fm.get("transform_config", {}) is Dictionary else {}
+		var raw_cfg: Variant = fm.get("transform_config")
+		var trans_cfg: Dictionary = raw_cfg if raw_cfg is Dictionary else empty_cfg
 
 		# 按点分或直接取值
 		var raw_val: Variant = _get_nested_field(backend_dto, src_field)

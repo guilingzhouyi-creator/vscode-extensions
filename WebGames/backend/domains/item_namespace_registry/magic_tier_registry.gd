@@ -73,18 +73,22 @@ func _collect_tier_candidates_for_rank(rank: int) -> Array:
 	var candidates: Array = []
 	for tier in _tiers:
 		var entry: Dictionary = _tiers[tier]
-		var interval: Array = entry.get("reference_interval", [])
-		if interval.size() >= 2 and rank >= int(interval[0]) and rank <= int(interval[1]):
-			candidates.append(int(entry.get("tier", 0)))
+		var raw_interval: Variant = entry.get("reference_interval")
+		if raw_interval is Array:
+			var interval := raw_interval as Array
+			if interval.size() >= 2 and rank >= int(interval[0]) and rank <= int(interval[1]):
+				candidates.append(int(entry.get("tier", 0)))
 	candidates.sort()
 	return candidates
 
 func _find_band_for_rank(rank: int) -> int:
-	for b in _bands:
-		var b_entry: Dictionary = _bands[b]
-		var b_interval: Array = b_entry.get("interval", [])
-		if b_interval.size() >= 2 and rank >= int(b_interval[0]) and rank <= int(b_interval[1]):
-			return int(b_entry.get("band", 0))
+	for band_key in _bands:
+		var b_entry: Dictionary = _bands[band_key]
+		var raw_interval: Variant = b_entry.get("interval")
+		if raw_interval is Array:
+			var b_interval := raw_interval as Array
+			if b_interval.size() >= 2 and rank >= int(b_interval[0]) and rank <= int(b_interval[1]):
+				return int(b_entry.get("band", 0))
 	return 0
 
 ## 装配期构建 rank 反查索引（能力分级候选 / 阶位档次）——
@@ -136,12 +140,15 @@ func _validate_ranks_continuity() -> bool:
 func _validate_tiers_intervals() -> bool:
 	for tier in _tiers:
 		var entry: Dictionary = _tiers[tier]
-		var interval: Array = entry.get("reference_interval", [])
+		var raw_interval: Variant = entry.get("reference_interval")
+		if not (raw_interval is Array):
+			return false
+		var interval := raw_interval as Array
 		if interval.size() < 2:
 			return false
-		var lo: int = int(interval[0])
-		var hi: int = int(interval[1])
-		if lo < 1 or hi > 11 or lo > hi:
+		var interval_lo: int = int(interval[0])
+		var interval_hi: int = int(interval[1])
+		if interval_lo < 1 or interval_hi > 11 or interval_lo > interval_hi:
 			return false
 	return true
 
@@ -151,7 +158,10 @@ func _validate_bands_coverage() -> bool:
 	var band_intervals: Array = []
 	for band in _bands:
 		var entry: Dictionary = _bands[band]
-		var interval: Array = entry.get("interval", [])
+		var raw_interval: Variant = entry.get("interval")
+		if not (raw_interval is Array):
+			return false
+		var interval := raw_interval as Array
 		if interval.size() < 2:
 			return false
 		var blo: int = int(interval[0])
@@ -179,8 +189,10 @@ func _validate_aptitudes_monotonicity() -> bool:
 
 func _validate_profession_ranks() -> bool:
 	var seen_magic_domain := false
-	for i in range(1, 14):
-		var entry: Dictionary = _profession_ranks.get(i, {})
+	for rank_idx in range(1, 14):
+		if not _profession_ranks.has(rank_idx):
+			return false
+		var entry: Dictionary = _profession_ranks[rank_idx]
 		if entry.is_empty():
 			return false
 		var is_magic: bool = bool(entry.get("magic_domain", false))

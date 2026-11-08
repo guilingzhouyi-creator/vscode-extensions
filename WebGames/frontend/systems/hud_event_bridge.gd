@@ -2,23 +2,26 @@
 # 模块归属: 前端系统层 (Frontend · 主页 HUD 事件桥接中枢)
 # 文件路径: res://frontend/systems/hud_event_bridge.gd
 # 架构定位: Presentation Bridge / Event Adapter
-# 跨域依赖: 上游: EventBusCore | 下游: MainHUDView, AuthoritativeHudSnapshotDTO
-# 职责说明: 单源监听 EventBusCore 四通信道，将领域事件与快照转换为前端轻量渲染快照，驱动 MainHUDView 单向刷新
-# 设计依据: Phase 122 施工细则 (Inv-SINGLE-SOURCE-SUBSCRIPTION-1, Inv-PRESENTATION-ZERO-CALC-2, Inv-IDEMPOTENT-ATTACH-DETACH-3)
+# 依赖与触发: 上游: AuthoritativeHudSyncService | 下游: MainHUDView, AuthoritativeHudSnapshotDTO
+# 职责说明: 单源监听主页 HUD 事件信道，将领域事件与快照转换为前端轻量渲染快照并单向刷新视图
+# 退出语义与设计依据: 单源订阅、表现层零计算与幂等挂卸载契约
 # ==============================================================================
 
+## HudEventBridge：主页 HUD 领域事件桥接中枢，负责幂等挂接视图与转发快照。
 class_name HudEventBridge
 extends RefCounted
 
 const MainHUDView = preload("res://frontend/views/main_hud/main_hud_view.gd")
-const EventBusCore = preload("res://backend/infrastructure/event_bus/event_bus_core.gd")
+const AuthoritativeHudSyncService = preload("res://backend/domains/world_state/services/authoritative_hud_sync_service.gd")
 
 static var _instance: HudEventBridge = null
+## 获取全局唯一的主页 HUD 事件桥接单例实例。
 static func get_instance() -> HudEventBridge:
 	if _instance == null:
 		_instance = HudEventBridge.new()
 	return _instance
 
+## 解绑并清空全局单例实例，供单元测试环境隔离复用。
 static func reset_for_tests() -> void:
 	if _instance != null:
 		_instance.detach_hud()
@@ -28,6 +31,7 @@ var _view_ref: WeakRef = null
 var _is_attached: bool = false
 var _bus_tokens: Array = []
 
+## 返回当前是否已绑定有效且未释放的主页 HUD 视图引用。
 func is_attached() -> bool:
 	return _is_attached and _view_ref != null and _view_ref.get_ref() != null
 
@@ -53,25 +57,14 @@ func detach_hud() -> void:
 	_is_attached = false
 
 func _setup_bus_subscriptions() -> void:
-	var bus := EventBusCore.get_instance()
-	if bus == null:
-		return
-
-	# 1. 订阅权威 HUD 快照全量推流信道
-	var t1 = bus.on_channel(EventChannelDefinition.HUD_STATUS_SNAPSHOT, _on_authoritative_snapshot_received)
-	_bus_tokens.append(t1)
-
-	# 2. 订阅钱包变更增量同步
-	var t2 = bus.on_channel(EventChannelDefinition.HUD_WALLET_MUTATED, _on_wallet_mutated)
-	_bus_tokens.append(t2)
-
-	# 3. 订阅序章与剧情叙事步进事件
-	var t3 = bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, _on_prologue_advanced)
-	_bus_tokens.append(t3)
-
-	# 4. 订阅世界进入与网关事件
-	var t4 = bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, _on_world_entered)
-	_bus_tokens.append(t4)
+	var tokens := AuthoritativeHudSyncService.subscribe_hud_channels(
+		_on_authoritative_snapshot_received,
+		_on_wallet_mutated,
+		_on_prologue_advanced,
+		_on_world_entered
+	)
+	for token in tokens:
+		_bus_tokens.append(token)
 
 func _on_authoritative_snapshot_received(pkt: Variant) -> void:
 	var view: MainHUDView = _get_view()

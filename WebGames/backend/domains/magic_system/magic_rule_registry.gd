@@ -108,7 +108,8 @@ func _validate_variants() -> bool:
 		var variant: Dictionary = _variants[variant_id]
 		if not _variant_sources_valid(variant):
 			return false
-		if not _valid_condition_tree(variant.get("fusion_conditions", {})):
+		var raw_conditions: Variant = variant.get("fusion_conditions")
+		if not (raw_conditions is Dictionary) or not _valid_condition_tree(raw_conditions as Dictionary):
 			return false
 		var vof := int(variant.get("variant_of_form", 0))
 		if vof < 1 or vof > 4:

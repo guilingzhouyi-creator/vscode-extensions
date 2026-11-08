@@ -55,7 +55,7 @@ func apply_affixes(affix_ids: Array) -> void:
 		var aff: Dictionary = GenericAffixSolver.get_affix(str(aff_id))
 		if aff.is_empty():
 			continue
-		var mods: Variant = aff.get("stat_mods", {})
+		var mods: Variant = aff.get("stat_mods")
 		if not (mods is Dictionary):
 			continue
 		if mods.has("str"): physiology.base_coefficients["STR"] = float(physiology.base_coefficients.get("STR", 1.0)) * float(mods["str"])

@@ -30,8 +30,9 @@ static func _accumulate_slot_item(item: ItemEntity, rune_defs: Dictionary, total
 
 	var runes: Array = item.affix_sockets.get("imprinted_runes", [])
 	for r in runes:
-		var def: Dictionary = rune_defs.get(str(r), {})
-		_accumulate_stat_map(def, total_mods)
+		var raw_def: Variant = rune_defs.get(str(r))
+		if raw_def is Dictionary:
+			_accumulate_stat_map(raw_def as Dictionary, total_mods)
 
 ## 聚合战备全槽词缀：前缀/后缀/符文修正 → 六维属性与抗性总和（rune_modifiers 配置驱动）
 ## 契约：空槽安全跳过；动态词缀/符文键名不在 total_mods 白名单内的自动忽略（不报错）。

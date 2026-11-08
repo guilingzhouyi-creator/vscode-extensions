@@ -171,6 +171,12 @@ static func validate_config(data: Dictionary) -> Dictionary:
 	return {"valid": errors.is_empty(), "errors": errors}
 
 
+static func _append_index_bucket(index_map: Dictionary, bucket_key: Variant, entry: Variant) -> void:
+	if not index_map.has(bucket_key):
+		index_map[bucket_key] = []
+	(index_map[bucket_key] as Array).append(entry)
+
+
 ## 装载期重建多键索引（_by_id/_by_domain/_by_view/_by_domain_view/_by_endpoint）
 func _rebuild_indexes() -> void:
 	_by_id.clear()
@@ -178,22 +184,14 @@ func _rebuild_indexes() -> void:
 	_by_view.clear()
 	_by_domain_view.clear()
 	_by_endpoint.clear()
-	for e in _entries:
-		_by_id[e.contract_id] = e
-		if not _by_domain.has(e.domain_name):
-			_by_domain[e.domain_name] = []
-		_by_domain[e.domain_name].append(e)
-		if not _by_view.has(e.view_name):
-			_by_view[e.view_name] = []
-		_by_view[e.view_name].append(e)
-		var dv := "%s|%s" % [e.domain_name, e.view_name]
-		if not _by_domain_view.has(dv):
-			_by_domain_view[dv] = []
-		_by_domain_view[dv].append(e)
-		var ek := int(e.endpoint_kind)
-		if not _by_endpoint.has(ek):
-			_by_endpoint[ek] = []
-		_by_endpoint[ek].append(e)
+	for entry in _entries:
+		_by_id[entry.contract_id] = entry
+		_append_index_bucket(_by_domain, entry.domain_name, entry)
+		_append_index_bucket(_by_view, entry.view_name, entry)
+		var domain_view_key := "%s|%s" % [entry.domain_name, entry.view_name]
+		_append_index_bucket(_by_domain_view, domain_view_key, entry)
+		var endpoint_key := int(entry.endpoint_kind)
+		_append_index_bucket(_by_endpoint, endpoint_key, entry)
 
 
 ## 强制重载配置（清装载标志后重新 ensure_loaded，供配置热更新与测试隔离）

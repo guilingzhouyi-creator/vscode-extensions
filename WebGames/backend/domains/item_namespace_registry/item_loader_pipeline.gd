@@ -79,17 +79,19 @@ static func load_all_from_config(catalog: ItemRegistryCatalog) -> Dictionary:
 	)
 	table_names.sort()
 	var all_items: Array = []
+	var empty_items: Array = []
 	for table_name in table_names:
-		all_items.append_array(GameConfig.get_array(str(table_name), "items", []))
+		all_items.append_array(GameConfig.get_array(str(table_name), "items", empty_items))
 	return load_from_dict_list(catalog, all_items)
 
 ## 配置热重载回收：同步注册表与 config/items/*.json 的差异——
 ## 配置中已删除的物品自动注销（数字 ID 与名称键回空闲池），新增物品自动注册。
 static func reload_from_config(catalog: ItemRegistryCatalog) -> Dictionary:
 	var all_items: Array = []
+	var empty_items: Array = []
 	for table_name in GameConfig.get_table_names():
 		if str(table_name).begins_with("items."):
-			all_items.append_array(GameConfig.get_array(str(table_name), "items", []))
+			all_items.append_array(GameConfig.get_array(str(table_name), "items", empty_items))
 
 	var configured_ids: Dictionary = {}
 	for it in all_items:
