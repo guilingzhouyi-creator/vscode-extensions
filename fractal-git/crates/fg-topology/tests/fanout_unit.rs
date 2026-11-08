@@ -11,8 +11,8 @@
 
 use fg_core::constants::{MAX_CARDS_PER_CELL, MAX_SUBAGENTS_PER_CARD};
 use fg_core::error::FractalError;
-use fg_topology::refs::FractalRef;
 use fg_topology::assert_fanout_available;
+use fg_topology::refs::FractalRef;
 
 /// Builds a card reference under `cell`.
 fn card(cell: &str, card_id: &str) -> FractalRef {

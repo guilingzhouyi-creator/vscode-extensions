@@ -304,7 +304,8 @@ impl PromotionStagingLedger {
 
         // Compare-and-swap against the head observed above: a concurrent promotion that moved the
         // trunk between the read and this write must lose rather than overwrite a newer acceptance.
-        if let Err(err) = ref_store.update_ref(&trunk_ref, &acceptance_oid, current_trunk.as_ref()) {
+        if let Err(err) = ref_store.update_ref(&trunk_ref, &acceptance_oid, current_trunk.as_ref())
+        {
             self.ledger_data.active_candidate = Some(active);
             return Err(err);
         }

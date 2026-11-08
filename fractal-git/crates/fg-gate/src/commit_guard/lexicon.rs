@@ -504,7 +504,8 @@ fn find_batch_codename(lower_line: &str) -> Option<String> {
 }
 
 /// Whether a single token is a bare batch codename.
-fn is_batch_token(token: &str) -> bool {    if let Some(rest) = token.strip_prefix("phase") {
+fn is_batch_token(token: &str) -> bool {
+    if let Some(rest) = token.strip_prefix("phase") {
         return !rest.is_empty() && rest.chars().all(|character| character.is_ascii_digit());
     }
     if let Some(rest) = token.strip_prefix("sprint") {
@@ -641,6 +642,9 @@ mod tests {
     #[test]
     fn a_bare_codename_still_wins_over_a_pairing_on_the_same_line() {
         // Two-pass form returns the bare token because pass one completes before pass two starts.
-        assert_eq!(find_batch_codename("sprint 2 then w3"), Some("w3".to_string()));
+        assert_eq!(
+            find_batch_codename("sprint 2 then w3"),
+            Some("w3".to_string())
+        );
     }
 }

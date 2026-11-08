@@ -29,11 +29,11 @@
 //! - `FGT-COR-001`: Core data model and error contract guard
 //! - `FGT-TOP-001`: Fractal topology reference guard
 
-use serde::{Deserialize, Serialize};
-pub use super::projection_tier::ProjectionTier;
 use super::projection_patterns::{pattern_matches, prefix_of, region_within};
+pub use super::projection_tier::ProjectionTier;
 use super::repo_path::path_matches_scope;
 use crate::error::{FractalError, FractalResult};
+use serde::{Deserialize, Serialize};
 
 /// The slice of the tree one node presents, and the tier that slice belongs to.
 ///
@@ -190,11 +190,12 @@ impl ProjectionScope {
             // The parent is restricted and this scope is not, so this scope claims the whole tree.
             return false;
         }
-        if self
-            .include_patterns
-            .iter()
-            .any(|pattern| parent.exclude_patterns.iter().any(|excluded| excluded == pattern))
-        {
+        if self.include_patterns.iter().any(|pattern| {
+            parent
+                .exclude_patterns
+                .iter()
+                .any(|excluded| excluded == pattern)
+        }) {
             // The child names a region the parent has explicitly subtracted.
             return false;
         }

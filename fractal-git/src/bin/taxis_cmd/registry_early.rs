@@ -14,8 +14,8 @@
 //! - `FGT-COR-001`: Core data model and error contract guard
 
 use super::{
-    branch, commit, diff, doctor, hash_object, index_plumbing, init, inspect, install,
-    list_files, projection, read, refs, relocate, stage, status, uninstall,
+    branch, commit, diff, doctor, hash_object, index_plumbing, init, inspect, install, list_files,
+    projection, read, refs, relocate, stage, status, uninstall,
 };
 
 use super::registry::{cmd, CommandSpec};
@@ -41,7 +41,11 @@ pub(crate) const TABLE: &[CommandSpec] = &[
     cmd("write-tree", &[], index_plumbing::handle_write_tree),
     cmd("commit-tree", &[], index_plumbing::handle_commit_tree),
     cmd("update-index", &[], index_plumbing::handle_update_index),
-    cmd("rev-parse", &["rev-parse"], index_plumbing::handle_rev_parse),
+    cmd(
+        "rev-parse",
+        &["rev-parse"],
+        index_plumbing::handle_rev_parse,
+    ),
     cmd("cat-file", &["cat-file"], read::handle_cat_file),
     cmd("ls-tree", &["ls-tree"], read::handle_ls_tree),
     cmd("ls-files", &["ls-files"], list_files::handle_ls_files),
@@ -54,7 +58,11 @@ pub(crate) const TABLE: &[CommandSpec] = &[
     cmd("grep", &["grep"], inspect::handle_grep),
     cmd("shortlog", &["shortlog"], inspect::handle_shortlog),
     cmd("describe", &["describe"], inspect::handle_describe),
-    cmd("count-objects", &["count-objects"], inspect::handle_count_objects),
+    cmd(
+        "count-objects",
+        &["count-objects"],
+        inspect::handle_count_objects,
+    ),
     cmd("check-attr", &["check-attr"], inspect::handle_check_attr),
     cmd("var", &["var"], inspect::handle_var),
 ];

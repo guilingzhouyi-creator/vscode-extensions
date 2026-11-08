@@ -94,7 +94,10 @@ mod tests {
         for spec in COMMAND_TABLE {
             for alias in spec.aliases {
                 if let Some(previous) = owner.insert(alias, spec.canonical) {
-                    panic!("alias {alias} is claimed by {previous} and {}", spec.canonical);
+                    panic!(
+                        "alias {alias} is claimed by {previous} and {}",
+                        spec.canonical
+                    );
                 }
             }
         }
@@ -127,7 +130,10 @@ mod tests {
 
     #[test]
     fn an_unknown_name_is_returned_unchanged_rather_than_guessed() {
-        assert_eq!(resolve_canonical_subcommand("no-such-command"), "no-such-command");
+        assert_eq!(
+            resolve_canonical_subcommand("no-such-command"),
+            "no-such-command"
+        );
         assert_eq!(resolve_canonical_subcommand(""), "");
     }
 }

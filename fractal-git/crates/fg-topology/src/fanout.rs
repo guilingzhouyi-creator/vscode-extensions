@@ -30,10 +30,9 @@ use crate::refs::FractalRef;
 /// because a guard that silently permits the tiers it does not cover is worse than no guard.
 fn bound_for(candidate: &FractalRef) -> FractalResult<(usize, &'static str)> {
     match candidate {
-        FractalRef::CardWorktree { .. } => Ok((
-            fg_core::constants::MAX_CARDS_PER_CELL,
-            "integration cell",
-        )),
+        FractalRef::CardWorktree { .. } => {
+            Ok((fg_core::constants::MAX_CARDS_PER_CELL, "integration cell"))
+        }
         FractalRef::SubAgentWorktree { .. } => Ok((
             fg_core::constants::MAX_SUBAGENTS_PER_CARD,
             "parent-Agent worktree",
@@ -61,9 +60,7 @@ fn shares_parent(candidate: &FractalRef, sibling: &FractalRef) -> bool {
         ) => cell_id == other_cell,
         (
             FractalRef::SubAgentWorktree {
-                cell_id,
-                card_id,
-                ..
+                cell_id, card_id, ..
             },
             FractalRef::SubAgentWorktree {
                 cell_id: other_cell,
@@ -85,7 +82,10 @@ fn shares_parent(candidate: &FractalRef, sibling: &FractalRef) -> bool {
 ///
 /// Returns [`FractalError::TopologyBreach`] carrying the exceeded bound when `siblings` is already
 /// at it, and [`FractalError::PolicyViolation`] when `candidate` has no bounded parent tier.
-pub fn assert_fanout_available(candidate: &FractalRef, siblings: &[FractalRef]) -> FractalResult<()> {
+pub fn assert_fanout_available(
+    candidate: &FractalRef,
+    siblings: &[FractalRef],
+) -> FractalResult<()> {
     let (bound, parent_label) = bound_for(candidate)?;
     let existing = siblings
         .iter()

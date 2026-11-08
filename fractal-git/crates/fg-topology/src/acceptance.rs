@@ -33,7 +33,10 @@ const COMMIT_TYPE: &str = "commit";
 ///
 /// Returns [`FractalError::ObjectCodec`] when the object is absent, is not a commit, or carries a
 /// malformed header.
-pub fn read_commit_header(odb: &impl OdbStore, oid: &Oid) -> FractalResult<fg_core::models::CommitHeader> {
+pub fn read_commit_header(
+    odb: &impl OdbStore,
+    oid: &Oid,
+) -> FractalResult<fg_core::models::CommitHeader> {
     let raw = odb.read_object(oid)?;
     let (kind, payload) = parse_loose_header(&raw)?;
     if kind != ObjectKind::Commit {
@@ -156,8 +159,11 @@ mod tests {
     }
 
     fn put(odb: &MemoryOdb, tree: u8, parent: Option<Oid>) -> Oid {
-        odb.write_object("commit", &commit_payload(Oid::from_bytes([tree; 20]), parent))
-            .expect("write candidate")
+        odb.write_object(
+            "commit",
+            &commit_payload(Oid::from_bytes([tree; 20]), parent),
+        )
+        .expect("write candidate")
     }
 
     #[test]
@@ -185,9 +191,14 @@ mod tests {
         let odb = MemoryOdb::default();
         let candidate = put(&odb, 0x11, None);
 
-        let accepted =
-            write_acceptance(&odb, "req-1", "refs/fractal/cell/core/main", &candidate, None)
-                .expect("accept");
+        let accepted = write_acceptance(
+            &odb,
+            "req-1",
+            "refs/fractal/cell/core/main",
+            &candidate,
+            None,
+        )
+        .expect("accept");
 
         let header = read_commit_header(&odb, &accepted).expect("read acceptance");
         assert!(header.parents.is_empty());

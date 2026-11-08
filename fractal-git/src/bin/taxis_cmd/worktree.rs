@@ -227,9 +227,7 @@ fn handle_worktree_add(ctx: &CliContext) {
     // fractal node exists, and only the latter answers "how many siblings does this cell have".
     if let Some(candidate) = options.fractal_ref() {
         let ref_store = fg_topology::refs::DiskRefStore::new(&ctx.git_dir);
-        if let Err(fanout_err) =
-            fg_topology::assert_fanout_available_in(&candidate, &ref_store)
-        {
+        if let Err(fanout_err) = fg_topology::assert_fanout_available_in(&candidate, &ref_store) {
             reject(CliTag::ERROR, fanout_err);
         }
     }

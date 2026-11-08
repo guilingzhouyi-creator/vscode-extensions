@@ -15,11 +15,12 @@
 
 use super::{
     archive, bisect, blame, bundle, clone, config, daemon, diagnostics_tool, maintenance,
-    maintenance_ops, notes_replace, pack_plumbing, project, quality, quarantine, reclaim,
-    remote, repack, submodule, unarchive,
+    maintenance_ops, notes_replace, pack_plumbing, project, quality, quarantine, reclaim, remote,
+    repack, submodule, unarchive,
 };
 
-use crate::{handle_version, handle_help};use super::registry::{cmd, CommandSpec};
+use super::registry::{cmd, CommandSpec};
+use crate::{handle_help, handle_version};
 
 /// Commands in this range of the authoritative table.
 pub(crate) const TABLE: &[CommandSpec] = &[
@@ -35,26 +36,66 @@ pub(crate) const TABLE: &[CommandSpec] = &[
     cmd("push", &["push"], remote::handle_push),
     cmd("pull", &["pull"], remote::handle_pull),
     cmd("config", &["config", "cfg"], config::handle_config),
-    cmd("submodule", &["submodule", "sub"], submodule::handle_submodule),
+    cmd(
+        "submodule",
+        &["submodule", "sub"],
+        submodule::handle_submodule,
+    ),
     cmd("project", &["project", "pj"], project::handle_project),
     cmd("quality", &["quality", "trace"], quality::handle_quality),
-    cmd("quarantine", &["quarantine", "quar"], quarantine::handle_quarantine),
+    cmd(
+        "quarantine",
+        &["quarantine", "quar"],
+        quarantine::handle_quarantine,
+    ),
     cmd("archive", &["archive"], archive::handle_archive),
-    cmd("unarchive", &["unarchive", "extract"], unarchive::handle_unarchive),
+    cmd(
+        "unarchive",
+        &["unarchive", "extract"],
+        unarchive::handle_unarchive,
+    ),
     cmd("bundle", &["bundle"], bundle::handle_bundle),
     cmd("blame", &["blame"], blame::handle_blame),
     cmd("bisect", &["bisect"], bisect::handle_bisect),
     cmd("daemon", &["serve", "daemon"], daemon::handle_daemon),
     cmd("notes", &["notes"], notes_replace::handle_notes),
     cmd("replace", &["replace"], notes_replace::handle_replace),
-    cmd("commit-graph", &["commit-graph"], maintenance_ops::handle_commit_graph),
-    cmd("sparse-checkout", &["sparse-checkout"], maintenance_ops::handle_sparse_checkout),
-    cmd("maintenance", &["maintenance"], maintenance_ops::handle_maintenance),
+    cmd(
+        "commit-graph",
+        &["commit-graph"],
+        maintenance_ops::handle_commit_graph,
+    ),
+    cmd(
+        "sparse-checkout",
+        &["sparse-checkout"],
+        maintenance_ops::handle_sparse_checkout,
+    ),
+    cmd(
+        "maintenance",
+        &["maintenance"],
+        maintenance_ops::handle_maintenance,
+    ),
     cmd("rerere", &["rerere"], maintenance_ops::handle_rerere),
-    cmd("unpack-objects", &["unpack-objects"], pack_plumbing::handle_unpack_objects),
-    cmd("index-pack", &["index-pack"], pack_plumbing::handle_index_pack),
-    cmd("multi-pack-index", &["multi-pack-index", "midx"], pack_plumbing::handle_multi_pack_index),
-    cmd("diagnostics", &["diagnostics", "diag"], diagnostics_tool::handle_diagnostics),
+    cmd(
+        "unpack-objects",
+        &["unpack-objects"],
+        pack_plumbing::handle_unpack_objects,
+    ),
+    cmd(
+        "index-pack",
+        &["index-pack"],
+        pack_plumbing::handle_index_pack,
+    ),
+    cmd(
+        "multi-pack-index",
+        &["multi-pack-index", "midx"],
+        pack_plumbing::handle_multi_pack_index,
+    ),
+    cmd(
+        "diagnostics",
+        &["diagnostics", "diag"],
+        diagnostics_tool::handle_diagnostics,
+    ),
     cmd("version", &["version", "-v", "--version"], handle_version),
     cmd("help", &["help", "-h", "--help"], handle_help),
 ];

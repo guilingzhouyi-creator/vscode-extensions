@@ -219,11 +219,7 @@ impl IndxSection {
             return false;
         }
         // Stages that represent an unresolved merge are anything but `Normal`.
-        let conflicting_stages = [
-            IndexStage::Base,
-            IndexStage::Ours,
-            IndexStage::Theirs,
-        ];
+        let conflicting_stages = [IndexStage::Base, IndexStage::Ours, IndexStage::Theirs];
         conflicting_stages.into_iter().any(|stage| {
             self.entries
                 .binary_search_by(|entry| entry.sort_key().cmp(&(path, stage)))

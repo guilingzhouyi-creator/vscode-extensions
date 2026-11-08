@@ -13,8 +13,8 @@
 use fg_core::error::FractalError;
 use fg_core::models::Oid;
 use fg_core::traits::RefStore;
-use fg_topology::refs::{DiskRefStore, FractalRef};
 use fg_topology::assert_fanout_available_in;
+use fg_topology::refs::{DiskRefStore, FractalRef};
 
 /// Builds a card reference under `cell`.
 fn card(cell: &str, card_id: &str) -> FractalRef {
