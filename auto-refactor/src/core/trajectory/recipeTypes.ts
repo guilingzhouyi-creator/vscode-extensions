@@ -97,7 +97,7 @@ export interface RecipePrecondition {
 }
 
 /**
- * Structured refactoring recipe synthesized from successful historical trajectories.
+ * Structural recipe candidate; qualityGain distinguishes observations from missing evidence.
  */
 export interface RefactoringRecipe {
     recipeId: string;
@@ -106,7 +106,9 @@ export interface RefactoringRecipe {
     description: string;
     precondition: RecipePrecondition;
     operations: TransformOp[];
-    expectedQualityGain: number;
+    /** Compatibility projection; absent until a score pair is measured. */
+    expectedQualityGain: number | null;
+    qualityGain: import('../review/review-contracts').Measurement<number>;
     sourceTrajectoryId?: string;
 }
 
@@ -139,9 +141,14 @@ export interface PraxisTrajectoryLearningInput {
  */
 export interface PraxisTrajectoryVerdict {
     hasBadToGoodImprovement: boolean;
-    qualityDelta: number;
-    qualityVelocity?: number;
-    generalizationIndex?: number;
+    qualityDelta: number | null;
+    qualityVelocity: number | null;
+    generalizationIndex: number | null;
+    measurements: {
+        qualityDelta: import('../review/review-contracts').Measurement<number>;
+        qualityVelocity: import('../review/review-contracts').Measurement<number>;
+        generalizationIndex: import('../review/review-contracts').Measurement<number>;
+    };
     extractedRecipe?: RefactoringRecipe;
     regressionIssues: Issue[];
     recommendations: RefactoringRecipe[];

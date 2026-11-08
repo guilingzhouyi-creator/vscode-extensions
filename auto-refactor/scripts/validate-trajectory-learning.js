@@ -635,8 +635,10 @@ function evaluateContext(rawInput: TypedContextView): any {
   const verdict = await service.learnFromTrajectory({ ...poolInput, churnRatio: 0.4 });
   assert.strictEqual(verdict.hasBadToGoodImprovement, true);
   assert(verdict.qualityDelta > 0 && verdict.qualityVelocity > 0);
+  assert.strictEqual(verdict.generalizationIndex, null);
+  assert.strictEqual(verdict.measurements.generalizationIndex.status, 'unmeasured');
   console.log(
-    `  ✔ Praxis Verdict: ΔScore=+${verdict.qualityDelta.toFixed(1)} | Velocity=${verdict.qualityVelocity.toFixed(1)} | GenIndex=${verdict.generalizationIndex.toFixed(1)} | Recipe=${verdict.extractedRecipe.recipeId}`,
+    `  ✔ Praxis Verdict: ΔScore=+${verdict.qualityDelta.toFixed(1)} | Velocity=${verdict.qualityVelocity.toFixed(1)} | GenIndex=unmeasured | Recipe=${verdict.extractedRecipe.recipeId}`,
   );
 
   const tStart = Date.now();

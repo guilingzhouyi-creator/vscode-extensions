@@ -22,6 +22,7 @@ import type {
     TransformOpKind,
 } from './recipeTypes';
 import { scoreDelta } from '../scoring/scorer-formulas';
+import { numberMeasurement } from '../review/review-contracts';
 import { CATEGORY_PREFIXES, PATTERN_DESCRIPTORS, type PatternDescriptor } from './recipe-catalog';
 
 type RecipeMeta = {
@@ -40,8 +41,6 @@ const PREDICATE_DUAL = 'dual' as const;
 
 const MIN_FUNCTION_LINES = 25;
 const MIN_BRANCH_COUNT = 3;
-const MIN_QUALITY_GAIN = 5.0;
-const DEFAULT_DELTA_SCORE = 10.0;
 const RECIPE_ID_PAD_LENGTH = 3;
 const FALLBACK_RECIPE_PREFIX = 'REC-GEN';
 
@@ -239,8 +238,15 @@ export class TrajectoryRecipeExtractor {
             return undefined;
         }
 
-        const deltaScore = this.calculateDeltaScore(input);
-        if (deltaScore < 0) {
+        const qualityGain = numberMeasurement(
+            input.beforeScore && input.afterScore
+                ? (scoreDelta(input.beforeScore.compositeScore, input.afterScore.compositeScore) ??
+                      NaN)
+                : null,
+            { source: 'trajectory-comparison', sampleIds: [input.trajectoryId] },
+            'missing-score-pair',
+        );
+        if (qualityGain.status === 'measured' && qualityGain.value <= 0) {
             return undefined;
         }
 
@@ -262,7 +268,8 @@ export class TrajectoryRecipeExtractor {
             description: recipeMeta.description,
             precondition: recipeMeta.precondition,
             operations: recipeMeta.operations,
-            expectedQualityGain: Math.max(MIN_QUALITY_GAIN, deltaScore),
+            expectedQualityGain: qualityGain.status === 'measured' ? qualityGain.value : null,
+            qualityGain,
             sourceTrajectoryId: input.trajectoryId,
         };
     }
@@ -308,22 +315,6 @@ export class TrajectoryRecipeExtractor {
         }
 
         return true;
-    }
-
-    /**
-     * Compute the quality delta score between revisions.
-     */
-    private calculateDeltaScore(input: PraxisTrajectoryLearningInput): number {
-        if (input.beforeScore && input.afterScore) {
-            const delta = scoreDelta(
-                input.beforeScore.compositeScore,
-                input.afterScore.compositeScore,
-            );
-            if (delta !== null) {
-                return delta;
-            }
-        }
-        return DEFAULT_DELTA_SCORE;
     }
 
     /**

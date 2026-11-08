@@ -23,11 +23,8 @@ import type { TrajectoryRecipeExtractor } from '../trajectory/recipeExtractor';
 import { defaultTrajectoryRecipeExtractor } from '../trajectory/recipeExtractor';
 import type { RegressionTrajectoryDetector } from '../trajectory/regressionTrajectoryDetector';
 import { defaultRegressionTrajectoryDetector } from '../trajectory/regressionTrajectoryDetector';
-import {
-    calculateRecipeGeneralizationIndex,
-    calculateTrajectoryQualityVelocity,
-    scoreDelta,
-} from '../scoring/scorer-formulas';
+import { calculateTrajectoryQualityVelocity, scoreDelta } from '../scoring/scorer-formulas';
+import { numberMeasurement } from '../review/review-contracts';
 
 /**
  * Public service interface provided to the Praxis team for trajectory learning governance.
@@ -103,21 +100,40 @@ export class PraxisTrajectoryLearningService implements IPraxisTrajectoryLearnin
     ): Promise<PraxisTrajectoryVerdict> {
         const startTime = Date.now();
 
-        const extractedRecipe = this.extractor.extractRecipeFromTrajectory(input);
+        const delta =
+            input.beforeScore && input.afterScore
+                ? (scoreDelta(input.beforeScore.compositeScore, input.afterScore.compositeScore) ??
+                  NaN)
+                : null;
+        const provenance = {
+            source: 'trajectory-comparison' as const,
+            sampleIds: [input.trajectoryId],
+        };
+        const deltaMeasurement = numberMeasurement(delta, provenance, 'missing-score-pair');
+        const velocityMeasurement =
+            deltaMeasurement.status === 'measured'
+                ? numberMeasurement(
+                      calculateTrajectoryQualityVelocity(
+                          input.beforeScore,
+                          input.afterScore,
+                          input.churnRatio ?? 0,
+                      ),
+                      provenance,
+                      'missing-score-pair',
+                  )
+                : deltaMeasurement;
+        const qualityDelta = deltaMeasurement.status === 'measured' ? deltaMeasurement.value : null;
+        const qualityVelocity =
+            velocityMeasurement.status === 'measured' ? velocityMeasurement.value : null;
+        const extractedRecipe =
+            qualityDelta !== null && qualityDelta > 0
+                ? this.extractor.extractRecipeFromTrajectory(input)
+                : undefined;
         if (extractedRecipe) {
             this.registerRecipe(extractedRecipe);
         }
-
-        const qualityDelta = this.calculateDelta(input);
-        const qualityVelocity = calculateTrajectoryQualityVelocity(
-            input.beforeScore,
-            input.afterScore,
-            input.churnRatio ?? 0,
-        );
-        const generalizationIndex = extractedRecipe
-            ? calculateRecipeGeneralizationIndex(1, 1, 0.1, extractedRecipe.expectedQualityGain)
-            : 0;
-        const hasImprovement = qualityDelta > 0 && extractedRecipe !== undefined;
+        const hasImprovement =
+            qualityDelta !== null && qualityDelta > 0 && extractedRecipe !== undefined;
 
         // Recommend existing recipes for the beforeContent if relevant
         const recommendations = this.matchRecipes(input.beforeContent, input.language);
@@ -128,7 +144,12 @@ export class PraxisTrajectoryLearningService implements IPraxisTrajectoryLearnin
             hasBadToGoodImprovement: hasImprovement,
             qualityDelta,
             qualityVelocity,
-            generalizationIndex,
+            generalizationIndex: null,
+            measurements: {
+                qualityDelta: deltaMeasurement,
+                qualityVelocity: velocityMeasurement,
+                generalizationIndex: { status: 'unmeasured', reason: 'missing-holdout-validation' },
+            },
             extractedRecipe,
             regressionIssues: [],
             recommendations,
@@ -173,21 +194,6 @@ export class PraxisTrajectoryLearningService implements IPraxisTrajectoryLearnin
      */
     public getLearnedRecipes(): readonly RefactoringRecipe[] {
         return Array.from(this.recipeRegistry.values());
-    }
-
-    private calculateDelta(input: PraxisTrajectoryLearningInput): number {
-        if (input.beforeScore && input.afterScore) {
-            // An unmeasured composite is NaN; subtracting it would feed NaN into the
-            // trajectory learning signal, where every threshold comparison silently fails.
-            const delta = scoreDelta(
-                input.beforeScore.compositeScore,
-                input.afterScore.compositeScore,
-            );
-            if (delta !== null) {
-                return delta;
-            }
-        }
-        return input.beforeContent !== input.afterContent ? 8.0 : 0.0;
     }
 }
 
