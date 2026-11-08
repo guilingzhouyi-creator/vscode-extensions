@@ -209,8 +209,8 @@ const WEIGHT_KEYS: readonly (keyof AutonomyScoringWeights)[] = Object.freeze([
     'criticalPathAutonomy',
 ] as const);
 
-function isFiniteNumber(value: unknown): value is number {
-    return typeof value === 'number' && Number.isFinite(value);
+function isFiniteNumber(candidate: unknown): candidate is number {
+    return typeof candidate === 'number' && Number.isFinite(candidate);
 }
 
 function mergeWeightOverrides(
@@ -316,26 +316,32 @@ export function resolveScoringConfig(
 function assertWeightMass(weights: AutonomyScoringWeights): void {
     let mass = 0;
     for (const key of WEIGHT_KEYS) {
-        const value = weights[key];
-        if (!isFiniteNumber(value) || value < 0) {
+        const weightScalar = weights[key];
+        if (!isFiniteNumber(weightScalar) || weightScalar < 0) {
             throw new RangeError(`autonomy weight "${key}" must be finite and non-negative`);
         }
-        mass += value;
+        mass += weightScalar;
     }
     if (mass <= 0) {
         throw new RangeError('autonomy weights must carry a positive total mass');
     }
 }
 
-function assertPositive(value: number, name: string): void {
-    if (!isFiniteNumber(value) || value <= 0) {
-        throw new RangeError(`${name} must be a finite positive number, got ${String(value)}`);
+function assertPositiveScalars(scalars: readonly number[]): void {
+    for (const scalar of scalars) {
+        if (!isFiniteNumber(scalar) || scalar <= 0) {
+            throw new RangeError(
+                `scoring parameter must be a finite positive number, got ${String(scalar)}`,
+            );
+        }
     }
 }
 
-function assertRatio(value: number, name: string): void {
-    if (!isFiniteNumber(value) || value <= 0 || value > 1) {
-        throw new RangeError(`${name} must be a finite ratio in (0, 1], got ${String(value)}`);
+function assertBoundedRatio(ratioScalar: number): void {
+    if (!isFiniteNumber(ratioScalar) || ratioScalar <= 0 || ratioScalar > 1) {
+        throw new RangeError(
+            `scoring parameter must be a finite ratio in (0, 1], got ${String(ratioScalar)}`,
+        );
     }
 }
 
@@ -347,34 +353,24 @@ function assertRatio(value: number, name: string): void {
  */
 export function assertValidScoringConfig(config: ScoringSystemConfig): ScoringSystemConfig {
     assertWeightMass(config.autonomy.weights);
-    assertPositive(config.compositeIndexFloor, 'compositeIndexFloor');
-    assertPositive(config.autonomy.cloneHalfPoint, 'cloneHalfPoint');
-    assertPositive(config.autonomy.cloneDensityElocUnit, 'cloneDensityElocUnit');
-    assertPositive(config.autonomy.supplyChain.minResilience, 'supplyChain.minResilience');
-    assertPositive(config.autonomy.epistemicReserve, 'autonomy.epistemicReserve');
-    assertPositive(
+    assertPositiveScalars([
+        config.compositeIndexFloor,
+        config.autonomy.cloneHalfPoint,
+        config.autonomy.cloneDensityElocUnit,
+        config.autonomy.supplyChain.minResilience,
+        config.autonomy.epistemicReserve,
         config.autonomy.epistemicSampleHalfPointEloc,
-        'autonomy.epistemicSampleHalfPointEloc',
-    );
-    assertPositive(config.quality.saturationHalfpoint, 'saturationHalfpoint');
-    assertPositive(config.quality.macroFileKneeScale, 'macroFileKneeScale');
-    assertPositive(config.quality.macroFileLogWeight, 'macroFileLogWeight');
-    assertPositive(config.quality.securityCeiling.exportLimit, 'securityCeiling.exportLimit');
-    assertPositive(config.quality.securityCeiling.locLimit, 'securityCeiling.locLimit');
-    assertPositive(
+        config.quality.saturationHalfpoint,
+        config.quality.macroFileKneeScale,
+        config.quality.macroFileLogWeight,
+        config.quality.securityCeiling.exportLimit,
+        config.quality.securityCeiling.locLimit,
         config.quality.securityCeiling.epistemicBaseReserve,
-        'securityCeiling.epistemicBaseReserve',
-    );
-    assertPositive(config.quality.epistemicCeiling.baseReserve, 'epistemicCeiling.baseReserve');
-    assertPositive(
+        config.quality.epistemicCeiling.baseReserve,
         config.quality.epistemicCeiling.volumeHalfPointLines,
-        'epistemicCeiling.volumeHalfPointLines',
-    );
-    assertPositive(
         config.quality.epistemicCeiling.exportSurfaceHalfPoint,
-        'epistemicCeiling.exportSurfaceHalfPoint',
-    );
-    assertRatio(config.antiGaming.semanticChangeRatioThreshold, 'semanticChangeRatioThreshold');
+    ]);
+    assertBoundedRatio(config.antiGaming.semanticChangeRatioThreshold);
     const microFloor = config.quality.microFileFloorScale;
     if (!isFiniteNumber(microFloor) || microFloor < 0 || microFloor >= 1) {
         throw new RangeError('microFileFloorScale must be a finite number in [0, 1)');

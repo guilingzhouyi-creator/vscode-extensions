@@ -89,7 +89,11 @@ function isAlgorithmContext(role: string, filePath: string): boolean {
  * @returns True if file is test suite, fixture, or script infrastructure.
  */
 function isExemptFromConstantScan(role: string, filePath: string): boolean {
-    return isTestFile(role, filePath);
+    return (
+        isTestFile(role, filePath) ||
+        role === 'gate_infrastructure' ||
+        isScriptOrGateFile(filePath)
+    );
 }
 
 /** Canonical rule catalog location referenced by drift diagnostics. */
@@ -298,14 +302,11 @@ export class ConstantsAnalyzer implements Analyzer {
 
         for (const lit of this.literals) {
             if (
-                this.shouldSkipMagicNumber(
-                    lit,
-                    min,
-                    suppress,
+                this.shouldSkipMagicNumber(lit, min, suppress, {
                     isDataOrConfig,
                     isConstLib,
-                    ctx.content,
-                )
+                    content: ctx.content,
+                })
             ) {
                 continue;
             }
@@ -318,16 +319,14 @@ export class ConstantsAnalyzer implements Analyzer {
         lit: LiteralRecord,
         min: number,
         suppress: Set<NormalizedNode>,
-        isDataOrConfig = false,
-        isConstLib = false,
-        content?: string,
+        scope: { isDataOrConfig?: boolean; isConstLib?: boolean; content?: string } = {},
     ): boolean {
         if (!lit.numeric || lit.isConstBound || lit.tolerated) return true;
         if (suppress.has(lit.node)) return true;
-        if (isConstLib && !this.isInComplexLogicFunction(lit.parent, content)) {
+        if (scope.isConstLib && !this.isInComplexLogicFunction(lit.parent, scope.content)) {
             return true;
         }
-        if (isDataOrConfig && !lit.parent?.functionLike) {
+        if (scope.isDataOrConfig && !lit.parent?.functionLike) {
             return true;
         }
         const num = Number(lit.value);
@@ -356,7 +355,7 @@ export class ConstantsAnalyzer implements Analyzer {
         const classification = classify ? classifyLiteral(lit.value, true) : null;
         if (classification && classification.isReasonable) return null;
 
-        const res = resolveLiteralIssueData({
+        const resolvedIssue = resolveLiteralIssueData({
             literalValue: lit.value,
             numeric: true,
             classification,
@@ -367,24 +366,24 @@ export class ConstantsAnalyzer implements Analyzer {
         const startLine = lit.node.start?.line ?? 1;
         const issue = createLineIssue(ANALYZER_CONSTANTS, ctx.filePath, {
             lineIdx: Math.max(0, startLine - 1),
-            rule: res.rule,
+            rule: resolvedIssue.rule,
             severity: SEVERITY_WARNING,
-            message: res.message,
-            detail: res.detail,
+            message: resolvedIssue.message,
+            detail: resolvedIssue.detail,
             suggestion: formatConstantDeclarationSuggestion({
                 filePath: ctx.filePath,
-                name: res.suggested,
+                name: resolvedIssue.suggested,
                 literalValue: lit.value,
                 isNumeric: true,
             }),
         });
         issue.location = locN(lit.node, ctx.filePath);
-        const magicNameIsUsable = !isContentlessName(res.suggested);
+        const magicNameIsUsable = !isContentlessName(resolvedIssue.suggested);
         issue.actionable = {
             action: 'extract_constant',
             code: CODE_CONST_MAGIC_NUMBER,
             targetScope: 'module_top_level',
-            targetSymbol: res.suggested,
+            targetSymbol: resolvedIssue.suggested,
             insertAnchor: { position: 'after_imports' },
             // The suggested name is only written when it names something: replacing a literal with
             // `EXTRACTED_NUMBER` would be a mechanical rewrite that hides the original value.
@@ -397,7 +396,7 @@ export class ConstantsAnalyzer implements Analyzer {
                               endLine: lit.node.end?.line ?? 1,
                               endCol: lit.node.end?.column ?? 1,
                           },
-                          replacementText: res.suggested,
+                          replacementText: resolvedIssue.suggested,
                       },
                   }
                 : {}),
@@ -427,15 +426,12 @@ export class ConstantsAnalyzer implements Analyzer {
 
         for (const lit of this.literals) {
             if (
-                this.shouldSkipHardcodedString(
-                    lit,
-                    minLen,
-                    ignoreSet,
+                this.shouldSkipHardcodedString(lit, minLen, ignoreSet, {
                     suppress,
-                    false,
+                    isTest: false,
                     isDataOrConfig,
                     isAlgorithm,
-                )
+                })
             ) {
                 continue;
             }
@@ -488,17 +484,28 @@ export class ConstantsAnalyzer implements Analyzer {
         lit: LiteralRecord,
         minLen: number,
         ignoreSet: Set<string>,
-        suppress: Set<NormalizedNode>,
-        isTest = false,
-        isDataOrConfig = false,
-        isAlgorithm = false,
+        scope: {
+            suppress: Set<NormalizedNode>;
+            isTest?: boolean;
+            isDataOrConfig?: boolean;
+            isAlgorithm?: boolean;
+        },
     ): boolean {
-        if (this.isToleratedLiteralNode(lit, suppress, isDataOrConfig)) return true;
+        if (this.isToleratedLiteralNode(lit, scope.suppress, Boolean(scope.isDataOrConfig)))
+            return true;
         const text = lit.value;
         const inner = stripQuotes(text);
         if (inner.length < minLen || inner.trim().length === 0) return true;
         const lower = inner.toLowerCase();
-        if (this.isHardcodedContextAllowed(lower, isTest, isDataOrConfig, isAlgorithm)) return true;
+        if (
+            this.isHardcodedContextAllowed(
+                lower,
+                Boolean(scope.isTest),
+                Boolean(scope.isDataOrConfig),
+                Boolean(scope.isAlgorithm),
+            )
+        )
+            return true;
         const classification = classifyLiteral(text, false);
         if (classification.isReasonable) return true;
         return ignoreSet.has(text) || ignoreSet.has(inner);
@@ -539,7 +546,7 @@ export class ConstantsAnalyzer implements Analyzer {
         const classification = classify ? classifyLiteral(text, false) : null;
         if (classification?.isReasonable) return null;
 
-        const res = resolveLiteralIssueData({
+        const resolvedIssue = resolveLiteralIssueData({
             literalValue: text,
             numeric: false,
             classification,
@@ -549,37 +556,46 @@ export class ConstantsAnalyzer implements Analyzer {
 
         const driftedRules = findUnregisteredRuleDrift(inner);
         const isBadge = isTerminalStatusBadge(inner);
-        const message = resolveHardcodedStringMessage(res.message, driftedRules, isBadge, inner);
+        const message = resolveHardcodedStringMessage(
+            resolvedIssue.message,
+            driftedRules,
+            isBadge,
+            inner,
+        );
 
         const startLine = lit.node.start?.line ?? 1;
         const issue = createLineIssue(ANALYZER_CONSTANTS, ctx.filePath, {
             lineIdx: Math.max(0, startLine - 1),
-            rule: res.rule,
+            rule: resolvedIssue.rule,
             severity: SEVERITY_WARNING,
             message,
             detail: {
-                ...res.detail,
+                ...resolvedIssue.detail,
                 ...(driftedRules.length > 0 ? { driftedRules } : {}),
                 ...(isBadge ? { terminalBadge: inner } : {}),
             },
             suggestion: formatConstantDeclarationSuggestion({
                 filePath: ctx.filePath,
-                name: res.suggested,
+                name: resolvedIssue.suggested,
                 literalValue: text,
                 isNumeric: false,
             }),
         });
         issue.location = locN(lit.node, ctx.filePath);
-        const stringNameIsUsable = !isContentlessName(res.suggested);
+        const stringNameIsUsable = !isContentlessName(resolvedIssue.suggested);
         issue.actionable = {
             action: 'extract_constant',
             code: CODE_CONST_HARDCODED_STRING,
             targetScope: 'module_top_level',
-            targetSymbol: res.suggested,
+            targetSymbol: resolvedIssue.suggested,
             insertAnchor: { position: 'after_imports' },
             // Same rule as magic numbers: a patch may only exist when the target name means
             // something. `const EXTRACTED_STRING = '/'` would be worse than the inline literal.
-            ...this.buildLiteralReplacementPatch(lit.node, res.suggested, stringNameIsUsable),
+            ...this.buildLiteralReplacementPatch(
+                lit.node,
+                resolvedIssue.suggested,
+                stringNameIsUsable,
+            ),
             safeToAutomate: stringNameIsUsable,
         };
         return issue;
@@ -590,10 +606,9 @@ export class ConstantsAnalyzer implements Analyzer {
         groups: Map<string, LiteralRecord[]>,
         threshold: number,
         suppress: Set<NormalizedNode>,
-        out: Issue[],
     ): void {
         for (const [, arr] of groups) {
-            this.processDuplicateGroup(ctx, arr, threshold, suppress, out);
+            this.processDuplicateGroup(ctx, arr, threshold, suppress);
         }
     }
 
@@ -602,7 +617,6 @@ export class ConstantsAnalyzer implements Analyzer {
         arr: LiteralRecord[],
         threshold: number,
         suppress: Set<NormalizedNode>,
-        out: Issue[],
     ): void {
         if (arr.length < threshold) return;
         for (const item of arr) suppress.add(item.node);
@@ -614,13 +628,13 @@ export class ConstantsAnalyzer implements Analyzer {
 
         const kind = first.numeric ? NUM_KIND : STR_KIND;
         const suggested = suggestConstantName(first.value, kind);
-        out.push(buildDuplicateIssue(ctx, arr, suggested));
+        this.issues.push(buildDuplicateIssue(ctx, arr, suggested));
     }
 
     private detectDuplicates(
         ctx: AnalyzerContext,
         suppress: Set<NormalizedNode>,
-        out: Issue[],
+        _out: Issue[],
     ): void {
         const isConstLib = isConstantDefinitionFile(ctx.filePath, ctx.content);
         const roleInference = inferFineGrainedFileRole(ctx.filePath, ctx.content?.slice(0, 500));
@@ -652,17 +666,17 @@ export class ConstantsAnalyzer implements Analyzer {
             },
         });
 
-        this.emitDuplicateIssues(ctx, groups, threshold, suppress, out);
+        this.emitDuplicateIssues(ctx, groups, threshold, suppress);
     }
 
-    private detectNestedConstants(ctx: AnalyzerContext, out: Issue[]): void {
+    private detectNestedConstants(ctx: AnalyzerContext, _out: Issue[]): void {
         const lines = ctx.content.split('\n');
         const masked = maskedLinesOfPath(ctx.filePath, ctx.content);
 
         for (let i = 0; i < lines.length; i++) {
             const trimmed = (masked[i] ?? '').trim();
             if (!trimmed || trimmed.startsWith('*')) continue;
-            this.checkConstantAlias(lines[i], trimmed, i + 1, ctx, out);
+            this.checkConstantAlias(lines[i], trimmed, i + 1, ctx);
         }
     }
 
@@ -671,7 +685,6 @@ export class ConstantsAnalyzer implements Analyzer {
         trimmed: string,
         lineNum: number,
         ctx: AnalyzerContext,
-        out: Issue[],
     ): void {
         const aliasMatch = trimmed.match(REGEX.SYNTAX.CONSTANT_ALIAS);
         if (!aliasMatch) return;
@@ -700,6 +713,6 @@ export class ConstantsAnalyzer implements Analyzer {
             targetSymbol: targetName,
             safeToAutomate: false,
         };
-        out.push(issue);
+        this.issues.push(issue);
     }
 }

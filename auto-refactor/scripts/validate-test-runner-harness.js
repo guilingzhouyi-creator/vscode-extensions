@@ -18,70 +18,54 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const { runValidationSuite, reportFailure, runEntry } = require('./common/test-runner-harness');
 
-async function main() {
-  let observedTempDir = '';
-
-  await runValidationSuite({
-    name: 'test-runner-harness-isolation',
-    fixtures: {
-      'test-file.txt': 'hello sandbox',
-      'nested/file.txt': ['line 1', 'line 2'],
-    },
-    run: async ({ tempDir }) => {
-      observedTempDir = tempDir;
-      assert.strictEqual(fs.existsSync(path.join(tempDir, 'test-file.txt')), true);
-      assert.strictEqual(
-        fs.readFileSync(path.join(tempDir, 'test-file.txt'), 'utf8'),
-        'hello sandbox',
-      );
-      assert.strictEqual(
-        fs.readFileSync(path.join(tempDir, 'nested/file.txt'), 'utf8'),
-        'line 1\nline 2',
-      );
-    },
-  });
-
-  // Teardown assertion: tempDir must be cleaned up
+function assertProbeOutput(seen, probe) {
   assert.strictEqual(
-    fs.existsSync(observedTempDir),
-    false,
-    'Sandbox directory must be cleaned up after execution',
+    seen.includes(probe.name),
+    true,
+    `${probe.name} failure must name the suite that broke`,
   );
+  if (probe.expectToken) {
+    assert.strictEqual(
+      seen.includes(probe.expectToken),
+      true,
+      `${probe.name} must report ${probe.expectToken}`,
+    );
+  }
+  if (probe.rejectToken) {
+    assert.strictEqual(
+      seen.includes(probe.rejectToken),
+      false,
+      `${probe.name} must not report ${probe.rejectToken} instead of the failure`,
+    );
+  }
+}
 
-  // Exit contract: a failing entry must terminate the process with status 1 and suite name.
-  // Asserted via child process because `process.exit` cannot be observed in-process without
-  // mocking the global and bypassing the real exit path.
+function verifyExitProbes() {
   const exitProbes = [
-    { name: 'probe-runEntry', call: "runEntry('probe-runEntry', async () => { throw new Error('probe'); })" },
+    {
+      name: 'probe-runEntry',
+      call: "runEntry('probe-runEntry', async () => { throw new Error('probe'); })",
+    },
     {
       name: 'probe-reportFailure',
-      call: [
-        "reportFailure('probe-reportFailure', () => console.log('cleanup-ran'))(new Error('probe'))",
-      ].join('\n'),
-      expects: ['cleanup-ran'],
+      call: "reportFailure('probe-reportFailure', () => console.log('cleanup-ran'))(new Error('probe'))",
+      expectToken: 'cleanup-ran',
     },
     {
       name: 'probe-cleanup-throws',
       call: "reportFailure('probe-cleanup-throws', () => { throw new Error('teardown'); })(new Error('probe'))",
       // The original failure must survive a broken teardown: reporting `teardown` instead would
       // hide why the suite actually failed.
-      expects: ['probe'],
-      rejects: ['teardown'],
+      expectToken: 'probe',
+      rejectToken: 'teardown',
     },
   ];
-  function assertProbeOutput(seen, probe) {
-    assert.strictEqual(seen.indexOf(probe.name) !== -1, true, `${probe.name} failure must name the suite that broke`);
-    for (const token of probe.expects ?? []) {
-      assert.strictEqual(seen.indexOf(token) !== -1, true, `${probe.name} must report ${token}`);
-    }
-    for (const token of probe.rejects ?? []) {
-      assert.strictEqual(seen.indexOf(token), -1, `${probe.name} must not report ${token} instead of the failure`);
-    }
-  }
 
+  const harnessPath = path
+    .join(__dirname, 'common', 'test-runner-harness.js')
+    .replace(/\\/g, '\\\\');
   for (const probe of exitProbes) {
     const probePath = path.join(os.tmpdir(), `${probe.name}-${process.pid}.cjs`);
-    const harnessPath = path.join(__dirname, 'common', 'test-runner-harness.js').replace(/\\/g, '\\\\');
     fs.writeFileSync(
       probePath,
       [
@@ -96,6 +80,42 @@ async function main() {
     const seen = `${outcome.stdout}${outcome.stderr}`;
     assertProbeOutput(seen, probe);
   }
+}
+
+async function main() {
+  let recordedSandboxDir = '';
+
+  await runValidationSuite({
+    name: 'test-runner-harness-isolation',
+    fixtures: {
+      'test-file.txt': 'hello sandbox',
+      'nested/file.txt': ['line 1', 'line 2'],
+    },
+    run: async ({ tempDir }) => {
+      recordedSandboxDir = tempDir;
+      assert.strictEqual(fs.existsSync(path.join(tempDir, 'test-file.txt')), true);
+      assert.strictEqual(
+        fs.readFileSync(path.join(tempDir, 'test-file.txt'), 'utf8'),
+        'hello sandbox',
+      );
+      assert.strictEqual(
+        fs.readFileSync(path.join(tempDir, 'nested/file.txt'), 'utf8'),
+        'line 1\nline 2',
+      );
+    },
+  });
+
+  // Teardown assertion: tempDir must be cleaned up
+  assert.strictEqual(
+    fs.existsSync(recordedSandboxDir),
+    false,
+    'Sandbox directory must be cleaned up after execution',
+  );
+
+  // Exit contract: a failing entry must terminate the process with status 1 and suite name.
+  // Asserted via child process because `process.exit` cannot be observed in-process without
+  // mocking the global and bypassing the real exit path.
+  verifyExitProbes();
 
   console.log('ALL TEST RUNNER HARNESS CHECKS PASSED SUCCESSFULLY!');
 }

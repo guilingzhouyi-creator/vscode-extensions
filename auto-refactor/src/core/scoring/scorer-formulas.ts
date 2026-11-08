@@ -47,8 +47,8 @@ export const MIN_EPISTEMIC_GAP = 0.01;
 export const THEORETICAL_SCORE_CEILING =
     Math.round(
         (DIMENSION_MAX_SCORE - DEFAULT_SCORING_CONFIG.quality.epistemicCeiling.baseReserve) *
-            100,
-    ) / 100;
+            DIMENSION_MAX_SCORE,
+    ) / DIMENSION_MAX_SCORE;
 /**
  * Grade cut-offs on the 0-100 composite score, evenly spaced by 10.
  *
@@ -351,8 +351,7 @@ export function resolveQualityGrade(compositeScore: number): QualityGrade {
     if (compositeScore >= GRADE_A_MIN) return 'A';
     if (compositeScore >= GRADE_B_MIN) return 'B';
     if (compositeScore >= GRADE_C_MIN) return 'C';
-    if (compositeScore >= GRADE_D_MIN) return 'D';
-    return 'F';
+    return compositeScore >= GRADE_D_MIN ? 'D' : 'F';
 }
 
 /**
@@ -603,9 +602,9 @@ function computeStandardDimensionScore(
     dim: QualityDimension,
     rawPoints: number,
     effectiveScale: number,
-    halfpoint: number,
-    dimensionCeiling: number,
+    curve: { readonly halfpoint: number; readonly ceiling: number },
 ): number {
+    const { halfpoint, ceiling: dimensionCeiling } = curve;
     if (rawPoints <= 0) {
         return dimensionCeiling;
     }
@@ -644,19 +643,17 @@ export function applyScaleDampedScores(
     const ceilingScale = metric !== undefined ? effectiveScale : 1;
     const securityCeiling = computeSecurityCeiling(metric, ceilingScale, config.securityCeiling);
     const generalCeiling = computeEpistemicCeiling(metric, ceilingScale, config.epistemicCeiling);
+    const standardCurve = {
+        halfpoint: config.saturationHalfpoint,
+        ceiling: generalCeiling,
+    };
 
     for (const dim of ALL_QUALITY_DIMENSIONS) {
         const rawPoints = sanitizeDeduction(deductionPoints[dim]);
         rawScores[dim] =
             dim === 'codeSecurity'
                 ? computeSecurityDimensionScore(rawPoints, securityCeiling)
-                : computeStandardDimensionScore(
-                      dim,
-                      rawPoints,
-                      effectiveScale,
-                      config.saturationHalfpoint,
-                      generalCeiling,
-                  );
+                : computeStandardDimensionScore(dim, rawPoints, effectiveScale, standardCurve);
     }
     return rawScores;
 }

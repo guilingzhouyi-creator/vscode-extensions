@@ -48,12 +48,7 @@ const SEVERITY_ERROR = 'error' as const;
 const SEVERITY_WARNING: Severity = 'warning';
 const SEVERITY_INFO = 'info' as const;
 const SHA1_HEX_LENGTH = 40;
-const CONTINUATION_DOT = '.';
-const CONTINUATION_RBRACE = '}';
-const CONTINUATION_CASE = 'case ';
-const CONTINUATION_DEFAULT = 'default:';
-const CONTINUATION_ELSE = 'else:';
-const CONTINUATION_ELIF = 'elif ';
+const CONTINUATION_PREFIX_RE = /^(?:\.|\}|case\s|default:|else\b|elif\s|\?(?!\.)|:|&&|\|\||\?\?)/;
 const ENCODED_STUB_TOKEN_LIST = 'VE9ETyxGSVhNRSxYWFgsSEFDSyx1bmltcGxlbWVudGVk';
 const ENCODING_BASE64 = 'base64';
 const ENCODING_UTF8 = 'utf8';
@@ -346,12 +341,8 @@ export class HygieneAnalyzer implements Analyzer {
         lastTerminalIndent: number,
     ): boolean {
         return (
-            trimmed.startsWith(CONTINUATION_DOT) ||
-            trimmed.startsWith(CONTINUATION_RBRACE) ||
-            trimmed.startsWith(CONTINUATION_CASE) ||
-            trimmed.startsWith(CONTINUATION_DEFAULT) ||
-            trimmed.startsWith(CONTINUATION_ELSE) ||
-            trimmed.startsWith(CONTINUATION_ELIF) ||
+            CONTINUATION_PREFIX_RE.test(trimmed) ||
+            indent < lastTerminalIndent ||
             (isIndentBased && indent <= lastTerminalIndent)
         );
     }

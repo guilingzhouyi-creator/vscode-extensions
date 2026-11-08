@@ -160,6 +160,12 @@ function collectDeclaredFunctionNames(rawTokens: readonly string[]): Set<string>
     return declaredNames;
 }
 
+const MIN_MULTILINE_LITERAL_LENGTH = 3;
+const CHAR_CODE_BACKTICK = 96;
+const CHAR_CODE_DOUBLE_QUOTE = 34;
+const CHAR_CODE_SINGLE_QUOTE = 39;
+const CHAR_CODE_LINE_FEED = 10;
+
 function countTokenFrequencies(
     tokens: readonly string[],
     targets: Set<string>,
@@ -168,8 +174,8 @@ function countTokenFrequencies(
     for (let i = 0; i < tokens.length; i++) {
         const token = tokens[i];
         if (targets.has(token)) {
-            const cur = freqMap.get(token) || 0;
-            freqMap.set(token, cur + 1);
+            const existingCount = freqMap.get(token) || 0;
+            freqMap.set(token, existingCount + 1);
         }
     }
     return freqMap;
@@ -213,11 +219,17 @@ function countInteriorMultilineLiteralLines(tokens: readonly { text: string }[])
     let interiorLines = 0;
     for (let i = 0; i < tokens.length; i++) {
         const text = tokens[i].text;
-        if (text.length < 3) continue;
+        if (text.length < MIN_MULTILINE_LITERAL_LENGTH) continue;
         const firstChar = text.charCodeAt(0);
-        if (firstChar !== 96 && firstChar !== 34 && firstChar !== 39) continue;
+        if (
+            firstChar !== CHAR_CODE_BACKTICK &&
+            firstChar !== CHAR_CODE_DOUBLE_QUOTE &&
+            firstChar !== CHAR_CODE_SINGLE_QUOTE
+        ) {
+            continue;
+        }
         for (let j = 1; j < text.length - 1; j++) {
-            if (text.charCodeAt(j) === 10) {
+            if (text.charCodeAt(j) === CHAR_CODE_LINE_FEED) {
                 interiorLines++;
             }
         }
@@ -225,19 +237,11 @@ function countInteriorMultilineLiteralLines(tokens: readonly { text: string }[])
     return interiorLines;
 }
 
-/**
- * Calculates effective code density and noise metrics across source content.
- *
- * @param content - Source code text to analyze.
- * @param language - Optional programming language tag.
- * @returns Breakdown of useful LOC, boilerplate LOC, density ratio,
- *   noise index, and tensor metrics.
- */
-export function computeEffectiveCodeDensity(
-    content: string,
-    language: string = 'typescript',
-): EffectiveDensityResult {
-    const lines = content.split(/\r?\n/);
+function summarizeBoilerplateLines(lines: readonly string[]): {
+    totalLoc: number;
+    boilerplateLoc: number;
+    forwardingCount: number;
+} {
     let totalLoc = 0;
     let boilerplateLoc = 0;
     let forwardingCount = 0;
@@ -254,6 +258,79 @@ export function computeEffectiveCodeDensity(
             forwardingCount++;
         }
     }
+    return { totalLoc, boilerplateLoc, forwardingCount };
+}
+
+function evaluateTokenStreamMetrics(
+    tokenStream: ReturnType<typeof tokenizeCode>,
+    usefulLoc: number,
+    effectiveDensity: number,
+): Partial<EffectiveDensityResult> {
+    const tokenCount = tokenStream.tokens.length;
+    if (tokenCount === 0) {
+        return {
+            tokenCount: 0,
+            tokensPerEloc: 0,
+            columnDensity: 0,
+            tspr: 0,
+            por: 0,
+            sufr: 0,
+            compositeDensity: 0,
+        };
+    }
+
+    const interiorLiteralLines = countInteriorMultilineLiteralLines(tokenStream.tokens);
+    const eloc = Math.max(1, usefulLoc - interiorLiteralLines);
+    const colMetrics = calculateColumnDensity(tokenCount, eloc);
+    const payloadMetrics = calculateWeightedTokenPayload(tokenStream.tokens);
+    const fanIns = extractDeclaredFunctionFanIns(tokenStream.rawTokens);
+    const reuseMetrics = calculateFunctionReuseMetrics(fanIns);
+    const entropyResult = calculateTokenShannonEntropy(tokenStream.rawTokens);
+    const entropyFactor = calculateGoldilocksEntropyFactor(entropyResult.entropy);
+
+    const compositeInputs = {
+        lineDensity: effectiveDensity,
+        columnDensity: colMetrics.columnDensity,
+        reuseDensity: fanIns.length > 0 ? reuseMetrics.reuseDensity : effectiveDensity,
+        sharedDensity: effectiveDensity,
+        payloadDensity: payloadMetrics.tspr,
+        entropyFactor,
+    };
+
+    const compositeDensity = calculateCompositeEffectiveDensity(compositeInputs);
+    const spatialEval = evaluateSpatialDensityManifold(compositeInputs);
+
+    return {
+        tokenEntropy: entropyResult.entropy,
+        vocabularySize: entropyResult.vocabularySize,
+        tokenCount,
+        tokensPerEloc: colMetrics.tokensPerEloc,
+        columnDensity: colMetrics.columnDensity,
+        tspr: payloadMetrics.tspr,
+        por: payloadMetrics.por,
+        sufr: reuseMetrics.sufr,
+        compositeDensity,
+        spatialDensity: spatialEval.spatialCompositeDensity,
+        mahalanobisDistance: spatialEval.mahalanobisDistance,
+        dominantDeficitAxis: spatialEval.dominantDeficitAxis,
+        fisherSimplexDistance: spatialEval.fisherSimplexDistance,
+    };
+}
+
+/**
+ * Calculates effective code density and noise metrics across source content.
+ *
+ * @param content - Source code text to analyze.
+ * @param language - Optional programming language tag.
+ * @returns Breakdown of useful LOC, boilerplate LOC, density ratio,
+ *   noise index, and tensor metrics.
+ */
+export function computeEffectiveCodeDensity(
+    content: string,
+    language: string = 'typescript',
+): EffectiveDensityResult {
+    const lines = content.split(/\r?\n/);
+    const { totalLoc, boilerplateLoc, forwardingCount } = summarizeBoilerplateLines(lines);
 
     const usefulLoc = Math.max(0, totalLoc - Math.floor(boilerplateLoc));
     const effectiveDensity =
@@ -264,61 +341,8 @@ export function computeEffectiveCodeDensity(
     const noiseIndex = calculateNoiseIndex(totalLoc, usefulLoc);
     const gaussianHealth = calculateGaussianDensityHealth(noiseIndex);
     const isLowDensity = totalLoc >= MIN_EVALUATION_LOC_THRESHOLD && effectiveDensity < 0.55;
-
-    // Advanced token density and payload tensor integration
     const tokenStream = tokenizeCode(content, language);
-    const tokenCount = tokenStream.tokens.length;
-
-    let tokensPerEloc = 0;
-    let columnDensity = 0;
-    let tspr = 0;
-    let por = 0;
-    let sufr = 0;
-    let compositeDensity = 0;
-    let tokenEntropy: number | undefined;
-    let vocabularySize: number | undefined;
-    let spatialDensity: number | undefined;
-    let mahalanobisDistance: number | undefined;
-    let dominantDeficitAxis: DensityAxis | undefined;
-    let fisherSimplexDistance: number | undefined;
-
-    if (tokenCount > 0) {
-        const interiorLiteralLines = countInteriorMultilineLiteralLines(tokenStream.tokens);
-        const eloc = Math.max(1, usefulLoc - interiorLiteralLines);
-        const colMetrics = calculateColumnDensity(tokenCount, eloc);
-        tokensPerEloc = colMetrics.tokensPerEloc;
-        columnDensity = colMetrics.columnDensity;
-
-        const payloadMetrics = calculateWeightedTokenPayload(tokenStream.tokens);
-        tspr = payloadMetrics.tspr;
-        por = payloadMetrics.por;
-
-        const fanIns = extractDeclaredFunctionFanIns(tokenStream.rawTokens);
-        const reuseMetrics = calculateFunctionReuseMetrics(fanIns);
-        sufr = reuseMetrics.sufr;
-
-        const entropyResult = calculateTokenShannonEntropy(tokenStream.rawTokens);
-        tokenEntropy = entropyResult.entropy;
-        vocabularySize = entropyResult.vocabularySize;
-        const entropyFactor = calculateGoldilocksEntropyFactor(entropyResult.entropy);
-
-        const compositeInputs = {
-            lineDensity: effectiveDensity,
-            columnDensity,
-            reuseDensity: fanIns.length > 0 ? reuseMetrics.reuseDensity : effectiveDensity,
-            sharedDensity: effectiveDensity,
-            payloadDensity: tspr,
-            entropyFactor,
-        };
-
-        compositeDensity = calculateCompositeEffectiveDensity(compositeInputs);
-
-        const spatialEval = evaluateSpatialDensityManifold(compositeInputs);
-        spatialDensity = spatialEval.spatialCompositeDensity;
-        mahalanobisDistance = spatialEval.mahalanobisDistance;
-        dominantDeficitAxis = spatialEval.dominantDeficitAxis;
-        fisherSimplexDistance = spatialEval.fisherSimplexDistance;
-    }
+    const tokenMetrics = evaluateTokenStreamMetrics(tokenStream, usefulLoc, effectiveDensity);
 
     return {
         totalLoc,
@@ -330,18 +354,13 @@ export function computeEffectiveCodeDensity(
         gaussianHealth,
         isLowDensity,
         physicalLineCount: lines.length,
-        tokenEntropy,
-        vocabularySize,
-        tokenCount,
-        tokensPerEloc,
-        columnDensity,
-        tspr,
-        por,
-        sufr,
-        compositeDensity,
-        spatialDensity,
-        mahalanobisDistance,
-        dominantDeficitAxis,
-        fisherSimplexDistance,
+        tokenCount: 0,
+        tokensPerEloc: 0,
+        columnDensity: 0,
+        tspr: 0,
+        por: 0,
+        sufr: 0,
+        compositeDensity: 0,
+        ...tokenMetrics,
     };
 }

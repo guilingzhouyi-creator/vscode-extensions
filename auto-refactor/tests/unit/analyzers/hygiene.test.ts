@@ -101,6 +101,22 @@ describe('HygieneAnalyzer Suite', () => {
             expect(deadCodeIssue).toBeDefined();
             expect(deadCodeIssue?.message).toContain('Dead code detected');
         });
+
+        it('does not flag dedented statements after braceless conditional return or multi-line ternary', () => {
+            const code = [
+                'export function evaluate(val: number): number {',
+                '    if (val < 0)',
+                '        return 0;',
+                '    return Number.isFinite(val)',
+                '        ? val * 2',
+                '        : 1;',
+                '}',
+            ].join('\n');
+            const ctx = createCtx('src/evaluate.ts', code);
+            const issues = analyzer.analyze(undefined, ctx);
+            const deadCodeIssue = issues.find((i) => i.rule === 'HYG-DED-001');
+            expect(deadCodeIssue).toBeUndefined();
+        });
     });
 
     describe('Error Messaging & Floating Promises (ERR-MSG-001 / ERR-FLT-001)', () => {
