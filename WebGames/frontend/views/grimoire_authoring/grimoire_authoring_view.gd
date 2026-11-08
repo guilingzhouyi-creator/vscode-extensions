@@ -202,6 +202,9 @@ func _ready() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		UIIntermediary.clear_view_bindings(self)
+		if is_instance_valid(_tabs) and _tabs.get_parent() == null:
+			_tabs.free()
+		_tabs = null
 
 # ==============================================================================
 # 静态文案初始化（非 @onready 节点通过路径访问）

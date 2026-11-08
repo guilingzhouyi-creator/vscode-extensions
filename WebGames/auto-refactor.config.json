@@ -41,10 +41,10 @@
       "options": {
         "enforceCleanLayers": true,
         "layers": {
-          "backend/domains/": "domain",
-          "backend/infrastructure/": "infrastructure",
-          "frontend/": "interface",
-          "tests/": "test"
+          "backend/domains": "domain",
+          "backend/infrastructure": "infrastructure",
+          "frontend": "interface",
+          "tests": "test"
         }
       }
     },

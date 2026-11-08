@@ -166,6 +166,9 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		HudEventBridge.get_instance().detach_hud()
 		UIIntermediary.clear_view_bindings(self)
+		if is_instance_valid(_subpanels) and _subpanels.get_parent() == null:
+			_subpanels.free()
+		_subpanels = null
 
 # ==============================================================================
 # 信号绑定

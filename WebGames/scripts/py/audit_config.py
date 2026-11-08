@@ -245,6 +245,8 @@ def _eval_bounded_range(ctx: RuleContext) -> None:
     rule_id = rule.get("rule_id", "VD_UNKNOWN")
     matches = JsonPathResolver.resolve(data, rule.get("key_path", ""))
     min_v, max_v, allow_float, inclusive = _resolve_bounded_range_limits(params, data)
+    if min_v is None or max_v is None:
+        return
 
     for loc, v in matches:
         if v is None:
@@ -272,16 +274,16 @@ def _eval_range_ordered(ctx: RuleContext) -> None:
     rights = JsonPathResolver.resolve(data, rule.get("key_path_right", ""))
     if not lefts or not rights:
         return
-    l_val, r_val = lefts[0][1], rights[0][1]
-    if l_val is None or r_val is None:
-        return
-    if not _is_valid_numeric(l_val) or not _is_valid_numeric(r_val):
-        return
     strict = params.get("strict_less", True)
-    bad = (l_val >= r_val) if strict else (l_val > r_val)
-    if bad:
-        op = "<" if strict else "<="
-        violations.append(f"{rule_id}: {rel_posix} {rule.get('key_path_left')} 必须 {op} {rule.get('key_path_right')}（实测 {l_val} / {r_val}）")
+    op = "<" if strict else "<="
+    for (_, l_val), (_, r_val) in zip(lefts, rights):
+        if l_val is None or r_val is None:
+            continue
+        if not _is_valid_numeric(l_val) or not _is_valid_numeric(r_val):
+            continue
+        bad = (l_val >= r_val) if strict else (l_val > r_val)
+        if bad:
+            violations.append(f"{rule_id}: {rel_posix} {rule.get('key_path_left')} 必须 {op} {rule.get('key_path_right')}（实测 {l_val} / {r_val}）")
 
 
 def _eval_enum_whitelist(ctx: RuleContext) -> None:

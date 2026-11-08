@@ -218,18 +218,25 @@ class SimplificationAuditor:
                 )
             )
 
+    @staticmethod
+    def _compute_indent_level(raw_line: str) -> int:
+        """计算缩进层级：制表符按 1 层计，空格按每 4 空格 1 层计。"""
+        ws_len = len(raw_line) - len(raw_line.lstrip())
+        leading_ws = raw_line[:ws_len]
+        return leading_ws.count("\t") + (leading_ws.count(" ") // 4)
+
     def _track_control_flow_nesting(
-        self, stripped: str, indent: int, nesting_depth: int, max_nesting: int
+        self, stripped: str, indent_level: int, nesting_depth: int, max_nesting: int
     ) -> tuple[bool, int, int]:
         """计算当前行是否结束函数作用域，并更新控制流嵌套深度。"""
-        if indent == 0 and not stripped.startswith("#"):
+        if indent_level == 0 and not stripped.startswith("#"):
             return False, 0, max_nesting
 
         if stripped.startswith(("if ", "for ", "while ", "match ", "elif ", "else:")):
             nesting_depth += 1
             max_nesting = max(max_nesting, nesting_depth)
-        elif indent < nesting_depth * 4 and nesting_depth > 0:
-            nesting_depth = max(0, indent // 4)
+        elif indent_level <= nesting_depth and nesting_depth > 0:
+            nesting_depth = max(0, indent_level - 1)
         return True, nesting_depth, max_nesting
 
     def audit_file_content(self, path: Path) -> None:
@@ -255,6 +262,7 @@ class SimplificationAuditor:
                 continue
 
             indent = len(ln) - len(ln.lstrip())
+            indent_level = self._compute_indent_level(ln)
 
             if PASS_RE.match(ln):
                 self._check_pass_redundancy(lines, i, rel, rel_posix)
@@ -276,7 +284,7 @@ class SimplificationAuditor:
                 max_func_nesting = 0
             elif in_func:
                 in_func, nesting_depth, max_func_nesting = self._track_control_flow_nesting(
-                    stripped, indent, nesting_depth, max_func_nesting
+                    stripped, indent_level, nesting_depth, max_func_nesting
                 )
 
         self._record_func_nesting_if_needed(

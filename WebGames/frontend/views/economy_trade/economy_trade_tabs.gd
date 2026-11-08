@@ -20,6 +20,7 @@ var currency_bar: KCurrencyBar = null
 var split_panel: KSplitPanel = null
 var search_bar: KSearchBar = null
 var _view = null
+var _filtered_auction_indices: Array[int] = []
 
 func setup(view: BaseScreen) -> void:
 	_view = view
@@ -141,12 +142,14 @@ func _populate_auction_list() -> void:
 	if _view == null or _view._auction_item_list == null:
 		return
 	_view._auction_item_list.clear()
+	_filtered_auction_indices.clear()
 	var keyword: String = _view._line_auction_search.text.strip_edges().to_lower()
 	var cat_index: int = _view._option_auction_category.selected
 	var cat_filter: String = ""
 	if cat_index > 0 and cat_index < _view._auction_category_keys.size():
 		cat_filter = _view._auction_category_keys[cat_index]
-	for item in _view._auction_items:
+	for idx in range(_view._auction_items.size()):
+		var item: Dictionary = _view._auction_items[idx]
 		var item_name: String = UIIntermediary.text(str(item.get("name", "ui.fe05.unknown")))
 		if not keyword.is_empty() and not item_name.to_lower().contains(keyword):
 			continue
@@ -159,6 +162,7 @@ func _populate_auction_list() -> void:
 			"buyout": _view._format_currency(int(item.get("buyout", 0))),
 			"seller": seller,
 		})
+		_filtered_auction_indices.append(idx)
 		_view._auction_item_list.add_item(display)
 
 ## 填充我的上架列表（名称/一口价/状态/期限）
@@ -178,19 +182,22 @@ func _populate_auction_my_list() -> void:
 func _on_auction_search_changed(_text: String) -> void: _populate_auction_list()
 func _on_auction_category_selected(_index: int) -> void: _populate_auction_list()
 func _on_auction_item_selected(index: int) -> void:
-	if _view != null: _view._auction_selected_index = index
+	if _view != null:
+		_view._auction_selected_index = _filtered_auction_indices[index] if index >= 0 and index < _filtered_auction_indices.size() else -1
 
 func _on_auction_bid_pressed() -> void:
 	if _view == null: return
 	var selected: Array = _view._auction_item_list.get_selected_items()
-	if not selected.is_empty():
-		print("[EconomyTrade] 出价竞拍: %s" % _view._auction_items[selected[0]].get("name", ""))
+	if not selected.is_empty() and selected[0] >= 0 and selected[0] < _filtered_auction_indices.size():
+		var orig_idx: int = _filtered_auction_indices[selected[0]]
+		print("[EconomyTrade] 出价竞拍: %s" % _view._auction_items[orig_idx].get("name", ""))
 
 func _on_auction_buyout_pressed() -> void:
 	if _view == null: return
 	var selected: Array = _view._auction_item_list.get_selected_items()
-	if not selected.is_empty():
-		print("[EconomyTrade] 一口价购买: %s" % _view._auction_items[selected[0]].get("name", ""))
+	if not selected.is_empty() and selected[0] >= 0 and selected[0] < _filtered_auction_indices.size():
+		var orig_idx: int = _filtered_auction_indices[selected[0]]
+		print("[EconomyTrade] 一口价购买: %s" % _view._auction_items[orig_idx].get("name", ""))
 
 # ==============================================================================
 # Tab 4: 商队物流 (LOGISTICS) 初始化与信号

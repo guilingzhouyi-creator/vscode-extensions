@@ -191,6 +191,9 @@ func _ready() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		UIIntermediary.clear_view_bindings(self)
+		if is_instance_valid(_tabs) and _tabs.get_parent() == null:
+			_tabs.free()
+		_tabs = null
 
 ## 应用 ThemeManager 单例主题（null 安全）
 func _apply_theme() -> void:

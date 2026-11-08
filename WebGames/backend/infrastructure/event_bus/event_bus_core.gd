@@ -22,6 +22,7 @@ var _dispatch_depth: int = 0
 var _max_depth: int = 16
 var _target_scratch: Array = [] # 按递归深度索引的目标暂存池（复用免热路径堆分配）
 var _seen_scratch: Array = [] # 按递归深度索引的通配去重池（O(n) 去重，替代线性 has 扫描）
+var _dead_tokens_scratch: Array = [] # 失效订阅令牌回收暂存池（复用免热路径堆分配）
 
 # ---- 叙事表缓存（自旧总线迁正：域 id → 文案表名，按配置重载版本失效） ----
 static var _record_seq: int = 0
@@ -59,6 +60,7 @@ func clear_for_tests() -> void:
 	_pool = EventPool.new(512)
 	_seq_counter = 0
 	_dispatch_depth = 0
+	_dead_tokens_scratch.clear()
 
 ## 对象池借还统一门面 API
 func borrow_packet(channel_id: int, category_mask: int, payload: Variant = null) -> EventPacket:
@@ -166,18 +168,19 @@ func dispatch_now(packet: EventPacket) -> void:
 		_collect_channel_subscribers(0, packet, seen, targets)
 
 	# 派发快照已在独立 targets 中，回调内增删订阅不影响本轮遍历（Inv-EB2-7）
-	var dead_tokens: Array = []
+	_dead_tokens_scratch.clear()
 	for tok in targets:
 		if not tok.is_active:
 			continue
 		if tok.callback.is_valid():
 			tok.callback.call(packet)
 		else:
-			dead_tokens.append(tok)
+			_dead_tokens_scratch.append(tok)
 
-	for dead_tok in dead_tokens:
+	for dead_tok in _dead_tokens_scratch:
 		dead_tok.is_active = false
 		_unregister_token(dead_tok)
+	_dead_tokens_scratch.clear()
 
 	targets.clear()
 	seen.clear()
