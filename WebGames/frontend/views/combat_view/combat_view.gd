@@ -164,7 +164,7 @@ func _ready() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		UIIntermediary.clear_view_bindings(self)
-		if is_instance_valid(_subpanels) and _subpanels.get_parent() == null:
+		if is_instance_valid(_subpanels) and not _subpanels.is_inside_tree():
 			_subpanels.free()
 		_subpanels = null
 

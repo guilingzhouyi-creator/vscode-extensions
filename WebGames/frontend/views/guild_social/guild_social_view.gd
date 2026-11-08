@@ -12,7 +12,6 @@ const KButtonClass = preload("res://frontend/components/k_button.gd")
 
 var _tabs = null
 
-
 # ------------------------------------------------------------------------------
 # 配置默认值（骨架阶段视图内常量兜底，业务数值经 apply_snapshot 注入，不直读 GameConfig）
 # ------------------------------------------------------------------------------
@@ -207,7 +206,7 @@ func _ready() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		UIIntermediary.clear_view_bindings(self)
-		if is_instance_valid(_tabs) and _tabs.get_parent() == null:
+		if is_instance_valid(_tabs) and not _tabs.is_inside_tree():
 			_tabs.free()
 		_tabs = null
 
@@ -244,8 +243,6 @@ func _load_mock_snapshot() -> void:
 func _init_tab_titles() -> void:
 	KTabBar.init_titles(_tab_container, PackedStringArray(["ui.fe09.tab.guild_info", "ui.fe09.tab.members", "ui.fe09.tab.chat", "ui.fe09.tab.friends", "ui.fe09.tab.npc_dialog", "ui.fe09.tab.trade"]))
 	KTabBar.init_titles(_friend_tab_container, PackedStringArray(["ui.fe09.friend.subtab.friend", "ui.fe09.friend.subtab.blacklist", "ui.fe09.friend.subtab.stranger"]))
-
-# ==============================================================================
 
 ## 初始化全部静态文案（16 个非唯一标签 + 各 Tab 按钮/占位符，i18n 全驱动）
 func _init_static_text() -> void:
