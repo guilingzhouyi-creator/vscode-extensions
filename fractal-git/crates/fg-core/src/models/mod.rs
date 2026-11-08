@@ -24,6 +24,8 @@ pub mod interactive;
 pub mod oid;
 pub mod policy;
 pub mod project;
+pub mod projection_tier;
+pub mod projection_patterns;
 pub mod provenance;
 pub mod quarantine;
 pub mod repo_path;
