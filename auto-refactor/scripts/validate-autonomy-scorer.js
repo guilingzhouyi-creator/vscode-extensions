@@ -135,7 +135,11 @@ async function testAutonomyMathematicalModel() {
       evalPure.compositeAutonomyIndex >= 90.0,
       `Expected >= 90, got ${evalPure.compositeAutonomyIndex}`,
     );
-    assert.strictEqual(evalPure.dimensions.effectiveLocAutonomy, 100);
+    assert.ok(
+      evalPure.dimensions.effectiveLocAutonomy >= 99.0 &&
+        evalPure.dimensions.effectiveLocAutonomy < 100.0,
+      `Expected effectiveLocAutonomy in [99.0, 100.0), got ${evalPure.dimensions.effectiveLocAutonomy}`,
+    );
     assert.ok(evalPure.dimensions.symbolCallAutonomy >= 90);
     assert.ok(evalPure.dimensions.supplyChainResilience >= 95);
     assert.ok(evalPure.dimensions.criticalPathAutonomy >= 90);

@@ -18,7 +18,7 @@ import type { StaticQualityVector } from './static-quality-model';
 import { computeStaticQualityScore } from './static-quality-model';
 import type { DynamicQualityVector } from '../dynamic/dynamic-types';
 import { computeDynamicQualityScore } from '../dynamic/dynamic-quality-scorer';
-import { SCORE_ROUNDING } from './scorer-formulas';
+import { SCORE_ROUNDING, THEORETICAL_SCORE_CEILING } from './scorer-formulas';
 
 /**
  * Contextual project characteristics driving dynamic weight adaptation.
@@ -75,7 +75,6 @@ export const DOMAIN_CORE_FRAMEWORK = 'core_framework';
 /** Stage classification for shipped code, used when no profile stage is supplied. */
 export const STAGE_PRODUCTION = 'production';
 const PERCENT_ROUND_FACTOR = 100;
-const MAX_SCORE_CEILING = 100.0;
 const LABEL_UNOBSERVED = 'unobserved';
 
 const DOMAIN_WEIGHT_MAP: Readonly<Record<string, readonly [number, number, number]>> =
@@ -187,7 +186,7 @@ export function computeUnifiedQualityScore(
     const staticScore = computeStaticQualityScore(staticVector);
     const dynamicScore = hasDynamic ? computeDynamicQualityScore(dynamicVector!) : staticScore;
     const feedbackScore = hasHistorical
-        ? Math.max(0.0, Math.min(MAX_SCORE_CEILING, historicalScore!))
+        ? Math.max(0.0, Math.min(THEORETICAL_SCORE_CEILING, historicalScore!))
         : staticScore;
 
     const totalRaw =
@@ -195,7 +194,10 @@ export function computeUnifiedQualityScore(
         (weights.Wd > 0 ? weights.Wd * dynamicScore : 0.0) +
         (weights.Wf > 0 ? weights.Wf * feedbackScore : 0.0);
 
-    const totalScore = Math.round(totalRaw * SCORE_ROUNDING) / SCORE_ROUNDING;
+    const totalScore = Math.min(
+        THEORETICAL_SCORE_CEILING,
+        Math.round(totalRaw * SCORE_ROUNDING) / SCORE_ROUNDING,
+    );
 
     const dynLabel = hasDynamic
         ? `${dynamicScore} (${(weights.Wd * PERCENT_ROUND_FACTOR).toFixed(0)}%)`

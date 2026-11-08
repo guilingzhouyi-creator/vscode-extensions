@@ -22,11 +22,10 @@ import type { QualityDimension } from './scoringTypes';
 import type { PrimaryQualityPillar } from './eightPillarModel';
 import type { IssueReach } from './riskWeightModel';
 import { mapRuleToPrimaryPillar, REACH_FACTORS } from './riskWeightModel';
-
-/** Maximum theoretical ceiling bound for static quality scoring (+100.0). */
-export const DEFAULT_STATIC_SCORE_CEILING = 100.0;
+import { THEORETICAL_SCORE_CEILING } from './scorer-formulas';
+export { THEORETICAL_SCORE_CEILING as DEFAULT_STATIC_SCORE_CEILING } from './scorer-formulas';
 /** Minimum theoretical floor bound for static quality scoring (-100.0). */
-export const DEFAULT_STATIC_SCORE_FLOOR = -DEFAULT_STATIC_SCORE_CEILING;
+export const DEFAULT_STATIC_SCORE_FLOOR = -100.0;
 
 const SCORE_ROUND_FACTOR = 100;
 const COSINE_ROUND_FACTOR = 1000;
@@ -302,7 +301,7 @@ export function synthesizeStaticQualityVector(
     overrides: Partial<Record<StaticQualityAxis, number>> = {},
 ): StaticQualityVector {
     const sanitizeScore = (raw: number): number =>
-        Math.min(DEFAULT_STATIC_SCORE_CEILING, Math.max(DEFAULT_STATIC_SCORE_FLOOR, raw));
+        Math.min(THEORETICAL_SCORE_CEILING, Math.max(DEFAULT_STATIC_SCORE_FLOOR, raw));
 
     const architectureScore = sanitizeScore(overrides.A ?? indices.architectureConsistency);
     const maintainabilityScore = sanitizeScore(overrides.M ?? indices.maintainability);
@@ -365,7 +364,10 @@ export function computeStaticQualityScore(
     }
 
     const rawScore = weightSum <= 0 ? 0 : weightedScore / weightSum;
-    return Math.round(rawScore * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR;
+    return Math.min(
+        THEORETICAL_SCORE_CEILING,
+        Math.round(rawScore * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
+    );
 }
 
 /**

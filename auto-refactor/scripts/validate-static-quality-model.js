@@ -80,11 +80,12 @@ async function main() {
   );
   assert.strictEqual(vector.T, 82.0); // modernity
   assert.strictEqual(vector.R, 85.0); // (90 + 80) / 2
-  assert.strictEqual(vector.S, 100.0); // codeSecurity
+  assert.strictEqual(vector.S, 99.75); // codeSecurity clamped by DEFAULT_STATIC_SCORE_CEILING (< 100)
+  assert.ok(vector.S < 100.0, 'Static quality axes must stay strictly below 100.0');
   assert.strictEqual(vector.E, 90.0); // (85 + 90 + 95) / 3
 
   const score = computeStaticQualityScore(vector);
-  assert.strictEqual(score, 90.3);
+  assert.strictEqual(score, 90.28);
   console.log(`✔ Static quality vector synthesized: score=${score}, Q_s=${JSON.stringify(vector)}`);
 
   // Vector with explicit overrides

@@ -546,6 +546,21 @@ function calculateCodeOriginality(
  * @param config - Autonomy parameters; defaults to the scoring SSOT.
  * @returns Full autonomy evaluation record.
  */
+/**
+ * Derives the irreducible asymptotic ceiling (< 100.0) for autonomy metrics.
+ * Even 100% in-house source retains runtime/compiler dependency and finite-sample uncertainty.
+ */
+function computeAutonomyEpistemicCeiling(
+    proprietaryEloc: number,
+    config: AutonomyScoringConfig,
+): number {
+    const reserve = Math.max(0.01, config.epistemicReserve);
+    const halfEloc = Math.max(1, config.epistemicSampleHalfPointEloc);
+    const safeEloc = Math.max(0, Number.isFinite(proprietaryEloc) ? proprietaryEloc : 0);
+    const sampleMargin = 0.75 / (1 + safeEloc / halfEloc);
+    return Math.min(99.99, +(PERCENT_MAX - reserve - sampleMargin).toFixed(PRECISION_TWO));
+}
+
 function synthesizeAutonomyEvaluation(
     state: AutonomyScanState,
     totalFiles: number,
@@ -554,48 +569,55 @@ function synthesizeAutonomyEvaluation(
     config: AutonomyScoringConfig = DEFAULT_SCORING_CONFIG.autonomy,
     compositeIndexFloor: number = DEFAULT_SCORING_CONFIG.compositeIndexFloor,
 ): AutonomyEvaluation {
+    const axisCeiling = computeAutonomyEpistemicCeiling(state.proprietaryEffectiveLoc, config);
     const totalTreeEloc =
         state.proprietaryEffectiveLoc + state.vendorEffectiveLoc + state.generatedEffectiveLoc;
-    const rLoc =
+    const rawLoc =
         totalTreeEloc > 0
             ? (state.proprietaryEffectiveLoc / totalTreeEloc) * PERCENT_FACTOR
-            : PERCENT_FACTOR;
+            : axisCeiling;
+    const rLoc = Math.min(axisCeiling, rawLoc);
 
     const totalScopedCalls = state.internalSymbolCalls + state.externalSdkCalls;
-    let rCall: number;
+    let rawCall: number;
     if (totalScopedCalls > 0) {
-        rCall = (state.internalSymbolCalls / totalScopedCalls) * PERCENT_FACTOR;
+        rawCall = (state.internalSymbolCalls / totalScopedCalls) * PERCENT_FACTOR;
     } else if (state.sdkCallCounts.size > 0 || state.externalSdkCalls > 0) {
         const externalPkgs = Math.max(1, state.sdkCallCounts.size);
-        rCall = Math.max(
+        rawCall = Math.max(
             config.minSymbolCallScore,
             PERCENT_FACTOR - externalPkgs * config.externalPackagePenalty,
         );
     } else {
-        rCall = PERCENT_FACTOR;
+        rawCall = axisCeiling;
     }
+    const rCall = Math.min(axisCeiling, rawCall);
 
     const rDomain =
         state.proprietaryEffectiveLoc > 0
             ? Math.min(
-                  PERCENT_FACTOR,
+                  axisCeiling,
                   (state.domainKernelEffectiveLoc / state.proprietaryEffectiveLoc) * PERCENT_FACTOR,
               )
-            : PERCENT_FACTOR;
+            : axisCeiling;
 
-    const rPure = calculateCodeOriginality(issues, state.proprietaryEffectiveLoc, config);
+    const rPure = Math.min(
+        axisCeiling,
+        calculateCodeOriginality(issues, state.proprietaryEffectiveLoc, config),
+    );
 
-    const rSupply = calculateSupplyChainResilience(supplyChain, config);
+    const rSupply = Math.min(axisCeiling, calculateSupplyChainResilience(supplyChain, config));
 
     const totalCriticalCalls = state.criticalPathInternalCalls + state.criticalPathExternalCalls;
-    let rCritical: number;
+    let rawCritical: number;
     if (state.criticalPathFiles > 0 && totalCriticalCalls > 0) {
-        rCritical = (state.criticalPathInternalCalls / totalCriticalCalls) * PERCENT_FACTOR;
+        rawCritical = (state.criticalPathInternalCalls / totalCriticalCalls) * PERCENT_FACTOR;
     } else if (state.criticalPathFiles > 0) {
-        rCritical = state.externalSdkCalls === 0 ? PERCENT_MAX : rCall;
+        rawCritical = state.externalSdkCalls === 0 ? axisCeiling : rCall;
     } else {
-        rCritical = rCall;
+        rawCritical = rCall;
     }
+    const rCritical = Math.min(axisCeiling, rawCritical);
 
     const weights = config.weights;
     const compositeScore = aggregateAutonomyAxes(
@@ -612,7 +634,7 @@ function synthesizeAutonomyEvaluation(
         compositeIndexFloor,
     );
 
-    const boundedComposite = Math.max(0, Math.min(PERCENT_FACTOR, compositeScore));
+    const boundedComposite = Math.max(0, Math.min(axisCeiling, compositeScore));
     const { grade, description } = resolveAutonomyGrade(boundedComposite);
 
     // Rigorous Bayesian Credible Interval via Jeffreys conjugate prior

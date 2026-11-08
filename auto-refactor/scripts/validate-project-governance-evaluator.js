@@ -102,8 +102,14 @@ function testAntiGamingProtection() {
   };
 
   const cleanResult = evaluateProjectGovernance(cleanInput);
-  assert(cleanResult.bonuses.cleanReuseBonus === 10, 'Earned 10-point capped clean reuse bonus');
-  assert(cleanResult.compositeScore === 100, 'Score is bounded at 100');
+  assert(
+    cleanResult.bonuses.cleanReuseBonus === 0,
+    'Zero-inflation policy emits no artificial clean reuse bonus padding',
+  );
+  assert(
+    cleanResult.compositeScore > 99 && cleanResult.compositeScore < 100,
+    'Score is bounded strictly below 100 by the epistemic ceiling',
+  );
   assert(cleanResult.grade === 'A+', 'Assigned A+ grade for flawless governance');
 
   const gamingInput = {

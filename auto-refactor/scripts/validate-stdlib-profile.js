@@ -223,8 +223,16 @@ async function testStdlibAutonomyQuantification() {
 
     const result = evaluateProjectAutonomy(files, [], { root: tempDir });
     assert.strictEqual(result.grade, 'L5_INDEPENDENT');
-    assert.strictEqual(result.dimensions.effectiveLocAutonomy, 100.0);
-    assert.strictEqual(result.dimensions.supplyChainResilience, 100.0);
+    assert.ok(
+      result.dimensions.effectiveLocAutonomy >= 99.0 &&
+        result.dimensions.effectiveLocAutonomy < 100.0,
+      `Expected effectiveLocAutonomy in [99.0, 100.0), got ${result.dimensions.effectiveLocAutonomy}`,
+    );
+    assert.ok(
+      result.dimensions.supplyChainResilience >= 99.0 &&
+        result.dimensions.supplyChainResilience < 100.0,
+      `Expected supplyChainResilience in [99.0, 100.0), got ${result.dimensions.supplyChainResilience}`,
+    );
     assert.ok(
       result.compositeAutonomyIndex >= 95.0,
       `Expected >= 95.0, got ${result.compositeAutonomyIndex}`,

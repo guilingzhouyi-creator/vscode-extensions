@@ -15,6 +15,7 @@
 
 import type { Issue } from '../types';
 import { GovernanceEvalMessages } from '../messages';
+import { computeEpistemicCeiling } from './scorer-formulas';
 import {
     DEDUCTION_DISTRIBUTED_REDUNDANCY,
     DEDUCTION_ROLE_DEVIATION,
@@ -37,10 +38,6 @@ export const STAGE_STABLE: ProjectMaturityStage = 'stable';
 /** Stage token for large-scale delivery, where redundancy and drift weigh heaviest. */
 export const STAGE_ENTERPRISE: ProjectMaturityStage = 'enterprise';
 
-const MAX_CLEAN_REUSE_BONUS = 10;
-const BONUS_PER_CLEAN_LIB = 2;
-const BONUS_PER_SOUND_POOL = 2;
-
 const GOV_GRADE_D_MAX = 70;
 const GOV_GRADE_C_MAX = 80;
 const GOV_GRADE_B_MAX = 90;
@@ -50,7 +47,6 @@ const STAGE_MULTIPLIER_PROTOTYPE = 0.85;
 const STAGE_MULTIPLIER_STABLE = 1.0;
 const STAGE_MULTIPLIER_ENTERPRISE = 1.4;
 
-const MAX_GOVERNANCE_BASE_SCORE = 100;
 const GOVERNANCE_ROUND_FACTOR = 100;
 
 /**
@@ -156,29 +152,19 @@ function calculateGovernanceDeductions(
     };
 }
 
-function calculateCleanReuseBonuses(input: ProjectGovernanceInput): {
+function collectReuseAntiGamingWarnings(input: ProjectGovernanceInput): {
     cleanReuseBonus: number;
     antiGamingWarnings: string[];
 } {
     const antiGamingWarnings: string[] = [];
-    if (input.overAbstractionCount === 0 && input.negativeRoiPoolCount === 0) {
-        return {
-            cleanReuseBonus: Math.min(
-                MAX_CLEAN_REUSE_BONUS,
-                input.cleanSharedLibraryCount * BONUS_PER_CLEAN_LIB +
-                    input.soundPoolCount * BONUS_PER_SOUND_POOL,
-            ),
-            antiGamingWarnings,
-        };
-    }
-
     if (input.overAbstractionCount > 0) {
         antiGamingWarnings.push(GovernanceEvalMessages.BONUS_NULLIFIED_OVER_ABSTRACTION);
     }
     if (input.negativeRoiPoolCount > 0) {
         antiGamingWarnings.push(GovernanceEvalMessages.BONUS_NULLIFIED_NEGATIVE_ROI_POOL);
     }
-
+    // Zero-inflation policy: verified clean reuse is never rewarded with flat additive points
+    // that could mask active deductions or push scores toward 100.0.
     return { cleanReuseBonus: 0, antiGamingWarnings };
 }
 
@@ -206,13 +192,22 @@ export function evaluateProjectGovernance(
 ): ProjectGovernanceScoreResult {
     const stageMultiplier = getStageMultiplier(input.stage);
     const { deductions, totalDeductions } = calculateGovernanceDeductions(input, stageMultiplier);
-    const { cleanReuseBonus, antiGamingWarnings } = calculateCleanReuseBonuses(input);
+    const { cleanReuseBonus, antiGamingWarnings } = collectReuseAntiGamingWarnings(input);
 
-    const rawScore = MAX_GOVERNANCE_BASE_SCORE - totalDeductions + cleanReuseBonus;
+    const epistemicCeiling = computeEpistemicCeiling({
+        file: '',
+        lines: input.totalLOC,
+        nonBlankLines: input.totalLOC,
+        functions: 0,
+        maxNestingDepth: 0,
+        topLevelDeclarations: input.totalFiles,
+        exportedSymbols: input.totalFiles,
+    });
+    const rawScore = epistemicCeiling - totalDeductions;
     const compositeScore = Math.max(
         0,
         Math.min(
-            MAX_GOVERNANCE_BASE_SCORE,
+            epistemicCeiling,
             Math.round(rawScore * GOVERNANCE_ROUND_FACTOR) / GOVERNANCE_ROUND_FACTOR,
         ),
     );

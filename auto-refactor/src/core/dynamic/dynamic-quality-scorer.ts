@@ -25,11 +25,9 @@ import type {
     DynamicIssueRisk,
 } from './dynamic-types';
 import { ALL_DYNAMIC_QUALITY_AXES, DEFAULT_DYNAMIC_WEIGHTS } from './dynamic-types';
-import { SCORE_ROUNDING } from '../scoring/scorer-formulas';
+import { SCORE_ROUNDING, THEORETICAL_SCORE_CEILING } from '../scoring/scorer-formulas';
 
-const MAX_SCORE = 100.0;
 const MIN_SCORE = 0.0;
-const DEFAULT_PRIOR_SCORE = 100.0;
 const TOTAL_OBSERVED_AXES_BASE = 5.0;
 const MIN_CONFIDENCE_THRESHOLD = 0.2;
 const DEFAULT_LATENCY_PERCENTILE_99_MS = 15.0;
@@ -105,12 +103,12 @@ function evaluateLatencyScore(dto: DynamicEvidenceDTO, priorScore: number): numb
     const latencyPercentile99Ms =
         lat.percentile99Ms ?? lat['p99Ms'] ?? DEFAULT_LATENCY_PERCENTILE_99_MS;
     const budget = lat.budgetMs ?? DEFAULT_LATENCY_BUDGET_MS;
-    let scoreL = MAX_SCORE;
+    let scoreL = THEORETICAL_SCORE_CEILING;
     if (latencyPercentile99Ms > budget) {
         const overshoot = (latencyPercentile99Ms - budget) / budget;
-        scoreL = MAX_SCORE * Math.exp(-OVERSHOOT_DECAY_RATE * overshoot);
+        scoreL = THEORETICAL_SCORE_CEILING * Math.exp(-OVERSHOOT_DECAY_RATE * overshoot);
     }
-    return Math.max(MIN_SCORE, Math.min(MAX_SCORE, scoreL));
+    return Math.max(MIN_SCORE, Math.min(THEORETICAL_SCORE_CEILING, scoreL));
 }
 
 /**
@@ -122,8 +120,11 @@ function evaluateThroughputScore(dto: DynamicEvidenceDTO, priorScore: number): n
     const ops = thr.opsPerSec ?? DEFAULT_THROUGHPUT_OPS;
     const targetOps = thr.targetOpsPerSec ?? DEFAULT_THROUGHPUT_OPS;
     return targetOps > 0
-        ? Math.max(MIN_SCORE, Math.min(MAX_SCORE, (ops / targetOps) * MAX_SCORE))
-        : MAX_SCORE;
+        ? Math.max(
+              MIN_SCORE,
+              Math.min(THEORETICAL_SCORE_CEILING, (ops / targetOps) * THEORETICAL_SCORE_CEILING),
+          )
+        : THEORETICAL_SCORE_CEILING;
 }
 
 /**
@@ -132,7 +133,7 @@ function evaluateThroughputScore(dto: DynamicEvidenceDTO, priorScore: number): n
 function evaluateMemoryScore(dto: DynamicEvidenceDTO, priorScore: number): number {
     if (dto.memory === undefined) return priorScore;
     const mem = dto.memory;
-    let scoreM = MAX_SCORE;
+    let scoreM = THEORETICAL_SCORE_CEILING;
     if ((mem.detectedLeakBytes ?? 0) > 0) {
         scoreM -= MEMORY_LEAK_DEDUCTION;
     }
@@ -144,7 +145,7 @@ function evaluateMemoryScore(dto: DynamicEvidenceDTO, priorScore: number): numbe
     if ((mem.allocationRateBytesPerSec ?? 0) > HIGH_ALLOCATION_RATE_LIMIT) {
         scoreM -= HIGH_ALLOCATION_RATE_DEDUCTION;
     }
-    return Math.max(MIN_SCORE, Math.min(MAX_SCORE, scoreM));
+    return Math.max(MIN_SCORE, Math.min(THEORETICAL_SCORE_CEILING, scoreM));
 }
 
 /**
@@ -157,7 +158,10 @@ function evaluateConcurrencyScore(dto: DynamicEvidenceDTO, priorScore: number): 
         return MIN_SCORE;
     }
     const contention = Math.max(0.0, Math.min(1.0, con.contentionRatio ?? 0.0));
-    return Math.max(MIN_SCORE, Math.min(MAX_SCORE, MAX_SCORE * (1.0 - contention)));
+    return Math.max(
+        MIN_SCORE,
+        Math.min(THEORETICAL_SCORE_CEILING, THEORETICAL_SCORE_CEILING * (1.0 - contention)),
+    );
 }
 
 /**
@@ -166,8 +170,11 @@ function evaluateConcurrencyScore(dto: DynamicEvidenceDTO, priorScore: number): 
 function evaluateExecutionScore(dto: DynamicEvidenceDTO, priorScore: number): number {
     if (dto.execution === undefined) return priorScore;
     const exec = dto.execution;
-    const lineCov = Math.max(0.0, Math.min(MAX_SCORE, exec.lineCoveragePct ?? 0.0));
-    const branchCov = Math.max(0.0, Math.min(MAX_SCORE, exec.branchCoveragePct ?? lineCov));
+    const lineCov = Math.max(0.0, Math.min(THEORETICAL_SCORE_CEILING, exec.lineCoveragePct ?? 0.0));
+    const branchCov = Math.max(
+        0.0,
+        Math.min(THEORETICAL_SCORE_CEILING, exec.branchCoveragePct ?? lineCov),
+    );
     const calls = exec.callCount ?? 0;
     const callDepthFactor =
         calls > 0
@@ -178,7 +185,7 @@ function evaluateExecutionScore(dto: DynamicEvidenceDTO, priorScore: number): nu
     return Math.max(
         MIN_SCORE,
         Math.min(
-            MAX_SCORE,
+            THEORETICAL_SCORE_CEILING,
             (lineCov * COVERAGE_LINE_WEIGHT + branchCov * COVERAGE_BRANCH_WEIGHT) * callDepthFactor,
         ),
     );
@@ -189,18 +196,19 @@ function evaluateExecutionScore(dto: DynamicEvidenceDTO, priorScore: number): nu
  * applying Bayesian prior smoothing for unobserved telemetry axes.
  *
  * @param dto - Ingested DynamicEvidenceDTO telemetry snapshot.
- * @param priorScore - Bayesian prior score used when metrics are unobserved (default: 100.0).
- * @returns Bounded DynamicQualityVector with values scaled between 0.0 and 100.0.
+ * @param priorScore - Bayesian prior score used when metrics are unobserved.
+ * @returns Bounded DynamicQualityVector with values scaled strictly below 100.0.
  */
 export function computeDynamicQualityVector(
     dto: DynamicEvidenceDTO,
-    priorScore = DEFAULT_PRIOR_SCORE,
+    priorScore = THEORETICAL_SCORE_CEILING,
 ): DynamicQualityVector {
-    const scoreL = evaluateLatencyScore(dto, priorScore);
-    const scoreT = evaluateThroughputScore(dto, priorScore);
-    const scoreM = evaluateMemoryScore(dto, priorScore);
-    const scoreC = evaluateConcurrencyScore(dto, priorScore);
-    const scoreE = evaluateExecutionScore(dto, priorScore);
+    const safePrior = Math.min(THEORETICAL_SCORE_CEILING, priorScore);
+    const scoreL = evaluateLatencyScore(dto, safePrior);
+    const scoreT = evaluateThroughputScore(dto, safePrior);
+    const scoreM = evaluateMemoryScore(dto, safePrior);
+    const scoreC = evaluateConcurrencyScore(dto, safePrior);
+    const scoreE = evaluateExecutionScore(dto, safePrior);
 
     return {
         L: Math.round(scoreL * SCORE_ROUNDING) / SCORE_ROUNDING,
@@ -216,7 +224,7 @@ export function computeDynamicQualityVector(
  *
  * @param vector - 5-dimensional DynamicQualityVector.
  * @param weights - Optional customized axis weights.
- * @returns Weighted dynamic quality score [0.0, 100.0].
+ * @returns Weighted dynamic quality score strictly below 100.0.
  */
 export function computeDynamicQualityScore(
     vector: DynamicQualityVector,
@@ -233,7 +241,10 @@ export function computeDynamicQualityScore(
     }
 
     if (weightSum <= 0) return 0;
-    return Math.round((weightedScore / weightSum) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    return Math.min(
+        THEORETICAL_SCORE_CEILING,
+        Math.round((weightedScore / weightSum) * SCORE_ROUNDING) / SCORE_ROUNDING,
+    );
 }
 
 /**

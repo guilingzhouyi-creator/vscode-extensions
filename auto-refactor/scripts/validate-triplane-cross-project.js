@@ -418,11 +418,16 @@ async function main() {
     location: { start: { line: idx * 10 + 1 } },
   }));
 
+  const cleanLargeBreakdown = scorer.evaluateFile('large-core.ts', [], mockMetric);
   const largeBreakdown = scorer.evaluateFile('large-core.ts', twentySmells, mockMetric);
   assert.strictEqual(
     largeBreakdown.indices.techDebtRisk,
-    100,
+    cleanLargeBreakdown.indices.techDebtRisk,
     'Tier 3 smells must be 100% isolated from techDebtRisk',
+  );
+  assert.ok(
+    largeBreakdown.indices.techDebtRisk < 100,
+    'Epistemic ceiling must keep techDebtRisk strictly below 100',
   );
   assert.ok(
     largeBreakdown.indices.standardization > 70,
