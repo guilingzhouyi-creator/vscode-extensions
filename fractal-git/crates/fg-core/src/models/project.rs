@@ -16,6 +16,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
+use super::horizon::{BaselineAnchor, HorizonSpan};
 use super::repo_path::path_matches_scope;
 use crate::error::{FractalError, FractalResult};
 
@@ -119,6 +120,12 @@ pub struct ProjectLease {
     pub dormant_cycles: u32,
     /// Current authorization and lifecycle status.
     pub status: LeaseStatus,
+    /// Snapshot this lease was derived from, if the lease was created from an existing node.
+    ///
+    /// Optional because a lease registered from scratch has no parent to anchor to, and because
+    /// records written before horizons existed must keep deserializing unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub baseline: Option<BaselineAnchor>,
 }
 
 impl ProjectLease {
@@ -150,7 +157,19 @@ impl ProjectLease {
             commit_counter: 0,
             dormant_cycles: 0,
             status: LeaseStatus::Active,
+            baseline: None,
         }
+    }
+
+    /// Returns the horizon this lease keeps, or `Full` when no baseline was recorded.
+    ///
+    /// Callers that only need the span do not have to unwrap the anchor; a lease without an
+    /// anchor is indistinguishable from a pre-horizon lease, and both mean "keep everything".
+    #[must_use]
+    pub fn horizon_span(&self) -> HorizonSpan {
+        self.baseline
+            .as_ref()
+            .map_or(HorizonSpan::Full, |anchor| anchor.span)
     }
 
     /// Evaluates whether the master TTL lease has elapsed relative to `now_secs`.
@@ -230,6 +249,13 @@ pub struct FractalSubLease {
     pub acquired_at: u64,
     /// Sub-lease TTL duration in seconds, strictly bounded by remaining master TTL.
     pub sub_ttl_seconds: u64,
+    /// Snapshot this worktree was derived from.
+    ///
+    /// Inherited from the parent project by default, but a sub-lease may narrow it: a Card that
+    /// only replays recent work is allowed to keep less than its project. It may never widen the
+    /// parent's span, so the inherited value is a ceiling rather than a starting point.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub baseline: Option<BaselineAnchor>,
 }
 
 impl FractalSubLease {
@@ -264,7 +290,41 @@ impl FractalSubLease {
             sub_zone_id,
             acquired_at: now_secs,
             sub_ttl_seconds: bounded_sub_ttl,
+            // A worktree derived from a project starts with the project's own horizon. It may later
+            // narrow it, but never widen it.
+            baseline: parent_project.baseline.clone(),
         })
+    }
+
+    /// Narrows this sub-lease's horizon to `anchor`, refusing to widen it.
+    ///
+    /// Narrowing is what an agent asks for when it only replays recent work. Widening would be a
+    /// claim the parent never authorized: the parent holds the bytes, so a child promising more
+    /// history than its parent keeps would promise data that does not exist on this node.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FractalError::PolicyViolation`] when `anchor` keeps more than the current horizon.
+    pub fn narrow_baseline(&mut self, anchor: BaselineAnchor) -> FractalResult<()> {
+        let current = self.horizon_span();
+        // `current` covering the request means the request is a subset of what this node already
+        // holds, so accepting it cannot promise bytes that are not here.
+        if !current.covers_at_least(&anchor.span) {
+            return Err(FractalError::PolicyViolation(format!(
+                "sub-lease horizon cannot widen: keeps {current:?}, requested {requested:?}",
+                requested = anchor.span
+            )));
+        }
+        self.baseline = Some(anchor);
+        Ok(())
+    }
+
+    /// Returns the horizon this sub-lease keeps, or `Full` when it inherited none.
+    #[must_use]
+    pub fn horizon_span(&self) -> HorizonSpan {
+        self.baseline
+            .as_ref()
+            .map_or(HorizonSpan::Full, |anchor| anchor.span)
     }
 
     /// Evaluates if the fractal sub-lease has expired or if the master lease has lapsed.
@@ -408,4 +468,99 @@ fn glob_match(pattern: &str, target_path: &str) -> bool {
     }
 
     pattern == target_path
+}
+
+#[cfg(test)]
+mod horizon_lease_tests {
+    use super::*;
+    use crate::models::horizon::AnchorOrigin;
+
+    fn lease_with(span: HorizonSpan) -> ProjectLease {
+        let mut lease = ProjectLease::new(
+            "core",
+            "fractal-git",
+            DEFAULT_PROJECT_MASTER_TTL_SECONDS,
+            RegistrationOrigin::CommandInteractive,
+            1_000,
+        );
+        lease.baseline = Some(BaselineAnchor {
+            oid: None,
+            span,
+            origin: AnchorOrigin::Trunk,
+        });
+        lease
+    }
+
+    #[test]
+    fn a_lease_without_a_baseline_keeps_everything() {
+        let lease = ProjectLease::new(
+            "core",
+            "fractal-git",
+            DEFAULT_PROJECT_MASTER_TTL_SECONDS,
+            RegistrationOrigin::CommandInteractive,
+            1_000,
+        );
+        assert!(lease.baseline.is_none());
+        assert_eq!(lease.horizon_span(), HorizonSpan::Full);
+    }
+
+    #[test]
+    fn a_sub_lease_inherits_the_projects_horizon() {
+        let parent = lease_with(HorizonSpan::Depth(50));
+        let sub =
+            FractalSubLease::derive(&parent, "agent", "card-1", None, 600, 1_001).expect("derive");
+        assert_eq!(sub.horizon_span(), HorizonSpan::Depth(50));
+    }
+
+    #[test]
+    fn a_sub_lease_may_narrow_its_horizon() {
+        let parent = lease_with(HorizonSpan::Depth(50));
+        let mut sub =
+            FractalSubLease::derive(&parent, "agent", "card-1", None, 600, 1_001).expect("derive");
+        sub.narrow_baseline(BaselineAnchor {
+            oid: None,
+            span: HorizonSpan::Depth(10),
+            origin: AnchorOrigin::Local,
+        })
+        .expect("narrowing must be allowed");
+        assert_eq!(sub.horizon_span(), HorizonSpan::Depth(10));
+    }
+
+    #[test]
+    fn a_sub_lease_cannot_widen_its_horizon() {
+        let parent = lease_with(HorizonSpan::Depth(10));
+        let mut sub =
+            FractalSubLease::derive(&parent, "agent", "card-1", None, 600, 1_001).expect("derive");
+        let widened = sub.narrow_baseline(BaselineAnchor {
+            oid: None,
+            span: HorizonSpan::Depth(50),
+            origin: AnchorOrigin::Local,
+        });
+        assert!(
+            widened.is_err(),
+            "a child may not promise more than its parent holds"
+        );
+        assert_eq!(sub.horizon_span(), HorizonSpan::Depth(10));
+    }
+
+    #[test]
+    fn a_lease_record_without_a_baseline_field_still_decodes() {
+        // Records written before horizons existed have no `baseline` key at all.
+        let json = r#"{
+            "id": "core",
+            "root_path": "fractal-git",
+            "path_jails": ["fractal-git/**"],
+            "sub_zones": [],
+            "origin": "CommandInteractive",
+            "registered_at": 1000,
+            "last_activity_at": 1000,
+            "master_ttl_seconds": 604800,
+            "commit_counter": 0,
+            "dormant_cycles": 0,
+            "status": "Active"
+        }"#;
+        let lease: ProjectLease = serde_json::from_str(json).expect("legacy record");
+        assert!(lease.baseline.is_none());
+        assert_eq!(lease.horizon_span(), HorizonSpan::Full);
+    }
 }

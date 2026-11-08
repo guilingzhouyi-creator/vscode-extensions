@@ -137,6 +137,15 @@ pub enum FractalError {
     /// An operation was denied due to namespace protection or permission constraints.
     #[error("Access denied: {0}")]
     AccessDenied(String),
+
+    /// A commit exists but lies outside the horizon the caller declared for itself.
+    ///
+    /// Distinct from [`FractalError::CorruptStore`] on purpose: the bytes are absent because the
+    /// node never claimed to hold them, not because they were lost. Reporting both as corruption
+    /// would send an operator to repair a healthy store, and reporting both as "beyond the
+    /// horizon" would let a genuine loss hide behind a window.
+    #[error("Commit {oid} is beyond the declared horizon ({span}); the node holds only its recent history")]
+    BeyondHorizon { oid: String, span: String },
 }
 
 impl FractalError {
