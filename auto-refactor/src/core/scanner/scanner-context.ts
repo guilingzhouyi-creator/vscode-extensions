@@ -24,6 +24,8 @@ export {
 export interface RunAnalyzersExecutionOptions {
     activeAnalyzers?: Set<string>;
     lineBounds?: readonly [number, number];
+    /** Request immutable facts about parser quality and actual analyzer invocations. */
+    observeExecution?: boolean;
 }
 
 /** Execution context exposing Scanner state and execution primitives to sub-pipelines. */

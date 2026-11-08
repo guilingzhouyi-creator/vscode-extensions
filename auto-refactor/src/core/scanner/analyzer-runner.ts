@@ -33,7 +33,8 @@ import {
     type NormalizedNode,
 } from '../ast/multilang';
 import { countLineStats } from '../../utils/linestats';
-import { adapterFor } from '../ast/adapters';
+import { adapterFor, hasAdapterFor } from '../ast/adapters';
+import { FileExecutionObserver, type FileExecutionObservation } from '../review/analyzer-execution';
 import { unsupportedLanguageDiagnostic } from '../ast/language-support';
 import {
     getLanguageIdFromPath,
@@ -67,6 +68,8 @@ export type { FileContextBase, ParseState, StreamingOutcome };
 export interface AnalyzerHost {
     config: ScanConfig;
     plan: ResolvedAnalyzer[];
+    /** Record actual calls only when explicitly requested by a review consumer. */
+    observeExecution?: boolean;
     logger: Logger;
     /** Import graph seeded on the in-process path; null when graph seeding is disabled. */
     graph: ModuleDependencyGraph | null;
@@ -100,6 +103,7 @@ interface FileContextBase {
     maskedSource?: MaskedSource;
     featureTape?: LineFeatureTape;
     lazySourceFileResolved?: boolean;
+    execution?: FileExecutionObserver;
 }
 
 /** Outcome of the streaming phase, including the state the legacy phase must reuse. */
@@ -308,10 +312,12 @@ function buildStreamingEntries(
     const entries: StreamingEntry[] = [];
     for (const planItem of partition.streaming) {
         if (!isFileAnalyzerActive(base.preflightMask, planItem.name)) {
+            base.execution?.skip(planItem.name, 'file-preflight');
             continue;
         }
+        const instance = resolveStreamingAnalyzer(planItem, forceFresh);
         entries.push({
-            analyzer: resolveStreamingAnalyzer(planItem, forceFresh),
+            analyzer: base.execution?.streaming(planItem.name, instance) ?? instance,
             ctx: makeContext(base, root, planItem.options),
         });
     }
@@ -494,8 +500,11 @@ export async function runFileAnalyzers(
     literals?: LiteralOccurrence[];
     loopSites?: LoopSite[];
     graphEdges?: ModuleGraphFileSummary;
+    execution?: FileExecutionObservation;
 }> {
     const cfg = host.config;
+    const execution = host.observeExecution
+        ? new FileExecutionObserver(rel, host.plan, { activeAnalyzers, lineBounds }) : undefined;
     const adapter = adapterFor(rel, cfg.parser);
     const partition = partitionPlan(host.plan, activeAnalyzers);
     seedDependencyGraph(host, rel, content);
@@ -516,6 +525,7 @@ export async function runFileAnalyzers(
         lineStats: countLineStats(content),
         seed,
         preflightMask,
+        execution,
     };
 
     const issues: Issue[] = [];
@@ -555,6 +565,11 @@ export async function runFileAnalyzers(
     return {
         issues,
         metric: outcome.metric.metric,
+        ...(execution ? {
+            execution: execution.finish(
+                adapter, outcome.ast ?? parse.proj!, hasAdapterFor(rel, cfg.parser),
+            ),
+        } : {}),
         ...(fileSymbols.definitions.length > 0 || fileSymbols.references.length > 0
             ? { symbols: fileSymbols }
             : {}),

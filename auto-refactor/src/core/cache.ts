@@ -19,6 +19,7 @@
  */
 import * as path from 'path';
 import type { Issue, FileMetric } from './types';
+import { L1Journal } from './cache-l1-journal';
 import type { Logger } from './logger';
 import { TOOL_VERSION } from './config/config';
 import { CACHE_FORMAT_VERSION, sha256Hex, canonicalJson, l2Key } from './cache-key';
@@ -32,12 +33,8 @@ import {
     readLinesSafe,
     writeFileAtomic,
     writeFileAtomicAsync,
-    writeBytesAtomic,
-    writeBytesAtomicAsync,
     appendLinesSafe,
     appendLinesSafeAsync,
-    appendBytesSafe,
-    appendBytesSafeAsync,
     probeWritable,
     parseL1Line,
     isValidL2,
@@ -170,10 +167,17 @@ export class CacheStore {
     private l2ByPath = new Map<string, L2Entry>();
     private dirtyL1 = new Map<string, Fingerprint>();
     private dirtyL2 = new Map<string, L2Entry>();
+    private l2RemovalGeneration = 0;
+    private l2PersistedRemovalGeneration = 0;
+    private flushInFlight?: Promise<void>;
+    private flushRequested = false;
+    /** Last best-effort persistence failure; cleared after a successful retry. */
+    lastFlushError?: unknown;
     private readonly manifestPath: string;
     private readonly fingerprintsPath: string;
     private readonly resultsPath: string;
     private readonly pathsPath: string;
+    private readonly l1Journal: L1Journal;
     private readonly l1IndexArcPath: string;
     private readonly l2StoreArcPath: string;
     private readonly l2DeltaWalPath: string;
@@ -198,6 +202,7 @@ export class CacheStore {
         this.fingerprintsPath = path.join(this.dir, FILE_FINGERPRINTS_JSONL);
         this.resultsPath = path.join(this.dir, FILE_RESULTS_JSONL);
         this.pathsPath = path.join(this.dir, FILE_PATHS_JSONL);
+        this.l1Journal = new L1Journal(this.dir);
         this.l1IndexArcPath = path.join(this.dir, FILE_L1_INDEX_ARC);
         this.l2StoreArcPath = path.join(this.dir, FILE_L2_STORE_ARC);
         this.l2DeltaWalPath = path.join(this.dir, FILE_L2_DELTA_WAL);
@@ -266,7 +271,7 @@ export class CacheStore {
     private loadCacheFromDisk(): void {
         if (this.loaded) return;
         this.loaded = true;
-        if (!this.tryLoadBinaryL1()) {
+        if (!this.l1Journal.load(this.l1) && !this.tryLoadBinaryL1()) {
             this.loadFingerprints();
         }
         if (!this.tryLoadBinaryL2()) {
@@ -647,6 +652,8 @@ export class CacheStore {
      * and resetting the WAL append log counter.
      */
     runCompactCache(): void {
+        if (this.flushInFlight || this.l1Journal.busy)
+            throw new Error('Cache writer busy: asynchronous flush active');
         if (!this.enabled) return;
         try {
             for (const entry of this.l2.values()) {
@@ -656,6 +663,7 @@ export class CacheStore {
             writeFileAtomic(this.resultsPath, serializeL2(this.l2));
             writeFileAtomic(this.pathsPath, serializePaths(this.l2ByPath));
             this.writeArc2L1SnapshotSync();
+            this.l1Journal.checkpointSync(this.l1);
             this.writeArc2L2SnapshotSync();
             this.appendedL1Count = 0;
             this.appendedL2Count = 0;
@@ -673,7 +681,12 @@ export class CacheStore {
 
     private executeFlushPreparation(): boolean {
         if (!this.enabled) return false;
-        if (this.dirtyL1.size === 0 && this.dirtyL2.size === 0) return false;
+        if (
+            this.dirtyL1.size === 0 &&
+            this.dirtyL2.size === 0 &&
+            this.l2RemovalGeneration === this.l2PersistedRemovalGeneration
+        )
+            return false;
         this.executeCleanupIfNeeded();
         return true;
     }
@@ -692,6 +705,7 @@ export class CacheStore {
         const fileSize = SyncIoBarrier.statSize(this.resultsPath);
         const isOverPhysicalThreshold = fileSize > 0 && fileSize >= this.maxL2LoadBytes * 0.75;
         return (
+            this.l2RemovalGeneration !== this.l2PersistedRemovalGeneration ||
             isOverPhysicalThreshold ||
             this.appendedL2Count >= COMPACTION_THRESHOLD_L2_ENTRIES ||
             !SyncIoBarrier.exists(this.resultsPath)
@@ -702,20 +716,31 @@ export class CacheStore {
      * Flushes dirty entries to disk using Append-Only WAL or periodic compaction snapshot.
      */
     flushCacheToDisk(): void {
+        if (this.flushInFlight) {
+            this.flushRequested = true;
+            return;
+        }
         if (!this.executeFlushPreparation()) return;
         try {
             if (this.dirtyL1.size > 0) {
-                if (this.shouldRewriteL1Snapshot()) {
+                const migrating = !this.l1Journal.ready;
+                const compacting = !this.l1Journal.busy && this.shouldRewriteL1Snapshot();
+                if (compacting) {
                     writeFileAtomic(this.fingerprintsPath, serializeL1(this.l1));
                     this.appendedL1Count = 0;
+                    this.l1Journal.checkpointSync(this.l1);
                 } else {
                     appendLinesSafe(this.fingerprintsPath, serializeL1(this.dirtyL1));
                     this.appendedL1Count += this.dirtyL1.size;
+                    this.l1Journal.appendSync(this.dirtyL1, this.l1);
                 }
-                this.writeArc2L1SnapshotSync();
+                if (migrating || compacting) this.writeArc2L1SnapshotSync();
                 this.dirtyL1.clear();
             }
-            if (this.dirtyL2.size > 0) {
+            if (
+                this.dirtyL2.size > 0 ||
+                this.l2RemovalGeneration !== this.l2PersistedRemovalGeneration
+            ) {
                 if (this.shouldRewriteL2Snapshot()) {
                     for (const entry of this.l2.values()) {
                         ensureL2EntryDecoded(entry);
@@ -723,6 +748,7 @@ export class CacheStore {
                     writeFileAtomic(this.resultsPath, serializeL2(this.l2));
                     writeFileAtomic(this.pathsPath, serializePaths(this.l2ByPath));
                     this.writeArc2L2SnapshotSync();
+                    this.l2PersistedRemovalGeneration = this.l2RemovalGeneration;
                     this.appendedL2Count = 0;
                 } else {
                     appendLinesSafe(this.resultsPath, serializeL2(this.dirtyL2));
@@ -744,54 +770,103 @@ export class CacheStore {
 
     private async flushL1Async(): Promise<void> {
         if (this.dirtyL1.size === 0) return;
-        if (this.shouldRewriteL1Snapshot()) {
-            await writeFileAtomicAsync(this.fingerprintsPath, serializeL1(this.l1));
-            this.appendedL1Count = 0;
-        } else {
-            await appendLinesSafeAsync(this.fingerprintsPath, serializeL1(this.dirtyL1));
-            this.appendedL1Count += this.dirtyL1.size;
+        const batch = this.dirtyL1;
+        this.dirtyL1 = new Map();
+        try {
+            const migrating = !this.l1Journal.ready;
+            if (migrating && this.shouldRewriteL1Snapshot()) {
+                await writeFileAtomicAsync(this.fingerprintsPath, serializeL1(this.l1));
+                this.appendedL1Count = 0;
+            } else {
+                await appendLinesSafeAsync(this.fingerprintsPath, serializeL1(batch));
+                this.appendedL1Count += batch.size;
+            }
+            await this.l1Journal.appendAsync(batch, this.l1);
+            if (migrating) await flushArc2L1Async(this.arc2Paths, this.l1, this.arc2Opts);
+        } catch (error) {
+            for (const [key, value] of batch) {
+                if (!this.dirtyL1.has(key)) this.dirtyL1.set(key, value);
+            }
+            throw error;
         }
-        await flushArc2L1Async(this.arc2Paths, this.l1, this.arc2Opts);
-        this.dirtyL1.clear();
     }
 
     private async flushL2Async(): Promise<void> {
-        if (this.dirtyL2.size === 0) return;
-        const isRewrite = this.shouldRewriteL2Snapshot();
-        if (isRewrite) {
-            await writeFileAtomicAsync(this.resultsPath, serializeL2(this.l2));
-            await writeFileAtomicAsync(this.pathsPath, serializePaths(this.l2ByPath));
-            this.appendedL2Count = 0;
-        } else {
-            await appendLinesSafeAsync(this.resultsPath, serializeL2(this.dirtyL2));
-            await appendLinesSafeAsync(this.pathsPath, serializeDirtyPaths(this.dirtyL2.values()));
-            this.appendedL2Count += this.dirtyL2.size;
+        if (
+            this.dirtyL2.size === 0 &&
+            this.l2RemovalGeneration === this.l2PersistedRemovalGeneration
+        )
+            return;
+        const removalGeneration = this.l2RemovalGeneration;
+        const batch = this.dirtyL2;
+        this.dirtyL2 = new Map();
+        try {
+            const isRewrite = this.shouldRewriteL2Snapshot();
+            if (isRewrite) {
+                await writeFileAtomicAsync(this.resultsPath, serializeL2(this.l2));
+                await writeFileAtomicAsync(this.pathsPath, serializePaths(this.l2ByPath));
+                this.appendedL2Count = 0;
+            } else {
+                await appendLinesSafeAsync(this.resultsPath, serializeL2(batch));
+                await appendLinesSafeAsync(this.pathsPath, serializeDirtyPaths(batch.values()));
+                this.appendedL2Count += batch.size;
+            }
+            await flushArc2L2Async(
+                this.arc2Paths,
+                this.l2.values(),
+                batch.values(),
+                isRewrite,
+                this.arc2Opts,
+            );
+            this.l2PersistedRemovalGeneration = removalGeneration;
+        } catch (error) {
+            for (const [key, value] of batch) {
+                if (this.l2.get(key) === value && !this.dirtyL2.has(key))
+                    this.dirtyL2.set(key, value);
+            }
+            throw error;
         }
-        await flushArc2L2Async(
-            this.arc2Paths,
-            this.l2.values(),
-            this.dirtyL2.values(),
-            isRewrite,
-            this.arc2Opts,
-        );
-        this.dirtyL2.clear();
     }
 
     /**
-     * Flushes dirty entries asynchronously using Append-Only WAL or periodic compaction snapshot.
+     * Serialize writers and drain requests received during an active flush. Failed batches remain
+     * dirty for retry; newer values take precedence when restoring an interrupted batch.
      */
-    async flushCacheToDiskAsync(): Promise<void> {
-        if (!this.executeFlushPreparation()) return;
-        try {
-            await this.flushL1Async();
-            await this.flushL2Async();
-        } catch {
-            /* Best-effort */
-        }
+    flushCacheToDiskAsync(): Promise<void> {
+        this.flushRequested = true;
+        if (this.flushInFlight) return this.flushInFlight;
+        this.flushInFlight = Promise.resolve()
+            .then(async () => {
+                do {
+                    this.flushRequested = false;
+                    try {
+                        await this.l1Journal.publishCheckpointAsync();
+                        this.lastFlushError = this.l1Journal.lastError;
+                        if (!this.executeFlushPreparation()) break;
+                        await this.flushL1Async();
+                        await this.flushL2Async();
+                        this.lastFlushError = this.l1Journal.lastError;
+                    } catch (error) {
+                        this.lastFlushError = error;
+                        break;
+                    }
+                } while (this.flushRequested);
+            })
+            .finally(() => {
+                this.flushInFlight = undefined;
+            });
+        return this.flushInFlight;
     }
 
     async flushAsync(): Promise<void> {
         await this.flushCacheToDiskAsync();
+    }
+
+    /** Drain both queued writes and any background checkpoint before an orderly shutdown. */
+    async settleAsync(): Promise<void> {
+        await this.flushAsync();
+        await this.l1Journal.waitForCheckpoint();
+        await this.flushAsync();
     }
 
     executeCleanupIfNeeded(): void {
@@ -809,7 +884,10 @@ export class CacheStore {
     }
 
     private removeSecondaryCacheEntry(entryRecord: L2Entry): void {
-        this.l2.delete(entryRecord.k);
+        if (!this.l2.delete(entryRecord.k)) return;
+        this.dirtyL2.delete(entryRecord.k);
+        this.l2RemovalGeneration++;
+        if (this.flushInFlight) this.flushRequested = true;
         const pathKey = this.getEntryPathKey(entryRecord);
         if (this.l2ByPath.get(pathKey) === entryRecord) {
             this.l2ByPath.delete(pathKey);
@@ -837,9 +915,11 @@ export class CacheStore {
     }
 
     clear(): boolean {
+        if (this.flushInFlight || this.l1Journal.busy) return false;
         try {
             if (!removeCacheDir(this.dir)) return false;
             this.resetMemoryMaps();
+            this.l1Journal.reset();
             this.appendedL1Count = 0;
             this.appendedL2Count = 0;
             this.enabled = this.initializeCache();

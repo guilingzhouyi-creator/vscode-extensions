@@ -142,7 +142,7 @@ export async function executeScanWithCache(
     for (const entry of queue.l1Fps) cache.writeL1(entry.rel, entry.fp);
     for (const item of queue.l2Refresh)
         cache.writeL2(item.fpHash, item.contentHash, item.rel, item.result, item.fp);
-    cache.flush();
+    await cache.flushAsync();
 
     const issues: Issue[] = [];
     const fileMetrics: FileMetric[] = [];

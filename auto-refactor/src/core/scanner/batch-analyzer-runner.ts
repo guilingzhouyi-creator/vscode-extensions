@@ -66,8 +66,14 @@ export function runLegacyPhase(
     const issues: Issue[] = [];
     const sourceFile = base.sourceFile;
     for (const planItem of legacy) {
-        if (!sourceFile && planItem.instance.requiresSourceFile) continue;
-        if (!isFileAnalyzerActive(base.preflightMask, planItem.name)) continue;
+        if (!sourceFile && planItem.instance.requiresSourceFile) {
+            base.execution?.skip(planItem.name, 'requires-source-file');
+            continue;
+        }
+        if (!isFileAnalyzerActive(base.preflightMask, planItem.name)) {
+            base.execution?.skip(planItem.name, 'file-preflight');
+            continue;
+        }
         const ctx: AnalyzerContext = {
             filePath: base.rel,
             content: base.content,
@@ -79,8 +85,10 @@ export function runLegacyPhase(
             lineStats: base.lineStats,
         };
         try {
+            base.execution?.begin(planItem.name);
             issues.push(...planItem.instance.analyze(sourceFile, ctx));
         } catch (error) {
+            base.execution?.fail(planItem.name, error);
             if (!sourceFile && error instanceof TypeError) {
                 // Analyzer strictly expected SourceFile AST; safely ignore on non-TS/JS files
                 continue;

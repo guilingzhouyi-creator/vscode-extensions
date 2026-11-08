@@ -474,7 +474,7 @@ function aggregateScanResults(perFile: ({ issues: Issue[]; metric: FileMetric | 
     return { issues, fileMetrics };
 }
 
-function runCommitRoutingCaches(ctx: CommitRoutingContext): void {
+async function runCommitRoutingCaches(ctx: CommitRoutingContext): Promise<void> {
     const incPruned = pruneIncrementalBucket(ctx.incBucket, incrementalMaxFiles());
     const incRssEvicted = incrementalRssGuard(ctx.session);
     if (incPruned > 0) {
@@ -490,7 +490,7 @@ function runCommitRoutingCaches(ctx: CommitRoutingContext): void {
     ctx.routingState.l2Refresh.forEach((item) => {
         ctx.cache.writeL2(item.fpHash, item.contentHash, item.rel, item.result, item.fp);
     });
-    ctx.cache.flush();
+    await ctx.cache.flushAsync();
 }
 
 function createDiffStats(ctx: CreateDiffStatsContext): DiffStats {
@@ -639,7 +639,7 @@ async function runDiffPipelines(ctx: ExecuteDiffPipelinesContext): Promise<{
         cache: ctx.cache,
     });
 
-    runCommitRoutingCaches({
+    await runCommitRoutingCaches({
         routingState: ctx.routingState,
         cache: ctx.cache,
         incBucket: ctx.incBucket,
