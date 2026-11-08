@@ -24,6 +24,9 @@ pub mod loose;
 pub mod projection;
 pub mod reflink;
 pub mod repack;
+pub mod synth_spec;
+pub mod synth_write;
+
 pub mod wal_journal;
 
 pub use archive::{ArchiveEntry, ArchiveFormat, ArchiveGenerator, TarWriter, ZipWriter};
@@ -57,6 +60,8 @@ pub use loose::{write_loose_object, LooseOdb};
 pub use projection::{export_native_to_git, import_git_to_native, ExportReport, ImportReport};
 pub use reflink::{clone_file_cow, detach_for_write, is_readonly, set_readonly, ReflinkKind};
 pub use repack::{scan_loose_objects, RepackEngine, RepackOptions, RepackReport};
+pub use synth_spec::{SynthRepo, SynthRepoSpec, SynthRepoStats};
+pub use synth_write::generate;
 pub use wal_journal::{WalJournal, WalRecord};
 
 // Re-export InMemoryIndexTree from fg-index for storage convenience
