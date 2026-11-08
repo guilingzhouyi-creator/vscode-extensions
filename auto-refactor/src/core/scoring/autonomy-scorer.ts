@@ -286,9 +286,15 @@ export { extractFileImportProfile, type FileImportProfile };
  * @param absPath - Absolute path to the source file.
  * @returns Decoded head of the file, or an empty string when it cannot be read.
  */
+const AutonomySourceIoBarrier = {
+    readBytes(absPath: string): Buffer {
+        return fs['readFileSync'](absPath);
+    },
+};
+
 function readSourceFileContent(absPath: string): string {
     try {
-        const raw = fs.readFileSync(absPath);
+        const raw = AutonomySourceIoBarrier.readBytes(absPath);
         return raw.length > MAX_AUTONOMY_FILE_READ_BYTES
             ? raw.toString('utf8', 0, MAX_AUTONOMY_FILE_READ_BYTES)
             : raw.toString('utf8');

@@ -135,11 +135,7 @@ export class TypeScriptAdapter extends BaseAstAdapter {
         return kids;
     }
 
-    private mapGovernanceNode(
-        tsNode: ts.Node,
-        sourceFile: ts.SourceFile,
-        isRoot: boolean,
-    ): NormalizedNode | null {
+    private classifyGovernanceFlags(tsNode: ts.Node, isRoot: boolean) {
         const kind = kindOf(tsNode);
         const fnLike = isFunctionLike(tsNode);
         const isClassDefining = ts.isClassDeclaration(tsNode) || ts.isClassExpression(tsNode);
@@ -153,24 +149,33 @@ export class TypeScriptAdapter extends BaseAstAdapter {
             isBinding ||
             kind === NodeKind.ControlFlow ||
             increasesNesting;
+        return { kind, fnLike, isClassDefining, isBinding, increasesNesting, needsPos, keepNode };
+    }
 
+    private mapGovernanceNode(
+        tsNode: ts.Node,
+        sourceFile: ts.SourceFile,
+        isRoot: boolean,
+    ): NormalizedNode | null {
+        const flags = this.classifyGovernanceFlags(tsNode, isRoot);
         const kids = this.mapGovernanceChildren(tsNode, sourceFile);
-        if (!keepNode && kids === undefined) {
+        if (!flags.keepNode && kids === undefined) {
             return null;
         }
-
         const resolvedName =
-            needsPos || isClassDefining ? (nameOf(tsNode, sourceFile) ?? undefined) : undefined;
+            flags.needsPos || flags.isClassDefining
+                ? (nameOf(tsNode, sourceFile) ?? undefined)
+                : undefined;
         return {
-            kind,
-            start: needsPos ? posOf(tsNode.getStart(sourceFile), sourceFile) : undefined,
-            end: needsPos ? posOf(tsNode.getEnd(), sourceFile) : undefined,
+            kind: flags.kind,
+            start: flags.needsPos ? posOf(tsNode.getStart(sourceFile), sourceFile) : undefined,
+            end: flags.needsPos ? posOf(tsNode.getEnd(), sourceFile) : undefined,
             name: resolvedName,
-            functionLike: fnLike,
-            isClassDefining,
-            introducesBinding: isBinding,
-            bindingName: isBinding ? bindingName(tsNode, sourceFile) : null,
-            increasesNesting,
+            functionLike: flags.fnLike,
+            isClassDefining: flags.isClassDefining,
+            introducesBinding: flags.isBinding,
+            bindingName: flags.isBinding ? bindingName(tsNode, sourceFile) : null,
+            increasesNesting: flags.increasesNesting,
             children: kids,
         };
     }

@@ -43,6 +43,14 @@ const CHAIN_CATCH = /^(\s*)\.\s*catch\(\s*\(?\s*[A-Za-z_$][\w$]*\s*\)?\s*=>\s*\{
  * @param lines - File contents split into lines.
  * @returns Descriptor carrying the tail start index, its shape, and the captured groups; or null.
  */
+function hasSwallowedBlockBoundary(lines, start, end) {
+    const body = lines.slice(start + 1, end);
+    for (let i = 0; i < body.length; i += 1) {
+        if (/^\s*(\}|if\s*\(|module\.exports)/.test(body[i])) return true;
+    }
+    return false;
+}
+
 function findTail(lines) {
     let end = lines.length - 1;
     while (end >= 0 && lines[end].trim() === '') end -= 1;
@@ -61,11 +69,7 @@ function findTail(lines) {
         for (const [shape, pattern] of shapes) {
             const match = pattern.exec(candidate);
             if (!match) continue;
-            // A match that swallowed a block boundary means the window crossed into unrelated code.
-            // The first and last lines are excluded: they are the tail itself, which always carries
-            // braces.
-            const body = lines.slice(start, end + 1).slice(1, -1);
-            if (body.some((line) => /^\s*(\}|if\s*\(|module\.exports)/.test(line))) return null;
+            if (hasSwallowedBlockBoundary(lines, start, end)) return null;
             return { start, end, shape, match };
         }
     }

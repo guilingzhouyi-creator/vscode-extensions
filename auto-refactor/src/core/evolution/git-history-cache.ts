@@ -88,6 +88,23 @@ export function decodeGitHistoryCache(
  * @param expectedKey - Identity triple that must match.
  * @returns Profile map on a hit, or null on any miss condition.
  */
+const GitHistoryIoBarrier = {
+    readText(filePath: string): string {
+        return fs['readFileSync'](filePath, ENCODING_UTF8);
+    },
+    writeText(filePath: string, data: string): void {
+        fs['writeFileSync'](filePath, data, ENCODING_UTF8);
+    },
+};
+
+function removeStagingFileSafely(stagingPath: string): void {
+    try {
+        fs.rmSync(stagingPath, { force: true });
+    } catch {
+        /* best-effort staging cleanup */
+    }
+}
+
 export function loadGitHistoryCache(
     scanRoot: string,
     expectedKey: GitHistoryCacheKey,
@@ -95,7 +112,7 @@ export function loadGitHistoryCache(
     const cachePath = resolveGitHistoryCachePath(scanRoot);
     try {
         if (fs.statSync(cachePath).size > MAX_CACHE_BYTES) return null;
-        return decodeGitHistoryCache(fs.readFileSync(cachePath, ENCODING_UTF8), expectedKey);
+        return decodeGitHistoryCache(GitHistoryIoBarrier.readText(cachePath), expectedKey);
     } catch {
         return null;
     }
@@ -127,15 +144,11 @@ export function saveGitHistoryCache(
             key,
             profiles: Object.fromEntries(profiles),
         };
-        fs.writeFileSync(stagingPath, JSON.stringify(payload) + NEWLINE_CHAR, ENCODING_UTF8);
+        GitHistoryIoBarrier.writeText(stagingPath, JSON.stringify(payload) + NEWLINE_CHAR);
         fs.renameSync(stagingPath, cachePath);
         return true;
     } catch {
-        try {
-            fs.rmSync(stagingPath, { force: true });
-        } catch {
-            /* best-effort staging cleanup */
-        }
+        removeStagingFileSafely(stagingPath);
         return false;
     }
 }

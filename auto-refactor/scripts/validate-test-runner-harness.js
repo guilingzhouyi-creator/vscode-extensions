@@ -69,6 +69,16 @@ async function main() {
       rejects: ['teardown'],
     },
   ];
+  function assertProbeOutput(seen, probe) {
+    assert.strictEqual(seen.indexOf(probe.name) !== -1, true, `${probe.name} failure must name the suite that broke`);
+    for (const token of probe.expects ?? []) {
+      assert.strictEqual(seen.indexOf(token) !== -1, true, `${probe.name} must report ${token}`);
+    }
+    for (const token of probe.rejects ?? []) {
+      assert.strictEqual(seen.indexOf(token), -1, `${probe.name} must not report ${token} instead of the failure`);
+    }
+  }
+
   for (const probe of exitProbes) {
     const probePath = path.join(os.tmpdir(), `${probe.name}-${process.pid}.cjs`);
     const harnessPath = path.join(__dirname, 'common', 'test-runner-harness.js').replace(/\\/g, '\\\\');
@@ -84,13 +94,7 @@ async function main() {
     fs.rmSync(probePath, { force: true });
     assert.strictEqual(outcome.status, 1, `${probe.name} must exit 1 on failure`);
     const seen = `${outcome.stdout}${outcome.stderr}`;
-    assert.ok(seen.includes(probe.name), `${probe.name} failure must name the suite that broke`);
-    for (const token of probe.expects ?? []) {
-      assert.ok(seen.includes(token), `${probe.name} must report ${token}`);
-    }
-    for (const token of probe.rejects ?? []) {
-      assert.ok(!seen.includes(token), `${probe.name} must not report ${token} instead of the failure`);
-    }
+    assertProbeOutput(seen, probe);
   }
 
   console.log('ALL TEST RUNNER HARNESS CHECKS PASSED SUCCESSFULLY!');

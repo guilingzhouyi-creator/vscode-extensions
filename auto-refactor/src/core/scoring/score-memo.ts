@@ -114,6 +114,23 @@ function canonicalIssueList(issues: readonly Issue[]): string {
 export function resolveScoreMemoPath(scanRoot: string): string {
     return path.join(scanRoot, CACHE_DIR_NAME, CACHE_FILE_NAME);
 }
+const ScoreMemoIoBarrier = {
+    readText(filePath: string): string {
+        return fs['readFileSync'](filePath, ENCODING_UTF8);
+    },
+    writeText(filePath: string, data: string): void {
+        fs['writeFileSync'](filePath, data, ENCODING_UTF8);
+    },
+};
+
+function removeStagingMemoSafely(stagingPath: string): void {
+    try {
+        fs.rmSync(stagingPath, { force: true });
+    } catch {
+        /* best-effort staging cleanup */
+    }
+}
+
 /** Loads memoized scores whose version and configuration fingerprint match; empty on any miss. */
 export function loadScoreMemo(
     scanRoot: string,
@@ -123,7 +140,7 @@ export function loadScoreMemo(
     try {
         if (fs.statSync(memoPath).size > MAX_MEMO_BYTES) return new Map();
         const payload = JSON.parse(
-            fs.readFileSync(memoPath, ENCODING_UTF8),
+            ScoreMemoIoBarrier.readText(memoPath),
         ) as Partial<ScoreMemoPayload> | null;
         if (!payload) return new Map();
         if (payload.version !== header.version) return new Map();
@@ -163,21 +180,13 @@ export function saveScoreMemo(
         const payload: ScoreMemoPayload = {
             version: header.version,
             configKey: header.configKey,
-            // Trim rather than refuse: an over-capacity memo must stay writable, or a
-            // long-lived checkout would silently stop caching. `Map` preserves insertion
-            // order and the caller appends freshly scored entries, so dropping from the
-            // head discards the oldest.
             scores: Object.fromEntries(trimToCapacity(memo)),
         };
-        fs.writeFileSync(stagingPath, JSON.stringify(payload), ENCODING_UTF8);
+        ScoreMemoIoBarrier.writeText(stagingPath, JSON.stringify(payload));
         fs.renameSync(stagingPath, memoPath);
         return true;
     } catch {
-        try {
-            fs.rmSync(stagingPath, { force: true });
-        } catch {
-            /* best-effort staging cleanup */
-        }
+        removeStagingMemoSafely(stagingPath);
         return false;
     }
 }

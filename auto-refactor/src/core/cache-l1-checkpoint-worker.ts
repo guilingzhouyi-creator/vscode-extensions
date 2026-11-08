@@ -19,13 +19,19 @@ interface CheckpointRequest {
     legacyOffset?: number;
 }
 
+const CheckpointIoBarrier = {
+    readBytes(filePath: string): Buffer {
+        return fs['readFileSync'](filePath);
+    },
+};
+
 const request = workerData as CheckpointRequest;
 if (!parentPort) throw new Error('L1 checkpoint requires an owned worker port');
 const state = new Map<string, Fingerprint>();
-const base = replayL1Frames(fs.readFileSync(request.checkpointPath), state);
+const base = replayL1Frames(CheckpointIoBarrier.readBytes(request.checkpointPath), state);
 if (base.truncatedTail) throw new Error('Cannot compact a truncated L1 checkpoint');
 const result = replayL1Frames(
-    fs.readFileSync(request.walPath),
+    CheckpointIoBarrier.readBytes(request.walPath),
     state,
     base.sequence,
     request.sequence,

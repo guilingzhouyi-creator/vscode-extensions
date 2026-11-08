@@ -798,6 +798,14 @@ export class CacheStore {
         }
     }
 
+    private restoreInterruptedL2Batch(batch: Map<string, L2Entry>): void {
+        for (const [key, value] of batch) {
+            if (this.l2.get(key) === value && !this.dirtyL2.has(key)) {
+                this.dirtyL2.set(key, value);
+            }
+        }
+    }
+
     private async flushL2Async(): Promise<void> {
         if (
             this.dirtyL2.size === 0 &&
@@ -827,10 +835,7 @@ export class CacheStore {
             );
             this.l2PersistedRemovalGeneration = removalGeneration;
         } catch (error) {
-            for (const [key, value] of batch) {
-                if (this.l2.get(key) === value && !this.dirtyL2.has(key))
-                    this.dirtyL2.set(key, value);
-            }
+            this.restoreInterruptedL2Batch(batch);
             throw error;
         }
     }

@@ -234,6 +234,16 @@ export class PraxisDiffGovernanceService implements IPraxisDiffGovernanceService
         ];
     }
 
+    private mergeHunkReviewVerdict(
+        hunk: ReviewDiffHunk,
+        verdict: PraxisVerdict,
+        baseViolations: string[],
+    ): void {
+        const prevViolations = hunk.reviewVerdict?.violations ?? [];
+        const merged = Array.from(new Set(prevViolations.concat(baseViolations)));
+        hunk.reviewVerdict = Object.assign({}, verdict, { violations: merged });
+    }
+
     private resolveDiffVerdict(
         issues: Issue[],
         rawVerdict: PraxisVerdict,
@@ -255,11 +265,7 @@ export class PraxisDiffGovernanceService implements IPraxisDiffGovernanceService
         if (verdict.status !== 'major_rework_needed') return verdict;
         const baseViolations = verdict.violations ?? [];
         for (const hunk of enrichedHunks) {
-            const prevViolations = hunk.reviewVerdict?.violations ?? [];
-            hunk.reviewVerdict = {
-                ...verdict,
-                violations: [...new Set([...prevViolations, ...baseViolations])],
-            };
+            this.mergeHunkReviewVerdict(hunk, verdict, baseViolations);
         }
         return verdict;
     }

@@ -15,9 +15,18 @@ import type { Fingerprint } from './cache';
 import { encodeL1Frame, replayL1Frames, type L1Delta } from './cache-l1-wal';
 import { writeBytesAtomic, writeBytesAtomicAsync } from './cache-persistence';
 
+const JournalIoBarrier = {
+    readBytes(filePath: string): Buffer {
+        return fs['readFileSync'](filePath);
+    },
+    appendBytes(filePath: string, frame: Buffer): void {
+        fs['appendFileSync'](filePath, frame);
+    },
+};
+
 function readOptional(file: string): Buffer {
     try {
-        return fs.readFileSync(file);
+        return JournalIoBarrier.readBytes(file);
     } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT') return Buffer.alloc(0);
         throw error;
@@ -157,7 +166,7 @@ export class L1Journal {
         const sequence = this.sequence + 1;
         const frame = encodeL1Frame(sequence, deltas);
         try {
-            fs.appendFileSync(this.walPath, frame);
+            JournalIoBarrier.appendBytes(this.walPath, frame);
             this.sequence = sequence;
             this.walBytes += frame.length;
             this.repairBytes = undefined;
