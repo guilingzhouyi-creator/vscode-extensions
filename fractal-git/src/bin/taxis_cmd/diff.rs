@@ -172,6 +172,13 @@ pub(crate) struct DiffRequest {
     pub(crate) exit_code: bool,
     /// Whether to suppress the report entirely; `--quiet` implies it.
     pub(crate) quiet: bool,
+    /// Path slice this invocation may show.
+    ///
+    /// Separate from `pathspecs` because the two answer different questions. A pathspec names
+    /// what the caller is asking about; a slice names what the node is allowed to see. A card
+    /// restricted to one crate should not print a diff of another crate even when asked directly,
+    /// so the slice is applied as a hard filter and the pathspec narrows within it.
+    pub(crate) slice: Option<fg_core::models::ProjectionScope>,
 }
 
 impl Default for DiffRequest {
@@ -188,16 +195,25 @@ impl Default for DiffRequest {
             no_prefix: false,
             exit_code: false,
             quiet: false,
+            slice: None,
         }
     }
 }
 
 /// Dispatches `taxis diff`.
 pub fn handle_diff(ctx: &CliContext) {
-    let request = match parse_request(&ctx.args) {
+    // The slice flags are removed from the argument list *before* parsing. Leaving them in place
+    // made the parser read the scope's value as a revision name, because a flag that takes a value
+    // is indistinguishable from a positional argument once the flag word itself is skipped.
+    let (args, slice) = match super::scope_flag::strip_scope(&ctx.args) {
         Ok(parsed) => parsed,
         Err(reason) => reject(CliTag::ERROR, reason),
     };
+    let mut request = match parse_request(&args) {
+        Ok(parsed) => parsed,
+        Err(reason) => reject(CliTag::ERROR, reason),
+    };
+    request.slice = slice;
     let view = match RepoView::open(ctx) {
         Ok(opened) => opened,
         Err(open_err) => fail_fatal(open_err),
@@ -236,10 +252,29 @@ pub fn run_revision_diff(
     right: &str,
     args: &[String],
 ) -> FractalResult<()> {
+    run_revision_diff_sliced(view, left, right, args, None)
+}
+
+/// Same as [`run_revision_diff`], additionally restricted to a path slice.
+///
+/// `show` and `diff` both come through here, so a slice declared once applies to both. Adding a
+/// second entry point would let the two commands drift apart in what they consider visible.
+///
+/// # Errors
+///
+/// Propagates a malformed argument list or an unreadable tree.
+pub fn run_revision_diff_sliced(
+    view: &RepoView,
+    left: &str,
+    right: &str,
+    args: &[String],
+    slice: Option<&fg_core::models::ProjectionScope>,
+) -> FractalResult<()> {
     let mut cli_args: Vec<String> = args.to_vec();
     cli_args.push(left.to_string());
     cli_args.push(right.to_string());
-    let request = parse_request(&cli_args).map_err(FractalError::ObjectCodec)?;
+    let mut request = parse_request(&cli_args).map_err(FractalError::ObjectCodec)?;
+    request.slice = slice.cloned();
     let comparisons = collect_comparisons(view, &request)?;
     let width = super::abbrev::abbreviation_width(view.approximate_object_count());
     report_text(&request, &comparisons, width);
@@ -297,6 +332,7 @@ fn apply_diff_parameterized_or_rev(
         request.context = parse_context(rest)?;
         return Ok(());
     }
+
     if argument.starts_with('-') && argument.len() > 1 {
         return Err(format!("diff does not support the flag '{argument}'"));
     }
@@ -390,6 +426,11 @@ pub(crate) fn collect_comparisons(
         }
     };
     let mut comparisons = compare_snapshots(&old, &new)?;
+    if let Some(slice) = request.slice.as_ref() {
+        comparisons.retain(|comparison| {
+            slice.admits(&comparison.new_path) || slice.admits(&comparison.old_path)
+        });
+    }
     if !request.pathspecs.is_empty() {
         comparisons.retain(|comparison| {
             super::path_filter::matches_any_pathspec(&comparison.new_path, &request.pathspecs)

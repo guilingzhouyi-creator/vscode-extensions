@@ -223,6 +223,8 @@ fn compute_commit_diff(view: &RepoView, record: &CommitRecord) -> FractalResult<
         no_prefix: false,
         exit_code: false,
         quiet: false,
+        // No slice: these callers build a patch for one commit, and the caller decides its paths.
+        slice: None,
     };
 
     let comparisons = collect_comparisons(view, &diff_req)?;
