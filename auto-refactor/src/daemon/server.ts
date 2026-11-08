@@ -94,6 +94,7 @@ const REASON_UNCAUGHT_EXCEPTION = 'uncaught-exception';
 const REASON_CLIENT_DEFAULT = 'client';
 
 const IDLE_TIMEOUT_MS = IDLE_TIMEOUT_MINUTES * SECONDS_PER_MINUTE * MS_PER_SECOND;
+const SHUTDOWN_DRAIN_TIMEOUT_MS = 10_000;
 
 /**
  * Represents an in-flight background scan or scan_diff task tracked by the daemon server.
@@ -166,8 +167,10 @@ export class DaemonServer {
     private server: net.Server | null = null;
     private stdioMode = false;
     private shuttingDown = false;
+    private shutdownTask?: Promise<void>;
     private idleTimer: NodeJS.Timeout | null = null;
     private pending: Map<string, PendingScan> = new Map();
+    private readonly activeScans = new Set<Promise<void>>();
     private nextId = 0;
     private onSigTerm?: () => void;
     private onSigInt?: () => void;
@@ -339,6 +342,16 @@ export class DaemonServer {
 
     /** Dispatch one decoded NDJSON message (shared by net + stdio transports). */
     private handleMessage(msg: DaemonMessage, transportIo: TransportIo, socket?: net.Socket): void {
+        if (this.shuttingDown) {
+            transportIo.write({
+                v: 1,
+                id: msg.id,
+                type: MESSAGE_TYPE_ERROR,
+                code: 'SHUTTING_DOWN',
+                message: 'Daemon is shutting down',
+            });
+            return;
+        }
         switch (msg.type) {
             case MSG_TYPE_HELLO:
                 this.handleHello(msg, transportIo);
@@ -349,34 +362,30 @@ export class DaemonServer {
                 break;
             case MSG_TYPE_SCAN:
                 this.scheduleIdle();
-                this.runScan({
-                    id: msg.id,
-                    requestId: msg.params.requestId,
-                    configJson: msg.params.config,
-                    options: msg.params.options,
-                    io: transportIo,
-                    socket,
-                }).catch((err: unknown) => {
-                    this.logger.error(
-                        `unhandled error during scan ${msg.params.requestId}: ${String(err)}`,
-                    );
-                });
+                this.trackScan(
+                    this.runScan({
+                        id: msg.id,
+                        requestId: msg.params.requestId,
+                        configJson: msg.params.config,
+                        options: msg.params.options,
+                        io: transportIo,
+                        socket,
+                    }),
+                );
                 break;
             case MSG_TYPE_SCAN_DIFF:
                 this.scheduleIdle();
-                this.runScanDiff({
-                    id: msg.id,
-                    requestId: msg.params.requestId,
-                    configJson: msg.params.config,
-                    diffs: msg.params.diffs,
-                    options: msg.params.options,
-                    io: transportIo,
-                    socket,
-                }).catch((err: unknown) => {
-                    this.logger.error(
-                        `unhandled error during scan_diff ${msg.params.requestId}: ${String(err)}`,
-                    );
-                });
+                this.trackScan(
+                    this.runScanDiff({
+                        id: msg.id,
+                        requestId: msg.params.requestId,
+                        configJson: msg.params.config,
+                        diffs: msg.params.diffs,
+                        options: msg.params.options,
+                        io: transportIo,
+                        socket,
+                    }),
+                );
                 break;
             case MSG_TYPE_SHUTDOWN:
                 this.logger.info(
@@ -395,6 +404,19 @@ export class DaemonServer {
         }
     }
 
+    private trackScan(operation: Promise<void>): void {
+        this.activeScans.add(operation);
+        void operation.then(
+            () => {
+                this.activeScans.delete(operation);
+            },
+            (error: unknown) => {
+                this.activeScans.delete(operation);
+                this.logger.error(`unhandled scan failure: ${String(error)}`);
+            },
+        );
+    }
+
     private async runScan(task: ScanTask): Promise<void> {
         const { id: taskId, requestId, configJson, options, socket } = task;
         const config = configJson as unknown as ScanConfig;
@@ -409,7 +431,11 @@ export class DaemonServer {
         });
 
         try {
-            const { report, stats } = await handleScan(this.ctx, config, options);
+            const { report, stats } = await handleScan(this.ctx, config, {
+                ...options,
+                signal: abortController.signal,
+            });
+            abortController.signal.throwIfAborted();
             this.handleScanSuccess(task, report, stats);
         } catch (error) {
             this.handleScanError(task, error);
@@ -432,7 +458,11 @@ export class DaemonServer {
         });
 
         try {
-            const { report, stats } = await handleScanDiff(this.ctx, config, diffs, options);
+            const { report, stats } = await handleScanDiff(this.ctx, config, diffs, {
+                ...options,
+                signal: abortController.signal,
+            });
+            abortController.signal.throwIfAborted();
             this.handleScanSuccess(task, report, stats);
         } catch (error) {
             this.handleScanError(task, error);
@@ -516,21 +546,58 @@ export class DaemonServer {
         }
     }
 
-    /** Graceful exit: stop accepting, release pools, remove registry, exit(0). */
-    shutdown(reason = REASON_UNKNOWN): void {
-        if (this.shuttingDown) return;
+    private async settleOwnedWork(): Promise<void> {
+        const results = await Promise.allSettled([...this.activeScans]);
+        await this.ctx.settleCaches();
+        const failures = results.filter((result) => result.status === 'rejected');
+        if (failures.length > 0) {
+            throw new AggregateError(
+                failures.map((result) => result.reason),
+                'Active scan drain failed',
+            );
+        }
+    }
+
+    private async drainBeforeExit(): Promise<void> {
+        let timer: NodeJS.Timeout | undefined;
+        try {
+            await Promise.race([
+                this.settleOwnedWork(),
+                new Promise<never>((_resolve, reject) => {
+                    timer = setTimeout(
+                        () => reject(new Error('Daemon shutdown drain timed out')),
+                        SHUTDOWN_DRAIN_TIMEOUT_MS,
+                    );
+                }),
+            ]);
+        } finally {
+            if (timer) clearTimeout(timer);
+        }
+    }
+
+    private async finishShutdown(reason: string): Promise<void> {
+        let exitCode = 0;
+        try {
+            await this.drainBeforeExit();
+        } catch (error) {
+            exitCode = 1;
+            this.logger.error(`daemon shutdown failed: ${String(error)}`);
+        }
+        this.releaseDaemonResources();
+        this.detachSignalHandlers();
+        this.logger.info(`daemon exiting (${reason}), status=${exitCode}`);
+        this.logger.close();
+        setImmediate(() => process.exit(exitCode));
+    }
+
+    /** Stop requests, drain durable caches, then release owned resources and exit. */
+    shutdown(reason = REASON_UNKNOWN): Promise<void> {
+        if (this.shutdownTask) return this.shutdownTask;
         this.shuttingDown = true;
         if (this.idleTimer) clearTimeout(this.idleTimer);
         this.abortPendingScans();
-        this.releaseDaemonResources();
-        this.detachSignalHandlers();
-        this.logger.info(`daemon exiting (${reason})`);
-        try {
-            this.logger.close();
-        } catch {
-            /* ignore */
-        }
-        setImmediate(() => process.exit(0));
+        this.shutdownTask = this.finishShutdown(reason);
+        return this.shutdownTask;
     }
 
     /** Registers signal handlers so they can be detached during shutdown. */
@@ -573,8 +640,12 @@ export async function runDaemonMain(argv: string[]): Promise<void> {
         );
         process.exit(1);
     }
-    const onSigTerm = (): void => server.shutdown(REASON_SIGTERM);
-    const onSigInt = (): void => server.shutdown(REASON_SIGINT);
+    const onSigTerm = (): void => {
+        void server.shutdown(REASON_SIGTERM);
+    };
+    const onSigInt = (): void => {
+        void server.shutdown(REASON_SIGINT);
+    };
     server.setSignalHandlers(onSigTerm, onSigInt);
     process.on(SIGNAL_SIGTERM, onSigTerm);
     process.on(SIGNAL_SIGINT, onSigInt);

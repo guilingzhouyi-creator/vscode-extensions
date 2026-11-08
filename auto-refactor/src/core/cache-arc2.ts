@@ -271,9 +271,10 @@ function computeSectionMask(entry: L2EntryRecord): number {
  * Ensure an L2EntryRecord whose payload was lazily mapped from disk is decoded in memory.
  *
  * @param entry - L2 cache record to materialize in place.
+ * @returns True if decoded (or already decoded), false if payload was corrupted.
  */
-export function ensureL2EntryDecoded(entry: L2EntryRecord): void {
-    if (entry.decoded !== false || !entry.rawPr50Slice) return;
+export function ensureL2EntryDecoded(entry: L2EntryRecord): boolean {
+    if (entry.decoded !== false || !entry.rawPr50Slice) return true;
     try {
         const decoded: FileResult = decodeSingleFileResultBuffer(entry.rawPr50Slice);
         entry.issues = decoded.issues;
@@ -291,10 +292,9 @@ export function ensureL2EntryDecoded(entry: L2EntryRecord): void {
             entry.graphEdges = decoded.graphEdges as L2EntryRecord['graphEdges'];
         }
         entry.decoded = true;
+        return true;
     } catch {
-        entry.issues = [];
-        entry.metric = null;
-        entry.decoded = true;
+        return false;
     }
 }
 
@@ -457,7 +457,9 @@ function parseSingleFrame(
     };
 
     if (!lazyDecode) {
-        ensureL2EntryDecoded(entry);
+        if (!ensureL2EntryDecoded(entry)) {
+            return null;
+        }
     }
 
     return { entry, nextOffset: frameEnd };

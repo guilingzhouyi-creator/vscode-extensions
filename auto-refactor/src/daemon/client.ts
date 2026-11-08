@@ -118,6 +118,7 @@ export class DaemonClient {
     private pendingPong: { resolve: () => void; reject: (error: Error) => void } | null = null;
     private caps: { cache: boolean; stream: boolean; maxWorkers: number; diff?: boolean } | null =
         null;
+    private dataListener: ((chunk: Buffer) => void) | null = null;
 
     constructor(
         readonly root: string,
@@ -146,9 +147,11 @@ export class DaemonClient {
         reject: (error: Error) => void,
     ): void {
         let settled = false;
+        let handshakeTimer: NodeJS.Timeout | null = null;
         const fail = (error: Error) => {
             if (settled) return;
             settled = true;
+            if (handshakeTimer) clearTimeout(handshakeTimer);
             try {
                 socket.destroy();
             } catch {
@@ -163,6 +166,7 @@ export class DaemonClient {
                     if (settled) return;
                     settled = true;
                     clearTimeout(timer);
+                    if (handshakeTimer) clearTimeout(handshakeTimer);
                     resolve();
                 },
                 reject: fail,
@@ -175,12 +179,13 @@ export class DaemonClient {
                 protocol: PROTOCOL_VERSION,
                 projectHash: this.projectHash,
             });
-            setTimeout(() => {
+            handshakeTimer = setTimeout(() => {
                 if (!settled) fail(new Error('HANDSHAKE_TIMEOUT'));
             }, HANDSHAKE_TIMEOUT_MS);
         });
 
-        socket.on('data', (chunk: Buffer) => this.onData(chunk.toString('utf8')));
+        this.dataListener = (chunk: Buffer) => this.onData(chunk.toString('utf8'));
+        socket.on('data', this.dataListener);
         socket.on('error', (err) => {
             if (!settled) fail(new Error(`CONNECT_ERROR: ${err.message}`));
             this.handleInFlightRejections(new Error(`DAEMON_DISCONNECT: ${err.message}`));
@@ -372,7 +377,10 @@ export class DaemonClient {
 
     close(): void {
         try {
-            this.socket?.removeListener('data', () => {});
+            if (this.dataListener) {
+                this.socket?.removeListener('data', this.dataListener);
+                this.dataListener = null;
+            }
             this.socket?.destroy();
         } catch {
             /* ignore */

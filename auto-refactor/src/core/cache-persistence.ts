@@ -298,6 +298,8 @@ export function isValidPathEntry(
  * @returns Serialized NDJSON string.
  */
 export function serializeL1(l1Cache: Map<string, Fingerprint>): string {
+    // Older readers ignore this format record, preserving an empty logical state on fallback.
+    if (l1Cache.size === 0) return '{"t":"l1-empty","v":1}\n';
     const lines: string[] = [];
     for (const [relPath, fingerprint] of l1Cache) {
         const lineObj: Record<string, unknown> = {

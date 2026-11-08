@@ -45,6 +45,7 @@ export interface DaemonScanContext {
     pools: WorkerPoolManager;
     session: WarmSession;
     getCache(root: string, cacheDir?: string): CacheStore;
+    settleCaches(): Promise<void>;
 }
 
 /**
@@ -52,6 +53,7 @@ export interface DaemonScanContext {
  * only where it explicitly allows an override of the resolved config.
  */
 export interface DaemonScanOptions {
+    signal?: AbortSignal;
     cache: boolean;
     cacheDir?: string;
     cacheCustom?: boolean;
@@ -80,7 +82,7 @@ export async function handleScan(
     options: DaemonScanOptions,
 ): Promise<{ report: ScanReport; stats: WarmStats }> {
     const startTimeMs = Date.now();
-    const cfg = { ...config } as ScanConfig;
+    const cfg = { ...config, signal: options.signal } as ScanConfig;
     if (typeof options.workers === 'number' && options.workers > 0) cfg.workers = options.workers;
     if (options.parser === 'oxc' || options.parser === 'typescript') cfg.parser = options.parser;
 
@@ -140,6 +142,7 @@ function buildDiffHintsMap(diffs: Array<Record<string, unknown>>): Map<string, D
  * @param diffs - Raw diff hints (JSON-serialized DiffInput); entries without a string filePath
  *   are ignored and only the first entry per filePath contributes.
  * @param options - Per-request diff options; see the nested tags for each flag.
+ * @param options.signal - Cooperative cancellation signal owned by the daemon request.
  * @param options.cache - When true, reuse the project CacheStore; false disables caching.
  * @param options.cacheDir - Optional cache directory override; defaults to the project cache.
  * @param options.cacheCustom - Forwards custom-cache permission to the cache layer.
@@ -155,6 +158,7 @@ export async function handleScanDiff(
     config: ScanConfig,
     diffs: Array<Record<string, unknown>>,
     options: {
+        signal?: AbortSignal;
         cache: boolean;
         cacheDir?: string;
         cacheCustom?: boolean;
@@ -165,7 +169,7 @@ export async function handleScanDiff(
     },
 ): Promise<{ report: ScanReport | DiffDeltaReport; stats: DiffStats }> {
     const startTimeMs = Date.now();
-    const cfg = { ...config } as ScanConfig;
+    const cfg = { ...config, signal: options.signal } as ScanConfig;
     if (typeof options.workers === 'number' && options.workers > 0) cfg.workers = options.workers;
     if (options.parser === 'oxc' || options.parser === 'typescript') cfg.parser = options.parser;
 
@@ -309,6 +313,22 @@ export function createDaemonContext(): DaemonScanContext {
     return {
         pools,
         session,
+        async settleCaches(): Promise<void> {
+            const results = await Promise.allSettled(
+                [...cacheByKey.values()].map(async (cache) => {
+                    await cache.settleAsync();
+                    if (cache.lastFlushError !== undefined) throw cache.lastFlushError;
+                }),
+            );
+            const failures = results.filter((result) => result.status === 'rejected');
+            if (failures.length > 0) {
+                const errors = failures.map((result) => result.reason);
+                throw new AggregateError(
+                    errors,
+                    `Cache drain failed: ${errors.map(String).join('; ')}`,
+                );
+            }
+        },
         getCache(root: string, cacheDir?: string): CacheStore {
             const key = cacheDir
                 ? path.resolve(cacheDir)
