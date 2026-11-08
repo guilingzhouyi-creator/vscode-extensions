@@ -454,9 +454,9 @@ impl LogRequest {
                         .map_err(|parse_err| format!("{other} requires a count: {parse_err}"))?;
                 }
                 "--horizon" => {
-                    let value = options.get(cursor).ok_or_else(|| {
-                        String::from("--horizon requires a value: full, <n>, or <n>s")
-                    })?;
+                    let value = options
+                        .get(cursor)
+                        .ok_or("--horizon requires a value: full, <n>, or <n>s")?;
                     request.horizon = parse_horizon(value)?;
                     cursor += 1;
                 }

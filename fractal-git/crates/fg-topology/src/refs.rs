@@ -586,7 +586,8 @@ impl DiskRefStore {
         let view = RefSources {
             store: self,
             packed: packed.as_ref(),
-        };        match fs::metadata(&refs_dir) {
+        };
+        match fs::metadata(&refs_dir) {
             Ok(meta) if meta.is_dir() => view.collect_loose(&refs_dir, &mut table)?,
             Ok(_) => {
                 return Err(FractalError::CorruptStore(format!(
@@ -1050,7 +1051,7 @@ mod tests {
     /// though an earlier parse was cached.
     #[test]
     fn packed_refs_cache_observes_a_rewritten_file() {
-        // The process temp directory is not writable in this build environment, so the fixture
+        // The process temporary directory is not writable in this build environment, so the fixture
         // lives under the crate's own target directory instead.
         let base = std::env::var_os("CARGO_TARGET_TMPDIR")
             .map(std::path::PathBuf::from)
@@ -1095,7 +1096,9 @@ mod tests {
         .expect("rewrite packed-refs");
 
         assert_eq!(
-            store.get_ref("refs/heads/main").expect("read after rewrite"),
+            store
+                .get_ref("refs/heads/main")
+                .expect("read after rewrite"),
             Some(second_oid),
             "a stamp change must force a re-parse rather than serve the stale table"
         );

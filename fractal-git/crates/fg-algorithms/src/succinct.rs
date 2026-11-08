@@ -50,22 +50,34 @@ pub struct EliasFano {
     /// sequential scan O(n^2 / 64) instead of O(n).
     #[serde(skip)]
     rank_before_word: Vec<usize>,
+    /// Finer 8-rank word locator derived alongside `rank_before_word` (excluded from serialization).
+    #[serde(skip)]
+    fine_inventory: Vec<u32>,
 }
 
+const FINE_INVENTORY_SHIFT: usize = 3;
+const FINE_INVENTORY_STEP: usize = 1 << FINE_INVENTORY_SHIFT;
+
 impl EliasFano {
-    /// Rebuilds `rank_before_word` from `high_words` in one linear pass.
+    /// Rebuilds derived lookup tables from `high_words` in one linear pass.
     ///
-    /// Every constructor funnels through here so the table can never disagree with the bitvector
-    /// it describes, and `from_bytes` gets it without widening the serialized format.
-    fn derive_rank_index(high_words: &[u64]) -> Vec<usize> {
+    /// Every constructor funnels through here so the tables can never disagree with the bitvector
+    /// they describe, and `from_bytes` gets them without widening the serialized format.
+    fn derive_rank_index(high_words: &[u64]) -> (Vec<usize>, Vec<u32>) {
         let mut rank = Vec::with_capacity(high_words.len() + 1);
+        let mut fine = Vec::with_capacity(high_words.len() * 4);
         let mut running = 0usize;
-        for &word in high_words {
+        let mut next_sample = 0usize;
+        for (word_idx, &word) in high_words.iter().enumerate() {
             rank.push(running);
             running += word.count_ones() as usize;
+            while next_sample < running {
+                fine.push(word_idx as u32);
+                next_sample += FINE_INVENTORY_STEP;
+            }
         }
         rank.push(running);
-        rank
+        (rank, fine)
     }
     /// Compresses a non-decreasing slice of 64-bit integers into an `EliasFano` structure.
     ///
@@ -81,6 +93,7 @@ impl EliasFano {
                 high_words: Vec::new(),
                 high_inventory: Vec::new(),
                 rank_before_word: Vec::new(),
+                fine_inventory: Vec::new(),
             });
         }
 
@@ -135,6 +148,7 @@ impl EliasFano {
     }
 
     /// Retrieves the integer at `index` in `O(1)` time, returning `None` if `index >= self.len()`.
+    #[inline]
     pub fn get(&self, index: usize) -> Option<u64> {
         if index >= self.count {
             return None;
@@ -323,7 +337,7 @@ impl EliasFano {
             .map(|word| word as usize)
             .collect();
 
-        let rank_before_word = Self::derive_rank_index(&high_words);
+        let (rank_before_word, fine_inventory) = Self::derive_rank_index(&high_words);
         Ok(Self {
             count,
             universe,
@@ -332,6 +346,7 @@ impl EliasFano {
             high_words,
             high_inventory,
             rank_before_word,
+            fine_inventory,
         })
     }
 
@@ -344,12 +359,12 @@ impl EliasFano {
         }
 
         let bit_offset = index * width;
-        let word_idx = bit_offset / 64;
-        let bit_in_word = bit_offset % 64;
+        let word_idx = bit_offset >> 6;
+        let bit_in_word = bit_offset & 63;
 
-        if word_idx >= self.low_words.len() {
+        let Some(&primary_word_raw) = self.low_words.get(word_idx) else {
             return 0;
-        }
+        };
 
         let low_mask = if width >= 64 {
             u64::MAX
@@ -357,7 +372,7 @@ impl EliasFano {
             (1u64 << width) - 1
         };
 
-        let primary_word = self.low_words[word_idx] >> bit_in_word;
+        let primary_word = primary_word_raw >> bit_in_word;
         if bit_in_word + width <= 64 {
             primary_word & low_mask
         } else {
@@ -383,26 +398,36 @@ impl EliasFano {
     ///
     /// The previous form re-counted `high_words[..word_idx]` on every call, which turned a single
     /// lookup into `O(n/64)` work and a full sequential scan into `O(n^2/64)`.
+    #[inline]
     fn select_high_1(&self, target_rank: usize) -> u64 {
-        let inventory_idx = target_rank / INVENTORY_INTERVAL;
-        let Some(&start_word) = self.high_inventory.get(inventory_idx) else {
+        let Some(&start_word_u32) = self.fine_inventory.get(target_rank >> FINE_INVENTORY_SHIFT)
+        else {
             return (self.high_words.len() as u64) * 64;
         };
-        let mut word_idx = start_word;
+        let start_word = start_word_u32 as usize;
+        let mut ones_accum = self.rank_before_word[start_word];
 
-        // Prefix count up to `start_word` is a single lookup instead of a rescan.
-        let mut ones_accum = self.rank_before_word[word_idx];
+        if let Some(&first_word) = self.high_words.get(start_word) {
+            let ones_in_first = first_word.count_ones() as usize;
+            if ones_accum + ones_in_first > target_rank {
+                let rank_in_word = target_rank - ones_accum;
+                let bit_in_word = select_in_word(first_word, rank_in_word as u32);
+                return (start_word as u64 * 64) + bit_in_word as u64;
+            }
+            ones_accum += ones_in_first;
+        }
 
-        while word_idx < self.high_words.len() {
-            let word = self.high_words[word_idx];
+        let Some(tail) = self.high_words.get(start_word + 1..) else {
+            return (self.high_words.len() as u64) * 64;
+        };
+        for (offset, &word) in tail.iter().enumerate() {
             let ones_in_word = word.count_ones() as usize;
             if ones_accum + ones_in_word > target_rank {
                 let rank_in_word = target_rank - ones_accum;
                 let bit_in_word = select_in_word(word, rank_in_word as u32);
-                return (word_idx as u64 * 64) + bit_in_word as u64;
+                return ((start_word + 1 + offset) as u64 * 64) + bit_in_word as u64;
             }
             ones_accum += ones_in_word;
-            word_idx += 1;
         }
 
         (self.high_words.len() as u64) * 64
@@ -422,13 +447,32 @@ fn read_le_u64_vec(bytes: &[u8], cursor: &mut usize, word_count: usize) -> Vec<u
 
 /// Finds 0-based bit position of the `rank`-th set bit in a 64-bit word.
 #[inline]
-fn select_in_word(word: u64, mut rank: u32) -> u32 {
-    let mut current = word;
-    while rank > 0 && current > 0 {
-        current &= current - 1;
+fn select_in_word(mut word: u64, mut rank: u32) -> u32 {
+    let mut offset = 0u32;
+    let ones32 = (word as u32).count_ones();
+    let go_hi32 = u32::from(rank >= ones32);
+    rank -= go_hi32 * ones32;
+    word >>= go_hi32 * 32;
+    offset += go_hi32 * 32;
+
+    let ones16 = ((word as u16) as u32).count_ones();
+    let go_hi16 = u32::from(rank >= ones16);
+    rank -= go_hi16 * ones16;
+    word >>= go_hi16 * 16;
+    offset += go_hi16 * 16;
+
+    let ones8 = (word as u8).count_ones();
+    let go_hi8 = u32::from(rank >= ones8);
+    rank -= go_hi8 * ones8;
+    word >>= go_hi8 * 8;
+    offset += go_hi8 * 8;
+
+    let mut rem = (word as u8) as u64;
+    while rank > 0 && rem > 0 {
+        rem &= rem - 1;
         rank -= 1;
     }
-    current.trailing_zeros()
+    (offset + rem.trailing_zeros()).min(64)
 }
 
 /// Incremental builder for `EliasFano` data structure.
@@ -534,7 +578,7 @@ impl EliasFanoBuilder {
         self.high_words.truncate(required_high_words);
 
         // Derived after truncation so the prefix table describes exactly the words that survive.
-        let rank_before_word = EliasFano::derive_rank_index(&self.high_words);
+        let (rank_before_word, fine_inventory) = EliasFano::derive_rank_index(&self.high_words);
 
         EliasFano {
             count: self.count,
@@ -544,6 +588,7 @@ impl EliasFanoBuilder {
             high_words: self.high_words,
             high_inventory: self.high_inventory,
             rank_before_word,
+            fine_inventory,
         }
     }
 }

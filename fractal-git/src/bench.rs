@@ -776,13 +776,15 @@ impl TaxisBenchmarkSuite {
         // from the real matcher's rule shape.
         let rule = fg_index::parse_line(&pattern, std::path::Path::new(".gitignore"), 1, "")
             .expect("adversarial pattern parses as a rule");
+        let matcher = fg_index::IgnoreMatcher::from_rules(vec![rule]);
         let subject: String = "a".repeat(64);
 
         let start = Instant::now();
         let mut rejected = 0usize;
         for _ in 0..iterations {
-            let matcher = fg_index::IgnoreMatcher::from_rules(vec![rule.clone()]);
-            if !matcher.is_ignored(&subject, false) {
+            if !std::hint::black_box(
+                std::hint::black_box(&matcher).is_ignored(std::hint::black_box(&subject), false),
+            ) {
                 rejected += 1;
             }
         }

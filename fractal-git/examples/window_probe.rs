@@ -98,11 +98,10 @@ fn main() {
             // as history made the per-commit cost rise with churn: a wider checkout is not history.
             // The checkout's on-disk share is estimated from its payload share, because only the
             // payload side knows which objects the head commit references.
-            let checkout_disk = if stats.payload_bytes > 0 {
-                disk_bytes.saturating_mul(stats.final_checkout_bytes) / stats.payload_bytes
-            } else {
-                0
-            };
+            let checkout_disk = disk_bytes
+                .saturating_mul(stats.final_checkout_bytes)
+                .checked_div(stats.payload_bytes)
+                .unwrap_or(0);
             let history_disk = disk_bytes.saturating_sub(checkout_disk);
             let payload_per_commit = stats.history_bytes_per_commit();
             let disk_per_commit = if commits > 0 {

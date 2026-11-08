@@ -125,7 +125,7 @@ fn linear_walk_agrees_with_the_recursive_reference_everywhere() {
         }
         let mut text = Vec::with_capacity(text_len);
         for _ in 0..text_len {
-            text.push(star(&mut state).min(b'c').max(b'a'));
+            text.push(star(&mut state).clamp(b'a', b'c'));
         }
         assert_eq!(
             glob_match(&pattern, &text),

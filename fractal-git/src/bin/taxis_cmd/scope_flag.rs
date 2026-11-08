@@ -80,14 +80,12 @@ pub(crate) fn take_scope_from(args: &[String]) -> Result<Option<ProjectionScope>
             "--scope" => {
                 let value = args
                     .get(cursor)
-                    .ok_or_else(|| String::from("--scope requires a path prefix or glob"))?;
+                    .ok_or("--scope requires a path prefix or glob")?;
                 push_pattern(&mut include, &mut exclude, value);
                 cursor += 1;
             }
             "--tier" => {
-                let value = args
-                    .get(cursor)
-                    .ok_or_else(|| String::from("--tier requires a tier name"))?;
+                let value = args.get(cursor).ok_or("--tier requires a tier name")?;
                 tier = parse_tier(value)?;
                 saw_tier = true;
                 cursor += 1;

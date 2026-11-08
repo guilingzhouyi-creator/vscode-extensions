@@ -139,29 +139,86 @@ impl IgnoreMatcher {
         if trimmed.is_empty() {
             return None;
         }
-        let components: Vec<&str> = trimmed.split('/').collect();
-
-        for depth in 1..components.len() {
-            let ancestor = components[..depth].join("/");
-            if let Some(decided) = self.direct_match(&ancestor, true) {
-                if decided.ignored {
-                    return Some(decided);
+        if !trimmed.contains('/') {
+            return self
+                .direct_match_rule(trimmed, is_directory)
+                .map(|(rule, ignored)| IgnoreMatch {
+                    pattern: rule.clone(),
+                    ignored,
+                });
+        }
+        if !trimmed.contains("//") {
+            for (idx, byte) in trimmed.bytes().enumerate() {
+                if byte == b'/' {
+                    if let Some((rule, true)) = self.direct_match_rule(&trimmed[..idx], true) {
+                        return Some(IgnoreMatch {
+                            pattern: rule.clone(),
+                            ignored: true,
+                        });
+                    }
                 }
             }
+            return self
+                .direct_match_rule(trimmed, is_directory)
+                .map(|(rule, ignored)| IgnoreMatch {
+                    pattern: rule.clone(),
+                    ignored,
+                });
         }
-        self.direct_match(trimmed, is_directory)
+
+        let components: Vec<&str> = trimmed.split('/').collect();
+        for depth in 1..components.len() {
+            let ancestor = components[..depth].join("/");
+            if let Some((rule, true)) = self.direct_match_rule(&ancestor, true) {
+                return Some(IgnoreMatch {
+                    pattern: rule.clone(),
+                    ignored: true,
+                });
+            }
+        }
+        self.direct_match_rule(trimmed, is_directory)
+            .map(|(rule, ignored)| IgnoreMatch {
+                pattern: rule.clone(),
+                ignored,
+            })
     }
 
     /// Returns true when the path is excluded and no later rule re-included it.
     pub fn is_ignored(&self, relative_path: &str, is_directory: bool) -> bool {
-        self.decide(relative_path, is_directory)
-            .map(|decided| decided.ignored)
-            .unwrap_or(false)
+        let trimmed = relative_path.trim_matches('/');
+        if trimmed.is_empty() {
+            return false;
+        }
+        if !trimmed.contains('/') {
+            return self
+                .direct_match_rule(trimmed, is_directory)
+                .is_some_and(|(_, ignored)| ignored);
+        }
+        if !trimmed.contains("//") {
+            for (idx, byte) in trimmed.bytes().enumerate() {
+                if byte == b'/'
+                    && self
+                        .direct_match_rule(&trimmed[..idx], true)
+                        .is_some_and(|(_, ignored)| ignored)
+                {
+                    return true;
+                }
+            }
+            return self
+                .direct_match_rule(trimmed, is_directory)
+                .is_some_and(|(_, ignored)| ignored);
+        }
+        self.decide(trimmed, is_directory)
+            .is_some_and(|decided| decided.ignored)
     }
 
-    /// Finds the last rule that matches the path directly.
-    fn direct_match(&self, relative_path: &str, is_directory: bool) -> Option<IgnoreMatch> {
-        let mut decided: Option<IgnoreMatch> = None;
+    /// Finds the last rule that matches the path directly without cloning on `is_ignored`.
+    fn direct_match_rule(
+        &self,
+        relative_path: &str,
+        is_directory: bool,
+    ) -> Option<(&IgnorePattern, bool)> {
+        let mut decided: Option<(&IgnorePattern, bool)> = None;
         for rule in &self.rules {
             if rule.directory_only && !is_directory {
                 continue;
@@ -169,10 +226,7 @@ impl IgnoreMatcher {
             if !rule.matches(relative_path) {
                 continue;
             }
-            decided = Some(IgnoreMatch {
-                pattern: rule.clone(),
-                ignored: !rule.negated,
-            });
+            decided = Some((rule, !rule.negated));
         }
         decided
     }
@@ -197,43 +251,84 @@ pub(crate) fn pattern_matches(
     base: &str,
     relative_path: &str,
 ) -> bool {
-    let Some(scoped) = scope_components(base, relative_path) else {
-        return false;
+    let scoped = if base.is_empty() {
+        relative_path
+    } else {
+        let Some(after_base) = relative_path.strip_prefix(base) else {
+            return false;
+        };
+        let Some(rest) = after_base.strip_prefix('/') else {
+            return false;
+        };
+        rest
     };
-    if anchored {
-        return match_from(segments, &scoped);
+    if !anchored {
+        let basename = match scoped.rsplit_once('/') {
+            Some((_, tail)) => tail,
+            None => scoped,
+        };
+        return match_single_component(segments, basename);
     }
-    // An unanchored pattern is matched against the basename only.
-    match scoped.last() {
-        Some(basename) => match_from(segments, &[basename]),
-        None => false,
+    if !scoped.contains('/') {
+        return match_single_component(segments, scoped);
     }
+    match_opt_path(segments, Some(scoped))
 }
 
-/// Strips the rule's base directory from the path, or returns `None` when the path is outside it.
-fn scope_components<'a>(base: &str, relative_path: &'a str) -> Option<Vec<&'a str>> {
-    if base.is_empty() {
-        return Some(relative_path.split('/').collect());
-    }
-    let prefix = format!("{base}/");
-    let remainder = relative_path.strip_prefix(&prefix)?;
-    Some(remainder.split('/').collect())
+fn all_any_depth(segments: &[PatternSegment]) -> bool {
+    segments
+        .iter()
+        .all(|segment| matches!(segment, PatternSegment::AnyDepth))
 }
 
-/// Matches pattern segments against path components, with `**` spanning any number of them.
-fn match_from(segments: &[PatternSegment], components: &[&str]) -> bool {
+fn match_single_component(segments: &[PatternSegment], component: &str) -> bool {
     match segments.first() {
-        None => components.is_empty(),
-        Some(PatternSegment::AnyDepth) => {
-            (0..=components.len()).any(|skip| match_from(&segments[1..], &components[skip..]))
+        None => false,
+        Some(PatternSegment::Glob(glob)) => {
+            all_any_depth(&segments[1..]) && glob_match(glob.as_bytes(), component.as_bytes())
         }
-        Some(PatternSegment::Glob(glob)) => match components.first() {
-            Some(component) => {
-                glob_match(glob.as_bytes(), component.as_bytes())
-                    && match_from(&segments[1..], &components[1..])
+        Some(PatternSegment::AnyDepth) => {
+            all_any_depth(&segments[1..]) || match_single_component(&segments[1..], component)
+        }
+    }
+}
+
+/// Zero-allocation recursive segment matcher over `/`-separated components of an optional tail.
+fn match_opt_path(segments: &[PatternSegment], path_opt: Option<&str>) -> bool {
+    let Some(first) = segments.first() else {
+        return path_opt.is_none();
+    };
+    let rest = &segments[1..];
+    match first {
+        PatternSegment::AnyDepth => {
+            if match_opt_path(rest, path_opt) {
+                return true;
             }
-            None => false,
-        },
+            let Some(mut cursor) = path_opt else {
+                return false;
+            };
+            loop {
+                match cursor.split_once('/') {
+                    Some((_, next_tail)) => {
+                        if match_opt_path(rest, Some(next_tail)) {
+                            return true;
+                        }
+                        cursor = next_tail;
+                    }
+                    None => return match_opt_path(rest, None),
+                }
+            }
+        }
+        PatternSegment::Glob(glob) => {
+            let Some(path) = path_opt else {
+                return false;
+            };
+            let (head, next_tail) = match path.split_once('/') {
+                Some((comp, tail)) => (comp, Some(tail)),
+                None => (path, None),
+            };
+            glob_match(glob.as_bytes(), head.as_bytes()) && match_opt_path(rest, next_tail)
+        }
     }
 }
 
