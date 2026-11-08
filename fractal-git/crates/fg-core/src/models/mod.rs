@@ -18,6 +18,7 @@ pub mod file_uid;
 pub mod generation;
 pub mod git_object_id;
 pub mod hex;
+pub mod horizon;
 pub mod identity;
 pub mod index_stage;
 pub mod interactive;
