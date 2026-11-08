@@ -247,7 +247,7 @@ export const FAMILY_DIMENSIONS: Record<string, QualityDimension> = {
     'GOV-GAM': 'maintainability',
     'GOV-BLS': 'maintainability',
     high: 'maintainability',
-    // --- standardization (44 prefixes) ---
+    // --- standardization (45 prefixes) ---
     'DEP-ORD': 'standardization',
     'DEP-WLD': 'standardization',
     DEP: 'standardization',
@@ -257,6 +257,7 @@ export const FAMILY_DIMENSIONS: Record<string, QualityDimension> = {
     'GUARD-SSOT': 'standardization',
     'GATE-HYG': 'standardization',
     'GUARD-HYG': 'standardization',
+    GAT: 'standardization',
     GATE: 'standardization',
     GUARD: 'standardization',
     SH: 'standardization',

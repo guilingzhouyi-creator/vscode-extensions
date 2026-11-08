@@ -158,6 +158,8 @@ interface ChildTraversalOptions {
 export class OxcAdapter extends BaseAstAdapter {
     /** Adapter id used by the parser registry and config keys. */
     id = 'oxc' as const;
+    /** Native ESTree precision; parser errors remain observable on both execution paths. */
+    readonly precision = 'ast' as const;
     /** Lowercase file extensions claimed by this adapter. */
     extensions = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
 
@@ -187,7 +189,7 @@ export class OxcAdapter extends BaseAstAdapter {
             }
         }
         root.children = children;
-        return { root };
+        return { root, parseDiagnostics: parseResult.errors };
     }
 
     /**
@@ -206,7 +208,9 @@ export class OxcAdapter extends BaseAstAdapter {
         policy: ProjectionPolicy,
     ): NodeProjector | null {
         const parseResult = executeOxcParse(filePath, content);
-        return new OxcProjector(parseResult.program, content, policy);
+        return Object.assign(new OxcProjector(parseResult.program, content, policy), {
+            parseDiagnostics: parseResult.errors,
+        });
     }
 
     private mapTopStatement(

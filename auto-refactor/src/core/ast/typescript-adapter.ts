@@ -71,6 +71,8 @@ interface NodeHierarchyContext {
 export class TypeScriptAdapter extends BaseAstAdapter {
     /** Identifier used by the adapter registry. */
     id = 'typescript' as const;
+    /** Native TypeScript AST precision; parse recovery is reported separately. */
+    readonly precision = 'ast' as const;
     /** File extensions claimed by this adapter. */
     extensions = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
 

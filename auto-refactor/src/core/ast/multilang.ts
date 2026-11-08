@@ -103,6 +103,8 @@ export interface NormalizedNode {
  */
 export interface NormalizedAst {
     root: NormalizedNode;
+    /** Diagnostics from this exact parse; absence conveys no claim of successful parsing. */
+    readonly parseDiagnostics?: readonly unknown[];
     /** Underlying native source file AST (e.g. ts.SourceFile) when available. */
     sourceFile?: ts.SourceFile;
 }
@@ -128,6 +130,8 @@ export interface ProjectionPolicy {
  * Language-agnostic on-demand projection interface for streaming traversal.
  */
 export interface NodeProjector {
+    /** Diagnostics from the same native parse used by this projection. */
+    readonly parseDiagnostics?: readonly unknown[];
     /** Root raw node (the SourceFile). */
     readonly root: unknown;
     /** Underlying native TypeScript SourceFile when projected by TsNodeProjector. */
@@ -186,6 +190,8 @@ export interface LanguageAdapter {
     id: string;
     /** File extensions claimed by this adapter (lowercase with leading dot). */
     extensions: string[];
+    /** Declared parse precision; absence remains unspecified for runtime adapters. */
+    readonly precision?: 'ast' | 'lexical';
     /** Parse source content into a normalized AST root. */
     parse(content: string, filePath: string, seed?: ProjectionSeed): NormalizedAst;
     /** Optional fast path creating a lazy node projector. */
