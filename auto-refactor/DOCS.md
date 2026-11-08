@@ -1,126 +1,124 @@
-# 📚 auto-refactor 技术架构总索引与 Praxis 交付白皮书 | Docs Index
+# 📚 `auto-refactor` Architecture Index & Praxis Whitepaper | Docs Index
 
-> **权威真源指针**：本文档为 `auto-refactor` 静态分析审查与多智能体治理引擎的全局总索引（对应工作区 [`AGENTS.md`](../AGENTS.md) 权威指针）。  
-> **存量文档归档说明**：重编前的历史版本文档快照已全量封存至工作区归档目录 `archive/auto-refactor/docs-snapshot-20261018/`、`archive/auto-refactor/docs-snapshot-20261010/` 及 `archive/auto-refactor/docs-snapshot-20260928/`（不参与构建与 CI）。
+> **Authoritative Pointer**: Global index for the `auto-refactor` static analysis and multi-agent governance engine (referenced by workspace [`AGENTS.md`](../AGENTS.md)).  
+> **Historical Archives**: Prior documentation snapshots are frozen in `archive/auto-refactor/docs-snapshot-20261018/`, `archive/auto-refactor/docs-snapshot-20261010/`, and `archive/auto-refactor/docs-snapshot-20260928/` (excluded from build and CI).
 
 ---
 
-## 🏗️ 1. 实际项目技术栈全景矩阵 (Actual Tech Stack Matrix)
+## 🏗️ 1. Actual Tech Stack Matrix (`v0.4.0`)
 
-`auto-refactor` v0.4.0 采用 **TypeScript 编排层 + Rust N-API 原生算子内核** 的混合双轨架构，自底向上分为六大核心技术层次：
+`auto-refactor` implements a hybrid **TypeScript Orchestration + Rust N-API Native Kernel** architecture across six unidirectional layers:
 
-| 技术栈层次 | 核心模块与物理路径 | 关键技术构件与真实规模指标 |
+| Layer | Core Modules & Paths | Key Technical Components & Scale Metrics |
 | :--- | :--- | :--- |
-| **L1. Rust N-API 原生加速内核** | `crates/auto-refactor-core`<br/>`crates/ops-{diff,graph,pattern,mask,clone,math,vector,scope}`<br/>`src/core/native/` | **Cargo 工作区十个成员 Crate**：线性空间 Myers 差分与字内并行距离、Tarjan SCC 与迭代式支配树、单趟词法脱敏状态机、MinHash+LSH 克隆检测、最稀有字节预筛多模式扫描、统计矩与向量几何、作用域遮蔽检测；配齐 `src/core/native/` 纯 TS 双端字节等价回退桥 |
-| **L2. 跨语言解析与语义图底座** | `src/core/ast/`<br/>`src/core/semantic/`<br/>`src/core/cfg/` | **`NormalizedNode` + `SemanticGraph`**：支持 **TS/JS** (`oxc-parser` 0.144.0 + `typescript` 5.3)、**Python** (`tree-sitter-python`)、**Rust** (`tree-sitter-rust`)、**Go**、**GDScript 4**、**Shell**、**YAML**、**Markdown** 八大生态；按需投影 CFG / DFG / CallGraph |
-| **L3. 四层规则分层体系与分析器** | `src/core/rules/registry.ts`<br/>`src/analyzers/*.ts`<br/>`src/core/messages/` | <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->内置分析器包（完整覆盖包括 `ANALYZER_GO_MODERN`、`ANALYZER_SHELL_LINT`、`ANALYZER_GATE_ARCHITECTURE` 在内的领域专家）、<!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor -->注册规则（<!-- METRICS:BEGIN rule-auto-refactor-canonical -->**360 条**<!-- METRICS:END rule-auto-refactor-canonical --> Canonical `FAMILY-TOPIC-NNN` + <!-- METRICS:BEGIN rule-auto-refactor-legacy -->**15 条**<!-- METRICS:END rule-auto-refactor-legacy --> Legacy Aliases，文档覆盖率保持双向闭环（<!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor -->全部有定义行）；全工作区 SSOT 单源目录统一收录 <!-- METRICS:BEGIN rule-total -->**534 条规则**<!-- METRICS:END rule-total -->）；机读纯英文（SARIF 2.1.0 / CAPP）+ 人读标准中文双轨文案解耦 |
-| **L4. 稀疏路由与双轨并发调度** | `src/core/router/sparseMoEGate.ts`<br/>`src/core/pipeline/dualTrackPipeline.ts`<br/>`src/core/scheduler/` | **27 专家 Sparse MoE 变更熵密（CED）路由器**（增量分析器绕过率 $\ge 70\%$）、`< 10ms` `ASTSliceExtractor` 局部切片快轨 + 全仓跨文件深轨、L1/L2 两级缓存与跨平台 NDJSON Daemon |
-| **L5. 三平面质量度量与自治度** | `src/core/scoring/`<br/>`src/core/dynamic/`<br/>`src/core/evolution/` | **静态平面**（10 大支柱 + 倒数型密度饱和曲线 + 算术/几何混合短板惩罚）+ **动态遥测平面** (`DynamicEvidenceDTO` + `RiskFusionEngine`) + **演化反馈平面**（Git 挖掘 + 梯度下降调权 + 代码自治度指数 **CAI**） |
-| **L6. Praxis 交付与 LayerVFS 体系** | `src/core/praxis/`<br/>`src/core/praxis/vfs/`<br/>`src/core/ring-buffer.ts`<br/>`src/core/rollback.ts` | **LayerVFS 虚拟分叉与零拷贝沙箱**：FastCDC 动态切块 + SQLite WAL CAS 去重存储（Fork `< 3ms`，Rollback `< 1ms`）、沙箱受控物理投影（零阻塞 I/O，超时 124 退出码）、MCTS 重构探索锦标赛（UCT 剪枝 + 圈复杂度增量评估）；**6 大正式治理门面** + **统一客户端 SDK (`PraxisReviewClient`)** |
+| **L1. Rust N-API Native Kernel** | `crates/auto-refactor-core`<br/>`crates/ops-{diff,graph,pattern,mask,clone,math,vector,scope}`<br/>`src/core/native/` | **10-Crate Cargo Workspace**: Linear-space Myers diff & bit-parallel distance, Tarjan SCC & iterative dominator tree, single-pass lexical masking DFA, MinHash+LSH clone detection, rare-byte multi-pattern scan, statistical moments & vector geometry, scope shadow detection; paired with 100% byte-identical pure-TS fallback shims in `src/core/native/` |
+| **L2. Multi-Language AST & Semantic IR** | `src/core/ast/`<br/>`src/core/semantic/`<br/>`src/core/cfg/` | **`NormalizedNode` + `SemanticGraph` + `LineFeatureTape`**: Supports 8 ecosystems — **TS/JS** (`oxc-parser` 0.144.0 + `typescript` 5.3), **Python** (`tree-sitter-python`), **Rust** (`tree-sitter-rust`), **Go**, **GDScript 4**, **Shell**, **YAML**, **Markdown**; lazy on-demand CFG / DFG / CallGraph projection |
+| **L3. 4-Stage Rule Hierarchy & Analyzers** | `src/core/rules/registry.ts`<br/>`src/analyzers/*.ts`<br/>`src/core/messages/` | <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count --> built-in analyzers (`resetState()` pooled, lazy `ctx.sourceFile` evaluation) and <!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor --> (<!-- METRICS:BEGIN rule-auto-refactor-canonical -->**360 条**<!-- METRICS:END rule-auto-refactor-canonical --> Canonical `FAMILY-TOPIC-NNN` + <!-- METRICS:BEGIN rule-auto-refactor-legacy -->**15 条**<!-- METRICS:END rule-auto-refactor-legacy --> Legacy Aliases, 100% documented in<!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor -->; workspace SSOT totals <!-- METRICS:BEGIN rule-total -->**534 条规则**<!-- METRICS:END rule-total -->); dual-track English (SARIF 2.1.0 / CAPP) + Chinese diagnostics |
+| **L4. Sparse MoE Routing & Dual-Track Pipeline** | `src/core/router/sparseMoEGate.ts`<br/>`src/core/experts/`<br/>`src/core/scanner/file-preflight-gate.ts`<br/>`src/core/pipeline/dualTrackPipeline.ts` | **32-Expert Sparse MoE Router** (`file-preflight-gate` + `SparseActivator` + `SparseRuleRouter` + `SparseMoEGate` + `AdaptiveExpertBiasRouter` + `GroupedExpertDispatcher` with 32-bit unsigned `AnalyzerBit` routing, $\ge 70\%$ incremental bypass), `< 10ms` `ASTSliceExtractor` Fast Track + cross-file Deep Track, L1/L2/L3 cache & NDJSON Daemon |
+| **L5. Tri-Plane Quality Scoring & Autonomy** | `src/core/scoring/`<br/>`src/core/dynamic/`<br/>`src/core/evolution/` | **Static Plane** (10 pillars + hyperbolic density saturation + arithmetic/geometric bottleneck penalty) + **Dynamic Telemetry Plane** (`DynamicEvidenceDTO` + `RiskFusionEngine`) + **Evolution Plane** (Git trajectory mining + gradient weight tuning + Code Autonomy Index **CAI**) |
+| **L6. Praxis Delivery & LayerVFS** | `src/core/praxis/`<br/>`src/core/praxis/vfs/`<br/>`src/core/ring-buffer.ts`<br/>`src/core/rollback.ts` | **LayerVFS Zero-Copy Sandbox**: FastCDC chunking + SQLite WAL CAS deduplication (Fork `< 3ms`, Rollback `< 1ms`), non-blocking sandbox materialization (timeout exit 124), MCTS refactoring tournament (UCT pruning + incremental CC delta); **6 Governance Facades** + **`PraxisReviewClient` SDK** |
 
 ---
 
-## 🗂️ 2. 六层分层技术文档索引 (Layered Documentation Directory)
+## 🗂️ 2. Six-Layer Documentation Directory
 
-### 🏛️ 第一层：核心架构、调度流水线与 Rust 原生内核 (`docs/01-architecture/`)
+### 🏛️ Layer 1: Core Architecture, Pipeline & Native Kernel (`docs/01-architecture/`)
 
-| 文档路径 | 核心主题 | 状态 |
+| Document | Core Scope | Status |
 | :--- | :--- | :---: |
-| [docs/01-architecture/01-system-overview.md](./docs/01-architecture/01-system-overview.md) | 六层单向架构全景、`DualTrackPipeline`、`SparseMoEGateRouter` 与 `LoadGovernor` | ✅ 已对齐 |
-| [docs/01-architecture/02-pipeline-and-caching.md](./docs/01-architecture/02-pipeline-and-caching.md) | L1/L2 两级增量缓存、`TopologyCache`、`CacheKey` 指纹隔离与 `scanAsymmetric` | ✅ 已对齐 |
-| [docs/01-architecture/03-daemon-and-ipc.md](./docs/01-architecture/03-daemon-and-ipc.md) | 跨平台守护进程（Named Pipe / UDS）、NDJSON 协议、RSS 自愈与冷扫描无损降级 | ✅ 已对齐 |
-| [docs/01-architecture/04-praxis-git-fractal-and-gating-spec.md](./docs/01-architecture/04-praxis-git-fractal-and-gating-spec.md) | Praxis 分形 Git 工作树、LayerVFS 虚拟分支、`L1/L2/L3A` 三级门禁与级联回滚 | ✅ 已对齐 |
-| [docs/01-architecture/05-rust-native-operator-kernel.md](./docs/01-architecture/05-rust-native-operator-kernel.md) | Rust 6 Crate 原生算子库（`ops-diff/graph/pattern/mask/clone`）与纯 TS Shim 双轨字节等价规范 | ✅ 已对齐 |
-| [docs/01-architecture/06-layervfs-virtual-storage-and-mcts.md](./docs/01-architecture/06-layervfs-virtual-storage-and-mcts.md) | LayerVFS 虚拟分叉、FastCDC 动态切块、SQLite WAL CAS 存储、沙箱受控物理投影与 MCTS 重构锦标赛 | ✅ 已对齐 |
+| [docs/01-architecture/01-system-overview.md](./docs/01-architecture/01-system-overview.md) | 6-layer unidirectional topology, 32-expert 4-stage matrix, `DualTrackPipeline`, 5-tier Sparse MoE routing, `LoadGovernor` | ✅ Aligned |
+| [docs/01-architecture/02-pipeline-and-caching.md](./docs/01-architecture/02-pipeline-and-caching.md) | L1/L2/L3 incremental cache, `engineDigest` invalidation, `TopologyCacheManager`, `SyncIoBarrier` atomic flush | ✅ Aligned |
+| [docs/01-architecture/03-daemon-and-ipc.md](./docs/01-architecture/03-daemon-and-ipc.md) | Cross-platform daemon (Named Pipe / UDS), NDJSON protocol, RSS self-healing & cold-scan fallback | ✅ Aligned |
+| [docs/01-architecture/04-praxis-git-fractal-and-gating-spec.md](./docs/01-architecture/04-praxis-git-fractal-and-gating-spec.md) | Praxis fractal Git worktree, LayerVFS virtual branches, `L1/L2/L3A` progressive gates & cascading rollback | ✅ Aligned |
+| [docs/01-architecture/05-rust-native-operator-kernel.md](./docs/01-architecture/05-rust-native-operator-kernel.md) | Rust native operator crates (`ops-diff/graph/pattern/mask/clone`) & pure-TS shim byte-parity contract | ✅ Aligned |
+| [docs/01-architecture/06-layervfs-virtual-storage-and-mcts.md](./docs/01-architecture/06-layervfs-virtual-storage-and-mcts.md) | LayerVFS virtual fork, FastCDC chunking, SQLite WAL CAS store, sandbox projection & MCTS tournament | ✅ Aligned |
 
-### 🌲 第二层：跨语言解析、语义 IR 与图分析底座 (`docs/02-parsers-and-ast/`)
+### 🌲 Layer 2: Multi-Language Parsing, Semantic IR & Graph Base (`docs/02-parsers-and-ast/`)
 
-| 文档路径 | 核心主题 | 状态 |
+| Document | Core Scope | Status |
 | :--- | :--- | :---: |
-| [docs/02-parsers-and-ast/01-multilang-abstraction.md](./docs/02-parsers-and-ast/01-multilang-abstraction.md) | `NormalizedNode` 统一语法树、`SemanticGraph` 跨语言语义 IR 与八语言适配矩阵 | ✅ 已对齐 |
-| [docs/02-parsers-and-ast/02-oxc-fastpath.md](./docs/02-parsers-and-ast/02-oxc-fastpath.md) | Rust `oxc-parser` Mode A 零物化流式快轨、Mode B 物化补偿与双轨字节等价验证 | ✅ 已对齐 |
-| [docs/02-parsers-and-ast/03-lazy-projection.md](./docs/02-parsers-and-ast/03-lazy-projection.md) | 零物化懒投影控制流图 (`CFG`)、支配树、数据流图 (`DFG`) 与跨文件调用图 (`CallGraph`) | ✅ 已对齐 |
+| [docs/02-parsers-and-ast/01-multilang-abstraction.md](./docs/02-parsers-and-ast/01-multilang-abstraction.md) | `NormalizedNode` unified AST, `SemanticGraph` cross-language IR & 8-language adapter matrix | ✅ Aligned |
+| [docs/02-parsers-and-ast/02-oxc-fastpath.md](./docs/02-parsers-and-ast/02-oxc-fastpath.md) | Rust `oxc-parser` Mode A zero-materialization fast path, Mode B compensation & byte-parity proof | ✅ Aligned |
+| [docs/02-parsers-and-ast/03-lazy-projection.md](./docs/02-parsers-and-ast/03-lazy-projection.md) | Lazy zero-materialization `CFG`, dominator tree, `DFG`, and cross-file `CallGraph` | ✅ Aligned |
 
-### ⚡ 第三层：行级增量计算、向量化 Diff 与流式底座 (`docs/03-incremental-and-diff/`)
+### ⚡ Layer 3: Line-Level Incremental, Vectorized Diff & Streaming (`docs/03-incremental-and-diff/`)
 
-| 文档路径 | 核心主题 | 状态 |
+| Document | Core Scope | Status |
 | :--- | :--- | :---: |
-| [docs/03-incremental-and-diff/01-line-level-incremental.md](./docs/03-incremental-and-diff/01-line-level-incremental.md) | `LineMap` 行号平移、`reuseSubtree` 子树复用、`ASTSliceExtractor` 与 `CallChainImpactTracer` | ✅ 已对齐 |
-| [docs/03-incremental-and-diff/02-diff-interface-spec.md](./docs/03-incremental-and-diff/02-diff-interface-spec.md) | 64-bit SWAR、FNV-1a、Bit-Parallel Myers / Histogram Diff 算法栈与 `scanDiffStream` 事件流 | ✅ 已对齐 |
-| [docs/03-incremental-and-diff/03-praxis-integration-guide.md](./docs/03-incremental-and-diff/03-praxis-integration-guide.md) | `CircularDiffBuffer` 环形缓冲、`Uint8Array` R4 冷存淘汰与 `SemanticPraxisContextEnricher` | ✅ 已对齐 |
+| [docs/03-incremental-and-diff/01-line-level-incremental.md](./docs/03-incremental-and-diff/01-line-level-incremental.md) | `LineMap` coordinate shift, `reuseSubtree`, `ASTSliceExtractor` & `CallChainImpactTracer` | ✅ Aligned |
+| [docs/03-incremental-and-diff/02-diff-interface-spec.md](./docs/03-incremental-and-diff/02-diff-interface-spec.md) | 64-bit SWAR, FNV-1a, Bit-Parallel Myers / Histogram Diff stack & `scanDiffStream` event stream | ✅ Aligned |
+| [docs/03-incremental-and-diff/03-praxis-integration-guide.md](./docs/03-incremental-and-diff/03-praxis-integration-guide.md) | `CircularDiffBuffer` ring buffer, `Uint8Array` R4 cold eviction & `SemanticPraxisContextEnricher` | ✅ Aligned |
 
-### 🔍 第四层：四层规则分层体系与内置分析器矩阵 (`docs/04-analyzers-and-rules/`)
+### 🔍 Layer 4: 4-Stage Rule Hierarchy & Built-in Analyzers (`docs/04-analyzers-and-rules/`)
 
-| 文档路径 | 核心主题 | 状态 |
+| Document | Core Scope | Status |
 | :--- | :--- | :---: |
-| [docs/04-analyzers-and-rules/01-builtin-rules.md](./docs/04-analyzers-and-rules/01-builtin-rules.md) | 四层规则分层体系、<!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->内置分析器、双轨文案架构与 <!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor -->全量内置规则字典（全工作区 SSOT 单源收录 <!-- METRICS:BEGIN rule-total -->**534 条规则**<!-- METRICS:END rule-total -->） | ✅ 已对齐 |
-| [docs/04-analyzers-and-rules/02-custom-analyzer-plugin.md](./docs/04-analyzers-and-rules/02-custom-analyzer-plugin.md) | 声明式 `PatternKernel` 与编程式 `Analyzer` 插件契约、`cacheCustom` 隔离与评分表扩展 | ✅ 已对齐 |
+| [docs/04-analyzers-and-rules/01-builtin-rules.md](./docs/04-analyzers-and-rules/01-builtin-rules.md) | 4-stage rule hierarchy, <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count --> built-in analyzers, dual-track diagnostics & <!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor --> dictionary (workspace SSOT <!-- METRICS:BEGIN rule-total -->**534 条规则**<!-- METRICS:END rule-total -->) | ✅ Aligned |
+| [docs/04-analyzers-and-rules/02-custom-analyzer-plugin.md](./docs/04-analyzers-and-rules/02-custom-analyzer-plugin.md) | Declarative `PatternKernel` & programmatic `Analyzer` plugin contract, `cacheCustom` isolation & scoring | ✅ Aligned |
 
-### 📊 第五层：配置契约、三平面质量度量与性能基准 (`docs/05-specs-and-benchmarks/`)
+### 📊 Layer 5: Config Contracts, Tri-Plane Scoring & Benchmarks (`docs/05-specs-and-benchmarks/`)
 
-| 文档路径 | 核心主题 | 状态 |
+| Document | Core Scope | Status |
 | :--- | :--- | :---: |
-| [docs/05-specs-and-benchmarks/01-config-and-reports.md](./docs/05-specs-and-benchmarks/01-config-and-reports.md) | `auto-refactor.config.json` 配置模式、抑制策略、JSON / SARIF 2.1.0 / Text 报告与退出码 | ✅ 已对齐 |
-| [docs/05-specs-and-benchmarks/02-performance-benchmarks.md](./docs/05-specs-and-benchmarks/02-performance-benchmarks.md) | 六大核心算子基准性能台账、热路径消融评测与 <!-- METRICS:BEGIN test-suite-count -->**194 套**<!-- METRICS:END test-suite-count -->测试套件防劣化回归护栏 | ✅ 已对齐 |
-| [docs/05-specs-and-benchmarks/03-comment-and-header-standard.md](./docs/05-specs-and-benchmarks/03-comment-and-header-standard.md) | 六字段模块文件头契约、有效注释密度 (ECD-C) 算法与 `gate:comments` 棘轮 | ✅ 已对齐 |
-| [docs/05-specs-and-benchmarks/04-cross-language-generalization.md](./docs/05-specs-and-benchmarks/04-cross-language-generalization.md) | 项目中立性护栏 (`validate-project-neutrality`) 与文件语义角色推导 (`file-role-inference.ts`) | ✅ 已对齐 |
-| [docs/05-specs-and-benchmarks/05-consumer-integration.md](./docs/05-specs-and-benchmarks/05-consumer-integration.md) | 外部工程接入指南 —— `baseline.json` 1.2.0 信用模型、自适应弹性债务限额、AAS 协议与 `fractal-git` / `workspace-timing` / `WebGames` 接入规范 | ✅ 已对齐 |
-| [docs/05-specs-and-benchmarks/06-modernization-program.md](./docs/05-specs-and-benchmarks/06-modernization-program.md) | 五大语言现代化规则包 (`*-modern`)、常量单源拓扑治理与结构债 ABC 分类治理法 | ✅ 已对齐 |
-| [docs/05-specs-and-benchmarks/07-quantified-quality-standard.md](./docs/05-specs-and-benchmarks/07-quantified-quality-standard.md) | 三平面质量量化模型（静态十大支柱 + 动态遥测 + 演化反馈）与代码自治度指数 (`CAI`) | ✅ 已对齐 |
-| [docs/05-specs-and-benchmarks/08-compact-agent-schema.md](./docs/05-specs-and-benchmarks/08-compact-agent-schema.md) | AAS v1.0 智能体原生审查契约 —— 文件聚合、L1~L5 架构依赖拓扑排序、高密度代码锚点切片与 5D 黎曼流形相空间张量 | ✅ 已对齐 |
+| [docs/05-specs-and-benchmarks/01-config-and-reports.md](./docs/05-specs-and-benchmarks/01-config-and-reports.md) | `auto-refactor.config.json` schema, suppression rules, JSON / SARIF 2.1.0 / Text reports & exit codes | ✅ Aligned |
+| [docs/05-specs-and-benchmarks/02-performance-benchmarks.md](./docs/05-specs-and-benchmarks/02-performance-benchmarks.md) | 6-operator performance ledger, hot-path ablation & <!-- METRICS:BEGIN test-suite-count -->**194 套**<!-- METRICS:END test-suite-count --> regression test suites | ✅ Aligned |
+| [docs/05-specs-and-benchmarks/03-comment-and-header-standard.md](./docs/05-specs-and-benchmarks/03-comment-and-header-standard.md) | 6-field module header contract (`CMT-HDR-001`), effective comment density (ECD-C) & `gate:comments` ratchet | ✅ Aligned |
+| [docs/05-specs-and-benchmarks/04-cross-language-generalization.md](./docs/05-specs-and-benchmarks/04-cross-language-generalization.md) | Project neutrality guard (`validate-project-neutrality`) & semantic file-role inference (`file-role-inference.ts`) | ✅ Aligned |
+| [docs/05-specs-and-benchmarks/05-consumer-integration.md](./docs/05-specs-and-benchmarks/05-consumer-integration.md) | Consumer integration guide — `baseline.json` 1.2.0 credit model, elastic debt quota, AAS v1.0 & workspace consumers | ✅ Aligned |
+| [docs/05-specs-and-benchmarks/06-modernization-program.md](./docs/05-specs-and-benchmarks/06-modernization-program.md) | 5-language modernization packs (`*-modern`), constant SSOT topology & structural debt ABC classification | ✅ Aligned |
+| [docs/05-specs-and-benchmarks/07-quantified-quality-standard.md](./docs/05-specs-and-benchmarks/07-quantified-quality-standard.md) | Tri-plane quality model (10 static pillars + dynamic telemetry + evolution feedback) & CAI 2.0 | ✅ Aligned |
+| [docs/05-specs-and-benchmarks/08-compact-agent-schema.md](./docs/05-specs-and-benchmarks/08-compact-agent-schema.md) | AAS v1.0 agent-native schema — file aggregation, `L1`–`L5` topological sort, inline code anchors & 5D phase tensor | ✅ Aligned |
 
-### 🤝 第六层：对接 Praxis 团队交付文档专层 (`docs/06-praxis-delivery/`)
+### 🤝 Layer 6: Praxis Delivery & SDK Integration (`docs/06-praxis-delivery/`)
 
-| 文档路径 | 核心主题 | 状态 |
+| Document | Core Scope | Status |
 | :--- | :--- | :---: |
-| [docs/05-specs-and-benchmarks/05-consumer-integration.md](./docs/05-specs-and-benchmarks/05-consumer-integration.md) | **外部工程与工作区子系统审查接入总指南**（AAS v1.0 协议、自适应弹性债务预算与多工程接入契约） | ✅ 已交付 |
-| [docs/06-praxis-delivery/01-praxis-architecture-and-spi-contracts.md](./docs/06-praxis-delivery/01-praxis-architecture-and-spi-contracts.md) | Praxis 对接架构全景、核心数据契约（`PraxisCardContext` / `ReviewDiffHunk`）与核心 SPI 扩展插槽手册 | ✅ 已交付 |
-| [docs/06-praxis-delivery/02-praxis-six-governance-services-api.md](./docs/06-praxis-delivery/02-praxis-six-governance-services-api.md) | Praxis 治理服务门面、工作区管理器与统一客户端 SDK (`PraxisReviewClient`) API 手册 | ✅ 已交付 |
-| [docs/06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md](./docs/06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md) | Praxis 团队端到端 TypeScript 联调代码范例、异常降级 SLA 与 <!-- METRICS:BEGIN test-suite-count -->**194 套**<!-- METRICS:END test-suite-count -->自动化验收矩阵 | ✅ 已交付 |
-| [docs/06-praxis-delivery/04-praxis-layervfs-integration-guide.md](./docs/06-praxis-delivery/04-praxis-layervfs-integration-guide.md) | LayerVFS 虚拟工作区集成实战指南、FastCDC 切块、CAS 零拷贝分叉、沙箱投影执行与 MCTS 重构锦标赛对接手册 | ✅ 已交付 |
-| [docs/praxis-integration-guide.md](./docs/praxis-integration-guide.md) | **Praxis 统一客户端 SDK (IPraxisReviewClient)、一体两面三层拓扑 Diff 与面向 Agent 结构化指令集成手册** | ✅ 已交付 |
+| [docs/05-specs-and-benchmarks/05-consumer-integration.md](./docs/05-specs-and-benchmarks/05-consumer-integration.md) | **External & Workspace Consumer Integration Guide** (AAS v1.0, elastic debt budget & multi-project contracts) | ✅ Delivered |
+| [docs/06-praxis-delivery/01-praxis-architecture-and-spi-contracts.md](./docs/06-praxis-delivery/01-praxis-architecture-and-spi-contracts.md) | Praxis architecture, data contracts (`PraxisCardContext` / `ReviewDiffHunk`) & SPI extension slots | ✅ Delivered |
+| [docs/06-praxis-delivery/02-praxis-six-governance-services-api.md](./docs/06-praxis-delivery/02-praxis-six-governance-services-api.md) | 6 governance facades, workspace manager & unified `PraxisReviewClient` SDK API reference | ✅ Delivered |
+| [docs/06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md](./docs/06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md) | End-to-end TypeScript integration runbook, fallback SLA & <!-- METRICS:BEGIN test-suite-count -->**194 套**<!-- METRICS:END test-suite-count --> acceptance matrix | ✅ Delivered |
+| [docs/06-praxis-delivery/04-praxis-layervfs-integration-guide.md](./docs/06-praxis-delivery/04-praxis-layervfs-integration-guide.md) | LayerVFS virtual workspace integration, FastCDC chunking, CAS zero-copy fork, sandbox projection & MCTS | ✅ Delivered |
+| [docs/praxis-integration-guide.md](./docs/praxis-integration-guide.md) | **`IPraxisReviewClient` SDK, 3-Layer Topological Diff & Structured Agent Guidance Manual** | ✅ Delivered |
 
-### 📐 架构图表 (`docs/diagrams/`)
+### 📐 Architecture Diagrams (`docs/diagrams/`)
 
-| 图表路径 | 内容说明 |
+| Diagram | Description |
 | :--- | :--- |
-| [docs/diagrams/class-diagram.mermaid](./docs/diagrams/class-diagram.mermaid) | 六层架构核心类图（`Scanner`, `DualTrackPipeline`, `SemanticGraph`, `NativeBridge`, `QualityScorer`） |
-| [docs/diagrams/sequence-diagram.mermaid](./docs/diagrams/sequence-diagram.mermaid) | 双轨扫描流水线与三平面质量评分时序图 |
-| [docs/diagrams/diff-class-diagram.mermaid](./docs/diagrams/diff-class-diagram.mermaid) | Praxis 子系统六大治理服务门面、五大 SPI 与回滚引擎类图 |
-| [docs/diagrams/diff-sequence-diagram.mermaid](./docs/diagrams/diff-sequence-diagram.mermaid) | Praxis 多智能体切片自审、流式 Diff (`scanDiffStream`)、冲突仲裁与卡级原子回滚时序图 |
-| [docs/diagrams/layervfs-architecture.mermaid](./docs/diagrams/layervfs-architecture.mermaid) | LayerVFS 毫秒级虚拟分叉、CAS 存储、受控沙箱物理投影与 MCTS 锦标赛时序拓扑图 |
+| [docs/diagrams/class-diagram.mermaid](./docs/diagrams/class-diagram.mermaid) | 6-layer class diagram (`Scanner`, `DualTrackPipeline`, `SemanticGraph`, `NativeBridge`, `QualityScorer`) |
+| [docs/diagrams/sequence-diagram.mermaid](./docs/diagrams/sequence-diagram.mermaid) | Dual-track pipeline & tri-plane quality scoring sequence diagram |
+| [docs/diagrams/diff-class-diagram.mermaid](./docs/diagrams/diff-class-diagram.mermaid) | Praxis 6 governance facades, 5 SPIs & rollback engine class diagram |
+| [docs/diagrams/diff-sequence-diagram.mermaid](./docs/diagrams/diff-sequence-diagram.mermaid) | Praxis multi-agent slice audit, `scanDiffStream`, conflict arbitration & card-level atomic rollback |
+| [docs/diagrams/layervfs-architecture.mermaid](./docs/diagrams/layervfs-architecture.mermaid) | LayerVFS virtual fork, CAS storage, sandbox projection & MCTS tournament sequence diagram |
 
 ---
 
-## 🛡️ 3. 一站式构建与门禁验证矩阵 (Gates & Verification Matrix)
+## 🛡️ 3. Gate & Verification Matrix
 
-| 命令 | 覆盖范围 | 门禁契约 |
+| Command | Scope | Gate Contract |
 | :--- | :--- | :--- |
-| `npm run gate` | `gate:rust` $\rightarrow$ `build` $\rightarrow$ `format:check` $\rightarrow$ `lint` $\rightarrow$ `gate:comments` $\rightarrow$ `gate:self` $\rightarrow$ `npm test` | 提交前唯一闭环入口，<!-- METRICS:BEGIN test-suite-count -->**194 套**<!-- METRICS:END test-suite-count -->并行与串行套件任一环失败即阻断 |
-| `npm run gate:rust` | `cargo clippy -- -D warnings` + `cargo fmt --check` + `cargo test`（全 6 个 Crate） | Rust 原生算子库零告警、全测试通过 |
-| `npm run gate:self` | 引擎自扫基线棘轮（error 级） | `newBlocking(error)` 必须恒为 `0` |
-| `npm run gate:self:slice` | AST 语义切片增量自审 (`scripts/gate-self-slice.js`) | 毫秒级局部语法树突变自检 |
-| `npm run gate:comments` | 注释与六字段模块头一致性棘轮 (`scripts/gate-comments.js`) | 新增注释或模块头违规即阻断 |
-| `npm run validate-rules-registry` | 规则注册表、发射集与 `01-builtin-rules.md` 双向对齐校验 | 375/375 规则注册与文档覆盖率 100%，零孤儿规则，全工作区 <!-- METRICS:BEGIN rule-total -->**534 条规则**<!-- METRICS:END rule-total -->对齐 |
-| `npm run validate-docs` | Markdown 文档围栏闭合 (`DOC-FEN-001`)、死链 (`DOC-LNK-001`) 与重复段落 (`DOC-DUP-001`) 校验 | 文档中心全量 `.md` 零违规 |
-| `npm run validate-praxis` | Praxis Diff 算子、五大 SPI、环形缓冲 R4 转储、流式事件、LayerVFS 与卡级回滚集成套件 | 核心集成测试套件断言成立 |
-| `auto-refactor gate` | `composite-quality-gate` 复合质量门禁结构化报告 | 统一评估静态分数、动态遥测、ELOC 密度、QED 投资回报、缺陷密度与债务变化，支持 `--stage pre-commit\|pre-push\|ci` |
+| `npm run gate` | `gate:rust` $\to$ `build` $\to$ `format:check` $\to$ `lint` $\to$ `gate:comments` $\to$ `gate:self` $\to$ `npm test` | Single pre-commit closure across <!-- METRICS:BEGIN test-suite-count -->**194 套**<!-- METRICS:END test-suite-count --> parallel & serial suites |
+| `npm run gate:rust` | `cargo clippy -- -D warnings` + `cargo fmt --check` + `cargo test` | Zero warnings and 100% test pass across Rust operator crates |
+| `npm run gate:self` | Self-scan baseline ratchet (`error` severity) | `newBlocking(error) === 0` |
+| `npm run gate:self:slice` | AST semantic slice incremental self-audit (`scripts/gate-self-slice.js`) | Sub-15ms localized AST mutation self-check |
+| `npm run gate:comments` | Comment density & 6-field header ratchet (`scripts/gate-comments.js`) | Blocks any new comment or module header violation |
+| `npm run validate-rules-registry` | Bidirectional closure between `registry.ts`, emitters & `01-builtin-rules.md` | 375/375 rule registration & doc coverage (100%), zero orphans, aligned with <!-- METRICS:BEGIN rule-total -->**534 条规则**<!-- METRICS:END rule-total --> |
+| `npm run validate-docs` | Markdown fence closure (`DOC-FEN-001`), broken links (`DOC-LNK-001`) & duplicate blocks (`DOC-DUP-001`) | Zero documentation hygiene violations |
+| `npm run validate-praxis` | Praxis diff operators, 5 SPIs, R4 ring buffer, streaming events, LayerVFS & atomic rollback | 100% integration assertions pass |
+| `auto-refactor gate` | `composite-quality-gate` structured verdict | Evaluates static score, dynamic telemetry, ELOC density, QED ROI & debt delta (`--stage pre-commit\|pre-push\|ci`) |
 
 ---
 
-## 💻 4. 生产级 CLI 命令全景 (CLI Commands Reference)
+## 💻 4. CLI Commands Reference
 
-`auto-refactor` 提供十大核心 CLI 子命令，全量集成于统一参数解析与运行时分发引擎：
-
-| 子命令 | 命令语法与参数示例 | 核心职责与交付输出 |
+| Subcommand | Syntax | Responsibility & Output |
 | :--- | :--- | :--- |
-| `scan` | `auto-refactor scan --format <json\|sarif\|text\|aas\|agent> [options]` | 全仓/局部静态扫描与质量评估，支持双轨流水线、L1/L2 缓存与自动修复 (`--fix`) |
-| `gate` | `auto-refactor gate [--stage pre-commit\|pre-push\|ci] [--root <dir>]` | 评估 `composite-quality-gate` 复合质量门禁阈值，生成多维结构化门禁裁定报告 |
-| `review` | `auto-refactor review --verdict <true-positive\|false-positive> [--rule <id>] [--root <dir>]` | 裁定待复核队列告警（真阳/误报），幂等落盘 `review-verdicts.json` 并重算贝叶斯置信校准语料 |
-| `self-test` | `auto-refactor self-test` | 运行内置已知违规 Corpus 固件测试，校验 32 专精分析器全量触发语义 |
-| `daemon` | `auto-refactor daemon start\|stop\|status [--root <dir>]` | 管理跨平台后台常驻守护进程（Named Pipe / UDS），提供毫秒级热扫描加速 |
-| `symbols` | `auto-refactor symbols <name> [--root <dir>]` | 查询 AST 符号定义、跨文件引用拓扑与调用链索引深度 |
-| `guide` | `auto-refactor guide <file> [--domain <d>] [--line <l>]` | 提取当前文件/领域的智能体治理守卫提示词与活动规则引导上下文 |
-| `trajectory` | `auto-refactor trajectory [<file>\|--summary]` | 检查全局 review 紧凑账本历史大盘或单文件修订演化轨迹 |
-| `memory` | `auto-refactor memory` | 查看活跃审查内存索引记录数、历史修订池及拓扑缓存容量 |
-| `stats` | `auto-refactor stats [--root <dir>]` | 统计目标工程的代码体积、物理 LOC、有效逻辑 ELOC、代码密度比与稀释率大盘 |
+| `scan` | `auto-refactor scan --format <json\|sarif\|text\|aas\|agent> [options]` | Full/incremental static scan, quality scoring, L1/L2 cache & autofix (`--fix`) |
+| `gate` | `auto-refactor gate [--stage pre-commit\|pre-push\|ci] [--root <dir>]` | Evaluates `composite-quality-gate` thresholds and emits structured gate verdict |
+| `review` | `auto-refactor review --verdict <true-positive\|false-positive> [--rule <id>] [--root <dir>]` | Records review verdicts into `review-verdicts.json` and recalibrates Bayesian priors |
+| `self-test` | `auto-refactor self-test` | Runs built-in violation corpus against all 32 domain analyzers |
+| `daemon` | `auto-refactor daemon start\|stop\|status [--root <dir>]` | Manages background daemon (Named Pipe / UDS) for sub-15ms warm scans |
+| `symbols` | `auto-refactor symbols <name> [--root <dir>]` | Queries AST symbol definitions, cross-file references & call-chain depth |
+| `guide` | `auto-refactor guide <file> [--domain <d>] [--line <l>]` | Extracts active agent governance constraints and rule guidance for a file/line |
+| `trajectory` | `auto-refactor trajectory [<file>\|--summary]` | Inspects `.refactor-trajectory/` revision history or per-file quality trajectory |
+| `memory` | `auto-refactor memory` | Reports active review memory records, revision pool & topology cache utilization |
+| `stats` | `auto-refactor stats [--root <dir>]` | Computes physical LOC, effective ELOC, code density & dilution metrics |
