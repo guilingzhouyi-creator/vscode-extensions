@@ -38,7 +38,7 @@ pub use fg_core::models::quarantine::{
     self, default_quarantine_dir, IsolateMutationRequest, QuarantineRecord, QuarantineRegistry,
     QuarantineStatus,
 };
-pub use ignore::{IgnoreMatch, IgnoreMatcher, IgnorePattern};
+pub use ignore::{parse_line, IgnoreMatch, IgnoreMatcher, IgnorePattern};
 pub use index_file::{encode_dirc_v2, write_dirc_v2, GitIndex, IndexEntry};
 pub use lockless_tree::InMemoryIndexTree;
 pub use submodules::GitModules;

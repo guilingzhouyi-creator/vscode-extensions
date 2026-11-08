@@ -241,59 +241,165 @@ fn match_from(segments: &[PatternSegment], components: &[&str]) -> bool {
 ///
 /// Supports `*` (any run of characters inside the component), `?` (exactly one character),
 /// `[abc]`, `[a-z]`, and `[!abc]`. A trailing backslash escapes the next character.
+///
+/// The walk is iterative with a single star resume point rather than recursive over every
+/// split. The recursive form was exponential in the number of separate stars: a pattern such
+/// as `a*a*a*...b` against an all-`a` subject explored `2^k` partial matches before concluding
+/// "no", which measured 3.5 ms at a 28-byte subject. The loop below is the classic linear
+/// backtracker: the most recent star defines one resume position, so the worst case is
+/// `O(pattern_len * text_len)` with `O(1)` state, and the accepting language is unchanged.
 fn glob_match(pattern: &[u8], text: &[u8]) -> bool {
-    if pattern.is_empty() {
-        return text.is_empty();
-    }
-    match pattern[0] {
-        b'*' => {
-            // Collapse consecutive stars; they mean the same thing as one.
-            let mut rest = &pattern[1..];
-            while rest.first() == Some(&b'*') {
-                rest = &rest[1..];
+    let mut pattern_cursor = 0usize;
+    let mut text_cursor = 0usize;
+    // Position of the most recent star in the pattern, and where its current
+    // expansion stopped in the text. One pair is enough: everything before that
+    // star is already known to match.
+    let mut star_pattern: Option<usize> = None;
+    let mut star_resume = 0usize;
+
+    while text_cursor < text.len() {
+        let advanced = if pattern_cursor < pattern.len() {
+            match pattern[pattern_cursor] {
+                b'*' => {
+                    // Record the star and collapse a run of them.
+                    star_pattern = Some(pattern_cursor);
+                    star_resume = text_cursor;
+                    pattern_cursor += 1;
+                    while pattern_cursor < pattern.len() && pattern[pattern_cursor] == b'*' {
+                        pattern_cursor += 1;
+                    }
+                    true
+                }
+                b'?' => {
+                    pattern_cursor += 1;
+                    text_cursor += 1;
+                    true
+                }
+                b'[' => match match_class_advance(pattern, text, pattern_cursor, text_cursor) {
+                    ClassStep::NotThisByte => false,
+                    ClassStep::Accepted {
+                        next_pattern,
+                        next_text,
+                    } => {
+                        pattern_cursor = next_pattern;
+                        text_cursor = next_text;
+                        true
+                    }
+                },
+                b'\\' if pattern_cursor + 1 < pattern.len() => {
+                    if text[text_cursor] == pattern[pattern_cursor + 1] {
+                        pattern_cursor += 2;
+                        text_cursor += 1;
+                        true
+                    } else {
+                        false
+                    }
+                }
+                literal => {
+                    if text[text_cursor] == literal {
+                        pattern_cursor += 1;
+                        text_cursor += 1;
+                        true
+                    } else {
+                        false
+                    }
+                }
             }
-            (0..=text.len()).any(|skip| glob_match(rest, &text[skip..]))
+        } else {
+            false
+        };
+
+        if advanced {
+            continue;
         }
-        b'?' => !text.is_empty() && glob_match(&pattern[1..], &text[1..]),
-        b'[' => match_class(pattern, text),
-        b'\\' if pattern.len() > 1 => {
-            !text.is_empty() && text[0] == pattern[1] && glob_match(&pattern[2..], &text[1..])
-        }
-        literal => !text.is_empty() && text[0] == literal && glob_match(&pattern[1..], &text[1..]),
+        // Mismatch: re-expand the last star by one byte, or give up when there is none.
+        let Some(star) = star_pattern else {
+            return false;
+        };
+        star_resume += 1;
+        pattern_cursor = star + 1;
+        text_cursor = star_resume;
     }
+
+    // Leftover pattern may only be stars; anything else needs a character the text lacks.
+    while pattern_cursor < pattern.len() && pattern[pattern_cursor] == b'*' {
+        pattern_cursor += 1;
+    }
+    pattern_cursor == pattern.len()
 }
 
-/// Matches a `[...]` character class at the head of `pattern` against `text`.
-fn match_class(pattern: &[u8], text: &[u8]) -> bool {
-    let Some(close) = pattern.iter().skip(1).position(|byte| *byte == b']') else {
-        // An unterminated class is a literal '[' — Git treats it that way rather than failing.
-        return !text.is_empty() && text[0] == b'[' && glob_match(&pattern[1..], &text[1..]);
+/// Outcome of matching one `[...]` class at the pattern head against one text byte.
+enum ClassStep {
+    /// The class consumed the byte; continue from these absolute cursors.
+    Accepted {
+        next_pattern: usize,
+        next_text: usize,
+    },
+    /// The class is well formed but the byte is outside it.
+    NotThisByte,
+}
+
+/// Resolves a `[...]` class positioned at `pattern_cursor`, reporting how to advance cursors.
+///
+/// Kept separate from the main walk so the backtracking structure stays flat. A malformed class
+/// is treated as a literal `[`, which is what Git does. `text_cursor` is the absolute position
+/// of the byte being matched, so the caller advances it by one on success.
+fn match_class_advance(
+    pattern: &[u8],
+    text: &[u8],
+    pattern_cursor: usize,
+    text_cursor: usize,
+) -> ClassStep {
+    let Some(byte) = text.get(text_cursor).copied() else {
+        return ClassStep::NotThisByte;
     };
-    if text.is_empty() {
-        return false;
+
+    let mut scan = pattern_cursor + 1;
+    while scan < pattern.len() && pattern[scan] != b']' {
+        scan += 1;
     }
-    let body = &pattern[1..1 + close];
-    let rest = &pattern[1 + close + 1..];
+    if scan >= pattern.len() {
+        // Unterminated: literal '[' semantics, so the class consumes the byte only if it is '['.
+        return if byte == b'[' {
+            ClassStep::Accepted {
+                next_pattern: pattern_cursor + 1,
+                next_text: text_cursor + 1,
+            }
+        } else {
+            ClassStep::NotThisByte
+        };
+    }
+
+    let body = &pattern[pattern_cursor + 1..scan];
     let (negated, members) = match body.first() {
         Some(b'!') | Some(b'^') => (true, &body[1..]),
         _ => (false, body),
     };
+
     let mut matched = false;
     let mut cursor = 0usize;
     while cursor < members.len() {
         if cursor + 2 < members.len() && members[cursor + 1] == b'-' {
-            if members[cursor] <= text[0] && text[0] <= members[cursor + 2] {
+            if members[cursor] <= byte && byte <= members[cursor + 2] {
                 matched = true;
             }
             cursor += 3;
         } else {
-            if members[cursor] == text[0] {
+            if members[cursor] == byte {
                 matched = true;
             }
             cursor += 1;
         }
     }
-    matched != negated && glob_match(rest, &text[1..])
+
+    if matched == negated {
+        ClassStep::NotThisByte
+    } else {
+        ClassStep::Accepted {
+            next_pattern: scan + 1,
+            next_text: text_cursor + 1,
+        }
+    }
 }
 
 /// Splits a pattern body into its anchoring flag and its path segments.
@@ -345,7 +451,7 @@ fn load_file(path: &Path, base: &str, rules: &mut Vec<IgnorePattern>) -> Fractal
 }
 
 /// Parses one line, returning `None` for blanks and comments.
-fn parse_line(raw_line: &str, source: &Path, line: usize, base: &str) -> Option<IgnorePattern> {
+pub fn parse_line(raw_line: &str, source: &Path, line: usize, base: &str) -> Option<IgnorePattern> {
     let trimmed = raw_line.trim_end_matches(['\r', ' ', '\t']);
     if trimmed.is_empty() || trimmed.starts_with('#') {
         return None;
@@ -537,3 +643,7 @@ mod tests {
         assert_eq!(parsed.pattern, "config/*.json");
     }
 }
+
+#[cfg(test)]
+#[path = "ignore_glob_tests.rs"]
+mod ignore_glob_tests;

@@ -41,9 +41,32 @@ pub struct EliasFano {
     high_words: Vec<u64>,
     /// Sampled word indices for every `INVENTORY_INTERVAL`-th set bit (one) in `high_words`.
     high_inventory: Vec<usize>,
+    /// Prefix popcount of `high_words`: `rank_before_word[w] == popcount(high_words[..w])`,
+    /// with a trailing entry holding the total one count (`len == high_words.len() + 1`).
+    ///
+    /// This is derived state, deliberately excluded from serialization so the on-disk payload
+    /// stays byte-identical. It exists because without it `select_high_1` had to re-count every
+    /// word before the sampled one on each call, which made `get` O(n/64) instead of O(1) and a
+    /// sequential scan O(n^2 / 64) instead of O(n).
+    #[serde(skip)]
+    rank_before_word: Vec<usize>,
 }
 
 impl EliasFano {
+    /// Rebuilds `rank_before_word` from `high_words` in one linear pass.
+    ///
+    /// Every constructor funnels through here so the table can never disagree with the bitvector
+    /// it describes, and `from_bytes` gets it without widening the serialized format.
+    fn derive_rank_index(high_words: &[u64]) -> Vec<usize> {
+        let mut rank = Vec::with_capacity(high_words.len() + 1);
+        let mut running = 0usize;
+        for &word in high_words {
+            rank.push(running);
+            running += word.count_ones() as usize;
+        }
+        rank.push(running);
+        rank
+    }
     /// Compresses a non-decreasing slice of 64-bit integers into an `EliasFano` structure.
     ///
     /// # Errors
@@ -57,6 +80,7 @@ impl EliasFano {
                 low_words: Vec::new(),
                 high_words: Vec::new(),
                 high_inventory: Vec::new(),
+                rank_before_word: Vec::new(),
             });
         }
 
@@ -299,6 +323,7 @@ impl EliasFano {
             .map(|word| word as usize)
             .collect();
 
+        let rank_before_word = Self::derive_rank_index(&high_words);
         Ok(Self {
             count,
             universe,
@@ -306,6 +331,7 @@ impl EliasFano {
             low_words,
             high_words,
             high_inventory,
+            rank_before_word,
         })
     }
 
@@ -350,14 +376,22 @@ impl EliasFano {
     }
 
     /// Finds the bit position (0-based) of the `target_rank`-th set bit (one) in `high_words`.
+    ///
+    /// Runs in `O(1)` amortised: the sampled `high_inventory` slot starts the walk, and
+    /// `rank_before_word` supplies the one-count preceding that word. Both are table reads, so the
+    /// loop below advances at most `INVENTORY_INTERVAL` words regardless of sequence length.
+    ///
+    /// The previous form re-counted `high_words[..word_idx]` on every call, which turned a single
+    /// lookup into `O(n/64)` work and a full sequential scan into `O(n^2/64)`.
     fn select_high_1(&self, target_rank: usize) -> u64 {
         let inventory_idx = target_rank / INVENTORY_INTERVAL;
-        let mut word_idx = self.high_inventory.get(inventory_idx).copied().unwrap_or(0);
+        let Some(&start_word) = self.high_inventory.get(inventory_idx) else {
+            return (self.high_words.len() as u64) * 64;
+        };
+        let mut word_idx = start_word;
 
-        let mut ones_accum = 0usize;
-        for &word in &self.high_words[..word_idx] {
-            ones_accum += word.count_ones() as usize;
-        }
+        // Prefix count up to `start_word` is a single lookup instead of a rescan.
+        let mut ones_accum = self.rank_before_word[word_idx];
 
         while word_idx < self.high_words.len() {
             let word = self.high_words[word_idx];
@@ -499,6 +533,9 @@ impl EliasFanoBuilder {
         let required_high_words = self.high_bits_len.div_ceil(64);
         self.high_words.truncate(required_high_words);
 
+        // Derived after truncation so the prefix table describes exactly the words that survive.
+        let rank_before_word = EliasFano::derive_rank_index(&self.high_words);
+
         EliasFano {
             count: self.count,
             universe: self.universe,
@@ -506,6 +543,7 @@ impl EliasFanoBuilder {
             low_words: self.low_words,
             high_words: self.high_words,
             high_inventory: self.high_inventory,
+            rank_before_word,
         }
     }
 }

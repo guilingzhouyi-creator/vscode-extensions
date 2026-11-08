@@ -211,9 +211,24 @@ impl IndxSection {
 
     /// Reports whether any conflict stage exists for a path.
     pub fn has_conflict(&self, path: &str) -> bool {
-        self.entries
-            .iter()
-            .any(|entry| entry.path == path && entry.stage != IndexStage::Normal)
+        // Entries are kept sorted by `(path, stage)`, so the three conflict stages for one path
+        // occupy a contiguous run. Probe for any of them with binary search instead of scanning
+        // the whole table: the previous linear form paid one cache miss per entry on an index of
+        // scattered `String` fields.
+        if self.entries.is_empty() {
+            return false;
+        }
+        // Stages that represent an unresolved merge are anything but `Normal`.
+        let conflicting_stages = [
+            IndexStage::Base,
+            IndexStage::Ours,
+            IndexStage::Theirs,
+        ];
+        conflicting_stages.into_iter().any(|stage| {
+            self.entries
+                .binary_search_by(|entry| entry.sort_key().cmp(&(path, stage)))
+                .is_ok()
+        })
     }
 
     /// Serializes the section payload.

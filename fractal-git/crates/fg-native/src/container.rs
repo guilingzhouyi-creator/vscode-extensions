@@ -612,23 +612,25 @@ impl ContainerFileLock {
             }
 
             if start.elapsed() >= timeout {
-                // SAFETY:
-                // - Preconditions: `handle` was opened above and is not wrapped in `ContainerFileLock`.
-                // - Invariants: Closed exactly once on the error exit path.
-                // - Postconditions: Kernel handle is released with zero descriptor leak.
-                unsafe { CloseHandle(handle) };
-                return Err(NativeError::Io(std::io::Error::new(
-                    std::io::ErrorKind::TimedOut,
-                    format!(
-                        "timed out waiting for container lock on '{}'",
-                        path.display()
-                    ),
-                )));
+                break;
             }
 
             std::thread::sleep(std::time::Duration::from_millis(sleep_ms));
             sleep_ms = (sleep_ms * 2).min(100);
         }
+
+        // SAFETY:
+        // - Preconditions: `handle` was opened above and is not wrapped in `ContainerFileLock`.
+        // - Invariants: Closed exactly once on the error exit path.
+        // - Postconditions: Kernel handle is released with zero descriptor leak.
+        unsafe { CloseHandle(handle) };
+        Err(NativeError::Io(std::io::Error::new(
+            std::io::ErrorKind::TimedOut,
+            format!(
+                "timed out waiting for container lock on '{}'",
+                path.display()
+            ),
+        )))
     }
 }
 
@@ -692,25 +694,30 @@ impl ContainerFileLock {
         let mut sleep_ms = 5u64;
 
         loop {
-            // SAFETY: file is a valid open file descriptor.
+            // SAFETY:
+            // - Preconditions: `file` is a valid open `std::fs::File` whose raw fd is owned for the call duration.
+            // - Invariants: `LOCK_EX | LOCK_NB` requests a non-blocking advisory lock without mutating file state.
+            // - Postconditions: Return value `0` guarantees exclusive advisory lock acquisition on `file`.
             let lock_status = unsafe { flock(file.as_raw_fd(), LOCK_EX | LOCK_NB) };
             if lock_status == 0 {
                 return Ok(Self { file });
             }
 
             if start.elapsed() >= timeout {
-                return Err(NativeError::Io(std::io::Error::new(
-                    std::io::ErrorKind::TimedOut,
-                    format!(
-                        "timed out waiting for container lock on '{}'",
-                        path.display()
-                    ),
-                )));
+                break;
             }
 
             std::thread::sleep(std::time::Duration::from_millis(sleep_ms));
             sleep_ms = (sleep_ms * 2).min(100);
         }
+
+        Err(NativeError::Io(std::io::Error::new(
+            std::io::ErrorKind::TimedOut,
+            format!(
+                "timed out waiting for container lock on '{}'",
+                path.display()
+            ),
+        )))
     }
 }
 
@@ -724,7 +731,10 @@ impl Drop for ContainerFileLock {
         }
 
         const LOCK_UN: i32 = 8;
-        // SAFETY: file is a valid open file descriptor.
+        // SAFETY:
+        // - Preconditions: `self.file` is a live open file descriptor holding the advisory lock.
+        // - Invariants: `Drop` runs at most once before `self.file` is closed.
+        // - Postconditions: Advisory lock on the descriptor is released.
         unsafe {
             flock(self.file.as_raw_fd(), LOCK_UN);
         }

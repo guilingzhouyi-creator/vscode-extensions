@@ -17,7 +17,6 @@
 //! - `FGT-TOP-001`: Fractal topology reference guard
 //! - `FGT-PRF-001`: Hot-path zero transient heap allocation guard
 
-use fg_core::jeffreys_beta_trials;
 use fg_core::models::{AuditHashChain, AuditRecord, AuthoritySecret};
 use serde::{Deserialize, Serialize};
 
@@ -68,24 +67,24 @@ pub struct TrinityManifoldSnapshot {
     pub chain_verified: bool,
     /// Total number of verified records in the chain.
     pub chain_length: usize,
-    /// Average mutant kill rate ($K \ge 60\%$) across evaluated records.
-    pub avg_mutant_kill_rate: f64,
-    /// Total loop transient heap allocations detected across all records.
+    /// Measured aggregate kill rate; compact audit rates lack execution denominators.
+    pub avg_mutant_kill_rate: Option<f64>,
+    /// Total loop transient heap allocations reported by compact audit records.
     pub total_transient_allocs: u32,
-    /// Objective Jeffreys Beta posterior credit mean (0.0 to 100.0).
-    pub bayesian_credit: f64,
-    /// Lower bound of the 95% Bayesian credible interval.
-    pub credit_lower_bound: f64,
-    /// Upper bound of the 95% Bayesian credible interval.
-    pub credit_upper_bound: f64,
+    /// Objective credit, absent without provenance-backed trial counts.
+    pub bayesian_credit: Option<f64>,
+    /// Lower bound of the 95% Bayesian credible interval, when measured.
+    pub credit_lower_bound: Option<f64>,
+    /// Upper bound of the 95% Bayesian credible interval, when measured.
+    pub credit_upper_bound: Option<f64>,
     /// Evaluated 5D Riemann phase space vector.
     pub riemann_vector: Riemann5DPhaseVector,
     /// Manifold geometric deviation from optimal origin.
     pub riemann_deviation: f64,
     /// Cumulative net quality delta across all records.
     pub net_quality_delta: f64,
-    /// Estimated net technical debt reduction ($\Delta\text{Debt}$).
-    pub net_debt_delta: f64,
+    /// Technical debt change, absent without a calibrated measurement model.
+    pub net_debt_delta: Option<f64>,
 }
 
 /// Evaluates multi-dimensional code evolution manifolds.
@@ -106,15 +105,15 @@ impl TrinityManifoldEvaluator {
             return TrinityManifoldSnapshot {
                 chain_verified: true,
                 chain_length: 0,
-                avg_mutant_kill_rate: 0.0,
+                avg_mutant_kill_rate: None,
                 total_transient_allocs: 0,
-                bayesian_credit: 0.0,
-                credit_lower_bound: 0.0,
-                credit_upper_bound: 0.0,
+                bayesian_credit: None,
+                credit_lower_bound: None,
+                credit_upper_bound: None,
                 riemann_vector: riemann_vec,
                 riemann_deviation,
                 net_quality_delta: 0.0,
-                net_debt_delta: 0.0,
+                net_debt_delta: None,
             };
         }
 
@@ -131,45 +130,28 @@ impl TrinityManifoldEvaluator {
             chain_verified = chain.verify_integrity(secret).is_ok();
         }
 
-        let mut total_kill_rate = 0.0f64;
         let mut total_allocs = 0u32;
         let mut total_net_quality = 0.0f64;
-        let mut total_trials = 0usize;
-        let mut passed_trials = 0usize;
 
         for record in records {
-            total_kill_rate += record.ikce.mut_kill as f64;
             total_allocs += record.tkcv.alloc;
             total_net_quality += record.score.net as f64;
-
-            total_trials += 10;
-            let kills = (record.ikce.mut_kill * 10.0).round() as usize;
-            passed_trials += kills;
         }
 
-        let record_count = records.len();
-        let avg_mutant_kill_rate = total_kill_rate / record_count as f64;
-
-        let posterior = jeffreys_beta_trials(passed_trials as u64, total_trials as u64);
-        let bayesian_mean = posterior.mean * 100.0;
-        let credible_lower = posterior.ci95_lower * 100.0;
-        let credible_upper = posterior.ci95_upper * 100.0;
-
-        // Net technical debt delta: positive quality and zero allocations reduce debt
-        let net_debt_delta = (total_net_quality * 2.5) - (total_allocs as f64 * 5.0);
-
+        // Compact audit records contain rates without execution identities or trial
+        // denominators. Authenticating their chain does not make them measurements.
         TrinityManifoldSnapshot {
             chain_verified,
-            chain_length: record_count,
-            avg_mutant_kill_rate,
+            chain_length: records.len(),
+            avg_mutant_kill_rate: None,
             total_transient_allocs: total_allocs,
-            bayesian_credit: bayesian_mean,
-            credit_lower_bound: credible_lower,
-            credit_upper_bound: credible_upper,
+            bayesian_credit: None,
+            credit_lower_bound: None,
+            credit_upper_bound: None,
             riemann_vector: riemann_vec,
             riemann_deviation,
             net_quality_delta: total_net_quality,
-            net_debt_delta,
+            net_debt_delta: None,
         }
     }
 
@@ -183,25 +165,24 @@ impl TrinityManifoldEvaluator {
             "VALID (HMAC-SHA1 SEAL INTACT)"
         };
 
-        let (kill_rate_str, credit_bar) = if snapshot.chain_length == 0 {
-            (
-                "UNMEASURED (0 verified records)".to_string(),
-                "UNMEASURED (0 verified records)".to_string(),
-            )
-        } else {
-            let bar_len = ((snapshot.bayesian_credit / 100.0) * 20.0).round() as usize;
-            (
-                format!("{:.1}%", snapshot.avg_mutant_kill_rate * 100.0),
-                format!(
-                    "[{}{}] {:.1}% (95% CI: [{:.1}%, {:.1}%])",
-                    "=".repeat(bar_len),
-                    " ".repeat(20usize.saturating_sub(bar_len)),
-                    snapshot.bayesian_credit,
-                    snapshot.credit_lower_bound,
-                    snapshot.credit_upper_bound
-                ),
-            )
+        let kill_rate_str = snapshot.avg_mutant_kill_rate.map_or_else(
+            || "UNMEASURED (no execution samples)".to_string(),
+            |rate| format!("{:.1}%", rate * 100.0),
+        );
+        let credit_bar = match (
+            snapshot.bayesian_credit,
+            snapshot.credit_lower_bound,
+            snapshot.credit_upper_bound,
+        ) {
+            (Some(mean), Some(lower), Some(upper)) => {
+                format!("{mean:.1}% (95% CI: [{lower:.1}%, {upper:.1}%])")
+            }
+            _ => "UNMEASURED (no execution samples)".to_string(),
         };
+        let debt_delta = snapshot.net_debt_delta.map_or_else(
+            || "UNMEASURED (no calibrated model)".to_string(),
+            |delta| format!("{delta:+.2} debt points eliminated"),
+        );
 
         format!(
             "================================================================================\n\
@@ -217,7 +198,7 @@ impl TrinityManifoldEvaluator {
              [Pillar 3: 5D Riemann Phase Space & Technical Debt]\n\
                Riemann Deviation (||D||) : {:.4}\n\
                Net Quality Delta (+/-)  : {:+.2}\n\
-               Net Debt Reduction       : {:+.2} debt points eliminated\n\
+               Net Debt Reduction       : {}\n\
              ================================================================================\n",
             chain_status,
             snapshot.chain_length,
@@ -226,7 +207,7 @@ impl TrinityManifoldEvaluator {
             credit_bar,
             snapshot.riemann_deviation,
             snapshot.net_quality_delta,
-            snapshot.net_debt_delta
+            debt_delta
         )
     }
 }
@@ -304,11 +285,14 @@ mod tests {
 
         assert!(snapshot.chain_verified);
         assert_eq!(snapshot.chain_length, 2);
-        assert!(snapshot.avg_mutant_kill_rate >= 0.90);
+        let encoded = serde_json::to_value(&snapshot).unwrap();
+        assert!(encoded["avg_mutant_kill_rate"].is_null());
+        assert!(encoded["bayesian_credit"].is_null());
+        assert!(encoded["credit_lower_bound"].is_null());
+        assert!(encoded["credit_upper_bound"].is_null());
         assert_eq!(snapshot.total_transient_allocs, 0);
-        assert!(snapshot.bayesian_credit > 80.0);
         assert!(snapshot.net_quality_delta > 3.0);
-        assert!(snapshot.net_debt_delta > 0.0);
+        assert_eq!(snapshot.net_debt_delta, None);
 
         let ascii = TrinityManifoldEvaluator::render_ascii_trace(&snapshot);
         assert!(ascii.contains("VALID (HMAC-SHA1 SEAL INTACT)"));

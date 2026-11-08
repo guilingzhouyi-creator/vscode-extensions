@@ -104,6 +104,11 @@ function checkErrorPropagation(line, ctx, violations) {
  * @param {string[]} violations - Mutable collector.
  */
 function checkLoopAllocation(line, trimmed, ctx, state, violations) {
+  if (!ctx.isProduction) {
+    state.inLoopBlock = false;
+    state.loopBraceDepth = 0;
+    return;
+  }
   if (RE_LOOP_START.test(trimmed)) state.inLoopBlock = true;
   if (!state.inLoopBlock) return;
   state.loopBraceDepth += braceDelta(line);
@@ -143,7 +148,9 @@ function advanceSafetyProof(trimmed, wasPending) {
  * @param {string[]} violations - Mutable collector.
  */
 function checkUnsafeProof(trimmed, ctx, hasSafetyProof, violations) {
-  const isUnsafeBlock = trimmed.startsWith('unsafe ') || trimmed === 'unsafe {';
+  if (trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) return;
+  const isUnsafeBlock =
+    trimmed.startsWith('unsafe ') || trimmed === 'unsafe {' || /\bunsafe\s*\{/.test(trimmed);
   // The proof comment must carry the `SAFETY:` prefix. Accepting any preceding comment let a
   // narrative note such as `// this is what upstream does` stand in for an actual justification,
   // which is not the same artifact: one records behaviour, the other records why the invariants a

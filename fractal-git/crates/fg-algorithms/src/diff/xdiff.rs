@@ -152,6 +152,7 @@ impl Engine {
     }
 
     /// Reports whether the two sides hold the same line at these reference indices.
+    #[inline(always)]
     fn same(&self, old_index: isize, new_index: isize) -> bool {
         match (self.hash_old(old_index), self.hash_new(new_index)) {
             (Some(first), Some(second)) => first == second,
@@ -164,6 +165,13 @@ impl Engine {
     /// The box limits are what stop a matching run from extending past the region being solved.
     /// Without them the run walks into the unchanged head or tail that the caller already matched
     /// away, which places the split outside the box.
+    ///
+    /// The index guards are folded into one unsigned comparison per side. The previous form called
+    /// `hash_old`/`hash_new`, each of which re-tested `index < 0`, then matched two `Option`s — up
+    /// to six conditional branches per compared line, executed once per position in every snake.
+    /// A negative index becomes a huge `usize`, so a single `as usize < len` test rejects it
+    /// without a separate sign branch.
+    #[inline(always)]
     fn same_within(
         &self,
         old_index: isize,
@@ -171,7 +179,19 @@ impl Engine {
         lim_old: isize,
         lim_new: isize,
     ) -> bool {
-        old_index < lim_old && new_index < lim_new && self.same(old_index, new_index)
+        if old_index >= lim_old || new_index >= lim_new {
+            return false;
+        }
+        // A negative `isize` cast to `usize` is at least `isize::MAX`, so the slice `get` below
+        // rejects it in the same branch that rejects "past the end". That removes the separate
+        // sign test the old `hash_old`/`hash_new` pair each performed.
+        match (
+            self.old_hashes.get(old_index as usize),
+            self.new_hashes.get(new_index as usize),
+        ) {
+            (Some(first), Some(second)) => first == second,
+            _ => false,
+        }
     }
 
     /// Extends one frontier by one diagonal on each side of its middle, seeding the new borders.
