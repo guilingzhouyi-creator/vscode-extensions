@@ -38,13 +38,36 @@ pub use e2e::{
 pub use profile::{BenchmarkLevel, BenchmarkProfile};
 
 /// Single benchmark metric record.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+///
+/// The distribution fields are `serde(default)` so a baseline captured before they existed still
+/// loads. They are the input the regression gate uses to derive a per-metric noise threshold
+/// instead of a single absolute floor: a 2 ns cutoff cannot be protected by a 3000 ns rule.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct BenchmarkMetric {
     pub name: String,
     pub iterations: usize,
     pub total_duration_us: u64,
     pub avg_latency_ns: u64,
     pub ops_per_sec: f64,
+    /// Number of samples the reported value was chosen from.
+    #[serde(default)]
+    pub sample_count: u32,
+    /// Fastest individual sample observed, in nanoseconds.
+    #[serde(default)]
+    pub observed_min_ns: u64,
+    /// Slowest individual sample observed, in nanoseconds.
+    #[serde(default)]
+    pub observed_max_ns: u64,
+}
+
+impl BenchmarkMetric {
+    /// Half-width of the observed sample spread, used as an empirical noise scale.
+    ///
+    /// When no distribution was recorded this returns `0`, which makes the caller fall back to the
+    /// relative tolerance alone rather than inventing a floor.
+    pub fn observed_spread_ns(&self) -> u64 {
+        self.observed_max_ns.saturating_sub(self.observed_min_ns)
+    }
 }
 
 /// Comprehensive benchmark suite report.
@@ -123,6 +146,12 @@ impl TaxisBenchmarkSuite {
             metrics.push(Self::fastest_of_samples(|| {
                 Self::bench_commit_message_guard(2000 * mult)
             }));
+            metrics.push(Self::fastest_of_samples(|| {
+                Self::bench_elias_fano_random_access(500 * mult)
+            }));
+            metrics.push(Self::fastest_of_samples(|| {
+                Self::bench_ignore_glob_adversarial(200 * mult)
+            }));
         }
 
         if matches!(
@@ -191,8 +220,17 @@ impl TaxisBenchmarkSuite {
         F: FnMut() -> BenchmarkMetric,
     {
         let mut best: Option<BenchmarkMetric> = None;
+        let mut observed_min = u64::MAX;
+        let mut observed_max = 0u64;
+        let mut samples = 0u32;
         for _ in 0..Self::METRIC_SAMPLES {
             let sample = measure();
+            // Record the spread across every sample, not just the winner. The gate derives its
+            // per-metric noise threshold from this, so discarding it would leave only the coarse
+            // relative tolerance.
+            observed_min = observed_min.min(sample.avg_latency_ns);
+            observed_max = observed_max.max(sample.avg_latency_ns);
+            samples += 1;
             if best
                 .as_ref()
                 .is_none_or(|current| sample.avg_latency_ns < current.avg_latency_ns)
@@ -202,7 +240,32 @@ impl TaxisBenchmarkSuite {
         }
         // `METRIC_SAMPLES` is a non-zero constant, so `best` is always populated; the fallback only
         // exists to keep the signature total without an unwrap that could never fire.
-        best.unwrap_or_else(&mut measure)
+        let mut chosen = best.unwrap_or_else(&mut measure);
+        chosen.sample_count = samples;
+        chosen.observed_min_ns = observed_min;
+        chosen.observed_max_ns = observed_max;
+        chosen
+    }
+
+    /// Measures only the metrics added for the `EliasFano` and glob contracts.
+    ///
+    /// Exists so a baseline can be refreshed for the new entries without re-measuring — and
+    /// therefore without perturbing — the sixteen established ones.
+    pub fn run_new_metric_probe(multiplier: usize) -> Self {
+        let mult = if multiplier == 0 { 1 } else { multiplier };
+        Self {
+            engine: "taxis".to_string(),
+            version: env!("CARGO_PKG_VERSION").to_string(),
+            timestamp_ms: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0),
+            profile: BenchmarkProfile::current(),
+            metrics: vec![
+                Self::fastest_of_samples(|| Self::bench_elias_fano_random_access(500 * mult)),
+                Self::fastest_of_samples(|| Self::bench_ignore_glob_adversarial(200 * mult)),
+            ],
+        }
     }
 
     /// Executes all seven micro-benchmarks with a given multiplier (1 = fast test, 10 = standard).
@@ -668,12 +731,76 @@ impl TaxisBenchmarkSuite {
         Self::calculate_metric(METRIC_CONCURRENT_TRANSACTIONS, iterations, elapsed)
     }
 
+    /// Benchmarks `EliasFano` random access at a size that exposes a non-constant `select`.
+    ///
+    /// The point is the shape, not the absolute number: a constant-time `get` costs the same at
+    /// 1 000 elements as at 32 000, so a quadratic prefix rescan shows up as a latency that grows
+    /// with the input. This benchmark exists because the operator documented `O(1)` while actually
+    /// re-counting its prefix on every call, and nothing measured it.
+    pub fn bench_elias_fano_random_access(iterations: usize) -> BenchmarkMetric {
+        // Monotone timestamps with realistic gaps, the shapes `fg-storage` actually compresses.
+        let count = 32_000usize;
+        let values: Vec<u64> = (0..count as u64).map(|i| i * 40 + (i % 7)).collect();
+        let compressed =
+            fg_algorithms::EliasFano::from_slice(&values).expect("monotone input compresses");
+
+        let start = Instant::now();
+        let mut sink = 0u64;
+        for round in 0..iterations {
+            // Stride by a co-prime so the access pattern covers the whole array without being
+            // sequential, which is what a commit-graph lookup actually looks like.
+            let index = (round.wrapping_mul(7919)) % count;
+            sink = sink.wrapping_add(compressed.get(index).unwrap_or(0));
+        }
+        let elapsed = start.elapsed();
+        std::hint::black_box(sink);
+
+        Self::calculate_metric(METRIC_ELIAS_FANO_ACCESS, iterations, elapsed)
+    }
+
+    /// Benchmarks `.gitignore` glob rejection on a star-dense pattern.
+    ///
+    /// `a*a*a*...b` against an all-`a` subject is the adversarial shape that made the recursive
+    /// matcher explore `2^k` partial matches. The workload is sized so a linear walk is
+    /// microseconds; an exponential one does not finish.
+    pub fn bench_ignore_glob_adversarial(iterations: usize) -> BenchmarkMetric {
+        // `a*a*a*...b` against an all-`a` subject: every star can expand, and none of the
+        // expansions reaches the trailing literal. A recursive matcher explores 2^k of them.
+        let mut pattern = String::new();
+        for _ in 0..24 {
+            pattern.push_str("a*");
+        }
+        pattern.push('b');
+
+        // Build the rule through the same parser production uses, so the benchmark cannot drift
+        // from the real matcher's rule shape.
+        let rule = fg_index::parse_line(&pattern, std::path::Path::new(".gitignore"), 1, "")
+            .expect("adversarial pattern parses as a rule");
+        let subject: String = "a".repeat(64);
+
+        let start = Instant::now();
+        let mut rejected = 0usize;
+        for _ in 0..iterations {
+            let matcher = fg_index::IgnoreMatcher::from_rules(vec![rule.clone()]);
+            if !matcher.is_ignored(&subject, false) {
+                rejected += 1;
+            }
+        }
+        let elapsed = start.elapsed();
+        assert_eq!(
+            rejected, iterations,
+            "the adversarial pattern must not match"
+        );
+
+        Self::calculate_metric(METRIC_IGNORE_GLOB_ADVERSARIAL, iterations, elapsed)
+    }
+
     /// Compares this benchmark suite against a baseline, returning violations
     /// if regression > tolerance_pct.
     ///
     /// Three ways to fail, and all three are reported rather than short-circuited so one run tells
     /// the whole story:
-    /// 1. a metric is slower than the baseline beyond tolerance *and* beyond the 3 µs noise floor;
+    /// 1. a metric is slower than the baseline beyond tolerance *and* beyond its own noise scale;
     /// 2. a metric has no baseline entry at all, so the ratchet cannot speak about it;
     /// 3. the baseline came from a different build profile, which makes every ratio meaningless.
     pub fn compare_with_baseline(
@@ -700,22 +827,29 @@ impl TaxisBenchmarkSuite {
                 unbaselined.push(current.name.clone());
                 continue;
             };
+            // A zero baseline can never be exceeded in ratio terms, so it silently disables the
+            // ratchet for that metric. Report it instead of pretending it was checked.
+            if base.avg_latency_ns == 0 {
+                passed = false;
+                unbaselined.push(current.name.clone());
+                continue;
+            }
 
             let max_allowed_ns =
                 (base.avg_latency_ns as f64 * (1.0 + tolerance_pct / 100.0)) as u64;
-            // Only flag if exceeds relative tolerance AND absolute difference >= 3000 ns (3 us)
-            // to avoid OS scheduling noise in debug profile
+            let noise_ns = Self::noise_threshold_ns(current, base, tolerance_pct);
             if current.avg_latency_ns > max_allowed_ns
-                && current.avg_latency_ns.saturating_sub(base.avg_latency_ns) >= 3000
+                && current.avg_latency_ns.saturating_sub(base.avg_latency_ns) > noise_ns
             {
                 passed = false;
                 regressions.push(format!(
-                    "{}: current {} ns > baseline {} ns (max allowed: {} ns, +{:.1}%)",
+                    "{}: current {} ns > baseline {} ns (max allowed: {} ns, +{:.1}%, noise floor {} ns)",
                     current.name,
                     current.avg_latency_ns,
                     base.avg_latency_ns,
                     max_allowed_ns,
-                    tolerance_pct
+                    tolerance_pct,
+                    noise_ns
                 ));
             } else if (current.avg_latency_ns as f64) < (base.avg_latency_ns as f64 * 0.8) {
                 improvements.push(format!(
@@ -735,6 +869,31 @@ impl TaxisBenchmarkSuite {
             unbaselined,
             profile_mismatch,
         }
+    }
+
+    /// Derives the minimum absolute change worth calling a regression for one metric.
+    ///
+    /// A single fixed floor cannot serve both a 2 ns cutoff test and a 32 µs guard: 3000 ns either
+    /// hides a 100x regression on the former or is meaningless for the latter. This scales the
+    /// threshold with the measurement instead:
+    ///
+    /// * `observed spread` — the recorded slowest-minus-fastest sample, which is exactly the
+    ///   run-to-run noise that made a fixed floor necessary;
+    /// * `relative tolerance` — the same percentage the ratio check uses, so a metric whose
+    ///   samples are tight gets a proportionally tight absolute bound;
+    /// * `1 ns` — the finest resolution the metric itself carries once averaged per iteration.
+    ///
+    /// The maximum of those three is used. For a 2 ns metric with no recorded spread that is 1 ns,
+    /// so a jump to 200 ns is caught; for a 32 µs guard with 4 µs of spread it is 4 µs, so ordinary
+    /// scheduling jitter does not trip it.
+    fn noise_threshold_ns(
+        current: &BenchmarkMetric,
+        base: &BenchmarkMetric,
+        tolerance_pct: f64,
+    ) -> u64 {
+        let spread = current.observed_spread_ns().max(base.observed_spread_ns());
+        let relative = (base.avg_latency_ns as f64 * tolerance_pct / 100.0) as u64;
+        spread.max(relative).max(1)
     }
 
     /// Explains why two profiles cannot be compared, or `None` when they can.
@@ -782,6 +941,12 @@ impl TaxisBenchmarkSuite {
             total_duration_us: total_us,
             avg_latency_ns: avg_ns,
             ops_per_sec,
+            // A single timing run has no spread to report. `fastest_of_samples` overwrites these
+            // when it combines several runs; leaving them zero keeps the fields honest rather
+            // than claiming a distribution that was never measured.
+            sample_count: 1,
+            observed_min_ns: avg_ns,
+            observed_max_ns: avg_ns,
         }
     }
 }

@@ -10,7 +10,9 @@ use fractal_git::constants::metrics::*;
 fn test_benchmark_suite_execution_and_timings() {
     let suite = TaxisBenchmarkSuite::run_default(1);
     assert_eq!(suite.engine, "taxis");
-    assert_eq!(suite.metrics.len(), 12);
+    // 14 within Level 1: the twelve original micro-benchmarks plus the EliasFano random-access
+    // and adversarial-glob contract guards.
+    assert_eq!(suite.metrics.len(), 14);
 
     for m in &suite.metrics {
         assert!(
@@ -95,6 +97,7 @@ fn test_benchmark_baseline_comparison_and_tolerance() {
         total_duration_us: 1000,
         avg_latency_ns: 10_000,
         ops_per_sec: 100_000.0,
+        ..Default::default()
     };
     let baseline = TaxisBenchmarkSuite {
         engine: "taxis".to_string(),
@@ -173,9 +176,9 @@ fn test_benchmark_suite_level2_and_level3() {
         .iter()
         .any(|m| m.name == METRIC_CONCURRENT_TRANSACTIONS));
 
-    // All levels combined: 12 (L1) + 2 (L2) + 2 (L3) = 16 metrics
+    // All levels combined: 14 (L1) + 2 (L2) + 2 (L3) = 18 metrics
     let suite_all = TaxisBenchmarkSuite::run_suite(BenchmarkLevel::All, 1);
-    assert_eq!(suite_all.metrics.len(), 16);
+    assert_eq!(suite_all.metrics.len(), 18);
     for m in &suite_all.metrics {
         assert!(m.iterations > 0);
         assert!(m.ops_per_sec > 0.0);

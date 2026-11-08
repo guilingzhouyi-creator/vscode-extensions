@@ -32,6 +32,8 @@ fn test_metric_missing_from_baseline_is_a_violation() {
         total_duration_us: 100,
         avg_latency_ns: 10_000,
         ops_per_sec: 100_000.0,
+
+        ..Default::default()
     };
     let current = TaxisBenchmarkSuite {
         engine: "taxis".to_string(),
@@ -51,6 +53,8 @@ fn test_metric_missing_from_baseline_is_a_violation() {
             total_duration_us: 100,
             avg_latency_ns: 10_000,
             ops_per_sec: 100_000.0,
+
+            ..Default::default()
         }],
     };
 
@@ -70,6 +74,8 @@ fn test_cross_profile_comparison_is_refused() {
         total_duration_us: 100,
         avg_latency_ns: 10_000,
         ops_per_sec: 100_000.0,
+
+        ..Default::default()
     };
     let baseline = TaxisBenchmarkSuite {
         engine: "taxis".to_string(),
@@ -102,6 +108,8 @@ fn test_unspecified_profile_baseline_still_comparable() {
         total_duration_us: 100,
         avg_latency_ns: 10_000,
         ops_per_sec: 100_000.0,
+
+        ..Default::default()
     };
     let legacy_baseline = TaxisBenchmarkSuite {
         engine: "taxis".to_string(),

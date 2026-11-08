@@ -150,6 +150,26 @@
       "ops_per_sec": 254647.31347084287,
       "observed_min_ns": 3904,
       "observed_max_ns": 5416
+    },
+    {
+      "name": "elias_fano_random_access_32k",
+      "iterations": 500,
+      "total_duration_us": 30,
+      "avg_latency_ns": 60,
+      "ops_per_sec": 16556291.390728477,
+      "sample_count": 3,
+      "observed_min_ns": 60,
+      "observed_max_ns": 97
+    },
+    {
+      "name": "ignore_glob_adversarial_many_stars",
+      "iterations": 200,
+      "total_duration_us": 240,
+      "avg_latency_ns": 1201,
+      "ops_per_sec": 832639.4671107411,
+      "sample_count": 3,
+      "observed_min_ns": 1201,
+      "observed_max_ns": 1636
     }
   ]
 }
