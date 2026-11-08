@@ -34,7 +34,8 @@
     "defensive-security-and-taint-safety",
     "constraint-driven-development",
     "algorithmic-operator-engineering",
-    "gate-governance"
+    "gate-governance",
+    "tiered-cache-and-wal-persistence"
   ],
   "rigidAxioms": [
     "5-layer decoupled architecture: Facade -> Controller -> Model -> Storage -> UI View unidirectional data flow.",

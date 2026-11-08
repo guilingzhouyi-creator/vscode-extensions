@@ -4,9 +4,9 @@ description: >-
   【触发：提交/分批/暂存/commit/git/预审/禁词/原子提交】当准备提交代码、分批原子提交或审查 git commit 信息时必须使用。按 6 层拓扑拆解提交，拦截 6 类黑话禁词，执行离线门禁预审与原子提交闭环。
 ---
 
-# batch-commit — 大型改动分批原子提交与门禁预审工作流
+# batch-commit — Six-Layer Topological Atomic Commit & Pre-Flight Gate Workflow
 
-本技能规范了跨域大型改动的自底向上拓扑分批、高内聚结构化提交信息编写、四大受控项目归属声明、6 类风格禁词拦截、门禁离线预审（Pre-flight Check）以及最终全域双重回归的标准工程化作业流程。
+Governs bottom-up 6-layer topological commit batching, parallel session isolation, 5D ELOC differential clamping, structured commit message authoring, 6-class forbidden term interception, and offline gate pre-flight verification.
 
 ---
 
@@ -21,191 +21,70 @@ description: >-
 - **何时联动**：并行会话改动混杂需要精准暂存 → `batch-commit` + `subagent-orchestration` + `constraint-driven-development`；提交信息被门禁拦下 → `batch-commit` + `rule-catalog-governance` + `gate-governance`
 <!-- SKILL-LINKS:END -->
 
-## 一、 适用场景与触发条件
+## 1. Bottom-Up Six-Layer Commit Topology
 
-当出现以下任一场景时，严禁使用单次巨石提交（Monolithic Commit），必须激活本分批提交工作流：
-1. **跨架构层次改动堆叠**：同时涉及底层契约/存储、通用基础设施、配置资源同构、业务领域实现、静态审查治理或全宗文档；
-2. **改动文件跨度大**：工作区改动涉及超过 15 个文件或跨越 2 个以上顶层项目/架构域；
-3. **高敏回滚与独立验证诉求**：改动包含底层数据结构重构或破坏性变更，需保证每一个提交点均可独立编译、独立运行回归测试、且具备干净的 `git bisect` 故障隔离粒度。
+Split multi-file ($> 15$ files) or cross-layer changes into self-contained, independently compilable commits ordered from L1 to L6:
+1. **Batch L1 (Contracts & Storage)**: Types, schemas, persistence protocols (`feat`/`refactor`).
+2. **Batch L2 (Infrastructure & Operators)**: Pools, native operators, runtime primitives (`feat`/`refactor`).
+3. **Batch L3 (Config & Rule Catalogs)**: Config tables, SSOT rule catalogs (`feat`/`refactor`).
+4. **Batch L4 (Domain & Views)**: Business logic, analyzers, UI views (`feat`/`refactor`).
+5. **Batch L5 (Quality & Tests)**: Unit/regression suites, density/complexity tuning (`test`/`refactor`).
+6. **Batch L6 (Documentation & Archives)**: Architecture specs, skills, blueprints (`docs`).
 
----
-
-## 二、 依赖拓扑 6 层分批标准体系 (Bottom-Up Dependency Topology)
-
-分批规划必须严格遵守自底向上、解耦可读、自洽闭环的 6 层拓扑依赖顺序：
-
-```text
-[第 1 批: Layer 1 底层契约与存储协议] (refactor/feat: contract, persistence, types)
-                    │
-                    ▼
-[第 2 批: Layer 2 通用基础设施与核心算子] (feat/refactor: infra, pool, alloc, runtime)
-                    │
-                    ▼
-[第 3 批: Layer 3 配置资源与同构规则] (feat/refactor: config, catalog, rules)
-                    │
-                    ▼
-[第 4 批: Layer 4 业务领域与视图表现] (feat/refactor: domain, logic, views)
-                    │
-                    ▼
-[第 5 批: Layer 5 静态治理与质量演进] (refactor/test: quality, complexity, coverage)
-                    │
-                    ▼
-[第 6 批: Layer 6 全宗文档与案卷归档] (docs: blueprint, archive, readme)
-```
-
-### 分层落地原则：
-- **自洽闭环**：每一批提交入库后，工作树必须能独立通过类型编译与单元测试，严禁前序批次依赖后序批次的代码；
-- **原子回滚**：单批提交聚焦单一架构层次与功能主题，若发生线上异常可精准单 commit 回滚；
-- **显式边界**：各批次所含文件路径严格正交，禁止同一文件在多个批次间反复改动与暂存。
-
-### 长程分批分卷章节标记契约 (mark_chapter 规范)
-当跨越 6 层拓扑开展大规模原子分批重构时，严禁连续执行多批提交而缺乏阶段性检查点。每完成一个关键拓扑层级（如 Layer 1 底层契约、Layer 3 规则资源、Layer 5 治理演进）的原子提交后，必须显式建立 `mark_chapter` 分卷标记：
-1. **状态快照锚定**：记录已合入的 Commit SHA、通过的回归测试基线与剩余待办批次；
-2. **隔离故障爆炸半径**：确保每一阶段提交均处于自洽可编译、可回溯状态，支持局部断点重试。
+- **Code Beat vs. Telemetry Beat**: Commit production code first (Code Beat), then commit audit snapshots/telemetry separately (Telemetry Beat). Record `mark_chapter` checkpoints (Commit SHA, passed suites, remaining batches) after major layers.
 
 ---
 
-## 三、 标准分批执行四步闭环 (S-P-C-V)
+## 2. Four-Step S-P-C-V Execution Loop
 
-对每个规划批次，必须严格循环执行以下 4 步作业闭环：
+### Step 1: Explicit Whitelist Staging & Parallel Session Isolation (`git add <files>`)
+1. **Explicit File List**: Never run `git add .` or `git add -A`. Stage only files belonging to the current batch and within the current session's Path Jail (`git add path/to/a.ts path/to/b.ts`).
+2. **Parallel Session Isolation**: Treat any modified/untracked files outside your task scope in `git status -s` as active parallel sessions — zero touch, zero formatting, zero cleanup. **Never** run `git checkout -- .`, `git restore .`, `git clean -fd`, or `git reset --hard`.
+3. **5D ELOC Differential Clamping (`FGT-GAT-001`)**:
+   - **Per-File Micro Envelope**: New file $E_{\text{add}} \le 360.0$ 5D ELOC; existing file $E_{\text{add}} \le 120.0$ (or $\le 180.0$ with $\ge 10$ lines refactored deletion); deletion $E_{\text{del}} \le 100.0$ (max $280.0$ with refactoring witness); substantive ratio $\ge 0.60$, $\text{TSPR} \ge 0.40$.
+   - **Batch Macro Envelope**: $\sum E_{\text{add}} \le 360.0$ 5D ELOC, $\sum E_{\text{del}} \le 280.0$ 5D ELOC, turnover $\sum E_{\text{add}} + 0.8 \sum E_{\text{del}} \ge \Theta_{\text{admission}} \in [3.0, 25.0]$ 5D ELOC.
+   - **Overflow Deconstruction**: Resolve `FILE_ADD_OVERFLOW` or `BATCH_ADD_OVERFLOW` by extracting cohesive algorithms into dedicated submodules (each new file receives a $360.0$ quota) or splitting commits; never lower gate thresholds. See [5d-eloc-differential-clamping-guide.md](references/5d-eloc-differential-clamping-guide.md).
 
-### Step 1: 显式精准暂存与并行会话避让 (`git add`)
-1. **显式文件白名单**：严禁裸调 `git add .` 或 `git add -A`，防止将未准备就绪的跨层文件或临时残留意外打入暂存区。必须显式列出属于当前批次、且在当前会话 Path Jail 授权范围内的文件列表：
-```powershell
-git add path/to/contract.ts path/to/storage.ts
-```
-*注：若有处于 `.gitignore` 规则边界但确需入库的治理脚本，使用 `git add -f <file>` 显式添加。*
+### Step 2: Author Commit Message & Run Offline Pre-Flight (`commit-msg-gate`)
+1. **Header Grammar**: `<type>(<scope>): <Chinese imperative summary>` (`type` $\in$ `feat|fix|refactor|docs|test|chore|style|perf|ci|build`; total length $15 \sim 80$ chars, subject $10 \sim 70$ chars; ASCII `(` `)` and `): `; no trailing `.`/`。`; no BOM/zero-width chars; no emoji).
+2. **Mandatory Sections & Lengths**:
+   - First section `[Project]` (`CMG-PRJ-001`): `- <workspace-timing | auto-refactor | WebGames | fractal-git | governance>`
+   - `[Why]` ($\ge 15$ non-whitespace chars), `[Verification]` ($\ge 12$ non-whitespace chars, qualitative assertions only), plus `[Added]` (`feat`), `[Fixed]` ($\ge 12$ chars, `fix`), `[Changed]` (`refactor`/`perf`), or `[Breaking Changes]` (`!`).
+   - Use ASCII brackets `[...]` and `- ` bullets ($\ge 8$ chars each), separated by single blank lines; total body $\ge 30$ non-whitespace chars.
+3. **Six Forbidden Style Classes & Rule Closure**:
 
-2. **并行会话零干预与防破坏性还原 (Session Isolation & Parallel Mutex)**：
-   - 当 `git status` 中存在不属于当前会话任务的文件修改或未跟踪文件时，必须识别为**外部并行会话活动**，坚决保持零触碰、零清理、零越界修复；
-   - **绝对禁止执行全局性破坏性还原命令**：严禁运行 `git checkout -- .`、`git restore .`、`git clean -fd` 或 `git reset --hard`，防止彻底销毁并行会话中尚未落盘或暂存的工作成果；
-   - 严禁自作主张对并行会话的文件执行格式化、语法“修复”或将其杂糅进当前提交。
-
-3. **两层 5D ELOC 差分双向钳制与准入更替审查 (`FGT-GAT-001`)**：
-   - **单文件微观形变包络**：新建文件 $E_{\text{add}} \le 360.0$ 5D ELOC，已有文件 $E_{\text{add}} \le 120.0$ 5D ELOC（若存在 $\ge 10$ 行重构删除见证放宽至 $180.0$）；单文件删除 $E_{\text{del}} \le 100.0$ 5D ELOC（超限至最高 $280.0$ 须有重构见证）；实质行比率 $\ge 0.60$、$\text{TSPR} \ge 0.40$；
-   - **批次宏观聚合包络**：单批总新增 $\sum E_{\text{add}} \le 360.0$ 5D ELOC，总删除 $\sum E_{\text{del}} \le 280.0$ 5D ELOC；
-   - **最低经验自适应净更替量门槛**：$\sum E_{\text{add}} + 0.8 \times \sum E_{\text{del}} \ge \Theta_{\text{admission}}$（Jeffreys Beta 后验动态钳位在 $[3.0, 25.0]$ 5D ELOC，杜绝纯注释与跳板伪更替）；
-   - **模块化拆解消解微分溢出协议 (Module Deconstruction Protocol)**：
-     - 当遇 `FILE_ADD_OVERFLOW` 或 `BATCH_ADD_OVERFLOW` 时，严禁强制合并或私改门禁阈值；
-     - 必须将大文件中自洽的复杂算法（如位集求解器、磁盘协同器）提取为新子模块；新文件独立享受 $360.0$ 配额，同时使母文件编辑行数收敛；
-     - 重构已有文件须保留核心接口，单文件删除严禁超过 $280.0$，防止触发 `CAPABILITY_EROSION`；
-   - **双轨交错提交节拍**：生产/业务代码（Code Beat）先行提交，自审周报与遥测存证（Telemetry Beat）接续提交，严禁混杂提交扩大爆炸半径。详见 [5d-eloc-differential-clamping-guide.md](references/5d-eloc-differential-clamping-guide.md)。
-
-### Step 2: 编写结构化提交信息与离线预审 (`commit-msg-gate`)
-在本地临时目录中创建提交信息文件 `commit_batch_N.txt`。必须满足以下刚性规范：
-
-#### 1. 标题排版与全要素契约
-- **格式**：`<type>(<scope>): <祈使句中文摘要标题>`（若含破坏性变更允许 `<type>!(<scope>): ...`）；
-- **全要素长度上下界**：标题总长严格限定在 15~80 字符（$15 \le L_{\text{header}} \le 80$），摘要描述部分 10~70 字符（$10 \le L_{\text{subject}} \le 70$）；
-- **`<type>` 严格受限**：`feat` | `fix` | `refactor` | `docs` | `test` | `chore` | `style` | `perf` | `ci` | `build`；
-- **标点排版硬性契约**：
-  - 必须使用标准半角英文冒号且后跟单一空格（`): `），严禁全角冒号（`）：`）、缺失空格（`):`）或多重连续空格（`):  `）；
-  - 作用域括号必须为半角 `(` 和 `)`，严禁全角括号；
-  - 标题结尾严禁带句号（包括半角 `.` 与全角 `。`）；
-  - 严禁包含零宽字符与字节顺序标记（BOM，如 `\u200B`~`\u200D`、`\uFEFF`）；
-  - 标题严禁包含 Emoji 表情符号（如 🚀, 🐛, ✨ 等）。
-
-#### 2. 正文首区块：受控五大项目显式归属 (`CMG-PRJ-001`)
-关键生产级提交（feat/fix/refactor/perf/docs/test/chore）正文首个结构化区块必须显式声明项目归属，枚举严格受限五大项目：
-```markdown
-[Project]
-- <workspace-timing | auto-refactor | WebGames | fractal-git | governance>
-```
-*若遗漏或填写未受控名称，强制触发 `CMG-PRJ-001` 一票否决。*
-
-#### 3. 结构化区块、排版与清单强力联动契约
-- **区块标签排版**：必须使用半角方括号（如 `[Why]`、`[Added]`、`[Changed]`、`[Fixed]`、`[Verification]`、`[Breaking Changes]`），严禁全角方括号（`【` `】`）；
-- **列表项排版**：列表项必须使用统一半角破折号加单一空格前缀 `- `（严禁使用 `* `、`+ ` 或有序数字列表 `1. `）；
-- **空行分割契约**：标题与正文之间、各区块之间必须保留且仅保留单一空行（严禁连续 2 个及以上空行）；
-- **实质内容字数上下界**：
-  - 单条列表项非空白实质字符数 $\ge 8$；
-  - `[Why]` 区块阐明改动的技术动因与核心痛点，非空白实质内容 $\ge 15$ 字符；
-  - `[Fixed]` 区块详述修复的异常场景与根因，非空白实质内容 $\ge 12$ 字符；
-  - `[Verification]` 区块详述本地运行的验证命令与质性技术断言，非空白实质内容 $\ge 12$ 字符；
-  - 正文总体非空白实质字数 $\ge 30$；
-- **类型与区块强力清单联动 (Mandatory Manifest Linkage)**：
-  - `feat` 提交必须包含 `[Added]` 区块；
-  - `fix` 提交必须包含 `[Fixed]` 区块；
-  - `refactor` 与 `perf` 提交必须包含 `[Changed]` 区块；
-  - 标题含有破坏性变更标识 `!`（如 `feat!:`）时必须包含 `[Breaking Changes]` 区块。
-
-#### 4. 纯客观技术事实质性断言与 6 类禁词风格拦截
-提交说明是永久技术档案，受 `commit-msg-forbidden-terms.json` 刚性管束：
-
-| 规则 ID | 禁词类别 | 典型违规词汇 | 治理与替换要求 |
+| Rule ID | Category | Blocked Examples | Requirement |
 | :--- | :--- | :--- | :--- |
-| **`CMG-STY-001`** | **临时敷衍** | `wip`, `temp`, `tmp`, `暂存`, `临时方案`, `随便改改`, `placeholder` | 阐明当前确切的改动范围与已知边界，禁止敷衍词汇 |
-| **`CMG-STY-002`** | **过度夸大** | `绝对`, `彻底解决`, `完美`, `100%`, `工业级`, `案卷施工`, `四阶段案卷`, `规则金字塔` | 陈述具体的技术解决手段与覆盖用例，杜绝神话宣扬 |
-| **`CMG-STY-003`** | **过度贬损** | `垃圾`, `一团糟`, `烂代码`, `毫无意义`, `useless code`, `broken beyond repair` | 客观说明重构的技术动因，杜绝情绪化负面词汇 |
-| **`CMG-STY-004`** | **风格元叙事** | `低调中肯`, `求真务实`, `移除宣扬性词汇`, `调整文案语调`, `风格升级`, `全部PASS` | 直接陈述改动的文件与小节内容，严禁将自省表态当作改动提交 |
-| **`CMG-STY-005`** | **程序化流水账** | `退出码0`, `双端返回0`, `双端脚本均返回`, `正常状态`, `运行完成`, `无报错` | `[Verification]` 必须陈述具体的边界用例与功能断言，杜绝套话 |
-| **`CMG-STY-006`** | **执行标签零执行数字** | `通过146套测试`, `耗时50.8s`, `419个文件`, `覆盖率98%` | 执行标签区域严禁堆砌数字量词，必须提炼为纯逻辑质性断言（例如“断言边界输入下算法正确回退；断言全量源码文件合规且无空文件”） |
+| `CMG-STY-001` | Perfunctory / Sprint Codenames | `wip`, `temp`, `tmp`, `暂存`, `临时方案`, `phase2`, `sprint 3`, `st7`, `w3`, `pass 2` | State exact technical scope and invariants |
+| `CMG-STY-002` | Exaggeration | `绝对`, `彻底解决`, `完美`, `100%`, `工业级`, `案卷施工`, `规则金字塔` | State concrete mechanisms and boundary cases |
+| `CMG-STY-003` | Pejorative | `垃圾`, `一团糟`, `烂代码`, `useless code`, `broken beyond repair` | State objective technical root cause |
+| `CMG-STY-004` | Meta-Narrative | `低调中肯`, `求真务实`, `移除宣扬性词汇`, `风格升级`, `全部PASS` | Describe code/doc changes directly |
+| `CMG-STY-005` | Procedural Log Dump | `退出码0`, `双端返回0`, `正常状态`, `运行完成`, `无报错` | State falsifiable behavioral assertions in `[Verification]` |
+| `CMG-STY-006` | Raw Execution Counts | `通过146套测试`, `耗时50.8s`, `419个文件`, `覆盖率98%` | Zero Arabic numerals/percentages in `[Verification]` |
 
-- **严禁敏捷冲刺期过程性代号**：正文中绝对严禁出现 `W1~W9`、`Pass 1..6`、`Sprint 3`、`phase\d+`、`st\d+` 等短期过程代号，所有描述必须转换为恒定技术事实；
-- **单源规则反虚构 (`RCFG-RULE-DRIFT`)**：正文中引用的所有规则 ID（如 `GUARD-AST-001`、`ARCH-FAC-001`）必须在 `scripts/common/rule-catalog.json` 中真实存在，严禁凭空捏造；
-- **第一人称代词与专业术语误杀规避 (`CMG-STY-008`)**：严禁第一人称代词（`I`、`we`、`my`、`our`）；正文英文缩写 `I/O` 会被正则 `\bI\b` 拦截，必须统一替代为中文“磁盘读写”或“输入输出”；
-- **质性验证结论铁律 (`CMG-STY-006`)**：`[Verification]` 区块内**严禁包含任何阿拉伯数字、统计量词或百分比**，必须纯粹以质性技术事实陈述门禁与断言通过。
+   - Also enforce `CMG-STY-008` (no first-person pronouns `I`/`we`/`my`/`our`; write `输入输出` instead of `I/O` in Chinese prose) and `RCFG-RULE-DRIFT` (every rule ID must exist in `scripts/common/rule-catalog.json`).
+4. **Pre-Flight Check**:
+   ```powershell
+   pwsh -File scripts/ps1/commit-msg-gate.ps1 "$dir\commit_batch_N.txt"
+   ```
 
-#### 5. 离线预审验证
-```powershell
-pwsh -File scripts/ps1/commit-msg-gate.ps1 "$dir\commit_batch_N.txt"
-```
-*必须获得 `Commit-Msg 检查通过` 且通过历史遥测审计链验证（`--verify-chain commit-msg`）方可进入下一步。*
-
-### Step 3: 暂存区物理卫生预审 (`pre-commit-gate`)
-在实际调用 `git commit` 前，手动触发 Pre-Commit 门禁脚本执行离线流式预审：
+### Step 3: Staged Hygiene & AST Slice Pre-Flight (`pre-commit-gate`)
 ```powershell
 pwsh -File scripts/ps1/pre-commit-gate.ps1
 ```
-*检查项目：零空文件、换行契约（ps1 CRLF，其余 LF）、TypeScript 4 空格缩进/其余 2 空格、敏感信息防泄漏、单文件双轨体积预算（ELOC<=900, LOC<=1400）、1:3 动态反推包络、高负荷注释密度 >= 8%、AST 切片局部复杂度（CC<=15, Depth<=4, Noise<=4.0）及暂存区五维有效代码微分边界与准入周转审查（`STAGED-DIFF-14` / `FGT-GAT-001`）。*
+If `GUARD-AST-001` (`CC > 15` or `Depth > 4`) fires, flatten branches with early guard returns or extract pure helper predicates, re-stage via `git add <file>`, and re-run. All gate subprocesses must run headlessly without stealing GUI focus.
 
-#### 暂存区 AST 切片复杂度阻断自愈指引 (AST Complexity Remediation)
-若预审触发 `GUARD-AST-001`（`CC > 15`）或控制流嵌套超标（`Depth > 4`）：
-1. **卫语句提前返回 (Guard Clauses)**：将深层嵌套的 `if-else` 或循环内分支改写为逆向断言提前 `return` 或 `continue`，压平控制流；
-2. **纯判定提取 (Pure Predicate Extraction)**：将复杂的组合条件表达式或路径判定拆分为无副作用的纯函数（如 `isTargetExtension`、`matchRulePattern`）；
-3. **重新暂存与二次预审**：重构后执行 `git add <file>`，重新运行 `pre-commit-gate.ps1`，直至绿色通过。
-
-#### 后台执行与焦点防抢占守卫 (Background Agent Focus Shield)
-执行门禁预审脚本（`pre-commit-gate.ps1`、`commit-msg-gate.ps1`）与自动化分批测试时，所有子进程调用与检查器必须严格处于后台静默运行模式：
-- 严禁触发任何 GUI 弹窗、凭据交互输入框或浏览器视口抢焦；
-- 严禁调用具有前台激活属性的命令打断用户键盘操作，确保全自动化流水线在后台透明完成。
-
-### Step 4: 原子提交与状态推进 (`git commit`)
-使用离线预审通过的说明文件执行提交，严禁添加 `--no-verify`：
+### Step 4: Atomic Commit & Final Regression (`git commit`)
 ```powershell
 git commit -F "$dir\commit_batch_N.txt"
+pwsh -File scripts/ps1/audit-all.ps1
 ```
-提交完成后执行 `git status -s` 核查工作树剩余文件，继续推进下一批。
-
-#### 批次间质量遥测闭环 (Inter-Batch Telemetry Cadence)
-在连续原子分批提交期间，每批提交完成后建议执行静态质量基准扫描：
-```powershell
-node auto-refactor/dist/index.js scan --root <target-project> --score
-```
-记录并跟踪复合质量指数 (CQI)、Tri-Plane 治理向量 ($Q_{\text{tot}}$) 与自研度指数 (CAI 2.0)，确保分批演进过程中质量棘轮单调不滑坡。
-
-> [!CAUTION] 产品发布更新日志防污染隔离
-> Git 提交说明陈述的是对代码库的**内部工程技术事实**；**严禁**直接将包含工程重构黑话的提交说明复制给用户端的 `CHANGELOG.md` 或 Release Notes。用户交付文档必须保持纯粹的用户功能与价值导向。
+Never pass `--no-verify`. Keep user-facing `CHANGELOG.md` / `README.md` isolated from internal engineering commit jargon.
 
 ---
 
-## 四、 最终全域双重回归验收
+## 3. Templates & Reference Guides
 
-全部批次提交完成、工作树完全 clean 之后，必须同次执行工作区双重全量验证：
-1. **跨域全量静态审查门禁**：
-   ```powershell
-   pwsh -File scripts/ps1/audit-all.ps1
-   # 断言全仓各子系统与各维度静态审查 100% 绿色通行
-   ```
-2. **引擎及子项目无头回归测试**：
-   依改动领域执行对应测试套件，断言全量测试通过且无未决缺陷；
-3. **全工作区零高危技术债务防线**：
-   断言全仓未引入任何 High/Critical 技术债务反弹，保持 0 项历史刚性基线（一票否决）。
-
----
-
-## 五、 关联模板与参考指南
-
-- [commit-template-standard.txt](templates/commit-template-standard.txt)：标准结构化提交信息模板；
-- [forbidden-terms-guide.md](references/forbidden-terms-guide.md)：风格禁词拦截与质性断言编写指引；
-- [5d-eloc-differential-clamping-guide.md](references/5d-eloc-differential-clamping-guide.md)：两层 5D ELOC 差分双向钳制模型与最低更替量准入判定规约。
+- [commit-template-standard.txt](templates/commit-template-standard.txt): Standard structured commit message template.
+- [forbidden-terms-guide.md](references/forbidden-terms-guide.md): Forbidden vocabulary & qualitative assertion guide.
+- [5d-eloc-differential-clamping-guide.md](references/5d-eloc-differential-clamping-guide.md): 5D ELOC differential clamping & module deconstruction guide.

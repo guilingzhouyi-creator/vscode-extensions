@@ -22,6 +22,8 @@
   },
   "associatedSkills": [
     "auto-refactor-dev",
+    "sparse-moe-and-ast-routing",
+    "praxis-vfs-and-trajectory-learning",
     "rust-engineering",
     "algorithmic-operator-engineering",
     "telemetry-statistical-modeling",
@@ -33,7 +35,8 @@
     "debugging-and-error-recovery",
     "constraint-driven-development",
     "rule-catalog-governance",
-    "state-concurrency-and-crash-recovery"
+    "state-concurrency-and-crash-recovery",
+    "tiered-cache-and-wal-persistence"
   ],
   "rigidAxioms": [
     "Dual-track parity: Rust native engine & TS facade must match 100% byte-for-byte; zero panic (RSM-PNC-001).",

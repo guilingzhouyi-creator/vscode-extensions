@@ -80,7 +80,7 @@
 | **`SCR`** | 脚本库标准（layer: L3） | 脚本命名、头契约与注册表双向完备：既无孤儿也无悬空。族内 5 个 ID，仅 workspace-timing，layer L3 | `L3-SCRIPT-STANDARD` |
 | **`ARF`** | 重构门槛（layer: L5） | 重构必须有净收益与等价性证明，禁止表面搬移。族内 2 个 ID，仅 workspace-timing，layer L5 | `ARF-*` |
 
-### fractal-git 原生内核（21 族）
+### fractal-git 原生内核（23 族）
 
 | 家族 (Family) | 领域职责 | 约束范围与规模 | 典型代表规则 (SSOT 已登记) |
 | :--- | :--- | :--- | :--- |
@@ -91,9 +91,11 @@
 | **`CAS`** | 无锁 CAS | CAS 循环必须处理 ABA 与内存序。族内 1 个 ID，仅 fractal-git | `FGT-CAS-001` |
 | **`COR`** | 核心不变量 | 核心数据结构的前置/后置不变式必须可断言。族内 1 个 ID，仅 fractal-git | `FGT-COR-001` |
 | **`FAC`** | 门面承载 | crate 门面必须实质承载，禁止空壳转发。族内 1 个 ID，仅 fractal-git | `FGT-FAC-001` |
-| **`GAT`** | 门禁自审 | 内核门禁必须自证检出能力。族内 1 个 ID，仅 fractal-git | `FGT-GAT-001` |
+| **`GAT`** | 门禁自审与差分包络 | 内核门禁自证检出能力，暂存差分批次包络、单文件边界、有效密度与连败收敛守卫。族内 6 个 ID，跨 2 个项目（fractal-git、global-tooling） | `FGT-GAT-001` |
 | **`IDX`** | 索引安全 | 索引访问必须边界检查或形式证明。族内 1 个 ID，仅 fractal-git | `FGT-IDX-001` |
+| **`IMPACT`** | 影响切片映射守卫 | 预测试切片仅允许收敛已登记路径的测试目标，未识别 crate 路径必须回退全量目标。族内 1 个 ID，仅 fractal-git | `FGT-IMPACT-001` |
 | **`LCK`** | 锁纪律 | 禁跨 await 持锁、锁粒度最小化。族内 1 个 ID，仅 fractal-git | `FGT-LCK-001` |
+| **`MSG`** | 内核提交说明守卫 | 提交头格式、段落拓扑、密度下界、禁词、悬空占位符、项目范围、合并豁免、锚点与规则 ID 闭包。族内 12 个 ID，仅 fractal-git | `FGT-MSG-001` |
 | **`MUT`** | 内核微变异击杀率验证 | 内核微变异击杀率必须满足门禁下界契约。族内 1 个 ID，仅 fractal-git | `FGT-MUT-001` |
 | **`OBJ`** | 对象生命周期 | 对象池借还必须成对且幂等。族内 1 个 ID，仅 fractal-git | `FGT-OBJ-001` |
 | **`POL`** | 策略注入 | 策略必须可替换，禁止硬编码分支。族内 1 个 ID，仅 fractal-git | `FGT-POL-001` |

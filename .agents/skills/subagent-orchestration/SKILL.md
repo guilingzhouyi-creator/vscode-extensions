@@ -4,9 +4,9 @@ description: >-
   【触发：subagent/派发任务/多agent协同/并发开发/隔离边界/上下文预算/交叉复审】派发或编排 SubAgent、处理五层上下文预算治理(75% 脱水)时必须使用。强制同构模型、独占 Zero-Intersection Path Jail 物理防冲突与交叉复审。
 ---
 
-# subagent-orchestration — 五层上下文治理与泛化 SubAgent 调度规范
+# subagent-orchestration — 5-Layer Context Governance & Orthogonal SubAgent Dispatch
 
-本技能将**五层上下文分级与 75% 预算防衰减治理**与**全工作区 (Archetype × Posture) 泛化 SubAgent 动态装配、独占 Path Jail 防冲突及主 Agent 8 步交叉复审闭环**统一收口。
+Governs the 5-layer context hierarchy (75% budget dehydration), orthogonal `(Archetype × Posture)` SubAgent synthesis, exclusive Zero-Intersection Path Jail isolation, and the 8-step parent cross-review loop.
 
 ---
 
@@ -21,72 +21,63 @@ description: >-
 - **何时联动**：技能描述命中率低或调用含义不清 → `skill-governance` + `subagent-orchestration` + `coding-craft`；多智能体任务装配与沙箱隔离 → `subagent-orchestration` + `skill-governance` + `gate-governance`
 <!-- SKILL-LINKS:END -->
 
-## 一、 五层上下文分级架构与四重立体防线
+## 1. Five-Layer Context Budget & Four-Line Defense
 
-1. **五层上下文分级与 75% 阈值脱水预算**：
-   - 按持久度从高到低分为：**L1 全局公理 (`AGENTS.md`) $\to$ L2 规格说明 (`SPEC.md` 按需章节) $\to$ L3 目标源码与局部 AST 切片 $\to$ L4 关键错误栈前 5 行 $\to$ L5 会话历史**；
-   - **75% 预警脱水**：上下文达 75% 容量时主动淘汰无效试错过程与冗长控制台流水账，仅保留【原始目标、根因结论、刚性红线】；将刚性总规置于开头（Primacy）、当前原子任务与自检命令置于末尾（Recency），规避中间迷失效应（Lost-in-the-Middle）。
-2. **微分 Token 注入与职责解耦 (消融 3x 机械复述)**：
-   - **System Contract (5 层系统契约)**：收口工作区全局公理、沙箱前缀、领域技术栈公理、专员姿态限定与 Layer 4 自检闭环，作为不可动摇的刚性底座；
-   - **Task Shell (高 SNR 增量任务外壳)**：彻底剔除重复的 7 项通用指标复述与命令列表，仅注入【独占文件列表 (Zero-Intersection Path Jail) $\to$ 核心技术目标 $\to$ 交付前 Layer 4 自检指令】，单次启动净省 ~34% Token，杜绝 Prompt 膨胀与注意力稀释。
-3. **SubAgent 四重立体防御**：
-   - **防线 1（平台级规则注入）**：`AGENTS.md` 无条件注入所有主/子 Agent；
-   - **防线 2（Runtime 工具物理门控）**：`review` / `explore` 姿态强制 `enable_write_tools: false` 物理拔除写权限，且锁定 `enable_subagent_tools: false`；
-   - **防线 3（5 层系统契约 `system_prompt`）**：由 `synthesize-subagent.js` 动态注入全局公理、六大规范性思维约束、Path Jail、领域公理与验证命令；
-   - **防线 4（任务外壳与同构模型锁定）**：强制 `Model: "inherit"` 同构继承主会话模型，并在任务完成后执行主 Agent 8 步独立交叉复审。
+1. **5-Layer Context Hierarchy & 75% Dehydration**:
+   - Priority order: **L1 Global Axioms (`AGENTS.md`) $\to$ L2 Active Spec (`SPEC.md` section) $\to$ L3 Target Source & AST Slice $\to$ L4 Top 5 Stack Frames $\to$ L5 Session History**.
+   - At 75% context utilization, prune failed trial logs and raw console dumps, retaining only `[Goal, Root Cause, Hard Constraints]`. Place hard axioms at the start (Primacy) and the atomic task + verification commands at the end (Recency).
+2. **Differential Token Injection (`System Contract` vs. `Task Shell`)**:
+   - **5-Layer System Contract**: Synthesized by `synthesize-subagent.js` (global axioms, Path Jail prefix, domain stack axioms, posture constraints, Layer 4 verification commands).
+   - **High-SNR Task Shell**: Injects only `[Exclusive File List (Zero-Intersection Path Jail) -> Core Technical Objective -> Pre-Delivery Layer 4 Check]`, cutting prompt overhead by ~34%.
+3. **Four-Line SubAgent Defense**:
+   - **Line 1 (Rule Injection)**: `AGENTS.md` is injected into all parent/child agents.
+   - **Line 2 (Physical Tool Gating)**: `review` and `explore` postures enforce `enable_write_tools: false` and `enable_subagent_tools: false`.
+   - **Line 3 (5-Layer `system_prompt`)**: Enforces 6 reasoning invariants, Path Jail, and domain verification.
+   - **Line 4 (`Model: "inherit"` + 8-Step Cross-Review)**: Locks subagent model to parent (`Model: "inherit"`) and requires independent 8-step parent verification.
 
 ---
 
-## 二、 核心正交派生矩阵 (Archetype × Posture)
+## 2. Orthogonal `(Archetype × Posture)` Preset Matrix
 
-<!-- METRICS:BEGIN subagent-archetype-count -->**7 个**<!-- METRICS:END subagent-archetype-count -->领域原型 × 5 种作业姿态正交派生 <!-- METRICS:BEGIN subagent-preset-count -->**27 条**<!-- METRICS:END subagent-preset-count -->预置专员（单源真源为 `.agents/subagents/agents/*.md`，由 `sync-agents-mirror.js` 单向镜像至插件包；DSH 四模式 `wg-{construct,refactor,review,explore}` 见 [.agents/dsh/README.md](../../dsh/README.md)）：
+<!-- METRICS:BEGIN subagent-archetype-count -->**7 个**<!-- METRICS:END subagent-archetype-count --> domain archetypes × 5 postures derive <!-- METRICS:BEGIN subagent-preset-count -->**27 条**<!-- METRICS:END subagent-preset-count --> presets (SSOT in `.agents/subagents/agents/*.md`, mirrored by `sync-agents-mirror.js`; DSH runtime modes `wg-{construct,refactor,review,explore}` documented in [.agents/dsh/README.md](../../dsh/README.md)):
 
-| 领域原型 (`archetype`) | 物理沙箱 (Path Jail) | 预置专员 (`presets`) | 核心本地验证命令 |
+| Archetype | Path Jail Prefix | Presets | Local Verification Command |
 | :--- | :--- | :--- | :--- |
 | **`vs-extension`** | `workspace-timing/` | `wt-construct`, `wt-review`, `wt-refactor`, `wt-explore` | `cd workspace-timing && npm run compile && npm run test:fast && npm run review` |
 | **`cli-engine`** | `auto-refactor/` | `ar-construct`, `ar-review`, `ar-refactor`, `ar-explore` | `cd auto-refactor && npm run build && node scripts/gate-self.js && npm test` |
 | **`game-engine`** | `WebGames/` | `wg-construct`, `wg-review`, `wg-refactor`, `wg-explore` | `cd WebGames && python scripts/py/audit_config.py --strict && pwsh scripts/ps1/audit-all.ps1` |
 | **`git-kernel`** | `fractal-git/` | `fg-construct`, `fg-review`, `fg-refactor`, `fg-explore` | `pwsh -File fractal-git/scripts/ps1/audit-taxis.ps1 && cargo test --workspace --manifest-path fractal-git/Cargo.toml` |
 | **`infra-tool`** | `scripts/` | `infra-construct`, `infra-review`, `infra-refactor`, `infra-explore`, `infra-guardian` | `pwsh -File scripts/ps1/pre-commit-gate.ps1 && pwsh -File scripts/ps1/audit-all.ps1 -Fast` |
-| **`workspace-meta`** | 全仓顶层元治理 | `workspace-review`, `workspace-refactor`, `workspace-guardian` | `node scripts/common/generate-rule-catalog.js --check-only` |
+| **`workspace-meta`** | Workspace root | `workspace-review`, `workspace-refactor`, `workspace-guardian` | `node scripts/common/generate-rule-catalog.js --check-only` |
 | **`skill-governance`** | `.agents/skills/` | `skill-construct`, `skill-review`, `skill-refactor` | `node scripts/common/validate-skills.js && node scripts/common/sync-skills.js --check` |
 
 ---
 
-## 三、 独占 Zero-Intersection Path Jail、可重入检查点与焦点防抢占
+## 3. Zero-Intersection Path Jail & Parallel Session Isolation
 
-1. **两两完全正交公理 ($\forall i \ne j,\ \text{Jail}_i \cap \text{Jail}_j = \emptyset$)**：并行派发多个写入专员（`construct`/`refactor`）时，必须在 Task Scope 中列出精确到具名文件的独占列表，严禁整目录宽泛授权或重叠文件授权；跨顶级项目并行时可使用 `Workspace: "branch"`；
-2. **读写协同与可重入章节检查点 (`mark_chapter`)**：复杂任务遵循 `Explore/Review 只读勘测 -> Construct/Refactor 定点施工 -> Guardian 复核`；长程跨层任务必须在关键拓扑节点输出章节检查点（已完成文件基线、已通过自检断言、下一原子任务契约），支持随时无损交接或单章回滚；
-3. **后台 Agent 焦点防抢占守卫**：后台或只读 SubAgent 严禁弹出系统模态框、强制激活窗口或滥用 `element.focus()` 抢夺人类前台光标；
-4. **多会话与外部并行感知公理 (Session Isolation & Parallel Mutex)**：运行中的会话必须识别共享工作树下的外部并行会话活动；当 `git status` 中检测到不属于本任务的文件变动时，严格保持零触碰、零清理、零顺带修复，严禁运行全局破坏性还原命令（`git restore .`、`git clean -fd`），并坚持显式白名单暂存；
-5. **两层 5D ELOC 差分钳制与双轨交错节拍**：专员交付代码强制遵从单文件微观包络（新增 $\le 120/180$，删除 $\le 100$）与批次净更替准入门槛（$\ge \Theta_{\text{admission}}$）；提交推进遵循生产代码先行（Code Beat）、自审周报存证随后（Telemetry Beat）的双轨交错节拍，严禁混杂提交扩大回滚风险。
+1. **Pairwise Disjoint Jails ($\forall i \ne j,\ \text{Jail}_i \cap \text{Jail}_j = \emptyset$)**: Concurrent write subagents (`construct`/`refactor`) must receive explicit, non-overlapping file lists; use `Workspace: "branch"` when parallelizing across top-level projects.
+2. **Read-First Cadence & `mark_chapter` Checkpoints**: Follow `Explore/Review (read-only) -> Construct/Refactor (scoped write) -> Guardian (verification)`, emitting re-entrant `mark_chapter` checkpoints after major milestones.
+3. **Parallel Session Mutex**: Never touch, format, or revert (`git restore .`, `git clean -fd`) files modified by external parallel sessions in `git status -s`; stage only explicit whitelist paths (`git add <files>`).
+4. **5D ELOC Clamping & Interleaved Beats**: Enforce per-file micro bounds (add $\le 120/180$, del $\le 100$) and batch admission turnover ($\ge \Theta_{\text{admission}}$), committing production code (Code Beat) separately from audit snapshots (Telemetry Beat).
 
 ---
 
-## 四、 JIT 动态装配命令与主 Agent 8 步交叉复审 SOP
+## 4. Synthesis Commands & 8-Step Parent Cross-Review
 
 ```bash
-# 1. 动态合成 SubAgent 契约与任务外壳（越界独占文件、冲突姿态、无预置组合一律拒绝）
-node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --preset fg-construct --files "fractal-git/crates/fg-index/src/lib.rs" --task "优化无锁索引" --json
-
-# 2. 校验全仓 SubAgent 目录、原型、姿态与单源模板 1:1 合规
+node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --preset fg-construct --files "fractal-git/crates/fg-index/src/lib.rs" --task "Optimize lock-free index" --json
 node .agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js
-
-# 3. 校验技能注册表 / 原型技能清单 / 专员模板 / DSH 写路径策略 / 意图路由五源闭合
 node .agents/skills/subagent-orchestration/scripts/validate-cascade-coherence.js
 ```
+*(Pass `--intent "<natural language>"` to `synthesize-subagent.js` to route via bigram Dice similarity $\ge 0.3$ against `skill-registry.json#domains[].scenarios[]`.)*
 
-三条命令行必须全部通过才允许派发：合成器拒绝越界与无源组合，目录守卫看守 27 条预置的物理结构，闭合守卫看守跨源一致性。
-
-**意图路由**：不确定该派哪个专员时，可直接传 `--intent "自然语言描述"`。解析不靠任何独立词表，而是在 `scripts/common/skill-registry.json` 的 `domains[].scenarios[]` 里按字符二元组 Dice 相似度匹配（阈值 0.3），命中的场景同时给出原型与作业姿态；相似度不足时报错并列出可用场景，绝不猜测。场景表想新增一条可路由意图，加 `intent` + `skills` + `posture` 三项即可，闭合守卫会同时校验该 (原型 × 姿态) 是否有预置专员支撑。
-
-SubAgent 返回后，主 Agent **严禁盲信其文字汇报**，必须独立执行 **8 步交叉复审**：
-① **沙箱越界审计**（`git status` / `git diff --name-only` 比对独占列表）$\to$ ② **领域编译自检** $\to$ ③ **体积与复杂度预算**（`evaluate-eloc-budget.js` / `validate-code-density.js`）$\to$ ④ **规则目录零漂移**（`validate-rule-id-closure.js`）$\to$ ⑤ **领域专属架构守卫** $\to$ ⑥ **自审棘轮与零 High/Critical 债务防反弹** $\to$ ⑦ **领域回归测试**（`auto-refactor` <!-- METRICS:BEGIN test-suite-count -->**194 套**<!-- METRICS:END test-suite-count -->、`workspace-timing` <!-- METRICS:BEGIN ws-test-case-count -->**246 项**<!-- METRICS:END ws-test-case-count -->）$\to$ ⑧ **全仓 <!-- METRICS:BEGIN pillar-count -->**6 大支柱**<!-- METRICS:END pillar-count -->统一审查**（`audit-all.ps1 -Fast`）。
+After a SubAgent completes, the parent Agent **must** execute the **8-Step Cross-Review**:
+① **Path Jail Boundary Audit** (`git status` / `git diff --name-only`) $\to$ ② **Domain Build Check** $\to$ ③ **Volume & Density Check** (`evaluate-eloc-budget.js` / `validate-code-density.js`) $\to$ ④ **Rule ID Closure** (`validate-rule-id-closure.js`) $\to$ ⑤ **Domain Architecture Guard** $\to$ ⑥ **Self-Scan Ratchet & Zero High/Critical Debt** $\to$ ⑦ **Domain Test Suite** (`auto-refactor` <!-- METRICS:BEGIN test-suite-count -->**194 套**<!-- METRICS:END test-suite-count -->, `workspace-timing` <!-- METRICS:BEGIN ws-test-case-count -->**246 项**<!-- METRICS:END ws-test-case-count -->) $\to$ ⑧ **Workspace <!-- METRICS:BEGIN pillar-count -->**6 大支柱**<!-- METRICS:END pillar-count --> Audit** (`audit-all.ps1 -Fast`).
 
 ---
 
-## 五、 关联参考与模板资产
+## 5. References & Templates
 
-- [cross-review-closed-loop-protocol.md](references/cross-review-closed-loop-protocol.md)：四重防线、五层上下文信任分级、Path Jail 正交公理与 8 步交叉复审领域路由全表；
-- [task-shell-construct.md](templates/task-shell-construct.md)：施工/只读审查双态任务外壳与可重入会话交接检查点样板；
-- [archetype-scaffold.json](templates/archetype-scaffold.json)：领域原型与作业姿态 JSON 配置脚手架。
+- [cross-review-closed-loop-protocol.md](references/cross-review-closed-loop-protocol.md): 4-line defense, 5-layer context priority, Path Jail disjointness & 8-step cross-review routing table.
+- [task-shell-construct.md](templates/task-shell-construct.md): Write/read-only task shell & `mark_chapter` checkpoint template.
+- [archetype-scaffold.json](templates/archetype-scaffold.json): Archetype & posture JSON configuration scaffold.

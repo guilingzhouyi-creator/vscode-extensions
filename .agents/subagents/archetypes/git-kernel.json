@@ -35,7 +35,8 @@
     "facade-discipline",
     "defensive-security-and-taint-safety",
     "debugging-and-error-recovery",
-    "constraint-driven-development"
+    "constraint-driven-development",
+    "tiered-cache-and-wal-persistence"
   ],
   "rigidAxioms": [
     "10-subsystem unidirectional hierarchy: fg-core/object/index/algorithms/pools/storage/native/topology/transport/gate; zero circular deps.",

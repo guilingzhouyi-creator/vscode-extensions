@@ -4,9 +4,9 @@ description: >-
   【触发：删除文件/rm/注入/污点追踪/变量遮蔽/路径穿越/清理目录】执行破坏性文件操作、清理目录、暴露端点或处理外部输入时触发。落实递归删除三步污点守卫(GUARD-DESTR-001)与只读自动变量防篡改。
 ---
 
-# defensive-security-and-taint-safety — 防御性安全、污点数据流与破坏性操作守卫规范
+# defensive-security-and-taint-safety — Taint Dataflow, Destructive-Op Guards & Exposure Isolation
 
-本技能确立了工作区在跨平台脚本、文件系统操作、子进程派生、前后端打包边界与凭证管理中的**零信任污点数据流（Taint Dataflow）思维与刚性安全守卫**。回答「在执行任何不可逆副作用或跨边界暴露前，必须完成哪些安全证明」。
+Enforces zero-trust taint tracking for recursive file deletion (`GUARD-DESTR-001`), read-only host variable protection (`GUARD-VAR-001`), subprocess injection defense, and client/bundle exposure isolation (`SEC-EXP-*` / `PROD-HYG-*`).
 
 ---
 
@@ -21,71 +21,49 @@ description: >-
 - **何时联动**：破坏性删除或路径穿越 → `defensive-security-and-taint-safety` + `gate-governance` + `coding-craft`；索引树并发写入或崩溃恢复 → `fractal-git-dev` + `state-concurrency-and-crash-recovery` + `defensive-security-and-taint-safety`
 <!-- SKILL-LINKS:END -->
 
-## 一、 适用场景与触发条件
+## 1. Three-Step Taint Guard for Recursive Deletion (`GUARD-DESTR-001` / `EXT-DIR-001`)
 
-在以下任一研发或审查场景中，必须激活本技能：
-1. **编写或修改含文件删除、目录清空、覆盖移动的代码或脚本**（`rm -rf`、`Remove-Item -Recurse`、`fs.rmSync`、`shutil.rmtree`）；
-2. **编写 PowerShell / Bash 脚本处理路径拼接、环境变量展开或循环删除**；
-3. **设计客户端/Webview 暴露接口、打包配置（`.vsix` / 前端 Bundle）或环境变量注入**；
-4. **排查 `GUARD-DESTR-001`、`GUARD-VAR-001`、`SEC-*`、`PROD-*`、`EXT-DIR-001` 门禁阻断**。
+`shell-safety` and `scripts/common/validate-destructive-ops.js` trace taint across **assignment chains and loop iterator aliases**. Every recursive delete (`rm -rf`, `Remove-Item -Recurse`, `fs.rmSync`, `shutil.rmtree`) must prove three preconditions:
 
----
-
-## 二、 破坏性文件操作三步污点守卫 (`GUARD-DESTR-001` / `EXT-DIR-001`)
-
-递归删除是工作区破坏半径最大的不可逆操作。静态分析器 `shell-safety` 与守卫 `scripts/common/validate-destructive-ops.js` 会沿**变量赋值链与循环迭代器别名**追踪污点源。任何递归删除操作前必须完成以下**三步前置证明**：
-
-| 防御步骤 | 刚性验证条件 | 典型致命反模式（一票否决） |
+| Step | Mandatory Precondition | Blocked Fatal Anti-Pattern |
 | :--- | :--- | :--- |
-| **1. 非空与去根校验** | 目标变量非空、非空白，且绝不等于 `/`、`\`、`~`、`$HOME`、`$env:USERPROFILE` 或盘符根目录 `C:\` | `rm -rf "$TARGET_DIR/"`（当 `$TARGET_DIR` 未定义或为空时直接退化为 `rm -rf /`） |
-| **2. 规范化绝对路径解析** | 必须先经 `path.resolve` / `Resolve-Path` / `realpath -m` 消除 `..` 路径穿越 | `fs.rmSync(path.join(base, userInput), { recursive: true })` 未拦截 `../../` |
-| **3. 沙箱前缀与深度断言** | 规范化路径必须严格以受控沙箱根目录（`REPO_ROOT` 或 `os.tmpdir()`）外加 `/` 开头，且相对深度 $\ge 1$ | 直接对由 `$HOME` 派生的别名变量（如 `$d = $HOME; foreach ($x in $d) { rm -rf $x }`）执行删除 |
+| **1. Non-Empty & Non-Root** | Target is non-empty, non-whitespace, and $\notin \{ \texttt{/}, \texttt{\\}, \texttt{\~}, \texttt{\$HOME}, \texttt{\$env:USERPROFILE}, \text{drive root} \}$ | `rm -rf "$TARGET_DIR/"` when `$TARGET_DIR` is unset |
+| **2. Canonical Path Resolution** | Resolve via `path.resolve` / `Resolve-Path` / `realpath -m` to strip `..` traversal segments | `fs.rmSync(path.join(base, userInput), { recursive: true })` without prefix verification |
+| **3. Sandbox Prefix & Depth $\ge 1$** | Resolved path starts with `REPO_ROOT/` or `os.tmpdir()/` and has relative depth $\ge 1$ | Deleting a loop alias derived from `$HOME` (`$d = $HOME; foreach ($x in $d) { rm -rf $x }`) |
 
-- **PowerShell `rm` 包装器双路守卫**：在 `scripts/ps1/lib/linux-parity.ps1` 中，无论走 GNU `rm.exe` 还是降级 `Remove-Item`，都必须在调用前执行 `Assert-SafeRecursiveRemoveTarget` 守卫；
-- **多会话并发下的零全局破坏性还原**：在共享工作区中，严禁运行全局性工作树丢弃命令（`git checkout -- .`、`git restore .`、`git clean -fd`、`git reset --hard`）。此类命令属于全仓不可逆破坏性操作，会直接销毁外部并行会话中正在编写但尚未暂存的代码资产；若需放弃改动，必须精确指向本会话的具体文件路径。
-
----
-
-## 三、 宿主只读变量防遮蔽与命令注入隔离 (`GUARD-VAR-001` / `SH-SEC-001` / `PS-SEC-001`)
-
-1. **严禁写入或遮蔽 PowerShell 只读自动变量 (`GUARD-VAR-001`)**：
-   - `$HOME`、`$PID`、`$PWD`、`$PSHome`、`$args`、`$input`、`$_`、`$?`、`$LASTEXITCODE`、`$MyInvocation`、`$PSBoundParameters`、`$true`、`$false`、`$null` 属于宿主保留自动变量；
-   - 严禁作为赋值左值、`param()` 形参名、`foreach ($HOME in ...)` 循环变量或 `catch` 绑定变量（在真实宿主上会抛出 `VariableNotWritable` 致命异常或污染全局会话）。
-2. **零动态代码拼接执行 (`SEC-VUL-001` / `PS-SEC-001` / `SH-SEC-001`)**：
-   - 严禁使用 `eval`、`new Function()`、`Invoke-Expression` (`iex`) 或将未转义变量拼入 `child_process.exec`；
-   - 子进程调用一律使用参数数组分离形式（`execFile` / `spawn(cmd, argsArray)` / PowerShell 标准参数传递）。
+- **Dual-Path `rm` Guard**: In `scripts/ps1/lib/linux-parity.ps1`, both GNU `rm.exe` and fallback `Remove-Item` bindings must invoke `Test-LinuxParityRemovalTarget` before execution.
+- **Parallel Session Protection**: Never run global destructive resets (`git checkout -- .`, `git restore .`, `git clean -fd`, `git reset --hard`) in shared worktrees.
 
 ---
 
-## 四、 前后端暴露面隔离与生产构建洁净度 (`SEC-EXP-*` / `PROD-HYG-*`)
+## 2. Read-Only Auto-Variables & Command Injection Defense (`GUARD-VAR-001` / `SH-SEC-001` / `PS-SEC-001`)
 
-1. **客户端暴露面五条铁律 (`SEC-EXP-001` ~ `SEC-EXP-005`)**：
-   - **禁止服务端密钥/内部配置进前端包 (`SEC-EXP-001` / `SEC-LEAK-001`)**：私钥、数据库连接串与内部管理端点严禁被打包进 Webview 或前端产物；
-   - **禁止以 UI 隐藏代替权限校验 (`SEC-EXP-002`)**：前端 CSS 隐藏或条件渲染不具备任何安全边界效力，权限校验必须在后端/宿主侧强制执行；
-   - **禁止打包实验或调试路由 (`SEC-EXP-004` / `SEC-EXP-005`)**：生产构建必须剥离 `__debug`、测试桩与未鉴权内部诊断端点。
-2. **生产构建洁净度 (`PROD-HYG-001` ~ `PROD-HYG-003`)**：
-   - 发布产物严禁残留调试 `console.log` / 未决 `TODO`（`PROD-HYG-001`）、严禁外泄内联或独立 `.map` Sourcemap（`PROD-HYG-002`）、严禁将 `process.env` 全量对象序列化注入客户端包（`PROD-HYG-003`）。
-3. **高熵凭证零硬编码 (`secret-detected` / `high-entropy-token` / `HC-SECRET`)**：
-   - 源码、测试夹具与技能模板中严禁出现真实 API Key、Bearer Token 或私钥块；测试用伪造凭证必须使用明显低熵占位符（如 `test-placeholder-token-0000`）。
+1. **No Writes or Shadowing on PowerShell Read-Only Variables (`GUARD-VAR-001`)**:
+   - Never assign to, declare as `param()`, or bind in `foreach` / `catch`: `$HOME`, `$PID`, `$PSHOME`, `$Host`, `$Error`, `$ExecutionContext`, `$ShellId`, `$PSVersionTable`, `$IsWindows`, `$IsLinux`, `$IsMacOS`, `$PSCulture`, `$PSUICulture`, `$PSEdition`.
+2. **Zero Dynamic Code Evaluation (`SEC-VUL-001` / `PS-SEC-001` / `SH-SEC-001`)**:
+   - Forbid `eval`, `new Function()`, `Invoke-Expression` (`iex`), and unescaped string interpolation in `child_process.exec`. Always pass argument arrays (`execFile` / `spawn(cmd, args)`).
 
 ---
 
-## 五、 本地预审命令
+## 3. Client Exposure & Production Bundle Hygiene (`SEC-EXP-*` / `PROD-HYG-*`)
+
+1. **Client Exposure Boundary (`SEC-EXP-001` ~ `SEC-EXP-005`)**:
+   - Never bundle server secrets, private keys, DB connection strings, or internal admin endpoints into Webviews or frontend assets (`SEC-EXP-001` / `SEC-LEAK-001`).
+   - Never rely on CSS hiding or client-side conditional rendering for access control (`SEC-EXP-002`).
+   - Strip `__debug` routes, test stubs, and unauthenticated diagnostic endpoints from production builds (`SEC-EXP-004` / `SEC-EXP-005`).
+2. **Production Bundle Hygiene (`PROD-HYG-001` ~ `PROD-HYG-003`) & Secrets (`HC-SECRET`)**:
+   - Strip debug `console.log` / `TODO` (`PROD-HYG-001`), externalize/strip sourcemaps (`PROD-HYG-002`), and never serialize raw `process.env` into client bundles (`PROD-HYG-003`).
+   - Never hardcode high-entropy tokens (`secret-detected` / `high-entropy-token` / `HC-SECRET`); use low-entropy placeholders (`test-placeholder-token-0000`) in fixtures.
+
+---
+
+## 4. Verification & JIT Assets
 
 ```powershell
-# 1. 运行跨语言破坏性文件操作与只读变量遮蔽守卫
 node scripts/common/validate-destructive-ops.js
-
-# 2. 运行安全沙箱清理样板与内存负样本自检探针
 node .agents/skills/defensive-security-and-taint-safety/templates/safe-sandbox-cleanup.js
-
-# 3. 运行 Linux 命令面与 rm 双路前置守卫一致性校验
 node scripts/common/validate-shell-parity.js
 ```
 
----
-
-## 六、 关联深水区参考与实操样板
-
-- [taint-dataflow-and-exposure-boundaries.md](references/taint-dataflow-and-exposure-boundaries.md)：赋值链/循环别名污点传播判定规则、跨语言路径沙箱守卫范式与前后端暴露面审计清单；
-- [safe-sandbox-cleanup.js](templates/safe-sandbox-cleanup.js)：内置三步污点证明与正反双向自检探针的安全沙箱递归清理标准样板。
+- [taint-dataflow-and-exposure-boundaries.md](references/taint-dataflow-and-exposure-boundaries.md): Assignment/loop-alias taint propagation rules, cross-language sandbox guards, and client exposure audit checklist.
+- [safe-sandbox-cleanup.js](templates/safe-sandbox-cleanup.js): 3-step taint-verified recursive sandbox cleanup template with built-in `runSelfProbes()`.

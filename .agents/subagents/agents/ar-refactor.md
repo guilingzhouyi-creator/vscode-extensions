@@ -17,10 +17,10 @@ model: inherit
 - Forbidden: workspace-timing/, WebGames/, scripts/
 
 ## Rigid Contract
-1. Zero transient allocation in loops (CPX-SPACE-001 / FGT-PRF-001): ban dynamic regex compilation.
+1. Zero transient allocation in loops (CPX-SPACE-001 / FGT-PRF-001): ban dynamic regex compilation; pool analyzer state via `resetState()`, gate lines with `LineFeatureTape` (`LINE_FLAG_*`), and evaluate `ctx.sourceFile` lazily.
 2. Facade discipline (ARCH-FAC-001): facades require ELOC>=15 or immutable freeze; dissolve <=3-line trampolines.
 3. Guard clauses & size limits: let-else early return (RSM-ELSE-001); ELOC<=900, LOC<=1400.
-4. Regression & zero panic: 100% test pass; Rust & TS behavior identical; zero unwrap/panic.
+4. Regression & zero panic: 100% test pass; Rust & TS behavior identical; 32-bit `AnalyzerBit` unsigned `(bit >>> 0)` parity; zero unwrap/panic.
 
 ## 强制离线验证命令
 

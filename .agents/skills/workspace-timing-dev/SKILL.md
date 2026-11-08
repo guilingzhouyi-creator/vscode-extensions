@@ -4,9 +4,9 @@ description: >-
   【触发：计时扩展/VS扩展/计时/UI国际化/环形缓冲/崩溃安全/双语字典】开发或维护 workspace-timing 扩展时触发。落实五层解耦、RingBuffer 与 Journal 双写崩溃安全、双语字典(zh-CN/en)与暗色 UI。
 ---
 
-# workspace-timing-dev — VS Code 扩展五层架构、崩溃安全与双语字典规范
+# workspace-timing-dev — VS Code Extension 5-Layer Architecture, Crash Safety & Bilingual i18n
 
-本技能规范了 `workspace-timing/` 扩展的五层单向解耦、RingBuffer + Journal 崩溃安全持久化、跨自然日原子切分、100% 双语字典覆盖及 L0~L5 审查规则对接。
+Governs the `workspace-timing/` 5-layer unidirectional architecture, RingBuffer + Journal crash-safe persistence, cross-midnight natural-day splitting, 100% bilingual dictionary parity (`zh-CN`/`en`), and `L0`–`L5` review gates.
 
 ---
 
@@ -21,39 +21,38 @@ description: >-
 - **何时联动**：计时视图卡顿或丢帧 → `workspace-timing-dev` + `interaction-design-physics` + `algorithmic-operator-engineering`；进程被杀后缓冲区数据丢失 → `workspace-timing-dev` + `state-concurrency-and-crash-recovery` + `test-benchmark-engineering`
 <!-- SKILL-LINKS:END -->
 
-## 一、 五层单向解耦架构与无头可测性
+## 1. Five-Layer Unidirectional Architecture & Headless Testability
 
-依赖严格自顶向下单向流动：`UI 表现层 (Webview/StatusBar) -> Engine 核心引擎 (TimerEngine/TimeAggregator) -> Storage 存储协调 (StorageCoordinator/RingBuffer/Journal/HistoryFolder) -> Analytics 遥测层 -> Shared 通用契约 (i18n/DTO)`。
-- **零反向依赖 (`LAY-IMPORT` / `LAY-CYCLE`)**：Storage / Engine / Analytics / Shared 严禁反向引用 UI 层或 `vscode.window` API；
-- **纯逻辑脱机单测**：核心计时与聚合算法 100% 支持脱离 VS Code 宿主在 Mock Clock 下运行单测（<!-- METRICS:BEGIN ws-test-case-count -->**246 项**<!-- METRICS:END ws-test-case-count -->用例）。
-
----
-
-## 二、 RingBuffer + Journal 崩溃安全与跨自然日工时守恒
-
-1. **三级崩溃安全防线**：
-   - **内存 RingBuffer**：秒级时间片内存聚合，零磁盘 I/O 掉帧；
-   - **增量追加 Journal (`[DELTA]`)**：心跳追加单行 NDJSON，异常断电或崩溃重启后自动无损回放（详见 [state-concurrency-and-crash-recovery](../state-concurrency-and-crash-recovery/SKILL.md)）；
-   - **全量检查点原子替换 (`stagingUri`)**：先写入 `stagingUri` 校验完整性，再原子重命名替换目标文件；危险重置前强制写入前置快照。
-2. **`HistoryFolder` 有界折叠与跨自然日切分 (`segmentedSessions`)**：
-   - 单日会话超 20 条按 FIFO 淘汰并沉淀入 `dailyTotals` 日桶，旧周会话自动归档，严格满足总工时守恒；
-   - 休眠唤醒（`resumeFromSleep`）跨越午夜或跨周时，经 `TimeAggregator.splitByNaturalDay(startMs, endMs)` 拆分为 `segmentedSessions`；当 `rawManual === 0 && rawAi === 0 && durationMs > 0` 时，必须将全部 `segDuration` 正向回退计入 `manualMs`，严禁比例乘零吞没时长。
+Dependencies flow strictly downward: `UI (Webview/StatusBar) -> Engine (TimerEngine/TimeAggregator) -> Storage (StorageCoordinator/RingBuffer/Journal/HistoryFolder) -> Analytics -> Shared (i18n/DTO)`.
+- **Zero Upward Imports (`LAY-IMPORT` / `LAY-CYCLE`)**: Storage, Engine, Analytics, and Shared must never import UI modules or `vscode.window`.
+- **Host-Free Unit Tests**: Core timing and aggregation logic runs in-memory under Mock Clock across <!-- METRICS:BEGIN ws-test-case-count -->**246 项**<!-- METRICS:END ws-test-case-count --> unit test cases.
 
 ---
 
-## 三、 UI 100% 双语字典 (`HC-UI-STRING`) 与暗色高对比度视觉契约
+## 2. Three-Tier Crash Recovery & Cross-Midnight Duration Conservation
 
-1. **100% 双语字典镜像**：所有界面文案经 `i18n.t(key)` 提取，在 `src/i18n/zh-CN.ts` 与 `src/i18n/en.ts`（及 `package.nls*.json`）双向对齐；严禁硬编码中英文或向用户暴露 `RingBuffer`/`NDJSON`/`dailyTotals` 等内部术语；
-2. **暗色高对比度与抗抖动排版**：色彩经 `:root` 的 `var(--vscode-*)` 驱动，SVG 与折线图刻度文字强制使用 `#ffffff` 或明亮主题变量（WCAG AA+）；动态数字声明 `font-variant-numeric: tabular-nums`，遵循单闭合边框与 IME 合成态互锁（见 [interaction-design-physics](../interaction-design-physics/SKILL.md)）。
+1. **Three-Tier Persistence**:
+   - **In-Memory `RingBuffer`**: Aggregates second-level slices in memory with zero disk I/O jitter.
+   - **Append-Only Journal (`[DELTA]`)**: Appends single-line NDJSON heartbeats for idempotent replay after crashes or power loss ([state-concurrency-and-crash-recovery](../state-concurrency-and-crash-recovery/SKILL.md)).
+   - **Atomic Checkpoint (`stagingUri`)**: Writes full snapshots to `stagingUri`, verifies integrity, and atomically renames over the target file (creating a safety snapshot before destructive resets).
+2. **`HistoryFolder` Folding & Cross-Midnight Splitting (`segmentedSessions`)**:
+   - Folds sessions exceeding 20 per day (FIFO) and prior weeks into `dailyTotals` while strictly conserving total duration.
+   - On wake from sleep across midnight/week boundaries (`resumeFromSleep`), `TimeAggregator.splitByNaturalDay(startMs, endMs)` splits intervals into `segmentedSessions`; when `rawManual === 0 && rawAi === 0 && durationMs > 0`, attribute the full `segDuration` to `manualMs` rather than zeroing it out.
 
 ---
 
-## 四、 L0~L5 审查门禁（单源 `review-rules.json`）与验证命令
+## 3. 100% Bilingual i18n (`HC-UI-STRING`) & High-Contrast Dark UI
+
+1. **100% Bilingual Parity**: Route all user-visible strings through `i18n.t(key)` with 1:1 key parity between `src/i18n/zh-CN.ts` and `src/i18n/en.ts` (plus `package.nls*.json`); never hardcode UI literals or expose internal identifiers (`RingBuffer`, `NDJSON`, `dailyTotals`).
+2. **Dark-First Visual Physics**: Bind colors to `var(--vscode-*)`, enforce `#ffffff` or high-contrast theme tokens on SVG/chart axis labels (WCAG AA+), apply `font-variant-numeric: tabular-nums` on live counters, and obey the 1-border rule and IME composition interlock ([interaction-design-physics](../interaction-design-physics/SKILL.md)).
+
+---
+
+## 4. Verification & JIT Assets
 
 ```bash
-cd workspace-timing
-npm run compile && npm run test:fast && npm run review
+cd workspace-timing && npm run compile && npm run test:fast && npm run review
 ```
 
-- [five-layer-architecture-and-i18n.md](references/five-layer-architecture-and-i18n.md)：五层架构边界、`[DELTA]` 日志回放方程、工时守恒定理与 L0~L5 审查层级详解；
-- [i18n-dictionary-template.json](templates/i18n-dictionary-template.json) / [time-aggregator-test-skeleton.ts](templates/time-aggregator-test-skeleton.ts)：双语字典样板与跨午夜工时守恒确定性单测脚手架。
+- [five-layer-architecture-and-i18n.md](references/five-layer-architecture-and-i18n.md): 5-layer boundary rules, `[DELTA]` journal replay equations, duration conservation theorem, and `L0`–`L5` review matrix.
+- [i18n-dictionary-template.json](templates/i18n-dictionary-template.json) / [time-aggregator-test-skeleton.ts](templates/time-aggregator-test-skeleton.ts): Bilingual dictionary and cross-midnight duration conservation test templates.

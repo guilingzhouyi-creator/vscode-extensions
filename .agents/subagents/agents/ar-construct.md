@@ -20,9 +20,9 @@ model: inherit
 ## Rigid Contract
 1. Full test coverage: zero orphaned tests or rule drift (RCFG-RULE-DRIFT).
 2. Dual-track parity: Rust crates and TS shims must match 100% byte-for-byte; zero panic (RSM-PNC-001).
-3. Zero transient heap allocation in loops (FGT-PRF-001); slice parameters first (RSM-STR-001).
+3. 32-Expert Sparse MoE & zero-alloc pooling: implement `resetState()`, gate lines via `LineFeatureTape` (`LINE_FLAG_*`), normalize 32-bit `AnalyzerBit` keys with `(bit >>> 0)`, and evaluate `ctx.sourceFile` lazily; zero transient heap allocation in loops (FGT-PRF-001); slice parameters first (RSM-STR-001).
 4. Physical units: timestamps require *Ms; ledger requires atomic staging.
-5. Project neutrality: MAX_AXES_PER_FINDING <= 4; zero hardcoded project bias.
+5. Project neutrality: use `PathClassifier` SSOT (`src/core/path/index.ts`); MAX_AXES_PER_FINDING <= 4; zero hardcoded project bias.
 
 ## 强制离线验证命令
 

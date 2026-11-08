@@ -4,12 +4,12 @@ description: >-
   【触发：WebGames/Godot/GDScript/游戏逻辑/写玩法/对象池/快照注入】开发或修改 WebGames 游戏模块时必须触发。坚持全域 GameConfig 配置驱动、视图表现层单向快照注入(apply_snapshot)与循环零堆分配(ADV-PRF-002)。
 ---
 
-# webgames-workflow — Godot 4.7 引擎纯逻辑解耦与配置驱动开发规范
+# webgames-workflow — Godot 4.7 Headless Domain Decoupling & `GameConfig` Workflow
 
-本技能规范了 `WebGames/` 项目中业务逻辑无头解耦、全域配置驱动、前端单向快照注入、对象池循环零堆分配（`ADV-PRF-002`）及原生 Python 静态提取门禁。
+Governs `WebGames/` headless domain simulation, `GameConfig` SSOT tables, unidirectional view snapshot injection (`apply_snapshot`), object-pool zero loop allocation (`ADV-PRF-002`), and Python static AST gates.
 
 > [!IMPORTANT]
-> **【非 Web 游戏刚性红线】**：`WebGames/`（历史命名）是**基于 Godot 4.7 引擎与 GDScript 的卡拉尔世界纯逻辑解耦独立系统**，面向桌面与无头架构。**严禁引入任何 DOM、HTML、CSS、浏览器 API 或 JS/TS Web 前端技术栈！**
+> **Non-Web Native Godot Boundary**: `WebGames/` (historical folder name) is a **standalone Godot 4.7 & GDScript simulation engine** targeting desktop and headless runners. **Never introduce DOM, HTML, CSS, browser APIs, or JS/TS web stacks into `WebGames/`.**
 
 ---
 
@@ -24,38 +24,38 @@ description: >-
 - **何时联动**：新玩法先出四阶段方案 → `spec-driven-development` + `webgames-workflow` + `test-benchmark-engineering`；热路径循环里出现对象分配 → `webgames-workflow` + `algorithmic-operator-engineering` + `complexity-budget`
 <!-- SKILL-LINKS:END -->
 
-## 一、 两轮施工周期与四阶段案卷铁律
+## 1. Two-Round Delivery Cycle & Four-Stage Blueprint Dossier
 
-在 `WebGames/docs/路线图/01_短期施工区/` 研发时，严格执行两轮周期：
-1. **第 1 轮（检查 $\to$ 方案编制 $\to$ 严禁提前编码）**：核对序号连续性，依据 [four-stage-blueprint-template.md](templates/four-stage-blueprint-template.md) 编写 4 份分阶段规范蓝图（`001_数据契约与实体定义.md`、`002_业务逻辑实现与状态机流转.md`、`003_全域配置驱动与泛化路由接入.md`、`004_全量回归验收与防复发门禁测试矩阵.md`，案卷目录严禁自造 `README.md` 或多余文件），**汇报并等待用户批准，未获批前严禁写业务代码或改路线图状态**；
-2. **第 2 轮（获批编码 $\to$ 全量验收 $\to$ 闭环归位）**：获批后按阶段 1~4 编码，通过 Python 静态门禁与无头测试后更新 `路线图总索引.md`（每满 10 个案卷归档至 `03_短期施工档案卷/`）。
-
----
-
-## 二、 全域配置驱动、表现层单向快照与 MOD SDK 契约
-
-1. **全域 `GameConfig` 驱动**：所有领域数值统一经 `GameConfig.get_*` 从 `config/domains/<domain>/core.json` 读取（严禁根目录平铺配置表），支持点分路径与热重载；
-2. **账号仓储与 MOD SDK 双向零漂移**：
-   - `AccountDiskRepository` 负责原子落盘，`AccountSessionStore` 与 `WorldGateway` 执行会话幂等恢复与世界准入校验；
-   - `sync_mod_sdk.py` 经 AST 静态萃取公共契约至 `WebGames/mods/core_sdk/`，由 `audit_sdk_sync.py` 看守 Core 与 `core_sdk` 100% 差分等价（公开规范见 [SPECIFICATION.md](../../../WebGames/mod_sdk/docs/SPECIFICATION.md)、[AGENT_INTERACTION.md](../../../WebGames/mod_sdk/docs/AGENT_INTERACTION.md)、[COMPANION_PROTOCOL.md](../../../WebGames/mod_sdk/docs/COMPANION_PROTOCOL.md)、[TOTAL_CONVERSION_SPEC.md](../../../WebGames/mod_sdk/docs/TOTAL_CONVERSION_SPEC.md)、[ART_AND_ASSETS_GUIDE.md](../../../WebGames/mod_sdk/docs/ART_AND_ASSETS_GUIDE.md)）；
-3. **前端表现层四大红线 (`frontend/views/**`)**：
-   - **视图零业务计算**：严禁调用 `randf()`/`randi()` 或内嵌战斗/汇率公式；
-   - **强类型 Tabs 控制器**：显式声明强类型子视图引用（如 `var _overview_view: OverviewView`），消除弱类型缩写与反射穿透；
-   - **单向快照注入**：业务数据唯一入口为 `apply_snapshot(snapshot: Dictionary) -> void`，严禁直读后端求解器私有状态。
+When developing under `WebGames/docs/路线图/01_短期施工区/`:
+1. **Round 1 (Blueprint First — No Production Code)**: Verify sequence continuity, generate the 4 stage files (`001_数据契约与实体定义.md`, `002_业务逻辑实现与状态机流转.md`, `003_全域配置驱动与泛化路由接入.md`, `004_全量回归验收与防复发门禁测试矩阵.md` per [four-stage-blueprint-template.md](templates/four-stage-blueprint-template.md); zero extra `README.md` or scratch files), and wait for user approval before writing GDScript.
+2. **Round 2 (Implementation & Archival)**: Implement stages 1–4, pass Python static audits and headless Godot tests, update `路线图总索引.md`, and archive every 10 completed dossiers into `03_短期施工档案卷/`.
 
 ---
 
-## 三、 对象池循环零分配 (`ADV-PRF-002`) 与无头测试工程化
+## 2. `GameConfig` SSOT, Unidirectional Snapshots & MOD SDK Parity
 
-1. **高承压对象池与定长环形缓冲**：帧循环（`_process` / `_physics_process`）与高频事件流严禁裸调 `.new()`（`ADV-PRF-002`）；池化对象必须实现 `reset_state()` 对称借还；轨迹历史采用定长 32 槽位 RingBuffer 与容器原位注入；
-2. **原生 Python 静态门禁与无头测试汇合**：
-   - `audit_arch_static.py` 剥离 Godot 冷启动直接执行 AST 审计（提速 87.5%）；
-   - 测试脚本按 `tests/unit/{domains,frontend,infrastructure}/` 归位（根目录 0 散落），继承 `TestCase` 并在 `domains.json` 与 `test_registry.gd` 双向注册；
-   - 多线程派发器（如 `AgentAsyncDispatcher`）必须内置 `Mutex` 防重入并提供 `pump()` / `flush()` / `teardown()`，测试清理分支显式 `flush()` 防无头退出死锁，超时自动打印日志末尾 50 行。
+1. **`GameConfig` SSOT**: Read all domain parameters via `GameConfig.get_*` / `GameConfig.msg` from `config/domains/<domain>/core.json` (never scatter root config tables); use `DeterministicRNG` instead of bare `randf()` / `randi()`.
+2. **Account Persistence & MOD SDK Zero Drift**:
+   - `AccountDiskRepository` enforces atomic disk writes; `AccountSessionStore` and `WorldGateway` handle idempotent session recovery.
+   - `sync_mod_sdk.py` extracts public contracts into `WebGames/mods/core_sdk/`, verified for 100% parity by `audit_sdk_sync.py` (specs: [SPECIFICATION.md](../../../WebGames/mod_sdk/docs/SPECIFICATION.md), [AGENT_INTERACTION.md](../../../WebGames/mod_sdk/docs/AGENT_INTERACTION.md), [COMPANION_PROTOCOL.md](../../../WebGames/mod_sdk/docs/COMPANION_PROTOCOL.md), [TOTAL_CONVERSION_SPEC.md](../../../WebGames/mod_sdk/docs/TOTAL_CONVERSION_SPEC.md), [ART_AND_ASSETS_GUIDE.md](../../../WebGames/mod_sdk/docs/ART_AND_ASSETS_GUIDE.md)).
+3. **Frontend View Redlines (`frontend/views/**`)**:
+   - Zero business formulas or RNG calls inside views;
+   - Declare strongly typed subview references (`var _overview_view: OverviewView`);
+   - Inject state exclusively via `apply_snapshot(snapshot: Dictionary) -> void` without reading backend solver state directly.
 
 ---
 
-## 四、 验证命令与关联资产
+## 3. Object-Pool Zero Loop Allocation (`ADV-PRF-002`) & Headless Testing
+
+1. **Zero Loop Allocation (`ADV-PRF-002`)**: Forbid `.new()` inside `_process` / `_physics_process` or hot event loops; pool entities with symmetric `reset_state()`, 32-slot RingBuffers, and in-place dictionary/array injection.
+2. **Static AST Gate & Headless Runner**:
+   - `audit_arch_static.py` audits GDScript ASTs without Godot cold-start overhead.
+   - Place unit tests under `tests/unit/{domains,frontend,infrastructure}/` inheriting `TestCase`, registered in both `config/infrastructure/domains.json` and `tests/test_registry.gd`.
+   - Threaded dispatchers (`AgentAsyncDispatcher`) must guard state with `Mutex` and expose `pump()`, `flush()`, and `teardown()` called in test teardown.
+
+---
+
+## 4. Verification & JIT Assets
 
 ```bash
 python WebGames/scripts/py/audit_arch_static.py && python WebGames/scripts/py/audit_sdk_sync.py
@@ -63,6 +63,6 @@ pwsh -File WebGames/scripts/ps1/check-gdscript.ps1 && pwsh -File WebGames/script
 pwsh -File WebGames/scripts/ps1/audit-all.ps1
 ```
 
-- [godot-architecture-non-web.md](references/godot-architecture-non-web.md)：三层解耦拓扑、非 Web 红线与 `ADV-PRF-002` 对象池 `reset_state()` 深度规范；
-- [four-stage-blueprint-template.md](templates/four-stage-blueprint-template.md)：阶段 001~004 四阶段技术规范蓝图一体化标准骨架；
-- [tab_view_controller_skeleton.gd](templates/tab_view_controller_skeleton.gd) / [test_case_skeleton.gd](templates/test_case_skeleton.gd)：强类型视图控制器与无头单测样板（编码风格须遵循 [GD老练风格硬性规范标准.md](../../../WebGames/docs/模板/GD老练风格硬性规范标准.md)）。
+- [godot-architecture-non-web.md](references/godot-architecture-non-web.md): 3-layer decoupling, non-Web boundary, and `ADV-PRF-002` object-pool `reset_state()` patterns.
+- [four-stage-blueprint-template.md](templates/four-stage-blueprint-template.md): 4-stage blueprint dossier template.
+- [tab_view_controller_skeleton.gd](templates/tab_view_controller_skeleton.gd) / [test_case_skeleton.gd](templates/test_case_skeleton.gd): Strongly typed view controller and headless `TestCase` templates (conforming to [GD老练风格硬性规范标准.md](../../../WebGames/docs/模板/GD老练风格硬性规范标准.md)).

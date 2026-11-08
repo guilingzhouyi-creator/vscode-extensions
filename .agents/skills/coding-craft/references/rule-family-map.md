@@ -423,11 +423,11 @@
 
 - warning / info：`FGT-FAC-001`
 
-### `GAT` — 门禁自审
+### `GAT` — 门禁自审与差分包络
 
-准则：内核门禁必须自证检出能力。
+准则：内核门禁必须自证检出能力；暂存差分批次包络、单文件边界、有效密度与连败收敛受严格约束。
 
-- **error**：`FGT-GAT-001`
+- **error**：`FGT-GAT-001`、`GAT-BATCH-001`、`GAT-BOUND-001`、`GAT-DENS-001`、`GAT-EXMP-001`、`GAT-STREAK-001`
 
 ### `IDX` — 索引安全
 
@@ -435,11 +435,23 @@
 
 - **error**：`FGT-IDX-001`
 
+### `IMPACT` — 影响切片映射守卫
+
+准则：预测试切片仅允许收敛已登记路径的测试目标，未识别 crate 路径必须回退全量目标。
+
+- **error**：`FGT-IMPACT-001`
+
 ### `LCK` — 锁纪律
 
 准则：禁跨 await 持锁、锁粒度最小化。
 
 - warning / info：`FGT-LCK-001`
+
+### `MSG` — 内核提交说明守卫
+
+准则：提交头格式、段落拓扑、密度下界、禁词、悬空占位符、项目范围、合并豁免、锚点与规则 ID 闭包。
+
+- **error**：`FGT-MSG-001`、`FGT-MSG-002`、`FGT-MSG-003`、`FGT-MSG-004`、`FGT-MSG-005`、`FGT-MSG-006`、`FGT-MSG-007`、`FGT-MSG-008`、`FGT-MSG-009`、`FGT-MSG-010`、`FGT-MSG-011`、`FGT-MSG-012`
 
 ### `MUT` — 内核微变异击杀率验证
 

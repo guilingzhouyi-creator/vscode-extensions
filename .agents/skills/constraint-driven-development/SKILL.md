@@ -4,9 +4,9 @@ description: >-
   【触发：交割/验收/证伪/Doubt/阈值下调/测试弱化/半成品】完成特性交付、声称修复完成或合入前对抗性证伪时必须触发。落实 Floor Guard 刚性底线与单调棘轮，主动推翻边界假设与脆弱实现。
 ---
 
-# constraint-driven-development — 刚性底线守卫、质量棘轮与对抗性证伪规范
+# constraint-driven-development — Floor Guard, Monotonic Ratchet & Adversarial Doubt Cycle
 
-本技能将编码前的**约束驱动底线守卫（Floor Guard & Ratchet Principle）**与编码完成后的**五步怀疑驱动对抗性证伪复审（Doubt Cycle）**合二为一：先以不可妥协的机器量化预算锁死底线，再在交割前假设作者过度自信，主动证伪未言明的边界假设与隐式耦合。
+Combines pre-coding **Floor Guard & Monotonic Ratchet** enforcement with pre-delivery **5-Step Adversarial Falsification (Doubt Cycle)** to block threshold relaxation, test weakening, and unverified boundary assumptions.
 
 ---
 
@@ -21,46 +21,47 @@ description: >-
 - **何时联动**：并行会话改动混杂需要精准暂存 → `batch-commit` + `subagent-orchestration` + `constraint-driven-development`；评分口径被注水或刷分 → `telemetry-statistical-modeling` + `constraint-driven-development` + `auto-refactor-dev`
 <!-- SKILL-LINKS:END -->
 
-## 一、 质量契约四大物理支柱与底线守卫 (The Floor Guard)
+## 1. The Six Non-Negotiable Floor Guards
 
-所有质量标准必须量化为脚本可离线检验的刚性指标，严禁为“让测试变绿”而发生以下**六大逆流退化行为**（任一命中即一票否决）：
+Never make a test or gate pass by degrading any of these six invariants:
+1. **No Threshold Lowering**: Never relax `baseline.json`, `eloc-budget-baseline.json`, linter configs, or gate thresholds.
+2. **No Suppression Silencing**: Never add `@ts-ignore`, `eslint-disable`, or `#[allow(...)]` to hide defects.
+3. **No Test Weakening**: Never delete tests, add `it.skip` (`TST-SKP-001`), or weaken `expect` assertions (`TST-TAU-001`).
+4. **No Placeholder Artifacts**: Never commit 0-byte files (`HYG-EMP-001`), unresolved `TODO`/`FIXME` markers, or empty `catch {}` blocks (`GOV-EXC-001`).
+5. **No Rule Catalog Drift**: Never cite an unregistered rule ID (`RCFG-RULE-DRIFT`).
+6. **No Cross-Session Interference**: Never run `git restore .` or `git clean -fd`, and never touch files modified by external parallel sessions.
 
-```text
-┌──────────────────────────────────────────────────────────────┐
-│                 底线守卫 (The Floor Guard)                   │
-├──────────────────────────────────────────────────────────────┤
-│ 1. 阈值私自下调 ──▶ 严禁修改 baseline/linter/门禁放宽门槛     │
-│ 2. 抑制检查消音 ──▶ 严禁新增 @ts-ignore / eslint-disable 消音 │
-│ 3. 测试断言弱化 ──▶ 严禁删测试、加 it.skip 或删减既有 expect  │
-│ 4. 虚假半成品   ──▶ 严禁提交 0 字节文件、TODO 占位、空 catch  │
-│ 5. 规则目录漂移 ──▶ 严禁书写未在 rule-catalog.json 登记的 ID  │
-│ 6. 跨会话越界   ──▶ 严禁全局破坏性还原或篡改外部并行会话文件  │
-└──────────────────────────────────────────────────────────────┘
-```
-
-- **单向单调棘轮 (The Ratchet Principle)**：覆盖率、性能耗时基线（`TB-REGRESSION`）、文件体积基线（`eloc-budget-baseline.json`）与全仓 High/Critical 技术债（恒为 **0 项**）只许优化收紧，严禁向下突破或反弹；
-- **反刷分熔断 (`BLOCK_GAMING_DETECTED`)**：语义改动率 $\text{ELOC}_{\text{semantic}} \le 15\%$ 且无真实技术债净消除的刷分重构直接熔断；
-- **会话边界与零破坏性还原**：严禁执行 `git restore .`、`git clean -fd` 或对非本会话文件顺手“修复”，严格坚守并行避让公理。
+- **Monotonic Ratchet Principle**: Coverage, latency baselines (`TB-REGRESSION`), volume baselines (`eloc-budget-baseline.json`), and workspace High/Critical technical debt (**0 items**) move strictly in the improving direction.
+- **Anti-Gaming Circuit Breaker (`BLOCK_GAMING_DETECTED`)**: Refactoring commits with semantic change ratio $\text{ELOC}_{\text{semantic}} \le 15\%$ and zero net technical debt reduction are rejected.
 
 ---
 
-## 二、 交割前五步对抗性证伪循环 (The 5-Step Doubt Cycle)
+## 2. Five-Step Adversarial Falsification Loop (The Doubt Cycle)
 
-当改动涉及**核心分支重构、跨模块接口变更、并发/幂等时序假设或持久化迁移**时，交割前必须执行怀疑循环：
+Before claiming completion on any core branch refactoring, cross-module contract change, concurrency/idempotency logic, or persistence migration, execute:
 
 ```text
-1. 声称 (CLAIM) ──▶ 2. 隔离 (EXTRACT) ──▶ 3. 证伪 (DOUBT) ──▶ 4. 仲裁 (RECONCILE) ──▶ 5. 收敛 (STOP <= 3轮)
+1. CLAIM ──▶ 2. EXTRACT ──▶ 3. DOUBT ──▶ 4. RECONCILE ──▶ 5. STOP (<= 3 rounds)
 ```
 
-1. **声称 (CLAIM)**：用 2~3 行技术语言明确写出当前改动依赖的核心不变量断言及其破坏后果；
-2. **隔离 (EXTRACT)**：剥离作者的主观自洽心路历程，仅将**代码 Diff 切片 (ARTIFACT)** 与**前置/后置契约 (CONTRACT)** 摆上审查台，避免顺从偏见（Validation Bias）；
-3. **证伪 (DOUBT)**：对照五大对抗性探针（退化空/超大输入、循环隐式堆分配、异常早退句柄泄漏、可变引用跨层污染、落盘半写损坏）主动找茬；
-4. **仲裁 (RECONCILE)**：将发现的问题客观归入【契约不清 $\to$ 修正文档】、【真实缺陷 $\to$ 立即修复】、【合理权衡 $\to$ 注释备案】、【环境噪音 $\to$ 忽略】；
-5. **收敛停机 (STOP)**：真实缺陷清零或满 3 轮即停（若 3 轮仍有分歧则上报人类裁决）。
+1. **CLAIM**: State in 2–3 lines the exact invariant your change relies on and what breaks if it fails.
+2. **EXTRACT**: Strip subjective narrative and inspect only the raw **Diff Slice (`ARTIFACT`)** against **Pre/Post-Conditions (`CONTRACT`)** to eliminate confirmation bias.
+3. **DOUBT**: Probe five adversarial vectors:
+   - Degenerate empty / oversized / non-ASCII inputs;
+   - Hidden transient heap allocations inside hot loops (`CPX-SPACE-001`);
+   - Early-return resource or handle leaks (`PRF-LEAK-001`);
+   - Cross-layer mutable reference aliasing;
+   - Torn writes or non-idempotent crash replay.
+4. **RECONCILE**: Classify each finding into `[Ambiguous Contract -> update doc]`, `[Real Defect -> fix + add regression test]`, `[Intentional Trade-off -> document in JSDoc]`, or `[Environment Noise -> ignore]`.
+5. **STOP**: Terminate once real defects reach 0 or after 3 rounds (escalate unresolved trade-offs to the user).
 
 ---
 
-## 三、 关联参考与模板资产
+## 3. Verification & JIT Assets
 
-- [floor-guard.md](references/floor-guard.md)：底线守卫退出码契约、五大对抗性证伪探针清单与怀疑循环记录表；
-- [floor-guard-contract.json](templates/floor-guard-contract.json)：机器可检验的质量预算与底线守卫配置模板。
+```powershell
+pwsh -File scripts/ps1/audit-all.ps1
+```
+
+- [floor-guard.md](references/floor-guard.md): Floor Guard exit-code contracts, 5 adversarial probe checklists, and Doubt Cycle log sheet.
+- [floor-guard-contract.json](templates/floor-guard-contract.json): Machine-verifiable quality budget and Floor Guard configuration template.

@@ -4,9 +4,9 @@ description: >-
   【触发：文档归档/蓝图/架构演进/README/归档清单/死链/案卷封存】编写、修改顶层架构蓝图、交付物归档、案卷封存或全宗技术档案时触发。维护 agent-native-system-blueprint 与纯正面向用户标准。
 ---
 
-# docs-archive-governance — 全宗技术档案、蓝图演进与文档门禁规范
+# docs-archive-governance — Blueprint Evolution, Read-Only Archives & Link Hygiene
 
-本技能规范了工作区顶层多智能体自治系统蓝图演进纪律、全宗技术档案库只读封存规范、四阶段方案案卷元数据及 Markdown 链接健康度守卫的标准作业流程。
+Governs the autonomous system blueprint (`docs/agent-native-system-blueprint.md`), read-only historical archive freeze rules (`archive/deliverables/`, `WebGames/docs/归档库/`), 4-stage design dossier structure, Markdown link hygiene, and user-facing documentation isolation.
 
 ---
 
@@ -21,112 +21,46 @@ description: >-
 - **何时联动**：新增技能或改技能描述 → `skill-governance` + `docs-archive-governance` + `batch-commit`；发版日志与版本号对齐 → `release-package-workflow` + `docs-archive-governance` + `batch-commit`
 <!-- SKILL-LINKS:END -->
 
-## 一、 适用场景与触发条件
+## 1. System Blueprint Evolution (`docs/agent-native-system-blueprint.md`)
 
-在以下任一文档维护或归档作业场景中，必须激活本技能：
-1. **更新或演进顶层架构设计蓝图**（`docs/agent-native-system-blueprint.md`）；
-2. **归档交付物、方案结项报告或评审案卷**（`archive/deliverables/`）；
-3. **四阶段开发方案立项与封存**（`WebGames/docs/路线图/`、`WebGames/docs/归档库/`）；
-4. **新增或修改面向用户的公共文档**（根目录 README、子项目 README、CHANGELOG）；
-5. **执行全仓 Markdown 链接存活性、排版契约与静态文档门禁检查**。
+1. **Four Pillars**: ① Peer Cell Triad (Builder, Tester, Reviewer with HTN-B dispatch); ② Dual-Surface 3-Layer Topological Diff; ③ R1–R5 Memory Distillation Pipeline; ④ Fractal Git Gate Topology.
+2. **Architectural Purity**: Record only verified architectural contracts, state machines, and Mermaid topologies; never write debugging notes, conversational drafts, or agile sprint codenames (`W1~W9`, `Pass 1..6`, `phase\d+`, `st\d+`).
 
 ---
 
-## 二、 顶层架构蓝图演进纪律 (`docs/agent-native-system-blueprint.md`)
+## 2. Read-Only Archive Freeze & Dossier Metadata
 
-顶层设计蓝图是整个工作区面向多智能体（Agent-Native）自主协同演进的核心宪章，其架构基石包括：
-1. **Cell 平权自治体系**：单 Cell 内部由三个平权实体组成（构建执行者、独立测试者、交叉审查者），依据负载动态分化与 HTN-B 拓扑分发；
-2. **一体两面三层拓扑 Diff**：一面服务智能体高效机器解析，一面服务人类开发者透明审阅；覆盖单元 Diff、跨域 Diff 与冲突仲裁三层体系；
-3. **R1~R5 记忆提纯管线**：从对话瞬时上下文逐层折叠收敛，最终沉淀为长期泛化技能库（Skills）；
-4. **分形 Git 门禁架构**：工作树按 Agent 与 SubAgent 严格隔离，门禁逐级守卫合入主干。
+1. **Historical Freeze Rule (`archive/deliverables/`, `WebGames/docs/归档库/`)**: Archived dossiers are immutable historical evidence. **Never** alter code snippets, logs, or conclusions inside archived dossiers to silence new linter rules.
+2. **Archive Metadata Header** (within first 20 lines; see [archive-metadata-header.md](templates/archive-metadata-header.md)):
+   ```markdown
+   # {Dossier Title}
 
-### 顶层蓝图演进刚性纪律：
-- **纯粹系统架构表达**：蓝图必须保持高阶系统性、拓扑抽象性与规范严密性，**绝对严禁**写入施工过程随笔、调试杂记、对话草稿、未决会议讨论或敏捷冲刺代号（如 `W1~W9`、`Pass 1..6` 等）；
-- **状态机与拓扑显式化**：新机制引入必须具备完整的生命周期状态机模型与拓扑演进图（Mermaid），明确边界与接口契约；
-- **增量演化与单源权威**：修改蓝图必须反映经过全量验证并固化的架构事实，保持与实际运行机制高度自洽。
-
----
-
-## 三、 全宗技术档案与历史卷只读封存规范
-
-工作区建立了完善的双层全宗技术档案机制：
-- **仓库级历史全宗**：`archive/deliverables/`（重大架构方案、全面审查报告、里程碑交付物留痕）；
-- **项目级技术全宗**：`WebGames/docs/归档库/`（标准工程级技术案卷）。
-
-### 1. 历史档案只读不可变性（Freeze 铁律）
-- **已验收历史存证**：已归档案卷是特定历史节点的客观事实存证，具备法律与工程留痕意义；
-- **严禁规避式修改**：**绝对严禁**为了消音新增的静态分析违规或迎合门禁指标，擅自篡改已归档历史案卷中的代码片段、测试日志或验收结论；对历史案卷应实施白名单豁免或只读封存。
-
-### 2. 标准档案元数据头块契约
-归档文件前 20 行内必须包含规范的键值元数据头块：
-```markdown
-# {案卷标题}
-
-> 档号: KALAR-DEV-YYYY-ST{NN}-{PPP}
-> 验收状态: PASS / LOCKED
-> 归档时间: YYYY-MM-DD
-> 密级: 内部技术档案（只读存证，严禁擅自修改已验收历史断言）
-```
-详见模板：[archive-metadata-header.md](templates/archive-metadata-header.md)。
-
-### 3. 四阶段方案案卷纪律
-- 凡涉及新功能或重大重构施工，方案目录下严格仅允许且必须包含完整的四阶段细则文件：
-  - `阶段1_上下文分析与影响面评估.md`
-  - `阶段2_架构拓扑与接口契约设计.md`
-  - `阶段3_原子施工与分步实施路线.md`
-  - `阶段4_全量验证与回归测试断言.md`
-- **严禁草稿散落**：严禁在方案目录平铺未命名的临时文件、草稿、碎片笔记或临时日志。
+   > 档号: KALAR-DEV-YYYY-ST{NN}-{PPP}
+   > 验收状态: PASS / LOCKED
+   > 归档时间: YYYY-MM-DD
+   > 密级: 内部技术档案（只读存证，严禁擅自修改已验收历史断言）
+   ```
+3. **4-Stage Design Dossier Layout**: Active feature/refactoring plan directories must contain only the 4 canonical files (`阶段1_上下文分析与影响面评估.md`, `阶段2_架构拓扑与接口契约设计.md`, `阶段3_原子施工与分步实施路线.md`, `阶段4_全量验证与回归测试断言.md`) with zero ad-hoc scratch files.
 
 ---
 
-## 四、 相对路径链接健康度与超链接门禁
+## 3. Markdown Link Hygiene & User-Facing Isolation
 
-所有 Markdown 文档中的超链接必须遵守严格的静态门禁守卫：
-
-| 门禁规则 / 守卫维度 | 违规场景与模式 | 刚性指标与治理规范 |
-| :--- | :--- | :--- |
-| **`DOC-LNK-001` / `HC-ABS-PATH`（禁绝对路径与本地 URI）** | 包含 Windows 盘符（`c:/...`）、`file:///` 或机器绝对路径 | **一票否决阻断**。绝对路径无法在跨平台或远端 CI 解析，必须统一采用项目相对路径（如 [blueprint](../../../docs/agent-native-system-blueprint.md)） |
-| **`DOC-LNK-001`（禁死链目标文件）** | 链接指向的文件在磁盘不存在 | **一票否决阻断**。重命名或移动文档时，必须全局批量更新所有相对路径引用 |
-| **`DOC-LNK-001`（禁失效标题锚点）** | 锚点链接（如 `#section`）在目标文档中无对应标题 | 锚点必须严格对齐目标文档中真实存在的 Markdown 标题 |
-
-详见避坑指引：[relative-link-hygiene.md](references/relative-link-hygiene.md)。
+1. **Relative Link Hygiene (`DOC-LNK-001` / `HC-ABS-PATH`)**:
+   - Forbid Windows drive letters (`c:/...`), `file:///`, or machine-absolute paths inside repository `.md` files; use valid relative paths (e.g., [blueprint](../../../docs/agent-native-system-blueprint.md)).
+   - Every linked file and `#heading` anchor must resolve on disk ([relative-link-hygiene.md](references/relative-link-hygiene.md)).
+2. **User-Facing Isolation & Style Honesty**:
+   - Keep user-facing documents (root `README.md`, extension `README.md`, `CHANGELOG.md`) free of internal refactoring jargon (e.g., trampoline ablation, AST slice complexity, RingBuffer dual-write) and sprint codenames (`p[0-9]+`, `phase[0-9]+`, `st[0-9]+`, `temp`, `wip`; `WebGames` views `fe_01`–`fe_17` exempt).
+   - Enforce `CMG-STY-001`~`004` (zero perfunctory, exaggerated, pejorative, or meta-narrative prose).
 
 ---
 
-## 五、 面向用户文档纯粹性与零黑话边界
-
-1. **客观价值导向，剥离施工代号**：
-   - 面向用户或外部贡献者的公开文档（README、CHANGELOG、API 指南）必须纯粹基于功能特性、架构价值与使用体验撰写；
-   - **绝对严禁**出现内部施工批次代号与敏捷过程代号（禁止词：`p[0-9]+`、`phase[0-9]+`、`st[0-9]+`、`W[0-9]+`、`Pass[0-9]+`、`temp`、`new`、`v[0-9]+`、`wip`；WebGames 前端视图保留 `fe_01`~`fe_17` 除外）；
-2. **纯客观技术表达**：
-   - 严禁敷衍词汇（`CMG-STY-001`）、夸大词汇（`CMG-STY-002`）、贬损词汇（`CMG-STY-003`）或元叙事口号（`CMG-STY-004`）；
-   - 技术事实陈述客观准确，以质性输入输出与断言说话；
-3. **产品交付文档与内部工程重构黑话物理隔离**：
-   - 商业级产品发布页（如 VS Code 扩展顶层 `README.md`）与产品更新日志（`CHANGELOG.md`）是面向最终软件用户的窗口；
-   - 严禁向用户泄露内部代码治理与工程重构黑话（如消融单行跳板、AST切片局部复杂度、RingBuffer崩溃双写等内部术语）；
-   - 技术改动必须翻译为用户可感知的质性体验提升（如“大幅减少内存占用”、“提升后台数据持久化可靠性”）。
-
----
-
-## 六、 文档审查与静态门禁验证指令
-
-在修改或归档文档后，必须执行以下验证命令：
+## 4. Verification Commands
 
 ```powershell
-# 1. 验证仓库静态打包展示资产健全性
 bash scripts/sh/check-display-assets.sh
-
-# 2. 运行 WebGames 专项文档静态门禁（命名、布局、死链、mermaid 语法）
 python WebGames/scripts/py/audit_docs.py
-# 或在 Windows PowerShell:
-pwsh -File WebGames/scripts/ps1/audit-docs.ps1
-
-# 3. 运行全仓文档多维排版与语法门禁验证
 node auto-refactor/scripts/validate-docs.js
+node scripts/common/validate-doc-anchors.js
+node scripts/common/validate-doc-reachability.js
 ```
-
-**质性断言标准**：
-- 控制台输出全部 `PASS`，0 死链、0 绝对路径 URI、0 破损锚点；
-- 历史归档案卷元数据头块 100% 健全，四阶段方案严格齐备；
-- 面向用户的 README/CHANGELOG 保持纯粹用户价值，无工程重构黑话泄漏；
-- 全工作区 High/Critical 技术债务保持 0 项历史刚性基线，无任何 0 字节空文件残留。
