@@ -271,22 +271,55 @@ function evaluateDebtCorridor({
   }
 
   // 2. Forced Paydown Mode Interlock (Ceiling Breached)
-  // If accumulated debt already at or above ceiling, only allow refactor/fix with zero new debt
+  //
+  // The ratchet only turns one way, so the branch that closes it must leave the repayment path
+  // open. A clean `refactor` or `fix` adds no debt and is what settles the oldest entry, so
+  // refusing it here would make the ledger monotonic in the wrong direction: once the ceiling is
+  // reached nothing passes, including the commits able to pay it down. The interlock therefore
+  // blocks new features and any commit that itself carries high-tier debt, and admits the zero-debt
+  // repayment commit in paydown mode so the caller still sees the unpaid balance.
   const isAccumulationCeilingReached = accumulatedHighDebt >= ACCUMULATION_CEILING;
   const isSingleCommitExceeded = currentHighCount > MAX_SINGLE_HIGH_DEBT;
   const isProjectedCeilingBreached = totalProjectedDebt > ACCUMULATION_CEILING;
+  const normalizedType = (commitType || '').toLowerCase();
+  const isRepaymentType = normalizedType === 'refactor' || normalizedType === 'fix';
+  const isCleanRepayment = isRepaymentType && currentHighCount === 0;
 
-  if (isAccumulationCeilingReached || isSingleCommitExceeded || isProjectedCeilingBreached) {
+  if (isAccumulationCeilingReached && !isCleanRepayment) {
     // If user attempts a new feature while debt ceiling is reached, block it immediately
-    const isNewFeature = (commitType || '').toLowerCase() === 'feat';
+    const isNewFeature = normalizedType === 'feat';
     const violationSummary = isNewFeature
       ? `Feature development blocked: High-risk technical debt ceiling reached (${accumulatedHighDebt}/${ACCUMULATION_CEILING}). Must pay down prior debt before introducing new features.`
-      : `Blocked: High-risk technical debt exceeds corridor budget (Current: ${currentHighCount}, Accumulated: ${accumulatedHighDebt}, Ceiling: ${ACCUMULATION_CEILING}).`;
+      : `Blocked: High-risk technical debt exceeds corridor budget (Current: ${currentHighCount}, Accumulated: ${accumulatedHighDebt}, Ceiling: ${ACCUMULATION_CEILING}). Only a debt-free refactor or fix may proceed.`;
 
     return {
       status: STATUS_BLOCK,
       mode: MODE_FORCED_PAYDOWN,
       reason: violationSummary,
+      criticalCount: 0,
+      currentHighDebtCount: currentHighCount,
+      accumulatedHighDebtCount: accumulatedHighDebt,
+      elasticAllowance: MAX_SINGLE_HIGH_DEBT,
+      ceiling: ACCUMULATION_CEILING,
+      remainingCredit: 0,
+      agentDirectives: buildAgentDirectives({
+        criticalIssues,
+        highIssues: currentHighIssues,
+        mode: MODE_FORCED_PAYDOWN,
+        isCritical: false,
+        unresolvedLedgerItems: ledger.items,
+        targetFile,
+        totalProjectedDebt,
+      }),
+    };
+  }
+
+  if (isAccumulationCeilingReached) {
+    // Repayment permitted: still a warning, because the balance is not yet zero.
+    return {
+      status: STATUS_WARN,
+      mode: MODE_FORCED_PAYDOWN,
+      reason: `Debt repayment admitted: this commit adds none and settles the oldest outstanding item (${accumulatedHighDebt}/${ACCUMULATION_CEILING} before repayment).`,
       criticalCount: 0,
       currentHighDebtCount: currentHighCount,
       accumulatedHighDebtCount: accumulatedHighDebt,

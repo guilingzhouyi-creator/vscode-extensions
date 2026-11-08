@@ -588,6 +588,24 @@ function testElasticTechDebtCorridor() {
     assert.ok(ceilingVerdict.agentDirectives.paydownInstructions.length > 0, 'Paydown instructions must be present');
 
     // 5. Paydown in clean refactor commit -> settles debt
+    //
+    // Guarded by the corridor verdict first: settlement runs only after the gate admits the
+    // message, so a corridor that blocks the clean refactor makes this settlement unreachable.
+    // Asserting only the ledger decrement proved the bookkeeping while the ratchet itself was
+    // closed, which is the state this module exists to prevent.
+    const repaymentVerdict = evaluateDebtCorridor({
+      findings: [],
+      styleScore: 100,
+      commitType: 'refactor',
+      logDir: tempLogDir,
+    });
+    assert.notStrictEqual(
+      repaymentVerdict.status,
+      STATUS_BLOCK,
+      'A debt-free refactor must be admitted while the ceiling is reached, or the ledger can never be reduced'
+    );
+    assert.strictEqual(repaymentVerdict.mode, MODE_FORCED_PAYDOWN);
+
     updateDebtLedger({
       isCleanCommit: true,
       logDir: tempLogDir,
