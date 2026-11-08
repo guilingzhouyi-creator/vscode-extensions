@@ -125,71 +125,55 @@ impl<'a> MaskTarget<'a> {
     }
 }
 
+#[inline]
+fn push_masked_spaces(line: &str, output: &mut String) {
+    let space_count = if line.is_ascii() {
+        line.len()
+    } else {
+        line.encode_utf16().count()
+    };
+    for _ in 0..space_count {
+        output.push(' ');
+    }
+}
+
+#[inline]
+fn is_plain_passthrough(line: &str, state: &MaskState, config: &MaskConfig) -> bool {
+    let no_state = state.quote.is_none()
+        && !state.in_block_comment
+        && !state.in_html_comment
+        && state.raw_string.is_none();
+    no_state && !has_trigger_char(line, config)
+}
+
+#[inline]
+fn is_unclosed_comment_line(line: &str, state: &MaskState, config: &MaskConfig) -> bool {
+    if state.quote.is_some() || state.raw_string.is_some() {
+        return false;
+    }
+    if config.html_comment && state.in_html_comment && !line.contains("-->") {
+        return true;
+    }
+    let Some((_, close)) = &config.block_comment else {
+        return false;
+    };
+    state.in_block_comment && !close.is_empty() && !line.contains(close)
+}
+
 fn mask_line_into(
     line: &str,
     state: &mut MaskState,
     config: &MaskConfig,
     target: &mut MaskTarget<'_>,
 ) {
-    // Fast path: no open quote or block comment, no raw string, and no trigger chars present
-    if state.quote.is_none()
-        && !state.in_block_comment
-        && !state.in_html_comment
-        && state.raw_string.is_none()
-        && !has_trigger_char(line, config)
-    {
+    if is_plain_passthrough(line, state, config) {
         target.output.push_str(line);
         return;
     }
 
-    // Fast path: wholly inside an HTML comment and contains no closing delimiter
-    if config.html_comment
-        && state.in_html_comment
-        && state.quote.is_none()
-        && state.raw_string.is_none()
-        && !line.contains("-->")
-    {
-        let space_count = if line.is_ascii() {
-            line.len()
-        } else {
-            line.encode_utf16().count()
-        };
-        for _ in 0..space_count {
-            target.output.push(' ');
-        }
-        return;
-    }
-
-    // Fast path: wholly inside a block comment and contains no closing delimiter
-    if let Some((_, close)) = &config.block_comment {
-        if state.in_block_comment
-            && state.quote.is_none()
-            && state.raw_string.is_none()
-            && !close.is_empty()
-            && !line.contains(close)
-        {
-            let space_count = if line.is_ascii() {
-                line.len()
-            } else {
-                line.encode_utf16().count()
-            };
-            for _ in 0..space_count {
-                target.output.push(' ');
-            }
-            return;
-        }
-    }
-
-    // Fast path: wholly inside a raw string and contains no quote delimiter
-    if state.raw_string.is_some() && !line.contains('"') {
-        let space_count = if line.is_ascii() {
-            line.len()
-        } else {
-            line.encode_utf16().count()
-        };
-        for _ in 0..space_count {
-            target.output.push(' ');
-        }
+    let wholly_unclosed_raw = state.raw_string.is_some() && !line.contains('"');
+    if wholly_unclosed_raw || is_unclosed_comment_line(line, state, config) {
+        push_masked_spaces(line, target.output);
         return;
     }
 

@@ -179,8 +179,8 @@ fn has_any_candidate_byte(bytes: &[u8], mask: &[bool; 256]) -> bool {
     false
 }
 
-fn match_multi_patterns(source_text: &str, patterns: &[String], results: &mut Vec<PatternMatch>) {
-    let candidates: Vec<PatternCandidate> = patterns
+fn build_pattern_candidates(patterns: &[String]) -> Vec<PatternCandidate<'_>> {
+    patterns
         .iter()
         .filter(|p| !p.is_empty())
         .map(|p| {
@@ -194,138 +194,200 @@ fn match_multi_patterns(source_text: &str, patterns: &[String], results: &mut Ve
                 min_len: bytes.len(),
             }
         })
-        .collect();
+        .collect()
+}
 
-    if candidates.is_empty() {
-        return;
+fn try_match_candidate_at(
+    line_bytes: &[u8],
+    line_num: u32,
+    col: usize,
+    cand: &PatternCandidate<'_>,
+    min_col: usize,
+    results: &mut Vec<PatternMatch>,
+) -> Option<usize> {
+    if col < cand.needle_offset {
+        return None;
+    }
+    let start_col = col - cand.needle_offset;
+    if start_col < min_col || line_bytes.len() - start_col < cand.min_len {
+        return None;
+    }
+    if &line_bytes[start_col..start_col + cand.min_len] != cand.bytes {
+        return None;
+    }
+    results.push(PatternMatch {
+        pattern: cand.pattern.clone(),
+        line: line_num,
+        column: (start_col + 1) as u32,
+        match_text: cand.pattern.clone(),
+    });
+    Some(start_col + cand.min_len.max(1))
+}
+
+#[inline]
+fn has_bitmask_block_miss(line_bytes: &[u8], col: usize, needle_bitmask: &[u64; 256]) -> bool {
+    if col + 8 > line_bytes.len() {
+        return false;
+    }
+    let combined = needle_bitmask[line_bytes[col] as usize]
+        | needle_bitmask[line_bytes[col + 1] as usize]
+        | needle_bitmask[line_bytes[col + 2] as usize]
+        | needle_bitmask[line_bytes[col + 3] as usize]
+        | needle_bitmask[line_bytes[col + 4] as usize]
+        | needle_bitmask[line_bytes[col + 5] as usize]
+        | needle_bitmask[line_bytes[col + 6] as usize]
+        | needle_bitmask[line_bytes[col + 7] as usize];
+    combined == 0
+}
+
+fn match_bitmask_column(
+    line_bytes: &[u8],
+    line_num: u32,
+    col: usize,
+    mut bits: u64,
+    candidates: &[PatternCandidate<'_>],
+    next_allowed: &mut [(u32, usize)],
+    results: &mut Vec<PatternMatch>,
+) {
+    while bits != 0 {
+        let idx = bits.trailing_zeros() as usize;
+        bits &= bits - 1;
+        let (last_line, allowed_col) = next_allowed[idx];
+        let min_col = if last_line == line_num { allowed_col } else { 0 };
+        if let Some(next_col) = try_match_candidate_at(
+            line_bytes,
+            line_num,
+            col,
+            &candidates[idx],
+            min_col,
+            results,
+        ) {
+            next_allowed[idx] = (line_num, next_col);
+        }
+    }
+}
+
+fn match_multi_bitmask(
+    source_text: &str,
+    candidates: &[PatternCandidate<'_>],
+    results: &mut Vec<PatternMatch>,
+) {
+    let mut needle_bitmask = [0u64; 256];
+    let mut min_pat_len = usize::MAX;
+    for (idx, cand) in candidates.iter().enumerate() {
+        needle_bitmask[cand.needle_byte as usize] |= 1u64 << idx;
+        min_pat_len = min_pat_len.min(cand.min_len);
     }
 
-    if candidates.len() <= 64 {
-        let mut needle_bitmask = [0u64; 256];
-        let mut min_pat_len = usize::MAX;
-        for (idx, cand) in candidates.iter().enumerate() {
-            needle_bitmask[cand.needle_byte as usize] |= 1u64 << idx;
-            if cand.min_len < min_pat_len {
-                min_pat_len = cand.min_len;
-            }
+    // Stores (last_matched_line_num, next_allowed_col) so no per-line fill(0) is required
+    let mut next_allowed = vec![(0u32, 0usize); candidates.len()];
+
+    for (line_idx, line) in source_text.lines().enumerate() {
+        if line.len() < min_pat_len {
+            continue;
         }
+        let line_bytes = line.as_bytes();
+        let line_num = (line_idx + 1) as u32;
+        let mut col = 0;
 
-        // Stores (last_matched_line_num, next_allowed_col) so no per-line fill(0) is required
-        let mut next_allowed = vec![(0u32, 0usize); candidates.len()];
-
-        for (line_idx, line) in source_text.lines().enumerate() {
-            let line_len = line.len();
-            if line_len < min_pat_len {
+        while col < line_bytes.len() {
+            if has_bitmask_block_miss(line_bytes, col, &needle_bitmask) {
+                col += 8;
                 continue;
             }
-
-            let line_bytes = line.as_bytes();
-            let line_num = (line_idx + 1) as u32;
-            let mut col = 0;
-
-            while col < line_len {
-                if col + 8 <= line_len
-                    && (needle_bitmask[line_bytes[col] as usize]
-                        | needle_bitmask[line_bytes[col + 1] as usize]
-                        | needle_bitmask[line_bytes[col + 2] as usize]
-                        | needle_bitmask[line_bytes[col + 3] as usize]
-                        | needle_bitmask[line_bytes[col + 4] as usize]
-                        | needle_bitmask[line_bytes[col + 5] as usize]
-                        | needle_bitmask[line_bytes[col + 6] as usize]
-                        | needle_bitmask[line_bytes[col + 7] as usize])
-                        == 0
-                {
-                    col += 8;
-                    continue;
-                }
-
-                let mut bits = needle_bitmask[line_bytes[col] as usize];
-                while bits != 0 {
-                    let idx = bits.trailing_zeros() as usize;
-                    bits &= bits - 1;
-                    let cand = &candidates[idx];
-                    if col >= cand.needle_offset {
-                        let start_col = col - cand.needle_offset;
-                        let (last_line, allowed_col) = next_allowed[idx];
-                        let min_col = if last_line == line_num {
-                            allowed_col
-                        } else {
-                            0
-                        };
-                        if start_col >= min_col
-                            && line_len - start_col >= cand.min_len
-                            && &line_bytes[start_col..start_col + cand.min_len] == cand.bytes
-                        {
-                            results.push(PatternMatch {
-                                pattern: cand.pattern.clone(),
-                                line: line_num,
-                                column: (start_col + 1) as u32,
-                                match_text: cand.pattern.clone(),
-                            });
-                            next_allowed[idx] = (line_num, start_col + cand.min_len.max(1));
-                        }
-                    }
-                }
-
-                col += 1;
+            let bits = needle_bitmask[line_bytes[col] as usize];
+            if bits != 0 {
+                match_bitmask_column(
+                    line_bytes,
+                    line_num,
+                    col,
+                    bits,
+                    candidates,
+                    &mut next_allowed,
+                    results,
+                );
             }
+            col += 1;
         }
-        return;
     }
+}
 
+fn match_dense_column(
+    line_bytes: &[u8],
+    line_num: u32,
+    col: usize,
+    anchor: u8,
+    candidates: &[PatternCandidate<'_>],
+    next_allowed: &mut [usize],
+    results: &mut Vec<PatternMatch>,
+) {
+    for (idx, cand) in candidates.iter().enumerate() {
+        if cand.needle_byte != anchor {
+            continue;
+        }
+        if let Some(next_col) = try_match_candidate_at(
+            line_bytes,
+            line_num,
+            col,
+            cand,
+            next_allowed[idx],
+            results,
+        ) {
+            next_allowed[idx] = next_col;
+        }
+    }
+}
+
+fn match_multi_dense(
+    source_text: &str,
+    candidates: &[PatternCandidate<'_>],
+    results: &mut Vec<PatternMatch>,
+) {
     let mut needle_mask = [false; 256];
     let mut min_pat_len = usize::MAX;
-    for cand in &candidates {
+    for cand in candidates {
         needle_mask[cand.needle_byte as usize] = true;
-        if cand.min_len < min_pat_len {
-            min_pat_len = cand.min_len;
-        }
+        min_pat_len = min_pat_len.min(cand.min_len);
     }
 
     let mut next_allowed = vec![0usize; candidates.len()];
 
     for (line_idx, line) in source_text.lines().enumerate() {
-        let line_len = line.len();
-        if line_len < min_pat_len {
+        if line.len() < min_pat_len {
             continue;
         }
-
         let line_bytes = line.as_bytes();
         if !has_any_candidate_byte(line_bytes, &needle_mask) {
             continue;
         }
-
         let line_num = (line_idx + 1) as u32;
         next_allowed.fill(0);
-        let mut col = 0;
 
-        while col < line_len {
-            let b = line_bytes[col];
-            if !needle_mask[b as usize] {
-                col += 1;
-                continue;
+        for (col, &b) in line_bytes.iter().enumerate() {
+            if needle_mask[b as usize] {
+                match_dense_column(
+                    line_bytes,
+                    line_num,
+                    col,
+                    b,
+                    candidates,
+                    &mut next_allowed,
+                    results,
+                );
             }
-
-            for (idx, cand) in candidates.iter().enumerate() {
-                if cand.needle_byte == b && col >= cand.needle_offset {
-                    let start_col = col - cand.needle_offset;
-                    if start_col >= next_allowed[idx]
-                        && line_len - start_col >= cand.min_len
-                        && &line_bytes[start_col..start_col + cand.min_len] == cand.bytes
-                    {
-                        results.push(PatternMatch {
-                            pattern: cand.pattern.clone(),
-                            line: line_num,
-                            column: (start_col + 1) as u32,
-                            match_text: cand.pattern.clone(),
-                        });
-                        next_allowed[idx] = start_col + cand.min_len.max(1);
-                    }
-                }
-            }
-
-            col += 1;
         }
+    }
+}
+
+fn match_multi_patterns(source_text: &str, patterns: &[String], results: &mut Vec<PatternMatch>) {
+    let candidates = build_pattern_candidates(patterns);
+    if candidates.is_empty() {
+        return;
+    }
+    if candidates.len() <= 64 {
+        match_multi_bitmask(source_text, &candidates, results);
+    } else {
+        match_multi_dense(source_text, &candidates, results);
     }
 }
 
