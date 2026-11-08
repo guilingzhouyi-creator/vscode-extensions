@@ -16,7 +16,7 @@
 //!     is not in the file.
 
 use fg_core::error::{FractalError, FractalResult};
-use fg_core::models::Oid;
+use fg_core::models::{FastOidSet, Oid};
 use fg_native::document::RepoDocument;
 use fg_native::sections::oplog::{OpLogEntry, OpLogParts, OpLogSection};
 use std::collections::BTreeMap;
@@ -152,21 +152,34 @@ impl OperationGraph {
             .map(|record| (record.op_id, to_operation(record)))
             .collect::<BTreeMap<Oid, Operation>>();
 
-        let current_head = operations
-            .values()
-            .filter(|candidate| {
-                !operations
-                    .values()
-                    .any(|other| other.parent_ids.contains(&candidate.op_id))
-            })
-            .map(|candidate| candidate.op_id)
-            .max();
+        let current_head = Self::leaf_head(&operations);
 
         Ok(Self {
             current_head,
             operations,
             disk_path: Some(disk_path),
         })
+    }
+
+    /// Finds the greatest operation id that no other operation claims as a parent.
+    ///
+    /// One pass to collect every claimed parent id, then one scan for the largest unclaimed key:
+    /// `O(n + total_parents)`. The previous form nested a full `values()` scan inside another and
+    /// ran a linear `contains` per candidate, which is `O(n^2 * parents)` — 25 million comparisons
+    /// for a 5 000-operation log, paid on every load.
+    fn leaf_head(operations: &BTreeMap<Oid, Operation>) -> Option<Oid> {
+        let mut claimed: FastOidSet = FastOidSet::default();
+        claimed.reserve(operations.len());
+        for operation in operations.values() {
+            for parent in &operation.parent_ids {
+                claimed.insert(*parent);
+            }
+        }
+        operations
+            .keys()
+            .filter(|op_id| !claimed.contains(*op_id))
+            .max()
+            .copied()
     }
 
     /// Records a new atomic repository operation and advances the current head.

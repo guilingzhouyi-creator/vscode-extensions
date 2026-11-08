@@ -499,6 +499,25 @@ impl RefSources<'_> {
 /// On-disk filesystem implementation of RefStore trait.
 pub struct DiskRefStore {
     git_dir: PathBuf,
+    /// Cached `packed-refs` parse, keyed by the file's `(modified, len)` stamp.
+    ///
+    /// Every `get_ref` used to re-read and re-parse the whole file, so a command that resolved
+    /// `n` references paid `n` full parses of a file whose size grows with the reference count.
+    /// The stamp is the cheapest change detector that stays correct: `packed-refs` is only ever
+    /// replaced wholesale by `git pack-refs`, and a rewrite changes both the length and the
+    /// timestamp. A stamp mismatch simply re-parses, so a torn or externally edited file cannot
+    /// serve a stale table.
+    ///
+    /// `Mutex` and `Arc` rather than `RefCell`/`Rc` because `RefStore` is `Send + Sync`.
+    packed_cache: std::sync::Mutex<Option<PackedCache>>,
+}
+
+/// One cached `packed-refs` parse together with the file stamp it was built from.
+struct PackedCache {
+    /// `(modified, len)` observed when the table was parsed.
+    stamp: Option<(std::time::SystemTime, u64)>,
+    /// Parsed name-to-object table, shared so the read path copies nothing.
+    table: std::sync::Arc<BTreeMap<String, Oid>>,
 }
 
 impl DiskRefStore {
@@ -506,7 +525,50 @@ impl DiskRefStore {
     pub fn new(git_dir: impl Into<PathBuf>) -> Self {
         Self {
             git_dir: git_dir.into(),
+            packed_cache: std::sync::Mutex::new(None),
         }
+    }
+
+    /// Reads `packed-refs` through the per-store cache, re-parsing only when the file stamp moves.
+    ///
+    /// Returns a shared handle so the common read path performs no copy at all. Callers that need
+    /// to mutate take a clone of the map.
+    fn packed_table_shared(&self) -> FractalResult<std::sync::Arc<BTreeMap<String, Oid>>> {
+        let path = self.git_dir.join(PACKED_REFS_FILE);
+        let stamp = std::fs::metadata(&path)
+            .ok()
+            .and_then(|meta| meta.modified().ok().map(|modified| (modified, meta.len())));
+
+        // A poisoned lock must not fail a read: the cache is pure derived state, so falling back
+        // to an uncached parse is always correct.
+        if let Ok(guard) = self.packed_cache.lock() {
+            if let Some(cached) = guard.as_ref() {
+                if cached.stamp == stamp {
+                    return Ok(std::sync::Arc::clone(&cached.table));
+                }
+            }
+        }
+
+        let table = std::sync::Arc::new(self.packed_table_uncached()?);
+        if let Ok(mut guard) = self.packed_cache.lock() {
+            *guard = Some(PackedCache {
+                stamp,
+                table: std::sync::Arc::clone(&table),
+            });
+        }
+        Ok(table)
+    }
+
+    /// Parses `packed-refs` from disk with no cache consultation.
+    fn packed_table_uncached(&self) -> FractalResult<BTreeMap<String, Oid>> {
+        let Some(body) = Self::read_body(&self.git_dir.join(PACKED_REFS_FILE))? else {
+            return Ok(BTreeMap::new());
+        };
+        let mut table = BTreeMap::new();
+        for line in body.lines() {
+            Self::absorb_packed_line(line, &mut table);
+        }
+        Ok(table)
     }
 
     /// Lists every reference the repository currently has, loose and packed alike.
@@ -515,14 +577,16 @@ impl DiskRefStore {
     /// omitted, because reporting a name with no object would misrepresent the repository. A
     /// directory that cannot be read is an error rather than an empty result.
     pub fn list_all(&self) -> FractalResult<Vec<(String, Oid)>> {
-        let packed = self.packed_table()?;
-        let mut table = packed.clone();
+        let packed = self.packed_table_shared()?;
+        // One copy, not two: `packed` is the shared handle and `table` is the mutable working set
+        // that loose refs are merged into. The previous form parsed into a fresh map and then
+        // cloned it again before the merge.
+        let mut table = (*packed).clone();
         let refs_dir = self.git_dir.join("refs");
         let view = RefSources {
             store: self,
-            packed: &packed,
-        };
-        match fs::metadata(&refs_dir) {
+            packed: packed.as_ref(),
+        };        match fs::metadata(&refs_dir) {
             Ok(meta) if meta.is_dir() => view.collect_loose(&refs_dir, &mut table)?,
             Ok(_) => {
                 return Err(FractalError::CorruptStore(format!(
@@ -586,14 +650,10 @@ impl DiskRefStore {
 
     /// Parses the packed reference table into a name-to-object mapping.
     fn packed_table(&self) -> FractalResult<BTreeMap<String, Oid>> {
-        let Some(body) = Self::read_body(&self.git_dir.join(PACKED_REFS_FILE))? else {
-            return Ok(BTreeMap::new());
-        };
-        let mut table = BTreeMap::new();
-        for line in body.lines() {
-            Self::absorb_packed_line(line, &mut table);
-        }
-        Ok(table)
+        // Clone out of the shared cache: callers mutate the result. The cache itself is what makes
+        // repeated resolutions cheap; a full copy of a reference table is far cheaper than
+        // re-reading and re-splitting the file.
+        Ok((*self.packed_table_shared()?).clone())
     }
 
     /// Absorbs one `packed-refs` line, skipping headers and peeled target lines.
@@ -982,6 +1042,66 @@ impl RefStore for DiskRefStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The cache must never serve a table that no longer matches the file on disk.
+    ///
+    /// This is the property that makes caching safe at all: `git pack-refs` rewrites the file
+    /// wholesale, and a second store built after that rewrite must observe the new content even
+    /// though an earlier parse was cached.
+    #[test]
+    fn packed_refs_cache_observes_a_rewritten_file() {
+        // The process temp directory is not writable in this build environment, so the fixture
+        // lives under the crate's own target directory instead.
+        let base = std::env::var_os("CARGO_TARGET_TMPDIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default().join("target"));
+        let dir = base.join(format!(
+            "packed-refs-cache-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        std::fs::create_dir_all(dir.join("refs")).expect("create temp git dir");
+
+        let first_oid = Oid::from_bytes([0x11; 20]);
+        let second_oid = Oid::from_bytes([0x22; 20]);
+        let packed_path = dir.join("packed-refs");
+
+        std::fs::write(
+            &packed_path,
+            format!("# pack-refs with: peeled\n{first_oid} refs/heads/main\n"),
+        )
+        .expect("write first packed-refs");
+
+        let store = DiskRefStore::new(&dir);
+        assert_eq!(
+            store.get_ref("refs/heads/main").expect("first read"),
+            Some(first_oid),
+            "first parse must see the first content"
+        );
+        // Repeated reads hit the cache and must agree.
+        assert_eq!(
+            store.get_ref("refs/heads/main").expect("cached read"),
+            Some(first_oid)
+        );
+
+        // Rewrite with a different oid and a different byte length so the stamp cannot collide.
+        std::fs::write(
+            &packed_path,
+            format!("# pack-refs with: peeled fully-peeled\n{second_oid} refs/heads/main\n"),
+        )
+        .expect("rewrite packed-refs");
+
+        assert_eq!(
+            store.get_ref("refs/heads/main").expect("read after rewrite"),
+            Some(second_oid),
+            "a stamp change must force a re-parse rather than serve the stale table"
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
 
     #[test]
     fn test_telemetry_ref_roundtrip_and_parsing() {
