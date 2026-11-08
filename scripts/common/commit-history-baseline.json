@@ -1,6 +1,6 @@
 {
   "schema": "commit-history-baseline/v1",
-  "ratifiedAt": "2026-10-21T12:49:04.000Z",
+  "ratifiedAt": "2026-11-02T14:24:26.000Z",
   "rationale": "Grow-only freeze for commits that already passed the gate in force when they were written. Tightening a rule must not retroactively invalidate published history, because the exemption cannot be added to an existing commit message. Each entry pins the commit SHA and the rule IDs it predates; a frozen commit is reported but never blocks. New commits are always judged by the current rules. Append-only: removing an entry re-arms the block for that commit, and editing an entry's ruleIds is a regression that must be justified in review.",
   "frozenCommits": [
     {
@@ -90,7 +90,8 @@
         "CMG-STY-001",
         "CMG-STY-004",
         "CMG-STY-005",
-        "CMG-STY-006"
+        "CMG-STY-006",
+        "GUARD-MSG-001"
       ]
     },
     {
@@ -129,7 +130,8 @@
       "committedAt": "2026-10-21T11:23:11.000Z",
       "ruleIds": [
         "CMG-STY-004",
-        "CMG-STY-005"
+        "CMG-STY-005",
+        "GUARD-MSG-001"
       ]
     },
     {
@@ -239,6 +241,69 @@
         "CMG-STY-001",
         "CMG-STY-004",
         "CMG-STY-005"
+      ]
+    },
+    {
+      "sha": "97cc2af5491d93e3915d06d46925e5f7d6e3fbe2",
+      "committedAt": "2026-10-23T11:16:02.000Z",
+      "ruleIds": [
+        "GUARD-MSG-001"
+      ]
+    },
+    {
+      "sha": "5df0e662fcaef6a56bc3d34f3be35f6db683d46f",
+      "committedAt": "2026-10-24T03:47:06.000Z",
+      "ruleIds": [
+        "CMG-STY-001"
+      ]
+    },
+    {
+      "sha": "2e9bb7b2dcd3d1571e4e0071d324815f7c47ce29",
+      "committedAt": "2026-10-24T05:17:39.000Z",
+      "ruleIds": [
+        "GUARD-MSG-001"
+      ]
+    },
+    {
+      "sha": "1104437fc792aa3ed6f2ea772a21a5f4d8c1f0c5",
+      "committedAt": "2026-10-24T05:47:45.000Z",
+      "ruleIds": [
+        "GUARD-MSG-001"
+      ]
+    },
+    {
+      "sha": "cba3fddf3b78e0bd341a60758767322c83519dd0",
+      "committedAt": "2026-10-26T04:19:11.000Z",
+      "ruleIds": [
+        "GUARD-MSG-001"
+      ]
+    },
+    {
+      "sha": "eb575cf9117340f878cc438e69abefbefa344b4b",
+      "committedAt": "2026-10-26T05:14:10.000Z",
+      "ruleIds": [
+        "GUARD-MSG-001"
+      ]
+    },
+    {
+      "sha": "4d595ba686aed17ba6409670669a955b2e6c096a",
+      "committedAt": "2026-10-31T09:57:12.000Z",
+      "ruleIds": [
+        "GUARD-MSG-001"
+      ]
+    },
+    {
+      "sha": "3e1f85882a137d2db7862747f2b911939d28b1bf",
+      "committedAt": "2026-10-31T09:58:05.000Z",
+      "ruleIds": [
+        "GUARD-MSG-001"
+      ]
+    },
+    {
+      "sha": "b2b6e8c5f6f4ac0852908fb617d094a179fc38de",
+      "committedAt": "2026-10-31T16:46:20.000Z",
+      "ruleIds": [
+        "GUARD-MSG-001"
       ]
     }
   ]

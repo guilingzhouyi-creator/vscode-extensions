@@ -134,14 +134,14 @@ function auditStep(step, index, context, findings) {
     return;
   }
 
-  if (bannerLines.length === 0 && verdictLines.length === 0) {
+  if (verdictLines.length === 0 || (index.banners.size > 0 && bannerLines.length === 0)) {
     findings.push({
       type: 'GUARD-STEP-001',
       entry: entryId,
       platform,
       file,
-      line: 0,
-      detail: `${step.id} 在 ${platform} 实现中既无横幅也无判定，该步骤从不出现在操作者视野中`,
+      line: bannerLines[0] || verdictLines[0] || 0,
+      detail: `${step.id} 在 ${platform} 实现中缺少配套横幅或判定，破坏步骤回显契约`,
     });
     return;
   }

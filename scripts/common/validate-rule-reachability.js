@@ -48,6 +48,7 @@ const IGNORED_DIRS = new Set(['node_modules', 'dist', 'out', 'archive', '.git', 
 const EXCLUDED_PATTERNS = Object.freeze([
   /rule-catalog\.json$/,
   /rule-sources\//,
+  /rules-[a-z-]+\.generated\.ts$/,
   /validate-rule-reachability\.js$/,
   /validate-rule-id-closure\.js$/,
   /commit-msg-forbidden-terms\.json$/,

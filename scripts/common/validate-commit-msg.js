@@ -233,13 +233,74 @@ function loadCommitHistoryBaseline() {
   }
 }
 
+function applyHistoryBaselineFreeze(res, frozenRules) {
+  let liveStructure = res.structureFindings || [];
+  let liveHallucinated = res.hallucinatedRules || [];
+  let liveStyle = res.styleFindings || [];
+  let liveBatch = res.batchFindings || [];
+  let isLivePermitted = res.isPermittedUnderCorridor;
+
+  if (!frozenRules) {
+    return { isFrozen: false, isLivePermitted, liveStructure, liveHallucinated, liveStyle };
+  }
+
+  liveStructure = liveStructure.filter((f) => !frozenRules.has(f.ruleId));
+  if (frozenRules.has(RULE_GATE_SSOT)) {
+    liveHallucinated = [];
+  }
+  liveStyle = liveStyle.filter((f) => !frozenRules.has(f.ruleId));
+  liveBatch = liveBatch.filter((f) => !frozenRules.has(f.ruleId));
+
+  const liveFindingsCount =
+    liveStructure.length + liveHallucinated.length + liveStyle.length + liveBatch.length;
+  if (liveFindingsCount === 0) {
+    return { isFrozen: true, isLivePermitted: true, liveStructure, liveHallucinated, liveStyle };
+  }
+
+  if (liveStructure.length > 0 || liveHallucinated.length > 0 || liveBatch.length > 0) {
+    isLivePermitted = false;
+  } else {
+    const { evaluateDebtCorridor } = require(MODULE_DEBT_CORRIDOR);
+    const debtVerdict = evaluateDebtCorridor({
+      findings: liveStyle,
+      styleScore: res.guardrail?.styleScore || 0,
+      commitType: res.guardrail?.parsedStructure?.type || '',
+      skipLog: true,
+    });
+    isLivePermitted = debtVerdict.status !== STATUS_BLOCK;
+  }
+
+  return { isFrozen: false, isLivePermitted, liveStructure, liveHallucinated, liveStyle };
+}
+
+function logRangeCommitResult(sha, live) {
+  if (!live.isLivePermitted) {
+    console.error(`\n❌ 提交 ${sha} 包含刚性违规内容:`);
+    if (live.liveHallucinated.length > 0) {
+      console.error(`   • RULE-TRUTH-08 违规 (虚构规则 ID): ${live.liveHallucinated.join(', ')}`);
+    }
+    for (const s of live.liveStructure) {
+      console.error(`   • [${s.step}] 结构契约违规: ${s.message} (${s.detail})`);
+    }
+    if (live.liveStyle.length > 0) {
+      console.error(formatDiagnosticReport(live.liveStyle));
+    }
+    return;
+  }
+  if (live.liveStyle.length > 0) {
+    console.warn(`\n⚠️  提交 ${sha} 包含弹性技术债 (已在弹性走廊配额内放行):`);
+    for (const f of live.liveStyle) {
+      console.warn(`   • [${f.ruleId}] 第 ${f.lineNum} 行: ${f.term} -> 建议: ${f.guidance || '陈述客观技术事实'}`);
+    }
+  }
+}
+
 function validateCommitRange(range) {
   const root = path.resolve(__dirname, PARENT_DIR_DEPTH_TWO);
   const env = getSafeGitEnv(root);
 
   let rawLog = '';
   try {
-    // Argument array: the range is one argv element and cannot be parsed as shell syntax.
     rawLog = execFileSync('git', ['log', '--no-merges', '--format=%x1e%H%x1f%B', range], {
       cwd: root,
       env,
@@ -262,47 +323,14 @@ function validateCommitRange(range) {
     const match = unitSepPattern.exec(record);
     if (!match) continue;
     const sha = match[1].trim();
-    const msg = match[2];
-
-    const res = validateSingleCommitMessage(msg);
-
-    // A frozen commit predates the given rules: report it, never block on it. Only findings
-    // whose rule ID is absent from the freeze entry are treated as live violations, so a frozen
-    // commit that violates a genuinely new rule still fails.
-    const frozenRules = historyBaseline.get(sha);
-    if (frozenRules) {
-      const allFindings = [
-        ...(res.structureFindings || []).map((f) => ({ ruleId: f.ruleId })),
-        ...(res.hallucinatedRules || []).map(() => ({ ruleId: 'GUARD-SSOT-001' })),
-        ...(res.styleFindings || []),
-      ];
-      const liveFindings = allFindings.filter((f) => !frozenRules.has(f.ruleId));
-      if (liveFindings.length === 0) {
-        frozenCount++;
-        continue;
-      }
+    const res = validateSingleCommitMessage(match[2]);
+    const live = applyHistoryBaselineFreeze(res, historyBaseline.get(sha));
+    if (live.isFrozen) {
+      frozenCount++;
+      continue;
     }
-
-    if (!res.isPermittedUnderCorridor) {
-      failedCount++;
-      console.error(`\n❌ 提交 ${sha} 包含刚性违规内容:`);
-      if (res.hallucinatedRules.length > 0) {
-        console.error(`   • RULE-TRUTH-08 违规 (虚构规则 ID): ${res.hallucinatedRules.join(', ')}`);
-      }
-      if ((res.structureFindings || []).length > 0) {
-        for (const s of res.structureFindings) {
-          console.error(`   • [${s.step}] 结构契约违规: ${s.message} (${s.detail})`);
-        }
-      }
-      if (res.styleFindings.length > 0) {
-        console.error(formatDiagnosticReport(res.styleFindings));
-      }
-    } else if (!res.valid) {
-      console.warn(`\n⚠️  提交 ${sha} 包含弹性技术债 (已在弹性走廊配额内放行):`);
-      for (const f of res.styleFindings) {
-        console.warn(`   • [${f.ruleId}] 第 ${f.lineNum} 行: ${f.term} -> 建议: ${f.guidance || '陈述客观技术事实'}`);
-      }
-    }
+    if (!live.isLivePermitted) failedCount++;
+    logRangeCommitResult(sha, live);
   }
 
   return { passed: failedCount === 0, total: records.length, failedCount, frozenCount };
@@ -389,18 +417,52 @@ function readCommitContent(target) {
   return fs.readFileSync(target, ENCODING_UTF8);
 }
 
+function resolveCommitFailureSummary(res, violationsCount) {
+  if (res.structureFindings && res.structureFindings.length > 0) {
+    return `Commit message structural contract failed with ${res.structureFindings.length} violation(s).`;
+  }
+  if (res.hallucinatedRules && res.hallucinatedRules.length > 0) {
+    return `Commit message referenced ${res.hallucinatedRules.length} unregistered/hallucinated rule ID(s).`;
+  }
+  if (res.debtVerdict?.reason && !res.debtVerdict.passed) {
+    return res.debtVerdict.reason;
+  }
+  return `Commit message verification failed with ${violationsCount} rule hallucination or forbidden style violations.`;
+}
+
+function printHumanCommitFailure(res) {
+  if (res.debtVerdict?.status === STATUS_BLOCK && res.debtVerdict?.reason) {
+    console.error(`✖ [DEBT-CORRIDOR-BLOCK] ${res.debtVerdict.reason}`);
+  }
+  if ((res.structureFindings || []).length > 0) {
+    console.error('✖ BLOCK GUARD-MSG-001: 提交信息未满足结构契约规范:');
+    for (const s of res.structureFindings) {
+      console.error(`   • [${s.step}] 结构契约违规: ${s.message}${s.detail ? ` (${s.detail})` : ''}`);
+    }
+  }
+  if (res.hallucinatedRules.length > 0) {
+    console.error('✖ BLOCK RULE-TRUTH-08: 提交信息提及未在单源注册表登记的虚构或漂移规则 ID:');
+    for (const h of res.hallucinatedRules) {
+      console.error(`   • 未知规则 ID: ${h}`);
+    }
+    console.error('   提示: 请检查规则拼写，或先在规则注册表 / review-rules.json 中登记该规则后重新生成目录。');
+  }
+  if ((res.batchFindings || []).length > 0) {
+    console.error('✖ BLOCK SLANG-GUARD-02: 提交信息包含施工批次或临时标记 (一票否决，不进入弹性走廊):');
+    for (const f of res.batchFindings) {
+      console.error(`   • 第 ${f.lineNum} 行: '${f.term}'`);
+    }
+    console.error('   提示: 移除 pN / phaseN / stN / wip / temp / new / vN 等过程性代号，改用客观技术描述。');
+  }
+  if (res.styleFindings.length > 0) {
+    console.error(formatDiagnosticReport(res.styleFindings));
+  }
+}
+
 function reportCommitMsgFailure(res, target, isAgentMode) {
   const violations = buildCommitMsgViolations(res, target);
-  let failureSummary = '';
-  if (res.structureFindings && res.structureFindings.length > 0) {
-    failureSummary = `Commit message structural contract failed with ${res.structureFindings.length} violation(s).`;
-  } else if (res.hallucinatedRules && res.hallucinatedRules.length > 0) {
-    failureSummary = `Commit message referenced ${res.hallucinatedRules.length} unregistered/hallucinated rule ID(s).`;
-  } else if (res.debtVerdict?.reason && !res.debtVerdict.passed) {
-    failureSummary = res.debtVerdict.reason;
-  } else {
-    failureSummary = `Commit message verification failed with ${violations.length} rule hallucination or forbidden style violations.`;
-  }
+  const failureSummary = resolveCommitFailureSummary(res, violations.length);
+  const targetFiles = [target].filter((t) => t && t !== STDIN_TOKEN);
 
   try {
     const { writeFailureSnapshot } = require(MODULE_LOG_ROTATOR);
@@ -411,16 +473,15 @@ function reportCommitMsgFailure(res, target, isAgentMode) {
       exitCode: 1,
       summary: failureSummary,
       violations,
-      targetFiles: [target].filter((t) => t && t !== STDIN_TOKEN),
+      targetFiles,
       verificationCommand: `node scripts/common/validate-commit-msg.js ${target}`,
     });
-  } catch (err) {
+  } catch {
     // Best-effort telemetry recording: ignore logging failure to avoid masking commit gate errors
   }
 
   if (isAgentMode) {
-    const targetFile = target && target !== STDIN_TOKEN ? target : '';
-    const targetVerification = targetFile || '.git/COMMIT_EDITMSG';
+    const targetVerification = targetFiles[0] || '.git/COMMIT_EDITMSG';
     const envelope = {
       protocolVersion: PROTOCOL_VERSION,
       status: STATUS_BLOCK,
@@ -433,7 +494,7 @@ function reportCommitMsgFailure(res, target, isAgentMode) {
       debtCorridor: res.debtVerdict,
       agentDirectives: {
         ...(res.debtVerdict?.agentDirectives || {}),
-        targetFiles: [target].filter((t) => t && t !== STDIN_TOKEN),
+        targetFiles,
         remediationPriority: Array.from(new Set(violations.map((v) => v.ruleId))),
         verificationCommand: `pwsh -File scripts/ps1/commit-msg-gate.ps1 ${targetVerification}`,
         fastRecheckCommand: `node scripts/common/validate-commit-msg.js ${targetVerification}`,
@@ -443,29 +504,7 @@ function reportCommitMsgFailure(res, target, isAgentMode) {
     process.exit(1);
   }
 
-  if (res.debtVerdict?.reason) {
-    console.error(`✖ [DEBT-CORRIDOR-BLOCK] ${res.debtVerdict.reason}`);
-  }
-
-  if (res.hallucinatedRules.length > 0) {
-    console.error('✖ BLOCK RULE-TRUTH-08: 提交信息提及未在单源注册表登记的虚构或漂移规则 ID:');
-    for (const h of res.hallucinatedRules) {
-      console.error(`   • 未知规则 ID: ${h}`);
-    }
-    console.error('   提示: 请检查规则拼写，或先在规则注册表 / review-rules.json 中登记该规则后重新生成目录。');
-  }
-
-  if ((res.batchFindings || []).length > 0) {
-    console.error('✖ BLOCK SLANG-GUARD-02: 提交信息包含施工批次或临时标记 (一票否决，不进入弹性走廊):');
-    for (const f of res.batchFindings) {
-      console.error(`   • 第 ${f.lineNum} 行: '${f.term}'`);
-    }
-    console.error('   提示: 移除 pN / phaseN / stN / wip / temp / new / vN 等过程性代号，改用客观技术描述。');
-  }
-
-  if (res.styleFindings.length > 0) {
-    console.error(formatDiagnosticReport(res.styleFindings));
-  }
+  printHumanCommitFailure(res);
   process.exit(1);
 }
 

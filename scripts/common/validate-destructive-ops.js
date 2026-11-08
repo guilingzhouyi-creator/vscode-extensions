@@ -429,7 +429,7 @@ function auditDestructiveTargets(full) {
  * @param {string} full - Absolute file path.
  * @returns {Array<object>} Findings.
  */
-function auditAutomaticVariableShadowing(full) {
+function auditAutomaticVariableShadowing(full, contentOverride) {
   if (!['.ps1', '.psm1'].includes(path.extname(full))) return [];
   const rel = path.relative(REPO_ROOT, full).replace(/\\/g, '/');
   const findings = [];
@@ -445,11 +445,13 @@ function auditAutomaticVariableShadowing(full) {
       detail: `$${name} is a read-only automatic variable; the write throws and the name keeps its previous value`,
     });
   };
-  fs.readFileSync(full, 'utf8').split(/\r?\n/).forEach((line, index) => {
+  const source = contentOverride !== undefined ? contentOverride : fs.readFileSync(full, 'utf8');
+  source.split(/\r?\n/).forEach((line, index) => {
     const trimmed = line.trim();
     if (trimmed.startsWith('#') || trimmed.startsWith('*')) return;
     for (const match of line.matchAll(/\$([A-Za-z_][A-Za-z0-9_]*)\s*(?:=[^=]|\+=|-=|\*=)/g)) report(match[1], index + 1);
     for (const match of line.matchAll(/foreach\s*\(\s*\$([A-Za-z_][A-Za-z0-9_]*)\s+in\b/gi)) report(match[1], index + 1);
+    for (const match of line.matchAll(/\bparam\s*\([^)]*\$([A-Za-z_][A-Za-z0-9_]*)/gi)) report(match[1], index + 1);
     for (const match of line.matchAll(/\[[A-Za-z_][A-Za-z0-9_.\[\]]*\]\s*\$([A-Za-z_][A-Za-z0-9_]*)\s*=/g)) {
       report(match[1], index + 1);
     }
@@ -488,11 +490,8 @@ function runSelfProbes() {
   expect('sh:non-recursive-ignored', parseShellDelete('rm -f "$LOG"'), null);
 
   for (const sample of SELF_PROBES.shadow) {
-    const name = (/(?:^|[^\w$])\$([A-Za-z_][A-Za-z0-9_]*)\s*=/.exec(sample)
-      || /foreach\s*\(\s*\$([A-Za-z_][A-Za-z0-9_]*)\s+in\b/i.exec(sample)
-      || /param\s*\([^)]*\$([A-Za-z_][A-Za-z0-9_]*)/i.exec(sample)
-      || [])[1];
-    expect(`shadow:${sample}`, READONLY_AUTOMATIC_VARIABLES.includes((name || '').toLowerCase()), true);
+    const detected = auditAutomaticVariableShadowing(path.join(REPO_ROOT, '__probe__.ps1'), sample);
+    expect(`shadow:${sample}`, detected.length > 0, true);
   }
   for (const sample of SELF_PROBES.forbidden) {
     expect(`forbidden:${sample}`, FORBIDDEN_OPERANDS.some((pattern) => pattern.test(sample)), true);

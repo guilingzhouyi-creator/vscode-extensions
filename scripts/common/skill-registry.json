@@ -157,7 +157,8 @@
         "facade-discipline",
         "defensive-security-and-taint-safety",
         "debugging-and-error-recovery",
-        "constraint-driven-development"
+        "constraint-driven-development",
+        "tiered-cache-and-wal-persistence"
       ],
       "scenarios": [
         {
@@ -206,6 +207,8 @@
       "archetype": "cli-engine",
       "chain": [
         "auto-refactor-dev",
+        "sparse-moe-and-ast-routing",
+        "praxis-vfs-and-trajectory-learning",
         "rust-engineering",
         "algorithmic-operator-engineering",
         "telemetry-statistical-modeling",
@@ -219,7 +222,8 @@
         "debugging-and-error-recovery",
         "constraint-driven-development",
         "rule-catalog-governance",
-        "state-concurrency-and-crash-recovery"
+        "state-concurrency-and-crash-recovery",
+        "tiered-cache-and-wal-persistence"
       ],
       "scenarios": [
         {
@@ -227,7 +231,26 @@
           "posture": "construct",
           "skills": [
             "auto-refactor-dev",
+            "sparse-moe-and-ast-routing",
             "rule-catalog-governance",
+            "test-benchmark-engineering"
+          ]
+        },
+        {
+          "intent": "优化稀疏 MoE 路由与多语言惰性投影",
+          "posture": "refactor",
+          "skills": [
+            "sparse-moe-and-ast-routing",
+            "algorithmic-operator-engineering",
+            "tiered-cache-and-wal-persistence"
+          ]
+        },
+        {
+          "intent": "LayerVFS 沙箱分叉或轨迹配方提取调试",
+          "posture": "construct",
+          "skills": [
+            "praxis-vfs-and-trajectory-learning",
+            "auto-refactor-dev",
             "test-benchmark-engineering"
           ]
         },
@@ -282,7 +305,8 @@
         "defensive-security-and-taint-safety",
         "constraint-driven-development",
         "algorithmic-operator-engineering",
-        "gate-governance"
+        "gate-governance",
+        "tiered-cache-and-wal-persistence"
       ],
       "scenarios": [
         {
@@ -856,6 +880,30 @@
         "pwsh -File scripts/ps1/audit-all.ps1"
       ]
     },
+    "praxis-vfs-and-trajectory-learning": {
+      "layer": "domain-adapter",
+      "pitch": "开发或调试 LayerVFS 虚拟文件沙箱、MCTS 重构树搜索、轨迹学习配方提取或 Praxis 审查门禁链时触发。保障 CAS 零落盘分叉与事务回滚闭环。",
+      "purpose": "回答『虚拟沙箱分叉是否污染磁盘、轨迹配方是否经五道门禁净化』，产出 LayerVFS 事务与轨迹配方回归结论。",
+      "triggers": [
+        "LayerVFS",
+        "MCTS",
+        "轨迹学习",
+        "配方提取",
+        "虚拟分叉",
+        "沙箱联调",
+        "回滚失败"
+      ],
+      "situations": [
+        "MCTS 搜索候选补丁时污染了物理工作区文件",
+        "历史提交轨迹噪声太多，配方提取召回率低",
+        "Praxis 审查门禁链阻断了跨文件重命名事务"
+      ],
+      "verification": [
+        "cd auto-refactor && npm test",
+        "node auto-refactor/scripts/validate-trajectory-learning.js",
+        "node scripts/common/validate-skills.js"
+      ]
+    },
     "release-package-workflow": {
       "layer": "workspace-governance",
       "pitch": "打包 VS Code 扩展、执行 -HotSync 热同步或编写 Keep-a-Changelog 发版日志时触发。确保产物自动轮转与用户文档零工程黑话。",
@@ -974,6 +1022,30 @@
         "pwsh -File scripts/ps1/audit-all.ps1"
       ]
     },
+    "sparse-moe-and-ast-routing": {
+      "layer": "domain-adapter",
+      "pitch": "开发或优化五级稀疏 MoE 路由、32 位无符号位掩码分派、LineFeatureTape 扫描或多语言 AST 惰性投影时触发。落实零热路径冗余解析与池化复位。",
+      "purpose": "回答『分析器是否绑定五级稀疏预筛、惰性语义图是否被提前物化』，产出位掩码路由与多语言 IR 回归结论。",
+      "triggers": [
+        "MoE",
+        "稀疏路由",
+        "位掩码",
+        "特征磁带",
+        "预筛优化",
+        "激活降级",
+        "惰性投影"
+      ],
+      "situations": [
+        "新增的分析器没有绑定AnalyzerBit或行级特征磁带预筛",
+        "非JS语言适配器过早实例化全量CFG导致扫描变慢",
+        "池化分析器未在resetState中清空上一文件的缓存字典"
+      ],
+      "verification": [
+        "cd auto-refactor && npm test",
+        "node auto-refactor/scripts/bench-hot-paths.js",
+        "node scripts/common/validate-skills.js"
+      ]
+    },
     "state-concurrency-and-crash-recovery": {
       "layer": "universal-methodology",
       "pitch": "涉及并发调度、句柄生命周期对称释放(PRF-LEAK-001)、异步派发器排空或崩溃恢复幂等性设计时触发。杜绝孤儿句柄与悬挂协程。",
@@ -1068,6 +1140,30 @@
         "cd auto-refactor && npm test",
         "cd workspace-timing && npm run test:fast",
         "pwsh -File fractal-git/scripts/ps1/audit-taxis.ps1"
+      ]
+    },
+    "tiered-cache-and-wal-persistence": {
+      "layer": "universal-methodology",
+      "pitch": "设计或维护多级增量缓存(L1/L2/L3)、12 因子复合指纹、拓扑反向依赖失效或 WAL 预写日志原子落盘时触发。防御内存溢出与断电半写损坏。",
+      "purpose": "为多级缓存、依赖拓扑失效与 WAL 原子落盘提供统一协议，杜绝过期脏缓存、内存膨胀与进程强杀数据损坏。",
+      "triggers": [
+        "WAL",
+        "L1L2缓存",
+        "拓扑失效",
+        "指纹校验",
+        "异步刷盘",
+        "缓存设计",
+        "缓存丢失"
+      ],
+      "situations": [
+        "全仓十万文件扫描时 L2 缓存把进程内存撑爆了",
+        "被依赖头文件改了但上游调用方缓存没有失效",
+        "并发进程同时刷写缓存文件引发写入竞争或半写"
+      ],
+      "verification": [
+        "cd auto-refactor && npm test",
+        "cd workspace-timing && npm run test:fast",
+        "node scripts/common/validate-skills.js"
       ]
     },
     "webgames-workflow": {

@@ -50,6 +50,7 @@ const IGNORED_DIRS = new Set([
   'temp',
   '.praxis',
   '.taxis',
+  '.vitest',
   '.venv',
   'venv',
 ]);
@@ -246,7 +247,8 @@ class PhysicalHygieneAuditor {
   auditEol(ext, content, relPath) {
     const hasCR = content.includes('\r');
     if (ext === '.ps1') {
-      if (!hasCR) {
+      const hasBareLF = content.replace(/\r\n/g, '').includes('\n');
+      if (hasBareLF || (!hasCR && content.includes('\n'))) {
         this.violations.eolContract.push({
           path: relPath,
           ruleId: 'HYG-EOL-001',

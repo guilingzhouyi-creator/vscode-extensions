@@ -164,7 +164,7 @@ function main() {
   const bomFile = writeFixture('bom.js', Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('const value = 1;\n')]));
   const validMsg = writeFixture(
     'valid-msg.txt',
-    'feat(gate): 增加门禁自检用例\n\n[Project / 项目归属]\n- governance\n\n[Why / 动机背景]\n- 门禁缺少可重复执行的三态回归用例，无法证明失败路径真实生效。\n\n[Added / 新增内容]\n- 新增自检脚本覆盖干净输入、违规输入与缺依赖三种状态。\n\n[Verification / 验证结论]\n- 自检矩阵逐项输出判定并与预期比较。\n',
+    'feat(gate): 增加自动化门禁三态自检用例\n\n[Project / 项目归属]\n- governance\n\n[Why / 动机背景]\n- 门禁缺少可重复执行的三态回归用例，无法证明失败路径真实生效。\n\n[Added / 新增内容]\n- 新增自检脚本覆盖干净输入、违规输入与缺依赖三种状态。\n\n[Verification / 验证结论]\n- 自检矩阵逐项输出判定并与预期比较。\n',
   );
   const invalidMsg = writeFixture('invalid-msg.txt', 'wip\n');
 

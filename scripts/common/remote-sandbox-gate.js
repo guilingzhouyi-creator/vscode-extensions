@@ -334,13 +334,24 @@ function executeLocalCommands(sliceKeys, isDeep) {
     console.log(`\n▶ [Slice: ${key}] ${def.title}`);
     for (let cmd of def.commands) {
       if (key === 'all' && isDeep) {
-        cmd = 'bash scripts/sh/audit-all.sh';
+        cmd = process.platform === 'win32'
+          ? 'pwsh -NoProfile -File scripts/ps1/audit-all.ps1'
+          : 'bash scripts/sh/audit-all.sh';
       }
       console.log(`  $ ${cmd}`);
       const shellCmd = process.platform === 'win32' ? 'pwsh' : 'bash';
       const shellArg = process.platform === 'win32' ? '-Command' : '-c';
-      const res = spawnSync(shellCmd, [shellArg, cmd], {
-        cwd: REPO_ROOT,
+      let execCmd = cmd;
+      let execCwd = REPO_ROOT;
+      if (process.platform === 'win32') {
+        const subshellMatch = /^\(\s*cd\s+([^\s&]+)\s*&&\s*(.+)\)\s*$/.exec(cmd);
+        if (subshellMatch) {
+          execCwd = path.join(REPO_ROOT, subshellMatch[1]);
+          execCmd = subshellMatch[2];
+        }
+      }
+      const res = spawnSync(shellCmd, [shellArg, execCmd], {
+        cwd: execCwd,
         stdio: 'inherit'
       });
       if (res.status !== 0) {
