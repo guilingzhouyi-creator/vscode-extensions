@@ -1,0 +1,394 @@
+{
+  "profileVersion": 1,
+  "testNotice": "Structural contract fixtures only; no execution, signature trust, or gate approval is claimed.",
+  "documents": {
+    "request": {
+      "schemaVersion": 1,
+      "kind": "review-request",
+      "binding": {
+        "reviewId": "review-1",
+        "operationId": "operation-1",
+        "snapshot": {
+          "repositoryId": "repository-1",
+          "tree": {
+            "algorithm": "git-sha1",
+            "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "manifestDigest": {
+            "algorithm": "sm3",
+            "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "baseline": {
+          "strategy": "initial",
+          "parents": []
+        },
+        "policyDigest": {
+          "algorithm": "sm3",
+          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "configurationDigest": {
+          "algorithm": "sm3",
+          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "requiredCapabilitiesDigest": {
+          "algorithm": "sm3",
+          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "scope": [
+        "src/a.ts"
+      ],
+      "deadlineAtMs": 1000,
+      "actorContext": {
+        "actorId": "agent-1"
+      }
+    },
+    "evidence": {
+      "schemaVersion": 1,
+      "kind": "analysis-evidence",
+      "binding": {
+        "reviewId": "review-1",
+        "operationId": "operation-1",
+        "snapshot": {
+          "repositoryId": "repository-1",
+          "tree": {
+            "algorithm": "git-sha1",
+            "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "manifestDigest": {
+            "algorithm": "sm3",
+            "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "baseline": {
+          "strategy": "initial",
+          "parents": []
+        },
+        "policyDigest": {
+          "algorithm": "sm3",
+          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "configurationDigest": {
+          "algorithm": "sm3",
+          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "requiredCapabilitiesDigest": {
+          "algorithm": "sm3",
+          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "engines": [
+        {
+          "id": "fixture-engine",
+          "version": "1.0.0",
+          "configurationDigest": {
+            "algorithm": "sm3",
+            "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        }
+      ],
+      "execution": {
+        "schemaVersion": 1,
+        "reviewId": "review-1",
+        "status": "partial",
+        "coverage": [
+          {
+            "analyzer": "fixture-engine",
+            "capability": "syntax",
+            "language": "typescript",
+            "required": true,
+            "status": "degraded",
+            "reason": "fixture-only"
+          }
+        ],
+        "tracks": {
+          "fast": "complete",
+          "deep": "pending"
+        },
+        "failures": []
+      },
+      "diagnostics": [],
+      "measurements": {
+        "qualityDelta": {
+          "status": "measured",
+          "value": 0,
+          "provenance": {
+            "source": "analysis",
+            "sampleIds": [
+              "sample-1"
+            ]
+          }
+        },
+        "generalization": {
+          "status": "unmeasured",
+          "reason": "not-executed-in-this-fixture"
+        },
+        "tests": {
+          "status": "unmeasured",
+          "reason": "not-executed-in-this-fixture"
+        },
+        "mutations": {
+          "status": "unmeasured",
+          "reason": "not-executed-in-this-fixture"
+        },
+        "performanceMs": {
+          "status": "unmeasured",
+          "reason": "not-executed-in-this-fixture"
+        }
+      },
+      "timing": {
+        "queueMs": 0,
+        "elapsedMs": 1.5,
+        "outputTruncated": false,
+        "budgetExhausted": false
+      }
+    },
+    "receipt": {
+      "schemaVersion": 1,
+      "kind": "trusted-review-receipt",
+      "payload": {
+        "binding": {
+          "reviewId": "review-1",
+          "operationId": "operation-1",
+          "snapshot": {
+            "repositoryId": "repository-1",
+            "tree": {
+              "algorithm": "git-sha1",
+              "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "manifestDigest": {
+              "algorithm": "sm3",
+              "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          },
+          "baseline": {
+            "strategy": "initial",
+            "parents": []
+          },
+          "policyDigest": {
+            "algorithm": "sm3",
+            "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "configurationDigest": {
+            "algorithm": "sm3",
+            "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "requiredCapabilitiesDigest": {
+            "algorithm": "sm3",
+            "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "issuer": "issuer-1",
+        "keyId": "key-1",
+        "signatureAlgorithm": "hmac-sm3",
+        "requestDigest": {
+          "algorithm": "sm3",
+          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "evidenceDigest": {
+          "algorithm": "sm3",
+          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "previousEvidenceDigest": null,
+        "decision": "unavailable",
+        "reasons": [
+          "incomplete execution"
+        ],
+        "issuedAtMs": 100,
+        "expiresAtMs": 200
+      },
+      "signature": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  },
+  "mutations": [
+    {
+      "name": "unknown-major-version",
+      "target": "request",
+      "pointer": "/schemaVersion",
+      "action": "set",
+      "value": 2
+    },
+    {
+      "name": "invalid-envelope-kind",
+      "target": "request",
+      "pointer": "/kind",
+      "action": "set",
+      "value": "approved"
+    },
+    {
+      "name": "unknown-top-level-field",
+      "target": "request",
+      "pointer": "/unknown",
+      "action": "set",
+      "value": true
+    },
+    {
+      "name": "missing-snapshot",
+      "target": "request",
+      "pointer": "/binding/snapshot",
+      "action": "remove"
+    },
+    {
+      "name": "short-object-identity",
+      "target": "request",
+      "pointer": "/binding/snapshot/tree/value",
+      "action": "set",
+      "value": "abc"
+    },
+    {
+      "name": "unknown-object-algorithm",
+      "target": "request",
+      "pointer": "/binding/snapshot/tree/algorithm",
+      "action": "set",
+      "value": "sm3"
+    },
+    {
+      "name": "uppercase-content-digest",
+      "target": "request",
+      "pointer": "/binding/policyDigest/value",
+      "action": "set",
+      "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    {
+      "name": "unknown-content-algorithm",
+      "target": "request",
+      "pointer": "/binding/policyDigest/algorithm",
+      "action": "set",
+      "value": "sha1"
+    },
+    {
+      "name": "missing-parent-baseline",
+      "target": "request",
+      "pointer": "/binding/baseline",
+      "action": "set",
+      "value": {
+        "strategy": "parent",
+        "parents": []
+      }
+    },
+    {
+      "name": "empty-scope",
+      "target": "request",
+      "pointer": "/scope",
+      "action": "set",
+      "value": []
+    },
+    {
+      "name": "duplicate-scope",
+      "target": "request",
+      "pointer": "/scope",
+      "action": "set",
+      "value": [
+        "src/a.ts",
+        "src/a.ts"
+      ]
+    },
+    {
+      "name": "empty-actor-identity",
+      "target": "request",
+      "pointer": "/actorContext/actorId",
+      "action": "set",
+      "value": ""
+    },
+    {
+      "name": "unsafe-timestamp",
+      "target": "request",
+      "pointer": "/deadlineAtMs",
+      "action": "set",
+      "value": 9007199254740992
+    },
+    {
+      "name": "invalid-execution-status",
+      "target": "evidence",
+      "pointer": "/execution/status",
+      "action": "set",
+      "value": "passed"
+    },
+    {
+      "name": "invalid-execution-version",
+      "target": "evidence",
+      "pointer": "/execution/schemaVersion",
+      "action": "set",
+      "value": 2
+    },
+    {
+      "name": "empty-analyzer-identity",
+      "target": "evidence",
+      "pointer": "/execution/coverage/0/analyzer",
+      "action": "set",
+      "value": ""
+    },
+    {
+      "name": "string-required-flag",
+      "target": "evidence",
+      "pointer": "/execution/coverage/0/required",
+      "action": "set",
+      "value": "false"
+    },
+    {
+      "name": "missing-observation-source",
+      "target": "evidence",
+      "pointer": "/measurements/qualityDelta/provenance/sampleIds",
+      "action": "set",
+      "value": []
+    },
+    {
+      "name": "duplicate-observation-samples",
+      "target": "evidence",
+      "pointer": "/measurements/qualityDelta/provenance/sampleIds",
+      "action": "set",
+      "value": [
+        "sample-1",
+        "sample-1"
+      ]
+    },
+    {
+      "name": "invalid-observation-source",
+      "target": "evidence",
+      "pointer": "/measurements/qualityDelta/provenance/source",
+      "action": "set",
+      "value": "assumed"
+    },
+    {
+      "name": "numeric-missing-observation",
+      "target": "evidence",
+      "pointer": "/measurements/tests",
+      "action": "set",
+      "value": 0
+    },
+    {
+      "name": "missing-required-measurement",
+      "target": "evidence",
+      "pointer": "/measurements/mutations",
+      "action": "remove"
+    },
+    {
+      "name": "invalid-issuer",
+      "target": "receipt",
+      "pointer": "/payload/issuer",
+      "action": "set",
+      "value": ""
+    },
+    {
+      "name": "invalid-decision",
+      "target": "receipt",
+      "pointer": "/payload/decision",
+      "action": "set",
+      "value": "passed"
+    },
+    {
+      "name": "short-signature",
+      "target": "receipt",
+      "pointer": "/signature",
+      "action": "set",
+      "value": "1234"
+    },
+    {
+      "name": "missing-signature",
+      "target": "receipt",
+      "pointer": "/signature",
+      "action": "remove"
+    }
+  ]
+}

@@ -193,8 +193,8 @@ function baselineTreeOid(repo: ParityRepo, files: readonly StagedFileEntry[]): s
 /**
  * Creates the baseline commit for a tree, message section, and parent ids.
  *
- * The message section is fed on stdin followed by exactly one newline, which mirrors the
- * canonical commit payload produced by the TypeScript engine.
+ * The message section is fed on stdin verbatim, which mirrors the canonical commit payload
+ * produced by the TypeScript engine and `git commit-tree -F`.
  */
 function baselineCommitOid(
     repo: ParityRepo,
@@ -206,7 +206,7 @@ function baselineCommitOid(
     for (const parentOid of parentOids) {
         args.push('-p', parentOid);
     }
-    return runGit(repo, args, `${messageSection}\n`);
+    return runGit(repo, args, messageSection);
 }
 
 /**

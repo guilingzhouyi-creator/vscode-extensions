@@ -1,0 +1,95 @@
+{
+  "profileVersion": 1,
+  "testKeyNotice": "Public interoperability test key; never a production trust key.",
+  "testKeyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "valid": [
+    {
+      "name": "nested-and-integer-keys",
+      "input": "{\"z\":0,\"a\":{\"2\":\"two\",\"10\":\"ten\"},\"list\":[{\"b\":2,\"a\":1},true,null]}",
+      "canonical": "{\"a\":{\"10\":\"ten\",\"2\":\"two\"},\"list\":[{\"a\":1,\"b\":2},true,null],\"z\":0}",
+      "sm3": "999d863ccd6d63ca81648adf833300db7f2c9e171d6d9d331704f61dfdf573bc",
+      "hmacSm3": "02ed200d0507d0f6b6bfabf87ffc39c6b9b1bd7cf36a4a2c8b8f4f1f2aaeb868"
+    },
+    {
+      "name": "ecmascript-numbers",
+      "input": "{\"numbers\":[333333333.33333329,4.50,2e-3,1e-27,-0,1e-6]}",
+      "canonical": "{\"numbers\":[333333333.3333333,4.5,0.002,1e-27,0,0.000001]}",
+      "sm3": "2da955914ddd61b390c6afc22136187caa54fc774126e5d7c5c8fda21712e514",
+      "hmacSm3": "ea599b7d35de74fb987cabf3738934d253b1126f9988731ece980101bbea1674"
+    },
+    {
+      "name": "utf16-order",
+      "input": "{\"\":1,\"😀\":2,\"€\":3,\"1\":4,\"\":5}",
+      "canonical": "{\"1\":4,\"\":5,\"€\":3,\"😀\":2,\"\":1}",
+      "sm3": "c5f26a90267f6e8bbd3d9a7d9ae4c2d63ad61a48392e46f88e8fc15a44eac7d6",
+      "hmacSm3": "4fa91daa1f38b6e1c345f2b271b254429ca80af2a0d6fa57f5b07f9f28c620e5"
+    },
+    {
+      "name": "escape-normalization",
+      "input": "{\"value\":\"\\u0061\\n\\t\\u000f\\/\\\\\\\"\"}",
+      "canonical": "{\"value\":\"a\\n\\t\\u000f/\\\\\\\"\"}",
+      "sm3": "240600d1bacabc63a0e343b4d1a87edba3f3d3f85657dc0e77465501837819d4",
+      "hmacSm3": "1430bfa99422d6072d7f7db7cceb9678d0194e0e0cc2be76d2d3ad5c3a4a9bfd"
+    },
+    {
+      "name": "safe-integer-boundaries",
+      "input": "{\"min\":-9007199254740991,\"max\":9007199254740991}",
+      "canonical": "{\"max\":9007199254740991,\"min\":-9007199254740991}",
+      "sm3": "ad5dd4afd58fe9502fd1672c7079e7ce26103227476dcd441f3022c289595699",
+      "hmacSm3": "a6f628f476f6239f2e0515bce9f99b3db9b7ae5c20d74b49e1a27491446b287e"
+    },
+    {
+      "name": "prototype-key",
+      "input": "{\"__proto__\":{\"z\":1,\"a\":2},\"constructor\":null}",
+      "canonical": "{\"__proto__\":{\"a\":2,\"z\":1},\"constructor\":null}",
+      "sm3": "8d0fba9a3902794df984bd9c53e8c08858f5095b10c6c89610439abf6bf50a3b",
+      "hmacSm3": "9f93f39f40f37c974e13800f260e9132e55b0443f5ea680e6185e2784464b27f"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "duplicate-key",
+      "input": "{\"a\":1,\"a\":2}"
+    },
+    {
+      "name": "escaped-duplicate-key",
+      "input": "{\"a\":1,\"\\u0061\":2}"
+    },
+    {
+      "name": "nested-duplicate-key",
+      "input": "{\"a\":[{\"b\":1,\"b\":2}]}"
+    },
+    {
+      "name": "unpaired-surrogate-value",
+      "input": "{\"a\":\"\\ud800\"}"
+    },
+    {
+      "name": "unpaired-surrogate-key",
+      "input": "{\"\\udc00\":1}"
+    },
+    {
+      "name": "unsafe-positive-integer",
+      "input": "{\"a\":9007199254740992}"
+    },
+    {
+      "name": "unsafe-negative-integer",
+      "input": "{\"a\":-9007199254740992}"
+    },
+    {
+      "name": "overflowing-number",
+      "input": "{\"a\":1e400}"
+    },
+    {
+      "name": "trailing-data",
+      "input": "{}{}"
+    },
+    {
+      "name": "excessive-nesting",
+      "input": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[0]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]"
+    },
+    {
+      "name": "utf8-bom",
+      "input": "﻿{}"
+    }
+  ]
+}

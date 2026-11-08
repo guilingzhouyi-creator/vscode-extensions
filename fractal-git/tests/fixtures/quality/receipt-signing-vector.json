@@ -1,0 +1,65 @@
+{
+  "profileVersion": 1,
+  "testNotice": "Public interoperability key only. Integrity does not prove execution, issuer trust, or approval; this receipt declares unavailable.",
+  "testKeyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "requestCanonical": "{\"actorContext\":{\"actorId\":\"agent-1\"},\"binding\":{\"baseline\":{\"parents\":[],\"strategy\":\"initial\"},\"configurationDigest\":{\"algorithm\":\"sm3\",\"value\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"operationId\":\"operation-1\",\"policyDigest\":{\"algorithm\":\"sm3\",\"value\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"requiredCapabilitiesDigest\":{\"algorithm\":\"sm3\",\"value\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"reviewId\":\"review-1\",\"snapshot\":{\"manifestDigest\":{\"algorithm\":\"sm3\",\"value\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"repositoryId\":\"repository-1\",\"tree\":{\"algorithm\":\"git-sha1\",\"value\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}}},\"deadlineAtMs\":1000,\"kind\":\"review-request\",\"schemaVersion\":1,\"scope\":[\"src/a.ts\"]}",
+  "evidenceCanonical": "{\"binding\":{\"baseline\":{\"parents\":[],\"strategy\":\"initial\"},\"configurationDigest\":{\"algorithm\":\"sm3\",\"value\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"operationId\":\"operation-1\",\"policyDigest\":{\"algorithm\":\"sm3\",\"value\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"requiredCapabilitiesDigest\":{\"algorithm\":\"sm3\",\"value\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"reviewId\":\"review-1\",\"snapshot\":{\"manifestDigest\":{\"algorithm\":\"sm3\",\"value\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"repositoryId\":\"repository-1\",\"tree\":{\"algorithm\":\"git-sha1\",\"value\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}}},\"diagnostics\":[],\"engines\":[{\"configurationDigest\":{\"algorithm\":\"sm3\",\"value\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"id\":\"fixture-engine\",\"version\":\"1.0.0\"}],\"execution\":{\"coverage\":[{\"analyzer\":\"fixture-engine\",\"capability\":\"syntax\",\"language\":\"typescript\",\"reason\":\"fixture-only\",\"required\":true,\"status\":\"degraded\"}],\"failures\":[],\"reviewId\":\"review-1\",\"schemaVersion\":1,\"status\":\"partial\",\"tracks\":{\"deep\":\"pending\",\"fast\":\"complete\"}},\"kind\":\"analysis-evidence\",\"measurements\":{\"generalization\":{\"reason\":\"not-executed-in-this-fixture\",\"status\":\"unmeasured\"},\"mutations\":{\"reason\":\"not-executed-in-this-fixture\",\"status\":\"unmeasured\"},\"performanceMs\":{\"reason\":\"not-executed-in-this-fixture\",\"status\":\"unmeasured\"},\"qualityDelta\":{\"provenance\":{\"sampleIds\":[\"sample-1\"],\"source\":\"analysis\"},\"status\":\"measured\",\"value\":0},\"tests\":{\"reason\":\"not-executed-in-this-fixture\",\"status\":\"unmeasured\"}},\"schemaVersion\":1,\"timing\":{\"budgetExhausted\":false,\"elapsedMs\":1.5,\"outputTruncated\":false,\"queueMs\":0}}",
+  "signingCanonical": "{\"kind\":\"trusted-review-receipt\",\"payload\":{\"binding\":{\"baseline\":{\"parents\":[],\"strategy\":\"initial\"},\"configurationDigest\":{\"algorithm\":\"sm3\",\"value\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"operationId\":\"operation-1\",\"policyDigest\":{\"algorithm\":\"sm3\",\"value\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"requiredCapabilitiesDigest\":{\"algorithm\":\"sm3\",\"value\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"reviewId\":\"review-1\",\"snapshot\":{\"manifestDigest\":{\"algorithm\":\"sm3\",\"value\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"},\"repositoryId\":\"repository-1\",\"tree\":{\"algorithm\":\"git-sha1\",\"value\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}}},\"decision\":\"unavailable\",\"evidenceDigest\":{\"algorithm\":\"sm3\",\"value\":\"3558cd40da2e2184f36ba0edcdd4103d09bfad3a78d248d9d42e81b6acdd5fab\"},\"expiresAtMs\":200,\"issuedAtMs\":100,\"issuer\":\"issuer-1\",\"keyId\":\"key-1\",\"previousEvidenceDigest\":null,\"reasons\":[\"incomplete execution\"],\"requestDigest\":{\"algorithm\":\"sm3\",\"value\":\"99461721644c8ee2a557ac06848d844fddee9e72fa96bfce4e8daef020e9a538\"},\"signatureAlgorithm\":\"hmac-sm3\"},\"schemaVersion\":1}",
+  "signingDigestSm3": "052b8c49b4583f46d3604e7ec005413e72d2b339f4292017586e17fcb47d0363",
+  "receipt": {
+    "schemaVersion": 1,
+    "kind": "trusted-review-receipt",
+    "payload": {
+      "binding": {
+        "reviewId": "review-1",
+        "operationId": "operation-1",
+        "snapshot": {
+          "repositoryId": "repository-1",
+          "tree": {
+            "algorithm": "git-sha1",
+            "value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "manifestDigest": {
+            "algorithm": "sm3",
+            "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          }
+        },
+        "baseline": {
+          "strategy": "initial",
+          "parents": []
+        },
+        "policyDigest": {
+          "algorithm": "sm3",
+          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "configurationDigest": {
+          "algorithm": "sm3",
+          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "requiredCapabilitiesDigest": {
+          "algorithm": "sm3",
+          "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "issuer": "issuer-1",
+      "keyId": "key-1",
+      "signatureAlgorithm": "hmac-sm3",
+      "requestDigest": {
+        "algorithm": "sm3",
+        "value": "99461721644c8ee2a557ac06848d844fddee9e72fa96bfce4e8daef020e9a538"
+      },
+      "evidenceDigest": {
+        "algorithm": "sm3",
+        "value": "3558cd40da2e2184f36ba0edcdd4103d09bfad3a78d248d9d42e81b6acdd5fab"
+      },
+      "previousEvidenceDigest": null,
+      "decision": "unavailable",
+      "reasons": [
+        "incomplete execution"
+      ],
+      "issuedAtMs": 100,
+      "expiresAtMs": 200
+    },
+    "signature": "91cc1dcd0f7efb7cebc750901996da67091eec209322c7f946465ff4fe26fb42"
+  }
+}
