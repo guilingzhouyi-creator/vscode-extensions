@@ -64,9 +64,57 @@ impl PathArena {
     }
 }
 
+#[inline]
+fn next_path_id_min(
+    base: &[CompactTreeEntry],
+    index_base: usize,
+    ours: &[CompactTreeEntry],
+    index_ours: usize,
+    theirs: &[CompactTreeEntry],
+    index_theirs: usize,
+) -> PathId {
+    let mut min_path_id = u32::MAX;
+    if let Some(&(path_id, _)) = base.get(index_base) {
+        min_path_id = min_path_id.min(path_id);
+    }
+    if let Some(&(path_id, _)) = ours.get(index_ours) {
+        min_path_id = min_path_id.min(path_id);
+    }
+    if let Some(&(path_id, _)) = theirs.get(index_theirs) {
+        min_path_id = min_path_id.min(path_id);
+    }
+    min_path_id
+}
+
+#[inline]
+fn advance_matching_entry(
+    entries: &[CompactTreeEntry],
+    cursor: &mut usize,
+    min_path_id: PathId,
+) -> Option<Oid> {
+    let &(path_id, oid) = entries.get(*cursor)?;
+    if path_id != min_path_id {
+        return None;
+    }
+    *cursor += 1;
+    Some(oid)
+}
+
+#[inline]
+fn select_three_way_oid(base: Option<Oid>, ours: Option<Oid>, theirs: Option<Oid>) -> Option<Oid> {
+    if ours == theirs || base == theirs {
+        return ours;
+    }
+    if base == ours {
+        return theirs;
+    }
+    ours.or(theirs)
+}
+
 /// Linear three-pointer scan merging sorted `(PathId, Oid)` slices without string hashing or tree balancing.
 ///
 /// Runs in $O(N_b + N_o + N_t)$ time, evaluating 3-way conflict rules purely with integer comparisons.
+#[must_use]
 pub fn three_way_linear_scan(
     base: &[CompactTreeEntry],
     ours: &[CompactTreeEntry],
@@ -76,61 +124,14 @@ pub fn three_way_linear_scan(
     let (mut index_base, mut index_ours, mut index_theirs) = (0, 0, 0);
 
     while index_base < base.len() || index_ours < ours.len() || index_theirs < theirs.len() {
-        let mut min_path_id = u32::MAX;
-        if index_base < base.len() && base[index_base].0 < min_path_id {
-            min_path_id = base[index_base].0;
-        }
-        if index_ours < ours.len() && ours[index_ours].0 < min_path_id {
-            min_path_id = ours[index_ours].0;
-        }
-        if index_theirs < theirs.len() && theirs[index_theirs].0 < min_path_id {
-            min_path_id = theirs[index_theirs].0;
-        }
+        let min_path_id =
+            next_path_id_min(base, index_base, ours, index_ours, theirs, index_theirs);
+        let base_oid = advance_matching_entry(base, &mut index_base, min_path_id);
+        let ours_oid = advance_matching_entry(ours, &mut index_ours, min_path_id);
+        let theirs_oid = advance_matching_entry(theirs, &mut index_theirs, min_path_id);
 
-        let base_oid = if index_base < base.len() && base[index_base].0 == min_path_id {
-            let oid = base[index_base].1;
-            index_base += 1;
-            Some(oid)
-        } else {
-            None
-        };
-
-        let ours_oid = if index_ours < ours.len() && ours[index_ours].0 == min_path_id {
-            let oid = ours[index_ours].1;
-            index_ours += 1;
-            Some(oid)
-        } else {
-            None
-        };
-
-        let theirs_oid = if index_theirs < theirs.len() && theirs[index_theirs].0 == min_path_id {
-            let oid = theirs[index_theirs].1;
-            index_theirs += 1;
-            Some(oid)
-        } else {
-            None
-        };
-
-        // 3-way merge decision
-        if ours_oid == theirs_oid {
-            if let Some(oid) = ours_oid {
-                result.push((min_path_id, oid));
-            }
-        } else if base_oid == ours_oid {
-            // theirs modified or deleted
-            if let Some(oid) = theirs_oid {
-                result.push((min_path_id, oid));
-            }
-        } else if base_oid == theirs_oid {
-            // ours modified or deleted
-            if let Some(oid) = ours_oid {
-                result.push((min_path_id, oid));
-            }
-        } else {
-            // Divergent change: in virtual base synthesis, preserve either branch's entry
-            if let Some(oid) = ours_oid.or(theirs_oid) {
-                result.push((min_path_id, oid));
-            }
+        if let Some(oid) = select_three_way_oid(base_oid, ours_oid, theirs_oid) {
+            result.push((min_path_id, oid));
         }
     }
 

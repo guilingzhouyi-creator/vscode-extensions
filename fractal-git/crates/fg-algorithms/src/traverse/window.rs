@@ -111,6 +111,67 @@ impl WindowSet {
     }
 }
 
+fn collect_unbounded_window<F>(tips: &[Oid], parents_of: &mut F) -> WindowSet
+where
+    F: FnMut(&Oid) -> Option<(Vec<Oid>, u64)>,
+{
+    // The unbounded path visits everything and reports no boundary, so a caller cannot mistake
+    // a complete history for a truncated one.
+    let mut set = WindowSet::default();
+    let mut queue: VecDeque<Oid> = tips.iter().copied().collect();
+    while let Some(oid) = queue.pop_front() {
+        if !set.kept.insert(oid) {
+            continue;
+        }
+        let Some((parents, _)) = parents_of(&oid) else {
+            continue;
+        };
+        for parent in parents {
+            if !set.kept.contains(&parent) {
+                queue.push_back(parent);
+            }
+        }
+    }
+    set
+}
+
+#[inline]
+fn exceeds_window_limit(
+    window: Window,
+    kept_len: usize,
+    newest_timestamp: u64,
+    timestamp: u64,
+) -> bool {
+    match window {
+        Window::Depth(depth) => kept_len >= depth as usize,
+        Window::Recent { seconds } => newest_timestamp.saturating_sub(timestamp) > seconds,
+        Window::Full => false,
+    }
+}
+
+fn enqueue_unseen_parents<F>(
+    oid: &Oid,
+    kept: &FastOidSet,
+    queued: &mut FastOidSet,
+    frontier: &mut BinaryHeap<(u64, Oid)>,
+    parents_of: &mut F,
+) where
+    F: FnMut(&Oid) -> Option<(Vec<Oid>, u64)>,
+{
+    let Some((parents, _)) = parents_of(oid) else {
+        return;
+    };
+    for parent in parents {
+        if kept.contains(&parent) || !queued.insert(parent) {
+            continue;
+        }
+        // A parent whose timestamp cannot be read is still queued: leaving it out would
+        // report a shorter history than exists, and the walk needs to see it to decide.
+        let parent_timestamp = parents_of(&parent).map_or(0, |(_, stamp)| stamp);
+        frontier.push((parent_timestamp, parent));
+    }
+}
+
 /// Walks from `tips` back until `window` is satisfied.
 ///
 /// Commits are visited newest-first so a depth window keeps the newest commits rather than an
@@ -120,6 +181,7 @@ impl WindowSet {
 ///
 /// Returns [`fg_core::error::FractalError::CorruptStore`] when a commit inside the window is
 /// unreadable. A commit outside the window is never read, so its readability is irrelevant.
+#[must_use]
 pub fn collect_window<F>(tips: &[Oid], window: Window, mut parents_of: F) -> WindowSet
 where
     F: FnMut(&Oid) -> Option<(Vec<Oid>, u64)>,
@@ -130,31 +192,11 @@ where
     }
 
     if window.is_unbounded() {
-        // The unbounded path visits everything and reports no boundary, so a caller cannot mistake
-        // a complete history for a truncated one.
-        let mut queue: VecDeque<Oid> = tips.iter().copied().collect();
-        while let Some(oid) = queue.pop_front() {
-            if !set.kept.insert(oid) {
-                continue;
-            }
-            if let Some((parents, _)) = parents_of(&oid) {
-                for parent in parents {
-                    if !set.kept.contains(&parent) {
-                        queue.push_back(parent);
-                    }
-                }
-            }
-        }
-        return set;
+        return collect_unbounded_window(tips, &mut parents_of);
     }
 
     // Newest-first ordering is what makes a depth window mean "the recent past". A max-heap keyed by
-    // `(timestamp, oid)` pops the newest commit in `O(log n)`; the previous form sorted the whole
-    // frontier after every expansion and removed its head with `Vec::remove(0)`, so walking `n`
-    // commits cost `O(n * f log f)` with a memmove per pop.
-    //
-    // Each tip is read once. Its timestamp feeds both the recency baseline and its own entry; the
-    // earlier form called the reader twice per tip to get the same field.
+    // `(timestamp, oid)` pops the newest commit in `O(log n)`.
     let mut seeds: Vec<(u64, Oid)> = Vec::with_capacity(tips.len());
     for tip in tips {
         if let Some((_, timestamp)) = parents_of(tip) {
@@ -167,8 +209,6 @@ where
         .max()
         .unwrap_or(0);
 
-    // `queued` keeps one frontier entry per commit. Without it a commit reachable from two kept
-    // parents is pushed twice, read twice, and discarded on the second pop.
     let mut frontier: BinaryHeap<(u64, Oid)> = BinaryHeap::with_capacity(seeds.len());
     let mut queued: FastOidSet = FastOidSet::default();
     for seed in seeds {
@@ -181,29 +221,14 @@ where
         if set.kept.contains(&oid) {
             continue;
         }
-        let limit_reached = match window {
-            Window::Depth(depth) => set.kept.len() >= depth as usize,
-            Window::Recent { seconds } => newest_timestamp.saturating_sub(timestamp) > seconds,
-            Window::Full => false,
-        };
-        if limit_reached {
+        if exceeds_window_limit(window, set.kept.len(), newest_timestamp, timestamp) {
             set.truncated = true;
             set.boundary.insert(oid);
             continue;
         }
 
         set.kept.insert(oid);
-        if let Some((parents, _)) = parents_of(&oid) {
-            for parent in parents {
-                if set.kept.contains(&parent) || !queued.insert(parent) {
-                    continue;
-                }
-                // A parent whose timestamp cannot be read is still queued: leaving it out would
-                // report a shorter history than exists, and the walk needs to see it to decide.
-                let parent_timestamp = parents_of(&parent).map_or(0, |(_, stamp)| stamp);
-                frontier.push((parent_timestamp, parent));
-            }
-        }
+        enqueue_unseen_parents(&oid, &set.kept, &mut queued, &mut frontier, &mut parents_of);
     }
 
     set

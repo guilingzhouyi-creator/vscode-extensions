@@ -324,6 +324,31 @@ fn write_record(writer: &mut FieldWriter, record: &PromotionRecord) -> NativeRes
     record.write_body_into(writer)
 }
 
+fn validate_finite_scores(composite: f64, cai: f64, lower: f64) -> NativeResult<()> {
+    if composite.is_finite() && cai.is_finite() && lower.is_finite() {
+        return Ok(());
+    }
+    Err(NativeError::NonFiniteScore)
+}
+
+fn read_anti_gaming_flag(reader: &mut FieldReader<'_>) -> NativeResult<bool> {
+    match reader.read_u8("anti_gaming_passed")? {
+        0 => Ok(false),
+        1 => Ok(true),
+        other => Err(NativeError::UnknownDiscriminant {
+            field: "anti_gaming_passed",
+            value: other,
+        }),
+    }
+}
+
+fn read_challenge_nonce(reader: &mut FieldReader<'_>) -> NativeResult<[u8; CHALLENGE_NONCE_LEN]> {
+    let nonce_slice = reader.take("challenge_nonce", CHALLENGE_NONCE_LEN)?;
+    let mut challenge_nonce = [0u8; CHALLENGE_NONCE_LEN];
+    challenge_nonce.copy_from_slice(nonce_slice);
+    Ok(challenge_nonce)
+}
+
 /// Reads one record.
 ///
 /// # Errors
@@ -338,31 +363,13 @@ fn read_record(reader: &mut FieldReader<'_>) -> NativeResult<PromotionRecord> {
     let cai_index = reader.read_f64_bits("cai_index")?;
     let credible_interval_lower = reader.read_f64_bits("credible_interval_lower")?;
 
-    if !composite_score.is_finite()
-        || !cai_index.is_finite()
-        || !credible_interval_lower.is_finite()
-    {
-        return Err(NativeError::NonFiniteScore);
-    }
+    validate_finite_scores(composite_score, cai_index, credible_interval_lower)?;
 
-    let anti_gaming_passed = match reader.read_u8("anti_gaming_passed")? {
-        0 => false,
-        1 => true,
-        other => {
-            return Err(NativeError::UnknownDiscriminant {
-                field: "anti_gaming_passed",
-                value: other,
-            })
-        }
-    };
+    let anti_gaming_passed = read_anti_gaming_flag(reader)?;
     let status = PromotionStatus::from_u8(reader.read_u8("promotion_status")?)?;
     let created_at_ms = reader.read_i64("created_at_ms")?;
     let expires_at_ms = reader.read_i64("expires_at_ms")?;
-
-    let nonce_slice = reader.take("challenge_nonce", CHALLENGE_NONCE_LEN)?;
-    let mut challenge_nonce = [0u8; CHALLENGE_NONCE_LEN];
-    challenge_nonce.copy_from_slice(nonce_slice);
-
+    let challenge_nonce = read_challenge_nonce(reader)?;
     let agent_uid = reader.read_string("agent_uid")?;
     let summary = reader.read_string("summary")?;
 

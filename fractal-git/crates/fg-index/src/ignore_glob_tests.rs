@@ -5,6 +5,44 @@
 
 use super::glob_match;
 
+fn eval_char_class_body(members: &[u8], ch: u8) -> bool {
+    let mut matched = false;
+    let mut cursor = 0usize;
+    while cursor < members.len() {
+        if cursor + 2 < members.len() && members[cursor + 1] == b'-' {
+            if members[cursor] <= ch && ch <= members[cursor + 2] {
+                matched = true;
+            }
+            cursor += 3;
+        } else {
+            if members[cursor] == ch {
+                matched = true;
+            }
+            cursor += 1;
+        }
+    }
+    matched
+}
+
+fn match_char_class(pattern: &[u8], text: &[u8]) -> bool {
+    let Some(close) = pattern.iter().skip(1).position(|byte| *byte == b']') else {
+        return !text.is_empty()
+            && text[0] == b'['
+            && reference_glob_match(&pattern[1..], &text[1..]);
+    };
+    if text.is_empty() {
+        return false;
+    }
+    let body = &pattern[1..1 + close];
+    let rest = &pattern[1 + close + 1..];
+    let (negated, members) = match body.first() {
+        Some(b'!') | Some(b'^') => (true, &body[1..]),
+        _ => (false, body),
+    };
+    let matched = eval_char_class_body(members, text[0]);
+    matched != negated && reference_glob_match(rest, &text[1..])
+}
+
 /// Reference matcher: the recursive split-over-every-position form this module used before
 /// the linear walk replaced it. Kept only as a test oracle, never called in production.
 ///
@@ -24,38 +62,7 @@ fn reference_glob_match(pattern: &[u8], text: &[u8]) -> bool {
             (0..=text.len()).any(|skip| reference_glob_match(rest, &text[skip..]))
         }
         b'?' => !text.is_empty() && reference_glob_match(&pattern[1..], &text[1..]),
-        b'[' => {
-            let Some(close) = pattern.iter().skip(1).position(|byte| *byte == b']') else {
-                return !text.is_empty()
-                    && text[0] == b'['
-                    && reference_glob_match(&pattern[1..], &text[1..]);
-            };
-            if text.is_empty() {
-                return false;
-            }
-            let body = &pattern[1..1 + close];
-            let rest = &pattern[1 + close + 1..];
-            let (negated, members) = match body.first() {
-                Some(b'!') | Some(b'^') => (true, &body[1..]),
-                _ => (false, body),
-            };
-            let mut matched = false;
-            let mut cursor = 0usize;
-            while cursor < members.len() {
-                if cursor + 2 < members.len() && members[cursor + 1] == b'-' {
-                    if members[cursor] <= text[0] && text[0] <= members[cursor + 2] {
-                        matched = true;
-                    }
-                    cursor += 3;
-                } else {
-                    if members[cursor] == text[0] {
-                        matched = true;
-                    }
-                    cursor += 1;
-                }
-            }
-            matched != negated && reference_glob_match(rest, &text[1..])
-        }
+        b'[' => match_char_class(pattern, text),
         b'\\' if pattern.len() > 1 => {
             !text.is_empty()
                 && text[0] == pattern[1]

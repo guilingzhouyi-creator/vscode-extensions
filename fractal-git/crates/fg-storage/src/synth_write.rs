@@ -75,6 +75,72 @@ impl SplitMix64 {
     }
 }
 
+struct SynthCommitBuffers {
+    slot_blobs: Vec<Oid>,
+    dir_trees: Vec<Oid>,
+    dir_dirty: Vec<bool>,
+    payload_buf: Vec<u8>,
+    written: std::collections::HashSet<Oid>,
+    blobs: u64,
+    trees: u64,
+    payload_bytes: u64,
+}
+
+fn write_commit_blobs(
+    odb: &LooseOdb,
+    spec: SynthRepoSpec,
+    commit_index: u32,
+    rng: &mut SplitMix64,
+    state: &mut SynthCommitBuffers,
+) -> FractalResult<()> {
+    let full_tree = commit_index == 0;
+    let churn_batch = spec.churn_batch();
+    let batch = if full_tree {
+        spec.working_tree_files
+    } else {
+        churn_batch.min(spec.working_tree_files)
+    };
+    let first_touched = if full_tree {
+        0
+    } else {
+        (commit_index as u64 * u64::from(churn_batch) % u64::from(spec.working_tree_files)) as u32
+    };
+    for offset in 0..batch {
+        let slot = (first_touched + offset) % spec.working_tree_files;
+        rng.fill(&mut state.payload_buf);
+        let blob_oid = odb.write_object(BLOB_TYPE, &state.payload_buf)?;
+        state.slot_blobs[slot as usize] = blob_oid;
+        state.dir_dirty[(slot % DIRECTORY_FANOUT) as usize] = true;
+        if state.written.insert(blob_oid) {
+            state.blobs += 1;
+            state.payload_bytes += state.payload_buf.len() as u64;
+        }
+    }
+    Ok(())
+}
+
+fn rebuild_dirty_leaf_trees(odb: &LooseOdb, state: &mut SynthCommitBuffers) -> FractalResult<u64> {
+    let mut current_leaf_bytes: u64 = 0;
+    for dir in 0..DIRECTORY_FANOUT {
+        if !state.dir_dirty[dir as usize] {
+            current_leaf_bytes += odb
+                .read_object(&state.dir_trees[dir as usize])
+                .map(|raw| raw.len() as u64)
+                .unwrap_or(0);
+            continue;
+        }
+        let (oid, bytes) = write_leaf_tree(odb, &state.slot_blobs, dir)?;
+        state.dir_trees[dir as usize] = oid;
+        state.dir_dirty[dir as usize] = false;
+        current_leaf_bytes += bytes;
+        if state.written.insert(oid) {
+            state.trees += 1;
+            state.payload_bytes += bytes;
+        }
+    }
+    Ok(current_leaf_bytes)
+}
+
 /// Writes a synthetic repository under `root`.
 ///
 /// The history is linear: each commit has exactly one parent. A linear shape keeps the measurement
@@ -90,115 +156,56 @@ pub fn generate(root: &Path, spec: SynthRepoSpec) -> FractalResult<SynthRepo> {
 
     let odb = LooseOdb::without_cache(root);
     let mut rng = SplitMix64::new(spec.seed);
+    let mut state = SynthCommitBuffers {
+        slot_blobs: vec![Oid::ZERO; spec.working_tree_files as usize],
+        dir_trees: vec![Oid::ZERO; DIRECTORY_FANOUT as usize],
+        dir_dirty: vec![true; DIRECTORY_FANOUT as usize],
+        payload_buf: vec![0u8; spec.bytes_per_file as usize],
+        written: std::collections::HashSet::new(),
+        blobs: 0,
+        trees: 0,
+        payload_bytes: 0,
+    };
 
-    let mut blobs: u64 = 0;
-    let mut trees: u64 = 0;
-    let mut payload_bytes: u64 = 0;
-    let mut written: std::collections::HashSet<Oid> = std::collections::HashSet::new();
-    // Blob id per file slot, so an unchanged file is not compressed and written again. A real
-    // repository reuses the object it already has, and rewriting all of them would both slow the
-    // generator and inflate the write count far past what the resulting store actually holds.
-    let mut slot_blobs: Vec<Oid> = vec![Oid::ZERO; spec.working_tree_files as usize];
-    // Object ids of the leaf tree for each directory, so only the directories whose contents
-    // changed are rebuilt. Rebuilding every directory per commit made the cost proportional to the
-    // whole working tree rather than to the churn, which is what made a realistically sized
-    // history unmeasurable in a debug build.
-    let mut dir_trees: Vec<Oid> = vec![Oid::ZERO; DIRECTORY_FANOUT as usize];
-    let mut dir_dirty: Vec<bool> = vec![true; DIRECTORY_FANOUT as usize];
     let mut source_tree: Oid = Oid::ZERO;
     let mut root_tree: Oid = Oid::ZERO;
-    let mut leaf_bytes: u64;
     let mut final_checkout_bytes: u64 = 0;
     let mut parent: Option<Oid> = None;
     let mut head = Oid::ZERO;
-    let churn_batch = spec.churn_batch();
 
     for commit_index in 0..spec.commits {
-        // The first commit adds the whole working tree, exactly as a real repository's initial
-        // commit does. Later commits rewrite a rotating slice.
-        //
-        // Without the full first commit, a low-churn history would start with most slots still
-        // holding `Oid::ZERO`, so its trees would reference an object that does not exist and the
-        // generator would emit a repository no reader can check out. It also kept the checkout size
-        // proportional to churn, which made the history-to-checkout comparison meaningless.
-        let full_tree = commit_index == 0;
-        let batch = if full_tree {
-            spec.working_tree_files
-        } else {
-            churn_batch.min(spec.working_tree_files)
-        };
-        // Rotating rather than shuffling keeps the batch deterministic while still touching every
-        // slot over the course of the history.
-        let first_touched = if full_tree {
-            0
-        } else {
-            (commit_index as u64 * u64::from(churn_batch) % u64::from(spec.working_tree_files))
-                as u32
-        };
-        for offset in 0..batch {
-            let slot = (first_touched + offset) % spec.working_tree_files;
-            let mut payload = vec![0u8; spec.bytes_per_file as usize];
-            rng.fill(&mut payload);
-            let blob_oid = odb.write_object(BLOB_TYPE, &payload)?;
-            slot_blobs[slot as usize] = blob_oid;
-            dir_dirty[(slot % DIRECTORY_FANOUT) as usize] = true;
-            // Count each distinct object once: two slots holding identical bytes share one object,
-            // and charging the payload twice would overstate the store.
-            if written.insert(blob_oid) {
-                blobs += 1;
-                payload_bytes += payload.len() as u64;
-            }
-        }
+        write_commit_blobs(&odb, spec, commit_index, &mut rng, &mut state)?;
+        let leaf_bytes = rebuild_dirty_leaf_trees(&odb, &mut state)?;
 
-        // Rebuild only the directories whose files changed, then the root over their new ids.
-        let mut current_leaf_bytes: u64 = 0;
-        for dir in 0..DIRECTORY_FANOUT {
-            if !dir_dirty[dir as usize] {
-                // An unchanged directory keeps its previous tree, whose size is already known.
-                current_leaf_bytes += odb
-                    .read_object(&dir_trees[dir as usize])
-                    .map(|raw| raw.len() as u64)
-                    .unwrap_or(0);
-                continue;
-            }
-            let (oid, bytes) = write_leaf_tree(&odb, &slot_blobs, dir)?;
-            dir_trees[dir as usize] = oid;
-            dir_dirty[dir as usize] = false;
-            current_leaf_bytes += bytes;
-            if written.insert(oid) {
-                trees += 1;
-                payload_bytes += bytes;
-            }
-        }
-        leaf_bytes = current_leaf_bytes;
-        let (source_oid, source_bytes) = write_source_tree(&odb, &dir_trees)?;
+        let (source_oid, source_bytes) = write_source_tree(&odb, &state.dir_trees)?;
         if source_oid != source_tree {
-            if written.insert(source_oid) {
-                trees += 1;
-                payload_bytes += source_bytes;
+            if state.written.insert(source_oid) {
+                state.trees += 1;
+                state.payload_bytes += source_bytes;
             }
             source_tree = source_oid;
         }
         let (root_oid, root_bytes) = write_root_tree(&odb, source_tree)?;
         if root_oid != root_tree {
-            if written.insert(root_oid) {
-                trees += 1;
-                payload_bytes += root_bytes;
+            if state.written.insert(root_oid) {
+                state.trees += 1;
+                state.payload_bytes += root_bytes;
             }
             root_tree = root_oid;
         }
 
         let payload = commit_payload(root_tree, parent, commit_index, spec.seed);
         let commit_oid = odb.write_object(COMMIT_TYPE, &payload)?;
-        if written.insert(commit_oid) {
-            payload_bytes += payload.len() as u64;
+        if state.written.insert(commit_oid) {
+            state.payload_bytes += payload.len() as u64;
         }
 
-        // On the last commit, record what a checkout of it actually references: the blobs, the
-        // directory trees, the source tree, and the root tree. A clone must materialize all of them
-        // regardless of window size, so they cannot count as history.
         if commit_index + 1 == spec.commits {
-            let blob_at_head: u64 = slot_blobs.iter().map(|blob| payload_len(&odb, blob)).sum();
+            let blob_at_head: u64 = state
+                .slot_blobs
+                .iter()
+                .map(|blob| payload_len(&odb, blob))
+                .sum();
             final_checkout_bytes =
                 blob_at_head + leaf_bytes + source_bytes + root_bytes + payload.len() as u64;
         }
@@ -207,21 +214,19 @@ pub fn generate(root: &Path, spec: SynthRepoSpec) -> FractalResult<SynthRepo> {
         parent = Some(commit_oid);
     }
 
-    // The working tree is the set of distinct blobs the final commit references. Two slots holding
-    // identical bytes share one blob, so this counts each object once rather than counting slots.
     let mut distinct_working_blobs: std::collections::HashSet<Oid> =
         std::collections::HashSet::new();
     let mut working_tree_bytes: u64 = 0;
-    for blob in &slot_blobs {
+    for blob in &state.slot_blobs {
         if distinct_working_blobs.insert(*blob) {
             working_tree_bytes += payload_len(&odb, blob);
         }
     }
     let stats = SynthRepoStats {
         commits: spec.commits,
-        blobs,
-        trees,
-        payload_bytes,
+        blobs: state.blobs,
+        trees: state.trees,
+        payload_bytes: state.payload_bytes,
         working_tree_bytes,
         final_checkout_bytes,
     };
