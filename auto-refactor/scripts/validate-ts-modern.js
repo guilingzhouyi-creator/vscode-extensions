@@ -79,6 +79,7 @@ const POSITIVE = [
 
 /** Negative fixture: the same keywords inside literals, comments and unrelated identifiers. */
 const NEGATIVE = [
+  "import { formatValue, MAX_LIMIT, TierEnum } from './helper';",
   'const text = "var x = 1; // not code";',
   '// var legacy = 2;',
   "/* const loaded = require('helper'); */",
@@ -87,6 +88,7 @@ const NEGATIVE = [
   'const company = 1;',
   'const many = 2;',
   "const message = 'arguments.length and text.substr(0, 1)';",
+  'export const entry = { label: formatValue(company), max: MAX_LIMIT, tier: TierEnum.Fast };',
   '',
 ].join('\n');
 
@@ -171,6 +173,26 @@ async function main() {
       `only the >= 0 comparison is a modernization finding, got ${JSON.stringify(files)}`,
     );
     console.log('  ✔ indexOf boundary rule fires on >= 0 and stays silent otherwise');
+
+    // ── 6. Object property values (functions, constants, enum members) do not trigger TSM-TYPE-001 ──
+    const propValIssues = await scanFixture(
+      root,
+      {
+        'src/prop-values.ts': [
+          "import { formatTime, MAX_ITEMS, CacheTier, UnusedType } from './helper';",
+          'export const item = { time: formatTime(10), limit: MAX_ITEMS, tier: CacheTier.Fast };',
+          'export const val: UnusedType = item;',
+        ].join('\n'),
+      },
+      packOn,
+    );
+    const typeIssues = propValIssues.filter((issue) => issue.rule === 'TSM-TYPE-001');
+    assert.strictEqual(typeIssues.length, 1, 'Must only flag UnusedType');
+    assert.ok(
+      typeIssues[0].message.includes('UnusedType') && !typeIssues[0].message.includes('formatTime'),
+      `Expected only UnusedType in TSM-TYPE-001, got: ${typeIssues[0].message}`,
+    );
+    console.log('  ✔ TSM-TYPE-001 ignores runtime functions, constants, and enum accesses after colon');
   } finally {
     cleanupTempDir(root);
   }

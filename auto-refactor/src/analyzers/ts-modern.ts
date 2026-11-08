@@ -395,6 +395,7 @@ export class TsModernAnalyzer extends DeclarativeModernAnalyzer {
         importLines: Set<number>,
         lineIndexByWord?: Map<string, Set<number>>,
     ): boolean {
+        if (!isCandidateTypeIdentifier(name)) return false;
         const matchingLines = lineIndexByWord?.get(name);
         if (matchingLines && matchingLines.size === 0) return false;
 
@@ -409,6 +410,12 @@ export class TsModernAnalyzer extends DeclarativeModernAnalyzer {
 
         return total > 0 && typed >= total;
     }
+}
+
+const VALUE_ONLY_IDENTIFIER_RE = /^(?:[a-z_$]|[A-Z0-9]+_[A-Z0-9_]+$)/;
+
+function isCandidateTypeIdentifier(name: string): boolean {
+    return !VALUE_ONLY_IDENTIFIER_RE.test(name);
 }
 
 function countMatches(code: string, pattern: RegExp): number {
@@ -524,12 +531,12 @@ function getCompiledTypePatterns(name: string): CompiledTypePatterns {
         word: new RegExp(`\\b${escaped}\\b`, REGEXP_GLOBAL_FLAG),
         fallbackWord: new RegExp(`\\b${escaped}\\b`),
         typePatterns: [
-            new RegExp(`:\\s*${escaped}\\b`, REGEXP_GLOBAL_FLAG),
+            new RegExp(`:\\s*${escaped}\\b(?!\\s*[(.])`, REGEXP_GLOBAL_FLAG),
             new RegExp(`\\bas\\s+${escaped}\\b`, REGEXP_GLOBAL_FLAG),
             new RegExp(`<\\s*${escaped}\\s*[,>]`, REGEXP_GLOBAL_FLAG),
             new RegExp(`\\bextends\\s+${escaped}\\b`, REGEXP_GLOBAL_FLAG),
             new RegExp(`\\bimplements\\s+${escaped}\\b`, REGEXP_GLOBAL_FLAG),
-            new RegExp(`(?<![|&])[|&](?![|&])\\s*${escaped}\\b`, REGEXP_GLOBAL_FLAG),
+            new RegExp(`(?<![|&])[|&](?![|&])\\s*${escaped}\\b(?!\\s*[(.])`, REGEXP_GLOBAL_FLAG),
             new RegExp(`\\b${escaped}\\s*(?<![|&])[|&](?![|&])`, REGEXP_GLOBAL_FLAG),
             new RegExp(`\\b${escaped}\\s*\\[\\s*\\]`, REGEXP_GLOBAL_FLAG),
         ],
