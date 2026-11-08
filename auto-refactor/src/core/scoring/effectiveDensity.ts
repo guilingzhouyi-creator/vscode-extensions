@@ -209,6 +209,22 @@ function evaluateLineBoilerplateWeight(trimmed: string): { weight: number; isFor
     return { weight: 0.0, isForwarding: false };
 }
 
+function countInteriorMultilineLiteralLines(tokens: readonly { text: string }[]): number {
+    let interiorLines = 0;
+    for (let i = 0; i < tokens.length; i++) {
+        const text = tokens[i].text;
+        if (text.length < 3) continue;
+        const firstChar = text.charCodeAt(0);
+        if (firstChar !== 96 && firstChar !== 34 && firstChar !== 39) continue;
+        for (let j = 1; j < text.length - 1; j++) {
+            if (text.charCodeAt(j) === 10) {
+                interiorLines++;
+            }
+        }
+    }
+    return interiorLines;
+}
+
 /**
  * Calculates effective code density and noise metrics across source content.
  *
@@ -267,7 +283,8 @@ export function computeEffectiveCodeDensity(
     let fisherSimplexDistance: number | undefined;
 
     if (tokenCount > 0) {
-        const eloc = Math.max(1, usefulLoc);
+        const interiorLiteralLines = countInteriorMultilineLiteralLines(tokenStream.tokens);
+        const eloc = Math.max(1, usefulLoc - interiorLiteralLines);
         const colMetrics = calculateColumnDensity(tokenCount, eloc);
         tokensPerEloc = colMetrics.tokensPerEloc;
         columnDensity = colMetrics.columnDensity;

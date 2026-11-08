@@ -68,6 +68,8 @@ import {
     isTestFile,
     isI18nFile,
     isScriptOrGateFile,
+    extractEmbeddedTestLineRanges,
+    isInsideEmbeddedTestZone,
     collectDuplicateGroups,
     buildDuplicateIssue,
 } from './constants-literal-helper';
@@ -173,6 +175,12 @@ export class ConstantsAnalyzer implements Analyzer {
     finalize(ctx: AnalyzerContext): Issue[] {
         const issues: Issue[] = [];
         this.reconcileIncrementalLiterals(ctx.incremental);
+        const embeddedTestRanges = extractEmbeddedTestLineRanges(ctx.content);
+        if (embeddedTestRanges.length > 0) {
+            this.literals = this.literals.filter(
+                (lit) => !isInsideEmbeddedTestZone(lit.line, embeddedTestRanges),
+            );
+        }
         this.issues = issues;
 
         // Duplicate literal detection: identify repeated literal groups, emit

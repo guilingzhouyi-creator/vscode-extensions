@@ -206,6 +206,35 @@ function testAggregateFallback() {
   console.log('  ✔ Aggregate large-file rule still reports function-count pressure');
 }
 
+function testMultilineTemplateLiteralTau() {
+  const cssLines = [];
+  for (let i = 0; i < 40; i++) {
+    cssLines.push(`  .card-${i} { display: flex; padding: ${i}px; }`);
+  }
+  const content = [
+    '/**',
+    ' * Module: Presentation — Dashboard Base Styles',
+    ' * Responsibilities: Export CSS stylesheet template literal.',
+    ' */',
+    'export function buildStyles(prefix: string): string {',
+    '  const normalized = prefix.trim();',
+    `  return \`\n${cssLines.join('\n')}\n\`;`,
+    '}',
+  ].join('\n');
+  const findings = runVolume('src/presentation/dashboard-base-styles.ts', content, {
+    effectiveLocWarn: 900,
+    effectiveLocFail: 1200,
+    fileLinesWarn: 1400,
+    fileFunctionsWarn: 500,
+  });
+  assert.strictEqual(
+    findings.some((issue) => issue.rule === 'VOL-TAU-001'),
+    false,
+    'Multi-line CSS template literal payload must not falsely trigger VOL-TAU-001',
+  );
+  console.log('  ✔ Multi-line template literal payload does not falsely trigger VOL-TAU-001');
+}
+
 /**
  * Run the whole suite.
  */
@@ -217,6 +246,7 @@ function main() {
   testDocumentationFloor();
   testCleanFile();
   testAggregateFallback();
+  testMultilineTemplateLiteralTau();
   console.log('\n✔ All volume budget assertions passed.');
 }
 

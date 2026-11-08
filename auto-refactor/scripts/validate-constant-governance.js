@@ -452,6 +452,46 @@ fn compute() {
   assert.strictEqual(isTerminalStatusBadge('[WORKTREE_OK]'), true);
   assert.strictEqual(isTerminalStatusBadge('[UAC_PROMOTION_STAGED]'), true);
   assert.strictEqual(isTerminalStatusBadge('[plain]'), false);
+
+  // Embedded Rust #[cfg(test)] mod tests zone extraction and multi-segment layer rule resolution
+  const {
+    extractEmbeddedTestLineRanges,
+    isInsideEmbeddedTestZone,
+  } = require('../dist/analyzers/constants-literal-helper');
+  const {
+    RuleCatalogIntegrityRule,
+  } = require('../dist/core/governance/rules/standardization');
+  const rustWithInlineTest = [
+    'pub fn production_fn() -> usize {',
+    '    42',
+    '}',
+    '#[cfg(test)]',
+    'mod tests {',
+    '    #[test]',
+    '    fn sample() {',
+    '        assert_eq!(42, 42);',
+    '    }',
+    '}',
+  ].join('\n');
+  const testRanges = extractEmbeddedTestLineRanges(rustWithInlineTest);
+  assert.strictEqual(testRanges.length, 1);
+  assert.deepStrictEqual(testRanges[0], [4, 10]);
+  assert.strictEqual(isInsideEmbeddedTestZone(2, testRanges), false);
+  assert.strictEqual(isInsideEmbeddedTestZone(7, testRanges), true);
+
+  const ruleCheckLine = 'pub const DOC_RULE: &str = "L3-DOC-LAYOUT";\npub const REV_RULE: &str = "L3-REVIEW-CONFIG";';
+  const ruleViolations = RuleCatalogIntegrityRule.checkFile({
+    filePath: 'crates/fg-gate/src/commit_guard/rule_ids.rs',
+    content: ruleCheckLine,
+    lines: ruleCheckLine.split('\n'),
+    masked: ruleCheckLine.split('\n'),
+    capabilities: { languageId: 'rust' },
+  });
+  assert.strictEqual(
+    ruleViolations,
+    null,
+    'Registered multi-segment L3-* rules must not be truncated by GOV-RUL-001',
+  );
 }
 console.log('  PASS: Rust constants, library topology, and rule drift guards verified.\n');
 

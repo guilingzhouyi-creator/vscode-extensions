@@ -480,6 +480,102 @@ export function isDataOrConfigFile(role: string, filePath: string, content?: str
     );
 }
 
+const EMBEDDED_TEST_ATTR_RE = /^\s*#\[\s*cfg\s*\(\s*test\s*\)\s*\]/;
+const EMBEDDED_TEST_MOD_RE = /^\s*(?:pub\s+)?mod\s+tests\b/;
+
+function countLineBraces(line: string): number {
+    let delta = 0;
+    for (let i = 0; i < line.length; i++) {
+        const ch = line.charCodeAt(i);
+        if (ch === 123) delta++;
+        else if (ch === 125) delta--;
+    }
+    return delta;
+}
+
+interface EmbeddedTestScanState {
+    pendingAttrLine: number;
+    activeStart: number;
+    braceDepth: number;
+    braceOpened: boolean;
+}
+
+function advanceEmbeddedTestLine(
+    line: string,
+    lineNum: number,
+    state: EmbeddedTestScanState,
+    ranges: Array<readonly [number, number]>,
+): void {
+    if (state.activeStart === 0) {
+        if (EMBEDDED_TEST_ATTR_RE.test(line)) {
+            state.pendingAttrLine = lineNum;
+            return;
+        }
+        if (state.pendingAttrLine > 0 || EMBEDDED_TEST_MOD_RE.test(line)) {
+            state.activeStart = state.pendingAttrLine > 0 ? state.pendingAttrLine : lineNum;
+            state.pendingAttrLine = 0;
+            state.braceDepth = 0;
+            state.braceOpened = false;
+        }
+    }
+    if (state.activeStart <= 0) return;
+    if (line.includes('{')) state.braceOpened = true;
+    state.braceDepth += countLineBraces(line);
+    if (state.braceOpened && state.braceDepth <= 0) {
+        ranges.push([state.activeStart, lineNum]);
+        state.activeStart = 0;
+        state.braceDepth = 0;
+        state.braceOpened = false;
+    }
+}
+
+/**
+ * Extracts 1-based [startLine, endLine] spans for inline Rust `#[cfg(test)] mod tests` blocks.
+ *
+ * @param content - Optional source text of the scanned file.
+ * @returns Array of inclusive [startLine, endLine] ranges.
+ */
+export function extractEmbeddedTestLineRanges(
+    content?: string,
+): Array<readonly [number, number]> {
+    if (!content || (!content.includes('cfg(test)') && !content.includes('mod tests'))) {
+        return [];
+    }
+    const lines = content.split(/\r?\n/);
+    const ranges: Array<readonly [number, number]> = [];
+    const state: EmbeddedTestScanState = {
+        pendingAttrLine: 0,
+        activeStart: 0,
+        braceDepth: 0,
+        braceOpened: false,
+    };
+    for (let i = 0; i < lines.length; i++) {
+        advanceEmbeddedTestLine(lines[i], i + 1, state, ranges);
+    }
+    if (state.activeStart > 0) {
+        ranges.push([state.activeStart, lines.length]);
+    }
+    return ranges;
+}
+
+/**
+ * Checks whether a 1-based line number falls within any embedded test range.
+ *
+ * @param line - 1-based source line number.
+ * @param ranges - Extracted embedded test ranges.
+ * @returns True if line is inside an embedded test block.
+ */
+export function isInsideEmbeddedTestZone(
+    line: number,
+    ranges: ReadonlyArray<readonly [number, number]>,
+): boolean {
+    for (let i = 0; i < ranges.length; i++) {
+        const [start, end] = ranges[i];
+        if (line >= start && line <= end) return true;
+    }
+    return false;
+}
+
 /**
  * Checks if a file represents a test suite, fixture, or mock.
  *

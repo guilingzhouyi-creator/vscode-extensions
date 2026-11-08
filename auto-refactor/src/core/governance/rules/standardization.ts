@@ -54,7 +54,7 @@ const JS_TS_LANGUAGES: ReadonlySet<string> = new Set(['typescript', 'javascript'
 const GDSCRIPT_PASS_KEYWORDS: ReadonlySet<string> = new Set(['pass']);
 
 const CANDIDATE_RULE_RE =
-    /(?<![A-Za-z0-9_])([A-Z][A-Z0-9]{1,5}(?:-[A-Z0-9_]{2,10}){1,3}-\d{3}|L[0-5]-[A-Z0-9_]+)(?![A-Za-z0-9_])/g;
+    /(?<![A-Za-z0-9_-])([A-Z][A-Z0-9]{1,5}(?:-[A-Z0-9_]{2,10}){1,3}-\d{3}|L[0-5](?:-[A-Z0-9_]+)+)(?![A-Za-z0-9_-])/g;
 
 const EXEMPT_RULE_CATALOG_RE =
     /(?:standardization|registry|dimensionLiterals|rule-catalog|builtin-rules|DOCS|dictionaries|def-use-chain|src\/core\/types)/i;
