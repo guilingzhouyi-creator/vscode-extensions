@@ -1,0 +1,889 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:taxis:quality-evidence:1",
+  "title": "Taxis Quality Evidence v1",
+  "description": "Wire shape only. Trust, snapshot matching, semantic completion and trial identities require additional verification.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/ReviewRequest"
+    },
+    {
+      "$ref": "#/$defs/AnalysisEvidence"
+    },
+    {
+      "$ref": "#/$defs/TrustedReviewReceipt"
+    }
+  ],
+  "$defs": {
+    "SchemaVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "Identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "RepoPath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "Digest": {
+      "type": "object",
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "const": "sm3"
+        },
+        "value": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "algorithm",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "GitObject": {
+      "type": "object",
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "const": "git-sha1"
+        },
+        "value": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      },
+      "required": [
+        "algorithm",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "SnapshotIdentity": {
+      "type": "object",
+      "properties": {
+        "repositoryId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "tree": {
+          "$ref": "#/$defs/GitObject"
+        },
+        "manifestDigest": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "repositoryId",
+        "tree",
+        "manifestDigest"
+      ],
+      "additionalProperties": false
+    },
+    "Baseline": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "strategy": {
+              "type": "string",
+              "const": "initial"
+            },
+            "parents": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/GitObject"
+              },
+              "minItems": 0,
+              "maxItems": 0,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "strategy",
+            "parents"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "strategy": {
+              "type": "string",
+              "const": "parent"
+            },
+            "parents": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/GitObject"
+              },
+              "minItems": 1,
+              "maxItems": 1,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "strategy",
+            "parents"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "strategy": {
+              "type": "string",
+              "const": "explicit"
+            },
+            "parents": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/GitObject"
+              },
+              "minItems": 1,
+              "maxItems": 1,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "strategy",
+            "parents"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "strategy": {
+              "type": "string",
+              "const": "merge"
+            },
+            "parents": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/GitObject"
+              },
+              "minItems": 2,
+              "maxItems": 64,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "strategy",
+            "parents"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ReviewBinding": {
+      "type": "object",
+      "properties": {
+        "reviewId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "operationId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/SnapshotIdentity"
+        },
+        "baseline": {
+          "$ref": "#/$defs/Baseline"
+        },
+        "policyDigest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "configurationDigest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "requiredCapabilitiesDigest": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "reviewId",
+        "operationId",
+        "snapshot",
+        "baseline",
+        "policyDigest",
+        "configurationDigest",
+        "requiredCapabilitiesDigest"
+      ],
+      "additionalProperties": false
+    },
+    "ReviewFailure": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "retryable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "Provenance": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "enum": [
+            "analysis",
+            "trajectory-comparison",
+            "test-execution",
+            "mutation-execution",
+            "holdout-validation"
+          ]
+        },
+        "sampleIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "minItems": 1,
+          "maxItems": 100000,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "source",
+        "sampleIds"
+      ],
+      "additionalProperties": false
+    },
+    "Unmeasured": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "unmeasured"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "status",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "NotApplicable": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "not-applicable"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "status",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "FailedMeasurement": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "failed"
+        },
+        "error": {
+          "$ref": "#/$defs/ReviewFailure"
+        }
+      },
+      "required": [
+        "status",
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    "MeasuredNumber": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "measured"
+        },
+        "value": {
+          "type": "number",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        }
+      },
+      "required": [
+        "status",
+        "value",
+        "provenance"
+      ],
+      "additionalProperties": false
+    },
+    "TrialCounts": {
+      "type": "object",
+      "properties": {
+        "passed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "passed",
+        "total"
+      ],
+      "additionalProperties": false
+    },
+    "MeasuredTrials": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "const": "measured"
+        },
+        "value": {
+          "$ref": "#/$defs/TrialCounts"
+        },
+        "provenance": {
+          "$ref": "#/$defs/Provenance"
+        }
+      },
+      "required": [
+        "status",
+        "value",
+        "provenance"
+      ],
+      "additionalProperties": false
+    },
+    "NumberMeasurement": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/MeasuredNumber"
+        },
+        {
+          "$ref": "#/$defs/Unmeasured"
+        },
+        {
+          "$ref": "#/$defs/NotApplicable"
+        },
+        {
+          "$ref": "#/$defs/FailedMeasurement"
+        }
+      ]
+    },
+    "TrialMeasurement": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/MeasuredTrials"
+        },
+        {
+          "$ref": "#/$defs/Unmeasured"
+        },
+        {
+          "$ref": "#/$defs/NotApplicable"
+        },
+        {
+          "$ref": "#/$defs/FailedMeasurement"
+        }
+      ]
+    },
+    "Measurements": {
+      "type": "object",
+      "properties": {
+        "qualityDelta": {
+          "$ref": "#/$defs/NumberMeasurement"
+        },
+        "generalization": {
+          "$ref": "#/$defs/NumberMeasurement"
+        },
+        "tests": {
+          "$ref": "#/$defs/TrialMeasurement"
+        },
+        "mutations": {
+          "$ref": "#/$defs/TrialMeasurement"
+        },
+        "performanceMs": {
+          "$ref": "#/$defs/NumberMeasurement"
+        }
+      },
+      "required": [
+        "qualityDelta",
+        "generalization",
+        "tests",
+        "mutations",
+        "performanceMs"
+      ],
+      "additionalProperties": false
+    },
+    "TrackStatus": {
+      "enum": [
+        "pending",
+        "running",
+        "complete",
+        "failed",
+        "not-required"
+      ]
+    },
+    "CapabilityCoverage": {
+      "type": "object",
+      "properties": {
+        "analyzer": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "capability": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "language": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "supported",
+            "executed",
+            "not-applicable",
+            "unsupported",
+            "failed",
+            "degraded"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "policyAllowsNotApplicable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "analyzer",
+        "capability",
+        "language",
+        "required",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "Execution": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "reviewId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "status": {
+          "enum": [
+            "queued",
+            "running",
+            "partial",
+            "complete",
+            "failed",
+            "cancelled",
+            "superseded"
+          ]
+        },
+        "coverage": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CapabilityCoverage"
+          },
+          "minItems": 0,
+          "maxItems": 100000
+        },
+        "tracks": {
+          "type": "object",
+          "properties": {
+            "fast": {
+              "$ref": "#/$defs/TrackStatus"
+            },
+            "deep": {
+              "$ref": "#/$defs/TrackStatus"
+            }
+          },
+          "required": [
+            "fast",
+            "deep"
+          ],
+          "additionalProperties": false
+        },
+        "failures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ReviewFailure"
+          },
+          "minItems": 0,
+          "maxItems": 100000
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "reviewId",
+        "status",
+        "coverage",
+        "tracks",
+        "failures"
+      ],
+      "additionalProperties": false
+    },
+    "EngineVersion": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "configurationDigest": {
+          "$ref": "#/$defs/Digest"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "configurationDigest"
+      ],
+      "additionalProperties": false
+    },
+    "Diagnostic": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "analyzer": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "rule": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "file": {
+          "$ref": "#/$defs/RepoPath"
+        },
+        "severity": {
+          "enum": [
+            "info",
+            "warning",
+            "error"
+          ]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8192
+        },
+        "startLine": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "startColumn": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "endLine": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "endColumn": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "id",
+        "analyzer",
+        "rule",
+        "file",
+        "severity",
+        "message",
+        "startLine",
+        "startColumn",
+        "endLine",
+        "endColumn"
+      ],
+      "additionalProperties": false
+    },
+    "Timing": {
+      "type": "object",
+      "properties": {
+        "queueMs": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "elapsedMs": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "outputTruncated": {
+          "type": "boolean"
+        },
+        "budgetExhausted": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "queueMs",
+        "elapsedMs",
+        "outputTruncated",
+        "budgetExhausted"
+      ],
+      "additionalProperties": false
+    },
+    "ReviewRequest": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "kind": {
+          "type": "string",
+          "const": "review-request"
+        },
+        "binding": {
+          "$ref": "#/$defs/ReviewBinding"
+        },
+        "scope": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RepoPath"
+          },
+          "minItems": 1,
+          "maxItems": 100000,
+          "uniqueItems": true
+        },
+        "deadlineAtMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "actorContext": {
+          "type": "object",
+          "properties": {
+            "actorId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "cardId": {
+              "$ref": "#/$defs/Identifier"
+            },
+            "checkpointId": {
+              "$ref": "#/$defs/Identifier"
+            }
+          },
+          "required": [
+            "actorId"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "binding",
+        "scope",
+        "deadlineAtMs"
+      ],
+      "additionalProperties": false
+    },
+    "AnalysisEvidence": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "kind": {
+          "type": "string",
+          "const": "analysis-evidence"
+        },
+        "binding": {
+          "$ref": "#/$defs/ReviewBinding"
+        },
+        "engines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EngineVersion"
+          },
+          "minItems": 1,
+          "maxItems": 1024
+        },
+        "execution": {
+          "$ref": "#/$defs/Execution"
+        },
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Diagnostic"
+          },
+          "minItems": 0,
+          "maxItems": 100000
+        },
+        "measurements": {
+          "$ref": "#/$defs/Measurements"
+        },
+        "timing": {
+          "$ref": "#/$defs/Timing"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "binding",
+        "engines",
+        "execution",
+        "diagnostics",
+        "measurements",
+        "timing"
+      ],
+      "additionalProperties": false
+    },
+    "ReceiptPayload": {
+      "type": "object",
+      "properties": {
+        "binding": {
+          "$ref": "#/$defs/ReviewBinding"
+        },
+        "issuer": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "keyId": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "signatureAlgorithm": {
+          "type": "string",
+          "const": "hmac-sm3"
+        },
+        "requestDigest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "evidenceDigest": {
+          "$ref": "#/$defs/Digest"
+        },
+        "previousEvidenceDigest": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "decision": {
+          "enum": [
+            "approved",
+            "blocked",
+            "needs-review",
+            "unavailable"
+          ]
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "minItems": 1,
+          "maxItems": 1024
+        },
+        "issuedAtMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "expiresAtMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "binding",
+        "issuer",
+        "keyId",
+        "signatureAlgorithm",
+        "requestDigest",
+        "evidenceDigest",
+        "previousEvidenceDigest",
+        "decision",
+        "reasons",
+        "issuedAtMs",
+        "expiresAtMs"
+      ],
+      "additionalProperties": false
+    },
+    "TrustedReviewReceipt": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "$ref": "#/$defs/SchemaVersion"
+        },
+        "kind": {
+          "type": "string",
+          "const": "trusted-review-receipt"
+        },
+        "payload": {
+          "$ref": "#/$defs/ReceiptPayload"
+        },
+        "signature": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "payload",
+        "signature"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
