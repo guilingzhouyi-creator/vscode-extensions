@@ -466,58 +466,55 @@ pub fn handle_var(ctx: &CliContext) {
     };
 
     if list_all || name.is_none() {
-        for standard in &[
-            "GIT_AUTHOR_IDENT",
-            "GIT_COMMITTER_IDENT",
-            "GIT_EDITOR",
-            "GIT_PAGER",
-            "GIT_DEFAULT_BRANCH",
-        ] {
-            if let Some(val) = resolve_git_var(standard, &entries) {
-                if ctx.json_mode {
-                    print_json(&serde_json::json!({ "key": standard, "value": val }));
-                } else {
-                    println!("{standard}={val}");
-                }
-            }
-        }
-        for entry in &entries {
-            let key = entry.key().to_dotted();
-            let value = entry.value().unwrap_or("");
-            if ctx.json_mode {
-                print_json(&serde_json::json!({ "key": key, "value": value }));
-            } else {
-                println!("{key}={value}");
-            }
-        }
+        print_all_git_vars(&entries, ctx.json_mode);
         return;
     }
 
     let wanted = name.unwrap_or_default();
     if let Some(val) = resolve_git_var(&wanted, &entries) {
-        if ctx.json_mode {
-            print_json(&serde_json::json!({ "key": wanted, "value": val }));
-        } else {
-            println!("{val}");
-        }
+        emit_single_var_value(&wanted, &val, ctx.json_mode);
         return;
     }
 
-    match entries
-        .iter()
-        .find(|entry| entry.key().to_dotted() == wanted)
-    {
-        Some(entry) => {
-            let value = entry.value().unwrap_or("");
-            if ctx.json_mode {
-                print_json(&serde_json::json!({ "key": wanted, "value": value }));
-            } else {
-                println!("{value}");
-            }
-        }
+    match entries.iter().find(|entry| entry.key().to_dotted() == wanted) {
+        Some(entry) => emit_single_var_value(&wanted, entry.value().unwrap_or(""), ctx.json_mode),
         // An unset variable is not an error for `var`: echoing nothing is how a script detects an
         // absent value, and exiting non-zero would make the check indistinguishable from a failure.
         None => std::process::exit(EXIT_NO_MATCH),
+    }
+}
+
+fn print_all_git_vars(entries: &[fg_index::config::ConfigEntry], json_mode: bool) {
+    for standard in &[
+        "GIT_AUTHOR_IDENT",
+        "GIT_COMMITTER_IDENT",
+        "GIT_EDITOR",
+        "GIT_PAGER",
+        "GIT_DEFAULT_BRANCH",
+    ] {
+        if let Some(val) = resolve_git_var(standard, entries) {
+            emit_var_key_value(standard, &val, json_mode);
+        }
+    }
+    for entry in entries {
+        let key = entry.key().to_dotted();
+        emit_var_key_value(&key, entry.value().unwrap_or(""), json_mode);
+    }
+}
+
+fn emit_var_key_value(key: &str, value: &str, json_mode: bool) {
+    if json_mode {
+        print_json(&serde_json::json!({ "key": key, "value": value }));
+    } else {
+        println!("{key}={value}");
+    }
+}
+
+fn emit_single_var_value(key: &str, value: &str, json_mode: bool) {
+    if json_mode {
+        print_json(&serde_json::json!({ "key": key, "value": value }));
+    } else {
+        println!("{value}");
     }
 }
 

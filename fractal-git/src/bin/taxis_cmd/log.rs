@@ -420,82 +420,91 @@ impl LogRequest {
         while cursor < options.len() {
             let argument = options[cursor].as_str();
             cursor += 1;
-            match argument {
-                "--graph" => request.graph = true,
-                "--stat" => request.diff_mode = Some(LogDiffMode::Stat),
-                "--name-only" => request.diff_mode = Some(LogDiffMode::NameOnly),
-                "--name-status" => request.diff_mode = Some(LogDiffMode::NameStatus),
-                "--oneline" => request.oneline = true,
-                "--follow" => request.follow = true,
-                "--all" => {
-                    request.all = true;
-                    request.limit = usize::MAX;
-                }
-                "--format" | "--pretty" => {
-                    let value = options
-                        .get(cursor)
-                        .ok_or_else(|| format!("{argument} requires a format string"))?;
-                    request.format = Some(value.clone());
-                    cursor += 1;
-                }
-                "-n" | "--max-count" => {
-                    let value = options
-                        .get(cursor)
-                        .ok_or_else(|| format!("{argument} requires a count"))?;
-                    request.limit = value
-                        .parse()
-                        .map_err(|parse_err| format!("{argument} requires a count: {parse_err}"))?;
-                    cursor += 1;
-                }
-                other if other.starts_with("-n=") || other.starts_with("--max-count=") => {
-                    let val = other.split_once('=').map(|(_, v)| v).unwrap_or("");
-                    request.limit = val
-                        .parse()
-                        .map_err(|parse_err| format!("{other} requires a count: {parse_err}"))?;
-                }
-                "--horizon" => {
-                    let value = options
-                        .get(cursor)
-                        .ok_or("--horizon requires a value: full, <n>, or <n>s")?;
-                    request.horizon = parse_horizon(value)?;
-                    cursor += 1;
-                }
-                other if other.starts_with("--horizon=") => {
-                    request.horizon = parse_horizon(&other["--horizon=".len()..])?;
-                }
-                other if other.starts_with("--format=") => {
-                    request.format = Some(other["--format=".len()..].to_string());
-                }
-                other if other.starts_with("--pretty=") => {
-                    request.format = Some(other["--pretty=".len()..].to_string());
-                }
-                other
-                    if other.starts_with('-')
-                        && other.len() > 1
-                        && other[1..]
-                            .chars()
-                            .all(|character| character.is_ascii_digit()) =>
-                {
-                    request.limit = other[1..]
-                        .parse()
-                        .map_err(|parse_err| format!("'-{other}' is not a count: {parse_err}"))?;
-                }
-                other if other.starts_with('-') => {
-                    return Err(format!("log does not support the flag '{other}'"));
-                }
-                other => {
-                    if request.revision_explicit {
-                        pathspecs.push(other.to_string());
-                    } else {
-                        request.revision = other.to_string();
-                        request.revision_explicit = true;
-                    }
-                }
-            }
+            request.apply_log_option(argument, &options, &mut cursor, &mut pathspecs)?;
         }
         request.pathspecs = pathspecs;
         request.projection = projection;
         Ok(request)
+    }
+
+    fn apply_log_option(
+        &mut self,
+        argument: &str,
+        options: &[String],
+        cursor: &mut usize,
+        pathspecs: &mut Vec<String>,
+    ) -> Result<(), String> {
+        match argument {
+            "--graph" => self.graph = true,
+            "--stat" => self.diff_mode = Some(LogDiffMode::Stat),
+            "--name-only" => self.diff_mode = Some(LogDiffMode::NameOnly),
+            "--name-status" => self.diff_mode = Some(LogDiffMode::NameStatus),
+            "--oneline" => self.oneline = true,
+            "--follow" => self.follow = true,
+            "--all" => {
+                self.all = true;
+                self.limit = usize::MAX;
+            }
+            "--format" | "--pretty" => {
+                let value = options
+                    .get(*cursor)
+                    .ok_or_else(|| format!("{argument} requires a format string"))?;
+                self.format = Some(value.clone());
+                *cursor += 1;
+            }
+            "-n" | "--max-count" => {
+                let value = options
+                    .get(*cursor)
+                    .ok_or_else(|| format!("{argument} requires a count"))?;
+                self.limit = value
+                    .parse()
+                    .map_err(|parse_err| format!("{argument} requires a count: {parse_err}"))?;
+                *cursor += 1;
+            }
+            "--horizon" => {
+                let value = options
+                    .get(*cursor)
+                    .ok_or("--horizon requires a value: full, <n>, or <n>s")?;
+                self.horizon = parse_horizon(value)?;
+                *cursor += 1;
+            }
+            other => self.apply_prefixed_log_option(other, pathspecs)?,
+        }
+        Ok(())
+    }
+
+    fn apply_prefixed_log_option(
+        &mut self,
+        other: &str,
+        pathspecs: &mut Vec<String>,
+    ) -> Result<(), String> {
+        if other.starts_with("-n=") || other.starts_with("--max-count=") {
+            let val = other.split_once('=').map(|(_, v)| v).unwrap_or("");
+            self.limit = val
+                .parse()
+                .map_err(|parse_err| format!("{other} requires a count: {parse_err}"))?;
+        } else if let Some(rest) = other.strip_prefix("--horizon=") {
+            self.horizon = parse_horizon(rest)?;
+        } else if let Some(rest) = other.strip_prefix("--format=") {
+            self.format = Some(rest.to_string());
+        } else if let Some(rest) = other.strip_prefix("--pretty=") {
+            self.format = Some(rest.to_string());
+        } else if other.starts_with('-')
+            && other.len() > 1
+            && other[1..].chars().all(|character| character.is_ascii_digit())
+        {
+            self.limit = other[1..]
+                .parse()
+                .map_err(|parse_err| format!("'-{other}' is not a count: {parse_err}"))?;
+        } else if other.starts_with('-') {
+            return Err(format!("log does not support the flag '{other}'"));
+        } else if self.revision_explicit {
+            pathspecs.push(other.to_string());
+        } else {
+            self.revision = other.to_string();
+            self.revision_explicit = true;
+        }
+        Ok(())
     }
 }
 

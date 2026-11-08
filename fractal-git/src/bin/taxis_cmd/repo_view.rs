@@ -202,42 +202,58 @@ impl RepoView {
                 name,
                 target: Some(oid),
             } => {
-                if fg_native::container_path(&self.git_dir).is_file()
-                    && (name == "refs/heads/main" || name == "refs/heads/trunk")
-                {
-                    let default_cell_ref = "refs/fractal/cell/cell-default/main";
-                    if let Ok(Some(cell_oid)) = self.lookup_reference(default_cell_ref) {
-                        if cell_oid != oid
-                            && self
-                                .commit_parents(&cell_oid)
-                                .is_ok_and(|p| p.contains(&oid))
-                        {
-                            return Ok(Some((default_cell_ref.to_string(), cell_oid)));
-                        }
-                    }
+                if let Some(advanced) = self.resolve_advanced_cell_head(&name, oid) {
+                    return Ok(Some(advanced));
                 }
                 return Ok(Some((name, oid)));
             }
             HeadState::Absent => {
-                let container_path = fg_native::container_path(&self.git_dir);
-                if container_path.is_file() {
-                    if let Ok(doc) = fg_native::RepoDocument::load(&container_path) {
-                        match doc.head {
-                            fg_native::HeadState::Symbolic { ref target } => {
-                                if let Some(oid) = self.lookup_reference(target)? {
-                                    return Ok(Some((target.clone(), oid)));
-                                }
-                            }
-                            fg_native::HeadState::Detached { oid } => {
-                                return Ok(Some(("HEAD".to_string(), oid)));
-                            }
-                        }
-                    }
+                if let Some(container_head) = self.resolve_container_head()? {
+                    return Ok(Some(container_head));
                 }
             }
             HeadState::Symbolic { target: None, .. } => {}
         }
 
+        self.resolve_fallback_cell_head()
+    }
+
+    fn resolve_advanced_cell_head(&self, name: &str, oid: Oid) -> Option<(String, Oid)> {
+        if !fg_native::container_path(&self.git_dir).is_file()
+            || (name != "refs/heads/main" && name != "refs/heads/trunk")
+        {
+            return None;
+        }
+        let default_cell_ref = "refs/fractal/cell/cell-default/main";
+        let cell_oid = self.lookup_reference(default_cell_ref).ok().flatten()?;
+        if cell_oid != oid && self.commit_parents(&cell_oid).is_ok_and(|p| p.contains(&oid)) {
+            return Some((default_cell_ref.to_string(), cell_oid));
+        }
+        None
+    }
+
+    fn resolve_container_head(&self) -> FractalResult<Option<(String, Oid)>> {
+        let container_path = fg_native::container_path(&self.git_dir);
+        if !container_path.is_file() {
+            return Ok(None);
+        }
+        let Ok(doc) = fg_native::RepoDocument::load(&container_path) else {
+            return Ok(None);
+        };
+        match doc.head {
+            fg_native::HeadState::Symbolic { ref target } => {
+                if let Some(oid) = self.lookup_reference(target)? {
+                    return Ok(Some((target.clone(), oid)));
+                }
+            }
+            fg_native::HeadState::Detached { oid } => {
+                return Ok(Some(("HEAD".to_string(), oid)));
+            }
+        }
+        Ok(None)
+    }
+
+    fn resolve_fallback_cell_head(&self) -> FractalResult<Option<(String, Oid)>> {
         let default_cell_ref = "refs/fractal/cell/cell-default/main";
         if let Some(oid) = self.lookup_reference(default_cell_ref)? {
             return Ok(Some((default_cell_ref.to_string(), oid)));

@@ -469,15 +469,7 @@ pub fn handle_rebase(ctx: &CliContext) {
 
     // Case 1: Already up-to-date
     if merge_base == upstream_commit {
-        if ctx.json_mode {
-            print_json(&serde_json::json!({
-                "engine": "taxis",
-                "operation": "rebase",
-                "status": "already_up_to_date"
-            }));
-        } else {
-            println!("Current branch is up to date.");
-        }
+        report_rebase_up_to_date(ctx.json_mode);
         return;
     }
 
@@ -486,32 +478,14 @@ pub fn handle_rebase(ctx: &CliContext) {
     super::git_hooks::run_pre_rebase(&hook_runner, &upstream_arg, effective_branch.as_deref());
 
     if merge_base == ours_commit {
-        project_worktree(
+        execute_fast_forward_rebase(
             &view,
             ours_commit,
             upstream_commit,
-            effective_branch.as_deref(),
-        );
-        record_rebase_op(
-            &view,
-            upstream_commit,
             &upstream_arg,
             effective_branch.as_deref(),
+            ctx.json_mode,
         );
-
-        if ctx.json_mode {
-            print_json(&serde_json::json!({
-                "engine": "taxis",
-                "operation": "rebase",
-                "status": "fast-forward",
-                "new_head": upstream_commit.to_hex(),
-            }));
-        } else {
-            println!(
-                "Fast-forwarded branch to {}",
-                &upstream_commit.to_hex()[..8]
-            );
-        }
         return;
     }
 
@@ -569,23 +543,69 @@ pub fn handle_rebase(ctx: &CliContext) {
         outcome,
         &session.rewritten_pairs,
     );
-    if !completed {
-        return;
+    if completed {
+        report_rebase_completion(
+            ctx.json_mode,
+            plan.items.len(),
+            state.current_tip,
+            effective_branch.as_deref(),
+        );
     }
+}
 
-    if ctx.json_mode {
+fn report_rebase_up_to_date(json_mode: bool) {
+    if json_mode {
+        print_json(&serde_json::json!({
+            "engine": "taxis",
+            "operation": "rebase",
+            "status": "already_up_to_date"
+        }));
+    } else {
+        println!("Current branch is up to date.");
+    }
+}
+
+fn execute_fast_forward_rebase(
+    view: &RepoView,
+    ours_commit: Oid,
+    upstream_commit: Oid,
+    upstream_arg: &str,
+    effective_branch: Option<&str>,
+    json_mode: bool,
+) {
+    project_worktree(view, ours_commit, upstream_commit, effective_branch);
+    record_rebase_op(view, upstream_commit, upstream_arg, effective_branch);
+    if json_mode {
+        print_json(&serde_json::json!({
+            "engine": "taxis",
+            "operation": "rebase",
+            "status": "fast-forward",
+            "new_head": upstream_commit.to_hex(),
+        }));
+    } else {
+        println!("Fast-forwarded branch to {}", &upstream_commit.to_hex()[..8]);
+    }
+}
+
+fn report_rebase_completion(
+    json_mode: bool,
+    replayed_count: usize,
+    new_tip: Oid,
+    effective_branch: Option<&str>,
+) {
+    if json_mode {
         print_json(&serde_json::json!({
             "engine": "taxis",
             "operation": "rebase",
             "status": "success",
-            "replayed_count": plan.items.len(),
-            "new_head": state.current_tip.to_hex(),
+            "replayed_count": replayed_count,
+            "new_head": new_tip.to_hex(),
             "branch": effective_branch,
         }));
     } else {
         println!(
             "Successfully rebased and updated refs/heads/{}.",
-            effective_branch.as_deref().unwrap_or("HEAD")
+            effective_branch.unwrap_or("HEAD")
         );
     }
 }

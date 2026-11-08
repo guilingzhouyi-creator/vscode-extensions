@@ -154,65 +154,8 @@ fn resolve_commits_to_format(
     view: &RepoView,
     opts: &FormatPatchOptions,
 ) -> FractalResult<Vec<CommitRecord>> {
-    let head = match view.effective_head_commit()? {
-        Some((_, oid)) => oid,
-        None => {
-            let starts = super::log::collect_all_starts(view)?;
-            starts.first().copied().ok_or_else(|| {
-                FractalError::ObjectCodec("cannot format-patch on an unborn HEAD".to_string())
-            })?
-        }
-    };
-
-    let (start_oid, exclude_oid) = if let Some(first_spec) = opts.range_specs.first() {
-        if let Some((left, right)) = first_spec.split_once("..") {
-            let left_oid = if left.is_empty() {
-                head
-            } else {
-                view.resolve(left)?
-            };
-            let right_oid = if right.is_empty() {
-                head
-            } else {
-                view.resolve(right)?
-            };
-            (right_oid, Some(left_oid))
-        } else if let Some(limit) = opts.count_limit {
-            let tip = view.resolve(first_spec)?;
-            let mut cur = tip;
-            let mut parents = Vec::new();
-            for _ in 0..limit {
-                let commit_obj = view.object(&cur)?;
-                let rec = parse_commit_record(cur, &commit_obj.payload)?;
-                if rec.parents.is_empty() {
-                    break;
-                }
-                cur = rec.parents[0];
-                parents.push(cur);
-            }
-            (tip, parents.last().copied())
-        } else {
-            let base_oid = view.resolve(first_spec)?;
-            (head, Some(base_oid))
-        }
-    } else if let Some(limit) = opts.count_limit {
-        let mut cur = head;
-        let mut parents = Vec::new();
-        for _ in 0..limit {
-            let commit_obj = view.object(&cur)?;
-            let rec = parse_commit_record(cur, &commit_obj.payload)?;
-            if rec.parents.is_empty() {
-                break;
-            }
-            cur = rec.parents[0];
-            parents.push(cur);
-        }
-        (head, parents.last().copied())
-    } else {
-        return Err(FractalError::ObjectCodec(
-            "format-patch requires a revision range or commit count".to_string(),
-        ));
-    };
+    let head = resolve_format_patch_head(view)?;
+    let (start_oid, exclude_oid) = resolve_range_endpoints(view, head, opts)?;
 
     let walked = walk_commits(view, &[start_oid])?;
     let excluded_set: std::collections::HashSet<Oid> = if let Some(ex) = exclude_oid {
@@ -240,6 +183,56 @@ fn resolve_commits_to_format(
     }
 
     Ok(filtered)
+}
+
+fn resolve_format_patch_head(view: &RepoView) -> FractalResult<Oid> {
+    if let Some((_, oid)) = view.effective_head_commit()? {
+        return Ok(oid);
+    }
+    let starts = super::log::collect_all_starts(view)?;
+    starts.first().copied().ok_or_else(|| {
+        FractalError::ObjectCodec("cannot format-patch on an unborn HEAD".to_string())
+    })
+}
+
+fn walk_nth_parent(view: &RepoView, start: Oid, limit: usize) -> FractalResult<Option<Oid>> {
+    let mut cur = start;
+    let mut last_parent = None;
+    for _ in 0..limit {
+        let commit_obj = view.object(&cur)?;
+        let rec = parse_commit_record(cur, &commit_obj.payload)?;
+        if rec.parents.is_empty() {
+            break;
+        }
+        cur = rec.parents[0];
+        last_parent = Some(cur);
+    }
+    Ok(last_parent)
+}
+
+fn resolve_range_endpoints(
+    view: &RepoView,
+    head: Oid,
+    opts: &FormatPatchOptions,
+) -> FractalResult<(Oid, Option<Oid>)> {
+    if let Some(first_spec) = opts.range_specs.first() {
+        if let Some((left, right)) = first_spec.split_once("..") {
+            let left_oid = if left.is_empty() { head } else { view.resolve(left)? };
+            let right_oid = if right.is_empty() { head } else { view.resolve(right)? };
+            return Ok((right_oid, Some(left_oid)));
+        }
+        if let Some(limit) = opts.count_limit {
+            let tip = view.resolve(first_spec)?;
+            return Ok((tip, walk_nth_parent(view, tip, limit)?));
+        }
+        return Ok((head, Some(view.resolve(first_spec)?)));
+    }
+    if let Some(limit) = opts.count_limit {
+        return Ok((head, walk_nth_parent(view, head, limit)?));
+    }
+    Err(FractalError::ObjectCodec(
+        "format-patch requires a revision range or commit count".to_string(),
+    ))
 }
 
 /// Formats a single commit into mbox-compatible email bytes.
