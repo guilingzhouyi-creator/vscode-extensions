@@ -25,6 +25,7 @@ pub mod oid;
 pub mod policy;
 pub mod project;
 pub mod projection_tier;
+pub mod projection;
 pub mod projection_patterns;
 pub mod provenance;
 pub mod quarantine;
@@ -63,6 +64,7 @@ pub use project::{
     SubAuthorizationZone, DEFAULT_EVICTION_DORMANT_CYCLE_THRESHOLD,
     DEFAULT_PROJECT_MASTER_TTL_SECONDS, DEFAULT_SUBAGENT_TTL_SECONDS,
 };
+pub use projection::{ProjectionScope, ProjectionTier};
 pub use provenance::{BlockProvenanceEntry, BlockProvenanceParams, ProvenanceLedger};
 pub use quarantine::{
     default_quarantine_dir, IsolateMutationRequest, QuarantineRecord, QuarantineRegistry,
