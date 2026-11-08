@@ -156,14 +156,17 @@ impl OdbStore for LooseOdb {
         let mut pooled_buffer = self.pool.acquire_guard_sized(BufferSizeClass::Page);
         pooled_buffer.clear();
         decoder.read_to_end(&mut pooled_buffer)?;
-        let uncompressed = pooled_buffer.as_slice().to_vec();
 
+        // Build the shared owner once, from the pooled buffer, and hand the same bytes to both the
+        // cache and the caller. The previous form copied inflate -> pooled -> Vec -> Arc and then
+        // copied again on every cache hit, which cost roughly three full memcpys per object and
+        // made the pool pointless: its buffer was written and immediately abandoned.
+        let shared: Arc<[u8]> = Arc::from(pooled_buffer.as_slice());
         if let Some(ref cache) = self.cache {
-            let size = uncompressed.len();
-            cache.insert(*oid, Arc::<[u8]>::from(uncompressed.as_slice()), size);
+            cache.insert(*oid, Arc::clone(&shared), shared.len());
         }
 
-        Ok(uncompressed)
+        Ok(shared.as_ref().to_vec())
     }
 
     fn write_object(&self, object_type: &str, payload: &[u8]) -> FractalResult<Oid> {
