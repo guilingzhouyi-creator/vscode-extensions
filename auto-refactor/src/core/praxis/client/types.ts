@@ -13,6 +13,7 @@
  *   runtime overhead.
  */
 
+import type { ReviewExecution } from '../../review/review-execution';
 import type { DiffInput, Issue, ScanReport } from '../../types';
 import type { PraxisCardContext, ReviewDiffHunk } from '../contracts';
 import type {
@@ -21,6 +22,7 @@ import type {
     PraxisGovernanceOptions,
 } from '../diffGovernance';
 import type { SemanticGraph } from '../../semantic/semanticGraph';
+import type { SemanticAdapterCapabilities } from '../../semantic/adapters/base';
 import type { PraxisSliceAuditVerdict, SparseRoutingPlan } from '../../router/sliceTypes';
 import type { IPraxisSliceAuditService } from '../sliceAuditService';
 import type { SparseMoEGateRouter } from '../../router/sparseMoEGate';
@@ -126,6 +128,10 @@ export interface PraxisFileReviewOptions {
  * Consolidated verdict returned from single file review.
  */
 export interface PraxisFileReviewVerdict {
+    /** Versioned execution coverage, independent from diagnostic severity. */
+    execution: ReviewExecution;
+    /** Resolved adapter declaration only; it conveys neither execution nor complete coverage. */
+    semanticCapabilities?: SemanticAdapterCapabilities;
     /** Target file path */
     filePath: string;
     /** File review verdict status */

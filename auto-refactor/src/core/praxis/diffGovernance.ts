@@ -173,17 +173,10 @@ export class PraxisDiffGovernanceService implements IPraxisDiffGovernanceService
         const graph = options.graph || new SemanticGraph();
 
         if (newContent && input.filePath) {
-            defaultSemanticAdapterRegistry.extractFileToGraph(filePath, newContent, graph);
+            await defaultSemanticAdapterRegistry.extractFileToGraph(filePath, newContent, graph);
         }
 
-        const issues: Issue[] = [
-            ...defaultPyramidEvaluator.evaluateAllLayer1(graph, { currentFilePath: filePath }),
-            ...this.runPerformanceAudit(filePath, newContent, options),
-            ...this.runDataArchAudit(filePath, newContent, graph, options),
-            ...this.runTestModernityAudit(filePath, newContent, options),
-            ...this.runArchitectureAudit(graph, options),
-        ];
-
+        const issues = this.collectStaticIssues(filePath, newContent, graph, options);
         const patchQuality = this.runPatchQualityAudit(
             filePath,
             input.oldContent ?? '',
@@ -191,20 +184,62 @@ export class PraxisDiffGovernanceService implements IPraxisDiffGovernanceService
             issues,
             options,
         );
+        if (patchQuality?.gamingViolations?.length) issues.push(...patchQuality.gamingViolations);
 
-        if (patchQuality?.gamingViolations?.length) {
-            issues.push(...patchQuality.gamingViolations);
-        }
-
-        const rawHunks = this.buildInitialHunks(input);
-        const enrichedHunks = this.enrichHunks(filePath, rawHunks, graph);
+        const enrichedHunks = this.enrichHunks(filePath, this.buildInitialHunks(input), graph);
         const hooks = options.hooks || this.createHooks(graph);
-
         const rawVerdict = await this.evaluateHunksVerdict(
             filePath,
             enrichedHunks,
             hooks.thresholdPolicy,
         );
+        let verdict = this.resolveDiffVerdict(issues, rawVerdict, patchQuality, enrichedHunks);
+        const affectedFiles = this.computeAggregatedImpact(enrichedHunks);
+        const topologicalDiff = buildThreeTierTopologicalDiff({
+            filePath,
+            oldContent: input.oldContent,
+            newContent,
+            hunks: enrichedHunks,
+            issues,
+            graph,
+            impactFiles: affectedFiles,
+        });
+        const unifiedPatch = this.resolveUnifiedPatch(input, newContent, enrichedHunks, filePath);
+        verdict = this.applyLayer3Escalation(verdict, topologicalDiff);
+
+        return {
+            hunks: enrichedHunks,
+            issues,
+            verdict,
+            impactSummary: { totalImpactedFiles: affectedFiles.length, affectedFiles },
+            patchQuality,
+            deltaScore: patchQuality?.deltaScore ?? undefined,
+            topologicalDiff,
+            unifiedPatch,
+        };
+    }
+
+    private collectStaticIssues(
+        filePath: string,
+        newContent: string | undefined,
+        graph: SemanticGraph,
+        options: PraxisGovernanceOptions,
+    ): Issue[] {
+        return [
+            ...defaultPyramidEvaluator.evaluateAllLayer1(graph, { currentFilePath: filePath }),
+            ...this.runPerformanceAudit(filePath, newContent, options),
+            ...this.runDataArchAudit(filePath, newContent, graph, options),
+            ...this.runTestModernityAudit(filePath, newContent, options),
+            ...this.runArchitectureAudit(graph, options),
+        ];
+    }
+
+    private resolveDiffVerdict(
+        issues: Issue[],
+        rawVerdict: PraxisVerdict,
+        patchQuality: PatchQualityResult | undefined,
+        enrichedHunks: ReviewDiffHunk[],
+    ): PraxisVerdict {
         let verdict = this.resolveBlockingVerdict(issues, rawVerdict);
         if (patchQuality?.verdict === 'gaming_rejected') {
             verdict = {
@@ -217,48 +252,44 @@ export class PraxisDiffGovernanceService implements IPraxisDiffGovernanceService
                 ],
             };
         }
-        const affectedFiles = this.computeAggregatedImpact(enrichedHunks);
-
-        const topologicalDiff = buildThreeTierTopologicalDiff({
-            filePath,
-            oldContent: input.oldContent,
-            newContent,
-            hunks: enrichedHunks,
-            issues,
-            graph,
-            impactFiles: affectedFiles,
-        });
-
-        const unifiedPatch =
-            input.oldContent !== undefined && newContent !== undefined
-                ? formatUnifiedDiff(input.oldContent, newContent, filePath)
-                : toAgentUnifiedPatch(enrichedHunks, filePath);
-
-        if (topologicalDiff.layer3.shouldEscalateToL3A && !verdict.shouldEscalateToL3A) {
-            verdict = {
+        if (verdict.status !== 'major_rework_needed') return verdict;
+        const baseViolations = verdict.violations ?? [];
+        for (const hunk of enrichedHunks) {
+            const prevViolations = hunk.reviewVerdict?.violations ?? [];
+            hunk.reviewVerdict = {
                 ...verdict,
-                shouldEscalateToL3A: true,
-                violations: [
-                    ...(verdict.violations || []),
-                    ...topologicalDiff.layer3.escalationReasons,
-                ],
+                violations: [...new Set([...prevViolations, ...baseViolations])],
             };
         }
+        return verdict;
+    }
 
+    private resolveUnifiedPatch(
+        input: DiffInput,
+        newContent: string | undefined,
+        enrichedHunks: ReviewDiffHunk[],
+        filePath: string,
+    ): string {
+        if (input.oldContent !== undefined && newContent !== undefined) {
+            return formatUnifiedDiff(input.oldContent, newContent, filePath);
+        }
+        return toAgentUnifiedPatch(enrichedHunks, filePath);
+    }
+
+    private applyLayer3Escalation(
+        verdict: PraxisVerdict,
+        topologicalDiff: ThreeTierTopologicalDiff,
+    ): PraxisVerdict {
+        if (!topologicalDiff.layer3.shouldEscalateToL3A || verdict.shouldEscalateToL3A) {
+            return verdict;
+        }
         return {
-            hunks: enrichedHunks,
-            issues,
-            verdict,
-            impactSummary: {
-                totalImpactedFiles: affectedFiles.length,
-                affectedFiles,
-            },
-            patchQuality,
-            // deltaScore is null when either side of the patch was not measured; the
-            // optional field carries that as "no value" rather than coercing to zero.
-            deltaScore: patchQuality?.deltaScore ?? undefined,
-            topologicalDiff,
-            unifiedPatch,
+            ...verdict,
+            shouldEscalateToL3A: true,
+            violations: [
+                ...(verdict.violations || []),
+                ...topologicalDiff.layer3.escalationReasons,
+            ],
         };
     }
 
@@ -359,10 +390,10 @@ export class PraxisDiffGovernanceService implements IPraxisDiffGovernanceService
                 impactFiles: hunk.astContext?.impactFiles,
             };
             const hunkVerdict = await activePolicy.evaluateChange(filePath, hunk, ctx);
+            hunk.reviewVerdict = hunkVerdict;
             if (hunkVerdict.status === 'major_rework_needed') {
-                return hunkVerdict;
-            }
-            if (hunkVerdict.status === 'minor_fix_needed') {
+                highest = hunkVerdict;
+            } else if (hunkVerdict.status === 'minor_fix_needed' && highest.status === 'passed') {
                 highest = hunkVerdict;
             }
         }

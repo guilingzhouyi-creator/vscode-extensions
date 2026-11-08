@@ -13,12 +13,14 @@
  *   2. Support Praxis multi-agent context attribution (cardId, cellId, agentUid, checkpointId).
  *   3. Emit structured AgentDirectives conforming to CAPP protocol and Dual-Faced Diff
  *      representations.
- *   4. Provide zero-configuration createPraxisClient factory with 100% backward compatibility.
+ *   4. Provide createPraxisClient with configurable analysis dependencies.
  * Exit Semantics & Design Rationale: Interface-driven facade designed for API stability; adheres
  *   to CC <= 15 and Depth <= 4 complexity budgets with fail-safe error isolation.
  */
 
-import * as fs from 'fs';
+import { randomUUID } from 'crypto';
+import { createReviewExecution } from '../review/review-execution';
+import { readPraxisFileContent } from './praxis-file-input';
 import type { DiffInput, Issue, ScanReport } from '../types';
 import type { PraxisCardContext, ReviewDiffHunk } from './contracts';
 import { DefaultPraxisRollbackGatekeeper } from './defaults';
@@ -240,15 +242,6 @@ export class PraxisReviewClient implements IPraxisReviewClient {
         return verdict;
     }
 
-    private async readFileContentSafe(filePath: string, content?: string): Promise<string> {
-        if (content !== undefined) return content;
-        try {
-            return await fs.promises.readFile(filePath, 'utf8');
-        } catch {
-            return '';
-        }
-    }
-
     private collectContentAuditIssues(
         filePath: string,
         fileContent: string,
@@ -266,11 +259,7 @@ export class PraxisReviewClient implements IPraxisReviewClient {
         }
 
         if (!activeSet || activeSet.has('data-architecture')) {
-            const dataIssues = defaultDataArchitectureEvaluator.audit(
-                filePath,
-                fileContent,
-                graph,
-            );
+            const dataIssues = defaultDataArchitectureEvaluator.audit(filePath, fileContent, graph);
             for (let i = 0; i < dataIssues.length; i++) issues.push(dataIssues[i]);
         }
 
@@ -345,9 +334,8 @@ export class PraxisReviewClient implements IPraxisReviewClient {
      *   - `directivesMarkdown`: Optional rendered Markdown representation of directives.
      *   - `cappDirectiveText`: Optional compact single-line CAPP DSL text.
      *   - `presentationPayload`: Optional rich UI diagnostic cards and presentation payload.
-     * @throws File read failures are handled fail-safely (treated as empty content);
-     *   unhandled rejections occur only if underlying AST extractors or MoE router throw fatal
-     *   runtime errors.
+     * @throws Propagates filesystem, root-boundary, and invalid UTF-8 errors; underlying
+     *   AST extraction and routing failures also reject the review.
      */
     public async reviewFile(
         filePath: string,
@@ -364,11 +352,17 @@ export class PraxisReviewClient implements IPraxisReviewClient {
             this.clearSemanticGraph();
         }
 
-        const fileContent = await this.readFileContentSafe(filePath, content);
+        const fileContent = await readPraxisFileContent(
+            filePath,
+            content,
+            options.root ?? this.root,
+        );
         const graph = opts.isolatedGraph ? new SemanticGraph() : (options.graph ?? this.graph);
+        const semanticCapabilities =
+            defaultSemanticAdapterRegistry.getCapabilitiesForFile(filePath);
 
         if (fileContent.length > 0) {
-            defaultSemanticAdapterRegistry.extractFileToGraph(filePath, fileContent, graph);
+            await defaultSemanticAdapterRegistry.extractFileToGraph(filePath, fileContent, graph);
         }
 
         try {
@@ -401,6 +395,23 @@ export class PraxisReviewClient implements IPraxisReviewClient {
 
             const status = this.resolveFileStatus(issues);
             const verdict: PraxisFileReviewVerdict = {
+                semanticCapabilities,
+                execution: createReviewExecution({
+                    reviewId: randomUUID(),
+                    tracks: { fast: 'complete', deep: 'not-required' },
+                    coverage: [
+                        {
+                            analyzer: 'praxis-sdk',
+                            capability: 'complete-analysis',
+                            language:
+                                defaultSemanticAdapterRegistry.getAdapterForFile(filePath)
+                                    ?.language ?? 'unknown',
+                            required: true,
+                            status: 'degraded',
+                            reason: 'SDK static checks do not execute the complete analyzer plan.',
+                        },
+                    ],
+                }),
                 filePath,
                 status,
                 issues,

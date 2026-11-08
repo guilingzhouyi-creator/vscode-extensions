@@ -7,12 +7,12 @@
  *   PythonSemanticAdapter, RustSemanticAdapter, GoSemanticAdapter, and GDScriptSemanticAdapter.
  * Responsibilities: Maintain extension-to-adapter resolution map, support dynamic registration,
  *   and execute graph population.
- * Exit Semantics & Design Rationale: Returns boolean on extraction attempt without throwing,
- *   guaranteeing engine resilience even when unknown file types are encountered.
+ * Exit Semantics & Design Rationale: Unknown languages return false; async extraction is awaited
+ *   by callers and original extraction failures propagate instead of claiming graph completion.
  */
 
 import type { SemanticGraph } from '../index';
-import type { UnifiedLanguageAdapter } from './base';
+import type { SemanticAdapterCapabilities, UnifiedLanguageAdapter } from './base';
 import { TypeScriptSemanticAdapter } from './typescript-adapter';
 import { PythonSemanticAdapter } from './python-adapter';
 import {
@@ -61,16 +61,40 @@ export class SemanticAdapterRegistry {
     }
 
     /**
+     * Describe the resolved implementation without claiming it ran for any review.
+     *
+     * @param filePath - Source path used by the same extension resolution as actual extraction.
+     * @returns Frozen declarations, or undefined for a language with no registered adapter.
+     */
+    public getCapabilitiesForFile(filePath: string): SemanticAdapterCapabilities | undefined {
+        const adapter = this.getAdapterForFile(filePath);
+        if (!adapter) return undefined;
+        return Object.freeze({
+            language: adapter.language,
+            version: adapter.version ?? null,
+            fileExtensions: Object.freeze([...adapter.fileExtensions]),
+            graphExtraction: adapter.graphExtraction,
+            supportsSlice: false,
+        });
+    }
+
+    /**
      * Extracts a file into the target SemanticGraph using the matching language adapter.
      *
-     * @returns true if an adapter was found and extracted; false otherwise.
+     * @returns True after synchronous extraction, or a promise of completion for async adapters;
+     *   false when no adapter is registered. Extraction failures retain their original errors.
      */
-    public extractFileToGraph(filePath: string, content: string, graph: SemanticGraph): boolean {
+    public extractFileToGraph(
+        filePath: string,
+        content: string,
+        graph: SemanticGraph,
+    ): boolean | Promise<boolean> {
         const adapter = this.getAdapterForFile(filePath);
         if (!adapter) {
             return false;
         }
-        adapter.extractToGraph(filePath, content, graph);
+        const extraction = adapter.extractToGraph(filePath, content, graph);
+        if (extraction) return extraction.then(() => true);
         return true;
     }
 

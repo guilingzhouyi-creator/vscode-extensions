@@ -945,3 +945,23 @@ export * from './core/telemetry';
 // ---- DeepInfer Disaggregated Serving & Worker Pool Management ----
 export { handleAsymmetricScan, handleSliceAudit, createDaemonContext } from './daemon/scanHandler';
 export { WorkerPoolManager } from './core/scheduler/worker-pool-manager';
+
+export * from './core/review/review-contracts';
+export * from './core/review/review-execution';
+export { captureSourceSnapshot } from './core/review/source-snapshot';
+export type {
+    SourceSnapshot,
+    SourceSnapshotIdentity,
+    SnapshotBudget,
+    SnapshotCaptureEntry,
+    SnapshotRead,
+    SnapshotGitObject,
+} from './core/review/source-snapshot';
+export type { SnapshotScanResult, SnapshotInputObservation } from './core/review/snapshot-scanner';
+export type {
+    FileExecutionObservation, AnalyzerExecutionObservation, ParserExecutionObservation,
+} from './core/review/analyzer-execution';
+export type {
+    SemanticAdapterCapabilities,
+    SemanticExtractionKind,
+} from './core/semantic/adapters/base';

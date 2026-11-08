@@ -22,8 +22,20 @@ import type {
 import type { SemanticGraph } from '../semanticGraph';
 import { buildCanonicalSymbolId, normalizeCanonicalPath } from './path-utils';
 
+/** Declared implementation precision, independent from per-request execution and parse success. */
+export type SemanticExtractionKind = 'ast' | 'lexical' | 'unspecified';
+
+/** Read-only declaration; registration cannot establish execution or complete review coverage. */
+export interface SemanticAdapterCapabilities {
+    readonly language: string;
+    readonly version: string | null;
+    readonly fileExtensions: readonly string[];
+    readonly graphExtraction: SemanticExtractionKind;
+    readonly supportsSlice: false;
+}
+
 /**
- * Universal contract for extracting language ASTs into the unified semantic graph.
+ * Universal contract for extracting language structure into the unified semantic graph.
  */
 export abstract class UnifiedLanguageAdapter {
     /** Language family identifier (e.g. 'typescript', 'python', 'rust', 'go', 'gdscript') */
@@ -31,6 +43,12 @@ export abstract class UnifiedLanguageAdapter {
 
     /** List of file extensions claimed by this adapter (e.g. ['.ts', '.tsx', '.js']) */
     public abstract readonly fileExtensions: string[];
+
+    /** Implementation revision; custom adapters without a declaration remain unversioned. */
+    public readonly version?: string;
+
+    /** Implementation mechanism only; AST extraction still requires per-input parse validation. */
+    public readonly graphExtraction: SemanticExtractionKind = 'unspecified';
 
     /**
      * Determines whether this adapter claims the given file path.

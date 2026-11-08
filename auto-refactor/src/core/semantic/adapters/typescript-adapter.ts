@@ -20,6 +20,8 @@ import { buildCanonicalSymbolId, normalizeCanonicalPath } from './path-utils';
  */
 export class TypeScriptSemanticAdapter extends UnifiedLanguageAdapter {
     public readonly language = 'typescript';
+    public override readonly version = '1';
+    public override readonly graphExtraction = 'ast';
     public readonly fileExtensions = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
 
     /**

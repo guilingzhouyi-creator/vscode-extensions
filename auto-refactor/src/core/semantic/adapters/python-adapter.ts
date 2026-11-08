@@ -30,6 +30,8 @@ export const PYTHON_KEYWORD_CALL_EXCLUSIONS: ReadonlySet<string> = new Set([
  */
 export class PythonSemanticAdapter extends UnifiedLanguageAdapter {
     public readonly language = 'python';
+    public override readonly version = '1';
+    public override readonly graphExtraction = 'lexical';
     public readonly fileExtensions = ['.py', '.pyi'];
 
     /**

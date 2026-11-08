@@ -241,6 +241,9 @@ export class DefaultPraxisHumanFaceStorage implements IPraxisHumanFaceStorage {
     }
 }
 
+const DEFAULT_TASK_ROLLBACK_ERR = 'Task rollback unavailable: no checkpoint store configured';
+const DEFAULT_MERGE_GATE_ERR = 'Merge gate unavailable: no authoritative gatekeeper configured';
+
 /**
  * Default gatekeeper and rollback engine.
  *
@@ -258,7 +261,7 @@ export class DefaultPraxisRollbackGatekeeper implements IPraxisRollbackGatekeepe
      * @returns `{ success: true, patch: '' }` so callers can continue down the optimistic path.
      */
     revertDiffHunk(_filePath: string, _hunkId: string): { success: boolean; patch: string } {
-        return { success: true, patch: '' };
+        return { success: false, patch: '' };
     }
 
     /**
@@ -268,7 +271,7 @@ export class DefaultPraxisRollbackGatekeeper implements IPraxisRollbackGatekeepe
      * @returns Empty `affectedFiles` and `rolledBackCheckpoints` arrays for serialization parity.
      */
     revertTaskCard(_cardId: string): { affectedFiles: string[]; rolledBackCheckpoints: string[] } {
-        return { affectedFiles: [], rolledBackCheckpoints: [] };
+        throw new Error(DEFAULT_TASK_ROLLBACK_ERR);
     }
 
     /**
@@ -284,7 +287,7 @@ export class DefaultPraxisRollbackGatekeeper implements IPraxisRollbackGatekeepe
         _targetBranch: string,
         _diffPayload: ReviewDiffHunk[],
     ): { approved: boolean; reason?: string; violations?: string[] } {
-        return { approved: true };
+        return { approved: false, reason: DEFAULT_MERGE_GATE_ERR, violations: [DEFAULT_MERGE_GATE_ERR] };
     }
 }
 

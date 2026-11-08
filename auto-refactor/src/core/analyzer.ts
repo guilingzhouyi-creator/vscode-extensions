@@ -84,6 +84,10 @@ import { executeScanWithCache } from './scanner/cache-scanner';
 import type { ScanWithDiffOptions } from './scanner/diff-scanner';
 import { executeScanWithDiff } from './scanner/diff-scanner';
 import type { RunAnalyzersExecutionOptions, ScannerContext } from './scanner/scanner-context';
+import type { FileExecutionObservation } from './review/analyzer-execution';
+import type { SourceSnapshot } from './review/source-snapshot';
+import { executeSnapshotScan } from './review/snapshot-scanner';
+import type { SnapshotScanResult } from './review/snapshot-scanner';
 
 /**
  * Optional analyzer capability consumed by the semantic-complexity post-scan pass.
@@ -136,6 +140,7 @@ export { summarizeUncertainty } from './reporting/canonical-issue-builder';
 export class Scanner implements ScannerContext {
     public plan: ResolvedAnalyzer[];
     public logger: Logger;
+    private inputSource: 'workspace' | 'immutable-snapshot' | undefined;
     /**
      * Import graph seeded during the scan (in-process path only); the consumer compares
      * its module count against fileMetrics to decide whether the graph is reusable.
@@ -406,6 +411,39 @@ export class Scanner implements ScannerContext {
         return this.graph.getModules().length > 0 ? this.graph : null;
     }
     /**
+     * Analyze a fixed snapshot with a fresh, non-persistent scanner instance.
+     * The returned static results preserve source identity and every non-text input outcome.
+     *
+     * @param snapshot - Captured source port; no workspace discovery or cache fallback is used.
+     * @param scope - Optional exact paths, including deleted paths to observe as missing.
+     * @returns Snapshot-bound diagnostics, metrics and explicit input observations.
+     */
+    async scanSnapshot(
+        snapshot: SourceSnapshot,
+        scope?: readonly string[],
+    ): Promise<SnapshotScanResult> {
+        if (this.inputSource !== undefined) throw new Error('Snapshot analysis requires a fresh scanner');
+        if (this.config.cacheEnabled !== false) throw new Error('Snapshot analysis requires cache persistence disabled');
+        if (!this.config.archetype) {
+            throw new Error('Snapshot analysis requires an explicit project archetype');
+        }
+        this.inputSource = 'immutable-snapshot';
+        return executeSnapshotScan({
+            snapshot, scope, signal: this.config.signal,
+            analyze: (file, content) => this.runAnalyzers(file, content, undefined, {
+                observeExecution: true,
+            }),
+        });
+    }
+
+    private beginWorkspaceScan(): void {
+        if (this.inputSource === 'immutable-snapshot') {
+            throw new Error('A snapshot scanner cannot analyze mutable workspace input');
+        }
+        this.inputSource = 'workspace';
+    }
+
+    /**
      * Execute the scan pipeline.
      *
      * Pipeline (serial stages) + scheduling policy:
@@ -432,6 +470,7 @@ export class Scanner implements ScannerContext {
      *     is 'Scan aborted by user'.
      */
     async scan(): Promise<ScanReport> {
+        this.beginWorkspaceScan();
         const cfg = this.config;
         if (cfg.signal?.aborted) {
             throw new Error('Scan aborted by user');
@@ -485,6 +524,7 @@ export class Scanner implements ScannerContext {
     async scanWithCache(
         opts: ScanWithCacheOptions,
     ): Promise<{ report: ScanReport; stats: WarmStats }> {
+        this.beginWorkspaceScan();
         return executeScanWithCache(this, opts);
     }
 
@@ -519,6 +559,7 @@ export class Scanner implements ScannerContext {
     async scanWithDiff(
         opts: ScanWithDiffOptions & { deltaOnly?: boolean },
     ): Promise<{ report: ScanReport | DiffDeltaReport; stats: DiffStats }> {
+        this.beginWorkspaceScan();
         return executeScanWithDiff(this, opts);
     }
 
@@ -551,7 +592,10 @@ export class Scanner implements ScannerContext {
             scopeOrOptions?: Set<string> | RunAnalyzersExecutionOptions,
             lineBounds?: readonly [number, number],
         ]
-    ): Promise<{ issues: Issue[]; metric: FileMetric | null }> {
+    ): Promise<{
+        issues: Issue[]; metric: FileMetric | null; execution?: FileExecutionObservation;
+    }> {
+        this.inputSource ??= 'workspace';
         const [scopeOrOptions, positionalBounds] = executionScope;
         let activeAnalyzers: Set<string> | undefined;
         let lineBounds: readonly [number, number] | undefined;
@@ -570,6 +614,8 @@ export class Scanner implements ScannerContext {
             {
                 config: this.config,
                 plan: this.plan,
+                observeExecution:
+                    !(scopeOrOptions instanceof Set) && scopeOrOptions?.observeExecution,
                 logger: this.logger,
                 graph: this.graph,
                 symbolIndex: this.symbolIndex,
@@ -605,6 +651,7 @@ export class Scanner implements ScannerContext {
         absRoot: string,
         preloaded?: Map<string, Buffer>,
     ): Promise<{ issues: Issue[]; metric: FileMetric | null }[]> {
+        this.beginWorkspaceScan();
         const cfg = this.config;
         return pMap(
             files,

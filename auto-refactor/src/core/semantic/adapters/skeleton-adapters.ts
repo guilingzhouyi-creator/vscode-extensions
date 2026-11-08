@@ -1,8 +1,8 @@
 /**
  * Module: Core Engine — Multi-Language Semantic Adapter Skeletons
  * File Path: src/core/semantic/adapters/skeleton-adapters.ts
- * Architecture Role: Provides production-ready adapter implementations for Rust, Go,
- *   and GDScript, ensuring uniform topological extraction into the SemanticGraph.
+ * Architecture Role: Provides lexical graph extraction for Rust, Go, and GDScript.
+ *   These approximate declarations do not establish compiler-validated AST coverage.
  * Dependencies & Triggers: Extends UnifiedLanguageAdapter from ./base.
  * Responsibilities: Parse declarations and dependencies for systems, backend, and game
  *   scripting languages.
@@ -19,6 +19,8 @@ import { buildCanonicalSymbolId, normalizeCanonicalPath } from './path-utils';
  */
 export class RustSemanticAdapter extends UnifiedLanguageAdapter {
     public readonly language = 'rust';
+    public override readonly version = '1';
+    public override readonly graphExtraction = 'lexical';
     public readonly fileExtensions = ['.rs'];
 
     public extractToGraph(filePath: string, content: string, graph: SemanticGraph): void {
@@ -78,6 +80,8 @@ export class RustSemanticAdapter extends UnifiedLanguageAdapter {
  */
 export class GoSemanticAdapter extends UnifiedLanguageAdapter {
     public readonly language = 'go';
+    public override readonly version = '1';
+    public override readonly graphExtraction = 'lexical';
     public readonly fileExtensions = ['.go'];
 
     public extractToGraph(filePath: string, content: string, graph: SemanticGraph): void {
@@ -136,6 +140,8 @@ export class GoSemanticAdapter extends UnifiedLanguageAdapter {
  */
 export class GDScriptSemanticAdapter extends UnifiedLanguageAdapter {
     public readonly language = 'gdscript';
+    public override readonly version = '1';
+    public override readonly graphExtraction = 'lexical';
     public readonly fileExtensions = ['.gd'];
 
     public extractToGraph(filePath: string, content: string, graph: SemanticGraph): void {
