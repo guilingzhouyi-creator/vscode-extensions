@@ -343,8 +343,8 @@ export class SessionManager {
         this.foldIfNeeded();
         this.advanceJournalWatermark(idleStartMs);
 
-        await this.journal.truncate();
         await this.saveCheckpoint();
+        await this.journal.truncate();
     }
 
     /**

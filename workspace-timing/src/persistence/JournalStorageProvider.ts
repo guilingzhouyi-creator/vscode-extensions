@@ -58,7 +58,8 @@ export class JournalStorageProvider implements IJournalStore {
             let text = '';
             for (let i = 0; i < slices.length; i++) {
                 const s = slices[i];
-                text += `{"t":${s.timestamp},"d":${s.deltaMs}}\n`;
+                const modePart = s.mode === 'ai' || s.mode === 'manual' ? `,"m":"${s.mode}"` : '';
+                text += `{"t":${s.timestamp},"d":${s.deltaMs}${modePart}}\n`;
             }
 
             await this.doAppend(text);
@@ -138,7 +139,8 @@ export class JournalStorageProvider implements IJournalStore {
                 parsed.d > 0 &&
                 parsed.d < parsed.t
             ) {
-                return { timestamp: parsed.t, deltaMs: parsed.d };
+                const mode = parsed.m === 'ai' ? 'ai' : parsed.m === 'manual' ? 'manual' : undefined;
+                return mode ? { timestamp: parsed.t, deltaMs: parsed.d, mode } : { timestamp: parsed.t, deltaMs: parsed.d };
             }
         } catch {
             log(LogLevel.Warn, `JournalStorageProvider: skipping corrupt line: ${trimmed}`);

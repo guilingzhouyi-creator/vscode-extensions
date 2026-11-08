@@ -83,7 +83,7 @@ for (const file of files) {
     }
 
     const targets = new Set<string>();
-    for (const m of text.matchAll(/(?:^|\n)\s*import[\s\S]*?from\s+['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)/g)) {
+    for (const m of text.matchAll(/(?:^|\n)\s*(?:import|export)[\s\S]*?from\s+['"]([^'"]+)['"]|(?:import|require)\s*\(\s*['"]([^'"]+)['"]\s*\)/g)) {
         const spec = m[1] ?? m[2];
         if (!spec) continue;
 

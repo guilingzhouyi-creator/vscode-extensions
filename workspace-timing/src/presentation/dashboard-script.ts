@@ -328,21 +328,22 @@ export function buildDashboardScript(labels: Record<string, string>): string {
         }
 
         // 计算各天数据点物理坐标 (cx, cy)
+        const xRatio = (i) => data.length > 1 ? (i / (data.length - 1)) : 0.5;
         const pts = data.map((d, i) => {
-          const cx = PAD_LEFT + (i / (data.length - 1)) * DRAW_W;
+          const cx = PAD_LEFT + xRatio(i) * DRAW_W;
           const cy = d.totalMs > 0 ? BASE_Y - (d.totalMs / maxVal) * EFFECTIVE_H : BASE_Y;
           return [cx, cy];
         });
 
         const ptsManual = dualTrack ? data.map((d, i) => {
-          const cx = PAD_LEFT + (i / (data.length - 1)) * DRAW_W;
+          const cx = PAD_LEFT + xRatio(i) * DRAW_W;
           const mMs = d.manualMs !== undefined ? d.manualMs : (d.totalMs || 0);
           const cy = mMs > 0 ? BASE_Y - (mMs / maxVal) * EFFECTIVE_H : BASE_Y;
           return [cx, cy];
         }) : pts;
 
         const ptsAi = dualTrack ? data.map((d, i) => {
-          const cx = PAD_LEFT + (i / (data.length - 1)) * DRAW_W;
+          const cx = PAD_LEFT + xRatio(i) * DRAW_W;
           const aMs = d.aiMs !== undefined ? d.aiMs : 0;
           const cy = aMs > 0 ? BASE_Y - (aMs / maxVal) * EFFECTIVE_H : BASE_Y;
           return [cx, cy];
@@ -482,10 +483,10 @@ export function buildDashboardScript(labels: Record<string, string>): string {
             const pillTextCls = isPeak ? 'ac-pill-text is-peak' : 'ac-pill-text';
             const pillBgCls = isPeak ? 'ac-pill-bg is-peak' : 'ac-pill-bg';
             const tipText = detailSub ? (durStr + ' (' + detailSub + ')') : durStr;
-            const subElem = detailSub ? '<text class="ac-pill-sub" x="0" y="21">' + detailSub + '</text>' : '';
+            const subElem = detailSub ? '<text class="ac-pill-sub" x="0" y="21">' + escapeHtml(detailSub) + '</text>' : '';
             pillGroup =
               '<g class="ac-pill-group" transform="translate(' + cx.toFixed(1) + ',' + pillY.toFixed(1) + ')">' +
-                '<title>' + tipText + '</title>' +
+                '<title>' + escapeHtml(tipText) + '</title>' +
                 '<rect class="' + pillBgCls + '" x="-' + halfW.toFixed(1) + '" y="-13" width="' + pillW.toFixed(1) + '" height="22" rx="11"/>' +
                 '<text class="' + pillTextCls + '" fill="#ffffff" x="0" y="2">' + durStr + '</text>' +
                 subElem +
@@ -559,7 +560,7 @@ export function buildDashboardScript(labels: Record<string, string>): string {
                 '<stop offset="100%" stop-color="#34d399" stop-opacity="0.0"/>' +
               '</linearGradient>' +
             '</defs>' +
-            '<title>' + tip + '</title>' +
+            '<title>' + escapeHtml(tip) + '</title>' +
             gridSvg +
             '<path class="ac-area" d="' + areaPath + '"></path>' +
             aiSvg +
@@ -590,7 +591,7 @@ export function buildDashboardScript(labels: Record<string, string>): string {
             const d = data[j];
             const cls = 'hm-cell l' + d.level + (d.future ? ' future' : '');
             const tip = d.future ? d.dateStr : (d.dateStr + ' · ' + formatDuration(d.totalMs));
-            cellHtml += '<div class="' + cls + '" title="' + tip + '"></div>';
+            cellHtml += '<div class="' + cls + '" title="' + escapeHtml(tip) + '"></div>';
           }
           heatmapHtml += '<div class="heatmap-week">' + cellHtml + '</div>';
         }
@@ -915,7 +916,7 @@ export function buildDashboardScript(labels: Record<string, string>): string {
             } else {
               barInnerHtml = '<div class="hourly-bar' + isPeak + '" style="--bar-scale:' + scale + ';"></div>';
             }
-            hourlyHtml += '<div class="' + slotCls + '" data-timerange="' + timeRange + '" data-dur="' + fullDurInfo + '" title="' + tip + '">' +
+            hourlyHtml += '<div class="' + slotCls + '" data-timerange="' + escapeHtml(timeRange) + '" data-dur="' + escapeHtml(fullDurInfo) + '" title="' + escapeHtml(tip) + '">' +
               '<div class="hourly-slot-track">' +
                 barInnerHtml +
               '</div>' +

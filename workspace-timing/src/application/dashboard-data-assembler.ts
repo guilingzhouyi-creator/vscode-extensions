@@ -22,6 +22,7 @@ import {
 import { TimeAggregator, type WeeklySummary } from '../domain/TimeAggregator';
 import type { DashboardData, DailyDetail, WeeklyTrendEntry } from '../domain/dashboard-types';
 import { DEFAULT_HEATMAP_WEEKS, DEFAULT_TREND_WEEKS, ISO_DATE_MD_START } from '../domain/constants-chart';
+import { currentLocale } from '../i18n/index';
 import type { GlobalSnapshot } from './GlobalAggregator';
 
 /** 入参聚合上下文：隔离外部对象直接传入，显式声明依赖字段 */
@@ -200,7 +201,7 @@ export function buildDashboardData(ctx: AssembleContext): DashboardData {
         dailyStats: TimeAggregator.last7Days(
             data.sessions,
             data.currentSessionStartMs,
-            config.locale === 'en' ? 'en' : 'zh-CN',
+            config.locale === 'en' || config.locale === 'zh-CN' ? config.locale : currentLocale(),
         ),
         heatmap,
         weekTotalMs: weeklySummary.totalMs,

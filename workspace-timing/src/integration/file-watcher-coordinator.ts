@@ -81,6 +81,7 @@ export class FileWatcherCoordinator implements Disposable {
     private _hasPulseInBatch: boolean = false;
     private _hasSignatureInBatch: boolean = false;
     private _representativeUri?: Uri;
+    private _disposed: boolean = false;
 
     constructor(private readonly onSignal: ExternalSignalCallback) {}
 
@@ -196,7 +197,11 @@ export class FileWatcherCoordinator implements Disposable {
                 this.bindGitApi(gitExt.exports);
             } else {
                 gitExt.activate().then(
-                    exports => this.bindGitApi(exports),
+                    exports => {
+                        if (!this._disposed) {
+                            this.bindGitApi(exports);
+                        }
+                    },
                     err => log(LogLevel.Debug, MSG_GIT_ACTIVATION_SKIPPED, err as Error),
                 );
             }
@@ -243,6 +248,7 @@ export class FileWatcherCoordinator implements Disposable {
     }
 
     public dispose(): void {
+        this._disposed = true;
         this.closeBatch();
         for (const d of this.subscriptions) {
             d.dispose();

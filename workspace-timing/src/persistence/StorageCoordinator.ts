@@ -58,9 +58,11 @@ export class StorageCoordinator {
 
         const errors: string[] = [];
         let primaryFailed = false;
+        let savedCount = 0;
 
         try {
             await this.primary.save(stamped);
+            savedCount++;
         } catch (err) {
             primaryFailed = true;
             errors.push(`primary: ${(err as Error).message}`);
@@ -74,11 +76,17 @@ export class StorageCoordinator {
         if (shouldSaveBackup) {
             try {
                 await this.fileBackup.save(stamped);
+                savedCount++;
             } catch (err) {
                 errors.push(`fileBackup: ${(err as Error).message}`);
             }
         }
 
+        if (savedCount === 0) {
+            const msg = `StorageCoordinator: save failed across all providers: ${errors.join('; ')}`;
+            log(LogLevel.Error, msg);
+            throw new Error(msg);
+        }
         if (errors.length > 0) {
             log(LogLevel.Warn, `StorageCoordinator: save partially failed: ${errors.join('; ')}`);
         }
@@ -87,10 +95,19 @@ export class StorageCoordinator {
     /** 读取数据（主存优先，文件备份兜底），并报告实际来源供恢复诊断 */
     async load(): Promise<LoadResult> {
         const primaryData = await this.primary.load();
+        const fileData = await this.fileBackup.load();
+        if (primaryData && fileData) {
+            if (
+                (fileData.lastSavedAtMs ?? 0) > (primaryData.lastSavedAtMs ?? 0) &&
+                fileData.totalMs >= primaryData.totalMs
+            ) {
+                return { data: fileData, source: 'fileBackup' };
+            }
+            return { data: primaryData, source: 'workspaceState' };
+        }
         if (primaryData) {
             return { data: primaryData, source: 'workspaceState' };
         }
-        const fileData = await this.fileBackup.load();
         if (fileData) {
             return { data: fileData, source: 'fileBackup' };
         }

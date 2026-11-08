@@ -104,23 +104,42 @@ export class RecoveryService {
      * 将按时间连续性分组的切片段合成并入 sessions 与 dailyTotals
      */
     private applyJournalSlices(data: WorkspaceTimingData, slices: TimeSlice[]): void {
-        const journalDelta = slices.reduce((sum, s) => sum + s.deltaMs, 0);
+        let journalDelta = 0;
+        let journalAiDelta = 0;
+        let journalManualDelta = 0;
+        for (const s of slices) {
+            journalDelta += s.deltaMs;
+            if (s.mode === 'ai') {
+                journalAiDelta += s.deltaMs;
+            } else {
+                journalManualDelta += s.deltaMs;
+            }
+        }
         data.totalMs += journalDelta;
+        data.aiTotalMs = (data.aiTotalMs ?? 0) + journalAiDelta;
+        data.manualTotalMs = (data.manualTotalMs ?? 0) + journalManualDelta;
 
-        const runs: { startMs: number; endMs: number }[] = [];
+        const runs: { startMs: number; endMs: number; manualMs: number; aiMs: number }[] = [];
         for (const s of slices) {
             const start = s.timestamp - s.deltaMs;
+            const sAi = s.mode === 'ai' ? s.deltaMs : 0;
+            const sManual = s.mode === 'ai' ? 0 : s.deltaMs;
             const last = runs[runs.length - 1];
             if (last && start <= last.endMs + SLICE_CONTINUITY_GAP_MS) {
                 last.endMs = Math.max(last.endMs, s.timestamp);
+                last.manualMs += sManual;
+                last.aiMs += sAi;
             } else {
-                runs.push({ startMs: start, endMs: s.timestamp });
+                runs.push({ startMs: start, endMs: s.timestamp, manualMs: sManual, aiMs: sAi });
             }
         }
 
         let synthesized = 0;
         for (const run of runs) {
-            const segs = TimeAggregator.splitByNaturalDay(run.startMs, run.endMs);
+            const segs = TimeAggregator.splitByNaturalDay(run.startMs, run.endMs, {
+                manualMs: run.manualMs,
+                aiMs: run.aiMs,
+            });
             data.sessions.push(...segs);
             synthesized += segs.length;
         }
@@ -193,7 +212,12 @@ export class RecoveryService {
         const elapsed = maxCompensatedEnd - data.currentSessionStartMs;
         if (elapsed > 0) {
             data.totalMs += elapsed;
-            const segs = TimeAggregator.splitByNaturalDay(data.currentSessionStartMs, maxCompensatedEnd);
+            data.manualTotalMs = (data.manualTotalMs ?? 0) + elapsed;
+            data.aiTotalMs = data.aiTotalMs ?? 0;
+            const segs = TimeAggregator.splitByNaturalDay(data.currentSessionStartMs, maxCompensatedEnd, {
+                manualMs: elapsed,
+                aiMs: 0,
+            });
             data.sessions.push(...segs);
             log(LogLevel.Info, `RecoveryService: compensated unfinished session: +${elapsed}ms`);
         }

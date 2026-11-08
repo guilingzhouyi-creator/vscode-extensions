@@ -399,7 +399,8 @@ export class TimerEngine {
 
     /** 空闲唤醒恢复：记录离开区间至 idleSessions 并开启新会话 */
     resumeFromIdle(resumeMs: number, idleStartMs: number = 0): number {
-        const effectiveStart = Math.max(1, idleStartMs || this._idleStartMs);
+        const rawStart = idleStartMs || this._idleStartMs;
+        const effectiveStart = rawStart > 0 ? rawStart : resumeMs;
         const effectiveEnd = Math.max(effectiveStart, resumeMs);
         const idleDuration = effectiveEnd - effectiveStart;
 
@@ -517,7 +518,13 @@ export class TimerEngine {
                     aiMs: aiSeg,
                 },
             ]);
-            this._todayEndedMs += this.todayOverlap(this._sessionStartMs, boundaryMs);
+            const overlap = this.todayOverlap(this._sessionStartMs, boundaryMs);
+            if (overlap > 0) {
+                const aiOverlap = Math.round(overlap * (aiSeg / elapsed));
+                this._todayEndedAiMs += aiOverlap;
+                this._todayEndedManualMs += overlap - aiOverlap;
+                this._todayEndedMs += overlap;
+            }
         }
 
         this.resetSessionPointers(boundaryMs);
@@ -546,7 +553,12 @@ export class TimerEngine {
                 ...this._data.sessions,
                 ...segmentedSessions,
             ]);
-            this._todayEndedMs += sealedToday;
+            if (sealedToday > 0) {
+                const aiOverlap = Math.round(sealedToday * (segs.ai / elapsed));
+                this._todayEndedAiMs += aiOverlap;
+                this._todayEndedManualMs += sealedToday - aiOverlap;
+                this._todayEndedMs += sealedToday;
+            }
         }
 
         this.resetSessionPointers(resumeMs);

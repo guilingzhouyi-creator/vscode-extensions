@@ -124,7 +124,8 @@ if (clText === null) {
   // DOC-CL-006：版本日期合法且不超前（防手滑写成未来日期）。
   // ★ 日期合法性用本地时区分量校验——经 toISOString 回转会在 UTC+8 把本地零点判成前一天
   //   （避免因 UTC 转换导致本地时区跨日边界判定偏差）。
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   for (const v of versions) {
     const m = v.date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     const dt = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;

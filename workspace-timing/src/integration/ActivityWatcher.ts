@@ -154,6 +154,14 @@ export class ActivityWatcher implements Disposable {
 
     public setModeOverride(mode: ActivityMode | null): void {
         this._modeOverride = mode;
+        if (this._debounceTimer !== null) {
+            clearTimeout(this._debounceTimer);
+            this._debounceTimer = null;
+        }
+        if (this._aiDebounceTimer !== null) {
+            clearTimeout(this._aiDebounceTimer);
+            this._aiDebounceTimer = null;
+        }
         const now = Date.now();
         if (mode !== null) {
             this._lastActivityMs = now;
@@ -189,6 +197,10 @@ export class ActivityWatcher implements Disposable {
     private activateAiState(now: number): boolean {
         if (!this._options.aiDetectionEnabled || this._modeOverride === WATCHER_MODE_MANUAL) {
             return false;
+        }
+        if (this._debounceTimer !== null) {
+            clearTimeout(this._debounceTimer);
+            this._debounceTimer = null;
         }
         this._lastAiActivityMs = now;
         this._lastExternalSignalMs = now;
@@ -297,7 +309,7 @@ export class ActivityWatcher implements Disposable {
 
     private handlePassiveInteraction(timestampMs: number = Date.now()): void {
         const now = timestampMs;
-        const cooldownMs = this._options.aiCooldownSeconds * MS_PER_SECOND;
+        const cooldownMs = this.getCurrentAiCooldownSeconds() * MS_PER_SECOND;
 
         if (this._mode === WATCHER_MODE_AI && (now - this._lastAiActivityMs < cooldownMs)) {
             this._lastActivityMs = now;
@@ -314,6 +326,11 @@ export class ActivityWatcher implements Disposable {
         if (this._modeOverride === WATCHER_MODE_AI) {
             this._lastActivityMs = timestampMs;
             return;
+        }
+
+        if (this._aiDebounceTimer !== null) {
+            clearTimeout(this._aiDebounceTimer);
+            this._aiDebounceTimer = null;
         }
 
         const now = timestampMs;

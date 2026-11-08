@@ -37,7 +37,7 @@ import type { Scheduler, StatusBarDisplayData } from './Scheduler';
 import { exportCSV, exportAggregatedCSV, exportReport, type ReportKind } from './exporters/index';
 import { buildDashboardData } from './dashboard-data-assembler';
 import { LogLevel, log } from '../integration/logger';
-import { t, format } from '../i18n/index';
+import { t, format, currentLocale } from '../i18n/index';
 
 export type { OrchestratorState };
 export { ORCHESTRATOR_STATES };
@@ -227,7 +227,8 @@ export class TimerOrchestrator {
     handleModeChange(mode: ActivityMode): void { this.sessionManager.switchMode(mode); }
 
     async exportReport(kind: ReportKind): Promise<string> {
-        const locale = this.disableManager.config.locale === LOCALE_EN ? LOCALE_EN : LOCALE_ZH_CN;
+        const cfgLocale = this.disableManager.config.locale;
+        const locale = cfgLocale === LOCALE_EN || cfgLocale === LOCALE_ZH_CN ? cfgLocale : currentLocale();
         return exportReport(this.timer.data, kind, locale);
     }
 
@@ -360,10 +361,11 @@ export class TimerOrchestrator {
                 ...d,
                 currentSessionStartMs: 0,
                 sessions: [],
+                idleSessions: [],
                 dailyTotals: {},
                 metadata: { ...d.metadata, lastJournalTs: 0 },
             });
-            const fresh: WorkspaceTimingData = { ...this.timer.data, sessions: [] };
+            const fresh: WorkspaceTimingData = { ...this.timer.data, sessions: [], idleSessions: [] };
             await this.storage.save(fresh, true);
             try {
                 await this.journal.truncate();
