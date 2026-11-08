@@ -23,11 +23,11 @@ use std::collections::HashSet;
 use std::io::Write;
 
 use fg_core::error::FractalResult;
-use fg_core::models::{ObjectKind, Oid};
+use fg_core::models::{HorizonSpan, ObjectKind, Oid, ProjectionScope};
 use fg_topology::DiskRefStore;
 use fractal_git::constants::cli::CliTag;
 
-use super::commit_walk::{walk_commits, CommitRecord};
+use super::commit_walk::{walk_commits, walk_commits_within, CommitRecord, CommitWalk, WalkLimit};
 use super::common::{fail_fatal, reject, CliContext};
 use super::log_render::*;
 use super::repo_view::RepoView;
@@ -70,13 +70,78 @@ pub fn handle_log(ctx: &CliContext) {
     let Some(records) = load_log_records(ctx, &view, &request) else {
         return;
     };
+    // The horizon is applied to the record set the walk produced. A depth horizon is pushed into
+    // the walk itself (see `load_log_records`), so this call only handles the time-based case and
+    // guards the depth case against a walk that could not honour the limit.
+    let records = apply_horizon(records, request.horizon);
     let filtered_records = filter_log_records(&view, records, &request);
     let shown = &filtered_records[..filtered_records.len().min(request.limit)];
+
     if ctx.json_mode {
         report_log_json(shown, &request);
+        if let Some(scope) = request.projection.as_ref() {
+            report_slice_json(&view, shown, scope);
+        }
         return;
     }
     render_log_entries(&view, shown, &request);
+    if let Some(scope) = request.projection.as_ref() {
+        render_slice_summary(&view, shown, scope);
+    }
+}
+
+/// Applies a declared horizon to an already-loaded record set.
+///
+/// The walk loads a limited window with the newest commits first, so a depth horizon is a prefix of
+/// that order. This is deliberately *not* a reachability claim: the dropped records still exist in
+/// the repository. What changes is only what this invocation was asked to look at, and the caller
+/// is told so by the summary line rather than being left to assume the history ended.
+fn apply_horizon(records: Vec<CommitRecord>, horizon: HorizonSpan) -> Vec<CommitRecord> {
+    match horizon {
+        HorizonSpan::Full => records,
+        HorizonSpan::Depth(depth) => records.into_iter().take(depth as usize).collect(),
+        HorizonSpan::Recent { seconds } => {
+            let Some(newest) = records.first().map(|record| record.committer_time) else {
+                return records;
+            };
+            let cutoff = newest.saturating_sub(seconds as i64);
+            records
+                .into_iter()
+                .take_while(|record| record.committer_time >= cutoff)
+                .collect()
+        }
+    }
+}
+
+/// Prints the per-commit slice verdicts as JSON when `--scope` was given.
+fn report_slice_json(view: &RepoView, records: &[CommitRecord], scope: &ProjectionScope) {
+    let report = super::log_projection::classify_records(view, records, scope);
+    for (record, verdict) in records.iter().zip(report.verdicts.iter()) {
+        println!(
+            "{{\"commit\":\"{}\",\"slice\":\"{}\",\"verdict\":\"{}\"}}",
+            record.oid.to_hex(),
+            scope.tier.as_str(),
+            match verdict {
+                super::log_projection::SliceVerdict::Visible => "visible",
+                super::log_projection::SliceVerdict::OutsideScope => "outside-scope",
+            }
+        );
+    }
+}
+
+/// Prints the slice summary below the rendered history.
+fn render_slice_summary(view: &RepoView, records: &[CommitRecord], scope: &ProjectionScope) {
+    let report = super::log_projection::classify_records(view, records, scope);
+    println!();
+    println!("{}", report.summary(scope));
+    for (record, verdict) in records.iter().zip(report.verdicts.iter()) {
+        if *verdict == super::log_projection::SliceVerdict::OutsideScope {
+            println!(
+                "  {} is present but outside this slice",
+                &record.oid.to_hex()[..12]
+            );
+        }
+    }
 }
 
 fn disambiguate_revision_pathspec(view: &RepoView, request: &mut LogRequest) {
@@ -97,22 +162,51 @@ fn load_log_records(
     view: &RepoView,
     request: &LogRequest,
 ) -> Option<Vec<CommitRecord>> {
+    // A depth horizon becomes a read budget, so the walk stops instead of finishing and discarding.
+    // The `--max-count` limit participates for the same reason: both ask for a prefix, and reading
+    // past a prefix is work whose result nobody sees.
+    let limit = read_budget(request);
     if request.all {
-        return load_all_log_records(ctx, view, request);
+        return load_all_log_records(ctx, view, request, limit);
     }
     if request.revision.contains("..") {
         return load_range_log_records(view, &request.revision);
     }
     if !request.revision_explicit && matches!(view.head_commit(), Ok(None)) {
-        return Some(load_unborn_fallback_records(ctx, view));
+        return Some(load_unborn_fallback_records(ctx, view, limit));
     }
-    Some(load_single_revision_records(view, &request.revision))
+    Some(load_single_revision_records(view, &request.revision, limit))
+}
+
+/// Translates the request's horizon and count limit into one read budget.
+///
+/// Takes the tighter of the two: `--horizon 10 -n 5` asks for the newer five, and reading ten to
+/// print five is the cost this function exists to remove. A `Recent` horizon cannot be expressed as
+/// a count — the boundary depends on timestamps that are only known after reading — so it stays
+/// unbounded here and is trimmed afterwards.
+fn read_budget(request: &LogRequest) -> WalkLimit {
+    let by_horizon = match request.horizon {
+        HorizonSpan::Depth(depth) => Some(depth as usize),
+        HorizonSpan::Full | HorizonSpan::Recent { .. } => None,
+    };
+    let by_count = if request.limit == usize::MAX {
+        None
+    } else {
+        Some(request.limit)
+    };
+    match (by_horizon, by_count) {
+        (Some(a), Some(b)) => WalkLimit::MaxCommits(a.min(b)),
+        (Some(a), None) => WalkLimit::MaxCommits(a),
+        (None, Some(b)) => WalkLimit::MaxCommits(b),
+        (None, None) => WalkLimit::Unbounded,
+    }
 }
 
 fn load_all_log_records(
     ctx: &CliContext,
     view: &RepoView,
     request: &LogRequest,
+    limit: WalkLimit,
 ) -> Option<Vec<CommitRecord>> {
     let starts = match collect_all_starts(view) {
         Ok(starts) => starts,
@@ -124,10 +218,24 @@ fn load_all_log_records(
         }
         return None;
     }
-    match walk_commits(view, &starts) {
-        Ok(walked) => Some(walked),
+    match walk_commits_within(view, &starts, limit) {
+        Ok(walked) => Some(apply_walk_truncation(walked)),
         Err(walk_err) => reject(CliTag::ERROR, walk_err),
     }
+}
+
+/// Turns a bounded walk into the record list the renderer consumes, reporting a truncated read.
+///
+/// A walk that stopped early is a prefix of the history. Saying so matters more than the count: a
+/// reader who is not told will take the shorter list for the whole answer.
+fn apply_walk_truncation(walked: CommitWalk) -> Vec<CommitRecord> {
+    if walked.truncated {
+        eprintln!(
+            "note: stopped after {} commits because of the requested limit; older history not read",
+            walked.records.len()
+        );
+    }
+    walked.records
 }
 
 fn load_range_log_records(view: &RepoView, revision: &str) -> Option<Vec<CommitRecord>> {
@@ -157,7 +265,11 @@ fn load_range_log_records(view: &RepoView, revision: &str) -> Option<Vec<CommitR
     )
 }
 
-fn load_unborn_fallback_records(ctx: &CliContext, view: &RepoView) -> Vec<CommitRecord> {
+fn load_unborn_fallback_records(
+    ctx: &CliContext,
+    view: &RepoView,
+    limit: WalkLimit,
+) -> Vec<CommitRecord> {
     let starts = match collect_all_starts(view) {
         Ok(found) => found,
         Err(collect_err) => reject(CliTag::ERROR, collect_err),
@@ -168,16 +280,20 @@ fn load_unborn_fallback_records(ctx: &CliContext, view: &RepoView) -> Vec<Commit
              Use `taxis checkout <ref>` or name a revision to inspect one lineage."
         );
     }
-    match walk_commits(view, &starts) {
-        Ok(walked) => walked,
+    match walk_commits_within(view, &starts, limit) {
+        Ok(walked) => walked.records,
         Err(walk_err) => reject(CliTag::ERROR, walk_err),
     }
 }
 
-fn load_single_revision_records(view: &RepoView, revision: &str) -> Vec<CommitRecord> {
+fn load_single_revision_records(
+    view: &RepoView,
+    revision: &str,
+    limit: WalkLimit,
+) -> Vec<CommitRecord> {
     let start = resolve_or_exit_no_match(view, revision);
-    match walk_commits(view, &[start]) {
-        Ok(walked) => walked,
+    match walk_commits_within(view, &[start], limit) {
+        Ok(walked) => walked.records,
         Err(walk_err) => reject(CliTag::ERROR, walk_err),
     }
 }
@@ -268,12 +384,24 @@ pub(crate) struct LogRequest {
     pub(crate) graph: bool,
     pub(crate) diff_mode: Option<LogDiffMode>,
     pub(crate) pathspecs: Vec<String>,
+    /// Declared history horizon. `Full` (the default) keeps every reachable commit.
+    pub(crate) horizon: HorizonSpan,
+    /// Paths this node is allowed to see, and the tier it sees them at.
+    ///
+    /// Distinct from `pathspecs`, which *drops* commits that touched nothing matching. A projection
+    /// *keeps* them and marks them out of scope, because a caller of a slice needs to know that work
+    /// happened elsewhere rather than believing nothing happened at all.
+    pub(crate) projection: Option<ProjectionScope>,
 }
 
 impl LogRequest {
     /// Parses flags and the optional revision.
     fn parse(args: &[String]) -> Result<Self, String> {
-        let (options, mut pathspecs) = super::path_filter::split_args_at_dashdash(args);
+        // The slice flags are removed before the rest of the parse, so the option loop never meets a
+        // token it does not know, and the slice's value is never mistaken for a revision or a
+        // pathspec. One spelling across `log`, `diff`, and `show`, parsed in one place.
+        let (remaining, projection) = super::scope_flag::strip_scope(args)?;
+        let (options, mut pathspecs) = super::path_filter::split_args_at_dashdash(&remaining);
         let mut request = Self {
             revision: "HEAD".to_string(),
             revision_explicit: false,
@@ -285,6 +413,8 @@ impl LogRequest {
             graph: false,
             diff_mode: None,
             pathspecs: Vec::new(),
+            horizon: HorizonSpan::Full,
+            projection: None,
         };
         let mut cursor = 0usize;
         while cursor < options.len() {
@@ -323,6 +453,16 @@ impl LogRequest {
                         .parse()
                         .map_err(|parse_err| format!("{other} requires a count: {parse_err}"))?;
                 }
+                "--horizon" => {
+                    let value = options.get(cursor).ok_or_else(|| {
+                        String::from("--horizon requires a value: full, <n>, or <n>s")
+                    })?;
+                    request.horizon = parse_horizon(value)?;
+                    cursor += 1;
+                }
+                other if other.starts_with("--horizon=") => {
+                    request.horizon = parse_horizon(&other["--horizon=".len()..])?;
+                }
                 other if other.starts_with("--format=") => {
                     request.format = Some(other["--format=".len()..].to_string());
                 }
@@ -354,6 +494,7 @@ impl LogRequest {
             }
         }
         request.pathspecs = pathspecs;
+        request.projection = projection;
         Ok(request)
     }
 }
@@ -419,7 +560,13 @@ pub(crate) struct ShowRequest {
 
 /// Dispatches `taxis show`.
 pub fn handle_show(ctx: &CliContext) {
-    let request = parse_show_args(&ctx.args);
+    // `show` prints a patch, so a slice drops hunks rather than labelling commits. Same flags,
+    // different consequence, and the command's own documentation says which.
+    let (show_args, slice) = match super::scope_flag::strip_scope(&ctx.args) {
+        Ok(parsed) => parsed,
+        Err(reason) => reject(CliTag::ERROR, reason),
+    };
+    let request = parse_show_args(&show_args);
     let view = match RepoView::open(ctx) {
         Ok(opened) => opened,
         Err(open_err) => fail_fatal(open_err),
@@ -446,7 +593,7 @@ pub fn handle_show(ctx: &CliContext) {
         return;
     }
 
-    render_show_commit(&view, record, &request);
+    render_show_commit(&view, record, &request, slice.as_ref());
 }
 
 fn parse_show_args(args: &[String]) -> ShowRequest {
@@ -469,6 +616,7 @@ fn parse_show_args(args: &[String]) -> ShowRequest {
             other if other.starts_with("-U") && other.len() > 2 => {
                 context = other[2..].parse().unwrap_or(3);
             }
+
             other if other.starts_with('-') => {
                 reject(
                     CliTag::ERROR,
@@ -502,6 +650,35 @@ fn try_show_blob_spec(view: &RepoView, revision: &str) -> bool {
         return true;
     }
     false
+}
+
+/// Parses a `--horizon` value.
+///
+/// Three shapes, and no fourth: `full` keeps every reachable commit, a bare integer is a commit
+/// count, and an integer with a `s` suffix is a duration. Anything else is refused rather than
+/// guessed, because a mistyped horizon silently truncates history and the caller would read the
+/// short answer as the whole truth.
+fn parse_horizon(value: &str) -> Result<HorizonSpan, String> {
+    let trimmed = value.trim();
+    if trimmed.eq_ignore_ascii_case("full") {
+        return Ok(HorizonSpan::Full);
+    }
+    if let Some(seconds) = trimmed.strip_suffix('s') {
+        let parsed: u64 = seconds
+            .parse()
+            .map_err(|parse_err| format!("--horizon duration is not a number: {parse_err}"))?;
+        if parsed == 0 {
+            return Err(String::from("--horizon duration must be greater than zero"));
+        }
+        return Ok(HorizonSpan::Recent { seconds: parsed });
+    }
+    let depth: u32 = trimmed
+        .parse()
+        .map_err(|parse_err| format!("--horizon accepts full, <n>, or <n>s: {parse_err}"))?;
+    if depth == 0 {
+        return Err(String::from("--horizon depth must be greater than zero"));
+    }
+    Ok(HorizonSpan::Depth(depth))
 }
 
 #[cfg(test)]

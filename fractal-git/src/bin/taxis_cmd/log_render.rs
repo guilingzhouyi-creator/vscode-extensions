@@ -250,7 +250,12 @@ pub(crate) fn civil_from_unix(seconds: i64) -> (i64, u32, u32, u32, u32, u32, u3
     (year, month, day, hour, minute, second, weekday)
 }
 
-pub(crate) fn render_show_commit(view: &RepoView, record: &CommitRecord, request: &ShowRequest) {
+pub(crate) fn render_show_commit(
+    view: &RepoView,
+    record: &CommitRecord,
+    request: &ShowRequest,
+    slice: Option<&fg_core::models::ProjectionScope>,
+) {
     print_full_entry_with_prefix(record, abbrev_width(view), "", "");
     println!();
     if request.part == ShowPart::HeaderOnly
@@ -264,7 +269,9 @@ pub(crate) fn render_show_commit(view: &RepoView, record: &CommitRecord, request
         _ => vec![format!("-U{}", request.context)],
     };
     let left = parent.unwrap_or_else(|| diff::EMPTY_TREE_MARKER.to_string());
-    if let Err(diff_err) = diff::run_revision_diff(view, &left, &record.oid.to_hex(), &args) {
+    if let Err(diff_err) =
+        diff::run_revision_diff_sliced(view, &left, &record.oid.to_hex(), &args, slice)
+    {
         reject(CliTag::ERROR, diff_err);
     }
 }
