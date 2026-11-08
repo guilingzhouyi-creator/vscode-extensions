@@ -152,8 +152,7 @@ export class ActivityWatcher implements Disposable {
         return this._lastActivityMs;
     }
 
-    public setModeOverride(mode: ActivityMode | null): void {
-        this._modeOverride = mode;
+    private clearDebounceTimers(): void {
         if (this._debounceTimer !== null) {
             clearTimeout(this._debounceTimer);
             this._debounceTimer = null;
@@ -162,6 +161,11 @@ export class ActivityWatcher implements Disposable {
             clearTimeout(this._aiDebounceTimer);
             this._aiDebounceTimer = null;
         }
+    }
+
+    public setModeOverride(mode: ActivityMode | null): void {
+        this._modeOverride = mode;
+        this.clearDebounceTimers();
         const now = Date.now();
         if (mode !== null) {
             this._lastActivityMs = now;
@@ -485,14 +489,7 @@ export class ActivityWatcher implements Disposable {
     }
 
     public dispose(): void {
-        if (this._debounceTimer !== null) {
-            clearTimeout(this._debounceTimer);
-            this._debounceTimer = null;
-        }
-        if (this._aiDebounceTimer !== null) {
-            clearTimeout(this._aiDebounceTimer);
-            this._aiDebounceTimer = null;
-        }
+        this.clearDebounceTimers();
         if (this._tickInterval !== null) {
             clearInterval(this._tickInterval);
             this._tickInterval = null;

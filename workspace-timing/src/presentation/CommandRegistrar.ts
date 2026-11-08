@@ -120,6 +120,10 @@ export class CommandRegistrar {
             );
         });
 
+        this.registerActivityModeCommands(activityWatcher);
+    }
+
+    private registerActivityModeCommands(activityWatcher: ActivityWatcher | null): void {
         /** 注册活动模式轮转切换命令契约（自动 -> AI协作 -> 人工开发 -> 自动） */
         this.registerCommand(TIMING_COMMAND_IDS.TOGGLE_ACTIVITY_MODE, () => {
             if (!activityWatcher) { this.noWorkspaceMsg(); return; }

@@ -113,24 +113,18 @@ export function weeklyStats(sessions: readonly TimeSession[], offsetMinutes?: nu
         .sort((a, b) => a.weekStart.localeCompare(b.weekStart));
 }
 
-/**
- * 最近 7 天每日统计
- */
-export function last7Days(
-    sessions: readonly TimeSession[],
-    currentSessionStartMs = 0,
-    locale: 'zh-CN' | 'en' = 'zh-CN',
-    currentActivityMode: 'manual' | 'ai' = 'manual',
-    offsetMinutes?: number,
-): {
+interface DayBucketEntry {
     label: string;
     weekday: string;
     totalMs: number;
     manualMs: number;
     aiMs: number;
-    manualRatio: number;
-    aiRatio: number;
-}[] {
+}
+
+function buildLast7DaysBuckets(
+    locale: 'zh-CN' | 'en',
+    offsetMinutes?: number,
+): Map<string, DayBucketEntry> {
     const weekdayNames = locale === 'en'
         ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
         : ['日', '一', '二', '三', '四', '五', '六'];
@@ -140,13 +134,7 @@ export function last7Days(
         : -new Date(nowMs).getTimezoneOffset();
     const shiftedNow = new Date(nowMs + effOffset * MS_PER_MINUTE);
 
-    const dayMap = new Map<string, {
-        label: string;
-        weekday: string;
-        totalMs: number;
-        manualMs: number;
-        aiMs: number;
-    }>();
+    const dayMap = new Map<string, DayBucketEntry>();
     for (let i = DAYS_TO_SUNDAY; i >= 0; i--) {
         const shiftedTarget = new Date(Date.UTC(
             shiftedNow.getUTCFullYear(),
@@ -163,9 +151,15 @@ export function last7Days(
             aiMs: 0,
         });
     }
+    return dayMap;
+}
 
-    const firstDayKey = dayMap.keys().next().value as string;
-    const firstDayStartMs = parseLocalDate(firstDayKey, offsetMinutes);
+function accumulate7DaySessions(
+    sessions: readonly TimeSession[],
+    dayMap: Map<string, DayBucketEntry>,
+    firstDayStartMs: number,
+    offsetMinutes?: number,
+): void {
     for (const s of sessions) {
         if (s.endMs <= firstDayStartMs) continue;
         const totalSessionDuration = s.endMs - s.startMs;
@@ -193,6 +187,30 @@ export function last7Days(
             }
         }, offsetMinutes);
     }
+}
+
+/**
+ * 最近 7 天每日统计
+ */
+export function last7Days(
+    sessions: readonly TimeSession[],
+    currentSessionStartMs = 0,
+    locale: 'zh-CN' | 'en' = 'zh-CN',
+    currentActivityMode: 'manual' | 'ai' = 'manual',
+    offsetMinutes?: number,
+): {
+    label: string;
+    weekday: string;
+    totalMs: number;
+    manualMs: number;
+    aiMs: number;
+    manualRatio: number;
+    aiRatio: number;
+}[] {
+    const dayMap = buildLast7DaysBuckets(locale, offsetMinutes);
+    const firstDayKey = dayMap.keys().next().value as string;
+    const firstDayStartMs = parseLocalDate(firstDayKey, offsetMinutes);
+    accumulate7DaySessions(sessions, dayMap, firstDayStartMs, offsetMinutes);
 
     if (currentSessionStartMs > 0) {
         const now = Date.now();
@@ -264,14 +282,13 @@ export function fullDailySeries(
 function accumulateSessionSegments(
     rawDayMap: Map<string, { totalMs: number; sessionCount: number }>,
     targetDates: ReadonlySet<string>,
-    startMs: number,
-    endMs: number,
+    bounds: { startMs: number; endMs: number },
     offsetMinutes?: number,
 ): void {
     let counted = false;
     eachDaySegment(
-        startMs,
-        endMs,
+        bounds.startMs,
+        bounds.endMs,
         (date, segStart, segEnd) => {
             if (targetDates.has(date)) {
                 const entry = rawDayMap.get(date) ?? { totalMs: 0, sessionCount: 0 };
@@ -386,8 +403,10 @@ export function weeklyTrend(
         accumulateSessionSegments(
             rawDayMap,
             windowDates,
-            Math.max(sessionItem.startMs, earliestStartMs),
-            Math.min(sessionItem.endMs, latestEndMs),
+            {
+                startMs: Math.max(sessionItem.startMs, earliestStartMs),
+                endMs: Math.min(sessionItem.endMs, latestEndMs),
+            },
             offsetMinutes,
         );
     }
@@ -450,8 +469,10 @@ export function weeklySummary(
         accumulateSessionSegments(
             rawDayMap,
             weekDates,
-            Math.max(s.startMs, weekStartMs),
-            Math.min(s.endMs, weekEndMs),
+            {
+                startMs: Math.max(s.startMs, weekStartMs),
+                endMs: Math.min(s.endMs, weekEndMs),
+            },
             offsetMinutes,
         );
     }
