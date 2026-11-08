@@ -583,7 +583,10 @@ fn execute_fast_forward_rebase(
             "new_head": upstream_commit.to_hex(),
         }));
     } else {
-        println!("Fast-forwarded branch to {}", &upstream_commit.to_hex()[..8]);
+        println!(
+            "Fast-forwarded branch to {}",
+            &upstream_commit.to_hex()[..8]
+        );
     }
 }
 

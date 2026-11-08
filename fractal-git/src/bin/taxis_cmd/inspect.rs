@@ -476,7 +476,10 @@ pub fn handle_var(ctx: &CliContext) {
         return;
     }
 
-    match entries.iter().find(|entry| entry.key().to_dotted() == wanted) {
+    match entries
+        .iter()
+        .find(|entry| entry.key().to_dotted() == wanted)
+    {
         Some(entry) => emit_single_var_value(&wanted, entry.value().unwrap_or(""), ctx.json_mode),
         // An unset variable is not an error for `var`: echoing nothing is how a script detects an
         // absent value, and exiting non-zero would make the check indistinguishable from a failure.

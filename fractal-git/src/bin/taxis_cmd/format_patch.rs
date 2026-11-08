@@ -217,8 +217,16 @@ fn resolve_range_endpoints(
 ) -> FractalResult<(Oid, Option<Oid>)> {
     if let Some(first_spec) = opts.range_specs.first() {
         if let Some((left, right)) = first_spec.split_once("..") {
-            let left_oid = if left.is_empty() { head } else { view.resolve(left)? };
-            let right_oid = if right.is_empty() { head } else { view.resolve(right)? };
+            let left_oid = if left.is_empty() {
+                head
+            } else {
+                view.resolve(left)?
+            };
+            let right_oid = if right.is_empty() {
+                head
+            } else {
+                view.resolve(right)?
+            };
             return Ok((right_oid, Some(left_oid)));
         }
         if let Some(limit) = opts.count_limit {

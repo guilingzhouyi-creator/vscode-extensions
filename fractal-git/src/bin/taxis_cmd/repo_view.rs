@@ -226,7 +226,11 @@ impl RepoView {
         }
         let default_cell_ref = "refs/fractal/cell/cell-default/main";
         let cell_oid = self.lookup_reference(default_cell_ref).ok().flatten()?;
-        if cell_oid != oid && self.commit_parents(&cell_oid).is_ok_and(|p| p.contains(&oid)) {
+        if cell_oid != oid
+            && self
+                .commit_parents(&cell_oid)
+                .is_ok_and(|p| p.contains(&oid))
+        {
             return Some((default_cell_ref.to_string(), cell_oid));
         }
         None

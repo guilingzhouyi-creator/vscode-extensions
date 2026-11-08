@@ -491,7 +491,9 @@ impl LogRequest {
             self.format = Some(rest.to_string());
         } else if other.starts_with('-')
             && other.len() > 1
-            && other[1..].chars().all(|character| character.is_ascii_digit())
+            && other[1..]
+                .chars()
+                .all(|character| character.is_ascii_digit())
         {
             self.limit = other[1..]
                 .parse()

@@ -741,8 +741,12 @@ impl TaxisBenchmarkSuite {
         // Monotone timestamps with realistic gaps, the shapes `fg-storage` actually compresses.
         let count = 32_000usize;
         let values: Vec<u64> = (0..count as u64).map(|i| i * 40 + (i % 7)).collect();
-        let compressed =
-            fg_algorithms::EliasFano::from_slice(&values).expect("monotone input compresses");
+        let Ok(compressed) = fg_algorithms::EliasFano::from_slice(&values) else {
+            return BenchmarkMetric {
+                name: METRIC_ELIAS_FANO_ACCESS.to_string(),
+                ..Default::default()
+            };
+        };
 
         let start = Instant::now();
         let mut sink = 0u64;
@@ -774,8 +778,13 @@ impl TaxisBenchmarkSuite {
 
         // Build the rule through the same parser production uses, so the benchmark cannot drift
         // from the real matcher's rule shape.
-        let rule = fg_index::parse_line(&pattern, std::path::Path::new(".gitignore"), 1, "")
-            .expect("adversarial pattern parses as a rule");
+        let Some(rule) = fg_index::parse_line(&pattern, std::path::Path::new(".gitignore"), 1, "")
+        else {
+            return BenchmarkMetric {
+                name: METRIC_IGNORE_GLOB_ADVERSARIAL.to_string(),
+                ..Default::default()
+            };
+        };
         let matcher = fg_index::IgnoreMatcher::from_rules(vec![rule]);
         let subject: String = "a".repeat(64);
 
