@@ -46,6 +46,8 @@ pub mod inspect_grep;
 pub mod lineage;
 pub mod list_files;
 pub mod log;
+pub mod log_projection;
+pub mod scope_flag;
 pub mod log_render;
 pub mod maintenance;
 pub mod maintenance_ops;
