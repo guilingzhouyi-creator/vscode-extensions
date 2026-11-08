@@ -6,8 +6,9 @@
 
 use fractal_git::server::{IpcCodec, IpcMessage};
 use fractal_git::{
-    AutoQualityScoreEnvelope, DiskRefStore, ElevationAttestation, Oid, PromotionStagingLedger,
-    RefStore, StagedPromotionRequest, StagedPromotionStatus, StandardNonceAuthorizer, TaxisPolicy,
+    AutoQualityScoreEnvelope, DiskRefStore, ElevationAttestation, LooseOdb, OdbStore, Oid,
+    PromotionStagingLedger, RefStore, StagedPromotionRequest, StagedPromotionStatus,
+    StandardNonceAuthorizer, TaxisPolicy,
 };
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -73,6 +74,21 @@ fn init_repository(prefix: &str) -> TestDir {
         .publish_new(&container_path)
         .expect("Publish repository container");
     directory
+}
+
+/// Writes a candidate commit into the repository's object database and returns its object id.
+///
+/// The promotion path now records an acceptance commit whose tree is copied from the candidate, so
+/// the candidate has to be a real readable commit rather than a bare fabricated id. A root commit
+/// carrying a distinct tree per `tree_byte` keeps the no-op check meaningful across scenarios.
+fn publish_candidate(git_dir: &Path, tree_byte: u8) -> Oid {
+    let odb = LooseOdb::without_cache(git_dir);
+    let mut payload = format!("tree {}\n", Oid::from_bytes([tree_byte; 20]));
+    payload.push_str("author Agent <agent@fractal.local> 1793788968 -0800\n");
+    payload.push_str("committer Agent <agent@fractal.local> 1793788968 -0800\n");
+    payload.push_str("\ncandidate for promotion\n");
+    odb.write_object("commit", payload.as_bytes())
+        .expect("write candidate commit")
 }
 
 #[test]
@@ -288,7 +304,7 @@ fn test_scenario_5_cryptographic_nonce_verification_and_atomic_cas_merge() {
     let policy = TaxisPolicy::default();
     let t0 = 1_700_000_000_000;
 
-    let candidate_oid = Oid::from_bytes([0x42; 20]);
+    let candidate_oid = publish_candidate(&git_dir, 0x42);
     let req_id = ledger
         .stage_promotion(
             candidate_oid,
@@ -311,8 +327,9 @@ fn test_scenario_5_cryptographic_nonce_verification_and_atomic_cas_merge() {
         approval_session_token: "GUI_SESSION_VERIFIED".into(),
         timestamp_ms: t0 + 2000,
     };
+    let odb = LooseOdb::without_cache(&git_dir);
     let err_tamper = ledger
-        .apply_elevation_approval(&req_id, &bad_proof, &authorizer, &ref_store)
+        .apply_elevation_approval(&req_id, &bad_proof, &authorizer, &ref_store, &odb)
         .unwrap_err();
     assert!(
         err_tamper
@@ -333,12 +350,30 @@ fn test_scenario_5_cryptographic_nonce_verification_and_atomic_cas_merge() {
     };
 
     ledger
-        .apply_elevation_approval(&req_id, &valid_proof, &authorizer, &ref_store)
+        .apply_elevation_approval(&req_id, &valid_proof, &authorizer, &ref_store, &odb)
         .expect("Valid elevation approval must succeed");
 
-    // System Trunk (refs/heads/main) is now atomically pointing to candidate_oid!
+    // System Trunk now points at a single acceptance commit, not at the candidate itself: the
+    // acceptance records the approved tree as one entry, so trunk history counts acceptances
+    // rather than the lower tier's internal commits.
     let main_ref = ref_store.get_ref("refs/heads/main").unwrap();
-    assert_eq!(main_ref, Some(candidate_oid));
+    let acceptance_oid = main_ref.expect("trunk must advance to an acceptance commit");
+    assert_ne!(
+        acceptance_oid, candidate_oid,
+        "trunk must not be advanced onto the candidate commit itself"
+    );
+
+    let acceptance_header =
+        fg_topology::read_commit_header(&odb, &acceptance_oid).expect("read acceptance commit");
+    assert!(
+        acceptance_header.parents.is_empty(),
+        "the first acceptance on an empty trunk has no parent"
+    );
+    assert_eq!(
+        acceptance_header.tree,
+        Oid::from_bytes([0x42; 20]),
+        "the acceptance must carry the approved candidate tree"
+    );
 
     // Audit trail must record the immutable promotion event
     let audits = authorizer.audit_entries();

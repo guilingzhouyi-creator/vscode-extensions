@@ -17,7 +17,7 @@
 use fractal_git::constants::cli::CliTag;
 use fractal_git::{
     compute_jeffreys_credible_lower, AutoQualityScoreEnvelope, DiskRefStore, ElevationAttestation,
-    Oid, PromotionStagingLedger, RefStore, StandardNonceAuthorizer, TaxisPolicy,
+    LooseOdb, Oid, PromotionStagingLedger, RefStore, StandardNonceAuthorizer, TaxisPolicy,
 };
 
 use super::common::{find_arg_value, print_json, reject, CliContext};
@@ -307,8 +307,9 @@ fn handle_elevation_approval(
 
     let authorizer = StandardNonceAuthorizer::new();
     let ref_store = DiskRefStore::new(&ctx.git_dir);
+    let odb = LooseOdb::without_cache(&ctx.git_dir);
 
-    match ledger.apply_elevation_approval(&target_id, &proof, &authorizer, &ref_store) {
+    match ledger.apply_elevation_approval(&target_id, &proof, &authorizer, &ref_store, &odb) {
         Ok(()) => {
             if ctx.json_mode {
                 let success_payload = serde_json::json!({
