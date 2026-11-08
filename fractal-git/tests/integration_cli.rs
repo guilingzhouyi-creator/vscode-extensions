@@ -62,6 +62,8 @@ mod test_lineage_commands;
 mod test_list_files_parity;
 #[path = "rust/test_log_options_parity.rs"]
 mod test_log_options_parity;
+#[path = "rust/test_log_projection.rs"]
+mod test_log_projection;
 #[path = "rust/test_maintenance_ops_parity.rs"]
 mod test_maintenance_ops_parity;
 #[path = "rust/test_notes_replace_parity.rs"]
@@ -70,6 +72,7 @@ mod test_notes_replace_parity;
 mod test_patch_commands;
 #[path = "rust/test_pathspec_resolution.rs"]
 mod test_pathspec_resolution;
+
 #[path = "rust/test_plumbing_tree_commands.rs"]
 mod test_plumbing_tree_commands;
 #[path = "rust/test_ref_commands.rs"]
