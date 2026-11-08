@@ -28,6 +28,7 @@ pub mod project;
 pub mod projection_tier;
 pub mod projection;
 pub mod projection_patterns;
+pub mod promotion;
 pub mod provenance;
 pub mod quarantine;
 pub mod repo_path;
@@ -66,6 +67,9 @@ pub use project::{
     DEFAULT_PROJECT_MASTER_TTL_SECONDS, DEFAULT_SUBAGENT_TTL_SECONDS,
 };
 pub use projection::{ProjectionScope, ProjectionTier};
+pub use promotion::{
+    parse_commit_header, CommitHeader, FoldedRange, PromotionSummary, PROMOTION_SUMMARY_SUBJECT,
+};
 pub use provenance::{BlockProvenanceEntry, BlockProvenanceParams, ProvenanceLedger};
 pub use quarantine::{
     default_quarantine_dir, IsolateMutationRequest, QuarantineRecord, QuarantineRegistry,
