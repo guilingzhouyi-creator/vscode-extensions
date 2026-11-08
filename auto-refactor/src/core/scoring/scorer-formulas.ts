@@ -24,6 +24,7 @@ import type {
 import { ALL_QUALITY_DIMENSIONS, DIMENSION_ANALYZERS, DIMENSION_SCALE_MODE } from './scoringTypes';
 import {
     DEFAULT_SCORING_CONFIG,
+    type EpistemicCeilingScoringConfig,
     type QualityScoringConfig,
     type SecurityCeilingScoringConfig,
 } from './scoring-parameters';
@@ -38,8 +39,16 @@ export {
     DEFAULT_CORRIDOR_EPSILON,
 } from '../math/numerical-corridor';
 
-/** Maximum clean score a quality dimension starts at before deductions. */
+/** Maximum nominal scale reference (mathematical 100-point scale upper bound). */
 export const DIMENSION_MAX_SCORE = 100;
+/** Irreducible minimum gap keeping asymptotic ceilings strictly below 100.00. */
+export const MIN_EPISTEMIC_GAP = 0.01;
+/** Theoretical asymptotic ceiling for clean default evaluation (< 100.0). */
+export const THEORETICAL_SCORE_CEILING =
+    Math.round(
+        (DIMENSION_MAX_SCORE - DEFAULT_SCORING_CONFIG.quality.epistemicCeiling.baseReserve) *
+            100,
+    ) / 100;
 /**
  * Grade cut-offs on the 0-100 composite score, evenly spaced by 10.
  *
@@ -220,6 +229,7 @@ export const COMPOSITE_INDEX_FLOOR = DEFAULT_SCORING_CONFIG.compositeIndexFloor;
  * @param evaluatedDimensions - List of active dimensions evaluated in scan.
  * @param weights - Scoring weight configuration.
  * @param indexFloor - Strictly positive floor applied before the geometric mean.
+ * @param indexCeiling - Asymptotic ceiling applied to dimensions and composite score.
  * @returns Composite score rounded to one decimal and coverage ratio.
  */
 export function computeCompositeScore(
@@ -227,7 +237,9 @@ export function computeCompositeScore(
     evaluatedDimensions: QualityDimension[],
     weights: QualityWeights,
     indexFloor: number = COMPOSITE_INDEX_FLOOR,
+    indexCeiling: number = THEORETICAL_SCORE_CEILING,
 ): { compositeScore: number; coverage: number } {
+    const safeCeiling = Math.min(DIMENSION_MAX_SCORE - MIN_EPISTEMIC_GAP, indexCeiling);
     // A negative or non-finite weight makes the weighted mean meaningless rather than
     // merely skewed, and the previous `totalWeight || 1` fallback silently turned that
     // into an arbitrary score, so reject the configuration at the boundary instead.
@@ -246,7 +258,7 @@ export function computeCompositeScore(
     let totalWeight = 0;
     for (const dim of evaluatedDimensions) {
         const dimWeight = weights[dim];
-        const index = Math.max(indexFloor, Math.min(DIMENSION_MAX_SCORE, rawScores[dim]));
+        const index = Math.max(indexFloor, Math.min(safeCeiling, rawScores[dim]));
         logSum += dimWeight * Math.log(index);
         totalWeight += dimWeight;
     }
@@ -268,8 +280,10 @@ export function computeCompositeScore(
             'composite score is undefined: every measured dimension has zero weight',
         );
     }
-    const compositeScore =
-        Math.round(Math.exp(logSum / totalWeight) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    const compositeScore = Math.min(
+        safeCeiling,
+        Math.round(Math.exp(logSum / totalWeight) * SCORE_ROUNDING) / SCORE_ROUNDING,
+    );
     return { compositeScore, coverage };
 }
 
@@ -356,6 +370,7 @@ export function resolveQualityGrade(compositeScore: number): QualityGrade {
  * @param lines - Evidence volume: a file's non-blank lines, or a repository total.
  * @param coverage - Dimension coverage ratio (0-1).
  * @param scope - Whether `lines` describes one file or the whole repository.
+ * @param stabilityFactor - Optional empirical stability multiplier in [0.1, 1.0].
  * @returns Confidence score clamped between floor and 1.
  */
 export function calculateConfidenceFromVolume(
@@ -440,8 +455,64 @@ export function computeSecurityCeiling(
     const lines = metric?.nonBlankLines ?? scaleFactor * config.baselineLines;
     const expTerm = config.exportWeight * Math.min(1.0, expSymbols / config.exportLimit);
     const locTerm = config.locWeight * Math.min(1.0, lines / config.locLimit);
-    const discount = config.maxDiscount * (expTerm + locTerm);
-    return Math.round((DIMENSION_MAX_SCORE - discount) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    const reserve = Math.max(MIN_EPISTEMIC_GAP, config.epistemicBaseReserve);
+    const discount = reserve + config.maxDiscount * (expTerm + locTerm);
+    return Math.min(
+        DIMENSION_MAX_SCORE - MIN_EPISTEMIC_GAP,
+        Math.round((DIMENSION_MAX_SCORE - discount) * SCORE_ROUNDING) / SCORE_ROUNDING,
+    );
+}
+
+/**
+ * Compute the epistemic & structural-surface asymptote for non-security dimensions.
+ *
+ * Even with zero static findings, finite AST rules leave unverified runtime, concurrency, and
+ * cross-module semantics (Rice's theorem uncertainty), so clean scores remain strictly below 100.
+ *
+ * @param metric - Optional precomputed lexical file metric.
+ * @param scaleFactor - Optional file scale factor relative to the 100 LOC baseline.
+ * @param config - Optional epistemic ceiling parameters; defaults to the scoring SSOT.
+ * @returns Strictly sub-100 theoretical ceiling for the dimension.
+ */
+export function computeEpistemicCeiling(
+    metric?: FileMetric | null,
+    scaleFactor = 1,
+    config: EpistemicCeilingScoringConfig = DEFAULT_SCORING_CONFIG.quality.epistemicCeiling,
+): number {
+    const expSymbols = metric?.exportedSymbols ?? 0;
+    const lines = metric?.nonBlankLines ?? scaleFactor * config.baselineLines;
+    const surfaceLoad =
+        config.volumeWeight * (Math.max(0, lines) / config.volumeHalfPointLines) +
+        config.exportWeight * (Math.max(0, expSymbols) / config.exportSurfaceHalfPoint);
+    const saturatedLoad =
+        Number.isFinite(surfaceLoad) && surfaceLoad > 0 ? surfaceLoad / (1 + surfaceLoad) : 0;
+    const reserve = Math.max(MIN_EPISTEMIC_GAP, config.baseReserve);
+    const discount = reserve + config.maxSurfaceDiscount * saturatedLoad;
+    return Math.min(
+        DIMENSION_MAX_SCORE - MIN_EPISTEMIC_GAP,
+        Math.round((DIMENSION_MAX_SCORE - discount) * SCORE_ROUNDING) / SCORE_ROUNDING,
+    );
+}
+
+/**
+ * Resolve the theoretical epistemic upper bound for a given quality dimension.
+ *
+ * @param dim - Target quality dimension.
+ * @param metric - Optional file metric for attack-surface and volume sensitivity.
+ * @param scaleFactor - Optional scale factor relative to 100 LOC.
+ * @param config - Quality curve configuration.
+ * @returns Strictly sub-100 dimension ceiling.
+ */
+export function computeDimensionCeiling(
+    dim: QualityDimension,
+    metric?: FileMetric | null,
+    scaleFactor = 1,
+    config: QualityScoringConfig = DEFAULT_SCORING_CONFIG.quality,
+): number {
+    if (dim === 'codeSecurity') {
+        return computeSecurityCeiling(metric, scaleFactor, config.securityCeiling);
+    }
+    return computeEpistemicCeiling(metric, scaleFactor, config.epistemicCeiling);
 }
 
 /**
@@ -533,46 +604,34 @@ function computeStandardDimensionScore(
     rawPoints: number,
     effectiveScale: number,
     halfpoint: number,
+    dimensionCeiling: number,
 ): number {
     if (rawPoints <= 0) {
-        return DIMENSION_MAX_SCORE;
+        return dimensionCeiling;
     }
     if (DIMENSION_SCALE_MODE[dim] === SCALE_MODE_ABSOLUTE_STR) {
-        const absoluteScore = Math.max(0, DIMENSION_MAX_SCORE - rawPoints);
-        return Number.isFinite(absoluteScore) ? absoluteScore : DIMENSION_MAX_SCORE;
+        const absoluteScore = Math.max(
+            0,
+            Math.round((dimensionCeiling - rawPoints) * SCORE_ROUNDING) / SCORE_ROUNDING,
+        );
+        return Number.isFinite(absoluteScore) ? absoluteScore : dimensionCeiling;
     }
     const density = rawPoints / effectiveScale;
-    const score = (DIMENSION_MAX_SCORE * halfpoint) / (halfpoint + density);
+    const score = (dimensionCeiling * halfpoint) / (halfpoint + density);
     return Number.isFinite(score)
-        ? Math.max(0, Math.min(DIMENSION_MAX_SCORE, score))
-        : DIMENSION_MAX_SCORE;
-}
-
-/**
- * Dispatches dimension score calculation based on dimension type.
- */
-function resolveDimensionScore(
-    dim: QualityDimension,
-    rawPoints: number,
-    securityCeiling: number,
-    effectiveScale: number,
-    halfpoint: number,
-): number {
-    if (dim === 'codeSecurity') {
-        return computeSecurityDimensionScore(rawPoints, securityCeiling);
-    }
-    return computeStandardDimensionScore(dim, rawPoints, effectiveScale, halfpoint);
+        ? Math.max(0, Math.min(dimensionCeiling, score))
+        : dimensionCeiling;
 }
 
 /**
  * Compute dimension quality scores from raw deduction points applying
- * scale-damping and security ceilings.
+ * scale-damping and generalized epistemic ceilings (< 100.0).
  *
  * @param deductionPoints - Map of quality dimensions to accumulated raw deduction points.
  * @param scaleFactor - Codebase or file scale factor damping factor.
- * @param metric - Optional file metric for computing security dimension ceilings.
+ * @param metric - Optional file metric for computing surface-aware ceilings.
  * @param config - Optional quality curve parameters; defaults to the scoring SSOT.
- * @returns Record of quality dimension scores mapped to their scale-damped scores.
+ * @returns Record of quality dimension scores mapped to their strictly sub-100 scale-damped scores.
  */
 export function applyScaleDampedScores(
     deductionPoints: Record<QualityDimension, number>,
@@ -582,18 +641,22 @@ export function applyScaleDampedScores(
 ): Record<QualityDimension, number> {
     const rawScores = {} as Record<QualityDimension, number>;
     const effectiveScale = sanitizeScaleFactor(scaleFactor, config);
-    const securityScale = metric !== undefined ? effectiveScale : 1;
-    const securityCeiling = computeSecurityCeiling(metric, securityScale, config.securityCeiling);
+    const ceilingScale = metric !== undefined ? effectiveScale : 1;
+    const securityCeiling = computeSecurityCeiling(metric, ceilingScale, config.securityCeiling);
+    const generalCeiling = computeEpistemicCeiling(metric, ceilingScale, config.epistemicCeiling);
 
     for (const dim of ALL_QUALITY_DIMENSIONS) {
         const rawPoints = sanitizeDeduction(deductionPoints[dim]);
-        rawScores[dim] = resolveDimensionScore(
-            dim,
-            rawPoints,
-            securityCeiling,
-            effectiveScale,
-            config.saturationHalfpoint,
-        );
+        rawScores[dim] =
+            dim === 'codeSecurity'
+                ? computeSecurityDimensionScore(rawPoints, securityCeiling)
+                : computeStandardDimensionScore(
+                      dim,
+                      rawPoints,
+                      effectiveScale,
+                      config.saturationHalfpoint,
+                      generalCeiling,
+                  );
     }
     return rawScores;
 }
@@ -656,7 +719,7 @@ export function accumulateProjectMetrics(
         totalWeight += weight;
 
         for (const dim of ALL_QUALITY_DIMENSIONS) {
-            const dimScore = fScore.indices[dim] ?? DIMENSION_MAX_SCORE;
+            const dimScore = fScore.indices[dim] ?? THEORETICAL_SCORE_CEILING;
             rawScores[dim] += dimScore * weight;
         }
 

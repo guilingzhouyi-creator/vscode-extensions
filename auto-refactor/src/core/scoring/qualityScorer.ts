@@ -54,9 +54,11 @@ import {
     calculateConfidence,
     calculateConfidenceFromVolume,
     applyScaleDampedScores,
+    computeDimensionCeiling,
     effectivePenaltyFromIndex,
     accumulateProjectMetrics,
     CONFIDENCE_SCOPE_PROJECT,
+    THEORETICAL_SCORE_CEILING,
 } from './scorer-formulas';
 
 const LANG_SHELL = 'shell';
@@ -289,9 +291,20 @@ export class QualityScorer {
         // and effective views coincide: the gap between them only exists within a file.
         const deductionPoints = {} as Record<QualityDimension, number>;
         const divisor = totalWeight || 1;
+        const scoringConfig = resolveScoringConfig(config?.scoring);
+        const projectScale = Math.max(1, totalWeight / DEFAULT_SCALE_REFERENCE_LINES);
         for (const dim of ALL_QUALITY_DIMENSIONS) {
             const weightedScore = rawScores[dim] / divisor;
-            rawScores[dim] = Math.round(weightedScore * SCORE_ROUNDING) / SCORE_ROUNDING;
+            const dimCeiling = computeDimensionCeiling(
+                dim,
+                null,
+                projectScale,
+                scoringConfig.quality,
+            );
+            rawScores[dim] = Math.min(
+                dimCeiling,
+                Math.round(weightedScore * SCORE_ROUNDING) / SCORE_ROUNDING,
+            );
             deductionPoints[dim] = Math.max(0, DIMENSION_MAX_SCORE - rawScores[dim]);
         }
 
@@ -309,12 +322,12 @@ export class QualityScorer {
                 ? this.tuner.tuneWeights(config.archetype, this.weights)
                 : this.weights;
 
-        const scoringConfig = resolveScoringConfig(config?.scoring);
         const { compositeScore, coverage } = computeCompositeScore(
             rawScores,
             evaluatedDimensions,
             effectiveWeights,
             scoringConfig.compositeIndexFloor,
+            THEORETICAL_SCORE_CEILING,
         );
         const grade = resolveQualityGrade(compositeScore);
         // Project scope: totalWeight is the repository's non-blank line total. Passing it

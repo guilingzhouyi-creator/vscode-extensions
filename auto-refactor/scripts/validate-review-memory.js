@@ -342,10 +342,23 @@ test('Transparent Quality Scoring: 10 independent indices, zero black-box deduct
     breakdown.indices.codeSecurity <= 50,
     'Code security score must be severely deducted for secret',
   );
+  const cleanBreakdown = scorer.evaluateFile('src/domain/user.ts', [], {
+    file: 'src/domain/user.ts',
+    lines: 100,
+    nonBlankLines: 80,
+    functions: 5,
+    maxNestingDepth: 4,
+    topLevelDeclarations: 3,
+    exportedSymbols: 2,
+  });
   assert.strictEqual(
     breakdown.indices.modernity,
-    100,
-    'Modernity should remain 100 when untouched',
+    cleanBreakdown.indices.modernity,
+    'Modernity should remain at the untouched epistemic ceiling',
+  );
+  assert(
+    breakdown.indices.modernity < 100,
+    'Untouched dimension ceiling must stay strictly below 100',
   );
 
   assert(

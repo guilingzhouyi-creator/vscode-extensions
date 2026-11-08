@@ -50,10 +50,11 @@ async function main() {
   const breakdown = synthesizeEightPillars(baseIndices, 88, 92);
   // The composite is the weighted geometric mean, not the arithmetic one: the quantified
   // quality standard (§3.3) requires a bottom-axis penalty so that a repository whose weakest
-  // pillar collapses cannot be rescued by the other seven. The arithmetic mean of this fixture
-  // is 90.70; the geometric mean is 90.59, and the gap widens as pillars diverge.
-  assert.strictEqual(breakdown.compositeScore, 90.59);
-  assert.strictEqual(breakdown.pillars.security, 100);
+  // pillar collapses cannot be rescued by the other seven. Security is clamped by the
+  // epistemic ceiling (99.75 < 100), yielding a geometric mean of 90.57.
+  assert.strictEqual(breakdown.compositeScore, 90.57);
+  assert.strictEqual(breakdown.pillars.security, 99.75);
+  assert.ok(breakdown.pillars.security < 100, 'Every pillar must obey the epistemic ceiling < 100');
   // The data pillar averages its override with semanticPurity. It used to fall back to
   // architectureConsistency, which handed that one ten-dimension index an effective 0.25
   // weight (0.15 architecture + 0.10 data) — more than any real axis.

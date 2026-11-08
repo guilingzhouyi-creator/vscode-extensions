@@ -182,12 +182,15 @@ function testScaleFactorCurve() {
 function testSecurityCeilingConfig() {
   console.log('4. Testing configurable security attack surface ceiling...');
   const clean = computeSecurityCeiling({ exportedSymbols: 0, nonBlankLines: 0 });
-  assert.ok(clean > 99.4 && clean <= 100, `Clean ceiling must stay near 100, got ${clean}`);
+  assert.ok(
+    clean > 99.4 && clean < 100,
+    `Clean ceiling must stay strictly below 100, got ${clean}`,
+  );
 
   const exposed = computeSecurityCeiling({ exportedSymbols: 500, nonBlankLines: 5000 });
   assert.ok(
-    exposed >= 99.4,
-    `Exposed ceiling must stay above the documented floor, got ${exposed}`,
+    exposed >= 99.2 && exposed < clean,
+    `Exposed ceiling must stay above the documented floor and below clean, got ${exposed}`,
   );
 
   const tuned = computeSecurityCeiling({ exportedSymbols: 500, nonBlankLines: 5000 }, 1, {
@@ -197,6 +200,7 @@ function testSecurityCeilingConfig() {
     locLimit: 500,
     maxDiscount: 1.0,
     baselineLines: 100,
+    epistemicBaseReserve: 0.25,
   });
   assert.ok(tuned < exposed, `A larger maxDiscount must lower the ceiling (${tuned} < ${exposed})`);
   console.log('   ✓ Security ceiling parameterization verified.');
@@ -264,19 +268,18 @@ function testOriginalityDensityScaling() {
   try {
     const config = { root: tempDir };
 
-    // 5.1 A large clean tree must report 100% originality.
+    // 5.1 A large clean tree must report originality at the epistemic ceiling (< 100%).
     const largeClean = evaluateProjectAutonomy([makeFile(2000)], [], config);
-    assert.strictEqual(
-      largeClean.dimensions.codeOriginality,
-      100,
-      `Clean large tree must report 100 originality, got ${largeClean.dimensions.codeOriginality}`,
+    assert.ok(
+      largeClean.dimensions.codeOriginality > 99.0 && largeClean.dimensions.codeOriginality < 100,
+      `Clean large tree must report originality strictly below 100, got ${largeClean.dimensions.codeOriginality}`,
     );
 
     // 5.2 Fifty duplicated literals must be ignored; the old absolute count saturated at 54.
     const literalHeavy = evaluateProjectAutonomy([makeFile(2000)], makeLiteralIssues(60), config);
     assert.strictEqual(
       literalHeavy.dimensions.codeOriginality,
-      100,
+      largeClean.dimensions.codeOriginality,
       `duplicate-literal must not penalize originality, got ${literalHeavy.dimensions.codeOriginality}`,
     );
 

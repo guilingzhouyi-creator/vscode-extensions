@@ -27,10 +27,12 @@ import { ALL_QUALITY_DIMENSIONS } from './scoringTypes';
 import {
     clampRatio,
     clampScore,
+    computeDimensionCeiling,
+    computeEpistemicCeiling,
     computeSecurityCeiling,
-    DIMENSION_MAX_SCORE,
     resolveQualityGrade,
     SCORE_ROUNDING,
+    THEORETICAL_SCORE_CEILING,
 } from './scorer-formulas';
 
 /** Default fallback security ceiling for unmeasured scopes. */
@@ -49,7 +51,6 @@ const COMPOSITE_DENSITY_THRESHOLD = 0.35;
 const PENALTY_MAINTAINABILITY_DENSITY = 15;
 const PENALTY_ARCH_POR_MAX = 15;
 const PENALTY_PERF_DENSITY_MAX = 10;
-const DEFAULT_PROJECT_COMPOSITE = 100.0;
 const RATIO_SCALE_HUNDRED = 100;
 const RATIO_SCALE_THOUSAND = 1000;
 const BOUNDED_SCORE_MIN = 15;
@@ -196,13 +197,15 @@ function computeDimensionIndices(
     densityResult: EffectiveDensityResult,
     isExemptFacade: boolean,
     securityCeiling: number,
+    scaleFactor = 1,
 ): Record<QualityDimension, number> {
     const indices: Record<QualityDimension, number> = {} as Record<QualityDimension, number>;
+    const generalCeiling = computeEpistemicCeiling(null, scaleFactor);
     for (const dim of ALL_QUALITY_DIMENSIONS) {
         const riskPenalty = riskResult.dimensionPenalties?.[dim] ?? 0;
         const densityPenalty = computeDensityDeduction(dim, densityResult, isExemptFacade);
         const dimPenalty = riskPenalty + densityPenalty;
-        const baseScore = dim === DIMENSION_CODE_SECURITY ? securityCeiling : DIMENSION_MAX_SCORE;
+        const baseScore = dim === DIMENSION_CODE_SECURITY ? securityCeiling : generalCeiling;
         indices[dim] = clampScore(baseScore - dimPenalty, baseScore);
     }
     return indices;
@@ -373,7 +376,10 @@ function extractFunctionQualityScores(content: string, issues: Issue[]): Functio
             endLine,
             cyclomaticComplexity,
         );
-        const score = clampScore(DIMENSION_MAX_SCORE - deduction);
+        const score = clampScore(
+            THEORETICAL_SCORE_CEILING - deduction,
+            THEORETICAL_SCORE_CEILING,
+        );
 
         functions.push({
             functionName: current.name,
@@ -407,21 +413,23 @@ function evaluateFileQuality(opt: ScoreFileQualityOptions): FileQualityScore {
     // 3. Base dimension indices
     const isExemptFacade =
         filePath.endsWith(FILE_SUFFIX_INDEX_TS) || filePath.endsWith(FILE_SUFFIX_DTS);
+    const generalCeiling = computeEpistemicCeiling(null, scaleFactor);
     const indices = computeDimensionIndices(
         riskResult,
         densityResult,
         isExemptFacade,
         securityCeiling,
+        scaleFactor,
     );
 
     const isTest = isTestFilePath(filePath);
     const dataScoreOverride =
         riskResult.pillarPenalties.data > 0
-            ? clampScore(DIMENSION_MAX_SCORE - riskResult.pillarPenalties.data)
+            ? clampScore(generalCeiling - riskResult.pillarPenalties.data, generalCeiling)
             : undefined;
     const testingScoreOverride =
         isTest || riskResult.pillarPenalties.testing > 0
-            ? clampScore(DIMENSION_MAX_SCORE - riskResult.pillarPenalties.testing)
+            ? clampScore(generalCeiling - riskResult.pillarPenalties.testing, generalCeiling)
             : undefined;
 
     // 4. Synthesize 8 pillars with non-linear ceilings
@@ -554,8 +562,7 @@ function accumulateScoreItem(
         acc.pillarSums[pillar] += pillars[pillar];
     }
     for (const dimension of ALL_QUALITY_DIMENSIONS) {
-        const fallback =
-            dimension === DIMENSION_CODE_SECURITY ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
+        const fallback = computeDimensionCeiling(dimension, null, 1);
         acc.dimSums[dimension] += dimensions?.[dimension] ?? fallback;
     }
 }
@@ -705,8 +712,7 @@ function createEmptyProjectScore(): ProjectQualityScore {
         number
     >;
     for (const dimension of ALL_QUALITY_DIMENSIONS) {
-        emptyDimensions[dimension] =
-            dimension === DIMENSION_CODE_SECURITY ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
+        emptyDimensions[dimension] = computeDimensionCeiling(dimension, null, 1);
     }
     const emptyPillars = synthesizeEightPillars(emptyDimensions);
     return {
@@ -791,8 +797,7 @@ function accumulateDimensionSums(
 ): void {
     const fDims = file.tenDimensions;
     for (const dimension of ALL_QUALITY_DIMENSIONS) {
-        const fallback =
-            dimension === DIMENSION_CODE_SECURITY ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
+        const fallback = computeDimensionCeiling(dimension, null, 1);
         const dimScore = fDims?.[dimension] ?? fallback;
         projectDimSums[dimension] += dimScore * fileWeight;
     }
@@ -890,7 +895,10 @@ function computeWeightedProjectDimensions(
         number
     >;
     for (const dimension of ALL_QUALITY_DIMENSIONS) {
-        projectDimensions[dimension] = clampScore(projectDimSums[dimension] / safeTotalWeight);
+        projectDimensions[dimension] = clampScore(
+            projectDimSums[dimension] / safeTotalWeight,
+            THEORETICAL_SCORE_CEILING,
+        );
     }
     return projectDimensions;
 }
@@ -917,7 +925,7 @@ function finalizeProjectEightPillars(
         const weight = synthesized.weights[pillar];
         const boundedScore = Math.max(
             BOUNDED_SCORE_MIN,
-            Math.min(DIMENSION_MAX_SCORE, projectPillars[pillar]),
+            Math.min(THEORETICAL_SCORE_CEILING, projectPillars[pillar]),
         );
         logSum += weight * Math.log(boundedScore);
         totalWeight += weight;
@@ -926,8 +934,9 @@ function finalizeProjectEightPillars(
         totalWeight > 0
             ? clampScore(
                   Math.round(Math.exp(logSum / totalWeight) * SCORE_ROUNDING) / SCORE_ROUNDING,
+                  THEORETICAL_SCORE_CEILING,
               )
-            : DEFAULT_PROJECT_COMPOSITE;
+            : THEORETICAL_SCORE_CEILING;
     return synthesized;
 }
 

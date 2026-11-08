@@ -11,8 +11,11 @@ import { describe, it, expect } from 'vitest';
 import {
     DIMENSION_MAX_SCORE,
     SATURATION_HALFPOINT,
+    THEORETICAL_SCORE_CEILING,
     applyScaleDampedScores,
     computeCompositeScore,
+    computeDimensionCeiling,
+    computeEpistemicCeiling,
     effectivePenaltyFromIndex,
     isMeasured,
     resolveQualityGrade,
@@ -43,18 +46,45 @@ const UNIFORM_WEIGHTS: QualityWeights = Object.fromEntries(
 ) as QualityWeights;
 
 describe('density index curve', () => {
-    it('scores a dimension with no findings at the ceiling', () => {
+    it('scores a dimension with no findings at the epistemic ceiling (< 100)', () => {
         const scores = applyScaleDampedScores(deductionsOf({}), 5);
-        expect(scores.duplication).toBe(DIMENSION_MAX_SCORE);
+        const expectedCeiling = computeEpistemicCeiling();
+        expect(scores.duplication).toBe(expectedCeiling);
+        expect(scores.duplication).toBeLessThan(DIMENSION_MAX_SCORE);
     });
 
-    it('places the half-point exactly at the declared saturation constant', () => {
+    it('places the half-point at half of the epistemic ceiling', () => {
         const scores = applyScaleDampedScores(
             deductionsOf({ duplication: SATURATION_HALFPOINT * 4 }),
             4,
         );
-        // density === SATURATION_HALFPOINT, so the index must land on 50.
-        expect(scores.duplication).toBeCloseTo(50, 10);
+        const expectedCeiling = computeEpistemicCeiling();
+        expect(scores.duplication).toBeCloseTo(expectedCeiling / 2, 10);
+    });
+
+    it('keeps every dimension ceiling strictly below 100 and decreases with surface exposure', () => {
+        for (const dim of ALL_QUALITY_DIMENSIONS) {
+            const small = computeDimensionCeiling(dim, {
+                file: 'a.ts',
+                lines: 50,
+                nonBlankLines: 50,
+                functions: 2,
+                maxNestingDepth: 1,
+                topLevelDeclarations: 2,
+                exportedSymbols: 1,
+            });
+            const large = computeDimensionCeiling(dim, {
+                file: 'b.ts',
+                lines: 2000,
+                nonBlankLines: 2000,
+                functions: 40,
+                maxNestingDepth: 3,
+                topLevelDeclarations: 50,
+                exportedSymbols: 40,
+            });
+            expect(small).toBeLessThan(DIMENSION_MAX_SCORE);
+            expect(large).toBeLessThan(small);
+        }
     });
 
     it('decreases strictly monotonically as density rises', () => {
@@ -171,9 +201,9 @@ describe('composite score', () => {
             UNIFORM_WEIGHTS,
         );
         expect(coverage).toBe(1);
-        // Weighted geometric mean of nine 100s and one 40: 100 * (0.4)^(1/10) = 91.2.
-        // The arithmetic mean would have reported 94, so the weaker axis costs more here.
-        expect(compositeScore).toBeCloseTo(91.2, 1);
+        // Weighted geometric mean of nine 99.75s and one 40: 99.75 * (40 / 99.75)^(1/10) = 91.04.
+        // The arithmetic mean would have reported ~93.8, so the weaker axis costs more here.
+        expect(compositeScore).toBeCloseTo(91.04, 1);
     });
 
     it('renormalizes when a dimension was not measured', () => {
@@ -189,7 +219,8 @@ describe('composite score', () => {
             UNIFORM_WEIGHTS,
         );
         expect(coverage).toBeCloseTo(0.9, 5);
-        expect(compositeScore).toBe(DIMENSION_MAX_SCORE);
+        expect(compositeScore).toBe(THEORETICAL_SCORE_CEILING);
+        expect(compositeScore).toBeLessThan(DIMENSION_MAX_SCORE);
     });
 
     it('rejects a negative weight instead of silently producing a skewed score', () => {
@@ -259,7 +290,7 @@ describe('composite aggregation guards a weak axis', () => {
         expect(compositeScore).toBeGreaterThan(50);
     });
 
-    it('keeps the composite at the ceiling when every axis is clean', () => {
+    it('keeps the composite at the epistemic ceiling (< 100) when every axis is clean', () => {
         const scores = deductionsOf({});
         for (const dim of ALL_QUALITY_DIMENSIONS) {
             scores[dim] = DIMENSION_MAX_SCORE;
@@ -269,7 +300,8 @@ describe('composite aggregation guards a weak axis', () => {
             ALL_QUALITY_DIMENSIONS,
             UNIFORM_WEIGHTS,
         );
-        expect(compositeScore).toBe(DIMENSION_MAX_SCORE);
+        expect(compositeScore).toBe(THEORETICAL_SCORE_CEILING);
+        expect(compositeScore).toBeLessThan(DIMENSION_MAX_SCORE);
     });
 
     it('stays within (0, 100] for any index mix', () => {

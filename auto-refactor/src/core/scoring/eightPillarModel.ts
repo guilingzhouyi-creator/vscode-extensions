@@ -11,6 +11,7 @@
  */
 
 import type { QualityDimension } from './scoringTypes';
+import { THEORETICAL_SCORE_CEILING } from './scorer-formulas';
 
 /**
  * Eight primary architectural pillars for executive code health evaluation.
@@ -120,8 +121,6 @@ export const DEFAULT_AGGREGATION_MODE = 'geometric';
 
 const PILLAR_SCORE_ROUND_FACTOR = 100;
 const COMPOSITE_PILLAR_INDEX_FLOOR = 15;
-const PILLAR_MAX_SCORE = 100;
-const DEFAULT_INITIAL_RAW_SCORE = 100.0;
 
 /**
  * Synthesize eight primary pillar scores from fine-grained dimension indices.
@@ -171,8 +170,12 @@ export function synthesizeEightPillars(
 
     for (const pillar of ALL_PRIMARY_PILLARS) {
         const values = pillarBuckets[pillar];
-        const averageScore = values.reduce((sum, valueScore) => sum + valueScore, 0) / values.length;
-        pillars[pillar] = Math.round(averageScore * PILLAR_SCORE_ROUND_FACTOR) / PILLAR_SCORE_ROUND_FACTOR;
+        const sumValues = values.reduce((sum, valueScore) => sum + valueScore, 0);
+        const averageScore = sumValues / values.length;
+        pillars[pillar] = Math.min(
+            THEORETICAL_SCORE_CEILING,
+            Math.round(averageScore * PILLAR_SCORE_ROUND_FACTOR) / PILLAR_SCORE_ROUND_FACTOR,
+        );
     }
 
     const appliedCeilings: { pillar: PrimaryQualityPillar; maxScore: number; reason: string }[] =
@@ -193,13 +196,13 @@ export function synthesizeEightPillars(
         weightedSum += pillars[pillar] * weight;
         const boundedScore = Math.max(
             COMPOSITE_PILLAR_INDEX_FLOOR,
-            Math.min(PILLAR_MAX_SCORE, pillars[pillar]),
+            Math.min(THEORETICAL_SCORE_CEILING, pillars[pillar]),
         );
         logSum += weight * Math.log(boundedScore);
         totalWeight += weight;
     }
 
-    let rawScore = DEFAULT_INITIAL_RAW_SCORE;
+    let rawScore = THEORETICAL_SCORE_CEILING;
     if (totalWeight > 0) {
         const scoreVal =
             aggregationMode === AGGREGATION_MODE_GEOMETRIC
@@ -207,7 +210,7 @@ export function synthesizeEightPillars(
                 : weightedSum / totalWeight;
         rawScore = Math.round(scoreVal * PILLAR_SCORE_ROUND_FACTOR) / PILLAR_SCORE_ROUND_FACTOR;
     }
-    const compositeScore = rawScore;
+    const compositeScore = Math.min(THEORETICAL_SCORE_CEILING, rawScore);
 
     return {
         pillars,

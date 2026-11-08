@@ -52,6 +52,10 @@ export interface AutonomyScoringConfig {
     readonly minSymbolCallScore: number;
     /** Score deducted per distinct external package in the same fallback path. */
     readonly externalPackagePenalty: number;
+    /** Irreducible toolchain/provenance reserve ensuring CAI asymptotically stays below 100%. */
+    readonly epistemicReserve: number;
+    /** ELOC half-point controlling finite-sample provenance convergence below the ceiling. */
+    readonly epistemicSampleHalfPointEloc: number;
     readonly supplyChain: SupplyChainScoringConfig;
 }
 
@@ -62,6 +66,19 @@ export interface SecurityCeilingScoringConfig {
     readonly exportLimit: number;
     readonly locLimit: number;
     readonly maxDiscount: number;
+    readonly baselineLines: number;
+    /** Irreducible security reserve keeping clean ceilings strictly below 100. */
+    readonly epistemicBaseReserve: number;
+}
+
+/** Epistemic & structural-surface asymptote keeping every dimension strictly below 100. */
+export interface EpistemicCeilingScoringConfig {
+    readonly baseReserve: number;
+    readonly maxSurfaceDiscount: number;
+    readonly volumeHalfPointLines: number;
+    readonly exportSurfaceHalfPoint: number;
+    readonly volumeWeight: number;
+    readonly exportWeight: number;
     readonly baselineLines: number;
 }
 
@@ -76,6 +93,7 @@ export interface QualityScoringConfig {
     /** Lower asymptote of the micro-file scale mapping in (0, 1). */
     readonly microFileFloorScale: number;
     readonly securityCeiling: SecurityCeilingScoringConfig;
+    readonly epistemicCeiling: EpistemicCeilingScoringConfig;
 }
 
 /** Parameters governing the canonical `BLOCK_GAMING_DETECTED` conjunction. */
@@ -142,6 +160,8 @@ export const DEFAULT_SCORING_CONFIG: ScoringSystemConfig = Object.freeze({
         cloneDensityElocUnit: 1000,
         minSymbolCallScore: 10,
         externalPackagePenalty: 15,
+        epistemicReserve: 0.25,
+        epistemicSampleHalfPointEloc: 4000,
         supplyChain: Object.freeze({
             directWeight: 0.5,
             transitiveWeight: 0.8,
@@ -160,6 +180,16 @@ export const DEFAULT_SCORING_CONFIG: ScoringSystemConfig = Object.freeze({
             exportLimit: 30,
             locLimit: 500,
             maxDiscount: 0.5,
+            baselineLines: 100,
+            epistemicBaseReserve: 0.25,
+        }),
+        epistemicCeiling: Object.freeze({
+            baseReserve: 0.25,
+            maxSurfaceDiscount: 0.55,
+            volumeHalfPointLines: 2500,
+            exportSurfaceHalfPoint: 80,
+            volumeWeight: 0.7,
+            exportWeight: 0.3,
             baselineLines: 100,
         }),
     }),
@@ -209,20 +239,10 @@ export function resolveAutonomyConfig(
 ): AutonomyScoringConfig {
     if (!override) return defaults;
     return Object.freeze({
+        ...defaults,
+        ...override,
         weights: mergeWeightOverrides(defaults.weights, override.weights),
-        aggregationMode: override.aggregationMode ?? defaults.aggregationMode,
-        cloneHalfPoint: override.cloneHalfPoint ?? defaults.cloneHalfPoint,
-        cloneDensityElocUnit: override.cloneDensityElocUnit ?? defaults.cloneDensityElocUnit,
-        minSymbolCallScore: override.minSymbolCallScore ?? defaults.minSymbolCallScore,
-        externalPackagePenalty: override.externalPackagePenalty ?? defaults.externalPackagePenalty,
-        supplyChain: Object.freeze({
-            directWeight: override.supplyChain?.directWeight ?? defaults.supplyChain.directWeight,
-            transitiveWeight:
-                override.supplyChain?.transitiveWeight ?? defaults.supplyChain.transitiveWeight,
-            depthWeight: override.supplyChain?.depthWeight ?? defaults.supplyChain.depthWeight,
-            minResilience:
-                override.supplyChain?.minResilience ?? defaults.supplyChain.minResilience,
-        }),
+        supplyChain: Object.freeze({ ...defaults.supplyChain, ...(override.supplyChain ?? {}) }),
     });
 }
 
@@ -238,19 +258,16 @@ export function resolveQualityConfig(
     override?: PartialScoringConfig['quality'],
 ): QualityScoringConfig {
     if (!override) return defaults;
-    const security = defaults.securityCeiling;
     return Object.freeze({
-        saturationHalfpoint: override.saturationHalfpoint ?? defaults.saturationHalfpoint,
-        macroFileKneeScale: override.macroFileKneeScale ?? defaults.macroFileKneeScale,
-        macroFileLogWeight: override.macroFileLogWeight ?? defaults.macroFileLogWeight,
-        microFileFloorScale: override.microFileFloorScale ?? defaults.microFileFloorScale,
+        ...defaults,
+        ...override,
         securityCeiling: Object.freeze({
-            exportWeight: override.securityCeiling?.exportWeight ?? security.exportWeight,
-            locWeight: override.securityCeiling?.locWeight ?? security.locWeight,
-            exportLimit: override.securityCeiling?.exportLimit ?? security.exportLimit,
-            locLimit: override.securityCeiling?.locLimit ?? security.locLimit,
-            maxDiscount: override.securityCeiling?.maxDiscount ?? security.maxDiscount,
-            baselineLines: override.securityCeiling?.baselineLines ?? security.baselineLines,
+            ...defaults.securityCeiling,
+            ...(override.securityCeiling ?? {}),
+        }),
+        epistemicCeiling: Object.freeze({
+            ...defaults.epistemicCeiling,
+            ...(override.epistemicCeiling ?? {}),
         }),
     });
 }
@@ -334,11 +351,29 @@ export function assertValidScoringConfig(config: ScoringSystemConfig): ScoringSy
     assertPositive(config.autonomy.cloneHalfPoint, 'cloneHalfPoint');
     assertPositive(config.autonomy.cloneDensityElocUnit, 'cloneDensityElocUnit');
     assertPositive(config.autonomy.supplyChain.minResilience, 'supplyChain.minResilience');
+    assertPositive(config.autonomy.epistemicReserve, 'autonomy.epistemicReserve');
+    assertPositive(
+        config.autonomy.epistemicSampleHalfPointEloc,
+        'autonomy.epistemicSampleHalfPointEloc',
+    );
     assertPositive(config.quality.saturationHalfpoint, 'saturationHalfpoint');
     assertPositive(config.quality.macroFileKneeScale, 'macroFileKneeScale');
     assertPositive(config.quality.macroFileLogWeight, 'macroFileLogWeight');
     assertPositive(config.quality.securityCeiling.exportLimit, 'securityCeiling.exportLimit');
     assertPositive(config.quality.securityCeiling.locLimit, 'securityCeiling.locLimit');
+    assertPositive(
+        config.quality.securityCeiling.epistemicBaseReserve,
+        'securityCeiling.epistemicBaseReserve',
+    );
+    assertPositive(config.quality.epistemicCeiling.baseReserve, 'epistemicCeiling.baseReserve');
+    assertPositive(
+        config.quality.epistemicCeiling.volumeHalfPointLines,
+        'epistemicCeiling.volumeHalfPointLines',
+    );
+    assertPositive(
+        config.quality.epistemicCeiling.exportSurfaceHalfPoint,
+        'epistemicCeiling.exportSurfaceHalfPoint',
+    );
     assertRatio(config.antiGaming.semanticChangeRatioThreshold, 'semanticChangeRatioThreshold');
     const microFloor = config.quality.microFileFloorScale;
     if (!isFiniteNumber(microFloor) || microFloor < 0 || microFloor >= 1) {
