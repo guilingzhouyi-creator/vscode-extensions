@@ -1,157 +1,67 @@
-# 仓库级脚本工程治理体系与跨平台同构规范
+# Workspace Script Governance & Cross-Platform Isomorphism Specification
 
-> 本文档为工作区仓库级脚本库（[`scripts/`](../../scripts/)）的统一工程治理规范、三种脚本语言生态契约、同构双实现机制与性能优化架构手册。
+> Authoritative engineering contract for the workspace script library ([`scripts/`](../../scripts/)), governing language-domain boundaries, PowerShell / Bash / Node.js defensive directives, cross-platform isomorphism, and Tier 1 streaming performance.
 
 ---
 
-## 一、 仓库级脚本治理总纲与目录分层
+## 1. Directory Topology (`scripts/`)
 
-仓库级脚本集中收口于根目录 `scripts/`，与子项目内部的私有构建脚本（如 `auto-refactor/scripts/*.js`、`WebGames/scripts/`）实施**物理与职责双重解耦**：
+Workspace-level scripts reside under `scripts/`, decoupled from project-internal scripts (`auto-refactor/scripts/`, `WebGames/scripts/`, `fractal-git/scripts/`):
 
 ```
 scripts/
-├── README.md                      # 仓库级脚本中枢索引与语言/职能矩阵
-├── common/                        # Node.js 语言域：跨平台算法、规则单源与流式门禁
-│   ├── gate-fast-staged.js        # Tier 1 极速内存流式门禁 (Gates 1~6)
-│   ├── validate-staged-slice.js   # AST 增量切片 CC/Depth/Noise 守卫（缺依赖即 fail-closed）
-│   ├── validate-code-density.js   # 五维密度、POR/TSPR 与稀释审查
-│   ├── evaluate-eloc-budget.js    # 双轨体积 ELOC<=900 / LOC<=1400 与 1:3 包络
-│   ├── validate-physical-hygiene.js # 物理卫生八维全域巡检
-│   ├── validate-gitignore-governance.js # .gitignore 换行、底线与反误伤守卫
-│   ├── validate-skills.js         # 技能集结构、死链与插件同构
-│   ├── validate-script-isomorphism.js # 跨平台脚本结构与防御契约守卫
-│   ├── validate-rule-id-closure.js # 门禁引用规则 ID 与目录登记闭包
-│   ├── generate-rule-catalog.js   # 规则单源目录聚合器（默认只读，--write 重生成）
-│   ├── bootstrap-gates.js         # 钩子激活与依赖/构建一键引导
-│   ├── test-gate-parity.js        # 双实现提交门禁行为差分
-│   ├── test-gate-selftest.js      # 门禁三态自检矩阵
-│   ├── gate-receipts.js           # 本地门禁收据引擎（阶段标记 / 提交落盘 / 推送审计）
-│   ├── rule-catalog.json          # 全仓规则事实真源 (SSOT)
-│   └── rule-sources/              # 受控规则源（auto-refactor / WebGames / global）
-├── ps1/                           # PowerShell 语言域：Windows 本地交互与门禁同构实现
-│   ├── audit-all.ps1              # 全工作区跨项目统一审查中枢
-│   ├── pre-commit-gate.ps1        # 本地提交前置门禁
-│   ├── commit-msg-gate.ps1        # 提交信息结构化与风格门禁
-│   ├── pre-push-gate.ps1          # 本地推送前置综合门禁
-│   ├── install-hooks.ps1          # 钩子激活
-│   ├── package.ps1                # 打包与热同步 (-HotSync)
-│   ├── check-display-assets.ps1   # 打包资产校验
-│   ├── release-tag.ps1            # 发布闭环
-│   └── version-bump.ps1           # 语义化版本递增
-└── sh/                            # Bash 语言域：Linux / CI 流水线同构实现与发布工具链
-    ├── audit-all.sh               # Linux 统一审查中枢
-    ├── pre-commit-gate.sh         # Git Hooks 提交前置门禁
-    ├── commit-msg-gate.sh         # 提交信息门禁
-    ├── pre-push-gate.sh           # 推送门禁
-    ├── install-hooks.sh           # 钩子激活
-    ├── package.sh                 # 打包
-    ├── check-display-assets.sh    # 打包资产校验
-    ├── release-tag.sh             # 发布闭环
-    └── version-bump.sh            # 语义化版本递增
+├── README.md                              # Inventory of all controlled scripts & domain matrix
+├── common/                                # Node.js (LF, 2-space, zero external npm dependencies)
+│   ├── gate-fast-staged.js                # Tier 1 single-process streaming pre-commit gate (< 250ms)
+│   ├── validate-staged-slice.js           # AST slice CC/Depth/Noise guard (fail-closed)
+│   ├── validate-code-density.js           # 5D code density, POR/TSPR & dilution guard
+│   ├── evaluate-eloc-budget.js            # Dual-track volume (ELOC <= 900, LOC <= 1400, 1:3 ratio)
+│   ├── validate-physical-hygiene.js       # 8D physical hygiene audit (8 KB fast-path short-circuit)
+│   ├── validate-destructive-ops.js        # Recursive deletion taint & read-only auto-var guard
+│   ├── validate-script-isomorphism.js     # ps1 <-> sh pairing, EOL, and directive guard
+│   ├── validate-rule-id-closure.js        # Bidirectional rule ID closure (RCFG-RULE-DRIFT)
+│   ├── sync-doc-metrics.js                # Single-source documentation metric renderer & checker
+│   ├── rule-catalog.json                  # Workspace SSOT rule catalog
+│   └── gate-step-registry.json            # Single-source gate step & verdict registry
+├── ps1/                                   # PowerShell 7+ (CRLF, StrictMode, -WorkingDirectory isolation)
+│   ├── lib/linux-parity.ps1               # Single-source GNU / PowerShell command surface binding
+│   └── {audit-all,pre-commit-gate,commit-msg-gate,pre-push-gate,package,install-hooks,...}.ps1
+└── sh/                                    # Bash (LF, set -uo pipefail, subshell cwd isolation)
+    └── {audit-all,pre-commit-gate,commit-msg-gate,pre-push-gate,package,install-hooks,...}.sh
 ```
 
 ---
 
-## 二、 三种核心脚本语言生态的工程契约
+## 2. Three-Runtime Engineering Contracts
 
-全仓跨平台脚本严格分为三种语言生态，各生态具备严谨的刚性工程契约：
+| Runtime | EOL | Defensive Header | Working Directory Isolation | Dependency Rule |
+| :--- | :--- | :--- | :--- | :--- |
+| **PowerShell (`.ps1`)** | `CRLF` | `Set-StrictMode -Version Latest`<br/>`$ErrorActionPreference = 'Stop'`<br/>`$PSNativeCommandUseErrorActionPreference = $true`<br/>`$PSNativeCommandArgumentPassing = 'Standard'` | Pass `-WorkingDirectory` to `Start-Process` or `Push-Location`/`try`/`finally`/`Pop-Location`; never bare `Set-Location` | Built-in `pwsh` 7+ only (never legacy `powershell.exe`) |
+| **Bash (`.sh`)** | `LF` | `#!/usr/bin/env bash`<br/>`set -uo pipefail` (plus `set -e` where required by `validate-script-isomorphism.js`) | Subshell `(cd "<dir>" && ...)` for child pipelines; use `printf "%s\n"` instead of `echo -e` | POSIX / Bash builtins + coreutils |
+| **Node.js (`.js`)** | `LF` | 6-field JSDoc header + `'use strict';` | Pure `path.resolve`/`path.join` operations; `cwd` passed explicitly to `spawnSync` | Node.js stdlib only (`fs`, `path`, `child_process`, `crypto`) |
 
+### Sandbox Git Config Isolation
+Gate entry scripts initialize fallback environment variables when running inside restricted containers or sandboxes without `~/.gitconfig`:
+```powershell
+if (-not $env:GIT_CONFIG_GLOBAL) { $env:GIT_CONFIG_GLOBAL = 'NUL' }
+if (-not $env:GIT_CONFIG_SYSTEM) { $env:GIT_CONFIG_SYSTEM = 'NUL' }
+if (-not $env:GIT_CONFIG_NOSYSTEM) { $env:GIT_CONFIG_NOSYSTEM = '1' }
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                   三种脚本工程契约与防御指令对照                       │
-├──────────────┬────────────┬─────────────┬──────────────┬───────────────┤
-│ 脚本生态类型 │ 物理换行符 │ 严格防御指令 │ 工作目录隔离 │ 外部依赖原则   │
-├──────────────┼────────────┼─────────────┼──────────────┼───────────────┤
-│ PowerShell   │ 必须 CRLF  │ StrictMode  │ -WorkDir 显式│ 纯系统内置    │
-│ Bash / Shell │ 必须 LF    │ pipefail    │ (cd ...) 子环│ 纯 POSIX/Bash │
-│ Node.js      │ 必须 LF    │ 'use strict'│ 纯路径操作   │ 零外部依赖    │
-└──────────────┴────────────┴─────────────┴──────────────┴───────────────┘
-```
-
-### 1. PowerShell (`.ps1`) 脚本工程契约
-- **物理换行契约**：PowerShell 脚本在磁盘必须**严格保持 CRLF 换行**；
-- **执行宿主与编码**：统一路由至跨平台 `pwsh`（PowerShell 7+），严禁裸调旧版 `powershell.exe`（Windows PS 5.1 解析无 BOM UTF-8 会发生乱码）；
-- **严格模式与异常中断**：脚本头部必须显式声明：
-  ```powershell
-  Set-StrictMode -Version Latest
-  $ErrorActionPreference = 'Stop'
-  ```
-- **工作目录显式隔离**：跨目录调用子项目流水线时，严禁使用 `Set-Location` 污染父进程，必须显式传递工作目录：
-  ```powershell
-  Start-Process -FilePath $npmCmd -ArgumentList "run", "test:fast" `
-      -WorkingDirectory (Join-Path $repoRoot "workspace-timing") `
-      -NoNewWindow -PassThru -Wait
-  ```
-- **沙箱安全与 Git 配置隔离**：为防止受限沙箱或 CI 容器无法读取用户根目录 `.gitconfig`，脚本头部注入默认值：
-  ```powershell
-  if (-not $env:GIT_CONFIG_GLOBAL) { $env:GIT_CONFIG_GLOBAL = 'NUL' }
-  if (-not $env:GIT_CONFIG_SYSTEM) { $env:GIT_CONFIG_SYSTEM = 'NUL' }
-  if (-not $env:GIT_CONFIG_NOSYSTEM) { $env:GIT_CONFIG_NOSYSTEM = '1' }
-  ```
-
-### 2. Bash / Shell (`.sh`) 脚本工程契约
-- **物理换行契约**：严格保持 **LF 换行**；
-- **管道安全与平铺退出码**：
-  - 首行声明 Shebang：`#!/usr/bin/env bash`；
-  - 严格声明 `set -uo pipefail`；
-  - **禁用全局裸 `set -e`**：门禁脚本需要显式处理预期失败分支以输出详尽诊断，全域裸 `set -e` 会导致脚本非预期异常退出并丢失上下文；
-  - 预期允许失败指令必须通过平铺方式捕获退出码：
-    ```bash
-    STATUS=0
-    npm test || STATUS=$?
-    if [ "$STATUS" -ne 0 ]; then
-        echo "✖ BLOCK  测试未通过" >&2
-        exit 1
-    fi
-    ```
-- **工作目录隔离与可移植性**：子项目切换必须使用 `(cd "<subproject>" && ...)` 子 Shell 结构，确保工作目录自动回弹；文本格式化统一使用 `printf "%s\n"` 替代不可移植的 `echo -e`。
-
-### 3. Node.js (`.js`) 脚本工程契约
-- **物理换行与缩进**：严格保持 LF 换行与 2 空格缩进；
-- **零外部运行时依赖（Zero Runtime Dependencies）**：必须纯粹使用原生 Node.js stdlib（`fs`, `path`, `child_process`, `assert`），保证在未执行 `npm install` 的裸机环境下依然可无障碍运行；
-- **双轨体积与复杂度刚性公理**：
-  - 单函数圈复杂度 $\text{CC} \le 15$、控制流嵌套深度 $\text{Depth} \le 4$、单行噪声比 $\text{Noise} \le 4.0$；
-  - 单文件有效代码行 $\text{ELOC} \le 900$、物理行 $\text{LOC} \le 1400$；
-- **头部契约与严格模式**：首行呈现六字段 JSDoc，主体声明 `'use strict';`。
 
 ---
 
-## 三、 同构双实现机制与自动化看守 (Isomorphic Architecture)
+## 3. Cross-Platform Isomorphism (`validate-script-isomorphism.js`)
 
-### 1. 同构双实现的必要性
-在多平台团队协作中，Windows 本地开发者主要依赖 PowerShell CLI 与热同步工具，而 Linux 服务器、macOS 开发者与 GitHub Actions CI 则依赖 Bash 环境。为彻底消除跨平台行为偏差，核心脚本实施同构双实现：
-
-| 同构脚本基名 | PowerShell 实现 | Bash 实现 | 职责定位 |
-| :--- | :--- | :--- | :--- |
-| `audit-all` | `scripts/ps1/audit-all.ps1` | `scripts/sh/audit-all.sh` | 全工作区跨项目统一审查中枢 |
-| `pre-commit-gate` | `scripts/ps1/pre-commit-gate.ps1` | `scripts/sh/pre-commit-gate.sh` | 本地提交前置物理与复杂度门禁 |
-| `commit-msg-gate` | `scripts/ps1/commit-msg-gate.ps1` | `scripts/sh/commit-msg-gate.sh` | 结构化提交信息与禁词风格门禁 |
-| `pre-push-gate` | `scripts/ps1/pre-push-gate.ps1` | `scripts/sh/pre-push-gate.sh` | 推送前置全量回归与基线看守 |
-| `package` | `scripts/ps1/package.ps1` | `scripts/sh/package.sh` | 扩展打包、展示资产校验与热同步 |
-| `check-display-assets`| `scripts/ps1/check-display-assets.ps1`| `scripts/sh/check-display-assets.sh`| 扩展图标与展示资产合规性校验 |
-| `install-hooks` | `scripts/ps1/install-hooks.ps1` | `scripts/sh/install-hooks.sh` | 仓库级 Git 钩子一键激活工具 |
-
-### 2. 自动化同构看守 (`validate-script-isomorphism.js`)
-为防范双实现发生参数或逻辑漂移，系统在统一门禁中接入了专门的同构守卫，自动验证：
-1. **配对完整性**：确认 `ps1` 脚本在 `sh` 中 100% 具备同名对应实现；
-2. **换行契约**：磁盘字节级确认 `ps1` 对应 CRLF，`sh` 对应 LF；
-3. **防御指令**：确认双方均具备各自宿主的严格防御指令；
-4. **参数一致性**：确认 `-Fast`、`-HotSync` 等核心参数双向对齐。
+The workspace maintains <!-- METRICS:BEGIN iso-pairs -->**29 对跨平台同构脚本**<!-- METRICS:END iso-pairs --> (including <!-- METRICS:BEGIN iso-pairs-root -->**11 对同构脚本**<!-- METRICS:END iso-pairs-root --> in root `scripts/ps1/` $\leftrightarrow$ `scripts/sh/`):
+1. **1:1 Basename Pairing**: Every root gate/packaging `.ps1` script pairs with a matching `.sh` script.
+2. **Closed Verdict Vocabulary (`validate-gate-ordering.js` & `validate-gate-verdicts.js`)**: Every step announced in `gate-step-registry.json` emits a single banner and resolves to the closed 4-state verdict vocabulary (`PASS`, `BLOCK`, `WARN`, `SKIP`).
+3. **Behavioral Parity (`test-gate-parity.js` & `test-gate-guards.js`)**: Negative-path self-probes verify both implementations reject identical malformed inputs.
 
 ---
 
-## 四、 脚本性能瓶颈与优化模型
+## 4. Performance Architecture
 
-### 1. Tier 1 内存单进程流式化 (<250ms)
-- **痛点**：在 Windows 系统上，派生子进程的开销高达 80ms~250ms。若在每次 Git 提交时依次派生 6 个独立 Node 进程分别校验空文件、换行符、黑话、AST 切片等，进程初始化耗时即超过 1.5 秒；
-- **优化**：将 6 大基础门禁集中于 `gate-fast-staged.js`，在**单一 Node.js 进程内单遍流式（Single-Pass Streaming）读取 Git 暂存区**，实测整体执行时间压缩至 **250ms**（纯内存判定仅 ~80ms）。
-
-### 2. 文件遍历 Fast-Path 8KB 短路判定
-- **痛点**：全仓扫描工具在遍历 2300+ 文件时，若无差别对所有文件调用 `fs.readFileSync(..., 'utf8')` 与 `.trim()`，大文件、二进制图片和长文本将引发巨量 I/O 和内存字符串分配；
-- **优化**：在 `validate-physical-hygiene.js` 中引入 `MAX_SUSPECT_SIZE_BYTES = 8192`。当物理文件大小 $> 8\text{KB}$ 时，其在工程常识中绝不可能是 0 字节文件、纯空白文件或 3 行跳板文件，直接跳过全文读取，**削减 90%+ 的非必要 I/O**，耗时从近 3 秒骤降至 1.4 秒（冷扫描从 38 秒降至 1 秒级）。
-
-### 3. $O(1)$ 常数时间复杂度查找
-- 禁词表匹配与规则反虚构判定全量重构为预编译 `Set.has()`，彻底根除循环体内 `Array.includes()` 带来的 $O(N \times M)$ 性能退化（消融 `PRF-ALG-002`）。
-
-### 4. 拓扑两阶段并发调度
-- 在 `audit-all.ps1` 中，第一阶段串行快速完成物理卫生与单源规则检查（耗时 ~1s），第二阶段通过 PowerShell 并发任务并行调度三大子系统（`auto-refactor`、`workspace-timing`、`WebGames`），将全仓全系统统一审查压缩至 **9 秒级**。
+1. **Tier 1 Single-Process Streaming (`gate-fast-staged.js`, `< 250ms`)**: Consolidates staged file checks into a single Node.js process to avoid repeated `80~250ms` Windows process spawn overhead.
+2. **8 KB Fast-Path Short-Circuit (`validate-physical-hygiene.js`)**: Files with `stat.size > 8192` bytes bypass full-file string trimming for 0-byte/blank/trampoline checks, cutting cold-scan I/O by $> 90\%$.
+3. **$O(1)$ Precompiled Lookup**: Forbidden commit terms and SSOT rule ID closure use precompiled `Set.has()` lookups (`PRF-ALG-002`).
+4. **Two-Phase Topological Concurrency (`audit-all`)**: Runs fast repo-wide metadata/hygiene gates first (~1s), then dispatches project test suites in parallel across <!-- METRICS:BEGIN pillar-count -->**6 大支柱**<!-- METRICS:END pillar-count -->.

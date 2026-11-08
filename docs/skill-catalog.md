@@ -28,20 +28,20 @@
 
 ## 二、三层拓扑
 
-全工作区 `24 项研发技能` 按职责分为三层：
+全工作区 `27 项研发技能` 按职责分为三层：
 
 | 层 | 定位 | 技能 |
 | :--- | :--- | :--- |
-| **Layer 1** 通用工程与算法突破层 | 跨项目复用的工程工艺、复杂度预算、证伪、调试与度量方法论；不绑定具体子项目，任何作业按需注入。 | [`algorithmic-operator-engineering`](../.agents/skills/algorithmic-operator-engineering/SKILL.md)、[`coding-craft`](../.agents/skills/coding-craft/SKILL.md)、[`complexity-budget`](../.agents/skills/complexity-budget/SKILL.md)、[`constraint-driven-development`](../.agents/skills/constraint-driven-development/SKILL.md)、[`debugging-and-error-recovery`](../.agents/skills/debugging-and-error-recovery/SKILL.md)、[`defensive-security-and-taint-safety`](../.agents/skills/defensive-security-and-taint-safety/SKILL.md)、[`facade-discipline`](../.agents/skills/facade-discipline/SKILL.md)、[`interaction-design-physics`](../.agents/skills/interaction-design-physics/SKILL.md)、[`spec-driven-development`](../.agents/skills/spec-driven-development/SKILL.md)、[`state-concurrency-and-crash-recovery`](../.agents/skills/state-concurrency-and-crash-recovery/SKILL.md)、[`telemetry-statistical-modeling`](../.agents/skills/telemetry-statistical-modeling/SKILL.md) |
+| **Layer 1** 通用工程与算法突破层 | 跨项目复用的工程工艺、复杂度预算、证伪、调试与度量方法论；不绑定具体子项目，任何作业按需注入。 | [`algorithmic-operator-engineering`](../.agents/skills/algorithmic-operator-engineering/SKILL.md)、[`coding-craft`](../.agents/skills/coding-craft/SKILL.md)、[`complexity-budget`](../.agents/skills/complexity-budget/SKILL.md)、[`constraint-driven-development`](../.agents/skills/constraint-driven-development/SKILL.md)、[`debugging-and-error-recovery`](../.agents/skills/debugging-and-error-recovery/SKILL.md)、[`defensive-security-and-taint-safety`](../.agents/skills/defensive-security-and-taint-safety/SKILL.md)、[`facade-discipline`](../.agents/skills/facade-discipline/SKILL.md)、[`interaction-design-physics`](../.agents/skills/interaction-design-physics/SKILL.md)、[`spec-driven-development`](../.agents/skills/spec-driven-development/SKILL.md)、[`state-concurrency-and-crash-recovery`](../.agents/skills/state-concurrency-and-crash-recovery/SKILL.md)、[`telemetry-statistical-modeling`](../.agents/skills/telemetry-statistical-modeling/SKILL.md)、[`tiered-cache-and-wal-persistence`](../.agents/skills/tiered-cache-and-wal-persistence/SKILL.md) |
 | **Layer 2** 工作区统一治理底座 | 提交、门禁、技能、规则、文档、发版、子代理与测试的统一底座；所有子项目共享同一套铁律与验证命令。 | [`batch-commit`](../.agents/skills/batch-commit/SKILL.md)、[`docs-archive-governance`](../.agents/skills/docs-archive-governance/SKILL.md)、[`gate-governance`](../.agents/skills/gate-governance/SKILL.md)、[`release-package-workflow`](../.agents/skills/release-package-workflow/SKILL.md)、[`rule-catalog-governance`](../.agents/skills/rule-catalog-governance/SKILL.md)、[`skill-governance`](../.agents/skills/skill-governance/SKILL.md)、[`subagent-orchestration`](../.agents/skills/subagent-orchestration/SKILL.md)、[`test-benchmark-engineering`](../.agents/skills/test-benchmark-engineering/SKILL.md) |
-| **Layer 3** 子项目领域适配器 | 把通用底座落到具体子项目（auto-refactor、workspace-timing、WebGames、fractal-git、Rust）的专属契约与红线。 | [`auto-refactor-dev`](../.agents/skills/auto-refactor-dev/SKILL.md)、[`fractal-git-dev`](../.agents/skills/fractal-git-dev/SKILL.md)、[`rust-engineering`](../.agents/skills/rust-engineering/SKILL.md)、[`webgames-workflow`](../.agents/skills/webgames-workflow/SKILL.md)、[`workspace-timing-dev`](../.agents/skills/workspace-timing-dev/SKILL.md) |
+| **Layer 3** 子项目领域适配器 | 把通用底座落到具体子项目（auto-refactor、workspace-timing、WebGames、fractal-git、Rust）的专属契约与红线。 | [`auto-refactor-dev`](../.agents/skills/auto-refactor-dev/SKILL.md)、[`fractal-git-dev`](../.agents/skills/fractal-git-dev/SKILL.md)、[`praxis-vfs-and-trajectory-learning`](../.agents/skills/praxis-vfs-and-trajectory-learning/SKILL.md)、[`rust-engineering`](../.agents/skills/rust-engineering/SKILL.md)、[`sparse-moe-and-ast-routing`](../.agents/skills/sparse-moe-and-ast-routing/SKILL.md)、[`webgames-workflow`](../.agents/skills/webgames-workflow/SKILL.md)、[`workspace-timing-dev`](../.agents/skills/workspace-timing-dev/SKILL.md) |
 
 ## 三、领域联动：调用一个技能会带出哪些技能
 
 ### 分形版本控制内核（`fractal-git / Taxis`）
 
 - **领域链**：`fractal-git-dev` → `rust-engineering` → `state-concurrency-and-crash-recovery` → `algorithmic-operator-engineering` → `test-benchmark-engineering`
-- **领域支援**：`spec-driven-development`、`coding-craft`、`complexity-budget`、`facade-discipline`、`defensive-security-and-taint-safety`、`debugging-and-error-recovery`、`constraint-driven-development`
+- **领域支援**：`spec-driven-development`、`coding-craft`、`complexity-budget`、`facade-discipline`、`defensive-security-and-taint-safety`、`debugging-and-error-recovery`、`constraint-driven-development`、`tiered-cache-and-wal-persistence`
 - **对应 SubAgent 原型**：`git-kernel`
 
 | 我遇到的场景 | 联动技能 |
@@ -53,13 +53,15 @@
 
 ### 自动重构内核（`auto-refactor Rust 与 TypeScript 双轨`）
 
-- **领域链**：`auto-refactor-dev` → `rust-engineering` → `algorithmic-operator-engineering` → `telemetry-statistical-modeling` → `test-benchmark-engineering`
-- **领域支援**：`spec-driven-development`、`coding-craft`、`complexity-budget`、`facade-discipline`、`debugging-and-error-recovery`、`constraint-driven-development`、`rule-catalog-governance`、`state-concurrency-and-crash-recovery`
+- **领域链**：`auto-refactor-dev` → `sparse-moe-and-ast-routing` → `praxis-vfs-and-trajectory-learning` → `rust-engineering` → `algorithmic-operator-engineering` → `telemetry-statistical-modeling` → `test-benchmark-engineering`
+- **领域支援**：`spec-driven-development`、`coding-craft`、`complexity-budget`、`facade-discipline`、`debugging-and-error-recovery`、`constraint-driven-development`、`rule-catalog-governance`、`state-concurrency-and-crash-recovery`、`tiered-cache-and-wal-persistence`
 - **对应 SubAgent 原型**：`cli-engine`
 
 | 我遇到的场景 | 联动技能 |
 | :--- | :--- |
-| 新增分析器或规则 | `auto-refactor-dev` + `rule-catalog-governance` + `test-benchmark-engineering` |
+| 新增分析器或规则 | `auto-refactor-dev` + `sparse-moe-and-ast-routing` + `rule-catalog-governance` + `test-benchmark-engineering` |
+| 优化稀疏 MoE 路由与多语言惰性投影 | `sparse-moe-and-ast-routing` + `algorithmic-operator-engineering` + `tiered-cache-and-wal-persistence` |
+| LayerVFS 沙箱分叉或轨迹配方提取调试 | `praxis-vfs-and-trajectory-learning` + `auto-refactor-dev` + `test-benchmark-engineering` |
 | Rust 与 TypeScript 输出字节不等价 | `auto-refactor-dev` + `rust-engineering` + `debugging-and-error-recovery` |
 | 评分口径被注水或刷分 | `telemetry-statistical-modeling` + `constraint-driven-development` + `auto-refactor-dev` |
 | 消融纯转发跳板与参数收敛 | `auto-refactor-dev` + `facade-discipline` + `complexity-budget` |
@@ -67,7 +69,7 @@
 ### VS Code 扩展与计时视图（`workspace-timing`）
 
 - **领域链**：`workspace-timing-dev` → `state-concurrency-and-crash-recovery` → `interaction-design-physics` → `test-benchmark-engineering` → `release-package-workflow`
-- **领域支援**：`spec-driven-development`、`coding-craft`、`complexity-budget`、`facade-discipline`、`debugging-and-error-recovery`、`defensive-security-and-taint-safety`、`constraint-driven-development`、`algorithmic-operator-engineering`、`gate-governance`
+- **领域支援**：`spec-driven-development`、`coding-craft`、`complexity-budget`、`facade-discipline`、`debugging-and-error-recovery`、`defensive-security-and-taint-safety`、`constraint-driven-development`、`algorithmic-operator-engineering`、`gate-governance`、`tiered-cache-and-wal-persistence`
 - **对应 SubAgent 原型**：`vs-extension`
 
 | 我遇到的场景 | 联动技能 |
@@ -134,7 +136,7 @@
 - **调用含义**：为算法与高频算子确立从数据表示到单趟融合的降维路径，并用差分基准与微基准证明收益真实存在。
 - **描述行**：`【触发：算子/热路径/吞吐优化/降维/SoA/LUT/基准等价/卡顿】当涉及算法瓶颈、吞吐优化、高频循环热路径或数据表示反转(SoA)时触发。执行五步降维协议与100%差分等价基准验证。`
 - **所属层**：通用工程与算法突破层
-- **联动定位**：分形版本控制内核（链上第 4 步）；自动重构内核（链上第 3 步）；游戏引擎与 Godot 视图（链上第 2 步）；VS Code 扩展与计时视图（领域支援）
+- **联动定位**：分形版本控制内核（链上第 4 步）；自动重构内核（链上第 5 步）；游戏引擎与 Godot 视图（链上第 2 步）；VS Code 扩展与计时视图（领域支援）
 - **前置**：`state-concurrency-and-crash-recovery`、`rust-engineering`、`webgames-workflow`
 - **接续**：`test-benchmark-engineering`、`telemetry-statistical-modeling`、`interaction-design-physics`
 - **并行支援**：`coding-craft`、`complexity-budget`、`constraint-driven-development`、`debugging-and-error-recovery`
@@ -357,7 +359,7 @@
 - **调用含义**：为评分器与度量算法确立无信息先验与客观统计口径，并用反刷分熔断识别虚假收益。
 - **描述行**：`【触发：评分/度量/跑分/统计模型/贝叶斯/CAI/注水/反刷分】开发评分器、重构度量算法或反刷分时触发。落实从 0 纯客观统计、Jeffreys Beta(0.5,0.5) 共轭后验估计与 BLOCK_GAMING_DETECTED 虚假重构熔断。`
 - **所属层**：通用工程与算法突破层
-- **联动定位**：自动重构内核（链上第 4 步）
+- **联动定位**：自动重构内核（链上第 6 步）
 - **前置**：`algorithmic-operator-engineering`
 - **接续**：`test-benchmark-engineering`
 - **并行支援**：`coding-craft`、`complexity-budget`、`constraint-driven-development`、`debugging-and-error-recovery`
@@ -372,6 +374,29 @@
 **验证命令**：
 
 - `node auto-refactor/scripts/validate-autonomy-scorer.js && node auto-refactor/scripts/validate-project-neutrality.js`
+
+### tiered-cache-and-wal-persistence
+
+- **调用含义**：为多级缓存、依赖拓扑失效与 WAL 原子落盘提供统一协议，杜绝过期脏缓存、内存膨胀与进程强杀数据损坏。
+- **描述行**：`【触发：WAL/L1L2缓存/拓扑失效/指纹校验/异步刷盘/缓存设计/缓存丢失】设计或维护多级增量缓存(L1/L2/L3)、12 因子复合指纹、拓扑反向依赖失效或 WAL 预写日志原子落盘时触发。防御内存溢出与断电半写损坏。`
+- **所属层**：通用工程与算法突破层
+- **联动定位**：分形版本控制内核（领域支援）；自动重构内核（领域支援）；VS Code 扩展与计时视图（领域支援）
+- **前置**：—（通用方法论横向支援）
+- **接续**：—（按需横向注入）
+- **并行支援**：`algorithmic-operator-engineering`、`coding-craft`、`complexity-budget`、`constraint-driven-development`
+- **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
+
+**典型情形**：
+
+- 全仓十万文件扫描时 L2 缓存把进程内存撑爆了
+- 被依赖头文件改了但上游调用方缓存没有失效
+- 并发进程同时刷写缓存文件引发写入竞争或半写
+
+**验证命令**：
+
+- `cd auto-refactor && npm test`
+- `cd workspace-timing && npm run test:fast`
+- `node scripts/common/validate-skills.js`
 
 ### batch-commit
 
@@ -540,7 +565,7 @@
 - **调用含义**：回答『这条修复该先写哪个失败用例、基准会不会回退』，产出红绿闭环与耗时棘轮数据。
 - **描述行**：`【触发：写单测/TDD/红绿测试/基准测试/性能回归/耗时棘轮/孤儿用例】编写单元测试、性能压测或实行 TDD 时必须使用。先写失败用例，隔离确定性时钟与伪随机种子，看守单调耗时预算与零孤儿用例。`
 - **所属层**：工作区统一治理底座
-- **联动定位**：分形版本控制内核（链上第 5 步）；自动重构内核（链上第 5 步）；VS Code 扩展与计时视图（链上第 4 步）；游戏引擎与 Godot 视图（链上第 4 步）；门禁与命令面基础设施（链上第 4 步）；工作区元治理与并行交付（领域支援）
+- **联动定位**：分形版本控制内核（链上第 5 步）；自动重构内核（链上第 7 步）；VS Code 扩展与计时视图（链上第 4 步）；游戏引擎与 Godot 视图（链上第 4 步）；门禁与命令面基础设施（链上第 4 步）；工作区元治理与并行交付（领域支援）
 - **前置**：`algorithmic-operator-engineering`、`telemetry-statistical-modeling`、`interaction-design-physics`、`coding-craft`
 - **接续**：`release-package-workflow`
 - **并行支援**：`constraint-driven-development`、`debugging-and-error-recovery`、`complexity-budget`、`spec-driven-development`
@@ -565,7 +590,7 @@
 - **所属层**：子项目领域适配器
 - **联动定位**：自动重构内核（领域入口）
 - **前置**：—（领域入口）
-- **接续**：`rust-engineering`
+- **接续**：`sparse-moe-and-ast-routing`
 - **并行支援**：`algorithmic-operator-engineering`、`coding-craft`、`complexity-budget`、`constraint-driven-development`
 - **协作专员**：原型 `cli-engine`：`ar-construct`、`ar-review`、`ar-refactor`、`ar-explore`
 
@@ -604,13 +629,36 @@
 - `cargo test --workspace --manifest-path fractal-git/Cargo.toml`
 - `pwsh -File fractal-git/scripts/ps1/audit-taxis.ps1`
 
+### praxis-vfs-and-trajectory-learning
+
+- **调用含义**：回答『虚拟沙箱分叉是否污染磁盘、轨迹配方是否经五道门禁净化』，产出 LayerVFS 事务与轨迹配方回归结论。
+- **描述行**：`【触发：LayerVFS/MCTS/轨迹学习/配方提取/虚拟分叉/沙箱联调/回滚失败】开发或调试 LayerVFS 虚拟文件沙箱、MCTS 重构树搜索、轨迹学习配方提取或 Praxis 审查门禁链时触发。保障 CAS 零落盘分叉与事务回滚闭环。`
+- **所属层**：子项目领域适配器
+- **联动定位**：自动重构内核（链上第 3 步）
+- **前置**：`sparse-moe-and-ast-routing`
+- **接续**：`rust-engineering`
+- **并行支援**：`algorithmic-operator-engineering`、`coding-craft`、`complexity-budget`、`constraint-driven-development`
+- **协作专员**：原型 `cli-engine`：`ar-construct`、`ar-review`、`ar-refactor`、`ar-explore`
+
+**典型情形**：
+
+- MCTS 搜索候选补丁时污染了物理工作区文件
+- 历史提交轨迹噪声太多，配方提取召回率低
+- Praxis 审查门禁链阻断了跨文件重命名事务
+
+**验证命令**：
+
+- `cd auto-refactor && npm test`
+- `node auto-refactor/scripts/validate-trajectory-learning.js`
+- `node scripts/common/validate-skills.js`
+
 ### rust-engineering
 
 - **调用含义**：回答『这段 Rust 是否达到工业级红线』，产出类型状态与零分配实现及 Clippy 干净结果。
 - **描述行**：`【触发：Rust/Cargo/unsafe/无锁/Clippy/编写Rust/panic】编写或重构 Rust 代码时必须触发。全面贯彻 Type-State 状态机、零瞬态堆分配(FGT-PRF-001)、thiserror 强类型错误、// SAFETY: 严格证明及 Clippy 零容忍门禁。`
 - **所属层**：子项目领域适配器
-- **联动定位**：分形版本控制内核（链上第 2 步）；自动重构内核（链上第 2 步）
-- **前置**：`fractal-git-dev`、`auto-refactor-dev`
+- **联动定位**：分形版本控制内核（链上第 2 步）；自动重构内核（链上第 4 步）
+- **前置**：`fractal-git-dev`、`praxis-vfs-and-trajectory-learning`
 - **接续**：`state-concurrency-and-crash-recovery`、`algorithmic-operator-engineering`
 - **并行支援**：`coding-craft`、`complexity-budget`、`constraint-driven-development`、`debugging-and-error-recovery`
 - **协作专员**：原型 `git-kernel`：`fg-construct`、`fg-review`、`fg-refactor`、`fg-explore`
@@ -627,6 +675,29 @@
 - `cargo fmt --all --manifest-path fractal-git/Cargo.toml -- --check`
 - `cargo clippy --workspace --all-targets --manifest-path fractal-git/Cargo.toml -- -D warnings`
 - `cargo test --workspace --manifest-path fractal-git/Cargo.toml`
+
+### sparse-moe-and-ast-routing
+
+- **调用含义**：回答『分析器是否绑定五级稀疏预筛、惰性语义图是否被提前物化』，产出位掩码路由与多语言 IR 回归结论。
+- **描述行**：`【触发：MoE/稀疏路由/位掩码/特征磁带/预筛优化/激活降级/惰性投影】开发或优化五级稀疏 MoE 路由、32 位无符号位掩码分派、LineFeatureTape 扫描或多语言 AST 惰性投影时触发。落实零热路径冗余解析与池化复位。`
+- **所属层**：子项目领域适配器
+- **联动定位**：自动重构内核（链上第 2 步）
+- **前置**：`auto-refactor-dev`
+- **接续**：`praxis-vfs-and-trajectory-learning`
+- **并行支援**：`algorithmic-operator-engineering`、`coding-craft`、`complexity-budget`、`constraint-driven-development`
+- **协作专员**：原型 `cli-engine`：`ar-construct`、`ar-review`、`ar-refactor`、`ar-explore`
+
+**典型情形**：
+
+- 新增的分析器没有绑定AnalyzerBit或行级特征磁带预筛
+- 非JS语言适配器过早实例化全量CFG导致扫描变慢
+- 池化分析器未在resetState中清空上一文件的缓存字典
+
+**验证命令**：
+
+- `cd auto-refactor && npm test`
+- `node auto-refactor/scripts/bench-hot-paths.js`
+- `node scripts/common/validate-skills.js`
 
 ### webgames-workflow
 
