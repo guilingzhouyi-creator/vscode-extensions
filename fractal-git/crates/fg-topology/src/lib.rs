@@ -10,10 +10,12 @@
 //!
 //! Domain Governance Rules: FGT-TOP-001 (topology state machine facade), FGT-COR-001, FGT-LCK-001.
 
+pub mod acceptance;
 pub mod authorizer;
 pub mod bisect;
 pub mod blackboard;
 pub mod conflict_tree;
+pub mod fanout;
 pub mod history_rollup;
 pub mod manifold;
 pub mod operation;
@@ -27,10 +29,12 @@ pub mod telemetry;
 pub mod verifier;
 pub mod worktree;
 
+pub use acceptance::{read_commit_header, write_acceptance};
 pub use authorizer::{ElevationAuthorizer, StandardNonceAuthorizer};
 pub use bisect::{BisectEngine, BisectState, BisectStep};
 pub use blackboard::{DiskBlackboardStore, BLACKBOARD_DIR};
 pub use conflict_tree::{AgentConflictSliceReport, ConflictSlice, ConflictTreeManager};
+pub use fanout::{assert_fanout_available, assert_fanout_available_in};
 pub use history_rollup::{
     CardMilestoneRecord, HierarchicalHistoryRollup, HierarchicalRollupFolder, MilestoneRollupEntry,
     PyramidFolder,

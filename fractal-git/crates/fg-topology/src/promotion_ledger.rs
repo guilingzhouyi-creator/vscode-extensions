@@ -20,7 +20,7 @@ use fg_core::models::{
     AutoQualityScoreEnvelope, ElevationAttestation, Oid, StagedPromotionRequest,
     StagedPromotionStatus, TaxisPolicy,
 };
-use fg_core::traits::RefStore;
+use fg_core::traits::{OdbStore, RefStore};
 use fg_native::document::RepoDocument;
 use fg_native::sections::prom::{PromSection, PromotionRecord, PromotionStatus};
 use std::path::{Path, PathBuf};
@@ -249,12 +249,17 @@ impl PromotionStagingLedger {
     }
 
     /// Executes atomic merge into System Trunk upon valid Human GUI elevation authorization.
+    ///
+    /// `odb` receives the acceptance commit this writes. It is a parameter rather than a field so
+    /// the ledger stays independent of where objects physically live, and so tests can supply an
+    /// in-memory store without opening a repository.
     pub fn apply_elevation_approval(
         &mut self,
         request_id: &str,
         proof: &ElevationAttestation,
         authorizer: &impl ElevationAuthorizer,
         ref_store: &impl RefStore,
+        odb: &impl OdbStore,
     ) -> FractalResult<()> {
         let mut active = match self.ledger_data.active_candidate.take() {
             Some(cand) if cand.request_id == request_id => cand,
@@ -278,13 +283,28 @@ impl PromotionStagingLedger {
             return Err(err);
         }
 
-        // 2. Atomically advance System Trunk reference (refs/heads/main)
+        // 2. Record one acceptance commit on System Trunk (refs/heads/main).
+        //
+        // The trunk advances by exactly one entry per accepted promotion, so its history length
+        // tracks accepted change rather than total lower-tier activity. Pointing the reference
+        // straight at the candidate instead would pull every nested commit into trunk reachability
+        // and make the trunk grow with exploration volume.
         let system_ref = FractalRef::SystemTrunk {
             branch: fg_core::constants::git::DEFAULT_SYSTEM_BRANCH.into(),
         };
-        if let Err(err) =
-            ref_store.update_ref(&system_ref.to_git_ref(), &active.candidate_commit_oid, None)
-        {
+        let trunk_ref = system_ref.to_git_ref();
+        let current_trunk = ref_store.get_ref(&trunk_ref)?;
+        let acceptance_oid = crate::acceptance::write_acceptance(
+            odb,
+            request_id,
+            &active.source_ref,
+            &active.candidate_commit_oid,
+            current_trunk,
+        )?;
+
+        // Compare-and-swap against the head observed above: a concurrent promotion that moved the
+        // trunk between the read and this write must lose rather than overwrite a newer acceptance.
+        if let Err(err) = ref_store.update_ref(&trunk_ref, &acceptance_oid, current_trunk.as_ref()) {
             self.ledger_data.active_candidate = Some(active);
             return Err(err);
         }

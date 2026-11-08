@@ -43,3 +43,8 @@ pub const DEFAULT_REPLACEMENT_SCORE_BASELINE_DELTA: f64 = 5.0;
 
 /// Default minimum auto score required for staged promotion.
 pub const DEFAULT_MINIMUM_PROMOTION_SCORE: f64 = 80.0;
+
+/// Maximum cards per integration cell: builder, independent tester, cross reviewer.
+pub const MAX_CARDS_PER_CELL: usize = 3;
+/// Maximum SubAgents per parent-Agent worktree, bounded for the same reason one tier down.
+pub const MAX_SUBAGENTS_PER_CARD: usize = 3;
