@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 
-use fg_algorithms::traverse::CcdIndex;
+use fg_algorithms::traverse::{CcdIndex, Window};
 use fg_core::error::FractalError;
 use fg_core::models::Oid;
 
@@ -83,4 +83,98 @@ fn commits_outside_the_index_are_not_claimed_as_related() {
     assert!(!index.is_ancestor(&oid(7), &root));
     assert!(!index.is_ancestor(&root, &oid(7)));
     assert!(index.merge_bases(&root, &oid(7)).is_empty());
+}
+
+#[test]
+fn a_windowed_index_covers_only_the_span_it_was_given() {
+    // A ten-commit chain, timestamped one second apart, indexed to a depth of four. The index must
+    // describe the four newest commits and report that its lower edge was cut off, so a caller
+    // cannot mistake a suffix for the whole history.
+    const BASE: u64 = 1_760_000_000;
+    let mut table: HashMap<Oid, (Vec<Oid>, u64)> = HashMap::new();
+    let chain: Vec<Oid> = (0..10).map(oid).collect();
+    for (index, commit) in chain.iter().enumerate() {
+        let parents = if index == 0 {
+            vec![]
+        } else {
+            vec![chain[index - 1]]
+        };
+        table.insert(*commit, (parents, BASE + index as u64));
+    }
+
+    let tip = chain[9];
+    let (index, set) =
+        CcdIndex::build_windowed(&[tip], Window::Depth(4), |oid| table.get(oid).cloned())
+            .expect("windowed index must build");
+
+    assert_eq!(index.len(), 4);
+    assert!(set.truncated, "the window stopped short of the root");
+    assert!(index.contains(&tip));
+    assert!(
+        !index.contains(&chain[0]),
+        "the root lies beyond the horizon"
+    );
+    assert!(
+        !index.is_window_complete(),
+        "the boundary leaves a parent unresolved, and that must be reported"
+    );
+}
+
+#[test]
+fn a_complete_window_reports_itself_as_complete() {
+    // The opposite claim: when the window does cover everything, `is_window_complete` must be true,
+    // otherwise a caller would refuse work it can actually do.
+    const BASE: u64 = 1_760_000_000;
+    let mut table: HashMap<Oid, (Vec<Oid>, u64)> = HashMap::new();
+    let chain: Vec<Oid> = (0..4).map(oid).collect();
+    for (index, commit) in chain.iter().enumerate() {
+        let parents = if index == 0 {
+            vec![]
+        } else {
+            vec![chain[index - 1]]
+        };
+        table.insert(*commit, (parents, BASE + index as u64));
+    }
+
+    let (index, set) = CcdIndex::build_windowed(&[chain[3]], Window::Depth(100), |oid| {
+        table.get(oid).cloned()
+    })
+    .expect("windowed index must build");
+
+    assert_eq!(index.len(), 4);
+    assert!(!set.truncated);
+    assert!(index.is_window_complete());
+    assert!(index.is_ancestor(&chain[0], &chain[3]));
+}
+
+#[test]
+fn an_unbounded_window_matches_the_complete_index() {
+    // `Full` must be behaviourally identical to indexing the whole table, or the default path would
+    // silently change answers for callers that never asked for a horizon.
+    const BASE: u64 = 1_760_000_000;
+    let mut table: HashMap<Oid, (Vec<Oid>, u64)> = HashMap::new();
+    let chain: Vec<Oid> = (0..6).map(oid).collect();
+    for (index, commit) in chain.iter().enumerate() {
+        let parents = if index == 0 {
+            vec![]
+        } else {
+            vec![chain[index - 1]]
+        };
+        table.insert(*commit, (parents, BASE + index as u64));
+    }
+
+    let complete = CcdIndex::from_table(&table, &[chain[5]]).expect("complete index");
+    let (windowed, set) =
+        CcdIndex::build_windowed(&[chain[5]], Window::Full, |oid| table.get(oid).cloned())
+            .expect("windowed index");
+
+    assert!(!set.truncated);
+    assert_eq!(windowed.len(), complete.len());
+    for commit in &chain {
+        assert_eq!(
+            windowed.corrected_date(commit),
+            complete.corrected_date(commit),
+            "an unbounded window must not change any corrected date"
+        );
+    }
 }

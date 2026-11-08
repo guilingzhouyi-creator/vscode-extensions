@@ -34,6 +34,7 @@ use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::{CorrectedCommitDate, FastOidMap, FastOidSet, Oid};
 
 use super::dag_walk::{DagWalker, SmallParentList};
+use super::window::{collect_window, Window, WindowSet};
 
 /// Upper bound on distinct commits materialised in one index.
 ///
@@ -54,6 +55,12 @@ struct CcdNode {
 #[derive(Debug, Clone, Default)]
 pub struct CcdIndex {
     nodes: FastOidMap<CcdNode>,
+    /// Whether the index was built over a suffix of the history rather than the whole reachable set.
+    ///
+    /// Carried on the index itself because the answer to "can these dates be compared with anything
+    /// outside me" depends only on how the index was built, and a caller that has to re-derive it
+    /// from a separately-held window will eventually forget to.
+    truncated: bool,
 }
 
 impl CcdIndex {
@@ -99,7 +106,10 @@ impl CcdIndex {
             );
         }
 
-        Ok(Self { nodes })
+        Ok(Self {
+            nodes,
+            truncated: false,
+        })
     }
 
     /// Builds the index from a parent table already held in memory.
@@ -111,6 +121,16 @@ impl CcdIndex {
     ///
     /// Same conditions as [`Self::build`].
     pub fn from_table(table: &HashMap<Oid, (Vec<Oid>, u64)>, tips: &[Oid]) -> FractalResult<Self> {
+        Self::from_table_inner(table, tips, false)
+    }
+
+    /// Shared body of [`Self::from_table`] and [`Self::build_windowed`], differing only in whether
+    /// the resulting index describes a suffix.
+    fn from_table_inner(
+        table: &HashMap<Oid, (Vec<Oid>, u64)>,
+        tips: &[Oid],
+        truncated: bool,
+    ) -> FractalResult<Self> {
         let mut nodes: FastOidMap<CcdNode> = FastOidMap::default();
         let order = topological_order_from_table(table, tips)?;
 
@@ -135,7 +155,62 @@ impl CcdIndex {
             );
         }
 
-        Ok(Self { nodes })
+        Ok(Self { nodes, truncated })
+    }
+
+    /// Builds the index over only the commits `window` keeps.
+    ///
+    /// A commit on the window's boundary is a parent of a kept commit but is not itself read, so
+    /// its corrected date is unknown. The recurrence treats it as having no predecessor, which is
+    /// exactly the value it would have if the history began there. That is sound for ordering the
+    /// kept commits among themselves and unsound for comparing a kept commit with a boundary one,
+    /// so [`Self::is_window_complete`] reports whether any such commit was cut off.
+    ///
+    /// # Errors
+    ///
+    /// Propagates [`collect_window`]'s failure and any error [`Self::from_table`] would raise.
+    pub fn build_windowed<F>(
+        tips: &[Oid],
+        window: Window,
+        mut parents_of: F,
+    ) -> FractalResult<(Self, WindowSet)>
+    where
+        F: FnMut(&Oid) -> Option<(Vec<Oid>, u64)>,
+    {
+        let set = collect_window(tips, window, &mut parents_of);
+        let mut table: HashMap<Oid, (Vec<Oid>, u64)> =
+            HashMap::with_capacity(set.kept.len().min(MAX_INDEXED_COMMITS));
+        for oid in set.kept.iter() {
+            if let Some((parents, timestamp)) = parents_of(oid) {
+                // Parents outside the window are dropped, not looked up. Keeping them would make
+                // the topological pass demand a row the table cannot have, since a boundary commit
+                // is by definition never read.
+                let kept_parents: Vec<Oid> = parents
+                    .into_iter()
+                    .filter(|parent| set.kept.contains(parent))
+                    .collect();
+                table.insert(*oid, (kept_parents, timestamp));
+            }
+        }
+        let kept_tips: Vec<Oid> = tips
+            .iter()
+            .copied()
+            .filter(|tip| set.kept.contains(tip))
+            .collect();
+        // The window itself decides whether the index is a suffix. A depth window that happened to
+        // cover everything is not truncated, and saying otherwise would make callers refuse work
+        // they can complete.
+        let index = Self::from_table_inner(&table, &kept_tips, set.truncated)?;
+        Ok((index, set))
+    }
+
+    /// Reports whether every parent named by a kept commit is itself in the index.
+    ///
+    /// False means the index describes a suffix of the history: comparisons against commits beyond
+    /// the boundary are undefined rather than merely unknown.
+    #[must_use]
+    pub fn is_window_complete(&self) -> bool {
+        !self.truncated
     }
 
     /// Number of commits materialised.
