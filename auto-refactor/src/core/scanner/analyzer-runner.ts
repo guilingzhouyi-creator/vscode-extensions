@@ -490,46 +490,6 @@ function collectCurrentFileLoopSites(plan: ResolvedAnalyzer[]): LoopSite[] {
  * Concurrency: asynchronous per-file execution; safe for concurrent execution on separate files.
  * @returns The file's issues, metric summary, and cross-file summaries.
  */
-function assembleFileAnalyzerResult(params: {
-    issues: Issue[];
-    metric: FileMetric | null;
-    execution?: FileExecutionObserver;
-    adapter: LanguageAdapter;
-    parsed: NormalizedAst | NodeProjector;
-    rel: string;
-    cfg: ScanConfig;
-    fileSymbols: { definitions: SymbolDefinition[]; references: SymbolReference[] };
-    literals: LiteralOccurrence[];
-    loopSites: LoopSite[];
-    graphEdges?: ModuleGraphFileSummary;
-}) {
-    const {
-        issues,
-        metric,
-        execution,
-        adapter,
-        parsed,
-        rel,
-        cfg,
-        fileSymbols,
-        literals,
-        loopSites,
-        graphEdges,
-    } = params;
-    const hasSymbols = fileSymbols.definitions.length > 0 || fileSymbols.references.length > 0;
-    return {
-        issues,
-        metric,
-        ...(execution
-            ? { execution: execution.finish(adapter, parsed, hasAdapterFor(rel, cfg.parser)) }
-            : {}),
-        ...(hasSymbols ? { symbols: fileSymbols } : {}),
-        ...(literals.length > 0 ? { literals } : {}),
-        ...(loopSites.length > 0 ? { loopSites } : {}),
-        ...(graphEdges ? { graphEdges } : {}),
-    };
-}
-
 export async function runFileAnalyzers(
     host: AnalyzerHost,
     rel: string,
@@ -616,4 +576,44 @@ export async function runFileAnalyzers(
         loopSites,
         graphEdges,
     });
+}
+
+function assembleFileAnalyzerResult(params: {
+    issues: Issue[];
+    metric: FileMetric | null;
+    execution?: FileExecutionObserver;
+    adapter: LanguageAdapter;
+    parsed: NormalizedAst | NodeProjector;
+    rel: string;
+    cfg: ScanConfig;
+    fileSymbols: { definitions: SymbolDefinition[]; references: SymbolReference[] };
+    literals: LiteralOccurrence[];
+    loopSites: LoopSite[];
+    graphEdges?: ModuleGraphFileSummary;
+}) {
+    const {
+        issues,
+        metric,
+        execution,
+        adapter,
+        parsed,
+        rel,
+        cfg,
+        fileSymbols,
+        literals,
+        loopSites,
+        graphEdges,
+    } = params;
+    const hasSymbols = fileSymbols.definitions.length > 0 || fileSymbols.references.length > 0;
+    return {
+        issues,
+        metric,
+        ...(execution
+            ? { execution: execution.finish(adapter, parsed, hasAdapterFor(rel, cfg.parser)) }
+            : {}),
+        ...(hasSymbols ? { symbols: fileSymbols } : {}),
+        ...(literals.length > 0 ? { literals } : {}),
+        ...(loopSites.length > 0 ? { loopSites } : {}),
+        ...(graphEdges ? { graphEdges } : {}),
+    };
 }

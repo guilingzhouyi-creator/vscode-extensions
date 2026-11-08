@@ -81,13 +81,6 @@ export function decodeGitHistoryCache(
         return null;
     }
 }
-/**
- * Loads the cached profile map for a scan root.
- *
- * @param scanRoot - Directory the scan was launched against.
- * @param expectedKey - Identity triple that must match.
- * @returns Profile map on a hit, or null on any miss condition.
- */
 const GitHistoryIoBarrier = {
     readText(filePath: string): string {
         return fs['readFileSync'](filePath, ENCODING_UTF8);
@@ -105,6 +98,13 @@ function removeStagingFileSafely(stagingPath: string): void {
     }
 }
 
+/**
+ * Loads the cached profile map for a scan root.
+ *
+ * @param scanRoot - Directory the scan was launched against.
+ * @param expectedKey - Identity triple that must match.
+ * @returns Profile map on a hit, or null on any miss condition.
+ */
 export function loadGitHistoryCache(
     scanRoot: string,
     expectedKey: GitHistoryCacheKey,

@@ -326,16 +326,6 @@ export type CyclePassLogger = { info: (msg: string) => void };
  * @param prebuilt - Dependency graph reused from an earlier pass.
  * @returns Detected issues plus any diagnostic warnings.
  */
-function resolveCyclePassGraph(
-    prebuilt: ModuleDependencyGraph | null | undefined,
-    usePrebuilt: boolean,
-): ModuleDependencyGraph {
-    if (usePrebuilt && prebuilt) return prebuilt;
-    const { ModuleDependencyGraph: GraphClass } =
-        require('./dependency-graph') as typeof import('./dependency-graph'); // @lazy break circular dependency
-    return new GraphClass();
-}
-
 export async function runCyclePass(
     report: ScanReport,
     config: ScanConfig,
@@ -362,4 +352,14 @@ export async function runCyclePass(
     auditImportCycles(graph, opts, issues, warnings);
 
     return { issues, warnings };
+}
+
+function resolveCyclePassGraph(
+    prebuilt: ModuleDependencyGraph | null | undefined,
+    usePrebuilt: boolean,
+): ModuleDependencyGraph {
+    if (usePrebuilt && prebuilt) return prebuilt;
+    const { ModuleDependencyGraph: GraphClass } =
+        require('./dependency-graph') as typeof import('./dependency-graph'); // @lazy break circular dependency
+    return new GraphClass();
 }

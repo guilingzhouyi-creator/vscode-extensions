@@ -1052,6 +1052,11 @@ export function fastPatternMatchShim(sourceText: string, patterns: string[]): Na
     return results;
 }
 
+function containsNonEmptyPattern(sourceText: string, pattern: string): boolean {
+    if (pattern.length === 0) return false;
+    return sourceText.indexOf(pattern) !== -1;
+}
+
 /**
  * Reports whether any pattern occurs, without building a single match record.
  *
@@ -1063,11 +1068,6 @@ export function fastPatternMatchShim(sourceText: string, patterns: string[]): Na
  * @param patterns - Pattern strings to probe.
  * @returns True when at least one pattern occurs.
  */
-function containsNonEmptyPattern(sourceText: string, pattern: string): boolean {
-    if (pattern.length === 0) return false;
-    return sourceText.indexOf(pattern) !== -1;
-}
-
 export function hasAnyPatternShim(sourceText: string, patterns: string[]): boolean {
     if (!sourceText || patterns.length === 0) {
         return false;
