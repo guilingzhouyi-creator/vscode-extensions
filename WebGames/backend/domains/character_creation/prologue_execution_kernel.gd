@@ -2,14 +2,18 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/character_creation/prologue_execution_kernel.gd
 # 架构定位: Domain Logic Component
-# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
-# 职责说明: 承接 OpeningEventStreamDTO 编排角色专属序章启动：构建上下文、 提取并缓存初始占位符、发放新手装备、推进四阶段剧情状态跃迁、生成结构化突变事件流 （CharacterCreated / LocationAssigned / EquipmentGranted / DialogueReady / PrologueCompleted） 与首步/后继事件包。事件与状态解耦——仅产出纯结构化结果，不指示前端页面。 无缝衔接 通用因果 DAG 编排引擎会话。 关联细则: 阶段2 §四（序章执行内核与状态解耦）与 协作契约
+# 依赖与触发: 上游: GameBootstrap, WorldGateway | 下游: GameConfig, EventBusCore
+# 配置与信号: 配置 config/domains/character_creation.json | 信号: EventBus 领域广播
+# 职责说明: 编排角色专属序章启动、占位符提取、新手装备发放、四阶段跃迁与 DAG 会话。
+#   事件与状态解耦，仅产出纯结构化结果。
 # 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
 ## PrologueExecutionKernel：Domain Logic Component
 class_name PrologueExecutionKernel
 extends RefCounted
+
+const MAX_HEADLESS_DAG_STEPS: int = 100
 
 # ==============================================================================
 # 一、启动编排（开局事件流 → 序章上下文 + 首步事件包）
@@ -231,7 +235,23 @@ static func render_dag_node_packet(
 	}
 	return packet
 
-## 执行并应用 DAG 节点突变（支持 PrologueCompleted、GoldGranted/ModifyGold、AttributeModified、LocationAssigned）
+static func _apply_mutation_entry(
+	mutation_entry: Variant,
+	ctx: CharacterPrologueContext,
+	profile: Variant,
+	settled: Array[Dictionary]
+) -> void:
+	if mutation_entry is Dictionary:
+		var mutation_record: Dictionary = (mutation_entry as Dictionary).duplicate(true)
+		var m_type: String = str(mutation_record.get("type", mutation_record.get("event", "")))
+		_apply_single_mutation(m_type, mutation_record, ctx, profile)
+		settled.append(mutation_record)
+	elif mutation_entry is String:
+		var label_record: Dictionary = {"type": str(mutation_entry)}
+		_apply_single_mutation(str(mutation_entry), label_record, ctx, profile)
+		settled.append(label_record)
+
+## 执行并应用 DAG 节点突变（PrologueCompleted、Gold、Attribute、Location）
 static func apply_dag_mutations(
 	mutations: Array,
 	ctx: CharacterPrologueContext,
@@ -241,18 +261,8 @@ static func apply_dag_mutations(
 	if ctx == null:
 		return settled
 
-	for m in mutations:
-		var d: Dictionary = {}
-		if m is Dictionary:
-			d = (m as Dictionary).duplicate(true)
-		elif m is String:
-			d = {"type": str(m)}
-		else:
-			continue
-
-		var m_type: String = str(d.get("type", d.get("event", "")))
-		_apply_single_mutation(m_type, d, ctx, profile)
-		settled.append(d)
+	for mutation_entry in mutations:
+		_apply_mutation_entry(mutation_entry, ctx, profile, settled)
 
 	return settled
 
@@ -380,7 +390,15 @@ static func execute_headless_mod_playthrough(config: Dictionary) -> Dictionary:
 
 	var transcript_steps: Array[Dictionary] = []
 	var choice_indices: Array = config.get("choice_indices", [])
-	_run_headless_loop(engine, ctx, profile, adapted_manifest, choice_indices, transcript_steps)
+	var loop_state: Dictionary = {
+		"ctx": ctx,
+		"profile": profile,
+		"manifest": adapted_manifest,
+		"choice_indices": choice_indices,
+		"choice_ptr": 0,
+		"step_index": 0
+	}
+	_run_headless_loop(engine, loop_state, transcript_steps)
 
 	return _build_headless_transcript(char_name, eff_race, eff_origin, reinc_res, profile, engine, ctx, transcript_steps)
 
@@ -394,45 +412,63 @@ static func _prepare_headless_candidates(config: Dictionary) -> Array:
 				candidates.append(pkg)
 	return candidates
 
+static func _step_headless_node(
+	engine: NarrativeDagExecutionEngine,
+	curr_nid: String,
+	node: NarrativeDAGNode,
+	loop_state: Dictionary
+) -> Dictionary:
+	var step_index: int = int(loop_state["step_index"])
+	var ctx: CharacterPrologueContext = loop_state["ctx"]
+	var profile: CharacterProfile = loop_state["profile"]
+	var adapted_manifest: Dictionary = loop_state["manifest"]
+	var choice_indices: Array = loop_state["choice_indices"]
+	var packet := render_dag_node_packet(node, ctx, adapted_manifest, step_index)
+	var action_payload: Dictionary = {}
+	if not node.choices.is_empty():
+		var c_idx: int = 0
+		var ptr: int = int(loop_state["choice_ptr"])
+		if ptr < choice_indices.size():
+			c_idx = clampi(int(choice_indices[ptr]), 0, node.choices.size() - 1)
+			loop_state["choice_ptr"] = ptr + 1
+		var chosen: Dictionary = node.choices[c_idx]
+		action_payload["selected_choice"] = chosen.get("choice_id", chosen.get("id", str(c_idx)))
+
+	var step_res := engine.execute_node_action(curr_nid, action_payload)
+	var raw_muts: Variant = step_res.get("mutations")
+	var mutations: Array = raw_muts if raw_muts is Array else node.mutations_on_complete
+	var applied := apply_dag_mutations(mutations, ctx, profile)
+	return {
+		"step_index": step_index,
+		"node_id": curr_nid,
+		"packet": packet.to_dto(),
+		"action_payload": action_payload,
+		"applied_mutations": applied,
+		"step_result": step_res
+	}
+
 static func _run_headless_loop(
 	engine: NarrativeDagExecutionEngine,
-	ctx: CharacterPrologueContext,
-	profile: CharacterProfile,
-	adapted_manifest: Dictionary,
-	choice_indices: Array,
+	loop_state: Dictionary,
 	transcript_steps: Array[Dictionary]
 ) -> void:
-	var choice_ptr: int = 0
 	var step_guard: int = 0
-	while not engine.active_node_ids.is_empty() and not engine.is_terminated and step_guard < 100:
+	while not engine.active_node_ids.is_empty() and not engine.is_terminated and step_guard < MAX_HEADLESS_DAG_STEPS:
 		step_guard += 1
 		var curr_nid: String = engine.active_node_ids[0]
 		var node: NarrativeDAGNode = engine.graph.nodes.get(curr_nid)
 		if node == null:
 			break
+		loop_state["step_index"] = transcript_steps.size()
+		transcript_steps.append(_step_headless_node(engine, curr_nid, node, loop_state))
 
-		var packet := render_dag_node_packet(node, ctx, adapted_manifest, transcript_steps.size())
-		var action_payload: Dictionary = {}
-		if not node.choices.is_empty():
-			var c_idx: int = 0
-			if choice_ptr < choice_indices.size():
-				c_idx = clampi(int(choice_indices[choice_ptr]), 0, node.choices.size() - 1)
-				choice_ptr += 1
-			var chosen: Dictionary = node.choices[c_idx]
-			action_payload["selected_choice"] = chosen.get("choice_id", chosen.get("id", str(c_idx)))
-
-		var step_res := engine.execute_node_action(curr_nid, action_payload)
-		var mutations: Array = step_res.get("mutations", node.mutations_on_complete)
-		var applied := apply_dag_mutations(mutations, ctx, profile)
-
-		transcript_steps.append({
-			"step_index": transcript_steps.size(),
-			"node_id": curr_nid,
-			"packet": packet.to_dto(),
-			"action_payload": action_payload,
-			"applied_mutations": applied,
-			"step_result": step_res
-		})
+static func _collect_applied_mutations(transcript_steps: Array[Dictionary]) -> Array:
+	var all_mutations: Array = []
+	for step_entry in transcript_steps:
+		var raw_muts: Variant = step_entry.get("applied_mutations")
+		if raw_muts is Array:
+			all_mutations.append_array(raw_muts as Array)
+	return all_mutations
 
 static func _build_headless_transcript(
 	char_name: String,
@@ -444,10 +480,7 @@ static func _build_headless_transcript(
 	ctx: CharacterPrologueContext,
 	transcript_steps: Array[Dictionary]
 ) -> Dictionary:
-	var all_mutations: Array = []
-	for s in transcript_steps:
-		for m in s.get("applied_mutations", []):
-			all_mutations.append(m)
+	var all_mutations: Array = _collect_applied_mutations(transcript_steps)
 
 	var last_visited: String = ""
 	if not engine.completed_node_ids.is_empty():

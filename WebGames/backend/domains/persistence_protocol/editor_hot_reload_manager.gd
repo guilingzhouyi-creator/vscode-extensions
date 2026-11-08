@@ -23,16 +23,23 @@ static func _ensure_scope_loaded() -> void:
 		return
 	var all_entries: Array = GameConfig.get_array("infrastructure.domains", "domains", [])
 	for entry in all_entries:
-		var d_id := String(entry.get("id", ""))
+		var domain_key := String(entry.get("id", ""))
 		var cfg_table := String(entry.get("config", ""))
-		var save_cfg: Dictionary = entry.get("save", {})
-		var hr_cfg: Dictionary = save_cfg.get("hot_reload", {})
-		_hot_reload_scope[d_id] = {
-			"allow": bool(hr_cfg.get("allow", false)),
-			"requires_rebuild": bool(hr_cfg.get("requires_rebuild", false))
+		var save_raw: Variant = entry.get("save")
+		var allow_reload := false
+		var needs_rebuild := false
+		if save_raw is Dictionary:
+			var hr_raw: Variant = (save_raw as Dictionary).get("hot_reload")
+			if hr_raw is Dictionary:
+				var hr_dict := hr_raw as Dictionary
+				allow_reload = bool(hr_dict.get("allow", false))
+				needs_rebuild = bool(hr_dict.get("requires_rebuild", false))
+		_hot_reload_scope[domain_key] = {
+			"allow": allow_reload,
+			"requires_rebuild": needs_rebuild
 		}
 		if not cfg_table.is_empty():
-			_table_to_domain_map[cfg_table] = d_id
+			_table_to_domain_map[cfg_table] = domain_key
 
 ## 配置表内容 SHA-256 哈希计算（纯值类型与确定性序列化，Inv-SV-9）
 static func _compute_table_hash(table_name: String) -> String:
@@ -78,9 +85,13 @@ static func apply_hot_reload(changed_tables: Dictionary) -> Dictionary:
 			if _hot_reload_scope.has(tbl):
 				domain_id = tbl
 
-		var scope: Dictionary = _hot_reload_scope.get(domain_id, {})
-		var allow: bool = bool(scope.get("allow", false))
-		var requires_rebuild: bool = bool(scope.get("requires_rebuild", false))
+		var scope_raw: Variant = _hot_reload_scope.get(domain_id)
+		var allow: bool = false
+		var requires_rebuild: bool = false
+		if scope_raw is Dictionary:
+			var scope_dict := scope_raw as Dictionary
+			allow = bool(scope_dict.get("allow", false))
+			requires_rebuild = bool(scope_dict.get("requires_rebuild", false))
 
 		# 2. 白名单拒绝判定（Inv-SV-14）
 		if not allow:
