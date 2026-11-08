@@ -12,11 +12,13 @@ import type { FileMetric, Issue } from '../types';
 import { assertSnapshotPath } from './source-snapshot';
 import type { SourceSnapshot, SourceSnapshotIdentity, SnapshotRead } from './source-snapshot';
 
+/** Recorded outcome for reading a single path from an immutable source snapshot. */
 export interface SnapshotInputObservation {
     readonly path: string;
     readonly kind: SnapshotRead['kind'];
     readonly reason?: string;
 }
+/** Immutable-snapshot scan output containing issues, metrics, and execution observations. */
 export interface SnapshotScanResult {
     readonly source: 'immutable-snapshot';
     readonly identity: SourceSnapshotIdentity;

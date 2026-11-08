@@ -1,16 +1,14 @@
 /**
  * Module: Core Naming — Name Integrity Against the Literal It Describes
  * File Path: src/core/naming/name-integrity.ts
- * Architecture Role: Leaf adjudicator deciding whether a generated identifier can be explained by
- *   the literal it came from; the analyzer uses it to tell a rename from a weld, the reporting layer
- *   to decide whether a patch may be handed to an agent.
+ * Architecture Role: Leaf adjudicator deciding whether a generated identifier is explainable
+ *   by its literal; analyzers separate renames from welds while reporters filter agent patches.
  * Dependencies & Triggers: The shared morpheme tokenizer only; called once per suggested name and
  *   once per emitted patch.
  * Responsibilities: Derive a literal's ordered word sequence, split an identifier back into words,
  *   and decide whether every identifier word appears, in order, among the literal's words.
- * Exit Semantics & Design Rationale: Pure and total; never throws. Ordered containment is the only
- *   sound weld detector: `INVALIDNAME` concatenates `invalid` and `name` and is unexplainable, while
- *   `UNCONDITIONAL` is one word of its literal and is explainable, so length cannot separate them.
+ * Exit Semantics & Design Rationale: Pure and total; never throws. Ordered containment detects
+ *   welds: `INVALIDNAME` merges two words unexplainably while `UNCONDITIONAL` stays explainable.
  */
 
 import { splitIdentifierTokens } from './case-converter';

@@ -672,7 +672,7 @@ export function buildDuplicateIssue(
             targetScope: TARGET_SCOPE_MODULE_TOP_LEVEL,
             targetSymbol: suggested,
             insertAnchor: { position: ANCHOR_POSITION_AFTER_IMPORTS },
-            // A separator literal repeats because it is punctuation, not because it deserves a name.
+            // A separator repeats as punctuation, not because it warrants a constant.
             safeToAutomate: !isContentlessName(suggested),
         },
     };

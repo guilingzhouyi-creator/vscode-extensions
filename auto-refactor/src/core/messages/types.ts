@@ -27,12 +27,18 @@
  */
 /** Canonical risk tiers shared by every diagnostic and governance rule. */
 export const RISK_TIERS = ['Low', 'Medium', 'High', 'Critical'] as const;
+/** Risk level string literal union derived from `RISK_TIERS`. */
 export type RiskTier = (typeof RISK_TIERS)[number];
+/** Low-severity risk classification constant. */
 export const RISK_LOW: RiskTier = 'Low';
+/** Medium-severity risk classification constant. */
 export const RISK_MEDIUM: RiskTier = 'Medium';
+/** High-severity risk classification constant. */
 export const RISK_HIGH: RiskTier = 'High';
+/** Critical-severity risk classification constant. */
 export const RISK_CRITICAL: RiskTier = 'Critical';
 
+/** Structured catalog message descriptor rendered into rule findings. */
 export interface DiagnosticDescriptor {
     readonly message: string;
     readonly suggestion?: string;

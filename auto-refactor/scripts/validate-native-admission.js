@@ -3,20 +3,18 @@
  * Module: Verification Harness — Native Operator Admission Baseline
  * File Path: scripts/validate-native-admission.js
  * Architecture Role: Guards the condition under which an operator belongs on the native path. The
- *   Rust kernel is not faster by default — a `Vec<f64>` copied across the boundary per call and a
- *   per-line scan that allocates on every hit are both measurably slower than the JS shim. Admission
- *   therefore has to be measured, not assumed.
- * Dependencies & Triggers: `dist/core/native` (both tracks) and `docs/01-architecture/native-admission-baseline.md`;
- *   run by `scripts/test-parallel.js` and directly.
+ *   Rust kernel is not faster by default — a `Vec<f64>` copied across the boundary and a per-line
+ *   scan that allocates per hit can be slower than JS. Admission must be measured, not assumed.
+ * Dependencies & Triggers: `dist/core/native` and
+ *   `docs/01-architecture/native-admission-baseline.md`; run by `scripts/test-parallel.js`.
  * Responsibilities:
- *   1. Decode the baseline table from the architecture document, so prose and assertion cannot drift.
+ *   1. Decode the baseline table from the architecture doc so prose and checks never drift.
  *   2. Build each payload deterministically and measure both tracks over repeated rounds.
  *   3. Fail when an `enforced` operator misses its ratio, or when the table is malformed.
  *   4. Report `documented` operators without blocking, since they record known-inadmissible shapes.
  * Exit Semantics & Design Rationale: Exits 0 when every enforced operator clears its ratio and the
- *   table parses, 1 otherwise. Ratios are compared as best-of-N to keep the guard stable under a
- *   loaded machine: a single cold run would fail on scheduler noise rather than on a real regression,
- *   and a flaky guard gets disabled, which is worse than no guard.
+ *   table parses, 1 otherwise. Ratios use best-of-N to keep the guard stable under a loaded
+ *   machine: one cold run fails on noise instead of regressions, and flaky guards get disabled.
  */
 
 'use strict';
@@ -67,9 +65,8 @@ function buildNumericPayload(count) {
 /**
  * Resolves the security prefilter tokens once, from the production token list.
  *
- * Derived rather than copied: a duplicate literal table would both drift from the real prefilter and
- * be indistinguishable to the security analyzer from actual dynamic-code usage. Resolved once at
- * module load so it cannot contribute I/O time to a measurement it is supposed to be the payload of.
+ * Derived rather than copied so the table cannot drift or mimic dynamic code, and resolved at
+ * module load so file reads never skew payload timings.
  *
  * @returns Token strings used by the security prefilter.
  */

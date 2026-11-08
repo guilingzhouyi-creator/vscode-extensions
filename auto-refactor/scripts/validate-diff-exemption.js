@@ -3,8 +3,8 @@
  * File Path: auto-refactor/scripts/validate-diff-exemption.js
  * Architecture Role: Proves that the exemption mechanism grants only what its policy allows, and
  *   that every refusal path refuses for the stated reason rather than by accident.
- * Dependencies & Triggers: diff-bounds-policy.js and diff-exemption-ledger.js; invoked by `npm test`
- *   through the SELF_AUDIT_SUITES lane and directly.
+ * Dependencies & Triggers: diff-bounds-policy.js and diff-exemption-ledger.js; invoked by
+ *   `npm test` through the SELF_AUDIT_SUITES lane and directly.
  * Responsibilities:
  *   1. Assert the band shape: a floor, a target above it, and a relaxed line strictly between them.
  *   2. Assert a grant needs a streak, a new short file, and a measurement above the relaxed line.

@@ -291,7 +291,7 @@ function evaluateCoverageRatioAndStatus(
 ): { icr: number; status: FinancialDebtMetrics['status'] } {
     if (safeAccrual <= 0) {
         if (safeYield > 0) {
-            // When accrual is zero, evaluate yield against continuous friction drag from existing debt stock
+            // With zero accrual, evaluate yield against ongoing friction drag from debt stock
             const effectiveDrag = Math.max(1.0, dragMinutes);
             const icr = roundTwoDecimals(safeYield / effectiveDrag);
             return { icr, status: STATUS_DE_LEVERAGING };
@@ -680,12 +680,14 @@ export function computeStochasticDynamics(input: StochasticInput): StochasticMet
 export function evaluateQuantitativeRiskModel(
     params: QuantitativeRiskModelParams,
 ): QuantitativeRiskAssessment;
+/** Evaluates quantitative risk metrics from separate domain input structs. */
 export function evaluateQuantitativeRiskModel(
     financialInput: FinancialDebtInput,
     riskInput: QualityRiskInput,
     inequalityInput: InequalityInput,
     stochasticInput: StochasticInput,
 ): QuantitativeRiskAssessment;
+/** Resolves parameter form and runs all four quantitative risk models. */
 export function evaluateQuantitativeRiskModel(
     paramsOrFinancial: QuantitativeRiskModelParams | FinancialDebtInput,
     riskInput?: QualityRiskInput,

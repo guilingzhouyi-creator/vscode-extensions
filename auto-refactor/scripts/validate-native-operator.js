@@ -425,10 +425,10 @@ function validatePatternMatchParity() {
   }
   console.log('  ✓ Multi-pattern matching 100% equivalent.');
 
-  // The existence check must agree with the record scan on the same corpus and the same pattern sets.
-  // Comparing against the record scan rather than against a hand-written expectation is what makes
-  // this a parity assertion: a divergence between the two native paths is the defect being hunted,
-  // and any change to either matcher surfaces here instead of as a silently lost security prefilter.
+  // The existence check must agree with the record scan on the same corpus and pattern sets.
+  // Comparing against the record scan rather than hand-written expectations asserts parity:
+  // any divergence between the two native paths surfaces here instead of hiding silently
+  // behind a lost security prefilter.
   const presenceProbes = [
     searchPatterns,
     ['not_found'],

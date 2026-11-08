@@ -2,18 +2,15 @@
 /**
  * Module: Verification Harness — Exit-Tail Migrator
  * File Path: scripts/migrate-validator-exit-tail.js
- * Architecture Role: Rewrites a validator's hand-rolled failure tail into the shared harness handler,
- *   so the failure contract lives in one place instead of in every script.
+ * Architecture Role: Rewrites a validator's hand-rolled failure tail into the shared harness
+ *   handler, so the failure contract lives in one place instead of in every script.
  * Dependencies & Triggers: Node stdlib only; run manually with an explicit file list.
  * Responsibilities:
  *   1. Recognise the three tail shapes these scripts use and rewrite exactly one of them.
- *   2. Add the harness import when the file does not already have one, at the end of the import block.
+ *   2. Add the harness import when missing, at the end of the existing import block.
  *   3. Refuse any file whose tail does not match a known shape, rather than guessing.
- * Exit Semantics & Design Rationale: Exits 0 when every listed file was migrated, 1 when any file was
- *   skipped. Deliberately narrow: it rewrites only the tail and the import, never the verification
- *   logic, so a migration can be reviewed by reading two hunks. The tool refuses ambiguous shapes
- *   because a wrong rewrite would silently disable a failure path — the one thing this work exists to
- *   prevent.
+ * Exit Semantics & Design Rationale: Exits 0 if all migrated, 1 if skipped. Rewrites only tail
+ *   and import, keeping checks intact; refuses ambiguous shapes to preserve failure paths.
  */
 
 'use strict';
@@ -39,8 +36,8 @@ const CHAIN_CATCH = /^(\s*)\.\s*catch\(\s*\(?\s*[A-Za-z_$][\w$]*\s*\)?\s*=>\s*\{
  * Finds the tail to replace, refusing any file whose tail is not the final statement.
  *
  * The tail must be the last thing in the file. A script that wraps its entry in `require.main` or
- * exports its functions keeps code after the catch, and rewriting the tail there would delete that
- * code — the first version of this tool did exactly that to a validator with a `require.main` guard.
+ * exports its functions keeps code after the catch, and rewriting the tail there would delete
+ * that code — v1 of this tool hit a validator carrying a `require.main` guard.
  * Unknown shapes are refused rather than guessed at.
  *
  * @param lines - File contents split into lines.
@@ -149,8 +146,8 @@ function rewriteTail(lines, tail, name) {
 /**
  * Adds members to an existing destructured harness import.
  *
- * Four validators already pull `createTempTestDir` and friends from the harness, so a second import
- * line would be redundant. Their import spans several lines; the member is appended to the last one.
+ * Four validators already pull `createTempTestDir` and friends from the harness, so another
+ * import line would be redundant. Their import spans several lines; we append to the last one.
  * Only the exact destructuring block that ends at the harness `require` is touched, so a different
  * module's import is never modified.
  *

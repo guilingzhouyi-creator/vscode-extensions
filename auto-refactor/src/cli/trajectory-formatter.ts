@@ -5,7 +5,7 @@
  * Dependencies & Triggers: Consumed by src/cli/trajectory-cmd.ts
  * Responsibilities: Formats ASCII tables, rolling moments, file trajectory revisions,
  *   and sparklines
- * Exit Semantics & Invariants: Deterministic string generation without side effects
+ * Exit Semantics & Design Rationale: Deterministic string generation without side effects.
  */
 
 import {

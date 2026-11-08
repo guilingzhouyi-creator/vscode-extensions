@@ -12,8 +12,10 @@ import type {
     ReviewFailure,
 } from './review-contracts';
 
+/** Execution lifecycle status of a review track (`fast` or `deep`). */
 export type ReviewTrackStatus = 'pending' | 'running' | 'complete' | 'failed' | 'not-required';
 
+/** Raw execution telemetry input reduced into a canonical review execution record. */
 export interface ReviewExecutionInput {
     readonly reviewId: string;
     readonly coverage: readonly ReviewCapabilityCoverage[];

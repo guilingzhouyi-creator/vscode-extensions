@@ -8,20 +8,25 @@
  */
 import { createHash } from 'node:crypto';
 
+/** Git blob object hash descriptor binding snapshot content identity. */
 export interface SnapshotGitObject {
     readonly algorithm: 'git-sha1';
     readonly value: string;
 }
+/** Cryptographic SM3 manifest digest descriptor for snapshot provenance. */
 export interface SnapshotDigest {
     readonly algorithm: 'sm3';
     readonly value: string;
 }
+/** Immutable repository, tree, and manifest identity tuple for a snapshot. */
 export interface SourceSnapshotIdentity {
     readonly repositoryId: string;
     readonly tree: SnapshotGitObject;
     readonly manifestDigest: SnapshotDigest;
 }
+/** Git file mode literal supported inside source snapshots. */
 export type SnapshotFileMode = '100644' | '100755' | '120000' | '160000';
+/** Raw capture entry payload supplied when constructing a source snapshot. */
 export type SnapshotCaptureEntry = {
     readonly path: string;
     readonly object: SnapshotGitObject;
@@ -29,12 +34,14 @@ export type SnapshotCaptureEntry = {
     | { readonly mode: '100644' | '100755' | '120000'; readonly bytes: Uint8Array; readonly byteLength: number }
     | { readonly mode: '160000' }
 );
+/** Validated immutable manifest metadata for one entry in a snapshot. */
 export interface SnapshotEntry {
     readonly path: string;
     readonly mode: SnapshotFileMode;
     readonly object: SnapshotGitObject;
     readonly byteLength: number;
 }
+/** Resource ceiling parameters bounding snapshot entry counts and byte sizes. */
 export interface SnapshotBudget {
     readonly maxEntries: number;
     readonly maxBlobBytes: number;
@@ -43,6 +50,7 @@ export interface SnapshotBudget {
 interface SnapshotReadBase extends SnapshotEntry {
     readonly source: 'immutable-snapshot';
 }
+/** Discriminated read result classifying text, binary, missing, and unsupported entries. */
 export type SnapshotRead =
     | { readonly kind: 'missing'; readonly path: string; readonly source: 'immutable-snapshot' }
     | (SnapshotReadBase & { readonly kind: 'submodule' })
@@ -53,6 +61,7 @@ export type SnapshotRead =
         readonly encoding: 'utf-8'; readonly bom: boolean;
         readonly lineEnding: 'none' | 'lf' | 'crlf' | 'cr' | 'mixed';
     });
+/** Read-only source snapshot port decoupled from mutable workspace filesystem access. */
 export interface SourceSnapshot {
     readonly source: 'immutable-snapshot';
     readonly identity: SourceSnapshotIdentity;

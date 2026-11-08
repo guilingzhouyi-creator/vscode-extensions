@@ -6,8 +6,8 @@
  * Dependencies & Triggers: `npm run validate-naming-suite`; imports ../dist/api and assert.
  * Responsibilities: Assert file/dir naming conventions, global constants, mutable state,
  *   type/member casing, vague blacklist, single-letter guard, and collection semantics.
- * Exit Semantics & Design Rationale: Exits 0 on complete pass, 1 on failure. The failure tail comes
- *   from the shared harness entry rather than a local catch, so the exit contract lives in one place.
+ * Exit Semantics & Design Rationale: Exits 0 on complete pass, 1 on failure. The failure tail
+ *   comes from the shared harness entry rather than a local catch, centralizing exit contracts.
  */
 'use strict';
 

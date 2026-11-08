@@ -4,12 +4,12 @@
  * Architecture Role: Evaluates macro-level aggregate bounding envelopes across all staged files
  *   in a single commit batch ([Sigma L_add_max, Sigma L_del_max]), preventing multi-file monolithic
  *   dumps and enforcing atomic decomposition under batch-commit 6-layer topology.
- * Dependencies & Triggers: Consumes diff-bounds-governor; invoked by gate-self-slice and anti-gaming runners.
+ * Dependencies & Triggers: Consumes diff-bounds-governor; invoked by gate-self-slice and runners.
  * Responsibilities:
  *   1. Enforce batch-wide 5D ELOC addition ceiling (Sigma L_add <= 360 lines);
  *   2. Enforce batch-wide 5D ELOC deletion ceiling (Sigma L_del <= 280 lines);
- *   3. Enforce empirical substantive net turnover admission floor (Sigma Delta_5D >= Theta_admission).
- * Exit Semantics & Design Rationale: CC <= 15; deterministic calculations; zero transient allocations;
+ *   3. Enforce empirical net turnover admission floor (Sigma Delta_5D >= Theta_admission).
+ * Exit Semantics & Design Rationale: CC <= 15; deterministic math; zero transient allocations;
  *   strict fail-closed verification.
  */
 

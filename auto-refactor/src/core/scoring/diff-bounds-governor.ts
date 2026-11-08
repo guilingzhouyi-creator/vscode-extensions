@@ -3,13 +3,13 @@
  * File Path: src/core/scoring/diff-bounds-governor.ts
  * Architecture Role: Evaluates differential semantic bounding envelopes ([L_add_min, L_add_max]
  *   and [L_del_min, L_del_max]), computes empirical Net Semantic Turnover (Δ_net), derives
- *   dynamic non-hardcoded admission thresholds (Θ_admission), and maintains audit ledger persistence.
+ *   dynamic non-hardcoded admission thresholds (Θ_admission), and maintains ledger persistence.
  * Dependencies & Triggers: Consumes semantic-delta-classifier, payload-density, token-entropy,
- *   descriptive-statistics, and numerical-corridor; invoked by anti-gaming engines and gate runners.
+ *   descriptive-statistics, and numerical-corridor; invoked by anti-gaming engines and runners.
  * Responsibilities:
  *   1. Enforce differential bounds preventing addition inflation and defensive capability erosion;
  *   2. Compute objective Net Semantic Turnover subtracting cosmetic and relocated churn;
- *   3. Calculate empirical admission thresholds via trajectory sliding-window moments and Jeffreys Beta;
+ *   3. Derive empirical admission thresholds via trajectory sliding-window moments & Jeffreys Beta;
  *   4. Persist admission audit ledger to .auto-refactor-cache/admission-turnover-ledger.ndjson.
  * Exit Semantics & Design Rationale: CC <= 15; deterministic calculations; fail-safe ledger I/O;
  *   zero arbitrary magic thresholds.
@@ -32,10 +32,10 @@ export const MIN_SEMANTIC_LINE_DENSITY = 0.60;
 /** Minimum additions count before inflation heuristics begin strictly enforcing density. */
 export const INFLATION_SAMPLE_LINE_THRESHOLD = 15;
 
-/** Maximum fraction of an existing file's LOC that may be deleted without equivalent compensation. */
+/** Max fraction of an existing file's LOC deletable without equivalent compensation. */
 export const MAX_DELETION_FRACTION_EROSION = 0.40;
 
-/** Minimum deletion line allowance floor below which small file deletions are exempt from erosion checks. */
+/** Minimum deletion line floor below which small deletions skip erosion checks. */
 export const MIN_DELETION_ALLOWANCE_LOC = 10;
 
 /** Absolute default ceiling for effective LOC budget per single file. */

@@ -253,7 +253,11 @@ fn match_bitmask_column(
         let idx = bits.trailing_zeros() as usize;
         bits &= bits - 1;
         let (last_line, allowed_col) = next_allowed[idx];
-        let min_col = if last_line == line_num { allowed_col } else { 0 };
+        let min_col = if last_line == line_num {
+            allowed_col
+        } else {
+            0
+        };
         if let Some(next_col) = try_match_candidate_at(
             line_bytes,
             line_num,
@@ -325,14 +329,9 @@ fn match_dense_column(
         if cand.needle_byte != anchor {
             continue;
         }
-        if let Some(next_col) = try_match_candidate_at(
-            line_bytes,
-            line_num,
-            col,
-            cand,
-            next_allowed[idx],
-            results,
-        ) {
+        if let Some(next_col) =
+            try_match_candidate_at(line_bytes, line_num, col, cand, next_allowed[idx], results)
+        {
             next_allowed[idx] = next_col;
         }
     }

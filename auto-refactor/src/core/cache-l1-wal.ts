@@ -17,6 +17,7 @@ const HEADER_CHECKSUM_OFFSET = 24;
 const CHECKSUM_OFFSET = 20;
 const MAX_PAYLOAD_BYTES = 128 * 1024 * 1024;
 
+/** L1 journal delta entry pairing a relative path with an updated or cleared fingerprint. */
 export type L1Delta = readonly [string, Fingerprint | null];
 
 /** Complete prefix metadata used to repair a torn append before the next write. */

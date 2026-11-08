@@ -63,7 +63,7 @@ export const ANALYZER_NAME_TO_BIT: Readonly<Record<string, number>> = Object.fre
     }, {}),
 );
 
-/** Immutable dictionary mapping single bit flags (both signed and unsigned) to their canonical analyzer names. */
+/** Maps single bit flags (signed and unsigned) to their canonical analyzer names. */
 export const BIT_TO_ANALYZER_NAME: Readonly<Record<number, string>> = Object.freeze(
     BUILTIN_ANALYZERS.reduce<Record<number, string>>((acc, name, idx) => {
         const signedBit = 1 << idx;

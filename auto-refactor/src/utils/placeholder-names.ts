@@ -1,8 +1,8 @@
 /**
  * Module: Utils — Generated Constant Name Placeholder Detection
  * File Path: src/utils/placeholder-names.ts
- * Architecture Role: Leaf predicate shared by the constant analyzer (whether a generated name may be
- *   applied automatically) and the reporting layer (whether a patch may be shown to an agent).
+ * Architecture Role: Leaf predicate shared by the constant analyzer (whether a name is safe for
+ *   autofix) and the reporting layer (whether a patch may be surfaced to an agent).
  * Dependencies & Triggers: The name-integrity adjudicator; once per literal finding and once per
  *   emitted patch.
  * Responsibilities: `isContentlessName` recognizes names carrying no trace of their literal,
@@ -28,7 +28,7 @@ export function isContentlessName(name: string | undefined): boolean {
     if (!name) return false;
     return CONTENTLESS_NAME_RE.test(name);
 }
-/** True when the literal does not account for the identifier's words; positional names are exempt. */
+/** True when the literal omits identifier words; positional names remain exempt. */
 export function isWeldName(name: string | undefined, literal: string | undefined): boolean {
     if (!name || !literal) return false;
     if (!name.endsWith(STRING_NAME_SUFFIX)) return false;

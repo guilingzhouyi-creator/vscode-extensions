@@ -10,12 +10,14 @@ import type { ResolvedAnalyzer } from '../analyzer-registry';
 import type { StreamingEntry, StreamingVisitHook } from '../ast/traverse';
 import type { LanguageAdapter, NormalizedAst, NodeProjector } from '../ast/multilang';
 
+/** Recorded parser adapter invocation state and diagnostic precision for one file. */
 export interface ParserExecutionObservation {
     readonly adapter: string;
     readonly precision: 'ast' | 'lexical' | 'unspecified';
     readonly status: 'complete' | 'degraded' | 'unavailable' | 'unsupported';
     readonly diagnostics: number | null;
 }
+/** Observed execution outcome for a single analyzer against one file. */
 export interface AnalyzerExecutionObservation {
     readonly analyzer: string;
     readonly version: number | null;
@@ -24,6 +26,7 @@ export interface AnalyzerExecutionObservation {
     readonly reason?: string;
     readonly failure?: string;
 }
+/** Aggregated parser and per-analyzer execution observations for one scanned file. */
 export interface FileExecutionObservation {
     readonly path: string;
     readonly parser: ParserExecutionObservation;

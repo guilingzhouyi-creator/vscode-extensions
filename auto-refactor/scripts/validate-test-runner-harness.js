@@ -48,9 +48,9 @@ async function main() {
     'Sandbox directory must be cleaned up after execution',
   );
 
-  // Exit contract: a failing entry must terminate the process with status 1 and name its suite.
-  // This is asserted through a child process because the contract is `process.exit`, which cannot be
-  // observed from inside the same process without replacing the global and losing the real code path.
+  // Exit contract: a failing entry must terminate the process with status 1 and suite name.
+  // Asserted via child process because `process.exit` cannot be observed in-process without
+  // mocking the global and bypassing the real exit path.
   const exitProbes = [
     { name: 'probe-runEntry', call: "runEntry('probe-runEntry', async () => { throw new Error('probe'); })" },
     {

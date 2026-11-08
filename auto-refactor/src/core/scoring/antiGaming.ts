@@ -588,6 +588,7 @@ function checkPatternPenaltyGaming(
     return null;
 }
 
+/** Evaluates conjunction of semantic ratio, diff bounds, turnover, and pattern gaming checks. */
 export function evaluateAntiGamingConjunction(
     input: AntiGamingConjunctionInput,
     config: AntiGamingScoringConfig = DEFAULT_SCORING_CONFIG.antiGaming,
@@ -612,9 +613,8 @@ export function evaluateAntiGamingConjunction(
  *
  * @param filePath - Physical path to the source file under evaluation.
  * @param content - Text content of the source file.
- * @param density - Effective-density result already computed for `content`, when the caller has it.
- *   Density evaluation tokenizes the whole file, and `evaluateFileQuality` needs the same result for
- *   its own indices, so passing it in avoids the second full-file tokenization per file.
+ * @param density - Precomputed density result for `content`, reused from `evaluateFileQuality`
+ *   to avoid tokenizing the file twice.
  * @returns Anti-gaming analysis result including penalty and identified issues.
  */
 export function detectScoreGaming(

@@ -7,7 +7,7 @@
  * Dependencies & Triggers: No imports; one instance per Scanner, read once per scan by
  *   `reportFinalizer` when it synthesizes native governance.
  * Responsibilities: Retain file text under a byte ceiling, seal once the ceiling is crossed, and
- *   answer whether a given file was kept so the caller never assumes a retention that did not happen.
+ *   report whether a file was kept so callers never assume retention that did not occur.
  * Exit Semantics & Design Rationale: Total and non-throwing. Sealing clears the map instead of
  *   evicting entries: a half-retained set would make the caller's hit rate depend on file order,
  *   which is harder to reason about than an all-or-nothing fallback. The default ceiling is 32 MB,
@@ -36,8 +36,7 @@ export class RetainedSourceStore {
         this.retainedBytes += bytes;
         return true;
     }
-    /** Retained text (empty once sealed, the caller's signal to read from disk), the byte ceiling in
-     *  force, and whether the ceiling was crossed. */
+    /** Retained source map (empty once sealed so callers fall back to disk reads). */
     public snapshot(): ReadonlyMap<string, string> {
         return this.entries;
     }

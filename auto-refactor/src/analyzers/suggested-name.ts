@@ -6,19 +6,22 @@
  * Dependencies & Triggers: Word derivation from the naming SSOT; once per emitted literal finding.
  * Responsibilities: Join the literal's ordered words with underscores, append the `_TEXT` suffix
  *   unless the slug already ends in it, and keep small integers position-named.
- * Exit Semantics & Design Rationale: Total, no I/O, never throws; an unsplittable literal degrades
- *   to the `EXTRACTED_*` fallback. Underscore joining matters because a whitespace-only split welded
- *   camelCase literals into names like `ARCHITECTUREANALYZERSEGMENTCACHES_TEXT`, which the reporter
- *   then discarded as mechanical. `SUGGESTED_NAME_INTEGER_LIMIT` is the bound above which an
- *   integer's magnitude says nothing about its role.
+ * Exit Semantics & Design Rationale: Total, no I/O, never throws; an unsplittable literal
+ *   falls back to `EXTRACTED_*`. Underscore joining keeps camelCase literals from welding into
+ *   noise names discarded by reporting. `SUGGESTED_NAME_INTEGER_LIMIT` bounds small integers.
  */
 import { REGEX } from '../core/constants';
 import { deriveLiteralWords, STRING_NAME_SUFFIX } from '../core/naming/name-integrity';
+
+/** Integer magnitude ceiling below which constants retain positional `CONST_<n>` names. */
 export const SUGGESTED_NAME_INTEGER_LIMIT = 1000;
-/** Fallbacks emitted when the literal yields no domain term, and the literal kinds distinguished. */
+/** Placeholder identifier fallback emitted for unexplainable numeric literals. */
 export const PLACEHOLDER_NUMBER_NAME = 'EXTRACTED_NUMBER';
+/** Placeholder identifier fallback emitted for unexplainable string literals. */
 export const PLACEHOLDER_STRING_NAME = 'EXTRACTED_STRING';
+/** Literal kind discriminant for numeric findings. */
 export const NUM_KIND = 'number';
+/** Literal kind discriminant for string findings. */
 export const STR_KIND = 'string';
 /** Suffix token marking a slug that already ends in `_TEXT`. */
 const STRING_SUFFIX_TOKEN = 'TEXT';
