@@ -18,7 +18,7 @@ use std::time::Instant;
 
 use fg_native::{RepoDocument, WorktreeRecord, WorktreeTier};
 use fractal_git::constants::cli::CliTag;
-use fractal_git::{QuotaGovernor, ScopeProjection, WorktreeMode, WorktreePool};
+use fractal_git::{FractalRef, QuotaGovernor, ScopeProjection, WorktreeMode, WorktreePool};
 
 use super::common::{fail_io, print_json, reject, CliContext};
 
@@ -205,7 +205,8 @@ fn handle_worktree_add(ctx: &CliContext) {
         );
     }
     let target_path = &ctx.args[1];
-    let (scopes, is_full, mode) = parse_worktree_add_options(&ctx.args[2..]);
+    let options = parse_worktree_add_options(&ctx.args[2..]);
+    let (scopes, is_full, mode) = (options.scopes.clone(), options.is_full, options.mode);
 
     let projection = if is_full {
         ScopeProjection::full()
@@ -219,6 +220,18 @@ fn handle_worktree_add(ctx: &CliContext) {
     let existing = list_registered_worktrees(&ctx.git_dir);
     if let Err(quota_err) = quota.assert_spawn_capacity(existing.len()) {
         reject(CliTag::ERROR, quota_err);
+    }
+
+    // Fan-out is checked against the references the repository actually holds, not the worktree
+    // registry: the registry records where a checkout landed, while the reference records which
+    // fractal node exists, and only the latter answers "how many siblings does this cell have".
+    if let Some(candidate) = options.fractal_ref() {
+        let ref_store = fg_topology::refs::DiskRefStore::new(&ctx.git_dir);
+        if let Err(fanout_err) =
+            fg_topology::assert_fanout_available_in(&candidate, &ref_store)
+        {
+            reject(CliTag::ERROR, fanout_err);
+        }
     }
 
     let started_at = Instant::now();
@@ -376,30 +389,91 @@ fn materialize_worktree_files(
 }
 
 /// Parses CLI flags specific to `worktree add` command.
-fn parse_worktree_add_options(args: &[String]) -> (Vec<String>, bool, WorktreeMode) {
-    let mut scopes = Vec::new();
-    let mut is_full = false;
-    let mut mode = WorktreeMode::VirtualMemory;
+/// Options accepted by `worktree add`.
+struct WorktreeAddOptions {
+    /// Path envelopes the worktree may write.
+    scopes: Vec<String>,
+    /// Whether the worktree materializes the full universe.
+    is_full: bool,
+    /// Storage mode the projection uses.
+    mode: WorktreeMode,
+    /// Integration cell the worktree belongs to, when one was named.
+    cell_id: Option<String>,
+    /// Parent Agent worktree a subagent hangs under, when one was named.
+    card_id: Option<String>,
+    /// Subagent identifier, which makes the reference an ephemeral leaf.
+    subagent_id: Option<String>,
+}
+
+impl WorktreeAddOptions {
+    /// Builds the fractal reference this worktree occupies, or `None` when no topology was named.
+    ///
+    /// Creating a worktree without a reference stays supported: `worktree add` also serves plain
+    /// scoped checkouts, and demanding a cell would break those callers. The reference is only
+    /// formed when the caller supplies enough of the path to name one.
+    fn fractal_ref(&self) -> Option<FractalRef> {
+        let cell = self.cell_id.as_ref()?;
+        match (&self.card_id, &self.subagent_id) {
+            (Some(card), Some(sub)) => Some(FractalRef::SubAgentWorktree {
+                cell_id: cell.clone(),
+                card_id: card.clone(),
+                subagent_id: sub.clone(),
+            }),
+            (Some(card), None) => Some(FractalRef::CardWorktree {
+                cell_id: cell.clone(),
+                card_id: card.clone(),
+            }),
+            (None, _) => Some(FractalRef::CellMain {
+                cell_id: cell.clone(),
+            }),
+        }
+    }
+}
+
+fn parse_worktree_add_options(args: &[String]) -> WorktreeAddOptions {
+    let mut options = WorktreeAddOptions {
+        scopes: Vec::new(),
+        is_full: false,
+        mode: WorktreeMode::VirtualMemory,
+        cell_id: None,
+        card_id: None,
+        subagent_id: None,
+    };
 
     let mut cursor = 0;
     while cursor < args.len() {
-        if args[cursor] == "--full" {
-            is_full = true;
-            cursor += 1;
-        } else if args[cursor] == "--scope" && cursor + 1 < args.len() {
-            scopes.push(args[cursor + 1].clone());
-            cursor += 2;
-        } else if args[cursor] == "--mode" && cursor + 1 < args.len() {
-            mode = match args[cursor + 1].as_str() {
-                "cow" => WorktreeMode::CoWClone,
-                "sparse" => WorktreeMode::SparseGhost,
-                _ => WorktreeMode::VirtualMemory,
-            };
-            cursor += 2;
-        } else {
-            cursor += 1;
+        match args[cursor].as_str() {
+            "--full" => {
+                options.is_full = true;
+                cursor += 1;
+            }
+            "--scope" if cursor + 1 < args.len() => {
+                options.scopes.push(args[cursor + 1].clone());
+                cursor += 2;
+            }
+            "--mode" if cursor + 1 < args.len() => {
+                options.mode = match args[cursor + 1].as_str() {
+                    "cow" => WorktreeMode::CoWClone,
+                    "sparse" => WorktreeMode::SparseGhost,
+                    _ => WorktreeMode::VirtualMemory,
+                };
+                cursor += 2;
+            }
+            "--cell" if cursor + 1 < args.len() => {
+                options.cell_id = Some(args[cursor + 1].clone());
+                cursor += 2;
+            }
+            "--card" if cursor + 1 < args.len() => {
+                options.card_id = Some(args[cursor + 1].clone());
+                cursor += 2;
+            }
+            "--sub" if cursor + 1 < args.len() => {
+                options.subagent_id = Some(args[cursor + 1].clone());
+                cursor += 2;
+            }
+            _ => cursor += 1,
         }
     }
 
-    (scopes, is_full, mode)
+    options
 }
