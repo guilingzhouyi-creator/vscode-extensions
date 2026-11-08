@@ -121,6 +121,19 @@ export class FileExecutionObserver {
         };
     }
 
+    private resolveParserStatus(
+        adapter: LanguageAdapter,
+        diagnostics: readonly unknown[] | undefined,
+        supported: boolean,
+    ): ParserExecutionObservation['status'] {
+        if (!supported) return 'unsupported';
+        if (adapter.precision === 'lexical') return 'degraded';
+        if (adapter.precision === 'ast' && diagnostics) {
+            return diagnostics.length === 0 ? 'complete' : 'degraded';
+        }
+        return 'unavailable';
+    }
+
     /** Freeze completed observations after all streaming/batch calls and any parser fallback. */
     finish(
         adapter: LanguageAdapter,
@@ -130,21 +143,20 @@ export class FileExecutionObserver {
         const native = parsed.sourceFile as { parseDiagnostics?: readonly unknown[] } | undefined;
         const candidate = parsed.parseDiagnostics ?? native?.parseDiagnostics;
         const diagnostics = Array.isArray(candidate) ? candidate : undefined;
-        let status: ParserExecutionObservation['status'] = 'unavailable';
-        if (!supported) status = 'unsupported';
-        else if (adapter.precision === 'lexical') status = 'degraded';
-        else if (adapter.precision === 'ast' && diagnostics) {
-            status = diagnostics.length === 0 ? 'complete' : 'degraded';
-        }
+        const status = this.resolveParserStatus(adapter, diagnostics, supported);
         const parser: ParserExecutionObservation = Object.freeze({
-            adapter: adapter.id, precision: adapter.precision ?? 'unspecified',
-            status, diagnostics: diagnostics?.length ?? null,
+            adapter: adapter.id,
+            precision: adapter.precision ?? 'unspecified',
+            status,
+            diagnostics: diagnostics?.length ?? null,
         });
         const analyzers: AnalyzerExecutionObservation[] = [];
         for (const calls of this.calls.values()) analyzers.push(this.finishAnalyzer(calls, parser));
         const bounds = this.scope.lineBounds;
         return Object.freeze({
-            path: this.file, parser, analyzers: Object.freeze(analyzers),
+            path: this.file,
+            parser,
+            analyzers: Object.freeze(analyzers),
             ...(bounds ? { lineBounds: Object.freeze([bounds[0], bounds[1]] as const) } : {}),
         });
     }

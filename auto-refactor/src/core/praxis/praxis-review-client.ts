@@ -242,6 +242,10 @@ export class PraxisReviewClient implements IPraxisReviewClient {
         return verdict;
     }
 
+    private isPlanAnalyzerActive(activeSet: Set<string> | undefined, analyzerId: string): boolean {
+        return !activeSet || activeSet.has(analyzerId);
+    }
+
     private collectContentAuditIssues(
         filePath: string,
         fileContent: string,
@@ -253,19 +257,14 @@ export class PraxisReviewClient implements IPraxisReviewClient {
             ? new Set(sparsePlan.activeAnalyzers)
             : undefined;
         const issues: Issue[] = [];
-        if (!activeSet || activeSet.has('performance')) {
-            const perfIssues = defaultPerformanceEvaluator.auditSource(filePath, fileContent);
-            for (let i = 0; i < perfIssues.length; i++) issues.push(perfIssues[i]);
+        if (this.isPlanAnalyzerActive(activeSet, 'performance')) {
+            issues.push(...defaultPerformanceEvaluator.auditSource(filePath, fileContent));
         }
-
-        if (!activeSet || activeSet.has('data-architecture')) {
-            const dataIssues = defaultDataArchitectureEvaluator.audit(filePath, fileContent, graph);
-            for (let i = 0; i < dataIssues.length; i++) issues.push(dataIssues[i]);
+        if (this.isPlanAnalyzerActive(activeSet, 'data-architecture')) {
+            issues.push(...defaultDataArchitectureEvaluator.audit(filePath, fileContent, graph));
         }
-
-        if ((!activeSet || activeSet.has('test-modernity')) && isTestFilePath(filePath)) {
-            const testIssues = defaultTestModernityEvaluator.auditTestSource(filePath, fileContent);
-            for (let i = 0; i < testIssues.length; i++) issues.push(testIssues[i]);
+        if (this.isPlanAnalyzerActive(activeSet, 'test-modernity') && isTestFilePath(filePath)) {
+            issues.push(...defaultTestModernityEvaluator.auditTestSource(filePath, fileContent));
         }
         return issues;
     }

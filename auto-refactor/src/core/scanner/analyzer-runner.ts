@@ -220,8 +220,12 @@ function ensureSourceFile(base: FileContextBase): ts.SourceFile | undefined {
         return base.sourceFile;
     }
     base.lazySourceFileResolved = true;
-    if (base.adapter.id === 'typescript' || base.adapter.id === 'oxc') {
-        base.sourceFile = require('../../utils/ast').createSourceFile(base.rel, base.content);
+    const isTsFamily = base.adapter.id === 'typescript' || base.adapter.id === 'oxc';
+    if (isTsFamily) {
+        const astModule = require('../../utils/ast') as {
+            createSourceFile: (filePath: string, text: string) => ts.SourceFile;
+        }; // @lazy deferred load so oxc-only scans never load typescript
+        base.sourceFile = astModule.createSourceFile(base.rel, base.content);
     }
     return base.sourceFile;
 }
@@ -486,6 +490,46 @@ function collectCurrentFileLoopSites(plan: ResolvedAnalyzer[]): LoopSite[] {
  * Concurrency: asynchronous per-file execution; safe for concurrent execution on separate files.
  * @returns The file's issues, metric summary, and cross-file summaries.
  */
+function assembleFileAnalyzerResult(params: {
+    issues: Issue[];
+    metric: FileMetric | null;
+    execution?: FileExecutionObserver;
+    adapter: LanguageAdapter;
+    parsed: NormalizedAst | NodeProjector;
+    rel: string;
+    cfg: ScanConfig;
+    fileSymbols: { definitions: SymbolDefinition[]; references: SymbolReference[] };
+    literals: LiteralOccurrence[];
+    loopSites: LoopSite[];
+    graphEdges?: ModuleGraphFileSummary;
+}) {
+    const {
+        issues,
+        metric,
+        execution,
+        adapter,
+        parsed,
+        rel,
+        cfg,
+        fileSymbols,
+        literals,
+        loopSites,
+        graphEdges,
+    } = params;
+    const hasSymbols = fileSymbols.definitions.length > 0 || fileSymbols.references.length > 0;
+    return {
+        issues,
+        metric,
+        ...(execution
+            ? { execution: execution.finish(adapter, parsed, hasAdapterFor(rel, cfg.parser)) }
+            : {}),
+        ...(hasSymbols ? { symbols: fileSymbols } : {}),
+        ...(literals.length > 0 ? { literals } : {}),
+        ...(loopSites.length > 0 ? { loopSites } : {}),
+        ...(graphEdges ? { graphEdges } : {}),
+    };
+}
+
 export async function runFileAnalyzers(
     host: AnalyzerHost,
     rel: string,
@@ -504,7 +548,8 @@ export async function runFileAnalyzers(
 }> {
     const cfg = host.config;
     const execution = host.observeExecution
-        ? new FileExecutionObserver(rel, host.plan, { activeAnalyzers, lineBounds }) : undefined;
+        ? new FileExecutionObserver(rel, host.plan, { activeAnalyzers, lineBounds })
+        : undefined;
     const adapter = adapterFor(rel, cfg.parser);
     const partition = partitionPlan(host.plan, activeAnalyzers);
     seedDependencyGraph(host, rel, content);
@@ -513,8 +558,6 @@ export async function runFileAnalyzers(
         parse.proj?.sourceFile ??
         parse.ast?.sourceFile ??
         materializeSourceFile(rel, content, partition.legacy, adapter);
-    // Compute line stats ONCE per file so every analyzer shares a single pass: the metric
-    // collector always needs them, and large-file reads them when enabled.
     const preflightMask = evaluateFilePreflightMask(content, rel, cfg);
     const base: FileContextBase = {
         rel,
@@ -529,8 +572,6 @@ export async function runFileAnalyzers(
     };
 
     const issues: Issue[] = [];
-    // Fail closed: when no adapter claims this extension the file is still analyzed by the
-    // line-based rules, but the scan must never look clean about the missing AST signal.
     const languageIssue = unsupportedLanguageDiagnostic(rel, cfg);
     if (languageIssue) issues.push(languageIssue);
 
@@ -562,19 +603,17 @@ export async function runFileAnalyzers(
     const graphEdges =
         host.graph?.extractFileSummary(rel) ?? extractModuleGraphSummary(rel, content);
 
-    return {
+    return assembleFileAnalyzerResult({
         issues,
         metric: outcome.metric.metric,
-        ...(execution ? {
-            execution: execution.finish(
-                adapter, outcome.ast ?? parse.proj!, hasAdapterFor(rel, cfg.parser),
-            ),
-        } : {}),
-        ...(fileSymbols.definitions.length > 0 || fileSymbols.references.length > 0
-            ? { symbols: fileSymbols }
-            : {}),
-        ...(literals.length > 0 ? { literals } : {}),
-        ...(loopSites.length > 0 ? { loopSites } : {}),
-        ...(graphEdges ? { graphEdges } : {}),
-    };
+        execution,
+        adapter,
+        parsed: outcome.ast ?? parse.proj!,
+        rel,
+        cfg,
+        fileSymbols,
+        literals,
+        loopSites,
+        graphEdges,
+    });
 }

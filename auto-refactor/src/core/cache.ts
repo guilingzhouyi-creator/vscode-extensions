@@ -365,6 +365,20 @@ export class CacheStore {
         }
     }
 
+    private extractL2OptionalExtras(
+        rawObject: Record<string, unknown>,
+        metadataOnly: boolean,
+    ): Partial<Pick<L2Entry, 'symbols' | 'literals' | 'loopSites' | 'graphEdges'>> {
+        if (metadataOnly) return {};
+        const extras: Partial<Pick<L2Entry, 'symbols' | 'literals' | 'loopSites' | 'graphEdges'>> =
+            {};
+        if (rawObject.symbols) extras.symbols = rawObject.symbols as L2Entry['symbols'];
+        if (rawObject.literals) extras.literals = rawObject.literals as L2Entry['literals'];
+        if (rawObject.loopSites) extras.loopSites = rawObject.loopSites as L2Entry['loopSites'];
+        if (rawObject.graphEdges) extras.graphEdges = rawObject.graphEdges as L2Entry['graphEdges'];
+        return extras;
+    }
+
     private parseL2Record(line: string, metadataOnly = false): L2Entry | null {
         try {
             const rawObject = JSON.parse(line) as Record<string, unknown>;
@@ -377,18 +391,7 @@ export class CacheStore {
                 ts: typeof rawObject.ts === TYPEOF_NUMBER ? (rawObject.ts as number) : 0,
                 fm: typeof rawObject.fm === TYPEOF_NUMBER ? (rawObject.fm as number) : undefined,
                 fs: typeof rawObject.fs === TYPEOF_NUMBER ? (rawObject.fs as number) : undefined,
-                ...(rawObject.symbols && !metadataOnly
-                    ? { symbols: rawObject.symbols as L2Entry['symbols'] }
-                    : {}),
-                ...(rawObject.literals && !metadataOnly
-                    ? { literals: rawObject.literals as L2Entry['literals'] }
-                    : {}),
-                ...(rawObject.loopSites && !metadataOnly
-                    ? { loopSites: rawObject.loopSites as L2Entry['loopSites'] }
-                    : {}),
-                ...(rawObject.graphEdges && !metadataOnly
-                    ? { graphEdges: rawObject.graphEdges as L2Entry['graphEdges'] }
-                    : {}),
+                ...this.extractL2OptionalExtras(rawObject, metadataOnly),
                 decoded: true,
             };
         } catch {
@@ -712,6 +715,44 @@ export class CacheStore {
         );
     }
 
+    private flushDirtyL1ToDisk(): void {
+        if (this.dirtyL1.size === 0) return;
+        const migrating = !this.l1Journal.ready;
+        const compacting = !this.l1Journal.busy && this.shouldRewriteL1Snapshot();
+        if (compacting) {
+            writeFileAtomic(this.fingerprintsPath, serializeL1(this.l1));
+            this.appendedL1Count = 0;
+            this.l1Journal.checkpointSync(this.l1);
+        } else {
+            appendLinesSafe(this.fingerprintsPath, serializeL1(this.dirtyL1));
+            this.appendedL1Count += this.dirtyL1.size;
+            this.l1Journal.appendSync(this.dirtyL1, this.l1);
+        }
+        if (migrating || compacting) this.writeArc2L1SnapshotSync();
+        this.dirtyL1.clear();
+    }
+
+    private flushDirtyL2ToDisk(): void {
+        const hasPendingRemoval = this.l2RemovalGeneration !== this.l2PersistedRemovalGeneration;
+        if (this.dirtyL2.size === 0 && !hasPendingRemoval) return;
+        if (this.shouldRewriteL2Snapshot()) {
+            for (const entry of this.l2.values()) {
+                ensureL2EntryDecoded(entry);
+            }
+            writeFileAtomic(this.resultsPath, serializeL2(this.l2));
+            writeFileAtomic(this.pathsPath, serializePaths(this.l2ByPath));
+            this.writeArc2L2SnapshotSync();
+            this.l2PersistedRemovalGeneration = this.l2RemovalGeneration;
+            this.appendedL2Count = 0;
+        } else {
+            appendLinesSafe(this.resultsPath, serializeL2(this.dirtyL2));
+            appendLinesSafe(this.pathsPath, serializeDirtyPaths(this.dirtyL2.values()));
+            this.appendArc2L2WalSync();
+            this.appendedL2Count += this.dirtyL2.size;
+        }
+        this.dirtyL2.clear();
+    }
+
     /**
      * Flushes dirty entries to disk using Append-Only WAL or periodic compaction snapshot.
      */
@@ -722,42 +763,8 @@ export class CacheStore {
         }
         if (!this.executeFlushPreparation()) return;
         try {
-            if (this.dirtyL1.size > 0) {
-                const migrating = !this.l1Journal.ready;
-                const compacting = !this.l1Journal.busy && this.shouldRewriteL1Snapshot();
-                if (compacting) {
-                    writeFileAtomic(this.fingerprintsPath, serializeL1(this.l1));
-                    this.appendedL1Count = 0;
-                    this.l1Journal.checkpointSync(this.l1);
-                } else {
-                    appendLinesSafe(this.fingerprintsPath, serializeL1(this.dirtyL1));
-                    this.appendedL1Count += this.dirtyL1.size;
-                    this.l1Journal.appendSync(this.dirtyL1, this.l1);
-                }
-                if (migrating || compacting) this.writeArc2L1SnapshotSync();
-                this.dirtyL1.clear();
-            }
-            if (
-                this.dirtyL2.size > 0 ||
-                this.l2RemovalGeneration !== this.l2PersistedRemovalGeneration
-            ) {
-                if (this.shouldRewriteL2Snapshot()) {
-                    for (const entry of this.l2.values()) {
-                        ensureL2EntryDecoded(entry);
-                    }
-                    writeFileAtomic(this.resultsPath, serializeL2(this.l2));
-                    writeFileAtomic(this.pathsPath, serializePaths(this.l2ByPath));
-                    this.writeArc2L2SnapshotSync();
-                    this.l2PersistedRemovalGeneration = this.l2RemovalGeneration;
-                    this.appendedL2Count = 0;
-                } else {
-                    appendLinesSafe(this.resultsPath, serializeL2(this.dirtyL2));
-                    appendLinesSafe(this.pathsPath, serializeDirtyPaths(this.dirtyL2.values()));
-                    this.appendArc2L2WalSync();
-                    this.appendedL2Count += this.dirtyL2.size;
-                }
-                this.dirtyL2.clear();
-            }
+            this.flushDirtyL1ToDisk();
+            this.flushDirtyL2ToDisk();
         } catch {
             /* Best-effort: scan stands on its own */
         }

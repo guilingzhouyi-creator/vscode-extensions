@@ -405,22 +405,29 @@ export function serializeArc2L2FramesOnly(entries: Iterable<L2EntryRecord>): Buf
     return Buffer.concat(frames);
 }
 
-function parseSingleFrame(
+function validateArc2FrameHeader(
     buf: Buffer,
     offset: number,
-    lazyDecode: boolean,
-): { entry: L2EntryRecord; nextOffset: number } | null {
+): { ts: number; frameEnd: number } | null {
     if (offset + ARC2_FRAME_HEADER_BYTES > buf.length) return null;
-    const frameMagic = buf.readUInt32LE(offset);
-    if (frameMagic !== ARC2_FRAME_MAGIC) return null;
+    if (buf.readUInt32LE(offset) !== ARC2_FRAME_MAGIC) return null;
     const payloadByteLen = buf.readUInt32LE(offset + 4);
     const expectedCrc = buf.readUInt32LE(offset + 8);
     const ts = buf.readDoubleLE(offset + 16);
     const frameEnd = offset + ARC2_FRAME_HEADER_BYTES + payloadByteLen;
     if (frameEnd > buf.length) return null;
-
     const actualCrc = computeBufferChecksum(buf, offset + ARC2_FRAME_HEADER_BYTES, frameEnd);
-    if (actualCrc !== expectedCrc) return null;
+    return actualCrc === expectedCrc ? { ts, frameEnd } : null;
+}
+
+function parseSingleFrame(
+    buf: Buffer,
+    offset: number,
+    lazyDecode: boolean,
+): { entry: L2EntryRecord; nextOffset: number } | null {
+    const header = validateArc2FrameHeader(buf, offset);
+    if (!header) return null;
+    const { ts, frameEnd } = header;
 
     let pos = offset + ARC2_FRAME_HEADER_BYTES;
     if (pos + 4 > frameEnd) return null;
@@ -456,10 +463,8 @@ function parseSingleFrame(
         decoded: false,
     };
 
-    if (!lazyDecode) {
-        if (!ensureL2EntryDecoded(entry)) {
-            return null;
-        }
+    if (!lazyDecode && !ensureL2EntryDecoded(entry)) {
+        return null;
     }
 
     return { entry, nextOffset: frameEnd };

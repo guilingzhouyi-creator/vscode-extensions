@@ -737,6 +737,31 @@ function collectWorkerLoopSites(streaming: LoadedAnalyzer[]): LoopSite[] {
     return [];
 }
 
+function assembleWorkerResultItem(params: {
+    file: string;
+    issues: Issue[];
+    metric: FileMetric | null;
+    fileSymbols: { definitions: SymbolDefinition[]; references: SymbolReference[] };
+    literals: LiteralOccurrence[];
+    loopSites: LoopSite[];
+    graphEdges?: ModuleGraphFileSummary;
+}): WorkerResultItem {
+    const { file, issues, metric, fileSymbols, literals, loopSites, graphEdges } = params;
+    const symbols =
+        fileSymbols.definitions.length > 0 || fileSymbols.references.length > 0
+            ? fileSymbols
+            : undefined;
+    return {
+        file,
+        issues,
+        metric,
+        symbols,
+        ...(literals.length > 0 ? { literals } : {}),
+        ...(loopSites.length > 0 ? { loopSites } : {}),
+        ...(graphEdges ? { graphEdges } : {}),
+    };
+}
+
 function executeScanPipeline(
     file: string,
     content: string,
@@ -839,23 +864,15 @@ function executeScanPipeline(
         /* Best-effort */
     }
 
-    const symbols =
-        fileSymbols.definitions.length > 0 || fileSymbols.references.length > 0
-            ? fileSymbols
-            : undefined;
-    const literals = fileLiterals.extractFileOccurrences(file);
-    const loopSites = collectWorkerLoopSites(streaming);
-    const graphEdges = extractModuleGraphSummary(file, content);
-
-    return {
+    return assembleWorkerResultItem({
         file,
         issues,
         metric: runResult.metric,
-        symbols,
-        ...(literals.length > 0 ? { literals } : {}),
-        ...(loopSites.length > 0 ? { loopSites } : {}),
-        ...(graphEdges ? { graphEdges } : {}),
-    };
+        fileSymbols,
+        literals: fileLiterals.extractFileOccurrences(file),
+        loopSites: collectWorkerLoopSites(streaming),
+        graphEdges: extractModuleGraphSummary(file, content),
+    });
 }
 
 interface RunOneContext {

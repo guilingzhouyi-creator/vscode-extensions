@@ -401,6 +401,32 @@ function encodeFileMetric(writer: Writer, metric: FileMetric | null | undefined)
     writeOptionalMetricField(writer, metric.tokensPerEloc);
 }
 
+function writeOptionalIssueString(writer: Writer, text: string | undefined): void {
+    if (text !== undefined) {
+        writer.writeU8(1);
+        writer.writeString(text);
+    } else {
+        writer.writeU8(0);
+    }
+}
+
+function writeOptionalIssueValue(writer: Writer, value: unknown): void {
+    if (value !== undefined) {
+        writer.writeU8(1);
+        writer.writeValue(value);
+    } else {
+        writer.writeU8(0);
+    }
+}
+
+function writeIssueLocation(writer: Writer, loc: Issue['location'] | undefined): void {
+    writer.writeString(loc?.file ?? '');
+    writer.writeVarint(loc?.start?.line ?? 0);
+    writer.writeVarint(loc?.start?.column ?? 0);
+    writer.writeVarint(loc?.end?.line ?? 0);
+    writer.writeVarint(loc?.end?.column ?? 0);
+}
+
 function encodeFileIssue(writer: Writer, issue: Issue): void {
     writer.writeString(issue.id ?? '');
     writer.writeString(issue.analyzer ?? '');
@@ -409,32 +435,11 @@ function encodeFileIssue(writer: Writer, issue: Issue): void {
         issue.severity === SEVERITY_INFO ? 0 : issue.severity === SEVERITY_WARNING ? 1 : 2;
     writer.writeU8(severityCode);
     writer.writeString(issue.message ?? '');
-    const loc = issue.location;
-    writer.writeString(loc?.file ?? '');
-    writer.writeVarint(loc?.start?.line ?? 0);
-    writer.writeVarint(loc?.start?.column ?? 0);
-    writer.writeVarint(loc?.end?.line ?? 0);
-    writer.writeVarint(loc?.end?.column ?? 0);
+    writeIssueLocation(writer, issue.location);
     writer.writeValue(issue.detail);
-    if (issue.suggestion !== undefined) {
-        writer.writeU8(1);
-        writer.writeString(issue.suggestion);
-    } else {
-        writer.writeU8(0);
-    }
-    if (issue.actionable !== undefined) {
-        writer.writeU8(1);
-        writer.writeValue(issue.actionable);
-    } else {
-        writer.writeU8(0);
-    }
-    const extraFields = extractIssueExtraFields(issue);
-    if (extraFields !== undefined) {
-        writer.writeU8(1);
-        writer.writeValue(extraFields);
-    } else {
-        writer.writeU8(0);
-    }
+    writeOptionalIssueString(writer, issue.suggestion);
+    writeOptionalIssueValue(writer, issue.actionable);
+    writeOptionalIssueValue(writer, extractIssueExtraFields(issue));
 }
 
 function encodeFileExtras(writer: Writer, fileResult: FileResult): void {

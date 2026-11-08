@@ -34,18 +34,21 @@ function assertSequence(sequence: number): void {
     }
 }
 
+function isFiniteNumber(val: unknown): val is number {
+    return typeof val === 'number' && Number.isFinite(val);
+}
+
+function isNonNegativeFinite(val: unknown): val is number {
+    return isFiniteNumber(val) && val >= 0;
+}
+
 function isFingerprint(value: unknown): value is Fingerprint {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
     const record = value as Record<string, unknown>;
-    return (
-        typeof record.mtimeMs === 'number' &&
-        Number.isFinite(record.mtimeMs) &&
-        typeof record.size === 'number' &&
-        Number.isFinite(record.size) &&
-        record.size >= 0 &&
-        (record.ino === undefined ||
-            (typeof record.ino === 'number' && Number.isFinite(record.ino) && record.ino >= 0))
-    );
+    if (!isFiniteNumber(record.mtimeMs) || !isNonNegativeFinite(record.size)) {
+        return false;
+    }
+    return record.ino === undefined || isNonNegativeFinite(record.ino);
 }
 
 function assertDelta(value: unknown): asserts value is L1Delta {
