@@ -269,17 +269,28 @@ if [[ -n "$TOUCHED_SKILLS" ]]; then
 fi
 
 # --- 提交信息规则覆盖清单双向闭包：内核规则族与外部真源之间不允许静默遗漏 ---
-if ! "$NODE_BIN" scripts/common/validate-commit-rule-coverage.js >"$STEP_LOG" 2>&1; then
-    record_pre_commit_failure "COMMIT-MSG-COVERAGE-15" \
-        "FGT-MSG-002" \
-        "Commit message rule coverage closure does not hold in both directions." \
-        "Run node scripts/common/validate-commit-rule-coverage.js to inspect unmapped or zombie rules." \
-        "node scripts/common/validate-commit-rule-coverage.js" \
-        "scripts/common/commit-rule-coverage.json"
-    cat "$ROOT_DIR/.audit-logs/last-failure.json"
-    exit 1
+write_step_banner "COMMIT-MSG-COVERAGE-15" "提交信息规则覆盖清单双向闭包校验"
+if [[ "$AGENT_MODE" == "1" ]]; then
+    if ! "$NODE_BIN" scripts/common/validate-commit-rule-coverage.js >"$STEP_LOG" 2>&1; then
+        record_pre_commit_failure "COMMIT-MSG-COVERAGE-15" \
+            "FGT-MSG-002" \
+            "Commit message rule coverage closure does not hold in both directions." \
+            "Run node scripts/common/validate-commit-rule-coverage.js to inspect unmapped or zombie rules." \
+            "node scripts/common/validate-commit-rule-coverage.js" \
+            "scripts/common/commit-rule-coverage.json"
+        write_step_verdict "COMMIT-MSG-COVERAGE-15" BLOCK "提交信息规则覆盖清单双向闭包不成立"
+        cat "$ROOT_DIR/.audit-logs/last-failure.json"
+        exit 1
+    fi
+    write_step_verdict "COMMIT-MSG-COVERAGE-15" PASS "覆盖清单双向闭包成立"
+else
+    if ! "$NODE_BIN" scripts/common/validate-commit-rule-coverage.js; then
+        write_step_verdict "COMMIT-MSG-COVERAGE-15" BLOCK "提交信息规则覆盖清单双向闭包不成立"
+        FAILED=1
+    else
+        write_step_verdict "COMMIT-MSG-COVERAGE-15" PASS "覆盖清单双向闭包成立"
+    fi
 fi
-write_step_verdict "COMMIT-MSG-COVERAGE-15" PASS "覆盖清单双向闭包成立"
 
 # --- 项目增量编译与语法验证 (精准增量触发) ---
 TOUCHED_WT_COMPILE=$(echo "$STAGED_FILES" | grep -E '^workspace-timing/(src/.+\.ts|tsconfig.*\.json)' || true)

@@ -485,15 +485,33 @@ if ($touchesSkills) {
             $failed = $true
         } else {
             Write-StepVerdict -StepId "SKILLS-SPEC-03" -Status "PASS" -Detail "技能集规范与插件同构合规"
-        # 提交信息规则覆盖清单双向闭包：内核规则族与外部真源之间不允许静默遗漏。
-        $resCoverage = Start-GateProcess -FilePath $nodeCmd -ArgumentList "scripts/common/validate-commit-rule-coverage.js" -WorkingDirectory $repoRoot
-        if ($resCoverage.ExitCode -ne 0) {
-            Write-StepVerdict -StepId "COMMIT-MSG-COVERAGE-15" -Status "BLOCK" -Detail "提交信息规则覆盖清单双向闭包不成立"
-            $failed = $true
-        } else {
-            Write-StepVerdict -StepId "COMMIT-MSG-COVERAGE-15" -Status "PASS" -Detail "覆盖清单双向闭包成立"
         }
-        }
+    }
+}
+
+# --- 提交信息规则覆盖清单双向闭包：内核规则族与外部真源之间不允许静默遗漏 ---
+if (-not $Agent) { Write-StepBanner -StepId "COMMIT-MSG-COVERAGE-15" }
+if ($Agent) {
+    $out = & $nodeCmd (Join-Path $repoRoot "scripts/common/validate-commit-rule-coverage.js") 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $json = Write-PreCommitFailure `
+            -StepId "COMMIT-MSG-COVERAGE-15" `
+            -RuleId "FGT-MSG-002" `
+            -Summary "Commit message rule coverage closure does not hold in both directions." `
+            -ActionableFix "Run 'node scripts/common/validate-commit-rule-coverage.js' to inspect unmapped or zombie rules." `
+            -VerifyCmd "node scripts/common/validate-commit-rule-coverage.js" `
+            -TargetFiles @("scripts/common/commit-rule-coverage.json") `
+            -Details ($out -join "`n")
+        Write-Output $json
+        exit 1
+    }
+} else {
+    $resCoverage = Start-GateProcess -FilePath $nodeCmd -ArgumentList "scripts/common/validate-commit-rule-coverage.js" -WorkingDirectory $repoRoot
+    if ($resCoverage.ExitCode -ne 0) {
+        Write-StepVerdict -StepId "COMMIT-MSG-COVERAGE-15" -Status "BLOCK" -Detail "提交信息规则覆盖清单双向闭包不成立"
+        $failed = $true
+    } else {
+        Write-StepVerdict -StepId "COMMIT-MSG-COVERAGE-15" -Status "PASS" -Detail "覆盖清单双向闭包成立"
     }
 }
 
