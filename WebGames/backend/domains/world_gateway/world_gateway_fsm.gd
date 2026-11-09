@@ -362,6 +362,56 @@ func _assimilate_perturbations(effective_world_id: String) -> void:
         broker.mark_world_visited(p.perturbation_id, effective_world_id)
     repo.save_world(world_inst)
 
+## 5. 序章向大地图探索无缝交接（水化创角终态，驱动 FSM 跃迁至 WORLD_EXPLORATION 并触发 HUD 初始同步）
+func handoff_prologue_to_world_exploration(handoff: PrologueHandoffDTO) -> Dictionary:
+    if handoff == null or handoff.character_id.is_empty():
+        return _fail("INVALID_HANDOFF", "序章交接对象不能为空且必须包含有效 character_id")
+
+    if not handoff.active_mods.is_empty():
+        active_mods = handoff.active_mods.duplicate()
+    context.active_character_id = handoff.character_id
+    if not handoff.assigned_start_location_id.is_empty():
+        context.selected_world_id = handoff.assigned_start_location_id
+
+    var fsm := GameLoopStateStack.new()
+    fsm.switch_to(GameLoopStateStack.EngineState.WORLD_EXPLORATION, {
+        "character_id": handoff.character_id,
+        "character_name": handoff.character_name,
+        "location_id": handoff.assigned_start_location_id,
+        "gold": handoff.initial_gold,
+        "race_id": handoff.race_id,
+        "origin_id": handoff.origin_id,
+        "attributes": handoff.allocated_attributes.duplicate(true),
+        "inventory_items": handoff.initial_inventory_items.duplicate(true)
+    })
+
+    context.current_phase = WorldGatewayModel.GatewayPhase.IN_WORLD
+
+    var hud_ctx: Dictionary = {
+        "account_id": context.account_id,
+        "character_id": handoff.character_id,
+        "character_name": handoff.character_name,
+        "wallet_gold": handoff.initial_gold,
+        "current_location": handoff.assigned_start_location_id,
+        "attributes": handoff.allocated_attributes
+    }
+    var snapshot: AuthoritativeHudSnapshotDTO = AuthoritativeHudSyncService.trigger_initial_sync(hud_ctx)
+
+    _notify_event("world_gateway.prologue_handed_off", {
+        "account_id": context.account_id,
+        "character_id": handoff.character_id,
+        "location_id": handoff.assigned_start_location_id,
+        "gold": handoff.initial_gold
+    })
+
+    return {
+        "success": true,
+        "phase": context.current_phase,
+        "state": fsm.current_state,
+        "snapshot": snapshot,
+        "handoff": handoff.to_dto()
+    }
+
 ## 退出世界回到世界栏主界面（门面方法，等价于 exit_to_gateway）
 func exit_world() -> Dictionary:
     return exit_to_gateway()

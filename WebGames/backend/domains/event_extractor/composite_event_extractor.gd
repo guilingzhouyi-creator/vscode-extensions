@@ -94,6 +94,15 @@ static func extract(
 # 步骤1 分组
 # ==============================================================================
 
+static func _new_group_entry(rule_id: String, account_id: String, transaction_id: String, projection: String) -> Dictionary:
+	return {
+		"rule_id": rule_id,
+		"account_id": account_id,
+		"transaction_id": transaction_id,
+		"projection": projection,
+		"events": []
+	}
+
 ## 以 (rule_id, account_id, transaction_id) 三元组为组合键分组原始事件批次
 static func group_primitive_events(batch: Array, grouping_rules: Array) -> Dictionary:
 	var groups := {}
@@ -105,13 +114,7 @@ static func group_primitive_events(batch: Array, grouping_rules: Array) -> Dicti
 		var rule_id := str(rule.get("rule_id", "raw"))
 		var key := _encode_composite_key([rule_id, prim["account_id"], prim["transaction_id"]])
 		if not groups.has(key):
-			groups[key] = {
-				"rule_id": rule_id,
-				"account_id": prim["account_id"],
-				"transaction_id": prim["transaction_id"],
-				"projection": str(rule.get("projection", "")),
-				"events": []
-			}
+			groups[key] = _new_group_entry(rule_id, str(prim["account_id"]), str(prim["transaction_id"]), str(rule.get("projection", "")))
 		groups[key]["events"].append(prim)
 	return groups
 
@@ -170,6 +173,11 @@ static func materialize(dto: CompositeEventDTO, library: AccountItemLibraryAggre
 # 步骤4 投影
 # ==============================================================================
 
+static func _ensure_item_projection_subdict(items: Dictionary, cid: String) -> Dictionary:
+	if not items.has(cid):
+		items[cid] = {}
+	return items[cid]
+
 ## 配置驱动派生视图：按账号汇总物品流与货币增量
 static func project(dto: CompositeEventDTO, projections: Dictionary, projection_name: String) -> Dictionary:
 	var rule: Dictionary = projections.get(projection_name, {})
@@ -177,9 +185,8 @@ static func project(dto: CompositeEventDTO, projections: Dictionary, projection_
 	for flow in dto.item_flows:
 		var cid := str(flow["canonical_id"])
 		var event_type := str(flow["event_type"])
-		if not items.has(cid):
-			items[cid] = {}
-		items[cid][event_type] = int(items[cid].get(event_type, 0)) + int(flow["quantity"])
+		var sub: Dictionary = _ensure_item_projection_subdict(items, cid)
+		sub[event_type] = int(sub.get(event_type, 0)) + int(flow["quantity"])
 	return {
 		"projection": projection_name,
 		"scope": str(rule.get("scope", "account")),

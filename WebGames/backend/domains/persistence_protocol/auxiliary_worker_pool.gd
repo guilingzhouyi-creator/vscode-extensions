@@ -250,6 +250,18 @@ func _cache_result(path: String, data: Variant) -> void:
 
 ## 底层纯 IO 与反序列化算子（可在非主线程安全执行）
 static func _load_resource_payload(path: String) -> Dictionary:
+	if path.ends_with(".kdat"):
+		if not FileAccess.file_exists(path):
+			return {"error": StorageContractInterfaces.ERR_NOT_FOUND}
+		var kdat_data: Variant = BinaryConfigReader.load_kdat_file(path)
+		if kdat_data == null:
+			return {"error": StorageContractInterfaces.ERR_CORRUPT}
+		var f := FileAccess.open(path, FileAccess.READ)
+		var b_len: int = f.get_length() if f != null else 0
+		if f != null:
+			f.close()
+		return {"data": kdat_data, "byte_count": b_len}
+
 	if not FileAccess.file_exists(path):
 		return {"error": StorageContractInterfaces.ERR_NOT_FOUND}
 

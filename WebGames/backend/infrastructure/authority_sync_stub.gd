@@ -31,12 +31,12 @@ func _init(p_mode: SyncMode = DEFAULT_MODE) -> void:
 # 二、权威校验与快照差分
 # ==============================================================================
 
-## 权威校验：单机直接通过，联机预留签名校验
+## 权威校验：单机直接通过，联机预留签名校验与隔离阻断
 func verify_authority(payload: Dictionary) -> Dictionary:
 	if mode == SyncMode.OFFLINE_TEXT:
-		return {"success": true, "verified": true, "mode": mode}
-	# 联机预留：需接入签名与回放校验（当前文字版不阻塞）
-	return {"success": false, "error_code": "ONLINE_NOT_IMPLEMENTED"}
+		return {"success": true, "verified": true, "mode": mode, "fast_path": true}
+	# 联机占位：由 RunModeIsolationSolver 快速失败阻断，杜绝空跑协程
+	return RunModeIsolationSolver.dispatch_authority_sync(WorldGatewayModel.GameMode.MULTIPLAYER, payload)
 
 ## 快照差分：文字版返回空差分，联机预留插值
 func diff_snapshot(old_state: Dictionary, new_state: Dictionary) -> Dictionary:

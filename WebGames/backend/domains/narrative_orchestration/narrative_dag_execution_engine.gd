@@ -18,11 +18,20 @@ var active_node_ids: Array[String] = []
 var completed_node_ids: Array[String] = []
 var runtime_context: Dictionary = {}
 var is_terminated: bool = false
+var _hook_interceptor: Callable = Callable()
 
 ## 出边邻接索引: from_node_id -> Array[NarrativeDAGEdge] (常数级获取出边)
 var _outgoing_edges_index: Dictionary = {}
 ## 前置依赖哈希集合: completed_node_id -> true (O(1) 汇聚依赖检查)
 var _completed_set: Dictionary = {}
+
+## 注册剧情节点拦截器（供 CG/视频播放等外部 Hook 挂接，解耦硬编码）
+func set_hook_interceptor(interceptor: Callable) -> void:
+	_hook_interceptor = interceptor
+
+## 获取当前注册的剧情节点拦截器
+func get_hook_interceptor() -> Callable:
+	return _hook_interceptor
 
 ## 以图结构初始化运行时会话：DAG 合法性校验（环检测/可达性）通过后激活入口节点并广播激活事件
 func initialize_with_graph(p_graph: NarrativeDAGGraphDTO, initial_context: Dictionary = {}) -> Dictionary:
@@ -40,6 +49,9 @@ func initialize_with_graph(p_graph: NarrativeDAGGraphDTO, initial_context: Dicti
 	completed_node_ids = []
 	_completed_set.clear()
 	is_terminated = false
+
+	if _hook_interceptor.is_valid():
+		_hook_interceptor.call(graph.graph_id, graph.entry_node_id, true)
 
 	_notify_event("narrative.dag.node_activated", {
 		"dag_id": graph.graph_id,
@@ -91,6 +103,9 @@ func _commit_node_completion(node_id: String, current_node: NarrativeDAGNode, ac
 	for k in action_payload.keys():
 		runtime_context[k] = action_payload[k]
 
+	if _hook_interceptor.is_valid():
+		_hook_interceptor.call(graph.graph_id, node_id, false)
+
 	_notify_event("narrative.dag.node_completed", {
 		"dag_id": graph.graph_id,
 		"node_id": node_id,
@@ -138,6 +153,8 @@ func _derive_downstream_activations(node_id: String, current_node: NarrativeDAGN
 			if not active_node_ids.has(next_id):
 				active_node_ids.append(next_id)
 				newly_activated.append(next_id)
+				if _hook_interceptor.is_valid():
+					_hook_interceptor.call(graph.graph_id, next_id, true)
 				_notify_event("narrative.dag.node_activated", {
 					"dag_id": graph.graph_id,
 					"node_id": next_id

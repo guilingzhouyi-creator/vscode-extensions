@@ -48,12 +48,14 @@ static func _merge_joypad_keys(raw_keys: Array, existing: Array) -> Array:
 			merged.append(item)
 	return merged
 
+const EMPTY_KEY_ARRAY: Array = []
+
 func _init() -> void:
 	var cfg_shortcuts: Dictionary = GameConfig.get_dict("domains.hardware_input", "keyboard_shortcuts", {})
 	for act_key in cfg_shortcuts.keys():
 		var raw_keys: Variant = cfg_shortcuts[act_key]
 		if raw_keys is Array:
-			var existing: Array = action_mappings.get(act_key, [])
+			var existing: Array = action_mappings.get(act_key, EMPTY_KEY_ARRAY)
 			action_mappings[str(act_key)] = _merge_joypad_keys(raw_keys as Array, existing)
 
 ## 解析 ESC 菜单栏动作路由配置（domains.hardware_input escape_menu_actions）
