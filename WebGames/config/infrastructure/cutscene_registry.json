@@ -1,0 +1,42 @@
+{
+  "_meta": {
+    "version": "1.0.0",
+    "description": "全域 CG 与视频资产清单注册表（纯净裸流免加密存储与无艺术资源文字占位）"
+  },
+  "cutscenes": {
+    "cs_prologue_awakening": {
+      "title_key": "cutscene.prologue_awakening.title",
+      "video_resource_path": "res://assets/media/cutscenes/prologue_awakening.ogv",
+      "duration_sec": 3.0,
+      "default_audio_bus": "BGM",
+      "default_volume_linear": 1.0,
+      "subtitles_track_id": "cutscene.prologue_awakening.subtitles",
+      "default_skippable": true,
+      "is_placeholder": true,
+      "placeholder_title": "Prologue Awakening",
+      "placeholder_text": "【文字占位】夜幕褪去，卡拉尔大陆从沉睡中苏醒，远古的星轨开始缓缓转动...",
+      "tags": [
+        "prologue",
+        "intro",
+        "lore"
+      ]
+    },
+    "cs_chapter1_climax": {
+      "title_key": "cutscene.chapter1_climax.title",
+      "video_resource_path": "res://assets/media/cutscenes/chapter1_climax.ogv",
+      "duration_sec": 3.0,
+      "default_audio_bus": "Cutscene",
+      "default_volume_linear": 1.0,
+      "subtitles_track_id": "cutscene.chapter1_climax.subtitles",
+      "default_skippable": true,
+      "is_placeholder": true,
+      "placeholder_title": "Chapter 1 Climax",
+      "placeholder_text": "【文字占位】魔力激流汇聚，巨兽轰然倒下，尘埃落定之处闪耀着最初的契约徽记...",
+      "tags": [
+        "chapter1",
+        "climax",
+        "combat"
+      ]
+    }
+  }
+}

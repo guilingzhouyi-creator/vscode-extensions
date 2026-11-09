@@ -14,13 +14,16 @@
 my_mod/
 ├── assets_manifest.json        # 资产清单与 SHA-256 完整性哈希清单
 └── assets/
+    ├── media/                  # 动画与视频流媒体
+    │   └── cutscenes/          # 剧情过场 CG 视频 (.ogv, .webm, .mp4)
     ├── textures/               # 纹理、UI 贴图与角色立绘
     │   ├── ui/                 # 界面元素、边框、图标与徽标
     │   ├── portraits/          # 角色身世与 NPC 对话立绘
     │   └── backgrounds/        # 序章场景插画与背景底图
     ├── audio/                  # 音效与配乐
     │   ├── bgm/                # 背景音乐流式音轨
-    │   └── sfx/                # 界面点击、技能释放与环境音效
+    │   ├── sfx/                # 界面点击、技能释放与环境音效
+    │   └── voice/              # 角色剧情台词配音
     ├── fonts/                  # 自定义排版字体文件
     └── shaders/                # 纯文本 GPU 着色器代码
 ```
@@ -33,6 +36,7 @@ my_mod/
 
 | 资产类型 | 推荐容器/格式 | 次优/兼容格式 | 严禁使用格式 | 规格限制与技术指标 |
 | :--- | :--- | :--- | :--- | :--- |
+| **全屏CG与过场视频** | `OGV` (Theora) / `WebM` | `MP4` (平台通用) | `AVI`, `WMV`, `FLV`, `MKV` | 最大分辨率 **1920 × 1080** (4K 需按机型动态降级)；帧率 30/60 fps；单视频 $\le$ **100 MB**；免加密纯净流式直接装载 |
 | **纹理与立绘** | `WebP` (推荐无损/高压比) | `PNG` | `BMP`, `TIFF`, `GIF` | 最大分辨率 **4096 × 4096**；单张物理体积 $\le$ **15 MB**；建议使用 sRGB 颜色空间与透明通道 (Alpha) |
 | **流式背景音** | `OGG` (Vorbis 编码) | - | `MP3`, `FLAC` | 采样率 **44.1 kHz / 48 kHz**；立体声 (Stereo)；码率推荐 128~192 kbps；单文件 $\le$ **30 MB** |
 | **短打击音效** | `WAV` (PCM 16-bit) | `OGG` | `MP3`, `MIDI` | 极低延迟打击/界面反馈；单声道/立体声；单文件 $\le$ **5 MB** |
@@ -163,3 +167,55 @@ flowchart TD
 ```
 
 - **哈希防篡改**：引擎在初次加载资产时将计算物理文件的 SHA-256 校验和，若与清单记录不匹配，将提示资产损坏或被篡改，阻断脏数据注入渲染管线。
+
+---
+
+## 七、 官方资产 vs MOD 资产寻址与环境双轨规约 (Asset Topology & Dual Environments)
+
+为了建立确定性的工程标准并彻底消除路径硬编码，引擎通过 `AssetPathResolver` 统一治理全域多媒体资产的存放位置与访问边界。
+
+### 1. 官方艺术资产目录拓扑 (`res://assets/`)
+
+官方预置资产集中于 `res://assets/` 物理根目录，并按业务领域实施一级子目录标准化：
+
+| 资产大类 | 官方物理标准路径 | 典型文件格式 | 说明 |
+| :--- | :--- | :--- | :--- |
+| **全屏过场 CG** | `res://assets/media/cutscenes/` | `.ogv`, `.webm`, `.mp4` | 剧情关键节点过场、序章揭幕与战役高潮全屏动画 |
+| **背景音乐** | `res://assets/audio/bgm/` | `.ogg` | 各大城镇、野外大地图与战斗背景回圈音乐 |
+| **音效采样** | `res://assets/audio/sfx/` | `.wav`, `.ogg` | UI 点击、技能释放、武器挥击与受击反馈 |
+| **剧情配音** | `res://assets/audio/voice/` | `.ogg` | 主线剧情语音与战斗台词 |
+| **UI 界面贴图** | `res://assets/textures/ui/` | `.webp`, `.png` | 界面组件、边框、卡牌底板与交互图标 |
+| **角色立绘与头像** | `res://assets/textures/characters/` | `.webp`, `.png` | 角色立绘、NPC 头像与身世插画 |
+| **物品道具图标** | `res://assets/textures/items/` | `.webp`, `.png` | 装备、消耗品、符文与任务道具图标 |
+| **3D 模型与场景** | `res://assets/models/` | `.gltf`, `.glb`, `.tscn` | 场景道具、几何碰撞体与网格模型 |
+| **排版字体** | `res://assets/fonts/` | `.ttf`, `.woff2` | 多语言排版字体与标题位图字体 |
+
+### 2. MOD 艺术资产三级发现级联 (3-Tier Discovery Cascade)
+
+针对模组开发者制作的艺术资产，引擎支持三级自适应级联发现机制：
+
+```mermaid
+flowchart TD
+    Req["资产请求 (mod://<mod_id>/assets/...)"] --> T0{"Tier 0 (工程内置)<br/>res://mods/<mod_id>/assets/ 存在?"}
+    T0 -- 是 (仅工程开发版有效) --> LoadT0["加载工程测试模组资产"]
+    T0 -- 否 --> T1{"Tier 1 (发行便携免装)<br/><exe_dir>/mods/<mod_id>/assets/ 存在?"}
+    T1 -- 是 --> LoadT1["加载便携同级模组资产"]
+    T1 -- 否 --> T2{"Tier 2 (用户安全沙盒)<br/>user://mods/<mod_id>/assets/ 存在?"}
+    T2 -- 是 --> LoadT2["加载用户工坊沙盒资产"]
+    T2 -- 否 --> Fallback["触发文字占位 (Text Placeholder) 优雅放行"]
+```
+
+- **Tier 0（工程内置测试）**：`res://mods/<mod_id>/assets/` —— 仅在工程开发版（编辑器调试/无头单测）开放，支持随工程源码直接测试模组；
+- **Tier 1（发行便携免装）**：`<exe_dir>/mods/<mod_id>/assets/` —— 面向单机绿色分发与免安装玩家，模组文件夹直接放置于游戏可执行程序同级；
+- **Tier 2（用户安全沙盒）**：`user://mods/<mod_id>/assets/` —— 全平台通用的隔离用户数据目录，面向 Steam 创意工坊动态下载与社区热插拔扩展。
+
+### 3. 工程开发版与正式发行版读盘策略差异
+
+| 评估维度 | 工程开发版 (Engineering Dev Build) | 正式发行版 (Release Production Build) |
+| :--- | :--- | :--- |
+| **环境判定特征** | `OS.has_feature("editor") or OS.has_feature("test")` | `OS.has_feature("standalone") or OS.has_feature("release")` |
+| **数据源格式** | 宽松支持明文 `.json`、松散文件、未烘焙原始切片 | 强制单源单文件高纯度二进制包 `config.kdat` (CRC32/DEFLATE) |
+| **官方资产承载** | 项目工程松散文件直接寻址 | 预打包入主程序或独立 `.pck` 封包 (如 `assets.pck`) |
+| **MOD 准入范围** | 扫描 Tier 0 (`res://mods/`)、Tier 1 与 Tier 2 | 刚性剔除 Tier 0，严格限制于 Tier 1 与 Tier 2 沙盒 |
+| **物理资产缺失处理** | 100% 自动降级为文字占位演播，确保自动化无头测试不阻塞 | 记录安全日志，静默跳过或触发合规占位，绝对禁止泄露宿主绝对路径 |
+| **路径安全护栏** | 开启防路径穿越清洗与警告堆栈跟踪 | 开启防路径穿越刚性熔断，过滤非法盘符与向上一级符号 (`..`) |

@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "kalar.mod_sdk.cutscene_manifest.v1",
+  "title": "CutsceneManifest",
+  "description": "卡拉尔世界引擎 CG 视频资产与剧情 Hook 扩展契约 (kalar.mod_sdk.cutscene_manifest.v1)",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "契约版本 (1.0.0)"
+    },
+    "cutscenes": {
+      "type": "array",
+      "description": "声明的 CG 视频资产清单",
+      "items": {
+        "type": "object",
+        "required": [
+          "cutscene_id",
+          "video_resource_path"
+        ],
+        "properties": {
+          "cutscene_id": {
+            "type": "string",
+            "description": "全局唯一 CG 语义标识符"
+          },
+          "title_key": {
+            "type": "string",
+            "description": "多语言标题文案键"
+          },
+          "video_resource_path": {
+            "type": "string",
+            "description": "视频文件物理相对或 res:// 路径"
+          },
+          "duration_sec": {
+            "type": "number",
+            "minimum": 0,
+            "description": "视频播放总时长（秒）"
+          },
+          "default_audio_bus": {
+            "type": "string",
+            "description": "输出音频总线名称 (Master/BGM/Cutscene)"
+          },
+          "default_volume_linear": {
+            "type": "number",
+            "minimum": 0.0,
+            "maximum": 1.0,
+            "description": "默认线性音量比例"
+          },
+          "subtitles_track_id": {
+            "type": "string",
+            "description": "绑定的字幕轨语言键"
+          },
+          "default_skippable": {
+            "type": "boolean",
+            "description": "是否允许跳过"
+          },
+          "is_placeholder": {
+            "type": "boolean",
+            "description": "是否为文字占位模式（早期无视频艺术资源时启用）"
+          },
+          "placeholder_title": {
+            "type": "string",
+            "description": "文字占位演出标题"
+          },
+          "placeholder_text": {
+            "type": "string",
+            "description": "文字占位演播剧本文案"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "hooks": {
+      "type": "array",
+      "description": "声明挂接的剧情与事件 Hook 清单",
+      "items": {
+        "type": "object",
+        "required": [
+          "hook_id",
+          "trigger_type",
+          "cutscene_id"
+        ],
+        "properties": {
+          "hook_id": {
+            "type": "string",
+            "description": "Hook 唯一标识符"
+          },
+          "trigger_type": {
+            "type": "string",
+            "enum": [
+              "NARRATIVE_NODE_PRE",
+              "NARRATIVE_NODE_POST",
+              "QUEST_STAGE_REACHED",
+              "LIFECYCLE_STAGE_ENTERED",
+              "CUSTOM_EVENT"
+            ],
+            "description": "触发拦截时机类型"
+          },
+          "target_filter": {
+            "type": "object",
+            "description": "目标过滤条件匹配字典"
+          },
+          "cutscene_id": {
+            "type": "string",
+            "description": "触发播放的目标 CG 标识符"
+          },
+          "override_params": {
+            "type": "object",
+            "description": "覆盖默认调用参数"
+          }
+        }
+      }
+    }
+  }
+}

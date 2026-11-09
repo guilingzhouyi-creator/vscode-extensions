@@ -1,0 +1,42 @@
+{
+  "_meta": {
+    "version": "1.0.0",
+    "description": "全域剧情、任务与生命周期 CG 播放 Hook 路由配置表"
+  },
+  "hooks": [
+    {
+      "hook_id": "hook_prologue_awakening_pre",
+      "trigger_type": "NARRATIVE_NODE_PRE",
+      "target_filter": {
+        "dag_id": "dag_prologue",
+        "node_id": "node_prologue_awakening"
+      },
+      "cutscene_id": "cs_prologue_awakening",
+      "override_params": {
+        "skippable": true,
+        "skip_hold_duration_sec": 0.3,
+        "fade_in_sec": 0.5,
+        "fade_out_sec": 0.5,
+        "auto_pause_world": true,
+        "play_once_per_save": true
+      }
+    },
+    {
+      "hook_id": "hook_chapter1_climax_post",
+      "trigger_type": "NARRATIVE_NODE_POST",
+      "target_filter": {
+        "dag_id": "dag_chapter1",
+        "node_id": "node_boss_defeat"
+      },
+      "cutscene_id": "cs_chapter1_climax",
+      "override_params": {
+        "skippable": true,
+        "skip_hold_duration_sec": 0.5,
+        "fade_in_sec": 0.3,
+        "fade_out_sec": 0.8,
+        "auto_pause_world": true,
+        "play_once_per_save": false
+      }
+    }
+  ]
+}
