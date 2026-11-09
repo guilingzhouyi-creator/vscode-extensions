@@ -66,6 +66,7 @@ sarif/
 workspace-timing/reports/
 WebGames/reports/
 tests/reports/
+fractal-git/reports/
 **/reports/audit-*.json
 **/reports/refactor-metrics*.json
 *.log
