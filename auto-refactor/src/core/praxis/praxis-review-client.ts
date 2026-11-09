@@ -20,8 +20,11 @@
 
 import { randomUUID } from 'crypto';
 import { createReviewExecution } from '../review/review-execution';
+import { executeReview } from '../review/review-executor';
+import type { ReviewRequest, ReviewRuntime, SnapshotReviewResult } from '../review/review-executor';
+import type { SourceSnapshot } from '../review/source-snapshot';
 import { readPraxisFileContent } from './praxis-file-input';
-import type { DiffInput, Issue, ScanReport } from '../types';
+import type { DiffInput, Issue, ScanConfig, ScanReport } from '../types';
 import type { PraxisCardContext, ReviewDiffHunk } from './contracts';
 import { DefaultPraxisRollbackGatekeeper } from './defaults';
 import type {
@@ -92,6 +95,20 @@ function countLinesFast(content: string): number {
 }
 
 /**
+ * Check supported-file publication after asynchronous SDK work without treating absence as support.
+ * @param graph - Published graph used by this file review.
+ * @param filePath - Source file whose extraction was requested.
+ * @param version - Token captured only when this extraction was actually published.
+ * @returns Whether a supported review lost its publication or has a newer pending replacement.
+ */
+function wasSemanticFileSuperseded(
+    graph: SemanticGraph, filePath: string, version?: symbol,
+): boolean {
+    if (!defaultSemanticAdapterRegistry.getCapabilitiesForFile(filePath)) return false;
+    return version === undefined || !graph.isFileVersionCurrent(filePath, version);
+}
+
+/**
  * High-performance, interface-driven standard implementation of IPraxisReviewClient.
  */
 export class PraxisReviewClient implements IPraxisReviewClient {
@@ -153,6 +170,26 @@ export class PraxisReviewClient implements IPraxisReviewClient {
         if (newGraph) {
             this.graph = newGraph;
         }
+    }
+
+    /**
+     * Review exact captured bytes through the shared fast/deep execution path.
+     * @param request - Exact scope, required experts and optional diff context.
+     * @param snapshot - Caller-captured immutable repository input.
+     * @param config - Analyzer configuration; snapshot execution owns fresh nonpersistent state.
+     * @param options - Cooperative execution collaborators and speculative routing options.
+     * @returns Neutral static execution facts after deep analysis and required compensation.
+     */
+    public reviewSnapshot(
+        request: ReviewRequest,
+        snapshot: SourceSnapshot,
+        config: ScanConfig,
+        options?: ReviewRuntime['options'],
+    ): Promise<SnapshotReviewResult> {
+        const scanner = new Scanner({
+            ...config, cacheEnabled: false, sparseRouting: false,
+        });
+        return executeReview(request, snapshot, { scanner, options });
     }
 
     /**
@@ -351,18 +388,23 @@ export class PraxisReviewClient implements IPraxisReviewClient {
             this.clearSemanticGraph();
         }
 
+        const graph = opts.isolatedGraph ? new SemanticGraph() : (options.graph ?? this.graph);
+        const semanticCapabilities =
+            defaultSemanticAdapterRegistry.getCapabilitiesForFile(filePath);
+        // Reservations are taken before awaiting input so request order, not read latency,
+        // decides which extraction may publish into the shared graph.
+        const semanticToken = semanticCapabilities
+            ? graph.beginFileUpdate(filePath) : undefined;
         const fileContent = await readPraxisFileContent(
             filePath,
             content,
             options.root ?? this.root,
         );
-        const graph = opts.isolatedGraph ? new SemanticGraph() : (options.graph ?? this.graph);
-        const semanticCapabilities =
-            defaultSemanticAdapterRegistry.getCapabilitiesForFile(filePath);
-
-        if (fileContent.length > 0) {
-            await defaultSemanticAdapterRegistry.extractFileToGraph(filePath, fileContent, graph);
-        }
+        const semanticPublished = semanticToken === undefined ? false
+            : await defaultSemanticAdapterRegistry.publishFileUpdate(
+                filePath, fileContent, graph, semanticToken,
+            );
+        const semanticVersion = semanticPublished ? graph.getFileVersion(filePath) : undefined;
 
         try {
             const effectiveCardContext = options.cardContext ?? this.defaultCardContext;
@@ -392,11 +434,13 @@ export class PraxisReviewClient implements IPraxisReviewClient {
             );
             issues.push(...contentIssues);
 
-            const status = this.resolveFileStatus(issues);
+            const superseded = wasSemanticFileSuperseded(graph, filePath, semanticVersion);
+            const status = superseded ? 'blocked' : this.resolveFileStatus(issues);
             const verdict: PraxisFileReviewVerdict = {
                 semanticCapabilities,
                 execution: createReviewExecution({
                     reviewId: randomUUID(),
+                    termination: superseded ? 'superseded' : undefined,
                     tracks: { fast: 'complete', deep: 'not-required' },
                     coverage: [
                         {

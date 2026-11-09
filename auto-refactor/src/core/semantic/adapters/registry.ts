@@ -11,7 +11,7 @@
  *   by callers and original extraction failures propagate instead of claiming graph completion.
  */
 
-import type { SemanticGraph } from '../index';
+import { SemanticGraph } from '../semanticGraph';
 import type { SemanticAdapterCapabilities, UnifiedLanguageAdapter } from './base';
 import { TypeScriptSemanticAdapter } from './typescript-adapter';
 import { PythonSemanticAdapter } from './python-adapter';
@@ -79,23 +79,54 @@ export class SemanticAdapterRegistry {
     }
 
     /**
-     * Extracts a file into the target SemanticGraph using the matching language adapter.
-     *
-     * @returns True after synchronous extraction, or a promise of completion for async adapters;
-     *   false when no adapter is registered. Extraction failures retain their original errors.
+     * Extract source-local facts off-graph, then publish only the latest successful file update.
+     * The reservation is taken at call time, so this entry point orders requests by invocation.
+     * @param filePath - Source path used for adapter resolution and publication ownership.
+     * @param content - Exact source content consumed by the adapter.
+     * @param graph - Published repository graph, unchanged while extraction is pending or fails.
+     * @returns True on publication; false for an unsupported file or superseded extraction.
      */
     public extractFileToGraph(
         filePath: string,
         content: string,
         graph: SemanticGraph,
     ): boolean | Promise<boolean> {
+        if (!this.getAdapterForFile(filePath)) return false;
+        return this.publishFileUpdate(filePath, content, graph, graph.beginFileUpdate(filePath));
+    }
+
+    /**
+     * Extract into an isolated graph under a reservation the caller already holds.
+     * Callers reserve synchronously at request entry so later input resolution cannot reorder them.
+     * @param filePath - Source path used for adapter resolution and publication ownership.
+     * @param content - Exact source content consumed by the adapter.
+     * @param graph - Published repository graph; untouched unless this token is still current.
+     * @param token - Reservation issued by the same graph before any asynchronous work started.
+     * @returns True on publication; false for an unsupported file or superseded extraction.
+     */
+    public publishFileUpdate(
+        filePath: string,
+        content: string,
+        graph: SemanticGraph,
+        token: symbol,
+    ): boolean | Promise<boolean> {
         const adapter = this.getAdapterForFile(filePath);
-        if (!adapter) {
-            return false;
+        if (!adapter) return false;
+        const replacement = new SemanticGraph();
+        try {
+            const extraction = adapter.extractToGraph(filePath, content, replacement);
+            if (extraction) {
+                return extraction.then(() => graph.completeFileUpdate(filePath, token, replacement))
+                    .catch(error => {
+                        graph.cancelFileUpdate(filePath, token);
+                        throw error;
+                    });
+            }
+            return graph.completeFileUpdate(filePath, token, replacement);
+        } catch (error) {
+            graph.cancelFileUpdate(filePath, token);
+            throw error;
         }
-        const extraction = adapter.extractToGraph(filePath, content, graph);
-        if (extraction) return extraction.then(() => true);
-        return true;
     }
 
     /**

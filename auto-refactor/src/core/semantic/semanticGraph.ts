@@ -35,6 +35,140 @@ export class SemanticGraph {
     private readonly outgoing: Map<string, Map<string, SemanticEdge>> = new Map();
     private readonly incoming: Map<string, Map<string, SemanticEdge>> = new Map();
     private readonly nodesByFile: Map<string, SemanticNode[]> = new Map();
+    private readonly fileUpdates = new Map<string, symbol>();
+    private readonly fileVersions = new Map<string, symbol>();
+
+    /**
+     * Read the current source-local publication identity, distinct from a snapshot/config digest.
+     * @param filePath - Source file whose extraction was published.
+     * @returns Process-local version token, absent for unversioned direct graph mutations.
+     */
+    public getFileVersion(filePath: string): symbol | undefined {
+        return this.fileVersions.get(normalizeCanonicalPath(filePath));
+    }
+
+    /**
+     * Check that a published file has neither changed nor acquired a newer pending extraction.
+     * @param filePath - Source file reviewed by the caller.
+     * @param version - Exact token captured after successful extraction.
+     * @returns Whether the caller's file publication remains current.
+     */
+    public isFileVersionCurrent(filePath: string, version: symbol): boolean {
+        const file = normalizeCanonicalPath(filePath);
+        return this.fileVersions.get(file) === version && !this.fileUpdates.has(file);
+    }
+
+    /**
+     * Reserve publication for the latest requested extraction of a canonical file.
+     * @param filePath - Source file being rebuilt outside the published graph.
+     * @returns Unique update token; older tokens cannot publish after a newer request.
+     */
+    public beginFileUpdate(filePath: string): symbol {
+        const file = normalizeCanonicalPath(filePath);
+        const token = Symbol(file);
+        this.fileUpdates.set(file, token);
+        return token;
+    }
+
+    /**
+     * Release a failed update without cancelling a newer request for the same file.
+     * @param filePath - File whose extraction failed.
+     * @param token - Exact reservation issued before extraction.
+     */
+    public cancelFileUpdate(filePath: string, token: symbol): void {
+        const file = normalizeCanonicalPath(filePath);
+        if (this.fileUpdates.get(file) === token) this.fileUpdates.delete(file);
+    }
+
+    /**
+     * Publish one completed source-local extraction synchronously, retaining stable inbound edges.
+     * Complexity is O(old/new file nodes + their incident edges + replacement edges).
+     * @param filePath - Canonical source owner of the replacement.
+     * @param token - Latest reservation for this file.
+     * @param replacement - Isolated adapter output, containing only this file's nodes and edges.
+     * @returns False when superseded, cleared or removed before publication.
+     */
+    public completeFileUpdate(
+        filePath: string, token: symbol, replacement: SemanticGraph,
+    ): boolean {
+        const file = normalizeCanonicalPath(filePath);
+        if (this.fileUpdates.get(file) !== token) return false;
+        const nodes = replacement.getAllNodes();
+        const edges = replacement.getAllEdges();
+        this.validateFileReplacement(file, nodes, edges);
+        this.fileUpdates.delete(file);
+        this.installFileReplacement(file, nodes, edges);
+        this.fileVersions.set(file, token);
+        return true;
+    }
+
+    /**
+     * Remove a deleted/renamed file and prevent unfinished extraction from resurrecting it.
+     * @param filePath - Source file to remove, using the graph's existing canonical path rules.
+     * @returns Number of previously published nodes removed.
+     */
+    public removeFile(filePath: string): number {
+        const file = normalizeCanonicalPath(filePath);
+        const count = this.nodesByFile.get(file)?.length ?? 0;
+        this.fileUpdates.delete(file);
+        this.fileVersions.delete(file);
+        this.installFileReplacement(file, [], []);
+        return count;
+    }
+
+    private validateFileReplacement(
+        file: string, nodes: SemanticNode[], edges: SemanticEdge[],
+    ): void {
+        const owned = new Set<string>();
+        for (const node of nodes) {
+            if (normalizeCanonicalPath(node.location.file) !== file) {
+                throw new Error('Semantic extraction emitted a node outside its source file');
+            }
+            const existing = this.nodes.get(node.id);
+            if (existing && normalizeCanonicalPath(existing.location.file) !== file) {
+                throw new Error('Semantic extraction overwrote another file symbol');
+            }
+            owned.add(node.id);
+        }
+        if (edges.some(edge => !owned.has(edge.fromNodeId))) {
+            throw new Error('Semantic extraction emitted an edge outside its source file');
+        }
+    }
+
+    private removePublishedEdge(edge: SemanticEdge): void {
+        const outgoing = this.outgoing.get(edge.fromNodeId);
+        outgoing?.delete(edge.id);
+        if (outgoing?.size === 0 && !this.nodes.has(edge.fromNodeId)) {
+            this.outgoing.delete(edge.fromNodeId);
+        }
+        const incoming = this.incoming.get(edge.toNodeId);
+        incoming?.delete(edge.id);
+        if (incoming?.size === 0 && !this.nodes.has(edge.toNodeId)) {
+            this.incoming.delete(edge.toNodeId);
+        }
+    }
+
+    private installFileReplacement(
+        file: string, nodes: SemanticNode[], edges: SemanticEdge[],
+    ): void {
+        const retained = new Set(nodes.map(node => node.id));
+        const previous = this.nodesByFile.get(file) ?? [];
+        this.nodesByFile.delete(file);
+        for (const node of previous) {
+            this.nodes.delete(node.id);
+            for (const edge of this.outgoing.get(node.id)?.values() ?? []) {
+                this.removePublishedEdge(edge);
+            }
+            this.outgoing.delete(node.id);
+            if (retained.has(node.id)) continue;
+            for (const edge of this.incoming.get(node.id)?.values() ?? []) {
+                this.removePublishedEdge(edge);
+            }
+            this.incoming.delete(node.id);
+        }
+        for (const node of nodes) this.addNode(node);
+        for (const edge of edges) this.addEdge(edge);
+    }
 
     /**
      * Inserts or replaces a node in the graph, updating inverted file indices.
@@ -42,6 +176,9 @@ export class SemanticGraph {
     public addNode(node: SemanticNode): this {
         const existing = this.nodes.get(node.id);
         if (existing?.location?.file) {
+            const previousFile = normalizeCanonicalPath(existing.location.file);
+            this.fileUpdates.delete(previousFile);
+            this.fileVersions.delete(previousFile);
             this.removeNodeFromFileIndex(existing);
         }
 
@@ -55,6 +192,8 @@ export class SemanticGraph {
 
         if (node.location?.file) {
             const canonicalFile = normalizeCanonicalPath(node.location.file);
+            this.fileUpdates.delete(canonicalFile);
+            this.fileVersions.delete(canonicalFile);
             let fileNodes = this.nodesByFile.get(canonicalFile);
             if (!fileNodes) {
                 fileNodes = [];
@@ -110,6 +249,8 @@ export class SemanticGraph {
      * Clears all nodes, edges, and file indices.
      */
     public clear(): void {
+        this.fileUpdates.clear();
+        this.fileVersions.clear();
         this.nodes.clear();
         this.outgoing.clear();
         this.incoming.clear();
@@ -120,6 +261,12 @@ export class SemanticGraph {
      * Inserts a directed edge connecting two existing or implicit nodes.
      */
     public addEdge(edge: SemanticEdge): this {
+        const owner = this.nodes.get(edge.fromNodeId)?.location.file;
+        if (owner) {
+            const file = normalizeCanonicalPath(owner);
+            this.fileUpdates.delete(file);
+            this.fileVersions.delete(file);
+        }
         if (!this.outgoing.has(edge.fromNodeId)) {
             this.outgoing.set(edge.fromNodeId, new Map());
         }
