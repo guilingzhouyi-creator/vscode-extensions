@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "kalar.mod_sdk.bundle_manifest.v1",
+  "title": "BundleManifest",
+  "description": "卡拉尔世界引擎 .kmod 模组扩展包发行元数据契约 (kalar.mod_sdk.bundle_manifest.v1)",
+  "type": "object",
+  "properties": {
+    "bundle_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+$",
+      "description": "模组扩展包全局唯一标识符，仅限小写字母、数字与下划线"
+    },
+    "bundle_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "模组扩展包可读显示名称"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "语义化版本号 (SemVer)，如 1.0.0"
+    },
+    "author": {
+      "type": "string",
+      "description": "模组创作者或研发团队署名"
+    },
+    "engine_api_version": {
+      "type": "string",
+      "description": "兼容的目标引擎 API 接口版本，如 1.0.0"
+    },
+    "tier": {
+      "type": "string",
+      "enum": [
+        "TIER_1_LOGIC",
+        "TIER_2_AUDIOVISUAL",
+        "TIER_3_OVERHAUL"
+      ],
+      "description": "模组层级规范：纯逻辑剧情包、视听增强包或全局大魔改规则包"
+    },
+    "description": {
+      "type": "string",
+      "description": "模组背景介绍与详细说明文案"
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "前置依赖模组 bundle_id 清单"
+    },
+    "files_manifest": {
+      "type": "object",
+      "description": "包内受控文件相对路径到 SHA-256 哈希与大小的强校验字典",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "文件 SHA-256 指纹"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "文件物理字节数"
+          }
+        },
+        "required": [
+          "sha256",
+          "size_bytes"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "created_timestamp_utc": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "构建打包生成的 UTC 时间戳秒数"
+    }
+  },
+  "required": [
+    "bundle_id",
+    "bundle_name",
+    "version",
+    "engine_api_version",
+    "tier",
+    "files_manifest",
+    "created_timestamp_utc"
+  ],
+  "additionalProperties": false
+}

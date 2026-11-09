@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "kalar.mod_sdk.workbench_config.v1",
+  "title": "WorkbenchConfig",
+  "description": "卡拉尔世界引擎模组开发者工作台运行配置规约 (kalar.mod_sdk.workbench_config.v1)",
+  "type": "object",
+  "properties": {
+    "workspace_root": {
+      "type": "string",
+      "minLength": 1,
+      "description": "开发者 MOD 工作区物理根目录路径"
+    },
+    "active_mod_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "当前工作台活跃调试目标模组标识符"
+    },
+    "watch_mode": {
+      "type": "boolean",
+      "description": "是否启用文件保存自动静态审查热监听"
+    },
+    "target_engine_mode": {
+      "type": "string",
+      "enum": [
+        "HEADLESS_PYTHON",
+        "HEADLESS_GODOT"
+      ],
+      "description": "推演引擎宿主模式：轻量 Python 模拟器或完整 Godot 无头运行时"
+    },
+    "default_playthrough_seed": {
+      "type": "string",
+      "description": "默认确定性伪随机数种子"
+    },
+    "export_target_dir": {
+      "type": "string",
+      "description": ".kmod 产物默认构建导出目录"
+    },
+    "log_level": {
+      "type": "string",
+      "enum": [
+        "DEBUG",
+        "INFO",
+        "WARN",
+        "ERROR"
+      ],
+      "description": "工作台控制台日志输出等级"
+    }
+  },
+  "required": [
+    "workspace_root",
+    "active_mod_id"
+  ],
+  "additionalProperties": false
+}
