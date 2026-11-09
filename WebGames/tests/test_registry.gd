@@ -156,6 +156,8 @@ const TestBinaryConfigAndKdatPipeline = preload("res://tests/integration/test_bi
 const TestCutsceneHookAndPlaybackPipeline = preload("res://tests/integration/test_cutscene_hook_and_playback_pipeline.gd")
 # 艺术资源寻址与环境裁决治理套件
 const TestAssetPathResolver = preload("res://tests/unit/infrastructure/test_asset_path_resolver.gd")
+# 全链路生命周期与ESC菜单后端双分流无头流水线
+const TestFullLifecycleChainAndEscFlowPipeline = preload("res://tests/integration/pipelines/test_full_lifecycle_chain_and_esc_flow_pipeline.gd")
 
 # 前端 17 大系统白模与表现层测试套件
 const TestFE01AccountEntry = preload("res://tests/unit/frontend/test_fe_01_account_entry.gd")
@@ -255,7 +257,8 @@ static func get_all_test_classes() -> Array:
 		TestAgentFullPlaythroughAndWorkbenchPipeline,
 		TestBinaryConfigAndKdatPipeline,
 		TestCutsceneHookAndPlaybackPipeline,
-		TestAssetPathResolver
+		TestAssetPathResolver,
+		TestFullLifecycleChainAndEscFlowPipeline
 	]
 
 ## 前端测试套件（17 大系统 + 6 前端基建与边界套件 = 23；全域 111 后端与横切 + 23 前端 = 134 套件）
