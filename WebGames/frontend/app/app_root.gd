@@ -28,13 +28,13 @@ func _ready() -> void:
 		get_tree().set_auto_accept_quit(false)
 	AppBootstrap.bootstrap(self)
 
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+func _notification(notification_type: int) -> void:
+	if notification_type == NOTIFICATION_WM_CLOSE_REQUEST:
 		_handle_desktop_close_request()
 
 func _handle_desktop_close_request() -> void:
-	var shut_req := GameShutdownDTO.Request.new()
-	shut_req.exit_reason = GameLifecycleModel.ExitReason.USER_DESKTOP_QUIT
-	GameLifecycleService.execute_graceful_shutdown(shut_req)
+	var shutdown_request := GameShutdownDTO.Request.new()
+	shutdown_request.exit_reason = GameLifecycleModel.ExitReason.USER_DESKTOP_QUIT
+	GameLifecycleService.execute_graceful_shutdown(shutdown_request)
 	if get_tree() != null:
 		get_tree().quit()

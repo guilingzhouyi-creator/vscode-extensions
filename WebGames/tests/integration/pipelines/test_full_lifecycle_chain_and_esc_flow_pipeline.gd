@@ -308,6 +308,11 @@ static func test_tc_flc_10_account_landing_view_state_reset() -> Dictionary:
 	view.select_server("LOCAL_OFFLINE")
 	var has_gw_before: bool = (ServiceLocator.get_active_gateway() != null)
 
+	view.selected_character_slot = "SLOT_01"
+	view._on_char_enter_pressed()
+	var active_gw = ServiceLocator.get_active_gateway()
+	var in_world_ok: bool = (active_gw != null and active_gw.context.current_phase == WorldGatewayModel.GatewayPhase.IN_WORLD)
+
 	var logout_res := view.logout_account()
 	var logout_ok: bool = bool(logout_res.get("success", false))
 
@@ -317,9 +322,10 @@ static func test_tc_flc_10_account_landing_view_state_reset() -> Dictionary:
 
 	view.free()
 
-	var passed: bool = login_ok and has_gw_before and logout_ok and state_reset and id_reset and gw_cleared
+	var passed: bool = login_ok and has_gw_before and in_world_ok and logout_ok and state_reset and id_reset and gw_cleared
 	return make_result("TC-FLC-10: 账号首页表单状态复位与网关上下文清空", passed, {
 		"state_reset": state_reset,
+		"in_world_ok": in_world_ok,
 		"gw_cleared": gw_cleared
 	})
 

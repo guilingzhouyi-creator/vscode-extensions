@@ -9,7 +9,7 @@
 class_name AccountEntryTabs
 extends BaseScreen
 
-var _view = null
+var _view: BaseScreen = null
 
 func setup(view: BaseScreen) -> void:
     _view = view
@@ -89,8 +89,8 @@ func init_character_create_text() -> void:
     UIIntermediary.resolve(view.char_create_back_btn, "ui.fe01.char_create.back")
     view.char_origin_option.clear()
     var origin_keys: Array = ["noble", "commoner", "orphan", "mercenary", "scholar"]
-    for k in origin_keys:
-        view.char_origin_option.add_item(UIIntermediary.text("ui.fe01.char_create.origin_" + str(k)))
+    for origin_key in origin_keys:
+        view.char_origin_option.add_item(UIIntermediary.text("ui.fe01.char_create.origin_" + str(origin_key)))
     apply_mod_creation_ui_adaptation()
 
 func apply_mod_creation_ui_adaptation() -> void:
@@ -112,14 +112,14 @@ func _populate_mod_origins_option(view: AccountEntryView) -> void:
     for i in range(view.available_origins_list.size()):
         var entry: Variant = view.available_origins_list[i]
         var label_text: String = _format_origin_entry_label(entry)
-        var oid: String = view._extract_origin_id(entry)
+        var origin_id: String = view._extract_origin_id(entry)
         view.char_origin_option.add_item(label_text, i)
-        view.char_origin_option.set_item_metadata(i, oid)
+        view.char_origin_option.set_item_metadata(i, origin_id)
 
 func _format_origin_entry_label(entry: Variant) -> String:
     if entry is Dictionary:
-        var d: Dictionary = entry as Dictionary
-        return str(d.get("name", d.get("origin_name", d.get("origin_id", ""))))
+        var entry_dict: Dictionary = entry as Dictionary
+        return str(entry_dict.get("name", entry_dict.get("origin_name", entry_dict.get("origin_id", ""))))
     return str(entry)
 
 func _populate_mod_traits_list(view: AccountEntryView) -> void:
@@ -134,9 +134,9 @@ func _populate_mod_traits_list(view: AccountEntryView) -> void:
 
 func _format_trait_entry_label(entry: Variant) -> String:
     if entry is Dictionary:
-        var d: Dictionary = entry as Dictionary
-        var pos_name: String = str(d.get("positive_name", d.get("positive", d.get("name", ""))))
-        var neg_name: String = str(d.get("negative_name", d.get("negative", "")))
+        var entry_dict: Dictionary = entry as Dictionary
+        var pos_name: String = str(entry_dict.get("positive_name", entry_dict.get("positive", entry_dict.get("name", ""))))
+        var neg_name: String = str(entry_dict.get("negative_name", entry_dict.get("negative", "")))
         if not neg_name.is_empty():
             return pos_name + " / " + neg_name
         return pos_name
@@ -145,17 +145,17 @@ func _format_trait_entry_label(entry: Variant) -> String:
 func populate_server_list() -> void:
     var view: AccountEntryView = _view
     view.server_list_item.clear()
-    for sv in view.server_list:
+    for server_entry in view.server_list:
         var status_key: String = "unknown"
-        match sv.get("status", "UNKNOWN"):
+        match server_entry.get("status", "UNKNOWN"):
             "ONLINE":
                 status_key = "online"
             "MAINTENANCE":
                 status_key = "offline"
         var status_label: String = UIIntermediary.text("ui.fe01.server_select.server_" + status_key)
-        var ping_label: String = UIIntermediary.text("ui.fe01.server_select.ping", {"ms": sv.get("ping_ms", 0)})
+        var ping_label: String = UIIntermediary.text("ui.fe01.server_select.ping", {"ms": server_entry.get("ping_ms", 0)})
         UIIntermediary.resolve_item(view.server_list_item, "ui.fe01.server_select.server_row", {
-            "name": sv.get("name", ""), "status": status_label, "ping": ping_label
+            "name": server_entry.get("name", ""), "status": status_label, "ping": ping_label
         })
     if view.server_list_item.get_item_count() > 0:
         view.server_list_item.select(0)
@@ -183,15 +183,15 @@ func populate_talent_list() -> void:
     var view: AccountEntryView = _view
     view.char_talent_list.clear()
     var talent_keys: Array = ["godly_strength", "eidetic", "sword", "magic", "iron", "wind"]
-    for k in talent_keys:
-        UIIntermediary.resolve_item(view.char_talent_list, "ui.fe01.char_create.talent_" + str(k))
+    for talent_key in talent_keys:
+        UIIntermediary.resolve_item(view.char_talent_list, "ui.fe01.char_create.talent_" + str(talent_key))
 
 func roll_attributes() -> void:
     var view: AccountEntryView = _view
-    var service = MockServiceContainer.get_instance().auth()
-    if service == null:
+    var auth_service: Variant = MockServiceContainer.get_instance().auth()
+    if auth_service == null:
         return
-    var result: Dictionary = service.roll_attribute_spread()
+    var result: Dictionary = auth_service.roll_attribute_spread()
     if not bool(result.get("success", false)):
         return
     var attrs: Dictionary = result.get("attrs", {})

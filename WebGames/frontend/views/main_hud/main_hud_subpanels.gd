@@ -254,20 +254,20 @@ func on_menu_exit_pressed() -> void:
 
 func on_menu_exit_to_gateway_pressed(gateway: WorldGatewayFSM = null) -> void:
 	append_battle_log("SYSTEM", "正在退出世界并返回世界档案...")
-	var active_gw = gateway if gateway != null else ServiceLocator.get_active_gateway()
-	var req := UnifiedProtocolFactory.create_human_request(
+	var active_gateway: WorldGatewayFSM = gateway if gateway != null else (ServiceLocator.get_active_gateway() as WorldGatewayFSM)
+	var request: ClientRequestEnvelopeDTO = UnifiedProtocolFactory.create_human_request(
 		"world_gateway", "ESC_EXIT_TO_GATEWAY", {"auto_save": true}
 	)
-	var _resp := UnifiedProtocolDispatcher.dispatch_request(req, active_gw)
+	var _response: Variant = UnifiedProtocolDispatcher.dispatch_request(request, active_gateway)
 	HudEventBridge.get_instance().detach_hud()
 	NavManager.get_instance().replace_screen("account_entry")
 
 func on_menu_quit_game_pressed() -> void:
 	append_battle_log("SYSTEM", "正在保存存档并退出游戏...")
-	var req := UnifiedProtocolFactory.create_human_request(
+	var request: ClientRequestEnvelopeDTO = UnifiedProtocolFactory.create_human_request(
 		"lifecycle", "ESC_QUIT_GAME", {"auto_save": true, "exit_reason": "USER_QUIT"}
 	)
-	var _resp := UnifiedProtocolDispatcher.dispatch_request(req, null)
+	var _response: Variant = UnifiedProtocolDispatcher.dispatch_request(request, null)
 	HudEventBridge.get_instance().detach_hud()
 	if _view != null and _view.get_tree() != null:
 		_view.get_tree().quit()

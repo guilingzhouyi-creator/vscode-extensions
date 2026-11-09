@@ -125,9 +125,9 @@ var main_menu_visible: bool = false
 # ==============================================================================
 
 ## 生命周期初始化：HUD 全量装配（主题/文案/状态栏/小地图/动作条/聊天/任务追踪/主菜单，骨架 Mock 驱动）
-var _subpanels = null
+var _subpanels: MainHUDSubpanels = null
 
-func _get_subpanels():
+func _get_subpanels() -> MainHUDSubpanels:
 	if _subpanels == null:
 		_subpanels = MainHUDSubpanelsClass.new()
 		_subpanels.setup(self)

@@ -11,10 +11,11 @@ extends BaseScreen
 
 const TabsClass = preload("res://frontend/views/account_entry/account_entry_tabs.gd")
 const WorldGatewayFSM = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
+const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
 const AuthService = preload("res://backend/domains/account/auth_service.gd")
 
-var _tabs = null
-func _get_tabs():
+var _tabs: AccountEntryTabs = null
+func _get_tabs() -> AccountEntryTabs:
     if _tabs == null:
         _tabs = TabsClass.new()
         _tabs.setup(self)
@@ -131,7 +132,7 @@ func _ready() -> void:
     if theme_mgr.theme != null:
         theme = theme_mgr.theme
 
-    var tabs = _get_tabs()
+    var tabs: AccountEntryTabs = _get_tabs()
     tabs.init_all_text()
     tabs.populate_server_list()
     tabs.populate_character_slots()
@@ -165,7 +166,7 @@ func switch_state(new_state: EntryState) -> void:
     if character_create_panel != null:
         character_create_panel.visible = (current_state == EntryState.CHARACTER_CREATE)
 
-func submit_login(username: String, _pass: String) -> Dictionary:
+func submit_login(username: String, password_plain: String) -> Dictionary:
     form_username = username.strip_edges()
     if form_username.is_empty():
         return {"success": false, "error_code": "ERR_EMPTY_USERNAME", "message": "ui.fe01.login.error_empty", "error_data": {}}
@@ -174,7 +175,7 @@ func submit_login(username: String, _pass: String) -> Dictionary:
     switch_state(EntryState.CHARACTER_SELECT)
     return {"success": true, "account_id": current_account_id, "token": current_session_token}
 
-func submit_register(username: String, _pass: String) -> Dictionary:
+func submit_register(username: String, password_plain: String) -> Dictionary:
     form_username = username.strip_edges()
     var min_len: int = GameConfig.get_int("frontend.views", "fe01_account_entry/min_username_len", 3)
     if form_username.length() < min_len:
@@ -187,9 +188,9 @@ func submit_register(username: String, _pass: String) -> Dictionary:
 func select_server(server_id: String) -> Dictionary:
     current_server_id = server_id
     if not current_account_id.is_empty():
-        var gw := WorldGatewayFSM.new(current_account_id)
-        gw.enter_gateway()
-        ServiceLocator.set_active_gateway(gw)
+        var gateway: WorldGatewayFSM = WorldGatewayFSM.new(current_account_id)
+        gateway.enter_gateway()
+        ServiceLocator.set_active_gateway(gateway)
     return {"success": true, "selected_server": server_id}
 
 ## 退出当前账号，注销凭证并复位到登录页
@@ -252,15 +253,15 @@ func _sync_mod_lists_from_source(src: Dictionary) -> void:
         available_traits_list = FrontendSnapshot.read_array(traits_src, traits_key)
 
 func _sync_mod_ui_controls_from_source(src: Dictionary) -> void:
-    var raw_ctrl: Variant = src.get("ui_controls", src.get("creation_ui_controls", null))
-    if not (raw_ctrl is Dictionary):
-        raw_ctrl = snapshot.get("ui_controls", snapshot.get("creation_ui_controls", null))
-    if raw_ctrl is Dictionary:
-        var ctrl_dict: Dictionary = raw_ctrl as Dictionary
+    var raw_controls: Variant = src.get("ui_controls", src.get("creation_ui_controls", null))
+    if not (raw_controls is Dictionary):
+        raw_controls = snapshot.get("ui_controls", snapshot.get("creation_ui_controls", null))
+    if raw_controls is Dictionary:
+        var controls_dict: Dictionary = raw_controls as Dictionary
         creation_ui_controls = {
-            "allow_manual_origin_select": bool(ctrl_dict.get("allow_manual_origin_select", false)),
-            "allow_manual_trait_select": bool(ctrl_dict.get("allow_manual_trait_select", false)),
-            "allow_attribute_reroll": bool(ctrl_dict.get("allow_attribute_reroll", false))
+            "allow_manual_origin_select": bool(controls_dict.get("allow_manual_origin_select", false)),
+            "allow_manual_trait_select": bool(controls_dict.get("allow_manual_trait_select", false)),
+            "allow_attribute_reroll": bool(controls_dict.get("allow_attribute_reroll", false))
         }
 
 func _reset_locked_form_selections() -> void:
@@ -273,19 +274,19 @@ func _reset_locked_form_selections() -> void:
 
 func _extract_origin_id(entry: Variant) -> String:
     if entry is Dictionary:
-        var d: Dictionary = entry as Dictionary
-        return str(d.get("origin_id", d.get("id", "")))
+        var entry_dict: Dictionary = entry as Dictionary
+        return str(entry_dict.get("origin_id", entry_dict.get("id", "")))
     if entry is String:
         return String(entry)
     return ""
 
 func _extract_positive_trait_id(entry: Variant) -> String:
     if entry is Dictionary:
-        var d: Dictionary = entry as Dictionary
-        var pos_val: String = str(d.get("positive", d.get("positive_trait", d.get("positive_id", ""))))
+        var entry_dict: Dictionary = entry as Dictionary
+        var pos_val: String = str(entry_dict.get("positive", entry_dict.get("positive_trait", entry_dict.get("positive_id", ""))))
         if not pos_val.is_empty():
             return pos_val
-        return str(d.get("trait_id", d.get("id", "")))
+        return str(entry_dict.get("trait_id", entry_dict.get("id", "")))
     if entry is String:
         return String(entry)
     return ""
@@ -295,10 +296,10 @@ func select_custom_origin_by_index(idx: int) -> bool:
         return false
     if idx < 0 or idx >= available_origins_list.size():
         return false
-    var oid: String = _extract_origin_id(available_origins_list[idx])
-    if oid.is_empty():
+    var origin_id: String = _extract_origin_id(available_origins_list[idx])
+    if origin_id.is_empty():
         return false
-    form_selected_origin_id = oid
+    form_selected_origin_id = origin_id
     if char_origin_option != null and idx < char_origin_option.item_count:
         char_origin_option.select(idx)
     return true
@@ -316,10 +317,10 @@ func select_custom_trait_by_index(idx: int) -> bool:
         return false
     if idx < 0 or idx >= available_traits_list.size():
         return false
-    var tid: String = _extract_positive_trait_id(available_traits_list[idx])
-    if tid.is_empty():
+    var trait_id: String = _extract_positive_trait_id(available_traits_list[idx])
+    if trait_id.is_empty():
         return false
-    form_selected_positive_trait = tid
+    form_selected_positive_trait = trait_id
     if char_talent_list != null and idx < char_talent_list.item_count:
         char_talent_list.select(idx)
     return true
@@ -357,7 +358,7 @@ func select_character_slot(slot_id: String) -> Dictionary:
     return {"success": true, "selected_slot": slot_id}
 
 func _connect_signals() -> void:
-    var tabs = _get_tabs()
+    var tabs: AccountEntryTabs = _get_tabs()
     splash_enter_btn.pressed.connect(_on_splash_enter_pressed)
     login_submit_btn.pressed.connect(_on_login_submit_pressed)
     login_goto_register_btn.pressed.connect(_on_login_goto_register_pressed)
@@ -424,8 +425,8 @@ func _on_register_back_pressed() -> void:
 func _on_server_confirm_pressed() -> void:
     var selected: PackedInt32Array = server_list_item.get_selected_items()
     if selected.size() > 0 and selected[0] < server_list.size():
-        var sv: Dictionary = server_list[selected[0]]
-        select_server(str(sv.get("id", "")))
+        var server_entry: Dictionary = server_list[selected[0]]
+        select_server(str(server_entry.get("id", "")))
     switch_state(EntryState.CHARACTER_SELECT)
 
 func _on_server_back_pressed() -> void:
@@ -435,6 +436,14 @@ func _on_char_enter_pressed() -> void:
     if selected_character_slot.is_empty():
         NavManager.get_instance().show_toast("请先选择一个角色", NavTypes.ToastLevel.WARNING)
         return
+    var active_gateway: WorldGatewayFSM = ServiceLocator.get_active_gateway() as WorldGatewayFSM
+    if active_gateway != null:
+        if active_gateway.context.current_phase == WorldGatewayModel.GatewayPhase.GATEWAY_ENTERED:
+            active_gateway.select_mode(WorldGatewayModel.GameMode.SINGLE_PLAYER)
+        if active_gateway.context.current_phase == WorldGatewayModel.GatewayPhase.CHARACTER_PENDING or active_gateway.context.current_phase == WorldGatewayModel.GatewayPhase.SLOT_WORLD_RESOLVED:
+            active_gateway.attach_ready_character(selected_character_slot)
+        if active_gateway.context.current_phase == WorldGatewayModel.GatewayPhase.WORLD_ENTRY_PERMITTED:
+            active_gateway.enter_world()
     NavManager.get_instance().show_toast("进入瓦尔兰大陆...", NavTypes.ToastLevel.SUCCESS)
     NavManager.get_instance().push_screen("main_hud", {"slot": selected_character_slot})
 
