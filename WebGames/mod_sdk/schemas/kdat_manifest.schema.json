@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "kalar.mod_sdk.kdat_manifest.v1",
+  "title": "KDataManifest",
+  "description": "卡拉尔世界引擎 .kdat 二进制数据流及打包编译清单元数据契约 (kalar.mod_sdk.kdat_manifest.v1)",
+  "type": "object",
+  "properties": {
+    "manifest_version": {
+      "type": "string",
+      "description": "清单规范版本号 (语义化版本: 1.0.0)"
+    },
+    "archive_format": {
+      "type": "string",
+      "enum": [
+        "single_table",
+        "monolithic_bundle",
+        "mod_package"
+      ],
+      "description": "二进制数据归档模式：单表独立、全库单包融合或 MOD 扩展包"
+    },
+    "generated_at": {
+      "type": "string",
+      "description": "构建生成时间戳 (ISO 8601 格式)"
+    },
+    "compression_algorithm": {
+      "type": "string",
+      "enum": [
+        "raw",
+        "deflate",
+        "zstd"
+      ],
+      "description": "数据体压缩算法"
+    },
+    "total_files": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "包含的二进制数据条目总数"
+    },
+    "uncompressed_bytes_total": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "未压缩原始字节总数"
+    },
+    "compressed_bytes_total": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "压缩后物理字节总数"
+    },
+    "compression_ratio": {
+      "type": "number",
+      "description": "总体压缩比率 (0.00 ~ 1.00)"
+    },
+    "entries": {
+      "type": "array",
+      "description": "编译打包条目明细清单",
+      "items": {
+        "type": "object",
+        "properties": {
+          "table_name": {
+            "type": "string",
+            "description": "数据表唯一标识名称 (如 domains.combat.mechanics)"
+          },
+          "source_file": {
+            "type": "string",
+            "description": "源文件相对路径"
+          },
+          "binary_file": {
+            "type": "string",
+            "description": "输出二进制文件相对路径"
+          },
+          "uncompressed_size": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "条目解压后大小"
+          },
+          "compressed_size": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "条目压缩后大小"
+          },
+          "crc32": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{8}$",
+            "description": "载荷 32 位 CRC 校验和十六进制字符串"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$",
+            "description": "二进制文件 SHA-256 哈希值"
+          }
+        },
+        "required": [
+          "table_name",
+          "source_file",
+          "binary_file",
+          "uncompressed_size",
+          "compressed_size",
+          "crc32",
+          "sha256"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "manifest_version",
+    "archive_format",
+    "total_files",
+    "entries"
+  ],
+  "additionalProperties": false
+}
