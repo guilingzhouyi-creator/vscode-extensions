@@ -42,76 +42,76 @@ static func reset_custom_handlers_for_tests() -> void:
 	_custom_handlers.clear()
 
 ## 快捷派发门面（对齐 dispatch_request）
-static func dispatch(req: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM = null) -> UnifiedResponseEnvelopeDTO:
-	return dispatch_request(req, gateway)
+static func dispatch(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM = null) -> UnifiedResponseEnvelopeDTO:
+	return dispatch_request(request, gateway)
 
 ## 核心派发入口：处理一切来自客户端或 Agent 包装的统一请求信封
-static func dispatch_request(req: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM = null) -> UnifiedResponseEnvelopeDTO:
-	if req == null:
+static func dispatch_request(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM = null) -> UnifiedResponseEnvelopeDTO:
+	if request == null:
 		return UnifiedProtocolFactory.create_response(
 			"", false, {}, "ERR_NULL_REQUEST", "请求信封不能为空"
 		)
 
 	# 1. 租约与并发冲突仲裁
-	if req.actor_type == ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI:
-		HumanControlLeaseManager.renew_human_lease(req.account_id, req.lease_nonce)
-	elif req.actor_type == ClientRequestEnvelopeDTO.ACTOR_AGENT:
+	if request.actor_type == ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI:
+		HumanControlLeaseManager.renew_human_lease(request.account_id, request.lease_nonce)
+	elif request.actor_type == ClientRequestEnvelopeDTO.ACTOR_AGENT:
 		if HumanControlLeaseManager.is_lease_active():
 			return UnifiedProtocolFactory.create_response(
-				req.request_id, false, {}, "ERR_PREEMPTED_BY_HUMAN", "人类前台正在操作，Agent 动作已被抢占式阻断"
+				request.request_id, false, {}, "ERR_PREEMPTED_BY_HUMAN", "人类前台正在操作，Agent 动作已被抢占式阻断"
 			)
 
 	# 2. 优先检查外部动态注册的领域处理器 (OCP 扩展点)
-	if _custom_handlers.has(req.domain):
-		var custom_fn: Callable = _custom_handlers[req.domain]
+	if _custom_handlers.has(request.domain):
+		var custom_fn: Callable = _custom_handlers[request.domain]
 		if custom_fn.is_valid():
-			return custom_fn.call(req, gateway)
+			return custom_fn.call(request, gateway)
 
 	# 3. 按核心内置领域路由分发
-	match req.domain:
+	match request.domain:
 		"world_state", "world_gateway", "lifecycle":
-			if req.action_type.begins_with("ESC_"):
-				return EscMenuBackendService.handle_esc_action(req, gateway)
-			elif req.domain == "world_state":
-				return _dispatch_agent_action_compat(req)
+			if request.action_type.begins_with("ESC_"):
+				return EscMenuBackendService.handle_esc_action(request, gateway)
+			elif request.domain == "world_state":
+				return _dispatch_agent_action_compat(request)
 		"game_settings":
-			return _dispatch_settings_action(req)
+			return _dispatch_settings_action(request)
 		_:
 			return UnifiedProtocolFactory.create_response(
-				req.request_id, false, {}, "ERR_UNKNOWN_DOMAIN", "未知业务领域: %s" % req.domain
+				request.request_id, false, {}, "ERR_UNKNOWN_DOMAIN", "未知业务领域: %s" % request.domain
 			)
 
 	return UnifiedProtocolFactory.create_response(
-		req.request_id, false, {}, "ERR_UNHANDLED_ACTION", "未支持的操作指令: %s" % req.action_type
+		request.request_id, false, {}, "ERR_UNHANDLED_ACTION", "未支持的操作指令: %s" % request.action_type
 	)
 
-static func _dispatch_agent_action_compat(req: ClientRequestEnvelopeDTO) -> UnifiedResponseEnvelopeDTO:
-	var agent_pkt := AgentActionPacketDTO.new()
-	agent_pkt.session_id = req.character_id
-	agent_pkt.directive_id = req.action_type
-	agent_pkt.params = req.payload
-	agent_pkt.client_timestamp_ms = req.client_timestamp_ms
-	var hud_ctx: Dictionary = {"account_id": req.account_id, "character_id": req.character_id}
-	if req.payload is Dictionary:
-		for k in req.payload.keys():
-			hud_ctx[k] = req.payload[k]
-	if not hud_ctx.has("unallocated_potential_points"):
-		hud_ctx["unallocated_potential_points"] = 5
-	if not hud_ctx.has("unread_mail_count"):
-		hud_ctx["unread_mail_count"] = 1
-	var hud_snap := AuthoritativeHudSyncService.get_authoritative_snapshot(hud_ctx)
-	var is_human_active: bool = false if req.actor_type == ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI else HumanControlLeaseManager.is_lease_active()
-	var res := AgentActionExecutionSolver.validate_and_execute(agent_pkt, hud_snap, is_human_active)
+static func _dispatch_agent_action_compat(request: ClientRequestEnvelopeDTO) -> UnifiedResponseEnvelopeDTO:
+	var agent_packet := AgentActionPacketDTO.new()
+	agent_packet.session_id = request.character_id
+	agent_packet.directive_id = request.action_type
+	agent_packet.params = request.payload
+	agent_packet.client_timestamp_ms = request.client_timestamp_ms
+	var hud_context: Dictionary = {"account_id": request.account_id, "character_id": request.character_id}
+	if request.payload is Dictionary:
+		for payload_key in request.payload.keys():
+			hud_context[payload_key] = request.payload[payload_key]
+	if not hud_context.has("unallocated_potential_points"):
+		hud_context["unallocated_potential_points"] = 5
+	if not hud_context.has("unread_mail_count"):
+		hud_context["unread_mail_count"] = 1
+	var hud_snapshot := AuthoritativeHudSyncService.get_authoritative_snapshot(hud_context)
+	var is_human_active: bool = false if request.actor_type == ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI else HumanControlLeaseManager.is_lease_active()
+	var execution_result := AgentActionExecutionSolver.validate_and_execute(agent_packet, hud_snapshot, is_human_active)
 	return UnifiedProtocolFactory.create_response(
-		req.request_id,
-		bool(res.get("success", false)),
-		res,
-		str(res.get("error_code", "")),
-		str(res.get("cause", "")),
-		res.get("causal_delta", {}) if res.has("causal_delta") else {}
+		request.request_id,
+		bool(execution_result.get("success", false)),
+		execution_result,
+		str(execution_result.get("error_code", "")),
+		str(execution_result.get("cause", "")),
+		execution_result.get("causal_delta", {}) if execution_result.has("causal_delta") else {}
 	)
 
-static func _dispatch_settings_action(req: ClientRequestEnvelopeDTO) -> UnifiedResponseEnvelopeDTO:
+static func _dispatch_settings_action(request: ClientRequestEnvelopeDTO) -> UnifiedResponseEnvelopeDTO:
 	return UnifiedProtocolFactory.create_response(
-		req.request_id, true, {"applied_settings": req.payload}, "", "设置应用成功"
+		request.request_id, true, {"applied_settings": request.payload}, "", "设置应用成功"
 	)

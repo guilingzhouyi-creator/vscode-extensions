@@ -51,8 +51,8 @@ static func get_lease_holder() -> String:
 	return _current_lease_holder
 
 ## 在测试环境下模拟推进租约时钟毫秒数
-static func simulate_time_advance_ms(ms: int) -> void:
-	_mock_time_offset_ms += ms
+static func simulate_time_advance_ms(advance_ms: int) -> void:
+	_mock_time_offset_ms += advance_ms
 
 static func _get_current_time_ms() -> int:
 	return Time.get_ticks_msec() + _mock_time_offset_ms

@@ -50,8 +50,8 @@ static func trigger_initial_sync(context: Dictionary) -> AuthoritativeHudSnapsho
 static func publish_stat_mutation(
 	character_id: String,
 	stat_name: String,
-	old_val: float,
-	new_val: float,
+	old_value: float,
+	new_value: float,
 	cause: String = ""
 ) -> void:
 	var bus := EventBusCore.get_instance()
@@ -60,13 +60,13 @@ static func publish_stat_mutation(
 	var mut := HudMutationEventsDTO.StatMutation.new()
 	mut.character_id = character_id
 	mut.stat_name = stat_name
-	mut.old_value = old_val
-	mut.new_value = new_val
-	mut.delta = new_val - old_val
+	mut.old_value = old_value
+	mut.new_value = new_value
+	mut.delta = new_value - old_value
 	mut.cause_event = cause
 	packet.payload_dto = mut
 	packet.narrative_key = "stat_mutated"
-	packet.narrative_args = [stat_name, old_val, new_val]
+	packet.narrative_args = [stat_name, old_value, new_value]
 	bus.dispatch_now(packet)
 	bus.recycle_packet(packet)
 
@@ -188,7 +188,7 @@ static func _resolve_identity(context: Dictionary, snapshot: AuthoritativeHudSna
 	snapshot.level = maxi(1, int(context.get("level", 1)))
 
 	var raw_race := String(context.get("race_id", ""))
-	var physiology = context.get("physiology", null)
+	var physiology: Variant = context.get("physiology", null)
 	if raw_race.is_empty() and physiology != null and "race_id" in physiology:
 		raw_race = String(physiology.race_id)
 
@@ -198,18 +198,18 @@ static func _resolve_identity(context: Dictionary, snapshot: AuthoritativeHudSna
 		snapshot.race_id = raw_race
 
 static func _resolve_physiology(context: Dictionary, snapshot: AuthoritativeHudSnapshotDTO) -> void:
-	var physiology = context.get("physiology", null)
+	var physiology: Variant = context.get("physiology", null)
 	if physiology != null:
 		if physiology.has_method("get_actual_values"):
 			snapshot.attribute_values = physiology.get_actual_values().duplicate()
 		if physiology.has_method("get_all_levels"):
 			snapshot.attribute_levels = physiology.get_all_levels().duplicate()
 
-	var raw_attr_vals = context.get("attribute_values", null)
+	var raw_attr_vals: Variant = context.get("attribute_values", null)
 	if raw_attr_vals is Dictionary and not raw_attr_vals.is_empty():
 		snapshot.attribute_values = raw_attr_vals.duplicate()
 
-	var raw_attr_levels = context.get("attribute_levels", null)
+	var raw_attr_levels: Variant = context.get("attribute_levels", null)
 	if raw_attr_levels is Dictionary and not raw_attr_levels.is_empty():
 		snapshot.attribute_levels = raw_attr_levels.duplicate()
 
@@ -225,7 +225,7 @@ static func _resolve_physiology(context: Dictionary, snapshot: AuthoritativeHudS
 	snapshot.ap_current = maxf(0.0, float(context.get("ap_current", snapshot.ap_max)))
 
 static func _resolve_wallet_and_progression(context: Dictionary, snapshot: AuthoritativeHudSnapshotDTO) -> void:
-	var wallet = context.get("wallet", null)
+	var wallet: Variant = context.get("wallet", null)
 	if wallet != null:
 		if "gold" in wallet:
 			snapshot.wallet_gold = int(wallet.gold)
@@ -242,7 +242,7 @@ static func _resolve_wallet_and_progression(context: Dictionary, snapshot: Autho
 	snapshot.title_rank_key = String(context.get("title_rank_key", ""))
 
 static func _resolve_calendar_and_retention(context: Dictionary, snapshot: AuthoritativeHudSnapshotDTO) -> void:
-	var raw_cal = context.get("calendar_env", null)
+	var raw_cal: Variant = context.get("calendar_env", null)
 	if raw_cal is WorldCalendarEnvironmentDTO:
 		snapshot.calendar_env = raw_cal
 	elif raw_cal is Dictionary and not raw_cal.is_empty():
@@ -257,9 +257,9 @@ static func _resolve_calendar_and_retention(context: Dictionary, snapshot: Autho
 	else:
 		snapshot.calendar_env = WorldCalendarEnvironmentDTO.new()
 
-	var raw_ops = context.get("ops_bulletin_brief", {})
+	var raw_ops: Variant = context.get("ops_bulletin_brief", {})
 	if raw_ops is Dictionary:
-		snapshot.ops_bulletin_brief = raw_ops.duplicate()
+		snapshot.ops_bulletin_brief = (raw_ops as Dictionary).duplicate()
 
 	snapshot.unread_mail_count = maxi(0, int(context.get("unread_mail_count", 0)))
 	snapshot.gacha_pity_counter = maxi(0, int(context.get("gacha_pity_counter", 0)))
@@ -267,28 +267,28 @@ static func _resolve_calendar_and_retention(context: Dictionary, snapshot: Autho
 static func _resolve_features_and_social(context: Dictionary, snapshot: AuthoritativeHudSnapshotDTO) -> void:
 	snapshot.guild_faction_id = String(context.get("guild_faction_id", ""))
 
-	var raw_dots = context.get("active_red_dot_paths", [])
+	var raw_dots: Variant = context.get("active_red_dot_paths", [])
 	if raw_dots is Array:
-		for dot in raw_dots:
+		for dot in (raw_dots as Array):
 			snapshot.active_red_dot_paths.append(str(dot))
 
 	snapshot.quest_tracker = _resolve_quest_tracker(context)
 	snapshot.mode_features = _resolve_mode_features(context)
 
 static func _resolve_quest_tracker(context: Dictionary) -> ActiveQuestTrackerDTO:
-	var raw_quest = context.get("quest_tracker", null)
+	var raw_quest: Variant = context.get("quest_tracker", null)
 	if raw_quest is ActiveQuestTrackerDTO:
-		return raw_quest
-	if raw_quest is Dictionary and not raw_quest.is_empty():
-		return ActiveQuestTrackerDTO.from_dto(raw_quest)
+		return raw_quest as ActiveQuestTrackerDTO
+	if raw_quest is Dictionary and not (raw_quest as Dictionary).is_empty():
+		return ActiveQuestTrackerDTO.from_dto(raw_quest as Dictionary)
 	return ActiveQuestTrackerDTO.new()
 
 static func _resolve_mode_features(context: Dictionary) -> ModeFeatureManifestDTO:
-	var raw_mode = context.get("mode_features", null)
+	var raw_mode: Variant = context.get("mode_features", null)
 	if raw_mode is ModeFeatureManifestDTO:
-		return raw_mode
-	if raw_mode is Dictionary and not raw_mode.is_empty():
-		return ModeFeatureManifestDTO.from_dto(raw_mode)
+		return raw_mode as ModeFeatureManifestDTO
+	if raw_mode is Dictionary and not (raw_mode as Dictionary).is_empty():
+		return ModeFeatureManifestDTO.from_dto(raw_mode as Dictionary)
 	if context.has("game_mode"):
 		return GameModeFeatureSolver.resolve_features(int(context.get("game_mode")))
 	return GameModeFeatureSolver.resolve_features(GameModeFeatureSolver.MODE_SINGLE_PLAYER)
