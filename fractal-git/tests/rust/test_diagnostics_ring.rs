@@ -132,9 +132,35 @@ fn the_threshold_value_admits_only_levels_at_or_above_it() {
 
 #[test]
 fn a_filtered_level_writes_nothing_to_the_file_sink() {
+    const CHILD_MARKER: &str = "TAXIS_TEST_FILTERED_SINK_CHILD";
+    const CHILD_COMPLETE: &str = "TAXIS_FILTERED_SINK_ASSERTIONS_COMPLETE";
+    if std::env::var_os(CHILD_MARKER).is_none() {
+        // Other tests legitimately emit to the process-wide sink without taking threshold_guard.
+        // Run this whole-file assertion in a fresh process, preserving parallelism in its parent.
+        let output = std::process::Command::new(std::env::current_exe().expect("test executable"))
+            .current_dir(env!("CARGO_MANIFEST_DIR"))
+            .args([
+                "--exact",
+                "test_diagnostics_ring::a_filtered_level_writes_nothing_to_the_file_sink",
+                "--nocapture",
+            ])
+            .env(CHILD_MARKER, "1")
+            .output()
+            .expect("run isolated sink assertions");
+        assert!(
+            output.status.success(),
+            "isolated sink test failed:\n{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        );
+        assert!(
+            String::from_utf8_lossy(&output.stdout).contains(CHILD_COMPLETE),
+            "isolated child must execute the assertions, not select zero tests",
+        );
+        return;
+    }
     // The other half, and the one that needs the real `emit` path: a rejected record must not reach
-    // the file. Held under the process-wide guard so the global it configures is not moved by a
-    // parallel test while this one reads it.
+    // the file. The child owns its sink and threshold; the guard also preserves the setter contract.
     let _guard = fg_core::diagnostics::threshold_guard();
     let path = unique_log_path("thresholds");
 
@@ -151,6 +177,7 @@ fn a_filtered_level_writes_nothing_to_the_file_sink() {
             "a debug record under a {threshold:?} threshold must be admitted={admitted}"
         );
     }
+    println!("{CHILD_COMPLETE}");
 }
 
 #[test]
