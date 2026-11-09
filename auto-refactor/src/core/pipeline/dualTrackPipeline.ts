@@ -28,6 +28,7 @@
  */
 
 import type { Scanner } from '../analyzer';
+import type { FileExecutionObservation } from '../review/analyzer-execution';
 import type { Issue, FileMetric, ProjectArchetype } from '../types';
 import { SEVERITY_ERROR } from '../types';
 import { classifyDiff } from '../router/diffClassifier';
@@ -246,6 +247,12 @@ export interface DualTrackExecution {
  * falls back to a fresh default instance or to scanner-owned state.
  */
 export interface DualTrackOptions {
+    /** Observe actual analyzer invocations, including rework and asynchronous compensation. */
+    onExecution?: (event: {
+        readonly track: 'fast' | 'rework' | 'cold';
+        readonly execution: FileExecutionObservation;
+        readonly metric: FileMetric | null;
+    }) => void;
     /** Escalation sink for deep-track events; a fresh channel is created when omitted. */
     escalationChannel?: EscalationChannel;
     /** Cooperative load governor used for event-loop yields; created when omitted. */
@@ -355,6 +362,7 @@ interface ConfidenceReworkContext {
     readonly issues: readonly Issue[];
     readonly lineBounds?: readonly [number, number];
     readonly routing?: SparseRouteResult;
+    readonly onExecution?: DualTrackOptions['onExecution'];
 }
 
 /** Result of one file's rework pass: the findings to ship plus the counters to report. */
@@ -699,8 +707,14 @@ async function auditColdCompensationEscalations(context: {
             input.filePath,
             input.newContent,
             undefined,
-            route.overflowAnalyzers,
+            {
+                activeAnalyzers: route.overflowAnalyzers,
+                observeExecution: Boolean(plan.options.onExecution),
+            },
         );
+        if (coldResult.execution) {
+            plan.options.onExecution?.({ track: 'cold', execution: coldResult.execution, metric: coldResult.metric });
+        }
 
         if (coldResult.issues.length > 0) {
             deepIssues.push(...coldResult.issues);
@@ -855,8 +869,12 @@ async function runConfidenceRework(
         {
             activeAnalyzers: new Set(analyzers),
             lineBounds: widerBounds,
+            observeExecution: Boolean(context.onExecution),
         },
     );
+    if (widerResult.execution) {
+        context.onExecution?.({ track: 'rework', execution: widerResult.execution, metric: widerResult.metric });
+    }
 
     const outcomes = reconcileRework(candidates, widerResult.issues);
     const summary = summarizeRework(outcomes);
@@ -891,8 +909,12 @@ async function auditSingleFileInput(context: AuditFileInputContext): Promise<voi
         {
             activeAnalyzers,
             lineBounds,
+            observeExecution: Boolean(context.options.onExecution),
         },
     );
+    if (fileResult.execution) {
+        context.options.onExecution?.({ track: 'fast', execution: fileResult.execution, metric: fileResult.metric });
+    }
 
     const boundedIssues =
         replayWindow && planner && planner.canUseSparseReplay(replayWindow)
@@ -909,6 +931,7 @@ async function auditSingleFileInput(context: AuditFileInputContext): Promise<voi
         issues: boundedIssues,
         lineBounds,
         routing: context.acc.sparseRouting[inputTarget.filePath],
+        onExecution: context.options.onExecution,
     });
     const finalIssues = reworkResult.issues;
 
