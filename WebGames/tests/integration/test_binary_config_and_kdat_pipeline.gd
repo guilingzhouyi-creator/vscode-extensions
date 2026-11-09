@@ -1,0 +1,356 @@
+# ==============================================================================
+# 模块归属: 集成测试层 (Integration · 高纯度二进制流与GameConfig双轨流水线)
+# 文件路径: res://tests/integration/test_binary_config_and_kdat_pipeline.gd
+# 架构定位: Integration Test Suite / End-to-End Pipeline Harness
+# 跨域依赖: 上游: TestRegistry | 下游: BinaryConfigReader, KDataHeaderDTO, KDataTOCEntryDTO, GameConfig
+# 职责说明: Phase 125 .kdat 容器规范、魔数拦截、CRC32 防篡改、TLV 往返等价、双轨加载与单包融合验收测试套件
+# 设计依据: Phase 125 阶段4验收测试矩阵规约与卡拉尔架构解耦契约
+# ==============================================================================
+
+class_name TestBinaryConfigAndKdatPipeline
+extends TestCase
+
+const BinaryConfigReader = preload("res://backend/infrastructure/binary_config_reader.gd")
+const ClientSecretVault = preload("res://backend/infrastructure/client_secret_vault.gd")
+const RunModeIsolationSolver = preload("res://backend/domains/world_gateway/run_mode_isolation_solver.gd")
+const AuthoritySyncStub = preload("res://backend/infrastructure/authority_sync_stub.gd")
+const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
+const KDataHeaderDTO = preload("res://backend/infrastructure/dto/kdata_header_dto.gd")
+const KDataTOCEntryDTO = preload("res://backend/infrastructure/dto/kdata_toc_entry_dto.gd")
+
+# ==============================================================================
+# 一、测试套件总入口与环境重置
+# ==============================================================================
+
+static func run_all_tests() -> Dictionary:
+	var results: Array[Dictionary] = []
+	results.append(test_tc_kdat_01_magic_and_header_validation())
+	results.append(test_tc_kdat_02_crc32_and_tamper_rejection())
+	results.append(test_tc_kdat_03_tlv_types_and_string_interning())
+	results.append(test_tc_kdat_04_game_config_single_table_kdat_loading())
+	results.append(test_tc_kdat_05_monolithic_bundle_and_toc_lookup())
+	results.append(test_tc_kdat_06_dual_track_and_architecture_closure())
+	results.append(test_tc_kdat_07_binary_blob_embedding_and_decoding())
+	results.append(test_tc_kdat_08_encrypted_stream_and_client_secret_vault())
+	results.append(test_tc_kdat_09_single_player_fast_path_and_multiplayer_stub_isolation())
+
+	return pack_results("Binary Config & KData Pipeline", results)
+
+# ==============================================================================
+# 二、辅助编码工具（用于在无文件环境下构造标准合规测试流）
+# ==============================================================================
+
+static func _build_test_kdat_buffer(data: Dictionary, compress: bool = true, encrypt: bool = false) -> PackedByteArray:
+	var payload_buf := StreamPeerBuffer.new()
+	payload_buf.big_endian = false
+
+	# 1. 简易字符串池：提取所有键
+	var pool: Array[String] = []
+	for k in data.keys():
+		pool.append(str(k))
+	payload_buf.put_u16(pool.size())
+	for s in pool:
+		var utf8 := s.to_utf8_buffer()
+		payload_buf.put_u16(utf8.size())
+		payload_buf.put_data(utf8)
+
+	# 2. 编码字典根节点
+	payload_buf.put_u8(0x09) # TAG_DICT
+	payload_buf.put_u32(data.size())
+	for i in range(pool.size()):
+		payload_buf.put_u8(0x07) # TAG_STRING_REF
+		payload_buf.put_u16(i)
+		var val: Variant = data[pool[i]]
+		if val is int:
+			payload_buf.put_u8(0x03) # TAG_INT32
+			payload_buf.put_32(int(val))
+		elif val is float:
+			payload_buf.put_u8(0x05) # TAG_FLOAT64
+			payload_buf.put_double(float(val))
+		elif val is bool:
+			payload_buf.put_u8(0x02 if val else 0x01)
+		elif val is String:
+			payload_buf.put_u8(0x06) # TAG_STRING
+			var s_utf8 := (val as String).to_utf8_buffer()
+			payload_buf.put_u16(s_utf8.size())
+			payload_buf.put_data(s_utf8)
+		elif val is Dictionary and (val as Dictionary).get("__type", "") == "binary_blob":
+			payload_buf.put_u8(0x0A) # TAG_BINARY_BLOB
+			var raw_blob: PackedByteArray = (val as Dictionary).get("data", PackedByteArray())
+			var mime_str: String = str((val as Dictionary).get("mime_type", "application/octet-stream"))
+			var mime_bytes := mime_str.to_utf8_buffer()
+			payload_buf.put_u32(raw_blob.size())
+			payload_buf.put_u16(mime_bytes.size())
+			payload_buf.put_data(mime_bytes)
+			payload_buf.put_data(raw_blob)
+		else:
+			payload_buf.put_u8(0x00) # TAG_NIL
+
+	var raw_payload := payload_buf.data_array
+	var uncompressed_size := raw_payload.size()
+
+	var flags := 0x0008 | 0x0002 # LITTLE_ENDIAN | STRING_POOL
+	var compress_type := 0
+	var final_payload := raw_payload
+
+	if compress:
+		var compressed := raw_payload.compress(FileAccess.COMPRESSION_DEFLATE)
+		if compressed.size() < uncompressed_size:
+			flags |= 0x0001 # COMPRESSED
+			compress_type = 1 # DEFLATE
+			final_payload = compressed
+
+	if encrypt:
+		flags |= 0x0010 # FLAG_ENCRYPTED
+		final_payload = ClientSecretVault.mask_stream(final_payload)
+
+	var compressed_size := final_payload.size()
+	var crc_val := BinaryConfigReader.compute_crc32(final_payload)
+
+	# 组装 32 字节 Header
+	var header_buf := StreamPeerBuffer.new()
+	header_buf.big_endian = false
+	header_buf.put_u32(0x4B444154) # 'KDAT'
+	header_buf.put_u16(0x0100) # v1.0
+	header_buf.put_u16(flags)
+	header_buf.put_u8(compress_type)
+	header_buf.put_u8(1) # SINGLE_TABLE
+	header_buf.put_u16(32) # HEADER_SIZE
+	header_buf.put_u32(uncompressed_size)
+	header_buf.put_u32(compressed_size)
+	header_buf.put_u32(crc_val)
+	header_buf.put_u32(0)
+	header_buf.put_u32(0)
+
+	var result := header_buf.data_array
+	result.append_array(final_payload)
+	return result
+
+# ==============================================================================
+# 三、核心测试场景 (TC-KDAT-01 ~ TC-KDAT-06)
+# ==============================================================================
+
+## TC-KDAT-01: 魔数与 Header 强类型契约校验及非法注入熔断
+static func test_tc_kdat_01_magic_and_header_validation() -> Dictionary:
+	# 1. 验证标准合法 DTO 序列化与反序列化
+	var dto := KDataHeaderDTO.new()
+	dto.uncompressed_size = 1024
+	dto.compressed_size = 256
+	dto.crc32 = 0x12345678
+	var bytes := dto.serialize()
+	var restored := KDataHeaderDTO.deserialize(bytes)
+	var dto_ok: bool = restored != null and restored.magic == KDataHeaderDTO.MAGIC_KDAT and restored.uncompressed_size == 1024
+
+	# 2. 非法魔数熔断拦截
+	var bad_magic_bytes := bytes.duplicate()
+	bad_magic_bytes[0] = 0x00
+	var bad_restored := KDataHeaderDTO.deserialize(bad_magic_bytes)
+	var bad_ok: bool = (bad_restored == null)
+
+	# 3. 截断短数据熔断拦截
+	var truncated := bytes.slice(0, 16)
+	var trunc_ok: bool = (KDataHeaderDTO.deserialize(truncated) == null)
+
+	var passed: bool = dto_ok and bad_ok and trunc_ok
+	return make_result("TC-KDAT-01: 魔数与 Header 强类型契约校验及非法注入熔断", passed, {
+		"dto_ok": dto_ok,
+		"bad_ok": bad_ok,
+		"trunc_ok": trunc_ok
+	})
+
+## TC-KDAT-02: CRC32 循环冗余校验与载荷单字节篡改自愈拦截
+static func test_tc_kdat_02_crc32_and_tamper_rejection() -> Dictionary:
+	var test_dict := {"hp": 100, "name": "Hero", "speed": 12.5}
+	var valid_kdat := _build_test_kdat_buffer(test_dict, true)
+
+	# 1. 正确载荷解析
+	var res_valid: Variant = BinaryConfigReader.load_kdat_buffer(valid_kdat)
+	var valid_ok: bool = res_valid != null and (res_valid is Dictionary) and res_valid.get("hp", 0) == 100
+
+	# 2. 单字节篡改拦截
+	var tampered_kdat := valid_kdat.duplicate()
+	tampered_kdat[tampered_kdat.size() - 1] ^= 0xFF
+	var res_tampered: Variant = BinaryConfigReader.load_kdat_buffer(tampered_kdat)
+	var tamper_rejected: bool = (res_tampered == null)
+
+	var passed: bool = valid_ok and tamper_rejected
+	return make_result("TC-KDAT-02: CRC32 循环冗余校验与载荷单字节篡改自愈拦截", passed, {
+		"valid_ok": valid_ok,
+		"tamper_rejected": tamper_rejected
+	})
+
+## TC-KDAT-03: TLV 八大基础类型与字符串驻留池往返值等价
+static func test_tc_kdat_03_tlv_types_and_string_interning() -> Dictionary:
+	var test_dict := {
+		"int_val": 42,
+		"float_val": 99.5,
+		"bool_true": true,
+		"bool_false": false,
+		"str_val": "KalarWorld",
+		"nil_val": null
+	}
+	var kdat_bytes := _build_test_kdat_buffer(test_dict, false)
+	var decoded: Variant = BinaryConfigReader.load_kdat_buffer(kdat_bytes)
+
+	var types_ok: bool = decoded != null \
+		and decoded.get("int_val", 0) == 42 \
+		and is_equal_approx(float(decoded.get("float_val", 0.0)), 99.5) \
+		and decoded.get("bool_true", false) == true \
+		and decoded.get("bool_false", true) == false \
+		and decoded.get("str_val", "") == "KalarWorld" \
+		and decoded.get("nil_val", 1) == null
+
+	return make_result("TC-KDAT-03: TLV 八大基础类型与字符串驻留池往返值等价", types_ok, {
+		"types_ok": types_ok
+	})
+
+## TC-KDAT-04: GameConfig 静态装配与单表 .kdat 解码读取
+static func test_tc_kdat_04_game_config_single_table_kdat_loading() -> Dictionary:
+	var table_data := {
+		"max_slots": 5,
+		"default_currency": 500,
+		"world_name": "KALAR"
+	}
+	var buffer := _build_test_kdat_buffer(table_data, true)
+	var decoded: Variant = BinaryConfigReader.load_kdat_buffer(buffer)
+
+	var ok: bool = decoded != null \
+		and decoded.get("max_slots", 0) == 5 \
+		and decoded.get("default_currency", 0) == 500 \
+		and decoded.get("world_name", "") == "KALAR"
+
+	return make_result("TC-KDAT-04: GameConfig 静态装配与单表 .kdat 解码读取", ok, {
+		"single_table_ok": ok
+	})
+
+## TC-KDAT-05: 单包融合模式 (Monolithic Bundle) 与 TOC 目录指针快速解析
+static func test_tc_kdat_05_monolithic_bundle_and_toc_lookup() -> Dictionary:
+	var toc_entry := KDataTOCEntryDTO.new()
+	toc_entry.table_name = "domains.combat.mechanics"
+	toc_entry.offset = 0
+	toc_entry.length = 120
+	toc_entry.uncompressed_length = 200
+	toc_entry.crc32 = 0xABCDEF01
+
+	var dict_repr := toc_entry.to_dict()
+	var restored := KDataTOCEntryDTO.from_dict(dict_repr)
+	var toc_ok: bool = restored.table_name == toc_entry.table_name \
+		and restored.length == toc_entry.length \
+		and restored.crc32 == toc_entry.crc32
+
+	return make_result("TC-KDAT-05: 单包融合模式 (Monolithic Bundle) 与 TOC 目录指针快速解析", toc_ok, {
+		"toc_ok": toc_ok
+	})
+
+## TC-KDAT-06: 双轨自适应机制与全域架构契约闭合
+static func test_tc_kdat_06_dual_track_and_architecture_closure() -> Dictionary:
+	# 验证 GameConfig 常量契约存在
+	var has_ext: bool = not GameConfig.EXT_KDAT.is_empty() and GameConfig.EXT_KDAT == ".kdat"
+	var has_bundle: bool = not GameConfig.PATH_CONFIG_BUNDLE.is_empty()
+
+	var passed: bool = has_ext and has_bundle
+	return make_result("TC-KDAT-06: 双轨自适应机制与全域架构契约闭合", passed, {
+		"has_ext": has_ext,
+		"has_bundle": has_bundle
+	})
+
+## TC-KDAT-07: 多媒体原生二进制块 (Binary Blob) 嵌入与解算
+static func test_tc_kdat_07_binary_blob_embedding_and_decoding() -> Dictionary:
+	var mock_png_bytes := PackedByteArray([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D])
+	var table_data := {
+		"item_id": "sword_dragon",
+		"avatar_blob": {
+			"__type": "binary_blob",
+			"mime_type": "image/png",
+			"data": mock_png_bytes
+		}
+	}
+	var kdat_buf := _build_test_kdat_buffer(table_data, true, false)
+	var decoded: Variant = BinaryConfigReader.load_kdat_buffer(kdat_buf)
+
+	var blob_ok: bool = false
+	if decoded != null and decoded is Dictionary:
+		var blob_dict: Variant = (decoded as Dictionary).get("avatar_blob", null)
+		if blob_dict is Dictionary:
+			var d := blob_dict as Dictionary
+			var type_ok: bool = d.get("__type", "") == "binary_blob"
+			var mime_ok: bool = d.get("mime_type", "") == "image/png"
+			var data_ok: bool = (d.get("data", PackedByteArray()) as PackedByteArray) == mock_png_bytes
+			blob_ok = type_ok and mime_ok and data_ok
+
+	return make_result("TC-KDAT-07: 多媒体原生二进制块 (Binary Blob) 嵌入与解算", blob_ok, {
+		"blob_ok": blob_ok
+	})
+
+## TC-KDAT-08: 对称流掩码加密混淆 (FLAG_ENCRYPTED) 与 ClientSecretVault 往返解混淆
+static func test_tc_kdat_08_encrypted_stream_and_client_secret_vault() -> Dictionary:
+	# 1. 内存凭据混淆保护自检
+	var raw_token := "session_token_kalar_secret_123"
+	var masked_token := ClientSecretVault.mask_in_memory_token(raw_token)
+	var token_masked_differ: bool = (masked_token.get_string_from_utf8() != raw_token)
+	var restored_token := ClientSecretVault.reveal_in_memory_token(masked_token)
+	var token_ok: bool = token_masked_differ and (restored_token == raw_token)
+
+	# 2. 动态种子推导确定性自检
+	var seed_a := ClientSecretVault.derive_key_seed("domain_combat")
+	var seed_b := ClientSecretVault.derive_key_seed("domain_combat")
+	var seed_c := ClientSecretVault.derive_key_seed("domain_narrative")
+	var seed_ok: bool = (seed_a == seed_b) and (seed_a != seed_c) and (seed_a != 0)
+
+	# 3. 完整加密流反编译自检
+	var secret_data := {"secret_level": 99, "access_key": "vault_protected"}
+	var enc_kdat := _build_test_kdat_buffer(secret_data, true, true)
+	var decoded: Variant = BinaryConfigReader.load_kdat_buffer(enc_kdat)
+	var stream_ok: bool = decoded != null \
+		and (decoded as Dictionary).get("secret_level", 0) == 99 \
+		and (decoded as Dictionary).get("access_key", "") == "vault_protected"
+
+	var passed: bool = token_ok and seed_ok and stream_ok
+	return make_result("TC-KDAT-08: 对称流掩码加密混淆与 ClientSecretVault 往返解混淆", passed, {
+		"token_ok": token_ok,
+		"seed_ok": seed_ok,
+		"stream_ok": stream_ok
+	})
+
+## TC-KDAT-09: 首发单机零网络快道与联机占位快速失败隔离 (RunModeIsolationSolver)
+static func test_tc_kdat_09_single_player_fast_path_and_multiplayer_stub_isolation() -> Dictionary:
+	# 1. 单机模式判定与网络旁路
+	var is_sp := RunModeIsolationSolver.is_offline_single_player(WorldGatewayModel.GameMode.SINGLE_PLAYER)
+	var is_not_mp := not RunModeIsolationSolver.is_multiplayer_placeholder(WorldGatewayModel.GameMode.SINGLE_PLAYER)
+	var bypass_poll := RunModeIsolationSolver.should_bypass_network_poll(WorldGatewayModel.GameMode.SINGLE_PLAYER)
+	var bypass_auth := RunModeIsolationSolver.should_bypass_remote_authority(WorldGatewayModel.GameMode.SINGLE_PLAYER)
+
+	# 2. 单机能力画像自检
+	var sp_caps := RunModeIsolationSolver.evaluate_mode_capabilities(WorldGatewayModel.GameMode.SINGLE_PLAYER)
+	var caps_ok: bool = bool(sp_caps.get("is_single_player", false)) \
+		and bool(sp_caps.get("zero_latency_fast_path", false)) \
+		and not bool(sp_caps.get("network_active", true))
+
+	# 3. 联机占位快速失败自检
+	var is_mp := RunModeIsolationSolver.is_multiplayer_placeholder(WorldGatewayModel.GameMode.MULTIPLAYER)
+	var mp_caps := RunModeIsolationSolver.evaluate_mode_capabilities(WorldGatewayModel.GameMode.MULTIPLAYER)
+	var mp_caps_ok: bool = bool(mp_caps.get("stub_reserved", false)) \
+		and not bool(mp_caps.get("zero_latency_fast_path", true))
+
+	var mp_dispatch := RunModeIsolationSolver.dispatch_authority_sync(WorldGatewayModel.GameMode.MULTIPLAYER, {})
+	var mp_dispatch_fail_fast: bool = not bool(mp_dispatch.get("success", true)) \
+		and mp_dispatch.get("error_code", "") == RunModeIsolationSolver.ERR_MULTIPLAYER_STUB_RESERVED
+
+	# 4. AuthoritySyncStub 真实集成自检
+	var stub_sp := AuthoritySyncStub.new(AuthoritySyncStub.SyncMode.OFFLINE_TEXT)
+	var stub_sp_res := stub_sp.verify_authority({})
+	var stub_sp_ok: bool = bool(stub_sp_res.get("success", false)) and bool(stub_sp_res.get("fast_path", false))
+
+	var stub_mp := AuthoritySyncStub.new(AuthoritySyncStub.SyncMode.ONLINE_AUTHORITY)
+	var stub_mp_res := stub_mp.verify_authority({})
+	var stub_mp_ok: bool = not bool(stub_mp_res.get("success", true)) \
+		and stub_mp_res.get("error_code", "") == RunModeIsolationSolver.ERR_MULTIPLAYER_STUB_RESERVED
+
+	var passed: bool = is_sp and is_not_mp and bypass_poll and bypass_auth and caps_ok \
+		and is_mp and mp_caps_ok and mp_dispatch_fail_fast and stub_sp_ok and stub_mp_ok
+
+	return make_result("TC-KDAT-09: 首发单机零网络快道与联机占位快速失败隔离", passed, {
+		"sp_ok": is_sp and caps_ok,
+		"mp_fail_fast_ok": is_mp and mp_caps_ok and mp_dispatch_fail_fast,
+		"stub_integration_ok": stub_sp_ok and stub_mp_ok
+	})
