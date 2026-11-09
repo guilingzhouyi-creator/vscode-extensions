@@ -13,10 +13,25 @@ class_name AccountSlotBindingSolver extends RefCounted
 const DOMAIN_ACCOUNT_CONFIG := "domains.account"
 const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
 const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
+const AccountSlotCreationDTO = preload("res://backend/domains/account/dto/account_slot_creation_dto.gd")
 
 # ==============================================================================
 # 一、创建角色与槽位绑定
 # ==============================================================================
+
+## 强类型上下文创角入口（GOV-DAT-001 参数泥团收敛规范）
+static func create_character_in_slot_context(ctx: AccountSlotCreationDTO) -> Dictionary:
+	if ctx == null:
+		return {"success": false, "error_code": "INVALID_CONTEXT"}
+	return create_character_in_slot(
+		ctx.account,
+		ctx.slot_id,
+		ctx.character_name,
+		ctx.title_prefix,
+		ctx.is_permadeath,
+		ctx.allow_default_fallback,
+		ctx.provision_disk
+	)
 
 ## 创建角色第一步：为指定账号的空槽位创建角色封面并绑定
 ## 边界：fallen 槽位（角色已死亡）可重挂新角色（零继承，slot_id 保持稳定）；

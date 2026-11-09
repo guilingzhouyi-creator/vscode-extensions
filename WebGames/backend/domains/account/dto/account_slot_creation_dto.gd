@@ -17,18 +17,15 @@ var character_name: String = ""
 var title_prefix: String = ""
 var is_permadeath: bool = false
 var allow_default_fallback: bool = true
+var provision_disk: bool = false
 
-func _init(
-	p_account: AccountProfileAggregate = null,
-	p_slot_id: String = "",
-	p_character_name: String = "",
-	p_title_prefix: String = "",
-	p_is_permadeath: bool = false,
-	p_allow_default_fallback: bool = true
-) -> void:
-	account = p_account
-	slot_id = p_slot_id
-	character_name = p_character_name
-	title_prefix = p_title_prefix
-	is_permadeath = p_is_permadeath
-	allow_default_fallback = p_allow_default_fallback
+func _init(init_params: Dictionary = {}) -> void:
+	if init_params.is_empty():
+		return
+	account = init_params.get("account", null)
+	slot_id = str(init_params.get("slot_id", ""))
+	character_name = str(init_params.get("character_name", ""))
+	title_prefix = str(init_params.get("title_prefix", ""))
+	is_permadeath = bool(init_params.get("is_permadeath", false))
+	allow_default_fallback = bool(init_params.get("allow_default_fallback", true))
+	provision_disk = bool(init_params.get("provision_disk", false))
