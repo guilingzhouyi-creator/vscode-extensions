@@ -35,6 +35,8 @@ const PATH_BATCH_LOAD_REQUEST_SCRIPT: String = "res://backend/domains/persistenc
 const CAT_CONFIG: String = "config"
 const EVENT_ALL_TABLES_READY: String = "config.all_tables_ready"
 const EXT_JSON: String = ".json"
+const EXT_KDAT: String = ".kdat"
+const PATH_CONFIG_BUNDLE: String = "res://config/config.kdat"
 const METHOD_GET_INSTANCE: String = "get_instance"
 const METHOD_RESOLVE_CONFIG_TABLE_ENTRY: String = "resolve_config_table_entry"
 const METHOD_GET_CRITICAL_BOOT_ENTRIES: String = "get_critical_boot_entries"
@@ -133,6 +135,15 @@ static func ensure_loaded() -> void:
 	if _loaded:
 		return
 	_tables.clear()
+	# 优先尝试加载单包融合模式 (Monolithic Bundle)
+	if FileAccess.file_exists(PATH_CONFIG_BUNDLE):
+		var bundle_data: Dictionary = BinaryConfigReader.load_monolithic_bundle(PATH_CONFIG_BUNDLE)
+		if not bundle_data.is_empty():
+			for t_name in bundle_data:
+				_tables[t_name] = bundle_data[t_name]
+			_loaded = true
+			_validate_required_tables()
+			return
 	_scan_dir(CONFIG_DIR, "")
 	_loaded = true
 	_validate_required_tables()
@@ -162,15 +173,22 @@ static func _ensure_table_loaded_jit(table_name: String) -> void:
 	var catalog: Variant = _get_catalog()
 	if catalog != null and catalog.has_method(METHOD_RESOLVE_CONFIG_TABLE_ENTRY):
 		var entry = catalog.resolve_config_table_entry(target_name)
-		if entry != null and not str(entry.physical_path).is_empty() and FileAccess.file_exists(entry.physical_path):
-			_load_table(entry.physical_path, target_name)
-			return
+		if entry != null and not str(entry.physical_path).is_empty():
+			var p_kdat := str(entry.physical_path).trim_suffix(EXT_JSON) + EXT_KDAT
+			if FileAccess.file_exists(p_kdat):
+				_load_table(p_kdat, target_name)
+				return
+			elif FileAccess.file_exists(entry.physical_path):
+				_load_table(entry.physical_path, target_name)
+				return
 
-	# 回退至约定物理路径
+	# 回退至约定物理路径 (优先探测 .kdat 二进制流)
 	var parts := target_name.split(".")
-	var fallback_path := CONFIG_DIR + "/".join(parts) + EXT_JSON
-	if FileAccess.file_exists(fallback_path):
-		_load_table(fallback_path, target_name)
+	var base_path := CONFIG_DIR + "/".join(parts)
+	if FileAccess.file_exists(base_path + EXT_KDAT):
+		_load_table(base_path + EXT_KDAT, target_name)
+	elif FileAccess.file_exists(base_path + EXT_JSON):
+		_load_table(base_path + EXT_JSON, target_name)
 
 ## 同步极速加载 L0 核心底座配置表（耗时 <= 5.0ms，建立最小可运行世界状态）
 static func ensure_l0_loaded_sync() -> int:
@@ -575,18 +593,37 @@ static func _scan_dir(dir_path: String, table_prefix: String) -> void:
 	if dir == null:
 		push_warning("GameConfig: 配置目录不存在: %s" % dir_path)
 		return
+	var scanned_tables: Dictionary = {}
+	# 优先加载高纯度二进制 .kdat
 	for file_name in dir.get_files():
-		if not file_name.ends_with(".json"):
-			continue
-		var table_name := file_name.get_basename()
-		if not table_prefix.is_empty():
-			table_name = table_prefix + "." + table_name
-		_load_table(dir_path + file_name, table_name)
+		if file_name.ends_with(EXT_KDAT):
+			var table_name := file_name.trim_suffix(EXT_KDAT)
+			if not table_prefix.is_empty():
+				table_name = table_prefix + "." + table_name
+			_load_table(dir_path + file_name, table_name)
+			scanned_tables[table_name] = true
+	# 回退处理 .json (若尚未被 .kdat 载入)
+	for file_name in dir.get_files():
+		if file_name.ends_with(EXT_JSON):
+			var table_name := file_name.trim_suffix(EXT_JSON)
+			if not table_prefix.is_empty():
+				table_name = table_prefix + "." + table_name
+			if not scanned_tables.has(table_name):
+				_load_table(dir_path + file_name, table_name)
 	for sub_dir in dir.get_directories():
 		var sub_prefix := sub_dir if table_prefix.is_empty() else table_prefix + "." + sub_dir
 		_scan_dir(dir_path + sub_dir + "/", sub_prefix)
 
 static func _load_table(file_path: String, table_name: String) -> void:
+	if file_path.ends_with(EXT_KDAT):
+		var kdat_data: Variant = BinaryConfigReader.load_kdat_file(file_path)
+		if kdat_data != null and (kdat_data is Dictionary):
+			_tables[table_name] = kdat_data
+			return
+		_scan_failures.append("%s: .kdat 解析或校验失败" % file_path)
+		push_warning("GameConfig: .kdat 解析或校验失败 [%s]" % file_path)
+		return
+
 	var json := JSON.new()
 	var text := FileAccess.get_file_as_string(file_path)
 	var err := json.parse(text)
