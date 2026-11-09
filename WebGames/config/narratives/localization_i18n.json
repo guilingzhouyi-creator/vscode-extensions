@@ -1,3 +1,4 @@
 {
-  "_comment": "占位叙事模板，待业务接入 EventBus.emit_narrative_by_key 时补充"
+  "_comment": "多语言国际化系统领域事件叙事模板",
+  "updated": "系统语言已切换至 {new_locale}（原语言：{old_locale}）"
 }
