@@ -11,17 +11,48 @@
 class_name I18nHotReloadPipeline
 extends RefCounted
 
-## 语言热切换：更新当前 locale 并返回新词典就绪状态
+## 语言热切换：更新当前 locale 并返回新词典就绪状态，向 EventBus 广播领域事件
 static func switch_language(
-	catalog: LocalizationRegistryCatalog,
-	new_locale: String
+    catalog: LocalizationRegistryCatalog,
+    new_locale: String
 ) -> Dictionary:
-	var old_loc = catalog.current_locale
-	catalog.current_locale = new_locale
+    if catalog == null:
+        return {
+            "success": false,
+            "error_code": "ERR_CATALOG_NULL",
+            "message": "词库实例为空，无法执行语言切换"
+        }
 
-	return {
-		"success": true,
-		"old_locale": old_loc,
-		"new_locale": new_locale,
-		"has_dictionary": catalog._locale_dictionaries.has(new_locale)
-	}
+    var clean_locale := new_locale.strip_edges()
+    if clean_locale.is_empty():
+        return {
+            "success": false,
+            "error_code": "ERR_EMPTY_LOCALE",
+            "message": "目标语言代码不能为空"
+        }
+
+    var old_locale: String = catalog.current_locale
+    catalog.current_locale = clean_locale
+
+    var has_dict: bool = catalog._locale_dictionaries.has(clean_locale)
+    var is_supported: bool = catalog.is_locale_supported(clean_locale)
+
+    # 广播全域语言切换领域事件（遵循 ADV-EVT-004：携带 args 与 category_key）
+    EventBusCore.get_instance().emit_domain_event("localization_i18n.updated", {
+        "args": [clean_locale, old_locale],
+        "category_key": "system",
+        "summary": {
+            "old_locale": old_locale,
+            "new_locale": clean_locale,
+            "has_dictionary": has_dict,
+            "is_supported": is_supported
+        }
+    })
+
+    return {
+        "success": true,
+        "old_locale": old_locale,
+        "new_locale": clean_locale,
+        "has_dictionary": has_dict,
+        "is_supported": is_supported
+    }
