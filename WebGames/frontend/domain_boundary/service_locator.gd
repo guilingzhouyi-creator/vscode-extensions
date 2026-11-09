@@ -15,6 +15,29 @@ const MockServiceContainer = preload("res://frontend/domain_boundary/mocks/mock_
 ## 已解析的服务容器单例（按 service_mode 惰性初始化）
 static var _instance: ServiceContainer
 
+## 全局当前激活的网关状态机引用 (WorldGatewayFSM)
+static var _active_gateway: RefCounted = null
+
+## 注册当前活跃的世界网关实例
+static func set_active_gateway(gateway: RefCounted) -> void:
+	_active_gateway = gateway
+	if _instance != null:
+		_instance.set_active_gateway(gateway)
+
+## 获取当前活跃的世界网关实例
+static func get_active_gateway() -> RefCounted:
+	if _active_gateway != null:
+		return _active_gateway
+	if _instance != null:
+		return _instance.get_active_gateway()
+	return null
+
+## 清空当前活跃的世界网关实例
+static func clear_active_gateway() -> void:
+	_active_gateway = null
+	if _instance != null:
+		_instance.clear_active_gateway()
+
 ## 获取当前服务容器单例（按配置惰性初始化）
 static func get_instance() -> ServiceContainer:
 	if _instance == null:
@@ -34,6 +57,7 @@ static func get_instance() -> ServiceContainer:
 static func get_mode() -> String:
 	return GameConfig.get_string("frontend.ui", "service_mode", "mock")
 
-## 重置定位器单例（测试隔离 / teardown 用）——清空已解析的容器引用
+## 重置定位器单例（测试隔离 / teardown 用）——清空已解析的容器引用与激活网关
 static func reset() -> void:
 	_instance = null
+	_active_gateway = null

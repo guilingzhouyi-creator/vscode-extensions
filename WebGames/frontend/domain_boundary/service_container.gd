@@ -16,6 +16,21 @@ extends RefCounted
 ## 服务实例注册表: service_name -> RefCounted
 var _services: Dictionary = {}
 
+## 当前会话激活的世界网关实例引用
+var _active_gateway: RefCounted = null
+
+## 注册当前活跃的世界网关实例
+func set_active_gateway(gateway: RefCounted) -> void:
+	_active_gateway = gateway
+
+## 获取当前活跃的世界网关实例
+func get_active_gateway() -> RefCounted:
+	return _active_gateway
+
+## 清空当前活跃的世界网关实例
+func clear_active_gateway() -> void:
+	_active_gateway = null
+
 ## 注册服务实例到通用注册表
 func register_service(service_name: String, instance: RefCounted) -> void:
 	_services[service_name] = instance
