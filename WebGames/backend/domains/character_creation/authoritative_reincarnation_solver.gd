@@ -225,8 +225,8 @@ static func _resolve_race_display_name(race_id: String) -> String:
     var race_cfg: Dictionary = GameConfig.get_dict("domains.character_creation", "races_catalog/" + race_id, {})
     var name_key: String = str(race_cfg.get("canonical_name_key", ""))
     if not name_key.is_empty():
-        var loc_name: String = GameConfig.get_string("i18n.core", name_key, "")
-        if not loc_name.is_empty():
+        var loc_name: String = LocalizationSolver.resolve_name_key(LocalizationRegistryCatalog.get_shared(), name_key)
+        if not loc_name.is_empty() and loc_name != "[%s]" % name_key:
             return loc_name
     match race_id:
         "HUMAN":
