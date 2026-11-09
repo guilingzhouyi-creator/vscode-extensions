@@ -16,6 +16,8 @@
 import type { Analyzer, AnalyzerContext, Issue, AgentActionType } from '../core/types';
 import { PerformanceMessages } from '../core/messages';
 import { detectUnboundedGrowth } from '../core/intelligence/dataFlow';
+import { getMaskedSourceOfPath } from '../core/policy/source-mask';
+import { PerformanceAsyncScope } from './performance-async-scope';
 
 import {
     LOOP_DEPTH_ERROR_THRESHOLD,
@@ -121,6 +123,8 @@ interface ScannedLine {
     readonly trimmed: string;
 }
 
+const INTERPOLATED_LITERAL_RE = /\$\{|#\{|\\\(|\b(?:[fF][rR]?|[rR][fF])["']|[$@]+"/;
+
 /**
  * Per-file invariants threaded through every stage of one line-oriented audit pass.
  *
@@ -132,6 +136,7 @@ interface ScanPassContext {
     readonly ctx: AnalyzerContext;
     readonly scanConfig: PerformanceScanConfig;
     readonly scanState: LineScanState;
+    readonly asyncScope: PerformanceAsyncScope;
     readonly loopStack: LoopScope[];
     readonly issues: Issue[];
 }
@@ -198,25 +203,27 @@ export class PerformanceAnalyzer implements Analyzer {
 
         let lineStart = 0;
         let lineIdx = 0;
-        const scanState: LineScanState = {
-            inAsyncFunction: false,
-            inBlockComment: false,
-            asyncBraceDepth: 0,
-            asyncIndent: -1,
-        };
+        const scanState: LineScanState = { inBlockComment: false };
+        const asyncScope = new PerformanceAsyncScope();
+        // The shared masker erases interpolation bodies too. Keep the existing raw heuristic
+        // for these files so executable template/f-string expressions remain visible.
+        const maskedLines = INTERPOLATED_LITERAL_RE.test(content)
+            ? undefined : ctx.maskedLines ?? getMaskedSourceOfPath(file, content).masked;
         const loopStack: LoopScope[] = [];
-        const pass: ScanPassContext = { ctx, scanConfig, scanState, loopStack, issues };
+        const pass: ScanPassContext = { ctx, scanConfig, scanState, asyncScope, loopStack, issues };
 
         while (lineStart < len) {
             const nextLine = extractNextLine(content, len, lineStart);
             lineStart = nextLine.nextStart;
 
+            const masked = maskedLines?.[lineIdx] ?? nextLine.lineText;
+            asyncScope.scanLine(masked, scanConfig.isIndentBased);
             if (handleComments(nextLine.trimmed, scanConfig.isIndentBased, scanState)) {
                 lineIdx++;
                 continue;
             }
 
-            this.scanLineContent(pass, nextLine, lineIdx);
+            this.scanLineContent(pass, nextLine, lineIdx, masked);
 
             lineIdx++;
         }
@@ -230,29 +237,18 @@ export class PerformanceAnalyzer implements Analyzer {
         return issues;
     }
 
-    private scanLineContent(pass: ScanPassContext, nextLine: ScannedLine, lineIdx: number): void {
-        const { scanConfig, scanState, loopStack } = pass;
+    private scanLineContent(
+        pass: ScanPassContext,
+        nextLine: ScannedLine,
+        lineIdx: number,
+        masked: string,
+    ): void {
+        const { scanConfig, loopStack } = pass;
         updateIndentLoops(nextLine.lineText, scanConfig.isIndentBased, loopStack);
-        if (
-            scanConfig.isIndentBased &&
-            scanState.inAsyncFunction &&
-            nextLine.trimmed !== '' &&
-            calculateIndent(nextLine.lineText) <= scanState.asyncIndent &&
-            !this.isAsyncDeclaration(nextLine.trimmed)
-        ) {
-            scanState.inAsyncFunction = false;
-            scanState.asyncIndent = -1;
-        }
-        if (this.isAsyncDeclaration(nextLine.trimmed)) {
-            scanState.inAsyncFunction = true;
-            scanState.asyncBraceDepth = 0;
-            scanState.asyncIndent = calculateIndent(nextLine.lineText);
-        }
-
         this.checkLoopNesting(pass, nextLine, lineIdx);
         this.auditAllocations(pass, nextLine.trimmed, lineIdx);
         this.auditLinearLookups(pass, nextLine.trimmed, lineIdx);
-        this.auditIo(pass, nextLine, lineIdx);
+        this.auditIo(pass, masked, lineIdx);
         this.auditBraces(pass, nextLine.trimmed);
     }
 
@@ -276,31 +272,16 @@ export class PerformanceAnalyzer implements Analyzer {
         }
     }
 
-    private auditIo(pass: ScanPassContext, nextLine: ScannedLine, lineIdx: number): void {
+    private auditIo(pass: ScanPassContext, masked: string, lineIdx: number): void {
         const { scanConfig } = pass;
         if (scanConfig.checkIO && !scanConfig.syncIoAllowlisted) {
-            this.checkBlockingIo(pass, nextLine, lineIdx);
+            this.checkBlockingIo(pass, masked, lineIdx);
         }
     }
 
     private auditBraces(pass: ScanPassContext, trimmed: string): void {
-        const { scanConfig, scanState, loopStack } = pass;
+        const { scanConfig, loopStack } = pass;
         if (scanConfig.isIndentBased) return;
-        if (scanState.inAsyncFunction) {
-            for (let i = 0; i < trimmed.length; i++) {
-                const ch = trimmed.charCodeAt(i);
-                if (ch === 123) {
-                    scanState.asyncBraceDepth++;
-                } else if (ch === 125) {
-                    scanState.asyncBraceDepth--;
-                    if (scanState.asyncBraceDepth <= 0) {
-                        scanState.inAsyncFunction = false;
-                        scanState.asyncBraceDepth = 0;
-                        break;
-                    }
-                }
-            }
-        }
         updateBraceLoops(trimmed, loopStack);
         if (
             loopStack.length > 0 &&
@@ -397,14 +378,14 @@ export class PerformanceAnalyzer implements Analyzer {
         }
     }
 
-    private checkBlockingIo(pass: ScanPassContext, nextLine: ScannedLine, lineIdx: number): void {
-        const { trimmed, lineText } = nextLine;
-        const inAsyncFunction = pass.scanState.inAsyncFunction;
+    private checkBlockingIo(pass: ScanPassContext, masked: string, lineIdx: number): void {
         for (const ioPattern of BLOCKING_IO_PATTERNS) {
-            if (!ioPattern.pattern.test(trimmed)) continue;
+            const column = masked.search(ioPattern.pattern);
+            if (column < 0) continue;
 
+            const inAsyncFunction = pass.asyncScope.isAsyncAt(column);
             const isCriticalContext =
-                inAsyncFunction || /(_process|_physics_process|tick|render)/.test(lineText);
+                inAsyncFunction || /(_process|_physics_process|tick|render)/.test(masked);
             const desc = PerformanceMessages.BLOCKING_SYNC_IO(ioPattern.name, inAsyncFunction);
             pass.issues.push(
                 this.mkIssue(pass.ctx, lineIdx, {

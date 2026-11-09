@@ -82,13 +82,10 @@ export interface LoopScope {
 }
 
 /**
- * Mutable state tracking asynchronous routines and block comments across lines.
+ * Mutable state tracking block comments across lines.
  */
 export interface LineScanState {
-    inAsyncFunction: boolean;
     inBlockComment: boolean;
-    asyncBraceDepth: number;
-    asyncIndent: number;
 }
 
 /**
