@@ -148,6 +148,14 @@ const TestAgentTelemetryHighThroughputPipeline = preload("res://tests/integratio
 const TestUnifiedProtocolAndEscPipeline = preload("res://tests/integration/pipelines/test_unified_protocol_and_esc_pipeline.gd")
 # MOD开发者SDK便利协议同步与推演流水线
 const TestModSdkDeveloperErgonomicsPipeline = preload("res://tests/integration/pipelines/test_mod_sdk_developer_ergonomics_pipeline.gd")
+# Agent全流程推演与开发者工作台流水线
+const TestAgentFullPlaythroughAndWorkbenchPipeline = preload("res://tests/integration/pipelines/test_agent_full_playthrough_and_workbench_pipeline.gd")
+# 高纯度二进制数据流与GameConfig双轨流水线
+const TestBinaryConfigAndKdatPipeline = preload("res://tests/integration/test_binary_config_and_kdat_pipeline.gd")
+# 全域非阻塞CG视频播放与剧情通用Hook流水线
+const TestCutsceneHookAndPlaybackPipeline = preload("res://tests/integration/test_cutscene_hook_and_playback_pipeline.gd")
+# 艺术资源寻址与环境裁决治理套件
+const TestAssetPathResolver = preload("res://tests/unit/infrastructure/test_asset_path_resolver.gd")
 
 # 前端 17 大系统白模与表现层测试套件
 const TestFE01AccountEntry = preload("res://tests/unit/frontend/test_fe_01_account_entry.gd")
@@ -243,10 +251,14 @@ static func get_all_test_classes() -> Array:
 		TestAgentHudSliceAndActionSpacePipeline,
 		TestAgentTelemetryHighThroughputPipeline,
 		TestUnifiedProtocolAndEscPipeline,
-		TestModSdkDeveloperErgonomicsPipeline
+		TestModSdkDeveloperErgonomicsPipeline,
+		TestAgentFullPlaythroughAndWorkbenchPipeline,
+		TestBinaryConfigAndKdatPipeline,
+		TestCutsceneHookAndPlaybackPipeline,
+		TestAssetPathResolver
 	]
 
-## 前端测试套件（17 大系统 + 6 前端基建与边界套件 = 23；全域 107 后端与横切 + 23 前端 = 130 套件）
+## 前端测试套件（17 大系统 + 6 前端基建与边界套件 = 23；全域 111 后端与横切 + 23 前端 = 134 套件）
 static func get_frontend_test_classes() -> Array:
 	return [
 		TestFE01AccountEntry, TestFE02MainHUD, TestFE03CharacterProgression,
@@ -260,8 +272,45 @@ static func get_frontend_test_classes() -> Array:
 		TestFrontendRobustness, TestFrontendErrorDomain
 	]
 
-## 全域测试套件（后端业务域 + 横切基础设施 + 前端 23 = 全域共 129 套件）
+## 全域测试套件（后端业务域 + 横切基础设施 + 前端 23 = 全域共 133 套件）
 static func get_all_engine_test_classes() -> Array:
 	var list := get_all_test_classes()
 	list.append_array(get_frontend_test_classes())
 	return list
+
+## 校验套件注册表完整性与唯一性契约 (ARCH-FAC-001)
+static func validate_registry_integrity() -> Dictionary:
+	var backend_classes := get_all_test_classes()
+	var frontend_classes := get_frontend_test_classes()
+	var total_classes := get_all_engine_test_classes()
+	var seen_classes: Dictionary = {}
+	var duplicates: Array = []
+	var null_entries: int = 0
+	for tc in total_classes:
+		if tc == null:
+			null_entries += 1
+			continue
+		var script_id: int = tc.get_instance_id()
+		if seen_classes.has(script_id):
+			duplicates.append(tc)
+		else:
+			seen_classes[script_id] = true
+	var is_valid: bool = (null_entries == 0) and (duplicates.is_empty())
+	return {
+		"valid": is_valid,
+		"backend_count": backend_classes.size(),
+		"frontend_count": frontend_classes.size(),
+		"total_count": total_classes.size(),
+		"null_count": null_entries,
+		"duplicate_count": duplicates.size()
+	}
+
+## 按类引用或标识检索注册状态
+static func is_test_class_registered(target_class) -> bool:
+	if target_class == null:
+		return false
+	var target_id: int = target_class.get_instance_id()
+	for tc in get_all_engine_test_classes():
+		if tc != null and tc.get_instance_id() == target_id:
+			return true
+	return false

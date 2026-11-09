@@ -88,7 +88,11 @@ const CROSS_CUTTING_SUITES: Array[String] = [
 	"res://tests/integration/pipelines/test_agent_hud_slice_and_action_space_pipeline.gd",
 	"res://tests/integration/pipelines/test_agent_telemetry_high_throughput_pipeline.gd",
 	"res://tests/integration/pipelines/test_unified_protocol_and_esc_pipeline.gd",
-	"res://tests/integration/pipelines/test_mod_sdk_developer_ergonomics_pipeline.gd"
+	"res://tests/integration/pipelines/test_mod_sdk_developer_ergonomics_pipeline.gd",
+	"res://tests/integration/pipelines/test_agent_full_playthrough_and_workbench_pipeline.gd",
+	"res://tests/integration/test_binary_config_and_kdat_pipeline.gd",
+	"res://tests/integration/test_cutscene_hook_and_playback_pipeline.gd",
+	"res://tests/unit/infrastructure/test_asset_path_resolver.gd"
 ]
 
 const ConfigRouterEngine = preload("res://backend/infrastructure/config_router_engine.gd")
