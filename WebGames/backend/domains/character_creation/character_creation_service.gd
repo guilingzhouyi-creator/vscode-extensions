@@ -25,8 +25,8 @@ static func create_new_character(
 	allocated_base_stats: Dictionary,
 	selected_trait_ids: Array
 ) -> Dictionary:
-	var origin = ReincarnationOriginEngine.get_origin(origin_id)
-	var region = ReincarnationOriginEngine.get_birth_region(birth_region_id)
+	var origin: Dictionary = ReincarnationOriginEngine.get_origin(origin_id)
+	var region: Dictionary = ReincarnationOriginEngine.get_birth_region(birth_region_id)
 
 	var sheet := CharacterPhysiologySheet.new()
 	sheet.race_id = str(origin.get("race", "HUMAN"))
@@ -47,8 +47,8 @@ static func create_new_character(
 	for stat_key in AttributeConversionEngine.DEFAULT_STAT_LIST:
 		sheet.base_coefficients[stat_key] = AttributeConversionEngine.race_coefficient(sheet.race_id, stat_key)
 		default_stat_set[stat_key] = true
-	for tid in selected_trait_ids:
-		var trait_info = InnateTraitRegistry.get_trait(tid)
+	for trait_id in selected_trait_ids:
+		var trait_info: Dictionary = InnateTraitRegistry.get_trait(str(trait_id))
 		if not trait_info.is_empty():
 			_apply_single_trait_modifiers(trait_info, sheet, default_stat_set, coef_scale, heart_clamp_min, heart_clamp_max)
 
@@ -63,7 +63,7 @@ static func create_new_character(
 	LifeCycleAndPhysiologySolver.calculate_somatic_function(sheet)
 
 	var wallet := CharacterWalletEntity.new()
-	var init_gold = int(origin.get("initial_gold", GameConfig.get_int("domains.character_creation", "defaults/initial_gold_fallback", 50)))
+	var init_gold: int = int(origin.get("initial_gold", GameConfig.get_int("domains.character_creation", "defaults/initial_gold_fallback", 50)))
 	wallet.gold = init_gold
 
 	EventBusCore.get_instance().emit_narrative_by_key(
@@ -141,10 +141,10 @@ static func process_character_creation(
 	var race_def := RaceDefinitionDTO.from_dto(race_data)
 	if not race_def.is_enabled:
 		var tag := race_def.canary_feature_tag
-		var flag = canary_flags.get(tag, null)
+		var canary_flag: Variant = canary_flags.get(tag, null)
 		var is_open := false
-		if flag != null:
-			is_open = CanaryRolloutSolver.is_feature_enabled_for_account(flag, request.account_id)
+		if canary_flag != null:
+			is_open = CanaryRolloutSolver.is_feature_enabled_for_account(canary_flag, request.account_id)
 		if not is_open:
 			return {
 				"success": false,

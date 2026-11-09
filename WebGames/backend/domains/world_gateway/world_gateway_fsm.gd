@@ -451,6 +451,6 @@ func _fail(code: String, msg: String) -> Dictionary:
 func _load_worlds_catalog() -> Dictionary:
     var raw_catalog: Dictionary = GameConfig.get_dict("domains.world_gateway", "worlds_catalog", {})
     var catalog: Dictionary = {}
-    for wid in raw_catalog.keys():
-        catalog[wid] = WorldInstanceDTO.from_dto(raw_catalog[wid], wid)
+    for world_id in raw_catalog.keys():
+        catalog[world_id] = WorldInstanceDTO.from_dto(raw_catalog[world_id], world_id)
     return catalog

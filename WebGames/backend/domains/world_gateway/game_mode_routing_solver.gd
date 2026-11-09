@@ -162,13 +162,13 @@ static func _resolve_single_player_entry(
 
 
 ## 从世界档案物理仓储动态解析并构建 WorldInstanceDTO
-static func _resolve_world_from_repository(wid: String) -> WorldInstanceDTO:
-	if wid.is_empty():
+static func _resolve_world_from_repository(world_id: String) -> WorldInstanceDTO:
+	if world_id.is_empty():
 		return null
-	var repo = WorldArchiveRepository.get_instance()
-	if repo == null:
+	var repository: WorldArchiveRepository = WorldArchiveRepository.get_instance()
+	if repository == null:
 		return null
-	var summary: WorldArchiveSummaryDTO = repo.get_world_summary(wid)
+	var summary: WorldArchiveSummaryDTO = repository.get_world_summary(world_id)
 	if summary == null:
 		return null
 

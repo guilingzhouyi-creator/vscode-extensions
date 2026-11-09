@@ -80,13 +80,14 @@ static func validate_point_buy_allocation(allocated_stats: Dictionary, max_point
 	var min_v := AttributeConversionEngine.min_level()
 	var max_v := AttributeConversionEngine.max_level()
 	var total_spent := 0
+	var out_of_range_template := GameConfig.get_string("narratives.character_creation", "point_buy_out_of_range", "Attribute %s out of range [%d, %d]: %d")
 
-	for k in required_keys:
-		var val = int(allocated_stats.get(k, min_v))
-		if val < min_v or val > max_v:
-			var msg := GameConfig.get_string("narratives.character_creation", "point_buy_out_of_range", "Attribute %s out of range [%d, %d]: %d") % [k, min_v, max_v, val]
+	for stat_key in required_keys:
+		var stat_value: int = int(allocated_stats.get(stat_key, min_v))
+		if stat_value < min_v or stat_value > max_v:
+			var msg := out_of_range_template % [stat_key, min_v, max_v, stat_value]
 			return { "valid": false, "reason": msg }
-		total_spent += val
+		total_spent += stat_value
 
 	if total_spent > total_limit:
 		var msg2 := GameConfig.get_string("narratives.character_creation", "point_buy_exceed", "Total points spent %d exceeds limit %d") % [total_spent, total_limit]

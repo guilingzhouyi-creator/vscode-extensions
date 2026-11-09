@@ -46,18 +46,18 @@ static func boot_character_prologue(opening: OpeningEventStreamDTO, race_id: Str
 	ctx.step_index = 0
 
 	# 1. 提取并缓存初始占位符
-	var ph := ProloguePlaceholderResolver.extract_placeholders(ctx)
-	ctx.runtime_placeholders = ph
+	var runtime_placeholders := ProloguePlaceholderResolver.extract_placeholders(ctx)
+	ctx.runtime_placeholders = runtime_placeholders
 
 	# 2. 发放初始装备（幂等保护在 Dispatcher 内）
-	var kit_res := StarterLoadoutDispatcher.dispatch_starter_kit(ctx)
+	var kit_result := StarterLoadoutDispatcher.dispatch_starter_kit(ctx)
 
 	# 3. 结构化事件列表（事件与状态彻底解耦）
 	var structured_mutations: Array[Dictionary] = [
 		{"type": "CharacterCreated", "character_id": ctx.character_id, "name": ctx.character_name},
 		{"type": "LocationAssigned", "location_id": ctx.assigned_start_location_id},
-		{"type": "EquipmentGranted", "kit_id": kit_res.get("kit_id", ""), "gold": kit_res.get("gold", 0)},
-		{"type": "DialogueReady", "npc_target": ph.get("NPC_TARGET", "")}
+		{"type": "EquipmentGranted", "kit_id": kit_result.get("kit_id", ""), "gold": kit_result.get("gold", 0)},
+		{"type": "DialogueReady", "npc_target": runtime_placeholders.get("NPC_TARGET", "")}
 	]
 
 	# 4. 生成第一步事件数据包（阶段配置经 domains.character_creation prologue_stages 驱动）
@@ -80,7 +80,7 @@ static func boot_character_prologue(opening: OpeningEventStreamDTO, race_id: Str
 	packet.available_actions = _to_string_array(stage1_cfg.get("available_actions", ["WAKE_UP", "NEXT"]))
 	packet.reserved_payload = {"mutations": structured_mutations}
 
-	return {"success": true, "context": ctx, "packet": packet, "kit": kit_res}
+	return {"success": true, "context": ctx, "packet": packet, "kit": kit_result}
 
 # ==============================================================================
 # 二、配置驱动单向阶段流转（Stage 1 -> 2 -> 3 -> 4 闭环完结）
@@ -99,8 +99,8 @@ static func advance_prologue_step(
 	if not ctx.is_active:
 		return {"success": false, "error_code": "INACTIVE_CONTEXT", "message": "序章上下文未激活"}
 
-	for k in action_payload.keys():
-		ctx.runtime_placeholders[k] = action_payload[k]
+	for payload_key in action_payload.keys():
+		ctx.runtime_placeholders[payload_key] = action_payload[payload_key]
 
 	ctx.current_stage += 1
 	ctx.step_index += 1

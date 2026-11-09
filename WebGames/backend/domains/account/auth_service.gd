@@ -71,18 +71,19 @@ static func register_account(request: AccountRegistrationDTO.Request, account_st
 		resp.error_code = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/invalid_username_length", "ERR_INVALID_USERNAME_LENGTH")
 		return resp
 
+	var err_already_exists := GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/account_already_exists", "ERR_ACCOUNT_ALREADY_EXISTS")
 	if not account_store.is_empty():
 		for acc_id in account_store.keys():
 			var existing: AccountProfileAggregate = account_store[acc_id]
 			if existing != null and existing.username.to_lower() == request.username.to_lower():
-				resp.error_code = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/account_already_exists", "ERR_ACCOUNT_ALREADY_EXISTS")
+				resp.error_code = err_already_exists
 				return resp
 	else:
 		var repo := AccountRepository.get_instance()
 		if not repo.is_loaded():
 			repo.load_all()
 		if repo.has_username(request.username):
-			resp.error_code = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/account_already_exists", "ERR_ACCOUNT_ALREADY_EXISTS")
+			resp.error_code = err_already_exists
 			return resp
 
 	var acc := AccountProfileAggregate.new()
