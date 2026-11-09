@@ -6,6 +6,10 @@
 class_name AppRoot
 extends Control
 
+const GameShutdownDTO = preload("res://backend/domains/lifecycle/dto/game_shutdown_dto.gd")
+const GameLifecycleModel = preload("res://backend/domains/lifecycle/lifecycle_model.gd")
+const GameLifecycleService = preload("res://backend/domains/lifecycle/game_lifecycle_service.gd")
+
 @onready var background_layer: CanvasLayer = $BackgroundLayer
 @onready var screen_layer: CanvasLayer = $ScreenLayer
 @onready var hud_layer: CanvasLayer = $HUDLayer
@@ -20,4 +24,17 @@ extends Control
 @onready var loading_overlay: LoadingOverlay = $OverlayLayer/LoadingOverlay
 
 func _ready() -> void:
+	if get_tree() != null:
+		get_tree().set_auto_accept_quit(false)
 	AppBootstrap.bootstrap(self)
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		_handle_desktop_close_request()
+
+func _handle_desktop_close_request() -> void:
+	var shut_req := GameShutdownDTO.Request.new()
+	shut_req.exit_reason = GameLifecycleModel.ExitReason.USER_DESKTOP_QUIT
+	GameLifecycleService.execute_graceful_shutdown(shut_req)
+	if get_tree() != null:
+		get_tree().quit()

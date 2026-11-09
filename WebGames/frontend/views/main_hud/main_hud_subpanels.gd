@@ -9,6 +9,7 @@ extends BaseScreen
 const KBadgeClass = preload("res://frontend/components/k_badge.gd")
 const KCurrencyBarClass = preload("res://frontend/components/k_currency_bar.gd")
 const KStatusBarClass = preload("res://frontend/components/k_status_bar.gd")
+const WorldGatewayFSM = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
 
 var currency_bar: KCurrencyBar = null
 var hp_status_bar: KStatusBar = null
@@ -243,15 +244,33 @@ func on_menu_settings_pressed() -> void:
 
 func on_menu_exit_pressed() -> void:
 	append_battle_log("SYSTEM", UIIntermediary.text("ui.fe02.battle_log.exit_game"))
-	NavManager.get_instance().replace_screen("account_entry")
+	var title := UIIntermediary.text("ui.fe02.menu.exit_dialog_title")
+	var msg := UIIntermediary.text("ui.fe02.menu.exit_dialog_msg")
+	DialogManager.get_instance().show_exit_choice(
+		title, msg,
+		Callable(self, "on_menu_exit_to_gateway_pressed"),
+		Callable(self, "on_menu_quit_game_pressed")
+	)
 
 func on_menu_exit_to_gateway_pressed(gateway: WorldGatewayFSM = null) -> void:
 	append_battle_log("SYSTEM", "正在退出世界并返回世界档案...")
+	var active_gw = gateway if gateway != null else ServiceLocator.get_active_gateway()
 	var req := UnifiedProtocolFactory.create_human_request(
 		"world_gateway", "ESC_EXIT_TO_GATEWAY", {"auto_save": true}
 	)
-	var _resp := UnifiedProtocolDispatcher.dispatch_request(req, gateway)
+	var _resp := UnifiedProtocolDispatcher.dispatch_request(req, active_gw)
+	HudEventBridge.get_instance().detach_hud()
 	NavManager.get_instance().replace_screen("account_entry")
+
+func on_menu_quit_game_pressed() -> void:
+	append_battle_log("SYSTEM", "正在保存存档并退出游戏...")
+	var req := UnifiedProtocolFactory.create_human_request(
+		"lifecycle", "ESC_QUIT_GAME", {"auto_save": true, "exit_reason": "USER_QUIT"}
+	)
+	var _resp := UnifiedProtocolDispatcher.dispatch_request(req, null)
+	HudEventBridge.get_instance().detach_hud()
+	if _view != null and _view.get_tree() != null:
+		_view.get_tree().quit()
 
 # ==============================================================================
 # 补全面板 UI 辅助

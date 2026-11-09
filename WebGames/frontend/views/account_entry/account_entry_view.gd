@@ -10,6 +10,8 @@ class_name AccountEntryView
 extends BaseScreen
 
 const TabsClass = preload("res://frontend/views/account_entry/account_entry_tabs.gd")
+const WorldGatewayFSM = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
+const AuthService = preload("res://backend/domains/account/auth_service.gd")
 
 var _tabs = null
 func _get_tabs():
@@ -29,6 +31,7 @@ enum EntryState {
 
 var current_state: EntryState = EntryState.SPLASH
 var current_account_id: String = ""
+var current_session_token: String = ""
 var current_server_id: String = "LOCAL_OFFLINE"
 var selected_character_slot: String = ""
 
@@ -167,8 +170,9 @@ func submit_login(username: String, _pass: String) -> Dictionary:
     if form_username.is_empty():
         return {"success": false, "error_code": "ERR_EMPTY_USERNAME", "message": "ui.fe01.login.error_empty", "error_data": {}}
     current_account_id = "ACC_" + form_username.to_upper()
+    current_session_token = "TOKEN_" + current_account_id
     switch_state(EntryState.CHARACTER_SELECT)
-    return {"success": true, "account_id": current_account_id}
+    return {"success": true, "account_id": current_account_id, "token": current_session_token}
 
 func submit_register(username: String, _pass: String) -> Dictionary:
     form_username = username.strip_edges()
@@ -176,12 +180,34 @@ func submit_register(username: String, _pass: String) -> Dictionary:
     if form_username.length() < min_len:
         return {"success": false, "error_code": "ERR_USERNAME_TOO_SHORT", "message": "ui.fe01.register.error_short", "error_data": {"min": min_len}}
     current_account_id = "ACC_" + form_username.to_upper()
+    current_session_token = "TOKEN_" + current_account_id
     switch_state(EntryState.CHARACTER_CREATE)
-    return {"success": true, "account_id": current_account_id}
+    return {"success": true, "account_id": current_account_id, "token": current_session_token}
 
 func select_server(server_id: String) -> Dictionary:
     current_server_id = server_id
+    if not current_account_id.is_empty():
+        var gw := WorldGatewayFSM.new(current_account_id)
+        gw.enter_gateway()
+        ServiceLocator.set_active_gateway(gw)
     return {"success": true, "selected_server": server_id}
+
+## 退出当前账号，注销凭证并复位到登录页
+func logout_account() -> Dictionary:
+    if not current_session_token.is_empty():
+        AuthService.revoke_token(current_session_token)
+    current_session_token = ""
+    current_account_id = ""
+    selected_character_slot = ""
+    form_username = ""
+    form_password = ""
+    if login_username_edit != null:
+        login_username_edit.text = ""
+    if login_password_edit != null:
+        login_password_edit.text = ""
+    ServiceLocator.clear_active_gateway()
+    switch_state(EntryState.LOGIN)
+    return {"success": true, "message": "已成功退出账号并重置状态机"}
 
 func set_character_slots_snapshot(slots: Array) -> void:
     apply_snapshot({"character_slots": slots})
@@ -403,7 +429,7 @@ func _on_server_confirm_pressed() -> void:
     switch_state(EntryState.CHARACTER_SELECT)
 
 func _on_server_back_pressed() -> void:
-    switch_state(EntryState.LOGIN)
+    logout_account()
 
 func _on_char_enter_pressed() -> void:
     if selected_character_slot.is_empty():
