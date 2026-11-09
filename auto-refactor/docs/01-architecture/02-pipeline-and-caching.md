@@ -10,10 +10,18 @@
 ```
 .auto-refactor-cache/
 ├── manifest.json       # Format version, tool version & capacity policy
-├── fingerprints.jsonl  # L1 physical stat fingerprints: { t: 'f', p, m, s, i }
+├── fingerprints.jsonl  # L1 compatible fingerprint snapshot: { t: 'f', p, m, s, i }
+├── l1-checkpoint.arcp  # Checksummed framed L1 checkpoint
+├── l1-delta.arwal      # L1 horizon plus subsequent generation deltas
 ├── results.jsonl       # L2 per-file scan results: { t: 'r', k, p, issues, metric, ts }
 └── paths.jsonl         # L3 path-to-key forward index: { t: 'x', pk, k }
 ```
+
+L1 publication uses [cache-l1-journal.ts](../../src/core/cache-l1-journal.ts) and [cache-l1-wal.ts](../../src/core/cache-l1-wal.ts). Ordinary batch/checkpoint frames retain version 1, including valid empty batches. Version 2 identifies an explicit empty checkpoint horizon: it is legal only as the first WAL frame, carries no fingerprint state, and cannot exceed the published checkpoint generation during replay. This distinguishes compaction metadata from ordinary empty transactions.
+
+Initialization, repair and compaction publish a nonempty checksummed horizon rather than a zero-byte WAL. Compaction preserves newer deltas after the horizon and includes the prefix in byte accounting. An interrupted migration with a horizon newer than its checkpoint is rejected so the complete JSONL fallback remains usable. Replay validates complete frames before applying batches; a torn tail can retain its verified prefix. When no valid prefix exists, repair atomically publishes a horizon before the next append attempt.
+
+`fingerprints.jsonl` remains the compatible L1 fallback. Its empty form is the single format record `{"t":"l1-empty","v":1}` followed by a newline; readers ignore that record rather than creating a fingerprint. Readers without version 2 support must use the fallback instead of interpreting a horizon as an ordinary batch.
 
 ```mermaid
 flowchart TD
