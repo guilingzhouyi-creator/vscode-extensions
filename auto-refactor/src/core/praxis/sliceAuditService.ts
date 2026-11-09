@@ -38,8 +38,28 @@ import type {
     SparseRoutingPlan,
 } from '../router/sliceTypes';
 import type { Issue } from '../types';
+import { executeReview } from '../review/review-executor';
+import type { ReviewRuntime, SnapshotReviewResult } from '../review/review-executor';
+import { captureFileRequirements } from '../review/execution-coverage';
+import type { FileAnalysisRequirement } from '../review/execution-coverage';
+import { assertSnapshotPath } from '../review/source-snapshot';
+import type { SourceSnapshot } from '../review/source-snapshot';
 import type { CompactAgentPrompt } from '../guidance/agentConstraintGenerator';
 import { formatCompactAgentPrompt } from '../guidance/agentConstraintGenerator';
+
+/** Slice planning context; immutable new content is always read from the supplied snapshot. */
+export interface SnapshotSliceReviewRequest {
+    readonly requestId: string;
+    readonly filePath: string;
+    readonly oldContent: string;
+    readonly changedLines?: readonly number[];
+    readonly requirements?: readonly FileAnalysisRequirement[];
+}
+/** Keep planning output separate from actual analyzer execution facts. */
+export interface SnapshotSliceReviewResult {
+    readonly plan?: PraxisSliceAuditVerdict;
+    readonly review: SnapshotReviewResult;
+}
 
 const NANOS_PER_MICRO = 1000n;
 const MICROS_PER_MILLI = 1000;
@@ -252,6 +272,39 @@ export class PraxisSliceAuditService implements IPraxisSliceAuditService {
     }
 
     /**
+     * Plan a captured slice, then execute it and finish every required whole-file expert.
+     * @param request - Slice context; copied before asynchronous planning.
+     * @param snapshot - Exact source bytes and non-text outcomes.
+     * @param runtime - Fresh scanner and dual-track collaborators owned by this review.
+     * @returns Planning metadata separately from awaited execution and coverage facts.
+     */
+    public async reviewSnapshotSlice(
+        request: SnapshotSliceReviewRequest,
+        snapshot: SourceSnapshot,
+        runtime: ReviewRuntime,
+    ): Promise<SnapshotSliceReviewResult> {
+        const { requestId, filePath, oldContent } = request;
+        assertSnapshotPath(filePath);
+        const changedLines = [...(request.changedLines ?? [])];
+        if (changedLines.some(line => !Number.isSafeInteger(line) || line < 1)) {
+            throw new Error('Snapshot slice lines must be positive integers');
+        }
+        const requirements = request.requirements && captureFileRequirements(request.requirements);
+        const read = snapshot.read(filePath);
+        const plan = read.kind === 'text' ? await this.auditSlice({
+            filePath, oldContent, newContent: read.content, changedLines,
+        }) : undefined;
+        const window = plan?.replayWindow;
+        const lineBounds: readonly [number, number] | undefined = window?.isBounded
+            ? [window.startLine, window.endLine] : undefined;
+        const review = await executeReview({
+            requestId, scope: [filePath], requirements,
+            changes: [{ path: filePath, oldContent, lineBounds }],
+        }, snapshot, runtime);
+        return Object.freeze({ plan, review });
+    }
+
+    /**
      * Audit incremental slice and format as CAPP prompt.
      */
     public async auditAgentSlice(
@@ -295,10 +348,10 @@ export class PraxisSliceAuditService implements IPraxisSliceAuditService {
 export const defaultPraxisSliceAuditService = new PraxisSliceAuditService();
 
 /**
- * Factory creating a fresh instance of IPraxisSliceAuditService.
+ * Factory creating a fresh slice service with planning and immutable execution entry points.
  *
- * @returns Configured IPraxisSliceAuditService instance.
+ * @returns Configured slice service compatible with the existing planning interface.
  */
-export function createPraxisSliceAuditService(): IPraxisSliceAuditService {
+export function createPraxisSliceAuditService(): PraxisSliceAuditService {
     return new PraxisSliceAuditService();
 }
