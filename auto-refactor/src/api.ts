@@ -958,6 +958,7 @@ export type {
     SnapshotGitObject,
 } from './core/review/source-snapshot';
 export type { SnapshotScanResult, SnapshotInputObservation } from './core/review/snapshot-scanner';
+export type { FileAnalysisRequirement, FileAnalysisCoverage } from './core/review/execution-coverage';
 export type {
     FileExecutionObservation, AnalyzerExecutionObservation, ParserExecutionObservation,
 } from './core/review/analyzer-execution';

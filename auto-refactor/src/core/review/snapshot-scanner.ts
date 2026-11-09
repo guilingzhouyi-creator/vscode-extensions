@@ -8,6 +8,8 @@
  */
 import { setImmediate as yieldImmediate } from 'node:timers/promises';
 import type { FileExecutionObservation } from './analyzer-execution';
+import { captureFileRequirements, collectExecutionCoverage } from './execution-coverage';
+import type { FileAnalysisCoverage, FileAnalysisRequirement } from './execution-coverage';
 import type { FileMetric, Issue } from '../types';
 import { assertSnapshotPath } from './source-snapshot';
 import type { SourceSnapshot, SourceSnapshotIdentity, SnapshotRead } from './source-snapshot';
@@ -26,9 +28,11 @@ export interface SnapshotScanResult {
     readonly issues: readonly Issue[];
     readonly fileMetrics: readonly FileMetric[];
     readonly execution: readonly FileExecutionObservation[];
+    readonly coverage: readonly FileAnalysisCoverage[];
 }
 interface SnapshotScanOptions {
     readonly snapshot: SourceSnapshot;
+    readonly requirements: readonly FileAnalysisRequirement[];
     readonly scope?: readonly string[];
     readonly signal?: AbortSignal;
     readonly analyze: (
@@ -38,12 +42,45 @@ interface SnapshotScanOptions {
         issues: Issue[]; metric: FileMetric | null; execution?: FileExecutionObservation;
     }>;
 }
+/** Snapshot, exact scope and cancellation shared by read-only input replay. */
+export interface SnapshotVisitOptions {
+    readonly snapshot: SourceSnapshot;
+    readonly scope: readonly string[];
+    readonly signal?: AbortSignal;
+}
 
 function inputObservation(read: SnapshotRead): SnapshotInputObservation {
     if (read.kind === 'unsupported') {
         return Object.freeze({ path: read.path, kind: read.kind, reason: read.reason });
     }
     return Object.freeze({ path: read.path, kind: read.kind });
+}
+
+/**
+ * Replay a captured scope through the snapshot port without analysis or workspace fallback.
+ * Each visited path yields exactly one observation, including non-text and missing entries.
+ *
+ * @param options - Snapshot port, validated exact scope and cancellation signal.
+ * @param visit - Caller callback receiving the read outcome before the next cooperative yield.
+ * @returns One immutable observation per requested path, in scope order.
+ */
+export async function visitSnapshotInputs(
+    options: SnapshotVisitOptions,
+    visit: (read: SnapshotRead) => void,
+): Promise<readonly SnapshotInputObservation[]> {
+    const { snapshot, scope, signal } = options;
+    if (new Set(scope).size !== scope.length) throw new Error('Duplicate snapshot scope path');
+    for (const path of scope) assertSnapshotPath(path);
+    const inputs: SnapshotInputObservation[] = [];
+    for (const path of scope) {
+        signal?.throwIfAborted();
+        const read = snapshot.read(path);
+        inputs.push(inputObservation(read));
+        visit(read);
+        await yieldImmediate(undefined, { signal });
+    }
+    signal?.throwIfAborted();
+    return Object.freeze(inputs);
 }
 
 /**
@@ -57,8 +94,9 @@ export async function executeSnapshotScan(
     options: SnapshotScanOptions,
 ): Promise<SnapshotScanResult> {
     const { snapshot, signal, analyze } = options;
+    const requirements = captureFileRequirements(options.requirements);
     signal?.throwIfAborted();
-    const scope = options.scope ?? snapshot.entries.map((entry) => entry.path);
+    const scope = [...(options.scope ?? snapshot.entries.map((entry) => entry.path))];
     if (new Set(scope).size !== scope.length) throw new Error('Duplicate snapshot scope path');
     for (const path of scope) assertSnapshotPath(path);
     const inputs: SnapshotInputObservation[] = [];
@@ -84,5 +122,6 @@ export async function executeSnapshotScan(
         issues: Object.freeze(issues),
         fileMetrics: Object.freeze(fileMetrics),
         execution: Object.freeze(execution),
+        coverage: collectExecutionCoverage({ requirements, inputs, execution }),
     });
 }

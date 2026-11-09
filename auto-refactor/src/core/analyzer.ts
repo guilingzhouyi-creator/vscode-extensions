@@ -68,7 +68,7 @@ import { ANALYZER_NAME_TO_BIT } from './constants/analyzer-bitmask';
 import { defaultContinuousRuleSampler } from './telemetry/continuous-rule-sampler';
 import { ChangeTrajectoryManager } from './trajectory/changeTrajectory';
 import { detectProjectArchetype } from './profiler/projectProfiler';
-import { ALL_BUILTIN_ANALYZERS, routeArchetypeToAnalyzers } from './router/sparseRuleRouter';
+import { routeArchetypeToAnalyzers } from './router/sparseRuleRouter';
 import { pMap, AR_TIMING, nowMs } from './scanner/worker-scheduler';
 import { runFileAnalyzers } from './scanner/analyzer-runner';
 import {
@@ -89,6 +89,7 @@ import type { FileExecutionObservation } from './review/analyzer-execution';
 import type { SourceSnapshot } from './review/source-snapshot';
 import { executeSnapshotScan } from './review/snapshot-scanner';
 import type { SnapshotScanResult } from './review/snapshot-scanner';
+import type { FileAnalysisRequirement } from './review/execution-coverage';
 
 /**
  * Optional analyzer capability consumed by the semantic-complexity post-scan pass.
@@ -184,6 +185,8 @@ export class Scanner implements ScannerContext {
         );
 
         const sparseResult = routeArchetypeToAnalyzers(detectedArchetype, {
+            availableAnalyzers: config.sparseRouting === true
+                ? this.plan.map((entry) => entry.name) : undefined,
             customAnalyzers: config.customAnalyzers?.map((customAnalyzer) => customAnalyzer.name),
         });
         // The routing decision is always computed so the report can explain the archetype, but it
@@ -204,13 +207,11 @@ export class Scanner implements ScannerContext {
                 ...config,
                 analyzers: { ...config.analyzers },
             };
-            for (const name of ALL_BUILTIN_ANALYZERS) {
-                const existing = sparseConfig.analyzers[name];
-                if (existing) {
-                    existing.enabled = activeSet.has(name);
-                } else {
-                    sparseConfig.analyzers[name] = { enabled: activeSet.has(name) };
-                }
+            for (const [name, declaration] of Object.entries(config.analyzers ?? {})) {
+                sparseConfig.analyzers[name] = {
+                    ...declaration,
+                    enabled: declaration.enabled !== false && activeSet.has(name),
+                };
             }
             this.plan = resolveAnalyzers(sparseConfig, config.baseDir || process.cwd());
             this.logger.info(
@@ -417,24 +418,54 @@ export class Scanner implements ScannerContext {
      *
      * @param snapshot - Captured source port; no workspace discovery or cache fallback is used.
      * @param scope - Optional exact paths, including deleted paths to observe as missing.
-     * @returns Snapshot-bound diagnostics, metrics and explicit input observations.
+     * @param requirements - File-analysis policy; defaults to configured enabled analyzers.
+     * @returns Snapshot-bound diagnostics, metrics and input/execution coverage observations.
      */
     async scanSnapshot(
         snapshot: SourceSnapshot,
         scope?: readonly string[],
+        requirements?: readonly FileAnalysisRequirement[],
     ): Promise<SnapshotScanResult> {
-        if (this.inputSource !== undefined) throw new Error('Snapshot analysis requires a fresh scanner');
-        if (this.config.cacheEnabled !== false) throw new Error('Snapshot analysis requires cache persistence disabled');
-        if (!this.config.archetype) {
-            throw new Error('Snapshot analysis requires an explicit project archetype');
-        }
-        this.inputSource = 'immutable-snapshot';
+        const configured = this.beginSnapshotAnalysis();
         return executeSnapshotScan({
             snapshot, scope, signal: this.config.signal,
+            requirements: requirements ?? configured,
             analyze: (file, content) => this.runAnalyzers(file, content, undefined, {
                 observeExecution: true,
             }),
         });
+    }
+
+    /**
+     * Claim a fresh scanner for immutable snapshot execution and return its required policy.
+     * The claim is permanent for this instance, so a snapshot run can never silently fall back
+     * to discovery, cache reuse or mutable workspace reads, and workspace runs are rejected later.
+     *
+     * @returns Configured enabled analyzer names, sorted for deterministic coverage order.
+     * @throws When the instance already served another input source, retains cache persistence
+     *   or lacks the explicit project archetype that snapshot analysis depends on.
+     */
+    beginSnapshotAnalysis(): readonly FileAnalysisRequirement[] {
+        if (this.inputSource !== undefined) throw new Error('Snapshot analysis requires a fresh scanner');
+        if (this.config.cacheEnabled !== false) {
+            throw new Error('Snapshot analysis requires cache persistence disabled');
+        }
+        if (!this.config.archetype) {
+            throw new Error('Snapshot analysis requires an explicit project archetype');
+        }
+        this.inputSource = 'immutable-snapshot';
+        return this.configuredFileRequirements();
+    }
+
+    private configuredFileRequirements(): readonly FileAnalysisRequirement[] {
+        const names = new Set(this.plan.map((entry) => entry.name));
+        for (const [name, declaration] of Object.entries(this.config.analyzers ?? {})) {
+            if (declaration.enabled !== false) names.add(name);
+        }
+        for (const declaration of this.config.customAnalyzers ?? []) {
+            if (declaration.enabled !== false) names.add(declaration.name);
+        }
+        return [...names].sort().map((analyzer) => ({ analyzer }));
     }
 
     private beginWorkspaceScan(): void {

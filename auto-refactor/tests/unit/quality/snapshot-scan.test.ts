@@ -70,6 +70,64 @@ describe('snapshot scanner entry', () => {
         expect(result.fileMetrics.map((metric) => metric.file)).toEqual(['src/a.ts']);
     });
 
+    it('reduces actual calls into snapshot-bound required file coverage', async () => {
+        const snapshot = captureSourceSnapshot(descriptor, [source('src/a.ts', 'export const answer = 42;')], budget);
+        const engine = scanner();
+        engine.config.analyzers = { required: { enabled: true }, skipped: { enabled: true } };
+        engine.config.bypassPreflight = true;
+        const analyzer = { name: 'required', version: 1, analyze: () => [] };
+        engine.plan = [{
+            name: 'required', options: {}, instance: analyzer,
+            factory: () => analyzer, modulePath: 'test-owned-analyzer',
+        }];
+        const result = await engine.scanSnapshot(snapshot);
+        expect(result.coverage).toEqual([
+            expect.objectContaining({
+                path: 'src/a.ts', analyzer: 'required', required: true, capability: 'file-analysis',
+                status: 'executed', observedVersion: 1, calls: 1,
+            }),
+            expect.objectContaining({
+                path: 'src/a.ts', analyzer: 'skipped', required: true,
+                status: 'supported', reason: 'analyzer-not-run', calls: 0,
+            }),
+        ]);
+        expect(Object.isFrozen(result.coverage)).toBe(true);
+        expect(Object.isFrozen(result.coverage[0])).toBe(true);
+    });
+
+    it('does not mutate policy declarations or activate disabled/undeclared analyzers', () => {
+        const config = {
+            ...getDefaultConfig(), root: process.cwd(), archetype: 'library',
+            sparseRouting: true, cacheEnabled: false, logLevel: 'error' as const,
+            analyzers: { constants: { enabled: false }, performance: { enabled: true } },
+        };
+        const declarations = structuredClone(config.analyzers);
+        const engine = new Scanner(config);
+        expect(config.analyzers).toEqual(declarations);
+        expect(engine.plan.map((entry) => entry.name)).toEqual(['performance']);
+    });
+
+    it('retains requirements skipped by sparse routing', async () => {
+        const config = {
+            ...getDefaultConfig(), root: process.cwd(), archetype: 'library',
+            sparseRouting: true, cacheEnabled: false, logLevel: 'error' as const,
+        };
+        config.analyzers['gdscript-game'] = { enabled: true };
+        const requested = Object.entries(config.analyzers)
+            .filter(([, declaration]) => declaration.enabled !== false).map(([name]) => name);
+        const engine = new Scanner(config);
+        const active = new Set(engine.plan.map((entry) => entry.name));
+        const skipped = requested.filter((name) => !active.has(name));
+        expect(skipped.length).toBeGreaterThan(0);
+        const snapshot = captureSourceSnapshot(descriptor, [source('src/a.ts', 'export const answer = 42;')], budget);
+        const result = await engine.scanSnapshot(snapshot);
+        for (const analyzer of skipped) {
+            expect(result.coverage).toContainEqual(expect.objectContaining({
+                analyzer, required: true, status: 'supported', reason: 'analyzer-not-run', calls: 0,
+            }));
+        }
+    });
+
     it('does not run text analyzers on non-text snapshot entries', async () => {
         const snapshot = captureSourceSnapshot(descriptor, [
             source('link.ts', '../outside.ts', '120000'),
