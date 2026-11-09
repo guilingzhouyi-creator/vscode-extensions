@@ -183,6 +183,13 @@ DAG 终结节点或剧情关键节点仅允许发布下列合法状态突变事�
 - **协议路由业务域 (`supported_domains`)**: `HOME_HUD, ESC_MENU, PROLOGUE, CHARACTER_CREATION`
 - **受支持系统菜单指令 (`esc_menu_actions`)**: `RESUME_GAME, OPEN_SETTINGS, SAVE_AND_QUIT_TO_ARCHIVE, FORCE_QUIT_TO_ARCHIVE, SAVE_AND_QUIT_TO_GATEWAY, SAVE_AND_QUIT_DESKTOP`
 - **信封强类型 Schema 版本 (`envelope_schema_versions`)**: 请求信封 `kalar.mod_sdk.client_request_envelope.v1`，响应信封 `kalar.mod_sdk.unified_response_envelope.v1`，ESC 载荷 `kalar.mod_sdk.esc_menu_action_payload.v1`
+
+### 9. 开发者集成工作台与归档打包能力契约 (Developer Workbench Capabilities)
+
+- **支持包格式 (`supported_package_formats`)**: `.kmod`, `.kdat`, `DIRECTORY`
+- **支持工作台动作 (`supported_actions`)**: `init`, `check`, `pack`, `play`, `workbench`, `verify`, `bake`, `self-test`
+- **归档压缩算法 (`supported_compression`)**: `ZIP_DEFLATE`
+- **单向指纹校验算法 (`hash_algorithm`)**: `SHA256`
 <!-- AUTOGEN_CAPABILITIES_END -->
 
 ---
@@ -388,8 +395,9 @@ MOD 可通过根目录下的 `destinies.json` 以**列表式结构**扩展创角
 | **资产烹饪** | `python mod_sdk/tools/kalar_mod.py cook <mod_dir> [--check]` | 校验格式与体积配额并生成 SHA-256 清单 |
 | **剧情演习** | `python mod_sdk/tools/kalar_mod.py preview <mod_dir> [--simulate]` | 打印 DAG 拓扑概览并模拟剧情推进水化 |
 | **无头试玩** | `python mod_sdk/tools/kalar_mod.py play <mod_dir> [--interactive] [--with-hud]` | 执行批量验收推演、Agent STDIO 交互或主页 HUD 贯通 |
-| **协议派发** | `python mod_sdk/tools/kalar_mod.py dispatch <mod_dir> [--action <type>] [--json]` | 离线派发统一协议请求并执行强类型信封校验 |
-| **打包归档** | `python mod_sdk/tools/kalar_mod.py pack <mod_dir> [--out-dir <dir>]` | 前置门禁校验并压缩为生产分发包 |
+| **协议派发** | `python mod_sdk/tools/kalar_mod.py dispatch <mod_dir> [--action <type>] [--json]` | 离线派发全域统一协议请求并执行强类型信封校验 |
+| **打包归档** | `python mod_sdk/tools/kalar_mod.py pack <mod_dir> [-o <out.kmod>] [--format kmod]` | 前置门禁校验并压缩打包为防篡改 `.kmod` 生产分发包 |
+| **集成工作台** | `python mod_sdk/tools/kalar_mod.py workbench [--self-test] [--verify <kmod>]` | 开发者一站式集成工作台、离线指纹校验与自动化自检 |
 
 ---
 

@@ -306,7 +306,7 @@ def _compute_file_sha256(file_path: Path) -> str:
 
 
 def _handle_pack(args: argparse.Namespace) -> int:
-    """分发 pack 子命令：验证模组并打包为 .zip 分发包。"""
+    """分发 pack 子命令：验证模组并打包为 .kmod / .zip 分发包。"""
     target_dir = Path(args.mod_dir).resolve()
     if not target_dir.is_dir():
         err_msg = f"MOD 目标目录不存在: {target_dir}"
@@ -358,6 +358,17 @@ def _handle_pack(args: argparse.Namespace) -> int:
                 version = str(m_data.get("version") or version)
         except Exception:
             pass
+
+    target_format = getattr(args, "pack_format", "kmod")
+    if args.output and str(args.output).endswith(".zip"):
+        target_format = "zip"
+    elif args.output and str(args.output).endswith(".kmod"):
+        target_format = "kmod"
+
+    if target_format == "kmod":
+        from kalar_workbench import handle_kmod_pack_cli
+        out_p = Path(args.output).resolve() if args.output else None
+        return handle_kmod_pack_cli(target_dir, out_p, args.as_json, pack_id, version)
 
     out_zip = Path(args.output).resolve() if args.output else target_dir.parent / f"{pack_id}_v{version}.zip"
 
@@ -421,6 +432,24 @@ def _handle_pack(args: argparse.Namespace) -> int:
     print(f"  • SHA-256    : {zip_sha256}")
     print("==============================================================================")
     return 0
+
+
+def _handle_workbench(args: argparse.Namespace) -> int:
+    """分发 workbench 子命令：开发者集成工作台核心命令台。"""
+    from kalar_workbench import handle_workbench_cli
+    return handle_workbench_cli(args)
+
+
+def _handle_bake(args: argparse.Namespace) -> int:
+    """分发 bake 子命令：将 JSON 配置表或目录编译为高纯度紧凑二进制流 (.kdat)。"""
+    try:
+        from kalar_config_compiler import handle_bake_cli
+    except ImportError:
+        scripts_py_lib = TOOLS_DIR.parent.parent / "scripts" / "py" / "lib"
+        if str(scripts_py_lib) not in sys.path:
+            sys.path.insert(0, str(scripts_py_lib))
+        from kalar_config_compiler import handle_bake_cli
+    return handle_bake_cli(args)
 
 
 # ==============================================================================
@@ -533,9 +562,16 @@ def _build_parser() -> argparse.ArgumentParser:
     p_play.add_argument("--with-hud", action="store_true", dest="with_hud", help="在推演战报中附带初始主页 HUD 快照切片")
 
     # 6. pack
-    p_pack = subparsers.add_parser("pack", help="验证并打包 MOD 为 .zip 分发包")
+    p_pack = subparsers.add_parser("pack", help="验证并打包 MOD 为 .kmod / .zip 分发包")
     p_pack.add_argument("mod_dir", help="待打包的 MOD 根目录路径")
-    p_pack.add_argument("-o", "--output", default=None, dest="output", help="生成的目标 ZIP 压缩包路径 (可选)")
+    p_pack.add_argument("-o", "--output", default=None, dest="output", help="生成的目标分发包路径 (可选，默认 .kmod)")
+    p_pack.add_argument(
+        "--format",
+        choices=["kmod", "zip"],
+        default="kmod",
+        dest="pack_format",
+        help="打包格式 (kmod 或 zip，默认: kmod)",
+    )
     p_pack.add_argument(
         "--no-check",
         action="store_true",
@@ -551,6 +587,21 @@ def _build_parser() -> argparse.ArgumentParser:
     p_disp.add_argument("--action", default="ESC_QUERY_READINESS", help="具体指令动作类型 (默认: ESC_QUERY_READINESS)")
     p_disp.add_argument("--payload", default="{}", help="业务载荷 JSON 字符串 (默认: {})")
     p_disp.add_argument("--json", action="store_true", dest="as_json", help="输出机器可读的结构化响应 JSON 信封")
+
+    # 8. workbench
+    p_wb = subparsers.add_parser("workbench", help="卡拉尔 MOD 开发者集成工作台统一命令台")
+    p_wb.add_argument("workbench_args", nargs="*", help="传递给工作台的子命令或参数")
+    p_wb.add_argument("--self-test", action="store_true", dest="self_test", help="执行工作台内部集成自测试")
+    p_wb.add_argument("--verify", dest="verify_target", default=None, help="校验指定 .kmod 归档包完整性与指纹")
+    p_wb.add_argument("-p", "--pack", dest="pack_target", default=None, help="打包指定 MOD 物理目录为 .kmod")
+    p_wb.add_argument("-o", "--output", dest="output", default=None, help="输出目标路径")
+
+    # 9. bake
+    p_bake = subparsers.add_parser("bake", help="将 JSON 配置表或目录编译为高纯度紧凑二进制流 (.kdat)")
+    p_bake.add_argument("input_path", help="输入源 JSON 文件或配置目录")
+    p_bake.add_argument("-o", "--output", dest="output", default=None, help="输出 .kdat 文件路径或目标目录")
+    p_bake.add_argument("--monolithic", action="store_true", help="全目录编译为单一融合包 config.kdat")
+    p_bake.add_argument("--no-compress", action="store_true", help="禁用数据压缩")
 
     return parser
 
@@ -577,6 +628,8 @@ def main() -> None:
         "play": _handle_play,
         "pack": _handle_pack,
         "dispatch": _handle_dispatch,
+        "workbench": _handle_workbench,
+        "bake": _handle_bake,
     }
 
     handler = handlers.get(args.subcommand)

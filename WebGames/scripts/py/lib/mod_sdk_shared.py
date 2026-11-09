@@ -490,6 +490,25 @@ def extract_capabilities(webgames_root: Path) -> dict[str, Any]:
             ],
             "channel_protocol": "STDIO_NDJSON",
         },
+        "workbench_capabilities": {
+            "supported_package_formats": [
+                ".kmod",
+                ".kdat",
+                "DIRECTORY",
+            ],
+            "supported_actions": [
+                "init",
+                "check",
+                "pack",
+                "play",
+                "workbench",
+                "verify",
+                "bake",
+                "self-test",
+            ],
+            "supported_compression": "ZIP_DEFLATE",
+            "hash_algorithm": "SHA256",
+        },
     }
 
 

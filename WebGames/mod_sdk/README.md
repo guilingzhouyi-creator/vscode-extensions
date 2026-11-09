@@ -65,9 +65,11 @@ WebGames/mod_sdk/
 │   ├── observation.schema.json # Agent 观察快照契约 (序章)
 │   ├── action.schema.json      # Agent 决策动作契约 (序章)
 │   ├── agent_hud_telemetry_packet.schema.json # 主页 HUD 原子遥测包契约
-│   └── agent_action_packet.schema.json # 专属动作通道上行指令包契约
+│   ├── agent_action_packet.schema.json # 专属动作通道上行指令包契约
+│   ├── bundle_manifest.schema.json # 模组 .kmod 归档包清单契约
+│   └── workbench_config.schema.json # 开发者集成工作台配置契约
 ├── templates/                  # 【官方脚手架模板】分级合规初始工程骨架
-│   ├── starter_story/          # Tier 1 纯逻辑与剧情命途初始工程骨架
+├── starter_story/          # Tier 1 纯逻辑与剧情命途初始工程骨架
 │   ├── audio_visual_pack/      # Tier 2 视听与艺术资产增强模板工程
 │   └── total_conversion_sample/# Tier 3 全局大魔改规则示例工程
 ├── examples/                   # 【实战范例】官方实战参考示例
@@ -75,6 +77,7 @@ WebGames/mod_sdk/
 │   └── README.md               # 范例索引与使用说明
 ├── tools/                      # 【开发工具箱】统一 CLI 门面与轻量级自动化诊断脚本
 │   ├── kalar_mod.py            # 【核心门面】统一命令行工具 (kalar-mod CLI Facade)
+│   ├── kalar_workbench.py      # 【工作台】开发者单一应用台与 .kmod 归档引擎
 │   ├── scaffold_mod.py         # 脚手架骨架生成器 (init 子命令实现)
 │   ├── check_mod.py            # 纯静态轻量自愈诊断器 (check 子命令实现)
 │   ├── cook_assets.py          # 视听资产预编译与哈希审计器 (cook 子命令实现)
@@ -177,14 +180,30 @@ python WebGames/mod_sdk/tools/kalar_mod.py play ./mods/my_prologue --interactive
 
 ### 6. `pack` —— 模组分发归档打包
 
-前置运行静态检查与资产审计，通过后自动过滤开发临时文件（如 `__pycache__`, `.git`, `.tmp`），压缩打包为标准 `.zip` 生产分发包并输出校验哈希。
+前置运行静态自愈检查与资产审计，通过后自动过滤开发临时文件（如 `__pycache__`, `.git`, `.tmp`），压缩打包为标准 `.kmod` 生产归档包（或指定 `--format zip`），计算内部资产全量 SHA-256 指纹清单并防篡改封签。
 
 ```bash
-# 校验并打包至默认输出目录
+# 校验并打包为标准 .kmod 分发包
 python WebGames/mod_sdk/tools/kalar_mod.py pack ./mods/my_prologue
 
-# 指定归档分发包输出目录
-python WebGames/mod_sdk/tools/kalar_mod.py pack ./mods/my_prologue --out-dir ./dist
+# 指定归档分发包输出路径与格式
+python WebGames/mod_sdk/tools/kalar_mod.py pack ./mods/my_prologue -o ./dist/my_prologue.kmod
+python WebGames/mod_sdk/tools/kalar_mod.py pack ./mods/my_prologue --format zip
+```
+
+### 7. `workbench` —— 开发者集成单一应用台
+
+开发者集成工作台整合脚手架、离线自愈诊断、.kmod 标准打包与完整性校验于单一工作台入口，并提供离线自检与 Agent 结对开发集成。
+
+```bash
+# 工作台概览与快捷引导
+python WebGames/mod_sdk/tools/kalar_mod.py workbench
+
+# 运行工作台全链路集成自测试夹具
+python WebGames/mod_sdk/tools/kalar_mod.py workbench --self-test
+
+# 校验并验证外部 .kmod 归档包完整性指纹
+python WebGames/mod_sdk/tools/kalar_mod.py workbench --verify ./dist/my_prologue.kmod
 ```
 
 ---

@@ -70,6 +70,8 @@ BINARY_SUFFIXES: set[str] = {
     ".woff",
     ".woff2",
     ".bin",
+    ".kdat",
+    ".kmod",
     ".pyc",
     ".uid",
     ".ctex",

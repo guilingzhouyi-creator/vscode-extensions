@@ -147,6 +147,24 @@ def _build_unified_protocol_autogen_lines(proto_cap: dict[str, Any]) -> list[str
     ]
 
 
+def _build_workbench_autogen_lines(wb_cap: dict[str, Any]) -> list[str]:
+    """构建开发者集成工作台与打包能力章节的动态 Markdown 行列表。"""
+    formats = COMMA_SEP.join([f"`{fmt}`" for fmt in wb_cap.get("supported_package_formats", [])])
+    actions = COMMA_SEP.join([f"`{act}`" for act in wb_cap.get("supported_actions", [])])
+    compression = wb_cap.get("supported_compression", "ZIP_DEFLATE")
+    hash_algo = wb_cap.get("hash_algorithm", "SHA256")
+
+    return [
+        "",
+        "### 9. 开发者集成工作台与归档打包能力契约 (Developer Workbench Capabilities)",
+        "",
+        f"- **支持包格式 (`supported_package_formats`)**: {formats}",
+        f"- **支持工作台动作 (`supported_actions`)**: {actions}",
+        f"- **归档压缩算法 (`supported_compression`)**: `{compression}`",
+        f"- **单向指纹校验算法 (`hash_algorithm`)**: `{hash_algo}`",
+    ]
+
+
 def generate_autogen_spec_section(capabilities: dict[str, Any]) -> str:
     """生成 MOD_SPEC.md 动态能力章节的 Markdown 文本。"""
     lines: list[str] = [
@@ -228,6 +246,10 @@ def generate_autogen_spec_section(capabilities: dict[str, Any]) -> str:
     proto_cap = capabilities.get("unified_protocol_capabilities", {})
     if isinstance(proto_cap, dict) and proto_cap:
         lines.extend(_build_unified_protocol_autogen_lines(proto_cap))
+
+    wb_cap = capabilities.get("workbench_capabilities", {})
+    if isinstance(wb_cap, dict) and wb_cap:
+        lines.extend(_build_workbench_autogen_lines(wb_cap))
 
     lines.append("<!-- AUTOGEN_CAPABILITIES_END -->")
     return "\n".join(lines)

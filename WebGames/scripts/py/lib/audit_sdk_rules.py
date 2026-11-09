@@ -184,6 +184,10 @@ def check_schemas_integrity(mod_sdk_dir: Path, findings: list[AuditFinding]) -> 
         ("client_request_envelope.schema.json", "全域通用客户端请求信封 Schema"),
         ("unified_response_envelope.schema.json", "全域统一服务端响应信封 Schema"),
         ("esc_menu_action_payload.schema.json", "ESC 系统菜单指令载荷强类型 Schema"),
+        ("bundle_manifest.schema.json", "模组 .kmod 归档包元数据清单 Schema"),
+        ("workbench_config.schema.json", "开发者集成工作台配置 Schema"),
+        ("kdat_manifest.schema.json", "二进制数据流打包编译清单元数据契约"),
+        ("cutscene_manifest.schema.json", "CG视频资产与剧情Hook扩展契约"),
     ]
 
     for s_name, s_desc in expected_schemas:
@@ -270,6 +274,10 @@ def check_tools_integrity(mod_sdk_dir: Path, findings: list[AuditFinding]) -> No
             "kalar_protocol_client.py",
             "统一通信协议客户端与本地模拟派发引擎 (dispatch)",
         ),
+        (
+            "kalar_workbench.py",
+            "开发者集成工作台与 .kmod 归档引擎 (workbench)",
+        ),
     ]
 
     for t_name, t_desc in expected_tools:
@@ -322,6 +330,7 @@ def check_tools_integrity(mod_sdk_dir: Path, findings: list[AuditFinding]) -> No
             "play",
             "pack",
             "dispatch",
+            "workbench",
         ]
         for subcmd in required_subcommands:
             if f'"{subcmd}"' not in cli_text and f"'{subcmd}'" not in cli_text:
