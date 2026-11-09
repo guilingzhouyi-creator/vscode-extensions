@@ -127,6 +127,40 @@ export type { ScanWithCacheOptions } from './scanner/cache-scanner';
 export type { ScanWithDiffOptions } from './scanner/diff-scanner';
 export { summarizeUncertainty } from './reporting/canonical-issue-builder';
 
+/** Files that mark a directory as the owner of the project being scanned. */
+const PROJECT_MANIFESTS = [
+    'package.json',
+    'Cargo.toml',
+    'auto-refactor.config.json',
+    'pyproject.toml',
+    'go.mod',
+    'project.godot',
+] as const;
+
+/**
+ * Resolve the directory that owns a cached scan of `root`.
+ *
+ * A scan may be rooted at any subdirectory, including a single source folder; writing the cache
+ * under that root then scatters cache trees through authored directories. Climbing to the nearest
+ * ancestor carrying a project manifest keeps one project on one cache. The filesystem root ends
+ * the climb, so a manifest-free tree still yields its own root instead of failing.
+ *
+ * @param root - Requested scan root, absolute or relative.
+ * @returns Absolute directory that should own `.auto-refactor-cache`.
+ */
+function projectCacheAnchor(root: string): string {
+    const origin = path.resolve(root);
+    let current = origin;
+    for (;;) {
+        for (const manifest of PROJECT_MANIFESTS) {
+            if (fs.existsSync(path.join(current, manifest))) return current;
+        }
+        const parent = path.dirname(current);
+        if (parent === current) return origin;
+        current = parent;
+    }
+}
+
 /**
  * Facade for the scan pipeline: resolves analyzers once per instance and exposes cold,
  * warm-cache, and diff entry points that all emit the same report shape.
@@ -228,7 +262,7 @@ export class Scanner implements ScannerContext {
     }
 
     /**
-     * Resolve the review-memory directory for this scan.
+     * Directory backing review memory for one scan.
      *
      * `cache: false` (`--no-cache`) promises that a scan leaves no trace on disk, so review memory
      * stays in-process: the dual-track pipeline still gets its records, but no
@@ -236,12 +270,19 @@ export class Scanner implements ScannerContext {
      * cycle measured ~4% of wall time on a 300-file scan, and writing a cache the caller disabled
      * was the real defect; the saving is a side effect of honouring the flag.
      *
-     * @param config - Resolved scan config carrying the cache switch.
+     * Otherwise the cache is anchored to the owning project rather than to whatever `root` the
+     * caller passed. A scan rooted at a subdirectory — or at a single file's directory — used to
+     * write `.auto-refactor-cache` next to the sources it was reading, which scattered cache trees
+     * through `src/` and made them look like authored content. Climbing to the nearest ancestor
+     * that carries a project manifest keeps every scan of one project on one cache, and the
+     * filesystem root terminates the climb so a manifest-free tree still resolves.
+     *
+     * @param config - Resolved scan config carrying the cache switch and requested root.
      * @returns Directory backing the manager, or `undefined` for a memory-only manager.
      */
     private reviewMemoryDir(config: ScanConfig): string | undefined {
         if (config.cacheEnabled === false) return undefined;
-        return path.join(config.root, DIR_AUTO_REFACTOR_CACHE);
+        return path.join(projectCacheAnchor(config.root), DIR_AUTO_REFACTOR_CACHE);
     }
 
     /**
