@@ -370,7 +370,7 @@ impl E2eWorkload {
 
             let base_dir = std::env::current_dir()
                 .unwrap_or_else(|_| PathBuf::from("."))
-                .join("target")
+                .join(".bench-corpus")
                 .join("workloads");
             fs::create_dir_all(&base_dir).map_err(FractalError::Io)?;
 
@@ -415,7 +415,11 @@ impl E2eWorkload {
     }
 
     /// Resolves the default real-world open-source workload bundle fixture, generating it
-    /// deterministically if not yet present in `target/workloads/`.
+    /// deterministically if not yet present in the reproducible benchmark corpus directory.
+    ///
+    /// The corpus deliberately avoids `target/`: Cargo owns that tree and `cargo clean`
+    /// deletes it wholesale, which would silently discard a multi-hundred-megabyte fixture
+    /// between otherwise identical benchmark runs.
     ///
     /// # Errors
     /// Returns `FractalError` if bundle creation fails.
@@ -425,7 +429,7 @@ impl E2eWorkload {
 
         let base_dir = std::env::current_dir()
             .unwrap_or_else(|_| PathBuf::from("."))
-            .join("target")
+            .join(".bench-corpus")
             .join("workloads");
         fs::create_dir_all(&base_dir).map_err(FractalError::Io)?;
 

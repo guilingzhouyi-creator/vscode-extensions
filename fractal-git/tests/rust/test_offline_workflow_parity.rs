@@ -20,13 +20,37 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 static WORKFLOW_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
+/// Removes scratch trees left behind by earlier runs of this suite.
+///
+/// A crashed or interrupted run leaves its per-PID tree behind, and removing only the exact
+/// path about to be reused let those leftovers accumulate without bound. Entries owned by the
+/// current process are kept so repeated calls inside one run stay incremental.
+fn purge_stale_scratch(base: &Path) {
+    let own_prefix = format!("{}_", std::process::id());
+    let Ok(entries) = fs::read_dir(base) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else {
+            continue;
+        };
+        if name.starts_with(&own_prefix) {
+            continue;
+        }
+        let _ = fs::remove_dir_all(entry.path());
+    }
+}
+
 fn scratch_dir(label: &str) -> PathBuf {
+    static PURGE: std::sync::Once = std::sync::Once::new();
     let count = WORKFLOW_COUNTER.fetch_add(1, Ordering::Relaxed);
     let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .expect("crate directory has workspace parent");
     let base = workspace_root.join("tmp").join("offline-workflow-parity");
     let _ = fs::create_dir_all(&base);
+    PURGE.call_once(|| purge_stale_scratch(&base));
     let path = base.join(format!("{}_{}_{}", std::process::id(), count, label));
     let _ = fs::remove_dir_all(&path);
     fs::create_dir_all(&path).expect("create scratch dir");
