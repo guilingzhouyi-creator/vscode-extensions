@@ -23,6 +23,10 @@ import { visitSnapshotInputs } from './snapshot-scanner';
 import type { SnapshotInputObservation, SnapshotScanResult } from './snapshot-scanner';
 import { assertSnapshotPath } from './source-snapshot';
 import type { SourceSnapshot } from './source-snapshot';
+import { captureReviewConfiguration } from './review-configuration';
+import type { ReviewConfigurationIdentity } from './review-configuration';
+import { SemanticSnapshotBuilder } from './semantic-snapshot';
+import type { SemanticGraphSnapshot } from './semantic-snapshot';
 
 /** Diff context selects speculative work; new bytes always come from the snapshot. */
 export interface ReviewChange {
@@ -46,6 +50,8 @@ export interface ReviewRuntime {
 export interface SnapshotReviewResult extends SnapshotScanResult {
     readonly requestId: string;
     readonly completion: ReviewExecution;
+    /** Independent structural observations bound to this snapshot and actual configuration. */
+    readonly semanticGraph: SemanticGraphSnapshot;
     readonly tracks: Readonly<{
         fast: 'pending' | 'complete' | 'failed';
         deep: 'pending' | 'complete' | 'failed';
@@ -156,14 +162,16 @@ async function readReviewFiles(context: {
     snapshot: SourceSnapshot;
     scope: readonly string[];
     changes: ReadonlyMap<string, ReviewChange>;
+    semantic: SemanticSnapshotBuilder;
     state: ExecutionState;
     signal?: AbortSignal;
 }): Promise<DiffFileInput[]> {
     const inputs: DiffFileInput[] = [];
     context.state.inputs = await visitSnapshotInputs(
         { snapshot: context.snapshot, scope: context.scope, signal: context.signal },
-        (read) => {
+        async (read) => {
             if (read.kind !== 'text') return;
+            await context.semantic.observe(read.path, read.content);
             const change = context.changes.get(read.path);
             inputs.push({
                 filePath: read.path, newContent: read.content,
@@ -210,6 +218,29 @@ function recordReviewFailure(state: ExecutionState, error: unknown, signal?: Abo
     else if (state.tracks.deep === 'pending') state.tracks.deep = 'failed';
 }
 
+function finishSemanticReview(context: {
+    snapshot: SourceSnapshot;
+    scope: readonly string[];
+    runtime: ReviewRuntime;
+    configuration: ReviewConfigurationIdentity;
+    semantic: SemanticSnapshotBuilder;
+    state: ExecutionState;
+}): { graph: SemanticGraphSnapshot; superseded: boolean } {
+    const { snapshot, scope, runtime, configuration, semantic, state } = context;
+    const current = captureReviewConfiguration(runtime.scanner.getConfig(), runtime.options);
+    const superseded = configuration.status === 'bound' &&
+        (current.status !== 'bound' || current.value !== configuration.value);
+    const paths = new Set(snapshot.entries.map(entry => entry.path));
+    const fullScope = paths.size === scope.length && scope.every(file => paths.has(file));
+    const reason = superseded ? 'configuration-changed' : state.cancelled ? 'cancelled' :
+        !fullScope ? 'partial-scope' : configuration.status !== 'bound' ? 'configuration-unavailable' :
+            undefined;
+    const graph = semantic.seal(
+        { snapshot: snapshot.identity, configuration }, state.inputs, reason,
+    );
+    return { graph, superseded };
+}
+
 /**
  * Execute captured bytes through existing fast/deep tracks, then finish missing required calls.
  * Inputs and requirements are detached before the first await. Repeated bounded observations
@@ -234,6 +265,10 @@ export async function executeReview(
     const configured = runtime.scanner.beginSnapshotAnalysis();
     const requirements = captureFileRequirements(request.requirements ?? configured);
     const capturedRuntime = { scanner: runtime.scanner, options: { ...runtime.options } };
+    const configuration = captureReviewConfiguration(
+        runtime.scanner.getConfig(), capturedRuntime.options,
+    );
+    const semantic = new SemanticSnapshotBuilder();
     const signal = runtime.scanner.getConfig().signal;
     const state: ExecutionState = {
         inputs: [], execution: [], issues: [], deepIssues: [], confirmedIssues: [],
@@ -241,13 +276,16 @@ export async function executeReview(
         tracks: { fast: 'pending', deep: 'pending' }, cancelled: false,
     };
     try {
-        const inputs = await readReviewFiles({ snapshot, scope, changes, state, signal });
+        const inputs = await readReviewFiles({ snapshot, scope, changes, state, signal, semantic });
         await runReviewTracks({ runtime: capturedRuntime, state, inputs, requirements });
     } catch (error) {
         recordReviewFailure(state, error, signal);
     }
     const coverage = collectReviewPassCoverage({
         requirements, inputs: state.inputs, execution: state.execution,
+    });
+    const generation = finishSemanticReview({
+        snapshot, scope, runtime: capturedRuntime, configuration, semantic, state,
     });
     const retainedIssues = state.issues.filter(issue =>
         !state.replaced.has(fileAnalyzerKey(issue.location.file, issue.analyzer)));
@@ -257,10 +295,10 @@ export async function executeReview(
         issues: orderedIssues([...retainedIssues, ...state.confirmedIssues, ...state.deepIssues]),
         fileMetrics: Object.freeze([...state.metrics.values()]),
         execution: Object.freeze(state.execution), coverage,
-        tracks: Object.freeze(state.tracks),
+        tracks: Object.freeze(state.tracks), semanticGraph: generation.graph,
         completion: createReviewExecution({
             reviewId: requestId, coverage, tracks: state.tracks,
-            termination: state.cancelled ? 'cancelled' : undefined,
+            termination: state.cancelled ? 'cancelled' : generation.superseded ? 'superseded' : undefined,
             failures: state.failure ? [state.failure] : undefined,
         }),
     });

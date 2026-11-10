@@ -324,6 +324,7 @@ export type CyclePassLogger = { info: (msg: string) => void };
  * @param config - Resolved scan configuration.
  * @param logger - Optional diagnostic sink.
  * @param prebuilt - Dependency graph reused from an earlier pass.
+ * @param snapshotSource - Exact fixed input text; omitted retains directory file reads.
  * @returns Detected issues plus any diagnostic warnings.
  */
 export async function runCyclePass(
@@ -331,6 +332,7 @@ export async function runCyclePass(
     config: ScanConfig,
     logger?: CyclePassLogger,
     prebuilt?: ModuleDependencyGraph | null,
+    snapshotSource?: ReadonlyMap<string, string>,
 ): Promise<{ issues: Issue[]; warnings: string[] }> {
     const issues: Issue[] = [];
     const warnings: string[] = [];
@@ -339,11 +341,18 @@ export async function runCyclePass(
     if (opts.detectCycles === false) return { issues, warnings };
 
     const files = report.fileMetrics.map((fileMetric) => fileMetric.file);
-    const usePrebuilt = prebuilt != null && opts.detectUnusedExports !== true;
+    const usePrebuilt = !snapshotSource && prebuilt != null && opts.detectUnusedExports !== true;
     const graph = resolveCyclePassGraph(prebuilt, usePrebuilt);
     const contents = new Map<string, string>();
 
-    if (!usePrebuilt) {
+    if (snapshotSource) {
+        for (const file of files) {
+            const content = snapshotSource.get(file);
+            if (content === undefined) throw new Error(`snapshot dependency source missing: ${file}`);
+            contents.set(file, content);
+            graph.registerFromContent(file, content);
+        }
+    } else if (!usePrebuilt) {
         await populateGraphFromFiles(files, config.root, graph, contents, warnings);
     }
     if (opts.detectUnusedExports === true) {
