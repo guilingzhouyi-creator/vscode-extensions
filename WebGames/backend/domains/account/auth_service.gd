@@ -14,6 +14,7 @@ const AccountRegistrationDTO = preload("res://backend/domains/account/dto/accoun
 const AccountCompositeAuthDTO = preload("res://backend/domains/account/dto/account_composite_auth_dto.gd")
 const HudEventContract = preload("res://backend/domains/world_state/hud_event_contract.gd")
 const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
+const AccountHomeViewModelBuilder = preload("res://backend/domains/account/services/account_home_view_model_builder.gd")
 
 const DOMAIN_ACCOUNT_CONFIG: String = "domains.account"
 const DEFAULT_GUEST_NAME_RANGE_MIN: int = 1000
@@ -46,9 +47,9 @@ static func create_guest_account(device_fingerprint: String = "", rng: Determini
 	var name_prefix := GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/guest_name_prefix", "ROGUE_")
 	# 局部变量更名为 name_range，避免遮蔽注入的 rng 参数
 	var name_range: Array = GameConfig.get_array(DOMAIN_ACCOUNT_CONFIG, "auth/guest_name_range", [DEFAULT_GUEST_NAME_RANGE_MIN, DEFAULT_GUEST_NAME_RANGE_MAX])
-	var lo := int(name_range[0]) if name_range.size() > 0 else DEFAULT_GUEST_NAME_RANGE_MIN
-	var hi := int(name_range[1]) if name_range.size() > 1 else DEFAULT_GUEST_NAME_RANGE_MAX
-	acc.username = name_prefix + str(guest_rng.randi_range(lo, hi))
+	var range_min := int(name_range[0]) if name_range.size() > 0 else DEFAULT_GUEST_NAME_RANGE_MIN
+	var range_max := int(name_range[1]) if name_range.size() > 1 else DEFAULT_GUEST_NAME_RANGE_MAX
+	acc.username = name_prefix + str(guest_rng.randi_range(range_min, range_max))
 	var guest_pass := GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/guest_password", "GUEST_NO_PASS")
 	acc.password_hash_sha256 = hash_password(guest_pass)
 	var default_fp := GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/default_fingerprint", "DEV_LOCAL_FP")
@@ -217,12 +218,18 @@ static func authenticate_local(username: String, pass_plain: String, account: Ac
 		var token := (token_prefix + account.account_id + "_" + str(Time.get_ticks_usec())).sha256_text()
 		var issued_at := account.last_login_timestamp_utc
 		var ttl := maxi(1, GameConfig.get_int("infrastructure.admin", "session/ttl_seconds", GameConfig.get_int(DOMAIN_ACCOUNT_CONFIG, "auth/session/ttl_seconds", 86400)))
+		var mask_enabled := GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "auth/session/mask_in_memory_tokens", true)
+		var mask_seed := ClientSecretVault.derive_key_seed(account.account_id)
+		var masked_bytes: PackedByteArray = ClientSecretVault.mask_in_memory_token(token, mask_seed) if mask_enabled else PackedByteArray()
+		var prefix_len := maxi(4, GameConfig.get_int(DOMAIN_ACCOUNT_CONFIG, "auth/home_view/mask_visible_prefix_len", 8))
 		_sessions[token.sha256_text()] = {
 			"account_id": account.account_id,
 			"username": account.username,
 			"issued_at": issued_at,
 			"expires_at": issued_at + ttl,
 			"device_fingerprint": device_fingerprint,
+			"token_masked": masked_bytes,
+			"token_prefix": token.substr(0, mini(prefix_len, token.length())),
 			"revoked": false
 		}
 		var code_ok := GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/ok", "OK")
@@ -350,13 +357,18 @@ static func validate_token(token: String, account_id: String = "", device_finger
 		return {"success": false, "error_code": "DEVICE_MISMATCH"}
 	return {"success": true, "account_id": session.get("account_id", ""), "issued_at": session.get("issued_at", 0), "expires_at": session.get("expires_at", 0), "state": "ACTIVE"}
 
-## 撤销会话（幂等；已撤销/不存在的 token 返回 false）
+## 撤销会话（幂等；擦除内存掩码令牌字节，已撤销/不存在的 token 返回 false）
 static func revoke_token(token: String) -> bool:
+	if token.is_empty():
+		return false
 	var key := token.sha256_text()
 	if not _sessions.has(key):
 		return false
 	var session: Dictionary = _sessions[key]
+	if bool(session.get("revoked", false)):
+		return false
 	session["revoked"] = true
+	session["token_masked"] = PackedByteArray()
 	_sessions[key] = session
 	var user_ident: String = String(session.get("username", session.get("account_id", "")))
 	EventBusCore.get_instance().emit_domain_event(HudEventContract.channel_auth_session_revoked(), {
@@ -366,6 +378,112 @@ static func revoke_token(token: String) -> bool:
 		"args": [user_ident]
 	})
 	return true
+
+## 检查传入会话令牌是否属于已知被撤销或已过期令牌（未在会话表登记的测试令牌串返回 false）
+static func is_token_revoked_or_expired(token: String, now_utc: int = -1) -> bool:
+	if token.is_empty() or not _sessions.has(token.sha256_text()):
+		return false
+	var session: Dictionary = _sessions[token.sha256_text()]
+	var now := now_utc if now_utc >= 0 else int(Time.get_unix_time_from_system())
+	return bool(session.get("revoked", false)) or now < int(session.get("issued_at", 0)) or now > int(session.get("expires_at", 0))
+
+## 读取脱敏会话元数据（绝不向外部暴露原始密钥或明文凭据）
+static func get_session_masked_metadata(token: String) -> Dictionary:
+	if token.is_empty() or not _sessions.has(token.sha256_text()):
+		return {}
+	var session: Dictionary = _sessions[token.sha256_text()]
+	var masked: Variant = session.get("token_masked", PackedByteArray())
+	var has_masked: bool = (masked is PackedByteArray and not (masked as PackedByteArray).is_empty())
+	return {
+		"account_id": String(session.get("account_id", "")),
+		"username": String(session.get("username", "")),
+		"token_prefix": String(session.get("token_prefix", "")),
+		"issued_at": int(session.get("issued_at", 0)),
+		"expires_at": int(session.get("expires_at", 0)),
+		"revoked": bool(session.get("revoked", false)),
+		"has_masked_token": has_masked
+	}
+
+## 标准注销会话（校验账号归属并撤销凭据）
+static func logout_session(token: String, account_id: String = "") -> Dictionary:
+	if token.is_empty():
+		return {"success": false, "error_code": GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/unauthorized", "ERR_UNAUTHORIZED"), "account_id": ""}
+	var token_validation := validate_token(token, account_id)
+	if not bool(token_validation.get("success", false)):
+		return {"success": false, "error_code": String(token_validation.get("error_code", GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/session_revoked", "ERR_SESSION_REVOKED"))), "account_id": String(token_validation.get("account_id", ""))}
+	var resolved_account := String(token_validation.get("account_id", ""))
+	var meta := get_session_masked_metadata(token)
+	var revoked := revoke_token(token)
+	return {
+		"success": revoked,
+		"error_code": GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/ok", "OK") if revoked else GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/session_revoked", "ERR_SESSION_REVOKED"),
+		"account_id": resolved_account,
+		"token_prefix": String(meta.get("token_prefix", ""))
+	}
+
+## 注册并按需自动建立受保护登录会话
+static func register_and_login(request: AccountRegistrationDTO.Request, auto_login: bool = true, account_store: Dictionary = {}) -> Dictionary:
+	var reg_resp := register_account(request, account_store)
+	if not reg_resp.success:
+		return {
+			"success": false,
+			"error_code": reg_resp.error_code,
+			"account_id": "",
+			"username": "",
+			"session_token": ""
+		}
+	var should_login := auto_login or GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "auth/session/auto_login_on_register", false)
+	if not should_login:
+		return {
+			"success": true,
+			"error_code": reg_resp.error_code,
+			"account_id": reg_resp.account_id,
+			"username": reg_resp.username,
+			"session_token": "",
+			"created_timestamp_utc": reg_resp.created_timestamp_utc
+		}
+	var target_acc: AccountProfileAggregate = null
+	if account_store.has(reg_resp.account_id):
+		target_acc = account_store[reg_resp.account_id]
+	else:
+		target_acc = AccountRepository.get_instance().find_by_id(reg_resp.account_id)
+	if target_acc == null:
+		return {
+			"success": false,
+			"error_code": GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/account_not_found", "ERR_ACCOUNT_NOT_FOUND"),
+			"account_id": reg_resp.account_id,
+			"username": reg_resp.username,
+			"session_token": ""
+		}
+	var auth_res := authenticate_local(request.username, request.password_plain, target_acc, request.device_fingerprint)
+	if AccountRepository.get_instance().has_account(target_acc.account_id):
+		AccountRepository.get_instance().save_account(target_acc)
+	return {
+		"success": bool(auth_res.get("success", false)),
+		"error_code": String(auth_res.get("code", "OK")),
+		"account_id": target_acc.account_id,
+		"username": target_acc.username,
+		"session_token": String(auth_res.get("token", "")),
+		"created_timestamp_utc": target_acc.created_timestamp_utc,
+		"last_login_timestamp_utc": target_acc.last_login_timestamp_utc,
+		"auto_enter_gateway": bool(auth_res.get("auto_enter_gateway", true))
+	}
+
+## 构建账号首页脱敏数据视图模型（禁止返回口令哈希与明文令牌）
+static func build_account_home_view_model(session_token: String = "", locale: String = "") -> Dictionary:
+	return AccountHomeViewModelBuilder.build_account_home_view_model(session_token, locale)
+
+## 吊销全部仍处于激活态的会话并擦除掩码凭据（保留 revoked 审计墓碑供 validate_token 识别 TOKEN_REVOKED）
+static func revoke_all_active_sessions() -> int:
+	var revoked_count := 0
+	for key in _sessions.keys():
+		var session: Dictionary = _sessions[key]
+		if not bool(session.get("revoked", false)):
+			session["revoked"] = true
+			session["token_masked"] = PackedByteArray()
+			_sessions[key] = session
+			revoked_count += 1
+	return revoked_count
 
 ## 清空全部会话（登出/重置场景）
 static func clear_sessions() -> void:
