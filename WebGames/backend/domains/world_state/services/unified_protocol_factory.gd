@@ -15,8 +15,61 @@ const ClientRequestEnvelopeDTO = preload("res://backend/domains/world_state/dto/
 const UnifiedResponseEnvelopeDTO = preload("res://backend/domains/world_state/dto/unified_response_envelope_dto.gd")
 const AgentActionPacketDTO = preload("res://backend/domains/world_state/dto/agent_action_packet_dto.gd")
 
+const MAX_POOLED_ENVELOPES: int = 32
+
 static var _lease_counter: int = 1
 static var _request_counter: int = 1
+static var _req_pool: Array[ClientRequestEnvelopeDTO] = []
+static var _resp_pool: Array[UnifiedResponseEnvelopeDTO] = []
+static var _req_borrowed_count: int = 0
+static var _resp_borrowed_count: int = 0
+
+## 从对象池借出请求信封（ADV-PRF-002：高频调用零瞬态堆分配）
+static func borrow_request_envelope() -> ClientRequestEnvelopeDTO:
+	_req_borrowed_count += 1
+	if not _req_pool.is_empty():
+		var reused: ClientRequestEnvelopeDTO = _req_pool.pop_back()
+		reused.reset_state()
+		return reused
+	return ClientRequestEnvelopeDTO.new()
+
+## 归还请求信封至对象池并彻底复位
+static func recycle_request_envelope(req: ClientRequestEnvelopeDTO) -> void:
+	if req == null:
+		return
+	req.reset_state()
+	if _req_borrowed_count > 0:
+		_req_borrowed_count -= 1
+	if _req_pool.size() < MAX_POOLED_ENVELOPES:
+		_req_pool.append(req)
+
+## 从对象池借出响应信封（ADV-PRF-002）
+static func borrow_response_envelope() -> UnifiedResponseEnvelopeDTO:
+	_resp_borrowed_count += 1
+	if not _resp_pool.is_empty():
+		var reused: UnifiedResponseEnvelopeDTO = _resp_pool.pop_back()
+		reused.reset_state()
+		return reused
+	return UnifiedResponseEnvelopeDTO.new()
+
+## 归还响应信封至对象池并彻底复位
+static func recycle_response_envelope(resp: UnifiedResponseEnvelopeDTO) -> void:
+	if resp == null:
+		return
+	resp.reset_state()
+	if _resp_borrowed_count > 0:
+		_resp_borrowed_count -= 1
+	if _resp_pool.size() < MAX_POOLED_ENVELOPES:
+		_resp_pool.append(resp)
+
+## 查询信封对象池借还遥测统计（校验借还严格守恒）
+static func get_pool_stats() -> Dictionary:
+	return {
+		"req_borrowed": _req_borrowed_count,
+		"resp_borrowed": _resp_borrowed_count,
+		"req_pooled": _req_pool.size(),
+		"resp_pooled": _resp_pool.size()
+	}
 
 ## 创建人类 UI 标准请求信封
 static func create_human_request(
@@ -111,7 +164,11 @@ static func create_response(
 	resp.server_timestamp_ms = Time.get_ticks_msec()
 	return resp
 
-## 测试环境重置计数器
+## 测试环境重置计数器与信封对象池
 static func reset_for_tests() -> void:
 	_lease_counter = 1
 	_request_counter = 1
+	_req_pool.clear()
+	_resp_pool.clear()
+	_req_borrowed_count = 0
+	_resp_borrowed_count = 0

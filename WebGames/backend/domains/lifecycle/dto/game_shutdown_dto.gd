@@ -22,6 +22,9 @@ class Request extends RefCounted:
 	var idempotency_key: String = ""
 	var force_timeout_seconds: float = 5.0
 	var timestamp_utc: int = 0
+	var save_before_quit: bool = true
+	var require_save_success: bool = false
+	var force_quit: bool = false
 
 	## 序列化停机请求为字典
 	func to_dto() -> Dictionary:
@@ -32,7 +35,10 @@ class Request extends RefCounted:
 			"target_save_slot": target_save_slot,
 			"idempotency_key": idempotency_key,
 			"force_timeout_seconds": force_timeout_seconds,
-			"timestamp_utc": timestamp_utc
+			"timestamp_utc": timestamp_utc,
+			"save_before_quit": save_before_quit,
+			"require_save_success": require_save_success,
+			"force_quit": force_quit
 		}
 
 	## 从字典重建停机请求（缺省回退默认值）
@@ -45,6 +51,9 @@ class Request extends RefCounted:
 		req.idempotency_key = String(data.get("idempotency_key", ""))
 		req.force_timeout_seconds = float(data.get("force_timeout_seconds", 5.0))
 		req.timestamp_utc = int(data.get("timestamp_utc", 0))
+		req.save_before_quit = bool(data.get("save_before_quit", true))
+		req.require_save_success = bool(data.get("require_save_success", false))
+		req.force_quit = bool(data.get("force_quit", false))
 		return req
 
 

@@ -16,6 +16,7 @@ var account_id: String = ""
 var character_id: String = ""
 var character_name: String = ""
 var race_id: String = "HUMAN"
+var current_location_id: String = ""
 var level: int = 1
 
 # 二、生理状态（下限守卫 maxf(1.0, ...) 防止除以零）
@@ -54,6 +55,7 @@ func to_dto() -> Dictionary:
 		"character_id": character_id,
 		"character_name": character_name,
 		"race_id": race_id,
+		"current_location_id": current_location_id,
 		"level": level,
 		"hp_current": hp_current,
 		"hp_max": hp_max,
@@ -92,6 +94,7 @@ static func _hydrate_identity(data: Dictionary, dto: AuthoritativeHudSnapshotDTO
 	dto.character_id = String(data.get("character_id", ""))
 	dto.character_name = String(data.get("character_name", ""))
 	dto.race_id = String(data.get("race_id", "HUMAN"))
+	dto.current_location_id = String(data.get("current_location_id", data.get("current_location", "")))
 	dto.level = maxi(1, int(data.get("level", 1)))
 
 static func _hydrate_physiology_and_wallet(data: Dictionary, dto: AuthoritativeHudSnapshotDTO) -> void:
@@ -107,24 +110,24 @@ static func _hydrate_physiology_and_wallet(data: Dictionary, dto: AuthoritativeH
 	dto.wallet_mana_monocrystals = int(data.get("wallet_mana_monocrystals", 0))
 	dto.ledger_nonce = int(data.get("ledger_nonce", 0))
 
-	var av = data.get("attribute_values", {})
-	if av is Dictionary:
-		dto.attribute_values = av.duplicate()
-	var al = data.get("attribute_levels", {})
-	if al is Dictionary:
-		dto.attribute_levels = al.duplicate()
+	var attr_values = data.get("attribute_values", {})
+	if attr_values is Dictionary:
+		dto.attribute_values = attr_values.duplicate()
+	var attr_levels = data.get("attribute_levels", {})
+	if attr_levels is Dictionary:
+		dto.attribute_levels = attr_levels.duplicate()
 
 	dto.unallocated_potential_points = maxi(0, int(data.get("unallocated_potential_points", 0)))
 	dto.title_rank_key = String(data.get("title_rank_key", ""))
 
 static func _hydrate_calendar_and_ops(data: Dictionary, dto: AuthoritativeHudSnapshotDTO) -> void:
-	var c_env = data.get("calendar_env", null)
-	if c_env is Dictionary and not c_env.is_empty():
-		dto.calendar_env = WorldCalendarEnvironmentDTO.from_dto(c_env)
+	var calendar_env_data = data.get("calendar_env", null)
+	if calendar_env_data is Dictionary and not calendar_env_data.is_empty():
+		dto.calendar_env = WorldCalendarEnvironmentDTO.from_dto(calendar_env_data)
 
-	var ops = data.get("ops_bulletin_brief", {})
-	if ops is Dictionary:
-		dto.ops_bulletin_brief = ops.duplicate()
+	var ops_bulletin = data.get("ops_bulletin_brief", {})
+	if ops_bulletin is Dictionary:
+		dto.ops_bulletin_brief = ops_bulletin.duplicate()
 
 	dto.unread_mail_count = maxi(0, int(data.get("unread_mail_count", 0)))
 	dto.gacha_pity_counter = maxi(0, int(data.get("gacha_pity_counter", 0)))
@@ -152,6 +155,7 @@ func to_legacy_snapshot() -> HudStatusSnapshotDTO:
 	legacy.character_id = character_id
 	legacy.character_name = character_name
 	legacy.race_id = race_id
+	legacy.current_location_id = current_location_id
 	legacy.attribute_values = attribute_values.duplicate()
 	legacy.attribute_levels = attribute_levels.duplicate()
 	legacy.hp_current = hp_current

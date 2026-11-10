@@ -16,6 +16,16 @@ const VersionedRuntimeContext = preload("res://backend/domains/version_governanc
 const VersionActivationGate = preload("res://backend/domains/version_governance/version_activation_gate.gd")
 const AgentTelemetryPoolRegistry = preload("res://backend/domains/world_state/services/agent_telemetry_pool_registry.gd")
 const ObjectPoolManager = preload("res://backend/infrastructure/object_pool_manager.gd")
+const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
+const HumanControlLeaseManager = preload("res://backend/domains/world_state/services/human_control_lease_manager.gd")
+const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
+const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
+const RuntimeModeGate = preload("res://backend/domains/persistence_protocol/runtime_mode_gate.gd")
+const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
+const WorldArchiveRepository = preload("res://backend/domains/world_state/world_archive_repository.gd")
+const AuthService = preload("res://backend/domains/account/auth_service.gd")
+const PrologueCutscenePort = preload("res://backend/domains/character_creation/prologue_cutscene_port.gd")
+const CutsceneOrchestrator = preload("res://backend/infrastructure/media/cutscene_orchestrator.gd")
 
 static func _ensure_telemetry_pool(pool_name: String, factory: Callable) -> void:
 	ObjectPoolManager.initialize()
@@ -81,6 +91,7 @@ static func assemble() -> Dictionary:
 	_catalog = ItemLoaderPipeline.build_catalog_from_config()
 	# 掉落事件监听器装配（注入注册表 catalog，订阅 monster.killed → 地面掉落声明）
 	_ground_loot_listener = GroundLootEventListener.new(_catalog)
+	PrologueCutscenePort.register_runner(Callable(GameBootstrap, "_run_prologue_cutscene_hook"))
 	GmCommandCatalog.register_default_commands()
 	_assembled = true
 	return {
@@ -181,7 +192,7 @@ static func quality_tier_registry() -> QualityTierRegistry:
 static func is_assembled() -> bool:
 	return _assembled
 
-## 全域反装配（对称幂等）：释放静态单例、解绑全局事件监听器并重置装配标记
+## 全域反装配（对称幂等）：按生命周期配置拓扑逆序清理各域运行时会话、租约、仓储、对象池并重置装配标记
 static func teardown() -> Dictionary:
 	if not _assembled:
 		return {
@@ -189,12 +200,30 @@ static func teardown() -> Dictionary:
 			"already_teared_down": true
 		}
 
-	# 1. 释放地面掉落监听器并解绑事件总线
-	if _ground_loot_listener != null:
-		_ground_loot_listener.dispose()
-		_ground_loot_listener = null
+	var teared_down: Array[String] = []
+	var order: Array = GameConfig.get_array("infrastructure.lifecycle", "shutdown_hooks/teardown_subsystems_order", [])
+	if order.is_empty():
+		order = [
+			"world_session_runtime",
+			"ground_loot_listener",
+			"human_control_lease",
+			"unified_protocol_factory",
+			"save_data_access_layer",
+			"world_archive_repository",
+			"account_repository",
+			"auth_sessions",
+			"telemetry_pools",
+			"object_pool_manager"
+		]
+	for step_name in order:
+		var key := String(step_name)
+		_teardown_single_subsystem(key)
+		teared_down.append(key)
 
-	# 2. 清理各静态单例引用
+	RuntimeModeGate.reset_for_tests()
+	PrologueCutscenePort.reset_for_tests()
+
+	# 清理顶层静态单例引用
 	_catalog = null
 	_magic_registry = null
 	_magic_rules = null
@@ -202,22 +231,65 @@ static func teardown() -> Dictionary:
 	if _active_context != null:
 		_active_context.dispose()
 		_active_context = null
-	AgentTelemetryPoolRegistry.bind_pool_backend(Callable(), Callable(), Callable())
-	AgentTelemetryPoolRegistry.reset_for_tests()
-	ObjectPoolManager.teardown()
 
-	# 3. 复位装配标记
+	# 复位装配标记
 	_assembled = false
 
-	# 4. 广播引擎反装配完成事件（统一 EventBus 接入）
+	# 广播引擎反装配完成事件（统一 EventBus 接入）
 	EventBusCore.get_instance().emit_domain_event("engine.teardown_completed", {
-		"timestamp_utc": int(Time.get_unix_time_from_system())
+		"timestamp_utc": int(Time.get_unix_time_from_system()),
+		"teared_down_subsystems": teared_down
 	})
-	EventBusCore.get_instance().emit_log("info", "GameBootstrap 反装配完成，全局单例已复位")
+	EventBusCore.get_instance().emit_log("info", "GameBootstrap 反装配完成，全局单例与会话子系统已对称复位")
 
 	return {
 		"success": true,
 		"already_teared_down": false,
 		"catalog_released": true,
-		"listeners_disposed": true
+		"listeners_disposed": true,
+		"teared_down_subsystems": teared_down
+	}
+
+static func _teardown_single_subsystem(subsystem_key: String) -> void:
+	match subsystem_key:
+		"world_session_runtime":
+			WorldSessionRuntimeService.revoke_account_session()
+		"ground_loot_listener":
+			if _ground_loot_listener != null:
+				_ground_loot_listener.dispose()
+				_ground_loot_listener = null
+		"human_control_lease":
+			HumanControlLeaseManager.reset_for_tests()
+		"unified_protocol_factory":
+			UnifiedProtocolFactory.reset_for_tests()
+		"save_data_access_layer":
+			SaveDataAccessLayer.reset_for_tests()
+		"world_archive_repository":
+			WorldArchiveRepository.reset_for_tests()
+		"account_repository":
+			AccountRepository.reset_for_tests()
+		"auth_sessions":
+			AuthService.revoke_all_active_sessions()
+		"telemetry_pools":
+			AgentTelemetryPoolRegistry.bind_pool_backend(Callable(), Callable(), Callable())
+			AgentTelemetryPoolRegistry.reset_for_tests()
+		"object_pool_manager":
+			ObjectPoolManager.teardown()
+
+## 依赖倒置过场播放适配器：由领域端口 PrologueCutscenePort 在无头或主线程安全调度 CutsceneOrchestrator
+static func _run_prologue_cutscene_hook(cutscene_id: String, skip_requested: bool) -> Dictionary:
+	var orchestrator := CutsceneOrchestrator.get_instance()
+	if orchestrator == null:
+		return {"success": false, "error_code": "CUTSCENE_ORCHESTRATOR_UNAVAILABLE"}
+	var play_res := orchestrator.play_by_id(cutscene_id, {"headless": true})
+	var skipped := false
+	if skip_requested:
+		skipped = orchestrator.skip_cutscene()
+	if not skipped and orchestrator.is_playing():
+		orchestrator.finish_cutscene()
+	return {
+		"success": bool(play_res.get("success", false)),
+		"cutscene_id": cutscene_id,
+		"skipped": skipped,
+		"is_placeholder": bool(play_res.get("is_placeholder", false))
 	}
