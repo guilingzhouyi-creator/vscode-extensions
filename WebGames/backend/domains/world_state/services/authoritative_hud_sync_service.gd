@@ -27,13 +27,14 @@ static func get_authoritative_snapshot(context: Dictionary) -> AuthoritativeHudS
 
 	return snapshot
 
-## 2. 推轨（Push）：广播主页 HUD 权威快照（池化借还守恒，零瞬态堆分配）
+## 2. 推轨（Push）：广播主页 HUD 权威快照（池化借还守恒，双载荷兼容）
 static func publish_hud_snapshot(snapshot: AuthoritativeHudSnapshotDTO) -> void:
 	if snapshot == null:
 		return
 	var bus := EventBusCore.get_instance()
 	var packet := bus.borrow_packet(EventChannelDefinition.HUD_STATUS_SNAPSHOT, EventCategoryMask.CORE_STATE)
-	packet.payload_dto = snapshot
+	var channel_label := GameConfig.get_string("domains.world_state", "hud/channels/snapshot", "world_state.snapshot_published")
+	EventPacket.bind_dual_payload(packet, snapshot, channel_label)
 	packet.source_entity_id = snapshot.character_id
 	packet.narrative_key = "snapshot_published"
 	packet.narrative_args = [snapshot.character_name]
@@ -46,7 +47,7 @@ static func trigger_initial_sync(context: Dictionary) -> AuthoritativeHudSnapsho
 	publish_hud_snapshot(snapshot)
 	return snapshot
 
-## 4. 增量推流：单项属性实值突变（池化借还守恒）
+## 4. 增量推流：单项属性实值突变（池化借还守恒，双载荷兼容）
 static func publish_stat_mutation(
 	character_id: String,
 	stat_name: String,
@@ -64,13 +65,14 @@ static func publish_stat_mutation(
 	mut.new_value = new_value
 	mut.delta = new_value - old_value
 	mut.cause_event = cause
-	packet.payload_dto = mut
+	var channel_label := GameConfig.get_string("domains.world_state", "hud/channels/stat_mutated", "world_state.stat_mutated")
+	EventPacket.bind_dual_payload(packet, mut, channel_label)
 	packet.narrative_key = "stat_mutated"
 	packet.narrative_args = [stat_name, old_value, new_value]
 	bus.dispatch_now(packet)
 	bus.recycle_packet(packet)
 
-## 5. 增量推流：钱包资产变动（池化借还守恒）
+## 5. 增量推流：钱包资产变动（池化借还守恒，双载荷与前端桥接键兼容）
 static func publish_wallet_mutation(
 	account_id: String,
 	currency_type: String,
@@ -88,19 +90,26 @@ static func publish_wallet_mutation(
 	mut.new_amount = new_amt
 	mut.delta = new_amt - old_amt
 	mut.reason_key = reason
-	packet.payload_dto = mut
+	var compat: Dictionary = {}
+	if currency_type == "gold":
+		compat["current_gold"] = new_amt
+	elif currency_type == "mana_monocrystals":
+		compat["current_crystals"] = new_amt
+	var channel_label := GameConfig.get_string("domains.world_state", "hud/channels/wallet_mutated", "world_state.wallet_mutated")
+	EventPacket.bind_dual_payload(packet, mut, channel_label, compat)
 	packet.narrative_key = "wallet_mutated"
 	packet.narrative_args = [currency_type, new_amt - old_amt]
 	bus.dispatch_now(packet)
 	bus.recycle_packet(packet)
 
-## 6. 历法时钟推进事件广播（池化借还守恒）
+## 6. 历法时钟推进事件广播（池化借还守恒，双载荷兼容）
 static func publish_clock_tick(calendar_env: WorldCalendarEnvironmentDTO) -> void:
 	if calendar_env == null:
 		return
 	var bus := EventBusCore.get_instance()
 	var packet := bus.borrow_packet(EventChannelDefinition.WORLD_CLOCK_ADVANCED, EventCategoryMask.CORE_STATE)
-	packet.payload_dto = calendar_env
+	var channel_label := GameConfig.get_string("domains.world_state", "hud/channels/clock_ticked", "world_state.clock_phase_ticked")
+	EventPacket.bind_dual_payload(packet, calendar_env, channel_label)
 	packet.source_entity_id = "world_calendar"
 	packet.narrative_key = "clock_phase_ticked"
 	packet.narrative_args = [calendar_env.calendar_years, calendar_env.calendar_months, calendar_env.calendar_days, calendar_env.day_phase_key]
@@ -126,22 +135,61 @@ static func is_human_interacting() -> bool:
 		return _human_interacting_override
 	return false
 
-## 7.1 HUD 领域事件信道订阅门面（屏蔽底层 EventBusCore 基础设施，供前端桥接器解耦绑定）
+## 7.1 HUD 领域事件信道订阅门面（精准子信道分流与通用域事件隔离，兼容既有 4 参调用）
 static func subscribe_hud_channels(
 	on_snapshot: Callable,
 	on_wallet: Callable,
 	on_prologue: Callable,
-	on_world_entered: Callable
+	on_world_entered: Callable,
+	on_stat_mutated: Callable = Callable(),
+	on_clock_advanced: Callable = Callable()
 ) -> Array:
 	var bus := EventBusCore.get_instance()
 	if bus == null:
 		return []
 	var tokens: Array = []
-	tokens.append(bus.on_channel(EventChannelDefinition.HUD_STATUS_SNAPSHOT, on_snapshot))
-	tokens.append(bus.on_channel(EventChannelDefinition.HUD_WALLET_MUTATED, on_wallet))
-	tokens.append(bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, on_prologue))
-	tokens.append(bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, on_world_entered))
+	if on_snapshot.is_valid():
+		tokens.append(bus.on_channel(EventChannelDefinition.HUD_STATUS_SNAPSHOT, on_snapshot))
+	if on_wallet.is_valid():
+		tokens.append(bus.on_channel(EventChannelDefinition.HUD_WALLET_MUTATED, on_wallet))
+	if on_stat_mutated.is_valid():
+		tokens.append(bus.on_channel(EventChannelDefinition.HUD_STAT_MUTATED, on_stat_mutated))
+	if on_clock_advanced.is_valid():
+		tokens.append(bus.on_channel(EventChannelDefinition.WORLD_CLOCK_ADVANCED, on_clock_advanced))
+	if on_prologue.is_valid():
+		tokens.append(bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, func(pkt: Variant) -> void:
+			var channel_name := _extract_event_channel_name(pkt)
+			if channel_name.begins_with("prologue.") or channel_name == "world_gateway.prologue_handed_off":
+				on_prologue.call(pkt)
+		))
+	if on_world_entered.is_valid():
+		tokens.append(bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, func(pkt: Variant) -> void:
+			var channel_name := _extract_event_channel_name(pkt)
+			if channel_name == "world_gateway.world_entered" or channel_name == "world_gateway.prologue_handed_off" or channel_name == "world.entered":
+				on_world_entered.call(pkt)
+		))
 	return tokens
+
+## 7.2 幂等注销由 subscribe_hud_channels 返回的全部订阅令牌（零残留）
+static func unsubscribe_hud_channels(tokens: Array) -> void:
+	if tokens == null:
+		return
+	for tok in tokens:
+		if tok != null and tok.has_method("unbind"):
+			tok.call("unbind")
+
+static func _extract_event_channel_name(pkt: Variant) -> String:
+	if pkt == null:
+		return ""
+	if pkt is Dictionary:
+		return String((pkt as Dictionary).get("channel", ""))
+	if pkt.get("payload_data") is Dictionary:
+		var channel_name := String((pkt.payload_data as Dictionary).get("channel", ""))
+		if not channel_name.is_empty():
+			return channel_name
+	if "narrative_key" in pkt:
+		return String(pkt.narrative_key)
+	return ""
 
 ## 8. Agent 专用拉轨：从上下文快速派生标准遥测数据包
 static func get_agent_telemetry_packet(
@@ -185,6 +233,7 @@ static func _resolve_identity(context: Dictionary, snapshot: AuthoritativeHudSna
 	snapshot.account_id = String(context.get("account_id", ""))
 	snapshot.character_id = String(context.get("character_id", ""))
 	snapshot.character_name = String(context.get("character_name", ""))
+	snapshot.current_location_id = String(context.get("current_location_id", context.get("current_location", "")))
 	snapshot.level = maxi(1, int(context.get("level", 1)))
 
 	var raw_race := String(context.get("race_id", ""))
