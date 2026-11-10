@@ -14,6 +14,7 @@ class_name CutscenePlayerView
 extends BaseScreen
 
 const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
+const KStatusBarClass = preload("res://frontend/components/k_status_bar.gd")
 
 signal playback_finished()
 signal skip_requested()
@@ -138,10 +139,8 @@ func _setup_placeholder_ui() -> void:
 	_placeholder_timer_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_MUTED)
 	_placeholder_container.add_child(_placeholder_timer_label)
 
-	_placeholder_progress_bar = ProgressBar.new()
+	_placeholder_progress_bar = KStatusBarClass.create_bar(0.0, 1.0, Vector2(400, 6))
 	_placeholder_progress_bar.name = "PlaceholderProgress"
-	_placeholder_progress_bar.custom_minimum_size = Vector2(400, 6)
-	_placeholder_progress_bar.max_value = 1.0
 	_placeholder_progress_bar.show_percentage = false
 	_placeholder_container.add_child(_placeholder_progress_bar)
 
@@ -164,11 +163,8 @@ func _setup_skip_ui() -> void:
 	_skip_tip_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_MUTED_DEFAULT)
 	_skip_prompt_box.add_child(_skip_tip_label)
 
-	_skip_progress_bar = ProgressBar.new()
+	_skip_progress_bar = KStatusBarClass.create_bar(0.0, 1.0, Vector2(80, 8))
 	_skip_progress_bar.name = "SkipProgressBar"
-	_skip_progress_bar.custom_minimum_size = Vector2(80, 8)
-	_skip_progress_bar.max_value = 1.0
-	_skip_progress_bar.value = 0.0
 	_skip_progress_bar.show_percentage = false
 	_skip_prompt_box.add_child(_skip_progress_bar)
 

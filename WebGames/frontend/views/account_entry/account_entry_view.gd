@@ -219,78 +219,17 @@ func _render_from_snapshot() -> void:
         server_list = FrontendSnapshot.read_array(snapshot, "default_servers")
     if snapshot.has("character_slots"):
         character_slots = FrontendSnapshot.read_array(snapshot, "character_slots")
-    if _has_mod_creation_snapshot_keys(snapshot):
-        var src: Dictionary = snapshot
-        if snapshot.get("creation_ui_snapshot") is Dictionary:
-            src = snapshot.get("creation_ui_snapshot") as Dictionary
-        _sync_mod_lists_from_source(src)
-        _sync_mod_ui_controls_from_source(src)
-        _reset_locked_form_selections()
-        _get_tabs().apply_mod_creation_ui_adaptation()
+	if _has_mod_creation_snapshot_keys(snapshot):
+		_get_tabs().sync_mod_creation_snapshot(snapshot)
 
 func _has_mod_creation_snapshot_keys(snap: Dictionary) -> bool:
-    return (
-        snap.has("creation_ui_snapshot")
-        or snap.has("mod_precheck_checklist") or snap.has("precheck_checklist")
-        or snap.has("ui_controls") or snap.has("creation_ui_controls")
-        or snap.has("available_origins_list") or snap.has("available_origins")
-        or snap.has("available_traits_list") or snap.has("available_trait_pairs")
-    )
-
-func _sync_mod_lists_from_source(src: Dictionary) -> void:
-    var checklist_src: Dictionary = src if (src.has("mod_precheck_checklist") or src.has("precheck_checklist")) else snapshot
-    var checklist_key: String = "mod_precheck_checklist" if checklist_src.has("mod_precheck_checklist") else "precheck_checklist"
-    if checklist_src.has(checklist_key):
-        mod_precheck_checklist = FrontendSnapshot.read_array(checklist_src, checklist_key)
-
-    var origins_src: Dictionary = src if (src.has("available_origins_list") or src.has("available_origins")) else snapshot
-    var origins_key: String = "available_origins_list" if origins_src.has("available_origins_list") else "available_origins"
-    if origins_src.has(origins_key):
-        available_origins_list = FrontendSnapshot.read_array(origins_src, origins_key)
-
-    var traits_src: Dictionary = src if (src.has("available_traits_list") or src.has("available_trait_pairs")) else snapshot
-    var traits_key: String = "available_traits_list" if traits_src.has("available_traits_list") else "available_trait_pairs"
-    if traits_src.has(traits_key):
-        available_traits_list = FrontendSnapshot.read_array(traits_src, traits_key)
-
-func _sync_mod_ui_controls_from_source(src: Dictionary) -> void:
-    var raw_controls: Variant = src.get("ui_controls", src.get("creation_ui_controls", null))
-    if not (raw_controls is Dictionary):
-        raw_controls = snapshot.get("ui_controls", snapshot.get("creation_ui_controls", null))
-    if raw_controls is Dictionary:
-        var controls_dict: Dictionary = raw_controls as Dictionary
-        creation_ui_controls = {
-            "allow_manual_origin_select": bool(controls_dict.get("allow_manual_origin_select", false)),
-            "allow_manual_trait_select": bool(controls_dict.get("allow_manual_trait_select", false)),
-            "allow_attribute_reroll": bool(controls_dict.get("allow_attribute_reroll", false))
-        }
-
-func _reset_locked_form_selections() -> void:
-    if not bool(creation_ui_controls.get("allow_manual_origin_select", false)):
-        form_selected_origin_id = ""
-    if not bool(creation_ui_controls.get("allow_manual_trait_select", false)):
-        form_selected_positive_trait = ""
-    if not bool(creation_ui_controls.get("allow_attribute_reroll", false)):
-        form_reroll_nonce = 0
+	return snap.has("creation_ui_snapshot") or snap.has("mod_precheck_checklist") or snap.has("precheck_checklist") or snap.has("ui_controls") or snap.has("creation_ui_controls") or snap.has("available_origins_list") or snap.has("available_origins") or snap.has("available_traits_list") or snap.has("available_trait_pairs")
 
 func _extract_origin_id(entry: Variant) -> String:
-    if entry is Dictionary:
-        var entry_dict: Dictionary = entry as Dictionary
-        return str(entry_dict.get("origin_id", entry_dict.get("id", "")))
-    if entry is String:
-        return String(entry)
-    return ""
+	return TabsClass.extract_origin_id(entry)
 
 func _extract_positive_trait_id(entry: Variant) -> String:
-    if entry is Dictionary:
-        var entry_dict: Dictionary = entry as Dictionary
-        var pos_val: String = str(entry_dict.get("positive", entry_dict.get("positive_trait", entry_dict.get("positive_id", ""))))
-        if not pos_val.is_empty():
-            return pos_val
-        return str(entry_dict.get("trait_id", entry_dict.get("id", "")))
-    if entry is String:
-        return String(entry)
-    return ""
+	return TabsClass.extract_positive_trait_id(entry)
 
 func select_custom_origin_by_index(idx: int) -> bool:
     if not bool(creation_ui_controls.get("allow_manual_origin_select", false)):
