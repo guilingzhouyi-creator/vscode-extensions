@@ -66,6 +66,7 @@ export class SemanticPraxisContextEnricher implements IPraxisContextEnricher {
             return {
                 enclosingSymbol: fallbackSymbol,
                 suggestedAction: action,
+                impactCompleteness: 'unknown',
             };
         }
 
@@ -76,11 +77,14 @@ export class SemanticPraxisContextEnricher implements IPraxisContextEnricher {
             return {
                 enclosingSymbol: fallbackSymbol,
                 suggestedAction: action,
+                impactCompleteness: 'unknown',
             };
         }
 
-        // Extract backward impact slice (files depending on or calling this symbol)
-        const impactSlice = this.graph.getSlice(matchedNode.id, 3, 'backward');
+        // Module imports target the file module, while calls can target a specific declaration.
+        // Include every observed file root so a matched function does not hide incoming imports.
+        const seeds = this.graph.getNodesByFile(canonicalFile).map(node => node.id);
+        const impactSlice = this.graph.getSlice(seeds, 3, 'backward');
         const impactFiles = Array.from(
             new Set(impactSlice.nodes.map((node) => node.location.file)),
         ).filter((filePath) => filePath !== canonicalFile);
@@ -93,6 +97,7 @@ export class SemanticPraxisContextEnricher implements IPraxisContextEnricher {
                 endLine: matchedNode.location.end.line,
             },
             impactFiles: impactFiles.length > 0 ? impactFiles : undefined,
+            impactCompleteness: 'partial',
             suggestedAction: action,
             extraContext: {
                 nodeId: matchedNode.id,
@@ -117,11 +122,9 @@ export class SemanticPraxisContextEnricher implements IPraxisContextEnricher {
         const fileNodes =
             typeof this.graph.getNodesByFile === 'function'
                 ? this.graph.getNodesByFile(canonicalFile)
-                : this.graph
-                      .getAllNodes()
-                      .filter(
-                          (node) => normalizeCanonicalPath(node.location?.file) === canonicalFile,
-                      );
+                : this.graph.getAllNodes().filter(
+                    (node) => normalizeCanonicalPath(node.location?.file) === canonicalFile,
+                );
 
         const candidates = fileNodes.filter(
             (node) => node.location.start.line <= endLine && node.location.end.line >= startLine,

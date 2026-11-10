@@ -14,7 +14,12 @@
  */
 
 import type { ReviewExecution } from '../../review/review-execution';
-import type { DiffInput, Issue, ScanReport } from '../../types';
+import type { DiffInput, Issue, ScanConfig, ScanReport } from '../../types';
+import type { SourceSnapshot } from '../../review/source-snapshot';
+import type {
+    ReviewRequest, ReviewRuntime, SnapshotReviewResult,
+} from '../../review/review-executor';
+import type { SemanticGraphSnapshot } from '../../review/semantic-snapshot';
 import type { PraxisCardContext, ReviewDiffHunk } from '../contracts';
 import type {
     IPraxisDiffGovernanceService,
@@ -64,6 +69,8 @@ export interface PraxisClientConfig {
  * Options configuring workspace-wide static analysis review.
  */
 export interface PraxisWorkspaceReviewOptions {
+    /** Fixed source manifest; omitted retains the legacy directory input mode. */
+    snapshot?: SourceSnapshot;
     /** Target directory to scan (defaults to client.root) */
     root?: string;
     /** Path to custom config file */
@@ -86,6 +93,10 @@ export interface PraxisWorkspaceReviewOptions {
  * Consolidated verdict returned from workspace review.
  */
 export interface PraxisWorkspaceReviewVerdict {
+    /** Actual execution coverage, separate from diagnostic severity. */
+    execution: ReviewExecution;
+    /** Immutable generation when review input supplies a fixed source manifest. */
+    semanticGraph?: SemanticGraphSnapshot;
     /** Complete scan report emitted by engine */
     scanReport: ScanReport;
     /** Consolidated workspace verdict status */
@@ -252,6 +263,16 @@ export interface IPraxisReviewClient {
     readonly defaultCardContext?: PraxisCardContext;
     /** Shared semantic graph maintained by the client */
     readonly semanticGraph: SemanticGraph;
+    /** Current immutable source/configuration generation, absent for unbound legacy mutations. */
+    readonly semanticGraphGeneration: SemanticGraphSnapshot | undefined;
+
+    /** Review captured inputs and replace the client's graph on current successful execution. */
+    reviewSnapshot(
+        request: ReviewRequest,
+        snapshot: SourceSnapshot,
+        config: ScanConfig,
+        options?: ReviewRuntime['options'],
+    ): Promise<SnapshotReviewResult>;
 
     /**
      * Conducts comprehensive static analysis review across entire workspace.

@@ -89,6 +89,8 @@ export interface PraxisDiffGovernanceResult {
     impactSummary: {
         totalImpactedFiles: number;
         affectedFiles: string[];
+        /** Observed topology is bounded; absent observations remain unknown. */
+        completeness?: 'unknown' | 'partial';
     };
     /** Patch quality evaluation score and eight-pillar breakdown */
     patchQuality?: PatchQualityResult;
@@ -156,6 +158,7 @@ export class PraxisDiffGovernanceService implements IPraxisDiffGovernanceService
                 symbolKind: context.symbolKind,
                 scopeRange: context.scopeRange,
                 impactFiles: context.impactFiles,
+                impactCompleteness: context.impactCompleteness ?? 'unknown',
             };
         }
         return hunks;
@@ -172,7 +175,7 @@ export class PraxisDiffGovernanceService implements IPraxisDiffGovernanceService
         const newContent = input.newContent;
         const graph = options.graph || new SemanticGraph();
 
-        if (newContent && input.filePath) {
+        if (typeof newContent === 'string' && input.filePath) {
             await defaultSemanticAdapterRegistry.extractFileToGraph(filePath, newContent, graph);
         }
 
@@ -211,7 +214,11 @@ export class PraxisDiffGovernanceService implements IPraxisDiffGovernanceService
             hunks: enrichedHunks,
             issues,
             verdict,
-            impactSummary: { totalImpactedFiles: affectedFiles.length, affectedFiles },
+            impactSummary: {
+                totalImpactedFiles: affectedFiles.length, affectedFiles,
+                completeness: enrichedHunks.length > 0 && enrichedHunks.every(
+                    hunk => hunk.astContext?.impactCompleteness === 'partial') ? 'partial' : 'unknown',
+            },
             patchQuality,
             deltaScore: patchQuality?.deltaScore ?? undefined,
             topologicalDiff,
@@ -241,7 +248,7 @@ export class PraxisDiffGovernanceService implements IPraxisDiffGovernanceService
     ): void {
         const prevViolations = hunk.reviewVerdict?.violations ?? [];
         const merged = Array.from(new Set(prevViolations.concat(baseViolations)));
-        hunk.reviewVerdict = Object.assign({}, verdict, { violations: merged });
+        hunk.reviewVerdict = { ...verdict, violations: merged };
     }
 
     private resolveDiffVerdict(

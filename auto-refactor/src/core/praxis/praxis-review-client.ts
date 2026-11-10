@@ -20,9 +20,11 @@
 
 import { randomUUID } from 'crypto';
 import { createReviewExecution } from '../review/review-execution';
+import type { ReviewExecution } from '../review/review-execution';
 import { executeReview } from '../review/review-executor';
 import type { ReviewRequest, ReviewRuntime, SnapshotReviewResult } from '../review/review-executor';
 import type { SourceSnapshot } from '../review/source-snapshot';
+import type { SemanticGraphSnapshot } from '../review/semantic-snapshot';
 import { readPraxisFileContent } from './praxis-file-input';
 import type { DiffInput, Issue, ScanConfig, ScanReport } from '../types';
 import type { PraxisCardContext, ReviewDiffHunk } from './contracts';
@@ -35,6 +37,7 @@ import type {
 import { defaultPraxisGovernanceService } from './diffGovernance';
 import { SemanticGraph } from '../semantic/semanticGraph';
 import { defaultSemanticAdapterRegistry } from '../semantic/adapters/registry';
+import type { SemanticAdapterCapabilities } from '../semantic/adapters/base';
 import { defaultPyramidEvaluator } from '../rules/universal-hierarchy/layer1Evaluator';
 import { defaultPerformanceEvaluator } from '../rules/universal-hierarchy/performanceRules';
 import { defaultDataArchitectureEvaluator } from '../intelligence/dataArchitecture';
@@ -46,8 +49,7 @@ import { defaultSparseMoEGateRouter } from '../router/sparseMoEGate';
 import type { PraxisSliceAuditVerdict, SparseRoutingPlan } from '../router/sliceTypes';
 import { Scanner } from '../analyzer';
 import { resolveConfig } from '../config/config';
-import { Logger } from '../logger';
-import { finalizeReport } from '../reporting/reportFinalizer';
+import { executeWorkspaceReview } from './client/workspace-execution';
 import type { PraxisLocale } from './presentation/i18n-types';
 import type {
     IPraxisReviewClient,
@@ -108,12 +110,77 @@ function wasSemanticFileSuperseded(
     return version === undefined || !graph.isFileVersionCurrent(filePath, version);
 }
 
+type SemanticFileInput = {
+    readonly fileContent: string;
+    readonly semanticVersion?: symbol;
+    readonly semanticCapabilities?: SemanticAdapterCapabilities;
+};
+
+/**
+ * Reserve before input awaits and release on every exit without cancelling a newer request.
+ * @param filePath - Source path used for input confinement and adapter resolution.
+ * @param content - Optional caller input; an empty string is still an explicit source.
+ * @param options - Published destination graph and workspace boundary.
+ * @param options.graph - Shared graph that owns publication reservations.
+ * @param options.root - Root used by the existing confined source reader.
+ * @returns Exact input and the identity of a publication this request actually completed.
+ */
+async function prepareSemanticFileInput(
+    filePath: string,
+    content: string | undefined,
+    options: { graph: SemanticGraph; root: string },
+): Promise<SemanticFileInput> {
+    const { graph, root } = options;
+    const semanticCapabilities = defaultSemanticAdapterRegistry.getCapabilitiesForFile(filePath);
+    const token = semanticCapabilities ? graph.beginFileUpdate(filePath) : undefined;
+    try {
+        const fileContent = await readPraxisFileContent(filePath, content, root);
+        const published = token !== undefined
+            && await defaultSemanticAdapterRegistry.publishFileUpdate(
+                filePath, fileContent, graph, token,
+            );
+        return {
+            fileContent,
+            semanticCapabilities,
+            semanticVersion: published ? graph.getFileVersion(filePath) : undefined,
+        };
+    } finally {
+        if (token !== undefined) graph.cancelFileUpdate(filePath, token);
+    }
+}
+
+/**
+ * Describe the legacy SDK's actual static scope without granting complete analyzer coverage.
+ * @param language - Language declared by the adapter captured for this input.
+ * @param superseded - Whether this publication lost its source-local version.
+ * @returns Neutral execution state with the existing explicit coverage gap.
+ */
+function createFileReviewExecution(
+    language: string | undefined, superseded: boolean,
+): ReviewExecution {
+    return createReviewExecution({
+        reviewId: randomUUID(),
+        termination: superseded ? 'superseded' : undefined,
+        tracks: { fast: 'complete', deep: 'not-required' },
+        coverage: [{
+            analyzer: 'praxis-sdk',
+            capability: 'complete-analysis',
+            language: language ?? 'unknown',
+            required: true,
+            status: 'degraded',
+            reason: 'SDK static checks do not execute the complete analyzer plan.',
+        }],
+    });
+}
+
 /**
  * High-performance, interface-driven standard implementation of IPraxisReviewClient.
  */
 export class PraxisReviewClient implements IPraxisReviewClient {
     private readonly root: string;
     private graph: SemanticGraph;
+    private graphRequest?: symbol;
+    private graphGeneration?: SemanticGraphSnapshot;
     private readonly diffService: IPraxisDiffGovernanceService;
     private readonly sliceService: IPraxisSliceAuditService;
     private readonly sparseRouter: SparseMoEGateRouter;
@@ -151,12 +218,19 @@ export class PraxisReviewClient implements IPraxisReviewClient {
         return this.graph;
     }
 
+    /** Current immutable snapshot observations, absent after unbound legacy graph mutations. */
+    public get semanticGraphGeneration(): SemanticGraphSnapshot | undefined {
+        return this.graphGeneration;
+    }
+
     /**
      * Clears all accumulated AST symbols, edges, and topologies from the internal semantic graph.
      * Prevents unbounded memory growth in long-running processes and batch review workflows.
      */
     public clearSemanticGraph(): void {
-        clearGraphInstance(this.graph);
+        this.graphRequest = Symbol('graph-cleared');
+        this.graphGeneration = undefined;
+        this.graph = new SemanticGraph();
     }
 
     /**
@@ -180,16 +254,24 @@ export class PraxisReviewClient implements IPraxisReviewClient {
      * @param options - Cooperative execution collaborators and speculative routing options.
      * @returns Neutral static execution facts after deep analysis and required compensation.
      */
-    public reviewSnapshot(
+    public async reviewSnapshot(
         request: ReviewRequest,
         snapshot: SourceSnapshot,
         config: ScanConfig,
         options?: ReviewRuntime['options'],
     ): Promise<SnapshotReviewResult> {
+        const publication = Symbol('snapshot-review');
+        this.graphRequest = publication;
         const scanner = new Scanner({
             ...config, cacheEnabled: false, sparseRouting: false,
         });
-        return executeReview(request, snapshot, { scanner, options });
+        const result = await executeReview(request, snapshot, { scanner, options });
+        if (this.graphRequest === publication &&
+            (result.completion.status === 'complete' || result.completion.status === 'partial')) {
+            this.graph = result.semanticGraph.createMutableGraph();
+            this.graphGeneration = result.semanticGraph;
+        }
+        return result;
     }
 
     /**
@@ -244,12 +326,15 @@ export class PraxisReviewClient implements IPraxisReviewClient {
             logLevel: 'error',
         });
 
-        const logger = new Logger(config.logLevel, config.logFile);
-        const scanner = new Scanner(config, logger);
-        const rawReport = await scanner.scan();
-
-        await finalizeReport(rawReport, config, {}, logger, scanner);
-        logger.close();
+        const publication = Symbol('workspace-review');
+        this.graphRequest = publication;
+        const workspace = await executeWorkspaceReview(config, options.snapshot);
+        const rawReport = workspace.report;
+        if (this.graphRequest === publication &&
+            workspace.execution.status !== 'cancelled' && workspace.execution.status !== 'superseded') {
+            this.graph = workspace.graph;
+            this.graphGeneration = workspace.generation;
+        }
 
         const issues = rawReport.issues;
         const status = this.resolveWorkspaceStatus(rawReport, options.failOnSeverity);
@@ -257,6 +342,8 @@ export class PraxisReviewClient implements IPraxisReviewClient {
 
         const verdict: PraxisWorkspaceReviewVerdict = {
             scanReport: rawReport,
+            execution: workspace.execution,
+            semanticGraph: workspace.generation,
             status,
             issues,
             cardContext: effectiveCardContext,
@@ -389,24 +476,19 @@ export class PraxisReviewClient implements IPraxisReviewClient {
         }
 
         const graph = opts.isolatedGraph ? new SemanticGraph() : (options.graph ?? this.graph);
-        const semanticCapabilities =
-            defaultSemanticAdapterRegistry.getCapabilitiesForFile(filePath);
+        if (graph === this.graph) {
+            this.graphRequest = Symbol('file-review');
+            this.graphGeneration = undefined;
+        }
         // Reservations are taken before awaiting input so request order, not read latency,
         // decides which extraction may publish into the shared graph.
-        const semanticToken = semanticCapabilities
-            ? graph.beginFileUpdate(filePath) : undefined;
-        const fileContent = await readPraxisFileContent(
-            filePath,
-            content,
-            options.root ?? this.root,
-        );
-        const semanticPublished = semanticToken === undefined ? false
-            : await defaultSemanticAdapterRegistry.publishFileUpdate(
-                filePath, fileContent, graph, semanticToken,
-            );
-        const semanticVersion = semanticPublished ? graph.getFileVersion(filePath) : undefined;
-
         try {
+            const {
+                fileContent, semanticCapabilities, semanticVersion,
+            } = await prepareSemanticFileInput(
+                filePath, content, { graph, root: options.root ?? this.root },
+            );
+
             const effectiveCardContext = options.cardContext ?? this.defaultCardContext;
             const useMoE = options.useSparseMoE ?? this.enableMoE;
 
@@ -438,23 +520,7 @@ export class PraxisReviewClient implements IPraxisReviewClient {
             const status = superseded ? 'blocked' : this.resolveFileStatus(issues);
             const verdict: PraxisFileReviewVerdict = {
                 semanticCapabilities,
-                execution: createReviewExecution({
-                    reviewId: randomUUID(),
-                    termination: superseded ? 'superseded' : undefined,
-                    tracks: { fast: 'complete', deep: 'not-required' },
-                    coverage: [
-                        {
-                            analyzer: 'praxis-sdk',
-                            capability: 'complete-analysis',
-                            language:
-                                defaultSemanticAdapterRegistry.getAdapterForFile(filePath)
-                                    ?.language ?? 'unknown',
-                            required: true,
-                            status: 'degraded',
-                            reason: 'SDK static checks do not execute the complete analyzer plan.',
-                        },
-                    ],
-                }),
+                execution: createFileReviewExecution(semanticCapabilities?.language, superseded),
                 filePath,
                 status,
                 issues,
@@ -577,13 +643,20 @@ export class PraxisReviewClient implements IPraxisReviewClient {
         options: PraxisGovernanceOptions = {},
     ): Promise<PraxisDiffGovernanceResult> {
         const effectiveCardContext = options.cardContext ?? this.defaultCardContext;
+        const publication = options.graph ? undefined : Symbol('diff-review');
+        const graph = options.graph ?? SemanticGraph.fromJSON(this.graph.toJSON());
+        if (publication) this.graphRequest = publication;
         const mergedOptions: PraxisGovernanceOptions = {
             ...options,
-            graph: options.graph ?? this.graph,
+            graph,
             cardContext: effectiveCardContext,
         };
 
         const result = await this.diffService.reviewDiff(input, mergedOptions);
+        if (publication && this.graphRequest === publication) {
+            this.graph = graph;
+            this.graphGeneration = undefined;
+        }
 
         if (effectiveCardContext && result.hunks?.length) {
             tagHunksWithContext(result.hunks, effectiveCardContext);

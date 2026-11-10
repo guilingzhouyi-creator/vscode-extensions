@@ -73,6 +73,8 @@ export interface ReviewDiffHunk<TMeta = Record<string, unknown>> {
         scopeRange?: { startLine: number; endLine: number };
         /** Downstream files affected by this change (reverse dependency closure) */
         impactFiles?: string[];
+        /** A bounded graph slice never establishes complete repository impact. */
+        impactCompleteness?: 'unknown' | 'partial';
     };
     lines: AttributedDiffLine<TMeta>[];
     /** Review department verdict */
@@ -96,6 +98,8 @@ export interface PraxisEnrichedContext {
     scopeRange?: { startLine: number; endLine: number };
     sharedCacheReferences?: Array<{ source: string; snippet: string }>;
     impactFiles?: string[];
+    /** Unknown without a matching node; otherwise bounded and partial. */
+    impactCompleteness?: 'unknown' | 'partial';
     suggestedAction?: 'auto_fix' | 'rework' | 'escalate_l3a';
     extraContext?: Record<string, unknown>;
 }
