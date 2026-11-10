@@ -165,8 +165,26 @@ func switch_state(new_state: EntryState) -> void:
 
 func submit_login(username: String, password_plain: String) -> Dictionary:
     form_username = username.strip_edges()
+    form_password = password_plain
     if form_username.is_empty():
         return {"success": false, "error_code": "ERR_EMPTY_USERNAME", "message": "ui.fe01.login.error_empty", "error_data": {}}
+    var mode := ServiceLocator.get_mode()
+    if mode == "backend" or mode == "real":
+        var auth_result: Dictionary = {}
+        var auth_svc: Variant = ServiceLocator.get_instance().auth()
+        if auth_svc != null and auth_svc.has_method("login_async"):
+            auth_svc.call("login_async", form_username, form_password, func(res: Dictionary):
+                auth_result.merge(res, true)
+            )
+        if not bool(auth_result.get("success", false)):
+            return auth_result
+        current_account_id = str(auth_result.get("account_id", ""))
+        current_session_token = str(auth_result.get("token", ""))
+        var slots: Array = auth_result.get("character_slots", [])
+        set_character_slots_snapshot(slots)
+        switch_state(EntryState.CHARACTER_SELECT)
+        return auth_result
+
     current_account_id = "ACC_" + form_username.to_upper()
     current_session_token = "TOKEN_" + current_account_id
     switch_state(EntryState.CHARACTER_SELECT)
@@ -174,9 +192,33 @@ func submit_login(username: String, password_plain: String) -> Dictionary:
 
 func submit_register(username: String, password_plain: String) -> Dictionary:
     form_username = username.strip_edges()
+    form_password = password_plain
     var min_len: int = GameConfig.get_int("frontend.views", "fe01_account_entry/min_username_len", 3)
     if form_username.length() < min_len:
         return {"success": false, "error_code": "ERR_USERNAME_TOO_SHORT", "message": "ui.fe01.register.error_short", "error_data": {"min": min_len}}
+    var mode := ServiceLocator.get_mode()
+    if mode == "backend" or mode == "real":
+        var reg_result: Dictionary = {}
+        var auth_svc: Variant = ServiceLocator.get_instance().auth()
+        if auth_svc != null and auth_svc.has_method("register_async"):
+            auth_svc.call("register_async", form_username, form_password, func(res: Dictionary):
+                reg_result.merge(res, true)
+            )
+        if not bool(reg_result.get("success", false)):
+            return reg_result
+        current_account_id = str(reg_result.get("account_id", ""))
+        current_session_token = "TOKEN_" + current_account_id
+        var empty_slots: Array = []
+        if auth_svc != null and auth_svc.has_method("get_characters_async"):
+            auth_svc.call("get_characters_async", current_account_id, func(char_res: Dictionary):
+                var ch: Array = char_res.get("characters", [])
+                empty_slots.append_array(ch)
+            )
+        if not empty_slots.is_empty():
+            set_character_slots_snapshot(empty_slots)
+        switch_state(EntryState.CHARACTER_CREATE)
+        return reg_result
+
     current_account_id = "ACC_" + form_username.to_upper()
     current_session_token = "TOKEN_" + current_account_id
     switch_state(EntryState.CHARACTER_CREATE)
@@ -203,6 +245,7 @@ func logout_account() -> Dictionary:
     selected_character_slot = ""
     form_username = ""
     form_password = ""
+    character_slots.clear()
     if login_username_edit != null:
         login_username_edit.text = ""
     if login_password_edit != null:
@@ -406,11 +449,35 @@ func _on_char_delete_pressed() -> void:
 func _on_char_back_pressed() -> void:
     switch_state(EntryState.SERVER_SELECT)
 
-func _on_char_create_confirm_pressed() -> void:
-    form_character_name = char_name_edit.text.strip_edges()
+func create_character(char_name: String, race: String = "HUMAN") -> Dictionary:
+    form_character_name = char_name.strip_edges()
+    form_selected_race = race
     if form_character_name.is_empty():
-        print("[AccountEntry] 角色名不能为空")
-        return
+        return {"success": false, "error_code": "ERR_NAME_EMPTY"}
+    var mode := ServiceLocator.get_mode()
+    if (mode == "backend" or mode == "real") and not current_account_id.is_empty():
+        var auth_svc: Variant = ServiceLocator.get_instance().auth()
+        if auth_svc != null and auth_svc.has_method("create_character_async"):
+            var create_res: Dictionary = {}
+            auth_svc.call("create_character_async", current_account_id, {
+                "name": form_character_name,
+                "race": form_selected_race
+            }, func(res: Dictionary):
+                create_res.merge(res, true)
+            )
+            if not bool(create_res.get("success", false)):
+                return create_res
+            var refreshed_slots: Array = []
+            auth_svc.call("get_characters_async", current_account_id, func(char_res: Dictionary):
+                var ch: Array = char_res.get("characters", [])
+                refreshed_slots.append_array(ch)
+            )
+            if not refreshed_slots.is_empty():
+                set_character_slots_snapshot(refreshed_slots)
+            _get_tabs().populate_character_slots()
+            switch_state(EntryState.CHARACTER_SELECT)
+            return create_res
+
     var new_slot := {
         "slot_id": "SLOT_NEW",
         "name": form_character_name,
@@ -426,6 +493,11 @@ func _on_char_create_confirm_pressed() -> void:
             break
     _get_tabs().populate_character_slots()
     switch_state(EntryState.CHARACTER_SELECT)
+    return {"success": true, "character": new_slot}
+
+func _on_char_create_confirm_pressed() -> void:
+    var char_name := char_name_edit.text.strip_edges() if char_name_edit != null else form_character_name
+    create_character(char_name, form_selected_race)
 
 func _on_char_create_back_pressed() -> void:
     switch_state(EntryState.CHARACTER_SELECT)

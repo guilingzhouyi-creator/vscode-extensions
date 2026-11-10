@@ -177,7 +177,8 @@ func populate_character_slots() -> void:
         else:
             UIIntermediary.resolve(btn, "ui.fe01.char_select.slot_empty", {"index": i + 1})
     on_char_slot_pressed(0)
-    view.char_slot_0_btn.button_pressed = true
+    if view.char_slot_0_btn != null:
+        view.char_slot_0_btn.button_pressed = true
 
 func populate_talent_list() -> void:
     var view: AccountEntryView = _view
@@ -220,18 +221,26 @@ func on_char_slot_pressed(index: int) -> void:
     var view: AccountEntryView = _view
     if index < 0 or index >= view.character_slots.size():
         view.selected_character_slot = ""
-        UIIntermediary.resolve(view.char_info_label, "ui.fe01.char_select.char_info_empty")
-        view.char_enter_btn.disabled = true
-        view.char_delete_btn.disabled = true
-        view.char_create_btn.disabled = false
+        if view.char_info_label != null:
+            UIIntermediary.resolve(view.char_info_label, "ui.fe01.char_select.char_info_empty")
+        if view.char_enter_btn != null:
+            view.char_enter_btn.disabled = true
+        if view.char_delete_btn != null:
+            view.char_delete_btn.disabled = true
+        if view.char_create_btn != null:
+            view.char_create_btn.disabled = false
         return
     var slot: Dictionary = view.character_slots[index]
     if slot.get("empty", false) or str(slot.get("name", "")) == "":
         view.selected_character_slot = ""
-        UIIntermediary.resolve(view.char_info_label, "ui.fe01.char_select.char_info_empty")
-        view.char_enter_btn.disabled = true
-        view.char_delete_btn.disabled = true
-        view.char_create_btn.disabled = false
+        if view.char_info_label != null:
+            UIIntermediary.resolve(view.char_info_label, "ui.fe01.char_select.char_info_empty")
+        if view.char_enter_btn != null:
+            view.char_enter_btn.disabled = true
+        if view.char_delete_btn != null:
+            view.char_delete_btn.disabled = true
+        if view.char_create_btn != null:
+            view.char_create_btn.disabled = false
     else:
         view.selected_character_slot = str(slot.get("slot_id", ""))
         var race_name: String = race_to_name(str(slot.get("race", "UNKNOWN")))
@@ -241,14 +250,18 @@ func on_char_slot_pressed(index: int) -> void:
         var class_label: String = UIIntermediary.text("ui.fe01.char_select.char_class")
         var level_label: String = UIIntermediary.text("ui.fe01.char_select.char_level", {"level": slot.get("level", 0)})
         var town_label: String = UIIntermediary.text("ui.fe01.char_select.char_town")
-        UIIntermediary.resolve(view.char_info_label, "ui.fe01.char_select.char_info", {
-            "char_name": name_label, "char_race": race_label, "char_class": class_label,
-            "char_level": level_label, "char_town": town_label,
-            "name": slot.get("name", ""), "race": race_name, "class": slot.get("class", ""), "town": town_name
-        })
-        view.char_enter_btn.disabled = false
-        view.char_delete_btn.disabled = false
-        view.char_create_btn.disabled = true
+        if view.char_info_label != null:
+            UIIntermediary.resolve(view.char_info_label, "ui.fe01.char_select.char_info", {
+                "char_name": name_label, "char_race": race_label, "char_class": class_label,
+                "char_level": level_label, "char_town": town_label,
+                "name": slot.get("name", ""), "race": race_name, "class": slot.get("class", ""), "town": town_name
+            })
+        if view.char_enter_btn != null:
+            view.char_enter_btn.disabled = false
+        if view.char_delete_btn != null:
+            view.char_delete_btn.disabled = false
+        if view.char_create_btn != null:
+            view.char_create_btn.disabled = true
 
 func race_to_name(race_key: String) -> String:
     match race_key.to_upper():
