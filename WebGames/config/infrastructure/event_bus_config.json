@@ -45,19 +45,25 @@
       "id": 769,
       "name": "HUD_STATUS_SNAPSHOT",
       "legacy": "world_state.snapshot_published",
-      "category": "CORE_STATE"
+      "category": "CORE_STATE",
+      "throttle_ms": 50,
+      "priority": "HIGH"
     },
     {
       "id": 770,
       "name": "HUD_STAT_MUTATED",
       "legacy": "world_state.stat_mutated",
-      "category": "CORE_STATE"
+      "category": "CORE_STATE",
+      "throttle_ms": 16,
+      "priority": "HIGH"
     },
     {
       "id": 771,
       "name": "HUD_WALLET_MUTATED",
       "legacy": "world_state.wallet_mutated",
-      "category": "CORE_STATE"
+      "category": "CORE_STATE",
+      "throttle_ms": 0,
+      "priority": "HIGH"
     },
     {
       "id": 1025,
@@ -105,12 +111,20 @@
       "id": 1539,
       "name": "WORLD_CLOCK_ADVANCED",
       "legacy": "EventBus.world_clock_advanced",
-      "category": "NARRATIVE_TEXT"
+      "category": "NARRATIVE_TEXT",
+      "throttle_ms": 50,
+      "priority": "NORMAL"
     },
     {
       "id": 1540,
       "name": "PROFESSION_PROMOTED",
       "legacy": "EventBus.profession_promoted",
+      "category": "CORE_STATE"
+    },
+    {
+      "id": 1027,
+      "name": "LIFECYCLE_SHUTDOWN_STARTED",
+      "legacy": "lifecycle.shutdown_started",
       "category": "CORE_STATE"
     }
   ],

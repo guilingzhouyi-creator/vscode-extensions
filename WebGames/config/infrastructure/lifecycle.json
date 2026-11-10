@@ -13,7 +13,8 @@
     "allow_cancel_exit": true,
     "confirm_dialog_required": true,
     "force_kill_on_deadlock": true,
-    "backup_corrupted_saves": true
+    "backup_corrupted_saves": true,
+    "allow_degraded_shutdown_on_save_failure": true
   },
   "errors": {
     "ERR_ALREADY_STOPPING": "系统正在执行停机流程，请勿重复操作",
@@ -28,6 +29,18 @@
       "execute_resource_descriptors",
       "revoke_session",
       "teardown_bootstrap"
+    ],
+    "teardown_subsystems_order": [
+      "world_session_runtime",
+      "ground_loot_listener",
+      "human_control_lease",
+      "unified_protocol_factory",
+      "save_data_access_layer",
+      "world_archive_repository",
+      "account_repository",
+      "auth_sessions",
+      "telemetry_pools",
+      "object_pool_manager"
     ],
     "resource_policies": {},
     "unwired_slot_sentinel": "UNBOUND",

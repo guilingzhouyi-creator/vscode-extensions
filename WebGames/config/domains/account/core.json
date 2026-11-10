@@ -3,7 +3,9 @@
     "session": {
       "ttl_seconds": 86400,
       "allow_future_clock_skew_seconds": 0,
-      "bind_device": true
+      "bind_device": true,
+      "mask_in_memory_tokens": true,
+      "auto_login_on_register": false
     },
     "salt": "KALAR_REALM_2026_SALT",
     "default_username": "Adventurer",
@@ -28,6 +30,8 @@
       "device_mismatch": "ERR_DEVICE_MISMATCH",
       "account_already_exists": "ERR_ACCOUNT_ALREADY_EXISTS",
       "invalid_username_length": "ERR_INVALID_USERNAME_LENGTH",
+      "unauthorized": "ERR_UNAUTHORIZED",
+      "session_revoked": "ERR_SESSION_REVOKED",
       "ok": "OK"
     },
     "channels": {
@@ -44,6 +48,11 @@
         "emit_login_event",
         "auto_enter_world_gateway"
       ]
+    },
+    "home_view": {
+      "max_recent_accounts": 10,
+      "default_locale": "zh-CN",
+      "mask_visible_prefix_len": 8
     }
   },
   "storage": {

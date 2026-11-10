@@ -15,6 +15,142 @@
       "reason": "view exists but no corresponding backend domain (historical reverse orphan)"
     }
   ],
+  "protocol_flows": {
+    "link_01_register_login": {
+      "domain": "account",
+      "actions": [
+        "REGISTER_ACCOUNT",
+        "LOGIN_LOCAL",
+        "LOGIN_COMPOSITE"
+      ],
+      "auth_required": false,
+      "event_channels": [
+        "account.registered",
+        "account.login_succeeded"
+      ]
+    },
+    "link_02_gateway_world_archive": {
+      "domain": "world_gateway",
+      "actions": [
+        "ENTER_GATEWAY",
+        "PROBE_MODES",
+        "SELECT_MODE",
+        "LIST_WORLDS",
+        "SELECT_OR_CREATE_WORLD"
+      ],
+      "auth_required": true,
+      "event_channels": [
+        "world_gateway.entered",
+        "world_gateway.mode_selected"
+      ]
+    },
+    "link_03_character_creation": {
+      "domain": "character_creation",
+      "actions": [
+        "ROLL_CHARACTER_PREVIEW",
+        "CREATE_AUTHORITATIVE_CHARACTER"
+      ],
+      "auth_required": true,
+      "event_channels": [
+        "character_creation.authoritative_completed"
+      ]
+    },
+    "link_04_prologue_cutscene": {
+      "domain": "prologue",
+      "actions": [
+        "START_PROLOGUE",
+        "ADVANCE_PROLOGUE",
+        "COMPLETE_PROLOGUE",
+        "SKIP_PROLOGUE"
+      ],
+      "auth_required": true,
+      "event_channels": [
+        "prologue.step_advanced",
+        "world_gateway.prologue_handed_off"
+      ]
+    },
+    "link_05_resident_hud_sync": {
+      "domain": "world_state",
+      "actions": [
+        "PULL_HUD_SNAPSHOT",
+        "TICK_WORLD_CLOCK",
+        "AGENT_ACTION"
+      ],
+      "auth_required": true,
+      "event_channels": [
+        "world_state.snapshot_published",
+        "world_state.stat_mutated",
+        "world_state.wallet_mutated",
+        "EventBus.world_clock_advanced"
+      ]
+    },
+    "link_06_esc_menu_services": {
+      "domain": "world_state",
+      "actions": [
+        "ESC_GET_MENU_STATE",
+        "ESC_QUERY_READINESS",
+        "ESC_SAVE_GAME",
+        "ESC_EXIT_TO_GATEWAY",
+        "ESC_QUIT_GAME",
+        "ESC_APPLY_SETTINGS"
+      ],
+      "auth_required": true,
+      "event_channels": [
+        "world_gateway.memory_scrubbed",
+        "lifecycle.save_completed"
+      ]
+    },
+    "link_07_exit_world": {
+      "domain": "world_gateway",
+      "actions": [
+        "EXIT_WORLD_TO_GATEWAY"
+      ],
+      "auth_required": true,
+      "event_channels": [
+        "world_gateway.memory_scrubbed"
+      ]
+    },
+    "link_08_switch_gateway_mode": {
+      "domain": "world_gateway",
+      "actions": [
+        "SWITCH_GATEWAY_MODE"
+      ],
+      "auth_required": true,
+      "event_channels": [
+        "world_gateway.mode_selected"
+      ]
+    },
+    "link_09_logout_account": {
+      "domain": "account",
+      "actions": [
+        "LOGOUT_ACCOUNT"
+      ],
+      "auth_required": true,
+      "event_channels": [
+        "account.session_revoked"
+      ]
+    },
+    "link_10_account_home": {
+      "domain": "account",
+      "actions": [
+        "GET_ACCOUNT_HOME_VIEW_MODEL"
+      ],
+      "auth_required": false,
+      "event_channels": []
+    },
+    "link_11_quit_game": {
+      "domain": "lifecycle",
+      "actions": [
+        "REQUEST_GRACEFUL_SHUTDOWN"
+      ],
+      "auth_required": false,
+      "event_channels": [
+        "lifecycle.shutdown_started",
+        "lifecycle.teardown_completed",
+        "lifecycle.shutdown_completed"
+      ]
+    }
+  },
   "entries": [
     {
       "contract_id": "CT-ACCO-ACCO-01",

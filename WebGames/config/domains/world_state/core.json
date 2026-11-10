@@ -126,5 +126,44 @@
     "zero_hardware_input_bypass": true,
     "human_preemption_lease_ms": 3000,
     "auto_preempt_on_modal_open": true
+  },
+  "hud_sync": {
+    "min_interval_ms": 50,
+    "max_batch_size": 32,
+    "enable_dual_payload_envelope": true
+  },
+  "esc_menu": {
+    "require_bound_slot_for_auto_save": true,
+    "allowed_actions": [
+      "ESC_GET_MENU_STATE",
+      "ESC_QUERY_READINESS",
+      "ESC_SAVE_GAME",
+      "ESC_EXIT_TO_GATEWAY",
+      "ESC_QUIT_GAME",
+      "ESC_APPLY_SETTINGS"
+    ],
+    "errors": {
+      "incomplete_save_blocked": "ERR_INCOMPLETE_SAVE_BLOCKED",
+      "save_flush_failed": "ERR_SAVE_FLUSH_FAILED"
+    }
+  },
+  "dispatcher": {
+    "require_session_auth": true,
+    "allow_stateless_compat_for_unregistered_tokens": true,
+    "stateless_compat_defaults": {
+      "unallocated_potential_points": 5,
+      "unread_mail_count": 1
+    },
+    "anonymous_allowed_actions": [
+      "REGISTER_ACCOUNT",
+      "LOGIN_LOCAL",
+      "LOGIN_COMPOSITE",
+      "GET_ACCOUNT_HOME_VIEW_MODEL",
+      "ESC_QUERY_READINESS",
+      "REQUEST_GRACEFUL_SHUTDOWN"
+    ],
+    "errors": {
+      "unauthorized": "ERR_UNAUTHORIZED"
+    }
   }
 }
