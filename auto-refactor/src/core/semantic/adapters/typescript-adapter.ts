@@ -20,7 +20,8 @@ import { buildCanonicalSymbolId, normalizeCanonicalPath } from './path-utils';
  */
 export class TypeScriptSemanticAdapter extends UnifiedLanguageAdapter {
     public readonly language = 'typescript';
-    public override readonly version = '1';
+    public override readonly version = '2';
+    public override readonly assetGeneration = `typescript:${ts.version}:semantic-ir-v2`;
     public override readonly graphExtraction = 'ast';
     public readonly fileExtensions = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
 
@@ -84,8 +85,10 @@ export class TypeScriptSemanticAdapter extends UnifiedLanguageAdapter {
             return;
         }
         const specifier = decl.moduleSpecifier.text;
-        const targetId = buildCanonicalSymbolId(this.language, specifier, 'module');
-        graph.addEdge(this.createDependencyEdge(moduleNodeId, targetId));
+        const targetId = `import:${JSON.stringify([this.language, specifier])}`;
+        graph.addEdge(this.createDependencyEdge(moduleNodeId, targetId, {
+            moduleSpecifier: specifier,
+        }));
     }
 
     /**

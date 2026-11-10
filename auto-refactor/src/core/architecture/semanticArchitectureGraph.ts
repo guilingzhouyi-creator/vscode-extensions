@@ -316,7 +316,8 @@ function collectFileMap(graph: SemanticGraph): Map<string, FileEntry> {
             const toFile = normalizePath(toNode.location.file);
             entry.imports.add(toFile);
         } else if (!toNode && edge.kind === 'depends_on') {
-            const pkg = parseExternalPackage(edge.toNodeId);
+            const specifier = edge.context?.moduleSpecifier;
+            const pkg = typeof specifier === 'string' ? specifier : parseExternalPackage(edge.toNodeId);
             if (pkg) entry.imports.add(pkg);
         }
     }

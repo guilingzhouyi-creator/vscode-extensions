@@ -47,6 +47,13 @@ export abstract class UnifiedLanguageAdapter {
     /** Implementation revision; custom adapters without a declaration remain unversioned. */
     public readonly version?: string;
 
+    /**
+     * Explicit asset-reuse generation covering parser versions, configuration and external inputs.
+     * Declare only when path, content and this generation fully determine extraction output.
+     * Omit for context-sensitive extractors whose dependencies cannot be captured.
+     */
+    public readonly assetGeneration?: string;
+
     /** Implementation mechanism only; AST extraction still requires per-input parse validation. */
     public readonly graphExtraction: SemanticExtractionKind = 'unspecified';
 

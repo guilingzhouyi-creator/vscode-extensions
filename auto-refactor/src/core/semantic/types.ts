@@ -138,6 +138,8 @@ export interface SemanticSubgraph {
     nodes: SemanticNode[];
     edges: SemanticEdge[];
     seedNodeId: string;
+    /** All traversal seeds; seedNodeId retains the first seed for existing consumers. */
+    seedNodeIds?: readonly string[];
     depth: number;
 }
 

@@ -12,6 +12,8 @@
  */
 
 import { SemanticGraph } from '../semanticGraph';
+import { SemanticAssetCache } from '../semantic-asset-cache';
+import type { SemanticAssetCacheOptions, SemanticAssetCacheStats } from '../semantic-asset-cache';
 import type { SemanticAdapterCapabilities, UnifiedLanguageAdapter } from './base';
 import { TypeScriptSemanticAdapter } from './typescript-adapter';
 import { PythonSemanticAdapter } from './python-adapter';
@@ -27,14 +29,21 @@ import {
 export class SemanticAdapterRegistry {
     private readonly adapters: UnifiedLanguageAdapter[] = [];
     private readonly extensionMap: Map<string, UnifiedLanguageAdapter> = new Map();
+    private readonly assets: SemanticAssetCache;
 
-    public constructor() {
+    public constructor(options: SemanticAssetCacheOptions = {}) {
+        this.assets = new SemanticAssetCache(options);
         // Register default multi-language adapters in precedence order
         this.register(new TypeScriptSemanticAdapter());
         this.register(new PythonSemanticAdapter());
         this.register(new RustSemanticAdapter());
         this.register(new GoSemanticAdapter());
         this.register(new GDScriptSemanticAdapter());
+    }
+
+    /** Actual extraction-asset retention and reuse; never a review completion counter. */
+    public get assetCacheStats(): SemanticAssetCacheStats {
+        return this.assets.stats;
     }
 
     /**
@@ -112,17 +121,24 @@ export class SemanticAdapterRegistry {
     ): boolean | Promise<boolean> {
         const adapter = this.getAdapterForFile(filePath);
         if (!adapter) return false;
-        const replacement = new SemanticGraph();
         try {
+            const key = this.assets.key(adapter, filePath, content);
+            const cached = key ? this.assets.read(key) : undefined;
+            if (cached) return graph.completeFileUpdate(filePath, token, cached);
+            const replacement = new SemanticGraph();
+            const publish = (): boolean => {
+                if (key) this.assets.write(key, replacement);
+                return graph.completeFileUpdate(filePath, token, replacement);
+            };
             const extraction = adapter.extractToGraph(filePath, content, replacement);
             if (extraction) {
-                return extraction.then(() => graph.completeFileUpdate(filePath, token, replacement))
+                return extraction.then(publish)
                     .catch(error => {
                         graph.cancelFileUpdate(filePath, token);
                         throw error;
                     });
             }
-            return graph.completeFileUpdate(filePath, token, replacement);
+            return publish();
         } catch (error) {
             graph.cancelFileUpdate(filePath, token);
             throw error;

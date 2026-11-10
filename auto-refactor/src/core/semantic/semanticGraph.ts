@@ -327,16 +327,17 @@ export class SemanticGraph {
     }
 
     /**
-     * Slices an impact subgraph radiating from a seed node up to a maximum depth.
+     * Slices an impact subgraph radiating from one or more seeds up to a maximum depth.
      */
     public getSlice(
-        seedNodeId: string,
+        seedNodeId: string | readonly string[],
         maxDepth: number = 3,
         direction: GraphDirection = DIRECTION_FORWARD,
     ): SemanticSubgraph {
         const visitedNodes = new Set<string>();
         const collectedEdges = new Set<SemanticEdge>();
-        const queue: Array<{ id: string; depth: number }> = [{ id: seedNodeId, depth: 0 }];
+        const seeds = typeof seedNodeId === 'string' ? [seedNodeId] : seedNodeId;
+        const queue = seeds.map(id => ({ id, depth: 0 }));
         let head = 0;
 
         while (head < queue.length) {
@@ -364,7 +365,8 @@ export class SemanticGraph {
         return {
             nodes,
             edges: Array.from(collectedEdges),
-            seedNodeId,
+            seedNodeId: seeds[0] ?? '',
+            ...(typeof seedNodeId === 'string' ? {} : { seedNodeIds: Object.freeze([...seeds]) }),
             depth: maxDepth,
         };
     }
