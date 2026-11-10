@@ -4,7 +4,7 @@
     "description": "EventBus 2.0 空间分发与分级分频配置表（唯一真源：默认值以本表为准）"
   },
   "pool": {
-    "capacity": 512
+    "capacity": 4096
   },
   "presentation": {
     "active_adapter": "HEADLESS_API",
@@ -118,6 +118,7 @@
     "reentrancy_guard": "event_bus2_reentrancy_guard",
     "core_state_in_frame_queue": "event_bus2_core_state_in_frame_queue",
     "frame_queue_overflow": "event_bus2_frame_queue_overflow",
-    "pool_overflow": "event_bus2_pool_overflow"
+    "pool_overflow": "event_bus2_pool_overflow",
+    "high_frequency_warning": "event_bus2_high_frequency_warning"
   }
 }

@@ -26,6 +26,7 @@ var _grid: Dictionary = {} # cell_key(int) -> Array[Dictionary]（含 token_id �
 var _listeners: Dictionary = {} # token_id(int) -> {center: Vector3, radius: float}
 var _called_scratch: Dictionary = {} # 去重字典复用（非重入路径零堆分配）
 var _targets_scratch: Array = [] # 派发目标暂存复用（遍历隔离防跳项，零堆分配）
+var _dead_tokens_scratch: Array = [] # 死亡监听器回收暂存复用（零堆分配）
 var _free_cell_buckets: Array = [] # 空闲单元格数组池，避免增删监听器触发瞬态堆分配
 var _dispatch_query_scratch: Dictionary = {} # 查询上下文复用，消除循环内临时结构分配
 var _spatial_reentrancy: int = 0 # 空间派发重入计数（回调内再派发时回退局部字典保正确性）
@@ -128,17 +129,23 @@ func _collect_cell_targets(cell_hash: int, query_ctx: Dictionary) -> void:
 	var query_radius: float = query_ctx["radius"]
 	var called_tokens: Dictionary = query_ctx["called"]
 	var targets: Array = query_ctx["targets"]
+	var dead_tokens: Array = query_ctx["dead_tokens"]
 	var entries: Array = _grid[cell_hash]
 	for entry in entries:
 		var token_id: int = entry["token_id"]
 		if called_tokens.has(token_id) or not _listeners.has(token_id):
 			continue
 		called_tokens[token_id] = true
+		var callback: Callable = entry["callback"]
+		if not callback.is_valid():
+			dead_tokens.append(token_id)
+			continue
 		var listener_record: Dictionary = _listeners[token_id]
 		var center: Vector3 = listener_record["center"]
 		var listener_radius: float = listener_record["radius"]
-		if origin.distance_to(center) <= query_radius + listener_radius:
-			targets.append(entry["callback"])
+		var total_r: float = query_radius + listener_radius
+		if origin.distance_squared_to(center) <= total_r * total_r:
+			targets.append(callback)
 
 func _collect_z_column_targets(cell_x: int, cell_y: int, z_bounds: Vector2i, query_ctx: Dictionary) -> void:
 	for cell_z in range(z_bounds.x, z_bounds.y + 1):
@@ -158,7 +165,7 @@ func _invoke_spatial_targets(targets: Array, packet: EventPacket) -> int:
 			dispatched += 1
 	return dispatched
 
-## 空间事件派发：单元格粗裁剪 → 欧氏距离精确过滤（Inv-EB2-2）→ token_id 去重
+## 空间事件派发：单元格粗裁剪 → 欧氏距离平方精确过滤（Inv-EB2-2）→ token_id 去重与死亡自愈
 func dispatch_spatial(pos: Vector3, radius: float, packet: EventPacket) -> int:
 	# 半径钳制：防御性上限，防止异常半径触发 (2r/cell+1)^3 立方遍历冻结总线
 	var clamped_radius: float = minf(maxf(0.0, radius), _max_dispatch_radius)
@@ -170,14 +177,17 @@ func dispatch_spatial(pos: Vector3, radius: float, packet: EventPacket) -> int:
 	var use_scratch: bool = (_spatial_reentrancy == 1)
 	var called_tokens: Dictionary = _called_scratch if use_scratch else {}
 	var targets: Array = _targets_scratch if use_scratch else []
+	var dead_tokens: Array = _dead_tokens_scratch if use_scratch else []
 	called_tokens.clear()
 	targets.clear()
+	dead_tokens.clear()
 
 	var query_ctx: Dictionary = _dispatch_query_scratch if use_scratch else {}
 	query_ctx["pos"] = pos
 	query_ctx["radius"] = clamped_radius
 	query_ctx["called"] = called_tokens
 	query_ctx["targets"] = targets
+	query_ctx["dead_tokens"] = dead_tokens
 
 	for cell_x in range(min_cell.x, max_cell.x + 1):
 		_collect_y_column_targets(cell_x, min_cell, max_cell, query_ctx)
@@ -185,9 +195,15 @@ func dispatch_spatial(pos: Vector3, radius: float, packet: EventPacket) -> int:
 	# 派发快照已在独立 targets 中，回调内增删订阅不影响本轮遍历（Inv-EB2-7 契约对齐）
 	var dispatched: int = _invoke_spatial_targets(targets, packet)
 
+	# 死亡监听器惰性自愈剔除（防幽灵残留与内存泄漏）
+	if not dead_tokens.is_empty():
+		for dead_id in dead_tokens:
+			unregister_listener(dead_id)
+
 	if use_scratch:
 		called_tokens.clear()
 		targets.clear()
+		dead_tokens.clear()
 		query_ctx.clear()
 	_spatial_reentrancy = prev_reentrancy
 	return dispatched
@@ -201,3 +217,18 @@ func dispatch_packet(packet: EventPacket) -> int:
 ## 单元格尺寸只读访问器（供核心/遥测读取，避免跨类访问私有字段）
 func get_cell_size() -> float:
 	return _cell_size
+
+## 获取当前注册的空间监听器总数（供遥测与测试断言）
+func get_listener_count() -> int:
+	return _listeners.size()
+
+## 清空空间哈希网格与所有临时池（供测试隔离与实例复位）
+func clear() -> void:
+	_grid.clear()
+	_listeners.clear()
+	_called_scratch.clear()
+	_targets_scratch.clear()
+	_dead_tokens_scratch.clear()
+	_free_cell_buckets.clear()
+	_dispatch_query_scratch.clear()
+	_spatial_reentrancy = 0

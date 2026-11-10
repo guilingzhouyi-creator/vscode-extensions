@@ -214,9 +214,13 @@ func cancel_task(task_id: int) -> bool:
 ## 同步快速判定某资源是否已在内存缓存就绪（无物理文件时直接判定就绪以进入占位播放）
 func is_resource_ready(resource_path: String) -> bool:
 	var canonical_path := AssetPathResolverClass.resolve_unified_uri(resource_path)
+	if _lru_cache.has(canonical_path):
+		return true
+	if _deterministic_mode:
+		return false
 	if canonical_path.is_empty() or not AssetPathResolverClass.asset_exists(canonical_path):
 		return true
-	return _lru_cache.has(canonical_path)
+	return false
 
 ## 获取已就绪的媒体资源实体，若未就绪返回 null
 func get_loaded_resource(resource_path: String) -> Resource:

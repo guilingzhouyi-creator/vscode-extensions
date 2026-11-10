@@ -248,7 +248,7 @@ static func load_monolithic_bundle(file_path: String) -> Dictionary:
 			continue
 
 		var table_slice := payload.slice(offset, offset + length)
-		var table_data := _decode_payload_stream(table_slice)
+		var table_data: Variant = _decode_payload_stream(table_slice)
 		if table_data != null and (table_data is Dictionary):
 			result[t_name] = table_data
 

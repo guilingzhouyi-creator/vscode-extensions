@@ -1,9 +1,9 @@
 # ==============================================================================
-# 单元测试：新一代EventBus 2.0空间分发与零GC流水线验收套件
-# 文件路径: res://tests/integration/pipelines/test_event_bus2_zero_gc_pipeline.gd
-# 职责: 验证新一代分发中枢的高性能、池化守恒、空间精确裁剪与因果时序一致性（12项断言）。
+# 单元测试：新一代EventBus 2.0空间分发与零瞬态堆分配流水线验收套件
+# 文件路径: res://tests/integration/pipelines/test_event_bus2_zero_heap_pipeline.gd
+# 职责: 验证新一代分发中枢的高性能、池化守恒、空间精确裁剪与因果时序一致性（17项断言）。
 # ==============================================================================
-class_name TestEventBus2ZeroGCPipeline
+class_name TestEventBus2ZeroHeapPipeline
 extends TestCase
 
 const EventPacket = preload("res://backend/infrastructure/event_bus/event_packet.gd")
@@ -48,6 +48,11 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_iteration_safety_under_concurrent_modification())
 	results.append(_test_2d_projection_and_headless_routing())
 	results.append(_test_headless_presentation_api_control_without_models())
+	results.append(_test_high_throughput_100k_burst_ops())
+	results.append(_test_dense_spatial_1000_entity_burst())
+	results.append(_test_ring_buffer_saturation_and_drop_metrics())
+	results.append(_test_dead_spatial_listener_auto_eviction())
+	results.append(_test_config_driven_channel_resolution())
 	_release_test_subscriptions()
 
 	return TestCase.pack_results("新一代EventBus 2.0空间分发测试套件", results)
@@ -314,3 +319,115 @@ static func _test_headless_presentation_api_control_without_models() -> Dictiona
 	if mock.spawned_entities.has("HERO_01"):
 		return {"name": tname, "test": tname, "passed": false, "message": "注销未清空"}
 	return {"name": tname, "test": tname, "passed": true, "message": "无模型纯 API 控制闭环通过"}
+
+# ---- 13. 100,000次高频因果派发吞吐与遥测指标闭环 ----
+static func _test_high_throughput_100k_burst_ops() -> Dictionary:
+	var tname := "TC-EB2-13: 100,000次高频因果派发吞吐与遥测指标闭环"
+	var bus := EventBusCore.new()
+	bus.initialize_from_config()
+	var counter := {"n": 0}
+	var token := _track_subscription(bus.subscribe(EventChannelDefinition.SYSTEM_HEARTBEAT_TICK, EventCategoryMask.SYSTEM_TELEMETRY,
+		func(_p: EventPacket) -> void: counter["n"] += 1
+	))
+	for i in range(100000):
+		var pkt := bus.borrow_packet(EventChannelDefinition.SYSTEM_HEARTBEAT_TICK, EventCategoryMask.SYSTEM_TELEMETRY, {"i": i})
+		bus.dispatch_now(pkt)
+		bus.recycle_packet(pkt)
+	token.unbind()
+	var metrics := bus.get_metrics_snapshot()
+	if counter["n"] != 100000:
+		return {"name": tname, "test": tname, "passed": false, "message": "派发次数不匹配 actual=%d" % counter["n"]}
+	if metrics["dispatched_count"] != 100000:
+		return {"name": tname, "test": tname, "passed": false, "message": "指标计数异常 dispatched=%d" % metrics["dispatched_count"]}
+	if metrics["pool_borrowed"] != 0:
+		return {"name": tname, "test": tname, "passed": false, "message": "对象池存在借出残留: %d" % metrics["pool_borrowed"]}
+	return {"name": tname, "test": tname, "passed": true, "message": "100,000次高频因果派发零泄漏且遥测指标精确"}
+
+# ---- 14. 1000实体高密度空间聚合与无开方距离平方裁剪 ----
+static func _test_dense_spatial_1000_entity_burst() -> Dictionary:
+	var tname := "TC-EB2-14: 1000实体高密度空间聚合与无开方距离平方裁剪"
+	var bus := EventBusCore.new()
+	var woken := {"count": 0}
+	var cb := func(_p: EventPacket) -> void:
+		woken["count"] += 1
+	# 在中心点 (50, 0, 50) 周围 20m 范围内密集注册 1000 个实体
+	for i in range(1000):
+		var angle: float = (float(i) / 1000.0) * TAU
+		var r: float = float(i % 20)
+		var pos := Vector3(50.0 + cos(angle) * r, 0.0, 50.0 + sin(angle) * r)
+		_track_subscription(bus.on_spatial(pos, 2.0, cb))
+	# 在 (50, 0, 50) 触发半径 25m 的爆炸（应全量覆盖这 1000 个实体）
+	var pkt := bus.borrow_packet(EventChannelDefinition.SPATIAL_EXPLOSION_IMPACT, EventCategoryMask.SPATIAL_VFX)
+	var hit_count := bus.dispatch_spatial(pkt, Vector3(50.0, 0.0, 50.0), 25.0)
+	bus.recycle_packet(pkt)
+	if hit_count != 1000 or woken["count"] != 1000:
+		return {"name": tname, "test": tname, "passed": false, "message": "高密度空间裁剪失真 hit=%d woken=%d" % [hit_count, woken["count"]]}
+	# 在远离中心点 (500, 0, 500) 触发半径 10m 的爆炸（半影外必须 0 唤醒）
+	var pkt_far := bus.borrow_packet(EventChannelDefinition.SPATIAL_EXPLOSION_IMPACT, EventCategoryMask.SPATIAL_VFX)
+	var hit_far := bus.dispatch_spatial(pkt_far, Vector3(500.0, 0.0, 500.0), 10.0)
+	bus.recycle_packet(pkt_far)
+	if hit_far != 0 or woken["count"] != 1000:
+		return {"name": tname, "test": tname, "passed": false, "message": "半影外存在幽灵唤醒 far_hit=%d" % hit_far}
+	return {"name": tname, "test": tname, "passed": true, "message": "1000高密度实体无开方距离平方裁剪 100% 精确"}
+
+# ---- 15. 环形缓冲饱和背压与丢弃遥测闭环 ----
+static func _test_ring_buffer_saturation_and_drop_metrics() -> Dictionary:
+	var tname := "TC-EB2-15: 环形缓冲饱和背压与丢弃遥测闭环"
+	var bus := EventBusCore.new()
+	bus.initialize_from_config()
+	var cap: int = bus.get_frame_buffer_capacity()
+	# 连续入队超过容量的事件（cap + 50 个）
+	for i in range(cap + 50):
+		var pkt := bus.borrow_packet(EventChannelDefinition.SPATIAL_AUDIO_PLAY, EventCategoryMask.SPATIAL_AUDIO, {"i": i})
+		bus.enqueue_frame(pkt)
+	var metrics := bus.get_metrics_snapshot()
+	if metrics["dropped_count"] != 50:
+		return {"name": tname, "test": tname, "passed": false, "message": "丢弃计数不符合 expected=50 actual=%d" % metrics["dropped_count"]}
+	var flushed := bus.flush_frame_events()
+	if flushed != cap:
+		return {"name": tname, "test": tname, "passed": false, "message": "清算数量应等于容量 expected=%d actual=%d" % [cap, flushed]}
+	if bus.get_pool().get_borrowed_count() != 0:
+		return {"name": tname, "test": tname, "passed": false, "message": "溢出事件回收残留 borrowed=%d" % bus.get_pool().get_borrowed_count()}
+	return {"name": tname, "test": tname, "passed": true, "message": "环形缓冲饱和背压与丢弃自动回收零残留"}
+
+# ---- 16. 死亡空间监听器惰性自愈剔除闭环 ----
+static func _test_dead_spatial_listener_auto_eviction() -> Dictionary:
+	var tname := "TC-EB2-16: 死亡空间监听器惰性自愈剔除闭环"
+	var grid := HeadlessSpatialHashGrid3D.new(16.0)
+	var dummy := RefCounted.new()
+	var valid_called := {"n": 0}
+	var valid_cb := func(_p: EventPacket) -> void: valid_called["n"] += 1
+	grid.register_listener(1, Vector3(0, 0, 0), 10.0, valid_cb)
+	grid.register_listener(2, Vector3(0, 0, 0), 10.0, Callable(dummy, "get_instance_id"))
+	if grid.get_listener_count() != 2:
+		return {"name": tname, "test": tname, "passed": false, "message": "初始注册数异常"}
+	dummy = null
+	var pkt := EventPacket.new()
+	pkt.set_spatial_header(Vector3(0, 0, 0), 10.0)
+	grid.dispatch_packet(pkt)
+	if grid.get_listener_count() != 1:
+		return {"name": tname, "test": tname, "passed": false, "message": "死亡监听器未自动清理 remaining=%d" % grid.get_listener_count()}
+	if valid_called["n"] != 1:
+		return {"name": tname, "test": tname, "passed": false, "message": "有效监听器未正常触发"}
+	return {"name": tname, "test": tname, "passed": true, "message": "死亡空间监听器惰性自愈剔除闭环生效"}
+
+# ---- 17. 配置驱动全域信道动态解析与极速派发 ----
+static func _test_config_driven_channel_resolution() -> Dictionary:
+	var tname := "TC-EB2-17: 配置驱动全域信道动态解析与极速派发"
+	var bus := EventBusCore.new()
+	bus.initialize_from_config()
+	var ch_auth := bus.resolve_channel_id("account.registered")
+	if ch_auth != EventChannelDefinition.AUTH_REGISTERED:
+		return {"name": tname, "test": tname, "passed": false, "message": "account.registered 解析错误"}
+	var ch_hud := bus.resolve_channel_id("world_state.snapshot_published")
+	if ch_hud != EventChannelDefinition.HUD_STATUS_SNAPSHOT:
+		return {"name": tname, "test": tname, "passed": false, "message": "world_state.snapshot_published 解析错误"}
+	var received := {"hit": false}
+	var tok := _track_subscription(bus.on_channel("account.registered", func(_p: EventPacket) -> void:
+		received["hit"] = true
+	))
+	bus.emit_domain_event("account.registered", {"user": "hero"})
+	tok.unbind()
+	if not received["hit"]:
+		return {"name": tname, "test": tname, "passed": false, "message": "字符串信道广播未命中订阅"}
+	return {"name": tname, "test": tname, "passed": true, "message": "配置驱动全域信道动态解析与极速广播闭环"}

@@ -14,6 +14,9 @@ extends RefCounted
 static var _instance: EventBusCore = null
 
 var _channel_routes: Dictionary = {} # channel_id(int) -> Array[EventBusSubscriptionToken]（掩码过滤按 token 内联判定）
+var _legacy_channel_to_id: Dictionary = {} # "channel_string" -> channel_id(int)
+var _id_to_legacy_channel: Dictionary = {} # channel_id(int) -> "channel_string"
+var _channel_cache_version: int = -1
 var _spatial_grid: HeadlessSpatialHashGrid3D = null
 var _ring_buffer: PingPongRingBuffer = null
 var _pool: EventPool = null
@@ -24,6 +27,16 @@ var _target_scratch: Array = [] # 按递归深度索引的目标暂存池（复�
 var _seen_scratch: Array = [] # 按递归深度索引的通配去重池（O(n) 去重，替代线性 has 扫描）
 var _dead_tokens_scratch: Array = [] # 失效订阅令牌回收暂存池（复用免热路径堆分配）
 
+# ---- 遥测指标 (Metrics & Profiling) ----
+var _enable_profiling: bool = true
+var _high_freq_threshold: int = 10000
+var _dispatched_count: int = 0
+var _enqueued_count: int = 0
+var _dropped_count: int = 0
+var _peak_dispatch_depth: int = 0
+var _current_window_ops: int = 0
+var _is_warning_high_freq: bool = false
+
 # ---- 叙事表缓存（自旧总线迁正：域 id → 文案表名，按配置重载版本失效） ----
 static var _record_seq: int = 0
 static var _narrative_table_cache: Dictionary = {}
@@ -32,8 +45,11 @@ static var _narrative_cache_version: int = -1
 func _init() -> void:
 	_spatial_grid = HeadlessSpatialHashGrid3D.new(16.0)
 	_ring_buffer = PingPongRingBuffer.new(4096)
-	_pool = EventPool.new(512)
+	_pool = EventPool.new(4096)
 	_max_depth = 16
+	_enable_profiling = true
+	_high_freq_threshold = 10000
+	_ensure_channel_registry_loaded()
 
 ## 应用级单例（生产模式与 GameBootstrap 统一入口；单元测试建议 EventBusCore.new() 独立实例）
 static func get_instance() -> EventBusCore:
@@ -41,26 +57,93 @@ static func get_instance() -> EventBusCore:
 		_instance = EventBusCore.new()
 	return _instance
 
-## 从 event_bus_config.json 驱动装配参数（单元尺寸/缓冲容量/池容量/熔断深度）
+## 确保频道配置与整型信道映射表加载对齐
+func _ensure_channel_registry_loaded() -> void:
+	var cur_ver: int = GameConfig.config_reload_version()
+	if _channel_cache_version == cur_ver and not _legacy_channel_to_id.is_empty():
+		return
+	_legacy_channel_to_id.clear()
+	_id_to_legacy_channel.clear()
+	# 预装高频基础信道别名
+	_legacy_channel_to_id["world_state.hud_snapshot_published"] = EventChannelDefinition.HUD_STATUS_SNAPSHOT
+	_legacy_channel_to_id["world_state.snapshot_published"] = EventChannelDefinition.HUD_STATUS_SNAPSHOT
+	_legacy_channel_to_id["world_state.stat_mutated"] = EventChannelDefinition.HUD_STAT_MUTATED
+	_legacy_channel_to_id["world_state.wallet_mutated"] = EventChannelDefinition.HUD_WALLET_MUTATED
+	_legacy_channel_to_id["currency.wallet.mutated"] = EventChannelDefinition.HUD_WALLET_MUTATED
+	_legacy_channel_to_id["account.registered"] = EventChannelDefinition.AUTH_REGISTERED
+	_legacy_channel_to_id["account.login_succeeded"] = EventChannelDefinition.AUTH_LOGIN_SUCCEEDED
+
+	var reg: Array = GameConfig.get_array("infrastructure.event_bus_config", "channel_registry", [])
+	for item in reg:
+		if not (item is Dictionary):
+			continue
+		var entry: Dictionary = item as Dictionary
+		var ch_id: int = int(entry.get("id", 0))
+		var ch_name: String = str(entry.get("name", ""))
+		var legacy: String = str(entry.get("legacy", ""))
+		if ch_id <= 0:
+			continue
+		if not ch_name.is_empty():
+			_legacy_channel_to_id[ch_name] = ch_id
+			_legacy_channel_to_id[ch_name.to_lower()] = ch_id
+		if not legacy.is_empty():
+			_legacy_channel_to_id[legacy] = ch_id
+			_legacy_channel_to_id[legacy.to_lower()] = ch_id
+		_id_to_legacy_channel[ch_id] = legacy if not legacy.is_empty() else ch_name
+	_channel_cache_version = cur_ver
+
+## 将信道名称、别名或整型常量解析为标准整型信道常量
+func resolve_channel_id(channel_spec: Variant) -> int:
+	if channel_spec is int:
+		return int(channel_spec)
+	if channel_spec is String:
+		var s: String = channel_spec as String
+		_ensure_channel_registry_loaded()
+		if _legacy_channel_to_id.has(s):
+			return int(_legacy_channel_to_id[s])
+		var s_lower: String = s.to_lower()
+		if _legacy_channel_to_id.has(s_lower):
+			return int(_legacy_channel_to_id[s_lower])
+		return EventChannelDefinition.DOMAIN_EVENT_GENERIC
+	return EventChannelDefinition.DOMAIN_EVENT_GENERIC
+
+## 从 event_bus_config.json 驱动装配参数（单元尺寸/缓冲容量/池容量/熔断深度/遥测钩子）
 func initialize_from_config() -> void:
 	var cell: float = GameConfig.get_float("infrastructure.event_bus_config", "spatial_routing/cell_size_meters", 16.0)
 	var max_r: float = GameConfig.get_float("infrastructure.event_bus_config", "spatial_routing/max_dispatch_radius_meters", 256.0)
 	_spatial_grid = HeadlessSpatialHashGrid3D.new(maxf(1.0, cell), maxf(1.0, max_r))
 	var ring_cap: int = GameConfig.get_int("infrastructure.event_bus_config", "frame_batching/ring_buffer_capacity", 4096)
 	_ring_buffer = PingPongRingBuffer.new(maxi(1, ring_cap))
-	var pool_cap: int = GameConfig.get_int("infrastructure.event_bus_config", "pool/capacity", 512)
+	var pool_cap: int = GameConfig.get_int("infrastructure.event_bus_config", "pool/capacity", 4096)
 	_pool = EventPool.new(maxi(1, pool_cap))
 	_max_depth = maxi(1, GameConfig.get_int("infrastructure.event_bus_config", "circuit_breaker/max_dispatch_depth", 16))
+	_enable_profiling = GameConfig.get_bool("infrastructure.event_bus_config", "metrics/enable_profiling_hooks", true)
+	_high_freq_threshold = maxi(100, GameConfig.get_int("infrastructure.event_bus_config", "metrics/high_frequency_warning_threshold_ops", 10000))
+	_ensure_channel_registry_loaded()
 
 ## 测试隔离：清空路由与状态
 func clear_for_tests() -> void:
 	_channel_routes.clear()
-	_spatial_grid = HeadlessSpatialHashGrid3D.new(16.0)
-	_ring_buffer = PingPongRingBuffer.new(4096)
-	_pool = EventPool.new(512)
+	_legacy_channel_to_id.clear()
+	_id_to_legacy_channel.clear()
+	_channel_cache_version = -1
+	if _spatial_grid != null:
+		_spatial_grid.clear()
+	else:
+		_spatial_grid = HeadlessSpatialHashGrid3D.new(16.0)
+	if _ring_buffer != null:
+		_ring_buffer.clear()
+	else:
+		_ring_buffer = PingPongRingBuffer.new(4096)
+	if _pool != null:
+		_pool.clear()
+	else:
+		_pool = EventPool.new(4096)
 	_seq_counter = 0
 	_dispatch_depth = 0
 	_dead_tokens_scratch.clear()
+	reset_metrics()
+	_ensure_channel_registry_loaded()
 
 ## 对象池借还统一门面 API
 func borrow_packet(channel_id: int, category_mask: int, payload: Variant = null) -> EventPacket:
@@ -155,6 +238,14 @@ func dispatch_now(packet: EventPacket) -> void:
 		return
 	var depth: int = _dispatch_depth
 	_dispatch_depth += 1
+	if _dispatch_depth > _peak_dispatch_depth:
+		_peak_dispatch_depth = _dispatch_depth
+	_dispatched_count += 1
+	_current_window_ops += 1
+	if _enable_profiling and _current_window_ops >= _high_freq_threshold and not _is_warning_high_freq:
+		_is_warning_high_freq = true
+		ErrorReporter.emit("event_bus2_high_frequency_warning", {"ops": _current_window_ops, "threshold": _high_freq_threshold})
+
 	_prepare_dispatch_scratch(depth)
 	var targets: Array = _target_scratch[depth]
 	var seen: Dictionary = _seen_scratch[depth]
@@ -166,6 +257,9 @@ func dispatch_now(packet: EventPacket) -> void:
 	_collect_channel_subscribers(packet.channel_id, packet, seen, targets)
 	if packet.channel_id != 0:
 		_collect_channel_subscribers(0, packet, seen, targets)
+	if packet.channel_id != EventChannelDefinition.DOMAIN_EVENT_GENERIC:
+		if (packet.category_mask & EventCategoryMask.NARRATIVE_TEXT) != 0 or not packet.narrative_key.is_empty():
+			_collect_channel_subscribers(EventChannelDefinition.DOMAIN_EVENT_GENERIC, packet, seen, targets)
 
 	# 派发快照已在独立 targets 中，回调内增删订阅不影响本轮遍历（Inv-EB2-7）
 	_dead_tokens_scratch.clear()
@@ -197,10 +291,12 @@ func enqueue_frame(packet: EventPacket) -> bool:
 		return false
 	_seq_counter += 1
 	packet.event_id = _seq_counter
+	_enqueued_count += 1
 	var ok: bool = _ring_buffer.enqueue(packet)
 	if not ok:
+		_dropped_count += 1
 		# 溢出兜底：入队失败的包由总线统一回收（否则调用方遗漏 recycle 时包永久滞留池外）
-		ErrorReporter.emit("event_bus2_frame_queue_overflow", {"channel_id": packet.channel_id})
+		ErrorReporter.emit("event_bus2_frame_queue_overflow", {"channel_id": packet.channel_id, "dropped_total": _dropped_count})
 		recycle_packet(packet)
 	return ok
 
@@ -333,21 +429,19 @@ func emit_narrative_by_key(template_key: String, category_key: String, args: Arr
 
 ## 广播泛化领域事件：结构化 payload 经 DOMAIN_EVENT_GENERIC 信道派发；
 ## 能解析出文案时追加叙事派发（与旧总线两步语义一致）
+## 广播泛化领域事件：配置驱动信道对齐；结构化 payload 经对应信道派发；
+## 能解析出文案时追加叙事派发（与旧总线两步语义一致）
 func emit_domain_event(channel: String, payload: Dictionary = {}) -> void:
-	var channel_def: int = EventChannelDefinition.DOMAIN_EVENT_GENERIC
-	match channel:
-		"world_state.hud_snapshot_published":
-			channel_def = EventChannelDefinition.HUD_STATUS_SNAPSHOT
-		"currency.wallet.mutated":
-			channel_def = EventChannelDefinition.HUD_WALLET_MUTATED
-		_:
-			channel_def = EventChannelDefinition.DOMAIN_EVENT_GENERIC
-
+	var channel_def: int = resolve_channel_id(channel)
 	var packet := borrow_packet(channel_def, EventCategoryMask.NARRATIVE_TEXT, payload)
-	var pdata: Dictionary = {"channel": channel, "payload": payload}
-	for k in payload.keys():
-		pdata[k] = payload[k]
+	var pdata: Dictionary
+	if payload.has("channel") and payload.has("payload"):
+		pdata = payload
+	else:
+		pdata = {"channel": channel, "payload": payload}
+		pdata.merge(payload)
 	packet.payload_data = pdata
+	packet.narrative_key = channel
 	dispatch_now(packet)
 	recycle_packet(packet)
 	var text := render_domain_event_text(channel, payload)
@@ -398,19 +492,37 @@ func emit_profession_promoted(character_id: String, profession_archetype: Dictio
 	recycle_packet(packet)
 
 ## 结构化信道订阅便捷入口：回调收到 EventPacket，载荷按信道语义取
-## payload_data（Narrative/Domain/Clock/Profession/Log 各迁正信道的 Dictionary/DTO）
+## 自动支持整型信道常量与配置驱动的字符串名称
 func on_channel(channel_id: Variant, callback: Callable) -> EventBusSubscriptionToken:
-	if channel_id is int:
-		return subscribe(channel_id, EventCategoryMask.MASK_ALL, callback)
-	if channel_id is String:
-		var ch_str: String = channel_id as String
-		var resolved_id: int = EventChannelDefinition.DOMAIN_EVENT_GENERIC
-		match ch_str:
-			"world_state.hud_snapshot_published":
-				resolved_id = EventChannelDefinition.HUD_STATUS_SNAPSHOT
-			"currency.wallet.mutated":
-				resolved_id = EventChannelDefinition.HUD_WALLET_MUTATED
-			_:
-				resolved_id = EventChannelDefinition.DOMAIN_EVENT_GENERIC
-		return subscribe(resolved_id, EventCategoryMask.MASK_ALL, callback)
-	return subscribe(int(channel_id), EventCategoryMask.MASK_ALL, callback)
+	var resolved_id: int = resolve_channel_id(channel_id)
+	return subscribe(resolved_id, EventCategoryMask.MASK_ALL, callback)
+
+# ==============================================================================
+# 遥测监控与性能度量 API
+# ==============================================================================
+
+## 获取当前运行时的性能遥测快照
+func get_metrics_snapshot() -> Dictionary:
+	return {
+		"dispatched_count": _dispatched_count,
+		"enqueued_count": _enqueued_count,
+		"dropped_count": _dropped_count,
+		"peak_dispatch_depth": _peak_dispatch_depth,
+		"current_window_ops": _current_window_ops,
+		"pool_borrowed": _pool.get_borrowed_count() if _pool != null else 0,
+		"pool_free": _pool.get_free_count() if _pool != null else 0,
+		"pool_peak": _pool.get_peak_borrowed_count() if _pool != null else 0,
+		"ring_buffer_size": _ring_buffer.size() if _ring_buffer != null else 0,
+		"spatial_listener_count": _spatial_grid.get_listener_count() if _spatial_grid != null else 0
+	}
+
+## 重置吞吐指标（供性能测试与周期清算）
+func reset_metrics() -> void:
+	_dispatched_count = 0
+	_enqueued_count = 0
+	_dropped_count = 0
+	_peak_dispatch_depth = 0
+	_current_window_ops = 0
+	_is_warning_high_freq = false
+	if _pool != null:
+		_pool.reset_metrics()

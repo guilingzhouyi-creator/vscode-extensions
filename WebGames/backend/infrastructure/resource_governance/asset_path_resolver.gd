@@ -228,9 +228,16 @@ static func _resolve_mod_scheme_uri(uri: String, fallback_mod_id: String) -> Str
 ## 安全清洗子路径，严格剥离 ".."、驱动器盘符等路径穿越模式
 static func sanitize_sandbox_path(raw_path: String) -> String:
 	var clean := raw_path.replace("\\", "/").strip_edges()
+	var prefix := ""
 
-	# 拦截冒号（针对非 res:// 或 user:// 的绝对物理盘符如 C:/）
-	if clean.contains(":") and not clean.begins_with(SCHEME_RES) and not clean.begins_with(SCHEME_USER):
+	# 若原路径为 res:// 或 user://，分离协议头；否则拦截冒号（针对非 res:// 或 user:// 的绝对物理盘符如 C:/）
+	if clean.begins_with(SCHEME_RES):
+		prefix = SCHEME_RES
+		clean = clean.substr(SCHEME_RES.length())
+	elif clean.begins_with(SCHEME_USER):
+		prefix = SCHEME_USER
+		clean = clean.substr(SCHEME_USER.length())
+	elif clean.contains(":"):
 		clean = clean.split(":")[-1]
 
 	var segments := clean.split("/")
@@ -245,13 +252,7 @@ static func sanitize_sandbox_path(raw_path: String) -> String:
 			continue
 		safe_segments.append(s)
 
-	# 若原路径为 res:// 或 user://，保留协议头
-	if clean.begins_with(SCHEME_RES):
-		return SCHEME_RES + "/".join(safe_segments)
-	elif clean.begins_with(SCHEME_USER):
-		return SCHEME_USER + "/".join(safe_segments)
-
-	return "/".join(safe_segments)
+	return prefix + "/".join(safe_segments)
 
 ## 规范化标识符字符集（仅允许英文字母、数字、下划线、短横线）
 static func sanitize_identifier(raw_id: String) -> String:

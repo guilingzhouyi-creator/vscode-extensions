@@ -51,3 +51,13 @@ func size() -> int:
 ## 获取当前环形缓冲区的物理最大容量
 func capacity() -> int:
 	return _capacity
+
+## 获取当前正在写入的活跃缓冲区积压数量
+func get_active_buffer_size() -> int:
+	return _buffer_a.size() if _write_to_a else _buffer_b.size()
+
+## 清空双缓冲区（供测试隔离与重置）
+func clear() -> void:
+	_buffer_a.clear()
+	_buffer_b.clear()
+	_write_to_a = true

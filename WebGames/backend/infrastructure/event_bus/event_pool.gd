@@ -12,11 +12,12 @@ class_name EventPool
 extends RefCounted
 
 var _free: Array[EventPacket] = []
-var _capacity: int = 512
+var _capacity: int = 4096
 var _borrowed: int = 0
+var _peak_borrowed: int = 0
 var _is_reporting: bool = false
 
-func _init(capacity: int = 512) -> void:
+func _init(capacity: int = 4096) -> void:
 	_capacity = maxi(1, capacity)
 
 ## 借出事件包：优先复用空闲包，池空且达容量上限时告警并分配池外包
@@ -30,6 +31,8 @@ func borrow() -> EventPacket:
 		pkt = EventPacket.new()
 	pkt.is_borrowed = true
 	_borrowed += 1
+	if _borrowed > _peak_borrowed:
+		_peak_borrowed = _borrowed
 	return pkt
 
 ## 归还事件包：防双重归还（is_borrowed 守卫），复位后入池
@@ -49,6 +52,25 @@ func get_free_count() -> int:
 ## 获取当前借出使用的实例数量
 func get_borrowed_count() -> int:
 	return maxi(0, _borrowed)
+
+## 获取自启动或重置以来的最大借出峰值高水位
+func get_peak_borrowed_count() -> int:
+	return maxi(0, _peak_borrowed)
+
+## 获取当前对象池容量上限
+func get_capacity() -> int:
+	return _capacity
+
+## 重置水位指标
+func reset_metrics() -> void:
+	_peak_borrowed = _borrowed
+
+## 清空对象池缓存与计数（供单元测试与隔离重置）
+func clear() -> void:
+	_free.clear()
+	_borrowed = 0
+	_peak_borrowed = 0
+	_is_reporting = false
 
 func _push_pool_overflow_hint() -> void:
 	# 池满新建属池外分配，经 ErrorReporter 统一通道遥测告警
