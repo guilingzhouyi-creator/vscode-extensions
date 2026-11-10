@@ -43,6 +43,38 @@ function fixture() {
 }
 afterEach(() => vi.restoreAllMocks());
 describe('semantic file publication', () => {
+    it('releases a failed input reservation while preserving the previous publication', async () => {
+        const client = new PraxisReviewClient({ enableMoE: false });
+        await client.reviewFile('src/a.ts', 'export function stable() {}', { useSparseMoE: false });
+        const graph = client.semanticGraph;
+        const version = graph.getFileVersion('src/a.ts')!;
+        const failure = new Error('source read failed');
+        vi.spyOn(fileInput, 'readPraxisFileContent').mockRejectedValueOnce(failure);
+        await expect(client.reviewFile('src/a.ts', undefined, { useSparseMoE: false })).rejects.toBe(failure);
+        expect(graph.isFileVersionCurrent('src/a.ts', version)).toBe(true);
+        expect(graph.getNodesByFile('src/a.ts').some(node => node.name === 'stable')).toBe(true);
+    });
+
+    it('a failed older input cannot cancel a newer extraction reservation', async () => {
+        const client = new PraxisReviewClient({ enableMoE: false });
+        const slow = deferred();
+        const original = fileInput.readPraxisFileContent;
+        const failure = new Error('older source read failed');
+        vi.spyOn(fileInput, 'readPraxisFileContent').mockImplementation(async (file, content, root) => {
+            if (content === 'failure') { await slow.promise; throw failure; }
+            return original(file, content, root);
+        });
+        const older = client.reviewFile('src/a.ts', 'failure', { useSparseMoE: false });
+        const rejection = expect(older).rejects.toBe(failure);
+        await client.reviewFile('src/a.ts', 'export function latest() {}', { useSparseMoE: false });
+        const graph = client.semanticGraph;
+        const version = graph.getFileVersion('src/a.ts')!;
+        slow.resolve();
+        await rejection;
+        expect(graph.isFileVersionCurrent('src/a.ts', version)).toBe(true);
+        expect(graph.getNodesByFile('src/a.ts').some(node => node.name === 'latest')).toBe(true);
+    });
+
     it('orders SDK requests before asynchronous input resolution can reorder them', async () => {
         const slow = deferred();
         const original = fileInput.readPraxisFileContent;
