@@ -11,12 +11,21 @@ extends RefCounted
 
 const ServiceContainer = preload("res://frontend/domain_boundary/service_container.gd")
 const MockServiceContainer = preload("res://frontend/domain_boundary/mocks/mock_service_container.gd")
+const RealServiceContainer = preload("res://frontend/domain_boundary/services/real_service_container.gd")
 
 ## 已解析的服务容器单例（按 service_mode 惰性初始化）
 static var _instance: ServiceContainer
 
 ## 全局当前激活的网关状态机引用 (WorldGatewayFSM)
 static var _active_gateway: RefCounted = null
+
+## 自定义服务模式覆盖（供测试用例或动态环境切换）
+static var _custom_mode: String = ""
+
+## 显式指定服务模式（测试隔离或动态切换）
+static func set_mode(mode: String) -> void:
+	_custom_mode = mode
+	_instance = null
 
 ## 注册当前活跃的世界网关实例
 static func set_active_gateway(gateway: RefCounted) -> void:
@@ -54,21 +63,25 @@ static func get_instance() -> ServiceContainer:
 	if _instance == null:
 		var mode := get_mode()
 		match mode:
+			"backend", "real":
+				_instance = RealServiceContainer.get_instance()
 			"mock":
 				_instance = MockServiceContainer.get_instance()
-			# 当 mode == "backend" 时未来返回 RealServiceContainer.get_instance()（当前不实现）
-			# "backend":
-			#	 _instance = RealServiceContainer.get_instance()
 			_:
 				printerr("[ServiceLocator] 未知的 service_mode: %s，回落到 mock" % mode)
 				_instance = MockServiceContainer.get_instance()
 	return _instance
 
-## 获取当前服务模式（从 frontend.ui.service_mode 配置读取，默认 mock）
+## 获取当前服务模式（从 custom_mode 覆盖或 frontend.ui.service_mode 配置读取，默认 mock）
 static func get_mode() -> String:
+	if not _custom_mode.is_empty():
+		return _custom_mode
 	return GameConfig.get_string("frontend.ui", "service_mode", "mock")
 
 ## 重置定位器单例（测试隔离 / teardown 用）——清空已解析的容器引用与激活网关
 static func reset() -> void:
 	_instance = null
 	_active_gateway = null
+	_custom_mode = ""
+	RealServiceContainer.reset_instance()
+	MockServiceContainer.reset_instance()

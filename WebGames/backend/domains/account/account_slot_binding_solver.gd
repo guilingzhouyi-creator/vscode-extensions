@@ -173,6 +173,58 @@ static func to_gateway_slot_states(account: AccountProfileAggregate, bound_world
 		})
 	return out
 
+## 将账号下的 SaveSlotSummaryDTO 导出为前端 AccountEntryView 消费的槽位字典列表
+## 字段契约: slot_id, name, race, class, level, town, empty
+## 保证槽位按照 max_slots (读 domains.account save_slot/max_slots 配置，默认 3) 补全空槽 (empty=true)
+static func to_frontend_character_slots(account: AccountProfileAggregate) -> Array:
+	var out: Array = []
+	var max_slots: int = GameConfig.get_int(DOMAIN_ACCOUNT_CONFIG, "save_slot/max_slots", 3)
+	if max_slots <= 0:
+		max_slots = 3
+	var prefix: String = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "save_slot/id_prefix", "SLOT_")
+	for i in range(1, max_slots + 1):
+		var slot_id: String = "%s%02d" % [prefix, i]
+		var is_occupied: bool = false
+		var summary: SaveSlotSummaryDTO = null
+		if account != null and account.save_slot_summaries.has(slot_id):
+			summary = account.save_slot_summaries[slot_id]
+			if summary != null and not summary.is_fallen:
+				is_occupied = true
+		if is_occupied and summary != null:
+			var race_val: String = "HUMAN"
+			var level_val: int = 1
+			if summary.character_profile != null:
+				if summary.character_profile.growth_state.has("level"):
+					level_val = int(summary.character_profile.growth_state.get("level", 1))
+				elif "level" in summary.character_profile:
+					level_val = int(summary.character_profile.get("level"))
+				if summary.character_profile.character_exclusive_progress.has("race"):
+					race_val = str(summary.character_profile.character_exclusive_progress.get("race"))
+				elif "race" in summary.character_profile:
+					race_val = str(summary.character_profile.get("race"))
+			var class_val: String = summary.profession_tier_name if not summary.profession_tier_name.is_empty() else "WARRIOR"
+			var town_val: String = summary.current_location_name if not summary.current_location_name.is_empty() else "TOWN_START"
+			out.append({
+				"slot_id": slot_id,
+				"name": summary.character_name,
+				"race": race_val,
+				"class": class_val,
+				"level": level_val,
+				"town": town_val,
+				"empty": false
+			})
+		else:
+			out.append({
+				"slot_id": slot_id,
+				"name": "",
+				"race": "",
+				"class": "",
+				"level": 0,
+				"town": "",
+				"empty": true
+			})
+	return out
+
 ## 解绑：删除槽位角色（回退为空槽，active_slot 清理）
 static func clear_slot(account: AccountProfileAggregate, slot_id: String) -> Dictionary:
 	if account == null or slot_id.is_empty():
