@@ -4,7 +4,7 @@
 # 架构定位: Domain Logic Component
 # 依赖与触发: 上游: GameBootstrap, WorldGateway | 下游: GameConfig, EventBusCore
 # 配置与信号: 配置 config/domains/character_creation.json | 信号: EventBus 领域广播
-# 职责说明: 编排角色专属序章启动、占位符提取、新手装备发放、四阶段跃迁与 DAG 会话。
+# 职责说明: 编排角色专属序章启动、模板参数提取、新手装备发放、四阶段跃迁与 DAG 会话。
 #   事件与状态解耦，仅产出纯结构化结果。
 # 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
@@ -22,7 +22,7 @@ const MAX_HEADLESS_DAG_STEPS: int = 100
 ## 启动角色序章，产出初始化结构化事件流。
 ## 契约：opening 为空或 character_id 为空返回 INVALID_OPENING；种族默认经
 ##       config 键 defaults/default_race_id 驱动（既有键）；内部顺序执行
-##       上下文构建 → 占位符提取 → 新手套件发放 → 突变事件列表 → 首步事件包。
+##       上下文构建 → 模板参数提取 → 新手套件发放 → 突变事件列表 → 首步事件包。
 static func boot_character_prologue(opening: OpeningEventStreamDTO, race_id: String = "", allow_default_fallback: bool = true) -> Dictionary:
 	if opening == null or opening.character_id.is_empty():
 		return {"success": false, "error_code": "INVALID_OPENING", "message": "开局事件包缺失或角色 ID 为空"}
@@ -45,7 +45,7 @@ static func boot_character_prologue(opening: OpeningEventStreamDTO, race_id: Str
 	ctx.current_stage = 1
 	ctx.step_index = 0
 
-	# 1. 提取并缓存初始占位符
+	# 1. 提取并缓存初始模板参数
 	var runtime_placeholders := ProloguePlaceholderResolver.extract_placeholders(ctx)
 	ctx.runtime_placeholders = runtime_placeholders
 
@@ -296,9 +296,9 @@ static func _apply_gold_mutation(gold_delta: int, ctx: CharacterPrologueContext,
 			var curr: int = int((profile as CharacterProfile).personal_resources.get("gold", 0))
 			(profile as CharacterProfile).personal_resources["gold"] = curr + gold_delta
 		elif profile is Dictionary:
-			var pr: Dictionary = (profile as Dictionary).get("personal_resources", {})
-			pr["gold"] = int(pr.get("gold", 0)) + gold_delta
-			(profile as Dictionary)["personal_resources"] = pr
+			var personal_res: Dictionary = (profile as Dictionary).get("personal_resources", {})
+			personal_res["gold"] = int(personal_res.get("gold", 0)) + gold_delta
+			(profile as Dictionary)["personal_resources"] = personal_res
 	var prev_gold: int = int(ctx.runtime_placeholders.get("INITIAL_GOLD", ctx.runtime_placeholders.get("STARTER_GOLD", 0)))
 	ctx.runtime_placeholders["INITIAL_GOLD"] = str(prev_gold + gold_delta)
 	ctx.runtime_placeholders["initial_gold"] = ctx.runtime_placeholders["INITIAL_GOLD"]
@@ -547,3 +547,65 @@ static func broadcast_step(
 		"character_id": packet.character_id,
 		"narrative_key": narrative_key
 	})
+
+## 无头完结序章并构造标准化 PrologueHandoffDTO（衔接大地图探索与 HUD 首帧同步）
+static func complete_prologue_to_handoff(
+	ctx: CharacterPrologueContext,
+	profile: CharacterProfile = null,
+	options: Dictionary = {}
+) -> Dictionary:
+	if ctx == null or ctx.character_id.is_empty():
+		return {"success": false, "error_code": "INVALID_PROLOGUE_CONTEXT", "handoff": null}
+
+	var extra_attrs: Dictionary = options.get("extra_attrs", {}) if options.get("extra_attrs", null) is Dictionary else {}
+	var initial_gold: int = int(options.get("initial_gold", -1))
+	var active_mods: Array = options.get("active_mods", []) if options.get("active_mods", null) is Array else []
+	var empty_step_payload: Dictionary = {}
+
+	var safety_steps := 0
+	var last_step_res: Dictionary = {}
+	while not ctx.is_completed and safety_steps < 8:
+		safety_steps += 1
+		last_step_res = advance_prologue_step(ctx, "NEXT", empty_step_payload)
+		if not bool(last_step_res.get("success", false)):
+			break
+
+	ctx.is_completed = true
+	ctx.is_active = false
+
+	var handoff := PrologueHandoffDTO.new()
+	handoff.account_id = ctx.account_id
+	handoff.character_id = ctx.character_id
+	handoff.character_name = ctx.character_name
+	handoff.race_id = ctx.race_id if not ctx.race_id.is_empty() else "HUMAN"
+	handoff.origin_id = str(ctx.runtime_placeholders.get("ORIGIN_ID", ctx.runtime_placeholders.get("origin_id", "")))
+	handoff.assigned_start_location_id = ctx.assigned_start_location_id if not ctx.assigned_start_location_id.is_empty() else "CENTRAL_CONTINENT"
+	handoff.active_mods = active_mods.duplicate()
+	handoff.timestamp_utc = int(Time.get_unix_time_from_system())
+
+	if profile != null:
+		handoff.allocated_attributes = profile.attributes.duplicate(true)
+		var raw_gold: int = int(profile.personal_resources.get("gold", 0))
+		handoff.initial_gold = initial_gold if initial_gold >= 0 else raw_gold
+		_append_profile_inventory_items(profile.inventory, handoff.initial_inventory_items)
+	elif initial_gold >= 0:
+		handoff.initial_gold = initial_gold
+
+	for attr_key in extra_attrs.keys():
+		handoff.allocated_attributes[attr_key] = extra_attrs[attr_key]
+
+	return {
+		"success": true,
+		"is_completed": ctx.is_completed,
+		"context": ctx,
+		"handoff": handoff
+	}
+
+static func _append_profile_inventory_items(inv: Dictionary, out_items: Array) -> void:
+	if inv.is_empty():
+		return
+	for item_key in inv.keys():
+		out_items.append(_make_inventory_handoff_entry(item_key, inv[item_key]))
+
+static func _make_inventory_handoff_entry(item_key: Variant, data_val: Variant) -> Dictionary:
+	return {"item_id": item_key, "data": data_val}

@@ -206,7 +206,8 @@ static func _execute_shutdown_stage(ctx: ShutdownStageContext) -> Dictionary:
 			_freeze_world_and_inputs()
 		"flush_saves":
 			var save_result: Dictionary = {}
-			if GameConfig.get_bool("infrastructure.lifecycle", "policies/auto_save_on_exit", true):
+			var auto_save_policy := GameConfig.get_bool("infrastructure.lifecycle", "policies/auto_save_on_exit", true)
+			if ctx.request.save_before_quit and auto_save_policy:
 				save_result = _flush_domain_saves(ctx.request.target_save_slot, ctx.providers, ctx.allow_default_fallback)
 				ctx.resp.is_save_completed = bool(save_result.get("success", false))
 				ctx.resp.save_sha256 = String(save_result.get("sha256", ""))
@@ -214,6 +215,10 @@ static func _execute_shutdown_stage(ctx: ShutdownStageContext) -> Dictionary:
 					stage_success = false
 					stage_error = String(save_result.get("error_code", "SAVE_FLUSH_FAILED"))
 					ctx.resp.degraded_resources.append("flush_saves")
+					var allow_degraded := GameConfig.get_bool("infrastructure.lifecycle", "policies/allow_degraded_shutdown_on_save_failure", true)
+					var strict_save := (ctx.request.require_save_success and not ctx.request.force_quit) or (not allow_degraded and not ctx.request.force_quit)
+					if strict_save:
+						_record_shutdown_failure(ctx.resp, "flush_saves", stage_error)
 			if ctx.bus != null:
 				ctx.bus.emit_domain_event("lifecycle.save_completed", {
 					"success": ctx.resp.is_save_completed,
@@ -226,20 +231,27 @@ static func _execute_shutdown_stage(ctx: ShutdownStageContext) -> Dictionary:
 			stage_success = bool(resource_result.get("success", false))
 			stage_error = String(resource_result.get("error_code", ""))
 		"revoke_session":
-			if not ctx.request.session_token.is_empty():
+			if not ctx.resp.failed_stage.is_empty():
+				stage_success = false
+				stage_error = "SKIPPED_DUE_TO_PRIOR_FAILURE"
+			elif not ctx.request.session_token.is_empty():
 				AuthService.revoke_token(ctx.request.session_token)
 				if ctx.bus != null:
 					ctx.bus.emit_domain_event("lifecycle.session_revoked", {
 						"token_prefix": ctx.request.session_token.substr(0, min(8, ctx.request.session_token.length()))
 					})
 		"teardown_bootstrap":
-			var teardown_result: Dictionary = GameBootstrap.teardown()
-			if not bool(teardown_result.get("success", false)):
+			if not ctx.resp.failed_stage.is_empty():
 				stage_success = false
-				stage_error = "BOOTSTRAP_TEARDOWN_FAILED"
-				ctx.resp.remaining_resources.append("bootstrap_teardown_failed")
-				ctx.resp.retained_resources.append("bootstrap_teardown_failed")
-				_record_shutdown_failure(ctx.resp, ctx.stage, stage_error)
+				stage_error = "SKIPPED_DUE_TO_PRIOR_FAILURE"
+			else:
+				var teardown_result: Dictionary = GameBootstrap.teardown()
+				if not bool(teardown_result.get("success", false)):
+					stage_success = false
+					stage_error = "BOOTSTRAP_TEARDOWN_FAILED"
+					ctx.resp.remaining_resources.append("bootstrap_teardown_failed")
+					ctx.resp.retained_resources.append("bootstrap_teardown_failed")
+					_record_shutdown_failure(ctx.resp, ctx.stage, stage_error)
 	var elapsed_ms: int = Time.get_ticks_msec() - stage_started_ms
 	var timeout_seconds: float = ctx.save_timeout if ctx.stage == "flush_saves" else (ctx.force_timeout if ctx.stage == "teardown_bootstrap" else 0.0)
 	if timeout_seconds > 0.0 and elapsed_ms > int(timeout_seconds * 1000.0):

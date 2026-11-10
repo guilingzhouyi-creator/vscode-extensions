@@ -108,6 +108,60 @@ static func create_character_authoritative(
         "gateway_result": gateway_res
     }
 
+## 统一编排门面：权威创角 + 开局事件流生成 + 自动启动角色序章上下文
+static func execute_creation_and_boot_prologue(
+    req: AuthoritativeCharacterCreationRequestDTO,
+    gateway_fsm: WorldGatewayFSM = null,
+    adapted_mod_manifest: Dictionary = {}
+) -> Dictionary:
+    var create_res := create_character_authoritative(req, gateway_fsm, adapted_mod_manifest)
+    if not bool(create_res.get("success", false)):
+        return create_res
+
+    var profile: CharacterProfile = create_res.get("profile", null)
+    var pres: CharacterCreationPresentationDTO = create_res.get("presentation", null)
+    var opening := OpeningEventStreamDTO.new()
+    opening.event_id = UniqueIdGenerator.next_id("EVT_OPENING_")
+    opening.account_id = req.account_id
+    opening.slot_id = "SLOT_%02d" % req.slot_id
+    opening.world_id = req.world_id
+    opening.character_id = str(create_res.get("character_id", ""))
+    opening.character_name = str(create_res.get("character_name", ""))
+    opening.race_id = pres.race_id if pres != null else "HUMAN"
+    opening.is_first_time_creation = true
+    var birth_region := ""
+    if pres != null and pres.prologue_preview is Dictionary:
+        birth_region = str(pres.prologue_preview.get("birth_region_id", ""))
+    opening.starting_location_id = birth_region if not birth_region.is_empty() else "CENTRAL_CONTINENT"
+    opening.opening_quest_line_id = "QUEST_PROLOGUE_MAIN_01"
+    opening.timestamp_utc = int(Time.get_unix_time_from_system())
+
+    EventBusCore.get_instance().emit_domain_event("opening_narrative.triggered", opening.to_dto())
+    var prologue_boot := PrologueExecutionKernel.boot_character_prologue(opening, opening.race_id, true)
+    if not bool(prologue_boot.get("success", false)):
+        return prologue_boot
+
+    var p_ctx: CharacterPrologueContext = prologue_boot.get("context", null)
+    if p_ctx != null and pres != null and not pres.origin_id.is_empty():
+        p_ctx.runtime_placeholders["ORIGIN_ID"] = pres.origin_id
+        p_ctx.runtime_placeholders["origin_id"] = pres.origin_id
+    if p_ctx != null and profile != null:
+        p_ctx.runtime_placeholders["INITIAL_GOLD"] = str(int(profile.personal_resources.get("gold", 0)))
+
+    return {
+        "success": true,
+        "character_id": opening.character_id,
+        "character_name": opening.character_name,
+        "slot_id": opening.slot_id,
+        "world_id": opening.world_id,
+        "profile": profile,
+        "presentation": pres,
+        "opening_event": opening,
+        "prologue_context": p_ctx,
+        "prologue_packet": prologue_boot.get("packet", null),
+        "gateway_result": create_res.get("gateway_result", {})
+    }
+
 # ==============================================================================
 # 二、输入校验与实体组装子函数 (CC <= 15, Depth <= 3)
 # ==============================================================================
