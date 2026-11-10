@@ -15,6 +15,8 @@ const AccountSlotBindingSolver = preload("res://backend/domains/account/account_
 const WorldModAffinityManager = preload("res://backend/domains/narrative_orchestration/world_mod_affinity_manager.gd")
 const ModPackageDiscoverySolver = preload("res://backend/domains/narrative_orchestration/mod_package_discovery_solver.gd")
 const CrossWorldPerturbationBroker = preload("res://backend/domains/narrative_orchestration/cross_world_perturbation_broker.gd")
+const RuntimeModeGate = preload("res://backend/domains/persistence_protocol/runtime_mode_gate.gd")
+const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
 
 var context: WorldGatewayContextDTO = null
 var _last_probe_reports: Dictionary = {}
@@ -202,6 +204,9 @@ func select_mode(
     context.selected_mode = mode
     context.selected_world_id = route_res.resolved_world.world_id
     context.current_phase = WorldGatewayModel.GatewayPhase.MODE_SELECTED
+    RuntimeModeGate.set_mode(
+        RuntimeModeGate.Mode.ONLINE if mode == WorldGatewayModel.GameMode.MULTIPLAYER else RuntimeModeGate.Mode.SINGLE_PLAYER
+    )
 
     context.selected_slot_id = primary_slot.slot_id
     context.is_first_time_creation = (primary_slot.bound_character_id.is_empty() or primary_slot.is_first_creation)
@@ -322,6 +327,14 @@ func enter_world(target_world_id: String = "", allow_safe_degrade: bool = false)
         context.selected_world_id = effective_world_id
 
     context.current_phase = WorldGatewayModel.GatewayPhase.IN_WORLD
+    WorldSessionRuntimeService.activate_world_session({
+        "account_id": context.account_id,
+        "gateway": self,
+        "world_id": context.selected_world_id,
+        "slot_id": context.selected_slot_id,
+        "character_id": context.active_character_id,
+        "game_mode": context.selected_mode
+    }, false)
     _notify_event("world_gateway.world_entered", {
         "account_id": context.account_id,
         "world_id": context.selected_world_id,
@@ -331,13 +344,13 @@ func enter_world(target_world_id: String = "", allow_safe_degrade: bool = false)
     return {"success": true, "phase": context.current_phase, "context": context.to_dto()}
 
 ## 记录单个虚空同化片段至世界历史（独立抽离避免循环内瞬态堆分配）
-func _append_single_perturbation_fragment(world_inst: WorldInstance, p: CrossWorldPerturbationDTO) -> void:
+func _append_single_perturbation_fragment(world_inst: WorldInstance, perturbation: CrossWorldPerturbationDTO) -> void:
     var fragment: Dictionary = {
         "event": "VOID_PERTURBATION_ASSIMILATED",
         "type": "VOID_PERTURBATION_ASSIMILATED",
-        "perturbation_id": p.perturbation_id,
-        "origin_world_id": p.origin_world_id,
-        "resonance_intensity": p.resonance_intensity,
+        "perturbation_id": perturbation.perturbation_id,
+        "origin_world_id": perturbation.origin_world_id,
+        "resonance_intensity": perturbation.resonance_intensity,
         "timestamp_utc": int(Time.get_unix_time_from_system())
     }
     world_inst.append_history_fragment(fragment)
@@ -389,12 +402,18 @@ func handoff_prologue_to_world_exploration(handoff: PrologueHandoffDTO) -> Dicti
 
     var hud_ctx: Dictionary = {
         "account_id": context.account_id,
+        "gateway": self,
+        "world_id": context.selected_world_id,
+        "slot_id": context.selected_slot_id,
         "character_id": handoff.character_id,
         "character_name": handoff.character_name,
+        "race_id": handoff.race_id,
+        "game_mode": context.selected_mode,
         "wallet_gold": handoff.initial_gold,
-        "current_location": handoff.assigned_start_location_id,
-        "attributes": handoff.allocated_attributes
+        "current_location_id": handoff.assigned_start_location_id,
+        "attribute_values": handoff.allocated_attributes.duplicate(true)
     }
+    WorldSessionRuntimeService.activate_world_session(hud_ctx, false)
     var snapshot: AuthoritativeHudSnapshotDTO = AuthoritativeHudSyncService.trigger_initial_sync(hud_ctx)
 
     _notify_event("world_gateway.prologue_handed_off", {
@@ -416,8 +435,11 @@ func handoff_prologue_to_world_exploration(handoff: PrologueHandoffDTO) -> Dicti
 func exit_world() -> Dictionary:
     return exit_to_gateway()
 
-## 5. 退回世界栏主界面并实施内存全量洗脱 (Full Memory Scrubbing)
+## 5. 退回世界栏主界面并实施内存全量洗脱 (Full Memory Scrubbing + 探针与模式闸门复位)
 func exit_to_gateway() -> Dictionary:
+    WorldSessionRuntimeService.deactivate_world_session()
+    RuntimeModeGate.set_mode(RuntimeModeGate.Mode.SINGLE_PLAYER)
+
     # 全量洗脱重置运行时所有模式、槽位、世界与角色状态
     context.selected_mode = WorldGatewayModel.GameMode.UNSELECTED
     context.selected_slot_id = ""
@@ -425,22 +447,83 @@ func exit_to_gateway() -> Dictionary:
     context.active_character_id = ""
     context.is_first_time_creation = false
     context.current_phase = WorldGatewayModel.GatewayPhase.GATEWAY_ENTERED
-    _last_probe_reports.clear()
     active_mods.clear()
     adapted_mod_manifest.clear()
     creation_ui_snapshot.clear()
 
+    if GameConfig.get_bool("domains.world_gateway", "gateway_policy/require_probe_refresh_on_exit", true):
+        _last_probe_reports = ModeReadinessProbe.probe_all_modes(context.account_id)
+    else:
+        _last_probe_reports.clear()
+
     _notify_event("world_gateway.memory_scrubbed", {
         "account_id": context.account_id,
-        "phase": context.current_phase
+        "phase": context.current_phase,
+        "probe_refreshed": not _last_probe_reports.is_empty()
     })
 
     return {
         "success": true,
         "phase": context.current_phase,
         "context": context.to_dto(),
+        "probe_reports": _last_probe_reports,
         "message": "已完成全量内存洗脱并返回世界网关"
     }
+
+## 6. 切换运行网关模式（仅允许已洗脱的 GATEWAY_ENTERED 状态；活跃世界内强拦截热切换）
+func switch_gateway_mode(
+    target_mode: int,
+    canary_flags: Dictionary = {},
+    account_slots: Array = [],
+    target_world_id: String = "",
+    target_slot_id: String = "",
+    custom_mods: Array = []
+) -> Dictionary:
+    var block_hot := GameConfig.get_bool("domains.world_gateway", "gateway_policy/block_hot_swap_while_world_active", true)
+    var err_hot := GameConfig.get_string("domains.world_gateway", "gateway_policy/err_hot_swap_blocked", "ERR_HOT_SWAP_BLOCKED_IN_ACTIVE_WORLD")
+    if block_hot and (context.current_phase == WorldGatewayModel.GatewayPhase.IN_WORLD or WorldSessionRuntimeService.has_active_world()):
+        return _fail(err_hot, "处于活跃世界运行态时严禁热切换网关模式，请先退出世界至网关后再切换")
+    if context.current_phase != WorldGatewayModel.GatewayPhase.GATEWAY_ENTERED:
+        return _fail(err_hot, "切换网关前须先经 exit_to_gateway 完成状态洗脱，当前阶段: %d" % context.current_phase)
+
+    _last_probe_reports = ModeReadinessProbe.probe_all_modes(context.account_id)
+    var sel_res := select_mode(target_mode, canary_flags, account_slots, target_world_id, target_slot_id, custom_mods)
+    if bool(sel_res.get("success", false)):
+        _notify_event("world_gateway.mode_switched", {
+            "account_id": context.account_id,
+            "mode": target_mode,
+            "world_id": context.selected_world_id,
+            "slot_id": context.selected_slot_id
+        })
+    return sel_res
+
+## 7. 查询当前可用的世界档案与目录摘要列表
+func list_world_archives() -> Array[Dictionary]:
+    var catalog := _load_worlds_catalog()
+    var result: Array[Dictionary] = []
+    var seen: Dictionary = {}
+    var repo := WorldArchiveRepository.get_instance()
+    if repo != null:
+        if not repo.is_loaded():
+            repo.load_all()
+        for w_summary in repo.list_worlds():
+            var w_dict: Dictionary = w_summary.to_dto() if (w_summary != null and w_summary.has_method("to_dto")) else {}
+            var wid := String(w_dict.get("world_id", ""))
+            if wid.is_empty():
+                continue
+            seen[wid] = true
+            result.append(w_dict)
+    for world_id in catalog.keys():
+        if seen.has(world_id):
+            continue
+        var dto: Variant = catalog[world_id]
+        result.append(_format_catalog_archive_entry(world_id, dto))
+    return result
+
+func _format_catalog_archive_entry(world_id: Variant, dto: Variant) -> Dictionary:
+    if dto != null and dto.has_method("to_dto"):
+        return dto.to_dto()
+    return {"world_id": world_id}
 
 func _notify_event(channel: String, payload: Dictionary) -> void:
     EventBusCore.get_instance().emit_domain_event(channel, payload)
