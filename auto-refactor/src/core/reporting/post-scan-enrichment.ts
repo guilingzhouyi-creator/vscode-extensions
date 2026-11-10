@@ -150,6 +150,8 @@ export interface SynthesizeGovernanceParams {
      * working set into a lookup; absent or missing an entry, the file is read from disk as before.
      */
     readonly contentByPath?: ReadonlyMap<string, string>;
+    /** False requires every scoring source in contentByPath and forbids host fallback. */
+    readonly allowHostRead?: boolean;
     /** Logger used to report memo reuse rates; the pass stays silent when omitted. */
     readonly logger?: Logger;
 }
@@ -673,6 +675,9 @@ export async function synthesizeNativeGovernance(
         SCORING_READ_CONCURRENCY,
         async ([filePath, fileIssues]) => {
             const cached = contentByPath?.get(filePath);
+            if (cached === undefined && params.allowHostRead === false) {
+                throw new Error(`snapshot governance source missing: ${filePath}`);
+            }
             const content =
                 cached ?? (await readOptionalTextAsync(resolveReadPath(rootDir, filePath))) ?? '';
             const domainName = extractDomainName(filePath);

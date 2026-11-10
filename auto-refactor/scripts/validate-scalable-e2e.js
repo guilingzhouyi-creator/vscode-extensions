@@ -124,6 +124,7 @@ async function testEndToEndScalablePipeline() {
   // Execute review for agent-frontend-1
   const result = await orchestrator.orchestrate(files, contents, {
     agentUid: 'agent-frontend-1',
+    analysisGeneration: 'scalable-fixture-v1',
     priority: TaskPriority.HIGH,
     enableTensorPartitioning: true,
     enableSecondaryCheck: true,
@@ -164,12 +165,21 @@ async function testEndToEndScalablePipeline() {
   // 5. Verify caching on second run (cacheHits must increase)
   const secondResult = await orchestrator.orchestrate(files, contents, {
     agentUid: 'agent-frontend-1',
+    analysisGeneration: 'scalable-fixture-v1',
     priority: TaskPriority.NORMAL,
-    enableTensorPartitioning: false,
+    enableTensorPartitioning: true,
+    enableSecondaryCheck: true,
     dependencyEdges: edges,
   });
 
   assert.ok(secondResult.cacheHits > 0, `Expected cache hits > 0, got ${secondResult.cacheHits}`);
+  const changedResult = await orchestrator.orchestrate(files, contents, {
+    agentUid: 'agent-frontend-1',
+    analysisGeneration: 'scalable-fixture-v2',
+    enableTensorPartitioning: false,
+    dependencyEdges: edges,
+  });
+  assert.strictEqual(changedResult.cacheHits, 0, 'A changed analysis generation must not reuse findings');
 
   console.log('  ✔ End-to-End scalable pipeline verified:');
   console.log(`    - Partitions evaluated: ${result.partitionCount}`);

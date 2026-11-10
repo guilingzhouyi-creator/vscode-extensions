@@ -81,14 +81,18 @@ import {
 
 export { BASELINE_GRANULARITY_GROUPED, groupCounts };
 
-/** Post-scan scope that sees the complete module set, so cross-file passes are allowed. */
-export const POST_SCAN_SCOPE_FULL = 'full';
-
-/** Post-scan scope limited to a changed-file subset, so cross-file passes are skipped. */
-export const POST_SCAN_SCOPE_INCREMENTAL = 'incremental';
-
-/** Post-scan scope: a full scan may use cross-file facts; an incremental one may not. */
-export type PostScanScope = typeof POST_SCAN_SCOPE_FULL | typeof POST_SCAN_SCOPE_INCREMENTAL;
+export {
+    POST_SCAN_SCOPE_FULL, POST_SCAN_SCOPE_INCREMENTAL,
+} from './report-finalization-context';
+export type {
+    PostScanScope, FinalizeBaselineOptions, FinalizeReportContext,
+} from './report-finalization-context';
+import {
+    POST_SCAN_SCOPE_FULL, resolveFinalizeContext,
+} from './report-finalization-context';
+import type {
+    PostScanScope, FinalizeBaselineOptions, FinalizeReportArguments,
+} from './report-finalization-context';
 
 /** Named identifiers for post-scan analysis passes. */
 const PASS_DEPENDENCY_GRAPH = 'dependency-graph';
@@ -181,46 +185,6 @@ const EMPTY_ISSUES: readonly Issue[] = Object.freeze([]);
 const EMPTY_SUPPRESSIONS: readonly SuppressionRule[] = Object.freeze([]);
 
 const FINALIZED = Symbol('auto-refactor:finalized');
-const KEY_REPORT = 'report';
-const KEY_CONFIG = 'config';
-
-/**
- * Options controlling the post-scan finalization passes.
- *
- * The name is historical — baseline ratchet settings were the first entries — but this is the
- * shared option bag `finalizeReport` receives from the API layer, so every post-scan artifact
- * path belongs here rather than in a second parallel struct the caller would have to keep in
- * sync. Field names match `ScanOptions` exactly so a caller's options object is assignable
- * without translation.
- */
-export interface FinalizeBaselineOptions {
-    baseline?: string;
-    updateBaseline?: string;
-    baselineGranularity?: string;
-    baselineRatchetDown?: boolean;
-    forceBaselineExpand?: boolean;
-    /** Write the human review queue to this NDJSON path when set. */
-    reviewQueue?: string;
-    /**
-     * Calibration corpus supplying per-rule outcome counts.
-     *
-     * Omitted by default, and that default is load-bearing: with no corpus every confidence is
-     * the analyzer's own score, exactly as it was before calibration existed. A project that has
-     * accumulated review outcomes points this at its own file and gets adjudicated posteriors
-     * instead.
-     */
-    confidenceCorpus?: string;
-}
-
-/** Unified context structure aggregating parameters across report finalization passes. */
-export interface FinalizeReportContext {
-    report: ScanReport;
-    config: ScanConfig;
-    options: FinalizeBaselineOptions;
-    logger: Logger;
-    reportScanner?: Scanner | null;
-    scope?: PostScanScope;
-}
 
 /** Execution context passed across individual post-scan analysis passes. */
 interface PostScanPassContext {
@@ -231,6 +195,7 @@ interface PostScanPassContext {
     scope: PostScanScope;
     warnings: string[];
     postScanPasses: string[];
+    snapshotSource?: ReadonlyMap<string, string>;
 }
 
 /** Specification driving generic scanner-based post-scan passes without duplicated code. */
@@ -313,7 +278,9 @@ async function applyDependencyGraphPass(context: PostScanPassContext): Promise<v
     postScanPasses.push(PASS_DEPENDENCY_GRAPH);
     const prebuilt = reportScanner ? reportScanner.getDependencyGraph() : null;
     const covered = prebuilt !== null && prebuilt.getModules().length >= report.fileMetrics.length;
-    const cycle = await runCyclePass(report, config, logger, covered ? prebuilt : null);
+    const cycle = await runCyclePass(
+        report, config, logger, covered ? prebuilt : null, context.snapshotSource,
+    );
 
     if (!covered && prebuilt !== null) {
         warnings.push(WARN_DEP_GRAPH_INCOMPLETE);
@@ -526,8 +493,8 @@ function matchSuppression(issue: Issue, index: SuppressionIndex): SuppressionRul
         typeof issue.detail?.function === 'string'
             ? issue.detail.function
             : typeof issue.detail?.name === 'string'
-              ? issue.detail.name
-              : EMPTY_STRING;
+                ? issue.detail.name
+                : EMPTY_STRING;
     const candidates = index.candidateRulesByAnalyzer.get(issue.analyzer) ?? index.generalRules;
     const normalizedFilePath = issue.location.file.replace(/\\/g, '/');
 
@@ -546,11 +513,12 @@ async function resolveFileDirectiveLines(
     rootDir: string,
     retainedSource: ReadonlyMap<string, string> | undefined,
     fileCache: Map<string, string[] | null>,
+    allowHostRead: boolean,
 ): Promise<string[] | null> {
     if (!file) return null;
     if (fileCache.has(file)) return fileCache.get(file) ?? null;
     let content = retainedSource?.get(file);
-    if (content === undefined) {
+    if (content === undefined && allowHostRead) {
         const fullPath = path.isAbsolute(file) ? file : path.resolve(rootDir, file);
         content = await fs.promises.readFile(fullPath, 'utf8').catch(() => undefined);
     }
@@ -612,6 +580,7 @@ async function applySuppressions(
     suppressions: readonly SuppressionRule[],
     rootDir: string,
     retainedSource?: ReadonlyMap<string, string>,
+    allowHostRead = true,
 ): Promise<number> {
     const arbiter = new FindingConfidenceArbiter();
     const index = suppressions.length > 0 ? buildSuppressionIndex(suppressions) : null;
@@ -624,6 +593,7 @@ async function applySuppressions(
             rootDir,
             retainedSource,
             fileCache,
+            allowHostRead,
         );
         if (applySingleIssueSuppression(issue, fileLines, arbiter, index)) {
             suppressedCount++;
@@ -745,6 +715,7 @@ interface RefreshQualityScoresParams {
     readonly scope: PostScanScope;
     readonly logger: Logger;
     readonly initialIssueCount?: number;
+    readonly snapshotSource?: ReadonlyMap<string, string>;
 }
 
 /**
@@ -783,7 +754,7 @@ function applyAutonomyScore(
  * @param params - Context carrying report, resolved config, scanner, scope, and initial count.
  */
 async function refreshQualityScores(params: RefreshQualityScoresParams): Promise<void> {
-    const { report, config, reportScanner, scope, logger, initialIssueCount = 0 } = params;
+    const { report, config, reportScanner, initialIssueCount = 0 } = params;
     const effectiveScorerArchetype = config.reviewProfile ?? config.archetype;
     const scorer =
         reportScanner && typeof reportScanner.getQualityScorer === 'function'
@@ -822,15 +793,26 @@ async function refreshQualityScores(params: RefreshQualityScoresParams): Promise
         report.issues,
     );
     report.qualityScore = projectQualityScore;
+    await refreshQualityProjections(params, projectQualityScore);
+}
 
+/** Project static scores and source-aware enrichment without persisting snapshot history. */
+async function refreshQualityProjections(
+    params: RefreshQualityScoresParams,
+    projectQualityScore: NonNullable<ScanReport['qualityScore']>,
+): Promise<void> {
+    const { report, config, reportScanner, scope, logger } = params;
+    const fileMetrics = report.fileMetrics ?? [];
     const staticVector = synthesizeStaticQualityVector(projectQualityScore.indices);
     const dynamicTelemetry = config.telemetryData;
     const dynamicVector =
         dynamicTelemetry && dynamicTelemetry.isObserved !== false
             ? computeDynamicQualityVector(dynamicTelemetry)
             : undefined;
-    const historicalScore = resolveHistoricalQualityScore(config);
-    const supervisorWeights = await syncAdaptiveSupervisorState({
+    const historicalScore = params.snapshotSource
+        ? undefined : resolveHistoricalQualityScore(config);
+    const supervisorWeights = params.snapshotSource
+        ? undefined : await syncAdaptiveSupervisorState({
         config,
         scope,
         historicalScore,
@@ -849,21 +831,26 @@ async function refreshQualityScores(params: RefreshQualityScoresParams): Promise
         (acc, item) => acc + (item.nonBlankLines || 0),
         0,
     );
-    recordHistoricalQualitySample(config, projectQualityScore.compositeScore, totalEffectiveLines);
+    if (!params.snapshotSource) {
+        recordHistoricalQualitySample(
+            config, projectQualityScore.compositeScore, totalEffectiveLines,
+        );
+    }
     projectQualityScore.quant = synthesizeProjectQuant(
         config,
         projectQualityScore,
         fileMetrics,
         report.issues,
     );
-    applyAutonomyScore(report, config, reportScanner);
+    if (!params.snapshotSource) applyAutonomyScore(report, config, reportScanner);
     report.governance = await synthesizeNativeGovernance({
         report,
         config,
         scope,
         // Reuse the text this scan already read; empty when retention sealed, or when the report
         // came from a warm/daemon scan, in which case governance reads from disk instead.
-        contentByPath: reportScanner?.retainedSourceText(),
+        contentByPath: params.snapshotSource ?? reportScanner?.retainedSourceText(),
+        allowHostRead: params.snapshotSource === undefined,
         logger,
     });
 }
@@ -1093,38 +1080,10 @@ async function applyArbitrationPass(
  * @param finalizeArguments - Context payload or positional execution arguments.
  * Concurrency: reentrant, idempotent async execution; safe for single-threaded runtime.
  */
-export async function finalizeReport(
-    ...finalizeArguments:
-        | [context: FinalizeReportContext]
-        | [
-              report: ScanReport,
-              config: ScanConfig,
-              options: FinalizeBaselineOptions,
-              logger: Logger,
-              reportScanner?: Scanner | null,
-              scope?: PostScanScope,
-          ]
-): Promise<void> {
-    const firstArg = finalizeArguments[0];
-    const isContextObject =
-        finalizeArguments.length === 1 &&
-        firstArg !== null &&
-        typeof firstArg === 'object' &&
-        KEY_REPORT in firstArg &&
-        KEY_CONFIG in firstArg;
+export async function finalizeReport(...finalizeArguments: FinalizeReportArguments): Promise<void> {
+    const context = resolveFinalizeContext(finalizeArguments);
 
-    const context: FinalizeReportContext = isContextObject
-        ? (firstArg as FinalizeReportContext)
-        : {
-              report: finalizeArguments[0] as ScanReport,
-              config: finalizeArguments[1] as ScanConfig,
-              options: finalizeArguments[2] as FinalizeBaselineOptions,
-              logger: finalizeArguments[3] as Logger,
-              reportScanner: finalizeArguments[4] ?? null,
-              scope: finalizeArguments[5] ?? POST_SCAN_SCOPE_FULL,
-          };
-
-    const { report, config, options, logger } = context;
+    const { report, config, options, logger, snapshotSource } = context;
     const reportScanner = context.reportScanner ?? null;
     const scope = context.scope ?? POST_SCAN_SCOPE_FULL;
 
@@ -1144,6 +1103,7 @@ export async function finalizeReport(
         scope,
         warnings,
         postScanPasses,
+        snapshotSource,
     };
 
     await applyDependencyGraphPass(passContext);
@@ -1151,7 +1111,7 @@ export async function finalizeReport(
     applyConstTopologyPass(passContext);
     applyErrorFlowPass(passContext);
     applySemanticComplexityPass(passContext);
-    applyEmptyDirectoryPass(passContext);
+    if (!snapshotSource) applyEmptyDirectoryPass(passContext);
 
     const cappedCount = applyAnalyzerSeverityCaps(report, config);
     postScanPasses.push(PASS_SUPPRESSIONS);
@@ -1159,9 +1119,21 @@ export async function finalizeReport(
         report,
         config.suppressions ?? [],
         config.root,
-        reportScanner?.retainedSourceText(),
+        snapshotSource ?? reportScanner?.retainedSourceText(),
+        snapshotSource === undefined,
     );
     report.summary.suppressedCount = suppressedCount;
+
+    if (snapshotSource) {
+        warnings.push('snapshot-external-enrichment-unavailable');
+        await refreshQualityScores({
+            report, config, reportScanner, scope, logger, initialIssueCount, snapshotSource,
+        });
+        computeSummary(report);
+        report.summary.postScanPasses = postScanPasses;
+        report.summary.warnings = warnings;
+        return;
+    }
 
     const calibrationStats = await loadEnrichedCalibrationStats({
         corpusPath: options.confidenceCorpus,

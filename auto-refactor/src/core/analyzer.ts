@@ -862,9 +862,12 @@ export class Scanner implements ScannerContext {
         issues: Issue[],
         fileMetrics: FileMetric[],
         durationMs: number,
+        snapshotSource?: ReadonlyMap<string, string>,
     ): ScanReport {
-        this.saveRouterBiasState(issues, filesScanned, durationMs);
-        this.saveRuleSamplingLedger(issues, filesScanned);
+        if (!snapshotSource) {
+            this.saveRouterBiasState(issues, filesScanned, durationMs);
+            this.saveRuleSamplingLedger(issues, filesScanned);
+        }
         return buildScanReport({
             host: {
                 config: this.config,
@@ -874,11 +877,13 @@ export class Scanner implements ScannerContext {
                 symbolIndex: this.symbolIndex,
                 literalIndex: this.literalIndex,
                 activatedReviewers: this.activatedReviewersSummary,
+                retainedSourceText: () => this.retainedSourceText(),
             },
             filesScanned,
             issues,
             fileMetrics,
             durationMs,
+            snapshotSource,
         });
     }
 }

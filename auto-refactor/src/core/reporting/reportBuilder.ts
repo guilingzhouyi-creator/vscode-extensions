@@ -121,6 +121,8 @@ export interface BuildScanReportContext {
     readonly issues: Issue[];
     readonly fileMetrics: FileMetric[];
     readonly durationMs: number;
+    /** Fixed source input suppresses history writes and host-derived autonomy enrichment. */
+    readonly snapshotSource?: ReadonlyMap<string, string>;
 }
 
 /**
@@ -299,13 +301,14 @@ function collectFileQuality(
     host: ReportHost,
     fileMetrics: FileMetric[],
     issuesByFile: Map<string, Issue[]>,
+    persistMemory = true,
 ): Record<string, QualityScoreBreakdown> {
     const fileQualityScores: Record<string, QualityScoreBreakdown> = {};
     for (const metric of fileMetrics) {
         const fileIssues = resolveFileIssues(issuesByFile, metric.file);
         const score = host.scorer.evaluateFile(metric.file, fileIssues, metric, host.config);
         fileQualityScores[metric.file] = score;
-        recordFileMemory(host, metric, fileIssues, score);
+        if (persistMemory) recordFileMemory(host, metric, fileIssues, score);
     }
     return fileQualityScores;
 }
@@ -414,11 +417,13 @@ function preapplyRetainedInlineSuppressions(
 export function buildScanReport(params: BuildScanReportContext): ScanReport {
     const host = params.host;
     const cfg = host.config;
-    const retainedSource = host.retainedSourceText?.();
+    const retainedSource = params.snapshotSource ?? host.retainedSourceText?.();
     preapplyRetainedInlineSuppressions(params.issues, retainedSource);
     const tallies = computeTallyIssues(params.issues);
     const issuesByFile = groupIssuesByFile(params.issues);
-    const fileQualityScores = collectFileQuality(host, params.fileMetrics, issuesByFile);
+    const fileQualityScores = collectFileQuality(
+        host, params.fileMetrics, issuesByFile, params.snapshotSource === undefined,
+    );
     const projectQualityScore = host.scorer.evaluateProject(
         fileQualityScores,
         params.fileMetrics,
@@ -431,14 +436,14 @@ export function buildScanReport(params: BuildScanReportContext): ScanReport {
         dynamicTelemetry && dynamicTelemetry.isObserved !== false
             ? computeDynamicQualityVector(dynamicTelemetry)
             : undefined;
-    const historicalScore = resolveHistoricalQualityScore(cfg);
+    const historicalScore = params.snapshotSource ? undefined : resolveHistoricalQualityScore(cfg);
     const triPlaneQuality = computeUnifiedQualityScore(
         staticVector,
         dynamicVector,
         historicalScore,
         resolveGovernanceProfile(cfg),
     );
-    const autonomy = evaluateProjectAutonomy(
+    const autonomy = params.snapshotSource ? undefined : evaluateProjectAutonomy(
         params.fileMetrics,
         params.issues,
         cfg,
@@ -446,7 +451,7 @@ export function buildScanReport(params: BuildScanReportContext): ScanReport {
         host.symbolIndex,
     );
 
-    host.reviewMemory.flush();
+    if (!params.snapshotSource) host.reviewMemory.flush();
     const runnerToolName = TOOL_NAME;
     const runnerToolVersion = TOOL_VERSION;
     return {
