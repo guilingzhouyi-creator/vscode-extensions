@@ -7,10 +7,11 @@
  *   consumed by public scanner, CLI entry points, and multi-agent collaborative workflows.
  * Responsibilities: Execute 7-stage workflow (Structure -> Partition -> Local -> Callback ->
  *   Cascade -> Global Invariants -> Elastic Scoring); manage cooperative event-loop yields.
- * Exit Semantics & Design Rationale: Never throws; handles large-scale multi-file inputs safely
- *   and outputs structured SparseSchedulerResult with timing, savings, and converged graph facts.
+ * Exit Semantics & Design Rationale: Missing inputs and executor errors reject with lease cleanup;
+ *   successful runs output structured scheduling results and converged graph facts.
  */
 
+import { randomUUID } from 'node:crypto';
 import type { Issue } from '../types';
 import { analyzeCodeDensity } from '../intelligence/code-density-analyzer';
 import { inferFineGrainedFileRole } from '../intelligence/file-role-inference';
@@ -51,6 +52,40 @@ export type DomainAuditExecutor = (
     partition: ReviewPartition,
 ) => Promise<Issue[]>;
 
+type AuditRun = {
+    readonly executor?: DomainAuditExecutor;
+    readonly cascadeEvents: ReviewCascadeEvent[];
+    readonly contextHash?: string;
+    readonly contentHashes?: ReadonlyMap<string, string>;
+    readonly options?: SparseSchedulerOptions;
+};
+
+/**
+ * Capture the full supplied workspace and opaque executor generation before yielding.
+ * O(n log n + bytes) time and O(n) temporary entries; no cache authority is inferred from routing.
+ */
+function captureAuditRun(
+    executor: DomainAuditExecutor | undefined,
+    generation: string,
+    inputs: ReadonlyMap<string, string>,
+    options?: SparseSchedulerOptions,
+): AuditRun {
+    if (!options?.analysisGeneration) return { executor, options, cascadeEvents: [] };
+    const contentHashes = new Map<string, string>();
+    const paths = [...inputs.keys()].sort();
+    for (const path of paths) contentHashes.set(path, computeSimpleContentHash(inputs.get(path)!));
+    return {
+        executor,
+        options,
+        cascadeEvents: [],
+        contentHashes,
+        contextHash: computeSimpleContentHash(JSON.stringify([
+            generation, options.analysisGeneration,
+            [...contentHashes], options.dependencyEdges ?? [],
+        ])),
+    };
+}
+
 /**
  * Configuration options for initializing a SparseOrchestrator instance.
  */
@@ -74,6 +109,7 @@ export class SparseOrchestrator {
     private readonly topologyCache: TopologyCacheManager;
     private readonly quotaGateway: AgentQuotaGateway;
     private customExecutor?: DomainAuditExecutor;
+    private executorGeneration = randomUUID();
 
     public constructor(options: SparseOrchestratorOptions = {}) {
         this.partitioner = options.partitioner ?? defaultDynamicPartitioner;
@@ -89,6 +125,7 @@ export class SparseOrchestrator {
      */
     public setAuditExecutor(executor: DomainAuditExecutor): void {
         this.customExecutor = executor;
+        this.executorGeneration = randomUUID();
     }
     /**
      * Attempts to acquire an agent lease for quota tracking.
@@ -142,9 +179,12 @@ export class SparseOrchestrator {
         file: string,
         content: string,
         partition: ReviewPartition,
+        run: AuditRun,
     ): Promise<{ findings: Issue[]; cacheHit: boolean }> {
-        const contentHash = computeSimpleContentHash(content);
-        const cached = this.cache.get(file, contentHash);
+        const contentHash = run.contentHashes?.get(file) ?? computeSimpleContentHash(content);
+        const contextHash = run.contextHash
+            ? computeSimpleContentHash(JSON.stringify([run.contextHash, partition])) : undefined;
+        const cached = contextHash ? this.cache.get(file, contentHash, contextHash) : undefined;
         if (cached) {
             return { findings: cached.localFindings, cacheHit: true };
         }
@@ -153,13 +193,14 @@ export class SparseOrchestrator {
         const roleInference = inferFineGrainedFileRole(file, content.slice(0, 300));
         let findingsForFile: Issue[] = [];
 
-        if (this.customExecutor) {
-            findingsForFile = await this.customExecutor(file, content, partition);
+        if (run.executor) {
+            findingsForFile = await run.executor(file, content, partition);
         }
 
-        this.cache.set({
+        if (contextHash) this.cache.set({
             filePath: file,
             contentHash,
+            contextHash,
             role: roleInference.role,
             density,
             localFindings: findingsForFile,
@@ -167,7 +208,6 @@ export class SparseOrchestrator {
             cachedAt: Date.now(),
         });
         this.topologyCache.put(file, contentHash, contentHash, findingsForFile);
-        this.detectAndDispatchCascades(file, content, findingsForFile);
 
         return { findings: findingsForFile, cacheHit: false };
     }
@@ -175,18 +215,19 @@ export class SparseOrchestrator {
     private async collectPartitionIssues(
         partition: ReviewPartition,
         fileContents: Map<string, string>,
-        onCacheHit: () => void,
-        onProcessedUnit: () => Promise<void>,
+        run: AuditRun,
+        callbacks: { onCacheHit: () => void; onProcessedUnit: () => Promise<void> },
     ): Promise<Issue[]> {
         const partitionFindings: Issue[] = [];
         for (const file of partition.primaryFiles) {
             const content = fileContents.get(file) ?? '';
-            const fileResult = await this.analyzeFileInPartition(file, content, partition);
+            const fileResult = await this.analyzeFileInPartition(file, content, partition, run);
             if (fileResult.cacheHit) {
-                onCacheHit();
+                callbacks.onCacheHit();
             }
+            this.detectAndDispatchCascades(file, content, fileResult.findings, run.cascadeEvents);
             partitionFindings.push(...fileResult.findings);
-            await onProcessedUnit();
+            await callbacks.onProcessedUnit();
         }
         return partitionFindings;
     }
@@ -194,7 +235,7 @@ export class SparseOrchestrator {
     private async executeLocalAnalysis(
         partitions: ReviewPartition[],
         fileContents: Map<string, string>,
-        options: SparseSchedulerOptions | undefined,
+        run: AuditRun,
         convergenceEngine: SemanticConvergenceEngine,
     ): Promise<{ durationMs: number; cacheHits: number }> {
         const t3Start = Date.now();
@@ -210,21 +251,22 @@ export class SparseOrchestrator {
             const partitionFindings = await this.collectPartitionIssues(
                 partition,
                 fileContents,
-                () => {
-                    cacheHits++;
-                },
-                async () => {
-                    processedUnits++;
-                    if (processedUnits % 15 === 0) {
-                        await cooperativeYield();
-                    }
+                run,
+                {
+                    onCacheHit: () => { cacheHits++; },
+                    onProcessedUnit: async () => {
+                        processedUnits++;
+                        if (processedUnits % 15 === 0) {
+                            await cooperativeYield();
+                        }
+                    },
                 },
             );
 
             resultBus.push({
                 partitionId: partition.id,
                 issues: partitionFindings,
-                dependencies: options?.dependencyEdges,
+                dependencies: run.options?.dependencyEdges,
                 executionTimeMs: Math.max(1, Date.now() - partitionStart),
             });
         }
@@ -293,7 +335,30 @@ export class SparseOrchestrator {
         fileContents: Map<string, string>,
         options?: SparseSchedulerOptions,
     ): Promise<SparseSchedulerResult> {
+        files = [...files];
+        fileContents = new Map(fileContents);
+        options = options ? structuredClone(options) : undefined;
+        const run = captureAuditRun(
+            this.customExecutor, this.executorGeneration, fileContents, options,
+        );
+        for (const file of files) {
+            if (file && file.trim() && !fileContents.has(file)) {
+                throw new Error(`Missing review input: ${file}`);
+            }
+        }
         const agentLease = this.acquireAgentLease(options);
+        try {
+            const result = await this.executeCapturedReview(files, fileContents, run);
+            return { ...result, agentLeaseId: agentLease?.leaseId };
+        } finally {
+            if (agentLease) this.quotaGateway.releaseLease(agentLease.leaseId);
+        }
+    }
+
+    private async executeCapturedReview(
+        files: string[], fileContents: Map<string, string>, run: AuditRun,
+    ): Promise<SparseSchedulerResult> {
+        const options = run.options;
         const timings = {
             structureAnalysis: 0,
             partitioning: 0,
@@ -314,12 +379,12 @@ export class SparseOrchestrator {
         const localResult = await this.executeLocalAnalysis(
             partitions,
             fileContents,
-            options,
+            run,
             convergenceEngine,
         );
         timings.localAnalysis = localResult.durationMs;
 
-        const cascadeEvents = this.eventBus.getDispatchedEvents();
+        const cascadeEvents = run.cascadeEvents;
         if (options?.enableSecondaryCheck !== false && cascadeEvents.length > 0) {
             timings.secondaryCheck = this.executeSecondaryRecheck(
                 cascadeEvents,
@@ -338,10 +403,6 @@ export class SparseOrchestrator {
         const t7Start = Date.now();
         timings.scoring = Math.max(1, Date.now() - t7Start);
 
-        if (agentLease) {
-            this.quotaGateway.releaseLease(agentLease.leaseId);
-        }
-
         const totalPossibleDomainUnits = validFiles.length * 5;
         const activatedUnits = partitions.reduce(
             (acc, partition) =>
@@ -351,11 +412,11 @@ export class SparseOrchestrator {
         const sparseActivationSavingsRatio =
             totalPossibleDomainUnits > 0
                 ? Number(
-                      (
-                          1 -
-                          activatedUnits / Math.max(activatedUnits, totalPossibleDomainUnits)
-                      ).toFixed(2),
-                  )
+                    (
+                        1 -
+                        activatedUnits / Math.max(activatedUnits, totalPossibleDomainUnits)
+                    ).toFixed(2),
+                )
                 : 0.5;
 
         return {
@@ -369,14 +430,15 @@ export class SparseOrchestrator {
             convergedResult: converged,
             circularDependencies: converged.circularDependencies,
             symbolConflicts: converged.symbolConflicts,
-            agentLeaseId: agentLease?.leaseId,
         };
     }
 
     /**
      * Detects potential semantic conflicts and dispatches cross-domain cascade events.
      */
-    private detectAndDispatchCascades(file: string, content: string, findings: Issue[]): void {
+    private detectAndDispatchCascades(
+        file: string, content: string, findings: Issue[], cascades: ReviewCascadeEvent[],
+    ): void {
         // Scenario 1: Comment contract contradicts implementation
         if (content.includes('Pure Utility') && /this\.\w+\s*=|global\.\w+\s*=/i.test(content)) {
             const event: ReviewCascadeEvent = {
@@ -387,6 +449,7 @@ export class SparseOrchestrator {
                 affectedFiles: [file],
                 reason: 'Module header claims pure utility, but AST contains mutable state writes',
             };
+            cascades.push(event);
             this.eventBus.dispatch(event);
         }
 
@@ -403,6 +466,7 @@ export class SparseOrchestrator {
                 reason: 'Identifier symbol collides with shared constants table',
                 triggeringFinding: namingIssue,
             };
+            cascades.push(event);
             this.eventBus.dispatch(event);
         }
     }

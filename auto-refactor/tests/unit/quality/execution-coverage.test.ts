@@ -44,7 +44,8 @@ describe('actual semantic adapter execution', () => {
         const registry = new SemanticAdapterRegistry();
         const capabilities = registry.getCapabilitiesForFile(path);
         expect(capabilities).toMatchObject({
-            language, graphExtraction: mode, version: '1', supportsSlice: false,
+            language, graphExtraction: mode, version: language === 'typescript' ? '2' : '1',
+            supportsSlice: false,
         });
         expect(capabilities).not.toHaveProperty('status');
         expect(Object.isFrozen(capabilities)).toBe(true);

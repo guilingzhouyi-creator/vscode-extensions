@@ -46,6 +46,26 @@ describe('review pass coverage', () => {
     it('rejects observations outside the captured input scope', () => {
         expect(() => reduce([{ ...pass(), path: 'src/other.ts' }])).toThrow(/scope/);
     });
+    it('preserves the first analyzer observation within each pass', () => {
+        const first = pass(undefined, true);
+        const duplicate = { ...first, analyzers: [...first.analyzers, ...pass().analyzers] };
+        expect(reduce([duplicate])).toMatchObject([{
+            status: 'failed', reason: 'analyzer-threw', calls: 1,
+        }]);
+        expect(() => coverage.collectExecutionCoverage({
+            requirements: [{ analyzer: 'performance', version: 1 }],
+            inputs: [{ path: first.path, kind: 'text' }], execution: [duplicate],
+        })).toThrow('Duplicate analyzer execution observation');
+    });
+    it('keeps an absent required expert incomplete beside observed experts', () => {
+        expect(coverage.collectReviewPassCoverage({
+            requirements: [{ analyzer: 'performance', version: 1 }, { analyzer: 'complexity', version: 1 }],
+            inputs: [{ path: 'src/a.ts', kind: 'text' }], execution: [pass()],
+        })).toMatchObject([
+            { analyzer: 'performance', status: 'executed', calls: 1 },
+            { analyzer: 'complexity', status: 'supported', reason: 'analyzer-not-run', calls: 0 },
+        ]);
+    });
     it('does not join different analyzer versions into one executed fact', () => {
         const changed = { ...pass(), analyzers: [{ ...pass().analyzers[0], version: 2 }] };
         expect(reduce([pass(), changed])).toMatchObject([{

@@ -82,8 +82,10 @@ export interface ReviewCascadeEvent {
 export interface ReviewContextEntry {
     /** Relative file path */
     filePath: string;
-    /** Content fingerprint hash */
+    /** Exact source string fingerprint. */
     contentHash: string;
+    /** Execution, workspace and partition identity; absent only for legacy direct cache callers. */
+    contextHash?: string;
     /** Inferred architectural role */
     role: FineGrainedFileRole;
     /** Evaluated code density metrics */
@@ -98,6 +100,11 @@ export interface ReviewContextEntry {
 
 /** Options configuring scale-adaptive sparse orchestration */
 export interface SparseSchedulerOptions {
+    /**
+     * Caller-declared analyzer/configuration generation, including external executor dependencies.
+     * Omit to disable finding reuse when an executor's complete configuration is unknown.
+     */
+    analysisGeneration?: string;
     /** Maximum worker concurrency */
     maxConcurrency?: number;
     /** Enable secondary cascade verification (default: true) */

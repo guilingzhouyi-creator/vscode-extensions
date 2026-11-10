@@ -36,10 +36,16 @@ interface CoverageInput {
     readonly inputs: readonly InputObservation[];
     readonly execution: readonly FileExecutionObservation[];
 }
-/** One analyzer entry bound to the pass (and optional line window) that produced it. */
-interface ObservedPass {
-    readonly pass: FileExecutionObservation;
-    readonly analyzer: AnalyzerExecutionObservation;
+/** Per-file/analyzer evidence retaining original failure, invocation and whole-file precedence. */
+interface PassSummary {
+    readonly first: AnalyzerExecutionObservation;
+    calls: number;
+    invoked?: AnalyzerExecutionObservation;
+    failed?: AnalyzerExecutionObservation;
+    invalidCalls: boolean;
+    inconsistentVersion: boolean;
+    invokedFile?: FileExecutionObservation;
+    wholeFile: boolean;
 }
 type Outcome = Pick<ReviewCapabilityCoverage, 'status' | 'reason'>;
 
@@ -123,66 +129,41 @@ function parserOutcome(
     return { status: 'executed' };
 }
 
-function collectObserved(
-    requirement: FileAnalysisRequirement,
-    passes: readonly FileExecutionObservation[],
-): ObservedPass[] {
-    const observed: ObservedPass[] = [];
-    for (const pass of passes) {
-        const analyzer = pass.analyzers.find((entry) => entry.analyzer === requirement.analyzer);
-        if (analyzer) observed.push({ pass, analyzer });
-    }
-    return observed;
-}
-
 /**
- * Reduce every pass for one required analyzer without letting a union of windows claim the file.
- * Complexity is O(passes); failures and version disagreement outrank later successful retries.
+ * Decide a requirement from a single-pass summary; failures retain observation order.
  * @param requirement - Required analyzer and optional pinned version.
- * @param observed - Analyzer entries observed across the passes of one file.
+ * @param observed - Summary for one file/analyzer, absent when never observed.
  * @param language - Language inferred from the snapshot path.
  * @returns A single outcome describing the file as a whole.
  */
 function passOutcome(
     requirement: FileAnalysisRequirement,
-    observed: readonly ObservedPass[],
+    observed: PassSummary | undefined,
     language: string,
 ): Outcome {
-    const failed = observed.find((entry) => entry.analyzer.status === 'failed');
-    if (failed) return { status: 'failed', reason: failed.analyzer.reason ?? 'analyzer-failed' };
+    if (observed?.failed) {
+        return { status: 'failed', reason: observed.failed.reason ?? 'analyzer-failed' };
+    }
     const declaration = languageOutcome(requirement.analyzer, language);
     if (declaration) return declaration;
-    const invoked = observed.filter((entry) => entry.analyzer.calls > 0);
-    if (invoked.length === 0) {
-        return { status: 'supported', reason: observed[0]?.analyzer.reason ?? 'analyzer-not-run' };
+    if (!observed?.invoked || !observed.invokedFile) {
+        return { status: 'supported', reason: observed?.first.reason ?? 'analyzer-not-run' };
     }
-    if (invoked.some((entry) => validCalls(entry.analyzer) !== entry.analyzer.calls)) {
-        return { status: 'failed', reason: 'invalid-call-count' };
-    }
-    if (new Set(invoked.map((entry) => entry.analyzer.version)).size > 1) {
-        return { status: 'failed', reason: 'inconsistent-analyzer-version' };
-    }
-    for (const entry of invoked) {
-        const version = versionOutcome(requirement, entry.analyzer);
-        if (version) return version;
-    }
-    for (const entry of invoked) {
-        if (entry.pass.lineBounds) continue;
-        const outcome = parserOutcome(entry.pass, entry.analyzer);
-        if (outcome.status === 'executed') return outcome;
-    }
-    return parserOutcome(invoked[0].pass, invoked[0].analyzer);
+    if (observed.invalidCalls) return { status: 'failed', reason: 'invalid-call-count' };
+    if (observed.inconsistentVersion) return { status: 'failed', reason: 'inconsistent-analyzer-version' };
+    const version = versionOutcome(requirement, observed.invoked);
+    if (version) return version;
+    if (observed.wholeFile) return { status: 'executed' };
+    return parserOutcome(observed.invokedFile, observed.invoked);
 }
 
 function reduceRequirement(
     source: InputObservation,
     requirement: FileAnalysisRequirement,
-    passes: readonly FileExecutionObservation[],
+    observed: PassSummary | undefined,
 ): FileAnalysisCoverage {
     const language = getLanguageIdFromPath(source.path) ?? 'unknown';
-    const observed = collectObserved(requirement, passes);
-    let calls = 0;
-    for (const entry of observed) calls += validCalls(entry.analyzer);
+    const calls = observed?.calls ?? 0;
     const outcome: Outcome = source.kind === 'text'
         ? passOutcome(requirement, observed, language)
         : { status: 'unsupported', reason: `input-${source.kind}` };
@@ -193,30 +174,71 @@ function reduceRequirement(
         language,
         required: true,
         calls,
-        observedVersion: observed[0]?.analyzer.version ?? null,
+        observedVersion: observed?.first.version ?? null,
         ...(requirement.version === undefined ? {} : { requiredVersion: requirement.version }),
         ...outcome,
     });
 }
 
 /**
- * Group repeated passes by path while refusing observations outside the captured input scope.
+ * Accumulate first-observation and invocation evidence without retaining per-pass wrappers.
+ * @param summary - Persistent summary for one file/analyzer pair.
+ * @param pass - Current original pass.
+ * @param analyzer - First matching analyzer observation in that pass.
+ */
+function accumulatePass(
+    summary: PassSummary, pass: FileExecutionObservation, analyzer: AnalyzerExecutionObservation,
+): void {
+    summary.calls += validCalls(analyzer);
+    if (analyzer.status === 'failed' && !summary.failed) summary.failed = analyzer;
+    if (!(analyzer.calls > 0)) return;
+    if (!summary.invoked) {
+        summary.invoked = analyzer;
+        summary.invokedFile = pass;
+    }
+    const version = summary.invoked.version;
+    const sameVersion = version === analyzer.version ||
+        (Number.isNaN(version) && Number.isNaN(analyzer.version));
+    if (!sameVersion) {
+        summary.inconsistentVersion = true;
+    }
+    if (validCalls(analyzer) !== analyzer.calls) summary.invalidCalls = true;
+    if (!summary.wholeFile && !pass.lineBounds) {
+        summary.wholeFile = parserOutcome(pass, analyzer).status === 'executed';
+    }
+}
+
+/**
+ * Index passes by file and analyzer in O(observed calls), preserving first duplicate semantics.
  * @param execution - Every observed pass, including bounded rework and compensation runs.
  * @param scope - Paths accepted by the enclosing snapshot request.
- * @returns Passes per path in observation order.
+ * @returns Reduced evidence retaining no per-pass arrays or wrappers.
  */
-function groupPasses(
+function groupObservedPasses(
     execution: readonly FileExecutionObservation[],
     scope: ReadonlySet<string>,
-): Map<string, FileExecutionObservation[]> {
-    const passes = new Map<string, FileExecutionObservation[]>();
+): Map<string, Map<string, PassSummary>> {
+    const passes = new Map<string, Map<string, PassSummary>>(
+        Array.from(scope, (path) => [path, new Map<string, PassSummary>()]),
+    );
+    const names = new Set<string>();
     for (const pass of execution) {
-        if (!scope.has(pass.path)) {
+        const file = passes.get(pass.path);
+        if (!file) {
             throw new Error('Execution observation outside the captured input scope');
         }
-        const existing = passes.get(pass.path);
-        if (existing) existing.push(pass);
-        else passes.set(pass.path, [pass]);
+        names.clear();
+        for (const analyzer of pass.analyzers) {
+            if (names.has(analyzer.analyzer)) continue;
+            names.add(analyzer.analyzer);
+            let summary = file.get(analyzer.analyzer);
+            if (!summary) {
+                summary = { first: analyzer, calls: 0, invalidCalls: false,
+                    inconsistentVersion: false, wholeFile: false };
+                file.set(analyzer.analyzer, summary);
+            }
+            accumulatePass(summary, pass, analyzer);
+        }
     }
     return passes;
 }
@@ -232,12 +254,14 @@ export function collectReviewPassCoverage(input: CoverageInput): readonly FileAn
     const requirements = captureFileRequirements(input.requirements);
     const scope = new Set(input.inputs.map((source) => source.path));
     if (scope.size !== input.inputs.length) throw new Error('Duplicate snapshot input observation');
-    const passes = groupPasses(input.execution, scope);
+    const passes = groupObservedPasses(input.execution, scope);
     const coverage: FileAnalysisCoverage[] = [];
     for (const source of input.inputs) {
-        const filePasses = passes.get(source.path) ?? [];
         for (const requirement of requirements) {
-            coverage.push(reduceRequirement(source, requirement, filePasses));
+            const observed = passes.get(source.path)?.get(requirement.analyzer);
+            coverage.push(reduceRequirement(
+                source, requirement, observed,
+            ));
         }
     }
     return Object.freeze(coverage);
@@ -250,10 +274,11 @@ export function collectReviewPassCoverage(input: CoverageInput): readonly FileAn
  */
 export function collectExecutionCoverage(input: CoverageInput): readonly FileAnalysisCoverage[] {
     const files = new Set<string>();
+    const names = new Set<string>();
     for (const pass of input.execution) {
         if (files.has(pass.path)) throw new Error('Duplicate file execution observation');
         files.add(pass.path);
-        const names = new Set<string>();
+        names.clear();
         for (const analyzer of pass.analyzers) {
             if (names.has(analyzer.analyzer)) throw new Error('Duplicate analyzer execution observation');
             names.add(analyzer.analyzer);

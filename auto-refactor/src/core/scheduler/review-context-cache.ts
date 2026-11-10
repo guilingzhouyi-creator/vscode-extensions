@@ -4,26 +4,27 @@
  * Architecture Role: In-memory cache store preserving AST facts, density metrics, and findings;
  *   powers secondary cascade re-checks and cross-partition verification without redundant I/O.
  * Dependencies & Triggers: scheduler-types; consumed by sparse-orchestrator.
- * Responsibilities: Cache file review context keyed by file path and content fingerprint;
+ * Responsibilities: Cache detached facts by source, workspace, execution and partition identity;
  *   track hit/miss metrics; provide query access for secondary semantic cascade passes.
- * Exit Semantics & Design Rationale: Bounded LRU-style in-memory map; never throws.
+ * Exit Semantics & Design Rationale: Bounded LRU map; non-cloneable entry payloads fail explicitly.
  */
 
 import type { ReviewContextEntry } from './scheduler-types';
 import { LruCache } from '../data-structures/lru-cache';
-import { javaHash } from '../algorithms/hash';
+import { createHash } from 'node:crypto';
 
 /** Maximum retained in-memory cache entries */
 const MAX_CACHE_ENTRIES = 2000;
 
 /**
- * Computes a fast deterministic content hash string using Java-style polynomial accumulation.
+ * Computes an opaque SHA-256 fingerprint of the exact UTF-16 code units.
+ * UTF-16 preserves distinct unpaired surrogates that UTF-8 replaces with the same bytes.
  *
  * @param content - Source file content
- * @returns Formatted hash string
+ * @returns Versioned cryptographic fingerprint; the historical export name remains compatible.
  */
 export function computeSimpleContentHash(content: string): string {
-    return `h${javaHash(content)}_${content.length}`;
+    return `sha256-utf16:${createHash('sha256').update(content, 'utf16le').digest('hex')}`;
 }
 
 /**
@@ -39,14 +40,17 @@ export class ReviewContextCache {
      * Refreshes entry recency in the LRU eviction order upon hit.
      *
      * @param filePath - Target file path
-     * @param contentHash - Expected content fingerprint hash
-     * @returns Matching ReviewContextEntry or undefined
+     * @param contentHash - Expected exact content fingerprint.
+     * @param contextHash - Workspace, configuration, executor and partition identity.
+     * @returns Detached matching entry or undefined.
      */
-    public get(filePath: string, contentHash: string): ReviewContextEntry | undefined {
-        const entry = this.entries.get(filePath);
-        if (entry && entry.contentHash === contentHash) {
+    public get(
+        filePath: string, contentHash: string, contextHash?: string,
+    ): ReviewContextEntry | undefined {
+        const entry = this.entries.get(JSON.stringify([filePath, contextHash ?? null]));
+        if (entry && entry.contentHash === contentHash && entry.contextHash === contextHash) {
             this.hitCount++;
-            return entry;
+            return structuredClone(entry);
         }
         this.missCount++;
         return undefined;
@@ -59,14 +63,16 @@ export class ReviewContextCache {
      * @param entry - Context entry payload
      */
     public set(entry: ReviewContextEntry): void {
-        this.entries.set(entry.filePath, entry);
+        this.entries.set(
+            JSON.stringify([entry.filePath, entry.contextHash ?? null]), structuredClone(entry),
+        );
     }
 
     /**
      * Returns all currently retained context entries.
      */
     public getAllEntries(): ReviewContextEntry[] {
-        return Array.from(this.entries.values());
+        return structuredClone(Array.from(this.entries.values()));
     }
 
     /**
