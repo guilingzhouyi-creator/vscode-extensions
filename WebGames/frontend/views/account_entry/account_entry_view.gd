@@ -219,17 +219,17 @@ func _render_from_snapshot() -> void:
         server_list = FrontendSnapshot.read_array(snapshot, "default_servers")
     if snapshot.has("character_slots"):
         character_slots = FrontendSnapshot.read_array(snapshot, "character_slots")
-	if _has_mod_creation_snapshot_keys(snapshot):
-		_get_tabs().sync_mod_creation_snapshot(snapshot)
+    if _has_mod_creation_snapshot_keys(snapshot):
+        _get_tabs().sync_mod_creation_snapshot(snapshot)
 
 func _has_mod_creation_snapshot_keys(snap: Dictionary) -> bool:
-	return snap.has("creation_ui_snapshot") or snap.has("mod_precheck_checklist") or snap.has("precheck_checklist") or snap.has("ui_controls") or snap.has("creation_ui_controls") or snap.has("available_origins_list") or snap.has("available_origins") or snap.has("available_traits_list") or snap.has("available_trait_pairs")
+    return snap.has("creation_ui_snapshot") or snap.has("mod_precheck_checklist") or snap.has("precheck_checklist") or snap.has("ui_controls") or snap.has("creation_ui_controls") or snap.has("available_origins_list") or snap.has("available_origins") or snap.has("available_traits_list") or snap.has("available_trait_pairs")
 
 func _extract_origin_id(entry: Variant) -> String:
-	return TabsClass.extract_origin_id(entry)
+    return TabsClass.extract_origin_id(entry)
 
 func _extract_positive_trait_id(entry: Variant) -> String:
-	return TabsClass.extract_positive_trait_id(entry)
+    return TabsClass.extract_positive_trait_id(entry)
 
 func select_custom_origin_by_index(idx: int) -> bool:
     if not bool(creation_ui_controls.get("allow_manual_origin_select", false)):

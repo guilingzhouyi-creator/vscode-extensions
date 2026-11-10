@@ -258,55 +258,55 @@ func race_to_name(race_key: String) -> String:
         _: return race_key
 
 func town_to_name(town_key: String) -> String:
-	match town_key.to_upper():
-		"VALAN_CAPITAL": return UIIntermediary.text("ui.fe01.char_select.town_valan")
-		"SILVER_GROVE": return UIIntermediary.text("ui.fe01.char_select.town_silver")
-		"IRON_FORTRESS": return UIIntermediary.text("ui.fe01.char_select.town_iron")
-		_: return town_key
+    match town_key.to_upper():
+        "VALAN_CAPITAL": return UIIntermediary.text("ui.fe01.char_select.town_valan")
+        "SILVER_GROVE": return UIIntermediary.text("ui.fe01.char_select.town_silver")
+        "IRON_FORTRESS": return UIIntermediary.text("ui.fe01.char_select.town_iron")
+        _: return town_key
 
 func sync_mod_creation_snapshot(snap: Dictionary) -> void:
-	var view: AccountEntryView = _view
-	var src: Dictionary = snap
-	if snap.get("creation_ui_snapshot") is Dictionary:
-		src = snap.get("creation_ui_snapshot") as Dictionary
-	var chk_src: Dictionary = src if (src.has("mod_precheck_checklist") or src.has("precheck_checklist")) else snap
-	var chk_k: String = "mod_precheck_checklist" if chk_src.has("mod_precheck_checklist") else "precheck_checklist"
-	if chk_src.has(chk_k):
-		view.mod_precheck_checklist = FrontendSnapshot.read_array(chk_src, chk_k)
-	var orig_src: Dictionary = src if (src.has("available_origins_list") or src.has("available_origins")) else snap
-	var orig_k: String = "available_origins_list" if orig_src.has("available_origins_list") else "available_origins"
-	if orig_src.has(orig_k):
-		view.available_origins_list = FrontendSnapshot.read_array(orig_src, orig_k)
-	var trt_src: Dictionary = src if (src.has("available_traits_list") or src.has("available_trait_pairs")) else snap
-	var trt_k: String = "available_traits_list" if trt_src.has("available_traits_list") else "available_trait_pairs"
-	if trt_src.has(trt_k):
-		view.available_traits_list = FrontendSnapshot.read_array(trt_src, trt_k)
-	var raw_ctrls: Variant = src.get("ui_controls", src.get("creation_ui_controls", null))
-	if not (raw_ctrls is Dictionary):
-		raw_ctrls = snap.get("ui_controls", snap.get("creation_ui_controls", null))
-	if raw_ctrls is Dictionary:
-		var d: Dictionary = raw_ctrls as Dictionary
-		view.creation_ui_controls = {
-			"allow_manual_origin_select": bool(d.get("allow_manual_origin_select", false)),
-			"allow_manual_trait_select": bool(d.get("allow_manual_trait_select", false)),
-			"allow_attribute_reroll": bool(d.get("allow_attribute_reroll", false))
-		}
-	if not bool(view.creation_ui_controls.get("allow_manual_origin_select", false)):
-		view.form_selected_origin_id = ""
-	if not bool(view.creation_ui_controls.get("allow_manual_trait_select", false)):
-		view.form_selected_positive_trait = ""
-	if not bool(view.creation_ui_controls.get("allow_attribute_reroll", false)):
-		view.form_reroll_nonce = 0
-	apply_mod_creation_ui_adaptation()
+    var view: AccountEntryView = _view
+    var src: Dictionary = snap
+    if snap.get("creation_ui_snapshot") is Dictionary:
+        src = snap.get("creation_ui_snapshot") as Dictionary
+    var chk_src: Dictionary = src if (src.has("mod_precheck_checklist") or src.has("precheck_checklist")) else snap
+    var chk_k: String = "mod_precheck_checklist" if chk_src.has("mod_precheck_checklist") else "precheck_checklist"
+    if chk_src.has(chk_k):
+        view.mod_precheck_checklist = FrontendSnapshot.read_array(chk_src, chk_k)
+    var orig_src: Dictionary = src if (src.has("available_origins_list") or src.has("available_origins")) else snap
+    var orig_k: String = "available_origins_list" if orig_src.has("available_origins_list") else "available_origins"
+    if orig_src.has(orig_k):
+        view.available_origins_list = FrontendSnapshot.read_array(orig_src, orig_k)
+    var trt_src: Dictionary = src if (src.has("available_traits_list") or src.has("available_trait_pairs")) else snap
+    var trt_k: String = "available_traits_list" if trt_src.has("available_traits_list") else "available_trait_pairs"
+    if trt_src.has(trt_k):
+        view.available_traits_list = FrontendSnapshot.read_array(trt_src, trt_k)
+    var raw_ctrls: Variant = src.get("ui_controls", src.get("creation_ui_controls", null))
+    if not (raw_ctrls is Dictionary):
+        raw_ctrls = snap.get("ui_controls", snap.get("creation_ui_controls", null))
+    if raw_ctrls is Dictionary:
+        var d: Dictionary = raw_ctrls as Dictionary
+        view.creation_ui_controls = {
+            "allow_manual_origin_select": bool(d.get("allow_manual_origin_select", false)),
+            "allow_manual_trait_select": bool(d.get("allow_manual_trait_select", false)),
+            "allow_attribute_reroll": bool(d.get("allow_attribute_reroll", false))
+        }
+    if not bool(view.creation_ui_controls.get("allow_manual_origin_select", false)):
+        view.form_selected_origin_id = ""
+    if not bool(view.creation_ui_controls.get("allow_manual_trait_select", false)):
+        view.form_selected_positive_trait = ""
+    if not bool(view.creation_ui_controls.get("allow_attribute_reroll", false)):
+        view.form_reroll_nonce = 0
+    apply_mod_creation_ui_adaptation()
 
 static func extract_origin_id(entry: Variant) -> String:
-	if entry is Dictionary:
-		return str((entry as Dictionary).get("origin_id", (entry as Dictionary).get("id", "")))
-	return String(entry) if entry is String else ""
+    if entry is Dictionary:
+        return str((entry as Dictionary).get("origin_id", (entry as Dictionary).get("id", "")))
+    return String(entry) if entry is String else ""
 
 static func extract_positive_trait_id(entry: Variant) -> String:
-	if entry is Dictionary:
-		var d: Dictionary = entry as Dictionary
-		var pos: String = str(d.get("positive", d.get("positive_trait", d.get("positive_id", ""))))
-		return pos if not pos.is_empty() else str(d.get("trait_id", d.get("id", "")))
-	return String(entry) if entry is String else ""
+    if entry is Dictionary:
+        var d: Dictionary = entry as Dictionary
+        var pos: String = str(d.get("positive", d.get("positive_trait", d.get("positive_id", ""))))
+        return pos if not pos.is_empty() else str(d.get("trait_id", d.get("id", "")))
+    return String(entry) if entry is String else ""
