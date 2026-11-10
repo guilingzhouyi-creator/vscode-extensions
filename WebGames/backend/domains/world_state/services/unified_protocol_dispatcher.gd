@@ -2,12 +2,12 @@
 # 模块归属: 跨端通信层 (Protocol · 统一协议调度器)
 # 文件路径: res://backend/domains/world_state/services/unified_protocol_dispatcher.gd
 # 架构定位: Domain Dispatcher / Entry Router
-# 依赖与触发: 上游: 前端视图, 伴侣通道 | 下游: EscMenuBackendService, AgentActionExecutionSolver, HumanControlLeaseManager
-# 职责说明: 接收 ClientRequestEnvelopeDTO，统一实施租约裁决、鉴权校验与领域路由分发
-# 退出语义与设计依据: 调度中心类；设计依据: 卡拉尔统一协议分发路由与零瞬态堆分配契约 (Inv-LEASE-PREEMPTION-1, Inv-ZERO-HEAP-DISPATCH-3)
+# 依赖与触发: 上游: 前端视图, 伴侣通道 | 下游: AuthService, WorldGatewayFSM, EscMenuBackendService, WorldSessionRuntimeService, GameLifecycleService
+# 职责说明: 接收 ClientRequestEnvelopeDTO，统一实施会话令牌守卫、人类租约仲裁与全 7 域 11 环路由分发。
+# 退出语义与设计依据: 调度中心类；设计依据: 卡拉尔统一协议分发路由与全链路交互契约 (Inv-LEASE-PREEMPTION-1, Inv-FE-BE-CONTRACT-1)
 # ==============================================================================
 
-## 统一协议分发器：集中解包客户端请求信封并路由至对应领域业务处理器
+## 统一协议分发器：集中解包客户端请求信封，执行令牌与租约裁决并路由至全链路业务处理器
 class_name UnifiedProtocolDispatcher
 extends RefCounted
 
@@ -19,7 +19,22 @@ const UnifiedResponseEnvelopeDTO = preload("res://backend/domains/world_state/dt
 const HumanControlLeaseManager = preload("res://backend/domains/world_state/services/human_control_lease_manager.gd")
 const AgentActionPacketDTO = preload("res://backend/domains/world_state/dto/agent_action_packet_dto.gd")
 const AuthoritativeHudSyncService = preload("res://backend/domains/world_state/services/authoritative_hud_sync_service.gd")
+const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
 const WorldGatewayFSM = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
+const AuthService = preload("res://backend/domains/account/auth_service.gd")
+const AccountProtocolHandler = preload("res://backend/domains/account/services/account_protocol_handler.gd")
+const WorldGatewayProtocolHandler = preload("res://backend/domains/world_gateway/world_gateway_protocol_handler.gd")
+const CharacterCreationProtocolHandler = preload("res://backend/domains/character_creation/character_creation_protocol_handler.gd")
+const LifecycleProtocolHandler = preload("res://backend/domains/lifecycle/services/lifecycle_protocol_handler.gd")
+
+const DOMAIN_WORLD_STATE_CONFIG: String = "domains.world_state"
+const PROTECTED_LEGACY_COMPAT_ACTIONS: Array[String] = [
+	"ESC_SAVE_GAME", "ESC_EXIT_TO_GATEWAY", "ESC_QUIT_GAME", "ESC_APPLY_SETTINGS"
+]
+const PROTECTED_GATEWAY_ACTIONS: Array[String] = [
+	"ENTER_GATEWAY", "PROBE_MODES", "LIST_WORLDS", "SELECT_MODE",
+	"SELECT_OR_CREATE_WORLD", "EXIT_WORLD_TO_GATEWAY", "SWITCH_GATEWAY_MODE"
+]
 
 ## 自定义领域请求处理器映射表 (domain -> Callable(req, gateway))
 static var _custom_handlers: Dictionary = {}
@@ -37,7 +52,7 @@ static func unregister_domain_handler(domain: String) -> void:
 static func has_domain_handler(domain: String) -> bool:
 	return _custom_handlers.has(domain)
 
-## 测试清理
+## 测试清理（含动态处理器与运行时会话上下文）
 static func reset_custom_handlers_for_tests() -> void:
 	_custom_handlers.clear()
 
@@ -61,19 +76,33 @@ static func dispatch_request(request: ClientRequestEnvelopeDTO, gateway: WorldGa
 				request.request_id, false, {}, "ERR_PREEMPTED_BY_HUMAN", "人类前台正在操作，Agent 动作已被抢占式阻断"
 			)
 
-	# 2. 优先检查外部动态注册的领域处理器 (OCP 扩展点)
+	# 2. 会话凭据与撤销令牌防线（拦截已注销/过期令牌及受保护域越权）
+	var auth_block := _enforce_auth_guard(request)
+	if auth_block != null:
+		return auth_block
+
+	# 3. 优先检查外部动态注册的领域处理器 (OCP 扩展点)
 	if _custom_handlers.has(request.domain):
 		var custom_fn: Callable = _custom_handlers[request.domain]
 		if custom_fn.is_valid():
 			return custom_fn.call(request, gateway)
 
-	# 3. 按核心内置领域路由分发
+	var eff_gw: WorldGatewayFSM = gateway if gateway != null else (WorldSessionRuntimeService.get_gateway() as WorldGatewayFSM)
+
+	# 4. 按核心 7 域路由分发全 11 环请求
 	match request.domain:
-		"world_state", "world_gateway", "lifecycle":
-			if request.action_type.begins_with("ESC_"):
-				return EscMenuBackendService.handle_esc_action(request, gateway)
-			elif request.domain == "world_state":
-				return _dispatch_agent_action_compat(request)
+		"account":
+			return _dispatch_account_action(request, eff_gw)
+		"world_gateway":
+			return _dispatch_gateway_action(request, eff_gw)
+		"character_creation":
+			return _dispatch_character_creation_action(request, eff_gw)
+		"prologue":
+			return _dispatch_prologue_action(request, eff_gw)
+		"world_state":
+			return _dispatch_world_state_action(request, eff_gw)
+		"lifecycle":
+			return _dispatch_lifecycle_action(request, eff_gw)
 		"game_settings":
 			return _dispatch_settings_action(request)
 		_:
@@ -81,9 +110,97 @@ static func dispatch_request(request: ClientRequestEnvelopeDTO, gateway: WorldGa
 				request.request_id, false, {}, "ERR_UNKNOWN_DOMAIN", "未知业务领域: %s" % request.domain
 			)
 
-	return UnifiedProtocolFactory.create_response(
-		request.request_id, false, {}, "ERR_UNHANDLED_ACTION", "未支持的操作指令: %s" % request.action_type
+# ==============================================================================
+# 会话鉴权门禁与令牌核验
+# ==============================================================================
+
+static func _enforce_auth_guard(request: ClientRequestEnvelopeDTO) -> UnifiedResponseEnvelopeDTO:
+	var err_unauth := GameConfig.get_string(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/errors/unauthorized", "ERR_UNAUTHORIZED")
+	var anon_actions: Array = GameConfig.get_array(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/anonymous_allowed_actions", [])
+	var is_anon_action := anon_actions.has(request.action_type)
+
+	# 已被显式吊销或过期的真实令牌，在任何非匿名请求上均予以拦截
+	if not request.session_token.is_empty() and AuthService.is_token_revoked_or_expired(request.session_token):
+		if not is_anon_action:
+			return UnifiedProtocolFactory.create_response(
+				request.request_id, false, {"revoked": true}, err_unauth, "会话令牌已注销或过期，拒绝访问"
+			)
+
+	if request.actor_type == ClientRequestEnvelopeDTO.ACTOR_AGENT:
+		if request.domain == "account" or request.domain == "lifecycle" or PROTECTED_GATEWAY_ACTIONS.has(request.action_type):
+			return UnifiedProtocolFactory.create_response(
+				request.request_id, false, {}, "ERR_AGENT_PRIVILEGE_BLOCKED", "Agent 主体禁止越权调度账号或网关变更指令"
+			)
+
+	if is_anon_action:
+		return null
+
+	var require_auth := GameConfig.get_bool(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/require_session_auth", true)
+	if not require_auth:
+		return null
+
+	var allow_compat := GameConfig.get_bool(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/allow_stateless_compat_for_unregistered_tokens", true)
+	var is_phase127_protected := (
+		request.domain == "character_creation"
+		or request.domain == "prologue"
+		or PROTECTED_GATEWAY_ACTIONS.has(request.action_type)
+		or (request.domain == "account" and request.action_type == "LOGOUT_ACCOUNT")
+		or request.action_type == "PULL_HUD_SNAPSHOT"
+		or request.action_type == "TICK_WORLD_CLOCK"
+		or request.action_type == "ESC_GET_MENU_STATE"
 	)
+
+	if not is_phase127_protected and allow_compat:
+		return null
+
+	var val_res := AuthService.validate_token(request.session_token, request.account_id)
+	if not bool(val_res.get("success", false)):
+		return UnifiedProtocolFactory.create_response(
+			request.request_id, false, val_res, err_unauth, "受保护业务请求必须携带有效鉴权会话令牌"
+		)
+	if request.account_id.is_empty():
+		request.account_id = String(val_res.get("account_id", ""))
+	return null
+
+# ==============================================================================
+# 各领域路由分派实现 (Link 1 ~ Link 11)
+# ==============================================================================
+
+static func _dispatch_account_action(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
+	return AccountProtocolHandler.dispatch(request, gateway)
+
+static func _dispatch_gateway_action(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
+	return WorldGatewayProtocolHandler.dispatch(request, gateway)
+
+static func _dispatch_character_creation_action(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
+	return CharacterCreationProtocolHandler.dispatch_creation(request, gateway)
+
+static func _dispatch_prologue_action(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
+	return CharacterCreationProtocolHandler.dispatch_prologue(request, gateway)
+
+static func _dispatch_world_state_action(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
+	if request.action_type.begins_with("ESC_"):
+		return EscMenuBackendService.handle_esc_action(request, gateway)
+	if request.action_type == "PULL_HUD_SNAPSHOT":
+		var auth_snap := WorldSessionRuntimeService.pull_authoritative_hud_snapshot()
+		var basic_snap := WorldSessionRuntimeService.pull_basic_hud_snapshot()
+		return UnifiedProtocolFactory.create_response(
+			request.request_id, true, {
+				"hud_snapshot": auth_snap.to_dto(),
+				"basic_snapshot": basic_snap.to_dto(),
+				"world_active": WorldSessionRuntimeService.has_active_world()
+			}, "", "主页 HUD 权威快照拉取成功"
+		)
+	if request.action_type == "TICK_WORLD_CLOCK":
+		var payload_dict: Dictionary = request.payload if request.payload is Dictionary else {}
+		var updated := WorldSessionRuntimeService.apply_mutation_and_sync(payload_dict, int(payload_dict.get("now_ms", -1)), bool(payload_dict.get("force_push", true)))
+		return UnifiedProtocolFactory.create_response(
+			request.request_id, true, {"hud_snapshot": updated.to_dto()}, "", "世界时钟与常驻 HUD 同步成功"
+		)
+	return _dispatch_agent_action_compat(request)
+
+static func _dispatch_lifecycle_action(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
+	return LifecycleProtocolHandler.dispatch(request, gateway)
 
 static func _dispatch_agent_action_compat(request: ClientRequestEnvelopeDTO) -> UnifiedResponseEnvelopeDTO:
 	var agent_packet := AgentActionPacketDTO.new()
@@ -91,14 +208,23 @@ static func _dispatch_agent_action_compat(request: ClientRequestEnvelopeDTO) -> 
 	agent_packet.directive_id = request.action_type
 	agent_packet.params = request.payload
 	agent_packet.client_timestamp_ms = request.client_timestamp_ms
-	var hud_context: Dictionary = {"account_id": request.account_id, "character_id": request.character_id}
+
+	var is_active_world := WorldSessionRuntimeService.has_active_world()
+	var hud_context: Dictionary = WorldSessionRuntimeService.build_live_hud_context() if is_active_world else {}
+	if not request.account_id.is_empty():
+		hud_context["account_id"] = request.account_id
+	if not request.character_id.is_empty():
+		hud_context["character_id"] = request.character_id
 	if request.payload is Dictionary:
 		for payload_key in request.payload.keys():
 			hud_context[payload_key] = request.payload[payload_key]
-	if not hud_context.has("unallocated_potential_points"):
-		hud_context["unallocated_potential_points"] = 5
-	if not hud_context.has("unread_mail_count"):
-		hud_context["unread_mail_count"] = 1
+
+	if not is_active_world and GameConfig.get_bool(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/allow_stateless_compat_for_unregistered_tokens", true):
+		var compat_defaults: Dictionary = GameConfig.get_dict(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/stateless_compat_defaults", {})
+		for dk in compat_defaults.keys():
+			if not hud_context.has(dk):
+				hud_context[dk] = compat_defaults[dk]
+
 	var hud_snapshot := AuthoritativeHudSyncService.get_authoritative_snapshot(hud_context)
 	var is_human_active: bool = false if request.actor_type == ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI else HumanControlLeaseManager.is_lease_active()
 	var execution_result := AgentActionExecutionSolver.validate_and_execute(agent_packet, hud_snapshot, is_human_active)

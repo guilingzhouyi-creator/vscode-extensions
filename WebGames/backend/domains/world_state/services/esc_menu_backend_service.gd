@@ -22,6 +22,9 @@ const UnifiedResponseEnvelopeDTO = preload("res://backend/domains/world_state/dt
 const WorldGatewayFSM = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
 const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
 const HumanControlLeaseManager = preload("res://backend/domains/world_state/services/human_control_lease_manager.gd")
+const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
+
+const DOMAIN_WORLD_STATE_CONFIG: String = "domains.world_state"
 
 ## 处理用户触发 ESC 快捷菜单时的动作路由
 static func handle_esc_action(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM = null) -> UnifiedResponseEnvelopeDTO:
@@ -31,90 +34,198 @@ static func handle_esc_action(request: ClientRequestEnvelopeDTO, gateway: WorldG
 		)
 
 	match request.action_type:
+		"ESC_GET_MENU_STATE":
+			return _handle_esc_get_menu_state(request, gateway)
 		"ESC_QUERY_READINESS":
-			var in_combat: bool = bool(request.payload.get("in_combat", false))
-			var in_cutscene: bool = bool(request.payload.get("in_cutscene", false))
-			var is_dead: bool = bool(request.payload.get("is_dead", false))
-			var readiness := SaveReadinessGuard.evaluate_save_readiness(in_combat, in_cutscene, is_dead)
-			return UnifiedProtocolFactory.create_response(
-				request.request_id, true, readiness, "", "保存就绪状态查询成功"
-			)
-
+			return _handle_esc_query_readiness(request)
 		"ESC_SAVE_GAME":
-			var in_combat: bool = bool(request.payload.get("in_combat", false))
-			var in_cutscene: bool = bool(request.payload.get("in_cutscene", false))
-			var is_dead: bool = bool(request.payload.get("is_dead", false))
-			var readiness := SaveReadinessGuard.evaluate_save_readiness(in_combat, in_cutscene, is_dead)
-			if not bool(readiness.get("is_ready", false)):
-				return UnifiedProtocolFactory.create_response(
-					request.request_id, false, readiness,
-					"ERR_SAVE_GUARD_BLOCKED",
-					"当前状态被守卫拦截，不可保存"
-				)
-
-			var slot_id: String = str(request.payload.get("slot_id", "SLOT_01"))
-			var mode: int = int(request.payload.get("game_mode", WorldGatewayModel.GameMode.SINGLE_PLAYER))
-			var path_safety := SaveReadinessGuard.evaluate_storage_path_safety("user://offline_vault/%s.sav" % slot_id.to_lower(), mode)
-			if not bool(path_safety.get("safe", path_safety.get("is_safe", false))):
-				return UnifiedProtocolFactory.create_response(
-					request.request_id, false, path_safety, "ERR_STORAGE_UNSAFE", "存储路径不符合模式隔离规范"
-				)
-
-			var raw_game_data: Variant = request.payload.get("game_data", null)
-			var game_data: Dictionary = {}
-			if raw_game_data is Dictionary and not (raw_game_data as Dictionary).is_empty():
-				game_data = (raw_game_data as Dictionary).duplicate(true)
-			else:
-				game_data = {
-					"slot_id": slot_id,
-					"saved_at": Time.get_unix_time_from_system()
-				}
-			var save_result := SaveDataAccessLayer.save_game(slot_id, game_data)
-			var is_save_success := bool(save_result.get("success", false))
-			return UnifiedProtocolFactory.create_response(
-				request.request_id, is_save_success, save_result,
-				"" if is_save_success else str(save_result.get("error_code", "ERR_SAVE_FAILED")),
-				"存档保存成功" if is_save_success else "存档保存失败"
-			)
-
+			return _handle_esc_save_game(request, gateway)
 		"ESC_EXIT_TO_GATEWAY":
-			if gateway == null:
-				return UnifiedProtocolFactory.create_response(
-					request.request_id, false, {}, "ERR_GATEWAY_NOT_BOUND", "未绑定当前世界的运行网关实例"
-				)
-			# 若指定 auto_save，执行前置快速刷盘
-			if bool(request.payload.get("auto_save", true)):
-				var slot_id: String = gateway.context.selected_slot_id if (gateway.context != null and not gateway.context.selected_slot_id.is_empty()) else "SLOT_01"
-				var auto_save_data: Dictionary = {
-					"slot_id": slot_id,
-					"account_id": gateway.context.account_id if gateway.context != null else "",
-					"saved_at": Time.get_unix_time_from_system()
-				}
-				SaveDataAccessLayer.save_game(slot_id, auto_save_data)
-
-			# 触发网关全量内存洗脱
-			var scrub_result := gateway.exit_to_gateway()
-			HumanControlLeaseManager.release_lease()
-			return UnifiedProtocolFactory.create_response(
-				request.request_id, bool(scrub_result.get("success", false)), scrub_result, "", "已成功退出世界并洗脱网关内存"
-			)
-
+			return _handle_esc_exit_to_gateway(request, gateway)
 		"ESC_QUIT_GAME":
-			var shutdown_request := GameShutdownDTO.Request.new()
-			shutdown_request.session_token = request.session_token
-			shutdown_request.account_id = request.account_id
-			shutdown_request.exit_reason = GameLifecycleModel.ExitReason.USER_DESKTOP_QUIT
-			shutdown_request.target_save_slot = str(request.payload.get("slot_id", "SLOT_01"))
-
-			var shutdown_response := GameLifecycleService.execute_graceful_shutdown(shutdown_request)
-			HumanControlLeaseManager.release_lease()
-			var is_shutdown_success: bool = bool(shutdown_response != null and shutdown_response.is_success)
-			var shutdown_dto: Dictionary = (shutdown_response.to_dto() as Dictionary) if shutdown_response != null else {}
-			var err_code: String = str(shutdown_response.error_code) if shutdown_response != null else "ERR_SHUTDOWN_FAILED"
-			return UnifiedProtocolFactory.create_response(
-				request.request_id, is_shutdown_success, shutdown_dto, err_code, "五阶段安全停机管线已执行完毕"
-			)
+			return _handle_esc_quit_game(request, gateway)
 
 	return UnifiedProtocolFactory.create_response(
 		request.request_id, false, {}, "ERR_INVALID_ESC_ACTION", "未识别的 ESC 指令: %s" % request.action_type
 	)
+
+static func _handle_esc_get_menu_state(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
+	var runtime_state := WorldSessionRuntimeService.get_esc_menu_state()
+	var in_combat: bool = bool(request.payload.get("in_combat", runtime_state.get("in_combat", false)))
+	var in_cutscene: bool = bool(request.payload.get("in_cutscene", runtime_state.get("in_cutscene", false)))
+	var is_dead: bool = bool(request.payload.get("is_dead", runtime_state.get("is_dead", false)))
+	var readiness := SaveReadinessGuard.evaluate_save_readiness(in_combat, in_cutscene, is_dead)
+	var menu_state_data := runtime_state.duplicate(true)
+	menu_state_data["readiness"] = readiness
+	menu_state_data["can_save"] = bool(readiness.get("is_ready", false))
+	menu_state_data["effective_slot_id"] = _resolve_effective_slot_id(request, gateway)
+	return UnifiedProtocolFactory.create_response(
+		request.request_id, true, menu_state_data, "", "ESC 菜单权威状态查询成功"
+	)
+
+static func _handle_esc_query_readiness(request: ClientRequestEnvelopeDTO) -> UnifiedResponseEnvelopeDTO:
+	var runtime_state := WorldSessionRuntimeService.get_esc_menu_state()
+	var in_combat: bool = bool(request.payload.get("in_combat", runtime_state.get("in_combat", false)))
+	var in_cutscene: bool = bool(request.payload.get("in_cutscene", runtime_state.get("in_cutscene", false)))
+	var is_dead: bool = bool(request.payload.get("is_dead", runtime_state.get("is_dead", false)))
+	var readiness := SaveReadinessGuard.evaluate_save_readiness(in_combat, in_cutscene, is_dead)
+	return UnifiedProtocolFactory.create_response(
+		request.request_id, true, readiness, "", "保存就绪状态查询成功"
+	)
+
+static func _handle_esc_save_game(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
+	var in_combat: bool = bool(request.payload.get("in_combat", false))
+	var in_cutscene: bool = bool(request.payload.get("in_cutscene", false))
+	var is_dead: bool = bool(request.payload.get("is_dead", false))
+	var readiness := SaveReadinessGuard.evaluate_save_readiness(in_combat, in_cutscene, is_dead)
+	if not bool(readiness.get("is_ready", false)):
+		return UnifiedProtocolFactory.create_response(
+			request.request_id, false, readiness, "ERR_SAVE_GUARD_BLOCKED", "当前状态被守卫拦截，不可保存"
+		)
+
+	var slot_id := _resolve_effective_slot_id(request, gateway)
+	if slot_id.is_empty():
+		return UnifiedProtocolFactory.create_response(
+			request.request_id, false, {}, "ERR_UNBOUND_SAVE_SLOT", "未绑定有效存档槽位，拒绝保存"
+		)
+
+	var mode: int = int(request.payload.get("game_mode", gateway.context.selected_mode if (gateway != null and gateway.context != null and gateway.context.selected_mode != WorldGatewayModel.GameMode.UNSELECTED) else WorldGatewayModel.GameMode.SINGLE_PLAYER))
+	var vault_prefix := GameConfig.get_string(DOMAIN_WORLD_STATE_CONFIG, "storage/offline_vault_prefix", "user://offline_vault/")
+	var path_safety := SaveReadinessGuard.evaluate_storage_path_safety("%s%s.sav" % [vault_prefix, slot_id.to_lower()], mode)
+	if not bool(path_safety.get("safe", path_safety.get("is_safe", false))):
+		return UnifiedProtocolFactory.create_response(
+			request.request_id, false, path_safety, "ERR_STORAGE_UNSAFE", "存储路径不符合模式隔离规范"
+		)
+
+	var game_data := _resolve_save_payload(request)
+	if game_data.is_empty():
+		var err_incomplete := GameConfig.get_string(DOMAIN_WORLD_STATE_CONFIG, "esc_menu/errors/incomplete_save_blocked", "ERR_INCOMPLETE_SAVE_BLOCKED")
+		if bool(request.payload.get("strict_full_save", false)):
+			return UnifiedProtocolFactory.create_response(
+				request.request_id, false, {"slot_id": slot_id}, err_incomplete, "拒绝用残缺空壳覆盖既有真实世界存档"
+			)
+		game_data = {
+			"slot_id": slot_id,
+			"saved_at": int(Time.get_unix_time_from_system())
+		}
+
+	var save_result := SaveDataAccessLayer.save_game(slot_id, game_data)
+	var is_save_success := bool(save_result.get("success", false))
+	if is_save_success:
+		WorldSessionRuntimeService.clear_world_dirty()
+	return UnifiedProtocolFactory.create_response(
+		request.request_id, is_save_success, save_result,
+		"" if is_save_success else str(save_result.get("error_code", "ERR_SAVE_FAILED")),
+		"存档保存成功" if is_save_success else "存档保存失败"
+	)
+
+static func _handle_esc_exit_to_gateway(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
+	if gateway == null:
+		return UnifiedProtocolFactory.create_response(
+			request.request_id, false, {}, "ERR_GATEWAY_NOT_BOUND", "未绑定当前世界的运行网关实例"
+		)
+
+	var slot_id := _resolve_effective_slot_id(request, gateway)
+	var auto_save_requested := bool(request.payload.get("auto_save", true))
+	var strict_auto := bool(request.payload.get("strict_auto_save", false)) or not slot_id.is_empty()
+	var skip_unbound := false
+	var save_res: Dictionary = {}
+
+	if auto_save_requested:
+		if strict_auto:
+			var err_incomplete := GameConfig.get_string(DOMAIN_WORLD_STATE_CONFIG, "esc_menu/errors/incomplete_save_blocked", "ERR_INCOMPLETE_SAVE_BLOCKED")
+			if slot_id.is_empty():
+				return UnifiedProtocolFactory.create_response(
+					request.request_id, false, {}, err_incomplete, "未绑定有效存档槽位，已阻断自动存盘"
+				)
+			var mode: int = int(gateway.context.selected_mode) if (gateway.context != null and gateway.context.selected_mode != WorldGatewayModel.GameMode.UNSELECTED) else WorldGatewayModel.GameMode.SINGLE_PLAYER
+			var vault_prefix := GameConfig.get_string(DOMAIN_WORLD_STATE_CONFIG, "storage/offline_vault_prefix", "user://offline_vault/")
+			var path_safety := SaveReadinessGuard.evaluate_storage_path_safety("%s%s.sav" % [vault_prefix, slot_id.to_lower()], mode)
+			if not bool(path_safety.get("safe", path_safety.get("is_safe", false))):
+				return UnifiedProtocolFactory.create_response(
+					request.request_id, false, path_safety, "ERR_STORAGE_UNSAFE", "存储路径不符合模式隔离规范"
+				)
+			var auto_payload := _resolve_save_payload(request)
+			if auto_payload.is_empty():
+				if not bool(request.payload.get("allow_skip_unsaved_exit", false)):
+					return UnifiedProtocolFactory.create_response(
+						request.request_id, false, {"slot_id": slot_id}, err_incomplete, "缺少完整多域数据，严禁以 3 字段空壳覆盖真实存档"
+					)
+				skip_unbound = true
+			else:
+				save_res = SaveDataAccessLayer.save_game(slot_id, auto_payload)
+				if not bool(save_res.get("success", false)):
+					var err_flush := GameConfig.get_string(DOMAIN_WORLD_STATE_CONFIG, "esc_menu/errors/save_flush_failed", "ERR_SAVE_FLUSH_FAILED")
+					return UnifiedProtocolFactory.create_response(
+						request.request_id, false, save_res, String(save_res.get("error_code", err_flush)), "退回网关前置多域存档失败，已保留现场状态"
+					)
+				WorldSessionRuntimeService.clear_world_dirty()
+		else:
+			skip_unbound = true
+
+	var scrub_result := gateway.exit_to_gateway()
+	WorldSessionRuntimeService.deactivate_world_session()
+	HumanControlLeaseManager.release_lease()
+	if skip_unbound:
+		scrub_result["auto_save_skipped_unbound_slot"] = true
+	if not save_res.is_empty():
+		scrub_result["save_result"] = save_res
+	return UnifiedProtocolFactory.create_response(
+		request.request_id, bool(scrub_result.get("success", false)), scrub_result, "", "已成功退出世界并洗脱网关内存"
+	)
+
+static func _handle_esc_quit_game(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
+	var shutdown_request := GameShutdownDTO.Request.new()
+	shutdown_request.session_token = request.session_token
+	shutdown_request.account_id = request.account_id if not request.account_id.is_empty() else WorldSessionRuntimeService.get_active_account_id()
+	shutdown_request.exit_reason = GameLifecycleModel.ExitReason.USER_DESKTOP_QUIT
+	shutdown_request.target_save_slot = _resolve_effective_slot_id(request, gateway)
+	shutdown_request.save_before_quit = bool(request.payload.get("save_before_quit", true))
+	shutdown_request.require_save_success = bool(request.payload.get("require_save_success", false))
+	shutdown_request.force_quit = bool(request.payload.get("force_quit", false))
+
+	var shutdown_response := GameLifecycleService.execute_graceful_shutdown(shutdown_request)
+	var is_shutdown_success: bool = bool(shutdown_response != null and shutdown_response.is_success)
+	if is_shutdown_success:
+		HumanControlLeaseManager.release_lease()
+	var shutdown_dto: Dictionary = (shutdown_response.to_dto() as Dictionary) if shutdown_response != null else {}
+	var err_code: String = "" if is_shutdown_success else (str(shutdown_response.error_code) if shutdown_response != null else "ERR_SHUTDOWN_FAILED")
+	return UnifiedProtocolFactory.create_response(
+		request.request_id, is_shutdown_success, shutdown_dto, err_code, "五阶段安全停机管线已执行完毕"
+	)
+
+static func _resolve_effective_slot_id(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> String:
+	var explicit := str(request.payload.get("slot_id", ""))
+	if not explicit.is_empty():
+		return explicit
+	if gateway != null and gateway.context != null and not gateway.context.selected_slot_id.is_empty():
+		return gateway.context.selected_slot_id
+	return WorldSessionRuntimeService.get_active_slot_id()
+
+static func _resolve_save_payload(request: ClientRequestEnvelopeDTO) -> Dictionary:
+	var raw_game_data: Variant = request.payload.get("game_data", null)
+	if raw_game_data is Dictionary and not (raw_game_data as Dictionary).is_empty():
+		return (raw_game_data as Dictionary).duplicate(true)
+	var built := SaveDataAccessLayer.build_save_payload()
+	if built.get("data", {}) is Dictionary and not (built["data"] as Dictionary).is_empty():
+		return built
+	if WorldSessionRuntimeService.has_active_world():
+		var runtime_built := WorldSessionRuntimeService.assemble_runtime_save_payload()
+		if runtime_built.get("data", {}) is Dictionary and not (runtime_built["data"] as Dictionary).is_empty():
+			return runtime_built
+	return {}
+
+static func _has_existing_full_domain_save(slot_id: String) -> bool:
+	if slot_id.is_empty():
+		return false
+	var existing := SaveDataAccessLayer.load_game(slot_id)
+	if not bool(existing.get("success", false)):
+		return false
+	var raw_data: Variant = existing.get("data", null)
+	if not raw_data is Dictionary:
+		return false
+	var save_dict: Dictionary = raw_data as Dictionary
+	for domain_key in save_dict.keys():
+		if domain_key != "slot_id" and domain_key != "saved_at" and domain_key != "account_id":
+			return true
+	return false
