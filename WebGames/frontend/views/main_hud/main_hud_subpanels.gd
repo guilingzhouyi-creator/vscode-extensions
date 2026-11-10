@@ -9,7 +9,6 @@ extends BaseScreen
 const KBadgeClass = preload("res://frontend/components/k_badge.gd")
 const KCurrencyBarClass = preload("res://frontend/components/k_currency_bar.gd")
 const KStatusBarClass = preload("res://frontend/components/k_status_bar.gd")
-const WorldGatewayFSM = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
 
 var currency_bar: KCurrencyBar = null
 var hp_status_bar: KStatusBar = null
@@ -252,9 +251,9 @@ func on_menu_exit_pressed() -> void:
 		Callable(self, "on_menu_quit_game_pressed")
 	)
 
-func on_menu_exit_to_gateway_pressed(gateway: WorldGatewayFSM = null) -> void:
+func on_menu_exit_to_gateway_pressed(gateway: RefCounted = null) -> void:
 	append_battle_log("SYSTEM", "正在退出世界并返回世界档案...")
-	var active_gateway: WorldGatewayFSM = gateway if gateway != null else (ServiceLocator.get_active_gateway() as WorldGatewayFSM)
+	var active_gateway: RefCounted = gateway if gateway != null else ServiceLocator.get_active_gateway()
 	var request: ClientRequestEnvelopeDTO = UnifiedProtocolFactory.create_human_request(
 		"world_gateway", "ESC_EXIT_TO_GATEWAY", {"auto_save": true}
 	)

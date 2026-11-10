@@ -24,6 +24,17 @@ static func set_active_gateway(gateway: RefCounted) -> void:
 	if _instance != null:
 		_instance.set_active_gateway(gateway)
 
+## 创建并激活指定账号的世界网关实例（解耦前端视图与后端网关实现）
+static func create_and_activate_gateway(account_id: String) -> RefCounted:
+	var gw_script: Variant = load("res://backend/domains/world_gateway/world_gateway_fsm.gd")
+	if gw_script != null and gw_script.can_instantiate():
+		var gw: RefCounted = gw_script.new(account_id)
+		if gw != null and gw.has_method("enter_gateway"):
+			gw.call("enter_gateway")
+		set_active_gateway(gw)
+		return gw
+	return null
+
 ## 获取当前活跃的世界网关实例
 static func get_active_gateway() -> RefCounted:
 	if _active_gateway != null:

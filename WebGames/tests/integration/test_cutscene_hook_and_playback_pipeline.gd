@@ -20,7 +20,7 @@ const CutsceneHookRegistry = preload("res://backend/infrastructure/media/cutscen
 const CutsceneOrchestrator = preload("res://backend/infrastructure/media/cutscene_orchestrator.gd")
 const CutscenePreloadPredictor = preload("res://backend/infrastructure/media/cutscene_preload_predictor.gd")
 const CutscenePlayerView = preload("res://frontend/views/cutscene_player/cutscene_player_view.gd")
-const CutscenePresenter = preload("res://frontend/views/cutscene_player/cutscene_presenter.gd")
+const CutscenePresenterClass = preload("res://frontend/presentation/common/cutscene_presenter.gd")
 const CutsceneEventBridge = preload("res://frontend/systems/cutscene_event_bridge.gd")
 
 const NarrativeDagExecutionEngine = preload("res://backend/domains/narrative_orchestration/narrative_dag_execution_engine.gd")
@@ -242,7 +242,7 @@ static func test_tc_cs_04_orchestrator_lifecycle_and_skip_interlock() -> Diction
 ## TC-CS-05: 表现层视口装配、文字占位演播驱动与字幕快照单向注入
 static func test_tc_cs_05_player_view_and_presenter_integration() -> Dictionary:
 	var view := CutscenePlayerView.new()
-	var presenter := CutscenePresenter.new()
+	var presenter := CutscenePresenterClass.new()
 	presenter.bind_view(view)
 
 	var finish_called: Array[bool] = [false]
@@ -325,9 +325,9 @@ static func test_tc_cs_06_zero_hardcoding_and_architecture_closure() -> Dictiona
 	graph.dag_id = "test_dag_closure"
 	var node := NarrativeDAGNode.new()
 	node.node_id = "n_start"
-	node.status = NarrativeDAGNode.STATUS_ACTIVE
+	node.node_type = NarrativeDAGNode.NodeType.START_ENTRY
 	graph.nodes["n_start"] = node
-	graph.entry_node_ids.append("n_start")
+	graph.entry_node_id = "n_start"
 
 	engine.initialize_with_graph(graph)
 	var pre_interceptor_ok: bool = interceptor_called[0]

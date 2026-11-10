@@ -10,9 +10,6 @@ class_name AccountEntryView
 extends BaseScreen
 
 const TabsClass = preload("res://frontend/views/account_entry/account_entry_tabs.gd")
-const WorldGatewayFSM = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
-const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
-const AuthService = preload("res://backend/domains/account/auth_service.gd")
 
 var _tabs: AccountEntryTabs = null
 func _get_tabs() -> AccountEntryTabs:
@@ -188,15 +185,19 @@ func submit_register(username: String, password_plain: String) -> Dictionary:
 func select_server(server_id: String) -> Dictionary:
     current_server_id = server_id
     if not current_account_id.is_empty():
-        var gateway: WorldGatewayFSM = WorldGatewayFSM.new(current_account_id)
-        gateway.enter_gateway()
-        ServiceLocator.set_active_gateway(gateway)
+        var active_gw: RefCounted = ServiceLocator.get_active_gateway()
+        if active_gw == null:
+            ServiceLocator.create_and_activate_gateway(current_account_id)
+        elif active_gw.has_method("enter_gateway"):
+            active_gw.call("enter_gateway")
     return {"success": true, "selected_server": server_id}
 
 ## 退出当前账号，注销凭证并复位到登录页
 func logout_account() -> Dictionary:
     if not current_session_token.is_empty():
-        AuthService.revoke_token(current_session_token)
+        var auth_svc: Variant = ServiceLocator.get_instance().auth()
+        if auth_svc != null and auth_svc.has_method("revoke_token"):
+            auth_svc.call("revoke_token", current_session_token)
     current_session_token = ""
     current_account_id = ""
     selected_character_slot = ""
@@ -436,14 +437,22 @@ func _on_char_enter_pressed() -> void:
     if selected_character_slot.is_empty():
         NavManager.get_instance().show_toast("请先选择一个角色", NavTypes.ToastLevel.WARNING)
         return
-    var active_gateway: WorldGatewayFSM = ServiceLocator.get_active_gateway() as WorldGatewayFSM
+    var active_gateway: RefCounted = ServiceLocator.get_active_gateway()
     if active_gateway != null:
-        if active_gateway.context.current_phase == WorldGatewayModel.GatewayPhase.GATEWAY_ENTERED:
-            active_gateway.select_mode(WorldGatewayModel.GameMode.SINGLE_PLAYER)
-        if active_gateway.context.current_phase == WorldGatewayModel.GatewayPhase.CHARACTER_PENDING or active_gateway.context.current_phase == WorldGatewayModel.GatewayPhase.SLOT_WORLD_RESOLVED:
-            active_gateway.attach_ready_character(selected_character_slot)
-        if active_gateway.context.current_phase == WorldGatewayModel.GatewayPhase.WORLD_ENTRY_PERMITTED:
-            active_gateway.enter_world()
+        var ctx: Variant = active_gateway.get("context")
+        var current_phase: int = int(ctx.current_phase) if ctx != null and "current_phase" in ctx else -1
+        # GatewayPhase: AUTHENTICATED=1, GATEWAY_ENTERED=2, MODE_SELECTED=3, SLOT_WORLD_RESOLVED=4, CHARACTER_PENDING=5, WORLD_ENTRY_PERMITTED=6, IN_WORLD=7
+        # GameMode: SINGLE_PLAYER=1
+        if current_phase == 2 and active_gateway.has_method("select_mode"):
+            active_gateway.call("select_mode", 1, {}, [])
+            ctx = active_gateway.get("context")
+            current_phase = int(ctx.current_phase) if ctx != null and "current_phase" in ctx else -1
+        if (current_phase == 4 or current_phase == 5) and active_gateway.has_method("attach_ready_character"):
+            active_gateway.call("attach_ready_character", selected_character_slot)
+            ctx = active_gateway.get("context")
+            current_phase = int(ctx.current_phase) if ctx != null and "current_phase" in ctx else -1
+        if current_phase == 6 and active_gateway.has_method("enter_world"):
+            active_gateway.call("enter_world")
     NavManager.get_instance().show_toast("进入瓦尔兰大陆...", NavTypes.ToastLevel.SUCCESS)
     NavManager.get_instance().push_screen("main_hud", {"slot": selected_character_slot})
 

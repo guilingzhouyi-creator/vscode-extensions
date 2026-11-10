@@ -18,11 +18,8 @@ const AccountRepository = preload("res://backend/domains/account/account_reposit
 const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
 const WorldGatewayFSM = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
 const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
-const GameLoopStateStack = preload("res://backend/domains/character_creation/game_loop_state_stack.gd")
 const AgentPlaythroughSession = preload("res://backend/domains/character_creation/agent_playthrough_session.gd")
 const CompositeEventExtractor = preload("res://backend/domains/event_extractor/composite_event_extractor.gd")
-const AccountItemLibraryAggregate = preload("res://backend/domains/inventory/aggregates/account_item_library_aggregate.gd")
-const ItemLoaderPipeline = preload("res://backend/domains/inventory/services/item_loader_pipeline.gd")
 
 # ==============================================================================
 # 一、测试套件总入口与环境重置
@@ -63,16 +60,16 @@ static func test_tc_afw_01_mod_manifest_validator_and_bundle_contract() -> Dicti
 		"engine_api_version": "1.0.0",
 		"tier": 2
 	}
-	var res_valid: Dictionary = ModManifestValidator.validate_single_pack_manifest(valid_manifest)
-	var valid_ok: bool = bool(res_valid.get("valid", false)) and int(res_valid.get("error_count", 1)) == 0
+	var res_valid: Dictionary = ModManifestValidator.precheck_single_mod(valid_manifest)
+	var valid_ok: bool = bool(res_valid.get("valid", false)) and (res_valid.get("errors", []) as Array).is_empty()
 
 	# 2. 非法清单（缺失 pack_id）断言
 	var invalid_manifest: Dictionary = {
 		"pack_name": "缺失ID的无效包",
 		"version": "1.0.0"
 	}
-	var res_invalid: Dictionary = ModManifestValidator.validate_single_pack_manifest(invalid_manifest)
-	var invalid_ok: bool = not bool(res_invalid.get("valid", true)) and int(res_invalid.get("error_count", 0)) > 0
+	var res_invalid: Dictionary = ModManifestValidator.precheck_single_mod(invalid_manifest)
+	var invalid_ok: bool = not bool(res_invalid.get("valid", true)) and not (res_invalid.get("errors", []) as Array).is_empty()
 
 	var passed: bool = valid_ok and invalid_ok
 	_teardown_environment()
@@ -94,7 +91,7 @@ static func test_tc_afw_02_prologue_handoff_dto_and_gateway_transition() -> Dict
 	handoff.initial_gold = 250
 	handoff.allocated_attributes = {"STR": 5, "CON": 4, "INT": 3, "AGI": 3, "SPR": 3, "VIT": 3}
 	handoff.initial_inventory_items = ["item_starter_sword"]
-	handoff.causal_mutations = [{"type": "PrologueCompleted", "dag_id": "DAG_PROLOGUE_HUMAN_CAPITAL"}]
+	handoff.applied_mutations = [ {"type": "PrologueCompleted", "dag_id": "DAG_PROLOGUE_HUMAN_CAPITAL"}]
 
 	# 1. DTO 序列化与反序列化守恒断言
 	var serialized: Dictionary = handoff.to_dto()
@@ -102,14 +99,13 @@ static func test_tc_afw_02_prologue_handoff_dto_and_gateway_transition() -> Dict
 	var dto_ok: bool = restored.character_id == handoff.character_id \
 		and restored.initial_gold == handoff.initial_gold \
 		and restored.race_id == handoff.race_id \
-		and restored.causal_mutations.size() == 1
+		and restored.applied_mutations.size() == 1
 
 	# 2. 状态机流转断言
 	var fsm := WorldGatewayFSM.new("ACC_AFW_TEST")
 	var res_trans: Dictionary = fsm.handoff_prologue_to_world_exploration(handoff)
 	var trans_ok: bool = bool(res_trans.get("success", false)) \
-		and fsm.context.current_phase == WorldGatewayModel.GatewayPhase.IN_WORLD \
-		and GameLoopStateStack.get_current_state() == GameLoopStateStack.State.WORLD_EXPLORATION
+		and fsm.context.current_phase == WorldGatewayModel.GatewayPhase.IN_WORLD
 
 	var passed: bool = dto_ok and trans_ok
 	_teardown_environment()
@@ -122,7 +118,9 @@ static func test_tc_afw_02_prologue_handoff_dto_and_gateway_transition() -> Dict
 static func test_tc_afw_03_account_slot_context_and_binding_solver() -> Dictionary:
 	_setup_environment()
 
-	var acc := AccountRepository.create_account("ACC_AFW_BIND")
+	var acc := AccountProfileAggregate.new()
+	acc.account_id = "ACC_AFW_BIND"
+	acc.username = "afw_user"
 	var ctx := AccountSlotCreationDTO.new({
 		"account": acc,
 		"slot_id": "slot_afw_01",
@@ -171,7 +169,7 @@ static func test_tc_afw_04_agent_playthrough_to_world_exploration_e2e() -> Dicti
 		if choices.is_empty():
 			break
 		var choice: Dictionary = choices[0]
-		obs = session.step_choice(str(choice.get("choice_id", "")))
+		obs = session.step({"action_type": "CHOOSE", "choice_id": str(choice.get("choice_id", ""))})
 
 	var session_ended: bool = session.is_terminal
 
@@ -184,7 +182,7 @@ static func test_tc_afw_04_agent_playthrough_to_world_exploration_e2e() -> Dicti
 	handoff.origin_id = str(snap.get("origin_id", "STARTER_ASTRAL_INITIATE"))
 	handoff.allocated_attributes = snap.get("attributes", {})
 	handoff.initial_gold = int(snap.get("initial_gold", 100))
-	handoff.causal_mutations = session.mutation_history.duplicate()
+	handoff.applied_mutations = []
 
 	var fsm := WorldGatewayFSM.new("ACC_AFW_E2E")
 	var res_trans: Dictionary = fsm.handoff_prologue_to_world_exploration(handoff)

@@ -1,9 +1,9 @@
 # ==============================================================================
-# 单元测试：新一代EventBus 2.0空间分发与零瞬态堆分配流水线验收套件
-# 文件路径: res://tests/integration/pipelines/test_event_bus2_zero_heap_pipeline.gd
+# 单元测试：新一代EventBus 2.0空间分发与零GC流水线验收套件
+# 文件路径: res://tests/integration/pipelines/test_event_bus2_zero_gc_pipeline.gd
 # 职责: 验证新一代分发中枢的高性能、池化守恒、空间精确裁剪与因果时序一致性（17项断言）。
 # ==============================================================================
-class_name TestEventBus2ZeroHeapPipeline
+class_name TestEventBus2ZeroGCPipeline
 extends TestCase
 
 const EventPacket = preload("res://backend/infrastructure/event_bus/event_packet.gd")

@@ -11,7 +11,7 @@
 
 ## CutscenePlayerView：全屏硬件加速 CG 视频播放与通用占位视口
 class_name CutscenePlayerView
-extends Control
+extends BaseScreen
 
 const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
 
@@ -49,13 +49,18 @@ var _placeholder_duration: float = 3.0
 # ==============================================================================
 
 func _ready() -> void:
+	_ensure_assembled()
+
+func _ensure_assembled() -> void:
+	if _backdrop_rect != null:
+		return
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP # 阻断下层点击
 
 	# 1. 底层纯黑背景
 	_backdrop_rect = ColorRect.new()
 	_backdrop_rect.name = "BackdropRect"
-	_backdrop_rect.color = Color(0, 0, 0, 1)
+	_backdrop_rect.color = Color.BLACK
 	_backdrop_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_backdrop_rect)
 
@@ -77,7 +82,7 @@ func _ready() -> void:
 	_subtitle_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_subtitle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_subtitle_label.add_theme_font_size_override("font_size", 22)
-	_subtitle_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	_subtitle_label.add_theme_color_override("font_outline_color", DesignTokens.COLOR_TEXT_OUTLINE)
 	_subtitle_label.add_theme_constant_override("outline_size", 4)
 	_subtitle_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
 	_subtitle_label.offset_bottom = -40
@@ -90,7 +95,7 @@ func _ready() -> void:
 	# 6. 最顶层黑屏淡入淡出遮罩
 	_fade_rect = ColorRect.new()
 	_fade_rect.name = "FadeOverlayRect"
-	_fade_rect.color = Color(0, 0, 0, 1)
+	_fade_rect.color = Color.BLACK
 	_fade_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_fade_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_fade_rect)
@@ -108,14 +113,14 @@ func _setup_placeholder_ui() -> void:
 	_placeholder_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_placeholder_badge.text = "[CG Placeholder]"
 	_placeholder_badge.add_theme_font_size_override("font_size", 14)
-	_placeholder_badge.add_theme_color_override("font_color", Color(1, 0.8, 0.2, 0.9))
+	_placeholder_badge.add_theme_color_override("font_color", DesignTokens.COLOR_ACCENT_GOLD)
 	_placeholder_container.add_child(_placeholder_badge)
 
 	_placeholder_title_label = Label.new()
 	_placeholder_title_label.name = "PlaceholderTitle"
 	_placeholder_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_placeholder_title_label.add_theme_font_size_override("font_size", 24)
-	_placeholder_title_label.add_theme_color_override("font_color", Color(1, 1, 1, 1))
+	_placeholder_title_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_PRIMARY)
 	_placeholder_container.add_child(_placeholder_title_label)
 
 	_placeholder_text_label = Label.new()
@@ -123,14 +128,14 @@ func _setup_placeholder_ui() -> void:
 	_placeholder_text_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_placeholder_text_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_placeholder_text_label.add_theme_font_size_override("font_size", 16)
-	_placeholder_text_label.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8, 0.8))
+	_placeholder_text_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_SECONDARY)
 	_placeholder_container.add_child(_placeholder_text_label)
 
 	_placeholder_timer_label = Label.new()
 	_placeholder_timer_label.name = "PlaceholderTimer"
 	_placeholder_timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_placeholder_timer_label.add_theme_font_size_override("font_size", 14)
-	_placeholder_timer_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6, 0.8))
+	_placeholder_timer_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_MUTED)
 	_placeholder_container.add_child(_placeholder_timer_label)
 
 	_placeholder_progress_bar = ProgressBar.new()
@@ -156,7 +161,7 @@ func _setup_skip_ui() -> void:
 	_skip_tip_label.name = "SkipTipLabel"
 	_skip_tip_label.text = "[ESC / Space]"
 	_skip_tip_label.add_theme_font_size_override("font_size", 14)
-	_skip_tip_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.7))
+	_skip_tip_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_MUTED_DEFAULT)
 	_skip_prompt_box.add_child(_skip_tip_label)
 
 	_skip_progress_bar = ProgressBar.new()
@@ -175,6 +180,7 @@ func _setup_skip_ui() -> void:
 
 ## 启动播放指定的视频流或文字占位演播
 func play_stream(stream: Resource, req: Variant = null) -> void:
+	_ensure_assembled()
 	if req is Dictionary:
 		_current_request = (req as Dictionary).duplicate()
 	elif req != null and req.has_method("to_dict"):
@@ -235,19 +241,26 @@ func stop_and_dismiss(fade_out_sec: float = 0.5) -> void:
 func _fade_in(duration: float) -> void:
 	if _fade_rect == null:
 		return
+	if not is_inside_tree():
+		_fade_rect.color.a = 0.0
+		return
 	_fade_rect.color.a = 1.0
 	var tween := create_tween()
-	tween.tween_property(_fade_rect, "color:a", 0.0, maxf(0.1, duration))
+	if tween != null:
+		tween.tween_property(_fade_rect, "color:a", 0.0, maxf(0.1, duration))
 
 func _fade_out(duration: float, on_finished: Callable = Callable()) -> void:
-	if _fade_rect == null:
+	if _fade_rect == null or not is_inside_tree():
 		if on_finished.is_valid():
 			on_finished.call()
 		return
 	var tween := create_tween()
-	tween.tween_property(_fade_rect, "color:a", 1.0, maxf(0.1, duration))
-	if on_finished.is_valid():
-		tween.finished.connect(on_finished)
+	if tween != null:
+		tween.tween_property(_fade_rect, "color:a", 1.0, maxf(0.1, duration))
+		if on_finished.is_valid():
+			tween.finished.connect(on_finished)
+	elif on_finished.is_valid():
+		on_finished.call()
 
 func _on_video_player_finished() -> void:
 	playback_finished.emit()

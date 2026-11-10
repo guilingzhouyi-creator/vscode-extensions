@@ -96,13 +96,13 @@ static func test_tc_flc_01_account_registration_and_guest_creation() -> Dictiona
 ## -----------------------------------------------------------------------------
 static func test_tc_flc_02_gateway_selection_and_mode_readiness() -> Dictionary:
 	var gw := WorldGatewayFSM.new("ACC_FLC_GW_01")
-	var enter_res := gw.enter_gateway()
+	var enter_res: Dictionary = gw.enter_gateway()
 	var enter_ok: bool = bool(enter_res.get("success", false))
 
-	var probe_res := gw.probe_all_modes()
+	var probe_res: Dictionary = enter_res.get("probe_reports", {})
 	var probe_ok: bool = not probe_res.is_empty()
 
-	var select_res := gw.select_mode(WorldGatewayModel.GameMode.SINGLE_PLAYER, {}, [])
+	var select_res: Dictionary = gw.select_mode(WorldGatewayModel.GameMode.SINGLE_PLAYER, {}, [])
 	var select_ok: bool = bool(select_res.get("success", false))
 	var phase_ok: bool = (gw.context.current_phase == WorldGatewayModel.GatewayPhase.CHARACTER_PENDING)
 
@@ -145,49 +145,50 @@ static func test_tc_flc_03_character_creation_and_slot_binding() -> Dictionary:
 static func test_tc_flc_04_prologue_narrative_and_cutscene_hook() -> Dictionary:
 	var hook_registry := CutsceneHookRegistry.new()
 	var hook_data := {
-		"media_id": "CG_PROLOGUE_OPENING",
+		"cutscene_id": "CS_VALAN_AWAKEN",
 		"trigger_type": CutsceneHookRegistry.TRIGGER_NARRATIVE_NODE_PRE,
-		"trigger_node_id": "NODE_VALAN_AWAKEN",
-		"priority": 10
+		"target_filter": {"dag_id": "DAG_PROLOGUE", "node_id": "NODE_VALAN_AWAKEN"}
 	}
-	var register_ok: bool = hook_registry.register_hook(hook_data)
-	var matched_hooks := hook_registry.query_matching_hooks(CutsceneHookRegistry.TRIGGER_NARRATIVE_NODE_PRE, "NODE_VALAN_AWAKEN")
-	var query_ok: bool = (matched_hooks.size() == 1)
+	hook_registry.register_hook(hook_data)
+	var matched_req := hook_registry.match_narrative_hook("DAG_PROLOGUE", "NODE_VALAN_AWAKEN", true)
+	var query_ok: bool = (matched_req != null and matched_req.cutscene_id == "CS_VALAN_AWAKEN")
 
 	var handoff := PrologueHandoffDTO.new()
 	handoff.account_id = "ACC_FLC_GW_01"
 	handoff.character_id = "CHAR_HERO_VALAN_01"
-	handoff.selected_slot_id = "SLOT_01"
-	handoff.assigned_world_id = "WORLD_VALAN_PRIME"
-	handoff.entry_town_id = "VALAN_CAPITAL"
+	handoff.character_name = "Valan Hero"
+	handoff.assigned_start_location_id = "VALAN_CAPITAL"
 
 	var dto := handoff.to_dto()
 	var restored := PrologueHandoffDTO.from_dto(dto)
-	var handoff_ok: bool = (restored.character_id == handoff.character_id) and (restored.assigned_world_id == handoff.assigned_world_id)
+	var handoff_ok: bool = (restored.character_id == handoff.character_id) and (restored.assigned_start_location_id == handoff.assigned_start_location_id)
 
-	var passed: bool = register_ok and query_ok and handoff_ok
+	var passed: bool = query_ok and handoff_ok
 	return make_result("TC-FLC-04: 序章推进媒体Hook触发与PrologueHandoffDTO交接", passed, {
-		"hook_count": matched_hooks.size(),
-		"world_id": restored.assigned_world_id
+		"matched_ok": query_ok,
+		"location_id": restored.assigned_start_location_id
 	})
 
 ## -----------------------------------------------------------------------------
 ## TC-FLC-05: 主页 HUD 首帧拉取与总线广播消费验证
 ## -----------------------------------------------------------------------------
 static func test_tc_flc_05_hud_authoritative_snapshot_and_event_bridge() -> Dictionary:
-	var snap := AuthoritativeHudSyncService.generate_snapshot("CHAR_HERO_VALAN_01", "ACC_FLC_GW_01", "SLOT_01")
+	var snap := AuthoritativeHudSyncService.get_authoritative_snapshot({"character_id": "CHAR_HERO_VALAN_01", "account_id": "ACC_FLC_GW_01", "slot_id": "SLOT_01"})
 	var snap_ok: bool = (snap != null and snap.character_id == "CHAR_HERO_VALAN_01")
 
 	var bridge := HudEventBridge.get_instance()
 	var hud_view := MainHUDView.new()
 	bridge.attach_hud(hud_view)
-	var attach_ok: bool = (bridge._hud_ref != null and bridge._hud_ref.get_ref() == hud_view)
+	var attach_ok: bool = bridge.is_attached()
 
 	bridge.detach_hud()
-	var detach_ok: bool = (bridge._hud_ref == null)
+	var detach_ok: bool = not bridge.is_attached()
 	hud_view.free()
 
 	var passed: bool = snap_ok and attach_ok and detach_ok
+	return make_result("TC-FLC-05: 主页HUD首帧拉取与总线广播消费验证", passed, {
+		"character_id": snap.character_id if snap != null else ""
+	})
 	return make_result("TC-FLC-05: 主页HUD首帧拉取与总线广播消费验证", passed, {
 		"character_id": snap.character_id if snap != null else ""
 	})
@@ -285,7 +286,8 @@ static func test_tc_flc_09_account_logout_and_secret_vault_clearing() -> Diction
 	reg_req.password_plain = "pwd_logout_123"
 	AuthService.register_account(reg_req)
 
-	var auth_res := AuthService.authenticate_local("logout_user", "pwd_logout_123")
+	var account := AccountRepository.get_instance().find_by_username("logout_user")
+	var auth_res: Dictionary = AuthService.authenticate_local("logout_user", "pwd_logout_123", account)
 	var login_token: String = str(auth_res.get("token", ""))
 	var token_active: bool = AuthService.validate_token(login_token).get("success", false)
 

@@ -1,6 +1,6 @@
 # ==============================================================================
 # 模块归属: 前端表现层 (Frontend · 全屏媒体播放视口 (Media Presentation))
-# 文件路径: res://frontend/views/cutscene_player/cutscene_presenter.gd
+# 文件路径: res://frontend/presentation/common/cutscene_presenter.gd
 # 架构定位: View Presenter / EventBus Boundary Mediator
 # 依赖与触发: 上游: EventBus / Coordinator | 下游: CutscenePlayerView
 # 职责说明: 作为 CG 视频播放视口与业务系统的表现层中介；
