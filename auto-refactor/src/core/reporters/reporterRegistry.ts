@@ -79,26 +79,24 @@ const BADGE_DEFAULT_SCORE = 100;
 
 /** Canonical ten dimensions for markdown report rendering */
 const CANONICAL_DIMENSIONS = Object.freeze([
-    { key: 'codeSecurity', num: ' 1', name: '代码安全', labelEn: '代码安全 (Code Security)' },
+    { key: 'codeSecurity', num: ' 1', labelEn: '代码安全 (Code Security)' },
     {
         key: 'architectureConsistency',
         num: ' 2',
-        name: '架构一致',
         labelEn: '架构一致 (Architecture)',
     },
-    { key: 'maintainability', num: ' 3', name: '可维护性', labelEn: '可维护性 (Maintainability)' },
+    { key: 'maintainability', num: ' 3', labelEn: '可维护性 (Maintainability)' },
     {
         key: 'performanceEfficiency',
         num: ' 4',
-        name: '性能预算',
         labelEn: '性能预算 (Performance)',
     },
-    { key: 'techDebtRisk', num: ' 5', name: '技术债风险', labelEn: '技术债风险 (Tech Debt Risk)' },
-    { key: 'semanticPurity', num: ' 6', name: '语义纯度', labelEn: '语义纯度 (Semantic Purity)' },
-    { key: 'duplication', num: ' 7', name: '重复率', labelEn: '重复率 (Duplication)' },
-    { key: 'standardization', num: ' 8', name: '标准化', labelEn: '标准化 (Standardization)' },
-    { key: 'modernity', num: ' 9', name: '现代化', labelEn: '现代化 (Modernity)' },
-    { key: 'commentQuality', num: '10', name: '注释质量', labelEn: '注释质量 (Comment Quality)' },
+    { key: 'techDebtRisk', num: ' 5', labelEn: '技术债风险 (Tech Debt Risk)' },
+    { key: 'semanticPurity', num: ' 6', labelEn: '语义纯度 (Semantic Purity)' },
+    { key: 'duplication', num: ' 7', labelEn: '重复率 (Duplication)' },
+    { key: 'standardization', num: ' 8', labelEn: '标准化 (Standardization)' },
+    { key: 'modernity', num: ' 9', labelEn: '现代化 (Modernity)' },
+    { key: 'commentQuality', num: '10', labelEn: '注释质量 (Comment Quality)' },
 ]);
 
 function formatScoreProgressBar(score: number, width = 12): string {

@@ -15,7 +15,7 @@
  */
 
 import * as ts from 'typescript';
-import type { AgentActionablePayload, AnalyzerContext, Severity } from '../core/types';
+import type { AnalyzerContext, Severity } from '../core/types';
 import type { DiagnosticDescriptor } from '../core/messages/types';
 import { auditFunctionSemantics, isExemptFunctionName } from './naming-path-helper';
 
@@ -156,7 +156,6 @@ const TYPE_NAME_TO_WRAPPER_MAP: ReadonlyMap<string, TypeWrapperHandler> = new Ma
 
 const SOURCE_TYPE_INFERENCE = 'type_inference';
 const SOURCE_INITIALIZER_CALL = 'initializer_call';
-const SOURCE_ABBREVIATION_EXPANSION = 'abbreviation_expansion';
 /** Standardized remediation action code for identifier token replacement. */
 export const ACTION_REPLACE_TOKEN = 'replace_token';
 /** Canonical governance norm defect taxonomy identifier for naming diagnostics. */

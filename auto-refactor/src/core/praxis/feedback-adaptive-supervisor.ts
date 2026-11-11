@@ -657,6 +657,9 @@ export const PraxisIoBarrier = {
  * @param cause - Underlying error or a description of the rejected payload.
  */
 function reportSnapshotLoadFailure(filePath: string, operation: string, cause: unknown): void {
+    // A missing snapshot is the normal first-run state, not a failure: reporting it on every
+    // scan would bury the one case that matters (a file that exists and cannot be read).
+    if (cause instanceof Error && (cause as NodeJS.ErrnoException).code === 'ENOENT') return;
     const detail = cause instanceof Error ? cause.message : String(cause);
     process.stderr.write(`[governance-snapshot] ${operation} failed for ${filePath}: ${detail}\n`);
 }

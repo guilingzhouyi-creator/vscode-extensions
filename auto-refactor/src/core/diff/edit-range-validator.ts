@@ -13,7 +13,8 @@
  *   all checks execute in O(1) space per edit range.
  */
 
-import { DiffOp, DIFF_OP_EQUAL, DIFF_OP_EQUAL_SPAN, DIFF_OP_DELETE } from './myers-algorithm';
+import type { DiffOp } from './myers-algorithm';
+import { DIFF_OP_EQUAL, DIFF_OP_EQUAL_SPAN, DIFF_OP_DELETE } from './myers-algorithm';
 
 /** `typeof` tag for numeric edit-range fields; non-numeric input is rejected. */
 const TYPEOF_NUMBER = 'number';

@@ -326,8 +326,7 @@ export function evaluateElasticComplexityBudget(
 ): ElasticBudgetEvaluation {
     const issues: Issue[] = [];
     const thresholds = computeBudgetThresholds(funcCtx, defaultWarn, defaultFail);
-    const { totalMultiplier, effectiveWarn, effectiveFail, hasAlgorithmicProof, multipliers } =
-        thresholds;
+    const { effectiveWarn, effectiveFail, hasAlgorithmicProof, multipliers } = thresholds;
 
     const isExceeded = funcCtx.cc >= effectiveWarn;
     if (isExceeded) {
