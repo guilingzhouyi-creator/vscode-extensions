@@ -71,6 +71,17 @@
     "LOG_EVENT_SUBSCRIBER_CLEARED": "Scoped subscriber cleared {count} active subscriptions for owner '{owner}'.",
     "LOG_IDEMPOTENT_REJECT": "Operation with token '{token}' was already processed. Duplicate execution skipped.",
     "LOG_DATA_SANITIZED": "Parameter '{param_name}' sanitized from raw value '{raw}' to safe value '{clean}'.",
-    "LOG_RPC_ISOLATION_BLOCKED": "Standalone local log or state blocked from multiplayer synchronization."
+    "LOG_RPC_ISOLATION_BLOCKED": "Standalone local log or state blocked from multiplayer synchronization.",
+    "LOG_GW_ENTERED": "Account '{account_id}' entered world gateway. Available modes: {available_modes}.",
+    "LOG_GW_MODE_SELECTED": "Account '{account_id}' selected mode {mode} for world '{world_id}' on slot '{slot_id}'.",
+    "LOG_GW_WORLD_ENTERED": "Account '{account_id}' entered world '{world_id}' with character '{character_id}' on slot '{slot_id}'.",
+    "LOG_GW_MEMORY_SCRUBBED": "World gateway memory scrubbed for account '{account_id}'. Returned to gateway phase {phase}.",
+    "LOG_GW_MODE_SWITCHED": "Account '{account_id}' switched gateway mode to {mode} for world '{world_id}' on slot '{slot_id}'.",
+    "LOG_GW_PROLOGUE_HANDOFF": "Prologue handed off for account '{account_id}', character '{character_id}' at location '{location_id}'.",
+    "LOG_GW_TRANSITION_BLOCKED": "Gateway transition blocked for account '{account_id}': {reason}.",
+    "LOG_LIFECYCLE_SHUTDOWN_START": "Graceful shutdown pipeline started with reason: {exit_reason}.",
+    "LOG_LIFECYCLE_SHUTDOWN_CLOSED": "Graceful shutdown pipeline closed; elapsed time: {elapsed_ms} ms.",
+    "LOG_LIFECYCLE_STAGE_TIMEOUT": "Shutdown phase '{phase_label}' timed out; continuing cleanup.",
+    "LOG_ESC_ACTION_DISPATCHED": "ESC action '{action_type}' dispatched for request '{request_id}'."
   }
 }

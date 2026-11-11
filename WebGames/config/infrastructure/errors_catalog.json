@@ -133,12 +133,12 @@
       "domain": "character_creation"
     },
     "GATEWAY_ERR_NO_MODE_SELECTED": {
-      "severity": "warn",
+      "severity": "error",
       "message_key": "errors/gateway_no_mode",
       "domain": "world_gateway"
     },
     "GATEWAY_ERR_MULTIPLAYER_DISABLED": {
-      "severity": "warn",
+      "severity": "error",
       "message_key": "errors/gateway_mp_disabled",
       "domain": "world_gateway"
     },
@@ -276,6 +276,106 @@
       "severity": "warn",
       "message_key": "",
       "domain": "inventory"
+    },
+    "GATEWAY_ERR_SLOT_NOT_FOUND": {
+      "severity": "error",
+      "message_key": "errors/gateway_slot_not_found",
+      "domain": "world_gateway"
+    },
+    "INVALID_ACCOUNT": {
+      "severity": "error",
+      "message_key": "errors/invalid_account",
+      "domain": "world_gateway"
+    },
+    "EMPTY_CHARACTER_ID": {
+      "severity": "error",
+      "message_key": "errors/empty_character_id",
+      "domain": "world_gateway"
+    },
+    "INVALID_HANDOFF": {
+      "severity": "error",
+      "message_key": "errors/invalid_handoff",
+      "domain": "world_gateway"
+    },
+    "ERR_HOT_SWAP_BLOCKED_IN_ACTIVE_WORLD": {
+      "severity": "error",
+      "message_key": "errors/hot_swap_blocked_in_active_world",
+      "domain": "world_gateway"
+    },
+    "INVALID_ACCOUNT_SLOTS": {
+      "severity": "error",
+      "message_key": "errors/invalid_account_slots",
+      "domain": "world_gateway"
+    },
+    "INVALID_ACCOUNT_SLOT_TYPE": {
+      "severity": "error",
+      "message_key": "errors/invalid_account_slot_type",
+      "domain": "world_gateway"
+    },
+    "EMPTY_OR_DUPLICATE_ACCOUNT_SLOT": {
+      "severity": "error",
+      "message_key": "errors/empty_or_duplicate_account_slot",
+      "domain": "world_gateway"
+    },
+    "ERR_MISSING_CRITICAL_MOD": {
+      "severity": "error",
+      "message_key": "errors/missing_critical_mod",
+      "domain": "world_gateway"
+    },
+    "GATEWAY_ERR_MULTIPLAYER_PENDING": {
+      "severity": "error",
+      "message_key": "errors/gateway_mp_pending",
+      "domain": "world_gateway"
+    },
+    "GATEWAY_ERR_INVALID_UNBOUND_SENTINEL_CONFIG": {
+      "severity": "error",
+      "message_key": "errors/gateway_invalid_unbound_sentinel",
+      "domain": "world_gateway"
+    },
+    "GATEWAY_ERR_WORLD_UNBOUND": {
+      "severity": "error",
+      "message_key": "errors/gateway_world_unbound",
+      "domain": "world_gateway"
+    },
+    "GATEWAY_ERR_SLOT_UNBOUND": {
+      "severity": "error",
+      "message_key": "errors/gateway_slot_unbound",
+      "domain": "world_gateway"
+    },
+    "GATEWAY_ERR_UNKNOWN_MODE": {
+      "severity": "error",
+      "message_key": "errors/gateway_unknown_mode",
+      "domain": "world_gateway"
+    },
+    "DISALLOWED_NAME_CHARACTER": {
+      "severity": "error",
+      "message_key": "errors/disallowed_name_character",
+      "domain": "character_creation"
+    },
+    "ERR_UNBOUND_SAVE_SLOT": {
+      "severity": "error",
+      "message_key": "errors/unbound_save_slot",
+      "domain": "world_state"
+    },
+    "ERR_GATEWAY_NOT_BOUND": {
+      "severity": "error",
+      "message_key": "errors/gateway_not_bound",
+      "domain": "world_state"
+    },
+    "ERR_NULL_REQUEST": {
+      "severity": "error",
+      "message_key": "errors/null_request",
+      "domain": "world_state"
+    },
+    "ERR_INVALID_ESC_ACTION": {
+      "severity": "error",
+      "message_key": "errors/invalid_esc_action",
+      "domain": "world_state"
+    },
+    "SECURITY_ERR_TRANSITION_BLOCKED": {
+      "severity": "error",
+      "message_key": "errors/security_transition_blocked",
+      "domain": "world_gateway"
     }
   }
 }

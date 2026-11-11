@@ -12,7 +12,7 @@
     "ADV-TYP-002": {
       "level": "ERROR",
       "name": "函数签名参数与返回值类型完整性",
-      "description": "所有业务函数定义必须标注参数类型与返回值类型（如 func foo(p_val: int) -> bool），严禁裸参数或无返回值签名",
+      "description": "所有业务函数定义必须标注参数类型与返回值类型（如 func foo(param_val: int) -> bool），严禁裸参数或无返回值签名",
       "fix_suggestion": "为所有函数参数补充类型标注并显式声明返回值类型（无返回值声明 -> void）"
     },
     "ADV-NAM-001": {
