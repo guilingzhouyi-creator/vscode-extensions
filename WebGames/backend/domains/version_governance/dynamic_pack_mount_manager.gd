@@ -17,13 +17,13 @@ static var _mounted_packs: Array[Dictionary] = []
 ## 动态挂载增量 PCK 资源包 (覆盖式物理挂载)
 static func mount_patch_pack(pck_path: String, version_str: String, priority: int = 100) -> bool:
 	if not FileAccess.file_exists(pck_path):
-		EventBusCore.get_instance().emit_log("error", "【PackMount】挂载失败：补丁文件不存在 -> %s" % pck_path)
+		EventBusCore.get_instance().emit_log("error", TemplateFormatter.format("PackMount failed: patch file does not exist: {path}", {"path": pck_path}))
 		return false
 
 	# 利用 Godot 原生虚拟文件系统，replace_files = true 执行覆盖式挂载
 	var success := ProjectSettings.load_resource_pack(pck_path, true)
 	if not success:
-		EventBusCore.get_instance().emit_log("error", "【PackMount】Godot 原生 load_resource_pack 失败 -> %s" % pck_path)
+		EventBusCore.get_instance().emit_log("error", TemplateFormatter.format("PackMount failed: Godot engine load_resource_pack returned failure: {path}", {"path": pck_path}))
 		return false
 
 	_mounted_packs.append({

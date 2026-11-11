@@ -40,7 +40,7 @@ func reload_configuration() -> void:
 		# L11: clamp 区间有序不变量（Inv-VD-3）——value_min > value_max 的倒置定义
 		# 拒绝登记并告警（旧实现静默登记 → 求值 clampf 恒返 value_max 的静默数值错误）
 		if def.value_min > def.value_max:
-			ErrorReporter.emit_warning("inventory", "INVALID_RANGE", "item_attributes: %s 倒置定义 value_min(%s) > value_max(%s)，拒绝登记" % [str(attr_uid), def.value_min, def.value_max])
+			ErrorReporter.emit_warning("inventory", "INVALID_RANGE", TemplateFormatter.format("item_attributes: inverted range defined for {attr_uid}: value_min({min}) > value_max({max}); registration rejected.", {"attr_uid": str(attr_uid), "min": def.value_min, "max": def.value_max}))
 			continue
 		_definitions[str(attr_uid)] = def
 

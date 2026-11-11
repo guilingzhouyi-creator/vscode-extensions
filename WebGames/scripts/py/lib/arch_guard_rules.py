@@ -33,18 +33,8 @@ ALLOWED_PUSH_FILES: frozenset[str] = frozenset({
   "backend/domains/contract_registry/domain_view_mapping_snapshot.gd",
 })
 
-# 存量旧模块错误消息硬编码中文与裸格式符渐进演进白名单（新增或已重构域必须严格遵守英文底座与命名占位符）
-LEGACY_ERROR_MESSAGE_WHITELIST: frozenset[str] = frozenset({
-  "backend/infrastructure/game_config.gd",
-  "backend/domains/admin_sandbox/gm_audit_service.gd",
-  "backend/domains/contract_registry/contract_registry_index.gd",
-  "backend/domains/inventory/item_attribute_registry.gd",
-  "backend/domains/inventory/wearable_inventory.gd",
-  "backend/domains/item_namespace_registry/magic_tier_registry.gd",
-  "backend/domains/narrative_orchestration/mod_package_discovery_solver.gd",
-  "backend/domains/persistence_protocol/save_data_access_layer.gd",
-  "backend/domains/persistence_protocol/save_migration_engine.gd",
-})
+# 存量旧模块错误消息硬编码中文与裸格式符渐进演进白名单（已全部清零完成英文底座改造）
+LEGACY_ERROR_MESSAGE_WHITELIST: frozenset[str] = frozenset()
 
 # 持久化核心实体聚合根列表与声明文件路径映射
 CORE_PERSISTENCE_CLASSES: tuple[tuple[str, str], ...] = (
@@ -197,6 +187,7 @@ def check_tc_arch_12(
   violations: list[str] = []
   emit_err_re = re.compile(r'ErrorReporter\.emit_(?:error|warning|fatal)\s*\([^,]+,\s*"[^"]+",\s*"([^"]*)"')
   fail_call_re = re.compile(r'\b_fail\s*\(\s*"[^"]+",\s*"([^"]*)"')
+  emit_log_re = re.compile(r'\bemit_log\s*\(\s*"[^"]*",\s*"([^"]*)"')
   chinese_re = re.compile(r'[\u4e00-\u9fff]')
   c_fmt_re = re.compile(r'%[0-9.]*[sdf]')
 
@@ -231,6 +222,19 @@ def check_tc_arch_12(
         if c_fmt_re.search(msg):
           violations.append(
             f"{rel_res}:{line_idx}: 失败提示使用裸格式符「{msg}」，须使用 {{param}} 英文命名占位符并经 TemplateFormatter 注入"
+          )
+
+      # 3. 检查 emit_log(...) 结构化日志消息
+      for m in emit_log_re.finditer(line):
+        msg = m.group(1)
+        rel_res = RES_PREFIX + rel_posix
+        if chinese_re.search(msg):
+          violations.append(
+            f"{rel_res}:{line_idx}: 日志输出包含硬编码中文「{msg}」，须使用英文底座并经占位符动态注入"
+          )
+        if c_fmt_re.search(msg):
+          violations.append(
+            f"{rel_res}:{line_idx}: 日志输出使用裸格式符「{msg}」，须使用 {{param}} 英文命名占位符并经 TemplateFormatter 注入"
           )
 
   return make_result("TC-ARCH-12: 英文底座日志与错误动态占位符注入规范断言", violations)

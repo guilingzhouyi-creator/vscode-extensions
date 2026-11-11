@@ -246,7 +246,7 @@ func restore(snapshot_data: Dictionary) -> void:
 		equipped_slots = rebuilt_slots
 	else:
 		# 无深载荷：空容器恢复 + 审计警告（不静默吞掉畸形快照；旧引用路径已退役）
-		ErrorReporter.emit_warning("wearable_inventory", "RESTORE_PAYLOAD_MISSING", "wearable_inventory 快照缺失 storage_payloads，已按空容器恢复")
+		ErrorReporter.emit_warning("wearable_inventory", "RESTORE_PAYLOAD_MISSING", "Wearable inventory snapshot missing storage_payloads; recovered as empty container.")
 		storage_items = []
 		equipped_slots = {}
 	for item in storage_items:

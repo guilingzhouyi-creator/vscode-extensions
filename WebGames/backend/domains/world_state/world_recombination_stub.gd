@@ -20,7 +20,7 @@ static func generate_new_world(default_template: Dictionary, history_worlds: Arr
 	var template: Dictionary = _resolve_template(default_template)
 	if not enabled:
 		return {"success": true, "world": template.duplicate(), "mode": MODE_DEFAULT_ONLY}
-	EventBusCore.get_instance().emit_log("warn", "WorldRecombinationStub: 多世界重组高级算法未完全落地，当前输出为模板合成回退数据")
+	EventBusCore.get_instance().emit_log("warn", "WorldRecombinationStub: multi-world recombination algorithm not fully deployed; outputting fallback template synthesis.")
 	var fragments: Array = []
 	for w in history_worlds:
 		if not w is Dictionary:

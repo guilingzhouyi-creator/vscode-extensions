@@ -274,7 +274,7 @@ func _register_name_keys() -> void:
 		_register_one(shared, entry, collisions)
 	if not collisions.is_empty():
 		_ready = false
-		ErrorReporter.emit_warning("item_namespace_registry", "NAME_KEY_COLLISION", "MagicTierRegistry: 名称键跨域冲突 %s" % JSON.stringify(collisions))
+		ErrorReporter.emit_warning("item_namespace_registry", "NAME_KEY_COLLISION", TemplateFormatter.format("MagicTierRegistry: cross-domain name key collisions: {collisions}", {"collisions": JSON.stringify(collisions)}))
 
 ## 单条目名称键登记（域所有者 magic，英文兜底键本体；跨域冲突入列）
 func _register_one(shared: LocalizationRegistryCatalog, entry: Dictionary, collisions: Array) -> void:

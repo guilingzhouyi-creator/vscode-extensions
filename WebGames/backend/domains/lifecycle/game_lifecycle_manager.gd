@@ -57,7 +57,7 @@ func transition_to(target_phase: int) -> bool:
 	if not _is_valid_transition(_current_phase, target_phase):
 		var prev_name := GameLifecycleModel.get_phase_name(_current_phase)
 		var target_name := GameLifecycleModel.get_phase_name(target_phase)
-		EventBusCore.get_instance().emit_log("warn", "非法生命周期跃迁被拦截: %s -> %s" % [prev_name, target_name])
+		EventBusCore.get_instance().emit_log("warn", TemplateFormatter.format("Illegal lifecycle phase transition intercepted: {previous} -> {target}.", {"previous": prev_name, "target": target_name}))
 		return false
 
 	var prev := _current_phase

@@ -54,7 +54,7 @@ static func _parse_manifest_at_path(manifest_path: String, fallback_pack_id: Str
     var content := file.get_as_text()
     var parsed_val: Variant = JSON.parse_string(content)
     if not (parsed_val is Dictionary):
-        ErrorReporter.emit_error("mod_narrative", "CONFIG_JSON_PARSE_FAIL", "MOD 清单 pack.json 格式非法或解析失败: %s" % manifest_path, {"file_path": manifest_path})
+        ErrorReporter.emit_error("mod_narrative", "CONFIG_JSON_PARSE_FAIL", TemplateFormatter.format("MOD manifest pack.json invalid format or parse failed: {path}", {"path": manifest_path}), {"file_path": manifest_path})
         return null
 
     var dto := NarrativePackManifestDTO.from_dto(parsed_val as Dictionary)
@@ -70,7 +70,7 @@ static func _parse_manifest_from_kmod(kmod_path: String, fallback_pack_id: Strin
     var reader := ZIPReader.new()
     var err := reader.open(kmod_path)
     if err != OK:
-        ErrorReporter.emit_error("mod_narrative", "CONFIG_FILE_READ_FAIL", "无法打开 .kmod 归档包: %s" % kmod_path, {"file_path": kmod_path})
+        ErrorReporter.emit_error("mod_narrative", "CONFIG_FILE_READ_FAIL", TemplateFormatter.format("Failed to open .kmod archive package: {path}", {"path": kmod_path}), {"file_path": kmod_path})
         return null
     var manifest_content := ""
     if reader.file_exists("pack.json"):
@@ -79,11 +79,11 @@ static func _parse_manifest_from_kmod(kmod_path: String, fallback_pack_id: Strin
         manifest_content = reader.read_file("manifest.json").get_string_from_utf8()
     reader.close()
     if manifest_content.is_empty():
-        ErrorReporter.emit_error("mod_narrative", "CONFIG_FILE_NOT_FOUND", ".kmod 归档包内缺失 pack.json 或 manifest.json: %s" % kmod_path, {"file_path": kmod_path})
+        ErrorReporter.emit_error("mod_narrative", "CONFIG_FILE_NOT_FOUND", TemplateFormatter.format(".kmod archive missing pack.json or manifest.json: {path}", {"path": kmod_path}), {"file_path": kmod_path})
         return null
     var parsed_val: Variant = JSON.parse_string(manifest_content)
     if not (parsed_val is Dictionary):
-        ErrorReporter.emit_error("mod_narrative", "CONFIG_JSON_PARSE_FAIL", ".kmod 归档包内清单解析错误: %s" % kmod_path, {"file_path": kmod_path})
+        ErrorReporter.emit_error("mod_narrative", "CONFIG_JSON_PARSE_FAIL", TemplateFormatter.format(".kmod archive manifest parse error: {path}", {"path": kmod_path}), {"file_path": kmod_path})
         return null
     var dto := NarrativePackManifestDTO.from_dto(parsed_val as Dictionary)
     if dto.pack_id.is_empty():
@@ -261,7 +261,7 @@ static func _read_json_file(file_path: String) -> Variant:
     var text := f.get_as_text()
     var parsed: Variant = JSON.parse_string(text)
     if parsed == null and not text.strip_edges().is_empty():
-        ErrorReporter.emit_error("mod_narrative", "CONFIG_JSON_PARSE_FAIL", "MOD JSON 解析语法错误: %s" % file_path, {"file_path": file_path})
+        ErrorReporter.emit_error("mod_narrative", "CONFIG_JSON_PARSE_FAIL", TemplateFormatter.format("MOD JSON parse syntax error: {path}", {"path": file_path}), {"file_path": file_path})
     return parsed
 
 ## 递归展平 i18n 嵌套字典为点分键与斜杠键
@@ -373,7 +373,7 @@ static func load_full_mod_package_from_dir(mod_dir: String) -> Dictionary:
 static func _load_full_package_from_kmod(kmod_path: String) -> Dictionary:
     var reader := ZIPReader.new()
     if reader.open(kmod_path) != OK:
-        ErrorReporter.emit_error("mod_narrative", "CONFIG_FILE_READ_FAIL", "无法打开 .kmod 归档包: %s" % kmod_path, {"file_path": kmod_path})
+        ErrorReporter.emit_error("mod_narrative", "CONFIG_FILE_READ_FAIL", TemplateFormatter.format("Failed to open .kmod archive package: {path}", {"path": kmod_path}), {"file_path": kmod_path})
         return {}
     var files := reader.get_files()
     var manifest_raw: Variant = null
@@ -428,7 +428,7 @@ static func scan_installed_full_mod_packages(custom_roots: Array = []) -> Array[
         ordered_packs = sort_res.get("sorted_packs", [])
     else:
         var err_code := str(sort_res.get("error", "CONFIG_VALIDATION_FAILED"))
-        var err_msg := "MOD 依赖拓扑排序失败: %s" % err_code
+        var err_msg := TemplateFormatter.format("MOD dependency topological sort failed: {error}", {"error": err_code})
         ErrorReporter.emit_error("mod_narrative", "CONFIG_VALIDATION_FAILED", err_msg, sort_res)
         ordered_packs = installed_packs
 

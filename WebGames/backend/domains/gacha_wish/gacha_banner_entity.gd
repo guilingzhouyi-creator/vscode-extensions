@@ -66,7 +66,7 @@ func restore_progress(snap: Dictionary) -> void:
 	if snap == null or snap.is_empty():
 		return
 	if snap.has("banner_id") and String(snap.get("banner_id")) != "" and snap.get("banner_id") != banner_id:
-		push_warning("GachaBannerAggregate.restore_progress: 快照 banner_id 不匹配 ('%s' vs '%s')，拒绝跨池回滚。" % [snap.get("banner_id"), banner_id])
+		push_warning(TemplateFormatter.format("GachaBannerAggregate.restore_progress: snapshot banner_id mismatch ('{snapshot}' vs '{current}'); cross-pool rollback rejected.", {"snapshot": snap.get("banner_id"), "current": banner_id}))
 		return
 	total_lifetime_pulls = maxi(0, int(snap.get("total_lifetime_pulls", total_lifetime_pulls)))
 	current_pity_count = maxi(0, int(snap.get("current_pity_count", current_pity_count)))

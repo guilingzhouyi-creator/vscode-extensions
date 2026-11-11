@@ -21,7 +21,7 @@ static func recalculate_node_upwards(registry: Dictionary, start_node_path: Stri
 ## 不再无限递归栈溢出；命中环即终止并告警（现场可审计、不静默）
 static func _recalculate_upwards_impl(registry: Dictionary, node_path: String, visited: Dictionary) -> void:
 	if visited.has(node_path):
-		push_warning("red_dot: 环检测命中于节点 %s（parent_path 成环/自指，脏数据）" % node_path)
+		push_warning(TemplateFormatter.format("red_dot: cycle detected at node {node} (cyclic or self-referential parent_path dirty data)", {"node": node_path}))
 		return
 	visited[node_path] = true
 

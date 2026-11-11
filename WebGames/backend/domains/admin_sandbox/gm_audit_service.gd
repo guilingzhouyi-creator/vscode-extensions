@@ -32,8 +32,8 @@ static func record_audit(admin_id: String, action: String, details: Dictionary) 
 	var audit_max := maxi(1, GameConfig.get_int("infrastructure.admin", "audit/max_entries", 500))
 	if audit_log.size() > audit_max:
 		audit_log = audit_log.slice(audit_log.size() - audit_max, audit_log.size())
-	var tmpl := GameConfig.get_string("narratives.admin", "audit_log", "GM Audit: Admin [%s] executed [%s]")
-	EventBusCore.get_instance().emit_log("warn", tmpl % [admin_id, action])
+	var tmpl := GameConfig.get_string("narratives.admin", "audit_log", "GM Audit: Admin [{admin_id}] executed [{action}]")
+	EventBusCore.get_instance().emit_log("warn", TemplateFormatter.format(tmpl, {"admin_id": admin_id, "action": action}))
 	return entry
 
 ## 清单 6：带密钥 HMAC 签名（受控环境密钥提供器——缺钥失败关闭，不降级公开摘要）
@@ -41,7 +41,7 @@ static func _sign(canonical: String) -> String:
 	var env_name := GameConfig.get_string("infrastructure.admin", "security/seal_key_env", "")
 	var key := OS.get_environment(env_name) if not env_name.is_empty() else ""
 	if key.is_empty():
-		ErrorReporter.emit_error("gm_audit_service", "AUDIT_KEY_MISSING", "GMArbitrationAuditService: 审计签名密钥缺失（seal_key_env 未配置）——签名不可用（失败关闭）")
+		ErrorReporter.emit_error("gm_audit_service", "AUDIT_KEY_MISSING", "Audit signing key missing; seal_key_env unconfigured (fail-closed).")
 		return ""
 	return Crypto.new().hmac_digest(
 		HashingContext.HASH_SHA256, key.to_utf8_buffer(), canonical.to_utf8_buffer()
