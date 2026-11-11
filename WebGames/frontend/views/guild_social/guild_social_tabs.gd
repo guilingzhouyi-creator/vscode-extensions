@@ -205,13 +205,8 @@ func _init_friends_tab() -> void:
 
 func _populate_friend_list() -> void:
 	_view._friend_list.clear()
-	var keyword: String = _view._line_friend_search.text.strip_edges().to_lower()
-	for friend in _view._friends:
-		if friend.get("category", FriendCategory.FRIEND) != _view._current_friend_category:
-			continue
+	for friend in _get_visible_friends():
 		var fname := UIIntermediary.text(str(friend.get("name", "")))
-		if not keyword.is_empty() and not fname.to_lower().contains(keyword):
-			continue
 		var status_icon := "●" if friend.get("online", false) else "○"
 		var location := UIIntermediary.text(str(friend.get("location", "")))
 		var level := int(friend.get("level", 0))

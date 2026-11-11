@@ -260,23 +260,22 @@ func update_revert_label() -> void:
 	if _view != null and _view._label_revert_countdown != null:
 		UIIntermediary.resolve(_view._label_revert_countdown, "ui.fe15.graphics.revert_countdown", {"seconds": int(_view.revert_seconds_remain)})
 
-func on_confirm_resolution_pressed() -> void:
-	if _view == null:
-		return
+func _dismiss_revert_popup() -> void:
 	_view.is_in_resolution_revert_countdown = false
 	if _view._panel_revert_popup != null:
 		_view._panel_revert_popup.visible = false
 	if _view._revert_timer != null:
 		_view._revert_timer.stop()
 
+func on_confirm_resolution_pressed() -> void:
+	if _view == null:
+		return
+	_dismiss_revert_popup()
+
 func on_revert_resolution_pressed() -> void:
 	if _view == null:
 		return
-	_view.is_in_resolution_revert_countdown = false
-	if _view._panel_revert_popup != null:
-		_view._panel_revert_popup.visible = false
-	if _view._revert_timer != null:
-		_view._revert_timer.stop()
+	_dismiss_revert_popup()
 	_view.selected_resolution = "1920x1080"
 	if _view._option_resolution != null:
 		for i in range(_view._option_resolution.item_count):

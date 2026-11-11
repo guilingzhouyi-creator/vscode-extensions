@@ -219,6 +219,13 @@ func _connect_signals() -> void:
 # Tab 1: 锻造 (FORGE)
 # ==============================================================================
 
+func _populate_category_option(option_btn: OptionButton) -> void:
+	option_btn.clear()
+	option_btn.add_item(UIIntermediary.text("ui.fe12.category.all"))
+	for cat in _recipe_categories:
+		option_btn.add_item(UIIntermediary.text("ui.fe12.category." + str(cat)))
+	option_btn.select(0)
+
 func _init_forge_tab() -> void:
 	var forge_tab: Control = _tab_container.get_child(0)
 	UIIntermediary.resolve(forge_tab.get_node("LeftPanel/SectionLabel"), "ui.fe12.forge.section_list")
@@ -226,11 +233,7 @@ func _init_forge_tab() -> void:
 	UIIntermediary.resolve(forge_tab.get_node("RightPanel/MaterialSectionLabel"), "ui.fe12.forge.section_materials")
 	UIIntermediary.resolve(forge_tab.get_node("RightPanel/QuantityRow/QtyLabel"), "ui.fe12.forge.quantity")
 	UIIntermediary.resolve_placeholder(_line_forge_search, "ui.fe12.forge.search_ph")
-	_option_forge_category.clear()
-	_option_forge_category.add_item(UIIntermediary.text("ui.fe12.category.all"))
-	for cat in _recipe_categories:
-		_option_forge_category.add_item(UIIntermediary.text("ui.fe12.category." + str(cat)))
-	_option_forge_category.select(0)
+	_populate_category_option(_option_forge_category)
 	_spin_forge_quantity.value = 1
 	UIIntermediary.resolve(_btn_forge_craft, "ui.fe12.forge.craft_btn")
 	_btn_forge_craft.disabled = true
@@ -239,17 +242,8 @@ func _init_forge_tab() -> void:
 
 func _populate_forge_recipe_list() -> void:
 	_forge_recipe_list.clear()
-	var keyword: String = _line_forge_search.text.strip_edges().to_lower()
-	var cat_index: int = _option_forge_category.selected
-	var cat_filter: String = ""
-	if cat_index > 0:
-		cat_filter = str(_recipe_categories[cat_index - 1])
-	for recipe in _forge_recipes:
+	for recipe in _get_filtered_forge_recipes():
 		var name_str: String = UIIntermediary.text(str(recipe.get("name", "")))
-		if not keyword.is_empty() and not name_str.to_lower().contains(keyword):
-			continue
-		if not cat_filter.is_empty() and str(recipe.get("category", "")) != cat_filter:
-			continue
 		var learned_tag := "✓" if bool(recipe.get("learned", false)) else "✗"
 		UIIntermediary.resolve_item(_forge_recipe_list, "ui.fe12.forge.recipe_display", {"tag": learned_tag, "name": name_str, "rarity": str(recipe.get("rarity", ""))})
 	if _tabs != null:
@@ -337,11 +331,7 @@ func _init_dismantle_tab() -> void:
 	for item in [["LeftPanel/SectionLabel", "ui.fe12.dismantle.section_list"], ["RightPanel/DetailSectionLabel", "ui.fe12.dismantle.section_preview"], ["RightPanel/PreviewLabel", "ui.fe12.dismantle.section_output"], ["RightPanel/QuantityRow/QtyLabel", "ui.fe12.dismantle.quantity"], ["RightPanel/HistoryLabel", "ui.fe12.dismantle.section_history"]]:
 		UIIntermediary.resolve(dismantle_tab.get_node(str(item[0])), str(item[1]))
 	UIIntermediary.resolve(_btn_dismantle_confirm, "ui.fe12.dismantle.confirm_btn")
-	_option_dismantle_filter.clear()
-	_option_dismantle_filter.add_item(UIIntermediary.text("ui.fe12.category.all"))
-	for cat in _recipe_categories:
-		_option_dismantle_filter.add_item(UIIntermediary.text("ui.fe12.category." + str(cat)))
-	_option_dismantle_filter.select(0)
+	_populate_category_option(_option_dismantle_filter)
 	_spin_dismantle_quantity.value = 1
 	_populate_dismantle_list()
 	_dismantle_history_list.clear()
@@ -350,13 +340,7 @@ func _init_dismantle_tab() -> void:
 
 func _populate_dismantle_list() -> void:
 	_dismantle_item_list.clear()
-	var cat_index: int = _option_dismantle_filter.selected
-	var cat_filter: String = ""
-	if cat_index > 0:
-		cat_filter = str(_recipe_categories[cat_index - 1])
-	for item in _dismantle_items:
-		if not cat_filter.is_empty() and str(item.get("category", "")) != cat_filter:
-			continue
+	for item in _get_filtered_dismantle_items():
 		UIIntermediary.resolve_item(_dismantle_item_list, "ui.fe12.dismantle.item_display", {
 			"name": UIIntermediary.text(str(item.get("name", ""))),
 			"rarity": str(item.get("rarity", "")),

@@ -204,22 +204,25 @@ func refresh_name_history() -> void:
 func _on_name_type_selected(_idx: int) -> void:
 	refresh_name_fee()
 
-func _on_name_check_pressed() -> void:
+func _read_validated_name_input() -> String:
 	if _view == null:
-		return
+		return ""
 	var name := _view._name_input.text.strip_edges()
 	if name.is_empty():
 		UIIntermediary.resolve(_view._name_check_result_label, "ui.fe17.name_registry.error_empty")
+		return ""
+	return name
+
+func _on_name_check_pressed() -> void:
+	var name := _read_validated_name_input()
+	if name.is_empty():
 		return
 	_view.search_query_keyword = name
 	UIIntermediary.resolve(_view._name_check_result_label, "ui.fe17.name_registry.check_available", {"name": name})
 
 func _on_name_register_pressed() -> void:
-	if _view == null:
-		return
-	var name := _view._name_input.text.strip_edges()
+	var name := _read_validated_name_input()
 	if name.is_empty():
-		UIIntermediary.resolve(_view._name_check_result_label, "ui.fe17.name_registry.error_empty")
 		return
 	var type_idx := _view._name_type_option.selected
 	_view._name_history.append({ "type": type_idx, "name_key": "", "custom_name": name, "time": "2026-09-01 00:00", "success": true })
