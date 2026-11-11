@@ -170,7 +170,7 @@ func reset_animation_state() -> void:
 ## 生命周期初始化：主题/Mock/文案/卡池切换/封面/UP/保底/货币/概率/历史/结果弹窗/信号（骨架零接线）
 func _get_tabs():
 	if _tabs == null:
-		_tabs = GachaWishTabsClass.new()
+		_tabs = _register_owned_subcontroller(GachaWishTabsClass.new())
 		_tabs.setup(self)
 	return _tabs
 
@@ -188,11 +188,6 @@ func _ready() -> void:
 	_init_result_overlay()
 	_connect_signals()
 	UIIntermediary.adapt_view(self)
-
-## 视图销毁钩子：清理 UIIntermediary 视图绑定（防悬挂引用）
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE:
-		UIIntermediary.clear_view_bindings(self)
 
 ## 应用 ThemeManager 单例主题（null 安全）
 func _apply_theme() -> void:

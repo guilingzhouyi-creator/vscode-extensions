@@ -120,7 +120,7 @@ var _tabs = null
 
 func _get_tabs():
 	if _tabs == null:
-		_tabs = EconomyTradeTabsClass.new()
+		_tabs = _register_owned_subcontroller(EconomyTradeTabsClass.new())
 		_tabs.setup(self)
 	return _tabs
 
@@ -186,14 +186,6 @@ func _ready() -> void:
 	_connect_signals()
 	tabs._connect_signals()
 	UIIntermediary.adapt_view(self)
-
-## 视图销毁钩子：清理 UIIntermediary 视图绑定（防悬挂引用）
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE:
-		UIIntermediary.clear_view_bindings(self)
-		if is_instance_valid(_tabs) and not _tabs.is_inside_tree():
-			_tabs.free()
-		_tabs = null
 
 ## 应用 ThemeManager 单例主题（null 安全）
 func _apply_theme() -> void:

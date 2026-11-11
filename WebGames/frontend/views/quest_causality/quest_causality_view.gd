@@ -119,7 +119,7 @@ func _render_from_snapshot() -> void:
 ## 生命周期初始化：主题/Mock 数据/四 Tab 装配/信号绑定/视觉适配（骨架零接线）
 func _get_tabs():
 	if _tabs == null:
-		_tabs = QuestCausalityTabsClass.new()
+		_tabs = _register_owned_subcontroller(QuestCausalityTabsClass.new())
 		_tabs.setup(self)
 	return _tabs
 
@@ -147,11 +147,6 @@ func _ready() -> void:
 
 	# 7. 批量视觉适配
 	UIIntermediary.adapt_view(self)
-
-## 视图销毁钩子：清理 UIIntermediary 视图绑定（防悬挂引用）
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE:
-		UIIntermediary.clear_view_bindings(self)
 
 ## 应用 ThemeManager 单例主题（null 安全）
 func _apply_theme() -> void:

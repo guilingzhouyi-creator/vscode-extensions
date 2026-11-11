@@ -149,9 +149,12 @@ var character_title: String = ""
 var age_years: int = 20
 var age_months: int = 5
 
+const DEFAULT_ATTR_VALUE: int = 10
+
 # 六维属性与潜能加点预览
 var attributes_base: Dictionary = {
-	"STR": 10, "AGI": 10, "CON": 10, "INT": 10, "WIS": 10, "CHA": 10
+	"STR": DEFAULT_ATTR_VALUE, "AGI": DEFAULT_ATTR_VALUE, "CON": DEFAULT_ATTR_VALUE,
+	"INT": DEFAULT_ATTR_VALUE, "WIS": DEFAULT_ATTR_VALUE, "CHA": DEFAULT_ATTR_VALUE
 }
 var attributes_preview: Dictionary = {}
 var available_potential_points: int = 5
@@ -213,7 +216,7 @@ func _ready() -> void:
 	_pot_preview_labels = [_pot_str_preview_label, _pot_agi_preview_label, _pot_con_preview_label, _pot_int_preview_label, _pot_wis_preview_label, _pot_cha_preview_label]
 	_equip_slot_btns = [_equip_main_hand_btn, _equip_off_hand_btn, _equip_head_btn, _equip_chest_btn, _equip_legs_btn, _equip_feet_btn, _equip_neck_btn, _equip_ring_l_btn, _equip_ring_r_btn]
 
-	_tabs = _create_tabs_controller()
+	_tabs = _register_owned_subcontroller(_create_tabs_controller()) as CharacterProgressionTabsClass
 	_tabs.setup(self)
 
 	_load_mock_snapshot()
@@ -231,14 +234,6 @@ func _ready() -> void:
 
 	_connect_signals()
 	UIIntermediary.adapt_view(self)
-
-## 视图销毁钩子：清理 UIIntermediary 视图绑定
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE:
-		UIIntermediary.clear_view_bindings(self)
-		if is_instance_valid(_tabs) and not _tabs.is_inside_tree():
-			_tabs.free()
-		_tabs = null
 
 # ==============================================================================
 # 主题与快照数据加载

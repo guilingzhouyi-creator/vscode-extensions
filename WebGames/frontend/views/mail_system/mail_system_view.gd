@@ -99,7 +99,7 @@ func claim_all_attachments_preview() -> Dictionary:
 # ==============================================================================
 
 func _ready() -> void:
-	_tabs = MailSystemTabsClass.new()
+	_tabs = _register_owned_subcontroller(MailSystemTabsClass.new())
 	_tabs.setup(self)
 
 	var tm := ThemeManager.get_instance()
@@ -116,10 +116,6 @@ func _ready() -> void:
 	_tabs.init_static_text()
 	_connect_signals()
 	UIIntermediary.adapt_view(self)
-
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE:
-		UIIntermediary.clear_view_bindings(self)
 
 func _load_mock_data() -> void:
 	if _tabs != null:

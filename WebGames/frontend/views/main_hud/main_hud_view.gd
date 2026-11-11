@@ -129,7 +129,7 @@ var _subpanels: MainHUDSubpanels = null
 
 func _get_subpanels() -> MainHUDSubpanels:
 	if _subpanels == null:
-		_subpanels = MainHUDSubpanelsClass.new()
+		_subpanels = _register_owned_subcontroller(MainHUDSubpanelsClass.new()) as MainHUDSubpanels
 		_subpanels.setup(self)
 	return _subpanels
 
@@ -162,13 +162,9 @@ func _ready() -> void:
 	HudEventBridge.get_instance().attach_hud(self)
 	UIIntermediary.adapt_view(self)
 
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE:
-		HudEventBridge.get_instance().detach_hud()
-		UIIntermediary.clear_view_bindings(self)
-		if is_instance_valid(_subpanels) and not _subpanels.is_inside_tree():
-			_subpanels.free()
-		_subpanels = null
+func _on_predelete_cleanup() -> void:
+	HudEventBridge.get_instance().detach_hud()
+	_subpanels = null
 
 # ==============================================================================
 # 信号绑定

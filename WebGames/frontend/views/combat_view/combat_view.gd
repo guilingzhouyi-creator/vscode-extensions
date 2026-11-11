@@ -13,7 +13,7 @@ const SubpanelsClass = preload("res://frontend/views/combat_view/combat_subpanel
 var _subpanels = null
 func _get_subpanels():
 	if _subpanels == null:
-		_subpanels = SubpanelsClass.new()
+		_subpanels = _register_owned_subcontroller(SubpanelsClass.new())
 		_subpanels.setup(self)
 	return _subpanels
 
@@ -160,13 +160,6 @@ func _ready() -> void:
 	_connect_signals()
 	_get_subpanels().init_text()
 	UIIntermediary.adapt_view(self)
-
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE:
-		UIIntermediary.clear_view_bindings(self)
-		if is_instance_valid(_subpanels) and not _subpanels.is_inside_tree():
-			_subpanels.free()
-		_subpanels = null
 
 func _connect_signals() -> void:
 	for i in _skill_buttons.size():

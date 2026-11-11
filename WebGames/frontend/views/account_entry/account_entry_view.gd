@@ -14,7 +14,7 @@ const TabsClass = preload("res://frontend/views/account_entry/account_entry_tabs
 var _tabs: AccountEntryTabs = null
 func _get_tabs() -> AccountEntryTabs:
     if _tabs == null:
-        _tabs = TabsClass.new()
+        _tabs = _register_owned_subcontroller(TabsClass.new()) as AccountEntryTabs
         _tabs.setup(self)
     return _tabs
 
@@ -138,10 +138,6 @@ func _ready() -> void:
     switch_state(EntryState.SPLASH)
     _connect_signals()
     UIIntermediary.adapt_view(self)
-
-func _notification(what: int) -> void:
-    if what == NOTIFICATION_PREDELETE:
-        UIIntermediary.clear_view_bindings(self)
 
 func _load_mock_snapshot() -> void:
     var account_data: Dictionary = MockServiceContainer.get_instance().snapshot_data().load_snapshot("account")
