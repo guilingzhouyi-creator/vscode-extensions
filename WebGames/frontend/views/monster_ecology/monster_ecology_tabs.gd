@@ -213,14 +213,20 @@ func _refresh_boss_detail() -> void:
 		"count": int(boss.get("participants", 0)),
 	})
 
-## 挑战按钮回调：骨架阶段仅 print 占位
+## 挑战按钮回调：经 Toast 反馈跳转意图
 func _on_boss_challenge_pressed() -> void:
 	if _selected_boss_idx < 0:
-		print("[MonsterEcology] 请先选择BOSS")
+		NavManager.get_instance().show_toast(
+			UIIntermediary.text("ui.fe11.world_boss.detail.prompt_select"),
+			NavTypes.ToastLevel.WARNING
+		)
 		return
 	var boss: Dictionary = _world_bosses[_selected_boss_idx]
 	var boss_name := UIIntermediary.text(str(boss.get("name_key", "")))
-	print("[MonsterEcology] 前往挑战: %s（骨架阶段：未接线）" % boss_name)
+	NavManager.get_instance().show_toast(
+		UIIntermediary.text("ui.fe11.world_boss.challenge_toast", {"name": boss_name}),
+		NavTypes.ToastLevel.INFO
+	)
 
 # ==============================================================================
 # Tab 2: BEAST_TIDE 兽潮
@@ -287,19 +293,25 @@ func _refresh_tide_rewards() -> void:
 	for reward_key in wave.get("reward_keys", []):
 		UIIntermediary.resolve_item(_view._tide_reward_list, str(reward_key))
 
-## 报名兽潮防守：切换加入/撤离按钮显隐并 print 反馈（骨架桩）
+## 报名兽潮防守：切换加入/撤离按钮显隐并经 Toast 反馈
 func _on_tide_join_pressed() -> void:
 	_tide_joined = true
 	_view._btn_tide_join.visible = false
 	_view._btn_tide_leave.visible = true
-	print("[MonsterEcology] 已报名兽潮防守")
+	NavManager.get_instance().show_toast(
+		UIIntermediary.text("ui.fe11.beast_tide.joined_toast"),
+		NavTypes.ToastLevel.SUCCESS
+	)
 
-## 撤离兽潮战场：切换加入/撤离按钮显隐并 print 反馈（骨架桩）
+## 撤离兽潮战场：切换加入/撤离按钮显隐并经 Toast 反馈
 func _on_tide_leave_pressed() -> void:
 	_tide_joined = false
 	_view._btn_tide_join.visible = true
 	_view._btn_tide_leave.visible = false
-	print("[MonsterEcology] 已撤离兽潮战场")
+	NavManager.get_instance().show_toast(
+		UIIntermediary.text("ui.fe11.beast_tide.left_toast"),
+		NavTypes.ToastLevel.INFO
+	)
 
 # ==============================================================================
 # 信号绑定与工具方法

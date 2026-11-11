@@ -308,7 +308,7 @@ func _on_grimoire_selected(idx: int) -> void:
 	_selected_grimoire_idx = idx
 	_refresh_library_detail()
 
-## 学习魔典按钮：未学习则置已学并刷新详情/列表、print 反馈（骨架桩）
+## 学习魔典按钮：未学习则置已学并刷新详情/列表及 Toast 反馈
 func _on_lib_learn_pressed() -> void:
 	if _selected_grimoire_idx < 0 or _selected_grimoire_idx >= _filtered_grimoires.size():
 		return
@@ -318,7 +318,10 @@ func _on_lib_learn_pressed() -> void:
 	grimoire["learned"] = true
 	_refresh_library_detail()
 	_refresh_grimoire_list()
-	print("[GrimoireAuthoring] 已学习魔典: %s" % str(grimoire.get("key", "")))
+	NavManager.get_instance().show_toast(
+		UIIntermediary.text("ui.fe13.library.learn_toast", {"key": str(grimoire.get("key", ""))}),
+		NavTypes.ToastLevel.SUCCESS
+	)
 
 # ==============================================================================
 # Tab 1: AST_EDITOR AST编辑器
@@ -351,17 +354,26 @@ func _on_ast_node_selected(idx: int) -> void:
 	_selected_ast_node_idx = idx
 	_refresh_ast_detail()
 
-## AST 保存草稿按钮（骨架阶段仅 print 占位，未接线）
+## AST 保存草稿按钮（经 Toast 反馈占位，未接线）
 func _on_ast_save_pressed() -> void:
-	print("[GrimoireAuthoring] 保存草稿（骨架阶段：未接线）")
+	NavManager.get_instance().show_toast(
+		UIIntermediary.text("ui.fe13.ast.save_toast"),
+		NavTypes.ToastLevel.INFO
+	)
 
-## AST 编译为魔典按钮（骨架阶段仅 print 占位，未接线）
+## AST 编译为魔典按钮（经 Toast 反馈占位，未接线）
 func _on_ast_compile_pressed() -> void:
-	print("[GrimoireAuthoring] 编译为魔典（骨架阶段：未接线）")
+	NavManager.get_instance().show_toast(
+		UIIntermediary.text("ui.fe13.ast.compile_toast"),
+		NavTypes.ToastLevel.INFO
+	)
 
-## AST 测试运行按钮（骨架阶段仅 print 占位，未接线）
+## AST 测试运行按钮（经 Toast 反馈占位，未接线）
 func _on_ast_test_pressed() -> void:
-	print("[GrimoireAuthoring] 测试运行（骨架阶段：未接线）")
+	NavManager.get_instance().show_toast(
+		UIIntermediary.text("ui.fe13.ast.test_toast"),
+		NavTypes.ToastLevel.INFO
+	)
 
 # ==============================================================================
 # Tab 2, 3, 4 委托给 GrimoireAuthoringTabs

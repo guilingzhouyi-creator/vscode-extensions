@@ -271,12 +271,17 @@ func on_result_detail_pressed() -> void:
 	var view: GachaWishView = _view
 	if view.latest_pull_results.is_empty():
 		return
+	var entries: PackedStringArray = []
+	var detail_params: Dictionary = {}
 	for drop in view.latest_pull_results:
-		print("[GachaWish] %s星 %s (NEW: %s)" % [
-			str(drop.get("rarity", "3")),
-			UIIntermediary.text(str(drop.get("name", "ui.fe06.unknown"))),
-			str(drop.get("is_recently_added", drop.get("is_new", false))),
-		])
+		detail_params["rarity"] = str(drop.get("rarity", "3"))
+		detail_params["name"] = UIIntermediary.text(str(drop.get("name", "ui.fe06.unknown")))
+		detail_params["is_new"] = str(drop.get("is_recently_added", drop.get("is_new", false)))
+		entries.append(UIIntermediary.text("ui.fe06.result.detail_item", detail_params))
+	NavManager.get_instance().show_toast(
+		UIIntermediary.text("ui.fe06.result.detail_toast", {"summary": " | ".join(entries)}),
+		NavTypes.ToastLevel.INFO
+	)
 
 func on_result_pull_again_pressed() -> void:
 	hide_result_overlay()

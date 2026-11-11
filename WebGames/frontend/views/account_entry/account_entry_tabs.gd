@@ -220,48 +220,44 @@ func update_attr_labels() -> void:
 func on_char_slot_pressed(index: int) -> void:
     var view: AccountEntryView = _view
     if index < 0 or index >= view.character_slots.size():
-        view.selected_character_slot = ""
-        if view.char_info_label != null:
-            UIIntermediary.resolve(view.char_info_label, "ui.fe01.char_select.char_info_empty")
-        if view.char_enter_btn != null:
-            view.char_enter_btn.disabled = true
-        if view.char_delete_btn != null:
-            view.char_delete_btn.disabled = true
-        if view.char_create_btn != null:
-            view.char_create_btn.disabled = false
+        _apply_empty_char_slot_ui(view)
         return
     var slot: Dictionary = view.character_slots[index]
     if slot.get("empty", false) or str(slot.get("name", "")) == "":
-        view.selected_character_slot = ""
-        if view.char_info_label != null:
-            UIIntermediary.resolve(view.char_info_label, "ui.fe01.char_select.char_info_empty")
-        if view.char_enter_btn != null:
-            view.char_enter_btn.disabled = true
-        if view.char_delete_btn != null:
-            view.char_delete_btn.disabled = true
-        if view.char_create_btn != null:
-            view.char_create_btn.disabled = false
-    else:
-        view.selected_character_slot = str(slot.get("slot_id", ""))
-        var race_name: String = race_to_name(str(slot.get("race", "UNKNOWN")))
-        var town_name: String = town_to_name(str(slot.get("town", "UNKNOWN")))
-        var name_label: String = UIIntermediary.text("ui.fe01.char_select.char_name")
-        var race_label: String = UIIntermediary.text("ui.fe01.char_select.char_race")
-        var class_label: String = UIIntermediary.text("ui.fe01.char_select.char_class")
-        var level_label: String = UIIntermediary.text("ui.fe01.char_select.char_level", {"level": slot.get("level", 0)})
-        var town_label: String = UIIntermediary.text("ui.fe01.char_select.char_town")
-        if view.char_info_label != null:
-            UIIntermediary.resolve(view.char_info_label, "ui.fe01.char_select.char_info", {
-                "char_name": name_label, "char_race": race_label, "char_class": class_label,
-                "char_level": level_label, "char_town": town_label,
-                "name": slot.get("name", ""), "race": race_name, "class": slot.get("class", ""), "town": town_name
-            })
-        if view.char_enter_btn != null:
-            view.char_enter_btn.disabled = false
-        if view.char_delete_btn != null:
-            view.char_delete_btn.disabled = false
-        if view.char_create_btn != null:
-            view.char_create_btn.disabled = true
+        _apply_empty_char_slot_ui(view)
+        return
+    _apply_selected_char_slot_ui(view, slot)
+
+func _set_char_action_buttons(view: AccountEntryView, has_selection: bool) -> void:
+    if view.char_enter_btn != null:
+        view.char_enter_btn.disabled = not has_selection
+    if view.char_delete_btn != null:
+        view.char_delete_btn.disabled = not has_selection
+    if view.char_create_btn != null:
+        view.char_create_btn.disabled = has_selection
+
+func _apply_empty_char_slot_ui(view: AccountEntryView) -> void:
+    view.selected_character_slot = ""
+    if view.char_info_label != null:
+        UIIntermediary.resolve(view.char_info_label, "ui.fe01.char_select.char_info_empty")
+    _set_char_action_buttons(view, false)
+
+func _apply_selected_char_slot_ui(view: AccountEntryView, slot: Dictionary) -> void:
+    view.selected_character_slot = str(slot.get("slot_id", ""))
+    var race_name: String = race_to_name(str(slot.get("race", "UNKNOWN")))
+    var town_name: String = town_to_name(str(slot.get("town", "UNKNOWN")))
+    var name_label: String = UIIntermediary.text("ui.fe01.char_select.char_name")
+    var race_label: String = UIIntermediary.text("ui.fe01.char_select.char_race")
+    var class_label: String = UIIntermediary.text("ui.fe01.char_select.char_class")
+    var level_label: String = UIIntermediary.text("ui.fe01.char_select.char_level", {"level": slot.get("level", 0)})
+    var town_label: String = UIIntermediary.text("ui.fe01.char_select.char_town")
+    if view.char_info_label != null:
+        UIIntermediary.resolve(view.char_info_label, "ui.fe01.char_select.char_info", {
+            "char_name": name_label, "char_race": race_label, "char_class": class_label,
+            "char_level": level_label, "char_town": town_label,
+            "name": slot.get("name", ""), "race": race_name, "class": slot.get("class", ""), "town": town_name
+        })
+    _set_char_action_buttons(view, true)
 
 func race_to_name(race_key: String) -> String:
     match race_key.to_upper():

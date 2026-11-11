@@ -9,11 +9,10 @@ class_name NotificationBulletinView
 extends BaseScreen
 
 const NotificationBulletinTabsClass = preload("res://frontend/views/notification_bulletin/notification_bulletin_tabs.gd")
+const RedDotTreeManagerClass = preload("res://frontend/ui_infrastructure/red_dot_tree_manager.gd")
 
 ## i18n 所属卷（第14卷：通知与公告系统）
 const FE := "fe14"
-
-const RedDotTreeManagerClass = preload("res://frontend/ui_infrastructure/red_dot_tree_manager.gd")
 
 # ==============================================================================
 # 枚举
@@ -328,7 +327,7 @@ func _on_back_btn_pressed() -> void:
 
 ## 主 Tab 切换：骨架阶段占位
 func _on_tab_changed(_tab_idx: int) -> void:
-	NavManager.get_instance().show_toast("切换公告分类", NavTypes.ToastLevel.INFO, 1.0)
+	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe14.toast.tab_switched"), NavTypes.ToastLevel.INFO, 1.0)
 
 # --- 通知中心 ---
 

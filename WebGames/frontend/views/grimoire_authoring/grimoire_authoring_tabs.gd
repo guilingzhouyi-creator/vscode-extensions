@@ -107,9 +107,15 @@ func on_auth_submit_pressed() -> void:
 	var view: GrimoireAuthoringView = _view
 	var title: String = view._auth_title_input.text.strip_edges()
 	if title.is_empty():
-		print("[GrimoireAuthoring] 请输入魔典名称")
+		NavManager.get_instance().show_toast(
+			UIIntermediary.text("ui.fe13.authoring.name_required"),
+			NavTypes.ToastLevel.WARNING
+		)
 		return
-	print("[GrimoireAuthoring] 著书提交: %s（骨架阶段：未接线）" % title)
+	NavManager.get_instance().show_toast(
+		UIIntermediary.text("ui.fe13.authoring.submit_toast", {"title": title}),
+		NavTypes.ToastLevel.INFO
+	)
 
 func init_royalty_tab() -> void:
 	var view: GrimoireAuthoringView = _view
@@ -180,14 +186,20 @@ func on_roy_claim_pressed() -> void:
 	for book in royalty_books:
 		total += int(book.get("income", 0))
 	if total <= 0:
-		print("[GrimoireAuthoring] 暂无可领取的版税")
+		NavManager.get_instance().show_toast(
+			UIIntermediary.text("ui.fe13.royalty.none_to_claim"),
+			NavTypes.ToastLevel.WARNING
+		)
 		return
 	for book in royalty_books:
 		book["income"] = 0
 	refresh_royalty_detail()
 	refresh_royalty_summary()
 	refresh_royalty_chart()
-	print("[GrimoireAuthoring] 已领取版税 %d 金币" % total)
+	NavManager.get_instance().show_toast(
+		UIIntermediary.text("ui.fe13.royalty.claim_toast", {"amount": total}),
+		NavTypes.ToastLevel.SUCCESS
+	)
 
 func init_decompile_tab() -> void:
 	var view: GrimoireAuthoringView = _view
@@ -227,7 +239,13 @@ func on_dec_decompile_pressed() -> void:
 	var view: GrimoireAuthoringView = _view
 	var idx: int = view._dec_target_option.selected
 	if idx < 0:
-		print("[GrimoireAuthoring] 请先选择目标魔典")
+		NavManager.get_instance().show_toast(
+			UIIntermediary.text("ui.fe13.decompile.no_target"),
+			NavTypes.ToastLevel.WARNING
+		)
 		return
 	var target: Dictionary = decompile_targets[idx]
-	print("[GrimoireAuthoring] 开始反编译: %s（骨架阶段：未接线）" % str(target.get("key", "")))
+	NavManager.get_instance().show_toast(
+		UIIntermediary.text("ui.fe13.decompile.start_toast", {"key": str(target.get("key", ""))}),
+		NavTypes.ToastLevel.INFO
+	)

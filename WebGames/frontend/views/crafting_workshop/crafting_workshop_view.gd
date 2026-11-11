@@ -305,12 +305,12 @@ func _on_forge_craft_pressed() -> void:
 	if selected_forge_item.is_empty() or not bool(selected_forge_item.get("learned", false)):
 		return
 	var qty: int = int(_spin_forge_quantity.value)
-	UIIntermediary.resolve(_label_forge_result, "ui.fe12.forge.craft_success", {
+	var crafted_text: String = UIIntermediary.resolve(_label_forge_result, "ui.fe12.forge.craft_success", {
 		"name": UIIntermediary.text(str(selected_forge_item.get("name", ""))),
 		"level": enhancement_target_level,
 		"count": qty,
 	})
-	print("[CraftingWorkshop] 锻造: %s +%d ×%d (成功率 %.0f%%)" % [selected_forge_item.get("name", ""), enhancement_target_level, qty, predicted_success_rate * 100.0])
+	NavManager.get_instance().show_toast(crafted_text, NavTypes.ToastLevel.SUCCESS)
 
 func _get_filtered_forge_recipes() -> Array:
 	var filtered: Array = []
@@ -399,7 +399,10 @@ func _on_dismantle_quantity_changed(_value: float) -> void:
 
 func _on_dismantle_confirm_pressed() -> void:
 	if selected_salvage_item.is_empty():
-		print("[CraftingWorkshop] 分解：未选择物品")
+		NavManager.get_instance().show_toast(
+			UIIntermediary.text("ui.fe12.dismantle.select_prompt"),
+			NavTypes.ToastLevel.WARNING
+		)
 		return
 	var qty: int = int(_spin_dismantle_quantity.value)
 	var item_name: String = UIIntermediary.text(str(selected_salvage_item.get("name", "")))
@@ -413,7 +416,10 @@ func _on_dismantle_confirm_pressed() -> void:
 			"count": int(entry.get("qty", 0)),
 			"time": str(entry.get("time", ""))
 		})
-	print("[CraftingWorkshop] 分解: %s ×%d" % [item_name, qty])
+	NavManager.get_instance().show_toast(
+		UIIntermediary.text("ui.fe12.dismantle.success_toast", {"name": item_name, "count": qty}),
+		NavTypes.ToastLevel.SUCCESS
+	)
 
 func _get_filtered_dismantle_items() -> Array:
 	var filtered: Array = []
@@ -432,7 +438,7 @@ func _get_filtered_dismantle_items() -> Array:
 # ==============================================================================
 
 func _on_tab_changed(_tab_index: int) -> void:
-	NavManager.get_instance().show_toast("切换工坊分类", NavTypes.ToastLevel.INFO, 1.0)
+	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe12.toast.tab_switched"), NavTypes.ToastLevel.INFO, 1.0)
 
 func _on_back_pressed() -> void:
 	self.back()

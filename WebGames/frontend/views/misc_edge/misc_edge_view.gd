@@ -356,7 +356,7 @@ func _on_back_btn_pressed() -> void:
 
 ## 主 Tab 切换：骨架阶段无额外处理（占位）
 func _on_tab_changed(_tab_idx: int) -> void:
-	NavManager.get_instance().show_toast("切换边缘功能", NavTypes.ToastLevel.INFO, 1.0)
+	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe17.toast.tab_switched"), NavTypes.ToastLevel.INFO, 1.0)
 
 # --- 身份伪装 ---
 

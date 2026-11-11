@@ -6,12 +6,12 @@
 class_name GuildSocialTabs
 extends BaseScreen
 
-enum FriendCategory {FRIEND, BLACKLIST, STRANGER}
-
 const KButtonClass = preload("res://frontend/components/k_button.gd")
 const KPageHeaderClass = preload("res://frontend/components/k_page_header.gd")
 const KSearchBarClass = preload("res://frontend/components/k_search_bar.gd")
 const KRarityTagClass = preload("res://frontend/components/k_rarity_tag.gd")
+
+enum FriendCategory {FRIEND, BLACKLIST, STRANGER}
 
 var page_header: KPageHeader = null
 var search_bar: KSearchBar = null
@@ -173,7 +173,10 @@ func _on_channel_selected(index: int) -> void:
 	_refresh_chat_display()
 
 func _on_channel_settings_pressed() -> void:
-	print("[GuildSocial] 频道设置（骨架阶段：未接线）")
+	NavManager.get_instance().show_toast(
+		UIIntermediary.text("ui.fe09.chat.settings_toast"),
+		NavTypes.ToastLevel.INFO
+	)
 
 func _on_chat_send_pressed() -> void:
 	_send_chat_message()
@@ -267,19 +270,28 @@ func _on_friend_selected(index: int) -> void:
 	_refresh_friend_detail(index)
 
 func _on_add_friend_pressed() -> void:
-	print("[GuildSocial] 添加好友（骨架阶段：未接线）")
+	NavManager.get_instance().show_toast(
+		UIIntermediary.text("ui.fe09.friend.add_toast"),
+		NavTypes.ToastLevel.INFO
+	)
 
 func _on_delete_friend_pressed() -> void:
 	var visible_friends := _get_visible_friends()
 	if _view._friend_selected_index >= 0 and _view._friend_selected_index < visible_friends.size():
 		var friend: Dictionary = visible_friends[_view._friend_selected_index]
-		print("[GuildSocial] 删除好友: %s" % friend.get("name", ""))
+		NavManager.get_instance().show_toast(
+			UIIntermediary.text("ui.fe09.friend.delete_toast", {"name": UIIntermediary.text(str(friend.get("name", "")))}),
+			NavTypes.ToastLevel.INFO
+		)
 
 func _on_whisper_friend_pressed() -> void:
 	var visible_friends := _get_visible_friends()
 	if _view._friend_selected_index >= 0 and _view._friend_selected_index < visible_friends.size():
 		var friend: Dictionary = visible_friends[_view._friend_selected_index]
-		print("[GuildSocial] 私聊好友: %s" % friend.get("name", ""))
+		NavManager.get_instance().show_toast(
+			UIIntermediary.text("ui.fe09.friend.whisper_toast", {"name": UIIntermediary.text(str(friend.get("name", "")))}),
+			NavTypes.ToastLevel.INFO
+		)
 
 # ==============================================================================
 # Tab 5: NPC对话 (NPC_DIALOG)
@@ -315,17 +327,31 @@ func _clear_dialog_options() -> void:
 
 func _on_dialog_option_pressed(_option_index: int, action: String) -> void:
 	match action:
-		"QUEST": print("[GuildSocial] 接取任务（骨架阶段：未接线）")
-		"SHOP": print("[GuildSocial] 打开商店（骨架阶段：未接线）")
+		"QUEST":
+			NavManager.get_instance().show_toast(
+				UIIntermediary.text("ui.fe09.npc.quest_toast"),
+				NavTypes.ToastLevel.INFO
+			)
+		"SHOP":
+			NavManager.get_instance().show_toast(
+				UIIntermediary.text("ui.fe09.npc.shop_toast"),
+				NavTypes.ToastLevel.INFO
+			)
 		"LEAVE":
 			_view._current_dialog_index = (_view._current_dialog_index + 1) % _view._npc_dialogs.size()
 			_refresh_npc_dialog_display()
 
 func _on_npc_quest_pressed() -> void:
-	print("[GuildSocial] 任务接取（骨架阶段：未接线）")
+	NavManager.get_instance().show_toast(
+		UIIntermediary.text("ui.fe09.npc.quest_toast"),
+		NavTypes.ToastLevel.INFO
+	)
 
 func _on_npc_shop_pressed() -> void:
-	print("[GuildSocial] 打开商店（骨架阶段：未接线）")
+	NavManager.get_instance().show_toast(
+		UIIntermediary.text("ui.fe09.npc.shop_toast"),
+		NavTypes.ToastLevel.INFO
+	)
 
 func _on_npc_leave_pressed() -> void:
 	_view._current_dialog_index = (_view._current_dialog_index + 1) % _view._npc_dialogs.size()

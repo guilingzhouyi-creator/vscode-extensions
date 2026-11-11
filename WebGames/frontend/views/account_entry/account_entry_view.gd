@@ -417,7 +417,7 @@ func _on_server_back_pressed() -> void:
 
 func _on_char_enter_pressed() -> void:
     if selected_character_slot.is_empty():
-        NavManager.get_instance().show_toast("请先选择一个角色", NavTypes.ToastLevel.WARNING)
+        NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe01.toast.select_character"), NavTypes.ToastLevel.WARNING)
         return
     var active_gateway: RefCounted = ServiceLocator.get_active_gateway()
     if active_gateway != null:
@@ -435,7 +435,7 @@ func _on_char_enter_pressed() -> void:
             current_phase = int(ctx.current_phase) if ctx != null and "current_phase" in ctx else -1
         if current_phase == 6 and active_gateway.has_method("enter_world"):
             active_gateway.call("enter_world")
-    NavManager.get_instance().show_toast("进入瓦尔兰大陆...", NavTypes.ToastLevel.SUCCESS)
+    NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe01.toast.entering_world"), NavTypes.ToastLevel.SUCCESS)
     NavManager.get_instance().push_screen("main_hud", {"slot": selected_character_slot})
 
 func _on_char_create_pressed() -> void:
@@ -444,7 +444,7 @@ func _on_char_create_pressed() -> void:
 func _on_char_delete_pressed() -> void:
     if selected_character_slot.is_empty():
         return
-    NavManager.get_instance().show_toast("已重置角色槽位: %s" % selected_character_slot, NavTypes.ToastLevel.INFO)
+    NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe01.toast.slot_reset", {"slot": selected_character_slot}), NavTypes.ToastLevel.INFO)
 
 func _on_char_back_pressed() -> void:
     switch_state(EntryState.SERVER_SELECT)

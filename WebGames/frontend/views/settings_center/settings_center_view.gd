@@ -177,7 +177,7 @@ func _connect_signals() -> void:
 		_tab_container.tab_changed.connect(_on_tab_changed)
 
 func _on_tab_changed(tab_index: int) -> void:
-	NavManager.get_instance().show_toast("切换设置分类", NavTypes.ToastLevel.INFO, 1.0)
+	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe15.toast.tab_switched"), NavTypes.ToastLevel.INFO, 1.0)
 
 func _on_back_pressed() -> void:
 	self.back()

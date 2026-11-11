@@ -364,16 +364,26 @@ func _on_shop_item_selected(_index: int) -> void:
 func _on_shop_quantity_changed(_value: float) -> void:
 	_refresh_shop_total()
 
-## 商店确认按钮：未选拦截，骨架阶段仅打印交易日志
+## 商店确认按钮：未选拦截，经 Toast 反馈交易确认
 func _on_shop_confirm_pressed() -> void:
 	var selected := _shop_item_list.get_selected_items()
 	if selected.is_empty():
-		print("[EconomyTrade] 未选择商品")
+		NavManager.get_instance().show_toast(
+			UIIntermediary.text("ui.fe05.shop.no_item_selected"),
+			NavTypes.ToastLevel.WARNING
+		)
 		return
 	var item: Dictionary = shop_shelves[selected[0]]
 	var qty := int(_spin_shop_quantity.value)
 	var action := UIIntermediary.text("ui.fe05.shop.mode_buy") if _shop_mode == ShopMode.BUY else UIIntermediary.text("ui.fe05.shop.mode_sell")
-	print("[EconomyTrade] %s: %s ×%d" % [action, item.get("name", ""), qty])
+	NavManager.get_instance().show_toast(
+		UIIntermediary.text("ui.fe05.shop.confirm_toast", {
+			"action": action,
+			"name": UIIntermediary.text(str(item.get("name", "ui.fe05.unknown"))),
+			"count": qty,
+		}),
+		NavTypes.ToastLevel.INFO
+	)
 
 # ==============================================================================
 # 信号绑定与工具方法
@@ -391,7 +401,7 @@ func _connect_signals() -> void:
 
 ## 主 Tab 切换：骨架阶段占位
 func _on_tab_changed(_tab_index: int) -> void:
-	NavManager.get_instance().show_toast("切换交易市场", NavTypes.ToastLevel.INFO, 1.0)
+	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe05.toast.tab_switched"), NavTypes.ToastLevel.INFO, 1.0)
 
 ## 返回按钮：经 ViewRouter 弹出视图回退上一级
 func _on_back_pressed() -> void:

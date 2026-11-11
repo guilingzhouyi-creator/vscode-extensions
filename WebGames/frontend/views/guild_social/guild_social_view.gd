@@ -372,13 +372,19 @@ func _init_player_trade_tab() -> void: _get_tabs()._init_player_trade_tab()
 # Tab 1: 公会信息 信号处理
 # ==============================================================================
 
-## 退出公会按钮回调（骨架阶段仅 print 占位，未接线）
+## 退出公会按钮回调（骨架阶段仅 Toast 占位，未接线）
 func _on_leave_guild_pressed() -> void:
-	print("[GuildSocial] 退出公会（骨架阶段：未接线）")
+	NavManager.get_instance().show_toast(
+		UIIntermediary.text("ui.fe09.guild.leave_toast"),
+		NavTypes.ToastLevel.INFO
+	)
 
-## 公会管理按钮回调（骨架阶段仅 print 占位，未接线）
+## 公会管理按钮回调（骨架阶段仅 Toast 占位，未接线）
 func _on_guild_manage_pressed() -> void:
-	print("[GuildSocial] 打开公会管理面板（骨架阶段：未接线）")
+	NavManager.get_instance().show_toast(
+		UIIntermediary.text("ui.fe09.guild.manage_toast"),
+		NavTypes.ToastLevel.INFO
+	)
 
 # ==============================================================================
 # Tab 2: 成员列表 信号处理
@@ -389,25 +395,40 @@ func _on_member_selected(index: int) -> void:
 	_member_selected_index = index
 	_refresh_member_detail(index)
 
-## 职位管理按钮回调：校验已选成员后 print 占位（骨架）
+## 职位管理按钮回调：校验已选成员后 Toast 占位（骨架）
 func _on_manage_roles_pressed() -> void:
 	if _member_selected_index < 0:
-		print("[GuildSocial] 职位管理：未选择成员")
+		NavManager.get_instance().show_toast(
+			UIIntermediary.text("ui.fe09.members.no_member_selected"),
+			NavTypes.ToastLevel.WARNING
+		)
 		return
 	var member: Dictionary = _guild_members[_member_selected_index]
-	print("[GuildSocial] 职位管理: %s" % member.get("name", ""))
+	NavManager.get_instance().show_toast(
+		UIIntermediary.text("ui.fe09.members.manage_roles_toast", {"name": UIIntermediary.text(str(member.get("name", "")))}),
+		NavTypes.ToastLevel.INFO
+	)
 
-## 邀请成员按钮回调（骨架阶段仅 print 占位，未接线）
+## 邀请成员按钮回调（骨架阶段仅 Toast 占位，未接线）
 func _on_invite_member_pressed() -> void:
-	print("[GuildSocial] 邀请成员（骨架阶段：未接线）")
+	NavManager.get_instance().show_toast(
+		UIIntermediary.text("ui.fe09.members.invite_toast"),
+		NavTypes.ToastLevel.INFO
+	)
 
-## 踢出成员按钮回调：校验已选成员后 print 占位（骨架）
+## 踢出成员按钮回调：校验已选成员后 Toast 占位（骨架）
 func _on_kick_member_pressed() -> void:
 	if _member_selected_index < 0:
-		print("[GuildSocial] 踢出成员：未选择成员")
+		NavManager.get_instance().show_toast(
+			UIIntermediary.text("ui.fe09.members.no_member_selected"),
+			NavTypes.ToastLevel.WARNING
+		)
 		return
 	var member: Dictionary = _guild_members[_member_selected_index]
-	print("[GuildSocial] 踢出成员: %s" % member.get("name", ""))
+	NavManager.get_instance().show_toast(
+		UIIntermediary.text("ui.fe09.members.kick_toast", {"name": UIIntermediary.text(str(member.get("name", "")))}),
+		NavTypes.ToastLevel.INFO
+	)
 
 # ==============================================================================
 # Tab 3 交互回调委托给 GuildSocialTabs
@@ -425,7 +446,7 @@ func _send_chat_message() -> void: _get_tabs()._send_chat_message()
 
 ## 主 Tab 切换：骨架阶段占位（预留）
 func _on_tab_changed(_tab_index: int) -> void:
-	NavManager.get_instance().show_toast("切换公会功能", NavTypes.ToastLevel.INFO, 1.0)
+	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe09.toast.tab_switched"), NavTypes.ToastLevel.INFO, 1.0)
 
 ## 返回按钮：经 ViewRouter 弹出视图回退上一级
 func _on_back_pressed() -> void:
