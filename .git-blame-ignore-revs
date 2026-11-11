@@ -1,0 +1,10 @@
+# Revs listed here are skipped by `git blame`, so a mechanical reformat does not
+# become the author of every line it re-indented.
+#
+# Enable locally once per clone:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# Append the SHA of every formatting-only commit below, one per line, in the order
+# they land. A commit belongs here only when it changes no token other than
+# whitespace and line breaks; a commit that also renames an identifier or moves a
+# branch must stay visible to blame.
