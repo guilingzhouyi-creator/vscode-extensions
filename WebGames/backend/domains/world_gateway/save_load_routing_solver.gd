@@ -14,7 +14,7 @@ extends RefCounted
 const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
 const PrologueExecutionKernel = preload("res://backend/domains/character_creation/prologue_execution_kernel.gd")
 const OpeningEventStreamDTO = preload("res://backend/domains/character_creation/opening_event_stream_dto.gd")
-const HudStateSyncService = preload("res://backend/domains/world_state/hud_state_sync_service.gd")
+const AuthoritativeHudSyncService = preload("res://backend/domains/world_state/services/authoritative_hud_sync_service.gd")
 const GameLifecycleService = preload("res://backend/domains/lifecycle/game_lifecycle_service.gd")
 const GameLifecycleModel = preload("res://backend/domains/lifecycle/lifecycle_model.gd")
 const GameShutdownDTO = preload("res://backend/domains/lifecycle/dto/game_shutdown_dto.gd")
@@ -136,21 +136,21 @@ static func synchronize_hud_entry(
 	wallet: CharacterWalletEntity = null
 ) -> HudStatusSnapshotDTO:
 	var char_id := slot.character_name.sha256_text().substr(0, 16)
-	var location := slot.current_location_name
 	var race_id := ""
 	if physiology != null and not physiology.race_id.is_empty():
 		race_id = physiology.race_id
 
-	return HudStateSyncService.trigger_initial_world_sync(
-		account.account_id,
-		char_id,
-		slot.character_name,
-		physiology,
-		wallet,
-		location,
-		race_id,
-		true
-	)
+	var auth_snapshot: AuthoritativeHudSnapshotDTO = AuthoritativeHudSyncService.trigger_initial_sync({
+		"account_id": account.account_id,
+		"character_id": char_id,
+		"character_name": slot.character_name,
+		"race_id": race_id,
+		"physiology": physiology,
+		"wallet": wallet,
+		"current_location_id": slot.current_location_name,
+		"allow_default_fallback": true
+	})
+	return auth_snapshot.to_legacy_snapshot()
 
 ## ESC 呼出菜单项配置获取
 static func get_esc_menu_options() -> Array[Dictionary]:

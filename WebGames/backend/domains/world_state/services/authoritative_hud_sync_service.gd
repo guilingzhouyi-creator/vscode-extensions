@@ -34,7 +34,10 @@ static func publish_hud_snapshot(snapshot: AuthoritativeHudSnapshotDTO) -> void:
 	var bus := EventBusCore.get_instance()
 	var packet := bus.borrow_packet(EventChannelDefinition.HUD_STATUS_SNAPSHOT, EventCategoryMask.CORE_STATE)
 	var channel_label := GameConfig.get_string("domains.world_state", "hud/channels/snapshot", "world_state.snapshot_published")
-	EventPacket.bind_dual_payload(packet, snapshot, channel_label)
+	EventPacket.bind_dual_payload(packet, snapshot, channel_label, {
+		"category_key": "hud",
+		"args": [snapshot.character_name]
+	})
 	packet.source_entity_id = snapshot.character_id
 	packet.narrative_key = "snapshot_published"
 	packet.narrative_args = [snapshot.character_name]
@@ -66,7 +69,10 @@ static func publish_stat_mutation(
 	mut.delta = new_value - old_value
 	mut.cause_event = cause
 	var channel_label := GameConfig.get_string("domains.world_state", "hud/channels/stat_mutated", "world_state.stat_mutated")
-	EventPacket.bind_dual_payload(packet, mut, channel_label)
+	EventPacket.bind_dual_payload(packet, mut, channel_label, {
+		"category_key": "hud",
+		"args": [stat_name, old_value, new_value]
+	})
 	packet.narrative_key = "stat_mutated"
 	packet.narrative_args = [stat_name, old_value, new_value]
 	bus.dispatch_now(packet)
@@ -90,7 +96,10 @@ static func publish_wallet_mutation(
 	mut.new_amount = new_amt
 	mut.delta = new_amt - old_amt
 	mut.reason_key = reason
-	var compat: Dictionary = {}
+	var compat: Dictionary = {
+		"category_key": "hud",
+		"args": [currency_type, new_amt - old_amt]
+	}
 	if currency_type == "gold":
 		compat["current_gold"] = new_amt
 	elif currency_type == "mana_monocrystals":
@@ -241,8 +250,9 @@ static func _resolve_identity(context: Dictionary, snapshot: AuthoritativeHudSna
 	if raw_race.is_empty() and physiology != null and "race_id" in physiology:
 		raw_race = String(physiology.race_id)
 
+	var allow_default_fallback: bool = bool(context.get("allow_default_fallback", true))
 	if raw_race.is_empty() or raw_race == "UNBOUND":
-		snapshot.race_id = "HUMAN"
+		snapshot.race_id = "HUMAN" if allow_default_fallback else "UNBOUND"
 	else:
 		snapshot.race_id = raw_race
 

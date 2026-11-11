@@ -14,7 +14,7 @@ const AccountProfileAggregate = preload("res://backend/domains/account/account_p
 const HudStatusSnapshotDTO = preload("res://backend/domains/world_state/dto/hud_status_snapshot_dto.gd")
 const HudMutationEventsDTO = preload("res://backend/domains/world_state/dto/hud_mutation_events_dto.gd")
 const HudEventContract = preload("res://backend/domains/world_state/hud_event_contract.gd")
-const HudStateSyncService = preload("res://backend/domains/world_state/hud_state_sync_service.gd")
+const AuthoritativeHudSyncService = preload("res://backend/domains/world_state/services/authoritative_hud_sync_service.gd")
 const AccountSlotBindingSolver = preload("res://backend/domains/account/account_slot_binding_solver.gd")
 const WorldGatewayFSM = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
 const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
@@ -143,8 +143,16 @@ static func test_hud_snapshot_real_source_derivation() -> Dictionary:
 	wallet.gold = 50
 	wallet.mana_monocrystals = 5
 
-	var snapshot := HudStateSyncService.get_hud_status_snapshot(
-		"ACC_1", "CHAR_1", "阿尔托会话", "HUMAN", sheet, wallet, "TOWN_VALAN")
+	var snapshot := AuthoritativeHudSyncService.get_authoritative_snapshot({
+		"account_id": "ACC_1",
+		"character_id": "CHAR_1",
+		"character_name": "阿尔托会话",
+		"race_id": "HUMAN",
+		"physiology": sheet,
+		"wallet": wallet,
+		"current_location_id": "TOWN_VALAN",
+		"allow_default_fallback": true
+	}).to_legacy_snapshot()
 	var keys := snapshot.to_dto().keys()
 	var no_myth := not keys.has("mp_current") and not keys.has("level") and not keys.has("exp_next")
 	var passed := snapshot.attribute_values == sheet.get_actual_values() \
@@ -162,8 +170,8 @@ static func test_hud_push_stream_and_payload_contract() -> Dictionary:
 		var w: Dictionary = pkt.payload_data if pkt.payload_data is Dictionary else {}
 		captured.append({"channel": str(w.get("channel", "")), "payload": w.get("payload", {})})
 	)
-	HudStateSyncService.publish_stat_mutation("CHAR_1", "STR", 3.0, 4.0, "TEST")
-	HudStateSyncService.publish_wallet_mutation("ACC_1", "gold", 50, 80, "TEST")
+	AuthoritativeHudSyncService.publish_stat_mutation("CHAR_1", "STR", 3.0, 4.0, "TEST")
+	AuthoritativeHudSyncService.publish_wallet_mutation("ACC_1", "gold", 50, 80, "TEST")
 	detach.call()
 
 	var stat_hit := false
@@ -197,8 +205,15 @@ static func test_full_headless_lifecycle_pipeline() -> Dictionary:
 	var sheet := CharacterPhysiologySheet.new()
 	var wallet := CharacterWalletEntity.new()
 	wallet.gold = 100
-	var snapshot := HudStateSyncService.trigger_initial_world_sync(
-		reg.account_id, "CHAR_LIFE", "生命会话", sheet, wallet, "TOWN_VALAN")
+	var snapshot := AuthoritativeHudSyncService.trigger_initial_sync({
+		"account_id": reg.account_id,
+		"character_id": "CHAR_LIFE",
+		"character_name": "生命会话",
+		"physiology": sheet,
+		"wallet": wallet,
+		"current_location_id": "TOWN_VALAN",
+		"allow_default_fallback": true
+	}).to_legacy_snapshot()
 	AuthService.revoke_token(String(auth.get("token", "")))
 	detach.call()
 
@@ -318,9 +333,16 @@ static func _simulate_world_and_hud(
 	var wallet: CharacterWalletEntity = create_res.get("wallet", null)
 	if wallet == null:
 		wallet = CharacterWalletEntity.new()
-	return HudStateSyncService.trigger_initial_world_sync(
-		account_id, char_id, char_name, sheet, wallet, "CENTRAL_CITY_PLAZA", "HUMAN"
-	)
+	return AuthoritativeHudSyncService.trigger_initial_sync({
+		"account_id": account_id,
+		"character_id": char_id,
+		"character_name": char_name,
+		"race_id": "HUMAN",
+		"physiology": sheet,
+		"wallet": wallet,
+		"current_location_id": "CENTRAL_CITY_PLAZA",
+		"allow_default_fallback": true
+	}).to_legacy_snapshot()
 
 static func _simulate_shutdown(account_id: String, slot_id: String, token: String) -> GameShutdownDTO.Response:
 	GameBootstrap.assemble()

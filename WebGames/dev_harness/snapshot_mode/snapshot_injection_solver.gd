@@ -15,7 +15,7 @@ const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/
 const SessionFlowContextDTO = preload("res://backend/domains/lifecycle/dto/session_flow_context_dto.gd")
 const GameLifecycleManager = preload("res://backend/domains/lifecycle/game_lifecycle_manager.gd")
 const GameLifecycleModel = preload("res://backend/domains/lifecycle/lifecycle_model.gd")
-const HudStateSyncService = preload("res://backend/domains/world_state/hud_state_sync_service.gd")
+const AuthoritativeHudSyncService = preload("res://backend/domains/world_state/services/authoritative_hud_sync_service.gd")
 const HudStatusSnapshotDTO = preload("res://backend/domains/world_state/dto/hud_status_snapshot_dto.gd")
 const CharacterPhysiologySheet = preload("res://backend/domains/lifecycle_physiology/physiology_entities.gd")
 const CharacterWalletEntity = preload("res://backend/domains/currency_economy/currency_entities.gd")
@@ -97,15 +97,17 @@ static func inject_and_hydrate(snapshot: Variant, target_stage_key: String = "")
     fsm.transition_to(GameLifecycleModel.LifecyclePhase.RUNNING)
 
     # 8. 主界面 HUD 快照同步汇聚
-    var hud_snapshot: HudStatusSnapshotDTO = HudStateSyncService.trigger_initial_world_sync(
-        ctx.account_id,
-        ctx.character_id,
-        ctx.character_name,
-        physiology,
-        wallet,
-        bundle.location_name,
-        bundle.race_id
-    )
+    var auth_hud_snapshot := AuthoritativeHudSyncService.trigger_initial_sync({
+        "account_id": ctx.account_id,
+        "character_id": ctx.character_id,
+        "character_name": ctx.character_name,
+        "race_id": bundle.race_id,
+        "physiology": physiology,
+        "wallet": wallet,
+        "current_location_id": bundle.location_name,
+        "allow_default_fallback": true
+    })
+    var hud_snapshot: HudStatusSnapshotDTO = auth_hud_snapshot.to_legacy_snapshot()
     ctx.hud_snapshot = hud_snapshot.to_dto() if hud_snapshot != null else {}
     ctx.physiology_snapshot = bundle.physiology_data.duplicate(true)
     ctx.wallet_snapshot = bundle.wallet_data.duplicate(true)
