@@ -214,7 +214,7 @@ class AdvancedCodeAuditor:
                             file_path=rel,
                             line_number=i,
                             message=f"函数「{func_name}」参数「{p}」缺少显式类型注解",
-                            fix_suggestion="为参数补充强类型，如 p_param: int",
+                            fix_suggestion="为参数补充强类型，如 param_name: int",
                         )
                     )
 

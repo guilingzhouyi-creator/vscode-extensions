@@ -23,7 +23,12 @@ import sys
 import time
 
 from audit_common import ensure_utf8_stdout, resolve_repo_root
-from lib.arch_guard_rules import check_tc_arch_09, check_tc_arch_10, check_tc_arch_11
+from lib.arch_guard_rules import (
+  check_tc_arch_09,
+  check_tc_arch_10,
+  check_tc_arch_11,
+  check_tc_arch_12,
+)
 ensure_utf8_stdout()
 
 RES_PREFIX = "res://"
@@ -610,6 +615,7 @@ def run_all_checks() -> tuple[bool, list[dict[str, Any]], str, float]:
     check_tc_arch_09(ctx, make_result),
     check_tc_arch_10(ctx, make_result, strip_comments),
     *check_tc_arch_11(ctx, make_result, strip_comments),
+    check_tc_arch_12(ctx, make_result, strip_comments),
   ]
 
   elapsed = time.perf_counter() - t0

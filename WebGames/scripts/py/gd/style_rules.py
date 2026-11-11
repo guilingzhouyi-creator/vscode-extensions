@@ -26,11 +26,15 @@ from gd.gd_common import (
     get_gd_files,
 )
 STYLE_CLASS_NAME_RE = re.compile(r"\bclass_name\s+([A-Za-z_][A-Za-z0-9_]*)")
+STYLE_INNER_CLASS_RE = re.compile(r"^\s*class\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:extends\s+[A-Za-z0-9_]+)?\s*:")
 STYLE_FUNC_RE = re.compile(r"^\s*(?:static\s+)?func\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
 STYLE_VAR_RE = re.compile(r"^\s*(?:static\s+)?var\s+([A-Za-z_][A-Za-z0-9_]*)\s*[:=]")
 STYLE_CONST_RE = re.compile(r"^\s*(?:static\s+)?const\s+([A-Za-z_][A-Za-z0-9_]*)\s*[:=]")
 PENDING_MARKER_RE = re.compile(r"#.*\b(TODO|FIXME|XXX|HACK)\b")
 HEADER_MUST = ("文件路径:", "职责")
+
+CLASS_NAME_STRICT_RE = re.compile(r"^[A-Z][A-Za-z0-9]*$")
+ALLOWED_SHORT_FUNCS = frozenset({"on", "to", "as", "is", "up", "in"})
 
 
 def _audit_file_header(rel: Path, lines: list[str], text: str, violations: list[str]) -> None:
@@ -46,16 +50,48 @@ def _audit_file_header(rel: Path, lines: list[str], text: str, violations: list[
 
 
 def _check_style_identifiers(rel: Path, i: int, ln: str, violations: list[str]) -> None:
-    """检查 class_name、func、var 的命名规范。"""
+    """检查 class_name、内部 class、func、var 的命名规范与长度约束。"""
+    # 1. class_name 严格 PascalCase (无下划线) 与 [3, 50] 字符长度
     m = STYLE_CLASS_NAME_RE.search(ln)
-    if m and not CLASS_NAME_RE.match(m.group(1)):
-        violations.append(f"{rel}:{i}: class_name 应为 PascalCase（{m.group(1)}）")
+    if m:
+        cname = m.group(1)
+        if not CLASS_NAME_STRICT_RE.match(cname) or "_" in cname:
+            violations.append(f"{rel}:{i}: class_name 应为严格 PascalCase（无下划线）（{cname}）")
+        elif len(cname) < 3 or len(cname) > 50:
+            violations.append(f"{rel}:{i}: class_name 字符长度需在 [3, 50] 区间内（{cname}，当前 {len(cname)} 字符）")
+
+    # 2. 内部 class 严格 PascalCase 与 [3, 50] 字符长度
+    m = STYLE_INNER_CLASS_RE.search(ln)
+    if m:
+        cname = m.group(1)
+        if not CLASS_NAME_STRICT_RE.match(cname) or "_" in cname:
+            violations.append(f"{rel}:{i}: 内部 class 应为严格 PascalCase（无下划线）（{cname}）")
+        elif len(cname) < 3 or len(cname) > 50:
+            violations.append(f"{rel}:{i}: 内部 class 字符长度需在 [3, 50] 区间内（{cname}，当前 {len(cname)} 字符）")
+
+    # 3. 函数名 snake_case 与 [3, 50] 字符长度
     m = STYLE_FUNC_RE.search(ln)
-    if m and not SNAKE_RE.match(m.group(1)):
-        violations.append(f"{rel}:{i}: 函数名应为 snake_case（{m.group(1)}）")
+    if m:
+        fname = m.group(1)
+        if not SNAKE_RE.match(fname):
+            violations.append(f"{rel}:{i}: 函数名应为 snake_case（{fname}）")
+        else:
+            core = fname.lstrip("_")
+            if len(core) < 3 and core not in ALLOWED_SHORT_FUNCS:
+                violations.append(f"{rel}:{i}: 函数名「{fname}」过短（至少 3 字符）")
+            elif len(fname) > 50:
+                violations.append(f"{rel}:{i}: 函数名「{fname}」长度超出上限（{len(fname)} > 50 字符）")
+
+    # 4. 变量名与属性名 snake_case、禁止 p_ 前缀与 <= 40 字符长度
     m = STYLE_VAR_RE.search(ln)
-    if m and not SNAKE_RE.match(m.group(1)):
-        violations.append(f"{rel}:{i}: 变量名应为 snake_case（{m.group(1)}）")
+    if m:
+        vname = m.group(1)
+        if not SNAKE_RE.match(vname):
+            violations.append(f"{rel}:{i}: 变量名应为 snake_case（{vname}）")
+        elif vname.startswith("p_"):
+            violations.append(f"{rel}:{i}: 变量名「{vname}」禁止使用 C++ 遗留 'p_' 前缀，应使用自然 snake_case 命名")
+        elif len(vname) > 40:
+            violations.append(f"{rel}:{i}: 变量名「{vname}」字符长度超出上限（{len(vname)} > 40 字符）")
 
 
 def _check_style_const_and_marker(rel: Path, i: int, ln: str, violations: list[str]) -> None:
@@ -64,10 +100,14 @@ def _check_style_const_and_marker(rel: Path, i: int, ln: str, violations: list[s
     if m:
         name = m.group(1)
         if "preload(" in ln:
-            if not CLASS_NAME_RE.match(name):
-                violations.append(f"{rel}:{i}: preload 常量引用应为 PascalCase（{name}）")
+            if not CLASS_NAME_STRICT_RE.match(name) or "_" in name:
+                violations.append(f"{rel}:{i}: preload 常量引用应为严格 PascalCase（{name}）")
+            elif len(name) < 3 or len(name) > 50:
+                violations.append(f"{rel}:{i}: preload 常量「{name}」长度需在 [3, 50] 字符区间内")
         elif not UPPER_RE.match(name):
             violations.append(f"{rel}:{i}: 常量应为 UPPER_SNAKE_CASE（{name}）")
+        elif len(name.lstrip("_")) < 2 or len(name) > 50:
+            violations.append(f"{rel}:{i}: 常量「{name}」长度需在 [2, 50] 字符区间内")
     pm = PENDING_MARKER_RE.search(ln)
     if pm:
         violations.append(f"{rel}:{i}: 注释含未决标记「{pm.group(1)}」——须落实为客观技术实现或移除（COMMENT-PENDING-MARKER）")
