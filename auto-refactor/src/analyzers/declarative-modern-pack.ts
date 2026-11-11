@@ -254,11 +254,7 @@ export class DeclarativeModernAnalyzer implements Analyzer {
     /**
      * Evaluates all configured rules on a single line context.
      */
-    private evaluateRulesOnLine(
-        ctx: LineScanContext,
-        issues: Issue[],
-        lineFlag?: number,
-    ): void {
+    private evaluateRulesOnLine(ctx: LineScanContext, issues: Issue[], lineFlag?: number): void {
         for (const rule of this.config.rules) {
             if (
                 rule.requiredLineFlags !== undefined &&

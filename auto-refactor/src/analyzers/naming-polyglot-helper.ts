@@ -81,14 +81,14 @@ export function buildPolyglotActionable(
         targetSymbol: candidate ?? name,
         patch: candidate
             ? {
-                range: {
-                    startLine: line,
-                    startCol: column,
-                    endLine: line,
-                    endCol: column + name.length,
-                },
-                replacementText: candidate,
-            }
+                  range: {
+                      startLine: line,
+                      startCol: column,
+                      endLine: line,
+                      endCol: column + name.length,
+                  },
+                  replacementText: candidate,
+              }
             : undefined,
         templateSnippet: candidate,
         targetArguments: {

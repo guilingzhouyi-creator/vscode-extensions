@@ -375,12 +375,12 @@ function buildSplitSuggestions(
     const { metrics, density, zoneProfile, thresholds } = evalCtx;
     const suggestions: string[] = [
         `Split into smaller modules by responsibility (current: ${metrics.lines} lines, ${density.effectiveCodeLines} effective LOC, ` +
-        `${metrics.functions} functions, ${metrics.topLevelDeclarations} top-level declarations, ${metrics.exportedSymbols} exports, max nesting ${metrics.maxNestingDepth}).`,
+            `${metrics.functions} functions, ${metrics.topLevelDeclarations} top-level declarations, ${metrics.exportedSymbols} exports, max nesting ${metrics.maxNestingDepth}).`,
     ];
     if (moduleNames.length > 1) {
         suggestions.push(
             `Detected potential modules by name prefix: ${moduleNames.join(', ')}. ` +
-            `Consider extracting each into its own file under a dedicated directory.`,
+                `Consider extracting each into its own file under a dedicated directory.`,
         );
     }
     if (
@@ -389,7 +389,7 @@ function buildSplitSuggestions(
     ) {
         suggestions.push(
             `Zone partitioner detected ${zoneProfile.segments.length} interleaved transitions between compute and gateway zones. ` +
-            `Extract compute kernels into a dedicated internal submodule to reduce entanglement.`,
+                `Extract compute kernels into a dedicated internal submodule to reduce entanglement.`,
         );
     }
     return suggestions;

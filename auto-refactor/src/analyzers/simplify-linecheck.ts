@@ -198,7 +198,10 @@ function findPythonTerminatingElse(lines: string[], lastStmtIdx: number, ifInden
     const lastStmt = lines[lastStmtIdx].trim();
     if (!/^(?:return|raise|break|continue)\b/.test(lastStmt)) return -1;
     const searchLineIndex = advancePastBlanksAndComments(lines, lastStmtIdx + 1);
-    if (searchLineIndex >= lines.length || calculateIndentWidth(lines[searchLineIndex]) !== ifIndent)
+    if (
+        searchLineIndex >= lines.length ||
+        calculateIndentWidth(lines[searchLineIndex]) !== ifIndent
+    )
         return -1;
     return /^(else|elif)\b/.test(lines[searchLineIndex].trim()) ? searchLineIndex : -1;
 }
@@ -319,9 +322,7 @@ function auditInlineBoolReturn(context: LineAuditContext): void {
         const ifBool = match[2] === 'true';
         const searchLineIndex = advancePastBlanksAndComments(context.lines, lineIndex + 1);
         if (searchLineIndex >= context.lines.length) continue;
-        const nextBool = REGEX.SYNTAX.RETURN_BOOL.exec(
-            context.lines[searchLineIndex].trim(),
-        );
+        const nextBool = REGEX.SYNTAX.RETURN_BOOL.exec(context.lines[searchLineIndex].trim());
         if (!nextBool) continue;
         if (ifBool === (nextBool[1] === 'true')) continue;
 
@@ -453,9 +454,7 @@ function auditPyBoolWithElse(spec: PythonBoolCheckSpec): void {
         calculateIndentWidth(spec.context.lines[searchLineIndex]) <= spec.ifIndent
     )
         return;
-    const elseBoolMatch = REGEX.PYTHON.RETURN_BOOL.exec(
-        spec.context.lines[searchLineIndex].trim(),
-    );
+    const elseBoolMatch = REGEX.PYTHON.RETURN_BOOL.exec(spec.context.lines[searchLineIndex].trim());
     if (!elseBoolMatch || spec.ifBool === (elseBoolMatch[1] === 'True')) return;
 
     emitBooleanIssue(

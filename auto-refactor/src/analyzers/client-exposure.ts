@@ -60,7 +60,11 @@ function makeExposureIssue(params: ExposureIssueParams): Issue {
 /**
  * Audits client code for internal administrative endpoint exposure (SEC-EXP-001).
  */
-function auditInternalApiEndpoints(file: string, rawLines: readonly string[], issues: Issue[]): void {
+function auditInternalApiEndpoints(
+    file: string,
+    rawLines: readonly string[],
+    issues: Issue[],
+): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
         if (!/\//.test(line)) continue;
@@ -86,7 +90,11 @@ function auditInternalApiEndpoints(file: string, rawLines: readonly string[], is
 /**
  * Audits client markup for CSS visual hiding in lieu of server auth (SEC-EXP-002).
  */
-function auditCssAuthorizationBypass(file: string, rawLines: readonly string[], issues: Issue[]): void {
+function auditCssAuthorizationBypass(
+    file: string,
+    rawLines: readonly string[],
+    issues: Issue[],
+): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
         if (REGEX.SECURITY.CSS_AUTH_BYPASS.test(line)) {
@@ -108,7 +116,11 @@ function auditCssAuthorizationBypass(file: string, rawLines: readonly string[], 
 /**
  * Audits feature flag usage for full implementation code delivery (SEC-EXP-003).
  */
-function auditFeatureFlagCodeSplitting(file: string, rawLines: readonly string[], issues: Issue[]): void {
+function auditFeatureFlagCodeSplitting(
+    file: string,
+    rawLines: readonly string[],
+    issues: Issue[],
+): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
         if (REGEX.SECURITY.FEATURE_FLAG_DEAD_GATE.test(line)) {
@@ -149,7 +161,11 @@ function auditUnreleasedRoutes(file: string, rawLines: readonly string[], issues
     }
 }
 
-function hasGuardedActivationOrOrigin(lines: readonly string[], start: number, end: number): boolean {
+function hasGuardedActivationOrOrigin(
+    lines: readonly string[],
+    start: number,
+    end: number,
+): boolean {
     for (let i = start; i < end; i++) {
         if (REGEX.SECURITY.USER_ACTIVATION_OR_ORIGIN.test(lines[i])) {
             return true;
@@ -167,7 +183,11 @@ function findSensitiveActionLine(lines: readonly string[], start: number, end: n
     return -1;
 }
 
-function auditIframeUserActivation(file: string, rawLines: readonly string[], issues: Issue[]): void {
+function auditIframeUserActivation(
+    file: string,
+    rawLines: readonly string[],
+    issues: Issue[],
+): void {
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
         if (!REGEX.SECURITY.MESSAGE_LISTENER.test(line)) {

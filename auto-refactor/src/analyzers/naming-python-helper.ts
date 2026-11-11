@@ -25,10 +25,7 @@ import {
     MAX_FUNCTION_NAME_LENGTH,
     type NamingActionablePayload,
 } from './naming-candidate-helper';
-import {
-    buildPolyglotActionable,
-    isUntoleratedSingleLetter,
-} from './naming-polyglot-helper';
+import { buildPolyglotActionable, isUntoleratedSingleLetter } from './naming-polyglot-helper';
 
 /** Structured diagnostic payload for Python naming findings. */
 export interface PythonFindingInput {

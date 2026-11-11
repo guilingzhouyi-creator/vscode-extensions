@@ -535,9 +535,7 @@ function advanceEmbeddedTestLine(
  * @param content - Optional source text of the scanned file.
  * @returns Array of inclusive [startLine, endLine] ranges.
  */
-export function extractEmbeddedTestLineRanges(
-    content?: string,
-): Array<readonly [number, number]> {
+export function extractEmbeddedTestLineRanges(content?: string): Array<readonly [number, number]> {
     if (!content || (!content.includes('cfg(test)') && !content.includes('mod tests'))) {
         return [];
     }
@@ -584,11 +582,7 @@ export function isInsideEmbeddedTestZone(
  * @returns True if the file matches test suite or fixture characteristics.
  */
 export function isTestFile(role: string, filePath: string): boolean {
-    return (
-        role === ROLE_TEST_SUITE ||
-        isTestFilePath(filePath) ||
-        isFixtureOrMockPath(filePath)
-    );
+    return role === ROLE_TEST_SUITE || isTestFilePath(filePath) || isFixtureOrMockPath(filePath);
 }
 
 /**

@@ -219,11 +219,7 @@ function findSingleCallSite(
 }
 
 function isTestOrFixturePath(filePath: string): boolean {
-    return (
-        isTestFilePath(filePath) ||
-        isFixtureOrMockPath(filePath) ||
-        filePath.endsWith('.d.ts')
-    );
+    return isTestFilePath(filePath) || isFixtureOrMockPath(filePath) || filePath.endsWith('.d.ts');
 }
 
 function evaluateCandidateInlining(

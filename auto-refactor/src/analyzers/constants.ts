@@ -90,9 +90,7 @@ function isAlgorithmContext(role: string, filePath: string): boolean {
  */
 function isExemptFromConstantScan(role: string, filePath: string): boolean {
     return (
-        isTestFile(role, filePath) ||
-        role === 'gate_infrastructure' ||
-        isScriptOrGateFile(filePath)
+        isTestFile(role, filePath) || role === 'gate_infrastructure' || isScriptOrGateFile(filePath)
     );
 }
 

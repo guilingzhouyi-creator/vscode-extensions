@@ -532,7 +532,10 @@ export function checkShellStrictExitCapture(
     emit: ShellEmitter,
 ): void {
     if (!hasSetE) return;
-    if (REGEX.SHELL.SH_PREDICATE_COMMANDS.test(trimmed) && !REGEX.SHELL.SH_EXIT_GUARD.test(trimmed)) {
+    if (
+        REGEX.SHELL.SH_PREDICATE_COMMANDS.test(trimmed) &&
+        !REGEX.SHELL.SH_EXIT_GUARD.test(trimmed)
+    ) {
         emit(
             lineIdx,
             RULE_SH_EXIT_001,

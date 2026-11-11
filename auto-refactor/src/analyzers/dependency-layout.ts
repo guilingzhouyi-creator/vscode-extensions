@@ -156,7 +156,7 @@ function isBootstrapExpression(expr: ts.Expression): boolean {
  */
 function expressionMentionsRequire(expr: ts.Expression): boolean {
     let current: ts.Expression = expr;
-    for (; ;) {
+    for (;;) {
         if (ts.isPropertyAccessExpression(current)) {
             current = current.expression;
             continue;
@@ -196,7 +196,10 @@ function findFirstPolyglotDeclarationLine(
         ) {
             continue;
         }
-        if (!isPolyglotImportLine(trimmed, language) && !isPolyglotHeaderPrologue(trimmed, language)) {
+        if (
+            !isPolyglotImportLine(trimmed, language) &&
+            !isPolyglotHeaderPrologue(trimmed, language)
+        ) {
             return i + 1;
         }
     }

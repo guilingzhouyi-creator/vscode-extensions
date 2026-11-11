@@ -314,11 +314,23 @@ export function auditFileBasics(
 
     if (file.endsWith('.ps1')) {
         if (!content.includes('\r\n') && content.includes('\n')) {
-            reportEolMismatch({ file, filePath: ctx.filePath, expectedEol: EOL_CRLF, actualEol: EOL_LF, issues });
+            reportEolMismatch({
+                file,
+                filePath: ctx.filePath,
+                expectedEol: EOL_CRLF,
+                actualEol: EOL_LF,
+                issues,
+            });
         }
     } else if (/\.(?:ts|js|json|md|sh|rs|py|gd)$/.test(file)) {
         if (content.includes('\r\n')) {
-            reportEolMismatch({ file, filePath: ctx.filePath, expectedEol: EOL_LF, actualEol: EOL_CRLF, issues });
+            reportEolMismatch({
+                file,
+                filePath: ctx.filePath,
+                expectedEol: EOL_LF,
+                actualEol: EOL_CRLF,
+                issues,
+            });
         }
     }
 

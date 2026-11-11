@@ -498,10 +498,14 @@ export function findAutomaticVariableShadows(lines: readonly string[]): Automati
     lines.forEach((line, index) => {
         if (isNonStatementLine(line.trim())) return;
         const lineNumber = index + 1;
-        for (const match of line.matchAll(REGEX.SHELL.createPsAssignScanner())) report(match[1], lineNumber);
-        for (const match of line.matchAll(REGEX.SHELL.createPsForeachScanner())) report(match[1], lineNumber);
-        for (const match of line.matchAll(REGEX.SHELL.createPsCastAssignScanner())) report(match[1], lineNumber);
-        for (const match of line.matchAll(REGEX.SHELL.createPsMultiAssignScanner())) report(match[1], lineNumber);
+        for (const match of line.matchAll(REGEX.SHELL.createPsAssignScanner()))
+            report(match[1], lineNumber);
+        for (const match of line.matchAll(REGEX.SHELL.createPsForeachScanner()))
+            report(match[1], lineNumber);
+        for (const match of line.matchAll(REGEX.SHELL.createPsCastAssignScanner()))
+            report(match[1], lineNumber);
+        for (const match of line.matchAll(REGEX.SHELL.createPsMultiAssignScanner()))
+            report(match[1], lineNumber);
     });
     return shadows;
 }

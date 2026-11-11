@@ -208,7 +208,8 @@ export class PerformanceAnalyzer implements Analyzer {
         // The shared masker erases interpolation bodies too. Keep the existing raw heuristic
         // for these files so executable template/f-string expressions remain visible.
         const maskedLines = INTERPOLATED_LITERAL_RE.test(content)
-            ? undefined : ctx.maskedLines ?? getMaskedSourceOfPath(file, content).masked;
+            ? undefined
+            : (ctx.maskedLines ?? getMaskedSourceOfPath(file, content).masked);
         const loopStack: LoopScope[] = [];
         const pass: ScanPassContext = { ctx, scanConfig, scanState, asyncScope, loopStack, issues };
 

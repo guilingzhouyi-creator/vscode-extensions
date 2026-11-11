@@ -141,7 +141,9 @@ const SNAKE_EXTS = new Set(['.py', '.rs', '.gd']);
  * @returns True when file is part of analyzer/engine implementations.
  */
 export function isAnalyzerOrEngineFile(filePath: string): boolean {
-    return REGEX.NAMING.ANALYZER_OR_ENGINE_PATH.test(normalizePathSeparators(filePath).toLowerCase());
+    return REGEX.NAMING.ANALYZER_OR_ENGINE_PATH.test(
+        normalizePathSeparators(filePath).toLowerCase(),
+    );
 }
 
 /**
@@ -230,8 +232,7 @@ function measureStructuredResourceMetrics(lines: readonly string[]): {
         symbolCount,
         literalCount,
         astDepth: depthState.maxDepth,
-        isExecutableLogic:
-            execCount >= MIN_EXECUTABLE_LOGIC_STATEMENTS && execCount > symbolCount,
+        isExecutableLogic: execCount >= MIN_EXECUTABLE_LOGIC_STATEMENTS && execCount > symbolCount,
     };
 }
 
@@ -480,7 +481,9 @@ function splitCamelStem(stem: string): string[] {
  */
 export function splitFileNameSegments(nameWithoutExt: string, ext: string): string[] {
     const isSnake = ext === '.py' || ext === '.rs' || ext === '.gd';
-    const cleaned = isSnake ? nameWithoutExt.replace(createSnakeCleanScanner(), '') : nameWithoutExt;
+    const cleaned = isSnake
+        ? nameWithoutExt.replace(createSnakeCleanScanner(), '')
+        : nameWithoutExt;
     const separator = isSnake ? '_' : '-';
     return cleaned
         .split(separator)
@@ -778,11 +781,11 @@ const TYPE_SINGLE_LETTER = 'single_letter' as const;
 export interface FunctionSemanticsFinding {
     /** Type tag classifying the semantic finding. */
     type:
-    | typeof TYPE_VERB_NOUN
-    | typeof TYPE_TOO_FEW_WORDS
-    | typeof TYPE_TOO_MANY_WORDS
-    | typeof TYPE_INVALID_MORPHEME
-    | typeof TYPE_SINGLE_LETTER;
+        | typeof TYPE_VERB_NOUN
+        | typeof TYPE_TOO_FEW_WORDS
+        | typeof TYPE_TOO_MANY_WORDS
+        | typeof TYPE_INVALID_MORPHEME
+        | typeof TYPE_SINGLE_LETTER;
     /** Offending token if applicable. */
     token?: string;
     /** Measured word count. */

@@ -29,7 +29,10 @@ import {
     DualTrackTestEvaluator,
     hasEmbeddedMarkers,
 } from '../core/scoring/dual-track-test-evaluator';
-import { partitionFileZones, type IntraFileZoneProfile } from '../core/intelligence/zone-partitioner';
+import {
+    partitionFileZones,
+    type IntraFileZoneProfile,
+} from '../core/intelligence/zone-partitioner';
 import { analyzeCodeDensity } from '../core/intelligence/code-density-analyzer';
 import { REGEX, normalizePathSeparators } from '../core/constants';
 import { isTestFilePath } from '../core/path';
@@ -616,7 +619,11 @@ export class TestModernityAnalyzer implements Analyzer {
         const callArgs = getCallArguments(node);
         if (node.expression.getText(sourceFile) === 'assert' && callArgs.length > 0) {
             const assertArgumentText = callArgs[0].getText(sourceFile).replace(/\s+/g, '');
-            return assertArgumentText === 'true' || assertArgumentText === '1===1' || assertArgumentText === '1==1';
+            return (
+                assertArgumentText === 'true' ||
+                assertArgumentText === '1===1' ||
+                assertArgumentText === '1==1'
+            );
         }
         return false;
     }
@@ -694,7 +701,10 @@ export class TestModernityAnalyzer implements Analyzer {
         if (flags.isObsolete) currentCase.obsoleteCount++;
     }
 
-    private extractFirstCaptureGroup(match: RegExpExecArray | null, fallback: string): string | undefined {
+    private extractFirstCaptureGroup(
+        match: RegExpExecArray | null,
+        fallback: string,
+    ): string | undefined {
         if (!match) return undefined;
         return match.slice(1).find(Boolean) || fallback;
     }

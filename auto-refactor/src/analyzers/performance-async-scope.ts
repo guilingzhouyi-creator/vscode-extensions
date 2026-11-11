@@ -33,7 +33,7 @@ export class PerformanceAsyncScope {
         for (let column = 0; column < masked.length; column++) {
             const wasAsync = this.asyncDepths.length > 0;
             this.scanCharacter(masked, column);
-            if (wasAsync !== (this.asyncDepths.length > 0)) {
+            if (wasAsync !== this.asyncDepths.length > 0) {
                 this.transitions.push(column + 1);
             }
         }

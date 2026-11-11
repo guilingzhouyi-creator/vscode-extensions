@@ -186,11 +186,11 @@ export class ShellLintAnalyzer implements Analyzer {
             const mapped = SHELL_ACTIONABLE_MAP[rule];
             const actionable = mapped
                 ? {
-                    action: mapped.action,
-                    code: mapped.code,
-                    safeToAutomate: mapped.safeToAutomate,
-                    templateSnippet: mapped.templateSnippet,
-                }
+                      action: mapped.action,
+                      code: mapped.code,
+                      safeToAutomate: mapped.safeToAutomate,
+                      templateSnippet: mapped.templateSnippet,
+                  }
                 : undefined;
             const issue = createLineIssue(this.name, file, {
                 lineIdx,

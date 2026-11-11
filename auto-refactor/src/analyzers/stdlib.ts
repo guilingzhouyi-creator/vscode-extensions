@@ -270,7 +270,14 @@ function collectRecursionSites(
                     ? declaration[2] + code.slice(declaration.index, openIndex)
                     : declaration[2];
             if (openIndex >= 0) {
-                openFrame({ name: declaration[1], params, depthBefore, code, openIndex, lineNumber });
+                openFrame({
+                    name: declaration[1],
+                    params,
+                    depthBefore,
+                    code,
+                    openIndex,
+                    lineNumber,
+                });
             } else {
                 pendingName = declaration[1];
                 pendingParams = params;
@@ -299,7 +306,10 @@ function hasSafetyComment(lines: readonly string[], lineIndex: number): boolean 
     for (let k = lineIndex - 1; k >= start; k--) {
         if (/^(?:\/\/|\/\*)\s*SAFETY:/i.test(lines[k].trim())) return true;
     }
-    return lineIndex + 1 < lines.length && /^(?:\/\/|\/\*)\s*SAFETY:/i.test(lines[lineIndex + 1].trim());
+    return (
+        lineIndex + 1 < lines.length &&
+        /^(?:\/\/|\/\*)\s*SAFETY:/i.test(lines[lineIndex + 1].trim())
+    );
 }
 
 interface StdlibIssueDescriptor {
@@ -514,8 +524,10 @@ export class StdlibAnalyzer implements Analyzer {
                     line: i + 1,
                     rule: 'STDLIB-ALLOC-001',
                     severity: SEVERITY_ERROR,
-                    message: 'Implicit dynamic heap allocation detected in no_std bare-metal context.',
-                    suggestion: 'Use fixed-capacity stack buffer, reference slices, or preallocated memory pool in no_std context.',
+                    message:
+                        'Implicit dynamic heap allocation detected in no_std bare-metal context.',
+                    suggestion:
+                        'Use fixed-capacity stack buffer, reference slices, or preallocated memory pool in no_std context.',
                 });
             }
         }
@@ -543,8 +555,10 @@ export class StdlibAnalyzer implements Analyzer {
                         line: i + 1,
                         rule: 'STDLIB-UNSAFE-001',
                         severity: SEVERITY_ERROR,
-                        message: 'Unsafe block lacks mandatory // SAFETY: invariant contract proof.',
-                        suggestion: 'Prepend // SAFETY: explaining why caller preconditions and memory invariants are upheld.',
+                        message:
+                            'Unsafe block lacks mandatory // SAFETY: invariant contract proof.',
+                        suggestion:
+                            'Prepend // SAFETY: explaining why caller preconditions and memory invariants are upheld.',
                     });
                 }
             }
@@ -582,8 +596,10 @@ export class StdlibAnalyzer implements Analyzer {
                     line: i + 1,
                     rule: 'STDLIB-CONST-001',
                     severity: SEVERITY_WARNING,
-                    message: 'Timing side-channel vulnerability: short-circuit byte comparison in cryptographic context.',
-                    suggestion: 'Use constant-time comparison (e.g. constant_time_eq or bitwise XOR accumulator) to prevent early termination.',
+                    message:
+                        'Timing side-channel vulnerability: short-circuit byte comparison in cryptographic context.',
+                    suggestion:
+                        'Use constant-time comparison (e.g. constant_time_eq or bitwise XOR accumulator) to prevent early termination.',
                 });
             }
         }
@@ -609,7 +625,8 @@ export class StdlibAnalyzer implements Analyzer {
                 rule: 'STDLIB-RECURSION-001',
                 severity: SEVERITY_WARNING,
                 message: `Function \`${site.functionName}\` has recursive self-invocation without explicit depth limit parameter or guard.`,
-                suggestion: 'Introduce explicit depth/recursion_limit parameter returning error upon limit, or convert to iterative loop.',
+                suggestion:
+                    'Introduce explicit depth/recursion_limit parameter returning error upon limit, or convert to iterative loop.',
                 detail: { functionName: site.functionName },
             });
         }
@@ -633,8 +650,10 @@ export class StdlibAnalyzer implements Analyzer {
             line: 1,
             rule: 'STDLIB-PORT-001',
             severity: SEVERITY_WARNING,
-            message: 'Platform-specific conditional compilation block lacks compile_error! or #error fallback for unsupported platforms.',
-            suggestion: 'Add #[cfg(not(any(...)))] compile_error!("Unsupported target OS/Arch"); fallback guard.',
+            message:
+                'Platform-specific conditional compilation block lacks compile_error! or #error fallback for unsupported platforms.',
+            suggestion:
+                'Add #[cfg(not(any(...)))] compile_error!("Unsupported target OS/Arch"); fallback guard.',
         });
     }
 }

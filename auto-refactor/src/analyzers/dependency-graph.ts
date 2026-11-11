@@ -44,8 +44,10 @@ interface DependencyGraphOptions {
 
 /** Normalize a file path the same way the core graph does: POSIX, extension stripped. */
 function normalizeRel(relPath: string): string {
-    return normalizePathSeparators(path.normalize(relPath))
-        .replace(/\.(ts|tsx|js|jsx|d\.ts|mts|cts|mjs|cjs)$/, '');
+    return normalizePathSeparators(path.normalize(relPath)).replace(
+        /\.(ts|tsx|js|jsx|d\.ts|mts|cts|mjs|cjs)$/,
+        '',
+    );
 }
 
 interface CompiledGroup {
