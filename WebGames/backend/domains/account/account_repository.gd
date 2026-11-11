@@ -152,9 +152,9 @@ func load_all() -> Dictionary:
 			return {"success": true, "count": shard_count, "error": "", "recovered_from": "shards"}
 		return {"success": true, "count": 0, "error": ""}
 
-	var res := _load_from_file(file_path)
-	if bool(res.get("success", false)):
-		return res
+	var load_result := _load_from_file(file_path)
+	if bool(load_result.get("success", false)):
+		return load_result
 
 	# 正档解析失败，触发防损坏自愈流程
 	if _auto_restore_enabled():
@@ -171,7 +171,7 @@ func load_all() -> Dictionary:
 			_save_registry_internal()
 			return {"success": true, "count": shard_count, "error": "", "recovered_from": "shards"}
 
-	return res
+	return load_result
 
 func _load_from_file(file_path: String) -> Dictionary:
 	var file := FileAccess.open(file_path, FileAccess.READ)
@@ -236,11 +236,11 @@ func _recover_from_shards(accounts_dir: String) -> int:
 func _load_and_register_single_shard(shard_file_path: String) -> bool:
 	if not FileAccess.file_exists(shard_file_path):
 		return false
-	var f := FileAccess.open(shard_file_path, FileAccess.READ)
-	if f == null:
+	var file_handle := FileAccess.open(shard_file_path, FileAccess.READ)
+	if file_handle == null:
 		return false
-	var text := f.get_as_text()
-	f.close()
+	var text := file_handle.get_as_text()
+	file_handle.close()
 	var json := JSON.new()
 	if json.parse(text) != OK:
 		return false
@@ -324,8 +324,8 @@ func delete_account(account_id: String) -> bool:
 		DirAccess.remove_absolute(shard_bak)
 
 	# 原子更新全局注册表
-	var res := _save_registry_internal()
-	return bool(res.get("success", false))
+	var save_res := _save_registry_internal()
+	return bool(save_res.get("success", false))
 
 func _save_registry_internal() -> Dictionary:
 	var reg_path := get_registry_file_path()
@@ -360,7 +360,7 @@ func _atomic_write_file(file_path: String, content: String) -> Dictionary:
 	var tmp_path := file_path + _get_tmp_suffix()
 	var tmp_file := FileAccess.open(tmp_path, FileAccess.WRITE)
 	if tmp_file == null:
-		return {"success": false, "error": "TMP_OPEN_FAILED: %s" % str(FileAccess.get_open_error())}
+		return {"success": false, "error": TemplateFormatter.format("TMP_OPEN_FAILED: {error}", {"error": str(FileAccess.get_open_error())})}
 
 	tmp_file.store_string(content)
 	tmp_file.flush()
@@ -375,13 +375,13 @@ func _atomic_write_file(file_path: String, content: String) -> Dictionary:
 			var policy := GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "storage/backup_fail_policy", "abort")
 			if policy == "abort":
 				DirAccess.remove_absolute(tmp_path)
-				return {"success": false, "error": "BACKUP_FAILED: %d" % backup_err}
+				return {"success": false, "error": TemplateFormatter.format("BACKUP_FAILED: {error}", {"error": backup_err})}
 
 	# rename 原子替换
 	var rename_err := DirAccess.rename_absolute(tmp_path, file_path)
 	if rename_err != OK:
 		DirAccess.remove_absolute(tmp_path)
-		return {"success": false, "error": "RENAME_FAILED: %d" % rename_err}
+		return {"success": false, "error": TemplateFormatter.format("RENAME_FAILED: {error}", {"error": rename_err})}
 
 	return {"success": true, "error": ""}
 
@@ -431,12 +431,12 @@ func _restore_from_backup(file_path: String, bak_path: String) -> bool:
 	return err == OK
 
 func _write_direct(file_path: String, content: String) -> Dictionary:
-	var f := FileAccess.open(file_path, FileAccess.WRITE)
-	if f == null:
+	var file_handle := FileAccess.open(file_path, FileAccess.WRITE)
+	if file_handle == null:
 		return {"success": false, "error": "DIRECT_WRITE_OPEN_FAILED"}
-	f.store_string(content)
-	f.flush()
-	f.close()
+	file_handle.store_string(content)
+	file_handle.flush()
+	file_handle.close()
 	return {"success": true, "error": ""}
 
 func _atomic_write_enabled() -> bool:

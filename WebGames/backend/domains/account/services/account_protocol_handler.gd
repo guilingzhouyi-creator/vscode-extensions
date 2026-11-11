@@ -30,21 +30,21 @@ static func dispatch(request: ClientRequestEnvelopeDTO, _gateway: WorldGatewayFS
 			reg_req.device_fingerprint = str(payload_dict.get("device_fingerprint", ""))
 			var auto_login := bool(payload_dict.get("auto_login", false))
 			if auto_login:
-				var res := AuthService.register_and_login(reg_req, true)
-				if bool(res.get("success", false)):
-					var acc_id := String(res.get("account_id", ""))
-					var tok := String(res.get("session_token", ""))
-					WorldSessionRuntimeService.activate_authenticated_session(acc_id, tok, WorldGatewayFSM.new(acc_id))
+				var auth_result := AuthService.register_and_login(reg_req, true)
+				if bool(auth_result.get("success", false)):
+					var registered_account_id := String(auth_result.get("account_id", ""))
+					var session_token := String(auth_result.get("session_token", ""))
+					WorldSessionRuntimeService.activate_authenticated_session(registered_account_id, session_token, WorldGatewayFSM.new(registered_account_id))
 				return UnifiedProtocolFactory.create_response(
-					request.request_id, bool(res.get("success", false)), res,
-					"" if bool(res.get("success", false)) else String(res.get("error_code", "ERR_REGISTER_FAILED")),
-					"账号注册成功" if bool(res.get("success", false)) else "账号注册失败"
+					request.request_id, bool(auth_result.get("success", false)), auth_result,
+					"" if bool(auth_result.get("success", false)) else String(auth_result.get("error_code", "ERR_REGISTER_FAILED")),
+					"Account registration succeeded" if bool(auth_result.get("success", false)) else "Account registration failed"
 				)
 			var reg_resp := AuthService.register_account(reg_req)
 			return UnifiedProtocolFactory.create_response(
 				request.request_id, reg_resp.success, reg_resp.to_dto(),
 				"" if reg_resp.success else reg_resp.error_code,
-				"账号注册完成" if reg_resp.success else "账号注册失败"
+				"Account registration completed" if reg_resp.success else "Account registration failed"
 			)
 
 		"LOGIN_LOCAL", "LOGIN_COMPOSITE":
@@ -65,13 +65,13 @@ static func dispatch(request: ClientRequestEnvelopeDTO, _gateway: WorldGatewayFS
 			return UnifiedProtocolFactory.create_response(
 				request.request_id, auth_resp.success, out_data,
 				"" if auth_resp.success else auth_resp.error_code,
-				"登录成功" if auth_resp.success else "登录失败"
+				"Login succeeded" if auth_resp.success else "Login failed"
 			)
 
 		"LOGOUT_ACCOUNT":
-			var active_gw := WorldSessionRuntimeService.get_gateway() as WorldGatewayFSM
-			if WorldSessionRuntimeService.has_active_world() and active_gw != null:
-				active_gw.exit_to_gateway()
+			var active_gateway := WorldSessionRuntimeService.get_gateway() as WorldGatewayFSM
+			if WorldSessionRuntimeService.has_active_world() and active_gateway != null:
+				active_gateway.exit_to_gateway()
 			var logout_res := AuthService.logout_session(request.session_token, request.account_id)
 			WorldSessionRuntimeService.revoke_account_session()
 			HumanControlLeaseManager.release_lease()
@@ -80,15 +80,16 @@ static func dispatch(request: ClientRequestEnvelopeDTO, _gateway: WorldGatewayFS
 			return UnifiedProtocolFactory.create_response(
 				request.request_id, bool(logout_res.get("success", false)), logout_res,
 				"" if bool(logout_res.get("success", false)) else String(logout_res.get("error_code", "ERR_LOGOUT_FAILED")),
-				"账号已注销并清理运行时凭据"
+				"Account logged out and runtime credentials revoked"
 			)
 
 		"GET_ACCOUNT_HOME_VIEW_MODEL":
 			var home_view_model := AuthService.build_account_home_view_model(request.session_token, str(payload_dict.get("locale", "")))
 			return UnifiedProtocolFactory.create_response(
-				request.request_id, true, home_view_model, "", "账号首页视图模型获取成功"
+				request.request_id, true, home_view_model, "", "Account home view model retrieved successfully"
 			)
 
 	return UnifiedProtocolFactory.create_response(
-		request.request_id, false, {}, "ERR_UNHANDLED_ACTION", "未支持的操作指令: %s" % request.action_type
+		request.request_id, false, {}, "ERR_UNHANDLED_ACTION",
+		TemplateFormatter.format("Unsupported action type: {action_type}", {"action_type": request.action_type})
 	)

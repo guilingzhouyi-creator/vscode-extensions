@@ -19,26 +19,26 @@ class_name CharacterDeathSolver extends RefCounted
 static func handle_character_death(account: AccountProfileAggregate, slot_id: String, world: WorldInstance) -> Dictionary:
 	if account == null or slot_id.is_empty():
 		return {"success": false, "error_code": "INVALID_SLOT"}
-	var dto: SaveSlotSummaryDTO = account.get_summary_by_slot(slot_id)
-	if dto == null:
+	var slot_summary: SaveSlotSummaryDTO = account.get_summary_by_slot(slot_id)
+	if slot_summary == null:
 		return {"success": false, "error_code": "SLOT_EMPTY"}
-	if dto.is_fallen:
+	if slot_summary.is_fallen:
 		return {"success": false, "error_code": "ALREADY_FALLEN", "slot_id": slot_id}
 
 	# 1. 精确清理角色本体子集（白名单，禁删全档）
 	var cleared: Array[String] = []
 	for k in CharacterProfile.CHARACTER_OWNED_KEYS:
-		if dto.has_character_payload(k):
-			dto.clear_character_payload(k)
+		if slot_summary.has_character_payload(k):
+			slot_summary.clear_character_payload(k)
 			cleared.append(k)
-	dto.is_fallen = true
-	dto.last_saved_time_utc = int(Time.get_unix_time_from_system())
+	slot_summary.is_fallen = true
+	slot_summary.last_saved_time_utc = int(Time.get_unix_time_from_system())
 
 	# 2. 世界零回退：时间继续推进 + 历史影响片段只增
 	var world_time_after: Dictionary = {}
 	if world != null:
 		world.advance_world_time(1)
-		world.append_history_fragment({"source": dto.character_name, "slot_id": slot_id, "event": "character_death"})
+		world.append_history_fragment({"source": slot_summary.character_name, "slot_id": slot_id, "event": "character_death"})
 		world_time_after = world.world_time.duplicate()
 
 	EventBusCore.get_instance().emit_domain_event("character.death", {"args": [slot_id], "summary": {"cleared_keys": cleared, "world_tick": world_time_after.get("tick", 0)}})

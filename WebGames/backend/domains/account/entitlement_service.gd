@@ -87,7 +87,7 @@ static func seal_entitlements(account: AccountProfileAggregate) -> String:
 		return ""
 	var key := _seal_key()
 	if key.is_empty():
-		ErrorReporter.emit_error("entitlement_service", "SEAL_KEY_MISSING", "EntitlementService: 密封密钥缺失（seal_key_env 未配置）——密封不可用（失败关闭，不降级公开常量摘要）")
+		ErrorReporter.emit_error("entitlement_service", "SEAL_KEY_MISSING", "EntitlementService: Seal key missing; sealed output unavailable (fail-closed).")
 		return ""
 	var payload := _canonical_payload(account)
 	var digest := Crypto.new().hmac_digest(HashingContext.HASH_SHA256, key, payload.to_utf8_buffer())

@@ -19,7 +19,7 @@ var character_name: String = GameConfig.get_string("domains.account", "save_slot
 var title_prefix: String = GameConfig.get_string("domains.account", "save_slot/defaults/title_prefix", "Apprentice Adventurer")
 var profession_tier_name: String = GameConfig.get_string("domains.account", "save_slot/defaults/profession_tier_name", "Novice Walker Tier 1")
 var apparent_age: int = GameConfig.get_int("domains.account", "save_slot/defaults/apparent_age", 20)
-var current_location_name: String = GameConfig.get_string("domains.account", "save_slot/defaults/current_location_name", "中洲·卡拉尔圣城")
+var current_location_name: String = GameConfig.get_string("domains.account", "save_slot/defaults/current_location_name", "Central Continent · Kalar Holy City")
 var play_time_seconds: int = GameConfig.get_int("domains.account", "save_slot/defaults/play_time_seconds", 0)
 var is_permadeath_mode: bool = GameConfig.get_bool("domains.account", "save_slot/defaults/is_permadeath_mode", false)
 var is_fallen: bool = GameConfig.get_bool("domains.account", "save_slot/defaults/is_fallen", false)
@@ -70,26 +70,26 @@ func serialize() -> Dictionary:
 	}
 
 ## 反序列化：缺键一律沿用字段初值（即 save_slot/defaults 配置缺省），默认值单点化于此
-static func deserialize(d: Dictionary) -> SaveSlotSummaryDTO:
-	var dto := SaveSlotSummaryDTO.new()
-	dto.slot_id = d.get("slot_id", dto.slot_id)
-	dto.character_name = d.get("character_name", dto.character_name)
-	dto.title_prefix = d.get("title_prefix", dto.title_prefix)
-	dto.profession_tier_name = d.get("profession_tier_name", dto.profession_tier_name)
-	dto.apparent_age = d.get("apparent_age", dto.apparent_age)
-	dto.current_location_name = d.get("current_location_name", dto.current_location_name)
-	dto.play_time_seconds = d.get("play_time_seconds", dto.play_time_seconds)
-	dto.is_permadeath_mode = d.get("is_permadeath_mode", dto.is_permadeath_mode)
-	dto.is_fallen = d.get("is_fallen", dto.is_fallen)
-	dto.last_saved_time_utc = d.get("last_saved_time_utc", dto.last_saved_time_utc)
-	dto.save_file_sha256 = d.get("save_file_sha256", dto.save_file_sha256)
-	dto.prologue_completed = bool(d.get("prologue_completed", dto.prologue_completed))
-	dto.world_slot_status = String(d.get("world_slot_status", dto.world_slot_status))
-	dto.world_id = String(d.get("world_id", dto.world_id))
-	var raw_profile: Variant = d.get("character_profile", {})
+static func deserialize(slot_dict: Dictionary) -> SaveSlotSummaryDTO:
+	var slot_dto := SaveSlotSummaryDTO.new()
+	slot_dto.slot_id = slot_dict.get("slot_id", slot_dto.slot_id)
+	slot_dto.character_name = slot_dict.get("character_name", slot_dto.character_name)
+	slot_dto.title_prefix = slot_dict.get("title_prefix", slot_dto.title_prefix)
+	slot_dto.profession_tier_name = slot_dict.get("profession_tier_name", slot_dto.profession_tier_name)
+	slot_dto.apparent_age = slot_dict.get("apparent_age", slot_dto.apparent_age)
+	slot_dto.current_location_name = slot_dict.get("current_location_name", slot_dto.current_location_name)
+	slot_dto.play_time_seconds = slot_dict.get("play_time_seconds", slot_dto.play_time_seconds)
+	slot_dto.is_permadeath_mode = slot_dict.get("is_permadeath_mode", slot_dto.is_permadeath_mode)
+	slot_dto.is_fallen = slot_dict.get("is_fallen", slot_dto.is_fallen)
+	slot_dto.last_saved_time_utc = slot_dict.get("last_saved_time_utc", slot_dto.last_saved_time_utc)
+	slot_dto.save_file_sha256 = slot_dict.get("save_file_sha256", slot_dto.save_file_sha256)
+	slot_dto.prologue_completed = bool(slot_dict.get("prologue_completed", slot_dto.prologue_completed))
+	slot_dto.world_slot_status = String(slot_dict.get("world_slot_status", slot_dto.world_slot_status))
+	slot_dto.world_id = String(slot_dict.get("world_id", slot_dto.world_id))
+	var raw_profile: Variant = slot_dict.get("character_profile", {})
 	if raw_profile is Dictionary and not (raw_profile as Dictionary).is_empty():
-		dto.character_profile = CharacterProfile.deserialize(raw_profile as Dictionary)
-	return dto
+		slot_dto.character_profile = CharacterProfile.deserialize(raw_profile as Dictionary)
+	return slot_dto
 
 ## 对象池生命周期重置
 func reset_state() -> void:
@@ -98,7 +98,7 @@ func reset_state() -> void:
 	title_prefix = GameConfig.get_string("domains.account", "save_slot/defaults/title_prefix", "Apprentice Adventurer")
 	profession_tier_name = GameConfig.get_string("domains.account", "save_slot/defaults/profession_tier_name", "Novice Walker Tier 1")
 	apparent_age = GameConfig.get_int("domains.account", "save_slot/defaults/apparent_age", 20)
-	current_location_name = GameConfig.get_string("domains.account", "save_slot/defaults/current_location_name", "中洲·卡拉尔圣城")
+	current_location_name = GameConfig.get_string("domains.account", "save_slot/defaults/current_location_name", "Central Continent · Kalar Holy City")
 	play_time_seconds = GameConfig.get_int("domains.account", "save_slot/defaults/play_time_seconds", 0)
 	is_permadeath_mode = GameConfig.get_bool("domains.account", "save_slot/defaults/is_permadeath_mode", false)
 	is_fallen = GameConfig.get_bool("domains.account", "save_slot/defaults/is_fallen", false)

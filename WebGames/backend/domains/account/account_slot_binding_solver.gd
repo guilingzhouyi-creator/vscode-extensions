@@ -69,14 +69,14 @@ static func create_character_in_slot(
 				"slot_id": slot_id
 			}
 		character_name = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "save_slot/defaults/character_name", "Nameless Wanderer")
-	var dto := SaveSlotSummaryDTO.new()
-	dto.slot_id = slot_id
-	dto.character_name = character_name
-	dto.title_prefix = title_prefix if not title_prefix.is_empty() else GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "save_slot/defaults/title_prefix", "Apprentice Adventurer")
-	dto.is_permadeath_mode = is_permadeath
-	dto.last_saved_time_utc = int(Time.get_unix_time_from_system())
-	dto.current_location_name = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "save_slot/defaults/current_location_name", "中洲·卡拉尔圣城")
-	var bind_res := account.bind_character_to_slot(slot_id, dto)
+	var slot_summary_dto := SaveSlotSummaryDTO.new()
+	slot_summary_dto.slot_id = slot_id
+	slot_summary_dto.character_name = character_name
+	slot_summary_dto.title_prefix = title_prefix if not title_prefix.is_empty() else GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "save_slot/defaults/title_prefix", "Apprentice Adventurer")
+	slot_summary_dto.is_permadeath_mode = is_permadeath
+	slot_summary_dto.last_saved_time_utc = int(Time.get_unix_time_from_system())
+	slot_summary_dto.current_location_name = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "save_slot/defaults/current_location_name", "Central Continent · Kalar Holy City")
+	var bind_res := account.bind_character_to_slot(slot_id, slot_summary_dto)
 	if not bind_res.success:
 		return bind_res
 
@@ -98,7 +98,7 @@ static func create_character_in_slot(
 		}
 		provision_res = SaveDataAccessLayer.save_game(slot_id, init_payload)
 		if bool(provision_res.get("success", false)):
-			dto.save_file_sha256 = str(provision_res.get("sha256", ""))
+			slot_summary_dto.save_file_sha256 = str(provision_res.get("sha256", ""))
 
 	var repo := AccountRepository.get_instance()
 	if repo.has_account(account.account_id):
@@ -123,8 +123,8 @@ static func quick_create_in_next_slot(account: AccountProfileAggregate, characte
 	if account == null:
 		return {"success": false, "error_code": "INVALID_ACCOUNT"}
 	for slot_id in account.save_slot_summaries:
-		var dto: SaveSlotSummaryDTO = account.save_slot_summaries[slot_id]
-		if dto != null and dto.is_fallen:
+		var slot_summary: SaveSlotSummaryDTO = account.save_slot_summaries[slot_id]
+		if slot_summary != null and slot_summary.is_fallen:
 			return create_character_in_slot(account, str(slot_id), character_name, "", false, allow_default_fallback, provision_disk)
 	var next_id := account.get_next_available_slot_id()
 	if next_id.is_empty():

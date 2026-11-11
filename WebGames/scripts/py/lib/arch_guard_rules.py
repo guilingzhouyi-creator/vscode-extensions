@@ -36,7 +36,6 @@ ALLOWED_PUSH_FILES: frozenset[str] = frozenset({
 # 存量旧模块错误消息硬编码中文与裸格式符渐进演进白名单（新增或已重构域必须严格遵守英文底座与命名占位符）
 LEGACY_ERROR_MESSAGE_WHITELIST: frozenset[str] = frozenset({
   "backend/infrastructure/game_config.gd",
-  "backend/domains/account/entitlement_service.gd",
   "backend/domains/admin_sandbox/gm_audit_service.gd",
   "backend/domains/contract_registry/contract_registry_index.gd",
   "backend/domains/inventory/item_attribute_registry.gd",
