@@ -71,13 +71,21 @@ function testRealRepoBatchEquivalence() {
     const singleProfile = singleProfiles[i];
     const batchProfile = batchProfiles[i];
 
-    assert.strictEqual(batchProfile.isGitAvailable, singleProfile.isGitAvailable, `isGitAvailable mismatch for ${file}`);
+    assert.strictEqual(
+      batchProfile.isGitAvailable,
+      singleProfile.isGitAvailable,
+      `isGitAvailable mismatch for ${file}`,
+    );
     assert.strictEqual(
       batchProfile.totalCommits,
       singleProfile.totalCommits,
       `totalCommits mismatch for ${file}: single=${singleProfile.totalCommits}, batch=${batchProfile.totalCommits}`,
     );
-    assert.strictEqual(batchProfile.bugFixCommits, singleProfile.bugFixCommits, `bugFixCommits mismatch for ${file}`);
+    assert.strictEqual(
+      batchProfile.bugFixCommits,
+      singleProfile.bugFixCommits,
+      `bugFixCommits mismatch for ${file}`,
+    );
     assert.strictEqual(
       batchProfile.uniqueAuthorsCount,
       singleProfile.uniqueAuthorsCount,
@@ -126,8 +134,16 @@ function testCodeEvolutionAnalyzerBatch() {
       seqResult.vulnerabilityMultiplier,
       `Multiplier mismatch for ${file}`,
     );
-    assert.strictEqual(batchResult.bugProneScore, seqResult.bugProneScore, `Bug prone mismatch for ${file}`);
-    assert.strictEqual(batchResult.authorEntropyScore, seqResult.authorEntropyScore, `Entropy mismatch for ${file}`);
+    assert.strictEqual(
+      batchResult.bugProneScore,
+      seqResult.bugProneScore,
+      `Bug prone mismatch for ${file}`,
+    );
+    assert.strictEqual(
+      batchResult.authorEntropyScore,
+      seqResult.authorEntropyScore,
+      `Entropy mismatch for ${file}`,
+    );
     assert.strictEqual(batchResult.decayScore, seqResult.decayScore, `Decay mismatch for ${file}`);
     assert.strictEqual(
       batchResult.debtVelocityScore,

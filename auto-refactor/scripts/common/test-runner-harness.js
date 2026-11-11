@@ -26,8 +26,8 @@ const path = require('path');
  * @returns {string} Absolute path to created temporary directory.
  */
 function createTempTestDir(prefix = 'ar-test') {
-    const sanitizedPrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '-');
-    return fs.mkdtempSync(path.join(os.tmpdir(), `${sanitizedPrefix}-`));
+  const sanitizedPrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, '-');
+  return fs.mkdtempSync(path.join(os.tmpdir(), `${sanitizedPrefix}-`));
 }
 
 /**
@@ -36,14 +36,14 @@ function createTempTestDir(prefix = 'ar-test') {
  * @param {string} dirPath - Directory path to remove.
  */
 function cleanupTempDir(dirPath) {
-    if (!dirPath || !fs.existsSync(dirPath)) {
-        return;
-    }
-    try {
-        fs.rmSync(dirPath, { recursive: true, force: true });
-    } catch {
-        // best-effort: ignore transient Windows file lock errors during teardown
-    }
+  if (!dirPath || !fs.existsSync(dirPath)) {
+    return;
+  }
+  try {
+    fs.rmSync(dirPath, { recursive: true, force: true });
+  } catch {
+    // best-effort: ignore transient Windows file lock errors during teardown
+  }
 }
 
 /**
@@ -53,15 +53,15 @@ function cleanupTempDir(dirPath) {
  * @param {Record<string, string | string[]>} fixtures - Map of relative path to file content.
  */
 function deployFixtures(targetDir, fixtures) {
-    for (const [relPath, content] of Object.entries(fixtures)) {
-        const fullPath = path.join(targetDir, relPath);
-        const parentDir = path.dirname(fullPath);
-        if (!fs.existsSync(parentDir)) {
-            fs.mkdirSync(parentDir, { recursive: true });
-        }
-        const textContent = Array.isArray(content) ? content.join('\n') : String(content);
-        fs.writeFileSync(fullPath, textContent, 'utf8');
+  for (const [relPath, content] of Object.entries(fixtures)) {
+    const fullPath = path.join(targetDir, relPath);
+    const parentDir = path.dirname(fullPath);
+    if (!fs.existsSync(parentDir)) {
+      fs.mkdirSync(parentDir, { recursive: true });
     }
+    const textContent = Array.isArray(content) ? content.join('\n') : String(content);
+    fs.writeFileSync(fullPath, textContent, 'utf8');
+  }
 }
 
 /**
@@ -74,31 +74,31 @@ function deployFixtures(targetDir, fixtures) {
  * @returns {Promise<void>}
  */
 async function runValidationSuite(options) {
-    const { name, fixtures = {}, run } = options;
-    if (typeof run !== 'function') {
-        throw new TypeError(`runValidationSuite: options.run must be a function, got ${typeof run}`);
+  const { name, fixtures = {}, run } = options;
+  if (typeof run !== 'function') {
+    throw new TypeError(`runValidationSuite: options.run must be a function, got ${typeof run}`);
+  }
+
+  const startTimestampMs = Date.now();
+  const tempDir = createTempTestDir(`suite-${name}`);
+
+  try {
+    if (Object.keys(fixtures).length > 0) {
+      deployFixtures(tempDir, fixtures);
     }
 
-    const startTimestampMs = Date.now();
-    const tempDir = createTempTestDir(`suite-${name}`);
+    const executionContext = {
+      tempDir,
+      deploy: (extraFixtures) => deployFixtures(tempDir, extraFixtures),
+    };
 
-    try {
-        if (Object.keys(fixtures).length > 0) {
-            deployFixtures(tempDir, fixtures);
-        }
+    await run(executionContext);
 
-        const executionContext = {
-            tempDir,
-            deploy: (extraFixtures) => deployFixtures(tempDir, extraFixtures),
-        };
-
-        await run(executionContext);
-
-        const durationMs = Date.now() - startTimestampMs;
-        console.log(`✔ ${name} (${durationMs}ms)`);
-    } finally {
-        cleanupTempDir(tempDir);
-    }
+    const durationMs = Date.now() - startTimestampMs;
+    console.log(`✔ ${name} (${durationMs}ms)`);
+  } finally {
+    cleanupTempDir(tempDir);
+  }
 }
 
 /**
@@ -116,18 +116,18 @@ async function runValidationSuite(options) {
  * @returns Handler that reports the error with the suite name and exits 1.
  */
 function reportFailure(name, cleanup) {
-    return (error) => {
-        console.error(`✖ ${name} failed`);
-        console.error(error && error.stack ? error.stack : error);
-        if (cleanup) {
-            try {
-                cleanup();
-            } catch {
-                // Teardown is best-effort; the failure verdict above is what matters.
-            }
-        }
-        process.exit(1);
-    };
+  return (error) => {
+    console.error(`✖ ${name} failed`);
+    console.error(error && error.stack ? error.stack : error);
+    if (cleanup) {
+      try {
+        cleanup();
+      } catch {
+        // Teardown is best-effort; the failure verdict above is what matters.
+      }
+    }
+    process.exit(1);
+  };
 }
 
 /**
@@ -141,18 +141,18 @@ function reportFailure(name, cleanup) {
  * @returns Promise that resolves only on a clean pass; the process exits 1 on failure.
  */
 async function runEntry(name, entry) {
-    try {
-        await entry();
-    } catch (error) {
-        reportFailure(name)(error);
-    }
+  try {
+    await entry();
+  } catch (error) {
+    reportFailure(name)(error);
+  }
 }
 
 module.exports = {
-    createTempTestDir,
-    cleanupTempDir,
-    deployFixtures,
-    runValidationSuite,
-    reportFailure,
-    runEntry,
+  createTempTestDir,
+  cleanupTempDir,
+  deployFixtures,
+  runValidationSuite,
+  reportFailure,
+  runEntry,
 };

@@ -393,7 +393,8 @@ async function runRustCorpusScenario(checkReporter) {
     }),
   ]);
   const isReportEqual =
-    JSON.stringify(normalizeReport(freshReport)) === JSON.stringify(normalizeReport(warmReport.report));
+    JSON.stringify(normalizeReport(freshReport)) ===
+    JSON.stringify(normalizeReport(warmReport.report));
   checkReporter(
     'scenario-rust-corpus',
     isReportEqual && warmReport.stats.daemonUsed === true,
@@ -410,7 +411,8 @@ async function runColdStartScenario(freshScan, warmScan, checkReporter) {
     warmReport = await warmScan();
   }
   const isReportEqual =
-    JSON.stringify(normalizeReport(freshReport)) === JSON.stringify(normalizeReport(warmReport.report));
+    JSON.stringify(normalizeReport(freshReport)) ===
+    JSON.stringify(normalizeReport(warmReport.report));
   checkReporter(
     'scenario-cold-start-empty-cache',
     isReportEqual && warmReport.stats.daemonUsed === true,
@@ -422,7 +424,8 @@ async function runImmediateRescanScenario(freshScan, warmScan, checkReporter) {
   const freshReport = await freshScan();
   const warmReport = await warmScan();
   const isReportEqual =
-    JSON.stringify(normalizeReport(freshReport)) === JSON.stringify(normalizeReport(warmReport.report));
+    JSON.stringify(normalizeReport(freshReport)) ===
+    JSON.stringify(normalizeReport(warmReport.report));
   checkReporter(
     'scenario-immediate-rescan',
     isReportEqual && warmReport.stats.daemonUsed === true && warmReport.stats.cacheHit > 0,
@@ -450,7 +453,8 @@ async function runPartialChangeScenario(freshScan, warmScan, checkReporter) {
   }
   const [freshReport, warmReport] = await Promise.all([freshScan(), warmScan()]);
   const isReportEqual =
-    JSON.stringify(normalizeReport(freshReport)) === JSON.stringify(normalizeReport(warmReport.report));
+    JSON.stringify(normalizeReport(freshReport)) ===
+    JSON.stringify(normalizeReport(warmReport.report));
   checkReporter(
     'scenario-partial-change',
     isReportEqual && warmReport.stats.daemonUsed === true,
@@ -460,12 +464,15 @@ async function runPartialChangeScenario(freshScan, warmScan, checkReporter) {
 }
 
 async function runTouchScenario(freshScan, warmScan, checkReporter) {
-  const files = fs.readdirSync(path.join(CORPUS, 'src')).map((name) => path.join(CORPUS, 'src', name));
+  const files = fs
+    .readdirSync(path.join(CORPUS, 'src'))
+    .map((name) => path.join(CORPUS, 'src', name));
   const currentTime = new Date();
   for (const file of files) fs.utimesSync(file, currentTime, currentTime);
   const [freshReport, warmReport] = await Promise.all([freshScan(), warmScan()]);
   const isReportEqual =
-    JSON.stringify(normalizeReport(freshReport)) === JSON.stringify(normalizeReport(warmReport.report));
+    JSON.stringify(normalizeReport(freshReport)) ===
+    JSON.stringify(normalizeReport(warmReport.report));
   checkReporter(
     'scenario-touch-no-content-change',
     isReportEqual && warmReport.stats.daemonUsed === true,
@@ -488,7 +495,8 @@ async function runConfigChangeScenario(freshScan, warmScan, checkReporter) {
   });
   const [freshReport, warmReport] = await Promise.all([freshScan(), warmScan()]);
   const isReportEqual =
-    JSON.stringify(normalizeReport(freshReport)) === JSON.stringify(normalizeReport(warmReport.report));
+    JSON.stringify(normalizeReport(freshReport)) ===
+    JSON.stringify(normalizeReport(warmReport.report));
   checkReporter(
     'scenario-config-change',
     isReportEqual && warmReport.stats.daemonUsed === true,
@@ -503,7 +511,8 @@ async function runParserSwitchScenario(freshScan, warmScan, checkReporter) {
     warmScan({ parser: 'oxc' }),
   ]);
   const isReportEqual =
-    JSON.stringify(normalizeReport(freshReport)) === JSON.stringify(normalizeReport(warmReport.report));
+    JSON.stringify(normalizeReport(freshReport)) ===
+    JSON.stringify(normalizeReport(warmReport.report));
   checkReporter(
     'scenario-parser-switch-oxc',
     isReportEqual && warmReport.stats.daemonUsed === true,
@@ -532,7 +541,8 @@ async function runCustomAnalyzerScenario(freshScan, warmScan, checkReporter) {
   });
   const [freshReport, warmReport] = await Promise.all([freshScan(), warmScan()]);
   const isReportEqual =
-    JSON.stringify(normalizeReport(freshReport)) === JSON.stringify(normalizeReport(warmReport.report));
+    JSON.stringify(normalizeReport(freshReport)) ===
+    JSON.stringify(normalizeReport(warmReport.report));
   checkReporter(
     'scenario-custom-analyzer-l2-disabled',
     isReportEqual && warmReport.stats.daemonUsed === true,
@@ -556,7 +566,8 @@ async function runDaemonCrashDegradeScenario(freshScan, checkReporter) {
     }),
   ]);
   const isReportEqual =
-    JSON.stringify(normalizeReport(freshReport)) === JSON.stringify(normalizeReport(warmReport.report));
+    JSON.stringify(normalizeReport(freshReport)) ===
+    JSON.stringify(normalizeReport(warmReport.report));
   checkReporter(
     'scenario-daemon-crash-degrade',
     isReportEqual && warmReport.stats.daemonUsed === false,

@@ -66,9 +66,15 @@ const negativeTests = [
 ];
 
 for (const p of negativeTests) {
-  assert.strictEqual(isTestFilePath(p), false, `Production path '${p}' must NOT be classified as test file`);
+  assert.strictEqual(
+    isTestFilePath(p),
+    false,
+    `Production path '${p}' must NOT be classified as test file`,
+  );
 }
-console.log(`✔ Verified ${positiveTests.length} positive and ${negativeTests.length} negative test paths.`);
+console.log(
+  `✔ Verified ${positiveTests.length} positive and ${negativeTests.length} negative test paths.`,
+);
 
 // --- [2/7] Testing Fixtures and Mock Path Identification ---
 console.log('\n--- [2/7] Testing Fixtures and Mock Path Identification ---');
@@ -82,7 +88,11 @@ const fixturePaths = [
 
 for (const p of fixturePaths) {
   assert.strictEqual(isFixtureOrMockPath(p), true, `Fixture path '${p}' must be recognized`);
-  assert.strictEqual(classifyFilePath(p), 'fixture', `Category for fixture '${p}' must be 'fixture'`);
+  assert.strictEqual(
+    classifyFilePath(p),
+    'fixture',
+    `Category for fixture '${p}' must be 'fixture'`,
+  );
 }
 console.log(`✔ Verified ${fixturePaths.length} fixture and mock paths.`);
 
@@ -98,7 +108,11 @@ const benchPaths = [
 
 for (const p of benchPaths) {
   assert.strictEqual(isBenchmarkPath(p), true, `Benchmark path '${p}' must be recognized`);
-  assert.strictEqual(classifyFilePath(p), 'benchmark', `Category for benchmark '${p}' must be 'benchmark'`);
+  assert.strictEqual(
+    classifyFilePath(p),
+    'benchmark',
+    `Category for benchmark '${p}' must be 'benchmark'`,
+  );
 }
 console.log(`✔ Verified ${benchPaths.length} benchmark paths.`);
 
@@ -131,7 +145,11 @@ const docPaths = [
 
 for (const p of docPaths) {
   assert.strictEqual(isDocumentationPath(p), true, `Doc path '${p}' must be recognized`);
-  assert.strictEqual(classifyFilePath(p), 'documentation', `Category for doc '${p}' must be 'documentation'`);
+  assert.strictEqual(
+    classifyFilePath(p),
+    'documentation',
+    `Category for doc '${p}' must be 'documentation'`,
+  );
 }
 console.log(`✔ Verified ${docPaths.length} documentation paths.`);
 
@@ -147,17 +165,41 @@ const distPaths = [
 
 for (const p of distPaths) {
   assert.strictEqual(isGeneratedOrDistPath(p), true, `Dist/gen path '${p}' must be recognized`);
-  assert.strictEqual(classifyFilePath(p), 'generated', `Category for dist '${p}' must be 'generated'`);
+  assert.strictEqual(
+    classifyFilePath(p),
+    'generated',
+    `Category for dist '${p}' must be 'generated'`,
+  );
 }
 console.log(`✔ Verified ${distPaths.length} distribution and generated code paths.`);
 
 // --- [7/7] Testing Architecture Exemption Predicate ---
 console.log('\n--- [7/7] Testing Architecture Exemption Predicate ---');
-assert.strictEqual(isExemptFromArchitectureRules('src/core/scanner.ts'), false, 'Core source must NOT be exempt');
-assert.strictEqual(isExemptFromArchitectureRules('tests/unit/scanner.test.ts'), true, 'Test must be exempt');
-assert.strictEqual(isExemptFromArchitectureRules('scripts/audit.ps1'), true, 'Script must be exempt');
-assert.strictEqual(isExemptFromArchitectureRules('fixtures/data.json'), true, 'Fixture must be exempt');
-assert.strictEqual(isExemptFromArchitectureRules('dist/api.js'), true, 'Dist artifact must be exempt');
+assert.strictEqual(
+  isExemptFromArchitectureRules('src/core/scanner.ts'),
+  false,
+  'Core source must NOT be exempt',
+);
+assert.strictEqual(
+  isExemptFromArchitectureRules('tests/unit/scanner.test.ts'),
+  true,
+  'Test must be exempt',
+);
+assert.strictEqual(
+  isExemptFromArchitectureRules('scripts/audit.ps1'),
+  true,
+  'Script must be exempt',
+);
+assert.strictEqual(
+  isExemptFromArchitectureRules('fixtures/data.json'),
+  true,
+  'Fixture must be exempt',
+);
+assert.strictEqual(
+  isExemptFromArchitectureRules('dist/api.js'),
+  true,
+  'Dist artifact must be exempt',
+);
 console.log('✔ Architecture exemption predicates verified.');
 
 console.log('\n================================================================');

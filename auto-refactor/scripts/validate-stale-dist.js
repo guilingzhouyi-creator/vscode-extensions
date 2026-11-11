@@ -41,8 +41,8 @@ const DERIVED_SUFFIXES = ['.d.ts', '.js.map', '.d.ts.map'];
  * @returns True for a `.js` file that is not itself a declaration or map.
  */
 function isCompiledModule(fileName) {
-    if (!fileName.endsWith('.js')) return false;
-    return !DERIVED_SUFFIXES.some((suffix) => fileName.endsWith(suffix));
+  if (!fileName.endsWith('.js')) return false;
+  return !DERIVED_SUFFIXES.some((suffix) => fileName.endsWith(suffix));
 }
 
 /**
@@ -52,19 +52,19 @@ function isCompiledModule(fileName) {
  * @returns Relative paths using forward slashes.
  */
 function listFiles(dir) {
-    const found = [];
-    const walk = (current) => {
-        for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
-            const full = path.join(current, entry.name);
-            if (entry.isDirectory()) {
-                walk(full);
-                continue;
-            }
-            found.push(path.relative(dir, full).replace(/\\/g, '/'));
-        }
-    };
-    walk(dir);
-    return found;
+  const found = [];
+  const walk = (current) => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
+      found.push(path.relative(dir, full).replace(/\\/g, '/'));
+    }
+  };
+  walk(dir);
+  return found;
 }
 
 /**
@@ -73,7 +73,7 @@ function listFiles(dir) {
  * @returns Relative module paths.
  */
 function emittedModules() {
-    return listFiles(DIST).filter((relative) => isCompiledModule(path.basename(relative)));
+  return listFiles(DIST).filter((relative) => isCompiledModule(path.basename(relative)));
 }
 
 /**
@@ -82,13 +82,13 @@ function emittedModules() {
  * @returns Relative source paths without extension, using forward slashes.
  */
 function sourceStems() {
-    const stems = new Set();
-    for (const relative of listFiles(SRC)) {
-        if (!/\.(ts|tsx|js|mts|cts)$/.test(relative)) continue;
-        if (relative.endsWith('.d.ts')) continue;
-        stems.add(relative.replace(/\.(tsx?|mts|cts|js)$/, ''));
-    }
-    return stems;
+  const stems = new Set();
+  for (const relative of listFiles(SRC)) {
+    if (!/\.(ts|tsx|js|mts|cts)$/.test(relative)) continue;
+    if (relative.endsWith('.d.ts')) continue;
+    stems.add(relative.replace(/\.(tsx?|mts|cts|js)$/, ''));
+  }
+  return stems;
 }
 
 /**
@@ -99,52 +99,52 @@ function sourceStems() {
  * @returns Orphaned artifacts, sorted.
  */
 function findOrphans(emitted, stems) {
-    const orphans = [];
-    for (const relative of emitted) {
-        const stem = relative.replace(/\.js$/, '');
-        if (stems.has(stem)) continue;
-        orphans.push(relative);
-    }
-    return orphans.sort();
+  const orphans = [];
+  for (const relative of emitted) {
+    const stem = relative.replace(/\.js$/, '');
+    if (stems.has(stem)) continue;
+    orphans.push(relative);
+  }
+  return orphans.sort();
 }
 
 function main() {
-    console.log('=== Stale Build Artifact Guard ===');
+  console.log('=== Stale Build Artifact Guard ===');
 
-    if (!fs.existsSync(DIST)) {
-        console.log('\n  ✔ no dist/ present; nothing can be stale.');
-        console.log('\nConclusion: build output absent, guard not applicable ✔');
-        return;
-    }
-    assert.ok(fs.existsSync(SRC), 'src/ must exist when dist/ does');
+  if (!fs.existsSync(DIST)) {
+    console.log('\n  ✔ no dist/ present; nothing can be stale.');
+    console.log('\nConclusion: build output absent, guard not applicable ✔');
+    return;
+  }
+  assert.ok(fs.existsSync(SRC), 'src/ must exist when dist/ does');
 
-    const emitted = emittedModules();
-    const orphans = findOrphans(emitted, sourceStems());
+  const emitted = emittedModules();
+  const orphans = findOrphans(emitted, sourceStems());
 
-    console.log(
-        `\n  scanned ${emitted.length} emitted module(s) against ${sourceStems().size} source stem(s).`,
+  console.log(
+    `\n  scanned ${emitted.length} emitted module(s) against ${sourceStems().size} source stem(s).`,
+  );
+
+  if (orphans.length > 0) {
+    console.error(
+      `\n✖ ${orphans.length} build artifact(s) have no owning source — validators would load stale code:`,
     );
+    for (const orphan of orphans.slice(0, 20)) console.error(`    dist/${orphan}`);
+    if (orphans.length > 20) console.error(`    ... and ${orphans.length - 20} more`);
+    console.error(
+      '\nFix: delete the listed files (or run a clean build). A rename without a clean',
+    );
+    console.error('build leaves the previous output behind because tsc never deletes.');
+    process.exit(1);
+  }
 
-    if (orphans.length > 0) {
-        console.error(
-            `\n✖ ${orphans.length} build artifact(s) have no owning source — validators would load stale code:`,
-        );
-        for (const orphan of orphans.slice(0, 20)) console.error(`    dist/${orphan}`);
-        if (orphans.length > 20) console.error(`    ... and ${orphans.length - 20} more`);
-        console.error(
-            '\nFix: delete the listed files (or run a clean build). A rename without a clean',
-        );
-        console.error('build leaves the previous output behind because tsc never deletes.');
-        process.exit(1);
-    }
-
-    console.log('  ✔ every emitted module maps back to a current source file.');
-    console.log('\nConclusion: dist/ is a faithful projection of src/ ✔');
+  console.log('  ✔ every emitted module maps back to a current source file.');
+  console.log('\nConclusion: dist/ is a faithful projection of src/ ✔');
 }
 
 try {
-    main();
+  main();
 } catch (error) {
-    console.error(`\n✖ Stale artifact guard failed: ${error.message}`);
-    process.exit(1);
+  console.error(`\n✖ Stale artifact guard failed: ${error.message}`);
+  process.exit(1);
 }

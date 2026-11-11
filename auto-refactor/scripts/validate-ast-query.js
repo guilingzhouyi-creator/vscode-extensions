@@ -20,13 +20,13 @@ const path = require('path');
 console.log('🚀 [AST-QUERY] Starting AST Query & Selector Verification Harness...\n');
 
 const {
-    walkNormalizedTree,
-    selectDescendants,
-    findFirst,
-    findNodesByKind,
-    collectCalls,
-    computeSubtreeDepth,
-    collectSubtreeNames,
+  walkNormalizedTree,
+  selectDescendants,
+  findFirst,
+  findNodesByKind,
+  collectCalls,
+  computeSubtreeDepth,
+  collectSubtreeNames,
 } = require('../dist/core/ast/ast-query');
 const { NodeKind } = require('../dist/core/ast/multilang');
 
@@ -38,73 +38,75 @@ const { NodeKind } = require('../dist/core/ast/multilang');
 //   │           └── Call: log
 //   └── Variable: count
 const tree = {
-    kind: NodeKind.SourceFile,
-    name: 'root',
-    children: [
+  kind: NodeKind.SourceFile,
+  name: 'root',
+  children: [
+    {
+      kind: NodeKind.Function,
+      name: 'main',
+      children: [
         {
-            kind: NodeKind.Function,
-            name: 'main',
-            children: [
-                {
-                    kind: NodeKind.Call,
-                    name: 'print',
-                },
-                {
-                    kind: NodeKind.ControlFlow,
-                    name: 'if',
-                    children: [
-                        {
-                            kind: NodeKind.Call,
-                            name: 'log',
-                        },
-                    ],
-                },
-            ],
+          kind: NodeKind.Call,
+          name: 'print',
         },
         {
-            kind: NodeKind.Variable,
-            name: 'count',
-            bindingName: 'count',
+          kind: NodeKind.ControlFlow,
+          name: 'if',
+          children: [
+            {
+              kind: NodeKind.Call,
+              name: 'log',
+            },
+          ],
         },
-    ],
+      ],
+    },
+    {
+      kind: NodeKind.Variable,
+      name: 'count',
+      bindingName: 'count',
+    },
+  ],
 };
 
 console.log('--- [1/5] Testing walkNormalizedTree Pre-Order Traversal & Depth ---');
 const visited = [];
 walkNormalizedTree(tree, (node, depth) => {
-    visited.push({ name: node.name, depth });
+  visited.push({ name: node.name, depth });
 });
 
 assert.deepStrictEqual(
-    visited,
-    [
-        { name: 'root', depth: 0 },
-        { name: 'main', depth: 1 },
-        { name: 'print', depth: 2 },
-        { name: 'if', depth: 2 },
-        { name: 'log', depth: 3 },
-        { name: 'count', depth: 1 },
-    ],
-    'Traversal order must strictly follow DFS pre-order with correct depth',
+  visited,
+  [
+    { name: 'root', depth: 0 },
+    { name: 'main', depth: 1 },
+    { name: 'print', depth: 2 },
+    { name: 'if', depth: 2 },
+    { name: 'log', depth: 3 },
+    { name: 'count', depth: 1 },
+  ],
+  'Traversal order must strictly follow DFS pre-order with correct depth',
 );
 console.log('✔ Pre-order sequence and depth verified.');
 
 console.log('--- [2/5] Testing Subtree Pruning (visitor returns false) ---');
 const prunedVisited = [];
 walkNormalizedTree(tree, (node) => {
-    prunedVisited.push(node.name);
-    if (node.name === 'main') {
-        return false; // Skip main's children
-    }
+  prunedVisited.push(node.name);
+  if (node.name === 'main') {
+    return false; // Skip main's children
+  }
 });
 assert.deepStrictEqual(
-    prunedVisited,
-    ['root', 'main', 'count'],
-    'Returning false from visitor must prune the entire subtree',
+  prunedVisited,
+  ['root', 'main', 'count'],
+  'Returning false from visitor must prune the entire subtree',
 );
 console.log('✔ Subtree pruning verified.');
 
-console.log('--- [3/5] Testing Selectors (selectDescendants, findFirst, findNodesByKind, collectCalls) ---');
+console.log(
+  '--- [3/5] Testing Selectors (selectDescendants, findFirst, findNodesByKind, collectCalls) ---',
+);
 const allCalls = collectCalls(tree);
 assert.strictEqual(allCalls.length, 2, 'Should find exactly 2 calls (print, log)');
 assert.strictEqual(allCalls[0].name, 'print');
@@ -138,13 +140,17 @@ console.log('--- [5/5] Testing 500-Level Deep Stack Safety ---');
 let current = { kind: NodeKind.Block, name: 'deep_0' };
 const deepRoot = current;
 for (let i = 1; i <= 500; i++) {
-    const next = { kind: NodeKind.Block, name: `deep_${i}` };
-    current.children = [next];
-    current = next;
+  const next = { kind: NodeKind.Block, name: `deep_${i}` };
+  current.children = [next];
+  current = next;
 }
 
 const deepDepth = computeSubtreeDepth(deepRoot);
-assert.strictEqual(deepDepth, 500, '500-level deep tree must report depth 500 without stack overflow');
+assert.strictEqual(
+  deepDepth,
+  500,
+  '500-level deep tree must report depth 500 without stack overflow',
+);
 console.log('✔ 500-level deep nesting traversed successfully without stack overflow.');
 
 console.log('\n🎉 [AST-QUERY] All 5 Verification Suites Passed!');
