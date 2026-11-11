@@ -49,7 +49,7 @@ static func validate_mode_transition(
 	return {
 		"allowed": true,
 		"error_code": "",
-		"message": "模式跃迁安全裁定通过"
+		"message": "Mode transition security verification passed"
 	}
 
 ## 检查探针报告就绪态
@@ -67,10 +67,11 @@ static func _check_probe_readiness(probe_report: Variant) -> Dictionary:
 		probe_msg = str(probe_report.get("message", ""))
 
 	if not is_ready:
+		var detail_msg := probe_msg if not probe_msg.is_empty() else "Environment not ready"
 		return {
 			"allowed": false,
 			"error_code": SECURITY_ERR_MODE_NOT_READY,
-			"message": "目标模式探针诊断未就绪: %s" % (probe_msg if not probe_msg.is_empty() else "环境未就绪")
+			"message": TemplateFormatter.format("Target mode probe diagnostics not ready: {detail}", {"detail": detail_msg})
 		}
 
 	return {"allowed": true, "error_code": "", "message": ""}
@@ -95,7 +96,7 @@ static func _check_multiplayer_authorization(probe_report: Variant) -> Dictionar
 		return {
 			"allowed": false,
 			"error_code": SECURITY_ERR_MULTIPLAYER_UNAUTHORIZED,
-			"message": "联机模式当前处于灰度维护状态，未对当前账号开放"
+			"message": "Multiplayer mode is currently under maintenance and not available for this account"
 		}
 
 	return {"allowed": true, "error_code": "", "message": ""}
@@ -106,7 +107,7 @@ static func validate_slot_mode_affinity(slot_mode: int, target_mode: int, slot_m
 		return {
 			"allowed": false,
 			"error_code": SECURITY_ERR_SLOT_MODE_POISONING,
-			"message": "单机存档槽位严禁渗透至联机界域"
+			"message": "Single-player save slot is strictly prohibited from penetrating into multiplayer realm"
 		}
 
 	if slot_mode != target_mode and slot_mode != WorldGatewayModel.GameMode.UNSELECTED:
@@ -122,13 +123,13 @@ static func validate_slot_mode_affinity(slot_mode: int, target_mode: int, slot_m
 				return {
 					"allowed": false,
 					"error_code": SECURITY_ERR_SLOT_MODE_POISONING,
-					"message": "带第三方 MOD 存档槽位严禁渗透至联机界域"
+					"message": "Save slot with third-party MOD is strictly prohibited from penetrating into multiplayer realm"
 				}
 
 	return {
 		"allowed": true,
 		"error_code": "",
-		"message": "槽位模式亲和性合规"
+		"message": "Slot mode affinity verified"
 	}
 
 ## 判断指定模组项是否属于官方原生 Vanilla 模组
@@ -138,18 +139,18 @@ static func is_vanilla_pack(mod_entry: Variant) -> bool:
 ## 模组官方 Vanilla 判定底层解算
 static func _is_vanilla_pack(mod_entry: Variant) -> bool:
 	if mod_entry is String:
-		var s := (mod_entry as String).to_lower()
-		return s == "vanilla" or s.begins_with("vanilla_") or s.begins_with("official_") or s == "core_vanilla"
+		var mod_str := (mod_entry as String).to_lower()
+		return mod_str == "vanilla" or mod_str.begins_with("vanilla_") or mod_str.begins_with("official_") or mod_str == "core_vanilla"
 
 	var pid: String = ""
 	var is_vanilla_flag: bool = false
 	var author: String = ""
 
 	if mod_entry is Dictionary:
-		var d: Dictionary = mod_entry as Dictionary
-		is_vanilla_flag = bool(d.get("is_vanilla", false)) or bool(d.get("is_official", false))
-		pid = str(d.get("pack_id", d.get("id", "")))
-		author = str(d.get("author", ""))
+		var mod_dict: Dictionary = mod_entry as Dictionary
+		is_vanilla_flag = bool(mod_dict.get("is_vanilla", false)) or bool(mod_dict.get("is_official", false))
+		pid = str(mod_dict.get("pack_id", mod_dict.get("id", "")))
+		author = str(mod_dict.get("author", ""))
 	elif mod_entry is Object:
 		var obj: Object = mod_entry as Object
 		if "is_vanilla" in obj:
@@ -180,7 +181,7 @@ static func validate_mod_realm_discipline(target_mode: int, active_mods: Array) 
 		return {
 			"allowed": true,
 			"error_code": "",
-			"message": "单机模组沙盒放行"
+			"message": "Single-player mod sandbox approved"
 		}
 
 	if target_mode == WorldGatewayModel.GameMode.MULTIPLAYER:
@@ -189,18 +190,18 @@ static func validate_mod_realm_discipline(target_mode: int, active_mods: Array) 
 				return {
 					"allowed": false,
 					"error_code": SECURITY_ERR_MULTIPLAYER_MOD_POISONING,
-					"message": "联机模式严禁加载第三方本地剧情/数值 MOD"
+					"message": "Multiplayer mode strictly prohibits loading third-party local storyline or numeric MODs"
 				}
 		return {
 			"allowed": true,
 			"error_code": "",
-			"message": "官方 Vanilla 原生包在联机模式下安全放行"
+			"message": "Official vanilla package safely approved in multiplayer mode"
 		}
 
 	return {
 		"allowed": true,
 		"error_code": "",
-		"message": "未选定模式放行"
+		"message": "Unselected mode approved"
 	}
 
 ## 校验网络信道通信纪律（单机模式下网络信道静默）
@@ -221,5 +222,5 @@ static func validate_network_channel_discipline(current_mode: int, channel_name:
 	return {
 		"allowed": true,
 		"error_code": "",
-		"message": "信道通信合规"
+		"message": "Channel communication compliant"
 	}

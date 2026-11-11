@@ -32,30 +32,30 @@ static func dispatch(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM
 		WorldSessionRuntimeService.bind_gateway(active_gateway)
 	if active_gateway == null:
 		return UnifiedProtocolFactory.create_response(
-			request.request_id, false, {}, "ERR_GATEWAY_NOT_BOUND", "未绑定有效的世界网关会话实例"
+			request.request_id, false, {}, "ERR_GATEWAY_NOT_BOUND", "Valid world gateway session instance not bound"
 		)
 
 	var payload_dict: Dictionary = request.payload if request.payload is Dictionary else {}
 	match request.action_type:
 		"ENTER_GATEWAY":
-			var res := active_gateway.enter_gateway()
-			if bool(res.get("success", false)):
-				res["worlds"] = active_gateway.list_world_archives()
+			var enter_result := active_gateway.enter_gateway()
+			if bool(enter_result.get("success", false)):
+				enter_result["worlds"] = active_gateway.list_world_archives()
 			return UnifiedProtocolFactory.create_response(
-				request.request_id, bool(res.get("success", false)), res,
-				"" if bool(res.get("success", false)) else String(res.get("error_code", "ERR_ENTER_GATEWAY")),
-				String(res.get("message", "已进入世界网关"))
+				request.request_id, bool(enter_result.get("success", false)), enter_result,
+				"" if bool(enter_result.get("success", false)) else String(enter_result.get("error_code", "ERR_ENTER_GATEWAY")),
+				String(enter_result.get("message", "Entered world gateway successfully"))
 			)
 
 		"PROBE_MODES":
 			var reports := ModeReadinessProbe.probe_all_modes(active_gateway.context.account_id)
 			return UnifiedProtocolFactory.create_response(
-				request.request_id, true, {"probe_reports": reports}, "", "模式就绪探针刷新成功"
+				request.request_id, true, {"probe_reports": reports}, "", "Mode readiness probes refreshed successfully"
 			)
 
 		"LIST_WORLDS":
 			return UnifiedProtocolFactory.create_response(
-				request.request_id, true, {"worlds": active_gateway.list_world_archives()}, "", "世界档案列表查询成功"
+				request.request_id, true, {"worlds": active_gateway.list_world_archives()}, "", "World archive list queried successfully"
 			)
 
 		"SELECT_MODE", "SELECT_OR_CREATE_WORLD":
@@ -68,17 +68,17 @@ static func dispatch(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM
 					world_repo.create_world(target_world_id, str(payload_dict.get("world_name", target_world_id)), int(payload_dict.get("seed_value", 20261110)))
 			var repo := AccountRepository.get_instance()
 			var acc := repo.find_by_id(active_gateway.context.account_id) if repo != null else null
-			var sel_res: Dictionary
+			var selection_result: Dictionary
 			if acc != null:
-				sel_res = active_gateway.select_mode_for_account(target_mode, acc, payload_dict.get("canary_flags", {}), target_world_id, target_slot_id)
+				selection_result = active_gateway.select_mode_for_account(target_mode, acc, payload_dict.get("canary_flags", {}), target_world_id, target_slot_id)
 			else:
 				var fallback_slot := target_slot_id if not target_slot_id.is_empty() else "SLOT_01"
 				var slots: Array = [{"slot_id": fallback_slot, "is_first_creation": true, "bound_world_id": target_world_id}]
-				sel_res = active_gateway.select_mode(target_mode, payload_dict.get("canary_flags", {}), slots, target_world_id, fallback_slot, payload_dict.get("custom_mods", []))
+				selection_result = active_gateway.select_mode(target_mode, payload_dict.get("canary_flags", {}), slots, target_world_id, fallback_slot, payload_dict.get("custom_mods", []))
 			return UnifiedProtocolFactory.create_response(
-				request.request_id, bool(sel_res.get("success", false)), sel_res,
-				"" if bool(sel_res.get("success", false)) else String(sel_res.get("error_code", "ERR_SELECT_MODE")),
-				String(sel_res.get("message", "网关模式与档位已选定"))
+				request.request_id, bool(selection_result.get("success", false)), selection_result,
+				"" if bool(selection_result.get("success", false)) else String(selection_result.get("error_code", "ERR_SELECT_MODE")),
+				String(selection_result.get("message", "Gateway mode and slot selected successfully"))
 			)
 
 		"EXIT_WORLD_TO_GATEWAY":
@@ -89,7 +89,7 @@ static func dispatch(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM
 			var scrub := active_gateway.exit_to_gateway()
 			HumanControlLeaseManager.release_lease()
 			return UnifiedProtocolFactory.create_response(
-				request.request_id, bool(scrub.get("success", false)), scrub, "", "已退出世界并返回网关"
+				request.request_id, bool(scrub.get("success", false)), scrub, "", "Exited world and returned to gateway"
 			)
 
 		"SWITCH_GATEWAY_MODE":
@@ -102,13 +102,14 @@ static func dispatch(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM
 				slots_arg = [{"slot_id": target_slot, "is_first_creation": true}]
 			else:
 				slots_arg = AccountSlotBindingSolver.to_gateway_slot_states(switch_account, str(payload_dict.get("world_id", "")))
-			var sw_res := active_gateway.switch_gateway_mode(new_mode, payload_dict.get("canary_flags", {}), slots_arg, str(payload_dict.get("world_id", "")), str(payload_dict.get("slot_id", "")))
+			var switch_result := active_gateway.switch_gateway_mode(new_mode, payload_dict.get("canary_flags", {}), slots_arg, str(payload_dict.get("world_id", "")), str(payload_dict.get("slot_id", "")))
 			return UnifiedProtocolFactory.create_response(
-				request.request_id, bool(sw_res.get("success", false)), sw_res,
-				"" if bool(sw_res.get("success", false)) else String(sw_res.get("error_code", "ERR_SWITCH_GATEWAY")),
-				String(sw_res.get("message", "切换运行网关完成"))
+				request.request_id, bool(switch_result.get("success", false)), switch_result,
+				"" if bool(switch_result.get("success", false)) else String(switch_result.get("error_code", "ERR_SWITCH_GATEWAY")),
+				String(switch_result.get("message", "Gateway mode switch completed successfully"))
 			)
 
 	return UnifiedProtocolFactory.create_response(
-		request.request_id, false, {}, "ERR_UNHANDLED_ACTION", "未支持的操作指令: %s" % request.action_type
+		request.request_id, false, {}, "ERR_UNHANDLED_ACTION",
+		TemplateFormatter.format("Unsupported action instruction: {action_type}.", {"action_type": request.action_type})
 	)

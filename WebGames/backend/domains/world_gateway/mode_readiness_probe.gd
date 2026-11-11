@@ -24,7 +24,7 @@ static func probe_single_player_environment() -> ModeReadinessReportDTO:
 	if not should_check_disk:
 		report.is_ready = true
 		report.status_code = "READY"
-		report.message = "单机存储环境就绪（跳过介质检查）"
+		report.message = "Single-player storage environment ready (media check skipped)"
 		report.latency_ms = 0
 		report.capabilities = ["local_storage", "offline_continuity"]
 		return report
@@ -37,29 +37,29 @@ static func probe_single_player_environment() -> ModeReadinessReportDTO:
 	if dir_err != OK and dir_err != ERR_ALREADY_EXISTS:
 		report.is_ready = false
 		report.status_code = "DIR_UNWRITABLE"
-		report.message = "本地存档目录创建失败: %s" % root_dir
+		report.message = TemplateFormatter.format("Failed to create local archive directory: {dir}", {"dir": root_dir})
 		report.latency_ms = 0
 		report.capabilities = []
 		return report
 
 	var test_probe_path := root_dir + ".probe_write_test.tmp"
-	var f := FileAccess.open(test_probe_path, FileAccess.WRITE)
-	if f == null:
+	var file_handle := FileAccess.open(test_probe_path, FileAccess.WRITE)
+	if file_handle == null:
 		report.is_ready = false
 		report.status_code = "DIR_UNWRITABLE"
-		report.message = "本地存档目录不可写或权限不足: %s" % root_dir
+		report.message = TemplateFormatter.format("Local archive directory not writable or insufficient permissions: {dir}", {"dir": root_dir})
 		report.latency_ms = 0
 		report.capabilities = []
 		return report
 
-	f.store_string("probe_ok")
-	f.flush()
-	f.close()
+	file_handle.store_string("probe_ok")
+	file_handle.flush()
+	file_handle.close()
 	DirAccess.remove_absolute(test_probe_path)
 
 	report.is_ready = true
 	report.status_code = "READY"
-	report.message = "单机存储环境就绪"
+	report.message = "Single-player storage environment ready"
 	report.latency_ms = 0
 	report.capabilities = ["local_storage", "offline_continuity"]
 	return report
@@ -75,14 +75,14 @@ static func probe_multiplayer_environment(account_id: String) -> ModeReadinessRe
 	if is_maintenance:
 		report.is_ready = false
 		report.status_code = "MAINTENANCE"
-		report.message = "联机服务器处于维护状态"
+		report.message = "Multiplayer server is currently under maintenance"
 		report.capabilities = []
 		return report
 
 	if account_id.is_empty():
 		report.is_ready = false
 		report.status_code = "FEATURE_DISABLED"
-		report.message = "账号未认证或为空，联机模式拒绝访问"
+		report.message = "Account unauthenticated or empty, multiplayer mode access denied"
 		report.capabilities = []
 		return report
 
@@ -95,13 +95,13 @@ static func probe_multiplayer_environment(account_id: String) -> ModeReadinessRe
 	if not is_enabled:
 		report.is_ready = false
 		report.status_code = "FEATURE_DISABLED"
-		report.message = "联机模式当前处于灰度维护状态，未对当前账号开放"
+		report.message = "Multiplayer mode is currently under maintenance and not available for this account"
 		report.capabilities = []
 		return report
 
 	report.is_ready = true
 	report.status_code = "READY"
-	report.message = "联机网关环境就绪"
+	report.message = "Multiplayer gateway environment ready"
 	report.capabilities = ["remote_realm", "multiplayer_sync"]
 	return report
 

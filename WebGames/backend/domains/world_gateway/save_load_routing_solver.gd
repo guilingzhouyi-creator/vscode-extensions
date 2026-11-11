@@ -39,12 +39,12 @@ static func validate_world_slot(account: AccountProfileAggregate, world_id: Stri
 	var target_id := world_id
 	if target_id.is_empty():
 		if not allow_default_fallback:
-			return {"success": false, "error_code": "UNBOUND_WORLD_ID", "message": "目标世界槽位未指定"}
+			return {"success": false, "error_code": "UNBOUND_WORLD_ID", "message": "Target world slot not specified"}
 		target_id = AccountProfileAggregate.WORLD_DEFAULT_SP_01
 
 	if account != null and account.is_world_slot_placeholder(target_id):
 		if not allow_default_fallback:
-			return {"success": false, "error_code": "UNBOUND_WORLD_SLOT", "message": "目标世界槽位为未绑定或占位符状态"}
+			return {"success": false, "error_code": "UNBOUND_WORLD_SLOT", "message": "Target world slot is unbound or in placeholder state"}
 		target_id = AccountProfileAggregate.WORLD_DEFAULT_SP_01
 
 	return {"success": true, "world_id": target_id}
@@ -108,9 +108,9 @@ static func execute_secondary_load(context: Dictionary) -> Dictionary:
 	var allow_default_fallback: bool = bool(context.get("allow_default_fallback", true))
 
 	if account == null:
-		return {"success": false, "error_code": "ERR_ACCOUNT_MISSING", "message": "账号聚合根缺失"}
+		return {"success": false, "error_code": "ERR_ACCOUNT_MISSING", "message": "Account aggregate root missing"}
 	if slot == null:
-		return {"success": false, "error_code": "ERR_SLOT_MISSING", "message": "目标存档槽位摘要缺失"}
+		return {"success": false, "error_code": "ERR_SLOT_MISSING", "message": "Target save slot summary missing"}
 
 	var world_val := validate_world_slot(account, target_world_id, allow_default_fallback)
 	if not bool(world_val.get("success", false)):
@@ -155,10 +155,10 @@ static func synchronize_hud_entry(
 ## ESC 呼出菜单项配置获取
 static func get_esc_menu_options() -> Array[Dictionary]:
 	return [
-		{"action": "RESUME", "label_key": "esc.action.resume", "default_text": "继续冒险"},
-		{"action": "SETTINGS", "label_key": "esc.action.settings", "default_text": "系统设置"},
-		{"action": "SAVE", "label_key": "esc.action.save", "default_text": "保存当前进度"},
-		{"action": "EXIT", "label_key": "esc.action.exit", "default_text": "保存并退出游戏"}
+		{"action": "RESUME", "label_key": "esc.action.resume", "default_text": "Resume Adventure"},
+		{"action": "SETTINGS", "label_key": "esc.action.settings", "default_text": "Game Settings"},
+		{"action": "SAVE", "label_key": "esc.action.save", "default_text": "Save Current Progress"},
+		{"action": "EXIT", "label_key": "esc.action.exit", "default_text": "Save and Exit Game"}
 	]
 
 ## ESC 菜单确认退出触发优雅停机管线
