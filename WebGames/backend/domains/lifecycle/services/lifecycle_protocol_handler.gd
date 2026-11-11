@@ -40,8 +40,9 @@ static func dispatch(request: ClientRequestEnvelopeDTO, gateway: Variant) -> Uni
 			HumanControlLeaseManager.release_lease()
 		var err := "" if ok else (String(shut_resp.error_code) if shut_resp != null else "ERR_SHUTDOWN_FAILED")
 		return UnifiedProtocolFactory.create_response(
-			request.request_id, ok, shut_resp.to_dto() if shut_resp != null else {}, err, "优雅停机请求执行完成"
+			request.request_id, ok, shut_resp.to_dto() if shut_resp != null else {}, err, "Graceful shutdown request executed successfully."
 		)
 	return UnifiedProtocolFactory.create_response(
-		request.request_id, false, {}, "ERR_UNHANDLED_ACTION", "未支持的操作指令: %s" % request.action_type
+		request.request_id, false, {}, "ERR_UNHANDLED_ACTION",
+		TemplateFormatter.format("Unsupported action instruction: {action_type}.", {"action_type": request.action_type})
 	)

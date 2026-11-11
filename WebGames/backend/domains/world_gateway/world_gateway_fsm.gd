@@ -54,15 +54,15 @@ func precheck_and_configure_single_player_mods(candidate_packs: Array, enabled_p
     if context.selected_mode == WorldGatewayModel.GameMode.MULTIPLAYER:
         return _fail(
             AntiBridgeGuard.SECURITY_ERR_MULTIPLAYER_MOD_POISONING,
-            "联机模式严禁启用自定义命途与UI扩展MOD"
+            "Multiplayer mode strictly forbids custom narrative paths and UI extension mods."
         )
 
-    var res: Dictionary = ModPrecheckAndAdaptationSolver.precheck_and_adapt_mod_list(candidate_packs, enabled_pack_ids)
-    if not bool(res.get("success", false)):
+    var precheck_result: Dictionary = ModPrecheckAndAdaptationSolver.precheck_and_adapt_mod_list(candidate_packs, enabled_pack_ids)
+    if not bool(precheck_result.get("success", false)):
         adapted_mod_manifest.clear()
         creation_ui_snapshot.clear()
-        var err_code: String = str(res.get("error_code", res.get("error", "ERR_MOD_PRECHECK_FAILED")))
-        var fail_dict: Dictionary = res.duplicate(true)
+        var err_code: String = str(precheck_result.get("error_code", precheck_result.get("error", "ERR_MOD_PRECHECK_FAILED")))
+        var fail_dict: Dictionary = precheck_result.duplicate(true)
         fail_dict["success"] = false
         fail_dict["error_code"] = err_code
         fail_dict["error"] = err_code
@@ -72,26 +72,26 @@ func precheck_and_configure_single_player_mods(candidate_packs: Array, enabled_p
             fail_dict["conflicts"] = []
         return fail_dict
 
-    var raw_manifest: Variant = res.get("adapted_manifest", {})
+    var raw_manifest: Variant = precheck_result.get("adapted_manifest", {})
     adapted_mod_manifest = (raw_manifest as Dictionary).duplicate(true) if raw_manifest is Dictionary else {}
-    var raw_ui_snap: Variant = res.get("creation_ui_snapshot", {})
+    var raw_ui_snap: Variant = precheck_result.get("creation_ui_snapshot", {})
     creation_ui_snapshot = (raw_ui_snap as Dictionary).duplicate(true) if raw_ui_snap is Dictionary else {}
-    var raw_enabled: Variant = res.get("enabled_pack_ids", [])
+    var raw_enabled: Variant = precheck_result.get("enabled_pack_ids", [])
     active_mods = (raw_enabled as Array).duplicate(true) if raw_enabled is Array else []
 
     _notify_event("world_gateway.mods_prechecked", {
         "account_id": context.account_id,
         "enabled_pack_ids": active_mods,
-        "precheck_checklist": res.get("precheck_checklist", [])
+        "precheck_checklist": precheck_result.get("precheck_checklist", [])
     })
-    return res
+    return precheck_result
 
 ## 扫描并配置单机模式显性 MOD（三级级联全包扫描与预检适配）
 func discover_and_configure_single_player_mods(custom_roots: Array = [], enabled_pack_ids: Array = ["*"]) -> Dictionary:
     if context.selected_mode == WorldGatewayModel.GameMode.MULTIPLAYER:
         return _fail(
             AntiBridgeGuard.SECURITY_ERR_MULTIPLAYER_MOD_POISONING,
-            "联机模式严禁启用自定义命途与UI扩展MOD"
+            "Multiplayer mode strictly forbids custom narrative paths and UI extension mods."
         )
     var candidates: Array[Dictionary] = ModPackageDiscoverySolver.scan_installed_full_mod_packages(custom_roots)
     return precheck_and_configure_single_player_mods(candidates, enabled_pack_ids)
@@ -113,29 +113,33 @@ func purge_and_fallback_to_vanilla() -> void:
 ## 1. 登录后进入世界栏（并行收集模式就绪探针报告）
 func enter_gateway() -> Dictionary:
     if context.current_phase != WorldGatewayModel.GatewayPhase.AUTHENTICATED:
-        return _fail("INVALID_TRANSITION", "当前状态不可重复进入网关: %d" % context.current_phase)
+        return _fail(
+            "INVALID_TRANSITION",
+            "Cannot re-enter world gateway from current phase: {current_phase}.",
+            {"current_phase": context.current_phase}
+        )
 
     context.current_phase = WorldGatewayModel.GatewayPhase.GATEWAY_ENTERED
 
     # 调用 ModeReadinessProbe 收集全域运行模式健康与就绪报告
     _last_probe_reports = ModeReadinessProbe.probe_all_modes(context.account_id)
 
-    var modes: Array = GameConfig.get_array("domains.world_gateway", "gateway_modes/available_modes", [
+    var available_modes: Array = GameConfig.get_array("domains.world_gateway", "gateway_modes/available_modes", [
         WorldGatewayModel.GameMode.SINGLE_PLAYER,
         WorldGatewayModel.GameMode.MULTIPLAYER
     ])
-    var gw_hooks: Dictionary = GameConfig.get_dict("domains.world_gateway", "gateway_hooks", {})
+    var gateway_hooks: Dictionary = GameConfig.get_dict("domains.world_gateway", "gateway_hooks", {})
     _notify_event("world_gateway.entered", {
         "account_id": context.account_id,
-        "available_modes": modes,
-        "configured_hooks": gw_hooks.get("on_gateway_entered", []),
+        "available_modes": available_modes,
+        "configured_hooks": gateway_hooks.get("on_gateway_entered", []),
         "probe_reports": _last_probe_reports
     })
     return {
         "success": true,
         "phase": context.current_phase,
         "context": context.to_dto(),
-        "available_modes": modes,
+        "available_modes": available_modes,
         "probe_reports": _last_probe_reports
     }
 
@@ -152,11 +156,11 @@ func select_mode(
         active_mods = custom_mods.duplicate()
 
     # 模组界域纪律气密守卫裁定（联机模式严禁加载第三方本地剧情/数值 MOD）
-    var mod_check := AntiBridgeGuard.validate_mod_realm_discipline(mode, active_mods)
-    if not bool(mod_check.get("allowed", false)):
+    var mod_discipline_result := AntiBridgeGuard.validate_mod_realm_discipline(mode, active_mods)
+    if not bool(mod_discipline_result.get("allowed", false)):
         return _fail(
-            str(mod_check.get("error_code", AntiBridgeGuard.SECURITY_ERR_MULTIPLAYER_MOD_POISONING)),
-            str(mod_check.get("message", "联机模式严禁加载第三方本地剧情/数值 MOD"))
+            str(mod_discipline_result.get("error_code", AntiBridgeGuard.SECURITY_ERR_MULTIPLAYER_MOD_POISONING)),
+            str(mod_discipline_result.get("message", "Multiplayer mode strictly forbids custom narrative paths and UI extension mods."))
         )
 
     # 气密级防越权守卫裁定：检查模式单向冻结（防热切换）与探针就绪报告
@@ -166,21 +170,25 @@ func select_mode(
     elif mode == WorldGatewayModel.GameMode.MULTIPLAYER:
         mode_report = _last_probe_reports.get("multiplayer", null)
 
-    var guard_res := AntiBridgeGuard.validate_mode_transition(
+    var transition_guard_result := AntiBridgeGuard.validate_mode_transition(
         context.current_phase,
         WorldGatewayModel.GatewayPhase.MODE_SELECTED,
         context.selected_mode,
         mode,
         mode_report
     )
-    if not bool(guard_res.get("allowed", false)):
+    if not bool(transition_guard_result.get("allowed", false)):
         return _fail(
-            str(guard_res.get("error_code", "SECURITY_ERR_TRANSITION_BLOCKED")),
-            str(guard_res.get("message", "模式跃迁被安全守卫拦截"))
+            str(transition_guard_result.get("error_code", "SECURITY_ERR_TRANSITION_BLOCKED")),
+            str(transition_guard_result.get("message", "Mode transition was blocked by security guard."))
         )
 
     if context.current_phase != WorldGatewayModel.GatewayPhase.GATEWAY_ENTERED:
-        return _fail("INVALID_TRANSITION", "未处于世界栏主界面，当前阶段: %d" % context.current_phase)
+        return _fail(
+            "INVALID_TRANSITION",
+            "World gateway is not in entered state; current phase: {current_phase}.",
+            {"current_phase": context.current_phase}
+        )
 
     # 若为联机模式，强制卸载本地第三方模组，回退 Vanilla 原生核心并洗脱
     if mode == WorldGatewayModel.GameMode.MULTIPLAYER:
@@ -188,48 +196,55 @@ func select_mode(
 
     var slot_conversion: Dictionary = _convert_account_slots(account_slots)
     if not bool(slot_conversion.get("success", false)):
-        return _fail(String(slot_conversion.get("error_code", "INVALID_ACCOUNT_SLOTS")), "账号槽位数据无效")
+        return _fail(
+            String(slot_conversion.get("error_code", "INVALID_ACCOUNT_SLOTS")),
+            "Account slot configuration is invalid."
+        )
 
-    var all_worlds := _load_worlds_catalog()
-    var route_res := GameModeRoutingSolver.resolve_mode_entry(
-        context.account_id, mode, all_worlds, slot_conversion["slots"], canary_flags, target_world_id, target_slot_id
+    var worlds_catalog := _load_worlds_catalog()
+    var route_result := GameModeRoutingSolver.resolve_mode_entry(
+        context.account_id, mode, worlds_catalog, slot_conversion["slots"], canary_flags, target_world_id, target_slot_id
     )
 
-    if not route_res.success:
-        return _fail(route_res.error_code, route_res.message)
-    var primary_slot: SaveSlotStateDTO = _pick_target_slot(route_res.available_slots, target_slot_id)
-    if primary_slot == null:
-        return _fail("GATEWAY_ERR_SLOT_NOT_FOUND", "指定档位不存在: %s" % target_slot_id)
+    if not route_result.success:
+        return _fail(route_result.error_code, route_result.message)
+    var target_slot_dto: SaveSlotStateDTO = _pick_target_slot(route_result.available_slots, target_slot_id)
+    if target_slot_dto == null:
+        return _fail(
+            "GATEWAY_ERR_SLOT_NOT_FOUND",
+            "Specified save slot not found: {target_slot_id}.",
+            {"target_slot_id": target_slot_id}
+        )
 
     context.selected_mode = mode
-    context.selected_world_id = route_res.resolved_world.world_id
+    context.selected_world_id = route_result.resolved_world.world_id
     context.current_phase = WorldGatewayModel.GatewayPhase.MODE_SELECTED
     RuntimeModeGate.set_mode(
         RuntimeModeGate.Mode.ONLINE if mode == WorldGatewayModel.GameMode.MULTIPLAYER else RuntimeModeGate.Mode.SINGLE_PLAYER
     )
 
-    context.selected_slot_id = primary_slot.slot_id
-    context.is_first_time_creation = (primary_slot.bound_character_id.is_empty() or primary_slot.is_first_creation)
+    context.selected_slot_id = target_slot_dto.slot_id
+    context.is_first_time_creation = (target_slot_dto.bound_character_id.is_empty() or target_slot_dto.is_first_creation)
 
     # 若为新开档或角色未就绪，流转至待创角/选角阶段
     if context.is_first_time_creation:
         context.current_phase = WorldGatewayModel.GatewayPhase.CHARACTER_PENDING
     else:
-        context.active_character_id = primary_slot.bound_character_id
+        context.active_character_id = target_slot_dto.bound_character_id
         context.current_phase = WorldGatewayModel.GatewayPhase.SLOT_WORLD_RESOLVED
 
-    var gw_hooks: Dictionary = GameConfig.get_dict("domains.world_gateway", "gateway_hooks", {})
+    var gateway_hooks_map: Dictionary = GameConfig.get_dict("domains.world_gateway", "gateway_hooks", {})
     _notify_event("world_gateway.mode_selected", {
         "account_id": context.account_id,
         "mode": mode,
         "world_id": context.selected_world_id,
         "slot_id": context.selected_slot_id,
         "requires_creation": context.is_first_time_creation,
-        "configured_hooks": gw_hooks.get("on_mode_selected", []),
+        "configured_hooks": gateway_hooks_map.get("on_mode_selected", []),
         "phase": context.current_phase
     })
 
-    return {"success": true, "context": context.to_dto(), "route_result": route_res}
+    return {"success": true, "context": context.to_dto(), "route_result": route_result}
 
 ## 根据账户属性与配置决策适配的游戏入口模式
 func select_mode_for_account(
@@ -240,7 +255,14 @@ func select_mode_for_account(
     target_slot_id: String = ""
 ) -> Dictionary:
     if account == null or account.account_id != context.account_id:
-        return _fail("INVALID_ACCOUNT", "账号与网关会话不匹配")
+        return _fail(
+            "INVALID_ACCOUNT",
+            "Account does not match gateway session: expected {expected_account_id}, got {account_id}.",
+            {
+                "expected_account_id": context.account_id,
+                "account_id": account.account_id if account != null else ""
+            }
+        )
     var effective_world_id: String = target_world_id
     if effective_world_id.is_empty() and not account.world_state_ref.is_empty():
         effective_world_id = account.world_state_ref
@@ -277,10 +299,14 @@ func _pick_target_slot(slots: Array, target_slot_id: String) -> SaveSlotStateDTO
 ## 3. 关联就绪角色（创角完成或选角完成调用）
 func attach_ready_character(character_id: String) -> Dictionary:
     if context.current_phase != WorldGatewayModel.GatewayPhase.CHARACTER_PENDING and context.current_phase != WorldGatewayModel.GatewayPhase.SLOT_WORLD_RESOLVED:
-        return _fail("INVALID_TRANSITION", "当前状态非待就绪角色态，当前阶段: %d" % context.current_phase)
+        return _fail(
+            "INVALID_TRANSITION",
+            "Current phase does not permit character attachment; current phase: {current_phase}.",
+            {"current_phase": context.current_phase}
+        )
 
     if character_id.is_empty():
-        return _fail("EMPTY_CHARACTER_ID", "挂载的角色标识不能为空")
+        return _fail("EMPTY_CHARACTER_ID", "Character ID cannot be empty.")
 
     context.active_character_id = character_id
     context.current_phase = WorldGatewayModel.GatewayPhase.WORLD_ENTRY_PERMITTED
@@ -297,15 +323,19 @@ func attach_ready_character(character_id: String) -> Dictionary:
 func enter_world(target_world_id: String = "", allow_safe_degrade: bool = false) -> Dictionary:
     var allow_bypass: bool = GameConfig.get_bool("domains.world_gateway", "gateway_policy/allow_direct_world_bypass", false)
     if not allow_bypass and context.current_phase != WorldGatewayModel.GatewayPhase.WORLD_ENTRY_PERMITTED:
-        return _fail("DIRECT_WORLD_BYPASS_BLOCKED", "禁止绕过世界网关直接进入世界，当前阶段: %d" % context.current_phase)
+        return _fail(
+            "DIRECT_WORLD_BYPASS_BLOCKED",
+            "Direct world entry without gateway initialization is blocked; current phase: {current_phase}.",
+            {"current_phase": context.current_phase}
+        )
 
     # 联机模式进入前置安全守卫核验与强制净化
     if context.selected_mode == WorldGatewayModel.GameMode.MULTIPLAYER:
-        var mod_check := AntiBridgeGuard.validate_mod_realm_discipline(context.selected_mode, active_mods)
-        if not bool(mod_check.get("allowed", false)):
+        var mod_discipline_result := AntiBridgeGuard.validate_mod_realm_discipline(context.selected_mode, active_mods)
+        if not bool(mod_discipline_result.get("allowed", false)):
             return _fail(
-                str(mod_check.get("error_code", AntiBridgeGuard.SECURITY_ERR_MULTIPLAYER_MOD_POISONING)),
-                str(mod_check.get("message", "联机模式严禁加载第三方本地剧情/数值 MOD"))
+                str(mod_discipline_result.get("error_code", AntiBridgeGuard.SECURITY_ERR_MULTIPLAYER_MOD_POISONING)),
+                str(mod_discipline_result.get("message", "Multiplayer mode strictly forbids custom narrative paths and UI extension mods."))
             )
         purge_and_fallback_to_vanilla()
 
@@ -314,12 +344,16 @@ func enter_world(target_world_id: String = "", allow_safe_degrade: bool = false)
         # 1. MOD 锁文件防坏档守卫核验（单机沙盒模式）
         if context.selected_mode == WorldGatewayModel.GameMode.SINGLE_PLAYER or context.selected_mode == WorldGatewayModel.GameMode.UNSELECTED:
             var installed_packs: Array = ModPackageDiscoverySolver.scan_installed_packs()
-            var affinity_mgr := WorldModAffinityManager.new()
-            var verify_res := affinity_mgr.verify_and_bind_world_mods(effective_world_id, installed_packs, allow_safe_degrade)
-            if not bool(verify_res.get("success", false)):
+            var affinity_manager := WorldModAffinityManager.new()
+            var verify_result := affinity_manager.verify_and_bind_world_mods(effective_world_id, installed_packs, allow_safe_degrade)
+            if not bool(verify_result.get("success", false)):
                 return _fail(
-                    str(verify_res.get("error", "ERR_MISSING_CRITICAL_MOD")),
-                    "进入世界时 MOD 锁文件校验失败: %s" % str(verify_res.get("missing_packs", []))
+                    str(verify_result.get("error", "ERR_MISSING_CRITICAL_MOD")),
+                    "Mod lockfile verification failed when entering world '{world_id}': missing critical packs {missing_packs}.",
+                    {
+                        "world_id": effective_world_id,
+                        "missing_packs": verify_result.get("missing_packs", [])
+                    }
                 )
 
             # 2. 外部虚空因果扰动同化
@@ -357,28 +391,31 @@ func _append_single_perturbation_fragment(world_inst: WorldInstance, perturbatio
 
 ## 拉取并同化外部虚空因果扰动至目标单机世界
 func _assimilate_perturbations(effective_world_id: String) -> void:
-    var broker := CrossWorldPerturbationBroker.get_instance()
-    if broker == null:
+    var perturbation_broker := CrossWorldPerturbationBroker.get_instance()
+    if perturbation_broker == null:
         return
-    var perturbations: Array[CrossWorldPerturbationDTO] = broker.poll_perturbations_for_world(effective_world_id)
+    var perturbations: Array[CrossWorldPerturbationDTO] = perturbation_broker.poll_perturbations_for_world(effective_world_id)
     if perturbations.is_empty():
         return
-    var repo := WorldArchiveRepository.get_instance()
-    if repo == null:
+    var archive_repo := WorldArchiveRepository.get_instance()
+    if archive_repo == null:
         return
-    var world_inst: WorldInstance = repo.load_world(effective_world_id)
+    var world_inst: WorldInstance = archive_repo.load_world(effective_world_id)
     if world_inst == null:
         return
 
-    for p in perturbations:
-        _append_single_perturbation_fragment(world_inst, p)
-        broker.mark_world_visited(p.perturbation_id, effective_world_id)
-    repo.save_world(world_inst)
+    for perturbation_dto in perturbations:
+        _append_single_perturbation_fragment(world_inst, perturbation_dto)
+        perturbation_broker.mark_world_visited(perturbation_dto.perturbation_id, effective_world_id)
+    archive_repo.save_world(world_inst)
 
 ## 5. 序章向大地图探索无缝交接（水化创角终态，驱动 FSM 跃迁至 WORLD_EXPLORATION 并触发 HUD 初始同步）
 func handoff_prologue_to_world_exploration(handoff: PrologueHandoffDTO) -> Dictionary:
     if handoff == null or handoff.character_id.is_empty():
-        return _fail("INVALID_HANDOFF", "序章交接对象不能为空且必须包含有效 character_id")
+        return _fail(
+            "INVALID_HANDOFF",
+            "Prologue handoff DTO cannot be null and must specify a valid character_id."
+        )
 
     if not handoff.active_mods.is_empty():
         active_mods = handoff.active_mods.duplicate()
@@ -386,8 +423,8 @@ func handoff_prologue_to_world_exploration(handoff: PrologueHandoffDTO) -> Dicti
     if not handoff.assigned_start_location_id.is_empty():
         context.selected_world_id = handoff.assigned_start_location_id
 
-    var fsm := GameLoopStateStack.new()
-    fsm.switch_to(GameLoopStateStack.EngineState.WORLD_EXPLORATION, {
+    var game_loop_stack := GameLoopStateStack.new()
+    game_loop_stack.switch_to(GameLoopStateStack.EngineState.WORLD_EXPLORATION, {
         "character_id": handoff.character_id,
         "character_name": handoff.character_name,
         "location_id": handoff.assigned_start_location_id,
@@ -426,7 +463,7 @@ func handoff_prologue_to_world_exploration(handoff: PrologueHandoffDTO) -> Dicti
     return {
         "success": true,
         "phase": context.current_phase,
-        "state": fsm.current_state,
+        "state": game_loop_stack.current_state,
         "snapshot": snapshot,
         "handoff": handoff.to_dto()
     }
@@ -467,7 +504,7 @@ func exit_to_gateway() -> Dictionary:
         "phase": context.current_phase,
         "context": context.to_dto(),
         "probe_reports": _last_probe_reports,
-        "message": "已完成全量内存洗脱并返回世界网关"
+        "message": "Gateway memory successfully scrubbed and returned to entered state."
     }
 
 ## 6. 切换运行网关模式（仅允许已洗脱的 GATEWAY_ENTERED 状态；活跃世界内强拦截热切换）
@@ -479,61 +516,79 @@ func switch_gateway_mode(
     target_slot_id: String = "",
     custom_mods: Array = []
 ) -> Dictionary:
-    var block_hot := GameConfig.get_bool("domains.world_gateway", "gateway_policy/block_hot_swap_while_world_active", true)
-    var err_hot := GameConfig.get_string("domains.world_gateway", "gateway_policy/err_hot_swap_blocked", "ERR_HOT_SWAP_BLOCKED_IN_ACTIVE_WORLD")
-    if block_hot and (context.current_phase == WorldGatewayModel.GatewayPhase.IN_WORLD or WorldSessionRuntimeService.has_active_world()):
-        return _fail(err_hot, "处于活跃世界运行态时严禁热切换网关模式，请先退出世界至网关后再切换")
+    var is_hot_swap_blocked := GameConfig.get_bool("domains.world_gateway", "gateway_policy/block_hot_swap_while_world_active", true)
+    var hot_swap_error_code := GameConfig.get_string("domains.world_gateway", "gateway_policy/err_hot_swap_blocked", "ERR_HOT_SWAP_BLOCKED_IN_ACTIVE_WORLD")
+    if is_hot_swap_blocked and (context.current_phase == WorldGatewayModel.GatewayPhase.IN_WORLD or WorldSessionRuntimeService.has_active_world()):
+        return _fail(
+            hot_swap_error_code,
+            "Hot switching gateway mode is blocked while active world is running."
+        )
     if context.current_phase != WorldGatewayModel.GatewayPhase.GATEWAY_ENTERED:
-        return _fail(err_hot, "切换网关前须先经 exit_to_gateway 完成状态洗脱，当前阶段: %d" % context.current_phase)
+        return _fail(
+            hot_swap_error_code,
+            "Gateway mode switch requires prior state scrubbing via exit_to_gateway; current phase: {current_phase}.",
+            {"current_phase": context.current_phase}
+        )
 
     _last_probe_reports = ModeReadinessProbe.probe_all_modes(context.account_id)
-    var sel_res := select_mode(target_mode, canary_flags, account_slots, target_world_id, target_slot_id, custom_mods)
-    if bool(sel_res.get("success", false)):
+    var selection_result := select_mode(target_mode, canary_flags, account_slots, target_world_id, target_slot_id, custom_mods)
+    if bool(selection_result.get("success", false)):
         _notify_event("world_gateway.mode_switched", {
             "account_id": context.account_id,
             "mode": target_mode,
             "world_id": context.selected_world_id,
             "slot_id": context.selected_slot_id
         })
-    return sel_res
+    return selection_result
 
 ## 7. 查询当前可用的世界档案与目录摘要列表
 func list_world_archives() -> Array[Dictionary]:
-    var catalog := _load_worlds_catalog()
+    var worlds_catalog := _load_worlds_catalog()
     var result: Array[Dictionary] = []
-    var seen: Dictionary = {}
-    var repo := WorldArchiveRepository.get_instance()
-    if repo != null:
-        if not repo.is_loaded():
-            repo.load_all()
-        for w_summary in repo.list_worlds():
-            var w_dict: Dictionary = w_summary.to_dto() if (w_summary != null and w_summary.has_method("to_dto")) else {}
-            var wid := String(w_dict.get("world_id", ""))
-            if wid.is_empty():
+    var registered_world_ids: Dictionary = {}
+    var archive_repo := WorldArchiveRepository.get_instance()
+    if archive_repo != null:
+        if not archive_repo.is_loaded():
+            archive_repo.load_all()
+        for archive_summary in archive_repo.list_worlds():
+            var archive_dto_dict: Dictionary = archive_summary.to_dto() if (archive_summary != null and archive_summary.has_method("to_dto")) else {}
+            var archive_world_id := String(archive_dto_dict.get("world_id", ""))
+            if archive_world_id.is_empty():
                 continue
-            seen[wid] = true
-            result.append(w_dict)
-    for world_id in catalog.keys():
-        if seen.has(world_id):
+            registered_world_ids[archive_world_id] = true
+            result.append(archive_dto_dict)
+    for world_id in worlds_catalog.keys():
+        if registered_world_ids.has(world_id):
             continue
-        var dto: Variant = catalog[world_id]
-        result.append(_format_catalog_archive_entry(world_id, dto))
+        var world_instance_dto: Variant = worlds_catalog[world_id]
+        result.append(_format_catalog_archive_entry(world_id, world_instance_dto))
     return result
 
-func _format_catalog_archive_entry(world_id: Variant, dto: Variant) -> Dictionary:
-    if dto != null and dto.has_method("to_dto"):
-        return dto.to_dto()
+func _format_catalog_archive_entry(world_id: Variant, world_instance_dto: Variant) -> Dictionary:
+    if world_instance_dto != null and world_instance_dto.has_method("to_dto"):
+        return world_instance_dto.to_dto()
     return {"world_id": world_id}
 
 func _notify_event(channel: String, payload: Dictionary) -> void:
     EventBusCore.get_instance().emit_domain_event(channel, payload)
 
-func _fail(code: String, msg: String) -> Dictionary:
-    return {"success": false, "error_code": code, "error": code, "message": msg, "context": context.to_dto()}
+func _fail(error_code: String, template_message: String, format_params: Dictionary = {}) -> Dictionary:
+    var formatted_message: String = TemplateFormatter.format(template_message, format_params) if not format_params.is_empty() else template_message
+    var error_context: Dictionary = context.to_dto()
+    for key in format_params:
+        error_context[str(key)] = format_params[key]
+    ErrorReporter.emit_error("world_gateway", error_code, formatted_message, error_context)
+    return {
+        "success": false,
+        "error_code": error_code,
+        "error": error_code,
+        "message": formatted_message,
+        "context": context.to_dto()
+    }
 
 func _load_worlds_catalog() -> Dictionary:
-    var raw_catalog: Dictionary = GameConfig.get_dict("domains.world_gateway", "worlds_catalog", {})
-    var catalog: Dictionary = {}
-    for world_id in raw_catalog.keys():
-        catalog[world_id] = WorldInstanceDTO.from_dto(raw_catalog[world_id], world_id)
-    return catalog
+    var raw_worlds_catalog: Dictionary = GameConfig.get_dict("domains.world_gateway", "worlds_catalog", {})
+    var worlds_catalog: Dictionary = {}
+    for world_id in raw_worlds_catalog.keys():
+        worlds_catalog[world_id] = WorldInstanceDTO.from_dto(raw_worlds_catalog[world_id], world_id)
+    return worlds_catalog

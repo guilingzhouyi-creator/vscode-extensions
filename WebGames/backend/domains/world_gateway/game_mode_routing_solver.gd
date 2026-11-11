@@ -62,32 +62,32 @@ static func resolve_mode_entry(
 	target_world_id: String = "",
 	target_slot_id: String = ""
 ) -> RoutingResultDTO:
-	var res := RoutingResultDTO.new()
+	var routing_result := RoutingResultDTO.new()
 	if canary_flags.is_empty():
 		canary_flags = load_default_canary_flags()
 
 	if mode == WorldGatewayModel.GameMode.UNSELECTED:
-		res.error_code = "GATEWAY_ERR_NO_MODE_SELECTED"
-		res.message = "未选择任何游戏模式"
-		return res
+		routing_result.error_code = "GATEWAY_ERR_NO_MODE_SELECTED"
+		routing_result.message = "No game mode selected."
+		return routing_result
 
 	# 槽位模式亲和性防护：若显式指定目标槽位且尝试进入联机界域，拦截单机槽位跨界渗透
 	if mode == WorldGatewayModel.GameMode.MULTIPLAYER and not target_slot_id.is_empty():
 		var affinity_check := _check_slot_affinity_for_multiplayer(account_slots, target_slot_id, mode)
 		if not bool(affinity_check.get("allowed", true)):
-			res.error_code = str(affinity_check.get("error_code", ""))
-			res.message = str(affinity_check.get("message", ""))
-			return res
+			routing_result.error_code = str(affinity_check.get("error_code", ""))
+			routing_result.message = str(affinity_check.get("message", ""))
+			return routing_result
 
 	if mode == WorldGatewayModel.GameMode.MULTIPLAYER:
-		return _resolve_multiplayer_entry(account_id, canary_flags, res)
+		return _resolve_multiplayer_entry(account_id, canary_flags, routing_result)
 
 	if mode == WorldGatewayModel.GameMode.SINGLE_PLAYER:
-		return _resolve_single_player_entry(account_id, all_worlds, account_slots, canary_flags, target_world_id, target_slot_id, res)
+		return _resolve_single_player_entry(account_id, all_worlds, account_slots, canary_flags, target_world_id, target_slot_id, routing_result)
 
-	res.error_code = "GATEWAY_ERR_UNKNOWN_MODE"
-	res.message = GameConfig.msg_fmt("world_gateway", "unknown_game_mode", {"mode": mode})
-	return res
+	routing_result.error_code = "GATEWAY_ERR_UNKNOWN_MODE"
+	routing_result.message = GameConfig.msg_fmt("world_gateway", "unknown_game_mode", {"mode": mode})
+	return routing_result
 
 
 static func _check_slot_affinity_for_multiplayer(account_slots: Array, target_slot_id: String, target_mode: int) -> Dictionary:
@@ -101,18 +101,21 @@ static func _check_slot_affinity_for_multiplayer(account_slots: Array, target_sl
 	return {"allowed": true, "error_code": "", "message": ""}
 
 
-static func _resolve_multiplayer_entry(account_id: String, canary_flags: Dictionary, res: RoutingResultDTO) -> RoutingResultDTO:
+static func _resolve_multiplayer_entry(account_id: String, canary_flags: Dictionary, routing_result: RoutingResultDTO) -> RoutingResultDTO:
 	var mp_flag: Variant = canary_flags.get("FEATURE_MULTIPLAYER_GATEWAY", null)
 	var is_enabled := false
 	if mp_flag != null and CanaryRolloutSolver != null:
 		is_enabled = CanaryRolloutSolver.is_feature_enabled_for_account(mp_flag, account_id)
 	if not is_enabled:
-		res.error_code = "GATEWAY_ERR_MULTIPLAYER_DISABLED"
-		res.message = "联机模式当前处于灰度维护状态，未对当前账号开放"
-		return res
-	res.error_code = "GATEWAY_ERR_MULTIPLAYER_PENDING"
-	res.message = "联机灰度已放行，但世界解析待后续阶段实现（当前首期仅单机）"
-	return res
+		routing_result.error_code = "GATEWAY_ERR_MULTIPLAYER_DISABLED"
+		routing_result.message = TemplateFormatter.format(
+			"Multiplayer mode is currently under canary maintenance and unavailable for account '{account_id}'.",
+			{"account_id": account_id}
+		)
+		return routing_result
+	routing_result.error_code = "GATEWAY_ERR_MULTIPLAYER_PENDING"
+	routing_result.message = "Multiplayer canary rollout is permitted, but world resolution is pending implementation."
+	return routing_result
 
 
 static func _resolve_single_player_entry(
@@ -122,21 +125,27 @@ static func _resolve_single_player_entry(
 	canary_flags: Dictionary,
 	target_world_id: String,
 	target_slot_id: String,
-	res: RoutingResultDTO
+	routing_result: RoutingResultDTO
 ) -> RoutingResultDTO:
 	var unbound_sentinel: String = GameConfig.get_string("infrastructure.lifecycle", "shutdown_hooks/unwired_slot_sentinel", "")
 	if unbound_sentinel.is_empty():
-		res.error_code = "GATEWAY_ERR_INVALID_UNBOUND_SENTINEL_CONFIG"
-		res.message = "未配置有效的未接线哨兵，禁止进行单机档位路由"
-		return res
+		routing_result.error_code = "GATEWAY_ERR_INVALID_UNBOUND_SENTINEL_CONFIG"
+		routing_result.message = "Unwired slot sentinel configuration is missing; single player slot routing is blocked."
+		return routing_result
 	if target_world_id == unbound_sentinel:
-		res.error_code = "GATEWAY_ERR_WORLD_UNBOUND"
-		res.message = "目标世界处于未接线保留态(UNBOUND)，禁止静默绑定"
-		return res
+		routing_result.error_code = "GATEWAY_ERR_WORLD_UNBOUND"
+		routing_result.message = TemplateFormatter.format(
+			"Target world '{world_id}' is in unwired reserved state (UNBOUND); silent binding is forbidden.",
+			{"world_id": target_world_id}
+		)
+		return routing_result
 	if not target_slot_id.is_empty() and target_slot_id == unbound_sentinel:
-		res.error_code = "GATEWAY_ERR_SLOT_UNBOUND"
-		res.message = "目标档位处于未接线保留态，禁止静默绑定"
-		return res
+		routing_result.error_code = "GATEWAY_ERR_SLOT_UNBOUND"
+		routing_result.message = TemplateFormatter.format(
+			"Target slot '{slot_id}' is in unwired reserved state; silent binding is forbidden.",
+			{"slot_id": target_slot_id}
+		)
+		return routing_result
 
 	var effective_world_id := target_world_id if not target_world_id.is_empty() else GameConfig.get_string("domains.world_gateway", "single_player/default_world_id", "WORLD_DEFAULT_SP_01")
 	var world_dto: WorldInstanceDTO = all_worlds.get(effective_world_id, null)
@@ -146,19 +155,19 @@ static func _resolve_single_player_entry(
 		world_dto = _resolve_world_from_repository(effective_world_id)
 
 	if world_dto == null:
-		res.error_code = "GATEWAY_ERR_DEFAULT_WORLD_NOT_FOUND"
-		res.message = GameConfig.msg_fmt("world_gateway", "world_data_missing", {"world_id": effective_world_id})
-		return res
+		routing_result.error_code = "GATEWAY_ERR_DEFAULT_WORLD_NOT_FOUND"
+		routing_result.message = GameConfig.msg_fmt("world_gateway", "world_data_missing", {"world_id": effective_world_id})
+		return routing_result
 
-	res.resolved_world = world_dto
-	var effective_slots := _resolve_effective_slots(account_id, effective_world_id, account_slots, canary_flags, target_slot_id, res)
+	routing_result.resolved_world = world_dto
+	var effective_slots := _resolve_effective_slots(account_id, effective_world_id, account_slots, canary_flags, target_slot_id, routing_result)
 	if effective_slots.is_empty():
-		return res
+		return routing_result
 	var primary_slot: SaveSlotStateDTO = effective_slots[0]
-	res.requires_character_creation = (primary_slot.bound_character_id.is_empty() or primary_slot.is_first_creation)
-	res.available_slots = effective_slots
-	res.success = true
-	return res
+	routing_result.requires_character_creation = (primary_slot.bound_character_id.is_empty() or primary_slot.is_first_creation)
+	routing_result.available_slots = effective_slots
+	routing_result.success = true
+	return routing_result
 
 
 ## 从世界档案物理仓储动态解析并构建 WorldInstanceDTO
@@ -172,13 +181,13 @@ static func _resolve_world_from_repository(world_id: String) -> WorldInstanceDTO
 	if summary == null:
 		return null
 
-	var dto := WorldInstanceDTO.new()
-	dto.world_id = summary.world_id
-	dto.world_name = summary.world_name
-	dto.mode = summary.mode
-	dto.seed_value = summary.seed_value
-	dto.is_active = summary.is_active
-	return dto
+	var instance_dto := WorldInstanceDTO.new()
+	instance_dto.world_id = summary.world_id
+	instance_dto.world_name = summary.world_name
+	instance_dto.mode = summary.mode
+	instance_dto.seed_value = summary.seed_value
+	instance_dto.is_active = summary.is_active
+	return instance_dto
 
 
 static func _resolve_effective_slots(

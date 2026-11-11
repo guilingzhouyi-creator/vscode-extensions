@@ -310,7 +310,10 @@ static func execute_graceful_shutdown(
 			"target_save_slot": request.target_save_slot,
 			"stage_order": shutdown_hooks.get("stage_order", [])
 		})
-		bus.emit_log("info", "安全停机管线启动，原因: %s" % GameLifecycleModel.get_reason_name(request.exit_reason))
+		bus.emit_log("info", TemplateFormatter.format(
+			"Graceful shutdown pipeline started with reason: {exit_reason}.",
+			{"exit_reason": GameLifecycleModel.get_reason_name(request.exit_reason)}
+		))
 
 	var ctx := ShutdownStageContext.new()
 	ctx.request = request
@@ -355,7 +358,10 @@ static func execute_graceful_shutdown(
 			"is_save_completed": resp.is_save_completed,
 			"timestamp_utc": int(Time.get_unix_time_from_system())
 		})
-		bus.emit_log("info", "安全停机流程闭环，耗时: %d ms" % resp.elapsed_milliseconds)
+		bus.emit_log("info", TemplateFormatter.format(
+			"Graceful shutdown pipeline closed; elapsed time: {elapsed_ms} ms.",
+			{"elapsed_ms": resp.elapsed_milliseconds}
+		))
 
 	return resp
 
@@ -368,7 +374,10 @@ static func _mark_phase_timeout(fsm: Variant, resp: GameShutdownDTO.Response, bu
 	_record_shutdown_failure(resp, phase_label, "SHUTDOWN_STAGE_TIMEOUT")
 	resp.remaining_resources.append("phase_timeout:%s" % phase_label)
 	if bus != null:
-		bus.emit_log("warn", "停机阶段 %s 超时；同步回调已返回，后续清理按配置继续" % phase_label)
+		bus.emit_log("warn", TemplateFormatter.format(
+			"Shutdown phase '{phase_label}' timed out; synchronous callback returned, continuing asynchronous cleanup.",
+			{"phase_label": phase_label}
+		))
 
 ## 阶段截止判定：耗时超过配置超时即降级（timeout<=0 视为不设限）
 static func _deadline_exceeded(start_ms: int, timeout_seconds: float) -> bool:

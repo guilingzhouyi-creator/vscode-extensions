@@ -30,7 +30,7 @@ const DOMAIN_WORLD_STATE_CONFIG: String = "domains.world_state"
 static func handle_esc_action(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM = null) -> UnifiedResponseEnvelopeDTO:
 	if request == null:
 		return UnifiedProtocolFactory.create_response(
-			"", false, {}, "ERR_NULL_REQUEST", "请求信封不能为空"
+			"", false, {}, "ERR_NULL_REQUEST", "Request envelope cannot be null."
 		)
 
 	match request.action_type:
@@ -46,7 +46,8 @@ static func handle_esc_action(request: ClientRequestEnvelopeDTO, gateway: WorldG
 			return _handle_esc_quit_game(request, gateway)
 
 	return UnifiedProtocolFactory.create_response(
-		request.request_id, false, {}, "ERR_INVALID_ESC_ACTION", "未识别的 ESC 指令: %s" % request.action_type
+		request.request_id, false, {}, "ERR_INVALID_ESC_ACTION",
+		TemplateFormatter.format("Unrecognized ESC action: {action_type}.", {"action_type": request.action_type})
 	)
 
 static func _handle_esc_get_menu_state(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
@@ -60,7 +61,7 @@ static func _handle_esc_get_menu_state(request: ClientRequestEnvelopeDTO, gatewa
 	menu_state_data["can_save"] = bool(readiness.get("is_ready", false))
 	menu_state_data["effective_slot_id"] = _resolve_effective_slot_id(request, gateway)
 	return UnifiedProtocolFactory.create_response(
-		request.request_id, true, menu_state_data, "", "ESC 菜单权威状态查询成功"
+		request.request_id, true, menu_state_data, "", "Authoritative ESC menu state queried successfully."
 	)
 
 static func _handle_esc_query_readiness(request: ClientRequestEnvelopeDTO) -> UnifiedResponseEnvelopeDTO:
@@ -70,7 +71,7 @@ static func _handle_esc_query_readiness(request: ClientRequestEnvelopeDTO) -> Un
 	var is_dead: bool = bool(request.payload.get("is_dead", runtime_state.get("is_dead", false)))
 	var readiness := SaveReadinessGuard.evaluate_save_readiness(in_combat, in_cutscene, is_dead)
 	return UnifiedProtocolFactory.create_response(
-		request.request_id, true, readiness, "", "保存就绪状态查询成功"
+		request.request_id, true, readiness, "", "Save readiness state evaluated successfully."
 	)
 
 static func _handle_esc_save_game(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
@@ -80,13 +81,13 @@ static func _handle_esc_save_game(request: ClientRequestEnvelopeDTO, gateway: Wo
 	var readiness := SaveReadinessGuard.evaluate_save_readiness(in_combat, in_cutscene, is_dead)
 	if not bool(readiness.get("is_ready", false)):
 		return UnifiedProtocolFactory.create_response(
-			request.request_id, false, readiness, "ERR_SAVE_GUARD_BLOCKED", "当前状态被守卫拦截，不可保存"
+			request.request_id, false, readiness, "ERR_SAVE_GUARD_BLOCKED", "Save operation is blocked by readiness guard."
 		)
 
 	var slot_id := _resolve_effective_slot_id(request, gateway)
 	if slot_id.is_empty():
 		return UnifiedProtocolFactory.create_response(
-			request.request_id, false, {}, "ERR_UNBOUND_SAVE_SLOT", "未绑定有效存档槽位，拒绝保存"
+			request.request_id, false, {}, "ERR_UNBOUND_SAVE_SLOT", "No valid save slot is bound; save operation rejected."
 		)
 
 	var mode: int = int(request.payload.get("game_mode", gateway.context.selected_mode if (gateway != null and gateway.context != null and gateway.context.selected_mode != WorldGatewayModel.GameMode.UNSELECTED) else WorldGatewayModel.GameMode.SINGLE_PLAYER))
@@ -94,7 +95,7 @@ static func _handle_esc_save_game(request: ClientRequestEnvelopeDTO, gateway: Wo
 	var path_safety := SaveReadinessGuard.evaluate_storage_path_safety("%s%s.sav" % [vault_prefix, slot_id.to_lower()], mode)
 	if not bool(path_safety.get("safe", path_safety.get("is_safe", false))):
 		return UnifiedProtocolFactory.create_response(
-			request.request_id, false, path_safety, "ERR_STORAGE_UNSAFE", "存储路径不符合模式隔离规范"
+			request.request_id, false, path_safety, "ERR_STORAGE_UNSAFE", "Storage path violates runtime mode isolation policy."
 		)
 
 	var game_data := _resolve_save_payload(request)
@@ -102,7 +103,7 @@ static func _handle_esc_save_game(request: ClientRequestEnvelopeDTO, gateway: Wo
 		var err_incomplete := GameConfig.get_string(DOMAIN_WORLD_STATE_CONFIG, "esc_menu/errors/incomplete_save_blocked", "ERR_INCOMPLETE_SAVE_BLOCKED")
 		if bool(request.payload.get("strict_full_save", false)):
 			return UnifiedProtocolFactory.create_response(
-				request.request_id, false, {"slot_id": slot_id}, err_incomplete, "拒绝用残缺空壳覆盖既有真实世界存档"
+				request.request_id, false, {"slot_id": slot_id}, err_incomplete, "Overwriting existing world save with incomplete payload shell is strictly forbidden."
 			)
 		game_data = {
 			"slot_id": slot_id,
@@ -116,13 +117,13 @@ static func _handle_esc_save_game(request: ClientRequestEnvelopeDTO, gateway: Wo
 	return UnifiedProtocolFactory.create_response(
 		request.request_id, is_save_success, save_result,
 		"" if is_save_success else str(save_result.get("error_code", "ERR_SAVE_FAILED")),
-		"存档保存成功" if is_save_success else "存档保存失败"
+		"Game save persisted successfully." if is_save_success else "Failed to persist game save."
 	)
 
 static func _handle_esc_exit_to_gateway(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
 	if gateway == null:
 		return UnifiedProtocolFactory.create_response(
-			request.request_id, false, {}, "ERR_GATEWAY_NOT_BOUND", "未绑定当前世界的运行网关实例"
+			request.request_id, false, {}, "ERR_GATEWAY_NOT_BOUND", "Active world gateway instance is not bound."
 		)
 
 	var slot_id := _resolve_effective_slot_id(request, gateway)
@@ -136,20 +137,20 @@ static func _handle_esc_exit_to_gateway(request: ClientRequestEnvelopeDTO, gatew
 			var err_incomplete := GameConfig.get_string(DOMAIN_WORLD_STATE_CONFIG, "esc_menu/errors/incomplete_save_blocked", "ERR_INCOMPLETE_SAVE_BLOCKED")
 			if slot_id.is_empty():
 				return UnifiedProtocolFactory.create_response(
-					request.request_id, false, {}, err_incomplete, "未绑定有效存档槽位，已阻断自动存盘"
+					request.request_id, false, {}, err_incomplete, "No valid save slot is bound; auto-save operation blocked."
 				)
 			var mode: int = int(gateway.context.selected_mode) if (gateway.context != null and gateway.context.selected_mode != WorldGatewayModel.GameMode.UNSELECTED) else WorldGatewayModel.GameMode.SINGLE_PLAYER
 			var vault_prefix := GameConfig.get_string(DOMAIN_WORLD_STATE_CONFIG, "storage/offline_vault_prefix", "user://offline_vault/")
 			var path_safety := SaveReadinessGuard.evaluate_storage_path_safety("%s%s.sav" % [vault_prefix, slot_id.to_lower()], mode)
 			if not bool(path_safety.get("safe", path_safety.get("is_safe", false))):
 				return UnifiedProtocolFactory.create_response(
-					request.request_id, false, path_safety, "ERR_STORAGE_UNSAFE", "存储路径不符合模式隔离规范"
+					request.request_id, false, path_safety, "ERR_STORAGE_UNSAFE", "Storage path violates runtime mode isolation policy."
 				)
 			var auto_payload := _resolve_save_payload(request)
 			if auto_payload.is_empty():
 				if not bool(request.payload.get("allow_skip_unsaved_exit", false)):
 					return UnifiedProtocolFactory.create_response(
-						request.request_id, false, {"slot_id": slot_id}, err_incomplete, "缺少完整多域数据，严禁以 3 字段空壳覆盖真实存档"
+						request.request_id, false, {"slot_id": slot_id}, err_incomplete, "Multi-domain save data is incomplete; saving partial shell is strictly forbidden."
 					)
 				skip_unbound = true
 			else:
@@ -157,7 +158,7 @@ static func _handle_esc_exit_to_gateway(request: ClientRequestEnvelopeDTO, gatew
 				if not bool(save_res.get("success", false)):
 					var err_flush := GameConfig.get_string(DOMAIN_WORLD_STATE_CONFIG, "esc_menu/errors/save_flush_failed", "ERR_SAVE_FLUSH_FAILED")
 					return UnifiedProtocolFactory.create_response(
-						request.request_id, false, save_res, String(save_res.get("error_code", err_flush)), "退回网关前置多域存档失败，已保留现场状态"
+						request.request_id, false, save_res, String(save_res.get("error_code", err_flush)), "Pre-exit multi-domain save failed; runtime state preserved without scrubbing."
 					)
 				WorldSessionRuntimeService.clear_world_dirty()
 		else:
@@ -171,7 +172,7 @@ static func _handle_esc_exit_to_gateway(request: ClientRequestEnvelopeDTO, gatew
 	if not save_res.is_empty():
 		scrub_result["save_result"] = save_res
 	return UnifiedProtocolFactory.create_response(
-		request.request_id, bool(scrub_result.get("success", false)), scrub_result, "", "已成功退出世界并洗脱网关内存"
+		request.request_id, bool(scrub_result.get("success", false)), scrub_result, "", "Successfully exited world session and scrubbed gateway memory."
 	)
 
 static func _handle_esc_quit_game(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
@@ -191,7 +192,7 @@ static func _handle_esc_quit_game(request: ClientRequestEnvelopeDTO, gateway: Wo
 	var shutdown_dto: Dictionary = (shutdown_response.to_dto() as Dictionary) if shutdown_response != null else {}
 	var err_code: String = "" if is_shutdown_success else (str(shutdown_response.error_code) if shutdown_response != null else "ERR_SHUTDOWN_FAILED")
 	return UnifiedProtocolFactory.create_response(
-		request.request_id, is_shutdown_success, shutdown_dto, err_code, "五阶段安全停机管线已执行完毕"
+		request.request_id, is_shutdown_success, shutdown_dto, err_code, "Five-phase graceful shutdown pipeline executed successfully."
 	)
 
 static func _resolve_effective_slot_id(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> String:
