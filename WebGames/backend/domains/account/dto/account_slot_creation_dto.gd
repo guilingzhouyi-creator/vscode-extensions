@@ -18,6 +18,7 @@ var title_prefix: String = ""
 var is_permadeath: bool = false
 var allow_default_fallback: bool = true
 var provision_disk: bool = false
+var race: String = ""
 
 func _init(init_params: Dictionary = {}) -> void:
 	if init_params.is_empty():
@@ -29,3 +30,4 @@ func _init(init_params: Dictionary = {}) -> void:
 	is_permadeath = bool(init_params.get("is_permadeath", false))
 	allow_default_fallback = bool(init_params.get("allow_default_fallback", true))
 	provision_disk = bool(init_params.get("provision_disk", false))
+	race = str(init_params.get("race", ""))

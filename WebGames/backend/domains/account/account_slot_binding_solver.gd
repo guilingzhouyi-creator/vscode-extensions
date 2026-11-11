@@ -11,6 +11,7 @@
 class_name AccountSlotBindingSolver extends RefCounted
 
 const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
+const CharacterProfile = preload("res://backend/domains/account/character_profile.gd")
 const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
 const AccountSlotCreationDTO = preload("res://backend/domains/account/dto/account_slot_creation_dto.gd")
 const DOMAIN_ACCOUNT_CONFIG := "domains.account"
@@ -23,15 +24,7 @@ const DOMAIN_ACCOUNT_CONFIG := "domains.account"
 static func create_character_in_slot_context(ctx: AccountSlotCreationDTO) -> Dictionary:
 	if ctx == null:
 		return {"success": false, "error_code": "INVALID_CONTEXT"}
-	return create_character_in_slot(
-		ctx.account,
-		ctx.slot_id,
-		ctx.character_name,
-		ctx.title_prefix,
-		ctx.is_permadeath,
-		ctx.allow_default_fallback,
-		ctx.provision_disk
-	)
+	return _create_character_in_slot_internal(ctx)
 
 ## 创建角色第一步：为指定账号的空槽位创建角色封面并绑定
 ## 边界：fallen 槽位（角色已死亡）可重挂新角色（零继承，slot_id 保持稳定）；
@@ -47,64 +40,51 @@ static func create_character_in_slot(
 	allow_default_fallback: bool = true,
 	provision_disk: bool = false
 ) -> Dictionary:
+	var ctx := AccountSlotCreationDTO.new({
+		"account": account,
+		"slot_id": slot_id,
+		"character_name": character_name,
+		"title_prefix": title_prefix,
+		"is_permadeath": is_permadeath,
+		"allow_default_fallback": allow_default_fallback,
+		"provision_disk": provision_disk
+	})
+	return _create_character_in_slot_internal(ctx)
+
+static func _create_character_in_slot_internal(ctx: AccountSlotCreationDTO) -> Dictionary:
+	var account: AccountProfileAggregate = ctx.account
 	if account == null:
 		return {"success": false, "error_code": "INVALID_ACCOUNT"}
+	var slot_id: String = _resolve_target_slot_id(account, ctx.slot_id)
 	if slot_id.is_empty():
-		var next_id := account.get_next_available_slot_id()
-		if next_id.is_empty():
-			return {"success": false, "error_code": "NO_AVAILABLE_SLOT"}
-		slot_id = next_id
-	if account.is_slot_occupied(slot_id):
-		var existing: SaveSlotSummaryDTO = account.get_summary_by_slot(slot_id)
-		if existing == null or not existing.is_fallen:
-			return {"success": false, "error_code": "SLOT_OCCUPIED", "slot_id": slot_id}
-		# fallen 槽位可重挂：下方以全新 DTO 整体替换该槽位（零继承；不就地重置旧 DTO，无死代码）
-	var require_explicit_name := GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "save_slot/unwired_policy/require_explicit_character_name", false)
-	if character_name.strip_edges().is_empty():
-		if not allow_default_fallback or require_explicit_name:
-			return {
-				"success": false,
-				"error_code": "PENDING_CHARACTER_NAME",
-				"unwired_slot": "character_name",
-				"slot_id": slot_id
-			}
-		character_name = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "save_slot/defaults/character_name", "Nameless Wanderer")
+		return {"success": false, "error_code": "NO_AVAILABLE_SLOT"}
+	if not _can_bind_slot(account, slot_id):
+		return {"success": false, "error_code": "SLOT_OCCUPIED", "slot_id": slot_id}
+
+	var name_res: Dictionary = _resolve_character_name(slot_id, ctx.character_name, ctx.allow_default_fallback)
+	if not bool(name_res.get("success", false)):
+		return name_res
+	var character_name: String = str(name_res.get("character_name", ""))
+
 	var slot_summary_dto := SaveSlotSummaryDTO.new()
 	slot_summary_dto.slot_id = slot_id
 	slot_summary_dto.character_name = character_name
-	slot_summary_dto.title_prefix = title_prefix if not title_prefix.is_empty() else GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "save_slot/defaults/title_prefix", "Apprentice Adventurer")
-	slot_summary_dto.is_permadeath_mode = is_permadeath
+	slot_summary_dto.title_prefix = ctx.title_prefix if not ctx.title_prefix.is_empty() else GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "save_slot/defaults/title_prefix", "Apprentice Adventurer")
+	slot_summary_dto.is_permadeath_mode = ctx.is_permadeath
 	slot_summary_dto.last_saved_time_utc = int(Time.get_unix_time_from_system())
 	slot_summary_dto.current_location_name = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "save_slot/defaults/current_location_name", "Central Continent · Kalar Holy City")
+	_attach_initial_profile_for_race(slot_summary_dto, character_name, ctx.race)
+
 	var bind_res := account.bind_character_to_slot(slot_id, slot_summary_dto)
 	if not bind_res.success:
 		return bind_res
 
-	var should_provision := provision_disk or GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "save_slot/auto_provision_disk", false)
-	var provision_res: Dictionary = {}
-	if should_provision:
-		var template: Dictionary = GameConfig.get_dict(DOMAIN_ACCOUNT_CONFIG, "save_slot/provision_template", {"level": 1, "gold": 0})
-		var init_payload := {
-			"version": 1,
-			"data": {
-				"character_info": {
-					"name": character_name,
-					"level": int(template.get("level", 1))
-				},
-				"wallet": {
-					"gold": int(template.get("gold", 0))
-				}
-			}
-		}
-		provision_res = SaveDataAccessLayer.save_game(slot_id, init_payload)
-		if bool(provision_res.get("success", false)):
-			slot_summary_dto.save_file_sha256 = str(provision_res.get("sha256", ""))
-
+	var provision_res: Dictionary = _provision_slot_disk_if_needed(slot_id, character_name, slot_summary_dto, ctx.provision_disk)
 	var repo := AccountRepository.get_instance()
 	if repo.has_account(account.account_id):
 		repo.save_account(account)
 
-	var world_ref := ensure_account_world_ref(account, allow_default_fallback)
+	var world_ref := ensure_account_world_ref(account, ctx.allow_default_fallback)
 	return {
 		"success": true,
 		"slot_id": slot_id,
@@ -113,6 +93,71 @@ static func create_character_in_slot(
 		"world_state_ref": world_ref,
 		"provision_result": provision_res
 	}
+
+static func _resolve_target_slot_id(account: AccountProfileAggregate, requested_slot_id: String) -> String:
+	if not requested_slot_id.is_empty():
+		return requested_slot_id
+	return account.get_next_available_slot_id()
+
+static func _can_bind_slot(account: AccountProfileAggregate, slot_id: String) -> bool:
+	if not account.is_slot_occupied(slot_id):
+		return true
+	var existing: SaveSlotSummaryDTO = account.get_summary_by_slot(slot_id)
+	# fallen 槽位可重挂：外层以全新 DTO 整体替换（零继承；不就地重置旧 DTO，无死代码）
+	return existing != null and existing.is_fallen
+
+static func _resolve_character_name(slot_id: String, raw_name: String, allow_default_fallback: bool) -> Dictionary:
+	var require_explicit_name := GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "save_slot/unwired_policy/require_explicit_character_name", false)
+	if raw_name.strip_edges().is_empty():
+		if not allow_default_fallback or require_explicit_name:
+			return {
+				"success": false,
+				"error_code": "PENDING_CHARACTER_NAME",
+				"unwired_slot": "character_name",
+				"slot_id": slot_id
+			}
+		return {
+			"success": true,
+			"character_name": GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "save_slot/defaults/character_name", "Nameless Wanderer")
+		}
+	return {"success": true, "character_name": raw_name}
+
+static func _attach_initial_profile_for_race(slot_summary_dto: SaveSlotSummaryDTO, character_name: String, race: String) -> void:
+	var clean_race: String = race.strip_edges()
+	if clean_race.is_empty():
+		return
+	var cp := CharacterProfile.new()
+	cp.character_id = UniqueIdGenerator.next_id("CHR_")
+	cp.character_name = character_name
+	cp.character_exclusive_progress["race"] = clean_race
+	slot_summary_dto.attach_character_profile(cp)
+
+static func _provision_slot_disk_if_needed(
+	slot_id: String,
+	character_name: String,
+	slot_summary_dto: SaveSlotSummaryDTO,
+	provision_disk: bool
+) -> Dictionary:
+	var should_provision := provision_disk or GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "save_slot/auto_provision_disk", false)
+	if not should_provision:
+		return {}
+	var template: Dictionary = GameConfig.get_dict(DOMAIN_ACCOUNT_CONFIG, "save_slot/provision_template", {"level": 1, "gold": 0})
+	var init_payload := {
+		"version": 1,
+		"data": {
+			"character_info": {
+				"name": character_name,
+				"level": int(template.get("level", 1))
+			},
+			"wallet": {
+				"gold": int(template.get("gold", 0))
+			}
+		}
+	}
+	var provision_res: Dictionary = SaveDataAccessLayer.save_game(slot_id, init_payload)
+	if bool(provision_res.get("success", false)):
+		slot_summary_dto.save_file_sha256 = str(provision_res.get("sha256", ""))
+	return provision_res
 
 # ==============================================================================
 # 二、快捷创建 / 世界引用沿用 / 网关档位状态桥接 / 解绑
@@ -184,46 +229,52 @@ static func to_frontend_character_slots(account: AccountProfileAggregate) -> Arr
 	var prefix: String = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "save_slot/id_prefix", "SLOT_")
 	for i in range(1, max_slots + 1):
 		var slot_id: String = "%s%02d" % [prefix, i]
-		var is_occupied: bool = false
-		var summary: SaveSlotSummaryDTO = null
-		if account != null and account.save_slot_summaries.has(slot_id):
-			summary = account.save_slot_summaries[slot_id]
-			if summary != null and not summary.is_fallen:
-				is_occupied = true
-		if is_occupied and summary != null:
-			var race_val: String = "HUMAN"
-			var level_val: int = 1
-			if summary.character_profile != null:
-				if summary.character_profile.growth_state.has("level"):
-					level_val = int(summary.character_profile.growth_state.get("level", 1))
-				elif "level" in summary.character_profile:
-					level_val = int(summary.character_profile.get("level"))
-				if summary.character_profile.character_exclusive_progress.has("race"):
-					race_val = str(summary.character_profile.character_exclusive_progress.get("race"))
-				elif "race" in summary.character_profile:
-					race_val = str(summary.character_profile.get("race"))
-			var class_val: String = summary.profession_tier_name if not summary.profession_tier_name.is_empty() else "WARRIOR"
-			var town_val: String = summary.current_location_name if not summary.current_location_name.is_empty() else "TOWN_START"
-			out.append({
-				"slot_id": slot_id,
-				"name": summary.character_name,
-				"race": race_val,
-				"class": class_val,
-				"level": level_val,
-				"town": town_val,
-				"empty": false
-			})
-		else:
-			out.append({
-				"slot_id": slot_id,
-				"name": "",
-				"race": "",
-				"class": "",
-				"level": 0,
-				"town": "",
-				"empty": true
-			})
+		out.append(get_frontend_character_slot(account, slot_id))
 	return out
+
+## 导出单个指定槽位的前端消费字典（创角即时回传与列表导出单源复用）
+static func get_frontend_character_slot(account: AccountProfileAggregate, slot_id: String) -> Dictionary:
+	var summary: SaveSlotSummaryDTO = null
+	var is_occupied: bool = false
+	if account != null and account.save_slot_summaries.has(slot_id):
+		summary = account.save_slot_summaries[slot_id]
+		if summary != null and not summary.is_fallen:
+			is_occupied = true
+	return _to_frontend_slot_dict(slot_id, summary, is_occupied)
+
+static func _to_frontend_slot_dict(slot_id: String, summary: SaveSlotSummaryDTO, is_occupied: bool) -> Dictionary:
+	if not is_occupied or summary == null:
+		return {
+			"slot_id": slot_id,
+			"name": "",
+			"race": "",
+			"class": "",
+			"level": 0,
+			"town": "",
+			"empty": true
+		}
+	var race_val: String = "HUMAN"
+	var level_val: int = 1
+	if summary.character_profile != null:
+		if summary.character_profile.growth_state.has("level"):
+			level_val = int(summary.character_profile.growth_state.get("level", 1))
+		elif "level" in summary.character_profile:
+			level_val = int(summary.character_profile.get("level"))
+		if summary.character_profile.character_exclusive_progress.has("race"):
+			race_val = str(summary.character_profile.character_exclusive_progress.get("race"))
+		elif "race" in summary.character_profile:
+			race_val = str(summary.character_profile.get("race"))
+	var class_val: String = summary.profession_tier_name if not summary.profession_tier_name.is_empty() else "WARRIOR"
+	var town_val: String = summary.current_location_name if not summary.current_location_name.is_empty() else "TOWN_START"
+	return {
+		"slot_id": slot_id,
+		"name": summary.character_name,
+		"race": race_val,
+		"class": class_val,
+		"level": level_val,
+		"town": town_val,
+		"empty": false
+	}
 
 ## 解绑：删除槽位角色（回退为空槽，active_slot 清理）
 static func clear_slot(account: AccountProfileAggregate, slot_id: String) -> Dictionary:

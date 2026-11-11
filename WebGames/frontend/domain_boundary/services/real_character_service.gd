@@ -11,6 +11,7 @@
 class_name RealCharacterService
 extends "res://frontend/domain_boundary/interfaces/i_character_service.gd"
 
+const IAuthService = preload("res://frontend/domain_boundary/interfaces/i_auth_service.gd")
 const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
 const UnifiedProtocolDispatcher = preload("res://backend/domains/world_state/services/unified_protocol_dispatcher.gd")
 const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
@@ -88,28 +89,7 @@ func create_character_async(account_id: String, token: String, req_data: Diction
 			"data": resp.data
 		})
 
-## 异步资质骰点契约实现（对齐 ROLL_CHARACTER_PREVIEW）
+## 异步资质骰点契约实现（复用前后端边界统一预览点分布）
 func roll_attributes_async(callback: Callable) -> void:
-	var req := UnifiedProtocolFactory.create_human_request(
-		"character_creation",
-		"ROLL_CHARACTER_PREVIEW",
-		{}
-	)
-	var resp := UnifiedProtocolDispatcher.dispatch_request(req)
-	if resp.success and resp.data is Dictionary:
-		if callback.is_valid():
-			callback.call(resp.data)
-		return
-	var rng := DeterministicRNG.global()
 	if callback.is_valid():
-		callback.call({
-			"success": true,
-			"attrs": {
-				"STR": rng.randi_range(8, 18),
-				"AGI": rng.randi_range(8, 18),
-				"CON": rng.randi_range(8, 18),
-				"INT": rng.randi_range(8, 18),
-				"WIS": rng.randi_range(8, 18),
-				"CHA": rng.randi_range(8, 18)
-			}
-		})
+		callback.call(IAuthService.build_preview_attribute_spread())

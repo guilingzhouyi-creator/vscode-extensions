@@ -84,18 +84,7 @@ func create_character_async(account_id: String, req_data: Dictionary, callback: 
 
 ## 六维资质骰点：确定性 8~18 生成（规则归边界层，视图只消费结果）
 func roll_attribute_spread() -> Dictionary:
-	var rng := DeterministicRNG.global()
-	return {
-		"success": true,
-		"attrs": {
-			"STR": rng.randi_range(8, 18),
-			"AGI": rng.randi_range(8, 18),
-			"CON": rng.randi_range(8, 18),
-			"INT": rng.randi_range(8, 18),
-			"WIS": rng.randi_range(8, 18),
-			"CHA": rng.randi_range(8, 18),
-		}
-	}
+	return IAuthService.build_preview_attribute_spread()
 
 func roll_attributes_async(callback: Callable) -> void:
 	MockBaseService.delayed_call(callback, roll_attribute_spread(), simulate_delay_ms)

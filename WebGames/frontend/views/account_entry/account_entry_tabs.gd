@@ -2,7 +2,7 @@
 # 模块归属: 前端表现层 (Frontend · 第1卷 账号与入口系统子面板委托)
 # 文件路径: res://frontend/views/account_entry/account_entry_tabs.gd
 # 架构定位: Presentation Sub-Panel Delegate
-# 跨域依赖: 上游: AccountEntryView | 下游: UIIntermediary, MockServiceContainer | 配置: 无直读 | 信号: 无
+# 跨域依赖: 上游: AccountEntryView | 下游: UIIntermediary, ServiceLocator | 配置: 无直读 | 信号: 无
 # 职责说明: 承担 AccountEntryView 的各面板静态文案初始化、单机MOD创角UI受控列表与控件适配、创角属性骰点与选服/角色列表填充
 # 设计依据: 业务领域第一性原理与前端表现层边界解耦契约
 # ==============================================================================
@@ -189,7 +189,7 @@ func populate_talent_list() -> void:
 
 func roll_attributes() -> void:
     var view: AccountEntryView = _view
-    var auth_service: Variant = MockServiceContainer.get_instance().auth()
+    var auth_service: Variant = ServiceLocator.get_instance().auth()
     if auth_service == null:
         return
     var result: Dictionary = auth_service.roll_attribute_spread()

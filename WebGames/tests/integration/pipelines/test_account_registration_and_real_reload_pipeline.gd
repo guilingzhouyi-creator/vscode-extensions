@@ -28,6 +28,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_arr_03_case_insensitive_duplicate_rejection())
 	results.append(test_arr_04_secondary_reload_and_slot_snapshot_reinjection())
 	results.append(test_arr_05_cold_boot_physical_restoration_from_disk())
+	results.append(test_arr_06_creation_response_matches_slot_export())
 	_teardown_env()
 	return TestCase.pack_results("Phase 131 注册后端校验、持久化与二次重载流水线", results)
 
@@ -278,4 +279,46 @@ static func test_arr_05_cold_boot_physical_restoration_from_disk() -> Dictionary
 		"load_count": load_count,
 		"ok_acc": ok_acc,
 		"ok_slots": ok_slots
+	})
+
+## TC-ARR-06: RealAuthService 创角返回字典与槽位导出单源一致 + 六维预览资质边界断言
+static func test_arr_06_creation_response_matches_slot_export() -> Dictionary:
+	_setup_env()
+	var auth_svc: Variant = ServiceLocator.get_instance().auth()
+	var reg_res: Dictionary = {}
+	auth_svc.register_async("SchemaParityHero", "ParityPass123", func(r: Dictionary) -> void: reg_res.merge(r, true))
+	var acc_id: String = str(reg_res.get("account_id", ""))
+
+	var create_res: Dictionary = {}
+	auth_svc.create_character_async(acc_id, {"name": "ValenParity", "race": "ELF"}, func(r: Dictionary) -> void: create_res.merge(r, true))
+	var created_char: Dictionary = create_res.get("character", {})
+
+	var chars_res: Dictionary = {}
+	auth_svc.get_characters_async(acc_id, func(r: Dictionary) -> void: chars_res.merge(r, true))
+	var slots: Array = chars_res.get("characters", [])
+	var exported_slot: Dictionary = slots[0] if not slots.is_empty() else {}
+
+	var ok_parity: bool = bool(create_res.get("success", false)) \
+		and not created_char.is_empty() \
+		and str(created_char.get("slot_id", "")) == str(exported_slot.get("slot_id", "")) \
+		and str(created_char.get("name", "")) == str(exported_slot.get("name", "")) \
+		and str(created_char.get("race", "")) == str(exported_slot.get("race", "")) \
+		and str(created_char.get("class", "")) == str(exported_slot.get("class", "")) \
+		and int(created_char.get("level", -1)) == int(exported_slot.get("level", -2)) \
+		and str(created_char.get("town", "")) == str(exported_slot.get("town", "")) \
+		and bool(created_char.get("empty", true)) == false
+
+	var roll_res: Dictionary = auth_svc.roll_attribute_spread()
+	var attrs: Dictionary = roll_res.get("attrs", {})
+	var ok_attrs: bool = bool(roll_res.get("success", false)) and attrs.size() == 6
+	for attr_key in ["STR", "AGI", "CON", "INT", "WIS", "CHA"]:
+		var val: int = int(attrs.get(attr_key, 0))
+		if val < 8 or val > 18:
+			ok_attrs = false
+
+	_teardown_env()
+	var passed: bool = ok_parity and ok_attrs
+	return TestCase.make_result("TC-ARR-06: 创角返回值与槽位导出单源一致及六维预览资质断言", passed, {
+		"ok_parity": ok_parity,
+		"ok_attrs": ok_attrs
 	})

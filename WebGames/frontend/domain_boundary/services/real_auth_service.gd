@@ -14,17 +14,14 @@ extends IAuthService
 
 const AccountRegistrationDTO = preload("res://backend/domains/account/dto/account_registration_dto.gd")
 const AccountCompositeAuthDTO = preload("res://backend/domains/account/dto/account_composite_auth_dto.gd")
+const AccountSlotCreationDTO = preload("res://backend/domains/account/dto/account_slot_creation_dto.gd")
 const AuthService = preload("res://backend/domains/account/auth_service.gd")
 const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
 const AccountSlotBindingSolver = preload("res://backend/domains/account/account_slot_binding_solver.gd")
-const CharacterProfile = preload("res://backend/domains/account/character_profile.gd")
 const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
 const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
 const UnifiedProtocolDispatcher = preload("res://backend/domains/world_state/services/unified_protocol_dispatcher.gd")
 
-const ATTR_KEYS: Array[String] = ["STR", "AGI", "CON", "INT", "WIS", "CHA"]
-const ATTR_ROLL_MIN: int = 8
-const ATTR_ROLL_MAX: int = 18
 const ERROR_CODE_I18N_MAP: Dictionary = {
     "ERR_INVALID_CREDENTIALS": "ui.fe01.login.error_invalid",
     "ERR_INVALID_USERNAME_LENGTH": "ui.fe01.register.error_short",
@@ -132,19 +129,20 @@ func create_character_async(account_id: String, req_data: Dictionary, callback: 
         _emit_error_callback(callback, "ERR_ACCOUNT_NOT_FOUND")
         return
 
-    var slot_id: String = str(req_data.get("slot_id", ""))
-    var title_prefix: String = str(req_data.get("title_prefix", ""))
-    var is_permadeath: bool = bool(req_data.get("is_permadeath", false))
-
-    var bind_res: Dictionary = AccountSlotBindingSolver.create_character_in_slot(
-        acc,
-        slot_id,
-        char_name,
-        title_prefix,
-        is_permadeath,
-        true,
-        true
-    )
+    var chosen_race: String = str(req_data.get("race", "HUMAN")).strip_edges()
+    if chosen_race.is_empty():
+        chosen_race = "HUMAN"
+    var creation_ctx := AccountSlotCreationDTO.new({
+        "account": acc,
+        "slot_id": str(req_data.get("slot_id", "")),
+        "character_name": char_name,
+        "title_prefix": str(req_data.get("title_prefix", "")),
+        "is_permadeath": bool(req_data.get("is_permadeath", false)),
+        "allow_default_fallback": true,
+        "provision_disk": true,
+        "race": chosen_race
+    })
+    var bind_res: Dictionary = AccountSlotBindingSolver.create_character_in_slot_context(creation_ctx)
 
     if not bool(bind_res.get("success", false)):
         var bind_err_code: String = str(bind_res.get("error_code", "ERR_BIND_FAILED"))
@@ -152,26 +150,7 @@ func create_character_async(account_id: String, req_data: Dictionary, callback: 
         return
 
     var bound_slot_id: String = str(bind_res.get("slot_id", ""))
-    var summary: SaveSlotSummaryDTO = acc.get_summary_by_slot(bound_slot_id)
-    if summary != null:
-        if summary.character_profile == null:
-            var cp := CharacterProfile.new()
-            cp.character_id = UniqueIdGenerator.next_id("CHR_")
-            cp.character_name = char_name
-            summary.attach_character_profile(cp)
-        var chosen_race: String = str(req_data.get("race", "HUMAN"))
-        summary.character_profile.character_exclusive_progress["race"] = chosen_race
-        repo.save_account(acc)
-
-    var created_slot := {
-        "slot_id": bind_res.get("slot_id", ""),
-        "name": char_name,
-        "race": str(req_data.get("race", "HUMAN")),
-        "class": "Novice",
-        "level": 1,
-        "town": "VALAN_CAPITAL",
-        "empty": false
-    }
+    var created_slot: Dictionary = AccountSlotBindingSolver.get_frontend_character_slot(acc, bound_slot_id)
 
     if callback.is_valid():
         callback.call({
@@ -181,27 +160,10 @@ func create_character_async(account_id: String, req_data: Dictionary, callback: 
 
 ## 六维资质骰点：确定性 8~18 生成
 func roll_attribute_spread() -> Dictionary:
-    var rng := DeterministicRNG.global()
-    var attrs: Dictionary = {}
-    for attr_key in ATTR_KEYS:
-        attrs[attr_key] = rng.randi_range(ATTR_ROLL_MIN, ATTR_ROLL_MAX)
-    return {
-        "success": true,
-        "attrs": attrs
-    }
+    return IAuthService.build_preview_attribute_spread()
 
-## 异步资质骰点契约实现（对齐 ROLL_CHARACTER_PREVIEW 动作）
+## 异步资质骰点契约实现
 func roll_attributes_async(callback: Callable) -> void:
-    var req := UnifiedProtocolFactory.create_human_request(
-        "character_creation",
-        "ROLL_CHARACTER_PREVIEW",
-        {}
-    )
-    var resp := UnifiedProtocolDispatcher.dispatch_request(req)
-    if resp.success and resp.data is Dictionary:
-        if callback.is_valid():
-            callback.call(resp.data)
-        return
     if callback.is_valid():
         callback.call(roll_attribute_spread())
 

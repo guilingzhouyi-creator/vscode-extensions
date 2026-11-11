@@ -6,6 +6,21 @@
 class_name IAuthService
 extends RefCounted
 
+const PREVIEW_ATTR_KEYS: Array[String] = ["STR", "AGI", "CON", "INT", "WIS", "CHA"]
+const PREVIEW_ATTR_MIN: int = 8
+const PREVIEW_ATTR_MAX: int = 18
+
+## 生成标准前端创角六维预览资质点（8~18 确定性采样，前后端边界单源复用）
+static func build_preview_attribute_spread() -> Dictionary:
+	var rng: DeterministicRNG = DeterministicRNG.global()
+	var attrs: Dictionary = {}
+	for attr_key in PREVIEW_ATTR_KEYS:
+		attrs[attr_key] = rng.randi_range(PREVIEW_ATTR_MIN, PREVIEW_ATTR_MAX)
+	return {
+		"success": true,
+		"attrs": attrs
+	}
+
 ## 异步登录契约 (callback: func(result: Dictionary) -> void)
 func login_async(username: String, password_plain: String, callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IAuthService.login_async: pure virtual method must be implemented by subclass")

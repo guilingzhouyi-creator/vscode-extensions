@@ -6,6 +6,8 @@
 class_name MockCharacterService
 extends ICharacterService
 
+const IAuthService = preload("res://frontend/domain_boundary/interfaces/i_auth_service.gd")
+
 func calculate_inventory_weight(items: Array) -> float:
 	var total := 0.0
 	for item in items:
@@ -54,16 +56,5 @@ func create_character_async(account_id: String, token: String, req_data: Diction
 		callback.call({"success": true, "character": new_char})
 
 func roll_attributes_async(callback: Callable) -> void:
-	var rng := DeterministicRNG.global()
 	if callback.is_valid():
-		callback.call({
-			"success": true,
-			"attrs": {
-				"STR": rng.randi_range(8, 18),
-				"AGI": rng.randi_range(8, 18),
-				"CON": rng.randi_range(8, 18),
-				"INT": rng.randi_range(8, 18),
-				"WIS": rng.randi_range(8, 18),
-				"CHA": rng.randi_range(8, 18)
-			}
-		})
+		callback.call(IAuthService.build_preview_attribute_spread())
