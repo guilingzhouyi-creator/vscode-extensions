@@ -51,7 +51,11 @@ function createMockScanReport(overrides = {}) {
 /**
  * Builds one finding carrying a replacement patch for a suggested constant name.
  *
- * @param fixture - Suggested name, originating literal, line index and the rule it belongs to.
+ * @param fixture - Destructured fixture fields.
+ * @param fixture.placeholderName - Suggested constant name under test.
+ * @param fixture.literal - Originating literal the suggestion replaces.
+ * @param fixture.index - Line index the finding points at.
+ * @param fixture.rule - Rule the finding is attributed to.
  * @returns Issue object carrying a templateSnippet patch.
  */
 function buildPlaceholderIssue({ placeholderName, literal, index, rule = 'hardcoded-string' }) {
@@ -151,7 +155,7 @@ function runTests() {
     'A single-word domain name ending in _TEXT must keep its patch',
   );
 
-  // Length is not the weld signal: `UNCONDITIONAL_TEXT` is longer than the welded `INVALIDNAME_TEXT`
+  // Length is not the weld signal: UNCONDITIONAL_TEXT is longer than the welded INVALIDNAME_TEXT
   // and must survive. An earlier guard keyed on the length of the upper-case run rejected 120
   // legitimate patches exactly like this one.
   const longVocabularyIssue = buildPlaceholderIssue({

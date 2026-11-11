@@ -16,7 +16,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { runValidationSuite, reportFailure, runEntry } = require('./common/test-runner-harness');
+const { runValidationSuite, reportFailure } = require('./common/test-runner-harness');
 
 function assertProbeOutput(seen, probe) {
   assert.strictEqual(

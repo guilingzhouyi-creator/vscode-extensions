@@ -299,7 +299,7 @@ function isIssueWithinSlices(issue, allSlices) {
 /**
  * Loads recent trajectory run points from active runs ledger.
  *
- * @param maxCount - Maximum runs to inspect.
+ * @param line - Maximum runs to inspect.
  * @returns Array of parsed trajectory points.
  */
 function parseTrajectoryLine(line) {

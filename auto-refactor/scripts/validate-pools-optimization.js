@@ -16,12 +16,11 @@
 'use strict';
 
 const assert = require('assert');
-const path = require('path');
 
 console.log('🚀 [POOLS] Starting Resource Pooling & Optimization Verification Harness...\n');
 
 // 1. Test LeasedRegexPool behavior
-const { LeasedRegexPool, sharedRegexPool } = require('../dist/core/data-structures/regex-pool');
+const { LeasedRegexPool } = require('../dist/core/data-structures/regex-pool');
 const pool = new LeasedRegexPool({ bucketCapacity: 4 });
 
 console.log('--- [1/4] Testing LeasedRegexPool lastIndex Concurrency Safety ---');

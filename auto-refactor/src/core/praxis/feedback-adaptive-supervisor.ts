@@ -681,7 +681,8 @@ function acceptGovernanceSnapshot(candidate: unknown): GovernanceLedgerSnapshot 
     if (typeof weights !== 'object' || weights === null) return null;
     const { Ws, Wd, Wf } = weights as Partial<FusionWeights>;
     if (typeof Ws !== 'number' || typeof Wd !== 'number' || typeof Wf !== 'number') return null;
-    if (!Array.isArray(snapshot.demotedRules) || !Array.isArray(snapshot.boostedPatterns)) return null;
+    if (!Array.isArray(snapshot.demotedRules) || !Array.isArray(snapshot.boostedPatterns))
+        return null;
     if (typeof snapshot.activeIncidents !== 'number') return null;
     if (typeof snapshot.evolutionStepsCount !== 'number') return null;
     return snapshot as GovernanceLedgerSnapshot;

@@ -16,7 +16,6 @@
 'use strict';
 
 const assert = require('assert');
-const path = require('path');
 
 console.log('🚀 [MEMORY-GOVERNOR] Starting Memory Governor & Eviction Verification Harness...\n');
 

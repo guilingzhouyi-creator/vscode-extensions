@@ -19,7 +19,6 @@
 'use strict';
 
 const assert = require('assert');
-const path = require('path');
 
 console.log('🚀 [ELASTIC-DEBT-BUDGET] Starting Dynamic Debt Budget Verification Harness...\n');
 

@@ -15,13 +15,11 @@
 'use strict';
 
 const assert = require('assert');
-const path = require('path');
 
 console.log('🚀 [AST-QUERY] Starting AST Query & Selector Verification Harness...\n');
 
 const {
   walkNormalizedTree,
-  selectDescendants,
   findFirst,
   findNodesByKind,
   collectCalls,

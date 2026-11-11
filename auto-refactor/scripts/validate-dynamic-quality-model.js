@@ -103,7 +103,7 @@ async function main() {
   const vector = computeDynamicQualityVector(dto);
   assert.strictEqual(vector.L, 99.75); // p99 <= budget, capped by epistemic ceiling (< 100)
   assert.strictEqual(vector.T, 99.75); // ops >= target, capped by epistemic ceiling (< 100)
-  assert.strictEqual(vector.M, 99.75); // no leaks, low GC pause, capped by epistemic ceiling (< 100)
+  assert.strictEqual(vector.M, 99.75); // no leaks, low GC pause, capped by epistemic ceiling
   assert.strictEqual(vector.C, 97.76); // 99.75 * (1 - 0.02)
   assert.ok(vector.E > 80.0, `Expected strong execution evidence score (got ${vector.E})`);
 

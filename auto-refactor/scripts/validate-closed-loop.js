@@ -148,7 +148,17 @@ async function verifyCorpusIntake() {
     throw new Error('EACCES');
   });
   assert.ok(unreadable instanceof Promise, 'the loader must be asynchronous');
-  const malformed = loadCalibrationCorpus('corpus.json', async () => '{ not json');
+  const malformed = await loadCalibrationCorpus('corpus.json', async () => '{ not json');
+  assert.strictEqual(malformed.stats.length, 0, 'malformed JSON must contribute no evidence');
+  assert.strictEqual(
+    malformed.rejections.length,
+    1,
+    'malformed JSON must be reported rather than silently dropped',
+  );
+  assert.ok(
+    malformed.rejections[0].includes('not valid JSON'),
+    'the rejection must name the parse failure',
+  );
   assert.deepStrictEqual(await loadCalibrationCorpus(undefined, async () => undefined), {
     stats: [],
     rejections: [],
