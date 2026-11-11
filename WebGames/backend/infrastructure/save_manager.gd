@@ -206,7 +206,7 @@ static func restore_backup(save_name: String) -> Dictionary:
 		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt") % backup_json.get_error_message())
 	var backup_data: Variant = backup_json.get_data()
 	if not backup_data is Dictionary:
-		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt") % "顶层非对象")
+		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt") % "top-level is not an object")
 	var env_b: Dictionary = backup_data
 	var backup_data_json: String = String(env_b.get("data_json", ""))
 	if not backup_data_json.is_empty():
@@ -214,7 +214,7 @@ static func restore_backup(save_name: String) -> Dictionary:
 		if inner.parse(backup_data_json) != OK:
 			return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt") % inner.get_error_message())
 	elif not (env_b.get("data") is Dictionary):
-		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt") % "无合法载荷")
+		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt") % "no valid payload")
 
 	# 2. 写恢复临时文件（校验中间产物可写）
 	var tmp_path := file_path + _tmp_suffix()

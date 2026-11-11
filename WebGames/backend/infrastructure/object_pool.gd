@@ -15,9 +15,9 @@ const ObjectPoolConfigDTO = preload("res://backend/infrastructure/object_pool_co
 const ObjectPoolStatsDTO = preload("res://backend/infrastructure/object_pool_stats_dto.gd")
 
 const METHOD_RESET_STATE: String = "reset_state"
-const LOG_OVERFLOW_WARN: String = "ObjectPool[%s] 活跃分配达到溢出预警阈值 (%d >= %d)"
-const LOG_HARD_LIMIT_ERR: String = "ObjectPool[%s] 达到硬性上限且禁止溢出分配"
-const LOG_DOUBLE_RELEASE: String = "ObjectPool[%s] 拦截到非法归还：对象未被借出或已重复归还"
+const LOG_OVERFLOW_WARN: String = "ObjectPool[{pool_name}] active allocation reached overflow warning threshold ({allocated} >= {threshold})."
+const LOG_HARD_LIMIT_ERR: String = "ObjectPool[{pool_name}] reached hard limit with overflow allocation forbidden."
+const LOG_DOUBLE_RELEASE: String = "ObjectPool[{pool_name}] illegal release intercepted: object was not acquired or already released."
 
 var _config: ObjectPoolConfigDTO = null
 var _pool_name: String = ""
@@ -54,9 +54,13 @@ func acquire() -> RefCounted:
 		_stats.total_allocated += 1
 		_stats.total_overflows += 1
 		if _stats.total_allocated >= _config.overflow_warning_threshold:
-			EventBusCore.get_instance().emit_log("warn", LOG_OVERFLOW_WARN % [_pool_name, _stats.total_allocated, _config.overflow_warning_threshold])
+			EventBusCore.get_instance().emit_log("warn", TemplateFormatter.format(LOG_OVERFLOW_WARN, {
+				"pool_name": _pool_name,
+				"allocated": _stats.total_allocated,
+				"threshold": _config.overflow_warning_threshold
+			}))
 	else:
-		EventBusCore.get_instance().emit_log("error", LOG_HARD_LIMIT_ERR % _pool_name)
+		EventBusCore.get_instance().emit_log("error", TemplateFormatter.format(LOG_HARD_LIMIT_ERR, {"pool_name": _pool_name}))
 		return null
 
 	if obj != null:
@@ -75,7 +79,7 @@ func release(obj: RefCounted) -> bool:
 		return false
 	var obj_id: int = obj.get_instance_id()
 	if not _acquired_set.has(obj_id):
-		EventBusCore.get_instance().emit_log("warn", LOG_DOUBLE_RELEASE % _pool_name)
+		EventBusCore.get_instance().emit_log("warn", TemplateFormatter.format(LOG_DOUBLE_RELEASE, {"pool_name": _pool_name}))
 		return false
 	_acquired_set.erase(obj_id)
 	_stats.total_releases += 1

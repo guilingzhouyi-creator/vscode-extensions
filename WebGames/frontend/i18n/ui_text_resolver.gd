@@ -45,6 +45,9 @@ static func resolve(key: String, params: Dictionary = {}) -> String:
 		var fallback_views := GameConfig.get_string("frontend.views", key, "")
 		if not fallback_views.is_empty():
 			return PlaceholderFiller.fill(fallback_views, params)
+		# 若 key 自身已是包含空格或大括号的英文底座模板/人读消息，直接填充参数输出，避免被包装成 [key]
+		if key.contains(" ") or key.contains("{"):
+			return PlaceholderFiller.fill(key, params)
 		return "[" + key + "]"
 
 	return PlaceholderFiller.fill(template, params)

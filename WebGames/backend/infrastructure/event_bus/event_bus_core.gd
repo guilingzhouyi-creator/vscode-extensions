@@ -367,16 +367,37 @@ static func get_category_name(category_key: String) -> String:
 	return category_key.to_upper()
 
 ## 按模板键渲染叙事文案：键形如 "<领域>/<名称>"，查表 "narratives.<领域>"
-static func render_narrative(template_key: String, args: Array = []) -> String:
+static func render_narrative(template_key: String, args: Variant = []) -> String:
 	var parts := template_key.split("/")
 	if parts.is_empty():
 		return template_key
 	var table_name := "narratives." + parts[0]
 	var path := "/".join(parts.slice(1))
 	var template := GameConfig.get_string(table_name, path, template_key)
-	if args.is_empty():
+	return _format_template_safely(template, args)
+
+## 辅助函数：安全格式化文案模板，优先匹配 {param} 命名占位符并注入参数
+static func _format_template_safely(template: String, raw_args: Variant) -> String:
+	if template.is_empty():
+		return ""
+	if raw_args == null:
 		return template
-	return template % args
+	if raw_args is Dictionary:
+		return TemplateFormatter.format(template, raw_args as Dictionary)
+	if raw_args is Array:
+		var arr := raw_args as Array
+		if arr.is_empty():
+			return template
+		var param_keys := TemplateFormatter.extract_param_keys(template)
+		if not param_keys.is_empty():
+			var dict_params: Dictionary = {}
+			for i in range(mini(param_keys.size(), arr.size())):
+				dict_params[param_keys[i]] = arr[i]
+			return TemplateFormatter.format(template, dict_params)
+		if "%" in template:
+			return template % arr
+		return template
+	return template
 
 ## 将领域 id 解析为其文案表名（映射以 domains.json 为准，按重载版本缓存）
 static func resolve_narrative_table(domain_id: String) -> String:
@@ -410,8 +431,8 @@ static func render_domain_event_text(channel: String, payload: Dictionary = {}) 
 			return String(payload.get("text", ""))
 		var template := GameConfig.get_string(resolve_narrative_table(domain), full_event_name, "")
 		if not template.is_empty():
-			var args: Array = payload.get("args", [])
-			return template if args.is_empty() else (template % args)
+			var args: Variant = payload.get("args", [])
+			return _format_template_safely(template, args)
 	return String(payload.get("text", ""))
 
 ## 广播结构化叙事事件：文案走 NARRATIVE_TEXT 掩码派发（旧总线叙事信号替代）
@@ -424,7 +445,7 @@ func emit_narrative(text: String, category_key: String = "combat", meta: Diction
 	recycle_packet(packet)
 
 ## 一站式推荐入口：按模板键渲染文案并广播
-func emit_narrative_by_key(template_key: String, category_key: String, args: Array = [], meta: Dictionary = {}) -> void:
+func emit_narrative_by_key(template_key: String, category_key: String, args: Variant = [], meta: Dictionary = {}) -> void:
 	emit_narrative(render_narrative(template_key, args), category_key, meta)
 
 ## 广播泛化领域事件：结构化 payload 经 DOMAIN_EVENT_GENERIC 信道派发；

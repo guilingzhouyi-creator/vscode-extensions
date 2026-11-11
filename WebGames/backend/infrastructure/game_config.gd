@@ -155,7 +155,7 @@ static func _validate_required_tables() -> void:
 		if not _tables.has(table_name):
 			missing.append(table_name)
 	if not missing.is_empty():
-		ErrorReporter.emit_error("game_config", "REQUIRED_TABLE_MISSING", "GameConfig: 缺少必需配置表: %s" % ", ".join(missing))
+		ErrorReporter.emit_error("game_config", "REQUIRED_TABLE_MISSING", TemplateFormatter.format("GameConfig: required config tables missing: {tables}", {"tables": ", ".join(missing)}))
 
 ## 获取统一资源目录实例（动态解耦，杜绝跨层静态强引用）
 static func _get_catalog() -> Variant:
@@ -591,7 +591,7 @@ static func _split_path(path: String) -> PackedStringArray:
 static func _scan_dir(dir_path: String, table_prefix: String) -> void:
 	var dir := DirAccess.open(dir_path)
 	if dir == null:
-		push_warning("GameConfig: 配置目录不存在: %s" % dir_path)
+		push_warning(TemplateFormatter.format("GameConfig: configuration directory does not exist: {path}", {"path": dir_path}))
 		return
 	var scanned_tables: Dictionary = {}
 	# 优先加载高纯度二进制 .kdat
@@ -620,22 +620,22 @@ static func _load_table(file_path: String, table_name: String) -> void:
 		if kdat_data != null and (kdat_data is Dictionary):
 			_tables[table_name] = kdat_data
 			return
-		_scan_failures.append("%s: .kdat 解析或校验失败" % file_path)
-		push_warning("GameConfig: .kdat 解析或校验失败 [%s]" % file_path)
+		_scan_failures.append(TemplateFormatter.format("{path}: .kdat parse or validation failed", {"path": file_path}))
+		push_warning(TemplateFormatter.format("GameConfig: .kdat parse or validation failed [{path}]", {"path": file_path}))
 		return
 
 	var json := JSON.new()
 	var text := FileAccess.get_file_as_string(file_path)
 	var err := json.parse(text)
 	if err != OK:
-		_scan_failures.append("%s: JSON 解析失败 (行 %d)" % [file_path, json.get_error_line()])
-		push_warning("GameConfig: JSON 解析失败 [%s]: %s (行 %d)" % [
-			file_path, json.get_error_message(), json.get_error_line()
-		])
+		_scan_failures.append(TemplateFormatter.format("{path}: JSON parse failed (line {line})", {"path": file_path, "line": json.get_error_line()}))
+		push_warning(TemplateFormatter.format("GameConfig: JSON parse failed [{path}]: {error} (line {line})", {
+			"path": file_path, "error": json.get_error_message(), "line": json.get_error_line()
+		}))
 		return
 	var data: Variant = json.get_data()
 	if data is Dictionary:
 		_tables[table_name] = data
 	else:
-		_scan_failures.append("%s: 顶层必须是 JSON 对象" % file_path)
-		push_warning("GameConfig: [%s] 顶层必须是 JSON 对象" % file_path)
+		_scan_failures.append(TemplateFormatter.format("{path}: top-level must be a JSON object", {"path": file_path}))
+		push_warning(TemplateFormatter.format("GameConfig: [{path}] top-level must be a JSON object", {"path": file_path}))

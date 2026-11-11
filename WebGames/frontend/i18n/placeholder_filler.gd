@@ -8,14 +8,40 @@
 class_name PlaceholderFiller
 extends RefCounted
 
+static var _regex: RegEx = RegEx.create_from_string(r"\{([a-zA-Z0-9_]+)\}")
+
 ## 填充主入口: fill(template, data) → 最终文本
 ## template: "金币: {amount}"  data: {"amount": 5000} → "金币: 5000"
 static func fill(template: String, data: Dictionary) -> String:
+	if template.is_empty():
+		return ""
+	if data.is_empty():
+		return template
+
+	var matches := _regex.search_all(template)
+	if matches.is_empty():
+		return template
+
 	var result := template
-	for key in data.keys():
-		var token := "{" + str(key) + "}"
-		var value: Variant = data[key]
-		result = result.replace(token, _format_value(key, value))
+	for m in matches:
+		var key := m.get_string(1)
+		var val_found: bool = false
+		var raw_val: Variant = null
+
+		if data.has(key):
+			val_found = true
+			raw_val = data[key]
+		elif data.has(key.to_lower()):
+			val_found = true
+			raw_val = data[key.to_lower()]
+		elif data.has(key.to_upper()):
+			val_found = true
+			raw_val = data[key.to_upper()]
+
+		if val_found:
+			var token := "{" + key + "}"
+			result = result.replace(token, _format_value(key, raw_val))
+
 	return result
 
 ## 批量填充: 同一模板 + 多组数据 → 多条文本

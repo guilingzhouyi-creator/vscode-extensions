@@ -247,7 +247,7 @@ static func teardown() -> Dictionary:
 		"timestamp_utc": int(Time.get_unix_time_from_system()),
 		"teared_down_subsystems": teared_down
 	})
-	EventBusCore.get_instance().emit_log("info", "GameBootstrap 反装配完成，全局单例与会话子系统已对称复位")
+	EventBusCore.get_instance().emit_log("info", "GameBootstrap teardown completed: global singletons and session subsystems symmetrically reset.")
 
 	return {
 		"success": true,
