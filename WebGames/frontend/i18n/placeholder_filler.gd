@@ -74,7 +74,7 @@ static func _format_value(key: String, value: Variant) -> String:
 			or key_lower.ends_with("_amount") \
 			or key_lower.ends_with("_gold") \
 			or key_lower.ends_with("_copper"):
-		return _format_thousands(value if is_int else int(numeric))
+		return format_thousands(value if is_int else int(numeric))
 
 	# 百分比类: 精确键 percent + 受控后缀 *_percent（不再对 rate 子串误命中）
 	if key_lower == "percent" or key_lower.ends_with("_percent"):
@@ -108,7 +108,7 @@ static func _to_finite_float(value: Variant) -> float:
 	return 0.0
 
 ## 千分位格式化: 5000 → "5,000"
-static func _format_thousands(value: int) -> String:
+static func format_thousands(value: int) -> String:
 	var s := str(abs(value))
 	var result := ""
 	var count := 0

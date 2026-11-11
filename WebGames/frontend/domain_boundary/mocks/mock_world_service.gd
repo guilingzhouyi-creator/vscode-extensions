@@ -20,21 +20,6 @@ func get_map_landmarks_async(callback: Callable) -> void:
 	var landmarks: Array = map_data.get("landmarks", [])
 	MockBaseService.delayed_call(callback, { "success": true, "landmarks": landmarks.duplicate(true) }, simulate_delay_ms)
 
-func plan_routes(from_idx: int, to_idx: int) -> Array:
-	if from_idx < 0 or to_idx < 0 or from_idx == to_idx:
-		return []
-	return [
-		{"label": "A", "hours": 6, "danger_key": "ui.fe10.pf.danger_low", "cost": 50},
-		{"label": "B", "hours": 4, "danger_key": "ui.fe10.pf.danger_mid", "cost": 80},
-		{"label": "C", "hours": 3, "danger_key": "ui.fe10.pf.danger_high", "cost": 120},
-	]
-
-func upgrade_territory(territory: Dictionary) -> Dictionary:
-	var updated: Dictionary = territory.duplicate(true)
-	updated["construction"] = 1.0
-	updated["garrison"] = int(updated.get("garrison", 0)) + 10
-	return {"success": true, "territory": updated}
-
 func enter_gateway_async(account_id: String, token: String, callback: Callable) -> void:
 	MockBaseService.delayed_call(callback, {"success": true, "account_id": account_id, "worlds": []}, simulate_delay_ms)
 

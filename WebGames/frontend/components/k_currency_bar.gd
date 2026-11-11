@@ -68,7 +68,7 @@ func set_currency(gold: int, silver: int, copper: int, crystals: int = 0) -> voi
 
 func set_gold(val: int) -> void:
 	if _lbl_gold != null:
-		_lbl_gold.text = _format_thousands(val)
+		_lbl_gold.text = PlaceholderFiller.format_thousands(val)
 
 func set_silver(val: int) -> void:
 	if _lbl_silver != null:
@@ -80,17 +80,4 @@ func set_copper(val: int) -> void:
 
 func set_crystals(val: int) -> void:
 	if _lbl_crystals != null:
-		_lbl_crystals.text = _format_thousands(val)
-
-func _format_thousands(value: int) -> String:
-	var s := str(abs(value))
-	var result := ""
-	var count := 0
-	for i in range(s.length() - 1, -1, -1):
-		if count > 0 and count % 3 == 0:
-			result = "," + result
-		result = s[i] + result
-		count += 1
-	if value < 0:
-		result = "-" + result
-	return result
+		_lbl_crystals.text = PlaceholderFiller.format_thousands(val)

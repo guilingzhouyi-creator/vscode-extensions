@@ -35,23 +35,6 @@ func get_map_landmarks_async(callback: Callable) -> void:
 			"landmarks": landmarks.duplicate(true)
 		})
 
-## 寻路规划：起终点索引 → 候选路线数组
-func plan_routes(from_idx: int, to_idx: int) -> Array:
-	if from_idx < 0 or to_idx < 0 or from_idx == to_idx:
-		return []
-	return [
-		{"label": "A", "hours": 6, "danger_key": "ui.fe10.pf.danger_low", "cost": 50},
-		{"label": "B", "hours": 4, "danger_key": "ui.fe10.pf.danger_mid", "cost": 80},
-		{"label": "C", "hours": 3, "danger_key": "ui.fe10.pf.danger_high", "cost": 120},
-	]
-
-## 领地升级：建设完成与驻军提升
-func upgrade_territory(territory: Dictionary) -> Dictionary:
-	var updated: Dictionary = territory.duplicate(true)
-	updated["construction"] = 1.0
-	updated["garrison"] = int(updated.get("garrison", 0)) + 10
-	return {"success": true, "territory": updated}
-
 func _dispatch_gateway_action(
 	action_type: String,
 	account_id: String,

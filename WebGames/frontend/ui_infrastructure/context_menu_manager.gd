@@ -25,22 +25,7 @@ var _dismiss_catcher: Control
 
 func bind_layer(layer: CanvasLayer, container: Control = null) -> void:
 	_layer = layer
-	_container = container if container != null else _ensure_fallback_container(layer)
-
-## 创建/复用 layer 下的缺省承载容器（Control 类型安全，幂等）
-func _ensure_fallback_container(layer: CanvasLayer) -> Control:
-	if layer == null:
-		return null
-	var fallback_name := "ContextMenuManagerFallbackContainer"
-	var existing := layer.get_node_or_null(fallback_name)
-	if existing is Control:
-		return existing
-	var fallback := Control.new()
-	fallback.name = fallback_name
-	fallback.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	fallback.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	layer.add_child(fallback)
-	return fallback
+	_container = container if container != null else ModalManager.ensure_fallback_container(layer, "ContextMenuManagerFallbackContainer")
 
 func show_menu(pos: Vector2, items: Array) -> Control:
 	hide_menu()

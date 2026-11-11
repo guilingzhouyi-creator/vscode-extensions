@@ -27,14 +27,13 @@ var _backdrop: ColorRect
 ## 绑定宿重视口层（container 缺省时在 layer 下自动创建全屏承载容器，保证类型安全与幂等重绑）
 func bind_layer(layer: CanvasLayer, container: Control = null) -> void:
 	_modal_layer = layer
-	_modal_container = container if container != null else _ensure_fallback_container(layer)
+	_modal_container = container if container != null else ensure_fallback_container(layer, "ModalManagerFallbackContainer")
 	_ensure_backdrop()
 
 ## 创建/复用 layer 下的缺省承载容器（Control 类型安全，幂等）
-func _ensure_fallback_container(layer: CanvasLayer) -> Control:
+static func ensure_fallback_container(layer: CanvasLayer, fallback_name: String) -> Control:
 	if layer == null:
 		return null
-	var fallback_name := "ModalManagerFallbackContainer"
 	var existing := layer.get_node_or_null(fallback_name)
 	if existing is Control:
 		return existing

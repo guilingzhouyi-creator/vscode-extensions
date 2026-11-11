@@ -26,23 +26,8 @@ var _is_visible: bool = false
 
 func bind_layer(layer: CanvasLayer, container: Control = null) -> void:
 	_layer = layer
-	_container = container if container != null else _ensure_fallback_container(layer)
+	_container = container if container != null else ModalManager.ensure_fallback_container(layer, "TooltipManagerFallbackContainer")
 	_ensure_bubble()
-
-## 创建/复用 layer 下的缺省承载容器（Control 类型安全，幂等）
-func _ensure_fallback_container(layer: CanvasLayer) -> Control:
-	if layer == null:
-		return null
-	var fallback_name := "TooltipManagerFallbackContainer"
-	var existing := layer.get_node_or_null(fallback_name)
-	if existing is Control:
-		return existing
-	var fallback := Control.new()
-	fallback.name = fallback_name
-	fallback.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	fallback.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	layer.add_child(fallback)
-	return fallback
 
 func _ensure_bubble() -> void:
 	if _bubble_panel != null or _container == null:

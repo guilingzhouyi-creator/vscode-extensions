@@ -16,13 +16,20 @@ func get_map_landmarks_async(callback: Callable) -> void:
 
 ## 寻路规划：起终点索引 → 候选路线数组（视图只渲染）
 func plan_routes(from_idx: int, to_idx: int) -> Array:
-	EventBusCore.get_instance().emit_log("error", "IWorldService.plan_routes: pure virtual method must be implemented by subclass")
-	return []
+	if from_idx < 0 or to_idx < 0 or from_idx == to_idx:
+		return []
+	return [
+		{"label": "A", "hours": 6, "danger_key": "ui.fe10.pf.danger_low", "cost": 50},
+		{"label": "B", "hours": 4, "danger_key": "ui.fe10.pf.danger_mid", "cost": 80},
+		{"label": "C", "hours": 3, "danger_key": "ui.fe10.pf.danger_high", "cost": 120},
+	]
 
 ## 领地升级：建设完成与驻军提升规则（返回新领地副本）
 func upgrade_territory(territory: Dictionary) -> Dictionary:
-	EventBusCore.get_instance().emit_log("error", "IWorldService.upgrade_territory: pure virtual method must be implemented by subclass")
-	return {"success": false, "error_code": "NOT_IMPLEMENTED"}
+	var updated: Dictionary = territory.duplicate(true)
+	updated["construction"] = 1.0
+	updated["garrison"] = int(updated.get("garrison", 0)) + 10
+	return {"success": true, "territory": updated}
 
 ## 异步进入网关契约 (对齐 ENTER_GATEWAY)
 func enter_gateway_async(account_id: String, token: String, callback: Callable) -> void:
