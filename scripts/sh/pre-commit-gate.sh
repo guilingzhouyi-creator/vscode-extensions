@@ -294,7 +294,11 @@ fi
 
 # --- 项目增量编译与语法验证 (精准增量触发) ---
 TOUCHED_WT_COMPILE=$(echo "$STAGED_FILES" | grep -E '^workspace-timing/(src/.+\.ts|tsconfig.*\.json)' || true)
-TOUCHED_AR_COMPILE=$(echo "$STAGED_FILES" | grep -E '^auto-refactor/(src/.+\.ts|tsconfig.*\.json)' || true)
+TOUCHED_AR_COMPILE=$(echo "$STAGED_FILES" | grep -E '^auto-refactor/(src/.+\.ts|tsconfig.*\.json|crates/.+\.rs|crates/.+\.toml|crates/Cargo\.(toml|lock))' || true)
+# Rust sources need the crate workspace checked, not the TypeScript project: a staged `.rs` file
+# can break `cargo check` while `tsc` stays perfectly green, which is how the crate workspace
+# previously reached pre-push without ever being compiled at commit time.
+TOUCHED_AR_CRATES=$(echo "$STAGED_FILES" | grep -E '^auto-refactor/crates/.+(\.rs|\.toml)$' || true)
 TOUCHED_WG_AUDIT=$(echo "$STAGED_FILES" | grep -E '^WebGames/(config/|scripts/py/audit_config\.py)' || true)
 TOUCHED_FG_COMPILE=$(echo "$STAGED_FILES" | grep -E '^fractal-git/(crates/.+\.rs|src/.+\.rs|Cargo\.(toml|lock))' || true)
 
@@ -397,7 +401,31 @@ if [[ -n "$TOUCHED_WT_DOC" ]]; then
 fi
 
 if [[ -n "$TOUCHED_AR_COMPILE" ]]; then
-    if [[ "$AGENT_MODE" -eq 1 ]]; then
+    if [[ -n "$TOUCHED_AR_CRATES" ]]; then
+        # Crate sources: check the Rust workspace, since `tsc` cannot see them at all.
+        if [[ "$AGENT_MODE" -eq 1 ]]; then
+            if ! (cd auto-refactor/crates && cargo check --workspace --all-targets) >"$STEP_LOG" 2>&1; then
+                record_pre_commit_failure "ENGINE-COMPILE-07" \
+                    "L0-COMPILE" \
+                    "Rust crate compilation failed in auto-refactor." \
+                    "Run 'cargo check --workspace --all-targets' in auto-refactor/crates and resolve errors." \
+                    "cargo check --workspace --all-targets" \
+                    "auto-refactor/crates"
+                cat "$ROOT_DIR/.audit-logs/last-failure.json"
+                exit 1
+            fi
+            write_step_verdict "ENGINE-COMPILE-07" PASS "auto-refactor Rust 增量编译通过"
+        else
+            write_step_banner "ENGINE-COMPILE-07"
+            if ! (cd auto-refactor/crates && cargo check --workspace --all-targets) >"$STEP_LOG" 2>&1; then
+                write_step_verdict "ENGINE-COMPILE-07" BLOCK "auto-refactor Rust 编译失败"
+                tail -n 15 "$STEP_LOG" | sed 's/^/   /'
+                FAILED=1
+            else
+                write_step_verdict "ENGINE-COMPILE-07" PASS "auto-refactor Rust 增量编译通过"
+            fi
+        fi
+    elif [[ "$AGENT_MODE" -eq 1 ]]; then
         if ! (cd auto-refactor && "$NPM_BIN" run build) >"$STEP_LOG" 2>&1; then
             record_pre_commit_failure "ENGINE-COMPILE-07" \
                 "L0-COMPILE" \
@@ -425,19 +453,19 @@ if [[ -n "$TOUCHED_AR_COMPILE" ]]; then
             AR_REL_FILES=$(echo "$AR_STAGED_TS" | sed 's|^auto-refactor/||' | tr '\n' ' ')
             read -r -a AR_REL_ARGS <<< "$AR_REL_FILES"
             if [[ "$AGENT_MODE" -eq 1 ]]; then
-                if ! (cd auto-refactor && npx vitest related "${AR_REL_ARGS[@]}" --run) >"$STEP_LOG" 2>&1; then
+                if ! (cd auto-refactor && npx vitest related "${AR_REL_ARGS[@]}" --run --passWithNoTests=false) >"$STEP_LOG" 2>&1; then
                     record_pre_commit_failure "ENGINE-TESTS-08" \
                         "GUARD-SYS-001" \
                         "Impacted unit tests failed in auto-refactor." \
                         "Run 'npx vitest related ... --run' in auto-refactor." \
-                        "npx --prefix auto-refactor vitest related \"$AR_REL_FILES\" --run" \
+                        "npx --prefix auto-refactor vitest related \"$AR_REL_FILES\" --run --passWithNoTests=false" \
                         "auto-refactor/src"
                     cat "$ROOT_DIR/.audit-logs/last-failure.json"
                     exit 1
                 fi
             else
                 write_step_banner "ENGINE-TESTS-08"
-                if ! (cd auto-refactor && npx vitest related "${AR_REL_ARGS[@]}" --run) >"$STEP_LOG" 2>&1; then
+                if ! (cd auto-refactor && npx vitest related "${AR_REL_ARGS[@]}" --run --passWithNoTests=false) >"$STEP_LOG" 2>&1; then
                     write_step_verdict "ENGINE-TESTS-08" BLOCK "auto-refactor 增量影响单测未通过"
                     tail -n 15 "$STEP_LOG" | sed 's/^/   /'
                     FAILED=1

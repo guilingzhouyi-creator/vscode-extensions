@@ -329,8 +329,9 @@ function Invoke-VitestRelated {
         if ($batches.Count -gt 1) {
             Write-GateHost "  ℹ️  [BATCH] vitest related over $($chunk.Count) files (batch $ordinal of $($batches.Count))" -ForegroundColor DarkGray
         }
+        $childArgs = @($entry, "related") + $chunk + @("--run", "--passWithNoTests=false")
         $child = Invoke-ChildProcess -FilePath $NodeCommand `
-            -ArgumentList (@($entry, "related") + $chunk + @("--run")) `
+            -ArgumentList $childArgs `
             -WorkingDirectory $WorkingDirectory -TimeoutSeconds $TimeoutSeconds
         if ($child.Output) { $lines.AddRange([string[]]$child.Output) }
         if ($child.ExitCode -ne 0) {
@@ -518,7 +519,10 @@ if ($Agent) {
 # --- 项目增量编译与语法验证 (精准增量触发) ---
 # 横幅由各步骤自身的触发分支渲染：入口处再打印一次会让同一标识出现两条横幅。
 $hasWtCompile = $stagedFiles | Where-Object { $_ -match "^workspace-timing/(src/.+\.ts|tsconfig.*\.json)" }
-$hasArCompile = $stagedFiles | Where-Object { $_ -match "^auto-refactor/(src/.+\.ts|tsconfig.*\.json)" }
+$hasArCompile = $stagedFiles | Where-Object { $_ -match "^auto-refactor/(src/.+\.ts|tsconfig.*\.json|crates/.+\.(rs|toml)|crates/Cargo\.(toml|lock))" }
+# Crate sources are invisible to `tsc`: a staged `.rs` file can break `cargo check` while the
+# TypeScript build stays green, so they need their own trigger and their own step branch.
+$hasArCrates = @($stagedFiles | Where-Object { $_ -match "^auto-refactor/crates/.+(\.rs|\.toml)$" })
 $hasWgAudit = $stagedFiles | Where-Object { $_ -match "^WebGames/(config/|scripts/py/audit_config\.py)" }
 $hasFgCompile = $stagedFiles | Where-Object { $_ -match "^fractal-git/(crates/.+\.rs|src/.+\.rs|Cargo\.(toml|lock))" }
 
@@ -635,29 +639,71 @@ if ($hasWtDoc) {
 }
 
 if ($hasArCompile) {
-    if (-not $Agent) { Write-StepBanner -StepId "ENGINE-COMPILE-07" }
-    if ($Agent) {
-        $childBuild = Invoke-ChildProcess -FilePath $npmCmd -ArgumentList @("run", "build") -WorkingDirectory (Join-Path $repoRoot "auto-refactor") -TimeoutSeconds 180
-        $out = $childBuild.Output
-        if ($childBuild.ExitCode -ne 0) {
-            $json = Write-PreCommitFailure `
-                -StepId "ENGINE-COMPILE-07" `
-                -RuleId "L0-COMPILE" `
-                -Summary "TypeScript compilation failed in auto-refactor." `
-                -ActionableFix "Run 'npm run build' in auto-refactor and resolve compiler errors." `
-                -VerifyCmd "npm --prefix auto-refactor run build" `
-                -TargetFiles @("auto-refactor/src") `
-                -Details ($out -join "`n")
-            Write-Output $json
-            exit 1
+    if ($hasArCrates.Count -gt 0) {
+        # Crate sources only exist inside the Rust workspace under auto-refactor/crates.
+        $arManifest = Join-Path $repoRoot "auto-refactor/crates/Cargo.toml"
+        if (-not $Agent) { Write-StepBanner -StepId "ENGINE-COMPILE-07" }
+        if ($Agent) {
+            if (-not $cargoCmd) {
+                $json = Write-PreCommitFailure `
+                    -StepId "ENGINE-COMPILE-07" `
+                    -RuleId "L0-COMPILE" `
+                    -Summary "cargo is unavailable, so auto-refactor crate sources cannot be compiled." `
+                    -ActionableFix "Install the Rust toolchain, then re-run the commit gate." `
+                    -VerifyCmd "cargo check --workspace --manifest-path auto-refactor/crates/Cargo.toml --all-targets" `
+                    -TargetFiles $hasArCrates `
+                    -Details "cargo executable was not resolved on this host."
+                Write-Output $json
+                exit 1
+            }
+            $out = & $cargoCmd check --workspace --manifest-path $arManifest --all-targets 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                $json = Write-PreCommitFailure `
+                    -StepId "ENGINE-COMPILE-07" `
+                    -RuleId "L0-COMPILE" `
+                    -Summary "Rust crate compilation failed in auto-refactor." `
+                    -ActionableFix "Run cargo check --workspace --manifest-path auto-refactor/crates/Cargo.toml --all-targets and resolve errors." `
+                    -VerifyCmd "cargo check --workspace --manifest-path auto-refactor/crates/Cargo.toml --all-targets" `
+                    -TargetFiles $hasArCrates `
+                    -Details ($out -join "`n")
+                Write-Output $json
+                exit 1
+            }
+            Write-StepVerdict -StepId "ENGINE-COMPILE-07" -Status "PASS" -Detail "auto-refactor Rust 增量编译通过"
+        } else {
+            $process = Start-GateProcess -FilePath $cargoCmd -ArgumentList "check", "--workspace", "--manifest-path", $arManifest, "--all-targets" -WorkingDirectory $repoRoot
+            if ($process.ExitCode -ne 0) {
+                Write-StepVerdict -StepId "ENGINE-COMPILE-07" -Status "BLOCK" -Detail "auto-refactor Rust 编译失败"
+                $failed = $true
+            } else {
+                Write-StepVerdict -StepId "ENGINE-COMPILE-07" -Status "PASS" -Detail "auto-refactor Rust 增量编译通过"
+            }
         }
     } else {
-        $process = Start-GateProcess -FilePath $npmCmd -ArgumentList "run", "build" -WorkingDirectory (Join-Path $repoRoot "auto-refactor")
-        if ($process.ExitCode -ne 0) {
-            Write-StepVerdict -StepId "ENGINE-COMPILE-07" -Status "BLOCK" -Detail "auto-refactor 编译失败"
-            $failed = $true
+        if (-not $Agent) { Write-StepBanner -StepId "ENGINE-COMPILE-07" }
+        if ($Agent) {
+            $childBuild = Invoke-ChildProcess -FilePath $npmCmd -ArgumentList @("run", "build") -WorkingDirectory (Join-Path $repoRoot "auto-refactor") -TimeoutSeconds 180
+            $out = $childBuild.Output
+            if ($childBuild.ExitCode -ne 0) {
+                $json = Write-PreCommitFailure `
+                    -StepId "ENGINE-COMPILE-07" `
+                    -RuleId "L0-COMPILE" `
+                    -Summary "TypeScript compilation failed in auto-refactor." `
+                    -ActionableFix "Run 'npm run build' in auto-refactor and resolve compiler errors." `
+                    -VerifyCmd "npm --prefix auto-refactor run build" `
+                    -TargetFiles @("auto-refactor/src") `
+                    -Details ($out -join "`n")
+                Write-Output $json
+                exit 1
+            }
         } else {
-            Write-StepVerdict -StepId "ENGINE-COMPILE-07" -Status "PASS" -Detail "auto-refactor 增量编译通过"
+            $process = Start-GateProcess -FilePath $npmCmd -ArgumentList "run", "build" -WorkingDirectory (Join-Path $repoRoot "auto-refactor")
+            if ($process.ExitCode -ne 0) {
+                Write-StepVerdict -StepId "ENGINE-COMPILE-07" -Status "BLOCK" -Detail "auto-refactor 编译失败"
+                $failed = $true
+            } else {
+                Write-StepVerdict -StepId "ENGINE-COMPILE-07" -Status "PASS" -Detail "auto-refactor 增量编译通过"
+            }
         }
     }
 
@@ -676,7 +722,7 @@ if ($hasArCompile) {
                         -RuleId "GUARD-SYS-001" `
                         -Summary "Impacted unit tests failed in auto-refactor." `
                         -ActionableFix "Re-run scripts/ps1/pre-commit-gate.ps1 and inspect the vitest failure detail below." `
-                        -VerifyCmd "npx --prefix auto-refactor vitest related <changed-source> --run" `
+                        -VerifyCmd "npx --prefix auto-refactor vitest related <changed-source> --run --passWithNoTests=false" `
                         -TargetFiles $arStagedCode `
                         -Details ($outVitest -join "`n")
                     Write-Output $json
