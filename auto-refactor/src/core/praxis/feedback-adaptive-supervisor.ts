@@ -601,6 +601,10 @@ export const PraxisIoBarrier = {
     /**
      * Synchronously write content to destination path ensuring directory creation.
      *
+     * Non-atomic on purpose: callers that persist a load-bearing ledger must use
+     * `writeAtomicSync` instead, because a process death mid-write leaves a truncated file
+     * that the loader would then discard as corrupt.
+     *
      * @param destinationPath - Target file path.
      * @param payload - UTF-8 string payload.
      */
@@ -608,6 +612,25 @@ export const PraxisIoBarrier = {
         const parentDirectory = path.dirname(destinationPath);
         fs.mkdirSync(parentDirectory, { recursive: true });
         syncFsWriteText(destinationPath, payload, ENCODING_UTF8);
+    },
+
+    /**
+     * Synchronously write content through a sibling temp file and rename it into place.
+     *
+     * `rename` is atomic within one filesystem, so a reader either sees the previous complete
+     * payload or the new complete payload, never a half-written one. The temp file is created
+     * beside the destination rather than in the system temp directory, because a cross-device
+     * rename degrades to copy-then-delete and loses the atomicity this method exists to buy.
+     *
+     * @param destinationPath - Target file path.
+     * @param payload - UTF-8 string payload.
+     */
+    writeAtomicSync(destinationPath: string, payload: string): void {
+        const parentDirectory = path.dirname(destinationPath);
+        fs.mkdirSync(parentDirectory, { recursive: true });
+        const stagingPath = `${destinationPath}.tmp`;
+        syncFsWriteText(stagingPath, payload, ENCODING_UTF8);
+        fs.renameSync(stagingPath, destinationPath);
     },
 
     /**
@@ -620,6 +643,49 @@ export const PraxisIoBarrier = {
         return syncFsReadText(sourcePath, ENCODING_UTF8);
     },
 };
+
+/**
+ * Reports why a governance snapshot could not be read or written.
+ *
+ * The supervisor is deliberately fail-soft: a missing or corrupt snapshot degrades to the
+ * default weights rather than aborting a scan. That containment used to be silent, which made
+ * a truncated file indistinguishable from "never created" — the learned weights reset and
+ * nothing in the logs said so. Diagnostics go to stderr so they survive piping.
+ *
+ * @param filePath - Snapshot path involved in the failed operation.
+ * @param operation - Which side failed ('load' or 'save').
+ * @param cause - Underlying error or a description of the rejected payload.
+ */
+function reportSnapshotLoadFailure(filePath: string, operation: string, cause: unknown): void {
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    process.stderr.write(`[governance-snapshot] ${operation} failed for ${filePath}: ${detail}\n`);
+}
+
+/**
+ * Validates a parsed governance snapshot before it is allowed to overwrite live weights.
+ *
+ * A schema mismatch is treated exactly like a corrupt file: the payload is rejected rather
+ * than partially applied, because applying an unknown-version snapshot would silently import
+ * weights whose meaning the running build cannot vouch for.
+ *
+ * @param candidate - Parsed JSON value.
+ * @returns The snapshot when it conforms to the current version, otherwise null.
+ */
+function acceptGovernanceSnapshot(candidate: unknown): GovernanceLedgerSnapshot | null {
+    if (typeof candidate !== 'object' || candidate === null) return null;
+    const snapshot = candidate as Partial<GovernanceLedgerSnapshot>;
+    if (snapshot.version !== GOVERNANCE_SNAPSHOT_VERSION) return null;
+    if (typeof snapshot.lastUpdated !== 'string') return null;
+    if (typeof snapshot.projectProfile !== 'string') return null;
+    const weights = snapshot.learnedWeights;
+    if (typeof weights !== 'object' || weights === null) return null;
+    const { Ws, Wd, Wf } = weights as Partial<FusionWeights>;
+    if (typeof Ws !== 'number' || typeof Wd !== 'number' || typeof Wf !== 'number') return null;
+    if (!Array.isArray(snapshot.demotedRules) || !Array.isArray(snapshot.boostedPatterns)) return null;
+    if (typeof snapshot.activeIncidents !== 'number') return null;
+    if (typeof snapshot.evolutionStepsCount !== 'number') return null;
+    return snapshot as GovernanceLedgerSnapshot;
+}
 
 /**
  * Closed-loop supervisor driving dynamic tri-plane weight adaptation
@@ -908,12 +974,13 @@ export class FeedbackAdaptiveSupervisor {
         const diskPath = path.resolve(filePath);
         this.snapshotMemoryCache.set(diskPath, snapshot);
         try {
-            PraxisIoBarrier.writeSync(
+            PraxisIoBarrier.writeAtomicSync(
                 filePath,
                 JSON.stringify(snapshot, null, JSON_INDENT_SPACES) + '\n',
             );
-        } catch {
-            // Best-effort disk persistence: memory snapshot remains valid when disk write fails
+        } catch (err) {
+            // Best-effort disk persistence: memory snapshot remains valid when disk write fails.
+            reportSnapshotLoadFailure(filePath, 'save', err);
         }
     }
 
@@ -926,11 +993,16 @@ export class FeedbackAdaptiveSupervisor {
         }
         try {
             const rawContent = PraxisIoBarrier.readSync(filePath);
-            const parsedSnapshot = JSON.parse(rawContent) as GovernanceLedgerSnapshot;
+            const parsedSnapshot = acceptGovernanceSnapshot(JSON.parse(rawContent));
+            if (parsedSnapshot === null) {
+                reportSnapshotLoadFailure(filePath, 'load', 'schema rejected');
+                return false;
+            }
             this.snapshotMemoryCache.set(diskPath, parsedSnapshot);
             this.applyImportedLedgerSnapshot(parsedSnapshot);
             return true;
-        } catch {
+        } catch (err) {
+            reportSnapshotLoadFailure(filePath, 'load', err);
             return false;
         }
     }
@@ -952,11 +1024,18 @@ export class FeedbackAdaptiveSupervisor {
         this.snapshotMemoryCache.set(diskPath, snapshot);
         const parentDirectory = path.dirname(filePath);
         await fs.promises.mkdir(parentDirectory, { recursive: true });
-        await fs.promises.writeFile(
-            filePath,
-            JSON.stringify(snapshot, null, JSON_INDENT_SPACES) + '\n',
-            ENCODING_UTF8,
-        );
+        const stagingPath = `${filePath}.tmp`;
+        try {
+            await fs.promises.writeFile(
+                stagingPath,
+                JSON.stringify(snapshot, null, JSON_INDENT_SPACES) + '\n',
+                ENCODING_UTF8,
+            );
+            await fs.promises.rename(stagingPath, filePath);
+        } catch (err) {
+            await fs.promises.rm(stagingPath, { force: true }).catch(() => undefined);
+            reportSnapshotLoadFailure(filePath, 'save', err);
+        }
     }
 
     /**
@@ -975,11 +1054,16 @@ export class FeedbackAdaptiveSupervisor {
         }
         try {
             const content = await fs.promises.readFile(filePath, ENCODING_UTF8);
-            const parsed = JSON.parse(content) as GovernanceLedgerSnapshot;
+            const parsed = acceptGovernanceSnapshot(JSON.parse(content));
+            if (parsed === null) {
+                reportSnapshotLoadFailure(filePath, 'load', 'schema rejected');
+                return false;
+            }
             this.snapshotMemoryCache.set(diskPath, parsed);
             this.applyImportedLedgerSnapshot(parsed);
             return true;
-        } catch {
+        } catch (err) {
+            reportSnapshotLoadFailure(filePath, 'load', err);
             return false;
         }
     }

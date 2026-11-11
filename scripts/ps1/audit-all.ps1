@@ -1034,6 +1034,19 @@ Write-GateHost ("└" + ("─" * $targetWidth) + "┘") -ForegroundColor Cyan
 Write-GateHost "💡 统一审查快照已落盘至: .audit-logs/audit-latest.json | audit-latest.aas.json | audit-latest.md" -ForegroundColor Gray
 Write-GateHost "💡 质量历史轨迹已追加至: .audit-logs/audit-history.jsonl" -ForegroundColor Gray
 
+# --- 治理快照漂移归口：仅时间戳变化回滚，语义变化留待显式提交 ---
+# 全量扫描必然重写 governance-supervisor.json 的 lastUpdated，若不归口会让工作树永久脏，
+# 进而锁死 release-tag.sh 的干净树门禁。此处只判定与回滚，绝不代替操作者提交。
+$snapshotNote = ""
+$snapshotHelper = Join-Path $repoRoot "auto-refactor/scripts/lib/trajectory-ledger-redact.js"
+if (Test-Path $snapshotHelper) {
+    $snapshotOutput = & $nodeCmd $snapshotHelper --revert-timestamp 2>&1
+    if ($snapshotOutput) { $snapshotNote = ($snapshotOutput | Out-String).Trim() }
+}
+if ($snapshotNote) {
+    Write-GateHost "ℹ️  $snapshotNote" -ForegroundColor DarkGray
+}
+
 if ($env:GITHUB_STEP_SUMMARY) {
     try {
         $md = New-Object System.Text.StringBuilder

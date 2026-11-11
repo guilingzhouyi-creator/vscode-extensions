@@ -300,6 +300,14 @@ fi
 
 rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
 
+# --- 治理快照漂移归口：仅时间戳变化回滚，语义变化留待显式提交 ---
+# 全量扫描必然重写 governance-supervisor.json 的 lastUpdated，若不归口会让工作树永久脏，
+# 进而锁死 release-tag.sh 的干净树门禁。此处只判定与回滚，绝不代替操作者提交。
+SNAPSHOT_NOTE=""
+if [[ -f "$ROOT_DIR/auto-refactor/scripts/lib/trajectory-ledger-redact.js" ]]; then
+    SNAPSHOT_NOTE=$("$NODE_BIN" "$ROOT_DIR/auto-refactor/scripts/lib/trajectory-ledger-redact.js" --revert-timestamp 2>&1) || true
+fi
+
 # 统一合并执行报告、十维质量看板与步骤摘要生成（消除多进程重复启动）
 REPORT_EXIT=0
 "$NODE_BIN" "$ROOT_DIR/scripts/common/render-audit-all-summary.js" \
@@ -320,6 +328,10 @@ fi
 
 if [[ "$JSON_MODE" -eq 1 || "$AGENT_MODE" -eq 1 ]]; then
     exit "$FAILED"
+fi
+
+if [[ -n "$SNAPSHOT_NOTE" ]]; then
+    echo "ℹ️  $SNAPSHOT_NOTE"
 fi
 
 if [[ "$FAILED" -ne 0 ]]; then
