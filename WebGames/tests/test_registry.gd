@@ -158,10 +158,12 @@ const TestCutsceneHookAndPlaybackPipeline = preload("res://tests/integration/tes
 const TestAssetPathResolver = preload("res://tests/unit/infrastructure/test_asset_path_resolver.gd")
 # 全链路生命周期与ESC菜单后端双分流无头流水线
 const TestFullLifecycleChainAndEscFlowPipeline = preload("res://tests/integration/pipelines/test_full_lifecycle_chain_and_esc_flow_pipeline.gd")
-# Phase 127 全链路前后端交互数据流契约与后端闭环改造无头验收流水线
+# 全链路前后端交互数据流契约与后端闭环改造无头验收流水线
 const TestFullChainBackendProtocolAndLifecyclePipeline = preload("res://tests/integration/pipelines/test_full_chain_backend_protocol_and_lifecycle_pipeline.gd")
-# Phase 131 注册后端校验、原子持久化与二次重载插槽回灌流水线
+# 注册后端校验、原子持久化与二次重载插槽回灌流水线
 const TestAccountRegistrationAndRealReloadPipeline = preload("res://tests/integration/pipelines/test_account_registration_and_real_reload_pipeline.gd")
+# 客户端交互协议空间标准化与边界适配器验收流水线
+const TestClientProtocolSpaceAndBoundaryPipeline = preload("res://tests/integration/pipelines/test_client_protocol_space_and_boundary_pipeline.gd")
 
 # 前端 17 大系统白模与表现层测试套件
 const TestFE01AccountEntry = preload("res://tests/unit/frontend/test_fe_01_account_entry.gd")
@@ -264,10 +266,11 @@ static func get_all_test_classes() -> Array:
 		TestAssetPathResolver,
 		TestFullLifecycleChainAndEscFlowPipeline,
 		TestFullChainBackendProtocolAndLifecyclePipeline,
-		TestAccountRegistrationAndRealReloadPipeline
+		TestAccountRegistrationAndRealReloadPipeline,
+		TestClientProtocolSpaceAndBoundaryPipeline
 	]
 
-## 前端测试套件（17 大系统 + 6 前端基建与边界套件 = 23；全域 111 后端与横切 + 23 前端 = 134 套件）
+## 前端测试套件（17 大系统 + 6 前端基建与边界套件 = 23；全域 115 后端与横切 + 23 前端 = 138 套件）
 static func get_frontend_test_classes() -> Array:
 	return [
 		TestFE01AccountEntry, TestFE02MainHUD, TestFE03CharacterProgression,
@@ -281,7 +284,7 @@ static func get_frontend_test_classes() -> Array:
 		TestFrontendRobustness, TestFrontendErrorDomain
 	]
 
-## 全域测试套件（后端业务域 + 横切基础设施 + 前端 23 = 全域共 133 套件）
+## 全域测试套件（后端业务域 + 横切基础设施 + 前端 23 = 全域共 138 套件）
 static func get_all_engine_test_classes() -> Array:
 	var list := get_all_test_classes()
 	list.append_array(get_frontend_test_classes())

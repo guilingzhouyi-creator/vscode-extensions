@@ -1,12 +1,13 @@
 # ==============================================================================
 # 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_full_chain_backend_protocol_and_lifecycle_pipeline.gd
-# 架构定位: Integration Test Pipeline / Phase 127 Full-Chain Acceptance Harness
-# 跨域依赖: 上游: TestRegistry | 下游: account, world_gateway, character_creation, world_state, lifecycle, persistence_protocol
-# 职责说明: Phase 127 全 11 环前后端交互协议数据流与后端闭环改造无头集成验收流水线，
+# 架构定位: Integration Test Pipeline / Full-Chain Acceptance Harness
+# 依赖与触发: 上游: TestRegistry | 下游: account, world_gateway, character_creation,
+#           world_state, lifecycle, persistence_protocol
+# 职责说明: 全 11 环前后端交互协议数据流与后端闭环改造无头集成验收流水线，
 #           涵盖端到端正向闭环、EventBus双载荷与分流、序章交接精度、HUD常驻与节流、
 #           ESC防残缺覆盖、活跃世界禁切网关、令牌脱敏注销、诚实停机失败及对称解体守恒。
-# 设计依据: Phase 127 阶段1~4施工细则 (TC-P127-01 ~ TC-P127-10, ADV-PRF-002)
+# 退出语义与设计依据: 全链路数据流交互契约规约 (TC-CHAIN-01 ~ TC-CHAIN-10, ADV-PRF-002)
 # ==============================================================================
 
 class_name TestFullChainBackendProtocolAndLifecyclePipeline

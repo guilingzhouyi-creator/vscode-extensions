@@ -1,12 +1,13 @@
 # ==============================================================================
 # 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_account_registration_and_real_reload_pipeline.gd
-# 架构定位: Integration Test Pipeline / Phase 131 Real Auth & Slot Reload Harness
-# 跨域依赖: 上游: TestRegistry | 下游: AccountEntryView, RealAuthService, AccountRepository, AccountSlotBindingSolver
-# 职责说明: Phase 131 注册页后端校验、原子持久化落盘与二次重载插槽回灌全链路验收流水线。
+# 架构定位: Integration Test Pipeline / Real Auth & Slot Reload Harness
+# 依赖与触发: 上游: TestRegistry | 下游: AccountEntryView, RealAuthService,
+#           AccountRepository, AccountSlotBindingSolver
+# 职责说明: 注册页后端校验、原子持久化落盘与二次重载插槽回灌全链路验收流水线。
 #           覆盖注册表单边界校验、磁盘文件落盘与哈希脱敏、大小写不敏感重名拦截、
 #           登出后二次重载插槽快照回灌以及引擎冷启动物理重载一致性断言。
-# 设计依据: Phase 131 施工方案与卡拉尔世界引擎前后端解耦规范
+# 退出语义与设计依据: 注册与持久化回灌规约与卡拉尔世界引擎前后端解耦规范
 # ==============================================================================
 
 class_name TestAccountRegistrationAndRealReloadPipeline

@@ -3,8 +3,8 @@
 # 文件路径: res://tests/integration/pipelines/test_full_chain_backend_helper.gd
 # 架构定位: Integration Test Harness Helper
 # 依赖与触发: 由 TestFullChainBackendProtocolAndLifecyclePipeline 消费
-# 职责说明: 提供 Phase 127 全链路无头集成测试环境装配、沙箱目录擦除与统一请求派发辅助方法。
-# 设计依据: Phase 127 验收规约与物理资源安全回收
+# 职责说明: 提供全链路无头集成测试环境装配、沙箱目录擦除与统一请求派发辅助方法。
+# 退出语义与设计依据: 全链路无头验收规约与物理资源安全回收
 # ==============================================================================
 
 ## TestFullChainBackendHelper：全链路无头集成测试装配辅助类
