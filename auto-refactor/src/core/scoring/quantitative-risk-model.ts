@@ -106,7 +106,8 @@ export interface FinancialDebtMetrics {
     readonly frictionDragHours: number;
     readonly status: 'de-leveraging' | 'balanced' | 'insolvent' | 'insufficient_samples';
     /** Native status tag */
-    readonly clearanceStatus: 'active-clearing' | 'balanced' | 'deficit-growing' | 'insufficient_samples';
+    readonly clearanceStatus:
+        'active-clearing' | 'balanced' | 'deficit-growing' | 'insufficient_samples';
 }
 
 /**
@@ -211,7 +212,9 @@ export interface QuantitativeRiskAssessment {
  * Helper to round a number to two decimal places safely.
  */
 function roundTwoDecimals(inputNumericValue: number): number {
-    return Number.isFinite(inputNumericValue) ? Math.round(inputNumericValue * PERCENT_SCALE) / PERCENT_SCALE : 0.0;
+    return Number.isFinite(inputNumericValue)
+        ? Math.round(inputNumericValue * PERCENT_SCALE) / PERCENT_SCALE
+        : 0.0;
 }
 
 /**
@@ -240,9 +243,16 @@ function calculateDragFromFiles(
 /**
  * Resolves total principal minutes and interest drag from debt inputs.
  */
-function resolvePrincipalAndDragMinutes(input: FinancialDebtInput): { totalMinutes: number; dragMinutes: number } {
-    const friction = typeof input.dragFriction === 'number' ? input.dragFriction : DEFAULT_DRAG_FRICTION_COEFFICIENT;
-    const initialMinutes = typeof input.totalRemediationMinutes === 'number' ? input.totalRemediationMinutes : 0;
+function resolvePrincipalAndDragMinutes(input: FinancialDebtInput): {
+    totalMinutes: number;
+    dragMinutes: number;
+} {
+    const friction =
+        typeof input.dragFriction === 'number'
+            ? input.dragFriction
+            : DEFAULT_DRAG_FRICTION_COEFFICIENT;
+    const initialMinutes =
+        typeof input.totalRemediationMinutes === 'number' ? input.totalRemediationMinutes : 0;
 
     if (!input.fileDebts || input.fileDebts.length === 0) {
         return {
@@ -312,7 +322,9 @@ function evaluateCoverageRatioAndStatus(
 /**
  * Maps operational status to clearance state.
  */
-function resolveClearanceStatus(status: FinancialDebtMetrics['status']): FinancialDebtMetrics['clearanceStatus'] {
+function resolveClearanceStatus(
+    status: FinancialDebtMetrics['status'],
+): FinancialDebtMetrics['clearanceStatus'] {
     switch (status) {
         case STATUS_DE_LEVERAGING:
             return CLEARANCE_ACTIVE_CLEARING;
@@ -443,9 +455,8 @@ export function computeQualityRiskRatios(input: QualityRiskInput): QualityRiskMe
     const samples = validScores.slice(-windowSize);
 
     if (samples.length < MIN_RISK_SAMPLE_SIZE) {
-        const fallbackMean = samples.length > 0
-            ? samples.reduce((acc, v) => acc + v, 0) / samples.length
-            : 0;
+        const fallbackMean =
+            samples.length > 0 ? samples.reduce((acc, v) => acc + v, 0) / samples.length : 0;
         return {
             qsr: 0.0,
             sortino: 0.0,
@@ -462,9 +473,10 @@ export function computeQualityRiskRatios(input: QualityRiskInput): QualityRiskMe
         };
     }
 
-    const baseline = typeof input.baselineScore === 'number' && Number.isFinite(input.baselineScore)
-        ? input.baselineScore
-        : computeEmpiricalBaseline(samples);
+    const baseline =
+        typeof input.baselineScore === 'number' && Number.isFinite(input.baselineScore)
+            ? input.baselineScore
+            : computeEmpiricalBaseline(samples);
     const meanScore = samples.reduce((acc, v) => acc + v, 0) / samples.length;
     const { stdDev, downsideDev } = computeScoreDeviations(samples, meanScore, baseline);
 
@@ -612,7 +624,10 @@ function estimateOuHalfLife(scores: readonly number[]): { halfLife: number; thet
 /**
  * Computes excess kurtosis for cyclomatic complexity values to detect heavy-tail risks.
  */
-function calculateExcessKurtosis(values?: readonly number[]): { kurtosis: number; isFatTailed: boolean } {
+function calculateExcessKurtosis(values?: readonly number[]): {
+    kurtosis: number;
+    isFatTailed: boolean;
+} {
     if (!values || values.length < MIN_KURTOSIS_SAMPLE_COUNT) {
         return { kurtosis: 0.0, isFatTailed: false };
     }

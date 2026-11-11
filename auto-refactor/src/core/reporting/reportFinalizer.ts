@@ -81,17 +81,17 @@ import {
 
 export { BASELINE_GRANULARITY_GROUPED, groupCounts };
 
-export {
-    POST_SCAN_SCOPE_FULL, POST_SCAN_SCOPE_INCREMENTAL,
-} from './report-finalization-context';
+export { POST_SCAN_SCOPE_FULL, POST_SCAN_SCOPE_INCREMENTAL } from './report-finalization-context';
 export type {
-    PostScanScope, FinalizeBaselineOptions, FinalizeReportContext,
+    PostScanScope,
+    FinalizeBaselineOptions,
+    FinalizeReportContext,
 } from './report-finalization-context';
-import {
-    POST_SCAN_SCOPE_FULL, resolveFinalizeContext,
-} from './report-finalization-context';
+import { POST_SCAN_SCOPE_FULL, resolveFinalizeContext } from './report-finalization-context';
 import type {
-    PostScanScope, FinalizeBaselineOptions, FinalizeReportArguments,
+    PostScanScope,
+    FinalizeBaselineOptions,
+    FinalizeReportArguments,
 } from './report-finalization-context';
 
 /** Named identifiers for post-scan analysis passes. */
@@ -279,7 +279,11 @@ async function applyDependencyGraphPass(context: PostScanPassContext): Promise<v
     const prebuilt = reportScanner ? reportScanner.getDependencyGraph() : null;
     const covered = prebuilt !== null && prebuilt.getModules().length >= report.fileMetrics.length;
     const cycle = await runCyclePass(
-        report, config, logger, covered ? prebuilt : null, context.snapshotSource,
+        report,
+        config,
+        logger,
+        covered ? prebuilt : null,
+        context.snapshotSource,
     );
 
     if (!covered && prebuilt !== null) {
@@ -493,8 +497,8 @@ function matchSuppression(issue: Issue, index: SuppressionIndex): SuppressionRul
         typeof issue.detail?.function === 'string'
             ? issue.detail.function
             : typeof issue.detail?.name === 'string'
-                ? issue.detail.name
-                : EMPTY_STRING;
+              ? issue.detail.name
+              : EMPTY_STRING;
     const candidates = index.candidateRulesByAnalyzer.get(issue.analyzer) ?? index.generalRules;
     const normalizedFilePath = issue.location.file.replace(/\\/g, '/');
 
@@ -810,14 +814,16 @@ async function refreshQualityProjections(
             ? computeDynamicQualityVector(dynamicTelemetry)
             : undefined;
     const historicalScore = params.snapshotSource
-        ? undefined : resolveHistoricalQualityScore(config);
+        ? undefined
+        : resolveHistoricalQualityScore(config);
     const supervisorWeights = params.snapshotSource
-        ? undefined : await syncAdaptiveSupervisorState({
-        config,
-        scope,
-        historicalScore,
-        currentCompositeScore: projectQualityScore.compositeScore,
-    });
+        ? undefined
+        : await syncAdaptiveSupervisorState({
+              config,
+              scope,
+              historicalScore,
+              currentCompositeScore: projectQualityScore.compositeScore,
+          });
     report.triPlaneQuality = computeUnifiedQualityScore(
         staticVector,
         dynamicVector,
@@ -833,7 +839,9 @@ async function refreshQualityProjections(
     );
     if (!params.snapshotSource) {
         recordHistoricalQualitySample(
-            config, projectQualityScore.compositeScore, totalEffectiveLines,
+            config,
+            projectQualityScore.compositeScore,
+            totalEffectiveLines,
         );
     }
     projectQualityScore.quant = synthesizeProjectQuant(
@@ -1127,7 +1135,13 @@ export async function finalizeReport(...finalizeArguments: FinalizeReportArgumen
     if (snapshotSource) {
         warnings.push('snapshot-external-enrichment-unavailable');
         await refreshQualityScores({
-            report, config, reportScanner, scope, logger, initialIssueCount, snapshotSource,
+            report,
+            config,
+            reportScanner,
+            scope,
+            logger,
+            initialIssueCount,
+            snapshotSource,
         });
         computeSummary(report);
         report.summary.postScanPasses = postScanPasses;

@@ -58,18 +58,26 @@ export function captureFileRequirements(
     requirements: readonly FileAnalysisRequirement[],
 ): readonly FileAnalysisRequirement[] {
     const names = new Set<string>();
-    return Object.freeze(requirements.map((requirement) => {
-        if (!requirement || typeof requirement.analyzer !== 'string' || !requirement.analyzer.trim()) {
-            throw new Error('Invalid required analyzer name');
-        }
-        if (names.has(requirement.analyzer)) throw new Error('Duplicate required analyzer');
-        if (requirement.version !== undefined &&
-            (!Number.isSafeInteger(requirement.version) || requirement.version < 1)) {
-            throw new Error('Invalid required analyzer version');
-        }
-        names.add(requirement.analyzer);
-        return Object.freeze({ ...requirement });
-    }));
+    return Object.freeze(
+        requirements.map((requirement) => {
+            if (
+                !requirement ||
+                typeof requirement.analyzer !== 'string' ||
+                !requirement.analyzer.trim()
+            ) {
+                throw new Error('Invalid required analyzer name');
+            }
+            if (names.has(requirement.analyzer)) throw new Error('Duplicate required analyzer');
+            if (
+                requirement.version !== undefined &&
+                (!Number.isSafeInteger(requirement.version) || requirement.version < 1)
+            ) {
+                throw new Error('Invalid required analyzer version');
+            }
+            names.add(requirement.analyzer);
+            return Object.freeze({ ...requirement });
+        }),
+    );
 }
 
 /**
@@ -103,8 +111,11 @@ function versionOutcome(
     requirement: FileAnalysisRequirement,
     analyzer: AnalyzerExecutionObservation,
 ): Outcome | undefined {
-    if (analyzer.version === null || !Number.isSafeInteger(analyzer.version) ||
-        analyzer.version < 1) {
+    if (
+        analyzer.version === null ||
+        !Number.isSafeInteger(analyzer.version) ||
+        analyzer.version < 1
+    ) {
         return { status: 'degraded', reason: 'analyzer-version-unknown' };
     }
     if (requirement.version !== undefined && requirement.version !== analyzer.version) {
@@ -117,9 +128,13 @@ function parserOutcome(
     file: FileExecutionObservation,
     analyzer: AnalyzerExecutionObservation,
 ): Outcome {
-    if (file.parser.status === 'unsupported') return { status: 'unsupported', reason: 'parser-unsupported' };
-    if (file.parser.status !== 'complete' || file.parser.precision !== 'ast' ||
-        file.parser.diagnostics !== 0) {
+    if (file.parser.status === 'unsupported')
+        return { status: 'unsupported', reason: 'parser-unsupported' };
+    if (
+        file.parser.status !== 'complete' ||
+        file.parser.precision !== 'ast' ||
+        file.parser.diagnostics !== 0
+    ) {
         return { status: 'degraded', reason: `parser-${file.parser.status}` };
     }
     if (file.lineBounds) return { status: 'degraded', reason: 'line-window' };
@@ -150,7 +165,8 @@ function passOutcome(
         return { status: 'supported', reason: observed?.first.reason ?? 'analyzer-not-run' };
     }
     if (observed.invalidCalls) return { status: 'failed', reason: 'invalid-call-count' };
-    if (observed.inconsistentVersion) return { status: 'failed', reason: 'inconsistent-analyzer-version' };
+    if (observed.inconsistentVersion)
+        return { status: 'failed', reason: 'inconsistent-analyzer-version' };
     const version = versionOutcome(requirement, observed.invoked);
     if (version) return version;
     if (observed.wholeFile) return { status: 'executed' };
@@ -164,9 +180,10 @@ function reduceRequirement(
 ): FileAnalysisCoverage {
     const language = getLanguageIdFromPath(source.path) ?? 'unknown';
     const calls = observed?.calls ?? 0;
-    const outcome: Outcome = source.kind === 'text'
-        ? passOutcome(requirement, observed, language)
-        : { status: 'unsupported', reason: `input-${source.kind}` };
+    const outcome: Outcome =
+        source.kind === 'text'
+            ? passOutcome(requirement, observed, language)
+            : { status: 'unsupported', reason: `input-${source.kind}` };
     return Object.freeze({
         path: source.path,
         analyzer: requirement.analyzer,
@@ -187,7 +204,9 @@ function reduceRequirement(
  * @param analyzer - First matching analyzer observation in that pass.
  */
 function accumulatePass(
-    summary: PassSummary, pass: FileExecutionObservation, analyzer: AnalyzerExecutionObservation,
+    summary: PassSummary,
+    pass: FileExecutionObservation,
+    analyzer: AnalyzerExecutionObservation,
 ): void {
     summary.calls += validCalls(analyzer);
     if (analyzer.status === 'failed' && !summary.failed) summary.failed = analyzer;
@@ -197,8 +216,8 @@ function accumulatePass(
         summary.invokedFile = pass;
     }
     const version = summary.invoked.version;
-    const sameVersion = version === analyzer.version ||
-        (Number.isNaN(version) && Number.isNaN(analyzer.version));
+    const sameVersion =
+        version === analyzer.version || (Number.isNaN(version) && Number.isNaN(analyzer.version));
     if (!sameVersion) {
         summary.inconsistentVersion = true;
     }
@@ -233,8 +252,13 @@ function groupObservedPasses(
             names.add(analyzer.analyzer);
             let summary = file.get(analyzer.analyzer);
             if (!summary) {
-                summary = { first: analyzer, calls: 0, invalidCalls: false,
-                    inconsistentVersion: false, wholeFile: false };
+                summary = {
+                    first: analyzer,
+                    calls: 0,
+                    invalidCalls: false,
+                    inconsistentVersion: false,
+                    wholeFile: false,
+                };
                 file.set(analyzer.analyzer, summary);
             }
             accumulatePass(summary, pass, analyzer);
@@ -259,9 +283,7 @@ export function collectReviewPassCoverage(input: CoverageInput): readonly FileAn
     for (const source of input.inputs) {
         for (const requirement of requirements) {
             const observed = passes.get(source.path)?.get(requirement.analyzer);
-            coverage.push(reduceRequirement(
-                source, requirement, observed,
-            ));
+            coverage.push(reduceRequirement(source, requirement, observed));
         }
     }
     return Object.freeze(coverage);
@@ -280,7 +302,8 @@ export function collectExecutionCoverage(input: CoverageInput): readonly FileAna
         files.add(pass.path);
         names.clear();
         for (const analyzer of pass.analyzers) {
-            if (names.has(analyzer.analyzer)) throw new Error('Duplicate analyzer execution observation');
+            if (names.has(analyzer.analyzer))
+                throw new Error('Duplicate analyzer execution observation');
             names.add(analyzer.analyzer);
         }
     }

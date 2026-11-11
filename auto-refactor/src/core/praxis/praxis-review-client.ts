@@ -104,7 +104,9 @@ function countLinesFast(content: string): number {
  * @returns Whether a supported review lost its publication or has a newer pending replacement.
  */
 function wasSemanticFileSuperseded(
-    graph: SemanticGraph, filePath: string, version?: symbol,
+    graph: SemanticGraph,
+    filePath: string,
+    version?: symbol,
 ): boolean {
     if (!defaultSemanticAdapterRegistry.getCapabilitiesForFile(filePath)) return false;
     return version === undefined || !graph.isFileVersionCurrent(filePath, version);
@@ -135,10 +137,14 @@ async function prepareSemanticFileInput(
     const token = semanticCapabilities ? graph.beginFileUpdate(filePath) : undefined;
     try {
         const fileContent = await readPraxisFileContent(filePath, content, root);
-        const published = token !== undefined
-            && await defaultSemanticAdapterRegistry.publishFileUpdate(
-                filePath, fileContent, graph, token,
-            );
+        const published =
+            token !== undefined &&
+            (await defaultSemanticAdapterRegistry.publishFileUpdate(
+                filePath,
+                fileContent,
+                graph,
+                token,
+            ));
         return {
             fileContent,
             semanticCapabilities,
@@ -156,20 +162,23 @@ async function prepareSemanticFileInput(
  * @returns Neutral execution state with the existing explicit coverage gap.
  */
 function createFileReviewExecution(
-    language: string | undefined, superseded: boolean,
+    language: string | undefined,
+    superseded: boolean,
 ): ReviewExecution {
     return createReviewExecution({
         reviewId: randomUUID(),
         termination: superseded ? 'superseded' : undefined,
         tracks: { fast: 'complete', deep: 'not-required' },
-        coverage: [{
-            analyzer: 'praxis-sdk',
-            capability: 'complete-analysis',
-            language: language ?? 'unknown',
-            required: true,
-            status: 'degraded',
-            reason: 'SDK static checks do not execute the complete analyzer plan.',
-        }],
+        coverage: [
+            {
+                analyzer: 'praxis-sdk',
+                capability: 'complete-analysis',
+                language: language ?? 'unknown',
+                required: true,
+                status: 'degraded',
+                reason: 'SDK static checks do not execute the complete analyzer plan.',
+            },
+        ],
     });
 }
 
@@ -263,11 +272,15 @@ export class PraxisReviewClient implements IPraxisReviewClient {
         const publication = Symbol('snapshot-review');
         this.graphRequest = publication;
         const scanner = new Scanner({
-            ...config, cacheEnabled: false, sparseRouting: false,
+            ...config,
+            cacheEnabled: false,
+            sparseRouting: false,
         });
         const result = await executeReview(request, snapshot, { scanner, options });
-        if (this.graphRequest === publication &&
-            (result.completion.status === 'complete' || result.completion.status === 'partial')) {
+        if (
+            this.graphRequest === publication &&
+            (result.completion.status === 'complete' || result.completion.status === 'partial')
+        ) {
             this.graph = result.semanticGraph.createMutableGraph();
             this.graphGeneration = result.semanticGraph;
         }
@@ -330,8 +343,11 @@ export class PraxisReviewClient implements IPraxisReviewClient {
         this.graphRequest = publication;
         const workspace = await executeWorkspaceReview(config, options.snapshot);
         const rawReport = workspace.report;
-        if (this.graphRequest === publication &&
-            workspace.execution.status !== 'cancelled' && workspace.execution.status !== 'superseded') {
+        if (
+            this.graphRequest === publication &&
+            workspace.execution.status !== 'cancelled' &&
+            workspace.execution.status !== 'superseded'
+        ) {
             this.graph = workspace.graph;
             this.graphGeneration = workspace.generation;
         }
@@ -483,11 +499,11 @@ export class PraxisReviewClient implements IPraxisReviewClient {
         // Reservations are taken before awaiting input so request order, not read latency,
         // decides which extraction may publish into the shared graph.
         try {
-            const {
-                fileContent, semanticCapabilities, semanticVersion,
-            } = await prepareSemanticFileInput(
-                filePath, content, { graph, root: options.root ?? this.root },
-            );
+            const { fileContent, semanticCapabilities, semanticVersion } =
+                await prepareSemanticFileInput(filePath, content, {
+                    graph,
+                    root: options.root ?? this.root,
+                });
 
             const effectiveCardContext = options.cardContext ?? this.defaultCardContext;
             const useMoE = options.useSparseMoE ?? this.enableMoE;

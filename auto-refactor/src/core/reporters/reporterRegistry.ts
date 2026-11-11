@@ -80,9 +80,19 @@ const BADGE_DEFAULT_SCORE = 100;
 /** Canonical ten dimensions for markdown report rendering */
 const CANONICAL_DIMENSIONS = Object.freeze([
     { key: 'codeSecurity', num: ' 1', name: '代码安全', labelEn: '代码安全 (Code Security)' },
-    { key: 'architectureConsistency', num: ' 2', name: '架构一致', labelEn: '架构一致 (Architecture)' },
+    {
+        key: 'architectureConsistency',
+        num: ' 2',
+        name: '架构一致',
+        labelEn: '架构一致 (Architecture)',
+    },
     { key: 'maintainability', num: ' 3', name: '可维护性', labelEn: '可维护性 (Maintainability)' },
-    { key: 'performanceEfficiency', num: ' 4', name: '性能预算', labelEn: '性能预算 (Performance)' },
+    {
+        key: 'performanceEfficiency',
+        num: ' 4',
+        name: '性能预算',
+        labelEn: '性能预算 (Performance)',
+    },
     { key: 'techDebtRisk', num: ' 5', name: '技术债风险', labelEn: '技术债风险 (Tech Debt Risk)' },
     { key: 'semanticPurity', num: ' 6', name: '语义纯度', labelEn: '语义纯度 (Semantic Purity)' },
     { key: 'duplication', num: ' 7', name: '重复率', labelEn: '重复率 (Duplication)' },
@@ -146,7 +156,15 @@ export function listReporters(): string[] {
 /**
  * Groups top scoring rationales by dimension key to explain score deductions.
  */
-function groupTopRationalesByDimension(rationales?: Array<{ dimension: string; delta: number; reason: string; rule?: string; line?: number }>): Map<string, string[]> {
+function groupTopRationalesByDimension(
+    rationales?: Array<{
+        dimension: string;
+        delta: number;
+        reason: string;
+        rule?: string;
+        line?: number;
+    }>,
+): Map<string, string[]> {
     const rationalesMap = new Map<string, string[]>();
     if (!rationales || rationales.length === 0) return rationalesMap;
     CANONICAL_DIMENSIONS.forEach((dimensionDef) => {
@@ -172,10 +190,17 @@ function formatDimensionRow(
     notEvaluatedSet: Set<string>,
     rationalesByDimension: Map<string, string[]>,
 ): string {
-    const rawScoreValue = qualityScore.indices ? (qualityScore.indices as any)[dimensionDef.key] : undefined;
-    const isNotEvaluated = notEvaluatedSet.has(dimensionDef.key as any) || rawScoreValue === undefined || !Number.isFinite(rawScoreValue);
+    const rawScoreValue = qualityScore.indices
+        ? (qualityScore.indices as any)[dimensionDef.key]
+        : undefined;
+    const isNotEvaluated =
+        notEvaluatedSet.has(dimensionDef.key as any) ||
+        rawScoreValue === undefined ||
+        !Number.isFinite(rawScoreValue);
     const scoreText = isNotEvaluated ? 'N/A' : (rawScoreValue as number).toFixed(1);
-    const weightVal = qualityScore.weights ? (qualityScore.weights as any)[dimensionDef.key] : undefined;
+    const weightVal = qualityScore.weights
+        ? (qualityScore.weights as any)[dimensionDef.key]
+        : undefined;
     const weightText = typeof weightVal === 'number' ? `${(weightVal * 100).toFixed(1)}%` : '-';
 
     if (isNotEvaluated) {
@@ -200,9 +225,10 @@ function formatQualityScorecard(qualityScore: NonNullable<ScanReport['qualitySco
     const compositeText = Number.isFinite(qualityScore.compositeScore)
         ? `${qualityScore.compositeScore} / 100`
         : 'N/A';
-    const confidenceText = qualityScore.confidence !== undefined
-        ? ` | 置信度: ${(qualityScore.confidence * 100).toFixed(0)}%`
-        : '';
+    const confidenceText =
+        qualityScore.confidence !== undefined
+            ? ` | 置信度: ${(qualityScore.confidence * 100).toFixed(0)}%`
+            : '';
     const section: string[] = [
         ``,
         `## 🎯 十维工程质量全景看板 (Quality Score: ${compositeText} [Grade: ${qualityScore.grade}]${confidenceText})`,
@@ -214,7 +240,9 @@ function formatQualityScorecard(qualityScore: NonNullable<ScanReport['qualitySco
     const rationalesByDimension = groupTopRationalesByDimension(qualityScore.rationales);
     const notEvaluatedSet = new Set(qualityScore.notEvaluated ?? []);
     for (const dimensionDef of CANONICAL_DIMENSIONS) {
-        section.push(formatDimensionRow(dimensionDef, qualityScore, notEvaluatedSet, rationalesByDimension));
+        section.push(
+            formatDimensionRow(dimensionDef, qualityScore, notEvaluatedSet, rationalesByDimension),
+        );
     }
 
     if (qualityScore.technicalDebt || qualityScore.densityTensorSummary) {
@@ -229,9 +257,10 @@ function formatQualityScorecard(qualityScore: NonNullable<ScanReport['qualitySco
         }
         if (qualityScore.densityTensorSummary) {
             const tensor = qualityScore.densityTensorSummary;
-            const distanceText = tensor.averageMahalanobisDistance !== undefined
-                ? `, 马氏距离: \`${tensor.averageMahalanobisDistance.toFixed(2)}\``
-                : '';
+            const distanceText =
+                tensor.averageMahalanobisDistance !== undefined
+                    ? `, 马氏距离: \`${tensor.averageMahalanobisDistance.toFixed(2)}\``
+                    : '';
             section.push(
                 `- **5D 黎曼相空间张量**: 逻辑密度 \`${(tensor.compositeDensity * 100).toFixed(1)}%\`, TSPR: \`${(tensor.averageTspr * 100).toFixed(0)}%\`, POR: \`${(tensor.averagePor * 100).toFixed(0)}%\`${distanceText}`,
             );
@@ -319,8 +348,8 @@ registerReporter({
             score >= BADGE_GREEN_MIN_SCORE
                 ? '#4c1'
                 : score >= BADGE_YELLOW_MIN_SCORE
-                    ? '#dfb317'
-                    : '#e05d44';
+                  ? '#dfb317'
+                  : '#e05d44';
         return `<svg xmlns="http://www.w3.org/2000/svg" width="110" height="20">
   <linearGradient id="b" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient>
   <mask id="a"><rect width="110" height="20" rx="3" fill="#fff"/></mask>

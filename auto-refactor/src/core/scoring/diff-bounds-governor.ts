@@ -24,16 +24,16 @@ import { computeStatisticalMoments, type StatisticalMoments } from '../math/desc
 import { clampRange, safeDivide } from '../math/numerical-corridor';
 
 /** Minimum token semantic payload ratio required for substantive code additions. */
-export const MIN_TSPR_ADDED_THRESHOLD = 0.40;
+export const MIN_TSPR_ADDED_THRESHOLD = 0.4;
 
 /** Minimum ratio of useful semantic lines to total additions before inflation is flagged. */
-export const MIN_SEMANTIC_LINE_DENSITY = 0.60;
+export const MIN_SEMANTIC_LINE_DENSITY = 0.6;
 
 /** Minimum additions count before inflation heuristics begin strictly enforcing density. */
 export const INFLATION_SAMPLE_LINE_THRESHOLD = 15;
 
 /** Max fraction of an existing file's LOC deletable without equivalent compensation. */
-export const MAX_DELETION_FRACTION_EROSION = 0.40;
+export const MAX_DELETION_FRACTION_EROSION = 0.4;
 
 /** Minimum deletion line floor below which small deletions skip erosion checks. */
 export const MIN_DELETION_ALLOWANCE_LOC = 10;
@@ -314,11 +314,12 @@ export function countUsefulAddedLines(addedLines: readonly string[]): number {
  * @param params - Differential bounds evaluation parameters.
  * @returns Derived envelope limits and measured payload attributes.
  */
-export function computeEnvelopeBounds(params: DifferentialBoundsParams): DifferentialEnvelopeBounds {
+export function computeEnvelopeBounds(
+    params: DifferentialBoundsParams,
+): DifferentialEnvelopeBounds {
     const originalLineCount = params.oldContent
         .split(/\r?\n/)
-        .filter((line) => line.trim().length > 0)
-        .length;
+        .filter((line) => line.trim().length > 0).length;
     const fileLocBudget = params.fileLocBudget ?? DEFAULT_FILE_LOC_BUDGET;
     const isNewFile = originalLineCount === 0;
 
@@ -331,20 +332,21 @@ export function computeEnvelopeBounds(params: DifferentialBoundsParams): Differe
     const additionUpperBound = isNewFile
         ? Math.min(fileLocBudget, MAX_COMMIT_FILE_ADD_NEW_5D_ELOC)
         : Math.min(
-            MAX_COMMIT_FILE_ADD_EXISTING_5D_ELOC,
-            Math.min(remainingBudget, maxExpansionByRatio),
-        );
+              MAX_COMMIT_FILE_ADD_EXISTING_5D_ELOC,
+              Math.min(remainingBudget, maxExpansionByRatio),
+          );
     const additionLowerBound = 0;
 
     // 2. Addition payload density measurements
     const usefulAddedLines = countUsefulAddedLines(params.addedLines);
     const usefulDeletedLines = countUsefulAddedLines(params.deletedLines);
     const tsprAdded = computeAddedLinesTspr(params.addedLines, params.language);
-    const semanticDensity = params.addedLines.length > 0
-        ? safeDivide(usefulAddedLines, params.addedLines.length)
-        : 1.0;
+    const semanticDensity =
+        params.addedLines.length > 0 ? safeDivide(usefulAddedLines, params.addedLines.length) : 1.0;
     const raw5dAdd = usefulAddedLines * tsprAdded;
-    const eloc5dAdd = Math.round(raw5dAdd * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) / DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
+    const eloc5dAdd =
+        Math.round(raw5dAdd * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) /
+        DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
     const eloc5dDel = usefulDeletedLines;
 
     // 3. Deletion envelope bounds (clamped to atomic batch ceiling)
@@ -352,9 +354,12 @@ export function computeEnvelopeBounds(params: DifferentialBoundsParams): Differe
     const deletionUpperBound = isNewFile
         ? 0
         : Math.min(
-            MAX_COMMIT_FILE_DEL_5D_ELOC,
-            Math.max(MIN_DELETION_ALLOWANCE_LOC, Math.floor(originalLineCount * MAX_DELETION_FRACTION_EROSION)),
-        );
+              MAX_COMMIT_FILE_DEL_5D_ELOC,
+              Math.max(
+                  MIN_DELETION_ALLOWANCE_LOC,
+                  Math.floor(originalLineCount * MAX_DELETION_FRACTION_EROSION),
+              ),
+          );
 
     return {
         addMin: additionLowerBound,
@@ -382,7 +387,9 @@ export function computeEnvelopeBounds(params: DifferentialBoundsParams): Differe
 export function compute5dElocDelta(params: DifferentialBoundsParams): File5dElocDelta {
     const bounds = computeEnvelopeBounds(params);
     const rawTurnover = bounds.eloc5dAdd + bounds.eloc5dDel;
-    const net5dTurnover = Math.round(rawTurnover * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) / DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
+    const net5dTurnover =
+        Math.round(rawTurnover * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) /
+        DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
 
     return {
         filePath: params.filePath,
@@ -477,7 +484,9 @@ function checkCapabilityErosion(
  * @param params - Change parameters including old/new content and diff lines.
  * @returns Verdict indicating whether change satisfies bounds envelopes.
  */
-export function evaluateDifferentialBounds(params: DifferentialBoundsParams): DifferentialBoundsVerdict {
+export function evaluateDifferentialBounds(
+    params: DifferentialBoundsParams,
+): DifferentialBoundsVerdict {
     const bounds = computeEnvelopeBounds(params);
     const addedLineCount = params.addedLines.length;
     const deletedLineCount = params.deletedLines.length;
@@ -528,14 +537,18 @@ export function computeNetSemanticTurnover(params: NetTurnoverParams): NetTurnov
     const rawNetTurnover = semanticAddedEloc + semanticDeletedEloc - relocatedEloc - cosmeticEloc;
     const netSemanticTurnover = Math.max(
         0,
-        Math.round(rawNetTurnover * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) / DECIMAL_ROUNDING_FACTOR_HUNDREDTH,
+        Math.round(rawNetTurnover * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) /
+            DECIMAL_ROUNDING_FACTOR_HUNDREDTH,
     );
 
     const totalPhysicalLines = physicalAddedLines + physicalDeletedLines;
-    const turnoverRatio = totalPhysicalLines > 0
-        ? Math.round(safeDivide(netSemanticTurnover, totalPhysicalLines) * DECIMAL_ROUNDING_FACTOR_THOUSANDTH) /
-            DECIMAL_ROUNDING_FACTOR_THOUSANDTH
-        : 1.0;
+    const turnoverRatio =
+        totalPhysicalLines > 0
+            ? Math.round(
+                  safeDivide(netSemanticTurnover, totalPhysicalLines) *
+                      DECIMAL_ROUNDING_FACTOR_THOUSANDTH,
+              ) / DECIMAL_ROUNDING_FACTOR_THOUSANDTH
+            : 1.0;
 
     const effectiveTurnoverScore =
         Math.round(netSemanticTurnover * turnoverRatio * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) /
@@ -597,20 +610,26 @@ export function calculateEmpiricalAdmissionThreshold(
     const noiseFactor = safeDivide(boundedNoise, MAX_NOISE_CEILING);
 
     // Dynamic threshold derivation
-    const discountStandardDeviation = STANDARD_DEVIATION_DISCOUNT_FACTOR * moments.standardDeviation;
+    const discountStandardDeviation =
+        STANDARD_DEVIATION_DISCOUNT_FACTOR * moments.standardDeviation;
     const statisticalCenter = Math.max(0, moments.mean - discountStandardDeviation);
     const calibratedThreshold = statisticalCenter * (1.0 - noiseFactor) * posteriorConfidence;
     const threshold =
-        Math.round(Math.max(ADMISSION_TURNOVER_FLOOR, calibratedThreshold) * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) /
-        DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
+        Math.round(
+            Math.max(ADMISSION_TURNOVER_FLOOR, calibratedThreshold) *
+                DECIMAL_ROUNDING_FACTOR_HUNDREDTH,
+        ) / DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
 
     return {
         threshold,
         rollingMean: moments.mean,
         rollingStdDev: moments.standardDeviation,
-        noiseFactor: Math.round(noiseFactor * DECIMAL_ROUNDING_FACTOR_THOUSANDTH) / DECIMAL_ROUNDING_FACTOR_THOUSANDTH,
+        noiseFactor:
+            Math.round(noiseFactor * DECIMAL_ROUNDING_FACTOR_THOUSANDTH) /
+            DECIMAL_ROUNDING_FACTOR_THOUSANDTH,
         posteriorConfidence:
-            Math.round(posteriorConfidence * DECIMAL_ROUNDING_FACTOR_THOUSANDTH) / DECIMAL_ROUNDING_FACTOR_THOUSANDTH,
+            Math.round(posteriorConfidence * DECIMAL_ROUNDING_FACTOR_THOUSANDTH) /
+            DECIMAL_ROUNDING_FACTOR_THOUSANDTH,
         sampleCount: sliceRuns.length,
     };
 }

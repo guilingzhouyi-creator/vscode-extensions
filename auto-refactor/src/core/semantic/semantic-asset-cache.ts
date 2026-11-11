@@ -49,8 +49,12 @@ export class SemanticAssetCache {
     constructor(options: SemanticAssetCacheOptions = {}) {
         this.maxEntries = options.maxEntries ?? DEFAULT_MAX_ENTRIES;
         this.maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
-        if (!Number.isSafeInteger(this.maxEntries) || this.maxEntries < 0 ||
-            !Number.isSafeInteger(this.maxBytes) || this.maxBytes < 0) {
+        if (
+            !Number.isSafeInteger(this.maxEntries) ||
+            this.maxEntries < 0 ||
+            !Number.isSafeInteger(this.maxBytes) ||
+            this.maxBytes < 0
+        ) {
             throw new RangeError('Semantic asset budgets must be non-negative safe integers');
         }
     }
@@ -63,17 +67,32 @@ export class SemanticAssetCache {
      * @returns Opaque in-process key, or undefined when retention is disabled or unversioned.
      */
     key(adapter: UnifiedLanguageAdapter, path: string, content: string): string | undefined {
-        if (!adapter.version || !adapter.assetGeneration ||
-            this.maxEntries === 0 || this.maxBytes === 0) return undefined;
+        if (
+            !adapter.version ||
+            !adapter.assetGeneration ||
+            this.maxEntries === 0 ||
+            this.maxBytes === 0
+        )
+            return undefined;
         let identity = this.identities.get(adapter);
         if (!identity) {
             identity = randomUUID();
             this.identities.set(adapter, identity);
         }
-        return createHash('sha256').update(JSON.stringify([
-            identity, adapter.version, adapter.assetGeneration, adapter.language,
-            adapter.graphExtraction, path,
-        ])).update('\0').update(content, 'utf16le').digest('hex');
+        return createHash('sha256')
+            .update(
+                JSON.stringify([
+                    identity,
+                    adapter.version,
+                    adapter.assetGeneration,
+                    adapter.language,
+                    adapter.graphExtraction,
+                    path,
+                ]),
+            )
+            .update('\0')
+            .update(content, 'utf16le')
+            .digest('hex');
     }
 
     /**
@@ -83,7 +102,10 @@ export class SemanticAssetCache {
      */
     read(key: string): SemanticGraph | undefined {
         const asset = this.entries.get(key);
-        if (!asset) { this.misses++; return undefined; }
+        if (!asset) {
+            this.misses++;
+            return undefined;
+        }
         this.entries.delete(key);
         this.entries.set(key, asset);
         this.hits++;
@@ -105,7 +127,10 @@ export class SemanticAssetCache {
         if (bytes > this.maxBytes) return;
         const data = structuredClone(source);
         const previous = this.entries.get(key);
-        if (previous) { this.bytes -= previous.bytes; this.entries.delete(key); }
+        if (previous) {
+            this.bytes -= previous.bytes;
+            this.entries.delete(key);
+        }
         this.entries.set(key, { ...data, bytes });
         this.bytes += bytes;
         while (this.entries.size > this.maxEntries || this.bytes > this.maxBytes) {
@@ -119,7 +144,12 @@ export class SemanticAssetCache {
 
     /** Detached counters; reading telemetry neither changes recency nor exposes cached objects. */
     get stats(): SemanticAssetCacheStats {
-        return Object.freeze({ entries: this.entries.size, bytes: this.bytes,
-            hits: this.hits, misses: this.misses, evictions: this.evictions });
+        return Object.freeze({
+            entries: this.entries.size,
+            bytes: this.bytes,
+            hits: this.hits,
+            misses: this.misses,
+            evictions: this.evictions,
+        });
     }
 }

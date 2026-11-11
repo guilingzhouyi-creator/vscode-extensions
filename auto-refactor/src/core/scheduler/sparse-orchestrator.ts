@@ -79,10 +79,14 @@ function captureAuditRun(
         options,
         cascadeEvents: [],
         contentHashes,
-        contextHash: computeSimpleContentHash(JSON.stringify([
-            generation, options.analysisGeneration,
-            [...contentHashes], options.dependencyEdges ?? [],
-        ])),
+        contextHash: computeSimpleContentHash(
+            JSON.stringify([
+                generation,
+                options.analysisGeneration,
+                [...contentHashes],
+                options.dependencyEdges ?? [],
+            ]),
+        ),
     };
 }
 
@@ -183,7 +187,8 @@ export class SparseOrchestrator {
     ): Promise<{ findings: Issue[]; cacheHit: boolean }> {
         const contentHash = run.contentHashes?.get(file) ?? computeSimpleContentHash(content);
         const contextHash = run.contextHash
-            ? computeSimpleContentHash(JSON.stringify([run.contextHash, partition])) : undefined;
+            ? computeSimpleContentHash(JSON.stringify([run.contextHash, partition]))
+            : undefined;
         const cached = contextHash ? this.cache.get(file, contentHash, contextHash) : undefined;
         if (cached) {
             return { findings: cached.localFindings, cacheHit: true };
@@ -197,16 +202,17 @@ export class SparseOrchestrator {
             findingsForFile = await run.executor(file, content, partition);
         }
 
-        if (contextHash) this.cache.set({
-            filePath: file,
-            contentHash,
-            contextHash,
-            role: roleInference.role,
-            density,
-            localFindings: findingsForFile,
-            durationMs: 1,
-            cachedAt: Date.now(),
-        });
+        if (contextHash)
+            this.cache.set({
+                filePath: file,
+                contentHash,
+                contextHash,
+                role: roleInference.role,
+                density,
+                localFindings: findingsForFile,
+                durationMs: 1,
+                cachedAt: Date.now(),
+            });
         this.topologyCache.put(file, contentHash, contentHash, findingsForFile);
 
         return { findings: findingsForFile, cacheHit: false };
@@ -253,7 +259,9 @@ export class SparseOrchestrator {
                 fileContents,
                 run,
                 {
-                    onCacheHit: () => { cacheHits++; },
+                    onCacheHit: () => {
+                        cacheHits++;
+                    },
                     onProcessedUnit: async () => {
                         processedUnits++;
                         if (processedUnits % 15 === 0) {
@@ -339,7 +347,10 @@ export class SparseOrchestrator {
         fileContents = new Map(fileContents);
         options = options ? structuredClone(options) : undefined;
         const run = captureAuditRun(
-            this.customExecutor, this.executorGeneration, fileContents, options,
+            this.customExecutor,
+            this.executorGeneration,
+            fileContents,
+            options,
         );
         for (const file of files) {
             if (file && file.trim() && !fileContents.has(file)) {
@@ -356,7 +367,9 @@ export class SparseOrchestrator {
     }
 
     private async executeCapturedReview(
-        files: string[], fileContents: Map<string, string>, run: AuditRun,
+        files: string[],
+        fileContents: Map<string, string>,
+        run: AuditRun,
     ): Promise<SparseSchedulerResult> {
         const options = run.options;
         const timings = {
@@ -412,11 +425,11 @@ export class SparseOrchestrator {
         const sparseActivationSavingsRatio =
             totalPossibleDomainUnits > 0
                 ? Number(
-                    (
-                        1 -
-                        activatedUnits / Math.max(activatedUnits, totalPossibleDomainUnits)
-                    ).toFixed(2),
-                )
+                      (
+                          1 -
+                          activatedUnits / Math.max(activatedUnits, totalPossibleDomainUnits)
+                      ).toFixed(2),
+                  )
                 : 0.5;
 
         return {
@@ -437,7 +450,10 @@ export class SparseOrchestrator {
      * Detects potential semantic conflicts and dispatches cross-domain cascade events.
      */
     private detectAndDispatchCascades(
-        file: string, content: string, findings: Issue[], cascades: ReviewCascadeEvent[],
+        file: string,
+        content: string,
+        findings: Issue[],
+        cascades: ReviewCascadeEvent[],
     ): void {
         // Scenario 1: Comment contract contradicts implementation
         if (content.includes('Pure Utility') && /this\.\w+\s*=|global\.\w+\s*=/i.test(content)) {
