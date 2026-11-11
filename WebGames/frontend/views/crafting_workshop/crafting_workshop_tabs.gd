@@ -63,41 +63,47 @@ func _populate_recipe_grid() -> void:
 	_view._recipe_selected_index = -1
 	_clear_recipe_detail()
 
-## 构建配方网格细胞：稀有度配色边框（未习得灰化）+ 名称/状态标签 + 点击回调
-func _make_recipe_cell(recipe: Dictionary, catalog_index: int) -> Control:
+func _build_cell_panel(cell_size: Vector2, border_color: Color, border_width: int, on_selected: Callable) -> PanelContainer:
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(96, 96)
-	var learned: bool = bool(recipe.get("learned", false))
+	panel.custom_minimum_size = cell_size
 	var style := StyleBoxFlat.new()
 	style.bg_color = DesignTokens.COLOR_SURFACE_DEFAULT
-	style.border_color = KRarityTag.get_rarity_color(_rarity_str_to_level(str(recipe.get("rarity", "COMMON")))) if learned else DesignTokens.COLOR_TEXT_MUTED_DEFAULT
-	style.border_width_left = 2
-	style.border_width_right = 2
-	style.border_width_top = 2
-	style.border_width_bottom = 2
-	style.corner_radius_top_left = 6
-	style.corner_radius_top_right = 6
-	style.corner_radius_bottom_left = 6
-	style.corner_radius_bottom_right = 6
+	style.border_color = border_color
+	style.set_border_width_all(border_width)
+	style.set_corner_radius_all(6)
 	panel.add_theme_stylebox_override("panel", style)
 	var vbox := VBoxContainer.new()
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	var name_label := Label.new()
-	name_label.text = UIIntermediary.text(str(recipe.get("name", "")))
-	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_label.add_theme_font_size_override("font_size", 11)
-	name_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_DEFAULT if learned else DesignTokens.COLOR_TEXT_MUTED_DEFAULT)
-	vbox.add_child(name_label)
-	var status_label := Label.new()
-	status_label.text = UIIntermediary.text("ui.fe12.recipes.status_learned") if learned else UIIntermediary.text("ui.fe12.recipes.status_not_learned")
-	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	status_label.add_theme_font_size_override("font_size", 10)
-	status_label.add_theme_color_override("font_color", DesignTokens.COLOR_SUCCESS_DEFAULT if learned else DesignTokens.COLOR_DANGER_DEFAULT)
-	vbox.add_child(status_label)
 	panel.add_child(vbox)
 	panel.gui_input.connect(func(event: InputEvent) -> void:
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-			_on_recipe_cell_selected(catalog_index))
+			on_selected.call())
+	return panel
+
+func _make_centered_cell_label(text_value: String, font_size: int, font_color: Color = Color.WHITE, apply_color: bool = false) -> Label:
+	var lbl := Label.new()
+	lbl.text = text_value
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.add_theme_font_size_override("font_size", font_size)
+	if apply_color:
+		lbl.add_theme_color_override("font_color", font_color)
+	return lbl
+
+## 构建配方网格细胞：稀有度配色边框（未习得灰化）+ 名称/状态标签 + 点击回调
+func _make_recipe_cell(recipe: Dictionary, catalog_index: int) -> Control:
+	var learned: bool = bool(recipe.get("learned", false))
+	var border_color := KRarityTag.get_rarity_color(_rarity_str_to_level(str(recipe.get("rarity", "COMMON")))) if learned else DesignTokens.COLOR_TEXT_MUTED_DEFAULT
+	var panel := _build_cell_panel(Vector2(96, 96), border_color, 2, _on_recipe_cell_selected.bind(catalog_index))
+	var vbox := panel.get_child(0) as VBoxContainer
+	vbox.add_child(_make_centered_cell_label(
+		UIIntermediary.text(str(recipe.get("name", ""))),
+		11,
+		DesignTokens.COLOR_TEXT_DEFAULT if learned else DesignTokens.COLOR_TEXT_MUTED_DEFAULT,
+		true
+	))
+	var status_key := "ui.fe12.recipes.status_learned" if learned else "ui.fe12.recipes.status_not_learned"
+	var status_color := DesignTokens.COLOR_SUCCESS_DEFAULT if learned else DesignTokens.COLOR_DANGER_DEFAULT
+	vbox.add_child(_make_centered_cell_label(UIIntermediary.text(status_key), 10, status_color, true))
 	return panel
 
 ## 清空配方详情为占位态
@@ -205,37 +211,11 @@ func _populate_material_grid() -> void:
 
 ## 构建材料网格细胞：稀有度配色边框 + 名称/数量标签 + 点击回调
 func _make_material_cell(mat: Dictionary, list_index: int) -> Control:
-	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(80, 80)
-	var style := StyleBoxFlat.new()
-	style.bg_color = DesignTokens.COLOR_SURFACE_DEFAULT
-	style.border_color = KRarityTag.get_rarity_color(_rarity_str_to_level(str(mat.get("rarity", "COMMON"))))
-	style.border_width_left = 1
-	style.border_width_right = 1
-	style.border_width_top = 1
-	style.border_width_bottom = 1
-	style.corner_radius_top_left = 6
-	style.corner_radius_top_right = 6
-	style.corner_radius_bottom_left = 6
-	style.corner_radius_bottom_right = 6
-	panel.add_theme_stylebox_override("panel", style)
-	var vbox := VBoxContainer.new()
-	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	var name_label := Label.new()
-	name_label.text = UIIntermediary.text(str(mat.get("name", "")))
-	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_label.add_theme_font_size_override("font_size", 11)
-	vbox.add_child(name_label)
-	var qty_label := Label.new()
-	qty_label.text = "x%d" % int(mat.get("qty", 0))
-	qty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	qty_label.add_theme_font_size_override("font_size", 11)
-	qty_label.add_theme_color_override("font_color", DesignTokens.COLOR_SUCCESS_DEFAULT)
-	vbox.add_child(qty_label)
-	panel.add_child(vbox)
-	panel.gui_input.connect(func(event: InputEvent) -> void:
-		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-			_on_material_cell_selected(list_index))
+	var border_color := KRarityTag.get_rarity_color(_rarity_str_to_level(str(mat.get("rarity", "COMMON"))))
+	var panel := _build_cell_panel(Vector2(80, 80), border_color, 1, _on_material_cell_selected.bind(list_index))
+	var vbox := panel.get_child(0) as VBoxContainer
+	vbox.add_child(_make_centered_cell_label(UIIntermediary.text(str(mat.get("name", ""))), 11))
+	vbox.add_child(_make_centered_cell_label("x%d" % int(mat.get("qty", 0)), 11, DesignTokens.COLOR_SUCCESS_DEFAULT, true))
 	return panel
 
 ## 清空材料详情为占位态

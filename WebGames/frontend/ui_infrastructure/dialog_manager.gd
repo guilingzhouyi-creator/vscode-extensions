@@ -16,31 +16,30 @@ static func get_instance() -> DialogManager:
 		_instance.name = "DialogManager"
 	return _instance
 
+func _add_modal_button(
+	panel: Control,
+	btn_box: HBoxContainer,
+	text_key: String,
+	min_width: float,
+	on_pressed: Callable = Callable()
+) -> Button:
+	var btn := Button.new()
+	btn.text = UIIntermediary.text(text_key)
+	btn.custom_minimum_size = Vector2(min_width, 32)
+	btn.pressed.connect(func():
+		ModalManager.get_instance().close_modal(panel)
+		if on_pressed.is_valid():
+			on_pressed.call()
+	)
+	btn_box.add_child(btn)
+	return btn
+
 ## 弹出二次确认对话框 (确认 / 取消)
 func show_confirm(title: String, message: String, on_confirm: Callable, on_cancel: Callable = Callable()) -> Control:
 	var panel := _create_base_panel(title, message)
 	var btn_box: HBoxContainer = panel.get_node("Content/ButtonBox")
-
-	var btn_cancel := Button.new()
-	btn_cancel.text = UIIntermediary.text("ui.common.dialog.cancel")
-	btn_cancel.custom_minimum_size = Vector2(80, 32)
-	btn_cancel.pressed.connect(func():
-		ModalManager.get_instance().close_modal(panel)
-		if on_cancel.is_valid():
-			on_cancel.call()
-	)
-	btn_box.add_child(btn_cancel)
-
-	var btn_ok := Button.new()
-	btn_ok.text = UIIntermediary.text("ui.common.dialog.confirm")
-	btn_ok.custom_minimum_size = Vector2(80, 32)
-	btn_ok.pressed.connect(func():
-		ModalManager.get_instance().close_modal(panel)
-		if on_confirm.is_valid():
-			on_confirm.call()
-	)
-	btn_box.add_child(btn_ok)
-
+	_add_modal_button(panel, btn_box, "ui.common.dialog.cancel", 80, on_cancel)
+	_add_modal_button(panel, btn_box, "ui.common.dialog.confirm", 80, on_confirm)
 	ModalManager.get_instance().open_modal(panel, false)
 	return panel
 
@@ -48,37 +47,9 @@ func show_confirm(title: String, message: String, on_confirm: Callable, on_cance
 func show_exit_choice(title: String, message: String, on_exit_to_archive: Callable, on_quit_game: Callable, on_cancel: Callable = Callable()) -> Control:
 	var panel := _create_base_panel(title, message)
 	var btn_box: HBoxContainer = panel.get_node("Content/ButtonBox")
-
-	var btn_cancel := Button.new()
-	btn_cancel.text = UIIntermediary.text("ui.common.dialog.cancel")
-	btn_cancel.custom_minimum_size = Vector2(80, 32)
-	btn_cancel.pressed.connect(func():
-		ModalManager.get_instance().close_modal(panel)
-		if on_cancel.is_valid():
-			on_cancel.call()
-	)
-	btn_box.add_child(btn_cancel)
-
-	var btn_archive := Button.new()
-	btn_archive.text = UIIntermediary.text("ui.fe02.menu.exit_to_archive")
-	btn_archive.custom_minimum_size = Vector2(110, 32)
-	btn_archive.pressed.connect(func():
-		ModalManager.get_instance().close_modal(panel)
-		if on_exit_to_archive.is_valid():
-			on_exit_to_archive.call()
-	)
-	btn_box.add_child(btn_archive)
-
-	var btn_quit := Button.new()
-	btn_quit.text = UIIntermediary.text("ui.fe02.menu.exit")
-	btn_quit.custom_minimum_size = Vector2(90, 32)
-	btn_quit.pressed.connect(func():
-		ModalManager.get_instance().close_modal(panel)
-		if on_quit_game.is_valid():
-			on_quit_game.call()
-	)
-	btn_box.add_child(btn_quit)
-
+	_add_modal_button(panel, btn_box, "ui.common.dialog.cancel", 80, on_cancel)
+	_add_modal_button(panel, btn_box, "ui.fe02.menu.exit_to_archive", 110, on_exit_to_archive)
+	_add_modal_button(panel, btn_box, "ui.fe02.menu.exit", 90, on_quit_game)
 	ModalManager.get_instance().open_modal(panel, false)
 	return panel
 
@@ -86,17 +57,7 @@ func show_exit_choice(title: String, message: String, on_exit_to_archive: Callab
 func show_alert(title: String, message: String, on_acknowledged: Callable = Callable()) -> Control:
 	var panel := _create_base_panel(title, message)
 	var btn_box: HBoxContainer = panel.get_node("Content/ButtonBox")
-
-	var btn_ok := Button.new()
-	btn_ok.text = UIIntermediary.text("ui.common.dialog.ok")
-	btn_ok.custom_minimum_size = Vector2(90, 32)
-	btn_ok.pressed.connect(func():
-		ModalManager.get_instance().close_modal(panel)
-		if on_acknowledged.is_valid():
-			on_acknowledged.call()
-	)
-	btn_box.add_child(btn_ok)
-
+	_add_modal_button(panel, btn_box, "ui.common.dialog.ok", 90, on_acknowledged)
 	ModalManager.get_instance().open_modal(panel, false)
 	return panel
 
@@ -112,24 +73,11 @@ func show_prompt(title: String, placeholder: String, on_submit: Callable) -> Con
 	content.add_child(line_edit)
 	content.move_child(line_edit, 1) # 插入到标题下方、按钮上方
 
-	var btn_cancel := Button.new()
-	btn_cancel.text = UIIntermediary.text("ui.common.dialog.cancel")
-	btn_cancel.custom_minimum_size = Vector2(80, 32)
-	btn_cancel.pressed.connect(func():
-		ModalManager.get_instance().close_modal(panel)
-	)
-	btn_box.add_child(btn_cancel)
-
-	var btn_ok := Button.new()
-	btn_ok.text = UIIntermediary.text("ui.common.dialog.submit")
-	btn_ok.custom_minimum_size = Vector2(80, 32)
-	btn_ok.pressed.connect(func():
-		var text := line_edit.text
-		ModalManager.get_instance().close_modal(panel)
+	_add_modal_button(panel, btn_box, "ui.common.dialog.cancel", 80)
+	_add_modal_button(panel, btn_box, "ui.common.dialog.submit", 80, func():
 		if on_submit.is_valid():
-			on_submit.call(text)
+			on_submit.call(line_edit.text)
 	)
-	btn_box.add_child(btn_ok)
 
 	ModalManager.get_instance().open_modal(panel, false)
 	return panel

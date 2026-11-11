@@ -108,31 +108,28 @@ func refresh_up_items() -> void:
 	for item in up_items:
 		view._up_items_grid.add_child(make_up_item_cell(item))
 
+func _make_card_label(text_value: String, font_size: int, font_color: Color) -> Label:
+	var lbl := Label.new()
+	lbl.text = text_value
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.add_theme_font_size_override("font_size", font_size)
+	lbl.add_theme_color_override("font_color", font_color)
+	return lbl
+
+func _append_new_badge_if_applicable(vbox: VBoxContainer, item_data: Dictionary) -> void:
+	if bool(item_data.get("is_recently_added", item_data.get("is_new", false))):
+		vbox.add_child(_make_card_label(UIIntermediary.text("ui.fe06.result.new"), 10, DesignTokens.COLOR_SUCCESS_DEFAULT))
+
 func make_up_item_cell(item: Dictionary) -> Control:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(140, 80)
 	var vbox := VBoxContainer.new()
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	var name_label := Label.new()
-	name_label.text = UIIntermediary.text(str(item.get("name", "ui.fe06.unknown")))
-	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_label.add_theme_font_size_override("font_size", 12)
-	name_label.add_theme_color_override("font_color", KRarityTag.get_rarity_color(int(str(item.get("rarity", "3")))))
-	vbox.add_child(name_label)
-	var rarity_label := Label.new()
 	var rarity_str := str(item.get("rarity", "3"))
-	rarity_label.text = UIIntermediary.text("ui.fe06.rarity.star", {"rarity": rarity_str})
-	rarity_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	rarity_label.add_theme_font_size_override("font_size", 11)
-	rarity_label.add_theme_color_override("font_color", KRarityTag.get_rarity_color(int(rarity_str)))
-	vbox.add_child(rarity_label)
-	if bool(item.get("is_recently_added", item.get("is_new", false))):
-		var new_label := Label.new()
-		new_label.text = UIIntermediary.text("ui.fe06.result.new")
-		new_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		new_label.add_theme_font_size_override("font_size", 10)
-		new_label.add_theme_color_override("font_color", DesignTokens.COLOR_SUCCESS_DEFAULT)
-		vbox.add_child(new_label)
+	var rarity_color := KRarityTag.get_rarity_color(int(rarity_str))
+	vbox.add_child(_make_card_label(UIIntermediary.text(str(item.get("name", "ui.fe06.unknown"))), 12, rarity_color))
+	vbox.add_child(_make_card_label(UIIntermediary.text("ui.fe06.rarity.star", {"rarity": rarity_str}), 11, rarity_color))
+	_append_new_badge_if_applicable(vbox, item)
 	panel.add_child(vbox)
 	return panel
 
@@ -231,36 +228,14 @@ func make_result_cell(drop: Dictionary) -> Control:
 	var rarity_color := KRarityTag.get_rarity_color(int(rarity_str))
 	style.bg_color = DesignTokens.COLOR_SURFACE_DEFAULT
 	style.border_color = rarity_color
-	style.border_width_left = 2
-	style.border_width_right = 2
-	style.border_width_top = 2
-	style.border_width_bottom = 2
-	style.corner_radius_top_left = 6
-	style.corner_radius_top_right = 6
-	style.corner_radius_bottom_left = 6
-	style.corner_radius_bottom_right = 6
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(6)
 	panel.add_theme_stylebox_override("panel", style)
 	var vbox := VBoxContainer.new()
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	var rarity_label := Label.new()
-	rarity_label.text = UIIntermediary.text("ui.fe06.rarity.star", {"rarity": rarity_str})
-	rarity_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	rarity_label.add_theme_font_size_override("font_size", 14)
-	rarity_label.add_theme_color_override("font_color", rarity_color)
-	vbox.add_child(rarity_label)
-	var name_label := Label.new()
-	name_label.text = UIIntermediary.text(str(drop.get("name", "ui.fe06.unknown")))
-	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_label.add_theme_font_size_override("font_size", 11)
-	name_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_DEFAULT)
-	vbox.add_child(name_label)
-	if bool(drop.get("is_recently_added", drop.get("is_new", false))):
-		var new_label := Label.new()
-		new_label.text = UIIntermediary.text("ui.fe06.result.new")
-		new_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		new_label.add_theme_font_size_override("font_size", 10)
-		new_label.add_theme_color_override("font_color", DesignTokens.COLOR_SUCCESS_DEFAULT)
-		vbox.add_child(new_label)
+	vbox.add_child(_make_card_label(UIIntermediary.text("ui.fe06.rarity.star", {"rarity": rarity_str}), 14, rarity_color))
+	vbox.add_child(_make_card_label(UIIntermediary.text(str(drop.get("name", "ui.fe06.unknown"))), 11, DesignTokens.COLOR_TEXT_DEFAULT))
+	_append_new_badge_if_applicable(vbox, drop)
 	panel.add_child(vbox)
 	return panel
 
