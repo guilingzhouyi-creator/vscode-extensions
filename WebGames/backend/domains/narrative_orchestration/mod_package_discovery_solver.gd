@@ -15,6 +15,7 @@ const TIER0_BUILTIN_PATH: String = "res://config/narratives/packs/"
 const TIER1_MODS_REL_PATH: String = "mods/narratives/"
 const TIER2_USER_SANDBOX_PATH: String = "user://mods/narratives/"
 const MANIFEST_FILENAME: String = "pack.json"
+const EMPTY_LIST: Array = []
 
 ## 获取三级级联剧情 MOD 发现根目录列表
 static func get_discovery_roots(custom_roots: Array = []) -> Array[String]:
@@ -53,6 +54,7 @@ static func _parse_manifest_at_path(manifest_path: String, fallback_pack_id: Str
     var content := file.get_as_text()
     var parsed_val: Variant = JSON.parse_string(content)
     if not (parsed_val is Dictionary):
+        ErrorReporter.emit_error("mod_narrative", "CONFIG_JSON_PARSE_FAIL", "MOD 清单 pack.json 格式非法或解析失败: %s" % manifest_path, {"file_path": manifest_path})
         return null
 
     var dto := NarrativePackManifestDTO.from_dto(parsed_val as Dictionary)
@@ -63,7 +65,34 @@ static func _parse_manifest_at_path(manifest_path: String, fallback_pack_id: Str
 
     return dto
 
-## 扫描指定单个根目录下的全部子目录清单
+## 从 .kmod 归档包中读取并解析清单
+static func _parse_manifest_from_kmod(kmod_path: String, fallback_pack_id: String) -> NarrativePackManifestDTO:
+    var reader := ZIPReader.new()
+    var err := reader.open(kmod_path)
+    if err != OK:
+        ErrorReporter.emit_error("mod_narrative", "CONFIG_FILE_READ_FAIL", "无法打开 .kmod 归档包: %s" % kmod_path, {"file_path": kmod_path})
+        return null
+    var manifest_content := ""
+    if reader.file_exists("pack.json"):
+        manifest_content = reader.read_file("pack.json").get_string_from_utf8()
+    elif reader.file_exists("manifest.json"):
+        manifest_content = reader.read_file("manifest.json").get_string_from_utf8()
+    reader.close()
+    if manifest_content.is_empty():
+        ErrorReporter.emit_error("mod_narrative", "CONFIG_FILE_NOT_FOUND", ".kmod 归档包内缺失 pack.json 或 manifest.json: %s" % kmod_path, {"file_path": kmod_path})
+        return null
+    var parsed_val: Variant = JSON.parse_string(manifest_content)
+    if not (parsed_val is Dictionary):
+        ErrorReporter.emit_error("mod_narrative", "CONFIG_JSON_PARSE_FAIL", ".kmod 归档包内清单解析错误: %s" % kmod_path, {"file_path": kmod_path})
+        return null
+    var dto := NarrativePackManifestDTO.from_dto(parsed_val as Dictionary)
+    if dto.pack_id.is_empty():
+        dto.pack_id = fallback_pack_id
+    if dto.root_path.is_empty():
+        dto.root_path = kmod_path
+    return dto
+
+## 扫描指定单个根目录下的全部子目录清单与 .kmod 归档包
 static func _scan_single_root_directory(root_path: String, discovered_map: Dictionary, discovery_order: Array[String]) -> void:
     if not DirAccess.dir_exists_absolute(root_path):
         return
@@ -79,6 +108,14 @@ static func _scan_single_root_directory(root_path: String, discovered_map: Dicti
             var sub_dir := root_path.path_join(entry_name)
             var manifest_file := sub_dir.path_join(MANIFEST_FILENAME)
             var manifest_dto := _parse_manifest_at_path(manifest_file, entry_name)
+            if manifest_dto != null:
+                var pid := manifest_dto.pack_id
+                if not discovered_map.has(pid):
+                    discovery_order.append(pid)
+                discovered_map[pid] = manifest_dto
+        elif not dir.current_is_dir() and entry_name.ends_with(".kmod"):
+            var kmod_file := root_path.path_join(entry_name)
+            var manifest_dto := _parse_manifest_from_kmod(kmod_file, entry_name.get_basename())
             if manifest_dto != null:
                 var pid := manifest_dto.pack_id
                 if not discovered_map.has(pid):
@@ -122,7 +159,7 @@ static func _find_missing_dependencies(pack_map: Dictionary) -> Array[String]:
 static func _build_topology_tables(pack_map: Dictionary, in_degree: Dictionary, adj_list: Dictionary) -> void:
     for pid in pack_map.keys():
         in_degree[pid] = 0
-        adj_list[pid] = []
+        adj_list[pid] = Array()
 
     for pid in pack_map.keys():
         var pack_obj: NarrativePackManifestDTO = pack_map[pid]
@@ -150,7 +187,7 @@ static func _process_kahn_tier(
     var next_tier: Array[NarrativePackManifestDTO] = []
     for pack_obj in current_tier:
         sorted_packs.append(pack_obj)
-        var successors: Array = adj_list.get(pack_obj.pack_id, [])
+        var successors: Array = adj_list.get(pack_obj.pack_id, EMPTY_LIST)
         for succ_id in successors:
             var new_deg: int = int(in_degree.get(succ_id, 0)) - 1
             in_degree[succ_id] = new_deg
@@ -221,7 +258,11 @@ static func _read_json_file(file_path: String) -> Variant:
     var f := FileAccess.open(file_path, FileAccess.READ)
     if f == null:
         return null
-    return JSON.parse_string(f.get_as_text())
+    var text := f.get_as_text()
+    var parsed: Variant = JSON.parse_string(text)
+    if parsed == null and not text.strip_edges().is_empty():
+        ErrorReporter.emit_error("mod_narrative", "CONFIG_JSON_PARSE_FAIL", "MOD JSON 解析语法错误: %s" % file_path, {"file_path": file_path})
+    return parsed
 
 ## 递归展平 i18n 嵌套字典为点分键与斜杠键
 static func _flatten_i18n_dict(dict: Dictionary, prefix: String, target: Dictionary) -> void:
@@ -306,6 +347,9 @@ static func _load_destinies_and_routing(mod_dir: String, pkg: Dictionary) -> voi
 
 ## 从指定目录完整读取并组装单包数据字典
 static func load_full_mod_package_from_dir(mod_dir: String) -> Dictionary:
+    if mod_dir.ends_with(".kmod"):
+        return _load_full_package_from_kmod(mod_dir)
+
     var manifest_path := mod_dir.path_join(MANIFEST_FILENAME)
     var pack_raw: Variant = _read_json_file(manifest_path)
     if not (pack_raw is Dictionary):
@@ -325,6 +369,55 @@ static func load_full_mod_package_from_dir(mod_dir: String) -> Dictionary:
     pkg["root_path"] = mod_dir
     return pkg
 
+## 从 .kmod 归档包完整读取并组装 MOD 数据字典
+static func _load_full_package_from_kmod(kmod_path: String) -> Dictionary:
+    var reader := ZIPReader.new()
+    if reader.open(kmod_path) != OK:
+        ErrorReporter.emit_error("mod_narrative", "CONFIG_FILE_READ_FAIL", "无法打开 .kmod 归档包: %s" % kmod_path, {"file_path": kmod_path})
+        return {}
+    var files := reader.get_files()
+    var manifest_raw: Variant = null
+    if reader.file_exists("pack.json"):
+        manifest_raw = JSON.parse_string(reader.read_file("pack.json").get_string_from_utf8())
+    elif reader.file_exists("manifest.json"):
+        manifest_raw = JSON.parse_string(reader.read_file("manifest.json").get_string_from_utf8())
+    if not (manifest_raw is Dictionary):
+        reader.close()
+        return {}
+    var pkg: Dictionary = (manifest_raw as Dictionary).duplicate(true)
+    var dag_graphs: Dictionary = pkg.get("dag_graphs", {})
+    var custom_i18n: Dictionary = pkg.get("custom_i18n", {})
+    for f in files:
+        if f.begins_with("dag_graphs/") and f.ends_with(".json"):
+            var raw: Variant = JSON.parse_string(reader.read_file(f).get_string_from_utf8())
+            if raw is Dictionary:
+                var stem := f.get_file().get_basename()
+                var dag_id := str((raw as Dictionary).get("dag_id", (raw as Dictionary).get("graph_id", stem)))
+                dag_graphs[dag_id] = raw
+        elif f.begins_with("i18n/") and f.ends_with(".json"):
+            var raw: Variant = JSON.parse_string(reader.read_file(f).get_string_from_utf8())
+            if raw is Dictionary:
+                _flatten_i18n_dict(raw as Dictionary, "", custom_i18n)
+        elif f == "destinies.json":
+            var raw: Variant = JSON.parse_string(reader.read_file(f).get_string_from_utf8())
+            if raw is Dictionary:
+                for k in ["ui_capabilities", "custom_origins", "custom_traits", "paired_presets", "custom_starter_kits", "custom_routing_rules"]:
+                    if (raw as Dictionary).has(k):
+                        pkg[k] = (raw as Dictionary)[k]
+        elif f == "routing_rules.json":
+            var raw: Variant = JSON.parse_string(reader.read_file(f).get_string_from_utf8())
+            if raw is Dictionary:
+                var rval: Variant = (raw as Dictionary).get("custom_routing_rules", (raw as Dictionary).get("routing_rules", []))
+                if rval is Array:
+                    var existing: Array = pkg.get("custom_routing_rules", [])
+                    existing.append_array(rval as Array)
+                    pkg["custom_routing_rules"] = existing
+    reader.close()
+    pkg["dag_graphs"] = dag_graphs
+    pkg["custom_i18n"] = custom_i18n
+    pkg["root_path"] = kmod_path
+    return pkg
+
 ## 扫描三级级联目录并按拓扑排序顺序组装已安装的全量 MOD 包数组
 static func scan_installed_full_mod_packages(custom_roots: Array = []) -> Array[Dictionary]:
     var installed_packs: Array[NarrativePackManifestDTO] = scan_installed_packs(custom_roots)
@@ -334,6 +427,9 @@ static func scan_installed_full_mod_packages(custom_roots: Array = []) -> Array[
     if bool(sort_res.get("success", false)):
         ordered_packs = sort_res.get("sorted_packs", [])
     else:
+        var err_code := str(sort_res.get("error", "CONFIG_VALIDATION_FAILED"))
+        var err_msg := "MOD 依赖拓扑排序失败: %s" % err_code
+        ErrorReporter.emit_error("mod_narrative", "CONFIG_VALIDATION_FAILED", err_msg, sort_res)
         ordered_packs = installed_packs
 
     var result: Array[Dictionary] = []

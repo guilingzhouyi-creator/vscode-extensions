@@ -49,6 +49,14 @@ var runtime_placeholders: Dictionary = {} # 占位符键 → 动态解析实值�
 # 五、序列化与反序列化
 # ==============================================================================
 
+## 序列化序章执行上下文为字典（对齐 SaveAssembler 领域持久化契约）
+func serialize() -> Dictionary:
+	return to_dto()
+
+## 反序列化序章执行上下文（对齐 SaveAssembler 领域持久化回灌契约）
+static func deserialize(d: Dictionary) -> CharacterPrologueContext:
+	return from_dto(d)
+
 ## 序列化序章执行上下文为字典（runtime_placeholders 深拷贝防外部突变）
 func to_dto() -> Dictionary:
 	return {

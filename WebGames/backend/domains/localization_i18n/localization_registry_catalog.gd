@@ -12,6 +12,7 @@ class_name LocalizationRegistryCatalog
 extends RefCounted
 
 const LocalizationI18nDTO = preload("res://backend/domains/localization_i18n/dto/localization_i18n_dto.gd")
+const EMPTY_DICT: Dictionary = {}
 
 ## 全局共享词库实例（懒加载）：启动即灌入 config/i18n 双词典（英文唯一底座 + 中文展示层）
 static var _shared: LocalizationRegistryCatalog = null
@@ -96,7 +97,7 @@ func load_locale_dict(locale: String, source_dict: Dictionary) -> void:
     for loc_key in source_dict:
         _locale_dictionaries[locale][str(loc_key)] = str(source_dict[loc_key])
 
-## 注入第三方 MOD 多语言词条（支持冲突覆盖与原模板快照暂存，实现隔离管理）
+## 注入第三方 MOD 多语言词条（支持冲突覆盖与原模板快照备份，实现隔离管理）
 func merge_mod_translations(
     mod_id: String,
     locale: String,
@@ -153,10 +154,11 @@ func unload_mod_translations(mod_id: String) -> int:
 
     var cleaned_count := 0
     var mod_locales: Dictionary = _mod_translations[mod_id]
+    var mod_orig: Dictionary = _mod_original_templates.get(mod_id, EMPTY_DICT)
 
     for locale in mod_locales:
         var keys: Array = mod_locales[locale]
-        var orig_map: Dictionary = _mod_original_templates.get(mod_id, {}).get(locale, {})
+        var orig_map: Dictionary = mod_orig.get(locale, EMPTY_DICT)
 
         for loc_key in keys:
             var key_str := str(loc_key)

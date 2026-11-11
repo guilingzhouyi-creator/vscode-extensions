@@ -4,12 +4,12 @@
 # 架构定位: Headless Mode Isolation Solver / Zero-Network Fast-Path Guard
 # 依赖与触发: 上游: WorldGatewayFSM, AuthoritySyncStub | 下游: WorldGatewayModel | 配置: config/domains/world_gateway.json | 信号: 无
 # 职责说明: 针对首个发行体验版提供单机与联机双轨环境的严格隔离；
-#           单机模式实行 100% 离线、零网络轮询、本地权威与瞬时同步的极致性能快道；
-#           联机模式严格作为占位预留 (Stub)，快速失败拦截并杜绝任何空跑轮询协程污染单机热路径。
-# 退出语义与设计依据: 首发单机极致纯粹性与联机占位防线架构规约 (Inv-MODE-ISO-1)
+#           单机模式实行 100% 离线、零网络轮询、本地权威与瞬时同步的高效性能快道；
+#           联机模式严格作为待命存根预留 (Stub)，快速失败拦截并杜绝任何空跑轮询协程污染单机热路径。
+# 退出语义与设计依据: 首发单机纯粹性与联机存根防线架构规约 (Inv-MODE-ISO-1)
 # ==============================================================================
 
-## RunModeIsolationSolver：单机极致快道与联机占位隔离解算器
+## RunModeIsolationSolver：单机快道与联机存根隔离解算器
 class_name RunModeIsolationSolver
 extends RefCounted
 
@@ -33,11 +33,11 @@ const MODE_MULTIPLAYER: int = WorldGatewayModel.GameMode.MULTIPLAYER
 static func is_offline_single_player(mode: int) -> bool:
 	return mode == MODE_SINGLE_PLAYER
 
-## 判定是否为联机占位模式（预留灰度，首发体验版不开放）
+## 判定是否为联机存根预留模式（预留灰度，首发体验版不开放）
 static func is_multiplayer_placeholder(mode: int) -> bool:
 	return mode == MODE_MULTIPLAYER
 
-## 判定是否旁路跳过网络心跳与远程轮询（单机模式与占位联机模式均应旁路，防止无谓开销）
+## 判定是否旁路跳过网络心跳与远程轮询（单机模式与存根联机模式均应旁路，防止无谓开销）
 static func should_bypass_network_poll(mode: int) -> bool:
 	return true
 

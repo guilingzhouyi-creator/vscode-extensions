@@ -23,6 +23,7 @@ var available_choices: Array[Dictionary] = []
 var character_snapshot: Dictionary = {}
 var is_terminal: bool = false
 var error_code: String = ""
+var diagnostic_dump: Dictionary = {} # 伴侣黑匣子现场转储字典（故障排查与现场复盘）
 
 # ==============================================================================
 # 二、对象池与重置契约 (ADV-PRF-002)
@@ -36,13 +37,14 @@ func reset_state() -> void:
 	character_snapshot.clear()
 	is_terminal = false
 	error_code = ""
+	diagnostic_dump.clear()
 
 # ==============================================================================
 # 三、序列化与工厂方法
 # ==============================================================================
 func to_dto() -> Dictionary:
 	var choices_copy: Array[Dictionary] = available_choices.duplicate(true)
-	return {
+	var res: Dictionary = {
 		"session_id": session_id,
 		"step_index": step_index,
 		"current_node_id": current_node_id,
@@ -52,6 +54,9 @@ func to_dto() -> Dictionary:
 		"is_terminal": is_terminal,
 		"error_code": error_code
 	}
+	if not diagnostic_dump.is_empty():
+		res["diagnostic_dump"] = diagnostic_dump.duplicate(true)
+	return res
 
 ## 从输入字典反序列化还原传输对象
 static func from_dto(raw: Dictionary) -> AgentObservationPacketDTO:
@@ -73,6 +78,9 @@ static func from_dto(raw: Dictionary) -> AgentObservationPacketDTO:
 		dto.character_snapshot = (raw_snap as Dictionary).duplicate(true)
 	dto.is_terminal = bool(raw.get("is_terminal", false))
 	dto.error_code = str(raw.get("error_code", ""))
+	var raw_dump: Variant = raw.get("diagnostic_dump", {})
+	if raw_dump is Dictionary:
+		dto.diagnostic_dump = (raw_dump as Dictionary).duplicate(true)
 	return dto
 
 # ==============================================================================

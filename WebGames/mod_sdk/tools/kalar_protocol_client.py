@@ -124,7 +124,8 @@ def validate_unified_response_envelope(data: dict[str, Any]) -> tuple[bool, list
         errors.append("server_timestamp_ms 必须为非负物理毫秒时间戳")
 
     allowed_keys = {
-        "request_id", "is_success", "payload", "error_code", "message", "server_timestamp_ms"
+        "request_id", "is_success", "success", "payload", "data",
+        "error_code", "message", "error_message", "causal_delta", "server_timestamp_ms"
     }
     for k in data.keys():
         if k not in allowed_keys:

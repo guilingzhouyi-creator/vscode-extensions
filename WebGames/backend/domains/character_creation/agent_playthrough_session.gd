@@ -23,6 +23,7 @@ var profile: CharacterProfile = null
 var adapted_manifest: Dictionary = {}
 var is_terminal: bool = false
 var history_stack: Array[Dictionary] = []
+var last_diagnostic_dump: Dictionary = {}
 
 # ==============================================================================
 # 二、推演启动核心入口 (Start Session)
@@ -34,16 +35,18 @@ func start_session(config: Dictionary) -> Dictionary:
 	step_index = 0
 	is_terminal = false
 	history_stack.clear()
+	last_diagnostic_dump.clear()
 
 	# 1. 预检并加载候选包
 	var manifest_res := _resolve_mod_manifest(config)
 	if not bool(manifest_res.get("success", false)):
 		is_terminal = true
 		var err_code: String = str(manifest_res.get("error_code", "ERR_MOD_PRECHECK_FAILED"))
-		CompanionBlackboxRecorder.create_diagnostic_dump(err_code, "", "", {
+		last_diagnostic_dump = CompanionBlackboxRecorder.create_diagnostic_dump(err_code, "", "", {
 			"config": config,
 			"manifest_res": manifest_res
 		})
+		_notify_diagnostic_dump(err_code)
 		return _build_error_observation(err_code)
 	adapted_manifest = manifest_res.get("adapted_manifest", {})
 
@@ -55,10 +58,11 @@ func start_session(config: Dictionary) -> Dictionary:
 	if not bool(solve_res.get("success", false)):
 		is_terminal = true
 		var err_code: String = str(solve_res.get("error_code", "REINCARNATION_FAILED"))
-		CompanionBlackboxRecorder.create_diagnostic_dump(err_code, "", "", {
+		last_diagnostic_dump = CompanionBlackboxRecorder.create_diagnostic_dump(err_code, "", "", {
 			"req": req.to_dto(),
 			"solve_res": solve_res
 		})
+		_notify_diagnostic_dump(err_code)
 		return _build_error_observation(err_code)
 
 	# 3. 角色档案构建与新手套件发放
@@ -78,11 +82,12 @@ func start_session(config: Dictionary) -> Dictionary:
 	if engine == null:
 		is_terminal = true
 		var err_code := "DAG_NOT_FOUND"
-		CompanionBlackboxRecorder.create_diagnostic_dump(err_code, "", "", {
+		last_diagnostic_dump = CompanionBlackboxRecorder.create_diagnostic_dump(err_code, "", "", {
 			"race_id": ctx.race_id,
 			"origin_id": origin_id,
 			"profile": profile.serialize()
 		})
+		_notify_diagnostic_dump(err_code)
 		return _build_error_observation(err_code)
 
 	is_terminal = engine.is_terminated
@@ -139,19 +144,21 @@ func step(action: Dictionary) -> Dictionary:
 	if current_node == null:
 		is_terminal = true
 		var err_code := "NODE_NOT_FOUND"
-		CompanionBlackboxRecorder.create_diagnostic_dump(err_code, "", active_nid, {
+		last_diagnostic_dump = CompanionBlackboxRecorder.create_diagnostic_dump(err_code, "", active_nid, {
 			"session_id": session_id,
 			"step_index": step_index
 		})
+		_notify_diagnostic_dump(err_code)
 		return _build_error_observation(err_code)
 
 	if not _validate_choice_legality(current_node, choice_id):
 		var err_code := "INVALID_CHOICE"
-		CompanionBlackboxRecorder.create_diagnostic_dump(err_code, "", active_nid, {
+		last_diagnostic_dump = CompanionBlackboxRecorder.create_diagnostic_dump(err_code, "", active_nid, {
 			"session_id": session_id,
 			"attempted_choice": choice_id,
 			"available_choices": current_node.choices
 		})
+		_notify_diagnostic_dump(err_code)
 		return _build_error_observation(err_code)
 
 	var action_payload: Dictionary = {}
@@ -163,12 +170,13 @@ func step(action: Dictionary) -> Dictionary:
 	var exec_res: Dictionary = engine.execute_node_action(active_nid, action_payload)
 	if not bool(exec_res.get("success", false)):
 		var err_code: String = str(exec_res.get("error_code", "EXECUTION_FAILED"))
-		CompanionBlackboxRecorder.create_diagnostic_dump(err_code, "", active_nid, {
+		last_diagnostic_dump = CompanionBlackboxRecorder.create_diagnostic_dump(err_code, "", active_nid, {
 			"session_id": session_id,
 			"step_index": step_index,
 			"action_payload": action_payload,
 			"exec_res": exec_res
 		})
+		_notify_diagnostic_dump(err_code)
 		return _build_error_observation(err_code)
 
 	var mutations: Array = exec_res.get("mutations", [])
@@ -444,9 +452,20 @@ func _build_error_observation(err_code: String) -> Dictionary:
 	packet.current_node_id = _get_active_node_id()
 	packet.is_terminal = is_terminal
 	packet.error_code = err_code
+	if not last_diagnostic_dump.is_empty():
+		packet.diagnostic_dump = last_diagnostic_dump.duplicate(true)
 	if profile != null:
 		packet.character_snapshot = _build_character_snapshot()
 	return packet.to_dto()
+
+func _notify_diagnostic_dump(err_code: String) -> void:
+	var bus := CompanionObserverBus.get_instance()
+	if bus != null and not last_diagnostic_dump.is_empty():
+		bus.broadcast_event("diagnostic_dump_recorded", {
+			"session_id": session_id,
+			"error_code": err_code,
+			"dump": last_diagnostic_dump
+		})
 
 func _record_history_snapshot(chosen_action: String = "") -> void:
 	var snap: Dictionary = {
