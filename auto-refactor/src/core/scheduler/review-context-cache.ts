@@ -45,7 +45,9 @@ export class ReviewContextCache {
      * @returns Detached matching entry or undefined.
      */
     public get(
-        filePath: string, contentHash: string, contextHash?: string,
+        filePath: string,
+        contentHash: string,
+        contextHash?: string,
     ): ReviewContextEntry | undefined {
         const entry = this.entries.get(JSON.stringify([filePath, contextHash ?? null]));
         if (entry && entry.contentHash === contentHash && entry.contextHash === contextHash) {
@@ -64,7 +66,8 @@ export class ReviewContextCache {
      */
     public set(entry: ReviewContextEntry): void {
         this.entries.set(
-            JSON.stringify([entry.filePath, entry.contextHash ?? null]), structuredClone(entry),
+            JSON.stringify([entry.filePath, entry.contextHash ?? null]),
+            structuredClone(entry),
         );
     }
 

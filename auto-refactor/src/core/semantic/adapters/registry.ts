@@ -132,11 +132,10 @@ export class SemanticAdapterRegistry {
             };
             const extraction = adapter.extractToGraph(filePath, content, replacement);
             if (extraction) {
-                return extraction.then(publish)
-                    .catch(error => {
-                        graph.cancelFileUpdate(filePath, token);
-                        throw error;
-                    });
+                return extraction.then(publish).catch((error) => {
+                    graph.cancelFileUpdate(filePath, token);
+                    throw error;
+                });
             }
             return publish();
         } catch (error) {

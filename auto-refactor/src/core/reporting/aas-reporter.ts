@@ -271,8 +271,7 @@ function projectDimensionDetails(
         if (breakdown.confidence !== undefined) {
             confidenceField = {
                 confidence:
-                    Math.round(breakdown.confidence * ROUND_SCALE_HUNDRED) /
-                    ROUND_SCALE_HUNDRED,
+                    Math.round(breakdown.confidence * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED,
             };
         }
         details[dimension] = {

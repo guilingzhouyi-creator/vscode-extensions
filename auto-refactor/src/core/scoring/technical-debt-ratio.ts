@@ -223,9 +223,9 @@ const PILLAR_BY_RULE_PREFIX: Readonly<Record<string, PrimaryQualityPillar>> = Ob
     'TB-': 'testing',
     // reliability
     'GOV-': 'reliability',
-  // Staged-differential gate bounds sit with governance: both answer "can this commit be trusted
-  // to land unchanged", not "how well is the code organised".
-  'GAT-': 'reliability',
+    // Staged-differential gate bounds sit with governance: both answer "can this commit be trusted
+    // to land unchanged", not "how well is the code organised".
+    'GAT-': 'reliability',
     'HYG-': 'reliability',
     'ERR-': 'reliability',
     'RES-': 'reliability',

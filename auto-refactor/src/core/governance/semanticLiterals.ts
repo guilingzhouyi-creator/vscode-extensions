@@ -761,10 +761,7 @@ function classifyStructuralString(unquoted: string): SemanticClassification | nu
         };
     }
 
-    if (
-        REGEX.LITERAL.PATH_PREFIX.test(unquoted) ||
-        REGEX.LITERAL.FILE_EXTENSION.test(unquoted)
-    ) {
+    if (REGEX.LITERAL.PATH_PREFIX.test(unquoted) || REGEX.LITERAL.FILE_EXTENSION.test(unquoted)) {
         return {
             kind: 'file-path',
             isReasonable: false,

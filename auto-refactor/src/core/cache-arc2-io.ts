@@ -265,10 +265,7 @@ export async function flushArc2L2Async(
                 }),
             );
         } else {
-            await appendBytesSafeAsync(
-                paths.l2DeltaWalPath,
-                serializeArc2L2FramesOnly(dirtyList),
-            );
+            await appendBytesSafeAsync(paths.l2DeltaWalPath, serializeArc2L2FramesOnly(dirtyList));
         }
     }
 }

@@ -232,15 +232,10 @@ export class DisaggregatedAuditPipeline {
         slice: PrefillAuditSlice,
     ): Promise<DecodeSliceVerdict> {
         const activeSet = new Set(slice.activeAnalyzers);
-        const result = await scanner.runAnalyzers(
-            slice.filePath,
-            slice.content,
-            undefined,
-            {
-                activeAnalyzers: activeSet,
-                lineBounds: slice.lineBounds,
-            },
-        );
+        const result = await scanner.runAnalyzers(slice.filePath, slice.content, undefined, {
+            activeAnalyzers: activeSet,
+            lineBounds: slice.lineBounds,
+        });
 
         return {
             sliceId: slice.sliceId,

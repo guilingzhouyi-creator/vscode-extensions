@@ -341,7 +341,8 @@ export interface ElocCounterDerivationOptions {
  * Resolves four-tier orthogonal ELOC counters.
  */
 function deriveElocCounters(options: ElocCounterDerivationOptions): ElocCounters {
-    const { processedEloc, uniqueIncrement, isFirstBaseline, existingLifetime, diffCounters } = options;
+    const { processedEloc, uniqueIncrement, isFirstBaseline, existingLifetime, diffCounters } =
+        options;
     let uniqueCount = uniqueIncrement;
     if (!isFirstBaseline && existingLifetime) {
         uniqueCount = Math.max(existingLifetime.eloc.uniqueTotal, uniqueIncrement);

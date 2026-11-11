@@ -271,7 +271,12 @@ function processChunkTextLines(
 ): { reachedCutoff: boolean; malformedCount: number; leftover: string } {
     const lines = chunkText.split('\n');
     const leftover = lines[0];
-    const { reachedCutoff, malformedCount } = parseLineBufferReverse(lines, query, lines.length - 1, 1);
+    const { reachedCutoff, malformedCount } = parseLineBufferReverse(
+        lines,
+        query,
+        lines.length - 1,
+        1,
+    );
     return { reachedCutoff, malformedCount, leftover };
 }
 
@@ -298,7 +303,12 @@ async function readArchiveChunksReverse(
             const readSize = Math.min(REVERSE_CHUNK_SIZE, currentFilePosition);
             currentFilePosition -= readSize;
 
-            const { bytesRead } = await fileHandle.read(chunkBuffer, 0, readSize, currentFilePosition);
+            const { bytesRead } = await fileHandle.read(
+                chunkBuffer,
+                0,
+                readSize,
+                currentFilePosition,
+            );
             const chunkText = chunkBuffer.toString('utf8', 0, bytesRead) + pendingLineSegment;
 
             const parseResult = processChunkTextLines(chunkText, query);
@@ -309,7 +319,11 @@ async function readArchiveChunksReverse(
         }
 
         if (pendingLineSegment.trim() && query.accumulator.length < query.maxRecords) {
-            const outcome = tryParseRecordLine(pendingLineSegment.trim(), query.cutoffTimeMs, query.accumulator);
+            const outcome = tryParseRecordLine(
+                pendingLineSegment.trim(),
+                query.cutoffTimeMs,
+                query.accumulator,
+            );
             if (!outcome.isValid) malformedCount++;
         }
     } catch {
@@ -390,7 +404,10 @@ export async function readRecordsTieredReverse(
     }
 
     const archivePath = path.join(ledgerDir, FILE_ARCHIVE_RUNS);
-    if (activeOutcome.earliestTimestamp > cutoffTimeMs && (await checkFileExistsAsync(archivePath))) {
+    if (
+        activeOutcome.earliestTimestamp > cutoffTimeMs &&
+        (await checkFileExistsAsync(archivePath))
+    ) {
         const archiveMalformedCount = await readArchiveChunksReverse(archivePath, query);
         malformedCount += archiveMalformedCount;
     }
@@ -415,7 +432,9 @@ interface BucketMetricsAccumulator {
     latestScore: number;
 }
 
-function computeBucketMetricsAccumulator(records: CompactTrajectoryRecord[]): BucketMetricsAccumulator {
+function computeBucketMetricsAccumulator(
+    records: CompactTrajectoryRecord[],
+): BucketMetricsAccumulator {
     let processedEloc = 0;
     let changedEloc = 0;
     let semanticEloc = 0;
@@ -538,15 +557,19 @@ function aggregateSingleBucket(
     const netDebtPoints = acc.debtResolved - acc.debtAdded;
     const netDebtYield =
         acc.semanticEloc > 0
-            ? Math.round((netDebtPoints / (acc.semanticEloc / ELOC_KILO_SCALE)) * ROUNDING_FACTOR_TWO_DECIMALS) /
-              ROUNDING_FACTOR_TWO_DECIMALS
+            ? Math.round(
+                  (netDebtPoints / (acc.semanticEloc / ELOC_KILO_SCALE)) *
+                      ROUNDING_FACTOR_TWO_DECIMALS,
+              ) / ROUNDING_FACTOR_TWO_DECIMALS
             : netDebtPoints;
 
     const gatePassRate =
-        Math.round((acc.gatePassedCount / runsCount) * PERCENT_MULTIPLIER * ROUNDING_FACTOR_TWO_DECIMALS) /
-        ROUNDING_FACTOR_TWO_DECIMALS;
+        Math.round(
+            (acc.gatePassedCount / runsCount) * PERCENT_MULTIPLIER * ROUNDING_FACTOR_TWO_DECIMALS,
+        ) / ROUNDING_FACTOR_TWO_DECIMALS;
 
-    const meanQed = Math.round((acc.qedSum / runsCount) * QED_PRECISION_SCALE) / QED_PRECISION_SCALE;
+    const meanQed =
+        Math.round((acc.qedSum / runsCount) * QED_PRECISION_SCALE) / QED_PRECISION_SCALE;
 
     return {
         bucketId: boundary.bucketId,
@@ -792,7 +815,9 @@ export async function projectTimelineReport(
     let bucketType = options.bucket;
     if (!bucketType) {
         bucketType =
-            durationMs <= MS_PER_HOUR * DEFAULT_AUTO_HOUR_WINDOW ? BUCKET_TYPE_HOUR : BUCKET_TYPE_DAY;
+            durationMs <= MS_PER_HOUR * DEFAULT_AUTO_HOUR_WINDOW
+                ? BUCKET_TYPE_HOUR
+                : BUCKET_TYPE_DAY;
     }
 
     const { records, malformedCount } = await readRecordsTieredReverse(

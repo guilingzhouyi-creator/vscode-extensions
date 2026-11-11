@@ -305,12 +305,12 @@ function resolveGroupsForUpdate(
         if (result.expandedKeys.length > 0) {
             logger.warn(
                 `Baseline update rejected ${result.expandedKeys.length} expansion(s) ` +
-                `under ratchet-down policy. New debt must be fixed or suppressed.`,
+                    `under ratchet-down policy. New debt must be fixed or suppressed.`,
             );
         }
         logger.info(
             `baseline ratchet-down: pruned=${result.prunedKeys.length} ` +
-            `decreasedCount=${result.decreasedCount} totalGroups=${result.groups.length}`,
+                `decreasedCount=${result.decreasedCount} totalGroups=${result.groups.length}`,
         );
         return result.groups;
     }
@@ -420,7 +420,7 @@ function applyBaselinePayload(
     const legacyNotice = snapshot.severityAware ? '' : LEGACY_ESCALATION_NOTICE;
     logger.info(
         `baseline ratchet(${baselineData.granularity ?? 'id'}): accepted=${accepted} ` +
-        `newIssues=${newIssues.length}${legacyNotice}`,
+            `newIssues=${newIssues.length}${legacyNotice}`,
     );
 }
 

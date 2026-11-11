@@ -76,9 +76,9 @@ const DIMENSION_PERFORMANCE_EFFICIENCY = 'performanceEfficiency';
 
 interface FamilyDeductionEntry {
     readonly dimension:
-    | typeof DIMENSION_ARCHITECTURE_CONSISTENCY
-    | typeof DIMENSION_CODE_SECURITY
-    | typeof DIMENSION_PERFORMANCE_EFFICIENCY;
+        | typeof DIMENSION_ARCHITECTURE_CONSISTENCY
+        | typeof DIMENSION_CODE_SECURITY
+        | typeof DIMENSION_PERFORMANCE_EFFICIENCY;
     readonly deduction: number;
     readonly rationale: (msg: string) => string;
 }

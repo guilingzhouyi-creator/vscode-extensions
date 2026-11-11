@@ -33,11 +33,7 @@ import {
 import { nativeCore } from '../native';
 import type { NativeDiffHunk } from '../native';
 import { FNV1A_32_PRIME, FNV1A_32_OFFSET_BASIS, fnv1a32, hashLines } from '../algorithms/hash';
-import {
-    acquireLineBuffers,
-    expandWorkingBuffers,
-    releaseLineBuffers,
-} from './line-buffer-pool';
+import { acquireLineBuffers, expandWorkingBuffers, releaseLineBuffers } from './line-buffer-pool';
 import {
     type EditRange,
     type EditRangeExtractionParams,
@@ -127,7 +123,8 @@ export function extractLinesOf(content: string, starts: number[]): string[] {
     const out: string[] = [];
     for (let lineIndex = 0; lineIndex < starts.length; lineIndex++) {
         const startOffset = starts[lineIndex];
-        const endOffset = lineIndex + 1 < starts.length ? starts[lineIndex + 1] - 1 : content.length;
+        const endOffset =
+            lineIndex + 1 < starts.length ? starts[lineIndex + 1] - 1 : content.length;
         out.push(content.slice(startOffset, endOffset));
     }
     return out;

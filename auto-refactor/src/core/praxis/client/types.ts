@@ -17,7 +17,9 @@ import type { ReviewExecution } from '../../review/review-execution';
 import type { DiffInput, Issue, ScanConfig, ScanReport } from '../../types';
 import type { SourceSnapshot } from '../../review/source-snapshot';
 import type {
-    ReviewRequest, ReviewRuntime, SnapshotReviewResult,
+    ReviewRequest,
+    ReviewRuntime,
+    SnapshotReviewResult,
 } from '../../review/review-executor';
 import type { SemanticGraphSnapshot } from '../../review/semantic-snapshot';
 import type { PraxisCardContext, ReviewDiffHunk } from '../contracts';

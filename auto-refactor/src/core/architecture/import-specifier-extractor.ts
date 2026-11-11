@@ -10,11 +10,7 @@
  */
 
 import * as path from 'path';
-import {
-    REGEX,
-    createJsImportScanner,
-    createGdscriptPreloadScanner,
-} from '../constants';
+import { REGEX, createJsImportScanner, createGdscriptPreloadScanner } from '../constants';
 
 /** Clean Architecture layer name for domain code, used in comparisons and path prefixes. */
 const ARCHITECTURE_LAYER_DOMAIN = 'domain';

@@ -319,7 +319,10 @@ export interface SiteDetailOptions {
  * @param options - Evidence chain, risk assessment, and remediation instructions.
  * @returns Populated SemanticReviewDetail bound to the site symbol.
  */
-export function buildSiteDetail(site: DataAccessSite, options: SiteDetailOptions): SemanticReviewDetail {
+export function buildSiteDetail(
+    site: DataAccessSite,
+    options: SiteDetailOptions,
+): SemanticReviewDetail {
     const isDeterministic = options.reliable ?? true;
     return {
         language: LANGUAGE_TYPESCRIPT,

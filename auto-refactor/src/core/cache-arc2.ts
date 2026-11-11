@@ -356,7 +356,8 @@ export function encodeArc2L2Frame(entry: L2EntryRecord): Buffer {
 
     const keyBuf = Buffer.from(entry.k, 'utf8');
     const pathBuf = Buffer.from(entry.p, 'utf8');
-    const metaBytes = U32_BYTES + keyBuf.length + U32_BYTES + pathBuf.length + FRAME_META_FIXED_BYTES;
+    const metaBytes =
+        U32_BYTES + keyBuf.length + U32_BYTES + pathBuf.length + FRAME_META_FIXED_BYTES;
     const payloadByteLen = metaBytes + pr50Slice.length;
 
     const frame = Buffer.allocUnsafe(ARC2_FRAME_HEADER_BYTES + payloadByteLen);

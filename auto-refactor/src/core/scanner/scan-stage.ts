@@ -248,10 +248,7 @@ async function readCommentSampleMap(
     return sampleMap;
 }
 
-function hasConfiguredCommentLanguage(
-    commentsPlan: ResolvedAnalyzer,
-    cfg: ScanConfig,
-): boolean {
+function hasConfiguredCommentLanguage(commentsPlan: ResolvedAnalyzer, cfg: ScanConfig): boolean {
     const planLang = commentsPlan.options?.targetDominantLanguage;
     const cfgLang = cfg.analyzers?.comments?.options?.targetDominantLanguage;
     return Boolean(planLang || cfgLang);

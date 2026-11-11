@@ -652,11 +652,7 @@ export interface LineAuditDispatchOptions {
 /**
  * Resolves case-insensitive column index in raw line with single boundary probe.
  */
-function resolveAsciiRawColumn(
-    context: LineAuditContext,
-    term: string,
-    hintIndex: number,
-): number {
+function resolveAsciiRawColumn(context: LineAuditContext, term: string, hintIndex: number): number {
     const termLen = term.length;
     const lowerTerm = term.toLowerCase();
 

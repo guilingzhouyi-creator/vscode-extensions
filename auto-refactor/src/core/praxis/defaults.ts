@@ -287,7 +287,11 @@ export class DefaultPraxisRollbackGatekeeper implements IPraxisRollbackGatekeepe
         _targetBranch: string,
         _diffPayload: ReviewDiffHunk[],
     ): { approved: boolean; reason?: string; violations?: string[] } {
-        return { approved: false, reason: DEFAULT_MERGE_GATE_ERR, violations: [DEFAULT_MERGE_GATE_ERR] };
+        return {
+            approved: false,
+            reason: DEFAULT_MERGE_GATE_ERR,
+            violations: [DEFAULT_MERGE_GATE_ERR],
+        };
     }
 }
 

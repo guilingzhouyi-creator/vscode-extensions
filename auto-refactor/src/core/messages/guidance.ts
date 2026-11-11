@@ -55,7 +55,8 @@ export const GuidanceMessages = {
     // Prompt Rendering Section Titles
     /** Render the guardrail prompt title. ASCII-only because pictograms survive tokenizers and
      *  terminals inconsistently; the bracketed label carries the section role instead. */
-    TITLE_LOCAL_GUARDRAILS: (filePath: string) => `### [Agent Local Engineering Guardrails: ${filePath}]`,
+    TITLE_LOCAL_GUARDRAILS: (filePath: string) =>
+        `### [Agent Local Engineering Guardrails: ${filePath}]`,
     /**
      * Render the blockquote that identifies the target scope and optional architecture layer.
      *

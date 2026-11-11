@@ -376,10 +376,7 @@ function extractFunctionQualityScores(content: string, issues: Issue[]): Functio
             endLine,
             cyclomaticComplexity,
         );
-        const score = clampScore(
-            THEORETICAL_SCORE_CEILING - deduction,
-            THEORETICAL_SCORE_CEILING,
-        );
+        const score = clampScore(THEORETICAL_SCORE_CEILING - deduction, THEORETICAL_SCORE_CEILING);
 
         functions.push({
             functionName: current.name,

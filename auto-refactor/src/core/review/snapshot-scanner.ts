@@ -39,7 +39,9 @@ interface SnapshotScanOptions {
         path: string,
         content: string,
     ) => Promise<{
-        issues: Issue[]; metric: FileMetric | null; execution?: FileExecutionObservation;
+        issues: Issue[];
+        metric: FileMetric | null;
+        execution?: FileExecutionObservation;
     }>;
 }
 /** Snapshot, exact scope and cancellation shared by read-only input replay. */
@@ -117,7 +119,8 @@ export async function executeSnapshotScan(
     }
     signal?.throwIfAborted();
     return Object.freeze({
-        source: 'immutable-snapshot', identity: snapshot.identity,
+        source: 'immutable-snapshot',
+        identity: snapshot.identity,
         inputs: Object.freeze(inputs),
         issues: Object.freeze(issues),
         fileMetrics: Object.freeze(fileMetrics),

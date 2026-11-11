@@ -43,10 +43,7 @@ const SCRATCH_STACK: TraversalFrame[] = [];
  * @param root - Root normalized node to begin traversal.
  * @param visitor - Consumer callback invoked for each node. Returning false skips children.
  */
-export function walkNormalizedTree(
-    root: NormalizedNode,
-    visitor: NormalizedNodeVisitor,
-): void {
+export function walkNormalizedTree(root: NormalizedNode, visitor: NormalizedNodeVisitor): void {
     if (!root) return;
 
     let stackIdx = 0;

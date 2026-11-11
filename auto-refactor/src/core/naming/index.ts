@@ -148,7 +148,8 @@ export interface PolyglotNamingContext {
 /**
  * Supported naming styles across languages and contexts.
  */
-export type NamingConvention = 'camelCase' | 'PascalCase' | 'snake_case' | 'kebab-case' | 'UPPER_SNAKE_CASE';
+export type NamingConvention =
+    'camelCase' | 'PascalCase' | 'snake_case' | 'kebab-case' | 'UPPER_SNAKE_CASE';
 
 /**
  * Formats an identifier to match the requested naming convention.

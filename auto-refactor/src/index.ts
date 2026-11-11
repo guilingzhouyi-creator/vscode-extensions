@@ -182,7 +182,7 @@ async function handleSymbolsCommand(args: string[]): Promise<void> {
         }
         process.stdout.write(
             `  coverage defs=${symbolQueryResult.stats.definitions} refs=${symbolQueryResult.stats.references} ` +
-            `crossFile=${symbolQueryResult.stats.crossFileReferences} (${symbolQueryResult.stats.builtFrom})\n`,
+                `crossFile=${symbolQueryResult.stats.crossFileReferences} (${symbolQueryResult.stats.builtFrom})\n`,
         );
         process.exit(0);
     } catch (error: unknown) {

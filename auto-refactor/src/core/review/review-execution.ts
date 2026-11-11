@@ -142,7 +142,10 @@ function resolveExecutionStatus(input: ReviewExecutionInput): ReviewExecutionSta
     if (input.tracks.deep === STATUS_PENDING || input.tracks.deep === STATUS_RUNNING) {
         return STATUS_PARTIAL;
     }
-    if (required.length === 0 || required.some((coverageItem) => !isCapabilityComplete(coverageItem))) {
+    if (
+        required.length === 0 ||
+        required.some((coverageItem) => !isCapabilityComplete(coverageItem))
+    ) {
         return STATUS_PARTIAL;
     }
     return STATUS_COMPLETE;

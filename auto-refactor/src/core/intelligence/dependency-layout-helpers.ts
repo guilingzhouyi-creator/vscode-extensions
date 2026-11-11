@@ -190,9 +190,7 @@ const customExemptionPatternMap = new Map<string, RegExp>();
  * @param customExemptions - Array of custom exemption token strings.
  * @returns Precompiled RegExp or null if empty.
  */
-export function resolveCustomExemptionRegex(
-    customExemptions: readonly string[],
-): RegExp | null {
+export function resolveCustomExemptionRegex(customExemptions: readonly string[]): RegExp | null {
     if (!customExemptions || customExemptions.length === 0) {
         return null;
     }

@@ -86,9 +86,11 @@ export class TypeScriptSemanticAdapter extends UnifiedLanguageAdapter {
         }
         const specifier = decl.moduleSpecifier.text;
         const targetId = `import:${JSON.stringify([this.language, specifier])}`;
-        graph.addEdge(this.createDependencyEdge(moduleNodeId, targetId, {
-            moduleSpecifier: specifier,
-        }));
+        graph.addEdge(
+            this.createDependencyEdge(moduleNodeId, targetId, {
+                moduleSpecifier: specifier,
+            }),
+        );
     }
 
     /**

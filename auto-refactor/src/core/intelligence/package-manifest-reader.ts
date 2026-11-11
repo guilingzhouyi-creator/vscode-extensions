@@ -88,7 +88,8 @@ export function extractLicenseFromManifest(
     manifest: RawPackageManifest | null | undefined,
 ): string | null {
     if (!manifest) return null;
-    const directLicense = typeof manifest.license === 'string' ? manifest.license : manifest.license?.type;
+    const directLicense =
+        typeof manifest.license === 'string' ? manifest.license : manifest.license?.type;
     if (typeof directLicense === 'string') return directLicense;
     if (Array.isArray(manifest.licenses) && manifest.licenses[0]?.type) {
         return manifest.licenses[0].type;

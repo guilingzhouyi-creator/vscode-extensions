@@ -21,7 +21,6 @@ import { RISK_HIGH, RISK_LOW, RISK_MEDIUM, type DiagnosticDescriptor } from './t
 /** Loop-nesting depth at or above which PRF-ALG-001 escalates risk to High. */
 const HIGH_RISK_NESTING_DEPTH = 4;
 
-
 /**
  * Performance-rule diagnostic descriptor catalog.
  *

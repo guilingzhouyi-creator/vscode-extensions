@@ -31,11 +31,7 @@ export type { AgentTopologyLayer } from '../reporters/agent-directives-types';
 import { inferFineGrainedFileRole } from '../intelligence/file-role-inference';
 import { getRoleBudget } from '../intelligence/elastic-budget-matrix';
 import { compressDiagnosticSentence, cleanSuggestion } from '../reporting/aas-remediation';
-import {
-    estimateNarrowTokens,
-    estimateTokens,
-    measureJsonBaseline,
-} from './token-estimate';
+import { estimateNarrowTokens, estimateTokens, measureJsonBaseline } from './token-estimate';
 
 /** Maximum number of memory rule hits rendered as frequent violations in the guidance prompt. */
 const MAX_MEMORY_RULE_HITS = 5;

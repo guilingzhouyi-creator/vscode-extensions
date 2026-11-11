@@ -348,7 +348,8 @@ export async function runCyclePass(
     if (snapshotSource) {
         for (const file of files) {
             const content = snapshotSource.get(file);
-            if (content === undefined) throw new Error(`snapshot dependency source missing: ${file}`);
+            if (content === undefined)
+                throw new Error(`snapshot dependency source missing: ${file}`);
             contents.set(file, content);
             graph.registerFromContent(file, content);
         }
