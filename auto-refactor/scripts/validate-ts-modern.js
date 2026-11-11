@@ -192,7 +192,9 @@ async function main() {
       typeIssues[0].message.includes('UnusedType') && !typeIssues[0].message.includes('formatTime'),
       `Expected only UnusedType in TSM-TYPE-001, got: ${typeIssues[0].message}`,
     );
-    console.log('  ✔ TSM-TYPE-001 ignores runtime functions, constants, and enum accesses after colon');
+    console.log(
+      '  ✔ TSM-TYPE-001 ignores runtime functions, constants, and enum accesses after colon',
+    );
   } finally {
     cleanupTempDir(root);
   }

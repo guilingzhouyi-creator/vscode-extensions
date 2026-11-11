@@ -73,15 +73,22 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
     // Nested gate scripts under scripts/ps1 and scripts/sh
     fs.mkdirSync(path.join(testDirectory, 'scripts', 'ps1'), { recursive: true });
     fs.mkdirSync(path.join(testDirectory, 'scripts', 'sh'), { recursive: true });
-    fs.writeFileSync(path.join(testDirectory, 'scripts', 'ps1', 'pre-commit-gate.ps1'), '# ps1 gate');
+    fs.writeFileSync(
+      path.join(testDirectory, 'scripts', 'ps1', 'pre-commit-gate.ps1'),
+      '# ps1 gate',
+    );
     fs.writeFileSync(path.join(testDirectory, 'scripts', 'sh', 'pre-commit-gate.sh'), '# sh gate');
 
     repoContext = inspectRepoArchetype(testDirectory);
     assert.strictEqual(repoContext.primaryArchetype, 'polyglot');
     assert.ok(repoContext.archetypes.includes('node'));
     assert.ok(repoContext.archetypes.includes('rust'));
-    assert.ok(repoContext.gateScripts.files.some((filePath) => filePath.includes('pre-commit-gate.ps1')));
-    assert.ok(repoContext.gateScripts.files.some((filePath) => filePath.includes('pre-commit-gate.sh')));
+    assert.ok(
+      repoContext.gateScripts.files.some((filePath) => filePath.includes('pre-commit-gate.ps1')),
+    );
+    assert.ok(
+      repoContext.gateScripts.files.some((filePath) => filePath.includes('pre-commit-gate.sh')),
+    );
 
     console.log(
       '  ✔ 1. Universal repository archetype detection (Node, Rust, Polyglot, Nested Gate Scripts)',
@@ -129,7 +136,10 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
 (function testMissingLocalHooks() {
   const testDirectory = createTempDir('missing-hook');
   try {
-    fs.writeFileSync(path.join(testDirectory, 'package.json'), JSON.stringify({ name: 'ci-only-project' }));
+    fs.writeFileSync(
+      path.join(testDirectory, 'package.json'),
+      JSON.stringify({ name: 'ci-only-project' }),
+    );
     fs.mkdirSync(path.join(testDirectory, '.github', 'workflows'), { recursive: true });
     fs.writeFileSync(
       path.join(testDirectory, '.github', 'workflows', 'ci.yml'),

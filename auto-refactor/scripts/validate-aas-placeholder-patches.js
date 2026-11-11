@@ -176,9 +176,6 @@ function runTests() {
 try {
   runTests();
 } catch (executionError) {
-  console.error(
-    'FAIL: validate-aas-placeholder-patches.js encountered an error:',
-    executionError,
-  );
+  console.error('FAIL: validate-aas-placeholder-patches.js encountered an error:', executionError);
   process.exitCode = 1;
 }

@@ -208,14 +208,20 @@ function runSingleArtifactMigration(sourcePath, options) {
   try {
     aas = projectToAas(payload);
   } catch (err) {
-    return { status: STATUS_SKIPPED, detail: `${relative}: not a report artifact (${err.message})` };
+    return {
+      status: STATUS_SKIPPED,
+      detail: `${relative}: not a report artifact (${err.message})`,
+    };
   }
 
   const destination = computeSidecarPath(sourcePath);
   const summary = `${relative}: verdict=${aas.verdict} score=${aas.health.score ?? 'N/A'} files=${Object.keys(aas.files || {}).length}`;
 
   if (!options.write) {
-    return { status: STATUS_MIGRATED, detail: `${summary} (dry run -> ${path.basename(destination)})` };
+    return {
+      status: STATUS_MIGRATED,
+      detail: `${summary} (dry run -> ${path.basename(destination)})`,
+    };
   }
 
   const serialized = JSON.stringify(aas, null, options.pretty ? 2 : 0);

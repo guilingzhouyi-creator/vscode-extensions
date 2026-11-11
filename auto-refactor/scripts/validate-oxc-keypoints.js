@@ -116,7 +116,9 @@ function normalize(scanReport) {
     .sort((issueA, issueB) => (issueA.id < issueB.id ? -1 : issueA.id > issueB.id ? 1 : 0));
   const fileMetrics = scanReport.fileMetrics
     .map((metric) => ({ ...metric }))
-    .sort((metricA, metricB) => (metricA.file < metricB.file ? -1 : metricA.file > metricB.file ? 1 : 0));
+    .sort((metricA, metricB) =>
+      metricA.file < metricB.file ? -1 : metricA.file > metricB.file ? 1 : 0,
+    );
   return JSON.stringify(
     {
       filesScanned: scanReport.summary.filesScanned,
@@ -148,7 +150,8 @@ function buildIssueLookup(issues) {
   for (const issue of issues) {
     const rule = issue.rule;
     const line = issue.location && issue.location.start ? issue.location.start.line : undefined;
-    const val = issue.detail && issue.detail.value !== undefined ? String(issue.detail.value) : undefined;
+    const val =
+      issue.detail && issue.detail.value !== undefined ? String(issue.detail.value) : undefined;
     if (val !== undefined) {
       const rvKey = `${rule}|${val}`;
       countsByRuleVal.set(rvKey, (countsByRuleVal.get(rvKey) || 0) + 1);
@@ -247,7 +250,10 @@ async function main() {
     fs.writeFileSync(path.join(SRC, 'widget.ts'), CONTENT);
     fs.writeFileSync(path.join(SRC, 'dep.ts'), "export const DEP = 'dep token';\n");
     fs.writeFileSync(path.join(SRC, 'other.ts'), "export const extra = 'other token';\n");
-    fs.writeFileSync(path.join(TMP, 'auto-refactor.config.json'), JSON.stringify(CONFIG, null, 2) + '\n');
+    fs.writeFileSync(
+      path.join(TMP, 'auto-refactor.config.json'),
+      JSON.stringify(CONFIG, null, 2) + '\n',
+    );
 
     const { scan } = require(path.join(ROOT, 'dist', 'api'));
     process.env.AR_FASTPATH = '0';
@@ -288,7 +294,9 @@ async function main() {
 
     const issues = JSON.parse(normalizedWithFastpath).issues;
     const lookup = buildIssueLookup(issues);
-    const widget = reportWithFastpath.fileMetrics.find((metric) => metric.file.endsWith('widget.ts'));
+    const widget = reportWithFastpath.fileMetrics.find((metric) =>
+      metric.file.endsWith('widget.ts'),
+    );
 
     runKeypointSpecs(KEYPOINT_SPECS, lookup, widget, pass, fail);
 

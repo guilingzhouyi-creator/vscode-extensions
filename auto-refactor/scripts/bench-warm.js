@@ -33,9 +33,14 @@ const FILES = 1001;
 const MIXED = 100;
 
 const commandArguments = process.argv.slice(2);
-const parser = (commandArguments.find((arg) => arg.startsWith('--parser=')) || '--parser=oxc').split('=')[1];
+const parser = (
+  commandArguments.find((arg) => arg.startsWith('--parser=')) || '--parser=oxc'
+).split('=')[1];
 const workers =
-  parseInt((commandArguments.find((arg) => arg.startsWith('--workers=')) || '--workers=4').split('=')[1], 10) || 4;
+  parseInt(
+    (commandArguments.find((arg) => arg.startsWith('--workers=')) || '--workers=4').split('=')[1],
+    10,
+  ) || 4;
 
 const DEFAULT_WARM_THRESHOLDS = Object.freeze({
   magicNumberMin: 2,
@@ -105,7 +110,10 @@ function buildCorpus() {
   removeDirectoryWithRetry(CORPUS);
   fs.mkdirSync(path.join(CORPUS, 'src'), { recursive: true });
   for (let fileIndex = 0; fileIndex < FILES; fileIndex++) {
-    fs.writeFileSync(path.join(CORPUS, 'src', `bench_${fileIndex}.ts`), TEMPLATES[fileIndex % TEMPLATES.length]);
+    fs.writeFileSync(
+      path.join(CORPUS, 'src', `bench_${fileIndex}.ts`),
+      TEMPLATES[fileIndex % TEMPLATES.length],
+    );
   }
   const configuration = {
     format: 'json',
@@ -121,7 +129,10 @@ function buildCorpus() {
     failOnAnalyzerError: false,
     parser,
   };
-  fs.writeFileSync(path.join(CORPUS, 'auto-refactor.config.json'), JSON.stringify(configuration, null, 2));
+  fs.writeFileSync(
+    path.join(CORPUS, 'auto-refactor.config.json'),
+    JSON.stringify(configuration, null, 2),
+  );
 }
 
 /** Modifies a subset of corpus files to simulate code churn. */
@@ -179,7 +190,12 @@ async function runColdAndWarmStages() {
   if (!isDaemonStarted) throw new Error('daemon failed to start for bench');
 
   const startTimeWarmFirst = performance.now();
-  const warmFirstReport = await scanWarm({ ...baseScanOptions, daemon: 'on', cache: true, cacheDir: CACHE_DIR });
+  const warmFirstReport = await scanWarm({
+    ...baseScanOptions,
+    daemon: 'on',
+    cache: true,
+    cacheDir: CACHE_DIR,
+  });
   const warmFirstDurationMs = printBenchmarkTiming(
     'S2 warm-1st',
     performance.now() - startTimeWarmFirst,
@@ -187,7 +203,12 @@ async function runColdAndWarmStages() {
   );
 
   const startTimeWarmSecond = performance.now();
-  const warmSecondReport = await scanWarm({ ...baseScanOptions, daemon: 'on', cache: true, cacheDir: CACHE_DIR });
+  const warmSecondReport = await scanWarm({
+    ...baseScanOptions,
+    daemon: 'on',
+    cache: true,
+    cacheDir: CACHE_DIR,
+  });
   const warmSecondDurationMs = printBenchmarkTiming(
     'S3 warm-2nd',
     performance.now() - startTimeWarmSecond,
@@ -195,7 +216,12 @@ async function runColdAndWarmStages() {
   );
 
   const startTimeWarmThird = performance.now();
-  const warmThirdReport = await scanWarm({ ...baseScanOptions, daemon: 'on', cache: true, cacheDir: CACHE_DIR });
+  const warmThirdReport = await scanWarm({
+    ...baseScanOptions,
+    daemon: 'on',
+    cache: true,
+    cacheDir: CACHE_DIR,
+  });
   const warmThirdDurationMs = printBenchmarkTiming(
     'S4 warm-3rd',
     performance.now() - startTimeWarmThird,
@@ -214,7 +240,12 @@ async function runColdAndWarmStages() {
 async function runMixedAndCliStages() {
   updateSampleCorpusFiles(MIXED);
   const startTimeMixed = performance.now();
-  const mixedReport = await scanWarm({ ...baseScanOptions, daemon: 'on', cache: true, cacheDir: CACHE_DIR });
+  const mixedReport = await scanWarm({
+    ...baseScanOptions,
+    daemon: 'on',
+    cache: true,
+    cacheDir: CACHE_DIR,
+  });
   const mixedDurationMs = printBenchmarkTiming(
     'S5 mixed-10%',
     performance.now() - startTimeMixed,
@@ -244,7 +275,9 @@ async function runMixedAndCliStages() {
   const cliDurationMs = printBenchmarkTiming(
     'S6 cold-2nd',
     performance.now() - startTimeCli,
-    cliSpawnResult.status === 0 ? '(cli spawn, hot disk cache)' : `FAILED status=${cliSpawnResult.status}`,
+    cliSpawnResult.status === 0
+      ? '(cli spawn, hot disk cache)'
+      : `FAILED status=${cliSpawnResult.status}`,
   );
 
   return {
@@ -340,7 +373,9 @@ async function main() {
 
   const isAcceptable = speedupS3 >= 5 && speedupS4 >= 5;
   console.log(
-    isAcceptable ? '\nACCEPTANCE: ✔ PASS (S3/S4 >= 5x vs S1)' : '\nACCEPTANCE: ✖ BLOCK (S3/S4 < 5x vs S1)',
+    isAcceptable
+      ? '\nACCEPTANCE: ✔ PASS (S3/S4 >= 5x vs S1)'
+      : '\nACCEPTANCE: ✖ BLOCK (S3/S4 < 5x vs S1)',
   );
 
   recordBenchmarkHistory(timings, isAcceptable, speedupS3, speedupS4);

@@ -111,13 +111,13 @@ const PARALLEL_SUITES = [
   { name: 'validate-capp-protocol', script: 'scripts/validate-capp-protocol.js' },
   { name: 'validate-sidecar-coverage', script: 'scripts/validate-sidecar-coverage.js' },
   {
-      name: 'validate-aas-reporter',
-      script: 'scripts/validate-aas-reporter.js',
-    },
-    {
-      name: 'validate-aas-placeholder-patches',
-      script: 'scripts/validate-aas-placeholder-patches.js',
-    },
+    name: 'validate-aas-reporter',
+    script: 'scripts/validate-aas-reporter.js',
+  },
+  {
+    name: 'validate-aas-placeholder-patches',
+    script: 'scripts/validate-aas-placeholder-patches.js',
+  },
   { name: 'validate-praxis-presentation', script: 'scripts/validate-praxis-presentation.js' },
   {
     name: 'validate-dual-faced-presentation',
@@ -480,7 +480,9 @@ async function runVitestUnit(skip) {
     let stderr = '';
     childProcessInstance.stdout.on('data', (chunk) => (stdout += chunk));
     childProcessInstance.stderr.on('data', (chunk) => (stderr += chunk));
-    childProcessInstance.on('error', (spawnError) => resolve({ code: 1, stdout, stderr: String(spawnError) }));
+    childProcessInstance.on('error', (spawnError) =>
+      resolve({ code: 1, stdout, stderr: String(spawnError) }),
+    );
     childProcessInstance.on('close', (exitCode) => resolve({ code: exitCode, stdout, stderr }));
   });
   return {

@@ -429,7 +429,9 @@ function assertStatementAnchorIsolation() {
   const textAnchorsAgain = swa.indexAnchors('src/stmts.ts', source);
   assert.strictEqual(textAnchorsAgain.length, 4, 'Text cache must remain isolated from AST cache');
   assert.strictEqual(textAnchorsAgain[0].name, 'A');
-  console.log('  ✔ statement anchors are independent and AST/text caches are isolated (cache-isolation)');
+  console.log(
+    '  ✔ statement anchors are independent and AST/text caches are isolated (cache-isolation)',
+  );
 }
 
 /**
@@ -572,7 +574,9 @@ function assertAdaptiveWindowIntegration() {
   assert.strictEqual(winBigSparse.isBounded, true, '300 lines fits low-density 475 cap');
   assert.strictEqual(winBigSparse.reason, REASON_COMPOUND_ANCHOR_WINDOW);
 
-  console.log('  ✔ adaptive window capacity calibrated from code density metrics (adaptive-window-cap)');
+  console.log(
+    '  ✔ adaptive window capacity calibrated from code density metrics (adaptive-window-cap)',
+  );
 }
 
 function main() {

@@ -179,7 +179,11 @@ async function testEndToEndScalablePipeline() {
     enableTensorPartitioning: false,
     dependencyEdges: edges,
   });
-  assert.strictEqual(changedResult.cacheHits, 0, 'A changed analysis generation must not reuse findings');
+  assert.strictEqual(
+    changedResult.cacheHits,
+    0,
+    'A changed analysis generation must not reuse findings',
+  );
 
   console.log('  ✔ End-to-End scalable pipeline verified:');
   console.log(`    - Partitions evaluated: ${result.partitionCount}`);

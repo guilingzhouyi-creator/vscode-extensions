@@ -182,12 +182,10 @@ function assertWindowEquivalence() {
 
   const boundedLines = [];
   const stats = createSparseHopperStats();
-  runStreaming(
-    FIXTURE_ADAPTER,
-    buildFixtureTree(),
-    [buildRecordingEntry(boundedLines)],
-    { lineBounds: [6, 9], hopperStats: stats },
-  );
+  runStreaming(FIXTURE_ADAPTER, buildFixtureTree(), [buildRecordingEntry(boundedLines)], {
+    lineBounds: [6, 9],
+    hopperStats: stats,
+  });
   assert.deepStrictEqual(
     boundedLines,
     [6, 7],

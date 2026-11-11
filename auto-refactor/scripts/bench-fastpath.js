@@ -66,7 +66,9 @@ function normalizeScanReport(rawReport) {
     .sort((issueA, issueB) => (issueA.id < issueB.id ? -1 : issueA.id > issueB.id ? 1 : 0));
   const fileMetrics = rawReport.fileMetrics
     .map((metricItem) => ({ ...metricItem }))
-    .sort((metricA, metricB) => (metricA.file < metricB.file ? -1 : metricA.file > metricB.file ? 1 : 0));
+    .sort((metricA, metricB) =>
+      metricA.file < metricB.file ? -1 : metricA.file > metricB.file ? 1 : 0,
+    );
   return JSON.stringify(
     {
       filesScanned: rawReport.summary.filesScanned,
@@ -211,7 +213,9 @@ function generateHeavyFileContent(fileIndex) {
     contentParts.push(`  }`);
     contentParts.push(`  for (let loopIdx = 0; loopIdx < ${(stepIndex % 5) + 2}; loopIdx++) {`);
     contentParts.push(`    accumulator += loopIdx * ${coeffC};`);
-    contentParts.push(`    if (loopIdx > 2 && paramY === ${stringLiteral}) { accumulator -= ${coeffC}; }`);
+    contentParts.push(
+      `    if (loopIdx > 2 && paramY === ${stringLiteral}) { accumulator -= ${coeffC}; }`,
+    );
     contentParts.push(`  }`);
     contentParts.push(`  while (accumulator > 100000) { accumulator -= 1000; }`);
     contentParts.push(`  const tokenMessage = ${stringLiteral};`);
@@ -383,14 +387,22 @@ async function main() {
   }
 
   const lightAvgBytes =
-    CORPUS_SELECTION !== 'heavy' ? buildCorpus(LIGHT_CORPUS_DIR, generateLightFileContent, 1001) : null;
+    CORPUS_SELECTION !== 'heavy'
+      ? buildCorpus(LIGHT_CORPUS_DIR, generateLightFileContent, 1001)
+      : null;
   const heavyAvgBytes =
-    CORPUS_SELECTION !== 'light' ? buildCorpus(HEAVY_CORPUS_DIR, generateHeavyFileContent, 1001) : null;
+    CORPUS_SELECTION !== 'light'
+      ? buildCorpus(HEAVY_CORPUS_DIR, generateHeavyFileContent, 1001)
+      : null;
   if (lightAvgBytes) {
-    console.log(`[bench-fastpath] corpus light (${PARSER_NAME}): 1001 files, avg ~${lightAvgBytes}B`);
+    console.log(
+      `[bench-fastpath] corpus light (${PARSER_NAME}): 1001 files, avg ~${lightAvgBytes}B`,
+    );
   }
   if (heavyAvgBytes) {
-    console.log(`[bench-fastpath] corpus heavy (${PARSER_NAME}): 1001 files, avg ~${heavyAvgBytes}B`);
+    console.log(
+      `[bench-fastpath] corpus heavy (${PARSER_NAME}): 1001 files, avg ~${heavyAvgBytes}B`,
+    );
   }
 
   console.log(`\n[bench-fastpath] per-file (in-process, Mode B, ${PARSER_NAME}):`);

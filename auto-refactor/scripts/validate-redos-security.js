@@ -70,7 +70,9 @@ assert(
 // Backreference inside quantified group — e.g. (a\1)+  where \1 is inside + group
 const backrefWarn = auditRegexSafety('(a\\1)+');
 assert(
-  backrefWarn.some((warningMessage) => warningMessage.includes('Backreference inside quantified group')),
+  backrefWarn.some((warningMessage) =>
+    warningMessage.includes('Backreference inside quantified group'),
+  ),
   'Detects backreference inside quantified group (a\\1)+',
 );
 

@@ -26,7 +26,11 @@ function checkDomainImmutability() {
   console.log('1. Checking Domain Immutability and Structural Integrity...');
 
   assert.ok(REGEX, 'REGEX catalog facade must be exported from core/constants');
-  assert.strictEqual(Object.isFrozen(REGEX), true, 'Master REGEX catalog facade must be deeply frozen');
+  assert.strictEqual(
+    Object.isFrozen(REGEX),
+    true,
+    'Master REGEX catalog facade must be deeply frozen',
+  );
 
   const requiredDomains = [
     'NAMING',
@@ -151,8 +155,12 @@ function checkPatternSafetyAndStateDiscipline() {
     `Must audit at least 6 scanner factories (audited ${testedScannersCount})`,
   );
 
-  console.log(`  ✔  Audited ${testedPatternsCount} stateless patterns: 100% ReDoS immune & state-leakage free.`);
-  console.log(`  ✔  Audited ${testedScannersCount} scanner factories: verified deterministic pristine creation.`);
+  console.log(
+    `  ✔  Audited ${testedPatternsCount} stateless patterns: 100% ReDoS immune & state-leakage free.`,
+  );
+  console.log(
+    `  ✔  Audited ${testedScannersCount} scanner factories: verified deterministic pristine creation.`,
+  );
 }
 
 function runAudit() {

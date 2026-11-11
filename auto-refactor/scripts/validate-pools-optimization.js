@@ -40,9 +40,9 @@ pool.return(re2, pattern, flags);
 
 let executed = false;
 pool.withScanner(pattern, flags, (scanner) => {
-    assert.strictEqual(scanner.lastIndex, 0);
-    scanner.lastIndex = 10;
-    executed = true;
+  assert.strictEqual(scanner.lastIndex, 0);
+  scanner.lastIndex = 10;
+  executed = true;
 });
 assert.ok(executed, 'withScanner callback must execute');
 
@@ -53,7 +53,10 @@ console.log('✔ LeasedRegexPool lastIndex safety verified.');
 
 // 2. Test SSOT regex patterns & camelToSnake
 console.log('\n--- [2/4] Testing regex-patterns camelToSnake with Pooled Scanner ---');
-const { camelToSnake, createCamelToSnakeScanner } = require('../dist/core/constants/regex-patterns');
+const {
+  camelToSnake,
+  createCamelToSnakeScanner,
+} = require('../dist/core/constants/regex-patterns');
 
 assert.strictEqual(camelToSnake('fooBarBaz'), 'foo_bar_baz');
 assert.strictEqual(camelToSnake('simple'), 'simple');
@@ -87,7 +90,7 @@ assert.deepStrictEqual(index1.starts, index2.starts, 'Line starts must be identi
 assert.strictEqual(index1.hashes.length, index2.hashes.length, 'Hash count must be identical');
 
 for (let i = 0; i < index1.hashes.length; i++) {
-    assert.strictEqual(index1.hashes[i], index2.hashes[i], `Hash at line ${i} must match`);
+  assert.strictEqual(index1.hashes[i], index2.hashes[i], `Hash at line ${i} must match`);
 }
 console.log('✔ computeLineStartsAndHashes parity & buffer pool verified.');
 
@@ -97,11 +100,11 @@ const { SecretsAnalyzer } = require('../dist/analyzers/secrets');
 
 const analyzer = new SecretsAnalyzer();
 const dummyCtx = {
-    filePath: 'src/auth/token.ts',
-    content: 'const token = "' + ['ghp_', '12345678901234567890'].join('') + '";',
-    config: { securityLevel: 'basic' },
-    options: {},
-    lineStats: { lines: 1, nonBlankLines: 1 },
+  filePath: 'src/auth/token.ts',
+  content: 'const token = "' + ['ghp_', '12345678901234567890'].join('') + '";',
+  config: { securityLevel: 'basic' },
+  options: {},
+  lineStats: { lines: 1, nonBlankLines: 1 },
 };
 
 const issues1 = analyzer.analyze(null, dummyCtx);
@@ -109,7 +112,11 @@ assert.strictEqual(issues1.length, 1, 'Must detect 1 secret issue');
 assert.strictEqual(issues1[0].rule, 'secret-detected');
 
 const issues2 = analyzer.analyze(null, dummyCtx);
-assert.strictEqual(issues2.length, 1, 'Must detect 1 secret issue on second run with cached patterns');
+assert.strictEqual(
+  issues2.length,
+  1,
+  'Must detect 1 secret issue on second run with cached patterns',
+);
 console.log('✔ SecretsAnalyzer pattern caching verified.');
 
 console.log('\n🎉 ALL RESOURCE POOLING & OPTIMIZATION VERIFICATIONS PASSED (4/4)!');

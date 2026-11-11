@@ -430,7 +430,12 @@ async function main() {
     assert(libReport.summary.activatedReviewers.active.includes('dependency-graph'));
 
     // 5. Test sparseRouting=true filtering
-    const sparseReport = await scan({ root: demoDir, sparseRouting: true, cache: false, workers: 1 });
+    const sparseReport = await scan({
+      root: demoDir,
+      sparseRouting: true,
+      cache: false,
+      workers: 1,
+    });
     assert.strictEqual(sparseReport.summary.activatedReviewers?.archetype, 'demo');
 
     console.log('Archetype activations verified across demo, web, game, library.');
@@ -482,12 +487,19 @@ async function main() {
   console.log(`Disaggregated Prefill-only completed in ${prefillResult.durationMs}ms`);
 
   // Full Prefill + Decode disaggregation
-  const fullDisaggregatedResult = await handleAsymmetricScan(daemonContext, daemonConfig, daemonInputs, {
-    prefillOnly: false,
-  });
+  const fullDisaggregatedResult = await handleAsymmetricScan(
+    daemonContext,
+    daemonConfig,
+    daemonInputs,
+    {
+      prefillOnly: false,
+    },
+  );
   assert.strictEqual(fullDisaggregatedResult.fastVerdict.status, 'SPECULATIVE_PASSED');
   assert.strictEqual(fullDisaggregatedResult.deepStatus, 'CONFIRMED');
-  console.log(`Full Disaggregated Prefill+Decode completed in ${fullDisaggregatedResult.durationMs}ms`);
+  console.log(
+    `Full Disaggregated Prefill+Decode completed in ${fullDisaggregatedResult.durationMs}ms`,
+  );
 
   // 3. KTransformers-style tiered analyzer pool offloading
   const pool = new WorkerPoolManager({ maxConcurrency: 2 });

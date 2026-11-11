@@ -458,9 +458,7 @@ fn compute() {
     extractEmbeddedTestLineRanges,
     isInsideEmbeddedTestZone,
   } = require('../dist/analyzers/constants-literal-helper');
-  const {
-    RuleCatalogIntegrityRule,
-  } = require('../dist/core/governance/rules/standardization');
+  const { RuleCatalogIntegrityRule } = require('../dist/core/governance/rules/standardization');
   const rustWithInlineTest = [
     'pub fn production_fn() -> usize {',
     '    42',
@@ -479,7 +477,8 @@ fn compute() {
   assert.strictEqual(isInsideEmbeddedTestZone(2, testRanges), false);
   assert.strictEqual(isInsideEmbeddedTestZone(7, testRanges), true);
 
-  const ruleCheckLine = 'pub const DOC_RULE: &str = "L3-DOC-LAYOUT";\npub const REV_RULE: &str = "L3-REVIEW-CONFIG";';
+  const ruleCheckLine =
+    'pub const DOC_RULE: &str = "L3-DOC-LAYOUT";\npub const REV_RULE: &str = "L3-REVIEW-CONFIG";';
   const ruleViolations = RuleCatalogIntegrityRule.checkFile({
     filePath: 'crates/fg-gate/src/commit_guard/rule_ids.rs',
     content: ruleCheckLine,
