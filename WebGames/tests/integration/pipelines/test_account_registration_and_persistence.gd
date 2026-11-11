@@ -42,21 +42,25 @@ static func _teardown_all_test_artifacts() -> void:
 	AccountRepository.reset_for_tests()
 
 ## TC-ARP-01: 账号标准注册与物理落盘加载一致性断言
-static func test_tc_arp_01_registration_and_persistence_roundtrip() -> Dictionary:
-	var repo := AccountRepository.get_instance()
-	var uname := "PersistHero01"
-	var plain_pass := "ValidPass123"
-
+static func _purge_existing_by_username(repo: AccountRepository, uname: String) -> void:
 	var existing := repo.find_by_username(uname)
 	if existing != null:
 		repo.delete_account(existing.account_id)
 
+static func _register_clean_account(repo: AccountRepository, uname: String, plain_pass: String, fp: String = "") -> AccountRegistrationDTO.Response:
+	_purge_existing_by_username(repo, uname)
 	var req := AccountRegistrationDTO.Request.new()
 	req.username = uname
 	req.password_plain = plain_pass
-	req.device_fingerprint = "FP_ARP_01"
+	if not fp.is_empty():
+		req.device_fingerprint = fp
+	return AuthService.register_account(req)
 
-	var resp := AuthService.register_account(req)
+static func test_tc_arp_01_registration_and_persistence_roundtrip() -> Dictionary:
+	var repo := AccountRepository.get_instance()
+	var uname := "PersistHero01"
+	var plain_pass := "ValidPass123"
+	var resp := _register_clean_account(repo, uname, plain_pass, "FP_ARP_01")
 	if not resp.success or resp.account_id.is_empty():
 		return TestCase.make_result("TC-ARP-01: 账号标准注册与物理落盘加载一致性断言", false, {"reason": "register_account failed"})
 
@@ -104,15 +108,7 @@ static func test_tc_arp_02_memory_reset_and_cold_boot_restore() -> Dictionary:
 	var repo := AccountRepository.get_instance()
 	var uname := "ColdBootHero"
 	var plain_pass := "ColdPass456"
-
-	var existing := repo.find_by_username(uname)
-	if existing != null:
-		repo.delete_account(existing.account_id)
-
-	var req := AccountRegistrationDTO.Request.new()
-	req.username = uname
-	req.password_plain = plain_pass
-	var reg_resp := AuthService.register_account(req)
+	var reg_resp := _register_clean_account(repo, uname, plain_pass)
 	if not reg_resp.success:
 		return TestCase.make_result("TC-ARP-02: 内存仓储重置与冷启动后磁盘加载自愈（模拟重启恢复）", false, {"reason": "registration failed"})
 
@@ -145,16 +141,7 @@ static func test_tc_arp_02_memory_reset_and_cold_boot_restore() -> Dictionary:
 static func test_tc_arp_03_duplicate_rejection_and_case_insensitive() -> Dictionary:
 	var repo := AccountRepository.get_instance()
 	var uname := "CaseHero"
-	var plain_pass := "Pass12345"
-
-	var existing := repo.find_by_username(uname)
-	if existing != null:
-		repo.delete_account(existing.account_id)
-
-	var req := AccountRegistrationDTO.Request.new()
-	req.username = uname
-	req.password_plain = plain_pass
-	var reg_resp := AuthService.register_account(req)
+	var reg_resp := _register_clean_account(repo, uname, "Pass12345")
 	if not reg_resp.success:
 		return TestCase.make_result("TC-ARP-03: 重名冲突拦截与不区分大小写检索", false, {"reason": "initial registration failed"})
 
@@ -190,10 +177,7 @@ static func test_tc_arp_04_composite_auth_auto_registration() -> Dictionary:
 	var repo := AccountRepository.get_instance()
 	var uname := "AutoCompositeHero"
 	var plain_pass := "AutoPass789"
-
-	var existing := repo.find_by_username(uname)
-	if existing != null:
-		repo.delete_account(existing.account_id)
+	_purge_existing_by_username(repo, uname)
 
 	var comp_req := AccountCompositeAuthDTO.Request.new()
 	comp_req.username = uname
@@ -272,16 +256,7 @@ static func test_tc_arp_05_legacy_salt_rehash_atomic_persistence() -> Dictionary
 static func test_tc_arp_06_account_deletion_and_index_cleanup() -> Dictionary:
 	var repo := AccountRepository.get_instance()
 	var uname := "UserToDelete06"
-	var plain_pass := "DelPass123"
-
-	var existing := repo.find_by_username(uname)
-	if existing != null:
-		repo.delete_account(existing.account_id)
-
-	var req := AccountRegistrationDTO.Request.new()
-	req.username = uname
-	req.password_plain = plain_pass
-	var reg_resp := AuthService.register_account(req)
+	var reg_resp := _register_clean_account(repo, uname, "DelPass123")
 	if not reg_resp.success:
 		return TestCase.make_result("TC-ARP-06: 账号删除与索引清理", false, {"reason": "registration failed"})
 

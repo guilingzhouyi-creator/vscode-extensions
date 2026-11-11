@@ -100,30 +100,44 @@ static func _test_tr_02_special_modifier_zero_hand_state() -> Dictionary:
 		"passed": passed
 	}
 
-## TC-TR-03: 玩家 0 手牌且 0 AP 姿态下时间轴保活持续推演断言
-static func _test_tr_03_zero_hand_keepalive_timeline_progression() -> Dictionary:
-	var engine := TertiaryTimelineEngine.new()
-	var rng := DeterministicRNG.from_seed(777)
-	engine.initialize(0, rng)
-
+static func _make_coordinator_fixture(
+	seed_val: int,
+	max_duration_ms: int,
+	point_id: String,
+	event_kind: int,
+	trigger_ms: int,
+	point_payload: Dictionary = {},
+	init_engine: bool = false
+) -> Dictionary:
+	var rng := DeterministicRNGClass.from_seed(seed_val)
+	var engine := TertiaryTimelineEngineClass.new()
+	if init_engine:
+		engine.initialize(0, rng)
 	var p_bar := ActionCardStagingBar.new()
 	p_bar.initialize("PLAYER", 5)
 	var e_bar := ActionCardStagingBar.new()
 	e_bar.initialize("ENEMY", 5)
-
 	var coordinator := CombatRoundCoordinator.new()
 	coordinator.initialize(engine, p_bar, e_bar, rng)
-
-	# 构建含未来未决事件的预排期计划 (在 4000ms 处有事件)
 	var schedule := TimelineEventScheduleDTO.new()
 	schedule.round_number = 1
-	schedule.max_round_duration_ms = 10000
+	schedule.max_round_duration_ms = max_duration_ms
 	var pt := TimelineEventScheduleDTO.ScheduledPoint.new()
-	pt.point_id = "EVT_FUTURE_DRAW"
-	pt.event_kind = TimelineEventScheduleDTO.EventKind.NORMAL_DRAW
-	pt.trigger_time_ms = 4000
+	pt.point_id = point_id
+	pt.event_kind = event_kind
+	pt.trigger_time_ms = trigger_ms
+	if not point_payload.is_empty():
+		pt.payload = point_payload
 	schedule.scheduled_points = [pt]
 	coordinator.set_round_schedule(schedule)
+	return {"coordinator": coordinator, "p_bar": p_bar, "pt": pt}
+
+## TC-TR-03: 玩家 0 手牌且 0 AP 姿态下时间轴保活持续推演断言
+static func _test_tr_03_zero_hand_keepalive_timeline_progression() -> Dictionary:
+	var fx := _make_coordinator_fixture(777, 10000, "EVT_FUTURE_DRAW", TimelineEventScheduleDTO.EventKind.NORMAL_DRAW, 4000, {}, true)
+	var p_bar: ActionCardStagingBar = fx["p_bar"]
+	var coordinator: CombatRoundCoordinator = fx["coordinator"]
+	var pt: TimelineEventScheduleDTO.ScheduledPoint = fx["pt"]
 
 	var p_part := CombatPipelineFSM.CombatParticipant.new()
 	p_part.participant_id = "HERO"
@@ -173,25 +187,10 @@ static func _test_tr_04_opening_schedule_and_min_spacing_constraint() -> Diction
 
 ## TC-TR-05: 加发牌点 ADD_DRAW 到点触发与额外卡牌补发断言
 static func _test_tr_05_add_draw_bonus_cards_trigger() -> Dictionary:
-	var rng := DeterministicRNGClass.from_seed(444)
-	var p_bar := ActionCardStagingBar.new()
-	p_bar.initialize("PLAYER", 5)
-	var e_bar := ActionCardStagingBar.new()
-	e_bar.initialize("ENEMY", 5)
-
-	var coordinator := CombatRoundCoordinator.new()
-	coordinator.initialize(TertiaryTimelineEngineClass.new(), p_bar, e_bar, rng)
-
-	var schedule := TimelineEventScheduleDTO.new()
-	schedule.round_number = 1
-	schedule.max_round_duration_ms = 8000
-	var pt := TimelineEventScheduleDTO.ScheduledPoint.new()
-	pt.point_id = "EVT_ADD_DRAW_TEST"
-	pt.event_kind = TimelineEventScheduleDTO.EventKind.ADD_DRAW
-	pt.trigger_time_ms = 2000
-	pt.payload = {"extra_bonus_cards": 2}
-	schedule.scheduled_points = [pt]
-	coordinator.set_round_schedule(schedule)
+	var fx := _make_coordinator_fixture(444, 8000, "EVT_ADD_DRAW_TEST", TimelineEventScheduleDTO.EventKind.ADD_DRAW, 2000, {"extra_bonus_cards": 2}, false)
+	var p_bar: ActionCardStagingBar = fx["p_bar"]
+	var coordinator: CombatRoundCoordinator = fx["coordinator"]
+	var pt: TimelineEventScheduleDTO.ScheduledPoint = fx["pt"]
 
 	var p_part := CombatPipelineFSM.CombatParticipant.new()
 	p_part.participant_id = "HERO"
@@ -252,24 +251,8 @@ static func _test_tr_06_cross_round_pending_modifier_consumption() -> Dictionary
 
 ## TC-TR-07: 前端 Presenter 视图快照脱敏与绝对时间戳零泄漏断言
 static func _test_tr_07_client_view_desensitization() -> Dictionary:
-	var rng := DeterministicRNG.from_seed(333)
-	var p_bar := ActionCardStagingBar.new()
-	p_bar.initialize("PLAYER", 5)
-	var e_bar := ActionCardStagingBar.new()
-	e_bar.initialize("ENEMY", 5)
-
-	var coordinator := CombatRoundCoordinator.new()
-	coordinator.initialize(TertiaryTimelineEngineClass.new(), p_bar, e_bar, rng)
-
-	var schedule := TimelineEventScheduleDTO.new()
-	schedule.round_number = 1
-	schedule.max_round_duration_ms = 10000
-	var pt := TimelineEventScheduleDTO.ScheduledPoint.new()
-	pt.point_id = "INTERNAL_PT"
-	pt.event_kind = TimelineEventScheduleDTO.EventKind.NORMAL_DRAW
-	pt.trigger_time_ms = 3000
-	schedule.scheduled_points = [pt]
-	coordinator.set_round_schedule(schedule)
+	var fx := _make_coordinator_fixture(333, 10000, "INTERNAL_PT", TimelineEventScheduleDTO.EventKind.NORMAL_DRAW, 3000, {}, false)
+	var coordinator: CombatRoundCoordinator = fx["coordinator"]
 
 	var p_part := CombatPipelineFSM.CombatParticipant.new()
 	var e_part := CombatPipelineFSM.CombatParticipant.new()

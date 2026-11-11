@@ -18,10 +18,10 @@ static func run_all_tests() -> Dictionary:
 			break
 	return { "domain": "Domain 09: 任务系统与因果事件链", "all_passed": all_passed, "results": results }
 
-static func test_quest_dag_structure() -> Dictionary:
+static func _build_dual_path_quest(quest_id: String = "") -> QuestObjectiveNode.QuestCausalityAggregate:
 	var quest := QuestObjectiveNode.QuestCausalityAggregate.new()
-	quest.quest_id = "QUEST_ARTIFACT"
-
+	if not quest_id.is_empty():
+		quest.quest_id = quest_id
 	var n_combat := QuestObjectiveNode.new()
 	n_combat.node_id = "KILL_BOSS"
 	n_combat.solution_type = "COMBAT_FORCE"
@@ -36,26 +36,16 @@ static func test_quest_dag_structure() -> Dictionary:
 
 	quest.objective_nodes = { "KILL_BOSS": n_combat, "STEAL_KEY": n_stealth }
 	quest.solution_paths = [["KILL_BOSS"], ["STEAL_KEY"]]
+	return quest
+
+static func test_quest_dag_structure() -> Dictionary:
+	var quest := _build_dual_path_quest("QUEST_ARTIFACT")
 
 	var passed = (quest.objective_nodes.size() == 2) and (quest.solution_paths.size() == 2)
 	return { "test": "TC-QST-01: 任务因果DAG多手段分支结构定义", "passed": passed }
 
 static func test_stealth_branch_resolution() -> Dictionary:
-	var quest := QuestObjectiveNode.QuestCausalityAggregate.new()
-	var n_combat := QuestObjectiveNode.new()
-	n_combat.node_id = "KILL_BOSS"
-	n_combat.solution_type = "COMBAT_FORCE"
-	n_combat.target_state_key = "boss_alive"
-	n_combat.required_value = false
-
-	var n_stealth := QuestObjectiveNode.new()
-	n_stealth.node_id = "STEAL_KEY"
-	n_stealth.solution_type = "STEALTH_THEFT"
-	n_stealth.target_state_key = "has_key"
-	n_stealth.required_value = true
-
-	quest.objective_nodes = { "KILL_BOSS": n_combat, "STEAL_KEY": n_stealth }
-	quest.solution_paths = [["KILL_BOSS"], ["STEAL_KEY"]]
+	var quest := _build_dual_path_quest()
 
 	var world_facts := { "boss_alive": true, "has_key": true } # 隐匿成功，BOSS未击杀
 	var res = CausalityDAGSolver.evaluate_quest_completion(quest, world_facts)

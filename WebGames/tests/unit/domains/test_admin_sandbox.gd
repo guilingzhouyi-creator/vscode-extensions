@@ -66,6 +66,13 @@ static func test_audit_log_cap_pruning() -> Dictionary:
 	var passed = size_ok and newest_kept and GMArbitrationAuditService.audit_log.size() == max_entries
 	return { "test": "TC-ADMIN-04: 审计有界化（尺寸≤上限，最旧先出）", "passed": passed, "before": before, "size": GMArbitrationAuditService.audit_log.size() }
 
+static func _make_gm_inventory_context(catalog: ItemRegistryCatalog) -> Dictionary:
+	var inv := WearableInventoryAggregate.new()
+	inv.baseline_capacity = 20
+	var gm_admin := AdminPermissionAggregate.new()
+	gm_admin.current_level = AdminPermissionAggregate.AdminLevel.LEVEL_GAME_MASTER
+	return { "admin": gm_admin, "inventory": inv, "catalog": catalog }
+
 static func test_bootstrap_assembly() -> Dictionary:
 	var res := GameBootstrap.assemble()
 	var catalog := GameBootstrap.catalog()
@@ -81,11 +88,9 @@ static func test_bootstrap_assembly() -> Dictionary:
 		and CommandRegistryEngine.has_command("time")
 
 	# 经装配 catalog 走通 /give 分发闭环
-	var inv := WearableInventoryAggregate.new()
-	inv.baseline_capacity = 20
-	var gm_admin := AdminPermissionAggregate.new()
-	gm_admin.current_level = AdminPermissionAggregate.AdminLevel.LEVEL_GAME_MASTER
-	var context := { "admin": gm_admin, "inventory": inv, "catalog": catalog }
+	var context := _make_gm_inventory_context(catalog)
+	var inv: WearableInventoryAggregate = context["inventory"]
+	var gm_admin: AdminPermissionAggregate = context["admin"]
 	var ast = ChatCommandParser.parse_input_line("/give mithril_longsword")
 	var dispatch = CommandRegistryEngine.dispatch_command(ast, gm_admin, context)
 	var dispatch_ok = dispatch.success and inv.storage_items.size() == 1
@@ -149,11 +154,9 @@ static func test_gm_command_catalog_dispatch() -> Dictionary:
 	GmCommandCatalog.register_default_commands()
 
 	var catalog := ItemLoaderPipeline.build_catalog_from_config()
-	var inv := WearableInventoryAggregate.new()
-	inv.baseline_capacity = 20
-	var gm_admin := AdminPermissionAggregate.new()
-	gm_admin.current_level = AdminPermissionAggregate.AdminLevel.LEVEL_GAME_MASTER
-	var context := { "admin": gm_admin, "inventory": inv, "catalog": catalog }
+	var context := _make_gm_inventory_context(catalog)
+	var inv: WearableInventoryAggregate = context["inventory"]
+	var gm_admin: AdminPermissionAggregate = context["admin"]
 
 	# /give 统一英文名 经命令注册表分发成功（handler 桥接沙盒求解器）
 	var ast = ChatCommandParser.parse_input_line("/give mithril_longsword")

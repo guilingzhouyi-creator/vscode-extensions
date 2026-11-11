@@ -137,19 +137,26 @@ static func _test_reference_label() -> Dictionary:
 		"passed": passed
 	}
 
-## TC-MD-06: 消费方零回归（registry 双体系不变量就绪 + baseline 解析 + 强度兜底 + mana_gate）
-static func _test_consumer_zero_regression() -> Dictionary:
+static func _make_ready_registry_and_resolve_r5() -> Dictionary:
 	var registry := MagicTierRegistry.new()
 	registry.reload_configuration()
-	var ready_ok: bool = registry.is_ready()
-	var tier_bl: Dictionary = registry.get_tier_baseline(2)
-	var tier_ok: bool = tier_bl.get("name_key", "") == "magic.ability_tier.heroic"
 	var resolver := MagicBaselineResolver.new(registry)
 	var result := resolver.resolve(
 		MagicTierSnapshot.MagicForm.INCANTATION,
 		MagicTierSnapshot.MagicRank.RANK_5,
 		MagicTierSnapshot.ManaAptitude.WORD_SPEAKER,
 		MagicTierSnapshot.ProfessionRank.SENIOR_MAGE)
+	return {"registry": registry, "resolver": resolver, "result": result}
+
+## TC-MD-06: 消费方零回归（registry 双体系不变量就绪 + baseline 解析 + 强度兜底 + mana_gate）
+static func _test_consumer_zero_regression() -> Dictionary:
+	var bundle := _make_ready_registry_and_resolve_r5()
+	var registry: MagicTierRegistry = bundle["registry"]
+	var resolver: MagicBaselineResolver = bundle["resolver"]
+	var result: Dictionary = bundle["result"]
+	var ready_ok: bool = registry.is_ready()
+	var tier_bl: Dictionary = registry.get_tier_baseline(2)
+	var tier_ok: bool = tier_bl.get("name_key", "") == "magic.ability_tier.heroic"
 	var resolve_ok: bool = result.get("success", false) and bool(result.get("magic_domain", false))
 	var fallback: float = resolver.get_strength_weight(99)
 	var fallback_ok: bool = is_equal_approx(fallback, 1.0)
@@ -209,17 +216,12 @@ static func _test_band_name_key() -> Dictionary:
 
 ## TC-RB-05: 消费方接入（registry 档次互斥全覆盖不变量就绪 + get_band_baseline + resolve rank_band）
 static func _test_band_consumer_integration() -> Dictionary:
-	var registry := MagicTierRegistry.new()
-	registry.reload_configuration()
+	var bundle := _make_ready_registry_and_resolve_r5()
+	var registry: MagicTierRegistry = bundle["registry"]
+	var result: Dictionary = bundle["result"]
 	var ready_ok: bool = registry.is_ready()
 	var band_bl: Dictionary = registry.get_band_baseline(2)
 	var band_ok: bool = band_bl.get("name_key", "") == "magic.rank_band.mid"
-	var resolver := MagicBaselineResolver.new(registry)
-	var result := resolver.resolve(
-		MagicTierSnapshot.MagicForm.INCANTATION,
-		MagicTierSnapshot.MagicRank.RANK_5,
-		MagicTierSnapshot.ManaAptitude.WORD_SPEAKER,
-		MagicTierSnapshot.ProfessionRank.SENIOR_MAGE)
 	var resolve_ok: bool = int(result.get("rank_band", -1)) == MagicTierSnapshot.MagicRankBand.MID
 	var passed = ready_ok and band_ok and resolve_ok
 	return {

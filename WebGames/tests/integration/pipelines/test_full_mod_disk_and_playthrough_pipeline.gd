@@ -214,19 +214,24 @@ static func test_inline_text_and_dual_track_placeholders() -> Dictionary:
 		"hydrated_text": hydrated_text
 	})
 
-## TC-FMP-05: 后端无头试玩推演与因果突变结算闭环
-static func test_headless_mod_playthrough_and_causal_mutations() -> Dictionary:
+static func _make_starter_playthrough_config(include_trait_and_seed: bool) -> Dictionary:
 	var config: Dictionary = {
 		"mod_dirs": ["res://mod_sdk/templates/starter_story"],
 		"enabled_pack_ids": ["*"],
 		"character_name": "阿尔温",
 		"race_id": "HUMAN",
 		"origin_id": "STARTER_ASTRAL_INITIATE",
-		"selected_positive_trait": "TRAIT_STARLIGHT_AFFINITY",
-		"reroll_nonce": 0,
-		"seed": 1337,
 		"choice_indices": [0, 0, 0]
 	}
+	if include_trait_and_seed:
+		config["selected_positive_trait"] = "TRAIT_STARLIGHT_AFFINITY"
+		config["reroll_nonce"] = 0
+		config["seed"] = 1337
+	return config
+
+## TC-FMP-05: 后端无头试玩推演与因果突变结算闭环
+static func test_headless_mod_playthrough_and_causal_mutations() -> Dictionary:
+	var config := _make_starter_playthrough_config(true)
 
 	var transcript := PrologueExecutionKernel.execute_headless_mod_playthrough(config)
 	var success: bool = bool(transcript.get("is_success", false))
@@ -259,14 +264,7 @@ static func test_headless_mod_playthrough_and_causal_mutations() -> Dictionary:
 
 ## TC-FMP-06: Python play_mod.py 与 GDScript 引擎同构等价验证
 static func test_python_and_gdscript_transcript_equivalence() -> Dictionary:
-	var config: Dictionary = {
-		"mod_dirs": ["res://mod_sdk/templates/starter_story"],
-		"enabled_pack_ids": ["*"],
-		"character_name": "阿尔温",
-		"race_id": "HUMAN",
-		"origin_id": "STARTER_ASTRAL_INITIATE",
-		"choice_indices": [0, 0, 0]
-	}
+	var config := _make_starter_playthrough_config(false)
 
 	var gd_transcript := PrologueExecutionKernel.execute_headless_mod_playthrough(config)
 	var gd_ok: bool = bool(gd_transcript.get("is_success", false))

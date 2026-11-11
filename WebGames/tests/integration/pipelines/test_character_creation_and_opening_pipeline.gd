@@ -145,14 +145,7 @@ static func _test_first_creation_opening_event_stream_dispatch() -> Dictionary:
 
 	var slot := _fresh_slot_state("ACC_CC_04")
 	var seen_channels: Array = []
-	var bus = EventBusCore.get_instance()
-	var cb := func(pkt: EventPacket) -> void:
-		var w: Dictionary = pkt.payload_data if pkt.payload_data is Dictionary else {}
-		seen_channels.append(str(w.get("channel", "")))
-	var tok := bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, cb)
-
-	var res := CharacterCreationService.process_character_creation(req, slot, {})
-	tok.unbind()
+	var res := _run_creation_capturing_channels(req, slot, {}, seen_channels)
 
 	var ok: bool = bool(res.get("success", false))
 	var opening: OpeningEventStreamDTO = res.get("opening_event", null)
@@ -168,6 +161,22 @@ static func _test_first_creation_opening_event_stream_dispatch() -> Dictionary:
 
 	var passed: bool = ok and event_fields_ok and broadcast_ok and location_ok
 	return { "test": "TC-CC-04: 首开档触发开局事件流广播（含首次标记与完整上下文）", "passed": passed }
+
+
+static func _run_creation_capturing_channels(
+	req: CharacterCreationRequestDTO,
+	slot_state: Dictionary,
+	canary_flags: Dictionary,
+	seen_channels: Array
+) -> Dictionary:
+	var bus := EventBusCore.get_instance()
+	var cb := func(pkt: EventPacket) -> void:
+		var w: Dictionary = pkt.payload_data if pkt.payload_data is Dictionary else {}
+		seen_channels.append(str(w.get("channel", "")))
+	var tok := bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, cb)
+	var res := CharacterCreationService.process_character_creation(req, slot_state, canary_flags)
+	tok.unbind()
+	return res
 
 
 ## TC-CC-05: 种族扩展灰度开关限制（非白名单拦截 / 白名单放行）
@@ -236,13 +245,7 @@ static func _test_full_lifecycle_gateway_to_opening_narrative() -> Dictionary:
 
 	var slot_state: Dictionary = primary_slot.to_dto() if primary_slot != null else _fresh_slot_state(account_id)
 	var seen_channels: Array = []
-	var bus = EventBusCore.get_instance()
-	var cb := func(pkt: EventPacket) -> void:
-		var w: Dictionary = pkt.payload_data if pkt.payload_data is Dictionary else {}
-		seen_channels.append(str(w.get("channel", "")))
-	var tok := bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, cb)
-	var res := CharacterCreationService.process_character_creation(req, slot_state, {})
-	tok.unbind()
+	var res := _run_creation_capturing_channels(req, slot_state, {}, seen_channels)
 
 	var creation_ok: bool = bool(res.get("success", false))
 	var opening: OpeningEventStreamDTO = res.get("opening_event", null)
