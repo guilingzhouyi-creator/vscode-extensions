@@ -225,8 +225,5 @@ func on_red_dot_item_activated() -> void:
 
 ## 统一页面标题栏构建
 func create_page_header(title_key: String) -> KPageHeader:
-	if page_header == null:
-		page_header = KPageHeaderClass.new()
-		page_header.title_key = title_key
-		page_header.back_pressed.connect(func(): if _view != null: _view.back())
+	page_header = _ensure_page_header(page_header, KPageHeaderClass, title_key, _view) as KPageHeader
 	return page_header

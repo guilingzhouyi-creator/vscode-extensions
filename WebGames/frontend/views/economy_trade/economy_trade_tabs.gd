@@ -26,23 +26,19 @@ func setup(view: BaseScreen) -> void:
 	_view = view
 
 func create_page_header(title_key: String) -> KPageHeader:
-	if page_header == null:
-		page_header = KPageHeaderClass.new(); page_header.title_key = title_key
-		page_header.back_pressed.connect(func(): if _view != null: _view.back())
+	page_header = _ensure_page_header(page_header, KPageHeaderClass, title_key, _view) as KPageHeader
 	return page_header
 
 func create_currency_bar() -> KCurrencyBar:
-	if currency_bar == null: currency_bar = KCurrencyBarClass.new()
+	currency_bar = _ensure_currency_bar(currency_bar, KCurrencyBarClass) as KCurrencyBar
 	return currency_bar
 
 func create_split_panel(ratio: float = 0.35) -> KSplitPanel:
-	if split_panel == null:
-		split_panel = KSplitPanelClass.new(); split_panel.left_ratio = ratio
+	split_panel = _ensure_split_panel(split_panel, KSplitPanelClass, ratio) as KSplitPanel
 	return split_panel
 
 func create_search_bar(ph_key: String = "") -> KSearchBar:
-	if search_bar == null:
-		search_bar = KSearchBarClass.new(); search_bar.placeholder_key = ph_key
+	search_bar = _ensure_search_bar(search_bar, KSearchBarClass, ph_key) as KSearchBar
 	return search_bar
 
 # ==============================================================================

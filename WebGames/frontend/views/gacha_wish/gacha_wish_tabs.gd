@@ -293,14 +293,10 @@ func load_mock_data() -> void:
 
 ## 统一页面标题栏构建
 func create_page_header(title_key: String) -> KPageHeader:
-	if page_header == null:
-		page_header = KPageHeaderClass.new()
-		page_header.title_key = title_key
-		page_header.back_pressed.connect(func(): if _view != null: _view.back())
+	page_header = _ensure_page_header(page_header, KPageHeaderClass, title_key, _view) as KPageHeader
 	return page_header
 
 ## 统一货币栏构建
 func create_currency_bar() -> KCurrencyBar:
-	if currency_bar == null:
-		currency_bar = KCurrencyBarClass.new()
+	currency_bar = _ensure_currency_bar(currency_bar, KCurrencyBarClass) as KCurrencyBar
 	return currency_bar

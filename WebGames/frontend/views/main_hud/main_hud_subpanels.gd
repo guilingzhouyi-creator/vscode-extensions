@@ -18,16 +18,11 @@ func setup(view: MainHUDView) -> void:
 	_view = view
 
 func create_currency_bar() -> KCurrencyBar:
-	if currency_bar == null:
-		currency_bar = KCurrencyBarClass.new()
-		currency_bar.show_gold = true
-		currency_bar.show_crystals = true
+	currency_bar = _ensure_currency_bar(currency_bar, KCurrencyBarClass, true, true) as KCurrencyBar
 	return currency_bar
 
 func create_status_bar(label_key: String = "") -> KStatusBar:
-	if hp_status_bar == null:
-		hp_status_bar = KStatusBarClass.new()
-		hp_status_bar.label_key = label_key
+	hp_status_bar = _ensure_status_bar(hp_status_bar, KStatusBarClass, label_key) as KStatusBar
 	return hp_status_bar
 
 func refresh_status_bars(hp: float, hp_max: float, mp: float, mp_max: float, ap: float, ap_max: float) -> void:

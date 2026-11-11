@@ -284,14 +284,10 @@ func _on_cdkey_input_submitted(_text: String) -> void:
 
 ## 统一页面标题栏构建
 func create_page_header(title_key: String) -> KPageHeader:
-	if page_header == null:
-		page_header = KPageHeaderClass.new()
-		page_header.title_key = title_key
-		page_header.back_pressed.connect(func(): if _view != null: _view.back())
+	page_header = _ensure_page_header(page_header, KPageHeaderClass, title_key, _view) as KPageHeader
 	return page_header
 
 ## 统一状态面板构建 (四态切换)
 func create_state_panel() -> KStatePanel:
-	if state_panel == null:
-		state_panel = KStatePanelClass.new()
+	state_panel = _ensure_state_panel(state_panel, KStatePanelClass) as KStatePanel
 	return state_panel

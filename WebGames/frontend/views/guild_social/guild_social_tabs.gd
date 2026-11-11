@@ -21,14 +21,11 @@ func setup(view: BaseScreen) -> void:
 	_view = view
 
 func create_page_header(title_key: String) -> KPageHeader:
-	if page_header == null:
-		page_header = KPageHeaderClass.new(); page_header.title_key = title_key
-		page_header.back_pressed.connect(func(): if _view != null: _view.back())
+	page_header = _ensure_page_header(page_header, KPageHeaderClass, title_key, _view) as KPageHeader
 	return page_header
 
 func create_search_bar(ph_key: String = "") -> KSearchBar:
-	if search_bar == null:
-		search_bar = KSearchBarClass.new(); search_bar.placeholder_key = ph_key
+	search_bar = _ensure_search_bar(search_bar, KSearchBarClass, ph_key) as KSearchBar
 	return search_bar
 
 # ==============================================================================

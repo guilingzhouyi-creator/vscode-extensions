@@ -15,9 +15,7 @@ func setup(view: BaseScreen) -> void:
 	_view = view
 
 func create_status_bar(label_key: String = "") -> KStatusBar:
-	if status_bar == null:
-		status_bar = KStatusBarClass.new()
-		status_bar.label_key = label_key
+	status_bar = _ensure_status_bar(status_bar, KStatusBarClass, label_key) as KStatusBar
 	return status_bar
 
 func init_text() -> void:

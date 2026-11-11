@@ -334,15 +334,10 @@ func _format_countdown(seconds: int) -> String:
 
 ## 统一页面标题栏构建
 func create_page_header(title_key: String) -> KPageHeader:
-	if page_header == null:
-		page_header = KPageHeaderClass.new()
-		page_header.title_key = title_key
-		page_header.back_pressed.connect(func(): if _view != null: _view.back())
+	page_header = _ensure_page_header(page_header, KPageHeaderClass, title_key, _view) as KPageHeader
 	return page_header
 
 ## 统一分栏面板构建
 func create_split_panel(ratio: float = 0.35) -> KSplitPanel:
-	if split_panel == null:
-		split_panel = KSplitPanelClass.new()
-		split_panel.left_ratio = ratio
+	split_panel = _ensure_split_panel(split_panel, KSplitPanelClass, ratio) as KSplitPanel
 	return split_panel

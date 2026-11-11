@@ -213,28 +213,20 @@ func _on_virtual_range_changed(start_idx: int, end_idx: int) -> void:
 
 ## 统一页面标题栏构建
 func create_page_header(title_key: String) -> KPageHeader:
-	if page_header == null:
-		page_header = KPageHeaderClass.new()
-		page_header.title_key = title_key
-		page_header.back_pressed.connect(func(): if _view != null: _view.back())
+	page_header = _ensure_page_header(page_header, KPageHeaderClass, title_key, _view) as KPageHeader
 	return page_header
 
 ## 统一分栏面板构建
 func create_split_panel(ratio: float = 0.4) -> KSplitPanel:
-	if split_panel == null:
-		split_panel = KSplitPanelClass.new()
-		split_panel.left_ratio = ratio
+	split_panel = _ensure_split_panel(split_panel, KSplitPanelClass, ratio) as KSplitPanel
 	return split_panel
 
 ## 统一定制搜索框构建 (300ms 防抖)
 func create_search_bar(placeholder_key: String = "ui.fe08.search.placeholder") -> KSearchBar:
-	if search_bar == null:
-		search_bar = KSearchBarClass.new()
-		search_bar.placeholder_key = placeholder_key
+	search_bar = _ensure_search_bar(search_bar, KSearchBarClass, placeholder_key) as KSearchBar
 	return search_bar
 
 ## 统一状态面板构建 (四态切换)
 func create_state_panel() -> KStatePanel:
-	if state_panel == null:
-		state_panel = KStatePanelClass.new()
+	state_panel = _ensure_state_panel(state_panel, KStatePanelClass) as KStatePanel
 	return state_panel
