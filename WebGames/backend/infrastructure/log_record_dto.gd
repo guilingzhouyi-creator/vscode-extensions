@@ -47,7 +47,7 @@ func reset_state() -> void:
 	channel = ""
 	error_code = ""
 	message = ""
-	context = {}
+	context.clear()
 
 ## 序列化为字典（timestamp 缺省时落当前系统时间；context 深拷贝隔离调用方改写）
 func to_dto() -> Dictionary:
@@ -64,18 +64,22 @@ func to_dto() -> Dictionary:
 		"context": context.duplicate(true),
 	}
 
-## 从字典反序列化还原记录（字段缺省用默认值；context 仅接受 Dictionary 并深拷贝）
-static func from_dto(data: Dictionary) -> LogRecordDTO:
-	var dto := LogRecordDTO.new()
-	if data.is_empty():
-		return dto
+## 从输入字典填充基类结构化日志字段（供 LogRecordDTO 与 StructuredLogRecord 复用）
+static func populate_base_from_dict(dto: LogRecordDTO, data: Dictionary) -> void:
+	if dto == null or data.is_empty():
+		return
 	dto.sequence = int(data.get("sequence", 0))
 	dto.timestamp_utc = int(data.get("timestamp_utc", 0))
 	dto.level = str(data.get("level", "INFO"))
 	dto.channel = str(data.get("channel", ""))
 	dto.error_code = str(data.get("error_code", ""))
 	dto.message = str(data.get("message", ""))
-	var ctx = data.get("context", {})
+	var ctx: Variant = data.get("context", {})
 	if ctx is Dictionary:
-		dto.context = ctx.duplicate(true)
+		dto.context = (ctx as Dictionary).duplicate(true)
+
+## 从字典反序列化还原记录（字段缺省用默认值；context 仅接受 Dictionary 并深拷贝）
+static func from_dto(data: Dictionary) -> LogRecordDTO:
+	var dto := LogRecordDTO.new()
+	populate_base_from_dict(dto, data)
 	return dto

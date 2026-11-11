@@ -117,6 +117,18 @@ static func apply(dict: Dictionary) -> Dictionary:
 		"redacted_keys": redacted_keys
 	}
 
+## 对 context 执行脱敏并直接装配至 StructuredLogRecord（单源收口 context 与 redacted_keys）
+static func apply_to_record(record: StructuredLogRecord, raw_context: Dictionary) -> void:
+	if record == null:
+		return
+	var redacted := apply(raw_context)
+	record.context = redacted.get("dict", {})
+	record.redacted_keys.clear()
+	var rk: Variant = redacted.get("redacted_keys", [])
+	if rk is Array:
+		for k in (rk as Array):
+			record.redacted_keys.append(str(k))
+
 static func _find_matching_rule(key_str: String) -> RuleEntry:
 	for rule in _rules:
 		if rule.regex != null and rule.regex.search(key_str) != null:

@@ -72,19 +72,9 @@ static func register_account(request: AccountRegistrationDTO.Request, account_st
 		return resp
 
 	var err_already_exists := GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/account_already_exists", "ERR_ACCOUNT_ALREADY_EXISTS")
-	if not account_store.is_empty():
-		for acc_id in account_store.keys():
-			var existing: AccountProfileAggregate = account_store[acc_id]
-			if existing != null and existing.username.to_lower() == request.username.to_lower():
-				resp.error_code = err_already_exists
-				return resp
-	else:
-		var repo := AccountRepository.get_instance()
-		if not repo.is_loaded():
-			repo.load_all()
-		if repo.has_username(request.username):
-			resp.error_code = err_already_exists
-			return resp
+	if _find_target_account_for_auth(request.username, account_store) != null:
+		resp.error_code = err_already_exists
+		return resp
 
 	var acc := AccountProfileAggregate.new()
 	acc.account_id = UniqueIdGenerator.next_id(GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/account_id_prefix", "ACC_USR_"))
@@ -266,20 +256,18 @@ static func _find_target_account_for_auth(username: String, account_store: Dicti
 		repo.load_all()
 	return repo.find_by_username(username)
 
+static func _find_account_by_id(account_id: String, account_store: Dictionary) -> AccountProfileAggregate:
+	if account_id.is_empty():
+		return null
+	if account_store.has(account_id):
+		return account_store[account_id]
+	return AccountRepository.get_instance().find_by_id(account_id)
+
 static func _register_composite_target_account(request: AccountCompositeAuthDTO.Request, account_store: Dictionary) -> Dictionary:
-	var reg_req := AccountRegistrationDTO.Request.new()
-	reg_req.username = request.username
-	reg_req.password_plain = request.password_plain
-	reg_req.device_fingerprint = request.device_fingerprint
-	reg_req.initial_entitlements = request.initial_entitlements
-	var reg_resp := register_account(reg_req, account_store)
+	var reg_resp := register_account(request, account_store)
 	if not reg_resp.success:
 		return {"success": false, "error_code": reg_resp.error_code, "account": null}
-	var target_account: AccountProfileAggregate = null
-	if not account_store.is_empty():
-		target_account = account_store.get(reg_resp.account_id, null)
-	else:
-		target_account = AccountRepository.get_instance().find_by_id(reg_resp.account_id)
+	var target_account := _find_account_by_id(reg_resp.account_id, account_store)
 	return {"success": true, "error_code": "", "account": target_account}
 
 ## 复合鉴权接口：支持自动注册/纯登录/纯注册三模流转
@@ -441,11 +429,7 @@ static func register_and_login(request: AccountRegistrationDTO.Request, auto_log
 			"session_token": "",
 			"created_timestamp_utc": reg_resp.created_timestamp_utc
 		}
-	var target_acc: AccountProfileAggregate = null
-	if account_store.has(reg_resp.account_id):
-		target_acc = account_store[reg_resp.account_id]
-	else:
-		target_acc = AccountRepository.get_instance().find_by_id(reg_resp.account_id)
+	var target_acc := _find_account_by_id(reg_resp.account_id, account_store)
 	if target_acc == null:
 		return {
 			"success": false,

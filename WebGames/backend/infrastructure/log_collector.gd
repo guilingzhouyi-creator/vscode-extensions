@@ -77,12 +77,7 @@ static func log(
 	record.source_line = int(caller_info.get("source_line", 0))
 	
 	# 构造期脱敏（Inv-LS-2 安全红线）：入流前脱敏
-	var redacted := RedactionRule.apply(context)
-	record.context = redacted["dict"]
-	var rk = redacted.get("redacted_keys", [])
-	if rk is Array:
-		for k in rk:
-			record.redacted_keys.append(str(k))
+	RedactionRule.apply_to_record(record, context)
 			
 	# 分发至全局事件总线（向后兼容广播；EventBus 内部已接线 LogRingBuffer 与 TelemetryAggregate）
 	var eb := EventBusCore.get_instance()

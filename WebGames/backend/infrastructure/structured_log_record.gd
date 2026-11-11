@@ -48,55 +48,34 @@ func reset_state() -> void:
 	duration_ms = 0
 	source_file = ""
 	source_line = 0
-	redacted_keys = []
+	redacted_keys.clear()
 
 ## 序列化当前对象为通用字典传输结构
 func to_dto() -> Dictionary:
-	var ts := timestamp_utc
-	if ts <= 0:
-		ts = int(Time.get_unix_time_from_system())
-	return {
-		"sequence": sequence,
-		"timestamp_utc": ts,
-		"level": level,
-		"channel": channel,
-		"error_code": error_code,
-		"message": message,
-		"trace_id": trace_id,
-		"parent_span_id": parent_span_id,
-		"event_category": event_category,
-		"duration_ms": duration_ms,
-		"source_file": source_file,
-		"source_line": source_line,
-		"context": context.duplicate(true),
-		"redacted_keys": redacted_keys.duplicate(),
-	}
+	var out: Dictionary = super.to_dto()
+	out["trace_id"] = trace_id
+	out["parent_span_id"] = parent_span_id
+	out["event_category"] = event_category
+	out["duration_ms"] = duration_ms
+	out["source_file"] = source_file
+	out["source_line"] = source_line
+	out["redacted_keys"] = redacted_keys.duplicate()
+	return out
 
 ## 从字典反序列化还原（继承字段 + 结构化字段；context/redacted_keys 仅接受合法类型并深拷贝）
 static func from_dto(data: Dictionary) -> StructuredLogRecord:
 	var dto := StructuredLogRecord.new()
 	if data.is_empty():
 		return dto
-	dto.sequence = int(data.get("sequence", 0))
-	dto.timestamp_utc = int(data.get("timestamp_utc", 0))
-	dto.level = str(data.get("level", "INFO"))
-	dto.channel = str(data.get("channel", ""))
-	dto.error_code = str(data.get("error_code", ""))
-	dto.message = str(data.get("message", ""))
+	LogRecordDTO.populate_base_from_dict(dto, data)
 	dto.trace_id = str(data.get("trace_id", ""))
 	dto.parent_span_id = str(data.get("parent_span_id", ""))
 	dto.event_category = str(data.get("event_category", ""))
 	dto.duration_ms = int(data.get("duration_ms", 0))
 	dto.source_file = str(data.get("source_file", ""))
 	dto.source_line = int(data.get("source_line", 0))
-	
-	var ctx = data.get("context", {})
-	if ctx is Dictionary:
-		dto.context = ctx.duplicate(true)
-		
-	var rk = data.get("redacted_keys", [])
+	var rk: Variant = data.get("redacted_keys", [])
 	if rk is Array:
-		for k in rk:
+		for k in (rk as Array):
 			dto.redacted_keys.append(str(k))
-			
 	return dto

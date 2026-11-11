@@ -159,16 +159,7 @@ func _dispatch_record(log_record: LogRecord) -> void:
 		_ring_buffer.call("push_record", log_record.to_dict())
 	else:
 		# 回退：委托至统一结构化日志缓冲（避免双轨分流）
-		var srec := StructuredLogRecord.new()
-		srec.level = _map_severity_to_level(log_record.severity)
-		srec.channel = log_record.domain
-		srec.message = log_record.message
-		srec.error_code = log_record.event_code
-		srec.trace_id = log_record.correlation_id
-		var redacted := RedactionRule.apply(log_record.context)
-		srec.context = redacted["dict"]
-		srec.timestamp_utc = int(log_record.timestamp)
-		srec.event_category = log_record.domain
+		var srec := _to_structured_record(log_record)
 		# 经 Redaction 校验后统一落盘、入环与遥测
 		LogFileExporter.consume(srec)
 		LogRingBuffer.append(srec)
@@ -189,6 +180,18 @@ func _dispatch_record(log_record: LogRecord) -> void:
 			printerr(formatted_line)
 		else:
 			print_rich(formatted_line)
+
+func _to_structured_record(log_record: LogRecord) -> StructuredLogRecord:
+	var srec := StructuredLogRecord.new()
+	srec.level = _map_severity_to_level(log_record.severity)
+	srec.channel = log_record.domain
+	srec.message = log_record.message
+	srec.error_code = log_record.event_code
+	srec.trace_id = log_record.correlation_id
+	srec.timestamp_utc = int(log_record.timestamp)
+	srec.event_category = log_record.domain
+	RedactionRule.apply_to_record(srec, log_record.context)
+	return srec
 
 func _map_severity_to_level(severity_level: Severity) -> String:
 	match severity_level:

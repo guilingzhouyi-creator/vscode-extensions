@@ -11,19 +11,16 @@
 class_name AccountCompositeAuthDTO
 extends RefCounted
 
+const BaseRegistrationDTO = preload("res://backend/domains/account/dto/account_registration_dto.gd")
 const SaveSlotSummaryDTO = preload("res://backend/domains/account/save_slot_dto.gd")
 
 const MODE_AUTO: String = "MODE_AUTO"
 const MODE_LOGIN_ONLY: String = "MODE_LOGIN_ONLY"
 const MODE_REGISTER_ONLY: String = "MODE_REGISTER_ONLY"
 
-## 复合鉴权请求载荷
-class Request extends RefCounted:
-	var username: String = ""
-	var password_plain: String = ""
+## 复合鉴权请求载荷（继承基础注册请求字段，扩展分流模式）
+class Request extends BaseRegistrationDTO.Request:
 	var action_mode: String = MODE_AUTO
-	var device_fingerprint: String = ""
-	var initial_entitlements: Array[String] = []
 
 	func _init(
 		p_username: String = "",
@@ -38,61 +35,35 @@ class Request extends RefCounted:
 
 	## 重置内部数据状态，供对象池无堆分配复用
 	func reset_state() -> void:
-		username = ""
-		password_plain = ""
+		super.reset_state()
 		action_mode = MODE_AUTO
-		device_fingerprint = ""
-		initial_entitlements.clear()
 
 	## 序列化当前对象为通用字典传输结构
 	func to_dto() -> Dictionary:
-		return {
-			"username": username,
-			"action_mode": action_mode,
-			"device_fingerprint": device_fingerprint,
-			"initial_entitlements": initial_entitlements.duplicate()
-		}
+		var out: Dictionary = super.to_dto()
+		out["action_mode"] = action_mode
+		return out
 
 	## 从输入字典反序列化还原传输对象
 	static func from_dto(data: Dictionary) -> Request:
 		var req := Request.new()
-		req.username = String(data.get("username", "")).strip_edges()
-		req.password_plain = String(data.get("password_plain", ""))
-		req.action_mode = String(data.get("action_mode", MODE_AUTO))
-		req.device_fingerprint = String(data.get("device_fingerprint", ""))
-		var raw_ent = data.get("initial_entitlements", [])
-		if raw_ent is Array:
-			for item in raw_ent:
-				req.initial_entitlements.append(String(item))
+		BaseRegistrationDTO.Request.populate_from_dict(req, data)
+		req.action_mode = str(data.get("action_mode", MODE_AUTO))
 		return req
 
-## 复合鉴权响应载荷
-class Response extends RefCounted:
-	var success: bool = false
-	var is_success: bool:
-		get:
-			return success
-		set(val):
-			success = val
-	var error_code: String = "OK"
-	var account_id: String = ""
-	var username: String = ""
+## 复合鉴权响应载荷（继承基础注册响应字段，扩展会话与世界槽位摘要）
+class Response extends BaseRegistrationDTO.Response:
 	var session_token: String = ""
 	var is_new_registration: bool = false
-	var created_timestamp_utc: int = 0
 	var last_login_timestamp_utc: int = 0
 	var save_slot_summaries: Dictionary = {}
 	var world_state_ref: String = ""
 
 	## 重置内部数据状态，供对象池无堆分配复用
 	func reset_state() -> void:
-		success = false
-		error_code = "OK"
-		account_id = ""
-		username = ""
+		super.reset_state()
 		session_token = ""
 		is_new_registration = false
-		created_timestamp_utc = 0
 		last_login_timestamp_utc = 0
 		save_slot_summaries.clear()
 		world_state_ref = ""
@@ -101,38 +72,28 @@ class Response extends RefCounted:
 	func to_dto() -> Dictionary:
 		var slot_dicts: Dictionary = {}
 		for k in save_slot_summaries.keys():
-			var item = save_slot_summaries[k]
+			var item: Variant = save_slot_summaries[k]
 			if item is SaveSlotSummaryDTO:
-				slot_dicts[k] = item.serialize()
+				slot_dicts[k] = (item as SaveSlotSummaryDTO).serialize()
 			elif item is Dictionary:
 				slot_dicts[k] = item
-		return {
-			"success": success,
-			"is_success": success,
-			"error_code": error_code,
-			"account_id": account_id,
-			"username": username,
-			"session_token": session_token,
-			"is_new_registration": is_new_registration,
-			"created_timestamp_utc": created_timestamp_utc,
-			"last_login_timestamp_utc": last_login_timestamp_utc,
-			"save_slot_summaries": slot_dicts,
-			"world_state_ref": world_state_ref
-		}
+		var out: Dictionary = super.to_dto()
+		out["session_token"] = session_token
+		out["is_new_registration"] = is_new_registration
+		out["last_login_timestamp_utc"] = last_login_timestamp_utc
+		out["save_slot_summaries"] = slot_dicts
+		out["world_state_ref"] = world_state_ref
+		return out
 
 	## 从输入字典反序列化还原传输对象
 	static func from_dto(data: Dictionary) -> Response:
 		var resp := Response.new()
-		resp.success = bool(data.get("success", false))
-		resp.error_code = String(data.get("error_code", "OK"))
-		resp.account_id = String(data.get("account_id", ""))
-		resp.username = String(data.get("username", ""))
-		resp.session_token = String(data.get("session_token", ""))
+		BaseRegistrationDTO.Response.populate_from_dict(resp, data)
+		resp.session_token = str(data.get("session_token", ""))
 		resp.is_new_registration = bool(data.get("is_new_registration", false))
-		resp.created_timestamp_utc = int(data.get("created_timestamp_utc", 0))
 		resp.last_login_timestamp_utc = int(data.get("last_login_timestamp_utc", 0))
-		resp.world_state_ref = String(data.get("world_state_ref", ""))
-		var raw_slots = data.get("save_slot_summaries", {})
+		resp.world_state_ref = str(data.get("world_state_ref", ""))
+		var raw_slots: Variant = data.get("save_slot_summaries", {})
 		if raw_slots is Dictionary:
 			for k in (raw_slots as Dictionary).keys():
 				var slot_data: Variant = (raw_slots as Dictionary)[k]
