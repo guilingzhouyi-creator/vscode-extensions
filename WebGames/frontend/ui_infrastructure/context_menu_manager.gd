@@ -14,7 +14,7 @@ signal menu_hidden()
 static var _instance: ContextMenuManager
 static func get_instance() -> ContextMenuManager:
 	if _instance == null:
-		_instance = load("res://frontend/ui_infrastructure/context_menu_manager.gd").new()
+		_instance = ContextMenuManager.new()
 		_instance.name = "ContextMenuManager"
 	return _instance
 

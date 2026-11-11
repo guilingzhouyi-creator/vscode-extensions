@@ -9,10 +9,14 @@ extends Node
 const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
 const ModalManager = preload("res://frontend/ui_infrastructure/modal_manager.gd")
 
+const BTN_WIDTH_STANDARD: float = 80.0
+const BTN_WIDTH_WIDE: float = 90.0
+const BTN_WIDTH_EXIT: float = 110.0
+
 static var _instance: DialogManager
 static func get_instance() -> DialogManager:
 	if _instance == null:
-		_instance = load("res://frontend/ui_infrastructure/dialog_manager.gd").new()
+		_instance = DialogManager.new()
 		_instance.name = "DialogManager"
 	return _instance
 
@@ -38,8 +42,8 @@ func _add_modal_button(
 func show_confirm(title: String, message: String, on_confirm: Callable, on_cancel: Callable = Callable()) -> Control:
 	var panel := _create_base_panel(title, message)
 	var btn_box: HBoxContainer = panel.get_node("Content/ButtonBox")
-	_add_modal_button(panel, btn_box, "ui.common.dialog.cancel", 80, on_cancel)
-	_add_modal_button(panel, btn_box, "ui.common.dialog.confirm", 80, on_confirm)
+	_add_modal_button(panel, btn_box, "ui.common.dialog.cancel", BTN_WIDTH_STANDARD, on_cancel)
+	_add_modal_button(panel, btn_box, "ui.common.dialog.confirm", BTN_WIDTH_STANDARD, on_confirm)
 	ModalManager.get_instance().open_modal(panel, false)
 	return panel
 
@@ -47,9 +51,9 @@ func show_confirm(title: String, message: String, on_confirm: Callable, on_cance
 func show_exit_choice(title: String, message: String, on_exit_to_archive: Callable, on_quit_game: Callable, on_cancel: Callable = Callable()) -> Control:
 	var panel := _create_base_panel(title, message)
 	var btn_box: HBoxContainer = panel.get_node("Content/ButtonBox")
-	_add_modal_button(panel, btn_box, "ui.common.dialog.cancel", 80, on_cancel)
-	_add_modal_button(panel, btn_box, "ui.fe02.menu.exit_to_archive", 110, on_exit_to_archive)
-	_add_modal_button(panel, btn_box, "ui.fe02.menu.exit", 90, on_quit_game)
+	_add_modal_button(panel, btn_box, "ui.common.dialog.cancel", BTN_WIDTH_STANDARD, on_cancel)
+	_add_modal_button(panel, btn_box, "ui.fe02.menu.exit_to_archive", BTN_WIDTH_EXIT, on_exit_to_archive)
+	_add_modal_button(panel, btn_box, "ui.fe02.menu.exit", BTN_WIDTH_WIDE, on_quit_game)
 	ModalManager.get_instance().open_modal(panel, false)
 	return panel
 
@@ -57,7 +61,7 @@ func show_exit_choice(title: String, message: String, on_exit_to_archive: Callab
 func show_alert(title: String, message: String, on_acknowledged: Callable = Callable()) -> Control:
 	var panel := _create_base_panel(title, message)
 	var btn_box: HBoxContainer = panel.get_node("Content/ButtonBox")
-	_add_modal_button(panel, btn_box, "ui.common.dialog.ok", 90, on_acknowledged)
+	_add_modal_button(panel, btn_box, "ui.common.dialog.ok", BTN_WIDTH_WIDE, on_acknowledged)
 	ModalManager.get_instance().open_modal(panel, false)
 	return panel
 
@@ -73,8 +77,8 @@ func show_prompt(title: String, placeholder: String, on_submit: Callable) -> Con
 	content.add_child(line_edit)
 	content.move_child(line_edit, 1) # 插入到标题下方、按钮上方
 
-	_add_modal_button(panel, btn_box, "ui.common.dialog.cancel", 80)
-	_add_modal_button(panel, btn_box, "ui.common.dialog.submit", 80, func():
+	_add_modal_button(panel, btn_box, "ui.common.dialog.cancel", BTN_WIDTH_STANDARD)
+	_add_modal_button(panel, btn_box, "ui.common.dialog.submit", BTN_WIDTH_STANDARD, func():
 		if on_submit.is_valid():
 			on_submit.call(line_edit.text)
 	)

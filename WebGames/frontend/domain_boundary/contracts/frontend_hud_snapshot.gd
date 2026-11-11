@@ -54,7 +54,7 @@ func to_dictionary() -> Dictionary:
 	}
 
 static func from_dictionary(data: Dictionary) -> FrontendHudSnapshot:
-	var dto: FrontendHudSnapshot = load("res://frontend/domain_boundary/contracts/frontend_hud_snapshot.gd").new()
+	var dto := FrontendHudSnapshot.new()
 	dto.character_id = read_string(data, "character_id")
 	var name_val := read_string(data, "character_name", "")
 	if name_val.is_empty():

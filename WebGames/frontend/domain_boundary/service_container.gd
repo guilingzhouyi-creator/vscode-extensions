@@ -45,30 +45,40 @@ func get_service(service_name: String) -> RefCounted:
 		return null
 	return _services[service_name]
 
+## 为全部渐进式演进业务域注册共享默认数据桩（消除 Mock/Real 容器重复装配）
+func _register_shared_mock_services() -> void:
+	register_service("combat", MockCombatService.new())
+	register_service("version", MockVersionService.new())
+	register_service("gacha", MockGachaService.new())
+	register_service("chat_command", MockChatCommandService.new())
+	register_service("crafting", MockCraftingService.new())
+	register_service("grimoire", MockGrimoireService.new())
+	register_service("economy", MockEconomyService.new())
+	register_service("quest", MockQuestService.new())
+	register_service("guild", MockGuildService.new())
+	register_service("save", MockSaveService.new())
+	register_service("misc_edge", MockMiscEdgeService.new())
+	register_service("mail", MockMailService.new())
+	register_service("snapshot_data", MockSnapshotDataService.new())
+
 # ==============================================================================
-# 二、领域便捷访问虚方法（子类应 override 并返回具体接口实现）
+# 二、领域强类型便捷访问契约（单源汇聚，Mock/Real 容器直接复用）
 # ==============================================================================
 
-func _unimplemented(method_name: String) -> Variant:
-	EventBusCore.get_instance().emit_log(
-		"error",
-		TemplateFormatter.format("ServiceContainer.{method}(): subclass must override", {"method": method_name})
-	)
-	return null
-
-func auth() -> Variant: return _unimplemented("auth")
-func world() -> Variant: return _unimplemented("world")
-func combat() -> Variant: return _unimplemented("combat")
-func version() -> Variant: return _unimplemented("version")
-func gacha() -> Variant: return _unimplemented("gacha")
-func chat_command() -> Variant: return _unimplemented("chat_command")
-func crafting() -> Variant: return _unimplemented("crafting")
-func grimoire() -> Variant: return _unimplemented("grimoire")
-func economy() -> Variant: return _unimplemented("economy")
-func character() -> Variant: return _unimplemented("character")
-func quest() -> Variant: return _unimplemented("quest")
-func guild() -> Variant: return _unimplemented("guild")
-func save() -> Variant: return _unimplemented("save")
-func misc_edge() -> Variant: return _unimplemented("misc_edge")
-func mail() -> Variant: return _unimplemented("mail")
-func snapshot_data() -> Variant: return _unimplemented("snapshot_data")
+func auth() -> IAuthService: return get_service("auth") as IAuthService
+func world() -> IWorldService: return get_service("world") as IWorldService
+func combat() -> ICombatService: return get_service("combat") as ICombatService
+func version() -> IVersionService: return get_service("version") as IVersionService
+func gacha() -> IGachaService: return get_service("gacha") as IGachaService
+func chat_command() -> IChatCommandService: return get_service("chat_command") as IChatCommandService
+func crafting() -> ICraftingService: return get_service("crafting") as ICraftingService
+func grimoire() -> IGrimoireService: return get_service("grimoire") as IGrimoireService
+func economy() -> IEconomyService: return get_service("economy") as IEconomyService
+func character() -> ICharacterService: return get_service("character") as ICharacterService
+func quest() -> IQuestService: return get_service("quest") as IQuestService
+func guild() -> IGuildService: return get_service("guild") as IGuildService
+func save() -> ISaveService: return get_service("save") as ISaveService
+func misc_edge() -> IMiscEdgeService: return get_service("misc_edge") as IMiscEdgeService
+func mail() -> IMailService: return get_service("mail") as IMailService
+func snapshot_data() -> ISnapshotDataService: return get_service("snapshot_data") as ISnapshotDataService
+func esc_menu() -> IEscMenuService: return get_service("esc_menu") as IEscMenuService

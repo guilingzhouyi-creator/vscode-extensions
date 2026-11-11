@@ -12,6 +12,7 @@ extends RefCounted
 const ServiceContainer = preload("res://frontend/domain_boundary/service_container.gd")
 const MockServiceContainer = preload("res://frontend/domain_boundary/mocks/mock_service_container.gd")
 const RealServiceContainer = preload("res://frontend/domain_boundary/services/real_service_container.gd")
+const WorldGatewayFSMClass = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
 const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
 
 ## 已解析的服务容器单例（按 service_mode 惰性初始化）
@@ -37,15 +38,12 @@ static func set_active_gateway(gateway: RefCounted) -> void:
 
 ## 创建并激活指定账号的世界网关实例（解耦前端视图与后端网关实现）
 static func create_and_activate_gateway(account_id: String) -> RefCounted:
-	var gw_script: Variant = load("res://backend/domains/world_gateway/world_gateway_fsm.gd")
-	if gw_script != null and gw_script.can_instantiate():
-		var gw: RefCounted = gw_script.new(account_id)
-		if gw != null and gw.has_method("enter_gateway"):
-			gw.call("enter_gateway")
-		set_active_gateway(gw)
-		WorldSessionRuntimeService.activate_authenticated_session(account_id, "", gw)
-		return gw
-	return null
+	var gw: RefCounted = WorldGatewayFSMClass.new(account_id)
+	if gw != null and gw.has_method("enter_gateway"):
+		gw.call("enter_gateway")
+	set_active_gateway(gw)
+	WorldSessionRuntimeService.activate_authenticated_session(account_id, "", gw)
+	return gw
 
 ## 获取当前活跃的世界网关实例（单源优先委托至后端会话真源）
 static func get_active_gateway() -> RefCounted:

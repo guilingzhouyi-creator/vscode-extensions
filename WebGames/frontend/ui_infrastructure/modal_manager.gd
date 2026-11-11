@@ -14,7 +14,7 @@ signal modal_closed(modal: Control)
 static var _instance: ModalManager
 static func get_instance() -> ModalManager:
 	if _instance == null:
-		_instance = load("res://frontend/ui_infrastructure/modal_manager.gd").new()
+		_instance = ModalManager.new()
 		_instance.name = "ModalManager"
 	return _instance
 
@@ -28,7 +28,7 @@ var _backdrop: ColorRect
 func bind_layer(layer: CanvasLayer, container: Control = null) -> void:
 	_modal_layer = layer
 	_modal_container = container if container != null else ensure_fallback_container(layer, "ModalManagerFallbackContainer")
-	_ensure_backdrop()
+	_backdrop = ensure_backdrop_for_container(_modal_container, _backdrop, "ModalBackdrop", _on_backdrop_input)
 
 ## 创建/复用 layer 下的缺省承载容器（Control 类型安全，幂等）
 static func ensure_fallback_container(layer: CanvasLayer, fallback_name: String) -> Control:
@@ -44,22 +44,29 @@ static func ensure_fallback_container(layer: CanvasLayer, fallback_name: String)
 	layer.add_child(fallback)
 	return fallback
 
-## 确保遮罩存在（支持重绑：容器变更时迁移遮罩，保持幂等）
-func _ensure_backdrop() -> void:
-	if _modal_container == null:
-		return
-	if _backdrop != null and is_instance_valid(_backdrop) and _backdrop.get_parent() == _modal_container:
-		return
-	if _backdrop != null and is_instance_valid(_backdrop):
-		_backdrop.queue_free()
-	_backdrop = ColorRect.new()
-	_backdrop.name = "ModalBackdrop"
-	_backdrop.color = DesignTokens.COLOR_BACKDROP_MASK
-	_backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
-	_backdrop.visible = false
-	_backdrop.gui_input.connect(_on_backdrop_input)
-	_modal_container.add_child(_backdrop)
+## 确保容器下全局暗色遮罩存在且对齐容器变化（UI 基础设施层共享，支持幂等重绑）
+static func ensure_backdrop_for_container(
+	container: Control,
+	existing_backdrop: ColorRect,
+	backdrop_name: String,
+	on_input: Callable
+) -> ColorRect:
+	if container == null:
+		return existing_backdrop
+	if existing_backdrop != null and is_instance_valid(existing_backdrop) and existing_backdrop.get_parent() == container:
+		return existing_backdrop
+	if existing_backdrop != null and is_instance_valid(existing_backdrop):
+		existing_backdrop.queue_free()
+	var backdrop := ColorRect.new()
+	backdrop.name = backdrop_name
+	backdrop.color = DesignTokens.COLOR_BACKDROP_MASK
+	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	backdrop.visible = false
+	if on_input.is_valid():
+		backdrop.gui_input.connect(on_input)
+	container.add_child(backdrop)
+	return backdrop
 
 ## 打开模态弹窗（同一实例重复打开时提升为栈顶，避免栈内重复与悬空键）
 func open_modal(modal: Control, dismiss_on_backdrop: bool = false) -> bool:

@@ -31,7 +31,7 @@ signal state_changed(from_state: AppState, to_state: AppState, context: Dictiona
 static var _instance: AppLifecycleFSM
 static func get_instance() -> AppLifecycleFSM:
 	if _instance == null:
-		_instance = load("res://frontend/app/app_lifecycle_fsm.gd").new()
+		_instance = AppLifecycleFSM.new()
 	return _instance
 
 var _current_state: AppState = AppState.BOOT

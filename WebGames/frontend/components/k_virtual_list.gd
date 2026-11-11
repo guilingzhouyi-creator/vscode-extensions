@@ -10,6 +10,7 @@ signal range_changed(start_idx: int, end_idx: int)
 
 ## 行对象池硬上限（R-31 / ADV-POOL-001：防池无界膨胀，魔法数字入常量）
 const POOL_HARD_CAP: int = 128
+const METHOD_RESET_STATE: String = "reset_state"
 
 ## ------------------------------------------------------------------------------
 ## 池化行节点具体实现（ADV-POOL-001 契约：复位一切跨复用残留）
@@ -105,14 +106,18 @@ func get_current_range() -> Vector2i:
 # 行对象池（R-31 / ADV-POOL-001：仅组件层落地 + 接口预留，不接线消费方）
 # ==============================================================================
 
+## 统一复位单行池化节点内部状态（KVirtualRow 具体类优先，兼容外部鸭子实现）
+static func _reset_row_state(row: Control) -> void:
+	if row is KVirtualRow:
+		(row as KVirtualRow).reset_state()
+	elif row.has_method(METHOD_RESET_STATE):
+		row.call(METHOD_RESET_STATE)
+
 ## 取用一枚行节点：优先复用池中空闲项（LIFO），池空则新建具体池化行
 func acquire_row() -> Control:
 	if not _row_pool.is_empty():
 		var reused: Control = _row_pool.pop_back()
-		if reused is KVirtualRow:
-			(reused as KVirtualRow).reset_state()
-		elif reused.has_method("reset_state"):
-			reused.call("reset_state")
+		_reset_row_state(reused)
 		reused.visible = true
 		return reused
 	var fresh := KVirtualRow.new()
@@ -137,10 +142,7 @@ func release_row(row: Control) -> void:
 		if _active_rows[idx] == row:
 			_active_rows.erase(idx)
 	# ADV-POOL-001 契约：归还前必须清态（优先具体实现，兼容消费方鸭子实现）
-	if row is KVirtualRow:
-		(row as KVirtualRow).reset_state()
-	elif row.has_method("reset_state"):
-		row.call("reset_state")
+	_reset_row_state(row)
 	row.visible = false
 	if _row_pool.size() >= _pool_capacity():
 		_detach_from_parent(row)
@@ -175,10 +177,7 @@ func _clear_row_pool() -> void:
 	for idx in _active_rows.keys():
 		var active_row: Control = _active_rows[idx]
 		if active_row != null and is_instance_valid(active_row):
-			if active_row is KVirtualRow:
-				(active_row as KVirtualRow).reset_state()
-			elif active_row.has_method("reset_state"):
-				active_row.call("reset_state")
+			_reset_row_state(active_row)
 			_detach_from_parent(active_row)
 			active_row.queue_free()
 	_active_rows.clear()

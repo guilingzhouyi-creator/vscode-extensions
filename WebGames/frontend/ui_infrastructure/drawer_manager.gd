@@ -21,7 +21,7 @@ signal drawer_closed(drawer: Control)
 static var _instance: DrawerManager
 static func get_instance() -> DrawerManager:
 	if _instance == null:
-		_instance = load("res://frontend/ui_infrastructure/drawer_manager.gd").new()
+		_instance = DrawerManager.new()
 		_instance.name = "DrawerManager"
 	return _instance
 
@@ -33,24 +33,7 @@ var _backdrop: ColorRect
 func bind_layer(layer: CanvasLayer, container: Control = null) -> void:
 	_layer = layer
 	_container = container if container != null else ModalManager.ensure_fallback_container(layer, "DrawerManagerFallbackContainer")
-	_ensure_backdrop()
-
-## 确保遮罩存在（支持重绑：容器变更时迁移遮罩，保持幂等）
-func _ensure_backdrop() -> void:
-	if _container == null:
-		return
-	if _backdrop != null and is_instance_valid(_backdrop) and _backdrop.get_parent() == _container:
-		return
-	if _backdrop != null and is_instance_valid(_backdrop):
-		_backdrop.queue_free()
-	_backdrop = ColorRect.new()
-	_backdrop.name = "DrawerBackdrop"
-	_backdrop.color = DesignTokens.COLOR_BACKDROP_MASK
-	_backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
-	_backdrop.visible = false
-	_backdrop.gui_input.connect(_on_backdrop_input)
-	_container.add_child(_backdrop)
+	_backdrop = ModalManager.ensure_backdrop_for_container(_container, _backdrop, "DrawerBackdrop", _on_backdrop_input)
 
 ## 打开抽屉
 func open_drawer(drawer: Control, side: EdgeSide = EdgeSide.RIGHT) -> bool:

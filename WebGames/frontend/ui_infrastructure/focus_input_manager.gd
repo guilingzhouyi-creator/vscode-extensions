@@ -9,7 +9,7 @@ extends RefCounted
 static var _instance: FocusInputManager
 static func get_instance() -> FocusInputManager:
 	if _instance == null:
-		_instance = load("res://frontend/ui_infrastructure/focus_input_manager.gd").new()
+		_instance = FocusInputManager.new()
 	return _instance
 
 var _focus_history: Array[Control] = []
