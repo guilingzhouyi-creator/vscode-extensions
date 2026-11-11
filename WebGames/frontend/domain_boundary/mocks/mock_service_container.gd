@@ -6,6 +6,9 @@
 class_name MockServiceContainer
 extends ServiceContainer
 
+const MockEscMenuService = preload("res://frontend/domain_boundary/mocks/mock_esc_menu_service.gd")
+const IEscMenuService = preload("res://frontend/domain_boundary/interfaces/i_esc_menu_service.gd")
+
 static var _instance: MockServiceContainer
 static func get_instance() -> MockServiceContainer:
 	if _instance == null:
@@ -38,6 +41,7 @@ func _init_default_services() -> void:
 	register_service("misc_edge", MockMiscEdgeService.new())
 	register_service("mail", MockMailService.new())
 	register_service("snapshot_data", MockSnapshotDataService.new())
+	register_service("esc_menu", MockEscMenuService.new())
 
 ## 泛化便捷访问
 func auth() -> IAuthService:
@@ -87,3 +91,6 @@ func mail() -> IMailService:
 
 func snapshot_data() -> ISnapshotDataService:
 	return get_service("snapshot_data") as ISnapshotDataService
+
+func esc_menu() -> IEscMenuService:
+	return get_service("esc_menu") as IEscMenuService

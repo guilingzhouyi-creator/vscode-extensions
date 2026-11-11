@@ -34,11 +34,25 @@ class RuntimeWorldSaveProvider extends RefCounted:
 
 static var _state: RuntimeSessionState = RuntimeSessionState.new()
 static var _runtime_save_provider: RuntimeWorldSaveProvider = null
+static var _masked_token: PackedByteArray = PackedByteArray()
+static var _token_mask_handler: Callable = Callable()
+static var _token_reveal_handler: Callable = Callable()
+
+## 注册外部安全混淆处理器（依赖倒置模式：由外层应用/基础设施注入，避免领域层逆向依赖基础设施）
+static func register_token_protection_handlers(masker: Callable, revealer: Callable) -> void:
+	_token_mask_handler = masker
+	_token_reveal_handler = revealer
 
 ## 激活已鉴权的账号级会话上下文
 static func activate_authenticated_session(account_id: String, raw_token: String = "", gateway: Variant = null) -> void:
 	_state.account_id = account_id
 	_state.session_token_hash = raw_token.sha256_text() if not raw_token.is_empty() else ""
+	if raw_token.is_empty():
+		_masked_token = PackedByteArray()
+	elif _token_mask_handler.is_valid():
+		_masked_token = _token_mask_handler.call(raw_token)
+	else:
+		_masked_token = raw_token.to_utf8_buffer()
 	if gateway != null:
 		_state.gateway_fsm = gateway
 
@@ -69,6 +83,18 @@ static func get_active_slot_id() -> String:
 ## 获取当前绑定世界 ID
 static func get_active_world_id() -> String:
 	return _state.world_id
+
+## 获取当前绑定角色 ID
+static func get_active_character_id() -> String:
+	return _state.character_id
+
+## 获取当前活跃会话令牌（由已注入的安全混淆器或安全备用流还原）
+static func get_active_session_token() -> String:
+	if _masked_token.is_empty():
+		return ""
+	if _token_reveal_handler.is_valid():
+		return str(_token_reveal_handler.call(_masked_token))
+	return _masked_token.get_string_from_utf8()
 
 ## 绑定创角后的序章上下文与角色档案（供序章推进与交接使用，退出自动销毁）
 static func bind_prologue_session(prologue_ctx: Variant, profile: Variant = null) -> void:
@@ -288,6 +314,7 @@ static func revoke_account_session() -> void:
 	_unregister_runtime_save_providers()
 	_state.reset_all()
 	_runtime_save_provider = null
+	_masked_token = PackedByteArray()
 
 ## 重置测试运行时状态（与 revoke_account_session 等价，保持测试隔离）
 static func reset_for_tests() -> void:

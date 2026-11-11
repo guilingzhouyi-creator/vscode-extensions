@@ -30,3 +30,19 @@ func create_character_async(account_id: String, req_data: Dictionary, callback: 
 func roll_attribute_spread() -> Dictionary:
 	printerr("IAuthService.roll_attribute_spread: 纯虚函数必须由子类实现")
 	return {"success": false, "error_code": "NOT_IMPLEMENTED"}
+
+## 异步资质骰点契约（对齐 ROLL_CHARACTER_PREVIEW 动作）
+func roll_attributes_async(callback: Callable) -> void:
+	printerr("IAuthService.roll_attributes_async: 纯虚函数必须由子类实现")
+
+## 异步注销/吊销令牌契约 (callback: func(result: Dictionary) -> void)
+func revoke_token(token: String, callback: Callable = Callable()) -> void:
+	printerr("IAuthService.revoke_token: 纯虚函数必须由子类实现")
+
+## 异步退出账号契约 (对齐 LOGOUT_ACCOUNT)
+func logout_async(account_id: String, token: String, callback: Callable = Callable()) -> void:
+	printerr("IAuthService.logout_async: 纯虚函数必须由子类实现")
+
+## 异步拉取账号首页视图模型契约 (对齐 GET_ACCOUNT_HOME_VIEW_MODEL)
+func get_account_home_async(account_id: String, token: String, callback: Callable = Callable()) -> void:
+	printerr("IAuthService.get_account_home_async: 纯虚函数必须由子类实现")

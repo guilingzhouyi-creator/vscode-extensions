@@ -39,3 +39,31 @@ func preview_add_point(attributes_preview: Dictionary, attr_key: String, remaini
 		"remain": remaining - 1,
 		"attributes": updated,
 	}
+
+func create_character_async(account_id: String, token: String, req_data: Dictionary, callback: Callable) -> void:
+	var char_name := str(req_data.get("name", "MockHero"))
+	var new_char := {
+		"slot_id": str(req_data.get("slot_id", "SLOT_01")),
+		"name": char_name,
+		"race": str(req_data.get("race", "HUMAN")),
+		"class": "Novice",
+		"level": 1,
+		"empty": false
+	}
+	if callback.is_valid():
+		callback.call({"success": true, "character": new_char})
+
+func roll_attributes_async(callback: Callable) -> void:
+	var rng := DeterministicRNG.global()
+	if callback.is_valid():
+		callback.call({
+			"success": true,
+			"attrs": {
+				"STR": rng.randi_range(8, 18),
+				"AGI": rng.randi_range(8, 18),
+				"CON": rng.randi_range(8, 18),
+				"INT": rng.randi_range(8, 18),
+				"WIS": rng.randi_range(8, 18),
+				"CHA": rng.randi_range(8, 18)
+			}
+		})

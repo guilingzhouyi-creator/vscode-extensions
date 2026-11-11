@@ -34,3 +34,24 @@ func upgrade_territory(territory: Dictionary) -> Dictionary:
 	updated["construction"] = 1.0
 	updated["garrison"] = int(updated.get("garrison", 0)) + 10
 	return {"success": true, "territory": updated}
+
+func enter_gateway_async(account_id: String, token: String, callback: Callable) -> void:
+	MockBaseService.delayed_call(callback, {"success": true, "account_id": account_id, "worlds": []}, simulate_delay_ms)
+
+func probe_modes_async(account_id: String, token: String, callback: Callable) -> void:
+	MockBaseService.delayed_call(callback, {"success": true, "probe_reports": {}}, simulate_delay_ms)
+
+func list_worlds_async(account_id: String, token: String, callback: Callable) -> void:
+	MockBaseService.delayed_call(callback, {"success": true, "worlds": []}, simulate_delay_ms)
+
+func select_mode_async(account_id: String, token: String, mode_id: int, account_slots: Array, callback: Callable) -> void:
+	MockBaseService.delayed_call(callback, {"success": true, "mode_id": mode_id}, simulate_delay_ms)
+
+func select_or_create_world_async(account_id: String, token: String, world_id: String, mode_id: int, callback: Callable) -> void:
+	MockBaseService.delayed_call(callback, {"success": true, "world_id": world_id, "mode_id": mode_id}, simulate_delay_ms)
+
+func switch_gateway_mode_async(account_id: String, token: String, target_mode: int, callback: Callable) -> void:
+	MockBaseService.delayed_call(callback, {"success": true, "target_mode": target_mode}, simulate_delay_ms)
+
+func exit_world_to_gateway_async(account_id: String, token: String, callback: Callable) -> void:
+	MockBaseService.delayed_call(callback, {"success": true}, simulate_delay_ms)

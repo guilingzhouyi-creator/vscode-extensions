@@ -96,3 +96,23 @@ func roll_attribute_spread() -> Dictionary:
 			"CHA": rng.randi_range(8, 18),
 		}
 	}
+
+func roll_attributes_async(callback: Callable) -> void:
+	MockBaseService.delayed_call(callback, roll_attribute_spread(), simulate_delay_ms)
+
+func revoke_token(token: String, callback: Callable = Callable()) -> void:
+	if callback.is_valid():
+		MockBaseService.delayed_call(callback, { "success": true, "token": token }, simulate_delay_ms)
+
+func logout_async(account_id: String, token: String, callback: Callable = Callable()) -> void:
+	if callback.is_valid():
+		MockBaseService.delayed_call(callback, { "success": true, "account_id": account_id }, simulate_delay_ms)
+
+func get_account_home_async(account_id: String, token: String, callback: Callable = Callable()) -> void:
+	var base_data := MockDataCatalog.get_domain_data("account")
+	if callback.is_valid():
+		MockBaseService.delayed_call(callback, {
+			"success": true,
+			"account_id": account_id,
+			"view_model": base_data.duplicate(true)
+		}, simulate_delay_ms)

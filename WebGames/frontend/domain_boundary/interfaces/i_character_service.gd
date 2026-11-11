@@ -20,3 +20,11 @@ func aggregate_equipment_modifiers(equipped_slots: Dictionary) -> Dictionary:
 func preview_add_point(attributes_preview: Dictionary, attr_key: String, remaining: int) -> Dictionary:
 	printerr("ICharacterService.preview_add_point: 纯虚函数必须由子类实现")
 	return {"success": false, "reason": "NOT_IMPLEMENTED"}
+
+## 异步创建权威角色契约 (对齐 CREATE_AUTHORITATIVE_CHARACTER)
+func create_character_async(account_id: String, token: String, req_data: Dictionary, callback: Callable) -> void:
+	printerr("ICharacterService.create_character_async: 纯虚函数必须由子类实现")
+
+## 异步命途资质骰点契约 (对齐 ROLL_CHARACTER_PREVIEW)
+func roll_attributes_async(callback: Callable) -> void:
+	printerr("ICharacterService.roll_attributes_async: 纯虚函数必须由子类实现")
