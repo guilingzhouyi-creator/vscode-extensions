@@ -76,7 +76,7 @@ static func from_dto(dict: Dictionary) -> Resource:
 			"INFRA": snap.coverage_status = CoverageStatus.INFRA
 			_: snap.coverage_status = CoverageStatus.MISSING
 	else:
-		push_warning(TemplateFormatter.format("DtoShapeViolation: coverage_status is not String ({type}), rejected as MISSING", {"type": str(st)}))
+		EventBusCore.get_instance().emit_log("warn", TemplateFormatter.format("DtoShapeViolation: coverage_status is not String ({type}), rejected as MISSING", {"type": str(st)}))
 		snap.coverage_status = CoverageStatus.MISSING
 
 	snap.backend_file_count = int(dict.get("backend_file_count", 0))

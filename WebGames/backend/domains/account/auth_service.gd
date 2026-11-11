@@ -14,7 +14,6 @@ const AccountRegistrationDTO = preload("res://backend/domains/account/dto/accoun
 const AccountCompositeAuthDTO = preload("res://backend/domains/account/dto/account_composite_auth_dto.gd")
 const HudEventContract = preload("res://backend/domains/world_state/hud_event_contract.gd")
 const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
-const AccountHomeViewModelBuilder = preload("res://backend/domains/account/services/account_home_view_model_builder.gd")
 
 const DOMAIN_ACCOUNT_CONFIG: String = "domains.account"
 const DEFAULT_GUEST_NAME_RANGE_MIN: int = 1000
@@ -468,10 +467,6 @@ static func register_and_login(request: AccountRegistrationDTO.Request, auto_log
 		"last_login_timestamp_utc": target_acc.last_login_timestamp_utc,
 		"auto_enter_gateway": bool(auth_res.get("auto_enter_gateway", true))
 	}
-
-## 构建账号首页脱敏数据视图模型（禁止返回口令哈希与明文令牌）
-static func build_account_home_view_model(session_token: String = "", locale: String = "") -> Dictionary:
-	return AccountHomeViewModelBuilder.build_account_home_view_model(session_token, locale)
 
 ## 吊销全部仍处于激活态的会话并擦除掩码凭据（保留 revoked 审计墓碑供 validate_token 识别 TOKEN_REVOKED）
 static func revoke_all_active_sessions() -> int:

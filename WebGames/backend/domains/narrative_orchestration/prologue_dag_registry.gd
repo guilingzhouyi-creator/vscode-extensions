@@ -44,7 +44,7 @@ static func get_graph_by_id(dag_id: String) -> NarrativeDAGGraphDTO:
         return null
 
     var raw: Dictionary = catalog.get(dag_id, {})
-    return _assemble_graph_from_raw(dag_id, raw)
+    return assemble_graph_from_raw(dag_id, raw)
 
 # ==============================================================================
 # 二、MOD 路由优先级匹配与内置路由回退内部方法 (CC <= 15, Depth <= 3)
@@ -173,7 +173,7 @@ static func _resolve_or_synthesize_mod_graph(
 ) -> NarrativeDAGGraphDTO:
     var mod_graphs: Dictionary = manifest.get("dag_graphs", manifest.get("custom_dag_graphs", {}))
     if mod_graphs.has(dag_id) and mod_graphs[dag_id] is Dictionary:
-        return _assemble_graph_from_raw(dag_id, mod_graphs[dag_id] as Dictionary)
+        return assemble_graph_from_raw(dag_id, mod_graphs[dag_id] as Dictionary)
 
     if builtin_catalog.has(dag_id):
         return get_graph_by_id(dag_id)
@@ -184,7 +184,7 @@ static func _resolve_or_synthesize_mod_graph(
         if builtin_catalog[k] is Dictionary:
             template_raw = builtin_catalog[k] as Dictionary
             break
-    return _assemble_graph_from_raw(dag_id, template_raw)
+    return assemble_graph_from_raw(dag_id, template_raw)
 
 ## 从原始叙事配置装配编排事件因果图谱
 static func assemble_graph_from_raw(dag_id: String, raw: Dictionary) -> NarrativeDAGGraphDTO:
@@ -201,9 +201,6 @@ static func assemble_graph_from_raw(dag_id: String, raw: Dictionary) -> Narrativ
         _add_single_raw_edge(g, ed)
 
     return g
-
-static func _assemble_graph_from_raw(dag_id: String, raw: Dictionary) -> NarrativeDAGGraphDTO:
-    return assemble_graph_from_raw(dag_id, raw)
 
 static func _add_single_raw_node(
     g: NarrativeDAGGraphDTO,

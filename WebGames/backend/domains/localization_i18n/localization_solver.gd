@@ -57,7 +57,7 @@ static func translate(
     var formatted_text: String = raw_template
     for param_key in params:
         var token: String = "{" + str(param_key) + "}"
-        if formatted_text.find(token) != -1:
+        if formatted_text.contains(token):
             formatted_text = formatted_text.replace(token, str(params[param_key]))
 
     return formatted_text

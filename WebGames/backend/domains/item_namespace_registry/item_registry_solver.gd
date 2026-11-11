@@ -36,24 +36,24 @@ static func _make_error(code: String, message: String) -> Dictionary:
 
 static func _validate_prototype_identity(catalog: ItemRegistryCatalog, proto: ItemRegistryCatalog.ItemPrototypeTemplate) -> Dictionary:
 	if not validate_canonical_id_format(proto.canonical_id):
-		return _make_error("ERR_INVALID_ID_FORMAT", _msg("invalid_id_format"))
+		return _make_error("ERR_INVALID_ID_FORMAT", _msg_fmt("invalid_id_format"))
 	if catalog._canonical_registry.has(proto.canonical_id):
-		return _make_error("ERR_ID_COLLISION", _msg("id_collision") % proto.canonical_id)
+		return _make_error("ERR_ID_COLLISION", _msg_fmt("id_collision", {"canonical_id": proto.canonical_id}))
 	if proto.english_name.is_empty():
-		return _make_error("ERR_ENGLISH_NAME_MISSING", _msg("english_name_missing") % proto.canonical_id)
+		return _make_error("ERR_ENGLISH_NAME_MISSING", _msg_fmt("english_name_missing", {"canonical_id": proto.canonical_id}))
 	if not _is_valid_english_name(proto.english_name):
-		return _make_error("ERR_ENGLISH_NAME_INVALID", _msg("english_name_invalid") % proto.english_name)
+		return _make_error("ERR_ENGLISH_NAME_INVALID", _msg_fmt("english_name_invalid", {"english_name": proto.english_name}))
 	return {}
 
 static func _validate_prototype_uniqueness(catalog: ItemRegistryCatalog, proto: ItemRegistryCatalog.ItemPrototypeTemplate) -> Dictionary:
 	if not proto.loc_name_key.is_empty() and catalog._loc_key_to_canonical.has(proto.loc_name_key):
-		return _make_error("ERR_NAME_KEY_COLLISION", _msg("name_key_collision") % proto.loc_name_key)
+		return _make_error("ERR_NAME_KEY_COLLISION", _msg_fmt("name_key_collision", {"loc_name_key": proto.loc_name_key}))
 	if catalog._english_name_to_canonical.has(proto.english_name):
-		return _make_error("ERR_ENGLISH_NAME_COLLISION", _msg("english_name_collision") % proto.english_name)
+		return _make_error("ERR_ENGLISH_NAME_COLLISION", _msg_fmt("english_name_collision", {"english_name": proto.english_name}))
 	if proto.numeric_id <= 0:
 		proto.numeric_id = catalog.allocate_numeric_id()
 	elif catalog._numeric_to_canonical.has(proto.numeric_id):
-		return _make_error("ERR_NUMERIC_COLLISION", _msg("numeric_id_collision") % proto.numeric_id)
+		return _make_error("ERR_NUMERIC_COLLISION", _msg_fmt("numeric_id_collision", {"numeric_id": proto.numeric_id}))
 	return {}
 
 static func _commit_prototype_to_catalog(catalog: ItemRegistryCatalog, proto: ItemRegistryCatalog.ItemPrototypeTemplate) -> void:
@@ -64,12 +64,12 @@ static func _commit_prototype_to_catalog(catalog: ItemRegistryCatalog, proto: It
 		catalog._loc_key_to_canonical[proto.loc_name_key] = proto.canonical_id
 	catalog._english_name_to_canonical[proto.english_name] = proto.canonical_id
 
-	var seen_aliases: Array = []
+	var seen_aliases: Dictionary = {}
 	for alias in proto.search_aliases:
 		var key: String = str(alias).to_lower().strip_edges()
 		if key.is_empty() or seen_aliases.has(key):
 			continue
-		seen_aliases.append(key)
+		seen_aliases[key] = true
 		if not catalog._alias_inverted_index.has(key):
 			catalog._alias_inverted_index[key] = []
 		catalog._alias_inverted_index[key].append(proto.canonical_id)
@@ -106,7 +106,7 @@ static func unregister_prototype(catalog: ItemRegistryCatalog, canonical_id: Str
 		return {
 			"success": false,
 			"error_code": "ERR_NOT_FOUND",
-			"message": _msg("not_found") % canonical_id
+			"message": _msg_fmt("not_found", {"canonical_id": canonical_id})
 		}
 
 	for alias in proto.search_aliases:
@@ -173,6 +173,6 @@ static func _is_valid_english_name(name: String) -> bool:
 			return false
 	return true
 
-## 错误文案查表（item_namespace_registry 域，未登记回传 key）
-static func _msg(key: String) -> String:
-	return GameConfig.msg("item_namespace_registry", key)
+## 错误文案查表并注入 {param} 命名占位符（item_namespace_registry 域）
+static func _msg_fmt(key: String, params: Dictionary = {}) -> String:
+	return GameConfig.msg_fmt("item_namespace_registry", key, params)

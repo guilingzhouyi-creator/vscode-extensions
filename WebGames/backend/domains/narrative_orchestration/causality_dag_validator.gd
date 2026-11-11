@@ -14,16 +14,16 @@ extends RefCounted
 ## 基础图元拓扑完整性校验（空校验、入口与终态存在性）
 static func _validate_graph_topology_integrity(graph: NarrativeDAGGraphDTO) -> Dictionary:
 	if graph == null or graph.nodes.is_empty():
-		return {"is_valid": false, "error_code": "EMPTY_GRAPH", "message": "图元或节点集合为空"}
+		return {"is_valid": false, "error_code": "EMPTY_GRAPH", "message": "Empty DAG or node collection"}
 
 	if graph.entry_node_id.is_empty() or not graph.nodes.has(graph.entry_node_id):
-		return {"is_valid": false, "error_code": "INVALID_ENTRY_NODE", "message": "入口节点不存在"}
+		return {"is_valid": false, "error_code": "INVALID_ENTRY_NODE", "message": "Entry node does not exist"}
 
 	if not graph.terminal_node_id.is_empty() and not graph.nodes.has(graph.terminal_node_id):
 		return {
 			"is_valid": false,
 			"error_code": "INVALID_TERMINAL_NODE",
-			"message": "终态节点不存在: %s" % graph.terminal_node_id
+			"message": TemplateFormatter.format("Terminal node does not exist: {node_id}", {"node_id": graph.terminal_node_id})
 		}
 
 	return {"is_valid": true}
@@ -34,7 +34,10 @@ static func _check_node_prerequisites(nid: String, node: NarrativeDAGNode, graph
 			return {
 				"is_valid": false,
 				"error_code": "MISSING_PREREQUISITE",
-				"message": "节点 %s 依赖不存在的前置: %s" % [nid, pre]
+				"message": TemplateFormatter.format(
+					"Node {node_id} requires missing prerequisite: {prerequisite}",
+					{"node_id": nid, "prerequisite": pre}
+				)
 			}
 	return {"is_valid": true}
 
@@ -49,7 +52,10 @@ static func _build_degrees_and_edges(graph: NarrativeDAGGraphDTO, in_degree: Dic
 			return {
 				"is_valid": false,
 				"error_code": "DANGLING_EDGE",
-				"message": "边连接了不存在的节点: %s -> %s" % [edge.from_node_id, edge.to_node_id]
+				"message": TemplateFormatter.format(
+					"Edge references non-existent node: {from_id} -> {to_id}",
+					{"from_id": edge.from_node_id, "to_id": edge.to_node_id}
+				)
 			}
 		adj_list[edge.from_node_id].append(edge.to_node_id)
 		in_degree[edge.to_node_id] = int(in_degree.get(edge.to_node_id, 0)) + 1
@@ -79,7 +85,10 @@ static func _detect_cycle_kahn(graph: NarrativeDAGGraphDTO, in_degree: Dictionar
 		return {
 			"is_valid": false,
 			"error_code": "CYCLE_DETECTED",
-			"message": "剧情 DAG 中检测到非法循环依赖环 (Cycle)，已访问 %d / 总节点数 %d" % [visited_count, graph.nodes.size()]
+			"message": TemplateFormatter.format(
+				"Cycle detected in narrative DAG: visited {visited} of {total} nodes",
+				{"visited": visited_count, "total": graph.nodes.size()}
+			)
 		}
 
 	return {"is_valid": true, "visited_count": visited_count}

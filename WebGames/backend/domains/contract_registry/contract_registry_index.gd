@@ -11,8 +11,9 @@
 class_name ContractRegistryIndex
 extends RefCounted
 
-const DOMAIN_NAME: String = "contract_registry_index"
 const EntryClass = preload("res://backend/domains/contract_registry/contract_registry_entry.gd")
+
+const DOMAIN_NAME: String = "contract_registry_index"
 
 const SUPPORTED_SCHEMA_VERSION: int = 1
 const CONTRACT_CONFIG_PATH_PRIMARY: String = "res://config/infrastructure/contracts.json"

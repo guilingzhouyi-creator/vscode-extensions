@@ -65,4 +65,4 @@ func _merge_section(raw: Variant, target: Dictionary, section: String) -> void:
 		for k in raw:
 			target[k] = raw[k]
 	elif raw != null:
-		push_warning(TemplateFormatter.format("game_settings: section '{section}' corrupted (expected Dictionary, got {type}); default values preserved.", {"section": section, "type": type_string(typeof(raw))}))
+		EventBusCore.get_instance().emit_log("warn", TemplateFormatter.format("game_settings: section '{section}' corrupted (expected Dictionary, got {type}); default values preserved.", {"section": section, "type": type_string(typeof(raw))}))

@@ -474,7 +474,7 @@ func _record_history_snapshot(chosen_action: String = "") -> void:
 		"chosen_action": chosen_action,
 		"active_node_id": _get_active_node_id(),
 		"engine_dto": engine.export_session_dto() if engine != null else null,
-		"ctx_dto": ctx.to_dto() if ctx != null else {},
+		"ctx_dto": ctx.serialize() if ctx != null else {},
 		"profile_dto": profile.serialize() if profile != null else {}
 	}
 	history_stack.append(snap)
@@ -489,7 +489,7 @@ func _restore_from_snapshot(snap: Dictionary) -> void:
 	if snap.has("ctx_dto") and ctx != null:
 		var raw_ctx: Variant = snap.get("ctx_dto")
 		if raw_ctx is Dictionary:
-			ctx = CharacterPrologueContext.from_dto(raw_ctx as Dictionary)
+			ctx = CharacterPrologueContext.deserialize(raw_ctx as Dictionary)
 
 	if snap.has("profile_dto") and profile != null:
 		var raw_prof: Variant = snap.get("profile_dto")

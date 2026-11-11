@@ -12,6 +12,7 @@ class_name EventProbabilityResolver
 extends RefCounted
 
 const CONFIG_TABLE: String = "domains.event_probability"
+const _EMPTY_DICT: Dictionary = {}
 
 ## 概率解析：基础概率 → 条件修正（上下文/状态）→ 动态调整（buff/环境）→ 事件关联
 ## 输出唯一契约：{ probability, modifiers, adjusted_by }——只算不执行
@@ -28,7 +29,8 @@ static func resolve(event_id: String, world_context: Dictionary) -> Dictionary:
 	# 1) 条件修正：world_context 满足的条件组合 → 修正系数（只读上下文，不写事件状态）
 	var conditions: Array = entry.get("conditions", [])
 	for cond in conditions:
-		if NarrativeCausalityOrchestrator.evaluate_ast_condition(cond.get("when", {}), world_context):
+		var cond_when: Dictionary = cond.get("when", _EMPTY_DICT)
+		if NarrativeCausalityOrchestrator.evaluate_ast_condition(cond_when, world_context):
 			var factor: float = float(cond.get("factor", 1.0))
 			prob *= factor
 			modifiers.append({"kind": "condition", "id": str(cond.get("id", "")), "factor": factor})
@@ -36,7 +38,8 @@ static func resolve(event_id: String, world_context: Dictionary) -> Dictionary:
 	# 2) 动态调整：buff/环境修正（配置驱动，禁止内嵌事件执行指令）
 	var adjustments: Array = entry.get("adjustments", [])
 	for adj in adjustments:
-		if NarrativeCausalityOrchestrator.evaluate_ast_condition(adj.get("when", {}), world_context):
+		var adj_when: Dictionary = adj.get("when", _EMPTY_DICT)
+		if NarrativeCausalityOrchestrator.evaluate_ast_condition(adj_when, world_context):
 			var delta: float = float(adj.get("delta", 0.0))
 			prob += delta
 			modifiers.append({"kind": "adjustment", "id": str(adj.get("id", "")), "delta": delta})

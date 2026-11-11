@@ -10,10 +10,10 @@
 ## AccountSlotBindingSolver：Headless Discrete Solver / Numerical Calculator
 class_name AccountSlotBindingSolver extends RefCounted
 
-const DOMAIN_ACCOUNT_CONFIG := "domains.account"
 const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
 const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
 const AccountSlotCreationDTO = preload("res://backend/domains/account/dto/account_slot_creation_dto.gd")
+const DOMAIN_ACCOUNT_CONFIG := "domains.account"
 
 # ==============================================================================
 # 一、创建角色与槽位绑定

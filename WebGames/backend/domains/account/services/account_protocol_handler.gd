@@ -13,6 +13,7 @@ class_name AccountProtocolHandler
 extends RefCounted
 
 const AuthService = preload("res://backend/domains/account/auth_service.gd")
+const AccountHomeViewModelBuilder = preload("res://backend/domains/account/services/account_home_view_model_builder.gd")
 const AccountRegistrationDTO = preload("res://backend/domains/account/dto/account_registration_dto.gd")
 const AccountCompositeAuthDTO = preload("res://backend/domains/account/dto/account_composite_auth_dto.gd")
 const WorldGatewayFSM = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
@@ -75,7 +76,7 @@ static func dispatch(request: ClientRequestEnvelopeDTO, _gateway: WorldGatewayFS
 			var logout_res := AuthService.logout_session(request.session_token, request.account_id)
 			WorldSessionRuntimeService.revoke_account_session()
 			HumanControlLeaseManager.release_lease()
-			var home_vm := AuthService.build_account_home_view_model("", str(payload_dict.get("locale", "")))
+			var home_vm := AccountHomeViewModelBuilder.build_account_home_view_model("", str(payload_dict.get("locale", "")))
 			logout_res["account_home_vm"] = home_vm
 			return UnifiedProtocolFactory.create_response(
 				request.request_id, bool(logout_res.get("success", false)), logout_res,
@@ -84,7 +85,7 @@ static func dispatch(request: ClientRequestEnvelopeDTO, _gateway: WorldGatewayFS
 			)
 
 		"GET_ACCOUNT_HOME_VIEW_MODEL":
-			var home_view_model := AuthService.build_account_home_view_model(request.session_token, str(payload_dict.get("locale", "")))
+			var home_view_model := AccountHomeViewModelBuilder.build_account_home_view_model(request.session_token, str(payload_dict.get("locale", "")))
 			return UnifiedProtocolFactory.create_response(
 				request.request_id, true, home_view_model, "", "Account home view model retrieved successfully"
 			)

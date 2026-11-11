@@ -28,9 +28,6 @@ const CharacterCreationProtocolHandler = preload("res://backend/domains/characte
 const LifecycleProtocolHandler = preload("res://backend/domains/lifecycle/services/lifecycle_protocol_handler.gd")
 
 const DOMAIN_WORLD_STATE_CONFIG: String = "domains.world_state"
-const PROTECTED_LEGACY_COMPAT_ACTIONS: Array[String] = [
-	"ESC_SAVE_GAME", "ESC_EXIT_TO_GATEWAY", "ESC_QUIT_GAME", "ESC_APPLY_SETTINGS"
-]
 const PROTECTED_GATEWAY_ACTIONS: Array[String] = [
 	"ENTER_GATEWAY", "PROBE_MODES", "LIST_WORLDS", "SELECT_MODE",
 	"SELECT_OR_CREATE_WORLD", "EXIT_WORLD_TO_GATEWAY", "SWITCH_GATEWAY_MODE"
@@ -92,17 +89,17 @@ static func dispatch_request(request: ClientRequestEnvelopeDTO, gateway: WorldGa
 	# 4. 按核心 7 域路由分发全 11 环请求
 	match request.domain:
 		"account":
-			return _dispatch_account_action(request, eff_gw)
+			return AccountProtocolHandler.dispatch(request, eff_gw)
 		"world_gateway":
-			return _dispatch_gateway_action(request, eff_gw)
+			return WorldGatewayProtocolHandler.dispatch(request, eff_gw)
 		"character_creation":
-			return _dispatch_character_creation_action(request, eff_gw)
+			return CharacterCreationProtocolHandler.dispatch_creation(request, eff_gw)
 		"prologue":
-			return _dispatch_prologue_action(request, eff_gw)
+			return CharacterCreationProtocolHandler.dispatch_prologue(request, eff_gw)
 		"world_state":
 			return _dispatch_world_state_action(request, eff_gw)
 		"lifecycle":
-			return _dispatch_lifecycle_action(request, eff_gw)
+			return LifecycleProtocolHandler.dispatch(request, eff_gw)
 		"game_settings":
 			return _dispatch_settings_action(request)
 		_:
@@ -167,18 +164,6 @@ static func _enforce_auth_guard(request: ClientRequestEnvelopeDTO) -> UnifiedRes
 # 各领域路由分派实现 (Link 1 ~ Link 11)
 # ==============================================================================
 
-static func _dispatch_account_action(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
-	return AccountProtocolHandler.dispatch(request, gateway)
-
-static func _dispatch_gateway_action(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
-	return WorldGatewayProtocolHandler.dispatch(request, gateway)
-
-static func _dispatch_character_creation_action(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
-	return CharacterCreationProtocolHandler.dispatch_creation(request, gateway)
-
-static func _dispatch_prologue_action(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
-	return CharacterCreationProtocolHandler.dispatch_prologue(request, gateway)
-
 static func _dispatch_world_state_action(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
 	if request.action_type.begins_with("ESC_"):
 		return EscMenuBackendService.handle_esc_action(request, gateway)
@@ -199,9 +184,6 @@ static func _dispatch_world_state_action(request: ClientRequestEnvelopeDTO, gate
 			request.request_id, true, {"hud_snapshot": updated.to_dto()}, "", "World clock and resident HUD synchronized successfully"
 		)
 	return _dispatch_agent_action_compat(request)
-
-static func _dispatch_lifecycle_action(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
-	return LifecycleProtocolHandler.dispatch(request, gateway)
 
 static func _dispatch_agent_action_compat(request: ClientRequestEnvelopeDTO) -> UnifiedResponseEnvelopeDTO:
 	var agent_packet := AgentActionPacketDTO.new()

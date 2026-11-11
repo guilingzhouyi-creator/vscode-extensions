@@ -25,7 +25,9 @@ static func generate_new_world(default_template: Dictionary, history_worlds: Arr
 	for w in history_worlds:
 		if not w is Dictionary:
 			continue
-		fragments.append_array(w.get("history_fragments", []))
+		var raw_frags: Variant = w.get("history_fragments")
+		if raw_frags is Array:
+			fragments.append_array(raw_frags as Array)
 	var composed: Dictionary = template.duplicate()
 	composed["recombined_fragments_count"] = fragments.size()
 	composed["sources"] = ["default", "history"]

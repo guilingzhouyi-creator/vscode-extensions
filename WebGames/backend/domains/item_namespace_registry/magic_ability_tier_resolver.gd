@@ -33,8 +33,8 @@ static func is_tier_break_allowed(tier: int, break_type: String = "") -> bool:
 			continue
 		if bool(entry.get("allow_break", false)):
 			return true
-		var allowed_types: Array = entry.get("allow_break_types", [])
-		if not break_type.is_empty() and allowed_types.has(break_type):
+		var raw_allowed_types: Variant = entry.get("allow_break_types")
+		if not break_type.is_empty() and raw_allowed_types is Array and (raw_allowed_types as Array).has(break_type):
 			return true
 		return false
 	return false
