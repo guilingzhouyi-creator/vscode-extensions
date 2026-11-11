@@ -196,13 +196,13 @@ function mergeThresholds(
         ...(overrides.thresholds || {}),
         ...(cliEffectiveLoc
             ? {
-                effectiveLocWarn: cliEffectiveLoc,
-                effectiveLocFail: Math.round(cliEffectiveLoc * 2),
-                ...(!cliFileLinesWarn ? { fileLinesWarn: Math.max(400, cliEffectiveLoc) } : {}),
-                ...(!cliFileLinesFail
-                    ? { fileLinesFail: Math.max(800, Math.round(cliEffectiveLoc * 2)) }
-                    : {}),
-            }
+                  effectiveLocWarn: cliEffectiveLoc,
+                  effectiveLocFail: Math.round(cliEffectiveLoc * 2),
+                  ...(!cliFileLinesWarn ? { fileLinesWarn: Math.max(400, cliEffectiveLoc) } : {}),
+                  ...(!cliFileLinesFail
+                      ? { fileLinesFail: Math.max(800, Math.round(cliEffectiveLoc * 2)) }
+                      : {}),
+              }
             : {}),
         ...(cliFileLinesWarn ? { fileLinesWarn: cliFileLinesWarn } : {}),
         ...(cliFileLinesFail ? { fileLinesFail: cliFileLinesFail } : {}),

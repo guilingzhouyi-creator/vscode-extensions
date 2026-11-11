@@ -155,7 +155,9 @@ export function mergeStatisticalMoments(
     secondMoments: StatisticalMoments,
 ): StatisticalMoments {
     if (!firstMoments || firstMoments.count === 0) {
-        return secondMoments || Object.freeze({ mean: 0, variance: 0, standardDeviation: 0, count: 0 });
+        return (
+            secondMoments || Object.freeze({ mean: 0, variance: 0, standardDeviation: 0, count: 0 })
+        );
     }
     if (!secondMoments || secondMoments.count === 0) {
         return firstMoments;
@@ -171,7 +173,9 @@ export function mergeStatisticalMoments(
     const momentSumFirst = firstMoments.variance * countFirst;
     const momentSumSecond = secondMoments.variance * countSecond;
     const mergedMomentSum =
-        momentSumFirst + momentSumSecond + delta * delta * ((countFirst * countSecond) / totalCount);
+        momentSumFirst +
+        momentSumSecond +
+        delta * delta * ((countFirst * countSecond) / totalCount);
 
     const variance = safeDivide(mergedMomentSum, totalCount);
     const standardDeviation = Math.sqrt(Math.max(0, variance));
@@ -226,7 +230,8 @@ export class OnlineWelfordAccumulator {
         const delta = otherAccumulator.runningMean - this.runningMean;
         this.runningMean += delta * (countSecond / totalCount);
         this.secondMomentSum +=
-            otherAccumulator.secondMomentSum + delta * delta * ((countFirst * countSecond) / totalCount);
+            otherAccumulator.secondMomentSum +
+            delta * delta * ((countFirst * countSecond) / totalCount);
         this.sampleCount = totalCount;
     }
 

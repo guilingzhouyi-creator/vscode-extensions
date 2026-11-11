@@ -109,11 +109,14 @@ function renderSqaleDebtLine(technicalDebt: QualityScoreBreakdown['technicalDebt
 /**
  * Renders 5D density tensor line.
  */
-function renderDensityTensorLine(densityTensor: QualityScoreBreakdown['densityTensorSummary']): void {
+function renderDensityTensorLine(
+    densityTensor: QualityScoreBreakdown['densityTensorSummary'],
+): void {
     if (!densityTensor) return;
-    const distanceSuffix = densityTensor.averageMahalanobisDistance !== undefined
-        ? ` | Mahalanobis: ${densityTensor.averageMahalanobisDistance.toFixed(2)}`
-        : '';
+    const distanceSuffix =
+        densityTensor.averageMahalanobisDistance !== undefined
+            ? ` | Mahalanobis: ${densityTensor.averageMahalanobisDistance.toFixed(2)}`
+            : '';
     process.stdout.write(
         `5D Density Tensor       : Density ${(densityTensor.compositeDensity * PERCENT_SCALE).toFixed(1)}% ` +
             `[TSPR: ${(densityTensor.averageTspr * PERCENT_SCALE).toFixed(0)}% | POR: ${(densityTensor.averagePor * PERCENT_SCALE).toFixed(0)}%${distanceSuffix}]\n`,
@@ -123,7 +126,9 @@ function renderDensityTensorLine(densityTensor: QualityScoreBreakdown['densityTe
 /**
  * Renders polyglot generalization metrics line.
  */
-function renderPolyglotLine(polyglotMetrics: QualityScoreBreakdown['polyglotGeneralization']): void {
+function renderPolyglotLine(
+    polyglotMetrics: QualityScoreBreakdown['polyglotGeneralization'],
+): void {
     if (!polyglotMetrics) return;
     process.stdout.write(
         `Polyglot Generalization : ${polyglotMetrics.index.toFixed(1)} / 100 ` +
@@ -138,10 +143,13 @@ function renderResilienceQuantLine(quant: QualityScoreBreakdown['quant']): void 
     if (!quant) return;
     const status = quant.financial.status;
     const statusBadge =
-        status === 'de-leveraging' ? '[Active-Clearing]' :
-        status === 'balanced' ? '[Balanced]' :
-        status === 'insufficient_samples' ? '[Insufficient-Samples]' :
-        '[Deficit-Growing]';
+        status === 'de-leveraging'
+            ? '[Active-Clearing]'
+            : status === 'balanced'
+              ? '[Balanced]'
+              : status === 'insufficient_samples'
+                ? '[Insufficient-Samples]'
+                : '[Deficit-Growing]';
     const rcrVal = quant.financial.rcr ?? quant.financial.interestCoverageRatio;
     const erqVal = quant.riskRatios.erq ?? quant.riskRatios.qsr;
     const ddrVal = quant.riskRatios.ddr ?? quant.riskRatios.sortino;
@@ -218,9 +226,14 @@ export function printQualityScoreAssessment(
     for (const [dimensionKey, scoreValue] of Object.entries(scoreBreakdown.indices)) {
         const isNotEvaluated = notEvaluatedSet.has(dimensionKey as QualityDimension);
         const valText = isNotEvaluated ? 'N/A [NOT EVALUATED]' : (scoreValue as number).toFixed(2);
-        const weightVal = scoreBreakdown.weights ? (scoreBreakdown.weights as any)[dimensionKey] : undefined;
-        const weightTag = typeof weightVal === 'number' ? ` (wt: ${(weightVal * 100).toFixed(1)}%)` : '';
-        process.stdout.write(`  • ${dimensionKey.padEnd(QUALITY_DIMENSION_LABEL_WIDTH)}: ${valText}${weightTag}\n`);
+        const weightVal = scoreBreakdown.weights
+            ? (scoreBreakdown.weights as any)[dimensionKey]
+            : undefined;
+        const weightTag =
+            typeof weightVal === 'number' ? ` (wt: ${(weightVal * 100).toFixed(1)}%)` : '';
+        process.stdout.write(
+            `  • ${dimensionKey.padEnd(QUALITY_DIMENSION_LABEL_WIDTH)}: ${valText}${weightTag}\n`,
+        );
     }
     if (triPlane) {
         renderTriPlaneVector(triPlane);

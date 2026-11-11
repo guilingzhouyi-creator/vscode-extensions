@@ -346,11 +346,11 @@ function collectBuiltinDescs(
 interface CustomAnalyzerCollectorContext {
     readonly customAnalyzers:
         | Array<{
-            name: string;
-            module: string;
-            enabled?: boolean;
-            options?: Record<string, unknown>;
-        }>
+              name: string;
+              module: string;
+              enabled?: boolean;
+              options?: Record<string, unknown>;
+          }>
         | undefined;
     readonly thresholds: ScanConfig['thresholds'];
     readonly baseDir: string | undefined;

@@ -13,12 +13,7 @@
  *   all checks execute in O(1) space per edit range.
  */
 
-import {
-    DiffOp,
-    DIFF_OP_EQUAL,
-    DIFF_OP_EQUAL_SPAN,
-    DIFF_OP_DELETE,
-} from './myers-algorithm';
+import { DiffOp, DIFF_OP_EQUAL, DIFF_OP_EQUAL_SPAN, DIFF_OP_DELETE } from './myers-algorithm';
 
 /** `typeof` tag for numeric edit-range fields; non-numeric input is rejected. */
 const TYPEOF_NUMBER = 'number';
@@ -106,7 +101,10 @@ export function validateEditByteBounds(editRange: EditRange, maxByte?: number): 
     if (hasInvalidEnd) {
         throw new Error('invalid edit range: end byte before start byte');
     }
-    if (maxByte !== undefined && (startByte > maxByte || oldEndByte > maxByte || newEndByte > maxByte)) {
+    if (
+        maxByte !== undefined &&
+        (startByte > maxByte || oldEndByte > maxByte || newEndByte > maxByte)
+    ) {
         throw new Error('invalid edit range: byte offset out of bounds');
     }
 }

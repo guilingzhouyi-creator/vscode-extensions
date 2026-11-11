@@ -89,7 +89,9 @@ export class SemanticGraph {
      * @returns False when superseded, cleared or removed before publication.
      */
     public completeFileUpdate(
-        filePath: string, token: symbol, replacement: SemanticGraph,
+        filePath: string,
+        token: symbol,
+        replacement: SemanticGraph,
     ): boolean {
         const file = normalizeCanonicalPath(filePath);
         if (this.fileUpdates.get(file) !== token) return false;
@@ -117,7 +119,9 @@ export class SemanticGraph {
     }
 
     private validateFileReplacement(
-        file: string, nodes: SemanticNode[], edges: SemanticEdge[],
+        file: string,
+        nodes: SemanticNode[],
+        edges: SemanticEdge[],
     ): void {
         const owned = new Set<string>();
         for (const node of nodes) {
@@ -130,7 +134,7 @@ export class SemanticGraph {
             }
             owned.add(node.id);
         }
-        if (edges.some(edge => !owned.has(edge.fromNodeId))) {
+        if (edges.some((edge) => !owned.has(edge.fromNodeId))) {
             throw new Error('Semantic extraction emitted an edge outside its source file');
         }
     }
@@ -149,9 +153,11 @@ export class SemanticGraph {
     }
 
     private installFileReplacement(
-        file: string, nodes: SemanticNode[], edges: SemanticEdge[],
+        file: string,
+        nodes: SemanticNode[],
+        edges: SemanticEdge[],
     ): void {
-        const retained = new Set(nodes.map(node => node.id));
+        const retained = new Set(nodes.map((node) => node.id));
         const previous = this.nodesByFile.get(file) ?? [];
         this.nodesByFile.delete(file);
         for (const node of previous) {
@@ -337,7 +343,7 @@ export class SemanticGraph {
         const visitedNodes = new Set<string>();
         const collectedEdges = new Set<SemanticEdge>();
         const seeds = typeof seedNodeId === 'string' ? [seedNodeId] : seedNodeId;
-        const queue = seeds.map(id => ({ id, depth: 0 }));
+        const queue = seeds.map((id) => ({ id, depth: 0 }));
         let head = 0;
 
         while (head < queue.length) {

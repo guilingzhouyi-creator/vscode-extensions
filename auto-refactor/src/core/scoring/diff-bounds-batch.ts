@@ -109,11 +109,14 @@ export function evaluateCommitBatchBounds(params: CommitBatchBoundsParams): Comm
     }
 
     const total5dAdd =
-        Math.round(accumulated5dAdd * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) / DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
+        Math.round(accumulated5dAdd * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) /
+        DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
     const total5dDel =
-        Math.round(accumulated5dDel * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) / DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
+        Math.round(accumulated5dDel * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) /
+        DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
     const total5dTurnover =
-        Math.round((total5dAdd + total5dDel) * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) / DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
+        Math.round((total5dAdd + total5dDel) * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) /
+        DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
 
     if (total5dAdd > MAX_COMMIT_BATCH_ADD_5D_ELOC) {
         return {

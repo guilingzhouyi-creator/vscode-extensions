@@ -219,8 +219,8 @@ export class Scanner implements ScannerContext {
         );
 
         const sparseResult = routeArchetypeToAnalyzers(detectedArchetype, {
-            availableAnalyzers: config.sparseRouting === true
-                ? this.plan.map((entry) => entry.name) : undefined,
+            availableAnalyzers:
+                config.sparseRouting === true ? this.plan.map((entry) => entry.name) : undefined,
             customAnalyzers: config.customAnalyzers?.map((customAnalyzer) => customAnalyzer.name),
         });
         // The routing decision is always computed so the report can explain the archetype, but it
@@ -469,11 +469,14 @@ export class Scanner implements ScannerContext {
     ): Promise<SnapshotScanResult> {
         const configured = this.beginSnapshotAnalysis();
         return executeSnapshotScan({
-            snapshot, scope, signal: this.config.signal,
+            snapshot,
+            scope,
+            signal: this.config.signal,
             requirements: requirements ?? configured,
-            analyze: (file, content) => this.runAnalyzers(file, content, undefined, {
-                observeExecution: true,
-            }),
+            analyze: (file, content) =>
+                this.runAnalyzers(file, content, undefined, {
+                    observeExecution: true,
+                }),
         });
     }
 
@@ -487,7 +490,8 @@ export class Scanner implements ScannerContext {
      *   or lacks the explicit project archetype that snapshot analysis depends on.
      */
     beginSnapshotAnalysis(): readonly FileAnalysisRequirement[] {
-        if (this.inputSource !== undefined) throw new Error('Snapshot analysis requires a fresh scanner');
+        if (this.inputSource !== undefined)
+            throw new Error('Snapshot analysis requires a fresh scanner');
         if (this.config.cacheEnabled !== false) {
             throw new Error('Snapshot analysis requires cache persistence disabled');
         }
@@ -667,7 +671,9 @@ export class Scanner implements ScannerContext {
             lineBounds?: readonly [number, number],
         ]
     ): Promise<{
-        issues: Issue[]; metric: FileMetric | null; execution?: FileExecutionObservation;
+        issues: Issue[];
+        metric: FileMetric | null;
+        execution?: FileExecutionObservation;
     }> {
         this.inputSource ??= 'workspace';
         const [scopeOrOptions, positionalBounds] = executionScope;

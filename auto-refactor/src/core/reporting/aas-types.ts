@@ -43,12 +43,12 @@ export interface AasCounts {
 /** Optional in-kernel verification & 5D Riemannian manifold health telemetry */
 export type AasVrfTelemetry =
     | {
-        readonly k: number;
-        readonly cr: number;
-        readonly ci: number;
-        readonly q: number;
-        readonly dm: number;
-    }
+          readonly k: number;
+          readonly cr: number;
+          readonly ci: number;
+          readonly q: number;
+          readonly dm: number;
+      }
     | CompactVerificationTelemetry;
 
 /** Executive health block containing composite score, letter grade, and CAI. */

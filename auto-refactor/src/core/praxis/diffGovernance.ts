@@ -215,9 +215,13 @@ export class PraxisDiffGovernanceService implements IPraxisDiffGovernanceService
             issues,
             verdict,
             impactSummary: {
-                totalImpactedFiles: affectedFiles.length, affectedFiles,
-                completeness: enrichedHunks.length > 0 && enrichedHunks.every(
-                    hunk => hunk.astContext?.impactCompleteness === 'partial') ? 'partial' : 'unknown',
+                totalImpactedFiles: affectedFiles.length,
+                affectedFiles,
+                completeness:
+                    enrichedHunks.length > 0 &&
+                    enrichedHunks.every((hunk) => hunk.astContext?.impactCompleteness === 'partial')
+                        ? 'partial'
+                        : 'unknown',
             },
             patchQuality,
             deltaScore: patchQuality?.deltaScore ?? undefined,

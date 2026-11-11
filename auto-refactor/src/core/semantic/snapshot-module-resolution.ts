@@ -14,7 +14,9 @@ import type { SemanticEdge, SemanticNode } from './types';
 const EXTENSIONS = Object.freeze(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 
 function localTarget(
-    edge: SemanticEdge, source: SemanticNode, modules: ReadonlyMap<string, SemanticNode>,
+    edge: SemanticEdge,
+    source: SemanticNode,
+    modules: ReadonlyMap<string, SemanticNode>,
 ): SemanticNode | undefined {
     const specifier = edge.context?.moduleSpecifier;
     if (typeof specifier !== 'string') return undefined;
@@ -23,8 +25,9 @@ function localTarget(
     if (base.startsWith('../')) return undefined;
     const exact = modules.get(base);
     if (exact) return exact;
-    const candidates = EXTENSIONS.flatMap(extension => [
-        modules.get(`${base}${extension}`), modules.get(`${base}/index${extension}`),
+    const candidates = EXTENSIONS.flatMap((extension) => [
+        modules.get(`${base}${extension}`),
+        modules.get(`${base}/index${extension}`),
     ]).filter((node): node is SemanticNode => node !== undefined);
     return candidates.length === 1 ? candidates[0] : undefined;
 }
@@ -39,17 +42,26 @@ export function resolveSnapshotModules(graph: SemanticGraph): {
     readonly unresolvedEdges: number;
 } {
     const nodes = graph.getAllNodes();
-    const byId = new Map(nodes.map(node => [node.id, node]));
-    const modules = new Map(nodes.filter(node => node.kind === 'module')
-        .map(node => [node.location.file, node]));
-    const edges = graph.getAllEdges().map(edge => {
+    const byId = new Map(nodes.map((node) => [node.id, node]));
+    const modules = new Map(
+        nodes.filter((node) => node.kind === 'module').map((node) => [node.location.file, node]),
+    );
+    const edges = graph.getAllEdges().map((edge) => {
         const source = byId.get(edge.fromNodeId);
-        if (!source || source.language !== 'typescript' || edge.kind !== 'depends_on' ||
-            byId.has(edge.toNodeId)) return edge;
+        if (
+            !source ||
+            source.language !== 'typescript' ||
+            edge.kind !== 'depends_on' ||
+            byId.has(edge.toNodeId)
+        )
+            return edge;
         const target = localTarget(edge, source, modules);
-        return target ? { ...edge, toNodeId: target.id, id: `${edge.id}:resolved:${target.id}` } : edge;
+        return target
+            ? { ...edge, toNodeId: target.id, id: `${edge.id}:resolved:${target.id}` }
+            : edge;
     });
-    const unresolvedEdges = edges.filter(edge =>
-        !byId.has(edge.fromNodeId) || !byId.has(edge.toNodeId)).length;
+    const unresolvedEdges = edges.filter(
+        (edge) => !byId.has(edge.fromNodeId) || !byId.has(edge.toNodeId),
+    ).length;
     return { graph: SemanticGraph.fromJSON({ nodes, edges }), unresolvedEdges };
 }

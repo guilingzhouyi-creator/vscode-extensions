@@ -63,9 +63,13 @@ export interface FinalizeReportContext {
 export type FinalizeReportArguments =
     | [context: FinalizeReportContext]
     | [
-        report: ScanReport, config: ScanConfig, options: FinalizeBaselineOptions,
-        logger: Logger, reportScanner?: Scanner | null, scope?: PostScanScope,
-    ];
+          report: ScanReport,
+          config: ScanConfig,
+          options: FinalizeBaselineOptions,
+          logger: Logger,
+          reportScanner?: Scanner | null,
+          scope?: PostScanScope,
+      ];
 
 /**
  * Normalize legacy positional calls without changing their input defaults.
@@ -85,11 +89,11 @@ export function resolveFinalizeContext(
     return isContextObject
         ? (firstArg as FinalizeReportContext)
         : {
-            report: finalizeArguments[0] as ScanReport,
-            config: finalizeArguments[1] as ScanConfig,
-            options: finalizeArguments[2] as FinalizeBaselineOptions,
-            logger: finalizeArguments[3] as Logger,
-            reportScanner: finalizeArguments[4] ?? null,
-            scope: finalizeArguments[5] ?? POST_SCAN_SCOPE_FULL,
-        };
+              report: finalizeArguments[0] as ScanReport,
+              config: finalizeArguments[1] as ScanConfig,
+              options: finalizeArguments[2] as FinalizeBaselineOptions,
+              logger: finalizeArguments[3] as Logger,
+              reportScanner: finalizeArguments[4] ?? null,
+              scope: finalizeArguments[5] ?? POST_SCAN_SCOPE_FULL,
+          };
 }

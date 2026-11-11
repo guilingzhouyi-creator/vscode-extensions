@@ -210,7 +210,15 @@ export class AstPrefixRadixCache {
      * Internal: Resolve or allocate next Radix child node along prefix edge.
      */
     private stepChildNode(options: RadixStepOptions): RadixTreeNode {
-        const { currentNode, lineKey, cumulativeLines, isTerminal, astSubtrees, importedSymbols, now } = options;
+        const {
+            currentNode,
+            lineKey,
+            cumulativeLines,
+            isTerminal,
+            astSubtrees,
+            importedSymbols,
+            now,
+        } = options;
         let nextNode = currentNode.children.get(lineKey);
         if (!nextNode) {
             this.evictLruIfNecessary();

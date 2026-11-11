@@ -143,10 +143,7 @@ interface SignatureParityContext {
     readonly localContent: string;
 }
 
-function checkSingleSignatureParity(
-    params: SignatureParityContext,
-    issues: Issue[],
-): void {
+function checkSingleSignatureParity(params: SignatureParityContext, issues: Issue[]): void {
     const { sig, workflowFile, ciContent, localContent } = params;
     const inCi = sig.ciPattern.test(ciContent);
     const inLocal = sig.localPattern.test(localContent);
@@ -243,9 +240,15 @@ function checkHookRouterDegradation(
                 emitRoutingIssue({
                     relPath,
                     message: `Hook router '${hookName}' invokes Windows PowerShell 5.1 (powershell.exe) directly instead of cross-platform 'pwsh'.`,
-                    remediation: 'Prioritize cross-platform pwsh and fall back gracefully to bash to prevent Windows PS 5.1 UTF-8 BOM encoding issues.',
-                    rationale: 'Windows PowerShell 5.1 misinterprets UTF-8 files without BOM, leading to silent script syntax failures in automated environments.',
-                    extraDetail: { action: 'harden_hook_router', targetFile: relPath, safeToAutomate: true },
+                    remediation:
+                        'Prioritize cross-platform pwsh and fall back gracefully to bash to prevent Windows PS 5.1 UTF-8 BOM encoding issues.',
+                    rationale:
+                        'Windows PowerShell 5.1 misinterprets UTF-8 files without BOM, leading to silent script syntax failures in automated environments.',
+                    extraDetail: {
+                        action: 'harden_hook_router',
+                        targetFile: relPath,
+                        safeToAutomate: true,
+                    },
                 }),
             ),
         );
@@ -257,8 +260,10 @@ function checkHookRouterDegradation(
                 emitRoutingIssue({
                     relPath,
                     message: `Hook router '${hookName}' declares #!/bin/sh shebang but contains non-portable Bash syntax.`,
-                    remediation: 'Change shebang to #!/usr/bin/env bash or remove bashisms to prevent execution failures on Debian/Ubuntu dash.',
-                    rationale: 'On many Linux distributions /bin/sh points to dash, which fails immediately on bash-specific syntax constructs.',
+                    remediation:
+                        'Change shebang to #!/usr/bin/env bash or remove bashisms to prevent execution failures on Debian/Ubuntu dash.',
+                    rationale:
+                        'On many Linux distributions /bin/sh points to dash, which fails immediately on bash-specific syntax constructs.',
                 }),
             ),
         );
@@ -448,11 +453,7 @@ function auditZeroByteHygiene(relPath: string, content: string, issues: Issue[])
     return true;
 }
 
-function auditClutterHygiene(
-    relPath: string,
-    content: string,
-    issues: Issue[],
-): void {
+function auditClutterHygiene(relPath: string, content: string, issues: Issue[]): void {
     const hasClutterGuard =
         /(?:validate-physical-hygiene|physical-hygiene|clutter|\.actual\.json|\.tmp|\.bak|desktop\.ini|thumbs\.db|\.ds_store|root-script)/i.test(
             content,
@@ -592,7 +593,8 @@ function auditShellStrictMode(
                     `Gate script '${path.basename(relPath)}' lacks strict error mode ('set -euo pipefail' or 'set -e').`,
                     'Add set -euo pipefail near script start to prevent silent failures and false-positive gate passes.',
                     {
-                        rationale: 'Without set -e, command failures inside gate scripts are ignored, leading to catastrophic false-pass gate releases.',
+                        rationale:
+                            'Without set -e, command failures inside gate scripts are ignored, leading to catastrophic false-pass gate releases.',
                         action: 'add_strict_mode',
                     },
                 ),
@@ -617,7 +619,8 @@ function auditPowerShellStrictMode(
                     `Gate script '${path.basename(relPath)}' lacks strict error preference ('$ErrorActionPreference = "Stop"').`,
                     "Declare $ErrorActionPreference = 'Stop' at the top of PowerShell gate script.",
                     {
-                        rationale: 'PowerShell by default continues execution after non-terminating errors, resulting in false-positive gate passes.',
+                        rationale:
+                            'PowerShell by default continues execution after non-terminating errors, resulting in false-positive gate passes.',
                         action: 'add_strict_error_preference',
                     },
                 ),

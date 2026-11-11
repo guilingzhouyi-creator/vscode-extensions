@@ -159,7 +159,11 @@ export function createSortedPairKey(
  * @param hitsB - Marginal hit count of rule B.
  * @returns Jaccard similarity coefficient in [0, 1].
  */
-export function computeFrequencyJaccardSimilarity(coHits: number, hitsA: number, hitsB: number): number {
+export function computeFrequencyJaccardSimilarity(
+    coHits: number,
+    hitsA: number,
+    hitsB: number,
+): number {
     const union = hitsA + hitsB - coHits;
     if (union <= 0) return 0;
     const similarity = coHits / union;
@@ -260,10 +264,16 @@ export class ContinuousRuleSamplingSidecar {
         for (const [ruleId, hits] of scanRuleHits.entries()) {
             const existing = this.ruleRecords.get(ruleId);
             const totalHits = (existing?.totalHits ?? 0) + hits;
-            const suppressedHits = (existing?.suppressedHits ?? 0) + (scanRuleSuppressions.get(ruleId) ?? 0);
-            const totalEvaluations = (existing?.totalEvaluations ?? this.totalFilesEvaluated - effectiveFiles) + effectiveFiles;
+            const suppressedHits =
+                (existing?.suppressedHits ?? 0) + (scanRuleSuppressions.get(ruleId) ?? 0);
+            const totalEvaluations =
+                (existing?.totalEvaluations ?? this.totalFilesEvaluated - effectiveFiles) +
+                effectiveFiles;
 
-            const posterior = computeJeffreysPosterior(totalHits, Math.max(totalHits, totalEvaluations));
+            const posterior = computeJeffreysPosterior(
+                totalHits,
+                Math.max(totalHits, totalEvaluations),
+            );
 
             this.ruleRecords.set(ruleId, {
                 ruleId,
@@ -328,7 +338,9 @@ export class ContinuousRuleSamplingSidecar {
                 ruleB: item.ruleB,
                 coHits: item.coHits,
                 jaccardSimilarity: similarity,
-                isRedundantCandidate: similarity >= REDUNDANCY_JACCARD_THRESHOLD && item.coHits >= REDUNDANCY_MIN_COHITS,
+                isRedundantCandidate:
+                    similarity >= REDUNDANCY_JACCARD_THRESHOLD &&
+                    item.coHits >= REDUNDANCY_MIN_COHITS,
             });
         }
 

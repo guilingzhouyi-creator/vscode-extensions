@@ -161,10 +161,7 @@ export class MemoryGovernor {
             ]);
         }
         if (stats.pressure === 'elevated') {
-            return this.sweep([
-                CacheEvictionTier.Ephemeral,
-                CacheEvictionTier.Intermediate,
-            ]);
+            return this.sweep([CacheEvictionTier.Ephemeral, CacheEvictionTier.Intermediate]);
         }
         return {
             sweptTiers: [],
@@ -201,7 +198,10 @@ export class MemoryGovernor {
         }
 
         const after = this.getMemoryStats();
-        const reclaimed = Math.max(0, Math.round((before.heapUsedMb - after.heapUsedMb) * 100) / 100);
+        const reclaimed = Math.max(
+            0,
+            Math.round((before.heapUsedMb - after.heapUsedMb) * 100) / 100,
+        );
 
         return {
             sweptTiers: Array.from(targetTiers),

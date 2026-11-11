@@ -204,7 +204,8 @@ function checkPoolSoundness(pool: PoolComponentContext): Issue | null {
             hasResetContract: pool.hasResetContract,
             hasCapacityCap: pool.hasCapacityCap,
         },
-        suggestion: 'Implement an explicit reset_state() lifecycle hook and bound the pool with a capacity limit.',
+        suggestion:
+            'Implement an explicit reset_state() lifecycle hook and bound the pool with a capacity limit.',
     });
 }
 
@@ -216,14 +217,16 @@ function checkPoolROI(pool: PoolComponentContext): Issue | null {
         rule: RULE_PRF_POL_003,
         severity: SEVERITY_WARNING,
         pool,
-        message: `Negative-ROI excessive pooling: "${pool.poolName}" pools lightweight tiny object "${pool.targetType}". ` +
+        message:
+            `Negative-ROI excessive pooling: "${pool.poolName}" pools lightweight tiny object "${pool.targetType}". ` +
             `Pool management overhead exceeds direct transient GC cost.`,
         detail: {
             poolName: pool.poolName,
             targetType: pool.targetType,
             reason: 'Micro-object pooling overhead penalty',
         },
-        suggestion: 'Dismantle pooling indirection for tiny immutable value objects; rely on fast generational heap allocation instead.',
+        suggestion:
+            'Dismantle pooling indirection for tiny immutable value objects; rely on fast generational heap allocation instead.',
     });
 }
 

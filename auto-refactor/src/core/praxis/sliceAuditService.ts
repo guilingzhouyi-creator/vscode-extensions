@@ -286,21 +286,34 @@ export class PraxisSliceAuditService implements IPraxisSliceAuditService {
         const { requestId, filePath, oldContent } = request;
         assertSnapshotPath(filePath);
         const changedLines = [...(request.changedLines ?? [])];
-        if (changedLines.some(line => !Number.isSafeInteger(line) || line < 1)) {
+        if (changedLines.some((line) => !Number.isSafeInteger(line) || line < 1)) {
             throw new Error('Snapshot slice lines must be positive integers');
         }
         const requirements = request.requirements && captureFileRequirements(request.requirements);
         const read = snapshot.read(filePath);
-        const plan = read.kind === 'text' ? await this.auditSlice({
-            filePath, oldContent, newContent: read.content, changedLines,
-        }) : undefined;
+        const plan =
+            read.kind === 'text'
+                ? await this.auditSlice({
+                      filePath,
+                      oldContent,
+                      newContent: read.content,
+                      changedLines,
+                  })
+                : undefined;
         const window = plan?.replayWindow;
         const lineBounds: readonly [number, number] | undefined = window?.isBounded
-            ? [window.startLine, window.endLine] : undefined;
-        const review = await executeReview({
-            requestId, scope: [filePath], requirements,
-            changes: [{ path: filePath, oldContent, lineBounds }],
-        }, snapshot, runtime);
+            ? [window.startLine, window.endLine]
+            : undefined;
+        const review = await executeReview(
+            {
+                requestId,
+                scope: [filePath],
+                requirements,
+                changes: [{ path: filePath, oldContent, lineBounds }],
+            },
+            snapshot,
+            runtime,
+        );
         return Object.freeze({ plan, review });
     }
 

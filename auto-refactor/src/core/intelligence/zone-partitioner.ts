@@ -234,7 +234,13 @@ function partitionByTextHeuristics(
             checkCommentIntent(line, tracker);
             continue;
         }
-        currentZone = stepHeuristicLine({ line, lineNum: i + 1, tracker, currentZone, rawSegments });
+        currentZone = stepHeuristicLine({
+            line,
+            lineNum: i + 1,
+            tracker,
+            currentZone,
+            rawSegments,
+        });
     }
 
     const intentRatio =

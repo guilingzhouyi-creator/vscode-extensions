@@ -264,10 +264,7 @@ interface PartitionInspectionContext {
  * @param ent - Directory entry to inspect.
  * @param context - Inspection context with accumulation collections.
  */
-function inspectPartitionEntry(
-    ent: fs.Dirent,
-    context: PartitionInspectionContext,
-): void {
+function inspectPartitionEntry(ent: fs.Dirent, context: PartitionInspectionContext): void {
     if (!ent.isDirectory() || IGNORED_DIRS.has(ent.name) || ent.name.startsWith('.')) {
         return;
     }
@@ -505,11 +502,10 @@ function sampleDirectoryLanguages(
         const current = dirQueue[queueHead++];
         if (current.depth > LANGUAGE_SAMPLE_MAX_DEPTH) continue;
 
-        const [newSampled, newDiscovered] = sampleItemsInDirectory(
-            current,
-            samplingContext,
-            { currentSampled: sampled, maxSampleFiles: maxSampleBudget },
-        );
+        const [newSampled, newDiscovered] = sampleItemsInDirectory(current, samplingContext, {
+            currentSampled: sampled,
+            maxSampleFiles: maxSampleBudget,
+        });
         sampled += newSampled;
         totalDiscoveredFiles += newDiscovered;
     }

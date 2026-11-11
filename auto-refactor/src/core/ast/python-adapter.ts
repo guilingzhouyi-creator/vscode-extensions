@@ -192,7 +192,13 @@ export class PythonAdapter extends BaseAstAdapter {
         const fnLike = kind === NodeKind.Function || kind === NodeKind.Method;
         const isClassDefining = kind === NodeKind.Class;
         const isBinding = introducesBinding(sitterNode);
-        const name = resolvePythonNodeName({ sitterNode, kind, fnLike, isClassDefining, isBinding });
+        const name = resolvePythonNodeName({
+            sitterNode,
+            kind,
+            fnLike,
+            isClassDefining,
+            isBinding,
+        });
 
         const node: NormalizedNode = {
             kind,

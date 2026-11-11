@@ -38,9 +38,15 @@ function encodeValue(value: unknown, ancestors: Set<object>): unknown {
     }
     ancestors.add(value);
     try {
-        if (Array.isArray(value)) return ['array', value.map(item => encodeValue(item, ancestors))];
+        if (Array.isArray(value))
+            return ['array', value.map((item) => encodeValue(item, ancestors))];
         const record = value as Record<string, unknown>;
-        return ['object', Object.keys(record).sort().map(key => [key, encodeValue(record[key], ancestors)])];
+        return [
+            'object',
+            Object.keys(record)
+                .sort()
+                .map((key) => [key, encodeValue(record[key], ancestors)]),
+        ];
     } finally {
         ancestors.delete(value);
     }
@@ -54,20 +60,25 @@ function encodeValue(value: unknown, ancestors: Set<object>): unknown {
  * @returns Detached configuration digest, or an explicit unavailable observation.
  */
 export function captureReviewConfiguration(
-    config: ScanConfig, options: unknown,
+    config: ScanConfig,
+    options: unknown,
 ): ReviewConfigurationIdentity {
     try {
-        if (config.customAnalyzers?.some(analyzer => analyzer.enabled !== false)) {
+        if (config.customAnalyzers?.some((analyzer) => analyzer.enabled !== false)) {
             throw new Error('Custom analyzer dependencies are not fully declared');
         }
         const { signal, ...settings } = config;
         void signal;
         const encoded = encodeValue({ settings, options }, new Set());
-        const value = createHash('sha256').update(buildPoolFingerprint(config))
-            .update(JSON.stringify(encoded)).digest('hex');
+        const value = createHash('sha256')
+            .update(buildPoolFingerprint(config))
+            .update(JSON.stringify(encoded))
+            .digest('hex');
         return Object.freeze({ status: 'bound', algorithm: 'sha256', value });
     } catch (error) {
-        return Object.freeze({ status: 'unavailable',
-            reason: error instanceof Error ? error.message : String(error) });
+        return Object.freeze({
+            status: 'unavailable',
+            reason: error instanceof Error ? error.message : String(error),
+        });
     }
 }

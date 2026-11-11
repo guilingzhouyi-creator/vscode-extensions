@@ -960,15 +960,25 @@ export type {
 export type { SnapshotScanResult, SnapshotInputObservation } from './core/review/snapshot-scanner';
 export { executeReview } from './core/review/review-executor';
 export type {
-    ReviewRequest, ReviewRuntime, ReviewChange, SnapshotReviewResult,
+    ReviewRequest,
+    ReviewRuntime,
+    ReviewChange,
+    SnapshotReviewResult,
 } from './core/review/review-executor';
 export type {
-    SemanticGraphSnapshot, SemanticGraphCoverage, SemanticFileImpact,
+    SemanticGraphSnapshot,
+    SemanticGraphCoverage,
+    SemanticFileImpact,
 } from './core/review/semantic-snapshot';
 export type { ReviewConfigurationIdentity } from './core/review/review-configuration';
-export type { FileAnalysisRequirement, FileAnalysisCoverage } from './core/review/execution-coverage';
 export type {
-    FileExecutionObservation, AnalyzerExecutionObservation, ParserExecutionObservation,
+    FileAnalysisRequirement,
+    FileAnalysisCoverage,
+} from './core/review/execution-coverage';
+export type {
+    FileExecutionObservation,
+    AnalyzerExecutionObservation,
+    ParserExecutionObservation,
 } from './core/review/analyzer-execution';
 export type {
     SemanticAdapterCapabilities,

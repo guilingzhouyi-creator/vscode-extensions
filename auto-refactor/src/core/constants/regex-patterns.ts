@@ -727,7 +727,11 @@ export const RUST_AWAIT_PATTERN = /\.await\b/;
 
 /** Matches panic, placeholder stub, un-implemented, or unreachable crash macro calls. */
 export const RUST_CRASH_MACRO_PATTERN = new RegExp(
-    '\\b(?:panic|' + ['t', 'o', 'd', 'o'].join('') + '|' + ['un', 'implemented'].join('') + '|unreachable)!\\s*\\(',
+    '\\b(?:panic|' +
+        ['t', 'o', 'd', 'o'].join('') +
+        '|' +
+        ['un', 'implemented'].join('') +
+        '|unreachable)!\\s*\\(',
 );
 
 /** Matches .expect() method call. */
@@ -863,7 +867,11 @@ export const STDLIB_IMPLICIT_ALLOC_PATTERN =
 
 /** Matches bare panic, unwrap, or abort in public routines. */
 export const STDLIB_RUST_PANIC_PATTERN = new RegExp(
-    '(?:\\bpanic!\\s*\\(|\\b(?:' + ['t', 'o', 'd', 'o'].join('') + '!|' + ['un', 'implemented'].join('') + '!)\\s*\\(|\\.unwrap\\(\\))',
+    '(?:\\bpanic!\\s*\\(|\\b(?:' +
+        ['t', 'o', 'd', 'o'].join('') +
+        '!|' +
+        ['un', 'implemented'].join('') +
+        '!)\\s*\\(|\\.unwrap\\(\\))',
 );
 
 /** Matches exported Go function signature header. */
@@ -1289,15 +1297,15 @@ export const REGEX_LITERAL = Object.freeze({
 export const REGEX = Object.freeze({
     NAMING: REGEX_NAMING,
     SYNTAX: REGEX_SYNTAX,
-    COMMENT: (REGEX_COMMENT),
+    COMMENT: REGEX_COMMENT,
     LITERAL: REGEX_LITERAL,
-    SHELL: (REGEX_SHELL),
-    SECURITY: (REGEX_SECURITY),
-    PYTHON: (REGEX_PYTHON),
-    GDSCRIPT: (REGEX_GDSCRIPT),
-    DATA: (REGEX_DATA),
-    GO: (REGEX_GO),
-    RUST: (REGEX_RUST),
-    TEST: (REGEX_TEST),
+    SHELL: REGEX_SHELL,
+    SECURITY: REGEX_SECURITY,
+    PYTHON: REGEX_PYTHON,
+    GDSCRIPT: REGEX_GDSCRIPT,
+    DATA: REGEX_DATA,
+    GO: REGEX_GO,
+    RUST: REGEX_RUST,
+    TEST: REGEX_TEST,
     escape: escapeRegex,
 });

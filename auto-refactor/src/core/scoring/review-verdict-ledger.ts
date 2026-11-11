@@ -248,9 +248,15 @@ export function aggregateVerdicts(records: readonly ReviewVerdictRecord[]): Rule
     }
     const stats: RuleCalibrationStats[] = [];
     for (const [rule, bucket] of byRule) {
-        stats.push({ rule, truePositives: bucket.truePositives, falsePositives: bucket.falsePositives });
+        stats.push({
+            rule,
+            truePositives: bucket.truePositives,
+            falsePositives: bucket.falsePositives,
+        });
     }
-    return stats.sort((left, right) => (left.rule < right.rule ? -1 : left.rule > right.rule ? 1 : 0));
+    return stats.sort((left, right) =>
+        left.rule < right.rule ? -1 : left.rule > right.rule ? 1 : 0,
+    );
 }
 
 /**

@@ -70,8 +70,7 @@ export const INFERRED_TYPES = Object.freeze({
 /**
  * Inferred data type of the constant value derived from canonical type dictionary.
  */
-export type ConstantInferredType =
-    (typeof INFERRED_TYPES)[keyof typeof INFERRED_TYPES];
+export type ConstantInferredType = (typeof INFERRED_TYPES)[keyof typeof INFERRED_TYPES];
 
 const DEFAULT_SEMANTIC_KIND = 'general';
 const HASH_ALGO_SHA256 = 'sha256';
@@ -322,7 +321,9 @@ function hasConstantTableCharacteristics(content: string): boolean {
     const exportConstCount = countRegexMatches(stripped, RE_EXPORT_CONST);
 
     const hasSufficientConstants =
-        exportConstCount >= MIN_EXPORT_CONST_THRESHOLD || hasEnum || (hasAsConst && exportConstCount >= 1);
+        exportConstCount >= MIN_EXPORT_CONST_THRESHOLD ||
+        hasEnum ||
+        (hasAsConst && exportConstCount >= 1);
     if (!hasSufficientConstants) return false;
 
     const lines = stripped
@@ -368,9 +369,7 @@ export interface ConstantProposalOptions {
  * @param options - Configuration parameters for the declaration proposal.
  * @returns Idiomatic declaration string tailored for Python, GDScript, Rust, or TS/JS.
  */
-export function formatConstantDeclarationSuggestion(
-    options: ConstantProposalOptions,
-): string {
+export function formatConstantDeclarationSuggestion(options: ConstantProposalOptions): string {
     const { filePath, name, literalValue, isNumeric, comment } = options;
     const norm = filePath.replace(/\\/g, '/').toLowerCase();
     const commentText = comment ? comment.trim() : '';

@@ -703,17 +703,16 @@ async function auditColdCompensationEscalations(context: {
         }
 
         await governor.yieldEventLoop();
-        const coldResult = await scanner.runAnalyzers(
-            input.filePath,
-            input.newContent,
-            undefined,
-            {
-                activeAnalyzers: route.overflowAnalyzers,
-                observeExecution: Boolean(plan.options.onExecution),
-            },
-        );
+        const coldResult = await scanner.runAnalyzers(input.filePath, input.newContent, undefined, {
+            activeAnalyzers: route.overflowAnalyzers,
+            observeExecution: Boolean(plan.options.onExecution),
+        });
         if (coldResult.execution) {
-            plan.options.onExecution?.({ track: 'cold', execution: coldResult.execution, metric: coldResult.metric });
+            plan.options.onExecution?.({
+                track: 'cold',
+                execution: coldResult.execution,
+                metric: coldResult.metric,
+            });
         }
 
         if (coldResult.issues.length > 0) {
@@ -862,18 +861,17 @@ async function runConfidenceRework(
     const needsUnbounded = candidates.some((candidate) => candidate.strategy === REWORK_DEEPEN_AST);
     const widerBounds =
         needsUnbounded || !context.lineBounds ? undefined : expandWindow(context.lineBounds);
-    const widerResult = await scanner.runAnalyzers(
-        input.filePath,
-        input.newContent,
-        undefined,
-        {
-            activeAnalyzers: new Set(analyzers),
-            lineBounds: widerBounds,
-            observeExecution: Boolean(context.onExecution),
-        },
-    );
+    const widerResult = await scanner.runAnalyzers(input.filePath, input.newContent, undefined, {
+        activeAnalyzers: new Set(analyzers),
+        lineBounds: widerBounds,
+        observeExecution: Boolean(context.onExecution),
+    });
     if (widerResult.execution) {
-        context.onExecution?.({ track: 'rework', execution: widerResult.execution, metric: widerResult.metric });
+        context.onExecution?.({
+            track: 'rework',
+            execution: widerResult.execution,
+            metric: widerResult.metric,
+        });
     }
 
     const outcomes = reconcileRework(candidates, widerResult.issues);
@@ -913,7 +911,11 @@ async function auditSingleFileInput(context: AuditFileInputContext): Promise<voi
         },
     );
     if (fileResult.execution) {
-        context.options.onExecution?.({ track: 'fast', execution: fileResult.execution, metric: fileResult.metric });
+        context.options.onExecution?.({
+            track: 'fast',
+            execution: fileResult.execution,
+            metric: fileResult.metric,
+        });
     }
 
     const boundedIssues =

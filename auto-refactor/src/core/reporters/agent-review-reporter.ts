@@ -18,9 +18,7 @@
  */
 
 import type { ScanReport, Issue } from '../types';
-import {
-    TOPOLOGY_LAYER_PRIORITY as TOPOLOGY_RANK,
-} from '../reporting/agent-audit-pipeline';
+import { TOPOLOGY_LAYER_PRIORITY as TOPOLOGY_RANK } from '../reporting/agent-audit-pipeline';
 import {
     formatCompactAgentPrompt,
     extractAnchorCodeSlice,
@@ -145,7 +143,9 @@ function buildRemediationRecipe(issue: Issue): AgentRemediationRecipe {
     const actionable = issue.actionable;
     let remediationSummary = issue.suggestion;
     if (!remediationSummary) {
-        remediationSummary = actionable ? `Apply standard ${actionable.action} remediation` : issue.message;
+        remediationSummary = actionable
+            ? `Apply standard ${actionable.action} remediation`
+            : issue.message;
     }
 
     return {
@@ -457,8 +457,11 @@ function formatDirectiveClarification(clarificationRequest: AgentClarificationRe
         lines.push('  * Candidate Options:');
         for (const optionItem of clarificationRequest.candidateOptions) {
             const recommendedSuffix = optionItem.recommended ? RECOMMENDED_SUFFIX : '';
-            const defaultChoiceSuffix = optionItem.key === clarificationRequest.defaultChoiceKey ? ' [default]' : '';
-            lines.push(`    - \`${optionItem.key}\`: ${optionItem.label}${recommendedSuffix}${defaultChoiceSuffix}`);
+            const defaultChoiceSuffix =
+                optionItem.key === clarificationRequest.defaultChoiceKey ? ' [default]' : '';
+            lines.push(
+                `    - \`${optionItem.key}\`: ${optionItem.label}${recommendedSuffix}${defaultChoiceSuffix}`,
+            );
         }
     }
     return lines;

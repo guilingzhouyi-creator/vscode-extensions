@@ -422,7 +422,10 @@ export function buildScanReport(params: BuildScanReportContext): ScanReport {
     const tallies = computeTallyIssues(params.issues);
     const issuesByFile = groupIssuesByFile(params.issues);
     const fileQualityScores = collectFileQuality(
-        host, params.fileMetrics, issuesByFile, params.snapshotSource === undefined,
+        host,
+        params.fileMetrics,
+        issuesByFile,
+        params.snapshotSource === undefined,
     );
     const projectQualityScore = host.scorer.evaluateProject(
         fileQualityScores,
@@ -443,13 +446,15 @@ export function buildScanReport(params: BuildScanReportContext): ScanReport {
         historicalScore,
         resolveGovernanceProfile(cfg),
     );
-    const autonomy = params.snapshotSource ? undefined : evaluateProjectAutonomy(
-        params.fileMetrics,
-        params.issues,
-        cfg,
-        retainedSource as Map<string, string> | undefined,
-        host.symbolIndex,
-    );
+    const autonomy = params.snapshotSource
+        ? undefined
+        : evaluateProjectAutonomy(
+              params.fileMetrics,
+              params.issues,
+              cfg,
+              retainedSource as Map<string, string> | undefined,
+              host.symbolIndex,
+          );
 
     if (!params.snapshotSource) host.reviewMemory.flush();
     const runnerToolName = TOOL_NAME;
