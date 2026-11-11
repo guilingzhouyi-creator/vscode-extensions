@@ -46,11 +46,13 @@ const CATEGORY_TEXTURES_ITEMS: String = "textures/items"
 const CATEGORY_MODELS: String = "models"
 const CATEGORY_FONTS: String = "fonts"
 
-## 统一 URI 协议头
+## 统一 URI 协议头与资产子目录常量
 const SCHEME_OFFICIAL: String = "official://"
 const SCHEME_MOD: String = "mod://"
 const SCHEME_RES: String = "res://"
 const SCHEME_USER: String = "user://"
+const DIR_ASSETS: String = "assets"
+const PREFIX_ASSETS: String = "assets/"
 
 static var _instance: AssetPathResolver = null
 static var _override_env_for_test: String = ""
@@ -162,18 +164,18 @@ static func resolve_mod_asset_path(mod_id: String, relative_asset_path: String) 
 
 	var candidate_roots := get_mod_discovery_roots()
 	for root_dir in candidate_roots:
-		var target_path := root_dir.path_join(clean_mod_id).path_join("assets").path_join(safe_rel_path)
+		var target_path := root_dir.path_join(clean_mod_id).path_join(DIR_ASSETS).path_join(safe_rel_path)
 		if asset_exists(target_path):
 			return target_path
 		# 兼容剧情模组专用子目录 (mods/narratives/<mod_id>/assets/...)
-		var narrative_path := root_dir.path_join("narratives").path_join(clean_mod_id).path_join("assets").path_join(safe_rel_path)
+		var narrative_path := root_dir.path_join("narratives").path_join(clean_mod_id).path_join(DIR_ASSETS).path_join(safe_rel_path)
 		if asset_exists(narrative_path):
 			return narrative_path
 
 	# 若三级级联均未探测到物理文件，返回首选沙盒物理路径（供资源探测或新建装配）
 	if is_engineering_build():
-		return ROOT_MODS_TIER0_DEV.path_join(clean_mod_id).path_join("assets").path_join(safe_rel_path)
-	return ROOT_MODS_TIER2_USER_SANDBOX.path_join(clean_mod_id).path_join("assets").path_join(safe_rel_path)
+		return ROOT_MODS_TIER0_DEV.path_join(clean_mod_id).path_join(DIR_ASSETS).path_join(safe_rel_path)
+	return ROOT_MODS_TIER2_USER_SANDBOX.path_join(clean_mod_id).path_join(DIR_ASSETS).path_join(safe_rel_path)
 
 # ==============================================================================
 # 五、通用 URI 协议解析引擎 (Unified URI Scheme)
@@ -202,8 +204,8 @@ static func resolve_unified_uri(uri_or_path: String, fallback_mod_id: String = "
 	if not fallback_mod_id.is_empty():
 		return resolve_mod_asset_path(fallback_mod_id, trimmed)
 	var rel_clean := sanitize_sandbox_path(trimmed)
-	if rel_clean.begins_with("assets/"):
-		rel_clean = rel_clean.trim_prefix("assets/")
+	if rel_clean.begins_with(PREFIX_ASSETS):
+		rel_clean = rel_clean.trim_prefix(PREFIX_ASSETS)
 	return ROOT_OFFICIAL_ASSETS.path_join(rel_clean)
 
 static func _resolve_mod_scheme_uri(uri: String, fallback_mod_id: String) -> String:
@@ -214,11 +216,11 @@ static func _resolve_mod_scheme_uri(uri: String, fallback_mod_id: String) -> Str
 		var first_segment := raw_path.substr(0, slash_pos)
 		var rest_path := raw_path.substr(slash_pos + 1)
 		# 若第一段是 assets，说明格式为 mod://assets/path，借用 fallback_mod_id
-		if first_segment == "assets" and not fallback_mod_id.is_empty():
+		if first_segment == DIR_ASSETS and not fallback_mod_id.is_empty():
 			return resolve_mod_asset_path(fallback_mod_id, rest_path)
 		# 否则格式为 mod://<mod_id>/assets/path
-		if rest_path.begins_with("assets/"):
-			rest_path = rest_path.trim_prefix("assets/")
+		if rest_path.begins_with(PREFIX_ASSETS):
+			rest_path = rest_path.trim_prefix(PREFIX_ASSETS)
 		return resolve_mod_asset_path(first_segment, rest_path)
 
 	if not fallback_mod_id.is_empty():

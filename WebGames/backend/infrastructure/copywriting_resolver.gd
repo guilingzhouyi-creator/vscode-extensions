@@ -55,7 +55,7 @@ static func resolve(
 
 	# 文案键登记名称注册表（跨域唯一；同域幂等）
 	LocalizationRegistryCatalog.get_shared().register_name_key(copy_key, domain, copy_key)
-	return {"success": true, "copy_key": copy_key, "text": _fill(template, params)}
+	return {"success": true, "copy_key": copy_key, "text": TemplateFormatter.format(template, params)}
 
 # ==============================================================================
 # 三、内部实现（模板选择 / 状态匹配 / 填充）
@@ -96,7 +96,3 @@ static func _missing_params(template: String, params: Dictionary) -> Array:
 		if not params.has(name):
 			missing.append(name)
 	return missing
-
-## 模板填充：将 {param} 占位符替换为参数字符串化值（统一委托底层高性能 TemplateFormatter）
-static func _fill(template: String, params: Dictionary) -> String:
-	return TemplateFormatter.format(template, params)

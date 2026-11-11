@@ -10,6 +10,8 @@
 ## GameConfig：Central Configuration Center
 class_name GameConfig extends RefCounted
 
+const ConfigRouterEngine = preload("res://backend/infrastructure/config_router_engine.gd")
+
 # ==============================================================================
 # 一、常量与状态
 # ==============================================================================
@@ -26,8 +28,6 @@ static var _path_cache: Dictionary = {}
 
 ## 路径分段缓存上限：防运行期动态键（msg/拼接路径）无界增长
 const PATH_CACHE_MAX_ENTRIES: int = 4096
-
-const ConfigRouterEngine = preload("res://backend/infrastructure/config_router_engine.gd")
 
 const PATH_STORAGE_CATALOG_SCRIPT: String = "res://backend/domains/persistence_protocol/storage_resource_catalog.gd"
 const PATH_AUX_WORKER_POOL_SCRIPT: String = "res://backend/domains/persistence_protocol/auxiliary_worker_pool.gd"

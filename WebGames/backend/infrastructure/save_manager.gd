@@ -47,7 +47,7 @@ static func _cleanup_orphan_tmp_files(save_dir: String) -> void:
 		fname = dir.get_next()
 	dir.list_dir_end()
 	if removed > 0:
-		EventBusCore.get_instance().emit_log("warn", _msg("orphan_tmp_cleaned") % removed)
+		EventBusCore.get_instance().emit_log("warn", _msg("orphan_tmp_cleaned", {"count": removed}))
 
 ## 内容 SHA-256 摘要（数据完整性校验用）
 static func compute_sha256(content_string: String) -> String:
@@ -71,7 +71,7 @@ static func is_valid_save_name(save_name: String) -> bool:
 ## 存档写入：名称合法性校验 → 信封组装（format_version/engine/SHA-256/data_json 单字段契约）→ 原子写
 static func save_game(save_name: String, payload: Dictionary) -> Dictionary:
 	if not is_valid_save_name(save_name):
-		return _fail("save", "INVALID_SAVE_NAME", _msg("invalid_save_name") % save_name)
+		return _fail("save", "INVALID_SAVE_NAME", _msg("invalid_save_name", {"name": save_name}))
 
 	ensure_save_directory()
 	var file_path := _save_dir() + save_name + _save_extension()
@@ -102,7 +102,7 @@ static func save_game(save_name: String, payload: Dictionary) -> Dictionary:
 		return write_result
 
 	var preview_len := GameConfig.get_int("infrastructure.persistence", "hash_preview_len", 8)
-	EventBusCore.get_instance().emit_log("info", _msg("save_success") % [file_path, sha256_hash.substr(0, preview_len)])
+	EventBusCore.get_instance().emit_log("info", _msg("save_success", {"path": file_path, "hash": sha256_hash.substr(0, preview_len)}))
 	return {
 		"success": true,
 		"stage": "COMMIT",
@@ -122,11 +122,11 @@ static func save_game(save_name: String, payload: Dictionary) -> Dictionary:
 ## 反序列化；legacy 无签名存档降级读取并告警（verified=false）
 static func load_game(save_name: String) -> Dictionary:
 	if not is_valid_save_name(save_name):
-		return _fail("load", "INVALID_SAVE_NAME", _msg("invalid_save_name") % save_name)
+		return _fail("load", "INVALID_SAVE_NAME", _msg("invalid_save_name", {"name": save_name}))
 
 	var file_path := _save_dir() + save_name + _save_extension()
 	if not FileAccess.file_exists(file_path):
-		return _fail("load", "FILE_NOT_EXIST", _msg("file_not_exist") % file_path)
+		return _fail("load", "FILE_NOT_EXIST", _msg("file_not_exist", {"path": file_path}))
 
 	var file := FileAccess.open(file_path, FileAccess.READ)
 	if not file:
@@ -138,7 +138,7 @@ static func load_game(save_name: String) -> Dictionary:
 	var json := JSON.new()
 	var parse_err := json.parse(content)
 	if parse_err != OK:
-		return _fail_or_recover("load", "JSON_PARSE_FAIL", _msg("json_parse_fail") % [json.get_error_line(), json.get_error_message()], save_name)
+		return _fail_or_recover("load", "JSON_PARSE_FAIL", _msg("json_parse_fail", {"line": json.get_error_line(), "error": json.get_error_message()}), save_name)
 
 	var envelope: Variant = json.get_data()
 	if not envelope is Dictionary:
@@ -151,9 +151,9 @@ static func load_game(save_name: String) -> Dictionary:
 	var min_supported := GameConfig.get_string("infrastructure.persistence", "min_supported_version", "1.0.0")
 	var env_version: String = String(env.get("format_version", min_supported))
 	if _version_newer_than(env_version, current_version):
-		return _fail("load", "VERSION_TOO_NEW", _msg("version_too_new") % env_version)
+		return _fail("load", "VERSION_TOO_NEW", _msg("version_too_new", {"version": env_version}))
 	if _version_newer_than(min_supported, env_version):
-		return _fail("load", "VERSION_TOO_OLD", _msg("version_too_old") % env_version)
+		return _fail("load", "VERSION_TOO_OLD", _msg("version_too_old", {"version": env_version}))
 
 	# 校验对象与消费对象必须是同一字节序列：仅信任被签名的 data_json
 	var raw_data_str: String = env.get("data_json", "")
@@ -169,12 +169,12 @@ static func load_game(save_name: String) -> Dictionary:
 	# 从已被校验的字节序列反序列化，杜绝 data / data_json 不一致
 	var data_json := JSON.new()
 	if data_json.parse(raw_data_str) != OK:
-		return _fail_or_recover("load", "JSON_PARSE_FAIL", _msg("json_parse_fail") % [data_json.get_error_line(), data_json.get_error_message()], save_name)
+		return _fail_or_recover("load", "JSON_PARSE_FAIL", _msg("json_parse_fail", {"line": data_json.get_error_line(), "error": data_json.get_error_message()}), save_name)
 	var parsed: Variant = data_json.get_data()
 	if not parsed is Dictionary:
 		return _fail_or_recover("load", "INVALID_ENVELOPE", _msg("invalid_envelope"), save_name)
 
-	EventBusCore.get_instance().emit_log("info", _msg("load_success") % file_path)
+	EventBusCore.get_instance().emit_log("info", _msg("load_success", {"path": file_path}))
 	return {"success": true, "data": parsed, "meta": env, "verified": true, "stage": "LOAD", "error_code": ""}
 
 # ==============================================================================
@@ -186,11 +186,11 @@ static func load_game(save_name: String) -> Dictionary:
 ## 不执行“先删除正档”（rename 覆盖即原子替换，旧正档保留到新正档就位）。
 static func restore_backup(save_name: String) -> Dictionary:
 	if not is_valid_save_name(save_name):
-		return _fail(OP_RESTORE, "INVALID_SAVE_NAME", _msg("invalid_save_name") % save_name)
+		return _fail(OP_RESTORE, "INVALID_SAVE_NAME", _msg("invalid_save_name", {"name": save_name}))
 	var file_path := _save_dir() + save_name + _save_extension()
 	var backup_path := file_path + _backup_suffix()
 	if not FileAccess.file_exists(backup_path):
-		return _fail(OP_RESTORE, "FILE_NOT_EXIST", _msg("file_not_exist") % backup_path)
+		return _fail(OP_RESTORE, "FILE_NOT_EXIST", _msg("file_not_exist", {"path": backup_path}))
 
 	# 1. 验证备份可读（不完整备份不进入恢复）
 	var backup_file := FileAccess.open(backup_path, FileAccess.READ)
@@ -203,24 +203,24 @@ static func restore_backup(save_name: String) -> Dictionary:
 	# 也拒绝覆盖正档（坏数据不得替换好数据）；预检失败正档保持原样
 	var backup_json := JSON.new()
 	if backup_json.parse(backup_content) != OK:
-		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt") % backup_json.get_error_message())
+		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt", {"path": backup_json.get_error_message()}))
 	var backup_data: Variant = backup_json.get_data()
 	if not backup_data is Dictionary:
-		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt") % "top-level is not an object")
+		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt", {"path": "top-level is not an object"}))
 	var env_b: Dictionary = backup_data
 	var backup_data_json: String = String(env_b.get("data_json", ""))
 	if not backup_data_json.is_empty():
 		var inner := JSON.new()
 		if inner.parse(backup_data_json) != OK:
-			return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt") % inner.get_error_message())
+			return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt", {"path": inner.get_error_message()}))
 	elif not (env_b.get("data") is Dictionary):
-		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt") % "no valid payload")
+		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt", {"path": "no valid payload"}))
 
 	# 2. 写恢复临时文件（校验中间产物可写）
 	var tmp_path := file_path + _tmp_suffix()
 	var tmp_file := FileAccess.open(tmp_path, FileAccess.WRITE)
 	if not tmp_file:
-		return _fail(OP_RESTORE, "OPEN_WRITE_FAIL", _msg("open_write_fail") % str(FileAccess.get_open_error()))
+		return _fail(OP_RESTORE, "OPEN_WRITE_FAIL", _msg("open_write_fail", {"error": str(FileAccess.get_open_error())}))
 	tmp_file.store_string(backup_content)
 	tmp_file.flush()
 	tmp_file.close()
@@ -229,7 +229,7 @@ static func restore_backup(save_name: String) -> Dictionary:
 	var err := DirAccess.rename_absolute(tmp_path, file_path)
 	if err != OK:
 		DirAccess.remove_absolute(tmp_path)
-		return _fail(OP_RESTORE, "ATOMIC_REPLACE_FAIL", _msg("atomic_replace_fail") % str(err))
+		return _fail(OP_RESTORE, "ATOMIC_REPLACE_FAIL", _msg("atomic_replace_fail", {"error": str(err)}))
 	return {"success": true, "stage": "RESTORE_COMMIT", "error_code": "", "path": file_path}
 
 # ==============================================================================
@@ -277,7 +277,7 @@ static func _fail_or_recover(
 		reloaded = load_game(save_name)
 	_recovering = false
 	if not reloaded.is_empty() and bool(reloaded.get("success", false)):
-		EventBusCore.get_instance().emit_log("warn", _msg("auto_restored") % save_name)
+		EventBusCore.get_instance().emit_log("warn", _msg("auto_restored", {"path": save_name}))
 		reloaded["auto_restored"] = true
 		reloaded["recovered_from"] = error_code
 		return reloaded
@@ -300,7 +300,7 @@ static func _atomic_write(file_path: String, content: String) -> Dictionary:
 
 	var tmp_file := FileAccess.open(tmp_path, FileAccess.WRITE)
 	if not tmp_file:
-		return {"success": false, "error": _msg("open_write_fail") % str(FileAccess.get_open_error())}
+		return {"success": false, "error": _msg("open_write_fail", {"error": str(FileAccess.get_open_error())})}
 	tmp_file.store_string(content)
 	tmp_file.flush()
 	tmp_file.close()
@@ -310,23 +310,23 @@ static func _atomic_write(file_path: String, content: String) -> Dictionary:
 		var backup_err := DirAccess.copy_absolute(file_path, file_path + _backup_suffix())
 		if backup_err != OK:
 			var policy := GameConfig.get_string("infrastructure.persistence", "atomic_write/backup_fail_policy", "abort")
-			EventBusCore.get_instance().emit_log("warn", _msg("backup_failed") % str(backup_err))
+			EventBusCore.get_instance().emit_log("warn", _msg("backup_failed", {"error": str(backup_err)}))
 			if policy == "abort":
 				DirAccess.remove_absolute(tmp_path)
-				return _fail("BACKUP", "BACKUP_FAILED", _msg("backup_failed") % str(backup_err))
+				return _fail("BACKUP", "BACKUP_FAILED", _msg("backup_failed", {"error": str(backup_err)}))
 
 	# rename 是文件系统级原子操作，正档要么全旧要么全新
 	var rename_err := DirAccess.rename_absolute(tmp_path, file_path)
 	if rename_err != OK:
 		DirAccess.remove_absolute(tmp_path)
-		return {"success": false, "error": _msg("atomic_replace_fail") % str(rename_err)}
+		return {"success": false, "error": _msg("atomic_replace_fail", {"error": str(rename_err)})}
 	return {}
 
 ## 直写模式（atomic_write 禁用时）：直接写文件（无备份/无原子替换保护）
 static func _write_direct(file_path: String, content: String) -> Dictionary:
 	var file := FileAccess.open(file_path, FileAccess.WRITE)
 	if not file:
-		return {"success": false, "error": _msg("open_write_fail") % str(FileAccess.get_open_error())}
+		return {"success": false, "error": _msg("open_write_fail", {"error": str(FileAccess.get_open_error())})}
 	file.store_string(content)
 	file.flush()
 	file.close()
@@ -363,6 +363,9 @@ static func _version_newer_than(a: String, b: String) -> bool:
 			return va > vb
 	return false
 
-## 日志文案查表（infrastructure.persistence messages 段，未登记回传 key）
-static func _msg(key: String) -> String:
-	return GameConfig.get_string("infrastructure.persistence", "messages/" + key, key)
+## 日志文案查表与动态占位符注入（infrastructure.persistence messages 段，未登记回传 key）
+static func _msg(key: String, params: Dictionary = {}) -> String:
+	var tmpl := GameConfig.get_string("infrastructure.persistence", "messages/" + key, key)
+	if params.is_empty():
+		return tmpl
+	return TemplateFormatter.format(tmpl, params)
