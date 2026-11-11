@@ -38,15 +38,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_tc_upe_09_custom_domain_handler_scalability())
 	return TestCase.pack_results("统一协议工厂与ESC系统菜单后端联动全链路流水线", results)
 
-static func _setup_env() -> void:
-	SaveDataAccessLayer.reset_for_tests()
-	GameLifecycleManager.reset_for_test()
-	HumanControlLeaseManager.reset_for_tests()
-	UnifiedProtocolFactory.reset_for_tests()
-	HudEventBridge.reset_for_tests()
-	UnifiedProtocolDispatcher.reset_custom_handlers_for_tests()
-
-static func _teardown_env() -> void:
+static func _reset_env() -> void:
 	SaveDataAccessLayer.reset_for_tests()
 	GameLifecycleManager.reset_for_test()
 	HumanControlLeaseManager.reset_for_tests()
@@ -58,7 +50,7 @@ static func _teardown_env() -> void:
 ## TC-UPE-01: 统一协议工厂双轨请求装箱与反装箱一致性断言
 ## -----------------------------------------------------------------------------
 static func test_tc_upe_01_protocol_factory_packing_roundtrip() -> Dictionary:
-	_setup_env()
+	_reset_env()
 
 	# 1. 人类请求装箱断言
 	var req_h := UnifiedProtocolFactory.create_human_request(
@@ -101,7 +93,7 @@ static func test_tc_upe_01_protocol_factory_packing_roundtrip() -> Dictionary:
 		and resp_restored.success == true \
 		and resp_restored.data.get("status", "") == "saved"
 
-	_teardown_env()
+	_reset_env()
 	var passed: bool = h_ok and h_roundtrip and a_ok and r_ok
 	return TestCase.make_result("TC-UPE-01: 统一协议工厂双轨请求装箱与反装箱一致性断言", passed)
 
@@ -109,7 +101,7 @@ static func test_tc_upe_01_protocol_factory_packing_roundtrip() -> Dictionary:
 ## TC-UPE-02: 人类控制租约抢占与 Agent 动作冲突拦截断言
 ## -----------------------------------------------------------------------------
 static func test_tc_upe_02_human_lease_preemption_and_agent_blocking() -> Dictionary:
-	_setup_env()
+	_reset_env()
 
 	var account_id := "ACC_LEASE_01"
 
@@ -138,7 +130,7 @@ static func test_tc_upe_02_human_lease_preemption_and_agent_blocking() -> Dictio
 	HumanControlLeaseManager.simulate_time_advance_ms(3500)
 	var lease_expired: bool = not HumanControlLeaseManager.is_lease_active(account_id)
 
-	_teardown_env()
+	_reset_env()
 	var passed: bool = (not pre_active) and lease_active_after_human and agent_blocked_ok and lease_expired
 	return TestCase.make_result("TC-UPE-02: 人类控制租约抢占与 Agent 动作冲突拦截断言", passed)
 
@@ -146,7 +138,7 @@ static func test_tc_upe_02_human_lease_preemption_and_agent_blocking() -> Dictio
 ## TC-UPE-03: HUD 事件桥接器单源订阅与幂等解绑断言
 ## -----------------------------------------------------------------------------
 static func test_tc_upe_03_hud_event_bridge_streaming_and_detach() -> Dictionary:
-	_setup_env()
+	_reset_env()
 
 	var hud_view := MainHUDView.new()
 	var bridge := HudEventBridge.get_instance()
@@ -193,7 +185,7 @@ static func test_tc_upe_03_hud_event_bridge_streaming_and_detach() -> Dictionary
 	})
 	var no_leak_update: bool = hud_view.wallet_gold == 12000
 
-	_teardown_env()
+	_reset_env()
 	var passed: bool = is_attached_1 and is_attached_2 and snap_received and wallet_received and is_detached and no_leak_update
 	return TestCase.make_result("TC-UPE-03: HUD 事件桥接器单源订阅与幂等解绑断言", passed)
 
@@ -201,7 +193,7 @@ static func test_tc_upe_03_hud_event_bridge_streaming_and_detach() -> Dictionary
 ## TC-UPE-04: ESC 菜单非战斗/非剧情保存状态裁决与置灰断言
 ## -----------------------------------------------------------------------------
 static func test_tc_upe_04_esc_query_save_readiness_guards() -> Dictionary:
-	_setup_env()
+	_reset_env()
 
 	# 1. 常态环境：允许保存
 	var req_normal := UnifiedProtocolFactory.create_human_request(
@@ -226,7 +218,7 @@ static func test_tc_upe_04_esc_query_save_readiness_guards() -> Dictionary:
 	var ok_cutscene: bool = resp_cutscene.success and not bool(resp_cutscene.data.get("is_ready", true)) \
 		and str(resp_cutscene.data.get("blocked_reason", "")) == "CANNOT_SAVE_DURING_CUTSCENE"
 
-	_teardown_env()
+	_reset_env()
 	var passed: bool = ok_normal and ok_combat and ok_cutscene
 	return TestCase.make_result("TC-UPE-04: ESC 菜单非战斗/非剧情保存状态裁决与置灰断言", passed)
 
@@ -234,7 +226,7 @@ static func test_tc_upe_04_esc_query_save_readiness_guards() -> Dictionary:
 ## TC-UPE-05: ESC 菜单安全保存与物理落盘断言
 ## -----------------------------------------------------------------------------
 static func test_tc_upe_05_esc_save_game_disk_persistence() -> Dictionary:
-	_setup_env()
+	_reset_env()
 
 	# 1. 尝试使用非法存储路径或异常模式
 	var req_unsafe := UnifiedProtocolFactory.create_human_request(
@@ -265,7 +257,7 @@ static func test_tc_upe_05_esc_save_game_disk_persistence() -> Dictionary:
 	var loaded_name: String = str(load_res.get("data", {}).get("player_name", ""))
 	var ok_data: bool = (loaded_name == "瓦尔兰守望者")
 
-	_teardown_env()
+	_reset_env()
 	var passed: bool = ok_unsafe_blocked and ok_save and ok_load and ok_data
 	return TestCase.make_result("TC-UPE-05: ESC 菜单安全保存与物理落盘断言", passed)
 
@@ -273,7 +265,7 @@ static func test_tc_upe_05_esc_save_game_disk_persistence() -> Dictionary:
 ## TC-UPE-06: ESC 退出到世界档案触发网关全量内存洗脱断言
 ## -----------------------------------------------------------------------------
 static func test_tc_upe_06_esc_exit_to_gateway_memory_scrubbing() -> Dictionary:
-	_setup_env()
+	_reset_env()
 
 	var account_id := "ACC_SCRUB_01"
 	var gateway := WorldGatewayFSM.new(account_id)
@@ -299,7 +291,7 @@ static func test_tc_upe_06_esc_exit_to_gateway_memory_scrubbing() -> Dictionary:
 	var mods_scrubbed: bool = (gateway.active_mods.is_empty())
 	var lease_released: bool = not HumanControlLeaseManager.is_lease_active(account_id)
 
-	_teardown_env()
+	_reset_env()
 	var passed: bool = in_world_before and exit_ok and phase_back and mode_scrubbed and slot_scrubbed and char_scrubbed and mods_scrubbed and lease_released
 	return TestCase.make_result("TC-UPE-06: ESC 退出到世界档案触发网关全量内存洗脱断言", passed, {
 		"in_world_before": in_world_before,
@@ -316,7 +308,7 @@ static func test_tc_upe_06_esc_exit_to_gateway_memory_scrubbing() -> Dictionary:
 ## TC-UPE-07: ESC 退出游戏触发五阶段优雅停机断言
 ## -----------------------------------------------------------------------------
 static func test_tc_upe_07_esc_quit_game_graceful_shutdown() -> Dictionary:
-	_setup_env()
+	_reset_env()
 	GameBootstrap.assemble()
 
 	var account_id := "ACC_QUIT_01"
@@ -331,7 +323,7 @@ static func test_tc_upe_07_esc_quit_game_graceful_shutdown() -> Dictionary:
 	var ok_phase: bool = resp_quit.data.get("current_phase", 0) != 0
 	var lease_released: bool = not HumanControlLeaseManager.is_lease_active(account_id)
 
-	_teardown_env()
+	_reset_env()
 	var passed: bool = ok_resp and ok_phase and lease_released
 	return TestCase.make_result("TC-UPE-07: ESC 退出游戏触发五阶段优雅停机断言", passed)
 
@@ -339,7 +331,7 @@ static func test_tc_upe_07_esc_quit_game_graceful_shutdown() -> Dictionary:
 ## TC-UPE-08: 协议交互高频循环零瞬态堆分配断言 (ADV-PRF-002)
 ## -----------------------------------------------------------------------------
 static func test_tc_upe_08_protocol_objects_zero_heap_recycling() -> Dictionary:
-	_setup_env()
+	_reset_env()
 
 	var req := ClientRequestEnvelopeDTO.new()
 	var resp := UnifiedResponseEnvelopeDTO.new()
@@ -371,7 +363,7 @@ static func test_tc_upe_08_protocol_objects_zero_heap_recycling() -> Dictionary:
 	resp.reset_state()
 	var final_clean: bool = req.request_id.is_empty() and req.payload.is_empty() and resp.request_id.is_empty() and resp.data.is_empty()
 
-	_teardown_env()
+	_reset_env()
 	var passed: bool = all_resetted and final_clean
 	return TestCase.make_result("TC-UPE-08: 协议交互高频循环零瞬态堆分配断言 (ADV-PRF-002)", passed)
 
@@ -379,7 +371,7 @@ static func test_tc_upe_08_protocol_objects_zero_heap_recycling() -> Dictionary:
 ## TC-UPE-09: 统一调度器自定义领域处理器注册与开闭原则动态扩展断言
 ## -----------------------------------------------------------------------------
 static func test_tc_upe_09_custom_domain_handler_scalability() -> Dictionary:
-	_setup_env()
+	_reset_env()
 
 	var custom_domain := "inventory_market"
 	var custom_called_box := [false]
@@ -414,6 +406,6 @@ static func test_tc_upe_09_custom_domain_handler_scalability() -> Dictionary:
 	var resp_after := UnifiedProtocolDispatcher.dispatch_request(req)
 	var unreg_rejected: bool = (not resp_after.success) and (resp_after.error_code == "ERR_UNKNOWN_DOMAIN")
 
-	_teardown_env()
+	_reset_env()
 	var passed: bool = has_registered and dispatch_ok and has_unregistered and unreg_rejected
 	return TestCase.make_result("TC-UPE-09: 统一调度器领域处理器注册与OCP开闭原则动态扩展断言", passed)

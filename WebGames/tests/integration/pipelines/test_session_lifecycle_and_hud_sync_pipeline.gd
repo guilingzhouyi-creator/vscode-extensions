@@ -55,6 +55,12 @@ static func _capture_events(callback: Callable) -> Callable:
 	return func() -> void:
 		tok.unbind()
 
+static func _capture_channel_records(captured: Array) -> Callable:
+	return _capture_events(func(pkt: EventPacket) -> void:
+		var w: Dictionary = pkt.payload_data if pkt.payload_data is Dictionary else {}
+		captured.append({"channel": str(w.get("channel", "")), "payload": w.get("payload", {})})
+	)
+
 static func _make_account_store() -> Dictionary:
 	return {}
 
@@ -87,10 +93,7 @@ static func test_registration_validation_and_duplicate() -> Dictionary:
 static func test_auth_eventbus_lifecycle_broadcast() -> Dictionary:
 	var store := _make_account_store()
 	var captured: Array = []
-	var detach := _capture_events(func(pkt: EventPacket) -> void:
-		var w: Dictionary = pkt.payload_data if pkt.payload_data is Dictionary else {}
-		captured.append({"channel": str(w.get("channel", "")), "payload": w.get("payload", {})})
-	)
+	var detach := _capture_channel_records(captured)
 
 	_register_user(store, "BroadcastSession", "Pass1234")
 	var acc := AccountProfileAggregate.new()
@@ -166,10 +169,7 @@ static func test_hud_snapshot_real_source_derivation() -> Dictionary:
 # ---- TC-HDS-05：推轨事件流与广播契约 ----
 static func test_hud_push_stream_and_payload_contract() -> Dictionary:
 	var captured: Array = []
-	var detach := _capture_events(func(pkt: EventPacket) -> void:
-		var w: Dictionary = pkt.payload_data if pkt.payload_data is Dictionary else {}
-		captured.append({"channel": str(w.get("channel", "")), "payload": w.get("payload", {})})
-	)
+	var detach := _capture_channel_records(captured)
 	AuthoritativeHudSyncService.publish_stat_mutation("CHAR_1", "STR", 3.0, 4.0, "TEST")
 	AuthoritativeHudSyncService.publish_wallet_mutation("ACC_1", "gold", 50, 80, "TEST")
 	detach.call()
@@ -191,10 +191,7 @@ static func test_hud_push_stream_and_payload_contract() -> Dictionary:
 static func test_full_headless_lifecycle_pipeline() -> Dictionary:
 	var store := _make_account_store()
 	var captured: Array = []
-	var detach := _capture_events(func(pkt: EventPacket) -> void:
-		var w: Dictionary = pkt.payload_data if pkt.payload_data is Dictionary else {}
-		captured.append({"channel": str(w.get("channel", "")), "payload": w.get("payload", {})})
-	)
+	var detach := _capture_channel_records(captured)
 	var reg := _register_user(store, "LifeSession", "Pass7890")
 	var acc := AccountProfileAggregate.new()
 	acc.account_id = reg.account_id

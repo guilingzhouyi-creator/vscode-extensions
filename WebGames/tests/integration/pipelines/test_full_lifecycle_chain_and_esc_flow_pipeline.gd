@@ -35,7 +35,7 @@ const MainHUDView = preload("res://frontend/views/main_hud/main_hud_view.gd")
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
-	_setup_env()
+	_reset_env()
 	results.append(test_tc_flc_01_account_registration_and_guest_creation())
 	results.append(test_tc_flc_02_gateway_selection_and_mode_readiness())
 	results.append(test_tc_flc_03_character_creation_and_slot_binding())
@@ -47,19 +47,10 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_tc_flc_09_account_logout_and_secret_vault_clearing())
 	results.append(test_tc_flc_10_account_landing_view_state_reset())
 	results.append(test_tc_flc_11_game_exit_graceful_shutdown_pipeline())
-	_teardown_env()
+	_reset_env()
 	return TestCase.pack_results("全链路生命周期与ESC菜单后端双分流无头集成测试流水线", results)
 
-static func _setup_env() -> void:
-	SaveDataAccessLayer.reset_for_tests()
-	GameLifecycleManager.reset_for_test()
-	HumanControlLeaseManager.reset_for_tests()
-	UnifiedProtocolFactory.reset_for_tests()
-	HudEventBridge.reset_for_tests()
-	UnifiedProtocolDispatcher.reset_custom_handlers_for_tests()
-	ServiceLocator.reset()
-
-static func _teardown_env() -> void:
+static func _reset_env() -> void:
 	SaveDataAccessLayer.reset_for_tests()
 	GameLifecycleManager.reset_for_test()
 	HumanControlLeaseManager.reset_for_tests()

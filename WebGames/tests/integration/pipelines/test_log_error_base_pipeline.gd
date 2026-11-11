@@ -127,29 +127,36 @@ static func _test_lg_05_error_code_registry_missing_codes() -> Dictionary:
 		return {"test": "TC-LG-05", "passed": false, "error": "missing_codes failed to identify exact missing list"}
 	return {"test": "TC-LG-05: ErrorCodeRegistry 未登记错误码断言", "passed": true}
 
-## TC-LG-06: LogFileExporter 文件创建与追加落盘断言
-static func _test_lg_06_exporter_append_and_file_creation() -> Dictionary:
+static func _prepare_exporter_config(
+	test_dir: String,
+	file_prefix: String,
+	min_level: String,
+	max_bytes: int = 1048576,
+	max_files: int = 3,
+	clear_existing: bool = false,
+	enabled: bool = true
+) -> void:
 	LogFileExporterClass.reset_for_test()
-	var test_dir := "user://test_logs_tc06"
-	var base := "%s/tc06_exp" % test_dir
-
-	# 清理旧测试产物
-	if DirAccess.dir_exists_absolute(test_dir):
+	if clear_existing and not test_dir.is_empty() and DirAccess.dir_exists_absolute(test_dir):
 		var d := DirAccess.open(test_dir)
 		if d != null:
 			for f in d.get_files():
 				DirAccess.remove_absolute("%s/%s" % [test_dir, f])
-
-	# 注入临时配置
 	var cfg := LogExportConfigDTOClass.new()
-	cfg.enabled = true
+	cfg.enabled = enabled
 	cfg.directory = test_dir
-	cfg.file_prefix = "tc06_exp"
-	cfg.min_level = "debug"
-	cfg.max_bytes = 1048576
-	cfg.max_files = 3
+	cfg.file_prefix = file_prefix
+	cfg.min_level = min_level
+	cfg.max_bytes = max_bytes
+	cfg.max_files = max_files
 	LogFileExporterClass._config = cfg
 	LogFileExporterClass._config_version = GameConfig.config_reload_version()
+
+## TC-LG-06: LogFileExporter 文件创建与追加落盘断言
+static func _test_lg_06_exporter_append_and_file_creation() -> Dictionary:
+	var test_dir := "user://test_logs_tc06"
+	var base := "%s/tc06_exp" % test_dir
+	_prepare_exporter_config(test_dir, "tc06_exp", "debug", 1048576, 3, true, true)
 
 	for i in range(3):
 		var rec := LogRecordDTOClass.new()
@@ -187,12 +194,7 @@ static func _test_lg_06_exporter_append_and_file_creation() -> Dictionary:
 
 ## TC-LG-07: LogFileExporter 非法路径安全防御断言
 static func _test_lg_07_exporter_invalid_dir_handling() -> Dictionary:
-	LogFileExporterClass.reset_for_test()
-	var cfg := LogExportConfigDTOClass.new()
-	cfg.enabled = true
-	cfg.directory = "" # 非法空目录
-	LogFileExporterClass._config = cfg
-	LogFileExporterClass._config_version = GameConfig.config_reload_version()
+	_prepare_exporter_config("", "kalar", "info")
 
 	var rec := LogRecordDTOClass.new()
 	rec.level = "INFO"
@@ -203,15 +205,7 @@ static func _test_lg_07_exporter_invalid_dir_handling() -> Dictionary:
 
 ## TC-LG-08: LogFileExporter 日志级别权重过滤断言
 static func _test_lg_08_exporter_level_filtering() -> Dictionary:
-	LogFileExporterClass.reset_for_test()
-	var test_dir := "user://test_logs_tc08"
-	var cfg := LogExportConfigDTOClass.new()
-	cfg.enabled = true
-	cfg.directory = test_dir
-	cfg.file_prefix = "tc08_exp"
-	cfg.min_level = "warn"
-	LogFileExporterClass._config = cfg
-	LogFileExporterClass._config_version = GameConfig.config_reload_version()
+	_prepare_exporter_config("user://test_logs_tc08", "tc08_exp", "warn")
 
 	var rec_debug := LogRecordDTOClass.new()
 	rec_debug.level = "debug"
@@ -235,16 +229,8 @@ static func _test_lg_08_exporter_level_filtering() -> Dictionary:
 
 ## TC-LG-09: LogFileExporter 通道白名单过滤断言
 static func _test_lg_09_exporter_channel_whitelist() -> Dictionary:
-	LogFileExporterClass.reset_for_test()
-	var test_dir := "user://test_logs_tc09"
-	var cfg := LogExportConfigDTOClass.new()
-	cfg.enabled = true
-	cfg.directory = test_dir
-	cfg.file_prefix = "tc09_exp"
-	cfg.min_level = "info"
-	cfg.include_channels = ["allowed_domain"]
-	LogFileExporterClass._config = cfg
-	LogFileExporterClass._config_version = GameConfig.config_reload_version()
+	_prepare_exporter_config("user://test_logs_tc09", "tc09_exp", "info")
+	LogFileExporterClass._config.include_channels = ["allowed_domain"]
 
 	var rec_blocked := LogRecordDTOClass.new()
 	rec_blocked.level = "info"
@@ -263,24 +249,8 @@ static func _test_lg_09_exporter_channel_whitelist() -> Dictionary:
 
 ## TC-LG-10: LogFileExporter 轮转截断与归档文件上限裁剪断言
 static func _test_lg_10_exporter_rotation_and_pruning() -> Dictionary:
-	LogFileExporterClass.reset_for_test()
 	var test_dir := "user://test_logs_tc10"
-	# 清空目录
-	if DirAccess.dir_exists_absolute(test_dir):
-		var d := DirAccess.open(test_dir)
-		if d != null:
-			for f in d.get_files():
-				DirAccess.remove_absolute("%s/%s" % [test_dir, f])
-
-	var cfg := LogExportConfigDTOClass.new()
-	cfg.enabled = true
-	cfg.directory = test_dir
-	cfg.file_prefix = "tc10_exp"
-	cfg.min_level = "info"
-	cfg.max_bytes = 80 # 极小字节阈值，单条即触发轮转
-	cfg.max_files = 2  # 最多保留 2 份归档
-	LogFileExporterClass._config = cfg
-	LogFileExporterClass._config_version = GameConfig.config_reload_version()
+	_prepare_exporter_config(test_dir, "tc10_exp", "info", 80, 2, true, true)
 
 	for i in range(10):
 		var rec := LogRecordDTOClass.new()
@@ -322,18 +292,20 @@ static func _test_lg_11_exporter_config_reload_reconstruction() -> Dictionary:
 		return {"test": "TC-LG-11", "passed": false, "error": "Exporter failed to refresh config on version bump"}
 	return {"test": "TC-LG-11: LogFileExporter 热重载版本自愈", "passed": true}
 
+static func _capture_posted_logs(action: Callable) -> Array[LogRecordDTO]:
+	var captured_records: Array[LogRecordDTO] = []
+	var bus := EventBusCore.get_instance()
+	var cb := func(pkt: EventPacket):
+		if pkt.payload_dto is LogRecordDTO:
+			captured_records.append(pkt.payload_dto as LogRecordDTO)
+	var tok := bus.on_channel(EventChannelDefinition.LOG_RECORD_POSTED, cb)
+	action.call()
+	tok.unbind()
+	return captured_records
+
 ## TC-LG-12: LogFileExporter 全局单调序号对账断言 (Inv-LG-3)
 static func _test_lg_12_exporter_sequence_reconciliation() -> Dictionary:
-	LogFileExporterClass.reset_for_test()
-	var test_dir := "user://test_logs_tc12"
-	var cfg := LogExportConfigDTOClass.new()
-	cfg.enabled = true
-	cfg.directory = test_dir
-	cfg.file_prefix = "tc12_exp"
-	cfg.min_level = "info"
-	cfg.max_bytes = 1048576
-	LogFileExporterClass._config = cfg
-	LogFileExporterClass._config_version = GameConfig.config_reload_version()
+	_prepare_exporter_config("user://test_logs_tc12", "tc12_exp", "info")
 
 	for i in range(5):
 		var r := LogRecordDTOClass.new()
@@ -349,11 +321,7 @@ static func _test_lg_12_exporter_sequence_reconciliation() -> Dictionary:
 
 ## TC-LG-13: LogFileExporter 关闭时零开销跳过断言
 static func _test_lg_13_exporter_disabled_zero_overhead() -> Dictionary:
-	LogFileExporterClass.reset_for_test()
-	var cfg := LogExportConfigDTOClass.new()
-	cfg.enabled = false
-	LogFileExporterClass._config = cfg
-	LogFileExporterClass._config_version = GameConfig.config_reload_version()
+	_prepare_exporter_config("", "kalar", "info", 1048576, 3, false, false)
 
 	var r := LogRecordDTOClass.new()
 	r.level = "error"
@@ -364,15 +332,9 @@ static func _test_lg_13_exporter_disabled_zero_overhead() -> Dictionary:
 
 ## TC-LG-14: ErrorReporter 已登记错误码广播与 DTO 组装断言
 static func _test_lg_14_error_reporter_emit_registered_error() -> Dictionary:
-	var captured_records: Array[LogRecordDTO] = []
-	var bus := EventBusCore.get_instance()
-	var cb := func(pkt: EventPacket):
-		if pkt.payload_dto is LogRecordDTO:
-			captured_records.append(pkt.payload_dto as LogRecordDTO)
-	var tok := bus.on_channel(EventChannelDefinition.LOG_RECORD_POSTED, cb)
-
-	ErrorReporterClass.emit_error("account", "ERR_ACCOUNT_NOT_FOUND", "Account not found", {"uid": 1001})
-	tok.unbind()
+	var captured_records := _capture_posted_logs(func():
+		ErrorReporterClass.emit_error("account", "ERR_ACCOUNT_NOT_FOUND", "Account not found", {"uid": 1001})
+	)
 
 	if captured_records.is_empty():
 		return {"test": "TC-LG-14", "passed": false, "error": "No record emitted"}
@@ -387,16 +349,10 @@ static func _test_lg_14_error_reporter_emit_registered_error() -> Dictionary:
 
 ## TC-LG-15: ErrorReporter 未登记错误码回退 ERR_UNKNOWN、遥测断点与调用方文本保留断言
 static func _test_lg_15_error_reporter_unregistered_fallback_and_telemetry() -> Dictionary:
-	var captured_records: Array[LogRecordDTO] = []
-	var bus := EventBusCore.get_instance()
-	var cb := func(pkt: EventPacket):
-		if pkt.payload_dto is LogRecordDTO:
-			captured_records.append(pkt.payload_dto as LogRecordDTO)
-	var tok := bus.on_channel(EventChannelDefinition.LOG_RECORD_POSTED, cb)
-
 	var bad_code := "ERR_UNREGISTERED_PROTOTYPE_XYZ"
-	ErrorReporterClass.emit_error("test", bad_code, "Custom fallback msg")
-	tok.unbind()
+	var captured_records := _capture_posted_logs(func():
+		ErrorReporterClass.emit_error("test", bad_code, "Custom fallback msg")
+	)
 
 	if captured_records.is_empty():
 		return {"test": "TC-LG-15", "passed": false, "error": "No record emitted"}
@@ -439,15 +395,9 @@ static func _test_lg_16_error_reporter_message_resolution() -> Dictionary:
 
 ## TC-LG-17: EventBus 既有 emit_log 签名兼容性断言
 static func _test_lg_17_event_bus_legacy_emit_log_compatibility() -> Dictionary:
-	var captured_records: Array[LogRecordDTO] = []
-	var bus := EventBusCore.get_instance()
-	var cb := func(pkt: EventPacket):
-		if pkt.payload_dto is LogRecordDTO:
-			captured_records.append(pkt.payload_dto as LogRecordDTO)
-	var tok := bus.on_channel(EventChannelDefinition.LOG_RECORD_POSTED, cb)
-
-	bus.emit_log("warn", "Legacy warning text")
-	tok.unbind()
+	var captured_records := _capture_posted_logs(func():
+		EventBusCore.get_instance().emit_log("warn", "Legacy warning text")
+	)
 
 	if captured_records.is_empty():
 		return {"test": "TC-LG-17", "passed": false, "error": "Legacy emit_log failed to emit log_record_emitted"}
@@ -566,15 +516,9 @@ static func _test_lg_23_full_integration_pipeline_regression() -> Dictionary:
 	ErrorCodeRegistryClass.reset_for_test()
 
 	# 模拟业务域通过 ErrorReporter 爆错
-	var bus := EventBusCore.get_instance()
-	var captured: Array[LogRecordDTO] = []
-	var cb := func(pkt: EventPacket):
-		if pkt.payload_dto is LogRecordDTO:
-			captured.append(pkt.payload_dto as LogRecordDTO)
-	var tok := bus.on_channel(EventChannelDefinition.LOG_RECORD_POSTED, cb)
-
-	ErrorReporterClass.emit_error("combat", "CONFIG_FILE_NOT_FOUND", "Config file missing in test")
-	tok.unbind()
+	var captured := _capture_posted_logs(func():
+		ErrorReporterClass.emit_error("combat", "CONFIG_FILE_NOT_FOUND", "Config file missing in test")
+	)
 
 	if captured.is_empty():
 		return {"test": "TC-LG-23", "passed": false, "error": "Full pipeline failed to emit record"}
@@ -583,14 +527,9 @@ static func _test_lg_23_full_integration_pipeline_regression() -> Dictionary:
 ## TC-LG-24: 加固改造断言（动态诊断保真、信包双载荷与持久化契约）
 static func _test_lg_24_hardened_observability_and_preservation() -> Dictionary:
 	# 1. 验证 ErrorReporter 保留动态诊断信息
-	var captured: Array[LogRecordDTO] = []
-	var bus := EventBusCore.get_instance()
-	var cb := func(pkt: EventPacket):
-		if pkt.payload_dto is LogRecordDTO:
-			captured.append(pkt.payload_dto as LogRecordDTO)
-	var tok := bus.on_channel(EventChannelDefinition.LOG_RECORD_POSTED, cb)
-	ErrorReporterClass.emit_error("config", "CONFIG_FILE_NOT_FOUND", "Missing config: custom_tables.json", {"actor": "unit_test"})
-	tok.unbind()
+	var captured := _capture_posted_logs(func():
+		ErrorReporterClass.emit_error("config", "CONFIG_FILE_NOT_FOUND", "Missing config: custom_tables.json", {"actor": "unit_test"})
+	)
 
 	if captured.is_empty():
 		return {"test": "TC-LG-24", "passed": false, "error": "emit_error failed to broadcast"}

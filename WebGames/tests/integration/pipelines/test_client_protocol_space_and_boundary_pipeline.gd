@@ -267,37 +267,31 @@ static func test_proto_06_real_character_service_authoritative_creation() -> Dic
 		"ok_roll": ok_roll, "ok_attrs": ok_attrs, "ok_create": ok_create, "ok_char_id": ok_char_id, "ok_prologue": ok_prologue
 	})
 
-## TC-PROTO-07: RealEscMenuService 系统菜单可用状态感知与安全存盘守卫回执验证
-static func test_proto_07_real_esc_menu_service_and_save_guard() -> Dictionary:
-	_setup_env()
-
+static func _bootstrap_in_world_character(username: String, pwd: String, world_id: String, char_name: String) -> Dictionary:
 	var auth := RealAuthService.new()
 	var reg_res := {}
-	auth.register_async("p128_user_07", "SecretPass128#07", func(res: Dictionary): reg_res.merge(res))
+	auth.register_async(username, pwd, func(res: Dictionary): reg_res.merge(res))
 	var acc_id := String(reg_res.get("account_id", ""))
-
 	var login_res := {}
-	auth.login_async("p128_user_07", "SecretPass128#07", func(res: Dictionary): login_res.merge(res))
+	auth.login_async(username, pwd, func(res: Dictionary): login_res.merge(res))
 	var token := String(login_res.get("token", ""))
-
 	var world_svc := RealWorldService.new()
 	world_svc.enter_gateway_async(acc_id, token, func(_r): pass)
-	world_svc.select_or_create_world_async(acc_id, token, "WORLD_P128_07", WorldGatewayModel.GameMode.SINGLE_PLAYER, func(_r): pass)
-
+	world_svc.select_or_create_world_async(acc_id, token, world_id, WorldGatewayModel.GameMode.SINGLE_PLAYER, func(_r): pass)
 	var char_svc := RealCharacterService.new()
 	var create_res := {}
-	char_svc.create_character_async(acc_id, token, {
-		"name": "SaveHeroP128",
-		"slot_index": 1,
-		"world_id": "WORLD_P128_07"
-	}, func(res: Dictionary): create_res.merge(res))
+	char_svc.create_character_async(acc_id, token, {"name": char_name, "slot_index": 1, "world_id": world_id}, func(res: Dictionary): create_res.merge(res))
 	var char_id := String((create_res.get("data", {}) as Dictionary).get("character_id", ""))
-
-	# 推进并完结序章，交接入界进入探索态
 	var done_req := UnifiedProtocolFactory.create_human_request(
 		"prologue", "COMPLETE_PROLOGUE", {"cutscene_id": "cs_prologue_awakening"}, token, acc_id, char_id
 	)
 	UnifiedProtocolDispatcher.dispatch_request(done_req)
+	return {"account_id": acc_id, "token": token, "character_id": char_id, "world_svc": world_svc}
+
+## TC-PROTO-07: RealEscMenuService 系统菜单可用状态感知与安全存盘守卫回执验证
+static func test_proto_07_real_esc_menu_service_and_save_guard() -> Dictionary:
+	_setup_env()
+	_bootstrap_in_world_character("p128_user_07", "SecretPass128#07", "WORLD_P128_07", "SaveHeroP128")
 
 	var esc_svc := RealEscMenuService.new()
 
@@ -324,34 +318,7 @@ static func test_proto_07_real_esc_menu_service_and_save_guard() -> Dictionary:
 ## TC-PROTO-08: HudEventBridge 六大信道全覆盖、主动快照拉取与幂等解绑验证
 static func test_proto_08_hud_event_bridge_six_channels_and_pull_snapshot() -> Dictionary:
 	_setup_env()
-
-	var auth := RealAuthService.new()
-	var reg_res := {}
-	auth.register_async("p128_user_08", "SecretPass128#08", func(res: Dictionary): reg_res.merge(res))
-	var acc_id := String(reg_res.get("account_id", ""))
-
-	var login_res := {}
-	auth.login_async("p128_user_08", "SecretPass128#08", func(res: Dictionary): login_res.merge(res))
-	var token := String(login_res.get("token", ""))
-
-	var world_svc := RealWorldService.new()
-	world_svc.enter_gateway_async(acc_id, token, func(_r): pass)
-	world_svc.select_or_create_world_async(acc_id, token, "WORLD_P128_08", WorldGatewayModel.GameMode.SINGLE_PLAYER, func(_r): pass)
-
-	var char_svc := RealCharacterService.new()
-	var create_res := {}
-	char_svc.create_character_async(acc_id, token, {
-		"name": "BridgeHeroP128",
-		"slot_index": 1,
-		"world_id": "WORLD_P128_08"
-	}, func(res: Dictionary): create_res.merge(res))
-	var char_id := String((create_res.get("data", {}) as Dictionary).get("character_id", ""))
-
-	# 推进并完结序章，交接入界进入探索态
-	var done_req := UnifiedProtocolFactory.create_human_request(
-		"prologue", "COMPLETE_PROLOGUE", {"cutscene_id": "cs_prologue_awakening"}, token, acc_id, char_id
-	)
-	UnifiedProtocolDispatcher.dispatch_request(done_req)
+	_bootstrap_in_world_character("p128_user_08", "SecretPass128#08", "WORLD_P128_08", "BridgeHeroP128")
 
 	var bridge := HudEventBridge.get_instance()
 
@@ -376,34 +343,10 @@ static func test_proto_08_hud_event_bridge_six_channels_and_pull_snapshot() -> D
 ## TC-PROTO-09: 退出世界退回网关与活跃世界禁切模式解耦闭关验证
 static func test_proto_09_exit_world_to_gateway_and_mode_switch() -> Dictionary:
 	_setup_env()
-
-	var auth := RealAuthService.new()
-	var reg_res := {}
-	auth.register_async("p128_user_09", "SecretPass128#09", func(res: Dictionary): reg_res.merge(res))
-	var acc_id := String(reg_res.get("account_id", ""))
-
-	var login_res := {}
-	auth.login_async("p128_user_09", "SecretPass128#09", func(res: Dictionary): login_res.merge(res))
-	var token := String(login_res.get("token", ""))
-
-	var world_svc := RealWorldService.new()
-	world_svc.enter_gateway_async(acc_id, token, func(_r): pass)
-	world_svc.select_or_create_world_async(acc_id, token, "WORLD_P128_09", WorldGatewayModel.GameMode.SINGLE_PLAYER, func(_r): pass)
-
-	var char_svc := RealCharacterService.new()
-	var create_res_09 := {}
-	char_svc.create_character_async(acc_id, token, {
-		"name": "SwitchHeroP128",
-		"slot_index": 1,
-		"world_id": "WORLD_P128_09"
-	}, func(res: Dictionary): create_res_09.merge(res))
-	var char_id_09 := String((create_res_09.get("data", {}) as Dictionary).get("character_id", ""))
-
-	# 推进并完结序章，交接入界进入探索态
-	var done_req := UnifiedProtocolFactory.create_human_request(
-		"prologue", "COMPLETE_PROLOGUE", {"cutscene_id": "cs_prologue_awakening"}, token, acc_id, char_id_09
-	)
-	UnifiedProtocolDispatcher.dispatch_request(done_req)
+	var env_ctx := _bootstrap_in_world_character("p128_user_09", "SecretPass128#09", "WORLD_P128_09", "SwitchHeroP128")
+	var acc_id := String(env_ctx["account_id"])
+	var token := String(env_ctx["token"])
+	var world_svc: RealWorldService = env_ctx["world_svc"]
 
 	# 1. 处于活跃世界中，尝试切换网关模式：必须被防越权护栏拦截
 	var sw_blocked_res := {}

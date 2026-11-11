@@ -97,6 +97,15 @@ static func test_multi_world_slot_placeholder_defense() -> Dictionary:
 
 	return {"test": "TC-SLD-02: 多世界槽位占位符防御校验", "passed": true}
 
+static func _run_default_secondary_load(account: AccountProfileAggregate, slot: SaveSlotSummaryDTO) -> Dictionary:
+	var ctx := {
+		"account": account,
+		"slot": slot,
+		"target_world_id": AccountProfileAggregate.WORLD_DEFAULT_SP_01,
+		"allow_default_fallback": true
+	}
+	return SaveLoadRoutingSolver.execute_secondary_load(ctx)
+
 # ---- TC-SLD-03: 边界 A 判定与序章重放重初始化流 ----
 static func test_boundary_a_prologue_replay_stream() -> Dictionary:
 	var account := AccountProfileAggregate.new()
@@ -115,13 +124,7 @@ static func test_boundary_a_prologue_replay_stream() -> Dictionary:
 	assert_eq(path, SaveLoadRoutingSolver.ENTRY_PATH_PROLOGUE_REPLAY, "TC-SLD-03A: 边界A应判定为序章重放流")
 
 	# 执行二次载入流转
-	var ctx := {
-		"account": account,
-		"slot": slot,
-		"target_world_id": AccountProfileAggregate.WORLD_DEFAULT_SP_01,
-		"allow_default_fallback": true
-	}
-	var res := SaveLoadRoutingSolver.execute_secondary_load(ctx)
+	var res := _run_default_secondary_load(account, slot)
 
 	assert_true(res.success, "TC-SLD-03B: 边界A流转应执行成功")
 	assert_eq(res.entry_path, SaveLoadRoutingSolver.ENTRY_PATH_PROLOGUE_REPLAY, "TC-SLD-03C: 应返回序章重放路径")
@@ -160,13 +163,7 @@ static func test_boundary_b_mature_save_direct_restore() -> Dictionary:
 	SaveDataAccessLayer.save_game(slot.slot_id, save_payload)
 
 	# 执行二次载入流转
-	var ctx := {
-		"account": account,
-		"slot": slot,
-		"target_world_id": AccountProfileAggregate.WORLD_DEFAULT_SP_01,
-		"allow_default_fallback": true
-	}
-	var res := SaveLoadRoutingSolver.execute_secondary_load(ctx)
+	var res := _run_default_secondary_load(account, slot)
 
 	assert_true(res.success, "TC-SLD-04B: 边界B直载流转应成功")
 	assert_eq(res.entry_path, SaveLoadRoutingSolver.ENTRY_PATH_DIRECT_RESTORE, "TC-SLD-04C: 应返回直载路径")
