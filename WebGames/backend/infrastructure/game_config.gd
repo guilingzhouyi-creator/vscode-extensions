@@ -438,28 +438,7 @@ static func has_table(table_name: String) -> bool:
 		_ensure_table_loaded_jit(target_table)
 	return _tables.has(target_table)
 
-## 判断「表 + 多级路径」是否存在
-static func has(table_name: String, path: String) -> bool:
-	ensure_loaded()
-	var route: Variant = ConfigRouterEngine.resolve_route(table_name, path)
-	var target_table: String = str(route.resolved_table)
-	if not _tables.has(target_table):
-		_ensure_table_loaded_jit(target_table)
-	if _lookup_path_in_table(_tables.get(target_table, {}), path) != null:
-		return true
-	var subtables: Array = ConfigRouterEngine.get_subtables_for_domain(table_name)
-	for sub in subtables:
-		var s_name := String(sub)
-		if s_name == target_table:
-			continue
-		if not _tables.has(s_name):
-			_ensure_table_loaded_jit(s_name)
-		if _lookup_path_in_table(_tables.get(s_name, {}), path) != null:
-			return true
-	return false
-
-## 泛用取值：任意类型，未命中或类型不符时返回 default（不抛错）
-static func get_value(table_name: String, path: String, default: Variant = null) -> Variant:
+static func _resolve_raw_value(table_name: String, path: String) -> Variant:
 	ensure_loaded()
 	var route: Variant = ConfigRouterEngine.resolve_route(table_name, path)
 	var target_table: String = str(route.resolved_table)
@@ -478,7 +457,16 @@ static func get_value(table_name: String, path: String, default: Variant = null)
 		var sub_val: Variant = _lookup_path_in_table(_tables.get(s_name, {}), path)
 		if sub_val != null:
 			return sub_val
-	return default
+	return null
+
+## 判断「表 + 多级路径」是否存在
+static func has(table_name: String, path: String) -> bool:
+	return _resolve_raw_value(table_name, path) != null
+
+## 泛用取值：任意类型，未命中或类型不符时返回 default（不抛错）
+static func get_value(table_name: String, path: String, default: Variant = null) -> Variant:
+	var val: Variant = _resolve_raw_value(table_name, path)
+	return val if val != null else default
 
 ## 类型化取值（带数值/字符串宽松转换与默认值回退，未命中一律回退 default）
 static func get_string(table_name: String, path: String, default: String = "") -> String:

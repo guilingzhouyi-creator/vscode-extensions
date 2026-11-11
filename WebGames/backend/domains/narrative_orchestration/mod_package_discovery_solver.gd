@@ -278,45 +278,38 @@ static func _flatten_i18n_dict(dict: Dictionary, prefix: String, target: Diction
             target[full_key.replace(".", "/")] = str_val
             target[full_key.replace("/", ".")] = str_val
 
-## 扫描 mod_dir/dag_graphs 目录下的所有剧情 DAG 图元
-static func _scan_mod_dag_graphs(mod_dir: String, target_graphs: Dictionary) -> void:
-    var dag_dir_path := mod_dir.path_join("dag_graphs")
-    if not DirAccess.dir_exists_absolute(dag_dir_path):
-        return
-    var dir := DirAccess.open(dag_dir_path)
+## 列出指定子目录下的全部 .json 文件完整路径
+static func _list_json_files(dir_path: String) -> Array[String]:
+    var files: Array[String] = []
+    if not DirAccess.dir_exists_absolute(dir_path):
+        return files
+    var dir := DirAccess.open(dir_path)
     if dir == null:
-        return
+        return files
     dir.list_dir_begin()
     var entry_name := dir.get_next()
     while not entry_name.is_empty():
         if not dir.current_is_dir() and entry_name.ends_with(".json"):
-            var file_path := dag_dir_path.path_join(entry_name)
-            var raw_json: Variant = _read_json_file(file_path)
-            if raw_json is Dictionary:
-                var stem := entry_name.get_basename()
-                var dag_id := str((raw_json as Dictionary).get("dag_id", (raw_json as Dictionary).get("graph_id", stem)))
-                target_graphs[dag_id] = raw_json
+            files.append(dir_path.path_join(entry_name))
         entry_name = dir.get_next()
     dir.list_dir_end()
+    return files
+
+## 扫描 mod_dir/dag_graphs 目录下的所有剧情 DAG 图元
+static func _scan_mod_dag_graphs(mod_dir: String, target_graphs: Dictionary) -> void:
+    for file_path in _list_json_files(mod_dir.path_join("dag_graphs")):
+        var raw_json: Variant = _read_json_file(file_path)
+        if raw_json is Dictionary:
+            var stem := file_path.get_file().get_basename()
+            var dag_id := str((raw_json as Dictionary).get("dag_id", (raw_json as Dictionary).get("graph_id", stem)))
+            target_graphs[dag_id] = raw_json
 
 ## 扫描 mod_dir/i18n 目录下的多语言本地化配置
 static func _scan_mod_i18n(mod_dir: String, target_i18n: Dictionary) -> void:
-    var i18n_dir_path := mod_dir.path_join("i18n")
-    if not DirAccess.dir_exists_absolute(i18n_dir_path):
-        return
-    var dir := DirAccess.open(i18n_dir_path)
-    if dir == null:
-        return
-    dir.list_dir_begin()
-    var entry_name := dir.get_next()
-    while not entry_name.is_empty():
-        if not dir.current_is_dir() and entry_name.ends_with(".json"):
-            var file_path := i18n_dir_path.path_join(entry_name)
-            var raw_json: Variant = _read_json_file(file_path)
-            if raw_json is Dictionary:
-                _flatten_i18n_dict(raw_json as Dictionary, "", target_i18n)
-        entry_name = dir.get_next()
-    dir.list_dir_end()
+    for file_path in _list_json_files(mod_dir.path_join("i18n")):
+        var raw_json: Variant = _read_json_file(file_path)
+        if raw_json is Dictionary:
+            _flatten_i18n_dict(raw_json as Dictionary, "", target_i18n)
 
 ## 加载 destinies.json 与 routing_rules.json 并合并入 MOD 包字典
 static func _load_destinies_and_routing(mod_dir: String, pkg: Dictionary) -> void:

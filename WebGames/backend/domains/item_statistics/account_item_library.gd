@@ -187,32 +187,29 @@ static func _collect_items_recursive(node: Dictionary, out: Array) -> void:
 	for child in node["children"].values():
 		_collect_items_recursive(child, out)
 
+static func _resolve_category_nodes(root: Dictionary, path: Array) -> Array[Dictionary]:
+	var nodes: Array[Dictionary] = []
+	if path.size() < 2:
+		return nodes
+	var major: Dictionary = root["children"].get(str(path[0]), {})
+	if major.is_empty():
+		return nodes
+	var minor: Dictionary = major["children"].get(str(path[1]), {})
+	if not minor.is_empty():
+		nodes.append(minor)
+	nodes.append(major)
+	return nodes
+
+static func _apply_node_stat_delta(node_stats: Dictionary, event_stat_key: String, deltas: Vector2i) -> void:
+	node_stats[event_stat_key] = int(node_stats.get(event_stat_key, 0)) + deltas.x
+	node_stats[STAT_CURRENT] = int(node_stats.get(STAT_CURRENT, 0)) + deltas.y
+
 ## 自底向上常数时间 O(1) 路径增量累加（消除全量子树递归求和性能开销）
 static func _apply_delta_upwards(root: Dictionary, path: Array, event_stat_key: String, deltas: Vector2i) -> void:
-	if path.size() < 2:
-		return
-	var major_key: String = str(path[0])
-	var minor_key: String = str(path[1])
-	var major: Dictionary = root["children"].get(major_key, {})
-	if major.is_empty():
-		return
-	var minor: Dictionary = major["children"].get(minor_key, {})
-	if not minor.is_empty():
-		var ms: Dictionary = minor["stats"]
-		ms[event_stat_key] = int(ms.get(event_stat_key, 0)) + deltas.x
-		ms[STAT_CURRENT] = int(ms.get(STAT_CURRENT, 0)) + deltas.y
-	var maj_s: Dictionary = major["stats"]
-	maj_s[event_stat_key] = int(maj_s.get(event_stat_key, 0)) + deltas.x
-	maj_s[STAT_CURRENT] = int(maj_s.get(STAT_CURRENT, 0)) + deltas.y
+	for node in _resolve_category_nodes(root, path):
+		_apply_node_stat_delta(node["stats"], event_stat_key, deltas)
 
 ## 自底向上递归重算路径上各分类节点的聚合统计（保留作为重构校验与全量同步基准）
 static func _recalc_upwards(root: Dictionary, path: Array) -> void:
-	var major_key: String = str(path[0])
-	var minor_key: String = str(path[1])
-	var major: Dictionary = root["children"].get(major_key, {})
-	if major.is_empty():
-		return
-	var minor: Dictionary = major["children"].get(minor_key, {})
-	if not minor.is_empty():
-		minor["stats"] = _aggregate_recursive(minor)
-	major["stats"] = _aggregate_recursive(major)
+	for node in _resolve_category_nodes(root, path):
+		node["stats"] = _aggregate_recursive(node)

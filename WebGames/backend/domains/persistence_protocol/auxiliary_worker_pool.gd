@@ -164,6 +164,12 @@ func enqueue_batch(batch_request: Variant) -> String:
 
 	return batch.batch_id
 
+func _cancel_task_instance(task: AsyncLoadTask, notify_callback: bool) -> void:
+	task.status = STATUS_CANCELLED
+	task.error_code = StorageContractInterfaces.ERR_TASK_CANCELLED
+	if notify_callback and task.callback.is_valid():
+		task.callback.call(false, null, StorageContractInterfaces.ERR_TASK_CANCELLED)
+
 ## 取消加载任务（支持传入任务 ID 或 CancellationToken）
 func cancel_task(target: Variant) -> bool:
 	if target is CancellationToken:
@@ -172,11 +178,8 @@ func cancel_task(target: Variant) -> bool:
 		while i >= 0:
 			if _pending_queue[i].token == target:
 				var t: AsyncLoadTask = _pending_queue[i]
-				t.status = STATUS_CANCELLED
-				t.error_code = StorageContractInterfaces.ERR_TASK_CANCELLED
 				_pending_queue.remove_at(i)
-				if t.callback.is_valid():
-					t.callback.call(false, null, StorageContractInterfaces.ERR_TASK_CANCELLED)
+				_cancel_task_instance(t, true)
 				cancelled_any = true
 			i -= 1
 		return cancelled_any
@@ -185,57 +188,42 @@ func cancel_task(target: Variant) -> bool:
 	for i in range(_pending_queue.size()):
 		if _pending_queue[i].task_id == tid:
 			var t: AsyncLoadTask = _pending_queue[i]
-			t.status = STATUS_CANCELLED
-			t.error_code = StorageContractInterfaces.ERR_TASK_CANCELLED
 			_pending_queue.remove_at(i)
-			if t.callback.is_valid():
-				t.callback.call(false, null, StorageContractInterfaces.ERR_TASK_CANCELLED)
+			_cancel_task_instance(t, true)
 			return true
 	if _running_tasks.has(tid):
-		var rt: AsyncLoadTask = _running_tasks[tid]
-		rt.status = STATUS_CANCELLED
-		rt.error_code = StorageContractInterfaces.ERR_TASK_CANCELLED
+		_cancel_task_instance(_running_tasks[tid] as AsyncLoadTask, false)
 		return true
 	return false
+
+func _run_task_execution(task: AsyncLoadTask) -> void:
+	var res := _load_resource_payload(task.resource_path)
+	task.duration_ms = float(Time.get_ticks_usec() - task.start_time_usec) / USEC_TO_MS
+	if res.has("error") and str(res["error"]) != StorageContractInterfaces.ERR_NONE:
+		task.status = STATUS_FAILED
+		task.error_code = String(res["error"])
+	else:
+		task.status = STATUS_COMPLETED
+		task.result_data = res.get("data", null)
+		task.byte_count = int(res.get("byte_count", 0))
+		_cache_result(task.resource_path, task.result_data)
+	_notify_task_finished(task)
 
 ## 任务执行调度（支持确定性同步或 WorkerThreadPool 异步派发）
 func _execute_task(task: AsyncLoadTask, sync_mode: bool) -> void:
 	if task.token != null and task.token.is_cancelled():
-		task.status = STATUS_CANCELLED
-		task.error_code = StorageContractInterfaces.ERR_TASK_CANCELLED
+		_cancel_task_instance(task, false)
 		_notify_task_finished(task)
 		return
 
 	task.status = STATUS_RUNNING
 
 	if sync_mode:
-		var res := _load_resource_payload(task.resource_path)
-		task.duration_ms = float(Time.get_ticks_usec() - task.start_time_usec) / USEC_TO_MS
-		if res.has("error") and str(res["error"]) != StorageContractInterfaces.ERR_NONE:
-			task.status = STATUS_FAILED
-			task.error_code = String(res["error"])
-		else:
-			task.status = STATUS_COMPLETED
-			task.result_data = res.get("data", null)
-			task.byte_count = int(res.get("byte_count", 0))
-			_cache_result(task.resource_path, task.result_data)
-		_notify_task_finished(task)
+		_run_task_execution(task)
 	else:
 		_running_tasks[task.task_id] = task
-		var task_fn := func() -> void:
-			var res := _load_resource_payload(task.resource_path)
-			task.duration_ms = float(Time.get_ticks_usec() - task.start_time_usec) / USEC_TO_MS
-			if res.has("error") and str(res["error"]) != StorageContractInterfaces.ERR_NONE:
-				task.status = STATUS_FAILED
-				task.error_code = String(res["error"])
-			else:
-				task.status = STATUS_COMPLETED
-				task.result_data = res.get("data", null)
-				task.byte_count = int(res.get("byte_count", 0))
-				_cache_result(task.resource_path, task.result_data)
-			_notify_task_finished(task)
 		var is_high_prio := (task.priority <= StorageContractInterfaces.LoadPriority.HIGH)
-		task.pool_task_id = WorkerThreadPool.add_task(task_fn, is_high_prio, TASK_THREAD_PREFIX + str(task.task_id))
+		task.pool_task_id = WorkerThreadPool.add_task(_run_task_execution.bind(task), is_high_prio, TASK_THREAD_PREFIX + str(task.task_id))
 
 ## 插入缓存并执行 FIFO 淘汰，保障缓存字典规模有界
 func _cache_result(path: String, data: Variant) -> void:

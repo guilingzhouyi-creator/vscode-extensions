@@ -38,14 +38,8 @@ var loaded_count: int = 0
 var failed_count: int = 0
 
 func _init(p_batch_id: String = "") -> void:
+	reset_state()
 	batch_id = p_batch_id
-	entries = []
-	on_item_loaded = Callable()
-	on_batch_completed = Callable()
-	cancellation_token = null
-	total_count = 0
-	loaded_count = 0
-	failed_count = 0
 
 ## 添加资源条目
 func add_entry(entry: ResourceIndexEntryDTO) -> void:

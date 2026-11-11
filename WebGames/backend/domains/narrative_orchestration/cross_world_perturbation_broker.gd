@@ -182,6 +182,10 @@ func emit_perturbation(perturbation: CrossWorldPerturbationDTO) -> Dictionary:
     }
 
 ## 针对指定目标世界拉取有效扰动列表（过滤同世界、已访问及已完全衰减项）
+func _is_perturbation_active(p: CrossWorldPerturbationDTO, now_ts: int) -> bool:
+    var eff_res := calculate_decayed_resonance(p.resonance_intensity, p.emitted_timestamp_utc, p.decay_half_life_seconds, now_ts)
+    return eff_res >= _min_resonance_threshold
+
 func poll_perturbations_for_world(target_world_id: String) -> Array[CrossWorldPerturbationDTO]:
     if target_world_id.is_empty():
         var empty_list: Array[CrossWorldPerturbationDTO] = []
@@ -195,14 +199,7 @@ func poll_perturbations_for_world(target_world_id: String) -> Array[CrossWorldPe
             continue
         if p.visited_world_ids.has(target_world_id):
             continue
-
-        var eff_res := calculate_decayed_resonance(
-            p.resonance_intensity,
-            p.emitted_timestamp_utc,
-            p.decay_half_life_seconds,
-            now_ts
-        )
-        if eff_res >= _min_resonance_threshold:
+        if _is_perturbation_active(p, now_ts):
             eligible.append(p)
 
     return eligible
@@ -228,13 +225,7 @@ func prune_decayed_perturbations() -> int:
     var pruned_count: int = 0
 
     for p in _perturbations:
-        var eff_res := calculate_decayed_resonance(
-            p.resonance_intensity,
-            p.emitted_timestamp_utc,
-            p.decay_half_life_seconds,
-            now_ts
-        )
-        if eff_res >= _min_resonance_threshold:
+        if _is_perturbation_active(p, now_ts):
             retained.append(p)
         else:
             pruned_count += 1

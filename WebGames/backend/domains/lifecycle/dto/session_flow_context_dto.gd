@@ -132,33 +132,20 @@ func has_unwired_slot(slot_name: String) -> bool:
 		return false
 	return unwired_slots.has(slot_name)
 
+static func _dup_dict_field(raw_val: Variant, deep_copy: bool) -> Dictionary:
+	var d: Dictionary = Dictionary(raw_val) if raw_val != null else {}
+	if deep_copy:
+		return d.duplicate(true)
+	return d
+
+static func _dup_array_field(raw_val: Variant, deep_copy: bool) -> Array:
+	var a: Array = Array(raw_val) if raw_val != null else []
+	if deep_copy:
+		return a.duplicate(true)
+	return a
+
 ## 序列化当前对象为通用字典传输结构
 func to_dto(deep_copy: bool = false) -> Dictionary:
-	if deep_copy:
-		return {
-			"session_token": session_token,
-			"account_id": account_id,
-			"username": username,
-			"current_slot_id": current_slot_id,
-			"character_id": character_id,
-			"character_name": character_name,
-			"gender": gender,
-			"race_id": race_id,
-			"current_world_id": current_world_id,
-			"game_mode": game_mode,
-			"current_stage_index": current_stage_index,
-			"is_esc_menu_open": is_esc_menu_open,
-			"is_active": is_active,
-			"account_snapshot": account_snapshot.duplicate(true),
-			"gateway_slot_states": gateway_slot_states.duplicate(true),
-			"physiology_snapshot": physiology_snapshot.duplicate(true),
-			"wallet_snapshot": wallet_snapshot.duplicate(true),
-			"opening_event_snapshot": opening_event_snapshot.duplicate(true),
-			"hud_snapshot": hud_snapshot.duplicate(true),
-			"shutdown_snapshot": shutdown_snapshot.duplicate(true),
-			"stage_results": stage_results.duplicate(true),
-			"unwired_slots": unwired_slots.duplicate()
-		}
 	return {
 		"session_token": session_token,
 		"account_id": account_id,
@@ -173,15 +160,15 @@ func to_dto(deep_copy: bool = false) -> Dictionary:
 		"current_stage_index": current_stage_index,
 		"is_esc_menu_open": is_esc_menu_open,
 		"is_active": is_active,
-		"account_snapshot": account_snapshot,
-		"gateway_slot_states": gateway_slot_states,
-		"physiology_snapshot": physiology_snapshot,
-		"wallet_snapshot": wallet_snapshot,
-		"opening_event_snapshot": opening_event_snapshot,
-		"hud_snapshot": hud_snapshot,
-		"shutdown_snapshot": shutdown_snapshot,
-		"stage_results": stage_results,
-		"unwired_slots": unwired_slots
+		"account_snapshot": _dup_dict_field(account_snapshot, deep_copy),
+		"gateway_slot_states": _dup_array_field(gateway_slot_states, deep_copy),
+		"physiology_snapshot": _dup_dict_field(physiology_snapshot, deep_copy),
+		"wallet_snapshot": _dup_dict_field(wallet_snapshot, deep_copy),
+		"opening_event_snapshot": _dup_dict_field(opening_event_snapshot, deep_copy),
+		"hud_snapshot": _dup_dict_field(hud_snapshot, deep_copy),
+		"shutdown_snapshot": _dup_dict_field(shutdown_snapshot, deep_copy),
+		"stage_results": _dup_dict_field(stage_results, deep_copy),
+		"unwired_slots": unwired_slots.duplicate() if deep_copy else unwired_slots
 	}
 
 ## 从输入字典反序列化还原传输对象
@@ -200,24 +187,14 @@ static func from_dto(data: Dictionary, deep_copy: bool = false) -> SessionFlowCo
 	dto.current_stage_index = int(data.get("current_stage_index", 0))
 	dto.is_esc_menu_open = bool(data.get("is_esc_menu_open", false))
 	dto.is_active = bool(data.get("is_active", true))
-	if deep_copy:
-		dto.account_snapshot = Dictionary(data.get("account_snapshot", {})).duplicate(true)
-		dto.gateway_slot_states = Array(data.get("gateway_slot_states", [])).duplicate(true)
-		dto.physiology_snapshot = Dictionary(data.get("physiology_snapshot", {})).duplicate(true)
-		dto.wallet_snapshot = Dictionary(data.get("wallet_snapshot", {})).duplicate(true)
-		dto.opening_event_snapshot = Dictionary(data.get("opening_event_snapshot", {})).duplicate(true)
-		dto.hud_snapshot = Dictionary(data.get("hud_snapshot", {})).duplicate(true)
-		dto.shutdown_snapshot = Dictionary(data.get("shutdown_snapshot", {})).duplicate(true)
-		dto.stage_results = Dictionary(data.get("stage_results", {})).duplicate(true)
-	else:
-		dto.account_snapshot = Dictionary(data.get("account_snapshot", {}))
-		dto.gateway_slot_states = Array(data.get("gateway_slot_states", []))
-		dto.physiology_snapshot = Dictionary(data.get("physiology_snapshot", {}))
-		dto.wallet_snapshot = Dictionary(data.get("wallet_snapshot", {}))
-		dto.opening_event_snapshot = Dictionary(data.get("opening_event_snapshot", {}))
-		dto.hud_snapshot = Dictionary(data.get("hud_snapshot", {}))
-		dto.shutdown_snapshot = Dictionary(data.get("shutdown_snapshot", {}))
-		dto.stage_results = Dictionary(data.get("stage_results", {}))
+	dto.account_snapshot = _dup_dict_field(data.get("account_snapshot", {}), deep_copy)
+	dto.gateway_slot_states = _dup_array_field(data.get("gateway_slot_states", []), deep_copy)
+	dto.physiology_snapshot = _dup_dict_field(data.get("physiology_snapshot", {}), deep_copy)
+	dto.wallet_snapshot = _dup_dict_field(data.get("wallet_snapshot", {}), deep_copy)
+	dto.opening_event_snapshot = _dup_dict_field(data.get("opening_event_snapshot", {}), deep_copy)
+	dto.hud_snapshot = _dup_dict_field(data.get("hud_snapshot", {}), deep_copy)
+	dto.shutdown_snapshot = _dup_dict_field(data.get("shutdown_snapshot", {}), deep_copy)
+	dto.stage_results = _dup_dict_field(data.get("stage_results", {}), deep_copy)
 	var slots: Array = Array(data.get("unwired_slots", []))
 	dto.unwired_slots = []
 	for s in slots:

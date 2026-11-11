@@ -13,34 +13,34 @@ extends RefCounted
 
 const CHUNK_SIZE_BYTES: int = 65536 # 64 KB 硬件对齐缓冲区
 
-## 流式分块计算并校验文件的 SHA-256
-static func verify_file_sha256(file_path: String, expected_sha256: String) -> Dictionary:
-	if expected_sha256.is_empty():
-		return {"success": false, "error": "MISSING_EXPECTED_HASH"}
+static func _hash_file_sha256(file_path: String) -> Dictionary:
 	if not FileAccess.file_exists(file_path):
-		return {"success": false, "error": "FILE_NOT_FOUND"}
-
+		return {"ok": false, "sha256": "", "error": "FILE_NOT_FOUND"}
 	var fa := FileAccess.open(file_path, FileAccess.READ)
 	if fa == null:
-		return {"success": false, "error": "FILE_OPEN_FAILED"}
-
+		return {"ok": false, "sha256": "", "error": "FILE_OPEN_FAILED"}
 	var ctx := HashingContext.new()
-	var err := ctx.start(HashingContext.HASH_SHA256)
-	if err != OK:
+	if ctx.start(HashingContext.HASH_SHA256) != OK:
 		fa.close()
-		return {"success": false, "error": "HASHING_CONTEXT_INIT_FAILED"}
-
+		return {"ok": false, "sha256": "", "error": "HASHING_CONTEXT_INIT_FAILED"}
 	while not fa.eof_reached():
 		var chunk := fa.get_buffer(CHUNK_SIZE_BYTES)
 		if chunk.is_empty():
 			break
 		ctx.update(chunk)
-
 	var digest := ctx.finish()
 	fa.close()
-	var computed_hex := digest.hex_encode().to_lower()
-	var matched := computed_hex == expected_sha256.strip_edges().to_lower()
+	return {"ok": true, "sha256": digest.hex_encode().to_lower(), "error": ""}
 
+## 流式分块计算并校验文件的 SHA-256
+static func verify_file_sha256(file_path: String, expected_sha256: String) -> Dictionary:
+	if expected_sha256.is_empty():
+		return {"success": false, "error": "MISSING_EXPECTED_HASH"}
+	var hashed := _hash_file_sha256(file_path)
+	if not bool(hashed.get("ok", false)):
+		return {"success": false, "error": str(hashed.get("error", "FILE_OPEN_FAILED"))}
+	var computed_hex := str(hashed.get("sha256", ""))
+	var matched := computed_hex == expected_sha256.strip_edges().to_lower()
 	return {
 		"success": matched,
 		"computed_sha256": computed_hex,
@@ -49,20 +49,5 @@ static func verify_file_sha256(file_path: String, expected_sha256: String) -> Di
 
 ## 计算单个文件的 SHA-256 十六进制字符串
 static func compute_file_sha256(file_path: String) -> String:
-	if not FileAccess.file_exists(file_path):
-		return ""
-	var fa := FileAccess.open(file_path, FileAccess.READ)
-	if fa == null:
-		return ""
-	var ctx := HashingContext.new()
-	if ctx.start(HashingContext.HASH_SHA256) != OK:
-		fa.close()
-		return ""
-	while not fa.eof_reached():
-		var chunk := fa.get_buffer(CHUNK_SIZE_BYTES)
-		if chunk.is_empty():
-			break
-		ctx.update(chunk)
-	var digest := ctx.finish()
-	fa.close()
-	return digest.hex_encode().to_lower()
+	var hashed := _hash_file_sha256(file_path)
+	return str(hashed.get("sha256", "")) if bool(hashed.get("ok", false)) else ""
