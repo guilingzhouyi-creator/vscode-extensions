@@ -9,6 +9,7 @@ class_name TestSaveConsistencyRecovery extends RefCounted
 const SaveDomainContract = preload("res://backend/domains/persistence_protocol/save_domain_contract.gd")
 const SaveValidationService = preload("res://backend/domains/persistence_protocol/save_validation_service.gd")
 const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
+const AtomicFileWriter = preload("res://backend/infrastructure/atomic_file_writer.gd")
 const SaveMigrationEngine = preload("res://backend/domains/persistence_protocol/save_migration_engine.gd")
 const EditorHotReloadManager = preload("res://backend/domains/persistence_protocol/editor_hot_reload_manager.gd")
 const RuntimeModeGate = preload("res://backend/domains/persistence_protocol/runtime_mode_gate.gd")
@@ -29,6 +30,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_hot_reload_retry_after_failure())
 	results.append(test_orphan_tmp_cleanup())
 	results.append(test_auto_restore_on_corrupt_primary())
+	results.append(test_atomic_writer_backup_rotation_and_restore())
 
 	var all_passed: bool = true
 	for r in results:
@@ -347,3 +349,57 @@ static func test_auto_restore_on_corrupt_primary() -> Dictionary:
 		"auto_restored": auto_restored,
 		"recovered_round": recovered_round
 	}
+
+## TC-SV-39: AtomicFileWriter 多代备份轮转、孤儿临时文件回收与恢复契约
+static func test_atomic_writer_backup_rotation_and_restore() -> Dictionary:
+	var base_dir: String = "user://test_atomic_writer_unit"
+	var target_path: String = base_dir + "/state.json"
+	var tmp_path: String = target_path + ".tmp"
+	var bak0: String = target_path + ".bak"
+	var bak1: String = target_path + ".bak.1"
+	var bak2: String = target_path + ".bak.2"
+	var opts: Dictionary = {"create_backup": true, "backup_retention": 3, "backup_fail_policy": "abort"}
+
+	var w1: Dictionary = AtomicFileWriter.write_text_atomic(target_path, "{\"v\":1}", opts)
+	var w2: Dictionary = AtomicFileWriter.write_text_atomic(target_path, "{\"v\":2}", opts)
+	var w3: Dictionary = AtomicFileWriter.write_text_atomic(target_path, "{\"v\":3}", opts)
+	var writes_ok: bool = bool(w1.get("success", false)) and bool(w2.get("success", false)) and bool(w3.get("success", false))
+
+	var primary_txt: String = _read_text_or_empty(target_path)
+	var bak0_txt: String = _read_text_or_empty(bak0)
+	var bak1_txt: String = _read_text_or_empty(bak1)
+	var rotation_ok: bool = primary_txt == "{\"v\":3}" and bak0_txt == "{\"v\":2}" and bak1_txt == "{\"v\":1}" and not FileAccess.file_exists(bak2)
+
+	var orphan_f: FileAccess = FileAccess.open(tmp_path, FileAccess.WRITE)
+	if orphan_f != null:
+		orphan_f.store_string("orphan")
+		orphan_f.flush()
+		orphan_f.close()
+	var cleaned_cnt: int = AtomicFileWriter.cleanup_orphan_tmp_files(base_dir)
+	var restore_ok: bool = AtomicFileWriter.restore_from_backup(target_path, bak0) and _read_text_or_empty(target_path) == "{\"v\":2}"
+
+	for p in [target_path, tmp_path, bak0, bak1, bak2]:
+		if FileAccess.file_exists(p):
+			DirAccess.remove_absolute(p)
+	if DirAccess.dir_exists_absolute(base_dir):
+		DirAccess.remove_absolute(base_dir)
+
+	var passed: bool = writes_ok and rotation_ok and cleaned_cnt == 1 and restore_ok
+	return {
+		"test": "TC-SV-39: AtomicFileWriter 多代备份轮转、孤儿清理与恢复契约断言",
+		"passed": passed,
+		"writes_ok": writes_ok,
+		"rotation_ok": rotation_ok,
+		"cleaned_cnt": cleaned_cnt,
+		"restore_ok": restore_ok
+	}
+
+static func _read_text_or_empty(file_path: String) -> String:
+	if not FileAccess.file_exists(file_path):
+		return ""
+	var f: FileAccess = FileAccess.open(file_path, FileAccess.READ)
+	if f == null:
+		return ""
+	var content: String = f.get_as_text()
+	f.close()
+	return content

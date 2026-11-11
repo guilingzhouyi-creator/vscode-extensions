@@ -92,9 +92,6 @@ func save_world_mod_lock(world_id: String, active_packs: Array) -> Dictionary:
 		return {"success": false, "error": "ERR_EMPTY_WORLD_ID"}
 
 	var target_path := get_lock_file_path(world_id)
-	var dir_path := target_path.get_base_dir()
-	if not dir_path.is_empty() and not DirAccess.dir_exists_absolute(dir_path):
-		DirAccess.make_dir_recursive_absolute(dir_path)
 
 	var serialized_packs: Array[Dictionary] = []
 	for p in active_packs:
@@ -110,32 +107,17 @@ func save_world_mod_lock(world_id: String, active_packs: Array) -> Dictionary:
 	}
 
 	var json_str := JSON.stringify(envelope, "  ")
-	var tmp_path := target_path + DEFAULT_TMP_SUFFIX
-	var bak_path := target_path + DEFAULT_BACKUP_SUFFIX
-
-	var file := FileAccess.open(tmp_path, FileAccess.WRITE)
-	if file == null:
-		return {"success": false, "error": "ERR_TMP_FILE_CREATE_FAILED"}
-	file.store_string(json_str)
-	file.flush()
-	file.close()
-
-	if FileAccess.file_exists(target_path):
-		if FileAccess.file_exists(bak_path):
-			DirAccess.remove_absolute(bak_path)
-		DirAccess.copy_absolute(target_path, bak_path)
-		DirAccess.remove_absolute(target_path)
-
-	var rename_err := DirAccess.rename_absolute(tmp_path, target_path)
-	if rename_err != OK:
-		var direct_file := FileAccess.open(target_path, FileAccess.WRITE)
-		if direct_file != null:
-			direct_file.store_string(json_str)
-			direct_file.flush()
-			direct_file.close()
-			DirAccess.remove_absolute(tmp_path)
-		else:
-			return {"success": false, "error": "ERR_RENAME_FAILED", "code": rename_err}
+	var write_res: Dictionary = AtomicFileWriter.write_text_atomic(target_path, json_str, {
+		"tmp_suffix": DEFAULT_TMP_SUFFIX,
+		"create_backup": true,
+		"backup_suffix": DEFAULT_BACKUP_SUFFIX,
+		"backup_fail_policy": "continue"
+	})
+	if not bool(write_res.get("success", false)):
+		var stage: String = str(write_res.get("error_stage", ""))
+		if stage == "tmp_open":
+			return {"success": false, "error": "ERR_TMP_FILE_CREATE_FAILED"}
+		return {"success": false, "error": "ERR_RENAME_FAILED", "code": int(write_res.get("error_code", ERR_FILE_CANT_WRITE))}
 
 	return {
 		"success": true,

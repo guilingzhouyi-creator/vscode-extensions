@@ -28,13 +28,13 @@ static func load_from_memory_string(settings: GameSettingsAggregate, json_str: S
 ## 真实文件落盘（）：固定路径 user://settings.kalar_cfg，写后 flush/close。
 ## 返回 { "success": bool, "path": String [, "error_code"] }
 static func save_to_file(settings: GameSettingsAggregate) -> Dictionary:
-	var file := FileAccess.open(DEFAULT_SETTINGS_PATH, FileAccess.WRITE)
-	if not file:
-		return { "success": false, "error_code": "OPEN_WRITE_FAIL", "path": DEFAULT_SETTINGS_PATH }
-	file.store_string(save_to_memory_string(settings))
-	file.flush()
-	file.close()
-	return { "success": true, "path": DEFAULT_SETTINGS_PATH }
+	var write_res: Dictionary = AtomicFileWriter.write_text_atomic(DEFAULT_SETTINGS_PATH, save_to_memory_string(settings), {
+		"create_backup": false
+	})
+	if bool(write_res.get("success", false)):
+		return { "success": true, "path": DEFAULT_SETTINGS_PATH }
+	var err_code: String = "ATOMIC_REPLACE_FAIL" if str(write_res.get("error_stage", "")) == "rename" else "OPEN_WRITE_FAIL"
+	return { "success": false, "error_code": err_code, "path": DEFAULT_SETTINGS_PATH }
 
 ## 真实文件读取并应用（）：缺失/解析失败返回受控错误码，不抛 Fatal。
 static func load_from_file(settings: GameSettingsAggregate) -> Dictionary:

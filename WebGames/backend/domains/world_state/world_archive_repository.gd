@@ -94,7 +94,7 @@ func load_all() -> Dictionary:
 
 	var cat_path := get_catalog_file_path()
 	var root_dir := cat_path.get_base_dir()
-	_ensure_directory(root_dir)
+	AtomicFileWriter.ensure_directory(root_dir)
 
 	if not FileAccess.file_exists(cat_path):
 		return {"success": true, "count": 0, "error": ""}
@@ -131,7 +131,7 @@ func _ensure_catalog_loaded() -> void:
 func _save_catalog_internal() -> Dictionary:
 	var cat_path := get_catalog_file_path()
 	var root_dir := cat_path.get_base_dir()
-	_ensure_directory(root_dir)
+	AtomicFileWriter.ensure_directory(root_dir)
 
 	var worlds_dict: Dictionary = {}
 	for wid in _worlds_cache.keys():
@@ -205,7 +205,7 @@ func create_world(
 		return {"success": false, "error": "WORLD_ALREADY_EXISTS"}
 
 	var world_dir := get_world_dir(world_id)
-	_ensure_directory(world_dir)
+	AtomicFileWriter.ensure_directory(world_dir)
 
 	var now := int(Time.get_unix_time_from_system())
 
@@ -269,9 +269,7 @@ func load_world(world_id: String) -> WorldInstance:
 	var state_path := world_dir + "world_state.json"
 	if not FileAccess.file_exists(state_path):
 		var bak_path := state_path + DEFAULT_BACKUP_SUFFIX
-		if FileAccess.file_exists(bak_path):
-			DirAccess.copy_absolute(bak_path, state_path)
-		else:
+		if not AtomicFileWriter.restore_from_backup(state_path, bak_path):
 			return null
 
 	var file := FileAccess.open(state_path, FileAccess.READ)
@@ -298,7 +296,7 @@ func save_world(instance: WorldInstance) -> Dictionary:
 	_ensure_catalog_loaded()
 	var wid := instance.world_id
 	var world_dir := get_world_dir(wid)
-	_ensure_directory(world_dir)
+	AtomicFileWriter.ensure_directory(world_dir)
 
 	var state_dict := instance.serialize()
 	var state_res := _atomic_write_file(world_dir + "world_state.json", JSON.stringify(state_dict, "\t"))
@@ -354,29 +352,19 @@ func delete_world(world_id: String) -> bool:
 # ==============================================================================
 
 func _atomic_write_file(file_path: String, content: String) -> Dictionary:
-	var tmp_path := file_path + DEFAULT_TMP_SUFFIX
-	var tmp_file := FileAccess.open(tmp_path, FileAccess.WRITE)
-	if tmp_file == null:
-		return {"success": false, "error": "TMP_OPEN_FAILED: %s" % str(FileAccess.get_open_error())}
-
-	tmp_file.store_string(content)
-	tmp_file.flush()
-	tmp_file.close()
-
-	if FileAccess.file_exists(file_path):
-		var bak_path := file_path + DEFAULT_BACKUP_SUFFIX
-		DirAccess.copy_absolute(file_path, bak_path)
-
-	var rename_err := DirAccess.rename_absolute(tmp_path, file_path)
-	if rename_err != OK:
-		DirAccess.remove_absolute(tmp_path)
-		return {"success": false, "error": "RENAME_FAILED: %d" % rename_err}
-
-	return {"success": true, "error": ""}
-
-func _ensure_directory(path: String) -> void:
-	if not DirAccess.dir_exists_absolute(path):
-		DirAccess.make_dir_recursive_absolute(path)
+	var write_res: Dictionary = AtomicFileWriter.write_text_atomic(file_path, content, {
+		"tmp_suffix": DEFAULT_TMP_SUFFIX,
+		"create_backup": true,
+		"backup_suffix": DEFAULT_BACKUP_SUFFIX,
+		"backup_fail_policy": "continue"
+	})
+	if bool(write_res.get("success", false)):
+		return {"success": true, "error": ""}
+	var stage: String = str(write_res.get("error_stage", ""))
+	var err_code: int = int(write_res.get("error_code", ERR_FILE_CANT_WRITE))
+	if stage == "tmp_open":
+		return {"success": false, "error": TemplateFormatter.format("TMP_OPEN_FAILED: {error}", {"error": str(err_code)})}
+	return {"success": false, "error": TemplateFormatter.format("RENAME_FAILED: {error}", {"error": err_code})}
 
 func _remove_directory_recursive(dir_path: String) -> void:
 	if not DirAccess.dir_exists_absolute(dir_path):

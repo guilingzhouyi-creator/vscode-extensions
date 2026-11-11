@@ -137,13 +137,13 @@ func load_all() -> Dictionary:
 
 	var file_path := get_registry_file_path()
 	var accounts_dir := file_path.get_base_dir()
-	_ensure_directory(accounts_dir)
+	AtomicFileWriter.ensure_directory(accounts_dir)
 	_cleanup_orphan_tmp_files(accounts_dir)
 
 	if not FileAccess.file_exists(file_path):
 		var bak_path := file_path + _get_backup_suffix()
 		if FileAccess.file_exists(bak_path):
-			var restored := _restore_from_backup(file_path, bak_path)
+			var restored := AtomicFileWriter.restore_from_backup(file_path, bak_path)
 			if restored:
 				return _load_from_file(file_path)
 		var shard_count := _recover_from_shards(accounts_dir)
@@ -160,7 +160,7 @@ func load_all() -> Dictionary:
 	if _auto_restore_enabled():
 		var bak_path := file_path + _get_backup_suffix()
 		if FileAccess.file_exists(bak_path):
-			var restored := _restore_from_backup(file_path, bak_path)
+			var restored := AtomicFileWriter.restore_from_backup(file_path, bak_path)
 			if restored:
 				var retry_res := _load_from_file(file_path)
 				if bool(retry_res.get("success", false)):
@@ -280,7 +280,7 @@ func save_account(account: AccountProfileAggregate) -> Dictionary:
 	# 确保存档目录物理存在
 	var reg_path := get_registry_file_path()
 	var accounts_dir := reg_path.get_base_dir()
-	_ensure_directory(accounts_dir)
+	AtomicFileWriter.ensure_directory(accounts_dir)
 
 	# 1. 独立单账号分片原子落盘（若启用）
 	if _save_individual_shards_enabled():
@@ -330,7 +330,7 @@ func delete_account(account_id: String) -> bool:
 func _save_registry_internal() -> Dictionary:
 	var reg_path := get_registry_file_path()
 	var accounts_dir := reg_path.get_base_dir()
-	_ensure_directory(accounts_dir)
+	AtomicFileWriter.ensure_directory(accounts_dir)
 
 	var accounts_dict := {}
 	for acc_id in _accounts_cache.keys():
@@ -354,90 +354,33 @@ func _save_registry_internal() -> Dictionary:
 # ==============================================================================
 
 func _atomic_write_file(file_path: String, content: String) -> Dictionary:
-	if not _atomic_write_enabled():
-		return _write_direct(file_path, content)
-
-	var tmp_path := file_path + _get_tmp_suffix()
-	var tmp_file := FileAccess.open(tmp_path, FileAccess.WRITE)
-	if tmp_file == null:
-		return {"success": false, "error": TemplateFormatter.format("TMP_OPEN_FAILED: {error}", {"error": str(FileAccess.get_open_error())})}
-
-	tmp_file.store_string(content)
-	tmp_file.flush()
-	tmp_file.close()
-
-	# 备份已存在的正档
-	if FileAccess.file_exists(file_path):
-		var bak_path := file_path + _get_backup_suffix()
-		_rotate_backups(file_path)
-		var backup_err := DirAccess.copy_absolute(file_path, bak_path)
-		if backup_err != OK:
-			var policy := GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "storage/backup_fail_policy", "abort")
-			if policy == "abort":
-				DirAccess.remove_absolute(tmp_path)
-				return {"success": false, "error": TemplateFormatter.format("BACKUP_FAILED: {error}", {"error": backup_err})}
-
-	# rename 原子替换
-	var rename_err := DirAccess.rename_absolute(tmp_path, file_path)
-	if rename_err != OK:
-		DirAccess.remove_absolute(tmp_path)
-		return {"success": false, "error": TemplateFormatter.format("RENAME_FAILED: {error}", {"error": rename_err})}
-
-	return {"success": true, "error": ""}
-
-func _rotate_backups(file_path: String) -> void:
-	var retention := GameConfig.get_int(DOMAIN_ACCOUNT_CONFIG, "storage/backup_retention", DEFAULT_BACKUP_RETENTION)
-	if retention <= 1:
-		return
-	var bak_suffix := _get_backup_suffix()
-	var i := retention - 1
-	while i >= 1:
-		_shift_backup_version(file_path, bak_suffix, i)
-		i -= 1
-
-func _shift_backup_version(file_path: String, bak_suffix: String, version_idx: int) -> void:
-	var src := file_path + bak_suffix if version_idx == 1 else file_path + bak_suffix + "." + str(version_idx - 1)
-	var dst := file_path + bak_suffix + "." + str(version_idx)
-	if not FileAccess.file_exists(src):
-		return
-	if FileAccess.file_exists(dst):
-		DirAccess.remove_absolute(dst)
-	DirAccess.rename_absolute(src, dst)
+	var atomic_enabled: bool = _atomic_write_enabled()
+	var policy: String = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "storage/backup_fail_policy", "abort")
+	var retention: int = GameConfig.get_int(DOMAIN_ACCOUNT_CONFIG, "storage/backup_retention", DEFAULT_BACKUP_RETENTION)
+	var write_res: Dictionary = AtomicFileWriter.write_text_atomic(file_path, content, {
+		"atomic_enabled": atomic_enabled,
+		"tmp_suffix": _get_tmp_suffix(),
+		"create_backup": true,
+		"backup_suffix": _get_backup_suffix(),
+		"backup_retention": retention,
+		"backup_fail_policy": policy
+	})
+	if bool(write_res.get("success", false)):
+		return {"success": true, "error": ""}
+	var stage: String = str(write_res.get("error_stage", ""))
+	var err_code: int = int(write_res.get("error_code", ERR_FILE_CANT_WRITE))
+	if not atomic_enabled:
+		return {"success": false, "error": "DIRECT_WRITE_OPEN_FAILED"}
+	if stage == "tmp_open":
+		return {"success": false, "error": TemplateFormatter.format("TMP_OPEN_FAILED: {error}", {"error": str(err_code)})}
+	if stage == "backup":
+		return {"success": false, "error": TemplateFormatter.format("BACKUP_FAILED: {error}", {"error": err_code})}
+	return {"success": false, "error": TemplateFormatter.format("RENAME_FAILED: {error}", {"error": err_code})}
 
 func _cleanup_orphan_tmp_files(accounts_dir: String) -> void:
 	if not GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "storage/orphan_tmp_cleanup", true):
 		return
-	var dir := DirAccess.open(accounts_dir)
-	if dir == null:
-		return
-	var tmp_suffix := _get_tmp_suffix()
-	dir.list_dir_begin()
-	var fname := dir.get_next()
-	while not fname.is_empty():
-		if not dir.current_is_dir() and fname.ends_with(tmp_suffix):
-			var file_to_remove := accounts_dir + ("/" if not accounts_dir.ends_with("/") else "") + fname
-			DirAccess.remove_absolute(file_to_remove)
-		fname = dir.get_next()
-	dir.list_dir_end()
-
-func _ensure_directory(dir_path: String) -> void:
-	if not DirAccess.dir_exists_absolute(dir_path):
-		DirAccess.make_dir_recursive_absolute(dir_path)
-
-func _restore_from_backup(file_path: String, bak_path: String) -> bool:
-	if not FileAccess.file_exists(bak_path):
-		return false
-	var err := DirAccess.copy_absolute(bak_path, file_path)
-	return err == OK
-
-func _write_direct(file_path: String, content: String) -> Dictionary:
-	var file_handle := FileAccess.open(file_path, FileAccess.WRITE)
-	if file_handle == null:
-		return {"success": false, "error": "DIRECT_WRITE_OPEN_FAILED"}
-	file_handle.store_string(content)
-	file_handle.flush()
-	file_handle.close()
-	return {"success": true, "error": ""}
+	AtomicFileWriter.cleanup_orphan_tmp_files(accounts_dir, _get_tmp_suffix())
 
 func _atomic_write_enabled() -> bool:
 	return GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "storage/atomic_write", true)

@@ -10,6 +10,7 @@
 ## SaveManager：Persistence Facade / Save Engine
 class_name SaveManager extends RefCounted
 
+const AtomicFileWriter = preload("res://backend/infrastructure/atomic_file_writer.gd")
 const OP_RESTORE: String = "restore"
 
 # ==============================================================================
@@ -24,8 +25,7 @@ static var _forbidden_tokens: Array[String] = [
 ## 确保存档目录存在（递归创建，幂等）；并按 recovery/orphan_tmp_cleanup 清理孤儿临时文件
 static func ensure_save_directory() -> void:
 	var save_dir := _save_dir()
-	if DirAccess.open(save_dir) == null:
-		DirAccess.make_dir_recursive_absolute(save_dir)
+	AtomicFileWriter.ensure_directory(save_dir)
 	_cleanup_orphan_tmp_files(save_dir)
 
 ## 孤儿临时文件清理（· A5 存档韧性）：原子写在 rename 前被中断会遗留 *{tmp_suffix}
@@ -33,19 +33,7 @@ static func ensure_save_directory() -> void:
 static func _cleanup_orphan_tmp_files(save_dir: String) -> void:
 	if not GameConfig.get_bool("infrastructure.persistence", "recovery/orphan_tmp_cleanup", true):
 		return
-	var dir := DirAccess.open(save_dir)
-	if dir == null:
-		return
-	var orphan_suffix := _tmp_suffix()
-	var removed := 0
-	dir.list_dir_begin()
-	var fname := dir.get_next()
-	while not fname.is_empty():
-		if not dir.current_is_dir() and fname.ends_with(orphan_suffix):
-			if DirAccess.remove_absolute(save_dir + fname) == OK:
-				removed += 1
-		fname = dir.get_next()
-	dir.list_dir_end()
+	var removed := AtomicFileWriter.cleanup_orphan_tmp_files(save_dir, _tmp_suffix())
 	if removed > 0:
 		EventBusCore.get_instance().emit_log("warn", _msg("orphan_tmp_cleaned", {"count": removed}))
 
@@ -216,20 +204,13 @@ static func restore_backup(save_name: String) -> Dictionary:
 	elif not (env_b.get("data") is Dictionary):
 		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt", {"path": "no valid payload"}))
 
-	# 2. 写恢复临时文件（校验中间产物可写）
-	var tmp_path := file_path + _tmp_suffix()
-	var tmp_file := FileAccess.open(tmp_path, FileAccess.WRITE)
-	if not tmp_file:
-		return _fail(OP_RESTORE, "OPEN_WRITE_FAIL", _msg("open_write_fail", {"error": str(FileAccess.get_open_error())}))
-	tmp_file.store_string(backup_content)
-	tmp_file.flush()
-	tmp_file.close()
-
-	# 3. 原子交换（rename 覆盖正档——不先删除正档）
-	var err := DirAccess.rename_absolute(tmp_path, file_path)
-	if err != OK:
-		DirAccess.remove_absolute(tmp_path)
-		return _fail(OP_RESTORE, "ATOMIC_REPLACE_FAIL", _msg("atomic_replace_fail", {"error": str(err)}))
+	# 2. 写恢复临时文件并原子交换至正档（不先删除正档）
+	var replace_res: Dictionary = AtomicFileWriter.replace_via_tmp(file_path, backup_content, _tmp_suffix())
+	if not bool(replace_res.get("success", false)):
+		var err_str: String = str(replace_res.get("error_code", ERR_FILE_CANT_WRITE))
+		if str(replace_res.get("error_stage", "")) == "tmp_open":
+			return _fail(OP_RESTORE, "OPEN_WRITE_FAIL", _msg("open_write_fail", {"error": err_str}))
+		return _fail(OP_RESTORE, "ATOMIC_REPLACE_FAIL", _msg("atomic_replace_fail", {"error": err_str}))
 	return {"success": true, "stage": "RESTORE_COMMIT", "error_code": "", "path": file_path}
 
 # ==============================================================================
@@ -293,44 +274,28 @@ static func _restore_hint(save_exists: bool, backup_exists: bool) -> String:
 
 ## 返回空 Dictionary 表示成功；否则为失败结果字典
 static func _atomic_write(file_path: String, content: String) -> Dictionary:
-	if not GameConfig.get_bool("infrastructure.persistence", "atomic_write/enabled", true):
-		return _write_direct(file_path, content)
-
-	var tmp_path := file_path + _tmp_suffix()
-
-	var tmp_file := FileAccess.open(tmp_path, FileAccess.WRITE)
-	if not tmp_file:
-		return {"success": false, "error": _msg("open_write_fail", {"error": str(FileAccess.get_open_error())})}
-	tmp_file.store_string(content)
-	tmp_file.flush()
-	tmp_file.close()
-
-	# 先备份已存在的正档，保证任何后续失败都可回滚；备份失败按配置策略处理（abort 中止替换 / continue 告警继续）
-	if FileAccess.file_exists(file_path):
-		var backup_err := DirAccess.copy_absolute(file_path, file_path + _backup_suffix())
-		if backup_err != OK:
-			var policy := GameConfig.get_string("infrastructure.persistence", "atomic_write/backup_fail_policy", "abort")
-			EventBusCore.get_instance().emit_log("warn", _msg("backup_failed", {"error": str(backup_err)}))
-			if policy == "abort":
-				DirAccess.remove_absolute(tmp_path)
-				return _fail("BACKUP", "BACKUP_FAILED", _msg("backup_failed", {"error": str(backup_err)}))
-
-	# rename 是文件系统级原子操作，正档要么全旧要么全新
-	var rename_err := DirAccess.rename_absolute(tmp_path, file_path)
-	if rename_err != OK:
-		DirAccess.remove_absolute(tmp_path)
-		return {"success": false, "error": _msg("atomic_replace_fail", {"error": str(rename_err)})}
-	return {}
-
-## 直写模式（atomic_write 禁用时）：直接写文件（无备份/无原子替换保护）
-static func _write_direct(file_path: String, content: String) -> Dictionary:
-	var file := FileAccess.open(file_path, FileAccess.WRITE)
-	if not file:
-		return {"success": false, "error": _msg("open_write_fail", {"error": str(FileAccess.get_open_error())})}
-	file.store_string(content)
-	file.flush()
-	file.close()
-	return {}
+	var atomic_enabled: bool = GameConfig.get_bool("infrastructure.persistence", "atomic_write/enabled", true)
+	var policy: String = GameConfig.get_string("infrastructure.persistence", "atomic_write/backup_fail_policy", "abort")
+	var write_res: Dictionary = AtomicFileWriter.write_text_atomic(file_path, content, {
+		"atomic_enabled": atomic_enabled,
+		"tmp_suffix": _tmp_suffix(),
+		"create_backup": true,
+		"backup_suffix": _backup_suffix(),
+		"backup_retention": 1,
+		"backup_fail_policy": policy
+	})
+	var backup_err: int = int(write_res.get("backup_error", OK))
+	if backup_err != OK:
+		EventBusCore.get_instance().emit_log("warn", _msg("backup_failed", {"error": str(backup_err)}))
+	if bool(write_res.get("success", false)):
+		return {}
+	var err_stage: String = str(write_res.get("error_stage", ""))
+	var err_str: String = str(write_res.get("error_code", ERR_FILE_CANT_WRITE))
+	if err_stage == "backup":
+		return _fail("BACKUP", "BACKUP_FAILED", _msg("backup_failed", {"error": err_str}))
+	if err_stage == "rename":
+		return {"success": false, "error": _msg("atomic_replace_fail", {"error": err_str})}
+	return {"success": false, "error": _msg("open_write_fail", {"error": err_str})}
 
 ## 存档根目录（infrastructure.persistence save_dir 配置，默认 user://saves/）
 static func _save_dir() -> String:

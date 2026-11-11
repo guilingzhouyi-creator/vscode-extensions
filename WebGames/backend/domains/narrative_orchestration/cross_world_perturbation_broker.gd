@@ -115,6 +115,7 @@ func _load_ledger_from_disk() -> void:
         return
 
     var content := file.get_as_text()
+    file.close()
     var parsed_val: Variant = JSON.parse_string(content)
     if not (parsed_val is Array):
         return
@@ -136,22 +137,11 @@ func _flush_ledger_to_disk() -> bool:
             serialized_items.append(d)
 
     var json_text := JSON.stringify(serialized_items, "  ")
-    var dir_path := _ledger_path.get_base_dir()
-    if not dir_path.is_empty() and not DirAccess.dir_exists_absolute(dir_path):
-        DirAccess.make_dir_recursive_absolute(dir_path)
-
-    var tmp_path := _ledger_path + ".tmp"
-    var file := FileAccess.open(tmp_path, FileAccess.WRITE)
-    if file == null:
-        return false
-
-    file.store_string(json_text)
-    file.close()
-
-    if FileAccess.file_exists(_ledger_path):
-        DirAccess.remove_absolute(_ledger_path)
-    var err := DirAccess.rename_absolute(tmp_path, _ledger_path)
-    return err == OK
+    var write_res: Dictionary = AtomicFileWriter.write_text_atomic(_ledger_path, json_text, {
+        "tmp_suffix": ".tmp",
+        "create_backup": false
+    })
+    return bool(write_res.get("success", false))
 
 ## 发射因果虚空共鸣扰动
 func emit_perturbation(perturbation: CrossWorldPerturbationDTO) -> Dictionary:
