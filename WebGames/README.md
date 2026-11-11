@@ -1,6 +1,6 @@
 # 卡拉尔世界引擎 (Kalar World Engine)
 
-无头确定性母机 + 解耦表现宿主的 Godot 4 工程。后端 47 个业务领域以「零硬编码、全配置驱动」为准则，前端仅消费 `EventBusCore` 事件流（Phase 72 后旧 `EventBus` 已全域退役）。
+无头确定性母机 + 解耦表现宿主的 Godot 4 工程。后端 47 个业务领域以「零硬编码、全配置驱动」为准则，前端通过领域边界层（`frontend/domain_boundary/`）规范化交互协议空间与 `EventBusCore` 事件总线与后端解耦。
 
 ## 快速开始
 
@@ -28,15 +28,20 @@ godot
 WebGames/
 ├── backend/
 │   ├── infrastructure/       # 基础设施：配置底座、事件总线、存档、时钟、确定性 RNG
-│   └── domains/              # 47 个业务领域，每领域 3 文件（实体 / 求解器 / 状态机）
-├── frontend/views/           # 表现层宿主（仅消费事件，不含业务逻辑）
+│   └── domains/              # 47 个业务领域（实体 / 求解器 / 状态机 / 协议处理器）
+├── frontend/
+│   ├── domain_boundary/      # 前端领域边界层：标准化交互协议空间、服务容器与边界适配器
+│   ├── systems/              # 系统桥接中枢：HUD 与 CG 视频事件桥接器
+│   └── views/                # 表现层宿主（待命零接线模式，通过 apply_snapshot 消费数据）
 ├── tests/
-│   ├── unit/                 # 每领域一个测试文件
+│   ├── unit/                 # 领域单元测试
+│   ├── integration/          # 全链路无头集成测试流水线
+│   ├── guards/               # 架构护栏与防复发测试
 │   ├── test_registry.gd      # 全域测试注册表（CLI 与 UI 共用，唯一事实来源）
 │   └── test_runner.gd        # headless CLI 入口
 ├── config/                   # 全部配置表（见下）
 │   └── infrastructure/domains.json  # 领域清单唯一事实来源（架构护栏依据）
-├── docs/                     # 设计文档
+├── docs/                     # 设计文档与国家标准技术档案库
 └── scripts/                  # 门禁、测试与工程化脚本（sh/py/ps1）
 ```
 
@@ -164,6 +169,21 @@ DeterministicRNG.reseed_global(seed)           # 整局复现开关
 - 缩进 Tab（GDScript 与 Godot 资源），JSON / Markdown 用 2 空格。
 - 换行符统一 LF（由 `.gitattributes` 与 `.editorconfig` 保证）。
 
+## 前后端交互架构与领域边界规范
+
+前端表现层与后端领域引擎实行严格的单向解耦交互契约：
+
+1. **表现层零业务逻辑待命契约**：
+   `frontend/views/**` 处于待命模式，严禁直接实例化或持有后端状态机、求解器或单例；数据流统一通过 `apply_snapshot(snapshot: Dictionary)` 单向注入。
+2. **规范化交互协议空间与服务容器**：
+   前端仅依赖 `frontend/domain_boundary/interfaces/` 暴露的强类型服务契约（`IAuthService`、`IWorldService`、`ICharacterService`、`IEscMenuService`），由 `ServiceContainer`（生产环境使用 `RealServiceContainer`，测试环境使用 `MockServiceContainer`）统一装配注入。
+3. **统一协议派发与强类型请求/响应信封**：
+   所有穿透后端的非广播交互均通过 `UnifiedProtocolFactory.create_human_request` 组装为 `ClientRequestEnvelopeDTO`，统一派发至 `UnifiedProtocolDispatcher`，返回强类型 `UnifiedResponseEnvelopeDTO`，严格根据 `success`、`error_code` 与 `message` 执行诚实回执判定。
+4. **会话单源协同与依赖倒置原则 (DIP)**：
+   全局账号 ID、会话令牌与网关实例由 `WorldSessionRuntimeService` 唯一托管，`ServiceLocator` 的网关生命周期全面委托至该运行时中枢；安全混淆能力遵循依赖倒置原则由基础设施层装配注入，领域层绝对零逆向依赖基础设施。
+5. **HUD 全信道桥接与主动拉取**：
+   `HudEventBridge` 订阅权威快照、钱包资产、序章推进、世界进入、属性突变与历法时钟全部 6 大核心事件信道，并提供 `pull_hud_snapshot_async()` 供视图在场景恢复时主动拉取权威状态，消除首帧时序残留。
+
 ## 持续集成与架构门禁
 
 > ⚠️ 本工程位于上层仓库的子目录，而 GitHub Actions 只读取**仓库根**的 `.github/workflows/`。
@@ -178,7 +198,7 @@ DeterministicRNG.reseed_global(seed)           # 整局复现开关
 | DoD 验收 | `bash scripts/sh/test-run.sh` | 全域测试套件 |
 | 架构护栏 | `bash scripts/sh/audit-arch.sh` | TC-ARCH-01~06：目录 / 配置表 / 测试注册 / 确定性 / 文档计数 / 键级漂移 |
 | 配置审查 | `python3 scripts/py/audit_config.py --strict` | JSON 可解析 / 键命名 / 必需表齐全 / 格式一致性（无 BOM · LF · 2 空格规范序列化） |
-| 全量审查聚合 | `bash scripts/sh/audit-all.sh` | 20 项静态门禁（配置 / 高级规范治理 / 简化防过度 / 硬编码 / 热点与堆分配 / 覆盖 / 死配置 / 密钥 / 上下界 / 物品三元组 / 文案 / 魔法维度 / 事件概率 / CDC / 头注释契约 / 信道审计 / 架构护栏 / 收口等）+ 文档四域基线棘轮门禁（`audit-docs.sh --baseline`，仅阻断新增违规；Agent 操作契约见 `docs/README.md`；bench/archive 须显式 `--group` 触发） |
+| 全量审查聚合 | `bash scripts/sh/audit-all.sh` | 21 项静态门禁（配置 / 高级规范治理 / 简化防过度 / 硬编码 / 热点与堆分配 / 覆盖 / 死配置 / 密钥 / 上下界 / 物品三元组 / 文案 / 魔法维度 / 事件概率 / CDC / 头注释契约 / 信道审计 / 架构护栏 / 收口 / auto-refactor 十维静态度量等）+ 文档四域基线棘轮门禁（`audit-docs.sh --baseline`，仅阻断新增违规；Agent 操作契约见 `docs/README.md`；bench/archive 须显式 `--group` 触发） |
 
 后四条均套了**失败重试一次**，用于吸收读取撞上他人写入窗口的瞬时假红；
 真实问题会连续两次失败，仍然红。
@@ -196,10 +216,10 @@ DeterministicRNG.reseed_global(seed)           # 整局复现开关
 |---|---|
 | backend .gd / 行数 | 302 / 约 26,759 行（全域 .gd 513 / 约 62,603 行，随新卷增长） |
 | 领域数 | 47 |
-| 测试项 | 770（CLI 与 UI 共用同一注册表，<!-- METRICS:BEGIN wg-test-suite-count -->**130 套**<!-- METRICS:END wg-test-suite-count -->注册测试套件 / 覆盖 47 领域；实时以 `tests/reports/test_latest.json` 为准） |
+| 测试项 | 770（CLI 与 UI 共用同一注册表，<!-- METRICS:BEGIN wg-test-suite-count -->**138 套**<!-- METRICS:END wg-test-suite-count -->注册测试套件 / 覆盖 47 领域；实时以 `tests/reports/test_latest.json` 为准） |
 | 配置表 | 123（含 65 张必需表，`audit_config.py` 口径） |
 | 配置调用点 | 862（`backend/` + `frontend/` 内 `GameConfig.get_*` 与 `GameConfig.msg`；表缺失 0；`GameConfig.get_value` 违禁调用 0） |
 | 函数 / 参数类型注解 | 100% / 100% |
 
 实时数据以审查产物为准：`bash scripts/sh/test-run.sh`（单测 JSON 汇总写入 `tests/reports/test_latest.json`）
-与 `bash scripts/sh/audit-all.sh`（20 项静态门禁含文档四域棘轮门禁，见 `docs/README.md` 契约）。
+与 `bash scripts/sh/audit-all.sh`（21 项静态门禁含文档四域棘轮门禁，见 `docs/README.md` 契约）。
