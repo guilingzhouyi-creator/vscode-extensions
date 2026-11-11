@@ -13,6 +13,9 @@ extends RefCounted
 
 const MainHUDView = preload("res://frontend/views/main_hud/main_hud_view.gd")
 const AuthoritativeHudSyncService = preload("res://backend/domains/world_state/services/authoritative_hud_sync_service.gd")
+const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
+const UnifiedProtocolDispatcher = preload("res://backend/domains/world_state/services/unified_protocol_dispatcher.gd")
+const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
 
 static var _instance: HudEventBridge = null
 ## 获取全局唯一的主页 HUD 事件桥接单例实例。
@@ -61,10 +64,95 @@ func _setup_bus_subscriptions() -> void:
 		_on_authoritative_snapshot_received,
 		_on_wallet_mutated,
 		_on_prologue_advanced,
-		_on_world_entered
+		_on_world_entered,
+		_on_stat_mutated,
+		_on_clock_advanced
 	)
 	for token in tokens:
 		_bus_tokens.append(token)
+
+## 主动向后端拉取当前常驻 HUD 权威状态快照（避免残留本地 Mock 初值）
+func pull_hud_snapshot_async(callback: Callable = Callable()) -> void:
+	var token := WorldSessionRuntimeService.get_active_session_token()
+	var account_id := WorldSessionRuntimeService.get_active_account_id()
+	var character_id := WorldSessionRuntimeService.get_active_character_id()
+	var req := UnifiedProtocolFactory.create_human_request(
+		"world_state",
+		"PULL_HUD_SNAPSHOT",
+		{},
+		token,
+		account_id,
+		character_id
+	)
+	var resp := UnifiedProtocolDispatcher.dispatch_request(req)
+	if resp.success and resp.data is Dictionary:
+		var view: MainHUDView = _get_view()
+		if view != null:
+			var payload: Dictionary = resp.data
+			var snap_dict: Dictionary = {
+				"account_id": payload.get("account_id", ""),
+				"character_name": payload.get("character_name", ""),
+				"hp_current": float(payload.get("hp_current", 100.0)),
+				"hp_max": float(payload.get("hp_max", 100.0)),
+				"mp_current": float(payload.get("mp_current", 50.0)),
+				"mp_max": float(payload.get("mp_max", 50.0)),
+				"ap_current": float(payload.get("ap_current", 10.0)),
+				"ap_max": float(payload.get("ap_max", 10.0)),
+				"gold": int(payload.get("wallet_gold", payload.get("gold", 0))),
+				"mana_monocrystals": int(payload.get("wallet_mana_monocrystals", payload.get("mana_monocrystals", 0))),
+				"level": int(payload.get("level", 1))
+			}
+			view.apply_snapshot(snap_dict)
+		if callback.is_valid():
+			callback.call({"success": true, "data": resp.data})
+		return
+	if callback.is_valid():
+		callback.call({"success": false, "error_code": resp.error_code, "message": resp.error_message})
+
+func _on_stat_mutated(pkt: Variant) -> void:
+	var view: MainHUDView = _get_view()
+	if view == null:
+		return
+	var payload: Dictionary = {}
+	if pkt != null and pkt.get("payload_data") is Dictionary:
+		payload = pkt.payload_data
+		if payload.has("payload") and payload.get("payload") is Dictionary:
+			payload = payload.get("payload")
+	elif pkt is Dictionary:
+		payload = pkt
+	if payload.is_empty():
+		return
+	var stat_name := str(payload.get("stat_name", ""))
+	var new_val := float(payload.get("new_value", 0.0))
+	var snap: Dictionary = {}
+	match stat_name:
+		"hp", "hp_current":
+			snap["hp_current"] = new_val
+		"mp", "mp_current":
+			snap["mp_current"] = new_val
+		"ap", "ap_current":
+			snap["ap_current"] = new_val
+		"gold":
+			snap["gold"] = int(new_val)
+		"mana_monocrystals":
+			snap["mana_monocrystals"] = int(new_val)
+	if not snap.is_empty():
+		view.apply_snapshot(snap)
+
+func _on_clock_advanced(pkt: Variant) -> void:
+	var view: MainHUDView = _get_view()
+	if view == null:
+		return
+	var payload: Dictionary = {}
+	if pkt != null and pkt.get("payload_data") is Dictionary:
+		payload = pkt.payload_data
+		if payload.has("payload") and payload.get("payload") is Dictionary:
+			payload = payload.get("payload")
+	elif pkt is Dictionary:
+		payload = pkt
+	var clock_str := str(payload.get("clock_display", payload.get("display", "")))
+	if not clock_str.is_empty():
+		view.apply_snapshot({"clock_display": clock_str})
 
 func _on_authoritative_snapshot_received(pkt: Variant) -> void:
 	var view: MainHUDView = _get_view()
