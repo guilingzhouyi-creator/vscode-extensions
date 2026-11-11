@@ -20,11 +20,11 @@ const STAGE_MINIMAL_RESTORE_READY: String = "MINIMAL_RESTORE_READY"
 const LOG_LEVEL_WARN: String = "warn"
 const LOG_LEVEL_ERROR: String = "error"
 const LOG_LEVEL_INFO: String = "info"
-const LOG_RESTORE_TIMEOUT: String = "PrimaryStorageEngine: 最小状态恢复耗时 (%.2fms) 超出预算 (%.2fms)"
-const LOG_SAVE_FAIL: String = "PrimaryStorageEngine: 保存存档失败 [%s]: %s"
-const LOG_LOAD_FAIL: String = "PrimaryStorageEngine: 加载存档失败 [%s]: %s"
-const LOG_RESTORE_SUCCESS: String = "PrimaryStorageEngine: 从备份成功恢复存档 [%s]"
-const LOG_RESTORE_FAIL: String = "PrimaryStorageEngine: 备份恢复失败 [%s]: %s"
+const LOG_RESTORE_TIMEOUT: String = "PrimaryStorageEngine: minimal state restore duration ({duration}ms) exceeded budget ({budget}ms)."
+const LOG_SAVE_FAIL: String = "PrimaryStorageEngine: failed to save archive [{slot}]: {error}"
+const LOG_LOAD_FAIL: String = "PrimaryStorageEngine: failed to load archive [{slot}]: {error}"
+const LOG_RESTORE_SUCCESS: String = "PrimaryStorageEngine: successfully restored archive from backup [{slot}]"
+const LOG_RESTORE_FAIL: String = "PrimaryStorageEngine: failed to restore from backup [{slot}]: {error}"
 const ERR_EMPTY_SLOT_ID: String = "EMPTY_SLOT_ID"
 const ERR_EMPTY_PAYLOAD: String = "EMPTY_PAYLOAD"
 const DEFAULT_ACCOUNT_ID: String = "ACC_DEFAULT"
@@ -68,7 +68,7 @@ func quick_restore_minimal_state(slot_id: String) -> Dictionary:
 
 	var max_budget := GameConfig.get_float("infrastructure.storage", "primary/minimal_state/max_restore_budget_ms", 5.0)
 	if elapsed_ms > max_budget:
-		EventBusCore.get_instance().emit_log(LOG_LEVEL_WARN, LOG_RESTORE_TIMEOUT % [elapsed_ms, max_budget])
+		EventBusCore.get_instance().emit_log(LOG_LEVEL_WARN, TemplateFormatter.format(LOG_RESTORE_TIMEOUT, {"duration": "%.2f" % elapsed_ms, "budget": "%.2f" % max_budget}))
 
 	return {
 		"success": true,
@@ -114,7 +114,7 @@ func save_primary_data(slot_id: String, payload: Dictionary) -> Dictionary:
 		return {"success": false, "error_code": ERR_EMPTY_PAYLOAD}
 	var res: Dictionary = SaveManager.save_game(clean_slot, payload)
 	if not bool(res.get("success", false)):
-		EventBusCore.get_instance().emit_log(LOG_LEVEL_ERROR, LOG_SAVE_FAIL % [clean_slot, res.get("error_code", "UNKNOWN")])
+		EventBusCore.get_instance().emit_log(LOG_LEVEL_ERROR, TemplateFormatter.format(LOG_SAVE_FAIL, {"slot": clean_slot, "error": res.get("error_code", "UNKNOWN")}))
 	return res
 
 ## 完整加载主要世界数据
@@ -124,7 +124,7 @@ func load_primary_data(slot_id: String) -> Dictionary:
 		return {"success": false, "error_code": ERR_EMPTY_SLOT_ID, "data": {}}
 	var res: Dictionary = SaveManager.load_game(clean_slot)
 	if not bool(res.get("success", false)):
-		EventBusCore.get_instance().emit_log(LOG_LEVEL_WARN, LOG_LOAD_FAIL % [clean_slot, res.get("error_code", "UNKNOWN")])
+		EventBusCore.get_instance().emit_log(LOG_LEVEL_WARN, TemplateFormatter.format(LOG_LOAD_FAIL, {"slot": clean_slot, "error": res.get("error_code", "UNKNOWN")}))
 	return res
 
 ## 从备份恢复存档
@@ -134,9 +134,9 @@ func restore_backup(slot_id: String) -> Dictionary:
 		return {"success": false, "error_code": ERR_EMPTY_SLOT_ID}
 	var res: Dictionary = SaveManager.restore_backup(clean_slot)
 	if bool(res.get("success", false)):
-		EventBusCore.get_instance().emit_log(LOG_LEVEL_INFO, LOG_RESTORE_SUCCESS % clean_slot)
+		EventBusCore.get_instance().emit_log(LOG_LEVEL_INFO, TemplateFormatter.format(LOG_RESTORE_SUCCESS, {"slot": clean_slot}))
 	else:
-		EventBusCore.get_instance().emit_log(LOG_LEVEL_ERROR, LOG_RESTORE_FAIL % [clean_slot, res.get("error_code", "UNKNOWN")])
+		EventBusCore.get_instance().emit_log(LOG_LEVEL_ERROR, TemplateFormatter.format(LOG_RESTORE_FAIL, {"slot": clean_slot, "error": res.get("error_code", "UNKNOWN")}))
 	return res
 
 ## 校验存档完整性与防伪签名

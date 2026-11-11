@@ -117,9 +117,9 @@ static func load_rules_from_config() -> Dictionary:
 		if not GameSaveAssembler.has_migration(from_v):
 			issues.append("MISSING_MIGRATION_%s" % from_v)
 	if issues.is_empty():
-		EventBusCore.get_instance().emit_log("info", "SaveMigrationEngine: 迁移配置驱动加载完毕（chain=%s）" % str(chain))
+		EventBusCore.get_instance().emit_log("info", TemplateFormatter.format("SaveMigrationEngine: migration config loaded: chain={chain}.", {"chain": str(chain)}))
 	else:
-		ErrorReporter.emit_error("save_migration_engine", "MIGRATION_PATH_BROKEN", "迁移链静态校验发现断链", {
+		ErrorReporter.emit_error("save_migration_engine", "MIGRATION_PATH_BROKEN", "Migration path static validation broken: chain has gaps.", {
 			"issues": issues
 		})
 	return {"success": issues.is_empty(), "chain": chain, "issues": issues}

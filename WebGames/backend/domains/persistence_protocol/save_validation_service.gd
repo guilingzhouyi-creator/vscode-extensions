@@ -33,7 +33,7 @@ static func validate_domains(working_data: Dictionary) -> Dictionary:
 				"policy": unknown_policy
 			})
 			if unknown_policy == "warn_and_skip":
-				EventBusCore.get_instance().emit_log("warning", "SaveValidationService: 存档含未知数据域 [%s]，按策略跳过" % d_key)
+				EventBusCore.get_instance().emit_log("warn", TemplateFormatter.format("SaveValidationService: save contains unknown domain [{domain}], skipped per policy.", {"domain": d_key}))
 				keys_to_remove.append(d_key)
 
 	for rem_key in keys_to_remove:

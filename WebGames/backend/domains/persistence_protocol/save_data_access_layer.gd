@@ -171,7 +171,7 @@ static func save_game(slot_name: String, payload: Dictionary = {}) -> Dictionary
 	# 3. 审查 L2 空壳档阻断（providers 全空时严禁静默写空档）
 	var data_dict: Dictionary = target_payload.get("data", {})
 	if data_dict.is_empty():
-		ErrorReporter.emit_error("save_data_access_layer", "EMPTY_SAVE_BLOCKED", "存档拒绝写入，数据域全空", {
+		ErrorReporter.emit_error("save_data_access_layer", "EMPTY_SAVE_BLOCKED", "Empty save write rejected: all domain data providers empty.", {
 			"slot": slot_name
 		})
 		return { "success": false, "error_code": "EMPTY_SAVE_BLOCKED" }

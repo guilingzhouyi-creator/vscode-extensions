@@ -29,7 +29,7 @@ const FEATURE_TEMPLATE: String = "template"
 const LOG_LEVEL_WARN: String = "warn"
 const TASK_THREAD_PREFIX: String = "AuxLoadTask_"
 const EXT_JSON: String = ".json"
-const LOG_QUEUE_FULL: String = "AuxiliaryWorkerPool: 队列已满，触发背压拦截: %s"
+const LOG_QUEUE_FULL: String = "AuxiliaryWorkerPool: queue is full, backpressure intercepted: {path}"
 const BATCH_ID_PREFIX: String = "batch_"
 
 ## 内部任务状态描述
@@ -104,7 +104,7 @@ func request_resource_async(
 	# 2. 检查背压上限
 	var max_capacity: int = GameConfig.get_int("infrastructure.storage", "auxiliary/thread_pool/queue_capacity", 128)
 	if _pending_queue.size() >= max_capacity:
-		EventBusCore.get_instance().emit_log(LOG_LEVEL_WARN, LOG_QUEUE_FULL % resource_path)
+		EventBusCore.get_instance().emit_log(LOG_LEVEL_WARN, TemplateFormatter.format(LOG_QUEUE_FULL, {"path": resource_path}))
 		if callback.is_valid():
 			callback.call(false, null, StorageContractInterfaces.ERR_BACKPRESSURE_EXCEEDED)
 		return -1

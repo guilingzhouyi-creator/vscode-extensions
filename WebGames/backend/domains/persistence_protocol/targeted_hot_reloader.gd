@@ -17,8 +17,8 @@ const ResourceDependencyDAG = preload("res://backend/domains/persistence_protoco
 const ERR_EMPTY_NODE: String = "EMPTY_NODE"
 const LOG_LEVEL_WARN: String = "warn"
 const LOG_LEVEL_INFO: String = "info"
-const LOG_RELOAD_FAIL: String = "TargetedHotReloader: 节点 %s 重载失败，执行安全回滚保留旧缓存"
-const LOG_RELOAD_SUCCESS: String = "TargetedHotReloader: 节点 %s 定向热重载成功，共刷新 %d 个关联节点"
+const LOG_RELOAD_FAIL: String = "TargetedHotReloader: node {node} reload failed; performed safe rollback preserving previous cache."
+const LOG_RELOAD_SUCCESS: String = "TargetedHotReloader: node {node} targeted reload succeeded, refreshed {count} associated nodes."
 
 static var _instance = null
 
@@ -68,7 +68,7 @@ func trigger_reload(changed_node: String, reload_resolver: Callable = Callable()
 			if not bool(step_res.get("success", false)):
 				failed_node = node
 				rollback_performed = true
-				EventBusCore.get_instance().emit_log(LOG_LEVEL_WARN, LOG_RELOAD_FAIL % node)
+				EventBusCore.get_instance().emit_log(LOG_LEVEL_WARN, TemplateFormatter.format(LOG_RELOAD_FAIL, {"node": node}))
 				break
 			else:
 				_cache_store[node] = step_res.get("data", null)
@@ -86,7 +86,7 @@ func trigger_reload(changed_node: String, reload_resolver: Callable = Callable()
 			"rollback_performed": true
 		}
 
-	EventBusCore.get_instance().emit_log(LOG_LEVEL_INFO, LOG_RELOAD_SUCCESS % [changed_node, reloaded_count])
+	EventBusCore.get_instance().emit_log(LOG_LEVEL_INFO, TemplateFormatter.format(LOG_RELOAD_SUCCESS, {"node": changed_node, "count": reloaded_count}))
 	return {
 		"success": true,
 		"affected_nodes": invalidation_list,
