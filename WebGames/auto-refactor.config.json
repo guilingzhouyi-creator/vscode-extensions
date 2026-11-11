@@ -76,7 +76,7 @@
         "checkNaming": true,
         "checkDeadCode": true,
         "checkTemporaryStubs": true,
-        "checkDuplicateBlocks": false
+        "checkDuplicateBlocks": true
       }
     },
     "gdscript-modern": {

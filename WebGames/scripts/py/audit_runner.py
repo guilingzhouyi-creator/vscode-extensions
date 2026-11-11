@@ -4,7 +4,7 @@
 # 文件路径: WebGames/scripts/py/audit_runner.py
 # 架构定位: 并行任务调度总控门面 (Parallel Audit Dispatcher Facade)
 # 依赖与触发: 触发方: audit-all / CI | 上游: 全域子审计脚本 | 下游: 控制台汇总报告与 JSON | 运行时: Python 3.10+
-# 职责说明: 统一编排并异步并行调度 20 项静态门禁，支持差异范围过滤、工作线程池与结构化聚合输出
+# 职责说明: 统一编排并异步并行调度全域静态门禁，支持差异范围过滤、工作线程池与结构化聚合输出
 # 退出语义与设计依据: 退出码: 0=全部门禁通过, 1=存在阻断违规, 2=环境异常 | 设计依据: AGENTS.md 构建门禁通用契约
 # ------------------------------------------------------------------------------
 # 用法示例:
@@ -230,6 +230,13 @@ AUDIT_TASKS: list[AuditTask] = [
         script_name="audit_sdk_sync.py",
         default_args=[],
         scopes={"config", "docs"},
+    ),
+    AuditTask(
+        task_id="code_clones",
+        name="跨文件代码克隆与重复逻辑域守卫",
+        script_name="audit_code_clones.py",
+        default_args=[],
+        scopes={"gd"},
     ),
 ]
 
