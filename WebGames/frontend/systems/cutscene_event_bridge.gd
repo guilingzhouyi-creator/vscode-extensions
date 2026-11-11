@@ -204,7 +204,7 @@ func _handle_cutscene_progress(payload: Dictionary) -> void:
 
 	presentation_progress.emit(cur_time, progress, subtitle)
 
-func _handle_cutscene_finished(payload: Dictionary) -> void:
+func _conclude_cutscene(payload: Dictionary, target_signal: Signal) -> void:
 	var view := get_active_view()
 	var fade_out_sec: float = float(payload.get("fade_out_sec", 0.5))
 	if view != null:
@@ -212,17 +212,13 @@ func _handle_cutscene_finished(payload: Dictionary) -> void:
 
 	var cs_id := _current_cutscene_id
 	_current_cutscene_id = ""
-	presentation_finished.emit(cs_id)
+	target_signal.emit(cs_id)
+
+func _handle_cutscene_finished(payload: Dictionary) -> void:
+	_conclude_cutscene(payload, presentation_finished)
 
 func _handle_cutscene_skipped(payload: Dictionary) -> void:
-	var view := get_active_view()
-	var fade_out_sec: float = float(payload.get("fade_out_sec", 0.5))
-	if view != null:
-		view.stop_and_dismiss(fade_out_sec)
-
-	var cs_id := _current_cutscene_id
-	_current_cutscene_id = ""
-	presentation_skipped.emit(cs_id)
+	_conclude_cutscene(payload, presentation_skipped)
 
 func _resolve_or_create_view() -> CutscenePlayerView:
 	var view := get_active_view()

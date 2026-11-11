@@ -339,40 +339,46 @@ func _init_exchange_tab() -> void:
 func _get_currency_copper_value(index: int) -> int:
 	return MockServiceContainer.get_instance().economy().get_currency_copper(index)
 
-## 刷新兑换显示：汇率与结果换算（源/目标铜币比值）
-func _refresh_exchange_display() -> void:
+func _read_exchange_selection() -> Dictionary:
 	if _view == null or _view._option_exchange_source == null:
-		return
+		return {}
 	var src_idx: int = _view._option_exchange_source.selected
 	var tgt_idx: int = _view._option_exchange_target.selected
 	if src_idx < 0 or tgt_idx < 0:
+		return {}
+	return {
+		"src_idx": src_idx,
+		"tgt_idx": tgt_idx,
+		"src_name": _view._option_exchange_source.get_item_text(src_idx),
+		"tgt_name": _view._option_exchange_target.get_item_text(tgt_idx),
+		"amount": int(_view._spin_exchange_amount.value)
+	}
+
+## 刷新兑换显示：汇率与结果换算（源/目标铜币比值）
+func _refresh_exchange_display() -> void:
+	var sel := _read_exchange_selection()
+	if sel.is_empty():
 		return
-	var src_name: String = _view._option_exchange_source.get_item_text(src_idx)
-	var tgt_name: String = _view._option_exchange_target.get_item_text(tgt_idx)
-	var src_copper: int = _get_currency_copper_value(src_idx)
-	var tgt_copper: int = _get_currency_copper_value(tgt_idx)
+	var src_copper: int = _get_currency_copper_value(int(sel["src_idx"]))
+	var tgt_copper: int = _get_currency_copper_value(int(sel["tgt_idx"]))
 	var economy := MockServiceContainer.get_instance().economy()
 	var rate: float = economy.calculate_exchange_rate(src_copper, tgt_copper)
-	var amount: int = int(_view._spin_exchange_amount.value)
+	var amount: int = int(sel["amount"])
 	var result: float = economy.calculate_exchange_result(amount, rate)
-	UIIntermediary.resolve(_view._label_exchange_rate, "ui.fe05.exchange.rate", {"source": src_name, "rate": "%.4f" % rate, "target": tgt_name})
-	UIIntermediary.resolve(_view._label_exchange_result, "ui.fe05.exchange.result", {"amount": amount, "source": src_name, "result": "%.2f" % result, "target": tgt_name})
+	UIIntermediary.resolve(_view._label_exchange_rate, "ui.fe05.exchange.rate", {"source": sel["src_name"], "rate": "%.4f" % rate, "target": sel["tgt_name"]})
+	UIIntermediary.resolve(_view._label_exchange_result, "ui.fe05.exchange.result", {"amount": amount, "source": sel["src_name"], "result": "%.2f" % result, "target": sel["tgt_name"]})
 
 func _on_exchange_source_selected(_index: int) -> void: _refresh_exchange_display()
 func _on_exchange_target_selected(_index: int) -> void: _refresh_exchange_display()
 func _on_exchange_amount_changed(_value: float) -> void: _refresh_exchange_display()
 
 func _on_exchange_confirm_pressed() -> void:
-	if _view == null:
+	var sel := _read_exchange_selection()
+	if sel.is_empty():
 		return
-	var src_idx: int = _view._option_exchange_source.selected
-	var tgt_idx: int = _view._option_exchange_target.selected
-	if src_idx < 0 or tgt_idx < 0:
-		return
-	var src_name: String = _view._option_exchange_source.get_item_text(src_idx)
-	var tgt_name: String = _view._option_exchange_target.get_item_text(tgt_idx)
-	var amount: int = int(_view._spin_exchange_amount.value)
-	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe05.exchange.confirm_toast", {"amount": amount, "source": src_name, "target": tgt_name}), NavTypes.ToastLevel.INFO)
+	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe05.exchange.confirm_toast", {
+		"amount": sel["amount"], "source": sel["src_name"], "target": sel["tgt_name"]
+	}), NavTypes.ToastLevel.INFO)
 
 # ==============================================================================
 # Tab 7: 资源水池 (RESOURCE_POOL) 初始化

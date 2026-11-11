@@ -52,142 +52,59 @@ func upgrade_territory(territory: Dictionary) -> Dictionary:
 	updated["garrison"] = int(updated.get("garrison", 0)) + 10
 	return {"success": true, "territory": updated}
 
+func _dispatch_gateway_action(
+	action_type: String,
+	account_id: String,
+	token: String,
+	extra_payload: Dictionary,
+	callback: Callable,
+	result_key: String = "data",
+	fallback_value: Variant = {}
+) -> void:
+	var payload := {"account_id": account_id}
+	payload.merge(extra_payload, true)
+	var req := UnifiedProtocolFactory.create_human_request("world_gateway", action_type, payload, token, account_id)
+	var resp := UnifiedProtocolDispatcher.dispatch_request(req)
+	if not callback.is_valid():
+		return
+	var out_val: Variant = resp.data
+	if result_key != "data":
+		out_val = resp.data.get(result_key, fallback_value) if resp.data is Dictionary else fallback_value
+	callback.call({
+		"success": resp.success,
+		"error_code": resp.error_code,
+		"message": resp.error_message,
+		result_key: out_val
+	})
+
 ## 异步进入网关契约实现
 func enter_gateway_async(account_id: String, token: String, callback: Callable) -> void:
-	var req := UnifiedProtocolFactory.create_human_request(
-		"world_gateway",
-		"ENTER_GATEWAY",
-		{"account_id": account_id},
-		token,
-		account_id
-	)
-	var resp := UnifiedProtocolDispatcher.dispatch_request(req)
-	if callback.is_valid():
-		callback.call({
-			"success": resp.success,
-			"error_code": resp.error_code,
-			"message": resp.error_message,
-			"data": resp.data
-		})
+	_dispatch_gateway_action("ENTER_GATEWAY", account_id, token, {}, callback)
 
 ## 异步探针就绪度探测契约实现
 func probe_modes_async(account_id: String, token: String, callback: Callable) -> void:
-	var req := UnifiedProtocolFactory.create_human_request(
-		"world_gateway",
-		"PROBE_MODES",
-		{"account_id": account_id},
-		token,
-		account_id
-	)
-	var resp := UnifiedProtocolDispatcher.dispatch_request(req)
-	if callback.is_valid():
-		callback.call({
-			"success": resp.success,
-			"error_code": resp.error_code,
-			"message": resp.error_message,
-			"probe_reports": resp.data.get("probe_reports", {}) if resp.data is Dictionary else {}
-		})
+	_dispatch_gateway_action("PROBE_MODES", account_id, token, {}, callback, "probe_reports", {})
 
 ## 异步世界档案列表查询契约实现
 func list_worlds_async(account_id: String, token: String, callback: Callable) -> void:
-	var req := UnifiedProtocolFactory.create_human_request(
-		"world_gateway",
-		"LIST_WORLDS",
-		{"account_id": account_id},
-		token,
-		account_id
-	)
-	var resp := UnifiedProtocolDispatcher.dispatch_request(req)
-	if callback.is_valid():
-		callback.call({
-			"success": resp.success,
-			"error_code": resp.error_code,
-			"message": resp.error_message,
-			"worlds": resp.data.get("worlds", []) if resp.data is Dictionary else []
-		})
+	_dispatch_gateway_action("LIST_WORLDS", account_id, token, {}, callback, "worlds", [])
 
 ## 异步模式与槽位选择契约实现
 func select_mode_async(account_id: String, token: String, mode_id: int, account_slots: Array, callback: Callable) -> void:
-	var req := UnifiedProtocolFactory.create_human_request(
-		"world_gateway",
-		"SELECT_MODE",
-		{
-			"account_id": account_id,
-			"target_mode": mode_id,
-			"account_slots": account_slots
-		},
-		token,
-		account_id
-	)
-	var resp := UnifiedProtocolDispatcher.dispatch_request(req)
-	if callback.is_valid():
-		callback.call({
-			"success": resp.success,
-			"error_code": resp.error_code,
-			"message": resp.error_message,
-			"data": resp.data
-		})
+	_dispatch_gateway_action("SELECT_MODE", account_id, token, {"target_mode": mode_id, "account_slots": account_slots}, callback)
 
 ## 异步选档/建档进入世界契约实现
 func select_or_create_world_async(account_id: String, token: String, world_id: String, mode_id: int, callback: Callable) -> void:
-	var req := UnifiedProtocolFactory.create_human_request(
-		"world_gateway",
-		"SELECT_OR_CREATE_WORLD",
-		{
-			"account_id": account_id,
-			"world_id": world_id,
-			"target_mode": mode_id,
-			"create_if_missing": true
-		},
-		token,
-		account_id
-	)
-	var resp := UnifiedProtocolDispatcher.dispatch_request(req)
-	if callback.is_valid():
-		callback.call({
-			"success": resp.success,
-			"error_code": resp.error_code,
-			"message": resp.error_message,
-			"data": resp.data
-		})
+	_dispatch_gateway_action("SELECT_OR_CREATE_WORLD", account_id, token, {
+		"world_id": world_id,
+		"target_mode": mode_id,
+		"create_if_missing": true
+	}, callback)
 
 ## 异步切换网关模式契约实现
 func switch_gateway_mode_async(account_id: String, token: String, target_mode: int, callback: Callable) -> void:
-	var req := UnifiedProtocolFactory.create_human_request(
-		"world_gateway",
-		"SWITCH_GATEWAY_MODE",
-		{
-			"account_id": account_id,
-			"target_mode": target_mode
-		},
-		token,
-		account_id
-	)
-	var resp := UnifiedProtocolDispatcher.dispatch_request(req)
-	if callback.is_valid():
-		callback.call({
-			"success": resp.success,
-			"error_code": resp.error_code,
-			"message": resp.error_message,
-			"data": resp.data
-		})
+	_dispatch_gateway_action("SWITCH_GATEWAY_MODE", account_id, token, {"target_mode": target_mode}, callback)
 
 ## 异步退出世界退回网关契约实现
 func exit_world_to_gateway_async(account_id: String, token: String, callback: Callable) -> void:
-	var req := UnifiedProtocolFactory.create_human_request(
-		"world_gateway",
-		"EXIT_WORLD_TO_GATEWAY",
-		{
-			"account_id": account_id
-		},
-		token,
-		account_id
-	)
-	var resp := UnifiedProtocolDispatcher.dispatch_request(req)
-	if callback.is_valid():
-		callback.call({
-			"success": resp.success,
-			"error_code": resp.error_code,
-			"message": resp.error_message,
-			"data": resp.data
-		})
+	_dispatch_gateway_action("EXIT_WORLD_TO_GATEWAY", account_id, token, {}, callback)

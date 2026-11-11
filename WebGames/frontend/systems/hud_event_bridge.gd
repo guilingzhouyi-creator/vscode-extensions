@@ -71,6 +71,31 @@ func _setup_bus_subscriptions() -> void:
 	for token in tokens:
 		_bus_tokens.append(token)
 
+func _extract_packet_payload(pkt: Variant, unwrap_nested: bool = true) -> Dictionary:
+	var payload: Dictionary = {}
+	if pkt != null and pkt.get("payload_data") is Dictionary:
+		payload = pkt.payload_data
+		if unwrap_nested and payload.has("payload") and payload.get("payload") is Dictionary:
+			payload = payload.get("payload")
+	elif pkt is Dictionary:
+		payload = pkt
+	return payload
+
+func _build_hud_snapshot_dict(payload: Dictionary) -> Dictionary:
+	return {
+		"account_id": payload.get("account_id", ""),
+		"character_name": payload.get("character_name", ""),
+		"hp_current": float(payload.get("hp_current", 100.0)),
+		"hp_max": float(payload.get("hp_max", 100.0)),
+		"mp_current": float(payload.get("mp_current", 50.0)),
+		"mp_max": float(payload.get("mp_max", 50.0)),
+		"ap_current": float(payload.get("ap_current", 10.0)),
+		"ap_max": float(payload.get("ap_max", 10.0)),
+		"gold": int(payload.get("wallet_gold", payload.get("gold", 0))),
+		"mana_monocrystals": int(payload.get("wallet_mana_monocrystals", payload.get("mana_monocrystals", 0))),
+		"level": int(payload.get("level", 1))
+	}
+
 ## 主动向后端拉取当前常驻 HUD 权威状态快照（避免残留本地 Mock 初值）
 func pull_hud_snapshot_async(callback: Callable = Callable()) -> void:
 	var token := WorldSessionRuntimeService.get_active_session_token()
@@ -88,39 +113,27 @@ func pull_hud_snapshot_async(callback: Callable = Callable()) -> void:
 	if resp.success and resp.data is Dictionary:
 		var view: MainHUDView = _get_view()
 		if view != null:
-			var payload: Dictionary = resp.data
-			var snap_dict: Dictionary = {
-				"account_id": payload.get("account_id", ""),
-				"character_name": payload.get("character_name", ""),
-				"hp_current": float(payload.get("hp_current", 100.0)),
-				"hp_max": float(payload.get("hp_max", 100.0)),
-				"mp_current": float(payload.get("mp_current", 50.0)),
-				"mp_max": float(payload.get("mp_max", 50.0)),
-				"ap_current": float(payload.get("ap_current", 10.0)),
-				"ap_max": float(payload.get("ap_max", 10.0)),
-				"gold": int(payload.get("wallet_gold", payload.get("gold", 0))),
-				"mana_monocrystals": int(payload.get("wallet_mana_monocrystals", payload.get("mana_monocrystals", 0))),
-				"level": int(payload.get("level", 1))
-			}
-			view.apply_snapshot(snap_dict)
+			view.apply_snapshot(_build_hud_snapshot_dict(resp.data))
 		if callback.is_valid():
 			callback.call({"success": true, "data": resp.data})
 		return
 	if callback.is_valid():
 		callback.call({"success": false, "error_code": resp.error_code, "message": resp.error_message})
 
-func _on_stat_mutated(pkt: Variant) -> void:
+func _resolve_active_view_payload(pkt: Variant, out_payload: Dictionary, unwrap_nested: bool = true, require_non_empty: bool = true) -> MainHUDView:
 	var view: MainHUDView = _get_view()
 	if view == null:
-		return
+		return null
+	out_payload.clear()
+	out_payload.merge(_extract_packet_payload(pkt, unwrap_nested))
+	if require_non_empty and out_payload.is_empty():
+		return null
+	return view
+
+func _on_stat_mutated(pkt: Variant) -> void:
 	var payload: Dictionary = {}
-	if pkt != null and pkt.get("payload_data") is Dictionary:
-		payload = pkt.payload_data
-		if payload.has("payload") and payload.get("payload") is Dictionary:
-			payload = payload.get("payload")
-	elif pkt is Dictionary:
-		payload = pkt
-	if payload.is_empty():
+	var view: MainHUDView = _resolve_active_view_payload(pkt, payload)
+	if view == null:
 		return
 	var stat_name := str(payload.get("stat_name", ""))
 	var new_val := float(payload.get("new_value", 0.0))
@@ -140,60 +153,26 @@ func _on_stat_mutated(pkt: Variant) -> void:
 		view.apply_snapshot(snap)
 
 func _on_clock_advanced(pkt: Variant) -> void:
-	var view: MainHUDView = _get_view()
+	var payload: Dictionary = {}
+	var view: MainHUDView = _resolve_active_view_payload(pkt, payload, true, false)
 	if view == null:
 		return
-	var payload: Dictionary = {}
-	if pkt != null and pkt.get("payload_data") is Dictionary:
-		payload = pkt.payload_data
-		if payload.has("payload") and payload.get("payload") is Dictionary:
-			payload = payload.get("payload")
-	elif pkt is Dictionary:
-		payload = pkt
 	var clock_str := str(payload.get("clock_display", payload.get("display", "")))
 	if not clock_str.is_empty():
 		view.apply_snapshot({"clock_display": clock_str})
 
 func _on_authoritative_snapshot_received(pkt: Variant) -> void:
-	var view: MainHUDView = _get_view()
+	var payload: Dictionary = {}
+	var view: MainHUDView = _resolve_active_view_payload(pkt, payload)
 	if view == null:
 		return
-	var payload: Dictionary = {}
-	if pkt != null and pkt.get("payload_data") is Dictionary:
-		payload = pkt.payload_data
-		if payload.has("payload") and payload.get("payload") is Dictionary:
-			payload = payload.get("payload")
-	elif pkt is Dictionary:
-		payload = pkt
-	if payload.is_empty():
-		return
-
-	var snap_dict: Dictionary = {
-		"account_id": payload.get("account_id", ""),
-		"character_name": payload.get("character_name", ""),
-		"hp_current": float(payload.get("hp_current", 100.0)),
-		"hp_max": float(payload.get("hp_max", 100.0)),
-		"mp_current": float(payload.get("mp_current", 50.0)),
-		"mp_max": float(payload.get("mp_max", 50.0)),
-		"ap_current": float(payload.get("ap_current", 10.0)),
-		"ap_max": float(payload.get("ap_max", 10.0)),
-		"gold": int(payload.get("wallet_gold", payload.get("gold", 0))),
-		"mana_monocrystals": int(payload.get("wallet_mana_monocrystals", payload.get("mana_monocrystals", 0))),
-		"level": int(payload.get("level", 1))
-	}
-	view.apply_snapshot(snap_dict)
+	view.apply_snapshot(_build_hud_snapshot_dict(payload))
 
 func _on_wallet_mutated(pkt: Variant) -> void:
-	var view: MainHUDView = _get_view()
+	var payload: Dictionary = {}
+	var view: MainHUDView = _resolve_active_view_payload(pkt, payload, true, false)
 	if view == null:
 		return
-	var payload: Dictionary = {}
-	if pkt != null and pkt.get("payload_data") is Dictionary:
-		payload = pkt.payload_data
-		if payload.has("payload") and payload.get("payload") is Dictionary:
-			payload = payload.get("payload")
-	elif pkt is Dictionary:
-		payload = pkt
 	var gold: int = int(payload.get("current_gold", payload.get("gold", view.wallet_gold)))
 	var crystals: int = int(payload.get("current_crystals", payload.get("crystals", view.wallet_mana_crystals)))
 	view.wallet_gold = gold
@@ -214,11 +193,7 @@ func _on_prologue_advanced(pkt: Variant) -> void:
 	var view: MainHUDView = _get_view()
 	if view == null:
 		return
-	var payload: Dictionary = {}
-	if pkt != null and pkt.get("payload_data") is Dictionary:
-		payload = pkt.payload_data
-	elif pkt is Dictionary:
-		payload = pkt
+	var payload := _extract_packet_payload(pkt, false)
 	var text: String = str(payload.get("narrative_text", payload.get("text", "")))
 	if not text.is_empty():
 		view.append_terminal_log("NARRATIVE", text)
