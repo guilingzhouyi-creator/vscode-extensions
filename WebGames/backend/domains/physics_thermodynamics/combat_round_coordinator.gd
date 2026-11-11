@@ -88,6 +88,38 @@ func set_round_schedule(schedule: TimelineEventScheduleDTO) -> void:
 	is_round_concluded_state = false
 	last_round_end_reason = ""
 
+func _record_normal_draw(processed_events: Array[Dictionary], event_id: String, extra_fields: Dictionary) -> void:
+	var drawn_card := _draw_random_card_from_pool()
+	var queue_res: Dictionary = player_staging.enqueue_card(drawn_card) if player_staging else {}
+	var entry := {
+		"event_id": event_id,
+		"type": "CARD_DISPATCHED",
+		"queue_res": queue_res
+	}
+	entry.merge(extra_fields, true)
+	processed_events.append(entry)
+	resolved_client_events.append({
+		"kind": "NORMAL_DRAW",
+		"drawn": 1,
+		"public_message": "战场节拍触发：补充了行动手牌"
+	})
+
+func _record_tension_pulse(processed_events: Array[Dictionary], event_id: String, payload: Dictionary, extra_fields: Dictionary) -> bool:
+	var t_type: String = payload.get("tension_type", "PRESSURE_SURGE")
+	var entry := {
+		"event_id": event_id,
+		"type": "TENSION_APPLIED",
+		"tension_type": t_type
+	}
+	entry.merge(extra_fields, true)
+	processed_events.append(entry)
+	resolved_client_events.append({
+		"kind": "TENSION_PULSE",
+		"tension_type": t_type,
+		"public_message": "战场紧张度突变"
+	})
+	return t_type == "FORCE_ROUND_ADVANCE"
+
 ## 步进协调：时间推进 -> 派发事件 -> 待发栏入队 -> 回合结束条件判定
 func step_coordinator(
 	delta_ms: int,
@@ -105,33 +137,9 @@ func step_coordinator(
 	# 1. 处理 timeline_engine 事件（空转引擎=零调度事件，语义等价旧 null）
 	for evt in fired_events:
 		if evt.event_type == TertiaryTimelineEngine.TimelineEventType.RANDOM_DISPATCH:
-			var drawn_card := _draw_random_card_from_pool()
-			var queue_res: Dictionary = player_staging.enqueue_card(drawn_card) if player_staging else {}
-			processed_events.append({
-				"event_id": evt.event_id,
-				"type": "CARD_DISPATCHED",
-				"time_ms": evt.trigger_time_ms,
-				"queue_res": queue_res
-			})
-			resolved_client_events.append({
-				"kind": "NORMAL_DRAW",
-				"drawn": 1,
-				"public_message": "战场节拍触发：补充了行动手牌"
-			})
+			_record_normal_draw(processed_events, evt.event_id, {"time_ms": evt.trigger_time_ms})
 		elif evt.event_type == TertiaryTimelineEngine.TimelineEventType.TENSION_PULSE:
-			var t_type: String = evt.payload.get("tension_type", "PRESSURE_SURGE")
-			processed_events.append({
-				"event_id": evt.event_id,
-				"type": "TENSION_APPLIED",
-				"tension_type": t_type,
-				"time_ms": evt.trigger_time_ms
-			})
-			resolved_client_events.append({
-				"kind": "TENSION_PULSE",
-				"tension_type": t_type,
-				"public_message": "战场紧张度突变"
-			})
-			if t_type == "FORCE_ROUND_ADVANCE":
+			if _record_tension_pulse(processed_events, evt.event_id, evt.payload, {"time_ms": evt.trigger_time_ms}):
 				should_end_round = true
 				end_reason = "TENSION_FORCE_ADVANCE"
 
@@ -142,19 +150,7 @@ func step_coordinator(
 			if not pt.is_executed and pt.trigger_time_ms <= round_elapsed_ms:
 				pt.is_executed = true
 				if pt.event_kind == TimelineEventScheduleDTO.EventKind.NORMAL_DRAW:
-					var drawn_card := _draw_random_card_from_pool()
-					var queue_res: Dictionary = player_staging.enqueue_card(drawn_card) if player_staging else {}
-					processed_events.append({
-						"event_id": pt.point_id,
-						"type": "CARD_DISPATCHED",
-						"event_kind": "NORMAL_DRAW",
-						"queue_res": queue_res
-					})
-					resolved_client_events.append({
-						"kind": "NORMAL_DRAW",
-						"drawn": 1,
-						"public_message": "战场节拍触发：补充了行动手牌"
-					})
+					_record_normal_draw(processed_events, pt.point_id, {"event_kind": "NORMAL_DRAW"})
 				elif pt.event_kind == TimelineEventScheduleDTO.EventKind.ADD_DRAW:
 					# bonus_cards 无界钳制——payload 来自外部 DTO，防御性封口到 [0, hand_cap]
 					var bonus_cards := clampi(int(pt.payload.get("extra_bonus_cards", 1)), 0, hand_cap)
@@ -172,18 +168,7 @@ func step_coordinator(
 						"public_message": "战场增益触发：额外补充加发牌"
 					})
 				elif pt.event_kind == TimelineEventScheduleDTO.EventKind.TENSION_PULSE:
-					var t_type: String = pt.payload.get("tension_type", "PRESSURE_SURGE")
-					processed_events.append({
-						"event_id": pt.point_id,
-						"type": "TENSION_APPLIED",
-						"tension_type": t_type
-					})
-					resolved_client_events.append({
-						"kind": "TENSION_PULSE",
-						"tension_type": t_type,
-						"public_message": "战场紧张度突变"
-					})
-					if t_type == "FORCE_ROUND_ADVANCE":
+					if _record_tension_pulse(processed_events, pt.point_id, pt.payload, {}):
 						should_end_round = true
 						end_reason = "TENSION_FORCE_ADVANCE"
 

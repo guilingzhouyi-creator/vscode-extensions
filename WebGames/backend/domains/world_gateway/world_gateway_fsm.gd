@@ -508,14 +508,8 @@ func exit_to_gateway() -> Dictionary:
     }
 
 ## 6. 切换运行网关模式（仅允许已洗脱的 GATEWAY_ENTERED 状态；活跃世界内强拦截热切换）
-func switch_gateway_mode(
-    target_mode: int,
-    canary_flags: Dictionary = {},
-    account_slots: Array = [],
-    target_world_id: String = "",
-    target_slot_id: String = "",
-    custom_mods: Array = []
-) -> Dictionary:
+func switch_gateway_mode(target_mode: int, canary_flags: Dictionary = {}, account_slots: Array = [],
+		target_world_id: String = "", target_slot_id: String = "", custom_mods: Array = []) -> Dictionary:
     var is_hot_swap_blocked := GameConfig.get_bool("domains.world_gateway", "gateway_policy/block_hot_swap_while_world_active", true)
     var hot_swap_error_code := GameConfig.get_string("domains.world_gateway", "gateway_policy/err_hot_swap_blocked", "ERR_HOT_SWAP_BLOCKED_IN_ACTIVE_WORLD")
     if is_hot_swap_blocked and (context.current_phase == WorldGatewayModel.GatewayPhase.IN_WORLD or WorldSessionRuntimeService.has_active_world()):

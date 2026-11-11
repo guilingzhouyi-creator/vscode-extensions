@@ -74,6 +74,23 @@ static func _handle_esc_query_readiness(request: ClientRequestEnvelopeDTO) -> Un
 		request.request_id, true, readiness, "", "Save readiness state evaluated successfully."
 	)
 
+static func _validate_save_path_safety(
+	request: ClientRequestEnvelopeDTO,
+	gateway: WorldGatewayFSM,
+	slot_id: String,
+	use_request_mode: bool
+) -> UnifiedResponseEnvelopeDTO:
+	var has_gw_mode: bool = (gateway != null and gateway.context != null and gateway.context.selected_mode != WorldGatewayModel.GameMode.UNSELECTED)
+	var gw_mode: int = int(gateway.context.selected_mode) if has_gw_mode else WorldGatewayModel.GameMode.SINGLE_PLAYER
+	var mode: int = int(request.payload.get("game_mode", gw_mode)) if use_request_mode else gw_mode
+	var vault_prefix := GameConfig.get_string(DOMAIN_WORLD_STATE_CONFIG, "storage/offline_vault_prefix", "user://offline_vault/")
+	var path_safety := SaveReadinessGuard.evaluate_storage_path_safety("%s%s.sav" % [vault_prefix, slot_id.to_lower()], mode)
+	if not bool(path_safety.get("safe", path_safety.get("is_safe", false))):
+		return UnifiedProtocolFactory.create_response(
+			request.request_id, false, path_safety, "ERR_STORAGE_UNSAFE", "Storage path violates runtime mode isolation policy."
+		)
+	return null
+
 static func _handle_esc_save_game(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
 	var in_combat: bool = bool(request.payload.get("in_combat", false))
 	var in_cutscene: bool = bool(request.payload.get("in_cutscene", false))
@@ -90,13 +107,9 @@ static func _handle_esc_save_game(request: ClientRequestEnvelopeDTO, gateway: Wo
 			request.request_id, false, {}, "ERR_UNBOUND_SAVE_SLOT", "No valid save slot is bound; save operation rejected."
 		)
 
-	var mode: int = int(request.payload.get("game_mode", gateway.context.selected_mode if (gateway != null and gateway.context != null and gateway.context.selected_mode != WorldGatewayModel.GameMode.UNSELECTED) else WorldGatewayModel.GameMode.SINGLE_PLAYER))
-	var vault_prefix := GameConfig.get_string(DOMAIN_WORLD_STATE_CONFIG, "storage/offline_vault_prefix", "user://offline_vault/")
-	var path_safety := SaveReadinessGuard.evaluate_storage_path_safety("%s%s.sav" % [vault_prefix, slot_id.to_lower()], mode)
-	if not bool(path_safety.get("safe", path_safety.get("is_safe", false))):
-		return UnifiedProtocolFactory.create_response(
-			request.request_id, false, path_safety, "ERR_STORAGE_UNSAFE", "Storage path violates runtime mode isolation policy."
-		)
+	var unsafe_resp := _validate_save_path_safety(request, gateway, slot_id, true)
+	if unsafe_resp != null:
+		return unsafe_resp
 
 	var game_data := _resolve_save_payload(request)
 	if game_data.is_empty():
@@ -139,13 +152,9 @@ static func _handle_esc_exit_to_gateway(request: ClientRequestEnvelopeDTO, gatew
 				return UnifiedProtocolFactory.create_response(
 					request.request_id, false, {}, err_incomplete, "No valid save slot is bound; auto-save operation blocked."
 				)
-			var mode: int = int(gateway.context.selected_mode) if (gateway.context != null and gateway.context.selected_mode != WorldGatewayModel.GameMode.UNSELECTED) else WorldGatewayModel.GameMode.SINGLE_PLAYER
-			var vault_prefix := GameConfig.get_string(DOMAIN_WORLD_STATE_CONFIG, "storage/offline_vault_prefix", "user://offline_vault/")
-			var path_safety := SaveReadinessGuard.evaluate_storage_path_safety("%s%s.sav" % [vault_prefix, slot_id.to_lower()], mode)
-			if not bool(path_safety.get("safe", path_safety.get("is_safe", false))):
-				return UnifiedProtocolFactory.create_response(
-					request.request_id, false, path_safety, "ERR_STORAGE_UNSAFE", "Storage path violates runtime mode isolation policy."
-				)
+			var unsafe_resp := _validate_save_path_safety(request, gateway, slot_id, false)
+			if unsafe_resp != null:
+				return unsafe_resp
 			var auto_payload := _resolve_save_payload(request)
 			if auto_payload.is_empty():
 				if not bool(request.payload.get("allow_skip_unsaved_exit", false)):

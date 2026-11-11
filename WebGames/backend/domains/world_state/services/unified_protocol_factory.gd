@@ -81,15 +81,7 @@ static func create_human_request(
 	character_id: String = ""
 ) -> ClientRequestEnvelopeDTO:
 	return _build_request_envelope(
-		ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI,
-		"REQ_H",
-		domain,
-		action_type,
-		payload,
-		session_token,
-		account_id,
-		character_id,
-		true
+		ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI, domain, action_type, payload, session_token, account_id, character_id
 	)
 
 ## 从既有 AgentActionPacketDTO 转换为统一请求信封（实现双轨统一收口）
@@ -129,28 +121,20 @@ static func create_agent_request(
 	session_token: String = ""
 ) -> ClientRequestEnvelopeDTO:
 	return _build_request_envelope(
-		ClientRequestEnvelopeDTO.ACTOR_AGENT,
-		"REQ_A",
-		domain,
-		action_type,
-		payload,
-		session_token,
-		account_id,
-		character_id,
-		false
+		ClientRequestEnvelopeDTO.ACTOR_AGENT, domain, action_type, payload, session_token, account_id, character_id
 	)
 
 static func _build_request_envelope(
 	actor_type: String,
-	id_prefix: String,
 	domain: String,
 	action_type: String,
 	payload: Dictionary,
 	session_token: String,
 	account_id: String,
-	character_id: String,
-	allocate_lease: bool
+	character_id: String
 ) -> ClientRequestEnvelopeDTO:
+	var is_human: bool = (actor_type == ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI)
+	var id_prefix: String = "REQ_H" if is_human else "REQ_A"
 	var req := ClientRequestEnvelopeDTO.new()
 	req.request_id = "%s_%d_%d" % [id_prefix, Time.get_ticks_msec(), _request_counter]
 	_request_counter += 1
@@ -161,7 +145,7 @@ static func _build_request_envelope(
 	req.session_token = session_token
 	req.account_id = account_id
 	req.character_id = character_id
-	if allocate_lease:
+	if is_human:
 		req.lease_nonce = _lease_counter
 		_lease_counter += 1
 	else:
