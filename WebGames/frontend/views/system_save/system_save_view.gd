@@ -131,7 +131,7 @@ var _tabs = null
 
 func _get_tabs():
 	if _tabs == null:
-		_tabs = SystemSaveTabsClass.new()
+		_tabs = _register_owned_subcontroller(SystemSaveTabsClass.new())
 		_tabs.setup(self)
 	return _tabs
 
@@ -159,11 +159,6 @@ func _ready() -> void:
 
 	# 8. 视图加载后批量视觉适配
 	UIIntermediary.adapt_view(self)
-
-## 视图销毁钩子：清理 UIIntermediary 视图绑定（防悬挂引用）
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE:
-		UIIntermediary.clear_view_bindings(self)
 
 # ==============================================================================
 # 主题应用

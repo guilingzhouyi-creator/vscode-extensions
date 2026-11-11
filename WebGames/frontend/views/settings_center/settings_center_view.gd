@@ -134,7 +134,7 @@ func switch_locale(locale: String) -> void:
 # ==============================================================================
 
 func _ready() -> void:
-	_tabs = SettingsCenterTabsClass.new()
+	_tabs = _register_owned_subcontroller(SettingsCenterTabsClass.new())
 	_tabs.setup(self)
 
 	_apply_theme()
@@ -148,10 +148,6 @@ func _ready() -> void:
 	_connect_signals()
 	_tabs.connect_signals()
 	UIIntermediary.adapt_view(self)
-
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE:
-		UIIntermediary.clear_view_bindings(self)
 
 func _apply_theme() -> void:
 	var tm := ThemeManager.get_instance()

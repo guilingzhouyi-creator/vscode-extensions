@@ -16,6 +16,9 @@ extends BaseScreen
 const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
 const KStatusBarClass = preload("res://frontend/components/k_status_bar.gd")
 
+const THEME_FONT_SIZE: String = "font_size"
+const THEME_FONT_COLOR: String = "font_color"
+
 signal playback_finished()
 signal skip_requested()
 
@@ -82,7 +85,7 @@ func _ensure_assembled() -> void:
 	_subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_subtitle_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_subtitle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_subtitle_label.add_theme_font_size_override("font_size", 22)
+	_subtitle_label.add_theme_font_size_override(THEME_FONT_SIZE, 22)
 	_subtitle_label.add_theme_color_override("font_outline_color", DesignTokens.COLOR_TEXT_OUTLINE)
 	_subtitle_label.add_theme_constant_override("outline_size", 4)
 	_subtitle_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
@@ -113,30 +116,30 @@ func _setup_placeholder_ui() -> void:
 	_placeholder_badge.name = "PlaceholderBadge"
 	_placeholder_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_placeholder_badge.text = "[CG Placeholder]"
-	_placeholder_badge.add_theme_font_size_override("font_size", 14)
-	_placeholder_badge.add_theme_color_override("font_color", DesignTokens.COLOR_ACCENT_GOLD)
+	_placeholder_badge.add_theme_font_size_override(THEME_FONT_SIZE, 14)
+	_placeholder_badge.add_theme_color_override(THEME_FONT_COLOR, DesignTokens.COLOR_ACCENT_GOLD)
 	_placeholder_container.add_child(_placeholder_badge)
 
 	_placeholder_title_label = Label.new()
 	_placeholder_title_label.name = "PlaceholderTitle"
 	_placeholder_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_placeholder_title_label.add_theme_font_size_override("font_size", 24)
-	_placeholder_title_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_PRIMARY)
+	_placeholder_title_label.add_theme_font_size_override(THEME_FONT_SIZE, 24)
+	_placeholder_title_label.add_theme_color_override(THEME_FONT_COLOR, DesignTokens.COLOR_TEXT_PRIMARY)
 	_placeholder_container.add_child(_placeholder_title_label)
 
 	_placeholder_text_label = Label.new()
 	_placeholder_text_label.name = "PlaceholderText"
 	_placeholder_text_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_placeholder_text_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_placeholder_text_label.add_theme_font_size_override("font_size", 16)
-	_placeholder_text_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_SECONDARY)
+	_placeholder_text_label.add_theme_font_size_override(THEME_FONT_SIZE, 16)
+	_placeholder_text_label.add_theme_color_override(THEME_FONT_COLOR, DesignTokens.COLOR_TEXT_SECONDARY)
 	_placeholder_container.add_child(_placeholder_text_label)
 
 	_placeholder_timer_label = Label.new()
 	_placeholder_timer_label.name = "PlaceholderTimer"
 	_placeholder_timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_placeholder_timer_label.add_theme_font_size_override("font_size", 14)
-	_placeholder_timer_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_MUTED)
+	_placeholder_timer_label.add_theme_font_size_override(THEME_FONT_SIZE, 14)
+	_placeholder_timer_label.add_theme_color_override(THEME_FONT_COLOR, DesignTokens.COLOR_TEXT_MUTED)
 	_placeholder_container.add_child(_placeholder_timer_label)
 
 	_placeholder_progress_bar = KStatusBarClass.create_bar(0.0, 1.0, Vector2(400, 6))
@@ -159,8 +162,8 @@ func _setup_skip_ui() -> void:
 	_skip_tip_label = Label.new()
 	_skip_tip_label.name = "SkipTipLabel"
 	_skip_tip_label.text = "[ESC / Space]"
-	_skip_tip_label.add_theme_font_size_override("font_size", 14)
-	_skip_tip_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_MUTED_DEFAULT)
+	_skip_tip_label.add_theme_font_size_override(THEME_FONT_SIZE, 14)
+	_skip_tip_label.add_theme_color_override(THEME_FONT_COLOR, DesignTokens.COLOR_TEXT_MUTED_DEFAULT)
 	_skip_prompt_box.add_child(_skip_tip_label)
 
 	_skip_progress_bar = KStatusBarClass.create_bar(0.0, 1.0, Vector2(80, 8))

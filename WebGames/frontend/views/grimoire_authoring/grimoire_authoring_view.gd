@@ -11,6 +11,8 @@ extends BaseScreen
 const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
 const GrimoireAuthoringTabsClass = preload("res://frontend/views/grimoire_authoring/grimoire_authoring_tabs.gd")
 
+const RARITY_COMMON: String = "common"
+
 # ==============================================================================
 # 节点引用（场景树中以 unique_name_in_owner 标记）
 # ==============================================================================
@@ -82,22 +84,22 @@ var _lib_categories: Array = [
 # --- 魔典数据（12，每分类2本） ---
 var _grimoires: Array = [
 	# 攻击招式 (0)
-	{"id": "GRIM_001", "key": "g001", "rarity": "common", "category": 0, "learned": true},
+	{"id": "GRIM_001", "key": "g001", "rarity": RARITY_COMMON, "category": 0, "learned": true},
 	{"id": "GRIM_002", "key": "g002", "rarity": "rare", "category": 0, "learned": false},
 	# 防御招式 (1)
-	{"id": "GRIM_003", "key": "g003", "rarity": "common", "category": 1, "learned": true},
+	{"id": "GRIM_003", "key": "g003", "rarity": RARITY_COMMON, "category": 1, "learned": true},
 	{"id": "GRIM_004", "key": "g004", "rarity": "rare", "category": 1, "learned": false},
 	# 辅助招式 (2)
-	{"id": "GRIM_005", "key": "g005", "rarity": "common", "category": 2, "learned": true},
-	{"id": "GRIM_006", "key": "g006", "rarity": "common", "category": 2, "learned": false},
+	{"id": "GRIM_005", "key": "g005", "rarity": RARITY_COMMON, "category": 2, "learned": true},
+	{"id": "GRIM_006", "key": "g006", "rarity": RARITY_COMMON, "category": 2, "learned": false},
 	# 控制招式 (3)
 	{"id": "GRIM_007", "key": "g007", "rarity": "rare", "category": 3, "learned": false},
-	{"id": "GRIM_008", "key": "g008", "rarity": "common", "category": 3, "learned": false},
+	{"id": "GRIM_008", "key": "g008", "rarity": RARITY_COMMON, "category": 3, "learned": false},
 	# 位移招式 (4)
-	{"id": "GRIM_009", "key": "g009", "rarity": "common", "category": 4, "learned": true},
-	{"id": "GRIM_010", "key": "g010", "rarity": "common", "category": 4, "learned": false},
+	{"id": "GRIM_009", "key": "g009", "rarity": RARITY_COMMON, "category": 4, "learned": true},
+	{"id": "GRIM_010", "key": "g010", "rarity": RARITY_COMMON, "category": 4, "learned": false},
 	# 被动招式 (5)
-	{"id": "GRIM_011", "key": "g011", "rarity": "common", "category": 5, "learned": true},
+	{"id": "GRIM_011", "key": "g011", "rarity": RARITY_COMMON, "category": 5, "learned": true},
 	{"id": "GRIM_012", "key": "g012", "rarity": "rare", "category": 5, "learned": false},
 ]
 
@@ -156,7 +158,7 @@ func connect_nodes(from_id: String, to_id: String) -> Dictionary:
 
 func _get_tabs():
 	if _tabs == null:
-		_tabs = GrimoireAuthoringTabsClass.new()
+		_tabs = _register_owned_subcontroller(GrimoireAuthoringTabsClass.new())
 		_tabs.setup(self)
 	return _tabs
 
@@ -197,14 +199,6 @@ func _ready() -> void:
 
 	# 10. 视图加载后批量视觉适配
 	UIIntermediary.adapt_view(self)
-
-## 视图销毁钩子：清理 UIIntermediary 视图绑定（防悬挂引用）
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE:
-		UIIntermediary.clear_view_bindings(self)
-		if is_instance_valid(_tabs) and not _tabs.is_inside_tree():
-			_tabs.free()
-		_tabs = null
 
 # ==============================================================================
 # 静态文案初始化（非 @onready 节点通过路径访问）

@@ -18,6 +18,12 @@ const KRarityTag = preload("res://frontend/components/k_rarity_tag.gd")
 const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
 const CraftingWorkshopTabsClass = preload("res://frontend/views/crafting_workshop/crafting_workshop_tabs.gd")
 
+const CATEGORY_WEAPON: String = "weapon"
+const CATEGORY_ARMOR: String = "armor"
+const CATEGORY_MATERIAL: String = "material"
+const RARITY_COMMON: String = "COMMON"
+const RARITY_RARE: String = "RARE"
+
 # ==============================================================================
 # 状态与快照字段
 # ==============================================================================
@@ -106,7 +112,7 @@ var _tabs = null
 
 func _get_tabs():
 	if _tabs == null:
-		_tabs = CraftingWorkshopTabsClass.new()
+		_tabs = _register_owned_subcontroller(CraftingWorkshopTabsClass.new())
 		_tabs.setup(self)
 	return _tabs
 
@@ -147,10 +153,6 @@ func _ready() -> void:
 	tabs._connect_signals()
 	UIIntermediary.adapt_view(self)
 
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE:
-		UIIntermediary.clear_view_bindings(self)
-
 func _apply_theme() -> void:
 	var tm := ThemeManager.get_instance()
 	if tm.theme != null:
@@ -162,18 +164,18 @@ func _apply_theme() -> void:
 
 func _load_mock_data() -> void:
 	var forge_recipes: Array = [
-		{"name": "ui.fe12.mock.forge.mithril_sword", "rarity": "RARE", "category": "weapon", "materials": [ {"name": "ui.fe12.mock.material.mithril_ingot", "qty": 3}, {"name": "ui.fe12.mock.material.iron_ore", "qty": 2}], "enhancement_level": 0, "learned": true},
-		{"name": "ui.fe12.mock.forge.leather_armor", "rarity": "COMMON", "category": "armor", "materials": [ {"name": "ui.fe12.mock.material.leather", "qty": 4}, {"name": "ui.fe12.mock.material.thread", "qty": 2}], "enhancement_level": 2, "learned": true},
-		{"name": "ui.fe12.mock.forge.wind_bow", "rarity": "RARE", "category": "weapon", "materials": [ {"name": "ui.fe12.mock.material.wood", "qty": 5}, {"name": "ui.fe12.mock.material.thread", "qty": 1}], "enhancement_level": 0, "learned": false},
-		{"name": "ui.fe12.mock.forge.arcane_staff", "rarity": "EPIC", "category": "weapon", "materials": [ {"name": "ui.fe12.mock.material.mana_shard", "qty": 6}, {"name": "ui.fe12.mock.material.wood", "qty": 3}], "enhancement_level": 0, "learned": true},
-		{"name": "ui.fe12.mock.forge.dragon_armor", "rarity": "LEGENDARY", "category": "armor", "materials": [ {"name": "ui.fe12.mock.material.dragon_scale", "qty": 8}, {"name": "ui.fe12.mock.material.mithril_ingot", "qty": 4}], "enhancement_level": 0, "learned": false},
+		{"name": "ui.fe12.mock.forge.mithril_sword", "rarity": RARITY_RARE, "category": CATEGORY_WEAPON, "materials": [ {"name": "ui.fe12.mock.material.mithril_ingot", "qty": 3}, {"name": "ui.fe12.mock.material.iron_ore", "qty": 2}], "enhancement_level": 0, "learned": true},
+		{"name": "ui.fe12.mock.forge.leather_armor", "rarity": RARITY_COMMON, "category": CATEGORY_ARMOR, "materials": [ {"name": "ui.fe12.mock.material.leather", "qty": 4}, {"name": "ui.fe12.mock.material.thread", "qty": 2}], "enhancement_level": 2, "learned": true},
+		{"name": "ui.fe12.mock.forge.wind_bow", "rarity": RARITY_RARE, "category": CATEGORY_WEAPON, "materials": [ {"name": "ui.fe12.mock.material.wood", "qty": 5}, {"name": "ui.fe12.mock.material.thread", "qty": 1}], "enhancement_level": 0, "learned": false},
+		{"name": "ui.fe12.mock.forge.arcane_staff", "rarity": "EPIC", "category": CATEGORY_WEAPON, "materials": [ {"name": "ui.fe12.mock.material.mana_shard", "qty": 6}, {"name": "ui.fe12.mock.material.wood", "qty": 3}], "enhancement_level": 0, "learned": true},
+		{"name": "ui.fe12.mock.forge.dragon_armor", "rarity": "LEGENDARY", "category": CATEGORY_ARMOR, "materials": [ {"name": "ui.fe12.mock.material.dragon_scale", "qty": 8}, {"name": "ui.fe12.mock.material.mithril_ingot", "qty": 4}], "enhancement_level": 0, "learned": false},
 	]
 	var recipe_catalog: Array = forge_recipes.duplicate(true)
 	var dismantle_items: Array = [
-		{"name": "ui.fe12.mock.dismantle.old_sword", "rarity": "COMMON", "category": "weapon", "qty": 2, "yield": [ {"name": "ui.fe12.mock.material.iron_ore", "qty": 3}]},
-		{"name": "ui.fe12.mock.dismantle.old_leather", "rarity": "COMMON", "category": "armor", "qty": 1, "yield": [ {"name": "ui.fe12.mock.material.leather", "qty": 2}]},
-		{"name": "ui.fe12.mock.dismantle.broken_staff", "rarity": "RARE", "category": "weapon", "qty": 1, "yield": [ {"name": "ui.fe12.mock.material.mana_shard", "qty": 2}, {"name": "ui.fe12.mock.material.wood", "qty": 2}]},
-		{"name": "ui.fe12.mock.dismantle.excess_mithril", "rarity": "RARE", "category": "material", "qty": 5, "yield": [ {"name": "ui.fe12.mock.material.mana_shard", "qty": 1}]},
+		{"name": "ui.fe12.mock.dismantle.old_sword", "rarity": RARITY_COMMON, "category": CATEGORY_WEAPON, "qty": 2, "yield": [ {"name": "ui.fe12.mock.material.iron_ore", "qty": 3}]},
+		{"name": "ui.fe12.mock.dismantle.old_leather", "rarity": RARITY_COMMON, "category": CATEGORY_ARMOR, "qty": 1, "yield": [ {"name": "ui.fe12.mock.material.leather", "qty": 2}]},
+		{"name": "ui.fe12.mock.dismantle.broken_staff", "rarity": RARITY_RARE, "category": CATEGORY_WEAPON, "qty": 1, "yield": [ {"name": "ui.fe12.mock.material.mana_shard", "qty": 2}, {"name": "ui.fe12.mock.material.wood", "qty": 2}]},
+		{"name": "ui.fe12.mock.dismantle.excess_mithril", "rarity": RARITY_RARE, "category": CATEGORY_MATERIAL, "qty": 5, "yield": [ {"name": "ui.fe12.mock.material.mana_shard", "qty": 1}]},
 	]
 	var materials: Array = _get_tabs().get_default_materials()
 	apply_snapshot({
