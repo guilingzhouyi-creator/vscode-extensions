@@ -4,8 +4,8 @@
  * File Path: scripts/validate-name-integrity.js
  * Architecture Role: Pins the naming contract that decides whether a generated identifier explains
  *   the literal it replaces. The rules exist so a suggestion cannot be accepted merely because it
- *   is syntactically valid: it must carry the literal's words, in order, and must not be a contentless
- *   placeholder that merely renames the noise.
+ *   is syntactically valid: it must carry the literal words, in order, and must not be a
+ *   contentless placeholder that merely renames the noise.
  * Dependencies & Triggers: consumes ../dist/core/naming/name-integrity and
  *   ../dist/utils/placeholder-names; registered in scripts/test-parallel.js.
  * Responsibilities:
@@ -27,9 +27,7 @@ const ROOT = path.join(__dirname, '..');
 const { deriveLiteralWords, splitNameWords, isNameExplainableByLiteral } = require(
   path.join(ROOT, 'dist/core/naming/name-integrity'),
 );
-const { isContentlessName, isWeldName } = require(
-  path.join(ROOT, 'dist/utils/placeholder-names'),
-);
+const { isContentlessName, isWeldName } = require(path.join(ROOT, 'dist/utils/placeholder-names'));
 
 /**
  * Runs one named assertion and records its verdict.
@@ -74,7 +72,10 @@ check(
 check(
   'explainability accepts the matching name and rejects the mismatched literal',
   () => {
-    assert.strictEqual(isNameExplainableByLiteral('approvalWindowSize', 'Approval Window Size'), true);
+    assert.strictEqual(
+      isNameExplainableByLiteral('approvalWindowSize', 'Approval Window Size'),
+      true,
+    );
     assert.strictEqual(isNameExplainableByLiteral('footerLabel', 'Approval Window Size'), false);
   },
   results,
@@ -103,7 +104,9 @@ check(
 
 const failed = results.filter((entry) => !entry.ok);
 for (const entry of results) {
-  console.log(`${entry.ok ? 'PASS' : 'FAIL'} ${entry.name}${entry.ok ? '' : ` — ${entry.message}`}`);
+  console.log(
+    `${entry.ok ? 'PASS' : 'FAIL'} ${entry.name}${entry.ok ? '' : ` — ${entry.message}`}`,
+  );
 }
 if (failed.length > 0) {
   console.error(`\n${failed.length}/${results.length} naming assertions failed.`);
