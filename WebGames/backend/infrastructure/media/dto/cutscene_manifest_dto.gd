@@ -3,9 +3,9 @@
 # 文件路径: res://backend/infrastructure/media/dto/cutscene_manifest_dto.gd
 # 架构定位: Infrastructure Data Transfer Object (DTO) / Media Manifest
 # 依赖与触发: 上游: GameConfig, CutsceneRegistry | 下游: CutsceneHookRegistry, CutsceneOrchestrator
-# 职责说明: 描述单个 CG 视频资产静态元数据规格（路径、时长、默认音轨、字幕映射及文字占位信息）；
+# 职责说明: 描述单个 CG 视频资产静态元数据规格（路径、时长、默认音轨、字幕映射及文字演播信息）；
 #           对齐配置驱动规范，为 MOD 扩展与全域无硬编码调用提供资产清单真源；
-#           天然兼容艺术资源尚未就位时的文字占位与演示描述。
+#           天然兼容艺术资源尚未就位时的文字演播与演示描述。
 # 退出语义与设计依据: 业务领域第一性原理与媒体资产元数据清单规约 (Inv-ZERO-HARDCODE-1)
 # ==============================================================================
 

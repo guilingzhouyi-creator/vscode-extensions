@@ -5,7 +5,7 @@
 # 依赖与触发: 上游: CutsceneHookRegistry, NarrativeDag, QuestCausality | 下游: CutsceneOrchestrator, CutscenePlayerView
 # 职责说明: 封装跨域播放视频/CG的强类型请求信封；承载跳过阈值、音量、音频总线、淡入淡出、字幕轨及回调；
 #           彻底解耦剧情与媒体实现，杜绝任何剧情脚本内的物理路径与播放器硬编码；
-#           天然支持早期无艺术资源下的文字占位演出（Text Placeholder）与主线程通用调度。
+#           天然支持早期无艺术资源下的文字演播回退（Text Presentation Fallback）与主线程通用调度。
 # 退出语义与设计依据: 业务领域第一性原理与参数化请求信封契约 (Inv-REENTRANT-DTO-3)
 # ==============================================================================
 
@@ -20,19 +20,19 @@ extends RefCounted
 ## 唯一 CG/视频语义标识符（对应配置表注册项，如 "cs_act1_awakening"）
 var cutscene_id: String = ""
 
-## 资源物理路径（若为空或无物理文件则自动回退至文字占位演出）
+## 资源物理路径（若为空或无物理文件则自动回退至文字演播）
 var video_path: String = ""
 
-## 是否处于占位/文字演出状态（默认 false，若物理文件不存在可自动激活）
+## 是否处于文字回退演播状态（默认 false，若物理文件不存在可自动激活）
 var is_placeholder: bool = false
 
-## 占位演示标题（如 "序幕觉醒" 或配置文案键）
+## 演播回退演示标题（如 "序幕觉醒" 或配置文案键）
 var placeholder_title: String = ""
 
-## 占位文字/剧本文本（无真实艺术视频时的文字占位内容）
+## 演播回退剧本文本（无真实艺术视频时的文字演播内容）
 var placeholder_text: String = ""
 
-## 演示播放总时长（秒；文字占位或无文件时自动按此时长倒计时完结）
+## 演示播放总时长（秒；文字演播或无文件时自动按此时长倒计时完结）
 var duration_sec: float = 3.0
 
 ## 跳过提示文案（如 "[ESC / Space] 跳过"；留空则由视口动态格式化）

@@ -6,7 +6,7 @@
 # 职责说明: 提供全域艺术资源（官方资产与 MOD 资产）的标准目录拓扑寻址与 URI 协议解析；
 #           严格区分工程版（Engineering Dev Build）与正式发行版（Release Build）的读盘策略；
 #           防御外部 MOD 路径穿越攻击（Anti-Path Traversal），为全域加载系统提供单一真源路径。
-# 退出语义与设计依据: 工业级三级级联安全路径隔离与双轨环境规约 (Inv-MOD-RELPATH-1 / Inv-PATH-TRAVERSAL-GUARD)
+# 退出语义与设计依据: 三级级联安全路径隔离与双轨环境规约 (Inv-MOD-RELPATH-1 / Inv-PATH-TRAVERSAL-GUARD)
 # ==============================================================================
 
 ## AssetPathResolver：全域艺术资源标准化寻址与环境裁决中枢
@@ -17,7 +17,7 @@ extends RefCounted
 # 一、环境枚举与标准目录常量定义
 # ==============================================================================
 
-## 运行环境标识：工程开发版（编辑器调试、无头单测、松散文件、占位优先）
+## 运行环境标识：工程开发版（编辑器调试、无头单测、松散文件、备用兜底优先）
 const ENV_ENGINEERING: String = "engineering"
 
 ## 运行环境标识：正式发行版（独立二进制、PCK封包、沙盒安全、强校验）
@@ -95,7 +95,7 @@ static func get_current_build_mode() -> String:
 
 	return ENV_ENGINEERING
 
-## 判定当前是否为工程开发版（宽松容错、文字占位演播、明文扫盘）
+## 判定当前是否为工程开发版（宽松容错、文字模拟演播、明文扫盘）
 static func is_engineering_build() -> bool:
 	return get_current_build_mode() == ENV_ENGINEERING
 
@@ -165,8 +165,12 @@ static func resolve_mod_asset_path(mod_id: String, relative_asset_path: String) 
 		var target_path := root_dir.path_join(clean_mod_id).path_join("assets").path_join(safe_rel_path)
 		if asset_exists(target_path):
 			return target_path
+		# 兼容剧情模组专用子目录 (mods/narratives/<mod_id>/assets/...)
+		var narrative_path := root_dir.path_join("narratives").path_join(clean_mod_id).path_join("assets").path_join(safe_rel_path)
+		if asset_exists(narrative_path):
+			return narrative_path
 
-	# 若三级级联均未探测到物理文件，返回首选沙盒物理路径（供占位探测或新建装配）
+	# 若三级级联均未探测到物理文件，返回首选沙盒物理路径（供资源探测或新建装配）
 	if is_engineering_build():
 		return ROOT_MODS_TIER0_DEV.path_join(clean_mod_id).path_join("assets").path_join(safe_rel_path)
 	return ROOT_MODS_TIER2_USER_SANDBOX.path_join(clean_mod_id).path_join("assets").path_join(safe_rel_path)

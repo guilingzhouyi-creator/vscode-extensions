@@ -5,7 +5,7 @@
 # 依赖与触发: 上游: CutsceneOrchestrator, CutscenePreloadPredictor | 下游: ResourceLoader, VideoStream
 # 职责说明: 负责视频与 CG 资源的异步非阻塞流式装载，将大体积磁盘 IO 从主线程彻底剥离；
 #           提供定容 LRU 显存/内存淘汰保护、取消令牌与针对无头自动化测试的确定性步进仿真；
-#           当物理艺术资源尚未就位时，自动降级为占位资源立即放行，杜绝主线程悬挂卡顿。
+#           当物理艺术资源尚未就位时，自动降级为虚拟回退资源立即放行，杜绝主线程悬挂卡顿。
 # 退出语义与设计依据: 零阻塞帧循环与高承压有界缓存规约 (Inv-NONBLOCK-LOAD-1 / Inv-LRU-BOUND-2)
 # ==============================================================================
 
@@ -211,7 +211,7 @@ func cancel_task(task_id: int) -> bool:
 	_active_tasks.erase(task_id)
 	return true
 
-## 同步快速判定某资源是否已在内存缓存就绪（无物理文件时直接判定就绪以进入占位播放）
+## 同步快速判定某资源是否已在内存缓存就绪（无物理文件时直接判定就绪以进入模拟回退播放）
 func is_resource_ready(resource_path: String) -> bool:
 	var canonical_path := AssetPathResolverClass.resolve_unified_uri(resource_path)
 	if _lru_cache.has(canonical_path):

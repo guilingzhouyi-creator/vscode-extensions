@@ -26,6 +26,7 @@ const WorldArchiveRepository = preload("res://backend/domains/world_state/world_
 const AuthService = preload("res://backend/domains/account/auth_service.gd")
 const PrologueCutscenePort = preload("res://backend/domains/character_creation/prologue_cutscene_port.gd")
 const CutsceneOrchestrator = preload("res://backend/infrastructure/media/cutscene_orchestrator.gd")
+const ClientSecretVault = preload("res://backend/infrastructure/client_secret_vault.gd")
 
 static func _ensure_telemetry_pool(pool_name: String, factory: Callable) -> void:
 	ObjectPoolManager.initialize()
@@ -76,6 +77,8 @@ static func assemble() -> Dictionary:
 	AgentTelemetryPoolRegistry.ensure_pools_registered()
 	# EventBus 2.0 生产单例装配（配置驱动参数；幂等，get_instance 惰性创建）
 	EventBusCore.get_instance().initialize_from_config()
+	# 启动期安全巡检：清理超过保留期的历史轮转归档日志
+	LogRetentionCleaner.sweep()
 	if not _security_ready():
 		return {"success": false, "error_code": "SECURITY_CONFIG_INVALID"}
 	# 魔法体系统一登记注册表唯一装配——就绪失败阻断装配（不暴露半成品）
@@ -92,6 +95,10 @@ static func assemble() -> Dictionary:
 	# 掉落事件监听器装配（注入注册表 catalog，订阅 monster.killed → 地面掉落声明）
 	_ground_loot_listener = GroundLootEventListener.new(_catalog)
 	PrologueCutscenePort.register_runner(Callable(GameBootstrap, "_run_prologue_cutscene_hook"))
+	WorldSessionRuntimeService.register_token_protection_handlers(
+		Callable(ClientSecretVault, "mask_in_memory_token"),
+		Callable(ClientSecretVault, "reveal_in_memory_token")
+	)
 	GmCommandCatalog.register_default_commands()
 	_assembled = true
 	return {

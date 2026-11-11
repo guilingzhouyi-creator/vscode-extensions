@@ -448,7 +448,7 @@ func emit_domain_event(channel: String, payload: Dictionary = {}) -> void:
 	if not text.is_empty():
 		emit_narrative(text, String(payload.get("category_key", "system")), payload)
 
-## 广播结构化日志记录：统一入环 + 旁路导出 + 遥测聚合（序号唯一签发，Inv-LG-3）
+## 广播结构化日志记录：统一入环 + 旁路导出 + 遥测聚合 + 控制台穿透（序号唯一签发，Inv-LG-3）
 func emit_log_record(record: LogRecordDTO) -> void:
 	if record == null:
 		return
@@ -456,6 +456,7 @@ func emit_log_record(record: LogRecordDTO) -> void:
 	record.sequence = _record_seq
 	var packet := borrow_packet(EventChannelDefinition.LOG_RECORD_POSTED, EventCategoryMask.SYSTEM_TELEMETRY)
 	packet.payload_dto = record
+	packet.payload_data = record.to_dto()
 	packet.narrative_key = record.message
 	dispatch_now(packet)
 	recycle_packet(packet)
@@ -467,6 +468,37 @@ func emit_log_record(record: LogRecordDTO) -> void:
 		srec = StructuredLogRecord.from_dto(record.to_dto())
 	LogRingBuffer.append(srec)
 	TelemetryAggregate.consume(srec)
+	_dispatch_console_log(record)
+
+## 控制台标准输出穿透分发（受 log.json/console 配置驱动，保障构建与排查端可见性）
+func _dispatch_console_log(record: LogRecordDTO) -> void:
+	if record == null:
+		return
+	var console_cfg: Dictionary = GameConfig.get_dict("infrastructure.log", "console", {})
+	if not bool(console_cfg.get("enabled", true)):
+		return
+	var min_level: String = str(console_cfg.get("min_level", "warn")).to_lower()
+	if _level_rank(record.level) < _level_rank(min_level):
+		return
+	var ch: String = record.channel if not record.channel.is_empty() else "system"
+	var formatted: String = "[%s][%s] %s" % [record.level.to_upper(), ch, record.message]
+	if record.context.has("diagnostic_detail"):
+		formatted += " | detail: %s" % str(record.context["diagnostic_detail"])
+	if not record.error_code.is_empty():
+		formatted += " (code: %s)" % record.error_code
+	if record.level.to_lower() == "error" or record.level.to_lower() == "critical":
+		printerr(formatted)
+	else:
+		print_rich(formatted)
+
+func _level_rank(lvl: String) -> int:
+	match lvl.to_lower():
+		"debug": return 10
+		"info": return 20
+		"warn", "warning": return 30
+		"error": return 40
+		"fatal", "critical": return 50
+		_: return 20
 
 ## 便捷日志入口：按 level_key + 原文构造 DTO 并委托 emit_log_record
 func emit_log(level_key: String, msg: String) -> void:

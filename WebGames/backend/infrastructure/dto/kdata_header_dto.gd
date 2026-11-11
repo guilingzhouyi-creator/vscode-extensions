@@ -5,7 +5,7 @@
 # 依赖与触发: 上游: BinaryConfigReader, GameConfig | 下游: StreamPeerBuffer, PackedByteArray | 配置: 无 | 信号: 无
 # 职责说明: .kdat 高纯度二进制流 32 字节定长 Header 强类型数据传输对象；
 #           负责魔数、协议版本、压缩标记与 CRC 校验字段的装配、校验与序列化。
-# 退出语义与设计依据: 工业级二进制容器规约与卡拉尔架构解耦契约 (Inv-KDAT-MAGIC-PARITY-1)
+# 退出语义与设计依据: 生产级二进制容器规约与卡拉尔架构解耦契约 (Inv-KDAT-MAGIC-PARITY-1)
 # ==============================================================================
 
 ## KDataHeaderDTO：.kdat 二进制流定长 Header 数据传输对象

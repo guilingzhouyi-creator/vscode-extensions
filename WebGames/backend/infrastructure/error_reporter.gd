@@ -42,9 +42,13 @@ static func emit_error(
 	record.error_code = final_code
 	record.message = final_message
 	# 所有权隔离 + 构造期脱敏（· Inv-LS-2 安全红线）：
-	# 本路径不经 LogCollector，若仅依赖规范链路脱敏，context 中的 token/secret
-	# 会经 EventBus → LogFileExporter 明文落盘（审查发现的脱敏接线缺口）。
-	var redacted := RedactionRule.apply(context)
+	# 保留动态诊断信息与未登记码本体至 context，避免静态模板抹杀排查线索
+	var final_context := context.duplicate(true)
+	if not message.is_empty() and final_message != message:
+		final_context["diagnostic_detail"] = message
+	if entry == null and error_code != "ERR_UNKNOWN":
+		final_context["unregistered_error_code"] = error_code
+	var redacted := RedactionRule.apply(final_context)
 	record.context = redacted["dict"]
 
 	EventBusCore.get_instance().emit_log_record(record)

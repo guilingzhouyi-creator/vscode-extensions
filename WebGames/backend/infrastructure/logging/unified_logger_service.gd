@@ -167,10 +167,12 @@ func _dispatch_record(p_rec: LogRecord) -> void:
 		srec.message = p_rec.message
 		srec.error_code = p_rec.event_code
 		srec.trace_id = p_rec.correlation_id
-		srec.context = p_rec.context.duplicate(true)
+		var redacted := RedactionRule.apply(p_rec.context)
+		srec.context = redacted["dict"]
 		srec.timestamp_utc = int(p_rec.timestamp)
 		srec.event_category = p_rec.domain
-		# 单机隔离：StructuredLogRecord 入环与遥测由 EventBus 统一调度，此处直入缓冲避免循环广播
+		# 经 Redaction 校验后统一落盘、入环与遥测
+		LogFileExporter.consume(srec)
 		LogRingBuffer.append(srec)
 		TelemetryAggregate.consume(srec)
 		if _metric_sink != null and _metric_sink.has_method("record_metric"):

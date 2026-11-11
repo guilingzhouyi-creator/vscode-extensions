@@ -6,7 +6,7 @@
 # 职责说明: 高性能流式解析 .kdat 高纯度紧凑二进制流；
 #           负责魔数拦截、CRC32 完整性校验、DEFLATE 解压、字符串驻留池还原与 TLV 装配；
 #           支持单表极速读取与全库单包融合模式 (Monolithic Bundle) 的 TOC 索引解析。
-# 退出语义与设计依据: 工业级二进制容器规约 (Inv-KDAT-MAGIC-PARITY-1 / Inv-ZERO-HEAP-DECODE-2)
+# 退出语义与设计依据: 生产级二进制容器规约 (Inv-KDAT-MAGIC-PARITY-1 / Inv-ZERO-HEAP-DECODE-2)
 # ==============================================================================
 
 ## BinaryConfigReader：.kdat 高纯度二进制数据流高性能解码器

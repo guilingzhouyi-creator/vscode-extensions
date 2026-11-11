@@ -3,7 +3,7 @@
 # 文件路径: res://backend/infrastructure/media/cutscene_orchestrator.gd
 # 架构定位: Playback Lifecycle Orchestrator / Headless FSM Coordinator
 # 依赖与触发: 上游: NarrativeDag, QuestCausality, CutsceneHookRegistry | 下游: CutsceneAsyncLoader, EventBusCore, Presenter
-# 职责说明: 编排 CG 视频播放全生命周期状态跃迁（缓冲、解码、文字占位、字幕同步、跳过、完结）；
+# 职责说明: 编排 CG 视频播放全生命周期状态跃迁（缓冲、解码、文字演播、字幕同步、跳过、完结）；
 #           向全域广播强类型事件（cutscene.started / finished / skipped），
 #           并协调恢复被挂起的剧情主流程，支持主线程一键调用与无头自动化测试的确定性步进仿真。
 # 退出语义与设计依据: 状态机单向流转与可重入安全编排规约 (Inv-REENTRANT-DTO-3)
@@ -63,7 +63,7 @@ func parse_and_play(payload: Dictionary) -> Dictionary:
 	var req := CutsceneRequestDTOClass.from_dict(payload)
 	return play_cutscene(req)
 
-## 启动播放流程（支持参数化请求信封与文字占位优雅降级）
+## 启动播放流程（支持参数化请求信封与文字演播优雅降级）
 func play_cutscene(req: CutsceneRequestDTO) -> Dictionary:
 	if req == null or req.cutscene_id.is_empty():
 		return {"success": false, "error_code": "INVALID_REQUEST"}
