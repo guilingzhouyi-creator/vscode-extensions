@@ -37,7 +37,8 @@ export const TRAJECTORY_BORDERS = Object.freeze({
     TOP: '┌─────────────────────────────────────────────────────────────────────────────┐',
     MIDDLE: '├─────────────────────────────────────────────────────────────────────────────┤',
     BOTTOM: '└─────────────────────────────────────────────────────────────────────────────┘',
-    HEADER_SEPARATOR: '│ ──────────────────  ─────  ────────  ───────────  ─────────────────  ──────  ───── │',
+    HEADER_SEPARATOR:
+        '│ ──────────────────  ─────  ────────  ───────────  ─────────────────  ──────  ───── │',
     FILE_FOOTER: '========================================\n',
 });
 
@@ -92,16 +93,26 @@ export function formatBucketRow(snapshot: TimelineBucketSnapshot): string {
         return `│ ── ${snapshot.bucketId.padEnd(IDLE_LINE_WIDTH, '·')} 0 runs │`;
     }
 
-    const bucketIdColumn = snapshot.bucketId.padEnd(BUCKET_ID_COL_WIDTH).slice(0, BUCKET_ID_COL_WIDTH);
+    const bucketIdColumn = snapshot.bucketId
+        .padEnd(BUCKET_ID_COL_WIDTH)
+        .slice(0, BUCKET_ID_COL_WIDTH);
     const runsCountColumn = String(snapshot.runsCount).padStart(RUNS_COL_WIDTH);
-    const semanticColumn = `${(snapshot.semanticEloc / NUM_THOUSAND).toFixed(1)}k`.padStart(SEMANTIC_COL_WIDTH);
+    const semanticColumn = `${(snapshot.semanticEloc / NUM_THOUSAND).toFixed(1)}k`.padStart(
+        SEMANTIC_COL_WIDTH,
+    );
     const netSign = snapshot.debtResolved >= snapshot.debtAdded ? '-' : '+';
     const debtDeltaValue = Math.abs(snapshot.debtResolved - snapshot.debtAdded);
     const debtDeltaColumn = `${netSign}${debtDeltaValue} pts`.padStart(DEBT_DELTA_COL_WIDTH);
     const scoreRangeText = `[${snapshot.scoreFloor.toFixed(1)}~${snapshot.scoreCeiling.toFixed(1)}]`;
-    const scoreRangeColumn = `${snapshot.latestScore.toFixed(2)} ${scoreRangeText}`.padEnd(SCORE_RANGE_COL_WIDTH).slice(0, SCORE_RANGE_COL_WIDTH);
-    const weightedMeanColumn = snapshot.weightedMeanScore.toFixed(2).padStart(METRIC_SCORE_COL_WIDTH);
-    const gatePassRateColumn = `${snapshot.gatePassRate.toFixed(1)}%`.padStart(METRIC_SCORE_COL_WIDTH);
+    const scoreRangeColumn = `${snapshot.latestScore.toFixed(2)} ${scoreRangeText}`
+        .padEnd(SCORE_RANGE_COL_WIDTH)
+        .slice(0, SCORE_RANGE_COL_WIDTH);
+    const weightedMeanColumn = snapshot.weightedMeanScore
+        .toFixed(2)
+        .padStart(METRIC_SCORE_COL_WIDTH);
+    const gatePassRateColumn = `${snapshot.gatePassRate.toFixed(1)}%`.padStart(
+        METRIC_SCORE_COL_WIDTH,
+    );
 
     return `│ ${bucketIdColumn} ${runsCountColumn} ${semanticColumn} ${debtDeltaColumn} ${scoreRangeColumn} ${weightedMeanColumn} ${gatePassRateColumn} │`;
 }
@@ -121,7 +132,9 @@ export function renderRollingMomentsSection(rootDir: string): string[] {
     lines.push(`│ 📊 TEMPORAL ROLLING EQUILIBRIUM (Multi-Pass Moments)                        │`);
 
     if (telemetry.sampleCount === 0) {
-        lines.push(`│ • Rolling Buffer: No active multi-pass samples recorded in cache.           │`);
+        lines.push(
+            `│ • Rolling Buffer: No active multi-pass samples recorded in cache.           │`,
+        );
     } else {
         const fastLine = `• Fast  Pass (N=5)  : Mean ${telemetry.fastWindow.mean.toFixed(2)} | σ ${telemetry.fastWindow.stdDev.toFixed(2)}  [Recent Mutation Window]`;
         const mesoLine = `• Meso  Pass (N=20) : Mean ${telemetry.mesoWindow.mean.toFixed(2)} | σ ${telemetry.mesoWindow.stdDev.toFixed(2)}  [Medium Equilibrium]`;
@@ -153,11 +166,15 @@ export function renderTimelineTableSection(
     lines.push(TRAJECTORY_BORDERS.MIDDLE);
     const headerTitle = `⏱️  VIRTUAL TIMELINE PROJECTION (Bucket: ${report.bucketType}, Adaptive Folded)`;
     lines.push(`│ ${headerTitle.padEnd(TRAJECTORY_FORMAT_METRICS.LINE_CONTENT_WIDTH)} │`);
-    lines.push(`│ RELATIVE WINDOW      RUNS  SEM_ELOC    DEBT(Δ)     LATEST [RANGE]   W_MEAN    GATE │`);
+    lines.push(
+        `│ RELATIVE WINDOW      RUNS  SEM_ELOC    DEBT(Δ)     LATEST [RANGE]   W_MEAN    GATE │`,
+    );
     lines.push(TRAJECTORY_BORDERS.HEADER_SEPARATOR);
 
     if (report.buckets.length === 0) {
-        lines.push(`│ No trajectory runs recorded in the requested time interval.                 │`);
+        lines.push(
+            `│ No trajectory runs recorded in the requested time interval.                 │`,
+        );
     } else {
         for (const bucket of report.buckets) {
             lines.push(formatBucketRow(bucket));
@@ -194,14 +211,22 @@ export function buildFileTrajectoryText(targetFile: string): string {
 
     const lines: string[] = [];
     lines.push(`\n=== Change Trajectory: ${targetFile} ===`);
-    lines.push(`Total Revisions: ${fileTrajectory.totalRevisions} | Agents: ${fileTrajectory.participatingAgents.join(', ')}`);
+    lines.push(
+        `Total Revisions: ${fileTrajectory.totalRevisions} | Agents: ${fileTrajectory.participatingAgents.join(', ')}`,
+    );
 
     for (const revision of fileTrajectory.revisions) {
         const score = revision.qualityScore?.compositeScore;
-        const scoreText = typeof score === 'number' && Number.isFinite(score) ? score.toFixed(2) : 'N/A';
+        const scoreText =
+            typeof score === 'number' && Number.isFinite(score) ? score.toFixed(2) : 'N/A';
         const dateStr = new Date(revision.timestamp).toISOString();
-        const shortRev = revision.revisionId.slice(0, TRAJECTORY_FORMAT_METRICS.REVISION_DISPLAY_LENGTH);
-        lines.push(`  • [${dateStr}] Rev ${shortRev} by Agent: ${revision.agentUid} | Score: ${scoreText}`);
+        const shortRev = revision.revisionId.slice(
+            0,
+            TRAJECTORY_FORMAT_METRICS.REVISION_DISPLAY_LENGTH,
+        );
+        lines.push(
+            `  • [${dateStr}] Rev ${shortRev} by Agent: ${revision.agentUid} | Score: ${scoreText}`,
+        );
     }
 
     if (fileTrajectory.activeAnomalies.length > 0) {

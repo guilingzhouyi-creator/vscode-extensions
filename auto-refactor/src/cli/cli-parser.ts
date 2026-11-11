@@ -125,7 +125,8 @@ const VALID_PROFILES_DEF = 'frontend backend composite';
 const VALID_FORMATS_DEF = 'json sarif text agent capp compact praxis aas';
 const VALID_COMMENT_LEVELS_DEF = 'off basic standard strict';
 const VALID_SECURITY_LEVELS_DEF = 'off basic full';
-const KNOWN_CLI_SUBCOMMANDS_DEF = 'scan daemon self-test review symbols guide trajectory memory stats';
+const KNOWN_CLI_SUBCOMMANDS_DEF =
+    'scan daemon self-test review symbols guide trajectory memory stats';
 
 function parseMappingTable<T extends Record<string, string>>(tableDefinition: string): Readonly<T> {
     const tableResult: Record<string, string> = {};

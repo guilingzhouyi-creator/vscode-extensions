@@ -232,7 +232,10 @@ export class DaemonClient {
     private executeTimedRequest<T>(
         timeoutMs: number,
         timeoutMessage: string,
-        registerPending: (pending: { resolve: (payload: T) => void; reject: (err: Error) => void }) => void,
+        registerPending: (pending: {
+            resolve: (payload: T) => void;
+            reject: (err: Error) => void;
+        }) => void,
         dispatchSend: (messageId: number, requestId: string) => void,
     ): Promise<T> {
         return new Promise<T>((resolve, reject) => {

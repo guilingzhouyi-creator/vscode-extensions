@@ -211,10 +211,15 @@ async function buildUnifiedDashboard(
     lines.push(TRAJECTORY_BORDERS.TOP);
     lines.push(`│ 🚀 AUTO-REFACTOR INTEGRATED TRAJECTORY TELEMETRY                            │`);
     lines.push(TRAJECTORY_BORDERS.MIDDLE);
-    lines.push(`│ Target Scope : ${rootDir.padEnd(TARGET_SCOPE_WIDTH).slice(0, TARGET_SCOPE_WIDTH)} │`);
+    lines.push(
+        `│ Target Scope : ${rootDir.padEnd(TARGET_SCOPE_WIDTH).slice(0, TARGET_SCOPE_WIDTH)} │`,
+    );
 
     if (lifetime) {
-        const equivalentLocMillions = ((lifetime.eloc.processedTotal * LOC_TO_EQUIV_RATIO) / MILLION_DIVISOR).toFixed(2);
+        const equivalentLocMillions = (
+            (lifetime.eloc.processedTotal * LOC_TO_EQUIV_RATIO) /
+            MILLION_DIVISOR
+        ).toFixed(2);
         const lifetimeLine = `Lifetime Totals: ${lifetime.totalRuns} runs | ${lifetime.eloc.processedTotal.toLocaleString()} ELOC (~${equivalentLocMillions}M eqLOC) | Net: +${lifetime.debt.totalResolved - lifetime.debt.totalAdded} pts`;
         const floorScore = lifetime.stability?.scoreFloor ?? lifetime.meanCompositeScore;
         const scoreLine = `Quality Baseline: Mean ${lifetime.meanCompositeScore} / 100 | Floor ${floorScore} | Pass Rate: ${lifetime.gatePassRate}%`;
@@ -233,7 +238,9 @@ async function buildUnifiedDashboard(
     lines.push(TRAJECTORY_BORDERS.BOTTOM);
 
     if (timelineReport.malformedLinesCount > 0) {
-        lines.push(`[Notice: Isolated and skipped ${timelineReport.malformedLinesCount} malformed NDJSON log line(s)]`);
+        lines.push(
+            `[Notice: Isolated and skipped ${timelineReport.malformedLinesCount} malformed NDJSON log line(s)]`,
+        );
     }
 
     return lines.join('\n');
@@ -259,13 +266,18 @@ async function writeOutputToFile(destinationFilePath: string, content: string): 
  * @param args CLI argument tokens.
  * @returns Result object containing text presentation and exit code.
  */
-export async function executeTrajectoryCommand(args: string[]): Promise<{ text: string; code: number }> {
+export async function executeTrajectoryCommand(
+    args: string[],
+): Promise<{ text: string; code: number }> {
     const options = parseTrajectoryArgs(args);
 
     if (options.targetFile) {
         const fileTrajectoryText = buildFileTrajectoryText(options.targetFile);
         if (options.outputFilePath) {
-            const writtenNotice = await writeOutputToFile(options.outputFilePath, fileTrajectoryText);
+            const writtenNotice = await writeOutputToFile(
+                options.outputFilePath,
+                fileTrajectoryText,
+            );
             return { text: writtenNotice, code: 0 };
         }
         return {

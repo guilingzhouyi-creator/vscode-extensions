@@ -382,7 +382,8 @@ function mergeVerdicts(
  */
 export function reviewCommand(args: readonly string[]): { code: number; text: string } {
     const invocation = resolveInvocation(args);
-    if (typeof invocation === 'string') return { code: EXIT_USAGE, text: `${USAGE}\n\n${invocation}` };
+    if (typeof invocation === 'string')
+        return { code: EXIT_USAGE, text: `${USAGE}\n\n${invocation}` };
 
     const ledgerPath =
         invocation.ledger ?? path.join(path.dirname(invocation.corpus), DEFAULT_LEDGER_NAME);
