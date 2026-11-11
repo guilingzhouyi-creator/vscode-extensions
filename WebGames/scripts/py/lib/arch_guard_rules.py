@@ -20,21 +20,50 @@ import re
 
 RES_PREFIX = "res://"
 
-# 全库 push_error/push_warning 散落收敛白名单（对齐 test_log_error_base_pipeline TC-LG-19）
+# 全库 push_error/push_warning 散落收敛白名单（仅保留 T0 启动极早期且未就绪 EventBus 时的 Config 装载站点；所有 T1/T2 均已清零迁移）
 ALLOWED_PUSH_FILES: frozenset[str] = frozenset({
   "backend/infrastructure/game_config.gd",
-  "backend/infrastructure/save_manager.gd",
-  "backend/domains/inventory/item_attribute_registry.gd",
-  "backend/domains/item_namespace_registry/magic_tier_registry.gd",
-  "backend/domains/gacha_wish/gacha_banner_entity.gd",
-  "backend/domains/game_settings/game_settings_aggregate.gd",
-  "backend/domains/notification_red_dot/red_dot_tree_fsm.gd",
-  "backend/domains/inventory/wearable_inventory.gd",
-  "backend/domains/contract_registry/domain_view_mapping_snapshot.gd",
+})
+
+# 全库底层应急 stderr 回退 白名单（仅允许在日志基础设施底座双汇点内部使用 printerr）
+ALLOWED_PRINTERR_FILES: frozenset[str] = frozenset({
+  "backend/infrastructure/event_bus/event_bus_core.gd",
+  "backend/infrastructure/logging/unified_logger_service.gd",
 })
 
 # 存量旧模块错误消息硬编码中文与裸格式符渐进演进白名单（已全部清零完成英文底座改造）
 LEGACY_ERROR_MESSAGE_WHITELIST: frozenset[str] = frozenset()
+
+_STRING_TOKEN_RE = re.compile(r'("(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\')')
+
+
+def _strip_string_contents(comment_stripped: str) -> str:
+  """将注释已剥离的源码中的字符串字面量内部替换为空格，保留行偏移与引号边界。"""
+  def repl(m: re.Match[str]) -> str:
+    s = m.group(0)
+    return s[0] + (" " * (len(s) - 2)) + s[-1]
+  return _STRING_TOKEN_RE.sub(repl, comment_stripped)
+
+
+def _iter_gd_sources(
+    ctx: Any,
+    strip_comments: Callable[[str], str],
+) -> list[tuple[str, str]]:
+  """遍历 backend 与 frontend 全量 .gd 源码并返回 (relative_posix, comment_stripped_code)。"""
+  entries: list[tuple[str, str]] = []
+  for sub in ("backend", "frontend"):
+    root_dir: Path = ctx.root / sub
+    if not root_dir.exists():
+      continue
+    for gd_file in sorted(root_dir.rglob("*.gd")):
+      rel_posix = gd_file.relative_to(ctx.root).as_posix()
+      cached = ctx.gd_sources.get(gd_file)
+      if cached is not None:
+        entries.append((rel_posix, cached[1]))
+      else:
+        raw = gd_file.read_text(encoding="utf-8")
+        entries.append((rel_posix, strip_comments(raw)))
+  return entries
 
 # 持久化核心实体聚合根列表与声明文件路径映射
 CORE_PERSISTENCE_CLASSES: tuple[tuple[str, str], ...] = (
@@ -139,41 +168,35 @@ def check_tc_arch_11(
     make_result: Callable[[str, list[str]], dict[str, Any]],
     strip_comments: Callable[[str], str],
 ) -> list[dict[str, Any]]:
-  """TC-ARCH-11A & TC-ARCH-11B: 业务零裸 print 与 push_error/push_warning 散落白名单守卫。"""
+  """TC-ARCH-11A & TC-ARCH-11B: 全库业务与视图零裸 print/printerr 及 push_error/push_warning 收敛守卫。"""
   violations_print: list[str] = []
   violations_push: list[str] = []
 
-  # 11A: 业务零裸 print (mirrors TC-LS-22)
-  bare_print_re = re.compile(r"(?<![a-zA-Z0-9_])print\s*\(")
-  for gd_file in ctx.backend_files:
-    rel = RES_PREFIX + gd_file.relative_to(ctx.root).as_posix()
-    _, code = ctx.gd_sources[gd_file]
-    for line_idx, line in enumerate(code.splitlines(), 1):
-      if bare_print_re.search(line):
-        violations_print.append(f"{rel}:{line_idx}: 严禁裸调用 print()，请使用 print_rich() 或 UnifiedLogger")
-
-  # 11B: push_error / push_warning 收敛白名单 (mirrors TC-LG-19)
+  # 11A: 全库业务与视图零裸 print() / printerr() (mirrors TC-LS-22)
+  bare_print_re = re.compile(r"(?<![a-zA-Z0-9_.])print\s*\(")
+  bare_printerr_re = re.compile(r"(?<![a-zA-Z0-9_.])printerr\s*\(")
   push_call_re = re.compile(r"\b(push_error|push_warning)\s*\(")
-  scan_roots = [ctx.root / "backend", ctx.root / "frontend"]
-  for s_root in scan_roots:
-    if not s_root.exists():
-      continue
-    for gd_file in sorted(s_root.rglob("*.gd")):
-      rel_str = gd_file.relative_to(ctx.root).as_posix()
-      if rel_str in ALLOWED_PUSH_FILES:
-        continue
-      raw = gd_file.read_text(encoding="utf-8")
-      code = strip_comments(raw)
-      for line_idx, line in enumerate(code.splitlines(), 1):
+
+  for rel_posix, code in _iter_gd_sources(ctx, strip_comments):
+    rel_res = RES_PREFIX + rel_posix
+    masked = _strip_string_contents(code)
+    allow_printerr = rel_posix in ALLOWED_PRINTERR_FILES
+    allow_push = rel_posix in ALLOWED_PUSH_FILES
+
+    for line_idx, line in enumerate(masked.splitlines(), 1):
+      if bare_print_re.search(line):
+        violations_print.append(f"{rel_res}:{line_idx}: 严禁裸调用 print()，请改用 EventBusCore.emit_log 或 NavManager.show_toast")
+      if not allow_printerr and bare_printerr_re.search(line):
+        violations_print.append(f"{rel_res}:{line_idx}: 严禁在日志底座双汇点外裸调用 printerr()，请改用 ErrorReporter 或 EventBusCore.emit_log")
+      if not allow_push:
         m = push_call_re.search(line)
         if m:
-          rel_res = RES_PREFIX + rel_str
           violations_push.append(
             f"{rel_res}:{line_idx}: 散落调用 {m.group(1)}()（不在收敛白名单中，必须经 ErrorReporter）"
           )
 
   return [
-    make_result("TC-ARCH-11A: 后端业务源码零裸 print 调试残留静态断言", violations_print),
+    make_result("TC-ARCH-11A: 全库业务与视图零裸 print/printerr 静态断言", violations_print),
     make_result("TC-ARCH-11B: 全库 push_error/push_warning 散落收敛与白名单守卫", violations_push),
   ]
 
@@ -183,58 +206,52 @@ def check_tc_arch_12(
     make_result: Callable[[str, list[str]], dict[str, Any]],
     strip_comments: Callable[[str], str],
 ) -> dict[str, Any]:
-  """TC-ARCH-12: 英文底座日志与错误动态占位符注入规范静态断言。"""
+  """TC-ARCH-12: 全库英文底座日志、错误上报与前端提示动态占位符注入规范静态断言。"""
   violations: list[str] = []
-  emit_err_re = re.compile(r'ErrorReporter\.emit_(?:error|warning|fatal)\s*\([^,]+,\s*"[^"]+",\s*"([^"]*)"')
-  fail_call_re = re.compile(r'\b_fail\s*\(\s*"[^"]+",\s*"([^"]*)"')
-  emit_log_re = re.compile(r'\bemit_log\s*\(\s*"[^"]*",\s*"([^"]*)"')
+  channel_patterns: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("错误上报", re.compile(r'ErrorReporter\.emit_(?:error|warning|fatal)\s*\(\s*[^,()]+\s*,\s*"[^"\n]+"\s*,\s*"([^"\n]*)"')),
+    ("错误迁移", re.compile(r'ErrorReporter\.migrate_push_error\s*\(\s*[^,()]+\s*,\s*"([^"\n]*)"')),
+    ("日志采集", re.compile(r'LogCollector\.log\s*\(\s*[^,()]+\s*,\s*[^,()]+\s*,\s*"([^"\n]*)"')),
+    ("失败提示", re.compile(r'\b_fail\s*\(\s*"[^"\n]+"\s*,\s*"([^"\n]*)"')),
+    ("日志输出", re.compile(r'\bemit_log\s*\(\s*"[^"\n]*"\s*,\s*"([^"\n]*)"')),
+    ("占位符模版", re.compile(r'TemplateFormatter\.format\s*\(\s*"([^"\n]*)"')),
+    ("界面轻提示", re.compile(r'\bshow_toast\s*\(\s*"([^"\n]*)"')),
+  )
   chinese_re = re.compile(r'[\u4e00-\u9fff]')
   c_fmt_re = re.compile(r'%[0-9.]*[sdf]')
 
-  for gd_file in ctx.backend_files:
-    rel_posix = gd_file.relative_to(ctx.root).as_posix()
+  for rel_posix, code in _iter_gd_sources(ctx, strip_comments):
     if rel_posix in LEGACY_ERROR_MESSAGE_WHITELIST:
       continue
 
-    _, code = ctx.gd_sources[gd_file]
-    for line_idx, line in enumerate(code.splitlines(), 1):
-      # 1. 检查 ErrorReporter.emit_* 静态字面量消息
-      for m in emit_err_re.finditer(line):
+    rel_res = RES_PREFIX + rel_posix
+    for label, pat in channel_patterns:
+      for m in pat.finditer(code):
         msg = m.group(1)
-        rel_res = RES_PREFIX + rel_posix
+        line_idx = code[:m.start()].count("\n") + 1
         if chinese_re.search(msg):
+          target_hint = " UIIntermediary.text" if label == "界面轻提示" else "英文底座并经动态占位符注入"
           violations.append(
-            f"{rel_res}:{line_idx}: 错误上报包含硬编码中文「{msg}」，须使用英文底座并在 narratives/errors.json 配置多语言文案"
+            f"{rel_res}:{line_idx}: {label}包含硬编码中文「{msg}」，须使用{target_hint}"
           )
         if c_fmt_re.search(msg):
           violations.append(
-            f"{rel_res}:{line_idx}: 错误上报使用裸格式符「{msg}」，须使用 {{param}} 英文命名占位符并经 TemplateFormatter 注入"
+            f"{rel_res}:{line_idx}: {label}使用裸格式符「{msg}」，须使用 {{param}} 英文命名占位符并经 TemplateFormatter 注入"
           )
 
-      # 2. 检查 _fail(...) 状态机/解算器失败提示
-      for m in fail_call_re.finditer(line):
-        msg = m.group(1)
-        rel_res = RES_PREFIX + rel_posix
-        if chinese_re.search(msg):
-          violations.append(
-            f"{rel_res}:{line_idx}: 失败提示包含硬编码中文「{msg}」，须使用英文底座并在 narratives/errors.json 配置多语言文案"
-          )
-        if c_fmt_re.search(msg):
-          violations.append(
-            f"{rel_res}:{line_idx}: 失败提示使用裸格式符「{msg}」，须使用 {{param}} 英文命名占位符并经 TemplateFormatter 注入"
-          )
-
-      # 3. 检查 emit_log(...) 结构化日志消息
-      for m in emit_log_re.finditer(line):
-        msg = m.group(1)
-        rel_res = RES_PREFIX + rel_posix
-        if chinese_re.search(msg):
-          violations.append(
-            f"{rel_res}:{line_idx}: 日志输出包含硬编码中文「{msg}」，须使用英文底座并经占位符动态注入"
-          )
-        if c_fmt_re.search(msg):
-          violations.append(
-            f"{rel_res}:{line_idx}: 日志输出使用裸格式符「{msg}」，须使用 {{param}} 英文命名占位符并经 TemplateFormatter 注入"
-          )
+  # 校验基础设施持久化文案表零裸格式符（统一使用 {param} 命名占位符）
+  pers_cfg = ctx.root / "config" / "infrastructure" / "persistence.json"
+  if pers_cfg.exists():
+    try:
+      p_data = json.loads(pers_cfg.read_text(encoding="utf-8"))
+      msgs = p_data.get("messages", {})
+      if isinstance(msgs, dict):
+        for mk, mv in msgs.items():
+          if isinstance(mv, str) and c_fmt_re.search(mv):
+            violations.append(
+              f"res://config/infrastructure/persistence.json: messages.{mk} 使用裸格式符「{mv}」，须改为 {{param}} 命名占位符"
+            )
+    except Exception:
+      pass
 
   return make_result("TC-ARCH-12: 英文底座日志与错误动态占位符注入规范断言", violations)

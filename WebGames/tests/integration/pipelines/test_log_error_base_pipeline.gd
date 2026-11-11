@@ -490,26 +490,17 @@ static func _test_lg_19_zero_push_error_in_contract_registry() -> Dictionary:
 	if text.contains("push_error(") or text.contains("push_warning("):
 		return {"test": "TC-LG-19", "passed": false, "error": "contract_registry_index still contains push_error/push_warning"}
 	# 全库扫描（backend + frontend 生产代码；tests/benchmarks dev 工具豁免）：
-	# T0 启动极早期/stderr 可见性、T1 装载期数据校验告警、T2 运行时守卫待迁移；
-	# 白名单之外新增命中即红
+	# 所有 T1 装载校验与 T2 运行时守卫已全部收敛至 EventBusCore / ErrorReporter；
+	# 仅保留 T0 启动极早期未就绪 EventBus 时的 Config 装载站点，白名单之外新增命中即红
 	var allowed := {
 		"res://backend/infrastructure/game_config.gd": "T0",
-		"res://backend/infrastructure/save_manager.gd": "T0",
-		"res://backend/domains/inventory/item_attribute_registry.gd": "T1",
-		"res://backend/domains/item_namespace_registry/magic_tier_registry.gd": "T1",
-		"res://backend/domains/gacha_wish/gacha_banner_entity.gd": "T2",
-		"res://backend/domains/game_settings/game_settings_aggregate.gd": "T2",
-		"res://backend/domains/notification_red_dot/red_dot_tree_fsm.gd": "T2",
-		# 畸形快照/畸形 DTO 运行时守卫告警（契约要求不静默）：
-		"res://backend/domains/inventory/wearable_inventory.gd": "T2",
-		"res://backend/domains/contract_registry/domain_view_mapping_snapshot.gd": "T2",
 	}
 	var offenders: Array[String] = []
 	_scan_push_scatter("res://backend", allowed, offenders)
 	_scan_push_scatter("res://frontend", allowed, offenders)
 	if not offenders.is_empty():
 		return {"test": "TC-LG-19", "passed": false, "error": "New push_error/push_warning scatter outside allowlist: %s" % "; ".join(offenders)}
-	return {"test": "TC-LG-19: 全库 push 散落分级收敛（8 站点白名单）", "passed": true}
+	return {"test": "TC-LG-19: 全库 push 散落收敛（仅 T0 配置装载白名单）", "passed": true}
 
 static func _scan_push_scatter(dir_path: String, allowed: Dictionary, offenders: Array[String]) -> void:
 	var dir := DirAccess.open(dir_path)

@@ -728,34 +728,56 @@ static func _test_ls_21_log_retention_cleaner_expiration_and_protection() -> Dic
 		"details": "ok_extract=%s" % str(ok_extract)
 	}
 
-## TC-LS-22: 全库后端业务路径 print( 零残留静态断言
+## TC-LS-22: 全库业务与视图路径 print(/printerr( 零残留静态断言
 static func _test_ls_22_backend_zero_print_statements_guard() -> Dictionary:
-	# 扫描 backend/ 目录，除注释外不得有 bare print( 调用
-	var da := DirAccess.open("res://backend")
+	# 扫描 backend/ 与 frontend/ 目录：除注释外严禁 bare print(；printerr( 仅允许存于日志底层双汇点
 	var print_hits: Array[String] = []
-	if da != null:
-		_scan_gd_files_for_print("res://backend", print_hits)
+	for root_dir in ["res://backend", "res://frontend"]:
+		if DirAccess.open(root_dir) != null:
+			_scan_gd_files_for_print(root_dir, print_hits)
 
 	var ok: bool = (print_hits.size() == 0)
 
 	return {
-		"test": "TC-LS-22: 全库后端业务路径 print( 零残留静态断言",
+		"test": "TC-LS-22: 全库业务与视图路径 print(/printerr( 零残留静态断言",
 		"passed": ok,
 		"details": "hits_count=%d, hits=%s" % [print_hits.size(), str(print_hits)]
 	}
 
-static func _check_gd_file_for_print(full_path: String, item: String, out_hits: Array[String]) -> void:
+static func _is_printerr_sink_path(full_path: String) -> bool:
+	return full_path == "res://backend/infrastructure/event_bus/event_bus_core.gd" \
+		or full_path == "res://backend/infrastructure/logging/unified_logger_service.gd"
+
+static func _is_ident_char(ch: String) -> bool:
+	return (ch >= "a" and ch <= "z") or (ch >= "A" and ch <= "Z") \
+		or (ch >= "0" and ch <= "9") or ch == "_" or ch == "."
+
+static func _contains_bare_log_call(line: String, call_prefix: String) -> bool:
+	var idx: int = line.find(call_prefix)
+	while idx != -1:
+		var comment_idx: int = line.find("#")
+		if comment_idx != -1 and comment_idx < idx:
+			return false
+		if idx == 0 or not _is_ident_char(line.substr(idx - 1, 1)):
+			return true
+		idx = line.find(call_prefix, idx + call_prefix.length())
+	return false
+
+static func _check_gd_file_for_print(full_path: String, _item: String, out_hits: Array[String]) -> void:
 	var fa := FileAccess.open(full_path, FileAccess.READ)
 	if fa == null:
 		return
+	var allow_printerr: bool = _is_printerr_sink_path(full_path)
 	var line_num := 0
 	while not fa.eof_reached() and line_num < 100000:
 		line_num += 1
 		var line := fa.get_line().strip_edges()
-		if line.begins_with("#"):
+		if line.begins_with("#") or line.is_empty():
 			continue
-		if line.begins_with("print(") or line.contains(" print(") or line.contains("\tprint("):
-			out_hits.append("%s:%d %s" % [item, line_num, line])
+		if _contains_bare_log_call(line, "print("):
+			out_hits.append("%s:%d %s" % [full_path, line_num, line])
+		elif not allow_printerr and _contains_bare_log_call(line, "printerr("):
+			out_hits.append("%s:%d %s" % [full_path, line_num, line])
 	fa.close()
 
 static func _scan_gd_files_for_print(dir_path: String, out_hits: Array[String]) -> void:
