@@ -4,8 +4,8 @@
 # 文件路径: WebGames/scripts/py/audit_arch_static.py
 # 架构定位: 原生静态分析架构护栏 (Native Static Architecture Guard)
 # 依赖与触发: 触发方: audit_runner / 本地 CLI | 上游: config/ 与 backend/ | 下游: 门禁报告 | 运行时: Python 3.10+
-# 职责说明: 纯原生静态审计领域架构合规性，断言领域目录、配置表落地、测试注册、确定性随机、文档计数、配置键存在性、退役契约与边界隔离
-# 退出语义与设计依据: 退出码: 0=合规, 1=阻断违规 | 设计依据: test_architecture_guard.gd 原生等价实现
+# 职责说明: 纯原生静态审计领域架构合规性，断言领域目录、配置表落地、测试注册、确定性随机、文档计数、配置键存在性、退役契约、边界隔离、错误码登记闭环、持久化契约对称性与全库日志收敛白名单
+# 退出语义与设计依据: 退出码: 0=合规, 1=阻断违规 | 设计依据: test_architecture_guard.gd 原生等价实现与全域代码规范
 # ------------------------------------------------------------------------------
 # 用法示例:
 #   python scripts/py/audit_arch_static.py
@@ -23,6 +23,7 @@ import sys
 import time
 
 from audit_common import ensure_utf8_stdout, resolve_repo_root
+from lib.arch_guard_rules import check_tc_arch_09, check_tc_arch_10, check_tc_arch_11
 ensure_utf8_stdout()
 
 RES_PREFIX = "res://"
@@ -592,7 +593,7 @@ def check_tc_arch_08(ctx: ArchitectureAuditContext) -> list[dict[str, Any]]:
 
 
 def run_all_checks() -> tuple[bool, list[dict[str, Any]], str, float]:
-  """运行全量 9 大架构合规性断言并统计耗时。"""
+  """运行全量 13 大架构合规性断言并统计耗时。"""
   t0 = time.perf_counter()
   ctx = ArchitectureAuditContext(ROOT)
   ctx.initialize()
@@ -606,6 +607,9 @@ def run_all_checks() -> tuple[bool, list[dict[str, Any]], str, float]:
     check_tc_arch_06(ctx),
     check_tc_arch_07(ctx),
     *check_tc_arch_08(ctx),
+    check_tc_arch_09(ctx, make_result),
+    check_tc_arch_10(ctx, make_result, strip_comments),
+    *check_tc_arch_11(ctx, make_result, strip_comments),
   ]
 
   elapsed = time.perf_counter() - t0

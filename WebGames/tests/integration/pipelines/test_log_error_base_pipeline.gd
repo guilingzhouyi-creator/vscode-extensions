@@ -42,6 +42,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_lg_21_gm_audit_i18n_and_convergence())
 	results.append(_test_lg_22_errors_catalog_required_table_present())
 	results.append(_test_lg_23_full_integration_pipeline_regression())
+	results.append(_test_lg_24_hardened_observability_and_preservation())
 
 	var passed_cnt := 0
 	for r in results:
@@ -587,3 +588,44 @@ static func _test_lg_23_full_integration_pipeline_regression() -> Dictionary:
 	if captured.is_empty():
 		return {"test": "TC-LG-23", "passed": false, "error": "Full pipeline failed to emit record"}
 	return {"test": "TC-LG-23: 全链路闭环回归", "passed": true}
+
+## TC-LG-24: 加固改造断言（动态诊断保真、信包双载荷与持久化契约）
+static func _test_lg_24_hardened_observability_and_preservation() -> Dictionary:
+	# 1. 验证 ErrorReporter 保留动态诊断信息
+	var captured: Array[LogRecordDTO] = []
+	var bus := EventBusCore.get_instance()
+	var cb := func(pkt: EventPacket):
+		if pkt.payload_dto is LogRecordDTO:
+			captured.append(pkt.payload_dto as LogRecordDTO)
+	var tok := bus.on_channel(EventChannelDefinition.LOG_RECORD_POSTED, cb)
+	ErrorReporterClass.emit_error("config", "CONFIG_FILE_NOT_FOUND", "Missing config: custom_tables.json", {"actor": "unit_test"})
+	tok.unbind()
+
+	if captured.is_empty():
+		return {"test": "TC-LG-24", "passed": false, "error": "emit_error failed to broadcast"}
+	var rec := captured[0]
+	if not rec.context.has("diagnostic_detail") or rec.context["diagnostic_detail"] != "Missing config: custom_tables.json":
+		return {"test": "TC-LG-24", "passed": false, "error": "Dynamic diagnostic detail was lost in ErrorReporter"}
+
+	# 2. 验证 CharacterPrologueContext.serialize() 对齐 SaveAssembler 契约
+	var ctx := CharacterPrologueContext.new()
+	ctx.account_id = "ACC_001"
+	ctx.character_id = "CHAR_001"
+	if not ctx.has_method("serialize"):
+		return {"test": "TC-LG-24", "passed": false, "error": "CharacterPrologueContext missing serialize method"}
+	var s_dict: Dictionary = ctx.serialize()
+	if s_dict.get("account_id") != "ACC_001":
+		return {"test": "TC-LG-24", "passed": false, "error": "CharacterPrologueContext serialize output invalid"}
+
+	# 3. 验证 AgentObservationPacketDTO diagnostic_dump 序列化往返
+	var obs := AgentObservationPacketDTO.new()
+	obs.session_id = "SESS_TEST_01"
+	obs.diagnostic_dump = {"dump_id": "dump_01", "error": "ERR_TEST"}
+	var obs_dto := obs.to_dto()
+	if not obs_dto.has("diagnostic_dump") or obs_dto["diagnostic_dump"]["dump_id"] != "dump_01":
+		return {"test": "TC-LG-24", "passed": false, "error": "diagnostic_dump failed to serialize"}
+	var revived := AgentObservationPacketDTO.from_dto(obs_dto)
+	if revived.diagnostic_dump.get("error") != "ERR_TEST":
+		return {"test": "TC-LG-24", "passed": false, "error": "diagnostic_dump failed to deserialize"}
+
+	return {"test": "TC-LG-24: 动态诊断保真、信包双载荷与持久化契约加固", "passed": true}

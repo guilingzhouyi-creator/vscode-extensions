@@ -34,6 +34,7 @@ from lib.audit_sdk_rules import (
     check_templates_and_examples,
     check_tools_integrity,
 )
+from lib.audit_sdk_protocol_rules import check_protocol_envelope_parity
 from lib.mod_sdk_shared import (
     check_contract_drift,
     ensure_utf8_stdout,
@@ -65,6 +66,7 @@ class ModSdkAuditor:
         check_templates_and_examples(self.mod_sdk_dir, self.findings)
         check_capabilities_schema(self.mod_sdk_dir, self.findings)
         check_spec_guidance_structure(self.mod_sdk_dir, self.findings)
+        check_protocol_envelope_parity(self.mod_sdk_dir, self.root, self.findings)
         self._check_zero_drift()
         return len(self.findings) == 0
 
