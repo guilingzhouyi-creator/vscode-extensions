@@ -7,6 +7,10 @@
   },
   "default_level": "info",
   "format": "[%s] %s",
+  "console": {
+    "enabled": true,
+    "min_level": "warn"
+  },
   "export": {
     "enabled": false,
     "directory": "user://logs",

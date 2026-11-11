@@ -13,9 +13,18 @@
       "type": "boolean",
       "description": "指令执行是否成功标志"
     },
+    "success": {
+      "type": "boolean",
+      "description": "指令执行是否成功标志 (兼容字段)"
+    },
     "payload": {
       "type": "object",
       "description": "领域服务返回的业务响应载荷字典",
+      "additionalProperties": true
+    },
+    "data": {
+      "type": "object",
+      "description": "业务返回实体数据字典 (兼容字段)",
       "additionalProperties": true
     },
     "error_code": {
@@ -25,6 +34,15 @@
     "message": {
       "type": "string",
       "description": "人类可读提示文本或错误详情信息"
+    },
+    "error_message": {
+      "type": "string",
+      "description": "本地化展示文案 Key 或调试信息 (兼容字段)"
+    },
+    "causal_delta": {
+      "type": "object",
+      "description": "操作引发的因果突变 (供 HUD 增量刷新与伴侣总线记录)",
+      "additionalProperties": true
     },
     "server_timestamp_ms": {
       "type": "integer",

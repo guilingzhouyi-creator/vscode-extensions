@@ -252,6 +252,16 @@
       "message_key": "errors/event_bus2_pool_overflow",
       "domain": "infrastructure"
     },
+    "event_bus2_high_frequency_warning": {
+      "severity": "warn",
+      "message_key": "errors/event_bus2_high_frequency_warning",
+      "domain": "infrastructure"
+    },
+    "INVALID_RANGE": {
+      "severity": "warn",
+      "message_key": "",
+      "domain": "inventory"
+    },
     "version_state_machine_illegal_transition": {
       "severity": "error",
       "message_key": "errors/version_state_machine_illegal_transition",

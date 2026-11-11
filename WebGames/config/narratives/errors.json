@@ -49,5 +49,6 @@
   "event_bus2_core_state_in_frame_queue": "CORE_STATE events are prohibited from asynchronous frame queue.",
   "event_bus2_frame_queue_overflow": "EventBus frame ring buffer overflowed; packet dropped.",
   "event_bus2_pool_overflow": "EventPacket pool capacity exceeded; allocating unpooled transient packet.",
+  "event_bus2_high_frequency_warning": "Event frequency threshold exceeded in current sampling window.",
   "version_state_machine_illegal_transition": "Illegal version lifecycle state transition rejected."
 }
