@@ -13,7 +13,9 @@ import type { DiffFileInput, DualTrackOptions } from '../pipeline/dualTrackPipel
 import type { FileMetric, Issue } from '../types';
 import type { FileExecutionObservation } from './analyzer-execution';
 import {
-    captureFileRequirements, collectReviewPassCoverage, fileAnalyzerKey,
+    captureFileRequirements,
+    collectReviewPassCoverage,
+    fileAnalyzerKey,
 } from './execution-coverage';
 import type { FileAnalysisCoverage, FileAnalysisRequirement } from './execution-coverage';
 import type { ReviewFailure } from './review-contracts';
@@ -77,14 +79,25 @@ function captureChanges(changes: readonly ReviewChange[], scope: readonly string
         assertSnapshotPath(change.path);
         if (!paths.has(change.path)) throw new Error('Review change is outside snapshot scope');
         if (captured.has(change.path)) throw new Error('Duplicate review change path');
-        if (typeof change.oldContent !== 'string') throw new Error('Review old content must be text');
+        if (typeof change.oldContent !== 'string')
+            throw new Error('Review old content must be text');
         const bounds = change.lineBounds;
-        if (bounds && (!Number.isSafeInteger(bounds[0]) || !Number.isSafeInteger(bounds[1]) ||
-            bounds[0] < 1 || bounds[1] < bounds[0])) throw new Error('Invalid review line window');
-        captured.set(change.path, Object.freeze({
-            path: change.path, oldContent: change.oldContent,
-            lineBounds: bounds ? Object.freeze([bounds[0], bounds[1]] as const) : undefined,
-        }));
+        if (
+            bounds &&
+            (!Number.isSafeInteger(bounds[0]) ||
+                !Number.isSafeInteger(bounds[1]) ||
+                bounds[0] < 1 ||
+                bounds[1] < bounds[0])
+        )
+            throw new Error('Invalid review line window');
+        captured.set(
+            change.path,
+            Object.freeze({
+                path: change.path,
+                oldContent: change.oldContent,
+                lineBounds: bounds ? Object.freeze([bounds[0], bounds[1]] as const) : undefined,
+            }),
+        );
     }
     return captured;
 }
@@ -118,9 +131,14 @@ async function compensateRequiredFiles(context: {
     requirements: readonly FileAnalysisRequirement[];
 }): Promise<void> {
     const { runtime, state, inputs, requirements } = context;
-    const missing = requiredCompensation(collectReviewPassCoverage({
-        requirements, inputs: state.inputs, execution: state.execution,
-    }), state.execution);
+    const missing = requiredCompensation(
+        collectReviewPassCoverage({
+            requirements,
+            inputs: state.inputs,
+            execution: state.execution,
+        }),
+        state.execution,
+    );
     const activeAnalyzers = new Set<string>();
     for (const input of inputs) {
         activeAnalyzers.clear();
@@ -132,7 +150,9 @@ async function compensateRequiredFiles(context: {
         if (activeAnalyzers.size === 0) continue;
         runtime.scanner.getConfig().signal?.throwIfAborted();
         const result = await runtime.scanner.runAnalyzers(
-            input.filePath, input.newContent, undefined,
+            input.filePath,
+            input.newContent,
+            undefined,
             { activeAnalyzers, observeExecution: true },
         );
         for (const analyzer of result.execution?.analyzers ?? []) {
@@ -150,12 +170,20 @@ function orderedIssues(issues: readonly Issue[]): readonly Issue[] {
     const unique = new Map<string, Issue>();
     for (const issue of issues) {
         const key = JSON.stringify([
-            issue.id, issue.analyzer, issue.rule, issue.location, issue.message, issue.severity,
+            issue.id,
+            issue.analyzer,
+            issue.rule,
+            issue.location,
+            issue.message,
+            issue.severity,
         ]);
         if (!unique.has(key)) unique.set(key, issue);
     }
-    return Object.freeze([...unique.entries()].sort(([left], [right]) =>
-        left < right ? -1 : left > right ? 1 : 0).map(([, issue]) => issue));
+    return Object.freeze(
+        [...unique.entries()]
+            .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+            .map(([, issue]) => issue),
+    );
 }
 
 async function readReviewFiles(context: {
@@ -174,8 +202,10 @@ async function readReviewFiles(context: {
             await context.semantic.observe(read.path, read.content);
             const change = context.changes.get(read.path);
             inputs.push({
-                filePath: read.path, newContent: read.content,
-                oldContent: change?.oldContent ?? read.content, lineBounds: change?.lineBounds,
+                filePath: read.path,
+                newContent: read.content,
+                oldContent: change?.oldContent ?? read.content,
+                lineBounds: change?.lineBounds,
             });
         },
     );
@@ -191,8 +221,9 @@ async function runReviewTracks(context: {
     const { runtime, state, inputs } = context;
     const signal = runtime.scanner.getConfig().signal;
     const tracks = await executeDualTrack(runtime.scanner, inputs, {
-        ...runtime.options, graph: undefined,
-        onExecution: event => {
+        ...runtime.options,
+        graph: undefined,
+        onExecution: (event) => {
             state.execution.push(event.execution);
             if (event.metric) state.metrics.set(event.execution.path, event.metric);
         },
@@ -228,15 +259,24 @@ function finishSemanticReview(context: {
 }): { graph: SemanticGraphSnapshot; superseded: boolean } {
     const { snapshot, scope, runtime, configuration, semantic, state } = context;
     const current = captureReviewConfiguration(runtime.scanner.getConfig(), runtime.options);
-    const superseded = configuration.status === 'bound' &&
+    const superseded =
+        configuration.status === 'bound' &&
         (current.status !== 'bound' || current.value !== configuration.value);
-    const paths = new Set(snapshot.entries.map(entry => entry.path));
-    const fullScope = paths.size === scope.length && scope.every(file => paths.has(file));
-    const reason = superseded ? 'configuration-changed' : state.cancelled ? 'cancelled' :
-        !fullScope ? 'partial-scope' : configuration.status !== 'bound' ? 'configuration-unavailable' :
-            undefined;
+    const paths = new Set(snapshot.entries.map((entry) => entry.path));
+    const fullScope = paths.size === scope.length && scope.every((file) => paths.has(file));
+    const reason = superseded
+        ? 'configuration-changed'
+        : state.cancelled
+          ? 'cancelled'
+          : !fullScope
+            ? 'partial-scope'
+            : configuration.status !== 'bound'
+              ? 'configuration-unavailable'
+              : undefined;
     const graph = semantic.seal(
-        { snapshot: snapshot.identity, configuration }, state.inputs, reason,
+        { snapshot: snapshot.identity, configuration },
+        state.inputs,
+        reason,
     );
     return { graph, superseded };
 }
@@ -260,20 +300,27 @@ export async function executeReview(
         throw new Error('Snapshot review requires the complete configured analyzer plan');
     }
     const requestId = request.requestId;
-    const scope = [...(request.scope ?? snapshot.entries.map(entry => entry.path))];
+    const scope = [...(request.scope ?? snapshot.entries.map((entry) => entry.path))];
     const changes = captureChanges(request.changes ?? [], scope);
     const configured = runtime.scanner.beginSnapshotAnalysis();
     const requirements = captureFileRequirements(request.requirements ?? configured);
     const capturedRuntime = { scanner: runtime.scanner, options: { ...runtime.options } };
     const configuration = captureReviewConfiguration(
-        runtime.scanner.getConfig(), capturedRuntime.options,
+        runtime.scanner.getConfig(),
+        capturedRuntime.options,
     );
     const semantic = new SemanticSnapshotBuilder();
     const signal = runtime.scanner.getConfig().signal;
     const state: ExecutionState = {
-        inputs: [], execution: [], issues: [], deepIssues: [], confirmedIssues: [],
-        metrics: new Map(), replaced: new Set(),
-        tracks: { fast: 'pending', deep: 'pending' }, cancelled: false,
+        inputs: [],
+        execution: [],
+        issues: [],
+        deepIssues: [],
+        confirmedIssues: [],
+        metrics: new Map(),
+        replaced: new Set(),
+        tracks: { fast: 'pending', deep: 'pending' },
+        cancelled: false,
     };
     try {
         const inputs = await readReviewFiles({ snapshot, scope, changes, state, signal, semantic });
@@ -282,23 +329,41 @@ export async function executeReview(
         recordReviewFailure(state, error, signal);
     }
     const coverage = collectReviewPassCoverage({
-        requirements, inputs: state.inputs, execution: state.execution,
+        requirements,
+        inputs: state.inputs,
+        execution: state.execution,
     });
     const generation = finishSemanticReview({
-        snapshot, scope, runtime: capturedRuntime, configuration, semantic, state,
+        snapshot,
+        scope,
+        runtime: capturedRuntime,
+        configuration,
+        semantic,
+        state,
     });
-    const retainedIssues = state.issues.filter(issue =>
-        !state.replaced.has(fileAnalyzerKey(issue.location.file, issue.analyzer)));
+    const retainedIssues = state.issues.filter(
+        (issue) => !state.replaced.has(fileAnalyzerKey(issue.location.file, issue.analyzer)),
+    );
     return Object.freeze({
-        requestId, source: 'immutable-snapshot', identity: snapshot.identity,
+        requestId,
+        source: 'immutable-snapshot',
+        identity: snapshot.identity,
         inputs: state.inputs,
         issues: orderedIssues([...retainedIssues, ...state.confirmedIssues, ...state.deepIssues]),
         fileMetrics: Object.freeze([...state.metrics.values()]),
-        execution: Object.freeze(state.execution), coverage,
-        tracks: Object.freeze(state.tracks), semanticGraph: generation.graph,
+        execution: Object.freeze(state.execution),
+        coverage,
+        tracks: Object.freeze(state.tracks),
+        semanticGraph: generation.graph,
         completion: createReviewExecution({
-            reviewId: requestId, coverage, tracks: state.tracks,
-            termination: state.cancelled ? 'cancelled' : generation.superseded ? 'superseded' : undefined,
+            reviewId: requestId,
+            coverage,
+            tracks: state.tracks,
+            termination: state.cancelled
+                ? 'cancelled'
+                : generation.superseded
+                  ? 'superseded'
+                  : undefined,
             failures: state.failure ? [state.failure] : undefined,
         }),
     });

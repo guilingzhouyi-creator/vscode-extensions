@@ -51,20 +51,27 @@ export class SemanticGraphSnapshot {
     readonly coverage: SemanticGraphCoverage;
 
     constructor(
-        graph: SemanticGraph, identity: SemanticGenerationIdentity, coverage: SemanticGraphCoverage,
+        graph: SemanticGraph,
+        identity: SemanticGenerationIdentity,
+        coverage: SemanticGraphCoverage,
     ) {
         this.#graph = SemanticGraph.fromJSON(structuredClone(graph.toJSON()));
         const source = identity.snapshot;
         this.identity = Object.freeze({
-            snapshot: Object.freeze({ repositoryId: source.repositoryId,
+            snapshot: Object.freeze({
+                repositoryId: source.repositoryId,
                 tree: Object.freeze({ ...source.tree }),
-                manifestDigest: Object.freeze({ ...source.manifestDigest }) }),
+                manifestDigest: Object.freeze({ ...source.manifestDigest }),
+            }),
             configuration: Object.freeze({ ...identity.configuration }),
-            extractors: Object.freeze(identity.extractors.map(entry =>
-                Object.freeze({ ...entry }))),
+            extractors: Object.freeze(
+                identity.extractors.map((entry) => Object.freeze({ ...entry })),
+            ),
         });
-        this.coverage = Object.freeze({ ...coverage,
-            inputs: Object.freeze(coverage.inputs.map(entry => Object.freeze({ ...entry }))) });
+        this.coverage = Object.freeze({
+            ...coverage,
+            inputs: Object.freeze(coverage.inputs.map((entry) => Object.freeze({ ...entry }))),
+        });
         Object.freeze(this);
     }
 
@@ -85,14 +92,21 @@ export class SemanticGraphSnapshot {
      */
     getFileImpact(file: string, depth = 3): SemanticFileImpact {
         if (!Number.isSafeInteger(depth) || depth < 0) throw new RangeError('Invalid impact depth');
-        const seeds = this.#graph.getNodesByFile(file).map(node => node.id);
+        const seeds = this.#graph.getNodesByFile(file).map((node) => node.id);
         if (seeds.length === 0) {
-            return Object.freeze({ status: 'unknown', files: Object.freeze([]),
-                reason: 'file-structure-unavailable' });
+            return Object.freeze({
+                status: 'unknown',
+                files: Object.freeze([]),
+                reason: 'file-structure-unavailable',
+            });
         }
         const slice = this.#graph.getSlice(seeds, depth, 'backward');
-        const files = [...new Set(slice.nodes.map(node => node.location.file))].sort();
-        return Object.freeze({ status: 'partial', files: Object.freeze(files), reason: this.coverage.reason });
+        const files = [...new Set(slice.nodes.map((node) => node.location.file))].sort();
+        return Object.freeze({
+            status: 'partial',
+            files: Object.freeze(files),
+            reason: this.coverage.reason,
+        });
     }
 
     /** Independent mutable copy for existing consumers; this generation remains unchanged. */
@@ -114,20 +128,37 @@ export class SemanticSnapshotBuilder {
     async observe(file: string, content: string): Promise<void> {
         const registry = defaultSemanticAdapterRegistry;
         const adapter = registry.getAdapterForFile(file);
-        const declaration = { path: file, language: adapter?.language ?? 'unknown',
-            version: adapter?.version ?? null, assetGeneration: adapter?.assetGeneration ?? null };
+        const declaration = {
+            path: file,
+            language: adapter?.language ?? 'unknown',
+            version: adapter?.version ?? null,
+            assetGeneration: adapter?.assetGeneration ?? null,
+        };
         if (!adapter) {
-            this.observations.push({ ...declaration, status: 'unsupported', reason: 'no-semantic-adapter' });
+            this.observations.push({
+                ...declaration,
+                status: 'unsupported',
+                reason: 'no-semantic-adapter',
+            });
             return;
         }
         try {
             const published = await registry.extractFileToGraph(file, content, this.graph);
-            this.observations.push(published
-                ? { ...declaration, status: 'observed' }
-                : { ...declaration, status: 'failed', reason: 'semantic-publication-superseded' });
+            this.observations.push(
+                published
+                    ? { ...declaration, status: 'observed' }
+                    : {
+                          ...declaration,
+                          status: 'failed',
+                          reason: 'semantic-publication-superseded',
+                      },
+            );
         } catch (error) {
-            this.observations.push({ ...declaration, status: 'failed',
-                reason: error instanceof Error ? error.message : String(error) });
+            this.observations.push({
+                ...declaration,
+                status: 'failed',
+                reason: error instanceof Error ? error.message : String(error),
+            });
         }
     }
 
@@ -140,15 +171,17 @@ export class SemanticSnapshotBuilder {
      */
     seal(
         identity: Omit<SemanticGenerationIdentity, 'extractors'>,
-        inputs: readonly SnapshotInputObservation[], reason?: string,
+        inputs: readonly SnapshotInputObservation[],
+        reason?: string,
     ): SemanticGraphSnapshot {
         const resolved = resolveSnapshotModules(this.graph);
-        const observed = this.observations.some(entry => entry.status === 'observed');
+        const observed = this.observations.some((entry) => entry.status === 'observed');
         const generation = { ...identity, extractors: this.observations };
         return new SemanticGraphSnapshot(resolved.graph, generation, {
             status: observed ? 'partial' : 'unknown',
             reason: reason ?? (observed ? 'adapter-coverage-incomplete' : 'graph-unavailable'),
-            inputs, unresolvedEdges: resolved.unresolvedEdges,
+            inputs,
+            unresolvedEdges: resolved.unresolvedEdges,
         });
     }
 }

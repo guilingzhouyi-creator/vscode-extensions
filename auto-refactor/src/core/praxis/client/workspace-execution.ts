@@ -39,20 +39,29 @@ async function observeWorkspaceGraph(scanner: Scanner): Promise<{
     for (const [file, content] of scanner.retainedSourceText()) {
         try {
             const published = await defaultSemanticAdapterRegistry.extractFileToGraph(
-                file, content, graph,
+                file,
+                content,
+                graph,
             );
-            if (!published) failures.push({ code: 'SEMANTIC_EXTRACTION_UNAVAILABLE',
-                message: `No semantic update published for ${file}` });
+            if (!published)
+                failures.push({
+                    code: 'SEMANTIC_EXTRACTION_UNAVAILABLE',
+                    message: `No semantic update published for ${file}`,
+                });
         } catch (error) {
-            failures.push({ code: 'SEMANTIC_EXTRACTION_FAILED',
-                message: error instanceof Error ? error.message : String(error) });
+            failures.push({
+                code: 'SEMANTIC_EXTRACTION_FAILED',
+                message: error instanceof Error ? error.message : String(error),
+            });
         }
     }
     return { graph: resolveSnapshotModules(graph).graph, failures };
 }
 
 async function executeSnapshotWorkspace(
-    scanner: Scanner, snapshot: SourceSnapshot, logger: Logger,
+    scanner: Scanner,
+    snapshot: SourceSnapshot,
+    logger: Logger,
 ): Promise<WorkspaceReviewExecution> {
     const started = Date.now();
     const result = await executeReview({ requestId: randomUUID() }, snapshot, { scanner });
@@ -61,25 +70,54 @@ async function executeSnapshotWorkspace(
         const input = snapshot.read(entry.path, entry.object);
         if (input.kind === 'text') snapshotSource.set(entry.path, input.content);
     }
-    const report = scanner.buildReport(result.inputs.filter(input => input.kind === 'text').length,
-        [...result.issues], [...result.fileMetrics], Date.now() - started, snapshotSource);
-    await finalizeReport({ report, config: scanner.getConfig(), options: {}, logger,
-        reportScanner: scanner, snapshotSource });
-    const execution = createReviewExecution({
-        reviewId: result.requestId, tracks: result.completion.tracks,
-        coverage: [...result.completion.coverage, {
-            analyzer: 'workspace-global', capability: 'workspace-structural-finalization', language: 'mixed',
-            required: true, status: 'supported',
-        }, {
-            analyzer: 'workspace-external', capability: 'workspace-external-enrichment', language: 'mixed',
-            required: true, status: 'unsupported', reason: 'snapshot-external-enrichment-unavailable',
-        }],
-        failures: result.completion.failures,
-        termination: result.completion.status === 'cancelled' || result.completion.status === 'superseded'
-            ? result.completion.status : undefined,
+    const report = scanner.buildReport(
+        result.inputs.filter((input) => input.kind === 'text').length,
+        [...result.issues],
+        [...result.fileMetrics],
+        Date.now() - started,
+        snapshotSource,
+    );
+    await finalizeReport({
+        report,
+        config: scanner.getConfig(),
+        options: {},
+        logger,
+        reportScanner: scanner,
+        snapshotSource,
     });
-    return { report, execution, graph: result.semanticGraph.createMutableGraph(),
-        generation: result.semanticGraph };
+    const execution = createReviewExecution({
+        reviewId: result.requestId,
+        tracks: result.completion.tracks,
+        coverage: [
+            ...result.completion.coverage,
+            {
+                analyzer: 'workspace-global',
+                capability: 'workspace-structural-finalization',
+                language: 'mixed',
+                required: true,
+                status: 'supported',
+            },
+            {
+                analyzer: 'workspace-external',
+                capability: 'workspace-external-enrichment',
+                language: 'mixed',
+                required: true,
+                status: 'unsupported',
+                reason: 'snapshot-external-enrichment-unavailable',
+            },
+        ],
+        failures: result.completion.failures,
+        termination:
+            result.completion.status === 'cancelled' || result.completion.status === 'superseded'
+                ? result.completion.status
+                : undefined,
+    });
+    return {
+        report,
+        execution,
+        graph: result.semanticGraph.createMutableGraph(),
+        generation: result.semanticGraph,
+    };
 }
 
 /**
@@ -89,7 +127,8 @@ async function executeSnapshotWorkspace(
  * @returns Report, exact topology observations and truthful execution completeness.
  */
 export async function executeWorkspaceReview(
-    config: ScanConfig, snapshot?: SourceSnapshot,
+    config: ScanConfig,
+    snapshot?: SourceSnapshot,
 ): Promise<WorkspaceReviewExecution> {
     const active = snapshot ? { ...config, cacheEnabled: false, sparseRouting: false } : config;
     const logger = new Logger(active.logLevel, active.logFile);
@@ -103,11 +142,26 @@ export async function executeWorkspaceReview(
         await finalizeReport(report, active, {}, logger, scanner);
         const observed = await observeWorkspaceGraph(scanner);
         const execution = createReviewExecution({
-            reviewId: randomUUID(), tracks: { fast: 'not-required', deep: 'not-required' },
-            coverage: [{ analyzer: 'sdk-workspace', capability: 'file-analysis', language: 'mixed',
-                required: true, status: 'degraded', reason: 'legacy-workspace-execution-unobserved' },
-            { analyzer: 'semantic-graph', capability: 'graph-analysis', language: 'mixed',
-                required: false, status: 'degraded', reason: 'workspace-snapshot-unavailable' }],
+            reviewId: randomUUID(),
+            tracks: { fast: 'not-required', deep: 'not-required' },
+            coverage: [
+                {
+                    analyzer: 'sdk-workspace',
+                    capability: 'file-analysis',
+                    language: 'mixed',
+                    required: true,
+                    status: 'degraded',
+                    reason: 'legacy-workspace-execution-unobserved',
+                },
+                {
+                    analyzer: 'semantic-graph',
+                    capability: 'graph-analysis',
+                    language: 'mixed',
+                    required: false,
+                    status: 'degraded',
+                    reason: 'workspace-snapshot-unavailable',
+                },
+            ],
             failures: observed.failures,
         });
         return { report, execution, graph: observed.graph };

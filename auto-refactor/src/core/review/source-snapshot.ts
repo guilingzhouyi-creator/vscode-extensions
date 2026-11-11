@@ -31,7 +31,11 @@ export type SnapshotCaptureEntry = {
     readonly path: string;
     readonly object: SnapshotGitObject;
 } & (
-    | { readonly mode: '100644' | '100755' | '120000'; readonly bytes: Uint8Array; readonly byteLength: number }
+    | {
+          readonly mode: '100644' | '100755' | '120000';
+          readonly bytes: Uint8Array;
+          readonly byteLength: number;
+      }
     | { readonly mode: '160000' }
 );
 /** Validated immutable manifest metadata for one entry in a snapshot. */
@@ -55,12 +59,19 @@ export type SnapshotRead =
     | { readonly kind: 'missing'; readonly path: string; readonly source: 'immutable-snapshot' }
     | (SnapshotReadBase & { readonly kind: 'submodule' })
     | (SnapshotReadBase & { readonly kind: 'binary' | 'symlink'; readonly bytes: Uint8Array })
-    | (SnapshotReadBase & { readonly kind: 'unsupported'; readonly reason: 'invalid-utf8'; readonly bytes: Uint8Array })
     | (SnapshotReadBase & {
-        readonly kind: 'text'; readonly bytes: Uint8Array; readonly content: string;
-        readonly encoding: 'utf-8'; readonly bom: boolean;
-        readonly lineEnding: 'none' | 'lf' | 'crlf' | 'cr' | 'mixed';
-    });
+          readonly kind: 'unsupported';
+          readonly reason: 'invalid-utf8';
+          readonly bytes: Uint8Array;
+      })
+    | (SnapshotReadBase & {
+          readonly kind: 'text';
+          readonly bytes: Uint8Array;
+          readonly content: string;
+          readonly encoding: 'utf-8';
+          readonly bom: boolean;
+          readonly lineEnding: 'none' | 'lf' | 'crlf' | 'cr' | 'mixed';
+      });
 /** Read-only source snapshot port decoupled from mutable workspace filesystem access. */
 export interface SourceSnapshot {
     readonly source: 'immutable-snapshot';
@@ -108,13 +119,24 @@ const UTF8_BOM_BYTE_2 = 0xbf;
  * @returns Nothing; throws when the path is ambiguous or outside the portable profile.
  */
 export function assertSnapshotPath(path: string): void {
-    if (typeof path !== 'string' || path.length === 0 || path.length > MAX_SNAPSHOT_PATH_LEN ||
-        /[\\:<>"|?*\u0000-\u001f\u007f\uD800-\uDFFF]/u.test(path) || path !== path.normalize('NFC')) {
+    if (
+        typeof path !== 'string' ||
+        path.length === 0 ||
+        path.length > MAX_SNAPSHOT_PATH_LEN ||
+        /[\\:<>"|?*\u0000-\u001f\u007f\uD800-\uDFFF]/u.test(path) ||
+        path !== path.normalize('NFC')
+    ) {
         throw new Error('Invalid snapshot path');
     }
     for (const component of path.split('/')) {
-        if (!component || component === '.' || component === '..' || /[. ]$/.test(component) ||
-            component.toLowerCase() === '.git' || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(component)) {
+        if (
+            !component ||
+            component === '.' ||
+            component === '..' ||
+            /[. ]$/.test(component) ||
+            component.toLowerCase() === '.git' ||
+            /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(component)
+        ) {
             throw new Error('Ambiguous snapshot path');
         }
     }
@@ -129,7 +151,8 @@ function copyObject(object: SnapshotGitObject): SnapshotGitObject {
 
 function assertBudget(budget: SnapshotBudget): void {
     for (const limitValue of [budget.maxEntries, budget.maxBlobBytes, budget.maxTotalBytes]) {
-        if (!Number.isSafeInteger(limitValue) || limitValue < 0) throw new Error('Invalid snapshot budget');
+        if (!Number.isSafeInteger(limitValue) || limitValue < 0)
+            throw new Error('Invalid snapshot budget');
     }
 }
 
@@ -155,7 +178,8 @@ function assertNoPathCollisions(entries: readonly SnapshotEntry[]): void {
         const components = entry.path.toLowerCase().normalize('NFC').split('/');
         components.pop();
         while (components.length > 0) {
-            if (paths.has(components.join('/'))) throw new Error('Snapshot file/directory collision');
+            if (paths.has(components.join('/')))
+                throw new Error('Snapshot file/directory collision');
             components.pop();
         }
     }
@@ -184,7 +208,12 @@ function buildCapturedEntry(
     const digest = createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex');
     if (digest !== object.value) throw new Error('Snapshot blob identity mismatch');
     return {
-        metadata: Object.freeze({ path: input.path, mode: input.mode, object, byteLength: bytes.length }),
+        metadata: Object.freeze({
+            path: input.path,
+            mode: input.mode,
+            object,
+            byteLength: bytes.length,
+        }),
         bytes,
     };
 }
@@ -211,20 +240,35 @@ function detectLineEnding(content: string): 'none' | 'lf' | 'crlf' | 'cr' | 'mix
 
 function readEntry(stored: StoredEntry): SnapshotRead {
     const base: SnapshotReadBase = { ...stored.metadata, source: SOURCE_IMMUTABLE_SNAPSHOT };
-    if (stored.metadata.mode === MODE_SUBMODULE) return Object.freeze({ ...base, kind: KIND_SUBMODULE });
+    if (stored.metadata.mode === MODE_SUBMODULE)
+        return Object.freeze({ ...base, kind: KIND_SUBMODULE });
     if (!stored.bytes) throw new Error('Snapshot blob bytes are missing');
     const bytes = Buffer.from(stored.bytes);
-    if (stored.metadata.mode === MODE_SYMLINK) return Object.freeze({ ...base, kind: KIND_SYMLINK, bytes });
+    if (stored.metadata.mode === MODE_SYMLINK)
+        return Object.freeze({ ...base, kind: KIND_SYMLINK, bytes });
     if (bytes.includes(0)) return Object.freeze({ ...base, kind: KIND_BINARY, bytes });
     let content: string;
     try {
         content = new TextDecoder(ENCODING_UTF8, { fatal: true, ignoreBOM: true }).decode(bytes);
     } catch {
-        return Object.freeze({ ...base, kind: KIND_UNSUPPORTED, reason: REASON_INVALID_UTF8, bytes });
+        return Object.freeze({
+            ...base,
+            kind: KIND_UNSUPPORTED,
+            reason: REASON_INVALID_UTF8,
+            bytes,
+        });
     }
     return Object.freeze({
-        ...base, kind: KIND_TEXT, bytes, content, encoding: ENCODING_UTF8,
-        bom: bytes.length >= UTF8_BOM_LEN && bytes[0] === UTF8_BOM_BYTE_0 && bytes[1] === UTF8_BOM_BYTE_1 && bytes[2] === UTF8_BOM_BYTE_2,
+        ...base,
+        kind: KIND_TEXT,
+        bytes,
+        content,
+        encoding: ENCODING_UTF8,
+        bom:
+            bytes.length >= UTF8_BOM_LEN &&
+            bytes[0] === UTF8_BOM_BYTE_0 &&
+            bytes[1] === UTF8_BOM_BYTE_1 &&
+            bytes[2] === UTF8_BOM_BYTE_2,
         lineEnding: detectLineEnding(content),
     });
 }
@@ -244,7 +288,9 @@ function readEntry(stored: StoredEntry): SnapshotRead {
  * @returns An immutable read port whose returned byte buffers are independent copies.
  */
 export function captureSourceSnapshot(
-    descriptor: Omit<SourceSnapshotIdentity, 'manifestDigest'> & { readonly manifestDigest?: SnapshotDigest },
+    descriptor: Omit<SourceSnapshotIdentity, 'manifestDigest'> & {
+        readonly manifestDigest?: SnapshotDigest;
+    },
     inputs: readonly SnapshotCaptureEntry[],
     budget: SnapshotBudget,
 ): SourceSnapshot {
@@ -264,27 +310,49 @@ export function captureSourceSnapshot(
         entryByPathMap.set(captured.metadata.path, captured);
     }
     assertNoPathCollisions(entries);
-    entries.sort((left, right) => left.path < right.path ? -1 : Number(left.path > right.path));
+    entries.sort((left, right) => (left.path < right.path ? -1 : Number(left.path > right.path)));
     const tuples = entries.map((entry) => [
-        entry.path, entry.mode, entry.object.algorithm, entry.object.value, entry.byteLength,
+        entry.path,
+        entry.mode,
+        entry.object.algorithm,
+        entry.object.value,
+        entry.byteLength,
     ]);
-    const manifestHash = createHash(ALGO_SM3).update(JSON.stringify([MANIFEST_SCHEMA_TAG, tuples])).digest('hex');
-    if (descriptor.manifestDigest && (descriptor.manifestDigest.algorithm !== ALGO_SM3 || descriptor.manifestDigest.value !== manifestHash)) {
+    const manifestHash = createHash(ALGO_SM3)
+        .update(JSON.stringify([MANIFEST_SCHEMA_TAG, tuples]))
+        .digest('hex');
+    if (
+        descriptor.manifestDigest &&
+        (descriptor.manifestDigest.algorithm !== ALGO_SM3 ||
+            descriptor.manifestDigest.value !== manifestHash)
+    ) {
         throw new Error('Snapshot manifest digest mismatch');
     }
     const identity = Object.freeze({
-        repositoryId: descriptor.repositoryId, tree, manifestDigest: Object.freeze({ algorithm: ALGO_SM3, value: manifestHash }),
+        repositoryId: descriptor.repositoryId,
+        tree,
+        manifestDigest: Object.freeze({ algorithm: ALGO_SM3, value: manifestHash }),
     });
     return Object.freeze({
-        source: SOURCE_IMMUTABLE_SNAPSHOT, identity, entries: Object.freeze(entries),
+        source: SOURCE_IMMUTABLE_SNAPSHOT,
+        identity,
+        entries: Object.freeze(entries),
         read(path: string, expectedObject?: SnapshotGitObject): SnapshotRead {
             assertSnapshotPath(path);
             const captured = entryByPathMap.get(path);
             if (!captured) {
                 if (expectedObject) throw new Error('Expected snapshot path is missing');
-                return Object.freeze({ kind: KIND_MISSING, path, source: SOURCE_IMMUTABLE_SNAPSHOT });
+                return Object.freeze({
+                    kind: KIND_MISSING,
+                    path,
+                    source: SOURCE_IMMUTABLE_SNAPSHOT,
+                });
             }
-            if (expectedObject && (expectedObject.algorithm !== ALGO_GIT_SHA1 || expectedObject.value !== captured.metadata.object.value)) {
+            if (
+                expectedObject &&
+                (expectedObject.algorithm !== ALGO_GIT_SHA1 ||
+                    expectedObject.value !== captured.metadata.object.value)
+            ) {
                 throw new Error('Requested snapshot object identity mismatch');
             }
             return readEntry(captured);
