@@ -8,5 +8,5 @@ extends RefCounted
 
 ## 读取指定域的骨架 Mock 快照（文件缺失/解析失败返回空字典）
 func load_snapshot(domain_id: String) -> Dictionary:
-	printerr("ISnapshotDataService.load_snapshot: 纯虚函数必须由子类实现")
+	EventBusCore.get_instance().emit_log("error", "ISnapshotDataService.load_snapshot: pure virtual method must be implemented by subclass")
 	return {}

@@ -8,4 +8,4 @@ extends RefCounted
 
 ## 异步检查客户端版本与灰度分群状态
 func check_version_async(callback: Callable) -> void:
-	printerr("IVersionService.check_version_async: 纯虚函数必须由子类实现")
+	EventBusCore.get_instance().emit_log("error", "IVersionService.check_version_async: pure virtual method must be implemented by subclass")

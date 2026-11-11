@@ -12,24 +12,24 @@ extends RefCounted
 
 ## 异步拉取 ESC 菜单可用状态 (can_save, is_dirty, allowed_actions)
 func get_menu_state_async(callback: Callable) -> void:
-	printerr("IEscMenuService.get_menu_state_async: 纯虚函数必须由子类实现")
+	EventBusCore.get_instance().emit_log("error", "IEscMenuService.get_menu_state_async: pure virtual method must be implemented by subclass")
 	if callback.is_valid():
 		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 异步请求安全存盘 (target_slot: "SLOT_01" 等, is_quicksave: bool)
 func request_save_async(target_slot: String, is_quicksave: bool, callback: Callable) -> void:
-	printerr("IEscMenuService.request_save_async: 纯虚函数必须由子类实现")
+	EventBusCore.get_instance().emit_log("error", "IEscMenuService.request_save_async: pure virtual method must be implemented by subclass")
 	if callback.is_valid():
 		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 异步请求退出世界退回网关
 func exit_to_gateway_async(callback: Callable) -> void:
-	printerr("IEscMenuService.exit_to_gateway_async: 纯虚函数必须由子类实现")
+	EventBusCore.get_instance().emit_log("error", "IEscMenuService.exit_to_gateway_async: pure virtual method must be implemented by subclass")
 	if callback.is_valid():
 		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 异步请求安全优雅退出游戏
 func quit_game_async(callback: Callable) -> void:
-	printerr("IEscMenuService.quit_game_async: 纯虚函数必须由子类实现")
+	EventBusCore.get_instance().emit_log("error", "IEscMenuService.quit_game_async: pure virtual method must be implemented by subclass")
 	if callback.is_valid():
 		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})

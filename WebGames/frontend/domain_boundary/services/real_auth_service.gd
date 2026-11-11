@@ -22,16 +22,25 @@ const WorldSessionRuntimeService = preload("res://backend/domains/world_state/se
 const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
 const UnifiedProtocolDispatcher = preload("res://backend/domains/world_state/services/unified_protocol_dispatcher.gd")
 
+const ATTR_KEYS: Array[String] = ["STR", "AGI", "CON", "INT", "WIS", "CHA"]
+const ATTR_ROLL_MIN: int = 8
+const ATTR_ROLL_MAX: int = 18
+const ERROR_CODE_I18N_MAP: Dictionary = {
+    "ERR_INVALID_CREDENTIALS": "ui.fe01.login.error_invalid",
+    "ERR_INVALID_USERNAME_LENGTH": "ui.fe01.register.error_short",
+    "ERR_ACCOUNT_ALREADY_EXISTS": "ui.fe01.register.error_already_exists",
+    "ERR_ACCOUNT_NOT_FOUND": "ui.fe01.login.error_not_found",
+    "ERR_DEVICE_MISMATCH": "ui.fe01.login.error_device",
+    "ERR_EMPTY_USERNAME": "ui.fe01.login.error_empty",
+    "ERR_NAME_EMPTY": "ui.fe01.char_create.error_empty_name",
+    "ERR_BIND_FAILED": "ui.fe01.char_create.error_bind_failed",
+}
+
 ## 异步登录契约实现
 func login_async(username: String, password_plain: String, callback: Callable) -> void:
     var user_clean: String = username.strip_edges()
     if user_clean.is_empty():
-        if callback.is_valid():
-            callback.call({
-                "success": false,
-                "error_code": "ERR_EMPTY_USERNAME",
-                "message": _map_error_to_i18n_key("ERR_EMPTY_USERNAME")
-            })
+        _emit_error_callback(callback, "ERR_EMPTY_USERNAME")
         return
 
     var req := AccountCompositeAuthDTO.Request.new()
@@ -41,12 +50,7 @@ func login_async(username: String, password_plain: String, callback: Callable) -
 
     var resp: AccountCompositeAuthDTO.Response = AuthService.composite_authenticate(req)
     if not resp.success:
-        if callback.is_valid():
-            callback.call({
-                "success": false,
-                "error_code": resp.error_code,
-                "message": _map_error_to_i18n_key(resp.error_code)
-            })
+        _emit_error_callback(callback, resp.error_code)
         return
 
     var repo := AccountRepository.get_instance()
@@ -77,12 +81,7 @@ func register_async(username: String, password_plain: String, callback: Callable
 
     var resp: AccountRegistrationDTO.Response = AuthService.register_account(req)
     if not resp.success:
-        if callback.is_valid():
-            callback.call({
-                "success": false,
-                "error_code": resp.error_code,
-                "message": _map_error_to_i18n_key(resp.error_code)
-            })
+        _emit_error_callback(callback, resp.error_code)
         return
 
     if callback.is_valid():
@@ -122,12 +121,7 @@ func get_characters_async(account_id: String, callback: Callable) -> void:
 func create_character_async(account_id: String, req_data: Dictionary, callback: Callable) -> void:
     var char_name: String = str(req_data.get("name", "")).strip_edges()
     if char_name.is_empty():
-        if callback.is_valid():
-            callback.call({
-                "success": false,
-                "error_code": "ERR_NAME_EMPTY",
-                "message": "ui.fe01.char_create.error_empty_name"
-            })
+        _emit_error_callback(callback, "ERR_NAME_EMPTY")
         return
 
     var repo := AccountRepository.get_instance()
@@ -135,12 +129,7 @@ func create_character_async(account_id: String, req_data: Dictionary, callback: 
         repo.load_all()
     var acc: AccountProfileAggregate = repo.find_by_id(account_id)
     if acc == null:
-        if callback.is_valid():
-            callback.call({
-                "success": false,
-                "error_code": "ERR_ACCOUNT_NOT_FOUND",
-                "message": _map_error_to_i18n_key("ERR_ACCOUNT_NOT_FOUND")
-            })
+        _emit_error_callback(callback, "ERR_ACCOUNT_NOT_FOUND")
         return
 
     var slot_id: String = str(req_data.get("slot_id", ""))
@@ -158,12 +147,8 @@ func create_character_async(account_id: String, req_data: Dictionary, callback: 
     )
 
     if not bool(bind_res.get("success", false)):
-        if callback.is_valid():
-            callback.call({
-                "success": false,
-                "error_code": str(bind_res.get("error_code", "ERR_BIND_FAILED")),
-                "message": "ui.fe01.char_create.error_bind_failed"
-            })
+        var bind_err_code: String = str(bind_res.get("error_code", "ERR_BIND_FAILED"))
+        _emit_error_callback(callback, bind_err_code, ERROR_CODE_I18N_MAP["ERR_BIND_FAILED"])
         return
 
     var bound_slot_id: String = str(bind_res.get("slot_id", ""))
@@ -197,16 +182,12 @@ func create_character_async(account_id: String, req_data: Dictionary, callback: 
 ## 六维资质骰点：确定性 8~18 生成
 func roll_attribute_spread() -> Dictionary:
     var rng := DeterministicRNG.global()
+    var attrs: Dictionary = {}
+    for attr_key in ATTR_KEYS:
+        attrs[attr_key] = rng.randi_range(ATTR_ROLL_MIN, ATTR_ROLL_MAX)
     return {
         "success": true,
-        "attrs": {
-            "STR": rng.randi_range(8, 18),
-            "AGI": rng.randi_range(8, 18),
-            "CON": rng.randi_range(8, 18),
-            "INT": rng.randi_range(8, 18),
-            "WIS": rng.randi_range(8, 18),
-            "CHA": rng.randi_range(8, 18),
-        }
+        "attrs": attrs
     }
 
 ## 异步资质骰点契约实现（对齐 ROLL_CHARACTER_PREVIEW 动作）
@@ -226,29 +207,27 @@ func roll_attributes_async(callback: Callable) -> void:
 
 ## 异步注销/吊销令牌契约实现（对齐 LOGOUT_ACCOUNT 动作）
 func revoke_token(token: String, callback: Callable = Callable()) -> void:
-    var req := UnifiedProtocolFactory.create_human_request(
-        "account",
-        "LOGOUT_ACCOUNT",
-        {"session_token": token}
+    _dispatch_logout(
+        WorldSessionRuntimeService.get_active_account_id(),
+        token,
+        {"session_token": token},
+        callback
     )
-    req.session_token = token
-    req.account_id = WorldSessionRuntimeService.get_active_account_id()
-    var resp := UnifiedProtocolDispatcher.dispatch_request(req)
-    if resp.success:
-        WorldSessionRuntimeService.revoke_account_session()
-    if callback.is_valid():
-        callback.call({
-            "success": resp.success,
-            "error_code": resp.error_code,
-            "message": resp.error_message
-        })
 
 ## 异步退出账号契约实现
 func logout_async(account_id: String, token: String, callback: Callable = Callable()) -> void:
+    _dispatch_logout(
+        account_id,
+        token,
+        {"account_id": account_id, "session_token": token},
+        callback
+    )
+
+func _dispatch_logout(account_id: String, token: String, payload: Dictionary, callback: Callable) -> void:
     var req := UnifiedProtocolFactory.create_human_request(
         "account",
         "LOGOUT_ACCOUNT",
-        {"account_id": account_id, "session_token": token},
+        payload,
         token,
         account_id
     )
@@ -286,19 +265,12 @@ func get_account_home_async(account_id: String, token: String, callback: Callabl
             "view_model": resp.data
         })
 
-func _map_error_to_i18n_key(err_code: String) -> String:
-    match err_code:
-        "ERR_INVALID_CREDENTIALS":
-            return "ui.fe01.login.error_invalid"
-        "ERR_INVALID_USERNAME_LENGTH":
-            return "ui.fe01.register.error_short"
-        "ERR_ACCOUNT_ALREADY_EXISTS":
-            return "ui.fe01.register.error_already_exists"
-        "ERR_ACCOUNT_NOT_FOUND":
-            return "ui.fe01.login.error_not_found"
-        "ERR_DEVICE_MISMATCH":
-            return "ui.fe01.login.error_device"
-        "ERR_EMPTY_USERNAME":
-            return "ui.fe01.login.error_empty"
-        _:
-            return err_code
+func _emit_error_callback(callback: Callable, error_code: String, fallback_i18n_key: String = "") -> void:
+    if not callback.is_valid():
+        return
+    var default_msg: String = fallback_i18n_key if not fallback_i18n_key.is_empty() else error_code
+    callback.call({
+        "success": false,
+        "error_code": error_code,
+        "message": str(ERROR_CODE_I18N_MAP.get(error_code, default_msg))
+    })

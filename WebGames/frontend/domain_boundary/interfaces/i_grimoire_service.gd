@@ -8,10 +8,10 @@ extends RefCounted
 
 ## 著书估价（按稿酬模式返回区间）：{success, min, max}
 func estimate_authoring_income(royalty_mode_index: int) -> Dictionary:
-	printerr("IGrimoireService.estimate_authoring_income: 纯虚函数必须由子类实现")
+	EventBusCore.get_instance().emit_log("error", "IGrimoireService.estimate_authoring_income: pure virtual method must be implemented by subclass")
 	return {"success": false, "error_code": "NOT_IMPLEMENTED"}
 
 ## 版税汇总：{success, total}
 func sum_royalties(books: Array) -> Dictionary:
-	printerr("IGrimoireService.sum_royalties: 纯虚函数必须由子类实现")
+	EventBusCore.get_instance().emit_log("error", "IGrimoireService.sum_royalties: pure virtual method must be implemented by subclass")
 	return {"success": false, "error_code": "NOT_IMPLEMENTED"}

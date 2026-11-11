@@ -8,5 +8,5 @@ extends RefCounted
 
 ## 预测强化成功率（返回 {success, rate}）；衰减公式与钳制在服务层
 func preview_enhance_rate(target_level: int) -> Dictionary:
-	printerr("ICraftingService.preview_enhance_rate: 纯虚函数必须由子类实现")
+	EventBusCore.get_instance().emit_log("error", "ICraftingService.preview_enhance_rate: pure virtual method must be implemented by subclass")
 	return {"success": false, "error_code": "NOT_IMPLEMENTED"}

@@ -8,5 +8,5 @@ extends RefCounted
 
 ## 任务状态跃迁（action: accept / abandon / submit）→ {success, quest, error_code}
 func transition_status(quest: Dictionary, action: String) -> Dictionary:
-	printerr("IQuestService.transition_status: 纯虚函数必须由子类实现")
+	EventBusCore.get_instance().emit_log("error", "IQuestService.transition_status: pure virtual method must be implemented by subclass")
 	return {"success": false, "error_code": "NOT_IMPLEMENTED"}

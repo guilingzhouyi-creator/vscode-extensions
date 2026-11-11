@@ -144,7 +144,7 @@ static func format_rarity(rarity_key: String) -> String:
 
 ## 检测模板中是否有未填充的占位符（验收用）
 static func has_unfilled_placeholders(text: String) -> bool:
-	# 检测 {xxx} 模式
+	# 检测 {placeholder_name} 命名占位符模式
 	var regex := RegEx.new()
 	regex.compile("\\{[a-zA-Z_][a-zA-Z0-9_]*\\}")
 	return regex.search(text) != null

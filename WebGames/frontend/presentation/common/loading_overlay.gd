@@ -26,9 +26,9 @@ func _ready() -> void:
 	center.add_child(_label)
 	add_child(center)
 
-func show_loading(hint: String = "载入中...") -> void:
+func show_loading(hint: String = "") -> void:
 	if _label != null:
-		_label.text = hint
+		_label.text = hint if not hint.is_empty() else UIIntermediary.text("ui.common.loading")
 	visible = true
 
 func hide_loading() -> void:

@@ -35,10 +35,13 @@ func clear_active_gateway() -> void:
 func register_service(service_name: String, instance: RefCounted) -> void:
 	_services[service_name] = instance
 
-## 按名解析服务实例；未注册时打印错误并返回 null
+## 按名解析服务实例；未注册时记录告警日志并返回 null
 func get_service(service_name: String) -> RefCounted:
 	if not _services.has(service_name):
-		printerr("[ServiceContainer] 未注册的服务: %s" % service_name)
+		EventBusCore.get_instance().emit_log(
+			"warn",
+			TemplateFormatter.format("ServiceContainer: unregistered service {service_name}", {"service_name": service_name})
+		)
 		return null
 	return _services[service_name]
 
@@ -46,66 +49,26 @@ func get_service(service_name: String) -> RefCounted:
 # 二、领域便捷访问虚方法（子类应 override 并返回具体接口实现）
 # ==============================================================================
 
-func auth() -> Variant:
-	printerr("[ServiceContainer] auth() 未实现：子类应 override 此方法")
+func _unimplemented(method_name: String) -> Variant:
+	EventBusCore.get_instance().emit_log(
+		"error",
+		TemplateFormatter.format("ServiceContainer.{method}(): subclass must override", {"method": method_name})
+	)
 	return null
 
-func world() -> Variant:
-	printerr("[ServiceContainer] world() 未实现：子类应 override 此方法")
-	return null
-
-func combat() -> Variant:
-	printerr("[ServiceContainer] combat() 未实现：子类应 override 此方法")
-	return null
-
-func version() -> Variant:
-	printerr("[ServiceContainer] version() 未实现：子类应 override 此方法")
-	return null
-
-func gacha() -> Variant:
-	printerr("[ServiceContainer] gacha() 未实现：子类应 override 此方法")
-	return null
-
-func chat_command() -> Variant:
-	printerr("[ServiceContainer] chat_command() 未实现：子类应 override 此方法")
-	return null
-
-func crafting() -> Variant:
-	printerr("[ServiceContainer] crafting() 未实现：子类应 override 此方法")
-	return null
-
-func grimoire() -> Variant:
-	printerr("[ServiceContainer] grimoire() 未实现：子类应 override 此方法")
-	return null
-
-func economy() -> Variant:
-	printerr("[ServiceContainer] economy() 未实现：子类应 override 此方法")
-	return null
-
-func character() -> Variant:
-	printerr("[ServiceContainer] character() 未实现：子类应 override 此方法")
-	return null
-
-func quest() -> Variant:
-	printerr("[ServiceContainer] quest() 未实现：子类应 override 此方法")
-	return null
-
-func guild() -> Variant:
-	printerr("[ServiceContainer] guild() 未实现：子类应 override 此方法")
-	return null
-
-func save() -> Variant:
-	printerr("[ServiceContainer] save() 未实现：子类应 override 此方法")
-	return null
-
-func misc_edge() -> Variant:
-	printerr("[ServiceContainer] misc_edge() 未实现：子类应 override 此方法")
-	return null
-
-func mail() -> Variant:
-	printerr("[ServiceContainer] mail() 未实现：子类应 override 此方法")
-	return null
-
-func snapshot_data() -> Variant:
-	printerr("[ServiceContainer] snapshot_data() 未实现：子类应 override 此方法")
-	return null
+func auth() -> Variant: return _unimplemented("auth")
+func world() -> Variant: return _unimplemented("world")
+func combat() -> Variant: return _unimplemented("combat")
+func version() -> Variant: return _unimplemented("version")
+func gacha() -> Variant: return _unimplemented("gacha")
+func chat_command() -> Variant: return _unimplemented("chat_command")
+func crafting() -> Variant: return _unimplemented("crafting")
+func grimoire() -> Variant: return _unimplemented("grimoire")
+func economy() -> Variant: return _unimplemented("economy")
+func character() -> Variant: return _unimplemented("character")
+func quest() -> Variant: return _unimplemented("quest")
+func guild() -> Variant: return _unimplemented("guild")
+func save() -> Variant: return _unimplemented("save")
+func misc_edge() -> Variant: return _unimplemented("misc_edge")
+func mail() -> Variant: return _unimplemented("mail")
+func snapshot_data() -> Variant: return _unimplemented("snapshot_data")

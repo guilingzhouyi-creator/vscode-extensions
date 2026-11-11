@@ -8,8 +8,8 @@ extends RefCounted
 
 ## 获取当前战斗快照 (BOSS血条、多部位状态、玩家状态)
 func get_combat_snapshot_async(battle_id: String, callback: Callable) -> void:
-	printerr("ICombatService.get_combat_snapshot_async: 纯虚函数必须由子类实现")
+	EventBusCore.get_instance().emit_log("error", "ICombatService.get_combat_snapshot_async: pure virtual method must be implemented by subclass")
 
 ## 释放技能动作模拟
 func cast_skill_async(skill_id: String, target_id: String, callback: Callable) -> void:
-	printerr("ICombatService.cast_skill_async: 纯虚函数必须由子类实现")
+	EventBusCore.get_instance().emit_log("error", "ICombatService.cast_skill_async: pure virtual method must be implemented by subclass")

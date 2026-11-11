@@ -85,7 +85,13 @@ func can_transition(to_state: AppState) -> bool:
 ## 推进状态跃迁
 func transition_to(to_state: AppState, context: Dictionary = {}) -> bool:
 	if not can_transition(to_state):
-		printerr("[AppLifecycleFSM] 非法状态跃迁: %s -> %s" % [get_state_name(_current_state), get_state_name(to_state)])
+		EventBusCore.get_instance().emit_log(
+			"warn",
+			TemplateFormatter.format(
+				"AppLifecycleFSM: illegal state transition {from_state} -> {to_state}",
+				{"from_state": get_state_name(_current_state), "to_state": get_state_name(to_state)}
+			)
+		)
 		return false
 
 	var from_state := _current_state

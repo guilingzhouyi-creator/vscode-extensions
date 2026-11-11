@@ -8,37 +8,37 @@ extends RefCounted
 
 ## 重置分页游标
 func reset_cursor() -> void:
-	printerr("IChatCommandSession.reset_cursor: 纯虚函数必须由子类实现")
+	EventBusCore.get_instance().emit_log("error", "IChatCommandSession.reset_cursor: pure virtual method must be implemented by subclass")
 
 ## 按前缀查询首页（返回 entries / page_index / total_pages）
 func query(prefix: String) -> Dictionary:
-	printerr("IChatCommandSession.query: 纯虚函数必须由子类实现")
+	EventBusCore.get_instance().emit_log("error", "IChatCommandSession.query: pure virtual method must be implemented by subclass")
 	return {}
 
 ## 下一页
 func next_page(prefix: String) -> Dictionary:
-	printerr("IChatCommandSession.next_page: 纯虚函数必须由子类实现")
+	EventBusCore.get_instance().emit_log("error", "IChatCommandSession.next_page: pure virtual method must be implemented by subclass")
 	return {}
 
 ## 上一页
 func prev_page(prefix: String) -> Dictionary:
-	printerr("IChatCommandSession.prev_page: 纯虚函数必须由子类实现")
+	EventBusCore.get_instance().emit_log("error", "IChatCommandSession.prev_page: pure virtual method must be implemented by subclass")
 	return {}
 
 ## 最近使用补全（返回 success / command）
 func apply_recent_completion(prefix: String) -> Dictionary:
-	printerr("IChatCommandSession.apply_recent_completion: 纯虚函数必须由子类实现")
+	EventBusCore.get_instance().emit_log("error", "IChatCommandSession.apply_recent_completion: pure virtual method must be implemented by subclass")
 	return {}
 
 ## 记录命令使用（最近窗口）
 func record_usage(command_name: String) -> void:
-	printerr("IChatCommandSession.record_usage: 纯虚函数必须由子类实现")
+	EventBusCore.get_instance().emit_log("error", "IChatCommandSession.record_usage: pure virtual method must be implemented by subclass")
 
 ## 重置 Tab 手势判定
 func reset_gesture() -> void:
-	printerr("IChatCommandSession.reset_gesture: 纯虚函数必须由子类实现")
+	EventBusCore.get_instance().emit_log("error", "IChatCommandSession.reset_gesture: pure virtual method must be implemented by subclass")
 
 ## Tab 手势判定（返回 is_tab / is_single_tap / is_double_tap）
 func feed_gesture(key_code: String, timestamp_msec: int) -> Dictionary:
-	printerr("IChatCommandSession.feed_gesture: 纯虚函数必须由子类实现")
+	EventBusCore.get_instance().emit_log("error", "IChatCommandSession.feed_gesture: pure virtual method must be implemented by subclass")
 	return {}

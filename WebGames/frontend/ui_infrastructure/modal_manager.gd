@@ -65,7 +65,7 @@ func _ensure_backdrop() -> void:
 ## 打开模态弹窗（同一实例重复打开时提升为栈顶，避免栈内重复与悬空键）
 func open_modal(modal: Control, dismiss_on_backdrop: bool = false) -> bool:
 	if modal == null:
-		printerr("[ModalManager] 无法打开空的模态控件")
+		EventBusCore.get_instance().emit_log("warn", "ModalManager: cannot open null modal control")
 		return false
 
 	if _modal_container != null and modal.get_parent() != _modal_container:

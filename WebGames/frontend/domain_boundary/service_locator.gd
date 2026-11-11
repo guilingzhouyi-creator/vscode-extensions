@@ -75,7 +75,10 @@ static func get_instance() -> ServiceContainer:
 			"mock":
 				_instance = MockServiceContainer.get_instance()
 			_:
-				printerr("[ServiceLocator] 未知的 service_mode: %s，回落到 mock" % mode)
+				EventBusCore.get_instance().emit_log(
+					"warn",
+					TemplateFormatter.format("ServiceLocator: unknown service_mode '{mode}', falling back to mock", {"mode": mode})
+				)
 				_instance = MockServiceContainer.get_instance()
 	return _instance
 

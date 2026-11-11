@@ -8,15 +8,15 @@ extends RefCounted
 
 ## 生成公会成员名单（等级/贡献/角色/在线态按规则生成）
 func generate_roster(count: int) -> Array:
-	printerr("IGuildService.generate_roster: 纯虚函数必须由子类实现")
+	EventBusCore.get_instance().emit_log("error", "IGuildService.generate_roster: pure virtual method must be implemented by subclass")
 	return []
 
 ## 成员管理权限判定（管理角色白名单由服务层配置驱动）
 func can_manage(user_role: String) -> bool:
-	printerr("IGuildService.can_manage: 纯虚函数必须由子类实现")
+	EventBusCore.get_instance().emit_log("error", "IGuildService.can_manage: pure virtual method must be implemented by subclass")
 	return false
 
 ## 交易状态机跃迁（action: lock / confirm / cancel）→ {success, locked, confirmed}
 func trade_transition(state: Dictionary, action: String) -> Dictionary:
-	printerr("IGuildService.trade_transition: 纯虚函数必须由子类实现")
+	EventBusCore.get_instance().emit_log("error", "IGuildService.trade_transition: pure virtual method must be implemented by subclass")
 	return {"success": false, "error_code": "NOT_IMPLEMENTED"}

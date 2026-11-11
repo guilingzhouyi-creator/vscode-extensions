@@ -79,7 +79,7 @@ func replace_screen(screen_id: String, params: Dictionary = {}, transition_type:
 ## 弹出并返回上一 Screen（默认 SLIDE_RIGHT 回退动效）
 func pop_screen(transition_type: int = NavTypes.TransitionType.SLIDE_RIGHT) -> Control:
 	if _screen_stack.size() <= 1:
-		printerr("[NavManager] 已经是栈底，无法继续返回")
+		EventBusCore.get_instance().emit_log("warn", "NavManager: already at stack bottom, cannot pop")
 		return null
 	var prev_id: String = _screen_stack[_screen_stack.size() - 2]
 	var result := _navigate_to(prev_id, {}, false, transition_type)
@@ -93,7 +93,10 @@ func pop_screen(transition_type: int = NavTypes.TransitionType.SLIDE_RIGHT) -> C
 ## 转场动效：transition_type != NONE 时旧屏在动效结束后才 queue_free，保证视觉连续性
 func _navigate_to(screen_id: String, params: Dictionary, record_history: bool, transition_type: int = NavTypes.TransitionType.NONE) -> Control:
 	if not _screen_registry.has(screen_id):
-		printerr("[NavManager] 未注册的 Screen: %s" % screen_id)
+		EventBusCore.get_instance().emit_log(
+			"warn",
+			TemplateFormatter.format("NavManager: unregistered screen {screen_id}", {"screen_id": screen_id})
+		)
 		return null
 
 	# 1. 先解析场景（缓存命中优先；失败即返回，旧屏不受影响）
@@ -102,18 +105,27 @@ func _navigate_to(screen_id: String, params: Dictionary, record_history: bool, t
 	if scene == null:
 		scene = load(scene_path) as PackedScene
 		if scene == null:
-			printerr("[NavManager] 场景加载失败: %s" % scene_path)
+			EventBusCore.get_instance().emit_log(
+				"warn",
+				TemplateFormatter.format("NavManager: failed to load scene {scene_path}", {"scene_path": scene_path})
+			)
 			return null
 		_cache_scene(screen_id, scene)
 
 	var inst := scene.instantiate() as Control
 	if inst == null:
-		printerr("[NavManager] 场景根节点不是 Control: %s" % scene_path)
+		EventBusCore.get_instance().emit_log(
+			"warn",
+			TemplateFormatter.format("NavManager: scene root is not Control {scene_path}", {"scene_path": scene_path})
+		)
 		return null
 
 	# 2. 挂载前置校验（R-04：宿主无效则不入栈、不销毁旧屏，杜绝孤儿节点 + 栈/场景不一致）
 	if _app_root == null or _app_root.screen_container == null:
-		printerr("[NavManager] 宿主未绑定, 拒绝跳转以保持栈/场景一致: %s" % screen_id)
+		EventBusCore.get_instance().emit_log(
+			"warn",
+			TemplateFormatter.format("NavManager: host unbound, navigation rejected for {screen_id}", {"screen_id": screen_id})
+		)
 		inst.queue_free()
 		return null
 
@@ -205,12 +217,16 @@ func show_toast(message: String, level: int = NavTypes.ToastLevel.INFO, duration
 	if _app_root != null and _app_root.toast_layer != null:
 		_app_root.toast_layer.show_toast(message, level, duration_sec)
 	else:
-		print("[Toast] ", message)
+		EventBusCore.get_instance().emit_log(
+			"info",
+			TemplateFormatter.format("Toast fallback: {message}", {"message": message})
+		)
 
 ## 显示全屏 Loading 遮罩
-func show_loading(hint: String = "载入中...") -> void:
+func show_loading(hint: String = "") -> void:
 	if _app_root != null and _app_root.loading_overlay != null:
-		_app_root.loading_overlay.show_loading(hint)
+		var effective_hint: String = hint if not hint.is_empty() else UIIntermediary.text("ui.common.loading")
+		_app_root.loading_overlay.show_loading(effective_hint)
 
 ## 隐藏全屏 Loading 遮罩
 func hide_loading() -> void:

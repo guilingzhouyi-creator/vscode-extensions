@@ -8,5 +8,5 @@ extends RefCounted
 
 ## 创建独立会话（每个视图实例持有自己的索引/手势状态，避免跨视图串扰）
 func create_session() -> IChatCommandSession:
-	printerr("IChatCommandService.create_session: 纯虚函数必须由子类实现")
+	EventBusCore.get_instance().emit_log("error", "IChatCommandService.create_session: pure virtual method must be implemented by subclass")
 	return null
