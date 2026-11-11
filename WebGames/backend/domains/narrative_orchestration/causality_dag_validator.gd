@@ -75,9 +75,11 @@ static func _detect_cycle_kahn(graph: NarrativeDAGGraphDTO, in_degree: Dictionar
 		if in_degree[nid] == 0:
 			zero_in_degree_queue.append(nid)
 
+	var head: int = 0
 	var visited_count := 0
-	while not zero_in_degree_queue.is_empty():
-		var current = zero_in_degree_queue.pop_front()
+	while head < zero_in_degree_queue.size():
+		var current: String = zero_in_degree_queue[head]
+		head += 1
 		visited_count += 1
 		_drain_kahn_neighbors(current, adj_list, in_degree, zero_in_degree_queue)
 
@@ -102,8 +104,8 @@ static func _drain_kahn_neighbors(current: String, adj_list: Dictionary, in_degr
 			queue.append(n_str)
 
 ## 校验非可选节点的入口可达闭包
-static func _verify_reachability(graph: NarrativeDAGGraphDTO) -> Dictionary:
-	var reachable := _collect_reachable_nodes(graph)
+static func _verify_reachability(graph: NarrativeDAGGraphDTO, adj_list: Dictionary = {}) -> Dictionary:
+	var reachable := _collect_reachable_nodes(graph, adj_list)
 	for nid in graph.nodes.keys():
 		if reachable.has(nid):
 			continue
@@ -132,14 +134,23 @@ static func validate_graph(graph: NarrativeDAGGraphDTO) -> Dictionary:
 	if not cycle_res.get("is_valid", false):
 		return cycle_res
 
-	var reach_res := _verify_reachability(graph)
+	var reach_res := _verify_reachability(graph, adj_list)
 	if not reach_res.get("is_valid", false):
 		return reach_res
 
 	return {"is_valid": true, "sorted_node_count": cycle_res.get("visited_count", 0)}
 
 
-static func _expand_reachable_edges(current: String, graph: NarrativeDAGGraphDTO, reachable: Dictionary, frontier: Array[String]) -> void:
+static func _expand_reachable_edges(current: String, graph: NarrativeDAGGraphDTO, adj_list: Dictionary, reachable: Dictionary, frontier: Array[String]) -> void:
+	if not adj_list.is_empty():
+		var neighbors: Variant = adj_list.get(current, null)
+		if neighbors is Array:
+			for nxt in (neighbors as Array):
+				var next_id := str(nxt)
+				if not reachable.has(next_id):
+					reachable[next_id] = true
+					frontier.append(next_id)
+		return
 	for edge in graph.edges:
 		if edge.from_node_id != current:
 			continue
@@ -148,11 +159,13 @@ static func _expand_reachable_edges(current: String, graph: NarrativeDAGGraphDTO
 			reachable[next_id] = true
 			frontier.append(next_id)
 
-## 从入口节点出发沿有向边收集可达节点集合（BFS）
-static func _collect_reachable_nodes(graph: NarrativeDAGGraphDTO) -> Dictionary:
+## 从入口节点出发沿有向边收集可达节点集合（O(V+E) 邻接表 BFS）
+static func _collect_reachable_nodes(graph: NarrativeDAGGraphDTO, adj_list: Dictionary = {}) -> Dictionary:
 	var reachable := {graph.entry_node_id: true}
 	var frontier: Array[String] = [graph.entry_node_id]
-	while not frontier.is_empty():
-		var current: String = frontier.pop_front()
-		_expand_reachable_edges(current, graph, reachable, frontier)
+	var head: int = 0
+	while head < frontier.size():
+		var current: String = frontier[head]
+		head += 1
+		_expand_reachable_edges(current, graph, adj_list, reachable, frontier)
 	return reachable

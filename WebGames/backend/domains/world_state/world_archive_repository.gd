@@ -352,12 +352,7 @@ func delete_world(world_id: String) -> bool:
 # ==============================================================================
 
 func _atomic_write_file(file_path: String, content: String) -> Dictionary:
-	var write_res: Dictionary = AtomicFileWriter.write_text_atomic(file_path, content, {
-		"tmp_suffix": DEFAULT_TMP_SUFFIX,
-		"create_backup": true,
-		"backup_suffix": DEFAULT_BACKUP_SUFFIX,
-		"backup_fail_policy": "continue"
-	})
+	var write_res: Dictionary = AtomicFileWriter.write_text_atomic(file_path, content)
 	if bool(write_res.get("success", false)):
 		return {"success": true, "error": ""}
 	var stage: String = str(write_res.get("error_stage", ""))

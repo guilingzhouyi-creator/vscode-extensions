@@ -11,6 +11,8 @@
 class_name AgentHudContextSliceDTO
 extends RefCounted
 
+const DEFAULT_STAT_POOL: float = 100.0
+
 # 一、基础身份切片
 var account_id: String = ""
 var character_id: String = ""
@@ -19,12 +21,12 @@ var race_id: String = "HUMAN"
 var level: int = 1
 
 # 二、生理体能切片 (数值与归一化安全比率 0.0 ~ 1.0)
-var hp_current: float = 100.0
-var hp_max: float = 100.0
+var hp_current: float = DEFAULT_STAT_POOL
+var hp_max: float = DEFAULT_STAT_POOL
 var hp_ratio: float = 1.0
 
-var mp_current: float = 100.0
-var mp_max: float = 100.0
+var mp_current: float = DEFAULT_STAT_POOL
+var mp_max: float = DEFAULT_STAT_POOL
 var mp_ratio: float = 1.0
 
 var ap_current: float = 10.0
@@ -69,11 +71,11 @@ func reset_state() -> void:
 	race_id = "HUMAN"
 	level = 1
 
-	hp_current = 100.0
-	hp_max = 100.0
+	hp_current = DEFAULT_STAT_POOL
+	hp_max = DEFAULT_STAT_POOL
 	hp_ratio = 1.0
-	mp_current = 100.0
-	mp_max = 100.0
+	mp_current = DEFAULT_STAT_POOL
+	mp_max = DEFAULT_STAT_POOL
 	mp_ratio = 1.0
 	ap_current = 10.0
 	ap_max = 10.0

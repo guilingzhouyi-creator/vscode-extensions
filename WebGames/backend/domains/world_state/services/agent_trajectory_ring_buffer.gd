@@ -55,14 +55,15 @@ func get_trajectory_window(steps: int = 8) -> Array[AgentHudTelemetryPacketDTO]:
 		out[i] = _slots[slot_idx]
 	return out
 
-## 获取自指定序列号（大于等于 from_seq）以来的累积因果突变
+## 获取自指定序列号（大于等于 from_seq）以来的累积因果突变（直读环形槽位，零临时窗口数组分配）
 func get_cumulative_deltas(from_sequence: int = 0) -> Array[HudCausalDeltaDTO]:
 	var deltas: Array[HudCausalDeltaDTO] = []
 	if _count <= 0:
 		return deltas
 
-	var window := get_trajectory_window(_count)
-	for pkt in window:
+	var start_idx: int = (_head - _count + _capacity) % _capacity
+	for i in range(_count):
+		var pkt: AgentHudTelemetryPacketDTO = _slots[(start_idx + i) % _capacity]
 		if pkt == null or pkt.sequence_index < from_sequence:
 			continue
 		for d in pkt.causal_deltas:
@@ -112,35 +113,42 @@ static func _sync_packet_data(src: AgentHudTelemetryPacketDTO, dst: AgentHudTele
 			dst.observation = AgentHudContextSliceDTO.new()
 		_sync_observation(src.observation, dst.observation)
 
-	# 差分原位同步
+	# 差分原位同步（单轮提取避免过深嵌套）
+	_sync_causal_deltas(src, dst)
+	# 行动空间原位同步
+	_sync_action_space(src, dst)
+
+static func _sync_causal_deltas(src: AgentHudTelemetryPacketDTO, dst: AgentHudTelemetryPacketDTO) -> void:
 	dst.causal_deltas.clear()
 	for d in src.causal_deltas:
-		if d != null:
-			var clone_delta := HudCausalDeltaDTO.new()
-			clone_delta.delta_category = d.delta_category
-			clone_delta.target_field = d.target_field
-			clone_delta.previous_value = d.previous_value
-			clone_delta.current_value = d.current_value
-			clone_delta.delta_amount = d.delta_amount
-			clone_delta.cause_identifier = d.cause_identifier
-			clone_delta.initiator = d.initiator
-			clone_delta.reason = d.reason
-			dst.causal_deltas.append(clone_delta)
+		if d == null:
+			continue
+		var clone_delta := HudCausalDeltaDTO.new()
+		clone_delta.delta_category = d.delta_category
+		clone_delta.target_field = d.target_field
+		clone_delta.previous_value = d.previous_value
+		clone_delta.current_value = d.current_value
+		clone_delta.delta_amount = d.delta_amount
+		clone_delta.cause_identifier = d.cause_identifier
+		clone_delta.initiator = d.initiator
+		clone_delta.reason = d.reason
+		dst.causal_deltas.append(clone_delta)
 
-	# 行动空间原位同步
+static func _sync_action_space(src: AgentHudTelemetryPacketDTO, dst: AgentHudTelemetryPacketDTO) -> void:
 	dst.action_space.clear()
 	for a in src.action_space:
-		if a != null:
-			var clone_act := AgentActionDirectiveDTO.new()
-			clone_act.directive_id = a.directive_id
-			clone_act.domain = a.domain
-			clone_act.description = a.description
-			clone_act.cost_payload = a.cost_payload
-			clone_act.preconditions = a.preconditions
-			clone_act.allowed_parameters = a.allowed_parameters
-			clone_act.is_executable = a.is_executable
-			clone_act.blocked_reason = a.blocked_reason
-			dst.action_space.append(clone_act)
+		if a == null:
+			continue
+		var clone_act := AgentActionDirectiveDTO.new()
+		clone_act.directive_id = a.directive_id
+		clone_act.domain = a.domain
+		clone_act.description = a.description
+		clone_act.cost_payload = a.cost_payload
+		clone_act.preconditions = a.preconditions
+		clone_act.allowed_parameters = a.allowed_parameters
+		clone_act.is_executable = a.is_executable
+		clone_act.blocked_reason = a.blocked_reason
+		dst.action_space.append(clone_act)
 
 static func _sync_observation(src: AgentHudContextSliceDTO, dst: AgentHudContextSliceDTO) -> void:
 	dst.reset_state()

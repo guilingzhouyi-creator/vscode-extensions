@@ -19,6 +19,7 @@ const AgentActionDirectiveDTO = preload("res://backend/domains/world_state/dto/a
 
 const MAGIC_HEADER: int = 0x4B414C52 # "KALR"
 const PROTOCOL_VER: int = 1
+const RATIO_BYTE_SCALE: float = 255.0
 
 # 差分字段编码映射
 const FIELD_TO_CODE: Dictionary = {
@@ -118,9 +119,9 @@ static func encode_to_bytes(packet: AgentHudTelemetryPacketDTO) -> PackedByteArr
 	if packet.observation != null:
 		var obs := packet.observation
 		spb.put_u16(obs.level)
-		spb.put_u8(int(clampf(obs.hp_ratio * 255.0, 0.0, 255.0)))
-		spb.put_u8(int(clampf(obs.mp_ratio * 255.0, 0.0, 255.0)))
-		spb.put_u8(int(clampf(obs.ap_ratio * 255.0, 0.0, 255.0)))
+		spb.put_u8(int(clampf(obs.hp_ratio * RATIO_BYTE_SCALE, 0.0, RATIO_BYTE_SCALE)))
+		spb.put_u8(int(clampf(obs.mp_ratio * RATIO_BYTE_SCALE, 0.0, RATIO_BYTE_SCALE)))
+		spb.put_u8(int(clampf(obs.ap_ratio * RATIO_BYTE_SCALE, 0.0, RATIO_BYTE_SCALE)))
 		spb.put_float(obs.hp_current)
 		spb.put_float(obs.hp_max)
 		spb.put_float(obs.ap_current)
@@ -193,9 +194,9 @@ static func decode_from_bytes(
 		pkt.observation.reset_state()
 		var obs := pkt.observation
 		obs.level = spb.get_u16()
-		obs.hp_ratio = float(spb.get_u8()) / 255.0
-		obs.mp_ratio = float(spb.get_u8()) / 255.0
-		obs.ap_ratio = float(spb.get_u8()) / 255.0
+		obs.hp_ratio = float(spb.get_u8()) / RATIO_BYTE_SCALE
+		obs.mp_ratio = float(spb.get_u8()) / RATIO_BYTE_SCALE
+		obs.ap_ratio = float(spb.get_u8()) / RATIO_BYTE_SCALE
 		obs.hp_current = spb.get_float()
 		obs.hp_max = spb.get_float()
 		obs.ap_current = spb.get_float()

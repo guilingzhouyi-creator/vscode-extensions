@@ -32,6 +32,9 @@ static var _instance: CutsceneHookRegistry = null
 
 var _manifests: Dictionary = {} # cutscene_id -> CutsceneManifestDTO
 var _hooks: Array[Dictionary] = [] # 规则列表
+var _narrative_hooks_index: Dictionary = {} # "pre/post|dag_id|node_id" -> hook_dict
+var _quest_hooks_index: Dictionary = {} # "quest_id|stage_id" -> hook_dict
+var _lifecycle_hooks_index: Dictionary = {} # stage_id -> hook_dict
 var _viewed_records: Dictionary = {} # cutscene_id -> bool
 
 # ==============================================================================
@@ -46,7 +49,7 @@ static func get_instance() -> CutsceneHookRegistry:
 ## 从 GameConfig 静态加载全域资产与 Hook 规则表
 func initialize_from_config() -> void:
 	_manifests.clear()
-	_hooks.clear()
+	_clear_hook_indices()
 
 	# 1. 载入资产清单
 	var reg_data: Dictionary = GameConfig.get_dict("infrastructure.cutscene_registry", "cutscenes", {})
@@ -75,7 +78,9 @@ func initialize_from_config() -> void:
 	var hooks_arr: Array = GameConfig.get_array("infrastructure.cutscene_hooks", "hooks", [])
 	for h in hooks_arr:
 		if h is Dictionary:
-			_hooks.append((h as Dictionary).duplicate(true))
+			var copied := (h as Dictionary).duplicate(true)
+			_hooks.append(copied)
+			_index_hook(copied)
 
 # ==============================================================================
 # 三、动态注册与重载接口 (支持 MOD 开发者热扩展)
@@ -90,47 +95,62 @@ func get_manifest(cutscene_id: String) -> CutsceneManifestDTO:
 
 func register_hook(hook_dict: Dictionary) -> void:
 	if not hook_dict.is_empty():
-		_hooks.append(hook_dict.duplicate(true))
+		var copied := hook_dict.duplicate(true)
+		_hooks.append(copied)
+		_index_hook(copied)
 
 func clear_for_tests() -> void:
 	_manifests.clear()
-	_hooks.clear()
+	_clear_hook_indices()
 	_viewed_records.clear()
+
+func _clear_hook_indices() -> void:
+	_hooks.clear()
+	_narrative_hooks_index.clear()
+	_quest_hooks_index.clear()
+	_lifecycle_hooks_index.clear()
+
+func _index_hook(hook_dict: Dictionary) -> void:
+	var trigger_type: String = str(hook_dict.get("trigger_type", ""))
+	var raw_filter: Variant = hook_dict.get("target_filter", null)
+	if not (raw_filter is Dictionary):
+		return
+	var filter: Dictionary = raw_filter as Dictionary
+	match trigger_type:
+		TRIGGER_NARRATIVE_NODE_PRE, TRIGGER_NARRATIVE_NODE_POST:
+			var key := "%s|%s|%s" % [trigger_type, str(filter.get("dag_id", "")), str(filter.get("node_id", ""))]
+			if not _narrative_hooks_index.has(key):
+				_narrative_hooks_index[key] = hook_dict
+		TRIGGER_QUEST_STAGE_REACHED:
+			var q_key := "%s|%s" % [str(filter.get("quest_id", "")), str(filter.get("stage_id", ""))]
+			if not _quest_hooks_index.has(q_key):
+				_quest_hooks_index[q_key] = hook_dict
+		TRIGGER_LIFECYCLE_STAGE_ENTERED:
+			var l_key := str(filter.get("stage_id", ""))
+			if not _lifecycle_hooks_index.has(l_key):
+				_lifecycle_hooks_index[l_key] = hook_dict
 
 # ==============================================================================
 # 四、Hook 规则匹配与参数解算
 # ==============================================================================
 
-## 匹配剧情 DAG 节点前置/后置 Hook
+## 匹配剧情 DAG 节点前置/后置 Hook (O(1) 哈希索引检索)
 func match_narrative_hook(dag_id: String, node_id: String, is_pre: bool) -> CutsceneRequestDTO:
 	var expected_type: String = TRIGGER_NARRATIVE_NODE_PRE if is_pre else TRIGGER_NARRATIVE_NODE_POST
-	for h in _hooks:
-		if str(h.get("trigger_type", "")) != expected_type:
-			continue
-		var filter: Dictionary = h.get("target_filter", {})
-		if str(filter.get("dag_id", "")) == dag_id and str(filter.get("node_id", "")) == node_id:
-			return _assemble_request_from_hook(h)
-	return null
+	var key := "%s|%s|%s" % [expected_type, dag_id, node_id]
+	var h: Variant = _narrative_hooks_index.get(key, null)
+	return _assemble_request_from_hook(h as Dictionary) if h is Dictionary else null
 
-## 匹配任务阶段达成 Hook
+## 匹配任务阶段达成 Hook (O(1) 哈希索引检索)
 func match_quest_hook(quest_id: String, stage_id: String) -> CutsceneRequestDTO:
-	for h in _hooks:
-		if str(h.get("trigger_type", "")) != TRIGGER_QUEST_STAGE_REACHED:
-			continue
-		var filter: Dictionary = h.get("target_filter", {})
-		if str(filter.get("quest_id", "")) == quest_id and str(filter.get("stage_id", "")) == stage_id:
-			return _assemble_request_from_hook(h)
-	return null
+	var q_key := "%s|%s" % [quest_id, stage_id]
+	var h: Variant = _quest_hooks_index.get(q_key, null)
+	return _assemble_request_from_hook(h as Dictionary) if h is Dictionary else null
 
-## 匹配生命周期阶段 Hook
+## 匹配生命周期阶段 Hook (O(1) 哈希索引检索)
 func match_lifecycle_hook(stage_id: String) -> CutsceneRequestDTO:
-	for h in _hooks:
-		if str(h.get("trigger_type", "")) != TRIGGER_LIFECYCLE_STAGE_ENTERED:
-			continue
-		var filter: Dictionary = h.get("target_filter", {})
-		if str(filter.get("stage_id", "")) == stage_id:
-			return _assemble_request_from_hook(h)
-	return null
+	var h: Variant = _lifecycle_hooks_index.get(stage_id, null)
+	return _assemble_request_from_hook(h as Dictionary) if h is Dictionary else null
 
 ## 基于 cutscene_id 构造参数化调用信封（支持外部显式覆盖参数）
 func resolve_request(cutscene_id: String, override_params: Dictionary = {}) -> CutsceneRequestDTO:

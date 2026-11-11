@@ -50,7 +50,7 @@ func to_dto() -> Dictionary:
 
 ## 从输入字典反序列化还原传输对象
 static func from_dto(data: Dictionary) -> RefCounted:
-	var dto: ItemStatDeltaDTO = load("res://backend/domains/item_statistics/item_stat_delta_dto.gd").new()
+	var dto := ItemStatDeltaDTO.new()
 	if data.is_empty():
 		return dto
 	dto.canonical_id = str(data.get("canonical_id", ""))

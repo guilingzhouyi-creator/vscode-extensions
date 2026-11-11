@@ -3,7 +3,7 @@
 # 文件路径: res://backend/infrastructure/telemetry_aggregate.gd
 # 架构定位: Telemetry Probe / Metric Collector
 # 依赖与触发: 上游: GameBootstrap, CombatSessionManager | 下游: UnifiedLoggerService | 配置: config/infrastructure/profiling.json | 信号: 性能超限告警
-# 职责说明: 单向只读消费结构化日志，按域与事件分类聚合计数与耗时分位 (p50/p95)， 滑动窗口重置，支撑热路径承压可观测性（Inv-LS-4 遥测单向不变量）。
+# 职责说明: 单向只读消费结构化日志，按域与事件分类聚合计数与耗时分位 (50%/95% 分位)， 滑动窗口重置，支撑热路径承压可观测性（Inv-LS-4 遥测单向不变量）。
 # 退出语义与设计依据: 性能治理与基准审计架构
 # ==============================================================================
 
@@ -24,6 +24,7 @@ class SlotMetric extends RefCounted:
 	var p95_ms: int = 0
 	var last_timestamp_utc: int = 0
 	var duration_samples: Array[int] = []
+	var _sample_write_cursor: int = 0
 
 	## 序列化槽位指标（供外部查询快照；不导出原始样本序列，防内存放大）
 	func to_dict() -> Dictionary:
@@ -47,10 +48,12 @@ static var _sample_size: int = 256
 static var _window_seconds: int = 60
 static var _enabled: bool = true
 static var _cached_version: int = -2
+static var _sort_scratch: Array[int] = []
 
 ## 测试复位：清空全部槽位并恢复默认配置（避免跨用例状态残留）
 static func reset_state() -> void:
 	_slots.clear()
+	_sort_scratch.clear()
 	_window_start_utc = 0
 	_sample_size = 256
 	_window_seconds = 60
@@ -102,25 +105,30 @@ static func consume(record: StructuredLogRecord) -> void:
 	if record.duration_ms > 0 or slot.duration_samples.size() == 0:
 		_track_duration(slot, record.duration_ms)
 
-## 追踪耗时样本：有界滑动窗口（超 sample_size 淘汰最旧），实时计算 p50/p95 分位
+## 追踪耗时样本：O(1) 定长环形覆写窗口（超 sample_size 原位覆盖），复用排序暂存缓冲实时计算 50%/95% 分位
 static func _track_duration(slot: SlotMetric, duration_ms: int) -> void:
-	slot.duration_samples.append(duration_ms)
-	if slot.duration_samples.size() > _sample_size:
-		slot.duration_samples.remove_at(0)
-		
-	var sorted_samples: Array = slot.duration_samples.duplicate()
-	sorted_samples.sort()
-	var n := sorted_samples.size()
-	if n > 0:
-		var idx_p50 := int(n * 0.50)
-		if idx_p50 >= n:
-			idx_p50 = n - 1
-		slot.p50_ms = int(sorted_samples[idx_p50])
-		
-		var idx_p95 := int(n * 0.95)
-		if idx_p95 >= n:
-			idx_p95 = n - 1
-		slot.p95_ms = int(sorted_samples[idx_p95])
+	if slot.duration_samples.size() < _sample_size:
+		slot.duration_samples.append(duration_ms)
+	else:
+		if slot.duration_samples.size() > _sample_size:
+			slot.duration_samples.resize(_sample_size)
+		slot._sample_write_cursor = slot._sample_write_cursor % _sample_size
+		slot.duration_samples[slot._sample_write_cursor] = duration_ms
+		slot._sample_write_cursor = (slot._sample_write_cursor + 1) % _sample_size
+
+	var n := slot.duration_samples.size()
+	if n <= 0:
+		return
+	_sort_scratch.resize(n)
+	for i in range(n):
+		_sort_scratch[i] = slot.duration_samples[i]
+	_sort_scratch.sort()
+
+	var idx_median := mini(n - 1, int(n * 0.50))
+	slot.p50_ms = int(_sort_scratch[idx_median])
+
+	var idx_tail := mini(n - 1, int(n * 0.95))
+	slot.p95_ms = int(_sort_scratch[idx_tail])
 
 ## 滑动窗口重置：超过 window_seconds 时清空全部槽位（新窗口从当前时刻起算）
 static func _maybe_roll_window(now_utc: int) -> void:

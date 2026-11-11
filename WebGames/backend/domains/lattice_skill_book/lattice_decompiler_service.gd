@@ -52,9 +52,11 @@ static func is_acyclic_dag(ast: SkillSubgraphAST) -> bool:
 		if in_degree[node_id] == 0:
 			queue.append(node_id)
 
+	var head: int = 0
 	var visited_count := 0
-	while queue.size() > 0:
-		var curr = queue.pop_front()
+	while head < queue.size():
+		var curr: String = queue[head]
+		head += 1
 		visited_count += 1
 		_process_topological_neighbors(curr, adj, in_degree, queue)
 
@@ -73,12 +75,15 @@ static func generate_ast_signature(ast: SkillSubgraphAST) -> String:
 	var title_sep := GameConfig.get_string("domains.lattice", "decompiler/signature_title_sep", ":")
 	var node_format := GameConfig.get_string("domains.lattice", "decompiler/signature_node_format", "%s:%s;")
 
-	var repr_str: String = prefix + ast.skill_name + title_sep
 	var sorted_keys: Array = ast.nodes.keys()
 	sorted_keys.sort()
-	for k in sorted_keys:
-		var n = ast.nodes[k]
-		repr_str += node_format % [k, n.get("symbol", "")]
+	var parts := PackedStringArray()
+	parts.resize(sorted_keys.size() + 1)
+	parts[0] = prefix + ast.skill_name + title_sep
+	for idx in range(sorted_keys.size()):
+		var k: Variant = sorted_keys[idx]
+		var n: Dictionary = ast.nodes[k]
+		parts[idx + 1] = node_format % [k, n.get("symbol", "")]
 
-	ast.signature_hash = repr_str.sha256_text()
+	ast.signature_hash = "".join(parts).sha256_text()
 	return ast.signature_hash

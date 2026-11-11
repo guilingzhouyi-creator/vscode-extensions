@@ -13,8 +13,6 @@ extends RefCounted
 
 const LOCK_FILENAME: String = "world_mod_lock.json"
 const DEFAULT_FORMAT_VERSION: String = "1.0.0"
-const DEFAULT_TMP_SUFFIX: String = ".tmp"
-const DEFAULT_BACKUP_SUFFIX: String = ".bak"
 
 ## 获取单机世界 MOD 锁文件的物理全路径
 func get_lock_file_path(world_id: String) -> String:
@@ -107,12 +105,7 @@ func save_world_mod_lock(world_id: String, active_packs: Array) -> Dictionary:
 	}
 
 	var json_str := JSON.stringify(envelope, "  ")
-	var write_res: Dictionary = AtomicFileWriter.write_text_atomic(target_path, json_str, {
-		"tmp_suffix": DEFAULT_TMP_SUFFIX,
-		"create_backup": true,
-		"backup_suffix": DEFAULT_BACKUP_SUFFIX,
-		"backup_fail_policy": "continue"
-	})
+	var write_res: Dictionary = AtomicFileWriter.write_text_atomic(target_path, json_str)
 	if not bool(write_res.get("success", false)):
 		var stage: String = str(write_res.get("error_stage", ""))
 		if stage == "tmp_open":

@@ -42,7 +42,7 @@ static func get_instance() -> ContractRegistryIndex:
 static func ensure_loaded() -> void:
 	if _loaded and _instance != null:
 		return
-	_instance = (load("res://backend/domains/contract_registry/contract_registry_index.gd") as GDScript).new()
+	_instance = ContractRegistryIndex.new()
 	_instance._load_from_config()
 
 
