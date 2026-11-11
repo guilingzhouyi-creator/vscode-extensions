@@ -80,20 +80,17 @@ static func create_human_request(
 	account_id: String = "",
 	character_id: String = ""
 ) -> ClientRequestEnvelopeDTO:
-	var req := ClientRequestEnvelopeDTO.new()
-	req.request_id = "REQ_H_%d_%d" % [Time.get_ticks_msec(), _request_counter]
-	_request_counter += 1
-	req.actor_type = ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI
-	req.domain = domain
-	req.action_type = action_type
-	req.payload = payload.duplicate(true)
-	req.session_token = session_token
-	req.account_id = account_id
-	req.character_id = character_id
-	req.lease_nonce = _lease_counter
-	_lease_counter += 1
-	req.client_timestamp_ms = Time.get_ticks_msec()
-	return req
+	return _build_request_envelope(
+		ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI,
+		"REQ_H",
+		domain,
+		action_type,
+		payload,
+		session_token,
+		account_id,
+		character_id,
+		true
+	)
 
 ## 从既有 AgentActionPacketDTO 转换为统一请求信封（实现双轨统一收口）
 static func wrap_agent_action(
@@ -131,17 +128,44 @@ static func create_agent_request(
 	character_id: String = "",
 	session_token: String = ""
 ) -> ClientRequestEnvelopeDTO:
+	return _build_request_envelope(
+		ClientRequestEnvelopeDTO.ACTOR_AGENT,
+		"REQ_A",
+		domain,
+		action_type,
+		payload,
+		session_token,
+		account_id,
+		character_id,
+		false
+	)
+
+static func _build_request_envelope(
+	actor_type: String,
+	id_prefix: String,
+	domain: String,
+	action_type: String,
+	payload: Dictionary,
+	session_token: String,
+	account_id: String,
+	character_id: String,
+	allocate_lease: bool
+) -> ClientRequestEnvelopeDTO:
 	var req := ClientRequestEnvelopeDTO.new()
-	req.request_id = "REQ_A_%d_%d" % [Time.get_ticks_msec(), _request_counter]
+	req.request_id = "%s_%d_%d" % [id_prefix, Time.get_ticks_msec(), _request_counter]
 	_request_counter += 1
-	req.actor_type = ClientRequestEnvelopeDTO.ACTOR_AGENT
+	req.actor_type = actor_type
 	req.domain = domain
 	req.action_type = action_type
 	req.payload = payload.duplicate(true)
 	req.session_token = session_token
 	req.account_id = account_id
 	req.character_id = character_id
-	req.lease_nonce = 0
+	if allocate_lease:
+		req.lease_nonce = _lease_counter
+		_lease_counter += 1
+	else:
+		req.lease_nonce = 0
 	req.client_timestamp_ms = Time.get_ticks_msec()
 	return req
 
@@ -163,6 +187,11 @@ static func create_response(
 	resp.causal_delta = causal_delta.duplicate(true)
 	resp.server_timestamp_ms = Time.get_ticks_msec()
 	return resp
+
+## 创建未处理动作的标准错误响应信封
+static func create_unhandled_action_response(request_id: String, action_type: String) -> UnifiedResponseEnvelopeDTO:
+	var msg := TemplateFormatter.format("Unsupported action instruction: {action_type}.", {"action_type": action_type})
+	return create_response(request_id, false, {}, "ERR_UNHANDLED_ACTION", msg)
 
 ## 测试环境重置计数器与信封对象池
 static func reset_for_tests() -> void:

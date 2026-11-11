@@ -32,7 +32,7 @@ static func dispatch_starter_kit(
         }
 
     # 2. 读取配置或 MOD 清单决定套件 ID
-    var manifest: Dictionary = _unwrap_adapted_manifest(adapted_mod_manifest)
+    var manifest: Dictionary = DestinyModManifestDTO.unwrap_adapted_manifest(adapted_mod_manifest)
     var kit_id := ctx.assigned_starter_kit_id
     if kit_id.is_empty():
         kit_id = GameConfig.get_string("domains.starter_loadout", "race_kit_map/" + ctx.race_id, "")
@@ -139,20 +139,12 @@ static func hydrate_starter_loadout_into_profile(
 # 三、套件多级路由解析与物理水化内部工具方法 (CC <= 15, Depth <= 3)
 # ==============================================================================
 
-static func _unwrap_adapted_manifest(raw_manifest: Dictionary) -> Dictionary:
-    if raw_manifest.is_empty():
-        return {}
-    var inner: Variant = raw_manifest.get("adapted_manifest", null)
-    if inner is Dictionary:
-        return inner as Dictionary
-    return raw_manifest
-
 static func _resolve_effective_kit(
     race_id: String,
     origin_id: String,
     adapted_mod_manifest: Dictionary
 ) -> Dictionary:
-    var manifest: Dictionary = _unwrap_adapted_manifest(adapted_mod_manifest)
+    var manifest: Dictionary = DestinyModManifestDTO.unwrap_adapted_manifest(adapted_mod_manifest)
     var kit_id: String = _resolve_mod_kit_id_for_origin(origin_id, manifest)
     var kit_cfg: Dictionary = {}
 

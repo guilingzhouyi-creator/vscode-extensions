@@ -234,7 +234,7 @@ static func _normalize_primitive(evt: Variant) -> Dictionary:
 		return {}
 	if prim["account_id"].is_empty() or prim["canonical_id"].is_empty() or int(prim["quantity"]) <= 0:
 		return {}
-	if not _valid_event_type(str(prim["event_type"])):
+	if not CompositeEventDTO.is_valid_event_type(str(prim["event_type"])):
 		return {}
 	return prim
 
@@ -284,16 +284,6 @@ static func _rule_by_id(rule_id: String, grouping_rules: Array) -> Dictionary:
 		if str(rule.get("rule_id", "")) == rule_id:
 			return rule
 	return {"rule_id": rule_id, "composite_event": "transaction.%s" % rule_id, "projection": ""}
-
-static func _valid_event_type(event_type: String) -> bool:
-	return event_type in [
-		ItemStatisticsSolver.EVENT_ITEM_GRANTED,
-		ItemStatisticsSolver.EVENT_ITEM_CONSUMED,
-		ItemStatisticsSolver.EVENT_ITEM_DESTROYED,
-		ItemStatisticsSolver.EVENT_ITEM_TRADED,
-		ItemStatisticsSolver.EVENT_ITEM_FORGED,
-		ItemStatisticsSolver.EVENT_ITEM_CLAWED_BACK
-	]
 
 # ==============================================================================
 # 配置读取（零硬编码：规则全部来自 event_extractor.json）

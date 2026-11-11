@@ -28,7 +28,7 @@ static func resolve_reincarnation_package(
     if char_name.is_empty():
         return { "success": false, "error_code": "EMPTY_NAME", "message": "角色名称不可为空" }
 
-    var manifest: Dictionary = _unwrap_adapted_manifest(adapted_mod_manifest)
+    var manifest: Dictionary = DestinyModManifestDTO.unwrap_adapted_manifest(adapted_mod_manifest)
     var ui_controls: Dictionary = manifest.get("ui_controls", {})
 
     # 1. 种子确定性收敛（当 MOD 显式开启 allow_attribute_reroll 时允许混入 reroll_nonce）
@@ -93,14 +93,6 @@ static func resolve_reincarnation_package(
 # ==============================================================================
 # 二、种子派生与身世/种族/区域受控解算 (CC <= 15, Depth <= 3)
 # ==============================================================================
-
-static func _unwrap_adapted_manifest(raw_manifest: Dictionary) -> Dictionary:
-    if raw_manifest.is_empty():
-        return {}
-    var inner: Variant = raw_manifest.get("adapted_manifest", null)
-    if inner is Dictionary:
-        return inner as Dictionary
-    return raw_manifest
 
 static func _compute_effective_seed(
     req: AuthoritativeCharacterCreationRequestDTO,
@@ -246,7 +238,7 @@ static func _resolve_race_display_name(race_id: String) -> String:
 
 static func _resolve_attributes(rng: DeterministicRNG, origin_cfg: Dictionary) -> Dictionary:
     var attr_cfg: Dictionary = GameConfig.get_dict("domains.character_creation", "authoritative_reincarnation/attribute_generation", {})
-    var keys: Array = attr_cfg.get("keys", ["STR", "CON", "INT", "AGI", "SPR", "VIT"])
+    var keys: Array = attr_cfg.get("keys", AttributeConversionEngine.DEFAULT_STAT_LIST)
     var min_val: int = int(attr_cfg.get("min_val", 1))
     var max_val: int = int(attr_cfg.get("max_val", 6))
     var baseline: int = int(attr_cfg.get("baseline", 3))

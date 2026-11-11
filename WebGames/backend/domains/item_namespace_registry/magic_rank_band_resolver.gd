@@ -24,9 +24,5 @@ static func rank_to_band(rank: int, registry: MagicTierRegistry) -> int:
 
 ## 档次名键查询（magic.rank_band.*；仅展示不作判定）
 static func band_name_key(band: int) -> String:
-	var bands: Dictionary = GameConfig.get_dict(CONFIG_TABLE, "rank_bands", {})
-	for key in bands:
-		var entry: Dictionary = bands[key]
-		if int(entry.get("band", 0)) == band:
-			return str(entry.get("name_key", ""))
-	return ""
+	var entry := MagicTierRegistry.lookup_config_entry("rank_bands", "band", band)
+	return str(entry.get("name_key", ""))

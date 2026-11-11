@@ -36,16 +36,6 @@
 class_name ModPrecheckAndAdaptationSolver
 extends RefCounted
 
-const VALID_UI_MODES: Array[String] = ["INHERIT", "ALLOW_MANUAL", "FORCE_RANDOM"]
-const ATTR_BONUS_MIN: int = -2
-const ATTR_BONUS_MAX: int = 3
-const ATTR_NET_SUM_MIN: int = -2
-const ATTR_NET_SUM_MAX: int = 4
-const INITIAL_GOLD_MIN: int = 0
-const INITIAL_GOLD_MAX: int = 1000
-const CAUSALITY_NET_TOLERANCE: int = 1
-const STARTER_KIT_MAX_ITEMS: int = 10
-
 # ==============================================================================
 # 一、单包显性 MOD 合规性静态预检 (Single-Pack Compliance Precheck)
 # - 输入: DestinyModManifestDTO 实例或原始 Dictionary (支持工程测试夹具零磁盘直传)

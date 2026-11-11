@@ -12,14 +12,7 @@ class_name CharacterBaselineAttributeSolver
 extends RefCounted
 
 # ==============================================================================
-# 一、常量与枚举
-# ==============================================================================
-
-## 六维属性标准遍历序（与 AttributeConversionEngine.DEFAULT_STAT_LIST 一致，基线派生用）
-const DEFAULT_STAT_LIST: Array[String] = ["STR", "CON", "INT", "AGI", "SPR", "VIT"]
-
-# ==============================================================================
-# 二、核心算法（基线属性派生）
+# 一、核心算法（基线属性派生，复用 AttributeConversionEngine.DEFAULT_STAT_LIST）
 # ==============================================================================
 
 ## 由后端根据种族定义与初始规则确定性生成基础属性等级（L1 1~6）。
@@ -34,7 +27,7 @@ static func generate_baseline_attributes(race_def: RaceDefinitionDTO) -> Diction
 	var base_level := clampi(GameConfig.get_int("domains.character_creation", "defaults/baseline_stat_level", 3), min_level, max_level)
 
 	var base_levels := {}
-	for stat_k in DEFAULT_STAT_LIST:
+	for stat_k in AttributeConversionEngine.DEFAULT_STAT_LIST:
 		base_levels[stat_k] = base_level
 
 	# 叠加种族修正（人族全维平衡；扩展种族经配置基准确认后放行）

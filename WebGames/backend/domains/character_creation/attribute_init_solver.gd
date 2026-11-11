@@ -75,7 +75,7 @@ static func map_roll_to_level(roll: int) -> int:
 ## 契约：六维键缺失按 min 兜底；越界或总消耗超限返回 { valid:false, reason }，
 ##       通过返回 { valid:true, total_spent, remaining_points }（无副作用）。
 static func validate_point_buy_allocation(allocated_stats: Dictionary, max_points: int = -1) -> Dictionary:
-	var required_keys: Array = GameConfig.get_array("domains.character_creation", "attribute_init/point_buy/required_keys", ["STR", "CON", "INT", "AGI", "SPR", "VIT"])
+	var required_keys: Array = GameConfig.get_array("domains.character_creation", "attribute_init/point_buy/required_keys", AttributeConversionEngine.DEFAULT_STAT_LIST)
 	var total_limit := max_points if max_points >= 0 else GameConfig.get_int("domains.character_creation", "attribute_init/point_buy/total_points", 21)
 	var min_v := AttributeConversionEngine.min_level()
 	var max_v := AttributeConversionEngine.max_level()

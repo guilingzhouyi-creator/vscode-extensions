@@ -74,10 +74,7 @@ static func dispatch_creation(request: ClientRequestEnvelopeDTO, gateway: Varian
 				request.request_id, true, resp_data, "", "Character creation and prologue initialization completed."
 			)
 
-	return UnifiedProtocolFactory.create_response(
-		request.request_id, false, {}, "ERR_UNHANDLED_ACTION",
-		TemplateFormatter.format("Unsupported action instruction: {action_type}.", {"action_type": request.action_type})
-	)
+	return UnifiedProtocolFactory.create_unhandled_action_response(request.request_id, request.action_type)
 
 static func dispatch_prologue(request: ClientRequestEnvelopeDTO, gateway: Variant) -> UnifiedResponseEnvelopeDTO:
 	var payload_dict: Dictionary = request.payload if request.payload is Dictionary else {}
@@ -150,7 +147,4 @@ static func dispatch_prologue(request: ClientRequestEnvelopeDTO, gateway: Varian
 				}, "", "Prologue completed and exploration handed off with initial HUD synchronization."
 			)
 
-	return UnifiedProtocolFactory.create_response(
-		request.request_id, false, {}, "ERR_UNHANDLED_ACTION",
-		TemplateFormatter.format("Unsupported action instruction: {action_type}.", {"action_type": request.action_type})
-	)
+	return UnifiedProtocolFactory.create_unhandled_action_response(request.request_id, request.action_type)

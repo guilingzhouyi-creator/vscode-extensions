@@ -109,7 +109,4 @@ static func dispatch(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM
 				String(switch_result.get("message", "Gateway mode switch completed successfully"))
 			)
 
-	return UnifiedProtocolFactory.create_response(
-		request.request_id, false, {}, "ERR_UNHANDLED_ACTION",
-		TemplateFormatter.format("Unsupported action instruction: {action_type}.", {"action_type": request.action_type})
-	)
+	return UnifiedProtocolFactory.create_unhandled_action_response(request.request_id, request.action_type)

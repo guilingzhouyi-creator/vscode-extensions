@@ -90,7 +90,4 @@ static func dispatch(request: ClientRequestEnvelopeDTO, _gateway: WorldGatewayFS
 				request.request_id, true, home_view_model, "", "Account home view model retrieved successfully"
 			)
 
-	return UnifiedProtocolFactory.create_response(
-		request.request_id, false, {}, "ERR_UNHANDLED_ACTION",
-		TemplateFormatter.format("Unsupported action type: {action_type}", {"action_type": request.action_type})
-	)
+	return UnifiedProtocolFactory.create_unhandled_action_response(request.request_id, request.action_type)

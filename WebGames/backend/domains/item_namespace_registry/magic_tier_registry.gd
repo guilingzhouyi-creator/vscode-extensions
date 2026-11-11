@@ -287,6 +287,15 @@ func _register_one(shared: LocalizationRegistryCatalog, entry: Dictionary, colli
 	if not res.success:
 		collisions.append(res)
 
+## 按配置节与整数字段从 domains.magic_tiers 查询单条基线条目（未命中返回空字典）
+static func lookup_config_entry(section: String, id_field: String, target_id: int) -> Dictionary:
+	var table: Dictionary = GameConfig.get_dict(CONFIG_TABLE, section, {})
+	for key in table:
+		var raw_entry: Variant = table[key]
+		if raw_entry is Dictionary and int((raw_entry as Dictionary).get(id_field, 0)) == target_id:
+			return raw_entry as Dictionary
+	return {}
+
 ## 全量基线导出（供遥测/统计/审计只读引用）
 func export_baselines() -> Dictionary:
 	return {

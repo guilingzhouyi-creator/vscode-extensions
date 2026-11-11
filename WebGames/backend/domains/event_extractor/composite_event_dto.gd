@@ -49,7 +49,7 @@ static func validate_dto(dto: CompositeEventDTO) -> Dictionary:
 		if f.is_empty() or f.get("canonical_id", "") == "":
 			violations.append("item_flow 缺少 canonical_id")
 			continue
-		if not _is_valid_event_type(str(f.get("event_type", ""))):
+		if not is_valid_event_type(str(f.get("event_type", ""))):
 			violations.append("item_flow 非法事件类型: %s" % str(f.get("event_type", "")))
 		if int(f.get("quantity", 0)) <= 0:
 			violations.append("item_flow 数量必须为正: %s" % str(f.get("canonical_id", "")))
@@ -61,7 +61,7 @@ static func validate_dto(dto: CompositeEventDTO) -> Dictionary:
 static func validate_grouping_rule(rule: Dictionary) -> Dictionary:
 	var violations: Array[String] = []
 	var source := str(rule.get("source_event", ""))
-	if not _is_valid_event_type(source):
+	if not is_valid_event_type(source):
 		violations.append("source_event 非法事件类型: %s" % source)
 	if str(rule.get("group_key", "")).is_empty():
 		violations.append("group_key 为空")
@@ -75,13 +75,17 @@ static func validate_grouping_rule(rule: Dictionary) -> Dictionary:
 # 内部实现
 # ==============================================================================
 
-static func _is_valid_event_type(event_type: String) -> bool:
-	var valid := [
-		ItemStatisticsSolver.EVENT_ITEM_GRANTED,
-		ItemStatisticsSolver.EVENT_ITEM_CONSUMED,
-		ItemStatisticsSolver.EVENT_ITEM_DESTROYED,
-		ItemStatisticsSolver.EVENT_ITEM_TRADED,
-		ItemStatisticsSolver.EVENT_ITEM_FORGED,
-		ItemStatisticsSolver.EVENT_ITEM_CLAWED_BACK
-	]
-	return valid.has(event_type)
+const VALID_EVENT_TYPES: Array[String] = [
+	ItemStatisticsSolver.EVENT_ITEM_GRANTED,
+	ItemStatisticsSolver.EVENT_ITEM_CONSUMED,
+	ItemStatisticsSolver.EVENT_ITEM_DESTROYED,
+	ItemStatisticsSolver.EVENT_ITEM_TRADED,
+	ItemStatisticsSolver.EVENT_ITEM_FORGED,
+	ItemStatisticsSolver.EVENT_ITEM_CLAWED_BACK
+]
+
+## 校验原始物品事件类型是否属于已注册事件集合
+static func is_valid_event_type(event_type: String) -> bool:
+	if event_type.is_empty():
+		return false
+	return VALID_EVENT_TYPES.has(event_type)

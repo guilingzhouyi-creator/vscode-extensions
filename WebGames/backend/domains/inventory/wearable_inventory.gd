@@ -143,6 +143,12 @@ func find_item_by_item_uid(item_uid: String) -> ItemEntity:
 			return item
 	return null
 
+enum RemovalOutcome {
+	NOT_FOUND = 0,
+	REMOVED_STORAGE = 1,
+	UNEQUIPPED_SLOT = 2,
+}
+
 ## 按实例引用移除物品（存在并成功移除返回 true，否则 false，增量扣减缓存）
 func remove_item(item: ItemEntity) -> bool:
 	if item == null:
@@ -160,6 +166,18 @@ func remove_item(item: ItemEntity) -> bool:
 		if _cached_total_weight < 0.0:
 			_cached_total_weight = 0.0
 	return true
+
+## 从背包或已装备槽位统一移除指定物品，返回移除来源枚举（供销毁/追缴/分解等管线统一复用）
+func remove_owned_item(item: ItemEntity) -> RemovalOutcome:
+	if item == null:
+		return RemovalOutcome.NOT_FOUND
+	if storage_items.has(item):
+		return RemovalOutcome.REMOVED_STORAGE if remove_item(item) else RemovalOutcome.NOT_FOUND
+	for slot in equipped_slots:
+		if equipped_slots[slot] == item:
+			unequip_item(slot)
+			return RemovalOutcome.UNEQUIPPED_SLOT
+	return RemovalOutcome.NOT_FOUND
 
 ## 装备：槽位存在/槽空/UID 未占用校验，置 EQUIPPED 态并归属（增量累加负重）
 func equip_item(slot: String, item: ItemEntity) -> bool:

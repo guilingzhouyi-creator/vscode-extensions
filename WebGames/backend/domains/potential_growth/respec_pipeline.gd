@@ -38,7 +38,7 @@ static func execute_heart_core_respec(
 	wallet.mana_monocrystals -= cost.crystal_cost
 
 	engine.unassigned_potential_points = engine.lifetime_potential_earned
-	var init_keys: Array = GameConfig.get_array("domains.potential", "growth/stat_list", ["STR", "CON", "INT", "AGI", "SPR", "VIT"])
+	var init_keys: Array = GameConfig.get_array("domains.potential", "growth/stat_list", AttributeConversionEngine.DEFAULT_STAT_LIST)
 	var reset := {}
 	for k in init_keys:
 		reset[k] = 0

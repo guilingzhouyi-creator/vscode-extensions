@@ -73,6 +73,15 @@ func to_dto() -> Dictionary:
         "custom_i18n": custom_i18n.duplicate(true)
     }
 
+## 统一解包外层或内层 adapted_manifest 适配器信封（供角色创建与叙事路由复用）
+static func unwrap_adapted_manifest(raw_manifest: Dictionary) -> Dictionary:
+    if raw_manifest.is_empty():
+        return {}
+    var inner: Variant = raw_manifest.get("adapted_manifest", null)
+    if inner is Dictionary:
+        return inner as Dictionary
+    return raw_manifest
+
 ## 从输入字典反序列化还原传输对象
 static func from_dto(d: Dictionary, fallback_pack_id: String = "") -> DestinyModManifestDTO:
     var dto := DestinyModManifestDTO.new()
@@ -105,9 +114,9 @@ static func from_dto(d: Dictionary, fallback_pack_id: String = "") -> DestinyMod
         dto.ui_capabilities = (raw_ui as Dictionary).duplicate(true)
 
     _populate_origins_array(d.get("custom_origins", []), dto.custom_origins)
-    _populate_traits_dict(d.get("custom_traits", {}), dto.custom_traits)
+    _populate_indexed_dict(d.get("custom_traits", {}), dto.custom_traits, "trait_id", Callable(DestinyModManifestDTO, "_normalize_trait_dict"))
     _populate_dict_array(d.get("paired_presets", []), dto.paired_presets)
-    _populate_starter_kits_dict(d.get("custom_starter_kits", {}), dto.custom_starter_kits)
+    _populate_indexed_dict(d.get("custom_starter_kits", {}), dto.custom_starter_kits, "kit_id", Callable(DestinyModManifestDTO, "_normalize_kit_dict"))
 
     var raw_rules: Variant = d.get("custom_routing_rules", d.get("routing_rules", []))
     _populate_dict_array(raw_rules, dto.custom_routing_rules)
@@ -167,26 +176,26 @@ static func _normalize_origin_entry(entry: Dictionary, default_id: String = "") 
     elif entry.has("birth_region_id") and not entry.has("birth_region"):
         entry["birth_region"] = entry["birth_region_id"]
 
-static func _populate_traits_dict(raw_val: Variant, target: Dictionary) -> void:
+static func _populate_indexed_dict(raw_val: Variant, target: Dictionary, id_key: String, normalizer: Callable) -> void:
     target.clear()
     if raw_val is Array:
         var cloned_arr: Array = (raw_val as Array).duplicate(true)
         for item in cloned_arr:
             if item is Dictionary:
                 var d_item: Dictionary = item as Dictionary
-                var tid: String = str(d_item.get("trait_id", "")).strip_edges()
-                if not tid.is_empty():
-                    _normalize_trait_dict(d_item)
-                    target[tid] = d_item
+                var key_id: String = str(d_item.get(id_key, "")).strip_edges()
+                if not key_id.is_empty():
+                    normalizer.call(d_item)
+                    target[key_id] = d_item
     elif raw_val is Dictionary:
         var cloned_dict: Dictionary = (raw_val as Dictionary).duplicate(true)
         for k in cloned_dict.keys():
             var entry: Variant = cloned_dict[k]
             if entry is Dictionary:
                 var d_entry: Dictionary = entry as Dictionary
-                if not d_entry.has("trait_id"):
-                    d_entry["trait_id"] = str(k)
-                _normalize_trait_dict(d_entry)
+                if not d_entry.has(id_key):
+                    d_entry[id_key] = str(k)
+                normalizer.call(d_entry)
                 target[str(k)] = d_entry
 
 static func _normalize_trait_dict(d: Dictionary) -> void:
@@ -200,28 +209,6 @@ static func _normalize_trait_dict(d: Dictionary) -> void:
             d["type"] = pol
     elif not d.has("polarity") and d.has("type"):
         d["polarity"] = d["type"]
-
-static func _populate_starter_kits_dict(raw_val: Variant, target: Dictionary) -> void:
-    target.clear()
-    if raw_val is Array:
-        var cloned_arr: Array = (raw_val as Array).duplicate(true)
-        for item in cloned_arr:
-            if item is Dictionary:
-                var d_item: Dictionary = item as Dictionary
-                var kid: String = str(d_item.get("kit_id", "")).strip_edges()
-                if not kid.is_empty():
-                    _normalize_kit_dict(d_item)
-                    target[kid] = d_item
-    elif raw_val is Dictionary:
-        var cloned_dict: Dictionary = (raw_val as Dictionary).duplicate(true)
-        for k in cloned_dict.keys():
-            var entry: Variant = cloned_dict[k]
-            if entry is Dictionary:
-                var d_entry: Dictionary = entry as Dictionary
-                if not d_entry.has("kit_id"):
-                    d_entry["kit_id"] = str(k)
-                _normalize_kit_dict(d_entry)
-                target[str(k)] = d_entry
 
 static func _normalize_kit_gold(kit: Dictionary) -> void:
     var has_init: bool = kit.has("initial_gold")

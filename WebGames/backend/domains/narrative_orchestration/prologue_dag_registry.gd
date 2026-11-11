@@ -22,7 +22,7 @@ static func resolve_prologue_dag(
     adapted_mod_manifest: Dictionary = {}
 ) -> NarrativeDAGGraphDTO:
     var catalog: Dictionary = GameConfig.get_dict("narratives.prologue_dag_catalog", "dag_graphs", {})
-    var manifest: Dictionary = _unwrap_adapted_manifest(adapted_mod_manifest)
+    var manifest: Dictionary = DestinyModManifestDTO.unwrap_adapted_manifest(adapted_mod_manifest)
 
     var mod_dag_id: String = _resolve_mod_prologue_dag_id(race_id, origin_id, manifest)
     if not mod_dag_id.is_empty():
@@ -49,14 +49,6 @@ static func get_graph_by_id(dag_id: String) -> NarrativeDAGGraphDTO:
 # ==============================================================================
 # 二、MOD 路由优先级匹配与内置路由回退内部方法 (CC <= 15, Depth <= 3)
 # ==============================================================================
-
-static func _unwrap_adapted_manifest(raw_manifest: Dictionary) -> Dictionary:
-    if raw_manifest.is_empty():
-        return {}
-    var inner: Variant = raw_manifest.get("adapted_manifest", null)
-    if inner is Dictionary:
-        return inner as Dictionary
-    return raw_manifest
 
 static func _resolve_mod_prologue_dag_id(
     race_id: String,

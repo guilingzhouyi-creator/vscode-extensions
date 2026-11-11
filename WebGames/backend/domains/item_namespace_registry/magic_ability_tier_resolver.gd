@@ -26,25 +26,18 @@ static func infer_tier_candidates(rank: int, registry: MagicTierRegistry) -> Arr
 ## 越级容忍：特殊个体/特殊魔法/装备/环境/状态可突破通常区间（allow_break 或
 ## allow_break_types 白名单）；系统不强制，仅查询判定
 static func is_tier_break_allowed(tier: int, break_type: String = "") -> bool:
-	var tiers: Dictionary = GameConfig.get_dict(CONFIG_TABLE, "ability_tiers", {})
-	for key in tiers:
-		var entry: Dictionary = tiers[key]
-		if int(entry.get("tier", 0)) != tier:
-			continue
-		if bool(entry.get("allow_break", false)):
-			return true
-		var raw_allowed_types: Variant = entry.get("allow_break_types")
-		if not break_type.is_empty() and raw_allowed_types is Array and (raw_allowed_types as Array).has(break_type):
-			return true
+	var entry := MagicTierRegistry.lookup_config_entry("ability_tiers", "tier", tier)
+	if entry.is_empty():
 		return false
+	if bool(entry.get("allow_break", false)):
+		return true
+	var raw_allowed_types: Variant = entry.get("allow_break_types")
+	if not break_type.is_empty() and raw_allowed_types is Array and (raw_allowed_types as Array).has(break_type):
+		return true
 	return false
 
 ## 参考标签（经验性称呼，如 5 阶 → 通常被概括为英雄级）：返回配置的 i18n 键本体，
 ## 仅展示不作判定（显示层经名称注册表/i18n 解析）
 static func tier_reference_label(tier: int) -> String:
-	var tiers: Dictionary = GameConfig.get_dict(CONFIG_TABLE, "ability_tiers", {})
-	for key in tiers:
-		var entry: Dictionary = tiers[key]
-		if int(entry.get("tier", 0)) == tier:
-			return str(entry.get("reference_label", ""))
-	return ""
+	var entry := MagicTierRegistry.lookup_config_entry("ability_tiers", "tier", tier)
+	return str(entry.get("reference_label", ""))

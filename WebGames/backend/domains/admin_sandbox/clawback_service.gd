@@ -119,7 +119,7 @@ static func clawback_item_prototype(
 			"message": _msg("clawback_nothing_to_claw")
 		}
 	for i in range(actual):
-		if not _remove_item(inventory, matches[i]):
+		if inventory.remove_owned_item(matches[i]) == WearableInventoryAggregate.RemovalOutcome.NOT_FOUND:
 			inventory.restore(inventory_snapshot)
 			return {"success": false, "error_code": "CLAWBACK_NOT_ATOMIC", "audit_id": tx_id}
 	if library != null:
@@ -173,7 +173,7 @@ static func clawback_item_instance(
 			"error_code": "CLAWBACK_NOTHING_TO_CLAW",
 			"message": _msg("clawback_nothing_to_claw")
 		}
-	if not _remove_item(inventory, item):
+	if inventory.remove_owned_item(item) == WearableInventoryAggregate.RemovalOutcome.NOT_FOUND:
 		return {"success": false, "error_code": "CLAWBACK_NOT_ATOMIC", "audit_id": tx_id}
 	if library != null:
 		ItemStatisticsSolver.record_item_event(library, ItemStatisticsSolver.EVENT_ITEM_CLAWED_BACK, item.template_id, 1, null, null, {
@@ -212,16 +212,6 @@ static func _gate(admin: AdminPermissionAggregate, mode: String) -> Dictionary:
 
 static func _currency_keys() -> Array:
 	return GameConfig.get_array("domains.currency", "debt/allowed_currencies", CharacterWalletEntity.CURRENCY_FIELDS)
-
-static func _remove_item(inventory: WearableInventoryAggregate, item: ItemEntity) -> bool:
-	if inventory.storage_items.has(item):
-		return inventory.remove_item(item)
-	for slot in inventory.equipped_slots:
-		if inventory.equipped_slots[slot] == item:
-			# 走聚合 API 卸装（内部置 UNOWNED 并同步扣减增量负重缓存）
-			inventory.unequip_item(slot)
-			return true
-	return false
 
 static func _wallet_balance(wallet: CharacterWalletEntity, currency_key: String) -> int:
 	match currency_key:

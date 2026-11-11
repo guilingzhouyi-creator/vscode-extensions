@@ -67,8 +67,13 @@ static func process_item_disposal(
 	#    快照面 = INVENTORY ∪ LOADOUT（M5：穿戴销毁失败须对称回滚，双簿记引用同源）
 	var inventory_snapshot := inventory.snapshot()
 	var loadout_snapshot: Dictionary = loadout.snapshot_slots() if loadout != null else {}
-	if not _remove_owned_item(inventory, target_item, loadout):
+	var remove_outcome := inventory.remove_owned_item(target_item)
+	if remove_outcome == WearableInventoryAggregate.RemovalOutcome.NOT_FOUND:
 		return {"success": false, "error_code": "ITEM_REMOVE_FAILED"}
+	if remove_outcome == WearableInventoryAggregate.RemovalOutcome.UNEQUIPPED_SLOT:
+		if loadout != null:
+			loadout.unequip_item_ref(target_item)
+		target_item.container_state = "DESTROYED"
 
 	# 3. 逐件回流：任一件容量/负重不足即整体回滚（输入物品复原，守恒拦截）
 	for product in products:
@@ -108,19 +113,3 @@ static func process_item_disposal(
 
 static func _msg(key: String) -> String:
 	return GameConfig.msg("matter_disposal", key)
-
-## 从背包或穿戴槽移除输入物品；穿戴槽销毁时双侧清槽（inventory + loadout）。
-## 时序：先 loadout 侧清槽（unequip_item_ref 会把状态置 UNOWNED），
-##       再统一落 DESTROYED——保证销毁态为终点、不被清槽动作覆写（评审 B2）。
-static func _remove_owned_item(inventory: WearableInventoryAggregate, item: ItemEntity, loadout: EquipmentLoadoutAggregate) -> bool:
-	if inventory.storage_items.has(item):
-		return inventory.remove_item(item)
-	for slot in inventory.equipped_slots:
-		if inventory.equipped_slots[slot] == item:
-			# 走聚合 API 卸装（同步扣减增量负重缓存；状态先落 UNOWNED 再统一覆写 DESTROYED）
-			inventory.unequip_item(slot)
-			if loadout != null:
-				loadout.unequip_item_ref(item)
-			item.container_state = "DESTROYED"
-			return true
-	return false

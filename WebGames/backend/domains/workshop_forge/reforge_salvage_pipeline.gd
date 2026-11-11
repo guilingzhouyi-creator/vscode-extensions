@@ -91,8 +91,11 @@ static func salvage_equipment(
 	if item.container_state == "LOCKED":
 		return {"success": false, "error_code": "ITEM_LOCKED"}
 	var inventory_snapshot := inventory.snapshot()
-	if not _remove_owned_item(inventory, item):
+	var remove_outcome := inventory.remove_owned_item(item)
+	if remove_outcome == WearableInventoryAggregate.RemovalOutcome.NOT_FOUND:
 		return {"success": false, "error_code": "ITEM_NOT_IN_INVENTORY"}
+	if remove_outcome == WearableInventoryAggregate.RemovalOutcome.UNEQUIPPED_SLOT:
+		item.container_state = "DESTROYED"
 	if library != null and not item.template_id.is_empty():
 		ItemStatisticsSolver.record_item_event(library, ItemStatisticsSolver.EVENT_ITEM_DESTROYED, item.template_id, 1, null, null, {
 			"transaction_id": item.item_id
@@ -113,15 +116,3 @@ static func salvage_equipment(
 		"workshop/salvage_success", "economy", [item.custom_name, refund_copper, refunded_crystals]
 	)
 	return {"success": true, "refund_copper": refund_copper, "refund_crystals": refunded_crystals}
-
-## 物品移除：背包优先，装备槽兜底（置 DESTROYED 态）
-static func _remove_owned_item(inventory: WearableInventoryAggregate, item: ItemEntity) -> bool:
-	if inventory.storage_items.has(item):
-		return inventory.remove_item(item)
-	for slot in inventory.equipped_slots:
-		if inventory.equipped_slots[slot] == item:
-			# 走聚合 API 卸装（同步扣减增量负重缓存；状态先落 UNOWNED 再统一覆写 DESTROYED）
-			inventory.unequip_item(slot)
-			item.container_state = "DESTROYED"
-			return true
-	return false

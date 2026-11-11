@@ -42,7 +42,4 @@ static func dispatch(request: ClientRequestEnvelopeDTO, gateway: Variant) -> Uni
 		return UnifiedProtocolFactory.create_response(
 			request.request_id, ok, shut_resp.to_dto() if shut_resp != null else {}, err, "Graceful shutdown request executed successfully."
 		)
-	return UnifiedProtocolFactory.create_response(
-		request.request_id, false, {}, "ERR_UNHANDLED_ACTION",
-		TemplateFormatter.format("Unsupported action instruction: {action_type}.", {"action_type": request.action_type})
-	)
+	return UnifiedProtocolFactory.create_unhandled_action_response(request.request_id, request.action_type)

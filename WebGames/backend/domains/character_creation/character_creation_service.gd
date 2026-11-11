@@ -96,14 +96,7 @@ static func _apply_single_trait_modifiers(
 			sheet.heart_core_integrity = clamp(sheet.heart_core_integrity + float(mods[stat_key]), heart_clamp_min, heart_clamp_max)
 
 # ==============================================================================
-# 二、防伪属性守卫（常量）
-# ==============================================================================
-
-## 战斗属性保留键清单：前端注入这些键一律丢弃（后端权威派生，不入任何派生路径）
-const FORGED_STAT_KEYS: Array[String] = ["STR", "CON", "INT", "AGI", "SPR", "VIT"]
-
-# ==============================================================================
-# 三、配置驱动创角主入口（升级增量）
+# 二、配置驱动创角主入口（升级增量）
 # ==============================================================================
 
 ## 升级增量：配置驱动创角主入口（直接内化于 CharacterCreationService，杜绝 V2 割裂）
@@ -122,7 +115,7 @@ static func process_character_creation(
 	# 0. 防伪守卫：前端注入战斗属性一律丢弃并告警（后端权威派生，不入任何派生路径）
 	var forged_dropped: Array = []
 	for key in request.extra_custom_fields.keys():
-		if FORGED_STAT_KEYS.has(str(key)) or str(key) in ["attributes", "stats", "base_stats"]:
+		if AttributeConversionEngine.DEFAULT_STAT_LIST.has(str(key)) or str(key) in ["attributes", "stats", "base_stats"]:
 			forged_dropped.append(str(key))
 	for fk in forged_dropped:
 		request.extra_custom_fields.erase(fk)
