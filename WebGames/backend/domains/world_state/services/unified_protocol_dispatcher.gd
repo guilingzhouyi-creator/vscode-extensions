@@ -64,7 +64,7 @@ static func dispatch(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM
 static func dispatch_request(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM = null) -> UnifiedResponseEnvelopeDTO:
 	if request == null:
 		return UnifiedProtocolFactory.create_response(
-			"", false, {}, "ERR_NULL_REQUEST", "请求信封不能为空"
+			"", false, {}, "ERR_NULL_REQUEST", "Request envelope cannot be null"
 		)
 
 	# 1. 租约与并发冲突仲裁
@@ -73,7 +73,7 @@ static func dispatch_request(request: ClientRequestEnvelopeDTO, gateway: WorldGa
 	elif request.actor_type == ClientRequestEnvelopeDTO.ACTOR_AGENT:
 		if HumanControlLeaseManager.is_lease_active():
 			return UnifiedProtocolFactory.create_response(
-				request.request_id, false, {}, "ERR_PREEMPTED_BY_HUMAN", "人类前台正在操作，Agent 动作已被抢占式阻断"
+				request.request_id, false, {}, "ERR_PREEMPTED_BY_HUMAN", "Human operator is active; Agent action was preemptively blocked"
 			)
 
 	# 2. 会话凭据与撤销令牌防线（拦截已注销/过期令牌及受保护域越权）
@@ -107,7 +107,8 @@ static func dispatch_request(request: ClientRequestEnvelopeDTO, gateway: WorldGa
 			return _dispatch_settings_action(request)
 		_:
 			return UnifiedProtocolFactory.create_response(
-				request.request_id, false, {}, "ERR_UNKNOWN_DOMAIN", "未知业务领域: %s" % request.domain
+				request.request_id, false, {}, "ERR_UNKNOWN_DOMAIN",
+				TemplateFormatter.format("Unknown domain: {domain}", {"domain": request.domain})
 			)
 
 # ==============================================================================
@@ -123,13 +124,13 @@ static func _enforce_auth_guard(request: ClientRequestEnvelopeDTO) -> UnifiedRes
 	if not request.session_token.is_empty() and AuthService.is_token_revoked_or_expired(request.session_token):
 		if not is_anon_action:
 			return UnifiedProtocolFactory.create_response(
-				request.request_id, false, {"revoked": true}, err_unauth, "会话令牌已注销或过期，拒绝访问"
+				request.request_id, false, {"revoked": true}, err_unauth, "Session token revoked or expired, access denied"
 			)
 
 	if request.actor_type == ClientRequestEnvelopeDTO.ACTOR_AGENT:
 		if request.domain == "account" or request.domain == "lifecycle" or PROTECTED_GATEWAY_ACTIONS.has(request.action_type):
 			return UnifiedProtocolFactory.create_response(
-				request.request_id, false, {}, "ERR_AGENT_PRIVILEGE_BLOCKED", "Agent 主体禁止越权调度账号或网关变更指令"
+				request.request_id, false, {}, "ERR_AGENT_PRIVILEGE_BLOCKED", "Agent actor is prohibited from executing account or gateway mutation directives"
 			)
 
 	if is_anon_action:
@@ -156,7 +157,7 @@ static func _enforce_auth_guard(request: ClientRequestEnvelopeDTO) -> UnifiedRes
 	var val_res := AuthService.validate_token(request.session_token, request.account_id)
 	if not bool(val_res.get("success", false)):
 		return UnifiedProtocolFactory.create_response(
-			request.request_id, false, val_res, err_unauth, "受保护业务请求必须携带有效鉴权会话令牌"
+			request.request_id, false, val_res, err_unauth, "Protected business requests must provide a valid authenticated session token"
 		)
 	if request.account_id.is_empty():
 		request.account_id = String(val_res.get("account_id", ""))
@@ -189,13 +190,13 @@ static func _dispatch_world_state_action(request: ClientRequestEnvelopeDTO, gate
 				"hud_snapshot": auth_snap.to_dto(),
 				"basic_snapshot": basic_snap.to_dto(),
 				"world_active": WorldSessionRuntimeService.has_active_world()
-			}, "", "主页 HUD 权威快照拉取成功"
+			}, "", "Home HUD authoritative snapshot retrieved successfully"
 		)
 	if request.action_type == "TICK_WORLD_CLOCK":
 		var payload_dict: Dictionary = request.payload if request.payload is Dictionary else {}
 		var updated := WorldSessionRuntimeService.apply_mutation_and_sync(payload_dict, int(payload_dict.get("now_ms", -1)), bool(payload_dict.get("force_push", true)))
 		return UnifiedProtocolFactory.create_response(
-			request.request_id, true, {"hud_snapshot": updated.to_dto()}, "", "世界时钟与常驻 HUD 同步成功"
+			request.request_id, true, {"hud_snapshot": updated.to_dto()}, "", "World clock and resident HUD synchronized successfully"
 		)
 	return _dispatch_agent_action_compat(request)
 
@@ -239,5 +240,5 @@ static func _dispatch_agent_action_compat(request: ClientRequestEnvelopeDTO) -> 
 
 static func _dispatch_settings_action(request: ClientRequestEnvelopeDTO) -> UnifiedResponseEnvelopeDTO:
 	return UnifiedProtocolFactory.create_response(
-		request.request_id, true, {"applied_settings": request.payload}, "", "设置应用成功"
+		request.request_id, true, {"applied_settings": request.payload}, "", "Settings applied successfully"
 	)
