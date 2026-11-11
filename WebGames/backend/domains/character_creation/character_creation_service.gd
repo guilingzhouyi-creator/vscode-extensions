@@ -33,8 +33,8 @@ static func create_new_character(
 
 	# L1 等级层：创角分配为统一 1~6 级（购点/骰点产出），越界经统一规则校验回退
 	for stat_key in AttributeConversionEngine.DEFAULT_STAT_LIST:
-		var lv := int(allocated_base_stats.get(stat_key, AttributeConversionEngine.min_level()))
-		if not sheet.set_level(stat_key, lv):
+		var stat_level := int(allocated_base_stats.get(stat_key, AttributeConversionEngine.min_level()))
+		if not sheet.set_level(stat_key, stat_level):
 			sheet.set_level(stat_key, AttributeConversionEngine.min_level())
 
 	# L2 先天基础系数层 = 种族系数 × 天赋修正（身世/天赋 = 系数修正，不占等级空间）
@@ -117,7 +117,7 @@ static func process_character_creation(
 	canary_flags: Dictionary
 ) -> Dictionary:
 	if request == null or slot_state.is_empty():
-		return {"success": false, "error_code": "INVALID_INPUT", "message": "请求或档位数据为空"}
+		return {"success": false, "error_code": "INVALID_INPUT", "message": "Character creation request or slot state data is empty."}
 
 	# 0. 防伪守卫：前端注入战斗属性一律丢弃并告警（后端权威派生，不入任何派生路径）
 	var forged_dropped: Array = []
@@ -149,7 +149,10 @@ static func process_character_creation(
 			return {
 				"success": false,
 				"error_code": "RACE_CANARY_RESTRICTED",
-				"message": "该种族当前处于灰度封测阶段，未向当前账号开放"
+				"message": TemplateFormatter.format(
+					"Race '{race_id}' is restricted by canary rollout and unavailable for account '{account_id}'.",
+					{"race_id": request.selected_race_id, "account_id": request.account_id}
+				)
 			}
 
 	# 2. 顺序状态机校验（角色名 → 性别 → 扩展参数）

@@ -98,17 +98,17 @@ static func evaluate_initiative(
 	var jitter_max := GameConfig.get_int("domains.combat", "initiative_model/jitter_max", 2)
 	var ap_lead_bonus := GameConfig.get_int("domains.combat", "initiative_model/lead_ap_bonus", 2)
 
-	var p_base := player.base_agility * w_agi + player.base_perception * w_per + float(player.level) * w_lvl
-	var e_base := enemy.base_agility * w_agi + enemy.base_perception * w_per + float(enemy.level) * w_lvl
+	var player_base := player.base_agility * w_agi + player.base_perception * w_per + float(player.level) * w_lvl
+	var enemy_base := enemy.base_agility * w_agi + enemy.base_perception * w_per + float(enemy.level) * w_lvl
 
-	var p_mod := 1.0 + player.equip_speed_modifier + player.temporary_buff_modifier
-	var e_mod := 1.0 + enemy.equip_speed_modifier + enemy.temporary_buff_modifier
+	var player_mod := 1.0 + player.equip_speed_modifier + player.temporary_buff_modifier
+	var enemy_mod := 1.0 + enemy.equip_speed_modifier + enemy.temporary_buff_modifier
 
-	var p_jitter := float(rng.randi_range(jitter_min, jitter_max)) if rng else 0.0
-	var e_jitter := float(rng.randi_range(jitter_min, jitter_max)) if rng else 0.0
+	var player_jitter := float(rng.randi_range(jitter_min, jitter_max)) if rng else 0.0
+	var enemy_jitter := float(rng.randi_range(jitter_min, jitter_max)) if rng else 0.0
 
-	player.calculated_score = (p_base * p_mod) + p_jitter
-	enemy.calculated_score = (e_base * e_mod) + e_jitter
+	player.calculated_score = (player_base * player_mod) + player_jitter
+	enemy.calculated_score = (enemy_base * enemy_mod) + enemy_jitter
 
 	# 胜负与平局决胜判定 (Tie-Breaker)
 	if abs(player.calculated_score - enemy.calculated_score) > 0.001:

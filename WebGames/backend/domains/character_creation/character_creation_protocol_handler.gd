@@ -41,7 +41,7 @@ static func dispatch_creation(request: ClientRequestEnvelopeDTO, gateway: Varian
 			return UnifiedProtocolFactory.create_response(
 				request.request_id, bool(roll_res.get("success", false)), roll_res,
 				"" if bool(roll_res.get("success", false)) else String(roll_res.get("error_code", "ERR_ROLL_FAILED")),
-				"创角命途预览解算完成"
+				"Character destiny preview calculated successfully."
 			)
 
 		"CREATE_AUTHORITATIVE_CHARACTER":
@@ -53,7 +53,7 @@ static func dispatch_creation(request: ClientRequestEnvelopeDTO, gateway: Varian
 			)
 			if not bool(flow_res.get("success", false)):
 				return UnifiedProtocolFactory.create_response(
-					request.request_id, false, flow_res, String(flow_res.get("error_code", "ERR_CHARACTER_CREATE_FAILED")), String(flow_res.get("message", "创建角色失败"))
+					request.request_id, false, flow_res, String(flow_res.get("error_code", "ERR_CHARACTER_CREATE_FAILED")), String(flow_res.get("message", "Character creation failed."))
 				)
 			var prologue_context: CharacterPrologueContext = flow_res.get("prologue_context", null)
 			var profile: Variant = flow_res.get("profile", null)
@@ -71,11 +71,12 @@ static func dispatch_creation(request: ClientRequestEnvelopeDTO, gateway: Varian
 				"presentation": pres.to_dto() if (pres != null and pres.has_method("to_dto")) else {}
 			}
 			return UnifiedProtocolFactory.create_response(
-				request.request_id, true, resp_data, "", "角色创建与序章启动完成"
+				request.request_id, true, resp_data, "", "Character creation and prologue initialization completed."
 			)
 
 	return UnifiedProtocolFactory.create_response(
-		request.request_id, false, {}, "ERR_UNHANDLED_ACTION", "未支持的操作指令: %s" % request.action_type
+		request.request_id, false, {}, "ERR_UNHANDLED_ACTION",
+		TemplateFormatter.format("Unsupported action instruction: {action_type}.", {"action_type": request.action_type})
 	)
 
 static func dispatch_prologue(request: ClientRequestEnvelopeDTO, gateway: Variant) -> UnifiedResponseEnvelopeDTO:
@@ -87,26 +88,26 @@ static func dispatch_prologue(request: ClientRequestEnvelopeDTO, gateway: Varian
 		"START_PROLOGUE":
 			if prologue_ctx == null:
 				return UnifiedProtocolFactory.create_response(
-					request.request_id, false, {}, "ERR_NO_PROLOGUE_CONTEXT", "缺少活跃序章上下文"
+					request.request_id, false, {}, "ERR_NO_PROLOGUE_CONTEXT", "Active prologue context is missing."
 				)
 			return UnifiedProtocolFactory.create_response(
-				request.request_id, true, {"character_id": prologue_ctx.character_id, "current_stage": prologue_ctx.current_stage, "is_completed": prologue_ctx.is_completed}, "", "序章已就绪"
+				request.request_id, true, {"character_id": prologue_ctx.character_id, "current_stage": prologue_ctx.current_stage, "is_completed": prologue_ctx.is_completed}, "", "Prologue session is ready."
 			)
 
 		"ADVANCE_PROLOGUE":
 			if prologue_ctx == null:
 				return UnifiedProtocolFactory.create_response(
-					request.request_id, false, {}, "ERR_NO_PROLOGUE_CONTEXT", "缺少活跃序章上下文"
+					request.request_id, false, {}, "ERR_NO_PROLOGUE_CONTEXT", "Active prologue context is missing."
 				)
 			var step_res := PrologueExecutionKernel.advance_prologue_step(prologue_ctx, str(payload_dict.get("choice_id", "NEXT")), payload_dict)
 			return UnifiedProtocolFactory.create_response(
-				request.request_id, bool(step_res.get("success", false)), {"current_stage": prologue_ctx.current_stage, "is_completed": prologue_ctx.is_completed}, "", "序章推进成功"
+				request.request_id, bool(step_res.get("success", false)), {"current_stage": prologue_ctx.current_stage, "is_completed": prologue_ctx.is_completed}, "", "Prologue step advanced successfully."
 			)
 
 		"COMPLETE_PROLOGUE", "SKIP_PROLOGUE":
 			if prologue_ctx == null:
 				return UnifiedProtocolFactory.create_response(
-					request.request_id, false, {}, "ERR_NO_PROLOGUE_CONTEXT", "缺少活跃序章上下文"
+					request.request_id, false, {}, "ERR_NO_PROLOGUE_CONTEXT", "Active prologue context is missing."
 				)
 			var cutscene_id := str(payload_dict.get("cutscene_id", ""))
 			if not cutscene_id.is_empty():
@@ -122,7 +123,7 @@ static func dispatch_prologue(request: ClientRequestEnvelopeDTO, gateway: Varian
 			)
 			if not bool(done_res.get("success", false)):
 				return UnifiedProtocolFactory.create_response(
-					request.request_id, false, done_res, String(done_res.get("error_code", "ERR_PROLOGUE_COMPLETE_FAILED")), "序章完结失败"
+					request.request_id, false, done_res, String(done_res.get("error_code", "ERR_PROLOGUE_COMPLETE_FAILED")), "Prologue completion failed."
 				)
 			var handoff: PrologueHandoffDTO = done_res.get("handoff", null)
 			var handoff_res: Dictionary = {}
@@ -146,9 +147,10 @@ static func dispatch_prologue(request: ClientRequestEnvelopeDTO, gateway: Varian
 					"completed": true,
 					"handoff": handoff.to_dto() if handoff != null else {},
 					"initial_hud_snapshot": snap_dict
-				}, "", "序章已完结并移交世界探索与 HUD 首帧同步"
+				}, "", "Prologue completed and exploration handed off with initial HUD synchronization."
 			)
 
 	return UnifiedProtocolFactory.create_response(
-		request.request_id, false, {}, "ERR_UNHANDLED_ACTION", "未支持的操作指令: %s" % request.action_type
+		request.request_id, false, {}, "ERR_UNHANDLED_ACTION",
+		TemplateFormatter.format("Unsupported action instruction: {action_type}.", {"action_type": request.action_type})
 	)

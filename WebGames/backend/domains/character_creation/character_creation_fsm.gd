@@ -45,7 +45,7 @@ var draft_request: CharacterCreationRequestDTO = null
 ## 契约：非 IDLE 返回 STEP_MISMATCH 且不产生任何副作用；成功后跃迁 NAME_INPUT_PENDING。
 func start_creation(account_id: String, slot_id: String, world_id: String) -> Dictionary:
 	if current_step != CreationStep.IDLE:
-		return {"success": false, "error_code": ERR_STEP_MISMATCH, "message": "状态机未处于 IDLE，禁止重复开档"}
+		return {"success": false, "error_code": ERR_STEP_MISMATCH, "message": "Creation FSM is not in IDLE state; duplicate session initiation is rejected."}
 	draft_request = CharacterCreationRequestDTO.new()
 	draft_request.account_id = account_id
 	draft_request.slot_id = slot_id
@@ -56,14 +56,18 @@ func start_creation(account_id: String, slot_id: String, world_id: String) -> Di
 ## 1. 设定角色名（长度 [min,max] + 禁用字符清单，均经配置表取值）。
 ## 契约：仅 NAME_INPUT_PENDING 可调用；trim 后长度越界返回 INVALID_NAME_LENGTH、
 ##       含禁用字符返回 DISALLOWED_NAME_CHARACTER；成功后跃迁 GENDER_SELECT_PENDING。
-func set_character_name(c_name: String) -> Dictionary:
+func set_character_name(character_name: String) -> Dictionary:
 	if current_step != CreationStep.NAME_INPUT_PENDING:
-		return {"success": false, "error_code": ERR_STEP_MISMATCH, "message": "当前不可设置角色名"}
+		return {
+			"success": false,
+			"error_code": ERR_STEP_MISMATCH,
+			"message": TemplateFormatter.format("Setting character name is not permitted in current step: {step}.", {"step": current_step})
+		}
 
-	var trimmed := c_name.strip_edges()
+	var trimmed := character_name.strip_edges()
 	var min_len: int = GameConfig.get_int("domains.character_creation", "rules/min_name_length", 2)
 	var max_len: int = GameConfig.get_int("domains.character_creation", "rules/max_name_length", 16)
-	var banned: Array = GameConfig.get_array("domains.character_creation", "rules/disallowed_name_characters", [])
+	var banned_chars: Array = GameConfig.get_array("domains.character_creation", "rules/disallowed_name_characters", [])
 
 	if trimmed.length() < min_len or trimmed.length() > max_len:
 		return {
@@ -71,9 +75,9 @@ func set_character_name(c_name: String) -> Dictionary:
 			"error_code": "INVALID_NAME_LENGTH",
 			"message": GameConfig.msg_fmt("character_creation", "name_length_invalid", {"min": min_len, "max": max_len})
 		}
-	for ch in banned:
+	for ch in banned_chars:
 		if trimmed.contains(str(ch)):
-			return {"success": false, "error_code": "DISALLOWED_NAME_CHARACTER", "message": "角色名包含禁用字符"}
+			return {"success": false, "error_code": "DISALLOWED_NAME_CHARACTER", "message": "Character name contains disallowed characters."}
 
 	draft_request.character_name = trimmed
 	current_step = CreationStep.GENDER_SELECT_PENDING
@@ -84,21 +88,29 @@ func set_character_name(c_name: String) -> Dictionary:
 ##       allowed_genders 时返回 GENDER_NOT_ALLOWED；成功后跃迁 EXTENSIONS_PENDING。
 func set_gender(gender_str: String, race_def: RaceDefinitionDTO) -> Dictionary:
 	if current_step != CreationStep.GENDER_SELECT_PENDING:
-		return {"success": false, "error_code": ERR_STEP_MISMATCH, "message": "当前不可选择性别"}
+		return {
+			"success": false,
+			"error_code": ERR_STEP_MISMATCH,
+			"message": TemplateFormatter.format("Selecting gender is not permitted in current step: {step}.", {"step": current_step})
+		}
 
-	var g_upper := gender_str.to_upper()
-	if race_def == null or not race_def.allowed_genders.has(g_upper):
-		return {"success": false, "error_code": "GENDER_NOT_ALLOWED", "message": "该种族不支持所选性别"}
+	var gender_upper := gender_str.to_upper()
+	if race_def == null or not race_def.allowed_genders.has(gender_upper):
+		return {"success": false, "error_code": "GENDER_NOT_ALLOWED", "message": "Selected gender is not permitted for the specified race."}
 
-	draft_request.selected_gender = g_upper
+	draft_request.selected_gender = gender_upper
 	current_step = CreationStep.EXTENSIONS_PENDING
-	return {"success": true, "step": current_step, "gender": g_upper}
+	return {"success": true, "step": current_step, "gender": gender_upper}
 
 ## 3. 提交扩展参数并锁定（深拷贝防外部突变）。
 ## 契约：仅 EXTENSIONS_PENDING 可调用；成功后跃迁 SUBMITTED_VALIDATING。
 func finalize_extensions(extra_fields: Dictionary) -> Dictionary:
 	if current_step != CreationStep.EXTENSIONS_PENDING:
-		return {"success": false, "error_code": ERR_STEP_MISMATCH, "message": "当前不可提交扩展参数"}
+		return {
+			"success": false,
+			"error_code": ERR_STEP_MISMATCH,
+			"message": TemplateFormatter.format("Finalizing extensions is not permitted in current step: {step}.", {"step": current_step})
+		}
 
 	draft_request.extra_custom_fields = extra_fields.duplicate(true)
 	current_step = CreationStep.SUBMITTED_VALIDATING
@@ -108,7 +120,11 @@ func finalize_extensions(extra_fields: Dictionary) -> Dictionary:
 ## 契约：仅 SUBMITTED_VALIDATING 可调用；成功后跃迁 PERSISTED_COMPLETED。
 func mark_persisted_completed() -> Dictionary:
 	if current_step != CreationStep.SUBMITTED_VALIDATING:
-		return {"success": false, "error_code": ERR_STEP_MISMATCH, "message": "当前不可标记持久化完成"}
+		return {
+			"success": false,
+			"error_code": ERR_STEP_MISMATCH,
+			"message": TemplateFormatter.format("Marking persisted completion is not permitted in current step: {step}.", {"step": current_step})
+		}
 	current_step = CreationStep.PERSISTED_COMPLETED
 	return {"success": true, "step": current_step}
 
@@ -116,6 +132,10 @@ func mark_persisted_completed() -> Dictionary:
 ## 契约：仅 PERSISTED_COMPLETED 可调用；成功后跃迁终态 OPENING_EVENT_TRIGGERED。
 func mark_opening_triggered() -> Dictionary:
 	if current_step != CreationStep.PERSISTED_COMPLETED:
-		return {"success": false, "error_code": ERR_STEP_MISMATCH, "message": "当前不可激活开局事件"}
+		return {
+			"success": false,
+			"error_code": ERR_STEP_MISMATCH,
+			"message": TemplateFormatter.format("Marking opening event triggered is not permitted in current step: {step}.", {"step": current_step})
+		}
 	current_step = CreationStep.OPENING_EVENT_TRIGGERED
 	return {"success": true, "step": current_step}

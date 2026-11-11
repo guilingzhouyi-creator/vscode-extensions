@@ -141,12 +141,12 @@ static func execute_creation_and_boot_prologue(
     if not bool(prologue_boot.get("success", false)):
         return prologue_boot
 
-    var p_ctx: CharacterPrologueContext = prologue_boot.get("context", null)
-    if p_ctx != null and pres != null and not pres.origin_id.is_empty():
-        p_ctx.runtime_placeholders["ORIGIN_ID"] = pres.origin_id
-        p_ctx.runtime_placeholders["origin_id"] = pres.origin_id
-    if p_ctx != null and profile != null:
-        p_ctx.runtime_placeholders["INITIAL_GOLD"] = str(int(profile.personal_resources.get("gold", 0)))
+    var prologue_context: CharacterPrologueContext = prologue_boot.get("context", null)
+    if prologue_context != null and pres != null and not pres.origin_id.is_empty():
+        prologue_context.runtime_placeholders["ORIGIN_ID"] = pres.origin_id
+        prologue_context.runtime_placeholders["origin_id"] = pres.origin_id
+    if prologue_context != null and profile != null:
+        prologue_context.runtime_placeholders["INITIAL_GOLD"] = str(int(profile.personal_resources.get("gold", 0)))
 
     return {
         "success": true,
@@ -157,7 +157,7 @@ static func execute_creation_and_boot_prologue(
         "profile": profile,
         "presentation": pres,
         "opening_event": opening,
-        "prologue_context": p_ctx,
+        "prologue_context": prologue_context,
         "prologue_packet": prologue_boot.get("packet", null),
         "gateway_result": create_res.get("gateway_result", {})
     }

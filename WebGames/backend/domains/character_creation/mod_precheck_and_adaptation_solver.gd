@@ -79,8 +79,8 @@ static func precheck_and_adapt_mod_list(
 
     for raw_pack in candidate_packs:
         var single_res: Dictionary = precheck_single_mod(raw_pack)
-        var dto: DestinyModManifestDTO = single_res.get("manifest")
-        var pid: String = dto.pack_id
+        var manifest_dto: DestinyModManifestDTO = single_res.get("manifest")
+        var pid: String = manifest_dto.pack_id
         var is_enabled: bool = enable_all or (not pid.is_empty() and enabled_set.has(pid))
         var is_compliant: bool = bool(single_res.get("valid", false))
 
@@ -91,7 +91,7 @@ static func precheck_and_adapt_mod_list(
             if not is_compliant:
                 has_non_compliant_enabled = true
             else:
-                enabled_manifests.append(dto)
+                enabled_manifests.append(manifest_dto)
                 enabled_ids_out.append(pid)
 
     if has_non_compliant_enabled:
@@ -163,9 +163,9 @@ static func precheck_and_adapt_mod_list(
 static func _build_enabled_lookup(enabled_pack_ids: Array) -> Dictionary:
     var out: Dictionary = {}
     for item in enabled_pack_ids:
-        var s: String = str(item).strip_edges()
-        if not s.is_empty():
-            out[s] = true
+        var clean_id: String = str(item).strip_edges()
+        if not clean_id.is_empty():
+            out[clean_id] = true
     return out
 
 static func _build_checklist_item(
@@ -235,11 +235,11 @@ static func _check_pack_incompatibilities(
 static func _new_list() -> Array:
     return []
 
-static func _record_dependencies(dto: DestinyModManifestDTO, dto_map: Dictionary, adj: Dictionary, in_degree: Dictionary) -> void:
-    for dep_id in dto.dependencies:
+static func _record_dependencies(manifest_dto: DestinyModManifestDTO, dto_map: Dictionary, adj: Dictionary, in_degree: Dictionary) -> void:
+    for dep_id in manifest_dto.dependencies:
         if dto_map.has(dep_id):
-            adj[dep_id].append(dto.pack_id)
-            in_degree[dto.pack_id] = in_degree[dto.pack_id] + 1
+            adj[dep_id].append(manifest_dto.pack_id)
+            in_degree[manifest_dto.pack_id] = in_degree[manifest_dto.pack_id] + 1
 
 static func _decrement_dependents(dependents: Array, in_degree: Dictionary, queue: Array[String]) -> void:
     for v_pid in dependents:
@@ -576,9 +576,9 @@ static func _build_creation_ui_snapshot(
 
     var available_trait_pairs: Array[Dictionary] = []
     for idx in range(paired_presets.size()):
-        var p_entry: Variant = paired_presets[idx]
-        if p_entry is Dictionary:
-            _append_ui_trait_pair_snapshot_item(idx, p_entry as Dictionary, traits, available_trait_pairs)
+        var preset_entry: Variant = paired_presets[idx]
+        if preset_entry is Dictionary:
+            _append_ui_trait_pair_snapshot_item(idx, preset_entry as Dictionary, traits, available_trait_pairs)
 
     return {
         "enabled_pack_ids": enabled_ids.duplicate(),

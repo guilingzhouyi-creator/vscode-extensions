@@ -19,16 +19,16 @@ var modifier_tags: Array[String] = []
 var extra_context: Dictionary = {}
 
 func _init(
-	p_base_attributes: Dictionary = {},
-	p_race_id: String = "",
-	p_profession_id: String = "",
-	p_level: int = 1,
-	p_modifier_tags: Array[String] = [],
-	p_extra_context: Dictionary = {}
+	base_attrs: Dictionary = {},
+	race: String = "",
+	profession: String = "",
+	char_level: int = 1,
+	tags: Array[String] = [],
+	extra_ctx: Dictionary = {}
 ) -> void:
-	base_attributes = p_base_attributes
-	race_id = p_race_id
-	profession_id = p_profession_id
-	level = p_level
-	modifier_tags = p_modifier_tags
-	extra_context = p_extra_context
+	base_attributes = base_attrs
+	race_id = race
+	profession_id = profession
+	level = char_level
+	modifier_tags = tags
+	extra_context = extra_ctx
