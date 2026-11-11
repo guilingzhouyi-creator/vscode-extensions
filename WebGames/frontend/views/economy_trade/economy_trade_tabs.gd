@@ -185,27 +185,13 @@ func _on_auction_item_selected(index: int) -> void:
 	if _view != null:
 		_view._auction_selected_index = _filtered_auction_indices[index] if index >= 0 and index < _filtered_auction_indices.size() else -1
 
-func _on_auction_bid_pressed() -> void:
+func _on_auction_action_pressed(toast_key: String) -> void:
 	if _view == null: return
 	var selected: Array = _view._auction_item_list.get_selected_items()
 	if not selected.is_empty() and selected[0] >= 0 and selected[0] < _filtered_auction_indices.size():
 		var orig_idx: int = _filtered_auction_indices[selected[0]]
 		var item_name: String = UIIntermediary.text(str(_view._auction_items[orig_idx].get("name", "ui.fe05.unknown")))
-		NavManager.get_instance().show_toast(
-			UIIntermediary.text("ui.fe05.auction.bid_toast", {"name": item_name}),
-			NavTypes.ToastLevel.INFO
-		)
-
-func _on_auction_buyout_pressed() -> void:
-	if _view == null: return
-	var selected: Array = _view._auction_item_list.get_selected_items()
-	if not selected.is_empty() and selected[0] >= 0 and selected[0] < _filtered_auction_indices.size():
-		var orig_idx: int = _filtered_auction_indices[selected[0]]
-		var item_name: String = UIIntermediary.text(str(_view._auction_items[orig_idx].get("name", "ui.fe05.unknown")))
-		NavManager.get_instance().show_toast(
-			UIIntermediary.text("ui.fe05.auction.buyout_toast", {"name": item_name}),
-			NavTypes.ToastLevel.INFO
-		)
+		NavManager.get_instance().show_toast(UIIntermediary.text(toast_key, {"name": item_name}), NavTypes.ToastLevel.INFO)
 
 # ==============================================================================
 # Tab 4: 商队物流 (LOGISTICS) 初始化与信号
@@ -386,10 +372,7 @@ func _on_exchange_confirm_pressed() -> void:
 	var src_name: String = _view._option_exchange_source.get_item_text(src_idx)
 	var tgt_name: String = _view._option_exchange_target.get_item_text(tgt_idx)
 	var amount: int = int(_view._spin_exchange_amount.value)
-	NavManager.get_instance().show_toast(
-		UIIntermediary.text("ui.fe05.exchange.confirm_toast", {"amount": amount, "source": src_name, "target": tgt_name}),
-		NavTypes.ToastLevel.INFO
-	)
+	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe05.exchange.confirm_toast", {"amount": amount, "source": src_name, "target": tgt_name}), NavTypes.ToastLevel.INFO)
 
 # ==============================================================================
 # Tab 7: 资源水池 (RESOURCE_POOL) 初始化
@@ -443,8 +426,8 @@ func _connect_signals() -> void:
 	_view._line_auction_search.text_changed.connect(_on_auction_search_changed)
 	_view._option_auction_category.item_selected.connect(_on_auction_category_selected)
 	_view._auction_item_list.item_selected.connect(_on_auction_item_selected)
-	_view._btn_auction_bid.pressed.connect(_on_auction_bid_pressed)
-	_view._btn_auction_buyout.pressed.connect(_on_auction_buyout_pressed)
+	_view._btn_auction_bid.pressed.connect(_on_auction_action_pressed.bind("ui.fe05.auction.bid_toast"))
+	_view._btn_auction_buyout.pressed.connect(_on_auction_action_pressed.bind("ui.fe05.auction.buyout_toast"))
 	_view._caravan_list.item_selected.connect(_on_caravan_selected)
 	_view._option_price_commodity.item_selected.connect(_on_price_commodity_selected)
 	_view._option_exchange_source.item_selected.connect(_on_exchange_source_selected)

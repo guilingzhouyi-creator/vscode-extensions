@@ -150,18 +150,12 @@ func _load_mock_snapshot() -> void:
 
 func switch_state(new_state: EntryState) -> void:
     current_state = new_state
-    if splash_panel != null:
-        splash_panel.visible = (current_state == EntryState.SPLASH)
-    if login_panel != null:
-        login_panel.visible = (current_state == EntryState.LOGIN)
-    if register_panel != null:
-        register_panel.visible = (current_state == EntryState.REGISTER)
-    if server_select_panel != null:
-        server_select_panel.visible = (current_state == EntryState.SERVER_SELECT)
-    if character_select_panel != null:
-        character_select_panel.visible = (current_state == EntryState.CHARACTER_SELECT)
-    if character_create_panel != null:
-        character_create_panel.visible = (current_state == EntryState.CHARACTER_CREATE)
+    if splash_panel != null: splash_panel.visible = (current_state == EntryState.SPLASH)
+    if login_panel != null: login_panel.visible = (current_state == EntryState.LOGIN)
+    if register_panel != null: register_panel.visible = (current_state == EntryState.REGISTER)
+    if server_select_panel != null: server_select_panel.visible = (current_state == EntryState.SERVER_SELECT)
+    if character_select_panel != null: character_select_panel.visible = (current_state == EntryState.CHARACTER_SELECT)
+    if character_create_panel != null: character_create_panel.visible = (current_state == EntryState.CHARACTER_CREATE)
 
 func submit_login(username: String, password_plain: String) -> Dictionary:
     form_username = username.strip_edges()
@@ -170,20 +164,7 @@ func submit_login(username: String, password_plain: String) -> Dictionary:
         return {"success": false, "error_code": "ERR_EMPTY_USERNAME", "message": "ui.fe01.login.error_empty", "error_data": {}}
     var mode := ServiceLocator.get_mode()
     if mode == "backend" or mode == "real":
-        var auth_result: Dictionary = {}
-        var auth_svc: Variant = ServiceLocator.get_instance().auth()
-        if auth_svc != null and auth_svc.has_method("login_async"):
-            auth_svc.call("login_async", form_username, form_password, func(res: Dictionary):
-                auth_result.merge(res, true)
-            )
-        if not bool(auth_result.get("success", false)):
-            return auth_result
-        current_account_id = str(auth_result.get("account_id", ""))
-        current_session_token = str(auth_result.get("token", ""))
-        var slots: Array = auth_result.get("character_slots", [])
-        set_character_slots_snapshot(slots)
-        switch_state(EntryState.CHARACTER_SELECT)
-        return auth_result
+        return _get_tabs().login_backend_flow(form_username, form_password)
 
     current_account_id = "ACC_" + form_username.to_upper()
     current_session_token = "TOKEN_" + current_account_id
@@ -198,26 +179,7 @@ func submit_register(username: String, password_plain: String) -> Dictionary:
         return {"success": false, "error_code": "ERR_USERNAME_TOO_SHORT", "message": "ui.fe01.register.error_short", "error_data": {"min": min_len}}
     var mode := ServiceLocator.get_mode()
     if mode == "backend" or mode == "real":
-        var reg_result: Dictionary = {}
-        var auth_svc: Variant = ServiceLocator.get_instance().auth()
-        if auth_svc != null and auth_svc.has_method("register_async"):
-            auth_svc.call("register_async", form_username, form_password, func(res: Dictionary):
-                reg_result.merge(res, true)
-            )
-        if not bool(reg_result.get("success", false)):
-            return reg_result
-        current_account_id = str(reg_result.get("account_id", ""))
-        current_session_token = "TOKEN_" + current_account_id
-        var empty_slots: Array = []
-        if auth_svc != null and auth_svc.has_method("get_characters_async"):
-            auth_svc.call("get_characters_async", current_account_id, func(char_res: Dictionary):
-                var ch: Array = char_res.get("characters", [])
-                empty_slots.append_array(ch)
-            )
-        if not empty_slots.is_empty():
-            set_character_slots_snapshot(empty_slots)
-        switch_state(EntryState.CHARACTER_CREATE)
-        return reg_result
+        return _get_tabs().register_backend_flow(form_username, form_password)
 
     current_account_id = "ACC_" + form_username.to_upper()
     current_session_token = "TOKEN_" + current_account_id
@@ -246,10 +208,8 @@ func logout_account() -> Dictionary:
     form_username = ""
     form_password = ""
     character_slots.clear()
-    if login_username_edit != null:
-        login_username_edit.text = ""
-    if login_password_edit != null:
-        login_password_edit.text = ""
+    if login_username_edit != null: login_username_edit.text = ""
+    if login_password_edit != null: login_password_edit.text = ""
     ServiceLocator.clear_active_gateway()
     switch_state(EntryState.LOGIN)
     return {"success": true, "message": "已成功退出账号并重置状态机"}
@@ -268,18 +228,10 @@ func _render_from_snapshot() -> void:
 func _has_mod_creation_snapshot_keys(snap: Dictionary) -> bool:
     return snap.has("creation_ui_snapshot") or snap.has("mod_precheck_checklist") or snap.has("precheck_checklist") or snap.has("ui_controls") or snap.has("creation_ui_controls") or snap.has("available_origins_list") or snap.has("available_origins") or snap.has("available_traits_list") or snap.has("available_trait_pairs")
 
-func _extract_origin_id(entry: Variant) -> String:
-    return TabsClass.extract_origin_id(entry)
-
-func _extract_positive_trait_id(entry: Variant) -> String:
-    return TabsClass.extract_positive_trait_id(entry)
-
 func select_custom_origin_by_index(idx: int) -> bool:
-    if not bool(creation_ui_controls.get("allow_manual_origin_select", false)):
+    if not bool(creation_ui_controls.get("allow_manual_origin_select", false)) or idx < 0 or idx >= available_origins_list.size():
         return false
-    if idx < 0 or idx >= available_origins_list.size():
-        return false
-    var origin_id: String = _extract_origin_id(available_origins_list[idx])
+    var origin_id: String = TabsClass.extract_origin_id(available_origins_list[idx])
     if origin_id.is_empty():
         return false
     form_selected_origin_id = origin_id
@@ -291,16 +243,14 @@ func select_custom_origin(origin_id: String) -> bool:
     if not bool(creation_ui_controls.get("allow_manual_origin_select", false)) or origin_id.is_empty():
         return false
     for i in range(available_origins_list.size()):
-        if _extract_origin_id(available_origins_list[i]) == origin_id:
+        if TabsClass.extract_origin_id(available_origins_list[i]) == origin_id:
             return select_custom_origin_by_index(i)
     return false
 
 func select_custom_trait_by_index(idx: int) -> bool:
-    if not bool(creation_ui_controls.get("allow_manual_trait_select", false)):
+    if not bool(creation_ui_controls.get("allow_manual_trait_select", false)) or idx < 0 or idx >= available_traits_list.size():
         return false
-    if idx < 0 or idx >= available_traits_list.size():
-        return false
-    var trait_id: String = _extract_positive_trait_id(available_traits_list[idx])
+    var trait_id: String = TabsClass.extract_positive_trait_id(available_traits_list[idx])
     if trait_id.is_empty():
         return false
     form_selected_positive_trait = trait_id
@@ -312,7 +262,7 @@ func select_custom_trait(pos_trait_id: String) -> bool:
     if not bool(creation_ui_controls.get("allow_manual_trait_select", false)) or pos_trait_id.is_empty():
         return false
     for i in range(available_traits_list.size()):
-        if _extract_positive_trait_id(available_traits_list[i]) == pos_trait_id:
+        if TabsClass.extract_positive_trait_id(available_traits_list[i]) == pos_trait_id:
             return select_custom_trait_by_index(i)
     return false
 
@@ -419,22 +369,7 @@ func _on_char_enter_pressed() -> void:
     if selected_character_slot.is_empty():
         NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe01.toast.select_character"), NavTypes.ToastLevel.WARNING)
         return
-    var active_gateway: RefCounted = ServiceLocator.get_active_gateway()
-    if active_gateway != null:
-        var ctx: Variant = active_gateway.get("context")
-        var current_phase: int = int(ctx.current_phase) if ctx != null and "current_phase" in ctx else -1
-        # GatewayPhase: AUTHENTICATED=1, GATEWAY_ENTERED=2, MODE_SELECTED=3, SLOT_WORLD_RESOLVED=4, CHARACTER_PENDING=5, WORLD_ENTRY_PERMITTED=6, IN_WORLD=7
-        # GameMode: SINGLE_PLAYER=1
-        if current_phase == 2 and active_gateway.has_method("select_mode"):
-            active_gateway.call("select_mode", 1, {}, [])
-            ctx = active_gateway.get("context")
-            current_phase = int(ctx.current_phase) if ctx != null and "current_phase" in ctx else -1
-        if (current_phase == 4 or current_phase == 5) and active_gateway.has_method("attach_ready_character"):
-            active_gateway.call("attach_ready_character", selected_character_slot)
-            ctx = active_gateway.get("context")
-            current_phase = int(ctx.current_phase) if ctx != null and "current_phase" in ctx else -1
-        if current_phase == 6 and active_gateway.has_method("enter_world"):
-            active_gateway.call("enter_world")
+    _get_tabs().advance_gateway_to_world()
     NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe01.toast.entering_world"), NavTypes.ToastLevel.SUCCESS)
     NavManager.get_instance().push_screen("main_hud", {"slot": selected_character_slot})
 
@@ -456,37 +391,11 @@ func create_character(char_name: String, race: String = "HUMAN") -> Dictionary:
         return {"success": false, "error_code": "ERR_NAME_EMPTY"}
     var mode := ServiceLocator.get_mode()
     if (mode == "backend" or mode == "real") and not current_account_id.is_empty():
-        var auth_svc: Variant = ServiceLocator.get_instance().auth()
-        if auth_svc != null and auth_svc.has_method("create_character_async"):
-            var create_res: Dictionary = {}
-            auth_svc.call("create_character_async", current_account_id, {
-                "name": form_character_name,
-                "race": form_selected_race
-            }, func(res: Dictionary):
-                create_res.merge(res, true)
-            )
-            if not bool(create_res.get("success", false)):
-                return create_res
-            var refreshed_slots: Array = []
-            auth_svc.call("get_characters_async", current_account_id, func(char_res: Dictionary):
-                var ch: Array = char_res.get("characters", [])
-                refreshed_slots.append_array(ch)
-            )
-            if not refreshed_slots.is_empty():
-                set_character_slots_snapshot(refreshed_slots)
-            _get_tabs().populate_character_slots()
-            switch_state(EntryState.CHARACTER_SELECT)
-            return create_res
+        var backend_res: Dictionary = _get_tabs().create_character_backend_flow(form_character_name, form_selected_race)
+        if bool(backend_res.get("_handled", false)):
+            return backend_res.get("result", {}) as Dictionary
 
-    var new_slot := {
-        "slot_id": "SLOT_NEW",
-        "name": form_character_name,
-        "race": form_selected_race,
-        "class": "Novice",
-        "level": 1,
-        "town": "VALAN_CAPITAL",
-        "empty": false
-    }
+    var new_slot := {"slot_id": "SLOT_NEW", "name": form_character_name, "race": form_selected_race, "class": "Novice", "level": 1, "town": "VALAN_CAPITAL", "empty": false}
     for i in range(character_slots.size()):
         if character_slots[i].get("empty", false) or str(character_slots[i].get("name", "")) == "":
             character_slots[i] = new_slot

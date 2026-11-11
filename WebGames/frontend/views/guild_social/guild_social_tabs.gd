@@ -49,12 +49,12 @@ func connect_signals() -> void:
 	_view._friend_tab_container.tab_changed.connect(_on_friend_tab_changed)
 	_view._friend_list.item_selected.connect(_on_friend_selected)
 	_view._btn_add_friend.pressed.connect(_on_add_friend_pressed)
-	_view._btn_delete_friend.pressed.connect(_on_delete_friend_pressed)
-	_view._btn_whisper_friend.pressed.connect(_on_whisper_friend_pressed)
+	_view._btn_delete_friend.pressed.connect(_on_friend_action_pressed.bind("ui.fe09.friend.delete_toast"))
+	_view._btn_whisper_friend.pressed.connect(_on_friend_action_pressed.bind("ui.fe09.friend.whisper_toast"))
 
 	# Tab 5: NPC对话
-	_view._btn_npc_quest.pressed.connect(_on_npc_quest_pressed)
-	_view._btn_npc_shop.pressed.connect(_on_npc_shop_pressed)
+	_view._btn_npc_quest.pressed.connect(_on_npc_action_pressed.bind("ui.fe09.npc.quest_toast"))
+	_view._btn_npc_shop.pressed.connect(_on_npc_action_pressed.bind("ui.fe09.npc.shop_toast"))
 	_view._btn_npc_leave.pressed.connect(_on_npc_leave_pressed)
 
 	# Tab 6: 玩家交易
@@ -173,10 +173,7 @@ func _on_channel_selected(index: int) -> void:
 	_refresh_chat_display()
 
 func _on_channel_settings_pressed() -> void:
-	NavManager.get_instance().show_toast(
-		UIIntermediary.text("ui.fe09.chat.settings_toast"),
-		NavTypes.ToastLevel.INFO
-	)
+	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe09.chat.settings_toast"), NavTypes.ToastLevel.INFO)
 
 func _on_chat_send_pressed() -> void:
 	_send_chat_message()
@@ -270,28 +267,13 @@ func _on_friend_selected(index: int) -> void:
 	_refresh_friend_detail(index)
 
 func _on_add_friend_pressed() -> void:
-	NavManager.get_instance().show_toast(
-		UIIntermediary.text("ui.fe09.friend.add_toast"),
-		NavTypes.ToastLevel.INFO
-	)
+	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe09.friend.add_toast"), NavTypes.ToastLevel.INFO)
 
-func _on_delete_friend_pressed() -> void:
+func _on_friend_action_pressed(toast_key: String) -> void:
 	var visible_friends := _get_visible_friends()
 	if _view._friend_selected_index >= 0 and _view._friend_selected_index < visible_friends.size():
 		var friend: Dictionary = visible_friends[_view._friend_selected_index]
-		NavManager.get_instance().show_toast(
-			UIIntermediary.text("ui.fe09.friend.delete_toast", {"name": UIIntermediary.text(str(friend.get("name", "")))}),
-			NavTypes.ToastLevel.INFO
-		)
-
-func _on_whisper_friend_pressed() -> void:
-	var visible_friends := _get_visible_friends()
-	if _view._friend_selected_index >= 0 and _view._friend_selected_index < visible_friends.size():
-		var friend: Dictionary = visible_friends[_view._friend_selected_index]
-		NavManager.get_instance().show_toast(
-			UIIntermediary.text("ui.fe09.friend.whisper_toast", {"name": UIIntermediary.text(str(friend.get("name", "")))}),
-			NavTypes.ToastLevel.INFO
-		)
+		NavManager.get_instance().show_toast(UIIntermediary.text(toast_key, {"name": UIIntermediary.text(str(friend.get("name", "")))}), NavTypes.ToastLevel.INFO)
 
 # ==============================================================================
 # Tab 5: NPC对话 (NPC_DIALOG)
@@ -328,30 +310,14 @@ func _clear_dialog_options() -> void:
 func _on_dialog_option_pressed(_option_index: int, action: String) -> void:
 	match action:
 		"QUEST":
-			NavManager.get_instance().show_toast(
-				UIIntermediary.text("ui.fe09.npc.quest_toast"),
-				NavTypes.ToastLevel.INFO
-			)
+			NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe09.npc.quest_toast"), NavTypes.ToastLevel.INFO)
 		"SHOP":
-			NavManager.get_instance().show_toast(
-				UIIntermediary.text("ui.fe09.npc.shop_toast"),
-				NavTypes.ToastLevel.INFO
-			)
+			NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe09.npc.shop_toast"), NavTypes.ToastLevel.INFO)
 		"LEAVE":
-			_view._current_dialog_index = (_view._current_dialog_index + 1) % _view._npc_dialogs.size()
-			_refresh_npc_dialog_display()
+			_on_npc_leave_pressed()
 
-func _on_npc_quest_pressed() -> void:
-	NavManager.get_instance().show_toast(
-		UIIntermediary.text("ui.fe09.npc.quest_toast"),
-		NavTypes.ToastLevel.INFO
-	)
-
-func _on_npc_shop_pressed() -> void:
-	NavManager.get_instance().show_toast(
-		UIIntermediary.text("ui.fe09.npc.shop_toast"),
-		NavTypes.ToastLevel.INFO
-	)
+func _on_npc_action_pressed(toast_key: String) -> void:
+	NavManager.get_instance().show_toast(UIIntermediary.text(toast_key), NavTypes.ToastLevel.INFO)
 
 func _on_npc_leave_pressed() -> void:
 	_view._current_dialog_index = (_view._current_dialog_index + 1) % _view._npc_dialogs.size()
@@ -366,39 +332,21 @@ func _init_player_trade_tab() -> void:
 	_view._trade_confirmed = false
 	_view._my_trade_items = []
 	UIIntermediary.resolve(_view._label_trade_partner, "ui.fe09.trade.partner_label", {"name": UIIntermediary.text(_view._trade_partner_name)})
-	_populate_my_inventory_list()
-	_refresh_my_trade_list()
-	_refresh_partner_trade_list()
+	_populate_trade_item_list(_view._my_inventory_list, _view._my_inventory)
+	_populate_trade_item_list(_view._my_trade_list, _view._my_trade_items)
+	_populate_trade_item_list(_view._partner_trade_list, _view._partner_trade_items)
 	_refresh_trade_status()
 	_view._spin_my_trade_gold.value = 0
 	UIIntermediary.resolve(_view._label_partner_gold, "ui.fe09.trade.partner_gold_label", {"amount": 3500})
 
-func _populate_my_inventory_list() -> void:
-	_view._my_inventory_list.clear()
-	for item in _view._my_inventory:
-		var item_name := UIIntermediary.text(str(item.get("name", "")))
-		var rarity_display := _rarity_display(str(item.get("rarity", "")))
-		var qty := int(item.get("qty", 1))
-		var display := UIIntermediary.text("ui.fe09.trade.item_display", {"name": item_name, "rarity": rarity_display, "qty": qty})
-		_view._my_inventory_list.add_item(display)
-
-func _refresh_my_trade_list() -> void:
-	_view._my_trade_list.clear()
-	for item in _view._my_trade_items:
-		var item_name := UIIntermediary.text(str(item.get("name", "")))
-		var rarity_display := _rarity_display(str(item.get("rarity", "")))
-		var qty := int(item.get("qty", 1))
-		var display := UIIntermediary.text("ui.fe09.trade.item_display", {"name": item_name, "rarity": rarity_display, "qty": qty})
-		_view._my_trade_list.add_item(display)
-
-func _refresh_partner_trade_list() -> void:
-	_view._partner_trade_list.clear()
-	for item in _view._partner_trade_items:
-		var item_name := UIIntermediary.text(str(item.get("name", "")))
-		var rarity_display := _rarity_display(str(item.get("rarity", "")))
-		var qty := int(item.get("qty", 1))
-		var display := UIIntermediary.text("ui.fe09.trade.item_display", {"name": item_name, "rarity": rarity_display, "qty": qty})
-		_view._partner_trade_list.add_item(display)
+func _populate_trade_item_list(list_ctrl: ItemList, items: Array) -> void:
+	list_ctrl.clear()
+	var item_params: Dictionary = {"name": "", "rarity": "", "qty": 1}
+	for item in items:
+		item_params["name"] = UIIntermediary.text(str(item.get("name", "")))
+		item_params["rarity"] = _rarity_display(str(item.get("rarity", "")))
+		item_params["qty"] = int(item.get("qty", 1))
+		list_ctrl.add_item(UIIntermediary.text("ui.fe09.trade.item_display", item_params))
 
 func _refresh_trade_status() -> void:
 	if _view._trade_confirmed:
@@ -416,13 +364,13 @@ func _on_my_inventory_selected(index: int) -> void:
 		return
 	var item: Dictionary = _view._my_inventory[index]
 	_view._my_trade_items.append(item.duplicate())
-	_refresh_my_trade_list()
+	_populate_trade_item_list(_view._my_trade_list, _view._my_trade_items)
 
 func _on_my_trade_selected(index: int) -> void:
 	if _view._trade_locked or _view._trade_confirmed or index < 0 or index >= _view._my_trade_items.size():
 		return
 	_view._my_trade_items.remove_at(index)
-	_refresh_my_trade_list()
+	_populate_trade_item_list(_view._my_trade_list, _view._my_trade_items)
 
 func _on_trade_gold_changed(_value: float) -> void:
 	_refresh_trade_status()
@@ -437,7 +385,7 @@ func _on_trade_cancel_pressed() -> void:
 	_apply_trade_transition("cancel")
 	_view._my_trade_items.clear()
 	_view._spin_my_trade_gold.value = 0
-	_refresh_my_trade_list()
+	_populate_trade_item_list(_view._my_trade_list, _view._my_trade_items)
 	_refresh_trade_status()
 
 func _apply_trade_transition(action: String) -> void:

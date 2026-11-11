@@ -112,7 +112,7 @@ func _populate_mod_origins_option(view: AccountEntryView) -> void:
     for i in range(view.available_origins_list.size()):
         var entry: Variant = view.available_origins_list[i]
         var label_text: String = _format_origin_entry_label(entry)
-        var origin_id: String = view._extract_origin_id(entry)
+        var origin_id: String = extract_origin_id(entry)
         view.char_origin_option.add_item(label_text, i)
         view.char_origin_option.set_item_metadata(i, origin_id)
 
@@ -130,7 +130,7 @@ func _populate_mod_traits_list(view: AccountEntryView) -> void:
         var entry: Variant = view.available_traits_list[i]
         var label_text: String = _format_trait_entry_label(entry)
         var idx: int = view.char_talent_list.add_item(label_text)
-        view.char_talent_list.set_item_metadata(idx, view._extract_positive_trait_id(entry))
+        view.char_talent_list.set_item_metadata(idx, extract_positive_trait_id(entry))
 
 func _format_trait_entry_label(entry: Variant) -> String:
     if entry is Dictionary:
@@ -319,3 +319,76 @@ static func extract_positive_trait_id(entry: Variant) -> String:
         var pos: String = str(d.get("positive", d.get("positive_trait", d.get("positive_id", ""))))
         return pos if not pos.is_empty() else str(d.get("trait_id", d.get("id", "")))
     return String(entry) if entry is String else ""
+
+func invoke_auth_sync(method: String, args: Array) -> Dictionary:
+    var out: Dictionary = {}
+    var auth_svc: Variant = ServiceLocator.get_instance().auth()
+    if auth_svc == null or not auth_svc.has_method(method):
+        return {"_missing": true}
+    var call_args: Array = args.duplicate()
+    call_args.append(func(res: Dictionary) -> void: out.merge(res, true))
+    auth_svc.callv(method, call_args)
+    return out
+
+func login_backend_flow(username: String, passwd: String) -> Dictionary:
+    var view: AccountEntryView = _view
+    var auth_result: Dictionary = invoke_auth_sync("login_async", [username, passwd])
+    if auth_result.has("_missing"):
+        auth_result.clear()
+    if not bool(auth_result.get("success", false)):
+        return auth_result
+    view.current_account_id = str(auth_result.get("account_id", ""))
+    view.current_session_token = str(auth_result.get("token", ""))
+    var slots: Array = auth_result.get("character_slots", [])
+    view.set_character_slots_snapshot(slots)
+    view.switch_state(AccountEntryView.EntryState.CHARACTER_SELECT)
+    return auth_result
+
+func register_backend_flow(username: String, passwd: String) -> Dictionary:
+    var view: AccountEntryView = _view
+    var reg_result: Dictionary = invoke_auth_sync("register_async", [username, passwd])
+    if reg_result.has("_missing"):
+        reg_result.clear()
+    if not bool(reg_result.get("success", false)):
+        return reg_result
+    view.current_account_id = str(reg_result.get("account_id", ""))
+    view.current_session_token = "TOKEN_" + view.current_account_id
+    var char_res: Dictionary = invoke_auth_sync("get_characters_async", [view.current_account_id])
+    var chars: Array = char_res.get("characters", []) if not char_res.has("_missing") else []
+    if not chars.is_empty():
+        view.set_character_slots_snapshot(chars)
+    view.switch_state(AccountEntryView.EntryState.CHARACTER_CREATE)
+    return reg_result
+
+func create_character_backend_flow(char_name: String, race: String) -> Dictionary:
+    var view: AccountEntryView = _view
+    var create_res: Dictionary = invoke_auth_sync("create_character_async", [view.current_account_id, {"name": char_name, "race": race}])
+    if create_res.has("_missing"):
+        return {"_handled": false}
+    if not bool(create_res.get("success", false)):
+        return {"_handled": true, "result": create_res}
+    var char_res: Dictionary = invoke_auth_sync("get_characters_async", [view.current_account_id])
+    var refreshed: Array = char_res.get("characters", []) if not char_res.has("_missing") else []
+    if not refreshed.is_empty():
+        view.set_character_slots_snapshot(refreshed)
+    populate_character_slots()
+    view.switch_state(AccountEntryView.EntryState.CHARACTER_SELECT)
+    return {"_handled": true, "result": create_res}
+
+func advance_gateway_to_world() -> void:
+    var view: AccountEntryView = _view
+    var gw: RefCounted = ServiceLocator.get_active_gateway()
+    if gw == null:
+        return
+    var phase := func() -> int:
+        var c: Variant = gw.get("context")
+        return int(c.current_phase) if c != null and "current_phase" in c else -1
+    var cur: int = phase.call()
+    if cur == 2 and gw.has_method("select_mode"):
+        gw.call("select_mode", 1, {}, [])
+        cur = phase.call()
+    if (cur == 4 or cur == 5) and gw.has_method("attach_ready_character"):
+        gw.call("attach_ready_character", view.selected_character_slot)
+        cur = phase.call()
+    if cur == 6 and gw.has_method("enter_world"):
+        gw.call("enter_world")
