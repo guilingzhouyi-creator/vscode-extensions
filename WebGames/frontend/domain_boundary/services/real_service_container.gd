@@ -12,6 +12,10 @@ class_name RealServiceContainer
 extends ServiceContainer
 
 const RealAuthService = preload("res://frontend/domain_boundary/services/real_auth_service.gd")
+const RealWorldService = preload("res://frontend/domain_boundary/services/real_world_service.gd")
+const RealCharacterService = preload("res://frontend/domain_boundary/services/real_character_service.gd")
+const RealEscMenuService = preload("res://frontend/domain_boundary/services/real_esc_menu_service.gd")
+const IEscMenuService = preload("res://frontend/domain_boundary/interfaces/i_esc_menu_service.gd")
 
 static var _instance: ServiceContainer = null
 
@@ -28,10 +32,10 @@ static func reset_instance() -> void:
         _instance._services.clear()
     _instance = null
 
-## 初始化默认服务套件：auth 装配真实后端，其余渐进式回退
+## 初始化默认服务套件：auth/world/character/esc_menu 装配真实协议适配器，其余渐进式回退
 func _init_default_services() -> void:
     register_service("auth", RealAuthService.new())
-    register_service("world", MockWorldService.new())
+    register_service("world", RealWorldService.new())
     register_service("combat", MockCombatService.new())
     register_service("version", MockVersionService.new())
     register_service("gacha", MockGachaService.new())
@@ -39,13 +43,14 @@ func _init_default_services() -> void:
     register_service("crafting", MockCraftingService.new())
     register_service("grimoire", MockGrimoireService.new())
     register_service("economy", MockEconomyService.new())
-    register_service("character", MockCharacterService.new())
+    register_service("character", RealCharacterService.new())
     register_service("quest", MockQuestService.new())
     register_service("guild", MockGuildService.new())
     register_service("save", MockSaveService.new())
     register_service("misc_edge", MockMiscEdgeService.new())
     register_service("mail", MockMailService.new())
     register_service("snapshot_data", MockSnapshotDataService.new())
+    register_service("esc_menu", RealEscMenuService.new())
 
 ## 强类型便捷访问方法
 func auth() -> IAuthService:
@@ -95,3 +100,6 @@ func mail() -> IMailService:
 
 func snapshot_data() -> ISnapshotDataService:
     return get_service("snapshot_data") as ISnapshotDataService
+
+func esc_menu() -> IEscMenuService:
+    return get_service("esc_menu") as IEscMenuService

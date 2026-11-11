@@ -12,6 +12,7 @@ extends RefCounted
 const ServiceContainer = preload("res://frontend/domain_boundary/service_container.gd")
 const MockServiceContainer = preload("res://frontend/domain_boundary/mocks/mock_service_container.gd")
 const RealServiceContainer = preload("res://frontend/domain_boundary/services/real_service_container.gd")
+const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
 
 ## 已解析的服务容器单例（按 service_mode 惰性初始化）
 static var _instance: ServiceContainer
@@ -27,9 +28,10 @@ static func set_mode(mode: String) -> void:
 	_custom_mode = mode
 	_instance = null
 
-## 注册当前活跃的世界网关实例
+## 注册当前活跃的世界网关实例（同步后端会话真源）
 static func set_active_gateway(gateway: RefCounted) -> void:
 	_active_gateway = gateway
+	WorldSessionRuntimeService.bind_gateway(gateway)
 	if _instance != null:
 		_instance.set_active_gateway(gateway)
 
@@ -41,20 +43,25 @@ static func create_and_activate_gateway(account_id: String) -> RefCounted:
 		if gw != null and gw.has_method("enter_gateway"):
 			gw.call("enter_gateway")
 		set_active_gateway(gw)
+		WorldSessionRuntimeService.activate_authenticated_session(account_id, "", gw)
 		return gw
 	return null
 
-## 获取当前活跃的世界网关实例
+## 获取当前活跃的世界网关实例（单源优先委托至后端会话真源）
 static func get_active_gateway() -> RefCounted:
+	var runtime_gw: Variant = WorldSessionRuntimeService.get_gateway()
+	if runtime_gw != null and runtime_gw is RefCounted:
+		return runtime_gw as RefCounted
 	if _active_gateway != null:
 		return _active_gateway
 	if _instance != null:
 		return _instance.get_active_gateway()
 	return null
 
-## 清空当前活跃的世界网关实例
+## 清空当前活跃的世界网关实例（同步释放后端会话绑定）
 static func clear_active_gateway() -> void:
 	_active_gateway = null
+	WorldSessionRuntimeService.bind_gateway(null)
 	if _instance != null:
 		_instance.clear_active_gateway()
 
@@ -83,5 +90,6 @@ static func reset() -> void:
 	_instance = null
 	_active_gateway = null
 	_custom_mode = ""
+	WorldSessionRuntimeService.bind_gateway(null)
 	RealServiceContainer.reset_instance()
 	MockServiceContainer.reset_instance()

@@ -2,9 +2,10 @@
 # 模块归属: 前端领域边界层 (Frontend · Domain Boundary Services)
 # 文件路径: res://frontend/domain_boundary/services/real_auth_service.gd
 # 架构定位: Domain Boundary Adapter / Service Bridge
-# 依赖与触发: 上游: ServiceContainer, ServiceLocator | 下游: AuthService, AccountRepository, AccountSlotBindingSolver
-# 职责说明: 实现 IAuthService 接口，封装后端真实 AuthService、AccountRepository 与 AccountSlotBindingSolver，
-#           为前端表现层提供无缝穿透真实后端的异步认证、注册、选服与角色槽位拉取能力。
+# 依赖与触发: 上游: ServiceContainer, ServiceLocator | 下游: AuthService,
+#           AccountRepository, AccountSlotBindingSolver
+# 职责说明: 实现 IAuthService 接口，封装后端真实 AuthService、AccountRepository
+#           与 AccountSlotBindingSolver，为前端表现层提供穿透后端的异步能力。
 # 设计依据: 业务领域第一性原理 / 前端无业务逻辑契约 / 领域边界穿透架构
 # ==============================================================================
 
@@ -17,6 +18,9 @@ const AuthService = preload("res://backend/domains/account/auth_service.gd")
 const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
 const AccountSlotBindingSolver = preload("res://backend/domains/account/account_slot_binding_solver.gd")
 const CharacterProfile = preload("res://backend/domains/account/character_profile.gd")
+const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
+const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
+const UnifiedProtocolDispatcher = preload("res://backend/domains/world_state/services/unified_protocol_dispatcher.gd")
 
 ## 异步登录契约实现
 func login_async(username: String, password_plain: String, callback: Callable) -> void:
@@ -50,6 +54,9 @@ func login_async(username: String, password_plain: String, callback: Callable) -
     var slots: Array = []
     if acc != null:
         slots = AccountSlotBindingSolver.to_frontend_character_slots(acc)
+
+    # 同步激活后端全链路会话运行时真源
+    WorldSessionRuntimeService.activate_authenticated_session(resp.account_id, resp.session_token)
 
     if callback.is_valid():
         callback.call({
@@ -201,6 +208,83 @@ func roll_attribute_spread() -> Dictionary:
             "CHA": rng.randi_range(8, 18),
         }
     }
+
+## 异步资质骰点契约实现（对齐 ROLL_CHARACTER_PREVIEW 动作）
+func roll_attributes_async(callback: Callable) -> void:
+    var req := UnifiedProtocolFactory.create_human_request(
+        "character_creation",
+        "ROLL_CHARACTER_PREVIEW",
+        {}
+    )
+    var resp := UnifiedProtocolDispatcher.dispatch_request(req)
+    if resp.success and resp.data is Dictionary:
+        if callback.is_valid():
+            callback.call(resp.data)
+        return
+    if callback.is_valid():
+        callback.call(roll_attribute_spread())
+
+## 异步注销/吊销令牌契约实现（对齐 LOGOUT_ACCOUNT 动作）
+func revoke_token(token: String, callback: Callable = Callable()) -> void:
+    var req := UnifiedProtocolFactory.create_human_request(
+        "account",
+        "LOGOUT_ACCOUNT",
+        {"session_token": token}
+    )
+    req.session_token = token
+    req.account_id = WorldSessionRuntimeService.get_active_account_id()
+    var resp := UnifiedProtocolDispatcher.dispatch_request(req)
+    if resp.success:
+        WorldSessionRuntimeService.revoke_account_session()
+    if callback.is_valid():
+        callback.call({
+            "success": resp.success,
+            "error_code": resp.error_code,
+            "message": resp.error_message
+        })
+
+## 异步退出账号契约实现
+func logout_async(account_id: String, token: String, callback: Callable = Callable()) -> void:
+    var req := UnifiedProtocolFactory.create_human_request(
+        "account",
+        "LOGOUT_ACCOUNT",
+        {"account_id": account_id, "session_token": token},
+        token,
+        account_id
+    )
+    var resp := UnifiedProtocolDispatcher.dispatch_request(req)
+    if resp.success:
+        WorldSessionRuntimeService.revoke_account_session()
+    if callback.is_valid():
+        callback.call({
+            "success": resp.success,
+            "error_code": resp.error_code,
+            "message": resp.error_message
+        })
+
+## 异步拉取账号首页视图模型契约实现
+func get_account_home_async(account_id: String, token: String, callback: Callable = Callable()) -> void:
+    var req := UnifiedProtocolFactory.create_human_request(
+        "account",
+        "GET_ACCOUNT_HOME_VIEW_MODEL",
+        {"account_id": account_id},
+        token,
+        account_id
+    )
+    var resp := UnifiedProtocolDispatcher.dispatch_request(req)
+    if not resp.success:
+        if callback.is_valid():
+            callback.call({
+                "success": false,
+                "error_code": resp.error_code,
+                "message": resp.error_message
+            })
+        return
+    if callback.is_valid():
+        callback.call({
+            "success": true,
+            "view_model": resp.data
+        })
 
 func _map_error_to_i18n_key(err_code: String) -> String:
     match err_code:
