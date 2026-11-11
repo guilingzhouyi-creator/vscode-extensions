@@ -14,7 +14,7 @@ signal tooltip_hidden()
 static var _instance: TooltipManager
 static func get_instance() -> TooltipManager:
 	if _instance == null:
-		_instance = load("res://frontend/ui_infrastructure/tooltip_manager.gd").new()
+		_instance = TooltipManager.new()
 		_instance.name = "TooltipManager"
 	return _instance
 

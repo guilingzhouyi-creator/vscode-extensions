@@ -31,16 +31,17 @@ ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()
 PRODUCTION_AREAS: tuple[str, ...] = ("backend", "frontend")
-MIN_EXACT_FUNC_ELOC = 7
+MIN_EXACT_FUNC_ELOC = 5
 MIN_NEAR_CLONE_ELOC = 14
 NEAR_CLONE_JACCARD_THRESHOLD = 0.85
 NEAR_CLONE_MAX_LEN_DELTA = 4
-BLOCK_WINDOW_LINES = 8
-MIN_BLOCK_RAW_CHARS = 140
+BLOCK_WINDOW_LINES = 6
+MIN_BLOCK_RAW_CHARS = 100
 SEPARATOR_LINE_WIDTH = 80
 
 EXEMPT_BOILERPLATE_FUNCS: frozenset[str] = frozenset({
-    "to_dto", "from_dto", "to_dict", "from_dict", "serialize", "deserialize",
+    "to_dto", "from_dto", "to_dict", "from_dict", "to_dictionary", "from_dictionary",
+    "to_save_snapshot", "from_save_snapshot", "serialize", "deserialize",
     "reset_state", "_init", "duplicate", "clone", "_notification", "_ready", "_exit_tree",
 })
 
@@ -241,6 +242,8 @@ def _detect_block_clones(functions: list[NormalizedFunction]) -> list[Finding]:
     """检出函数体内跨文件连续多行逻辑块复制。"""
     window_index: dict[tuple[str, ...], list[tuple[NormalizedFunction, int]]] = collections.defaultdict(list)
     for fn in functions:
+        if fn.name in EXEMPT_BOILERPLATE_FUNCS:
+            continue
         for start_idx in range(max(0, fn.eloc - BLOCK_WINDOW_LINES + 1)):
             raw_slice = fn.raw_lines[start_idx : start_idx + BLOCK_WINDOW_LINES]
             if sum(len(line) for line in raw_slice) >= MIN_BLOCK_RAW_CHARS:

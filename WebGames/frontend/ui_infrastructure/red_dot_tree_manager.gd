@@ -11,7 +11,7 @@ signal red_dot_changed(path: String, count: int)
 static var _instance: RedDotTreeManager
 static func get_instance() -> RedDotTreeManager:
 	if _instance == null:
-		_instance = load("res://frontend/ui_infrastructure/red_dot_tree_manager.gd").new()
+		_instance = RedDotTreeManager.new()
 	return _instance
 
 # 存储各节点的计数值: path -> int
@@ -49,6 +49,15 @@ func reset() -> void:
 	_leaf_counts.clear()
 	_recalculate_tree()
 
+## 将单个叶子计数值沿着点分祖先链自底向上累加（零字符串切片与循环堆拼接）
+static func _accumulate_ancestors(leaf: String, val: int, counts: Dictionary) -> void:
+	counts[leaf] = counts.get(leaf, 0) + val
+	var dot_idx: int = leaf.rfind(".")
+	while dot_idx > 0:
+		var prefix: String = leaf.substr(0, dot_idx)
+		counts[prefix] = counts.get(prefix, 0) + val
+		dot_idx = leaf.rfind(".", dot_idx - 1)
+
 ## 自底向上重新聚合全树节点计数值
 func _recalculate_tree() -> void:
 	var old_counts: Dictionary = _counts.duplicate()
@@ -59,19 +68,7 @@ func _recalculate_tree() -> void:
 		var val: int = int(_leaf_counts[leaf])
 		if val <= 0:
 			continue
-
-		# 自身
-		new_counts[leaf] = new_counts.get(leaf, 0) + val
-
-		# 向所有父前缀贡献值
-		var parts: PackedStringArray = leaf.split(".")
-		var prefix: String = ""
-		for i in range(parts.size() - 1):
-			if i == 0:
-				prefix = parts[0]
-			else:
-				prefix += "." + parts[i]
-			new_counts[prefix] = new_counts.get(prefix, 0) + val
+		_accumulate_ancestors(leaf, val, new_counts)
 
 	_counts = new_counts
 

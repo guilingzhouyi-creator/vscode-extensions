@@ -14,6 +14,7 @@ var screen_id: String = ""
 var navigation_params: Dictionary = {}
 var snapshot: Dictionary = {}
 var ui_state_container: Control = null
+var _owned_subcontroller: Node = null
 
 ## 页面被推入激活时调用
 func on_screen_enter(params: Dictionary = {}) -> void:
@@ -43,6 +44,24 @@ func apply_snapshot(payload: Dictionary) -> void:
 ## 子类渲染映射钩子：只允许将快照字段映射到节点，禁止业务计算与随机判定
 func _render_from_snapshot() -> void:
 	pass
+
+## 注册由本视图独占持有的子控制器（页面销毁时自动安全释放）
+func _register_owned_subcontroller(ctrl: Node) -> Node:
+	_owned_subcontroller = ctrl
+	return ctrl
+
+## 子类扩展清理钩子（销毁前最先触发）
+func _on_predelete_cleanup() -> void:
+	pass
+
+## 根节点销毁时自动清理视图动态绑定与非树上子控制器
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		_on_predelete_cleanup()
+		UIIntermediary.clear_view_bindings(self)
+		if is_instance_valid(_owned_subcontroller) and not _owned_subcontroller.is_inside_tree():
+			_owned_subcontroller.free()
+		_owned_subcontroller = null
 
 ## 懒加载五态容器（Loading / Ready / Empty / Error 与重试回调）
 func get_ui_state_container() -> Control:
@@ -81,3 +100,46 @@ func show_error_state(message: String = "", retry_callback: Callable = Callable(
 		container.set_error_message(message)
 	container.bind_retry_callback(retry_callback)
 	container.set_state(UIStateContainerClass.State.ERROR)
+
+## 通用 K-组件单例/懒加载装配助手（泛化解耦，避免各子面板模板复制）
+func _ensure_page_header(current: Control, header_script: Script, title_key: String, host_view: Control = null) -> Control:
+	if current == null:
+		current = header_script.new() as Control
+		current.set("title_key", title_key)
+		var target_host: Control = host_view if host_view != null else self
+		current.connect("back_pressed", Callable(target_host, "back"))
+	return current
+
+func _ensure_split_panel(current: Control, split_script: Script, ratio: float = 0.35) -> Control:
+	if current == null:
+		current = split_script.new() as Control
+		current.set("left_ratio", ratio)
+	return current
+
+func _ensure_currency_bar(current: Control, bar_script: Script, show_gold: bool = false, show_crystals: bool = false) -> Control:
+	if current == null:
+		current = bar_script.new() as Control
+		if show_gold:
+			current.set("show_gold", true)
+		if show_crystals:
+			current.set("show_crystals", true)
+	return current
+
+func _ensure_search_bar(current: Control, search_script: Script, ph_key: String = "") -> Control:
+	if current == null:
+		current = search_script.new() as Control
+		if not ph_key.is_empty():
+			current.set("placeholder_key", ph_key)
+	return current
+
+func _ensure_state_panel(current: Control, state_script: Script) -> Control:
+	if current == null:
+		current = state_script.new() as Control
+	return current
+
+func _ensure_status_bar(current: Control, bar_script: Script, label_key: String = "") -> Control:
+	if current == null:
+		current = bar_script.new() as Control
+		if not label_key.is_empty():
+			current.set("label_key", label_key)
+	return current

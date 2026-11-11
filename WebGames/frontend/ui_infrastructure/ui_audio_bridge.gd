@@ -21,7 +21,7 @@ signal play_sfx(sfx_type: UISfxType, volume_db: float)
 static var _instance: UIAudioBridge
 static func get_instance() -> UIAudioBridge:
 	if _instance == null:
-		_instance = load("res://frontend/ui_infrastructure/ui_audio_bridge.gd").new()
+		_instance = UIAudioBridge.new()
 	return _instance
 
 func play_hover(volume_db: float = 0.0) -> void:

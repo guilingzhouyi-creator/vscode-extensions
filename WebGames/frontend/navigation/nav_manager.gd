@@ -29,6 +29,9 @@ const MAX_SCENE_CACHE_ENTRIES: int = 24
 ## 转场动效持续时长（秒）
 const TRANSITION_DURATION: float = 0.25
 
+const LOG_LEVEL_WARN: String = "warn"
+const METHOD_ON_SCREEN_EXIT: String = "on_screen_exit"
+
 ## 默认注册 17 个功能视图（R-28：注释计数与实现对齐）
 func _init_default_registry() -> void:
 	register_screen("account_entry", "res://frontend/views/account_entry/account_entry_view.tscn")
@@ -79,7 +82,7 @@ func replace_screen(screen_id: String, params: Dictionary = {}, transition_type:
 ## 弹出并返回上一 Screen（默认 SLIDE_RIGHT 回退动效）
 func pop_screen(transition_type: int = NavTypes.TransitionType.SLIDE_RIGHT) -> Control:
 	if _screen_stack.size() <= 1:
-		EventBusCore.get_instance().emit_log("warn", "NavManager: already at stack bottom, cannot pop")
+		EventBusCore.get_instance().emit_log(LOG_LEVEL_WARN, "NavManager: already at stack bottom, cannot pop")
 		return null
 	var prev_id: String = _screen_stack[_screen_stack.size() - 2]
 	var result := _navigate_to(prev_id, {}, false, transition_type)
@@ -94,7 +97,7 @@ func pop_screen(transition_type: int = NavTypes.TransitionType.SLIDE_RIGHT) -> C
 func _navigate_to(screen_id: String, params: Dictionary, record_history: bool, transition_type: int = NavTypes.TransitionType.NONE) -> Control:
 	if not _screen_registry.has(screen_id):
 		EventBusCore.get_instance().emit_log(
-			"warn",
+			LOG_LEVEL_WARN,
 			TemplateFormatter.format("NavManager: unregistered screen {screen_id}", {"screen_id": screen_id})
 		)
 		return null
@@ -106,7 +109,7 @@ func _navigate_to(screen_id: String, params: Dictionary, record_history: bool, t
 		scene = load(scene_path) as PackedScene
 		if scene == null:
 			EventBusCore.get_instance().emit_log(
-				"warn",
+				LOG_LEVEL_WARN,
 				TemplateFormatter.format("NavManager: failed to load scene {scene_path}", {"scene_path": scene_path})
 			)
 			return null
@@ -115,7 +118,7 @@ func _navigate_to(screen_id: String, params: Dictionary, record_history: bool, t
 	var inst := scene.instantiate() as Control
 	if inst == null:
 		EventBusCore.get_instance().emit_log(
-			"warn",
+			LOG_LEVEL_WARN,
 			TemplateFormatter.format("NavManager: scene root is not Control {scene_path}", {"scene_path": scene_path})
 		)
 		return null
@@ -123,7 +126,7 @@ func _navigate_to(screen_id: String, params: Dictionary, record_history: bool, t
 	# 2. 挂载前置校验（R-04：宿主无效则不入栈、不销毁旧屏，杜绝孤儿节点 + 栈/场景不一致）
 	if _app_root == null or _app_root.screen_container == null:
 		EventBusCore.get_instance().emit_log(
-			"warn",
+			LOG_LEVEL_WARN,
 			TemplateFormatter.format("NavManager: host unbound, navigation rejected for {screen_id}", {"screen_id": screen_id})
 		)
 		inst.queue_free()
@@ -137,11 +140,7 @@ func _navigate_to(screen_id: String, params: Dictionary, record_history: bool, t
 	inst.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	if transition_type == NavTypes.TransitionType.NONE or old_screen == null:
-		# 无动效：立即销毁旧屏（退出钩子 + 延迟释放）
-		if old_screen != null:
-			if old_screen.has_method("on_screen_exit"):
-				old_screen.call("on_screen_exit")
-			old_screen.queue_free()
+		_exit_and_free_screen(old_screen)
 	else:
 		_play_transition(old_screen, inst, transition_type)
 
@@ -153,6 +152,14 @@ func _navigate_to(screen_id: String, params: Dictionary, record_history: bool, t
 		inst.call("on_screen_enter", params)
 
 	return inst
+
+## 统一触发屏幕退出钩子并安全释放
+func _exit_and_free_screen(screen: Control) -> void:
+	if screen == null:
+		return
+	if screen.has_method(METHOD_ON_SCREEN_EXIT):
+		screen.call(METHOD_ON_SCREEN_EXIT)
+	screen.queue_free()
 
 ## 转场动效调度：根据类型派发到具体动效实现，转场结束后自动清理旧屏
 func _play_transition(old_screen: Control, new_screen: Control, transition_type: int) -> void:
@@ -169,9 +176,7 @@ func _play_transition(old_screen: Control, new_screen: Control, transition_type:
 		NavTypes.TransitionType.SLIDE_RIGHT:
 			_play_slide_transition(old_screen, new_screen, false)
 		_:
-			if old_screen.has_method("on_screen_exit"):
-				old_screen.call("on_screen_exit")
-			old_screen.queue_free()
+			_exit_and_free_screen(old_screen)
 
 ## 淡入淡出转场：旧屏淡出 + 新屏淡入（交叉淡入淡出）
 func _play_fade_transition(old_screen: Control, new_screen: Control) -> void:
@@ -180,9 +185,7 @@ func _play_fade_transition(old_screen: Control, new_screen: Control) -> void:
 	_active_transition.tween_property(new_screen, "modulate:a", 1.0, TRANSITION_DURATION)
 	_active_transition.tween_property(old_screen, "modulate:a", 0.0, TRANSITION_DURATION)
 	_active_transition.chain().tween_callback(func():
-		if old_screen.has_method("on_screen_exit"):
-			old_screen.call("on_screen_exit")
-		old_screen.queue_free()
+		_exit_and_free_screen(old_screen)
 	)
 
 ## 滑动转场：旧屏滑出 + 新屏滑入（方向由 slide_left 控制）
@@ -194,9 +197,7 @@ func _play_slide_transition(old_screen: Control, new_screen: Control, slide_left
 	_active_transition.tween_property(old_screen, "position:x", -container_size.x * direction, TRANSITION_DURATION)
 	_active_transition.tween_property(new_screen, "position:x", 0.0, TRANSITION_DURATION)
 	_active_transition.chain().tween_callback(func():
-		if old_screen.has_method("on_screen_exit"):
-			old_screen.call("on_screen_exit")
-		old_screen.queue_free()
+		_exit_and_free_screen(old_screen)
 	)
 
 ## 创建 Tween（通过 app_root 的场景树，确保 process loop 驱动）
