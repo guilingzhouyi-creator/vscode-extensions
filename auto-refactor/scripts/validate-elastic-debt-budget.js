@@ -23,19 +23,20 @@ const path = require('path');
 
 console.log('🚀 [ELASTIC-DEBT-BUDGET] Starting Dynamic Debt Budget Verification Harness...\n');
 
-const {
-  evaluateElasticDebtBudget,
-  computeWeightedDebtPoints,
-} = require('../dist/api');
+const { evaluateElasticDebtBudget, computeWeightedDebtPoints } = require('../dist/api');
 
 // --- [1/7] Testing Zero Debt Permitted Status ---
 console.log('--- [1/7] Testing Zero Debt Permitted Status ---');
 const zeroEval = evaluateElasticDebtBudget(
   { critical: 0, high: 0, medium: 0, low: 0 },
-  { totalFiles: 200, compositeScore: 95.0 }
+  { totalFiles: 200, compositeScore: 95.0 },
 );
 assert.strictEqual(zeroEval.isWithinBudget, true, 'Zero debt must be within budget');
-assert.strictEqual(zeroEval.verdict, 'PERMITTED_ZERO_DEBT', 'Zero debt verdict must be PERMITTED_ZERO_DEBT');
+assert.strictEqual(
+  zeroEval.verdict,
+  'PERMITTED_ZERO_DEBT',
+  'Zero debt verdict must be PERMITTED_ZERO_DEBT',
+);
 assert.strictEqual(zeroEval.violations.length, 0, 'Zero debt must produce 0 violations');
 console.log('✔ Zero debt fully compliant (PERMITTED_ZERO_DEBT).');
 
@@ -46,21 +47,37 @@ const refProject = evaluateElasticDebtBudget({}, { totalFiles: 200 });
 const largeProject = evaluateElasticDebtBudget({}, { totalFiles: 800 });
 const hugeProject = evaluateElasticDebtBudget({}, { totalFiles: 1800 });
 
-assert.strictEqual(smallProject.scaleFactor, 1.0, 'Small project (<200 files) must clamp scale factor to 1.0');
-assert.strictEqual(refProject.scaleFactor, 1.0, 'Reference project (200 files) scale factor must be 1.0');
-assert.strictEqual(largeProject.scaleFactor, 2.0, '800-file project scale factor must be sqrt(800/200) = 2.0');
-assert.strictEqual(hugeProject.scaleFactor, 3.0, '1800-file project scale factor must be sqrt(1800/200) = 3.0');
+assert.strictEqual(
+  smallProject.scaleFactor,
+  1.0,
+  'Small project (<200 files) must clamp scale factor to 1.0',
+);
+assert.strictEqual(
+  refProject.scaleFactor,
+  1.0,
+  'Reference project (200 files) scale factor must be 1.0',
+);
+assert.strictEqual(
+  largeProject.scaleFactor,
+  2.0,
+  '800-file project scale factor must be sqrt(800/200) = 2.0',
+);
+assert.strictEqual(
+  hugeProject.scaleFactor,
+  3.0,
+  '1800-file project scale factor must be sqrt(1800/200) = 3.0',
+);
 
 assert.ok(
   largeProject.dynamicLimits.critical > refProject.dynamicLimits.critical,
-  'Large project must receive larger critical debt allowance than reference project'
+  'Large project must receive larger critical debt allowance than reference project',
 );
 assert.ok(
   largeProject.dynamicLimits.high > refProject.dynamicLimits.high,
-  'Large project must receive larger high debt allowance than reference project'
+  'Large project must receive larger high debt allowance than reference project',
 );
 console.log(
-  `✔ Scale factor validated: 50 files -> ${smallProject.scaleFactor}, 200 files -> ${refProject.scaleFactor}, 800 files -> ${largeProject.scaleFactor}, 1800 files -> ${hugeProject.scaleFactor}.`
+  `✔ Scale factor validated: 50 files -> ${smallProject.scaleFactor}, 200 files -> ${refProject.scaleFactor}, 800 files -> ${largeProject.scaleFactor}, 1800 files -> ${hugeProject.scaleFactor}.`,
 );
 
 // --- [3/7] Testing Health Elasticity Dampening Multipliers ---
@@ -72,14 +89,18 @@ const cEval = evaluateElasticDebtBudget({}, { totalFiles: 200, compositeScore: 8
 const degradedEval = evaluateElasticDebtBudget({}, { totalFiles: 200, compositeScore: 70.0 });
 
 assert.strictEqual(aPlusEval.healthElasticityFactor, 1.25, 'A+ quality (>=98) factor must be 1.25');
-assert.strictEqual(aEval.healthElasticityFactor, 1.10, 'A quality (>=95) factor must be 1.10');
-assert.strictEqual(bEval.healthElasticityFactor, 1.00, 'B quality (>=90) factor must be 1.00');
-assert.strictEqual(cEval.healthElasticityFactor, 0.70, 'C quality (>=80) factor must be 0.70');
-assert.strictEqual(degradedEval.healthElasticityFactor, 0.40, 'Degraded quality (<80) factor must be 0.40');
+assert.strictEqual(aEval.healthElasticityFactor, 1.1, 'A quality (>=95) factor must be 1.10');
+assert.strictEqual(bEval.healthElasticityFactor, 1.0, 'B quality (>=90) factor must be 1.00');
+assert.strictEqual(cEval.healthElasticityFactor, 0.7, 'C quality (>=80) factor must be 0.70');
+assert.strictEqual(
+  degradedEval.healthElasticityFactor,
+  0.4,
+  'Degraded quality (<80) factor must be 0.40',
+);
 
 assert.ok(
   aPlusEval.dynamicLimits.high > degradedEval.dynamicLimits.high,
-  'Healthy project must earn wider elastic envelope than degraded project'
+  'Healthy project must earn wider elastic envelope than degraded project',
 );
 console.log('✔ Health elasticity multipliers verified across all quality score tiers.');
 
@@ -87,47 +108,53 @@ console.log('✔ Health elasticity multipliers verified across all quality score
 console.log('\n--- [4/7] Testing Elastic Non-Zero Allowance for Critical & High Tiers ---');
 const elasticEval = evaluateElasticDebtBudget(
   { critical: 1, high: 2, medium: 5, low: 20 },
-  { totalFiles: 800, compositeScore: 99.0 }
+  { totalFiles: 800, compositeScore: 99.0 },
 );
 
 assert.strictEqual(
   elasticEval.isWithinBudget,
   true,
-  'Critical=1 and High=2 must NOT be vetoed under healthy large codebase envelope'
+  'Critical=1 and High=2 must NOT be vetoed under healthy large codebase envelope',
 );
 assert.strictEqual(
   elasticEval.verdict,
   'PERMITTED_ELASTIC',
-  'Verdict must be PERMITTED_ELASTIC rather than failure'
+  'Verdict must be PERMITTED_ELASTIC rather than failure',
 );
 assert.strictEqual(elasticEval.violations.length, 0, 'No violations should occur within allowance');
 console.log(
-  `✔ Non-one-vote-veto verified: Critical=1/5, High=2/12 permitted under elastic envelope.`
+  `✔ Non-one-vote-veto verified: Critical=1/5, High=2/12 permitted under elastic envelope.`,
 );
 
 // --- [5/7] Testing Circuit Breaker on Exceeded Budget ---
 console.log('\n--- [5/7] Testing Circuit Breaker on Exceeded Dynamic Budget ---');
 const breachedEval = evaluateElasticDebtBudget(
   { critical: 10, high: 25 },
-  { totalFiles: 800, compositeScore: 99.0 }
+  { totalFiles: 800, compositeScore: 99.0 },
 );
 
 assert.strictEqual(breachedEval.isWithinBudget, false, 'Over-budget debt must be blocked');
 assert.strictEqual(
   breachedEval.verdict,
   'BLOCKED_EXCEEDED_BUDGET',
-  'Verdict must be BLOCKED_EXCEEDED_BUDGET'
+  'Verdict must be BLOCKED_EXCEEDED_BUDGET',
 );
 assert.ok(breachedEval.violations.length >= 2, 'Must report violations for both critical and high');
 const violationTiers = breachedEval.violations.map((v) => v.tier);
 assert.ok(violationTiers.includes('critical'), 'Must include critical tier violation');
 assert.ok(violationTiers.includes('high'), 'Must include high tier violation');
-console.log(`✔ Circuit breaker successfully blocked over-budget debt: ${breachedEval.violations.length} violations reported.`);
+console.log(
+  `✔ Circuit breaker successfully blocked over-budget debt: ${breachedEval.violations.length} violations reported.`,
+);
 
 // --- [6/7] Testing Composite Weighted Growth Enforcement ---
 console.log('\n--- [6/7] Testing Composite Weighted Growth Enforcement ---');
 const points = computeWeightedDebtPoints({ critical: 2, high: 5, medium: 20, low: 50 });
-assert.strictEqual(points, 2 * 10 + 5 * 3 + 20 * 1 + 50 * 0.2, 'Weighted points formula must match contract');
+assert.strictEqual(
+  points,
+  2 * 10 + 5 * 3 + 20 * 1 + 50 * 0.2,
+  'Weighted points formula must match contract',
+);
 
 const growthBreachEval = evaluateElasticDebtBudget(
   { critical: 2, high: 4, medium: 30, low: 50 },
@@ -135,14 +162,20 @@ const growthBreachEval = evaluateElasticDebtBudget(
     totalFiles: 800,
     compositeScore: 99.0,
     maxWeightedGrowth: 40,
-  }
+  },
 );
-assert.strictEqual(growthBreachEval.isWithinBudget, false, 'Excessive composite growth must trigger breach');
+assert.strictEqual(
+  growthBreachEval.isWithinBudget,
+  false,
+  'Excessive composite growth must trigger breach',
+);
 const hasGrowthViolation = growthBreachEval.violations.some((v) =>
-  v.message.includes('Composite weighted debt growth')
+  v.message.includes('Composite weighted debt growth'),
 );
 assert.ok(hasGrowthViolation, 'Must record composite weighted debt growth violation');
-console.log('✔ Composite weighted growth limiter correctly protects against cumulative debt creep.');
+console.log(
+  '✔ Composite weighted growth limiter correctly protects against cumulative debt creep.',
+);
 
 // --- [7/7] Testing Delta Additions Against Baseline ---
 console.log('\n--- [7/7] Testing Incremental Delta Evaluation Against Baseline ---');
