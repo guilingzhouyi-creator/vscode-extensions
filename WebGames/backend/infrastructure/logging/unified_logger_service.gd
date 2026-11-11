@@ -64,38 +64,38 @@ var _mute_console: bool = false
 var _is_standalone_mode: bool = true
 
 ## 构造：注入消息模板目录与最低过滤等级
-func _init(p_catalog: Dictionary = {}, p_min_level: Severity = Severity.INFO) -> void:
-	_message_catalog = p_catalog.duplicate(true)
-	_min_severity = p_min_level
+func _init(catalog: Dictionary = {}, min_level: Severity = Severity.INFO) -> void:
+	_message_catalog = catalog.duplicate(true)
+	_min_severity = min_level
 
 ## 设置控制台与日志链路的最低输出日志级别
-func set_min_severity(p_sev: Severity) -> void:
-	_min_severity = p_sev
+func set_min_severity(severity_level: Severity) -> void:
+	_min_severity = severity_level
 
 ## 设置是否静音屏蔽控制台的标准输出
-func set_mute_console(p_mute: bool) -> void:
-	_mute_console = p_mute
+func set_mute_console(mute_console: bool) -> void:
+	_mute_console = mute_console
 
 ## 设置是否以独立单机模式运行日志管道
-func set_standalone_mode(p_sp: bool) -> void:
-	_is_standalone_mode = p_sp
+func set_standalone_mode(is_standalone: bool) -> void:
+	_is_standalone_mode = is_standalone
 
 ## 挂载外部高吞吐环形缓冲区
-func set_ring_buffer(p_buf: Object) -> void:
-	_ring_buffer = p_buf
+func set_ring_buffer(ring_buffer: Object) -> void:
+	_ring_buffer = ring_buffer
 
 ## 挂载遥测度量指标收集接收器
-func set_metric_sink(p_sink: Object) -> void:
-	_metric_sink = p_sink
+func set_metric_sink(metric_sink: Object) -> void:
+	_metric_sink = metric_sink
 
 ## 获取日志服务已注册的事件目录字典
 func get_catalog() -> Dictionary:
 	return _message_catalog
 
 ## 加载配置表模板库
-func load_catalog_from_dict(p_config: Dictionary) -> void:
-	if p_config.has("events") and p_config["events"] is Dictionary:
-		var evs: Dictionary = p_config["events"]
+func load_catalog_from_dict(catalog_config: Dictionary) -> void:
+	if catalog_config.has("events") and catalog_config["events"] is Dictionary:
+		var evs: Dictionary = catalog_config["events"]
 		for code in evs:
 			_message_catalog[str(code)] = str(evs[code])
 
@@ -109,26 +109,26 @@ func load_from_game_config() -> void:
 
 ## 记录日志统一核心 API
 func log_event(
-	p_code: String,
-	p_domain: String,
-	p_severity: Severity,
-	p_params: Dictionary = {},
-	p_correlation_id: String = ""
+	event_code: String,
+	domain_name: String,
+	severity_level: Severity,
+	event_params: Dictionary = {},
+	correlation_id: String = ""
 ) -> LogRecord:
-	if p_severity < _min_severity:
+	if severity_level < _min_severity:
 		return null
 	
 	var default_template: String = "[{code}] Event occurred in domain {domain}."
-	var template: String = str(_message_catalog.get(p_code, default_template))
-	var formatted_msg: String = _format_message(template, p_params, p_code, p_domain)
+	var template: String = str(_message_catalog.get(event_code, default_template))
+	var formatted_msg: String = _format_message(template, event_params, event_code, domain_name)
 	
 	var rec := LogRecord.new()
-	rec.event_code = p_code
-	rec.domain = p_domain
-	rec.severity = p_severity
+	rec.event_code = event_code
+	rec.domain = domain_name
+	rec.severity = severity_level
 	rec.timestamp = Time.get_unix_time_from_system()
-	rec.correlation_id = p_correlation_id
-	rec.context = p_params.duplicate(true)
+	rec.correlation_id = correlation_id
+	rec.context = event_params.duplicate(true)
 	rec.message = formatted_msg
 	
 	_dispatch_record(rec)
@@ -139,61 +139,59 @@ func log_event(
 # ==============================================================================
 
 ## 尝试广播至网络 RPC（受单机隔离保护拦截）
-func try_dispatch_to_network_rpc(p_rec: LogRecord) -> bool:
+func try_dispatch_to_network_rpc(log_record: LogRecord) -> bool:
 	if _is_standalone_mode:
 		# 单机模式严格阻断向网络发送本地日志
 		return false
-	return p_rec != null
+	return log_record != null
 
-## 模板占位符格式化
-func _format_message(p_tpl: String, p_params: Dictionary, p_code: String, p_domain: String) -> String:
-	var msg: String = p_tpl
-	msg = msg.replace("{code}", p_code)
-	msg = msg.replace("{domain}", p_domain)
-	for k in p_params:
-		msg = msg.replace("{" + str(k) + "}", str(p_params[k]))
-	return msg
+## 模板占位符格式化（统一委托底层 TemplateFormatter 执行英文占位符动态注入）
+func _format_message(template_str: String, event_params: Dictionary, event_code: String, domain_name: String) -> String:
+	var params: Dictionary = event_params.duplicate(true)
+	params["code"] = event_code
+	params["domain"] = domain_name
+	return TemplateFormatter.format(template_str, params)
 
 ## 多路分发输出 Sink（收敛至统一管线）
-func _dispatch_record(p_rec: LogRecord) -> void:
+func _dispatch_record(log_record: LogRecord) -> void:
 	# 1. 内存有界环形缓冲（注入式或回退至 LogRingBuffer 统一缓冲）
 	if _ring_buffer != null and _ring_buffer.has_method("push_record"):
-		_ring_buffer.call("push_record", p_rec.to_dict())
+		_ring_buffer.call("push_record", log_record.to_dict())
 	else:
 		# 回退：委托至统一结构化日志缓冲（避免双轨分流）
 		var srec := StructuredLogRecord.new()
-		srec.level = _map_severity_to_level(p_rec.severity)
-		srec.channel = p_rec.domain
-		srec.message = p_rec.message
-		srec.error_code = p_rec.event_code
-		srec.trace_id = p_rec.correlation_id
-		var redacted := RedactionRule.apply(p_rec.context)
+		srec.level = _map_severity_to_level(log_record.severity)
+		srec.channel = log_record.domain
+		srec.message = log_record.message
+		srec.error_code = log_record.event_code
+		srec.trace_id = log_record.correlation_id
+		var redacted := RedactionRule.apply(log_record.context)
 		srec.context = redacted["dict"]
-		srec.timestamp_utc = int(p_rec.timestamp)
-		srec.event_category = p_rec.domain
+		srec.timestamp_utc = int(log_record.timestamp)
+		srec.event_category = log_record.domain
 		# 经 Redaction 校验后统一落盘、入环与遥测
 		LogFileExporter.consume(srec)
 		LogRingBuffer.append(srec)
 		TelemetryAggregate.consume(srec)
 		if _metric_sink != null and _metric_sink.has_method("record_metric"):
-			_metric_sink.call("record_metric", "log_event_count", "LOG_VOLUME", 1.0, {"domain": p_rec.domain, "severity": _get_severity_name(p_rec.severity)})
+			_metric_sink.call("record_metric", "log_event_count", "LOG_VOLUME", 1.0, {"domain": log_record.domain, "severity": _get_severity_name(log_record.severity)})
 	
 	# 2. 控制台输出格式化
 	if not _mute_console:
-		var sev_name: String = _get_severity_name(p_rec.severity)
+		var sev_name: String = _get_severity_name(log_record.severity)
 		var formatted_line: String = "[%s][%s][%s] %s" % [
 			sev_name,
-			p_rec.domain,
-			p_rec.event_code,
-			p_rec.message
+			log_record.domain,
+			log_record.event_code,
+			log_record.message
 		]
-		if p_rec.severity >= Severity.ERROR:
+		if log_record.severity >= Severity.ERROR:
 			printerr(formatted_line)
 		else:
 			print_rich(formatted_line)
 
-func _map_severity_to_level(p_sev: Severity) -> String:
-	match p_sev:
+func _map_severity_to_level(severity_level: Severity) -> String:
+	match severity_level:
 		Severity.TRACE: return "DEBUG"
 		Severity.DEBUG: return "DEBUG"
 		Severity.INFO: return "INFO"
@@ -202,8 +200,8 @@ func _map_severity_to_level(p_sev: Severity) -> String:
 		Severity.CRITICAL: return "ERROR"
 		_: return "INFO"
 
-func _get_severity_name(p_sev: Severity) -> String:
-	match p_sev:
+func _get_severity_name(severity_level: Severity) -> String:
+	match severity_level:
 		Severity.TRACE: return "TRACE"
 		Severity.DEBUG: return "DEBUG"
 		Severity.INFO: return "INFO"

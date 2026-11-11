@@ -174,9 +174,9 @@ static func _ensure_table_loaded_jit(table_name: String) -> void:
 	if catalog != null and catalog.has_method(METHOD_RESOLVE_CONFIG_TABLE_ENTRY):
 		var entry = catalog.resolve_config_table_entry(target_name)
 		if entry != null and not str(entry.physical_path).is_empty():
-			var p_kdat := str(entry.physical_path).trim_suffix(EXT_JSON) + EXT_KDAT
-			if FileAccess.file_exists(p_kdat):
-				_load_table(p_kdat, target_name)
+			var path_kdat := str(entry.physical_path).trim_suffix(EXT_JSON) + EXT_KDAT
+			if FileAccess.file_exists(path_kdat):
+				_load_table(path_kdat, target_name)
 				return
 			elif FileAccess.file_exists(entry.physical_path):
 				_load_table(entry.physical_path, target_name)
