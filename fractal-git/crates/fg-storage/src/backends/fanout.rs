@@ -77,7 +77,7 @@ pub fn binary_search_oid_table(
     stride: usize,
     low: usize,
     high: usize,
-    target: &[u8; OID_LEN],
+    target: &[u8],
 ) -> Option<usize> {
     let mut left = low;
     let mut right = high;
@@ -85,7 +85,7 @@ pub fn binary_search_oid_table(
         let mid = left + (right - left) / 2;
         let start = table_start.checked_add(mid.checked_mul(stride)?)?;
         let candidate = bytes.get(start..start + OID_LEN)?;
-        match candidate.cmp(&target[..]) {
+        match candidate.cmp(target) {
             std::cmp::Ordering::Less => left = mid + 1,
             std::cmp::Ordering::Greater => right = mid,
             std::cmp::Ordering::Equal => return Some(mid),
