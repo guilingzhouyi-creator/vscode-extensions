@@ -599,3 +599,36 @@ fn timing_extension_misnomer_and_intent_prefix_are_rejected() {
         "disallowed intent prefix 希望能 must be rejected: {err_intent}"
     );
 }
+
+#[test]
+fn frozen_project_lease_is_rejected_at_storage_boundary() {
+    let temp_dir = std::env::temp_dir().join(format!("taxis_frozen_lease_{}", std::process::id()));
+    let git_projects = temp_dir.join(".git").join("projects");
+    let _ = std::fs::create_dir_all(&git_projects);
+    let cache_json = r#"{
+      "schema": "project-lease-cache/v1",
+      "leases": {
+        "fractal-git": {
+          "id": "fractal-git",
+          "root_path": "fractal-git",
+          "status": "Frozen",
+          "master_ttl_seconds": 604800,
+          "last_activity_unix_seconds": 1000
+        }
+      }
+    }"#;
+    std::fs::write(git_projects.join("active_projects.json"), cache_json)
+        .expect("write lease cache");
+
+    let mut violations = Vec::new();
+    let declared = vec!["fractal-git".to_string()];
+    fg_gate::commit_guard::project::check_project_leases_at(&temp_dir, &declared, &mut violations);
+    let _ = std::fs::remove_dir_all(&temp_dir);
+
+    assert!(
+        violations
+            .iter()
+            .any(|v| v.contains("FGT-MSG-007") && v.contains("Frozen")),
+        "Frozen project lease must be rejected: {violations:?}"
+    );
+}

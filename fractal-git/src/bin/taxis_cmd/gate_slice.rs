@@ -3,15 +3,17 @@
 //! Architecture Role: Evaluates two-tier 5D ELOC differential bounds and empirical admission on staged changes.
 //! Domain Governance Rules: FGT-GAT-001, FGT-PRF-001.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
+use std::path::Path;
 
 use fg_algorithms::diff::eloc_5d::evaluate_file_diff_5d_eloc;
-use fg_core::models::Oid;
+use fg_core::models::{FileMode, IndexStage, Oid};
 use fg_gate::diff_bounds::{
     CommitBatchTotals, DiffBoundsGovernor, DiffBoundsVerdict, SingleFile5dBounds,
     DELETION_TURNOVER_WEIGHT,
 };
+use fg_native::RepoDocument;
 
 use super::common::{find_all_arg_values, print_json, CliContext};
 use super::repo_view::RepoView;
@@ -29,42 +31,55 @@ struct EvaluatedSliceEntry {
 /// Dispatches the `taxis gate-slice` command.
 pub fn handle_gate_slice(ctx: &CliContext) {
     let cli_file_arguments = find_all_arg_values(&ctx.args, &["--file", "-f"]);
-    let candidate_file_paths: Vec<String> = if !cli_file_arguments.is_empty() {
-        cli_file_arguments.into_iter().map(String::from).collect()
-    } else {
-        super::commit::collect_staged_files(ctx)
-    };
+    let staged_only_mode = ctx.args.iter().any(|arg| arg == "--staged");
+    let source_is_cli = !cli_file_arguments.is_empty();
+
     let repo_view = RepoView::open(ctx).ok();
-    let work_root = super::repo_view::resolve_work_root(&ctx.git_dir);
+    let work_root = repo_view
+        .as_ref()
+        .map(|view| view.work_root().to_path_buf())
+        .unwrap_or_else(|| super::repo_view::resolve_work_root(&ctx.git_dir));
+
     let (_, head_tree) = load_head_tree(repo_view.as_ref());
-    let mut evaluated_entries = Vec::with_capacity(candidate_file_paths.len());
-    for file_path in &candidate_file_paths {
-        if !is_auditable_code_file(file_path) {
-            continue;
-        }
-        let new_bytes = fs::read(work_root.join(file_path)).ok();
-        let old_bytes = read_tree_blob_bytes(repo_view.as_ref(), head_tree.get(file_path));
-        if let Some(entry) = build_evaluated_slice_entry(
-            file_path.clone(),
-            !head_tree.contains_key(file_path),
-            old_bytes.as_deref(),
-            new_bytes.as_deref(),
-        ) {
-            evaluated_entries.push(entry);
-        }
-    }
-    if evaluated_entries.is_empty() {
+    let index_map = load_active_index_map(&ctx.git_dir);
+
+    let slice_entries = if source_is_cli {
+        collect_cli_slice_entries(
+            &cli_file_arguments,
+            staged_only_mode,
+            &work_root,
+            repo_view.as_ref(),
+            &head_tree,
+            &index_map,
+        )
+    } else {
+        collect_staged_slice_entries(&head_tree, &index_map, repo_view.as_ref())
+    };
+
+    if slice_entries.is_empty() {
         emit_empty_slice_pass(ctx);
         return;
     }
-    let batch_totals = compute_batch_totals(&evaluated_entries);
-    let governor_inputs: Vec<(&str, SingleFile5dBounds, bool)> = evaluated_entries
+
+    fg_core::diag_info!(
+        "gate_slice",
+        "evaluating {} file(s) from {}",
+        slice_entries.len(),
+        if source_is_cli { "cli" } else { "index" }
+    );
+
+    let batch_totals = compute_batch_totals(&slice_entries);
+    let governor_inputs: Vec<(&str, SingleFile5dBounds, bool)> = slice_entries
         .iter()
         .map(|entry| (entry.path.as_str(), entry.bounds, false))
         .collect();
-    let verdict = DiffBoundsGovernor::evaluate_with_witnesses(&governor_inputs, &batch_totals, &[]);
-    report_slice_verdict(ctx, &verdict, &batch_totals, evaluated_entries.len());
-    if !verdict.is_admitted {
+
+    let governance_verdict: DiffBoundsVerdict =
+        DiffBoundsGovernor::evaluate_with_witnesses(&governor_inputs, &batch_totals, &[]);
+
+    report_slice_verdict(ctx, &governance_verdict, &batch_totals, slice_entries.len());
+
+    if !governance_verdict.is_admitted {
         std::process::exit(1);
     }
 }
@@ -109,6 +124,148 @@ fn load_head_tree(repo_view: Option<&RepoView>) -> (Option<Oid>, BTreeMap<String
     (Some(oid), tree)
 }
 
+/// Loads stage-0 entries from `.git/index` or falls back to the native container index section.
+fn load_active_index_map(git_dir: &Path) -> BTreeMap<String, (Oid, FileMode)> {
+    let mut index_map = BTreeMap::new();
+    let index_file = git_dir.join("index");
+    if index_file.is_file() {
+        if let Ok(git_index) = fg_index::GitIndex::load(&index_file) {
+            for entry in git_index.entries() {
+                if entry.stage == IndexStage::Normal {
+                    index_map.insert(normalize_repo_path(&entry.path), (entry.oid, entry.mode));
+                }
+            }
+        }
+        return index_map;
+    }
+
+    let container_path = fg_native::container_path(git_dir);
+    if container_path.is_file() {
+        if let Ok(doc) = RepoDocument::load(&container_path) {
+            for entry in doc.indx.entries() {
+                if entry.stage == IndexStage::Normal {
+                    index_map.insert(normalize_repo_path(&entry.path), (entry.oid, entry.mode));
+                }
+            }
+        }
+    }
+    index_map
+}
+
+/// Collects differential deltas for staged auditable code files comparing Index against `HEAD`.
+fn collect_staged_slice_entries(
+    head_tree: &BTreeMap<String, TreeEntry>,
+    index_map: &BTreeMap<String, (Oid, FileMode)>,
+    repo_view: Option<&RepoView>,
+) -> Vec<EvaluatedSliceEntry> {
+    let candidate_paths = collect_changed_index_paths(head_tree, index_map);
+    let mut entries = Vec::with_capacity(candidate_paths.len());
+    for rel_path in candidate_paths {
+        if !is_auditable_code_file(&rel_path) {
+            continue;
+        }
+        if let Some(evaluated) = evaluate_staged_pair(&rel_path, head_tree, index_map, repo_view) {
+            entries.push(evaluated);
+        }
+    }
+    entries
+}
+
+/// Collects differential deltas for explicit `--file`/`-f` CLI targets against `HEAD`.
+fn collect_cli_slice_entries(
+    cli_paths: &[&str],
+    staged_only_mode: bool,
+    work_root: &Path,
+    repo_view: Option<&RepoView>,
+    head_tree: &BTreeMap<String, TreeEntry>,
+    index_map: &BTreeMap<String, (Oid, FileMode)>,
+) -> Vec<EvaluatedSliceEntry> {
+    let mut unique_paths = BTreeSet::new();
+    for raw_path in cli_paths {
+        let normalized = normalize_repo_path(raw_path);
+        if !normalized.is_empty() {
+            unique_paths.insert(normalized);
+        }
+    }
+    let mut entries = Vec::with_capacity(unique_paths.len());
+    for rel_path in unique_paths {
+        if let Some(evaluated) = evaluate_cli_target(
+            rel_path,
+            staged_only_mode,
+            work_root,
+            repo_view,
+            head_tree,
+            index_map,
+        ) {
+            entries.push(evaluated);
+        }
+    }
+    entries
+}
+
+/// Collects all paths whose Index entry differs from the `HEAD` tree.
+fn collect_changed_index_paths(
+    head_tree: &BTreeMap<String, TreeEntry>,
+    index_map: &BTreeMap<String, (Oid, FileMode)>,
+) -> Vec<String> {
+    let mut changed = Vec::new();
+    for (path, (idx_oid, idx_mode)) in index_map {
+        let unchanged = head_tree
+            .get(path)
+            .is_some_and(|head_entry| head_entry.oid == *idx_oid && head_entry.mode == *idx_mode);
+        if !unchanged {
+            changed.push(path.clone());
+        }
+    }
+    for path in head_tree.keys() {
+        if !index_map.contains_key(path) {
+            changed.push(path.clone());
+        }
+    }
+    changed
+}
+
+/// Evaluates a staged path by comparing its Index blob payload against its `HEAD` blob payload.
+fn evaluate_staged_pair(
+    rel_path: &str,
+    head_tree: &BTreeMap<String, TreeEntry>,
+    index_map: &BTreeMap<String, (Oid, FileMode)>,
+    repo_view: Option<&RepoView>,
+) -> Option<EvaluatedSliceEntry> {
+    let old_bytes = read_tree_blob_bytes(repo_view, head_tree.get(rel_path));
+    let new_bytes = read_index_blob_bytes(repo_view, index_map.get(rel_path));
+    build_evaluated_slice_entry(
+        rel_path.to_string(),
+        !head_tree.contains_key(rel_path),
+        old_bytes.as_deref(),
+        new_bytes.as_deref(),
+    )
+}
+
+/// Evaluates a CLI-specified file target from staged Index or worktree against `HEAD`.
+fn evaluate_cli_target(
+    rel_path: String,
+    staged_only_mode: bool,
+    work_root: &Path,
+    repo_view: Option<&RepoView>,
+    head_tree: &BTreeMap<String, TreeEntry>,
+    index_map: &BTreeMap<String, (Oid, FileMode)>,
+) -> Option<EvaluatedSliceEntry> {
+    let old_bytes = read_tree_blob_bytes(repo_view, head_tree.get(&rel_path));
+    let new_bytes = if staged_only_mode {
+        read_index_blob_bytes(repo_view, index_map.get(&rel_path))
+    } else {
+        fs::read(work_root.join(&rel_path)).ok()
+    };
+    let is_new_file = !head_tree.contains_key(&rel_path);
+    build_evaluated_slice_entry(
+        rel_path,
+        is_new_file,
+        old_bytes.as_deref(),
+        new_bytes.as_deref(),
+    )
+}
+
 /// Reads raw blob payload from a flattened tree entry, excluding gitlinks.
 fn read_tree_blob_bytes(
     repo_view: Option<&RepoView>,
@@ -117,6 +274,16 @@ fn read_tree_blob_bytes(
     let view = repo_view?;
     let tree_entry = entry?;
     view.payload_for(tree_entry.mode, &tree_entry.oid).ok()
+}
+
+/// Reads raw blob payload from a staged index entry, excluding gitlinks.
+fn read_index_blob_bytes(
+    repo_view: Option<&RepoView>,
+    entry: Option<&(Oid, FileMode)>,
+) -> Option<Vec<u8>> {
+    let view = repo_view?;
+    let (oid, mode) = entry?;
+    view.payload_for(*mode, oid).ok()
 }
 
 /// Computes incremental 5D ELOC delta between two optional raw byte slices.
@@ -213,6 +380,15 @@ fn is_auditable_code_file(rel_path: &str) -> bool {
         lower_ext.as_str(),
         "ts" | "tsx" | "js" | "jsx" | "rs" | "gd" | "py" | "sh" | "bash" | "ps1"
     )
+}
+
+/// Normalizes repository-relative paths to forward-slash notation.
+fn normalize_repo_path(raw_path: &str) -> String {
+    let trimmed = raw_path
+        .trim()
+        .trim_start_matches("./")
+        .trim_start_matches(".\\");
+    trimmed.replace('\\', "/")
 }
 
 /// Emits slice gate verdict in JSON or human-readable terminal format.
