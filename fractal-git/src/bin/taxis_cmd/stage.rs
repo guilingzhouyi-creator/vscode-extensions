@@ -23,6 +23,8 @@ use fg_core::constants::git::OBJ_BLOB;
 use fg_core::models::{FileMode, IndexStage, Oid};
 use fg_core::traits::OdbStore;
 use fg_index::{AttributeSet, IgnoreMatcher, IndexEntry};
+use fg_topology::DiskBlackboardStore;
+use fractal_git::constants::cli::CliTag;
 use fractal_git::LooseOdb;
 
 use super::checkout::{load_index_entries, plan_worktree_path, update_dirc_index, worktree_stat};
@@ -73,6 +75,11 @@ pub fn handle_add(ctx: &CliContext) {
         Ok(rebased) => rebased,
         Err(reason) => fail_fatal(reason),
     };
+    for spec in &options.pathspecs {
+        if spec != "." && !spec.is_empty() {
+            assert_blackboard_write_permitted(view.git_dir(), spec);
+        }
+    }
     let mut index_map = load_index_entries(view.git_dir());
     let matcher = match view.ignore_matcher() {
         Ok(loaded) => loaded,
@@ -324,12 +331,39 @@ fn has_tracked_under(tracked: &BTreeSet<String>, dir_rel: &str) -> bool {
         .is_some_and(|first| first.starts_with(&prefix))
 }
 
+/// Asserts that writing to `rel_path` is permitted by active blackboard leases.
+fn assert_blackboard_write_permitted(git_dir: &Path, rel_path: &str) {
+    let store = DiskBlackboardStore::new(git_dir);
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0);
+    let agent = std::env::var("TAXIS_AGENT_ID").ok();
+    let cell = std::env::var("TAXIS_CELL_ID").ok();
+    if let Ok(Some(collision)) =
+        store.assert_write_permitted(rel_path, agent.as_deref(), cell.as_deref(), now_ms)
+    {
+        super::common::reject(
+            CliTag::VERIFY_FAIL,
+            format!(
+                "Intent conflict detected: scope '{}' in '{}' is already claimed by agent '{}' (lease: {}, remaining TTL: {}s)",
+                collision.scope_id,
+                collision.file_path,
+                collision.conflicting_agent,
+                collision.conflicting_lease_id,
+                collision.remaining_ttl_seconds
+            ),
+        );
+    }
+}
+
 /// Hashes one working-tree file, writes its blob to the ODB, and updates `index_map`.
 fn stage_single_file(
     s_ctx: &StageContext<'_>,
     rel_path: &str,
     index_map: &mut BTreeMap<String, IndexEntry>,
 ) {
+    assert_blackboard_write_permitted(s_ctx.view.git_dir(), rel_path);
     let full_path = match plan_worktree_path(s_ctx.view.work_root(), rel_path) {
         Ok(planned) => planned,
         Err(detail) => fail_fatal(detail),

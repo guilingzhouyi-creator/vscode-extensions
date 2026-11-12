@@ -32,6 +32,7 @@ use fg_object::GitCommit;
 use fg_storage::commit_materializer::{persist_commit_object, persist_index_tree};
 use fg_storage::LooseOdb;
 use fg_topology::conflict_tree::{ConflictSlice, ConflictTreeManager};
+use fg_topology::DiskBlackboardStore;
 use fractal_git::constants::cli::CliTag;
 
 use super::checkout::{
@@ -265,6 +266,37 @@ fn handle_merge_abort(view: &RepoView) {
     println!("Merge aborted.");
 }
 
+/// Asserts that none of the merge target files collide with active blackboard leases.
+fn assert_blackboard_merge_permitted(
+    git_dir: &std::path::Path,
+    files: &BTreeMap<String, TreeEntry>,
+) {
+    let store = DiskBlackboardStore::new(git_dir);
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0);
+    let agent = std::env::var("TAXIS_AGENT_ID").ok();
+    let cell = std::env::var("TAXIS_CELL_ID").ok();
+    for path in files.keys() {
+        if let Ok(Some(collision)) =
+            store.assert_write_permitted(path, agent.as_deref(), cell.as_deref(), now_ms)
+        {
+            reject(
+                CliTag::VERIFY_FAIL,
+                format!(
+                    "Intent conflict detected: scope '{}' in '{}' is already claimed by agent '{}' (lease: {}, remaining TTL: {}s)",
+                    collision.scope_id,
+                    collision.file_path,
+                    collision.conflicting_agent,
+                    collision.conflicting_lease_id,
+                    collision.remaining_ttl_seconds
+                ),
+            );
+        }
+    }
+}
+
 /// Executes a fast-forward merge by directly pointing HEAD at the target commit.
 fn execute_fast_forward(
     view: &RepoView,
@@ -291,6 +323,7 @@ fn execute_fast_forward(
         reject(CliTag::ERROR, diff_err);
     }
 
+    assert_blackboard_merge_permitted(view.git_dir(), &new_files);
     remove_stale_files(view.work_root(), &current_files, &new_files);
     let index_entries = materialize_files(view, &new_files);
     update_dirc_index(view.git_dir(), &index_entries);
@@ -591,6 +624,7 @@ fn finish_clean_merge(m_ctx: &CleanMergeContext<'_>, merged_tree: &BTreeMap<Stri
     let commit_oid = persist_commit_object(&commit, &odb)
         .unwrap_or_else(|err| fail_io("persist merge commit", err));
 
+    assert_blackboard_merge_permitted(m_ctx.view.git_dir(), &new_files);
     remove_stale_files(m_ctx.view.work_root(), m_ctx.ours_files, &new_files);
     let index_entries = materialize_files(m_ctx.view, &new_files);
     update_dirc_index(m_ctx.view.git_dir(), &index_entries);
