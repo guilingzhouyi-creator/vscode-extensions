@@ -37,6 +37,7 @@ function assertReviewPath(root: string, filePath: string): void {
  * @param root - Root used for lexical and canonical filesystem confinement.
  * @returns The exact supplied content or decoded UTF-8 source.
  * @throws Native filesystem errors, path confinement errors, or INVALID_ENCODING.
+ * ASYNC-CONCURRENCY: read-only; both reads are awaited together and no shared state is touched.
  */
 export async function readPraxisFileContent(
     filePath: string,

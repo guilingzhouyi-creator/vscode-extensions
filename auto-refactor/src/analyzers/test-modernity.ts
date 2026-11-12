@@ -769,9 +769,6 @@ export class TestModernityAnalyzer implements Analyzer {
 
     /**
      * Appends a diagnostic test smell site record if any non-conforming anti-pattern is flagged.
-     *
-     * @param params - Smell site parameters including line coordinates and smell indicators.
-     * @param sites - Mutable collection of test site records.
      */
     private recordSiteIfSmell(
         params: {

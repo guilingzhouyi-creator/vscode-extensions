@@ -61,7 +61,7 @@ function computeMaxBranchDepth(node: NormalizedNode, currentDepth = 0): number {
 /**
  * Check if the function declaration has documentation or structured contract annotation.
  *
- * @param content - Entire source file text.
+ * @param ctx - Analyzer context holding the source text.
  * @param startLine - Starting line number of the function (1-based).
  * @returns Contract presence and explicit dispatch annotation indicators.
  */

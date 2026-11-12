@@ -318,7 +318,6 @@ export type CyclePassLogger = { info: (msg: string) => void };
 
 /**
  * Post-scan pass reporting import cycles and, when enabled, unused modules/exports.
- * Concurrency: Thread-safe async analysis pass operating on independent AST structures.
  *
  * @param report - Scan report whose file metrics define the analyzed file set.
  * @param config - Resolved scan configuration.
@@ -326,6 +325,7 @@ export type CyclePassLogger = { info: (msg: string) => void };
  * @param prebuilt - Dependency graph reused from an earlier pass.
  * @param snapshotSource - Exact fixed input text; omitted retains directory file reads.
  * @returns Detected issues plus any diagnostic warnings.
+ * ASYNC-CONCURRENCY: read-only over report and graph; issues and warnings are call-local.
  */
 export async function runCyclePass(
     report: ScanReport,

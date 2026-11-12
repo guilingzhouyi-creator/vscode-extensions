@@ -265,6 +265,8 @@ async function writeOutputToFile(destinationFilePath: string, content: string): 
  *
  * @param args CLI argument tokens.
  * @returns Result object containing text presentation and exit code.
+ * ASYNC-CONCURRENCY: stateless over the ledger; concurrent runs meet only on the caller-chosen
+ * output file.
  */
 export async function executeTrajectoryCommand(
     args: string[],

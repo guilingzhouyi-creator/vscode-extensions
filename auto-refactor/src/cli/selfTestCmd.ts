@@ -321,13 +321,15 @@ function collectFalsePositives(issues: readonly ScanReport['issues'][number][]):
 /**
  * Executes built-in end-to-end self-test suite on synthetic fixtures.
  *
- * Two directions are asserted. Every `EXPECTED_PAIRS` entry must fire (no silent analyzer
+ * Two directions are asserted: every `EXPECTED_PAIRS` entry must fire (no silent analyzer
  * regression), and no rule in `CLEAN_RULE_ALLOWLIST` may fire on the negative-control fixture
- * (no silent over-matching). Only the first direction existed before, which is exactly the
- * blind spot that let the fixture rot unnoticed while the gate stayed green.
+ * (no silent over-matching). Only the first existed before, which is the blind spot that let
+ * the fixture rot unnoticed while the gate stayed green.
  *
  * @param _args - Command-line arguments.
  * @returns Resulting exit code and text output report.
+ * ASYNC-CONCURRENCY: self-contained; each run owns a fresh temp fixture root, so concurrent runs
+ * cannot observe one another.
  */
 export async function runSelfTestCommand(_args: string[]): Promise<{ code: number; text: string }> {
     const lines: string[] = [];

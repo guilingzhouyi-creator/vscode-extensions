@@ -276,6 +276,8 @@ export async function handleAsymmetricScan(
  * @param changedLines - One-based line numbers known to have changed; when omitted the extractor
  *   derives the diff itself.
  * @returns Extracted slices plus the elapsed milliseconds spent on extraction.
+ * ASYNC-CONCURRENCY: one daemon request owns the handler; the daemon serializes handlers per
+ * cache root.
  */
 export async function handleSliceAudit(
     filePath: string,

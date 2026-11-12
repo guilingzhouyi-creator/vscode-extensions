@@ -133,6 +133,7 @@ export const DEFAULT_WINDOW_EXPANSION_FACTOR = 2;
  * we believe when we know nothing".
  *
  * @param issue - Finding whose confidence to resolve.
+ * @param calibratedRuleConfidences - Per-rule calibrated confidence, when any exists.
  * @returns Confidence in the unit interval.
  */
 export function resolveIssueConfidence(

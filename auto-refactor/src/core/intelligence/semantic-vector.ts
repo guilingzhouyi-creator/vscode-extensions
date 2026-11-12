@@ -50,7 +50,7 @@ function fnv1a64(str: string): bigint {
 /**
  * Branch-free SWAR (SIMD Within A Register) popcount for 32-bit unsigned integers.
  *
- * @param x 32-bit unsigned integer.
+ * @param value32 - 32-bit unsigned integer.
  * @returns Number of set bits.
  */
 function popcount32(value32: number): number {

@@ -207,7 +207,8 @@ function recordSelfCall(
  * continuation line still suppresses the finding. A body that opens and closes on one line is
  * inspected immediately, since its frame would otherwise be popped before the line is scanned.
  *
- * @param content - Whole file content.
+ * @param lines - Raw lines of the file under review.
+ * @param maskedLines - Comment-masked lines, when the caller already produced them.
  * @returns Self-invocations that no guard covers.
  */
 function collectRecursionSites(

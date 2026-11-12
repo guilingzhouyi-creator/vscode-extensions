@@ -380,6 +380,7 @@ async function readActiveLedgerReverse(
  * @param cutoffTimeMs Minimum timestamp to retrieve.
  * @param maxRecords Max record safety limit.
  * @returns Array of records ordered chronologically (oldest to newest) and malformed lines count.
+ * ASYNC-CONCURRENCY: read-only over the ledger; the accumulator is call-local.
  */
 export async function readRecordsTieredReverse(
     ledgerDir: string,
@@ -803,6 +804,8 @@ function aggregateRelativeTimeBuckets(
  *
  * @param options Projection query options.
  * @returns Unified timeline report with buckets and metrics.
+ * ASYNC-CONCURRENCY: awaited by its caller and never re-entered; no shared state crosses an
+ * await.
  */
 export async function projectTimelineReport(
     options: TimelineProjectionOptions,

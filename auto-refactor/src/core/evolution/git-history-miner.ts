@@ -58,7 +58,6 @@ const CMD_GIT = 'git';
 const ENCODING_UTF8 = 'utf8';
 const STDIO_IGNORE = 'ignore';
 const STDIO_PIPE = 'pipe';
-const FORWARD_SLASH = '/';
 const ASCII_RECORD_SEP = '\x1e';
 const ASCII_FIELD_SEP = '\x1f';
 const NEWLINE_SPLIT_RE = /\r?\n/;

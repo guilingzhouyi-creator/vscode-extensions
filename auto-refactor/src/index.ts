@@ -61,9 +61,6 @@ import {
 /** Decimal radix used when parsing numeric CLI arguments such as `--line`. */
 const DECIMAL_RADIX = 10;
 
-/** Number of leading revision-id characters shown by the `trajectory` CLI subcommand. */
-const REVISION_ID_DISPLAY_LENGTH = 8;
-
 /** CLI subcommand identifiers */
 const CMD_SYMBOLS = 'symbols';
 const CMD_GUIDE = 'guide';
@@ -98,7 +95,6 @@ const STATUS_FAILED = 'FAILED';
 const DEFAULT_GATE_STAGE: GateStage = 'pre-commit';
 const DEFAULT_STATIC_ERROR_ID = 'STATIC_ERROR';
 const CONFIG_FILE_NAME = 'auto-refactor.config.json';
-const PROJECT_SUBDIR_NAME = 'auto-refactor';
 const SEVERITY_ERROR = 'error';
 
 /**

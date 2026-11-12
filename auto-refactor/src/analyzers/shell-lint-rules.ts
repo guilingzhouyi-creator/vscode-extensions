@@ -553,6 +553,7 @@ export function checkShellStrictExitCapture(
  * @param lines - Raw lines of the script.
  * @param maskedLines - Masked lines of the script.
  * @param emit - Issue emission callback.
+ * @param filePath - Path of the script under review.
  */
 export function checkShellResourceCleanup(
     lines: string[],

@@ -84,6 +84,8 @@ const DRIVE_PATH_REGEX = /[a-zA-Z]:[\\/][^ \r\n\t"']+/g;
 
 /**
  * Normalizes absolute local paths to repository-relative representation.
+ * @param inputPathString - Path that may contain an absolute prefix.
+ * @returns Repository-relative path, or the input unchanged when it cannot be normalized.
  */
 export function sanitizePath(inputPathString: string): string {
     if (typeof inputPathString !== 'string') return inputPathString;

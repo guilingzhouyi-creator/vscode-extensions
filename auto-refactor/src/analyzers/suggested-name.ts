@@ -25,7 +25,12 @@ export const NUM_KIND = 'number';
 export const STR_KIND = 'string';
 /** Suffix token marking a slug that already ends in `_TEXT`. */
 const STRING_SUFFIX_TOKEN = 'TEXT';
-/** Derives a valid SCREAMING_SNAKE_CASE identifier for a literal finding. */
+/**
+ * Derives a valid SCREAMING_SNAKE_CASE identifier for a literal finding.
+ * @param value - Literal text the constant would replace.
+ * @param kind - Literal kind deciding the naming strategy.
+ * @returns SCREAMING_SNAKE_CASE identifier, or an empty string when none is derivable.
+ */
 export function suggestConstantName(value: string, kind: string): string {
     if (kind === NUM_KIND) {
         const numericValue = Number(value);

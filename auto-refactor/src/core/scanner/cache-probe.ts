@@ -243,9 +243,10 @@ function tryQueueIncremental(context: QueueIncrementalContext): boolean {
 
 /**
  * Probe a single file against L1 session state and L2 disk cache.
- * Concurrency: safe per distinct file slot; appends to caller-owned queue arrays on the event loop.
  *
  * @param options - Probe parameters including cache, buckets and target file.
+ * ASYNC-CONCURRENCY: mutates the caller-provided cache and queue, so one batch owns those
+ * buckets.
  */
 export async function probeSingleFileCache(options: ProbeSingleFileOptions): Promise<void> {
     const {
@@ -443,11 +444,11 @@ function recordAnalyzedResults(context: RecordAnalyzedContext): number {
 
 /**
  * Analyze the files the probe could not serve from either cache level.
- * Concurrency: coordinates worker pool or sequential batch execution; not reentrant on the same
- * session bucket.
  *
  * @param options - Execution context and files scheduled for full analysis.
  * @returns Number of analyzed files and pool warm status.
+ * Concurrency: coordinates worker pool or sequential batch execution; not reentrant on the same
+ * session bucket.
  */
 export async function executeCacheMisses(
     options: ExecuteCacheMissesOptions,
@@ -546,10 +547,10 @@ async function runIncrementalRecovery(
 
 /**
  * Analyze the files whose changed line ranges allow subtree reuse.
- * Concurrency: sequential per-file async execution; mutates caller-supplied incremental bucket.
  *
  * @param options - Incremental execution parameters and files to process.
  * @returns Execution statistics for incremental files.
+ * Concurrency: sequential per-file async execution; mutates caller-supplied incremental bucket.
  */
 export async function executeIncrementalFiles(
     options: ExecuteIncrementalFilesOptions,

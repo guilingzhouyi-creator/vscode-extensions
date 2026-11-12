@@ -125,6 +125,7 @@ async function executeSnapshotWorkspace(
  * @param config - Resolved SDK analyzer configuration.
  * @param snapshot - Explicit fixed source; absent retains legacy directory scan behavior.
  * @returns Report, exact topology observations and truthful execution completeness.
+ * ASYNC-CONCURRENCY: owns its scanner; a caller sharing a cache directory must serialize.
  */
 export async function executeWorkspaceReview(
     config: ScanConfig,

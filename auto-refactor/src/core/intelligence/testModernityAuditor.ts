@@ -27,13 +27,6 @@ import {
 } from './testModernity';
 import { isCommentLine } from '../scanner/text-scanner-utils';
 
-/** Permitted test file naming suffixes and directories. */
-const TEST_DIR_NAME = '/tests/';
-const TEST_FILE_PREFIX = '/test_';
-const PYTHON_TEST_SUFFIX = '_test.py';
-const GDSCRIPT_TEST_SUFFIX = '_test.gd';
-const RUST_TEST_SUFFIX = '_test.rs';
-
 /** Skip marker keywords across testing frameworks. */
 const PYTEST_SKIP_MARKER = '@pytest.mark.skip';
 const UNITTEST_SKIP_MARKER = '@unittest.skip';

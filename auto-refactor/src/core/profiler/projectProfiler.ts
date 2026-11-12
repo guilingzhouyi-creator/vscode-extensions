@@ -68,7 +68,6 @@ const DIR_LIB_TITLE = 'Lib';
 const DIR_LIBRARY = 'library';
 const DIR_CORE = 'core';
 const DIR_STD = 'std';
-const DIR_ALLOC = 'alloc';
 const DIR_KERNEL = 'kernel';
 
 const KERNEL_PATH_SEGMENT = '/kernel';
@@ -373,23 +372,6 @@ function queueSampledDirectory(
     if (current.depth + 1 <= LANGUAGE_SAMPLE_MAX_DEPTH) {
         context.dirQueue.push({ dir: subDir, depth: current.depth + 1 });
     }
-}
-
-/**
- * Record observed file extension for language distribution sampling.
- *
- * @param fileName - Inspected file name.
- * @param languages - Map of language identifier to file count.
- * @returns 1 if extension matches a recognized language, 0 otherwise.
- */
-function recordSampledFile(fileName: string, languages: Record<string, number>): number {
-    const ext = path.extname(fileName).toLowerCase();
-    const lang = EXT_TO_LANG[ext];
-    if (lang) {
-        languages[lang] = (languages[lang] || 0) + 1;
-        return 1;
-    }
-    return 0;
 }
 
 /**

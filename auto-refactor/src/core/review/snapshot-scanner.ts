@@ -65,6 +65,7 @@ function inputObservation(read: SnapshotRead): SnapshotInputObservation {
  * @param options - Snapshot port, validated exact scope and cancellation signal.
  * @param visit - Caller callback receiving the read outcome before the next cooperative yield.
  * @returns One immutable observation per requested path, in scope order.
+ * ASYNC-CONCURRENCY: cooperative; awaits between inputs and honours the abort signal.
  */
 export async function visitSnapshotInputs(
     options: SnapshotVisitOptions,
@@ -91,6 +92,8 @@ export async function visitSnapshotInputs(
  *
  * @param options - Snapshot, optional exact scope, cancellation signal and isolated analyzer host.
  * @returns Static results with input provenance; completion requires separate capability checks.
+ * ASYNC-CONCURRENCY: awaited by its caller and never re-entered; no shared state crosses an
+ * await.
  */
 export async function executeSnapshotScan(
     options: SnapshotScanOptions,

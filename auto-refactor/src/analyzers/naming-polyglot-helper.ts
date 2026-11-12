@@ -12,7 +12,6 @@
  * Exit Semantics & Design Rationale: Pure functional helper returning Issue[]; zero side effects.
  */
 
-import type { AnalyzerContext, Issue, Severity } from '../core/types';
 import { SEVERITY_WARNING } from '../core/types';
 import { camelToSnake, REGEX } from '../core/constants';
 import { calculateBraceDelta } from '../core/ast/block-scope-utils';
