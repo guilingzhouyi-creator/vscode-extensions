@@ -13,6 +13,7 @@
  *   with explicit errors on illegal staging input; satisfies CC <= 15 and Depth <= 4.
  */
 
+import { spawnSync } from 'node:child_process';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -102,6 +103,22 @@ export function computeGitBlobOid(payload: Uint8Array): string {
 }
 
 /**
+ * Checks whether a loose Git object already exists on disk with a non-empty payload.
+ */
+export function hasLooseObjectOnDisk(gitDir: string, oid: string): boolean {
+    if (!RE_OBJECT_ID.test(oid)) {
+        return false;
+    }
+    const normalized = oid.toLowerCase();
+    const targetFile = path.join(gitDir, 'objects', normalized.slice(0, 2), normalized.slice(2));
+    try {
+        return fs.existsSync(targetFile) && fs.statSync(targetFile).size > 0;
+    } catch {
+        return false;
+    }
+}
+
+/**
  * Encodes and zlib-compresses a loose object, writing it atomically to `.git/objects/`.
  */
 export function writeLooseObjectToDisk(
@@ -118,12 +135,21 @@ export function writeLooseObjectToDisk(
     const targetDir = path.join(gitDir, 'objects', prefix);
     const targetFile = path.join(targetDir, suffix);
 
-    if (!fs.existsSync(targetFile)) {
+    if (!hasLooseObjectOnDisk(gitDir, oid)) {
         fs.mkdirSync(targetDir, { recursive: true });
         const compressed = zlib.deflateSync(raw);
         const tmpFile = nextTempFilePath(targetFile);
         fs.writeFileSync(tmpFile, compressed);
-        fs.renameSync(tmpFile, targetFile);
+        try {
+            fs.renameSync(tmpFile, targetFile);
+        } catch (err) {
+            if (fs.existsSync(tmpFile)) {
+                fs.unlinkSync(tmpFile);
+            }
+            if (!hasLooseObjectOnDisk(gitDir, oid)) {
+                throw err;
+            }
+        }
     }
 
     return { oid, objectPath: targetFile };
@@ -233,10 +259,14 @@ function insertTreeLeaf(root: DirectoryNode, leaf: StagedTreeLeaf): void {
         current = descendIntoDirectory(current, segment);
     }
     if (current.directories.has(leaf.name)) {
-        throw new Error(`Staged path conflict: '${leaf.name}' is staged as both a file and a directory`);
+        throw new Error(`[FGT-IDX-001] Staged path conflict: '${leaf.name}' is staged as both a file and a directory`);
     }
-    if (current.leaves.has(leaf.name)) {
-        throw new Error(`Duplicate staged path: '${leaf.segments.join('/')}'`);
+    const existingLeaf = current.leaves.get(leaf.name);
+    if (existingLeaf) {
+        if (existingLeaf.oid === leaf.oid && existingLeaf.mode === leaf.mode) {
+            return;
+        }
+        throw new Error(`[FGT-IDX-001] Duplicate staged path: '${leaf.segments.join('/')}'`);
     }
     current.leaves.set(leaf.name, leaf);
 }
@@ -442,7 +472,10 @@ export function materializeCommitPure(
     });
     const { oid: commitOid } = writeLooseObjectToDisk(gitDir, 'commit', commitPayload);
 
-    // 3. Advance the fractal ref atomically.
+    // 3. Verify materialized CAS objects and advance the fractal ref atomically.
+    if (!hasLooseObjectOnDisk(gitDir, treeOid) || !hasLooseObjectOnDisk(gitDir, commitOid)) {
+        throw new Error(`[FGT-OBJ-001] Materialized CAS objects missing on disk for commit '${commitOid}'`);
+    }
     writeRefFile(gitDir, req.targetRef.gitRef, commitOid);
 
     return {
@@ -451,6 +484,98 @@ export function materializeCommitPure(
         targetRef: req.targetRef.gitRef,
         durationMs: Date.now() - startMs,
     };
+}
+
+/**
+ * Options for invoking the Taxis CLI / IPC Daemon bridge from TypeScript.
+ */
+export interface TaxisDaemonBridgeOptions {
+    readonly taxisBinPath?: string;
+    readonly timeoutMs?: number;
+}
+
+/**
+ * Structured receipt returned by `taxis daemon --request <json>`.
+ */
+export interface TaxisDaemonReceiptDto {
+    readonly command: string;
+    readonly ok: boolean;
+    readonly latency_us: number;
+    readonly cache_generation: number;
+    readonly cache_hit: boolean;
+    readonly tree_oid?: string;
+    readonly commit_oid?: string;
+    readonly target_ref?: string;
+    readonly entry_count: number;
+    readonly entries?: readonly string[];
+    readonly detail?: string;
+}
+
+/**
+ * Invokes `taxis daemon --request <json>` when a Taxis binary is configured and available.
+ */
+export function invokeTaxisDaemonRequest(
+    gitDir: string,
+    requestPayload: Record<string, unknown>,
+    options: TaxisDaemonBridgeOptions = {},
+): TaxisDaemonReceiptDto | null {
+    const binPath = options.taxisBinPath ?? process.env.TAXIS_BIN;
+    if (!binPath || !fs.existsSync(binPath)) {
+        return null;
+    }
+    const serialized = JSON.stringify(requestPayload);
+    const out = spawnSync(binPath, ['--git-dir', gitDir, 'daemon', '--request', serialized], {
+        encoding: 'utf8',
+        timeout: options.timeoutMs ?? 5000,
+    });
+    if (out.error || out.status !== 0 || !out.stdout) {
+        return null;
+    }
+    try {
+        return JSON.parse(out.stdout.trim()) as TaxisDaemonReceiptDto;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Materializes a commit via the Taxis IPC Daemon bridge when available, falling back to
+ * `materializeCommitPure` with full CAS object existence verification.
+ */
+export function materializeCommitViaTaxisBridge(
+    gitDir: string,
+    req: MaterializeCommitRequest,
+    options: TaxisDaemonBridgeOptions = {},
+): MaterializeCommitResult {
+    const startMs = Date.now();
+    if (!req.agentMeta && !req.committerSignature) {
+        const sig = resolveSignatures(req).author;
+        const entries = req.files.map((file) => ({
+            path: file.path,
+            mode: file.mode,
+            content: typeof file.content === 'string' ? file.content : Buffer.from(file.content).toString('utf8'),
+        }));
+        const payload = {
+            target_ref: req.targetRef.gitRef,
+            parent_oids: req.parentCommitOids,
+            entries,
+            message: req.message,
+            author_name: sig.name,
+            author_email: sig.email,
+            timestamp_sec: sig.timestampSec,
+            tz_offset: sig.tzOffset ?? '+0000',
+        };
+        const receipt = invokeTaxisDaemonRequest(gitDir, { type: 'Commit', payload }, options);
+        if (receipt?.ok && receipt.commit_oid && receipt.tree_oid && hasLooseObjectOnDisk(gitDir, receipt.commit_oid)) {
+            return {
+                commitOid: receipt.commit_oid,
+                treeOid: receipt.tree_oid,
+                targetRef: req.targetRef.gitRef,
+                durationMs: Date.now() - startMs,
+            };
+        }
+    }
+    return materializeCommitPure(gitDir, req);
 }
 
 /**
