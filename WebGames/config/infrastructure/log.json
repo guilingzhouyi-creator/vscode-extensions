@@ -35,21 +35,21 @@
     "enabled": true,
     "rules": [
       {
-        "field_pattern": "token|session_token",
+        "field_pattern": "token|session_token|access_token|refresh_token|auth_token|nested_token|authorization|api_key|apikey|private_key|signing_key|client_secret",
         "mask_mode": "mask",
         "mask_prefix_len": 4,
         "mask_suffix_len": 4,
         "replace_with": "****"
       },
       {
-        "field_pattern": "fingerprint|device_fingerprint",
+        "field_pattern": "fingerprint|device_fingerprint|email|ip_address",
         "mask_mode": "mask",
         "mask_prefix_len": 4,
         "mask_suffix_len": 0,
         "replace_with": "****"
       },
       {
-        "field_pattern": "password|password_hash|secret|seal_key",
+        "field_pattern": "password|passwd|password_hash|secret|seal_key|hmac_secret|aes_key|master_secret|cookie",
         "mask_mode": "drop"
       },
       {

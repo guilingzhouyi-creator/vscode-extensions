@@ -12,7 +12,7 @@
   "not_a_command": "Not a command",
   "unknown_chat_command": "Unknown command: /%s",
   "permission_denied": "Permission denied for command: /%s",
-  "audit_log": "GM Audit: Admin [%s] executed [%s]",
+  "audit_log": "GM Audit: Admin [{admin_id}] executed [{action}]",
   "clawback_offline_forbidden": "【追缴】仅限联机模式可用（单机沙盒一律拒绝）",
   "clawback_permission_denied": "【追缴】无追缴权限（需 LEVEL_GAME_MASTER）",
   "clawback_nothing_to_claw": "【追缴】无资产可追缴",

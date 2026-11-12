@@ -4,7 +4,7 @@
 # 文件路径: WebGames/mod_sdk/tools/kalar_mod.py
 # 架构定位: MOD开发工具链统一入口门面 (Unified Mod CLI Interface)
 # 依赖与触发: 触发方: CLI / 用户 / CI / 自动化管道 | 上游: scaffold_mod / check_mod / cook_assets / preview_mod / play_mod | 下游: 终端交互 / 校验报告 / 模组包 | 运行时: Python 3.10+
-# 职责说明: 聚合 init、check、cook、preview、play、pack、dispatch 七大核心子命令，提供一致的开发者交互界面与工件打包
+# 职责说明: 聚合 init、check、cook、preview、play、pack、dispatch、workbench、bake 九大核心子命令，提供一致的开发者交互界面与工件打包
 # 退出语义与设计依据: 退出码: 0=操作成功, 1=业务校验失败, 2=参数错误/IO异常 | 设计依据: 《卡拉尔数据契约规范 v1.0》与第一性原理
 # ------------------------------------------------------------------------------
 # 用法示例:

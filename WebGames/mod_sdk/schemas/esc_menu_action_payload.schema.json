@@ -8,6 +8,7 @@
     "action_type": {
       "type": "string",
       "enum": [
+        "ESC_GET_MENU_STATE",
         "ESC_QUERY_READINESS",
         "ESC_SAVE_GAME",
         "ESC_EXIT_TO_GATEWAY",

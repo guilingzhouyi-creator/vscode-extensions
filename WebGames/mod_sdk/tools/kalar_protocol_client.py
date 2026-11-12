@@ -12,7 +12,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 import argparse
 import json
 import sys
@@ -143,6 +143,7 @@ def validate_esc_action_payload(data: dict[str, Any]) -> tuple[bool, list[str]]:
     if "action_type" not in data:
         errors.append("缺失必需字段: action_type")
     elif data["action_type"] not in [
+        "ESC_GET_MENU_STATE",
         "ESC_QUERY_READINESS",
         "ESC_SAVE_GAME",
         "ESC_EXIT_TO_GATEWAY",
@@ -306,6 +307,7 @@ class LocalMockDispatcher:
     ) -> dict[str, Any]:
         """处理 ESC 系统菜单相关指令。"""
         valid_esc_actions = [
+            "ESC_GET_MENU_STATE",
             "ESC_QUERY_READINESS",
             "ESC_SAVE_GAME",
             "ESC_EXIT_TO_GATEWAY",

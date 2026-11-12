@@ -181,7 +181,7 @@ DAG 终结节点或剧情关键节点仅允许发布下列合法状态突变事�
 - **受支持参与者身份 (`supported_actors`)**: `HUMAN_UI, AGENT`
 - **人类独占抢占租约窗口 (`human_preemption_lease_ms`)**: `3000ms`（模态打开自动抢占: `True`）
 - **协议路由业务域 (`supported_domains`)**: `HOME_HUD, ESC_MENU, PROLOGUE, CHARACTER_CREATION`
-- **受支持系统菜单指令 (`esc_menu_actions`)**: `RESUME_GAME, OPEN_SETTINGS, SAVE_AND_QUIT_TO_ARCHIVE, FORCE_QUIT_TO_ARCHIVE, SAVE_AND_QUIT_TO_GATEWAY, SAVE_AND_QUIT_DESKTOP`
+- **受支持系统菜单指令 (`esc_menu_actions`)**: `ESC_GET_MENU_STATE, ESC_QUERY_READINESS, ESC_SAVE_GAME, ESC_EXIT_TO_GATEWAY, ESC_QUIT_GAME, ESC_APPLY_SETTINGS`
 - **信封强类型 Schema 版本 (`envelope_schema_versions`)**: 请求信封 `kalar.mod_sdk.client_request_envelope.v1`，响应信封 `kalar.mod_sdk.unified_response_envelope.v1`，ESC 载荷 `kalar.mod_sdk.esc_menu_action_payload.v1`
 
 ### 9. 开发者集成工作台与归档打包能力契约 (Developer Workbench Capabilities)

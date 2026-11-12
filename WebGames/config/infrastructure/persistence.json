@@ -30,11 +30,10 @@
     "load_success": "Game loaded successfully from: {path}",
     "invalid_save_name": "Invalid save name (path traversal or illegal characters): {name}",
     "atomic_replace_fail": "Atomic replace failed (original preserved): {error}",
-    "legacy_unverified": "Legacy save without data_json; integrity check skipped.",
     "backup_corrupt": "Backup corrupted or unparseable; primary save kept intact: {path}",
     "version_too_new": "Save format version {version} is newer than this engine supports.",
     "version_too_old": "Save format version {version} is older than the minimum supported version.",
-    "backup_failed": "Failed to back up previous save (continuing): {error}",
+    "backup_failed": "Failed to back up previous save: {error}",
     "auto_restored": "Primary save was corrupt; automatically restored from backup: {path}",
     "orphan_tmp_cleaned": "Cleaned {count} orphan temp save file(s) at startup."
   },
