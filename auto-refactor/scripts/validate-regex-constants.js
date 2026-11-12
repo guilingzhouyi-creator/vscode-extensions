@@ -27,6 +27,7 @@ const ROOT = path.join(__dirname, '..');
 const rust = require(path.join(ROOT, 'dist/core/constants/regex-rust'));
 const shell = require(path.join(ROOT, 'dist/core/constants/regex-shell'));
 const data = require(path.join(ROOT, 'dist/core/constants/regex-data'));
+const patterns = require(path.join(ROOT, 'dist/core/constants/regex-patterns'));
 
 /** Collected assertion verdicts, printed before exit. */
 const results = [];
@@ -72,6 +73,16 @@ check('the shell foreach pattern matches a loop and rejects a plain call', () =>
 check('the data query predicate accepts a query call and rejects prose', () => {
   assert.strictEqual(data.isDataQueryCall('db.findMany({})'), true);
   assert.strictEqual(data.isDataQueryCall('const label = "hello"'), false);
+});
+
+check('convertCamelToSnake converts camelCase identifier to snake_case', () => {
+  assert.strictEqual(patterns.convertCamelToSnake('testNameHelper'), 'test_name_helper');
+  assert.strictEqual(patterns.convertCamelToSnake('already_snake'), 'already_snake');
+});
+
+check('createSnakeCleanScanner strips leading and trailing underscores', () => {
+  const scanner = patterns.createSnakeCleanScanner();
+  assert.strictEqual('__token_name__'.replace(scanner, ''), 'token_name');
 });
 
 const failed = results.filter((entry) => !entry.ok);

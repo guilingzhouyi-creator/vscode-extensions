@@ -68,7 +68,7 @@ const FLAG_GLOBAL = 'g';
 /** Standard replacement template token for converting camelCase to snake_case. */
 export const CAMEL_TO_SNAKE_REPLACEMENT = '$1_$2';
 
-/** Converts a camelCase identifier to lower_snake_case using SSOT patterns. */
+// Converts a camelCase identifier to lower_snake_case using SSOT patterns.
 export function convertCamelToSnake(name: string): string {
     const scanner = sharedRegexPool.borrow(PATTERN_CAMEL_TO_SNAKE, FLAG_GLOBAL);
     const snakeCaseIdentifier = name.replace(scanner, CAMEL_TO_SNAKE_REPLACEMENT).toLowerCase();
@@ -79,12 +79,12 @@ export function convertCamelToSnake(name: string): string {
 /** Backward compatibility alias for convertCamelToSnake. */
 export const camelToSnake = convertCamelToSnake;
 
-/** Creates or borrows a global scanner for converting camelCase to snake_case. */
+// Creates or borrows a global scanner for converting camelCase to snake_case.
 export function createCamelToSnakeScanner(): RegExp {
     return sharedRegexPool.borrow(PATTERN_CAMEL_TO_SNAKE, FLAG_GLOBAL);
 }
 
-/** Creates or borrows a global scanner for converting snake_case to camelCase. */
+// Creates or borrows a global scanner for converting snake_case to camelCase.
 export function createSnakeToCamelScanner(): RegExp {
     return sharedRegexPool.borrow(PATTERN_SNAKE_TO_CAMEL, FLAG_GLOBAL);
 }
@@ -93,7 +93,7 @@ export function createSnakeToCamelScanner(): RegExp {
 export const HANDLER_OR_SOLVER_PATTERN =
     /^(?:on[A-Z]|handle[A-Z]|resolve[A-Z]|solve[A-Z]|dispatch[A-Z]|_on_[a-z0-9]|_input$|_gui_input$|_unhandled_input$)/;
 
-/** Creates or borrows a global scanner for converting kebab-case to camelCase. */
+// Creates or borrows a global scanner for converting kebab-case to camelCase.
 export function createKebabToCamelScanner(): RegExp {
     return sharedRegexPool.borrow(PATTERN_KEBAB_TO_CAMEL, FLAG_GLOBAL);
 }
@@ -144,17 +144,17 @@ export const PARSER_FUNCTION_NAME_PATTERN =
 /** Matches event loop, poller, or background daemon function names. */
 export const EVENT_LOOP_FUNCTION_NAME_PATTERN = /(?:daemon|poll|listen|loop)/i;
 
-/** Creates a fresh global scanner for stripping leading and trailing underscores. */
+// Creates a fresh global scanner for stripping leading and trailing underscores.
 export function createSnakeCleanScanner(): RegExp {
     return /^_+|_+$/g;
 }
 
-/** Creates a fresh global scanner for stripping enclosing quotes. */
+// Creates a fresh global scanner for stripping enclosing quotes.
 export function createOuterQuotesScanner(): RegExp {
     return /^['"`]|['"`]$/g;
 }
 
-/** Creates a fresh global scanner for replacing non-alphanumeric sequences. */
+// Creates a fresh global scanner for replacing non-alphanumeric sequences.
 export function createNonAlphanumericScanner(): RegExp {
     return /[^A-Za-z0-9]+/g;
 }
