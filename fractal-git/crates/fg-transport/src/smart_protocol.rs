@@ -8,7 +8,10 @@
 //!
 //! Domain Governance Rules: FGT-TRN-001 (smart wire protocol), FGT-COR-001.
 
+use fg_core::error::FractalResult;
+
 use crate::packetline::PacketLine;
+pub use crate::protocol_request::{SmartV2Command, SmartV2Request};
 
 /// Git Smart Protocol v2 capability advertisement and request parser.
 pub struct ProtocolV2Handler;
@@ -29,5 +32,10 @@ impl ProtocolV2Handler {
     pub fn format_ref_line(ref_name: &str, oid_hex: &str) -> Vec<u8> {
         let line = format!("{} {}\n", oid_hex, ref_name);
         PacketLine::encode_line(&line)
+    }
+
+    /// Parses a raw client Smart Protocol v2 request stream into a structured `SmartV2Request`.
+    pub fn parse_request(bytes: &[u8]) -> FractalResult<SmartV2Request> {
+        SmartV2Request::parse(bytes)
     }
 }
