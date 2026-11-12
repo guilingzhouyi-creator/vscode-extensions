@@ -13,30 +13,6 @@ import type { PraxisRuleI18nEntry } from '../../i18n-types';
  * 架构规范领域规则中文本地化呈现字典。
  */
 export const ZH_CN_ARCHITECTURE_RULES: Record<string, PraxisRuleI18nEntry> = {
-    'ADV-PRF-001': {
-        name: '循环内高开销运算外提',
-        summary: '在循环或热路径中检测到重复的重型运算或未缓存的属性深度解析。',
-        remediation: '将循环内恒定的计算表达式或属性查找提升到循环外部，使用局部变量缓存结果。',
-        rationale: '避免在热路径上浪费 CPU 周期，提升代码局部执行吞吐量。',
-    },
-    'ADV-PRF-002': {
-        name: '循环内瞬态堆分配防护',
-        summary: '在紧凑循环内部检测到高频临时对象或闭包实例化，引发高 GC 压力。',
-        remediation: '在循环外预先分配可复用实例或池化对象，在迭代中通过 reset_state() 清理复用。',
-        rationale: '瞬态短生命周期对象会加剧垃圾回收器分代停顿，严重影响响应时间。',
-    },
-    'ARC-COH-001': {
-        name: '单文件行数超出上限',
-        summary: '文件总物理行数超出既定架构上限（通常为 400 行）。',
-        remediation: '根据单一职责原则拆分领域职责，将内聚逻辑抽取为独立子模块。',
-        rationale: '超大文件显著增加人机阅读认知负担，并增加并发合并冲突概率。',
-    },
-    'ARC-COH-002': {
-        name: '单文件函数数量超标',
-        summary: '单文件中定义的顶层函数与方法总数过多（通常超出 20 个）。',
-        remediation: '评估职责聚合度，将从属辅助函数归类收拢至专用子模块或领域工具类中。',
-        rationale: '过多函数混杂在同一文件通常意味着模块内聚性不足，存在隐藏上帝对象风险。',
-    },
     'ARCH-ABS-001': {
         name: '过度抽象与非必要间接层',
         summary: '过度抽象与非必要间接层：为少量共性引入跨层深层转发跳板、跨域依赖反转或循环依赖。',
@@ -58,12 +34,12 @@ export const ZH_CN_ARCHITECTURE_RULES: Record<string, PraxisRuleI18nEntry> = {
         remediation: '将环境配置提升到应用装配层解析，并以强类型参数注入领域对象。',
     },
     'ARCH-CFG-002': {
-        name: 'ARCH-CFG-002',
+        name: '全库未参与决策的死配置项',
         summary: '声明的配置项在全库代码中从未参与任何决策、控制流或计算（死配置）。',
         remediation: '移除无用死配置项或补充对应业务开关/策略引用。',
     },
     'ARCH-CFG-003': {
-        name: 'ARCH-CFG-003',
+        name: '多处重复定义同一配置项破坏单源',
         summary: '同一配置项在多处重复定义，破坏配置单一真源。',
         remediation: '收敛重复配置到单一配置表或继承层级中。',
     },
@@ -100,19 +76,19 @@ export const ZH_CN_ARCHITECTURE_RULES: Record<string, PraxisRuleI18nEntry> = {
         remediation: '将子表登记至主配置表并接入点分路由与细粒度热重载守卫。',
     },
     'ARCH-DEC-002': {
-        name: 'ARCH-DEC-002',
+        name: '分析器主体耦合多语言语法树适配细节',
         summary:
             '多语言 AST 解析与适配器逻辑必须独立解耦为适配器模块，分析器主体严禁混杂语法树构造细节或深耦合特定语言适配器实现。',
         remediation:
             '将多语言 AST 构造逻辑抽取至 `src/core/semantic/adapters/` 独立适配器，分析器仅面向 `NormalizedNode` 或多态接口。',
     },
     'ARCH-DIR-001': {
-        name: 'ARCH-DIR-001',
+        name: '领域层未倒置依赖接口契约',
         summary: '倒置依赖，在领域层定义接口契约，由外层实现。',
         remediation: '核心逆流：领域层 (Domain) 反向依赖外层应用层/基础设施/接口层。',
     },
     'ARCH-DIR-002': {
-        name: 'ARCH-DIR-002',
+        name: '业务流缺少应用用例服务层统筹',
         summary: '引入用例服务 (Application Service) 统筹业务流。',
         remediation: '越层穿透：接口层控制器绕过应用层直接直连基础设施实现。',
     },
@@ -122,16 +98,14 @@ export const ZH_CN_ARCHITECTURE_RULES: Record<string, PraxisRuleI18nEntry> = {
         remediation: '调整调用依赖流向，由内层领域定义契约接口并交由基础设施层实现。',
     },
     'ARCH-DISP-001': {
-        name: 'ARCH-DISP-001',
-        summary:
-            'Monolithic dispatchers with excessive branches (> 8) tightly couple domain logic, violating the Open-Closed Principle.',
+        name: '分支过载的单体调度器违反开闭原则',
+        summary: '分支过多的单体调度器（> 8 路）紧耦合领域逻辑，违背架构开闭原则。',
         remediation:
             '重构为基于字典/Map 的查表分发 (Table-Driven) 或策略模式 (Strategy Pattern)，解耦各分支业务逻辑。',
     },
     'ARCH-DSP-002': {
-        name: 'ARCH-DSP-002',
-        summary:
-            'Dispatcher closure fragmentation: Object literal defines excessive inline function closures (>= 15), causing closure explosion and function inflation.',
+        name: '调度器对象字面量内联闭包碎片膨胀',
+        summary: '对象字面量定义过多内联函数闭包（>= 15），引发闭包膨胀与调度函数碎片化。',
         remediation:
             '重构为按职责正交划分的 switch 分发函数（单函数圈复杂度 <= 10）或顶层具名处理函数，消除闭包碎片化。',
     },
@@ -146,7 +120,7 @@ export const ZH_CN_ARCHITECTURE_RULES: Record<string, PraxisRuleI18nEntry> = {
         remediation: '解除核心计算与展示框架依赖，保持无头独立执行与测试能力。',
     },
     'ARCH-LEAK-001': {
-        name: 'ARCH-LEAK-001',
+        name: '领域模型混入外部框架专有类型',
         summary: '领域模型使用 POJO/原生实体，隔离外部框架专有类型。',
         remediation: '职责泄漏：纯领域模型直接引用或泄漏外部框架库 (Express/Vue/Godot/ORM)。',
     },
@@ -186,7 +160,7 @@ export const ZH_CN_ARCHITECTURE_RULES: Record<string, PraxisRuleI18nEntry> = {
             '按四分流治理原则重构：纯算子进入算法库、常量进入常量库、规则进入策略库、通用转换进入基础层。',
     },
     'DAT-DEF-001': {
-        name: 'DAT-DEF-001',
+        name: '受信内部领域边界存在冗余防御校验',
         summary: '受信内部领域边界内的冗余重复防御性校验。',
         remediation: '在信任边界执行一次性完整校验，内部领域对象依托不可变类型保证。',
     },
@@ -196,12 +170,12 @@ export const ZH_CN_ARCHITECTURE_RULES: Record<string, PraxisRuleI18nEntry> = {
         remediation: '将存储驱动调用封装在仓储接口实现内，领域层仅依赖仓储契约。',
     },
     'DAT-NPL-001': {
-        name: 'DAT-NPL-001',
+        name: '迭代与映射上下文存在 N+1 重复查询',
         summary: '迭代与映射上下文中的 N+1 查询与重复存储调用。',
         remediation: '将循环内查询提升至外层使用批量 IN 查询或 DataLoader 批量加载。',
     },
     'DAT-QRY-001': {
-        name: 'DAT-QRY-001',
+        name: '在线请求链路执行无界全表读取过滤',
         summary: '在线请求链路中的无界数据读取或全表内存过滤。',
         remediation: '增加游标分页或 Limit/Offset 条件，强制限制单次读取上限。',
     },
@@ -212,7 +186,7 @@ export const ZH_CN_ARCHITECTURE_RULES: Record<string, PraxisRuleI18nEntry> = {
         remediation: '确保资源中心双向对称登记，修复或移除悬空资源路径与孤儿资产。',
     },
     'DAT-SER-001': {
-        name: 'DAT-SER-001',
+        name: '跨层调用链存在重复序列化反序列化转换',
         summary: '跨层调用链中的重复序列化与反序列化转换。',
         remediation: '在内部调用链路传递强类型原生对象，仅在网络边界执行序列化。',
     },
@@ -222,27 +196,27 @@ export const ZH_CN_ARCHITECTURE_RULES: Record<string, PraxisRuleI18nEntry> = {
         remediation: '解除反向依赖，通过控制反转或事件总线进行解耦。',
     },
     'DEP-LAZ-001': {
-        name: 'DEP-LAZ-001',
+        name: '函数内存在未经审计声明的临时延迟导入',
         summary: '未提供审计声明或合规理由的函数内部临时导入。',
         remediation: '将导入提升至文件顶部，或添加 @lazy/@optional 注释标注意图。',
     },
     'DEP-ORD-001': {
-        name: 'DEP-ORD-001',
+        name: '文件布局与导入分组偏离工程规范',
         summary: '文件布局与导入分组不符合当前语言现代化工程规范。',
         remediation: '调整导入顺序为 Stdlib -> ThirdParty -> InternalShared -> Local。',
     },
     'DEP-RES-001': {
-        name: 'DEP-RES-001',
+        name: '业务逻辑硬编码未纳管外部路径或连接串',
         summary: '业务逻辑中散落硬编码的未纳管外部 URL、文件路径或连接串。',
         remediation: '将外部资源地址统一抽取至配置文件或服务资源注册中心。',
     },
     'DEP-WLD-001': {
-        name: 'DEP-WLD-001',
+        name: '通配符导入破坏显式依赖与树摇裁剪',
         summary: '使用通配符导入破坏显式依赖跟踪与树摇优化。',
         remediation: '改用显式具名导入 (Named Imports)，明确模块依赖面。',
     },
     'PRF-ALG-001': {
-        name: 'PRF-ALG-001',
+        name: '循环内线性查找未哈希预索引降维',
         summary: '将内层查找通过 Map/Set 哈希预索引降维为 $O(1)$。',
         remediation: '发现 $\\ge 3$ 层循环嵌套 (潜在 $O(N^3)$ 多项式计算热点)。',
     },
@@ -254,24 +228,24 @@ export const ZH_CN_ARCHITECTURE_RULES: Record<string, PraxisRuleI18nEntry> = {
             '在循环外预先将外部集合构建为 Map 或 Dictionary 哈希索引，将内层查找降至 O(1)，算法总体降至 O(N+M)。',
     },
     'PRF-IO-001': {
-        name: 'PRF-IO-001',
+        name: '热路径或主线程调用同步阻塞 I/O 接口',
         summary: '切换为异步非阻塞对应 API，避免锁死 Node.js 事件循环或游戏主线程。',
         remediation:
             '事件循环同步阻塞风险：在 `async` 上下文或高频帧循环内调用同步阻塞 I/O (如 `readFileSync`, `time.sleep`)。`thresholds.blockingIoAllowPatterns` 声明的路径 glob（CLI/校验器/基准脚本等进程式工具）豁免；该键同时下发给治理规则 `GOV-PRF-004`，属单一策略源。',
     },
     'PRF-LEAK-001': {
-        name: 'PRF-LEAK-001',
+        name: '循环或定时器内集合无界追加内存泄漏',
         summary: '检测循环或定时器内的集合无界追加，防范 O(t) 或 O(n) 内存泄漏。',
         remediation: '为集合设置容量上限/LRU淘汰/定期重置，或避免在循环与定时器内无界追加。',
     },
     'PRF-MEM-001': {
-        name: 'PRF-MEM-001',
+        name: '循环体内未提升复用的局部缓冲区对象',
         summary: '将缓冲区/对象提升至循环外部复用，循环内仅清空重置。',
         remediation:
             '高频热路径瞬态堆对象分配 (循环体内 `new Array`, `new Object`, `.duplicate(true)` 等)。',
     },
     'PRF-MEM-002': {
-        name: 'PRF-MEM-002',
+        name: '循环热路径瞬态实例化与深拷贝分配',
         summary: '循环热路径严禁瞬态实例化与深复制，必须使用对象池或外部复用（ADV-PRF-002）。',
         remediation:
             '高承压热路径瞬态堆对象分配 (循环体内 `new Class()`, `.new()`, `.duplicate(true)` 等)。采用对象池模式并在借出/归还时调用 `reset_state()` 重置状态。',
@@ -301,7 +275,7 @@ export const ZH_CN_ARCHITECTURE_RULES: Record<string, PraxisRuleI18nEntry> = {
             '引入环形缓冲区（RingBuffer）或接入定长字节缓冲池（BufferPool），实现零拷贝槽位循环复用。',
     },
     'clean-layer-violation': {
-        name: 'clean-layer-violation',
+        name: '增量管线存在跨分层逆向依赖越界',
         summary: '增量管线中的分层越界（clean-layer 口径）。',
         remediation: '按层序调整依赖方向或把实现下沉/上提到正确层。',
     },
@@ -311,32 +285,32 @@ export const ZH_CN_ARCHITECTURE_RULES: Record<string, PraxisRuleI18nEntry> = {
         remediation: '按配置的 allowGroups/allowExternal 调整导入，或显式登记豁免。',
     },
     'expensive-loop-operation': {
-        name: 'expensive-loop-operation',
+        name: '循环体内执行深拷贝或同步序列化开销',
         summary: '循环体内执行昂贵深拷贝（.duplicate(true)）或阻塞式序列化与IO。',
         remediation: '消除热路径内的深拷贝操作，改用只读视图或轻量引用。',
     },
     'high-algorithmic-complexity': {
-        name: 'high-algorithmic-complexity',
+        name: '多重嵌套循环或内置线性查找热点',
         summary: '循环多重嵌套引发潜在 O(N^2)/O(N^3) 复杂度热点或循环体内隐式线性查找。',
         remediation: '重构循环嵌套或预先构建 Map/Set 索引将查找降为 O(1)。',
     },
     'import-cycle': {
-        name: 'import-cycle',
+        name: '模块间存在静态循环导入依赖环',
         summary: '模块级循环依赖（Python 相对导入与包解析同样覆盖）。',
         remediation: '把共享契约下沉为独立模块，或用惰性导入打断环（惰性导入不建边）。',
     },
     'loop-transient-allocation': {
-        name: 'loop-transient-allocation',
+        name: '循环体内存在违背契约的瞬态堆分配',
         summary: '循环体内瞬态堆分配（ADV-PRF-002），违背零瞬态分配契约。',
         remediation: '将对象实例化提升到循环外或使用对象池模式（ADV-POOL-001）。',
     },
     'unused-export': {
-        name: 'unused-export',
+        name: '模块导出符号未在仓库内被引用',
         summary: '导出符号无人引用（TS/JS 口径；Python 无 export 关键字不参与）。',
         remediation: '删除无人使用的导出，或把它收回模块内部。',
     },
     'unused-module': {
-        name: 'unused-module',
+        name: '非入口模块未在依赖图中被导入使用',
         summary: '模块无人导入（非入口白名单内）。',
         remediation: '删除该模块，或把入口 glob 加入 entryGlobs。',
     },

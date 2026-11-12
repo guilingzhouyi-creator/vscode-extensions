@@ -20,9 +20,9 @@ export const ZH_CN_SECURITY_RULES: Record<string, PraxisRuleI18nEntry> = {
         rationale: '深层回调嵌套不仅可读性极差，而且异常冒泡与上下文资源清理非常容易遗漏。',
     },
     'CMP-DEN-001': {
-        name: 'CMP-DEN-001',
+        name: '单行高密度堆砌位运算与条件算子超越认知上限',
         summary:
-            'Dense syntactic packing of bitwise, arithmetic and conditional operators without naming or spacing exceeds human cognitive chunking capacity.',
+            '在缺少中间命名与合理留白的情况下单行密集堆砌位运算、算术与三元算子，超出认知组块上限。',
         remediation: '降低认知密度：添加适当空白与具名中间常量，拆分高密度算式或位运算组合。',
     },
     'CMP-EXP-001': {
@@ -33,22 +33,10 @@ export const ZH_CN_SECURITY_RULES: Record<string, PraxisRuleI18nEntry> = {
         rationale: '过于冗长的内联表达式增加认知负荷并极易掩盖短路求值与优先级逻辑缺陷。',
     },
     'CMP-LIN-001': {
-        name: 'CMP-LIN-001',
+        name: '多条独立语句或副作用强行压缩至同一物理行',
         summary:
-            'Cramming multiple distinct statements or side-effects onto a single line impairs stack traces, debug stepping, and code readability.',
+            '将多条独立声明或副作用语句压缩在同一物理行，损害异常堆栈定位、断点步进与阅读清晰度。',
         remediation: '将单行内的多个语句或副作用拆分为独立代码行，遵循单行单一语义原则。',
-    },
-    'CMP-LOC-001': {
-        name: '单函数圈复杂度过高',
-        summary: '函数的独立判定分支过多（圈复杂度超出阈值），逻辑分支拓扑过于复杂。',
-        remediation: '使用卫语句提前返回（Guard Clauses），或运用策略表/多态分发拆分多层分支。',
-        rationale: '过高的分支复杂度呈指数级提升单元测试用例构造难度并隐藏边界缺陷。',
-    },
-    'CMP-LOC-002': {
-        name: '嵌套层级过深',
-        summary: '代码块缩进与控制流嵌套层次超出阈值（通常超过 4 层）。',
-        remediation: '将内层深层控制流提取为独立私有函数，并采用及早返回原则扁平化逻辑。',
-        rationale: '深层金字塔嵌套严重破坏代码可读性与局部推理推导能力。',
     },
     'CPX-AMP-001': {
         name: '复杂度放大陷阱',
@@ -85,7 +73,7 @@ export const ZH_CN_SECURITY_RULES: Record<string, PraxisRuleI18nEntry> = {
             '利用局部卫语句提前校验，或将深层长跨度闭环提取为纯函数子算子以缩短认知跳跃距离。',
     },
     'CPX-REC-001': {
-        name: 'CPX-REC-001',
+        name: '跨函数互递归调用链缺少明确停机边界保障',
         summary: '跨函数/跨文件无终止保障的递归或互递归调用链。',
         remediation: '引入显式深度累加参数与终止保护，或改写为迭代工作列表。',
     },
@@ -96,7 +84,7 @@ export const ZH_CN_SECURITY_RULES: Record<string, PraxisRuleI18nEntry> = {
         remediation: '评估逻辑共性并依据领域边界进行抽离，或消除局部开发复制。',
     },
     'CPX-SPACE-001': {
-        name: 'CPX-SPACE-001',
+        name: '热点循环内存在无界内存分配与全量重复物化',
         summary: '热点循环内无界瞬态内存分配与重复全量物化。',
         remediation: '将对象/缓冲区分配提升到循环外，循环内执行就地重置与复用。',
     },
@@ -112,30 +100,17 @@ export const ZH_CN_SECURITY_RULES: Record<string, PraxisRuleI18nEntry> = {
         remediation: '将内层数据预先构建为 Map/Set 索引，降低复合复杂度至 O(N)。',
     },
     'ERR-PRP-001': {
-        name: 'ERR-PRP-001',
+        name: '错误码跨声明重复抛出或沿调用链过度深层透传',
         summary: '错误码跨声明重复抛出（分类法冲突）或沿调用链向上传播过多跳数。',
         remediation: '统一错误分类法，使用具名错误类型并在边界层显式捕获转换。',
     },
-    'RES-LAK-001': {
-        name: '资源未在终结块释放',
-        summary: '打开的流、句柄、定时器或锁未在 finally 块或清理函数中保证释放。',
-        remediation:
-            '确保在 try...finally 结构中调用 release/close/dispose，或使用 Disposable 模式。',
-        rationale: '异常路径下的资源遗漏将导致文件句柄枯竭、内存泄漏或死锁。',
-    },
-    'SEC-CST-001': {
-        name: '禁止硬编码敏感凭据',
-        summary: '在代码切片中检测到硬编码的高熵密钥、密码或 API Token。',
-        remediation: '将敏感凭据迁移至安全环境变量或保密凭证存储服务中，切勿在源代码中显式书写。',
-        rationale: '硬编码凭据极易随代码提交扩散并造成凭据泄漏风险。',
-    },
     'SEC-LEAK-001': {
-        name: 'SEC-LEAK-001',
+        name: '日志或异常输出疑似泄漏敏感口令密钥与 PII',
         summary: '日志/异常中输出敏感数据（密码、令牌、个人标识）。',
         remediation: '脱敏后再记录，或只记录标识符与哈希。',
     },
     'SEC-VUL-001': {
-        name: 'SEC-VUL-001',
+        name: '调用任意动态代码执行入口存在代码注入漏洞',
         summary: '任意动态代码执行（eval/exec/Function 构造）。',
         remediation: '改为显式分支或查表；确需动态求值时使用受限解析器。',
     },
@@ -202,12 +177,12 @@ export const ZH_CN_SECURITY_RULES: Record<string, PraxisRuleI18nEntry> = {
         rationale: '未附带证明的 unsafe 块显著增加内存破坏、未定义行为与维护审计风险。',
     },
     'TST-DBT-001': {
-        name: 'TST-DBT-001',
+        name: '测试用例存在未登记收敛计划的滞后技术债务',
         summary: '未登记里程碑收敛计划或责任人的滞后测试技术债务。',
         remediation: '在测试债务登记表中补全责任 Agent 及目标收敛里程碑。',
     },
     'TST-DEN-001': {
-        name: 'TST-DEN-001',
+        name: '核心业务模块有效测试密度或业务覆盖度不足',
         summary: '关键业务模块的有效现代化测试密度 (EMTD) 或当前业务承接率 (CBCR) 低于阈值。',
         remediation: '补齐高风险语义单元的契约测试与边界测试，提高实际故障感知能力。',
     },
@@ -217,12 +192,12 @@ export const ZH_CN_SECURITY_RULES: Record<string, PraxisRuleI18nEntry> = {
         remediation: '将测试迁移至验证活跃业务契约与实际领域状态变化。',
     },
     'TST-SKP-001': {
-        name: 'TST-SKP-001',
+        name: '核心域测试套件遗留长期跳过或隔离停跑用例',
         summary: '核心业务域中长期滞留的跳过、隔离或未执行测试用例。',
         remediation: '修复并恢复测试用例，或正式登记入测试债务清单并设定收敛里程碑。',
     },
     'TST-TAU-001': {
-        name: 'TST-TAU-001',
+        name: '测试用例包含恒真同义反复或缺少真实业务断言',
         summary: '缺乏真实业务断言或包含恒真断言的无效测试。',
         remediation: '替换恒真断言为针对业务实体输出和错误边界的有效验证。',
     },
@@ -234,17 +209,17 @@ export const ZH_CN_SECURITY_RULES: Record<string, PraxisRuleI18nEntry> = {
             '将内嵌在非 Rust 生产文件中的测试逻辑迁移至显式独立测试文件（如 *.test.ts），Rust 计算库测试必须置于 #[cfg(test)] 尾部分区并补充 Agent 可读注释。',
     },
     'duplicate-literal': {
-        name: 'duplicate-literal',
+        name: '同源多处重复字符串字面量可提取共享常量',
         summary: '自动聚合多处行号并提示提取共享常量。',
         remediation: '同一文件内相同字面量出现频次超标（默认 ≥ 3 次）。',
     },
     'high-complexity': {
-        name: 'high-complexity',
+        name: '函数圈复杂度与分支密度突破可维护上限',
         summary: '函数圈复杂度超过阈值。',
         remediation: '抽取具名步骤、早返回替代嵌套分支，或按职责拆分函数。',
     },
     'high-entropy-token': {
-        name: 'high-entropy-token',
+        name: '检测到高信息熵字符串疑似硬编码令牌凭证',
         summary: '高熵字符串疑似密钥/令牌。',
         remediation: '移入配置/密钥管理；确为误报时用 matchRule 抑制并写明理由。',
     },
@@ -254,7 +229,7 @@ export const ZH_CN_SECURITY_RULES: Record<string, PraxisRuleI18nEntry> = {
         remediation: '将常量直接内联或提升至模块顶层单源声明，消除无意义的间接别名与深层对象嵌套。',
     },
     'secret-detected': {
-        name: 'secret-detected',
+        name: '模式识别检出疑似明文硬编码密码或私密凭据',
         summary: '疑似硬编码凭据（按模式识别）。',
         remediation: '撤销并轮换该凭据；改为从环境/密钥管理读取。',
     },
