@@ -48,12 +48,12 @@ export const RUST_TUPLE_LET_PATTERN =
 export const RUST_TRANSIENT_ALLOCATION_PATTERN =
     /\b(?:(?:Vec|Box|String|HashMap|BTreeMap|HashSet|BTreeSet)::(?:new|with_capacity)\s*\(|\.clone\()/;
 
-/** Creates a fresh global scanner for matching open braces in Rust blocks. */
+// Creates a fresh global scanner for matching open braces in Rust blocks.
 export function createRustOpenBraceScanner(): RegExp {
     return /\{/g;
 }
 
-/** Creates a fresh global scanner for matching close braces in Rust blocks. */
+// Creates a fresh global scanner for matching close braces in Rust blocks.
 export function createRustCloseBraceScanner(): RegExp {
     return /\}/g;
 }
@@ -116,7 +116,7 @@ export const RUST_EXPECT_CALL_PATTERN = /\.expect\s*\(/;
 /** Matches Rust naked unwrap method invocation. */
 export const RUST_UNWRAP_PATTERN = /\.unwrap\s*\(/;
 
-/** Creates a fresh global scanner for Rust .unwrap() and .expect() calls. */
+// Creates a fresh global scanner for Rust .unwrap() and .expect() calls.
 export function createRustUnwrapScanner(): RegExp {
     return /\.(?:unwrap|expect)\s*\(/g;
 }
@@ -155,5 +155,5 @@ export const REGEX_RUST = Object.freeze({
     UNWRAP: RUST_UNWRAP_PATTERN,
     createOpenBraceScanner: createRustOpenBraceScanner,
     createCloseBraceScanner: createRustCloseBraceScanner,
-    createRustUnwrapScanner: createRustUnwrapScanner,
+    createRustUnwrapScanner,
 });

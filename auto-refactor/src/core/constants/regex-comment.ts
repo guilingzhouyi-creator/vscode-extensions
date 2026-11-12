@@ -41,7 +41,10 @@ export const ESLINT_DISABLE_PATTERN = /eslint-disable/;
 /** Matches single JSDoc tag on a line. */
 export const JSDOC_TAG_PATTERN = /^\s*\*\s*@([a-zA-Z0-9_-]+)(?:\s+(.*))?$/;
 
-/** Creates a fresh global scanner for extracting JSDoc tags. */
+/**
+ * Creates a fresh global scanner for extracting JSDoc tags.
+ * @returns Global regex capturing a JSDoc tag name.
+ */
 export function createJsdocTagScanner(): RegExp {
     return /@([a-zA-Z0-9_-]+)/g;
 }

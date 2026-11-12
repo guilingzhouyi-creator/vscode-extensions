@@ -21,7 +21,11 @@ export const DATA_STORAGE_RECEIVER_QUERY_PATTERN =
 export const DATA_DIRECT_QUERY_METHOD_PATTERN =
     /\.(?:find(?:ById|One|First|Many)|fetchRecords|getBy\w+|queryAll)\s*\(/i;
 
-/** Tests whether a trimmed line is a database or storage query call site. */
+/**
+ * Tests whether a trimmed line is a database or storage query call site.
+ * @param trimmed - Line already trimmed of surrounding whitespace.
+ * @returns True when the trimmed line is such a call site.
+ */
 export function isDataQueryCall(trimmed: string): boolean {
     return (
         DATA_STORAGE_RECEIVER_QUERY_PATTERN.test(trimmed) ||

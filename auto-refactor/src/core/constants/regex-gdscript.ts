@@ -93,7 +93,10 @@ export const GDSCRIPT_FOR_DECL_PATTERN = /^\s*for\s+[a-zA-Z_]\w*\s+in\b/;
 export const GDSCRIPT_HEADER_PROLOGUE_PATTERN =
     /^(?:@tool\b|@icon\s*\(|tool\b|class_name\s+|extends\s+)/;
 
-/** Creates a fresh global scanner for GDScript preload/load calls. */
+/**
+ * Creates a fresh global scanner for GDScript preload/load calls.
+ * @returns Global regex capturing the path inside a GDScript preload or load call.
+ */
 export function createGdscriptPreloadScanner(): RegExp {
     return /(?:preload|load)\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
 }
@@ -123,5 +126,5 @@ export const REGEX_GDSCRIPT = Object.freeze({
     FUNC_DECL_HEADER: GDSCRIPT_FUNC_DECL_HEADER_PATTERN,
     FOR_DECL: GDSCRIPT_FOR_DECL_PATTERN,
     HEADER_PROLOGUE: GDSCRIPT_HEADER_PROLOGUE_PATTERN,
-    createGdscriptPreloadScanner: createGdscriptPreloadScanner,
+    createGdscriptPreloadScanner,
 });

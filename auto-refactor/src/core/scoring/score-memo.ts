@@ -110,7 +110,7 @@ function canonicalIssueList(issues: readonly Issue[]): string {
     parts.sort();
     return parts.join('\u001e');
 }
-/** Resolves the memo file path for a scan root. */
+// Resolves the memo file path for a scan root.
 export function resolveScoreMemoPath(scanRoot: string): string {
     return path.join(scanRoot, CACHE_DIR_NAME, CACHE_FILE_NAME);
 }
@@ -131,7 +131,7 @@ function removeStagingMemoSafely(stagingPath: string): void {
     }
 }
 
-/** Loads memoized scores whose version and configuration fingerprint match; empty on any miss. */
+// Loads memoized scores whose version and configuration fingerprint match; empty on any miss.
 export function loadScoreMemo(
     scanRoot: string,
     header: ScoreMemoHeader,

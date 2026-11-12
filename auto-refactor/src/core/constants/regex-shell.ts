@@ -131,22 +131,22 @@ export const PS_NON_INTERACTIVE_FLAG_PATTERN = /-(?:Force|NonInteractive|Batch|S
 export const PS_DOC_HEADER_PATTERN =
     /(?:\.(?:SYNOPSIS|DESCRIPTION)|\b(?:Module|Description|Purpose):|<#|#\s*(?:模块归属|职责说明|架构定位|用法示例|退出语义):)/i;
 
-/** Creates a fresh global scanner for PowerShell variable assignment detection. */
+// Creates a fresh global scanner for PowerShell variable assignment detection.
 export function createPsAssignScanner(): RegExp {
     return /\$([A-Za-z_][A-Za-z0-9_]*)\s*(?:=[^=]|\+=|-=|\*=)/g;
 }
 
-/** Creates a fresh global scanner for PowerShell foreach statement variable extraction. */
+// Creates a fresh global scanner for PowerShell foreach statement variable extraction.
 export function createPsForeachScanner(): RegExp {
     return /foreach\s*\(\s*\$([A-Za-z_][A-Za-z0-9_]*)\s+in\b/gi;
 }
 
-/** Creates a fresh global scanner for PowerShell type-casted variable assignment detection. */
+// Creates a fresh global scanner for PowerShell type-casted variable assignment detection.
 export function createPsCastAssignScanner(): RegExp {
     return /\[[A-Za-z_][A-Za-z0-9_.[\]]*\]\s*\$([A-Za-z_][A-Za-z0-9_]*)\s*=/g;
 }
 
-/** Creates a fresh global scanner for PowerShell multi-variable assignment detection. */
+// Creates a fresh global scanner for PowerShell multi-variable assignment detection.
 export function createPsMultiAssignScanner(): RegExp {
     return /\$([A-Za-z_][A-Za-z0-9_]*)\s*,[^=\r\n]*=/g;
 }
@@ -307,12 +307,12 @@ export const SHELL_FOREACH_STATEMENT_PATTERN = /(?:^|[\s;{}])foreach\s*\(/i;
 /** Matches start of heredoc redirection with delimiter capture. */
 export const SHELL_HEREDOC_START_PATTERN = /(?:^|[^<])<<-?\s*['"]?([A-Za-z0-9_]+)['"]?/;
 
-/** Creates a fresh global scanner for taint identifier token extraction. */
+// Creates a fresh global scanner for taint identifier token extraction.
 export function createTaintIdentifierScanner(): RegExp {
     return /\$?([A-Za-z_][A-Za-z0-9_]*)/g;
 }
 
-/** Creates a fresh global scanner for extracting shell environment variables. */
+// Creates a fresh global scanner for extracting shell environment variables.
 export function createShellEnvVarScanner(): RegExp {
     return /\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/g;
 }

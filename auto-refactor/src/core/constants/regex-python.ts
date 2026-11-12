@@ -121,17 +121,17 @@ export const PYTHON_IF_HEADER_PATTERN = /^\s*if\s+[^:]+:\s*$/;
 /** Matches Python def or class declaration header. */
 export const PYTHON_DECL_HEADER_PATTERN = /^\s*(?:def|class)\s+[a-zA-Z_]\w*\b/;
 
-/** Creates a fresh global scanner for stripping parentheses. */
+// Creates a fresh global scanner for stripping parentheses.
 export function createParenStripScanner(): RegExp {
     return /[()]/g;
 }
 
-/** Creates a fresh scanner for stripping Python pointer/star prefixes (*args, **kwargs). */
+// Creates a fresh scanner for stripping Python pointer/star prefixes (*args, **kwargs).
 export function createStarPrefixStripScanner(): RegExp {
     return /^\*{1,2}/;
 }
 
-/** Creates a fresh global scanner for with statement target bindings. */
+// Creates a fresh global scanner for with statement target bindings.
 export function createWithAsScanner(): RegExp {
     return /\bas\s+([A-Za-z_]\w*)\s*(?:,|:)/g;
 }

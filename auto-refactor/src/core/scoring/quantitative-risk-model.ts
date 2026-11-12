@@ -684,25 +684,22 @@ export function computeStochasticDynamics(input: StochasticInput): StochasticMet
 
 /**
  * Evaluates comprehensive quantitative risk assessment across all four mathematical domains.
- * Supports consolidated parameter object (SIM-ARGS-001) as well as legacy 4-tuple arguments.
+ * consolidated-parameter overload: the legacy four-argument form has its own block below.
  *
- * @param params - Consolidated QuantitativeRiskModelParams or financial input.
- * @param riskInput - Optional historical score time-series for legacy calls.
- * @param inequalityInput - Optional file debts and category counts for legacy calls.
- * @param stochasticInput - Optional trajectory and CC values for legacy calls.
+ * @param params - Consolidated financial, risk, inequality and stochastic inputs.
  * @returns Unified quantitative risk assessment.
  */
 export function evaluateQuantitativeRiskModel(
     params: QuantitativeRiskModelParams,
 ): QuantitativeRiskAssessment;
-/** Evaluates quantitative risk metrics from separate domain input structs. */
+// Evaluates quantitative risk metrics from separate domain input structs.
 export function evaluateQuantitativeRiskModel(
     financialInput: FinancialDebtInput,
     riskInput: QualityRiskInput,
     inequalityInput: InequalityInput,
     stochasticInput: StochasticInput,
 ): QuantitativeRiskAssessment;
-/** Resolves parameter form and runs all four quantitative risk models. */
+// Resolves parameter form and runs all four quantitative risk models.
 export function evaluateQuantitativeRiskModel(
     paramsOrFinancial: QuantitativeRiskModelParams | FinancialDebtInput,
     riskInput?: QualityRiskInput,

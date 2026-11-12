@@ -52,7 +52,7 @@ function isWideGlyph(codePoint: number): boolean {
     }
     return false;
 }
-/** Estimates tokens for a prompt fragment: an upper bound on Latin text, close on CJK text. */
+// Estimates tokens for a prompt fragment: an upper bound on Latin text, close on CJK text.
 export function estimateTokens(text: string): number {
     if (!text) return 0;
     let wideCount = 0;
@@ -66,11 +66,11 @@ export function estimateTokens(text: string): number {
     }
     return Math.max(1, Math.ceil(wideCount + narrowCount / NARROW_CHARS_PER_TOKEN));
 }
-/** Measured byte weight of the JSON payload a compact prompt replaces. */
+// Measured byte weight of the JSON payload a compact prompt replaces.
 export function measureJsonBaseline(records: readonly unknown[]): number {
     return records.length === 0 ? 0 : JSON.stringify(records).length;
 }
-/** Estimates tokens for an ASCII JSON payload of the given length. */
+// Estimates tokens for an ASCII JSON payload of the given length.
 export function estimateNarrowTokens(charCount: number): number {
     return charCount <= 0 ? 0 : Math.ceil(charCount / NARROW_CHARS_PER_TOKEN);
 }

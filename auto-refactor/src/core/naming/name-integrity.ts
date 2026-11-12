@@ -22,7 +22,7 @@ export const NAME_WORD_MIN_LENGTH = 2;
 /** Maximum number of words in a generated identifier. */
 export const NAME_WORD_MAX_COUNT = 4;
 
-/** Derives the bounded, ordered word sequence that becomes an identifier. */
+// Derives the bounded, ordered word sequence that becomes an identifier.
 export function deriveLiteralWords(literal: string): string[] {
     const segments = literal
         .replace(/^['"`]|['"`]$/g, '')
@@ -42,7 +42,7 @@ export function deriveLiteralWords(literal: string): string[] {
     return words;
 }
 
-/** Splits an identifier into its constituent words. */
+// Splits an identifier into its constituent words.
 export function splitNameWords(name: string): string[] {
     const core = name.endsWith(STRING_NAME_SUFFIX)
         ? name.slice(0, -STRING_NAME_SUFFIX.length)
@@ -63,7 +63,7 @@ function splitNamePart(part: string): string[] {
         .map((word) => word.toUpperCase());
 }
 
-/** True when every identifier word is accounted for by the literal, in order. */
+// True when every identifier word is accounted for by the literal, in order.
 export function isNameExplainableByLiteral(name: string, literal: string): boolean {
     if (!name || !literal) return false;
     const sourceWords = deriveLiteralWords(literal);

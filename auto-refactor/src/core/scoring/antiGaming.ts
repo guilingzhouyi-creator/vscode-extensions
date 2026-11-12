@@ -411,7 +411,7 @@ function checkTautologicalPadding(
  * (lines >= 300 with Shannon entropy H(T) < 2.5).
  *
  * @param filePath - Physical path to source file under evaluation.
- * @param content - Source file text content.
+ * @param density - Pre-computed effective density for the file.
  * @param issues - Output issues collection.
  * @param gamingKinds - Detected gaming pattern collection.
  * @returns Quality penalty points (25.0 if triggered, else 0.0).
@@ -588,7 +588,13 @@ function checkPatternPenaltyGaming(
     return null;
 }
 
-/** Evaluates conjunction of semantic ratio, diff bounds, turnover, and pattern gaming checks. */
+/**
+ * Evaluates conjunction of semantic ratio, diff bounds, turnover, and pattern gaming checks.
+ *
+ * @param input - Measured ratios and diff bounds for one change set.
+ * @param config - Scoring thresholds governing this evaluation.
+ * @returns Whether the change set is dual-confirmed, together with every gate that fired.
+ */
 export function evaluateAntiGamingConjunction(
     input: AntiGamingConjunctionInput,
     config: AntiGamingScoringConfig = DEFAULT_SCORING_CONFIG.antiGaming,

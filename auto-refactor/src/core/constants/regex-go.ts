@@ -61,12 +61,18 @@ export const GO_IF_SHORT_DECL_PATTERN = /^\s*if\s+[^;]+;\s*/;
 /** Matches Go short variable declaration line. */
 export const GO_SHORT_VAR_DECL_PATTERN = /^\s*([a-zA-Z_][a-zA-Z0-9_,\s]*)\s*:=/;
 
-/** Creates a fresh global scanner for Go named literal instantiations. */
+/**
+ * Creates a fresh global scanner for Go named literal instantiations.
+ * @returns Global regex capturing a Go named literal type token.
+ */
 export function createGoNamedLiteralScanner(): RegExp {
     return /\b([a-zA-Z_]\w*)\s*\{/g;
 }
 
-/** Creates a fresh global scanner for Go call expressions. */
+/**
+ * Creates a fresh global scanner for Go call expressions.
+ * @returns Global regex capturing a Go call expression callee.
+ */
 export function createGoCallExprScanner(): RegExp {
     return /\b([a-zA-Z_]\w*(?:\.[a-zA-Z_]\w*)?)\s*\(/g;
 }

@@ -46,9 +46,7 @@ const PROPERTY_CODE = 'code';
 /** File not found error code for asynchronous baseline reading. */
 const ERROR_CODE_ENOENT = 'ENOENT';
 
-/**
- * Type guard for ENOENT filesystem errors.
- */
+// Type guard for ENOENT filesystem errors.
 export function isEnoentError(error: unknown): boolean {
     if (!error || typeof error !== TYPEOF_OBJECT) {
         return false;
@@ -56,17 +54,13 @@ export function isEnoentError(error: unknown): boolean {
     return (error as Record<string, unknown>)[PROPERTY_CODE] === ERROR_CODE_ENOENT;
 }
 
-/**
- * Log read errors unless the file is cleanly absent.
- */
+// Log read errors unless the file is cleanly absent.
 export function logBaselineReadError(err: unknown, logger: Logger): void {
     if (isEnoentError(err)) return;
     logger.warn(`Failed to read baseline file: ${err}`);
 }
 
-/**
- * Read baseline file asynchronously, ignoring missing files.
- */
+// Read baseline file asynchronously, ignoring missing files.
 export function readBaselineFile(baselinePath: string, logger: Logger): Promise<string | null> {
     return fs.promises.readFile(baselinePath, 'utf8').catch((err: unknown) => {
         logBaselineReadError(err, logger);
@@ -74,9 +68,7 @@ export function readBaselineFile(baselinePath: string, logger: Logger): Promise<
     });
 }
 
-/**
- * Asynchronously read and parse existing baseline if available.
- */
+// Asynchronously read and parse existing baseline if available.
 export async function tryReadExistingBaseline(filePath: string): Promise<BaselinePayload | null> {
     try {
         const raw = await fs.promises.readFile(filePath, 'utf8');
@@ -86,10 +78,7 @@ export async function tryReadExistingBaseline(filePath: string): Promise<Baselin
     }
 }
 
-/**
- * Remap a grouped baseline key if its file portion matches a path remap dictionary.
- * Group key format: `${analyzer}|${rule}|${filePath}`.
- */
+// Remap a grouped baseline key if its file portion matches a path remap dictionary.
 export function remapGroupKey(key: string, pathRemap?: Record<string, string>): string {
     if (!pathRemap) return key;
     const parts = key.split(GROUP_KEY_SEPARATOR);
@@ -103,9 +92,7 @@ export function remapGroupKey(key: string, pathRemap?: Record<string, string>): 
     return key;
 }
 
-/**
- * Normalizes existing baseline groups with path remapping for refactoring migrations (GOV-RTC-002).
- */
+// Normalizes existing baseline groups with path remapping for refactoring migrations (GOV-RTC-002).
 export function normalizeGroupsForRename(
     groups: GroupedBaselineRow[],
     pathRemap?: Record<string, string>,

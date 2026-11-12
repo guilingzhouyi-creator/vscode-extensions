@@ -23,12 +23,12 @@ const CONTENTLESS_NAME_RE = /(?:^|[^A-Za-z0-9_])EXTRACTED_(?:STRING|NUMBER)(?:$|
 const POSITIONAL_NAME_RE = /(?:^|[^A-Za-z0-9_])CONST_\d+_TEXT(?:$|[^A-Za-z0-9_])/;
 /** Longest identifier-like run inside a patch body that may be a generated name. */
 const PATCH_IDENTIFIER_RE = /[A-Z][A-Z0-9_]{2,}/g;
-/** True when a generated name carries no trace of the literal it describes. */
+// True when a generated name carries no trace of the literal it describes.
 export function isContentlessName(name: string | undefined): boolean {
     if (!name) return false;
     return CONTENTLESS_NAME_RE.test(name);
 }
-/** True when the literal omits identifier words; positional names remain exempt. */
+// True when the literal omits identifier words; positional names remain exempt.
 export function isWeldName(name: string | undefined, literal: string | undefined): boolean {
     if (!name || !literal) return false;
     if (!name.endsWith(STRING_NAME_SUFFIX)) return false;
@@ -38,7 +38,7 @@ export function isWeldName(name: string | undefined, literal: string | undefined
     if (deriveLiteralWords(literal).length === 0) return false;
     return !isNameExplainableByLiteral(name, literal);
 }
-/** True when a patch body is too weak to hand to an agent. */
+// True when a patch body is too weak to hand to an agent.
 export function isPlaceholderPatchText(text: string | undefined, literal?: string): boolean {
     if (!text) return true;
     if (CONTENTLESS_NAME_RE.test(text) || POSITIONAL_NAME_RE.test(text)) return true;
