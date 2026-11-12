@@ -270,10 +270,7 @@ const CJK_PROVISIONAL_TERMS: &[&str] = &[
     "零缺陷全部达标",
 ];
 
-/// Vocabulary that is legitimate engineering terminology and must survive the scan.
-///
-/// Kept in one place so a new compound only has to be added here rather than special-cased at each
-/// call site.
+/// Bilingual engineering vocabulary exempted before token and phrase matching.
 const WHITELIST_PHRASES: &[&str] = &[
     "临时文件",
     "临时目录",
@@ -315,6 +312,61 @@ const WHITELIST_PHRASES: &[&str] = &[
     "断言神喻",
     "差分神喻",
     "测试预言机",
+    "断言预言机",
+    "差分预言机",
+    "test oracle",
+    "brittle oracle",
+    "assertion oracle",
+    "differential oracle",
+    "absolute path",
+    "absolute address",
+    "absolute value",
+    "absolute coordinate",
+    "absolute position",
+    "temp file",
+    "temporary file",
+    "temporary directory",
+    "temporary table",
+    "temporary object",
+    "temporary buffer",
+    "temporary variable",
+    "temporary storage",
+    "full build",
+    "full checkpoint",
+    "garbage collection",
+    "garbage collector",
+    "garbage-collected",
+    "garbage-collection",
+    "quick fix action",
+    "quick-fix action",
+    "format placeholder",
+    "template placeholder",
+    "parameter placeholder",
+    "empty placeholder",
+    "placeholder node",
+    "placeholder pattern",
+    "placeholder bag",
+    "placeholder archive",
+    "vacuous placeholder",
+    "positional placeholder",
+    "staging area",
+    "two-pass",
+    "multi-pass",
+    "single-pass",
+    "pass by value",
+    "pass by reference",
+    "pass parameter",
+    "pass parameters",
+    "pass argument",
+    "pass arguments",
+    "pass through",
+    "pass-through",
+    "passing parameter",
+    "passing parameters",
+    "passing argument",
+    "passing arguments",
+    "passing options",
+    "message passing",
 ];
 
 /// Unresolved markers that defer a decision instead of stating one.
@@ -457,22 +509,16 @@ pub fn scrub_for_policy_terms(message: &str) -> String {
 
 /// Removes whitelisted phrases from already-masked, lower-cased text.
 ///
-/// Longer phrases are subtracted first so `临时文件` is removed before `临时` could be reported, and
-/// each removal leaves whitespace behind so the surrounding tokens stay separated.
-///
-/// The scan is skipped entirely when no whitelisted phrase is present, which is the common case.
-/// That early exit matters because this runs once per line of every commit message.
+/// Longer phrases are subtracted first so `临时文件` or `quick fix action` is removed before a
+/// prohibited sub-term could fire, and each removal leaves whitespace behind so surrounding tokens
+/// remain delimited.
 fn subtract_whitelist<'a>(lower: &'a str) -> Cow<'a, str> {
-    if lower.is_ascii() {
-        return Cow::Borrowed(lower);
-    }
     if !WHITELIST_PHRASES
         .iter()
         .any(|phrase| lower.contains(phrase))
     {
         return Cow::Borrowed(lower);
     }
-    // Phrases are pre-sorted at first use so the per-call cost does not include a sort.
     static ORDERED: std::sync::OnceLock<Vec<&'static str>> = std::sync::OnceLock::new();
     let ordered = ORDERED.get_or_init(|| {
         let mut phrases: Vec<&'static str> = WHITELIST_PHRASES.to_vec();
