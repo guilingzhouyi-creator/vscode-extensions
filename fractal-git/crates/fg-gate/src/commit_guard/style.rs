@@ -174,6 +174,7 @@ const DISALLOWED_PREFIXES: &[&str] = &[
     "尝试",
     "开始",
     "想要",
+    "希望能",
     "希望",
     "拟",
     "本提交",
@@ -186,8 +187,43 @@ const DISALLOWED_PREFIXES: &[&str] = &[
 ];
 
 /// First-person pronouns that break the zero-person perspective.
-const FIRST_PERSON_PRONOUNS: &[&str] =
-    &["我们", "我", "本Agent", "笔者", "团队", "俺", "咱", "本人"];
+const FIRST_PERSON_PRONOUNS_CJK: &[&str] =
+    &["我们", "我", "本agent", "笔者", "团队", "俺", "咱", "本人"];
+
+/// English whole-word first-person pronouns breaking objective zero-person perspective.
+const FIRST_PERSON_PRONOUNS_ASCII: &[&str] = &["i", "we", "my", "our", "me", "us"];
+
+/// Explicit past-tense English verbs forbidden in imperative commit subject openings.
+const DISALLOWED_ENGLISH_PAST_TENSE: &[&str] = &[
+    "added",
+    "modified",
+    "fixed",
+    "optimized",
+    "completed",
+    "done",
+    "did",
+    "was",
+    "were",
+    "updated",
+    "refactored",
+    "implemented",
+    "removed",
+    "deleted",
+    "changed",
+    "enhanced",
+    "resolved",
+    "improved",
+    "created",
+    "adjusted",
+    "configured",
+    "integrated",
+    "standardized",
+    "unified",
+    "introduced",
+    "extracted",
+    "simplified",
+    "decoupled",
+];
 
 /// Compounds where the first-person character is a bound morpheme, not a narrator.
 const BOUND_MORPHEME_COMPOUNDS: &[&str] = &["自我", "自举", "自身", "自省"];
@@ -196,6 +232,7 @@ const BOUND_MORPHEME_COMPOUNDS: &[&str] = &["自我", "自举", "自身", "自�
 const CANONICAL_PROJECT_TRIPLETS: &[(&str, &str, &str)] = &[
     ("autorefactor", "auto-refactor", "auto-refactor"),
     ("workspacetiming", "workspace-timing", "workspace-timing"),
+    ("timing扩展", "workspace-timing", "workspace-timing"),
     ("fractalgit", "fractal-git", "fractal-git"),
     ("网页游戏", "WebGames", "webgames"),
 ];
@@ -237,105 +274,147 @@ pub fn check_imperative_subject(subject: &str) -> Option<StyleFinding> {
     {
         return None;
     }
-    if is_likely_english_past_tense(&lower) {
+    if let Some(tense_desc) = check_english_verb_inflection(&lower) {
         return Some(StyleFinding {
             rule_id: fg_core::constants::rules::RULE_FGT_MSG_004,
             token: first_word.to_string(),
             message: format!(
-                "Commit subject opens with past-tense '{}'; use the base imperative verb",
-                first_word
+                "Commit subject opens with {} '{}'; use the base imperative verb",
+                tense_desc, first_word
             ),
         });
     }
     None
 }
 
-/// Whether an English word looks like a past participle rather than an imperative.
-fn is_likely_english_past_tense(word: &str) -> bool {
-    if !word
-        .chars()
-        .all(|character| character.is_ascii_alphabetic())
+/// Checks whether an opening English word carries non-imperative verb inflection (`-ed`, `-ing`, `-es`, `-s`).
+fn check_english_verb_inflection(word: &str) -> Option<&'static str> {
+    if word.is_empty()
+        || !word
+            .chars()
+            .all(|character| character.is_ascii_alphabetic())
     {
-        return false;
+        return None;
     }
-    const EXCEPTIONS: &[&str] = &["need", "seed", "feed", "embed", "bed", "red", "shed"];
-    if EXCEPTIONS.contains(&word) || APPROVED_ENGLISH_VERBS.contains(&word) {
-        return false;
+    if APPROVED_ENGLISH_VERBS.contains(&word) {
+        return None;
     }
-    word.ends_with("ed") && word.chars().count() > 3
+    if DISALLOWED_ENGLISH_PAST_TENSE.contains(&word) {
+        return Some("past-tense verb");
+    }
+    const ED_EXCEPTIONS: &[&str] = &[
+        "need", "seed", "feed", "embed", "bed", "red", "shed", "exceed", "proceed", "succeed",
+    ];
+    let len = word.len();
+    if word.ends_with("ing") && len >= 5 {
+        return Some("present participle (-ing)");
+    }
+    if word.ends_with("ed") && len >= 5 && !ED_EXCEPTIONS.contains(&word) {
+        return Some("past-tense (-ed)");
+    }
+    if word.ends_with("es") && len >= 5 {
+        return Some("third-person singular (-es)");
+    }
+    if word.ends_with('s')
+        && !word.ends_with("ss")
+        && len >= 4
+        && !matches!(word, "status" | "alias" | "focus" | "taxis" | "this")
+    {
+        return Some("third-person singular (-s)");
+    }
+    None
 }
 
 /// Scans every line for first-person pronouns and non-canonical project names.
+///
+/// Inline backtick spans are intentionally NOT masked so subjective pronouns inside backticks
+/// cannot bypass zero-POV enforcement.
 pub fn scan_body_lines(lines: &[&str]) -> Vec<StyleFinding> {
     let mut findings = Vec::new();
     for line in lines {
         if line.is_empty() {
             continue;
         }
-        let masked_code = mask_code_spans(line);
-        let masked_bound = mask_bound_morphemes(&masked_code);
-        let lowered = if masked_bound.bytes().any(|byte| byte.is_ascii_uppercase()) {
-            Cow::Owned(masked_bound.to_lowercase())
-        } else if masked_bound.is_ascii() {
-            masked_bound
-        } else {
-            Cow::Owned(masked_bound.to_lowercase())
-        };
-
-        if let Some(pronoun) = find_first_person_pronoun(&lowered) {
-            findings.push(StyleFinding {
-                rule_id: fg_core::constants::rules::RULE_FGT_MSG_004,
-                token: pronoun.to_string(),
-                message: format!(
-                    "Commit message uses first-person '{}'; a version history is written in the objective voice",
-                    pronoun
-                ),
-            });
-        }
-
-        for &(misnomer, canonical, canonical_lower) in CANONICAL_PROJECT_TRIPLETS {
-            if lowered.contains(misnomer) && !lowered.contains(canonical_lower) {
-                findings.push(StyleFinding {
-                    rule_id: fg_core::constants::rules::RULE_FGT_MSG_007,
-                    token: misnomer.to_string(),
-                    message: format!(
-                        "Commit message spells the project '{}'; the canonical name is '{}'",
-                        misnomer, canonical
-                    ),
-                });
-            }
-        }
+        scan_style_line(line, &mut findings);
     }
     findings
 }
 
-/// Finds the first matching first-person pronoun, skipping ASCII lines that cannot match.
-fn find_first_person_pronoun(lowered: &str) -> Option<&'static str> {
-    if lowered.is_ascii() {
-        return None;
+/// Scans a single message line for first-person POV and project nomenclature drift.
+fn scan_style_line(line: &str, findings: &mut Vec<StyleFinding>) {
+    let masked_bound = mask_bound_morphemes(line);
+    let lowered = if masked_bound.bytes().any(|byte| byte.is_ascii_uppercase()) {
+        Cow::Owned(masked_bound.to_lowercase())
+    } else if masked_bound.is_ascii() {
+        masked_bound
+    } else {
+        Cow::Owned(masked_bound.to_lowercase())
+    };
+
+    if let Some(pronoun) = find_first_person_pronoun(&lowered) {
+        findings.push(StyleFinding {
+            rule_id: fg_core::constants::rules::RULE_FGT_MSG_004,
+            token: pronoun.to_string(),
+            message: format!(
+                "Commit message uses first-person '{}'; a version history is written in the objective voice",
+                pronoun
+            ),
+        });
     }
-    FIRST_PERSON_PRONOUNS
-        .iter()
-        .find(|pronoun| lowered.contains(**pronoun))
-        .copied()
+
+    for &(misnomer, canonical, canonical_lower) in CANONICAL_PROJECT_TRIPLETS {
+        if lowered.contains(misnomer) && !lowered.contains(canonical_lower) {
+            findings.push(StyleFinding {
+                rule_id: fg_core::constants::rules::RULE_FGT_MSG_007,
+                token: misnomer.to_string(),
+                message: format!(
+                    "Commit message spells the project '{}'; the canonical name is '{}'",
+                    misnomer, canonical
+                ),
+            });
+        }
+    }
 }
 
-/// Blanks out inline code spans so quoted identifiers are not mistaken for prose.
-fn mask_code_spans<'a>(line: &'a str) -> Cow<'a, str> {
-    if !line.contains('`') {
-        return Cow::Borrowed(line);
-    }
-    let mut output = String::with_capacity(line.len());
-    let mut in_code = false;
-    for character in line.chars() {
-        if character == '`' {
-            in_code = !in_code;
-            output.push(' ');
-            continue;
+/// Finds the first matching CJK or English whole-word first-person pronoun.
+fn find_first_person_pronoun(lowered: &str) -> Option<&'static str> {
+    if !lowered.is_ascii() {
+        if let Some(zh) = FIRST_PERSON_PRONOUNS_CJK
+            .iter()
+            .find(|pronoun| lowered.contains(**pronoun))
+            .copied()
+        {
+            return Some(zh);
         }
-        output.push(if in_code { ' ' } else { character });
     }
-    Cow::Owned(output)
+    let bytes = lowered.as_bytes();
+    let mut idx = 0usize;
+    while idx < bytes.len() {
+        if bytes[idx].is_ascii_alphabetic() {
+            let start = idx;
+            while idx < bytes.len() && (bytes[idx].is_ascii_alphanumeric() || bytes[idx] == b'_') {
+                idx += 1;
+            }
+            let prev_hyphen = start > 0 && bytes[start - 1] == b'-';
+            let next_hyphen = idx < bytes.len() && bytes[idx] == b'-';
+            let token = &lowered[start..idx];
+            let is_io_abbrev = token == "i"
+                && ((idx < bytes.len() && bytes[idx] == b'/')
+                    || (start > 0 && bytes[start - 1] == b'/'));
+            if !prev_hyphen && !next_hyphen && !is_io_abbrev {
+                if let Some(en) = FIRST_PERSON_PRONOUNS_ASCII
+                    .iter()
+                    .find(|&&pronoun| pronoun == token)
+                    .copied()
+                {
+                    return Some(en);
+                }
+            }
+        } else {
+            idx += 1;
+        }
+    }
+    None
 }
 
 /// Blanks out bound-morpheme compounds before the pronoun scan.

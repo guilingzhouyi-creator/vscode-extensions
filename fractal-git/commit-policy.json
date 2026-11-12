@@ -15,7 +15,7 @@
   ],
   "headerMetrics": {
     "unit": "unicode-character",
-    "minChars": 5,
+    "minChars": 15,
     "maxChars": 80,
     "rationale": "Character counting keeps a 30-character Chinese subject legal; byte counting rejected it at 90 bytes. The reference implementation in scripts/common/commit-structure-contract.js also counts characters."
   },

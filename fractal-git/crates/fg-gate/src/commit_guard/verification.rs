@@ -58,8 +58,8 @@ pub fn extract_assertions(verification_content: &str) -> Vec<String> {
         if trimmed.is_empty() {
             continue;
         }
-        if trimmed.starts_with('-') || trimmed.starts_with('*') {
-            let bullet = trimmed.trim_start_matches(['-', '*', ' ']).trim();
+        if trimmed.starts_with('-') {
+            let bullet = trimmed.trim_start_matches(['-', ' ']).trim();
             if !bullet.is_empty() {
                 bullets.push(bullet.to_string());
             }
