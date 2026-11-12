@@ -494,4 +494,5 @@ module.exports = Object.freeze({
   loadRecentTurnoverRecords,
   calculateEmpiricalAdmissionThreshold,
   evaluateFileStagedDiff,
+  readGitBlobText,
 });
