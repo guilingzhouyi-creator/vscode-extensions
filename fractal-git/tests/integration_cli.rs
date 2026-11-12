@@ -73,15 +73,15 @@ mod test_patch_commands;
 #[path = "rust/test_pathspec_resolution.rs"]
 mod test_pathspec_resolution;
 
+#[path = "rust/test_cli_semantics_core.rs"]
+mod test_cli_semantics_core;
+#[path = "rust/test_cli_semantics_ops.rs"]
+mod test_cli_semantics_ops;
 #[path = "rust/test_plumbing_tree_commands.rs"]
 mod test_plumbing_tree_commands;
 #[path = "rust/test_ref_commands.rs"]
 mod test_ref_commands;
 #[path = "rust/test_switch_parity.rs"]
 mod test_switch_parity;
-#[path = "rust/test_cli_semantics_core.rs"]
-mod test_cli_semantics_core;
-#[path = "rust/test_cli_semantics_ops.rs"]
-mod test_cli_semantics_ops;
 #[path = "rust/test_worktree_checkout_parity.rs"]
 mod test_worktree_checkout_parity;

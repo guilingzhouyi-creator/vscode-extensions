@@ -10,7 +10,7 @@
 //!
 //! ### Domain Governance Rules (SSOT):
 //! - `FGT-COR-001`: Core data model and error contract guard
-//! - `FGT-CLI-001`: CLI exit status and parity contract guard
+//! - `FGT-ERR-001`: CLI usage rejection and strong-typed error propagation guard
 
 use std::fs;
 use std::path::Path;
@@ -108,17 +108,42 @@ pub(crate) fn parse_commit_cli_flags(args: &[String]) -> CommitCliFlags<'_> {
     }
 }
 
+/// Reports whether `arg` consumes the following argument as a commit message file path.
+fn takes_separate_message_file_value(arg: &str) -> bool {
+    arg == "-F" || arg == "--file"
+}
+
+/// Reports whether `arg` already carries the commit message file path inline.
+fn carries_inline_message_file_value(arg: &str) -> bool {
+    arg.starts_with("--file=") || (arg.starts_with("-F") && arg.len() > 2)
+}
+
 /// Builds a cloned `CliContext` without `-F`/`--file` message arguments so downstream sync sees only staged path flags.
+///
+/// Arguments after a `--` separator are path operands by contract and are copied verbatim, so a staged
+/// file whose name begins with `-F` is never mistaken for the message file switch.
 pub(crate) fn strip_message_file_flags(ctx: &CliContext) -> CliContext {
     let mut cleaned_args = Vec::with_capacity(ctx.args.len());
     let mut cursor = 0;
+    let mut operands_only = false;
     while cursor < ctx.args.len() {
         let arg = ctx.args[cursor].as_str();
-        if arg == "-F" || arg == "--file" {
+        if operands_only {
+            cleaned_args.push(ctx.args[cursor].clone());
+            cursor += 1;
+            continue;
+        }
+        if arg == "--" {
+            operands_only = true;
+            cleaned_args.push(ctx.args[cursor].clone());
+            cursor += 1;
+            continue;
+        }
+        if takes_separate_message_file_value(arg) {
             cursor += 2;
             continue;
         }
-        if arg.starts_with("--file=") || (arg.starts_with("-F") && arg.len() > 2) {
+        if carries_inline_message_file_value(arg) {
             cursor += 1;
             continue;
         }
