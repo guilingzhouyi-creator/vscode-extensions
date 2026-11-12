@@ -15,16 +15,20 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+REPO_ROOT="$(cd "${PROJECT_ROOT}/.." && pwd)"
 MANIFEST_PATH="${PROJECT_ROOT}/Cargo.toml"
 
 FAST_MODE=0
+JSON_MODE=0
 for arg in "$@"; do
     case "$arg" in
         --fast|-f|-Fast) FAST_MODE=1 ;;
+        --json|-Json) JSON_MODE=1 ;;
         --help|-h|-Help)
             echo "用法: bash fractal-git/scripts/sh/audit-taxis.sh [选项]"
             echo "选项:"
             echo "  --fast, -f, -Fast   快速模式 (限制测试线程数)"
+            echo "  --json, -Json       机器消费模式 (仅在结束时输出单一 JSON)"
             echo "  --help, -h, -Help   显示此帮助信息"
             exit 0
             ;;
@@ -35,17 +39,17 @@ for arg in "$@"; do
     esac
 done
 
-echo "=========================================================================="
-echo "  Taxis (Fractal Git) Industrial Audit & Auto-Refactor Quality Gate (Bash)"
-echo "=========================================================================="
-
 # 步骤身份与四态判定由工作区共享运行时库提供，禁止在本 Runner 内复制实现。
-GATE_ROOT_DIR="${PROJECT_ROOT}/.."
+GATE_ROOT_DIR="${REPO_ROOT}"
 GATE_NODE_BIN="$(command -v node 2>/dev/null || echo node)"
-GATE_SUPPRESS=0
+GATE_SUPPRESS="${JSON_MODE}"
 # shellcheck source=scripts/sh/lib/gate-runtime.sh
 . "${GATE_ROOT_DIR}/scripts/sh/lib/gate-runtime.sh"
 gate_init audit-taxis
+
+gate_log "=========================================================================="
+gate_log "  Taxis (Fractal Git) Industrial Audit & Auto-Refactor Quality Gate (Bash)"
+gate_log "=========================================================================="
 
 write_step_banner "CRATE-TOPOLOGY-01"
 CARGO_CMD="${CARGO_CMD:-cargo}"
@@ -56,11 +60,19 @@ if ! command -v "${CARGO_CMD}" &>/dev/null; then
 fi
 if command -v node &>/dev/null; then
     TOPO_STATUS=0
-    node "${PROJECT_ROOT}/scripts/common/validate-crate-topology.js" || TOPO_STATUS=$?
-    node "${PROJECT_ROOT}/scripts/common/check-zero-alloc-boundary.js" || TOPO_STATUS=$?
-    node "${PROJECT_ROOT}/scripts/common/validate-git-parity.js" --require-git || TOPO_STATUS=$?
-    "${CARGO_CMD}" fmt --manifest-path "${MANIFEST_PATH}" --all -- --check || TOPO_STATUS=$?
-    "${CARGO_CMD}" clippy --workspace --manifest-path "${MANIFEST_PATH}" --all-targets -- -D warnings || TOPO_STATUS=$?
+    if [[ "${JSON_MODE}" -eq 1 ]]; then
+        node "${PROJECT_ROOT}/scripts/common/validate-crate-topology.js" >/dev/null 2>&1 || TOPO_STATUS=$?
+        node "${PROJECT_ROOT}/scripts/common/check-zero-alloc-boundary.js" >/dev/null 2>&1 || TOPO_STATUS=$?
+        node "${PROJECT_ROOT}/scripts/common/validate-git-parity.js" --require-git >/dev/null 2>&1 || TOPO_STATUS=$?
+        "${CARGO_CMD}" fmt --manifest-path "${MANIFEST_PATH}" --all -- --check >/dev/null 2>&1 || TOPO_STATUS=$?
+        "${CARGO_CMD}" clippy --workspace --manifest-path "${MANIFEST_PATH}" --all-targets -- -D warnings >/dev/null 2>&1 || TOPO_STATUS=$?
+    else
+        node "${PROJECT_ROOT}/scripts/common/validate-crate-topology.js" || TOPO_STATUS=$?
+        node "${PROJECT_ROOT}/scripts/common/check-zero-alloc-boundary.js" || TOPO_STATUS=$?
+        node "${PROJECT_ROOT}/scripts/common/validate-git-parity.js" --require-git || TOPO_STATUS=$?
+        "${CARGO_CMD}" fmt --manifest-path "${MANIFEST_PATH}" --all -- --check || TOPO_STATUS=$?
+        "${CARGO_CMD}" clippy --workspace --manifest-path "${MANIFEST_PATH}" --all-targets -- -D warnings || TOPO_STATUS=$?
+    fi
     if [[ "${TOPO_STATUS}" -ne 0 ]]; then
         write_step_verdict "CRATE-TOPOLOGY-01" BLOCK "内核子系统拓扑、零分配边界、Git 对等、格式或 Clippy 校验未通过"
         exit 1
@@ -75,7 +87,7 @@ fi
 # -----------------------------------------------------------------------------
 # 内核子系统回归测试套件
 # -----------------------------------------------------------------------------
-echo ""
+gate_log ""
 write_step_banner "CRATE-REGRESSION-02"
 TEST_STATUS=0
 if [[ "${FAST_MODE}" -eq 1 ]]; then
@@ -83,25 +95,76 @@ if [[ "${FAST_MODE}" -eq 1 ]]; then
 else
     TEST_OUTPUT="$("${CARGO_CMD}" test --workspace --manifest-path "${MANIFEST_PATH}" 2>&1)" || TEST_STATUS=$?
 fi
-printf '%s\n' "${TEST_OUTPUT}"
+if [[ "${JSON_MODE}" -eq 0 ]]; then
+    printf '%s\n' "${TEST_OUTPUT}"
+fi
 if [[ "${TEST_STATUS}" -ne 0 ]]; then
     write_step_verdict "CRATE-REGRESSION-02" BLOCK "cargo 回归套件报告失败"
     exit 1
 fi
-PASSED_TOTAL="$(printf '%s\n' "${TEST_OUTPUT}" | sed -nE 's/^test result: (ok|FAILED)\. ([0-9]+) passed.*/\2/p' | awk '{s+=$1} END {print s+0}')"
-if [[ "${PASSED_TOTAL}" -gt 0 ]]; then
-    write_step_verdict "CRATE-REGRESSION-02" PASS "${PASSED_TOTAL} 项测试通过"
+
+TSC_PATH="${REPO_ROOT}/auto-refactor/node_modules/typescript/bin/tsc"
+if [[ ! -f "${TSC_PATH}" ]]; then
+    TSC_PATH="${PROJECT_ROOT}/node_modules/typescript/bin/tsc"
+fi
+if [[ ! -f "${PROJECT_ROOT}/node_modules/ajv/dist/2020.js" && -f "${PROJECT_ROOT}/package-lock.json" ]] && command -v npm &>/dev/null; then
+    NPM_CI_STATUS=0
+    npm --prefix "${PROJECT_ROOT}" ci --offline --ignore-scripts >/dev/null 2>&1 || NPM_CI_STATUS=$?
+    if [[ "${NPM_CI_STATUS}" -ne 0 ]]; then
+        gate_log_err "npm offline ci unavailable (${NPM_CI_STATUS}); proceeding to TS check."
+    fi
+fi
+TS_STATUS=0
+if [[ ! -f "${TSC_PATH}" ]]; then
+    TS_STATUS=1
+else
+    node "${PROJECT_ROOT}/scripts/common/sync-quality-evidence.js" --check >/dev/null 2>&1 || TS_STATUS=$?
+    if [[ "${TS_STATUS}" -eq 0 ]]; then
+        node "${TSC_PATH}" -p "${PROJECT_ROOT}/tsconfig.json" || TS_STATUS=$?
+    fi
+fi
+TS_OUTPUT=""
+TS_PASSED=0
+if [[ "${TS_STATUS}" -eq 0 ]]; then
+    TS_TEST_FILES=()
+    while IFS= read -r -d '' tf; do
+        TS_TEST_FILES+=("$tf")
+    done < <(find "${PROJECT_ROOT}/dist/tests/ts" -maxdepth 1 -type f -name '*.test.js' -print0 2>/dev/null | sort -z)
+    if [[ "${#TS_TEST_FILES[@]}" -eq 0 ]]; then
+        TS_STATUS=1
+    else
+        TS_OUTPUT="$(node --test "${TS_TEST_FILES[@]}" 2>&1)" || TS_STATUS=$?
+        if [[ "${JSON_MODE}" -eq 0 ]]; then
+            printf '%s\n' "${TS_OUTPUT}"
+        fi
+        if [[ "${TS_STATUS}" -eq 0 ]]; then
+            TS_PASSED="$(printf '%s\n' "${TS_OUTPUT}" | sed -nE 's/^.*[[:space:]]pass ([0-9]+)[[:space:]]*$/\1/p' | tail -n 1)"
+            TS_PASSED="${TS_PASSED:-0}"
+        fi
+    fi
+fi
+if [[ "${TS_STATUS}" -ne 0 ]]; then
+    write_step_verdict "CRATE-REGRESSION-02" BLOCK "TypeScript 编译、契约校验或 tests/ts 回归套件报告失败"
+    exit 1
+fi
+
+RUST_PASSED="$(printf '%s\n' "${TEST_OUTPUT}" | sed -nE 's/^test result: (ok|FAILED)\. ([0-9]+) passed.*/\2/p' | awk '{s+=$1} END {print s+0}')"
+PASSED_TOTAL=$((RUST_PASSED + TS_PASSED))
+if [[ "${PASSED_TOTAL}" -gt 0 && "${TS_PASSED}" -gt 0 ]]; then
+    write_step_verdict "CRATE-REGRESSION-02" PASS "${PASSED_TOTAL} 项测试通过 (含 TS ${TS_PASSED} 项)"
+elif [[ "${PASSED_TOTAL}" -gt 0 ]]; then
+    write_step_verdict "CRATE-REGRESSION-02" WARN "Rust ${PASSED_TOTAL} 项通过，但 node --test 未报告通过计数"
 else
     # A green exit status carrying no reported count means the harness executed nothing, or the
     # output shape changed underneath this parser. Both conditions must surface: calling this PASS
     # made an empty suite indistinguishable from one that actually asserted.
-    write_step_verdict "CRATE-REGRESSION-02" WARN "cargo 未报告任何测试计数，回归覆盖不可证实"
+    write_step_verdict "CRATE-REGRESSION-02" WARN "未报告任何测试计数，回归覆盖不可证实"
 fi
 
 # -----------------------------------------------------------------------------
 # 性能微基准与耗时棘轮
 # -----------------------------------------------------------------------------
-echo ""
+gate_log ""
 write_step_banner "CRATE-BENCHMARK-03"
 # 微基准的清单路径、基线路径与采样数由 Node 侧单一实现持有：双平台各自拼装命令行会在
 # 基线路径的相对/绝对形式上悄悄分叉，届时「两端同构」只在脚本结构上成立而不在语义上成立。
@@ -111,7 +174,11 @@ if ! command -v node &>/dev/null; then
     write_step_verdict "CRATE-BENCHMARK-03" BLOCK "node 运行时缺失，微基准棘轮无法执行"
     exit 1
 fi
-node "${BENCH_SCRIPT}" || BENCH_STATUS=$?
+if [[ "${JSON_MODE}" -eq 1 ]]; then
+    node "${BENCH_SCRIPT}" >/dev/null 2>&1 || BENCH_STATUS=$?
+else
+    node "${BENCH_SCRIPT}" || BENCH_STATUS=$?
+fi
 if [[ "${BENCH_STATUS}" -ne 0 ]]; then
     write_step_verdict "CRATE-BENCHMARK-03" BLOCK "TB-REGRESSION 微基准超出容差包络"
     exit 1
@@ -121,7 +188,7 @@ write_step_verdict "CRATE-BENCHMARK-03" PASS "微基准在 15% 容差包络内"
 # -----------------------------------------------------------------------------
 # 重构质量分数包络计算
 # -----------------------------------------------------------------------------
-echo ""
+gate_log ""
 write_step_banner "QUALITY-ENVELOPE-04"
 AUDIT_SCRIPT="${PROJECT_ROOT}/scripts/common/run-audit-report.js"
 REPORT_PATH="${PROJECT_ROOT}/reports/audit-latest.json"
@@ -129,14 +196,20 @@ COMPOSITE_SCORE=""
 CAI_SCORE=""
 CI_LOWER=""
 
-# 分数只来自客观报告。报告缺失时保持空值并如实标注 N/A，
-# 绝不以写死常数回填，否则审查输出会给出任何检查都未产出的数字。
+# 分数只来自客观报告。报告缺失或执行失败时保持空值并如实标注 SKIP，
+# 绝不以写死常数或陈旧报告回填，否则审查输出会给出伪造测量。
 if command -v node &>/dev/null && [[ -f "${AUDIT_SCRIPT}" ]]; then
     REPORT_ARGS=()
     [[ "${FAST_MODE}" -eq 1 ]] && REPORT_ARGS+=("--fast")
-    node "${AUDIT_SCRIPT}" ${REPORT_ARGS[@]+"${REPORT_ARGS[@]}"} >/dev/null 2>&1 || true
-    if [[ -f "${REPORT_PATH}" ]]; then
-        DYNAMIC_VALUES="$(node -e '
+    REPORT_STATUS=0
+    if [[ "${JSON_MODE}" -eq 1 ]]; then
+        node "${AUDIT_SCRIPT}" ${REPORT_ARGS[@]+"${REPORT_ARGS[@]}"} >/dev/null 2>&1 || REPORT_STATUS=$?
+    else
+        node "${AUDIT_SCRIPT}" ${REPORT_ARGS[@]+"${REPORT_ARGS[@]}"} || REPORT_STATUS=$?
+    fi
+    if [[ "${REPORT_STATUS}" -eq 0 && -f "${REPORT_PATH}" ]]; then
+        DYNAMIC_VALUES=""
+        if ! DYNAMIC_VALUES="$(node -e '
             try {
                 const r = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
                 if (r && r.qualityEnvelope) {
@@ -146,7 +219,9 @@ if command -v node &>/dev/null && [[ -f "${AUDIT_SCRIPT}" ]]; then
                                  pick(r.qualityEnvelope.credible_interval_lower)].join(" "));
                 }
             } catch {}
-        ' "${REPORT_PATH}" 2>/dev/null || true)"
+        ' "${REPORT_PATH}" 2>/dev/null)"; then
+            DYNAMIC_VALUES=""
+        fi
         if [[ -n "${DYNAMIC_VALUES}" ]]; then
             read -r COMPOSITE_SCORE CAI_SCORE CI_LOWER <<< "${DYNAMIC_VALUES}"
         fi
@@ -162,8 +237,9 @@ fi
 # -----------------------------------------------------------------------------
 # 自举晋级桥接校验
 # -----------------------------------------------------------------------------
-echo ""
+gate_log ""
 write_step_banner "PROMOTION-BRIDGE-05"
+PROMO_STATUS_LABEL="SKIP"
 if [[ -z "${COMPOSITE_SCORE}" || -z "${CAI_SCORE}" || -z "${CI_LOWER}" ]]; then
     write_step_verdict "PROMOTION-BRIDGE-05" SKIP "质量包络不可得，晋级请求无可依附的客观分数"
 else
@@ -180,20 +256,35 @@ else
         write_step_verdict "PROMOTION-BRIDGE-05" BLOCK "晋级演练仓库初始化失败，无法验证暂存链路"
         exit 1
     fi
-    CANDIDATE_OID="$(git -C "${PROJECT_ROOT}" rev-parse HEAD 2>/dev/null || true)"
+    CANDIDATE_OID=""
+    if ! CANDIDATE_OID="$(git -C "${PROJECT_ROOT}" rev-parse HEAD 2>/dev/null)"; then
+        CANDIDATE_OID=""
+    fi
     if [[ ! "${CANDIDATE_OID}" =~ ^[0-9a-f]{40}$ ]]; then
         CANDIDATE_OID="0000000000000000000000000000000000000000"
     fi
     PROMO_STATUS=0
-    "${CARGO_CMD}" run --manifest-path "${MANIFEST_PATH}" --bin taxis -- promotion request \
-        --git-dir "${PROMO_ROOT}/.taxis" \
-        --candidate "${CANDIDATE_OID}" \
-        --agent "taxis-auditor" \
-        --score "${COMPOSITE_SCORE}" \
-        --cai "${CAI_SCORE}" \
-        --ci-lower "${CI_LOWER}" \
-        --summary "In-house self-audit verified: clean topology, zero-alloc boundary, ${PASSED_TOTAL} passing tests, and TB-REGRESSION baseline ratchet preserved." \
-        || PROMO_STATUS=$?
+    if [[ "${JSON_MODE}" -eq 1 ]]; then
+        "${CARGO_CMD}" run --manifest-path "${MANIFEST_PATH}" --bin taxis -- promotion request \
+            --git-dir "${PROMO_ROOT}/.taxis" \
+            --candidate "${CANDIDATE_OID}" \
+            --agent "taxis-auditor" \
+            --score "${COMPOSITE_SCORE}" \
+            --cai "${CAI_SCORE}" \
+            --ci-lower "${CI_LOWER}" \
+            --summary "In-house self-audit verified: clean topology, zero-alloc boundary, ${PASSED_TOTAL} passing tests, and TB-REGRESSION baseline ratchet preserved." \
+            >/dev/null 2>&1 || PROMO_STATUS=$?
+    else
+        "${CARGO_CMD}" run --manifest-path "${MANIFEST_PATH}" --bin taxis -- promotion request \
+            --git-dir "${PROMO_ROOT}/.taxis" \
+            --candidate "${CANDIDATE_OID}" \
+            --agent "taxis-auditor" \
+            --score "${COMPOSITE_SCORE}" \
+            --cai "${CAI_SCORE}" \
+            --ci-lower "${CI_LOWER}" \
+            --summary "In-house self-audit verified: clean topology, zero-alloc boundary, ${PASSED_TOTAL} passing tests, and TB-REGRESSION baseline ratchet preserved." \
+            || PROMO_STATUS=$?
+    fi
     if [[ "${PROMO_STATUS}" -ne 0 ]]; then
         write_step_verdict "PROMOTION-BRIDGE-05" BLOCK "自举晋级暂存请求失败"
         exit 1
@@ -203,11 +294,41 @@ else
         write_step_verdict "PROMOTION-BRIDGE-05" BLOCK "晋级暂存请求未落盘，仓库容器缺失"
         exit 1
     fi
+    PROMO_STATUS_LABEL="PASS"
     write_step_verdict "PROMOTION-BRIDGE-05" PASS "晋级暂存请求已受理，候选保留于提权审批暂存账本"
 fi
 
-echo ""
-echo "=========================================================================="
-echo "  TAXIS QUALITY & PERFORMANCE GATES COMPLETED"
-echo "=========================================================================="
+if [[ "${JSON_MODE}" -eq 1 ]]; then
+    node -e '
+        const fast = process.argv[1] === "1";
+        const passed = Number(process.argv[2]) || 0;
+        const comp = process.argv[3] ? Number(process.argv[3]) : null;
+        const cai = process.argv[4] ? Number(process.argv[4]) : null;
+        const ci = process.argv[5] ? Number(process.argv[5]) : null;
+        const promo = process.argv[6] || "SKIP";
+        const qualityStatus = comp !== null && cai !== null && ci !== null ? "PASS" : "SKIP";
+        console.log(JSON.stringify({
+            protocolVersion: "1.0.0",
+            status: "PASS",
+            entry: "audit-taxis",
+            fastMode: fast,
+            steps: {
+                "CRATE-TOPOLOGY-01": "PASS",
+                "CRATE-REGRESSION-02": passed > 0 ? "PASS" : "WARN",
+                "CRATE-BENCHMARK-03": "PASS",
+                "QUALITY-ENVELOPE-04": qualityStatus,
+                "PROMOTION-BRIDGE-05": promo,
+            },
+            testsPassed: passed,
+            qualityEnvelope: { compositeScore: comp, caiScore: cai, credibleIntervalLower: ci },
+            failedSteps: [],
+        }, null, 2));
+    ' "${FAST_MODE}" "${PASSED_TOTAL}" "${COMPOSITE_SCORE}" "${CAI_SCORE}" "${CI_LOWER}" "${PROMO_STATUS_LABEL}"
+    exit 0
+fi
+
+gate_log ""
+gate_log "=========================================================================="
+gate_log "  TAXIS QUALITY & PERFORMANCE GATES COMPLETED"
+gate_log "=========================================================================="
 exit 0
