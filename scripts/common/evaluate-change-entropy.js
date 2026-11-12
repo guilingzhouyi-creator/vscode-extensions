@@ -274,6 +274,40 @@ function getCommitListInRange(commitRange) {
 }
 
 /**
+ * Fetches numstat and commit subjects for an entire revision range in one git invocation.
+ *
+ * @param {string} commitRange - Revision range string.
+ * @returns {Map<string, { subject: string, numstat: string }> | null} Map from SHA to commit data, or null on error.
+ */
+function readCommitNumstatBatch(commitRange) {
+    if (!commitRange) return null;
+    try {
+        const raw = execFileSync('git', ['log', commitRange, '--numstat', '--format=\x1e%H\x1f%s'], {
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+            maxBuffer: 64 * 1024 * 1024,
+        });
+        const blocks = raw.split('\x1e').filter(Boolean);
+        const map = new Map();
+        for (let i = 0; i < blocks.length; i++) {
+            const block = blocks[i];
+            const nl = block.indexOf('\n');
+            const header = nl === -1 ? block : block.slice(0, nl);
+            const numstat = nl === -1 ? '' : block.slice(nl + 1);
+            const sep = header.indexOf('\x1f');
+            if (sep !== -1) {
+                const sha = header.slice(0, sep).trim();
+                const subject = header.slice(sep + 1).trim();
+                map.set(sha, { subject, numstat });
+            }
+        }
+        return map;
+    } catch {
+        return null;
+    }
+}
+
+/**
  * Evaluates change entropy across a multi-commit revision range.
  * Asserts that each individual commit in the range is atomic and cohesive (GUARD-ENT-001),
  * preventing spurious false positives from aggregating domain-scoped commits.
@@ -288,23 +322,31 @@ function evaluateMultiCommitRange(commits, commitRange) {
     const diffusedCommits = [];
     const unreadableCommits = [];
     const historyBaseline = loadCommitHistoryBaseline();
+    const batchMap = readCommitNumstatBatch(commitRange);
 
     for (let i = 0; i < commits.length; i++) {
         const sha = commits[i];
         let numstat;
-        try {
-            // Argument array: a SHA can never be parsed as shell syntax.
-            numstat = execFileSync('git', ['diff-tree', '--no-commit-id', '-r', '--numstat', sha], {
-                encoding: 'utf8',
-                stdio: ['ignore', 'pipe', 'ignore'],
-                maxBuffer: 10 * 1024 * 1024,
-            });
-        } catch {
-            // A commit whose diff cannot be read contributes no measurable entropy. Recording it
-            // keeps the run honest: silently scoring it as zero would understate diffusion and let
-            // a genuinely dispersed push pass the GUARD-ENT-001 threshold.
-            unreadableCommits.push(sha.slice(0, 8));
-            continue;
+        let batchSubject = '';
+        const cached = batchMap ? batchMap.get(sha) : null;
+        if (cached) {
+            numstat = cached.numstat;
+            batchSubject = cached.subject;
+        } else {
+            try {
+                // Argument array: a SHA can never be parsed as shell syntax.
+                numstat = execFileSync('git', ['diff-tree', '--no-commit-id', '-r', '--numstat', sha], {
+                    encoding: 'utf8',
+                    stdio: ['ignore', 'pipe', 'ignore'],
+                    maxBuffer: 10 * 1024 * 1024,
+                });
+            } catch {
+                // A commit whose diff cannot be read contributes no measurable entropy. Recording it
+                // keeps the run honest: silently scoring it as zero would understate diffusion and let
+                // a genuinely dispersed push pass the GUARD-ENT-001 threshold.
+                unreadableCommits.push(sha.slice(0, 8));
+                continue;
+            }
         }
 
         const commitResult = evaluateChangeEntropy(numstat);
@@ -321,14 +363,16 @@ function evaluateMultiCommitRange(commits, commitRange) {
                 // Grandfathered commit: exempt from diffusion blocking
                 continue;
             }
-            let subject = sha.slice(0, 8);
-            try {
-                subject = execFileSync('git', ['log', '-1', '--format=%s', sha], {
-                    encoding: 'utf8',
-                    stdio: ['ignore', 'pipe', 'ignore'],
-                }).trim();
-            } catch {
-                // Subject is cosmetic: the SHA already identifies the commit in the report.
+            let subject = batchSubject || sha.slice(0, 8);
+            if (!subject || subject === sha.slice(0, 8)) {
+                try {
+                    subject = execFileSync('git', ['log', '-1', '--format=%s', sha], {
+                        encoding: 'utf8',
+                        stdio: ['ignore', 'pipe', 'ignore'],
+                    }).trim();
+                } catch {
+                    // Subject is cosmetic: the SHA already identifies the commit in the report.
+                }
             }
             diffusedCommits.push({
                 sha: sha.slice(0, 8),
