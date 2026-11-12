@@ -340,3 +340,83 @@ fn test_commit_authorization_lockdown_blocks_expired_project() {
     assert_eq!(unfrozen.status, LeaseStatus::Active);
     assert!(!unfrozen.is_expired(now + 500));
 }
+
+#[test]
+fn test_disk_blackboard_store_write_guard() {
+    let test_dir = TestDir::new("bb_guard");
+    let git_dir = test_dir.path().join(".git");
+    std::fs::create_dir_all(&git_dir).unwrap();
+
+    let store = fg_topology::DiskBlackboardStore::new(&git_dir);
+    let now_ms = 1_700_000_000_000_i64;
+
+    // 1. Fresh repository has no leases: write is permitted
+    let check1 = store
+        .assert_write_permitted("src/lib.rs", Some("agent-b"), Some("cell-b"), now_ms)
+        .unwrap();
+    assert_eq!(check1, None);
+
+    // 2. Register intent lease from agent-a in cell-a on src/core/
+    let mut board = store.load_or_create("card-1", "cell-a").unwrap();
+    let claim = fg_core::models::SymbolClaim::new("agent-a", "src/core/", "*", 300, now_ms);
+    board.claim_symbol(claim).expect("claim succeeds");
+    store.save(&board).unwrap();
+
+    // 3. Different cell & agent trying to write under src/core/ is blocked
+    let conflict = store
+        .assert_write_permitted(
+            "src/core/parser.rs",
+            Some("agent-b"),
+            Some("cell-b"),
+            now_ms,
+        )
+        .unwrap();
+    assert!(conflict.is_some());
+    let collision = conflict.unwrap();
+    assert_eq!(collision.conflicting_agent, "agent-a");
+    assert_eq!(collision.file_path, "src/core/parser.rs");
+
+    // 4. Different path outside scope is permitted
+    let outside = store
+        .assert_write_permitted(
+            "src/utils/log.rs",
+            Some("agent-b"),
+            Some("cell-b"),
+            now_ms,
+        )
+        .unwrap();
+    assert_eq!(outside, None);
+
+    // 5. Same cell is permitted
+    let same_cell = store
+        .assert_write_permitted(
+            "src/core/parser.rs",
+            Some("agent-peer"),
+            Some("cell-a"),
+            now_ms,
+        )
+        .unwrap();
+    assert_eq!(same_cell, None);
+
+    // 6. Same agent is permitted
+    let same_agent = store
+        .assert_write_permitted(
+            "src/core/parser.rs",
+            Some("agent-a"),
+            Some("cell-other"),
+            now_ms,
+        )
+        .unwrap();
+    assert_eq!(same_agent, None);
+
+    // 7. Expired lease is permitted
+    let expired_check = store
+        .assert_write_permitted(
+            "src/core/parser.rs",
+            Some("agent-b"),
+            Some("cell-b"),
+            now_ms + 400_000,
+        )
+        .unwrap();
+    assert_eq!(expired_check, None);
+}
