@@ -65,3 +65,39 @@ test('runVariantTournament picks highest-scoring clean variant and discards flaw
     assert.strictEqual(modernOutcome.winnerScore, 100);
     assert.deepStrictEqual(modernOutcome.discardedVariantIds, ['var-flawed-conflict']);
 });
+
+test('evaluateBranchVariants fails closed when all candidate variants fail gate checks', () => {
+    const flawedCandidates = [
+        {
+            variantId: 'var-conflict-only',
+            agentUid: 'subagent-1',
+            files: [
+                {
+                    path: 'bad.ts',
+                    mode: '100644' as const,
+                    content: '<<<<<<< HEAD\nconst a = 1;\n=======\nconst a = 2;\n>>>>>>>',
+                },
+            ],
+        },
+        {
+            variantId: 'var-empty-only',
+            agentUid: 'subagent-2',
+            files: [
+                {
+                    path: 'empty.ts',
+                    mode: '100644' as const,
+                    content: '',
+                },
+            ],
+        },
+    ];
+
+    assert.throws(
+        () => evaluateBranchVariants(flawedCandidates),
+        /failed pre-review gate verification/i,
+    );
+    assert.throws(
+        () => runVariantTournament(flawedCandidates),
+        /failed pre-review gate verification/i,
+    );
+});

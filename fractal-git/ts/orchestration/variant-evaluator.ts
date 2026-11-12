@@ -62,20 +62,16 @@ export function evaluateBranchVariants(candidates: readonly CandidateVariant[]):
         }
     }
 
-    // Fallback: if no candidate passed cleanly, pick the highest scoring imperfect candidate
     if (!bestCandidate) {
-        let maxFallbackScore = -1;
-        for (const candidate of candidates) {
-            const s = scores.get(candidate.variantId) ?? 0;
-            if (s > maxFallbackScore) {
-                maxFallbackScore = s;
-                bestCandidate = candidate;
-                bestScore = s;
-            }
-        }
+        const summary = candidates
+            .map((c) => `${c.variantId}(score=${scores.get(c.variantId) ?? 0})`)
+            .join(', ');
+        throw new Error(
+            `All ${candidates.length} candidate variants failed pre-review gate verification: ${summary}`,
+        );
     }
 
-    const winner = bestCandidate ?? candidates[0];
+    const winner = bestCandidate;
     const discardedVariantIds = candidates
         .filter((c) => c.variantId !== winner.variantId)
         .map((c) => c.variantId);
