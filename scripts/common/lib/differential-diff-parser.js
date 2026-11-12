@@ -397,13 +397,7 @@ function readGitBlobText(revSpec) {
   }
 }
 
-/**
- * Evaluates staged diff for a single file using stateful multi-line comment tracking.
- *
- * @param {string} relativePath - Repo-relative staged file path.
- * @param {boolean} isNew - Whether file does not exist in HEAD.
- * @returns {object} File bounds metrics.
- */
+/** Resolves a hunk line against full revision context, with stateful fallback for absent blobs. */
 function resolveDiffLineKind(line, lineNumber, kinds, fallbackState) {
   const index = lineNumber - 1;
   if (kinds && index >= 0 && index < kinds.length) {
@@ -419,14 +413,16 @@ function countClassifiedDiffLines(diffRaw, oldLineKinds, newLineKinds) {
   let newLineNum = 0;
   const addFallbackState = { inBlockComment: false, inDocComment: false };
   const delFallbackState = { inBlockComment: false, inDocComment: false };
+  let inHunk = false;
   for (const line of diffRaw.split(/\r?\n/)) {
-    if (/^(?:\+\+\+|---|diff |index )/.test(line)) {
-      continue;
-    }
     const hunkMatch = /^@@\s+-(\d+)(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s+@@/.exec(line);
     if (hunkMatch) {
       oldLineNum = Number(hunkMatch[1]);
       newLineNum = Number(hunkMatch[2]);
+      inHunk = true;
+      continue;
+    }
+    if (!inHunk) {
       continue;
     }
     if (line.startsWith('+')) {
@@ -443,6 +439,7 @@ function countClassifiedDiffLines(diffRaw, oldLineKinds, newLineKinds) {
   return counts;
 }
 
+/** Evaluates one staged file using full-revision line classifications and stateful fallback. */
 function evaluateFileStagedDiff(relativePath, isNew) {
   let diffRaw = '';
   try {
