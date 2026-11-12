@@ -21,6 +21,7 @@ pub mod bisect;
 pub mod blackboard;
 pub mod blame;
 pub mod branch;
+pub mod branch_list;
 pub mod bundle;
 pub mod checkout;
 pub mod cherry_pick;
