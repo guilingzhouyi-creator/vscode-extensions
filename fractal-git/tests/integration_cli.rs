@@ -81,5 +81,7 @@ mod test_ref_commands;
 mod test_switch_parity;
 #[path = "rust/test_cli_semantics_core.rs"]
 mod test_cli_semantics_core;
+#[path = "rust/test_cli_semantics_ops.rs"]
+mod test_cli_semantics_ops;
 #[path = "rust/test_worktree_checkout_parity.rs"]
 mod test_worktree_checkout_parity;
