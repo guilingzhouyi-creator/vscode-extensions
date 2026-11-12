@@ -84,7 +84,7 @@ export const DIMENSION_TO_PILLAR_MAP: Record<QualityDimension, PrimaryQualityPil
     techDebtRisk: PILLAR_RELIABILITY,
     standardization: PILLAR_EXTENSIBILITY,
     commentQuality: PILLAR_EXTENSIBILITY,
-    duplication: PILLAR_EXTENSIBILITY,
+    duplication: PILLAR_DATA,
     modernity: PILLAR_EXTENSIBILITY,
 };
 
@@ -160,7 +160,7 @@ export function synthesizeEightPillars(
         testing: [testingScoreOverride ?? indices.modernity],
         reliability: [indices.semanticPurity, indices.techDebtRisk],
         security: [indices.codeSecurity],
-        extensibility: [indices.standardization, indices.commentQuality, indices.duplication],
+        extensibility: [indices.standardization, indices.commentQuality, indices.modernity],
     };
 
     const pillars: Record<PrimaryQualityPillar, number> = {} as Record<
