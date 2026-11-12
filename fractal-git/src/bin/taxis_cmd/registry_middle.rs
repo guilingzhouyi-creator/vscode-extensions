@@ -16,7 +16,7 @@
 use super::{
     am, apply, bench, blackboard, checkout, cherry_pick, format_patch, gate_slice, inspect,
     lineage, log, merge, operation, plumbing_tree, promotion, read, rebase, reset, rev_list,
-    revert, stash, tag, undo, verify, worktree,
+    revert, stash, switch, tag, undo, verify, worktree,
 };
 
 use super::registry::{cmd, CommandSpec};
@@ -28,11 +28,8 @@ pub(crate) const TABLE: &[CommandSpec] = &[
     cmd("check-ignore", &["check-ignore"], read::handle_check_ignore),
     cmd("log", &["lg", "log"], log::handle_log),
     cmd("show", &["sh", "show"], log::handle_show),
-    cmd(
-        "checkout",
-        &["co", "checkout", "sw", "switch"],
-        checkout::handle_checkout,
-    ),
+    cmd("checkout", &["co", "checkout"], checkout::handle_checkout),
+    cmd("switch", &["sw", "switch"], switch::handle_switch),
     cmd("merge", &["mg", "merge"], merge::handle_merge),
     cmd("reset", &["reset"], reset::handle_reset),
     cmd("tag", &["tag"], tag::handle_tag),

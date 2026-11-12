@@ -31,17 +31,27 @@ use fg_native::RepoDocument;
 use fractal_git::constants::cli::CliTag;
 use fractal_git::{DiskRefStore, RefStore};
 
-use super::common::{fail_io, reject, CliContext};
+use super::common::{fail_io, fail_usage, reject, CliContext};
 use super::repo_view::RepoView;
 use super::status::collect_status;
+use super::switch::{
+    assert_switch_branch_target, execute_orphan_branch, record_prev_head,
+    resolve_previous_head_target, take_flag_value, validate_new_branch_name,
+};
 use super::tree_view::{flatten_commit_tree, flatten_tree_for_diff, TreeEntry};
 
-/// Parsed options for `taxis checkout`.
+/// Parsed options for `taxis checkout` and `taxis switch`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct CheckoutOptions {
-    target: String,
-    new_branch: Option<String>,
-    force: bool,
+pub(crate) struct CheckoutOptions {
+    pub(crate) target: String,
+    pub(crate) new_branch: Option<String>,
+    pub(crate) force_create: bool,
+    pub(crate) detach: bool,
+    pub(crate) orphan: Option<String>,
+    pub(crate) force: bool,
+    pub(crate) quiet: bool,
+    pub(crate) is_switch: bool,
+    pub(crate) was_reset: bool,
 }
 
 /// Dispatches the `checkout` command: resolves targets, materializes worktrees, and updates HEAD.
@@ -71,24 +81,33 @@ pub fn handle_checkout(ctx: &CliContext) {
         }
     }
 
-    let mut opts = parse_checkout_options(&ctx.args);
+    let opts = parse_checkout_options(&ctx.args);
+    execute_checkout_or_switch(ctx, opts);
+}
+
+/// Executes parsed `checkout` or `switch` options against the opened repository.
+pub(crate) fn execute_checkout_or_switch(ctx: &CliContext, mut opts: CheckoutOptions) {
     let view = RepoView::open_or_exit(ctx);
 
     if opts.target == "-" || opts.target == "@{-1}" {
-        let prev_path = view.git_dir().join("PREV_HEAD");
-        if let Ok(prev_str) = std::fs::read_to_string(&prev_path) {
-            let target_str = prev_str.trim().to_string();
-            if !target_str.is_empty() {
-                opts.target = target_str;
-            }
-        }
+        resolve_previous_head_target(&view, &mut opts);
+    }
+
+    if let Some(orphan_branch) = opts.orphan.clone() {
+        execute_orphan_branch(&view, &opts, &orphan_branch);
+        return;
+    }
+
+    if opts.is_switch && opts.new_branch.is_none() && !opts.detach {
+        assert_switch_branch_target(&view, &opts.target);
     }
 
     let (target_commit, tree_oid) = match view.resolve_tree(&opts.target) {
         Ok(resolved) => resolved,
         Err(resolve_err) => {
             if let Some(ref new_b) = opts.new_branch {
-                if view.effective_head_commit().ok().flatten().is_none() {
+                if opts.target == "HEAD" && view.effective_head_commit().ok().flatten().is_none() {
+                    validate_new_branch_name(new_b);
                     let head_path = view.git_dir().join("HEAD");
                     let sym_target = format!("refs/heads/{new_b}");
                     if let Err(io_err) = fs::write(&head_path, format!("ref: {sym_target}\n")) {
@@ -101,7 +120,9 @@ pub fn handle_checkout(ctx: &CliContext) {
                             let _ = doc.save_atomic(&container_path);
                         }
                     }
-                    eprintln!("Switched to a new branch '{new_b}'");
+                    if !opts.quiet {
+                        eprintln!("Switched to a new branch '{new_b}'");
+                    }
                     return;
                 }
             }
@@ -109,7 +130,7 @@ pub fn handle_checkout(ctx: &CliContext) {
         }
     };
 
-    let effective_branch = resolve_effective_branch(&view, &opts);
+    let effective_branch = resolve_effective_branch(&view, &mut opts);
 
     let head_oid_opt = view
         .head_commit()
@@ -164,12 +185,14 @@ pub fn handle_checkout(ctx: &CliContext) {
         .object(&target_commit)
         .ok()
         .and_then(|object| commit_subject(&object.payload));
-    print_checkout_verdict(
-        &opts,
-        target_commit,
-        effective_branch.as_deref(),
-        target_subject.as_deref(),
-    );
+    if !opts.quiet {
+        print_checkout_verdict(
+            &opts,
+            target_commit,
+            effective_branch.as_deref(),
+            target_subject.as_deref(),
+        );
+    }
 }
 
 /// Extracts the subject line Git names in its detached-HEAD report.
@@ -192,35 +215,68 @@ fn commit_subject(payload: &[u8]) -> Option<String> {
 
 /// Parses command-line arguments into structured checkout options.
 fn parse_checkout_options(args: &[String]) -> CheckoutOptions {
-    let mut new_branch = None;
+    let mut new_branch: Option<&str> = None;
+    let mut orphan: Option<&str> = None;
+    let mut force_create = false;
+    let mut detach = false;
     let mut force = false;
-    let mut positional = Vec::new();
+    let mut quiet = false;
+    let mut target: Option<&str> = None;
     let mut cursor = 0;
 
     while cursor < args.len() {
-        let arg = &args[cursor];
-        if arg == "-f" || arg == "--force" {
-            force = true;
-            cursor += 1;
-        } else if (arg == "-b" || arg == "-B") && cursor + 1 < args.len() {
-            new_branch = Some(args[cursor + 1].clone());
-            cursor += 2;
-        } else {
-            positional.push(arg.clone());
-            cursor += 1;
+        let arg = args[cursor].as_str();
+        match arg {
+            "-f" | "--force" => {
+                force = true;
+                cursor += 1;
+            }
+            "-q" | "--quiet" => {
+                quiet = true;
+                cursor += 1;
+            }
+            "-d" | "--detach" => {
+                detach = true;
+                cursor += 1;
+            }
+            "--track" | "--no-track" | "-l" | "--guess" | "--no-guess" => {
+                cursor += 1;
+            }
+            "-b" => {
+                new_branch = Some(take_flag_value(args, &mut cursor, arg));
+            }
+            "-B" => {
+                new_branch = Some(take_flag_value(args, &mut cursor, arg));
+                force_create = true;
+            }
+            "--orphan" => {
+                orphan = Some(take_flag_value(args, &mut cursor, arg));
+            }
+            "--" => {
+                cursor += 1;
+            }
+            _ if arg.starts_with('-') && arg != "-" => {
+                fail_usage(format!("unknown option `{arg}` for `checkout`"));
+            }
+            _ => {
+                if target.is_none() {
+                    target = Some(arg);
+                }
+                cursor += 1;
+            }
         }
     }
 
-    let target = if let Some(first_pos) = positional.first() {
-        first_pos.clone()
-    } else {
-        "HEAD".to_string()
-    };
-
     CheckoutOptions {
-        target,
-        new_branch,
+        target: target.unwrap_or("HEAD").to_string(),
+        new_branch: new_branch.map(str::to_string),
+        force_create,
+        detach,
+        orphan: orphan.map(str::to_string),
         force,
+        quiet,
+        is_switch: false,
+        was_reset: false,
     }
 }
 
@@ -230,7 +286,7 @@ fn parse_checkout_options(args: &[String]) -> CheckoutOptions {
 /// trees and refuses only when the switch would replace the edit. Rejecting on any dirty path
 /// forced `--force` for edits that do not intersect the switch at all, and losing them is exactly
 /// what the guard exists to prevent.
-fn check_switch_conflicts(
+pub(crate) fn check_switch_conflicts(
     view: &RepoView,
     current_files: &BTreeMap<String, TreeEntry>,
     new_files: &BTreeMap<String, TreeEntry>,
@@ -330,16 +386,24 @@ pub(crate) fn assert_worktree_cleanliness(view: &RepoView, force: bool) {
 }
 
 /// Determines the effective branch name (if switching to a branch).
-fn resolve_effective_branch(view: &RepoView, opts: &CheckoutOptions) -> Option<String> {
+fn resolve_effective_branch(view: &RepoView, opts: &mut CheckoutOptions) -> Option<String> {
+    if opts.detach {
+        return None;
+    }
+
     if let Some(ref new_b) = opts.new_branch {
-        if view
+        validate_new_branch_name(new_b);
+        let exists = view
             .branches()
-            .is_ok_and(|b| b.iter().any(|(name, _)| name == new_b))
-        {
-            reject(
-                CliTag::ERROR,
-                format!("A branch named '{new_b}' already exists."),
-            );
+            .is_ok_and(|b| b.iter().any(|(name, _)| name == new_b));
+        if exists {
+            if !opts.force_create {
+                reject(
+                    CliTag::ERROR,
+                    format!("fatal: a branch named '{new_b}' already exists"),
+                );
+            }
+            opts.was_reset = true;
         }
         return Some(new_b.clone());
     }
@@ -694,19 +758,7 @@ pub(crate) fn update_references(
     branch_name: Option<&str>,
 ) {
     let ref_store = DiskRefStore::new(git_dir);
-    if let Ok(head_state) = ref_store.head() {
-        let prev_name = match head_state {
-            fg_topology::refs::HeadState::Symbolic { name, .. } => name
-                .strip_prefix("refs/heads/")
-                .unwrap_or(&name)
-                .to_string(),
-            fg_topology::refs::HeadState::Detached(oid) => oid.to_hex(),
-            fg_topology::refs::HeadState::Absent => String::new(),
-        };
-        if !prev_name.is_empty() {
-            let _ = std::fs::write(git_dir.join("PREV_HEAD"), format!("{prev_name}\n"));
-        }
-    }
+    record_prev_head(git_dir, &ref_store, branch_name, Some(target_commit));
     let hook_runner = super::git_hooks::discover(git_dir, work_root);
     let previous_head = ref_store.get_ref("HEAD").ok().flatten();
     let branch_update = branch_name.map(|branch| {
@@ -818,6 +870,9 @@ fn print_checkout_verdict(
     subject: Option<&str>,
 ) {
     match branch_name {
+        Some(branch) if opts.was_reset => {
+            eprintln!("Switched to and reset branch '{branch}'");
+        }
         Some(branch) if opts.new_branch.is_some() => {
             eprintln!("Switched to a new branch '{branch}'");
         }
@@ -843,6 +898,7 @@ mod tests {
         assert_eq!(opts.target, "main");
         assert_eq!(opts.new_branch, None);
         assert!(!opts.force);
+        assert!(!opts.detach);
     }
 
     #[test]

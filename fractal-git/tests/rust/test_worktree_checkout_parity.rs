@@ -1,16 +1,16 @@
 //! Module: tests::test_worktree_checkout_parity — Worktree and Checkout Edge Parity
 //! File Path: tests/rust/test_worktree_checkout_parity.rs
-//! Architecture Role: Proves unborn-HEAD `checkout -b` / `switch -c` and `worktree list --porcelain`
-//!   behave with differential parity against standard Git expectations.
+//! Architecture Role: Proves unborn-HEAD `checkout -b` / `switch -c`, `switch` flag matrices,
+//!   and `worktree list --porcelain` behave with differential parity against system Git.
 //! Dependencies & Triggers: Run by `cargo test --workspace`.
-//! Responsibilities: Validate CLI behavior for initial repository states and porcelain formatting.
+//! Responsibilities: Validate CLI behavior for initial repository states, `switch`/`sw`, and porcelain formatting.
 //!
 //! Domain Governance Rules: FGT-COR-001, FGT-CLI-001.
 
 use std::fs;
 use std::path::PathBuf;
 
-use crate::cli_harness::run_taxis;
+use crate::cli_harness::{run_taxis, test_temp_dir};
 
 fn scratch_repo(label: &str) -> PathBuf {
     crate::cli_harness::scratch_repo("taxis_wt_co", label)
@@ -36,6 +36,30 @@ fn test_checkout_new_branch_on_unborn_head() {
     assert_eq!(head_content.trim(), "ref: refs/heads/feature/unborn-test");
 
     let _ = fs::remove_dir_all(&repo);
+}
+
+#[test]
+fn test_switch_create_on_unborn_head_and_rejects_bad_start_point() {
+    let tmp = test_temp_dir("sw_unborn_");
+    let repo = tmp.path();
+    let init_out = run_taxis(repo, &["init", "--dev"]);
+    assert!(init_out.status.success());
+
+    // `switch -c` on unborn HEAD must create/select branch rather than treating `-c` as branch name
+    let sw_out = run_taxis(repo, &["switch", "-c", "feat/unborn-switch"]);
+    assert!(
+        sw_out.status.success(),
+        "switch -c on unborn HEAD must succeed: {}",
+        String::from_utf8_lossy(&sw_out.stderr)
+    );
+    let stderr = String::from_utf8_lossy(&sw_out.stderr);
+    assert!(stderr.contains("Switched to a new branch 'feat/unborn-switch'"));
+    let head_content = fs::read_to_string(repo.join(".taxis").join("HEAD")).unwrap();
+    assert_eq!(head_content.trim(), "ref: refs/heads/feat/unborn-switch");
+
+    // Nonexistent explicit start-point must still fail even on unborn HEAD
+    let bad = run_taxis(repo, &["switch", "-c", "feat/bad", "nonexistent-start"]);
+    assert!(!bad.status.success());
 }
 
 #[test]

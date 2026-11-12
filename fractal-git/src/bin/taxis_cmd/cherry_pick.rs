@@ -32,6 +32,10 @@ use super::checkout::{
     assert_worktree_cleanliness, materialize_files, remove_stale_files, update_dirc_index,
     update_references,
 };
+use super::cherry_pick_state::{
+    format_conflict_target_label, handle_transplant_abort, persist_conflicted_transplant_state,
+    try_text_auto_merge_conflict,
+};
 use super::commit_walk::{parse_commit_record, CommitRecord};
 use super::common::{fail_io, print_json, reject, CliContext};
 use super::operation::{record_head_operation, HeadOperationSpec};
@@ -46,10 +50,10 @@ pub(crate) struct DeltaTransplantSpec {
 }
 
 /// Flattened base/ours/theirs tree maps for a 3-way commit delta transplant.
-struct TransplantTrees {
-    base_files: BTreeMap<String, TreeEntry>,
-    ours_files: BTreeMap<String, TreeEntry>,
-    theirs_files: BTreeMap<String, TreeEntry>,
+pub(crate) struct TransplantTrees {
+    pub(crate) base_files: BTreeMap<String, TreeEntry>,
+    pub(crate) ours_files: BTreeMap<String, TreeEntry>,
+    pub(crate) theirs_files: BTreeMap<String, TreeEntry>,
 }
 
 /// Dispatches the `cherry-pick` command.
@@ -68,13 +72,7 @@ pub fn handle_cherry_pick(ctx: &CliContext) {
 pub(crate) fn execute_commit_delta_transplant(ctx: &CliContext, spec: &DeltaTransplantSpec) {
     let op = spec.operation;
     if ctx.args.iter().any(|a| a == "--abort") {
-        let view = RepoView::open_or_exit(ctx);
-        let cherry_head_path = view.git_dir().join("CHERRY_PICK_HEAD");
-        if !cherry_head_path.is_file() {
-            eprintln!("{} fatal: no cherry-pick in progress", CliTag::ERROR);
-            std::process::exit(1);
-        }
-        let _ = std::fs::remove_file(cherry_head_path);
+        handle_transplant_abort(ctx, spec);
         return;
     }
     if ctx.args.is_empty() {
@@ -108,7 +106,8 @@ pub(crate) fn execute_commit_delta_transplant(ctx: &CliContext, spec: &DeltaTran
         theirs_files: flatten_commit_tree(&view, &theirs_commit).unwrap_or_default(),
     };
 
-    let merged_tree = reconcile_transplant_trees(&trees, &target_record, spec);
+    let merged_tree =
+        reconcile_transplant_trees(&view, &trees, ours_commit, &target_record, spec, ctx);
     let (new_files, merged_root_tree) =
         stage_and_persist_transplant_tree(&view, &merged_tree, &trees);
 
@@ -182,11 +181,14 @@ fn resolve_transplant_target(
     (target_oid, target_record, parent_oid)
 }
 
-/// Runs 3-way merge reconciliation for a transplant operation.
+/// Runs 3-way merge reconciliation, writing conflict markers and state files if conflicts remain.
 fn reconcile_transplant_trees(
+    view: &RepoView,
     trees: &TransplantTrees,
+    ours_commit: Oid,
     target_record: &CommitRecord,
     spec: &DeltaTransplantSpec,
+    ctx: &CliContext,
 ) -> BTreeMap<String, Oid> {
     let base_map: BTreeMap<String, Oid> = trees
         .base_files
@@ -207,16 +209,34 @@ fn reconcile_transplant_trees(
     match ThreeWayMerge::merge(&base_map, &ours_map, &theirs_map) {
         ThreeWayMergeResult::Clean { merged_tree } => merged_tree,
         ThreeWayMergeResult::FastForward => theirs_map,
-        ThreeWayMergeResult::Conflicted { conflicts, .. } => {
-            let paths: Vec<_> = conflicts.iter().map(|c| &c.path).collect();
-            let short = &target_record.oid.to_hex()[..8];
-            let detail = if spec.invert_delta {
-                format!("error: could not revert {short}...\nConflicts in: {paths:?}")
-            } else {
-                let first_line = target_record.message.lines().next().unwrap_or("");
-                format!("error: could not apply {short}... {first_line}\nConflicts in: {paths:?}")
-            };
-            reject(CliTag::ERROR, detail);
+        ThreeWayMergeResult::Conflicted {
+            mut merged_tree,
+            conflicts,
+        } => {
+            let odb = LooseOdb::new(view.git_dir());
+            let target_label = format_conflict_target_label(target_record);
+            let mut remaining = Vec::new();
+            for conflict in &conflicts {
+                if let Some(resolved_oid) =
+                    try_text_auto_merge_conflict(view, &odb, conflict, &target_label)
+                {
+                    merged_tree.insert(conflict.path.clone(), resolved_oid);
+                } else {
+                    remaining.push(conflict.clone());
+                }
+            }
+            if remaining.is_empty() {
+                return merged_tree;
+            }
+            persist_conflicted_transplant_state(
+                view,
+                trees,
+                ours_commit,
+                target_record,
+                spec,
+                (&merged_tree, &remaining, &target_label),
+                ctx,
+            );
         }
     }
 }
