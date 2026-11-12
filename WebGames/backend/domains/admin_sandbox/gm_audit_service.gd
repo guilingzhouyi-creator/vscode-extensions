@@ -10,10 +10,6 @@
 ## GMArbitrationAuditService：Domain Service / State Orchestrator
 class_name GMArbitrationAuditService extends RefCounted
 
-const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
-const SystemBaseMessages = preload("res://backend/infrastructure/logging/system_base_messages.gd")
-const CryptoIntegrityLib = preload("res://backend/infrastructure/pure/crypto_integrity_lib.gd")
-
 static var audit_log: Array = []
 
 ## 记录 GM 操作流水：规范化载荷签名（缺钥失败关闭）+ 有界裁剪（O(1) 批量切片）+ 日志广播

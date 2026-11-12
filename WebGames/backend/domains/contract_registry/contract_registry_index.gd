@@ -12,7 +12,6 @@ class_name ContractRegistryIndex
 extends RefCounted
 
 const EntryClass = preload("res://backend/domains/contract_registry/contract_registry_entry.gd")
-const SystemBaseMessages = preload("res://backend/infrastructure/logging/system_base_messages.gd")
 
 const DOMAIN_NAME: String = "contract_registry_index"
 

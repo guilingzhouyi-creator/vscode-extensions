@@ -10,10 +10,6 @@
 ## EntitlementService：Domain Service / State Orchestrator
 class_name EntitlementService extends RefCounted
 
-const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
-const SystemBaseMessages = preload("res://backend/infrastructure/logging/system_base_messages.gd")
-const CryptoIntegrityLib = preload("res://backend/infrastructure/pure/crypto_integrity_lib.gd")
-
 # ==============================================================================
 # 一、统一鉴权入口与白名单
 # ==============================================================================
