@@ -440,8 +440,26 @@ fn bit_parallel_myers_128(pattern: &[u32], text: &[u32]) -> u32 {
 }
 
 fn scalar_myers_distance(pattern: &[u32], text: &[u32]) -> u32 {
-    let n = pattern.len();
-    let m = text.len();
+    let mut prefix = 0usize;
+    let mut end_n = pattern.len();
+    let mut end_m = text.len();
+    while prefix < end_n && prefix < end_m && pattern[prefix] == text[prefix] {
+        prefix += 1;
+    }
+    while end_n > prefix && end_m > prefix && pattern[end_n - 1] == text[end_m - 1] {
+        end_n -= 1;
+        end_m -= 1;
+    }
+    let pat_mid = &pattern[prefix..end_n];
+    let txt_mid = &text[prefix..end_m];
+    let n = pat_mid.len();
+    let m = txt_mid.len();
+    if n == 0 {
+        return m as u32;
+    }
+    if m == 0 {
+        return n as u32;
+    }
     let max = n + m;
     let size = 2 * max + 1;
     let mut v = vec![0usize; size];
@@ -458,7 +476,7 @@ fn scalar_myers_distance(pattern: &[u32], text: &[u32]) -> u32 {
             };
             let mut y = (x as isize - k) as usize;
 
-            while x < n && y < m && pattern[x] == text[y] {
+            while x < n && y < m && pat_mid[x] == txt_mid[y] {
                 x += 1;
                 y += 1;
             }
@@ -717,5 +735,51 @@ mod tests {
         let mut t = p.clone();
         t[30] = 999;
         assert_eq!(compute_bit_parallel_myers_distance(&p, &t), 3);
+    }
+
+    #[test]
+    fn test_bit_parallel_myers_distance_128_and_scalar_boundaries() {
+        let p64: Vec<u32> = (0..64).collect();
+        let mut t64 = p64.clone();
+        t64[20] = 777;
+        assert_eq!(compute_bit_parallel_myers_distance(&p64, &t64), 3);
+
+        let p100: Vec<u32> = (0..100).collect();
+        let mut t100 = p100.clone();
+        t100[50] = 888;
+        assert_eq!(compute_bit_parallel_myers_distance(&p100, &t100), 3);
+
+        let p140: Vec<u32> = (0..140).collect();
+        let mut t140 = p140.clone();
+        t140[70] = 999;
+        assert_eq!(compute_bit_parallel_myers_distance(&p140, &p140), 0);
+        assert_eq!(compute_bit_parallel_myers_distance(&p140, &t140), 2);
+    }
+
+    #[test]
+    fn test_histogram_anchor_partition_above_fallback_threshold() {
+        let mut old_lines = Vec::new();
+        let mut new_lines = Vec::new();
+        old_lines.push("LEFT_HEAD_OLD".to_string());
+        new_lines.push("LEFT_HEAD_NEW".to_string());
+        for i in 0..20 {
+            old_lines.push(format!("repeat_brace_{}", i % 3));
+            new_lines.push(format!("repeat_brace_{}", i % 3));
+        }
+        old_lines.push("UNIQUE_HISTOGRAM_ANCHOR_LINE".to_string());
+        new_lines.push("UNIQUE_HISTOGRAM_ANCHOR_LINE".to_string());
+        for i in 0..20 {
+            old_lines.push(format!("repeat_tail_{}", i % 3));
+            new_lines.push(format!("repeat_tail_{}", i % 3));
+        }
+        old_lines.push("RIGHT_TAIL_OLD".to_string());
+        new_lines.push("RIGHT_TAIL_NEW".to_string());
+
+        let hunks = run_histogram_diff(&old_lines.join("\n"), &new_lines.join("\n"));
+        assert_eq!(hunks.len(), 2);
+        assert!(hunks[0].lines.iter().any(|l| l == "-LEFT_HEAD_OLD"));
+        assert!(hunks[0].lines.iter().any(|l| l == "+LEFT_HEAD_NEW"));
+        assert!(hunks[1].lines.iter().any(|l| l == "-RIGHT_TAIL_OLD"));
+        assert!(hunks[1].lines.iter().any(|l| l == "+RIGHT_TAIL_NEW"));
     }
 }
