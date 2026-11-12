@@ -12,6 +12,8 @@
  *   empty inputs; never throws uncaught exceptions.
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
 import type {
     PraxisTrajectoryLearningInput,
     PraxisTrajectoryVerdict,
@@ -23,8 +25,30 @@ import type { TrajectoryRecipeExtractor } from '../trajectory/recipeExtractor';
 import { defaultTrajectoryRecipeExtractor } from '../trajectory/recipeExtractor';
 import type { RegressionTrajectoryDetector } from '../trajectory/regressionTrajectoryDetector';
 import { defaultRegressionTrajectoryDetector } from '../trajectory/regressionTrajectoryDetector';
-import { calculateTrajectoryQualityVelocity, scoreDelta } from '../scoring/scorer-formulas';
-import { numberMeasurement } from '../review/review-contracts';
+import { calculateRecipeGeneralizationIndex, calculateTrajectoryQualityVelocity, scoreDelta } from '../scoring/scorer-formulas';
+import { numberMeasurement, type Measurement } from '../review/review-contracts';
+
+const DEFAULT_TRAJECTORY_DIR = '.refactor-trajectory';
+const DEFAULT_RECIPES_FILE = 'recipes.json';
+const ENCODING_UTF8 = 'utf8';
+
+/** Historical trajectory sample retained for holdout generalization evaluation. */
+export interface HistoricalTrajectorySample {
+    readonly trajectoryId: string;
+    readonly filePath: string;
+    readonly language?: string;
+    readonly category?: string;
+    readonly qualityDelta: number;
+    readonly beforeContent: string;
+}
+
+/** Persistent disk schema for `.refactor-trajectory/recipes.json`. */
+export interface PersistedRecipesEnvelope {
+    readonly schemaVersion: 1;
+    readonly updatedAtMs: number;
+    readonly recipes: readonly RefactoringRecipe[];
+    readonly history: readonly HistoricalTrajectorySample[];
+}
 
 /**
  * Public service interface provided to the Praxis team for trajectory learning governance.
@@ -69,6 +93,31 @@ export interface IPraxisTrajectoryLearningService {
      * @returns Readonly array of RefactoringRecipes.
      */
     getLearnedRecipes(): readonly RefactoringRecipe[];
+
+    /**
+     * Persist learned recipes and trajectory history to `.refactor-trajectory/recipes.json`.
+     */
+    saveRecipesToDisk(rootOrFilePath?: string): Promise<string>;
+    /**
+     * Load persisted recipes and trajectory history from `.refactor-trajectory/recipes.json`.
+     */
+    loadRecipesFromDisk(rootOrFilePath?: string): Promise<readonly RefactoringRecipe[]>;
+}
+
+function resolveRecipesFilePath(rootOrFilePath?: string, fallbackRoot?: string): string {
+    const target = rootOrFilePath ?? fallbackRoot ?? process.cwd();
+    return target.endsWith('.json')
+        ? path.resolve(target)
+        : path.resolve(target, DEFAULT_TRAJECTORY_DIR, DEFAULT_RECIPES_FILE);
+}
+
+function computeHoldoutDispersion(deltas: readonly number[], meanDelta: number): number {
+    if (deltas.length <= 1 || meanDelta <= 0) return 0;
+    let varianceSum = 0;
+    for (const val of deltas) {
+        varianceSum += (val - meanDelta) * (val - meanDelta);
+    }
+    return Math.min(1, Math.max(0, Math.sqrt(varianceSum / deltas.length) / (meanDelta + 1)));
 }
 
 /**
@@ -81,15 +130,21 @@ export class PraxisTrajectoryLearningService implements IPraxisTrajectoryLearnin
 
     private readonly recipeRegistry: Map<string, RefactoringRecipe> = new Map();
 
+    private readonly historicalSamples: HistoricalTrajectorySample[] = [];
+
+    private readonly persistenceRoot?: string;
+
     /**
      * Initialize service with modular recipe extractor and regression detector.
      */
     constructor(
         extractor: TrajectoryRecipeExtractor = defaultTrajectoryRecipeExtractor,
         detector: RegressionTrajectoryDetector = defaultRegressionTrajectoryDetector,
+        persistenceRoot?: string,
     ) {
         this.extractor = extractor;
         this.detector = detector;
+        this.persistenceRoot = persistenceRoot;
     }
 
     /**
@@ -135,6 +190,22 @@ export class PraxisTrajectoryLearningService implements IPraxisTrajectoryLearnin
         const hasImprovement =
             qualityDelta !== null && qualityDelta > 0 && extractedRecipe !== undefined;
 
+        const genMeasurement = this.evaluateHoldoutGeneralization(input, extractedRecipe);
+        const generalizationIndex = genMeasurement.status === 'measured' ? genMeasurement.value : null;
+        if (qualityDelta !== null && Number.isFinite(qualityDelta)) {
+            this.recordHistoricalSample({
+                trajectoryId: input.trajectoryId,
+                filePath: input.filePath,
+                language: input.language,
+                category: extractedRecipe?.category,
+                qualityDelta,
+                beforeContent: input.beforeContent,
+            });
+        }
+        if (this.persistenceRoot && extractedRecipe) {
+            await this.saveRecipesToDisk(this.persistenceRoot);
+        }
+
         // Recommend existing recipes for the beforeContent if relevant
         const recommendations = this.matchRecipes(input.beforeContent, input.language);
 
@@ -144,17 +215,81 @@ export class PraxisTrajectoryLearningService implements IPraxisTrajectoryLearnin
             hasBadToGoodImprovement: hasImprovement,
             qualityDelta,
             qualityVelocity,
-            generalizationIndex: null,
+            generalizationIndex,
             measurements: {
                 qualityDelta: deltaMeasurement,
                 qualityVelocity: velocityMeasurement,
-                generalizationIndex: { status: 'unmeasured', reason: 'missing-holdout-validation' },
+                generalizationIndex: genMeasurement,
             },
             extractedRecipe,
             regressionIssues: [],
             recommendations,
             durationMs,
         };
+    }
+
+    private evaluateHoldoutGeneralization(
+        input: PraxisTrajectoryLearningInput,
+        recipe?: RefactoringRecipe,
+    ): Measurement<number> {
+        const holdout = this.historicalSamples.filter((s) => s.trajectoryId !== input.trajectoryId);
+        if (holdout.length === 0) {
+            return { status: 'unmeasured', reason: 'missing-holdout-validation' };
+        }
+        const positiveDeltas: number[] = [];
+        const sampleIds: string[] = [];
+        let deltaSum = 0;
+        for (const sample of holdout) {
+            sampleIds.push(sample.trajectoryId);
+            const matched = recipe
+                ? this.extractor.matchesRecipe(recipe, sample.beforeContent, sample.language) || sample.category === recipe.category
+                : sample.qualityDelta > 0;
+            if (sample.qualityDelta > 0 && matched) {
+                deltaSum += sample.qualityDelta;
+                positiveDeltas.push(sample.qualityDelta);
+            }
+        }
+        const supportCount = positiveDeltas.length;
+        const meanImpact = supportCount > 0 ? deltaSum / supportCount : 0;
+        const genIndex = calculateRecipeGeneralizationIndex(supportCount, holdout.length, computeHoldoutDispersion(positiveDeltas, meanImpact), meanImpact);
+        return numberMeasurement(genIndex, { source: 'holdout-validation', sampleIds }, 'missing-holdout-validation');
+    }
+
+    public recordHistoricalSample(sample: HistoricalTrajectorySample): void {
+        const idx = this.historicalSamples.findIndex((e) => e.trajectoryId === sample.trajectoryId);
+        if (idx >= 0) this.historicalSamples[idx] = sample;
+        else this.historicalSamples.push(sample);
+    }
+
+    public async saveRecipesToDisk(rootOrFilePath?: string): Promise<string> {
+        const targetFile = resolveRecipesFilePath(rootOrFilePath, this.persistenceRoot);
+        await fs.promises.mkdir(path.dirname(targetFile), { recursive: true });
+        const envelope: PersistedRecipesEnvelope = {
+            schemaVersion: 1,
+            updatedAtMs: Date.now(),
+            recipes: Array.from(this.recipeRegistry.values()),
+            history: [...this.historicalSamples],
+        };
+        const stagingFile = `${targetFile}.${process.pid}.tmp`;
+        await fs.promises.writeFile(stagingFile, JSON.stringify(envelope, null, 2), ENCODING_UTF8);
+        await fs.promises.rename(stagingFile, targetFile);
+        return targetFile;
+    }
+
+    public async loadRecipesFromDisk(rootOrFilePath?: string): Promise<readonly RefactoringRecipe[]> {
+        const targetFile = resolveRecipesFilePath(rootOrFilePath, this.persistenceRoot);
+        try {
+            const parsed = JSON.parse(await fs.promises.readFile(targetFile, ENCODING_UTF8)) as Partial<PersistedRecipesEnvelope>;
+            for (const recipe of parsed.recipes ?? []) {
+                if (recipe && typeof recipe.recipeId === 'string') this.registerRecipe(recipe);
+            }
+            for (const sample of parsed.history ?? []) {
+                if (sample && typeof sample.trajectoryId === 'string') this.recordHistoricalSample(sample);
+            }
+        } catch {
+            // Absent or unreadable persistence file falls back safely to in-memory state.
+        }
+        return this.getLearnedRecipes();
     }
 
     /**
@@ -210,6 +345,7 @@ export const defaultPraxisTrajectoryLearningService = new PraxisTrajectoryLearni
 export function createTrajectoryLearningService(
     extractor?: TrajectoryRecipeExtractor,
     detector?: RegressionTrajectoryDetector,
+    persistenceRoot?: string,
 ): IPraxisTrajectoryLearningService {
-    return new PraxisTrajectoryLearningService(extractor, detector);
+    return new PraxisTrajectoryLearningService(extractor, detector, persistenceRoot);
 }

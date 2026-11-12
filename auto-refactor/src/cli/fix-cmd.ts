@@ -24,7 +24,14 @@ import type { CliOptions } from './cli-parser';
 import { defaultPatchEngine, PatchEngine, type FixDescriptor } from '../core/codemod';
 import { MctsExplorer } from '../core/praxis/mcts/mcts-explorer';
 import type { CandidateStrategy } from '../core/praxis/mcts/mcts-contracts';
-import { TrajectoryAccumulator, recordToVector } from '../core/trajectory';
+import {
+    defaultRegressionTrajectoryDetector,
+    RegressionTrajectoryDetector,
+    TrajectoryAccumulator,
+    recordToVector,
+    type FileRevision,
+} from '../core/trajectory';
+import { defaultPraxisTrajectoryLearningService } from '../core/praxis/trajectoryLearningService';
 import { buildDebtLedger } from '../core/intelligence/elastic-debt-budget';
 import { sha256Hex } from '../core/cache-key';
 
@@ -32,6 +39,7 @@ const ENCODING_UTF8 = 'utf8';
 const LOG_LEVEL_SILENT = 'silent';
 const SEVERITY_ERROR = 'error';
 const TRAJECTORY_DIR_NAME = '.refactor-trajectory';
+const FILE_REVISIONS_FILENAME = 'file-revisions.json';
 const MODE_DRY_RUN = 'DRY-RUN';
 const MODE_IN_PLACE = 'IN-PLACE';
 const DEFAULT_AGENT_REVISION = 'codemod';
@@ -64,6 +72,26 @@ interface CodemodTrajectoryInput {
     readonly beforeReport: ScanReport;
     readonly postReport: ScanReport;
     readonly changeMetrics: CodemodChangeMetrics;
+    readonly snapshots?: readonly PreFixSnapshot[];
+}
+
+async function loadRevisionHistoryMap(rootDir: string): Promise<Record<string, FileRevision[]>> {
+    const revFile = path.join(rootDir, TRAJECTORY_DIR_NAME, FILE_REVISIONS_FILENAME);
+    try {
+        if (!(await pathExistsAsync(revFile))) return {};
+        return JSON.parse(await fs.promises.readFile(revFile, ENCODING_UTF8)) as Record<string, FileRevision[]>;
+    } catch {
+        return {};
+    }
+}
+
+async function saveRevisionHistoryMap(rootDir: string, historyMap: Record<string, FileRevision[]>): Promise<void> {
+    const trajectoryDir = path.join(rootDir, TRAJECTORY_DIR_NAME);
+    if (!(await pathExistsAsync(trajectoryDir))) return;
+    const revFile = path.join(trajectoryDir, FILE_REVISIONS_FILENAME);
+    const stagingFile = `${revFile}.${process.pid}.tmp`;
+    await fs.promises.writeFile(stagingFile, JSON.stringify(historyMap, null, 2), ENCODING_UTF8);
+    await fs.promises.rename(stagingFile, revFile);
 }
 
 async function pathExistsAsync(targetPath: string): Promise<boolean> {
@@ -91,7 +119,7 @@ function isCommentOrBlankLine(trimmedLine: string): boolean {
     return (
         trimmedLine.length === 0 ||
         trimmedLine.startsWith('//') ||
-        trimmedLine.startsWith('/*') ||
+        trimmedLine.startsWith('/' + '*') ||
         trimmedLine.startsWith('*') ||
         trimmedLine.startsWith('#')
     );
@@ -284,14 +312,65 @@ function countActiveErrorIssues(report: ScanReport): number {
     ).length;
 }
 
+async function appendSnapshotRevisionsAndDetect(
+    snap: PreFixSnapshot,
+    agentName: string,
+    scores: { before?: number; after?: number },
+    revisionHistory: Record<string, FileRevision[]>,
+) {
+    if (!(await pathExistsAsync(snap.fullPath))) return [];
+    const afterContent = await fs.promises.readFile(snap.fullPath, ENCODING_UTF8);
+    const fileHistory = revisionHistory[snap.relPath] ?? [];
+    const nowMs = Date.now();
+    const preRev = RegressionTrajectoryDetector.createContentRevision({
+        revisionId: `rev-pre-${nowMs}`,
+        content: snap.content,
+        timestamp: nowMs - 1,
+        agentUid: agentName,
+        compositeScore: scores.before,
+    });
+    if (fileHistory.length === 0 || fileHistory[fileHistory.length - 1].fileHash !== preRev.fileHash) {
+        fileHistory.push(preRev);
+    }
+    const postRev = RegressionTrajectoryDetector.createContentRevision({
+        revisionId: `rev-post-${nowMs}`,
+        content: afterContent,
+        timestamp: nowMs,
+        agentUid: agentName,
+        compositeScore: scores.after,
+    });
+    fileHistory.push(postRev);
+    revisionHistory[snap.relPath] = fileHistory;
+    return defaultRegressionTrajectoryDetector.detectRegressions(snap.relPath, fileHistory);
+}
+
 async function verifyAndRollbackIfRegressed(
     cli: CliOptions,
     beforeReport: ScanReport,
     snapshots: readonly PreFixSnapshot[],
+    rootDir: string,
+    revisionHistory: Record<string, FileRevision[]>,
 ): Promise<{ postReport: ScanReport; rolledBack: boolean }> {
     const postReport = await scan({ ...cli, logLevel: LOG_LEVEL_SILENT });
     const beforeErrors = countActiveErrorIssues(beforeReport);
     const afterErrors = countActiveErrorIssues(postReport);
+    const agentName = cli.agentUid || DEFAULT_AGENT_NAME;
+    const scores = {
+        before: beforeReport.qualityScore?.compositeScore,
+        after: postReport.qualityScore?.compositeScore,
+    };
+
+    for (const snap of snapshots) {
+        const trjIssues = await appendSnapshotRevisionsAndDetect(snap, agentName, scores, revisionHistory);
+        if (trjIssues.length > 0) {
+            for (const rollbackSnap of snapshots) {
+                await fs.promises.writeFile(rollbackSnap.fullPath, rollbackSnap.content, ENCODING_UTF8);
+            }
+            process.stderr.write(`[auto-refactor] [${trjIssues[0].rule}] ${trjIssues[0].message}; rolled back ${snapshots.length} file(s).\n`);
+            return { postReport, rolledBack: true };
+        }
+    }
+
     if (afterErrors > beforeErrors && snapshots.length > 0) {
         for (const snap of snapshots) {
             await fs.promises.writeFile(snap.fullPath, snap.content, ENCODING_UTF8);
@@ -302,7 +381,38 @@ async function verifyAndRollbackIfRegressed(
         );
         return { postReport, rolledBack: true };
     }
+    await saveRevisionHistoryMap(rootDir, revisionHistory);
     return { postReport, rolledBack: false };
+}
+
+async function learnSingleSnapshot(
+    snap: PreFixSnapshot,
+    beforeReport: ScanReport,
+    postReport: ScanReport,
+): Promise<void> {
+    if (!(await pathExistsAsync(snap.fullPath))) return;
+    const afterContent = await fs.promises.readFile(snap.fullPath, ENCODING_UTF8);
+    await defaultPraxisTrajectoryLearningService.learnFromTrajectory({
+        trajectoryId: `fix-trj-${Date.now()}-${snap.relPath}`,
+        filePath: snap.relPath,
+        beforeContent: snap.content,
+        afterContent,
+        beforeScore: beforeReport.qualityScore,
+        afterScore: postReport.qualityScore,
+    });
+}
+
+async function learnAndPersistSnapshots(
+    rootDir: string,
+    snapshots: readonly PreFixSnapshot[],
+    beforeReport: ScanReport,
+    postReport: ScanReport,
+): Promise<void> {
+    await defaultPraxisTrajectoryLearningService.loadRecipesFromDisk(rootDir);
+    for (const snap of snapshots) {
+        await learnSingleSnapshot(snap, beforeReport, postReport);
+    }
+    await defaultPraxisTrajectoryLearningService.saveRecipesToDisk(rootDir);
 }
 
 async function recordCodemodTrajectory(input: CodemodTrajectoryInput): Promise<void> {
@@ -346,6 +456,9 @@ async function recordCodemodTrajectory(input: CodemodTrajectoryInput): Promise<v
                 modified: changeMetrics.modifiedFiles,
             },
         });
+        if (input.snapshots && input.snapshots.length > 0) {
+            await learnAndPersistSnapshots(rootDir, input.snapshots, beforeReport, postReport);
+        }
     } catch (trajectoryErr: unknown) {
         if (cli.logLevel && cli.logLevel !== LOG_LEVEL_SILENT) {
             process.stderr.write(
@@ -434,10 +547,13 @@ export async function handleFixWorkflow(cli: CliOptions): Promise<number> {
     );
 
     if (!cli.fixDryRun && totalApplied > 0) {
+        const revisionHistory = await loadRevisionHistoryMap(rootDir);
         const { postReport, rolledBack } = await verifyAndRollbackIfRegressed(
             cli,
             report,
             snapshots,
+            rootDir,
+            revisionHistory,
         );
         if (rolledBack) {
             return 1;
@@ -450,6 +566,7 @@ export async function handleFixWorkflow(cli: CliOptions): Promise<number> {
             beforeReport: report,
             postReport,
             changeMetrics,
+            snapshots,
         });
     }
 
