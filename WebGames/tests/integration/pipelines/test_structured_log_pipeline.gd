@@ -10,6 +10,8 @@ extends RefCounted
 
 
 
+const StructuredLogPrintScanner = preload("res://tests/support/structured_log_print_scanner.gd")
+
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	var domain_name := "后端全域系统日志改造升级全量验收流水线"
@@ -211,6 +213,9 @@ static func _test_ls_05_redaction_rule_conservative_fallback() -> Dictionary:
 
 	var ok: bool = (
 		not meta.has("secret") and
+		not str(meta.get("nested_token", "")).contains("ABCD1234") and
+		str(meta.get("nested_token", "")).contains("****") and
+		res.get("redacted_keys", []).has("nested_token") and
 		list_arr.size() == 1 and
 		not list_arr[0].has("password") and
 		list_arr[0].get("name") == "item_1"
@@ -591,17 +596,37 @@ static func _test_ls_17_log_query_service_dual_source_merge_and_pagination() -> 
 
 ## TC-LS-18: LogQueryService 命中超限截断标记断言
 static func _test_ls_18_log_query_service_truncation_cap() -> Dictionary:
-	# 构造虚拟超出 MAX_RESULTS 场景的 Criteria
-	var res := LogQueryDTO.Result.new()
-	res.total = LogQueryService.MAX_RESULTS + 50
-	res.truncated = (res.total > LogQueryService.MAX_RESULTS)
+	LogRingBuffer.clear()
+	var target_count := LogQueryService.MAX_RESULTS + 10
+	LogRingBuffer.set_capacity_override_for_test(target_count + 5)
+	for i in range(1, target_count + 1):
+		var rec := StructuredLogRecord.new()
+		rec.sequence = i
+		rec.level = "INFO"
+		rec.channel = "trunc_probe"
+		rec.message = "TruncProbe_%d" % i
+		LogRingBuffer.append(rec)
 
-	var ok: bool = (res.truncated == true)
+	var c := LogQueryDTO.Criteria.new()
+	c.channels = ["trunc_probe"]
+	c.page = 1
+	c.page_size = 50
+	var res := LogQueryService.query(c)
 
+	var c_over := LogQueryDTO.Criteria.new()
+	c_over.channels = ["trunc_probe"]
+	c_over.page = 101
+	c_over.page_size = 50
+	var res_over := LogQueryService.query(c_over)
+
+	var ok: bool = res.truncated == true and res.total == target_count and res.records.size() == 50 and res_over.records.is_empty()
+
+	LogRingBuffer.clear()
+	LogRingBuffer.set_capacity_override_for_test(-1)
 	return {
 		"test": "TC-LS-18: LogQueryService 命中超限截断标记断言",
 		"passed": ok,
-		"details": "truncated=%s" % str(res.truncated)
+		"details": "truncated=%s, total=%d, page_size=%d" % [str(res.truncated), res.total, res.records.size()]
 	}
 
 ## TC-LS-19: 脱敏安全红线全链路断言 (落盘/内存/检索零明文)
@@ -716,87 +741,45 @@ static func _test_ls_21_log_retention_cleaner_expiration_and_protection() -> Dic
 
 	var ok_extract: bool = (extracted_exp == expired_ts and extracted_fresh == fresh_ts)
 
+	# 临时指向 test_dir 执行真实 sweep()，验证过期归档被删且主文件/未过期归档保留
+	var log_tbl: Dictionary = GameConfig._tables.get("infrastructure.log", {})
+	var exp_sec: Dictionary = log_tbl.get("export", {}) if log_tbl.get("export", {}) is Dictionary else {}
+	var prev_dir: Variant = exp_sec.get("directory", null)
+	exp_sec["directory"] = test_dir
+	var removed_count := LogRetentionCleaner.sweep(now, true)
+	if prev_dir != null:
+		exp_sec["directory"] = prev_dir
+	else:
+		exp_sec.erase("directory")
+
+	var expired_path := "%s/%s.%d.log" % [test_dir, prefix, expired_ts]
+	var fresh_path := "%s/%s.%d.log" % [test_dir, prefix, fresh_ts]
+	var main_path := "%s/%s.log" % [test_dir, prefix]
+	var sweep_ok := (removed_count == 1) and (not FileAccess.file_exists(expired_path)) \
+		and FileAccess.file_exists(fresh_path) and FileAccess.file_exists(main_path)
+
 	# 清理测试目录
-	DirAccess.remove_absolute("%s/%s.log" % [test_dir, prefix])
-	DirAccess.remove_absolute("%s/%s.%d.log" % [test_dir, prefix, expired_ts])
-	DirAccess.remove_absolute("%s/%s.%d.log" % [test_dir, prefix, fresh_ts])
+	for p in [main_path, expired_path, fresh_path]:
+		if FileAccess.file_exists(p):
+			DirAccess.remove_absolute(p)
 	DirAccess.remove_absolute(test_dir)
 
 	return {
 		"test": "TC-LS-21: LogRetentionCleaner 过期归档清理与主文件保护断言",
-		"passed": ok_extract,
-		"details": "ok_extract=%s" % str(ok_extract)
+		"passed": ok_extract and sweep_ok,
+		"details": "ok_extract=%s, sweep_ok=%s, removed=%d" % [str(ok_extract), str(sweep_ok), removed_count]
 	}
 
 ## TC-LS-22: 全库业务与视图路径 print(/printerr( 零残留静态断言
 static func _test_ls_22_backend_zero_print_statements_guard() -> Dictionary:
 	# 扫描 backend/ 与 frontend/ 目录：除注释外严禁 bare print(；printerr( 仅允许存于日志底层双汇点
-	var print_hits: Array[String] = []
-	for root_dir in ["res://backend", "res://frontend"]:
-		if DirAccess.open(root_dir) != null:
-			_scan_gd_files_for_print(root_dir, print_hits)
-
+	var print_hits: Array[String] = StructuredLogPrintScanner.scan_roots(["res://backend", "res://frontend"])
 	var ok: bool = (print_hits.size() == 0)
-
 	return {
 		"test": "TC-LS-22: 全库业务与视图路径 print(/printerr( 零残留静态断言",
 		"passed": ok,
 		"details": "hits_count=%d, hits=%s" % [print_hits.size(), str(print_hits)]
 	}
-
-static func _is_printerr_sink_path(full_path: String) -> bool:
-	return full_path == "res://backend/infrastructure/event_bus/event_bus_core.gd" \
-		or full_path == "res://backend/infrastructure/logging/unified_logger_service.gd"
-
-static func _is_ident_char(ch: String) -> bool:
-	return (ch >= "a" and ch <= "z") or (ch >= "A" and ch <= "Z") \
-		or (ch >= "0" and ch <= "9") or ch == "_" or ch == "."
-
-static func _contains_bare_log_call(line: String, call_prefix: String) -> bool:
-	var idx: int = line.find(call_prefix)
-	while idx != -1:
-		var comment_idx: int = line.find("#")
-		if comment_idx != -1 and comment_idx < idx:
-			return false
-		if idx == 0 or not _is_ident_char(line.substr(idx - 1, 1)):
-			return true
-		idx = line.find(call_prefix, idx + call_prefix.length())
-	return false
-
-static func _check_gd_file_for_print(full_path: String, _item: String, out_hits: Array[String]) -> void:
-	var fa := FileAccess.open(full_path, FileAccess.READ)
-	if fa == null:
-		return
-	var allow_printerr: bool = _is_printerr_sink_path(full_path)
-	var line_num := 0
-	while not fa.eof_reached() and line_num < 100000:
-		line_num += 1
-		var line := fa.get_line().strip_edges()
-		if line.begins_with("#") or line.is_empty():
-			continue
-		if _contains_bare_log_call(line, "print("):
-			out_hits.append("%s:%d %s" % [full_path, line_num, line])
-		elif not allow_printerr and _contains_bare_log_call(line, "printerr("):
-			out_hits.append("%s:%d %s" % [full_path, line_num, line])
-	fa.close()
-
-static func _scan_gd_files_for_print(dir_path: String, out_hits: Array[String]) -> void:
-	var da := DirAccess.open(dir_path)
-	if da == null:
-		return
-	da.list_dir_begin()
-	var item := da.get_next()
-	while not item.is_empty():
-		if item == "." or item == "..":
-			item = da.get_next()
-			continue
-		var full := "%s/%s" % [dir_path, item]
-		if da.current_is_dir():
-			_scan_gd_files_for_print(full, out_hits)
-		elif item.ends_with(".gd"):
-			_check_gd_file_for_print(full, item, out_hits)
-		item = da.get_next()
-	da.list_dir_end()
 
 ## TC-LS-23: 与错误底座协同（错误码走 ErrorReporter，日志走 LogCollector）
 static func _test_ls_23_synergy_with_phase_66_error_base() -> Dictionary:
