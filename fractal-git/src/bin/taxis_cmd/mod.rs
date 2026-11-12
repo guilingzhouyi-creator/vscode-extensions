@@ -25,6 +25,7 @@ pub mod branch_list;
 pub mod bundle;
 pub mod checkout;
 pub mod cherry_pick;
+pub mod cherry_pick_state;
 pub mod clone;
 pub mod commit;
 pub mod commit_ops;
