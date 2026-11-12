@@ -37,18 +37,19 @@ const {
 } = require('./lib/diff-exemption-ledger');
 const { emitAgentVerdict, emitHumanVerdict } = require('./lib/diff-verdict-reporter');
 const {
-    isAuditableCodeFile,
-    getStagedStatusList,
     loadRecentTurnoverRecords,
+    loadRecentAdmissionSamples,
     calculateEmpiricalAdmissionThreshold,
     evaluateFileStagedDiff,
+    isAuditableCodeFile,
+    getStagedStatusList,
 } = require('./lib/differential-diff-parser');
 
 /** Violation types the ledger may resolve; every other type is structural. */
 const EXEMPTIBLE_VIOLATION_TYPES = Object.freeze(['SUBSTANTIVE_TARGET_DEFICIT']);
 
 /** Weight of a deleted 5D ELOC in the net turnover, below the weight of an added one. */
-const DELETION_TURNOVER_WEIGHT = 0.8;
+const DELETION_TURNOVER_WEIGHT = BATCH_BANDS.deletionTurnoverWeight;
 
 /** Streak at which a repeated block is announced as possibly structural. */
 const ESCALATION_NOTICE_STREAK = 2;
@@ -187,7 +188,10 @@ function evaluateStagedDifferentialBounds(options = {}) {
     }
 
     const { fileMetricsList, metricsByPath, totals } = measureStagedFiles(stagedList);
-    const admissionThreshold = calculateEmpiricalAdmissionThreshold(loadRecentTurnoverRecords());
+    const recentSamples = typeof loadRecentAdmissionSamples === 'function'
+        ? loadRecentAdmissionSamples()
+        : loadRecentTurnoverRecords();
+    const admissionThreshold = calculateEmpiricalAdmissionThreshold(recentSamples);
 
     const violations = [];
     checkFileMicroViolations(fileMetricsList, totals.elocAdd, violations);

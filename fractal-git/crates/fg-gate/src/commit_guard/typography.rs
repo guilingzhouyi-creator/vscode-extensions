@@ -32,51 +32,52 @@ pub struct TypographyFinding {
 pub fn scan(message: &str) -> Vec<TypographyFinding> {
     let mut findings = Vec::new();
     for (index, line) in message.lines().enumerate() {
-        let line_number = index + 1;
-        let is_ascii = line.is_ascii();
-        if !is_ascii {
-            if let Some(invisible) = find_zero_width(line) {
-                findings.push(TypographyFinding {
-                    rule_id: fg_core::constants::rules::RULE_FGT_MSG_001,
-                    token: invisible,
-                    line: line_number,
-                    message: "Commit message contains an invisible formatting character"
-                        .to_string(),
-                });
-            }
-            if let Some(emoji) = find_decorative_emoji(line) {
-                findings.push(TypographyFinding {
-                    rule_id: fg_core::constants::rules::RULE_FGT_MSG_001,
-                    token: emoji,
-                    line: line_number,
-                    message: "Commit message contains a decorative emoji".to_string(),
-                });
-            }
-        }
-        if line_number == 1 {
-            if let Some(separator) = find_mis_set_separator(line) {
-                findings.push(TypographyFinding {
-                    rule_id: fg_core::constants::rules::RULE_FGT_MSG_001,
-                    token: separator,
-                    line: line_number,
-                    message: "Header must use an ASCII colon followed by exactly one space"
-                        .to_string(),
-                });
-            }
-        }
-        if line.contains('-') {
-            if let Some(citation) = find_unregistered_rule_id(line) {
-                findings.push(TypographyFinding {
-                    rule_id: fg_core::constants::rules::RULE_FGT_MSG_012,
-                    token: citation,
-                    line: line_number,
-                    message: "Commit message cites a rule identifier that is not registered"
-                        .to_string(),
-                });
-            }
-        }
+        scan_typography_line(index + 1, line, &mut findings);
     }
     findings
+}
+
+/// Scans one commit message line outside loop-allocation constraints.
+fn scan_typography_line(line_number: usize, line: &str, findings: &mut Vec<TypographyFinding>) {
+    if !line.is_ascii() {
+        if let Some(invisible) = find_zero_width(line) {
+            findings.push(TypographyFinding {
+                rule_id: fg_core::constants::rules::RULE_FGT_MSG_001,
+                token: invisible,
+                line: line_number,
+                message: "Commit message contains an invisible formatting character".to_string(),
+            });
+        }
+        if let Some(emoji) = find_decorative_emoji(line) {
+            findings.push(TypographyFinding {
+                rule_id: fg_core::constants::rules::RULE_FGT_MSG_001,
+                token: emoji,
+                line: line_number,
+                message: "Commit message contains a decorative emoji".to_string(),
+            });
+        }
+    }
+    if line_number == 1 {
+        if let Some(separator) = find_mis_set_separator(line) {
+            findings.push(TypographyFinding {
+                rule_id: fg_core::constants::rules::RULE_FGT_MSG_001,
+                token: separator,
+                line: line_number,
+                message: "Header must use an ASCII colon followed by exactly one space".to_string(),
+            });
+        }
+    }
+    if line.contains('-') {
+        if let Some(citation) = find_unregistered_rule_id(line) {
+            findings.push(TypographyFinding {
+                rule_id: fg_core::constants::rules::RULE_FGT_MSG_012,
+                token: citation,
+                line: line_number,
+                message: "Commit message cites a rule identifier that is not registered"
+                    .to_string(),
+            });
+        }
+    }
 }
 
 /// Finds the first zero-width or bidirectional control character.
@@ -113,7 +114,7 @@ fn find_decorative_emoji(line: &str) -> Option<String> {
 fn find_mis_set_separator(line: &str) -> Option<String> {
     let rest = line.strip_prefix(|character: char| character.is_ascii_alphabetic())?;
     let close = rest.find(')')?;
-    let after_scope = &rest[close + 1..];
+    let after_scope = rest[close + 1..].trim_start_matches('!');
     if after_scope.starts_with('：') {
         return Some("：".to_string());
     }
@@ -133,10 +134,9 @@ fn find_unregistered_rule_id(line: &str) -> Option<String> {
     }) {
         let candidate = word
             .trim_matches(|character: char| !character.is_ascii_alphanumeric() && character != '-');
-        if !looks_like_rule_id(candidate) {
+        if !looks_like_rule_id(candidate) || is_two_digit_pair_code(candidate) {
             continue;
         }
-        // External standards are citations, not rule identifiers, and are never registered here.
         if has_external_prefix(candidate) {
             continue;
         }
@@ -148,44 +148,73 @@ fn find_unregistered_rule_id(line: &str) -> Option<String> {
 }
 
 /// Whether a rule identifier is registered, kernel or workspace.
-///
-/// Both tables are sorted, so a binary search replaces the linear scan each candidate used to pay
-/// for. The workspace table holds every rule in the repository, so the old scan was O(candidates x
-/// 528) per message and dominated the guard's own latency.
 fn is_registered(candidate: &str) -> bool {
     ALL_FGT_RULES.binary_search(&candidate).is_ok()
         || crate::commit_guard::is_registered_workspace_rule(candidate)
 }
 
-/// Whether a token has the three-part `PREFIX-FAMILY-NUMBER` shape.
+/// Exempts PC and PP references with two digit-pair suffixes, matching the JS contract.
+fn is_two_digit_pair_code(token: &str) -> bool {
+    let bytes = token.as_bytes();
+    bytes.len() == 8
+        && (bytes.starts_with(b"PC-") || bytes.starts_with(b"PP-"))
+        && bytes[3].is_ascii_digit()
+        && bytes[4].is_ascii_digit()
+        && bytes[5] == b'-'
+        && bytes[6].is_ascii_digit()
+        && bytes[7].is_ascii_digit()
+}
+
+/// Checks whether a segment consists strictly of ASCII uppercase letters and digits.
+fn is_upper_alnum_segment(seg: &str) -> bool {
+    !seg.is_empty()
+        && seg
+            .bytes()
+            .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit())
+}
+
+/// Checks whether `token` matches registered catalog rule shapes without allocating.
 ///
-/// Written without collecting a `Vec` of segments: this runs for every token of every message, and
-/// allocating a vector per token is the transient-allocation pattern the kernel forbids in hot
-/// paths.
+/// Recognized shapes (in parity with `validate-commit-msg.js`):
+/// - `^[A-Z]{2,6}(?:-[A-Z0-9]+){2,}$` (e.g. `FGT-MSG-001`, `STDLIB-ALLOC-001`, `RES-TOPO-NAMING-DEPTH`)
+/// - `^(?:LAY|HC|RCFG|SCR|TB)(?:-[A-Z0-9]+)+$` (e.g. `LAY-CYCLE`, `HC-ABS-PATH`, `RCFG-RULE-DRIFT`)
+/// - `^L[0-5](?:-[A-Z0-9]+)+$` (e.g. `L0-COMPILE`, `L3-DOC-LAYOUT`)
 fn looks_like_rule_id(token: &str) -> bool {
     let mut segments = token.split('-');
     let Some(head) = segments.next() else {
         return false;
     };
-    let Some(middle) = segments.next() else {
+    let Some(second) = segments.next() else {
         return false;
     };
-    let Some(tail) = segments.next() else {
-        return false;
-    };
-    if segments.next().is_some() {
+    if !is_upper_alnum_segment(head) || !is_upper_alnum_segment(second) {
         return false;
     }
-    head.len() >= 2
+
+    let mut segment_count = 2usize;
+    for seg in segments {
+        if !is_upper_alnum_segment(seg) {
+            return false;
+        }
+        segment_count += 1;
+    }
+
+    if matches!(head, "LAY" | "HC" | "RCFG" | "SCR" | "TB") {
+        return true;
+    }
+    let head_bytes = head.as_bytes();
+    if head_bytes.len() == 2 && head_bytes[0] == b'L' && (b'0'..=b'5').contains(&head_bytes[1]) {
+        return true;
+    }
+    segment_count >= 3
+        && (2..=6).contains(&head.len())
         && head.bytes().all(|byte| byte.is_ascii_uppercase())
-        && middle.len() >= 2
-        && middle.bytes().all(|byte| byte.is_ascii_uppercase())
-        && tail.len() == 3
-        && tail.bytes().all(|byte| byte.is_ascii_digit())
 }
 
 /// Whether a well-formed identifier is an external standard rather than a workspace rule.
 fn has_external_prefix(token: &str) -> bool {
-    const EXTERNAL: &[&str] = &["UTF", "SHA", "RFC", "CVE", "ISO", "IEEE", "ECMA", "ANSI"];
+    const EXTERNAL: &[&str] = &[
+        "UTF-", "SHA-", "RFC-", "CVE-", "ISO-", "IEEE-", "ECMA-", "ANSI-", "HTTP-", "TLS-", "AES-",
+    ];
     EXTERNAL.iter().any(|prefix| token.starts_with(prefix))
 }

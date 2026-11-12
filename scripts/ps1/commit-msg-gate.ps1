@@ -69,7 +69,7 @@ function Show-CommitTemplateGuide {
     Write-Host ""
     Write-Host "💡 【生产工程级提交信息标准模板指引】:" -ForegroundColor Yellow
     Write-Host "-----------------------------------------------------------------" -ForegroundColor Gray
-    Write-Host "<type>(<scope>): <祈使句中文摘要标题，5~80 字符，不以句号结尾>" -ForegroundColor Cyan
+    Write-Host "<type>(<scope>): <祈使句中文摘要标题，15~80 字符，不以句号结尾>" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "[Project / 项目归属]" -ForegroundColor Cyan
     Write-Host "- <workspace-timing | auto-refactor | WebGames | fractal-git | governance>" -ForegroundColor Gray

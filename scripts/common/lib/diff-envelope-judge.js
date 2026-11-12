@@ -24,6 +24,7 @@ const { execFileSync } = require('child_process');
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
 
 const {
+    DIFF_BOUNDS_CONTRACT,
     DIFF_RULES,
     FILE_ADD_BANDS,
     FILE_DEL_BANDS,
@@ -40,7 +41,7 @@ const {
 } = require('./diff-bounds-policy');
 
 /** Fraction of a deletion that a preceding commit's additions must cover to witness a refactor. */
-const WITNESS_COVERAGE_RATIO = 0.7;
+const WITNESS_COVERAGE_RATIO = DIFF_BOUNDS_CONTRACT.expansionPolicy.witnessCoverageRatio;
 
 /**
  * Detects whether the immediate preceding commit provided refactor addition capacity.

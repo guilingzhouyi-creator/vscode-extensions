@@ -1,6 +1,6 @@
 //! Module: fg-core — Fractal Git Domain Gate Rules SSOT
 //! File Path: crates/fg-core/src/constants/rules.rs
-//! Architecture Role: Single source of truth for all 24 registered Fractal Git domain
+//! Architecture Role: Single source of truth for all 36 registered Fractal Git domain
 //!   rules in `scripts/common/rule-catalog.json`. Enforces zero rule ID drift (`RCFG-RULE-DRIFT`).
 
 /// FGT-ALG-001: Myers diff, 3-way merge, and FastCDC chunking algorithm boundary guard.

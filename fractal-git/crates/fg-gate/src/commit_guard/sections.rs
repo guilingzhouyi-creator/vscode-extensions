@@ -83,8 +83,8 @@ impl SectionSlot {
         match self {
             Self::Project => &["project", "项目", "项目归属"],
             Self::Why => &["why", "动机", "背景", "动机背景"],
-            Self::Added => &["added", "新增", "新增内容"],
-            Self::Changed => &["changed", "变更", "变更调整", "修改", "调整"],
+            Self::Added => &["added", "新增", "新增内容", "新增功能"],
+            Self::Changed => &["changed", "变更", "变更调整", "修改", "调整", "重构"],
             Self::Removed => &["removed", "删除", "移除"],
             Self::Fixed => &["fixed", "修复", "修复缺陷"],
             Self::Breaking => &["breaking changes", "breaking change", "破坏性变更"],
@@ -335,7 +335,7 @@ pub fn check_section_floors(scan: &SectionScan, violations: &mut Vec<String>) {
             _ => 0,
         };
         if floor == 0 {
-            if slot.is_change_group() {
+            if slot.is_change_group() || slot == SectionSlot::Breaking {
                 reject_short_bullets(section, violations);
             }
             continue;
@@ -350,7 +350,7 @@ pub fn check_section_floors(scan: &SectionScan, violations: &mut Vec<String>) {
                 floor
             ));
         }
-        if slot.is_change_group() {
+        if slot.is_change_group() || slot == SectionSlot::Breaking {
             reject_short_bullets(section, violations);
         }
     }
@@ -403,5 +403,58 @@ pub fn check_empty_sections(scan: &SectionScan, violations: &mut Vec<String>) {
             out_of_place,
             must_follow
         ));
+    }
+}
+
+/// Checks physical line formatting inside commit body: rejects fullwidth brackets, invalid bullet markers, and multiple blank lines.
+pub fn check_body_formatting(lines: &[&str], violations: &mut Vec<String>) {
+    if lines.len() <= 2 {
+        return;
+    }
+    let body_lines = &lines[2..];
+
+    // Check consecutive empty lines
+    let mut consecutive_blank = 0usize;
+    for line in body_lines {
+        if line.trim().is_empty() {
+            consecutive_blank += 1;
+            if consecutive_blank >= 2 {
+                violations.push(format!(
+                    "{}: Body contains consecutive blank lines; keep exactly one blank line between sections",
+                    fg_core::constants::rules::RULE_FGT_MSG_002
+                ));
+                break;
+            }
+        } else {
+            consecutive_blank = 0;
+        }
+    }
+
+    // Check fullwidth brackets on headings and invalid bullet markers
+    for line in body_lines {
+        let trimmed = line.trim();
+        if trimmed.starts_with('【')
+            || trimmed.starts_with('［')
+            || trimmed.ends_with('】')
+            || trimmed.ends_with('］')
+        {
+            violations.push(format!(
+                "{}: Section heading contains fullwidth brackets: '{}'; use ASCII '[' and ']'",
+                fg_core::constants::rules::RULE_FGT_MSG_002,
+                trimmed
+            ));
+        }
+        if trimmed.starts_with("* ")
+            || trimmed.starts_with("+ ")
+            || trimmed.starts_with("• ")
+            || trimmed.starts_with("、 ")
+        {
+            let marker = &trimmed[..trimmed.find(' ').unwrap_or(1)];
+            violations.push(format!(
+                "{}: List item uses invalid marker '{} '; list items must start with '- '",
+                fg_core::constants::rules::RULE_FGT_MSG_002,
+                marker
+            ));
+        }
     }
 }
