@@ -11,9 +11,10 @@ use fg_algorithms::diff::eloc_5d::evaluate_file_diff_5d_eloc;
 use fg_core::models::{FileMode, IndexStage, Oid};
 use fg_gate::diff_bounds::{
     CommitBatchTotals, DiffBoundsGovernor, DiffBoundsVerdict, SingleFile5dBounds,
-    DELETION_TURNOVER_WEIGHT,
+    DELETION_TURNOVER_WEIGHT, WITNESS_COVERAGE_RATIO,
 };
 use fg_native::RepoDocument;
+use fg_object::borrowed::GitCommitRef;
 
 use super::common::{find_all_arg_values, print_json, CliContext};
 use super::repo_view::RepoView;
@@ -40,7 +41,7 @@ pub fn handle_gate_slice(ctx: &CliContext) {
         .map(|view| view.work_root().to_path_buf())
         .unwrap_or_else(|| super::repo_view::resolve_work_root(&ctx.git_dir));
 
-    let (_, head_tree) = load_head_tree(repo_view.as_ref());
+    let (head_oid_opt, head_tree) = load_head_tree(repo_view.as_ref());
     let index_map = load_active_index_map(&ctx.git_dir);
 
     let slice_entries = if source_is_cli {
@@ -69,13 +70,24 @@ pub fn handle_gate_slice(ctx: &CliContext) {
     );
 
     let batch_totals = compute_batch_totals(&slice_entries);
-    let governor_inputs: Vec<(&str, SingleFile5dBounds, bool)> = slice_entries
-        .iter()
-        .map(|entry| (entry.path.as_str(), entry.bounds, false))
-        .collect();
+    let head_add_eloc =
+        compute_previous_head_add_eloc(repo_view.as_ref(), head_oid_opt, &head_tree);
+    let witness_flags = build_witness_flags(
+        &slice_entries,
+        batch_totals.total_effective_lines_added,
+        head_add_eloc,
+    );
 
-    let governance_verdict: DiffBoundsVerdict =
-        DiffBoundsGovernor::evaluate_with_witnesses(&governor_inputs, &batch_totals, &[]);
+    let mut governor_inputs = Vec::with_capacity(slice_entries.len());
+    for (entry, &has_witness) in slice_entries.iter().zip(witness_flags.iter()) {
+        governor_inputs.push((entry.path.as_str(), entry.bounds, has_witness));
+    }
+
+    let governance_verdict: DiffBoundsVerdict = DiffBoundsGovernor::evaluate_with_witnesses(
+        &governor_inputs,
+        &batch_totals,
+        &[],
+    );
 
     report_slice_verdict(ctx, &governance_verdict, &batch_totals, slice_entries.len());
 
@@ -182,7 +194,7 @@ fn collect_cli_slice_entries(
 ) -> Vec<EvaluatedSliceEntry> {
     let mut unique_paths = BTreeSet::new();
     for raw_path in cli_paths {
-        let normalized = normalize_repo_path(raw_path);
+        let normalized = normalize_cli_path(raw_path, work_root);
         if !normalized.is_empty() {
             unique_paths.insert(normalized);
         }
@@ -364,6 +376,78 @@ fn compute_batch_totals(slice_entries: &[EvaluatedSliceEntry]) -> CommitBatchTot
     )
 }
 
+/// Computes total 5D added ELOC in `HEAD~1..HEAD` as cross-commit refactoring capacity witness.
+fn compute_previous_head_add_eloc(
+    repo_view: Option<&RepoView>,
+    head_oid_opt: Option<Oid>,
+    head_tree: &BTreeMap<String, TreeEntry>,
+) -> f64 {
+    let Some(view) = repo_view else {
+        return 0.0;
+    };
+    let Some(head_oid) = head_oid_opt else {
+        return 0.0;
+    };
+    let Ok(head_obj) = view.object(&head_oid) else {
+        return 0.0;
+    };
+    let Ok(commit_ref) = GitCommitRef::parse(&head_obj.payload) else {
+        return 0.0;
+    };
+    let Some(parent_oid) = commit_ref.parents().first().copied() else {
+        return 0.0;
+    };
+    let Ok(parent_tree) = flatten_commit_tree(view, &parent_oid) else {
+        return 0.0;
+    };
+
+    let mut head_add_eloc = 0.0f64;
+    for (path, head_entry) in head_tree {
+        if !is_auditable_code_file(path) {
+            continue;
+        }
+        let parent_entry = parent_tree.get(path);
+        if parent_entry.is_some_and(|prev| prev.oid == head_entry.oid) {
+            continue;
+        }
+        head_add_eloc += compute_blob_pair_added_eloc(view, parent_entry, head_entry);
+    }
+    head_add_eloc
+}
+
+/// Evaluates added 5D ELOC for a single changed commit tree pair.
+fn compute_blob_pair_added_eloc(
+    view: &RepoView,
+    parent_entry: Option<&TreeEntry>,
+    head_entry: &TreeEntry,
+) -> f64 {
+    let old_bytes = read_tree_blob_bytes(Some(view), parent_entry);
+    let new_bytes = read_tree_blob_bytes(Some(view), Some(head_entry));
+    if is_binary_payload(old_bytes.as_deref()) || is_binary_payload(new_bytes.as_deref()) {
+        return 0.0;
+    }
+    let old_text = decode_lf_text(old_bytes.as_deref().unwrap_or(&[]));
+    let new_text = decode_lf_text(new_bytes.as_deref().unwrap_or(&[]));
+    evaluate_file_diff_5d_eloc(&old_text, &new_text).effective_lines_added
+}
+
+/// Computes per-file refactoring witness flags aligned with `diff-envelope-judge.js`.
+fn build_witness_flags(
+    slice_entries: &[EvaluatedSliceEntry],
+    batch_add_eloc: f64,
+    head_add_eloc: f64,
+) -> Vec<bool> {
+    let mut flags = Vec::with_capacity(slice_entries.len());
+    for entry in slice_entries {
+        let required = entry.bounds.effective_lines_deleted * WITNESS_COVERAGE_RATIO;
+        let has_witness = !entry.bounds.is_new_file
+            && (batch_add_eloc >= required
+                || head_add_eloc >= entry.bounds.effective_lines_deleted);
+        flags.push(has_witness);
+    }
+    flags
+}
+
 /// Matches the auditable code file filter owned by `differential-diff-parser.js`.
 fn is_auditable_code_file(rel_path: &str) -> bool {
     let Some((_, raw_ext)) = rel_path.rsplit_once('.') else {
@@ -389,6 +473,17 @@ fn normalize_repo_path(raw_path: &str) -> String {
         .trim_start_matches("./")
         .trim_start_matches(".\\");
     trimmed.replace('\\', "/")
+}
+
+/// Normalizes CLI `--file`/`-f` inputs relative to `work_root` when passed as worktree paths.
+fn normalize_cli_path(raw_path: &str, work_root: &Path) -> String {
+    let candidate = Path::new(raw_path);
+    if candidate.is_absolute() {
+        if let Ok(stripped) = candidate.strip_prefix(work_root) {
+            return stripped.to_string_lossy().replace('\\', "/");
+        }
+    }
+    normalize_repo_path(raw_path)
 }
 
 /// Emits slice gate verdict in JSON or human-readable terminal format.
