@@ -10,7 +10,7 @@ use std::path::Path;
 use fg_algorithms::diff::eloc_5d::evaluate_file_diff_5d_eloc;
 use fg_core::models::{FileMode, IndexStage, Oid};
 use fg_gate::diff_bounds::{
-    CommitBatchTotals, DiffBoundsGovernor, DiffBoundsVerdict, SingleFile5dBounds,
+    AdmissionSample, CommitBatchTotals, DiffBoundsGovernor, DiffBoundsVerdict, SingleFile5dBounds,
     DELETION_TURNOVER_WEIGHT, WITNESS_COVERAGE_RATIO,
 };
 use fg_native::RepoDocument;
@@ -77,6 +77,7 @@ pub fn handle_gate_slice(ctx: &CliContext) {
         batch_totals.total_effective_lines_added,
         head_add_eloc,
     );
+    let recent_samples = load_dual_ledger_samples(&ctx.git_dir, &work_root);
 
     let mut governor_inputs = Vec::with_capacity(slice_entries.len());
     for (entry, &has_witness) in slice_entries.iter().zip(witness_flags.iter()) {
@@ -86,7 +87,7 @@ pub fn handle_gate_slice(ctx: &CliContext) {
     let governance_verdict: DiffBoundsVerdict = DiffBoundsGovernor::evaluate_with_witnesses(
         &governor_inputs,
         &batch_totals,
-        &[],
+        &recent_samples,
     );
 
     report_slice_verdict(ctx, &governance_verdict, &batch_totals, slice_entries.len());
@@ -446,6 +447,67 @@ fn build_witness_flags(
         flags.push(has_witness);
     }
     flags
+}
+
+/// Reads recent Jeffreys admission samples across both Taxis and auto-refactor NDJSON ledgers.
+fn load_dual_ledger_samples(git_dir: &Path, work_root: &Path) -> Vec<AdmissionSample> {
+    let mut samples = Vec::new();
+    let candidate_paths = [
+        git_dir.join("telemetry/admission_ledger.ndjson"),
+        work_root.join(".auto-refactor-cache/admission-turnover-ledger.ndjson"),
+        work_root.join("auto-refactor/.auto-refactor-cache/admission-turnover-ledger.ndjson"),
+    ];
+    for ledger_path in &candidate_paths {
+        append_ledger_samples_from_file(ledger_path, &mut samples);
+    }
+    samples
+}
+
+/// Parses one NDJSON ledger file and appends valid admission samples into `samples`.
+fn append_ledger_samples_from_file(ledger_path: &Path, samples: &mut Vec<AdmissionSample>) {
+    if !ledger_path.is_file() {
+        return;
+    }
+    let Ok(content) = fs::read_to_string(ledger_path) else {
+        return;
+    };
+    for ledger_line in content.lines() {
+        let trimmed = ledger_line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if let Some(sample) = parse_ledger_sample_line(trimmed) {
+            samples.push(sample);
+        }
+    }
+}
+
+/// Parses one JSONL record supporting both `taxis` and `auto-refactor` ledger schemas.
+fn parse_ledger_sample_line(trimmed_json: &str) -> Option<AdmissionSample> {
+    let value: serde_json::Value = serde_json::from_str(trimmed_json).ok()?;
+    let turnover = value
+        .get("turnover")
+        .and_then(|num| num.as_f64())
+        .or_else(|| {
+            value
+                .get("netSemanticTurnover")
+                .and_then(|num| num.as_f64())
+        })?;
+    if !turnover.is_finite() {
+        return None;
+    }
+    let passed = value
+        .get("passed")
+        .and_then(|flag| flag.as_bool())
+        .or_else(|| value.get("gatePassed").and_then(|flag| flag.as_bool()))
+        .or_else(|| {
+            value
+                .get("verdict")
+                .and_then(|verdict| verdict.as_str())
+                .map(|verdict| verdict == "ADMITTED")
+        })
+        .unwrap_or(turnover >= fg_gate::diff_bounds::ADMISSION_TURNOVER_FLOOR);
+    Some(AdmissionSample::new(turnover, passed))
 }
 
 /// Matches the auditable code file filter owned by `differential-diff-parser.js`.
