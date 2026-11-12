@@ -17,7 +17,11 @@ import type {
     HeuristicScore,
     MctsNode,
 } from './mcts-contracts';
-import { evaluateCandidateStrategy } from './heuristic-evaluator';
+import {
+    evaluateCandidateStrategy,
+    evaluateIncrementalSlice,
+    type SliceEvaluationOptions,
+} from './heuristic-evaluator';
 import type { MctsExplorerOptions } from './mcts-explorer';
 import { MctsExplorer } from './mcts-explorer';
 import {
@@ -38,6 +42,7 @@ export type {
     HeuristicScore,
     MctsExplorerOptions,
     MctsNode,
+    SliceEvaluationOptions,
     EditStepConfidence,
     SafePrefixRolloutResult,
     SpeculativeEditStep,
@@ -46,6 +51,7 @@ export type {
 
 export {
     evaluateCandidateStrategy,
+    evaluateIncrementalSlice,
     MctsExplorer,
     DSparkConfidenceScheduler,
     defaultDSparkConfidenceScheduler,
