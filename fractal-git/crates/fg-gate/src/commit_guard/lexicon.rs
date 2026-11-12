@@ -1,14 +1,14 @@
 //! Module: fg-gate — Commit Lexicon Guard
 //! File Path: crates/fg-gate/src/commit_guard/lexicon.rs
 //! Architecture Role: Detects provisional vocabulary, stylistic hyperbole, batch codenames and
-//!   unresolved markers in a commit message, with code-span masking and whitelist subtraction.
+//!   unresolved markers in a commit message, with rule-id protection and whitelist subtraction.
 //! Dependencies & Triggers: Consumed by `commit_guard::verify` after section resolution.
-//! Responsibilities: Mask inline code and URLs, match whole tokens rather than substrings, subtract
-//!   the shared whitelist, and report the exact token and line that triggered a finding.
-//! Exit Semantics & Design Rationale: Matching is token-anchored because substring matching made
-//!   a short provisional stem fire on a longer legitimate word (for example the abbreviation inside
-//!   "commit template") and rejected engineering prose. A finding always names the token, so an
-//!   author can act on it without re-reading the whole rule table.
+//! Responsibilities: Preserve inline code and URL visibility so forbidden terms cannot hide in them,
+//!   mask registered rule-ID shapes, match whole ASCII tokens and CJK containment, subtract the
+//!   shared whitelist, and report the exact token and line that triggered a finding.
+//! Exit Semantics & Design Rationale: Matching is token-anchored for ASCII and containment-based
+//!   for CJK and multi-word phrases, syncing 100% with `commit-msg-forbidden-terms.json`. A finding
+//!   always names the offending token so an author can remediate immediately.
 //!
 //! Domain Governance Rules: FGT-MSG-004 (vocabulary), FGT-MSG-005 (unresolved markers),
 //!   FGT-MSG-008 (batch codenames).
@@ -179,8 +179,100 @@ const PROMOTIONAL_TERMS: &[&str] = &[
     "零缺陷全部达标",
 ];
 
-/// Subset of provisional terms in CJK script that require containment matching.
-const CJK_PROVISIONAL_TERMS: &[&str] = &[
+/// Multi-word or hyphenated English phrases synced with `commit-msg-forbidden-terms.json`.
+const MULTIWORD_FORBIDDEN_PHRASES: &[&str] = &[
+    "quick fix",
+    "quick-fix",
+    "quick-and-dirty",
+    "for now",
+    "ad hoc",
+    "ad-hoc",
+    "band aid",
+    "band-aid",
+    "half baked",
+    "half-baked",
+    "rough draft",
+    "casual commit",
+    "update code",
+    "fix bug",
+    "silver bullet",
+    "zero bug",
+    "zero-bug",
+    "god tier",
+    "god-tier",
+    "industrial grade",
+    "industrial-grade",
+    "enterprise grade",
+    "enterprise-grade",
+    "state of the art",
+    "state-of-the-art",
+    "best in class",
+    "best-in-class",
+    "completely solved",
+    "fully eliminated",
+    "never fails",
+    "never fail",
+    "absolutely safe",
+    "absolutely correct",
+    "absolutely flawless",
+    "100% safe",
+    "100% secure",
+    "100% fixed",
+    "100% working",
+    "100% reliable",
+    "100% guaranteed",
+    "total crap",
+    "complete mess",
+    "useless code",
+    "broken beyond repair",
+    "game changer",
+    "game-changer",
+    "paradigm shift",
+    "epoch making",
+    "epoch-making",
+    "quantum leap",
+    "milestone breakthrough",
+    "tone down",
+    "low key",
+    "low-key",
+    "stay humble",
+    "truth seeking",
+    "truth-seeking",
+    "down to earth",
+    "down-to-earth",
+    "meta narrative",
+    "meta-narrative",
+    "style refactoring",
+    "style upgrade",
+    "factual and pragmatic",
+    "perfect closed loop",
+    "perfect closed-loop",
+    "completely cleared",
+    "zero violations",
+    "zero violation",
+    "exit code 0",
+    "return code 0",
+    "exit status 0",
+    "without errors",
+    "without error",
+    "all tests pass",
+    "all tests passed",
+    "all tests green",
+    "all gates pass",
+    "all gates passed",
+    "all green",
+    "100% pass",
+    "100% passed",
+    "nine-fold gate",
+    "nine-fold gates",
+    "nine-fold defense",
+    "9-fold gate",
+    "9-fold gates",
+    "9-fold defense",
+];
+
+/// Every CJK forbidden term across all four categories requiring containment matching.
+const CJK_CONTAINMENT_TERMS: &[&str] = &[
     "临时",
     "暂存",
     "暂时",
@@ -383,77 +475,102 @@ const UNRESOLVED_MARKERS: &[&str] = &[
 
 /// Scans a full commit message for lexical violations.
 ///
-/// Returns findings in message order. Code spans and URLs are masked first so a term quoted as
-/// code is not treated as prose.
-///
-/// Also returns the masked and whitelist-subtracted text, because the policy-specific term check
-/// needs exactly that intermediate result. Recomputing it separately meant the whole message was
-/// masked, lowered and scrubbed twice per commit.
+/// Inline backtick spans and URLs are intentionally NOT masked so forbidden wording cannot evade
+/// detection by wrapping itself inside backticks or query strings. Uppercase rule ID tokens
+/// (`ARCH-TMP-001`) are masked before splitting so hyphenated provisional segments inside valid
+/// catalog citations never trigger false positives.
 pub fn scan(message: &str) -> (Vec<LexiconFinding>, String) {
     let mut findings = Vec::new();
     let mut prepared = String::with_capacity(message.len());
     for (index, raw_line) in message.lines().enumerate() {
-        let line_number = index + 1;
-        let masked = mask_uppercase_rule_ids(raw_line);
-        // Whitelisted phrases are removed before tokenizing, not compared afterwards.
-        // CJK has no word delimiters, so `临时文件` arrives as one token and an equality test
-        // against the whitelist would only ever match a line that was *exactly* the phrase.
-        // Subtracting the phrase from the text is the only way containment can be made honest.
-        let lower_line: Cow<'_, str> = if masked.bytes().any(|byte| byte.is_ascii_uppercase()) {
-            Cow::Owned(masked.to_lowercase())
-        } else if masked.is_ascii() {
-            masked
-        } else {
-            Cow::Owned(masked.to_lowercase())
-        };
-        let scrubbed = subtract_whitelist(&lower_line);
-        prepared.push_str(&scrubbed);
-        prepared.push('\n');
-        for_each_token(&scrubbed, |token| {
-            if let Some(rule) = classify_token(token) {
-                findings.push(LexiconFinding {
-                    rule_id: rule,
-                    token: token.to_string(),
-                    line: line_number,
-                    message: describe_token(rule, token),
-                });
-            }
-        });
-
-        if let Some(marker) = find_unresolved_marker(&scrubbed) {
-            findings.push(LexiconFinding {
-                rule_id: fg_core::constants::rules::RULE_FGT_MSG_005,
-                token: marker,
-                line: line_number,
-                message: "Commit message defers a decision instead of stating a verified fact"
-                    .to_string(),
-            });
-        }
-
-        if let Some(code) = find_batch_codename(&scrubbed) {
-            findings.push(LexiconFinding {
-                rule_id: fg_core::constants::rules::RULE_FGT_MSG_008,
-                token: code,
-                line: line_number,
-                message: "Commit message names a construction batch instead of a technical fact"
-                    .to_string(),
-            });
-        }
-
-        if let Some(placeholder) = find_template_placeholder(raw_line) {
-            findings.push(LexiconFinding {
-                rule_id: fg_core::constants::rules::RULE_FGT_MSG_005,
-                token: placeholder,
-                line: line_number,
-                message: "Commit message still contains an unreplaced template placeholder"
-                    .to_string(),
-            });
-        }
+        scan_single_line(index + 1, raw_line, &mut findings, &mut prepared);
     }
     (findings, prepared)
 }
 
-/// Replaces inline code spans and URLs with spaces so their contents are never scanned.
+/// Scans one message line without inline allocation churn inside the caller loop.
+fn scan_single_line(
+    line_number: usize,
+    raw_line: &str,
+    findings: &mut Vec<LexiconFinding>,
+    prepared: &mut String,
+) {
+    let rule_masked = mask_uppercase_rule_ids(raw_line);
+    let lower_line: Cow<'_, str> = if rule_masked.bytes().any(|byte| byte.is_ascii_uppercase()) {
+        Cow::Owned(rule_masked.to_lowercase())
+    } else if rule_masked.is_ascii() {
+        rule_masked
+    } else {
+        Cow::Owned(rule_masked.to_lowercase())
+    };
+    let scrubbed = subtract_whitelist(&lower_line);
+    prepared.push_str(&scrubbed);
+    prepared.push('\n');
+
+    let mut line_has_vocab_finding = false;
+    for_each_token(&scrubbed, |token| {
+        if let Some(rule) = classify_token(token) {
+            line_has_vocab_finding = true;
+            findings.push(LexiconFinding {
+                rule_id: rule,
+                token: token.to_string(),
+                line: line_number,
+                message: describe_token(rule, token),
+            });
+        }
+    });
+
+    if !line_has_vocab_finding {
+        if let Some(phrase) = find_multiword_forbidden_phrase(&scrubbed) {
+            findings.push(LexiconFinding {
+                rule_id: fg_core::constants::rules::RULE_FGT_MSG_004,
+                token: phrase.to_string(),
+                line: line_number,
+                message: describe_token(fg_core::constants::rules::RULE_FGT_MSG_004, phrase),
+            });
+        }
+    }
+
+    if !scrubbed.is_ascii() && scrubbed.contains("100%") {
+        findings.push(LexiconFinding {
+            rule_id: fg_core::constants::rules::RULE_FGT_MSG_004,
+            token: "100%".to_string(),
+            line: line_number,
+            message: describe_token(fg_core::constants::rules::RULE_FGT_MSG_004, "100%"),
+        });
+    }
+
+    if let Some(marker) = find_unresolved_marker(&scrubbed) {
+        findings.push(LexiconFinding {
+            rule_id: fg_core::constants::rules::RULE_FGT_MSG_005,
+            token: marker,
+            line: line_number,
+            message: "Commit message defers a decision instead of stating a verified fact"
+                .to_string(),
+        });
+    }
+
+    if let Some(code) = find_batch_codename(&scrubbed) {
+        findings.push(LexiconFinding {
+            rule_id: fg_core::constants::rules::RULE_FGT_MSG_008,
+            token: code,
+            line: line_number,
+            message: "Commit message names a construction batch instead of a technical fact"
+                .to_string(),
+        });
+    }
+
+    if let Some(placeholder) = find_template_placeholder(raw_line) {
+        findings.push(LexiconFinding {
+            rule_id: fg_core::constants::rules::RULE_FGT_MSG_005,
+            token: placeholder,
+            line: line_number,
+            message: "Commit message still contains an unreplaced template placeholder".to_string(),
+        });
+    }
+}
+
+/// Checks whether a token matches an uppercase multi-segment rule identifier (`ARCH-TMP-001`).
 fn is_uppercase_rule_shape(token: &str) -> bool {
     let mut seg_count = 0usize;
     let mut head_ok = false;
@@ -480,6 +597,7 @@ fn is_uppercase_rule_shape(token: &str) -> bool {
     head_ok && seg_count >= 3
 }
 
+/// Masks registered-shape uppercase rule IDs so tokens like `ARCH-TMP-001` are not flagged as provisional wording.
 fn mask_uppercase_rule_ids(line: &str) -> Cow<'_, str> {
     if !line.contains('-') || !line.bytes().any(|byte| byte.is_ascii_uppercase()) {
         return Cow::Borrowed(line);
@@ -515,6 +633,14 @@ fn mask_uppercase_rule_ids(line: &str) -> Cow<'_, str> {
         },
         None => Cow::Borrowed(line),
     }
+}
+
+/// Finds the first multi-word forbidden ASCII phrase via whole-term boundary matching.
+fn find_multiword_forbidden_phrase(scrubbed: &str) -> Option<&'static str> {
+    MULTIWORD_FORBIDDEN_PHRASES
+        .iter()
+        .copied()
+        .find(|phrase| contains_whole_term(scrubbed, phrase))
 }
 
 /// Prepares a message for policy-specific term matching.
@@ -606,11 +732,6 @@ fn is_cjk_char(character: char) -> bool {
 }
 
 /// Maps one token to the rule it violates, if any.
-///
-/// ASCII terms must match the token exactly: containment made a short provisional stem match a
-/// longer legitimate word (the abbreviation inside the word "template"), which rejected ordinary
-/// engineering prose. CJK has no word delimiters, so a CJK term is still matched by containment —
-/// otherwise a compound like the temporary-file phrase could never be caught.
 fn classify_token(token: &str) -> Option<&'static str> {
     if token.is_ascii() {
         if sorted_all_forbidden_table().binary_search(&token).is_ok() {
@@ -619,7 +740,7 @@ fn classify_token(token: &str) -> Option<&'static str> {
         return None;
     }
 
-    if CJK_PROVISIONAL_TERMS
+    if CJK_CONTAINMENT_TERMS
         .iter()
         .any(|term| token.contains(term))
     {

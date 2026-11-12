@@ -399,3 +399,96 @@ fn narrative_subject_is_rejected() {
         "a narrative past-tense subject must be rejected: {error}"
     );
 }
+
+#[test]
+fn uppercase_commit_type_is_rejected_due_to_case_sensitivity() {
+    let policy = TaxisPolicy::workspace_strict();
+    let message = TEMPLATE_CONFORMANT.replace("feat(gate):", "FEAT(gate):");
+    let result = CommitMessageGuard::parse_and_verify(&message, &policy, None);
+    let error = result.err().map(|e| format!("{e:?}")).unwrap_or_default();
+    assert!(
+        error.contains("GUARD-MSG-001"),
+        "uppercase type must be rejected: {error}"
+    );
+}
+
+#[test]
+fn breaking_change_bang_requires_breaking_changes_section() {
+    let policy = TaxisPolicy::workspace_strict();
+    let message = TEMPLATE_CONFORMANT.replace("feat(gate):", "feat(gate)!:");
+    let result = CommitMessageGuard::parse_and_verify(&message, &policy, None);
+    let error = result.err().map(|e| format!("{e:?}")).unwrap_or_default();
+    assert!(
+        error.contains("FGT-MSG-002") && error.contains("Breaking Changes"),
+        "breaking change header must require [Breaking Changes] section: {error}"
+    );
+
+    let compliant_breaking = TEMPLATE_CONFORMANT
+        .replace("feat(gate):", "feat(gate)!:")
+        .replace(
+            "[Verification",
+            "[Breaking Changes]\n- 升级门禁接口契约与返回值定义适配指南。\n\n[Verification",
+        );
+    let ok_res = CommitMessageGuard::parse_and_verify(&compliant_breaking, &policy, None);
+    assert!(
+        ok_res.is_ok(),
+        "breaking commit with section must pass: {:?}",
+        ok_res.err()
+    );
+}
+
+#[test]
+fn feat_commit_requires_added_section_and_refactor_requires_changed() {
+    let policy = TaxisPolicy::workspace_strict();
+    let feat_with_changed_only =
+        TEMPLATE_CONFORMANT.replace("[Added / 新增内容]", "[Changed / 变更调整]");
+    let feat_err = CommitMessageGuard::parse_and_verify(&feat_with_changed_only, &policy, None)
+        .err()
+        .map(|e| format!("{e:?}"))
+        .unwrap_or_default();
+    assert!(
+        feat_err.contains("FGT-MSG-002") && feat_err.contains("[Added]"),
+        "feat commit must require [Added] section: {feat_err}"
+    );
+
+    let refactor_with_added_only = TEMPLATE_CONFORMANT.replace("feat(gate):", "refactor(gate):");
+    let refactor_err =
+        CommitMessageGuard::parse_and_verify(&refactor_with_added_only, &policy, None)
+            .err()
+            .map(|e| format!("{e:?}"))
+            .unwrap_or_default();
+    assert!(
+        refactor_err.contains("FGT-MSG-002") && refactor_err.contains("[Changed]"),
+        "refactor commit must require [Changed] section: {refactor_err}"
+    );
+}
+
+#[test]
+fn forbidden_terms_inside_backticks_and_urls_are_rejected() {
+    let policy = TaxisPolicy::workspace_strict();
+    let backtick_wip = TEMPLATE_CONFORMANT.replace(
+        "新增语义槽位解析与双语别名表。",
+        "新增语义槽位解析与 `wip` 暂存逻辑验证。",
+    );
+    let err_backtick = CommitMessageGuard::parse_and_verify(&backtick_wip, &policy, None)
+        .err()
+        .map(|e| format!("{e:?}"))
+        .unwrap_or_default();
+    assert!(
+        err_backtick.contains("FGT-MSG-004"),
+        "provisional terms in backticks must NOT bypass the scan: {err_backtick}"
+    );
+
+    let url_hack = TEMPLATE_CONFORMANT.replace(
+        "新增语义槽位解析与双语别名表。",
+        "参考实现见 https://example.com/api/quick-fix 处理。",
+    );
+    let err_url = CommitMessageGuard::parse_and_verify(&url_hack, &policy, None)
+        .err()
+        .map(|e| format!("{e:?}"))
+        .unwrap_or_default();
+    assert!(
+        err_url.contains("FGT-MSG-004"),
+        "forbidden terms in URLs must NOT bypass the scan: {err_url}"
+    );
+}
