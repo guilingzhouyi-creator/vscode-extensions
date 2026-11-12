@@ -19,6 +19,7 @@ coverage/
 target/
 **/target/
 **/*.rs.bk
+auto-refactor/crates/auto-refactor-core/index.node
 
 # 3. Python 运行时、虚拟环境与测试缓存
 __pycache__/
