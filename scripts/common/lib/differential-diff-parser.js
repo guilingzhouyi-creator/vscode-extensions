@@ -214,57 +214,158 @@ function getStagedStatusList() {
 }
 
 /**
- * Reads historical turnover records from git telemetry ledger.
+ * Parses one NDJSON record into normalized `{ turnover, passed }` form supporting both ledgers.
  *
- * @returns {number[]}
+ * @param {string} trimmedLine - Raw NDJSON record line.
+ * @returns {{ turnover: number, passed: boolean } | null} Parsed sample or null.
  */
-function loadRecentTurnoverRecords() {
-  const ledgerPath = path.join(REPO_ROOT, '.git', 'telemetry', 'admission_ledger.ndjson');
-  if (!fs.existsSync(ledgerPath)) return [];
+function parseLedgerSample(trimmedLine) {
   try {
-    const content = fs.readFileSync(ledgerPath, 'utf8');
-    const records = [];
-    for (const line of content.split(/\r?\n/)) {
-      if (!line.trim()) continue;
-      try {
-        const parsed = JSON.parse(line.trim());
-        if (typeof parsed.turnover === 'number') {
-          records.push(parsed.turnover);
-        }
-      } catch {
-        // Ignore corrupted entry
-      }
-    }
-    return records;
+    const parsed = JSON.parse(trimmedLine);
+    const turnover =
+      typeof parsed.turnover === 'number'
+        ? parsed.turnover
+        : typeof parsed.netSemanticTurnover === 'number'
+          ? parsed.netSemanticTurnover
+          : null;
+    if (turnover === null || !Number.isFinite(turnover)) return null;
+    let passed = turnover >= DIFF_BOUNDS_CONTRACT.empiricalAdmission.turnoverFloor;
+    if (typeof parsed.passed === 'boolean') passed = parsed.passed;
+    else if (typeof parsed.gatePassed === 'boolean') passed = parsed.gatePassed;
+    else if (typeof parsed.verdict === 'string') passed = parsed.verdict === 'ADMITTED';
+    return { turnover, passed };
   } catch {
-    return [];
+    return null;
   }
 }
 
 /**
- * Calculates Bayesian empirical admission threshold.
+ * Reads recent admission trajectory samples from both Taxis and auto-refactor NDJSON ledgers.
  *
- * @param {number[]} recentTurnovers
- * @returns {number}
+ * @returns {Array<{ turnover: number, passed: boolean }>}
  */
-function calculateEmpiricalAdmissionThreshold(recentTurnovers, floor = 3.0, cap = 25.0) {
-  if (recentTurnovers.length < 3) {
+function loadRecentAdmissionSamples() {
+  const candidateLedgers = [
+    path.join(REPO_ROOT, DIFF_BOUNDS_CONTRACT.ledgers.taxisRelative),
+    path.join(REPO_ROOT, DIFF_BOUNDS_CONTRACT.ledgers.autoRefactorRelative),
+    path.join(REPO_ROOT, 'auto-refactor', DIFF_BOUNDS_CONTRACT.ledgers.autoRefactorRelative),
+  ];
+  const samples = [];
+  for (const ledgerPath of candidateLedgers) {
+    if (!fs.existsSync(ledgerPath)) continue;
+    try {
+      const content = fs.readFileSync(ledgerPath, 'utf8');
+      for (const line of content.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        const sample = parseLedgerSample(trimmed);
+        if (sample) samples.push(sample);
+      }
+    } catch {
+      // Ignore unreadable ledger file
+    }
+  }
+  return samples;
+}
+
+/**
+ * Reads historical turnover numbers from dual admission ledgers.
+ *
+ * @returns {number[]}
+ */
+function loadRecentTurnoverRecords() {
+  return loadRecentAdmissionSamples().map((sample) => sample.turnover);
+}
+
+/**
+ * Normalizes mixed numeric/sample trajectory inputs into `{ turnover, passed }` records.
+ *
+ * @param {Array<number | { turnover?: number, netSemanticTurnover?: number, passed?: boolean, gatePassed?: boolean, verdict?: string }>} entries
+ * @param {number} floor
+ * @returns {Array<{ turnover: number, passed: boolean }>}
+ */
+function normalizeTrajectorySamples(entries, floor) {
+  if (!Array.isArray(entries)) return [];
+  const normalized = [];
+  for (const entry of entries) {
+    if (typeof entry === 'number' && Number.isFinite(entry)) {
+      normalized.push({ turnover: entry, passed: entry >= floor });
+      continue;
+    }
+    if (!entry || typeof entry !== 'object') continue;
+    const turnover =
+      typeof entry.turnover === 'number'
+        ? entry.turnover
+        : typeof entry.netSemanticTurnover === 'number'
+          ? entry.netSemanticTurnover
+          : null;
+    if (turnover === null || !Number.isFinite(turnover)) continue;
+    let passed = turnover >= floor;
+    if (typeof entry.passed === 'boolean') passed = entry.passed;
+    else if (typeof entry.gatePassed === 'boolean') passed = entry.gatePassed;
+    else if (typeof entry.verdict === 'string') passed = entry.verdict === 'ADMITTED';
+    normalized.push({ turnover, passed });
+  }
+  return normalized;
+}
+
+/**
+ * Calculates Bayesian Jeffreys Beta(0.5, 0.5) empirical admission threshold aligned with SSOT contract.
+ *
+ * Accepts either raw numeric turnovers or structured `{ turnover, passed }` samples. Uses population
+ * variance via Welford's algorithm and pass-rate Jeffreys posterior `(passCount + 0.5) / (N + 1.0)`.
+ *
+ * @param {Array<number | { turnover: number, passed?: boolean }>} recentInput
+ * @param {number} [floor]
+ * @param {number} [cap]
+ * @param {{ currentComplexity?: number, currentEloc?: number }} [options]
+ * @returns {number} Calibrated empirical threshold clamped to [floor, cap].
+ */
+function calculateEmpiricalAdmissionThreshold(
+  recentInput,
+  floor = DIFF_BOUNDS_CONTRACT.empiricalAdmission.turnoverFloor,
+  cap = DIFF_BOUNDS_CONTRACT.empiricalAdmission.turnoverCap,
+  options = {},
+) {
+  const policy = DIFF_BOUNDS_CONTRACT.empiricalAdmission;
+  const samples = normalizeTrajectorySamples(recentInput, floor).slice(-policy.trajectoryWindowSize);
+  if (samples.length < policy.minTrajectorySamples) {
     return floor;
   }
-  const sampleCount = recentTurnovers.length;
-  const turnoverSum = recentTurnovers.reduce((acc, v) => acc + v, 0);
-  const empiricalMean = turnoverSum / sampleCount;
 
-  const sampleVariance =
-    recentTurnovers
-      .map((val) => (val - empiricalMean) * (val - empiricalMean))
-      .reduce((acc, v) => acc + v, 0) / Math.max(1.0, sampleCount - 1.0);
-  const standardDeviation = Math.sqrt(sampleVariance);
+  let validCount = 0;
+  let runningMean = 0;
+  let secondMomentSum = 0;
+  let passCount = 0;
 
-  const jeffreysPosteriorMean = (0.5 + turnoverSum) / (1.0 + sampleCount);
-  const candidateThreshold = jeffreysPosteriorMean - 0.5 * standardDeviation;
+  for (const sample of samples) {
+    validCount += 1;
+    if (sample.passed) passCount += 1;
+    const delta = sample.turnover - runningMean;
+    runningMean += delta / validCount;
+    const deltaAfter = sample.turnover - runningMean;
+    secondMomentSum += delta * deltaAfter;
+  }
 
-  return Math.min(Math.max(candidateThreshold, floor), cap);
+  if (validCount < policy.minTrajectorySamples) {
+    return floor;
+  }
+
+  const variance = Math.max(0, secondMomentSum / validCount);
+  const standardDeviation = Math.sqrt(variance);
+  const posteriorConfidence =
+    (passCount + policy.jeffreysPriorAlpha) /
+    (validCount + policy.jeffreysPriorAlpha + policy.jeffreysPriorBeta);
+
+  const complexity = Number(options.currentComplexity || 0);
+  const eloc = Math.max(1, Number(options.currentEloc || 1));
+  const rawNoise = Number.isFinite(complexity) && complexity > 0 ? complexity / eloc : 0;
+  const noiseFactor = Math.min(Math.max(rawNoise, 0), policy.maxNoiseCeiling) / policy.maxNoiseCeiling;
+
+  const statisticalCenter = Math.max(0, runningMean - policy.stdDevDiscountFactor * standardDeviation);
+  const calibrated = statisticalCenter * (1.0 - noiseFactor) * posteriorConfidence;
+  const clamped = Math.min(Math.max(calibrated, floor), cap);
+  return Math.round(clamped * 100) / 100;
 }
 
 /**
@@ -392,6 +493,7 @@ module.exports = Object.freeze({
   isMechanicalTrampoline,
   isAuditableCodeFile,
   getStagedStatusList,
+  loadRecentAdmissionSamples,
   loadRecentTurnoverRecords,
   calculateEmpiricalAdmissionThreshold,
   evaluateFileStagedDiff,
