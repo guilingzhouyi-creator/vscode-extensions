@@ -28,6 +28,8 @@ pub mod cherry_pick;
 pub mod cherry_pick_state;
 pub mod clone;
 pub mod commit;
+pub mod commit_flags;
+pub mod commit_amend;
 pub mod commit_ops;
 pub mod commit_walk;
 pub mod common;
