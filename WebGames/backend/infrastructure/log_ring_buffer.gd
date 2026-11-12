@@ -10,12 +10,15 @@
 ## LogRingBuffer：Log Collector & Stream Processor
 class_name LogRingBuffer extends RefCounted
 
+const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
+const StatisticsMathLib = preload("res://backend/infrastructure/pure/statistics_math_lib.gd")
+
 # ==============================================================================
 # 一、环形缓冲状态
 # ==============================================================================
 
 static var _buffer: Array[StructuredLogRecord] = []
-static var _capacity: int = 1000
+static var _capacity: int = LogConstants.DEFAULT_RING_BUFFER_CAPACITY
 static var _capacity_override: int = -1
 static var _head: int = 0
 static var _cached_version: int = -2
@@ -37,7 +40,7 @@ static func set_capacity_override_for_test(cap: int) -> void:
 	if cap <= 0:
 		_capacity_override = -1
 		_cached_version = -2
-		_capacity = 1000
+		_capacity = LogConstants.DEFAULT_RING_BUFFER_CAPACITY
 		_ensure_capacity_fresh()
 	else:
 		_capacity_override = cap
@@ -53,7 +56,7 @@ static func _ensure_capacity_fresh() -> void:
 		return
 	_cached_version = current_version
 
-	var new_cap := GameConfig.get_int("infrastructure.log", "structured/ring_buffer_capacity", 1000)
+	var new_cap := GameConfig.get_int(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_RING_CAPACITY, LogConstants.DEFAULT_RING_BUFFER_CAPACITY)
 	new_cap = maxi(1, new_cap)
 	if new_cap != _capacity:
 		_capacity = new_cap
@@ -77,13 +80,13 @@ static func append(record: StructuredLogRecord) -> void:
 		return
 	_ensure_capacity_fresh()
 
-	# 深拷贝快照：调用方（LogCollector 返回的 record）入环后改写不污染缓冲
-	var snapshot := StructuredLogRecord.from_dto(record.to_dto())
+	# 深拷贝快照：调用方（LogCollector 返回的 record）入环后改写不污染缓冲（优先零中间字典 clone）
+	var snapshot: StructuredLogRecord = record.clone() if record.has_method("clone") else StructuredLogRecord.from_dto(record.to_dto())
 	if _buffer.size() < _capacity:
 		_buffer.append(snapshot)
 	else:
 		_buffer[_head] = snapshot
-		_head = (_head + 1) % _capacity
+		_head = StatisticsMathLib.ring_next_cursor(_head, _capacity)
 
 ## 查询当前环形缓冲中的记录（只读）
 static func query(from_utc: int = 0, levels: Array = [], channels: Array = []) -> Array:

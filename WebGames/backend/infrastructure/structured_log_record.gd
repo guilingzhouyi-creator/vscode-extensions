@@ -10,6 +10,8 @@
 ## StructuredLogRecord：Log Collector & Stream Processor
 class_name StructuredLogRecord extends LogRecordDTO
 
+const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
+
 # ==============================================================================
 # 一、结构化扩展字段
 # ==============================================================================
@@ -53,14 +55,33 @@ func reset_state() -> void:
 ## 序列化当前对象为通用字典传输结构
 func to_dto() -> Dictionary:
 	var out: Dictionary = super.to_dto()
-	out["trace_id"] = trace_id
-	out["parent_span_id"] = parent_span_id
-	out["event_category"] = event_category
-	out["duration_ms"] = duration_ms
-	out["source_file"] = source_file
-	out["source_line"] = source_line
-	out["redacted_keys"] = redacted_keys.duplicate()
+	out[LogConstants.KEY_TRACE_ID] = trace_id
+	out[LogConstants.KEY_PARENT_SPAN_ID] = parent_span_id
+	out[LogConstants.KEY_EVENT_CATEGORY] = event_category
+	out[LogConstants.KEY_DURATION_MS] = duration_ms
+	out[LogConstants.KEY_SOURCE_FILE] = source_file
+	out[LogConstants.KEY_SOURCE_LINE] = source_line
+	out[LogConstants.KEY_REDACTED_KEYS] = redacted_keys.duplicate()
 	return out
+
+## 深拷贝克隆当前结构化日志对象（避免中间字典反序列化堆分配损耗，ADV-PRF-002）
+func clone() -> StructuredLogRecord:
+	var c := StructuredLogRecord.new()
+	c.sequence = sequence
+	c.timestamp_utc = timestamp_utc
+	c.level = level
+	c.channel = channel
+	c.error_code = error_code
+	c.message = message
+	c.context = context.duplicate(true)
+	c.trace_id = trace_id
+	c.parent_span_id = parent_span_id
+	c.event_category = event_category
+	c.duration_ms = duration_ms
+	c.source_file = source_file
+	c.source_line = source_line
+	c.redacted_keys = redacted_keys.duplicate()
+	return c
 
 ## 从字典反序列化还原（继承字段 + 结构化字段；context/redacted_keys 仅接受合法类型并深拷贝）
 static func from_dto(data: Dictionary) -> StructuredLogRecord:
@@ -68,13 +89,13 @@ static func from_dto(data: Dictionary) -> StructuredLogRecord:
 	if data.is_empty():
 		return dto
 	LogRecordDTO.populate_base_from_dict(dto, data)
-	dto.trace_id = str(data.get("trace_id", ""))
-	dto.parent_span_id = str(data.get("parent_span_id", ""))
-	dto.event_category = str(data.get("event_category", ""))
-	dto.duration_ms = int(data.get("duration_ms", 0))
-	dto.source_file = str(data.get("source_file", ""))
-	dto.source_line = int(data.get("source_line", 0))
-	var rk: Variant = data.get("redacted_keys", [])
+	dto.trace_id = str(data.get(LogConstants.KEY_TRACE_ID, ""))
+	dto.parent_span_id = str(data.get(LogConstants.KEY_PARENT_SPAN_ID, ""))
+	dto.event_category = str(data.get(LogConstants.KEY_EVENT_CATEGORY, ""))
+	dto.duration_ms = int(data.get(LogConstants.KEY_DURATION_MS, 0))
+	dto.source_file = str(data.get(LogConstants.KEY_SOURCE_FILE, ""))
+	dto.source_line = int(data.get(LogConstants.KEY_SOURCE_LINE, 0))
+	var rk: Variant = data.get(LogConstants.KEY_REDACTED_KEYS, [])
 	if rk is Array:
 		for k in (rk as Array):
 			dto.redacted_keys.append(str(k))

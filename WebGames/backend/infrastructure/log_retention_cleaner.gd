@@ -10,6 +10,8 @@
 ## LogRetentionCleaner：Log Collector & Stream Processor
 class_name LogRetentionCleaner extends RefCounted
 
+const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
+
 # ==============================================================================
 # 一、状态与清理执行
 # ==============================================================================
@@ -21,20 +23,20 @@ static func reset_state() -> void:
 	_last_sweep = 0
 
 static func _resolve_cutoff_seconds(now: int, force: bool) -> int:
-	var retention_cfg: Dictionary = GameConfig.get_dict("infrastructure.log", "retention", {})
+	var retention_cfg: Dictionary = GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_RETENTION, {})
 	if not bool(retention_cfg.get("enabled", true)):
 		return -1
-	var max_days: int = int(retention_cfg.get("max_days", 7))
+	var max_days: int = int(retention_cfg.get("max_days", LogConstants.DEFAULT_RETENTION_DAYS))
 	if max_days <= 0:
 		return -1
-	var interval: int = int(retention_cfg.get("cleanup_interval_seconds", 3600))
+	var interval: int = int(retention_cfg.get("cleanup_interval_seconds", LogConstants.DEFAULT_CLEANUP_INTERVAL_SEC))
 	if not force and (_last_sweep > 0 and now - _last_sweep < interval):
 		return -1
 	_last_sweep = now
-	return max_days * 86400
+	return max_days * LogConstants.SECONDS_PER_DAY
 
 static func _is_expired_archive_file(f: String, main_file: String, prefix: String, now: int, cutoff_seconds: int) -> bool:
-	if f == main_file or not f.begins_with(prefix + ".") or not f.ends_with(".log"):
+	if f == main_file or not LogConstants.is_rotated_archive_filename(f, prefix):
 		return false
 	var ts: int = _extract_timestamp(f, prefix)
 	return ts > 0 and (now - ts) > cutoff_seconds
@@ -46,9 +48,9 @@ static func sweep(now_utc: int = -1, force: bool = false) -> int:
 	if cutoff_seconds <= 0:
 		return 0
 
-	var dir_path: String = GameConfig.get_string("infrastructure.log", "export/directory", "user://logs")
-	var prefix: String = GameConfig.get_string("infrastructure.log", "export/file_prefix", "kalar")
-	var main_file: String = "%s.log" % prefix
+	var dir_path: String = GameConfig.get_string(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_EXPORT_DIR, LogConstants.DEFAULT_LOG_DIR)
+	var prefix: String = GameConfig.get_string(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_EXPORT_PREFIX, LogConstants.DEFAULT_LOG_PREFIX)
+	var main_file: String = prefix + LogConstants.LOG_FILE_EXTENSION
 	var da: DirAccess = DirAccess.open(dir_path)
 	if da == null:
 		return 0
@@ -69,8 +71,8 @@ static func sweep(now_utc: int = -1, force: bool = false) -> int:
 static func _extract_timestamp(filename: String, prefix: String) -> int:
 	# 文件名形态：<prefix>.<timestamp>.log，兼容导出器同秒碰撞名 <prefix>.<timestamp>_<n>.log
 	var without_prefix: String = filename.substr(prefix.length() + 1)
-	if without_prefix.ends_with(".log"):
-		var raw_ts: String = without_prefix.left(without_prefix.length() - 4)
+	if without_prefix.ends_with(LogConstants.LOG_FILE_EXTENSION):
+		var raw_ts: String = without_prefix.left(without_prefix.length() - LogConstants.LOG_FILE_EXTENSION.length())
 		if raw_ts.is_valid_int():
 			return raw_ts.to_int()
 		if "_" in raw_ts:

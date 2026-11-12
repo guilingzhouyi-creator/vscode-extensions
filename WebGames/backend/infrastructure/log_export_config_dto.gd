@@ -10,6 +10,8 @@
 ## LogExportConfigDTO：Log Collector & Stream Processor
 class_name LogExportConfigDTO extends RefCounted
 
+const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
+
 # ==============================================================================
 # 一、导出策略字段
 # ==============================================================================
@@ -21,7 +23,7 @@ var enabled: bool = false
 var directory: String = ""
 
 ## 导出的主文件名前缀（如 "kalar"，生成 kalar.log）
-var file_prefix: String = "kalar"
+var file_prefix: String = LogConstants.DEFAULT_LOG_PREFIX
 
 ## 单文件轮转字节阈值（0 表示不进行容量轮转，默认 5MB: 5242880）
 var max_bytes: int = 0
@@ -30,7 +32,19 @@ var max_bytes: int = 0
 var max_files: int = 0
 
 ## 最低落盘级别（debug < info < warn < error，低于此级别的日志被丢弃）
-var min_level: String = "info"
+var min_level: String = LogConstants.LEVEL_LOWER_INFO
+
+## 批处理攒批写入阈值（1 表示即刻同步落盘）
+var batch_size: int = LogConstants.DEFAULT_BATCH_THRESHOLD
+
+## 是否启用导出日志 AES-256-CBC Encrypt-then-MAC 加密密封
+var encryption_enabled: bool = false
+
+## 加密密钥环境变量名（受控密钥提供器，禁明文硬编码）
+var encryption_seal_key_env: String = LogConstants.ENC_DEFAULT_SEAL_ENV
+
+## 是否启用防篡改审计哈希链
+var hmac_chain_enabled: bool = true
 
 ## 通道白名单（为空表示全部通道均允许落盘）
 var include_channels: Array[String] = []
@@ -42,15 +56,22 @@ var include_channels: Array[String] = []
 ## 从 GameConfig 中解析 export 段（缺省安全回退）
 static func from_config() -> LogExportConfigDTO:
 	var dto := LogExportConfigDTO.new()
-	var export_dict: Dictionary = GameConfig.get_dict("infrastructure.log", "export", {})
+	var export_dict: Dictionary = GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_EXPORT, {})
 	if export_dict.is_empty():
 		return dto
 	dto.enabled = bool(export_dict.get("enabled", false))
-	dto.directory = str(export_dict.get("directory", "user://logs"))
-	dto.file_prefix = str(export_dict.get("file_prefix", "kalar"))
-	dto.max_bytes = int(export_dict.get("max_bytes", 5242880))
-	dto.max_files = int(export_dict.get("max_files", 5))
-	dto.min_level = str(export_dict.get("min_level", "info"))
+	dto.directory = str(export_dict.get("directory", LogConstants.DEFAULT_LOG_DIR))
+	dto.file_prefix = str(export_dict.get("file_prefix", LogConstants.DEFAULT_LOG_PREFIX))
+	dto.max_bytes = int(export_dict.get("max_bytes", LogConstants.DEFAULT_MAX_LOG_BYTES))
+	dto.max_files = int(export_dict.get("max_files", LogConstants.DEFAULT_MAX_LOG_FILES))
+	dto.min_level = str(export_dict.get("min_level", LogConstants.LEVEL_LOWER_INFO))
+	dto.batch_size = maxi(1, int(export_dict.get("batch_size", LogConstants.DEFAULT_BATCH_THRESHOLD)))
+	var enc_val = export_dict.get("encryption", {})
+	if enc_val is Dictionary:
+		var enc_dict: Dictionary = enc_val
+		dto.encryption_enabled = bool(enc_dict.get("enabled", false))
+		dto.encryption_seal_key_env = str(enc_dict.get("seal_key_env", LogConstants.ENC_DEFAULT_SEAL_ENV))
+		dto.hmac_chain_enabled = bool(enc_dict.get("hmac_chain", true))
 	var channels = export_dict.get("include_channels", [])
 	if channels is Array:
 		dto.include_channels.clear()

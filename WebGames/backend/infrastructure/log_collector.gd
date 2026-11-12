@@ -10,17 +10,30 @@
 ## LogCollector：Log Collector & Stream Processor
 class_name LogCollector extends RefCounted
 
+const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
+const StatisticsMathLib = preload("res://backend/infrastructure/pure/statistics_math_lib.gd")
+
 # ==============================================================================
 # 一、链路追踪状态
 # ==============================================================================
 
 static var _active_trace_id: String = ""
 static var _seq: int = 0
+static var _caller_capture_enabled: bool = true
 
 ## 测试复位：清空活跃链路 ID 与序号（避免跨用例状态残留）
 static func reset_state() -> void:
 	_active_trace_id = ""
 	_seq = 0
+	_caller_capture_enabled = true
+
+## 设置是否抓取调用方调用栈（热循环压测时可临时关闭，降低反射开销）
+static func set_caller_capture_enabled(enabled: bool) -> void:
+	_caller_capture_enabled = enabled
+
+## 是否已启用调用栈提取
+static func is_caller_capture_enabled() -> bool:
+	return _caller_capture_enabled
 
 ## 业务入口调用：签发新链路追踪 ID（战斗回合开始/交易开启/管线启动）
 static func begin_trace(custom_id: String = "") -> String:
@@ -71,12 +84,12 @@ static func log(
 	else:
 		record.trace_id = _derived_trace_id(channel)
 		
-	# 提取调用方信息（仅文件名 basename，杜绝绝对路径）
-	var caller_info := _extract_caller()
-	record.source_file = str(caller_info.get("source_file", ""))
-	record.source_line = int(caller_info.get("source_line", 0))
+	# 提取调用方信息（委托纯算子域库提取 basename，杜绝绝对路径）
+	var caller_info := StatisticsMathLib.extract_caller_from_stack(get_stack(), ["log_collector.gd"]) if _caller_capture_enabled else {}
+	record.source_file = str(caller_info.get(LogConstants.KEY_SOURCE_FILE, ""))
+	record.source_line = int(caller_info.get(LogConstants.KEY_SOURCE_LINE, 0))
 	
-	# 构造期脱敏（Inv-LS-2 安全红线）：入流前脱敏
+	# 构造期脱敏（Inv-LS-2 安全红线）：入流前同时对 context 与 message 正文执行脱敏
 	RedactionRule.apply_to_record(record, context)
 			
 	# 分发至全局事件总线（向后兼容广播；EventBus 内部已接线 LogRingBuffer 与 TelemetryAggregate）
@@ -96,19 +109,4 @@ static func log(
 ## 无活跃链路时基于 channel 派生追踪 ID（保证每次 log 均有可对账的 trace_id）
 static func _derived_trace_id(channel: String) -> String:
 	var ch := channel if not channel.is_empty() else "SYS"
-	return "TRACE_%s_%d" % [ch, _seq]
-
-## 从调用栈提取来源文件（仅 basename）与行号（跳过本文件自身帧）
-static func _extract_caller() -> Dictionary:
-	var stack := get_stack()
-	if stack.is_empty():
-		return {"source_file": "", "source_line": 0}
-	for frame in stack:
-		var src := str(frame.get("source", ""))
-		var fname := src.get_file()
-		if fname != "log_collector.gd" and not fname.is_empty():
-			return {
-				"source_file": fname,
-				"source_line": int(frame.get("line", 0))
-			}
-	return {"source_file": "", "source_line": 0}
+	return "%s_%s_%d" % [LogConstants.TRACE_PREFIX_DEFAULT, ch, _seq]
