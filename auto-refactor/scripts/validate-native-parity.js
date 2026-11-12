@@ -12,12 +12,12 @@
  *   field), and it was never wired into any npm script, so it had never actually run. The
  *   file has been replaced by this one, which uses the real signatures.
  * Dependencies & Triggers: `dist/core/native/native-bridge` for both engines; requires the
- *   native binding to load, and skips the native arm with a clear message when it does not.
+ *   native binding to load, and exits non-zero (fail-closed) when it is missing.
  * Responsibilities: load the binding directly rather than through the bridge (which falls
  *   back to the shim, making a self-comparison pass vacuously), then compare all ten exported
  *   operators on identical inputs, including a cyclic graph for the cycle-extraction path.
- * Exit Semantics & Design Rationale: Read-only comparison; exits non-zero on the first
- *   divergence so an operator regression cannot ship with the shim silently disagreeing.
+ * Exit Semantics & Design Rationale: Read-only comparison; exits non-zero if native binding is
+ *   missing or on the first divergence so an operator regression cannot ship silently skipped.
  */
 
 'use strict';
@@ -153,13 +153,11 @@ function runAll() {
   console.log(`  native binding loaded: ${native !== null}`);
 
   if (!nativeAvailable) {
-    // Skipping loudly rather than passing silently: a vacuous parity check is worse
-    // than no check, because it reads as evidence the two engines agree.
-    console.warn(
-      '  [SKIP] native binding unavailable; parity NOT verified. ' +
-        'Build it with `npm run build:native` to enable this gate.',
+    console.error(
+      '  ✖ BLOCK native binding unavailable; parity NOT verified. ' +
+        'Build it with `npm run build:native` so native/shim parity runs fail-closed.',
     );
-    process.exitCode = 0;
+    process.exitCode = 1;
     return;
   }
 

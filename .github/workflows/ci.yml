@@ -710,6 +710,15 @@ jobs:
         working-directory: auto-refactor
         run: npm ci --legacy-peer-deps
 
+      - name: Setup Rust toolchain
+        if: steps.scope.outputs.run == 'true'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build native addon
+        if: steps.scope.outputs.run == 'true'
+        working-directory: auto-refactor
+        run: npm run build:native
+
       - name: Gate (format + lint + strict comments + full test suite)
         if: steps.scope.outputs.run == 'true'
         working-directory: auto-refactor
