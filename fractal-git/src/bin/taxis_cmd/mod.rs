@@ -93,6 +93,7 @@ pub mod status_collect;
 pub mod status_render;
 pub mod status_untracked;
 pub mod submodule;
+pub mod submodule_update;
 pub mod tag;
 pub mod tree_view;
 pub mod unarchive;
