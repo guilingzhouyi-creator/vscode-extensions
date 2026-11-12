@@ -24,6 +24,21 @@ const PASCAL_CASE_RE = /^[A-Z][a-zA-Z0-9]*$/;
 const PATH_DECL_TAG_RE = /文件路径|@file/;
 const HEADER_KEYWORD_RE =
     /\/\*\*|\/\/!|职责|Responsibilities|Overview|模块归属|Module:|模块|\/\/\s*={10,}|#\s*={10,}/;
+const COMMENT_PREFIX_RE = /^\s*(?:\/\*|\*|\/\/|#|"{3}|'{3})/;
+const IGNORED_BASENAMES: ReadonlySet<string> = new Set([
+    'index',
+    'main',
+    'lib',
+    'mod',
+    'api',
+    'types',
+    'cli',
+    'README',
+    'readme',
+    'Readme',
+]);
+const TIER_CACHE_MAX = 4096;
+const TIER_CACHE = new Map<string, string>();
 
 /**
  * Validates snake_case file naming convention.
@@ -86,18 +101,6 @@ export const FileNamingRule: GovernanceRule = {
         const nameWithoutExt = baseName.slice(0, -ext.length);
 
         // Skip special files (including documentation entry points)
-        const IGNORED_BASENAMES = new Set([
-            'index',
-            'main',
-            'lib',
-            'mod',
-            'api',
-            'types',
-            'cli',
-            'README',
-            'readme',
-            'Readme',
-        ]);
         if (IGNORED_BASENAMES.has(nameWithoutExt) || nameWithoutExt.toLowerCase() === 'readme') {
             return null;
         }
@@ -161,7 +164,8 @@ function validatePathParity(lines: string[], normalizedPath: string): Governance
     const scanLimit = Math.min(PATH_DECL_SCAN_LINES, lines.length);
     for (let i = 0; i < scanLimit; i++) {
         const line = lines[i];
-        if (!/^\s*(?:\/\*|\*|\/\/|#|"{3}|'{3})/.test(line)) continue;
+        if (!line.includes('@file') && !line.includes('文件路径')) continue;
+        if (!COMMENT_PREFIX_RE.test(line)) continue;
         if (!PATH_DECL_TAG_RE.test(line)) continue;
         const match = PATH_DECL_RE.exec(line);
         if (!match || !match[1]) continue;
@@ -198,9 +202,11 @@ function hasModuleHeaderDocstring(lines: string[], isPython: boolean): boolean {
     const headLimit = Math.min(HEADER_SCAN_LINES, lines.length);
     for (let i = 0; i < headLimit; i++) {
         const line = lines[i];
-        const trimmed = line.trim();
-        if (isPython && (trimmed.startsWith('"""') || trimmed.startsWith("'''"))) {
-            return true;
+        if (isPython) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('"""') || trimmed.startsWith("'''")) {
+                return true;
+            }
         }
         if (HEADER_KEYWORD_RE.test(line)) {
             return true;
@@ -271,6 +277,15 @@ const TIER_TOOLING_RE = /(?:^|\/)(?:scripts?|\.github|\.githooks|tools?)(?:\/|$)
 const TIER_CONTRACTS_RE = /(?:^|\/)(?:core|infrastructures?|infra|shared)(?:\/|$)/i;
 const TIER_DOMAIN_RE = /(?:^|\/)(?:domains?|features?|services?|models?)(?:\/|$)/i;
 
+const TIER_PATTERNS: readonly [RegExp, string][] = [
+    [TIER_DOCS_RE, 'docs'],
+    [TIER_CONFIG_RE, 'config'],
+    [TIER_TEST_RE, 'test'],
+    [TIER_TOOLING_RE, 'tooling'],
+    [TIER_CONTRACTS_RE, 'contracts'],
+    [TIER_DOMAIN_RE, 'domain'],
+];
+
 /**
  * Classifies a file path into an architectural tier for blast radius governance.
  *
@@ -278,14 +293,21 @@ const TIER_DOMAIN_RE = /(?:^|\/)(?:domains?|features?|services?|models?)(?:\/|$)
  * @returns Architectural tier name or 'other'.
  */
 export function classifyArchitecturalTier(filePath: string): string {
-    const normalized = filePath.replace(/\\/g, '/');
-    if (TIER_DOCS_RE.test(normalized)) return 'docs';
-    if (TIER_CONFIG_RE.test(normalized)) return 'config';
-    if (TIER_TEST_RE.test(normalized)) return 'test';
-    if (TIER_TOOLING_RE.test(normalized)) return 'tooling';
-    if (TIER_CONTRACTS_RE.test(normalized)) return 'contracts';
-    if (TIER_DOMAIN_RE.test(normalized)) return 'domain';
-    return 'other';
+    const cached = TIER_CACHE.get(filePath);
+    if (cached !== undefined) return cached;
+
+    const normalized = filePath.includes('\\') ? filePath.replace(/\\/g, '/') : filePath;
+    let tier = 'other';
+    for (let i = 0; i < TIER_PATTERNS.length; i++) {
+        if (TIER_PATTERNS[i][0].test(normalized)) {
+            tier = TIER_PATTERNS[i][1];
+            break;
+        }
+    }
+
+    if (TIER_CACHE.size >= TIER_CACHE_MAX) TIER_CACHE.clear();
+    TIER_CACHE.set(filePath, tier);
+    return tier;
 }
 
 const TOKEN_IMPORT = 'import';
@@ -294,6 +316,7 @@ const TOKEN_LOAD = 'load';
 const BLAST_RADIUS_TRIGGERS: readonly string[] = [TOKEN_IMPORT, TOKEN_REQUIRE, TOKEN_LOAD];
 
 function hasImportOrRequireToken(line: string): boolean {
+    if (!line.includes("'") && !line.includes('"')) return false;
     return line.includes(TOKEN_IMPORT) || line.includes('require(') || line.includes('load(');
 }
 

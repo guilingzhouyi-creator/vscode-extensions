@@ -365,11 +365,47 @@ function buildDefaultRulesCandidateRegex(): RegExp {
     return new RegExp(parts.join('|'), 'i');
 }
 
+const ASCII_CANDIDATE_RE = new RegExp(
+    `\\b(?:${ASCII_CORE_ROOT_PATTERNS.join('|')})\\b|\\b100%`,
+    'i',
+);
+const HAS_NON_ASCII_RE = /[^\u0000-\u007f]/;
+
+function buildChineseCandidateRegex(): RegExp | null {
+    const chinesePatterns: string[] = [];
+    for (const rule of DEFAULT_TERMINOLOGY_RULES) {
+        for (const pattern of rule.patterns) {
+            if (pattern) {
+                chinesePatterns.push(
+                    pattern.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&'),
+                );
+            }
+        }
+    }
+    return chinesePatterns.length > 0 ? new RegExp(chinesePatterns.join('|')) : null;
+}
+
+const CHINESE_CANDIDATE_RE = buildChineseCandidateRegex();
+
 /**
  * Top-level singleton regex matching candidate forbidden terms and roots across all default rules.
  * Enables zero-overhead pre-filtering to short-circuit clean prose lines and documents.
  */
 export const DEFAULT_RULES_FAST_CANDIDATE_RE: RegExp = buildDefaultRulesCandidateRegex();
+
+/**
+ * Splits ASCII case-insensitive scanning from gated non-ASCII checks so V8 keeps Latin1/ASCII
+ * fast paths active on source files without non-ASCII characters.
+ *
+ * @param text - Candidate line or document text.
+ * @returns True when text may match any default terminology rule.
+ */
+export function hasDefaultTerminologyCandidate(text: string): boolean {
+    if (ASCII_CANDIDATE_RE.test(text)) return true;
+    return Boolean(
+        CHINESE_CANDIDATE_RE && HAS_NON_ASCII_RE.test(text) && CHINESE_CANDIDATE_RE.test(text),
+    );
+}
 
 const EMPTY_TERMINOLOGY_FINDINGS: readonly TerminologyFinding[] = Object.freeze([]);
 
@@ -448,6 +484,8 @@ function getOrCompileAsciiPattern(asciiPat: string): RegExp {
 interface CompiledRuleLexicon {
     readonly patternRe: RegExp | null;
     readonly patternSet: ReadonlySet<string>;
+    readonly allNonAsciiPatterns: boolean;
+    readonly asciiCombinedRe: RegExp | null;
 }
 
 const RULE_LEXICON_CACHE = new WeakMap<TerminologyRule, CompiledRuleLexicon>();
@@ -458,8 +496,17 @@ function getOrCompileRuleLexicon(rule: TerminologyRule): CompiledRuleLexicon {
         const validPatterns = rule.patterns.filter((pattern): pattern is string =>
             Boolean(pattern && pattern.length > 0),
         );
+        const asciiCombinedRe =
+            rule.asciiPatterns.length > 0
+                ? new RegExp(`(?:${rule.asciiPatterns.join(')|(?:')})`, 'i')
+                : null;
         if (validPatterns.length === 0) {
-            lexicon = { patternRe: null, patternSet: new Set() };
+            lexicon = {
+                patternRe: null,
+                patternSet: new Set(),
+                allNonAsciiPatterns: false,
+                asciiCombinedRe,
+            };
         } else {
             // Sort by descending length so longer compound phrases match first
             const sorted = [...validPatterns].sort(
@@ -468,9 +515,14 @@ function getOrCompileRuleLexicon(rule: TerminologyRule): CompiledRuleLexicon {
             const escaped = sorted.map((pattern) =>
                 pattern.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, '\\$&'),
             );
+            const allNonAsciiPatterns = validPatterns.every((pattern) =>
+                HAS_NON_ASCII_RE.test(pattern),
+            );
             lexicon = {
                 patternRe: new RegExp(escaped.join('|'), 'g'),
                 patternSet: new Set(validPatterns),
+                allNonAsciiPatterns,
+                asciiCombinedRe,
             };
         }
         RULE_LEXICON_CACHE.set(rule, lexicon);
@@ -547,7 +599,7 @@ function maskDefaultWhitelist(line: string): string {
     if (DEFAULT_WHITELIST_COMPILED.asciiRe) {
         sanitized = sanitized.replace(DEFAULT_WHITELIST_COMPILED.asciiRe, ' __WHITELIST_TERM__ ');
     }
-    if (DEFAULT_WHITELIST_COMPILED.nonAsciiRe) {
+    if (DEFAULT_WHITELIST_COMPILED.nonAsciiRe && HAS_NON_ASCII_RE.test(sanitized)) {
         sanitized = sanitized.replace(
             DEFAULT_WHITELIST_COMPILED.nonAsciiRe,
             ' __WHITELIST_TERM__ ',
@@ -676,6 +728,7 @@ function collectLinePatterns(
 ): void {
     const lexicon = getOrCompileRuleLexicon(rule);
     if (!lexicon.patternRe) return;
+    if (lexicon.allNonAsciiPatterns && !HAS_NON_ASCII_RE.test(context.sanitized)) return;
 
     lexicon.patternRe.lastIndex = 0;
     const seenTerms = new Set<string>();
@@ -717,6 +770,10 @@ function collectLineAsciiPatterns(
     context: LineAuditContext,
     rule: TerminologyRule,
 ): void {
+    const lexicon = getOrCompileRuleLexicon(rule);
+    if (lexicon.asciiCombinedRe && !lexicon.asciiCombinedRe.test(context.sanitized)) {
+        return;
+    }
     for (const asciiPat of rule.asciiPatterns) {
         const asciiRegex = getOrCompileAsciiPattern(asciiPat);
         asciiRegex.lastIndex = 0;
@@ -766,7 +823,7 @@ function auditLineAgainstRules(
 
 function isEligibleProseLine(line: string, isDefaultRules: boolean): boolean {
     if (!line || line.trim().length === 0) return false;
-    return !isDefaultRules || DEFAULT_RULES_FAST_CANDIDATE_RE.test(line);
+    return !isDefaultRules || hasDefaultTerminologyCandidate(line);
 }
 
 /**
@@ -785,7 +842,7 @@ export function auditTerminologyProse(
     if (!content || content.length === 0) return EMPTY_TERMINOLOGY_FINDINGS;
 
     const isDefaultRules = rules === DEFAULT_TERMINOLOGY_RULES;
-    if (isDefaultRules && !DEFAULT_RULES_FAST_CANDIDATE_RE.test(content)) {
+    if (isDefaultRules && !hasDefaultTerminologyCandidate(content)) {
         return EMPTY_TERMINOLOGY_FINDINGS;
     }
 
