@@ -17,6 +17,7 @@
 | `docs/模板/` | 标准工程化四阶段与编码老练风格模板库（必须定向区间切片阅读） | [README.md](模板/README.md) |
 | `docs/玩法汇总/` | 玩法设计稿（需求源头，只读参考） | 目录内按序号命名 |
 | `docs/艺术工单需求表/` | 视觉/UI/音频艺术生产工单库（面向美术团队与外包交付的工业级生产契约） | [README.md](艺术工单需求表/README.md) |
+| `docs/源码文档/` | 全源码体系化技术文档库（1:1 映射当前运行源码的架构、契约、状态机、配置与验证基线，区别于施工细则与封存档案） | [README.md](源码文档/README.md) |
 | `docs/audit/` | 专项审查与审计报告（契约层/UI/质量审计） | [AUDIT_REPORT_UI缺失.md](audit/AUDIT_REPORT_UI缺失.md) ｜ [前端可视化.md](audit/AUDIT_REPORT_前端可视化.md) ｜ [注释覆盖度.md](audit/AUDIT_REPORT_注释覆盖度.md) ｜ [退出流程审查.md](audit/AUDIT_REPORT_退出流程审查.md) |
 | `docs/` 根 | 稳定命名族（`README.md`、`卡拉尔世界引擎开发路线图.md`、`后端代码注释规范.md`，已登记 `NAMING_RULES` scope `.`） | — |
 

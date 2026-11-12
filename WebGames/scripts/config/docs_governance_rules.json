@@ -30,7 +30,7 @@
     "PHASE-CODE-SANITY": { "severity": "error", "fixable": false, "desc": "短期施工区细则代码块违规散落（示例代码中严禁出现 push_error/push_warning 散落或 randf/randi 等非确定性调用）" }
   },
   "naming_rules": [
-    { "scope": ".", "dirs": ["后端架构", "前端架构", "归档库", "路线图", "玩法汇总", "模板", "audit", "艺术工单需求表"], "files": ["卡拉尔世界引擎开发路线图\\.md", "README\\.md", "后端代码注释规范\\.md"] },
+    { "scope": ".", "dirs": ["后端架构", "前端架构", "归档库", "路线图", "玩法汇总", "模板", "audit", "艺术工单需求表", "源码文档"], "files": ["卡拉尔世界引擎开发路线图\\.md", "README\\.md", "后端代码注释规范\\.md"] },
     { "scope": "艺术工单需求表", "dirs": [], "files": ["README\\.md", ".+\\.md"] },
     { "scope": "audit", "dirs": [], "files": ["AUDIT_REPORT_.+\\.md"] },
     { "scope": "后端架构", "files": ["后端架构需求表\\d+\\.md", "后端架构需求表索引\\.md"] },
@@ -49,6 +49,17 @@
     { "scope": "路线图/02_长期演进区", "sub": true, "files": ["阶段\\d_.+\\.md", "README\\.md"] },
     { "scope": "玩法汇总", "dirs": ["基础玩法", "进阶玩法"], "files": [] },
     { "scope": "玩法汇总", "sub": true, "files": ["基本玩法需求设计稿([一二三四五六])?\\.md", "进阶玩法需求设计稿\\.md"] },
-    { "scope": "模板", "files": [".+模板\\.md", ".+标准\\.md", "README\\.md"] }
+    { "scope": "模板", "files": [".+模板\\.md", ".+标准\\.md", "README\\.md"] },
+    { "scope": "源码文档", "dirs": ["00_架构总览", "01_后端基础设施", "02_后端跨域底座", "03_后端业务领域", "04_前端表现层", "05_配置与本地化体系", "06_开发工具与模组SDK", "07_测试基准与工程脚本"], "files": ["README\\.md"] },
+    { "scope": "源码文档/00_架构总览", "dirs": [], "files": ["README\\.md", "\\d{2}_[\\u4e00-\\u9fffA-Za-z0-9_]+\\.md"] },
+    { "scope": "源码文档/01_后端基础设施", "dirs": [], "files": ["README\\.md", "[a-z][a-z0-9_]*\\.md"] },
+    { "scope": "源码文档/02_后端跨域底座", "dirs": [], "files": ["README\\.md", "[a-z][a-z0-9_]*\\.md"] },
+    { "scope": "源码文档/03_后端业务领域", "dirs": ["01_核心物理与世界", "02_角色养成与装备", "03_经济社交与叙事", "04_运维治理与网关"], "files": ["README\\.md"] },
+    { "scope": "源码文档/03_后端业务领域", "sub": true, "files": ["README\\.md", "[a-z][a-z0-9_]*\\.md"] },
+    { "scope": "源码文档/04_前端表现层", "dirs": ["05_业务视图层"], "files": ["README\\.md", "\\d{2}_[\\u4e00-\\u9fffA-Za-z0-9_]+\\.md"] },
+    { "scope": "源码文档/04_前端表现层/05_业务视图层", "dirs": [], "files": ["README\\.md", "\\d{2}_[\\u4e00-\\u9fffA-Za-z0-9_]+\\.md"] },
+    { "scope": "源码文档/05_配置与本地化体系", "dirs": [], "files": ["README\\.md", "\\d{2}_[\\u4e00-\\u9fffA-Za-z0-9_]+\\.md"] },
+    { "scope": "源码文档/06_开发工具与模组SDK", "dirs": [], "files": ["README\\.md", "\\d{2}_[\\u4e00-\\u9fffA-Za-z0-9_]+\\.md"] },
+    { "scope": "源码文档/07_测试基准与工程脚本", "dirs": [], "files": ["README\\.md", "\\d{2}_[\\u4e00-\\u9fffA-Za-z0-9_]+\\.md"] }
   ]
 }
