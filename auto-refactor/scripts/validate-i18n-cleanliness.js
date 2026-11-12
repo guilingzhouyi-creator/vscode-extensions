@@ -113,15 +113,24 @@ function main() {
   assert.ok(fs.existsSync(dictModularDir), 'zh-cn/ modular dictionary directory must exist');
 
   const { ZH_CN_RULES } = require('../dist/core/praxis/presentation/dictionaries/zh-cn');
+  const { RULE_REGISTRY } = require('../dist/core/rules/registry');
   assert.ok(ZH_CN_RULES, 'ZH_CN_RULES must be exported');
   assert.ok(
     ZH_CN_RULES['STDLIB-PANIC-001'],
     'zh-cn dictionary must register STDLIB-PANIC-001 translation',
   );
 
+  const canonicalIds = RULE_REGISTRY.filter((rule) => rule.canonical).map((rule) => rule.id);
+  const missingCanonical = canonicalIds.filter((id) => !ZH_CN_RULES[id]);
+  assert.strictEqual(
+    missingCanonical.length,
+    0,
+    `ZH_CN_RULES missing canonical rules: ${missingCanonical.join(', ')}`,
+  );
   const ruleCount = Object.keys(ZH_CN_RULES).length;
-  assert.ok(ruleCount >= 270, `ZH_CN_RULES must cover at least 270 rules, found: ${ruleCount}`);
-  console.log(`✔  Presentation dictionary is properly populated (${ruleCount} rules decoupled).`);
+  console.log(
+    `✔  Presentation dictionary covers ${canonicalIds.length} canonical rules (${ruleCount} total).`,
+  );
 
   console.log('✔  Internationalization cleanliness guard passed completely.');
 }

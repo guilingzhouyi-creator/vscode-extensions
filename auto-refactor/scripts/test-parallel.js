@@ -446,7 +446,12 @@ const SELF_AUDIT_SUITES = [
   // The exemption mechanism is a gate that can admit a violation, so its refusal paths are tested
   // as hard as its grant path: a policy that granted everything must fail this suite too.
   { name: 'validate-diff-exemption', script: 'scripts/validate-diff-exemption.js' },
+  { name: 'validate-regex-constants', script: 'scripts/validate-regex-constants.js' },
   { name: 'validate-name-integrity', script: 'scripts/validate-name-integrity.js' },
+  {
+    name: 'validate-rule-dictionary-closure',
+    script: 'scripts/validate-rule-dictionary-closure.js',
+  },
   // The native kernel is not faster by default, so admission is measured against a baseline
   // rather than assumed. An unmeasured native path is indistinguishable from no kernel at all.
   { name: 'validate-native-admission', script: 'scripts/validate-native-admission.js' },
