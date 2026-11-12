@@ -79,5 +79,7 @@ mod test_plumbing_tree_commands;
 mod test_ref_commands;
 #[path = "rust/test_switch_parity.rs"]
 mod test_switch_parity;
+#[path = "rust/test_cli_semantics_core.rs"]
+mod test_cli_semantics_core;
 #[path = "rust/test_worktree_checkout_parity.rs"]
 mod test_worktree_checkout_parity;
