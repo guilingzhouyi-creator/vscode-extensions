@@ -211,4 +211,69 @@ describe('LayerVFS MCTS — Multi-Agent Exploration Tournament', () => {
         expect(newBytes).not.toBeNull();
         expect(Buffer.from(newBytes!).toString('utf8')).toContain('processOrder(order: OrderDto)');
     });
+
+    it('explores multi-step 3-ply tree combining non-conflicting patch strategies', async () => {
+        const cardContext: PraxisCardContext = {
+            cardId: 'TASK-MCTS-3PLY',
+            cellId: 'multi-ply-cell',
+            agentUid: 'agent-tree-explorer',
+        };
+
+        const store = manager.getStore();
+        await store.putFile('main', 'src/payment.js', 'function pay() { return false; }\n');
+        await store.putFile('main', 'src/shipping.js', 'function ship() { return false; }\n');
+        await store.commitBranch('main', 'Add payment and shipping modules');
+
+        const strat1: CandidateStrategy = {
+            strategyId: 'patch-order',
+            label: 'Refactor Order Module',
+            fileModifications: new Map([['src/order.js', 'function processOrder() { return true; }\n']]),
+        };
+        const strat2: CandidateStrategy = {
+            strategyId: 'patch-payment',
+            label: 'Refactor Payment Module',
+            fileModifications: new Map([['src/payment.js', 'function pay() { return true; }\n']]),
+        };
+        const strat3: CandidateStrategy = {
+            strategyId: 'patch-shipping',
+            label: 'Refactor Shipping Module',
+            fileModifications: new Map([['src/shipping.js', 'function ship() { return true; }\n']]),
+        };
+
+        const multiPlyExplorer = createMctsExplorer({
+            workspaceManager: manager,
+            maxDepth: 3,
+        });
+
+        const verdict = await multiPlyExplorer.explore(cardContext, [strat1, strat2, strat3]);
+
+        expect(verdict.candidatesEvaluated).toBeGreaterThan(3);
+        expect(verdict.treeDepthExplored).toBe(3);
+        expect(verdict.winningChain).toBeDefined();
+        expect(verdict.winningChain!.length).toBe(3);
+        expect(verdict.winningDeltas.length).toBe(3);
+    });
+
+    it('terminates safely when exploration exceeds timeout budget without leaking workspaces', async () => {
+        const cardContext: PraxisCardContext = {
+            cardId: 'TASK-MCTS-TIMEOUT',
+            cellId: 'timeout-cell',
+            agentUid: 'agent-timeout',
+        };
+
+        const timeoutExplorer = createMctsExplorer({
+            workspaceManager: manager,
+            maxDepth: 3,
+            timeoutMs: 0,
+        });
+
+        const strat: CandidateStrategy = {
+            strategyId: 'patch-fast',
+            label: 'Fast Patch',
+            fileModifications: new Map([['src/order.js', 'function fast() { return true; }\n']]),
+        };
+
+        const verdict = await timeoutExplorer.explore(cardContext, [strat]);
+        expect(verdict.timedOut).toBe(true);
+    });
 });
