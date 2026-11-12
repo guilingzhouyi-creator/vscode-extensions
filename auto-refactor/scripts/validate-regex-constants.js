@@ -85,6 +85,16 @@ check('createSnakeCleanScanner strips leading and trailing underscores', () => {
   assert.strictEqual('__token_name__'.replace(scanner, ''), 'token_name');
 });
 
+check('createJsImportScanner matches import statements and require calls', () => {
+  assert.strictEqual(patterns.createJsImportScanner().test("import { foo } from 'bar';"), true);
+  assert.strictEqual(patterns.createJsImportScanner().test("const x = require('baz');"), true);
+});
+
+check('createStringLiteralScanner matches quoted string literals', () => {
+  const scanner = patterns.createStringLiteralScanner();
+  assert.strictEqual(scanner.test('"hello world"'), true);
+});
+
 const failed = results.filter((entry) => !entry.ok);
 for (const entry of results) {
   console.log(

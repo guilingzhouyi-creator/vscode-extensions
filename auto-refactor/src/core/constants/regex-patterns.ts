@@ -222,12 +222,12 @@ export const ASSIGN_PATTERN = /^\s*([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/;
 /** Matches simple relative import specifier (starts with . or /). */
 export const RELATIVE_SPECIFIER_PATTERN = /^\.\.?\/|^\//;
 
-/** Creates a fresh global scanner for JS/TS import statements across multiple styles. */
+// Creates a fresh global scanner for JS/TS import statements across multiple styles.
 export function createJsImportScanner(): RegExp {
     return /(?:import\s+(?:type\s+)?(?:[\s\S]*?from\s+)?|export\s+(?:[\s\S]*?from\s+)?|import\(|require\()['"]([^'"]+)['"]/g;
 }
 
-/** Creates a fresh global scanner for CommonJS require calls. */
+// Creates a fresh global scanner for CommonJS require calls.
 export function createRequireCallScanner(): RegExp {
     return /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
 }
@@ -288,7 +288,7 @@ export const RUST_TEST_ATTR_PATTERN = /#\[[^\]]*(?:test|cfg\(test\))[^\]]*\]/;
 /** Matches Rust naked unwrap method invocation. */
 export const RUST_UNWRAP_PATTERN = /\.unwrap\s*\(/;
 
-/** Creates a fresh global scanner for Rust .unwrap() and .expect() calls. */
+// Creates a fresh global scanner for Rust .unwrap() and .expect() calls.
 export function createRustUnwrapScanner(): RegExp {
     return /\.(?:unwrap|expect)\s*\(/g;
 }
@@ -337,7 +337,7 @@ export const GDSCRIPT_YIELD_PATTERN = /\byield\s*\(/;
 /** Matches legacy Godot 3 export statement. */
 export const GDSCRIPT_EXPORT_STMT_PATTERN = /^\s*export(?:\s*\([^)]*\))?\s+(?:var|const|onready)\b/;
 
-/** Creates a fresh global scanner for GDScript preload/load calls and string extends. */
+// Creates a fresh global scanner for GDScript preload/load calls and string extends.
 export function createGdscriptPreloadScanner(): RegExp {
     return /(?:(?:preload|load)\s*\(\s*['"](?:res:\/\/)?([^'"]+)['"]\s*\)|extends\s+['"](?:res:\/\/)?([^'"]+)['"])/g;
 }
@@ -392,22 +392,22 @@ export const GO_DEFER_STMT_PATTERN = /^\s*defer\s+/;
 /** Matches Go return statement. */
 export const GO_RETURN_STMT_PATTERN = /^\s*return\b/;
 
-/** Creates a fresh global scanner for Go named literal tokens (true, false, nil, iota). */
+// Creates a fresh global scanner for Go named literal tokens (true, false, nil, iota).
 export function createGoNamedLiteralScanner(): RegExp {
     return /\b(true|false|nil|iota)\b/g;
 }
 
-/** Creates a fresh global scanner for Go function call expressions. */
+// Creates a fresh global scanner for Go function call expressions.
 export function createGoCallExprScanner(): RegExp {
     return /([A-Za-z_](?:[\w.]*[A-Za-z0-9_])?)\s*\(/g;
 }
 
-/** Creates a fresh global scanner for quoted string literals. */
+// Creates a fresh global scanner for quoted string literals.
 export function createStringLiteralScanner(): RegExp {
     return /(["`])((?:\\.|(?!\1).)*)\1/g;
 }
 
-/** Creates a fresh global scanner for integer literal numbers. */
+// Creates a fresh global scanner for integer literal numbers.
 export function createIntLiteralScanner(): RegExp {
     return /\b(?:0[xX][0-9a-fA-F_]+|0[oO][0-7_]+|0[bB][01_]+|[1-9][0-9_]*|0)\b/g;
 }
