@@ -1034,12 +1034,12 @@ export const REGEX_SYNTAX = Object.freeze({
     TS_TYPE_ALIAS_HEADER: TS_TYPE_ALIAS_HEADER_PATTERN,
     LOOP_HEADER: LOOP_HEADER_PATTERN,
     CONTROL_FLOW_BRANCH: CONTROL_FLOW_BRANCH_PATTERN,
-    createControlFlowBranchScanner: createControlFlowBranchScanner,
+    createControlFlowBranchScanner,
     TRANSIENT_TS_CONTAINER: TRANSIENT_TS_CONTAINER_PATTERN,
     BLOCKING_IO: BLOCKING_IO_PATTERN,
     VALID_IDENTIFIER: VALID_IDENTIFIER_PATTERN,
     REGEX_ESCAPE: REGEX_ESCAPE_PATTERN,
-    createRegexEscapeScanner: createRegexEscapeScanner,
+    createRegexEscapeScanner,
     PREV_LINE_ARG_TERMINATOR: PREV_LINE_ARG_TERMINATOR_PATTERN,
     RUST_TRY_MACRO: RUST_TRY_MACRO_PATTERN,
     RUST_EXTERN_CRATE: RUST_EXTERN_CRATE_PATTERN,
@@ -1185,7 +1185,7 @@ export const CJK_CHAR_PATTERN = /[　-〿一-鿿＀-￯]/;
 /** Matches remote URL in single or double quotes. */
 export const REMOTE_URL_PATTERN = /['"](https?:\/\/[A-Za-z0-9_./?=&%-]+)['"]/;
 
-/** Creates a fresh global scanner for remote URLs. */
+// Creates a fresh global scanner for remote URLs.
 export function createRemoteUrlScanner(): RegExp {
     return /['"](https?:\/\/[A-Za-z0-9_./?=&%-]+)['"]/g;
 }
@@ -1203,22 +1203,22 @@ export const TEST_FILE_EXT_PATTERN = /\.(?:test|spec)\.[a-z0-9]+$/i;
 /** Matches styling stylesheet file extensions. */
 export const STYLE_FILE_EXT_PATTERN = /\.(?:css|scss|less|sass)\b/i;
 
-/** Creates a fresh global scanner for replacing all whitespace sequences. */
+// Creates a fresh global scanner for replacing all whitespace sequences.
 export function createWhitespaceGlobalScanner(): RegExp {
     return /\s+/g;
 }
 
-/** Creates a fresh global scanner for converting backslashes to forward slashes. */
+// Creates a fresh global scanner for converting backslashes to forward slashes.
 export function createBackslashGlobalScanner(): RegExp {
     return /\\/g;
 }
 
-/** Normalizes all Windows-style backslashes to POSIX forward slashes. */
+// Normalizes all Windows-style backslashes to POSIX forward slashes.
 export function normalizePathSeparators(pathStr: string): string {
     return pathStr.replace(createBackslashGlobalScanner(), '/');
 }
 
-/** Creates a fresh multiline scanner for trailing whitespace removal. */
+// Creates a fresh multiline scanner for trailing whitespace removal.
 export function createTrailingWhitespaceScanner(): RegExp {
     return /[ \t]+$/gm;
 }

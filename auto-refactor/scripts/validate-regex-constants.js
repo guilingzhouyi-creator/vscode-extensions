@@ -103,6 +103,14 @@ check('createRegexEscapeScanner matches metacharacters requiring escape', () => 
   assert.strictEqual(patterns.createRegexEscapeScanner().test('^[a-z]+$'), true);
 });
 
+check('normalizePathSeparators normalizes Windows backslashes to forward slashes', () => {
+  assert.strictEqual(patterns.normalizePathSeparators('path\\to\\file'), 'path/to/file');
+});
+
+check('createTrailingWhitespaceScanner matches trailing whitespace before newline', () => {
+  assert.strictEqual(patterns.createTrailingWhitespaceScanner().test('line with space   \n'), true);
+});
+
 const failed = results.filter((entry) => !entry.ok);
 for (const entry of results) {
   console.log(
