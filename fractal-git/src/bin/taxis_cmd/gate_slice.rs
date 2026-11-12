@@ -627,3 +627,131 @@ fn report_slice_verdict(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn large_existing_file_single_line_edit_avoids_whole_file_overflow() {
+        let mut old_lines: Vec<String> = (0..135)
+            .map(|idx| format!("pub fn compute_step_{idx}(v: usize) -> usize {{ v + {idx} }}"))
+            .collect();
+        let old_text = format!("{}\n", old_lines.join("\n"));
+        old_lines[12] = "pub fn compute_step_12(v: usize) -> usize { v * 2 + 12 }".to_string();
+        let new_text = format!("{}\n", old_lines.join("\n"));
+
+        let evaluated = build_evaluated_slice_entry(
+            "src/large_existing.rs".to_string(),
+            false,
+            Some(old_text.as_bytes()),
+            Some(new_text.as_bytes()),
+        )
+        .expect("non-binary text entry");
+
+        assert_eq!(evaluated.bounds.physical_lines_added, 1);
+        assert_eq!(evaluated.bounds.physical_lines_deleted, 1);
+        assert_eq!(evaluated.bounds.effective_lines_added, 1.0);
+        assert_eq!(evaluated.bounds.effective_lines_deleted, 1.0);
+        assert!(!evaluated.bounds.is_new_file);
+        assert!(fg_gate::diff_bounds::audit_single_file_envelope(
+            &evaluated.path,
+            &evaluated.bounds,
+            false
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn large_existing_file_small_substantive_patch_passes_full_governor_admission() {
+        let mut old_lines: Vec<String> = (0..140)
+            .map(|idx| format!("pub fn item_{idx}(x: i64) -> i64 {{ x + {idx} }}"))
+            .collect();
+        let old_text = format!("{}\n", old_lines.join("\n"));
+        old_lines[20] = "pub fn item_20(x: i64) -> i64 { x.saturating_add(42) }".to_string();
+        old_lines.insert(
+            21,
+            "pub fn item_extra_a(x: i64) -> i64 { x * 3 }".to_string(),
+        );
+        old_lines.insert(
+            22,
+            "pub fn item_extra_b(x: i64) -> i64 { x * 5 }".to_string(),
+        );
+        let new_text = format!("{}\n", old_lines.join("\n"));
+
+        let evaluated = build_evaluated_slice_entry(
+            "src/large_module.rs".to_string(),
+            false,
+            Some(old_text.as_bytes()),
+            Some(new_text.as_bytes()),
+        )
+        .expect("non-binary text entry");
+
+        let entries = [evaluated];
+        let totals = compute_batch_totals(&entries);
+        let witness_flags = build_witness_flags(&entries, totals.total_effective_lines_added, 0.0);
+        let governor_inputs = [(
+            entries[0].path.as_str(),
+            entries[0].bounds,
+            witness_flags[0],
+        )];
+        let verdict = DiffBoundsGovernor::evaluate_with_witnesses(&governor_inputs, &totals, &[]);
+
+        assert!(verdict.is_admitted);
+        assert!(verdict.file_violations.is_empty());
+        assert_eq!(totals.total_effective_lines_added, 3.0);
+        assert_eq!(totals.total_net_turnover, 3.8);
+    }
+
+    #[test]
+    fn edit_inside_block_comment_yields_zero_effective_additions() {
+        let old_text = "/*\n * Old comment interior line\n */\npub fn live() -> usize { 1 }\n";
+        let new_text =
+            "/*\nUpdated plain prose without leading asterisk\n */\npub fn live() -> usize { 1 }\n";
+
+        let evaluated = build_evaluated_slice_entry(
+            "src/commented.rs".to_string(),
+            false,
+            Some(old_text.as_bytes()),
+            Some(new_text.as_bytes()),
+        )
+        .expect("non-binary");
+        assert_eq!(evaluated.bounds.physical_lines_added, 1);
+        assert_eq!(evaluated.bounds.effective_lines_added, 0.0);
+    }
+
+    #[test]
+    fn dual_ledger_parser_supports_both_schemas() {
+        let taxis_sample = parse_ledger_sample_line(r#"{"turnover":12.5,"passed":true}"#)
+            .expect("taxis ledger entry");
+        assert_eq!(taxis_sample, AdmissionSample::new(12.5, true));
+
+        let ar_sample =
+            parse_ledger_sample_line(r#"{"netSemanticTurnover":8.0,"verdict":"ADMITTED"}"#)
+                .expect("auto-refactor ledger entry");
+        assert_eq!(ar_sample, AdmissionSample::new(8.0, true));
+
+        let ar_blocked = parse_ledger_sample_line(
+            r#"{"netSemanticTurnover":2.0,"verdict":"BLOCKED_INSUFFICIENT_TURNOVER"}"#,
+        )
+        .expect("auto-refactor blocked entry");
+        assert_eq!(ar_blocked, AdmissionSample::new(2.0, false));
+    }
+
+    #[test]
+    fn collect_changed_index_paths_returns_empty_when_index_matches_head() {
+        let oid = Oid::from_bytes([9u8; 20]);
+        let mut head_tree = BTreeMap::new();
+        head_tree.insert(
+            "src/unchanged.rs".to_string(),
+            TreeEntry {
+                mode: FileMode::RegularFile,
+                oid,
+            },
+        );
+        let mut index_map = BTreeMap::new();
+        index_map.insert("src/unchanged.rs".to_string(), (oid, FileMode::RegularFile));
+        let changed = collect_changed_index_paths(&head_tree, &index_map);
+        assert!(changed.is_empty());
+    }
+}
