@@ -355,6 +355,35 @@ async function recordCodemodTrajectory(input: CodemodTrajectoryInput): Promise<v
     }
 }
 
+async function collectFixesByFile(
+    rootDir: string,
+    issues: readonly ScanReport['issues'][number][],
+): Promise<Map<string, FixDescriptor[]>> {
+    const fileIssuesByPath = new Map<string, ScanReport['issues'][number][]>();
+    for (const issue of issues) {
+        if (issue.clusteredInto) continue;
+        let groupedIssues = fileIssuesByPath.get(issue.location.file);
+        if (!groupedIssues) {
+            groupedIssues = [];
+            fileIssuesByPath.set(issue.location.file, groupedIssues);
+        }
+        groupedIssues.push(issue);
+    }
+
+    const fileFixesByPath = new Map<string, FixDescriptor[]>();
+    for (const [relPath, fileIssues] of fileIssuesByPath.entries()) {
+        const fullPath = path.resolve(rootDir, relPath);
+        const sourceText = (await pathExistsAsync(fullPath))
+            ? await fs.promises.readFile(fullPath, ENCODING_UTF8)
+            : undefined;
+        const fileFixes = PatchEngine.issuesToFixes(fileIssues, sourceText, fullPath);
+        if (fileFixes.length > 0) {
+            fileFixesByPath.set(relPath, fileFixes);
+        }
+    }
+    return fileFixesByPath;
+}
+
 /**
  * Executes automated AST codemod repairs for actionable scan findings.
  * Concurrency: Requires external synchronization on target workspace files during in-place writes.
@@ -364,15 +393,8 @@ async function recordCodemodTrajectory(input: CodemodTrajectoryInput): Promise<v
  */
 export async function handleFixWorkflow(cli: CliOptions): Promise<number> {
     const report = await scan(cli);
-    const fixesByFile = new Map<string, FixDescriptor[]>();
-
-    for (const issue of report.issues) {
-        if (issue.clusteredInto) continue;
-        const fix = PatchEngine.issueToFix(issue);
-        if (fix) {
-            getOrCreateFixList(fixesByFile, issue.location.file).push(fix);
-        }
-    }
+    const rootDir = cli.root || process.cwd();
+    const fixesByFile = await collectFixesByFile(rootDir, report.issues);
 
     if (fixesByFile.size === 0) {
         process.stdout.write(
@@ -381,7 +403,6 @@ export async function handleFixWorkflow(cli: CliOptions): Promise<number> {
         return 0;
     }
 
-    const rootDir = cli.root || process.cwd();
     let totalApplied = 0;
     let totalSkipped = 0;
     const changeMetrics: CodemodChangeMetrics = {
