@@ -134,12 +134,18 @@ def audit_file(path: Path, findings: list[str]) -> None:
 
 
 def main() -> int:
-    """CLI 入口：扫描 backend/**/*.gd 循环内热点反模式。"""
+    """CLI 入口：扫描 backend/**/*.gd 与 frontend/**/*.gd 循环内热点反模式。"""
     ap = argparse.ArgumentParser()
     ap.add_argument("--strict", action="store_true", help="有发现即返回 1")
     args = ap.parse_args()
 
-    files = sorted(p for p in (ROOT / "backend").rglob("*.gd") if p.is_file())
+    files = sorted(
+        p
+        for sub in ("backend", "frontend")
+        if (ROOT / sub).exists()
+        for p in (ROOT / sub).rglob("*.gd")
+        if p.is_file()
+    )
     findings: list[str] = []
     for f in files:
         audit_file(f, findings)

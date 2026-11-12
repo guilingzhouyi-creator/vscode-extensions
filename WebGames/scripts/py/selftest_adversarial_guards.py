@@ -22,7 +22,8 @@ from audit_common import ensure_utf8_stdout
 import audit_hardcode
 import audit_script_comment
 import audit_secrets
-from lib.arch_guard_rules import check_tc_arch_12, check_tc_arch_13
+from lib.arch_guard_rules import check_tc_arch_12, check_tc_arch_13, check_tc_arch_14
+from lib.audit_sdk_protocol_rules import _check_esc_action_enum_parity
 
 ensure_utf8_stdout()
 
@@ -117,12 +118,44 @@ def _test_arch_log_and_crypto_evasion() -> list[str]:
     return failures
 
 
+def _test_case_sensitive_res_and_esc_drift() -> list[str]:
+    """对抗样本 4：验证精确大小写 res:// 校验与 ESC 动作枚举漂移检测必被拦截。"""
+    failures: list[str] = []
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        target_dir = root / "backend" / "infrastructure"
+        target_dir.mkdir(parents=True, exist_ok=True)
+        (target_dir / "RealFile.gd").write_text("class_name RealFile\n", encoding="utf-8")
+        probe = target_dir / "probe.gd"
+        probe.write_text('const X = preload("res://backend/infrastructure/realfile.gd")\n', encoding="utf-8")
+        res14 = check_tc_arch_14(SimpleNamespace(root=root), _make_result, _strip_comments_stub)
+        if res14["passed"] or not res14["violations"]:
+            failures.append("TC-ARCH-14 未能拦截大小写不匹配的 preload(res://) 路径")
+
+        mod_sdk = root / "mod_sdk"
+        (mod_sdk / "schemas").mkdir(parents=True, exist_ok=True)
+        (mod_sdk / "capabilities.json").write_text(
+            '{"unified_protocol_capabilities": {"esc_menu_actions": ["ESC_A", "ESC_B"]}}',
+            encoding="utf-8",
+        )
+        (mod_sdk / "schemas" / "esc_menu_action_payload.schema.json").write_text(
+            '{"properties": {"action_type": {"enum": ["ESC_A"]}}}',
+            encoding="utf-8",
+        )
+        esc_findings: list = []
+        _check_esc_action_enum_parity(mod_sdk, esc_findings)
+        if not esc_findings or esc_findings[0].rule_id != "SDK-PROTOCOL-ESC-ENUM-DRIFT":
+            failures.append("SDK-PROTOCOL-ESC-ENUM-DRIFT 未能拦截 Schema 与 capabilities 枚举漂移")
+    return failures
+
+
 def main() -> int:
     """CLI 入口：运行脚本库对抗性逃逸全量自检并返回退出码。"""
     failures: list[str] = []
     failures.extend(_test_script_comment_evasion())
     failures.extend(_test_quote_masking_hardcode())
     failures.extend(_test_arch_log_and_crypto_evasion())
+    failures.extend(_test_case_sensitive_res_and_esc_drift())
 
     if failures:
         for item in failures:

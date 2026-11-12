@@ -187,8 +187,7 @@ DeterministicRNG.reseed_global(seed)           # 整局复现开关
 ## 持续集成与架构门禁
 
 > ⚠️ 本工程位于上层仓库的子目录，而 GitHub Actions 只读取**仓库根**的 `.github/workflows/`。
-> 因此门禁**不在**本目录的 `.github/` 下，而在上层仓库根的 `.github/workflows/godot-ci.yml`。
-> （本目录那份 `.github/workflows/ci.yml` 从未被 GitHub 执行过，勿往里加步骤。）
+> 因此门禁**不在**本目录内，而在上层仓库根的 `.github/workflows/godot-ci.yml`（禁止在本目录下新增冗余 workflow）。
 
 流水线在 push 触及 `WebGames/**`（含纯文档改动）或任意 PR 时触发，**任一步失败即整条变红**：
 
@@ -198,7 +197,7 @@ DeterministicRNG.reseed_global(seed)           # 整局复现开关
 | DoD 验收 | `bash scripts/sh/test-run.sh` | 全域测试套件 |
 | 架构护栏 | `bash scripts/sh/audit-arch.sh` | TC-ARCH-01~06：目录 / 配置表 / 测试注册 / 确定性 / 文档计数 / 键级漂移 |
 | 配置审查 | `python3 scripts/py/audit_config.py --strict` | JSON 可解析 / 键命名 / 必需表齐全 / 格式一致性（无 BOM · LF · 2 空格规范序列化） |
-| 全量审查聚合 | `bash scripts/sh/audit-all.sh` | 21 项静态门禁（配置 / 高级规范治理 / 简化防过度 / 硬编码 / 热点与堆分配 / 覆盖 / 死配置 / 密钥 / 上下界 / 物品三元组 / 文案 / 魔法维度 / 事件概率 / CDC / 头注释契约 / 信道审计 / 架构护栏 / 收口 / auto-refactor 十维静态度量等）+ 文档四域基线棘轮门禁（`audit-docs.sh --baseline`，仅阻断新增违规；Agent 操作契约见 `docs/README.md`；bench/archive 须显式 `--group` 触发） |
+| 全量审查聚合 | `bash scripts/sh/audit-all.sh` | 23 项静态门禁（配置 / 高级规范治理 / 简化防过度 / 硬编码 / 热点与堆分配 / 覆盖 / 死配置 / 密钥 / 上下界 / 物品三元组 / 文案 / 魔法维度 / 事件概率 / CDC / 头注释契约 / 信道审计 / 架构护栏 / 收口 / auto-refactor 十维静态度量 / 脚本对抗自检等）+ 文档四域基线棘轮门禁（`audit-docs.sh --baseline`，仅阻断新增违规；Agent 操作契约见 `docs/README.md`；bench/archive 须显式 `--group` 触发） |
 
 后四条均套了**失败重试一次**，用于吸收读取撞上他人写入窗口的瞬时假红；
 真实问题会连续两次失败，仍然红。
@@ -216,10 +215,10 @@ DeterministicRNG.reseed_global(seed)           # 整局复现开关
 |---|---|
 | backend .gd / 行数 | 302 / 约 26,759 行（全域 .gd 513 / 约 62,603 行，随新卷增长） |
 | 领域数 | 47 |
-| 测试项 | 770（CLI 与 UI 共用同一注册表，<!-- METRICS:BEGIN wg-test-suite-count -->**138 套**<!-- METRICS:END wg-test-suite-count -->注册测试套件 / 覆盖 47 领域；实时以 `tests/reports/test_latest.json` 为准） |
+| 测试项 | 770（CLI 与 UI 共用同一注册表，<!-- METRICS:BEGIN wg-test-suite-count -->**139 套**<!-- METRICS:END wg-test-suite-count -->注册测试套件 / 覆盖 47 领域；实时以 `tests/reports/test_latest.json` 为准） |
 | 配置表 | 123（含 65 张必需表，`audit_config.py` 口径） |
 | 配置调用点 | 862（`backend/` + `frontend/` 内 `GameConfig.get_*` 与 `GameConfig.msg`；表缺失 0；`GameConfig.get_value` 违禁调用 0） |
 | 函数 / 参数类型注解 | 100% / 100% |
 
 实时数据以审查产物为准：`bash scripts/sh/test-run.sh`（单测 JSON 汇总写入 `tests/reports/test_latest.json`）
-与 `bash scripts/sh/audit-all.sh`（21 项静态门禁含文档四域棘轮门禁，见 `docs/README.md` 契约）。
+与 `bash scripts/sh/audit-all.sh`（23 项静态门禁含文档四域棘轮门禁，见 `docs/README.md` 契约）。

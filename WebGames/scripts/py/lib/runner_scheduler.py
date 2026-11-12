@@ -220,7 +220,9 @@ def _classify_git_path_item(
     engine_hits: set[str],
 ) -> bool:
     """分析单个 git 路径并归类到 scopes/engine_hits。"""
-    if "WebGames/" in path_str:
+    if path_str.startswith("WebGames/"):
+        path_str = path_str[len("WebGames/"):]
+    elif "WebGames/" in path_str:
         path_str = path_str.split("WebGames/", 1)[1]
 
     if path_str.endswith(".gd"):
@@ -228,6 +230,13 @@ def _classify_git_path_item(
         if "tests/" in path_str:
             scopes.add("test")
         return False
+
+    if path_str.startswith("scripts/"):
+        scopes.add("scripts")
+        if path_str.endswith(".json"):
+            scopes.add("config")
+        base = path_str.rsplit("/", 1)[-1]
+        return _classify_scripts_path(base, registered_by_name, engine_hits)
 
     if path_str.startswith("config/") or path_str.endswith(".json"):
         scopes.add("config")
@@ -237,13 +246,22 @@ def _classify_git_path_item(
         scopes.add("docs")
         return False
 
-    if path_str.startswith("scripts/"):
-        scopes.add("scripts")
-        base = path_str.rsplit("/", 1)[-1]
-        return _classify_scripts_path(base, registered_by_name, engine_hits)
-
     scopes.add("all")
     return False
+
+
+def _extract_porcelain_paths(raw_line: str) -> list[str]:
+    """解析 git status --porcelain 单行中的规范 POSIX 路径（兼容重命名与引号路径）。"""
+    if len(raw_line) < 4:
+        return []
+    path_part = raw_line[3:].strip()
+    candidates = path_part.split(" -> ") if " -> " in path_part else [path_part]
+    cleaned: list[str] = []
+    for item in candidates:
+        p = item.strip().strip('"').replace("\\", "/")
+        if p:
+            cleaned.append(p)
+    return cleaned
 
 
 def _process_git_status_lines(
@@ -255,12 +273,9 @@ def _process_git_status_lines(
     """遍历 git status 变更行并统计触发的作用域与引擎任务。"""
     scripts_need_full = False
     for line in lines:
-        parts = line.strip().split(maxsplit=1)
-        if len(parts) < 2:
-            continue
-        path_str = parts[1].replace("\\", "/")
-        if _classify_git_path_item(path_str, registered_by_name, scopes, engine_hits):
-            scripts_need_full = True
+        for path_str in _extract_porcelain_paths(line):
+            if _classify_git_path_item(path_str, registered_by_name, scopes, engine_hits):
+                scripts_need_full = True
     return scripts_need_full
 
 
@@ -271,7 +286,7 @@ def detect_git_changed_scope_tasks(root: Path, all_registered_tasks: list[AuditT
     registered_by_name = {t.script_name: t.task_id for t in all_registered_tasks}
     try:
         r = subprocess.run(
-            ["git", "status", "--porcelain"],
+            ["git", "status", "--porcelain", "--", "."],
             cwd=root,
             capture_output=True,
             text=True,
@@ -281,9 +296,9 @@ def detect_git_changed_scope_tasks(root: Path, all_registered_tasks: list[AuditT
         if r.returncode != 0:
             return {"all"}, set(), False
 
-        lines = r.stdout.strip().splitlines()
+        lines = [ln for ln in r.stdout.splitlines() if ln.strip()]
         if not lines:
-            return {"gd", "config", "docs"}, set(), False
+            return {"gd", "config", "docs", "scripts", "test", "all"}, set(), False
 
         scripts_need_full = _process_git_status_lines(
             lines, registered_by_name, scopes, engine_hits

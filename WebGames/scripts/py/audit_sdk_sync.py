@@ -129,7 +129,8 @@ def main() -> int:
             "  - MOD_SPEC.md 契约指南章节完整且动态标记闭合 (含 Tier 1/2/3 与 docs/ 导航)"
         )
         print("  - docs/ 权威规范库 (SPECIFICATION.md 等) 物理完整且非空")
-        print("  - schemas/ 强类型契约字典 (全量 15 项 Schema) 物理完整且语法校验通过")
+        schema_count = len(list((auditor.mod_sdk_dir / "schemas").glob("*.schema.json")))
+        print(f"  - schemas/ 强类型契约字典 (全量 {schema_count} 项 Schema) 物理完整且语法校验通过")
         print("  - tools/ 工具链 (kalar_mod.py 统一 CLI 等) 完备且子命令覆盖全面")
         print("  - templates/ 分级初始工程骨架物理完整")
         print("  - 磁盘文件与单一真源静态萃取结果完全一致 (0 漂移)")

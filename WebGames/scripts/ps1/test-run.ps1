@@ -3,7 +3,7 @@
 # 文件路径: WebGames/scripts/ps1/test-run.ps1
 # 架构定位: 单元与集成测试 Runner (Windows PowerShell)
 # 依赖与触发: 触发方: CI 流水线 / 本地验收 | 上游: Godot CLI / test_runner.gd | 下游: 控制台测试报告 | 运行时: PowerShell 7+
-# 职责说明: 以 Headless 模式运行全量 109 套测试套件，实时输出断言通过率与汇总报告
+# 职责说明: 以 Headless 模式运行全域测试套件，实时输出断言通过率与汇总报告
 # 退出语义与设计依据: 退出码: 0=全部通过 (100%), 1=存在用例失败 | 设计依据: AGENTS.md 构建门禁第一条
 # ------------------------------------------------------------------------------
 # 用法示例:
@@ -45,8 +45,13 @@ Write-Host "【test-run】开始运行单元测试（godot=$GodotBin）..."
 # Godot 常规 WARNING 走 stderr；在 Stop 偏好下会被误判为终止错误，此处放宽为
 # Continue，以真实退出码判定（对齐 test-run.sh 第 40-42 行语义）
 $prevEAP = $ErrorActionPreference
-& $GodotBin --headless --path $RootDir -s res://tests/test_runner.gd 2>&1 | Tee-Object -FilePath $LogPath
-$code = $LASTEXITCODE
+$ErrorActionPreference = 'Continue'
+try {
+  & $GodotBin --headless --path $RootDir -s res://tests/test_runner.gd 2>&1 | Tee-Object -FilePath $LogPath
+  $code = $LASTEXITCODE
+} finally {
+  $ErrorActionPreference = $prevEAP
+}
 if ($code -ne 0) {
   Write-Host "【test-run】Godot 运行异常（exit=$code），测试失败项清单："
   Select-String -Path $LogPath -Pattern '\[ FAIL \]|❌|FAILED' | Select-Object -First 100 | ForEach-Object { Write-Host $_.Line }
@@ -74,7 +79,8 @@ $summary = [ordered]@{
   failed       = $failed
   ok           = $ok
 }
-$summary | ConvertTo-Json | Set-Content -Path $Report -Encoding UTF8
+$summaryJson = (($summary | ConvertTo-Json) -replace "`r`n", "`n").TrimEnd("`n") + "`n"
+[System.IO.File]::WriteAllText($Report, $summaryJson, [System.Text.UTF8Encoding]::new($false))
 Copy-Item $Report $Latest -Force
 Remove-Item $LogPath -Force -ErrorAction SilentlyContinue
 

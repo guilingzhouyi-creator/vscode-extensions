@@ -22,21 +22,27 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RootDir = Split-Path -Parent (Split-Path -Parent $ScriptDir)
 
-$pyCmd = Get-Command python -ErrorAction SilentlyContinue
+$pyCmd = ""
+foreach ($c in @("python3", "python")) {
+  if (Get-Command $c -ErrorAction SilentlyContinue) {
+    $pyCmd = $c
+    break
+  }
+}
 if (-not $pyCmd) {
-  Write-Host "【audit-perf】python 缺失"
+  Write-Host "【audit-perf】python3/python 缺失"
   exit 1
 }
 
 Write-Host "=== 1/2 静态热点扫描 audit_perf_hotspots.py ==="
 Push-Location $RootDir
-& python "scripts\py\audit_perf_hotspots.py"
+& $pyCmd "scripts\py\audit_perf_hotspots.py"
 Pop-Location
 
 Write-Host ""
 Write-Host "=== 2/2 性能回归门禁（阈值 $GateThreshold%）==="
 Push-Location $RootDir
-& python "scripts\py\report_aggregate.py" --gate $GateThreshold
+& $pyCmd "scripts\py\report_aggregate.py" --gate $GateThreshold
 $code = $LASTEXITCODE
 Pop-Location
 if ($code -ne 0) {

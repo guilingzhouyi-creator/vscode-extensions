@@ -150,9 +150,46 @@ def _check_request_envelope_parity(
       pass
 
 
+def _check_esc_action_enum_parity(
+    mod_sdk_dir: Path, findings: list[AuditFinding]
+) -> None:
+  """审查 esc_menu_action_payload.schema.json 与 capabilities.json ESC 指令枚举一致性。"""
+  cap_path = mod_sdk_dir / "capabilities.json"
+  schema_path = mod_sdk_dir / "schemas" / "esc_menu_action_payload.schema.json"
+  if not cap_path.is_file() or not schema_path.is_file():
+    return
+  try:
+    cap_data = json.loads(cap_path.read_text(encoding=UTF8))
+    cap_actions = set(cap_data.get("unified_protocol_capabilities", {}).get("esc_menu_actions", []))
+    s_data = json.loads(schema_path.read_text(encoding=UTF8))
+    schema_actions = set(s_data.get("properties", {}).get("action_type", {}).get("enum", []))
+    if cap_actions != schema_actions:
+      findings.append(
+        AuditFinding(
+          rule_id="SDK-PROTOCOL-ESC-ENUM-DRIFT",
+          file_path="WebGames/mod_sdk/schemas/esc_menu_action_payload.schema.json",
+          line=10,
+          severity=SEVERITY_ERROR,
+          message=f"ESC 菜单动作枚举与 capabilities.json 不一致: schema={sorted(schema_actions)} vs cap={sorted(cap_actions)}",
+          suggestion="将 esc_menu_action_payload.schema.json action_type.enum 与 capabilities.json 对齐",
+        )
+      )
+  except (OSError, ValueError) as exc:
+    findings.append(
+      AuditFinding(
+        rule_id="SDK-PROTOCOL-SCHEMA-INVALID",
+        file_path="WebGames/mod_sdk/schemas/esc_menu_action_payload.schema.json",
+        line=1,
+        severity=SEVERITY_ERROR,
+        message=f"读取或解析 esc_menu_action_payload.schema.json 失败: {exc}",
+      )
+    )
+
+
 def check_protocol_envelope_parity(
     mod_sdk_dir: Path, root: Path, findings: list[AuditFinding]
 ) -> None:
   """审计跨端统一请求/响应信封 DTO (GDScript) 与 SDK 客户端及 Schema 的字段一致性 (SDK-PROTOCOL-PARITY)。"""
   _check_response_envelope_parity(mod_sdk_dir, root, findings)
   _check_request_envelope_parity(mod_sdk_dir, root, findings)
+  _check_esc_action_enum_parity(mod_sdk_dir, findings)

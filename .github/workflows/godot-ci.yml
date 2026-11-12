@@ -113,7 +113,7 @@ jobs:
             sleep "$RETRY_SLEEP"
           done
 
-      - name: 全量审查聚合（20 项静态门禁 + 文档四域基线棘轮门禁 + SARIF 导出；失败重试一次）
+      - name: 全量审查聚合（23 项静态门禁 + 文档四域基线棘轮门禁 + SARIF 导出；失败重试一次）
         run: |
           mkdir -p ../sarif
           for i in 1 2; do

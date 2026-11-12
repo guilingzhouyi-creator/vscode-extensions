@@ -327,3 +327,74 @@ def check_tc_arch_13(
         )
 
   return make_result("TC-ARCH-13: 密码学域库边界隔离与防时序侧信道合规断言", violations)
+
+
+_PRELOAD_RES_RE = re.compile(r'\b(?:preload|ResourceLoader\.load)\s*\(\s*"(res://[^"\n]+)"')
+
+
+def _case_exact_exists(root: Path, rel_posix: str) -> bool:
+  """逐级比对磁盘目录真实大小写，防止 Windows 大小写不敏感掩盖 Linux CI 断链。"""
+  cur = root
+  parts = [p for p in rel_posix.split("/") if p]
+  if not parts:
+    return False
+  for part in parts:
+    if not cur.is_dir():
+      return False
+    try:
+      names = {child.name for child in cur.iterdir()}
+    except OSError:
+      return False
+    if part not in names:
+      return False
+    cur = cur / part
+  return cur.exists()
+
+
+def check_tc_arch_14(
+    ctx: Any,
+    make_result: Callable[[str, list[str]], dict[str, Any]],
+    strip_comments: Callable[[str], str],
+) -> dict[str, Any]:
+  """TC-ARCH-14: 全库静态 preload/ResourceLoader.load 资源路径严格区分大小写存在性断言。"""
+  violations: list[str] = []
+  dir_entries_cache: dict[Path, set[str]] = {}
+
+  def _cached_exact_exists(rel_posix: str) -> bool:
+    cur = ctx.root
+    parts = [p for p in rel_posix.split("/") if p]
+    if not parts:
+      return False
+    for part in parts:
+      names = dir_entries_cache.get(cur)
+      if names is None:
+        if not cur.is_dir():
+          return False
+        try:
+          names = {child.name for child in cur.iterdir()}
+        except OSError:
+          return False
+        dir_entries_cache[cur] = names
+      if part not in names:
+        return False
+      cur = cur / part
+    return cur.exists()
+
+  for sub in ("backend", "frontend", "dev_harness"):
+    sub_dir: Path = ctx.root / sub
+    if not sub_dir.exists():
+      continue
+    for gd_file in sorted(sub_dir.rglob("*.gd")):
+      rel_src = gd_file.relative_to(ctx.root).as_posix()
+      raw = gd_file.read_text(encoding="utf-8", errors="ignore")
+      code = strip_comments(raw)
+      for idx, ln in enumerate(code.splitlines(), 1):
+        for m in _PRELOAD_RES_RE.finditer(ln):
+          res_path = m.group(1)
+          rel_target = res_path[len(RES_PREFIX):]
+          if not _cached_exact_exists(rel_target):
+            violations.append(
+              f"{RES_PREFIX}{rel_src}:{idx}: 静态加载路径不存在或大小写不匹配 -> {res_path}"
+            )
+
+  return make_result("TC-ARCH-14: 全库静态 res:// 路径精确大小写存在性断言", violations)

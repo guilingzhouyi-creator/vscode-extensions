@@ -47,7 +47,7 @@ while [[ $# -gt 0 ]]; do
     *) echo "【用法错误】未知参数: $1"; exit 2 ;;
   esac
 done
-case "$SCOPE" in all|backend|benchmarks|tests|frontend) ;; *) echo "【用法错误】--scope 取值: all|backend|benchmarks|tests|frontend"; exit 2 ;; esac
+case "$SCOPE" in all|backend|frontend|dev_harness|tests|benchmarks) ;; *) echo "【用法错误】--scope 取值: all|backend|frontend|dev_harness|tests|benchmarks"; exit 2 ;; esac
 
 if ! command -v "$GODOT_BIN" >/dev/null 2>&1; then
   if command -v "${GODOT_BIN}.exe" >/dev/null 2>&1; then
@@ -81,7 +81,8 @@ if [[ "$PER_FILE" -eq 0 ]]; then
   cat "$LOG"
   FAILED_FILES="$(grep -E '^✗ res://' "$LOG" | sed -E 's/^✗ (res:\/\/[^ ]+).*/\1/' | sort -u)"
   if [[ -n "$FAILED_FILES" ]]; then
-    echo "【check-gdscript】批处理失败明细 ${#FAILED_FILES} 项，对失败清单逐个复验定位..."
+    FAILED_COUNT="$(printf '%s\n' "$FAILED_FILES" | grep -c .)"
+    echo "【check-gdscript】批处理失败明细 ${FAILED_COUNT} 项，对失败清单逐个复验定位..."
     CHECKED=0
     FAILS=0
     while IFS= read -r res_path; do

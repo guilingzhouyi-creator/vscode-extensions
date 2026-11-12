@@ -12,7 +12,7 @@
 # ==============================================================================
 [CmdletBinding()]
 param(
-  [ValidateSet("all", "backend", "benchmarks", "tests", "frontend")]
+  [ValidateSet("all", "backend", "frontend", "dev_harness", "tests", "benchmarks")]
   [string]$Scope = "all",
   [string]$GodotBin = $env:GODOT_BIN,
   [switch]$PerFile
@@ -39,10 +39,6 @@ $RootDir = Split-Path -Parent (Split-Path -Parent $ScriptDir)
 # ==============================================================================
 $batchScriptPath = Join-Path $RootDir "tests/batch_syntax_checker.gd"
 $batchScriptRes = "res://tests/batch_syntax_checker.gd"
-if (-not (Test-Path $batchScriptPath)) {
-  $batchScriptPath = Join-Path $RootDir "tests/fixtures/batch_syntax_checker.gd"
-  $batchScriptRes = "res://tests/fixtures/batch_syntax_checker.gd"
-}
 if (-not (Test-Path $batchScriptPath)) {
   Write-Host "【check-gdscript】无法找到 batch_syntax_checker.gd（单一真源缺失，请先登记）"
   exit 2

@@ -28,7 +28,7 @@ $PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
 $env:GIT_CONFIG_GLOBAL = "NUL"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$WebGamesDir = Split-Path -Parent $ScriptDir
+$WebGamesDir = Split-Path -Parent (Split-Path -Parent $ScriptDir)
 $RepoRoot = Split-Path -Parent $WebGamesDir
 $GitHooksDir = Join-Path $RepoRoot ".git\hooks"
 

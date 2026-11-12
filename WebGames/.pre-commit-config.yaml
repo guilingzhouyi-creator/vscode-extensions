@@ -39,7 +39,7 @@ repos:
       # 4. 凭证与敏感密钥扫描
       - id: audit-secrets
         name: audit-secrets (凭证泄漏扫描)
-        entry: python scripts/py/audit_secrets.py
+        entry: python scripts/py/audit_secrets.py --strict
         language: system
         files: \.(gd|json|md|sh|ps1|py)$
         pass_filenames: false

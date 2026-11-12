@@ -368,12 +368,12 @@ def extract_unified_protocol_capabilities(config_dir: Path) -> dict[str, Any]:
             "CHARACTER_CREATION",
         ],
         "esc_menu_actions": [
-            "RESUME_GAME",
-            "OPEN_SETTINGS",
-            "SAVE_AND_QUIT_TO_ARCHIVE",
-            "FORCE_QUIT_TO_ARCHIVE",
-            "SAVE_AND_QUIT_TO_GATEWAY",
-            "SAVE_AND_QUIT_DESKTOP",
+            "ESC_GET_MENU_STATE",
+            "ESC_QUERY_READINESS",
+            "ESC_SAVE_GAME",
+            "ESC_EXIT_TO_GATEWAY",
+            "ESC_QUIT_GAME",
+            "ESC_APPLY_SETTINGS",
         ],
         "envelope_schema_versions": {
             "client_request": "kalar.mod_sdk.client_request_envelope.v1",

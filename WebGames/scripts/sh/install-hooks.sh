@@ -43,7 +43,7 @@ cat << 'EOF' > "${GIT_HOOKS_DIR}/pre-commit"
 echo "【Git Hook】正在执行 WebGames 提交前安全审查..."
 if command -v pwsh >/dev/null 2>&1; then
     pwsh -NoProfile -File "WebGames/scripts/ps1/audit-all.ps1"
-elif [[ -f "WebGames/scripts/sh/audit-all.sh" ]]; then
+elif [ -f "WebGames/scripts/sh/audit-all.sh" ]; then
     bash "WebGames/scripts/sh/audit-all.sh"
 else
     echo "未找到可用执行器，跳过门禁。"

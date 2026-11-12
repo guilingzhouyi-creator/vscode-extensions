@@ -4,7 +4,7 @@
 # 文件路径: WebGames/scripts/sh/test-run.sh
 # 架构定位: 单元与集成测试 Runner (Linux Bash)
 # 依赖与触发: 触发方: CI 流水线 / 本地验收 | 上游: Godot CLI / test_runner.gd | 下游: 控制台测试报告 | 运行时: Bash 4+
-# 职责说明: 以 Headless 模式运行全量 109 套测试套件，实时输出断言通过率与汇总报告
+# 职责说明: 以 Headless 模式运行全域测试套件，实时输出断言通过率与汇总报告
 # 退出语义与设计依据: 退出码: 0=全部通过 (100%), 1=存在用例失败 | 设计依据: AGENTS.md 构建门禁第一条
 # ------------------------------------------------------------------------------
 # 用法示例:
@@ -76,11 +76,11 @@ TOTAL="$(echo "$LINE" | grep -oE '[0-9]+' | tail -1)"
 PASSED="$(echo "$LINE" | grep -oE '[0-9]+' | head -1)"
 FAILED=$(( ${TOTAL:-0} - ${PASSED:-0} ))
 GODOT_VER="$("$GODOT_BIN" --version 2>/dev/null | head -1)"
-OK=1
-if [[ "${TOTAL:-0}" -gt 0 ]] && [[ "$FAILED" = "0" ]]; then OK=0; fi
+OK_BOOL="false"
+if [[ "${TOTAL:-0}" -gt 0 ]] && [[ "$FAILED" = "0" ]]; then OK_BOOL="true"; fi
 
 printf '{\n  "tool": "test_runner.gd",\n  "godot_version": "%s",\n  "timestamp": "%s",\n  "passed": %s,\n  "total": %s,\n  "failed": %s,\n  "ok": %s\n}\n' \
-  "$GODOT_VER" "$(date +%Y-%m-%dT%H:%M:%S)" "${PASSED:-0}" "${TOTAL:-0}" "$FAILED" "$OK" > "$REPORT"
+  "$GODOT_VER" "$(date +%Y-%m-%dT%H:%M:%S)" "${PASSED:-0}" "${TOTAL:-0}" "$FAILED" "$OK_BOOL" > "$REPORT"
 cp "$REPORT" "$LATEST"
 rm -f "$LOG"
 
@@ -91,7 +91,7 @@ if [[ -n "$OLD_FILES" ]]; then
   printf '%s\n' "$OLD_FILES" | xargs rm -f
 fi
 
-if [[ "$OK" = "0" ]]; then
+if [[ "$OK_BOOL" = "true" ]]; then
   echo "【test-run】通过: $PASSED / $TOTAL 项断言全部通过"
   echo "【test-run】完成: $REPORT"
   exit 0

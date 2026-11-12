@@ -29,6 +29,7 @@ from lib.arch_guard_rules import (
   check_tc_arch_11,
   check_tc_arch_12,
   check_tc_arch_13,
+  check_tc_arch_14,
 )
 ensure_utf8_stdout()
 
@@ -577,23 +578,26 @@ def check_tc_arch_07(ctx: ArchitectureAuditContext) -> dict[str, Any]:
 
 
 def check_tc_arch_08(ctx: ArchitectureAuditContext) -> list[dict[str, Any]]:
-  """TC-ARCH-08A & TC-ARCH-08B: 账号槽位解算器边界隔离护栏。"""
+  """TC-ARCH-08A & TC-ARCH-08B: 业务领域层严禁预加载基础设施层与引用外层状态栈。"""
   violations_a: list[str] = []
   violations_b: list[str] = []
-  solver_path = ctx.root / "backend/domains/account/account_slot_binding_solver.gd"
 
+  for gd_file in sorted(DOMAINS_DIR.rglob("*.gd")) if DOMAINS_DIR.exists() else []:
+    _, content = ctx.gd_sources.get(gd_file, ("", ""))
+    rel = RES_PREFIX + gd_file.relative_to(ctx.root).as_posix()
+    if "res://backend/infrastructure/" in content:
+      violations_a.append(f"{rel}: 领域层严禁包含 res://backend/infrastructure/ 依赖")
+
+  solver_path = ctx.root / "backend/domains/account/account_slot_binding_solver.gd"
   if not solver_path.exists():
-    violations_a.append("目标文件不存在: res://backend/domains/account/account_slot_binding_solver.gd")
     violations_b.append("目标文件不存在: res://backend/domains/account/account_slot_binding_solver.gd")
   else:
     _, content = ctx.gd_sources.get(solver_path, ("", ""))
-    if "res://backend/infrastructure/" in content:
-      violations_a.append("account_slot_binding_solver.gd 严禁包含 res://backend/infrastructure/ 依赖")
     if re.search(r"\bGameLoopStateStack\b", content):
       violations_b.append("account_slot_binding_solver.gd 严禁引用 GameLoopStateStack 符号")
 
   return [
-    make_result("TC-ARCH-08A: 账号槽位解算器严禁包含基础设施层预加载路径", violations_a),
+    make_result("TC-ARCH-08A: 全量业务领域严禁包含基础设施层预加载路径", violations_a),
     make_result("TC-ARCH-08B: 账号槽位解算器严禁引用 GameLoopStateStack", violations_b),
   ]
 
@@ -618,6 +622,7 @@ def run_all_checks() -> tuple[bool, list[dict[str, Any]], str, float]:
     *check_tc_arch_11(ctx, make_result, strip_comments),
     check_tc_arch_12(ctx, make_result, strip_comments),
     check_tc_arch_13(ctx, make_result, strip_comments),
+    check_tc_arch_14(ctx, make_result, strip_comments),
   ]
 
   elapsed = time.perf_counter() - t0
