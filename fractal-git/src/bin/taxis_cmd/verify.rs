@@ -12,14 +12,21 @@
 //! - `FGT-COR-001`: Core data model and error contract guard
 //! - `FGT-GAT-001`: Fractal Git domain gate guard
 
+use std::path::{Path, PathBuf};
+
 use fg_core::models::{current_unix_seconds, AuthoritySecret};
+use fg_gate::auto_audit_hook::{AutoAuditHook, AutoAuditReceipt};
+use fg_gate::resolve_authority_secret;
 use fractal_git::constants::cli::CliTag;
 use fractal_git::{
-    ActorIdentity, AgentPushContext, CommitMessageGuard, ConflictGuard, FractalRef,
+    ActorIdentity, AgentPushContext, CommitMessageGuard, ConflictGuard, FractalRef, HookTier,
     PreReceiveGuard, QuotaGovernor, TaxisPolicy,
 };
 
-use super::common::{print_json, reject, CliContext};
+use super::common::{find_all_arg_values, find_arg_value, print_json, reject, CliContext};
+
+/// Default filename for the signed verification receipt inside `.taxis/` or `git_dir`.
+pub const VERIFY_RECEIPT_FILENAME: &str = "verify-receipt.json";
 
 /// Fixture secret backing the deterministic `taxis verify` self-test.
 const FIXTURE_SECRET_BYTES: [u8; 32] = [7u8; 32];
@@ -108,13 +115,19 @@ pub fn handle_verify(ctx: &CliContext) {
     );
     let msg_guard_ok = CommitMessageGuard::parse_and_verify(valid_msg, &policy, None).is_ok();
 
-    // Tiers 3 & 4: conflict markers and quota limits
+    // Tiers 3 & 4: conflict markers, TKCV+Canary real file inspection, and quota limits
+    let signing_secret = resolve_authority_secret(&ctx.git_dir).unwrap_or_else(|_| secret.clone());
+    let (workspace_ok, receipt) = inspect_workspace_and_issue_receipt(ctx, &signing_secret);
     let conflict_ok =
-        ConflictGuard::assert_clean_content("sample.rs", b"pub fn clean() {}\n").is_ok();
+        ConflictGuard::assert_clean_content("sample.rs", b"pub fn clean() {}\n").is_ok()
+            && workspace_ok;
     let quota = QuotaGovernor::default();
     let quota_ok = quota.assert_spawn_capacity(0).is_ok() && quota.assert_storage_budget(0).is_ok();
 
     let all_gates_passed = pre_receive_ok && msg_guard_ok && conflict_ok && quota_ok;
+    if let Some(ref verified_receipt) = receipt {
+        persist_verify_receipt(ctx, verified_receipt, all_gates_passed);
+    }
     report_verify(
         ctx,
         &quota,
@@ -128,6 +141,126 @@ pub fn handle_verify(ctx: &CliContext) {
     if !all_gates_passed {
         std::process::exit(1);
     }
+}
+
+/// Inspects explicit `--file` targets or staged workspace files via ConflictGuard + AutoAuditHook.
+fn inspect_workspace_and_issue_receipt(
+    ctx: &CliContext,
+    secret: &AuthoritySecret,
+) -> (bool, Option<AutoAuditReceipt>) {
+    let work_root = super::repo_view::resolve_work_root(&ctx.git_dir);
+    let target_files = collect_verify_targets(ctx, &work_root);
+    let hook = AutoAuditHook::new(HookTier::SubToCard).with_authority_secret(secret.clone());
+    let test_override = find_arg_value(&ctx.args, &["--test", "--test-file"])
+        .and_then(|test_path| std::fs::read_to_string(work_root.join(test_path)).ok());
+
+    let mut latest_receipt: Option<AutoAuditReceipt> = None;
+    for rel_path in &target_files {
+        let Some(file_receipt) =
+            audit_single_workspace_file(&hook, &work_root, rel_path, test_override.as_deref())
+        else {
+            return (false, None);
+        };
+        latest_receipt = Some(file_receipt);
+    }
+
+    if latest_receipt.is_none() {
+        let default_source = "pub fn verify_probe(val: u32) -> u32 {\n    val * 2\n}\n";
+        let default_tests = "#[test]\nfn test_verify_probe() {\n    assert_eq!(verify_probe(4), 8);\n}\n";
+        latest_receipt = hook.audit_source_and_test("src/lib.rs", default_source, default_tests, "taxis-verify").ok();
+    }
+
+    (latest_receipt.is_some(), latest_receipt)
+}
+
+/// Collects explicit `--file` paths or staged index paths for real-file verification.
+fn collect_verify_targets(ctx: &CliContext, work_root: &Path) -> Vec<String> {
+    let explicit = find_all_arg_values(&ctx.args, &["--file", "--files", "--source"]);
+    if !explicit.is_empty() {
+        return explicit.into_iter().map(str::to_string).collect();
+    }
+    let mut staged = Vec::new();
+    let index_file = ctx.git_dir.join("index");
+    if let Ok(git_index) = fg_index::GitIndex::load(&index_file) {
+        for entry in git_index.entries() {
+            if work_root.join(&entry.path).is_file() {
+                staged.push(entry.path.clone());
+            }
+        }
+    }
+    staged
+}
+
+/// Audits one workspace file against ConflictGuard, TKCV, and IKCE Canary probes.
+fn audit_single_workspace_file(
+    hook: &AutoAuditHook,
+    work_root: &Path,
+    rel_path: &str,
+    test_override: Option<&str>,
+) -> Option<AutoAuditReceipt> {
+    let direct = Path::new(rel_path);
+    let full_path = if direct.is_file() { direct.to_path_buf() } else { work_root.join(rel_path) };
+    let workspace_rel = full_path
+        .strip_prefix(work_root)
+        .ok()
+        .and_then(|sub| sub.to_str())
+        .unwrap_or(rel_path);
+    let bytes = std::fs::read(&full_path).ok()?;
+    ConflictGuard::assert_clean_content(workspace_rel, &bytes).ok()?;
+    let source_code = std::str::from_utf8(&bytes).ok()?;
+    hook.audit_source_and_test(workspace_rel, source_code, test_override.unwrap_or(source_code), "taxis-verify")
+        .ok()
+}
+
+/// Persists the signed verification receipt to `.taxis/verify-receipt.json` and any `--receipt` path.
+fn persist_verify_receipt(ctx: &CliContext, receipt: &AutoAuditReceipt, all_gates_passed: bool) {
+    let composite_score = (receipt.credit.posterior_mean * 100.0).clamp(0.0, 100.0);
+    let payload = serde_json::json!({
+        "schema": "taxis-verify-receipt-v1",
+        "all_gates_passed": all_gates_passed,
+        "anti_gaming_passed": !receipt.credit.gaming_detected,
+        "composite_score": composite_score,
+        "cai_index": composite_score,
+        "credible_interval_lower": receipt.credit.credible_interval_lower * 100.0,
+        "receipt_digest": receipt.receipt_digest,
+        "signature": receipt.record.sig,
+        "audit_record": receipt.record,
+    });
+    let Ok(serialized) = serde_json::to_vec_pretty(&payload) else { return };
+    for target in resolve_receipt_destinations(ctx) {
+        if let Some(parent) = target.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::write(&target, &serialized);
+    }
+}
+
+/// Resolves output paths where `verify-receipt.json` should be written.
+fn resolve_receipt_destinations(ctx: &CliContext) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+    if let Some(custom) = find_arg_value(&ctx.args, &["--receipt", "--output"]) {
+        paths.push(PathBuf::from(custom));
+    }
+    if ctx.git_dir.is_dir() {
+        paths.push(ctx.git_dir.join(VERIFY_RECEIPT_FILENAME));
+    }
+    let dot_taxis = super::repo_view::resolve_work_root(&ctx.git_dir).join(".taxis");
+    if dot_taxis.is_dir() {
+        paths.push(dot_taxis.join(VERIFY_RECEIPT_FILENAME));
+    }
+    paths
+}
+
+/// Computes lowercase hex SM3 digest of a canonical payload string.
+pub(crate) fn compute_sm3_hex(payload: &str) -> String {
+    const HEX_DIGITS: &[u8; 16] = b"0123456789abcdef";
+    let digest = fg_core::crypto::sm3_hash(payload.as_bytes());
+    let mut out = String::with_capacity(digest.len() * 2);
+    for byte in &digest {
+        out.push(HEX_DIGITS[(byte >> 4) as usize] as char);
+        out.push(HEX_DIGITS[(byte & 0x0f) as usize] as char);
+    }
+    out
 }
 
 /// Prints the four gate tier results in the requested format.

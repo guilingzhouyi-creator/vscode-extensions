@@ -14,6 +14,10 @@
 //! - `FGT-COR-001`: Core data model and error contract guard
 //! - `FGT-GAT-001`: Fractal Git domain gate guard
 
+use std::path::{Path, PathBuf};
+
+use fg_core::models::{AuditRecord, AuthoritySecret};
+use fg_gate::resolve_authority_secret;
 use fractal_git::constants::cli::CliTag;
 use fractal_git::{
     compute_jeffreys_credible_lower, AutoQualityScoreEnvelope, DiskRefStore, ElevationAttestation,
@@ -21,6 +25,10 @@ use fractal_git::{
 };
 
 use super::common::{find_arg_value, print_json, reject, CliContext};
+use super::verify::{compute_sm3_hex, VERIFY_RECEIPT_FILENAME};
+
+/// Fixture secret matching `taxis verify` when no external authority secret is configured.
+const VERIFY_FIXTURE_SECRET_BYTES: [u8; 32] = [7u8; 32];
 
 /// Byte length of the GUI challenge nonce carried by an elevation proof.
 const NONCE_BYTES: usize = 32;
@@ -92,16 +100,53 @@ fn resolve_candidate_oid(ctx: &CliContext) -> Oid {
     }
 }
 
-/// Parses the Auto Quality score envelope from CLI arguments.
-fn parse_auto_score(args: &[String]) -> AutoQualityScoreEnvelope {
-    let composite_score = find_arg_value(args, &["--score"])
-        .and_then(|val| val.parse::<f64>().ok())
-        .unwrap_or(0.0);
-    let cai_index = find_arg_value(args, &["--cai"])
-        .and_then(|val| val.parse::<f64>().ok())
-        .unwrap_or(100.0);
+/// Verified fields extracted from a `.taxis/verify-receipt.json` document.
+struct VerifiedReceiptEvidence {
+    composite_score: f64,
+    cai_index: f64,
+    ci_lower: f64,
+    anti_gaming_passed: bool,
+    summary_report: String,
+}
+
+/// Parses and validates the Auto Quality score envelope from CLI arguments and receipt evidence.
+fn parse_auto_score(ctx: &CliContext) -> AutoQualityScoreEnvelope {
+    let args = &ctx.args;
+    let receipt_ev = resolve_and_verify_receipt(ctx);
+    let cli_score = find_arg_value(args, &["--score"]).and_then(|val| val.parse::<f64>().ok());
+    let cli_cai = find_arg_value(args, &["--cai"]).and_then(|val| val.parse::<f64>().ok());
     let custom_ci_lower =
         find_arg_value(args, &["--ci-lower"]).and_then(|val| val.parse::<f64>().ok());
+    let verified_report = verify_report_argument(find_arg_value(args, &["--report"]));
+
+    if receipt_ev.is_none()
+        && verified_report.is_none()
+        && cli_score.unwrap_or(0.0) >= 80.0
+        && (cli_cai.is_none() || custom_ci_lower.is_none())
+    {
+        reject(
+            CliTag::PROMOTION_REJECTED,
+            "unverified high-score promotion blocked: supply --receipt (.taxis/verify-receipt.json) or complete quality envelope (--cai and --ci-lower)",
+        );
+    }
+    if let (Some(claimed), Some(ref verified)) = (cli_score, &receipt_ev) {
+        if claimed > verified.composite_score + 0.5 {
+            reject(
+                CliTag::PROMOTION_REJECTED,
+                format!(
+                    "claimed promotion score {:.1} exceeds verified receipt score {:.1}",
+                    claimed, verified.composite_score
+                ),
+            );
+        }
+    }
+
+    let composite_score = cli_score
+        .or_else(|| receipt_ev.as_ref().map(|ev| ev.composite_score))
+        .unwrap_or(0.0);
+    let cai_index = cli_cai
+        .or_else(|| receipt_ev.as_ref().map(|ev| ev.cai_index))
+        .unwrap_or(100.0);
     let cyclomatic_complexity_delta = find_arg_value(args, &["--cc-delta"])
         .and_then(|val| val.parse::<i32>().ok())
         .unwrap_or(0);
@@ -110,23 +155,122 @@ fn parse_auto_score(args: &[String]) -> AutoQualityScoreEnvelope {
         .unwrap_or(0);
     let anti_gaming_passed = find_arg_value(args, &["--anti-gaming"])
         .and_then(|val| val.parse::<bool>().ok())
-        .unwrap_or(true);
-    let report = find_arg_value(args, &["--report"])
-        .unwrap_or("Auto-Refactor Quality Gate: zero debt verification.")
-        .to_string();
-
-    let ci_lower =
-        custom_ci_lower.unwrap_or_else(|| compute_jeffreys_credible_lower(composite_score));
+        .unwrap_or_else(|| receipt_ev.as_ref().is_none_or(|ev| ev.anti_gaming_passed));
+    let summary_report = verified_report
+        .or_else(|| receipt_ev.as_ref().map(|ev| ev.summary_report.clone()))
+        .unwrap_or_else(|| "Auto-Refactor Quality Gate: zero debt verification.".to_string());
+    let credible_interval_lower = custom_ci_lower
+        .or_else(|| receipt_ev.as_ref().map(|ev| ev.ci_lower))
+        .unwrap_or_else(|| compute_jeffreys_credible_lower(composite_score));
 
     AutoQualityScoreEnvelope {
         composite_score,
         cai_index,
         cyclomatic_complexity_delta,
         eloc_delta,
-        credible_interval_lower: ci_lower,
+        credible_interval_lower,
         anti_gaming_passed,
-        summary_report: report,
+        summary_report,
     }
+}
+
+/// Locates and cryptographically verifies `.taxis/verify-receipt.json` or `--receipt <path>`.
+fn resolve_and_verify_receipt(ctx: &CliContext) -> Option<VerifiedReceiptEvidence> {
+    let explicit_receipt = find_arg_value(&ctx.args, &["--receipt"]).map(PathBuf::from);
+    let default_path = ctx.git_dir.join(VERIFY_RECEIPT_FILENAME);
+    let candidate_path = explicit_receipt.or_else(|| default_path.is_file().then_some(default_path));
+    let Some(receipt_path) = candidate_path else {
+        if ctx.args.iter().any(|arg| arg == "--require-receipt") {
+            reject(
+                CliTag::PROMOTION_REJECTED,
+                "missing required verification receipt (.taxis/verify-receipt.json)",
+            );
+        }
+        return None;
+    };
+    let Ok(raw_bytes) = std::fs::read(&receipt_path) else {
+        reject(CliTag::PROMOTION_REJECTED, "cannot read verification receipt");
+    };
+    Some(verify_receipt_bytes(ctx, &raw_bytes))
+}
+
+/// Verifies the cryptographic signature, SM3 digest, and gate verdicts inside a receipt JSON payload.
+fn verify_receipt_bytes(ctx: &CliContext, raw_bytes: &[u8]) -> VerifiedReceiptEvidence {
+    let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(raw_bytes) else {
+        reject(CliTag::PROMOTION_REJECTED, "malformed verification receipt JSON");
+    };
+    let gates_passed = parsed["all_gates_passed"].as_bool().unwrap_or(false);
+    let anti_gaming = parsed["anti_gaming_passed"].as_bool().unwrap_or(false);
+    if !gates_passed || !anti_gaming {
+        reject(
+            CliTag::PROMOTION_REJECTED,
+            "verification receipt indicates failed gate or anti-gaming breach",
+        );
+    }
+    let Ok(record) = serde_json::from_value::<AuditRecord>(parsed["audit_record"].clone()) else {
+        reject(CliTag::PROMOTION_REJECTED, "verification receipt missing audit_record");
+    };
+    let digest_claim = parsed["receipt_digest"].as_str().unwrap_or_default();
+    let expected_digest = compute_sm3_hex(&record.canonical_payload());
+    if digest_claim.is_empty() || digest_claim != expected_digest {
+        reject(
+            CliTag::PROMOTION_REJECTED,
+            "verification receipt digest mismatch (tampered evidence)",
+        );
+    }
+    let secret = resolve_authority_secret(&ctx.git_dir).unwrap_or_else(|_| {
+        AuthoritySecret::from_bytes(&VERIFY_FIXTURE_SECRET_BYTES)
+            .unwrap_or_else(|err| reject(CliTag::ERROR, err))
+    });
+    if !record.verify_signature(&secret) {
+        reject(CliTag::PROMOTION_REJECTED, "verification receipt HMAC signature check failed");
+    }
+    let composite_score = parsed["composite_score"]
+        .as_f64()
+        .unwrap_or(record.score.cred as f64);
+    let cai_index = parsed["cai_index"].as_f64().unwrap_or(composite_score);
+    let ci_lower = parsed["credible_interval_lower"]
+        .as_f64()
+        .unwrap_or((record.score.ci_lo as f64) * 100.0);
+    VerifiedReceiptEvidence {
+        composite_score,
+        cai_index,
+        ci_lower,
+        anti_gaming_passed: anti_gaming,
+        summary_report: format!(
+            "Verified Taxis Receipt (digest={})",
+            &expected_digest[..expected_digest.len().min(12)]
+        ),
+    }
+}
+
+/// Validates `--report <arg>`, loading file contents when `<arg>` designates a report file path.
+fn verify_report_argument(report_arg: Option<&str>) -> Option<String> {
+    let raw = report_arg?;
+    let is_file_arg = raw.ends_with(".json")
+        || raw.ends_with(".md")
+        || raw.ends_with(".txt")
+        || Path::new(raw).is_file();
+    if !is_file_arg {
+        return (!raw.trim().is_empty()).then(|| raw.to_string());
+    }
+    let Ok(content) = std::fs::read_to_string(raw) else {
+        reject(CliTag::PROMOTION_REJECTED, "specified report file does not exist");
+    };
+    if content.trim().is_empty() {
+        reject(CliTag::PROMOTION_REJECTED, "specified report file is empty");
+    }
+    if raw.ends_with(".json") {
+        let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content) else {
+            reject(CliTag::PROMOTION_REJECTED, "report file is not valid JSON");
+        };
+        if parsed["all_gates_passed"].as_bool() == Some(false)
+            || parsed["anti_gaming_passed"].as_bool() == Some(false)
+        {
+            reject(CliTag::PROMOTION_REJECTED, "report file indicates failed gate");
+        }
+    }
+    Some(content)
 }
 
 /// Handles staging a promotion candidate with quality envelope and TTL lease.
@@ -144,7 +288,7 @@ fn handle_stage_request(
     let agent_uid = find_arg_value(&ctx.args, &["--agent", "--agent-uid"])
         .unwrap_or("agent-sub-001")
         .to_string();
-    let auto_score = parse_auto_score(&ctx.args);
+    let auto_score = parse_auto_score(ctx);
     let composite_score = auto_score.composite_score;
     let cai_index = auto_score.cai_index;
     let cc_delta = auto_score.cyclomatic_complexity_delta;
