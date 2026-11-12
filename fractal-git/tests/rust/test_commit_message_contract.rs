@@ -492,3 +492,110 @@ fn forbidden_terms_inside_backticks_and_urls_are_rejected() {
         "forbidden terms in URLs must NOT bypass the scan: {err_url}"
     );
 }
+
+#[test]
+fn english_first_person_pronouns_and_verb_inflections_are_rejected() {
+    let policy = TaxisPolicy::workspace_strict();
+    let we_message = TEMPLATE_CONFORMANT.replace(
+        "门禁按字面量比较区块名，导致模板推荐的双名写法被误判为缺少区块。",
+        "We implemented the semantic slot resolver to avoid false rejections.",
+    );
+    let err_we = CommitMessageGuard::parse_and_verify(&we_message, &policy, None)
+        .err()
+        .map(|e| format!("{e:?}"))
+        .unwrap_or_default();
+    assert!(
+        err_we.contains("FGT-MSG-004") && err_we.contains("first-person"),
+        "English first-person pronouns must be rejected: {err_we}"
+    );
+
+    let ing_header = TEMPLATE_CONFORMANT.replace(
+        "feat(gate): 新增提交信息区块槽位解析与双语别名",
+        "feat(gate): adding semantic slot resolver",
+    );
+    let err_ing = CommitMessageGuard::parse_and_verify(&ing_header, &policy, None)
+        .err()
+        .map(|e| format!("{e:?}"))
+        .unwrap_or_default();
+    assert!(
+        err_ing.contains("FGT-MSG-004") && err_ing.contains("participle"),
+        "English -ing verb in header summary must be rejected: {err_ing}"
+    );
+
+    let es_header = TEMPLATE_CONFORMANT.replace(
+        "feat(gate): 新增提交信息区块槽位解析与双语别名",
+        "fix(gate): fixes regression in parser",
+    );
+    let err_es = CommitMessageGuard::parse_and_verify(&es_header, &policy, None)
+        .err()
+        .map(|e| format!("{e:?}"))
+        .unwrap_or_default();
+    assert!(
+        err_es.contains("FGT-MSG-004"),
+        "English third-person singular verb in header summary must be rejected: {err_es}"
+    );
+}
+
+#[test]
+fn invalid_bullet_markers_consecutive_blank_lines_and_fullwidth_brackets_are_rejected() {
+    let policy = TaxisPolicy::workspace_strict();
+    let star_bullet = TEMPLATE_CONFORMANT.replace(
+        "- 新增语义槽位解析与双语别名表。",
+        "* 新增语义槽位解析与双语别名表。",
+    );
+    let err_star = CommitMessageGuard::parse_and_verify(&star_bullet, &policy, None)
+        .err()
+        .map(|e| format!("{e:?}"))
+        .unwrap_or_default();
+    assert!(
+        err_star.contains("FGT-MSG-002"),
+        "asterisk bullets must be rejected: {err_star}"
+    );
+
+    let consecutive_blanks = TEMPLATE_CONFORMANT.replace("\n\n[Why", "\n\n\n[Why");
+    let err_blanks = CommitMessageGuard::parse_and_verify(&consecutive_blanks, &policy, None)
+        .err()
+        .map(|e| format!("{e:?}"))
+        .unwrap_or_default();
+    assert!(
+        err_blanks.contains("FGT-MSG-002"),
+        "consecutive blank lines must be rejected: {err_blanks}"
+    );
+
+    let fullwidth_bracket = TEMPLATE_CONFORMANT.replace("[Why / 动机背景]", "【Why / 动机背景】");
+    let err_bracket = CommitMessageGuard::parse_and_verify(&fullwidth_bracket, &policy, None)
+        .err()
+        .map(|e| format!("{e:?}"))
+        .unwrap_or_default();
+    assert!(
+        err_bracket.contains("FGT-MSG-002"),
+        "fullwidth brackets must be rejected: {err_bracket}"
+    );
+}
+
+#[test]
+fn timing_extension_misnomer_and_intent_prefix_are_rejected() {
+    let policy = TaxisPolicy::workspace_strict();
+    let misnomer = TEMPLATE_CONFORMANT.replace("fractal-git", "timing扩展");
+    let err_mis = CommitMessageGuard::parse_and_verify(&misnomer, &policy, None)
+        .err()
+        .map(|e| format!("{e:?}"))
+        .unwrap_or_default();
+    assert!(
+        err_mis.contains("FGT-MSG-007"),
+        "misnomer timing扩展 must be rejected: {err_mis}"
+    );
+
+    let intent = TEMPLATE_CONFORMANT.replace(
+        "新增提交信息区块槽位解析与双语别名",
+        "希望能支持语义槽位解析",
+    );
+    let err_intent = CommitMessageGuard::parse_and_verify(&intent, &policy, None)
+        .err()
+        .map(|e| format!("{e:?}"))
+        .unwrap_or_default();
+    assert!(
+        err_intent.contains("FGT-MSG-004"),
+        "disallowed intent prefix 希望能 must be rejected: {err_intent}"
+    );
+}
