@@ -11,6 +11,7 @@ extends SceneTree
 const SCAN_DIRS: Array[String] = [
 	"res://backend",
 	"res://frontend",
+	"res://dev_harness",
 	"res://tests",
 	"res://benchmarks"
 ]

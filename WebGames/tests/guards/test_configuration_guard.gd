@@ -89,20 +89,20 @@ static func test_required_tables_present() -> Dictionary:
 ## 热重载原子发布——版本单调递增且必需表保持零缺失
 static func test_reload_version_monotonic() -> Dictionary:
 	var before := GameConfig.describe()
-	var initial_config_version: int = GameConfig.get_int("infrastructure.admin", "config_version", 0)
+	var version_before: int = GameConfig.config_reload_version()
 	var res := GameConfig.reload_config()
 	var ok_publish: bool = res.get("success", false)
 	var after := GameConfig.describe()
 	var missing: Array = after.get("missing_required", [])
-	var version_same_or_higher: bool = true
-	# reload 成功路径已发布：必需表零缺失 + 表数不缩水 + 热重载广播版本存在
+	var version_after: int = int(res.get("version", -1))
+	# reload 成功路径已发布：必需表零缺失 + 表数不缩水 + 热重载版本严格递增
 	var passed: bool = ok_publish and missing.is_empty() \
 		and int(after.get("count", 0)) >= int(before.get("count", 0)) \
-		and (initial_config_version > 0)
+		and (version_after > version_before)
 	return {
 		"test": "TC-CFG-05: 配置热重载原子发布（版本单调/必需表零缺失/无半更新）",
 		"passed": passed,
-		"version": res.get("version", -1), "missing": missing
+		"version": version_after, "missing": missing
 	}
 
 ## get_many 批量读与逐键 get_value 逐位等价

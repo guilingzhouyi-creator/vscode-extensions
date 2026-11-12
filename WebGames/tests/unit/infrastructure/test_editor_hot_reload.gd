@@ -52,9 +52,11 @@ static func test_change_detection_via_hash() -> Dictionary:
 	var no_change := EditorHotReloadManager.detect_changes()
 	var init_clean := no_change.is_empty()
 
-	# 模拟注入变更哈希
-	var changed_map := { table_a: "new_hash_modified_content_12345" }
-	var passed := init_clean and not changed_map.is_empty()
+	# 篡改基线记录以触发真实哈希漂移检测
+	EditorHotReloadManager._last_hashes[table_a] = "outdated_synthetic_baseline_hash"
+	var detected := EditorHotReloadManager.detect_changes()
+	var change_detected := detected.has(table_a) and String(detected.get(table_a, "")) != "outdated_synthetic_baseline_hash"
+	var passed := init_clean and change_detected
 	return {
 		"test": "TC-SV-17: 配置表内容 SHA-256 哈希变更精准检测断言",
 		"passed": passed,
@@ -151,8 +153,12 @@ static func test_hot_reload_failure_rollback() -> Dictionary:
 	EditorHotReloadManager.register_table_baseline("domains.quest")
 	var old_hash: String = EditorHotReloadManager._last_hashes.get("domains.quest", "")
 
-	# 验证 baseline 状态保持
-	var passed := not old_hash.is_empty()
+	# 将该域改为禁止热更并注入新哈希，验证失败路径下原基线哈希完整保留（未半更新）
+	EditorHotReloadManager.set_domain_scope("quest_causality", false, false, "domains.quest")
+	var apply_res := EditorHotReloadManager.apply_hot_reload({ "domains.quest": "rejected_new_hash" })
+	var quest_status: String = String(apply_res.get("results", {}).get("quest_causality", {}).get("status", ""))
+	var post_hash: String = EditorHotReloadManager._last_hashes.get("domains.quest", "")
+	var passed := not old_hash.is_empty() and quest_status == "skipped" and post_hash == old_hash
 	return {
 		"test": "TC-SV-21: 热更新异常状态保持与基线安全回滚断言",
 		"passed": passed
@@ -251,8 +257,12 @@ static func test_four_layer_isolation_comprehensive() -> Dictionary:
 	var ds_ok: bool = (RuntimeModeGate.get_active_data_source() == SaveManager)
 	# 3. 生命周期隔离
 	var lc_ok: bool = RuntimeModeGate.is_hot_reload_enabled()
-	# 4. 服务入口隔离
-	var gate_ok: bool = true
+	# 4. 服务入口隔离：联机模式下本地写盘与热更新双双阻断，复原后恢复单机
+	RuntimeModeGate.set_mode(RuntimeModeGate.Mode.ONLINE)
+	var online_blocked := (not RuntimeModeGate.is_single_player()) \
+		and (not bool(EditorHotReloadManager.apply_hot_reload({"domains.game_settings": "x"}).get("success", true)))
+	RuntimeModeGate.reset_for_tests()
+	var gate_ok: bool = online_blocked and RuntimeModeGate.is_single_player()
 
 	var passed: bool = is_sp and ds_ok and lc_ok and gate_ok
 	return {

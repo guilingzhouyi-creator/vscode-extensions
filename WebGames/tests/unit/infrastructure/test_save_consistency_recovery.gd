@@ -112,14 +112,33 @@ static func test_save_domain_acyclic_dependencies() -> Dictionary:
 		var d_id := String(entry.get("id", ""))
 		deps[d_id] = entry.get("depends_on", [])
 
-	# 校验 inventory 与 item 之间无循环依赖（单向引用）
-	var inv_deps: Array = deps.get("inventory", [])
-	var item_has_inv := false
-	var passed := not inv_deps.has("character_creation") and not item_has_inv
+	# 全图三色 DFS 环路检测（0=未访, 1=访问中/栈内, 2=已完成），任何 depends_on 环路即判定失败
+	var color: Dictionary = {}
+	var has_cycle := _detect_dependency_cycle(deps, color)
 	return {
 		"test": "TC-SV-15: 存档数据域依赖拓扑单向无环约束断言",
-		"passed": passed
+		"passed": not deps.is_empty() and not has_cycle
 	}
+
+static func _detect_dependency_cycle(deps: Dictionary, color: Dictionary) -> bool:
+	for node_id in deps.keys():
+		if int(color.get(node_id, 0)) == 0:
+			if _dfs_has_cycle(String(node_id), deps, color):
+				return true
+	return false
+
+static func _dfs_has_cycle(node_id: String, deps: Dictionary, color: Dictionary) -> bool:
+	color[node_id] = 1
+	var neighbors: Array = deps.get(node_id, []) if deps.get(node_id, []) is Array else []
+	for nxt in neighbors:
+		var nxt_id := String(nxt)
+		var state := int(color.get(nxt_id, 0))
+		if state == 1:
+			return true
+		if state == 0 and deps.has(nxt_id) and _dfs_has_cycle(nxt_id, deps, color):
+			return true
+	color[node_id] = 2
+	return false
 
 ## TC-SV-16: 高频域增量保存（Inv-SV-10）
 static func test_high_frequency_domain_dirty_save() -> Dictionary:

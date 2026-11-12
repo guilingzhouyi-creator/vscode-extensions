@@ -103,17 +103,25 @@ static func test_entitlements_round_trip() -> Dictionary:
 	return {"test": "TC-ACC-07: entitlements 非空序列化往返（类型化数组兼容）", "passed": passed}
 
 static func test_entitlements_seal_tamper() -> Dictionary:
-	# 密封密钥经环境供给——测试显式注入受控测试密钥（缺钥即失败关闭）
+	# 密封密钥经环境供给——测试显式注入受控测试密钥（缺钥或删封条均失败关闭）
+	var prev_key := OS.get_environment("KALAR_ENTITLEMENT_KEY")
 	OS.set_environment("KALAR_ENTITLEMENT_KEY", "test-seal-key-v1")
 	var acc := AccountProfileAggregate.new()
 	acc.account_id = "ACC_SEAL"
 	acc.entitlements.append("TIER_PREMIUM")
 	var saved := acc.serialize()
-	# 篡改存档：追加未授权资格 → 密封重算不符 → 权限回退空（fail-safe）
-	saved["entitlements"] = ["TIER_PREMIUM", "EVIL_GRANT"]
-	var restored := AccountProfileAggregate.deserialize(saved)
-	var passed: bool = restored != null and restored.entitlements.is_empty()
-	return {"test": "TC-ACC-08: entitlements 存档密封防篡改（改档即回退空）", "passed": passed}
+	# 篡改存档：追加未授权资格 -> 密封重算不符 -> 权限回退空（fail-safe）
+	var tampered := saved.duplicate(true)
+	tampered["entitlements"] = ["TIER_PREMIUM", "EVIL_GRANT"]
+	var restored := AccountProfileAggregate.deserialize(tampered)
+	# 删封条绕过：entitlements_seal 为空时同样必须 Fail-Closed 清空权限
+	var stripped := saved.duplicate(true)
+	stripped["entitlements_seal"] = ""
+	var restored_stripped := AccountProfileAggregate.deserialize(stripped)
+	OS.set_environment("KALAR_ENTITLEMENT_KEY", prev_key)
+	var passed: bool = restored != null and restored.entitlements.is_empty() \
+		and restored_stripped != null and restored_stripped.entitlements.is_empty()
+	return {"test": "TC-ACC-08: entitlements 存档密封防篡改与空封条阻断（改档/删封条即回退空）", "passed": passed}
 
 static func test_character_creation_in_slot() -> Dictionary:
 	var repo := AccountRepository.get_instance()

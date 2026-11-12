@@ -133,10 +133,11 @@ static func test_post_migration_validation_failure() -> Dictionary:
 
 	var old_data := { "inventory": {} }
 	var result := SaveMigrationEngine.migrate(old_data, "0.7.0")
-	# 即使经过 sanitize 清洗或报错，应保持安全处置
+	# 经过 sanitize 清洗或阻断，绝不允许原始整型 123456 透传保留至输出载荷
 	var success: bool = bool(result.get("success", false))
-
-	var passed := (result.has("data") or not success)
+	var out_data: Dictionary = result.get("data", {}) if result.get("data", {}) is Dictionary else {}
+	var inv_val: Variant = out_data.get("inventory", null)
+	var passed := (inv_val is Dictionary) or (not success)
 	return {
 		"test": "TC-SV-09: 迁移后数据校验清洗与格式守卫断言",
 		"passed": passed

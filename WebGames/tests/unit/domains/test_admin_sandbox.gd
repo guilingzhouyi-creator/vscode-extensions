@@ -43,8 +43,17 @@ static func test_god_mode_execution() -> Dictionary:
 	return { "test": "TC-ADMIN-02: 上帝模式作弊指令注入与全属性拉满", "passed": passed }
 
 static func test_audit_logging() -> Dictionary:
+	var prev_key := OS.get_environment("KALAR_ENTITLEMENT_KEY")
+	OS.set_environment("KALAR_ENTITLEMENT_KEY", "test-admin-audit-seal-key-v1")
 	var entry = GMArbitrationAuditService.record_audit("GM_TEST_01", "GIVE_GOLD", { "amount": 10000 })
-	var passed = (entry.admin_id == "GM_TEST_01") and (entry.signature != "")
+	var signed_ok: bool = (entry.admin_id == "GM_TEST_01") and (str(entry.signature) != "")
+
+	OS.set_environment("KALAR_ENTITLEMENT_KEY", "")
+	var entry_fail_closed = GMArbitrationAuditService.record_audit("GM_TEST_01", "GIVE_GOLD_NO_KEY", { "amount": 1 })
+	var fail_closed_ok: bool = str(entry_fail_closed.signature) == ""
+
+	OS.set_environment("KALAR_ENTITLEMENT_KEY", prev_key)
+	var passed: bool = signed_ok and fail_closed_ok
 	return { "test": "TC-ADMIN-03: GM 仲裁日志审计与防篡改签名", "passed": passed }
 
 ## 审计日志有界化——record_audit 后按

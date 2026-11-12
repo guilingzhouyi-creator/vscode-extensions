@@ -122,8 +122,10 @@ static func test_auxiliary_worker_pool_task_closure_cleanup() -> Dictionary:
 	var pool: Variant = AuxiliaryWorkerPool.get_instance()
 
 	var callback_executed_box: Array[bool] = [false]
-	var task_id: int = int(pool.request_resource_async("res://config/game_config.json", 1, null, func(ok: bool, _data, _err):
+	var callback_ok_box: Array[bool] = [false]
+	var task_id: int = int(pool.request_resource_async("res://config/items/core.json", 1, null, func(ok: bool, data, _err):
 		callback_executed_box[0] = true
+		callback_ok_box[0] = ok and data != null
 	))
 
 	# 提取已完成任务并检查其闭包引用已被释放
@@ -136,7 +138,7 @@ static func test_auxiliary_worker_pool_task_closure_cleanup() -> Dictionary:
 			break
 
 	AuxiliaryWorkerPool.reset_for_tests()
-	var passed: bool = callback_executed_box[0] and completed_task_found and callback_freed
+	var passed: bool = callback_executed_box[0] and callback_ok_box[0] and completed_task_found and callback_freed
 	return {
 		"test": "TC-MEM-04: AuxiliaryWorkerPool 任务完成即时解绑闭包验证",
 		"passed": passed,

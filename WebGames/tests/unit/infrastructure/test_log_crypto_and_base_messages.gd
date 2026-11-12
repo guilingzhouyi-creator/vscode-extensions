@@ -9,6 +9,7 @@ const LogConstants = preload("res://backend/infrastructure/logging/log_constants
 const SystemBaseMessages = preload("res://backend/infrastructure/logging/system_base_messages.gd")
 const CryptoIntegrityLib = preload("res://backend/infrastructure/pure/crypto_integrity_lib.gd")
 const StatisticsMathLib = preload("res://backend/infrastructure/pure/statistics_math_lib.gd")
+const LogAdversarialSecurityCases = preload("res://tests/unit/infrastructure/log_adversarial_security_cases.gd")
 
 static func run_all_tests() -> Dictionary:
 	var results: Array = []
@@ -16,6 +17,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_encrypted_log_export_query_and_chain_verify())
 	results.append(test_redaction_inline_scrub_and_salted_hash())
 	results.append(test_base_messages_and_statistics_lib_separation())
+	results.append_array(LogAdversarialSecurityCases.run_all_cases())
 
 	var all_passed: bool = true
 	for r in results:
