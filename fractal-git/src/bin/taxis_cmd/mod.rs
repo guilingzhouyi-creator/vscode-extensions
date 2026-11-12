@@ -90,6 +90,7 @@ pub mod revert;
 pub mod scope_flag;
 pub mod stage;
 pub mod stash;
+pub mod stash_stack;
 pub mod stash_merge;
 pub mod status;
 pub mod status_collect;
