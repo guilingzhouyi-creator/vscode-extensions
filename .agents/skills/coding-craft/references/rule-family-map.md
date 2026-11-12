@@ -139,7 +139,7 @@
 准则：同类字面量必须提取、跨文件同义常量零漂移、常量声明区固定、禁厨房水槽式常量仓。
 
 - warning / info：`CONST-CLU-001`、`CONST-DRF-001`、`CONST-LAY-001`、`CONST-LAY-002`、`CONST-LIB-001`、`CONST-OWN-001`、
-  `CONST-SCP-001`、`CONST-SCP-002`、`duplicate-literal`、`nested-constant`
+  `CONST-SCP-001`、`CONST-SCP-002`、`duplicate-literal`、`hardcoded-string`、`magic-number`、`nested-constant`
 
 ### `VOL` — 双轨体积预算
 

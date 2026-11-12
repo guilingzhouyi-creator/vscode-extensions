@@ -42,7 +42,7 @@ flowchart LR
 ```
 
 1. **Tier 1 (Tool Primitive Mapping)**: Maps native linter identifiers (`no-eval`, `radix`, `no-var`) to canonical 3-3-3 rules.
-2. **Tier 2 (Legacy Evolution Alignment)**: Maps <!-- METRICS:BEGIN rule-auto-refactor-legacy -->**15 条**<!-- METRICS:END rule-auto-refactor-legacy --> historical rule aliases (`import-cycle`, `clean-layer-violation`, etc.) to planned 3-3-3 canonical counterparts (`ALIAS_MIGRATION_WINDOW`).
+2. **Tier 2 (Legacy Evolution Alignment)**: Maps <!-- METRICS:BEGIN rule-auto-refactor-legacy -->**17 条**<!-- METRICS:END rule-auto-refactor-legacy --> historical rule aliases (`import-cycle`, `clean-layer-violation`, etc.) to planned 3-3-3 canonical counterparts (`ALIAS_MIGRATION_WINDOW`).
 3. **Tier 3 (Presentation Clustering)**: Deduplicates overlapping diagnostics across <!-- METRICS:BEGIN overlap-cluster-count -->**11 个**<!-- METRICS:END overlap-cluster-count --> semantic clusters (covering <!-- METRICS:BEGIN overlap-member-count -->**23 条**<!-- METRICS:END overlap-member-count --> member rules) in the presentation adapter without altering raw AST emissions.
 
 ---
@@ -51,11 +51,11 @@ flowchart LR
 
 ### 4.1 Single-Source Rule Distribution Matrix
 
-`scripts/common/rule-catalog.json` governs <!-- METRICS:BEGIN rule-total -->**534 条规则**<!-- METRICS:END rule-total --> across five controlled scopes:
+`scripts/common/rule-catalog.json` governs <!-- METRICS:BEGIN rule-total -->**536 条规则**<!-- METRICS:END rule-total --> across five controlled scopes:
 
 | Scope | Source Location | Rule Count | Primary Governance Responsibility |
 | :--- | :--- | :--- | :--- |
-| **`auto-refactor`** | `auto-refactor/src/core/rules/registry.ts` | <!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor --> | 32-expert Sparse MoE static analysis, AST slice guards, 10D scoring, 5-language modernization |
+| **`auto-refactor`** | `auto-refactor/src/core/rules/registry.ts` | <!-- METRICS:BEGIN rule-auto-refactor -->**377 条规则**<!-- METRICS:END rule-auto-refactor --> | 32-expert Sparse MoE static analysis, AST slice guards, 10D scoring, 5-language modernization |
 | **`workspace-timing`** | `workspace-timing/scripts/src/review/` | <!-- METRICS:BEGIN rule-workspace-timing -->**49 条规则**<!-- METRICS:END rule-workspace-timing --> | VS Code extension 5-layer decoupling, RingBuffer+Journal crash recovery, bilingual UI & a11y |
 | **`WebGames`** | `scripts/common/rule-sources/webgames-rules.json` | <!-- METRICS:BEGIN rule-webgames -->**50 条规则**<!-- METRICS:END rule-webgames --> | Kalar `GameConfig` SSOT, unidirectional `apply_snapshot` views, object-pool zero loop allocation |
 | **`fractal-git`** | `fractal-git/crates/fg-gate/` | <!-- METRICS:BEGIN rule-fractal-git -->**37 条规则**<!-- METRICS:END rule-fractal-git --> | 10-crate kernel boundaries, lock-free CAS, zero panic, `// SAFETY:` invariants & poset integrity |

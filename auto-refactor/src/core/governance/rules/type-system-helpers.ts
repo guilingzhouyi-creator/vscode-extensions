@@ -29,30 +29,49 @@ const MSG_EXPLICIT_TYPING =
     'Variable uses implicit loose assignment (`var =`). Use explicit declaration or static inference (`:=`).';
 const SUGG_EXPLICIT_TYPING = 'Change to `var name := ...` or provide an explicit type annotation.';
 
-/** Opening parenthesis character set for function signature scanning. */
-const OPEN_PAREN_CHARS: ReadonlySet<string> = new Set(['(']);
+const EXPORT_KEYWORD = 'export';
+const EXPORT_KEYWORD_LEN = EXPORT_KEYWORD.length;
+const KEYWORD_FUNCTION = 'function';
+const KEYWORD_CONST = 'const';
+const KEYWORD_ANY = 'any';
 
-/** Export keywords targeted by exported declaration return-type enforcement. */
-const EXPORT_KEYWORDS: ReadonlySet<string> = new Set(['export']);
+const CHAR_CODE_UPPER_A = 65;
+const CHAR_CODE_UPPER_Z = 90;
+const CHAR_CODE_LOWER_A = 97;
+const CHAR_CODE_LOWER_Z = 122;
+const CHAR_CODE_DIGIT_ZERO = 48;
+const CHAR_CODE_DIGIT_NINE = 57;
+const CHAR_CODE_UNDERSCORE = 95;
+const CHAR_CODE_DOLLAR = 36;
 
-/**
- * Evaluates whether a string contains an opening parenthesis character using Set lookup.
- */
-function containsOpenParen(part: string): boolean {
-    for (let k = 0; k < part.length; k++) {
-        if (OPEN_PAREN_CHARS.has(part[k])) return true;
-    }
-    return false;
+function isIdentCharCode(code: number): boolean {
+    return (
+        (code >= CHAR_CODE_UPPER_A && code <= CHAR_CODE_UPPER_Z) ||
+        (code >= CHAR_CODE_LOWER_A && code <= CHAR_CODE_LOWER_Z) ||
+        (code >= CHAR_CODE_DIGIT_ZERO && code <= CHAR_CODE_DIGIT_NINE) ||
+        code === CHAR_CODE_UNDERSCORE ||
+        code === CHAR_CODE_DOLLAR
+    );
 }
 
 /**
- * Evaluates whether a line contains an export keyword token using Set lookup.
+ * Evaluates whether a string contains an opening parenthesis character.
+ */
+function containsOpenParen(part: string): boolean {
+    return part.includes('(');
+}
+
+/**
+ * Evaluates whether a line contains an export keyword token without array allocations.
  */
 function lineHasExportKeyword(line: string): boolean {
-    if (!line.includes('export')) return false;
-    const tokens = line.split(/[^a-zA-Z0-9_$]+/);
-    for (let i = 0; i < tokens.length; i++) {
-        if (EXPORT_KEYWORDS.has(tokens[i])) return true;
+    let pos = line.indexOf(EXPORT_KEYWORD);
+    while (pos !== -1) {
+        const prevOk = pos === 0 || !isIdentCharCode(line.charCodeAt(pos - 1));
+        const end = pos + EXPORT_KEYWORD_LEN;
+        const nextOk = end >= line.length || !isIdentCharCode(line.charCodeAt(end));
+        if (prevOk && nextOk) return true;
+        pos = line.indexOf(EXPORT_KEYWORD, end);
     }
     return false;
 }
@@ -212,7 +231,7 @@ export function checkGdFunctionSignature(
 export function checkUnsafeAny(masked: string[], violations: GovernanceViolation[]): void {
     for (let i = 0; i < masked.length; i++) {
         const line = masked[i];
-        if (!REGEX.SYNTAX.TS_ANY_KEYWORD.test(line)) continue;
+        if (!line.includes(KEYWORD_ANY) || !REGEX.SYNTAX.TS_ANY_KEYWORD.test(line)) continue;
         const trimmed = line.trim();
         if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
         if (REGEX.SYNTAX.TS_ANY_TYPE.test(line) && !REGEX.COMMENT.ESLINT_DISABLE.test(line)) {
@@ -260,73 +279,109 @@ function extractDeclarationSignature(
     return sig;
 }
 
-/**
- * Emits a GOV-TYP-006 violation for an unannotated exported function or arrow.
- *
- * @param violations - Accumulator.
- * @param symbol - Function or variable identifier.
- * @param line - 1-based line number.
- * @param column - 1-based column number.
- * @param isArrow - True if declaration is an arrow function.
- */
+interface MissingReturnLocation {
+    readonly symbol: string;
+    readonly line: number;
+    readonly column: number;
+    readonly isArrow: boolean;
+}
+
 function reportMissingReturnType(
     violations: GovernanceViolation[],
-    symbol: string,
-    line: number,
-    column: number,
-    isArrow: boolean,
+    loc: MissingReturnLocation,
 ): void {
-    const kind = isArrow ? 'arrow function' : 'function';
-    const message = `Exported ${kind} \`${symbol}\` lacks explicit return type annotation.`;
-    const suggestion = isArrow
-        ? `Add an explicit return type: \`export const ${symbol} = (...): ReturnType => ...\`.`
-        : `Add an explicit return type: \`export function ${symbol}(...): ReturnType\`.`;
+    const kind = loc.isArrow ? 'arrow function' : 'function';
+    const message = `Exported ${kind} \`${loc.symbol}\` lacks explicit return type annotation.`;
+    const suggestion = loc.isArrow
+        ? `Add an explicit return type: \`export const ${loc.symbol} = (...): ReturnType => ...\`.`
+        : `Add an explicit return type: \`export function ${loc.symbol}(...): ReturnType\`.`;
 
     violations.push({
         ruleId: RULE_ID_GOV_TYP_006,
         message,
-        line,
-        column,
+        line: loc.line,
+        column: loc.column,
         suggestion,
         fixable: false,
     });
 }
 
+interface ExportDeclSpec {
+    readonly declRe: RegExp;
+    readonly terminatorRe: RegExp;
+    readonly returnTypeSuffixRe: RegExp;
+    readonly isArrow: boolean;
+}
+
+const EXPORT_FN_SPEC: ExportDeclSpec = {
+    declRe: REGEX.SYNTAX.TS_EXPORT_FN,
+    terminatorRe: REGEX.SYNTAX.BLOCK_OR_SEMI,
+    returnTypeSuffixRe: REGEX.SYNTAX.TS_FN_RETURN_TYPE_SUFFIX,
+    isArrow: false,
+};
+
+const EXPORT_ARROW_SPEC: ExportDeclSpec = {
+    declRe: REGEX.SYNTAX.TS_EXPORT_CONST_ARROW,
+    terminatorRe: REGEX.SYNTAX.ARROW_BODY,
+    returnTypeSuffixRe: REGEX.SYNTAX.TS_ARROW_RETURN_TYPE_SUFFIX,
+    isArrow: true,
+};
+
 /**
  * Inspects an exported declaration (function or arrow const) for missing return type.
- *
- * @param line - Line text.
- * @param idx - Current line index.
- * @param masked - Masked lines.
- * @param violations - Accumulator.
- * @param declRe - Matcher for the declaration header.
- * @param terminatorRe - Delimiter matcher for signature end.
- * @param returnTypeSuffixRe - Pattern asserting presence of return type.
- * @param isArrow - True if evaluating an arrow function.
  */
 function inspectExportedDeclaration(
-    line: string,
-    idx: number,
     masked: string[],
+    idx: number,
     violations: GovernanceViolation[],
-    declRe: RegExp,
-    terminatorRe: RegExp,
-    returnTypeSuffixRe: RegExp,
-    isArrow: boolean,
+    spec: ExportDeclSpec,
 ): void {
-    const match = declRe.exec(line);
+    const match = spec.declRe.exec(masked[idx]);
     if (!match) return;
 
     const symbol = match[1];
-    const sig = extractDeclarationSignature(masked, idx, terminatorRe);
+    const sig = extractDeclarationSignature(masked, idx, spec.terminatorRe);
 
-    if (!returnTypeSuffixRe.test(sig)) {
-        reportMissingReturnType(violations, symbol, idx + 1, match.index + 1, isArrow);
+    if (!spec.returnTypeSuffixRe.test(sig)) {
+        reportMissingReturnType(violations, {
+            symbol,
+            line: idx + 1,
+            column: match.index + 1,
+            isArrow: spec.isArrow,
+        });
     }
 }
 
 const EXPORT_FN_KEYWORD_RE = /\bfunction\b/;
 const EXPORT_CONST_KEYWORD_RE = /\bconst\b/;
+
+function inspectExportedLine(
+    masked: string[],
+    idx: number,
+    violations: GovernanceViolation[],
+): void {
+    const line = masked[idx];
+    if (!line.includes(EXPORT_KEYWORD)) return;
+    const hasFnToken = line.includes(KEYWORD_FUNCTION);
+    const hasConstToken = line.includes(KEYWORD_CONST);
+    if (!hasFnToken && !hasConstToken) return;
+    if (!lineHasExportKeyword(line)) return;
+
+    const hasFn = hasFnToken && EXPORT_FN_KEYWORD_RE.test(line);
+    const hasConst = hasConstToken && EXPORT_CONST_KEYWORD_RE.test(line);
+    if (!hasFn && !hasConst) return;
+
+    const trimmed = line.trim();
+    if (trimmed.startsWith('//') || trimmed.startsWith('*')) return;
+    if (REGEX.COMMENT.ESLINT_DISABLE.test(line)) return;
+
+    if (hasFn) {
+        inspectExportedDeclaration(masked, idx, violations, EXPORT_FN_SPEC);
+    }
+    if (hasConst) {
+        inspectExportedDeclaration(masked, idx, violations, EXPORT_ARROW_SPEC);
+    }
+}
 
 /**
  * Checks TypeScript source lines for exported functions lacking explicit return types.
@@ -349,38 +404,6 @@ export function checkExportedFunctionReturnTypes(
     }
 
     for (let i = 0; i < masked.length; i++) {
-        const line = masked[i];
-        if (!lineHasExportKeyword(line)) continue;
-        const hasFn = EXPORT_FN_KEYWORD_RE.test(line);
-        const hasConst = EXPORT_CONST_KEYWORD_RE.test(line);
-        if (!hasFn && !hasConst) continue;
-        const trimmed = line.trim();
-        if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
-        if (REGEX.COMMENT.ESLINT_DISABLE.test(line)) continue;
-
-        if (hasFn) {
-            inspectExportedDeclaration(
-                line,
-                i,
-                masked,
-                violations,
-                REGEX.SYNTAX.TS_EXPORT_FN,
-                REGEX.SYNTAX.BLOCK_OR_SEMI,
-                REGEX.SYNTAX.TS_FN_RETURN_TYPE_SUFFIX,
-                false,
-            );
-        }
-        if (hasConst) {
-            inspectExportedDeclaration(
-                line,
-                i,
-                masked,
-                violations,
-                REGEX.SYNTAX.TS_EXPORT_CONST_ARROW,
-                REGEX.SYNTAX.ARROW_BODY,
-                REGEX.SYNTAX.TS_ARROW_RETURN_TYPE_SUFFIX,
-                true,
-            );
-        }
+        inspectExportedLine(masked, i, violations);
     }
 }

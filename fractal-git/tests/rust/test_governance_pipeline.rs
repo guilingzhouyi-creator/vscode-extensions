@@ -49,7 +49,7 @@ fractal-git
 [Why]
 Record objective physical timestamps for code blocks to eliminate semantic disputes.
 
-[Changed]
+[Added]
 - Added BlockProvenanceEntry structure
 - Implemented DiskProvenanceStore for atomic storage
 
@@ -247,7 +247,7 @@ fractal-git
 [Why]
 Test hook execution with structured verification.
 
-[Changed]
+[Added]
 - Added hook tests
 
 [Verification]

@@ -73,12 +73,28 @@ function getDbgPatterns(identifiers: string[]): CachedDbgPattern[] {
     return patterns;
 }
 
-/**
- * GOV-DBG-001: Diagnostic & Debug Statements in Production Code.
- * Ensures debugging statements do not leak into production paths.
- */
-function matchesDbgPattern(line: string, pat: CachedDbgPattern): boolean {
-    return line.includes(pat.id) && pat.wordRe.test(line) && pat.callRe.test(line);
+const TOKEN_CONSOLE_DOT = 'console.';
+
+function selectPresentDbgPatterns(identifiers: string[], content: string): CachedDbgPattern[] {
+    const candidates = getDbgPatterns(identifiers);
+    const active: CachedDbgPattern[] = [];
+    let checkedConsolePrefix = false;
+    let hasConsolePrefix = false;
+
+    for (let i = 0; i < candidates.length; i++) {
+        const pat = candidates[i];
+        if (pat.id.startsWith(TOKEN_CONSOLE_DOT)) {
+            if (!checkedConsolePrefix) {
+                checkedConsolePrefix = true;
+                hasConsolePrefix = content.includes(TOKEN_CONSOLE_DOT);
+            }
+            if (!hasConsolePrefix) continue;
+        }
+        if (content.includes(pat.id)) {
+            active.push(pat);
+        }
+    }
+    return active;
 }
 
 /**
@@ -111,17 +127,15 @@ function checkDebugLine(
 
     for (let pIdx = 0; pIdx < patterns.length; pIdx++) {
         const pat = patterns[pIdx];
-        if (!matchesDbgPattern(line, pat)) continue;
+        if (!line.includes(pat.id)) continue;
+        const matchResult = pat.wordRe.exec(line);
+        if (!matchResult || !pat.callRe.test(line)) continue;
 
-        const matchResult = line.match(pat.wordRe);
         violations.push({
             ruleId: 'GOV-DBG-001',
             message: `Diagnostic call \`${pat.id}\` found in production file.`,
             line: lineIndex + 1,
-            column:
-                matchResult && matchResult.index != null
-                    ? matchResult.index + 1
-                    : line.search(pat.wordRe) + 1,
+            column: matchResult.index + 1,
             suggestion: 'Remove debug statement or route through a configurable Logger interface.',
             fixable: false,
         });
@@ -155,16 +169,13 @@ export const DiagnosticLeakRule: GovernanceRule = {
             return null;
         }
 
-        const violations: GovernanceViolation[] = [];
-        const lines = ctx.masked;
-        const patterns = getDbgPatterns(ctx.capabilities.debugIdentifiers).filter((pattern) =>
-            ctx.content.includes(pattern.id),
-        );
-
+        const patterns = selectPresentDbgPatterns(ctx.capabilities.debugIdentifiers, ctx.content);
         if (patterns.length === 0) {
             return null;
         }
 
+        const violations: GovernanceViolation[] = [];
+        const lines = ctx.masked;
         for (let i = 0; i < lines.length; i++) {
             checkDebugLine(lines[i], i, patterns, violations);
         }

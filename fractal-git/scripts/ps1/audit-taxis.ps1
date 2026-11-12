@@ -195,6 +195,9 @@ Write-StepBanner -StepId "CRATE-REGRESSION-02"
 if (-not $cargoCmd) {
     Write-StepVerdict -StepId "CRATE-REGRESSION-02" -Status "BLOCK" -Detail "cargo 工具链缺失，回归套件无法执行"
     $failures.Add("CRATE-REGRESSION-02")
+} elseif (-not $nodeCmd) {
+    Write-StepVerdict -StepId "CRATE-REGRESSION-02" -Status "BLOCK" -Detail "node 运行时缺失，TS 回归套件无法执行"
+    $failures.Add("CRATE-REGRESSION-02")
 } else {
     $testArgs = if ($Fast) {
         @("test", "--workspace", "--manifest-path", $ManifestPath, "--", "--test-threads=4")
@@ -202,23 +205,75 @@ if (-not $cargoCmd) {
         @("test", "--workspace", "--manifest-path", $ManifestPath)
     }
     $procTest = Invoke-AuditChild -FilePath $cargoCmd -ArgumentList $testArgs -Label "cargo-test"
-    if ($procTest.ExitCode -ne 0) {
-        Write-StepVerdict -StepId "CRATE-REGRESSION-02" -Status "BLOCK" -Detail "cargo 回归套件报告失败"
+    $tsPassed = 0
+    $tsFailed = $false
+    if ($procTest.ExitCode -eq 0) {
+        $syncEvidenceScript = Join-Path $ProjectRoot "scripts/common/sync-quality-evidence.js"
+        $tscPath = Join-Path $RepoRoot "auto-refactor/node_modules/typescript/bin/tsc"
+        if (-not (Test-Path -LiteralPath $tscPath)) {
+            $tscPath = Join-Path $ProjectRoot "node_modules/typescript/bin/tsc"
+        }
+        $ajv2020Entry = Join-Path $ProjectRoot "node_modules/ajv/dist/2020.js"
+        $lockFile = Join-Path $ProjectRoot "package-lock.json"
+        if (-not (Test-Path -LiteralPath $ajv2020Entry) -and (Test-Path -LiteralPath $lockFile)) {
+            $npmCmd = if (Get-Command npm.cmd -ErrorAction SilentlyContinue) { "npm.cmd" } elseif (Get-Command npm -ErrorAction SilentlyContinue) { "npm" } else { $null }
+            if ($npmCmd) {
+                $null = Invoke-AuditChild -FilePath $npmCmd -ArgumentList @("ci", "--offline", "--ignore-scripts") -Label "ts-deps"
+            }
+        }
+        if (-not (Test-Path -LiteralPath $tscPath)) {
+            $tsFailed = $true
+        } else {
+            $procSync = Invoke-AuditChild -FilePath $nodeCmd -ArgumentList @($syncEvidenceScript, "--check") -Label "ts-sync"
+            $procTsc = if ($procSync.ExitCode -eq 0) {
+                Invoke-AuditChild -FilePath $nodeCmd -ArgumentList @($tscPath, "-p", (Join-Path $ProjectRoot "tsconfig.json")) -Label "ts-build"
+            } else {
+                [pscustomobject]@{ ExitCode = 1 }
+            }
+            if ($procTsc.ExitCode -ne 0) {
+                $tsFailed = $true
+            } else {
+                $tsTestDir = Join-Path $ProjectRoot "dist/tests/ts"
+                $tsTestFiles = @(Get-ChildItem -LiteralPath $tsTestDir -Filter "*.test.js" -File -ErrorAction SilentlyContinue | Sort-Object Name | ForEach-Object { $_.FullName })
+                if ($tsTestFiles.Count -eq 0) {
+                    $tsFailed = $true
+                } else {
+                    $procTsTest = Invoke-AuditChild -FilePath $nodeCmd -ArgumentList (@("--test") + $tsTestFiles) -Label "ts-test"
+                    if ($procTsTest.ExitCode -ne 0) {
+                        $tsFailed = $true
+                    } else {
+                        $tsOutput = Read-AuditChildOutput -Label "ts-test"
+                        $tsPassMatch = [regex]::Matches($tsOutput, '(?m)^.*\bpass\s+(\d+)\s*$')
+                        if ($tsPassMatch.Count -gt 0) {
+                            $tsPassed = [int]$tsPassMatch[$tsPassMatch.Count - 1].Groups[1].Value
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if ($procTest.ExitCode -ne 0 -or $tsFailed) {
+        $reason = if ($procTest.ExitCode -ne 0) { "cargo 回归套件报告失败" } else { "TypeScript 编译、契约校验或 tests/ts 回归套件报告失败" }
+        Write-StepVerdict -StepId "CRATE-REGRESSION-02" -Status "BLOCK" -Detail $reason
         $failures.Add("CRATE-REGRESSION-02")
     } else {
         $testOutput = Read-AuditChildOutput -Label "cargo-test"
         foreach ($m in [regex]::Matches($testOutput, 'test result: (?:ok|FAILED)\.\s+(\d+)\s+passed')) {
             $passedTotal += [int]$m.Groups[1].Value
         }
-        if ($passedTotal -gt 0) {
+        $passedTotal += $tsPassed
+        if ($passedTotal -gt 0 -and $tsPassed -gt 0) {
             $statusRegression = "PASS"
-            Write-StepVerdict -StepId "CRATE-REGRESSION-02" -Status "PASS" -Detail "$passedTotal 项测试通过"
+            Write-StepVerdict -StepId "CRATE-REGRESSION-02" -Status "PASS" -Detail "$passedTotal 项测试通过 (含 TS $tsPassed 项)"
+        } elseif ($passedTotal -gt 0) {
+            $statusRegression = "WARN"
+            Write-StepVerdict -StepId "CRATE-REGRESSION-02" -Status "WARN" -Detail "Rust $passedTotal 项通过，但 node --test 未报告通过计数"
         } else {
             # A green exit code carrying no reported count means the harness executed nothing, or
             # the output shape changed underneath this parser. Both conditions must surface: calling
             # this PASS made an empty suite indistinguishable from one that actually asserted.
             $statusRegression = "WARN"
-            Write-StepVerdict -StepId "CRATE-REGRESSION-02" -Status "WARN" -Detail "cargo 未报告任何测试计数，回归覆盖不可证实"
+            Write-StepVerdict -StepId "CRATE-REGRESSION-02" -Status "WARN" -Detail "未报告任何测试计数，回归覆盖不可证实"
         }
     }
 }
@@ -317,44 +372,55 @@ if ($statusQuality -ne "PASS" -or -not $cargoCmd) {
         Remove-Item -LiteralPath $promoLedgerRoot -Recurse -Force -ErrorAction SilentlyContinue
     }
     New-Item -ItemType Directory -Path $promoLedgerRoot -Force | Out-Null
-    # A promotion is staged into the repository container, so the ledger refuses to run in a
-    # directory that has none. Creating the container through `taxis init` keeps this probe on
-    # the same path an operator takes; hand-writing the file would test a state no command makes.
-    $promoInitArgs = @("run", "--manifest-path", $ManifestPath, "--bin", "taxis", "--", "init", "--dev", "--workspace", $promoLedgerRoot)
-    $procPromoInit = Invoke-AuditChild -FilePath $cargoCmd -ArgumentList $promoInitArgs -Label "promotion-init"
-    if ($procPromoInit.ExitCode -ne 0) {
-        Write-StepVerdict -StepId "PROMOTION-BRIDGE-05" -Status "BLOCK" -Detail "晋级演练仓库初始化失败，无法验证暂存链路"
-        $failures.Add("PROMOTION-BRIDGE-05")
-    } else {
-        $candidateOid = (git -C $ProjectRoot rev-parse HEAD 2>$null | Out-String).Trim()
-        if ($candidateOid -notmatch '^[0-9a-f]{40}$') {
-            $candidateOid = "0000000000000000000000000000000000000000"
+    try {
+        # A promotion is staged into the repository container, so the ledger refuses to run in a
+        # directory that has none. Creating the container through `taxis init` keeps this probe on
+        # the same path an operator takes; hand-writing the file would test a state no command makes.
+        $promoInitArgs = @("run", "--manifest-path", $ManifestPath, "--bin", "taxis", "--", "init", "--dev", "--workspace", $promoLedgerRoot)
+        $procPromoInit = Invoke-AuditChild -FilePath $cargoCmd -ArgumentList $promoInitArgs -Label "promotion-init"
+        if ($procPromoInit.ExitCode -ne 0) {
+            Write-StepVerdict -StepId "PROMOTION-BRIDGE-05" -Status "BLOCK" -Detail "晋级演练仓库初始化失败，无法验证暂存链路"
+            $failures.Add("PROMOTION-BRIDGE-05")
+        } else {
+            $candidateOid = ""
+            try {
+                $candidateOid = (git -C $ProjectRoot rev-parse HEAD 2>$null | Out-String).Trim()
+            } catch {
+                $candidateOid = ""
+            }
+            if ($candidateOid -notmatch '^[0-9a-f]{40}$') {
+                $candidateOid = "0000000000000000000000000000000000000000"
+            }
+            $promoArgs = @(
+                "run", "--manifest-path", $ManifestPath, "--bin", "taxis", "--", "promotion", "request",
+                "--git-dir", (Join-Path $promoLedgerRoot ".taxis"),
+                "--candidate", $candidateOid,
+                "--agent", "taxis-auditor",
+                "--score", $compositeScore.ToString("F1"),
+                "--cai", $caiScore.ToString("F1"),
+                "--ci-lower", $ciLower.ToString("F1"),
+                "--summary", "In-house self-audit verified: clean topology, zero-alloc boundary, $passedTotal passing tests, and TB-REGRESSION baseline ratchet preserved."
+            )
+            # 落盘断言检查的是容器本身：账本是容器的一个节，不存在独立的账本文件。
+            # 先前这里断言 `fractal/staged_promotions.json`，那个文件在账本二进制化后已不存在，
+            # 于是「命令成功」被固定误判为「未落盘」——断言的名字换了，它看守的对象也必须换。
+            $promoContainerFile = Join-Path (Join-Path $promoLedgerRoot ".taxis") "repo.txc"
+            $procPromo = Invoke-AuditChild -FilePath $cargoCmd -ArgumentList $promoArgs -Label "promotion"
+            if ($procPromo.ExitCode -ne 0) {
+                Write-StepVerdict -StepId "PROMOTION-BRIDGE-05" -Status "BLOCK" -Detail "自举晋级暂存请求失败"
+                $failures.Add("PROMOTION-BRIDGE-05")
+            } elseif (-not (Test-Path -LiteralPath $promoContainerFile)) {
+                Write-StepVerdict -StepId "PROMOTION-BRIDGE-05" -Status "BLOCK" -Detail "晋级暂存请求未落盘，仓库容器缺失"
+                $failures.Add("PROMOTION-BRIDGE-05")
+            } else {
+                $statusPromotion = "PASS"
+                Write-StepVerdict -StepId "PROMOTION-BRIDGE-05" -Status "PASS" -Detail "晋级暂存请求已受理并落盘，候选保留于提权审批暂存账本"
+            }
         }
-        $promoArgs = @(
-        "run", "--manifest-path", $ManifestPath, "--bin", "taxis", "--", "promotion", "request",
-        "--git-dir", (Join-Path $promoLedgerRoot ".taxis"),
-        "--candidate", $candidateOid,
-        "--agent", "taxis-auditor",
-        "--score", $compositeScore.ToString("F1"),
-        "--cai", $caiScore.ToString("F1"),
-        "--ci-lower", $ciLower.ToString("F1"),
-        "--summary", "In-house self-audit verified: clean topology, zero-alloc boundary, $passedTotal passing tests, and TB-REGRESSION baseline ratchet preserved."
-    )
-    # 落盘断言检查的是容器本身：账本是容器的一个节，不存在独立的账本文件。
-    # 先前这里断言 `fractal/staged_promotions.json`，那个文件在账本二进制化后已不存在，
-    # 于是「命令成功」被固定误判为「未落盘」——断言的名字换了，它看守的对象也必须换。
-    $promoContainerFile = Join-Path (Join-Path $promoLedgerRoot ".taxis") "repo.txc"
-    $procPromo = Invoke-AuditChild -FilePath $cargoCmd -ArgumentList $promoArgs -Label "promotion"
-    if ($procPromo.ExitCode -ne 0) {
-        Write-StepVerdict -StepId "PROMOTION-BRIDGE-05" -Status "BLOCK" -Detail "自举晋级暂存请求失败"
-        $failures.Add("PROMOTION-BRIDGE-05")
-    } elseif (-not (Test-Path -LiteralPath $promoContainerFile)) {
-        Write-StepVerdict -StepId "PROMOTION-BRIDGE-05" -Status "BLOCK" -Detail "晋级暂存请求未落盘，仓库容器缺失"
-        $failures.Add("PROMOTION-BRIDGE-05")
-    } else {
-        $statusPromotion = "PASS"
-        Write-StepVerdict -StepId "PROMOTION-BRIDGE-05" -Status "PASS" -Detail "晋级暂存请求已受理并落盘，候选保留于提权审批暂存账本"
-    }
+    } finally {
+        if (-not [string]::IsNullOrWhiteSpace($promoLedgerRoot) -and (Test-Path -LiteralPath $promoLedgerRoot)) {
+            Remove-Item -LiteralPath $promoLedgerRoot -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 

@@ -268,6 +268,20 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#expensive-loop-operation',
     }),
     defineRule({
+        id: 'hardcoded-string',
+        family: RULE_FAMILY_CONSTANTS,
+        analyzer: ANALYZER_CONSTANTS,
+        canonical: false,
+        legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Hardcoded string literal outside constant declarations risks magic-value drift and duplication.',
+        remediation:
+            'Extract domain-meaningful string literals into descriptive module-level constants.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hardcoded-string',
+    }),
+    defineRule({
         id: 'high-algorithmic-complexity',
         family: RULE_FAMILY_PERFORMANCE,
         analyzer: ANALYZER_PERFORMANCE,
@@ -411,6 +425,20 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         remediation:
             'Hoist object instantiation outside the loop or utilize object pool patterns (ADV-POOL-001).',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#loop-transient-allocation',
+    }),
+    defineRule({
+        id: 'magic-number',
+        family: RULE_FAMILY_CONSTANTS,
+        analyzer: ANALYZER_CONSTANTS,
+        canonical: false,
+        legacyReason: LEGACY_REASON_ID_NOT_CANONICAL,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Unexplained numeric literal (magic number) embedded directly in logic instead of a named constant.',
+        remediation:
+            'Extract unnamed numeric literals into semantic module-level constants explaining their physical or policy meaning.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#magic-number',
     }),
     defineRule({
         id: 'nested-constant',

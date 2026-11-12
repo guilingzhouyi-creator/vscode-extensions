@@ -22,13 +22,16 @@ use fractal_git::fractal::refs::validate_ref_name;
 use fractal_git::{DiskRefStore, FractalRef, Oid, RefStore, TopologyVerifier};
 
 use super::commit_walk::parse_commit_record;
-use super::common::{fail_fatal, print_json, reject, CliContext};
+use super::common::{fail_fatal, fail_usage, print_json, reject, CliContext};
 use super::repo_view::RepoView;
 
 /// Options for branch subcommands.
 #[derive(Debug, Default)]
 struct BranchOptions {
     list: bool,
+    all: bool,
+    remotes: bool,
+    verbosity: u8,
     delete: Option<String>,
     force_delete: bool,
     rename: Option<(Option<String>, String)>,
@@ -65,7 +68,12 @@ pub fn handle_branch(ctx: &CliContext) {
         return;
     }
 
-    list_branches(&view, ctx);
+    let listing = super::branch_list::ListingOptions {
+        all: opts.all,
+        remotes: opts.remotes,
+        verbosity: opts.verbosity,
+    };
+    super::branch_list::list_branches_with_options(&view, &listing, ctx);
 }
 
 /// Parses CLI arguments into structured branch command options.
@@ -83,11 +91,11 @@ fn parse_branch_options(args: &[String]) -> BranchOptions {
     }
 
     let mut cursor = 0;
-    let mut positional = Vec::new();
+    let mut positional: Vec<&str> = Vec::new();
 
     while cursor < args.len() {
-        let arg = &args[cursor];
-        match arg.as_str() {
+        let arg = args[cursor].as_str();
+        match arg {
             "-d" if cursor + 1 < args.len() => {
                 opts.delete = Some(args[cursor + 1].clone());
                 cursor += 1;
@@ -97,7 +105,8 @@ fn parse_branch_options(args: &[String]) -> BranchOptions {
                 opts.force_delete = true;
                 cursor += 1;
             }
-            "-m" if cursor + 2 < args.len() => {
+            "-d" | "-D" => fail_usage("branch name required for delete"),
+            "-m" if cursor + 2 < args.len() && !args[cursor + 1].starts_with('-') => {
                 opts.rename = Some((Some(args[cursor + 1].clone()), args[cursor + 2].clone()));
                 cursor += 2;
             }
@@ -105,21 +114,38 @@ fn parse_branch_options(args: &[String]) -> BranchOptions {
                 opts.rename = Some((None, args[cursor + 1].clone()));
                 cursor += 1;
             }
-            "-a" | "--all" | "-l" | "--list" => {
+            "-m" => fail_usage("branch name required for rename"),
+            "-a" | "--all" => {
+                opts.all = true;
                 opts.list = true;
             }
-            other if !other.starts_with('-') => {
-                positional.push(other.to_string());
+            "-r" | "--remotes" => {
+                opts.remotes = true;
+                opts.list = true;
             }
-            _ => {}
+            "-l" | "--list" => {
+                opts.list = true;
+            }
+            "-v" | "--verbose" => {
+                opts.verbosity = opts.verbosity.saturating_add(1).min(2);
+            }
+            "-vv" => {
+                opts.verbosity = 2;
+            }
+            other if !other.starts_with('-') => {
+                positional.push(other);
+            }
+            other => fail_usage(format!("unknown option `{other}` for `branch`")),
         }
         cursor += 1;
     }
 
     if opts.delete.is_none() && opts.rename.is_none() && !positional.is_empty() {
-        let branch_name = positional[0].clone();
-        let start_point = positional.get(1).cloned();
+        let branch_name = positional[0].to_string();
+        let start_point = positional.get(1).map(|val| (*val).to_string());
         opts.create = Some((branch_name, start_point));
+    } else if !opts.list && opts.delete.is_none() && opts.rename.is_none() {
+        opts.list = true;
     }
 
     opts
@@ -400,63 +426,5 @@ fn rename_branch(view: &RepoView, old_name: Option<&str>, new_name: &str, ctx: &
             "old": effective_old,
             "new": new_name,
         }));
-    }
-}
-
-/// Prints local branches, marking HEAD with `*` and linked worktrees with `+`.
-pub fn list_branches(view: &RepoView, ctx: &CliContext) {
-    let current = match view.head_branch() {
-        Ok(state) => state,
-        Err(head_err) => reject(CliTag::ERROR, head_err),
-    };
-    let unborn = current
-        .as_ref()
-        .filter(|(_, target)| target.is_none())
-        .map(|(name, _)| name.clone());
-    let listed = match view.branches() {
-        Ok(branches) => branches,
-        Err(list_err) => reject(CliTag::ERROR, list_err),
-    };
-    let elsewhere: Vec<String> = view.linked_worktree_branches();
-
-    if ctx.json_mode {
-        let rendered: Vec<serde_json::Value> = listed
-            .iter()
-            .map(|(name, oid)| {
-                serde_json::json!({
-                    "name": name,
-                    "oid": oid.to_hex(),
-                    "current": current.as_ref().is_some_and(|(head, _)| head == name),
-                })
-            })
-            .collect();
-        print_json(&serde_json::json!({
-            "engine": "taxis",
-            "operation": "branch",
-            "branch_count": rendered.len(),
-            "branches": rendered,
-        }));
-        return;
-    }
-
-    let mut names: Vec<(String, char)> = listed
-        .iter()
-        .map(|(name, _)| {
-            let marker = if current.as_ref().is_some_and(|(head, _)| head == name) {
-                '*'
-            } else if elsewhere.contains(name) {
-                '+'
-            } else {
-                ' '
-            };
-            (name.clone(), marker)
-        })
-        .collect();
-    if let Some(name) = unborn {
-        names.push((name, '*'));
-        names.sort_by(|left, right| left.0.cmp(&right.0));
-    }
-    for (name, marker) in names {
-        println!("{marker} {name}");
     }
 }

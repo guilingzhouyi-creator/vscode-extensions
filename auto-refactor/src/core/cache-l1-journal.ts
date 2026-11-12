@@ -34,7 +34,9 @@ function readOptional(file: string): Buffer {
 }
 
 const CHECKPOINT_BYTES = 1024 * 1024;
-const WAL_BACKPRESSURE_BYTES = 8 * CHECKPOINT_BYTES;
+const WAL_BACKPRESSURE_MULTIPLIER = 8;
+const WAL_BACKPRESSURE_BYTES = WAL_BACKPRESSURE_MULTIPLIER * CHECKPOINT_BYTES;
+export { WAL_BACKPRESSURE_BYTES };
 
 interface JournalOptions {
     checkpointBytes?: number;
@@ -77,6 +79,23 @@ export class L1Journal {
 
     get busy(): boolean {
         return this.checkpointInFlight !== undefined;
+    }
+
+    get isWorkerUnavailable(): boolean {
+        return this.workerUnavailable;
+    }
+
+    get currentWalBytes(): number {
+        return this.walBytes;
+    }
+
+    needsFallbackCompaction(): boolean {
+        return (
+            this.ready &&
+            (this.walBytes >= WAL_BACKPRESSURE_BYTES ||
+                (this.workerUnavailable &&
+                    (this.walBytes >= this.checkpointBytes || this.lastError !== undefined)))
+        );
     }
 
     /** Validate checkpoint and WAL together before replacing the caller's state. */
@@ -176,6 +195,25 @@ export class L1Journal {
         }
     }
 
+    /**
+     * Publish a compact checkpoint asynchronously when workers fail or backpressure hits.
+     */
+    async checkpointAsync(state: Map<string, Fingerprint>): Promise<void> {
+        await this.waitForCheckpoint();
+        if (this.busy) throw new Error('L1 checkpoint worker busy');
+        const sequence = this.sequence + 1;
+        const horizon = encodeL1Frame(sequence, [], 'horizon');
+        if (!this.ready) await writeBytesAtomicAsync(this.walPath, horizon);
+        await writeBytesAtomicAsync(this.checkpointPath, encodeL1Frame(sequence, state));
+        this.sequence = sequence;
+        this.ready = true;
+        this.lastError = undefined;
+        await writeBytesAtomicAsync(this.walPath, horizon);
+        this.repairBytes = undefined;
+        this.walBytes = horizon.length;
+        this.prepared = undefined;
+    }
+
     /** Append a generation without serializing unchanged fingerprints after initial migration. */
     async appendAsync(deltas: Iterable<L1Delta>, state: Map<string, Fingerprint>): Promise<void> {
         if (!this.ready) {
@@ -192,9 +230,12 @@ export class L1Journal {
         }
         if (this.walBytes >= WAL_BACKPRESSURE_BYTES) {
             await this.waitForCheckpoint();
-            if (this.workerUnavailable) throw this.lastError;
         }
         await this.publishCheckpointAsync();
+        if (this.needsFallbackCompaction()) {
+            await this.checkpointAsync(state);
+            return;
+        }
         const sequence = this.sequence + 1;
         const frame = encodeL1Frame(sequence, deltas);
         try {

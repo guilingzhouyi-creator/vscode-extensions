@@ -7,7 +7,7 @@
 
 ## 1. 架构定位与消费模式矩阵 (Consumer Architecture Matrix)
 
-`auto-refactor` 作为工作区静态分析与多智能体代码治理引擎，内置 <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->分析器与 <!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor -->（全工作区 SSOT 单源收录 <!-- METRICS:BEGIN rule-total -->**534 条规则**<!-- METRICS:END rule-total -->）。针对不同的宿主工程形态与执行阶段，系统提供四种正交消费模式：
+`auto-refactor` 作为工作区静态分析与多智能体代码治理引擎，内置 <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count -->分析器与 <!-- METRICS:BEGIN rule-auto-refactor -->**377 条规则**<!-- METRICS:END rule-auto-refactor -->（全工作区 SSOT 单源收录 <!-- METRICS:BEGIN rule-total -->**536 条规则**<!-- METRICS:END rule-total -->）。针对不同的宿主工程形态与执行阶段，系统提供四种正交消费模式：
 
 | 消费模式 | 调用接口 / 入口命令 | 输出介质与协议 | 适用场景与典型消费者 |
 | :--- | :--- | :--- | :--- |

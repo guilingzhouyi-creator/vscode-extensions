@@ -103,7 +103,7 @@ pub fn handle_verify(ctx: &CliContext) {
     let valid_msg = concat!(
         "feat(core): verify taxis commit guard\n\n",
         "[Why]\nSystem integrity audit.\n\n",
-        "[Changed]\n- Audited invariants\n\n",
+        "[Added]\n- Audited invariants\n\n",
         "[Verification]\nAssert all domain invariants hold true without regression."
     );
     let msg_guard_ok = CommitMessageGuard::parse_and_verify(valid_msg, &policy, None).is_ok();

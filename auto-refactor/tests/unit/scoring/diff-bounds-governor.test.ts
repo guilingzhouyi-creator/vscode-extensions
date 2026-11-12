@@ -6,7 +6,7 @@
  *   derivation (Θ_admission), and admission ledger persistence.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -20,6 +20,10 @@ import {
     computeNetSemanticTurnover,
     calculateEmpiricalAdmissionThreshold,
     appendAdmissionAuditRecord,
+    loadAdmissionTrajectoryPoints,
+    resolveAdmissionLedgerPaths,
+    DIFF_BOUNDS_CONTRACT,
+    DELETION_TURNOVER_WEIGHT,
     VERDICT_ADMITTED,
     VERDICT_BLOCKED_INSUFFICIENT_TURNOVER,
     VERDICT_BLOCK_GAMING_INFLATION,
@@ -29,10 +33,14 @@ import {
     VERDICT_BLOCK_BATCH_ADD_OVERFLOW,
     VERDICT_BLOCK_BATCH_DEL_OVERFLOW,
     ADMISSION_TURNOVER_FLOOR,
+    ADMISSION_TURNOVER_CAP,
+    INFLATION_SAMPLE_LINE_THRESHOLD,
     MIN_EXPANSION_ALLOWANCE_LOC,
     MAX_COMMIT_FILE_ADD_NEW_5D_ELOC,
     MAX_COMMIT_FILE_ADD_EXISTING_5D_ELOC,
+    MAX_COMMIT_FILE_ADD_REFACTOR_5D_ELOC,
     MAX_COMMIT_FILE_DEL_5D_ELOC,
+    MAX_COMMIT_FILE_DEL_WITNESSED_5D_ELOC,
     MAX_COMMIT_BATCH_ADD_5D_ELOC,
     MAX_COMMIT_BATCH_DEL_5D_ELOC,
     CACHE_DIRECTORY_NAME,
@@ -169,7 +177,10 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
             expect(delta.usefulDeleted).toBe(1);
             expect(delta.eloc5dAdd).toBeGreaterThan(0);
             expect(delta.eloc5dDel).toBe(1);
-            expect(delta.net5dTurnover).toBeCloseTo(delta.eloc5dAdd + delta.eloc5dDel, 2);
+            expect(delta.net5dTurnover).toBeCloseTo(
+                delta.eloc5dAdd + delta.eloc5dDel * DELETION_TURNOVER_WEIGHT,
+                2,
+            );
         });
     });
 
@@ -376,7 +387,7 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
             expect(batchVerdict.verdictCode).toBe(VERDICT_ADMITTED);
             expect(batchVerdict.total5dAdd).toBe(40);
             expect(batchVerdict.total5dDel).toBe(10);
-            expect(batchVerdict.total5dTurnover).toBe(50);
+            expect(batchVerdict.total5dTurnover).toBe(48);
         });
 
         it('intercepts commit batch exceeding aggregate 5D addition ceiling (360 lines)', () => {
@@ -717,5 +728,116 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
             expect(parsed.netSemanticTurnover).toBe(42.5);
             expect(parsed.verdict).toBe(VERDICT_ADMITTED);
         });
+    });
+
+    describe('SSOT Unified Contract Parity (diff-bounds-contract.json)', () => {
+        it('matches unified JSON contract thresholds across Rust/JS/TS bounds', () => {
+            expect(INFLATION_SAMPLE_LINE_THRESHOLD).toBe(10);
+            expect(DELETION_TURNOVER_WEIGHT).toBe(0.8);
+            expect(ADMISSION_TURNOVER_FLOOR).toBe(3.0);
+            expect(ADMISSION_TURNOVER_CAP).toBe(25.0);
+            expect(MAX_COMMIT_FILE_ADD_NEW_5D_ELOC).toBe(180);
+            expect(MAX_COMMIT_FILE_ADD_EXISTING_5D_ELOC).toBe(120);
+            expect(MAX_COMMIT_FILE_ADD_REFACTOR_5D_ELOC).toBe(180);
+            expect(MAX_COMMIT_FILE_DEL_5D_ELOC).toBe(100);
+            expect(MAX_COMMIT_FILE_DEL_WITNESSED_5D_ELOC).toBe(280);
+            expect(DIFF_BOUNDS_CONTRACT.schema).toBe('diff-bounds-contract/v1');
+        });
+
+        it('widens existing-file addition ceiling to 180 when refactoring deletes > 10 ELOC', () => {
+            const oldLines = Array.from({ length: 400 }, (_, i) => `const existing${i} = ${i};`);
+            const bounds = computeEnvelopeBounds({
+                filePath: 'src/refactor-target.ts',
+                oldContent: oldLines.join('\n'),
+                newContent: oldLines.slice(20).join('\n'),
+                addedLines: Array.from({ length: 130 }, (_, i) => `const next${i} = ${i};`),
+                deletedLines: oldLines.slice(0, 15),
+                fileLocBudget: 900,
+            });
+            expect(bounds.addMax).toBe(180);
+        });
+
+        it('enforces sample width 10 and caps empirical admission threshold at 25.0', () => {
+            const recentRuns: TrajectoryRunPoint[] = Array.from({ length: 20 }, (_, i) => ({
+                timestamp: 1000 + i * 100,
+                netSemanticTurnover: 120.0,
+                gatePassed: true,
+            }));
+            const capped = calculateEmpiricalAdmissionThreshold({
+                recentRuns,
+                currentComplexity: 0,
+                currentEloc: 100,
+            });
+            expect(capped.threshold).toBe(25.0);
+
+            const twoSamples = calculateEmpiricalAdmissionThreshold({
+                recentRuns: recentRuns.slice(0, 2),
+                currentComplexity: 0,
+                currentEloc: 100,
+            });
+            expect(twoSamples.threshold).toBe(3.0);
+        });
+
+        it('loads trajectory samples from both auto-refactor and taxis telemetry ledgers', () => {
+            const [arLedger, taxisLedger] = resolveAdmissionLedgerPaths(tempDir);
+            fs.mkdirSync(path.dirname(arLedger), { recursive: true });
+            fs.mkdirSync(path.dirname(taxisLedger), { recursive: true });
+            fs.writeFileSync(
+                arLedger,
+                `${JSON.stringify({ timestamp: 1, netSemanticTurnover: 9.5, verdict: 'ADMITTED' })}\n`,
+            );
+            fs.writeFileSync(taxisLedger, `${JSON.stringify({ turnover: 14.0, passed: true })}\n`);
+
+            const loaded = loadAdmissionTrajectoryPoints(tempDir);
+            expect(loaded).toHaveLength(2);
+            expect(loaded[0].netSemanticTurnover).toBe(9.5);
+            expect(loaded[0].gatePassed).toBe(true);
+            expect(loaded[1].netSemanticTurnover).toBe(14.0);
+            expect(loaded[1].gatePassed).toBe(true);
+        });
+    });
+});
+
+describe('DiffBoundsGovernor contract loading failures', () => {
+    afterEach(() => {
+        vi.doUnmock('fs');
+        vi.resetModules();
+    });
+
+    function mockContractRead(readContract: () => string): void {
+        vi.resetModules();
+        vi.doMock('fs', () => ({
+            ...fs,
+            readFileSync: (...args: Parameters<typeof fs.readFileSync>) =>
+                String(args[0]).endsWith('diff-bounds-contract.json')
+                    ? readContract()
+                    : fs.readFileSync(...args),
+        }));
+    }
+
+    it.each(['{}', 'null', '{"fileAddBands": []}'])(
+        'rejects incomplete or invalid contract shape %s',
+        async (raw) => {
+            mockContractRead(() => raw);
+            await expect(import('../../../src/core/scoring/diff-bounds-governor')).rejects.toThrow(
+                'Differential bounds contract has invalid or missing fields.',
+            );
+        },
+    );
+
+    it('propagates malformed JSON rather than activating fallback parameters', async () => {
+        mockContractRead(() => '{');
+        await expect(import('../../../src/core/scoring/diff-bounds-governor')).rejects.toBeInstanceOf(
+            SyntaxError,
+        );
+    });
+
+    it('propagates a read failure for a discovered contract', async () => {
+        mockContractRead(() => {
+            throw new Error('contract read fixture failed');
+        });
+        await expect(import('../../../src/core/scoring/diff-bounds-governor')).rejects.toThrow(
+            'contract read fixture failed',
+        );
     });
 });

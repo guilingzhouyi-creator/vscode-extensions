@@ -5,7 +5,7 @@
 > 项目内私有脚本（如 `auto-refactor/scripts/*.js` 的 validate/bench 系列）不在此库，
 > 保留在各项目内部，由各自 `package.json` 引用。
 >
-> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**106 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
+> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**107 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
 
 ---
 
@@ -89,6 +89,7 @@
 | `common/` | JSON | `rule-catalog.json` | data / ssot（全工作区规则事实真源聚合目录） | 静态审查与门禁工具链 |
 | `common/` | JSON | `impact-slice-map.js` | data / slices（改动路径到预测试目标的影响面映射单源：包、测试与切片身份集中登记，供预测试机与本地切片共用） | `remote-sandbox-gate`、`validate-impact-slices` |
 | `common/` | JSON | `commit-rule-coverage.json` | data / ssot（提交信息门禁规则覆盖矩阵的数据面，登记每条提交层规则被哪些用例覆盖） | `validate-commit-rule-coverage` |
+| `common/` | JSON | `diff-bounds-contract.json` | data / ssot（5D ELOC、TSPR、删除换手率、重构放宽与 Jeffreys 经验准入的跨语言参数契约） | `gate-differential-bounds`、auto-refactor、taxis |
 | `common/` | JSON | `diff-exemptions.json` | data / ledger（差分豁免授予账本：`schemaVersion` 加 `grants` 映射，逐条记录被豁免标识的测量值、floor 与 target，随提交走以便审计复算） | `diff-exemption-ledger`、`gate-differential-bounds` |
 | `common/` | JSON | `rule-lexicon.json` | data / ssot（跨引擎与门禁脚本共享的规则标识符与语义步骤词汇形状单源字典） | 静态审查与提交门禁工具链 |
 | `sh/` | Bash | `pre-commit-gate.sh` | gate（本地提交物理卫生与多项前置检查，含 AST 切片） | `.githooks/pre-commit`、本地 CLI |

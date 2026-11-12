@@ -130,6 +130,8 @@ export const ExplicitTypingRule: GovernanceRule = {
     category: TYPE_SYSTEM_CATEGORY,
     severity: SEVERITY_WARNING,
     risk: RISK_MEDIUM,
+    languages: ['gdscript'],
+    textTrigger: 'var',
     rationale:
         'Implicit loose typing hides type errors at runtime and weakens static safety guarantees.',
     isFixable: false,
@@ -164,6 +166,7 @@ export const FunctionSignatureCompletenessRule: GovernanceRule = {
         'Missing return type annotations on functions degrade API contracts and compiler static analysis.',
     isFixable: false,
     languages: ['gdscript', 'python'],
+    textTrigger: ['func', 'def'],
     targetKinds: [NodeKind.Function, NodeKind.Method],
     checkNode(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (!ctx.capabilities.supportsStaticTyping) return null;

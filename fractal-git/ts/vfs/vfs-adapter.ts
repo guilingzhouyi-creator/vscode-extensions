@@ -65,6 +65,7 @@ function isWithinScope(candidatePath: string, scopePrefixes?: readonly string[])
  */
 export class LayerVfsAdapter {
     private readonly virtualFiles: Map<string, VirtualFileNode> = new Map();
+    private readonly tombstones: Set<string> = new Set();
 
     /**
      * Writes or updates an in-memory virtual file node.
@@ -76,12 +77,41 @@ export class LayerVfsAdapter {
     ): void {
         const existing = this.virtualFiles.get(path);
         const version = existing ? existing.version + 1 : 1;
+        this.tombstones.delete(path);
         this.virtualFiles.set(path, {
             path,
             content,
             executable,
             version,
         });
+    }
+
+    /**
+     * Marks a virtual path as deleted with an explicit tombstone.
+     */
+    public deleteVirtualFile(path: string): void {
+        this.virtualFiles.delete(path);
+        this.tombstones.add(path);
+    }
+
+    /**
+     * Returns all pending deletion tombstones.
+     */
+    public toTombstones(): string[] {
+        return this.toScopedTombstones([]);
+    }
+
+    /**
+     * Returns pending deletion tombstones constrained to the given scope prefixes.
+     */
+    public toScopedTombstones(scopePrefixes: readonly string[]): string[] {
+        const deletedPaths: string[] = [];
+        for (const candidatePath of this.tombstones) {
+            if (isWithinScope(candidatePath, scopePrefixes)) {
+                deletedPaths.push(candidatePath);
+            }
+        }
+        return deletedPaths;
     }
 
     /**
@@ -113,12 +143,20 @@ export class LayerVfsAdapter {
      * Ingests file entries from Auto LayerVFS snapshot or sandbox delta.
      */
     public ingestLayerVfsEntries(
-        entries: Array<{ path: string; content?: Uint8Array | string; mode?: number }>,
+        entries: Array<{ path: string; content?: Uint8Array | string | null; mode?: number; deleted?: boolean }>,
         scopePrefixes?: string[],
     ): number {
         let count = 0;
         for (const entry of entries) {
-            if (!entry.content || !isWithinScope(entry.path, scopePrefixes)) {
+            if (!isWithinScope(entry.path, scopePrefixes)) {
+                continue;
+            }
+            if (entry.deleted === true || entry.content === null) {
+                this.deleteVirtualFile(entry.path);
+                count++;
+                continue;
+            }
+            if (entry.content === undefined) {
                 continue;
             }
             const isExecutable = entry.mode ? (entry.mode & 0o111) !== 0 : false;
@@ -129,9 +167,10 @@ export class LayerVfsAdapter {
     }
 
     /**
-     * Clears virtual dirty file buffers after successful materialization.
+     * Clears virtual dirty file buffers and deletion tombstones after successful materialization.
      */
     public clear(): void {
         this.virtualFiles.clear();
+        this.tombstones.clear();
     }
 }

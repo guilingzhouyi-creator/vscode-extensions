@@ -110,7 +110,7 @@ const rows = overlapClusterRows();
    - 选举集合内严重度最高的卡片作为唯一主卡展示，其余次级规则写入主卡的 `correlatedRules: string[]` 元数据。
 3. **双端差异化消费原则**：
    - **UI 呈现端**：仅渲染主卡，在折叠标签中显示「同时关联：X 规则」，界面清晰清爽；
-   - **Agent 执行端**：底层仍保留完整的 375 条细粒度规则诊断与 `sourceAgentDirective`，确保 AI 智能体拥有 100% 的准确依据以产出无遗漏的补丁。
+   - **Agent 执行端**：底层仍保留完整的 377 条细粒度规则诊断与 `sourceAgentDirective`，确保 AI 智能体拥有 100% 的准确依据以产出无遗漏的补丁。
 
 ---
 
@@ -120,7 +120,7 @@ Praxis 交付以 <!-- METRICS:BEGIN test-suite-count -->**197 套**<!-- METRICS:
 
 | 验收核心域 | 验证命令 / 脚本路径 | 核心断言内容 | 验收标准 |
 | :--- | :--- | :--- | :---: |
-| **规则完整性与注册一致性** | `npm run validate-rules-registry` | 32 个分析器与 375 条注册规则 100% 覆盖无孤儿规则（全工作区 534 条） | **PASS** |
+| **规则完整性与注册一致性** | `npm run validate-rules-registry` | 32 个分析器与 377 条注册规则 100% 覆盖无孤儿规则（全工作区 536 条） | **PASS** |
 | **Praxis 统一 SDK 与双载荷** | `npm run validate-praxis-presentation` | `createPraxisClient` 全工作区、单文件、双载荷与 i18n 汉化 | **PASS** |
 | **11 组语义重叠并查集去重** | `npm run validate-dual-faced-presentation` | 验证并查集 `findRoot`/`union` 正确归并，次级规则沉淀到元数据 | **PASS** |
 | **毫秒级切片与 Sparse MoE 路由** | `npm run validate-self-slice-audit` | 单切片执行时延 **< 10ms**，分析器绕过率 $\ge 70\%$ | **PASS** |

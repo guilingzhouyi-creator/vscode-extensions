@@ -30,7 +30,7 @@
         "missing single space after colon",
         "repeated spaces after colon"
       ],
-      "notes": "Rust currently uses str::len() (UTF-8 bytes) for header bounds; must switch to chars().count() before this entry can move to implemented (decision C-07)."
+      "notes": "Implemented in fg-gate with chars().count() Unicode character metrics and unified 15..=80 bounds across policy presets."
     },
     {
       "jsStep": "SLANG-GUARD-02",
@@ -43,7 +43,7 @@
         "inline code block and URL masking",
         "word-boundary anchored ascii patterns"
       ],
-      "notes": "Rust currently does substring contains() with no word boundary, no whitelist, no masking; `temp` wrongly matches `template`."
+      "notes": "Implemented in fg-gate with word-boundary matching, CJK containment, bilingual whitelist subtraction, and uppercase rule-ID masking."
     },
     {
       "jsStep": "BODY-SPLIT-03",
@@ -87,7 +87,7 @@
         "ASCII square bracket headings only",
         "ASCII hyphen and space list markers only"
       ],
-      "notes": "Rust matches required_sections by literal name, so `[Project / 项目归属]` and `[动机]` are falsely rejected."
+      "notes": "Implemented in fg-gate via semantic slot resolution, bilingual aliases, and type-specific [Added]/[Changed]/[Breaking Changes] slot enforcement."
     },
     {
       "jsStep": "PROJECT-SCOPE-06",
@@ -100,7 +100,7 @@
         "inline and list declaration forms",
         "project nomenclature drift"
       ],
-      "notes": "Rust uses substring matching for allowed_projects, so `fractal-git-evil` passes."
+      "notes": "Implemented in fg-gate via exact project matching and upward active_projects.json cache inspection for Frozen lease lockdown."
     },
     {
       "jsStep": "BATCH-CODE-07",
@@ -119,7 +119,7 @@
       "covers": [
         "rule identifiers quoted in the message must exist in rule-catalog.json"
       ],
-      "notes": "Rust has no rule-id anti-hallucination check at all; a fabricated ABC-XYZ-999 currently commits."
+      "notes": "Implemented in fg-gate with looks_like_rule_id shape detection and binary search closure against WORKSPACE_RULE_IDS and ALL_FGT_RULES."
     },
     {
       "jsStep": "TEXT-TRUTH-09",
@@ -137,7 +137,7 @@
       "covers": [
         "structural exemption for genuinely generated merge commits"
       ],
-      "notes": "Rust currently skips message validation for merge entirely rather than granting a recorded exemption. Design decision C-05 requires parent-count evidence, not header text matching."
+      "notes": "Implemented in fg-gate with parent_count >= 2 structural evidence exemption in rewrite.rs."
     }
   ],
   "kernelOnly": [
@@ -149,12 +149,12 @@
     {
       "rustRule": "FGT-MSG-010",
       "status": "implemented",
-      "reason": "Declaration-to-diff symbol anchoring. No JavaScript counterpart exists; this is a kernel-only capability."
+      "reason": "Declaration-to-diff symbol anchoring. Matched in JS via candidate symbol checking when diff context is supplied."
     },
     {
       "rustRule": "FGT-MSG-011",
       "status": "implemented",
-      "reason": "Policy downgrade attempt interception. No JavaScript counterpart exists because the global gate has no policy tier concept."
+      "reason": "Policy downgrade attempt interception against commit-policy.json floor. Matched in JS via policy-tier validation."
     },
     {
       "rustRule": "FGT-MSG-005",

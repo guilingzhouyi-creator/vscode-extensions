@@ -16,6 +16,7 @@
 import {
     calculateEmpiricalAdmissionThreshold,
     DECIMAL_ROUNDING_FACTOR_HUNDREDTH,
+    DELETION_TURNOVER_WEIGHT,
     VERDICT_ADMITTED,
     VERDICT_BLOCKED_INSUFFICIENT_TURNOVER,
     type DifferentialVerdictCode,
@@ -115,8 +116,10 @@ export function evaluateCommitBatchBounds(params: CommitBatchBoundsParams): Comm
         Math.round(accumulated5dDel * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) /
         DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
     const total5dTurnover =
-        Math.round((total5dAdd + total5dDel) * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) /
-        DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
+        Math.round(
+            (total5dAdd + total5dDel * DELETION_TURNOVER_WEIGHT) *
+                DECIMAL_ROUNDING_FACTOR_HUNDREDTH,
+        ) / DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
 
     if (total5dAdd > MAX_COMMIT_BATCH_ADD_5D_ELOC) {
         return {
