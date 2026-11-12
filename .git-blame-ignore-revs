@@ -8,3 +8,24 @@
 # they land. A commit belongs here only when it changes no token other than
 # whitespace and line breaks; a commit that also renames an identifier or moves a
 # branch must stay visible to blame.
+
+# refactor(auto-refactor): 统一分析器目录缩进与换行契约
+a2f6871b71df25ae4e71a20a4846a4bb706e4be2
+# refactor(auto-refactor): 统一命令行与守护进程目录缩进与换行契约
+1a25f1af0bf20a7881a1b3a6ea6bedb31623d759
+# refactor(auto-refactor): 统一审查与执行目录缩进与换行契约
+20890e0c3dee861af7277a6e3539793979057d52
+# refactor(auto-refactor): 统一核心评分与报告目录缩进与换行契约
+d42259f65bc07f06c9ccc2bfc633660f9d1b5fc3
+# refactor(auto-refactor): 统一核心架构目录缩进与换行契约
+e96aae91e981d213c0e0562539a05c4390dac1ea
+# refactor(auto-refactor): 统一核心消息与工具目录缩进与换行契约
+d7499fcf397a131945d115e3c4cfd33889ab8d7e
+# refactor(auto-refactor): 统一脚本校验目录缩进与换行契约
+6f3d2ddf511b9ea4cc851f3b6e34080f1019c129
+# refactor(auto-refactor): 统一脚本校验与预热目录缩进与换行契约
+ff6ba8c9ecd5a4437ac420d89e248d9b32ebf6e4
+# refactor(auto-refactor): 统一脚本校验收尾目录缩进与换行契约
+e07960bfefefcb8a82fddcca85ca18401cc3a477
+# style(auto-refactor): 对齐新增校验脚本的格式化规范
+d50a3d1b785f0e06a063ef5a3d5f8d04de5f0593

@@ -61,7 +61,7 @@
 | Document | Core Scope | Status |
 | :--- | :--- | :---: |
 | [docs/05-specs-and-benchmarks/01-config-and-reports.md](./docs/05-specs-and-benchmarks/01-config-and-reports.md) | `auto-refactor.config.json` schema, suppression rules, JSON / SARIF 2.1.0 / Text reports & exit codes | ✅ Aligned |
-| [docs/05-specs-and-benchmarks/02-performance-benchmarks.md](./docs/05-specs-and-benchmarks/02-performance-benchmarks.md) | 6-operator performance ledger, hot-path ablation & <!-- METRICS:BEGIN test-suite-count -->**194 套**<!-- METRICS:END test-suite-count --> regression test suites | ✅ Aligned |
+| [docs/05-specs-and-benchmarks/02-performance-benchmarks.md](./docs/05-specs-and-benchmarks/02-performance-benchmarks.md) | 6-operator performance ledger, hot-path ablation & <!-- METRICS:BEGIN test-suite-count -->**197 套**<!-- METRICS:END test-suite-count --> regression test suites | ✅ Aligned |
 | [docs/05-specs-and-benchmarks/03-comment-and-header-standard.md](./docs/05-specs-and-benchmarks/03-comment-and-header-standard.md) | 6-field module header contract (`CMT-HDR-001`), effective comment density (ECD-C) & `gate:comments` ratchet | ✅ Aligned |
 | [docs/05-specs-and-benchmarks/04-cross-language-generalization.md](./docs/05-specs-and-benchmarks/04-cross-language-generalization.md) | Project neutrality guard (`validate-project-neutrality`) & semantic file-role inference (`file-role-inference.ts`) | ✅ Aligned |
 | [docs/05-specs-and-benchmarks/05-consumer-integration.md](./docs/05-specs-and-benchmarks/05-consumer-integration.md) | Consumer integration guide — `baseline.json` 1.2.0 credit model, elastic debt quota, AAS v1.0 & workspace consumers | ✅ Aligned |
@@ -76,7 +76,7 @@
 | [docs/05-specs-and-benchmarks/05-consumer-integration.md](./docs/05-specs-and-benchmarks/05-consumer-integration.md) | **External & Workspace Consumer Integration Guide** (AAS v1.0, elastic debt budget & multi-project contracts) | ✅ Delivered |
 | [docs/06-praxis-delivery/01-praxis-architecture-and-spi-contracts.md](./docs/06-praxis-delivery/01-praxis-architecture-and-spi-contracts.md) | Praxis architecture, data contracts (`PraxisCardContext` / `ReviewDiffHunk`) & SPI extension slots | ✅ Delivered |
 | [docs/06-praxis-delivery/02-praxis-six-governance-services-api.md](./docs/06-praxis-delivery/02-praxis-six-governance-services-api.md) | 6 governance facades, workspace manager & unified `PraxisReviewClient` SDK API reference | ✅ Delivered |
-| [docs/06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md](./docs/06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md) | End-to-end TypeScript integration runbook, fallback SLA & <!-- METRICS:BEGIN test-suite-count -->**194 套**<!-- METRICS:END test-suite-count --> acceptance matrix | ✅ Delivered |
+| [docs/06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md](./docs/06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md) | End-to-end TypeScript integration runbook, fallback SLA & <!-- METRICS:BEGIN test-suite-count -->**197 套**<!-- METRICS:END test-suite-count --> acceptance matrix | ✅ Delivered |
 | [docs/06-praxis-delivery/04-praxis-layervfs-integration-guide.md](./docs/06-praxis-delivery/04-praxis-layervfs-integration-guide.md) | LayerVFS virtual workspace integration, FastCDC chunking, CAS zero-copy fork, sandbox projection & MCTS | ✅ Delivered |
 | [docs/praxis-integration-guide.md](./docs/praxis-integration-guide.md) | **`IPraxisReviewClient` SDK, 3-Layer Topological Diff & Structured Agent Guidance Manual** | ✅ Delivered |
 
@@ -96,10 +96,11 @@
 
 | Command | Scope | Gate Contract |
 | :--- | :--- | :--- |
-| `npm run gate` | `gate:rust` $\to$ `build` $\to$ `format:check` $\to$ `lint` $\to$ `gate:comments` $\to$ `gate:self` $\to$ `npm test` | Single pre-commit closure across <!-- METRICS:BEGIN test-suite-count -->**194 套**<!-- METRICS:END test-suite-count --> parallel & serial suites |
+| `npm run gate` | `gate:rust` $\to$ `build` $\to$ `format:check` $\to$ `lint` $\to$ `gate:comments` $\to$ `gate:redundancy` $\to$ `gate:self` $\to$ `self-test` $\to$ `npm test` | Single gate closure across <!-- METRICS:BEGIN test-suite-count -->**197 套**<!-- METRICS:END test-suite-count --> parallel & serial suites |
 | `npm run gate:rust` | `cargo clippy -- -D warnings` + `cargo fmt --check` + `cargo test` | Zero warnings and 100% test pass across Rust operator crates |
+| `npm run gate:redundancy` | `scripts/validate-redundancy-governance.js` | Dead stub, hollow facade & redundant fallback ratchet |
 | `npm run gate:self` | Self-scan baseline ratchet (`error` severity) | `newBlocking(error) === 0` |
-| `npm run gate:self:slice` | AST semantic slice incremental self-audit (`scripts/gate-self-slice.js`) | Sub-15ms localized AST mutation self-check |
+| `npm run gate:self:slice` | AST semantic slice incremental self-audit (`scripts/gate-self-slice.js`) | Sub-15ms localized AST mutation self-check (also wired in `audit-all --fast`) |
 | `npm run gate:comments` | Comment density & 6-field header ratchet (`scripts/gate-comments.js`) | Blocks any new comment or module header violation |
 | `npm run validate-rules-registry` | Bidirectional closure between `registry.ts`, emitters & `01-builtin-rules.md` | 375/375 rule registration & doc coverage (100%), zero orphans, aligned with <!-- METRICS:BEGIN rule-total -->**534 条规则**<!-- METRICS:END rule-total --> |
 | `npm run validate-docs` | Markdown fence closure (`DOC-FEN-001`), broken links (`DOC-LNK-001`) & duplicate blocks (`DOC-DUP-001`) | Zero documentation hygiene violations |

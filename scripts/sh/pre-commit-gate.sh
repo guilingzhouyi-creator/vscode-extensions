@@ -458,7 +458,7 @@ if [[ -n "$TOUCHED_AR_COMPILE" ]]; then
                     record_pre_commit_failure "ENGINE-TESTS-08" \
                         "GUARD-SYS-001" \
                         "Impacted unit tests failed in auto-refactor." \
-                        "Run 'npx vitest related ... --run' in auto-refactor." \
+                        "Run 'npx vitest related ... --run --passWithNoTests=false' in auto-refactor." \
                         "npx --prefix auto-refactor vitest related \"$AR_REL_FILES\" --run --passWithNoTests=false" \
                         "auto-refactor/src"
                     cat "$ROOT_DIR/.audit-logs/last-failure.json"

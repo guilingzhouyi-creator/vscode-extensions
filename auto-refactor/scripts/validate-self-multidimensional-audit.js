@@ -8,7 +8,7 @@
  *   TypeScript compiler API, and scans src/**\/*.ts.
  * Responsibilities:
  *   1. CASE-01 (Dual-Scale Volume Guard): Strict assertion that 0 files in src/
- *      exceed 800 ELOC or 1200 LOC.
+ *      exceed 900 ELOC or 1400 LOC.
  *   2. CASE-02 (Shannon Entropy Guard): Information entropy verification across all source files
  *   3. CASE-03 (AST / LOC Density Guard): Validates AST node-to-LOC syntax
  *      density within [0.5, 40.0].

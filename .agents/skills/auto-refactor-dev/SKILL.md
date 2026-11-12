@@ -60,7 +60,15 @@ Governs the `auto-refactor/` 6-layer architecture, Rust+TS 100% byte parity, <!-
 
 ---
 
-## 4. Verification & References
+## 4. 门禁链与 CI 原生构建（Gate Chain & Native CI Parity）
+
+1. **全量门禁链**: `npm run gate` 串联 `gate:rust` $\to$ `build` $\to$ `format:check` $\to$ `lint` $\to$ `gate:comments` $\to$ `gate:redundancy` $\to$ `gate:self` $\to$ `self-test` $\to$ `npm test`（`ENGINE-FORMAT-42`~`ENGINE-REDUNDANCY-45` 已镜像入 `pre-push-gate`）；`audit-all --fast` 额外调度 `gate:self:slice` 增量自审。
+2. **原生双轨 Fail-Closed**: `crates/` 构建产物 `index.node` 已移出 Git 追踪（`.gitignore` 纳管）；`validate-native-parity.js` 缺失原生二进制时直接 `exit 1`，CI `auto-refactor` 作业通过 `dtolnay/rust-toolchain@stable` 与 `npm run build:native` 现场构建。
+3. **提交期与账本守卫**: `pre-commit-gate` 命中 `crates/**` 自动执行 `auto-refactor/crates` Cargo 检查，`vitest related` 强制 `--passWithNoTests=false` 拒绝零匹配静默放行；`validate-rule-dictionary-closure.js` 校验 <!-- METRICS:BEGIN rule-auto-refactor-canonical -->**360 条**<!-- METRICS:END rule-auto-refactor-canonical -->核心规则中文本地化闭包；`validate-trajectory-ledger.js` 纳管 `baseline-signatures.json` 体积与 `governance-supervisor.json` 权重归一；`audit-all` 结束时通过 `--revert-timestamp` 回滚仅时间戳漂移。
+
+---
+
+## 5. Verification & References
 
 ```bash
 cd auto-refactor && npm run build && npm run gate && npm test && node scripts/bench-hot-paths.js

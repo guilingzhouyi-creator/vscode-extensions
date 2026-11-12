@@ -763,6 +763,107 @@ check(
   })(),
 );
 
+// --- 负向自证补齐（crates 触发 / vitest 零匹配 / 规则字典孤儿 / 账本监督器权重）---
+const REPO_ROOT_DIR = path.resolve(__dirname, '../..');
+
+check(
+  'pre-commit gates match auto-refactor crates changes and invoke cargo workspace check',
+  (() => {
+    const shSrc = fs.readFileSync(path.join(REPO_ROOT_DIR, 'scripts/sh/pre-commit-gate.sh'), 'utf8');
+    const psSrc = fs.readFileSync(path.join(REPO_ROOT_DIR, 'scripts/ps1/pre-commit-gate.ps1'), 'utf8');
+    const shCompileMatch = /TOUCHED_AR_COMPILE=[^\n]*grep -E '([^']+)'/.exec(shSrc);
+    const shCratesMatch = /TOUCHED_AR_CRATES=[^\n]*grep -E '([^']+)'/.exec(shSrc);
+    const psCompileMatch = /\$hasArCompile\s*=.*-match\s+"([^"]+)"/.exec(psSrc);
+    const psCratesMatch = /\$hasArCrates\s*=.*-match\s+"([^"]+)"/.exec(psSrc);
+    if (!shCompileMatch || !shCratesMatch || !psCompileMatch || !psCratesMatch) return false;
+    const probeFiles = ['auto-refactor/crates/ops-mask/src/lib.rs', 'auto-refactor/crates/Cargo.toml'];
+    const patterns = [shCompileMatch[1], shCratesMatch[1], psCompileMatch[1], psCratesMatch[1]].map(
+      (raw) => new RegExp(raw),
+    );
+    const allMatch = probeFiles.every((sample) => patterns.every((re) => re.test(sample)));
+    const usesCratesManifest =
+      shSrc.includes('cd auto-refactor/crates && cargo check --workspace --all-targets') &&
+      psSrc.includes('auto-refactor/crates/Cargo.toml');
+    return allMatch && usesCratesManifest;
+  })(),
+);
+
+check(
+  'vitest related disables passWithNoTests and blocks unmatched source files',
+  (() => {
+    const shSrc = fs.readFileSync(path.join(REPO_ROOT_DIR, 'scripts/sh/pre-commit-gate.sh'), 'utf8');
+    const psSrc = fs.readFileSync(path.join(REPO_ROOT_DIR, 'scripts/ps1/pre-commit-gate.ps1'), 'utf8');
+    const vitestCalls = [...shSrc.matchAll(/npx vitest related[^\r\n]+/g)];
+    if (vitestCalls.length === 0) return false;
+    const shStrict = vitestCalls.every((m) => m[0].includes('--passWithNoTests=false'));
+    const psHelperMatch = /function Invoke-VitestRelated[\s\S]*?\r?\n\}/.exec(psSrc);
+    const psStrict = Boolean(
+      psHelperMatch &&
+      psHelperMatch[0].includes('--passWithNoTests=false') &&
+      psSrc.includes('Invoke-VitestRelated'),
+    );
+    if (!shStrict || !psStrict) return false;
+    const { spawnSync } = require('child_process');
+    const vitestEntry = path.join(REPO_ROOT_DIR, 'auto-refactor/node_modules/vitest/vitest.mjs');
+    if (!fs.existsSync(vitestEntry)) return true;
+    const probe = spawnSync(
+      process.execPath,
+      [vitestEntry, 'related', 'scripts/gate-self.js', '--run', '--passWithNoTests=false'],
+      { cwd: path.join(REPO_ROOT_DIR, 'auto-refactor'), encoding: 'utf8' },
+    );
+    return probe.status !== 0;
+  })(),
+);
+
+check(
+  'rule dictionary closure guard detects unregistered orphan rule ids',
+  (() => {
+    const closureScript = path.join(REPO_ROOT_DIR, 'auto-refactor/scripts/validate-rule-dictionary-closure.js');
+    if (!fs.existsSync(closureScript)) return false;
+    const registryDist = path.join(REPO_ROOT_DIR, 'auto-refactor/dist/core/rules/registry.js');
+    if (!fs.existsSync(registryDist)) {
+      return fs.readFileSync(closureScript, 'utf8').includes('orphan detection rejects an unregistered key');
+    }
+    const { spawnSync } = require('child_process');
+    const run = spawnSync(process.execPath, [closureScript], {
+      cwd: path.join(REPO_ROOT_DIR, 'auto-refactor'),
+      encoding: 'utf8',
+    });
+    const { RULE_REGISTRY } = require(registryDist);
+    const registeredIds = new Set(RULE_REGISTRY.map((rule) => rule.id));
+    return (
+      run.status === 0 &&
+      run.stdout.includes('PASS orphan detection rejects an unregistered key') &&
+      !registeredIds.has('ORPHAN-PROBE-999')
+    );
+  })(),
+);
+
+check(
+  'trajectory ledger guard blocks invalid supervisor weight sum Ws=0.9',
+  (() => {
+    const LEDGER = require('./validate-trajectory-ledger');
+    const ledgerProbeDir = makeScratch('ledger-supervisor-probe-');
+    const invalidSnapshot = {
+      version: '1.0',
+      lastUpdated: '2026-11-11T00:00:00.000Z',
+      projectProfile: 'standard',
+      learnedWeights: { Ws: 0.9, Wd: 0.47, Wf: 0.05 },
+      activeIncidents: 0,
+      demotedRules: [],
+      boostedPatterns: [],
+      evolutionStepsCount: 1,
+    };
+    fs.writeFileSync(
+      path.join(ledgerProbeDir, 'governance-supervisor.json'),
+      JSON.stringify(invalidSnapshot),
+      'utf8',
+    );
+    const result = LEDGER.validateSupervisorSnapshot(ledgerProbeDir);
+    return result.violations >= 1;
+  })(),
+);
+
 const failures = results.filter((r) => !r.ok).length;if (failures > 0) {
   console.error(`✖ BLOCK  ${failures} guard assertion(s) did not hold`);
   process.exit(1);
