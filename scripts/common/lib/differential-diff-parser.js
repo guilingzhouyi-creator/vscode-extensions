@@ -4,12 +4,11 @@
  * Architecture Role: Staged git diff parser and 5D Riemannian line semantic classifier
  * Dependencies & Triggers: Consumed by gate-differential-bounds.js, pre-commit-gate, and CLI audits
  * Responsibilities:
- *   1. Classify diff line semantics (blank, comment, doc comment, trampoline, substantive);
+ *   1. Classify diff line semantics with stateful multi-line block comment tracking;
  *   2. Run git diff --cached and evaluate per-file physical/effective line metrics;
- *   3. Collect staged status list and historical turnover records.
- * Exit Semantics & Design Rationale: Pure functional evaluator.
- *   Extracted from gate-differential-bounds.js to preserve single-file volume budget <= 900 ELOC
- *   and keep staged differential evaluation within the single-commit rate limit.
+ *   3. Collect staged status list and dual-ledger Jeffreys Beta(0.5, 0.5) admission samples.
+ * Exit Semantics & Design Rationale: Pure functional evaluator aligned with diff-bounds-contract.json.
+ *   Maintains 100% behavioral parity with fg-algorithms::diff::eloc_5d and fg-gate::diff_bounds.
  */
 
 'use strict';
@@ -18,6 +17,7 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 
+const DIFF_BOUNDS_CONTRACT = Object.freeze(require('../diff-bounds-contract.json'));
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
 
 const CODE_EXTENSIONS = new Set([
@@ -35,10 +35,25 @@ const LINE_TRAMPOLINE = 3;
 const LINE_SUBSTANTIVE = 4;
 
 /**
+ * Checks whether a trimmed segment begins with a single-line comment delimiter across supported languages.
+ *
+ * @param {string} trimmed - Trimmed line segment.
+ * @returns {boolean} True when line starts with a single-line comment token.
+ */
+function isSingleLineComment(trimmed) {
+  return (
+    trimmed.startsWith('//') ||
+    trimmed.startsWith('#') ||
+    trimmed.startsWith('--') ||
+    trimmed.startsWith(';')
+  );
+}
+
+/**
  * Detects mechanical forwarding or empty stub lines.
  *
- * @param {string} trimmed - Trimmed line text
- * @returns {boolean} True if trampoline
+ * @param {string} trimmed - Trimmed line text.
+ * @returns {boolean} True if trampoline.
  */
 function isMechanicalTrampoline(trimmed) {
   const isShortForwardingCall =
@@ -50,39 +65,122 @@ function isMechanicalTrampoline(trimmed) {
 }
 
 /**
- * Classifies a line slice with 5D Riemannian rules.
+ * Updates block-comment tracker for trailing `/*` tokens outside quotes or `//` comments.
  *
- * @param {string} line - Raw line text
- * @returns {number} Semantic kind
+ * @param {string} codeSlice - Trimmed code segment.
+ * @param {{ inBlockComment: boolean, inDocComment: boolean }} state - Mutable block state.
  */
-function classifyLine(line) {
+function scanTrailingBlockComment(codeSlice, state) {
+  let index = 0;
+  let inDoubleQuote = false;
+  while (index < codeSlice.length) {
+    const ch = codeSlice[index];
+    if (inDoubleQuote) {
+      if (ch === '\\' && index + 1 < codeSlice.length) {
+        index += 2;
+        continue;
+      }
+      if (ch === '"') inDoubleQuote = false;
+      index += 1;
+      continue;
+    }
+    if (ch === '"') {
+      inDoubleQuote = true;
+      index += 1;
+      continue;
+    }
+    if (codeSlice.startsWith('//', index)) break;
+    if (codeSlice.startsWith('/*', index)) {
+      const isDoc = codeSlice.startsWith('/**', index) && !codeSlice.startsWith('/**/', index);
+      const closePos = codeSlice.indexOf('*/', index + 2);
+      if (closePos >= 0) {
+        index = closePos + 2;
+        continue;
+      }
+      state.inBlockComment = true;
+      state.inDocComment = isDoc;
+      break;
+    }
+    index += 1;
+  }
+}
+
+/**
+ * Classifies trimmed text starting outside an active block comment.
+ *
+ * @param {string} trimmed - Trimmed segment.
+ * @param {{ inBlockComment: boolean, inDocComment: boolean }} state - Mutable block state.
+ * @returns {number} Semantic line classification constant.
+ */
+function classifyUncommentedSegment(trimmed, state) {
+  let current = trimmed;
+  while (true) {
+    if (current.length === 0) return LINE_BLANK;
+    if (current.startsWith('///') || current.startsWith('//!')) return LINE_DOC_COMMENT;
+    if (isSingleLineComment(current)) return LINE_COMMENT;
+    if (current.startsWith('/*')) {
+      const isDoc = current.startsWith('/**') && !current.startsWith('/**/');
+      const afterOpen = current.slice(2);
+      const closePos = afterOpen.indexOf('*/');
+      if (closePos < 0) {
+        state.inBlockComment = true;
+        state.inDocComment = isDoc;
+        return isDoc ? LINE_DOC_COMMENT : LINE_COMMENT;
+      }
+      const afterClose = afterOpen.slice(closePos + 2).trim();
+      if (afterClose.length === 0 || isSingleLineComment(afterClose)) {
+        return isDoc ? LINE_DOC_COMMENT : LINE_COMMENT;
+      }
+      current = afterClose;
+      continue;
+    }
+    scanTrailingBlockComment(current, state);
+    return isMechanicalTrampoline(current) ? LINE_TRAMPOLINE : LINE_SUBSTANTIVE;
+  }
+}
+
+/**
+ * Classifies one source line using and mutating multi-line block comment state.
+ *
+ * @param {string} line - Raw line text.
+ * @param {{ inBlockComment: boolean, inDocComment: boolean }} state - Mutable block comment state.
+ * @returns {number} Semantic kind constant.
+ */
+function classifyLineWithState(line, state) {
   const trimmed = line.trim();
   if (trimmed.length === 0) return LINE_BLANK;
-  if (trimmed.startsWith('///') || trimmed.startsWith('//!') || trimmed.startsWith('/**')) {
-    return LINE_DOC_COMMENT;
+  if (state.inBlockComment) {
+    const wasDoc = state.inDocComment;
+    const closePos = trimmed.indexOf('*/');
+    if (closePos < 0) {
+      return wasDoc ? LINE_DOC_COMMENT : LINE_COMMENT;
+    }
+    state.inBlockComment = false;
+    state.inDocComment = false;
+    const remainder = trimmed.slice(closePos + 2).trim();
+    if (remainder.length === 0 || isSingleLineComment(remainder)) {
+      return wasDoc ? LINE_DOC_COMMENT : LINE_COMMENT;
+    }
+    return classifyUncommentedSegment(remainder, state);
   }
-  if (
-    trimmed.startsWith('//') ||
-    trimmed.startsWith('/*') ||
-    trimmed.startsWith('*') ||
-    trimmed.endsWith('*/') ||
-    trimmed.startsWith('#') ||
-    trimmed.startsWith('--') ||
-    trimmed.startsWith(';')
-  ) {
-    return LINE_COMMENT;
-  }
-  if (isMechanicalTrampoline(trimmed)) {
-    return LINE_TRAMPOLINE;
-  }
-  return LINE_SUBSTANTIVE;
+  return classifyUncommentedSegment(trimmed, state);
+}
+
+/**
+ * Classifies a single isolated line slice with 5D Riemannian rules.
+ *
+ * @param {string} line - Raw line text.
+ * @returns {number} Semantic kind constant.
+ */
+function classifyLine(line) {
+  return classifyLineWithState(line, { inBlockComment: false, inDocComment: false });
 }
 
 /**
  * Checks if a file path belongs to auditable code files.
  *
- * @param {string} filePath - Path relative to repo root
- * @returns {boolean}
+ * @param {string} filePath - Path relative to repo root.
+ * @returns {boolean} True if auditable source file.
  */
 function isAuditableCodeFile(filePath) {
   const ext = path.extname(filePath).toLowerCase();
@@ -170,12 +268,80 @@ function calculateEmpiricalAdmissionThreshold(recentTurnovers, floor = 3.0, cap 
 }
 
 /**
- * Evaluates staged diff for a single file.
+ * Classifies every line of a file text snapshot in stateful block-comment order (1-based indexed).
  *
- * @param {string} relativePath
- * @param {boolean} isNew
- * @returns {object} File bounds metrics
+ * @param {string} sourceText - Full file content at a given git revision/index.
+ * @returns {number[]} 0-based array mapping lineIdx -> LINE_* constant.
  */
+function classifyAllLinesWithState(sourceText) {
+  const state = { inBlockComment: false, inDocComment: false };
+  return sourceText.split(/\r?\n/).map((line) => classifyLineWithState(line, state));
+}
+
+/**
+ * Reads full blob content from index (`:path`) or `HEAD:path` for accurate block-comment context.
+ *
+ * @param {string} revSpec - Git object spec such as `:src/foo.ts` or `HEAD:src/foo.ts`.
+ * @returns {string | null} File content or null if unavailable.
+ */
+function readGitBlobText(revSpec) {
+  try {
+    return execFileSync('git', ['show', revSpec], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Evaluates staged diff for a single file using stateful multi-line comment tracking.
+ *
+ * @param {string} relativePath - Repo-relative staged file path.
+ * @param {boolean} isNew - Whether file does not exist in HEAD.
+ * @returns {object} File bounds metrics.
+ */
+function resolveDiffLineKind(line, lineNumber, kinds, fallbackState) {
+  const index = lineNumber - 1;
+  if (kinds && index >= 0 && index < kinds.length) {
+    return kinds[index];
+  }
+  return classifyLineWithState(line.slice(1), fallbackState);
+}
+
+/** Accumulates hunk counts using full-file classifications and revision line coordinates. */
+function countClassifiedDiffLines(diffRaw, oldLineKinds, newLineKinds) {
+  const counts = { physAdd: 0, physDel: 0, substantiveAdd: 0, substantiveDel: 0, nonCommentNonBlankAdd: 0 };
+  let oldLineNum = 0;
+  let newLineNum = 0;
+  const addFallbackState = { inBlockComment: false, inDocComment: false };
+  const delFallbackState = { inBlockComment: false, inDocComment: false };
+  for (const line of diffRaw.split(/\r?\n/)) {
+    if (/^(?:\+\+\+|---|diff |index )/.test(line)) {
+      continue;
+    }
+    const hunkMatch = /^@@\s+-(\d+)(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s+@@/.exec(line);
+    if (hunkMatch) {
+      oldLineNum = Number(hunkMatch[1]);
+      newLineNum = Number(hunkMatch[2]);
+      continue;
+    }
+    if (line.startsWith('+')) {
+      counts.physAdd += 1;
+      const kind = resolveDiffLineKind(line, newLineNum++, newLineKinds, addFallbackState);
+      counts.substantiveAdd += Number(kind === LINE_SUBSTANTIVE);
+      counts.nonCommentNonBlankAdd += Number(kind === LINE_SUBSTANTIVE || kind === LINE_TRAMPOLINE);
+    } else if (line.startsWith('-')) {
+      counts.physDel += 1;
+      const kind = resolveDiffLineKind(line, oldLineNum++, oldLineKinds, delFallbackState);
+      counts.substantiveDel += Number(kind === LINE_SUBSTANTIVE);
+    }
+  }
+  return counts;
+}
+
 function evaluateFileStagedDiff(relativePath, isNew) {
   let diffRaw = '';
   try {
@@ -188,37 +354,16 @@ function evaluateFileStagedDiff(relativePath, isNew) {
     // Diff failure fallback
   }
 
-  let physAdd = 0;
-  let physDel = 0;
-  let substantiveAdd = 0;
-  let substantiveDel = 0;
-  let nonCommentNonBlankAdd = 0;
+  const headContent = isNew ? null : readGitBlobText(`HEAD:${relativePath}`);
+  const indexContent = readGitBlobText(`:${relativePath}`);
+  const oldLineKinds = headContent !== null ? classifyAllLinesWithState(headContent) : null;
+  const newLineKinds = indexContent !== null ? classifyAllLinesWithState(indexContent) : null;
 
-  const lines = diffRaw.split(/\r?\n/);
-  for (const line of lines) {
-    if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('@@')) {
-      continue;
-    }
-    if (line.startsWith('+')) {
-      physAdd++;
-      const kind = classifyLine(line.slice(1));
-      if (kind === LINE_SUBSTANTIVE) {
-        substantiveAdd++;
-        nonCommentNonBlankAdd++;
-      } else if (kind === LINE_TRAMPOLINE) {
-        nonCommentNonBlankAdd++;
-      }
-    } else if (line.startsWith('-')) {
-      physDel++;
-      const kind = classifyLine(line.slice(1));
-      if (kind === LINE_SUBSTANTIVE) {
-        substantiveDel++;
-      }
-    }
-  }
+  const { physAdd, physDel, substantiveAdd, substantiveDel, nonCommentNonBlankAdd } =
+    countClassifiedDiffLines(diffRaw, oldLineKinds, newLineKinds);
 
   const substantiveRatio = physAdd > 0 ? nonCommentNonBlankAdd / physAdd : 1.0;
-  const tspr = nonCommentNonBlankAdd > 0 ? substantiveAdd / nonCommentNonBlankAdd : 1.0;
+  const tspr = physAdd === 0 ? 1.0 : nonCommentNonBlankAdd > 0 ? substantiveAdd / nonCommentNonBlankAdd : 0.0;
 
   return {
     path: relativePath,
@@ -234,6 +379,7 @@ function evaluateFileStagedDiff(relativePath, isNew) {
 
 module.exports = Object.freeze({
   REPO_ROOT,
+  DIFF_BOUNDS_CONTRACT,
   CODE_EXTENSIONS,
   EXEMPT_EXTENSIONS,
   LINE_BLANK,
@@ -242,6 +388,7 @@ module.exports = Object.freeze({
   LINE_TRAMPOLINE,
   LINE_SUBSTANTIVE,
   classifyLine,
+  classifyLineWithState,
   isMechanicalTrampoline,
   isAuditableCodeFile,
   getStagedStatusList,
