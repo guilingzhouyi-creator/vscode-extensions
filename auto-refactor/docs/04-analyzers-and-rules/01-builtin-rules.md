@@ -1,4 +1,4 @@
-# 01. 四层规则分层架构、32 个内置分析器与 375 条全量规则字典 (360 规范 + 15 历史别名)
+# 01. 四层规则分层架构、32 个内置分析器与 377 条全量规则字典 (360 规范 + 17 历史别名)
 
 > **所属层级**：L4 规则引擎与内置分析器 (`docs/04-analyzers-and-rules/`)  
 > **对应代码真源**：`src/core/rules/registry.ts`、`src/core/rules/entries/*.ts`、`src/core/analyzer-registry.ts`、`src/analyzers/*.ts`
@@ -7,7 +7,7 @@
 
 ## 1. 四层规则分层架构与双轨文案架构
 
-`auto-refactor` 将全部 **375 条内置规则**（含 **360 条规范化 `FAMILY-TOPIC-NNN` 规则**与 **15 条向后兼容别名规则**）统一收拢于 `src/core/rules/registry.ts` 单一真源注册表中，并由 `npm run validate-rules-registry` 门禁在每次构建时强制校验「发射集 = 注册集 = 文档覆盖集（375/375）」。在工作区全域单源规则目录快照（`scripts/common/rule-catalog.json`）中，活跃规则规模保持 **534 条全仓 SSOT 活跃规则**。
+`auto-refactor` 将全部 **377 条内置规则**（含 **360 条规范化 `FAMILY-TOPIC-NNN` 规则**与 **17 条向后兼容别名规则**）统一收拢于 `src/core/rules/registry.ts` 单一真源注册表中，并由 `npm run validate-rules-registry` 门禁在每次构建时强制校验「发射集 = 注册集 = 文档覆盖集（377/377）」。在工作区全域单源规则目录快照（`scripts/common/rule-catalog.json`）中，活跃规则规模保持 **536 条全仓 SSOT 活跃规则**。
 
 ### 1.1 四层规则分层拓扑
 
@@ -15,12 +15,12 @@
 | :--- | :---: | :--- | :--- |
 | **Layer 1：全域安全与卫生底线** | 69 条 | `SEC` / `HYG` / `ERR` / `CMT` / `DOC` / `SIM` | 凭证防泄露、注入防御、错误吞没拦截、代码物理卫生、注释质量 (ECD-C) 与文档结构完整性 |
 | **Layer 2：语言族现代化与标准库** | 112 条 | `TSM` / `MOD` / `PYM` / `RSM` / `GOM` / `GDM` / `SH` / `PS` (`SHL`) / `STDLIB` (`STD`) / `UI` / `PROD` | TypeScript、Python、Rust、Go、GDScript、Shell、PowerShell 现代语法惯用法、标准库手写轮子替换与前端工程现代化 |
-| **Layer 3：架构拓扑、治理、数据与性能** | 170 条 | `ARCH` / `GOV` / `DAT` / `PRF` / `DEP` / `NAM` / `CONST` / `CPX` / `GATE` / `CMP` / `NUM` / `GUARD` / `ENG` / `EXT` / `BIG` | 分层单向依赖、架构防腐、多 Agent 协作防冲突 (`GOV-AGN-001`)、切片破坏防范 (`GOV-SLC-001`)、轨迹回归检验 (`GOV-TRJ-001`)、N+1 数据库查询阻断与热循环零分配 |
-| **Layer 4：领域专精、测试现代性与历史兼容** | 16 条 | `VSC` / `TST` + 15 条 Legacy Aliases | Godot 4 游戏引擎运行态契约、VS Code 扩展清单与事件规范、测试有效覆盖深度与历史规则平滑迁移过渡窗口 |
+| **Layer 3：架构拓扑、治理、数据与性能** | 172 条 | `ARCH` / `GOV` / `DAT` / `PRF` / `DEP` / `NAM` / `CONST` / `CPX` / `GATE` / `CMP` / `NUM` / `GUARD` / `ENG` / `EXT` / `BIG` | 分层单向依赖、架构防腐、多 Agent 协作防冲突 (`GOV-AGN-001`)、切片破坏防范 (`GOV-SLC-001`)、轨迹回归检验 (`GOV-TRJ-001`)、N+1 数据库查询阻断与热循环零分配 |
+| **Layer 4：领域专精、测试现代性与历史兼容** | 16 条 | `VSC` / `TST` + 17 条 Legacy Aliases | Godot 4 游戏引擎运行态契约、VS Code 扩展清单与事件规范、测试有效覆盖深度与历史规则平滑迁移过渡窗口 |
 
 ### 1.2 双轨文案分层契约（Dual-Track Wording Architecture）
 
-- **机读/执行轨（Machine & Agent Track）**：位于 `src/core/messages/`、`src/core/rules/entries/` 与 `src/core/guidance/`，底层规则注册表（`RULE_REGISTRY`）与内核诊断统一为规范英文标准（涵盖所有 `summary` 与 `remediation` 规范元数据），输出高 Token 密度、确定性的 SARIF 2.1.0 诊断载荷与 CAPP 智能体修复提示词，并作为工作区单源规则目录（`scripts/common/rule-catalog.json`，534 条全仓 SSOT）的唯一真源底座。
+- **机读/执行轨（Machine & Agent Track）**：位于 `src/core/messages/`、`src/core/rules/entries/` 与 `src/core/guidance/`，底层规则注册表（`RULE_REGISTRY`）与内核诊断统一为规范英文标准（涵盖所有 `summary` 与 `remediation` 规范元数据），输出高 Token 密度、确定性的 SARIF 2.1.0 诊断载荷与 CAPP 智能体修复提示词，并作为工作区单源规则目录（`scripts/common/rule-catalog.json`，536 条全仓 SSOT）的唯一真源底座。
 - **人读/呈现轨（Human & Presentation Track）**：由 **Praxis 表现层**（`src/core/praxis/presentation/`）与 `PraxisI18nProvider` 独占承载，采用模块化领域分包双语字典（`zh-cn/` 与 `en/`），面向人类工程师与 IDE 富文本诊断卡片（`PraxisDiagnosticCard`）提供完整、专业、细粒度的人机可读本地化转译与交互式修复指引。
 
 ### 1.3 标准 3-3-3 命名拓扑公理、权威三字母映射与三阶双轨别名等价网络
@@ -47,7 +47,7 @@
 #### 1.3.3 三阶双轨别名等价网络（areAliasForms）
 规则 ID 是工程配置、基线压制清单（Baseline Ratchet）以及存量 SARIF 报告的持久化契约锚点。引擎通过 `src/core/rules/aliases.ts` 中的 `areAliasForms(left, right)` 实现了 **三阶双轨别名等价网络**：
 1. **阶一：字面精确等价**：若 `left === right`，直接判定匹配（O(1) 短路）；
-2. **阶二：历史别名规范映射等价**：基于 `LEGACY_RULE_ALIASES` 字典，若 `canonicalRuleId(left) === canonicalRuleId(right)`，判定为同一规则的现代与历史标识（15 条存量别名平滑支持）；
+2. **阶二：历史别名规范映射等价**：基于 `LEGACY_RULE_ALIASES` 字典，若 `canonicalRuleId(left) === canonicalRuleId(right)`，判定为同一规则的现代与历史标识（17 条存量别名平滑支持）；
 3. **阶三：标准 3 字母拓扑归一化等价**：通过 `toCanonicalRuleId(left) === toCanonicalRuleId(right)`，将非标多字母主题码投影为标准 3-3-3 拓扑形式后断言等价。
 
 该网络使得消费方无论在基线配置中使用历史旧名称（如 `clean-layer-violation`）、存量扩展名称还是最新 3-3-3 规范名称，引擎均能透明互认，达成「零静默破坏」的平滑演进。
@@ -78,28 +78,28 @@
 
 ---
 
-## 3. 全量 375 条内置规则权威字典（由门禁自动核验）
+## 3. 全量 377 条内置规则权威字典（由门禁自动核验）
 
 ### Layer 1 — 全域安全、密钥与卫生底线层 (Universal Safety & Hygiene)
 
 | 规则 ID | 所属分析器 | 规则族 | 默认级别 | 适用语言 | 规则中文摘要 (`summary`) | 修复与重构指引 (`remediation`) |
 | :--- | :--- | :--- | :---: | :--- | :--- | :--- |
-| `CMT-BAN-001` | <a id="cmt-ban-001"></a>`comments` | `CMT` | `warning` | `all` | 不足 150 行的小文件使用 `═` 文件级横幅。 | `standard` 及以上 |
-| `CMT-CON-001` | <a id="cmt-con-001"></a>`comments` | `CMT` | `warning` | `all` | 异步导出方法未注明并发调度假设、可重入性或幂等语义。 | `strict` |
-| `CMT-DOC-001` | <a id="cmt-doc-001"></a>`comments` | `CMT` | `warning` | `all` | 核心公开导出符号缺少功能描述、参数或返回值 Docstring/JSDoc 说明。 | `standard` 及以上 |
-| `CMT-DOC-002` | <a id="cmt-doc-002"></a>`comments` | `CMT` | `warning` | `all` | 机械无意义冗余注释 (注释文本仅重复函数名或符号名)。 | `standard` 及以上 |
-| `CMT-HDR-001` | <a id="cmt-hdr-001"></a>`comments` | `CMT` | `warning` | `all` | 源码文件顶部缺少文件层级职责与设计意图注释。 | `basic` 及以上 |
-| `CMT-HDR-002` | <a id="cmt-hdr-002"></a>`comments` | `CMT` | `warning` | `all` | 规范严格六字段题头契约缺失六字段之一 (模块归属、文件路径、架构定位、依赖与触发、职责说明、退出语义与设计依据)。 | `strict` |
-| `CMT-HDR-003` | <a id="cmt-hdr-003"></a>`comments` | `CMT` | `warning` | `all` | 题头声明路径与物理文件路径失真不一致。 | `strict` |
+| `CMT-BAN-001` | <a id="cmt-ban-001"></a>`comments` | `CMT` | `warning` | `all` | 不足 150 行的小文件使用 `═` 文件级横幅。 | 删除不足 150 行文件中的横幅分隔条，改用简洁的分节标题注释。 |
+| `CMT-CON-001` | <a id="cmt-con-001"></a>`comments` | `CMT` | `warning` | `all` | 异步导出方法未注明并发调度假设、可重入性或幂等语义。 | 在 JSDoc 中明确标注并发调度假设、可重入保护、锁作用域或幂等语义。 |
+| `CMT-DOC-001` | <a id="cmt-doc-001"></a>`comments` | `CMT` | `warning` | `all` | 核心公开导出符号缺少功能描述、参数或返回值 Docstring/JSDoc 说明。 | 为公开导出符号补齐职责摘要与参数、返回值契约说明的 JSDoc/Docstring。 |
+| `CMT-DOC-002` | <a id="cmt-doc-002"></a>`comments` | `CMT` | `warning` | `all` | 机械无意义冗余注释 (注释文本仅重复函数名或符号名)。 | 改写机械复述注释，补充设计动机、边界不变量或异常前提说明。 |
+| `CMT-HDR-001` | <a id="cmt-hdr-001"></a>`comments` | `CMT` | `warning` | `all` | 源码文件顶部缺少文件层级职责与设计意图注释。 | 在文件顶部补充模块职责、上下游依赖与设计意图说明注释。 |
+| `CMT-HDR-002` | <a id="cmt-hdr-002"></a>`comments` | `CMT` | `warning` | `all` | 规范严格六字段题头契约缺失六字段之一 (模块归属、文件路径、架构定位、依赖与触发、职责说明、退出语义与设计依据)。 | 补齐标准六字段模块题头（Module、File Path、Architecture Role、Dependencies & Triggers、Responsibilities、Exit Semantics & Design Rationale）。 |
+| `CMT-HDR-003` | <a id="cmt-hdr-003"></a>`comments` | `CMT` | `warning` | `all` | 题头声明路径与物理文件路径失真不一致。 | 更新模块题头中的 `File Path` 字段，使其与磁盘实际相对路径一致。 |
 | `CMT-HDR-004` | <a id="cmt-hdr-004"></a>`comments` | `CMT` | `warning` | `all` | 文件排版顺序违规：顶层六字段模块头注释必须置于所有非指令代码语句之前。 | 调整文件物理排版，将模块头 JSDoc 块移至文件第 1 行（或 shebang 之后）。 |
 | `CMT-INT-001` | <a id="cmt-int-001"></a>`comments` | `CMT` | `warning` | `all` | 注释声称的职责特征（如纯函数、无副作用、并发安全）与 AST 实际数据流/副作用特征矛盾。 | 修正注释使其真实反映实现行为，或重构代码消除未声明的副作用与竞态条件。 |
 | `CMT-LNG-001` | <a id="cmt-lng-001"></a>`comments` | `CMT` | `warning` | `all` | 注释书写语言显著偏离项目或代码域的主导规范（例如英文主导库中突兀插入中文注释）。 | 将注释语言对齐项目推荐规范，保持代码域内部风格一致性。 |
 | `CMT-LNG-002` | <a id="cmt-lng-002"></a>`comments` | `CMT` | `warning` | `all` | 单个文件内部中英文注释无序交错混杂（中文与英文占比均较高且缺乏分层规律）。 | 统一单文件内的注释语言规范，避免局部多语言风格碎片化。 |
-| `CMT-MOJI-001` | <a id="cmt-moji-001"></a>`comments` | `CMT` | `warning` | `all` | 编码损坏（U+FFFD 替换符、UTF-8 被按 Latin-1 解码的 `Ã`+高位字节、Windows-1252 智能引号乱码）。跨语言通用。 | `basic` 及以上 |
-| `CMT-SEP-001` | <a id="cmt-sep-001"></a>`comments` | `CMT` | `warning` | `all` | 同一文件混用短标题分隔（`── 标题 ──`）与长串分隔（`──── 标题`）；纯分隔线豁免。 | `standard` 及以上 |
+| `CMT-MOJI-001` | <a id="cmt-moji-001"></a>`comments` | `CMT` | `warning` | `all` | 编码损坏（U+FFFD 替换符、UTF-8 被按 Latin-1 解码的 `Ã`+高位字节、Windows-1252 智能引号乱码）。跨语言通用。 | 以 UTF-8 无 BOM 重新编码保存文件，并清理替换损坏或乱码字符序列。 |
+| `CMT-SEP-001` | <a id="cmt-sep-001"></a>`comments` | `CMT` | `warning` | `all` | 同一文件混用短标题分隔（`── 标题 ──`）与长串分隔（`──── 标题`）；纯分隔线豁免。 | 统一全文件内采用单一规格的分节分隔线样式。 |
 | `CMT-TRM-001` | <a id="cmt-trm-001"></a>`comments` | `CMT` | `warning` | `all` | 注释或文档中包含临时敷衍口吻、过度肯定吹嘘、情绪化贬损或非客观元叙事用语。 | 使用求真客观的技术事实陈述，说明具体技术范围、实现机制与设计不变量。 |
 | `CMT-VMD-001` | <a id="cmt-vmd-001"></a>`comments` | `CMT` | `warning` | `all` | 有效注释密度过低或存在逐行直译代码名的注水现象（未解释设计原因与边界不变量）。 | 减少重复代码名的冗余直译，重点补充“为什么这样设计”与“哪些边界不能破坏”。 |
-| `CMT-WID-001` | <a id="cmt-wid-001"></a>`comments` | `CMT` | `warning` | `all` | 注释/docstring 物理行宽超过 100 列；工具指令行（`noqa`/`type: ignore`/`eslint-disable`/`@ts-expect-error` 等）以及 `comments.options.directiveTokens` 声明的项目自有指令豁免。 | `standard` 及以上 |
+| `CMT-WID-001` | <a id="cmt-wid-001"></a>`comments` | `CMT` | `warning` | `all` | 注释/docstring 物理行宽超过 100 列；工具指令行（`noqa`/`type: ignore`/`eslint-disable`/`@ts-expect-error` 等）以及 `comments.options.directiveTokens` 声明的项目自有指令豁免。 | 合理折行排版注释与文档字符串，使每行物理宽度保持在 100 列以内。 |
 | `DOC-DUP-001` | <a id="doc-dup-001"></a>`docs` | `DOC` | `warning` | `markdown` | 同一文档内正文行重复（≥24 字符）。 | 收敛为单一章节 + 指针，避免副本漂移。 |
 | `DOC-FEN-001` | <a id="doc-fen-001"></a>`docs` | `DOC` | `error` | `markdown` | Markdown 代码围栏未闭合。 | 补上闭合围栏，避免后续章节被吞进代码块。 |
 | `DOC-LNK-001` | <a id="doc-lnk-001"></a>`docs` | `DOC` | `warning` | `markdown` | 反引号路径或相对链接指向不存在的文件。 | 更新为现路径，或在行内标注已废止/示例。 |
@@ -456,6 +456,7 @@
 | `disallowed-import` | <a id="disallowed-import"></a>`dependency-graph` | `DEP` | `error` | `all` | 声明式导入边界违规：跨组依赖或未授权外部包。（计划迁移至 `DEP-IMP-001`） | 按配置的 allowGroups/allowExternal 调整导入，或显式登记豁免。 |
 | `duplicate-literal` | <a id="duplicate-literal"></a>`constants` | `LEGACY` | `warning` | `all` | 自动聚合多处行号并提示提取共享常量。（计划迁移至 `CST-DUP-001`） | 同一文件内相同字面量出现频次超标（默认 ≥ 3 次）。 |
 | `expensive-loop-operation` | <a id="expensive-loop-operation"></a>`performance` | `PRF` | `error` | `all` | 循环体内执行昂贵深拷贝（.duplicate(true)）或阻塞式序列化与IO。（计划迁移至 `PRF-CLON-001`） | 消除热路径内的深拷贝操作，改用只读视图或轻量引用。 |
+| `hardcoded-string` | <a id="hardcoded-string"></a>`constants` | `CONST` | `warning` | `all` | 常量区外散落硬编码字符串字面量，存在魔值漂移与重复风险。（计划迁移至 `CST-STR-001`） | 将具备领域语义的硬编码字符串抽取为具名模块级常量。 |
 | `high-algorithmic-complexity` | <a id="high-algorithmic-complexity"></a>`performance` | `PRF` | `warning` | `all` | 循环多重嵌套引发潜在 O(N^2)/O(N^3) 复杂度热点或循环体内隐式线性查找。（计划迁移至 `PRF-NEST-001`） | 重构循环嵌套或预先构建 Map/Set 索引将查找降为 O(1)。 |
 | `high-complexity` | <a id="high-complexity"></a>`complexity` | `CPX` | `warning` | `all` | 函数圈复杂度超过阈值。（计划迁移至 `CPX-CYC-001`） | 抽取具名步骤、早返回替代嵌套分支，或按职责拆分函数。 |
 | `high-entropy-token` | <a id="high-entropy-token"></a>`secrets` | `LEGACY` | `warning` | `all` | 高熵字符串疑似密钥/令牌。（计划迁移至 `SEC-ENT-001`） | 移入配置/密钥管理；确为误报时用 matchRule 抑制并写明理由。 |
@@ -470,6 +471,7 @@
 | `VOL-TAU-002` | <a id="vol-tau-002"></a>`large-file` | `VOL` | `warning` | `all` | 令牌密度高于上限：每有效代码行的语义令牌数高于 22，单行承载的概念超出一次阅读可容纳的量。 | 从单体链式表达式中抽取中间变量，把嵌套逻辑摊到独立行上。 |
 | `VOL-POR-001` | <a id="vol-por-001"></a>`architecture` | `VOL` | `warning` | `all` | 接线载荷超出绝对占比预算：模块的导入、再导出与转发胶水行占比超过 60%，而模块职责并不以接线为本务。 | 把转发包装内联回调用方，或把接线集中到独立组装根，让模块承载逻辑而非连接。 |
 | `loop-transient-allocation` | <a id="loop-transient-allocation"></a>`performance` | `PRF` | `warning` | `all` | 循环体内瞬态堆分配（ADV-PRF-002），违背零瞬态分配契约。（计划迁移至 `PRF-TRAN-001`） | 将对象实例化提升到循环外或使用对象池模式（ADV-POOL-001）。 |
+| `magic-number` | <a id="magic-number"></a>`constants` | `CONST` | `warning` | `all` | 代码逻辑中直接嵌入未解释的裸数字字面量（魔法数字）。（计划迁移至 `CST-NUM-001`） | 将未命名的数值字面量抽取为具备清晰物理或策略语义的模块级常量。 |
 | `nested-constant` | <a id="nested-constant"></a>`constants` | `LEGACY` | `warning` | `all` | 严禁常量化嵌套：禁止冗余常量别名引用、深层嵌套常量对象与作用域内部伪常量。（计划迁移至 `CST-NST-001`） | 将常量直接内联或提升至模块顶层单源声明，消除无意义的间接别名与深层对象嵌套。 |
 | `secret-detected` | <a id="secret-detected"></a>`secrets` | `LEGACY` | `error` | `all` | 疑似硬编码凭据（按模式识别）。（计划迁移至 `SEC-TOK-001`） | 撤销并轮换该凭据；改为从环境/密钥管理读取。 |
 | `unused-export` | <a id="unused-export"></a>`dependency-graph` | `DEP` | `warning` | `all` | 导出符号无人引用（TS/JS 口径；Python 无 export 关键字不参与）。（计划迁移至 `DEP-UNX-001`） | 删除无人使用的导出，或把它收回模块内部。 |

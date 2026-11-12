@@ -52,7 +52,7 @@ Defines the 3-tier gate architecture (Tier 1 Local Shift-Left $\to$ Tier 1.5 Rem
 
 `git diff --cached --name-only` maps staged paths to 5 controlled domains:
 - `workspace-timing/**` $\to$ `npm run compile && npm run test:fast && npm run review`
-- `auto-refactor/**` $\to$ <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count --> experts & <!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor --> self-audit (`npm run gate && npm test`)
+- `auto-refactor/**` $\to$ <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count --> experts & <!-- METRICS:BEGIN rule-auto-refactor -->**377 条规则**<!-- METRICS:END rule-auto-refactor --> self-audit (`npm run gate && npm test`)
 - `WebGames/**` $\to$ `check-gdscript.sh`, `test-run.ps1`, config parity audit
 - `fractal-git/**` $\to$ `cargo clippy --all-targets -- -D warnings`, `cargo test`, `audit-taxis.ps1`
 - `scripts/**` / `.github/**` / `AGENTS.md` / `.agents/**` $\to$ `governance` domain (`audit-all.ps1`, `validate-skills.js`)
