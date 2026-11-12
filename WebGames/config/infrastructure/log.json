@@ -18,7 +18,13 @@
     "max_bytes": 5242880,
     "max_files": 5,
     "min_level": "info",
-    "include_channels": []
+    "batch_size": 1,
+    "include_channels": [],
+    "encryption": {
+      "enabled": false,
+      "seal_key_env": "KALAR_LOG_SEAL_KEY",
+      "hmac_chain": true
+    }
   },
   "structured": {
     "enabled": true,
@@ -82,6 +88,8 @@
     "LOG_LIFECYCLE_SHUTDOWN_START": "Graceful shutdown pipeline started with reason: {exit_reason}.",
     "LOG_LIFECYCLE_SHUTDOWN_CLOSED": "Graceful shutdown pipeline closed; elapsed time: {elapsed_ms} ms.",
     "LOG_LIFECYCLE_STAGE_TIMEOUT": "Shutdown phase '{phase_label}' timed out; continuing cleanup.",
-    "LOG_ESC_ACTION_DISPATCHED": "ESC action '{action_type}' dispatched for request '{request_id}'."
+    "LOG_ESC_ACTION_DISPATCHED": "ESC action '{action_type}' dispatched for request '{request_id}'.",
+    "LOG_TAMPER_DETECTED": "Log chain integrity anomaly detected at sequence {sequence}: {reason}.",
+    "LOG_ENCRYPTION_FALLBACK": "Log encryption seal key missing for env '{env_name}'; operating in fail-safe plain audit mode."
   }
 }
