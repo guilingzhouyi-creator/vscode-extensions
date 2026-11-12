@@ -39,6 +39,13 @@ pub struct SectionParseResult {
     pub headings: Vec<(String, String)>,
 }
 
+#[derive(Clone, Copy)]
+struct CommitMeta<'a> {
+    commit_type: &'a str,
+    is_breaking: bool,
+    is_production: bool,
+}
+
 /// High-integrity commit message and semantic diff guard.
 pub struct CommitMessageGuard;
 
@@ -114,7 +121,8 @@ impl CommitMessageGuard {
         Self::validate_header_bounds(header, policy, &mut violations);
 
         // 2. Conventional Commit header structure parsing
-        let (commit_type, scope, summary) = Self::parse_header(header, &mut violations, policy);
+        let (commit_type, scope, summary, is_breaking) =
+            Self::parse_header(header, &mut violations, policy);
 
         // 2b. Imperative subject contract: a version history reads as a list of actions.
         if let Some(finding) = style::check_imperative_subject(&summary) {
@@ -130,14 +138,18 @@ impl CommitMessageGuard {
         let is_production = policy
             .production_types
             .iter()
-            .any(|prod_type| prod_type.eq_ignore_ascii_case(&commit_type));
+            .any(|prod_type| prod_type == &commit_type);
 
         // 4. Blank line, production/non-critical sections, ordering, deduplication, and project tag checks
+        let meta = CommitMeta {
+            commit_type: &commit_type,
+            is_breaking,
+            is_production,
+        };
         Self::validate_body_spacing_and_trailers(
             &lines,
             policy,
-            is_production,
-            &commit_type,
+            meta,
             &parsed_sections,
             &section_scan,
             &mut violations,
@@ -242,7 +254,7 @@ impl CommitMessageGuard {
         header: &str,
         violations: &mut Vec<String>,
         policy: &TaxisPolicy,
-    ) -> (String, Option<String>, String) {
+    ) -> (String, Option<String>, String, bool) {
         let colon_idx = match header.find(':') {
             Some(idx) => idx,
             None => {
@@ -253,28 +265,45 @@ impl CommitMessageGuard {
                     )
                     .into(),
                 );
-                return ("unknown".into(), None, header.to_string());
+                return ("unknown".into(), None, header.to_string(), false);
             }
         };
 
         let type_and_scope = header[..colon_idx].trim();
         let summary = header[colon_idx + 1..].trim().to_string();
 
-        let (commit_type, scope) = if let Some(open_paren) = type_and_scope.find('(') {
-            if type_and_scope.ends_with(')') {
-                let parsed_type = type_and_scope[..open_paren].trim().to_lowercase();
-                let parsed_scope = type_and_scope[open_paren + 1..type_and_scope.len() - 1]
-                    .trim()
-                    .to_string();
-                (parsed_type, Some(parsed_scope))
+        let (commit_type, scope, is_breaking) = if let Some(open_paren) = type_and_scope.find('(') {
+            let ends_with_bang = type_and_scope.ends_with(")!");
+            if ends_with_bang || type_and_scope.ends_with(')') {
+                let scope_end = if ends_with_bang {
+                    type_and_scope.len() - 2
+                } else {
+                    type_and_scope.len() - 1
+                };
+                let mut raw_type = type_and_scope[..open_paren].trim();
+                let mut breaking = ends_with_bang;
+                if let Some(stripped) = raw_type.strip_suffix('!') {
+                    raw_type = stripped.trim();
+                    breaking = true;
+                }
+                let parsed_scope = type_and_scope[open_paren + 1..scope_end].trim().to_string();
+                (raw_type.to_string(), Some(parsed_scope), breaking)
             } else {
                 violations.push(
                     "GUARD-MSG-001: Malformed scope in header (unmatched parentheses)".into(),
                 );
-                (type_and_scope.to_lowercase(), None)
+                let (raw_type, breaking) = match type_and_scope.strip_suffix('!') {
+                    Some(stripped) => (stripped.trim().to_string(), true),
+                    None => (type_and_scope.to_string(), false),
+                };
+                (raw_type, None, breaking)
             }
         } else {
-            (type_and_scope.to_lowercase(), None)
+            let (raw_type, breaking) = match type_and_scope.strip_suffix('!') {
+                Some(stripped) => (stripped.trim().to_string(), true),
+                None => (type_and_scope.to_string(), false),
+            };
+            (raw_type, None, breaking)
         };
 
         if policy.require_scope {
@@ -299,7 +328,7 @@ impl CommitMessageGuard {
             && !policy
                 .allowed_types
                 .iter()
-                .any(|allowed_type| allowed_type.eq_ignore_ascii_case(&commit_type))
+                .any(|allowed_type| allowed_type == &commit_type)
         {
             violations.push(format!(
                 "GUARD-MSG-001: Commit type '{}' is not in allowed list: {:?}",
@@ -307,7 +336,7 @@ impl CommitMessageGuard {
             ));
         }
 
-        (commit_type, scope, summary)
+        (commit_type, scope, summary, is_breaking)
     }
 
     fn parse_sections(body_lines: &[&str]) -> SectionParseResult {
@@ -389,11 +418,31 @@ impl CommitMessageGuard {
             2
         } else if matches!(
             lower.as_str(),
-            "added" | "changed" | "fixed" | "removed" | "新增" | "变更" | "修改" | "修复" | "删除"
+            "added"
+                | "changed"
+                | "fixed"
+                | "removed"
+                | "新增"
+                | "新增内容"
+                | "新增功能"
+                | "变更"
+                | "变更调整"
+                | "修改"
+                | "调整"
+                | "重构"
+                | "修复"
+                | "修复缺陷"
+                | "删除"
+                | "移除"
         ) {
             3
-        } else if lower == "verification" || lower == "验证" || lower == "验证结论" {
+        } else if matches!(
+            lower.as_str(),
+            "breaking changes" | "breaking change" | "破坏性变更"
+        ) {
             4
+        } else if lower == "verification" || lower == "验证" || lower == "验证结论" {
+            5
         } else {
             99
         }
@@ -455,23 +504,49 @@ impl CommitMessageGuard {
         }
     }
 
-    fn check_fix_commit_section(
+    fn check_type_specific_sections(
         commit_type: &str,
+        is_breaking: bool,
+        scan: &sections::SectionScan,
         sections: &HashMap<String, String>,
+        policy: &TaxisPolicy,
         violations: &mut Vec<String>,
     ) {
-        if !commit_type.eq_ignore_ascii_case("fix") {
-            return;
+        if commit_type == "fix" {
+            let has_fixed = sections.keys().any(|section_key| {
+                let lower = section_key.to_lowercase();
+                lower == "fixed" || lower == "修复" || lower == "修复缺陷"
+            });
+            if !has_fixed {
+                violations.push(
+                    "GUARD-MSG-001: Fix commits must use '[Fixed]' section instead of '[Changed]'"
+                        .into(),
+                );
+            }
         }
-        let has_fixed = sections.keys().any(|section_key| {
-            let lower = section_key.to_lowercase();
-            lower == "fixed" || lower == "修复"
-        });
-        if !has_fixed {
-            violations.push(
-                "GUARD-MSG-001: Fix commits must use '[Fixed]' section instead of '[Changed]'"
-                    .into(),
-            );
+
+        if !policy.required_sections.is_empty() {
+            if commit_type == "feat" && !scan.has_slot(sections::SectionSlot::Added) {
+                violations.push(format!(
+                    "{}: Commit type 'feat' requires structured section [Added]",
+                    fg_core::constants::rules::RULE_FGT_MSG_002
+                ));
+            }
+            if (commit_type == "refactor" || commit_type == "perf")
+                && !scan.has_slot(sections::SectionSlot::Changed)
+            {
+                violations.push(format!(
+                    "{}: Commit type '{}' requires structured section [Changed]",
+                    fg_core::constants::rules::RULE_FGT_MSG_002,
+                    commit_type
+                ));
+            }
+            if is_breaking && !scan.has_slot(sections::SectionSlot::Breaking) {
+                violations.push(format!(
+                    "{}: Breaking commit (header contains '!') requires structured section [Breaking Changes]",
+                    fg_core::constants::rules::RULE_FGT_MSG_002
+                ));
+            }
         }
     }
 
@@ -570,13 +645,13 @@ impl CommitMessageGuard {
     fn validate_body_spacing_and_trailers(
         lines: &[&str],
         policy: &TaxisPolicy,
-        is_production: bool,
-        commit_type: &str,
+        meta: CommitMeta<'_>,
         parsed: &SectionParseResult,
         scan: &sections::SectionScan,
         violations: &mut Vec<String>,
     ) {
         Self::check_blank_line(lines, policy.require_blank_line, violations);
+        sections::check_body_formatting(lines, violations);
         Self::check_section_duplicates(
             &parsed.headings,
             policy.disallow_duplicate_sections,
@@ -587,12 +662,19 @@ impl CommitMessageGuard {
             policy.enforce_section_ordering,
             violations,
         );
-        Self::check_fix_commit_section(commit_type, &parsed.sections, violations);
+        Self::check_type_specific_sections(
+            meta.commit_type,
+            meta.is_breaking,
+            scan,
+            &parsed.sections,
+            policy,
+            violations,
+        );
         sections::check_empty_sections(scan, violations);
         sections::check_section_floors(scan, violations);
         Self::check_body_volume_and_required_sections(
-            commit_type,
-            is_production,
+            meta.commit_type,
+            meta.is_production,
             parsed,
             scan,
             policy,
@@ -651,16 +733,18 @@ impl CommitMessageGuard {
         if policy.qualitative_verification_only
             && verification::contains_execution_telemetry_numbers(ver_content)
         {
-            violations.push(
-                "CMG-STY-006: [Verification] must contain qualitative logic assertions; raw execution telemetry numbers/percentages are forbidden".into(),
-            );
+            violations.push(format!(
+                "{}: [Verification] must contain qualitative logic assertions; raw execution telemetry numbers/percentages are forbidden",
+                rule_ids::RULE_CMG_STY_006
+            ));
         }
         if policy.require_falsifiable_verification
             && !verification::has_falsifiable_assertion(ver_content)
         {
-            violations.push(
-                "CMG-STY-006: [Verification] must contain at least one substantive falsifiable technical assertion (not a raw shell command or placeholder)".into(),
-            );
+            violations.push(format!(
+                "{}: [Verification] must contain at least one substantive falsifiable technical assertion (not a raw shell command or placeholder)",
+                rule_ids::RULE_CMG_STY_006
+            ));
         }
     }
 }

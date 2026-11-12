@@ -8,7 +8,7 @@
  * Responsibilities:
  *   - Export immutable Git object types and octal file modes.
  *   - Export canonical Fractal Ref prefixes and branch names.
- *   - Export 17 registered FGT-* rule identifiers.
+ *   - Export 36 registered FGT-* rule identifiers.
  *   - Export hermetic benchmark metric names and CLI badges.
  * Exit Semantics & Design Rationale: Provides deeply frozen dictionary objects ensuring runtime
  *   tamper-proofing across JavaScript event loops and IPC bridges.
@@ -48,7 +48,7 @@ export const FRACTAL_REF = Object.freeze({
 } as const);
 
 /**
- * 24 Registered FGT Rules registered in scripts/common/rule-catalog.json,
+ * 36 Registered FGT Rules registered in scripts/common/rule-catalog.json,
  * mirroring crates/fg-core/src/constants/rules.rs (100% SSOT parity).
  */
 export const FGT_RULES = Object.freeze({
@@ -64,6 +64,18 @@ export const FGT_RULES = Object.freeze({
     FGT_GAT_001: 'FGT-GAT-001',
     FGT_IDX_001: 'FGT-IDX-001',
     FGT_LCK_001: 'FGT-LCK-001',
+    FGT_MSG_001: 'FGT-MSG-001',
+    FGT_MSG_002: 'FGT-MSG-002',
+    FGT_MSG_003: 'FGT-MSG-003',
+    FGT_MSG_004: 'FGT-MSG-004',
+    FGT_MSG_005: 'FGT-MSG-005',
+    FGT_MSG_006: 'FGT-MSG-006',
+    FGT_MSG_007: 'FGT-MSG-007',
+    FGT_MSG_008: 'FGT-MSG-008',
+    FGT_MSG_009: 'FGT-MSG-009',
+    FGT_MSG_010: 'FGT-MSG-010',
+    FGT_MSG_011: 'FGT-MSG-011',
+    FGT_MSG_012: 'FGT-MSG-012',
     FGT_MUT_001: 'FGT-MUT-001',
     FGT_OBJ_001: 'FGT-OBJ-001',
     FGT_POL_001: 'FGT-POL-001',

@@ -752,7 +752,7 @@ export function applyIssueDeductions(
     let claimedByFamilyMask = 0;
     const recordFamilyClaim: DeductionApplier = (dim, points, reason, rule, line) => {
         claimedByFamilyMask |= DIMENSION_BIT_MAP[dim] || 0;
-        apply(dim, points, reason, rule, line);
+        effectiveApply(dim, points, reason, rule, line);
     };
 
     applyArchitectureDeductions(issue, recordFamilyClaim);

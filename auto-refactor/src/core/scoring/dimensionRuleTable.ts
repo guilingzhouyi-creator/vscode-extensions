@@ -167,6 +167,7 @@ const RULES_COMMENT_BANNED = ['CMT-BAN-001', 'CMT-TRM-001'];
 /** Constants rules with their own deduction, ahead of the hardcoded-string fallback. */
 const RULE_DUPLICATE_LITERAL = 'duplicate-literal';
 const RULE_MAGIC_NUMBER = 'magic-number';
+const RULE_HARDCODED_STRING = 'hardcoded-string';
 /**
  * Modernization analyzers: every rule they emit is deprecated-language-feature evidence, which
  * is what the `modernity` axis is declared to measure in DIMENSION_ANALYZERS.
@@ -542,6 +543,13 @@ export const DIMENSION_RULES: DimensionRule[] = [
         dimension: DIMENSION_DUPLICATION,
         points: DEDUCTION_SCATTERED_LOCALS,
         rationale: ScoringRationales.SCATTERED_LOCALS,
+    },
+    {
+        analyzer: ANALYZER_CONSTANTS,
+        covers: ruleMatches([RULE_HARDCODED_STRING], ['hardcoded', 'string literal']),
+        dimension: DIMENSION_DUPLICATION,
+        points: DEDUCTION_HARDCODED_STRING,
+        rationale: ScoringRationales.HARDCODED_STRING,
     },
     {
         analyzer: ANALYZER_CONSTANTS,

@@ -31,6 +31,7 @@ const SCAN_TARGETS = Object.freeze([
   'scripts/sh',
   '.githooks',
   '.github/workflows',
+  'auto-refactor/src',
   'fractal-git/scripts',
   'fractal-git/ts',
   'fractal-git/crates',
@@ -101,6 +102,90 @@ const FIXTURE_ALLOWLIST = new Map([
   ['L1-FAKE-CRASH', 'Negative probe fixture in validate-skills self-probe'],
 ]);
 
+const ALIASES_RELATIVE_PATH = 'auto-refactor/src/core/rules/aliases.ts';
+
+/**
+ * Dynamically extracts target canonical IDs from the legacy rule aliases table.
+ *
+ * @param {string} aliasesPath - Absolute path to aliases.ts.
+ * @returns {Set<string>} Canonical target rule IDs mapped in aliases.ts.
+ */
+function loadLegacyAliasTargets(aliasesPath) {
+  if (!fs.existsSync(aliasesPath)) return new Set();
+  const content = fs.readFileSync(aliasesPath, 'utf8');
+  const blockMatch = content.match(
+    /LEGACY_RULE_ALIASES:\s*Readonly<Record<string,\s*string>>\s*=\s*Object\.freeze\(\{([\s\S]*?)\}\);/,
+  );
+  if (!blockMatch) return new Set();
+  const re = /'([a-z0-9-]+)':\s*'([A-Z0-9-]+)'/g;
+  const targets = new Set();
+  let m;
+  while ((m = re.exec(blockMatch[1])) !== null) {
+    targets.add(m[2]);
+  }
+  return targets;
+}
+
+/**
+ * Builds the map of non-rule tokens or transitional identifiers permitted only within
+ * explicit source files (e.g. SPDX licenses in compliance scanners, transitional alias targets).
+ *
+ * @param {string} repoRoot - Absolute repository root.
+ * @returns {Map<string, {files: Set<string>, rationale: string}>} Scoped allowlist.
+ */
+function buildScopedAllowlist(repoRoot) {
+  const scoped = new Map([
+    ['BSD-2-CLAUSE', { files: new Set(['auto-refactor/src/core/intelligence/license-compliance.ts']), rationale: 'SPDX license identifier' }],
+    ['BSD-3-CLAUSE', { files: new Set(['auto-refactor/src/core/intelligence/license-compliance.ts']), rationale: 'SPDX license identifier' }],
+    ['BSD-4-CLAUSE', { files: new Set(['auto-refactor/src/core/intelligence/license-compliance.ts']), rationale: 'SPDX license identifier' }],
+    ['CC-BY-SA-3', { files: new Set(['auto-refactor/src/core/intelligence/license-compliance.ts']), rationale: 'SPDX license identifier' }],
+    ['CC-BY-SA-4', { files: new Set(['auto-refactor/src/core/intelligence/license-compliance.ts']), rationale: 'SPDX license identifier' }],
+    ['RULE-META-SELF-VIOLATION', { files: new Set(['auto-refactor/src/core/architecture/meta-architecture-rules.ts']), rationale: 'Diagnostic tag for engine self-check' }],
+    ['ASY-FLW-001', { files: new Set(['auto-refactor/src/core/cfg/def-use-chain.ts']), rationale: 'Documented flow analysis finding ID in comment' }],
+    ['SAF-NIL-001', { files: new Set(['auto-refactor/src/core/cfg/def-use-chain.ts']), rationale: 'Documented null safety finding ID in comment' }],
+    ['ARCH-DSP-001', { files: new Set(['auto-refactor/src/core/rules/topic-catalog.ts']), rationale: 'Predecessor topic reference in historical anomaly registry' }],
+    ['GOV-AGENT-COLLISION', { files: new Set(['auto-refactor/src/core/trajectory/agentCollisionDetector.ts']), rationale: 'Diagnostic tag for multi-agent collision' }],
+  ]);
+
+  const targets = loadLegacyAliasTargets(path.join(repoRoot, ALIASES_RELATIVE_PATH));
+  for (const targetId of targets) {
+    scoped.set(targetId, {
+      files: new Set([ALIASES_RELATIVE_PATH]),
+      rationale: 'Transitional canonical alias target in aliases.ts',
+    });
+  }
+  return scoped;
+}
+
+const SCOPED_ALLOWLIST = buildScopedAllowlist(REPO_ROOT);
+
+/**
+ * Evaluates whether all occurrences of an identifier are valid (registered, fixture, or scoped).
+ *
+ * @param {string} id - Identifier candidate.
+ * @param {Iterable<string>} files - Relative file paths referencing the identifier.
+ * @param {Set<string>} registeredIds - Registered rule IDs.
+ * @param {Map<string, string>} fixtureAllowlist - Global fixture allowlist.
+ * @param {Map<string, {files: Set<string>, rationale: string}>} scopedAllowlist - Scoped allowlist.
+ * @returns {{allowed: boolean, unauthorizedFiles: string[]}} Evaluation result.
+ */
+function auditReference(id, files, registeredIds, fixtureAllowlist, scopedAllowlist) {
+  if (registeredIds.has(id) || fixtureAllowlist.has(id)) {
+    return { allowed: true, unauthorizedFiles: [] };
+  }
+  const scoped = scopedAllowlist.get(id);
+  if (!scoped) {
+    return { allowed: false, unauthorizedFiles: [...files] };
+  }
+  const unauthorizedFiles = [];
+  for (const f of files) {
+    if (!scoped.files.has(f)) {
+      unauthorizedFiles.push(f);
+    }
+  }
+  return { allowed: unauthorizedFiles.length === 0, unauthorizedFiles };
+}
+
 /**
  * Recursively collects scannable files beneath a directory.
  *
@@ -116,6 +201,7 @@ function collectFiles(dir, accumulator = []) {
     if (entry.isDirectory()) {
       collectFiles(full, accumulator);
     } else if (SCAN_EXTENSIONS.has(path.extname(entry.name))) {
+      if (path.resolve(full) === __filename) continue;
       accumulator.push(full);
     }
   }
@@ -192,6 +278,38 @@ function runSelfProbes() {
     ]).length,
     0,
   );
+
+  const mockRegistered = new Set(['GUARD-ORD-001']);
+  const mockFixture = new Map([['FAKE-XYZ-999', 'test']]);
+  const mockScoped = new Map([
+    ['SCOPED-ID-001', { files: new Set(['allowed/path.ts']), rationale: 'test' }],
+  ]);
+
+  expect(
+    'registered-id-passes',
+    auditReference('GUARD-ORD-001', ['any/file.ts'], mockRegistered, mockFixture, mockScoped).allowed,
+    true,
+  );
+  expect(
+    'global-fixture-passes',
+    auditReference('FAKE-XYZ-999', ['any/file.ts'], mockRegistered, mockFixture, mockScoped).allowed,
+    true,
+  );
+  expect(
+    'scoped-id-in-allowed-file-passes',
+    auditReference('SCOPED-ID-001', ['allowed/path.ts'], mockRegistered, mockFixture, mockScoped).allowed,
+    true,
+  );
+  expect(
+    'scoped-id-in-unauthorized-file-blocks',
+    auditReference('SCOPED-ID-001', ['allowed/path.ts', 'leak/path.ts'], mockRegistered, mockFixture, mockScoped).allowed,
+    false,
+  );
+  expect(
+    'unregistered-id-blocks',
+    auditReference('UNREGISTERED-ID-999', ['any/file.ts'], mockRegistered, mockFixture, mockScoped).allowed,
+    false,
+  );
   return failures;
 }
 
@@ -235,8 +353,10 @@ function runClosureAudit() {
   const registered = loadRegisteredIds();
   const unregistered = [];
   for (const [id, files] of references.entries()) {
-    if (registered.ids.has(id) || FIXTURE_ALLOWLIST.has(id)) continue;
-    unregistered.push({ id, files: [...files] });
+    const verdict = auditReference(id, files, registered.ids, FIXTURE_ALLOWLIST, SCOPED_ALLOWLIST);
+    if (!verdict.allowed) {
+      unregistered.push({ id, files: verdict.unauthorizedFiles });
+    }
   }
 
   return { totalReferenced: references.size, unregistered, missingReason: registered.missingReason };
@@ -320,5 +440,8 @@ module.exports = Object.freeze({
   loadRegisteredIds,
   findMissingLegacyReasons,
   runSelfProbes,
+  auditReference,
+  buildScopedAllowlist,
+  loadLegacyAliasTargets,
   RULE_ID_PATTERN,
 });

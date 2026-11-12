@@ -33,7 +33,7 @@ pub fn handle_submodule(ctx: &CliContext) {
     match subcmd {
         "status" => handle_status(ctx, rest_args),
         "init" => handle_init(ctx, rest_args),
-        "update" => handle_update(ctx, rest_args),
+        "update" => super::submodule_update::handle_update(ctx, rest_args),
         "deinit" => handle_deinit(ctx, rest_args),
         "sync" => handle_sync(ctx, rest_args),
         "add" => handle_add(ctx, rest_args),
@@ -45,7 +45,7 @@ pub fn handle_submodule(ctx: &CliContext) {
 }
 
 /// Gathers Gitlink tree entries from the current HEAD commit.
-fn collect_head_tree_gitlinks(view: &RepoView) -> BTreeMap<String, (FileMode, Oid)> {
+pub(crate) fn collect_head_tree_gitlinks(view: &RepoView) -> BTreeMap<String, (FileMode, Oid)> {
     let mut gitlinks = BTreeMap::new();
     let head_tree_oid = match view
         .head_commit()
@@ -262,58 +262,6 @@ fn derive_path_from_url(url: &str) -> String {
     match trimmed.rsplit(['/', '\\']).next() {
         Some(name) if !name.is_empty() => name.to_string(),
         _ => "submodule".to_string(),
-    }
-}
-
-/// Updates submodules to match recorded gitlink commits.
-fn handle_update(ctx: &CliContext, args: &[String]) {
-    let mut do_init = false;
-    for arg in args {
-        if arg == "--init" {
-            do_init = true;
-        }
-    }
-
-    if do_init {
-        handle_init(ctx, &[]);
-    }
-
-    let view = match RepoView::open(ctx) {
-        Ok(v) => v,
-        Err(err) => reject(CliTag::ERROR, format!("open repository: {err}")),
-    };
-
-    let gitmodules = match GitModules::load_from_worktree(view.work_root()) {
-        Ok(gm) => gm,
-        Err(err) => reject(CliTag::ERROR, format!("load .gitmodules: {err}")),
-    };
-
-    let gitlinks = collect_head_tree_gitlinks(&view);
-    let mut updated_paths = Vec::new();
-
-    for entry in gitmodules.entries().values() {
-        if let Some((_, oid)) = gitlinks.get(&entry.path) {
-            let sub_path = view.work_root().join(&entry.path);
-            let _ = std::fs::create_dir_all(&sub_path);
-            let short_oid = if oid.to_hex().len() >= 8 {
-                &oid.to_hex()[..8]
-            } else {
-                &oid.to_hex()
-            };
-            updated_paths.push((entry.path.clone(), short_oid.to_string()));
-        }
-    }
-
-    if ctx.json_mode {
-        print_json(&serde_json::json!({
-            "operation": "submodule_update",
-            "updated_count": updated_paths.len(),
-            "submodules": updated_paths,
-        }));
-    } else {
-        for (path, short_oid) in &updated_paths {
-            println!("Submodule path '{path}': checked out '{short_oid}'");
-        }
     }
 }
 

@@ -73,7 +73,16 @@ const PREFIX_SHA = 'SHA-';
 const PREFIX_RFC = 'RFC-';
 const PREFIX_CVE = 'CVE-';
 const PREFIX_ISO = 'ISO-';
-const EXTERNAL_ID_PREFIXES = Object.freeze([PREFIX_UTF, PREFIX_SHA, PREFIX_RFC, PREFIX_CVE, PREFIX_ISO]);
+const EXTERNAL_ID_PREFIXES = Object.freeze([
+  PREFIX_UTF,
+  PREFIX_SHA,
+  PREFIX_RFC,
+  PREFIX_CVE,
+  PREFIX_ISO,
+  'HTTP-',
+  'TLS-',
+  'AES-',
+]);
 
 const { getSafeGitEnv } = require(MODULE_GIT_ENV);
 const {
@@ -128,7 +137,8 @@ function loadTermsConfig() {
 
 function validateRuleAntiHallucination(content) {
   const validIds = getValidRuleIds();
-  const rulePattern = /\b([A-Z]{2,4}(?:-[A-Z0-9]+){2,}|L[0-5]-[A-Z0-9]+)\b/g;
+  const rulePattern =
+    /\b([A-Z]{2,6}(?:-[A-Z0-9]+){2,}|(?:LAY|HC|RCFG|SCR|TB)-[A-Z0-9]+(?:-[A-Z0-9]+)*|L[0-5]-[A-Z0-9]+(?:-[A-Z0-9]+)*)\b/g;
   let match;
   const hallucinated = [];
 
@@ -508,10 +518,10 @@ function reportCommitMsgFailure(res, target, isAgentMode) {
   process.exit(1);
 }
 
-function handleSingleCommitValidation(target, content, isAgentMode) {
+function handleSingleCommitValidation(target, content, isAgentMode, options = {}) {
   const targetFile = target && target !== STDIN_TOKEN ? target : '';
   const targetVerification = targetFile || '.git/COMMIT_EDITMSG';
-  const res = validateSingleCommitMessage(content, { targetFile });
+  const res = validateSingleCommitMessage(content, { ...options, targetFile });
   const commitType = res.guardrail?.parsedStructure?.type || '';
 
   // 1. Blocked: Critical failure or debt ceiling exhausted
@@ -624,14 +634,14 @@ function handleSingleCommitValidation(target, content, isAgentMode) {
  * @param {boolean} isAgentMode - Whether to emit the structured envelope.
  * @returns {void}
  */
-function handleStructureOnlyMode(args, isAgentMode) {
+function handleStructureOnlyMode(args, isAgentMode, options = {}) {
   const target = args.find((a) => !a.startsWith('-') || a === STDIN_TOKEN);
   const content = readCommitContent(target);
   if (content === null) {
     console.error('✖ BLOCK 提交信息文件不存在或未提供');
     process.exit(1);
   }
-  const findings = verifyStructure(content);
+  const findings = verifyStructure(content, options);
   const passed = findings.length === 0;
   if (isAgentMode) {
     console.log(
@@ -654,15 +664,50 @@ function handleStructureOnlyMode(args, isAgentMode) {
   process.exit(passed ? 0 : 1);
 }
 
+/** Parses explicit single-message policy and staged declaration witness inputs. */
+function parseContractArgs(rawArgs) {
+  const args = [];
+  const options = {};
+  for (let index = 0; index < rawArgs.length; index++) {
+    const argument = rawArgs[index];
+    if (argument === '--policy') {
+      const tier = rawArgs[++index];
+      if (!tier || tier.startsWith('-')) throw new Error('--policy requires a policy tier');
+      options.policyTier = tier;
+    } else if (argument === '--staged') {
+      options.diffText = execFileSync('git', ['diff', '--cached', '--no-color', '--'], {
+        cwd: path.resolve(__dirname, PARENT_DIR_DEPTH_TWO), encoding: ENCODING_UTF8,
+        maxBuffer: 20 * 1024 * 1024,
+      });
+    } else {
+      args.push(argument);
+    }
+  }
+  if (args.includes(ARG_RANGE) && Object.keys(options).length > 0) {
+    throw new Error('--policy and --staged require a single commit message');
+  }
+  return { args, options };
+}
+
 function main() {
-  const args = process.argv.slice(2);
-  const isAgentMode = args.includes(ARG_AGENT) || args.includes(ARG_AGENT_SHORT) || args.includes(ARG_JSON);
+  const rawArgs = process.argv.slice(2);
+  const isAgentMode = rawArgs.includes(ARG_AGENT) || rawArgs.includes(ARG_AGENT_SHORT) || rawArgs.includes(ARG_JSON);
+  let contract;
+  try {
+    contract = parseContractArgs(rawArgs);
+  } catch (error) {
+    const report = { protocolVersion: PROTOCOL_VERSION, status: 'BLOCK',
+      gate: 'commit-msg:arguments', summary: error.message };
+    console.error(isAgentMode ? JSON.stringify(report) : `✖ BLOCK ${error.message}`);
+    process.exit(1);
+  }
+  const { args, options } = contract;
 
   // The shell entry points delegate their seven structural checks here. `--structure-only` keeps the
   // delegation narrow: the shell has already rendered its step banners, and re-running the style
   // dictionary would report the same finding twice under two different step ids.
   if (args.includes('--structure-only')) {
-    handleStructureOnlyMode(args, isAgentMode);
+    handleStructureOnlyMode(args, isAgentMode, options);
     return;
   }
 
@@ -680,13 +725,13 @@ function main() {
 
   const posArgs = args.filter((a) => !a.startsWith('-') || a === STDIN_TOKEN);
   if (posArgs.length === 0) {
-    console.error('用法: node validate-commit-msg.js <msg-file | -> [--range <git-range>] [--agent]');
+    console.error('用法: node validate-commit-msg.js <msg-file | -> [--policy <tier>] [--staged] [--range <git-range>] [--agent]');
     process.exit(1);
   }
 
   const target = posArgs[0];
   const content = readCommitContent(target);
-  handleSingleCommitValidation(target, content, isAgentMode);
+  handleSingleCommitValidation(target, content, isAgentMode, options);
 }
 
 if (require.main === module) {

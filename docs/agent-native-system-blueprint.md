@@ -279,8 +279,8 @@ flowchart LR
 ```
 
 ### 1. 单源规则全闭包治理
-全工作区所有规则严格收口至单源目录（SSOT <!-- METRICS:BEGIN rule-total -->**534 条规则**<!-- METRICS:END rule-total -->）：
-- `auto-refactor` 承载 <!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor -->（静态重构与 AST 切片守卫）；
+全工作区所有规则严格收口至单源目录（SSOT <!-- METRICS:BEGIN rule-total -->**536 条规则**<!-- METRICS:END rule-total -->）：
+- `auto-refactor` 承载 <!-- METRICS:BEGIN rule-auto-refactor -->**377 条规则**<!-- METRICS:END rule-auto-refactor -->（静态重构与 AST 切片守卫）；
 - `workspace-timing` 承载 <!-- METRICS:BEGIN rule-workspace-timing -->**49 条规则**<!-- METRICS:END rule-workspace-timing -->（VS Code 扩展分层与崩溃安全）；
 - `WebGames` 承载 <!-- METRICS:BEGIN rule-webgames -->**50 条规则**<!-- METRICS:END rule-webgames -->（配置驱动与游戏对象池）；
 - 全局基础设施承载 **35 项**基础设施守卫契约（物理卫生八维与脚本同构）；

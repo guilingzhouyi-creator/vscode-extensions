@@ -707,7 +707,7 @@ fn commit_ingested_odb_tree(
             "feat(core): import archive '{archive_name}' into ODB\n\n\
              [Project]\nfractal-git\n\n\
              [Why]\nIngest structured archive asset into repository object database.\n\n\
-             [Changed]\n- Materialized root tree from archive members\n- Ingested objects directly into ODB\n\n\
+             [Added]\n- Materialized root tree from archive members\n- Ingested objects directly into ODB\n\n\
              [Verification]\nAsserted tree integrity and actor authorization."
         )
     });

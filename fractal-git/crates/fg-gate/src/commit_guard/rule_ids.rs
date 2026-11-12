@@ -114,6 +114,9 @@ pub const WORKSPACE_RULE_IDS: &[&str] = &[
     "secret-detected", "unused-export", "unused-module",
 ];
 
+/// Registered Commit-Msg Style rule forbidding raw execution telemetry counts in `[Verification]`.
+pub const RULE_CMG_STY_006: &str = "CMG-STY-006";
+
 /// Whether an identifier names a registered workspace rule.
 pub fn is_registered(rule_id: &str) -> bool {
     let clean = rule_id.trim();
@@ -123,4 +126,14 @@ pub fn is_registered(rule_id: &str) -> bool {
             .is_ok();
     }
     WORKSPACE_RULE_IDS.binary_search(&clean).is_ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn commit_guard_workspace_rule_constants_are_registered() {
+        assert!(is_registered(RULE_CMG_STY_006));
+    }
 }

@@ -11,6 +11,11 @@ import * as fs from 'fs';
 import type { Issue } from '../types';
 import { FormatPreserver } from './format-preserver';
 import { TextEditApplier } from './text-edit-applier';
+import {
+    resolveBatchIssuesFixes,
+    resolveSingleIssueFix,
+    resolveTransformContext,
+} from './transforms/fix-dispatcher';
 import type {
     CodemodOptions,
     FixDescriptor,
@@ -29,6 +34,16 @@ interface DiffHunk {
     readonly newCount: number;
     readonly lines: readonly string[];
 }
+
+interface PreparedPatchPayload {
+    readonly patchedContent: string;
+    readonly diff: string;
+    readonly appliedCount: number;
+    readonly skippedCount: number;
+}
+
+const CONTEXT_LINES_BEFORE = 3;
+const CONTEXT_LINES_AFTER = 4;
 
 const syncFsWriteText = fs.writeFileSync.bind(fs);
 
@@ -121,28 +136,37 @@ async function writeAtomicAsync(filePath: string, content: string): Promise<void
 export class PatchEngine {
     /**
      * Converts a diagnostic Issue with actionable patch payload into a FixDescriptor.
+     * Supports `insertAnchor` constant hoisting (fail-closed without valid source text)
+     * and dispatches registered codemod transforms.
      *
      * @param issue - Diagnostic finding emitted by scanner.
-     * @returns FixDescriptor or null if issue cannot be fixed automatically.
+     * @param sourceTextOrContext - Optional target file content or TransformContext for
+     *   anchor resolution and transform execution.
+     * @returns FixDescriptor or null if issue cannot be fixed safely.
      */
-    public static issueToFix(issue: Issue): FixDescriptor | null {
-        if (issue.actionable?.patch) {
-            const patchItem = issue.actionable.patch;
-            const edit: TextEdit = {
-                startLine: patchItem.range.startLine,
-                startCol: patchItem.range.startCol,
-                endLine: patchItem.range.endLine,
-                endCol: patchItem.range.endCol,
-                newText: patchItem.replacementText,
-            };
-            return {
-                ruleId: issue.rule,
-                description: issue.suggestion || issue.message,
-                safetyLevel: issue.actionable.safeToAutomate ? 'guaranteed' : 'heuristic',
-                edits: [edit],
-            };
-        }
-        return null;
+    public static issueToFix(
+        issue: Issue,
+        sourceTextOrContext?: string | TransformContext,
+    ): FixDescriptor | null {
+        const context = resolveTransformContext(issue, sourceTextOrContext);
+        return resolveSingleIssueFix(issue, context);
+    }
+
+    /**
+     * Converts all actionable findings for a single file into a conflict-aware list of
+     * FixDescriptors, deduplicating shared top-level constant declarations in batch.
+     *
+     * @param issues - Findings belonging to a single source file.
+     * @param sourceText - Optional source content of the target file.
+     * @param filePath - Optional file path used to build TransformContext.
+     * @returns Ordered array of non-conflicting FixDescriptors for the file.
+     */
+    public static issuesToFixes(
+        issues: readonly Issue[],
+        sourceText?: string,
+        filePath?: string,
+    ): FixDescriptor[] {
+        return resolveBatchIssuesFixes(issues, sourceText, filePath);
     }
 
     /**
@@ -157,6 +181,47 @@ export class PatchEngine {
             filePath,
             sourceText: content,
             lines: content.split(/\r\n|\r|\n/),
+        };
+    }
+
+    private buildApplyResult(
+        filePath: string,
+        originalContent: string,
+        prepared: PreparedPatchPayload,
+    ): PatchApplyResult {
+        return {
+            filePath,
+            originalContent,
+            patchedContent: prepared.patchedContent,
+            unifiedDiff: prepared.diff,
+            appliedFixCount: prepared.appliedCount,
+            skippedConflictCount: prepared.skippedCount,
+        };
+    }
+
+    private preparePatchPayload(
+        filePath: string,
+        content: string,
+        fixes: readonly FixDescriptor[],
+        options: CodemodOptions,
+    ): PreparedPatchPayload {
+        const lineEnding = FormatPreserver.detectLineEnding(content);
+        const filteredFixes = this.filterFixes(fixes, options);
+        const allEdits: TextEdit[] = [];
+        for (const fix of filteredFixes) {
+            allEdits.push(...fix.edits);
+        }
+        const applyResult = TextEditApplier.applyEdits(content, allEdits);
+        const patchedContent = FormatPreserver.normalizeLineEndings(
+            applyResult.content,
+            lineEnding,
+        );
+        const diff = this.generateUnifiedDiff(filePath, content, patchedContent);
+        return {
+            patchedContent,
+            diff,
+            appliedCount: applyResult.appliedCount,
+            skippedCount: applyResult.skippedCount,
         };
     }
 
@@ -175,34 +240,11 @@ export class PatchEngine {
         fixes: readonly FixDescriptor[],
         options: CodemodOptions = {},
     ): PatchApplyResult {
-        const lineEnding = FormatPreserver.detectLineEnding(content);
-        const filteredFixes = this.filterFixes(fixes, options);
-
-        // Collect all atomic edits from approved fixes
-        const allEdits: TextEdit[] = [];
-        for (const fix of filteredFixes) {
-            allEdits.push(...fix.edits);
+        const prepared = this.preparePatchPayload(filePath, content, fixes, options);
+        if (!options.dryRun && prepared.patchedContent !== content) {
+            writeAtomicSync(filePath, prepared.patchedContent);
         }
-
-        const applyResult = TextEditApplier.applyEdits(content, allEdits);
-        const patchedContent = FormatPreserver.normalizeLineEndings(
-            applyResult.content,
-            lineEnding,
-        );
-        const diff = this.generateUnifiedDiff(filePath, content, patchedContent);
-
-        if (!options.dryRun && patchedContent !== content) {
-            writeAtomicSync(filePath, patchedContent);
-        }
-
-        return {
-            filePath,
-            originalContent: content,
-            patchedContent,
-            unifiedDiff: diff,
-            appliedFixCount: applyResult.appliedCount,
-            skippedConflictCount: applyResult.skippedCount,
-        };
+        return this.buildApplyResult(filePath, content, prepared);
     }
 
     /**
@@ -221,33 +263,11 @@ export class PatchEngine {
         fixes: readonly FixDescriptor[],
         options: CodemodOptions = {},
     ): Promise<PatchApplyResult> {
-        const lineEnding = FormatPreserver.detectLineEnding(content);
-        const filteredFixes = this.filterFixes(fixes, options);
-
-        const allEdits: TextEdit[] = [];
-        for (const fix of filteredFixes) {
-            allEdits.push(...fix.edits);
+        const prepared = this.preparePatchPayload(filePath, content, fixes, options);
+        if (!options.dryRun && prepared.patchedContent !== content) {
+            await writeAtomicAsync(filePath, prepared.patchedContent);
         }
-
-        const applyResult = TextEditApplier.applyEdits(content, allEdits);
-        const patchedContent = FormatPreserver.normalizeLineEndings(
-            applyResult.content,
-            lineEnding,
-        );
-        const diff = this.generateUnifiedDiff(filePath, content, patchedContent);
-
-        if (!options.dryRun && patchedContent !== content) {
-            await writeAtomicAsync(filePath, patchedContent);
-        }
-
-        return {
-            filePath,
-            originalContent: content,
-            patchedContent,
-            unifiedDiff: diff,
-            appliedFixCount: applyResult.appliedCount,
-            skippedConflictCount: applyResult.skippedCount,
-        };
+        return this.buildApplyResult(filePath, content, prepared);
     }
 
     /**
@@ -342,9 +362,9 @@ export class PatchEngine {
             newEnd--;
         }
 
-        const contextBefore = Math.max(0, startIdx - 3);
-        const contextAfterOld = Math.min(oldLines.length, oldEnd + 4);
-        const contextAfterNew = Math.min(newLines.length, newEnd + 4);
+        const contextBefore = Math.max(0, startIdx - CONTEXT_LINES_BEFORE);
+        const contextAfterOld = Math.min(oldLines.length, oldEnd + CONTEXT_LINES_AFTER);
+        const contextAfterNew = Math.min(newLines.length, newEnd + CONTEXT_LINES_AFTER);
 
         const hunkLines: string[] = [];
 

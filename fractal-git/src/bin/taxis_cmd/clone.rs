@@ -27,11 +27,10 @@ use fg_core::traits::RefStore;
 use fg_index::config::{set_value, ConfigKey, ConfigWriteMode};
 use fg_storage::in_place::{BundleConsumeOptions, InPlaceBundleConsumer};
 use fg_storage::{clone_file_cow, LooseOdb, OdbRouter};
-use fractal_git::constants::cli::CliTag;
 use fractal_git::DiskRefStore;
 
 use super::checkout::{materialize_files, update_dirc_index};
-use super::common::{fail_fatal, fail_io, fail_usage, print_json, reject, CliContext};
+use super::common::{fail_fatal, fail_io, fail_usage, print_json, CliContext};
 use super::repo_view::RepoView;
 use super::tree_view::flatten_commit_tree;
 
@@ -60,12 +59,11 @@ pub fn handle_clone(ctx: &CliContext) {
 
     let source_path = resolve_local_source_path(&options.source);
     let Some(local_source) = source_path else {
-        reject(
-            CliTag::ERROR,
-            format!(
-                "offline clone requires a local repository path or bundle file (got '{}')",
-                options.source
-            ),
+        super::remote::fail_network_unavailable(
+            ctx,
+            "clone",
+            &options.source,
+            "Clone using native `git clone <url> <dir>` or package an offline bundle (`git bundle create`), then run `taxis clone <local-path-or-bundle> <dir>`.",
         );
     };
 

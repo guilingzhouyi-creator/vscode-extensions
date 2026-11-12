@@ -11,8 +11,108 @@
 
 use fg_core::models::TaxisPolicy;
 use std::collections::HashMap;
+use std::path::Path;
 
 use super::sections::{SectionScan, SectionSlot};
+
+/// Normalizes project aliases (`web-games` -> `webgames`, `fractalgit` -> `fractal-git`, `timing` -> `workspace-timing`).
+fn normalize_project_alias(raw: &str) -> &str {
+    match raw {
+        "web-games" => "webgames",
+        "fractalgit" => "fractal-git",
+        "timing" => "workspace-timing",
+        other => other,
+    }
+}
+
+/// Evaluates a single lease entry against the declared project slice.
+fn check_single_lease_record(
+    lease_value: &serde_json::Value,
+    declared: &[String],
+    violations: &mut Vec<String>,
+) {
+    let Some(raw_id) = lease_value.get("id").and_then(|val| val.as_str()) else {
+        return;
+    };
+    let Some(raw_status) = lease_value.get("status").and_then(|val| val.as_str()) else {
+        return;
+    };
+    if !raw_status.eq_ignore_ascii_case("frozen") {
+        return;
+    }
+    let canonical_id = normalize_project_alias(raw_id.trim());
+    for candidate in declared {
+        if normalize_project_alias(candidate.as_str()) == canonical_id {
+            violations.push(format!(
+                "{}: Project '{}' TTL lease has expired and is Frozen; commit privileges locked",
+                fg_core::constants::rules::RULE_FGT_MSG_007,
+                raw_id
+            ));
+            break;
+        }
+    }
+}
+
+/// Parses an existing project cache file and evaluates frozen leases against declared projects.
+fn inspect_cache_file(
+    cache_path: &Path,
+    declared: &[String],
+    violations: &mut Vec<String>,
+) -> bool {
+    let Ok(content) = std::fs::read_to_string(cache_path) else {
+        return false;
+    };
+    let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content) else {
+        return false;
+    };
+    let Some(leases_val) = parsed.get("leases") else {
+        return true;
+    };
+    if let Some(map) = leases_val.as_object() {
+        for entry_val in map.values() {
+            check_single_lease_record(entry_val, declared, violations);
+        }
+        return true;
+    }
+    if let Some(arr) = leases_val.as_array() {
+        for entry_val in arr {
+            check_single_lease_record(entry_val, declared, violations);
+        }
+        return true;
+    }
+    true
+}
+
+/// Inspects active project cache files upward from `search_start` to enforce Frozen lease lockdown.
+pub fn check_project_leases_at(
+    search_start: &Path,
+    declared: &[String],
+    violations: &mut Vec<String>,
+) {
+    for ancestor in search_start.ancestors() {
+        let taxis_cache = ancestor
+            .join(".taxis")
+            .join("projects")
+            .join("active_projects.json");
+        if taxis_cache.is_file() && inspect_cache_file(&taxis_cache, declared, violations) {
+            return;
+        }
+        let git_cache = ancestor
+            .join(".git")
+            .join("projects")
+            .join("active_projects.json");
+        if git_cache.is_file() && inspect_cache_file(&git_cache, declared, violations) {
+            return;
+        }
+        let runtime_cache = ancestor
+            .join(".taxis")
+            .join("runtime")
+            .join("active_projects.json");
+        if runtime_cache.is_file() && inspect_cache_file(&runtime_cache, declared, violations) {
+            return;
+        }
+    }
+}
 
 /// Collects every project name declared in the project slot.
 ///
@@ -98,8 +198,8 @@ pub fn check_project_tag(
         .iter()
         .map(|name| name.trim().to_lowercase())
         .collect();
-    for project in declared {
-        if !allowed.iter().any(|candidate| candidate == &project) {
+    for project in &declared {
+        if !allowed.iter().any(|candidate| candidate == project) {
             violations.push(format!(
                 "{}: Project '{}' is not in the controlled list: {:?}",
                 fg_core::constants::rules::RULE_FGT_MSG_007,
@@ -107,5 +207,9 @@ pub fn check_project_tag(
                 policy.allowed_projects
             ));
         }
+    }
+
+    if let Ok(current_path) = std::env::current_dir() {
+        check_project_leases_at(&current_path, &declared, violations);
     }
 }

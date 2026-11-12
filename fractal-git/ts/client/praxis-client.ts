@@ -11,10 +11,85 @@
  *   `verifyPreReviewZone` fails, preventing unverified agent mutations from entering the DAG.
  */
 
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import type { FractalRefDescriptor, MaterializeCommitResult, StagedFileEntry } from '../contracts';
-import { GIT_FILE_MODE } from '../constants';
+import { FRACTAL_REF, GIT_FILE_MODE } from '../constants';
 import { materializeCommitPure } from '../native-binding';
 import { verifyPreReviewZone } from '../gate-bridge';
+
+const RE_HEX_OID = /^[0-9a-fA-F]{40}$/;
+
+function resolveGitRefOid(gitDir: string, refName: string, depth = 0): string | undefined {
+    if (depth >= 8) {
+        return undefined;
+    }
+    const cleanRef = refName.replace(/^\/+/, '');
+    const loosePath = path.join(gitDir, cleanRef);
+    if (fs.existsSync(loosePath) && fs.statSync(loosePath).isFile()) {
+        const body = fs.readFileSync(loosePath, 'utf8').trim();
+        if (body.startsWith('ref:')) {
+            return resolveGitRefOid(gitDir, body.slice(4).trim(), depth + 1);
+        }
+        if (RE_HEX_OID.test(body)) {
+            return body.toLowerCase();
+        }
+    }
+    const packedPath = path.join(gitDir, 'packed-refs');
+    if (fs.existsSync(packedPath) && fs.statSync(packedPath).isFile()) {
+        const lines = fs.readFileSync(packedPath, 'utf8').split(/\r?\n/);
+        for (const rawLine of lines) {
+            const line = rawLine.trim();
+            if (line.length === 0 || line.startsWith('#') || line.startsWith('^')) {
+                continue;
+            }
+            const spaceIdx = line.indexOf(' ');
+            if (spaceIdx > 0 && line.slice(spaceIdx + 1).trim() === cleanRef) {
+                const candidate = line.slice(0, spaceIdx).trim();
+                if (RE_HEX_OID.test(candidate)) {
+                    return candidate.toLowerCase();
+                }
+            }
+        }
+    }
+    return undefined;
+}
+
+function resolveParentCommitOids(gitDir: string, targetGitRef: string): string[] {
+    const existingRefOid = resolveGitRefOid(gitDir, targetGitRef);
+    if (existingRefOid) {
+        return [existingRefOid];
+    }
+    const headOid = resolveGitRefOid(gitDir, 'HEAD');
+    return headOid ? [headOid] : [];
+}
+
+function buildCompliantCommitMessage(
+    cardId: string,
+    cellId: string,
+    worktreeId: string,
+    files: readonly StagedFileEntry[],
+    score: number,
+): string {
+    const fileSummary = files.length > 0
+        ? files.slice(0, 5).map((entry) => entry.path).join(', ')
+        : worktreeId;
+    return [
+        `feat(subagent): persist verified worktree commit for ${cardId}`,
+        '',
+        '[Project / 项目归属]',
+        '- fractal-git',
+        '',
+        '[Why / 动机背景]',
+        `- Materialize pre-review changes from ${worktreeId} inside cell ${cellId} onto fractal history.`,
+        '',
+        '[Added / 新增内容]',
+        `- Recorded staged payload (${files.length} file(s)): ${fileSummary}`,
+        '',
+        '[Verification / 验证结论]',
+        `- Pre-review gate check confirmed ${fileSummary} scored ${score} without conflict markers or allocation violations.`,
+    ].join('\n');
+}
 
 /**
  * Immutable facade metadata descriptor for the Fractal Git Client SDK.
@@ -55,7 +130,7 @@ export class PraxisGitClient {
     ): AgentWorktreeHandle {
         const ref: FractalRefDescriptor = {
             tier: 'subagent_worktree',
-            gitRef: `refs/fractal/cell/${cellId}/card/${cardId}/sub/${subagentId}`,
+            gitRef: `${FRACTAL_REF.CELLS_PREFIX}${cellId}/card/${cardId}/sub/${subagentId}`,
             cellId,
             cardId,
             subagentId,
@@ -68,12 +143,12 @@ export class PraxisGitClient {
             worktreeId,
             fractalRef: ref,
             stageFile: (
-                path: string,
+                filePath: string,
                 content: Uint8Array | string,
                 executable = false,
             ) => {
                 stagedFiles.push({
-                    path,
+                    path: filePath,
                     mode: executable ? GIT_FILE_MODE.EXECUTABLE : GIT_FILE_MODE.REGULAR,
                     content,
                 });
@@ -87,11 +162,19 @@ export class PraxisGitClient {
                         `(score: ${verdict.score}): ${reasons}`,
                     );
                 }
+                const parentCommitOids = resolveParentCommitOids(this.gitDir, ref.gitRef);
+                const message = buildCompliantCommitMessage(
+                    cardId,
+                    cellId,
+                    worktreeId,
+                    stagedFiles,
+                    verdict.score,
+                );
                 return materializeCommitPure(this.gitDir, {
                     targetRef: ref,
-                    parentCommitOids: [],
+                    parentCommitOids,
                     files: stagedFiles,
-                    message: 'feat(subagent): atomic task commit\n\n[Project: fractal-git]',
+                    message,
                     authorName: `${cellId}:${subagentId}`,
                     authorEmail: `${subagentId}@${cellId}.praxis.local`,
                     agentMeta: {

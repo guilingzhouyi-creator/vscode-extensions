@@ -301,6 +301,8 @@ function collectViolations(params: ViolationCheckParams): DebtTierViolation[] {
     if (highViolation) violations.push(highViolation);
     const medViolation = checkTierLimit(TIER_MEDIUM, raw.medium, delta.medium, limits.medium);
     if (medViolation) violations.push(medViolation);
+    const lowViolation = checkTierLimit(TIER_LOW, raw.low, delta.low, limits.low);
+    if (lowViolation) violations.push(lowViolation);
     if (weightedGrowth > maxGrowthLimit) {
         violations.push({
             tier: TIER_CRITICAL,
@@ -327,24 +329,24 @@ function determineVerdictAndRationale(params: VerdictDecisionParams): {
     rationale: string;
 } {
     const { raw, delta, violations, scaleFactor, healthFactor, limits } = params;
-    if (raw.critical === 0 && raw.high === 0 && delta.medium === 0) {
+    if (violations.length > 0) {
+        return {
+            verdict: 'BLOCKED_EXCEEDED_BUDGET',
+            rationale: `Technical debt breached elastic budget thresholds: ${violations.map((v) => v.message).join('; ')}`,
+        };
+    }
+    if (raw.critical === 0 && raw.high === 0 && delta.medium === 0 && delta.low === 0) {
         return {
             verdict: 'PERMITTED_ZERO_DEBT',
             rationale: 'Zero Critical and High technical debt observed; fully compliant.',
         };
     }
-    if (violations.length === 0) {
-        return {
-            verdict: 'PERMITTED_ELASTIC',
-            rationale:
-                `Technical debt is within dynamic elastic envelope (scale=${scaleFactor.toFixed(2)}, ` +
-                `healthFactor=${healthFactor.toFixed(2)}, critical=${raw.critical}/${limits.critical}, ` +
-                `high=${raw.high}/${limits.high}). No one-vote veto applied.`,
-        };
-    }
     return {
-        verdict: 'BLOCKED_EXCEEDED_BUDGET',
-        rationale: `Technical debt breached elastic budget thresholds: ${violations.map((v) => v.message).join('; ')}`,
+        verdict: 'PERMITTED_ELASTIC',
+        rationale:
+            `Technical debt is within dynamic elastic envelope (scale=${scaleFactor.toFixed(2)}, ` +
+            `healthFactor=${healthFactor.toFixed(2)}, critical=${raw.critical}/${limits.critical}, ` +
+            `high=${raw.high}/${limits.high}). No one-vote veto applied.`,
     };
 }
 
@@ -412,9 +414,12 @@ export function evaluateElasticDebtBudget(
     };
 }
 
-const CRITICAL_RULE_RE = /^(?:ARCH-|clean-layer-violation$|expensive-loop-operation$)/;
-const HIGH_RULE_RE = /^(?:high-complexity$|CPX-|PRF-|DAT-|TST-TAU|GOV-GAM)/;
-const MEDIUM_RULE_RE = /^(?:large-file$|BIG-|SIM-|duplicate-literal$|GOV-LOG)/;
+const CRITICAL_RULE_RE =
+    /^(?:ARCH-|clean-layer-violation$|expensive-loop-operation$|SEC-VUL-00[12]$|SEC-EXP-00[1245]$|secret-detected$|DEP-INV-|DEP-VULN-|disallowed-import$|import-cycle$|FGT-DEP-|FGT-SAF-)/;
+const HIGH_RULE_RE =
+    /^(?:high-complexity$|CPX-|PRF-|DAT-|TST-TAU|GOV-GAM|SEC-|PS-SEC-|SH-SEC-|high-entropy-token$|DEP-PHANTOM-|DEP-LIC-)/;
+const MEDIUM_RULE_RE =
+    /^(?:large-file$|BIG-|SIM-|duplicate-literal$|GOV-LOG|DEP-(?:DEV|OBS|PIN)-|MOD-DEP-|unused-export$|unused-module$)/;
 const CODE_EXTENSIONS = new Set(['.ts', '.tsx', '.rs', '.go', '.gd', '.py']);
 const DOC_EXTENSIONS = new Set(['.json', '.md', '.yaml', '.yml', '.txt']);
 const LINE_SHIFT_TOLERANCE = 10;

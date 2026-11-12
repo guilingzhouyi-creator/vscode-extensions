@@ -6,13 +6,60 @@
  * Responsibilities: Validate the authoritative schema without coercion or external schema loading.
  * Exit Semantics & Design Rationale: Structural validity establishes neither trust nor gate authority.
  */
-import Ajv2020 from 'ajv/dist/2020';
+import { createRequire } from 'node:module';
 import type { QualityDocument } from './evidence-contracts';
 import { qualityEvidenceSchema } from './evidence-schema';
 import { canonicalReviewJson, ReviewEncodingError } from './canonical-json';
 
-const validator = new Ajv2020({ allErrors: false, coerceTypes: false, removeAdditional: false, useDefaults: false })
-    .compile<QualityDocument>(qualityEvidenceSchema);
+interface Ajv2020Options {
+    readonly allErrors: boolean;
+    readonly coerceTypes: boolean;
+    readonly removeAdditional: boolean;
+    readonly useDefaults: boolean;
+}
+
+type AjvValidateFunction<T> = (data: unknown) => data is T;
+
+interface Ajv2020Instance {
+    compile<T>(schema: object): AjvValidateFunction<T>;
+}
+
+type Ajv2020Constructor = new (options: Ajv2020Options) => Ajv2020Instance;
+
+interface Ajv2020ModuleExports {
+    readonly default?: unknown;
+    readonly Ajv2020?: unknown;
+}
+
+function isAjv2020Constructor(value: unknown): value is Ajv2020Constructor {
+    return typeof value === 'function';
+}
+
+function loadAjv2020Constructor(): Ajv2020Constructor {
+    const loadModule = createRequire(__filename) as (specifier: string) => unknown;
+    const rawModule = loadModule('ajv/dist/2020');
+    if (isAjv2020Constructor(rawModule)) {
+        return rawModule;
+    }
+    if (rawModule !== null && typeof rawModule === 'object') {
+        const exportsObj = rawModule as Ajv2020ModuleExports;
+        if (isAjv2020Constructor(exportsObj.default)) {
+            return exportsObj.default;
+        }
+        if (isAjv2020Constructor(exportsObj.Ajv2020)) {
+            return exportsObj.Ajv2020;
+        }
+    }
+    throw new ReviewEncodingError('ajv/dist/2020 constructor export is unavailable');
+}
+
+const Ajv2020 = loadAjv2020Constructor();
+const validator: AjvValidateFunction<QualityDocument> = new Ajv2020({
+    allErrors: false,
+    coerceTypes: false,
+    removeAdditional: false,
+    useDefaults: false,
+}).compile<QualityDocument>(qualityEvidenceSchema);
 
 function freezeDocument<T>(value: T): T {
     if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {

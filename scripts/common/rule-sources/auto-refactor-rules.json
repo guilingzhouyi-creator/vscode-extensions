@@ -2,7 +2,7 @@
   "schema": "auto-refactor-rules-registry-snapshot/v1",
   "generatedAt": "2026-10-30T06:58:27.391Z",
   "source": "auto-refactor/dist/core/rules/registry.js",
-  "totalRules": 375,
+  "totalRules": 377,
   "rules": [
     {
       "id": "analyzer-error",
@@ -1109,6 +1109,12 @@
       "summary": "PowerShell binding writes a read-only automatic variable, so the write throws and the name keeps its previous value."
     },
     {
+      "id": "hardcoded-string",
+      "family": "CONST",
+      "severity": "warning",
+      "summary": "Hardcoded string literal outside constant declarations risks magic-value drift and duplication."
+    },
+    {
       "id": "high-algorithmic-complexity",
       "family": "PRF",
       "severity": "warning",
@@ -1257,6 +1263,12 @@
       "family": "PRF",
       "severity": "warning",
       "summary": "Transient heap allocation inside a loop (ADV-PRF-002), violating the zero-transient-allocation contract."
+    },
+    {
+      "id": "magic-number",
+      "family": "CONST",
+      "severity": "warning",
+      "summary": "Unexplained numeric literal (magic number) embedded directly in logic instead of a named constant."
     },
     {
       "id": "MOD-BWD-001",

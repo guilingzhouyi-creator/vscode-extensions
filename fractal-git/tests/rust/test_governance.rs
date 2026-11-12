@@ -36,7 +36,7 @@ fn test_rust_grade_commit_guard_validations() {
 [Why]
 Eliminate transient heap allocation during streaming object encoding.
 
-[Changed]
+[Added]
 - Added aligned page chunker implementation
 - Wired zero-copy buffer recycling
 
@@ -452,7 +452,7 @@ Short."#;
 [Why]
 Eliminate transient heap allocation during streaming object encoding.
 
-[Changed]
+[Added]
 - Added aligned page chunker implementation
 - Wired zero-copy buffer recycling
 

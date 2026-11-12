@@ -1,6 +1,6 @@
 # 📚 `auto-refactor` Documentation & Praxis Delivery Hub
 
-> **Baseline**: `auto-refactor` v0.4.0 (TypeScript + Rust N-API 10-crate workspace, 8-language Semantic IR + `LineFeatureTape`, <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count --> pooled Sparse MoE analyzers, <!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor --> registry, <!-- METRICS:BEGIN test-suite-count -->**197 套**<!-- METRICS:END test-suite-count --> test suites, LayerVFS CAS sandbox + MCTS refactoring tree, tri-plane quality scoring, and `PraxisReviewClient` SDK).  
+> **Baseline**: `auto-refactor` v0.4.0 (TypeScript + Rust N-API 10-crate workspace, 8-language Semantic IR + `LineFeatureTape`, <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count --> pooled Sparse MoE analyzers, <!-- METRICS:BEGIN rule-auto-refactor -->**377 条规则**<!-- METRICS:END rule-auto-refactor --> registry, <!-- METRICS:BEGIN test-suite-count -->**197 套**<!-- METRICS:END test-suite-count --> test suites, LayerVFS CAS sandbox + MCTS refactoring tree, tri-plane quality scoring, and `PraxisReviewClient` SDK).
 > **Historical Snapshots**: Frozen in [`archive/auto-refactor/docs-snapshot-20261018/`](../../archive/auto-refactor/docs-snapshot-20261018/), [`archive/auto-refactor/docs-snapshot-20261010/`](../../archive/auto-refactor/docs-snapshot-20261010/), and [`archive/auto-refactor/docs-snapshot-20260928/`](../../archive/auto-refactor/docs-snapshot-20260928/).
 
 ---
@@ -27,7 +27,7 @@
 * [04-sparse-reference-replay.md](./03-incremental-and-diff/04-sparse-reference-replay.md): Sparse reference sliding-window replay, composite anchor merging, call-site bridging, and tree-level pruning.
 
 ### 🔍 L4. 4-Stage Rule Hierarchy & Built-in Analyzers (`04-analyzers-and-rules/`)
-* [01-builtin-rules.md](./04-analyzers-and-rules/01-builtin-rules.md): 4-stage rule hierarchy, <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count --> built-in analyzers, dual-track EN/ZH diagnostics, and <!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor --> dictionary (workspace SSOT <!-- METRICS:BEGIN rule-total -->**534 条规则**<!-- METRICS:END rule-total -->).
+* [01-builtin-rules.md](./04-analyzers-and-rules/01-builtin-rules.md): 4-stage rule hierarchy, <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count --> built-in analyzers, dual-track EN/ZH diagnostics, and <!-- METRICS:BEGIN rule-auto-refactor -->**377 条规则**<!-- METRICS:END rule-auto-refactor --> dictionary (workspace SSOT <!-- METRICS:BEGIN rule-total -->**536 条规则**<!-- METRICS:END rule-total -->).
 * [02-custom-analyzer-plugin.md](./04-analyzers-and-rules/02-custom-analyzer-plugin.md): Declarative `PatternKernel` and programmatic `Analyzer` plugin contract, `cacheCustom` isolation, and scoring integration.
 
 ### 📊 L5. Config Contracts, Tri-Plane Scoring & Benchmarks (`05-specs-and-benchmarks/`)
@@ -41,7 +41,7 @@
 * [07-quantified-quality-standard.md](./05-specs-and-benchmarks/07-quantified-quality-standard.md): 10 dimensions $\to$ 8 strategic pillars, hyperbolic saturation, dynamic security ceiling, tri-plane risk resonance ($S^{1.0} \cdot D^{1.2} \cdot H^{0.8}$), and **CAI 2.0 6D autonomy score** (Jeffreys Beta posterior).
 
 ### 🤝 L6. Praxis Delivery & SDK Integration (`06-praxis-delivery/`)
-* [05-consumer-integration.md](./05-specs-and-benchmarks/05-consumer-integration.md): **External & Workspace Consumer Integration Guide** (<!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count --> analyzers, <!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor -->, <!-- METRICS:BEGIN test-suite-count -->**197 套**<!-- METRICS:END test-suite-count --> test suites, AAS v1.0).
+* [05-consumer-integration.md](./05-specs-and-benchmarks/05-consumer-integration.md): **External & Workspace Consumer Integration Guide** (<!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count --> analyzers, <!-- METRICS:BEGIN rule-auto-refactor -->**377 条规则**<!-- METRICS:END rule-auto-refactor -->, <!-- METRICS:BEGIN test-suite-count -->**197 套**<!-- METRICS:END test-suite-count --> test suites, AAS v1.0).
 * [01-praxis-architecture-and-spi-contracts.md](./06-praxis-delivery/01-praxis-architecture-and-spi-contracts.md): `PraxisCardContext`, `ReviewDiffHunk`, AST diagnostic completeness vs presentation deduplication, and SPI extension slots.
 * [02-praxis-six-governance-services-api.md](./06-praxis-delivery/02-praxis-six-governance-services-api.md): Governance facades and [`PraxisReviewClient`](../src/core/praxis/praxis-review-client.ts) (`createPraxisClient`) SDK API reference.
 * [03-praxis-integration-runbook-and-acceptance.md](./06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md): End-to-end TypeScript integration runbook, union-find deduplication across <!-- METRICS:BEGIN overlap-cluster-count -->**11 个**<!-- METRICS:END overlap-cluster-count --> overlap clusters, and <!-- METRICS:BEGIN test-suite-count -->**197 套**<!-- METRICS:END test-suite-count --> acceptance matrix.

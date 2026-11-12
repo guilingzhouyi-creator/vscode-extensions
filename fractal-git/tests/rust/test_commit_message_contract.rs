@@ -399,3 +399,236 @@ fn narrative_subject_is_rejected() {
         "a narrative past-tense subject must be rejected: {error}"
     );
 }
+
+#[test]
+fn uppercase_commit_type_is_rejected_due_to_case_sensitivity() {
+    let policy = TaxisPolicy::workspace_strict();
+    let message = TEMPLATE_CONFORMANT.replace("feat(gate):", "FEAT(gate):");
+    let result = CommitMessageGuard::parse_and_verify(&message, &policy, None);
+    let error = result.err().map(|e| format!("{e:?}")).unwrap_or_default();
+    assert!(
+        error.contains("GUARD-MSG-001"),
+        "uppercase type must be rejected: {error}"
+    );
+}
+
+#[test]
+fn breaking_change_bang_requires_breaking_changes_section() {
+    let policy = TaxisPolicy::workspace_strict();
+    let message = TEMPLATE_CONFORMANT.replace("feat(gate):", "feat(gate)!:");
+    let result = CommitMessageGuard::parse_and_verify(&message, &policy, None);
+    let error = result.err().map(|e| format!("{e:?}")).unwrap_or_default();
+    assert!(
+        error.contains("FGT-MSG-002") && error.contains("Breaking Changes"),
+        "breaking change header must require [Breaking Changes] section: {error}"
+    );
+
+    let compliant_breaking = TEMPLATE_CONFORMANT
+        .replace("feat(gate):", "feat(gate)!:")
+        .replace(
+            "[Verification",
+            "[Breaking Changes]\n- 升级门禁接口契约与返回值定义适配指南。\n\n[Verification",
+        );
+    let ok_res = CommitMessageGuard::parse_and_verify(&compliant_breaking, &policy, None);
+    assert!(
+        ok_res.is_ok(),
+        "breaking commit with section must pass: {:?}",
+        ok_res.err()
+    );
+}
+
+#[test]
+fn feat_commit_requires_added_section_and_refactor_requires_changed() {
+    let policy = TaxisPolicy::workspace_strict();
+    let feat_with_changed_only =
+        TEMPLATE_CONFORMANT.replace("[Added / 新增内容]", "[Changed / 变更调整]");
+    let feat_err = CommitMessageGuard::parse_and_verify(&feat_with_changed_only, &policy, None)
+        .err()
+        .map(|e| format!("{e:?}"))
+        .unwrap_or_default();
+    assert!(
+        feat_err.contains("FGT-MSG-002") && feat_err.contains("[Added]"),
+        "feat commit must require [Added] section: {feat_err}"
+    );
+
+    let refactor_with_added_only = TEMPLATE_CONFORMANT.replace("feat(gate):", "refactor(gate):");
+    let refactor_err =
+        CommitMessageGuard::parse_and_verify(&refactor_with_added_only, &policy, None)
+            .err()
+            .map(|e| format!("{e:?}"))
+            .unwrap_or_default();
+    assert!(
+        refactor_err.contains("FGT-MSG-002") && refactor_err.contains("[Changed]"),
+        "refactor commit must require [Changed] section: {refactor_err}"
+    );
+}
+
+#[test]
+fn forbidden_terms_inside_backticks_and_urls_are_rejected() {
+    let policy = TaxisPolicy::workspace_strict();
+    let backtick_wip = TEMPLATE_CONFORMANT.replace(
+        "新增语义槽位解析与双语别名表。",
+        "新增语义槽位解析与 `wip` 暂存逻辑验证。",
+    );
+    let err_backtick = CommitMessageGuard::parse_and_verify(&backtick_wip, &policy, None)
+        .err()
+        .map(|e| format!("{e:?}"))
+        .unwrap_or_default();
+    assert!(
+        err_backtick.contains("FGT-MSG-004"),
+        "provisional terms in backticks must NOT bypass the scan: {err_backtick}"
+    );
+
+    let url_hack = TEMPLATE_CONFORMANT.replace(
+        "新增语义槽位解析与双语别名表。",
+        "参考实现见 https://example.com/api/quick-fix 处理。",
+    );
+    let err_url = CommitMessageGuard::parse_and_verify(&url_hack, &policy, None)
+        .err()
+        .map(|e| format!("{e:?}"))
+        .unwrap_or_default();
+    assert!(
+        err_url.contains("FGT-MSG-004"),
+        "forbidden terms in URLs must NOT bypass the scan: {err_url}"
+    );
+}
+
+#[test]
+fn english_first_person_pronouns_and_verb_inflections_are_rejected() {
+    let policy = TaxisPolicy::workspace_strict();
+    let we_message = TEMPLATE_CONFORMANT.replace(
+        "门禁按字面量比较区块名，导致模板推荐的双名写法被误判为缺少区块。",
+        "We implemented the semantic slot resolver to avoid false rejections.",
+    );
+    let err_we = CommitMessageGuard::parse_and_verify(&we_message, &policy, None)
+        .err()
+        .map(|e| format!("{e:?}"))
+        .unwrap_or_default();
+    assert!(
+        err_we.contains("FGT-MSG-004") && err_we.contains("first-person"),
+        "English first-person pronouns must be rejected: {err_we}"
+    );
+
+    let ing_header = TEMPLATE_CONFORMANT.replace(
+        "feat(gate): 新增提交信息区块槽位解析与双语别名",
+        "feat(gate): adding semantic slot resolver",
+    );
+    let err_ing = CommitMessageGuard::parse_and_verify(&ing_header, &policy, None)
+        .err()
+        .map(|e| format!("{e:?}"))
+        .unwrap_or_default();
+    assert!(
+        err_ing.contains("FGT-MSG-004") && err_ing.contains("participle"),
+        "English -ing verb in header summary must be rejected: {err_ing}"
+    );
+
+    let es_header = TEMPLATE_CONFORMANT.replace(
+        "feat(gate): 新增提交信息区块槽位解析与双语别名",
+        "fix(gate): fixes regression in parser",
+    );
+    let err_es = CommitMessageGuard::parse_and_verify(&es_header, &policy, None)
+        .err()
+        .map(|e| format!("{e:?}"))
+        .unwrap_or_default();
+    assert!(
+        err_es.contains("FGT-MSG-004"),
+        "English third-person singular verb in header summary must be rejected: {err_es}"
+    );
+}
+
+#[test]
+fn invalid_bullet_markers_consecutive_blank_lines_and_fullwidth_brackets_are_rejected() {
+    let policy = TaxisPolicy::workspace_strict();
+    let star_bullet = TEMPLATE_CONFORMANT.replace(
+        "- 新增语义槽位解析与双语别名表。",
+        "* 新增语义槽位解析与双语别名表。",
+    );
+    let err_star = CommitMessageGuard::parse_and_verify(&star_bullet, &policy, None)
+        .err()
+        .map(|e| format!("{e:?}"))
+        .unwrap_or_default();
+    assert!(
+        err_star.contains("FGT-MSG-002"),
+        "asterisk bullets must be rejected: {err_star}"
+    );
+
+    let consecutive_blanks = TEMPLATE_CONFORMANT.replace("\n\n[Why", "\n\n\n[Why");
+    let err_blanks = CommitMessageGuard::parse_and_verify(&consecutive_blanks, &policy, None)
+        .err()
+        .map(|e| format!("{e:?}"))
+        .unwrap_or_default();
+    assert!(
+        err_blanks.contains("FGT-MSG-002"),
+        "consecutive blank lines must be rejected: {err_blanks}"
+    );
+
+    let fullwidth_bracket = TEMPLATE_CONFORMANT.replace("[Why / 动机背景]", "【Why / 动机背景】");
+    let err_bracket = CommitMessageGuard::parse_and_verify(&fullwidth_bracket, &policy, None)
+        .err()
+        .map(|e| format!("{e:?}"))
+        .unwrap_or_default();
+    assert!(
+        err_bracket.contains("FGT-MSG-002"),
+        "fullwidth brackets must be rejected: {err_bracket}"
+    );
+}
+
+#[test]
+fn timing_extension_misnomer_and_intent_prefix_are_rejected() {
+    let policy = TaxisPolicy::workspace_strict();
+    let misnomer = TEMPLATE_CONFORMANT.replace("fractal-git", "timing扩展");
+    let err_mis = CommitMessageGuard::parse_and_verify(&misnomer, &policy, None)
+        .err()
+        .map(|e| format!("{e:?}"))
+        .unwrap_or_default();
+    assert!(
+        err_mis.contains("FGT-MSG-007"),
+        "misnomer timing扩展 must be rejected: {err_mis}"
+    );
+
+    let intent = TEMPLATE_CONFORMANT.replace(
+        "新增提交信息区块槽位解析与双语别名",
+        "希望能支持语义槽位解析",
+    );
+    let err_intent = CommitMessageGuard::parse_and_verify(&intent, &policy, None)
+        .err()
+        .map(|e| format!("{e:?}"))
+        .unwrap_or_default();
+    assert!(
+        err_intent.contains("FGT-MSG-004"),
+        "disallowed intent prefix 希望能 must be rejected: {err_intent}"
+    );
+}
+
+#[test]
+fn frozen_project_lease_is_rejected_at_storage_boundary() {
+    let temp_dir = std::env::temp_dir().join(format!("taxis_frozen_lease_{}", std::process::id()));
+    let git_projects = temp_dir.join(".git").join("projects");
+    let _ = std::fs::create_dir_all(&git_projects);
+    let cache_json = r#"{
+      "schema": "project-lease-cache/v1",
+      "leases": {
+        "fractal-git": {
+          "id": "fractal-git",
+          "root_path": "fractal-git",
+          "status": "Frozen",
+          "master_ttl_seconds": 604800,
+          "last_activity_unix_seconds": 1000
+        }
+      }
+    }"#;
+    std::fs::write(git_projects.join("active_projects.json"), cache_json)
+        .expect("write lease cache");
+
+    let mut violations = Vec::new();
+    let declared = vec!["fractal-git".to_string()];
+    fg_gate::commit_guard::project::check_project_leases_at(&temp_dir, &declared, &mut violations);
+    let _ = std::fs::remove_dir_all(&temp_dir);
+
+    assert!(
+        violations
+            .iter()
+            .any(|v| v.contains("FGT-MSG-007") && v.contains("Frozen")),
+        "Frozen project lease must be rejected: {violations:?}"
+    );
+}

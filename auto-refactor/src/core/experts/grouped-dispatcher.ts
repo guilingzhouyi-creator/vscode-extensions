@@ -16,7 +16,7 @@
  */
 
 import { analyzerMaskToNames } from '../constants/analyzer-bitmask';
-import { EXPERT_BY_BIT, EXPERT_BY_INDEX } from './expert-catalog';
+import { EXPERT_BY_BIT } from './expert-catalog';
 import type { ASTSliceNode } from '../router/sliceTypes';
 
 /** Number of batches processed before yielding the event loop to prevent starvation. */
@@ -114,7 +114,7 @@ export class GroupedExpertDispatcher {
         for (let i = 0; i < items.length; i++) {
             const item = items[i];
             const mask = item.activeMask >>> 0;
-            unionMask |= mask;
+            unionMask = (unionMask | mask) >>> 0;
 
             let activeInItem = 0;
             for (let bitIdx = 0; bitIdx < TOTAL_ROUTER_EXPERTS; bitIdx++) {
@@ -132,7 +132,7 @@ export class GroupedExpertDispatcher {
             const bucketItems = buckets[bitIdx];
             if (bucketItems.length > 0) {
                 const expertBit = (1 << bitIdx) >>> 0;
-                const profile = EXPERT_BY_INDEX[bitIdx] ?? EXPERT_BY_BIT.get(expertBit);
+                const profile = EXPERT_BY_BIT.get(expertBit);
                 const expertId = profile?.id ?? `unknown_expert_${bitIdx}`;
                 batches.push({
                     expertBit,

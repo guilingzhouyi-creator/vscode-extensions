@@ -465,8 +465,8 @@ function extractVerificationItems(body) {
     }
   }
   const bullets = collected
-    .filter((l) => /^[-*]\s+/.test(l))
-    .map((l) => l.replace(/^[-*]\s+/, "").trim());
+    .filter((l) => /^-\s+/.test(l))
+    .map((l) => l.replace(/^-\s+/, "").trim());
   if (bullets.length > 0) return bullets;
   const prose = collected.join(" ").trim();
   return prose ? [prose] : [];
@@ -501,9 +501,14 @@ function checkVerificationAssertion(body, add) {
 function getSectionRank(name) {
   if (/^(project|项目|项目归属)$/.test(name)) return 1;
   if (/^(why|动机|背景|动机背景)$/.test(name)) return 2;
-  if (/^(added|changed|fixed|removed|新增|变更|修改|修复|删除)$/.test(name))
+  if (
+    /^(added|changed|fixed|removed|新增|新增内容|新增功能|变更|变更调整|修改|调整|重构|修复|修复缺陷|删除|移除)$/.test(
+      name,
+    )
+  )
     return 3;
-  if (/^(verification|验证|验证结论)$/.test(name)) return 4;
+  if (/^(breaking\s*changes?|破坏性变更)$/i.test(name)) return 4;
+  if (/^(verification|验证|验证结论)$/.test(name)) return 5;
   return 99;
 }
 
@@ -679,7 +684,7 @@ function checkEmptySections(body, add) {
       continue;
     }
     if (currentSection !== null && line.length > 0) {
-      const substantive = line.replace(/^[-*]\s*/, "").trim();
+      const substantive = line.replace(/^-\s*/, "").trim();
       if (substantive.length > 0) {
         sectionContentLength += substantive.length;
       }
@@ -742,11 +747,114 @@ function checkSectionDensityBounds(body, add) {
   validateSectionDensity(body, countSubstantive, STEP, add);
 }
 
+const POLICY_MANIFEST_PATH = path.join(__dirname, "../../fractal-git/commit-policy.json");
+const POLICY_TIER_RANKS = Object.freeze({
+  "git-native": 1,
+  conventional: 2,
+  "rust-strict": 3,
+  "workspace-strict": 3,
+});
+
+/**
+ * Validates policy tier enforcement against commit-policy.json (FGT-MSG-011).
+ *
+ * @param {object} options - Verification options.
+ * @param {Function} add - Finding sink.
+ */
+function checkPolicyTier(options, add) {
+  if (!options || !options.policyTier) return;
+  const tier = String(options.policyTier).trim().toLowerCase();
+  let manifest;
+  try {
+    manifest = JSON.parse(require("fs").readFileSync(POLICY_MANIFEST_PATH, "utf8"));
+    if (!Object.hasOwn(POLICY_TIER_RANKS, manifest.floor)) {
+      throw new Error("unknown policy floor");
+    }
+  } catch (error) {
+    add(
+      STEP.header,
+      "FGT-MSG-011",
+      `无法读取仓库策略底线: ${error.message}`,
+      "restore a valid commit-policy.json before selecting a policy tier",
+    );
+    return;
+  }
+
+  const denied = (manifest.deniedTiers || []).find((d) => d.tier === tier);
+  if (denied) {
+    add(
+      STEP.header,
+      "FGT-MSG-011",
+      `策略 '${tier}' 被策略清单显式拒绝: ${denied.reason}`,
+      "choose an allowed policy tier",
+    );
+    return;
+  }
+
+  const floorRank = POLICY_TIER_RANKS[manifest.floor] || 3;
+  const tierRank = POLICY_TIER_RANKS[tier] || 0;
+  if (tierRank < floorRank) {
+    add(
+      STEP.header,
+      "FGT-MSG-011",
+      `策略 '${tier}' 低于仓库强制底线 '${manifest.floor}'`,
+      "selector may tighten the contract but never relax it",
+    );
+  }
+}
+
+/** Extracts names from added diff lines, retaining nested declaration keywords. */
+function extractDiffDeclarationSymbols(diffText) {
+  const candidates = [];
+  const keywords = ["fn", "func", "function", "struct", "enum", "trait", "impl", "class",
+    "class_name", "interface", "type", "const", "static", "let", "mod", "pub"];
+  const declRe = /\b(?:fn|func|function|struct|enum|trait|impl|class|class_name|interface|type|const|static|let|mod|pub)\s+(?=([\p{L}\p{N}_]+))/gu;
+  const addedLines = diffText.split(/\r?\n/).filter((line) => line.startsWith("+") && !line.startsWith("+++"));
+  for (const line of addedLines) {
+    let match;
+    while ((match = declRe.exec(line)) !== null) {
+      const name = match[1];
+      if ([...name].length < 2 || name === "__" || keywords.includes(name)) continue;
+      if (!candidates.includes(name)) candidates.push(name);
+    }
+  }
+  return candidates;
+}
+
+/**
+ * Validates declaration symbol anchoring against staged diff symbols (FGT-MSG-010).
+ *
+ * @param {{body: string, type: string}} parsed - Parsed commit message.
+ * @param {object} options - Verification options.
+ * @param {Function} add - Finding sink.
+ */
+function checkDeclarationAnchors(parsed, options, add) {
+  if (!options || (!options.diffText && !options.candidateSymbols)) return;
+  if (!CRITICAL_TYPES.includes(parsed.type)) return;
+
+  const candidates = options.candidateSymbols || extractDiffDeclarationSymbols(options.diffText);
+  if (candidates.length === 0) return;
+  const substantiveCandidates = candidates.filter((symbol) => !symbol.startsWith("test_"));
+  if (substantiveCandidates.length === 0) return;
+
+  const verItems = extractVerificationItems(parsed.body);
+  const verText = verItems.join(" ");
+  const hasAnchor = substantiveCandidates.some((symbol) => verText.includes(symbol));
+  if (!hasAnchor) {
+    add(
+      STEP.sections,
+      "FGT-MSG-010",
+      "验证结论未引用本次差异实际引入的符号或测试名称",
+      "cite what was actually demonstrated under [Verification]",
+    );
+  }
+}
+
 /**
  * Runs the seven structural checks.
  *
  * @param {string} content - Raw commit message.
- * @param {{ projects?: string[] }} [options] - Overrides for testing.
+ * @param {{ projects?: string[], policyTier?: string, diffText?: string, candidateSymbols?: string[] }} [options] - Overrides for testing.
  * @returns {Array<{step: string, ruleId: string, message: string, detail: string, line?: number, token?: string}>} Findings.
  */
 function verifyStructure(content, options = {}) {
@@ -761,6 +869,7 @@ function verifyStructure(content, options = {}) {
   }
 
   checkHeaderShape(parsed, add);
+  checkPolicyTier(options, add);
   checkTypographyAndPunctuation(content, parsed, add);
   checkTemplatePlaceholders(parsed, add);
   checkUnresolvedMarkers(parsed, add);
@@ -770,6 +879,7 @@ function verifyStructure(content, options = {}) {
   checkEmptySections(parsed.body, add);
   checkSectionOrderAndDuplication(parsed.body, add);
   checkVerificationAssertion(parsed.body, add);
+  checkDeclarationAnchors(parsed, options, add);
   checkBatchCodenames(parsed.body, add);
   return findings;
 }

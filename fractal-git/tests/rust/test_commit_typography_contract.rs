@@ -170,3 +170,63 @@ fn downgrade_below_the_floor_is_refused() {
         "a policy below the floor must be refused before any message check: {error}"
     );
 }
+
+#[test]
+fn registered_special_rules_survive_typography_check() {
+    let policy = TaxisPolicy::workspace_strict();
+    for registered_rule in [
+        "LAY-CYCLE",
+        "HC-SECRET",
+        "HC-ABS-PATH",
+        "STDLIB-ALLOC-001",
+        "L0-COMPILE",
+        "L3-DOC-LAYOUT",
+        "RCFG-RULE-DRIFT",
+        "UUID-REENTRANT-001",
+    ] {
+        let message = compliant_message()
+            .replace("长期技术档案", &format!("{registered_rule} 规定的技术档案"));
+        let res = CommitMessageGuard::parse_and_verify(&message, &policy, None);
+        assert!(
+            res.is_ok(),
+            "registered rule citation '{registered_rule}' must pass: {:?}",
+            res.err()
+        );
+    }
+}
+
+#[test]
+fn external_standards_prefixes_survive() {
+    let policy = TaxisPolicy::workspace_strict();
+    for standard in ["HTTP-2", "TLS-13", "AES-256", "UTF-8", "RFC-3629"] {
+        let message = compliant_message().replace("RFC-3629", standard);
+        let res = CommitMessageGuard::parse_and_verify(&message, &policy, None);
+        assert!(
+            res.is_ok(),
+            "external standard citation '{standard}' must pass: {:?}",
+            res.err()
+        );
+    }
+}
+
+#[test]
+fn fabricated_lay_and_hc_and_l_rules_are_rejected() {
+    let policy = TaxisPolicy::workspace_strict();
+    for fabricated in [
+        "LAY-FAKE-CYCLE",
+        "HC-NONEXISTENT",
+        "L3-FAKE-RULE",
+        "ABC-FAKE-999",
+    ] {
+        let message = compliant_message()
+            .replace("长期技术档案", &format!("{fabricated} 无法解析的技术档案"));
+        let error = CommitMessageGuard::parse_and_verify(&message, &policy, None)
+            .err()
+            .map(|r| format!("{r:?}"))
+            .unwrap_or_default();
+        assert!(
+            error.contains("FGT-MSG-012"),
+            "fabricated rule citation '{fabricated}' must be rejected with FGT-MSG-012: {error}"
+        );
+    }
+}

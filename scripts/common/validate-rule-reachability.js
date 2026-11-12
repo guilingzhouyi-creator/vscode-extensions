@@ -2,15 +2,15 @@
  * Module: Rule Reachability Guard — Declared Rules Must Have an Execution Surface
  * File Path: scripts/common/validate-rule-reachability.js
  * Architecture Role: Prevents catalog entries from existing without any implementation
- *   surface by asserting each error-severity rule identifier appears in code or config.
+ *   surface by asserting every rule identifier (error, warning, and info) appears in code or config.
  * Dependencies & Triggers: Consumes Node.js standard libraries (fs, path) and
  *   scripts/common/rule-catalog.json; invoked by pre-push gate, audit-all, and CI.
  * Responsibilities:
  *   1. Build a text corpus from gate scripts, analyzer sources, and project configs;
- *   2. Assert every error-severity catalog rule appears in that corpus;
+ *   2. Assert every registered catalog rule across all severities appears in that corpus;
  *   3. Support an explicit manual exception manifest with documented rationale;
  *   4. Report unreachable rules with ownership context and fail closed.
- * Exit Semantics & Design Rationale: 0 = every error rule is referenced by executable
+ * Exit Semantics & Design Rationale: 0 = every catalog rule is referenced by executable
  *   assets, 1 = unreachable rule detected. Documentation-only mentions are excluded from
  *   the corpus so prose cannot satisfy implementation reachability.
  */
@@ -119,9 +119,13 @@ function runAudit() {
   const exceptions = loadExceptions();
   const unreachable = [];
   for (const rule of catalog.rules || []) {
-    if (rule.severity !== 'error') continue;
     if (mentionsRule(corpus, rule.id) || exceptions.has(rule.id)) continue;
-    unreachable.push({ id: rule.id, project: rule.project, family: rule.family });
+    unreachable.push({
+      id: rule.id,
+      project: rule.project,
+      family: rule.family,
+      severity: rule.severity,
+    });
   }
   return unreachable;
 }
@@ -151,8 +155,8 @@ function main() {
           gate: 'rule-reachability',
           unreachable,
           summary: passed
-            ? 'Every error-severity rule is referenced by executable assets.'
-            : `${unreachable.length} error rule(s) have no execution surface.`,
+            ? 'Every catalog rule (error, warning, info) is referenced by executable assets.'
+            : `${unreachable.length} catalog rule(s) have no execution surface.`,
         },
         null,
         2,
@@ -162,13 +166,13 @@ function main() {
   }
 
   if (passed) {
-    console.log('  PASS Rule reachability: every error rule has an execution surface.');
+    console.log('  PASS Rule reachability: every catalog rule across all severities has an execution surface.');
     process.exit(0);
   }
 
-  console.error(`✖ BLOCK Rule reachability: ${unreachable.length} error rule(s) without implementation references:`);
+  console.error(`✖ BLOCK Rule reachability: ${unreachable.length} catalog rule(s) without implementation references:`);
   for (const rule of unreachable) {
-    console.error(`  - ${rule.id} (${rule.project}/${rule.family})`);
+    console.error(`  - ${rule.id} (${rule.project}/${rule.family}/${rule.severity})`);
   }
   console.error('  Add an implementation reference or a documented entry in rule-reachability-exceptions.json.');
   process.exit(1);

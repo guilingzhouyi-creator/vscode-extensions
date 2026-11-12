@@ -25,8 +25,9 @@ import * as net from 'net';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { ScanConfig } from '../core/types';
+import type { CacheStore } from '../core/cache';
 import { Logger } from '../core/logger';
-import type { DaemonMessage, HelloAckMessage, HelloMessage } from './protocol';
+import type { DaemonMessage, HelloAckMessage, HelloMessage, PongMessage } from './protocol';
 import { PROTOCOL_VERSION, PROTOCOL_SOFTWARE_VERSION, encodeMessage, decodeLine } from './protocol';
 import type { RegistryInfo } from './registry';
 import { projectHashFor, pipeNameFor, writeRegistry, clearRegistry, logFilePath } from './registry';
@@ -56,9 +57,15 @@ const ENCODING_UTF8 = 'utf8';
 
 /** Node stream/socket event names. */
 const EVENT_DATA = 'data';
+const EVENT_DRAIN = 'drain';
 const EVENT_END = 'end';
 const EVENT_CLOSE = 'close';
 const ERROR_EVENT = 'error';
+
+/** Default upper bounds (16 MiB / 32 MiB) for incoming NDJSON frame and transport buffer. */
+const MIB_BYTES = 1024 * 1024;
+export const DEFAULT_MAX_FRAME_BYTES = 16 * MIB_BYTES;
+export const DEFAULT_MAX_BUFFER_BYTES = 32 * MIB_BYTES;
 
 /** Node process event and signal names. */
 const SIGNAL_SIGTERM = 'SIGTERM';
@@ -79,6 +86,8 @@ const MESSAGE_TYPE_ERROR = 'error';
 
 /** Protocol error codes and message descriptions. */
 const CODE_PROTOCOL_PARSE = 'PROTOCOL_PARSE';
+const CODE_FRAME_TOO_LARGE = 'FRAME_TOO_LARGE';
+const CODE_BUFFER_OVERFLOW = 'BUFFER_OVERFLOW';
 const CODE_SCAN_FAILED = 'SCAN_FAILED';
 const CODE_UNKNOWN_MESSAGE = 'UNKNOWN_MESSAGE';
 const MSG_MALFORMED_NDJSON = 'malformed NDJSON line';
@@ -116,6 +125,58 @@ interface TransportIo {
 
 interface BufferState {
     buffer: string;
+    closed?: boolean;
+}
+
+interface QueuedWriter {
+    write: (msg: DaemonMessage) => void;
+    dispose: () => void;
+}
+
+function createBackpressureWriter(
+    stream: NodeJS.WritableStream,
+    onPause?: () => void,
+    onResume?: () => void,
+): QueuedWriter {
+    const queue: string[] = [];
+    let draining = false;
+    let disposed = false;
+    const pump = (): void => {
+        draining = false;
+        if (disposed || !(stream as net.Socket).writable) {
+            queue.length = 0;
+            onResume?.();
+            return;
+        }
+        while (queue.length > 0 && stream.write(queue.shift()!)) {}
+        if (queue.length > 0) {
+            draining = true;
+            stream.once(EVENT_DRAIN, pump);
+        } else {
+            onResume?.();
+        }
+    };
+    return {
+        write: (msg: DaemonMessage): void => {
+            if (disposed || !(stream as net.Socket).writable) return;
+            const payload = encodeMessage(msg);
+            if (draining || queue.length > 0) {
+                queue.push(payload);
+                return;
+            }
+            if (!stream.write(payload)) {
+                draining = true;
+                onPause?.();
+                stream.once(EVENT_DRAIN, pump);
+            }
+        },
+        dispose: (): void => {
+            disposed = true;
+            queue.length = 0;
+            draining = false;
+            stream.removeListener(EVENT_DRAIN, pump);
+        },
+    };
 }
 
 interface BaseScanTaskOptions {
@@ -174,15 +235,62 @@ export class DaemonServer {
     private nextId = 0;
     private onSigTerm?: () => void;
     private onSigInt?: () => void;
+    private readonly maxFrameBytes: number;
+    private readonly maxBufferBytes: number;
+    private readonly observedCaches = new Set<CacheStore>();
+    private readonly writers = new Set<QueuedWriter>();
 
-    constructor(root: string, opts: { stdio?: boolean; logFile?: string } = {}) {
+    constructor(
+        root: string,
+        opts: {
+            stdio?: boolean;
+            logFile?: string;
+            maxFrameBytes?: number;
+            maxBufferBytes?: number;
+        } = {},
+    ) {
         this.root = path.resolve(root);
         this.projectHash = projectHashFor(this.root);
         this.pipe = pipeNameFor(this.projectHash);
         this.logFile = opts.logFile || logFilePath(this.projectHash);
         this.stdioMode = opts.stdio === true;
+        this.maxFrameBytes = opts.maxFrameBytes ?? DEFAULT_MAX_FRAME_BYTES;
+        this.maxBufferBytes = opts.maxBufferBytes ?? DEFAULT_MAX_BUFFER_BYTES;
         this.ctx = createDaemonContext();
+        const origGetCache = this.ctx.getCache.bind(this.ctx);
+        this.ctx.getCache = (cacheRoot: string, cacheDir?: string): CacheStore => {
+            const store = origGetCache(cacheRoot, cacheDir);
+            this.observedCaches.add(store);
+            return store;
+        };
         this.logger = new Logger(DEFAULT_LOG_LEVEL, this.stdioMode ? undefined : this.logFile);
+    }
+
+    /** Returns the first non-cleared cache persistence failure message observed by the daemon. */
+    public getLastFlushError(): string | undefined {
+        for (const cache of this.observedCaches) {
+            const err = cache.lastFlushError;
+            if (err !== undefined) return err instanceof Error ? err.message : String(err);
+        }
+        return undefined;
+    }
+
+    /** Returns daemon runtime status, including cache flush failure visibility. */
+    public getStatus(): {
+        shuttingDown: boolean;
+        pendingScans: number;
+        activeScans: number;
+        poolCount: number;
+        lastFlushError?: string;
+    } {
+        const lastFlushError = this.getLastFlushError();
+        return {
+            shuttingDown: this.shuttingDown,
+            pendingScans: this.pending.size,
+            activeScans: this.activeScans.size,
+            poolCount: this.ctx.pools.size(),
+            ...(lastFlushError ? { lastFlushError } : {}),
+        };
     }
 
     /** Returns the map of currently pending scan requests. */
@@ -238,15 +346,37 @@ export class DaemonServer {
         });
     }
 
+    private abortOverflow(state: BufferState, io: TransportIo, code: string, msg: string): void {
+        state.buffer = '';
+        state.closed = true;
+        this.logger.warn(`closing daemon transport due to ${code}: ${msg}`);
+        io.write({ v: 1, id: 0, type: MESSAGE_TYPE_ERROR, code, message: msg });
+        io.close();
+    }
+
     private processIncomingChunk(
         chunk: string,
         bufferState: BufferState,
         transportIo: TransportIo,
         socket?: net.Socket,
     ): void {
+        if (bufferState.closed) return;
+        if (bufferState.buffer.length + chunk.length > this.maxBufferBytes) {
+            this.abortOverflow(bufferState, transportIo, CODE_BUFFER_OVERFLOW, 'buffer overflow');
+            return;
+        }
         bufferState.buffer += chunk;
         let newlineIndex: number;
         while ((newlineIndex = bufferState.buffer.indexOf('\n')) >= 0) {
+            if (newlineIndex > this.maxFrameBytes) {
+                this.abortOverflow(
+                    bufferState,
+                    transportIo,
+                    CODE_FRAME_TOO_LARGE,
+                    'frame too large',
+                );
+                return;
+            }
             const rawLine = bufferState.buffer.slice(0, newlineIndex).trim();
             bufferState.buffer = bufferState.buffer.slice(newlineIndex + 1);
             if (!rawLine) continue;
@@ -266,47 +396,72 @@ export class DaemonServer {
             }
             this.handleMessage(decodedMessage, transportIo, socket);
         }
+        if (!bufferState.closed && bufferState.buffer.length > this.maxFrameBytes) {
+            this.abortOverflow(bufferState, transportIo, CODE_FRAME_TOO_LARGE, 'frame too large');
+        }
     }
 
     private runStdioServer(): void {
         const stdin = process.stdin;
-        const stdout = process.stdout;
         const bufferState: BufferState = { buffer: '' };
+        const writer = createBackpressureWriter(process.stdout);
+        this.writers.add(writer);
         const transportIo: TransportIo = {
-            write: (message: DaemonMessage) => stdout.write(encodeMessage(message)),
-            close: () => {},
+            write: writer.write,
+            close: () => {
+                bufferState.closed = true;
+                writer.dispose();
+                this.writers.delete(writer);
+                stdin.pause();
+            },
             id: () => 0,
         };
         stdin.setEncoding(ENCODING_UTF8);
         stdin.on(EVENT_DATA, (chunk: string) =>
             this.processIncomingChunk(chunk, bufferState, transportIo),
         );
-        stdin.on(EVENT_END, () => this.shutdown(REASON_STDIO_EOF));
+        stdin.on(EVENT_END, () => {
+            writer.dispose();
+            this.writers.delete(writer);
+            void this.shutdown(REASON_STDIO_EOF);
+        });
     }
 
     private handleConnection(socket: net.Socket): void {
         this.scheduleIdle();
         const bufferState: BufferState = { buffer: '' };
         socket.setEncoding(ENCODING_UTF8);
-        const write = (message: DaemonMessage) => {
-            if (!socket.destroyed) socket.write(encodeMessage(message));
-        };
+        const writer = createBackpressureWriter(
+            socket,
+            () => {
+                if (!socket.destroyed) socket.pause();
+            },
+            () => {
+                if (!socket.destroyed) socket.resume();
+            },
+        );
+        this.writers.add(writer);
         const transportIo: TransportIo = {
-            write,
-            close: () => socket.destroy(),
+            write: writer.write,
+            close: () => {
+                bufferState.closed = true;
+                writer.dispose();
+                this.writers.delete(writer);
+                socket.destroy();
+            },
             id: () => this.nextId++,
+        };
+        const onDone = (): void => {
+            writer.dispose();
+            this.writers.delete(writer);
+            this.abortSocketPending(socket);
+            this.scheduleIdle();
         };
         socket.on(EVENT_DATA, (chunk: string) =>
             this.processIncomingChunk(chunk, bufferState, transportIo, socket),
         );
-        socket.on(EVENT_CLOSE, () => {
-            this.abortSocketPending(socket);
-            this.scheduleIdle();
-        });
-        socket.on(ERROR_EVENT, () => {
-            this.abortSocketPending(socket);
-            this.scheduleIdle();
-        });
+        socket.on(EVENT_CLOSE, onDone);
+        socket.on(ERROR_EVENT, onDone);
     }
 
     private abortSocketPending(socket: net.Socket): void {
@@ -356,10 +511,18 @@ export class DaemonServer {
             case MSG_TYPE_HELLO:
                 this.handleHello(msg, transportIo);
                 break;
-            case MSG_TYPE_PING:
-                transportIo.write({ v: 1, id: msg.id, type: MSG_TYPE_PONG });
+            case MSG_TYPE_PING: {
+                const lastFlushError = this.getLastFlushError();
+                const pongMessage: DaemonMessage = {
+                    v: 1,
+                    id: msg.id,
+                    type: MSG_TYPE_PONG,
+                    ...(lastFlushError !== undefined ? { lastFlushError } : {}),
+                } as PongMessage;
+                transportIo.write(pongMessage);
                 this.scheduleIdle();
                 break;
+            }
             case MSG_TYPE_SCAN:
                 this.scheduleIdle();
                 this.trackScan(
@@ -441,6 +604,7 @@ export class DaemonServer {
             this.handleScanError(task, error);
         } finally {
             this.pending.delete(requestId);
+            if (!this.shuttingDown) this.ctx.pools.rssGuard();
         }
     }
 
@@ -468,7 +632,17 @@ export class DaemonServer {
             this.handleScanError(task, error);
         } finally {
             this.pending.delete(requestId);
+            if (!this.shuttingDown) this.ctx.pools.rssGuard();
         }
+    }
+
+    private resolveTaskFlushError(task: ScanTask | ScanDiffTask): string | undefined {
+        const rootValue = task.configJson?.root;
+        if (task.options?.cache && typeof rootValue === 'string' && rootValue) {
+            const err = this.ctx.getCache(rootValue, task.options.cacheDir).lastFlushError;
+            if (err !== undefined) return err instanceof Error ? err.message : String(err);
+        }
+        return this.getLastFlushError();
     }
 
     private handleScanSuccess(
@@ -476,13 +650,19 @@ export class DaemonServer {
         report: unknown,
         stats: unknown,
     ): void {
+        const lastFlushError = this.resolveTaskFlushError(task);
+        if (lastFlushError !== undefined) {
+            this.logger.warn(`cache flush error recorded after scan: ${lastFlushError}`);
+        }
+        const baseStats =
+            stats && typeof stats === 'object' ? (stats as Record<string, unknown>) : {};
         task.io.write({
             v: 1,
             id: task.id,
             type: MSG_TYPE_SCAN_DONE,
             requestId: task.requestId,
             report: report as unknown as Record<string, unknown>,
-            stats: stats as unknown as Record<string, unknown>,
+            stats: lastFlushError !== undefined ? { ...baseStats, lastFlushError } : baseStats,
         });
         this.scheduleIdle();
     }
@@ -503,6 +683,7 @@ export class DaemonServer {
 
     private scheduleIdle(): void {
         if (this.idleTimer) clearTimeout(this.idleTimer);
+        if (!this.shuttingDown) this.ctx.pools.rssGuard();
         this.idleTimer = setTimeout(() => {
             this.logger.info(`idle ${IDLE_TIMEOUT_MS / MS_PER_SECOND}s — exiting`);
             this.shutdown(REASON_IDLE_TIMEOUT);
@@ -522,6 +703,8 @@ export class DaemonServer {
     }
 
     private releaseDaemonResources(): void {
+        for (const writer of this.writers) writer.dispose();
+        this.writers.clear();
         try {
             this.ctx.pools.shutdown();
         } catch {

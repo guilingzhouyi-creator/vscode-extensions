@@ -23,8 +23,48 @@ use fg_transport::remote::{LoopbackTransport, RemoteTransport};
 use fractal_git::constants::cli::CliTag;
 use serde_json::json;
 
-use super::common::{fail_fatal, fail_unavailable, print_json, reject, CliContext};
+use super::common::{
+    fail_fatal, fail_unavailable, fail_usage, print_json, reject, CliContext, EXIT_UNAVAILABLE,
+};
 use super::repo_view::RepoView;
+
+/// Reports that network transport is disabled in this edition, emitting `fallback_hint` JSON when requested.
+pub(crate) fn fail_network_unavailable(
+    ctx: &CliContext,
+    operation: &str,
+    url: &str,
+    fallback_hint: &str,
+) -> ! {
+    let edition = fg_core::constants::Edition::CURRENT;
+    let capability = fg_core::constants::CAPABILITY_NETWORK;
+    if ctx.json_mode {
+        fg_core::diag_debug!(
+            "capability",
+            "refused '{}' on '{}' because '{}' is disabled in the {} edition",
+            operation,
+            url,
+            capability,
+            edition.as_str()
+        );
+        print_json(&json!({
+            "engine": "taxis",
+            "operation": operation,
+            "status": "unavailable",
+            "capability": capability,
+            "edition": edition.as_str(),
+            "url": url,
+            "fallback_hint": fallback_hint,
+            "error": format!(
+                "'{operation}' requires the '{capability}' capability, which the {} edition does not provide.",
+                edition.as_str()
+            ),
+        }));
+        std::process::exit(EXIT_UNAVAILABLE)
+    }
+    eprintln!("  url: {url}");
+    eprintln!("  fallback_hint: {fallback_hint}");
+    fail_unavailable(capability, operation)
+}
 
 /// A configured remote repository entry.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -65,25 +105,53 @@ pub fn handle_remote(ctx: &CliContext) {
         "add" => add_remote(ctx, &config_path, rest_args),
         "remove" | "rm" => remove_remote(ctx, &config_path, rest_args),
         "get-url" => get_remote_url(ctx, &config_path, rest_args),
-        other if !other.starts_with('-') => {
+        "set-url" => super::remote_upstream::set_remote_url(ctx, &config_path, rest_args),
+        other if other.starts_with('-') => {
+            fail_usage(format!("unknown option `{other}` for `remote`"));
+        }
+        other => {
             reject(
                 CliTag::ERROR,
                 format!(
-                    "unknown remote subcommand '{other}'; supported: add, remove, rm, get-url, -v"
+                    "unknown remote subcommand '{other}'; supported: add, remove, rm, get-url, set-url, -v"
                 ),
             );
         }
-        _ => list_remotes(ctx, &config_path, false),
     }
 }
 
 /// Dispatches the `taxis fetch` command.
 pub fn handle_fetch(ctx: &CliContext) {
-    let remote_target = ctx.args.first().map(String::as_str).unwrap_or("origin");
-    let config_path = ctx.git_dir.join("config");
-    let target_url = resolve_remote_url(&config_path, remote_target);
+    let mut fetch_all = false;
+    let mut positional: Vec<&str> = Vec::new();
+    for arg in &ctx.args {
+        match arg.as_str() {
+            "--all" => fetch_all = true,
+            "-p" | "--prune" | "-q" | "--quiet" | "-v" | "--verbose" | "-f" | "--force"
+            | "--tags" | "-n" | "--no-tags" => {}
+            other if other.starts_with('-') => {
+                fail_usage(format!("unknown option `{other}` for `fetch`"));
+            }
+            other => positional.push(other),
+        }
+    }
 
-    let scheme = require_transport("fetch", remote_target, &target_url);
+    let config_path = ctx.git_dir.join("config");
+    if fetch_all {
+        let remotes = load_configured_remotes(&config_path);
+        if remotes.is_empty() {
+            fail_fatal("no remotes configured for fetch --all");
+        }
+        for remote_entry in &remotes {
+            let scheme = require_transport(ctx, "fetch", &remote_entry.name, &remote_entry.url);
+            execute_loopback_fetch(ctx, scheme, &remote_entry.name, &remote_entry.url);
+        }
+        return;
+    }
+
+    let remote_target = positional.first().copied().unwrap_or("origin");
+    let target_url = resolve_remote_url(&config_path, remote_target);
+    let scheme = require_transport(ctx, "fetch", remote_target, &target_url);
     execute_loopback_fetch(ctx, scheme, remote_target, &target_url);
 }
 
@@ -91,12 +159,13 @@ pub fn handle_fetch(ctx: &CliContext) {
 pub fn handle_push(ctx: &CliContext) {
     let mut dry_run = false;
     let mut force = false;
+    let mut set_upstream = false;
     let mut positional: Vec<String> = Vec::new();
     for arg in &ctx.args {
         match arg.as_str() {
             "-n" | "--dry-run" => dry_run = true,
             "-f" | "--force" => force = true,
-            "-u" | "--set-upstream" => {}
+            "-u" | "--set-upstream" => set_upstream = true,
             other if other.starts_with('-') => {
                 reject(CliTag::ERROR, format!("push: unknown option '{other}'"));
             }
@@ -112,7 +181,7 @@ pub fn handle_push(ctx: &CliContext) {
     let config_path = ctx.git_dir.join("config");
     let target_url = resolve_remote_url(&config_path, remote_target);
 
-    let scheme = require_transport("push", remote_target, &target_url);
+    let scheme = require_transport(ctx, "push", remote_target, &target_url);
     if scheme == TransportScheme::LocalFile && !dry_run {
         if let Some(dest_git_dir) = super::remote_sync::resolve_source_git_dir(&target_url) {
             super::remote_sync::sync_local_repository_push(&super::remote_sync::LocalPushParams {
@@ -123,29 +192,43 @@ pub fn handle_push(ctx: &CliContext) {
                 refspecs,
                 force,
             });
+            if set_upstream {
+                super::remote_upstream::configure_upstream_tracking(ctx, remote_target, refspecs);
+            }
             return;
         }
     }
     execute_loopback_push(ctx, scheme, remote_target, &target_url, refspecs, dry_run);
+    if set_upstream && !dry_run {
+        super::remote_upstream::configure_upstream_tracking(ctx, remote_target, refspecs);
+    }
 }
 
 /// Dispatches the `taxis pull` command.
 pub fn handle_pull(ctx: &CliContext) {
-    let remote_target = ctx
-        .args
-        .iter()
-        .find(|arg| !arg.starts_with('-'))
-        .map(String::as_str)
-        .unwrap_or("origin");
+    let mut merge_flags: Vec<String> = Vec::new();
+    let mut positional: Vec<&str> = Vec::new();
+    for arg in &ctx.args {
+        match arg.as_str() {
+            "--ff-only" | "--no-ff" => merge_flags.push(arg.clone()),
+            "--rebase" | "--ff" | "-q" | "--quiet" | "-v" | "--verbose" | "-f" | "--force"
+            | "--no-rebase" => {}
+            other if other.starts_with('-') => {
+                fail_usage(format!("unknown option `{other}` for `pull`"));
+            }
+            other => positional.push(other),
+        }
+    }
+    let remote_target = positional.first().copied().unwrap_or("origin");
     let config_path = ctx.git_dir.join("config");
     let target_url = resolve_remote_url(&config_path, remote_target);
 
-    let scheme = require_transport("pull", remote_target, &target_url);
-    execute_loopback_pull(ctx, scheme, remote_target, &target_url);
+    let scheme = require_transport(ctx, "pull", remote_target, &target_url);
+    execute_loopback_pull_with_flags(ctx, scheme, remote_target, &target_url, &merge_flags);
 }
 
 /// Loads all configured remotes from the repository configuration file.
-fn load_configured_remotes(config_path: &Path) -> Vec<ConfiguredRemote> {
+pub(crate) fn load_configured_remotes(config_path: &Path) -> Vec<ConfiguredRemote> {
     let entries: Vec<ConfigEntry> = match read_config(config_path) {
         Ok(loaded_entries) => loaded_entries,
         Err(_) => return Vec::new(),
@@ -323,6 +406,39 @@ fn resolve_remote_url(config_path: &Path, remote_target: &str) -> String {
     ))
 }
 
+/// Whether a URL looks like an SCP-style SSH remote (`[user@]host:path`) rather than a Windows drive path.
+pub(crate) fn looks_like_scp_remote(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    let is_windows_drive = bytes.len() >= 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':';
+    !is_windows_drive
+        && !value.starts_with('/')
+        && !value.starts_with('.')
+        && value.contains('@')
+        && value.contains(':')
+        && !Path::new(value).exists()
+}
+
+/// Strips `file://` (handling Windows `file:///C:/...` leading slash) while keeping original path case.
+pub(crate) fn strip_file_url_prefix(trimmed: &str) -> &str {
+    let Some(rest) = trimmed
+        .strip_prefix("file://")
+        .or_else(|| trimmed.strip_prefix("FILE://"))
+    else {
+        return trimmed;
+    };
+    if cfg!(windows) {
+        let bytes = rest.as_bytes();
+        if bytes.len() >= 3
+            && bytes[0] == b'/'
+            && bytes[1].is_ascii_alphabetic()
+            && bytes[2] == b':'
+        {
+            return &rest[1..];
+        }
+    }
+    rest
+}
+
 /// Whether a remote argument is self-evidently a URL or a path rather than a configured name.
 ///
 /// Deliberately narrow: a bare word is a remote *name*, and treating it as a path is exactly the
@@ -336,6 +452,7 @@ fn looks_like_url_or_path(value: &str) -> bool {
         || lowered.starts_with("file://")
         || lowered.starts_with("loopback:");
     has_scheme
+        || looks_like_scp_remote(value)
         || value.contains('/')
         || value.contains('\\')
         || value.starts_with('.')
@@ -403,13 +520,13 @@ fn resolve_transport(url: &str) -> ResolvedTransport {
             };
         }
     }
+    if looks_like_scp_remote(trimmed) {
+        return ResolvedTransport::NetworkDisabled {
+            scheme: "ssh".to_string(),
+        };
+    }
 
-    // A bare or explicit local path. `file://` is stripped before the existence test because
-    // `Path::new("file:///x")` is not a filesystem path on any platform.
-    let local_path = lowered
-        .strip_prefix("file://")
-        .unwrap_or(trimmed)
-        .to_string();
+    let local_path = strip_file_url_prefix(trimmed).to_string();
     if Path::new(&local_path).exists() {
         return ResolvedTransport::Available(TransportScheme::LocalFile);
     }
@@ -421,24 +538,19 @@ fn resolve_transport(url: &str) -> ResolvedTransport {
 /// Every failure path exits non-zero. Returning success while printing "not mounted" was the defect
 /// this replaces: `push` is the release path, and a `push && deploy` pipeline read that zero as
 /// confirmation that the commit had reached the remote.
-fn require_transport(operation: &str, remote_target: &str, url: &str) -> TransportScheme {
+fn require_transport(
+    ctx: &CliContext,
+    operation: &str,
+    remote_target: &str,
+    url: &str,
+) -> TransportScheme {
     match resolve_transport(url) {
         ResolvedTransport::Available(scheme) => scheme,
-        ResolvedTransport::NetworkDisabled { scheme } => {
-            if !fg_core::constants::Capabilities::current()
-                .allows(fg_core::constants::CAPABILITY_NETWORK)
-            {
-                fail_unavailable(
-                    fg_core::constants::CAPABILITY_NETWORK,
-                    &format!("{operation} over '{scheme}://' to '{remote_target}'"),
-                );
-            }
-            // A general edition answers this scheme, but no implementation is linked into this
-            // build yet. Refusing beats pretending, and the message must not claim it succeeded.
-            fail_unavailable(
-                fg_core::constants::CAPABILITY_NETWORK,
-                &format!("{operation} over '{scheme}://' to '{remote_target}' (no adapter linked)"),
-            )
+        ResolvedTransport::NetworkDisabled { .. } => {
+            let hint = format!(
+                "Run native `git {operation} {remote_target}` when online, or configure a local path / `file://` mirror or bundle."
+            );
+            fail_network_unavailable(ctx, operation, url, &hint);
         }
         ResolvedTransport::MissingPath { path } => fail_fatal(format!(
             "'{remote_target}' does not appear to be a git repository (no such path: {path})"
@@ -605,11 +717,12 @@ fn execute_loopback_push(
 }
 
 /// Executes local loopback pull (fetch + status confirmation or fast-forward).
-fn execute_loopback_pull(
+fn execute_loopback_pull_with_flags(
     ctx: &CliContext,
     scheme: TransportScheme,
     remote_target: &str,
     target_url: &str,
+    merge_flags: &[String],
 ) {
     execute_loopback_fetch(ctx, scheme, remote_target, target_url);
     if scheme == TransportScheme::LocalFile {
@@ -618,9 +731,12 @@ fn execute_loopback_pull(
             if try_pull_into_unborn_head(ctx, &fetch_head) {
                 return;
             }
+            let mut merge_args = Vec::with_capacity(1 + merge_flags.len());
+            merge_args.push("FETCH_HEAD".to_string());
+            merge_args.extend(merge_flags.iter().cloned());
             let merge_ctx = CliContext {
                 git_dir: ctx.git_dir.clone(),
-                args: vec!["FETCH_HEAD".to_string()],
+                args: merge_args,
                 json_mode: ctx.json_mode,
             };
             super::merge::handle_merge(&merge_ctx);

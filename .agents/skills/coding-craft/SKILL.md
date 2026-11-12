@@ -1,12 +1,12 @@
 ---
 name: coding-craft
 description: >-
-  【触发：写代码/重构/命名/错误处理/类型设计/SSOT/空捕获】编写、生成或审查任何代码时必须遵循。坚持命名即契约、显式失败语义、类型穷尽、最小接口暴露与单向依赖，对接 534 条 SSOT 规则。
+  【触发：写代码/重构/命名/错误处理/类型设计/SSOT/空捕获】编写、生成或审查任何代码时必须遵循。坚持命名即契约、显式失败语义、类型穷尽、最小接口暴露与单向依赖，对接 536 条 SSOT 规则。
 ---
 
 # coding-craft — Universal Coding Craft, Multi-Language Idioms & Normative Thinking
 
-Defines function-level engineering craft invariants and 6 metacognitive constraints across all workspace languages, backed by `scripts/common/rule-catalog.json` (<!-- METRICS:BEGIN rule-family-count-all -->**70 个规则族**<!-- METRICS:END rule-family-count-all -->, <!-- METRICS:BEGIN rule-total -->**534 条规则**<!-- METRICS:END rule-total -->).
+Defines function-level engineering craft invariants and 6 metacognitive constraints across all workspace languages, backed by `scripts/common/rule-catalog.json` (<!-- METRICS:BEGIN rule-family-count-all -->**70 个规则族**<!-- METRICS:END rule-family-count-all -->, <!-- METRICS:BEGIN rule-total -->**536 条规则**<!-- METRICS:END rule-total -->).
 
 ---
 
@@ -68,7 +68,7 @@ node scripts/common/validate-rule-id-closure.js && node scripts/common/validate-
 node scripts/common/evaluate-eloc-budget.js && node scripts/common/validate-code-density.js --all
 ```
 
-- [rule-family-map.md](references/rule-family-map.md): Complete mapping of <!-- METRICS:BEGIN rule-family-count-all -->**70 个规则族**<!-- METRICS:END rule-family-count-all --> and <!-- METRICS:BEGIN rule-total -->**534 条规则**<!-- METRICS:END rule-total -->.
+- [rule-family-map.md](references/rule-family-map.md): Complete mapping of <!-- METRICS:BEGIN rule-family-count-all -->**70 个规则族**<!-- METRICS:END rule-family-count-all --> and <!-- METRICS:BEGIN rule-total -->**536 条规则**<!-- METRICS:END rule-total -->.
 - [normative-thinking-constraints.md](references/normative-thinking-constraints.md): Six normative metacognitive constraints and self-probing guard patterns.
 - [python-idioms.md](references/python-idioms.md): `PYM` modern Python idioms and refactoring examples.
 - [code-review-checklist.md](templates/code-review-checklist.md): 7-domain pre-commit code review checklist.

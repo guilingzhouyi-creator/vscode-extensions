@@ -22,13 +22,95 @@
 import { isVocabularyEnumeration } from '../markerScope';
 import {
     CONSTRUCTION_JARGON_RE,
-    DEFAULT_RULES_FAST_CANDIDATE_RE,
+    hasDefaultTerminologyCandidate,
     auditTerminologyProse,
 } from '../terminology-engine';
 import { fileNameEndsWith, isToolOrTestScript } from '../pathScope';
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
 import { CODE_GOV_PROSE_SANITIZATION } from '../../constants/rule-codes';
-import { isCommentLine } from '../../scanner/text-scanner-utils';
+
+const CHAR_CODE_TAB = 9;
+const CHAR_CODE_LF = 10;
+const CHAR_CODE_CR = 13;
+const CHAR_CODE_SPACE = 32;
+const CHAR_CODE_HASH = 35;
+const CHAR_CODE_ASTERISK = 42;
+const CHAR_CODE_SLASH = 47;
+const CHAR_CODE_DIGIT_ZERO = 48;
+const CHAR_CODE_DIGIT_NINE = 57;
+const CHAR_CODE_DOLLAR = 36;
+const CHAR_CODE_HYPHEN = 45;
+const CHAR_CODE_UPPER_A = 65;
+const CHAR_CODE_UPPER_Z = 90;
+const CHAR_CODE_UNDERSCORE = 95;
+const CHAR_CODE_LOWER_A = 97;
+const CHAR_CODE_LOWER_Z = 122;
+const CHAR_CODE_ASCII_MAX = 127;
+const MIN_DOSSIER_LINE_LEN = 3;
+const COMMENT_PREFIX_TRIGGERS: readonly string[] = ['//', '*', '#'];
+const DIAGNOSTIC_MESSAGE_TRIGGERS: readonly string[] = ['mkIssue', 'message:', 'suggestion:'];
+const HAS_NON_ASCII_RE = /[^\u0000-\u007f]/;
+const COMMENT_WHITESPACE_RE = /\s/;
+
+/**
+ * Zero-allocation comment prefix check matching C-family (`//`, `/*`, `*`) and `#` lines.
+ */
+function isCommentLineFast(line: string): boolean {
+    const len = line.length;
+    if (len === 0) return false;
+    let i = 0;
+    while (i < len) {
+        const c = line.charCodeAt(i);
+        const isAsciiWs =
+            c === CHAR_CODE_SPACE ||
+            c === CHAR_CODE_TAB ||
+            (c >= CHAR_CODE_LF && c <= CHAR_CODE_CR);
+        if (isAsciiWs || (c > CHAR_CODE_ASCII_MAX && COMMENT_WHITESPACE_RE.test(line[i]))) {
+            i++;
+            continue;
+        }
+        break;
+    }
+    if (i >= len) return false;
+    const first = line.charCodeAt(i);
+    if (first === CHAR_CODE_ASTERISK || first === CHAR_CODE_HASH) return true;
+    if (first === CHAR_CODE_SLASH && i + 1 < len) {
+        const second = line.charCodeAt(i + 1);
+        return second === CHAR_CODE_SLASH || second === CHAR_CODE_ASTERISK;
+    }
+    return false;
+}
+
+function hasAsciiDigit(text: string): boolean {
+    for (let i = 0; i < text.length; i++) {
+        const c = text.charCodeAt(i);
+        if (c >= CHAR_CODE_DIGIT_ZERO && c <= CHAR_CODE_DIGIT_NINE) return true;
+    }
+    return false;
+}
+
+function isTokenIdentCharCode(code: number): boolean {
+    return (
+        (code >= CHAR_CODE_UPPER_A && code <= CHAR_CODE_UPPER_Z) ||
+        (code >= CHAR_CODE_LOWER_A && code <= CHAR_CODE_LOWER_Z) ||
+        (code >= CHAR_CODE_DIGIT_ZERO && code <= CHAR_CODE_DIGIT_NINE) ||
+        code === CHAR_CODE_UNDERSCORE ||
+        code === CHAR_CODE_DOLLAR ||
+        code === CHAR_CODE_HYPHEN
+    );
+}
+
+function containsExactToken(line: string, token: string): boolean {
+    let idx = line.indexOf(token);
+    while (idx !== -1) {
+        const prevOk = idx === 0 || !isTokenIdentCharCode(line.charCodeAt(idx - 1));
+        const end = idx + token.length;
+        const nextOk = end >= line.length || !isTokenIdentCharCode(line.charCodeAt(end));
+        if (prevOk && nextOk) return true;
+        idx = line.indexOf(token, end);
+    }
+    return false;
+}
 
 /**
  * Checks whether a line references internal jargon governance identifiers.
@@ -49,13 +131,13 @@ const CHINESE_CONSTRUCTION_JARGON_RE =
  * Checks whether a single source line contains temporary task jargon or `WIP` markers in comments.
  */
 function checkCommentLineJargon(line: string, lineIndex: number): GovernanceViolation | null {
-    if (!isCommentLine(line) || isJargonSelfReference(line)) return null;
+    if (!isCommentLineFast(line) || isJargonSelfReference(line)) return null;
 
     const match = CONSTRUCTION_JARGON_RE.exec(line);
     let matchedText = match ? match[0] : '';
     let matchIdx = match ? match.index : -1;
 
-    if (!match) {
+    if (!match && HAS_NON_ASCII_RE.test(line)) {
         const zhMatch = CHINESE_CONSTRUCTION_JARGON_RE.exec(line);
         if (zhMatch) {
             matchedText = zhMatch[0];
@@ -88,6 +170,7 @@ export const LexicalHygieneRule: GovernanceRule = {
     category: 'maintainability',
     severity: 'warning',
     risk: 'medium',
+    textTrigger: COMMENT_PREFIX_TRIGGERS,
     rationale:
         'Transient task tags and batch jargon compromise architectural longevity and create documentation drift.',
     isFixable: false,
@@ -95,13 +178,6 @@ export const LexicalHygieneRule: GovernanceRule = {
         if (
             isToolOrTestScript(ctx.filePath) ||
             fileNameEndsWith(ctx.filePath, ['sanitization.ts'])
-        ) {
-            return null;
-        }
-
-        if (
-            !CONSTRUCTION_JARGON_RE.test(ctx.content) &&
-            !CHINESE_CONSTRUCTION_JARGON_RE.test(ctx.content)
         ) {
             return null;
         }
@@ -144,6 +220,25 @@ function isExemptDiagnosticFile(filePath: string): boolean {
     );
 }
 
+function hasDiagnosticTriggerToken(text: string): boolean {
+    return text.includes('mkIssue') || text.includes('message:') || text.includes('suggestion:');
+}
+
+function checkDiagnosticLine(line: string, lineIndex: number): GovernanceViolation | null {
+    if (!hasDiagnosticTriggerToken(line) || !CHINESE_CHAR_RE.test(line)) return null;
+    if (isCommentLineFast(line)) return null;
+    if (!DIAGNOSTIC_TRIGGER_RE.test(line) || GOV_MSG_001_MARKER_RE.test(line)) return null;
+
+    return {
+        ruleId: GOV_MSG_001_ID,
+        message: GOV_MSG_001_MESSAGE,
+        line: lineIndex + 1,
+        column: line.search(CHINESE_CHAR_RE) + 1,
+        suggestion: GOV_MSG_001_SUGGESTION,
+        fixable: false,
+    };
+}
+
 /**
  * GOV-MSG-001: Technical diagnostic messages and suggestions in lower-level analyzers must
  * strictly adhere to standard technical English and avoid unmanaged non-ASCII strings.
@@ -154,31 +249,22 @@ export const DiagnosticMessageRule: GovernanceRule = {
     category: 'standardization',
     severity: SEVERITY_WARNING_LEVEL,
     risk: RISK_MEDIUM_LEVEL,
+    textTrigger: DIAGNOSTIC_MESSAGE_TRIGGERS,
     rationale:
         'All low-level diagnostic messages, analyzer issues, and remediation suggestions must strictly use technical English to maintain industrial compatibility and avoid encoding artifacts.',
     isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (isExemptDiagnosticFile(ctx.filePath)) return null;
-        if (!CHINESE_CHAR_RE.test(ctx.content)) return null;
+        if (!hasDiagnosticTriggerToken(ctx.content) || !CHINESE_CHAR_RE.test(ctx.content)) {
+            return null;
+        }
 
         const violations: GovernanceViolation[] = [];
         const lines = ctx.lines;
 
         for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            if (!CHINESE_CHAR_RE.test(line)) continue;
-            if (isCommentLine(line)) continue;
-
-            if (DIAGNOSTIC_TRIGGER_RE.test(line) && !GOV_MSG_001_MARKER_RE.test(line)) {
-                violations.push({
-                    ruleId: GOV_MSG_001_ID,
-                    message: GOV_MSG_001_MESSAGE,
-                    line: i + 1,
-                    column: line.search(CHINESE_CHAR_RE) + 1,
-                    suggestion: GOV_MSG_001_SUGGESTION,
-                    fixable: false,
-                });
-            }
+            const hit = checkDiagnosticLine(lines[i], i);
+            if (hit) violations.push(hit);
         }
 
         return violations.length > 0 ? violations : null;
@@ -188,26 +274,21 @@ export const DiagnosticMessageRule: GovernanceRule = {
 const DOSSIER_JARGON_RE =
     /\b(st_[0-9]+[a-z0-9_]*|phase[\s_]*[0-9]+|p[0-9]{2,}|milestone[\s_]*[0-9]+)\b/i;
 
-/** Identifiers on lines to skip when inspecting for historical dossier references. */
-const DOSSIER_SELF_REF_IDENTIFIERS: ReadonlySet<string> = new Set([
-    'DOSSIER_JARGON_RE',
-    'GOV-ARC-001',
-    'DossierBoundaryIsolationRule',
-]);
-
 /**
- * Checks whether a line references dossier self-governance identifiers using Set lookup.
+ * Checks whether a line references dossier self-governance identifiers without allocation.
  */
 function isDossierSelfReference(line: string): boolean {
-    const tokens = line.split(/[^a-zA-Z0-9_$-]+/);
-    for (let i = 0; i < tokens.length; i++) {
-        if (DOSSIER_SELF_REF_IDENTIFIERS.has(tokens[i])) return true;
-    }
-    return false;
+    return (
+        containsExactToken(line, 'DOSSIER_JARGON_RE') ||
+        containsExactToken(line, 'GOV-ARC-001') ||
+        containsExactToken(line, 'DossierBoundaryIsolationRule')
+    );
 }
 
 function isExemptDossierPath(filePath: string): boolean {
-    const normalized = filePath.replace(/\\/g, '/').toLowerCase();
+    const normalized = (
+        filePath.includes('\\') ? filePath.replace(/\\/g, '/') : filePath
+    ).toLowerCase();
     return (
         /(?:\/|^)(?:archive|fixtures?|tests?|history)(?:\/|$)/i.test(normalized) ||
         normalized.startsWith('archive/') ||
@@ -219,6 +300,7 @@ function isExemptDossierPath(filePath: string): boolean {
  * Evaluates a single source line for historical dossier nomenclature violations.
  */
 function checkDossierLine(line: string, lineIndex: number): GovernanceViolation | null {
+    if (line.length < MIN_DOSSIER_LINE_LEN || !hasAsciiDigit(line)) return null;
     const match = DOSSIER_JARGON_RE.exec(line);
     if (!match || isDossierSelfReference(line)) return null;
 
@@ -248,7 +330,7 @@ export const DossierBoundaryIsolationRule: GovernanceRule = {
     isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (isExemptDossierPath(ctx.filePath)) return null;
-        if (!DOSSIER_JARGON_RE.test(ctx.content)) return null;
+        if (!hasAsciiDigit(ctx.content) || !DOSSIER_JARGON_RE.test(ctx.content)) return null;
 
         const violations: GovernanceViolation[] = [];
         const lines = ctx.lines;
@@ -273,6 +355,7 @@ export const ProseTerminologySanitizationRule: GovernanceRule = {
     category: 'maintainability',
     severity: 'warning',
     risk: 'medium',
+    textTrigger: COMMENT_PREFIX_TRIGGERS,
     rationale:
         'Technical prose in source comments and docstrings must remain objective, factual, and free of hyperbolic slogans or unsubstantiated marketing claims.',
     isFixable: false,
@@ -284,15 +367,11 @@ export const ProseTerminologySanitizationRule: GovernanceRule = {
             return null;
         }
 
-        if (!DEFAULT_RULES_FAST_CANDIDATE_RE.test(ctx.content)) {
-            return null;
-        }
-
         const candidateComments: string[] = [];
         const candidateLineNumbers: number[] = [];
         for (let i = 0; i < ctx.lines.length; i++) {
             const line = ctx.lines[i];
-            if (isCommentLine(line) && DEFAULT_RULES_FAST_CANDIDATE_RE.test(line)) {
+            if (isCommentLineFast(line) && hasDefaultTerminologyCandidate(line)) {
                 candidateComments.push(line);
                 candidateLineNumbers.push(i + 1);
             }
