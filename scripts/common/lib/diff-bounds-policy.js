@@ -19,6 +19,8 @@
  */
 'use strict';
 
+const DIFF_BOUNDS_CONTRACT = Object.freeze(require('../diff-bounds-contract.json'));
+
 /** Rule identifiers owned by global tooling; one per boundary family. */
 const RULE_BOUND = 'GAT-BOUND-001';
 const RULE_DENS = 'GAT-DENS-001';
@@ -38,19 +40,19 @@ const DENSITY_IN_BAND = 'in-band';
 
 /** Single-file add envelope in 5D ELOC: a new file, an edit, and a refactor each get their own ceiling. */
 const FILE_ADD_BANDS = Object.freeze({
-    newFile: Object.freeze({ floor: 0, target: 180, ceiling: 360, rule: RULE_BOUND }),
-    existingFile: Object.freeze({ floor: 0, target: 60, ceiling: 120, rule: RULE_BOUND }),
-    refactorWitness: Object.freeze({ floor: 0, target: 90, ceiling: 180, rule: RULE_BOUND }),
+    newFile: Object.freeze({ ...DIFF_BOUNDS_CONTRACT.fileAddBands.newFile, rule: RULE_BOUND }),
+    existingFile: Object.freeze({ ...DIFF_BOUNDS_CONTRACT.fileAddBands.existingFile, rule: RULE_BOUND }),
+    refactorWitness: Object.freeze({ ...DIFF_BOUNDS_CONTRACT.fileAddBands.refactorWitness, rule: RULE_BOUND }),
 });
 
 /** Single-file delete envelope in 5D ELOC; the ceiling widens when a refactor witness exists. */
 const FILE_DEL_BANDS = Object.freeze({
-    plain: Object.freeze({ floor: 0, target: 50, ceiling: 100, rule: RULE_BOUND }),
-    witnessed: Object.freeze({ floor: 0, target: 140, ceiling: 280, rule: RULE_BOUND }),
+    plain: Object.freeze({ ...DIFF_BOUNDS_CONTRACT.fileDelBands.plain, rule: RULE_BOUND }),
+    witnessed: Object.freeze({ ...DIFF_BOUNDS_CONTRACT.fileDelBands.witnessed, rule: RULE_BOUND }),
 });
 
 /** Deleted 5D ELOC above which an existing file is treated as a refactor rather than an edit. */
-const REFACTOR_WITNESS_MIN_DEL_ELOC = 10;
+const REFACTOR_WITNESS_MIN_DEL_ELOC = DIFF_BOUNDS_CONTRACT.expansionPolicy.refactorWitnessMinDelEloc;
 
 /**
  * Substantive density band for added lines.
@@ -61,17 +63,13 @@ const REFACTOR_WITNESS_MIN_DEL_ELOC = 10;
  * third of its lines on explanation, and demanding otherwise would price the explanation at zero.
  */
 const SUBSTANTIVE_RATIO_BAND = Object.freeze({
-    floor: 0.45,
-    target: 0.6,
-    hardCeiling: 0.85,
+    ...DIFF_BOUNDS_CONTRACT.densityBands.substantiveRatio,
     rule: RULE_DENS,
 });
 
 /** Payload ratio band over the same physical lines, so a file cannot clear one band by failing the other. */
 const TSPR_BAND = Object.freeze({
-    floor: 0.3,
-    target: 0.4,
-    hardCeiling: 0.75,
+    ...DIFF_BOUNDS_CONTRACT.densityBands.tspr,
     rule: RULE_DENS,
 });
 
@@ -81,14 +79,20 @@ const TSPR_BAND = Object.freeze({
  * Below this width a ratio is dominated by its denominator: a ten-line addition with two comments
  * swings the ratio by five points per line, so judging it would reward padding rather than quality.
  */
-const DENSITY_MIN_PHYS_ADD = 10;
+const DENSITY_MIN_PHYS_ADD = DIFF_BOUNDS_CONTRACT.densityBands.minPhysAddSampleWidth;
 
 /** Commit batch macro envelope in 5D ELOC, plus the empirical turnover bounds. */
 const BATCH_BANDS = Object.freeze({
-    add: Object.freeze({ floor: 0, target: 240, ceiling: 360, rule: RULE_BATCH }),
-    del: Object.freeze({ floor: 0, target: 140, ceiling: 280, rule: RULE_BATCH }),
-    turnoverFloor: 3.0,
-    turnoverCap: 25.0,
+    add: Object.freeze({ ...DIFF_BOUNDS_CONTRACT.batchBands.add, rule: RULE_BATCH }),
+    del: Object.freeze({ ...DIFF_BOUNDS_CONTRACT.batchBands.del, rule: RULE_BATCH }),
+    deletionTurnoverWeight: DIFF_BOUNDS_CONTRACT.batchBands.deletionTurnoverWeight,
+    turnoverFloor: DIFF_BOUNDS_CONTRACT.empiricalAdmission.turnoverFloor,
+    turnoverCap: DIFF_BOUNDS_CONTRACT.empiricalAdmission.turnoverCap,
+});
+
+/** Empirical Jeffreys Beta(0.5, 0.5) admission calibration policy from SSOT contract. */
+const EMPIRICAL_ADMISSION_POLICY = Object.freeze({
+    ...DIFF_BOUNDS_CONTRACT.empiricalAdmission,
 });
 
 /**
@@ -102,7 +106,7 @@ const BATCH_BANDS = Object.freeze({
  * the two bands double-penalise the same file for the same lines, and the only way out is deleting
  * the explanation that made the code reviewable.
  */
-const TSPR_VOUCH_FOR_DENSITY = 0.85;
+const TSPR_VOUCH_FOR_DENSITY = DIFF_BOUNDS_CONTRACT.densityBands.tsprVouchForDensity;
 
 /**
  * Exemption parameters.
@@ -243,6 +247,8 @@ const DIFF_RULES = Object.freeze({
 });
 
 module.exports = {
+    DIFF_BOUNDS_CONTRACT,
+    EMPIRICAL_ADMISSION_POLICY,
     DIFF_RULES,
     FILE_ADD_BANDS,
     FILE_DEL_BANDS,
