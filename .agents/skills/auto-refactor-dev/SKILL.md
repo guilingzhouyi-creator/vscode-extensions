@@ -6,7 +6,7 @@ description: >-
 
 # auto-refactor-dev — Static Refactoring Engine, Dual-Track Operators & Praxis SDK Contract
 
-Governs the `auto-refactor/` 6-layer architecture, Rust+TS 100% byte parity, <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count --> built-in Sparse MoE analyzers across 4 pipeline stages (Stage 0–3), <!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor --> (<!-- METRICS:BEGIN test-suite-count -->**194 套**<!-- METRICS:END test-suite-count --> test suites), `PraxisReviewClient` SDK, and 3-layer topological Diff engine.
+Governs the `auto-refactor/` 6-layer architecture, Rust+TS 100% byte parity, <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count --> built-in Sparse MoE analyzers across 4 pipeline stages (Stage 0–3), <!-- METRICS:BEGIN rule-auto-refactor -->**377 条规则**<!-- METRICS:END rule-auto-refactor --> (<!-- METRICS:BEGIN test-suite-count -->**194 套**<!-- METRICS:END test-suite-count --> test suites), `PraxisReviewClient` SDK, and 3-layer topological Diff engine.
 
 ---
 
@@ -23,7 +23,7 @@ Governs the `auto-refactor/` 6-layer architecture, Rust+TS 100% byte parity, <!-
 
 ## 1. Six-Layer Architecture, Rust+TS Byte Parity & Project Neutrality
 
-1. **6-Layer Unidirectional Topology**: L1 Native Operators (`crates/ops-{diff,graph,pattern,mask,clone}`) $\to$ L2 `NormalizedNode` + `LineFeatureTape` + 8-language `SemanticGraph` $\to$ L3 (<!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count --> pooled analyzers & <!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor -->) $\to$ L4 5-Tier Sparse MoE Router & `< 10ms` AST slice pipeline $\to$ L5 10-pillar scoring & CAI 2.0 evolution plane $\to$ L6 Praxis SDK & LayerVFS sandbox.
+1. **6-Layer Unidirectional Topology**: L1 Native Operators (`crates/ops-{diff,graph,pattern,mask,clone}`) $\to$ L2 `NormalizedNode` + `LineFeatureTape` + 8-language `SemanticGraph` $\to$ L3 (<!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count --> pooled analyzers & <!-- METRICS:BEGIN rule-auto-refactor -->**377 条规则**<!-- METRICS:END rule-auto-refactor -->) $\to$ L4 5-Tier Sparse MoE Router & `< 10ms` AST slice pipeline $\to$ L5 10-pillar scoring & CAI 2.0 evolution plane $\to$ L6 Praxis SDK & LayerVFS sandbox.
 2. **Rust+TS 100% Byte Parity**: Rust N-API operators and `src/core/native/*-shim.ts` must produce 100% identical JSON key order, UTF-8/LF line-column offsets, dominator tree ordering, and 4-decimal float precision (`validate-native-parity.js` & `validate-equivalence.js`).
 3. **Project Neutrality (`validate-project-neutrality.js`)**: Core analyzers must never hardcode consumer-specific paths (`WebGames/`, `workspace-timing/`); infer `ProjectArchetype` solely from standard project manifests (`project.godot`, `package.json`, `Cargo.toml`, `go.mod`).
 4. **`PathClassifier` SSOT (`src/core/path/index.ts`)**: All path classification and exemption checks must route through `PathClassifier` predicates (`isTestFilePath`, `isFixtureOrMockPath`, `isBenchmarkPath`, `isScriptOrGatePath`, `isGeneratedOrDistPath`); ad-hoc path regexes in analyzers are forbidden.

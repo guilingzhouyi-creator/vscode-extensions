@@ -22,7 +22,15 @@ export { TextEditApplier, ApplyEditsResult } from './text-edit-applier';
 
 export { PatchEngine, defaultPatchEngine } from './patch-engine';
 
-export { createExtractConstantFix, ExtractConstantOptions } from './transforms/extract-constant';
+export {
+    createExtractConstantFix,
+    resolveSafeConstantExtraction,
+    resolveConstantInsertionLine,
+    CONSTANT_EXTRACTION_RULE_SPECS,
+    ExtractConstantOptions,
+    SafeExtractConstantInput,
+    PlannedConstantExtraction,
+} from './transforms/extract-constant';
 
 export { createUnusedImportFix, UnusedImportOptions } from './transforms/unused-imports';
 

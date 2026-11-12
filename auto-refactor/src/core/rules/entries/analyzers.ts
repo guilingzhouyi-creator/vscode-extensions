@@ -34,7 +34,7 @@ import {
     RULE_SIM_ARGS_002,
     RULE_CMT_HDR_004,
 } from '../../scoring/dimensionLiterals';
-import { REMEDIATION_STANDARD_AND_ABOVE, ANALYZER_MODERN_RULES } from './analyzers-modern';
+import { ANALYZER_MODERN_RULES } from './analyzers-modern';
 import { ANALYZER_HYGIENE_RULES } from './analyzers-hygiene';
 
 /**
@@ -44,6 +44,7 @@ import { ANALYZER_HYGIENE_RULES } from './analyzers-hygiene';
  * so this list stays the single ordered entry point the registry consumes.
  */
 export const ANALYZER_RULES: readonly RuleDefinition[] = [
+    // ── Comment Quality & Header Contracts (CMT-*) ──
     defineRule({
         id: 'CMT-BAN-001',
         family: RULE_FAMILY_COMMENTS,
@@ -52,7 +53,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
         summary: 'Banner divider (═) used in small file (< 150 lines).',
-        remediation: REMEDIATION_STANDARD_AND_ABOVE,
+        remediation:
+            'Remove banner divider bars from files under 150 lines; use concise section headers instead.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-ban-001',
     }),
     defineRule({
@@ -64,7 +66,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         defaultSeverity: SEVERITY_WARNING,
         summary:
             'Async exported function lacks concurrency scheduling assumptions, reentrancy, or idempotence contract.',
-        remediation: '`strict`',
+        remediation:
+            'Document concurrency assumptions, reentrancy guards, lock scope, or idempotence semantics in JSDoc.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-con-001',
     }),
     defineRule({
@@ -76,7 +79,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         defaultSeverity: SEVERITY_WARNING,
         summary:
             'Public exported symbol lacks Docstring/JSDoc description, parameters, or return type documentation.',
-        remediation: REMEDIATION_STANDARD_AND_ABOVE,
+        remediation:
+            'Add JSDoc or docstring summary alongside parameter and return descriptions on public exported symbols.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-doc-001',
     }),
     defineRule({
@@ -87,7 +91,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
         summary: 'Tautological redundant comment merely repeating symbol or function name.',
-        remediation: REMEDIATION_STANDARD_AND_ABOVE,
+        remediation:
+            'Rewrite tautological comments to state design rationale, invariants, or edge cases rather than echoing symbol names.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-doc-002',
     }),
     defineRule({
@@ -99,7 +104,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         defaultSeverity: SEVERITY_WARNING,
         summary:
             'Source file missing top-level file header comment explaining responsibility and design intent.',
-        remediation: '`basic` and above',
+        remediation:
+            'Add a top-level file header comment describing module responsibility, dependencies, and design intent.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-hdr-001',
     }),
     defineRule({
@@ -111,7 +117,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         defaultSeverity: SEVERITY_WARNING,
         summary:
             'Standard strict six-field file header missing one of six mandatory fields (Module, File Path, Architecture Role, Dependencies & Triggers, Responsibilities, Exit Semantics & Design Rationale).',
-        remediation: '`strict`',
+        remediation:
+            'Include all six required header fields (Module, File Path, Architecture Role, Dependencies & Triggers, Responsibilities, Exit Semantics & Design Rationale).',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-hdr-002',
     }),
     defineRule({
@@ -122,7 +129,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
         summary: 'File header declared path does not match actual physical file path.',
-        remediation: '`strict`',
+        remediation:
+            'Update the File Path header field to match the exact relative path of the source file on disk.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-hdr-003',
     }),
     defineRule({
@@ -182,7 +190,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         defaultSeverity: SEVERITY_WARNING,
         summary:
             'Encoding corruption detected (U+FFFD replacement characters, UTF-8 decoded as Latin-1, or Windows-1252 mojibake).',
-        remediation: '`basic` and above',
+        remediation:
+            'Re-encode the file in UTF-8 without BOM and replace corrupted or mojibake byte sequences cleanly.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-moji-001',
     }),
     defineRule({
@@ -194,7 +203,8 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         defaultSeverity: SEVERITY_WARNING,
         summary:
             'Inconsistent section separator styles mixed in same file (short ── title ── vs long ──── title).',
-        remediation: REMEDIATION_STANDARD_AND_ABOVE,
+        remediation:
+            'Standardize on a single consistent section separator style throughout the file.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-sep-001',
     }),
     defineRule({
@@ -231,9 +241,11 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         languages: ALL_LANGUAGES,
         defaultSeverity: SEVERITY_WARNING,
         summary: 'Comment or docstring physical line length exceeds 100 columns.',
-        remediation: REMEDIATION_STANDARD_AND_ABOVE,
+        remediation:
+            'Wrap comment or docstring lines cleanly so every physical comment line stays at or below 100 columns.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-wid-001',
     }),
+    // ── Documentation & Error Discipline Rules (DOC-*, ERR-*) ──
     defineRule({
         id: 'DOC-DUP-001',
         family: 'DOC',
@@ -320,6 +332,7 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
             'Unify error taxonomy with named error types and transform errors at boundary layers.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#err-prp-001',
     }),
+    // ── Hygiene, Performance & Python Modernization Rules (PRF-*, PYM-*) ──
     ...ANALYZER_HYGIENE_RULES,
     defineRule({
         id: 'PRF-ALG-001',
@@ -519,6 +532,7 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         remediation: 'Migrate to PEP 604 pipe syntax (X | None).',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-union-001',
     }),
+    // ── Security & Simplification Rules (SEC-*, SIM-*) ──
     defineRule({
         id: 'SEC-LEAK-001',
         family: RULE_FAMILY_SECURITY,
