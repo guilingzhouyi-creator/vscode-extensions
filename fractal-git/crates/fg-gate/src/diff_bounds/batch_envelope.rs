@@ -7,6 +7,8 @@
 pub const MAX_COMMIT_BATCH_ADD_5D_ELOC: f64 = 360.0;
 /// Macro batch ceiling for total 5D ELOC deletions per commit.
 pub const MAX_COMMIT_BATCH_DEL_5D_ELOC: f64 = 280.0;
+/// Weight applied to deleted 5D ELOC in net batch turnover.
+pub const DELETION_TURNOVER_WEIGHT: f64 = 0.8;
 
 /// Aggregate totals across all staged files in a candidate commit batch.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -104,5 +106,24 @@ mod tests {
         let totals = CommitBatchTotals::new(10, 400, 10.0, 310.0, 258.0);
         let err = audit_commit_batch_envelope(&totals).unwrap_err();
         assert_eq!(err.rule_id, "BLOCK_BATCH_DEL_OVERFLOW");
+    }
+
+    #[test]
+    fn test_batch_matches_ssot_json_contract() {
+        let raw = include_str!("../../../../../scripts/common/diff-bounds-contract.json");
+        let parsed: serde_json::Value = serde_json::from_str(raw).expect("valid SSOT json");
+        let batch = &parsed["batchBands"];
+        assert_eq!(
+            batch["add"]["ceiling"].as_f64(),
+            Some(MAX_COMMIT_BATCH_ADD_5D_ELOC)
+        );
+        assert_eq!(
+            batch["del"]["ceiling"].as_f64(),
+            Some(MAX_COMMIT_BATCH_DEL_5D_ELOC)
+        );
+        assert_eq!(
+            batch["deletionTurnoverWeight"].as_f64(),
+            Some(DELETION_TURNOVER_WEIGHT)
+        );
     }
 }

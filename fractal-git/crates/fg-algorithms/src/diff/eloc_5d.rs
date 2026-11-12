@@ -5,6 +5,12 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::engine::DiffEngine;
+use super::patch::split_lines;
+
+/// Unified turnover weight applied to deleted 5D ELOC in net batch turnover.
+pub const DELETION_TURNOVER_WEIGHT: f64 = 0.8;
+
 /// Classification of a source code line in 5D Riemannian phase space.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LineSemanticKind {
@@ -263,20 +269,33 @@ pub fn evaluate_file_5d_eloc(source_content: &str) -> File5dElocMetrics {
 /// 5D ELOC differential delta between old and new texts.
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 pub struct Diff5dElocDelta {
+    /// Added physical lines.
     pub physical_lines_added: usize,
+    /// Deleted physical lines.
     pub physical_lines_deleted: usize,
+    /// Added 5D effective lines of code.
     pub effective_lines_added: f64,
+    /// Deleted 5D effective lines of code.
     pub effective_lines_deleted: f64,
+    /// Weighted net semantic turnover (`eloc_add + eloc_del * 0.8`).
     pub net_turnover_weighted: f64,
+    /// Technical Substance Preservation Ratio on added lines.
     pub preservation_ratio_added: f64,
+    /// Ratio of non-comment, non-blank additions to physical lines added.
     pub substantive_ratio_added: f64,
-    /// Backward-compatible aliases:
+    /// Backward-compatible alias for `physical_lines_added`.
     pub phys_add: usize,
+    /// Backward-compatible alias for `physical_lines_deleted`.
     pub phys_del: usize,
+    /// Backward-compatible alias for `effective_lines_added`.
     pub eloc_5d_add: f64,
+    /// Backward-compatible alias for `effective_lines_deleted`.
     pub eloc_5d_del: f64,
+    /// Backward-compatible alias for `net_turnover_weighted`.
     pub net_5d_turnover: f64,
+    /// Backward-compatible alias for `preservation_ratio_added`.
     pub tspr_add: f64,
+    /// Backward-compatible alias for `substantive_ratio_added`.
     pub substantive_ratio_add: f64,
 }
 
@@ -296,6 +315,122 @@ impl FloatPrecisionExt for f64 {
         let scaling_factor = 10f64.powi(decimals as i32);
         (self * scaling_factor).round() / scaling_factor
     }
+}
+
+/// Builds normalized `Diff5dElocDelta` metrics from accumulated counters.
+#[inline]
+fn assemble_diff_delta(
+    physical_lines_added: usize,
+    blank_lines_added: usize,
+    comment_lines_added: usize,
+    effective_lines_added: f64,
+    physical_lines_deleted: usize,
+    effective_lines_deleted: f64,
+) -> Diff5dElocDelta {
+    let non_comment_non_blank_added =
+        physical_lines_added.saturating_sub(blank_lines_added + comment_lines_added);
+    let substantive_ratio_added = if physical_lines_added > 0 {
+        non_comment_non_blank_added as f64 / physical_lines_added as f64
+    } else {
+        1.0
+    };
+    let preservation_ratio_added = if physical_lines_added == 0 {
+        1.0
+    } else if non_comment_non_blank_added > 0 {
+        effective_lines_added / non_comment_non_blank_added as f64
+    } else {
+        0.0
+    };
+    let net_turnover_weighted = (effective_lines_added
+        + effective_lines_deleted * DELETION_TURNOVER_WEIGHT)
+        .round_to_precision(2);
+
+    Diff5dElocDelta {
+        physical_lines_added,
+        physical_lines_deleted,
+        effective_lines_added,
+        effective_lines_deleted,
+        net_turnover_weighted,
+        preservation_ratio_added,
+        substantive_ratio_added,
+        phys_add: physical_lines_added,
+        phys_del: physical_lines_deleted,
+        eloc_5d_add: effective_lines_added,
+        eloc_5d_del: effective_lines_deleted,
+        net_5d_turnover: net_turnover_weighted,
+        tspr_add: preservation_ratio_added,
+        substantive_ratio_add: substantive_ratio_added,
+    }
+}
+
+/// Classifies every slice in `lines` in full file context into pre-allocated `out_kinds`.
+fn classify_file_lines_into(lines: &[&str], out_kinds: &mut Vec<LineSemanticKind>) {
+    let mut comment_state = CommentBlockState::default();
+    for line_slice in lines {
+        out_kinds.push(classify_line_with_state(line_slice, &mut comment_state));
+    }
+}
+
+/// Evaluates file-level 5D ELOC differential delta between full `old_content` and `new_content`.
+///
+/// Tracks multi-line block comment state across full file context before diffing lines so edited
+/// interior lines inside `/* ... */` are classified accurately rather than treated as substantive.
+pub fn evaluate_file_diff_5d_eloc(old_content: &str, new_content: &str) -> Diff5dElocDelta {
+    if old_content == new_content {
+        return assemble_diff_delta(0, 0, 0, 0.0, 0, 0.0);
+    }
+    let old_lines = split_lines(old_content);
+    let new_lines = split_lines(new_content);
+    let mut old_kinds = Vec::with_capacity(old_lines.len());
+    let mut new_kinds = Vec::with_capacity(new_lines.len());
+    classify_file_lines_into(&old_lines, &mut old_kinds);
+    classify_file_lines_into(&new_lines, &mut new_kinds);
+
+    let (old_changed, new_changed) = DiffEngine::new().compute_change_flags_with_lines(
+        old_content,
+        new_content,
+        &old_lines,
+        &new_lines,
+    );
+
+    let mut physical_lines_added = 0usize;
+    let mut blank_lines_added = 0usize;
+    let mut comment_lines_added = 0usize;
+    let mut effective_lines_added = 0.0f64;
+
+    for (changed, kind) in new_changed.iter().zip(new_kinds.iter()) {
+        if !*changed {
+            continue;
+        }
+        physical_lines_added += 1;
+        match kind {
+            LineSemanticKind::Blank => blank_lines_added += 1,
+            LineSemanticKind::Comment | LineSemanticKind::DocComment => comment_lines_added += 1,
+            LineSemanticKind::Trampoline => {}
+            LineSemanticKind::Substantive => effective_lines_added += 1.0,
+        }
+    }
+
+    let mut physical_lines_deleted = 0usize;
+    let mut effective_lines_deleted = 0.0f64;
+    for (changed, kind) in old_changed.iter().zip(old_kinds.iter()) {
+        if !*changed {
+            continue;
+        }
+        physical_lines_deleted += 1;
+        if kind.is_substantive() {
+            effective_lines_deleted += 1.0;
+        }
+    }
+
+    assemble_diff_delta(
+        physical_lines_added,
+        blank_lines_added,
+        comment_lines_added,
+        effective_lines_added,
+        physical_lines_deleted,
+        effective_lines_deleted,
+    )
 }
 
 /// Evaluates 5D ELOC delta over slices of added and deleted lines.
@@ -331,34 +466,78 @@ pub fn evaluate_diff_5d_eloc<'a>(
         }
     }
 
-    let substantive_ratio_added = if physical_lines_added > 0 {
-        (physical_lines_added - blank_lines_added - comment_lines_added) as f64
-            / physical_lines_added as f64
-    } else {
-        0.0
-    };
-    let preservation_ratio_added = if physical_lines_added > 0 {
-        effective_lines_added / physical_lines_added as f64
-    } else {
-        0.0
-    };
-    let net_turnover_weighted =
-        (effective_lines_added + effective_lines_deleted * 0.8).round_to_precision(2);
-
-    Diff5dElocDelta {
+    assemble_diff_delta(
         physical_lines_added,
-        physical_lines_deleted,
+        blank_lines_added,
+        comment_lines_added,
         effective_lines_added,
+        physical_lines_deleted,
         effective_lines_deleted,
-        net_turnover_weighted,
-        preservation_ratio_added,
-        substantive_ratio_added,
-        phys_add: physical_lines_added,
-        phys_del: physical_lines_deleted,
-        eloc_5d_add: effective_lines_added,
-        eloc_5d_del: effective_lines_deleted,
-        net_5d_turnover: net_turnover_weighted,
-        tspr_add: preservation_ratio_added,
-        substantive_ratio_add: substantive_ratio_added,
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn block_comment_state_machine_tracks_multiline_and_pointers() {
+        let mut state = CommentBlockState::default();
+        assert_eq!(
+            classify_line_with_state("*ptr = 42;", &mut state),
+            LineSemanticKind::Substantive
+        );
+        assert_eq!(
+            classify_line_with_state("-- SQL style comment", &mut state),
+            LineSemanticKind::Comment
+        );
+        assert_eq!(
+            classify_line_with_state("; ASM style comment", &mut state),
+            LineSemanticKind::Comment
+        );
+        assert_eq!(
+            classify_line_with_state("/* start block", &mut state),
+            LineSemanticKind::Comment
+        );
+        assert!(state.in_block_comment);
+        assert_eq!(
+            classify_line_with_state("plain interior explanation without star", &mut state),
+            LineSemanticKind::Comment
+        );
+        assert_eq!(
+            classify_line_with_state("*/", &mut state),
+            LineSemanticKind::Comment
+        );
+        assert!(!state.in_block_comment);
+        assert_eq!(
+            classify_line_with_state("let active = 1;", &mut state),
+            LineSemanticKind::Substantive
+        );
+    }
+
+    #[test]
+    fn file_diff_delta_extracts_incremental_changes_only() {
+        let mut old_lines: Vec<String> = (0..130)
+            .map(|idx| format!("pub fn existing_{idx}() -> usize {{ {idx} }}"))
+            .collect();
+        let old_text = format!("{}\n", old_lines.join("\n"));
+        old_lines[5] = "pub fn existing_5() -> usize { 999 }".to_string();
+        let new_text = format!("{}\n", old_lines.join("\n"));
+
+        let delta = evaluate_file_diff_5d_eloc(&old_text, &new_text);
+        assert_eq!(delta.physical_lines_added, 1);
+        assert_eq!(delta.physical_lines_deleted, 1);
+        assert_eq!(delta.effective_lines_added, 1.0);
+        assert_eq!(delta.effective_lines_deleted, 1.0);
+        assert_eq!(delta.net_turnover_weighted, 1.8);
+    }
+
+    #[test]
+    fn tspr_denominator_excludes_comments_and_blanks() {
+        let source = "// hdr\n/// doc\nlet value = 42;\n";
+        let metrics = evaluate_file_5d_eloc(source);
+        assert_eq!(metrics.effective_lines_of_code, 1.0);
+        assert!((metrics.substance_preservation_ratio - 1.0).abs() < 1e-6);
+        assert!((metrics.substantive_line_ratio - (1.0 / 3.0)).abs() < 1e-6);
     }
 }
