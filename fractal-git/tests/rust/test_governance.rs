@@ -486,3 +486,29 @@ Assert markdown links and code block citations resolve without broken references
         res_docs_ok.err()
     );
 }
+
+#[test]
+fn test_auto_audit_hook_receipt_and_canary_probe_closure() {
+    let secret = AuthoritySecret::from_bytes(&[0x55; 32]).expect("secret");
+    let hook = fractal_git::AutoAuditHook::new(fractal_git::HookTier::SubToCard)
+        .with_authority_secret(secret.clone());
+
+    let clean_src = "pub fn compute_bonus(level: u32) -> bool {\n    level >= 10\n}\n";
+    let clean_test = "#[test]\nfn test_bonus() {\n    assert!(compute_bonus(12));\n    assert!(!compute_bonus(5));\n}\n";
+
+    let receipt = hook
+        .audit_source_and_test("crates/fg-gate/bonus.rs", clean_src, clean_test, "agent-p1")
+        .expect("clean slice with real assertions must produce an AutoAuditReceipt");
+    assert!(receipt.verify_digest());
+    assert!(receipt.record.verify_signature(&secret));
+    assert_eq!(receipt.canary_report.killed_mutants, Some(1));
+    assert_eq!(receipt.canary_report.kill_rate, Some(1.0));
+    assert!(receipt.credit.posterior_mean > 0.80);
+
+    let strict_hook = fractal_git::AutoAuditHook::new(fractal_git::HookTier::SubToCard)
+        .with_require_external_runner(true);
+    let unmeasured_err = strict_hook
+        .audit_source_and_test("crates/fg-gate/bonus.rs", clean_src, "// comment only", "agent-p1")
+        .expect_err("explicit external runner requirement must reject unmeasured tests");
+    assert!(unmeasured_err.to_string().contains("Review unavailable"));
+}
