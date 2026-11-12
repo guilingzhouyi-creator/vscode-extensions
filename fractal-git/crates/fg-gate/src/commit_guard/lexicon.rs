@@ -394,7 +394,7 @@ pub fn scan(message: &str) -> (Vec<LexiconFinding>, String) {
     let mut prepared = String::with_capacity(message.len());
     for (index, raw_line) in message.lines().enumerate() {
         let line_number = index + 1;
-        let masked = mask_code_and_urls(raw_line);
+        let masked = mask_uppercase_rule_ids(raw_line);
         // Whitelisted phrases are removed before tokenizing, not compared afterwards.
         // CJK has no word delimiters, so `临时文件` arrives as one token and an equality test
         // against the whitelist would only ever match a line that was *exactly* the phrase.
@@ -454,48 +454,66 @@ pub fn scan(message: &str) -> (Vec<LexiconFinding>, String) {
 }
 
 /// Replaces inline code spans and URLs with spaces so their contents are never scanned.
-fn mask_code_and_urls(line: &str) -> Cow<'_, str> {
-    let has_scheme = line.contains("://");
-    let has_backtick = line.contains('`');
-    if !has_scheme && !has_backtick {
+fn is_uppercase_rule_shape(token: &str) -> bool {
+    let mut seg_count = 0usize;
+    let mut head_ok = false;
+    let mut seg_start = 0usize;
+    let bytes = token.as_bytes();
+    for idx in 0..=bytes.len() {
+        if idx == bytes.len() || bytes[idx] == b'-' {
+            let seg = &token[seg_start..idx];
+            if seg.is_empty()
+                || !seg
+                    .bytes()
+                    .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit())
+            {
+                return false;
+            }
+            if seg_count == 0 {
+                head_ok = (2..=6).contains(&seg.len())
+                    && seg.bytes().all(|byte| byte.is_ascii_uppercase());
+            }
+            seg_count += 1;
+            seg_start = idx + 1;
+        }
+    }
+    head_ok && seg_count >= 3
+}
+
+fn mask_uppercase_rule_ids(line: &str) -> Cow<'_, str> {
+    if !line.contains('-') || !line.bytes().any(|byte| byte.is_ascii_uppercase()) {
         return Cow::Borrowed(line);
     }
-
-    let without_urls: Cow<'_, str> = if has_scheme {
-        let mut result = String::with_capacity(line.len());
-        let mut remainder = line;
-        while let Some(position) = remainder.find("://") {
-            let scheme_start = remainder[..position]
-                .rfind(|character: char| character.is_whitespace())
-                .map_or(0, |index| index + 1);
-            let after = position + 3;
-            let url_end = remainder[after..]
-                .find(|character: char| character.is_whitespace())
-                .map_or(remainder.len(), |index| after + index);
-            result.push_str(&remainder[..scheme_start]);
-            result.push(' ');
-            remainder = &remainder[url_end..];
-        }
-        result.push_str(remainder);
-        Cow::Owned(result)
-    } else {
-        Cow::Borrowed(line)
-    };
-
-    if has_backtick {
-        let mut masked = String::with_capacity(without_urls.len());
-        let mut in_code = false;
-        for character in without_urls.chars() {
-            if character == '`' {
-                in_code = !in_code;
-                masked.push(' ');
-                continue;
+    let bytes = line.as_bytes();
+    let mut masked: Option<Vec<u8>> = None;
+    let mut idx = 0usize;
+    while idx < bytes.len() {
+        if bytes[idx].is_ascii_uppercase() {
+            let start = idx;
+            while idx < bytes.len()
+                && (bytes[idx].is_ascii_uppercase()
+                    || bytes[idx].is_ascii_digit()
+                    || bytes[idx] == b'-')
+            {
+                idx += 1;
             }
-            masked.push(if in_code { ' ' } else { character });
+            let slice = &line[start..idx];
+            let prev_ok = start == 0 || !bytes[start - 1].is_ascii_alphanumeric();
+            let next_ok = idx == bytes.len() || !bytes[idx].is_ascii_alphanumeric();
+            if prev_ok && next_ok && is_uppercase_rule_shape(slice) {
+                let buf = masked.get_or_insert_with(|| line.as_bytes().to_vec());
+                buf[start..idx].fill(b' ');
+            }
+        } else {
+            idx += 1;
         }
-        Cow::Owned(masked)
-    } else {
-        without_urls
+    }
+    match masked {
+        Some(buf) => match String::from_utf8(buf) {
+            Ok(text) => Cow::Owned(text),
+            Err(_) => Cow::Borrowed(line),
+        },
+        None => Cow::Borrowed(line),
     }
 }
 
