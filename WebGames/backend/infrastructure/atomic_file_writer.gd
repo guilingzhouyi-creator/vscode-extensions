@@ -16,6 +16,12 @@ const DEFAULT_BACKUP_SUFFIX: String = ".bak"
 const DEFAULT_BACKUP_RETENTION: int = 1
 const DEFAULT_BACKUP_FAIL_POLICY: String = "continue"
 
+static var _tmp_seq: int = 0
+
+static func _next_tmp_id() -> int:
+    _tmp_seq += 1
+    return _tmp_seq
+
 ## 确保目标目录存在（幂等递归创建）
 static func ensure_directory(dir_path: String) -> bool:
     if dir_path.is_empty():
@@ -43,14 +49,22 @@ static func cleanup_orphan_tmp_files(dir_path: String, tmp_suffix: String = DEFA
     dir.list_dir_end()
     return removed
 
-## 从指定备份路径拷贝恢复目标正档
+## 从指定备份路径经临时文件原子替换恢复目标正档
 static func restore_from_backup(file_path: String, bak_path: String) -> bool:
     if file_path.is_empty() or bak_path.is_empty():
         return false
     if not FileAccess.file_exists(bak_path):
         return false
-    ensure_directory(file_path.get_base_dir())
-    return DirAccess.copy_absolute(bak_path, file_path) == OK
+    var fa := FileAccess.open(bak_path, FileAccess.READ)
+    if fa == null:
+        return false
+    var bak_content := fa.get_as_text()
+    var read_err := fa.get_error()
+    fa.close()
+    if read_err != OK and read_err != ERR_FILE_EOF:
+        return false
+    var res := replace_via_tmp(file_path, bak_content, DEFAULT_TMP_SUFFIX)
+    return bool(res.get("success", false))
 
 ## 按最大保留代数执行历史备份轮转（.bak -> .bak.1 -> .bak.2 ...）
 static func rotate_backups(
@@ -111,7 +125,7 @@ static func write_text_atomic(
     var tmp_suffix: String = str(options.get("tmp_suffix", DEFAULT_TMP_SUFFIX))
     if tmp_suffix.is_empty():
         tmp_suffix = DEFAULT_TMP_SUFFIX
-    var tmp_path: String = file_path + tmp_suffix
+    var tmp_path: String = "%s.%d_%d%s" % [file_path, OS.get_process_id(), _next_tmp_id(), tmp_suffix]
     if not _write_text_handle(tmp_path, content):
         return {
             "success": false,
@@ -169,15 +183,25 @@ static func _write_text_handle(target_path: String, content: String) -> bool:
     if file == null:
         return false
     file.store_string(content)
+    var write_err: int = file.get_error()
     file.flush()
+    var flush_err: int = file.get_error()
     file.close()
-    return true
+    return write_err == OK and flush_err == OK
 
 static func _shift_backup_version(file_path: String, bak_suffix: String, version_idx: int) -> void:
     var src: String = file_path + bak_suffix if version_idx == 1 else file_path + bak_suffix + "." + str(version_idx - 1)
     var dst: String = file_path + bak_suffix + "." + str(version_idx)
     if not FileAccess.file_exists(src):
         return
-    if FileAccess.file_exists(dst):
-        DirAccess.remove_absolute(dst)
-    DirAccess.rename_absolute(src, dst)
+    var staged_old := "%s.shifting_%d" % [dst, _next_tmp_id()]
+    var had_dst := FileAccess.file_exists(dst)
+    if had_dst:
+        if DirAccess.rename_absolute(dst, staged_old) != OK:
+            return
+    var rename_err := DirAccess.rename_absolute(src, dst)
+    if rename_err != OK:
+        if had_dst and FileAccess.file_exists(staged_old):
+            DirAccess.rename_absolute(staged_old, dst)
+    elif had_dst and FileAccess.file_exists(staged_old):
+        DirAccess.remove_absolute(staged_old)

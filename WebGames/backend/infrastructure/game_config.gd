@@ -22,6 +22,7 @@ const CONFIG_DIR: String = "res://config/"
 
 static var _tables: Dictionary = {}
 static var _loaded: bool = false
+static var _tables_mutex: Mutex = Mutex.new()
 
 ## 路径分段解析缓存（table:path 每调用 split 重建的消除）。
 ## 键域 = 代码内静态字面量路径（有界）；只缓存分段不含值——热重载表值变化天然生效，
@@ -234,7 +235,9 @@ static func load_via_storage_async(on_completed: Callable = Callable()) -> void:
 		if ok and (data is Dictionary):
 			var t_name: String = str(entry.metadata.get("table_name", ""))
 			if not t_name.is_empty():
+				_tables_mutex.lock()
 				_tables[t_name] = data
+				_tables_mutex.unlock()
 
 	batch_req.on_batch_completed = func(_bid: String, total: int, _failed: int) -> void:
 		_validate_required_tables()

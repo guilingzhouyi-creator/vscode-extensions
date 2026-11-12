@@ -31,6 +31,12 @@ const MSG_GAME_CONFIG_ROOT_WARN: String = "GameConfig: [{path}] top-level must b
 const MSG_AUDIT_KEY_MISSING: String = "Audit signing key missing; seal_key_env unconfigured (fail-closed)."
 const MSG_SEAL_KEY_MISSING: String = "EntitlementService: Seal key missing; sealed output unavailable (fail-closed)."
 const MSG_GM_AUDIT_FALLBACK: String = "GM Audit: Admin [{admin_id}] executed [{action}]"
+const MSG_SNAPSHOT_PROD_BLOCKED: String = "Snapshot test mode is permitted in Debug/Test builds only."
+const MSG_NULL_REQUEST: String = "Snapshot object cannot be null."
+const MSG_SAVE_TOPLEVEL_NOT_OBJECT: String = "top-level is not an object"
+const MSG_SAVE_NO_VALID_PAYLOAD: String = "no valid payload"
+const MSG_SAVE_UNVERIFIED_BACKUP: String = "unverified or signature-mismatched backup"
+const MSG_SAVE_MISSING_FORMAT_VERSION: String = "Invalid save envelope structure: missing format_version."
 
 const MSG_POOL_OVERFLOW_WARN: String = "ObjectPool[{pool_name}] active allocation reached overflow warning threshold ({allocated} >= {threshold})."
 const MSG_POOL_HARD_LIMIT_ERR: String = "ObjectPool[{pool_name}] reached hard limit with overflow allocation forbidden."

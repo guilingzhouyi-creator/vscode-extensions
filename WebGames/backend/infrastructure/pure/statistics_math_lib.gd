@@ -17,10 +17,16 @@ const LogConstants = preload("res://backend/infrastructure/logging/log_constants
 # ==============================================================================
 
 static var _inline_kv_secret_re: RegEx = RegEx.create_from_string(
-	r"(?i)\b(password|passwd|pwd|secret|token|session_token|api_key|apikey|seal_key|private_key)\s*([:=])\s*([^\s,;'\x22}\]]+)"
+	r"(?i)([\"']?\b(?:password|passwd|pwd|secret|token|session_token|access_token|refresh_token|auth_token|api_key|apikey|seal_key|private_key|client_secret)\b[\"']?\s*[:=]\s*[\"']?)([^\s,;&'\x22}\]]+)"
 )
 static var _inline_bearer_re: RegEx = RegEx.create_from_string(
-	r"(?i)\b(bearer)\s+([A-Za-z0-9._\-]{6,})"
+	r"(?i)\b(bearer|basic)\s+([A-Za-z0-9._\-+/=]{6,})"
+)
+static var _inline_email_re: RegEx = RegEx.create_from_string(
+	r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b"
+)
+static var _inline_home_path_re: RegEx = RegEx.create_from_string(
+	r"(?i)((?:[A-Z]:[/\\]Users[/\\]|/(?:Users|home)/))([^/\\\s'\x22,;}\]]+)"
 )
 
 # ==============================================================================
@@ -65,19 +71,25 @@ static func mask_string(val_str: String, prefix_len: int, suffix_len: int, repla
 	var s := val_str.right(suffix_len) if suffix_len > 0 else ""
 	return p + replace_with + s
 
-## 二次内联洗净日志正文文本中的敏感凭据模式（password=/token=/Bearer 等，零匹配快速短路跳过）
+## 二次内联洗净日志正文文本中的敏感凭据模式（含引号 JSON、URL 查询串、Bearer/Basic、邮箱与系统路径用户名）
 static func scrub_inline_secrets(message: String, mask_token: String = LogConstants.DEFAULT_MASK_REPLACEMENT) -> String:
 	if message.is_empty():
 		return message
 	var has_kv := ("=" in message) or (":" in message)
-	var has_bearer := message.findn("bearer ") != -1
-	if not has_kv and not has_bearer:
+	var has_auth := (message.findn("bearer") != -1) or (message.findn("basic") != -1)
+	var has_email := "@" in message
+	var has_path := ("Users" in message) or ("/home/" in message)
+	if not has_kv and not has_auth and not has_email and not has_path:
 		return message
 	var out := message
 	if has_kv and _inline_kv_secret_re != null:
-		out = _inline_kv_secret_re.sub(out, "$1$2" + mask_token, true)
-	if has_bearer and _inline_bearer_re != null:
+		out = _inline_kv_secret_re.sub(out, "$1" + mask_token, true)
+	if has_auth and _inline_bearer_re != null:
 		out = _inline_bearer_re.sub(out, "$1 " + mask_token, true)
+	if has_email and _inline_email_re != null:
+		out = _inline_email_re.sub(out, mask_token, true)
+	if has_path and _inline_home_path_re != null:
+		out = _inline_home_path_re.sub(out, "$1" + mask_token, true)
 	return out
 
 ## 从调用栈提取首个非跳过白名单的源文件 basename 与行号（杜绝绝对路径泄漏）

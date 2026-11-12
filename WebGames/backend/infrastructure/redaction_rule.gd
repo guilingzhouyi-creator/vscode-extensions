@@ -2,7 +2,7 @@
 # 模块归属: 基础设施层 (Infrastructure · Logging & Telemetry)
 # 文件路径: res://backend/infrastructure/redaction_rule.gd
 # 架构定位: Log Collector & Stream Processor
-# 依赖与触发: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/logging.json | 信号: FATAL/ERROR 级别告警信号
+# 依赖与触发: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/log.json | 信号: FATAL/ERROR 级别告警信号
 # 职责说明: 依据 log.json redaction 段配置对结构化日志 context 执行构造期脱敏， 支持 mask、drop、hash 三种安全模式，杜绝凭证落盘（Inv-LS-2 安全红线）。
 # 退出语义与设计依据: 业务域第一性原理 / 统一结构化日志规范
 # ==============================================================================
@@ -77,9 +77,9 @@ static func _ensure_loaded() -> void:
 ## 内置默认脱敏规则（配置段缺失时兜底：令牌/指纹掩码、口令丢弃、账号哈希）
 static func _init_default_rules() -> void:
 	var defaults: Array[Dictionary] = [
-		{"field_pattern": "token|session_token", "mask_mode": MODE_MASK, "mask_prefix_len": LogConstants.DEFAULT_MASK_PREFIX_LEN, "mask_suffix_len": LogConstants.DEFAULT_MASK_SUFFIX_LEN, "replace_with": LogConstants.DEFAULT_MASK_REPLACEMENT},
-		{"field_pattern": "fingerprint|device_fingerprint", "mask_mode": MODE_MASK, "mask_prefix_len": LogConstants.DEFAULT_MASK_PREFIX_LEN, "mask_suffix_len": 0, "replace_with": LogConstants.DEFAULT_MASK_REPLACEMENT},
-		{"field_pattern": "password|password_hash|secret|seal_key", "mask_mode": MODE_DROP},
+		{"field_pattern": "token|session_token|access_token|refresh_token|auth_token|nested_token|authorization|api_key|apikey|private_key|signing_key|client_secret", "mask_mode": MODE_MASK, "mask_prefix_len": LogConstants.DEFAULT_MASK_PREFIX_LEN, "mask_suffix_len": LogConstants.DEFAULT_MASK_SUFFIX_LEN, "replace_with": LogConstants.DEFAULT_MASK_REPLACEMENT},
+		{"field_pattern": "fingerprint|device_fingerprint|email|ip_address", "mask_mode": MODE_MASK, "mask_prefix_len": LogConstants.DEFAULT_MASK_PREFIX_LEN, "mask_suffix_len": 0, "replace_with": LogConstants.DEFAULT_MASK_REPLACEMENT},
+		{"field_pattern": "password|passwd|password_hash|secret|seal_key|hmac_secret|aes_key|master_secret|cookie", "mask_mode": MODE_DROP},
 		{"field_pattern": "account_id", "mask_mode": MODE_HASH}
 	]
 	for item in defaults:
@@ -148,60 +148,55 @@ static func _find_matching_rule(key_str: String) -> RuleEntry:
 			return rule
 	return null
 
-## 递归脱敏字典：嵌套字典/数组继续下钻；命中规则按模式处理；未命中规则的字符串执行内联凭据二次清洗
+## 递归脱敏字典：先匹配键名规则（防敏感键以嵌套字典/数组形态逃逸）；未命中时继续下钻容器或执行内联凭据二次清洗
 static func _redact_dict(source: Dictionary, out_redacted_keys: Array[String]) -> Dictionary:
 	var target: Dictionary = {}
 	for k in source.keys():
 		var key_str := str(k)
 		var val = source[k]
+		var matched_rule := _find_matching_rule(key_str)
+		if matched_rule != null:
+			if not (key_str in out_redacted_keys):
+				out_redacted_keys.append(key_str)
+			match matched_rule.mask_mode:
+				MODE_DROP:
+					pass
+				MODE_HASH:
+					target[k] = CryptoIntegrityLib.sha256_hex(str(val))
+				MODE_SALTED_HASH:
+					target[k] = CryptoIntegrityLib.salted_hash_hex(str(val), matched_rule.salt)
+				MODE_MASK:
+					target[k] = StatisticsMathLib.mask_string(str(val), matched_rule.mask_prefix_len, matched_rule.mask_suffix_len, matched_rule.replace_with)
+				_:
+					target[k] = matched_rule.replace_with
+			continue
 
-		# 递归处理嵌套字典/数组
 		if val is Dictionary:
 			target[k] = _redact_dict(val, out_redacted_keys)
-			continue
 		elif val is Array:
-			target[k] = _redact_array(val, out_redacted_keys)
-			continue
-
-		var matched_rule := _find_matching_rule(key_str)
-		if matched_rule == null:
-			if val is String:
-				var cleaned := StatisticsMathLib.scrub_inline_secrets(val)
-				if cleaned != val and not (key_str in out_redacted_keys):
-					out_redacted_keys.append(key_str)
-				target[k] = cleaned
-			else:
-				target[k] = val
-			continue
-
-		# 命中脱敏规则
-		if not (key_str in out_redacted_keys):
-			out_redacted_keys.append(key_str)
-
-		match matched_rule.mask_mode:
-			MODE_DROP:
-				# 整键丢弃，不写入 target
-				pass
-			MODE_HASH:
-				target[k] = CryptoIntegrityLib.sha256_hex(str(val))
-			MODE_SALTED_HASH:
-				target[k] = CryptoIntegrityLib.salted_hash_hex(str(val), matched_rule.salt)
-			MODE_MASK:
-				target[k] = StatisticsMathLib.mask_string(str(val), matched_rule.mask_prefix_len, matched_rule.mask_suffix_len, matched_rule.replace_with)
-			_:
-				target[k] = matched_rule.replace_with
+			target[k] = _redact_array(val, out_redacted_keys, key_str)
+		elif val is String:
+			var cleaned := StatisticsMathLib.scrub_inline_secrets(val)
+			if cleaned != val and not (key_str in out_redacted_keys):
+				out_redacted_keys.append(key_str)
+			target[k] = cleaned
+		else:
+			target[k] = val
 	return target
 
-## 递归脱敏数组：逐项下钻字典/数组，其余字符串按需清洗
-static func _redact_array(source: Array, out_redacted_keys: Array[String]) -> Array:
+## 递归脱敏数组：逐项下钻字典/数组，其余字符串按需清洗并记录所属键审计痕迹
+static func _redact_array(source: Array, out_redacted_keys: Array[String], parent_key: String = "") -> Array:
 	var target: Array = []
 	for item in source:
 		if item is Dictionary:
 			target.append(_redact_dict(item, out_redacted_keys))
 		elif item is Array:
-			target.append(_redact_array(item, out_redacted_keys))
+			target.append(_redact_array(item, out_redacted_keys, parent_key))
 		elif item is String:
-			target.append(StatisticsMathLib.scrub_inline_secrets(item))
+			var cleaned := StatisticsMathLib.scrub_inline_secrets(item)
+			if cleaned != item and not parent_key.is_empty() and not (parent_key in out_redacted_keys):
+				out_redacted_keys.append(parent_key)
+			target.append(cleaned)
 		else:
 			target.append(item)
 	return target

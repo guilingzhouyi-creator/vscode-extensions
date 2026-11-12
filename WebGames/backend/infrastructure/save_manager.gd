@@ -2,8 +2,8 @@
 # 模块归属: 基础设施层 (Infrastructure · Persistence & Save)
 # 文件路径: res://backend/infrastructure/save_manager.gd
 # 架构定位: Persistence Facade / Save Engine
-# 依赖与触发: 上游: WorldState, CharacterProgression, Inventory | 下游: FileAccess, VersionedRuntimeContext | 配置: config/infrastructure/save.json | 信号: 存档开始 / 成功 / 失败事件
-# 职责说明: 负责 .kalar_save 自洽存档文件的原子读写与 SHA-256 数据完整性校验。 存档目录/扩展名/信封版本/引擎标识/日志文案全部由 config/infrastructure/persistence.json 驱动。  完整性契约（重要）: 信封中【只存 data_json 一个数据字段】，不存在与之平行的 "data" 对象。 校验与消费必须指向同一字节序列：校验 data_json 的 SHA-256，并从 该字符串反序列化返回。若同时存在可写的 "data" 字段，攻击者只需改写 data 而不动 data_json 即可绕过校验，校验将形同虚设。  原子写契约: 写入 .tmp -> flush/close -> 备份旧档为 .bak -> rename 原子替换。 任一步失败都不会破坏已存在的正档（rename 是文件系统级原子操作）。  旧档兼容: 仅含 "data" 而无 "data_json" 的历史存档按 legacy 降级读取， 无法校验（缺少被签名的原始字节序列），返回 verified=false 并告警。
+# 依赖与触发: 上游: WorldState, CharacterProgression, Inventory | 下游: FileAccess, VersionedRuntimeContext | 配置: config/infrastructure/persistence.json | 信号: 存档开始 / 成功 / 失败事件
+# 职责说明: 负责 .kalar_save 自洽存档文件的原子读写与 SHA-256 数据完整性校验。 存档目录/扩展名/信封版本/引擎标识/日志文案全部由 config/infrastructure/persistence.json 驱动。  完整性契约（重要）: 信封中【只存 data_json 一个数据字段】，不存在与之平行的 "data" 对象； 校验与消费必须指向同一字节序列：校验 data_json 的 SHA-256，并从该字符串反序列化返回。 原子写契约: 写入唯一 .tmp -> 校验写盘错误码 flush/close -> 备份旧档为 .bak -> rename 原子替换。 历史无签名 legacy 存档严格拒收（返回 INVALID_ENVELOPE）。
 # 退出语义与设计依据: 事务型存档原子写入规范
 # ==============================================================================
 
@@ -12,6 +12,7 @@ class_name SaveManager extends RefCounted
 
 const AtomicFileWriter = preload("res://backend/infrastructure/atomic_file_writer.gd")
 const CryptoIntegrityLib = preload("res://backend/infrastructure/pure/crypto_integrity_lib.gd")
+const SystemBaseMessages = preload("res://backend/infrastructure/logging/system_base_messages.gd")
 const OP_RESTORE: String = "restore"
 
 # ==============================================================================
@@ -138,7 +139,9 @@ static func load_game(save_name: String) -> Dictionary:
 	# 低于最低支持版本亦拒绝（迁移链外）。当前单版本：min == current（配置驱动）
 	var current_version := GameConfig.get_string("infrastructure.persistence", "format_version", "1.0.0")
 	var min_supported := GameConfig.get_string("infrastructure.persistence", "min_supported_version", "1.0.0")
-	var env_version: String = String(env.get("format_version", min_supported))
+	var env_version: String = String(env.get("format_version", ""))
+	if env_version.is_empty():
+		return _fail_or_recover("load", "INVALID_ENVELOPE", SystemBaseMessages.MSG_SAVE_MISSING_FORMAT_VERSION, save_name)
 	if _version_newer_than(env_version, current_version):
 		return _fail("load", "VERSION_TOO_NEW", _msg("version_too_new", {"version": env_version}))
 	if _version_newer_than(min_supported, env_version):
@@ -195,15 +198,22 @@ static func restore_backup(save_name: String) -> Dictionary:
 		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt", {"path": backup_json.get_error_message()}))
 	var backup_data: Variant = backup_json.get_data()
 	if not backup_data is Dictionary:
-		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt", {"path": "top-level is not an object"}))
+		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt", {"path": SystemBaseMessages.MSG_SAVE_TOPLEVEL_NOT_OBJECT}))
 	var env_b: Dictionary = backup_data
+	var b_ver: String = String(env_b.get("format_version", ""))
+	var current_ver := GameConfig.get_string("infrastructure.persistence", "format_version", "1.0.0")
+	var min_ver := GameConfig.get_string("infrastructure.persistence", "min_supported_version", "1.0.0")
+	if b_ver.is_empty() or _version_newer_than(b_ver, current_ver) or _version_newer_than(min_ver, b_ver):
+		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt", {"path": SystemBaseMessages.MSG_SAVE_UNVERIFIED_BACKUP}))
 	var backup_data_json: String = String(env_b.get("data_json", ""))
-	if not backup_data_json.is_empty():
-		var inner := JSON.new()
-		if inner.parse(backup_data_json) != OK:
-			return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt", {"path": inner.get_error_message()}))
-	elif not (env_b.get("data") is Dictionary):
-		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt", {"path": "no valid payload"}))
+	var backup_sig: String = String(env_b.get("signature_sha256", ""))
+	if backup_data_json.is_empty() or backup_sig.is_empty():
+		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt", {"path": SystemBaseMessages.MSG_SAVE_NO_VALID_PAYLOAD}))
+	if not CryptoIntegrityLib.constant_time_equals(compute_sha256(backup_data_json), backup_sig):
+		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt", {"path": SystemBaseMessages.MSG_SAVE_UNVERIFIED_BACKUP}))
+	var inner := JSON.new()
+	if inner.parse(backup_data_json) != OK or not (inner.get_data() is Dictionary):
+		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt", {"path": inner.get_error_message()}))
 
 	# 2. 写恢复临时文件并原子交换至正档（不先删除正档）
 	var replace_res: Dictionary = AtomicFileWriter.replace_via_tmp(file_path, backup_content, _tmp_suffix())

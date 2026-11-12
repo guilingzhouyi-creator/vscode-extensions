@@ -2,7 +2,7 @@
 # 模块归属: 基础设施层 (Infrastructure · Logging & Telemetry)
 # 文件路径: res://backend/infrastructure/logging/unified_logger_service.gd
 # 架构定位: Log Collector & Stream Processor
-# 依赖与触发: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/logging.json | 信号: FATAL/ERROR 级别告警信号
+# 依赖与触发: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/log.json | 信号: FATAL/ERROR 级别告警信号
 # 职责说明: 全域统一结构化日志服务：支持按模块分级过滤（DEBUG/INFO/WARN/ERROR/FATAL）、上下文标签绑定、异步缓冲写入与防日志泛滥限流。
 # 退出语义与设计依据: 统一结构化日志规范 / 性能基准审计
 # ==============================================================================
@@ -106,9 +106,9 @@ func load_catalog_from_dict(catalog_config: Dictionary) -> void:
 
 ## 从 GameConfig.log 统一加载英文事件码模板（配置驱动，Inv-RM-11）
 func load_from_game_config() -> void:
-	var tbl: Dictionary = GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_UNIFIED_EVENTS, {})
+	var tbl: Dictionary = GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_EVENTS, {})
 	if tbl.is_empty():
-		tbl = GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_EVENTS, {})
+		tbl = GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_UNIFIED_EVENTS, {})
 	for code in tbl:
 		_message_catalog[str(code)] = str(tbl[code])
 
@@ -156,14 +156,18 @@ func _format_message(template_str: String, event_params: Dictionary, event_code:
 	params[LogConstants.KEY_DOMAIN] = domain_name
 	return TemplateFormatter.format(template_str, params)
 
-## 多路分发输出 Sink（收敛至统一管线，Inv-LG-3）
+## 多路分发输出 Sink（先统一构造期脱敏，再收敛至 RingBuffer / EventBusCore 管线，Inv-LS-2 & Inv-LG-3）
 func _dispatch_record(log_record: LogRecord) -> void:
+	var srec := _to_structured_record(log_record)
+	# 同步写回已脱敏消息与上下文，防止调用方持有的 LogRecord 留存明文凭据
+	log_record.message = srec.message
+	log_record.context = srec.context.duplicate(true)
+
 	# 1. 内存有界环形缓冲（注入式或回退至 EventBusCore 全局中枢）
 	if _ring_buffer != null and _ring_buffer.has_method("push_record"):
-		_ring_buffer.call("push_record", log_record.to_dict())
+		_ring_buffer.call("push_record", srec.to_dto())
 	else:
 		# 收敛：委托至 EventBusCore 统一广播中枢（签发单调 sequence 并扇出至 LogRingBuffer、LogFileExporter 与 TelemetryAggregate）
-		var srec := _to_structured_record(log_record)
 		if _mute_console:
 			srec.context[LogConstants.KEY_MUTE_CONSOLE] = true
 		var eb := EventBusCore.get_instance()
@@ -177,9 +181,9 @@ func _dispatch_record(log_record: LogRecord) -> void:
 		log_record.sequence = srec.sequence
 
 		if _metric_sink != null and _metric_sink.has_method("record_metric"):
-			_metric_sink.call("record_metric", "log_event_count", LogConstants.CATEGORY_LOG_VOLUME, 1.0, {
+			_metric_sink.call("record_metric", LogConstants.METRIC_LOG_EVENT_COUNT, LogConstants.CATEGORY_LOG_VOLUME, 1.0, {
 				LogConstants.KEY_DOMAIN: log_record.domain,
-				"severity": _get_severity_name(log_record.severity)
+				LogConstants.KEY_SEVERITY: _get_severity_name(log_record.severity)
 			})
 	
 	# 2. 控制台输出格式化（总线为空且未静音时本地穿透，避免漏打）
@@ -209,20 +213,20 @@ func _to_structured_record(log_record: LogRecord) -> StructuredLogRecord:
 
 func _map_severity_to_level(severity_level: Severity) -> String:
 	match severity_level:
-		Severity.TRACE: return "DEBUG"
-		Severity.DEBUG: return "DEBUG"
-		Severity.INFO: return "INFO"
-		Severity.WARNING: return "WARN"
-		Severity.ERROR: return "ERROR"
-		Severity.CRITICAL: return "ERROR"
-		_: return "INFO"
+		Severity.TRACE: return LogConstants.LEVEL_DEBUG
+		Severity.DEBUG: return LogConstants.LEVEL_DEBUG
+		Severity.INFO: return LogConstants.LEVEL_INFO
+		Severity.WARNING: return LogConstants.LEVEL_WARN
+		Severity.ERROR: return LogConstants.LEVEL_ERROR
+		Severity.CRITICAL: return LogConstants.LEVEL_ERROR
+		_: return LogConstants.LEVEL_INFO
 
 func _get_severity_name(severity_level: Severity) -> String:
 	match severity_level:
-		Severity.TRACE: return "TRACE"
-		Severity.DEBUG: return "DEBUG"
-		Severity.INFO: return "INFO"
-		Severity.WARNING: return "WARN"
-		Severity.ERROR: return "ERROR"
-		Severity.CRITICAL: return "CRIT"
-		_: return "UNKNOWN"
+		Severity.TRACE: return LogConstants.LEVEL_TRACE
+		Severity.DEBUG: return LogConstants.LEVEL_DEBUG
+		Severity.INFO: return LogConstants.LEVEL_INFO
+		Severity.WARNING: return LogConstants.LEVEL_WARN
+		Severity.ERROR: return LogConstants.LEVEL_ERROR
+		Severity.CRITICAL: return LogConstants.LEVEL_CRIT
+		_: return LogConstants.LEVEL_UNKNOWN

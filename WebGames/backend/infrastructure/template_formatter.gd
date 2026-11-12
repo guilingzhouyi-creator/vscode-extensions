@@ -41,8 +41,13 @@ static func format(
 	if matches.is_empty():
 		return template_str
 
-	var result := template_str
+	var parts: PackedStringArray = PackedStringArray()
+	var cursor: int = 0
 	for m in matches:
+		var m_start: int = m.get_start(0)
+		var m_end: int = m.get_end(0)
+		if m_start > cursor:
+			parts.append(template_str.substr(cursor, m_start - cursor))
 		var key := m.get_string(1)
 		var val_found: bool = false
 		var val_str: String = ""
@@ -59,12 +64,18 @@ static func format(
 
 		var placeholder := "{" + key + "}"
 		if val_found:
-			result = result.replace(placeholder, val_str)
+			parts.append(val_str)
 		elif not keep_unmatched:
 			var replacement := fallback_marker if not fallback_marker.is_empty() else placeholder
-			result = result.replace(placeholder, replacement)
+			parts.append(replacement)
+		else:
+			parts.append(placeholder)
+		cursor = m_end
 
-	return result
+	if cursor < template_str.length():
+		parts.append(template_str.substr(cursor))
+
+	return "".join(parts)
 
 ## 检查模板中包含的所有参数名清单
 static func extract_param_keys(template_str: String) -> Array[String]:
