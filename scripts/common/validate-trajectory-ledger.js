@@ -17,6 +17,9 @@ const path = require('path');
 
 const MAX_RECORD_BYTE_SIZE = 350;
 const MAX_TOTAL_STORAGE_BYTES = 2 * 1024 * 1024; // 2 MB
+const MAX_BASELINE_SIGNATURES_BYTES = 256 * 1024; // 256 KB
+const WEIGHT_SUM_MIN = 0.99;
+const WEIGHT_SUM_MAX = 1.01;
 
 function resolveLedgerDir() {
   const root = path.resolve(__dirname, '..', '..');
@@ -193,6 +196,109 @@ function validateWeeklySummaries(ledgerDir) {
   return { bytes: totalBytes, violations };
 }
 
+/**
+ * Validates learnedWeights object and unit-simplex normalization invariant.
+ *
+ * @param {unknown} weights - Parsed learnedWeights field.
+ * @returns {string[]} Weight validation errors.
+ */
+function validateSupervisorWeights(weights) {
+  if (!weights || typeof weights !== 'object') {
+    return ['governance-supervisor.json missing learnedWeights object'];
+  }
+  const vals = ['Ws', 'Wd', 'Wf'].map((k) => weights[k]);
+  const allFiniteUnit = vals.every((v) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1);
+  if (!allFiniteUnit) {
+    return ['governance-supervisor.json learnedWeights.{Ws,Wd,Wf} must be finite numbers in [0, 1]'];
+  }
+  const sum = vals[0] + vals[1] + vals[2];
+  if (sum < WEIGHT_SUM_MIN || sum > WEIGHT_SUM_MAX) {
+    return [`governance-supervisor.json weight sum (${sum.toFixed(4)}) outside [0.99, 1.01]`];
+  }
+  return [];
+}
+
+/**
+ * Validates structural and weight-normalization invariants on a parsed supervisor snapshot.
+ *
+ * @param {unknown} data - Parsed governance-supervisor.json object.
+ * @returns {string[]} Validation failure messages (empty when valid).
+ */
+function validateSupervisorPayload(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return ['governance-supervisor.json must be a JSON object'];
+  }
+  const issues = [];
+  if (data.version !== '1.0') {
+    issues.push(`governance-supervisor.json version must be "1.0" (got ${JSON.stringify(data.version)})`);
+  }
+  issues.push(...validateSupervisorWeights(data.learnedWeights));
+  if (!Array.isArray(data.demotedRules) || !Array.isArray(data.boostedPatterns)) {
+    issues.push('governance-supervisor.json demotedRules and boostedPatterns must be arrays');
+  }
+  if (!Number.isInteger(data.activeIncidents) || data.activeIncidents < 0) {
+    issues.push('governance-supervisor.json activeIncidents must be a non-negative integer');
+  }
+  if (!Number.isInteger(data.evolutionStepsCount) || data.evolutionStepsCount < 0) {
+    issues.push('governance-supervisor.json evolutionStepsCount must be a non-negative integer');
+  }
+  return issues;
+}
+
+/**
+ * Validates baseline-signatures.json byte budget and JSON parseability.
+ *
+ * @param {string} ledgerDir - Resolved trajectory ledger directory.
+ * @returns {{ bytes: number, violations: number }} Physical usage and violation count.
+ */
+function validateBaselineSignatures(ledgerDir) {
+  const sigPath = path.join(ledgerDir, 'baseline-signatures.json');
+  if (!fs.existsSync(sigPath)) {
+    return { bytes: 0, violations: 0 };
+  }
+  const bytes = fs.statSync(sigPath).size;
+  let violations = 0;
+  if (bytes > MAX_BASELINE_SIGNATURES_BYTES) {
+    console.error(
+      `  ❌ baseline-signatures.json (${bytes} bytes) exceeds limit (${MAX_BASELINE_SIGNATURES_BYTES} bytes)`,
+    );
+    violations += 1;
+  }
+  try {
+    JSON.parse(fs.readFileSync(sigPath, 'utf8'));
+  } catch (err) {
+    console.error(`  ❌ baseline-signatures.json is invalid JSON: ${err.message}`);
+    violations += 1;
+  }
+  return { bytes, violations };
+}
+
+/**
+ * Validates governance-supervisor.json physical size and schema invariants.
+ *
+ * @param {string} ledgerDir - Resolved trajectory ledger directory.
+ * @returns {{ bytes: number, violations: number }} Physical usage and violation count.
+ */
+function validateSupervisorSnapshot(ledgerDir) {
+  const supPath = path.join(ledgerDir, 'governance-supervisor.json');
+  if (!fs.existsSync(supPath)) {
+    return { bytes: 0, violations: 0 };
+  }
+  const bytes = fs.statSync(supPath).size;
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(supPath, 'utf8'));
+  } catch (err) {
+    console.error(`  ❌ governance-supervisor.json is invalid JSON: ${err.message}`);
+    return { bytes, violations: 1 };
+  }
+  const issues = validateSupervisorPayload(parsed);
+  for (const issue of issues) {
+    console.error(`  ❌ ${issue}`);
+  }
+  return { bytes, violations: issues.length };
+}
+
 function main() {
   console.log('🔍 [Gate:TrajectoryLedger] Validating physical bounds of trajectory ledger...');
 
@@ -202,15 +308,18 @@ function main() {
     process.exit(0);
   }
 
-  const activeRes = validateActiveRuns(ledgerDir);
-  const archiveRes = validateArchivedRuns(ledgerDir);
-  const activationRes = validateActivationSidecar(ledgerDir);
-  const lifetimeRes = validateLifetimeSummary(ledgerDir);
-  const weeklyRes = validateWeeklySummaries(ledgerDir);
+  const checks = [
+    validateActiveRuns(ledgerDir),
+    validateArchivedRuns(ledgerDir),
+    validateActivationSidecar(ledgerDir),
+    validateLifetimeSummary(ledgerDir),
+    validateWeeklySummaries(ledgerDir),
+    validateBaselineSignatures(ledgerDir),
+    validateSupervisorSnapshot(ledgerDir),
+  ];
 
-  const totalBytes = activeRes.bytes + archiveRes.bytes + activationRes.bytes + lifetimeRes.bytes + weeklyRes.bytes;
-  const violations =
-    activeRes.violations + archiveRes.violations + activationRes.violations + lifetimeRes.violations + weeklyRes.violations;
+  const totalBytes = checks.reduce((acc, res) => acc + res.bytes, 0);
+  const violations = checks.reduce((acc, res) => acc + res.violations, 0);
 
   if (totalBytes > MAX_TOTAL_STORAGE_BYTES) {
     console.error(
@@ -232,4 +341,12 @@ function main() {
   process.exit(0);
 }
 
-main();
+module.exports = {
+  validateBaselineSignatures,
+  validateSupervisorPayload,
+  validateSupervisorSnapshot,
+};
+
+if (require.main === module) {
+  main();
+}
