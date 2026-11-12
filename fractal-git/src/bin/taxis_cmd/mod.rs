@@ -79,6 +79,7 @@ pub mod relocate;
 pub mod remote;
 pub mod remote_sync;
 pub mod remote_sync_push;
+pub mod remote_upstream;
 pub mod repack;
 pub mod repo_view;
 pub mod reset;
