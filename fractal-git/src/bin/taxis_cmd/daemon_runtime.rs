@@ -17,15 +17,16 @@
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use fg_core::constants::git::{OBJ_BLOB, OBJ_TREE};
+use fg_core::constants::git::{OBJ_BLOB, OBJ_COMMIT, OBJ_TREE};
 use fg_core::error::{FractalError, FractalResult};
-use fg_core::models::{FileMode, Oid};
-use fg_core::traits::OdbStore;
+use fg_core::models::{current_unix_seconds, FileMode, Oid};
+use fg_core::traits::{OdbStore, RefStore};
 use fg_index::{GitIndex, InMemoryIndexTree};
 use fg_native::sections::indx::IndexEntry as NativeIndexEntry;
+use fg_native::sections::refs::RefRecord;
 use fg_native::RepoDocument;
 use fractal_git::server::{IpcDaemonReceipt, IpcMessage, IpcStageEntry};
-use fractal_git::LooseOdb;
+use fractal_git::{DiskRefStore, LooseOdb};
 
 /// In-memory resident daemon session caching `RepoDocument` and `InMemoryIndexTree`.
 pub struct DaemonHotSession {
@@ -81,6 +82,36 @@ impl DaemonHotSession {
             )),
             IpcMessage::Status { scope_prefix } => Ok(self.exec_status(scope_prefix.as_deref())),
             IpcMessage::Stage { entries } => self.exec_stage(entries),
+            IpcMessage::Commit {
+                target_ref,
+                parent_oids,
+                entries,
+                message: msg_text,
+                author_name,
+                author_email,
+                timestamp_sec,
+                tz_offset,
+            } => self.exec_commit(
+                target_ref,
+                parent_oids,
+                entries,
+                msg_text,
+                (
+                    author_name,
+                    author_email,
+                    *timestamp_sec,
+                    tz_offset.as_deref(),
+                ),
+            ),
+            IpcMessage::DiffSlice {
+                scope_prefix,
+                base_oid,
+                head_oid,
+            } => Ok(self.exec_diff_slice(
+                scope_prefix.as_deref(),
+                base_oid.as_deref(),
+                head_oid.as_deref(),
+            )),
             _ => Err(FractalError::ObjectCodec(
                 "Unsupported daemon IPC command".to_owned(),
             )),
@@ -93,6 +124,7 @@ impl DaemonHotSession {
         let mut receipt =
             empty_receipt("status", scoped.entry_count(), "hot_index_ready".to_owned());
         receipt.entries = scoped.entries().keys().cloned().collect();
+        receipt.target_ref = resolve_head_ref(&self.git_dir);
         receipt
     }
 
@@ -104,6 +136,58 @@ impl DaemonHotSession {
         receipt.tree_oid = Some(tree_oid.to_hex());
         receipt.entries = self.index_tree.entries().keys().cloned().collect();
         Ok(receipt)
+    }
+
+    fn exec_commit(
+        &mut self,
+        target_ref: &str,
+        parent_oids: &[String],
+        entries: &[IpcStageEntry],
+        message: &str,
+        author_meta: (&str, &str, Option<i64>, Option<&str>),
+    ) -> FractalResult<IpcDaemonReceipt> {
+        let odb = LooseOdb::new(&self.git_dir);
+        let tree_oid = self.stage_and_persist(&odb, entries)?;
+        let payload = format_commit_payload(&tree_oid, parent_oids, message, author_meta)?;
+        let commit_oid = odb.write_object(OBJ_COMMIT, payload.as_bytes())?;
+        DiskRefStore::new(&self.git_dir).update_ref(target_ref, &commit_oid, None)?;
+        if let Some(ref mut doc) = self.container_doc {
+            let _ = doc.refs.upsert(RefRecord {
+                name: target_ref.to_owned(),
+                oid: commit_oid,
+                peeled: None,
+            });
+            self.flush_container();
+        }
+        let mut receipt = empty_receipt(
+            "commit",
+            self.index_tree.entry_count(),
+            "committed".to_owned(),
+        );
+        receipt.tree_oid = Some(tree_oid.to_hex());
+        receipt.commit_oid = Some(commit_oid.to_hex());
+        receipt.target_ref = Some(target_ref.to_owned());
+        receipt.entries = self.index_tree.entries().keys().cloned().collect();
+        Ok(receipt)
+    }
+
+    fn exec_diff_slice(
+        &self,
+        scope: Option<&str>,
+        base: Option<&str>,
+        head: Option<&str>,
+    ) -> IpcDaemonReceipt {
+        let scoped = scoped_tree(&self.index_tree, scope);
+        let entries: Vec<String> = scoped.entries().keys().cloned().collect();
+        let detail = format!(
+            "slice {}..{} ({})",
+            base.unwrap_or("INDEX"),
+            head.unwrap_or("WORKTREE"),
+            entries.join(",")
+        );
+        let mut receipt = empty_receipt("diff_slice", entries.len(), detail);
+        receipt.entries = entries;
+        receipt
     }
 
     pub(crate) fn stage_and_persist(
@@ -176,6 +260,41 @@ pub(crate) fn scoped_tree(tree: &InMemoryIndexTree, scope: Option<&str>) -> InMe
         Some(prefix) if !prefix.trim().is_empty() => tree.filter_by_scope(&[prefix]),
         _ => tree.clone(),
     }
+}
+
+fn format_commit_payload(
+    tree_oid: &Oid,
+    parent_oids: &[String],
+    message: &str,
+    author_meta: (&str, &str, Option<i64>, Option<&str>),
+) -> FractalResult<String> {
+    let (name, email, ts_opt, tz_opt) = author_meta;
+    let ts = ts_opt.unwrap_or_else(current_unix_seconds);
+    let tz = tz_opt.unwrap_or("+0000");
+    let mut header = format!("tree {}\n", tree_oid.to_hex());
+    for parent_hex in parent_oids {
+        append_parent_line(&mut header, &Oid::from_hex(parent_hex)?);
+    }
+    Ok(format!(
+        "{header}author {name} <{email}> {ts} {tz}\ncommitter {name} <{email}> {ts} {tz}\n\n{message}"
+    ))
+}
+
+fn append_parent_line(header: &mut String, parent_oid: &Oid) {
+    header.push_str("parent ");
+    header.push_str(&parent_oid.to_hex());
+    header.push('\n');
+}
+
+fn resolve_head_ref(git_dir: &Path) -> Option<String> {
+    let raw = std::fs::read_to_string(git_dir.join("HEAD")).ok()?;
+    let trimmed = raw.trim();
+    Some(
+        trimmed
+            .strip_prefix("ref:")
+            .map_or(trimmed, str::trim)
+            .to_owned(),
+    )
 }
 
 pub(crate) fn empty_receipt(command: &str, entry_count: usize, detail: String) -> IpcDaemonReceipt {
