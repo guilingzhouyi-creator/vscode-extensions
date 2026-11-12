@@ -251,7 +251,12 @@ export class TestModernityAnalyzer implements Analyzer {
         const sites: TestSite[] = [];
         const caseRecords: CaseRecord[] = [];
 
-        const resolvedSourceFile = sourceFile ?? ctx.sourceFile;
+        const cachedCtx = ctx as { sourceFile?: ts.SourceFile; _cachedSourceFile?: ts.SourceFile };
+        const resolvedSourceFile =
+            sourceFile ?? cachedCtx._cachedSourceFile ?? cachedCtx.sourceFile;
+        if (resolvedSourceFile && !cachedCtx._cachedSourceFile) {
+            cachedCtx._cachedSourceFile = resolvedSourceFile;
+        }
         if (resolvedSourceFile && typeof resolvedSourceFile.forEachChild === 'function') {
             this.analyzeWithAst(resolvedSourceFile, ctx, sites, caseRecords);
         }

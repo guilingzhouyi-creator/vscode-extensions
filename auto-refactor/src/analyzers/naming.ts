@@ -192,11 +192,15 @@ export class NamingAnalyzer implements Analyzer {
     }
 
     private resolveSourceFile(ctx: AnalyzerContext): ts.SourceFile | undefined {
-        if (ctx.sourceFile) {
-            return ctx.sourceFile;
+        const cached = (ctx as { _cachedSourceFile?: ts.SourceFile })._cachedSourceFile ?? ctx.sourceFile;
+        if (cached) {
+            (ctx as { _cachedSourceFile?: ts.SourceFile })._cachedSourceFile = cached;
+            return cached;
         }
         if (!ctx.content) return undefined;
-        return ts.createSourceFile(ctx.filePath, ctx.content, ts.ScriptTarget.Latest, true);
+        const sf = ts.createSourceFile(ctx.filePath, ctx.content, ts.ScriptTarget.Latest, true);
+        (ctx as { _cachedSourceFile?: ts.SourceFile })._cachedSourceFile = sf;
+        return sf;
     }
 
     /**

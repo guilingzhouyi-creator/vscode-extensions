@@ -214,12 +214,18 @@ function resolveSourceFile(
     if (language !== 'typescript') {
         return sourceFile;
     }
-    const existing = sourceFile || (ctx as { sourceFile?: ts.SourceFile }).sourceFile;
+    const cachedCtx = ctx as { sourceFile?: ts.SourceFile; _cachedSourceFile?: ts.SourceFile };
+    const existing = sourceFile || cachedCtx._cachedSourceFile || cachedCtx.sourceFile;
     if (existing || !ctx.content) {
+        if (existing) {
+            cachedCtx._cachedSourceFile = existing;
+        }
         return existing;
     }
     try {
-        return ts.createSourceFile(ctx.filePath, ctx.content, ts.ScriptTarget.Latest, true);
+        const sf = ts.createSourceFile(ctx.filePath, ctx.content, ts.ScriptTarget.Latest, true);
+        cachedCtx._cachedSourceFile = sf;
+        return sf;
     } catch {
         return undefined;
     }
