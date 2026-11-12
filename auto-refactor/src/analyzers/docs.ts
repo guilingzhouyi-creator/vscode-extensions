@@ -84,8 +84,19 @@ interface DocsOptions {
 export class DocsAnalyzer implements Analyzer {
     name = 'docs' as const;
 
+    private readonly pathExistsCache: Map<string, boolean> = new Map();
+
     public resetState(): void {
-        // Stateless markdown analyzer - safe for pool reuse
+        this.pathExistsCache.clear();
+    }
+
+    private checkPathExists(absPath: string): boolean {
+        let exists = this.pathExistsCache.get(absPath);
+        if (exists === undefined) {
+            exists = fs.existsSync(absPath);
+            this.pathExistsCache.set(absPath, exists);
+        }
+        return exists;
     }
 
     /**
@@ -192,10 +203,9 @@ export class DocsAnalyzer implements Analyzer {
             const line = lines[i];
             if (exemptMarkersRe.test(line)) continue;
             for (const target of this.extractTargets(line, exempt)) {
-                if (
-                    fs.existsSync(path.resolve(root, target)) ||
-                    fs.existsSync(path.resolve(docDir, target))
-                ) {
+                const rootTarget = path.resolve(root, target);
+                const docTarget = path.resolve(docDir, target);
+                if (this.checkPathExists(rootTarget) || this.checkPathExists(docTarget)) {
                     continue;
                 }
                 emit(

@@ -27,7 +27,13 @@ import type {
     MaterializeCommitResult,
     StagedFileEntry,
 } from '../../ts/contracts';
-import { materializeCommitPure } from '../../ts/native-binding';
+import {
+    hasLooseObjectOnDisk,
+    invokeTaxisDaemonRequest,
+    materializeCommitPure,
+    materializeCommitViaTaxisBridge,
+    writeLooseObjectToDisk,
+} from '../../ts/native-binding';
 
 /** One differential corpus consumed by both the TypeScript engine and the reference git baseline. */
 interface ParityCorpus {
@@ -505,6 +511,46 @@ test('materializeCommitPure rejects duplicate and conflicting staged paths', () 
             () => materializeCommitPure(gitDir, validationRequest([stagedFile('../escape.txt', 'escape\n')])),
             /not a legal tree entry name/,
         );
+    } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+    }
+});
+
+test('idempotent duplicate staged paths, CAS existence check, and Taxis daemon bridge fallback', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fractal-git-parity-bridge-'));
+    try {
+        const gitDir = path.join(root, '.git');
+        fs.mkdirSync(gitDir, { recursive: true });
+        assert.strictEqual(hasLooseObjectOnDisk(gitDir, 'not-an-oid'), false);
+
+        const singleResult = materializeCommitPure(
+            gitDir,
+            validationRequest([stagedFile('src/idempotent.ts', 'export const v = 1;\n')]),
+        );
+        const dupIdempotentResult = materializeCommitViaTaxisBridge(
+            gitDir,
+            validationRequest([
+                stagedFile('src/idempotent.ts', 'export const v = 1;\n'),
+                stagedFile('src/idempotent.ts', 'export const v = 1;\n'),
+            ]),
+            { taxisBinPath: path.join(root, 'nonexistent-taxis-bin') },
+        );
+        assert.strictEqual(dupIdempotentResult.treeOid, singleResult.treeOid);
+        assert.strictEqual(dupIdempotentResult.commitOid, singleResult.commitOid);
+        assert.strictEqual(hasLooseObjectOnDisk(gitDir, singleResult.treeOid), true);
+        assert.strictEqual(hasLooseObjectOnDisk(gitDir, singleResult.commitOid), true);
+        assert.strictEqual(
+            invokeTaxisDaemonRequest(gitDir, { type: 'Ping', payload: { timestamp_ms: 1 } }, {
+                taxisBinPath: path.join(root, 'nonexistent-taxis-bin'),
+            }),
+            null,
+        );
+
+        const written = writeLooseObjectToDisk(gitDir, 'blob', Buffer.from('repair probe\n', 'utf8'));
+        fs.writeFileSync(written.objectPath, Buffer.alloc(0));
+        assert.strictEqual(hasLooseObjectOnDisk(gitDir, written.oid), false);
+        writeLooseObjectToDisk(gitDir, 'blob', Buffer.from('repair probe\n', 'utf8'));
+        assert.strictEqual(hasLooseObjectOnDisk(gitDir, written.oid), true);
     } finally {
         fs.rmSync(root, { recursive: true, force: true });
     }

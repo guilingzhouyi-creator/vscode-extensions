@@ -211,6 +211,38 @@ impl QuarantineRegistry {
         Self::update_status(quarantine_dir, quarantine_id, QuarantineStatus::Restored)
     }
 
+    /// Restores a quarantined modification back to the working tree with path safety validation.
+    pub fn restore_to_workspace(
+        quarantine_dir: &Path,
+        quarantine_id: &str,
+        work_root: &Path,
+    ) -> FractalResult<QuarantineRecord> {
+        let record = Self::find_by_id(quarantine_dir, quarantine_id)?.ok_or_else(|| {
+            FractalError::CorruptStore(format!("Quarantine record not found: {quarantine_id}"))
+        })?;
+        let patch_content = Self::read_patch_content(quarantine_dir, &record)?;
+        let target_path = validate_safe_rel_path(work_root, &record.rel_path)?;
+
+        let original_text = if target_path.is_file() {
+            fs::read_to_string(&target_path).unwrap_or_default()
+        } else {
+            String::new()
+        };
+
+        let restored_content = apply_patch_payload(&original_text, &patch_content);
+
+        if let Some(parent) = target_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        write_file_atomic(&target_path, restored_content.as_bytes(), true)?;
+
+        Self::mark_restored(quarantine_dir, quarantine_id)?;
+
+        let mut updated = record;
+        updated.status = QuarantineStatus::Restored;
+        Ok(updated)
+    }
+
     /// Marks a quarantine record as discarded.
     pub fn mark_discarded(quarantine_dir: &Path, quarantine_id: &str) -> FractalResult<()> {
         Self::update_status(quarantine_dir, quarantine_id, QuarantineStatus::Discarded)
@@ -238,6 +270,106 @@ impl QuarantineRegistry {
 #[must_use]
 pub fn default_quarantine_dir(git_dir: &Path) -> PathBuf {
     git_dir.join("quarantine")
+}
+
+/// Validates that a relative path does not escape the repository work root.
+pub fn validate_safe_rel_path(work_root: &Path, rel_path: &str) -> FractalResult<PathBuf> {
+    if rel_path.is_empty() {
+        return Err(FractalError::PolicyViolation("Empty file path".into()));
+    }
+    let p = Path::new(rel_path);
+    if p.is_absolute() {
+        return Err(FractalError::PolicyViolation(format!(
+            "Absolute path forbidden in quarantine: {rel_path}"
+        )));
+    }
+    for comp in p.components() {
+        match comp {
+            std::path::Component::ParentDir => {
+                return Err(FractalError::PolicyViolation(format!(
+                    "Path traversal '..' forbidden: {rel_path}"
+                )));
+            }
+            std::path::Component::Normal(_) | std::path::Component::CurDir => {}
+            _ => {
+                return Err(FractalError::PolicyViolation(format!(
+                    "Invalid path component: {rel_path}"
+                )));
+            }
+        }
+    }
+    Ok(work_root.join(p))
+}
+
+/// Applies a unified diff patch or full-content payload to original text.
+pub fn apply_patch_payload(original_text: &str, patch_payload: &str) -> String {
+    let is_unified = patch_payload.contains("@@ -")
+        && (patch_payload.starts_with("--- ") || patch_payload.contains("\n--- "));
+    if !is_unified {
+        return patch_payload.to_string();
+    }
+
+    let orig_lines: Vec<&str> = original_text.split('\n').collect();
+    let mut clean_orig: Vec<String> = orig_lines
+        .iter()
+        .map(|l| l.strip_suffix('\r').unwrap_or(l).to_string())
+        .collect();
+    if clean_orig.last().map(|s| s.as_str()) == Some("") && clean_orig.len() > 1 {
+        clean_orig.pop();
+    }
+
+    let patch_lines: Vec<&str> = patch_payload.split('\n').collect();
+    let mut output: Vec<String> = Vec::new();
+    let mut orig_idx = 0usize;
+    let mut cursor = 0usize;
+
+    while cursor < patch_lines.len() {
+        let line = patch_lines[cursor]
+            .strip_suffix('\r')
+            .unwrap_or(patch_lines[cursor]);
+        if let Some(hunk_header) = line.strip_prefix("@@ -") {
+            let old_part = hunk_header.split('+').next().unwrap_or("").trim();
+            let old_start_str = old_part.split(',').next().unwrap_or("1");
+            let target_start = old_start_str.parse::<usize>().unwrap_or(1).saturating_sub(1);
+
+            while orig_idx < target_start && orig_idx < clean_orig.len() {
+                output.push(clean_orig[orig_idx].clone());
+                orig_idx += 1;
+            }
+
+            cursor += 1;
+            while cursor < patch_lines.len() {
+                let h_line = patch_lines[cursor]
+                    .strip_suffix('\r')
+                    .unwrap_or(patch_lines[cursor]);
+                if h_line.starts_with("@@ -") || h_line.starts_with("diff --git") {
+                    break;
+                }
+                if let Some(rest) = h_line.strip_prefix('+') {
+                    output.push(rest.to_string());
+                } else if let Some(_rest) = h_line.strip_prefix('-') {
+                    orig_idx += 1;
+                } else if let Some(rest) = h_line.strip_prefix(' ') {
+                    output.push(rest.to_string());
+                    orig_idx += 1;
+                }
+                cursor += 1;
+            }
+        } else {
+            cursor += 1;
+        }
+    }
+
+    while orig_idx < clean_orig.len() {
+        output.push(clean_orig[orig_idx].clone());
+        orig_idx += 1;
+    }
+
+    let mut result = output.join("\n");
+    if original_text.ends_with('\n') || patch_payload.ends_with('\n') {
+        result.push('\n');
+    }
+    result
 }
 
 #[cfg(test)]

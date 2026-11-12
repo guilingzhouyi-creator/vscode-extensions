@@ -6,7 +6,88 @@
     "ratchetBaseline": "baselines/self-scan.baseline.json freezes findings the project accepted as known debt rather than defects.",
     "incidentRollback": "praxis Incident Ledger rollback events record advice that had to be reverted, the strongest false-positive signal available."
   },
-  "rules": [],
+  "rules": [
+    {
+      "rule": "CMT-HDR-001",
+      "truePositives": 5,
+      "falsePositives": 5
+    },
+    {
+      "rule": "duplicate-literal",
+      "truePositives": 4,
+      "falsePositives": 18
+    },
+    {
+      "rule": "GOV-EXC-001",
+      "truePositives": 9,
+      "falsePositives": 3
+    },
+    {
+      "rule": "GOV-PRF-004",
+      "truePositives": 11,
+      "falsePositives": 1
+    },
+    {
+      "rule": "hardcoded-string",
+      "truePositives": 1,
+      "falsePositives": 6
+    },
+    {
+      "rule": "high-complexity",
+      "truePositives": 3,
+      "falsePositives": 10
+    },
+    {
+      "rule": "HYG-STB-002",
+      "truePositives": 1,
+      "falsePositives": 2
+    },
+    {
+      "rule": "import-cycle",
+      "truePositives": 8,
+      "falsePositives": 0
+    },
+    {
+      "rule": "large-file",
+      "truePositives": 1,
+      "falsePositives": 1
+    },
+    {
+      "rule": "magic-number",
+      "truePositives": 14,
+      "falsePositives": 10
+    },
+    {
+      "rule": "PRF-ALG-001",
+      "truePositives": 2,
+      "falsePositives": 6
+    },
+    {
+      "rule": "SEC-VUL-001",
+      "truePositives": 1,
+      "falsePositives": 2
+    },
+    {
+      "rule": "SEC-VUL-002",
+      "truePositives": 1,
+      "falsePositives": 1
+    },
+    {
+      "rule": "SEC-VUL-003",
+      "truePositives": 1,
+      "falsePositives": 1
+    },
+    {
+      "rule": "secret-detected",
+      "truePositives": 12,
+      "falsePositives": 2
+    },
+    {
+      "rule": "VOL-ELOC-001",
+      "truePositives": 2,
+      "falsePositives": 4
+    }
+  ],
   "notes": [
     "An empty rules array is a valid, honest state: every confidence then equals the analyzer's own score, exactly as before calibration existed.",
     "Populate an entry only from recorded outcomes, never from an estimate of how accurate a rule feels.",

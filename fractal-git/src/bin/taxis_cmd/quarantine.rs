@@ -175,7 +175,7 @@ fn handle_show(ctx: &CliContext, args: &[String]) {
     print!("{}", patch_content);
 }
 
-/// Marks a quarantine record as restored.
+/// Marks a quarantine record as restored and reapplies its patch to the working tree.
 fn handle_restore(ctx: &CliContext, args: &[String]) {
     if args.is_empty() {
         reject(
@@ -186,24 +186,28 @@ fn handle_restore(ctx: &CliContext, args: &[String]) {
 
     let quarantine_id = &args[0];
     let quarantine_directory = default_quarantine_dir(&ctx.git_dir);
+    let work_root = super::repo_view::resolve_work_root(&ctx.git_dir);
 
-    QuarantineRegistry::mark_restored(&quarantine_directory, quarantine_id)
-        .unwrap_or_else(|restore_error| fail_io("restore quarantine record", restore_error));
+    let restored_record =
+        QuarantineRegistry::restore_to_workspace(&quarantine_directory, quarantine_id, &work_root)
+            .unwrap_or_else(|restore_error| fail_io("restore quarantine record", restore_error));
 
     if ctx.json_mode {
         #[derive(serde::Serialize)]
         struct RestoreResult<'a> {
             quarantine_id: &'a str,
+            rel_path: &'a str,
             restored: bool,
         }
         print_json(&RestoreResult {
             quarantine_id,
+            rel_path: &restored_record.rel_path,
             restored: true,
         });
     } else {
         println!(
-            "Quarantine record '{}' successfully marked as RESTORED.",
-            quarantine_id
+            "Quarantine record '{}' successfully restored to '{}'.",
+            quarantine_id, restored_record.rel_path
         );
     }
 }
@@ -282,6 +286,28 @@ fn handle_isolate(ctx: &CliContext, args: &[String]) {
         nonce,
     })
     .unwrap_or_else(|isolate_error| fail_io("isolate file mutation", isolate_error));
+
+    // Revert/clean contaminated workspace file
+    let index_file = ctx.git_dir.join("index");
+    let mut reverted_from_index = false;
+    if let Ok(git_index) = fg_index::GitIndex::load(&index_file) {
+        if let Some(entry) = git_index.entries().iter().find(|e| e.path == *rel_path) {
+            let dummy_ctx = CliContext {
+                git_dir: ctx.git_dir.clone(),
+                json_mode: false,
+                args: Vec::new(),
+            };
+            if let Ok(view) = super::repo_view::RepoView::open(&dummy_ctx) {
+                if let Ok(blob) = view.blob_payload(&entry.oid) {
+                    let _ = fg_core::write_file_atomic(&file_to_read, &blob, true);
+                    reverted_from_index = true;
+                }
+            }
+        }
+    }
+    if !reverted_from_index && file_to_read.is_file() {
+        let _ = fs::remove_file(&file_to_read);
+    }
 
     if ctx.json_mode {
         print_json(&record);

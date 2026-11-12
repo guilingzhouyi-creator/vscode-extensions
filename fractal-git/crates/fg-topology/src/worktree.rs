@@ -57,6 +57,16 @@ impl PathJail {
             })
         }
     }
+
+    /// Verifies if a scope or path intersects with any allowed prefix in the jail.
+    pub fn intersects_scope(&self, scope: &str) -> bool {
+        if self.allowed_prefixes.is_empty() || scope == "*" {
+            return true;
+        }
+        self.allowed_prefixes
+            .iter()
+            .any(|prefix| path_matches_scope(scope, prefix) || path_matches_scope(prefix, scope))
+    }
 }
 
 /// Scope Projection specification defining the delegated subpath region for an agent worktree.
@@ -94,6 +104,17 @@ impl ScopeProjection {
         self.scopes
             .iter()
             .any(|prefix| path_matches_scope(relative_path, prefix))
+    }
+
+    /// Checks whether this projection intersects with a path or subpath prefix.
+    pub fn intersects_path(&self, candidate_path: &str) -> bool {
+        if self.is_full || candidate_path == "*" {
+            return true;
+        }
+        self.scopes.iter().any(|prefix| {
+            path_matches_scope(candidate_path, prefix)
+                || path_matches_scope(prefix, candidate_path)
+        })
     }
 
     /// Asserts that a child projection's scopes are strictly a subset of this parent projection.

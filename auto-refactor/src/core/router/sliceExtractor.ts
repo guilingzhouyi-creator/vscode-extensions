@@ -25,6 +25,10 @@ interface DeclarationBoundary {
     endLine: number;
     isExported: boolean;
     declarationLineText: string;
+    isIndentationBlock?: boolean;
+    baseIndent?: number;
+    sawOpeningBrace?: boolean;
+    braceDepth?: number;
 }
 
 const KIND_CLASS = 'ClassDeclaration';
@@ -32,8 +36,7 @@ const KIND_INTERFACE = 'InterfaceDeclaration';
 const KIND_TYPE_ALIAS = 'TypeAliasDeclaration';
 const KIND_FUNCTION = 'FunctionDeclaration';
 
-const CHAR_CODE_OPEN_BRACE = 123;
-const CHAR_CODE_CLOSE_BRACE = 125;
+const GDSCRIPT_FUNC_RE = /^\s*(?:static\s+)?func\s+([A-Za-z0-9_$]+)/;
 
 function extractDeclarationKind(line: string): string {
     if (line.includes('class ')) return KIND_CLASS;
@@ -54,34 +57,135 @@ function tryStartBoundary(
     lineNum: number,
     trimmed: string,
 ): DeclarationBoundary | null {
-    const match = DECLARATION_START_RE.exec(line);
-    if (!match) return null;
+    let name = '';
+    const gdMatch = GDSCRIPT_FUNC_RE.exec(line);
+    if (gdMatch) {
+        name = gdMatch[1];
+    } else {
+        const match = DECLARATION_START_RE.exec(line);
+        if (!match) return null;
+        name = extractMatchedName(match);
+    }
+
+    const isIndented =
+        /^(?:def|func)\b/.test(trimmed) ||
+        (trimmed.endsWith(':') && !line.includes('{') && !line.includes(';'));
+    const baseIndent = Math.max(0, line.search(/\S/));
+
     return {
-        name: extractMatchedName(match),
+        name,
         kind: extractDeclarationKind(line),
         startLine: lineNum,
         endLine: lineNum,
         isExported: line.includes('export'),
         declarationLineText: trimmed,
+        isIndentationBlock: isIndented,
+        baseIndent,
+        sawOpeningBrace: false,
+        braceDepth: 0,
     };
 }
 
-function computeBraceDelta(line: string): number {
-    let delta = 0;
-    for (let i = 0; i < line.length; i++) {
-        const charCode = line.charCodeAt(i);
-        if (charCode === CHAR_CODE_OPEN_BRACE) delta++;
-        else if (charCode === CHAR_CODE_CLOSE_BRACE) delta--;
-    }
-    return delta;
+interface LexicalScanState {
+    inBlockComment: boolean;
+    inStringChar: string | null;
 }
 
-function isBoundaryClosed(line: string, braceDepth: number, kind: string): boolean {
-    return braceDepth <= 0 && (line.includes('}') || kind === KIND_TYPE_ALIAS);
+function skipCommentOrString(line: string, i: number, state: LexicalScanState): number {
+    if (state.inBlockComment) {
+        if (line[i] === '*' && line[i + 1] === '/') {
+            state.inBlockComment = false;
+            return i + 2;
+        }
+        return i + 1;
+    }
+    if (state.inStringChar !== null) {
+        if (line[i] === '\\') return i + 2;
+        if (line[i] === state.inStringChar) {
+            state.inStringChar = null;
+        }
+        return i + 1;
+    }
+    if ((line[i] === '/' && line[i + 1] === '/') || line[i] === '#') {
+        return line.length;
+    }
+    if (line[i] === '/' && line[i + 1] === '*') {
+        state.inBlockComment = true;
+        return i + 2;
+    }
+    const char = line[i];
+    if (char === '"' || char === "'" || char === '`') {
+        state.inStringChar = char;
+        return i + 1;
+    }
+    return -1;
+}
+
+function scanLineBraces(
+    line: string,
+    state: LexicalScanState,
+): { delta: number; sawOpen: boolean } {
+    let delta = 0;
+    let sawOpen = false;
+    let i = 0;
+    while (i < line.length) {
+        const next = skipCommentOrString(line, i, state);
+        if (next !== -1) {
+            i = next;
+            continue;
+        }
+        if (line[i] === '{') {
+            delta++;
+            sawOpen = true;
+        } else if (line[i] === '}') {
+            delta--;
+        }
+        i++;
+    }
+    return { delta, sawOpen };
+}
+
+function advanceIndentationBlock(
+    current: DeclarationBoundary,
+    line: string,
+    lineNum: number,
+    trimmed: string,
+): boolean {
+    if (trimmed === '' || trimmed.startsWith('#')) {
+        return true;
+    }
+    const lineIndent = line.search(/\S/);
+    if (lineIndent > (current.baseIndent ?? 0)) {
+        current.endLine = lineNum;
+        return true;
+    }
+    return false;
+}
+
+function advanceBraceBlock(
+    current: DeclarationBoundary,
+    line: string,
+    lineNum: number,
+    state: LexicalScanState,
+): boolean {
+    const scan = scanLineBraces(line, state);
+    if (scan.sawOpen) {
+        current.sawOpeningBrace = true;
+    }
+    current.braceDepth = (current.braceDepth ?? 0) + scan.delta;
+    current.endLine = lineNum;
+    if (
+        current.sawOpeningBrace &&
+        current.braceDepth <= 0 &&
+        (line.includes('}') || current.kind === KIND_TYPE_ALIAS)
+    ) {
+        return false;
+    }
+    return true;
 }
 
 /**
- * Scan lines to detect declaration boundaries using block nesting tracking.
+ * Scan lines to detect declaration boundaries using lexical and indentation tracking.
  *
  * @param lines - Array of source lines.
  * @returns List of detected declaration boundaries.
@@ -89,7 +193,7 @@ function isBoundaryClosed(line: string, braceDepth: number, kind: string): boole
 function scanDeclarationBoundaries(lines: string[]): DeclarationBoundary[] {
     const boundaries: DeclarationBoundary[] = [];
     let current: DeclarationBoundary | null = null;
-    let braceDepth = 0;
+    const lexicalState: LexicalScanState = { inBlockComment: false, inStringChar: null };
 
     for (let i = 0; i < lines.length; i++) {
         const lineNum = i + 1;
@@ -98,18 +202,24 @@ function scanDeclarationBoundaries(lines: string[]): DeclarationBoundary[] {
 
         if (!current) {
             current = tryStartBoundary(line, lineNum, trimmed);
-            if (current) braceDepth = 0;
-        }
-
-        if (current) {
-            braceDepth += computeBraceDelta(line);
-            current.endLine = lineNum;
-
-            if (isBoundaryClosed(line, braceDepth, current.kind)) {
+            if (
+                current &&
+                !current.isIndentationBlock &&
+                !advanceBraceBlock(current, line, lineNum, lexicalState)
+            ) {
                 boundaries.push(current);
                 current = null;
-                braceDepth = 0;
             }
+            continue;
+        }
+
+        const stillOpen = current.isIndentationBlock
+            ? advanceIndentationBlock(current, line, lineNum, trimmed)
+            : advanceBraceBlock(current, line, lineNum, lexicalState);
+
+        if (!stillOpen) {
+            boundaries.push(current);
+            current = current.isIndentationBlock ? tryStartBoundary(line, lineNum, trimmed) : null;
         }
     }
 

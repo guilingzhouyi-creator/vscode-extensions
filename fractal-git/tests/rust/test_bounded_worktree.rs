@@ -209,6 +209,68 @@ fn test_quarantine_isolation_and_restoration_cycle() {
 }
 
 #[test]
+fn test_quarantine_workspace_restore_and_path_safety() {
+    let test_dir = TestDir::new("quar_restore");
+    let work_root = test_dir.path().join("work_root");
+    let quar_dir = test_dir.path().join(".taxis").join("quarantine");
+    std::fs::create_dir_all(&work_root).unwrap();
+
+    let target_file = work_root.join("scripts/mod.gd");
+    std::fs::create_dir_all(target_file.parent().unwrap()).unwrap();
+    std::fs::write(&target_file, "old\n").unwrap();
+
+    let patch_payload = "--- a/scripts/mod.gd\n+++ b/scripts/mod.gd\n@@ -1 +1 @@\n-old\n+new\n";
+
+    let record = QuarantineRegistry::isolate_mutation(IsolateMutationRequest {
+        quarantine_dir: &quar_dir,
+        project_id: "WebGames",
+        agent_id: "agent-wg",
+        rel_path: "scripts/mod.gd",
+        file_uid: None,
+        patch_or_content: patch_payload,
+        reason: "Unregistered mutation outside slice",
+        current_time: 1700000000,
+        nonce: 101,
+    })
+    .expect("isolation succeeds");
+
+    // Replay restoration to workspace
+    let restored = QuarantineRegistry::restore_to_workspace(&quar_dir, &record.quarantine_id, &work_root)
+        .expect("restore succeeds");
+    assert_eq!(restored.status, QuarantineStatus::Restored);
+
+    let restored_file_content = std::fs::read_to_string(&target_file).unwrap();
+    assert_eq!(restored_file_content, "new\n");
+
+    // Path traversal breach must fail closed
+    let traversal_record = QuarantineRegistry::isolate_mutation(IsolateMutationRequest {
+        quarantine_dir: &quar_dir,
+        project_id: "WebGames",
+        agent_id: "agent-evil",
+        rel_path: "../../../evil.txt",
+        file_uid: None,
+        patch_or_content: "malicious",
+        reason: "Path traversal attempt",
+        current_time: 1700000000,
+        nonce: 102,
+    })
+    .expect("isolation succeeds");
+
+    let err = QuarantineRegistry::restore_to_workspace(
+        &quar_dir,
+        &traversal_record.quarantine_id,
+        &work_root,
+    )
+    .unwrap_err();
+    match err {
+        FractalError::PolicyViolation(msg) => {
+            assert!(msg.contains("forbidden"));
+        }
+        other => panic!("Expected PolicyViolation, got: {:?}", other),
+    }
+}
+
+#[test]
 fn test_virtual_inode_persistence_roundtrip() {
     let test_dir = TestDir::new("inode_table");
     let table_file = test_dir.path().join("virtual_inodes.json");

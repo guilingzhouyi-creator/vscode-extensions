@@ -49,6 +49,14 @@ const CONTINUE_MATCH_RE = /^continue(?:;|$)/;
 const IF_MATCH_RE = /^if(?:\s|\()/;
 const SAFE_AWAIT_PREFIX_RE = /^(?:await\s|return\s|void\s)/;
 const TERMINATOR_BODY_RE = /^(?:return|throw|break|continue)\b/;
+const ELSE_RE = /^}\s*else\b/;
+
+interface BranchFrame {
+    thenBlock: BasicBlock;
+    elseBlock: BasicBlock;
+    mergeBlock: BasicBlock;
+    inElse: boolean;
+}
 
 /** Set of language keywords to exclude from identifier extraction. */
 const KEYWORDS = new Set([
@@ -357,6 +365,109 @@ export class CfgBuilder {
         };
     }
 
+    private closeActiveBranch(currentBlock: BasicBlock, frame: BranchFrame): BasicBlock {
+        if (!currentBlock.isTerminator()) {
+            currentBlock.addSuccessor(frame.mergeBlock, UNCONDITIONAL_EDGE);
+        }
+        if (!frame.inElse) {
+            frame.elseBlock.addSuccessor(frame.mergeBlock, UNCONDITIONAL_EDGE);
+        }
+        return frame.mergeBlock;
+    }
+
+    private handleBranchElse(currentBlock: BasicBlock, frame: BranchFrame): BasicBlock {
+        if (!currentBlock.isTerminator()) {
+            currentBlock.addSuccessor(frame.mergeBlock, UNCONDITIONAL_EDGE);
+        }
+        frame.inElse = true;
+        return frame.elseBlock;
+    }
+
+    private processConditionStatement(
+        stmt: CfgStatement,
+        trimmed: string,
+        currentBlock: BasicBlock,
+        exit: BasicBlock,
+        branchStack: BranchFrame[],
+    ): BasicBlock {
+        const condBlock = this.createBlock(CONDITION_BLOCK_KIND);
+        condBlock.addStatement(stmt);
+        currentBlock.addSuccessor(condBlock, UNCONDITIONAL_EDGE);
+
+        if (CfgBuilder.hasInlineTerminator(trimmed)) {
+            condBlock.addSuccessor(exit, TRUE_BRANCH_EDGE);
+            const fallthroughBlock = this.createBlock(NORMAL_BLOCK_KIND);
+            condBlock.addSuccessor(fallthroughBlock, FALSE_BRANCH_EDGE);
+            return fallthroughBlock;
+        }
+
+        const thenBlock = this.createBlock(NORMAL_BLOCK_KIND);
+        const elseBlock = this.createBlock(NORMAL_BLOCK_KIND);
+        const mergeBlock = this.createBlock(NORMAL_BLOCK_KIND);
+        condBlock.addSuccessor(thenBlock, TRUE_BRANCH_EDGE);
+        condBlock.addSuccessor(elseBlock, FALSE_BRANCH_EDGE);
+
+        branchStack.push({ thenBlock, elseBlock, mergeBlock, inElse: false });
+        return thenBlock;
+    }
+
+    private processStatement(
+        stmt: CfgStatement,
+        trimmed: string,
+        currentBlock: BasicBlock,
+        exit: BasicBlock,
+        branchStack: BranchFrame[],
+    ): BasicBlock {
+        if (stmt.kind === CONDITION_KIND) {
+            return this.processConditionStatement(stmt, trimmed, currentBlock, exit, branchStack);
+        }
+        if (stmt.kind === RETURN_KEYWORD || stmt.kind === THROW_KEYWORD) {
+            currentBlock.addStatement(stmt);
+            currentBlock.addSuccessor(exit, UNCONDITIONAL_EDGE);
+            return this.createBlock(NORMAL_BLOCK_KIND);
+        }
+        currentBlock.addStatement(stmt);
+        return currentBlock;
+    }
+
+    private processLineBranchOrStatement(
+        line: string,
+        lineNum: number,
+        stmtCounter: number,
+        currentBlock: BasicBlock,
+        exit: BasicBlock,
+        branchStack: BranchFrame[],
+    ): { nextBlock: BasicBlock; nextCounter: number } {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('#')) {
+            return { nextBlock: currentBlock, nextCounter: stmtCounter };
+        }
+
+        if (branchStack.length > 0 && (trimmed === '}' || trimmed === '};')) {
+            return {
+                nextBlock: this.closeActiveBranch(currentBlock, branchStack.pop()!),
+                nextCounter: stmtCounter,
+            };
+        }
+
+        if (branchStack.length > 0 && ELSE_RE.test(trimmed)) {
+            return {
+                nextBlock: this.handleBranchElse(currentBlock, branchStack[branchStack.length - 1]),
+                nextCounter: stmtCounter,
+            };
+        }
+
+        const stmt = CfgBuilder.parseStatement(trimmed, lineNum, `s_${stmtCounter}`);
+        const nextBlock = this.processStatement(
+            stmt,
+            trimmed,
+            currentBlock,
+            exit,
+            branchStack,
+        );
+        return { nextBlock, nextCounter: stmtCounter + 1 };
+    }
+
     /**
      * Builds a Control Flow Graph from a list of raw code lines representing a function body.
      * Concurrency: Thread-safe, reentrant, creates isolated block states per call.
@@ -374,43 +485,23 @@ export class CfgBuilder {
 
         let currentBlock = entry;
         let stmtCounter = 0;
+        const branchStack: BranchFrame[] = [];
 
         for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            const trimmed = line.trim();
-            if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('#')) {
-                continue;
-            }
+            const step = this.processLineBranchOrStatement(
+                lines[i],
+                baseLine + i,
+                stmtCounter,
+                currentBlock,
+                exit,
+                branchStack,
+            );
+            currentBlock = step.nextBlock;
+            stmtCounter = step.nextCounter;
+        }
 
-            const lineNum = baseLine + i;
-            const stmtId = `s_${stmtCounter++}`;
-            const stmt = CfgBuilder.parseStatement(trimmed, lineNum, stmtId);
-
-            if (stmt.kind === CONDITION_KIND) {
-                const condBlock = this.createBlock(CONDITION_BLOCK_KIND);
-                condBlock.addStatement(stmt);
-                currentBlock.addSuccessor(condBlock, UNCONDITIONAL_EDGE);
-
-                if (CfgBuilder.hasInlineTerminator(trimmed)) {
-                    condBlock.addSuccessor(exit, TRUE_BRANCH_EDGE);
-                    const fallthroughBlock = this.createBlock(NORMAL_BLOCK_KIND);
-                    condBlock.addSuccessor(fallthroughBlock, FALSE_BRANCH_EDGE);
-                    currentBlock = fallthroughBlock;
-                } else {
-                    const thenBlock = this.createBlock(NORMAL_BLOCK_KIND);
-                    const elseBlock = this.createBlock(NORMAL_BLOCK_KIND);
-                    condBlock.addSuccessor(thenBlock, TRUE_BRANCH_EDGE);
-                    condBlock.addSuccessor(elseBlock, FALSE_BRANCH_EDGE);
-
-                    currentBlock = thenBlock;
-                }
-            } else if (stmt.kind === RETURN_KEYWORD || stmt.kind === THROW_KEYWORD) {
-                currentBlock.addStatement(stmt);
-                currentBlock.addSuccessor(exit, UNCONDITIONAL_EDGE);
-                currentBlock = this.createBlock(NORMAL_BLOCK_KIND);
-            } else {
-                currentBlock.addStatement(stmt);
-            }
+        while (branchStack.length > 0) {
+            currentBlock = this.closeActiveBranch(currentBlock, branchStack.pop()!);
         }
 
         if (

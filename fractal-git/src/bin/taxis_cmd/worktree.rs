@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use fg_native::{RepoDocument, WorktreeRecord, WorktreeTier};
+use fg_topology::DiskBlackboardStore;
 use fractal_git::constants::cli::CliTag;
 use fractal_git::{FractalRef, QuotaGovernor, ScopeProjection, WorktreeMode, WorktreePool};
 
@@ -232,6 +233,32 @@ fn handle_worktree_add(ctx: &CliContext) {
         }
     }
 
+    let bb_store = DiskBlackboardStore::new(&ctx.git_dir);
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0);
+    let env_agent = std::env::var("TAXIS_AGENT_ID").ok();
+    let env_cell = std::env::var("TAXIS_CELL_ID").ok();
+    let agent = options.subagent_id.as_deref().or(env_agent.as_deref());
+    let cell = options.cell_id.as_deref().or(env_cell.as_deref());
+
+    for scope in &projection.scopes {
+        if let Ok(Some(collision)) = bb_store.assert_write_permitted(scope, agent, cell, now_ms) {
+            reject(
+                CliTag::VERIFY_FAIL,
+                format!(
+                    "Intent conflict detected: scope '{}' in '{}' is already claimed by agent '{}' (lease: {}, remaining TTL: {}s)",
+                    collision.scope_id,
+                    collision.file_path,
+                    collision.conflicting_agent,
+                    collision.conflicting_lease_id,
+                    collision.remaining_ttl_seconds
+                ),
+            );
+        }
+    }
+
     let started_at = Instant::now();
     let destination = PathBuf::from(target_path);
     if let Err(create_err) = std::fs::create_dir_all(&destination) {
@@ -242,7 +269,14 @@ fn handle_worktree_add(ctx: &CliContext) {
     }
 
     let materialized = materialize_projection(&destination, &projection)
-        + materialize_worktree_files(&ctx.git_dir, &destination, &projection, mode);
+        + materialize_worktree_files(
+            &ctx.git_dir,
+            &destination,
+            &projection,
+            mode,
+            options.target_commit.as_deref(),
+            options.from_workspace,
+        );
     let creation_latency_us = started_at.elapsed().as_micros() as u64;
     let mut record = if projection.is_full {
         WorktreeRecord::full(destination.display().to_string())
@@ -319,19 +353,72 @@ fn materialize_projection(destination: &Path, projection: &ScopeProjection) -> u
     created
 }
 
-/// Materializes actual files into the allocated worktree using CoW block reflink or Ghost Linking.
+/// Materializes actual files into the allocated worktree using CoW block reflink, Ghost Linking,
+/// or Git ODB tree projection.
 ///
-/// Within-scope files are made writable (or eligible for CoW writes); outside-scope files are
-/// projected as read-only stubs, providing a complete read view for compilers and linters while
-/// preventing unauthorized writes.
+/// When a commit-ish revision or target branch is specified, files are materialized directly
+/// from the resolved Git ODB tree snapshot, preventing dirty workspace files from contaminating
+/// clean agent worktrees.
 fn materialize_worktree_files(
     git_dir: &Path,
     destination: &Path,
     projection: &ScopeProjection,
     mode: WorktreeMode,
+    target_commit_or_ref: Option<&str>,
+    from_workspace: bool,
 ) -> usize {
     if mode == WorktreeMode::VirtualMemory {
         return 0;
+    }
+
+    if !from_workspace {
+        if let Some(target) = target_commit_or_ref {
+            let dummy_ctx = CliContext {
+                git_dir: git_dir.to_path_buf(),
+                json_mode: false,
+                args: Vec::new(),
+            };
+            if let Ok(view) = super::repo_view::RepoView::open(&dummy_ctx) {
+                if let Ok((_, tree_oid)) = view.resolve_tree(target) {
+                    let mut tree_files = std::collections::BTreeMap::new();
+                    if super::tree_view::flatten_tree_for_diff(
+                        &view,
+                        &tree_oid,
+                        "",
+                        &mut tree_files,
+                    )
+                    .is_ok()
+                        && !tree_files.is_empty()
+                    {
+                        let mut materialized_count = 0usize;
+                        for (rel_path, entry) in tree_files.iter().take(PROJECTION_SCAN_LIMIT) {
+                            let in_scope = projection.contains_path(rel_path);
+                            if mode == WorktreeMode::SparseGhost && !in_scope {
+                                let is_root_manifest =
+                                    !rel_path.contains('/') && !rel_path.contains('\\');
+                                if !is_root_manifest {
+                                    continue;
+                                }
+                            }
+                            let dst_file = destination
+                                .join(rel_path.replace('/', std::path::MAIN_SEPARATOR_STR));
+                            if let Some(parent) = dst_file.parent() {
+                                let _ = std::fs::create_dir_all(parent);
+                            }
+                            if let Ok(payload) = view.blob_payload(&entry.oid) {
+                                if std::fs::write(&dst_file, payload).is_ok() {
+                                    materialized_count += 1;
+                                    if !in_scope {
+                                        let _ = fg_storage::reflink::set_readonly(&dst_file, true);
+                                    }
+                                }
+                            }
+                        }
+                        return materialized_count;
+                    }
+                }
+            }
+        }
     }
 
     let work_root = super::repo_view::resolve_work_root(git_dir);
@@ -401,6 +488,10 @@ struct WorktreeAddOptions {
     card_id: Option<String>,
     /// Subagent identifier, which makes the reference an ephemeral leaf.
     subagent_id: Option<String>,
+    /// Target branch or commit OID to project from Git ODB.
+    target_commit: Option<String>,
+    /// Whether to explicitly clone from dirty worktree instead of commit tree.
+    from_workspace: bool,
 }
 
 impl WorktreeAddOptions {
@@ -436,6 +527,8 @@ fn parse_worktree_add_options(args: &[String]) -> WorktreeAddOptions {
         cell_id: None,
         card_id: None,
         subagent_id: None,
+        target_commit: None,
+        from_workspace: false,
     };
 
     let mut cursor = 0;
@@ -468,6 +561,18 @@ fn parse_worktree_add_options(args: &[String]) -> WorktreeAddOptions {
             "--sub" if cursor + 1 < args.len() => {
                 options.subagent_id = Some(args[cursor + 1].clone());
                 cursor += 2;
+            }
+            "--commit" | "-c" | "--branch" | "-b" | "--ref" if cursor + 1 < args.len() => {
+                options.target_commit = Some(args[cursor + 1].clone());
+                cursor += 2;
+            }
+            "--workspace" | "--dirty" => {
+                options.from_workspace = true;
+                cursor += 1;
+            }
+            other if !other.starts_with('-') && options.target_commit.is_none() => {
+                options.target_commit = Some(other.to_string());
+                cursor += 1;
             }
             _ => cursor += 1,
         }

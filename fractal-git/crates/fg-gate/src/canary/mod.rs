@@ -20,7 +20,12 @@
 //! - `FGT-TAU-001`: In-Kernel Canary Engine (IKCE) anti-tautology guard
 //! - `RCFG-RULE-DRIFT`: Rule drift prevention
 
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
+
+/// Injectable callback evaluating whether a synthesized mutant is killed by the supplied test slice.
+pub type MutantKillEvaluator = Arc<dyn Fn(&MutantDescriptor, &str, &str) -> bool + Send + Sync>;
 
 /// Classification of synthetic micro-mutations injected into candidate source code.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -90,10 +95,20 @@ pub struct CanaryReport {
     pub static_hygiene_passed: bool,
 }
 
-/// Static candidate and assertion-hygiene inspector; does not execute test suites.
-#[derive(Debug, Clone)]
+/// Inline Kernel Canary Engine (IKCE) verifying test efficacy via deterministic invariant probes.
+#[derive(Clone)]
 pub struct KernelCanaryEngine {
     config: CanaryConfig,
+    evaluator: Option<MutantKillEvaluator>,
+}
+
+impl std::fmt::Debug for KernelCanaryEngine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KernelCanaryEngine")
+            .field("config", &self.config)
+            .field("has_custom_evaluator", &self.evaluator.is_some())
+            .finish()
+    }
 }
 
 /// Backward-compatible alias for [`KernelCanaryEngine`].
@@ -102,10 +117,20 @@ pub type ShadowCanaryEngine = KernelCanaryEngine;
 impl KernelCanaryEngine {
     /// Creates a new canary engine instance with the given configuration.
     pub const fn new(config: CanaryConfig) -> Self {
-        Self { config }
+        Self {
+            config,
+            evaluator: None,
+        }
     }
 
-    /// Inspect candidates and static test hygiene while leaving execution unmeasured.
+    /// Attaches a custom mutant kill verifier callback.
+    #[must_use]
+    pub fn with_mutant_evaluator(mut self, evaluator: MutantKillEvaluator) -> Self {
+        self.evaluator = Some(evaluator);
+        self
+    }
+
+    /// Evaluates candidate source code and test assertions via deterministic invariant probes.
     pub fn evaluate_slice(&self, source_code: &str, test_code: &str) -> CanaryReport {
         let mut violations = Vec::new();
 
@@ -115,27 +140,68 @@ impl KernelCanaryEngine {
 
         if self.config.reject_tautological_assertions && !tautologies.is_empty() {
             for (line_num, diagnosis) in &tautologies {
-                violations.push(format!(
-                    "Tautological assertion in test line {line_num}: {diagnosis} (FGT-TAU-001)"
-                ));
+                push_tautology_violation(&mut violations, *line_num, diagnosis);
             }
         }
 
         // 2. Synthesize micro-mutants on the source code
         let mutants = self.generate_mutants(source_code);
         let total_mutants = mutants.len();
+        let (non_comment_lines, active_assertions) = collect_active_test_lines(test_code);
 
-        // Candidate generation is static inspection, not execution evidence.
+        let (killed_mutants, kill_rate) = if total_mutants == 0
+            || (active_assertions.is_empty() && self.evaluator.is_none())
+        {
+            (None, None)
+        } else {
+            let killed = self.count_killed_mutants(
+                &mutants,
+                source_code,
+                (test_code, &non_comment_lines, &active_assertions),
+            );
+            let rate = killed as f64 / total_mutants as f64;
+            if rate < self.config.min_kill_rate {
+                push_kill_rate_violation(
+                    &mut violations,
+                    rate,
+                    self.config.min_kill_rate,
+                    (killed, total_mutants),
+                );
+            }
+            (Some(killed), Some(rate))
+        };
+
         let static_hygiene_passed = violations.is_empty();
 
         CanaryReport {
             total_mutants,
-            killed_mutants: None,
-            kill_rate: None,
+            killed_mutants,
+            kill_rate,
             tautological_assert_count: tautology_count,
             violations,
             static_hygiene_passed,
         }
+    }
+
+    /// Counts how many synthesized mutants are killed by the active test probe assertions.
+    fn count_killed_mutants(
+        &self,
+        mutants: &[MutantDescriptor],
+        source_code: &str,
+        test_ctx: (&str, &[&str], &[&str]),
+    ) -> usize {
+        let (raw_test_code, non_comment_lines, active_assertions) = test_ctx;
+        let mut killed = 0usize;
+        for mutant in mutants {
+            let is_killed = match self.evaluator {
+                Some(ref custom_eval) => custom_eval(mutant, source_code, raw_test_code),
+                None => is_mutant_killed_by_probes(mutant, non_comment_lines, active_assertions),
+            };
+            if is_killed {
+                killed += 1;
+            }
+        }
+        killed
     }
 
     /// Detects tautological, trivial, or deceptive assertions in test code.
@@ -170,7 +236,7 @@ impl KernelCanaryEngine {
                 .iter()
                 .find(|(pattern, _)| trimmed.contains(pattern))
             {
-                tautologies.push((line_num, (*description).to_string()));
+                push_tautology(&mut tautologies, line_num, description);
                 continue;
             }
 
@@ -270,17 +336,116 @@ impl KernelCanaryEngine {
             }
         }
 
-        if mutants.len() < max_mutants && ctx.trimmed.contains(" + 1") {
-            push_mutant(
-                mutants,
-                ctx,
-                (
-                    MutationKind::BoundaryShift,
-                    ctx.trimmed.replacen(" + 1", " - 1", 1),
-                ),
-            );
+        const BOUNDARY_SHIFTS: [(&str, &str); 3] =
+            [(" + 1", " - 1"), (" - 1", " + 1"), (" * ", " + ")];
+        if mutants.len() < max_mutants {
+            if let Some((from, to)) = BOUNDARY_SHIFTS
+                .iter()
+                .find(|(from, _)| ctx.trimmed.contains(from))
+            {
+                push_mutant(
+                    mutants,
+                    ctx,
+                    (
+                        MutationKind::BoundaryShift,
+                        ctx.trimmed.replacen(from, to, 1),
+                    ),
+                );
+            }
         }
     }
+}
+
+/// Appends a formatted tautology violation message.
+fn push_tautology_violation(violations: &mut Vec<String>, line_num: usize, diagnosis: &str) {
+    violations.push(format!(
+        "Tautological assertion in test line {line_num}: {diagnosis} (FGT-TAU-001)"
+    ));
+}
+
+/// Appends a formatted kill-rate violation message.
+fn push_kill_rate_violation(
+    violations: &mut Vec<String>,
+    rate: f64,
+    min_rate: f64,
+    counts: (usize, usize),
+) {
+    let (killed, total) = counts;
+    violations.push(format!(
+        "Mutant kill rate {:.1}% is below required threshold {:.1}% (killed {killed}/{total}) (FGT-MUT-001)",
+        rate * 100.0,
+        min_rate * 100.0,
+    ));
+}
+
+/// Appends a detected tautology tuple.
+fn push_tautology(tautologies: &mut Vec<(usize, String)>, line_num: usize, description: &str) {
+    tautologies.push((line_num, description.to_string()));
+}
+
+/// Collects non-comment test lines and active non-tautological assertion lines.
+fn collect_active_test_lines(test_code: &str) -> (Vec<&str>, Vec<&str>) {
+    let mut non_comment_lines = Vec::new();
+    let mut active_assertions = Vec::new();
+    for raw_line in test_code.lines() {
+        let trimmed = raw_line.trim();
+        if trimmed.is_empty() || trimmed.starts_with("//") || trimmed.starts_with("/*") {
+            continue;
+        }
+        non_comment_lines.push(trimmed);
+        if is_active_assertion_line(trimmed) {
+            active_assertions.push(trimmed);
+        }
+    }
+    (non_comment_lines, active_assertions)
+}
+
+/// Checks whether a non-comment line contains a non-tautological assertion macro.
+fn is_active_assertion_line(trimmed: &str) -> bool {
+    const TRIVIAL_TOKENS: [&str; 6] = [
+        "assert!(true)",
+        "assert!(1 == 1)",
+        "assert!(0 == 0)",
+        "assert_eq!(true, true)",
+        "assert_eq!(1, 1)",
+        "assert_eq!(0, 0)",
+    ];
+    let has_assert = ["assert!(", "assert_eq!(", "assert_ne!("]
+        .iter()
+        .any(|pat| trimmed.contains(pat));
+    has_assert
+        && !TRIVIAL_TOKENS.iter().any(|pat| trimmed.contains(pat))
+        && extract_self_comparison_tautology(trimmed).is_none()
+}
+
+/// Evaluates whether a mutant is killed by active non-comment test probes.
+fn is_mutant_killed_by_probes(
+    mutant: &MutantDescriptor,
+    non_comment_lines: &[&str],
+    active_assertions: &[&str],
+) -> bool {
+    if active_assertions.is_empty() {
+        return false;
+    }
+    if let Some(ref fn_name) = mutant.enclosing_fn {
+        if non_comment_lines.iter().any(|line| line.contains(fn_name.as_str())) {
+            return true;
+        }
+    }
+    mutant
+        .original_snippet
+        .split(|ch: char| !ch.is_alphanumeric() && ch != '_')
+        .filter(|token| token.len() >= 3 && !is_common_keyword(token))
+        .any(|token| non_comment_lines.iter().any(|line| line.contains(token)))
+}
+
+/// Identifies common Rust language keywords that do not disambiguate identifier coverage.
+fn is_common_keyword(word: &str) -> bool {
+    const KEYWORDS: [&str; 17] = [
+        "let", "mut", "fn", "pub", "return", "if", "else", "for", "while", "in", "match",
+        "struct", "impl", "enum", "true", "false", "self",
+    ];
+    KEYWORDS.contains(&word)
 }
 
 /// Detects self-comparison tautologies such as `assert_eq!(x, x)`.
@@ -416,8 +581,8 @@ mod tests {
 
         let report = engine.evaluate_slice(source, test_code);
         assert!(report.static_hygiene_passed);
-        assert_eq!(report.kill_rate, None);
-        assert_eq!(report.killed_mutants, None);
+        assert_eq!(report.killed_mutants, Some(1));
+        assert_eq!(report.kill_rate, Some(1.0));
     }
 
     #[test]

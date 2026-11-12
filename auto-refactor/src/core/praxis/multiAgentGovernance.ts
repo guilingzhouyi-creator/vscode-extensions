@@ -26,6 +26,8 @@ import {
     defaultAgentCollisionDetector,
     defaultMultiAgentCoordinator,
     defaultPatchArbiter,
+    type PatchArbitrationOptions,
+    type PatchIssueScanner,
 } from '../trajectory';
 
 /**
@@ -38,6 +40,8 @@ export interface PraxisMultiAgentOptions {
     duplicateWorkThreshold?: number;
     /** Whether to evaluate patch quality on candidates (default: true) */
     enablePatchQuality?: boolean;
+    /** Optional issue scanner callback for candidate patch arbitration */
+    issueScanner?: PatchIssueScanner;
 }
 
 /**
@@ -85,7 +89,10 @@ export interface IPraxisMultiAgentGovernanceService {
     /**
      * Ranks and arbitrates competing candidate patches submitted by parallel agents.
      */
-    arbitrateCompetingPatches(patches: AgentPatchSlice[]): PatchArbitrationCandidate[];
+    arbitrateCompetingPatches(
+        patches: AgentPatchSlice[],
+        options?: PatchArbitrationOptions | PatchIssueScanner,
+    ): PatchArbitrationCandidate[];
 }
 
 /**
@@ -103,6 +110,12 @@ export class PraxisMultiAgentGovernanceService implements IPraxisMultiAgentGover
             baseEdges: options.baseEdges,
             duplicateWorkThreshold: options.duplicateWorkThreshold,
         });
+        if (options.issueScanner) {
+            report.arbitrations = defaultPatchArbiter.arbitratePatches(
+                patches,
+                options.issueScanner,
+            );
+        }
 
         const blockingIssues = report.issues.filter((i) => i.severity === 'error');
         const advisoryWarnings: string[] = [];
@@ -155,8 +168,11 @@ export class PraxisMultiAgentGovernanceService implements IPraxisMultiAgentGover
     /**
      * Ranks and arbitrates competing candidate patches.
      */
-    public arbitrateCompetingPatches(patches: AgentPatchSlice[]): PatchArbitrationCandidate[] {
-        return defaultPatchArbiter.arbitratePatches(patches);
+    public arbitrateCompetingPatches(
+        patches: AgentPatchSlice[],
+        options?: PatchArbitrationOptions | PatchIssueScanner,
+    ): PatchArbitrationCandidate[] {
+        return defaultPatchArbiter.arbitratePatches(patches, options);
     }
 }
 

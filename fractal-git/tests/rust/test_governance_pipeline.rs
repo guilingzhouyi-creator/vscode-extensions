@@ -662,3 +662,109 @@ fn test_merge_commit_matches_system_git_merge() {
     );
     let _ = fs::remove_dir_all(&repo);
 }
+
+#[test]
+fn test_verify_and_promotion_receipt_evidence_closure() {
+    let root = test_temp_path("taxis_verify_promo_closure");
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).expect("create root");
+    let taxis_bin = env!("CARGO_BIN_EXE_taxis");
+
+    let init_out = std::process::Command::new(taxis_bin)
+        .args(["init", "--dev", "--workspace"])
+        .arg(&root)
+        .output()
+        .expect("run taxis init");
+    assert!(init_out.status.success(), "taxis init failed");
+
+    let src_file = root.join("clean_mod.rs");
+    fs::write(
+        &src_file,
+        "pub fn double_val(x: u32) -> u32 {\n    x * 2\n}\n#[test]\nfn t() {\n    assert_eq!(double_val(3), 6);\n}\n",
+    )
+    .expect("write clean_mod.rs");
+
+    let git_dir = root.join(".taxis");
+    let candidate_oid = "1111111111111111111111111111111111111111";
+
+    // 1. Bare high-score promotion without receipt or --cai/--ci-lower must be blocked
+    let unverified_promo = std::process::Command::new(taxis_bin)
+        .args([
+            "promotion",
+            "request",
+            "--git-dir",
+            &git_dir.to_string_lossy(),
+            "--candidate",
+            candidate_oid,
+            "--score",
+            "95.0",
+        ])
+        .output()
+        .expect("run unverified promotion");
+    assert!(
+        !unverified_promo.status.success(),
+        "unverified high-score promotion without receipt or attested envelope must fail"
+    );
+
+    // 2. Run `taxis verify` on real workspace file -> produces signed `.taxis/verify-receipt.json`
+    let verify_out = std::process::Command::new(taxis_bin)
+        .args([
+            "verify",
+            "--git-dir",
+            &git_dir.to_string_lossy(),
+            "--file",
+            &src_file.to_string_lossy(),
+        ])
+        .output()
+        .expect("run taxis verify");
+    assert!(verify_out.status.success(), "taxis verify should pass on clean_mod.rs");
+    let receipt_path = git_dir.join("verify-receipt.json");
+    assert!(receipt_path.is_file(), "verify-receipt.json must be written to .taxis/");
+
+    // 3. Promotion using verified receipt succeeds
+    let verified_promo = std::process::Command::new(taxis_bin)
+        .args([
+            "promotion",
+            "request",
+            "--git-dir",
+            &git_dir.to_string_lossy(),
+            "--candidate",
+            candidate_oid,
+            "--receipt",
+            &receipt_path.to_string_lossy(),
+        ])
+        .output()
+        .expect("run verified promotion");
+    assert!(
+        verified_promo.status.success(),
+        "promotion backed by valid verify-receipt.json must succeed: {}",
+        String::from_utf8_lossy(&verified_promo.stderr)
+    );
+
+    // 4. Tampering with receipt_digest causes promotion to fail closed
+    let mut receipt_json: serde_json::Value =
+        serde_json::from_slice(&fs::read(&receipt_path).unwrap()).unwrap();
+    receipt_json["receipt_digest"] = serde_json::Value::String("0000bad0digest".into());
+    let tampered_path = git_dir.join("tampered-receipt.json");
+    fs::write(&tampered_path, serde_json::to_vec(&receipt_json).unwrap()).unwrap();
+
+    let tampered_promo = std::process::Command::new(taxis_bin)
+        .args([
+            "promotion",
+            "request",
+            "--git-dir",
+            &git_dir.to_string_lossy(),
+            "--candidate",
+            candidate_oid,
+            "--receipt",
+            &tampered_path.to_string_lossy(),
+        ])
+        .output()
+        .expect("run tampered promotion");
+    assert!(
+        !tampered_promo.status.success(),
+        "tampered receipt must be rejected by promotion gate"
+    );
+
+    let _ = fs::remove_dir_all(&root);
+}

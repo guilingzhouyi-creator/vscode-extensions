@@ -105,6 +105,7 @@ function computeBayesianAutonomyConfidence(
     effectiveLoc: number,
     totalFiles: number,
     totalScopedCalls: number,
+    totalRuleObservations = 0,
 ): AutonomyConfidence {
     const locSufficiency = 1.0 - Math.exp(-effectiveLoc / SCALE_LOC_EXPONENT);
     const fileSufficiency = 1.0 - Math.exp(-totalFiles / SCALE_FILE_EXPONENT);
@@ -117,7 +118,11 @@ function computeBayesianAutonomyConfidence(
 
     const effectiveSampleSize = Math.max(
         MIN_EFFECTIVE_SAMPLE_SIZE,
-        Math.round(effectiveLoc / PERCENT_FACTOR + totalScopedCalls),
+        totalRuleObservations > 0
+            ? totalRuleObservations
+            : totalScopedCalls > 0
+                ? totalScopedCalls
+                : Math.min(totalFiles, 100),
     );
     const pObserved = Math.max(0.0, Math.min(1.0, compositeScore / PERCENT_FACTOR));
 
@@ -644,11 +649,13 @@ function synthesizeAutonomyEvaluation(
     const { grade, description } = resolveAutonomyGrade(boundedComposite);
 
     // Rigorous Bayesian Credible Interval via Jeffreys conjugate prior
+    const totalRuleObservations = totalScopedCalls + issues.length;
     const confidence = computeBayesianAutonomyConfidence(
         boundedComposite,
         state.proprietaryEffectiveLoc,
         totalFiles,
         totalScopedCalls,
+        totalRuleObservations,
     );
 
     const externalSdkInventory: ExternalSdkUsage[] = Array.from(state.sdkCallCounts.entries())

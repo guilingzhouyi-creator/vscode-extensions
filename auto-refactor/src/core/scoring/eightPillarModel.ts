@@ -85,7 +85,7 @@ export const DIMENSION_TO_PILLAR_MAP: Record<QualityDimension, PrimaryQualityPil
     standardization: PILLAR_EXTENSIBILITY,
     commentQuality: PILLAR_EXTENSIBILITY,
     duplication: PILLAR_EXTENSIBILITY,
-    modernity: PILLAR_EXTENSIBILITY,
+    modernity: PILLAR_TESTING,
 };
 
 /**
@@ -156,7 +156,7 @@ export function synthesizeEightPillars(
         architecture: [indices.architectureConsistency],
         maintainability: [indices.maintainability],
         performance: [indices.performanceEfficiency],
-        data: [dataScoreOverride ?? indices.duplication, indices.semanticPurity],
+        data: [dataScoreOverride ?? indices.semanticPurity, indices.semanticPurity],
         testing: [testingScoreOverride ?? indices.modernity],
         reliability: [indices.semanticPurity, indices.techDebtRisk],
         security: [indices.codeSecurity],

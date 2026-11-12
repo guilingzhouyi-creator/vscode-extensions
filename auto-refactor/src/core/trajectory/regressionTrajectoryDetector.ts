@@ -14,11 +14,48 @@
 import type { Issue } from '../types';
 import type { FileRevision, TrajectoryComparison } from './types';
 import { scoreDelta } from '../scoring/scorer-formulas';
+import { sha256Hex } from '../cache-key';
+
+const QUALITY_COLLAPSE_THRESHOLD = -10.0;
 
 /**
  * Detector that identifies regressive oscillation and anti-pattern re-emergence in trajectories.
  */
 export class RegressionTrajectoryDetector {
+    private static issueSeq = 1;
+
+    /**
+     * Builds a deterministic FileRevision record from raw file content.
+     */
+    public static createContentRevision(params: {
+        revisionId: string;
+        content: string;
+        timestamp: number;
+        agentUid?: string;
+        compositeScore?: number;
+        ruleHitIds?: string[];
+    }): FileRevision {
+        const digest = sha256Hex(params.content);
+        const normalizedAst = sha256Hex(
+            params.content
+                .split('\n')
+                .map((line) => line.trim())
+                .filter((line) => line.length > 0 && !line.startsWith('//'))
+                .join('\n'),
+        );
+        return {
+            revisionId: params.revisionId,
+            timestamp: params.timestamp,
+            agentUid: params.agentUid ?? 'codemod-fix',
+            fileHash: digest,
+            astDigest: normalizedAst,
+            qualityScore: {
+                compositeScore: params.compositeScore ?? Number.NaN,
+                indices: {} as FileRevision['qualityScore']['indices'],
+            } as FileRevision['qualityScore'],
+            ruleHitIds: params.ruleHitIds ?? [],
+        };
+    }
     /**
      * Inspect a sequence of revisions for cyclic regressions or flip-flop reversions.
      *
@@ -190,7 +227,7 @@ export class RegressionTrajectoryDetector {
         if (delta === null) {
             return undefined;
         }
-        if (delta <= -12.0) {
+        if (delta <= QUALITY_COLLAPSE_THRESHOLD) {
             return this.createRegressionIssue(
                 filePath,
                 1,
@@ -206,9 +243,9 @@ export class RegressionTrajectoryDetector {
      * Create a standard GOV-TRJ-001 Issue object.
      */
     private createRegressionIssue(filePath: string, line: number, message: string): Issue {
-        const randomSuffix = Math.random().toString(36).slice(2, 6);
+        const seqSuffix = String(RegressionTrajectoryDetector.issueSeq++).padStart(4, '0');
         return {
-            id: `gov-trj-${Date.now()}-${randomSuffix}`,
+            id: `gov-trj-${Date.now()}-${seqSuffix}`,
             rule: 'GOV-TRJ-001',
             severity: 'error',
             analyzer: 'governance',

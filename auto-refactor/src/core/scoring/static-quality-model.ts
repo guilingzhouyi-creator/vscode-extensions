@@ -2,14 +2,14 @@
  * Module: Core Scoring — Static Analysis Plane Quality Model & Confidence Quantification
  * File Path: src/core/scoring/static-quality-model.ts
  * Architecture Role: Single source of truth for the Static Analysis Plane (SAP) mathematical
- *   model; formalizes the 7-dimensional static quality vector Q_s = (A, M, P, D, T, R, E),
+ *   model; formalizes the 8-dimensional static quality vector Q_s = (A, M, P, D, T, R, S, E),
  *   static risk confidence formulation S_i = P_i * C_i * I_i, vector space deltas, and
  *   inter-plane projection from fine-grained 10-dimension indicators.
  * Dependencies & Triggers: Consumes Issue and IssueReach from ../types and riskWeightModel,
  *   QualityDimension from ./scoringTypes; consumed by hierarchicalScorer, patchQuality,
  *   and feedback fusion engine.
  * Responsibilities:
- *   1. Define StaticQualityAxis and StaticQualityVector Q_s = (A, M, P, D, T, R, E).
+ *   1. Define StaticQualityAxis and StaticQualityVector Q_s = (A, M, P, D, T, R, S, E).
  *   2. Synthesize Q_s from fine-grained dimension indices with optional domain overrides.
  *   3. Calculate static issue risk S_i = P_i * C_i * I_i with reach-aware blast radius.
  *   4. Compute vector deltas, Euclidean distances, and cosine similarities between revisions.
@@ -289,12 +289,12 @@ export function computeStaticIssueRisk(
 }
 
 /**
- * Synthesizes the 7-dimensional Static Quality Vector Q_s = (A, M, P, D, T, R, E)
+ * Synthesizes the 8-dimensional Static Quality Vector Q_s = (A, M, P, D, T, R, S, E)
  * from the fine-grained 10-dimension index map.
  *
  * @param indices - Fine-grained 10-dimension quality indices [0.0, 100.0].
  * @param overrides - Optional direct overrides for specific axes.
- * @returns Normalized 7-dimensional StaticQualityVector.
+ * @returns Normalized 8-dimensional StaticQualityVector.
  */
 export function synthesizeStaticQualityVector(
     indices: Record<QualityDimension, number>,
@@ -345,7 +345,7 @@ export function synthesizeStaticQualityVector(
 /**
  * Computes the scalar static composite quality score Q_s_total from a StaticQualityVector.
  *
- * @param vector - 7-dimensional StaticQualityVector.
+ * @param vector - 8-dimensional StaticQualityVector.
  * @param weights - Optional customized axis weights.
  * @returns Weighted static score [0.0, 100.0].
  */

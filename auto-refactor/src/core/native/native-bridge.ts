@@ -83,7 +83,8 @@ const DEFAULT_MINHASH_PERMUTATIONS = 64;
 const KIB_FACTOR = 1024;
 const LARGE_DIFF_KIB = 4;
 const LARGE_DIFF_BYTES_THRESHOLD = LARGE_DIFF_KIB * KIB_FACTOR;
-const LARGE_GRAPH_EDGES_THRESHOLD = 128;
+const LARGE_GRAPH_EDGES_THRESHOLD = 10000;
+const LARGE_MASK_COMPACT_BYTES_THRESHOLD = 512 * KIB_FACTOR;
 const MIN_NATIVE_TRIGRAM_TOKEN_COUNT = 500;
 
 const NATIVE_BINDING_PATH = '../../../crates/auto-refactor-core/index.node';
@@ -706,7 +707,7 @@ function assembleCloneOps(
         },
         maskSourceCodeCompact: (content: string, config: NativeMaskConfig) => {
             if (
-                content.length < LARGE_DIFF_BYTES_THRESHOLD ||
+                content.length < LARGE_MASK_COMPACT_BYTES_THRESHOLD ||
                 typeof binding.maskSourceCodeCompact !== 'function'
             ) {
                 return jsShim.maskSourceCodeCompact(content, config);
@@ -911,11 +912,22 @@ function loadNativeBindingModule(): RawNativeBinding | null {
             rejectedBindingReason = `addon version mismatch: expected 0.4.0*, got ${declaredVersion}`;
             return null;
         }
+        loadedRawBinding = binding;
         return binding;
     } catch (err) {
         rejectedBindingReason = `addon failed to load: ${(err as Error).message}`;
     }
     return null;
+}
+
+let loadedRawBinding: RawNativeBinding | null = null;
+
+/**
+ * Exposes the raw underlying compiled native binding for differential parity testing and diagnosis.
+ * Returns null when the compiled addon is not loaded.
+ */
+export function getRawNativeBinding(): RawNativeBinding | null {
+    return loadedRawBinding;
 }
 
 function probeNativeBinding(): INativeCore | null {

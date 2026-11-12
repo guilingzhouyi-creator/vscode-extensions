@@ -48,6 +48,31 @@ export interface BranchDelta {
 }
 
 /**
+ * Quarantine entry exported from LayerVFS compatible with Taxis .taxis/quarantine/ format.
+ */
+export interface QuarantineExportEntry {
+    readonly quarantineId: string;
+    readonly projectId: string;
+    readonly agentId: string;
+    readonly relPath: string;
+    readonly patchFile: string;
+    readonly reason: string;
+    readonly quarantinedAt: number;
+    readonly status: 'Isolated' | 'Restored' | 'Discarded';
+    readonly patchContent: string;
+}
+
+/**
+ * Snapshot of quarantined mutations from an isolated workspace branch.
+ */
+export interface QuarantineSnapshotExport {
+    readonly exportTimestamp: number;
+    readonly cardId: string;
+    readonly branchId: string;
+    readonly entries: readonly QuarantineExportEntry[];
+}
+
+/**
  * Options for configuring CasStore instances.
  */
 export interface CasStoreOptions {
@@ -623,6 +648,49 @@ export class CasStore {
         }
 
         return deltas.sort((deltaA, deltaB) => deltaA.path.localeCompare(deltaB.path));
+    }
+
+    /**
+     * Exports an active branch state as a quarantine snapshot conforming to .taxis/quarantine/.
+     *
+     * @param branchName - Target branch to export.
+     * @param reason - Reason for quarantine isolation.
+     * @returns Structured quarantine snapshot.
+     */
+    public async exportQuarantineSnapshot(
+        branchName: string,
+        reason = 'Isolated LayerVFS workspace violation',
+    ): Promise<QuarantineSnapshotExport> {
+        const branch = this.getBranchOrThrow(branchName);
+        const cardContext = branch.cardContext;
+        const now = Date.now();
+        const nowSec = Math.floor(now / 1000);
+        const entries: QuarantineExportEntry[] = [];
+
+        let index = 1;
+        for (const [relPath] of branch.entries.entries()) {
+            const fileObj = await this.getFile(branchName, relPath);
+            const contentStr = fileObj ? Buffer.from(fileObj.content).toString('utf8') : '';
+            const quarantineId = `quar-${nowSec}-${index++}`;
+            entries.push({
+                quarantineId,
+                projectId: cardContext?.cellId ?? 'default',
+                agentId: cardContext?.agentUid ?? 'agent',
+                relPath,
+                patchFile: `${quarantineId}.patch`,
+                reason,
+                quarantinedAt: nowSec,
+                status: 'Isolated',
+                patchContent: contentStr,
+            });
+        }
+
+        return {
+            exportTimestamp: now,
+            cardId: cardContext?.cardId ?? branchName,
+            branchId: branchName,
+            entries,
+        };
     }
 
     /**

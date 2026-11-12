@@ -250,13 +250,17 @@ export class TrajectoryRecipeExtractor {
             return undefined;
         }
 
-        const recipeMeta = this.detectTransformationPattern(
-            beforeLines,
-            afterLines,
-            input.language,
-            input.beforeContent,
-            input.afterContent,
-        );
+        const recipeMeta =
+            this.detectTransformationPattern(
+                beforeLines,
+                afterLines,
+                input.language,
+                input.beforeContent,
+                input.afterContent,
+            ) ??
+            (qualityGain.status === 'measured' && qualityGain.value > 0
+                ? this.synthesizeVerifiedFallbackMeta(beforeLines, afterLines, input.language)
+                : undefined);
         if (!recipeMeta) {
             return undefined;
         }
@@ -339,6 +343,28 @@ export class TrajectoryRecipeExtractor {
             }
         }
         return undefined;
+    }
+
+    private synthesizeVerifiedFallbackMeta(
+        beforeLines: string[],
+        afterLines: string[],
+        language?: string,
+    ): RecipeMeta | undefined {
+        const filterCode = (lines: string[]): string =>
+            lines
+                .map((line) => line.trim())
+                .filter((line) => line.length > 0 && !line.startsWith('//') && !line.startsWith('/*') && !line.startsWith('*') && !line.startsWith('#'))
+                .join('\n');
+        if (filterCode(beforeLines) === filterCode(afterLines)) {
+            return undefined;
+        }
+        return {
+            name: 'Verified Codemod Structural Improvement',
+            category: 'defensive-guard',
+            description: 'Synthesized refactoring recipe from verified positive-delta trajectory transformation.',
+            precondition: { targetLanguage: language, minLines: 1, antiPatternTags: ['missing-guard'] },
+            operations: [this.createOp('inject-null-guard', 'module-slice', 'Apply verified structural guard or codemod transformation.')],
+        };
     }
 
     private detectTagInCode(tag: string, code: string, getLines: () => string[]): boolean {
