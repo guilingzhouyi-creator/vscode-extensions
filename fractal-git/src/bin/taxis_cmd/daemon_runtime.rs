@@ -43,7 +43,7 @@ impl DaemonHotSession {
     pub fn open(git_dir: &Path) -> Self {
         let container_doc = RepoDocument::load(&fg_native::container_path(git_dir)).ok();
         let mut index_tree = InMemoryIndexTree::new();
-        if let Ok(git_idx) = GitIndex::load(&git_dir.join("index")) {
+        if let Ok(git_idx) = GitIndex::load(git_dir.join("index")) {
             for entry in git_idx.entries() {
                 let _ = index_tree.stage_oid(&entry.path, entry.mode, entry.oid);
             }
@@ -62,6 +62,18 @@ impl DaemonHotSession {
         }
     }
 
+    /// Returns the monotonic generation counter of the in-memory session cache.
+    #[must_use]
+    pub const fn cache_generation(&self) -> u64 {
+        self.cache_generation
+    }
+
+    /// Returns the total number of IPC requests processed by this warm session.
+    #[must_use]
+    pub const fn request_count(&self) -> u64 {
+        self.request_count
+    }
+
     /// Returns the number of resolved entries currently held in the hot index tree.
     #[must_use]
     pub fn entry_count(&self) -> usize {
@@ -72,7 +84,7 @@ impl DaemonHotSession {
     #[must_use]
     pub fn execute(&mut self, message: &IpcMessage) -> IpcDaemonReceipt {
         let started = Instant::now();
-        let cache_hit = self.request_count > 0;
+        let cache_hit = self.request_count() > 0;
         self.request_count += 1;
         let outcome = match message {
             IpcMessage::Ping { timestamp_ms } => Ok(empty_receipt(
@@ -116,7 +128,7 @@ impl DaemonHotSession {
                 "Unsupported daemon IPC command".to_owned(),
             )),
         };
-        finalize_receipt(outcome, started, self.cache_generation, cache_hit)
+        finalize_receipt(outcome, started, self.cache_generation(), cache_hit)
     }
 
     fn exec_status(&self, scope_prefix: Option<&str>) -> IpcDaemonReceipt {
