@@ -83,7 +83,9 @@ export class SemanticAdapterRegistry {
             version: adapter.version ?? null,
             fileExtensions: Object.freeze([...adapter.fileExtensions]),
             graphExtraction: adapter.graphExtraction,
-            supportsSlice: false,
+            supportsSlice: Boolean(
+                (adapter as unknown as { supportsSlice?: boolean }).supportsSlice,
+            ) as false,
         });
     }
 
