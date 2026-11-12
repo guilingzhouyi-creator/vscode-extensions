@@ -12,7 +12,7 @@
  */
 
 import type { PraxisCardContext } from '../contracts';
-import type { BranchDelta, CasStore } from './cas-store';
+import type { BranchDelta, CasStore, QuarantineSnapshotExport } from './cas-store';
 import type { FileEditOp, VfsFileEntry, WorkspaceHandle, WorkspaceSnapshot } from './vfs-contracts';
 
 /**
@@ -35,6 +35,10 @@ export interface LayerVFSWorkspace {
     rollback(targetSnapshotId?: string): Promise<boolean>;
     discard(): boolean;
     diff(): BranchDelta[];
+    exportQuarantineSnapshot(
+        reason?: string,
+        quarantineDir?: string,
+    ): Promise<QuarantineSnapshotExport>;
 }
 
 /**
@@ -55,6 +59,11 @@ export interface ManagedWorkspaceRecord {
 export interface WorkspaceDiscardDelegate {
     getStore(): CasStore;
     discardWorkspace(branchId: string): boolean;
+    exportQuarantineSnapshot(
+        branchId: string,
+        reason?: string,
+        quarantineDir?: string,
+    ): Promise<QuarantineSnapshotExport>;
 }
 
 /**
@@ -150,5 +159,16 @@ export class ManagedWorkspace implements LayerVFSWorkspace {
         return this.delegate
             .getStore()
             .diffBranches(this.record.baseBranch, this.record.handle.branchId);
+    }
+
+    public async exportQuarantineSnapshot(
+        reason?: string,
+        quarantineDir?: string,
+    ): Promise<QuarantineSnapshotExport> {
+        return this.delegate.exportQuarantineSnapshot(
+            this.record.handle.branchId,
+            reason,
+            quarantineDir,
+        );
     }
 }

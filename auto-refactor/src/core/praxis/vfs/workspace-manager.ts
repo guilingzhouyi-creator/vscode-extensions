@@ -15,12 +15,12 @@
  */
 
 import type { PraxisCardContext } from '../contracts';
-import type { CasStoreOptions } from './cas-store';
+import type { CasStoreOptions, QuarantineSnapshotExport } from './cas-store';
 import { CasStore } from './cas-store';
 import type { LayerVFSWorkspace, ManagedWorkspaceRecord } from './managed-workspace';
 import { ManagedWorkspace } from './managed-workspace';
 
-export type { LayerVFSWorkspace, ManagedWorkspaceRecord };
+export type { LayerVFSWorkspace, ManagedWorkspaceRecord, QuarantineSnapshotExport };
 
 /**
  * Options for configuring the WorkspaceManager.
@@ -35,6 +35,7 @@ export interface WorkspaceManagerOptions {
  * Multi-Agent Workspace Router and Sandbox Manager for LayerVFS.
  */
 export class WorkspaceManager {
+    private static monotonicSeq = 0;
     private readonly store: CasStore;
     private readonly defaultBase: string;
     private readonly activeWorkspaces = new Map<string, ManagedWorkspaceRecord>();
@@ -64,7 +65,8 @@ export class WorkspaceManager {
         baseBranch?: string,
     ): Promise<LayerVFSWorkspace> {
         const base = baseBranch ?? this.defaultBase;
-        const branchId = `ws_${cardContext.cardId}_${Date.now()}`;
+        const seq = ++WorkspaceManager.monotonicSeq;
+        const branchId = `ws_${cardContext.cardId}_${Date.now()}_${seq}`;
 
         // Commit base state if never snapshotted, establishing immutable baseline
         let baselineSnapshotId: string | undefined;
@@ -147,6 +149,83 @@ export class WorkspaceManager {
         }
 
         return this.store.discardBranch(branchId);
+    }
+
+    /**
+     * Exports and optionally persists a quarantine snapshot of a workspace into .taxis/quarantine format.
+     *
+     * @param workspaceId - Branch ID or task card ID.
+     * @param reason - Reason for quarantine isolation.
+     * @param quarantineDir - Optional filesystem destination to write patch files and quarantine_registry.json.
+     */
+    public async exportQuarantineSnapshot(
+        workspaceId: string,
+        reason?: string,
+        quarantineDir?: string,
+    ): Promise<QuarantineSnapshotExport> {
+        let branchId = workspaceId;
+        const record = this.activeWorkspaces.get(workspaceId);
+        if (!record) {
+            const mapped = this.cardToBranchIndex.get(workspaceId);
+            if (mapped) {
+                branchId = mapped;
+            } else {
+                throw new Error(`Workspace '${workspaceId}' not found in WorkspaceManager`);
+            }
+        }
+
+        const exportData = await this.store.exportQuarantineSnapshot(branchId, reason);
+
+        if (quarantineDir) {
+            await this.flushQuarantineToDisk(quarantineDir, exportData);
+        }
+
+        return exportData;
+    }
+
+    private async flushQuarantineToDisk(
+        quarantineDir: string,
+        exportData: QuarantineSnapshotExport,
+    ): Promise<void> {
+        const fs = await import('node:fs');
+        const path = await import('node:path');
+        await fs.promises.mkdir(quarantineDir, { recursive: true });
+
+        const registryPath = path.join(quarantineDir, 'quarantine_registry.json');
+        let records: Array<Record<string, unknown>> = [];
+        if (fs.existsSync(registryPath)) {
+            try {
+                const existing = JSON.parse(await fs.promises.readFile(registryPath, 'utf8'));
+                if (Array.isArray(existing.records)) {
+                    records = existing.records;
+                }
+            } catch {
+                records = [];
+            }
+        }
+
+        for (const entry of exportData.entries) {
+            const patchPath = path.join(quarantineDir, entry.patchFile);
+            await fs.promises.writeFile(patchPath, entry.patchContent, 'utf8');
+
+            const rec = {
+                quarantine_id: entry.quarantineId,
+                project_id: entry.projectId,
+                agent_id: entry.agentId,
+                rel_path: entry.relPath,
+                patch_file: entry.patchFile,
+                reason: entry.reason,
+                quarantined_at: entry.quarantinedAt,
+                status: entry.status,
+            };
+            records.push(rec);
+        }
+
+        await fs.promises.writeFile(
+            registryPath,
+            JSON.stringify({ records }, null, 2),
+            'utf8',
+        );
     }
 
     /**
