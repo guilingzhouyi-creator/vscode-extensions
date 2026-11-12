@@ -100,6 +100,7 @@ const TestResourceLifecycleGovernance = preload("res://tests/unit/infrastructure
 const TestBoundedCacheAndIdempotency = preload("res://tests/unit/infrastructure/test_bounded_cache_and_idempotency.gd")
 const TestBackendRobustnessGuard = preload("res://tests/guards/test_backend_robustness_guard.gd")
 const TestUnifiedLoggerService = preload("res://tests/unit/infrastructure/test_unified_logger_service.gd")
+const TestLogCryptoAndBaseMessages = preload("res://tests/unit/infrastructure/test_log_crypto_and_base_messages.gd")
 # EventBus 2.0 空间分发与零GC流水线
 const TestEventBus2ZeroGCPipeline = preload("res://tests/integration/pipelines/test_event_bus2_zero_gc_pipeline.gd")
 # 用户会话生命周期与主页HUD双轨同步流水线
@@ -235,7 +236,7 @@ static func get_all_test_classes() -> Array:
 		TestPerformanceAndScalabilityPipeline, TestCombatDualRandomAndTimelinePipeline, TestLogErrorBasePipeline,
 		TestStructuredLogPipeline,
 		TestSaveDomainContracts, TestSaveMigrationEngine, TestEditorHotReload, TestSaveConsistencyRecovery,
-		TestResourceLifecycleGovernance, TestBoundedCacheAndIdempotency, TestBackendRobustnessGuard, TestUnifiedLoggerService,
+		TestResourceLifecycleGovernance, TestBoundedCacheAndIdempotency, TestBackendRobustnessGuard, TestUnifiedLoggerService, TestLogCryptoAndBaseMessages,
 		TestEventBus2ZeroGCPipeline,
 		TestSessionLifecycleAndHudSyncPipeline,
 		TestVersionGovernancePipeline,
@@ -270,7 +271,7 @@ static func get_all_test_classes() -> Array:
 		TestClientProtocolSpaceAndBoundaryPipeline
 	]
 
-## 前端测试套件（17 大系统 + 6 前端基建与边界套件 = 23；全域 115 后端与横切 + 23 前端 = 138 套件）
+## 前端测试套件（17 大系统 + 6 前端基建与边界套件 = 23；全域 116 后端与横切 + 23 前端 = 139 套件）
 static func get_frontend_test_classes() -> Array:
 	return [
 		TestFE01AccountEntry, TestFE02MainHUD, TestFE03CharacterProgression,
@@ -284,7 +285,7 @@ static func get_frontend_test_classes() -> Array:
 		TestFrontendRobustness, TestFrontendErrorDomain
 	]
 
-## 全域测试套件（后端业务域 + 横切基础设施 + 前端 23 = 全域共 138 套件）
+## 全域测试套件（后端业务域 + 横切基础设施 + 前端 23 = 全域共 139 套件）
 static func get_all_engine_test_classes() -> Array:
 	var list := get_all_test_classes()
 	list.append_array(get_frontend_test_classes())

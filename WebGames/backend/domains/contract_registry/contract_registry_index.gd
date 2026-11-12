@@ -12,6 +12,7 @@ class_name ContractRegistryIndex
 extends RefCounted
 
 const EntryClass = preload("res://backend/domains/contract_registry/contract_registry_entry.gd")
+const SystemBaseMessages = preload("res://backend/infrastructure/logging/system_base_messages.gd")
 
 const DOMAIN_NAME: String = "contract_registry_index"
 
@@ -52,12 +53,12 @@ static func ensure_loaded() -> void:
 func _read_config_file_text() -> String:
 	var path := CONTRACT_CONFIG_PATH_PRIMARY
 	if not FileAccess.file_exists(path):
-		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_FILE_NOT_FOUND", TemplateFormatter.format("ContractRegistryIndex: config file not found: {path}", {"path": path}))
+		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_FILE_NOT_FOUND", SystemBaseMessages.format(SystemBaseMessages.MSG_CONTRACT_CONFIG_NOT_FOUND, {"path": path}))
 		return ""
 
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
-		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_FILE_READ_FAIL", TemplateFormatter.format("ContractRegistryIndex: failed to read config file: {path}", {"path": path}))
+		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_FILE_READ_FAIL", SystemBaseMessages.format(SystemBaseMessages.MSG_CONTRACT_CONFIG_READ_FAIL, {"path": path}))
 		return ""
 
 	var text := file.get_as_text()
@@ -69,12 +70,12 @@ func _parse_json_dict(text: String) -> Dictionary:
 	var json := JSON.new()
 	var err := json.parse(text)
 	if err != OK:
-		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_JSON_PARSE_FAIL", TemplateFormatter.format("ContractRegistryIndex: JSON parse failed: {error}", {"error": json.get_error_message()}))
+		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_JSON_PARSE_FAIL", SystemBaseMessages.format(SystemBaseMessages.MSG_CONTRACT_JSON_PARSE_FAIL, {"error": json.get_error_message()}))
 		return {}
 
 	var data = json.get_data()
 	if not (data is Dictionary):
-		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_ROOT_NOT_DICT", "ContractRegistryIndex: config root must be a Dictionary object.")
+		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_ROOT_NOT_DICT", SystemBaseMessages.MSG_CONTRACT_ROOT_NOT_DICT)
 		return {}
 
 	return data as Dictionary
@@ -83,7 +84,7 @@ func _parse_json_dict(text: String) -> Dictionary:
 func _unpack_registry_sections(dict: Dictionary) -> bool:
 	_schema_version = int(dict.get("$schema_version", 0))
 	if _schema_version != SUPPORTED_SCHEMA_VERSION:
-		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_SCHEMA_UNSUPPORTED", TemplateFormatter.format("ContractRegistryIndex: unsupported schema_version {version} (expected {expected})", {"version": _schema_version, "expected": SUPPORTED_SCHEMA_VERSION}))
+		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_SCHEMA_UNSUPPORTED", SystemBaseMessages.format(SystemBaseMessages.MSG_CONTRACT_SCHEMA_UNSUPPORTED, {"version": _schema_version, "expected": SUPPORTED_SCHEMA_VERSION}))
 		return false
 
 	var raw_infra = dict.get("infra_domains", [])
@@ -94,7 +95,7 @@ func _unpack_registry_sections(dict: Dictionary) -> bool:
 	var vres := validate_config(dict)
 	if not bool(vres.get("valid", false)):
 		var errs: Array = vres.get("errors", [])
-		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_VALIDATION_FAILED", TemplateFormatter.format("ContractRegistryIndex: contract structure validation failed: {errors}", {"errors": "; ".join(errs)}))
+		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_VALIDATION_FAILED", SystemBaseMessages.format(SystemBaseMessages.MSG_CONTRACT_VALIDATION_FAILED, {"errors": "; ".join(errs)}))
 		return false
 
 	var raw_entries = dict.get("entries", [])

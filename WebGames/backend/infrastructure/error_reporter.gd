@@ -10,6 +10,9 @@
 ## ErrorReporter：Error Code Registry / Reporter
 class_name ErrorReporter extends RefCounted
 
+const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
+const StatisticsMathLib = preload("res://backend/infrastructure/pure/statistics_math_lib.gd")
+
 # ==============================================================================
 # 一、统一错误上报入口
 # ==============================================================================
@@ -29,7 +32,7 @@ static func emit_error(
 	if entry == null:
 		# 未登记错误码：回退 ERR_UNKNOWN 并遥测计数；message 回退调用方文本，空则保留原始码本体
 		ErrorCodeRegistry.report_unregistered(error_code)
-		final_code = "ERR_UNKNOWN"
+		final_code = LogConstants.ERR_CODE_UNKNOWN
 		if final_message.is_empty():
 			final_message = error_code
 	else:
@@ -37,17 +40,17 @@ static func emit_error(
 		final_message = _resolve_message(final_code, message)
 
 	var record := LogRecordDTO.new()
-	record.level = entry.severity if entry != null else "error"
+	record.level = entry.severity if entry != null else LogConstants.LEVEL_LOWER_ERROR
 	record.channel = channel
 	record.error_code = final_code
-	record.message = final_message
+	record.message = StatisticsMathLib.scrub_inline_secrets(final_message)
 	# 所有权隔离 + 构造期脱敏（· Inv-LS-2 安全红线）：
 	# 保留动态诊断信息与未登记码本体至 context，避免静态模板抹杀排查线索
 	var final_context := context.duplicate(true)
 	if not message.is_empty() and final_message != message:
-		final_context["diagnostic_detail"] = message
-	if entry == null and error_code != "ERR_UNKNOWN":
-		final_context["unregistered_error_code"] = error_code
+		final_context[LogConstants.KEY_DIAGNOSTIC_DETAIL] = message
+	if entry == null and error_code != LogConstants.ERR_CODE_UNKNOWN:
+		final_context[LogConstants.KEY_UNREGISTERED_CODE] = error_code
 	var redacted := RedactionRule.apply(final_context)
 	record.context = redacted["dict"]
 
@@ -66,7 +69,7 @@ static func _resolve_message(error_code: String, fallback: String) -> String:
 		if not hit.is_empty():
 			return hit
 	# 兼容直查：按 error_code 本体查 narratives.errors 表
-	var direct := GameConfig.get_string("narratives.errors", error_code, "")
+	var direct := GameConfig.get_string(LogConstants.CFG_NARRATIVES_ERRORS, error_code, "")
 	if not direct.is_empty():
 		return direct
 	if not fallback.is_empty():
@@ -78,18 +81,18 @@ static func _resolve_message(error_code: String, fallback: String) -> String:
 static func _resolve_message_key(message_key: String) -> String:
 	var parts := message_key.split("/")
 	if parts.size() >= 2:
-		var table := "narratives." + parts[0]
+		var table := LogConstants.CFG_NARRATIVES_PREFIX + parts[0]
 		var path := "/".join(parts.slice(1))
 		return GameConfig.get_string(table, path, "")
-	return GameConfig.get_string("narratives.errors", message_key, "")
+	return GameConfig.get_string(LogConstants.CFG_NARRATIVES_ERRORS, message_key, "")
 
 ## 存量 push_error / push_warning 零阻断收敛包装：保持原调用点失败关闭语义，仅收敛通道
 static func migrate_push_error(channel: String, msg: String) -> void:
-	emit_error(channel, "ERR_UNKNOWN", msg, {})
+	emit_error(channel, LogConstants.ERR_CODE_UNKNOWN, msg, {})
 
 ## 便捷错误/告警广播入口（默认通道 infrastructure）
 static func emit(error_code: String, context: Dictionary = {}, message: String = "") -> void:
-	emit_error("infrastructure", error_code, message, context)
+	emit_error(LogConstants.CHANNEL_INFRASTRUCTURE, error_code, message, context)
 
 ## 便捷告警入口（facade: 严重度由 errors_catalog.json 中登记的 warn 级错误码决定）
 static func emit_warning(channel: String, error_code: String, message: String = "", context: Dictionary = {}) -> void:

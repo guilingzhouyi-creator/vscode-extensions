@@ -11,6 +11,8 @@
 class_name GameConfig extends RefCounted
 
 const ConfigRouterEngine = preload("res://backend/infrastructure/config_router_engine.gd")
+const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
+const SystemBaseMessages = preload("res://backend/infrastructure/logging/system_base_messages.gd")
 
 # ==============================================================================
 # 一、常量与状态
@@ -155,7 +157,7 @@ static func _validate_required_tables() -> void:
 		if not _tables.has(table_name):
 			missing.append(table_name)
 	if not missing.is_empty():
-		ErrorReporter.emit_error("game_config", "REQUIRED_TABLE_MISSING", TemplateFormatter.format("GameConfig: required config tables missing: {tables}", {"tables": ", ".join(missing)}))
+		ErrorReporter.emit_error(LogConstants.CHANNEL_GAME_CONFIG, "REQUIRED_TABLE_MISSING", SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_REQUIRED_MISSING, {"tables": ", ".join(missing)}))
 
 ## 获取统一资源目录实例（动态解耦，杜绝跨层静态强引用）
 static func _get_catalog() -> Variant:
@@ -579,7 +581,7 @@ static func _split_path(path: String) -> PackedStringArray:
 static func _scan_dir(dir_path: String, table_prefix: String) -> void:
 	var dir := DirAccess.open(dir_path)
 	if dir == null:
-		push_warning(TemplateFormatter.format("GameConfig: configuration directory does not exist: {path}", {"path": dir_path}))
+		push_warning(SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_DIR_MISSING, {"path": dir_path}))
 		return
 	var scanned_tables: Dictionary = {}
 	# 优先加载高纯度二进制 .kdat
@@ -608,16 +610,16 @@ static func _load_table(file_path: String, table_name: String) -> void:
 		if kdat_data != null and (kdat_data is Dictionary):
 			_tables[table_name] = kdat_data
 			return
-		_scan_failures.append(TemplateFormatter.format("{path}: .kdat parse or validation failed", {"path": file_path}))
-		push_warning(TemplateFormatter.format("GameConfig: .kdat parse or validation failed [{path}]", {"path": file_path}))
+		_scan_failures.append(SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_KDAT_FAIL, {"path": file_path}))
+		push_warning(SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_KDAT_WARN, {"path": file_path}))
 		return
 
 	var json := JSON.new()
 	var text := FileAccess.get_file_as_string(file_path)
 	var err := json.parse(text)
 	if err != OK:
-		_scan_failures.append(TemplateFormatter.format("{path}: JSON parse failed (line {line})", {"path": file_path, "line": json.get_error_line()}))
-		push_warning(TemplateFormatter.format("GameConfig: JSON parse failed [{path}]: {error} (line {line})", {
+		_scan_failures.append(SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_JSON_FAIL, {"path": file_path, "line": json.get_error_line()}))
+		push_warning(SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_JSON_WARN, {
 			"path": file_path, "error": json.get_error_message(), "line": json.get_error_line()
 		}))
 		return
@@ -625,5 +627,5 @@ static func _load_table(file_path: String, table_name: String) -> void:
 	if data is Dictionary:
 		_tables[table_name] = data
 	else:
-		_scan_failures.append(TemplateFormatter.format("{path}: top-level must be a JSON object", {"path": file_path}))
-		push_warning(TemplateFormatter.format("GameConfig: [{path}] top-level must be a JSON object", {"path": file_path}))
+		_scan_failures.append(SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_ROOT_OBJECT, {"path": file_path}))
+		push_warning(SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_ROOT_WARN, {"path": file_path}))

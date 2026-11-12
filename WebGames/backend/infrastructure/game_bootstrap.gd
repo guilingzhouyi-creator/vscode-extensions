@@ -27,6 +27,8 @@ const AuthService = preload("res://backend/domains/account/auth_service.gd")
 const PrologueCutscenePort = preload("res://backend/domains/character_creation/prologue_cutscene_port.gd")
 const CutsceneOrchestrator = preload("res://backend/infrastructure/media/cutscene_orchestrator.gd")
 const ClientSecretVault = preload("res://backend/infrastructure/client_secret_vault.gd")
+const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
+const SystemBaseMessages = preload("res://backend/infrastructure/logging/system_base_messages.gd")
 
 static func _ensure_telemetry_pool(pool_name: String, factory: Callable) -> void:
 	ObjectPoolManager.initialize()
@@ -247,7 +249,8 @@ static func teardown() -> Dictionary:
 		"timestamp_utc": int(Time.get_unix_time_from_system()),
 		"teared_down_subsystems": teared_down
 	})
-	EventBusCore.get_instance().emit_log("info", "GameBootstrap teardown completed: global singletons and session subsystems symmetrically reset.")
+	EventBusCore.get_instance().emit_log(LogConstants.LEVEL_LOWER_INFO, SystemBaseMessages.MSG_BOOT_TEARDOWN_COMPLETED)
+	LogFileExporter.flush()
 
 	return {
 		"success": true,

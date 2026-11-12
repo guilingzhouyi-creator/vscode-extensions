@@ -59,6 +59,7 @@ const CROSS_CUTTING_SUITES: Array[String] = [
 	"res://tests/unit/infrastructure/test_bounded_cache_and_idempotency.gd",
 	"res://tests/guards/test_backend_robustness_guard.gd",
 	"res://tests/unit/infrastructure/test_unified_logger_service.gd",
+	"res://tests/unit/infrastructure/test_log_crypto_and_base_messages.gd",
 	"res://tests/integration/pipelines/test_combat_tertiary_timeline_pipeline.gd",
 	"res://tests/integration/pipelines/test_item_attribute_affix_system_pipeline.gd",
 	"res://tests/integration/pipelines/test_character_creation_and_opening_pipeline.gd",

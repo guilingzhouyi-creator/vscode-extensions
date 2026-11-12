@@ -10,6 +10,9 @@
 ## UnifiedLoggerService：Log Collector & Stream Processor
 class_name UnifiedLoggerService extends RefCounted
 
+const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
+const SystemBaseMessages = preload("res://backend/infrastructure/logging/system_base_messages.gd")
+
 # ==============================================================================
 # 一、日志等级与记录实体
 # ==============================================================================
@@ -26,6 +29,7 @@ enum Severity {
 
 ## 结构化日志记录实体
 class LogRecord extends RefCounted:
+	var sequence: int = 0
 	var event_code: String = ""
 	var domain: String = ""
 	var severity: Severity = Severity.INFO
@@ -37,6 +41,7 @@ class LogRecord extends RefCounted:
 	## 序列化为字典（遥测/导出用）
 	func to_dict() -> Dictionary:
 		return {
+			"sequence": sequence,
 			"event_code": event_code,
 			"domain": domain,
 			"severity": severity,
@@ -101,9 +106,9 @@ func load_catalog_from_dict(catalog_config: Dictionary) -> void:
 
 ## 从 GameConfig.log 统一加载英文事件码模板（配置驱动，Inv-RM-11）
 func load_from_game_config() -> void:
-	var tbl: Dictionary = GameConfig.get_dict("infrastructure.log", "unified_events", {})
+	var tbl: Dictionary = GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_UNIFIED_EVENTS, {})
 	if tbl.is_empty():
-		tbl = GameConfig.get_dict("infrastructure.log", "events", {})
+		tbl = GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_EVENTS, {})
 	for code in tbl:
 		_message_catalog[str(code)] = str(tbl[code])
 
@@ -118,8 +123,7 @@ func log_event(
 	if severity_level < _min_severity:
 		return null
 	
-	var default_template: String = "[{code}] Event occurred in domain {domain}."
-	var template: String = str(_message_catalog.get(event_code, default_template))
+	var template: String = str(_message_catalog.get(event_code, SystemBaseMessages.MSG_FALLBACK_EVENT))
 	var formatted_msg: String = _format_message(template, event_params, event_code, domain_name)
 	
 	var rec := LogRecord.new()
@@ -148,34 +152,44 @@ func try_dispatch_to_network_rpc(log_record: LogRecord) -> bool:
 ## 模板占位符格式化（统一委托底层 TemplateFormatter 执行英文占位符动态注入）
 func _format_message(template_str: String, event_params: Dictionary, event_code: String, domain_name: String) -> String:
 	var params: Dictionary = event_params.duplicate(true)
-	params["code"] = event_code
-	params["domain"] = domain_name
+	params[LogConstants.KEY_CODE] = event_code
+	params[LogConstants.KEY_DOMAIN] = domain_name
 	return TemplateFormatter.format(template_str, params)
 
-## 多路分发输出 Sink（收敛至统一管线）
+## 多路分发输出 Sink（收敛至统一管线，Inv-LG-3）
 func _dispatch_record(log_record: LogRecord) -> void:
-	# 1. 内存有界环形缓冲（注入式或回退至 LogRingBuffer 统一缓冲）
+	# 1. 内存有界环形缓冲（注入式或回退至 EventBusCore 全局中枢）
 	if _ring_buffer != null and _ring_buffer.has_method("push_record"):
 		_ring_buffer.call("push_record", log_record.to_dict())
 	else:
-		# 回退：委托至统一结构化日志缓冲（避免双轨分流）
+		# 收敛：委托至 EventBusCore 统一广播中枢（签发单调 sequence 并扇出至 LogRingBuffer、LogFileExporter 与 TelemetryAggregate）
 		var srec := _to_structured_record(log_record)
-		# 经 Redaction 校验后统一落盘、入环与遥测
-		LogFileExporter.consume(srec)
-		LogRingBuffer.append(srec)
-		TelemetryAggregate.consume(srec)
+		if _mute_console:
+			srec.context[LogConstants.KEY_MUTE_CONSOLE] = true
+		var eb := EventBusCore.get_instance()
+		if eb != null:
+			eb.emit_log_record(srec)
+		else:
+			# 极端无总线环境优雅回退
+			LogFileExporter.consume(srec)
+			LogRingBuffer.append(srec)
+			TelemetryAggregate.consume(srec)
+		log_record.sequence = srec.sequence
+
 		if _metric_sink != null and _metric_sink.has_method("record_metric"):
-			_metric_sink.call("record_metric", "log_event_count", "LOG_VOLUME", 1.0, {"domain": log_record.domain, "severity": _get_severity_name(log_record.severity)})
+			_metric_sink.call("record_metric", "log_event_count", LogConstants.CATEGORY_LOG_VOLUME, 1.0, {
+				LogConstants.KEY_DOMAIN: log_record.domain,
+				"severity": _get_severity_name(log_record.severity)
+			})
 	
-	# 2. 控制台输出格式化
-	if not _mute_console:
-		var sev_name: String = _get_severity_name(log_record.severity)
-		var formatted_line: String = "[%s][%s][%s] %s" % [
-			sev_name,
+	# 2. 控制台输出格式化（总线为空且未静音时本地穿透，避免漏打）
+	if not _mute_console and EventBusCore.get_instance() == null:
+		var formatted_line := SystemBaseMessages.format_unified_console_line(
+			_get_severity_name(log_record.severity),
 			log_record.domain,
 			log_record.event_code,
 			log_record.message
-		]
+		)
 		if log_record.severity >= Severity.ERROR:
 			printerr(formatted_line)
 		else:

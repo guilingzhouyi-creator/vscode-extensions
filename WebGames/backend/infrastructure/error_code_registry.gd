@@ -10,6 +10,8 @@
 ## ErrorCodeRegistry：Error Code Registry / Reporter
 class_name ErrorCodeRegistry extends RefCounted
 
+const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
+
 # ==============================================================================
 # 一、错误码条目实体
 # ==============================================================================
@@ -31,14 +33,14 @@ static var _unregistered_counts: Dictionary = {} # 未登记错误码遥测计�
 static var _unregistered_overflow: int = 0       # 遥测表满后的丢弃计数（有界收敛，对齐 PATH_CACHE 上限惯例）
 
 ## 未登记遥测表上限：防攻击者可控 code 无界增长内存
-const MAX_UNREGISTERED_TRACKED: int = 512
+const MAX_UNREGISTERED_TRACKED: int = LogConstants.MAX_UNREGISTERED_TRACKED
 
 ## 注册表新鲜度守卫：当配置表发生重载版本变更时自动重建
 static func _ensure_loaded() -> void:
 	if not _registry.is_empty() and _config_version == GameConfig.config_reload_version():
 		return
 	_registry.clear()
-	var catalog: Dictionary = GameConfig.get_dict("infrastructure.errors_catalog", "errors", {})
+	var catalog: Dictionary = GameConfig.get_dict(LogConstants.CFG_ERRORS_CATALOG, "errors", {})
 	for code_str in catalog.keys():
 		var raw_entry = catalog[code_str]
 		if raw_entry is Dictionary:

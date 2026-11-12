@@ -18,6 +18,9 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_standalone_rpc_isolation())
 	results.append(test_profiling_metric_sample())
 	results.append(test_profiling_metric_bounded_capacity())
+	results.append(test_unified_logger_eventbus_sequence_convergence())
+	results.append(test_log_collector_caller_capture_toggle())
+	results.append(test_log_file_exporter_batch_and_critical_flush())
 
 	var all_passed: bool = true
 	for r in results:
@@ -177,4 +180,97 @@ static func test_profiling_metric_bounded_capacity() -> Dictionary:
 		"test": "TC-RM-36: 性能度量队列容量有界硬约束防内存泄漏",
 		"passed": passed,
 		"detail": "sample_count=%d" % hook.sample_count()
+	}
+
+## TC-RM-37: 统一日志服务收敛至 EventBusCore 序号签发与入环对账
+static func test_unified_logger_eventbus_sequence_convergence() -> Dictionary:
+	var logger := UnifiedLoggerService.new()
+	logger.set_mute_console(true)
+	logger.load_catalog_from_dict({
+		"events": {
+			"TEST_CONVERGENCE_01": "Convergence test event in domain {domain}."
+		}
+	})
+	var rec: UnifiedLoggerService.LogRecord = logger.log_event(
+		"TEST_CONVERGENCE_01",
+		"governance",
+		UnifiedLoggerService.Severity.INFO
+	)
+
+	var ok_seq: bool = (rec != null) and (rec.sequence > 0)
+	var ok_dto: bool = (rec != null) and (int(rec.to_dict().get("sequence", 0)) == rec.sequence)
+	return {
+		"test": "TC-RM-37: 统一日志服务收敛至 EventBusCore 序号签发与入环对账",
+		"passed": ok_seq and ok_dto,
+		"detail": "rec_sequence=%d" % (rec.sequence if rec != null else 0)
+	}
+
+## TC-RM-38: LogCollector 反射调用栈按需抓取门槛切换断言
+static func test_log_collector_caller_capture_toggle() -> Dictionary:
+	LogCollector.reset_state()
+	LogCollector.set_caller_capture_enabled(false)
+	var rec_disabled := LogCollector.log("info", "test_domain", "Caller disabled test")
+	var disabled_empty: bool = rec_disabled.source_file.is_empty() and rec_disabled.source_line == 0
+
+	LogCollector.set_caller_capture_enabled(true)
+	var rec_enabled := LogCollector.log("info", "test_domain", "Caller enabled test")
+	var enabled_ok: bool = rec_enabled.source_file.ends_with(".gd") and rec_enabled.source_line > 0
+
+	LogCollector.reset_state()
+	return {
+		"test": "TC-RM-38: LogCollector 反射调用栈按需抓取门槛切换断言",
+		"passed": disabled_empty and enabled_ok,
+		"detail": "disabled_empty=%s, enabled_ok=%s" % [str(disabled_empty), str(enabled_ok)]
+	}
+
+## TC-RM-39: LogFileExporter 批处理暂存与紧急刷盘屏障断言
+static func test_log_file_exporter_batch_and_critical_flush() -> Dictionary:
+	LogFileExporter.reset_for_test()
+	var test_dir := "user://test_batch_logs_tc39"
+	if DirAccess.dir_exists_absolute(test_dir):
+		var d := DirAccess.open(test_dir)
+		if d != null:
+			for f in d.get_files():
+				DirAccess.remove_absolute("%s/%s" % [test_dir, f])
+
+	var cfg := LogExportConfigDTO.new()
+	cfg.enabled = true
+	cfg.directory = test_dir
+	cfg.file_prefix = "batch_tc39"
+	cfg.min_level = "info"
+	cfg.max_bytes = 1048576
+	cfg.max_files = 2
+	LogFileExporter._config = cfg
+	LogFileExporter._config_version = GameConfig.config_reload_version()
+	LogFileExporter._batch_threshold = 4
+
+	var r1 := LogRecordDTO.new()
+	r1.level = "INFO"
+	r1.message = "Batch line 1"
+	var r2 := LogRecordDTO.new()
+	r2.level = "INFO"
+	r2.message = "Batch line 2"
+
+	LogFileExporter.consume(r1)
+	LogFileExporter.consume(r2)
+	var buffered_ok: bool = (LogFileExporter._pending_batch.size() == 2) and (LogFileExporter._exported_count == 0)
+
+	var r_err := LogRecordDTO.new()
+	r_err.level = "ERROR"
+	r_err.message = "Critical triggers immediate barrier flush"
+	LogFileExporter.consume(r_err)
+	var flushed_ok: bool = (LogFileExporter._pending_batch.size() == 0) and (LogFileExporter._exported_count == 3)
+
+	if DirAccess.dir_exists_absolute(test_dir):
+		var d := DirAccess.open(test_dir)
+		if d != null:
+			for f in d.get_files():
+				DirAccess.remove_absolute("%s/%s" % [test_dir, f])
+		DirAccess.remove_absolute(test_dir)
+	LogFileExporter.reset_for_test()
+
+	return {
+		"test": "TC-RM-39: LogFileExporter 批处理暂存与紧急刷盘屏障断言",
+		"passed": buffered_ok and flushed_ok,
+		"detail": "buffered_ok=%s, flushed_ok=%s" % [str(buffered_ok), str(flushed_ok)]
 	}

@@ -11,6 +11,10 @@
 class_name EventBusCore
 extends RefCounted
 
+const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
+const SystemBaseMessages = preload("res://backend/infrastructure/logging/system_base_messages.gd")
+const StatisticsMathLib = preload("res://backend/infrastructure/pure/statistics_math_lib.gd")
+
 static var _instance: EventBusCore = null
 
 var _channel_routes: Dictionary = {} # channel_id(int) -> Array[EventBusSubscriptionToken]（掩码过滤按 token 内联判定）
@@ -475,18 +479,32 @@ func emit_log_record(record: LogRecordDTO) -> void:
 		return
 	_record_seq += 1
 	record.sequence = _record_seq
-	var packet := borrow_packet(EventChannelDefinition.LOG_RECORD_POSTED, EventCategoryMask.SYSTEM_TELEMETRY)
-	packet.payload_dto = record
-	packet.payload_data = record.to_dto()
-	packet.narrative_key = record.message
-	dispatch_now(packet)
-	recycle_packet(packet)
-	LogFileExporter.consume(record)
+	if record.timestamp_utc <= 0:
+		record.timestamp_utc = int(Time.get_unix_time_from_system())
+	if record.channel.is_empty():
+		record.channel = LogConstants.CHANNEL_SYSTEM
+	if not record.message.is_empty():
+		record.message = StatisticsMathLib.scrub_inline_secrets(record.message)
+
 	var srec: StructuredLogRecord
 	if record is StructuredLogRecord:
 		srec = record
 	else:
 		srec = StructuredLogRecord.from_dto(record.to_dto())
+	if srec.trace_id.is_empty():
+		var active_trace := LogCollector.get_active_trace_id()
+		if not active_trace.is_empty():
+			srec.trace_id = active_trace
+		else:
+			srec.trace_id = "%s_%s_%d" % [LogConstants.TRACE_PREFIX_DEFAULT, srec.channel, _record_seq]
+
+	var packet := borrow_packet(EventChannelDefinition.LOG_RECORD_POSTED, EventCategoryMask.SYSTEM_TELEMETRY)
+	packet.payload_dto = srec
+	packet.payload_data = srec.to_dto()
+	packet.narrative_key = srec.message
+	dispatch_now(packet)
+	recycle_packet(packet)
+	LogFileExporter.consume(srec)
 	LogRingBuffer.append(srec)
 	TelemetryAggregate.consume(srec)
 	_dispatch_console_log(record)
@@ -495,37 +513,27 @@ func emit_log_record(record: LogRecordDTO) -> void:
 func _dispatch_console_log(record: LogRecordDTO) -> void:
 	if record == null:
 		return
-	var console_cfg: Dictionary = GameConfig.get_dict("infrastructure.log", "console", {})
+	if bool(record.context.get(LogConstants.KEY_MUTE_CONSOLE, false)):
+		return
+	var console_cfg: Dictionary = GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_CONSOLE, {})
 	if not bool(console_cfg.get("enabled", true)):
 		return
-	var min_level: String = str(console_cfg.get("min_level", "warn")).to_lower()
-	if _level_rank(record.level) < _level_rank(min_level):
+	var min_level: String = str(console_cfg.get("min_level", LogConstants.LEVEL_LOWER_WARN)).to_lower()
+	if LogConstants.level_rank(record.level) < LogConstants.level_rank(min_level):
 		return
-	var ch: String = record.channel if not record.channel.is_empty() else "system"
-	var formatted: String = "[%s][%s] %s" % [record.level.to_upper(), ch, record.message]
-	if record.context.has("diagnostic_detail"):
-		formatted += " | detail: %s" % str(record.context["diagnostic_detail"])
-	if not record.error_code.is_empty():
-		formatted += " (code: %s)" % record.error_code
-	if record.level.to_lower() == "error" or record.level.to_lower() == "critical":
+	var detail := str(record.context.get(LogConstants.KEY_DIAGNOSTIC_DETAIL, "")) if record.context.has(LogConstants.KEY_DIAGNOSTIC_DETAIL) else ""
+	var formatted := SystemBaseMessages.format_console_line(record.level, record.channel, record.message, record.error_code, detail)
+	if LogConstants.is_critical_level(record.level):
 		printerr(formatted)
 	else:
 		print_rich(formatted)
 
-func _level_rank(lvl: String) -> int:
-	match lvl.to_lower():
-		"debug": return 10
-		"info": return 20
-		"warn", "warning": return 30
-		"error": return 40
-		"fatal", "critical": return 50
-		_: return 20
-
 ## 便捷日志入口：按 level_key + 原文构造 DTO 并委托 emit_log_record
-func emit_log(level_key: String, msg: String) -> void:
+func emit_log(level_key: String, msg: String, ch: String = LogConstants.CHANNEL_SYSTEM) -> void:
 	var record := LogRecordDTO.new()
 	record.level = level_key
 	record.message = msg
+	record.channel = ch
 	emit_log_record(record)
 
 ## 时钟推进广播（旧 world_clock_advanced 信号替代，CORE_STATE 强一致内联）
