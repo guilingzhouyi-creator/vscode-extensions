@@ -64,6 +64,16 @@ const IMPACT_RULES = Object.freeze([
     reason: '核心数据模型被治理、算法与存储三方共同覆盖'
   }),
   Object.freeze({
+    prefix: 'crates/fg-pools/',
+    targets: ['integration_storage', 'integration_cli'],
+    reason: '对象池与沙箱隔离被存储与命令行套件覆盖'
+  }),
+  Object.freeze({
+    prefix: 'crates/fg-transport/',
+    targets: ['integration_cli', 'integration_governance'],
+    reason: '网络传输与协议封包被命令行与治理套件覆盖'
+  }),
+  Object.freeze({
     prefix: 'src/bin/taxis_cmd/',
     targets: ['integration_cli', 'integration_governance'],
     reason: '子命令分发被命令行与治理套件覆盖'
@@ -147,9 +157,126 @@ function buildImpactTestCommand(targets) {
   return `(cd fractal-git && ${invocations.join(' && ')})`;
 }
 
+/**
+ * Maps auto-refactor changed source path to narrowest unit tests and slice analyzers.
+ */
+const AUTO_IMPACT_RULES = Object.freeze([
+  Object.freeze({
+    prefix: 'src/core/ast/',
+    testSuites: ['ast-slice-cfg-scoring.test.ts', 'fast-path-analyzers.test.ts'],
+    reason: 'AST 语法单元与切片提取被切片与快速路径套件覆盖'
+  }),
+  Object.freeze({
+    prefix: 'src/core/router/',
+    testSuites: ['ast-slice-cfg-scoring.test.ts', 'fast-path-analyzers.test.ts', 'grouped-dispatcher-bitmask.test.ts'],
+    reason: 'MoE 稀疏路由与切片提取被位掩码分发与切片套件覆盖'
+  }),
+  Object.freeze({
+    prefix: 'src/core/scoring/',
+    testSuites: ['ast-slice-cfg-scoring.test.ts', 'elastic-compatibility-arbiter.test.ts'],
+    reason: '评分器与自治度模型被打分与仲裁套件覆盖'
+  }),
+  Object.freeze({
+    prefix: 'src/core/cfg/',
+    testSuites: ['ast-slice-cfg-scoring.test.ts', 'cfg-inline-guard.test.ts'],
+    reason: '控制流图与支配边构建被 CFG 守卫套件覆盖'
+  }),
+  Object.freeze({
+    prefix: 'src/core/cache/',
+    testSuites: ['cache-arc2-l1-recovery.test.ts', 'cache-flush-concurrency.test.ts', 'cache-store-wal.test.ts'],
+    reason: '多级缓存与 WAL 预写日志被缓存系列套件覆盖'
+  }),
+  Object.freeze({
+    prefix: 'src/core/intelligence/',
+    testSuites: ['codemod-anchor-and-rules.test.ts', 'fast-path-analyzers.test.ts'],
+    reason: '符号索引与调用图被符号分析与代码修改套件覆盖'
+  }),
+  Object.freeze({
+    prefix: 'src/core/diff/',
+    testSuites: ['density-vector-space.test.ts', 'bounded-corridor.test.ts'],
+    reason: '差分引擎与语义分类被向量空间与有界廊道套件覆盖'
+  }),
+  Object.freeze({
+    prefix: 'src/core/praxis/',
+    testSuites: ['praxis-vfs-taxis-bridge.test.ts'],
+    reason: 'Praxis 门禁与 VFS 沙箱被桥接单测套件覆盖'
+  }),
+  Object.freeze({
+    prefix: 'src/analyzers/',
+    testSuites: ['density-analyzers-integration.test.ts', 'fast-path-analyzers.test.ts', 'layer1-rules.test.ts'],
+    reason: '静态分析器被集成分析与快速路径套件覆盖'
+  })
+]);
+
+/**
+ * Resolves affected auto-refactor unit test suites based on changed paths.
+ *
+ * @param {string[]} changedPaths - Repository-relative changed paths.
+ * @returns {{testSuites: string[], unknown: string[]}}
+ */
+function resolveAutoImpactTargets(changedPaths) {
+  const testSuites = new Set();
+  const unknown = [];
+  const sortedRules = [...AUTO_IMPACT_RULES].sort((a, b) => b.prefix.length - a.prefix.length);
+
+  for (const rawPath of changedPaths) {
+    const normalized = rawPath.replace(/\\/g, '/');
+    const marker = 'auto-refactor/';
+    const at = normalized.indexOf(marker);
+    if (at < 0) continue;
+    const inner = normalized.slice(at + marker.length);
+
+    if (inner.startsWith('tests/unit/') && inner.endsWith('.test.ts')) {
+      testSuites.add(path.basename(inner));
+      continue;
+    }
+
+    const rule = sortedRules.find(entry => inner.startsWith(entry.prefix));
+    if (rule) {
+      for (const suite of rule.testSuites) testSuites.add(suite);
+    } else if (inner.startsWith('src/')) {
+      unknown.push(inner);
+    }
+  }
+
+  if (unknown.length > 0) {
+    testSuites.add('ast-slice-cfg-scoring.test.ts');
+    testSuites.add('fast-path-analyzers.test.ts');
+    testSuites.add('density-analyzers-integration.test.ts');
+  }
+
+  return { testSuites: [...testSuites].sort(), unknown };
+}
+
+/**
+ * Builds the test command for impacted auto-refactor targets.
+ *
+ * @param {string[]} testSuites - Impacted unit test file names.
+ * @param {string[]} [changedPaths] - Changed files for slice gate detection.
+ * @returns {string} Shell command string.
+ */
+function buildAutoImpactTestCommand(testSuites, changedPaths = []) {
+  const parts = [];
+  if (testSuites.length > 0) {
+    const testArgs = testSuites.map(s => `tests/unit/${s}`).join(' ');
+    parts.push(`npx vitest run ${testArgs}`);
+  }
+  const hasCodeChanges = changedPaths.some(p => /\.(ts|js|rs|py|gd)$/.test(p));
+  if (hasCodeChanges) {
+    parts.push('node scripts/gate-self-slice.js');
+  }
+  if (parts.length === 0) {
+    return 'echo "impact slice: no auto-refactor test target affected"';
+  }
+  return `(cd auto-refactor && ${parts.join(' && ')})`;
+}
+
 module.exports = {
   TARGET_PACKAGE,
   IMPACT_RULES,
+  AUTO_IMPACT_RULES,
   resolveImpactTargets,
-  buildImpactTestCommand
+  resolveAutoImpactTargets,
+  buildImpactTestCommand,
+  buildAutoImpactTestCommand
 };
