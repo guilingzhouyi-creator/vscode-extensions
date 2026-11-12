@@ -23,7 +23,7 @@ const os = require('os');
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 
-const { resolveImpactTargets, buildImpactTestCommand } =
+const { resolveImpactTargets, buildImpactTestCommand, resolveAutoImpactTargets, buildAutoImpactTestCommand } =
   require('./impact-slice-map.js');
 
 const DEFAULT_SSH_HOST = 'ssh.instabox.sh';
@@ -65,7 +65,7 @@ const SLICE_DEFINITIONS = Object.freeze({
   'auto-refactor': Object.freeze({
     title: 'auto-refactor 静态引擎、AST 单元测试与自审门禁',
     commands: [
-      '(cd auto-refactor && npm run build)',
+      '[ -f auto-refactor/dist/index.js ] || (cd auto-refactor && npm run build)',
       '(cd auto-refactor && npx vitest run tests/unit)',
       '(cd auto-refactor && node scripts/gate-self.js)'
     ]
@@ -130,6 +130,26 @@ function parseArgs(args) {
  * @returns {string[]} List of changed relative file paths.
  */
 function detectChangedFiles() {
+  const isWindows = process.platform === 'win32';
+  const taxisCandidates = [
+    'taxis',
+    path.join(REPO_ROOT, 'fractal-git', 'target', 'release', isWindows ? 'taxis.exe' : 'taxis'),
+    path.join(REPO_ROOT, 'fractal-git', 'target', 'debug', isWindows ? 'taxis.exe' : 'taxis'),
+  ];
+  for (const cand of taxisCandidates) {
+    try {
+      if (fs.existsSync(cand) || (!cand.includes(path.sep) && spawnSync(cand, ['--version']).status === 0)) {
+        const out = execFileSync(cand, ['diff', '--name-only'], {
+          cwd: REPO_ROOT,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'ignore'],
+        });
+        const items = out.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        if (items.length > 0) return Array.from(new Set(items));
+      }
+    } catch {}
+  }
+
   try {
     const statusOut = execFileSync('git', ['status', '--porcelain'], {
       cwd: REPO_ROOT,
@@ -147,8 +167,13 @@ function detectChangedFiles() {
       stdio: ['ignore', 'pipe', 'ignore']
     }).split('\n').map(f => f.trim()).filter(f => f.length > 0);
 
-    const merged = Array.from(new Set([...unstaged, ...diffHead]));
-    return merged;
+    const diffCached = execFileSync('git', ['diff', '--cached', '--name-only'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore']
+    }).split('\n').map(f => f.trim()).filter(f => f.length > 0);
+
+    return Array.from(new Set([...unstaged, ...diffHead, ...diffCached]));
   } catch (err) {
     return [];
   }
@@ -421,18 +446,44 @@ function prepareSync(options) {
  */
 function resolveExecutionTarget(slice) {
   if (slice === 'impact') {
-    const fractalPaths = detectChangedFiles().filter(
+    const changed = detectChangedFiles();
+    const fractalPaths = changed.filter(
       file => file.replace(/\\/g, '/').includes('fractal-git/')
     );
-    const { targets, unknown } = resolveImpactTargets(fractalPaths);
-    const impactCommand = buildImpactTestCommand(targets);
-    console.log(
-      `🔍 [Tier 1.5] 影响面切片: ${fractalPaths.length} 个 fractal-git 变更 -> ` +
-      `目标 [${targets.join(', ') || '无'}]`
+    const autoPaths = changed.filter(
+      file => file.replace(/\\/g, '/').includes('auto-refactor/')
     );
-    if (unknown.length > 0) {
-      console.log(`⚠  未登记规则的 crate 路径 ${unknown.length} 处，已放宽到全部目标`);
+    const commands = [];
+
+    if (fractalPaths.length > 0) {
+      const { targets, unknown } = resolveImpactTargets(fractalPaths);
+      commands.push(buildImpactTestCommand(targets));
+      console.log(
+        `🔍 [Tier 1.5] 影响面切片 (fractal-git): ${fractalPaths.length} 个变更 -> ` +
+        `目标 [${targets.join(', ') || '无'}]`
+      );
+      if (unknown.length > 0) {
+        console.log(`⚠  未登记规则的 crate 路径 ${unknown.length} 处，已放宽到全部目标`);
+      }
     }
+
+    if (autoPaths.length > 0) {
+      const { testSuites, unknown } = resolveAutoImpactTargets(autoPaths);
+      commands.push(buildAutoImpactTestCommand(testSuites, autoPaths));
+      console.log(
+        `🔍 [Tier 1.5] 影响面切片 (auto-refactor): ${autoPaths.length} 个变更 -> ` +
+        `测试套件 [${testSuites.join(', ') || '无'}]`
+      );
+      if (unknown.length > 0) {
+        console.log(`⚠  未精确映射的 auto-refactor 模块 ${unknown.length} 处，已执行核心回归`);
+      }
+    }
+
+    if (commands.length === 0) {
+      commands.push('echo "impact slice: no affected test targets across active projects"');
+    }
+
+    const impactCommand = commands.join(' && ');
     return { targetSlices: ['impact'], impactCommand };
   }
 
