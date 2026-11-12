@@ -672,6 +672,7 @@ export class CacheStore {
             this.appendedL2Count = 0;
             this.dirtyL1.clear();
             this.dirtyL2.clear();
+            this.lastFlushError = undefined;
         } catch {
             /* Best-effort */
         }
@@ -775,21 +776,65 @@ export class CacheStore {
         this.flushCacheToDisk();
     }
 
+    /**
+     * Executes in-process fallback compaction for L1 index and journal frames.
+     * Rewrites checkpoint and legacy fingerprints to clear unbounded WAL backlog.
+     */
+    private async compactL1FallbackAsync(): Promise<void> {
+        await this.l1Journal.checkpointAsync(this.l1);
+        await writeFileAtomicAsync(this.fingerprintsPath, serializeL1(this.l1));
+        this.appendedL1Count = 0;
+        await flushArc2L1Async(this.arc2Paths, this.l1, this.arc2Opts);
+    }
+
+    /**
+     * Persists dirty L1 fingerprints across legacy JSONL, WAL journal, and ARC2 index.
+     * Coordinates migration checkpoints and fallback compaction under backpressure.
+     */
+    private async persistL1BatchAsync(
+        batch: Map<string, Fingerprint>,
+        migrating: boolean,
+        mustRewriteLegacy: boolean,
+        willFallbackCompact: boolean,
+    ): Promise<void> {
+        if (mustRewriteLegacy) {
+            await writeFileAtomicAsync(this.fingerprintsPath, serializeL1(this.l1));
+            this.appendedL1Count = 0;
+        }
+        await this.l1Journal.appendAsync(batch, this.l1);
+        if (willFallbackCompact) {
+            await writeFileAtomicAsync(this.fingerprintsPath, serializeL1(this.l1));
+            this.appendedL1Count = 0;
+            await flushArc2L1Async(this.arc2Paths, this.l1, this.arc2Opts);
+            return;
+        }
+        if (!mustRewriteLegacy) {
+            await appendLinesSafeAsync(this.fingerprintsPath, serializeL1(batch));
+            this.appendedL1Count += batch.size;
+        }
+        if (migrating) {
+            await flushArc2L1Async(this.arc2Paths, this.l1, this.arc2Opts);
+        }
+    }
+
+    /**
+     * Asynchronously flushes dirty L1 fingerprints to disk and WAL journal storage.
+     * Restores uncommitted entries back to the dirty map on persistence failures.
+     */
     private async flushL1Async(): Promise<void> {
         if (this.dirtyL1.size === 0) return;
         const batch = this.dirtyL1;
         this.dirtyL1 = new Map();
         try {
             const migrating = !this.l1Journal.ready;
-            if (migrating && this.shouldRewriteL1Snapshot()) {
-                await writeFileAtomicAsync(this.fingerprintsPath, serializeL1(this.l1));
-                this.appendedL1Count = 0;
-            } else {
-                await appendLinesSafeAsync(this.fingerprintsPath, serializeL1(batch));
-                this.appendedL1Count += batch.size;
-            }
-            await this.l1Journal.appendAsync(batch, this.l1);
-            if (migrating) await flushArc2L1Async(this.arc2Paths, this.l1, this.arc2Opts);
+            const mustRewriteLegacy = migrating && this.shouldRewriteL1Snapshot();
+            const willFallbackCompact = !migrating && this.l1Journal.needsFallbackCompaction();
+            await this.persistL1BatchAsync(
+                batch,
+                migrating,
+                mustRewriteLegacy,
+                willFallbackCompact,
+            );
         } catch (error) {
             for (const [key, value] of batch) {
                 if (!this.dirtyL1.has(key)) this.dirtyL1.set(key, value);
@@ -841,6 +886,28 @@ export class CacheStore {
     }
 
     /**
+     * Executes a single serialized flush cycle across L1, L2, and ARC2 persistence layers.
+     * Returns true when the iteration completed successfully and can continue draining requests.
+     */
+    private async executeAsyncFlushCycle(): Promise<boolean> {
+        try {
+            await this.l1Journal.publishCheckpointAsync();
+            if (this.dirtyL1.size === 0 && this.l1Journal.needsFallbackCompaction()) {
+                await this.compactL1FallbackAsync();
+            }
+            this.lastFlushError = this.l1Journal.lastError;
+            if (!this.executeFlushPreparation()) return false;
+            await this.flushL1Async();
+            await this.flushL2Async();
+            this.lastFlushError = this.l1Journal.lastError;
+            return true;
+        } catch (error) {
+            this.lastFlushError = error;
+            return false;
+        }
+    }
+
+    /**
      * Serialize writers and drain requests received during an active flush. Failed batches remain
      * dirty for retry; newer values take precedence when restoring an interrupted batch.
      */
@@ -849,20 +916,11 @@ export class CacheStore {
         if (this.flushInFlight) return this.flushInFlight;
         this.flushInFlight = Promise.resolve()
             .then(async () => {
-                do {
+                while (this.flushRequested) {
                     this.flushRequested = false;
-                    try {
-                        await this.l1Journal.publishCheckpointAsync();
-                        this.lastFlushError = this.l1Journal.lastError;
-                        if (!this.executeFlushPreparation()) break;
-                        await this.flushL1Async();
-                        await this.flushL2Async();
-                        this.lastFlushError = this.l1Journal.lastError;
-                    } catch (error) {
-                        this.lastFlushError = error;
-                        break;
-                    }
-                } while (this.flushRequested);
+                    const shouldContinue = await this.executeAsyncFlushCycle();
+                    if (!shouldContinue) break;
+                }
             })
             .finally(() => {
                 this.flushInFlight = undefined;
@@ -934,6 +992,7 @@ export class CacheStore {
             this.l1Journal.reset();
             this.appendedL1Count = 0;
             this.appendedL2Count = 0;
+            this.lastFlushError = undefined;
             this.enabled = this.initializeCache();
             if (this.enabled) this.runRebuildCacheManifest();
             return this.enabled;

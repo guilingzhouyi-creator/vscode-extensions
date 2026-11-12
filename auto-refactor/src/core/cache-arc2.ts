@@ -65,6 +65,7 @@ const HEADER_OFFSET_KIND = 6;
 const HEADER_OFFSET_RECORD_COUNT = 8;
 const HEADER_OFFSET_STRING_POOL = 12;
 const HEADER_OFFSET_LEGACY_JSONL = 16;
+const HEADER_OFFSET_STORE_GEN = 20;
 const HEADER_OFFSET_CREATED_AT = 24;
 const HEADER_OFFSET_MAX_ENTRIES = 32;
 const HEADER_OFFSET_MAX_AGE_DAYS = 36;
@@ -93,6 +94,7 @@ export interface Arc2Header {
     recordCount: number;
     stringPoolOffset: number;
     legacyJsonlBytes: number;
+    storeGeneration: number;
     createdAtMs: number;
     maxEntries: number;
     maxAgeDays: number;
@@ -105,6 +107,7 @@ export interface Arc2HeaderInit {
     recordCount: number;
     stringPoolOffset?: number;
     legacyJsonlBytes?: number;
+    storeGeneration?: number;
     createdAtMs?: number;
     maxEntries?: number;
     maxAgeDays?: number;
@@ -115,6 +118,15 @@ export interface Arc2ContainerMeta {
     maxEntries?: number;
     maxAgeDays?: number;
     legacyJsonlBytes?: number;
+    storeGeneration?: number;
+}
+
+/**
+ * Validated ARC2 L2 container header and byte offset immediately following the last valid frame.
+ */
+export interface Arc2L2LoadResult {
+    header: Arc2Header;
+    validBytes: number;
 }
 
 /**
@@ -148,6 +160,7 @@ export function encodeArc2Header(init: Arc2HeaderInit): Buffer {
     header.writeUInt32LE(init.recordCount >>> 0, HEADER_OFFSET_RECORD_COUNT);
     header.writeUInt32LE((init.stringPoolOffset ?? 0) >>> 0, HEADER_OFFSET_STRING_POOL);
     header.writeUInt32LE((init.legacyJsonlBytes ?? 0) >>> 0, HEADER_OFFSET_LEGACY_JSONL);
+    header.writeUInt32LE((init.storeGeneration ?? 0) >>> 0, HEADER_OFFSET_STORE_GEN);
     header.writeDoubleLE(init.createdAtMs ?? Date.now(), HEADER_OFFSET_CREATED_AT);
     header.writeUInt32LE((init.maxEntries ?? 100_000) >>> 0, HEADER_OFFSET_MAX_ENTRIES);
     header.writeUInt32LE(
@@ -183,6 +196,7 @@ export function decodeArc2Header(buf: Buffer, expectedKind?: number): Arc2Header
         recordCount: buf.readUInt32LE(HEADER_OFFSET_RECORD_COUNT),
         stringPoolOffset: buf.readUInt32LE(HEADER_OFFSET_STRING_POOL),
         legacyJsonlBytes: buf.readUInt32LE(HEADER_OFFSET_LEGACY_JSONL),
+        storeGeneration: buf.readUInt32LE(HEADER_OFFSET_STORE_GEN),
         createdAtMs: buf.readDoubleLE(HEADER_OFFSET_CREATED_AT),
         maxEntries: buf.readUInt32LE(HEADER_OFFSET_MAX_ENTRIES),
         maxAgeDays: buf.readUInt32LE(HEADER_OFFSET_MAX_AGE_DAYS),
@@ -421,6 +435,7 @@ export function serializeArc2L2Container(
         kind,
         recordCount: count,
         legacyJsonlBytes: meta.legacyJsonlBytes ?? 0,
+        storeGeneration: meta.storeGeneration ?? 0,
         maxEntries: meta.maxEntries,
         maxAgeDays: meta.maxAgeDays,
     });
@@ -514,13 +529,13 @@ function parseSingleFrame(
  * @param buf - Raw container buffer read from disk.
  * @param onEntry - Callback invoked for each validated L2 entry frame in sequential order.
  * @param lazyDecode - Whether to defer PR50 payload decoding until a cache hit occurs.
- * @returns Validated Arc2Header or null if the container header is invalid.
+ * @returns Validated Arc2L2LoadResult with header and validBytes end offset, or null if invalid.
  */
 export function loadArc2L2Container(
     buf: Buffer,
     onEntry: (entry: L2EntryRecord) => void,
     lazyDecode = true,
-): Arc2Header | null {
+): Arc2L2LoadResult | null {
     const header = decodeArc2Header(buf);
     if (!header || (header.kind !== ARC2_KIND_STORE && header.kind !== ARC2_KIND_WAL)) {
         return null;
@@ -532,5 +547,5 @@ export function loadArc2L2Container(
         onEntry(parsed.entry);
         offset = parsed.nextOffset;
     }
-    return header;
+    return { header, validBytes: offset };
 }

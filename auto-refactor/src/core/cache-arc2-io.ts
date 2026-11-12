@@ -13,6 +13,7 @@
  *   while maintaining strict atomic write safety and fallback recovery.
  */
 
+import * as fs from 'fs';
 import type { Fingerprint } from './cache';
 import {
     SyncIoBarrier,
@@ -23,8 +24,10 @@ import {
     type L2EntryRecord,
 } from './cache-persistence';
 import {
+    ARC2_HEADER_BYTES,
     ARC2_KIND_STORE,
     ARC2_KIND_WAL,
+    decodeArc2Header,
     ensureL2EntryDecoded,
     loadArc2L1Index,
     loadArc2L2Container,
@@ -34,6 +37,71 @@ import {
 } from './cache-arc2';
 
 export { ensureL2EntryDecoded };
+
+const Arc2SyncFsBarrier = {
+    openReadSync: (filePath: string): number => fs['openSync'](filePath, 'r'),
+    readSync: (fd: number, buf: Buffer, offset: number, length: number, pos: number): number =>
+        fs['readSync'](fd, buf, offset, length, pos),
+    closeSync: (fd: number): void => fs['closeSync'](fd),
+    truncateSync: (filePath: string, len: number): void => fs['truncateSync'](filePath, len),
+};
+
+const NOOP_L2_ENTRY = (_entry: L2EntryRecord): void => {};
+
+function readArc2StoreGenerationSync(storePath: string): number {
+    if (!SyncIoBarrier.exists(storePath)) return 0;
+    let fd: number | undefined;
+    try {
+        fd = Arc2SyncFsBarrier.openReadSync(storePath);
+        const buf = Buffer.allocUnsafe(ARC2_HEADER_BYTES);
+        const bytesRead = Arc2SyncFsBarrier.readSync(fd, buf, 0, ARC2_HEADER_BYTES, 0);
+        if (bytesRead < ARC2_HEADER_BYTES) return 0;
+        const header = decodeArc2Header(buf, ARC2_KIND_STORE);
+        return header ? header.storeGeneration : 0;
+    } catch {
+        return 0;
+    } finally {
+        if (fd !== undefined) {
+            try {
+                Arc2SyncFsBarrier.closeSync(fd);
+            } catch {
+                /* best-effort close */
+            }
+        }
+    }
+}
+
+async function readArc2StoreGenerationAsync(storePath: string): Promise<number> {
+    let handle: fs.promises.FileHandle | undefined;
+    try {
+        handle = await fs.promises.open(storePath, 'r');
+        const buf = Buffer.allocUnsafe(ARC2_HEADER_BYTES);
+        const { bytesRead } = await handle.read(buf, 0, ARC2_HEADER_BYTES, 0);
+        if (bytesRead < ARC2_HEADER_BYTES) return 0;
+        const header = decodeArc2Header(buf, ARC2_KIND_STORE);
+        return header ? header.storeGeneration : 0;
+    } catch {
+        return 0;
+    } finally {
+        if (handle !== undefined) {
+            try {
+                await handle.close();
+            } catch {
+                /* best-effort close */
+            }
+        }
+    }
+}
+
+function nextArc2StoreGeneration(previousGeneration: number): number {
+    const next = ((previousGeneration >>> 0) + 1) >>> 0;
+    return next === 0 ? 1 : next;
+}
+
+function isWalAlignedWithStore(walGeneration: number, storeGeneration: number): boolean {
+    if (storeGeneration === 0) return walGeneration === 0;
+    return walGeneration === storeGeneration;
+}
 
 /** Path bundle required for ARC2 container disk coordination. */
 export interface Arc2SyncPaths {
@@ -80,6 +148,25 @@ export function tryLoadArc2L1Index(
     }
 }
 
+function replayAlignedWalSync(
+    walPath: string,
+    storeGeneration: number,
+    syncedJsonlBytes: number,
+    onEntry: (entry: L2EntryRecord) => void,
+): number {
+    if (!SyncIoBarrier.exists(walPath)) return syncedJsonlBytes;
+    const walBuf = SyncIoBarrier.readBytes(walPath);
+    const walHeader = decodeArc2Header(walBuf, ARC2_KIND_WAL);
+    if (!walHeader || !isWalAlignedWithStore(walHeader.storeGeneration, storeGeneration)) {
+        return syncedJsonlBytes;
+    }
+    const walResult = loadArc2L2Container(walBuf, onEntry, true);
+    if (walResult && walResult.header.legacyJsonlBytes > syncedJsonlBytes) {
+        return walResult.header.legacyJsonlBytes;
+    }
+    return syncedJsonlBytes;
+}
+
 /**
  * Attempts to load the binary L2 store and delta WAL from disk into the store.
  *
@@ -103,25 +190,23 @@ export function tryLoadArc2L2Container(
     try {
         const storeBuf = SyncIoBarrier.readBytes(storePath);
         if (storeBuf.length > maxLoadBytes * 2) return false;
-        let syncedJsonlBytes = 0;
-        const storeHeader = loadArc2L2Container(storeBuf, onEntry, true);
-        if (!storeHeader) return false;
-        syncedJsonlBytes = storeHeader.legacyJsonlBytes;
+        const storeResult = loadArc2L2Container(storeBuf, onEntry, true);
+        if (!storeResult) return false;
 
-        if (SyncIoBarrier.exists(walPath)) {
-            const walBuf = SyncIoBarrier.readBytes(walPath);
-            const walHeader = loadArc2L2Container(walBuf, onEntry, true);
-            if (walHeader && walHeader.legacyJsonlBytes > syncedJsonlBytes) {
-                syncedJsonlBytes = walHeader.legacyJsonlBytes;
-            }
-        }
-
+        const syncedJsonlBytes = replayAlignedWalSync(
+            walPath,
+            storeResult.header.storeGeneration,
+            storeResult.header.legacyJsonlBytes,
+            onEntry,
+        );
         const currentJsonlBytes = SyncIoBarrier.statSize(resultsPath);
         if (currentJsonlBytes > syncedJsonlBytes && syncedJsonlBytes >= 0) {
             onOutdated?.();
         }
         return true;
-    } catch {
+    } catch (error) {
+        /* Expected: corrupt containers fall back cleanly to JSONL recovery */
+        void error;
         return false;
     }
 }
@@ -164,17 +249,46 @@ export function writeArc2L2SnapshotSync(
         ensureL2EntryDecoded(entry);
     }
     const jsonlSize = Math.max(0, SyncIoBarrier.statSize(paths.resultsPath));
+    const prevGeneration = readArc2StoreGenerationSync(paths.l2StoreArcPath);
+    const storeGeneration = nextArc2StoreGeneration(prevGeneration);
     const storeBuf = serializeArc2L2Container(entriesList, ARC2_KIND_STORE, {
         maxEntries: opts.maxEntries,
         maxAgeDays: opts.maxAgeDays,
         legacyJsonlBytes: jsonlSize,
+        storeGeneration,
     });
     writeBytesAtomic(paths.l2StoreArcPath, storeBuf);
     SyncIoBarrier.remove(paths.l2DeltaWalPath);
 }
 
+function tryAppendExistingWalSync(
+    walPath: string,
+    storeGeneration: number,
+    dirtyList: L2EntryRecord[],
+): boolean {
+    if (!SyncIoBarrier.exists(walPath)) return false;
+    try {
+        const walBuf = SyncIoBarrier.readBytes(walPath);
+        const loaded = loadArc2L2Container(walBuf, NOOP_L2_ENTRY, true);
+        if (!loaded || !isWalAlignedWithStore(loaded.header.storeGeneration, storeGeneration)) {
+            return false;
+        }
+        if (loaded.validBytes < walBuf.length) {
+            Arc2SyncFsBarrier.truncateSync(walPath, loaded.validBytes);
+        }
+        appendBytesSafe(walPath, serializeArc2L2FramesOnly(dirtyList));
+        return true;
+    } catch (error) {
+        /* Expected: corrupt or unreadable WAL triggers clean atomic replacement below */
+        void error;
+        return false;
+    }
+}
+
 /**
  * Synchronously appends dirty L2 entries to the delta WAL (or initializes it).
+ * Truncate-repairs any torn tail and replaces stale-generation or corrupt WAL files
+ * before appending new frames.
  *
  * @param paths - Container path bundle.
  * @param dirtyEntries - Dirty L2 entries to append.
@@ -187,16 +301,18 @@ export function appendArc2L2WalSync(
 ): void {
     const dirtyList = Array.from(dirtyEntries);
     const jsonlSize = Math.max(0, SyncIoBarrier.statSize(paths.resultsPath));
-    if (!SyncIoBarrier.exists(paths.l2DeltaWalPath)) {
-        const walBuf = serializeArc2L2Container(dirtyList, ARC2_KIND_WAL, {
-            maxEntries: opts.maxEntries,
-            maxAgeDays: opts.maxAgeDays,
-            legacyJsonlBytes: jsonlSize,
-        });
-        writeBytesAtomic(paths.l2DeltaWalPath, walBuf);
-    } else {
-        appendBytesSafe(paths.l2DeltaWalPath, serializeArc2L2FramesOnly(dirtyList));
+    const storeGeneration = readArc2StoreGenerationSync(paths.l2StoreArcPath);
+    if (tryAppendExistingWalSync(paths.l2DeltaWalPath, storeGeneration, dirtyList)) {
+        return;
     }
+
+    const walBuf = serializeArc2L2Container(dirtyList, ARC2_KIND_WAL, {
+        maxEntries: opts.maxEntries,
+        maxAgeDays: opts.maxAgeDays,
+        legacyJsonlBytes: jsonlSize,
+        storeGeneration,
+    });
+    writeBytesAtomic(paths.l2DeltaWalPath, walBuf);
 }
 
 /**
@@ -222,6 +338,31 @@ export async function flushArc2L1Async(
     );
 }
 
+async function tryAppendExistingWalAsync(
+    walPath: string,
+    storeGeneration: number,
+    dirtyList: L2EntryRecord[],
+): Promise<boolean> {
+    if (!SyncIoBarrier.exists(walPath)) return false;
+    try {
+        const walBuf = await fs.promises.readFile(walPath);
+        const loaded = loadArc2L2Container(walBuf, NOOP_L2_ENTRY, true);
+        if (!loaded || !isWalAlignedWithStore(loaded.header.storeGeneration, storeGeneration)) {
+            return false;
+        }
+        if (loaded.validBytes < walBuf.length) {
+            await fs.promises.truncate(walPath, loaded.validBytes);
+        }
+        const frames = serializeArc2L2FramesOnly(dirtyList);
+        await appendBytesSafeAsync(walPath, frames);
+        return true;
+    } catch (error) {
+        /* Expected: corrupt or unreadable WAL triggers clean atomic replacement below */
+        void error;
+        return false;
+    }
+}
+
 /**
  * Asynchronously flushes ARC2 L2 either via full snapshot compaction or delta WAL append.
  *
@@ -244,28 +385,35 @@ export async function flushArc2L2Async(
         for (const entry of entriesList) {
             ensureL2EntryDecoded(entry);
         }
+        const storeGeneration = nextArc2StoreGeneration(
+            await readArc2StoreGenerationAsync(paths.l2StoreArcPath),
+        );
         await writeBytesAtomicAsync(
             paths.l2StoreArcPath,
             serializeArc2L2Container(entriesList, ARC2_KIND_STORE, {
                 maxEntries: opts.maxEntries,
                 maxAgeDays: opts.maxAgeDays,
                 legacyJsonlBytes: jsonlSize,
+                storeGeneration,
             }),
         );
         SyncIoBarrier.remove(paths.l2DeltaWalPath);
-    } else {
-        const dirtyList = Array.from(dirtyEntries);
-        if (!SyncIoBarrier.exists(paths.l2DeltaWalPath)) {
-            await writeBytesAtomicAsync(
-                paths.l2DeltaWalPath,
-                serializeArc2L2Container(dirtyList, ARC2_KIND_WAL, {
-                    maxEntries: opts.maxEntries,
-                    maxAgeDays: opts.maxAgeDays,
-                    legacyJsonlBytes: jsonlSize,
-                }),
-            );
-        } else {
-            await appendBytesSafeAsync(paths.l2DeltaWalPath, serializeArc2L2FramesOnly(dirtyList));
-        }
+        return;
     }
+
+    const dirtyList = Array.from(dirtyEntries);
+    const storeGeneration = await readArc2StoreGenerationAsync(paths.l2StoreArcPath);
+    if (await tryAppendExistingWalAsync(paths.l2DeltaWalPath, storeGeneration, dirtyList)) {
+        return;
+    }
+
+    await writeBytesAtomicAsync(
+        paths.l2DeltaWalPath,
+        serializeArc2L2Container(dirtyList, ARC2_KIND_WAL, {
+            maxEntries: opts.maxEntries,
+            maxAgeDays: opts.maxAgeDays,
+            legacyJsonlBytes: jsonlSize,
+            storeGeneration,
+        }),
+    );
 }
