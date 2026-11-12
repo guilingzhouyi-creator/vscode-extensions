@@ -720,7 +720,7 @@ fn test_unarchive_to_odb_succeeds_on_feature_branch() {
             "--branch",
             "refs/fractal/cell/cell-default/card/import-feature",
             "-m",
-            "feat(core): import library archive into ODB\n\n[Project]\nfractal-git\n\n[Why]\nAdd shared library helpers.\n\n[Changed]\n- Ingested lib.rs\n\n[Verification]\nTested locally.",
+            "feat(core): import library archive into ODB\n\n[Project]\nfractal-git\n\n[Why]\nAdd shared library helpers.\n\n[Added]\n- Ingested lib.rs\n\n[Verification]\nTested locally.",
             zip_path.to_str().expect("zip path"),
         ],
     );

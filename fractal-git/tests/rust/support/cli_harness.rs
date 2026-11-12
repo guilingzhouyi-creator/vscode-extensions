@@ -119,8 +119,14 @@ pub fn run_git_ok(cwd: &Path, args: &[&str]) -> String {
 
 /// Returns a workspace-strict compliant commit message citing the changed file/symbol.
 pub fn compliant_commit_msg(subject: &str, symbol_or_file: &str) -> String {
-    let change_header = if subject.starts_with("fix(") {
+    let change_header = if subject.starts_with("fix(") || subject.starts_with("fix!(") {
         "[Fixed / 修复内容]"
+    } else if subject.starts_with("refactor(")
+        || subject.starts_with("refactor!(")
+        || subject.starts_with("perf(")
+        || subject.starts_with("perf!(")
+    {
+        "[Changed / 变更调整]"
     } else {
         "[Added / 新增内容]"
     };
