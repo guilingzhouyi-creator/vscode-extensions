@@ -473,21 +473,7 @@ export function computeEnvelopeBounds(
     const fileLocBudget = params.fileLocBudget ?? DEFAULT_FILE_LOC_BUDGET;
     const isNewFile = originalLineCount === 0;
 
-    // 1. Addition envelope bounds (decoupled from static budget, clamped to atomic batch ceiling)
-    const maxExpansionByRatio = Math.max(
-        MIN_EXPANSION_ALLOWANCE_LOC,
-        Math.floor(originalLineCount * MAX_EXPANSION_LOC_RATIO),
-    );
-    const remainingBudget = Math.max(0, fileLocBudget - originalLineCount);
-    const additionUpperBound = isNewFile
-        ? Math.min(fileLocBudget, MAX_COMMIT_FILE_ADD_NEW_5D_ELOC)
-        : Math.min(
-              MAX_COMMIT_FILE_ADD_EXISTING_5D_ELOC,
-              Math.min(remainingBudget, maxExpansionByRatio),
-          );
-    const additionLowerBound = 0;
-
-    // 2. Addition payload density measurements
+    // 1. Addition payload density measurements (computed first so deletions can calibrate refactor headroom)
     const usefulAddedLines = countUsefulAddedLines(params.addedLines);
     const usefulDeletedLines = countUsefulAddedLines(params.deletedLines);
     const tsprAdded = computeAddedLinesTspr(params.addedLines, params.language);
@@ -499,17 +485,42 @@ export function computeEnvelopeBounds(
         DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
     const eloc5dDel = usefulDeletedLines;
 
-    // 3. Deletion envelope bounds (clamped to atomic batch ceiling)
+    const hasRefactorWitness = Boolean(
+        params.hasEquivalentExtraction ||
+            params.isFormalRetirement ||
+            usefulDeletedLines > REFACTOR_WITNESS_MIN_DEL_ELOC,
+    );
+    const addCommitCeiling = hasRefactorWitness
+        ? MAX_COMMIT_FILE_ADD_REFACTOR_5D_ELOC
+        : MAX_COMMIT_FILE_ADD_EXISTING_5D_ELOC;
+
+    // 2. Addition envelope bounds (decoupled from static budget, clamped to atomic batch ceiling)
+    const maxExpansionByRatio = Math.max(
+        MIN_EXPANSION_ALLOWANCE_LOC,
+        Math.floor(originalLineCount * MAX_EXPANSION_LOC_RATIO),
+    );
+    const remainingBudget = Math.max(0, fileLocBudget - originalLineCount);
+    const additionUpperBound = isNewFile
+        ? Math.min(fileLocBudget, MAX_COMMIT_FILE_ADD_NEW_5D_ELOC)
+        : hasRefactorWitness
+          ? Math.min(remainingBudget, addCommitCeiling)
+          : Math.min(addCommitCeiling, Math.min(remainingBudget, maxExpansionByRatio));
+    const additionLowerBound = 0;
+
+    // 3. Deletion envelope bounds (clamped to witnessed refactor or plain single-file ceiling)
     const deletionLowerBound = 0;
+    const isWitnessedDeletion = Boolean(params.hasEquivalentExtraction || params.isFormalRetirement);
     const deletionUpperBound = isNewFile
         ? 0
-        : Math.min(
-              MAX_COMMIT_FILE_DEL_5D_ELOC,
-              Math.max(
-                  MIN_DELETION_ALLOWANCE_LOC,
-                  Math.floor(originalLineCount * MAX_DELETION_FRACTION_EROSION),
-              ),
-          );
+        : isWitnessedDeletion
+          ? MAX_COMMIT_FILE_DEL_WITNESSED_5D_ELOC
+          : Math.min(
+                MAX_COMMIT_FILE_DEL_5D_ELOC,
+                Math.max(
+                    MIN_DELETION_ALLOWANCE_LOC,
+                    Math.floor(originalLineCount * MAX_DELETION_FRACTION_EROSION),
+                ),
+            );
 
     return {
         addMin: additionLowerBound,
@@ -536,7 +547,7 @@ export function computeEnvelopeBounds(
  */
 export function compute5dElocDelta(params: DifferentialBoundsParams): File5dElocDelta {
     const bounds = computeEnvelopeBounds(params);
-    const rawTurnover = bounds.eloc5dAdd + bounds.eloc5dDel;
+    const rawTurnover = bounds.eloc5dAdd + bounds.eloc5dDel * DELETION_TURNOVER_WEIGHT;
     const net5dTurnover =
         Math.round(rawTurnover * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) /
         DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
@@ -571,7 +582,7 @@ function checkAdditionInflation(
     addedLineCount: number,
     bounds: DifferentialEnvelopeBounds,
 ): ViolationCheckResult | undefined {
-    if (addedLineCount <= INFLATION_SAMPLE_LINE_THRESHOLD) {
+    if (addedLineCount < INFLATION_SAMPLE_LINE_THRESHOLD) {
         return undefined;
     }
     if (bounds.tsprAdded < MIN_TSPR_ADDED_THRESHOLD) {
@@ -582,12 +593,16 @@ function checkAdditionInflation(
                 `the required minimum threshold (${MIN_TSPR_ADDED_THRESHOLD.toFixed(3)}) across ${addedLineCount} added lines.`,
         };
     }
-    if (bounds.semanticDensity < MIN_SEMANTIC_LINE_DENSITY) {
+    const substantiveTarget =
+        bounds.tsprAdded >= TSPR_VOUCH_FOR_DENSITY
+            ? MIN_SEMANTIC_LINE_FLOOR
+            : MIN_SEMANTIC_LINE_DENSITY;
+    if (bounds.semanticDensity < substantiveTarget) {
         return {
             verdictCode: VERDICT_BLOCK_GAMING_INFLATION,
             reason:
                 `Addition substantive line density (${bounds.semanticDensity.toFixed(3)}) is below ` +
-                `the required minimum threshold (${MIN_SEMANTIC_LINE_DENSITY.toFixed(3)}) with ${bounds.usefulAddedLines}/${addedLineCount} substantive lines.`,
+                `the required minimum threshold (${substantiveTarget.toFixed(3)}) with ${bounds.usefulAddedLines}/${addedLineCount} substantive lines.`,
         };
     }
     if (bounds.eloc5dAdd > bounds.addMax) {
@@ -617,14 +632,15 @@ function checkCapabilityErosion(
     if (bounds.eloc5dDel <= bounds.delMax) {
         return undefined;
     }
-    if (params.hasEquivalentExtraction || params.isFormalRetirement) {
+    const isWitnessed = Boolean(params.hasEquivalentExtraction || params.isFormalRetirement);
+    if (isWitnessed && bounds.eloc5dDel <= MAX_COMMIT_FILE_DEL_WITNESSED_5D_ELOC) {
         return undefined;
     }
     return {
         verdictCode: VERDICT_BLOCK_FILE_DEL_OVERFLOW,
         reason:
             `Deletion 5D ELOC volume (${bounds.eloc5dDel} lines) exceeds safe single-file erosion ceiling ` +
-            `(${bounds.delMax} lines) without verified equivalent module extraction or formal retirement.`,
+            `(${bounds.delMax} lines)${isWitnessed ? '' : ' without verified equivalent module extraction or formal retirement'}.`,
     };
 }
 
@@ -759,16 +775,18 @@ export function calculateEmpiricalAdmissionThreshold(
     const boundedNoise = clampRange(measuredNoise, 0, MAX_NOISE_CEILING);
     const noiseFactor = safeDivide(boundedNoise, MAX_NOISE_CEILING);
 
-    // Dynamic threshold derivation
+    // Dynamic threshold derivation (clamped to SSOT [floor, cap], cold-start floor when < 3 samples)
     const discountStandardDeviation =
         STANDARD_DEVIATION_DISCOUNT_FACTOR * moments.standardDeviation;
     const statisticalCenter = Math.max(0, moments.mean - discountStandardDeviation);
     const calibratedThreshold = statisticalCenter * (1.0 - noiseFactor) * posteriorConfidence;
+    const boundedThreshold =
+        sliceRuns.length < MIN_TRAJECTORY_SAMPLES
+            ? ADMISSION_TURNOVER_FLOOR
+            : clampRange(calibratedThreshold, ADMISSION_TURNOVER_FLOOR, ADMISSION_TURNOVER_CAP);
     const threshold =
-        Math.round(
-            Math.max(ADMISSION_TURNOVER_FLOOR, calibratedThreshold) *
-                DECIMAL_ROUNDING_FACTOR_HUNDREDTH,
-        ) / DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
+        Math.round(boundedThreshold * DECIMAL_ROUNDING_FACTOR_HUNDREDTH) /
+        DECIMAL_ROUNDING_FACTOR_HUNDREDTH;
 
     return {
         threshold,
@@ -782,6 +800,89 @@ export function calculateEmpiricalAdmissionThreshold(
             DECIMAL_ROUNDING_FACTOR_THOUSANDTH,
         sampleCount: sliceRuns.length,
     };
+}
+
+/**
+ * Resolves dual ledger paths compatible with both auto-refactor and Taxis git telemetry stores.
+ *
+ * @param workspaceRoot - Workspace root directory override.
+ * @returns Ordered list of candidate NDJSON ledger file paths.
+ */
+export function resolveAdmissionLedgerPaths(workspaceRoot?: string): readonly string[] {
+    const root = workspaceRoot ?? process.cwd();
+    return [
+        path.join(root, DIFF_BOUNDS_CONTRACT.ledgers.autoRefactorRelative),
+        path.join(root, DIFF_BOUNDS_CONTRACT.ledgers.taxisRelative),
+    ];
+}
+
+interface AdmissionLedgerPoint {
+    timestamp?: number;
+    netSemanticTurnover?: number;
+    turnover?: number;
+    gatePassed?: boolean;
+    passed?: boolean;
+    verdict?: string;
+}
+
+/** Resolves explicit admission results before deriving a result from the contract floor. */
+function resolveTrajectoryGatePassed(parsed: AdmissionLedgerPoint, turnover: number): boolean {
+    if (typeof parsed.gatePassed === 'boolean') return parsed.gatePassed;
+    if (typeof parsed.passed === 'boolean') return parsed.passed;
+    if (typeof parsed.verdict === 'string') return parsed.verdict === VERDICT_ADMITTED;
+    return turnover >= ADMISSION_TURNOVER_FLOOR;
+}
+
+/** Normalizes one ledger row; malformed or nonnumeric observations cannot enter calibration. */
+function parseAdmissionTrajectoryPoint(line: string): TrajectoryRunPoint | null {
+    try {
+        const parsed = JSON.parse(line) as AdmissionLedgerPoint | null;
+        if (parsed === null || typeof parsed !== 'object') return null;
+        const turnover =
+            typeof parsed.netSemanticTurnover === 'number'
+                ? parsed.netSemanticTurnover
+                : parsed.turnover;
+        if (typeof turnover !== 'number' || !Number.isFinite(turnover)) return null;
+        return {
+            timestamp: typeof parsed.timestamp === 'number' ? parsed.timestamp : 0,
+            netSemanticTurnover: turnover,
+            gatePassed: resolveTrajectoryGatePassed(parsed, turnover),
+        };
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Synchronously reads historical trajectory samples across dual admission ledgers.
+ *
+ * @param workspaceRoot - Workspace root directory override.
+ * @param windowSize - Maximum trailing records to retain.
+ * @returns Normalized trajectory points ready for Jeffreys admission calibration.
+ */
+export function loadAdmissionTrajectoryPoints(
+    workspaceRoot?: string,
+    windowSize: number = DEFAULT_TRAJECTORY_WINDOW_SIZE,
+): TrajectoryRunPoint[] {
+    const ledgerPaths = resolveAdmissionLedgerPaths(workspaceRoot);
+    const points: TrajectoryRunPoint[] = [];
+    for (let pIdx = 0; pIdx < ledgerPaths.length; pIdx++) {
+        const ledgerPath = ledgerPaths[pIdx];
+        if (!fs.existsSync(ledgerPath)) continue;
+        try {
+            const raw = fs.readFileSync(ledgerPath, 'utf8');
+            const lines = raw.split(/\r?\n/);
+            for (let lIdx = 0; lIdx < lines.length; lIdx++) {
+                const trimmed = lines[lIdx].trim();
+                if (!trimmed) continue;
+                const point = parseAdmissionTrajectoryPoint(trimmed);
+                if (point !== null) points.push(point);
+            }
+        } catch {
+            // Ignore unreadable ledger file
+        }
+    }
+    return points.slice(-windowSize);
 }
 
 /**
