@@ -46,6 +46,28 @@ FORBIDDEN_RNG_CALLS = re.compile(
 )
 
 
+def _strip_gd_comment(line: str) -> str:
+    """引号感知剥离行内 GDScript 注释，防止字符串内 `#` 掩盖同行违规。"""
+    quote_char = ""
+    escaped = False
+    for idx, ch in enumerate(line):
+        if escaped:
+            escaped = False
+            continue
+        if ch == "\\" and quote_char:
+            escaped = True
+            continue
+        if ch in ('"', "'"):
+            if not quote_char:
+                quote_char = ch
+            elif quote_char == ch:
+                quote_char = ""
+            continue
+        if ch == "#" and not quote_char:
+            return line[:idx].rstrip()
+    return line.rstrip()
+
+
 @dataclass(slots=True)
 class Finding:
     """高级代码审查问题载荷。"""
@@ -365,7 +387,7 @@ class AdvancedCodeAuditor:
 
         loop_stack: list[int] = []
         for i, ln in enumerate(lines, 1):
-            code_line = ln.split("#")[0].rstrip()
+            code_line = _strip_gd_comment(ln)
             stripped = code_line.strip()
             if not stripped:
                 continue

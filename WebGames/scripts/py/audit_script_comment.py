@@ -108,6 +108,8 @@ def _check_declared_path_match(head_lines: list[str], path: Path, path_str: str)
         if "文件路径:" in line:
             decl_path = line.split("文件路径:", 1)[1].strip().replace("\\", "/")
             repo_parent = ROOT.parent if (ROOT.parent / "scripts").exists() else ROOT
+            if not path.is_relative_to(repo_parent):
+                return []
             rel_repo = str(path.relative_to(repo_parent)).replace("\\", "/")
             rel_wg = str(path.relative_to(ROOT)).replace("\\", "/") if path.is_relative_to(ROOT) else None
             valid_paths = {rel_repo}
@@ -161,14 +163,14 @@ def _check_separator_lines(
     return violations, fixed
 
 
-def _check_comment_markers(head_lines: list[str], path_str: str) -> list[dict[str, Any]]:
-    """检测未决标记与批次黑话禁止词。"""
+def _check_comment_markers(all_lines: list[str], path_str: str) -> list[dict[str, Any]]:
+    """检测未决标记（全文件扫描，防头注释后躲藏）与头注释批次黑话禁止词。"""
     violations: list[dict[str, Any]] = []
-    for i, line in enumerate(head_lines):
+    for i, line in enumerate(all_lines):
         stripped = line.strip()
         if not (stripped.startswith("#") or stripped.startswith("//")):
             continue
-        if any(ignore in line for ignore in ("PENDING_RE", "JARGON_RE", "COMMENT-", "RULE")):
+        if any(ignore in line for ignore in ("PENDING_RE", "JARGON_RE", "COMMENT-", "RULE", "反例测试用例")):
             continue
         if PENDING_RE.search(line):
             violations.append({
@@ -176,7 +178,7 @@ def _check_comment_markers(head_lines: list[str], path_str: str) -> list[dict[st
                 "rule": "COMMENT-PENDING-MARKER",
                 "detail": f"L{i+1} 注释含未决标记：{line.strip()[:60]}"
             })
-        if JARGON_RE.search(line):
+        if i < 35 and JARGON_RE.search(line):
             violations.append({
                 "file": path_str,
                 "rule": "COMMENT-JARGON",
@@ -223,12 +225,15 @@ def audit_file(path: Path, fix: bool = False) -> list[dict[str, Any]]:
     if fix and fixed:
         _save_fixed_header(path, new_lines)
 
-    violations.extend(_check_comment_markers(head_lines, path_str))
+    violations.extend(_check_comment_markers(lines, path_str))
 
+    non_comment_text = "\n".join(
+        ln for ln in lines if not ln.lstrip().startswith("#")
+    )
     if path.suffix == ".ps1":
-        violations.extend(_check_ps1_triad(text, path))
+        violations.extend(_check_ps1_triad(non_comment_text, path))
     elif path.suffix == ".sh":
-        violations.extend(_check_bash_safety(lines, text, path))
+        violations.extend(_check_bash_safety(lines, non_comment_text, path))
     elif path.suffix == ".py":
         violations.extend(_check_py_docstring(text, path))
         violations.extend(_check_py_strict_typing(text, path))

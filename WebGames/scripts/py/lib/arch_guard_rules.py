@@ -209,16 +209,16 @@ def check_tc_arch_12(
   """TC-ARCH-12: 全库英文底座日志、错误上报与前端提示动态占位符注入规范静态断言。"""
   violations: list[str] = []
   channel_patterns: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("错误上报", re.compile(r'ErrorReporter\.emit_(?:error|warning|fatal)\s*\(\s*[^,()]+\s*,\s*"[^"\n]+"\s*,\s*"([^"\n]*)"')),
+    ("错误上报", re.compile(r'ErrorReporter\.emit_(?:error|warning|fatal)\s*\(\s*[^,()]+\s*,\s*[^,()]+\s*,\s*"([^"\n]*)"')),
     ("错误迁移", re.compile(r'ErrorReporter\.migrate_push_error\s*\(\s*[^,()]+\s*,\s*"([^"\n]*)"')),
     ("日志采集", re.compile(r'LogCollector\.log\s*\(\s*[^,()]+\s*,\s*[^,()]+\s*,\s*"([^"\n]*)"')),
-    ("失败提示", re.compile(r'\b_fail\s*\(\s*"[^"\n]+"\s*,\s*"([^"\n]*)"')),
-    ("日志输出", re.compile(r'\bemit_log\s*\(\s*"[^"\n]*"\s*,\s*"([^"\n]*)"')),
+    ("失败提示", re.compile(r'\b_fail\s*\([^()\n]*"([^"\n]*)"')),
+    ("日志输出", re.compile(r'\bemit_log\s*\(\s*[^,()\n]+\s*,\s*"([^"\n]*)"')),
     ("占位符模版", re.compile(r'TemplateFormatter\.format\s*\(\s*"([^"\n]*)"')),
     ("界面轻提示", re.compile(r'\bshow_toast\s*\(\s*"([^"\n]*)"')),
   )
   chinese_re = re.compile(r'[\u4e00-\u9fff]')
-  c_fmt_re = re.compile(r'%[0-9.]*[sdf]')
+  c_fmt_re = re.compile(r'%[0-9.]*[sdf]|\{\d+\}')
 
   for rel_posix, code in _iter_gd_sources(ctx, strip_comments):
     if rel_posix in LEGACY_ERROR_MESSAGE_WHITELIST:
@@ -254,4 +254,76 @@ def check_tc_arch_12(
     except Exception:
       pass
 
+  # 校验合规标准英文底座文本库：MSG_* 严禁混入中文或裸 %s/%d/{0} 占位符
+  base_msg_file: Path = ctx.root / "backend" / "infrastructure" / "logging" / "system_base_messages.gd"
+  if base_msg_file.exists():
+    b_raw = base_msg_file.read_text(encoding="utf-8")
+    b_code = strip_comments(b_raw)
+    for m_const in re.finditer(r'const\s+(MSG_[A-Z0-9_]+)\s*:\s*String\s*=\s*"([^"\n]*)"', b_code):
+      const_name, tmpl_val = m_const.group(1), m_const.group(2)
+      if chinese_re.search(tmpl_val) or c_fmt_re.search(tmpl_val):
+        violations.append(
+          f"res://backend/infrastructure/logging/system_base_messages.gd: {const_name} 违反英文 {{param}} 底座纯洁性契约"
+        )
+
+  # 校验 log.json 事件模板全部使用 {param} 命名占位符（防 %s/%d/{0} 回流）
+  log_cfg: Path = ctx.root / "config" / "infrastructure" / "log.json"
+  if log_cfg.exists():
+    try:
+      l_data = json.loads(log_cfg.read_text(encoding="utf-8"))
+      for section_key in ("events", "unified_events"):
+        evs = l_data.get(section_key, {})
+        if isinstance(evs, dict):
+          for ek, ev in evs.items():
+            if isinstance(ev, str) and c_fmt_re.search(ev):
+              violations.append(
+                f"res://config/infrastructure/log.json: {section_key}.{ek} 禁止使用裸 %s/%d/{{0}} 占位符「{ev}」"
+              )
+    except (OSError, ValueError):
+      pass
+
   return make_result("TC-ARCH-12: 英文底座日志与错误动态占位符注入规范断言", violations)
+
+
+ALLOWED_CRYPTO_FILES: frozenset[str] = frozenset({
+  "backend/infrastructure/pure/crypto_integrity_lib.gd",
+})
+_UNSAFE_MAC_EQ_RE = re.compile(
+  r"\b(?:expected_mac|mac_hex|recorded_seal|expected_hmac|recorded_hash)\b\s*[!=]=\s*"
+)
+_HARDCODED_KEY_LITERAL_RE = re.compile(
+  r'(?:const|var)\s+[a-z0-9_]*(?:seal_key|hmac_key|aes_key|private_key|master_secret|signing_key)\b[^=\n]*=\s*"([^"\n]{8,})"',
+  re.IGNORECASE,
+)
+
+
+def check_tc_arch_13(
+    ctx: Any,
+    make_result: Callable[[str, list[str]], dict[str, Any]],
+    strip_comments: Callable[[str], str],
+) -> dict[str, Any]:
+  """TC-ARCH-13: 密码学纯计算库边界隔离、常量时间比对与零静态密钥字面量断言。"""
+  violations: list[str] = []
+  crypto_raw_re = re.compile(r"\b(?:AESContext|Crypto)\.new\s*\(|\.hmac_digest\s*\(")
+
+  for rel_posix, code in _iter_gd_sources(ctx, strip_comments):
+    rel_res = RES_PREFIX + rel_posix
+    is_crypto_lib = rel_posix in ALLOWED_CRYPTO_FILES
+    masked = _strip_string_contents(code)
+
+    for idx, (raw_ln, m_ln) in enumerate(zip(code.splitlines(), masked.splitlines()), 1):
+      if not is_crypto_lib and crypto_raw_re.search(m_ln):
+        violations.append(
+          f"{rel_res}:{idx}: 禁止在 CryptoIntegrityLib 之外直接调用 AESContext/Crypto/hmac_digest（CRYPTO-ISOLATION-001）"
+        )
+      if not is_crypto_lib and _UNSAFE_MAC_EQ_RE.search(m_ln):
+        violations.append(
+          f"{rel_res}:{idx}: 敏感 MAC/Seal/Hash 校验禁止直接 ==/!= 比对，必须调用 CryptoIntegrityLib.constant_time_equals（CRYPTO-TIMING-001）"
+        )
+      km = _HARDCODED_KEY_LITERAL_RE.search(raw_ln)
+      if km and not re.match(r"^[A-Z0-9_]+$", km.group(1)):
+        violations.append(
+          f"{rel_res}:{idx}: 疑似硬编码静态密钥字面量，必须由环境变量或安全 Vault 动态注入（CRYPTO-SECRET-001）"
+        )
+
+  return make_result("TC-ARCH-13: 密码学域库边界隔离与防时序侧信道合规断言", violations)

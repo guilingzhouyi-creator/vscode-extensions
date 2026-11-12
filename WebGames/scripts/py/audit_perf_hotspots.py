@@ -32,7 +32,9 @@ LINEAR_FIND_RE = re.compile(r"\.find\(")
 # （纯数值累加如 `x += 1`、`sum += int(...)` 不匹配，避免误报）
 STRING_BUILD_RE = re.compile(r'(\+= "|%\s*[\[A-Za-z_]|\bstr\(|String\(|"[^"\n]*"\s*\+)')
 DEBUG_EMIT_RE = re.compile(r"(print\(|push_warning\(|push_error\(|\.emit\()")
-HEAP_ALLOC_RE = re.compile(r"(\.new\(|\.duplicate\(\s*true\s*\))")
+HEAP_ALLOC_RE = re.compile(
+    r"(\.new\(|\.duplicate\(\s*true\s*\)|RegEx\.create_from_string\s*\(|(?:AESContext|Crypto|HashingContext)\.new\s*\()"
+)
 
 CHECKS = {
     "nested": "嵌套循环(O(n²)候选)",

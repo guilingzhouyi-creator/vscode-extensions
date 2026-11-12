@@ -54,6 +54,10 @@ TOKENS: list[tuple[str, str]] = [
         r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b",
         "疑似 JWT",
     ),
+    (
+        r"(?<![A-Za-z0-9_])(?:seal_key|hmac_secret|aes_key|master_secret|signing_key|client_secret)\b(?:\s*:\s*[A-Za-z0-9_\[\]]+)?\s*[:=]\s*['\"](?![A-Z0-9_]+['\"])[^'\"\n\s]{12,}['\"]",
+        "静态密钥字面量赋值",
+    ),
 ]
 
 BINARY_SUFFIXES: set[str] = {
@@ -88,6 +92,12 @@ FAST_BYTE_PROBES: tuple[bytes, ...] = (
     b"AIza",
     b"sk-",
     b"eyJ",
+    b"seal_key",
+    b"hmac_secret",
+    b"aes_key",
+    b"master_secret",
+    b"signing_key",
+    b"client_secret",
 )
 
 ALL_COMPILED = [(re.compile(p), label) for p, label in MARKERS + TOKENS]
@@ -189,7 +199,10 @@ def scan_file(path: Path, findings: list[str]) -> int:
     if not text:
         return 0
 
-    rel = path.relative_to(HERE.parents[2]).as_posix()
+    try:
+        rel = path.relative_to(HERE.parents[2]).as_posix()
+    except ValueError:
+        rel = path.as_posix()
     counts, examples = _scan_text_findings(text)
     total = sum(counts.values())
     if total:
@@ -215,9 +228,10 @@ def main() -> int:
     for p in paths:
         total += scan_file(p, findings)
 
+    mode_label = "阻断级" if args.strict else "提示级"
     print(
         f"【audit-secrets】扫描 {len(paths)} 个文件（{'全仓库' if args.repo else 'WebGames/'}），"
-        f"发现 {total} 处密钥/凭证候选（提示级）"
+        f"发现 {total} 处密钥/凭证候选（{mode_label}）"
     )
     for fd in findings:
         print(f"  ✗ {fd}")
@@ -226,7 +240,7 @@ def main() -> int:
             "【审查结论】--strict 模式未通过：存在疑似密钥，请先清除或轮换后再提交"
         )
         return 1
-    print("【审查结论】通过（提示级）")
+    print(f"【审查结论】通过（{mode_label}）")
     return 0
 
 

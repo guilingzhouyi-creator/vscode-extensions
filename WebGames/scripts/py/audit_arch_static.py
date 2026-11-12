@@ -28,6 +28,7 @@ from lib.arch_guard_rules import (
   check_tc_arch_10,
   check_tc_arch_11,
   check_tc_arch_12,
+  check_tc_arch_13,
 )
 ensure_utf8_stdout()
 
@@ -616,6 +617,7 @@ def run_all_checks() -> tuple[bool, list[dict[str, Any]], str, float]:
     check_tc_arch_10(ctx, make_result, strip_comments),
     *check_tc_arch_11(ctx, make_result, strip_comments),
     check_tc_arch_12(ctx, make_result, strip_comments),
+    check_tc_arch_13(ctx, make_result, strip_comments),
   ]
 
   elapsed = time.perf_counter() - t0

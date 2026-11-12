@@ -38,9 +38,25 @@ TODO_RE = re.compile(r"\b(TODO|FIXME|HACK)\b")
 
 
 def strip_comment(line: str) -> str:
-    """启发式剥离 GDScript 行注释。"""
-    idx = line.find("#")
-    return line[:idx] if idx >= 0 else line
+    """引号感知剥离 GDScript 行注释，避免字符串内 `#` 截断同行后续代码。"""
+    quote_char = ""
+    escaped = False
+    for idx, ch in enumerate(line):
+        if escaped:
+            escaped = False
+            continue
+        if ch == "\\" and quote_char:
+            escaped = True
+            continue
+        if ch in ('"', "'"):
+            if not quote_char:
+                quote_char = ch
+            elif quote_char == ch:
+                quote_char = ""
+            continue
+        if ch == "#" and not quote_char:
+            return line[:idx]
+    return line
 
 
 def _check_digits(code: str, i: int, counts: list[int], examples: list[str]) -> None:
@@ -75,8 +91,12 @@ def _scan_code_line(
     if not code:
         return
     _check_digits(code, i, counts, examples)
-    if '"' in code and STRING_RE.search(code):
-        counts[2] += 1
+    if '"' in code:
+        sm = STRING_RE.search(code)
+        if sm:
+            counts[2] += 1
+            if counts[2] <= 2:
+                examples.append(f"L{i} 字符串 {sm.group(0)[:28]}")
     _check_debug_and_todo(code, ln, i, counts, examples)
 
 

@@ -82,7 +82,7 @@ def _audit_domain_entry(domain: str, entry_key: str, entry: dict[str, Any], viol
 
 
 def _audit_backend_inlines(violations: list[str]) -> None:
-    """审查后端 GDScript 中是否存在硬编码文案模板字面量。"""
+    """审查后端 GDScript 中是否存在硬编码文案模板字面量及底座英文文本纯洁性。"""
     for gd in BACKEND.rglob("*.gd"):
         if gd.name in RESOLVER_FILES:
             continue
@@ -92,6 +92,17 @@ def _audit_backend_inlines(violations: list[str]) -> None:
                 continue
             if PLACEHOLDER_RE.search(line) and CJK_RE.search(line):
                 violations.append(f"[零内联] {gd.relative_to(ROOT)}:{idx} 代码含文案模板字面量")
+
+    base_msg_path = BACKEND / "infrastructure" / "logging" / "system_base_messages.gd"
+    if base_msg_path.exists():
+        for idx, line in enumerate(base_msg_path.read_text(encoding="utf-8").splitlines(), 1):
+            code_part = line.split("#")[0]
+            if not re.match(r"\s*const\s+MSG_", code_part):
+                continue
+            if CJK_RE.search(code_part):
+                violations.append(f"[底座混杂] {base_msg_path.relative_to(ROOT)}:{idx} 英文底座文本严禁含中文")
+            if LEGACY_PLACEHOLDER_RE.search(code_part) or re.search(r"\{\d+\}", code_part):
+                violations.append(f"[底座占位符] {base_msg_path.relative_to(ROOT)}:{idx} 须使用 {{param}} 命名占位符")
 
 
 def _load_copywriting_domains(cw_dir: Path) -> dict[str, dict[str, Any]]:

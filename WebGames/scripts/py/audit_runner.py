@@ -112,7 +112,7 @@ AUDIT_TASKS: list[AuditTask] = [
         task_id="secrets",
         name="密钥与敏感凭证泄露扫描",
         script_name="audit_secrets.py",
-        default_args=[],
+        default_args=["--strict"],
         scopes={"all"},
     ),
     AuditTask(
@@ -237,6 +237,13 @@ AUDIT_TASKS: list[AuditTask] = [
         script_name="audit_code_clones.py",
         default_args=[],
         scopes={"gd"},
+    ),
+    AuditTask(
+        task_id="script_adversarial",
+        name="脚本库对抗性逃逸自检守卫",
+        script_name="selftest_adversarial_guards.py",
+        default_args=[],
+        scopes={"scripts"},
     ),
 ]
 
