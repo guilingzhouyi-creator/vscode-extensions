@@ -55,40 +55,164 @@ fn split_lines(content: &str) -> Vec<&str> {
     lines
 }
 
-fn compute_diff(old: &[&str], new: &[&str]) -> Vec<DiffOp> {
-    let n = old.len();
-    let m = new.len();
+const FALLBACK_THRESHOLD: usize = 32;
+const MAX_RECURSION_DEPTH: usize = 64;
+const BINARY_SEARCH_MIN_BUCKET: usize = 8;
 
-    let mut prefix = 0;
-    while prefix < n && prefix < m && old[prefix] == new[prefix] {
+type Span = (usize, usize, usize, usize);
+
+struct HistogramContext<'a> {
+    old_lines: &'a [&'a str],
+    new_lines: &'a [&'a str],
+    old_hashes: Vec<u64>,
+    new_hashes: Vec<u64>,
+    target_positions: HashMap<u64, Vec<usize>>,
+    ops: Vec<DiffOp>,
+}
+
+fn compute_diff(old: &[&str], new: &[&str]) -> Vec<DiffOp> {
+    let old_hashes: Vec<u64> = old.iter().map(|&s| hash_line_fnv1a64(s)).collect();
+    let new_hashes: Vec<u64> = new.iter().map(|&s| hash_line_fnv1a64(s)).collect();
+    let mut target_positions: HashMap<u64, Vec<usize>> = HashMap::with_capacity(new.len());
+    for (idx, &hash) in new_hashes.iter().enumerate() {
+        target_positions.entry(hash).or_default().push(idx);
+    }
+    let mut ctx = HistogramContext {
+        old_lines: old,
+        new_lines: new,
+        old_hashes,
+        new_hashes,
+        target_positions,
+        ops: Vec::with_capacity(old.len() + new.len()),
+    };
+    execute_histogram_recursion(&mut ctx, (0, old.len(), 0, new.len()), 0);
+    ctx.ops
+}
+
+fn scan_anchor_bucket(
+    ctx: &HistogramContext<'_>,
+    bucket: &[usize],
+    bounds_b: (usize, usize),
+    src_line: &str,
+) -> Option<(usize, usize)> {
+    let (start_b, end_b) = bounds_b;
+    if bucket.is_empty() || bucket[0] >= end_b || bucket[bucket.len() - 1] < start_b {
+        return None;
+    }
+    let start_idx = if bucket.len() <= BINARY_SEARCH_MIN_BUCKET || bucket[0] >= start_b {
+        0
+    } else {
+        bucket.partition_point(|&pos| pos < start_b)
+    };
+    let mut count_target = 0usize;
+    let mut matched_target: Option<usize> = None;
+    for &pos in &bucket[start_idx..] {
+        if pos >= end_b {
+            break;
+        }
+        count_target += 1;
+        if matched_target.is_none() && ctx.new_lines[pos] == src_line {
+            matched_target = Some(pos);
+        }
+    }
+    matched_target.map(|target_idx| (count_target, target_idx))
+}
+
+fn find_best_anchor(ctx: &HistogramContext<'_>, span: Span) -> Option<(usize, usize)> {
+    let (start_a, end_a, start_b, end_b) = span;
+    let mid_source = start_a + (end_a - start_a) / 2;
+    let mut best_anchor: Option<(usize, usize)> = None;
+    let mut min_occurrences = usize::MAX;
+    let mut best_dist = usize::MAX;
+
+    for src_idx in start_a..end_a {
+        let Some(bucket) = ctx.target_positions.get(&ctx.old_hashes[src_idx]) else {
+            continue;
+        };
+        let Some((count_target, target_idx)) =
+            scan_anchor_bucket(ctx, bucket, (start_b, end_b), ctx.old_lines[src_idx])
+        else {
+            continue;
+        };
+        let dist = src_idx.abs_diff(mid_source);
+        if count_target < min_occurrences || (count_target == min_occurrences && dist < best_dist) {
+            min_occurrences = count_target;
+            best_dist = dist;
+            best_anchor = Some((src_idx, target_idx));
+            if count_target == 1 && dist == 0 {
+                break;
+            }
+        }
+    }
+    best_anchor
+}
+
+fn trim_span_edges(ctx: &mut HistogramContext<'_>, span: Span) -> (Span, usize) {
+    let (start_a, end_a, start_b, end_b) = span;
+    let mut prefix = 0usize;
+    while start_a + prefix < end_a
+        && start_b + prefix < end_b
+        && ctx.old_hashes[start_a + prefix] == ctx.new_hashes[start_b + prefix]
+        && ctx.old_lines[start_a + prefix] == ctx.new_lines[start_b + prefix]
+    {
+        ctx.ops
+            .push(DiffOp::Equal(start_a + prefix, start_b + prefix));
         prefix += 1;
     }
-
-    let mut suffix = 0;
-    while suffix < (n - prefix)
-        && suffix < (m - prefix)
-        && old[n - 1 - suffix] == new[m - 1 - suffix]
+    let (min_a, min_b) = (start_a + prefix, start_b + prefix);
+    let mut suffix = 0usize;
+    while end_a - suffix > min_a
+        && end_b - suffix > min_b
+        && ctx.old_hashes[end_a - 1 - suffix] == ctx.new_hashes[end_b - 1 - suffix]
+        && ctx.old_lines[end_a - 1 - suffix] == ctx.new_lines[end_b - 1 - suffix]
     {
         suffix += 1;
     }
+    ((min_a, end_a - suffix, min_b, end_b - suffix), suffix)
+}
 
-    let old_mid = &old[prefix..n - suffix];
-    let new_mid = &new[prefix..m - suffix];
-
-    let mid_ops = compute_myers_diff(old_mid, new_mid, prefix);
-
-    let mut all_ops = Vec::with_capacity(n + m);
-    for i in 0..prefix {
-        all_ops.push(DiffOp::Equal(i, i));
+fn append_suffix_equals(ops: &mut Vec<DiffOp>, end_a: usize, end_b: usize, suffix_count: usize) {
+    for offset in 0..suffix_count {
+        ops.push(DiffOp::Equal(end_a + offset, end_b + offset));
     }
-    all_ops.extend(mid_ops);
-    for i in 0..suffix {
-        let old_idx = n - suffix + i;
-        let new_idx = m - suffix + i;
-        all_ops.push(DiffOp::Equal(old_idx, new_idx));
-    }
+}
 
-    all_ops
+fn execute_histogram_recursion(ctx: &mut HistogramContext<'_>, span: Span, depth: usize) {
+    if span.0 == span.1 {
+        ctx.ops.extend((span.2..span.3).map(DiffOp::Insert));
+        return;
+    }
+    if span.2 == span.3 {
+        ctx.ops.extend((span.0..span.1).map(DiffOp::Delete));
+        return;
+    }
+    let ((act_a, end_a, act_b, end_b), suffix) = trim_span_edges(ctx, span);
+    let (rem_a, rem_b) = (end_a - act_a, end_b - act_b);
+    if rem_a == 0 && rem_b == 0 {
+        append_suffix_equals(&mut ctx.ops, end_a, end_b, suffix);
+        return;
+    }
+    if rem_a <= FALLBACK_THRESHOLD || rem_b <= FALLBACK_THRESHOLD || depth >= MAX_RECURSION_DEPTH {
+        let sub_ops = compute_myers_diff(
+            &ctx.old_lines[act_a..end_a],
+            &ctx.new_lines[act_b..end_b],
+            &ctx.old_hashes[act_a..end_a],
+            &ctx.new_hashes[act_b..end_b],
+            (act_a, act_b),
+        );
+        ctx.ops.extend(sub_ops);
+        append_suffix_equals(&mut ctx.ops, end_a, end_b, suffix);
+        return;
+    }
+    if let Some((anchor_a, anchor_b)) = find_best_anchor(ctx, (act_a, end_a, act_b, end_b)) {
+        execute_histogram_recursion(ctx, (act_a, anchor_a, act_b, anchor_b), depth + 1);
+        ctx.ops.push(DiffOp::Equal(anchor_a, anchor_b));
+        execute_histogram_recursion(ctx, (anchor_a + 1, end_a, anchor_b + 1, end_b), depth + 1);
+    } else {
+        ctx.ops.extend((act_a..end_a).map(DiffOp::Delete));
+        ctx.ops.extend((act_b..end_b).map(DiffOp::Insert));
+    }
+    append_suffix_equals(&mut ctx.ops, end_a, end_b, suffix);
 }
 
 #[inline(always)]
@@ -101,19 +225,23 @@ fn hash_line_fnv1a64(line: &str) -> u64 {
     hash
 }
 
-fn compute_myers_diff(old: &[&str], new: &[&str], offset: usize) -> Vec<DiffOp> {
+fn compute_myers_diff(
+    old: &[&str],
+    new: &[&str],
+    old_hashes: &[u64],
+    new_hashes: &[u64],
+    offsets: (usize, usize),
+) -> Vec<DiffOp> {
+    let (offset_a, offset_b) = offsets;
     let n = old.len();
     let m = new.len();
 
     if n == 0 {
-        return (0..m).map(|j| DiffOp::Insert(offset + j)).collect();
+        return (0..m).map(|j| DiffOp::Insert(offset_b + j)).collect();
     }
     if m == 0 {
-        return (0..n).map(|i| DiffOp::Delete(offset + i)).collect();
+        return (0..n).map(|i| DiffOp::Delete(offset_a + i)).collect();
     }
-
-    let old_hashes: Vec<u64> = old.iter().map(|&s| hash_line_fnv1a64(s)).collect();
-    let new_hashes: Vec<u64> = new.iter().map(|&s| hash_line_fnv1a64(s)).collect();
 
     let max = n + m;
     let row_size = 2 * max + 1;
@@ -145,7 +273,7 @@ fn compute_myers_diff(old: &[&str], new: &[&str], offset: usize) -> Vec<DiffOp> 
             v[k_idx] = x;
 
             if x >= n && y >= m {
-                return backtrack(&trace_arena, old, new, offset, d);
+                return backtrack(&trace_arena, old, new, (offset_a, offset_b), d);
             }
 
             k += 2;
@@ -154,10 +282,10 @@ fn compute_myers_diff(old: &[&str], new: &[&str], offset: usize) -> Vec<DiffOp> 
 
     let mut fallback = Vec::new();
     for i in 0..n {
-        fallback.push(DiffOp::Delete(offset + i));
+        fallback.push(DiffOp::Delete(offset_a + i));
     }
     for j in 0..m {
-        fallback.push(DiffOp::Insert(offset + j));
+        fallback.push(DiffOp::Insert(offset_b + j));
     }
     fallback
 }
@@ -166,9 +294,10 @@ fn backtrack(
     trace_arena: &[usize],
     _old: &[&str],
     _new: &[&str],
-    offset: usize,
+    offsets: (usize, usize),
     d: isize,
 ) -> Vec<DiffOp> {
+    let (offset_a, offset_b) = offsets;
     let mut ops = Vec::new();
 
     let mut curr_x = _old.len();
@@ -195,22 +324,22 @@ fn backtrack(
         while curr_x > prev_x && curr_y > prev_y {
             curr_x -= 1;
             curr_y -= 1;
-            ops.push(DiffOp::Equal(offset + curr_x, offset + curr_y));
+            ops.push(DiffOp::Equal(offset_a + curr_x, offset_b + curr_y));
         }
 
         if curr_x > prev_x {
             curr_x -= 1;
-            ops.push(DiffOp::Delete(offset + curr_x));
+            ops.push(DiffOp::Delete(offset_a + curr_x));
         } else if curr_y > prev_y {
             curr_y -= 1;
-            ops.push(DiffOp::Insert(offset + curr_y));
+            ops.push(DiffOp::Insert(offset_b + curr_y));
         }
     }
 
     while curr_x > 0 && curr_y > 0 {
         curr_x -= 1;
         curr_y -= 1;
-        ops.push(DiffOp::Equal(offset + curr_x, offset + curr_y));
+        ops.push(DiffOp::Equal(offset_a + curr_x, offset_b + curr_y));
     }
 
     ops.reverse();
@@ -268,7 +397,7 @@ fn bit_parallel_myers_64(pattern: &[u32], text: &[u32]) -> u32 {
         if (hp & target_bit) != 0 {
             score += 1;
         } else if (hn & target_bit) != 0 {
-            score -= 1;
+            score = score.saturating_sub(1);
         }
     }
 
@@ -303,7 +432,7 @@ fn bit_parallel_myers_128(pattern: &[u32], text: &[u32]) -> u32 {
         if (hp & target_bit) != 0 {
             score += 1;
         } else if (hn & target_bit) != 0 {
-            score -= 1;
+            score = score.saturating_sub(1);
         }
     }
 
