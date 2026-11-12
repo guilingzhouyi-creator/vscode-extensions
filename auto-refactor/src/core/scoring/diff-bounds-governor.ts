@@ -113,6 +113,22 @@ const DEFAULT_DIFF_BOUNDS_CONTRACT: DiffBoundsContractShape = {
     },
 };
 
+/** Validates every required contract leaf before exposing numeric parameters to governance. */
+function matchesContractShape(value: unknown, expected: unknown): boolean {
+    if (typeof expected === 'number') {
+        return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+    }
+    if (typeof expected === 'string') {
+        return typeof value === 'string' && value.trim().length > 0;
+    }
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+    const fields = value as Record<string, unknown>;
+    for (const [key, expectedField] of Object.entries(expected as Record<string, unknown>)) {
+        if (!matchesContractShape(fields[key], expectedField)) return false;
+    }
+    return true;
+}
+
 function loadDiffBoundsContract(): DiffBoundsContractShape {
     const candidatePaths = [
         path.resolve(__dirname, '../../../../scripts/common/diff-bounds-contract.json'),
@@ -123,12 +139,12 @@ function loadDiffBoundsContract(): DiffBoundsContractShape {
     for (let i = 0; i < candidatePaths.length; i++) {
         const candidatePath = candidatePaths[i];
         if (!fs.existsSync(candidatePath)) continue;
-        try {
-            const raw = fs.readFileSync(candidatePath, 'utf8');
-            return JSON.parse(raw) as DiffBoundsContractShape;
-        } catch {
-            // Fall back to verified defaults if external JSON cannot be read
+        const raw = fs.readFileSync(candidatePath, 'utf8');
+        const parsed: unknown = JSON.parse(raw);
+        if (!matchesContractShape(parsed, DEFAULT_DIFF_BOUNDS_CONTRACT)) {
+            throw new Error('Differential bounds contract has invalid or missing fields.');
         }
+        return parsed as DiffBoundsContractShape;
     }
     return DEFAULT_DIFF_BOUNDS_CONTRACT;
 }

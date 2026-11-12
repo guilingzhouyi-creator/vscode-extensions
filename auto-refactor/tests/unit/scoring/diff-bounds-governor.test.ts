@@ -6,7 +6,7 @@
  *   derivation (Θ_admission), and admission ledger persistence.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -795,5 +795,49 @@ describe('DiffBoundsGovernor — Differential Envelopes & Dynamic Admission', ()
             expect(loaded[1].netSemanticTurnover).toBe(14.0);
             expect(loaded[1].gatePassed).toBe(true);
         });
+    });
+});
+
+describe('DiffBoundsGovernor contract loading failures', () => {
+    afterEach(() => {
+        vi.doUnmock('fs');
+        vi.resetModules();
+    });
+
+    function mockContractRead(readContract: () => string): void {
+        vi.resetModules();
+        vi.doMock('fs', () => ({
+            ...fs,
+            readFileSync: (...args: Parameters<typeof fs.readFileSync>) =>
+                String(args[0]).endsWith('diff-bounds-contract.json')
+                    ? readContract()
+                    : fs.readFileSync(...args),
+        }));
+    }
+
+    it.each(['{}', 'null', '{"fileAddBands": []}'])(
+        'rejects incomplete or invalid contract shape %s',
+        async (raw) => {
+            mockContractRead(() => raw);
+            await expect(import('../../../src/core/scoring/diff-bounds-governor')).rejects.toThrow(
+                'Differential bounds contract has invalid or missing fields.',
+            );
+        },
+    );
+
+    it('propagates malformed JSON rather than activating fallback parameters', async () => {
+        mockContractRead(() => '{');
+        await expect(import('../../../src/core/scoring/diff-bounds-governor')).rejects.toBeInstanceOf(
+            SyntaxError,
+        );
+    });
+
+    it('propagates a read failure for a discovered contract', async () => {
+        mockContractRead(() => {
+            throw new Error('contract read fixture failed');
+        });
+        await expect(import('../../../src/core/scoring/diff-bounds-governor')).rejects.toThrow(
+            'contract read fixture failed',
+        );
     });
 });
