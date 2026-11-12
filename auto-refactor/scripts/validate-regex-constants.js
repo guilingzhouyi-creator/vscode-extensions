@@ -95,6 +95,14 @@ check('createStringLiteralScanner matches quoted string literals', () => {
   assert.strictEqual(scanner.test('"hello world"'), true);
 });
 
+check('createIntLiteralScanner matches integer numbers', () => {
+  assert.strictEqual(patterns.createIntLiteralScanner().test('12345'), true);
+});
+
+check('createRegexEscapeScanner matches metacharacters requiring escape', () => {
+  assert.strictEqual(patterns.createRegexEscapeScanner().test('^[a-z]+$'), true);
+});
+
 const failed = results.filter((entry) => !entry.ok);
 for (const entry of results) {
   console.log(

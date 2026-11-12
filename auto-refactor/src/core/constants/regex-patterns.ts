@@ -412,7 +412,7 @@ export function createIntLiteralScanner(): RegExp {
     return /\b(?:0[xX][0-9a-fA-F_]+|0[oO][0-7_]+|0[bB][01_]+|[1-9][0-9_]*|0)\b/g;
 }
 
-/** Creates a fresh global scanner for floating point literal numbers. */
+// Creates a fresh global scanner for floating point literal numbers.
 export function createFloatLiteralScanner(): RegExp {
     return /\b(?:(?:[0-9][0-9_]*\.[0-9_]*|[0-9][0-9_]*[eE][+-]?[0-9_]+|\.[0-9][0-9_]*)(?:[eE][+-]?[0-9_]+)?)\b/g;
 }
@@ -487,17 +487,17 @@ const PATTERN_COMPONENT_HANDLER_DECL =
     '\\b(?:const|let|var)\\s+([A-Za-z0-9_]+)\\s*=\\s*(?:\\([^)]*\\)|[A-Za-z0-9_]+)\\s*=>';
 const PATTERN_COMPONENT_PROPS_DECL = 'interface\\s+([A-Za-z0-9_]*Props)\\s*\\{([^}]+)\\}';
 
-/** Creates a fresh global scanner for React hook function declarations. */
+// Creates a fresh global scanner for React hook function declarations.
 export function createReactHookScanner(): RegExp {
     return new RegExp(PATTERN_COMPONENT_HOOK_DECL, 'g');
 }
 
-/** Creates a fresh global scanner for event handler arrow function declarations. */
+// Creates a fresh global scanner for event handler arrow function declarations.
 export function createComponentHandlerScanner(): RegExp {
     return new RegExp(PATTERN_COMPONENT_HANDLER_DECL, 'g');
 }
 
-/** Creates a fresh global scanner for React Component Props interface declarations. */
+// Creates a fresh global scanner for React Component Props interface declarations.
 export function createComponentPropsScanner(): RegExp {
     return new RegExp(PATTERN_COMPONENT_PROPS_DECL, 'g');
 }
@@ -646,7 +646,7 @@ export const BLOCKING_IO_PATTERN =
 export const CONTROL_FLOW_BRANCH_PATTERN =
     /\b(?:if\s*\(|for\s*\(|while\s*\(|switch\s*\(|catch\s*\()/;
 
-/** Creates a fresh global scanner for counting C-family control-flow branches. */
+// Creates a fresh global scanner for counting C-family control-flow branches.
 export function createControlFlowBranchScanner(): RegExp {
     return /\b(?:if\s*\(|for\s*\(|while\s*\(|switch\s*\(|catch\s*\()/g;
 }
@@ -657,7 +657,7 @@ export const VALID_IDENTIFIER_PATTERN = /^[A-Za-z_$][\w$]*$/;
 /** Matches special regular expression characters for escaping. */
 export const REGEX_ESCAPE_PATTERN = /[.*+?^${}()|[\]\\]/;
 
-/** Creates a fresh global scanner for escaping regular expression characters. */
+// Creates a fresh global scanner for escaping regular expression characters.
 export function createRegexEscapeScanner(): RegExp {
     return /[.*+?^${}()|[\]\\]/g;
 }
