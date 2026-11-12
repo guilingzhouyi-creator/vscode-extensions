@@ -17,11 +17,18 @@ param(
     [string]$RemoteSha = "",
     [string]$RefsFile = "",
     [switch]$AllowBypass,
-    [switch]$StaggeredPush
+    [switch]$StaggeredPush,
+    [switch]$Help
 )
 Set-StrictMode -Version Latest
 
 $ErrorActionPreference = 'Stop'
+
+if ($Help) {
+    Write-Output "用法: pwsh -File scripts/ps1/pre-push-gate.ps1 [-Agent] [-ViewLog] [-StaggeredPush] [-Help]"
+    Write-Output "层级流向: 常规推送走 Tier 1 (本地 pre-commit / pre-push) -> Tier 2 (CI)；Tier 1.5 云端预测试机由 -StaggeredPush 或手工 pwsh -File scripts/ps1/remote-sandbox-test.ps1 -Slice staged 触发。"
+    exit 0
+}
 
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
@@ -320,6 +327,10 @@ if ($isStaggered) {
     }
 
     Write-StepVerdict -StepId "CASCADE-COHERENCE-41" -Status "SKIP" -Detail "错峰历史推进跳过工作区协同闭合"
+    Write-StepVerdict -StepId "ENGINE-FORMAT-42" -Status "SKIP" -Detail "错峰历史推进跳过工作区格式校验"
+    Write-StepVerdict -StepId "ENGINE-LINT-43" -Status "SKIP" -Detail "错峰历史推进跳过工作区静态代码检查"
+    Write-StepVerdict -StepId "ENGINE-COMMENTS-44" -Status "SKIP" -Detail "错峰历史推进跳过工作区注释契约"
+    Write-StepVerdict -StepId "ENGINE-REDUNDANCY-45" -Status "SKIP" -Detail "错峰历史推进跳过工作区冗余治理"
 } else {
 if ($runAll) {
     Write-GateHost "ℹ️  检测到跨项目/共享治理改动或全量基准，执行全量门禁回归" -ForegroundColor Yellow
@@ -593,6 +604,21 @@ if ($refsLineCount -gt 0) {
 $codeCascade41 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @(".agents/skills/subagent-orchestration/scripts/validate-cascade-coherence.js") -WorkingDirectory $repoRoot -StepId "CASCADE-COHERENCE-41" -TimeoutSeconds 60
 if ($codeCascade41 -ne 0) {
     $failed = $true
+}
+
+if ($runAr) {
+    $codeFormat42 = Invoke-GateStep -FilePath $npmCmd -ArgumentList @("run", "format:check") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-FORMAT-42" -TimeoutSeconds 60
+    $codeLint43 = Invoke-GateStep -FilePath $npmCmd -ArgumentList @("run", "lint") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-LINT-43" -TimeoutSeconds 120
+    $codeComments44 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/gate-comments.js") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-COMMENTS-44" -TimeoutSeconds 60
+    $codeRedundancy45 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/validate-redundancy-governance.js") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-REDUNDANCY-45" -TimeoutSeconds 60
+    if ($codeFormat42 -ne 0 -or $codeLint43 -ne 0 -or $codeComments44 -ne 0 -or $codeRedundancy45 -ne 0) {
+        $failed = $true
+    }
+} else {
+    Write-StepVerdict -StepId "ENGINE-FORMAT-42" -Status "SKIP" -Detail "auto-refactor 未受影响"
+    Write-StepVerdict -StepId "ENGINE-LINT-43" -Status "SKIP" -Detail "auto-refactor 未受影响"
+    Write-StepVerdict -StepId "ENGINE-COMMENTS-44" -Status "SKIP" -Detail "auto-refactor 未受影响"
+    Write-StepVerdict -StepId "ENGINE-REDUNDANCY-45" -Status "SKIP" -Detail "auto-refactor 未受影响"
 }
 }
 

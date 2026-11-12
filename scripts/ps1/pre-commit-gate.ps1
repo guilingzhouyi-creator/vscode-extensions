@@ -639,10 +639,10 @@ if ($hasWtDoc) {
 }
 
 if ($hasArCompile) {
+    if (-not $Agent) { Write-StepBanner -StepId "ENGINE-COMPILE-07" }
     if ($hasArCrates.Count -gt 0) {
         # Crate sources only exist inside the Rust workspace under auto-refactor/crates.
         $arManifest = Join-Path $repoRoot "auto-refactor/crates/Cargo.toml"
-        if (-not $Agent) { Write-StepBanner -StepId "ENGINE-COMPILE-07" }
         if ($Agent) {
             if (-not $cargoCmd) {
                 $json = Write-PreCommitFailure `
@@ -680,7 +680,6 @@ if ($hasArCompile) {
             }
         }
     } else {
-        if (-not $Agent) { Write-StepBanner -StepId "ENGINE-COMPILE-07" }
         if ($Agent) {
             $childBuild = Invoke-ChildProcess -FilePath $npmCmd -ArgumentList @("run", "build") -WorkingDirectory (Join-Path $repoRoot "auto-refactor") -TimeoutSeconds 180
             $out = $childBuild.Output

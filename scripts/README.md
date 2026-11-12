@@ -273,7 +273,9 @@ Python 版使用 docstring + `if __name__ == "__main__":` 守卫。
 | **推送前置门禁** | `pwsh scripts/ps1/pre-push-gate.ps1` | `pwsh scripts/ps1/pre-push-gate.ps1 -Agent` | `pwsh scripts/ps1/pre-push-gate.ps1 -ViewLog` |
 | **失败快照轮转器** | `node scripts/common/log-rotator.js --view` | `node scripts/common/log-rotator.js --agent` | 自动保留最近一次失败至 `.audit-logs/last-failure.json` |
 
-> 各入口的语义步骤数均由 `scripts/common/gate-step-registry.json` 单源登记：提交前置 <!-- METRICS:BEGIN step-pre-commit -->**15 个语义步骤**<!-- METRICS:END step-pre-commit -->、提交信息 <!-- METRICS:BEGIN step-commit-msg -->**10 个语义步骤**<!-- METRICS:END step-commit-msg -->、推送前置 <!-- METRICS:BEGIN step-pre-push -->**41 个语义步骤**<!-- METRICS:END step-pre-push -->、全工作区审查 <!-- METRICS:BEGIN step-audit-all -->**6 个语义步骤**<!-- METRICS:END step-audit-all -->、fractal-git 审查 <!-- METRICS:BEGIN step-audit-taxis -->**5 个语义步骤**<!-- METRICS:END step-audit-taxis -->，合计 <!-- METRICS:BEGIN step-total -->**77 个语义步骤**<!-- METRICS:END step-total -->。
+> 各入口的语义步骤数均由 `scripts/common/gate-step-registry.json` 单源登记：提交前置 <!-- METRICS:BEGIN step-pre-commit -->**15 个语义步骤**<!-- METRICS:END step-pre-commit -->、提交信息 <!-- METRICS:BEGIN step-commit-msg -->**10 个语义步骤**<!-- METRICS:END step-commit-msg -->、推送前置 <!-- METRICS:BEGIN step-pre-push -->**45 个语义步骤**<!-- METRICS:END step-pre-push -->、全工作区审查 <!-- METRICS:BEGIN step-audit-all -->**6 个语义步骤**<!-- METRICS:END step-audit-all -->、fractal-git 审查 <!-- METRICS:BEGIN step-audit-taxis -->**5 个语义步骤**<!-- METRICS:END step-audit-taxis -->，合计 <!-- METRICS:BEGIN step-total -->**81 个语义步骤**<!-- METRICS:END step-total -->。
+>
+> **层级调度流向**：常规推送走 **Tier 1（本地 `pre-commit` / `pre-push`） $\to$ Tier 2（CI）**；**Tier 1.5（云端 Linux 预测试机）**由 `pre-push-gate --staggered-push`（错峰编排 `staggered-push-orchestrator.js`）或手工执行 `pwsh -File scripts/ps1/remote-sandbox-test.ps1 -Slice staged` / `bash scripts/sh/remote-sandbox-test.sh --slice staged` 显式触发。
 >
 > 推送门禁的输出形如
 > `✔  <步骤标识>  <详情>`（通过态只留勾号，异常态才写出 `✖ BLOCK` / `↷ SKIP` / `▲ WARN` 大写词），
@@ -306,6 +308,7 @@ Python 版使用 docstring + `if __name__ == "__main__":` 守卫。
 > | `COMMIT-HISTORY-BASELINE-36` | 提交历史冻结清单只能覆盖早于其生效时刻的提交 |
 > | `RULE-SOURCE-37` | 规则源文件内容与目录一致性 |
 > | `DESTRUCTIVE-OPS-38` | 破坏性文件操作静态守卫与溯源 |
+> | `ENGINE-FORMAT-42` ~ `ENGINE-REDUNDANCY-45` | auto-refactor Prettier 格式、ESLint 契约、注释密度棘轮、冗余打桩治理 |
 
 ---
 

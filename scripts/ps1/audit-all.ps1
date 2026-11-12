@@ -253,6 +253,12 @@ if (-not $Fast -and $statusAr -eq "PASS") {
             $statusAr = "BLOCK"
         }
     }
+} elseif ($Fast -and $statusAr -eq "PASS") {
+    $procArSlice = Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/gate-self-slice.js") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArSelfOut -RedirectStandardError $logArSelfErr -PassThru
+    $arSliceClean = Wait-ProcessWithTimeout -Process $procArSlice -TimeoutSeconds 60 -ProcessName "auto-refactor scripts/gate-self-slice.js" -LogFiles @($logArSelfOut, $logArSelfErr)
+    if (-not $arSliceClean -or $procArSlice.ExitCode -ne 0) {
+        $statusAr = "BLOCK"
+    }
 }
 
 # 权威报告文件存在性校验：若子项目进程返回 0 但缺失权威报告，按 Fail-Closed 升级为 BLOCK

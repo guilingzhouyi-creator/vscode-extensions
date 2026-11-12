@@ -36,6 +36,11 @@ STAGGERED_PUSH=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --help|-h|-Help)
+            echo "用法: bash scripts/sh/pre-push-gate.sh [--agent] [--view-log] [--staggered-push] [--help]"
+            echo "层级流向: 常规推送走 Tier 1 (本地 pre-commit / pre-push) -> Tier 2 (CI)；Tier 1.5 云端预测试机由 --staggered-push 或手工 bash scripts/sh/remote-sandbox-test.sh --slice staged 触发。"
+            exit 0
+            ;;
         --pushed-sha) PUSHED_SHA="${2:-}"; shift 2 ;;
         --remote-sha) REMOTE_SHA="${2:-}"; shift 2 ;;
         --refs-file) REFS_FILE="${2:-}"; shift 2 ;;
@@ -47,6 +52,11 @@ done
 
 for arg in "$@"; do
     case "$arg" in
+        --help|-h|-Help)
+            echo "用法: bash scripts/sh/pre-push-gate.sh [--agent] [--view-log] [--staggered-push] [--help]"
+            echo "层级流向: 常规推送走 Tier 1 (本地 pre-commit / pre-push) -> Tier 2 (CI)；Tier 1.5 云端预测试机由 --staggered-push 或手工 bash scripts/sh/remote-sandbox-test.sh --slice staged 触发。"
+            exit 0
+            ;;
         --view-log|-v)
             exec "$NODE_BIN" "$ROOT_DIR/scripts/common/log-rotator.js" --view
             ;;
@@ -306,6 +316,10 @@ if [[ "$IS_STAGGERED" -eq 1 ]]; then
     fi
 
     write_step_verdict "CASCADE-COHERENCE-41" SKIP "错峰历史推进跳过工作区协同闭合"
+    write_step_verdict "ENGINE-FORMAT-42" SKIP "错峰历史推进跳过工作区格式校验"
+    write_step_verdict "ENGINE-LINT-43" SKIP "错峰历史推进跳过工作区静态代码检查"
+    write_step_verdict "ENGINE-COMMENTS-44" SKIP "错峰历史推进跳过工作区注释契约"
+    write_step_verdict "ENGINE-REDUNDANCY-45" SKIP "错峰历史推进跳过工作区冗余治理"
 else
 if [[ "$RUN_ALL" -eq 1 ]]; then
     log_gate "ℹ️  检测到跨项目/共享治理改动或全量基准，执行全量门禁回归"
@@ -601,6 +615,18 @@ fi
 # 任何单点校验都看不见，必须交叉比对。
 if ! run_gate_step 60 "CASCADE-COHERENCE-41" "$ROOT_DIR" "$NODE_BIN" .agents/skills/subagent-orchestration/scripts/validate-cascade-coherence.js; then
     FAILED=1
+fi
+
+if [[ "$RUN_AR" -eq 1 ]]; then
+    run_gate_step 60 "ENGINE-FORMAT-42" "$ROOT_DIR/auto-refactor" "$NPM_BIN" run format:check || FAILED=1
+    run_gate_step 120 "ENGINE-LINT-43" "$ROOT_DIR/auto-refactor" "$NPM_BIN" run lint || FAILED=1
+    run_gate_step 60 "ENGINE-COMMENTS-44" "$ROOT_DIR/auto-refactor" "$NODE_BIN" scripts/gate-comments.js || FAILED=1
+    run_gate_step 60 "ENGINE-REDUNDANCY-45" "$ROOT_DIR/auto-refactor" "$NODE_BIN" scripts/validate-redundancy-governance.js || FAILED=1
+else
+    write_step_verdict "ENGINE-FORMAT-42" SKIP "auto-refactor 未受影响"
+    write_step_verdict "ENGINE-LINT-43" SKIP "auto-refactor 未受影响"
+    write_step_verdict "ENGINE-COMMENTS-44" SKIP "auto-refactor 未受影响"
+    write_step_verdict "ENGINE-REDUNDANCY-45" SKIP "auto-refactor 未受影响"
 fi
 fi
 

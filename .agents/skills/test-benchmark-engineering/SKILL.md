@@ -40,7 +40,7 @@ Unifies **Red-Green-Refactor TDD**, **deterministic clock/PRNG/sandbox isolation
 ## 2. Zero Orphan Specs (`TST-ORC-001`) & Latency Ratchet (`TB-REGRESSION`)
 
 1. **Mandatory Suite Registration across Controlled Projects**:
-   - **`auto-refactor`**: Register all `scripts/validate-*.js` and unit suites in `scripts/test-parallel.js` (<!-- METRICS:BEGIN test-suite-count -->**194 套**<!-- METRICS:END test-suite-count --> suites, verified by `validate-suite-manifest.js`).
+   - **`auto-refactor`**: Register all `scripts/validate-*.js` and unit suites in `scripts/test-parallel.js` (<!-- METRICS:BEGIN test-suite-count -->**197 套**<!-- METRICS:END test-suite-count --> suites, verified by `validate-suite-manifest.js`).
    - **`workspace-timing`**: <!-- METRICS:BEGIN ws-test-case-count -->**246 项**<!-- METRICS:END ws-test-case-count --> unit tests under `src/test/` executed via `npm run test:fast` and `npm run review`.
    - **`WebGames`**: Inherit `TestCase` under `tests/unit/{domains,frontend,infrastructure}/` and register in both `config/infrastructure/domains.json` and `tests/test_registry.gd` (<!-- METRICS:BEGIN wg-test-suite-count -->**138 套**<!-- METRICS:END wg-test-suite-count --> suites).
    - **`fractal-git`**: Register kernel & E2E suites in `Cargo.toml` and `audit-taxis.ps1`.

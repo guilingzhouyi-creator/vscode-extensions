@@ -401,6 +401,9 @@ if [[ -n "$TOUCHED_WT_DOC" ]]; then
 fi
 
 if [[ -n "$TOUCHED_AR_COMPILE" ]]; then
+    if [[ "$AGENT_MODE" -eq 0 ]]; then
+        write_step_banner "ENGINE-COMPILE-07"
+    fi
     if [[ -n "$TOUCHED_AR_CRATES" ]]; then
         # Crate sources: check the Rust workspace, since `tsc` cannot see them at all.
         if [[ "$AGENT_MODE" -eq 1 ]]; then
@@ -416,7 +419,6 @@ if [[ -n "$TOUCHED_AR_COMPILE" ]]; then
             fi
             write_step_verdict "ENGINE-COMPILE-07" PASS "auto-refactor Rust 增量编译通过"
         else
-            write_step_banner "ENGINE-COMPILE-07"
             if ! (cd auto-refactor/crates && cargo check --workspace --all-targets) >"$STEP_LOG" 2>&1; then
                 write_step_verdict "ENGINE-COMPILE-07" BLOCK "auto-refactor Rust 编译失败"
                 tail -n 15 "$STEP_LOG" | sed 's/^/   /'
@@ -437,7 +439,6 @@ if [[ -n "$TOUCHED_AR_COMPILE" ]]; then
             exit 1
         fi
     else
-        write_step_banner "ENGINE-COMPILE-07"
         if ! (cd auto-refactor && "$NPM_BIN" run build) >"$STEP_LOG" 2>&1; then
             write_step_verdict "ENGINE-COMPILE-07" BLOCK "auto-refactor 编译失败"
             tail -n 15 "$STEP_LOG" | sed 's/^/   /'

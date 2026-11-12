@@ -248,6 +248,14 @@ if [[ "$FAST_MODE" -eq 0 && "$STATUS_AR" == "PASS" ]]; then
             cat "$LOG_AR_SELF" >> "$LOG_AR"
         fi
     done
+elif [[ "$FAST_MODE" -eq 1 && "$STATUS_AR" == "PASS" ]]; then
+    CODE_GATE_AR=0
+    (cd auto-refactor && "$NODE_BIN" scripts/gate-self-slice.js) >"$LOG_AR_SELF" 2>&1 || CODE_GATE_AR=$?
+    if [[ "$CODE_GATE_AR" -ne 0 ]]; then
+        STATUS_AR="BLOCK"
+        FAILED=1
+        cat "$LOG_AR_SELF" >> "$LOG_AR"
+    fi
 fi
 
 # 判定必须在所有影响该步骤的检查之后渲染：gate-self 与并行套件同属 ENGINE-AUDIT-05。

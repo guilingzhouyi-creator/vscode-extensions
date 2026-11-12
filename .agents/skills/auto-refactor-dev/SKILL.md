@@ -6,7 +6,7 @@ description: >-
 
 # auto-refactor-dev — Static Refactoring Engine, Dual-Track Operators & Praxis SDK Contract
 
-Governs the `auto-refactor/` 6-layer architecture, Rust+TS 100% byte parity, <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count --> built-in Sparse MoE analyzers across 4 pipeline stages (Stage 0–3), <!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor --> (<!-- METRICS:BEGIN test-suite-count -->**194 套**<!-- METRICS:END test-suite-count --> test suites), `PraxisReviewClient` SDK, and 3-layer topological Diff engine.
+Governs the `auto-refactor/` 6-layer architecture, Rust+TS 100% byte parity, <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count --> built-in Sparse MoE analyzers across 4 pipeline stages (Stage 0–3), <!-- METRICS:BEGIN rule-auto-refactor -->**375 条规则**<!-- METRICS:END rule-auto-refactor --> (<!-- METRICS:BEGIN test-suite-count -->**197 套**<!-- METRICS:END test-suite-count --> test suites), `PraxisReviewClient` SDK, and 3-layer topological Diff engine.
 
 ---
 
@@ -48,7 +48,7 @@ Governs the `auto-refactor/` 6-layer architecture, Rust+TS 100% byte parity, <!-
   2. **32-Bit Unsigned Bitmask Parity**: `AnalyzerBit.CONCURRENCY = 1 << 31` sets the Int32 sign bit (`-2147483648`). `BIT_TO_ANALYZER_NAME`, `EXPERT_BY_BIT` (`expert-catalog.ts`), and `EXPERT_BASE_SCORES` (`expert-activation-library.ts`) must normalize keys with `(bit >>> 0)` and index both signed/unsigned keys, backed by `EXPERT_BY_INDEX` in `grouped-dispatcher.ts`.
   3. **`LineFeatureTape` (`LINE_FLAG_*`) Pre-Gating**: Use precomputed per-line bitmasks (`LINE_FLAG_HAS_CALL_PAREN`, `LINE_FLAG_COMMENT`, `LINE_FLAG_IMPORT` in `source-mask.ts`) to skip non-matching lines in $O(1)$.
   4. **32/32 `resetState()` Pooling & Lazy `ctx.sourceFile`**: Every analyzer must implement `resetState()` for `AnalyzerPool` reuse and evaluate `ctx.lines` / `ctx.maskedText` before touching `ctx.sourceFile` in `finalize(ctx)`.
-- **Rule & Regex SSOT**: Register rules as `FAMILY-TOPIC-NNN` across `src/core/rules/`, `dimensionRuleTable.ts` ($\text{AxesPerFinding} \le 4$), and `scripts/common/rule-catalog.json`; register all `scripts/validate-*.js` in `scripts/test-parallel.js` (<!-- METRICS:BEGIN test-suite-count -->**194 套**<!-- METRICS:END test-suite-count --> suites, `validate-suite-manifest.js`). Centralize regex literals in `src/core/constants/regex-patterns.ts` (`validate-regex-ssot.js`). Avoid duplicate `export *` collisions in `src/api.ts` (`TS2308`).
+- **Rule & Regex SSOT**: Register rules as `FAMILY-TOPIC-NNN` across `src/core/rules/`, `dimensionRuleTable.ts` ($\text{AxesPerFinding} \le 4$), and `scripts/common/rule-catalog.json`; register all `scripts/validate-*.js` in `scripts/test-parallel.js` (<!-- METRICS:BEGIN test-suite-count -->**197 套**<!-- METRICS:END test-suite-count --> suites, `validate-suite-manifest.js`). Centralize regex literals in `src/core/constants/regex-patterns.ts` (`validate-regex-ssot.js`). Avoid duplicate `export *` collisions in `src/api.ts` (`TS2308`).
 
 ---
 

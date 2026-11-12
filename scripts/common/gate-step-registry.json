@@ -362,6 +362,26 @@
           "id": "CASCADE-COHERENCE-41",
           "ruleId": "RCFG-RULE-DRIFT",
           "title": "技能注册表、原型、专员模板与 DSH 策略四方闭合"
+        },
+        {
+          "id": "ENGINE-FORMAT-42",
+          "ruleId": "HYG-EOL-001",
+          "title": "auto-refactor Prettier 格式校验"
+        },
+        {
+          "id": "ENGINE-LINT-43",
+          "ruleId": "GUARD-SYS-001",
+          "title": "auto-refactor ESLint 结构与契约检查"
+        },
+        {
+          "id": "ENGINE-COMMENTS-44",
+          "ruleId": "CMT-DOC-001",
+          "title": "auto-refactor 注释密度与六字段头棘轮"
+        },
+        {
+          "id": "ENGINE-REDUNDANCY-45",
+          "ruleId": "HYG-DED-001",
+          "title": "auto-refactor 冗余打桩与空壳门面治理"
         }
       ]
     },
