@@ -28,7 +28,7 @@ import { SCORE_ROUNDING } from './scorer-formulas';
 const APPROVED_DELTA_CC_MAGNITUDE = 4;
 const MAX_APPROVED_PARAM_COUNT = 3;
 const GAMING_KIND_ARTIFICIAL_SPLITTING = 'artificial_function_splitting';
-const RULE_GAMING_001 = 'GAMING-001';
+const RULE_GAMING_001 = 'GOV-GAM-001';
 const RULE_SPLITTING_KEYWORD = 'splitting';
 
 const SEVERITY_ERROR_TAG = 'error';
@@ -227,10 +227,23 @@ function computeRegressionPenalty(
     regressionIssues: Issue[],
     explanation: string[],
 ): number {
-    const existingRuleKeys = new Set(existingIssues.map((i) => `${i.rule}:${i.severity}`));
-    const newlyIntroduced = newIssues.filter(
-        (i) => !existingRuleKeys.has(`${i.rule}:${i.severity}`),
-    );
+    // Track per-(rule, severity) multiplicity credits instead of a Set so introducing
+    // extra occurrences of an already-present rule still incurs regression penalties.
+    const existingRuleCounts = new Map<string, number>();
+    for (const item of existingIssues) {
+        const key = `${item.rule}:${item.severity}`;
+        existingRuleCounts.set(key, (existingRuleCounts.get(key) ?? 0) + 1);
+    }
+    const newlyIntroduced: Issue[] = [];
+    for (const item of newIssues) {
+        const key = `${item.rule}:${item.severity}`;
+        const remaining = existingRuleCounts.get(key) ?? 0;
+        if (remaining > 0) {
+            existingRuleCounts.set(key, remaining - 1);
+        } else {
+            newlyIntroduced.push(item);
+        }
+    }
     const totalRegressions = [...regressionIssues, ...newlyIntroduced];
 
     let penalty = 0;
