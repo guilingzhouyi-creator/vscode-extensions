@@ -8,11 +8,13 @@
 //!
 //! Domain Governance Rules: FGT-PRF-001 (worktree slot pooling), FGT-COR-001, FGT-POL-001.
 
-use fg_core::error::{FractalError, FractalResult};
 use parking_lot::Mutex;
 use std::collections::VecDeque;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+
+use fg_core::error::{FractalError, FractalResult};
 
 /// Execution acceleration mode for dynamic virtual worktree allocations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -48,6 +50,7 @@ pub struct WorktreePool {
     available_slots: Mutex<VecDeque<usize>>,
     max_slots: usize,
     base_dir: PathBuf,
+    epoch_counter: AtomicU64,
 }
 
 impl WorktreePool {
@@ -66,6 +69,7 @@ impl WorktreePool {
             available_slots: Mutex::new(slots),
             max_slots,
             base_dir,
+            epoch_counter: AtomicU64::new(1),
         }
     }
 
@@ -94,12 +98,13 @@ impl WorktreePool {
         let mut guard = self.available_slots.lock();
         guard.pop_front().map(|slot_id| {
             let slot_dir = self.base_dir.join(format!("slot_{slot_id:03}"));
+            let epoch = self.epoch_counter.fetch_add(1, Ordering::Relaxed);
             WorktreeDescriptor {
                 slot_id,
                 token: format!("{prefix}-slot-{slot_id}"),
                 is_active: true,
                 mode,
-                epoch: 0,
+                epoch,
                 scopes,
                 direct_bypass_cache: slot_dir.join("cache"),
                 direct_bypass_test_store: slot_dir.join("test-store"),
@@ -137,18 +142,40 @@ impl WorktreePool {
 
     /// Assert that the path is an authorized scratch directory to prevent accidental destruction.
     fn assert_safe_scratch_path(path: &Path) -> FractalResult<()> {
+        let mut has_slot_or_taxis = false;
+        for component in path.components() {
+            match component {
+                Component::ParentDir => {
+                    return Err(FractalError::PolicyViolation(
+                        "Refusing to purge path with parent traversal components (..)".into(),
+                    ));
+                }
+                Component::Normal(os_str) => {
+                    let text = os_str.to_string_lossy();
+                    if text.contains("slot_") || text.contains(".taxis") {
+                        has_slot_or_taxis = true;
+                    }
+                }
+                _ => {}
+            }
+        }
         let path_repr = path.to_string_lossy();
         if path_repr.is_empty() || path_repr == "/" || path_repr == "\\" {
             return Err(FractalError::PolicyViolation(
                 "Refusing to purge root or empty path".into(),
             ));
         }
-        if !path_repr.contains("slot_") && !path_repr.contains(".taxis") {
+        if !has_slot_or_taxis {
             return Err(FractalError::PolicyViolation(format!(
                 "Refusing to purge non-slot path: '{path_repr}'"
             )));
         }
         Ok(())
+    }
+
+    /// Current monotonic allocation epoch.
+    pub fn current_epoch(&self) -> u64 {
+        self.epoch_counter.load(Ordering::Relaxed)
     }
 
     /// Number of currently idle slots.
@@ -260,9 +287,25 @@ mod tests {
         assert!(WorktreePool::assert_safe_scratch_path(Path::new("C:\\")).is_err());
         assert!(WorktreePool::assert_safe_scratch_path(Path::new("")).is_err());
         assert!(WorktreePool::assert_safe_scratch_path(Path::new("/home/user")).is_err());
+        // Traversal with .. must be rejected
+        assert!(WorktreePool::assert_safe_scratch_path(Path::new(
+            "/tmp/.taxis/slot_001/../../etc/passwd"
+        ))
+        .is_err());
         assert!(WorktreePool::assert_safe_scratch_path(Path::new(
             "/tmp/.taxis-worktrees/slot_001/cache"
         ))
         .is_ok());
+    }
+
+    #[test]
+    fn test_worktree_pool_monotonic_epoch() {
+        let pool = WorktreePool::new(3);
+        let s1 = pool.acquire_slot("t1").expect("s1");
+        let s2 = pool.acquire_slot("t2").expect("s2");
+        assert!(s2.epoch > s1.epoch);
+        pool.release_slot(s1);
+        let s3 = pool.acquire_slot("t3").expect("s3");
+        assert!(s3.epoch > s2.epoch);
     }
 }
