@@ -271,8 +271,8 @@ function checkZeroPOV(line, lineNum, rawDisplayLine = '') {
 
   const displayLine = (rawDisplayLine || line).trim();
 
-  // Mask inline code blocks and URLs
-  let sanitized = line.replace(/`[^`]+`/g, ' ').replace(/https?:\/\/[^\s]+/g, ' ');
+  // Inline code blocks and URLs are intentionally not masked so subjective pronouns cannot evade detection.
+  let sanitized = line;
 
   // Mask bound-morpheme compounds before scanning for the bare pronoun.
   for (const compound of BOUND_WO_COMPOUNDS) {
