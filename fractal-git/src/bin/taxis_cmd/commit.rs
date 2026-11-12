@@ -32,17 +32,19 @@ use fractal_git::{
     ValidatedCommitWitness,
 };
 
+use super::commit_amend::{load_amend_state, materialize_amend_commit, AmendState};
+use super::commit_flags::{
+    append_signoff_trailer, has_taxis_governance_flags, parse_commit_cli_flags,
+    resolve_commit_message_with_flags, strip_message_file_flags,
+};
 pub(crate) use super::commit_ops::verify_project_lease_authorization;
 use super::commit_ops::*;
 use super::common::{fail_io, find_all_arg_values, find_arg_value, reject, CliContext};
 
 /// Dispatches atomic commit creation with governance and identity checks.
 pub fn handle_commit(ctx: &CliContext) {
-    if ctx
-        .args
-        .iter()
-        .any(|arg| arg == "-a" || arg == "--all" || arg == "-am")
-    {
+    let flags = parse_commit_cli_flags(&ctx.args);
+    if flags.stage_all {
         super::stage::stage_tracked_for_commit(ctx);
     }
 
@@ -58,10 +60,36 @@ pub fn handle_commit(ctx: &CliContext) {
         (git_native_default, cell_id, agent_id),
         (&target_ref, &mut policy),
     );
+    let amend_state = if flags.amend {
+        Some(load_amend_state(ctx, &target_ref))
+    } else {
+        None
+    };
 
-    let message = resolve_commit_message(&ctx.args, card_id);
-    let staged_files = collect_staged_files(ctx);
     let work_root = super::repo_view::resolve_work_root(&ctx.git_dir);
+    let raw_message = resolve_commit_message_with_flags(
+        &ctx.args,
+        &flags,
+        card_id,
+        &work_root,
+        amend_state
+            .as_ref()
+            .map(|state| state.record.message.as_str()),
+    );
+    let message = if flags.signoff {
+        let signer = resolve_commit_committer(
+            ctx,
+            git_native_default,
+            human_author.as_deref(),
+            agent_id,
+            cell_id,
+        );
+        append_signoff_trailer(&raw_message, &signer.name, &signer.email)
+    } else {
+        raw_message
+    };
+
+    let staged_files = collect_staged_files(ctx);
     fg_core::diag_debug!(
         "commit",
         "policy={} tier={} staged={} target={} native={}",
@@ -99,8 +127,13 @@ pub fn handle_commit(ctx: &CliContext) {
     // The witness must describe the message that is actually written, not only the one that entered
     // the hook chain: `prepare-commit-msg` and `commit-msg` may rewrite the text, so a witness
     // captured before them attests to something the repository never stored. The post-hook result
-    // is therefore the witness that accompanies the commit.
-    let final_message = super::git_hooks::run_commit_chain(&hook_runner, &ctx.git_dir, &message);
+    // is therefore the witness that accompanies the commit. With `--no-verify`, pre-commit and
+    // commit-msg hooks are skipped while prepare-commit-msg still runs.
+    let final_message = if flags.no_verify {
+        super::git_hooks::run_prepare_chain(&hook_runner, &ctx.git_dir, &message, "message")
+    } else {
+        super::git_hooks::run_commit_chain(&hook_runner, &ctx.git_dir, &message)
+    };
     let bypass = resolve_bypass_grant(&ctx.args, git_native_default, &final_message);
     let witness = match &bypass {
         // A recorded bypass skips message validation because that is what the flag promises, and
@@ -129,13 +162,13 @@ pub fn handle_commit(ctx: &CliContext) {
         &staged_files,
         &final_message,
         human_author.as_deref(),
-        agent_id,
-        cell_id,
-        &target_ref,
+        (agent_id, cell_id, flags.reset_author),
+        (&target_ref, amend_state.as_ref()),
     );
 
+    let sync_ctx = strip_message_file_flags(ctx);
     sync_committed_index_and_container(
-        ctx,
+        &sync_ctx,
         (&tx_id, wal.as_ref(), &target_ref),
         (
             &staged_files,
@@ -144,9 +177,24 @@ pub fn handle_commit(ctx: &CliContext) {
             &materialized.modes,
         ),
     );
-    advance_head_after_commit(&ctx.git_dir, &target_ref, &materialized.commit_oid);
+    if amend_state
+        .as_ref()
+        .is_some_and(|state| state.detached_head)
+    {
+        let ref_store = DiskRefStore::new(&ctx.git_dir);
+        let _ = ref_store.update_head_detached(&materialized.commit_oid);
+    } else {
+        advance_head_after_commit(&ctx.git_dir, &target_ref, &materialized.commit_oid);
+    }
 
     super::git_hooks::run_post_hook(&hook_runner, "post-commit", &[]);
+    if let Some(ref state) = amend_state {
+        super::git_hooks::run_post_rewrite(
+            &hook_runner,
+            "amend",
+            &[(state.amended_oid.to_hex(), materialized.commit_oid.to_hex())],
+        );
+    }
     record_commit_in_operation_graph(ctx, &materialized.commit_oid, &target_ref, &actor, &witness);
     record_block_provenance(ctx, &materialized, &staged_files, agent_id, cell_id);
     touch_affected_project_leases(&ctx.git_dir, &staged_files);
@@ -483,41 +531,30 @@ fn unvalidated_witness(message: &str, _policy: &TaxisPolicy) -> ValidatedCommitW
     )
 }
 
-/// Extracts commit message or generates a conventional default.
-///
-/// The generated default must itself satisfy the policy that will validate it, because a fallback
-/// that always fails the gate pushes authors towards disabling the gate. It therefore carries the
-/// project declaration the workspace contract demands.
-fn resolve_commit_message(args: &[String], card_id: &str) -> String {
-    let declared_project = find_arg_value(args, &["--project"]).unwrap_or("governance");
-    find_arg_value(args, &["-m", "-am", "--message"])
-        .map(String::from)
-        .unwrap_or_else(|| {
-            format!(
-                concat!(
-                    "feat(core): record atomic commit checkpoint for {card}\n\n",
-                    "[Project / 项目归属]\n- {project}\n\n",
-                    "[Why / 动机背景]\n- Capture the current working tree as a recoverable checkpoint ",
-                    "before further mutation begins.\n\n",
-                    "[Changed / 变更调整]\n- Persisted the staged working tree state as an immutable ",
-                    "commit object.\n\n",
-                    "[Verification / 验证结论]\n- Assert the recorded tree matches the staged content ",
-                    "and the target reference advances atomically."
-                ),
-                card = card_id,
-                project = declared_project
-            )
-        })
-}
-
-/// Reports whether the caller explicitly supplied Taxis governance or actor flags.
-fn has_taxis_governance_flags(args: &[String]) -> bool {
-    args.iter().any(|arg| {
-        matches!(
-            arg.as_str(),
-            "--policy" | "--agent" | "--human" | "--cell" | "--card" | "--token" | "--target"
-        )
-    })
+/// Resolves the committer signature used for commit headers and `--signoff`.
+fn resolve_commit_committer(
+    ctx: &CliContext,
+    git_native_default: bool,
+    human_author: Option<&str>,
+    agent_id: &str,
+    cell_id: &str,
+) -> GitSignature {
+    let timestamp_sec = chrono::Utc::now().timestamp();
+    if git_native_default {
+        if let Ok(view) = super::repo_view::RepoView::open(ctx) {
+            return super::index_plumbing::resolve_git_signature(
+                &view,
+                "GIT_COMMITTER_NAME",
+                "GIT_COMMITTER_EMAIL",
+                "GIT_COMMITTER_DATE",
+            );
+        }
+        return resolve_git_native_signature(ctx);
+    }
+    match human_author {
+        Some(human_name) => GitSignature::new(human_name, human_email(human_name), timestamp_sec),
+        None => GitSignature::for_agent(agent_id, cell_id, timestamp_sec),
+    }
 }
 
 /// Resolves author signature from Git environment variables or `.git/config`.
@@ -535,7 +572,7 @@ fn resolve_git_native_signature(ctx: &CliContext) -> GitSignature {
 
 /// Collects every path the caller declares as part of this commit, or reads changed paths from index.
 pub(crate) fn collect_staged_files(ctx: &CliContext) -> Vec<String> {
-    let declared = find_all_arg_values(&ctx.args, &["--file", "--add"]);
+    let declared = find_all_arg_values(&ctx.args, &["--add"]);
     let work_root = super::repo_view::resolve_work_root(&ctx.git_dir);
     let mut files = std::collections::BTreeSet::new();
     let mut index_entries: std::collections::BTreeMap<String, (Oid, FileMode)> =
@@ -701,10 +738,11 @@ fn materialize_staged_files(
     staged_files: &[String],
     message: &str,
     human_author: Option<&str>,
-    agent_id: &str,
-    cell_id: &str,
-    target_ref: &FractalRef,
+    actor_meta: (&str, &str, bool),
+    target_and_amend: (&FractalRef, Option<&AmendState>),
 ) -> fractal_git::MaterializedCommit {
+    let (agent_id, cell_id, reset_author) = actor_meta;
+    let (target_ref, amend_state) = target_and_amend;
     let timestamp_sec = chrono::Utc::now().timestamp();
     let git_native_default = !fg_native::container_path(&ctx.git_dir).is_file()
         && !has_taxis_governance_flags(&ctx.args);
@@ -750,10 +788,18 @@ fn materialize_staged_files(
     }
     let previous_head = ref_store.get_ref("HEAD").ok().flatten();
     let merge_heads = read_merge_heads(&ctx.git_dir);
-    let declared_files = find_all_arg_values(&ctx.args, &["--file", "--add"]);
+    let declared_files = find_all_arg_values(&ctx.args, &["--add"]);
     let index_file = ctx.git_dir.join("index");
 
-    let materialized = if declared_files.is_empty() && index_file.is_file() {
+    let materialized = if let Some(state) = amend_state {
+        materialize_amend_commit(
+            ctx,
+            &odb,
+            state,
+            (&index_file, &declared_files, staged_files, &work_root),
+            (message, &author, &committer, reset_author),
+        )
+    } else if declared_files.is_empty() && index_file.is_file() {
         materialize_from_git_index(
             ctx,
             &odb,
@@ -780,6 +826,32 @@ fn materialize_staged_files(
             Err(materialize_err) => fail_io("materialize commit", materialize_err),
         }
     };
+
+    if amend_state.is_some_and(|state| state.detached_head) {
+        let head_rows = [super::git_hooks::ReferenceUpdate {
+            previous: previous_head,
+            next: materialized.commit_oid.to_hex(),
+            name: "HEAD".to_string(),
+        }];
+        if !super::git_hooks::run_reference_transaction(&hook_runner, "preparing", &head_rows)
+            || !super::git_hooks::run_reference_transaction(&hook_runner, "prepared", &head_rows)
+        {
+            let _ =
+                super::git_hooks::run_reference_transaction(&hook_runner, "aborted", &head_rows);
+            reject(
+                CliTag::ERROR,
+                "reference-transaction hook rejected the commit reference update",
+            );
+        }
+        if let Err(update_err) = ref_store.update_head_detached(&materialized.commit_oid) {
+            let _ =
+                super::git_hooks::run_reference_transaction(&hook_runner, "aborted", &head_rows);
+            fail_io("advance detached HEAD", update_err);
+        }
+        let _ = super::git_hooks::run_reference_transaction(&hook_runner, "committed", &head_rows);
+        clear_merge_state(&ctx.git_dir, !merge_heads.is_empty());
+        return materialized;
+    }
 
     let branch_update = super::git_hooks::ReferenceUpdate {
         previous: materialized.parent_oid,
