@@ -1,9 +1,9 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-11-06T15:28:28.382Z",
-  "totalRules": 534,
+  "generatedAt": "2026-11-12T04:55:21.748Z",
+  "totalRules": 536,
   "counts": {
-    "autoRefactor": 375,
+    "autoRefactor": 377,
     "workspaceTiming": 49,
     "webGames": 50,
     "fractalGit": 37,
@@ -2550,6 +2550,15 @@
       "canonical": true
     },
     {
+      "id": "hardcoded-string",
+      "project": "auto-refactor",
+      "family": "CONST",
+      "severity": "warning",
+      "summary": "Hardcoded string literal outside constant declarations risks magic-value drift and duplication.",
+      "canonical": false,
+      "legacyReason": "id-not-canonical"
+    },
+    {
       "project": "workspace-timing",
       "family": "HC",
       "layer": "L3",
@@ -2963,6 +2972,15 @@
       "family": "PRF",
       "severity": "warning",
       "summary": "Transient heap allocation inside a loop (ADV-PRF-002), violating the zero-transient-allocation contract.",
+      "canonical": false,
+      "legacyReason": "id-not-canonical"
+    },
+    {
+      "id": "magic-number",
+      "project": "auto-refactor",
+      "family": "CONST",
+      "severity": "warning",
+      "summary": "Unexplained numeric literal (magic number) embedded directly in logic instead of a named constant.",
       "canonical": false,
       "legacyReason": "id-not-canonical"
     },

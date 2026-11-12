@@ -19,9 +19,6 @@ import type { RuleDefinition } from '../types';
 
 import { ANALYZER_GDSCRIPT_MODERN, ANALYZER_GDSCRIPT_GAME } from '../../scoring/dimensionLiterals';
 
-/** Shared remediation level descriptor for GDScript rules. */
-export const REMEDIATION_STANDARD_AND_ABOVE = '`standard` and above';
-
 /**
  * Modern GDScript and game domain rule definitions.
  */

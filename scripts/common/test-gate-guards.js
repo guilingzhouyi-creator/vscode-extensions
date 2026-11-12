@@ -410,6 +410,9 @@ const CANONICAL_RULE_ID_PATTERN = /^[A-Z][A-Z0-9]{1,5}(?:-[A-Z0-9]{2,10}){1,3}-\
 const liveCanonical = (catalogParsed.rules || []).filter(
   (r) => r.project === 'auto-refactor' && CANONICAL_RULE_ID_PATTERN.test(r.id),
 ).length;
+const liveLegacy = (catalogParsed.rules || []).filter(
+  (r) => r.project === 'auto-refactor' && !CANONICAL_RULE_ID_PATTERN.test(r.id),
+).length;
 const staleCanonical = liveCanonical - 1;
 check(
   'docs consistency guard reads a coverage ratio',
@@ -433,8 +436,8 @@ check(
 );
 check(
   'docs consistency guard reads a canonical/legacy split',
-  DOCS_CONSISTENCY.scanTextForClaims(`全量规则字典 (${staleCanonical} 规范 + 15 历史别名)`, claimDetectors).length === 1 &&
-    DOCS_CONSISTENCY.scanTextForClaims(`全量规则字典 (${liveCanonical} 规范 + 15 历史别名)`, claimDetectors).length === 0,
+  DOCS_CONSISTENCY.scanTextForClaims(`全量规则字典 (${staleCanonical} 规范 + ${liveLegacy} 历史别名)`, claimDetectors).length === 1 &&
+    DOCS_CONSISTENCY.scanTextForClaims(`全量规则字典 (${liveCanonical} 规范 + ${liveLegacy} 历史别名)`, claimDetectors).length === 0,
 );
 check(
   'docs consistency guard leaves a rule-id suffix and a test ratio alone',
