@@ -11,6 +11,7 @@
 class_name SaveManager extends RefCounted
 
 const AtomicFileWriter = preload("res://backend/infrastructure/atomic_file_writer.gd")
+const CryptoIntegrityLib = preload("res://backend/infrastructure/pure/crypto_integrity_lib.gd")
 const OP_RESTORE: String = "restore"
 
 # ==============================================================================
@@ -37,9 +38,9 @@ static func _cleanup_orphan_tmp_files(save_dir: String) -> void:
 	if removed > 0:
 		EventBusCore.get_instance().emit_log("warn", _msg("orphan_tmp_cleaned", {"count": removed}))
 
-## 内容 SHA-256 摘要（数据完整性校验用）
+## 内容 SHA-256 摘要（数据完整性校验用，委托纯密码学域库）
 static func compute_sha256(content_string: String) -> String:
-	return content_string.sha256_text()
+	return CryptoIntegrityLib.sha256_hex(content_string)
 
 ## 存档名合法性校验：拒绝空名、超长名、路径分隔符与路径穿越片段
 static func is_valid_save_name(save_name: String) -> bool:
@@ -151,7 +152,7 @@ static func load_game(save_name: String) -> Dictionary:
 		return _fail_or_recover("load", "INVALID_ENVELOPE", _msg("invalid_envelope"), save_name)
 
 	var calculated_hash := compute_sha256(raw_data_str)
-	if calculated_hash != recorded_hash:
+	if not CryptoIntegrityLib.constant_time_equals(calculated_hash, recorded_hash):
 		return _fail_or_recover("load", "CHECKSUM_MISMATCH", _msg("checksum_mismatch"), save_name, {"recorded": recorded_hash, "calculated": calculated_hash})
 
 	# 从已被校验的字节序列反序列化，杜绝 data / data_json 不一致

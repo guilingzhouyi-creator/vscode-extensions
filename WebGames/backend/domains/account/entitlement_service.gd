@@ -10,6 +10,10 @@
 ## EntitlementService：Domain Service / State Orchestrator
 class_name EntitlementService extends RefCounted
 
+const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
+const SystemBaseMessages = preload("res://backend/infrastructure/logging/system_base_messages.gd")
+const CryptoIntegrityLib = preload("res://backend/infrastructure/pure/crypto_integrity_lib.gd")
+
 # ==============================================================================
 # 一、统一鉴权入口与白名单
 # ==============================================================================
@@ -64,16 +68,7 @@ static func encrypted_storage_enabled() -> bool:
 
 ## 密封密钥 ID（非秘密元数据，仅用于追溯；HMAC 密钥来自环境变量）
 static func _seal_key_id() -> String:
-	return GameConfig.get_string("infrastructure.admin", "security/seal_key_id", "")
-
-## HMAC 密钥读取：仅接受环境密钥（受控密钥提供器）——缺失返回空（失败关闭），
-## 严禁回退到公开配置值（seal_key_id 为非秘密元数据，不得充当 HMAC 密钥）
-static func _seal_key() -> PackedByteArray:
-	# 密钥安全策略：仅接受环境密钥（受控密钥提供器）——缺失返回空（失败关闭），
-	# 严禁回退到公开配置值（seal_key_id 为非秘密元数据，不得充当 HMAC 密钥）
-	var env_name := GameConfig.get_string("infrastructure.admin", "security/seal_key_env", "")
-	var key := OS.get_environment(env_name) if not env_name.is_empty() else ""
-	return key.to_utf8_buffer()
+	return GameConfig.get_string(LogConstants.CFG_ADMIN_TABLE, LogConstants.CFG_PATH_SECURITY_SEAL_ID, "")
 
 ## 规范化载荷：账号 ID + 白名单过滤后排序权限列表（顺序无关，防误报篡改）
 static func _canonical_payload(account: AccountProfileAggregate) -> String:
@@ -85,16 +80,16 @@ static func _canonical_payload(account: AccountProfileAggregate) -> String:
 static func seal_entitlements(account: AccountProfileAggregate) -> String:
 	if account == null:
 		return ""
-	var key := _seal_key()
+	var key := CryptoIntegrityLib.resolve_seal_key_bytes(LogConstants.CFG_ADMIN_TABLE, LogConstants.CFG_PATH_SECURITY_SEAL_ENV)
 	if key.is_empty():
-		ErrorReporter.emit_error("entitlement_service", "SEAL_KEY_MISSING", "EntitlementService: Seal key missing; sealed output unavailable (fail-closed).")
+		ErrorReporter.emit_error(LogConstants.CHANNEL_ENTITLEMENT, "SEAL_KEY_MISSING", SystemBaseMessages.MSG_SEAL_KEY_MISSING)
 		return ""
 	var payload := _canonical_payload(account)
-	var digest := Crypto.new().hmac_digest(HashingContext.HASH_SHA256, key, payload.to_utf8_buffer())
-	return "v2:%s:%s" % [_seal_key_id(), digest.hex_encode()]
+	var mac_hex := CryptoIntegrityLib.hmac_sha256_hex(key, payload.to_utf8_buffer())
+	return "v2:%s:%s" % [_seal_key_id(), mac_hex]
 
-## 校验权限指纹是否被篡改
+## 校验权限指纹是否被篡改（常量时间比对，防御时序侧信道攻击）
 static func verify_seal(account: AccountProfileAggregate, recorded_seal: String) -> bool:
 	if account == null or recorded_seal.is_empty():
 		return false
-	return seal_entitlements(account) == recorded_seal
+	return CryptoIntegrityLib.constant_time_equals(seal_entitlements(account), recorded_seal)

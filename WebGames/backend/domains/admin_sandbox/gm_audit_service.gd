@@ -10,15 +10,19 @@
 ## GMArbitrationAuditService：Domain Service / State Orchestrator
 class_name GMArbitrationAuditService extends RefCounted
 
+const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
+const SystemBaseMessages = preload("res://backend/infrastructure/logging/system_base_messages.gd")
+const CryptoIntegrityLib = preload("res://backend/infrastructure/pure/crypto_integrity_lib.gd")
+
 static var audit_log: Array = []
 
 ## 记录 GM 操作流水：规范化载荷签名（缺钥失败关闭）+ 有界裁剪（O(1) 批量切片）+ 日志广播
 static func record_audit(admin_id: String, action: String, details: Dictionary) -> Dictionary:
 	# 清单 6：签名覆盖规范化完整载荷（含 details——JSON 排序键确定性）+ key_id 支持轮换验证
-	var key_id := GameConfig.get_string("infrastructure.admin", "security/seal_key_id", "")
+	var key_id := GameConfig.get_string(LogConstants.CFG_ADMIN_TABLE, LogConstants.CFG_PATH_SECURITY_SEAL_ID, "")
 	var canonical := "%s:%s:%s" % [admin_id, action, JSON.stringify(details, "", true)]
 	var entry := {
-		"timestamp_utc": int(Time.get_unix_time_from_system()),
+		LogConstants.KEY_TIMESTAMP_UTC: int(Time.get_unix_time_from_system()),
 		"admin_id": admin_id,
 		"action": action,
 		"details": details,
@@ -29,27 +33,24 @@ static func record_audit(admin_id: String, action: String, details: Dictionary) 
 	# 审计有界化——按 infrastructure.admin audit/max_entries（默认 500）
 	# 从头裁剪，最旧先出，长运行审计内存受控（recent_limit 仍只控制查询窗口）
 	# 有界裁剪 O(max_entries) 浅拷贝（500 引用级，可忽略），避免 while+pop_front O(n²) 移位
-	var audit_max := maxi(1, GameConfig.get_int("infrastructure.admin", "audit/max_entries", 500))
+	var audit_max := maxi(1, GameConfig.get_int(LogConstants.CFG_ADMIN_TABLE, "audit/max_entries", 500))
 	if audit_log.size() > audit_max:
 		audit_log = audit_log.slice(audit_log.size() - audit_max, audit_log.size())
-	var tmpl := GameConfig.get_string("narratives.admin", "audit_log", "GM Audit: Admin [{admin_id}] executed [{action}]")
-	EventBusCore.get_instance().emit_log("warn", TemplateFormatter.format(tmpl, {"admin_id": admin_id, "action": action}))
+	var tmpl := GameConfig.get_string("narratives.admin", "audit_log", SystemBaseMessages.MSG_GM_AUDIT_FALLBACK)
+	EventBusCore.get_instance().emit_log(LogConstants.LEVEL_LOWER_WARN, TemplateFormatter.format(tmpl, {"admin_id": admin_id, "action": action}))
 	return entry
 
 ## 清单 6：带密钥 HMAC 签名（受控环境密钥提供器——缺钥失败关闭，不降级公开摘要）
 static func _sign(canonical: String) -> String:
-	var env_name := GameConfig.get_string("infrastructure.admin", "security/seal_key_env", "")
-	var key := OS.get_environment(env_name) if not env_name.is_empty() else ""
+	var key := CryptoIntegrityLib.resolve_seal_key_bytes(LogConstants.CFG_ADMIN_TABLE, LogConstants.CFG_PATH_SECURITY_SEAL_ENV)
 	if key.is_empty():
-		ErrorReporter.emit_error("gm_audit_service", "AUDIT_KEY_MISSING", "Audit signing key missing; seal_key_env unconfigured (fail-closed).")
+		ErrorReporter.emit_error(LogConstants.CHANNEL_GM_AUDIT, "AUDIT_KEY_MISSING", SystemBaseMessages.MSG_AUDIT_KEY_MISSING)
 		return ""
-	return Crypto.new().hmac_digest(
-		HashingContext.HASH_SHA256, key.to_utf8_buffer(), canonical.to_utf8_buffer()
-	).hex_encode()
+	return CryptoIntegrityLib.hmac_sha256_hex(key, canonical.to_utf8_buffer())
 
 ## 最近审计流水查询（recent_limit 配置驱动，上限裁剪）
 static func get_recent_audits(limit: int = -1) -> Array:
-	var cfg_limit := GameConfig.get_int("infrastructure.admin", "audit/recent_limit", 20)
+	var cfg_limit := GameConfig.get_int(LogConstants.CFG_ADMIN_TABLE, "audit/recent_limit", 20)
 	var lim := limit if limit >= 0 else cfg_limit
 	var count: int = mini(lim, audit_log.size())
 	return audit_log.slice(audit_log.size() - count, audit_log.size())

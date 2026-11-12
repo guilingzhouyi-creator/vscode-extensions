@@ -10,21 +10,27 @@
 ## RedactionRule：Log Collector & Stream Processor
 class_name RedactionRule extends RefCounted
 
-const MODE_MASK: String = "mask"
-const MODE_DROP: String = "drop"
-const MODE_HASH: String = "hash"
+const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
+const CryptoIntegrityLib = preload("res://backend/infrastructure/pure/crypto_integrity_lib.gd")
+const StatisticsMathLib = preload("res://backend/infrastructure/pure/statistics_math_lib.gd")
+
+const MODE_MASK: String = LogConstants.REDACT_MODE_MASK
+const MODE_DROP: String = LogConstants.REDACT_MODE_DROP
+const MODE_HASH: String = LogConstants.REDACT_MODE_HASH
+const MODE_SALTED_HASH: String = LogConstants.REDACT_MODE_SALTED_HASH
 
 # ==============================================================================
 # 一、脱敏规则条目实体
 # ==============================================================================
 
-## 单条脱敏规则：字段正则 + 脱敏模式（mask/drop/hash）与掩码参数
+## 单条脱敏规则：字段正则 + 脱敏模式（mask/drop/hash/salted_hash）与掩码参数
 class RuleEntry extends RefCounted:
 	var regex: RegEx = null
-	var mask_mode: String = MODE_MASK # mask | drop | hash
-	var mask_prefix_len: int = 4
-	var mask_suffix_len: int = 4
-	var replace_with: String = "****"
+	var mask_mode: String = MODE_MASK # mask | drop | hash | salted_hash
+	var mask_prefix_len: int = LogConstants.DEFAULT_MASK_PREFIX_LEN
+	var mask_suffix_len: int = LogConstants.DEFAULT_MASK_SUFFIX_LEN
+	var replace_with: String = LogConstants.DEFAULT_MASK_REPLACEMENT
+	var salt: String = ""
 
 # ==============================================================================
 # 二、规则加载与配置
@@ -50,7 +56,7 @@ static func _ensure_loaded() -> void:
 	_cached_version = current_version
 	_rules.clear()
 
-	var redaction_cfg := GameConfig.get_dict("infrastructure.log", "redaction", {})
+	var redaction_cfg := GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_REDACTION, {})
 	if redaction_cfg.is_empty():
 		_enabled = true
 		_default_mode = MODE_MASK
@@ -71,8 +77,8 @@ static func _ensure_loaded() -> void:
 ## 内置默认脱敏规则（配置段缺失时兜底：令牌/指纹掩码、口令丢弃、账号哈希）
 static func _init_default_rules() -> void:
 	var defaults: Array[Dictionary] = [
-		{"field_pattern": "token|session_token", "mask_mode": MODE_MASK, "mask_prefix_len": 4, "mask_suffix_len": 4, "replace_with": "****"},
-		{"field_pattern": "fingerprint|device_fingerprint", "mask_mode": MODE_MASK, "mask_prefix_len": 4, "mask_suffix_len": 0, "replace_with": "****"},
+		{"field_pattern": "token|session_token", "mask_mode": MODE_MASK, "mask_prefix_len": LogConstants.DEFAULT_MASK_PREFIX_LEN, "mask_suffix_len": LogConstants.DEFAULT_MASK_SUFFIX_LEN, "replace_with": LogConstants.DEFAULT_MASK_REPLACEMENT},
+		{"field_pattern": "fingerprint|device_fingerprint", "mask_mode": MODE_MASK, "mask_prefix_len": LogConstants.DEFAULT_MASK_PREFIX_LEN, "mask_suffix_len": 0, "replace_with": LogConstants.DEFAULT_MASK_REPLACEMENT},
 		{"field_pattern": "password|password_hash|secret|seal_key", "mask_mode": MODE_DROP},
 		{"field_pattern": "account_id", "mask_mode": MODE_HASH}
 	]
@@ -92,9 +98,10 @@ static func _build_rule_entry(item: Dictionary) -> RuleEntry:
 	var entry := RuleEntry.new()
 	entry.regex = re
 	entry.mask_mode = str(item.get("mask_mode", MODE_MASK))
-	entry.mask_prefix_len = int(item.get("mask_prefix_len", 4))
-	entry.mask_suffix_len = int(item.get("mask_suffix_len", 4))
-	entry.replace_with = str(item.get("replace_with", "****"))
+	entry.mask_prefix_len = int(item.get("mask_prefix_len", LogConstants.DEFAULT_MASK_PREFIX_LEN))
+	entry.mask_suffix_len = int(item.get("mask_suffix_len", LogConstants.DEFAULT_MASK_SUFFIX_LEN))
+	entry.replace_with = str(item.get("replace_with", LogConstants.DEFAULT_MASK_REPLACEMENT))
+	entry.salt = str(item.get("salt", ""))
 	return entry
 
 # ==============================================================================
@@ -117,7 +124,7 @@ static func apply(dict: Dictionary) -> Dictionary:
 		"redacted_keys": redacted_keys
 	}
 
-## 对 context 执行脱敏并直接装配至 StructuredLogRecord（单源收口 context 与 redacted_keys）
+## 对 context 与消息正文执行构造期脱敏并直接装配至 StructuredLogRecord（Inv-LS-2 安全红线）
 static func apply_to_record(record: StructuredLogRecord, raw_context: Dictionary) -> void:
 	if record == null:
 		return
@@ -128,6 +135,12 @@ static func apply_to_record(record: StructuredLogRecord, raw_context: Dictionary
 	if rk is Array:
 		for k in (rk as Array):
 			record.redacted_keys.append(str(k))
+	if _enabled and not record.message.is_empty():
+		var scrubbed_msg := StatisticsMathLib.scrub_inline_secrets(record.message)
+		if scrubbed_msg != record.message:
+			record.message = scrubbed_msg
+			if not (LogConstants.KEY_MESSAGE in record.redacted_keys):
+				record.redacted_keys.append(LogConstants.KEY_MESSAGE)
 
 static func _find_matching_rule(key_str: String) -> RuleEntry:
 	for rule in _rules:
@@ -135,14 +148,14 @@ static func _find_matching_rule(key_str: String) -> RuleEntry:
 			return rule
 	return null
 
-## 递归脱敏字典：嵌套字典/数组继续下钻；命中规则按模式处理（drop 整键丢弃 / hash 摘要 / mask 前后缀留）
+## 递归脱敏字典：嵌套字典/数组继续下钻；命中规则按模式处理；未命中规则的字符串执行内联凭据二次清洗
 static func _redact_dict(source: Dictionary, out_redacted_keys: Array[String]) -> Dictionary:
 	var target: Dictionary = {}
 	for k in source.keys():
 		var key_str := str(k)
 		var val = source[k]
 
-		# 递归处理嵌套字典
+		# 递归处理嵌套字典/数组
 		if val is Dictionary:
 			target[k] = _redact_dict(val, out_redacted_keys)
 			continue
@@ -152,7 +165,13 @@ static func _redact_dict(source: Dictionary, out_redacted_keys: Array[String]) -
 
 		var matched_rule := _find_matching_rule(key_str)
 		if matched_rule == null:
-			target[k] = val
+			if val is String:
+				var cleaned := StatisticsMathLib.scrub_inline_secrets(val)
+				if cleaned != val and not (key_str in out_redacted_keys):
+					out_redacted_keys.append(key_str)
+				target[k] = cleaned
+			else:
+				target[k] = val
 			continue
 
 		# 命中脱敏规则
@@ -160,18 +179,20 @@ static func _redact_dict(source: Dictionary, out_redacted_keys: Array[String]) -
 			out_redacted_keys.append(key_str)
 
 		match matched_rule.mask_mode:
-			"drop":
+			MODE_DROP:
 				# 整键丢弃，不写入 target
 				pass
-			"hash":
-				target[k] = str(val).sha256_text()
-			"mask":
-				target[k] = _apply_mask(str(val), matched_rule.mask_prefix_len, matched_rule.mask_suffix_len, matched_rule.replace_with)
+			MODE_HASH:
+				target[k] = CryptoIntegrityLib.sha256_hex(str(val))
+			MODE_SALTED_HASH:
+				target[k] = CryptoIntegrityLib.salted_hash_hex(str(val), matched_rule.salt)
+			MODE_MASK:
+				target[k] = StatisticsMathLib.mask_string(str(val), matched_rule.mask_prefix_len, matched_rule.mask_suffix_len, matched_rule.replace_with)
 			_:
 				target[k] = matched_rule.replace_with
 	return target
 
-## 递归脱敏数组：逐项下钻字典/数组，其余原样保留
+## 递归脱敏数组：逐项下钻字典/数组，其余字符串按需清洗
 static func _redact_array(source: Array, out_redacted_keys: Array[String]) -> Array:
 	var target: Array = []
 	for item in source:
@@ -179,15 +200,8 @@ static func _redact_array(source: Array, out_redacted_keys: Array[String]) -> Ar
 			target.append(_redact_dict(item, out_redacted_keys))
 		elif item is Array:
 			target.append(_redact_array(item, out_redacted_keys))
+		elif item is String:
+			target.append(StatisticsMathLib.scrub_inline_secrets(item))
 		else:
 			target.append(item)
 	return target
-
-## 掩码应用：保留前 prefix_len 与后 suffix_len 位，中段替换为 replace_with
-static func _apply_mask(val_str: String, prefix_len: int, suffix_len: int, replace_with: String) -> String:
-	var total_len := val_str.length()
-	if total_len <= prefix_len + suffix_len or total_len == 0:
-		return replace_with
-	var p := val_str.left(prefix_len)
-	var s := val_str.right(suffix_len) if suffix_len > 0 else ""
-	return p + replace_with + s
