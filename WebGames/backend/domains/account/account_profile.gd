@@ -170,9 +170,14 @@ static func deserialize(d: Dictionary) -> AccountProfileAggregate:
 	var raw_ent: Variant = d.get("entitlements", GameConfig.get_array(DOMAIN_ACCOUNT_CONFIG, "entitlements/default", []))
 	if raw_ent is Array:
 		acc.entitlements.assign(raw_ent) # 类型化转换：JSON/配置返回的未类型化 Array → Array[String]（防运行时类型错误）
-	# 密封校验：存档携带密封而重算不符 → 数据被改/损坏 → 权限回退空（fail-safe，明文存档的完整性防线）
+	# 密封校验：开启安全存储或环境中存在密封密钥时强制闭环验签（缺封或篡改均清零权限）；否则兼容已附密封的防篡改校验
 	var recorded_seal := str(d.get("entitlements_seal", ""))
-	if not recorded_seal.is_empty() and not EntitlementService.verify_seal(acc, recorded_seal):
+	var has_seal_key := not CryptoIntegrityLib.resolve_seal_key_bytes(LogConstants.CFG_ADMIN_TABLE, LogConstants.CFG_PATH_SECURITY_SEAL_ENV).is_empty()
+	var seal_required := EntitlementService.encrypted_storage_enabled() or has_seal_key
+	if seal_required:
+		if recorded_seal.is_empty() or not EntitlementService.verify_seal(acc, recorded_seal):
+			acc.entitlements.clear()
+	elif not recorded_seal.is_empty() and not EntitlementService.verify_seal(acc, recorded_seal):
 		acc.entitlements.clear()
 	# 白名单过滤：allowed 非空时拒绝未列出资格（防存档自造权限；空列表=放行全部）
 	acc.entitlements.assign(EntitlementService.filter_allowed(acc.entitlements))

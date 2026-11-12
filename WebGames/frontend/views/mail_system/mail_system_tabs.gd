@@ -159,7 +159,7 @@ func on_reply() -> void:
 	if idx.size() > 0 and idx[0] < filtered.size():
 		var mail: Dictionary = filtered[idx[0]]
 		view._line_edit_recipient.text = UIIntermediary.text(str(mail.get("sender_key", "")))
-		view._line_edit_subject.text = "Re: %s" % UIIntermediary.text(str(mail.get("subject_key", "")))
+		view._line_edit_subject.text = UIIntermediary.text("ui.fe08.reply.subject_prefix", {"subject": UIIntermediary.text(str(mail.get("subject_key", "")))})
 		view._right_tab_container.current_tab = 1
 
 func on_add_attachment() -> void:

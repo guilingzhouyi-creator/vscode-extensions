@@ -20,7 +20,6 @@ const HudStatusSnapshotDTO = preload("res://backend/domains/world_state/dto/hud_
 const CharacterPhysiologySheet = preload("res://backend/domains/lifecycle_physiology/physiology_entities.gd")
 const CharacterWalletEntity = preload("res://backend/domains/currency_economy/currency_entities.gd")
 const AuthService = preload("res://backend/domains/account/auth_service.gd")
-const GameBootstrap = preload("res://backend/infrastructure/game_bootstrap.gd")
 const RuntimeModeGate = preload("res://backend/domains/persistence_protocol/runtime_mode_gate.gd")
 const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
 const AccountProfileAggregate = preload("res://backend/domains/account/account_profile.gd")
@@ -65,7 +64,7 @@ static func inject_and_hydrate(snapshot: Variant, target_stage_key: String = "")
         return {
             "success": false,
             "error_code": "ERR_NULL_SNAPSHOT",
-            "message": "快照对象不可为空"
+            "message": SystemBaseMessages.MSG_NULL_REQUEST
         }
 
     # 2. 基础系统装配就绪与虚拟命途MOD预检合并水化

@@ -208,7 +208,7 @@ func _refresh_notif_list() -> void:
 		# 分类筛选：-1 = 全部
 		if _notif_category_filter >= 0 and int(item.get("category", 0)) != _notif_category_filter:
 			continue
-		var read_marker := "" if item.get("read", false) else "[新] "
+		var read_marker := "" if item.get("read", false) else UIIntermediary.text("ui.fe14.notification.new_marker")
 		var title_text: String = UIIntermediary.text(item.get("title_key", ""))
 		var idx: int = _notif_item_list.add_item("%s%s" % [read_marker, title_text])
 		# 未读项加粗标记

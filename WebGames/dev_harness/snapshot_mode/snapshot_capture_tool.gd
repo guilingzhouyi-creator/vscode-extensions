@@ -11,13 +11,16 @@ extends RefCounted
 
 const TestSnapshotBundleDTO = preload("res://dev_harness/snapshot_mode/dto/test_snapshot_bundle_dto.gd")
 const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
+const SnapshotEnvironmentGuard = preload("res://dev_harness/snapshot_mode/snapshot_environment_guard.gd")
 const SnapshotInjectionSolver = preload("res://dev_harness/snapshot_mode/snapshot_injection_solver.gd")
 
-## 抓取当前全域状态为快照 DTO
+## 抓取当前全域状态为快照 DTO（非 Debug/Test 环境强行熔断返回空对象）
 static func capture_current_state(snapshot_id: String, description: String = "", custom_ctx: RefCounted = null) -> TestSnapshotBundleDTO:
+	if not SnapshotEnvironmentGuard.is_injection_permitted():
+		return null
 	var bundle := TestSnapshotBundleDTO.new()
 	bundle.snapshot_id = snapshot_id
-	bundle.description = description if not description.is_empty() else "运行时捕获现场快照: " + snapshot_id
+	bundle.description = description if not description.is_empty() else snapshot_id
 	bundle.timestamp_utc = int(Time.get_unix_time_from_system())
 
 	# 1. 优先从活动会话上下文汲取字段
@@ -123,14 +126,21 @@ static func capture_to_json_string(snapshot_id: String, description: String = ""
 	var bundle := capture_current_state(snapshot_id, description, custom_ctx)
 	return JSON.stringify(bundle.to_dict(), "\t")
 
-## 将快照保存为磁盘文件
+## 将快照保存为磁盘文件（强制环境守卫、沙箱路径校验并脱敏会话凭据）
 static func save_snapshot_to_file(bundle: TestSnapshotBundleDTO, file_path: String) -> bool:
+	if not SnapshotEnvironmentGuard.is_injection_permitted():
+		return false
 	if bundle == null or file_path.is_empty():
 		return false
+	if file_path.contains("..") or not (file_path.begins_with("user://") or file_path.begins_with("res://tests/")):
+		return false
+	var payload_dict := bundle.to_dict()
+	payload_dict["session_token"] = LogConstants.DEFAULT_MASK_REPLACEMENT if not String(payload_dict.get("session_token", "")).is_empty() else ""
+	var content := JSON.stringify(payload_dict, "\t")
 	var file := FileAccess.open(file_path, FileAccess.WRITE)
 	if file == null:
 		return false
-	var content := JSON.stringify(bundle.to_dict(), "\t")
 	file.store_string(content)
+	var err := file.get_error()
 	file.close()
-	return true
+	return err == OK

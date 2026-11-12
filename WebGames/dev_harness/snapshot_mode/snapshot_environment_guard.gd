@@ -43,11 +43,11 @@ static func validate_injection_environment() -> Dictionary:
 			"message": "Debug test environment confirmed."
 		}
 
-	var err_msg := "快照测试工程模式仅允许在 Debug/Test 模式下运行，生产环境已绝对熔断阻断！"
-	EventBusCore.get_instance().emit_log("error", err_msg)
+	var err_msg := SystemBaseMessages.MSG_SNAPSHOT_PROD_BLOCKED if SystemBaseMessages else "Snapshot test mode is permitted in Debug/Test builds only."
+	EventBusCore.get_instance().emit_log(LogConstants.LEVEL_LOWER_ERROR, err_msg)
 	return {
 		"permitted": false,
-		"error_code": ERROR_TEST_MODE_DISABLED,
+		"error_code": ERROR_PRODUCTION_BLOCKED if OS.has_feature("release") else ERROR_TEST_MODE_DISABLED,
 		"message": err_msg
 	}
 

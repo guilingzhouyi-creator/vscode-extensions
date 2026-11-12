@@ -149,7 +149,7 @@ func _refresh_mail_list() -> void:
 		var mail: Dictionary = filtered[i]
 		var sender: String = UIIntermediary.text(str(mail.get("sender_key", "")))
 		var subject: String = UIIntermediary.text(str(mail.get("subject_key", "")))
-		var read_mark: String = "[已读] " if bool(mail.get("is_read", false)) else "[未读] "
+		var read_mark: String = UIIntermediary.text("ui.fe08.list.read_mark") if bool(mail.get("is_read", false)) else UIIntermediary.text("ui.fe08.list.unread_mark")
 		var attach_mark: String = " 📎" if bool(mail.get("has_attachment", false)) else ""
 		_mail_item_list.add_item("%s%s - %s%s" % [read_mark, sender, subject, attach_mark])
 	if _tabs != null:

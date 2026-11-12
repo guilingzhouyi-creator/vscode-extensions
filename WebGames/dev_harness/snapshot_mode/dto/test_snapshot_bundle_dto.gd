@@ -56,6 +56,7 @@ var wallet_data: Dictionary = {
 	"copper": 0,
 	"silver": 0,
 	"gold": 1000,
+	"platinum": 0,
 	"mana_monocrystals": 10
 }
 
@@ -103,7 +104,7 @@ func reset_state() -> void:
 		"sanity": 100, "status_effects": []
 	}
 	wallet_data = {
-		"copper": 0, "silver": 0, "gold": 1000, "mana_monocrystals": 10
+		"copper": 0, "silver": 0, "gold": 1000, "platinum": 0, "mana_monocrystals": 10
 	}
 	inventory_items.clear()
 	location_name = "CENTRAL_CITY_PLAZA"

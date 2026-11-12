@@ -112,7 +112,8 @@ func save_primary_data(slot_id: String, payload: Dictionary) -> Dictionary:
 		return {"success": false, "error_code": ERR_EMPTY_SLOT_ID}
 	if payload.is_empty():
 		return {"success": false, "error_code": ERR_EMPTY_PAYLOAD}
-	var res: Dictionary = SaveManager.save_game(clean_slot, payload)
+	var save_envelope: Dictionary = payload if payload.has("data") else {"data": payload}
+	var res: Dictionary = SaveManager.save_game(clean_slot, save_envelope)
 	if not bool(res.get("success", false)):
 		EventBusCore.get_instance().emit_log(LOG_LEVEL_ERROR, TemplateFormatter.format(LOG_SAVE_FAIL, {"slot": clean_slot, "error": res.get("error_code", "UNKNOWN")}))
 	return res

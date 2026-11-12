@@ -196,7 +196,7 @@ func refresh_name_history() -> void:
 	for item in _view._name_history:
 		var type_idx: int = int(item.get("type", 0))
 		var type_name: String = UIIntermediary.text(MiscEdgeView.NAME_TYPE_KEYS[type_idx]) if (type_idx >= 0 and type_idx < MiscEdgeView.NAME_TYPE_KEYS.size()) else UIIntermediary.text("ui.fe17.name_registry.type_unknown")
-		var status := "[OK]" if item.get("success", false) else "[FAIL]"
+		var status := UIIntermediary.text("ui.fe17.name_registry.status_ok") if item.get("success", false) else UIIntermediary.text("ui.fe17.name_registry.status_fail")
 		var name: String = item.get("custom_name", "") if (item.has("custom_name") and not str(item.get("custom_name", "")).is_empty()) else UIIntermediary.text(item.get("name_key", ""))
 		var history_item := UIIntermediary.text("ui.fe17.name_registry.history_item", {"status": status, "type": type_name, "name": name, "time": item.get("time", "")})
 		_view._name_history_list.add_item(history_item)

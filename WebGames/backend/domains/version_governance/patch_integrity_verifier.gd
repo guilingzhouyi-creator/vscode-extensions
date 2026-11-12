@@ -40,7 +40,7 @@ static func verify_file_sha256(file_path: String, expected_sha256: String) -> Di
 	if not bool(hashed.get("ok", false)):
 		return {"success": false, "error": str(hashed.get("error", "FILE_OPEN_FAILED"))}
 	var computed_hex := str(hashed.get("sha256", ""))
-	var matched := computed_hex == expected_sha256.strip_edges().to_lower()
+	var matched := CryptoIntegrityLib.constant_time_equals(computed_hex, expected_sha256.strip_edges().to_lower())
 	return {
 		"success": matched,
 		"computed_sha256": computed_hex,

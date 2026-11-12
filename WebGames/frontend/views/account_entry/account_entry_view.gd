@@ -208,7 +208,7 @@ func logout_account() -> Dictionary:
     if login_password_edit != null: login_password_edit.text = ""
     ServiceLocator.clear_active_gateway()
     switch_state(EntryState.LOGIN)
-    return {"success": true, "message": "已成功退出账号并重置状态机"}
+    return {"success": true, "message": UIIntermediary.text("ui.fe01.logout.success")}
 
 func set_character_slots_snapshot(slots: Array) -> void:
     apply_snapshot({"character_slots": slots})

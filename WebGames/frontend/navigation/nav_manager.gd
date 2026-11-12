@@ -22,6 +22,7 @@ var _scene_cache: Dictionary = {}
 
 ## 当前活跃的转场 Tween（同一时刻仅允许一个转场；新转场启动前先 kill 旧 Tween）
 var _active_transition: Tween = null
+var _transitioning_old_screen: Control = null
 
 ## 场景缓存最大条目（R-07：防随注册表扩张无界增长；超限按插入序 FIFO 逐出）
 const MAX_SCENE_CACHE_ENTRIES: int = 24
@@ -163,17 +164,23 @@ func _exit_and_free_screen(screen: Control) -> void:
 
 ## 转场动效调度：根据类型派发到具体动效实现，转场结束后自动清理旧屏
 func _play_transition(old_screen: Control, new_screen: Control, transition_type: int) -> void:
-	# 同一时刻仅允许一个转场；新转场启动前先 kill 旧 Tween 并立即释放旧屏
+	# 同一时刻仅允许一个转场；新转场启动前先立即清理上一段未完结的旧屏并 kill 旧 Tween
+	if _transitioning_old_screen != null and is_instance_valid(_transitioning_old_screen) and _transitioning_old_screen != old_screen:
+		_exit_and_free_screen(_transitioning_old_screen)
+	_transitioning_old_screen = null
 	if _active_transition != null and _active_transition.is_valid():
 		_active_transition.kill()
 	_active_transition = _create_tween()
 
 	match transition_type:
 		NavTypes.TransitionType.FADE:
+			_transitioning_old_screen = old_screen
 			_play_fade_transition(old_screen, new_screen)
 		NavTypes.TransitionType.SLIDE_LEFT:
+			_transitioning_old_screen = old_screen
 			_play_slide_transition(old_screen, new_screen, true)
 		NavTypes.TransitionType.SLIDE_RIGHT:
+			_transitioning_old_screen = old_screen
 			_play_slide_transition(old_screen, new_screen, false)
 		_:
 			_exit_and_free_screen(old_screen)
@@ -185,6 +192,8 @@ func _play_fade_transition(old_screen: Control, new_screen: Control) -> void:
 	_active_transition.tween_property(new_screen, "modulate:a", 1.0, TRANSITION_DURATION)
 	_active_transition.tween_property(old_screen, "modulate:a", 0.0, TRANSITION_DURATION)
 	_active_transition.chain().tween_callback(func():
+		if _transitioning_old_screen == old_screen:
+			_transitioning_old_screen = null
 		_exit_and_free_screen(old_screen)
 	)
 
@@ -197,6 +206,8 @@ func _play_slide_transition(old_screen: Control, new_screen: Control, slide_left
 	_active_transition.tween_property(old_screen, "position:x", -container_size.x * direction, TRANSITION_DURATION)
 	_active_transition.tween_property(new_screen, "position:x", 0.0, TRANSITION_DURATION)
 	_active_transition.chain().tween_callback(func():
+		if _transitioning_old_screen == old_screen:
+			_transitioning_old_screen = null
 		_exit_and_free_screen(old_screen)
 	)
 

@@ -47,6 +47,7 @@ var _hold_threshold: float = 0.3
 var _is_placeholder_mode: bool = false
 var _placeholder_elapsed: float = 0.0
 var _placeholder_duration: float = 3.0
+var _last_placeholder_tenths: int = -1
 
 # ==============================================================================
 # 一、节点装配与视口初始化
@@ -115,7 +116,7 @@ func _setup_placeholder_ui() -> void:
 	_placeholder_badge = Label.new()
 	_placeholder_badge.name = "PlaceholderBadge"
 	_placeholder_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_placeholder_badge.text = "[CG Placeholder]"
+	_placeholder_badge.text = UIIntermediary.text("ui.cutscene.placeholder_badge")
 	_placeholder_badge.add_theme_font_size_override(THEME_FONT_SIZE, 14)
 	_placeholder_badge.add_theme_color_override(THEME_FONT_COLOR, DesignTokens.COLOR_ACCENT_GOLD)
 	_placeholder_container.add_child(_placeholder_badge)
@@ -161,7 +162,7 @@ func _setup_skip_ui() -> void:
 
 	_skip_tip_label = Label.new()
 	_skip_tip_label.name = "SkipTipLabel"
-	_skip_tip_label.text = "[ESC / Space]"
+	_skip_tip_label.text = UIIntermediary.text("ui.cutscene.skip_tip")
 	_skip_tip_label.add_theme_font_size_override(THEME_FONT_SIZE, 14)
 	_skip_tip_label.add_theme_color_override(THEME_FONT_COLOR, DesignTokens.COLOR_TEXT_MUTED_DEFAULT)
 	_skip_prompt_box.add_child(_skip_tip_label)
@@ -195,7 +196,7 @@ func play_stream(stream: Resource, req: Variant = null) -> void:
 	_hold_time = 0.0
 
 	var custom_tip: String = str(_current_request.get("skip_prompt_text", ""))
-	_skip_tip_label.text = custom_tip if not custom_tip.is_empty() else "[ESC / Space]"
+	_skip_tip_label.text = custom_tip if not custom_tip.is_empty() else UIIntermediary.text("ui.cutscene.skip_tip")
 
 	var audio_bus: String = str(_current_request.get("audio_bus", "BGM"))
 	var volume_linear: float = float(_current_request.get("volume_linear", 1.0))
@@ -204,6 +205,7 @@ func play_stream(stream: Resource, req: Variant = null) -> void:
 
 	if stream != null and stream is VideoStream:
 		_is_placeholder_mode = false
+		_last_placeholder_tenths = -1
 		_placeholder_container.visible = false
 		_video_player.visible = true
 		_video_player.stream = stream as VideoStream
@@ -215,6 +217,7 @@ func play_stream(stream: Resource, req: Variant = null) -> void:
 		_is_placeholder_mode = true
 		_placeholder_elapsed = 0.0
 		_placeholder_duration = duration_val if duration_val > 0.0 else 3.0
+		_last_placeholder_tenths = 0
 		_video_player.visible = false
 		_placeholder_container.visible = true
 
@@ -291,7 +294,10 @@ func _process(delta: float) -> void:
 	# 文字占位演出计时驱动（无物理视频时自动推进并触发完结）
 	if _is_placeholder_mode:
 		_placeholder_elapsed += delta
-		_placeholder_timer_label.text = "%.1fs / %.1fs" % [_placeholder_elapsed, _placeholder_duration]
+		var current_tenths: int = int(floor(_placeholder_elapsed * 10.0))
+		if current_tenths != _last_placeholder_tenths:
+			_last_placeholder_tenths = current_tenths
+			_placeholder_timer_label.text = "%.1fs / %.1fs" % [_placeholder_elapsed, _placeholder_duration]
 		_placeholder_progress_bar.value = clampf(_placeholder_elapsed / maxf(0.01, _placeholder_duration), 0.0, 1.0)
 		if _placeholder_elapsed >= _placeholder_duration:
 			_is_placeholder_mode = false

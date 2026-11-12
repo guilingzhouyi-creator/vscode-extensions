@@ -211,6 +211,7 @@ func _run_task_execution(task: AsyncLoadTask) -> void:
 
 ## 任务执行调度（支持确定性同步或 WorkerThreadPool 异步派发）
 func _execute_task(task: AsyncLoadTask, sync_mode: bool) -> void:
+	_pending_queue.erase(task)
 	if task.token != null and task.token.is_cancelled():
 		_cancel_task_instance(task, false)
 		_notify_task_finished(task)

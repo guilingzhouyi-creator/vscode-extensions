@@ -190,7 +190,7 @@ static func authenticate_local(username: String, pass_plain: String, account: Ac
 	var input_hash := hash_password(pass_plain)
 	var rehashed := false
 	if account.username == username and not account.is_guest_mode and account.salt_version == 0:
-		if account.password_hash_sha256 == pass_plain.sha256_text():
+		if CryptoIntegrityLib.constant_time_equals(account.password_hash_sha256, pass_plain.sha256_text()):
 			account.password_hash_sha256 = input_hash
 			account.salt_version = 1
 			rehashed = true
@@ -198,7 +198,7 @@ static func authenticate_local(username: String, pass_plain: String, account: Ac
 			if repo.has_account(account.account_id):
 				repo.save_account(account)
 
-	var matched := account.username == username and (account.is_guest_mode or account.password_hash_sha256 == input_hash)
+	var matched := account.username == username and (account.is_guest_mode or CryptoIntegrityLib.constant_time_equals(account.password_hash_sha256, input_hash))
 	if matched:
 		account.last_login_timestamp_utc = int(Time.get_unix_time_from_system())
 		if not device_fingerprint.is_empty():

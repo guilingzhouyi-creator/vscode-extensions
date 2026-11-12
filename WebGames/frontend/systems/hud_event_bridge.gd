@@ -175,8 +175,6 @@ func _on_wallet_mutated(pkt: Variant) -> void:
 		return
 	var gold: int = int(payload.get("current_gold", payload.get("gold", view.wallet_gold)))
 	var crystals: int = int(payload.get("current_crystals", payload.get("crystals", view.wallet_mana_crystals)))
-	view.wallet_gold = gold
-	view.wallet_mana_crystals = crystals
 	view.apply_snapshot({
 		"hp_current": view.stat_hp_current,
 		"hp_max": view.stat_hp_max,
@@ -202,7 +200,7 @@ func _on_world_entered(pkt: Variant) -> void:
 	var view: MainHUDView = _get_view()
 	if view == null:
 		return
-	view.append_battle_log("SYSTEM", "已成功同步世界权威状态")
+	view.append_battle_log("SYSTEM", UIIntermediary.text("ui.fe02.battle_log.world_synced"))
 
 func _get_view() -> MainHUDView:
 	if not _is_attached or _view_ref == null:

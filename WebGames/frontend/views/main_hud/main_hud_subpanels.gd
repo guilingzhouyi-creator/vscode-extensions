@@ -247,7 +247,7 @@ func on_menu_exit_pressed() -> void:
 	)
 
 func on_menu_exit_to_gateway_pressed(gateway: RefCounted = null) -> void:
-	append_battle_log("SYSTEM", "正在退出世界并返回世界档案...")
+	append_battle_log("SYSTEM", UIIntermediary.text("ui.fe02.battle_log.exiting_to_archive"))
 	var active_gateway: RefCounted = gateway if gateway != null else ServiceLocator.get_active_gateway()
 	var request: ClientRequestEnvelopeDTO = UnifiedProtocolFactory.create_human_request(
 		"world_gateway", "ESC_EXIT_TO_GATEWAY", {"auto_save": true}
@@ -257,7 +257,7 @@ func on_menu_exit_to_gateway_pressed(gateway: RefCounted = null) -> void:
 	NavManager.get_instance().replace_screen("account_entry")
 
 func on_menu_quit_game_pressed() -> void:
-	append_battle_log("SYSTEM", "正在保存存档并退出游戏...")
+	append_battle_log("SYSTEM", UIIntermediary.text("ui.fe02.battle_log.saving_and_quitting"))
 	var request: ClientRequestEnvelopeDTO = UnifiedProtocolFactory.create_human_request(
 		"lifecycle", "ESC_QUIT_GAME", {"auto_save": true, "exit_reason": "USER_QUIT"}
 	)

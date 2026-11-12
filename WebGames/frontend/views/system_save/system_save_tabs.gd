@@ -257,7 +257,7 @@ func refresh_cdkey_history() -> void:
 		return
 	_view._item_list_cdkey_history.clear()
 	for item in _view._cdkey_history:
-		var status := "[OK]" if item.get("success", false) else "[FAIL]"
+		var status := UIIntermediary.text("ui.fe16.cdkey.status_ok") if item.get("success", false) else UIIntermediary.text("ui.fe16.cdkey.status_fail")
 		_view._item_list_cdkey_history.add_item("%s  %s  %s" % [status, item.get("code", ""), item.get("time", "")])
 
 func redeem_cdkey() -> void:
