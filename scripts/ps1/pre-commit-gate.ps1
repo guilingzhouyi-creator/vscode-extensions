@@ -14,7 +14,8 @@
 [CmdletBinding()]
 param(
     [switch]$ViewLog,
-    [switch]$Agent
+    [switch]$Agent,
+    [switch]$Fast
 )
 Set-StrictMode -Version Latest
 
@@ -680,28 +681,47 @@ if ($hasArCompile) {
             }
         }
     } else {
-        if ($Agent) {
-            $childBuild = Invoke-ChildProcess -FilePath $npmCmd -ArgumentList @("run", "build") -WorkingDirectory (Join-Path $repoRoot "auto-refactor") -TimeoutSeconds 180
-            $out = $childBuild.Output
-            if ($childBuild.ExitCode -ne 0) {
-                $json = Write-PreCommitFailure `
-                    -StepId "ENGINE-COMPILE-07" `
-                    -RuleId "L0-COMPILE" `
-                    -Summary "TypeScript compilation failed in auto-refactor." `
-                    -ActionableFix "Run 'npm run build' in auto-refactor and resolve compiler errors." `
-                    -VerifyCmd "npm --prefix auto-refactor run build" `
-                    -TargetFiles @("auto-refactor/src") `
-                    -Details ($out -join "`n")
-                Write-Output $json
-                exit 1
+        $arDistEntry = Join-Path $repoRoot "auto-refactor/dist/index.js"
+        $arNeedsBuild = -not (Test-Path $arDistEntry)
+        if (-not $arNeedsBuild) {
+            $arDistTime = (Get-Item $arDistEntry).LastWriteTimeUtc
+            $arStagedSrc = @($stagedFiles | Where-Object { $_ -match "^auto-refactor/src/.+\.ts$" })
+            foreach ($srcFile in $arStagedSrc) {
+                $srcPath = Join-Path $repoRoot $srcFile
+                if ((Test-Path $srcPath) -and ((Get-Item $srcPath).LastWriteTimeUtc -gt $arDistTime)) {
+                    $arNeedsBuild = $true
+                    break
+                }
+            }
+        }
+        if ($arNeedsBuild) {
+            if ($Agent) {
+                $childBuild = Invoke-ChildProcess -FilePath $npmCmd -ArgumentList @("run", "build") -WorkingDirectory (Join-Path $repoRoot "auto-refactor") -TimeoutSeconds 180
+                $out = $childBuild.Output
+                if ($childBuild.ExitCode -ne 0) {
+                    $json = Write-PreCommitFailure `
+                        -StepId "ENGINE-COMPILE-07" `
+                        -RuleId "L0-COMPILE" `
+                        -Summary "TypeScript compilation failed in auto-refactor." `
+                        -ActionableFix "Run 'npm run build' in auto-refactor and resolve compiler errors." `
+                        -VerifyCmd "npm --prefix auto-refactor run build" `
+                        -TargetFiles @("auto-refactor/src") `
+                        -Details ($out -join "`n")
+                    Write-Output $json
+                    exit 1
+                }
+            } else {
+                $process = Start-GateProcess -FilePath $npmCmd -ArgumentList "run", "build" -WorkingDirectory (Join-Path $repoRoot "auto-refactor")
+                if ($process.ExitCode -ne 0) {
+                    Write-StepVerdict -StepId "ENGINE-COMPILE-07" -Status "BLOCK" -Detail "auto-refactor 编译失败"
+                    $failed = $true
+                } else {
+                    Write-StepVerdict -StepId "ENGINE-COMPILE-07" -Status "PASS" -Detail "auto-refactor 增量编译通过"
+                }
             }
         } else {
-            $process = Start-GateProcess -FilePath $npmCmd -ArgumentList "run", "build" -WorkingDirectory (Join-Path $repoRoot "auto-refactor")
-            if ($process.ExitCode -ne 0) {
-                Write-StepVerdict -StepId "ENGINE-COMPILE-07" -Status "BLOCK" -Detail "auto-refactor 编译失败"
-                $failed = $true
-            } else {
-                Write-StepVerdict -StepId "ENGINE-COMPILE-07" -Status "PASS" -Detail "auto-refactor 增量编译通过"
+            if (-not $Agent) {
+                Write-StepVerdict -StepId "ENGINE-COMPILE-07" -Status "PASS" -Detail "auto-refactor 编译产物已是最新 (免去二次冗余构建)"
             }
         }
     }
@@ -819,116 +839,66 @@ if ($hasFgCompile) {
     Write-StepVerdict -StepId "RUST-COMPILE-10" -Status "SKIP" -Detail "仅文档或配置变更"
 }
 
-# --- 暂存区增量 AST 切片质量与复杂度审查 ---
-$touchedCode = $stagedFiles | Where-Object { ($_ -match '\.(ts|js)$') -and ($_ -notmatch '(\.d\.ts|dist/|out/|fixtures/)') }
-if ($touchedCode) {
-    if (-not $Agent) { Write-StepBanner -StepId "STAGED-SLICE-11" }
-    if ($Agent) {
-        $outSlice = & $nodeCmd (Join-Path $repoRoot "scripts/common/validate-staged-slice.js") --agent 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            $failJsonPath = Join-Path $repoRoot ".audit-logs/last-failure.json"
-            if (Test-Path $failJsonPath) {
-                Get-Content $failJsonPath -Raw
-            } else {
-                Write-Output ($outSlice -join "`n")
-            }
-            exit 1
+# --- 暂存区增量 AST 切片、代码密度、体积包络与微分边界流式统一审查 ---
+$touchedCode = @($stagedFiles | Where-Object { ($_ -match '\.(ts|js|rs|py|gd)$') -and ($_ -notmatch '(\.d\.ts|dist/|out/|fixtures/)') })
+$touchedAuditable = @($stagedFiles | Where-Object { ($_ -match '\.(ts|js|py|gd|rs|go|sh|ps1)$') -and ($_ -notmatch '(\.d\.ts|dist/|out/|fixtures/)') })
+
+$streamRes = Invoke-ChildProcess -FilePath $nodeCmd `
+    -ArgumentList @((Join-Path $repoRoot "scripts/common/gate-differential-bounds.js"), "--stream") `
+    -WorkingDirectory $repoRoot -TimeoutSeconds 180
+
+$streamData = $null
+if ($streamRes.Output) {
+    try {
+        $rawJson = ($streamRes.Output | Where-Object { $_ -match '^\{.*"steps":' }) -join ""
+        if ($rawJson) {
+            $streamData = $rawJson | ConvertFrom-Json
         }
-    } else {
-        $process = Start-GateProcess -FilePath $nodeCmd -ArgumentList "scripts/common/validate-staged-slice.js" -WorkingDirectory $repoRoot
-        if ($process.ExitCode -ne 0) {
-            Write-StepVerdict -StepId "STAGED-SLICE-11" -Status "BLOCK" -Detail "暂存区 AST 切片审查未通过"
-            $failed = $true
-        } else {
-            Write-StepVerdict -StepId "STAGED-SLICE-11" -Status "PASS" -Detail "暂存区 AST 切片复杂度合规"
-        }
-    }
-} elseif (-not $Agent) {
-    Write-StepVerdict -StepId "STAGED-SLICE-11" -Status "SKIP" -Detail "无暂存 TS/JS 代码"
+    } catch {}
 }
 
-$touchedAuditable = $stagedFiles | Where-Object { ($_ -match '\.(ts|js|py|gd|rs|go|sh|ps1)$') -and ($_ -notmatch '(\.d\.ts|dist/|out/|fixtures/)') }
-if ($touchedAuditable) {
-    if (-not $Agent) { Write-StepBanner -StepId "STAGED-DENSITY-12" }
-    if ($Agent) {
-        $outDensity = & $nodeCmd (Join-Path $repoRoot "scripts/common/validate-code-density.js") --staged --agent 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            $failJsonPath = Join-Path $repoRoot ".audit-logs/last-failure.json"
-            if (Test-Path $failJsonPath) {
-                Get-Content $failJsonPath -Raw
-            } else {
-                Write-Output ($outDensity -join "`n")
-            }
-            exit 1
-        }
-    } else {
-        $resDensity = Start-GateProcess -FilePath $nodeCmd -ArgumentList "scripts/common/validate-code-density.js", "--staged" -WorkingDirectory $repoRoot
-        if ($resDensity.ExitCode -ne 0) {
-            Write-StepVerdict -StepId "STAGED-DENSITY-12" -Status "BLOCK" -Detail "暂存区代码密度与接线载荷审查未通过"
-            $failed = $true
-        } else {
-            Write-StepVerdict -StepId "STAGED-DENSITY-12" -Status "PASS" -Detail "暂存区代码密度与接线载荷合规"
-        }
+function Handle-StreamingVerdict {
+    param(
+        [string]$StepId,
+        [string]$RuleId,
+        [object]$StepData,
+        [bool]$HasTarget,
+        [string]$SkipDetail,
+        [string[]]$TargetFiles,
+        [string]$DefaultPass
+    )
+    if (-not $HasTarget) {
+        if (-not $Agent) { Write-StepVerdict -StepId $StepId -Status "SKIP" -Detail $SkipDetail }
+        return
     }
-} elseif (-not $Agent) {
-    Write-StepVerdict -StepId "STAGED-DENSITY-12" -Status "SKIP" -Detail "无暂存可审计代码"
-}
-
-if ($touchedAuditable) {
-    if (-not $Agent) { Write-StepBanner -StepId "STAGED-VOLUME-13" }
-    if ($Agent) {
-        $outEloc = & $nodeCmd (Join-Path $repoRoot "scripts/common/evaluate-eloc-budget.js") --staged --json 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            $json = Write-PreCommitFailure `
-                -StepId "STAGED-VOLUME-13" `
-                -RuleId "VOL-ELOC-001" `
-                -Summary "Staged code exceeds ELOC/LOC budgets or the 1:3 dynamic envelope." `
-                -ActionableFix "Run 'node scripts/common/evaluate-eloc-budget.js --staged' and split or densify the offending module." `
-                -VerifyCmd "node scripts/common/evaluate-eloc-budget.js --staged" `
-                -TargetFiles @($touchedAuditable) `
-                -Details ($outEloc -join "`n")
+    if (-not $Agent) { Write-StepBanner -StepId $StepId }
+    if ($StepData -and $StepData.status -eq "BLOCK") {
+        if ($Agent) {
+            $json = Write-PreCommitFailure -StepId $StepId -RuleId $RuleId `
+                -Summary ($StepData.summary ?? $StepData.detail) -ActionableFix $StepData.detail `
+                -VerifyCmd "pwsh -File scripts/ps1/pre-commit-gate.ps1 -Fast" -TargetFiles $TargetFiles
             Write-Output $json
             exit 1
         }
+        Write-StepVerdict -StepId $StepId -Status "BLOCK" -Detail $StepData.detail
+        $script:failed = $true
     } else {
-        $resEloc = Start-GateProcess -FilePath $nodeCmd -ArgumentList "scripts/common/evaluate-eloc-budget.js", "--staged" -WorkingDirectory $repoRoot
-        if ($resEloc.ExitCode -ne 0) {
-            Write-StepVerdict -StepId "STAGED-VOLUME-13" -Status "BLOCK" -Detail "暂存区双轨体积与动态包络审查未通过"
-            $failed = $true
-        } else {
-            Write-StepVerdict -StepId "STAGED-VOLUME-13" -Status "PASS" -Detail "暂存区双轨体积与动态包络合规"
-        }
+        $detail = if ($StepData -and $StepData.detail) { $StepData.detail } else { $DefaultPass }
+        if (-not $Agent) { Write-StepVerdict -StepId $StepId -Status "PASS" -Detail $detail }
     }
-} elseif (-not $Agent) {
-    Write-StepVerdict -StepId "STAGED-VOLUME-13" -Status "SKIP" -Detail "无暂存可审计代码"
 }
 
-# --- 暂存区五维有效代码微分边界与准入周转审查 ---
-if ($touchedAuditable) {
-    if (-not $Agent) { Write-StepBanner -StepId "STAGED-DIFF-14" }
-    if ($Agent) {
-        $outDiff = & $nodeCmd (Join-Path $repoRoot "scripts/common/gate-differential-bounds.js") --agent 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            $failJsonPath = Join-Path $repoRoot ".audit-logs/last-failure.json"
-            if (Test-Path $failJsonPath) {
-                Get-Content $failJsonPath -Raw
-            } else {
-                Write-Output ($outDiff -join "`n")
-            }
-            exit 1
-        }
-    } else {
-        $resDiff = Start-GateProcess -FilePath $nodeCmd -ArgumentList "scripts/common/gate-differential-bounds.js" -WorkingDirectory $repoRoot
-        if ($resDiff.ExitCode -ne 0) {
-            Write-StepVerdict -StepId "STAGED-DIFF-14" -Status "BLOCK" -Detail "暂存区五维微分边界或准入周转未达标"
-            $failed = $true
-        } else {
-            Write-StepVerdict -StepId "STAGED-DIFF-14" -Status "PASS" -Detail "暂存区五维微分边界与准入周转合规"
-        }
-    }
-} elseif (-not $Agent) {
-    Write-StepVerdict -StepId "STAGED-DIFF-14" -Status "SKIP" -Detail "无暂存可审计代码"
-}
+Handle-StreamingVerdict -StepId "STAGED-SLICE-11" -RuleId "GUARD-AST-001" -StepData $streamData.steps.'STAGED-SLICE-11' `
+    -HasTarget ($touchedCode.Count -gt 0) -SkipDetail "无暂存代码" -TargetFiles $touchedCode -DefaultPass "暂存区 AST 切片复杂度合规"
+
+Handle-StreamingVerdict -StepId "STAGED-DENSITY-12" -RuleId "VOL-DIL-001" -StepData $streamData.steps.'STAGED-DENSITY-12' `
+    -HasTarget ($touchedAuditable.Count -gt 0) -SkipDetail "无暂存可审计代码" -TargetFiles $touchedAuditable -DefaultPass "暂存区代码密度与接线载荷合规"
+
+Handle-StreamingVerdict -StepId "STAGED-VOLUME-13" -RuleId "VOL-ELOC-001" -StepData $streamData.steps.'STAGED-VOLUME-13' `
+    -HasTarget ($touchedAuditable.Count -gt 0) -SkipDetail "无暂存可审计代码" -TargetFiles $touchedAuditable -DefaultPass "暂存区双轨体积与动态包络合规"
+
+Handle-StreamingVerdict -StepId "STAGED-DIFF-14" -RuleId "FGT-GAT-001" -StepData $streamData.steps.'STAGED-DIFF-14' `
+    -HasTarget ($touchedAuditable.Count -gt 0) -SkipDetail "无暂存可审计代码" -TargetFiles $touchedAuditable -DefaultPass "暂存区五维微分边界与准入周转合规"
 
 if ($Agent) {
     Complete-GateTelemetry -Gate "pre-commit" -Status "PASS" -FilesCount $stagedFiles.Count
