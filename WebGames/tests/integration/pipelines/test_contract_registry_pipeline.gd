@@ -500,9 +500,20 @@ static func test_s4_03_e2e_parser_to_guard_full_scan() -> Dictionary:
 
 
 static func test_s4_04_e2e_guard_to_broadcaster_event_bus() -> Dictionary:
+	var bus := EventBusCore.get_instance()
+	var tracker := {"received": false, "total_domains": 0}
+	var tok := bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, func(pkt: EventPacket) -> void:
+		var d: Dictionary = pkt.payload_data if pkt.payload_data is Dictionary else {}
+		if str(d.get("channel", "")) == "contract_registry.completeness_report":
+			var p: Dictionary = d.get("payload", {}) if d.get("payload", {}) is Dictionary else {}
+			tracker["received"] = true
+			tracker["total_domains"] = int(p.get("total_domains", 0))
+	)
 	var rep: Dictionary = GuardClass.audit_full_registry()
 	BroadcasterClass.broadcast_completeness_report(rep)
-	return {"test": "TC-CT-S4-04: 端到端：完整性扫描结果经 EventBus 广播", "passed": true}
+	tok.unbind()
+	var ok := bool(tracker["received"]) and int(tracker["total_domains"]) == int(rep.get("total_domains", -1))
+	return {"test": "TC-CT-S4-04: 端到端：完整性扫描结果经 EventBus 广播", "passed": ok}
 
 
 static func test_s4_05_e2e_config_reload_pipeline() -> Dictionary:

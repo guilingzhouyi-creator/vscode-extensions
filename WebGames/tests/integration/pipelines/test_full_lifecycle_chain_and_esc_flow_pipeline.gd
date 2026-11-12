@@ -180,9 +180,6 @@ static func test_tc_flc_05_hud_authoritative_snapshot_and_event_bridge() -> Dict
 	return make_result("TC-FLC-05: 主页HUD首帧拉取与总线广播消费验证", passed, {
 		"character_id": snap.character_id if snap != null else ""
 	})
-	return make_result("TC-FLC-05: 主页HUD首帧拉取与总线广播消费验证", passed, {
-		"character_id": snap.character_id if snap != null else ""
-	})
 
 ## -----------------------------------------------------------------------------
 ## TC-FLC-06: 前端 ESC 菜单后端显示服务逻辑（就绪查询与自动存档刷盘）

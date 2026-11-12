@@ -262,6 +262,8 @@ static func test_full_lifecycle_with_mode_switch_and_exit() -> Dictionary:
 ## TC-HMA-08: 高频时钟与增量事件池化借还守恒断言
 ## -----------------------------------------------------------------------------
 static func test_event_packet_pool_conservation() -> Dictionary:
+	var bus := EventBusCore.get_instance()
+	var borrowed_before := bus._pool.get_borrowed_count() if bus._pool != null else 0
 	var c_env := WorldCalendarEnvironmentResolver.resolve_environment(1, 1, 1, 0, 1)
 
 	# 连续循环 100 次派发，验证 EventBus 对象池借出与归还生命周期无泄漏
@@ -275,8 +277,15 @@ static func test_event_packet_pool_conservation() -> Dictionary:
 	# 广播之后执行一次权威快照发布
 	var snap := AuthoritativeHudSyncService.get_authoritative_snapshot({"character_id": "CHAR_POOL"})
 	AuthoritativeHudSyncService.publish_hud_snapshot(snap)
+	var borrowed_after := bus._pool.get_borrowed_count() if bus._pool != null else -1
+	var peak := bus._pool.get_peak_borrowed_count() if bus._pool != null else -1
+	var conserved := snap != null and borrowed_after == borrowed_before and peak >= borrowed_before
 
-	return TestCase.make_result("TC-HMA-08: 高频时钟与增量事件池化借还守恒断言", true)
+	return TestCase.make_result("TC-HMA-08: 高频时钟与增量事件池化借还守恒断言", conserved, {
+		"borrowed_before": borrowed_before,
+		"borrowed_after": borrowed_after,
+		"peak": peak
+	})
 
 ## -----------------------------------------------------------------------------
 ## TC-HMA-09: 通用无头分页切片求解与边界安全防线
