@@ -23,65 +23,215 @@ import { tokenizeCode } from '../intelligence/token-entropy';
 import { computeStatisticalMoments, type StatisticalMoments } from '../math/descriptive-statistics';
 import { clampRange, safeDivide } from '../math/numerical-corridor';
 
+interface DiffBoundsContractShape {
+    readonly fileAddBands: {
+        readonly newFile: { readonly ceiling: number };
+        readonly existingFile: { readonly ceiling: number };
+        readonly refactorWitness: { readonly ceiling: number };
+    };
+    readonly fileDelBands: {
+        readonly plain: { readonly ceiling: number };
+        readonly witnessed: { readonly ceiling: number };
+    };
+    readonly expansionPolicy: {
+        readonly defaultFileLocBudget: number;
+        readonly minExpansionAllowanceLoc: number;
+        readonly maxExpansionLocRatio: number;
+        readonly minDeletionAllowanceLoc: number;
+        readonly maxDeletionFractionErosion: number;
+        readonly refactorWitnessMinDelEloc: number;
+        readonly witnessCoverageRatio: number;
+    };
+    readonly densityBands: {
+        readonly minPhysAddSampleWidth: number;
+        readonly substantiveRatio: { readonly floor: number; readonly target: number };
+        readonly tspr: { readonly target: number };
+        readonly tsprVouchForDensity: number;
+    };
+    readonly batchBands: {
+        readonly deletionTurnoverWeight: number;
+    };
+    readonly empiricalAdmission: {
+        readonly turnoverFloor: number;
+        readonly turnoverCap: number;
+        readonly minTrajectorySamples: number;
+        readonly trajectoryWindowSize: number;
+        readonly jeffreysPriorAlpha: number;
+        readonly jeffreysPriorBeta: number;
+        readonly jeffreysDefaultPosterior: number;
+        readonly stdDevDiscountFactor: number;
+        readonly maxNoiseCeiling: number;
+    };
+    readonly ledgers: {
+        readonly taxisRelative: string;
+        readonly autoRefactorRelative: string;
+    };
+}
+
+const DEFAULT_DIFF_BOUNDS_CONTRACT: DiffBoundsContractShape = {
+    fileAddBands: {
+        newFile: { ceiling: 180 },
+        existingFile: { ceiling: 120 },
+        refactorWitness: { ceiling: 180 },
+    },
+    fileDelBands: {
+        plain: { ceiling: 100 },
+        witnessed: { ceiling: 280 },
+    },
+    expansionPolicy: {
+        defaultFileLocBudget: 900,
+        minExpansionAllowanceLoc: 60,
+        maxExpansionLocRatio: 0.35,
+        minDeletionAllowanceLoc: 10,
+        maxDeletionFractionErosion: 0.4,
+        refactorWitnessMinDelEloc: 10,
+        witnessCoverageRatio: 0.7,
+    },
+    densityBands: {
+        minPhysAddSampleWidth: 10,
+        substantiveRatio: { floor: 0.45, target: 0.6 },
+        tspr: { target: 0.4 },
+        tsprVouchForDensity: 0.85,
+    },
+    batchBands: {
+        deletionTurnoverWeight: 0.8,
+    },
+    empiricalAdmission: {
+        turnoverFloor: 3.0,
+        turnoverCap: 25.0,
+        minTrajectorySamples: 3,
+        trajectoryWindowSize: 20,
+        jeffreysPriorAlpha: 0.5,
+        jeffreysPriorBeta: 0.5,
+        jeffreysDefaultPosterior: 0.5,
+        stdDevDiscountFactor: 0.5,
+        maxNoiseCeiling: 4.0,
+    },
+    ledgers: {
+        taxisRelative: '.git/telemetry/admission_ledger.ndjson',
+        autoRefactorRelative: '.auto-refactor-cache/admission-turnover-ledger.ndjson',
+    },
+};
+
+function loadDiffBoundsContract(): DiffBoundsContractShape {
+    const candidatePaths = [
+        path.resolve(__dirname, '../../../../scripts/common/diff-bounds-contract.json'),
+        path.resolve(__dirname, '../../../../../scripts/common/diff-bounds-contract.json'),
+        path.resolve(process.cwd(), 'scripts/common/diff-bounds-contract.json'),
+        path.resolve(process.cwd(), '../scripts/common/diff-bounds-contract.json'),
+    ];
+    for (let i = 0; i < candidatePaths.length; i++) {
+        const candidatePath = candidatePaths[i];
+        if (!fs.existsSync(candidatePath)) continue;
+        try {
+            const raw = fs.readFileSync(candidatePath, 'utf8');
+            return JSON.parse(raw) as DiffBoundsContractShape;
+        } catch {
+            // Fall back to verified defaults if external JSON cannot be read
+        }
+    }
+    return DEFAULT_DIFF_BOUNDS_CONTRACT;
+}
+
+export const DIFF_BOUNDS_CONTRACT: DiffBoundsContractShape = loadDiffBoundsContract();
+
 /** Minimum token semantic payload ratio required for substantive code additions. */
-export const MIN_TSPR_ADDED_THRESHOLD = 0.4;
+export const MIN_TSPR_ADDED_THRESHOLD = DIFF_BOUNDS_CONTRACT.densityBands.tspr.target;
 
 /** Minimum ratio of useful semantic lines to total additions before inflation is flagged. */
-export const MIN_SEMANTIC_LINE_DENSITY = 0.6;
+export const MIN_SEMANTIC_LINE_DENSITY = DIFF_BOUNDS_CONTRACT.densityBands.substantiveRatio.target;
+
+/** Rigid substantive line ratio floor enforced even when high TSPR vouches for explanatory headers. */
+export const MIN_SEMANTIC_LINE_FLOOR = DIFF_BOUNDS_CONTRACT.densityBands.substantiveRatio.floor;
+
+/** TSPR threshold above which dense payload vouches for the substantive density target down to floor. */
+export const TSPR_VOUCH_FOR_DENSITY = DIFF_BOUNDS_CONTRACT.densityBands.tsprVouchForDensity;
 
 /** Minimum additions count before inflation heuristics begin strictly enforcing density. */
-export const INFLATION_SAMPLE_LINE_THRESHOLD = 15;
+export const INFLATION_SAMPLE_LINE_THRESHOLD =
+    DIFF_BOUNDS_CONTRACT.densityBands.minPhysAddSampleWidth;
+
+/** Weight applied to deleted 5D ELOC in net commit batch turnover. */
+export const DELETION_TURNOVER_WEIGHT = DIFF_BOUNDS_CONTRACT.batchBands.deletionTurnoverWeight;
 
 /** Max fraction of an existing file's LOC deletable without equivalent compensation. */
-export const MAX_DELETION_FRACTION_EROSION = 0.4;
+export const MAX_DELETION_FRACTION_EROSION =
+    DIFF_BOUNDS_CONTRACT.expansionPolicy.maxDeletionFractionErosion;
 
 /** Minimum deletion line floor below which small deletions skip erosion checks. */
-export const MIN_DELETION_ALLOWANCE_LOC = 10;
+export const MIN_DELETION_ALLOWANCE_LOC =
+    DIFF_BOUNDS_CONTRACT.expansionPolicy.minDeletionAllowanceLoc;
+
+/** Deleted 5D ELOC threshold above which existing files receive refactor addition headroom. */
+export const REFACTOR_WITNESS_MIN_DEL_ELOC =
+    DIFF_BOUNDS_CONTRACT.expansionPolicy.refactorWitnessMinDelEloc;
+
+/** Minimum coverage fraction required from replacement additions to witness large deletions. */
+export const WITNESS_COVERAGE_RATIO = DIFF_BOUNDS_CONTRACT.expansionPolicy.witnessCoverageRatio;
 
 /** Absolute default ceiling for effective LOC budget per single file. */
-export const DEFAULT_FILE_LOC_BUDGET = 900;
+export const DEFAULT_FILE_LOC_BUDGET = DIFF_BOUNDS_CONTRACT.expansionPolicy.defaultFileLocBudget;
 
 /** Minimum LOC allowance below which expansion upper bounds are relaxed for small modules. */
-export const MIN_EXPANSION_ALLOWANCE_LOC = 60;
+export const MIN_EXPANSION_ALLOWANCE_LOC =
+    DIFF_BOUNDS_CONTRACT.expansionPolicy.minExpansionAllowanceLoc;
 
 /** Maximum expansion fraction of current LOC allowed in a single un-decoupled atomic change. */
-export const MAX_EXPANSION_LOC_RATIO = 0.35;
+export const MAX_EXPANSION_LOC_RATIO = DIFF_BOUNDS_CONTRACT.expansionPolicy.maxExpansionLocRatio;
 
 /** Maximum single-file added 5D ELOC allowed in a single commit for a brand new file. */
-export const MAX_COMMIT_FILE_ADD_NEW_5D_ELOC = 180;
+export const MAX_COMMIT_FILE_ADD_NEW_5D_ELOC = DIFF_BOUNDS_CONTRACT.fileAddBands.newFile.ceiling;
 
 /** Maximum single-file added 5D ELOC allowed in a single commit for an existing file. */
-export const MAX_COMMIT_FILE_ADD_EXISTING_5D_ELOC = 120;
+export const MAX_COMMIT_FILE_ADD_EXISTING_5D_ELOC =
+    DIFF_BOUNDS_CONTRACT.fileAddBands.existingFile.ceiling;
+
+/** Maximum single-file added 5D ELOC allowed when refactoring witness headroom applies. */
+export const MAX_COMMIT_FILE_ADD_REFACTOR_5D_ELOC =
+    DIFF_BOUNDS_CONTRACT.fileAddBands.refactorWitness.ceiling;
 
 /** Maximum single-file deleted 5D ELOC allowed in a single commit without formal retirement. */
-export const MAX_COMMIT_FILE_DEL_5D_ELOC = 100;
+export const MAX_COMMIT_FILE_DEL_5D_ELOC = DIFF_BOUNDS_CONTRACT.fileDelBands.plain.ceiling;
+
+/** Maximum single-file deleted 5D ELOC allowed in a single commit when covered by a refactor witness. */
+export const MAX_COMMIT_FILE_DEL_WITNESSED_5D_ELOC =
+    DIFF_BOUNDS_CONTRACT.fileDelBands.witnessed.ceiling;
 
 /** Minimum substantive useful 5D turnover required for admission. */
 export const MIN_SUBSTANTIVE_TURNOVER_FLOOR = 1.0;
 
 /** Mathematical floor for minimum admission turnover (based on AST block minimum depth). */
-export const ADMISSION_TURNOVER_FLOOR = 3.0;
+export const ADMISSION_TURNOVER_FLOOR = DIFF_BOUNDS_CONTRACT.empiricalAdmission.turnoverFloor;
+
+/** Hard cap on adaptive empirical admission turnover to prevent permanent lockout. */
+export const ADMISSION_TURNOVER_CAP = DIFF_BOUNDS_CONTRACT.empiricalAdmission.turnoverCap;
+
+/** Minimum number of trajectory runs required before adaptive thresholding leaves floor. */
+export const MIN_TRAJECTORY_SAMPLES = DIFF_BOUNDS_CONTRACT.empiricalAdmission.minTrajectorySamples;
 
 /** Maximum acceptable noise index (CC / ELOC) before full noise damping is applied. */
-export const MAX_NOISE_CEILING = 4.0;
+export const MAX_NOISE_CEILING = DIFF_BOUNDS_CONTRACT.empiricalAdmission.maxNoiseCeiling;
 
 /** Default sliding window size for historical trajectory sampling. */
-export const DEFAULT_TRAJECTORY_WINDOW_SIZE = 20;
+export const DEFAULT_TRAJECTORY_WINDOW_SIZE =
+    DIFF_BOUNDS_CONTRACT.empiricalAdmission.trajectoryWindowSize;
 
 /** Default language identifier for differential code analysis. */
 export const DEFAULT_DIFF_LANGUAGE = 'typescript';
 
 /** Bayesian prior alpha parameter for Jeffreys Beta(0.5, 0.5) distribution. */
-export const JEFFREYS_PRIOR_ALPHA = 0.5;
+export const JEFFREYS_PRIOR_ALPHA = DIFF_BOUNDS_CONTRACT.empiricalAdmission.jeffreysPriorAlpha;
 
 /** Bayesian prior beta parameter for Jeffreys Beta(0.5, 0.5) distribution. */
-export const JEFFREYS_PRIOR_BETA = 0.5;
+export const JEFFREYS_PRIOR_BETA = DIFF_BOUNDS_CONTRACT.empiricalAdmission.jeffreysPriorBeta;
 
 /** Fallback posterior confidence value when sample size is zero. */
-export const JEFFREYS_DEFAULT_POSTERIOR = 0.5;
+export const JEFFREYS_DEFAULT_POSTERIOR =
+    DIFF_BOUNDS_CONTRACT.empiricalAdmission.jeffreysDefaultPosterior;
 
 /** Discount factor applied to trajectory standard deviation in empirical threshold derivation. */
-export const STANDARD_DEVIATION_DISCOUNT_FACTOR = 0.5;
+export const STANDARD_DEVIATION_DISCOUNT_FACTOR =
+    DIFF_BOUNDS_CONTRACT.empiricalAdmission.stdDevDiscountFactor;
 
 /** Percentage calculation scaling multiplier. */
 export const PERCENTAGE_SCALE_FACTOR = 100;
