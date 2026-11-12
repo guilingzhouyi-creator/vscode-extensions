@@ -2,13 +2,15 @@
 # 模块归属: 基础设施层 (Infrastructure · Logging & Telemetry)
 # 文件路径: res://backend/infrastructure/log_record_dto.gd
 # 架构定位: Log Collector & Stream Processor
-# 依赖与触发: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/logging.json | 信号: FATAL/ERROR 级别告警信号
+# 依赖与触发: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/log.json | 信号: FATAL/ERROR 级别告警信号
 # 职责说明: 承载全域单调递增序号的结构化日志与错误记录，实现 error_code 与 message 分离， 支持原子落盘导出、前端渲染与调试追踪对账（Inv-LG-1, Inv-LG-2, Inv-LG-3）。
 # 退出语义与设计依据: 统一结构化日志规范 / 性能基准审计
 # ==============================================================================
 
 ## LogRecordDTO：Log Collector & Stream Processor
 class_name LogRecordDTO extends RefCounted
+
+const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
 
 # ==============================================================================
 # 一、记录字段
@@ -21,7 +23,7 @@ var sequence: int = 0
 var timestamp_utc: int = 0
 
 ## 日志级别键（debug / info / warn / error，映射 log.json levels）
-var level: String = "INFO"
+var level: String = LogConstants.LEVEL_INFO
 
 ## 来源域/模块标识（如 "contract_registry_index", "game_config" 等）
 var channel: String = ""
@@ -43,7 +45,7 @@ var context: Dictionary = {}
 func reset_state() -> void:
 	sequence = 0
 	timestamp_utc = 0
-	level = "INFO"
+	level = LogConstants.LEVEL_INFO
 	channel = ""
 	error_code = ""
 	message = ""
@@ -70,7 +72,7 @@ static func populate_base_from_dict(dto: LogRecordDTO, data: Dictionary) -> void
 		return
 	dto.sequence = int(data.get("sequence", 0))
 	dto.timestamp_utc = int(data.get("timestamp_utc", 0))
-	dto.level = str(data.get("level", "INFO"))
+	dto.level = str(data.get(LogConstants.KEY_LEVEL, LogConstants.LEVEL_INFO))
 	dto.channel = str(data.get("channel", ""))
 	dto.error_code = str(data.get("error_code", ""))
 	dto.message = str(data.get("message", ""))

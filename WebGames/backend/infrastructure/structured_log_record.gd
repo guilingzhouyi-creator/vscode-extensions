@@ -10,8 +10,6 @@
 ## StructuredLogRecord：Log Collector & Stream Processor
 class_name StructuredLogRecord extends LogRecordDTO
 
-const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
-
 # ==============================================================================
 # 一、结构化扩展字段
 # ==============================================================================

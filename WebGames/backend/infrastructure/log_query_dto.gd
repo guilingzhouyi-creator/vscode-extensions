@@ -2,13 +2,15 @@
 # 模块归属: 基础设施层 (Infrastructure · Logging & Telemetry)
 # 文件路径: res://backend/infrastructure/log_query_dto.gd
 # 架构定位: Log Collector & Stream Processor
-# 依赖与触发: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/logging.json | 信号: FATAL/ERROR 级别告警信号
+# 依赖与触发: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/log.json | 信号: FATAL/ERROR 级别告警信号
 # 职责说明: 承载结构化日志多维检索入参与分页查询结果 DTO（Inv-LS-5 检索只读不变量）。
 # 退出语义与设计依据: 统一结构化日志规范 / 性能基准审计
 # ==============================================================================
 
 ## LogQueryDTO：Log Collector & Stream Processor
 class_name LogQueryDTO extends RefCounted
+
+const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
 
 # ==============================================================================
 # 一、检索条件（Criteria）
@@ -41,10 +43,10 @@ class Criteria extends RefCounted:
 		set(val):
 			page = maxi(1, val)
 			
-	## 每页大小（钳制在 [1, 500] 区间）
-	var page_size: int = 100:
+	## 每页大小（钳制在 [1, MAX_QUERY_PAGE_SIZE] 区间）
+	var page_size: int = LogConstants.DEFAULT_QUERY_PAGE_SIZE:
 		set(val):
-			page_size = clampi(val, 1, 500)
+			page_size = clampi(val, 1, LogConstants.MAX_QUERY_PAGE_SIZE)
 
 # ==============================================================================
 # 二、查询结果（Result）
