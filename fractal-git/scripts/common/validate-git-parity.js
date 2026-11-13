@@ -562,40 +562,57 @@ function compareLooseObjectBytes(gitDir, taxisDir, oid, label, violations) {
 }
 
 /**
- * Builds a nested tree with the JavaScript encoder and compares it with git at every level.
+ * Builds a nested tree with the JS encoder and optionally compares real taxis binary vs git.
  *
  * @param {object} gitRunner - Git plumbing runner.
+ * @param {object|null} taxisRunner - Optional taxis plumbing runner.
  * @param {Array<object>} spec - Tree specification.
  * @param {string} label - Fixture label for diagnostics.
  * @param {Array<string>} violations - Collected violations.
  * @returns {{ oid: string, payload: Buffer }} JavaScript-encoded tree.
  */
-function verifyTreeSpec(gitRunner, spec, label, violations) {
-    const entries = [];
+function verifyTreeSpec(gitRunner, taxisRunner, spec, label, violations) {
+    const gitEntries = [];
+    const taxisEntries = [];
     spec.forEach((node) => {
         if (Array.isArray(node.children)) {
-            const child = verifyTreeSpec(gitRunner, node.children, label + '/' + node.name, violations);
-            entries.push({ name: node.name, mode: '40000', oid: child.oid });
+            const child = verifyTreeSpec(gitRunner, taxisRunner, node.children, label + '/' + node.name, violations);
+            gitEntries.push({ name: node.name, mode: '40000', oid: child.oid });
+            if (taxisRunner) taxisEntries.push({ name: node.name, mode: '40000', oid: child.oid });
             return;
         }
         if (normalizeMode(node.mode) === '160000') {
-            entries.push({ name: node.name, mode: '160000', oid: node.oid });
+            gitEntries.push({ name: node.name, mode: '160000', oid: node.oid });
+            if (taxisRunner) taxisEntries.push({ name: node.name, mode: '160000', oid: node.oid });
             return;
         }
         const payload = Buffer.from(node.content, 'utf8');
-        entries.push({ name: node.name, mode: node.mode, oid: plumbingWriteBlob(gitRunner, payload) });
+        gitEntries.push({ name: node.name, mode: node.mode, oid: plumbingWriteBlob(gitRunner, payload) });
+        if (taxisRunner) taxisEntries.push({ name: node.name, mode: node.mode, oid: plumbingWriteBlob(taxisRunner, payload) });
     });
 
-    const encoded = encodeTree(entries);
+    const encoded = encodeTree(gitEntries);
     const javascriptOid = computeObjectOid('tree', encoded.payload);
-    const gitOid = plumbingWriteTree(gitRunner, entries);
+    const gitOid = plumbingWriteTree(gitRunner, gitEntries);
     if (javascriptOid !== gitOid) {
         reportViolation(violations, 'FGT-OBJ-001 tree parity failure on ' + label + ': git ' + gitOid + ', engine ' + javascriptOid);
     }
-    const gitOrder = plumbingListTreeLines(gitRunner, gitOid).map((line) => line.slice(line.indexOf('\t') + 1));
+    const gitLines = plumbingListTreeLines(gitRunner, gitOid);
+    const gitOrder = gitLines.map((line) => line.slice(line.indexOf('\t') + 1));
     const engineOrder = encoded.entries.map((entry) => entry.name);
     if (gitOrder.join('\n') !== engineOrder.join('\n')) {
         reportViolation(violations, 'FGT-OBJ-001 tree ordering failure on ' + label + ': git [' + gitOrder.join(', ') + '], engine [' + engineOrder.join(', ') + ']');
+    }
+    if (taxisRunner) {
+        const taxisOid = plumbingWriteTree(taxisRunner, taxisEntries);
+        if (taxisOid !== gitOid) {
+            reportViolation(violations, 'FGT-OBJ-001 [Binary] tree OID failure on ' + label + ': git ' + gitOid + ', taxis ' + taxisOid);
+        } else {
+            compareLooseObjectBytes(gitRunner.gitDir, taxisRunner.gitDir, gitOid, 'tree:' + label, violations);
+            if (gitLines.join('\n') !== plumbingListTreeLines(taxisRunner, taxisOid).join('\n')) {
+                reportViolation(violations, 'FGT-OBJ-001 [Binary] ls-tree output divergence on ' + label);
+            }
+        }
     }
     return { oid: javascriptOid, payload: encoded.payload };
 }
@@ -635,29 +652,31 @@ function verifyBlobVectors(gitRunner, taxisRunner, violations) {
  * Verifies tree vectors, including nested levels and canonical ordering.
  *
  * @param {object} gitRunner - Git plumbing runner.
+ * @param {object|null} taxisRunner - Optional taxis plumbing runner.
  * @param {Array<string>} violations - Collected violations.
  * @returns {{ count: number, firstTreeOid: string }} Vector count and a reusable tree id.
  */
-function verifyTreeVectors(gitRunner, violations) {
+function verifyTreeVectors(gitRunner, taxisRunner, violations) {
     const vectors = treeVectors();
     let firstTreeOid = '';
     vectors.forEach((vector) => {
-        const tree = verifyTreeSpec(gitRunner, vector.spec, vector.label, violations);
+        const tree = verifyTreeSpec(gitRunner, taxisRunner, vector.spec, vector.label, violations);
         if (firstTreeOid.length === 0) firstTreeOid = tree.oid;
     });
     return { count: vectors.length, firstTreeOid };
 }
 
 /**
- * Verifies commit vectors against git commit-tree.
+ * Verifies commit vectors across JS encoder, system git, and optional taxis binary.
  *
  * @param {object} gitRunner - Git plumbing runner.
+ * @param {object|null} taxisRunner - Optional taxis plumbing runner.
  * @param {string} treeOid - Tree object id usable by every commit vector.
  * @param {Array<string>} parentOids - Parent commit ids.
  * @param {Array<string>} violations - Collected violations.
  * @returns {number} Number of verified vectors.
  */
-function verifyCommitVectors(gitRunner, treeOid, parentOids, violations) {
+function verifyCommitVectors(gitRunner, taxisRunner, treeOid, parentOids, violations) {
     const vectors = commitVectors(treeOid, parentOids);
     vectors.forEach((fields) => {
         const engineOid = computeObjectOid('commit', encodeCommit(fields));
@@ -665,42 +684,58 @@ function verifyCommitVectors(gitRunner, treeOid, parentOids, violations) {
         if (engineOid !== gitOid) {
             reportViolation(violations, 'FGT-OBJ-001 commit parity failure on ' + fields.label + ': git ' + gitOid + ', engine ' + engineOid);
         }
+        if (taxisRunner) {
+            const taxisOid = plumbingWriteCommit(taxisRunner, fields);
+            if (taxisOid !== gitOid) {
+                reportViolation(violations, 'FGT-OBJ-001 [Binary] commit OID failure on ' + fields.label + ': git ' + gitOid + ', taxis ' + taxisOid);
+            } else {
+                compareLooseObjectBytes(gitRunner.gitDir, taxisRunner.gitDir, gitOid, 'commit:' + fields.label, violations);
+            }
+        }
     });
     return vectors.length;
 }
 
 /**
- * Verifies annotated tag vectors against git mktag.
+ * Verifies annotated tag vectors across JS encoder, system git, and optional taxis binary.
  *
  * @param {object} gitRunner - Git plumbing runner.
+ * @param {object|null} taxisRunner - Optional taxis plumbing runner.
  * @param {object} targets - Object ids available as tag targets.
  * @param {Array<string>} violations - Collected violations.
  * @returns {number} Number of verified vectors.
  */
-function verifyTagVectors(gitRunner, targets, violations) {
+function verifyTagVectors(gitRunner, taxisRunner, targets, violations) {
     const vectors = tagVectors(targets);
     let firstTagOid = '';
-    vectors.forEach((fields) => {
+    const checkOneTag = (fields, tagLabel) => {
         const engineOid = computeObjectOid('tag', encodeTag(fields));
         const gitOid = plumbingWriteTag(gitRunner, fields);
         if (engineOid !== gitOid) {
-            reportViolation(violations, 'FGT-OBJ-001 tag parity failure on ' + fields.label + ': git ' + gitOid + ', engine ' + engineOid);
+            reportViolation(violations, 'FGT-OBJ-001 ' + tagLabel + ': git ' + gitOid + ', engine ' + engineOid);
         }
-        if (firstTagOid.length === 0) firstTagOid = gitOid;
+        if (taxisRunner) {
+            const taxisOid = plumbingWriteTag(taxisRunner, fields);
+            if (taxisOid !== gitOid) {
+                reportViolation(violations, 'FGT-OBJ-001 [Binary] ' + tagLabel + ': git ' + gitOid + ', taxis ' + taxisOid);
+            } else {
+                compareLooseObjectBytes(gitRunner.gitDir, taxisRunner.gitDir, gitOid, 'tag:' + fields.tag, violations);
+            }
+        }
+        return gitOid;
+    };
+    vectors.forEach((fields) => {
+        const oid = checkOneTag(fields, 'tag parity failure on ' + fields.label);
+        if (firstTagOid.length === 0) firstTagOid = oid;
     });
     if (firstTagOid.length > 0) {
-        const nested = {
+        checkOneTag({
             object: firstTagOid,
             kind: 'tag',
             tag: 'nested-tag',
             tagger: signature('Parity Tagger', '+0000', 1700000100),
             message: 'nested tag message\n',
-        };
-        const engineOid = computeObjectOid('tag', encodeTag(nested));
-        const gitOid = plumbingWriteTag(gitRunner, nested);
-        if (engineOid !== gitOid) {
-            reportViolation(violations, 'FGT-OBJ-001 tag-of-tag parity failure: git ' + gitOid + ', engine ' + engineOid);
-        }
+        }, 'tag-of-tag parity failure');
     }
     return vectors.length + 1;
 }
@@ -709,20 +744,27 @@ function verifyTagVectors(gitRunner, targets, violations) {
  * Writes the required parent commits and returns their ids.
  *
  * @param {object} gitRunner - Git plumbing runner.
+ * @param {object|null} taxisRunner - Optional taxis plumbing runner.
  * @param {string} treeOid - Tree object id.
  * @param {number} count - Number of parents to create.
+ * @param {Array<string>} violations - Collected violations.
  * @returns {Array<string>} Parent commit ids.
  */
-function bootstrapParentCommits(gitRunner, treeOid, count) {
+function bootstrapParentCommits(gitRunner, taxisRunner, treeOid, count, violations) {
     const parents = [];
     for (let index = 0; index < count; index += 1) {
-        parents.push(plumbingWriteCommit(gitRunner, {
+        const fields = {
             tree: treeOid,
             parents: [],
             author: signature('Parity Parent', '+0000', 1600000000 + index),
             committer: signature('Parity Parent', '+0000', 1600000000 + index),
             message: 'parent ' + String(index) + '\n',
-        }));
+        };
+        const gitOid = plumbingWriteCommit(gitRunner, fields);
+        if (taxisRunner && plumbingWriteCommit(taxisRunner, fields) !== gitOid) {
+            reportViolation(violations, 'FGT-OBJ-001 [Binary] bootstrap parent commit divergence at ' + String(index));
+        }
+        parents.push(gitOid);
     }
     return parents;
 }
@@ -857,26 +899,23 @@ function runGitParityValidation() {
     let verified = 0;
     try {
         verified += verifyBlobVectors(gitRunner, taxisRunner, violations);
-        const treeResult = verifyTreeVectors(gitRunner, violations);
+        const treeResult = verifyTreeVectors(gitRunner, taxisRunner, violations);
         verified += treeResult.count;
-        const parents = bootstrapParentCommits(gitRunner, treeResult.firstTreeOid, 3);
-        verified += verifyCommitVectors(gitRunner, treeResult.firstTreeOid, parents, violations);
-        const blobOid = plumbingWriteBlob(gitRunner, Buffer.from('tag target\n', 'utf8'));
-        const targets = {
-            blob: blobOid,
-            tree: treeResult.firstTreeOid,
-            commit: parents[0],
-            tag: plumbingWriteTag(gitRunner, {
-                object: parents[0],
-                kind: 'commit',
-                tag: 'bootstrap',
-                tagger: signature('Parity Tagger', '+0000', 1700000000),
-                message: 'bootstrap tag\n',
-            }),
-        };
-        verified += verifyTagVectors(gitRunner, targets, violations);
+        const parents = bootstrapParentCommits(gitRunner, taxisRunner, treeResult.firstTreeOid, 3, violations);
+        verified += verifyCommitVectors(gitRunner, taxisRunner, treeResult.firstTreeOid, parents, violations);
+        const tagPayload = Buffer.from('tag target\n', 'utf8');
+        const blobOid = plumbingWriteBlob(gitRunner, tagPayload);
+        if (taxisRunner && plumbingWriteBlob(taxisRunner, tagPayload) !== blobOid) {
+            reportViolation(violations, 'FGT-OBJ-001 [Binary] bootstrap tag target blob divergence');
+        }
+        const bootTag = { object: parents[0], kind: 'commit', tag: 'bootstrap', tagger: signature('Parity Tagger', '+0000', 1700000000), message: 'bootstrap tag\n' };
+        const tagOid = plumbingWriteTag(gitRunner, bootTag);
+        if (taxisRunner && plumbingWriteTag(taxisRunner, bootTag) !== tagOid) {
+            reportViolation(violations, 'FGT-OBJ-001 [Binary] bootstrap tag divergence');
+        }
+        verified += verifyTagVectors(gitRunner, taxisRunner, { blob: blobOid, tree: treeResult.firstTreeOid, commit: parents[0], tag: tagOid }, violations);
         console.log('Git Baseline: ' + execFileSync('git', ['--version'], { stdio: 'pipe' }).toString('utf8').trim());
-        console.log('Verified vectors against the reference baseline: ' + String(verified));
+        console.log('Verified vectors against reference baseline: ' + String(verified) + (taxisRunner ? ' (JS + real taxis binary)' : ' (JS baseline)'));
     } catch (error) {
         reportViolation(violations, 'FGT-OBJ-001 reference baseline execution failed: ' + error.message);
     } finally {
