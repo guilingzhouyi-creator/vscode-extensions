@@ -69,6 +69,11 @@ export class WorkspaceOrchestrator {
         targetRef: FractalRefDescriptor,
         parentRef: FractalRefDescriptor,
     ): ActiveWorkspaceRecord {
+        if (!cardContext.cellId?.trim() || !cardContext.cardId?.trim() || !cardContext.agentUid?.trim()) {
+            throw new Error(
+                'WorkspaceOrchestrator requires non-empty cellId, cardId, and agentUid coordinates',
+            );
+        }
         const seq = ++WorkspaceOrchestrator.monotonicSeq;
         const now = Date.now();
         const workspaceId = `ws_${cardContext.cardId}_${now}_${seq}`;
@@ -127,10 +132,17 @@ export class WorkspaceOrchestrator {
                 typeof file.content === 'string'
                     ? file.content
                     : Buffer.from(file.content).toString('utf8');
+            const projectId = record.cardContext.cellId?.trim();
+            const agentId = record.cardContext.agentUid?.trim();
+            if (!projectId || !agentId) {
+                throw new Error(
+                    `Workspace ${workspaceId} is missing cellId or agentUid for quarantine export`,
+                );
+            }
             return {
                 quarantineId,
-                projectId: record.cardContext.cellId || 'default',
-                agentId: record.cardContext.agentUid || 'subagent',
+                projectId,
+                agentId,
                 relPath: file.path,
                 patchFile: `${quarantineId}.patch`,
                 reason,

@@ -1,37 +1,42 @@
 /**
- * Module: Fractal Git — Developer CLI Commands
+ * Module: Fractal Git — Developer CLI Commands & Structural Branch Grammar
  * File Path: ts/cli/commands.ts
  * Architecture Role: Provides developer-facing CLI commands (`status`, `graph`, `reclaim`)
- *   with Dual-Faced output (human-friendly text and machine-parseable JSON).
- * Dependencies & Triggers: Consumed when CLI commands are executed.
- * Responsibilities: Query fractal refs on disk, format status trees, and trigger reclamation.
- * Exit Semantics & Design Rationale: CC <= 15 and Depth <= 4; non-blocking read-only inspection.
+ *   and structural 5-tier fractal branch coordinate parsing/derivation matching `fg-topology`.
+ * Dependencies & Triggers: Consumes `../constants` and Node `fs`/`path`.
+ * Responsibilities: Query fractal refs on disk, parse 5-tier coordinates without substring heuristics,
+ *   derive child branch names from active parents, and format status trees.
+ * Exit Semantics & Design Rationale: CC <= 15 and Depth <= 4; eliminates D/F collisions via `/main` leaf.
  */
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import {
+    parseFractalTier,
+    TIER_CARD,
+    TIER_CELL,
+    TIER_SUB,
+    TIER_SYSTEM_TRUNK,
+    TIER_TRUNK,
+    type FractalRefTier,
+} from './branch-parser';
 
-/** Trunk tier representing root repository branch line. */
-export const TIER_TRUNK = 'trunk' as const;
-/** Cell tier representing cell-level integration mainlines. */
-export const TIER_CELL = 'cell' as const;
-/** Card tier representing individual task and worktree references. */
-export const TIER_CARD = 'card' as const;
-/** Sub tier representing subagent ephemeral reference probes. */
-export const TIER_SUB = 'sub' as const;
+export {
+    hasForbiddenBranchPrefix,
+    isValidKebabSegment,
+    normalizeCellId,
+    parseFractalCoordinate,
+    parseFractalTier,
+    TIER_CARD,
+    TIER_CELL,
+    TIER_SUB,
+    TIER_SYSTEM_TRUNK,
+    TIER_TRUNK,
+    type FractalRefTier,
+    type ParsedFractalCoordinate,
+} from './branch-parser';
+export { deriveChildBranch } from './branch-derivation';
 
-/**
- * Union of supported reference hierarchy tiers in Fractal Git.
- */
-export type FractalRefTier =
-    | typeof TIER_TRUNK
-    | typeof TIER_CELL
-    | typeof TIER_CARD
-    | typeof TIER_SUB;
-
-const SEGMENT_CARD = '/card/';
-const SEGMENT_SUB = '/sub/';
-const SEGMENT_CELL = '/cell/';
 const REFS_DIR = 'refs';
 const FRACTAL_DIR = 'fractal';
 const REFS_PREFIX = 'refs/';
@@ -45,25 +50,6 @@ export interface DiscoveredFractalRef {
     readonly refName: string;
     readonly commitOid: string;
     readonly tier: FractalRefTier;
-}
-
-/**
- * Derives the reference hierarchy tier based on the canonical ref path.
- *
- * @param refName Canonical Git ref path (e.g. `refs/fractal/card/c1/sub/s1`).
- * @returns Hierarchy tier identifier ('trunk', 'cell', 'card', or 'sub').
- */
-export function parseFractalTier(refName: string): FractalRefTier {
-    if (refName.includes(SEGMENT_CARD) && refName.includes(SEGMENT_SUB)) {
-        return TIER_SUB;
-    }
-    if (refName.includes(SEGMENT_CARD)) {
-        return TIER_CARD;
-    }
-    if (refName.includes(SEGMENT_CELL)) {
-        return TIER_CELL;
-    }
-    return TIER_TRUNK;
 }
 
 /**
@@ -170,7 +156,7 @@ export function formatFractalStatusText(refs: readonly DiscoveredFractalRef[]): 
         return lines.join('\n');
     }
 
-    const trunks = refs.filter((r) => r.tier === TIER_TRUNK);
+    const trunks = refs.filter((r) => r.tier === TIER_SYSTEM_TRUNK || r.tier === TIER_TRUNK);
     const cells = refs.filter((r) => r.tier === TIER_CELL);
     const cards = refs.filter((r) => r.tier === TIER_CARD);
     const subs = refs.filter((r) => r.tier === TIER_SUB);

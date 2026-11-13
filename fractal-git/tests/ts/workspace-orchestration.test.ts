@@ -17,7 +17,7 @@ test('WorkspaceOrchestrator allocates and releases workspaces', () => {
 
     const record = orchestrator.allocateWorkspace(
         { cardId: 'card-200', cellId: 'cell-alpha', agentUid: 'agent-1' },
-        { tier: 'card_worktree', gitRef: 'refs/fractal/cell/cell-alpha/card/card-200' },
+        { tier: 'card_worktree', gitRef: 'refs/fractal/cell/cell-alpha/card/card-200/main' },
         { tier: 'cell_main', gitRef: 'refs/fractal/cell/cell-alpha/main' },
     );
 
@@ -27,6 +27,15 @@ test('WorkspaceOrchestrator allocates and releases workspaces', () => {
     const removed = orchestrator.removeWorkspace(record.workspaceId);
     assert.strictEqual(removed, true);
     assert.strictEqual(orchestrator.getActiveCount(), 0);
+
+    assert.throws(
+        () => orchestrator.allocateWorkspace(
+            { cardId: 'card-200', cellId: '   ', agentUid: 'agent-1' },
+            { tier: 'card_worktree', gitRef: 'refs/fractal/cell/cell-alpha/card/card-200/main' },
+            { tier: 'cell_main', gitRef: 'refs/fractal/cell/cell-alpha/main' },
+        ),
+        /non-empty cellId, cardId, and agentUid/,
+    );
 });
 
 test('runVariantTournament picks highest-scoring clean variant and discards flawed variants', () => {

@@ -18,7 +18,20 @@ import { FRACTAL_REF, GIT_FILE_MODE } from '../constants';
 import { materializeCommitPure } from '../native-binding';
 import { verifyPreReviewZone } from '../gate-bridge';
 
+import { hasForbiddenBranchPrefix, isValidKebabSegment, normalizeCellId } from '../cli/commands';
+
 const RE_HEX_OID = /^[0-9a-fA-F]{40}$/;
+
+function assertCanonicalCoordinate(role: string, raw: string): string {
+    const trimmed = typeof raw === 'string' ? raw.trim() : '';
+    if (!isValidKebabSegment(trimmed)) {
+        throw new Error(`Invalid ${role} coordinate '${trimmed}': expected lowercase kebab-case`);
+    }
+    if (hasForbiddenBranchPrefix(trimmed)) {
+        throw new Error(`Forbidden ${role} scratch prefix in '${trimmed}'`);
+    }
+    return trimmed;
+}
 
 function resolveGitRefOid(gitDir: string, refName: string, depth = 0): string | undefined {
     if (depth >= 8) {
@@ -121,6 +134,20 @@ export class PraxisGitClient {
     }
 
     /**
+     * Builds the canonical Tier 3 card reference (`.../card/<cardId>/main`) preventing D/F collisions.
+     */
+    public buildCardRef(cellId: string, cardId: string): FractalRefDescriptor {
+        const canonicalCell = normalizeCellId(assertCanonicalCoordinate('cell', cellId));
+        const cleanCard = assertCanonicalCoordinate('card', cardId);
+        return {
+            tier: 'card_worktree',
+            gitRef: `${FRACTAL_REF.CELL_PREFIX}${canonicalCell}/card/${cleanCard}/${FRACTAL_REF.CARD_CANONICAL_LEAF}`,
+            cellId: canonicalCell,
+            cardId: cleanCard,
+        };
+    }
+
+    /**
      * Spawns an isolated SubAgent worktree handle under the designated parent card.
      */
     public spawnSubAgentWorktree(
@@ -128,15 +155,18 @@ export class PraxisGitClient {
         cardId: string,
         subagentId: string,
     ): AgentWorktreeHandle {
+        const canonicalCell = normalizeCellId(assertCanonicalCoordinate('cell', cellId));
+        const cleanCard = assertCanonicalCoordinate('card', cardId);
+        const cleanAgent = assertCanonicalCoordinate('subagent', subagentId);
         const ref: FractalRefDescriptor = {
             tier: 'subagent_worktree',
-            gitRef: `${FRACTAL_REF.CELLS_PREFIX}${cellId}/card/${cardId}/sub/${subagentId}`,
-            cellId,
-            cardId,
-            subagentId,
+            gitRef: `${FRACTAL_REF.CELL_PREFIX}${canonicalCell}/card/${cleanCard}/sub/${cleanAgent}`,
+            cellId: canonicalCell,
+            cardId: cleanCard,
+            subagentId: cleanAgent,
         };
 
-        const worktreeId = `wt-${cellId}-${cardId}-${subagentId}`;
+        const worktreeId = `wt-${canonicalCell}-${cleanCard}-${cleanAgent}`;
         const stagedFiles: StagedFileEntry[] = [];
 
         return {
@@ -164,8 +194,8 @@ export class PraxisGitClient {
                 }
                 const parentCommitOids = resolveParentCommitOids(this.gitDir, ref.gitRef);
                 const message = buildCompliantCommitMessage(
-                    cardId,
-                    cellId,
+                    cleanCard,
+                    canonicalCell,
                     worktreeId,
                     stagedFiles,
                     verdict.score,
@@ -175,13 +205,13 @@ export class PraxisGitClient {
                     parentCommitOids,
                     files: stagedFiles,
                     message,
-                    authorName: `${cellId}:${subagentId}`,
-                    authorEmail: `${subagentId}@${cellId}.praxis.local`,
+                    authorName: `${canonicalCell}:${cleanAgent}`,
+                    authorEmail: `${cleanAgent}@${canonicalCell}.praxis.local`,
                     agentMeta: {
                         cardContext: {
-                            cardId,
-                            cellId,
-                            agentUid: subagentId,
+                            cardId: cleanCard,
+                            cellId: canonicalCell,
+                            agentUid: cleanAgent,
                         },
                         qualityScore: verdict.score,
                         gateStatus: 'approved',

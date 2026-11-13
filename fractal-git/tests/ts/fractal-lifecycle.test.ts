@@ -11,10 +11,18 @@ import { execFileSync } from 'node:child_process';
 import { test } from 'node:test';
 import {
     createFractalGitEngine,
+    deriveChildBranch,
     FGT_RULES,
     FRACTAL_REF,
     LayerVfsAdapter,
+    parseFractalCoordinate,
+    parseFractalTier,
     PraxisGitClient,
+    TIER_CARD,
+    TIER_CELL,
+    TIER_SUB,
+    TIER_SYSTEM_TRUNK,
+    TIER_TRUNK,
     verifyPreReviewZone,
 } from '../../ts/index';
 
@@ -50,7 +58,7 @@ test('FractalGitEngine materializes commit and updates ref in temp git repo', ()
         const result = engine.materializeCommit({
             targetRef: {
                 tier: 'card_worktree',
-                gitRef: 'refs/fractal/cell/cell-alpha/card/card-101',
+                gitRef: 'refs/fractal/cell/cell-alpha/card/card-101/main',
             },
             parentCommitOids: [],
             files: [
@@ -69,7 +77,7 @@ test('FractalGitEngine materializes commit and updates ref in temp git repo', ()
         assert.strictEqual(result.treeOid.length, 40);
 
         // Verify ref file written on disk
-        const refFile = path.join(gitDir, 'refs/fractal/cell/cell-alpha/card/card-101');
+        const refFile = path.join(gitDir, 'refs/fractal/cell/cell-alpha/card/card-101/main');
         assert.strictEqual(fs.existsSync(refFile), true);
         const refContent = fs.readFileSync(refFile, 'utf8').trim();
         assert.strictEqual(refContent, result.commitOid);
@@ -95,7 +103,7 @@ test('FractalGitEngine materializes commit and updates ref in temp git repo', ()
     }
 });
 
-test('PraxisGitClient uses refs/fractal/cells/, resolves parent commit OID, and writes workspace-strict message', () => {
+test('PraxisGitClient uses refs/fractal/cell/, builds canonical card refs, and writes workspace-strict message', () => {
     const tmpBase = fs.mkdtempSync(path.join(os.tmpdir(), 'praxis-client-test-'));
     const gitDir = path.join(tmpBase, '.git');
     fs.mkdirSync(gitDir, { recursive: true });
@@ -113,12 +121,18 @@ test('PraxisGitClient uses refs/fractal/cells/, resolves parent commit OID, and 
         fs.writeFileSync(path.join(gitDir, 'HEAD'), 'ref: refs/heads/main\n', 'utf8');
 
         const client = new PraxisGitClient(gitDir);
+        const cardRef = client.buildCardRef('fractalgit', 'card-2');
+        assert.strictEqual(cardRef.gitRef, `${FRACTAL_REF.CELL_PREFIX}fractal-git/card/card-2/main`);
+        assert.strictEqual(cardRef.cellId, 'fractal-git');
+
         const handle = client.spawnSubAgentWorktree('cell-1', 'card-2', 'sub-3');
-        assert.ok(handle.fractalRef.gitRef.startsWith(FRACTAL_REF.CELLS_PREFIX));
+        assert.ok(handle.fractalRef.gitRef.startsWith(FRACTAL_REF.CELL_PREFIX));
 
         handle.stageFile('src/feature.ts', 'export const feature = 42;\n');
         const firstResult = handle.submitForPreReview();
-        assert.strictEqual(firstResult.targetRef, `${FRACTAL_REF.CELLS_PREFIX}cell-1/card/card-2/sub/sub-3`);
+        assert.strictEqual(firstResult.targetRef, `${FRACTAL_REF.CELL_PREFIX}cell-1/card/card-2/sub/sub-3`);
+        assert.throws(() => client.spawnSubAgentWorktree('', 'card-2', 'sub-3'), /Invalid cell coordinate/);
+        assert.throws(() => client.spawnSubAgentWorktree('auto-refactor', 'wip-hack', 'sub-3'), /Forbidden card scratch prefix/);
 
         const rawFirst = execFileSync('git', ['--git-dir', gitDir, 'cat-file', '-p', firstResult.commitOid], {
             encoding: 'utf8',
@@ -169,4 +183,41 @@ test('LayerVfsAdapter preserves empty string files, deletion tombstones, and exp
     adapter.writeVirtualFile('src/removed.ts', 'restored\n');
     assert.deepStrictEqual(adapter.toTombstones(), ['src/deleted-flag.ts']);
     assert.strictEqual(Object.keys(FGT_RULES).length, 36);
+});
+
+test('5-tier structural parser and child branch derivation enforce D/F-safe canonical taxonomy', () => {
+    assert.strictEqual(parseFractalTier('refs/heads/main'), TIER_SYSTEM_TRUNK);
+    assert.strictEqual(parseFractalTier('integration'), TIER_TRUNK);
+    assert.strictEqual(parseFractalTier('cell/fractal-git/main'), TIER_CELL);
+    assert.strictEqual(parseFractalTier('refs/fractal/cell/fractal-git/card/k1/main'), TIER_CARD);
+    assert.strictEqual(parseFractalTier('feat/fractal-git/branch-norm'), TIER_CARD);
+    assert.strictEqual(parseFractalTier('cell/fractal-git/card/k1/sub/agent-1'), TIER_SUB);
+
+    const legacyCard = parseFractalCoordinate('cell/fractal-git/card/k1');
+    assert.ok(legacyCard);
+    assert.strictEqual(legacyCard.isLegacyFourSegmentCard, true);
+    assert.strictEqual(legacyCard.canonicalShortBranch, 'cell/fractal-git/card/k1/main');
+
+    assert.strictEqual(deriveChildBranch('main', 'integration'), 'integration');
+    assert.strictEqual(deriveChildBranch('integration', 'fractalgit'), 'cell/fractal-git/main');
+    assert.strictEqual(
+        deriveChildBranch('cell/fractal-git/main', 'kernel-std'),
+        'cell/fractal-git/card/kernel-std/main',
+    );
+    assert.strictEqual(
+        deriveChildBranch('cell/fractal-git/main', 'kernel-std', 'feat'),
+        'feat/fractal-git/kernel-std',
+    );
+    assert.strictEqual(
+        deriveChildBranch('cell/fractal-git/card/kernel-std/main', 'worker-1'),
+        'cell/fractal-git/card/kernel-std/sub/worker-1',
+    );
+    assert.throws(
+        () => deriveChildBranch('cell/fractal-git/card/kernel-std', 'worker-1'),
+        /D\/F-colliding 4-segment card branch/,
+    );
+    assert.throws(
+        () => deriveChildBranch('main', 'cell-random'),
+        /can only derive 'integration'/,
+    );
 });
