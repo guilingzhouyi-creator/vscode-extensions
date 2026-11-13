@@ -97,3 +97,56 @@ test('receipt signing covers the v1 envelope and payload with exact shared bytes
     assert.equal(verifyCanonicalReview(JSON.stringify(altered), Buffer.from(vector.receipt.signature, 'hex'), key), false);
     assert.throws(() => receiptSigningBytes(JSON.stringify(fixtures.documents.request)));
 });
+
+test('measurements accept closed tenDimensions and quantMetrics and reject invalid extensions', () => {
+    const base = structuredClone(fixtures.documents.evidence) as Record<string, unknown>;
+    const measurements = base.measurements as Record<string, unknown>;
+    measurements.tenDimensions = {
+        architectureConsistency: 94.5,
+        semanticPurity: 96.0,
+        codeSecurity: 99.5,
+        performanceEfficiency: 92.25,
+        standardization: 95.0,
+        modernity: 91.5,
+        maintainability: 93.0,
+        commentQuality: 89.75,
+        duplication: 98.0,
+        techDebtRisk: 97.5,
+        compositeScore: 94.8,
+        grade: 'A+',
+    };
+    measurements.quantMetrics = {
+        rcr: 1.4,
+        erq: 2.1,
+        ddr: 1.8,
+        edb95: 3.2,
+        ptd: 4.5,
+        dsi: 0.28,
+        rcd: 1.15,
+        ehl: 2.5,
+        workspaceHealthScore: 93.2,
+        autonomyRate: 0.96,
+        polyglotIndex: 91.0,
+        sqaleMinutes: 42.5,
+        tdr: 0.03,
+        confidence: 0.91,
+    };
+    const parsed = parseQualityDocument(JSON.stringify(base));
+    assert.equal(parsed.kind, 'analysis-evidence');
+    if (parsed.kind === 'analysis-evidence') {
+        assert.equal(parsed.measurements.tenDimensions?.grade, 'A+');
+        assert.equal(parsed.measurements.quantMetrics?.autonomyRate, 0.96);
+    }
+
+    const extraField = structuredClone(base) as Record<string, unknown>;
+    ((extraField.measurements as Record<string, unknown>).tenDimensions as Record<string, unknown>).unknownAxis = 100;
+    assert.throws(() => parseQualityDocument(JSON.stringify(extraField)));
+
+    const outOfRange = structuredClone(base) as Record<string, unknown>;
+    ((outOfRange.measurements as Record<string, unknown>).tenDimensions as Record<string, unknown>).codeSecurity = 101;
+    assert.throws(() => parseQualityDocument(JSON.stringify(outOfRange)));
+
+    const badGrade = structuredClone(base) as Record<string, unknown>;
+    ((badGrade.measurements as Record<string, unknown>).tenDimensions as Record<string, unknown>).grade = 'Z';
+    assert.throws(() => parseQualityDocument(JSON.stringify(badGrade)));
+});

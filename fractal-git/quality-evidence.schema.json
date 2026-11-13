@@ -418,6 +418,143 @@
         }
       ]
     },
+    "ScorePercent": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "FiniteScalar": {
+      "type": "number",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "TenDimensions": {
+      "type": "object",
+      "properties": {
+        "architectureConsistency": {
+          "$ref": "#/$defs/ScorePercent"
+        },
+        "semanticPurity": {
+          "$ref": "#/$defs/ScorePercent"
+        },
+        "codeSecurity": {
+          "$ref": "#/$defs/ScorePercent"
+        },
+        "performanceEfficiency": {
+          "$ref": "#/$defs/ScorePercent"
+        },
+        "standardization": {
+          "$ref": "#/$defs/ScorePercent"
+        },
+        "modernity": {
+          "$ref": "#/$defs/ScorePercent"
+        },
+        "maintainability": {
+          "$ref": "#/$defs/ScorePercent"
+        },
+        "commentQuality": {
+          "$ref": "#/$defs/ScorePercent"
+        },
+        "duplication": {
+          "$ref": "#/$defs/ScorePercent"
+        },
+        "techDebtRisk": {
+          "$ref": "#/$defs/ScorePercent"
+        },
+        "compositeScore": {
+          "$ref": "#/$defs/ScorePercent"
+        },
+        "grade": {
+          "type": "string",
+          "pattern": "^(A\\+|A|B|C|D|F|N/A)$",
+          "minLength": 1,
+          "maxLength": 8
+        }
+      },
+      "required": [
+        "architectureConsistency",
+        "semanticPurity",
+        "codeSecurity",
+        "performanceEfficiency",
+        "standardization",
+        "modernity",
+        "maintainability",
+        "commentQuality",
+        "duplication",
+        "techDebtRisk",
+        "compositeScore",
+        "grade"
+      ],
+      "additionalProperties": false
+    },
+    "QuantMetrics": {
+      "type": "object",
+      "properties": {
+        "rcr": {
+          "$ref": "#/$defs/FiniteScalar"
+        },
+        "erq": {
+          "$ref": "#/$defs/FiniteScalar"
+        },
+        "ddr": {
+          "$ref": "#/$defs/FiniteScalar"
+        },
+        "edb95": {
+          "$ref": "#/$defs/FiniteScalar"
+        },
+        "ptd": {
+          "$ref": "#/$defs/FiniteScalar"
+        },
+        "dsi": {
+          "$ref": "#/$defs/FiniteScalar"
+        },
+        "rcd": {
+          "$ref": "#/$defs/FiniteScalar"
+        },
+        "ehl": {
+          "$ref": "#/$defs/FiniteScalar"
+        },
+        "workspaceHealthScore": {
+          "$ref": "#/$defs/ScorePercent"
+        },
+        "autonomyRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "polyglotIndex": {
+          "$ref": "#/$defs/ScorePercent"
+        },
+        "sqaleMinutes": {
+          "$ref": "#/$defs/FiniteScalar"
+        },
+        "tdr": {
+          "$ref": "#/$defs/FiniteScalar"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "rcr",
+        "erq",
+        "ddr",
+        "edb95",
+        "ptd",
+        "dsi",
+        "rcd",
+        "ehl",
+        "workspaceHealthScore",
+        "autonomyRate",
+        "polyglotIndex",
+        "sqaleMinutes",
+        "tdr",
+        "confidence"
+      ],
+      "additionalProperties": false
+    },
     "Measurements": {
       "type": "object",
       "properties": {
@@ -435,6 +572,12 @@
         },
         "performanceMs": {
           "$ref": "#/$defs/NumberMeasurement"
+        },
+        "tenDimensions": {
+          "$ref": "#/$defs/TenDimensions"
+        },
+        "quantMetrics": {
+          "$ref": "#/$defs/QuantMetrics"
         }
       },
       "required": [

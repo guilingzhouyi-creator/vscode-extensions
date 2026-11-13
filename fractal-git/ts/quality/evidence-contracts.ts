@@ -99,12 +99,50 @@ export type NumberMeasurement = (MeasuredNumber) | (Unmeasured) | (NotApplicable
 
 export type TrialMeasurement = (MeasuredTrials) | (Unmeasured) | (NotApplicable) | (FailedMeasurement);
 
+export type ScorePercent = number;
+
+export type FiniteScalar = number;
+
+export type TenDimensions = {
+    readonly "architectureConsistency": ScorePercent;
+    readonly "semanticPurity": ScorePercent;
+    readonly "codeSecurity": ScorePercent;
+    readonly "performanceEfficiency": ScorePercent;
+    readonly "standardization": ScorePercent;
+    readonly "modernity": ScorePercent;
+    readonly "maintainability": ScorePercent;
+    readonly "commentQuality": ScorePercent;
+    readonly "duplication": ScorePercent;
+    readonly "techDebtRisk": ScorePercent;
+    readonly "compositeScore": ScorePercent;
+    readonly "grade": string;
+};
+
+export type QuantMetrics = {
+    readonly "rcr": FiniteScalar;
+    readonly "erq": FiniteScalar;
+    readonly "ddr": FiniteScalar;
+    readonly "edb95": FiniteScalar;
+    readonly "ptd": FiniteScalar;
+    readonly "dsi": FiniteScalar;
+    readonly "rcd": FiniteScalar;
+    readonly "ehl": FiniteScalar;
+    readonly "workspaceHealthScore": ScorePercent;
+    readonly "autonomyRate": number;
+    readonly "polyglotIndex": ScorePercent;
+    readonly "sqaleMinutes": FiniteScalar;
+    readonly "tdr": FiniteScalar;
+    readonly "confidence": number;
+};
+
 export type Measurements = {
     readonly "qualityDelta": NumberMeasurement;
     readonly "generalization": NumberMeasurement;
     readonly "tests": TrialMeasurement;
     readonly "mutations": TrialMeasurement;
     readonly "performanceMs": NumberMeasurement;
+    readonly "tenDimensions"?: TenDimensions;
+    readonly "quantMetrics"?: QuantMetrics;
 };
 
 export type TrackStatus = "pending" | "running" | "complete" | "failed" | "not-required";
