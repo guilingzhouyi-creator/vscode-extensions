@@ -42,10 +42,15 @@ pub fn sync_local_repository_fetch(
     target_url: &str,
 ) {
     let discovered_refs = discover_local_remote_refs(source_git_dir);
-    copy_object_store_contents(
+    if let Err(io_err) = copy_object_store_contents(
         &source_git_dir.join("objects"),
         &ctx.git_dir.join("objects"),
-    );
+    ) {
+        super::common::reject(
+            fractal_git::constants::cli::CliTag::ERROR,
+            format!("copy object store during fetch: {io_err}"),
+        );
+    }
     let report_refs =
         record_fetched_tracking_refs(&ctx.git_dir, remote_target, target_url, &discovered_refs);
     report_fetch_outcome(ctx, remote_target, target_url, &report_refs);
@@ -56,7 +61,10 @@ fn discover_local_remote_refs(source_git_dir: &Path) -> Vec<(String, Oid)> {
     collect_loose_heads_refs(&source_git_dir.join("refs/heads"), &mut discovered_refs);
     collect_packed_heads_refs(&source_git_dir.join("packed-refs"), &mut discovered_refs);
     if discovered_refs.is_empty() {
-        let default_cell = source_git_dir.join("refs/fractal/cell/cell-default/main");
+        let default_cell = source_git_dir.join(format!(
+            "refs/fractal/cell/{}/main",
+            fg_core::constants::policy::DEFAULT_CELL_ID
+        ));
         if let Ok(content) = std::fs::read_to_string(default_cell) {
             if let Ok(oid) = Oid::from_hex(content.trim()) {
                 discovered_refs.push(("main".to_string(), oid));
@@ -108,12 +116,16 @@ fn collect_packed_heads_refs(packed_refs_path: &Path, discovered_refs: &mut Vec<
     }
 }
 
-pub(crate) fn copy_object_store_contents(src_objects: &Path, dst_objects: &Path) {
-    let _ = std::fs::create_dir_all(dst_objects);
-    let Ok(entries) = std::fs::read_dir(src_objects) else {
-        return;
-    };
-    for entry in entries.flatten() {
+pub(crate) fn copy_object_store_contents(
+    src_objects: &Path,
+    dst_objects: &Path,
+) -> std::io::Result<()> {
+    if !src_objects.exists() {
+        return Ok(());
+    }
+    std::fs::create_dir_all(dst_objects)?;
+    for entry in std::fs::read_dir(src_objects)? {
+        let entry = entry?;
         let entry_name = entry.file_name();
         let entry_name_str = entry_name.to_string_lossy();
         let path = entry.path();
@@ -121,27 +133,27 @@ pub(crate) fn copy_object_store_contents(src_objects: &Path, dst_objects: &Path)
             continue;
         }
         if entry_name_str.len() == 2 {
-            copy_directory_files(&path, &dst_objects.join(&*entry_name_str));
+            copy_directory_files(&path, &dst_objects.join(&*entry_name_str))?;
         } else if entry_name_str == "pack" {
-            copy_directory_files(&path, &dst_objects.join("pack"));
+            copy_directory_files(&path, &dst_objects.join("pack"))?;
         }
     }
+    Ok(())
 }
 
-fn copy_directory_files(src_dir: &Path, dst_dir: &Path) {
-    let _ = std::fs::create_dir_all(dst_dir);
-    let Ok(entries) = std::fs::read_dir(src_dir) else {
-        return;
-    };
-    for item in entries.flatten() {
-        if item.file_name() == "multi-pack-index" {
+fn copy_directory_files(src_dir: &Path, dst_dir: &Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst_dir)?;
+    for entry_res in std::fs::read_dir(src_dir)? {
+        let obj_entry = entry_res?;
+        if obj_entry.file_name() == "multi-pack-index" {
             continue;
         }
-        let dst_file = dst_dir.join(item.file_name());
+        let dst_file = dst_dir.join(obj_entry.file_name());
         if !dst_file.is_file() {
-            let _ = std::fs::copy(item.path(), &dst_file);
+            std::fs::copy(obj_entry.path(), &dst_file)?;
         }
     }
+    Ok(())
 }
 
 fn record_fetched_tracking_refs(

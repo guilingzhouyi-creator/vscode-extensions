@@ -15,6 +15,8 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use fg_core::models::Oid;
+use fg_core::traits::RefStore;
+use fg_topology::refs::{DiskRefStore, FractalRef};
 use fractal_git::constants::cli::CliTag;
 use serde_json::json;
 
@@ -60,10 +62,15 @@ pub fn sync_local_repository_push(params: &LocalPushParams<'_>) {
         params.refspecs,
         params.force,
     );
-    copy_object_store_contents(
+    if let Err(io_err) = copy_object_store_contents(
         &view.git_dir().join("objects"),
         &params.dest_git_dir.join("objects"),
-    );
+    ) {
+        reject(
+            CliTag::ERROR,
+            format!("copy object store during push: {io_err}"),
+        );
+    }
 
     let results =
         apply_remote_ref_updates(&view, params.dest_git_dir, params.remote_target, &updates);
@@ -79,15 +86,13 @@ fn build_push_ref_updates(
 ) -> Vec<(String, Oid, bool)> {
     if refspecs.is_empty() {
         let branch = extract_branch_short_name(effective_ref);
-        let cell_ref = if effective_ref.starts_with("refs/fractal/cell/") {
-            effective_ref.to_string()
-        } else {
-            format!("refs/fractal/cell/cell-default/{branch}")
-        };
-        return vec![
-            (format!("refs/heads/{branch}"), head_oid, global_force),
-            (cell_ref, head_oid, global_force),
-        ];
+        let head_ref = format!("refs/heads/{branch}");
+        let cell_ref = derive_cell_ref(effective_ref, branch);
+        let mut updates = vec![(head_ref.clone(), head_oid, global_force)];
+        if cell_ref != head_ref {
+            updates.push((cell_ref, head_oid, global_force));
+        }
+        return updates;
     }
 
     let mut updates = Vec::new();
@@ -148,10 +153,6 @@ fn resolve_push_source(view: &RepoView, src: &str, fallback_head: Oid) -> Oid {
     if let Ok(oid) = view.resolve(src) {
         return oid;
     }
-    let clean = src.strip_prefix("refs/heads/").unwrap_or(src);
-    if clean == "main" || clean == "master" {
-        return fallback_head;
-    }
     reject(
         CliTag::ERROR,
         format!("error: src refspec {src} does not match any"),
@@ -174,12 +175,32 @@ fn extract_branch_short_name(ref_name: &str) -> &str {
 }
 
 fn derive_cell_ref(effective_ref: &str, branch: &str) -> String {
+    if let Some(fractal) = fractal_git::FractalRef::parse(branch) {
+        if !matches!(fractal, fractal_git::FractalRef::SystemTrunk { .. })
+            && !fractal.is_telemetry()
+        {
+            return fractal.to_git_ref();
+        }
+    }
+    if let Some(fractal) = fractal_git::FractalRef::parse(effective_ref) {
+        if !matches!(fractal, fractal_git::FractalRef::SystemTrunk { .. })
+            && !fractal.is_telemetry()
+        {
+            return fractal.to_git_ref();
+        }
+    }
     if let Some(rest) = effective_ref.strip_prefix("refs/fractal/cell/") {
         if let Some((cell_id, _)) = rest.split_once('/') {
             return format!("refs/fractal/cell/{cell_id}/{branch}");
         }
     }
-    format!("refs/fractal/cell/cell-default/{branch}")
+    if let Some(rest) = branch.strip_prefix("cell/") {
+        return format!("refs/fractal/cell/{rest}");
+    }
+    format!(
+        "refs/fractal/cell/{}/{branch}",
+        fg_core::constants::policy::DEFAULT_CELL_ID
+    )
 }
 
 fn apply_remote_ref_updates(
@@ -188,21 +209,32 @@ fn apply_remote_ref_updates(
     remote_target: &str,
     updates: &[(String, Oid, bool)],
 ) -> Vec<(String, Result<(), String>)> {
+    let dest_store = DiskRefStore::new(dest_git_dir);
     let mut results = Vec::with_capacity(updates.len());
     for (dst_ref, new_oid, force) in updates {
-        let existing = read_remote_ref_oid(dest_git_dir, dst_ref);
+        let existing = match dest_store.get_ref(dst_ref) {
+            Ok(val) => val,
+            Err(read_err) => {
+                results.push((dst_ref.clone(), Err(read_err.to_string())));
+                continue;
+            }
+        };
+        if let Some(fractal_ref) = FractalRef::parse(dst_ref) {
+            if let Err(policy_err) =
+                fractal_ref.verify_telemetry_update_policy(existing, Some(*new_oid), *force)
+            {
+                results.push((dst_ref.clone(), Err(policy_err.to_string())));
+                continue;
+            }
+        }
         if let Some(old_oid) = existing {
             if old_oid != *new_oid && !*force && !is_ancestor(view, old_oid, *new_oid) {
                 results.push((dst_ref.clone(), Err("non-fast-forward".to_string())));
                 continue;
             }
         }
-        let target_file = dest_git_dir.join(dst_ref);
-        if let Some(parent) = target_file.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        if let Err(io_err) = std::fs::write(&target_file, format!("{}\n", new_oid.to_hex())) {
-            results.push((dst_ref.clone(), Err(io_err.to_string())));
+        if let Err(update_err) = dest_store.update_ref(dst_ref, new_oid, existing.as_ref()) {
+            results.push((dst_ref.clone(), Err(update_err.to_string())));
             continue;
         }
         if let Some(branch) = dst_ref.strip_prefix("refs/heads/") {
@@ -212,24 +244,6 @@ fn apply_remote_ref_updates(
         results.push((dst_ref.clone(), Ok(())));
     }
     results
-}
-
-fn read_remote_ref_oid(dest_git_dir: &Path, ref_name: &str) -> Option<Oid> {
-    if let Ok(content) = std::fs::read_to_string(dest_git_dir.join(ref_name)) {
-        if let Ok(oid) = Oid::from_hex(content.trim()) {
-            return Some(oid);
-        }
-    }
-    let content = std::fs::read_to_string(dest_git_dir.join("packed-refs")).ok()?;
-    for line in content.lines() {
-        let trimmed = line.trim();
-        if let Some((hex, name)) = trimmed.split_once(' ') {
-            if name.trim() == ref_name {
-                return Oid::from_hex(hex.trim()).ok();
-            }
-        }
-    }
-    None
 }
 
 fn is_ancestor(view: &RepoView, ancestor: Oid, descendant: Oid) -> bool {

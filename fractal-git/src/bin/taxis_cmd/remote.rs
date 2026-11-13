@@ -792,14 +792,22 @@ fn try_pull_into_unborn_head(ctx: &CliContext, fetch_head_path: &Path) -> bool {
         .map(|(n, _)| n)
         .unwrap_or_else(|| "main".to_string());
     super::checkout::update_references(view.git_dir(), view.work_root(), target_oid, Some(&branch));
-    let cell_ref = view
-        .git_dir()
-        .join("refs/fractal/cell/cell-default")
-        .join(&branch);
-    if let Some(parent) = cell_ref.parent() {
-        let _ = std::fs::create_dir_all(parent);
+    if fg_gate::BranchGovernanceFloor::resolve(view.git_dir()).tier
+        != fg_core::models::BranchEnforcementTier::Strict
+        && branch == "main"
+    {
+        let cell_ref = view
+            .git_dir()
+            .join(format!(
+                "refs/fractal/cell/{}",
+                fg_core::constants::policy::DEFAULT_CELL_ID
+            ))
+            .join(&branch);
+        if let Some(parent) = cell_ref.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::write(cell_ref, format!("{}\n", target_oid.to_hex()));
     }
-    let _ = std::fs::write(cell_ref, format!("{}\n", target_oid.to_hex()));
 
     if !ctx.json_mode {
         println!(

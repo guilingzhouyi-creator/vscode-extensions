@@ -306,10 +306,15 @@ fn update_single_submodule(
     let sub_git_dir = SubmoduleController::resolve_submodule_git_dir(&sub_work_root)
         .unwrap_or_else(|| sub_work_root.join(".git"));
     ensure_submodule_git_scaffold(&sub_work_root, &sub_git_dir, effective_url);
-    super::remote_sync::copy_object_store_contents(
+    if let Err(io_err) = super::remote_sync::copy_object_store_contents(
         &src_git_dir.join("objects"),
         &sub_git_dir.join("objects"),
-    );
+    ) {
+        fail_fatal(format!(
+            "failed to copy object store for submodule '{}': {io_err}",
+            entry.path
+        ));
+    }
 
     let target_oid = match gitlink_oid {
         Some(oid) => oid,

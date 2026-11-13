@@ -118,9 +118,9 @@ pub fn handle_verify(ctx: &CliContext) {
     // Tiers 3 & 4: conflict markers, TKCV+Canary real file inspection, and quota limits
     let signing_secret = resolve_authority_secret(&ctx.git_dir).unwrap_or_else(|_| secret.clone());
     let (workspace_ok, receipt) = inspect_workspace_and_issue_receipt(ctx, &signing_secret);
-    let conflict_ok =
-        ConflictGuard::assert_clean_content("sample.rs", b"pub fn clean() {}\n").is_ok()
-            && workspace_ok;
+    let conflict_ok = ConflictGuard::assert_clean_content("sample.rs", b"pub fn clean() {}\n")
+        .is_ok()
+        && workspace_ok;
     let quota = QuotaGovernor::default();
     let quota_ok = quota.assert_spawn_capacity(0).is_ok() && quota.assert_storage_budget(0).is_ok();
 
@@ -166,8 +166,11 @@ fn inspect_workspace_and_issue_receipt(
 
     if latest_receipt.is_none() {
         let default_source = "pub fn verify_probe(val: u32) -> u32 {\n    val * 2\n}\n";
-        let default_tests = "#[test]\nfn test_verify_probe() {\n    assert_eq!(verify_probe(4), 8);\n}\n";
-        latest_receipt = hook.audit_source_and_test("src/lib.rs", default_source, default_tests, "taxis-verify").ok();
+        let default_tests =
+            "#[test]\nfn test_verify_probe() {\n    assert_eq!(verify_probe(4), 8);\n}\n";
+        latest_receipt = hook
+            .audit_source_and_test("src/lib.rs", default_source, default_tests, "taxis-verify")
+            .ok();
     }
 
     (latest_receipt.is_some(), latest_receipt)
@@ -199,7 +202,11 @@ fn audit_single_workspace_file(
     test_override: Option<&str>,
 ) -> Option<AutoAuditReceipt> {
     let direct = Path::new(rel_path);
-    let full_path = if direct.is_file() { direct.to_path_buf() } else { work_root.join(rel_path) };
+    let full_path = if direct.is_file() {
+        direct.to_path_buf()
+    } else {
+        work_root.join(rel_path)
+    };
     let workspace_rel = full_path
         .strip_prefix(work_root)
         .ok()
@@ -208,8 +215,13 @@ fn audit_single_workspace_file(
     let bytes = std::fs::read(&full_path).ok()?;
     ConflictGuard::assert_clean_content(workspace_rel, &bytes).ok()?;
     let source_code = std::str::from_utf8(&bytes).ok()?;
-    hook.audit_source_and_test(workspace_rel, source_code, test_override.unwrap_or(source_code), "taxis-verify")
-        .ok()
+    hook.audit_source_and_test(
+        workspace_rel,
+        source_code,
+        test_override.unwrap_or(source_code),
+        "taxis-verify",
+    )
+    .ok()
 }
 
 /// Persists the signed verification receipt to `.taxis/verify-receipt.json` and any `--receipt` path.
@@ -226,7 +238,9 @@ fn persist_verify_receipt(ctx: &CliContext, receipt: &AutoAuditReceipt, all_gate
         "signature": receipt.record.sig,
         "audit_record": receipt.record,
     });
-    let Ok(serialized) = serde_json::to_vec_pretty(&payload) else { return };
+    let Ok(serialized) = serde_json::to_vec_pretty(&payload) else {
+        return;
+    };
     for target in resolve_receipt_destinations(ctx) {
         if let Some(parent) = target.parent() {
             let _ = std::fs::create_dir_all(parent);
