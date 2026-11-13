@@ -12,7 +12,12 @@ class_name TelemetrySidecarEngine
 extends RefCounted
 
 var _event_ring_buffer: Array = []
+var _ring_head: int = 0
+var _ring_count: int = 0
 var max_buffer_capacity: int = GameConfig.get_int("domains.telemetry_account_lifecycle", "buffer/max_capacity", 1000)
+
+static var _salt_mod_cached: int = 10000
+static var _salt_cfg_ver: int = -1
 
 ## 记录埋点事件：确定性事件 ID（账号+UTC+盐模）+ 环形缓冲入队（溢出丢最旧）
 func record_event(
@@ -26,27 +31,58 @@ func record_event(
 	var evt_id := "%s_%d_%d" % [account_id, current_utc, salt]
 	var evt := TelemetryEventDTO.new(evt_id, event_name, account_id, current_utc, session_duration, payload)
 
-	_event_ring_buffer.append(evt)
-	if _event_ring_buffer.size() > max_buffer_capacity:
-		_event_ring_buffer.pop_front() # 环形缓冲区溢出自动丢弃最旧项
+	var cap: int = maxi(0, max_buffer_capacity)
+	if cap == 0:
+		_event_ring_buffer.clear()
+		_ring_head = 0
+		_ring_count = 0
+		return evt
+	if _event_ring_buffer.size() > cap:
+		var trimmed: Array = flush_events_batch()
+		var keep_start: int = maxi(0, trimmed.size() - cap)
+		for idx in range(keep_start, trimmed.size()):
+			_event_ring_buffer.append(trimmed[idx])
+		_ring_head = 0
+		_ring_count = _event_ring_buffer.size()
+	if _ring_count < cap:
+		if _event_ring_buffer.size() < cap and _ring_head == 0:
+			_event_ring_buffer.append(evt)
+		else:
+			if _event_ring_buffer.size() < cap:
+				_event_ring_buffer.resize(cap)
+			_event_ring_buffer[(_ring_head + _ring_count) % cap] = evt
+		_ring_count += 1
+	else:
+		_event_ring_buffer[_ring_head] = evt
+		_ring_head = (_ring_head + 1) % cap
 
 	return evt
 
 ## 批量提取：整批复制后清空缓冲（刷盘供上游消费）
 func flush_events_batch() -> Array:
-	var batch: Variant = _event_ring_buffer.duplicate()
+	var batch: Array = []
+	var buf_size: int = _event_ring_buffer.size()
+	if _ring_count > 0 and buf_size > 0:
+		batch.resize(_ring_count)
+		for i in range(_ring_count):
+			batch[i] = _event_ring_buffer[(_ring_head + i) % buf_size]
 	_event_ring_buffer.clear()
+	_ring_head = 0
+	_ring_count = 0
 	return batch
 
 ## 当前缓冲内事件数
 func get_buffer_count() -> int:
-	return maxi(0, _event_ring_buffer.size())
+	return _ring_count
 
 # ==============================================================================
 # 配置读取
 # ==============================================================================
 
 static func _salt_modulus() -> int:
-	# L1（）：取模除数下限守卫（Inv-VD-1）——配置 0 时 % 除零崩溃
-	#（对照 deterministic_replay_engine.gd:32 maxi(1,…) 惯例）
-	return maxi(1, GameConfig.get_int("domains.telemetry_account_lifecycle", "event_id/salt_modulus", 10000))
+	var ver: int = GameConfig.config_reload_version()
+	if _salt_cfg_ver != ver:
+		# L1（）：取模除数下限守卫（Inv-VD-1）——配置 0 时 % 除零崩溃
+		_salt_mod_cached = maxi(1, GameConfig.get_int("domains.telemetry_account_lifecycle", "event_id/salt_modulus", 10000))
+		_salt_cfg_ver = ver
+	return _salt_mod_cached

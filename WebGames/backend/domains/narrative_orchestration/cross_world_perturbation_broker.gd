@@ -24,6 +24,7 @@ var _max_retained_entries: int = DEFAULT_MAX_ENTRIES
 var _min_resonance_threshold: float = DEFAULT_MIN_RESONANCE
 var _perturbations: Array[CrossWorldPerturbationDTO] = []
 var _perturbations_by_id: Dictionary = {}
+var _serialized_by_id: Dictionary = {}
 var _is_loaded: bool = false
 
 ## 获取单例实例
@@ -67,6 +68,7 @@ func set_custom_ledger_path(path: String) -> void:
     _ledger_path = path
     _perturbations.clear()
     _perturbations_by_id.clear()
+    _serialized_by_id.clear()
     _is_loaded = false
     _load_ledger_from_disk()
 
@@ -74,6 +76,7 @@ func set_custom_ledger_path(path: String) -> void:
 func reset_broker() -> void:
     _perturbations.clear()
     _perturbations_by_id.clear()
+    _serialized_by_id.clear()
     _is_loaded = false
     _ledger_path = DEFAULT_LEDGER_PATH
 
@@ -123,20 +126,27 @@ func _load_ledger_from_disk() -> void:
     var raw_list := parsed_val as Array
     for item in raw_list:
         if item is Dictionary:
-            var dto := _dict_to_dto(item as Dictionary)
+            var item_dict := item as Dictionary
+            var dto := _dict_to_dto(item_dict)
             if dto != null and not dto.perturbation_id.is_empty():
                 _perturbations.append(dto)
                 _perturbations_by_id[dto.perturbation_id] = dto
+                _serialized_by_id[dto.perturbation_id] = _dto_to_dict(dto)
 
-## 原子刷盘物理账本
+## 原子刷盘物理账本（按扰动条目增量缓存字典序列化结果，避免每条触发全量重转）
 func _flush_ledger_to_disk() -> bool:
     var serialized_items: Array[Dictionary] = []
     for p in _perturbations:
-        var d := _dto_to_dict(p)
+        var pid := p.perturbation_id
+        var d: Dictionary = _serialized_by_id.get(pid, {})
+        if d.is_empty():
+            d = _dto_to_dict(p)
+            if not d.is_empty():
+                _serialized_by_id[pid] = d
         if not d.is_empty():
             serialized_items.append(d)
 
-    var json_text := JSON.stringify(serialized_items, "  ")
+    var json_text := JSON.stringify(serialized_items)
     var write_res: Dictionary = AtomicFileWriter.write_text_atomic(_ledger_path, json_text, {
         "tmp_suffix": ".tmp",
         "create_backup": false
@@ -173,6 +183,7 @@ func emit_perturbation(perturbation: CrossWorldPerturbationDTO) -> Dictionary:
     else:
         _perturbations_by_id[pid] = perturbation
         _perturbations.append(perturbation)
+    _serialized_by_id[pid] = _dto_to_dict(perturbation)
 
     var flushed := _flush_ledger_to_disk()
     return {
@@ -215,6 +226,7 @@ func mark_world_visited(perturbation_id: String, target_world_id: String) -> boo
     var p: CrossWorldPerturbationDTO = _perturbations_by_id[perturbation_id]
     if not p.visited_world_ids.has(target_world_id):
         p.visited_world_ids.append(target_world_id)
+        _serialized_by_id[perturbation_id] = _dto_to_dict(p)
         _flush_ledger_to_disk()
     return true
 
@@ -238,8 +250,10 @@ func prune_decayed_perturbations() -> int:
     if pruned_count > 0:
         _perturbations = retained
         _perturbations_by_id.clear()
+        _serialized_by_id.clear()
         for p in _perturbations:
             _perturbations_by_id[p.perturbation_id] = p
+            _serialized_by_id[p.perturbation_id] = _dto_to_dict(p)
         _flush_ledger_to_disk()
 
     return pruned_count

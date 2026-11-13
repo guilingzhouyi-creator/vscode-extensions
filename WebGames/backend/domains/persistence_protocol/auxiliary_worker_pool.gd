@@ -52,14 +52,20 @@ static var _instance: RefCounted = null
 const DEFAULT_MAX_CACHE_ENTRIES: int = 64
 const DEFAULT_MAX_COMPLETED_TASKS: int = 128
 
+static var _queue_cap_cached: int = 128
+static var _queue_cap_cfg_ver: int = -1
+
 var _task_counter: int = 0
 var _pending_queue: Array[AsyncLoadTask] = []
 var _running_tasks: Dictionary = {}    # task_id -> AsyncLoadTask
 var _completed_tasks: Array[AsyncLoadTask] = []
+var _completed_head: int = 0
 var _cached_results: Dictionary = {}   # resource_path -> Variant
 var _cache_keys_fifo: Array[String] = []
+var _cache_fifo_head: int = 0
 var _max_cache_entries: int = DEFAULT_MAX_CACHE_ENTRIES
 var _active_batches: Dictionary = {}   # batch_id -> BatchLoadRequestDTO
+var _state_mutex: Mutex = Mutex.new()
 
 var _deterministic_mode: bool = true
 
@@ -74,9 +80,12 @@ func _init() -> void:
 	_pending_queue = []
 	_running_tasks = {}
 	_completed_tasks = []
+	_completed_head = 0
 	_cached_results = {}
 	_cache_keys_fifo = []
+	_cache_fifo_head = 0
 	_active_batches = {}
+	_state_mutex = Mutex.new()
 	var force_sync: bool = GameConfig.get_bool("infrastructure.storage", "deterministic/force_sync_in_tests", true)
 	_deterministic_mode = force_sync or OS.has_feature(FEATURE_TEMPLATE) == false
 
@@ -95,14 +104,21 @@ func request_resource_async(
 		return -1
 
 	# 1. 缓存命中短路
-	if _cached_results.has(resource_path):
-		var cached_val: Variant = _cached_results[resource_path]
+	_state_mutex.lock()
+	var cache_hit: bool = _cached_results.has(resource_path)
+	var cached_val: Variant = _cached_results.get(resource_path, null) if cache_hit else null
+	_state_mutex.unlock()
+	if cache_hit:
 		if callback.is_valid():
 			callback.call(true, cached_val, StorageContractInterfaces.ERR_NONE)
 		return 0
 
-	# 2. 检查背压上限
-	var max_capacity: int = GameConfig.get_int("infrastructure.storage", "auxiliary/thread_pool/queue_capacity", 128)
+	# 2. 检查背压上限（随 GameConfig.config_reload_version() 缓存）
+	var ver: int = GameConfig.config_reload_version()
+	if _queue_cap_cfg_ver != ver:
+		_queue_cap_cached = GameConfig.get_int("infrastructure.storage", "auxiliary/thread_pool/queue_capacity", 128)
+		_queue_cap_cfg_ver = ver
+	var max_capacity: int = _queue_cap_cached
 	if _pending_queue.size() >= max_capacity:
 		EventBusCore.get_instance().emit_log(LOG_LEVEL_WARN, TemplateFormatter.format(LOG_QUEUE_FULL, {"path": resource_path}))
 		if callback.is_valid():
@@ -119,13 +135,7 @@ func request_resource_async(
 	task.status = STATUS_PENDING
 	task.start_time_usec = Time.get_ticks_usec()
 
-	# 3. 按优先级升序保序插入
-	var idx := 0
-	while idx < _pending_queue.size() and _pending_queue[idx].priority <= task.priority:
-		idx += 1
-	_pending_queue.insert(idx, task)
-
-	# 4. 驱动调度
+	# 3. 直接驱动调度（避免无意义先 insert 再立即 erase）
 	_execute_task(task, _deterministic_mode)
 
 	return task.task_id
@@ -211,7 +221,6 @@ func _run_task_execution(task: AsyncLoadTask) -> void:
 
 ## 任务执行调度（支持确定性同步或 WorkerThreadPool 异步派发）
 func _execute_task(task: AsyncLoadTask, sync_mode: bool) -> void:
-	_pending_queue.erase(task)
 	if task.token != null and task.token.is_cancelled():
 		_cancel_task_instance(task, false)
 		_notify_task_finished(task)
@@ -222,20 +231,29 @@ func _execute_task(task: AsyncLoadTask, sync_mode: bool) -> void:
 	if sync_mode:
 		_run_task_execution(task)
 	else:
+		_state_mutex.lock()
 		_running_tasks[task.task_id] = task
+		_state_mutex.unlock()
 		var is_high_prio := (task.priority <= StorageContractInterfaces.LoadPriority.HIGH)
 		task.pool_task_id = WorkerThreadPool.add_task(_run_task_execution.bind(task), is_high_prio, TASK_THREAD_PREFIX + str(task.task_id))
 
-## 插入缓存并执行 FIFO 淘汰，保障缓存字典规模有界
+## 插入缓存并执行环形 FIFO 淘汰，保障缓存字典规模有界且零 pop_front 挪移
 func _cache_result(path: String, data: Variant) -> void:
+	_state_mutex.lock()
 	if _cached_results.has(path):
 		_cached_results[path] = data
+		_state_mutex.unlock()
 		return
-	while _cache_keys_fifo.size() >= _max_cache_entries:
-		var oldest_key: String = String(_cache_keys_fifo.pop_front())
+	if _cache_keys_fifo.size() < _max_cache_entries:
+		_cached_results[path] = data
+		_cache_keys_fifo.append(path)
+	elif _max_cache_entries > 0:
+		var oldest_key: String = _cache_keys_fifo[_cache_fifo_head]
 		_cached_results.erase(oldest_key)
-	_cached_results[path] = data
-	_cache_keys_fifo.append(path)
+		_cache_keys_fifo[_cache_fifo_head] = path
+		_cache_fifo_head = (_cache_fifo_head + 1) % _cache_keys_fifo.size()
+		_cached_results[path] = data
+	_state_mutex.unlock()
 
 ## 底层纯 IO 与反序列化算子（可在非主线程安全执行）
 static func _load_resource_payload(path: String) -> Dictionary:
@@ -272,47 +290,74 @@ static func _load_resource_payload(path: String) -> Dictionary:
 
 ## 完成后通知
 func _notify_task_finished(task: AsyncLoadTask) -> void:
+	_state_mutex.lock()
 	if _running_tasks.has(task.task_id):
 		_running_tasks.erase(task.task_id)
+	_state_mutex.unlock()
 	if task.callback.is_valid():
 		var ok := (task.status == STATUS_COMPLETED)
 		task.callback.call(ok, task.result_data, task.error_code)
 		task.callback = Callable() # 立即释放回调闭包，阻断外部大对象与 DTO 连锁强引用常驻
 
-	while _completed_tasks.size() >= DEFAULT_MAX_COMPLETED_TASKS:
-		_completed_tasks.pop_front()
-	_completed_tasks.append(task)
+	_state_mutex.lock()
+	if _completed_tasks.size() < DEFAULT_MAX_COMPLETED_TASKS and _completed_head == 0:
+		_completed_tasks.append(task)
+	elif DEFAULT_MAX_COMPLETED_TASKS > 0:
+		_completed_tasks[_completed_head] = task
+		_completed_head = (_completed_head + 1) % _completed_tasks.size()
+	_state_mutex.unlock()
 
 ## 轮询消费完成缓冲区
 func pump_completed_tasks(max_count: int = DEFAULT_PUMP_BATCH_SIZE) -> int:
-	var processed := 0
-	while not _completed_tasks.is_empty() and processed < max_count:
-		_completed_tasks.pop_front()
-		processed += 1
+	_state_mutex.lock()
+	var count: int = _completed_tasks.size()
+	var processed: int = mini(maxi(0, max_count), count)
+	if processed > 0:
+		if _completed_head == 0:
+			_completed_tasks = _completed_tasks.slice(processed)
+		else:
+			var ordered: Array[AsyncLoadTask] = _completed_tasks.slice(_completed_head)
+			ordered.append_array(_completed_tasks.slice(0, _completed_head))
+			_completed_tasks = ordered.slice(processed)
+			_completed_head = 0
+	_state_mutex.unlock()
 	return processed
 
 ## 获取已缓存资源
 func get_cached_resource(resource_path: String) -> Variant:
-	return _cached_results.get(resource_path, null)
+	_state_mutex.lock()
+	var val: Variant = _cached_results.get(resource_path, null)
+	_state_mutex.unlock()
+	return val
 
 ## 清理闲置资源
 func evict_idle_resources() -> int:
+	_state_mutex.lock()
 	var count := _cached_results.size()
 	_cached_results.clear()
 	_cache_keys_fifo.clear()
+	_cache_fifo_head = 0
+	_state_mutex.unlock()
 	return count
 
 ## 获取待执行及正在执行队列总大小
 func get_queue_size() -> int:
-	return _pending_queue.size() + _running_tasks.size()
+	_state_mutex.lock()
+	var sz: int = _pending_queue.size() + _running_tasks.size()
+	_state_mutex.unlock()
+	return sz
 
 ## 测试重置
 static func reset_for_tests() -> void:
 	if _instance != null:
+		_instance._state_mutex.lock()
 		_instance._pending_queue.clear()
 		_instance._running_tasks.clear()
 		_instance._completed_tasks.clear()
+		_instance._completed_head = 0
 		_instance._cached_results.clear()
 		_instance._cache_keys_fifo.clear()
+		_instance._cache_fifo_head = 0
 		_instance._active_batches.clear()
+		_instance._state_mutex.unlock()
 	_instance = null

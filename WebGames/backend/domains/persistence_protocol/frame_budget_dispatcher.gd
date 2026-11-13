@@ -49,29 +49,47 @@ func get_pending_count() -> int:
 		return 0
 	return _submission_queue.size()
 
+var _clear_epoch: int = 0
+static var _budget_cfg_cached: float = 2.0
+static var _budget_cfg_ver: int = -1
+
 ## 单帧预算切片执行
 func pump_slice(budget_override_ms: float = -1.0) -> Dictionary:
 	var max_budget: float = budget_override_ms
 	if max_budget <= 0.0:
-		max_budget = GameConfig.get_float("infrastructure.storage", "auxiliary/frame_budget/max_ms_per_frame", 2.0)
+		var ver: int = GameConfig.config_reload_version()
+		if _budget_cfg_ver != ver:
+			_budget_cfg_cached = GameConfig.get_float("infrastructure.storage", "auxiliary/frame_budget/max_ms_per_frame", 2.0)
+			_budget_cfg_ver = ver
+		max_budget = _budget_cfg_cached
 	
 	var budget_usec := int(max_budget * MS_TO_USEC)
 	var start_ticks := Time.get_ticks_usec()
 	var executed := 0
 	var budget_exhausted := false
+	var start_epoch: int = _clear_epoch
+	var exec_idx: int = 0
+	var initial_count: int = _submission_queue.size()
 
-	while not _submission_queue.is_empty():
+	while exec_idx < initial_count and exec_idx < _submission_queue.size() and _clear_epoch == start_epoch:
 		var now := Time.get_ticks_usec()
 		var elapsed := now - start_ticks
 		if elapsed >= budget_usec:
 			budget_exhausted = true
 			break
 
-		var item: Dictionary = _submission_queue.pop_front()
+		var item: Dictionary = _submission_queue[exec_idx]
+		exec_idx += 1
 		var action: Callable = item["action"]
 		if action.is_valid():
 			action.call()
 			executed += 1
+
+	if _clear_epoch == start_epoch and exec_idx > 0:
+		if exec_idx >= _submission_queue.size():
+			_submission_queue.clear()
+		else:
+			_submission_queue = _submission_queue.slice(exec_idx)
 
 	var total_elapsed_ms := float(Time.get_ticks_usec() - start_ticks) / USEC_TO_MS
 
@@ -86,6 +104,7 @@ func pump_slice(budget_override_ms: float = -1.0) -> Dictionary:
 func clear() -> int:
 	var count := _submission_queue.size()
 	_submission_queue.clear()
+	_clear_epoch += 1
 	return count
 
 ## 测试重置

@@ -113,7 +113,7 @@ func merge_mod_translations(
     if not _mod_translations.has(mod_id):
         _mod_translations[mod_id] = {}
     if not _mod_translations[mod_id].has(locale):
-        _mod_translations[mod_id][locale] = []
+        _mod_translations[mod_id][locale] = {}
 
     if not _mod_original_templates.has(mod_id):
         _mod_original_templates[mod_id] = {}
@@ -122,6 +122,7 @@ func merge_mod_translations(
 
     var added_count := 0
     var overridden_count := 0
+    var mod_key_set: Dictionary = _mod_translations[mod_id][locale]
 
     for loc_key in translations:
         var key_str := str(loc_key)
@@ -136,8 +137,7 @@ func merge_mod_translations(
             _locale_dictionaries[locale][key_str] = template_val
             added_count += 1
 
-        if not _mod_translations[mod_id][locale].has(key_str):
-            _mod_translations[mod_id][locale].append(key_str)
+        mod_key_set[key_str] = true
 
     return {
         "success": true,
@@ -169,9 +169,9 @@ func unload_mod_translations(mod_id: String) -> int:
     var mod_orig: Dictionary = _mod_original_templates.get(mod_id, EMPTY_DICT)
 
     for locale in mod_locales:
-        var keys: Array = mod_locales[locale]
+        var keys_map: Dictionary = mod_locales[locale]
         var orig_map: Dictionary = mod_orig.get(locale, EMPTY_DICT)
-        cleaned_count += _restore_locale_mod_keys(locale, keys, orig_map)
+        cleaned_count += _restore_locale_mod_keys(locale, keys_map.keys(), orig_map)
 
     _mod_translations.erase(mod_id)
     _mod_original_templates.erase(mod_id)
