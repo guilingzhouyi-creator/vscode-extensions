@@ -5,7 +5,7 @@
 > 项目内私有脚本（如 `auto-refactor/scripts/*.js` 的 validate/bench 系列）不在此库，
 > 保留在各项目内部，由各自 `package.json` 引用。
 >
-> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**107 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
+> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**109 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
 
 ---
 
@@ -24,6 +24,7 @@
 | `common/` | Node.js | `test-gate-guards.js` | validate / guards（负向自证：逐项证明顺序、词表、同构守卫确实能检出各自缺陷类别） | `pre-push-gate`、CI |
 | `common/` | Node.js | `validate-script-isomorphism.js` | audit / isomorphism（<!-- METRICS:BEGIN iso-pairs -->**29 对跨平台同构脚本**<!-- METRICS:END iso-pairs -->结构对应性、逐行换行一致性、`set -e`/pipefail 与 PowerShell 原生命令开关守卫；WebGames 按已文档化策略豁免 errexit） | `audit-all`、CI |
 | `common/` | Node.js | `validate-shell-parity.js` | audit / parity（Linux 命令面守卫：断言 AGENTS.md 承诺的每个命令都真实可绑定、兼容层同时具备 GNU 与 PowerShell 降级两条路径，并回报当前宿主解析出的模式 `gnu` / `native`） | `pre-push-gate`、CI |
+| `common/` | Node.js | `validate-branch-governance.js` | gate / branch（五层分形分支命名分类法与受保护集成主干拦截器，校验 `main`/`integration`/`cell/*/main`/人类别名投影并拦截临时黑话分支） | `pre-commit-gate`、`gate-receipts`、CI |
 | `common/` | Node.js | `validate-skills.js` | audit / skills（全工作区研发技能规范、死链与镜像等价性守卫） | `pre-commit-gate`、`audit-all` |
 | `common/` | Node.js | `sync-skills.js` | tooling / skills（根目录技能集与 workspace-governance 插件双向同步工具） | 本地 CLI |
 | `common/` | Node.js | `sync-agents-mirror.js` | tooling / agents（SubAgent 定义模板与 AGENTS.md 单向镜像到插件包，并核验字节等价与计数滞后） | `sync-skills`、`pre-push-gate` |
@@ -56,6 +57,7 @@
 | `common/` | Node.js | `test-gate-parity.js` | validate / parity（双实现提交门禁行为差分） | CI、本地 CLI |
 | `common/` | Node.js | `test-gate-selftest.js` | validate / selftest（门禁 PASS/违规/缺依赖三态矩阵） | CI、本地 CLI |
 | `common/` | Node.js | `gate-receipts.js` | gate / receipt（本地门禁收据引擎：pre-commit/commit-msg 阶段标记、post-commit/post-merge 落盘、pre-push 逐提交审计与 ref 安全性判定；`--no-verify` 提交只能显式 bypass 并留痕） | `.githooks/*`、`pre-push-gate`、`install-hooks` |
+| `common/` | Node.js | `gate-receipts-selftest.js` | validate / receipt（本地门禁收据引擎隔离自测套件：校验双阶段签名、篡改/移植收据拦截与暂存树漂移检测） | `gate-receipts` |
 | `common/` | Node.js | `validate-commit-msg.js` | gate / commit（生产级结构化提交信息格式、区块与有效字数综合调度器） | `commit-msg-gate` |
 | `common/` | Node.js | `commit-structure-contract.js` | gate / structure（七项结构契约的单一实现：标题形态与长度、空行分割、正文密度、必需区块、项目归属、批次代号；`commit-msg-gate` 双实现均委托此处） | `validate-commit-msg`、`commit-msg-gate` |
 | `common/` | Node.js | `validate-commit-msg-style.js` | gate / style（提交信息文本风格与四维禁词核验器） | `commit-msg-gate`、`pre-push-gate`、CI |
