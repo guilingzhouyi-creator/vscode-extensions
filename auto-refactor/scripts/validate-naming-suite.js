@@ -194,6 +194,54 @@ const FIXTURES = {
   ].join('\n'),
 };
 
+/**
+ * Evaluates whether an issue matches an optional file extension and exact symbol name.
+ *
+ * @param issue - Diagnostic issue emitted by NamingAnalyzer.
+ * @param symbolName - Expected `detail.name` identifier.
+ * @param ext - Optional trailing file extension filter (e.g. `.rs`, `.go`, `.gd`).
+ * @returns True when extension and `detail.name` match.
+ */
+function matchesSymbolIssue(issue, symbolName, ext) {
+  const extMatch = !ext || (issue.location && issue.location.file.endsWith(ext));
+  return Boolean(extMatch && issue.detail && issue.detail.name === symbolName);
+}
+
+/**
+ * Asserts at least one diagnostic in `issues` targets `symbolName`.
+ *
+ * @param issues - Filtered rule issues.
+ * @param symbolName - Target identifier expected to trigger the rule.
+ * @param ext - Optional file extension filter.
+ * @param message - Assertion failure message.
+ */
+function assertHasSymbolIssue(issues, symbolName, ext, message) {
+  assert.ok(
+    issues.some((issue) => matchesSymbolIssue(issue, symbolName, ext)),
+    message || `Expected symbol ${symbolName} to trigger rule`,
+  );
+}
+
+/**
+ * Asserts zero diagnostics in `issues` target an exempted `symbolName`.
+ *
+ * @param issues - Filtered rule issues.
+ * @param symbolName - Identifier expected to remain exempt.
+ * @param ext - Optional file extension filter.
+ * @param message - Assertion failure message.
+ */
+function assertNoSymbolIssue(issues, symbolName, ext, message) {
+  assert.ok(
+    !issues.some((issue) => matchesSymbolIssue(issue, symbolName, ext)),
+    message || `Expected symbol ${symbolName} to remain exempt`,
+  );
+}
+
+/**
+ * Materializes multi-language naming fixtures and analyzer config in a temp workspace.
+ *
+ * @param root - Temporary workspace root path.
+ */
 function writeWorkspace(root) {
   for (const [relPath, content] of Object.entries(FIXTURES)) {
     const abs = path.join(root, relPath);
@@ -217,6 +265,11 @@ function writeWorkspace(root) {
   );
 }
 
+/**
+ * Verifies file-level (`NAM-FIL-001`) and directory-level (`NAM-DIR-001`) naming gates.
+ *
+ * @param byRule - Lookup helper returning issues emitted for a rule ID.
+ */
 function verifyFileAndDirRules(byRule) {
   const filIssues = byRule('NAM-FIL-001');
   assert.ok(
@@ -249,11 +302,16 @@ function verifyFileAndDirRules(byRule) {
   console.log('  ✔ NAM-DIR-001 flags non-kebab/camelCase directory names');
 }
 
+/**
+ * Verifies top-level constants, mutable globals, types, and class member casing rules.
+ *
+ * @param byRule - Lookup helper returning issues emitted for a rule ID.
+ */
 function verifyGlobalsAndTypes(byRule) {
   const glb1 = byRule('NAM-GLB-001');
-  assert.ok(glb1.some((i) => i.detail && i.detail.name === 'badConst'));
-  assert.ok(!glb1.some((i) => i.detail && i.detail.name === 'GOOD_CONST'));
-  assert.ok(!glb1.some((i) => i.detail && i.detail.name === 'arrowFn'));
+  assertHasSymbolIssue(glb1, 'badConst');
+  assertNoSymbolIssue(glb1, 'GOOD_CONST');
+  assertNoSymbolIssue(glb1, 'arrowFn');
   console.log('  ✔ NAM-GLB-001 flags lowercase module constants, exempting functions');
 
   const glb2 = byRule('NAM-GLB-002');
@@ -261,17 +319,22 @@ function verifyGlobalsAndTypes(byRule) {
   console.log('  ✔ NAM-GLB-002 flags mutable top-level let declarations');
 
   const typ = byRule('NAM-TYP-001');
-  assert.ok(typ.some((i) => i.detail && i.detail.name === 'goodClass'));
-  assert.ok(typ.some((i) => i.detail && i.detail.name === 'goodInterface'));
-  assert.ok(!typ.some((i) => i.detail && i.detail.name === 'ValidScanner'));
+  assertHasSymbolIssue(typ, 'goodClass');
+  assertHasSymbolIssue(typ, 'goodInterface');
+  assertNoSymbolIssue(typ, 'ValidScanner');
   console.log('  ✔ NAM-TYP-001 flags non-PascalCase class and interface definitions');
 
   const mbr = byRule('NAM-MBR-001');
-  assert.ok(mbr.some((i) => i.detail && i.detail.name === 'BadMethod'));
-  assert.ok(!mbr.some((i) => i.detail && i.detail.name === 'goodMethod'));
+  assertHasSymbolIssue(mbr, 'BadMethod');
+  assertNoSymbolIssue(mbr, 'goodMethod');
   console.log('  ✔ NAM-MBR-001 flags non-camelCase methods and members');
 }
 
+/**
+ * Verifies vague variable names, single-letter rules, and collection naming semantics.
+ *
+ * @param byRule - Lookup helper returning issues emitted for a rule ID.
+ */
 function verifyVariablesAndCollections(byRule) {
   const vag = byRule('NAM-VAG-001');
   assert.ok(vag.some((i) => i.detail && i.detail.name === 'res'));
@@ -292,6 +355,11 @@ function verifyVariablesAndCollections(byRule) {
   console.log('  ✔ NAM-COL-001 checks Map relationship semantics');
 }
 
+/**
+ * Verifies detection of transient sprint/phase jargon in identifiers and test titles.
+ *
+ * @param byRule - Lookup helper returning issues emitted for a rule ID.
+ */
 function verifyJargonRules(byRule) {
   const jrg = byRule('NAM-JRG-002');
   assert.ok(jrg.length >= 6, `Expected at least 6 NAM-JRG-002 issues, got ${jrg.length}`);
@@ -309,11 +377,18 @@ function verifyJargonRules(byRule) {
   );
 }
 
+/**
+ * Verifies Python function identifier bounds (`NAM-LEN-002`) and dunder exemptions.
+ *
+ * @param byRule - Lookup helper returning issues emitted for a rule ID.
+ */
 function verifyFunctionLengthRules(byRule) {
   const len2Issues = byRule('NAM-LEN-002');
   assert.ok(len2Issues.length >= 2, 'NAM-LEN-002 should catch short and long python functions');
-  assert.ok(
-    len2Issues.some((i) => i.detail && i.detail.name === 'fn'),
+  assertHasSymbolIssue(
+    len2Issues,
+    'fn',
+    undefined,
     'short python function fn should trigger NAM-LEN-002',
   );
   assert.ok(
@@ -322,8 +397,10 @@ function verifyFunctionLengthRules(byRule) {
     ),
     'excessively long python function should trigger NAM-LEN-002',
   );
-  assert.ok(
-    !len2Issues.some((i) => i.detail && i.detail.name === '__init__'),
+  assertNoSymbolIssue(
+    len2Issues,
+    '__init__',
+    undefined,
     'dunder methods such as __init__ should be exempt from NAM-LEN-002',
   );
   console.log('  ✔ NAM-LEN-002 flags short/long Python function names, exempting dunder methods');
@@ -331,46 +408,44 @@ function verifyFunctionLengthRules(byRule) {
 
 const { getTunedAnalyzerOptions } = require('../dist/core/profiler/scaleTuner');
 
+const SCALE_TIER_EXPECTATIONS = [
+  ['micro', 1, 3, 3, 35, 1, 3, 3, 35],
+  ['medium', 2, 4, 4, 48, 2, 4, 4, 45],
+  ['large', 2, 5, 4, 55, 2, 5, 4, 50],
+];
+
+/**
+ * Verifies adaptive scaleTuner bounds across micro, medium, and large repository tiers.
+ */
 function verifyScaleTunerNamingOptions() {
-  const microOpts = getTunedAnalyzerOptions('micro', 'naming', {});
-  assert.strictEqual(microOpts.minFileWords, 1);
-  assert.strictEqual(microOpts.maxFileWords, 3);
-  assert.strictEqual(microOpts.minFileLength, 3);
-  assert.strictEqual(microOpts.maxFileLength, 35);
-  assert.strictEqual(microOpts.minFunctionWords, 1);
-  assert.strictEqual(microOpts.maxFunctionWords, 3);
-  assert.strictEqual(microOpts.minFunctionLength, 3);
-  assert.strictEqual(microOpts.maxFunctionLength, 35);
-  assert.strictEqual(microOpts.enforceVerbNounContract, true);
-  assert.strictEqual(microOpts.enforceMorphemeCheck, true);
-
-  const medOpts = getTunedAnalyzerOptions('medium', 'naming', {});
-  assert.strictEqual(medOpts.minFileWords, 2);
-  assert.strictEqual(medOpts.maxFileWords, 4);
-  assert.strictEqual(medOpts.minFileLength, 4);
-  assert.strictEqual(medOpts.maxFileLength, 48);
-  assert.strictEqual(medOpts.minFunctionWords, 2);
-  assert.strictEqual(medOpts.maxFunctionWords, 4);
-  assert.strictEqual(medOpts.minFunctionLength, 4);
-  assert.strictEqual(medOpts.maxFunctionLength, 45);
-  assert.strictEqual(medOpts.enforceVerbNounContract, true);
-  assert.strictEqual(medOpts.enforceMorphemeCheck, true);
-
-  const largeOpts = getTunedAnalyzerOptions('large', 'naming', {});
-  assert.strictEqual(largeOpts.minFileWords, 2);
-  assert.strictEqual(largeOpts.maxFileWords, 5);
-  assert.strictEqual(largeOpts.minFileLength, 4);
-  assert.strictEqual(largeOpts.maxFileLength, 55);
-  assert.strictEqual(largeOpts.minFunctionWords, 2);
-  assert.strictEqual(largeOpts.maxFunctionWords, 5);
-  assert.strictEqual(largeOpts.minFunctionLength, 4);
-  assert.strictEqual(largeOpts.maxFunctionLength, 50);
-  assert.strictEqual(largeOpts.enforceVerbNounContract, true);
-  assert.strictEqual(largeOpts.enforceMorphemeCheck, true);
+  for (const [
+    tier,
+    minFW,
+    maxFW,
+    minFL,
+    maxFL,
+    minFnW,
+    maxFnW,
+    minFnL,
+    maxFnL,
+  ] of SCALE_TIER_EXPECTATIONS) {
+    const opts = getTunedAnalyzerOptions(tier, 'naming', {});
+    assert.strictEqual(opts.minFileWords, minFW);
+    assert.strictEqual(opts.maxFileWords, maxFW);
+    assert.strictEqual(opts.minFileLength, minFL);
+    assert.strictEqual(opts.maxFileLength, maxFL);
+    assert.strictEqual(opts.minFunctionWords, minFnW);
+    assert.strictEqual(opts.maxFunctionWords, maxFnW);
+    assert.strictEqual(opts.minFunctionLength, minFnL);
+    assert.strictEqual(opts.maxFunctionLength, maxFnL);
+    assert.strictEqual(opts.enforceVerbNounContract, true);
+    assert.strictEqual(opts.enforceMorphemeCheck, true);
+  }
 
   console.log('  ✔ scaleTuner provides correct adaptive naming options across tiers');
 }
 
+/** Verifies morpheme phonetics (`NAM-FIL-001`) and verb-noun contracts (`NAM-LEN-002`). */
 function verifyAdaptiveNamingRules(byRule) {
   const filIssues = byRule('NAM-FIL-001');
   assert.ok(
@@ -435,40 +510,39 @@ function verifyAdaptiveNamingRules(byRule) {
   console.log('  ✔ NAM-LEN-002 flags verb-noun contract across TS, Python, Go, and Rust');
 }
 
+/** Verifies Rust polyglot naming diagnostics and test-module exemptions. */
 function verifyRustPolyglotNaming(byRule) {
   const typIssues = byRule('NAM-TYP-001');
-  assert.ok(
-    typIssues.some(
-      (i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === 'bad_rust_struct',
-    ),
+  assertHasSymbolIssue(
+    typIssues,
+    'bad_rust_struct',
+    '.rs',
     'Rust bad_rust_struct should trigger NAM-TYP-001',
   );
 
   const glbIssues = byRule('NAM-GLB-001');
-  assert.ok(
-    glbIssues.some(
-      (i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === 'bad_rust_const',
-    ),
+  assertHasSymbolIssue(
+    glbIssues,
+    'bad_rust_const',
+    '.rs',
     'Rust bad_rust_const should trigger NAM-GLB-001',
   );
-  assert.ok(
-    !glbIssues.some((i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === 'fn'),
+  assertNoSymbolIssue(
+    glbIssues,
+    'fn',
+    '.rs',
     'const fn should not trigger NAM-GLB-001 on keyword fn',
   );
 
   const sglIssues = byRule('NAM-SGL-001');
-  assert.ok(
-    sglIssues.some((i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === 'x'),
+  assertHasSymbolIssue(
+    sglIssues,
+    'x',
+    '.rs',
     'Rust single-letter variable x should trigger NAM-SGL-001',
   );
-  assert.ok(
-    !sglIssues.some((i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === '_'),
-    'Rust wildcard _ should be exempt from NAM-SGL-001',
-  );
-  assert.ok(
-    !sglIssues.some((i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === 'i'),
-    'Rust loop index i should be exempt from NAM-SGL-001',
-  );
+  assertNoSymbolIssue(sglIssues, '_', '.rs', 'Rust wildcard _ should be exempt from NAM-SGL-001');
+  assertNoSymbolIssue(sglIssues, 'i', '.rs', 'Rust loop index i should be exempt from NAM-SGL-001');
   assert.strictEqual(
     sglIssues.filter((i) => i.location.file.endsWith('.rs')).length,
     1,
@@ -476,10 +550,7 @@ function verifyRustPolyglotNaming(byRule) {
   );
 
   const vagIssues = byRule('NAM-VAG-001');
-  assert.ok(
-    vagIssues.some((i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === 'data'),
-    'Rust variable data should trigger NAM-VAG-001',
-  );
+  assertHasSymbolIssue(vagIssues, 'data', '.rs', 'Rust variable data should trigger NAM-VAG-001');
   assert.strictEqual(
     vagIssues.filter((i) => i.location.file.endsWith('.rs')).length,
     1,
@@ -489,42 +560,34 @@ function verifyRustPolyglotNaming(byRule) {
   console.log('  ✔ NAM-TYP-001, NAM-GLB-001, NAM-SGL-001, NAM-VAG-001 verified for Rust');
 }
 
+/** Verifies Go polyglot naming diagnostics and test-function exemptions. */
 function verifyGoPolyglotNaming(byRule) {
   const typIssues = byRule('NAM-TYP-001');
-  assert.ok(
-    typIssues.some(
-      (i) => i.location.file.endsWith('.go') && i.detail && i.detail.name === 'bad_go_type',
-    ),
+  assertHasSymbolIssue(
+    typIssues,
+    'bad_go_type',
+    '.go',
     'Go bad_go_type should trigger NAM-TYP-001',
   );
 
   const jrgIssues = byRule('NAM-JRG-002');
-  assert.ok(
-    jrgIssues.some(
-      (i) => i.location.file.endsWith('.go') && i.detail && i.detail.name === 'PhaseOneManager',
-    ),
+  assertHasSymbolIssue(
+    jrgIssues,
+    'PhaseOneManager',
+    '.go',
     'Go PhaseOneManager should trigger NAM-JRG-002',
   );
-  assert.ok(
-    jrgIssues.some(
-      (i) => i.location.file.endsWith('.go') && i.detail && i.detail.name === 'temp_limit',
-    ),
-    'Go temp_limit should trigger NAM-JRG-002',
-  );
+  assertHasSymbolIssue(jrgIssues, 'temp_limit', '.go', 'Go temp_limit should trigger NAM-JRG-002');
 
   const sglIssues = byRule('NAM-SGL-001');
-  assert.ok(
-    sglIssues.some((i) => i.location.file.endsWith('.go') && i.detail && i.detail.name === 'x'),
+  assertHasSymbolIssue(
+    sglIssues,
+    'x',
+    '.go',
     'Go single-letter variable x should trigger NAM-SGL-001',
   );
-  assert.ok(
-    !sglIssues.some((i) => i.location.file.endsWith('.go') && i.detail && i.detail.name === '_'),
-    'Go wildcard _ should be exempt from NAM-SGL-001',
-  );
-  assert.ok(
-    !sglIssues.some((i) => i.location.file.endsWith('.go') && i.detail && i.detail.name === 'i'),
-    'Go loop index i should be exempt from NAM-SGL-001',
-  );
+  assertNoSymbolIssue(sglIssues, '_', '.go', 'Go wildcard _ should be exempt from NAM-SGL-001');
+  assertNoSymbolIssue(sglIssues, 'i', '.go', 'Go loop index i should be exempt from NAM-SGL-001');
   assert.strictEqual(
     sglIssues.filter((i) => i.location.file.endsWith('.go')).length,
     1,
@@ -532,10 +595,7 @@ function verifyGoPolyglotNaming(byRule) {
   );
 
   const vagIssues = byRule('NAM-VAG-001');
-  assert.ok(
-    vagIssues.some((i) => i.location.file.endsWith('.go') && i.detail && i.detail.name === 'res'),
-    'Go variable res should trigger NAM-VAG-001',
-  );
+  assertHasSymbolIssue(vagIssues, 'res', '.go', 'Go variable res should trigger NAM-VAG-001');
   assert.strictEqual(
     vagIssues.filter((i) => i.location.file.endsWith('.go')).length,
     1,
@@ -545,6 +605,7 @@ function verifyGoPolyglotNaming(byRule) {
   console.log('  ✔ NAM-TYP-001, NAM-JRG-002, NAM-SGL-001, NAM-VAG-001 verified for Go');
 }
 
+/** Verifies GDScript polyglot naming diagnostics and preload exemptions. */
 function verifyGDScriptPolyglotNaming(byRule) {
   const typIssues = byRule('NAM-TYP-001');
   assert.ok(
@@ -603,6 +664,11 @@ function verifyGDScriptPolyglotNaming(byRule) {
   console.log('  ✔ NAM-TYP-001, NAM-GLB-001, NAM-SGL-001, NAM-VAG-001 verified for GDScript');
 }
 
+/**
+ * Verifies `NAM-LEN-001` and AAS v1.0 actionable rename payloads across Go, GDScript, Rust, and Python.
+ *
+ * @param byRule - Lookup helper returning issues emitted for a rule ID.
+ */
 function verifyPolyglotVariableLengthsAndActionable(byRule) {
   const len1Issues = byRule('NAM-LEN-001');
   assert.ok(
@@ -641,6 +707,9 @@ function verifyPolyglotVariableLengthsAndActionable(byRule) {
   );
 }
 
+/**
+ * Executes the end-to-end naming governance scan suite against an ephemeral workspace.
+ */
 async function run() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-naming-'));
   try {
