@@ -17,18 +17,18 @@
 //! Domain Governance Rules: FGT-GAT-001 (hook contracts), FGT-COR-001.
 
 mod config;
+mod process;
+mod shell;
 
 use config::{absolutize, hook_is_executable, read_core_hook_settings, resolve_hooks_dir};
 pub use config::read_core_authority_secret;
+use process::{build_command, capture_child_output, capture_tail, SpawnOutcome};
+use shell::{interpreter_chain, shell_candidates};
 
 use std::collections::BTreeMap;
-use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
-use std::time::{Duration, Instant};
-
-/// Maximum number of characters retained from each captured hook output stream.
-const OUTPUT_TAIL_LIMIT: usize = 4096;
+use std::process::Stdio;
+use std::time::Duration;
 
 /// Exit code reported when a hook exists but no shell interpreter can execute it.
 const EXIT_INTERPRETER_UNAVAILABLE: i32 = 126;
@@ -37,15 +37,7 @@ const EXIT_INTERPRETER_UNAVAILABLE: i32 = 126;
 const DEFAULT_HOOK_TIMEOUT: Duration = Duration::from_secs(600);
 
 /// Polling interval used while waiting for a hook process to finish.
-const HOOK_POLL_INTERVAL: Duration = Duration::from_millis(25);
-
-/// Budget for one interpreter health probe; broken launchers must not stall hook discovery.
-#[cfg(windows)]
-const SHELL_PROBE_TIMEOUT: Duration = Duration::from_millis(250);
-
-/// Total budget for interpreter discovery; unprobed candidates remain available as fallbacks.
-#[cfg(windows)]
-const TOTAL_PROBE_BUDGET: Duration = Duration::from_millis(1000);
+pub(super) const HOOK_POLL_INTERVAL: Duration = Duration::from_millis(25);
 
 /// Lifecycle result of a single Git hook invocation.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -420,252 +412,4 @@ impl GitHookRunner {
 /// Renders a filesystem path in the forward-slash form Git hands to hook scripts.
 pub fn hook_argument_path(path: &Path) -> String {
     path.to_string_lossy().replace('\\', "/")
-}
-
-/// Returns the interpreter cache for the current platform.
-///
-/// Windows has no shebang execution, so hook scripts are handed to an available POSIX shell;
-/// other platforms execute the hook file directly and let the kernel honour its shebang.
-fn shell_candidates() -> &'static [String] {
-    static CANDIDATES: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
-    CANDIDATES.get_or_init(resolve_shell_candidates)
-}
-
-/// Resolves the interpreter chain, keeping only launchers proven able to start a shell.
-///
-/// Some Windows hosts ship several MSYS installations whose runtimes cannot coexist; probing
-/// each candidate once avoids selecting a launcher that only fails at hook execution time.
-fn resolve_shell_candidates() -> Vec<String> {
-    let discovered = build_shell_candidates();
-
-    #[cfg(windows)]
-    {
-        let probing_started = Instant::now();
-        let mut healthy_index: Option<usize> = None;
-        for (index, candidate) in discovered.iter().enumerate() {
-            if probing_started.elapsed() >= TOTAL_PROBE_BUDGET {
-                break;
-            }
-            if healthy_shell(candidate) {
-                healthy_index = Some(index);
-                break;
-            }
-        }
-        if let Some(index) = healthy_index {
-            let mut ordered = Vec::with_capacity(discovered.len());
-            ordered.push(discovered[index].clone());
-            ordered.extend(
-                discovered
-                    .into_iter()
-                    .enumerate()
-                    .filter(|(position, _)| *position != index)
-                    .map(|(_, candidate)| candidate),
-            );
-            ordered
-        } else {
-            Vec::new()
-        }
-    }
-    #[cfg(not(windows))]
-    {
-        discovered
-    }
-}
-
-/// Reports whether one launcher can start a POSIX shell and exit cleanly within the probe budget.
-///
-/// A launcher that cannot start a shell is rejected quickly so a host with several broken MSYS
-/// installations does not pay their startup cost on every process; the surviving launcher is
-/// placed first and the unprobed remainder stays available as fallback candidates.
-#[cfg(windows)]
-fn healthy_shell(program: &str) -> bool {
-    let Ok(mut child) = Command::new(program)
-        .args(["-c", "exit 0"])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-    else {
-        return false;
-    };
-
-    let deadline = Instant::now() + SHELL_PROBE_TIMEOUT;
-    loop {
-        match child.try_wait() {
-            Ok(Some(status)) => return status.success(),
-            Ok(None) => {}
-            Err(_) => {
-                let _ = child.kill();
-                return false;
-            }
-        }
-        if Instant::now() >= deadline {
-            let _ = child.kill();
-            let _ = child.wait();
-            return false;
-        }
-        std::thread::sleep(HOOK_POLL_INTERVAL);
-    }
-}
-
-/// Builds the one-shot interpreter chain: no shell on POSIX, POSIX shells on Windows.
-fn build_shell_candidates() -> Vec<String> {
-    #[cfg(windows)]
-    {
-        windows_shell_candidates()
-    }
-    #[cfg(not(windows))]
-    {
-        Vec::new()
-    }
-}
-
-/// Orders launchers so the first entry of the chain is attempted first.
-fn interpreter_chain() -> Vec<Option<&'static str>> {
-    let shells = shell_candidates();
-    if shells.is_empty() {
-        return vec![None];
-    }
-    shells.iter().map(|shell| Some(shell.as_str())).collect()
-}
-
-/// Discovers POSIX shells on Windows, preferring Git and MSYS installations over WSL shims.
-#[cfg(windows)]
-fn windows_shell_candidates() -> Vec<String> {
-    let mut candidates = Vec::new();
-    for known_root in well_known_install_roots() {
-        push_shell_candidates(&mut candidates, &known_root);
-    }
-    if let Some(path_value) = std::env::var_os("PATH") {
-        for directory in std::env::split_paths(&path_value) {
-            if is_windows_shim_root(&directory) {
-                continue;
-            }
-            push_shell_candidates(&mut candidates, &directory);
-        }
-    }
-    for fallback in ["bash", "sh"] {
-        candidates.push(fallback.to_string());
-    }
-    candidates
-}
-
-/// Derives POSIX shell locations from the host environment instead of hardcoded drive letters.
-///
-/// Git for Windows may be absent from PATH while its interpreter still exists under the
-/// program-files directories, and MSYS2 commonly lives next to the system drive. Building the
-/// candidates from environment variables keeps the module portable across hosts and avoids
-/// embedding machine-specific absolute paths in tracked source.
-#[cfg(windows)]
-fn well_known_install_roots() -> Vec<PathBuf> {
-    let mut roots = Vec::new();
-    for variable in ["ProgramFiles", "ProgramW6432", "ProgramFiles(x86)"] {
-        let Some(directory) = std::env::var_os(variable) else {
-            continue;
-        };
-        let base = PathBuf::from(directory);
-        roots.push(base.join("Git").join("bin"));
-        roots.push(base.join("Git").join("usr").join("bin"));
-    }
-    if let Some(drive) = std::env::var_os("SystemDrive") {
-        let base = PathBuf::from(drive);
-        roots.push(base.join("msys64").join("usr").join("bin"));
-        roots.push(base.join("msys64").join("mingw64").join("bin"));
-    }
-    if let Some(msys_root) = std::env::var_os("MSYS2_ROOT") {
-        roots.push(PathBuf::from(msys_root).join("usr").join("bin"));
-    }
-    roots
-}
-
-/// Reports whether a PATH entry hosts Windows-native shells that are not POSIX shells.
-#[cfg(windows)]
-fn is_windows_shim_root(directory: &Path) -> bool {
-    let lower = directory.to_string_lossy().to_ascii_lowercase();
-    lower.contains("system32")
-        || lower.contains("windowsapps")
-        || lower.contains("shims")
-        || lower.contains("scoop")
-}
-
-/// Appends the POSIX shells installed in one directory, preserving discovery order.
-#[cfg(windows)]
-fn push_shell_candidates(candidates: &mut Vec<String>, directory: &Path) {
-    for file_name in ["bash.exe", "sh.exe"] {
-        let candidate = directory.join(file_name);
-        if !candidate.is_file() {
-            continue;
-        }
-        let candidate_text = candidate.to_string_lossy().to_string();
-        if candidates
-            .iter()
-            .any(|existing| existing.eq_ignore_ascii_case(&candidate_text))
-        {
-            continue;
-        }
-        candidates.push(candidate_text);
-    }
-}
-
-/// Builds the command that runs one hook file, optionally through a POSIX shell.
-fn build_command(shell: Option<&str>, hook_path: &Path) -> Command {
-    match shell {
-        Some(program) => {
-            let mut command = Command::new(program);
-            command.arg(hook_argument_path(hook_path));
-            command
-        }
-        None => Command::new(hook_path),
-    }
-}
-
-/// Captured result of one spawned interpreter attempt.
-enum SpawnOutcome {
-    /// The hook finished and its streams were collected.
-    Completed(std::process::Output),
-    /// The wall-clock budget expired and the hook was terminated.
-    TimedOut,
-}
-
-/// Feeds optional stdin into the hook process and collects its captured output.
-///
-/// A hook that exceeds the budget is killed and reported without draining its inherited pipes,
-/// because grandchildren may keep those handles open after their parent was terminated.
-fn capture_child_output(
-    mut child: Child,
-    stdin: Option<&str>,
-    timeout: Duration,
-) -> std::io::Result<SpawnOutcome> {
-    if let Some(input) = stdin {
-        if let Some(mut pipe) = child.stdin.take() {
-            pipe.write_all(input.as_bytes())?;
-        }
-    }
-
-    let deadline = Instant::now() + timeout;
-    loop {
-        if child.try_wait()?.is_some() {
-            return child.wait_with_output().map(SpawnOutcome::Completed);
-        }
-        if Instant::now() >= deadline {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Ok(SpawnOutcome::TimedOut);
-        }
-        std::thread::sleep(HOOK_POLL_INTERVAL);
-    }
-}
-
-/// Keeps only the trailing portion of one captured hook stream.
-fn capture_tail(bytes: &[u8]) -> String {
-    let text = String::from_utf8_lossy(bytes);
-    let trimmed = text.trim_end();
-    let character_count = trimmed.chars().count();
-    if character_count <= OUTPUT_TAIL_LIMIT {
-        return trimmed.to_string();
-    }
-    trimmed
-        .chars()
-        .skip(character_count - OUTPUT_TAIL_LIMIT)
-        .collect()
 }
