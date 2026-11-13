@@ -32,6 +32,7 @@ import type {
 import type { WarmSession } from '../core/analyzer';
 import { Scanner, WorkerPoolManager, createWarmSession } from '../core/analyzer';
 import { CacheStore } from '../core/cache';
+import { resolveConfig } from '../core/config/config';
 import { Logger } from '../core/logger';
 import type { FastTrackVerdict } from '../core/pipeline/dualTrackPipeline';
 import { executeDualTrack } from '../core/pipeline/dualTrackPipeline';
@@ -239,7 +240,15 @@ export async function handleAsymmetricScan(
     durationMs: number;
 }> {
     const startTimeMs = Date.now();
-    const cfg = { ...config };
+    const hasExplicitCfg = Boolean(config && typeof config.concurrency === 'number' && config.analyzers);
+    const cfg = hasExplicitCfg
+        ? { ...config }
+        : resolveConfig({
+            root: config?.root || process.cwd(),
+            archetype: config?.archetype,
+            cache: false,
+            logLevel: config?.logLevel || 'silent',
+        });
     const logger = new Logger(cfg.logLevel || 'silent', cfg.logFile);
     try {
         const scanner = new Scanner(cfg, logger);
