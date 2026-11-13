@@ -45,6 +45,7 @@ const MSG_TYPE_CONNECT = 'connect';
 const MSG_TYPE_HELLO = 'hello';
 const MSG_TYPE_SCAN = 'scan';
 const MSG_TYPE_SCAN_DIFF = 'scan_diff';
+const MSG_TYPE_SCAN_ASYMMETRIC = 'scan_asymmetric';
 const MSG_TYPE_PING = 'ping';
 const MSG_TYPE_SHUTDOWN = 'shutdown';
 const MSG_TYPE_CLIENT_REQUEST = 'client-request';
@@ -115,9 +116,19 @@ export class DaemonClient {
         resolve: (diffResult: { report: unknown; stats: unknown }) => void;
         reject: (error: Error) => void;
     } | null = null;
+    private pendingExtended: {
+        resolve: (result: { report: unknown; stats: unknown }) => void;
+        reject: (error: Error) => void;
+    } | null = null;
     private pendingPong: { resolve: () => void; reject: (error: Error) => void } | null = null;
-    private caps: { cache: boolean; stream: boolean; maxWorkers: number; diff?: boolean } | null =
-        null;
+    private caps: {
+        cache: boolean;
+        stream: boolean;
+        maxWorkers: number;
+        diff?: boolean;
+        snapshot?: boolean;
+        slice?: boolean;
+    } | null = null;
     private dataListener: ((chunk: Buffer) => void) | null = null;
 
     constructor(
@@ -133,6 +144,10 @@ export class DaemonClient {
         if (this.pendingScanDiff) {
             this.pendingScanDiff.reject(error);
             this.pendingScanDiff = null;
+        }
+        if (this.pendingExtended) {
+            this.pendingExtended.reject(error);
+            this.pendingExtended = null;
         }
         if (this.pendingPong) {
             this.pendingPong.reject(error);
@@ -298,6 +313,16 @@ export class DaemonClient {
         return !!(this.caps && this.caps.diff === true);
     }
 
+    /** Whether the connected daemon advertised immutable `snapshot` scan support. */
+    hasSnapshotCap(): boolean {
+        return !!(this.caps && this.caps.snapshot === true);
+    }
+
+    /** Whether the connected daemon advertised AST `slice` audit support. */
+    hasSliceCap(): boolean {
+        return !!(this.caps && this.caps.slice === true);
+    }
+
     /** Run one diff scan (scanDiff / scanDiffDelta). Must be connected first. */
     scanDiff(
         config: ScanConfig,
@@ -324,6 +349,49 @@ export class DaemonClient {
                 });
             },
         );
+    }
+
+    /**
+     * Send one extended request (`scan_asymmetric`, `scan_snapshot`, or `slice_audit`) via the
+     * shared extended slot. Must be connected first.
+     */
+    requestExtended(
+        buildFrame: (messageId: number, requestId: string) => DaemonMessage,
+    ): Promise<{ report: unknown; stats: unknown }> {
+        return this.executeTimedRequest<{ report: unknown; stats: unknown }>(
+            SCAN_TIMEOUT_MS,
+            'SCAN_TIMEOUT',
+            (pending) => {
+                this.pendingExtended = pending;
+            },
+            (messageId, requestId) => {
+                this.sendDaemonMessage(buildFrame(messageId, requestId));
+            },
+        );
+    }
+
+    /** Run an asymmetric prefill/decode scan on changed inputs. */
+    asymmetricScan(
+        config: ScanConfig,
+        inputs: Array<{
+            filePath: string;
+            oldContent: string;
+            newContent: string;
+            lineBounds?: readonly [number, number];
+        }>,
+        options: { author?: string; forceFull?: boolean; prefillOnly?: boolean } = {},
+    ): Promise<{ report: unknown; stats: unknown }> {
+        return this.requestExtended((id, requestId) => ({
+            v: 1,
+            id,
+            type: MSG_TYPE_SCAN_ASYMMETRIC,
+            params: {
+                requestId,
+                config: config as unknown as Record<string, unknown>,
+                inputs,
+                options,
+            },
+        }));
     }
 
     /** Ping the daemon (status command). Rejects when not running / no response. */
@@ -440,6 +508,11 @@ export class DaemonClient {
             this.pendingScanDiff = null;
             return;
         }
+        if (this.pendingExtended) {
+            this.pendingExtended.resolve({ report: msg.report, stats: msg.stats });
+            this.pendingExtended = null;
+            return;
+        }
         if (this.pendingScan) {
             this.pendingScan.resolve({
                 report: msg.report as unknown as ScanReport,
@@ -454,11 +527,15 @@ export class DaemonClient {
             if (this.pendingScanDiff) {
                 this.pendingScanDiff.reject(new Error(`DAEMON_ERROR(${msg.code}): ${msg.message}`));
             }
+            if (this.pendingExtended) {
+                this.pendingExtended.reject(new Error(`DAEMON_ERROR(${msg.code}): ${msg.message}`));
+            }
             if (this.pendingScan) {
                 this.pendingScan.reject(new Error(`DAEMON_ERROR(${msg.code}): ${msg.message}`));
             }
         }
         this.pendingScanDiff = null;
+        this.pendingExtended = null;
         this.pendingScan = null;
     }
 
@@ -495,6 +572,43 @@ export interface WarmScanParams {
     readonly logger?: Logger;
 }
 
+/** Configuration and execution bundle for a single one-shot daemon IPC call. */
+export interface OneShotDaemonParams<T> {
+    root: string;
+    logger?: Logger;
+    label: string;
+    checkCap?: (client: DaemonClient) => boolean;
+    execute: (client: DaemonClient) => Promise<T>;
+}
+
+/**
+ * Connect to the per-project daemon, verify capability, execute one request, and close.
+ * ASYNC-CONCURRENCY: Single-connection async flow; creates an unshared client per invocation.
+ *
+ * @param params - Structured connection, capability, and execution bundle.
+ * @returns Request result or null whenever the daemon is unavailable or lacks capability.
+ */
+export async function runOneShotDaemon<T>(params: OneShotDaemonParams<T>): Promise<T | null> {
+    const client = new DaemonClient(params.root);
+    try {
+        await client.connect();
+        if (params.checkCap && !params.checkCap(client)) {
+            client.close();
+            params.logger?.debug(`${params.label} rejected: daemon lacks capability`);
+            return null;
+        }
+        const outcome = await params.execute(client);
+        client.close();
+        return outcome;
+    } catch (error) {
+        client.close();
+        params.logger?.debug(
+            `${params.label} fallback: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        return null;
+    }
+}
+
 /**
  * One-shot convenience: connect, run one warm scan, and close the client. Returns null instead
  * of throwing whenever the daemon is missing, drifts, times out, or disconnects, so the caller
@@ -504,20 +618,13 @@ export interface WarmScanParams {
  * @returns Warm-scan result, or null when the daemon path is unusable; this async call resolves
  *          after the client closes.
  */
-export async function tryWarmScan(params: WarmScanParams): Promise<WarmScanResult | null> {
-    const client = new DaemonClient(params.root);
-    try {
-        await client.connect();
-        const warmScanResult = await client.scan(params.config, params.options);
-        client.close();
-        return warmScanResult;
-    } catch (error) {
-        client.close();
-        params.logger?.debug(
-            `warm scan fallback to cold scan: ${error instanceof Error ? error.message : String(error)}`,
-        );
-        return null;
-    }
+export function tryWarmScan(params: WarmScanParams): Promise<WarmScanResult | null> {
+    return runOneShotDaemon({
+        root: params.root,
+        logger: params.logger,
+        label: 'warm scan',
+        execute: (client) => client.scan(params.config, params.options),
+    });
 }
 
 /** Parameters for executing a one-shot warm diff scan against daemon */
@@ -540,25 +647,14 @@ export interface WarmScanDiffParams {
  * @returns Diff-scan result `{ report, stats }`, or null when unusable; this async call
  *          resolves after the client closes.
  */
-export async function tryWarmScanDiff(
+export function tryWarmScanDiff(
     params: WarmScanDiffParams,
 ): Promise<{ report: unknown; stats: unknown } | null> {
-    const client = new DaemonClient(params.root);
-    try {
-        await client.connect();
-        if (!client.hasDiffCap()) {
-            client.close();
-            params.logger?.debug('warm scan diff rejected: daemon lacks diff capability');
-            return null;
-        }
-        const diffScanResult = await client.scanDiff(params.config, params.diffs, params.options);
-        client.close();
-        return diffScanResult;
-    } catch (error) {
-        client.close();
-        params.logger?.debug(
-            `warm scan diff fallback to cold scan: ${error instanceof Error ? error.message : String(error)}`,
-        );
-        return null;
-    }
+    return runOneShotDaemon({
+        root: params.root,
+        logger: params.logger,
+        label: 'warm scan diff',
+        checkCap: (client) => client.hasDiffCap(),
+        execute: (client) => client.scanDiff(params.config, params.diffs, params.options),
+    });
 }

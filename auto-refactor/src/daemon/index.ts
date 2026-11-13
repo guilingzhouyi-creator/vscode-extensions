@@ -15,9 +15,11 @@
  */
 
 import { DaemonServer, daemonMain } from './server';
-import { DaemonClient } from './client';
+import { DaemonClient, tryWarmScan, tryWarmScanDiff } from './client';
+import type { SnapshotScanParams, SliceAuditParams } from './snapshot-client';
+import { trySnapshotScan, trySliceAudit } from './snapshot-client';
 import { PROTOCOL_VERSION, PROTOCOL_SOFTWARE_VERSION, encodeMessage, decodeLine } from './protocol';
-import type { DaemonMessage, HelloAckMessage } from './protocol';
+import type { DaemonMessage, HelloAckMessage, SnapshotScanEntryInput } from './protocol';
 import {
     projectHashFor,
     pipeNameFor,
@@ -35,11 +37,17 @@ import {
     handleSliceAudit,
 } from './scanHandler';
 import type { DaemonScanContext } from './scanHandler';
+import { handleSnapshotScan } from './snapshot-handler';
+import type { SnapshotScanOptions } from './snapshot-handler';
 
 export {
     DaemonServer,
     daemonMain,
     DaemonClient,
+    tryWarmScan,
+    tryWarmScanDiff,
+    trySnapshotScan,
+    trySliceAudit,
     PROTOCOL_VERSION,
     PROTOCOL_SOFTWARE_VERSION,
     encodeMessage,
@@ -55,9 +63,19 @@ export {
     handleScanDiff,
     handleAsymmetricScan,
     handleSliceAudit,
+    handleSnapshotScan,
 };
 
-export type { DaemonMessage, HelloAckMessage, RegistryInfo, DaemonScanContext };
+export type {
+    DaemonMessage,
+    HelloAckMessage,
+    SnapshotScanEntryInput,
+    RegistryInfo,
+    DaemonScanContext,
+    SnapshotScanOptions,
+    SnapshotScanParams,
+    SliceAuditParams,
+};
 
 /**
  * Diagnostics descriptor for unhandled promise rejection occurrences in the daemon.
