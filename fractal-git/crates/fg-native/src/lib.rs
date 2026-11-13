@@ -20,6 +20,7 @@ pub mod container;
 pub mod document;
 pub mod error;
 pub mod junction;
+pub mod policy_vault;
 pub mod repo_identity;
 pub mod repo_layout;
 pub mod section_tag;
@@ -40,14 +41,15 @@ pub use container::{ContainerBuilder, ContainerHeader, ContainerView, SectionEnt
 pub use document::RepoDocument;
 pub use error::{NativeError, NativeResult};
 pub use junction::create_junction;
+pub use policy_vault::{LoadedPolicyVault, PolicyVaultState, PolicyVaultStore};
 pub use repo_identity::{
     fill_random_bytes, generate_repo_id, repo_id_from_hex, repo_id_to_hex, store_path, store_root,
     REPO_ID_HEX_LEN, STORES_DIR_NAME, STORE_DIR_NAME,
 };
 pub use repo_layout::{
-    attempt_hide, classify_workspace_entry, container_path, hide_directory, is_directory_hidden,
-    read_guard_file, write_guard_file, InitializedRepository, PhysicalLayout, RepoLayout,
-    WORKSPACE_DIR_NAME,
+    attempt_hide, classify_workspace_entry, container_path, hide_directory, hide_path,
+    is_directory_hidden, read_guard_file, write_guard_file, InitializedRepository, PhysicalLayout,
+    RepoLayout, WORKSPACE_DIR_NAME,
 };
 pub use section_tag::SectionTag;
 pub use sections::{

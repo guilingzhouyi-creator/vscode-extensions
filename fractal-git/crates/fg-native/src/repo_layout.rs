@@ -25,11 +25,14 @@
 
 use std::path::{Path, PathBuf};
 
+use fg_core::models::{BranchEnforcementTier, EnforcementTier};
+
 use crate::constants::{
     CONTAINER_FILE_NAME, GUARD_FILE_CONTENT, GUARD_FILE_NAME, JOURNAL_DIR_NAME, OBJECTS_DIR_NAME,
 };
 use crate::document::RepoDocument;
 use crate::error::{NativeError, NativeResult};
+use crate::policy_vault::PolicyVaultStore;
 use crate::sections::meta::LayoutMode;
 
 /// Name of the directory a workspace uses to point at its repository.
@@ -162,6 +165,28 @@ impl RepoLayout {
     /// Returns [`NativeError::RepositoryExists`] when a container is already present, and propagates
     /// directory-creation and container-publication failures.
     pub fn initialize_with(&self, document: &RepoDocument) -> NativeResult<InitializedRepository> {
+        self.initialize_with_policy(
+            document,
+            EnforcementTier::Strict,
+            BranchEnforcementTier::Native,
+            false,
+        )
+    }
+
+    /// Creates the repository directories, publishes `document`, and seals the initial hidden
+    /// binary policy vault with the caller-specified enforcement floors.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NativeError::RepositoryExists`] when a container is already present, and propagates
+    /// directory-creation, policy-vault sealing, and container-publication failures.
+    pub fn initialize_with_policy(
+        &self,
+        document: &RepoDocument,
+        commit_floor: EnforcementTier,
+        branch_floor: BranchEnforcementTier,
+        locked_by_authority: bool,
+    ) -> NativeResult<InitializedRepository> {
         let container_path = self.container_path();
 
         std::fs::create_dir_all(self.repo_dir.join(OBJECTS_DIR_NAME))?;
@@ -181,6 +206,19 @@ impl RepoLayout {
         // instead of leaving a container that exists but cannot resolve a branch.
         std::fs::write(self.repo_dir.join("HEAD"), head_content)?;
         std::fs::create_dir_all(self.repo_dir.join("refs/heads"))?;
+
+        PolicyVaultStore::write_initial_for_container(
+            &self.repo_dir,
+            document.meta.repo_id,
+            commit_floor,
+            branch_floor,
+            locked_by_authority,
+        )
+        .map_err(|policy_err| {
+            NativeError::Io(std::io::Error::other(format!(
+                "initialize hidden policy vault: {policy_err}"
+            )))
+        })?;
 
         let hidden = attempt_hide(&self.repo_dir);
 
@@ -287,14 +325,13 @@ pub fn read_guard_file(repo_dir: &Path) -> NativeResult<Option<String>> {
     }
 }
 
-/// Marks `directory` hidden on Windows.
+/// Marks `target` (directory or file) hidden on Windows.
 ///
 /// # Errors
 ///
-/// Returns [`NativeError::Io`] when the attribute cannot be set. Callers treat this as advisory:
-/// the guard file is the protection that matters.
+/// Returns [`NativeError::Io`] when the attribute cannot be set.
 #[cfg(windows)]
-pub fn hide_directory(directory: &Path) -> NativeResult<()> {
+pub fn hide_path(target: &Path) -> NativeResult<()> {
     use std::os::windows::ffi::OsStrExt;
 
     #[link(name = "kernel32")]
@@ -308,7 +345,7 @@ pub fn hide_directory(directory: &Path) -> NativeResult<()> {
 
     // The path is encoded as NUL-terminated UTF-16 and kept alive for the duration of both calls;
     // the pointers handed to Win32 therefore stay valid until the calls return.
-    let mut wide_path: Vec<u16> = directory.as_os_str().encode_wide().collect();
+    let mut wide_path: Vec<u16> = target.as_os_str().encode_wide().collect();
     wide_path.push(0);
 
     // SAFETY:
@@ -336,6 +373,17 @@ pub fn hide_directory(directory: &Path) -> NativeResult<()> {
     Ok(())
 }
 
+/// Marks `directory` hidden on Windows.
+///
+/// # Errors
+///
+/// Returns [`NativeError::Io`] when the attribute cannot be set. Callers treat this as advisory:
+/// the guard file is the protection that matters.
+#[cfg(windows)]
+pub fn hide_directory(directory: &Path) -> NativeResult<()> {
+    hide_path(directory)
+}
+
 /// Reports whether the directory is hidden; always `false` off Windows.
 ///
 /// # Errors
@@ -348,6 +396,16 @@ pub fn is_directory_hidden(directory: &Path) -> NativeResult<bool> {
     const FILE_ATTRIBUTE_HIDDEN: u32 = 0x0000_0002;
     let metadata = std::fs::symlink_metadata(directory)?;
     Ok(metadata.file_attributes() & FILE_ATTRIBUTE_HIDDEN != 0)
+}
+
+/// Marks `target` hidden; a no-op on platforms without a Win32 hidden attribute.
+///
+/// # Errors
+///
+/// Infallible no-op on platforms without a Win32 hidden attribute.
+#[cfg(not(windows))]
+pub fn hide_path(_target: &Path) -> NativeResult<()> {
+    Ok(())
 }
 
 /// Marks `directory` hidden; a no-op on platforms without a hidden attribute.
