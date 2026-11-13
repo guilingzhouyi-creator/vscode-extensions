@@ -188,6 +188,7 @@ pub use fg_gate::verifier::{
 };
 
 // Benchmark & Performance Ratchet exports
+pub mod audit_runner;
 pub mod bench;
 pub mod pathspec;
 pub use bench::{BaselineComparisonVerdict, BenchmarkLevel, BenchmarkMetric, TaxisBenchmarkSuite};
