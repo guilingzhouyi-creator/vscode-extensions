@@ -8,7 +8,10 @@
 //!
 //! Domain Governance Rules: FGT-STO-001, FGT-OBJ-001.
 
+use super::import::setup_native_scaffold;
 use super::*;
+use crate::cas_backend::CasBackend;
+use crate::loose::LooseOdb;
 use fg_core::models::{FileMode, IndexStage, ObjectKind};
 use fg_core::traits::OdbStore;
 use fg_index::GitIndex;
