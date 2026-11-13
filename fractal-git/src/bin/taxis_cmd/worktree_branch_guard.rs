@@ -11,7 +11,7 @@ use fg_gate::{BranchGovernanceFloor, BranchGuard};
 use fg_topology::verifier::TopologyVerifier;
 use fractal_git::constants::cli::CliTag;
 use fractal_git::fractal::refs::HeadState;
-use fractal_git::{DiskRefStore, FractalRef, RefStore, ScopeProjection};
+use fractal_git::{DiskRefStore, FractalRef, ScopeProjection};
 
 use super::common::{reject, CliContext};
 use super::fractal_context::{

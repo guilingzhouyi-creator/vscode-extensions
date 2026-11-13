@@ -919,23 +919,48 @@ mod tests {
             .count();
         assert_eq!(kinds, 2);
     }
-    /// Creates a unique scratch directory inside the workspace tmp tree.
+    /// RAII guard for unit-test scratch directories under `target/test_tmp/fg-index-config`.
+    ///
+    /// Keeping fixtures inside the crate target tree avoids polluting the monorepo root `tmp/`
+    /// while preserving directories when a thread is already panicking for failure triage.
+    struct ConfigScratch(std::path::PathBuf);
+
+    impl std::ops::Deref for ConfigScratch {
+        type Target = std::path::Path;
+
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    impl Drop for ConfigScratch {
+        fn drop(&mut self) {
+            if !std::thread::panicking() {
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
+        }
+    }
+
+    /// Creates a unique scratch directory inside `fractal-git/target/test_tmp/fg-index-config`.
     ///
     /// The host temporary directory is not writable for every runner, and MSYS style shells hand
     /// native processes a POSIX style scratch variable that Windows resolves against the drive root,
-    /// scratch fixtures stay under the workspace exactly like the differential suite does.
-    fn scratch_root(name: &str) -> std::path::PathBuf {
+    /// so scratch fixtures stay inside the crate target tree and reclaim when the test passes.
+    fn scratch_root(name: &str) -> ConfigScratch {
         let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-        let workspace_root = manifest_dir
+        let crate_workspace = manifest_dir
             .ancestors()
-            .nth(3)
-            .expect("the crate lives three levels below the workspace root");
-        let base = workspace_root.join("tmp").join("fg-index-config");
+            .nth(2)
+            .expect("the crate lives two levels below the fractal-git workspace root");
+        let base = crate_workspace
+            .join("target")
+            .join("test_tmp")
+            .join("fg-index-config");
         let _ = std::fs::create_dir_all(&base);
         let root = base.join(format!("{}-{name}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).expect("scratch directory");
-        root
+        ConfigScratch(root)
     }
 
     fn write_fixture(path: &std::path::Path, contents: &str) {
