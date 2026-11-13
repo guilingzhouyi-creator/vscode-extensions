@@ -399,7 +399,8 @@ if (-not $stagedFiles -or $stagedFiles.Count -eq 0 -or ($stagedFiles.Count -eq 1
 
 if (-not $Agent) {
     Write-GateHost "=================================================================" -ForegroundColor Cyan
-    Write-GateHost "🔒 执行本地 Pre-Commit 质量安全与物理卫生检查 (PowerShell 版)" -ForegroundColor Cyan
+    $modeTag = if ($Fast) { " [快速模式 -Fast]" } else { "" }
+    Write-GateHost "🔒 执行本地 Pre-Commit 质量安全与物理卫生检查 (PowerShell 版)$modeTag" -ForegroundColor Cyan
     Write-GateHost "=================================================================" -ForegroundColor Cyan
 }
 
@@ -857,6 +858,23 @@ if ($streamRes.Output) {
     } catch {}
 }
 
+if ($streamRes.ExitCode -ne 0 -or -not $streamData) {
+    if ($Agent) {
+        $failSummary = if ($streamData -and $streamData.steps -and ($streamData.steps.PSObject.Properties['STAGED-DIFF-14'])) {
+            $streamData.steps.'STAGED-DIFF-14'.detail
+        } else {
+            "Differential stream gate execution failed with exit code $($streamRes.ExitCode)"
+        }
+        $json = Write-PreCommitFailure -StepId "STAGED-DIFF-14" -RuleId "FGT-GAT-001" `
+            -Summary $failSummary -ActionableFix "Run 'node scripts/common/gate-differential-bounds.js --stream' to inspect output" `
+            -VerifyCmd "pwsh -File scripts/ps1/pre-commit-gate.ps1 -Fast" -TargetFiles $touchedAuditable
+        Write-Output $json
+        exit 1
+    }
+    Write-GateHost "✖ BLOCK  流式质量安全门禁异常退出 (ExitCode: $($streamRes.ExitCode))" -ForegroundColor Red
+    $failed = $true
+}
+
 function Handle-StreamingVerdict {
     param(
         [string]$StepId,
@@ -872,32 +890,39 @@ function Handle-StreamingVerdict {
         return
     }
     if (-not $Agent) { Write-StepBanner -StepId $StepId }
-    if ($StepData -and $StepData.status -eq "BLOCK") {
+    if (-not $StepData -or $StepData.status -ne "PASS") {
+        $failDetail = if ($StepData -and $StepData.detail) { $StepData.detail } else { "$StepId 审查未通过或未产出数据 (Fail-Closed)" }
+        $failSummary = if ($StepData -and $StepData.summary) { $StepData.summary } else { $failDetail }
         if ($Agent) {
             $json = Write-PreCommitFailure -StepId $StepId -RuleId $RuleId `
-                -Summary ($StepData.summary ?? $StepData.detail) -ActionableFix $StepData.detail `
+                -Summary $failSummary -ActionableFix $failDetail `
                 -VerifyCmd "pwsh -File scripts/ps1/pre-commit-gate.ps1 -Fast" -TargetFiles $TargetFiles
             Write-Output $json
             exit 1
         }
-        Write-StepVerdict -StepId $StepId -Status "BLOCK" -Detail $StepData.detail
+        Write-StepVerdict -StepId $StepId -Status "BLOCK" -Detail $failDetail
         $script:failed = $true
     } else {
-        $detail = if ($StepData -and $StepData.detail) { $StepData.detail } else { $DefaultPass }
+        $detail = if ($StepData.detail) { $StepData.detail } else { $DefaultPass }
         if (-not $Agent) { Write-StepVerdict -StepId $StepId -Status "PASS" -Detail $detail }
     }
 }
 
-Handle-StreamingVerdict -StepId "STAGED-SLICE-11" -RuleId "GUARD-AST-001" -StepData $streamData.steps.'STAGED-SLICE-11' `
+$s11 = if ($streamData -and $streamData.steps -and ($streamData.steps.PSObject.Properties['STAGED-SLICE-11'])) { $streamData.steps.'STAGED-SLICE-11' } else { $null }
+$s12 = if ($streamData -and $streamData.steps -and ($streamData.steps.PSObject.Properties['STAGED-DENSITY-12'])) { $streamData.steps.'STAGED-DENSITY-12' } else { $null }
+$s13 = if ($streamData -and $streamData.steps -and ($streamData.steps.PSObject.Properties['STAGED-VOLUME-13'])) { $streamData.steps.'STAGED-VOLUME-13' } else { $null }
+$s14 = if ($streamData -and $streamData.steps -and ($streamData.steps.PSObject.Properties['STAGED-DIFF-14'])) { $streamData.steps.'STAGED-DIFF-14' } else { $null }
+
+Handle-StreamingVerdict -StepId "STAGED-SLICE-11" -RuleId "GUARD-AST-001" -StepData $s11 `
     -HasTarget ($touchedCode.Count -gt 0) -SkipDetail "无暂存代码" -TargetFiles $touchedCode -DefaultPass "暂存区 AST 切片复杂度合规"
 
-Handle-StreamingVerdict -StepId "STAGED-DENSITY-12" -RuleId "VOL-DIL-001" -StepData $streamData.steps.'STAGED-DENSITY-12' `
+Handle-StreamingVerdict -StepId "STAGED-DENSITY-12" -RuleId "VOL-DIL-001" -StepData $s12 `
     -HasTarget ($touchedAuditable.Count -gt 0) -SkipDetail "无暂存可审计代码" -TargetFiles $touchedAuditable -DefaultPass "暂存区代码密度与接线载荷合规"
 
-Handle-StreamingVerdict -StepId "STAGED-VOLUME-13" -RuleId "VOL-ELOC-001" -StepData $streamData.steps.'STAGED-VOLUME-13' `
+Handle-StreamingVerdict -StepId "STAGED-VOLUME-13" -RuleId "VOL-ELOC-001" -StepData $s13 `
     -HasTarget ($touchedAuditable.Count -gt 0) -SkipDetail "无暂存可审计代码" -TargetFiles $touchedAuditable -DefaultPass "暂存区双轨体积与动态包络合规"
 
-Handle-StreamingVerdict -StepId "STAGED-DIFF-14" -RuleId "FGT-GAT-001" -StepData $streamData.steps.'STAGED-DIFF-14' `
+Handle-StreamingVerdict -StepId "STAGED-DIFF-14" -RuleId "FGT-GAT-001" -StepData $s14 `
     -HasTarget ($touchedAuditable.Count -gt 0) -SkipDetail "无暂存可审计代码" -TargetFiles $touchedAuditable -DefaultPass "暂存区五维微分边界与准入周转合规"
 
 if ($Agent) {
