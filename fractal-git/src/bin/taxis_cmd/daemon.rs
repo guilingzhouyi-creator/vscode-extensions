@@ -22,13 +22,33 @@ use fractal_git::{IpcCodec, IpcMessage, PacketLine};
 
 use super::common::{fail_io, find_arg_value, print_json, reject, CliContext};
 
+#[path = "daemon_ipc_dispatch.rs"]
+mod daemon_ipc_dispatch;
+#[path = "daemon_persistent.rs"]
+mod daemon_persistent;
 #[path = "daemon_runtime.rs"]
 pub mod daemon_runtime;
+#[path = "daemon_scheduler/mod.rs"]
+pub mod daemon_scheduler;
+#[path = "daemon_transport/mod.rs"]
+pub mod daemon_transport;
 
 pub use daemon_runtime::DaemonHotSession;
 
-/// Dispatches `taxis daemon` / `taxis serve` across probe, `--request`, `--once`, and `--serve` modes.
+/// Dispatches `taxis daemon` / `taxis serve` across start, stop, probe, `--request`, `--once`, and `--serve` modes.
 pub fn handle_daemon(ctx: &CliContext) {
+    if ctx.args.iter().any(|arg| arg == "stop" || arg == "--stop") {
+        daemon_persistent::handle_daemon_stop(ctx);
+        return;
+    }
+    if ctx
+        .args
+        .iter()
+        .any(|arg| arg == "start" || arg == "--persistent" || arg == "--async-audit")
+    {
+        daemon_persistent::run_persistent_daemon(ctx);
+        return;
+    }
     if let Some(raw_request) = find_arg_value(&ctx.args, &["--request"]) {
         handle_daemon_request(ctx, raw_request);
         return;
