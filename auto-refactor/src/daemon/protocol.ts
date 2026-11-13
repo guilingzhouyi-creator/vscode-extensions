@@ -58,7 +58,14 @@ export interface HelloAckMessage {
     type: 'hello_ack';
     version: string;
     protocol: number;
-    caps: { cache: boolean; stream: boolean; maxWorkers: number; diff: boolean };
+    caps: {
+        cache: boolean;
+        stream: boolean;
+        maxWorkers: number;
+        diff: boolean;
+        snapshot?: boolean;
+        slice?: boolean;
+    };
 }
 
 /**
@@ -228,6 +235,41 @@ export interface ShutdownMessage {
  * type-specific fields; the shared `v`/`id` envelope carries version and request
  * correlation metadata for every variant.
  */
+/**
+ * Single snapshot entry forwarded over daemon IPC for immutable snapshot review.
+ */
+export interface SnapshotScanEntryInput {
+    path: string;
+    mode?: '100644' | '100755' | '120000' | '160000';
+    content?: string;
+    bytesBase64?: string;
+    gitSha1?: string;
+}
+
+/**
+ * Immutable source-snapshot scan request returning full 10D, ADR-Q, and SQALE metrics.
+ */
+export interface ScanSnapshotMessage {
+    v: number;
+    id: number;
+    type: 'scan_snapshot';
+    params: {
+        requestId: string;
+        config: Record<string, unknown>;
+        entries: SnapshotScanEntryInput[];
+        options?: {
+            repositoryId?: string;
+            treeSha1?: string;
+            maxEntries?: number;
+            maxBlobBytes?: number;
+            maxTotalBytes?: number;
+        };
+    };
+}
+
+/**
+ * Unified discriminated union of all valid IPC wire protocol frames.
+ */
 export type DaemonMessage =
     | HelloMessage
     | HelloAckMessage
@@ -235,6 +277,7 @@ export type DaemonMessage =
     | ScanDiffMessage
     | ScanAsymmetricMessage
     | SliceAuditMessage
+    | ScanSnapshotMessage
     | ScanDataMessage
     | ScanDoneMessage
     | ErrorMessage
