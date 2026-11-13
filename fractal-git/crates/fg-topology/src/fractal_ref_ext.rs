@@ -16,10 +16,10 @@ impl FractalRef {
     pub fn tier(&self) -> u8 {
         match self {
             Self::SystemTrunk { .. } => 0,
-            Self::Trunk => 1,
-            Self::CellMain { .. } => 2,
-            Self::CardWorktree { .. } => 3,
-            Self::SubAgentWorktree { .. } => 4,
+            Self::Trunk | Self::AuditTrunk => 1,
+            Self::CellMain { .. } | Self::AuditCellMain { .. } => 2,
+            Self::CardWorktree { .. } | Self::AuditCard { .. } => 3,
+            Self::SubAgentWorktree { .. } | Self::AuditSubAgent { .. } => 4,
             _ => 99,
         }
     }
@@ -39,6 +39,17 @@ impl FractalRef {
             Self::SubAgentWorktree {
                 cell_id, card_id, ..
             } => Some(Self::CardWorktree {
+                cell_id: cell_id.clone(),
+                card_id: card_id.clone(),
+            }),
+            Self::AuditTrunk => None,
+            Self::AuditCellMain { .. } => Some(Self::AuditTrunk),
+            Self::AuditCard { cell_id, .. } => Some(Self::AuditCellMain {
+                cell_id: cell_id.clone(),
+            }),
+            Self::AuditSubAgent {
+                cell_id, card_id, ..
+            } => Some(Self::AuditCard {
                 cell_id: cell_id.clone(),
                 card_id: card_id.clone(),
             }),
@@ -72,9 +83,9 @@ impl FractalRef {
             Self::SystemTrunk { branch } => Some(branch.clone()),
             Self::Trunk => Some("integration".to_owned()),
             Self::CellMain { cell_id } => Some(format!("cell/{cell_id}/main")),
-            Self::CardWorktree { cell_id, card_id } => {
-                Some(format!("cell/{cell_id}/card/{card_id}/{CARD_CANONICAL_LEAF}"))
-            }
+            Self::CardWorktree { cell_id, card_id } => Some(format!(
+                "cell/{cell_id}/card/{card_id}/{CARD_CANONICAL_LEAF}"
+            )),
             Self::SubAgentWorktree {
                 cell_id,
                 card_id,
@@ -134,7 +145,11 @@ impl FractalRef {
                 cell_id: parts[1].to_string(),
             });
         }
-        if parts.len() == 5 && parts[0] == "cell" && parts[2] == "card" && parts[4] == CARD_CANONICAL_LEAF {
+        if parts.len() == 5
+            && parts[0] == "cell"
+            && parts[2] == "card"
+            && parts[4] == CARD_CANONICAL_LEAF
+        {
             return Some(Self::CardWorktree {
                 cell_id: parts[1].to_string(),
                 card_id: parts[3].to_string(),

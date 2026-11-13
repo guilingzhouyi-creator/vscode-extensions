@@ -169,6 +169,18 @@ pub enum FractalRef {
     /// be listed and audited. The trailing component is the commit the exemption was granted for;
     /// the reason itself lives in the receipt object that component points at.
     CommitBypassAudit { commit_oid: Oid },
+    /// Root trunk of the dedicated worktree-free Fractal Audit Tree (`refs/fractal/audit/trunk`).
+    AuditTrunk,
+    /// Cell-level rollup audit head (`refs/fractal/audit/cell/{cell_id}/main`).
+    AuditCellMain { cell_id: String },
+    /// Card-level audit head (`refs/fractal/audit/cell/{cell_id}/card/{card_id}/main`).
+    AuditCard { cell_id: String, card_id: String },
+    /// SubAgent-level audit head (`refs/fractal/audit/cell/{cell_id}/card/{card_id}/sub/{subagent_id}`).
+    AuditSubAgent {
+        cell_id: String,
+        card_id: String,
+        subagent_id: String,
+    },
 }
 
 /// Resolved position of the repository's `HEAD`.
@@ -252,9 +264,9 @@ enum LooseBody {
     Symbolic(String),
 }
 
-/// Splits a reference name on `/` into a stack buffer of up to 8 components without allocating.
-pub(crate) fn split_ref_segments(input: &str) -> Option<([&str; 8], usize)> {
-    let mut parts = [""; 8];
+/// Splits a reference name on `/` into a stack buffer of up to 12 components without allocating.
+pub(crate) fn split_ref_segments(input: &str) -> Option<([&str; 12], usize)> {
+    let mut parts = [""; 12];
     let mut len = 0;
     for seg in input.split('/') {
         if len >= parts.len() {
@@ -303,6 +315,10 @@ impl FractalRef {
             Self::CommitBypassAudit { commit_oid } => {
                 format!("{}commit-bypass/{}", REF_TELEMETRY_PREFIX, commit_oid)
             }
+            Self::AuditTrunk
+            | Self::AuditCellMain { .. }
+            | Self::AuditCard { .. }
+            | Self::AuditSubAgent { .. } => self.format_audit_ref(),
         }
     }
 
@@ -365,6 +381,7 @@ impl FractalRef {
             "trunk" | "integration" => Some(Self::Trunk),
             "cell" => Self::parse_fractal_cell_ref(parts),
             "telemetry" => Self::parse_fractal_telemetry_ref(parts),
+            "audit" => Self::parse_fractal_audit_ref(parts),
             _ => None,
         }
     }
@@ -408,19 +425,19 @@ impl FractalRef {
         )
     }
 
-    /// Asserts that an update to this reference complies with protected telemetry invariants:
+    /// Asserts that an update to this reference complies with protected telemetry/audit invariants:
     /// - Force updates (--force) are strictly prohibited.
     /// - Rewinds (non-fast-forward updates or deleting non-absent refs) are strictly prohibited.
     ///
     /// # Errors
-    /// Returns [`FractalError::AccessDenied`] if telemetry update policy is violated.
+    /// Returns [`FractalError::AccessDenied`] if telemetry/audit update policy is violated.
     pub fn verify_telemetry_update_policy(
         &self,
         old_oid: Option<Oid>,
         new_oid: Option<Oid>,
         is_force: bool,
     ) -> FractalResult<()> {
-        if !self.is_telemetry() {
+        if !self.is_telemetry() && !self.is_audit_tree() {
             return Ok(());
         }
 
