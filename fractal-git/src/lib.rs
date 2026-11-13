@@ -58,13 +58,14 @@ pub use fg_core::error::{FractalError, FractalResult};
 pub use fg_core::models::{
     ActorIdentity, AgentCommitMeta, AgentPushContext, AuditHashChain, AuditIkceVerdict,
     AuditRecord, AuditScore, AuditTkcvVerdict, AuthorityTier, AutoQualityScoreEnvelope,
-    BlackboardCollision, BlockProvenanceEntry, BlockProvenanceParams, CardBlackboard, ChangeId,
-    ConflictPresentationMode, DiffCoherenceMode, ElevationAttestation, FileMode, FileUid,
-    FractalSubLease, GitSignature, IndexStage, IntentLease, LeaseStatus, MutationBudget, Oid,
-    PraxisCardContext, ProjectLease, ProjectLeaseCache, ProvenanceLedger, QuarantineRegistry,
-    RegistrationOrigin, ReservationStatus, ReservedFileToken, SliceAuthorization,
-    StagedPromotionRequest, StagedPromotionStatus, SubAuthorizationZone, TaxisPolicy,
-    UnsignedAuditRecordParams, ValidatedCommitWitness, AUDIT_RECORD_BYTE_BUDGET, GENESIS_PREV_HASH,
+    BlackboardCollision, BlockProvenanceEntry, BlockProvenanceParams, BranchEnforcementTier,
+    BranchPolicySpec, CardBlackboard, ChangeId, ConflictPresentationMode, DiffCoherenceMode,
+    ElevationAttestation, EnforcementTier, FileMode, FileUid, FractalSubLease, GitSignature,
+    IndexStage, IntentLease, LeaseStatus, MutationBudget, Oid, PraxisCardContext, ProjectLease,
+    ProjectLeaseCache, ProvenanceLedger, QuarantineRegistry, RegistrationOrigin, ReservationStatus,
+    ReservedFileToken, SealedPolicyPayload, SliceAuthorization, StagedPromotionRequest,
+    StagedPromotionStatus, SubAuthorizationZone, TaxisPolicy, UnsignedAuditRecordParams,
+    ValidatedCommitWitness, AUDIT_RECORD_BYTE_BUDGET, GENESIS_PREV_HASH,
 };
 pub use fg_core::traits::{
     AgentWorktreeHandle, GateVerdict, GateVerifier, OdbStore, ReclamationAudit, RefStore,
@@ -159,6 +160,9 @@ pub use fg_transport::smart_protocol::ProtocolV2Handler;
 
 // Gate & Policy exports
 pub use fg_gate::auto_audit_hook::AutoAuditHook;
+pub use fg_gate::branch_guard::{
+    BranchBypassContext, BranchFloorSource, BranchGateOutcome, BranchGovernanceFloor, BranchGuard,
+};
 pub use fg_gate::canary::{
     CanaryConfig, CanaryReport, KernelCanaryEngine, MutantDescriptor, MutationKind,
     ShadowCanaryEngine,
@@ -176,7 +180,7 @@ pub use fg_gate::hook::{
     CommitGovernanceHook, ElevationPromotionGateHook, FractalHook, HookContext, HookPipeline,
     HookTier, HookVerdict, HygieneConflictHook,
 };
-pub use fg_gate::policy_floor::PolicyFloor;
+pub use fg_gate::policy_floor::{PolicyFloor, PolicyVaultHealth};
 pub use fg_gate::pre_receive::PreReceiveGuard;
 pub use fg_gate::quota_governor::QuotaGovernor;
 pub use fg_gate::verifier::{

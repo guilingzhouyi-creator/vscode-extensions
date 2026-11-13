@@ -11,6 +11,7 @@
 
 pub mod authority;
 pub mod auto_audit_hook;
+pub mod branch_guard;
 pub mod canary;
 pub mod commit_guard;
 pub mod conflict_guard;
@@ -28,6 +29,9 @@ pub use authority::{
     AUTHORITY_SECRET_ENV,
 };
 pub use auto_audit_hook::AutoAuditHook;
+pub use branch_guard::{
+    BranchBypassContext, BranchFloorSource, BranchGateOutcome, BranchGovernanceFloor, BranchGuard,
+};
 pub use canary::{
     CanaryConfig, CanaryReport, KernelCanaryEngine, MutationKind, ShadowCanaryEngine,
 };
@@ -45,9 +49,40 @@ pub use hook::{
     CommitGovernanceHook, DiffBoundsGovernanceHook, ElevationPromotionGateHook, FractalHook,
     HookContext, HookPipeline, HookTier, HookVerdict, HygieneConflictHook,
 };
-pub use policy_floor::{preset_for_tier, PolicyFloor};
+pub use policy_floor::{preset_for_tier, PolicyFloor, PolicyVaultHealth};
 pub use pre_receive::{ActorIdentity, AgentPushContext, PreReceiveGuard};
+
 pub use quota_governor::{
     QuotaGovernor, DEFAULT_MAX_CONCURRENT_WORKTREES, DEFAULT_MAX_WORKSPACE_DISK_BYTES,
 };
 pub use verifier::{KernelAstVerifier, VerifierConfig, VerifierViolation, ViolationSeverity};
+
+#[cfg(test)]
+pub(crate) mod test_support {
+    use std::path::{Path, PathBuf};
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static TEMP_SEQ: AtomicU64 = AtomicU64::new(0);
+
+    pub(crate) struct TempDir(PathBuf);
+
+    impl TempDir {
+        pub(crate) fn new() -> std::io::Result<Self> {
+            let seq = TEMP_SEQ.fetch_add(1, Ordering::Relaxed);
+            let dir =
+                std::env::temp_dir().join(format!("fg-gate-test-{}-{seq}", std::process::id()));
+            std::fs::create_dir_all(&dir)?;
+            Ok(Self(dir))
+        }
+
+        pub(crate) fn path(&self) -> &Path {
+            &self.0
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+}

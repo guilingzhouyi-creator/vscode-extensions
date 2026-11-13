@@ -149,27 +149,26 @@ impl KernelCanaryEngine {
         let total_mutants = mutants.len();
         let (non_comment_lines, active_assertions) = collect_active_test_lines(test_code);
 
-        let (killed_mutants, kill_rate) = if total_mutants == 0
-            || (active_assertions.is_empty() && self.evaluator.is_none())
-        {
-            (None, None)
-        } else {
-            let killed = self.count_killed_mutants(
-                &mutants,
-                source_code,
-                (test_code, &non_comment_lines, &active_assertions),
-            );
-            let rate = killed as f64 / total_mutants as f64;
-            if rate < self.config.min_kill_rate {
-                push_kill_rate_violation(
-                    &mut violations,
-                    rate,
-                    self.config.min_kill_rate,
-                    (killed, total_mutants),
+        let (killed_mutants, kill_rate) =
+            if total_mutants == 0 || (active_assertions.is_empty() && self.evaluator.is_none()) {
+                (None, None)
+            } else {
+                let killed = self.count_killed_mutants(
+                    &mutants,
+                    source_code,
+                    (test_code, &non_comment_lines, &active_assertions),
                 );
-            }
-            (Some(killed), Some(rate))
-        };
+                let rate = killed as f64 / total_mutants as f64;
+                if rate < self.config.min_kill_rate {
+                    push_kill_rate_violation(
+                        &mut violations,
+                        rate,
+                        self.config.min_kill_rate,
+                        (killed, total_mutants),
+                    );
+                }
+                (Some(killed), Some(rate))
+            };
 
         let static_hygiene_passed = violations.is_empty();
 
@@ -428,7 +427,10 @@ fn is_mutant_killed_by_probes(
         return false;
     }
     if let Some(ref fn_name) = mutant.enclosing_fn {
-        if non_comment_lines.iter().any(|line| line.contains(fn_name.as_str())) {
+        if non_comment_lines
+            .iter()
+            .any(|line| line.contains(fn_name.as_str()))
+        {
             return true;
         }
     }
@@ -442,8 +444,8 @@ fn is_mutant_killed_by_probes(
 /// Identifies common Rust language keywords that do not disambiguate identifier coverage.
 fn is_common_keyword(word: &str) -> bool {
     const KEYWORDS: [&str; 17] = [
-        "let", "mut", "fn", "pub", "return", "if", "else", "for", "while", "in", "match",
-        "struct", "impl", "enum", "true", "false", "self",
+        "let", "mut", "fn", "pub", "return", "if", "else", "for", "while", "in", "match", "struct",
+        "impl", "enum", "true", "false", "self",
     ];
     KEYWORDS.contains(&word)
 }

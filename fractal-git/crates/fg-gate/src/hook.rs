@@ -273,6 +273,65 @@ impl FractalHook for DiffBoundsGovernanceHook {
 }
 
 // -----------------------------------------------------------------------------
+// Built-in Hook: Topological Fractal Hierarchy Governance (FGT-TOP-001)
+// -----------------------------------------------------------------------------
+
+/// Intercepts promotions and merges to ensure strict adherence to the 4-tier fractal hierarchy.
+#[derive(Debug, Clone, Copy)]
+pub struct TopologyFractalHook {
+    tier: HookTier,
+}
+
+impl TopologyFractalHook {
+    /// Creates a built-in fractal topology governance hook targeting `tier`.
+    pub const fn new(tier: HookTier) -> Self {
+        Self { tier }
+    }
+}
+
+impl FractalHook for TopologyFractalHook {
+    fn id(&self) -> &'static str {
+        "fgt-hook-topology-hierarchy"
+    }
+
+    fn tier(&self) -> HookTier {
+        self.tier
+    }
+
+    fn evaluate(&self, ctx: &HookContext<'_>) -> FractalResult<HookVerdict> {
+        let src_ref_opt = fg_topology::refs::FractalRef::parse(ctx.source_ref);
+        let dst_ref_opt = fg_topology::refs::FractalRef::parse(ctx.target_ref);
+
+        if let (Some(src), Some(dst)) = (src_ref_opt, dst_ref_opt) {
+            if src == dst {
+                return Ok(HookVerdict::Pass);
+            }
+            if ctx.commit_message.is_some()
+                && matches!(
+                    (&src, &dst),
+                    (
+                        fg_topology::refs::FractalRef::SystemTrunk { .. }
+                            | fg_topology::refs::FractalRef::Trunk,
+                        fg_topology::refs::FractalRef::CellMain { cell_id }
+                    ) if cell_id == fg_core::constants::policy::DEFAULT_CELL_ID
+                        || cell_id == "governance"
+                )
+            {
+                return Ok(HookVerdict::Pass);
+            }
+            match fg_topology::verifier::TopologyVerifier::assert_legal_merge(&src, &dst) {
+                Ok(()) => Ok(HookVerdict::Pass),
+                Err(err) => Ok(HookVerdict::Block {
+                    reason: format!("FGT-TOP-001: Topological promotion breach: {err}"),
+                }),
+            }
+        } else {
+            Ok(HookVerdict::Pass)
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
 // Composite Hook Pipeline Runner
 // -----------------------------------------------------------------------------
 
@@ -301,6 +360,9 @@ impl HookPipeline {
         pipeline.register(Arc::new(crate::auto_audit_hook::AutoAuditHook::new(
             HookTier::SubToCard,
         )));
+        pipeline.register(Arc::new(TopologyFractalHook::new(HookTier::SubToCard)));
+        pipeline.register(Arc::new(TopologyFractalHook::new(HookTier::CardToCell)));
+        pipeline.register(Arc::new(TopologyFractalHook::new(HookTier::CellToTrunk)));
         pipeline.register(Arc::new(ElevationPromotionGateHook));
         pipeline
     }
@@ -369,8 +431,10 @@ mod tests {
         std::fs::write(&empty_file, b"").unwrap();
 
         let conflicted_file = scratch.join("conflict.rs");
-        let conflict_payload =
-            format!("fn a() {{\n{} HEAD\nlet x = 1;\n=======\nlet x = 2;\n{} branch\n}}\n", "<<<<<<<", ">>>>>>>");
+        let conflict_payload = format!(
+            "fn a() {{\n{} HEAD\nlet x = 1;\n=======\nlet x = 2;\n{} branch\n}}\n",
+            "<<<<<<<", ">>>>>>>"
+        );
         std::fs::write(&conflicted_file, conflict_payload.as_bytes()).unwrap();
 
         let clean_file = scratch.join("clean.rs");
@@ -384,7 +448,7 @@ mod tests {
         let ctx_empty = HookContext {
             tier: HookTier::SubToCard,
             source_ref: "refs/fractal/cell/c1/card/k1/sub/s1",
-            target_ref: "refs/fractal/cell/c1/card/k1",
+            target_ref: "refs/fractal/cell/c1/card/k1/main",
             actor: &actor,
             policy: &policy,
             staged_files: &staged_empty,
@@ -401,7 +465,10 @@ mod tests {
         };
         let verdict_conflict = hook.evaluate(&ctx_conflict).unwrap();
         assert!(!verdict_conflict.is_passing());
-        assert!(verdict_conflict.block_reason().unwrap().contains("FGT-GAT-001"));
+        assert!(verdict_conflict
+            .block_reason()
+            .unwrap()
+            .contains("FGT-GAT-001"));
 
         let staged_clean = vec![clean_file.to_string_lossy().to_string()];
         let ctx_clean = HookContext {

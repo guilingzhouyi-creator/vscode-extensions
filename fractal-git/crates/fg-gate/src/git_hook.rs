@@ -20,10 +20,12 @@ mod config;
 mod process;
 mod shell;
 
-use config::{absolutize, hook_is_executable, read_core_hook_settings, resolve_hooks_dir};
 pub use config::read_core_authority_secret;
+use config::{absolutize, hook_is_executable, read_core_hook_settings, resolve_hooks_dir};
 use process::{build_command, capture_child_output, capture_tail, SpawnOutcome};
-use shell::{interpreter_chain, shell_candidates};
+use shell::interpreter_chain;
+#[cfg(windows)]
+use shell::shell_candidates;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};

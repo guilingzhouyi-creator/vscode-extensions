@@ -287,8 +287,12 @@ fn collect_verifier_blocks(violations: &[VerifierViolation]) -> (Vec<String>, us
     let mut transient_allocs = 0usize;
     for v in violations {
         if v.severity == ViolationSeverity::Block {
-            blocks.push(format!("[{}] {}:{}: {}", v.rule_id, v.file, v.line, v.message));
-            transient_allocs += usize::from(v.rule_id == "FGT-PRF-001" || v.rule_id == "ADV-PRF-002");
+            blocks.push(format!(
+                "[{}] {}:{}: {}",
+                v.rule_id, v.file, v.line, v.message
+            ));
+            transient_allocs +=
+                usize::from(v.rule_id == "FGT-PRF-001" || v.rule_id == "ADV-PRF-002");
         }
     }
     (blocks, transient_allocs)
@@ -297,7 +301,11 @@ fn collect_verifier_blocks(violations: &[VerifierViolation]) -> (Vec<String>, us
 /// Appends blocking IKCE canary violations into `blocks`.
 fn append_canary_blocks(canary_report: &CanaryReport, blocks: &mut Vec<String>) {
     for v in &canary_report.violations {
-        let tag = if v.contains("FGT-TAU-001") { "FGT-TAU-001" } else { "FGT-MUT-001" };
+        let tag = if v.contains("FGT-TAU-001") {
+            "FGT-TAU-001"
+        } else {
+            "FGT-MUT-001"
+        };
         blocks.push(format!("[{tag}] [IKCE] {v}"));
     }
 }
@@ -307,8 +315,16 @@ fn extract_module_id(path: &str) -> String {
     let normalized = path.replace('\\', "/");
     let mut parts = normalized.split('/');
     let first = parts.next().unwrap_or("root");
-    let chosen = if first == "crates" { parts.next().unwrap_or(first) } else { first };
-    if chosen.is_empty() { "root".into() } else { chosen.to_string() }
+    let chosen = if first == "crates" {
+        parts.next().unwrap_or(first)
+    } else {
+        first
+    };
+    if chosen.is_empty() {
+        "root".into()
+    } else {
+        chosen.to_string()
+    }
 }
 
 /// Computes the lowercase hex SM3 digest over a canonical audit payload.
