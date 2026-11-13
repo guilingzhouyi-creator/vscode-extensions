@@ -170,3 +170,108 @@ pub(crate) fn scan_raw_string_ascii(
     state.raw_string = Some(hashes);
     Some(line.len())
 }
+
+#[inline]
+pub(crate) fn step_raw_string_continuation_ascii(
+    line: &[u8],
+    out: &mut [u8],
+    state: &mut MaskState,
+    hashes: usize,
+    index: usize,
+    len: usize,
+) -> usize {
+    out[index] = b' ';
+    let closes_raw = line[index] == b'"'
+        && index + 1 + hashes <= len
+        && line[index + 1..index + 1 + hashes]
+            .iter()
+            .all(|&c| c == b'#');
+    if closes_raw {
+        out[index + 1..=index + hashes].fill(b' ');
+        state.raw_string = None;
+        return index + 1 + hashes;
+    }
+    index + 1
+}
+
+#[inline]
+pub(crate) fn is_raw_string_candidate_ascii(line: &[u8], index: usize, len: usize) -> bool {
+    let b = line[index];
+    b == b'r' || ((b == b'b' || b == b'c') && index + 1 < len && line[index + 1] == b'r')
+}
+
+#[inline]
+pub(crate) fn step_active_quote_ascii(
+    line: &[u8],
+    out: &mut [u8],
+    state: &mut MaskState,
+    active_quote: char,
+    index: usize,
+    len: usize,
+) -> usize {
+    out[index] = b' ';
+    let b = line[index];
+    if b == b'\\' {
+        if index + 1 < len {
+            out[index + 1] = b' ';
+        }
+        return index + 2;
+    }
+    if b == active_quote as u8 {
+        state.quote = None;
+    }
+    index + 1
+}
+
+#[inline]
+pub(crate) fn step_block_comment_ascii(
+    line: &[u8],
+    out: &mut [u8],
+    state: &mut MaskState,
+    bc_close_bytes: Option<&[u8]>,
+    index: usize,
+) -> usize {
+    if let Some(close) = bc_close_bytes {
+        if !close.is_empty() && line[index..].starts_with(close) {
+            out[index..index + close.len()].fill(b' ');
+            state.in_block_comment = false;
+            return index + close.len();
+        }
+    }
+    out[index] = b' ';
+    index + 1
+}
+
+#[inline]
+pub(crate) fn step_html_comment_ascii(
+    line: &[u8],
+    out: &mut [u8],
+    state: &mut MaskState,
+    index: usize,
+) -> usize {
+    if line[index..].starts_with(b"-->") {
+        out[index..index + 3].fill(b' ');
+        state.in_html_comment = false;
+        return index + 3;
+    }
+    out[index] = b' ';
+    index + 1
+}
+
+#[inline]
+pub(crate) fn step_open_quote_ascii(
+    out: &mut [u8],
+    state: &mut MaskState,
+    b: u8,
+    multiline_templates: bool,
+    index: usize,
+) -> usize {
+    let quote_char = b as char;
+    state.quote = if quote_char == '`' && !multiline_templates {
+        None
+    } else {
+        Some(quote_char)
+    };
+    out[index] = b' ';
+    index + 1
+}

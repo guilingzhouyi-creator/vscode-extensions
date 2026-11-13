@@ -3,11 +3,11 @@
 //! Architecture Role: Byte-level scanner for multilang string/comment masking
 //! and line statistics, providing 100% byte-parity with ECMAScript UTF-16 AST rules.
 
+mod ascii;
 mod ascii_helpers;
 
-use ascii_helpers::{
-    has_trigger_char, mask_regex_body_ascii, opens_regex_literal_ascii, scan_raw_string_ascii,
-};
+use ascii::mask_line_ascii_into;
+use ascii_helpers::has_trigger_char;
 
 /// Configuration flags for source code comment and literal masking.
 #[derive(Debug, Clone, Default)]
@@ -117,9 +117,9 @@ pub fn mask_source_code_compact(content: &str, config: &MaskConfig) -> String {
 }
 
 /// Mutable working scratch buffer and final destination string for line masking.
-struct MaskTarget<'a> {
-    scratch: &'a mut Vec<u8>,
-    output: &'a mut String,
+pub(crate) struct MaskTarget<'a> {
+    pub(crate) scratch: &'a mut Vec<u8>,
+    pub(crate) output: &'a mut String,
 }
 
 impl<'a> MaskTarget<'a> {
@@ -195,206 +195,6 @@ fn mask_line(line: &str, state: &mut MaskState, config: &MaskConfig) -> String {
     let mut target = MaskTarget::new(&mut buf, &mut out);
     mask_line_into(line, state, config, &mut target);
     out
-}
-
-#[inline]
-fn step_raw_string_continuation_ascii(
-    line: &[u8],
-    out: &mut [u8],
-    state: &mut MaskState,
-    hashes: usize,
-    index: usize,
-    len: usize,
-) -> usize {
-    out[index] = b' ';
-    if line[index] == b'"'
-        && index + 1 + hashes <= len
-        && line[index + 1..index + 1 + hashes]
-            .iter()
-            .all(|&c| c == b'#')
-    {
-        for offset in 1..=hashes {
-            out[index + offset] = b' ';
-        }
-        state.raw_string = None;
-        return index + 1 + hashes;
-    }
-    index + 1
-}
-
-#[inline]
-fn is_raw_string_candidate_ascii(line: &[u8], index: usize, len: usize) -> bool {
-    let b = line[index];
-    b == b'r' || ((b == b'b' || b == b'c') && index + 1 < len && line[index + 1] == b'r')
-}
-
-#[inline]
-fn step_active_quote_ascii(
-    line: &[u8],
-    out: &mut [u8],
-    state: &mut MaskState,
-    active_quote: char,
-    index: usize,
-    len: usize,
-) -> usize {
-    let q_byte = active_quote as u8;
-    out[index] = b' ';
-    let b = line[index];
-    if b == b'\\' {
-        if index + 1 < len {
-            out[index + 1] = b' ';
-        }
-        return index + 2;
-    }
-    if b == q_byte {
-        state.quote = None;
-    }
-    index + 1
-}
-
-#[inline]
-fn step_block_comment_ascii(
-    line: &[u8],
-    out: &mut [u8],
-    state: &mut MaskState,
-    bc_close_bytes: Option<&[u8]>,
-    index: usize,
-) -> usize {
-    if let Some(close) = bc_close_bytes {
-        if !close.is_empty() && line[index..].starts_with(close) {
-            for offset in 0..close.len() {
-                out[index + offset] = b' ';
-            }
-            state.in_block_comment = false;
-            return index + close.len();
-        }
-    }
-    out[index] = b' ';
-    index + 1
-}
-
-#[inline]
-fn step_html_comment_ascii(
-    line: &[u8],
-    out: &mut [u8],
-    state: &mut MaskState,
-    index: usize,
-) -> usize {
-    if line[index..].starts_with(b"-->") {
-        out[index..index + 3].fill(b' ');
-        state.in_html_comment = false;
-        return index + 3;
-    }
-    out[index] = b' ';
-    index + 1
-}
-
-#[inline]
-fn step_open_quote_ascii(
-    out: &mut [u8],
-    state: &mut MaskState,
-    b: u8,
-    multiline_templates: bool,
-    index: usize,
-) -> usize {
-    let quote_char = b as char;
-    state.quote = if quote_char == '`' && !multiline_templates {
-        None
-    } else {
-        Some(quote_char)
-    };
-    out[index] = b' ';
-    index + 1
-}
-
-fn mask_line_ascii_into(
-    line: &[u8],
-    state: &mut MaskState,
-    config: &MaskConfig,
-    target: &mut MaskTarget<'_>,
-) {
-    let len = line.len();
-    let out = &mut *target.scratch;
-    out.clear();
-    out.extend_from_slice(line);
-    let mut index = 0;
-
-    let lc_bytes = config.line_comment.as_bytes();
-    let bc_open_bytes = config.block_comment.as_ref().map(|(o, _)| o.as_bytes());
-    let bc_close_bytes = config.block_comment.as_ref().map(|(_, c)| c.as_bytes());
-    let quote_bytes = config.quote_chars.as_bytes();
-    let has_double_quote = quote_bytes.contains(&b'"');
-
-    while index < len {
-        if let Some(active_quote) = state.quote {
-            index = step_active_quote_ascii(line, out, state, active_quote, index, len);
-            continue;
-        }
-
-        if let Some(hashes) = state.raw_string {
-            index = step_raw_string_continuation_ascii(line, out, state, hashes, index, len);
-            continue;
-        }
-
-        if state.in_block_comment {
-            index = step_block_comment_ascii(line, out, state, bc_close_bytes, index);
-            continue;
-        }
-
-        if state.in_html_comment {
-            index = step_html_comment_ascii(line, out, state, index);
-            continue;
-        }
-
-        // Code mode: check comments
-        if !lc_bytes.is_empty() && line[index..].starts_with(lc_bytes) {
-            out[index..len].fill(b' ');
-            break;
-        }
-
-        if let Some(open) = bc_open_bytes {
-            if !open.is_empty() && line[index..].starts_with(open) {
-                for offset in 0..open.len() {
-                    out[index + offset] = b' ';
-                }
-                state.in_block_comment = true;
-                index += open.len();
-                continue;
-            }
-        }
-
-        if config.html_comment && line[index..].starts_with(b"<!--") {
-            out[index..index + 4].fill(b' ');
-            state.in_html_comment = true;
-            index += 4;
-            continue;
-        }
-
-        let b = line[index];
-        if config.regex_literals && b == b'/' && opens_regex_literal_ascii(line, index) {
-            index = mask_regex_body_ascii(line, index, out);
-            continue;
-        }
-
-        if has_double_quote && is_raw_string_candidate_ascii(line, index, len) {
-            if let Some(end_idx) = scan_raw_string_ascii(line, index, out, state) {
-                index = end_idx;
-                continue;
-            }
-        }
-
-        if quote_bytes.contains(&b) {
-            index = step_open_quote_ascii(out, state, b, config.multiline_templates, index);
-            continue;
-        }
-
-        index += 1;
-    }
-
-    // SAFETY: Input slice was guaranteed valid UTF-8, and masking exclusively substitutes
-    // bytes with ASCII space (0x20), maintaining UTF-8 boundary integrity without allocation.
-    let s = unsafe { std::str::from_utf8_unchecked(target.scratch) };
-    target.output.push_str(s);
 }
 
 fn opens_regex_literal_u16(units: &[u16], index: usize) -> bool {
