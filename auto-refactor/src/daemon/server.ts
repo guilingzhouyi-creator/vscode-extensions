@@ -27,12 +27,27 @@ import * as path from 'path';
 import type { ScanConfig } from '../core/types';
 import type { CacheStore } from '../core/cache';
 import { Logger } from '../core/logger';
-import type { DaemonMessage, HelloAckMessage, HelloMessage, PongMessage } from './protocol';
+import type {
+    DaemonMessage,
+    HelloAckMessage,
+    HelloMessage,
+    PongMessage,
+    ScanAsymmetricMessage,
+    ScanSnapshotMessage,
+    SliceAuditMessage,
+} from './protocol';
 import { PROTOCOL_VERSION, PROTOCOL_SOFTWARE_VERSION, encodeMessage, decodeLine } from './protocol';
 import type { RegistryInfo } from './registry';
 import { projectHashFor, pipeNameFor, writeRegistry, clearRegistry, logFilePath } from './registry';
 import type { DaemonScanContext } from './scanHandler';
-import { createDaemonContext, handleScan, handleScanDiff } from './scanHandler';
+import {
+    createDaemonContext,
+    handleAsymmetricScan,
+    handleScan,
+    handleScanDiff,
+    handleSliceAudit,
+} from './scanHandler';
+import { handleSnapshotScan } from './snapshot-handler';
 
 /** Number of idle minutes before the daemon shuts itself down. */
 const IDLE_TIMEOUT_MINUTES = 10;
@@ -62,9 +77,11 @@ const EVENT_END = 'end';
 const EVENT_CLOSE = 'close';
 const ERROR_EVENT = 'error';
 
-/** Default upper bounds (16 MiB / 32 MiB) for incoming NDJSON frame and transport buffer. */
+/** Byte size of one MiB used to compute frame and buffer caps. */
 const MIB_BYTES = 1024 * 1024;
+/** Maximum allowed byte length for a single incoming NDJSON frame (16 MiB). */
 export const DEFAULT_MAX_FRAME_BYTES = 16 * MIB_BYTES;
+/** Maximum allowed buffered bytes per socket before backpressure truncation (32 MiB). */
 export const DEFAULT_MAX_BUFFER_BYTES = 32 * MIB_BYTES;
 
 /** Node process event and signal names. */
@@ -80,6 +97,9 @@ const MSG_TYPE_PING = 'ping';
 const MSG_TYPE_PONG = 'pong';
 const MSG_TYPE_SCAN = 'scan';
 const MSG_TYPE_SCAN_DIFF = 'scan_diff';
+const MSG_TYPE_SCAN_ASYMMETRIC = 'scan_asymmetric';
+const MSG_TYPE_SLICE_AUDIT = 'slice_audit';
+const MSG_TYPE_SCAN_SNAPSHOT = 'scan_snapshot';
 const MSG_TYPE_SCAN_DONE = 'scan_done';
 const MSG_TYPE_SHUTDOWN = 'shutdown';
 const MESSAGE_TYPE_ERROR = 'error';
@@ -111,7 +131,7 @@ const SHUTDOWN_DRAIN_TIMEOUT_MS = 10_000;
 export interface PendingScan {
     requestId: string;
     id: number;
-    kind: 'scan' | 'scan_diff';
+    kind: 'scan' | 'scan_diff' | 'scan_asymmetric' | 'slice_audit' | 'scan_snapshot';
     socket?: net.Socket;
     startedAt: number;
     abortController: AbortController;
@@ -227,6 +247,7 @@ export class DaemonServer {
     readonly logger: Logger;
     private server: net.Server | null = null;
     private stdioMode = false;
+    private readonly keepAlive: boolean;
     private shuttingDown = false;
     private shutdownTask?: Promise<void>;
     private idleTimer: NodeJS.Timeout | null = null;
@@ -244,6 +265,7 @@ export class DaemonServer {
         root: string,
         opts: {
             stdio?: boolean;
+            keepAlive?: boolean;
             logFile?: string;
             maxFrameBytes?: number;
             maxBufferBytes?: number;
@@ -254,6 +276,7 @@ export class DaemonServer {
         this.pipe = pipeNameFor(this.projectHash);
         this.logFile = opts.logFile || logFilePath(this.projectHash);
         this.stdioMode = opts.stdio === true;
+        this.keepAlive = opts.keepAlive === true;
         this.maxFrameBytes = opts.maxFrameBytes ?? DEFAULT_MAX_FRAME_BYTES;
         this.maxBufferBytes = opts.maxBufferBytes ?? DEFAULT_MAX_BUFFER_BYTES;
         this.ctx = createDaemonContext();
@@ -420,11 +443,21 @@ export class DaemonServer {
         stdin.on(EVENT_DATA, (chunk: string) =>
             this.processIncomingChunk(chunk, bufferState, transportIo),
         );
-        stdin.on(EVENT_END, () => {
-            writer.dispose();
-            this.writers.delete(writer);
-            void this.shutdown(REASON_STDIO_EOF);
-        });
+        const onStdioEof = (): void => {
+            if (this.shuttingDown) return;
+            const finalizeStdio = (): void => {
+                writer.dispose();
+                this.writers.delete(writer);
+                void this.shutdown(REASON_STDIO_EOF);
+            };
+            if (this.activeScans.size === 0) {
+                finalizeStdio();
+                return;
+            }
+            void Promise.allSettled([...this.activeScans]).then(finalizeStdio);
+        };
+        stdin.once(EVENT_END, onStdioEof);
+        stdin.once(EVENT_CLOSE, onStdioEof);
     }
 
     private handleConnection(socket: net.Socket): void {
@@ -489,6 +522,8 @@ export class DaemonServer {
                 stream: true,
                 maxWorkers: DAEMON_MAX_WORKERS,
                 diff: true,
+                snapshot: true,
+                slice: true,
             },
         };
         transportIo.write(ack);
@@ -549,6 +584,15 @@ export class DaemonServer {
                         socket,
                     }),
                 );
+                break;
+            case MSG_TYPE_SCAN_ASYMMETRIC:
+                this.dispatchExtendedScan(msg, transportIo, socket, MSG_TYPE_SCAN_ASYMMETRIC);
+                break;
+            case MSG_TYPE_SLICE_AUDIT:
+                this.dispatchExtendedScan(msg, transportIo, socket, MSG_TYPE_SLICE_AUDIT);
+                break;
+            case MSG_TYPE_SCAN_SNAPSHOT:
+                this.dispatchExtendedScan(msg, transportIo, socket, MSG_TYPE_SCAN_SNAPSHOT);
                 break;
             case MSG_TYPE_SHUTDOWN:
                 this.logger.info(
@@ -636,7 +680,91 @@ export class DaemonServer {
         }
     }
 
-    private resolveTaskFlushError(task: ScanTask | ScanDiffTask): string | undefined {
+    private dispatchExtendedScan(
+        msg: ScanAsymmetricMessage | SliceAuditMessage | ScanSnapshotMessage,
+        io: TransportIo,
+        socket: net.Socket | undefined,
+        kind: 'scan_asymmetric' | 'slice_audit' | 'scan_snapshot',
+    ): void {
+        this.scheduleIdle();
+        const requestId = msg.params.requestId;
+        this.trackScan(
+            this.runTrackedTask({ id: msg.id, requestId, io, socket, kind }, async (signal) => {
+                if (kind === MSG_TYPE_SCAN_ASYMMETRIC) {
+                    const params = (msg as ScanAsymmetricMessage).params;
+                    const result = await handleAsymmetricScan(
+                        this.ctx,
+                        params.config as unknown as ScanConfig,
+                        params.inputs,
+                        params.options,
+                    );
+                    signal.throwIfAborted();
+                    return {
+                        report: {
+                            fastVerdict: result.fastVerdict,
+                            deepStatus: result.deepStatus,
+                            deepIssuesCount: result.deepIssuesCount,
+                        },
+                        stats: { daemonUsed: true, durationMs: result.durationMs },
+                    };
+                }
+                if (kind === MSG_TYPE_SLICE_AUDIT) {
+                    const params = (msg as SliceAuditMessage).params;
+                    const result = await handleSliceAudit(
+                        params.filePath,
+                        params.oldContent,
+                        params.newContent,
+                        params.changedLines,
+                    );
+                    return {
+                        report: { slices: result.slices },
+                        stats: { daemonUsed: true, durationMs: result.durationMs },
+                    };
+                }
+                const params = (msg as ScanSnapshotMessage).params;
+                return handleSnapshotScan(params.config, params.entries, {
+                    ...params.options,
+                    signal,
+                });
+            }),
+        );
+    }
+
+    private async runTrackedTask(
+        meta: {
+            id: number;
+            requestId: string;
+            io: { write: (message: DaemonMessage) => void };
+            socket?: net.Socket;
+            kind: PendingScan['kind'];
+        },
+        executor: (signal: AbortSignal) => Promise<{ report: unknown; stats: unknown }>,
+    ): Promise<void> {
+        const abortController = new AbortController();
+        this.pending.set(meta.requestId, {
+            requestId: meta.requestId,
+            id: meta.id,
+            kind: meta.kind,
+            socket: meta.socket,
+            startedAt: Date.now(),
+            abortController,
+        });
+        try {
+            const { report, stats } = await executor(abortController.signal);
+            abortController.signal.throwIfAborted();
+            this.handleScanSuccess(meta, report, stats);
+        } catch (error) {
+            this.handleScanError(meta, error);
+        } finally {
+            this.pending.delete(meta.requestId);
+            if (!this.shuttingDown) this.ctx.pools.rssGuard();
+        }
+    }
+
+    private resolveTaskFlushError(task: {
+        configJson?: Record<string, unknown>;
+        options?: BaseScanTaskOptions;
+    }): string | undefined {
         const rootValue = task.configJson?.root;
         if (task.options?.cache && typeof rootValue === 'string' && rootValue) {
             const err = this.ctx.getCache(rootValue, task.options.cacheDir).lastFlushError;
@@ -646,7 +774,13 @@ export class DaemonServer {
     }
 
     private handleScanSuccess(
-        task: ScanTask | ScanDiffTask,
+        task: {
+            id: number;
+            requestId: string;
+            io: { write: (message: DaemonMessage) => void };
+            configJson?: Record<string, unknown>;
+            options?: BaseScanTaskOptions;
+        },
         report: unknown,
         stats: unknown,
     ): void {
@@ -667,7 +801,14 @@ export class DaemonServer {
         this.scheduleIdle();
     }
 
-    private handleScanError(task: ScanTask | ScanDiffTask, err: unknown): void {
+    private handleScanError(
+        task: {
+            id: number;
+            requestId: string;
+            io: { write: (message: DaemonMessage) => void };
+        },
+        err: unknown,
+    ): void {
         const message = err instanceof Error ? err.message : String(err);
         task.io.write({
             v: 1,
@@ -684,6 +825,7 @@ export class DaemonServer {
     private scheduleIdle(): void {
         if (this.idleTimer) clearTimeout(this.idleTimer);
         if (!this.shuttingDown) this.ctx.pools.rssGuard();
+        if (this.keepAlive) return;
         this.idleTimer = setTimeout(() => {
             this.logger.info(`idle ${IDLE_TIMEOUT_MS / MS_PER_SECOND}s — exiting`);
             this.shutdown(REASON_IDLE_TIMEOUT);
@@ -797,24 +939,28 @@ export class DaemonServer {
 
 const FLAG_ROOT = '--root';
 const FLAG_STDIO = '--stdio';
+const FLAG_KEEP_ALIVE = '--keep-alive';
 
 /**
- * CLI entry: `node dist/daemon/server.js --root DIR [--stdio]`.
+ * CLI entry: `node dist/daemon/server.js --root DIR [--stdio] [--keep-alive]`.
  *
  * Async by contract: awaits the one-time endpoint bind before wiring signal handlers, then
  * returns while the process stays alive on the listening server or the stdio stream.
  *
  * @param argv - CLI arguments after the script name; `--root DIR` selects the project root
- *   (falling back to `process.cwd()`) and `--stdio` selects the embedded stdio transport.
+ *   (falling back to `process.cwd()`), `--stdio` selects the embedded stdio transport, and
+ *   `--keep-alive` disables automatic idle timeout shutdown.
  * @returns Resolves once the endpoint is bound and SIGTERM/SIGINT/uncaughtException handlers
  *   are installed; a bind failure writes to stderr and calls `process.exit(1)` instead.
+ * Concurrency: single-process event loop async startup; binds endpoint once before signal setup.
  */
 export async function runDaemonMain(argv: string[]): Promise<void> {
     const rootArg = argv.find((argStr, i) => argStr === FLAG_ROOT && argv[i + 1])
         ? argv[argv.indexOf(FLAG_ROOT) + 1]
         : process.cwd();
     const stdio = argv.includes(FLAG_STDIO);
-    const server = new DaemonServer(rootArg, { stdio });
+    const keepAlive = argv.includes(FLAG_KEEP_ALIVE);
+    const server = new DaemonServer(rootArg, { stdio, keepAlive });
     try {
         await server.startListening();
     } catch (error) {
