@@ -69,7 +69,7 @@ impl PacketLine {
             })?;
 
             match len {
-                0 | 1 | 2 => {
+                0..=2 => {
                     bytes = &bytes[4..];
                     continue;
                 }

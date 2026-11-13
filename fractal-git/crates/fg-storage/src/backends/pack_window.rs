@@ -152,7 +152,7 @@ impl<'a> Read for PackWindowStream<'a> {
         let chunk = self
             .reader
             .read_exact_at(self.cursor, to_read)
-            .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, err.to_string()))?;
+            .map_err(|err| std::io::Error::other(err.to_string()))?;
         buf[..chunk.len()].copy_from_slice(&chunk);
         self.cursor += chunk.len() as u64;
         Ok(chunk.len())

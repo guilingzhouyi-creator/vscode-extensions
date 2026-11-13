@@ -79,7 +79,9 @@ impl PackBuffer {
     pub fn read_slice(&self, offset: usize, len: usize) -> FractalResult<Vec<u8>> {
         match self {
             Self::Memory(bytes) => {
-                let end = offset + len;
+                let end = offset.checked_add(len).ok_or_else(|| {
+                    FractalError::CorruptStore(format!("Slice offset overflow: {offset} + {len}"))
+                })?;
                 let slice = bytes.get(offset..end).ok_or_else(|| {
                     FractalError::CorruptStore(format!("Slice out of bounds: {offset}..{end}"))
                 })?;
@@ -128,6 +130,11 @@ const SIZE_LOW_MASK: u8 = 0x0f;
 const SIZE_CONTINUATION_BITS: u32 = 7;
 
 /// Shift applied to the *first* continuation byte.
+///
+/// The low nibble of the type byte already carries four size bits, so the first continuation
+/// contributes bits 4..10, not bits 7..13. Starting at seven shifts the whole size upward and yields
+/// a declared size that is plausible but wrong; inflation then disagrees with it and the error
+/// points at the payload instead of at the header decoding that produced it.
 const SIZE_FIRST_CONTINUATION_SHIFT: u32 = 4;
 
 /// Payload bits carried by one continuation byte.
@@ -136,6 +143,11 @@ const SIZE_CONTINUATION_MASK: u8 = 0x7f;
 /// Supplies the base object for a `REF_DELTA` whose base lives elsewhere.
 pub trait DeltaBaseSource {
     /// Returns the kind and payload of `oid`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the id is unknown or unreadable; returning a synthetic fallback base would
+    /// reconstruct the wrong bytes.
     fn read_base(&self, oid: &Oid) -> FractalResult<(ObjectKind, Vec<u8>)>;
 }
 
@@ -158,6 +170,11 @@ pub struct PackFile {
 
 impl PackFile {
     /// Loads and validates a packfile, routing to windowed reader when exceeding threshold.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FractalError::Io`] when the file cannot be read and
+    /// [`FractalError::CorruptStore`] for a bad magic, an unsupported version, or a truncated file.
     pub fn load(path: impl Into<PathBuf>) -> FractalResult<Self> {
         let path = path.into();
         let file_len = fs::metadata(&path)?.len();
@@ -783,5 +800,19 @@ mod tests {
         let delta_obj_mem = pack_mem.read_at(delta_offset, &NoBase).expect("read mem delta");
         let delta_obj_win = pack_win.read_at(delta_offset, &NoBase).expect("read win delta");
         assert_eq!(delta_obj_win, delta_obj_mem);
+    }
+
+    #[test]
+    fn test_pack_buffer_read_slice_overflow_and_bounds() {
+        let buf = PackBuffer::Memory(vec![10, 20, 30, 40]);
+        assert_eq!(buf.len(), 4);
+        assert_eq!(buf.get_byte(0).unwrap(), 10);
+        assert_eq!(buf.get_byte(3).unwrap(), 40);
+        assert!(buf.get_byte(4).is_err());
+        assert!(buf.read_slice(usize::MAX, 1).is_err());
+        assert!(buf.read_slice(2, usize::MAX).is_err());
+        assert!(buf.read_slice(0, 5).is_err());
+        let slice = buf.read_slice(1, 2).expect("valid slice");
+        assert_eq!(slice, vec![20, 30]);
     }
 }

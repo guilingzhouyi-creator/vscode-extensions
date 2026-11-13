@@ -188,8 +188,7 @@ impl Oid {
     /// Access primary 20-byte binary array reference (100% backward compatible with Git SHA-1 APIs).
     pub fn as_bytes(&self) -> &[u8; 20] {
         let slice = &self.bytes[..20];
-        // SAFETY: slice is exactly 20 bytes
-        unsafe { &*(slice.as_ptr() as *const [u8; 20]) }
+        <&[u8; 20]>::try_from(slice).expect("20-byte slice conversion")
     }
 
     /// Access variable-length digest slice according to hash algorithm (20 or 32 bytes).
@@ -310,7 +309,21 @@ impl Serialize for Oid {
         if serializer.is_human_readable() {
             serializer.serialize_str(&self.to_hex())
         } else {
-            serializer.serialize_bytes(self.as_bytes())
+            match self.algo {
+                HashAlgorithm::Sha1 => serializer.serialize_bytes(self.as_bytes()),
+                HashAlgorithm::Sha256 => {
+                    let mut buf = [0u8; 33];
+                    buf[0] = 0x01;
+                    buf[1..33].copy_from_slice(&self.bytes);
+                    serializer.serialize_bytes(&buf)
+                }
+                HashAlgorithm::Sm3 => {
+                    let mut buf = [0u8; 33];
+                    buf[0] = 0x02;
+                    buf[1..33].copy_from_slice(&self.bytes);
+                    serializer.serialize_bytes(&buf)
+                }
+            }
         }
     }
 }
@@ -326,7 +339,7 @@ impl<'de> Deserialize<'de> for Oid {
             type Value = Oid;
 
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("a 40/64-character hex string or 20/32 raw bytes for Oid")
+                formatter.write_str("a 40/64-character hex string or 20/32/33 raw bytes for Oid")
             }
 
             fn visit_str<E>(self, hex_text: &str) -> Result<Self::Value, E>
@@ -340,16 +353,29 @@ impl<'de> Deserialize<'de> for Oid {
             where
                 E: serde::de::Error,
             {
-                if byte_slice.len() == 20 {
-                    let mut buffer = [0u8; 20];
-                    buffer.copy_from_slice(byte_slice);
-                    Ok(Oid::from_bytes(buffer))
-                } else if byte_slice.len() == 32 {
-                    let mut buffer = [0u8; 32];
-                    buffer.copy_from_slice(byte_slice);
-                    Ok(Oid::from_sha256(buffer))
-                } else {
-                    Err(serde::de::Error::invalid_length(byte_slice.len(), &self))
+                match byte_slice.len() {
+                    20 => {
+                        let mut buffer = [0u8; 20];
+                        buffer.copy_from_slice(byte_slice);
+                        Ok(Oid::from_bytes(buffer))
+                    }
+                    32 => {
+                        let mut buffer = [0u8; 32];
+                        buffer.copy_from_slice(byte_slice);
+                        Ok(Oid::from_sha256(buffer))
+                    }
+                    33 => {
+                        let mut buffer = [0u8; 32];
+                        buffer.copy_from_slice(&byte_slice[1..33]);
+                        match byte_slice[0] {
+                            0x01 => Ok(Oid::from_sha256(buffer)),
+                            0x02 => Ok(Oid::from_sm3(buffer)),
+                            tag => Err(serde::de::Error::custom(format!(
+                                "Unknown OID algorithm tag {tag} in binary payload"
+                            ))),
+                        }
+                    }
+                    len => Err(serde::de::Error::invalid_length(len, &self)),
                 }
             }
 
@@ -357,14 +383,14 @@ impl<'de> Deserialize<'de> for Oid {
             where
                 A: serde::de::SeqAccess<'de>,
             {
-                let mut buffer = Vec::new();
+                let mut buffer = Vec::with_capacity(33);
                 while let Some(byte_val) = seq.next_element()? {
                     buffer.push(byte_val);
-                    if buffer.len() > 32 {
+                    if buffer.len() > 33 {
                         return Err(serde::de::Error::invalid_length(buffer.len(), &self));
                     }
                 }
-                Oid::from_slice(&buffer).map_err(serde::de::Error::custom)
+                self.visit_bytes(&buffer)
             }
         }
 
@@ -424,5 +450,33 @@ mod tests {
         assert_eq!(standard, direct);
         assert_eq!(direct.as_slice().len(), 32);
         assert_eq!(direct.algorithm(), HashAlgorithm::Sm3);
+    }
+
+    #[test]
+    fn test_oid_binary_serde_preserves_algorithms() {
+        use serde::de::Deserialize;
+        let oid_sm3 = Oid::from_sm3([0xab; 32]);
+        let mut buf_sm3 = [0u8; 33];
+        buf_sm3[0] = 0x02;
+        buf_sm3[1..33].copy_from_slice(oid_sm3.as_slice());
+        let de_sm3 = Oid::deserialize(serde::de::value::BytesDeserializer::<serde::de::value::Error>::new(&buf_sm3))
+            .expect("deserialize sm3");
+        assert_eq!(de_sm3.algorithm(), HashAlgorithm::Sm3);
+        assert_eq!(de_sm3, oid_sm3);
+
+        let oid_sha256 = Oid::from_sha256([0xcd; 32]);
+        let mut buf_sha256 = [0u8; 33];
+        buf_sha256[0] = 0x01;
+        buf_sha256[1..33].copy_from_slice(oid_sha256.as_slice());
+        let de_sha256 = Oid::deserialize(serde::de::value::BytesDeserializer::<serde::de::value::Error>::new(&buf_sha256))
+            .expect("deserialize sha256");
+        assert_eq!(de_sha256.algorithm(), HashAlgorithm::Sha256);
+        assert_eq!(de_sha256, oid_sha256);
+
+        let oid_sha1 = Oid::from_bytes([0x12; 20]);
+        let de_sha1 = Oid::deserialize(serde::de::value::BytesDeserializer::<serde::de::value::Error>::new(oid_sha1.as_bytes()))
+            .expect("deserialize sha1");
+        assert_eq!(de_sha1.algorithm(), HashAlgorithm::Sha1);
+        assert_eq!(de_sha1, oid_sha1);
     }
 }
