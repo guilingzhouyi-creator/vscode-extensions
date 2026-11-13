@@ -230,12 +230,19 @@ func _on_skill_pressed(slot_idx: int) -> void:
 	append_battle_log("SKILL", UIIntermediary.text("ui.fe04.log.skill_cast", {"skill": skill_name, "slot": slot_idx}))
 	spawn_floating_damage(Vector2(640, 360), 128.0, false, false)
 
+const MAX_FLOATING_DTOS: int = 64
+const MAX_BATTLE_LOG_PARAGRAPHS: int = 200
+static var _lifetime_cfg_cached: float = 1.0
+static var _lifetime_cfg_ver: int = -1
+
 func append_battle_log(category: String, text: String) -> void:
 	if not _battle_log_rich:
 		return
 	var tm := ThemeManager.get_instance()
 	var color_tag := tm.get_bbcode_color_tag(category)
 	_battle_log_rich.append_text("%s[%s] %s[/color]\n" % [color_tag, category, text])
+	while _battle_log_rich.get_paragraph_count() > MAX_BATTLE_LOG_PARAGRAPHS:
+		_battle_log_rich.remove_paragraph(0)
 
 # ==============================================================================
 # 飘字与弹窗委托
@@ -243,13 +250,19 @@ func append_battle_log(category: String, text: String) -> void:
 
 func spawn_floating_damage(pos: Vector2, amount: float, is_crit: bool = false, is_heal: bool = false) -> FloatingTextDTO:
 	_text_seq += 1
+	var ver: int = GameConfig.config_reload_version()
+	if _lifetime_cfg_ver != ver:
+		_lifetime_cfg_cached = GameConfig.get_float("frontend.views", "fe04_combat_view/default_text_lifetime", 1.0)
+		_lifetime_cfg_ver = ver
 	var dto := FloatingTextDTO.new()
 	dto.text_id = _text_seq
 	dto.amount = amount
 	dto.is_crit = is_crit
 	dto.is_heal = is_heal
 	dto.world_pos = pos
-	dto.lifetime = GameConfig.get_float("frontend.views", "fe04_combat_view/default_text_lifetime", 1.0)
+	dto.lifetime = _lifetime_cfg_cached
+	if floating_texts.size() >= MAX_FLOATING_DTOS:
+		floating_texts = floating_texts.slice(floating_texts.size() - MAX_FLOATING_DTOS + 1)
 	floating_texts.append(dto)
 	if is_inside_tree():
 		_get_subpanels().spawn_floating_label(dto)
@@ -290,7 +303,7 @@ func set_boss_status_snapshot(b_name: String, hp: float, max_hp: float, parts: A
 	boss_name = _combat_vm.boss_name
 	boss_total_hp = _combat_vm.boss_hp_current
 	boss_max_hp = _combat_vm.boss_hp_max
-	boss_parts = _combat_vm.boss_parts.duplicate(true)
+	boss_parts = _combat_vm.boss_parts
 	if is_inside_tree():
 		_refresh_boss_bar()
 		_get_subpanels().refresh_boss_parts()

@@ -163,8 +163,9 @@ func _init_mail_detail() -> void:
 	_label_detail_recipient.text = ""
 	_label_detail_time.text = ""
 	_rich_text_body.text = ""
-	if _tabs != null:
-		_tabs.clear_container_children(_attachment_list_container)
+	if _attachment_list_container != null:
+		for child in _attachment_list_container.get_children():
+			child.visible = false
 	_btn_claim_attachment.disabled = true
 	_btn_reply.disabled = true
 	_btn_delete_mail.disabled = true

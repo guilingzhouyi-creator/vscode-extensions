@@ -184,15 +184,24 @@ func _send_chat_message() -> void:
 	if text.is_empty() or _view._current_channel_index < 0 or _view._current_channel_index >= _view._chat_channels.size():
 		return
 	var sender := "ui.fe09.mock.local_player_name"
-	_view._chat_channels[_view._current_channel_index]["messages"].append({"sender": sender, "text": text})
-	var msg_list: Array = _view._chat_channels[_view._current_channel_index]["messages"]
+	var channel: Dictionary = _view._chat_channels[_view._current_channel_index]
+	var msg_list: Array = channel["messages"]
+	msg_list.append({"sender": sender, "text": text})
 	if msg_list.size() > _view._max_chat_lines:
 		msg_list.pop_front()
 	_view._line_chat_input.clear()
-	_populate_channel_list()
+	var channel_name := UIIntermediary.text(str(channel.get("name", "")))
 	if _view._current_channel_index < _view._channel_list.get_item_count():
+		var display := UIIntermediary.text("ui.fe09.chat.channel_item", {"name": channel_name, "count": msg_list.size()})
+		_view._channel_list.set_item_text(_view._current_channel_index, display)
 		_view._channel_list.select(_view._current_channel_index)
-	_refresh_chat_display()
+	if _view.is_inside_tree() and _view._richtext_chat_messages != null:
+		var tm := ThemeManager.get_instance()
+		var color_tag := tm.get_bbcode_color_tag("GUILD")
+		var line := UIIntermediary.text("ui.fe09.chat.message_format", {"channel": channel_name, "sender": UIIntermediary.text(sender), "text": UIIntermediary.text(text)})
+		_view._richtext_chat_messages.append_text("%s%s[/color]\n" % [color_tag, line])
+		while _view._richtext_chat_messages.get_paragraph_count() > _view._max_chat_lines:
+			_view._richtext_chat_messages.remove_paragraph(0)
 
 # ==============================================================================
 # Tab 4: 好友系统 (FRIENDS)

@@ -7,9 +7,11 @@ class_name CombatSubpanels
 extends BaseScreen
 
 const KStatusBarClass = preload("res://frontend/components/k_status_bar.gd")
+const MAX_FLOATING_LABEL_POOL: int = 32
 
 var status_bar: KStatusBar = null
 var _view: Variant = null
+var _floating_label_pool: Array[Label] = []
 
 func setup(view: BaseScreen) -> void:
 	_view = view
@@ -172,7 +174,11 @@ func spawn_floating_label(dto: CombatFloatingTextDTO) -> void:
 	var view: CombatView = _view
 	if not view._floating_text_layer:
 		return
-	var lbl := Label.new()
+	var lbl := _acquire_floating_label(view._floating_text_layer)
+	var prev_tw: Variant = lbl.get_meta("_active_tween", null)
+	if prev_tw is Tween and (prev_tw as Tween).is_valid():
+		(prev_tw as Tween).kill()
+
 	var prefix: String = "+" if dto.is_heal else "-"
 	var color: Color = DesignTokens.COLOR_SUCCESS_DEFAULT if dto.is_heal else DesignTokens.COLOR_DANGER_DEFAULT
 	if dto.is_crit:
@@ -183,14 +189,35 @@ func spawn_floating_label(dto: CombatFloatingTextDTO) -> void:
 		lbl.add_theme_font_size_override("font_size", 20)
 	lbl.text = "%s%d" % [prefix, int(dto.amount)]
 	lbl.add_theme_color_override("font_color", color)
-	lbl.add_theme_color_override("font_outline_color", DesignTokens.COLOR_TEXT_OUTLINE)
-	lbl.add_theme_constant_override("outline_size", 3)
+	lbl.modulate = Color.WHITE
 	var local_pos: Vector2 = view._floating_text_layer.get_global_transform().affine_inverse() * dto.world_pos
 	lbl.position = local_pos
-	lbl.z_index = 100
-	view._floating_text_layer.add_child(lbl)
+	lbl.visible = true
 	var tween: Tween = view.create_tween()
+	lbl.set_meta("_active_tween", tween)
 	tween.set_parallel(true)
 	tween.tween_property(lbl, "position:y", lbl.position.y - 60.0, dto.lifetime)
 	tween.tween_property(lbl, "modulate:a", 0.0, dto.lifetime)
-	tween.chain().tween_callback(lbl.queue_free)
+	tween.chain().tween_callback(_recycle_floating_label.bind(lbl))
+
+func _acquire_floating_label(layer: Control) -> Label:
+	while not _floating_label_pool.is_empty():
+		var reused: Label = _floating_label_pool.pop_back()
+		if reused != null and is_instance_valid(reused):
+			return reused
+	var lbl := Label.new()
+	lbl.add_theme_color_override("font_outline_color", DesignTokens.COLOR_TEXT_OUTLINE)
+	lbl.add_theme_constant_override("outline_size", 3)
+	lbl.z_index = 100
+	layer.add_child(lbl)
+	return lbl
+
+func _recycle_floating_label(lbl: Label) -> void:
+	if lbl == null or not is_instance_valid(lbl):
+		return
+	lbl.set_meta("_active_tween", null)
+	lbl.visible = false
+	if _floating_label_pool.size() < MAX_FLOATING_LABEL_POOL:
+		_floating_label_pool.append(lbl)
+	else:
+		lbl.queue_free()

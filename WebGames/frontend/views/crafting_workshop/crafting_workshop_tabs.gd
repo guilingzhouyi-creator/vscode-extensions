@@ -48,20 +48,90 @@ func _init_recipes_tab() -> void:
 	_populate_recipe_grid()
 	_refresh_recipe_progress()
 
-## 重建配方网格：按分类过滤生成细胞，重置选中并清详情
+## 重建配方网格：按分类过滤复用网格细胞（零 queue_free 抖动与零重复信号绑定），重置选中并清详情
 func _populate_recipe_grid() -> void:
 	if _view == null or _view._recipe_grid == null:
 		return
-	for child in _view._recipe_grid.get_children():
-		child.queue_free()
+	var grid: Container = _view._recipe_grid
 	var category: String = _view._recipe_categories[_view._recipe_current_category] if _view._recipe_current_category < _view._recipe_categories.size() else ""
+	var active_idx: int = 0
 	for i in range(_view._recipe_catalog.size()):
 		var recipe: Dictionary = _view._recipe_catalog[i]
 		if not category.is_empty() and str(recipe.get("category", "")) != category:
 			continue
-		_view._recipe_grid.add_child(_make_recipe_cell(recipe, i))
+		var learned: bool = bool(recipe.get("learned", false))
+		var border_color := KRarityTag.get_rarity_color(_rarity_str_to_level(str(recipe.get("rarity", "COMMON")))) if learned else DesignTokens.COLOR_TEXT_MUTED_DEFAULT
+		var cell := _acquire_pooled_grid_cell(grid, active_idx, Vector2(96, 96), border_color, 2, _on_recipe_cell_meta_clicked)
+		cell.set_meta("_item_idx", i)
+		var status_key := "ui.fe12.recipes.status_learned" if learned else "ui.fe12.recipes.status_not_learned"
+		var status_color := DesignTokens.COLOR_SUCCESS_DEFAULT if learned else DesignTokens.COLOR_DANGER_DEFAULT
+		_configure_cell_labels(
+			cell,
+			UIIntermediary.text(str(recipe.get("name", ""))),
+			11,
+			DesignTokens.COLOR_TEXT_DEFAULT if learned else DesignTokens.COLOR_TEXT_MUTED_DEFAULT,
+			true,
+			UIIntermediary.text(status_key),
+			10,
+			status_color
+		)
+		active_idx += 1
+	for j in range(active_idx, grid.get_child_count()):
+		(grid.get_child(j) as Control).visible = false
 	_view._recipe_selected_index = -1
 	_clear_recipe_detail()
+
+func _on_recipe_cell_meta_clicked(panel: PanelContainer) -> void:
+	_on_recipe_cell_selected(int(panel.get_meta("_item_idx", -1)))
+
+func _on_material_cell_meta_clicked(panel: PanelContainer) -> void:
+	_on_material_cell_selected(int(panel.get_meta("_item_idx", -1)))
+
+func _acquire_pooled_grid_cell(
+	grid: Container,
+	active_idx: int,
+	cell_size: Vector2,
+	border_color: Color,
+	border_width: int,
+	on_panel_clicked: Callable
+) -> PanelContainer:
+	var panel: PanelContainer = null
+	if active_idx < grid.get_child_count():
+		panel = grid.get_child(active_idx) as PanelContainer
+		panel.visible = true
+		var existing_style := panel.get_theme_stylebox("panel") as StyleBoxFlat
+		if existing_style != null:
+			existing_style.border_color = border_color
+		return panel
+	panel = _build_cell_panel(cell_size, border_color, border_width, on_panel_clicked)
+	var vbox := panel.get_child(0) as VBoxContainer
+	vbox.add_child(_make_centered_cell_label("", 11))
+	vbox.add_child(_make_centered_cell_label("", 10))
+	grid.add_child(panel)
+	return panel
+
+func _configure_cell_labels(
+	panel: PanelContainer,
+	title_text: String,
+	title_size: int,
+	title_color: Color,
+	apply_title_color: bool,
+	sub_text: String,
+	sub_size: int,
+	sub_color: Color
+) -> void:
+	var vbox := panel.get_child(0) as VBoxContainer
+	var lbl_top := vbox.get_child(0) as Label
+	lbl_top.text = title_text
+	lbl_top.add_theme_font_size_override("font_size", title_size)
+	if apply_title_color:
+		lbl_top.add_theme_color_override("font_color", title_color)
+	else:
+		lbl_top.remove_theme_color_override("font_color")
+	var lbl_sub := vbox.get_child(1) as Label
+	lbl_sub.text = sub_text
+	lbl_sub.add_theme_font_size_override("font_size", sub_size)
+	lbl_sub.add_theme_color_override("font_color", sub_color)
 
 func _build_cell_panel(cell_size: Vector2, border_color: Color, border_width: int, on_selected: Callable) -> PanelContainer:
 	var panel := PanelContainer.new()
@@ -77,7 +147,7 @@ func _build_cell_panel(cell_size: Vector2, border_color: Color, border_width: in
 	panel.add_child(vbox)
 	connect_managed(panel.gui_input, func(event: InputEvent) -> void:
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-			on_selected.call())
+			on_selected.call(panel))
 	return panel
 
 func _make_centered_cell_label(text_value: String, font_size: int, font_color: Color = Color.WHITE, apply_color: bool = false) -> Label:
@@ -88,23 +158,6 @@ func _make_centered_cell_label(text_value: String, font_size: int, font_color: C
 	if apply_color:
 		lbl.add_theme_color_override("font_color", font_color)
 	return lbl
-
-## 构建配方网格细胞：稀有度配色边框（未习得灰化）+ 名称/状态标签 + 点击回调
-func _make_recipe_cell(recipe: Dictionary, catalog_index: int) -> Control:
-	var learned: bool = bool(recipe.get("learned", false))
-	var border_color := KRarityTag.get_rarity_color(_rarity_str_to_level(str(recipe.get("rarity", "COMMON")))) if learned else DesignTokens.COLOR_TEXT_MUTED_DEFAULT
-	var panel := _build_cell_panel(Vector2(96, 96), border_color, 2, _on_recipe_cell_selected.bind(catalog_index))
-	var vbox := panel.get_child(0) as VBoxContainer
-	vbox.add_child(_make_centered_cell_label(
-		UIIntermediary.text(str(recipe.get("name", ""))),
-		11,
-		DesignTokens.COLOR_TEXT_DEFAULT if learned else DesignTokens.COLOR_TEXT_MUTED_DEFAULT,
-		true
-	))
-	var status_key := "ui.fe12.recipes.status_learned" if learned else "ui.fe12.recipes.status_not_learned"
-	var status_color := DesignTokens.COLOR_SUCCESS_DEFAULT if learned else DesignTokens.COLOR_DANGER_DEFAULT
-	vbox.add_child(_make_centered_cell_label(UIIntermediary.text(status_key), 10, status_color, true))
-	return panel
 
 ## 清空配方详情为空态
 func _clear_recipe_detail() -> void:
@@ -202,29 +255,35 @@ func _refresh_material_category_buttons() -> void:
 		var btn: Button = _view._material_category_hbox.get_child(i)
 		btn.button_pressed = (i == _view._material_current_category)
 
-## 重建材料网格：按分类过滤生成细胞，重置选中并清详情
+## 重建材料网格：按分类过滤复用网格细胞（零 queue_free 抖动与零重复信号绑定），重置选中并清详情
 func _populate_material_grid() -> void:
 	if _view == null or _view._material_grid == null:
 		return
-	for child in _view._material_grid.get_children():
-		child.queue_free()
+	var grid: Container = _view._material_grid
 	var category: String = _view._material_categories[_view._material_current_category] if _view._material_current_category < _view._material_categories.size() else ""
+	var active_idx: int = 0
 	for i in range(_view._materials.size()):
 		var mat: Dictionary = _view._materials[i]
 		if not category.is_empty() and str(mat.get("category", "")) != category:
 			continue
-		_view._material_grid.add_child(_make_material_cell(mat, i))
+		var border_color := KRarityTag.get_rarity_color(_rarity_str_to_level(str(mat.get("rarity", "COMMON"))))
+		var cell := _acquire_pooled_grid_cell(grid, active_idx, Vector2(80, 80), border_color, 1, _on_material_cell_meta_clicked)
+		cell.set_meta("_item_idx", i)
+		_configure_cell_labels(
+			cell,
+			UIIntermediary.text(str(mat.get("name", ""))),
+			11,
+			Color.WHITE,
+			false,
+			"x%d" % int(mat.get("qty", 0)),
+			11,
+			DesignTokens.COLOR_SUCCESS_DEFAULT
+		)
+		active_idx += 1
+	for j in range(active_idx, grid.get_child_count()):
+		(grid.get_child(j) as Control).visible = false
 	_view._material_selected_index = -1
 	_clear_material_detail()
-
-## 构建材料网格细胞：稀有度配色边框 + 名称/数量标签 + 点击回调
-func _make_material_cell(mat: Dictionary, list_index: int) -> Control:
-	var border_color := KRarityTag.get_rarity_color(_rarity_str_to_level(str(mat.get("rarity", "COMMON"))))
-	var panel := _build_cell_panel(Vector2(80, 80), border_color, 1, _on_material_cell_selected.bind(list_index))
-	var vbox := panel.get_child(0) as VBoxContainer
-	vbox.add_child(_make_centered_cell_label(UIIntermediary.text(str(mat.get("name", ""))), 11))
-	vbox.add_child(_make_centered_cell_label("x%d" % int(mat.get("qty", 0)), 11, DesignTokens.COLOR_SUCCESS_DEFAULT, true))
-	return panel
 
 ## 清空材料详情为空态
 func _clear_material_detail() -> void:

@@ -300,14 +300,26 @@ func _on_chat_tab_changed(tab_idx: int) -> void:
 # 聊天滚动区消息流
 # ==============================================================================
 
-## 终端行追加（tag 分类 + 时间戳 + 文字）
+const CHANNEL_TAGS: Dictionary = {
+	ChatChannel.WORLD: "WORLD",
+	ChatChannel.GUILD: "GUILD",
+	ChatChannel.PARTY: "PARTY",
+	ChatChannel.SYSTEM: "SYSTEM",
+	ChatChannel.COMBAT: "COMBAT",
+}
+
+## 终端行追加（tag 分类 + 文字，增量追加至 RichTextLabel 避免全量重建）
 func append_terminal_log(tag: String, text: String) -> void:
 	message_terminal_buffer.append({"tag": tag, "text": text})
 	if message_terminal_buffer.size() > max_terminal_lines:
 		message_terminal_buffer.pop_front()
-	_refresh_chat_view()
+	if _chat_rich_label:
+		var color_tag := ThemeManager.get_instance().get_bbcode_color_tag(tag)
+		_chat_rich_label.append_text("%s[%s] %s[/color]\n" % [color_tag, tag, text])
+		while _chat_rich_label.get_paragraph_count() > max_terminal_lines:
+			_chat_rich_label.remove_paragraph(0)
 
-## 刷新聊天显示：当前频道消息 + 补全面板
+## 刷新聊天显示：全量重载（仅初始化/切换频道时触发）
 func _refresh_chat_view() -> void:
 	if not _chat_rich_label:
 		return
@@ -398,8 +410,7 @@ func _apply_page(res: Dictionary) -> void:
 	completion_total_pages = res.total_pages
 
 func _channel_tag_name(channel: ChatChannel) -> String:
-	var tags := {ChatChannel.WORLD: "WORLD", ChatChannel.GUILD: "GUILD", ChatChannel.PARTY: "PARTY", ChatChannel.SYSTEM: "SYSTEM", ChatChannel.COMBAT: "COMBAT"}
-	return tags.get(channel, "SYSTEM")
+	return str(CHANNEL_TAGS.get(channel, "SYSTEM"))
 
 static func _command_prefix(input_text: String) -> String:
 	var text := input_text.strip_edges()

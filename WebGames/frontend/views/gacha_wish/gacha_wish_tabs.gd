@@ -115,12 +115,13 @@ func refresh_up_items() -> void:
 	var view: GachaWishView = _view
 	if not view._up_items_grid:
 		return
-	for child in view._up_items_grid.get_children():
-		child.queue_free()
 	var banner := get_current_banner()
 	var up_items: Array = banner.get("up_items", [])
-	for item in up_items:
-		view._up_items_grid.add_child(make_up_item_cell(item))
+	for i in range(up_items.size()):
+		var cell := _acquire_up_item_cell(view._up_items_grid, i)
+		_configure_up_item_cell(cell, up_items[i] as Dictionary)
+	for j in range(up_items.size(), view._up_items_grid.get_child_count()):
+		(view._up_items_grid.get_child(j) as Control).visible = false
 
 func _make_card_label(text_value: String, font_size: int, font_color: Color) -> Label:
 	var lbl := Label.new()
@@ -130,22 +131,34 @@ func _make_card_label(text_value: String, font_size: int, font_color: Color) -> 
 	lbl.add_theme_color_override("font_color", font_color)
 	return lbl
 
-func _append_new_badge_if_applicable(vbox: VBoxContainer, item_data: Dictionary) -> void:
-	if bool(item_data.get("is_recently_added", item_data.get("is_new", false))):
-		vbox.add_child(_make_card_label(UIIntermediary.text("ui.fe06.result.new"), 10, DesignTokens.COLOR_SUCCESS_DEFAULT))
-
-func make_up_item_cell(item: Dictionary) -> Control:
+func _acquire_up_item_cell(grid: Container, idx: int) -> PanelContainer:
+	if idx < grid.get_child_count():
+		var existing := grid.get_child(idx) as PanelContainer
+		existing.visible = true
+		return existing
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(140, 80)
 	var vbox := VBoxContainer.new()
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_child(_make_card_label("", 12, Color.WHITE))
+	vbox.add_child(_make_card_label("", 11, Color.WHITE))
+	vbox.add_child(_make_card_label(UIIntermediary.text("ui.fe06.result.new"), 10, DesignTokens.COLOR_SUCCESS_DEFAULT))
+	panel.add_child(vbox)
+	grid.add_child(panel)
+	return panel
+
+func _configure_up_item_cell(panel: PanelContainer, item: Dictionary) -> void:
+	var vbox := panel.get_child(0) as VBoxContainer
 	var rarity_str := str(item.get("rarity", "3"))
 	var rarity_color := KRarityTag.get_rarity_color(int(rarity_str))
-	vbox.add_child(_make_card_label(UIIntermediary.text(str(item.get("name", "ui.fe06.unknown"))), 12, rarity_color))
-	vbox.add_child(_make_card_label(UIIntermediary.text("ui.fe06.rarity.star", {"rarity": rarity_str}), 11, rarity_color))
-	_append_new_badge_if_applicable(vbox, item)
-	panel.add_child(vbox)
-	return panel
+	var lbl_name := vbox.get_child(0) as Label
+	lbl_name.text = UIIntermediary.text(str(item.get("name", "ui.fe06.unknown")))
+	lbl_name.add_theme_color_override("font_color", rarity_color)
+	var lbl_star := vbox.get_child(1) as Label
+	lbl_star.text = UIIntermediary.text("ui.fe06.rarity.star", {"rarity": rarity_str})
+	lbl_star.add_theme_color_override("font_color", rarity_color)
+	var lbl_new := vbox.get_child(2) as Label
+	lbl_new.visible = bool(item.get("is_recently_added", item.get("is_new", false)))
 
 func init_history_panel() -> void:
 	var view: GachaWishView = _view
@@ -228,30 +241,48 @@ func populate_result_grid(drops: Array) -> void:
 	var view: GachaWishView = _view
 	if not view._result_items_grid:
 		return
-	for child in view._result_items_grid.get_children():
-		child.queue_free()
-	for drop in drops:
-		view._result_items_grid.add_child(make_result_cell(drop))
+	for i in range(drops.size()):
+		var cell := _acquire_result_cell(view._result_items_grid, i)
+		_configure_result_cell(cell, drops[i] as Dictionary)
+	for j in range(drops.size(), view._result_items_grid.get_child_count()):
+		(view._result_items_grid.get_child(j) as Control).visible = false
 	view._result_items_grid.tooltip_text = UIIntermediary.text("ui.fe06.result.count", {"count": drops.size()})
 
-func make_result_cell(drop: Dictionary) -> Control:
+func _acquire_result_cell(grid: Container, idx: int) -> PanelContainer:
+	if idx < grid.get_child_count():
+		var existing := grid.get_child(idx) as PanelContainer
+		existing.visible = true
+		return existing
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(96, 110)
 	var style := StyleBoxFlat.new()
-	var rarity_str := str(drop.get("rarity", "3"))
-	var rarity_color := KRarityTag.get_rarity_color(int(rarity_str))
 	style.bg_color = DesignTokens.COLOR_SURFACE_DEFAULT
-	style.border_color = rarity_color
 	style.set_border_width_all(2)
 	style.set_corner_radius_all(6)
 	panel.add_theme_stylebox_override("panel", style)
 	var vbox := VBoxContainer.new()
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_child(_make_card_label(UIIntermediary.text("ui.fe06.rarity.star", {"rarity": rarity_str}), 14, rarity_color))
-	vbox.add_child(_make_card_label(UIIntermediary.text(str(drop.get("name", "ui.fe06.unknown"))), 11, DesignTokens.COLOR_TEXT_DEFAULT))
-	_append_new_badge_if_applicable(vbox, drop)
+	vbox.add_child(_make_card_label("", 14, Color.WHITE))
+	vbox.add_child(_make_card_label("", 11, DesignTokens.COLOR_TEXT_DEFAULT))
+	vbox.add_child(_make_card_label(UIIntermediary.text("ui.fe06.result.new"), 10, DesignTokens.COLOR_SUCCESS_DEFAULT))
 	panel.add_child(vbox)
+	grid.add_child(panel)
 	return panel
+
+func _configure_result_cell(panel: PanelContainer, drop: Dictionary) -> void:
+	var rarity_str := str(drop.get("rarity", "3"))
+	var rarity_color := KRarityTag.get_rarity_color(int(rarity_str))
+	var style := panel.get_theme_stylebox("panel") as StyleBoxFlat
+	if style != null:
+		style.border_color = rarity_color
+	var vbox := panel.get_child(0) as VBoxContainer
+	var lbl_star := vbox.get_child(0) as Label
+	lbl_star.text = UIIntermediary.text("ui.fe06.rarity.star", {"rarity": rarity_str})
+	lbl_star.add_theme_color_override("font_color", rarity_color)
+	var lbl_name := vbox.get_child(1) as Label
+	lbl_name.text = UIIntermediary.text(str(drop.get("name", "ui.fe06.unknown")))
+	var lbl_new := vbox.get_child(2) as Label
+	lbl_new.visible = bool(drop.get("is_recently_added", drop.get("is_new", false)))
 
 func on_result_skip_pressed() -> void:
 	hide_result_overlay()
