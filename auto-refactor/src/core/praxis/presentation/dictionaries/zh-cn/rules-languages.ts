@@ -411,4 +411,14 @@ export const ZH_CN_LANGUAGE_RULES: Record<string, PraxisRuleI18nEntry> = {
         summary: '分析器在单文件上抛异常（failOnAnalyzerError 可升为 error）。',
         remediation: '修复分析器缺陷；已知外部数据问题可保持 info 留痕。',
     },
+    'hardcoded-string': {
+        name: '源码中存在硬编码字符串字面量',
+        summary: '业务逻辑或配置中包含未抽取的硬编码字符串字面量。',
+        remediation: '将重复或业务关键字符串提取为命名常量或本地化字典。',
+    },
+    'magic-number': {
+        name: '源码中存在未解释的魔数数字字面量',
+        summary: '业务逻辑中包含未声明常量名称的数值字面量。',
+        remediation: '将魔数提升为自解释的语义常量或枚举类型。',
+    },
 };

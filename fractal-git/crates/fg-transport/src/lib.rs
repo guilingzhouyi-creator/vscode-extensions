@@ -14,13 +14,14 @@ use fg_core::error::{FractalError, FractalResult};
 
 pub mod ipc;
 pub mod packetline;
+pub mod protocol_request;
 pub mod remote;
 pub mod smart_protocol;
 
 pub use ipc::{IpcCodec, IpcDaemonReceipt, IpcMessage, IpcStageEntry};
 pub use packetline::{PacketLine, PKT_DELIM, PKT_FLUSH};
 pub use remote::{LoopbackTransport, MockTransport, RemoteRef, RemoteTransport};
-pub use smart_protocol::ProtocolV2Handler;
+pub use smart_protocol::{ProtocolV2Handler, SmartV2Command, SmartV2Request};
 
 /// Canonical wire version for the local Agent IPC framing protocol.
 pub const IPC_PROTOCOL_VERSION: u16 = 1;

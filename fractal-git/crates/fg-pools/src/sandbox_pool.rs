@@ -51,11 +51,11 @@ impl SandboxPool {
         })
     }
 
-    /// Releases a slot back to the idle queue.
+    /// Releases a slot back to the idle queue with idempotent de-duplication.
     pub fn release(&self, mut slot: SandboxSlot) {
         slot.in_use = false;
         let mut guard = self.free_slots.lock();
-        if guard.len() < self.max_slots {
+        if guard.len() < self.max_slots && !guard.iter().any(|s| s.id == slot.id) {
             guard.push_back(slot);
         }
     }
@@ -63,5 +63,23 @@ impl SandboxPool {
     /// Count of currently available idle slots.
     pub fn available(&self) -> usize {
         self.free_slots.lock().len()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sandbox_pool_idempotent_release() {
+        let pool = SandboxPool::new(3);
+        let s1 = pool.acquire().expect("acquire slot");
+        assert_eq!(pool.available(), 2);
+
+        // Multiple calls to release with same slot must be idempotent
+        pool.release(s1.clone());
+        assert_eq!(pool.available(), 3);
+        pool.release(s1);
+        assert_eq!(pool.available(), 3);
     }
 }

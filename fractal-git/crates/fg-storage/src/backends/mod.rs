@@ -17,6 +17,7 @@ pub mod midx_writer;
 pub mod odb_router;
 pub mod pack_bitmap;
 pub mod pack_file;
+pub mod pack_window;
 pub mod pack_writer;
 
 pub use idx_file::PackIndex;

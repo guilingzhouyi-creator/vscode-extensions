@@ -44,6 +44,7 @@ import {
     RULE_NAM_MBR_001,
 } from '../constants/rules-quality.generated';
 import type { AgentActionablePayload, Issue, Severity } from '../types';
+import { RULE_REGISTRY } from './registry';
 
 /** Structured diagnostic template for a rule violation. */
 export interface DiagnosticTemplate {
@@ -55,7 +56,7 @@ export interface DiagnosticTemplate {
 }
 
 /** Registry of structured diagnostic templates for prominent auto-refactor rules. */
-export const DIAGNOSTIC_CATALOG: Readonly<Record<string, DiagnosticTemplate>> = Object.freeze({
+const CURATED_DIAGNOSTIC_CATALOG: Readonly<Record<string, DiagnosticTemplate>> = Object.freeze({
     [RULE_VOL_ELOC_001]: {
         ruleId: RULE_VOL_ELOC_001,
         defaultSeverity: 'error',
@@ -257,6 +258,50 @@ export const DIAGNOSTIC_CATALOG: Readonly<Record<string, DiagnosticTemplate>> = 
         suggestion: 'Handle errors explicitly with Result/Option or typed exception recovery.',
     },
 });
+
+function buildUnifiedDiagnosticCatalog(): Record<string, DiagnosticTemplate> {
+    const catalog: Record<string, DiagnosticTemplate> = { ...CURATED_DIAGNOSTIC_CATALOG };
+    for (const rule of RULE_REGISTRY) {
+        if (!catalog[rule.id]) {
+            const numMatch = rule.id.match(/\d+$/);
+            const numStr = numMatch ? numMatch[0].padStart(3, '0') : '001';
+            const actionCode = `AR:${rule.family}:${numStr}`;
+            catalog[rule.id] = {
+                ruleId: rule.id,
+                defaultSeverity: rule.defaultSeverity,
+                actionCode,
+                defaultMessage: rule.summary,
+                suggestion:
+                    rule.remediation ||
+                    'Review and refactor code to adhere to workspace standards.',
+            };
+        }
+    }
+    return catalog;
+}
+
+/** Registry of structured diagnostic templates for all registered auto-refactor rules. */
+export const DIAGNOSTIC_CATALOG: Readonly<Record<string, DiagnosticTemplate>> =
+    Object.freeze(buildUnifiedDiagnosticCatalog());
+
+/**
+ * Returns coverage metrics of DIAGNOSTIC_CATALOG against RULE_REGISTRY.
+ *
+ * @returns Coverage statistics including covered rule count and percentage.
+ */
+export function getDiagnosticCatalogCoverage(): {
+    coveredRules: number;
+    totalAutoRules: number;
+    coveragePercent: number;
+} {
+    const coveredRules = Object.keys(DIAGNOSTIC_CATALOG).length;
+    const totalAutoRules = RULE_REGISTRY.length;
+    const coveragePercent =
+        totalAutoRules > 0
+            ? Math.round((coveredRules / totalAutoRules) * 1000) / 10
+            : 0;
+    return { coveredRules, totalAutoRules, coveragePercent };
+}
 
 /**
  * Format a diagnostic message using the catalog template or fallback.

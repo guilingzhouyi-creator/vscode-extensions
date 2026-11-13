@@ -43,6 +43,7 @@ const {
     evaluateFileStagedDiff,
     isAuditableCodeFile,
     getStagedStatusList,
+    readGitBlobText,
 } = require('./lib/differential-diff-parser');
 
 /** Violation types the ledger may resolve; every other type is structural. */
@@ -220,14 +221,159 @@ function evaluateStagedDifferentialBounds(options = {}) {
     };
 }
 
+function auditSliceStep(codeFiles, steps) {
+    try {
+        const { analyzeSourceText, DEFAULT_CONFIG } = require('./validate-staged-slice');
+        const violations = [];
+        for (const f of codeFiles) {
+            if (!/\.(ts|tsx|js|jsx)$/.test(f.path)) continue;
+            const c = typeof readGitBlobText === 'function' ? readGitBlobText(`:${f.path}`) : null;
+            if (!c) continue;
+            const findings = analyzeSourceText(c, f.path, DEFAULT_CONFIG, null);
+            if (findings && findings.length > 0) {
+                for (const item of findings) {
+                    violations.push({ file: f.path, line: item.line || 1, ruleId: item.rule || 'GUARD-AST-001', message: item.message });
+                }
+            }
+        }
+        if (violations.length > 0) {
+            steps['STAGED-SLICE-11'] = {
+                status: 'BLOCK',
+                detail: `AST切片复杂度超标 (${violations.length} 处违规: ${violations[0].message})`,
+                ruleId: 'GUARD-AST-001',
+                summary: violations[0].message,
+                violations,
+            };
+        } else {
+            steps['STAGED-SLICE-11'] = { status: 'PASS', detail: '暂存区 AST 切片复杂度合规', ruleId: 'GUARD-AST-001', violations: [] };
+        }
+    } catch (err) {
+        steps['STAGED-SLICE-11'] = { status: 'BLOCK', detail: `AST切片审查异常: ${err.message}`, ruleId: 'GUARD-AST-001', summary: err.message, violations: [{ message: err.message }] };
+    }
+}
+
+function auditDensityStep(auditableFiles, steps) {
+    try {
+        const { auditFileDensity } = require('./validate-code-density');
+        const densityOptions = { porLimit: 0.6, minTau: 2.5, maxTau: 22 };
+        const densityViolations = [];
+        for (const f of auditableFiles) {
+            const c = typeof readGitBlobText === 'function' ? readGitBlobText(`:${f.path}`) : null;
+            if (c === null) continue;
+            const res = auditFileDensity(f.path, densityOptions, c);
+            if (res && res.violations && res.violations.length > 0) {
+                densityViolations.push(...res.violations);
+            }
+        }
+        if (densityViolations.length > 0) {
+            steps['STAGED-DENSITY-12'] = {
+                status: 'BLOCK',
+                detail: `代码密度审查未通过: ${densityViolations[0].message}`,
+                ruleId: 'VOL-DIL-001',
+                summary: densityViolations[0].message,
+                violations: densityViolations,
+            };
+        } else {
+            steps['STAGED-DENSITY-12'] = { status: 'PASS', detail: '暂存区代码密度与接线载荷合规', ruleId: 'VOL-DIL-001', violations: [] };
+        }
+    } catch (err) {
+        steps['STAGED-DENSITY-12'] = { status: 'BLOCK', detail: `代码密度审查异常: ${err.message}`, ruleId: 'VOL-DIL-001', summary: err.message, violations: [{ message: err.message }] };
+    }
+}
+
+function auditVolumeStep(auditableFiles, steps) {
+    try {
+        const { evaluateCodeMetrics, evaluateDynamicEnvelope } = require('./evaluate-eloc-budget');
+        const volumeViolations = [];
+        for (const f of auditableFiles) {
+            const c = typeof readGitBlobText === 'function' ? readGitBlobText(`:${f.path}`) : null;
+            if (c === null) continue;
+            const ext = path.extname(f.path).toLowerCase();
+            const m = evaluateCodeMetrics(c, ext, f.path);
+            const env = evaluateDynamicEnvelope(m, {}, f.path, c);
+            if (env.severity === 'error') {
+                volumeViolations.push({ file: f.path, ruleId: 'VOL-ELOC-001', message: env.reason || `双轨体积超标 (${m.eloc} ELOC, ${m.totalLoc} LOC)` });
+            }
+        }
+        if (volumeViolations.length > 0) {
+            steps['STAGED-VOLUME-13'] = {
+                status: 'BLOCK',
+                detail: `模块双轨体积超限: ${volumeViolations[0].message}`,
+                ruleId: 'VOL-ELOC-001',
+                summary: volumeViolations[0].message,
+                violations: volumeViolations,
+            };
+        } else {
+            steps['STAGED-VOLUME-13'] = { status: 'PASS', detail: '暂存区双轨体积与动态包络合规', ruleId: 'VOL-ELOC-001', violations: [] };
+        }
+    } catch (err) {
+        steps['STAGED-VOLUME-13'] = { status: 'BLOCK', detail: `双轨体积审查异常: ${err.message}`, ruleId: 'VOL-ELOC-001', summary: err.message, violations: [{ message: err.message }] };
+    }
+}
+
+function auditDiffStep(options, steps) {
+    try {
+        const diffResult = evaluateStagedDifferentialBounds(options);
+        if (diffResult.violations && diffResult.violations.length > 0) {
+            steps['STAGED-DIFF-14'] = {
+                status: 'BLOCK',
+                detail: `五维微分边界未达标: ${diffResult.violations[0].message}`,
+                ruleId: 'FGT-GAT-001',
+                summary: diffResult.violations[0].message,
+                violations: diffResult.violations,
+            };
+        } else {
+            steps['STAGED-DIFF-14'] = { status: 'PASS', detail: '暂存区五维微分边界与准入周转合规', ruleId: 'FGT-GAT-001', violations: [] };
+        }
+    } catch (err) {
+        steps['STAGED-DIFF-14'] = { status: 'BLOCK', detail: `差分边界审查异常: ${err.message}`, ruleId: 'FGT-GAT-001', summary: err.message, violations: [{ message: err.message }] };
+    }
+}
+
+/**
+ * Executes unified in-memory streaming validation across STAGED-SLICE-11..14 in a single process.
+ *
+ * @param {object} [options]
+ * @returns {{ passed: boolean, steps: Record<string, { status: string, detail: string, ruleId: string, summary?: string, violations?: any[] }> }}
+ */
+function evaluateStagedStreamingSuite(options = {}) {
+    const stagedList = getStagedStatusList();
+    const auditableFiles = stagedList.filter(entry => isAuditableCodeFile(entry.path));
+    const codeFiles = stagedList.filter(entry => /\.(ts|js|rs|py|gd)$/.test(entry.path) && !entry.path.endsWith('.d.ts'));
+
+    const steps = {
+        'STAGED-SLICE-11': { status: 'SKIP', detail: '无暂存代码', ruleId: 'GUARD-AST-001', violations: [] },
+        'STAGED-DENSITY-12': { status: 'SKIP', detail: '无暂存可审计代码', ruleId: 'VOL-DIL-001', violations: [] },
+        'STAGED-VOLUME-13': { status: 'SKIP', detail: '无暂存可审计代码', ruleId: 'VOL-ELOC-001', violations: [] },
+        'STAGED-DIFF-14': { status: 'SKIP', detail: '无暂存可审计代码', ruleId: 'FGT-GAT-001', violations: [] },
+    };
+
+    if (codeFiles.length > 0) auditSliceStep(codeFiles, steps);
+    if (auditableFiles.length > 0) {
+        auditDensityStep(auditableFiles, steps);
+        auditVolumeStep(auditableFiles, steps);
+        auditDiffStep(options, steps);
+    }
+
+    const passed = Object.values(steps).every(s => s.status !== 'BLOCK');
+    return { passed, steps };
+}
+
 /**
  * Main entry point.
  */
 function main() {
     const args = process.argv.slice(2);
     const isAgent = args.includes('--agent') || args.includes('-a') || args.includes('--json');
+    const isStream = args.includes('--stream') || args.includes('--unified');
     const acknowledged = args.includes('--acknowledge-streak');
     const context = { PROTOCOL_VERSION, GATE_NAME, STEP_ID };
+
+    if (isStream) {
+        const streamResult = evaluateStagedStreamingSuite({ ackStreak: acknowledged });
+        process.stdout.write(JSON.stringify(streamResult) + '\n');
+        process.exit(streamResult.passed ? 0 : 1);
+    }
 
     const verdict = evaluateStagedDifferentialBounds({ ackStreak: acknowledged });
     if (isAgent) emitAgentVerdict(verdict, acknowledged, context);
@@ -239,6 +385,7 @@ if (require.main === module) main();
 module.exports = {
     REPO_ROOT,
     evaluateStagedDifferentialBounds,
+    evaluateStagedStreamingSuite,
     measureStagedFiles,
     resolveViolations,
 };

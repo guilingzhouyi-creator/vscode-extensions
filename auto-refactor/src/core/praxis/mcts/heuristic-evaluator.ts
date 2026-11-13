@@ -142,8 +142,8 @@ function computeScoreBreakdown(
         originalViolationCount > 0
             ? (originalViolationCount - violationCount) / originalViolationCount
             : violationCount === 0
-              ? 1.0
-              : -0.5;
+                ? 1.0
+                : -0.5;
 
     const rulePenalty = Math.min(MAX_RULE_WEIGHT, violationCount * VIOLATION_PENALTY_MULTIPLIER);
     const ruleWeight =
@@ -185,45 +185,76 @@ function computeScoreBreakdown(
 }
 
 /**
- * Evaluates a candidate strategy in its sandboxed workspace and produces a HeuristicScore.
+ * Options for incremental slice evaluation.
+ */
+export interface SliceEvaluationOptions {
+    /** Map of file path to baseline content before strategy application */
+    originalFiles?: ReadonlyMap<string, string>;
+    /** Optional prior score from parent search node to accumulate deltas */
+    parentScore?: HeuristicScore;
+    /** Skip physical command execution when already validated upstream */
+    skipVerification?: boolean;
+}
+
+/**
+ * Evaluates an incremental candidate slice in its sandboxed workspace and
+ * produces a HeuristicScore.
  *
  * Concurrency: Asynchronous pipeline; operates on an isolated workspace copy per candidate.
+ * Complexity bounds: CC <= 15, Depth <= 4.
  *
  * @param strategy - Candidate refactoring strategy under evaluation.
  * @param workspace - LayerVFS workspace holding the candidate modifications.
- * @returns Comprehensive HeuristicScore.
+ * @param options - Incremental slice evaluation options.
+ * @returns Comprehensive HeuristicScore with incremental metrics.
  */
-export async function evaluateCandidateStrategy(
+export async function evaluateIncrementalSlice(
     strategy: CandidateStrategy,
     workspace: LayerVFSWorkspace,
+    options: SliceEvaluationOptions = {},
 ): Promise<HeuristicScore> {
-    const testsPassed = await runVerificationCommand(strategy, workspace);
+    const testsPassed = options.skipVerification
+        ? (options.parentScore?.testsPassed ?? true)
+        : await runVerificationCommand(strategy, workspace);
 
-    let complexityDelta = 0;
-    let violationCount = 0;
-    let originalViolationCount = 0;
+    let sliceComplexityDelta = 0;
+    let sliceViolationDelta = 0;
+    let baselineViolations = options.parentScore?.violationCount ?? 0;
 
-    for (const [filePath, modifiedContent] of strategy.fileModifications.entries()) {
-        const modStr =
-            typeof modifiedContent === 'string'
-                ? modifiedContent
-                : Buffer.from(modifiedContent).toString('utf8');
+    const filesToAudit = new Set<string>([
+        ...strategy.fileModifications.keys(),
+        ...(strategy.localizedEdits ? strategy.localizedEdits.keys() : []),
+    ]);
 
-        violationCount += countCodeDefects(modStr);
-        const newCpx = estimateComplexity(modStr);
-        const originalFile = await workspace.getFile(filePath);
-        const origStr = originalFile ? Buffer.from(originalFile.content).toString('utf8') : modStr;
-        const origCpx = originalFile ? estimateComplexity(origStr) : newCpx;
+    for (const filePath of filesToAudit) {
+        const fileRecord = await workspace.getFile(filePath);
+        if (!fileRecord) continue;
 
-        originalViolationCount += countCodeDefects(origStr);
-        complexityDelta += newCpx - origCpx;
+        const currentStr = Buffer.from(fileRecord.content).toString('utf8');
+        const currentViolations = countCodeDefects(currentStr);
+        const currentCpx = estimateComplexity(currentStr);
+
+        const origStr = options.originalFiles?.get(filePath);
+        const origViolations = origStr !== undefined
+            ? countCodeDefects(origStr)
+            : currentViolations;
+        const origCpx = origStr !== undefined ? estimateComplexity(origStr) : currentCpx;
+
+        sliceComplexityDelta += currentCpx - origCpx;
+        sliceViolationDelta += currentViolations - origViolations;
+        if (!options.parentScore) {
+            baselineViolations += origViolations;
+        }
     }
+
+    const complexityDelta = (options.parentScore?.complexityDelta ?? 0) + sliceComplexityDelta;
+    const violationCount = Math.max(0, baselineViolations + sliceViolationDelta);
 
     const { compositeScore, caiScore, breakdown } = computeScoreBreakdown(
         testsPassed,
         complexityDelta,
         violationCount,
-        originalViolationCount,
+        baselineViolations,
     );
 
     return {
@@ -234,4 +265,22 @@ export async function evaluateCandidateStrategy(
         caiScore,
         breakdown,
     };
+}
+
+/**
+ * Evaluates a candidate strategy in its sandboxed workspace using incremental slice evaluation.
+ *
+ * Concurrency: Asynchronous pipeline; operates safely on isolated sandboxed LayerVFS workspaces.
+ *
+ * @param strategy - Candidate refactoring strategy under evaluation.
+ * @param workspace - LayerVFS workspace holding candidate modifications.
+ * @param options - Optional slice evaluation options.
+ * @returns Comprehensive HeuristicScore.
+ */
+export async function evaluateCandidateStrategy(
+    strategy: CandidateStrategy,
+    workspace: LayerVFSWorkspace,
+    options: SliceEvaluationOptions = {},
+): Promise<HeuristicScore> {
+    return evaluateIncrementalSlice(strategy, workspace, options);
 }

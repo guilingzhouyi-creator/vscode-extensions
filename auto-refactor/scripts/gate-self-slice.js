@@ -20,10 +20,22 @@
 
 const { spawnSync } = require('child_process');
 const fs = require('fs');
-const os = require('os');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
+
+if (!process.env.NODE_PATH) {
+  const timingNm = path.join(ROOT, '..', 'workspace-timing', 'node_modules');
+  if (fs.existsSync(timingNm)) {
+    process.env.NODE_PATH = timingNm;
+    try {
+      require('module').Module._initPaths();
+    } catch {
+      // Best-effort path init
+    }
+  }
+}
+
 const DIR_DIST = 'dist';
 const DIR_BASELINES = 'baselines';
 const CONFIG_FILENAME = 'auto-refactor.config.json';
@@ -39,7 +51,6 @@ const MODULE_MYERS_ALGO = '../dist/core/diff/myers-algorithm';
 const CLI = path.join(ROOT, DIR_DIST, 'index.js');
 const CONFIG = path.join(ROOT, CONFIG_FILENAME);
 const BASELINE = path.join(ROOT, DIR_BASELINES, BASELINE_FILENAME);
-const REPORT = path.join(os.tmpdir(), `auto-refactor-slice-scan-${process.pid}.json`);
 
 const CMD_REV_PARSE = 'rev-parse';
 const CMD_DIFF = 'diff';
@@ -171,8 +182,8 @@ function getGitChangedFiles() {
     }
     return Array.from(changed).filter(
       (filePath) =>
-        (filePath.startsWith('src/') || filePath.startsWith('scripts/')) &&
-        (filePath.endsWith('.ts') || filePath.endsWith('.js')),
+        (filePath.startsWith('src/') || filePath.startsWith('scripts/') || filePath.startsWith('crates/')) &&
+        /\.(ts|js|rs|py|gd)$/.test(filePath),
     );
   } catch {
     // best-effort: fallback to empty list when git status fails
@@ -498,20 +509,21 @@ async function evaluateAdmissionTurnover(targetFiles) {
 }
 
 /**
- * Read and print blocking summary from temporary report file.
+ * Read and print blocking summary from in-memory scan report JSON.
  *
  * @param summaryParams - Summary report parameters.
  * @param summaryParams.fileCount - Scanned file count.
  * @param summaryParams.severity - Configured severity.
  * @param summaryParams.exitCode - CLI exit code.
  * @param summaryParams.allSlices - Extracted AST slices for range filtering.
+ * @param summaryParams.reportJson - Raw report JSON string from CLI stdout.
  */
-function reportBlockingSummary({ fileCount, severity, exitCode, allSlices }) {
+function reportBlockingSummary({ fileCount, severity, exitCode, allSlices, reportJson }) {
   let blockingCount = 0;
   try {
-    const report = JSON.parse(readTextFile(REPORT));
+    const report = JSON.parse(reportJson || '{}');
     const targetWeight = SEVERITY_WEIGHT_MAP[severity] ?? DEFAULT_SEVERITY_WEIGHT;
-    const blocking = report.issues.filter(
+    const blocking = (report.issues || []).filter(
       (issue) =>
         issue.isNew &&
         !issue.suppression &&
@@ -527,9 +539,8 @@ function reportBlockingSummary({ fileCount, severity, exitCode, allSlices }) {
       );
     }
   } catch {
-    // ignore: non-fatal if report file is missing or unreadable
+    // ignore: non-fatal if report is missing or unparseable
   }
-  fs.rmSync(REPORT, { force: true });
   const verdict = exitCode === EXIT_PASS ? STATUS_PASS_LABEL : STATUS_BLOCK_LABEL;
   logGate(
     `targeted-scan (files=${fileCount} newBlocking(${severity})=${blockingCount}) → ${verdict}`,
@@ -560,8 +571,6 @@ function executeTargetedScan({ targetFiles, activeAnalyzers, severity, allSlices
     activeAnalyzers.join(','),
     '--format',
     'json',
-    '--out',
-    REPORT,
     '--baseline-granularity',
     BASELINE_GROUPED,
     '--baseline',
@@ -574,13 +583,26 @@ function executeTargetedScan({ targetFiles, activeAnalyzers, severity, allSlices
     LOG_LEVEL_WARN,
   ];
 
-  const scanProcessResult = spawnSync(process.execPath, cliArgs, { cwd: ROOT, stdio: 'inherit' });
+  const scanProcessResult = spawnSync(process.execPath, cliArgs, {
+    cwd: ROOT,
+    encoding: 'utf8',
+    maxBuffer: 32 * 1024 * 1024,
+  });
   if (scanProcessResult.error) {
     logGateError(`failed to launch CLI: ${scanProcessResult.error.message}`);
     return EXIT_USAGE_ERROR;
   }
+  if (scanProcessResult.stderr) {
+    process.stderr.write(scanProcessResult.stderr);
+  }
   const exitCode = scanProcessResult.status === null ? EXIT_USAGE_ERROR : scanProcessResult.status;
-  reportBlockingSummary({ fileCount: targetFiles.length, severity, exitCode, allSlices });
+  reportBlockingSummary({
+    fileCount: targetFiles.length,
+    severity,
+    exitCode,
+    allSlices,
+    reportJson: scanProcessResult.stdout,
+  });
   return exitCode;
 }
 

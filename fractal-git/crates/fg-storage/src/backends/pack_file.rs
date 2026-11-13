@@ -35,6 +35,7 @@ use fg_core::decode_git_offset_varint;
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::{compute_object_oid, ObjectKind, Oid};
 
+use crate::backends::pack_window::{PackWindowReader, PackWindowStream, DEFAULT_PACK_WINDOW_SIZE};
 use crate::backends::pack_writer::{crc32_ieee, PackEntryMeta};
 use crate::delta_git::apply_git_delta;
 
@@ -52,6 +53,54 @@ const PACK_HEADER_LEN: usize = 12;
 
 /// Byte length of the trailing checksum.
 const PACK_TRAILER_LEN: usize = 20;
+
+/// Default threshold (512 KiB) above which PackFile uses on-demand sliding window instead of whole heap allocation.
+pub const PACK_WINDOW_THRESHOLD: u64 = 512 * 1024;
+
+/// Underlying packfile storage: contiguous in-memory or sliding window on-demand.
+#[derive(Debug)]
+pub enum PackBuffer {
+    Memory(Vec<u8>),
+    Windowed(PackWindowReader),
+}
+
+impl PackBuffer {
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Memory(bytes) => bytes.len(),
+            Self::Windowed(reader) => reader.total_len() as usize,
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn read_slice(&self, offset: usize, len: usize) -> FractalResult<Vec<u8>> {
+        match self {
+            Self::Memory(bytes) => {
+                let end = offset.checked_add(len).ok_or_else(|| {
+                    FractalError::CorruptStore(format!("Slice offset overflow: {offset} + {len}"))
+                })?;
+                let slice = bytes.get(offset..end).ok_or_else(|| {
+                    FractalError::CorruptStore(format!("Slice out of bounds: {offset}..{end}"))
+                })?;
+                Ok(slice.to_vec())
+            }
+            Self::Windowed(reader) => reader.read_exact_at(offset as u64, len),
+        }
+    }
+
+    pub fn get_byte(&self, offset: usize) -> FractalResult<u8> {
+        match self {
+            Self::Memory(bytes) => bytes
+                .get(offset)
+                .copied()
+                .ok_or_else(|| FractalError::CorruptStore(format!("Offset out of bounds: {offset}"))),
+            Self::Windowed(reader) => reader.read_byte_at(offset as u64),
+        }
+    }
+}
 
 /// Ceiling on how many delta links may be followed for one object.
 ///
@@ -111,16 +160,16 @@ pub struct PackedObject {
     pub payload: Vec<u8>,
 }
 
-/// A packfile held in memory together with its header facts.
+/// A packfile held in memory or windowed on-demand together with its header facts.
 #[derive(Debug)]
 pub struct PackFile {
     path: PathBuf,
-    bytes: Vec<u8>,
+    buffer: PackBuffer,
     object_count: u32,
 }
 
 impl PackFile {
-    /// Loads and validates a packfile.
+    /// Loads and validates a packfile, routing to windowed reader when exceeding threshold.
     ///
     /// # Errors
     ///
@@ -128,16 +177,50 @@ impl PackFile {
     /// [`FractalError::CorruptStore`] for a bad magic, an unsupported version, or a truncated file.
     pub fn load(path: impl Into<PathBuf>) -> FractalResult<Self> {
         let path = path.into();
-        let bytes = fs::read(&path)?;
-        Self::parse(path, bytes)
+        let file_len = fs::metadata(&path)?.len();
+        if file_len > PACK_WINDOW_THRESHOLD {
+            Self::load_windowed(path, DEFAULT_PACK_WINDOW_SIZE)
+        } else {
+            let bytes = fs::read(&path)?;
+            Self::parse(path, bytes)
+        }
+    }
+
+    /// Loads a packfile using an explicit on-demand sliding window reader.
+    pub fn load_windowed(path: impl Into<PathBuf>, window_size: usize) -> FractalResult<Self> {
+        let path = path.into();
+        let reader = PackWindowReader::open(&path, window_size)?;
+        if reader.total_len() < (PACK_HEADER_LEN + PACK_TRAILER_LEN) as u64 {
+            return Err(FractalError::CorruptStore(format!(
+                "packfile '{}' is {} bytes, shorter than a pack header plus trailer",
+                path.display(),
+                reader.total_len()
+            )));
+        }
+        let header = reader.read_exact_at(0, PACK_HEADER_LEN)?;
+        if header[..4] != PACK_MAGIC {
+            return Err(FractalError::CorruptStore(format!(
+                "packfile '{}' has magic {:02x?}, expected PACK",
+                path.display(),
+                &header[..4]
+            )));
+        }
+        let version = u32::from_be_bytes([header[4], header[5], header[6], header[7]]);
+        if !(PACK_VERSION_MIN..=PACK_VERSION_MAX).contains(&version) {
+            return Err(FractalError::CorruptStore(format!(
+                "packfile '{}' declares version {version}; this build reads {PACK_VERSION_MIN}..={PACK_VERSION_MAX}",
+                path.display()
+            )));
+        }
+        let object_count = u32::from_be_bytes([header[8], header[9], header[10], header[11]]);
+        Ok(Self {
+            path,
+            buffer: PackBuffer::Windowed(reader),
+            object_count,
+        })
     }
 
     /// Validates a pack already held in memory.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`FractalError::CorruptStore`] for a bad magic, an unsupported version, or a file
-    /// shorter than its own header plus trailer.
     pub fn parse(path: PathBuf, bytes: Vec<u8>) -> FractalResult<Self> {
         if bytes.len() < PACK_HEADER_LEN + PACK_TRAILER_LEN {
             return Err(FractalError::CorruptStore(format!(
@@ -163,9 +246,14 @@ impl PackFile {
         let object_count = u32::from_be_bytes([bytes[8], bytes[9], bytes[10], bytes[11]]);
         Ok(Self {
             path,
-            bytes,
+            buffer: PackBuffer::Memory(bytes),
             object_count,
         })
+    }
+
+    /// Whether this pack is accessed via on-demand windowed buffering.
+    pub fn is_windowed(&self) -> bool {
+        matches!(self.buffer, PackBuffer::Windowed(_))
     }
 
     /// Path this pack was loaded from.
@@ -203,9 +291,10 @@ impl PackFile {
         &self,
         resolver: &dyn DeltaBaseSource,
     ) -> FractalResult<(Oid, Vec<PackEntryMeta>)> {
-        let trailer_start = self.bytes.len().saturating_sub(PACK_TRAILER_LEN);
+        let trailer_start = self.buffer.len().saturating_sub(PACK_TRAILER_LEN);
+        let trailer_slice = self.buffer.read_slice(trailer_start, PACK_TRAILER_LEN)?;
         let mut pack_sha_bytes = [0u8; 20];
-        pack_sha_bytes.copy_from_slice(&self.bytes[trailer_start..]);
+        pack_sha_bytes.copy_from_slice(&trailer_slice);
         let pack_oid = Oid::from_bytes(pack_sha_bytes);
 
         let capacity = self.object_count as usize;
@@ -219,7 +308,8 @@ impl PackFile {
             let (kind, payload, end_offset) =
                 self.decode_indexed_entry(cursor, resolver, &by_offset, &by_oid)?;
             let oid = compute_object_oid(kind, payload.as_ref());
-            let crc = crc32_ieee(&self.bytes[cursor..end_offset]);
+            let entry_slice = self.buffer.read_slice(cursor, end_offset - cursor)?;
+            let crc = crc32_ieee(&entry_slice);
 
             by_offset.insert(start_offset, (kind, Arc::clone(&payload)));
             by_oid.insert(oid, (kind, payload));
@@ -249,7 +339,7 @@ impl PackFile {
         match type_code {
             TYPE_OFS_DELTA => {
                 let (base_offset, slice_start) =
-                    decode_ofs_offset(&self.bytes, post_header, start_offset)?;
+                    self.decode_ofs_offset(post_header, start_offset)?;
                 let (delta, consumed) =
                     self.inflate_with_consumed(slice_start, declared_size, start_offset)?;
                 let (kind, reconstructed) = if let Some((base_kind, base_bytes)) =
@@ -322,7 +412,7 @@ impl PackFile {
         match type_code {
             TYPE_OFS_DELTA => {
                 self.consume_budget(budget, offset)?;
-                let (base_offset, after_offset) = decode_ofs_offset(&self.bytes, cursor, offset)?;
+                let (base_offset, after_offset) = self.decode_ofs_offset(cursor, offset)?;
                 cursor = after_offset;
                 let delta = self.inflate(cursor, declared_size, offset)?;
                 let base = self.read_at_depth(base_offset, resolver, budget)?;
@@ -349,6 +439,28 @@ impl PackFile {
         }
     }
 
+    /// Decodes the backward offset of an `OFS_DELTA` from either memory or window reader.
+    fn decode_ofs_offset(&self, start: usize, offset: u64) -> FractalResult<(u64, usize)> {
+        match &self.buffer {
+            PackBuffer::Memory(bytes) => decode_ofs_offset(bytes, start, offset),
+            PackBuffer::Windowed(reader) => {
+                let avail = (reader.total_len() as usize).saturating_sub(start).min(32);
+                let slice = reader.read_exact_at(start as u64, avail)?;
+                let (distance, consumed) = decode_git_offset_varint(&slice).ok_or_else(|| {
+                    FractalError::CorruptStore(format!(
+                        "OFS_DELTA at offset {offset} has a truncated or overflowing base offset"
+                    ))
+                })?;
+                let base = offset.checked_sub(distance).ok_or_else(|| {
+                    FractalError::CorruptStore(format!(
+                        "OFS_DELTA at offset {offset} points {distance} bytes back, past the pack start"
+                    ))
+                })?;
+                Ok((base, start + consumed))
+            }
+        }
+    }
+
     /// Converts an offset into a slice index, refusing offsets inside the header or trailer.
     fn check_offset(&self, offset: u64) -> FractalResult<usize> {
         let index = usize::try_from(offset).map_err(|_| {
@@ -357,7 +469,7 @@ impl PackFile {
                 self.path.display()
             ))
         })?;
-        let upper = self.bytes.len().saturating_sub(PACK_TRAILER_LEN);
+        let upper = self.buffer.len().saturating_sub(PACK_TRAILER_LEN);
         if index < PACK_HEADER_LEN || index >= upper {
             return Err(FractalError::CorruptStore(format!(
                 "packfile '{}' offset {offset} lies outside the object region {PACK_HEADER_LEN}..{upper}",
@@ -381,24 +493,14 @@ impl PackFile {
 
     /// Decodes a type/size header, returning the type code, size, and post-header cursor.
     fn decode_header(&self, start: usize) -> FractalResult<(u8, usize, usize)> {
-        let first = *self.bytes.get(start).ok_or_else(|| {
-            FractalError::CorruptStore(format!(
-                "packfile '{}' ends before the object header at {start}",
-                self.path.display()
-            ))
-        })?;
+        let first = self.buffer.get_byte(start)?;
         let type_code = (first & TYPE_MASK) >> TYPE_SHIFT;
         let mut size = usize::from(first & SIZE_LOW_MASK);
         let mut shift = SIZE_FIRST_CONTINUATION_SHIFT;
         let mut cursor = start + 1;
         let mut byte = first;
         while byte & SIZE_CONTINUE != 0 {
-            byte = *self.bytes.get(cursor).ok_or_else(|| {
-                FractalError::CorruptStore(format!(
-                    "packfile '{}' size header at {start} is truncated",
-                    self.path.display()
-                ))
-            })?;
+            byte = self.buffer.get_byte(cursor)?;
             size |= usize::from(byte & SIZE_CONTINUATION_MASK) << shift;
             shift += SIZE_CONTINUATION_BITS;
             cursor += 1;
@@ -407,16 +509,10 @@ impl PackFile {
     }
 
     /// Reads the 20-byte base id of a `REF_DELTA`.
-    fn read_base_oid(&self, cursor: usize, offset: u64) -> FractalResult<Oid> {
-        let end = cursor + 20;
-        let slice = self.bytes.get(cursor..end).ok_or_else(|| {
-            FractalError::CorruptStore(format!(
-                "packfile '{}' REF_DELTA at offset {offset} has no complete base id",
-                self.path.display()
-            ))
-        })?;
+    fn read_base_oid(&self, cursor: usize, _offset: u64) -> FractalResult<Oid> {
+        let slice = self.buffer.read_slice(cursor, 20)?;
         let mut raw = [0u8; 20];
-        raw.copy_from_slice(slice);
+        raw.copy_from_slice(&slice);
         Ok(Oid::from_bytes(raw))
     }
 
@@ -433,20 +529,36 @@ impl PackFile {
         declared_size: usize,
         offset: u64,
     ) -> FractalResult<(Vec<u8>, usize)> {
-        let slice = self.bytes.get(start..).ok_or_else(|| {
-            FractalError::CorruptStore(format!(
-                "packfile '{}' object at offset {offset} has no payload region",
-                self.path.display()
-            ))
-        })?;
-        let mut decoder = ZlibDecoder::new(slice);
         let mut out = Vec::with_capacity(declared_size);
-        decoder.read_to_end(&mut out).map_err(|io_err| {
-            FractalError::CorruptStore(format!(
-                "packfile '{}' object at offset {offset} failed to inflate: {io_err}",
-                self.path.display()
-            ))
-        })?;
+        let consumed = match &self.buffer {
+            PackBuffer::Memory(bytes) => {
+                let slice = bytes.get(start..).ok_or_else(|| {
+                    FractalError::CorruptStore(format!(
+                        "packfile '{}' object at offset {offset} has no payload region",
+                        self.path.display()
+                    ))
+                })?;
+                let mut decoder = ZlibDecoder::new(slice);
+                decoder.read_to_end(&mut out).map_err(|io_err| {
+                    FractalError::CorruptStore(format!(
+                        "packfile '{}' object at offset {offset} failed to inflate: {io_err}",
+                        self.path.display()
+                    ))
+                })?;
+                decoder.total_in() as usize
+            }
+            PackBuffer::Windowed(reader) => {
+                let stream = PackWindowStream::new(reader, start as u64, reader.total_len());
+                let mut decoder = ZlibDecoder::new(stream);
+                decoder.read_to_end(&mut out).map_err(|io_err| {
+                    FractalError::CorruptStore(format!(
+                        "packfile '{}' object at offset {offset} failed to inflate: {io_err}",
+                        self.path.display()
+                    ))
+                })?;
+                decoder.total_in() as usize
+            }
+        };
         if out.len() != declared_size {
             return Err(FractalError::CorruptStore(format!(
                 "packfile '{}' object at offset {offset} inflated to {} bytes but declared {declared_size}",
@@ -454,7 +566,7 @@ impl PackFile {
                 out.len()
             )));
         }
-        Ok((out, decoder.total_in() as usize))
+        Ok((out, consumed))
     }
 }
 
@@ -507,7 +619,7 @@ fn reconstruct(base: PackedObject, delta: &[u8], offset: u64) -> FractalResult<P
 
 #[cfg(test)]
 mod tests {
-    use super::{decode_ofs_offset, PackFile, PackedObject, MAX_CHAIN_DEPTH};
+    use super::{decode_ofs_offset, PackBuffer, PackFile, PackedObject, MAX_CHAIN_DEPTH};
     use crate::backends::pack_file::DeltaBaseSource;
     use fg_core::error::FractalResult;
     use fg_core::models::{ObjectKind, Oid};
@@ -664,5 +776,43 @@ mod tests {
             payload: b"x".to_vec(),
         };
         assert_eq!(left.clone(), left);
+    }
+
+    #[test]
+    fn test_windowed_pack_reading_and_parity() {
+        let (pack_mem, base_offset, delta_offset) = pack_with_ofs_delta();
+        assert!(!pack_mem.is_windowed());
+
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let pack_path = temp_dir.path().join("window_test.pack");
+        if let PackBuffer::Memory(ref bytes) = pack_mem.buffer {
+            std::fs::write(&pack_path, bytes).expect("write pack");
+        }
+
+        let pack_win = PackFile::load_windowed(&pack_path, 64).expect("load windowed");
+        assert!(pack_win.is_windowed());
+        assert_eq!(pack_win.object_count(), pack_mem.object_count());
+
+        let base_obj_mem = pack_mem.read_at(base_offset, &NoBase).expect("read mem base");
+        let base_obj_win = pack_win.read_at(base_offset, &NoBase).expect("read win base");
+        assert_eq!(base_obj_win, base_obj_mem);
+
+        let delta_obj_mem = pack_mem.read_at(delta_offset, &NoBase).expect("read mem delta");
+        let delta_obj_win = pack_win.read_at(delta_offset, &NoBase).expect("read win delta");
+        assert_eq!(delta_obj_win, delta_obj_mem);
+    }
+
+    #[test]
+    fn test_pack_buffer_read_slice_overflow_and_bounds() {
+        let buf = PackBuffer::Memory(vec![10, 20, 30, 40]);
+        assert_eq!(buf.len(), 4);
+        assert_eq!(buf.get_byte(0).unwrap(), 10);
+        assert_eq!(buf.get_byte(3).unwrap(), 40);
+        assert!(buf.get_byte(4).is_err());
+        assert!(buf.read_slice(usize::MAX, 1).is_err());
+        assert!(buf.read_slice(2, usize::MAX).is_err());
+        assert!(buf.read_slice(0, 5).is_err());
+        let slice = buf.read_slice(1, 2).expect("valid slice");
+        assert_eq!(slice, vec![20, 30]);
     }
 }

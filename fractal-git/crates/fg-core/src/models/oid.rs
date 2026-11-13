@@ -16,59 +16,8 @@ use crate::error::{FractalError, FractalResult};
 /// Character width of a hexadecimal OID rendering.
 const HEX_WIDTH: usize = 40;
 
-/// Compact 20-byte cryptographic object identifier representing standard Git SHA-1 hashes.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Oid([u8; 20]);
-
-impl Oid {
-    /// Zero OID constant (40 zeros).
-    pub const ZERO: Self = Self([0u8; 20]);
-
-    /// Constructs an Oid from 20 raw bytes.
-    pub const fn from_bytes(bytes: [u8; 20]) -> Self {
-        Self(bytes)
-    }
-
-    /// Parses a 40-character hexadecimal string into an Oid.
-    ///
-    /// # Errors
-    ///
-    /// Returns a typed codec error when the trimmed input is not exactly 40 bytes or holds a
-    /// character outside the hexadecimal alphabet. Multi-byte input is rejected rather than
-    /// sliced, so no character boundary can be crossed.
-    pub fn from_hex(hex_str: &str) -> FractalResult<Self> {
-        let hex = hex_str.trim();
-        let bytes = decode_fixed_hex::<20>(hex).map_err(|decode_err| match decode_err {
-            HexDecodeError::Length { actual, .. } => FractalError::ObjectCodec(format!(
-                "Invalid OID hex length: expected {HEX_WIDTH}, got {actual}"
-            )),
-            HexDecodeError::NonHex => {
-                FractalError::ObjectCodec(format!("Invalid hex byte in OID '{hex}'"))
-            }
-        })?;
-        Ok(Self(bytes))
-    }
-
-    /// Access raw 20-byte binary slice.
-    pub fn as_bytes(&self) -> &[u8; 20] {
-        &self.0
-    }
-
-    /// Returns lowercase 40-character hexadecimal representation.
-    pub fn to_hex(&self) -> String {
-        encode_hex(&self.0)
-    }
-
-    /// Derives an Oid from an SM3 32-byte digest by prefix projection.
-    pub fn from_sm3(digest: [u8; 32]) -> Self {
-        let mut bytes = [0u8; 20];
-        bytes.copy_from_slice(&digest[..20]);
-        Self(bytes)
-    }
-}
-
 /// Cryptographic hash algorithm families for object identification and audit chains.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum HashAlgorithm {
     /// Git standard SHA-1 (160 bits / 20 bytes).
     Sha1,
@@ -102,7 +51,182 @@ impl HashAlgorithm {
     }
 }
 
-/// Multi-algorithm cryptographic object identifier for sovereign and standard Git trees.
+/// Extended multi-algorithm cryptographic object identifier supporting Git SHA-1 (20 bytes),
+/// SHA-256 (32 bytes), and SM3 (32 bytes) with 100% backward compatibility for 20-byte SHA-1 APIs.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Oid {
+    algo: HashAlgorithm,
+    bytes: [u8; 32],
+}
+
+impl Oid {
+    /// Zero OID constant (40 zeros in Git SHA-1).
+    pub const ZERO: Self = Self {
+        algo: HashAlgorithm::Sha1,
+        bytes: [0u8; 32],
+    };
+
+    /// Constructs an Oid from 20 raw SHA-1 bytes.
+    pub const fn from_bytes(raw: [u8; 20]) -> Self {
+        let mut bytes = [0u8; 32];
+        let mut i = 0;
+        while i < 20 {
+            bytes[i] = raw[i];
+            i += 1;
+        }
+        Self {
+            algo: HashAlgorithm::Sha1,
+            bytes,
+        }
+    }
+
+    /// Constructs an Oid from 20 raw SHA-1 bytes.
+    pub const fn from_sha1(raw: [u8; 20]) -> Self {
+        Self::from_bytes(raw)
+    }
+
+    /// Constructs an Oid from 32 raw SHA-256 bytes.
+    pub const fn from_sha256(raw: [u8; 32]) -> Self {
+        Self {
+            algo: HashAlgorithm::Sha256,
+            bytes: raw,
+        }
+    }
+
+    /// Constructs an Oid from an SM3 32-byte digest preserving full 32-byte digest fidelity.
+    pub const fn from_sm3(digest: [u8; 32]) -> Self {
+        Self {
+            algo: HashAlgorithm::Sm3,
+            bytes: digest,
+        }
+    }
+
+    /// Constructs an Oid from a dynamic slice of either 20 or 32 bytes.
+    pub fn from_slice(slice: &[u8]) -> FractalResult<Self> {
+        match slice.len() {
+            20 => {
+                let mut raw = [0u8; 20];
+                raw.copy_from_slice(slice);
+                Ok(Self::from_bytes(raw))
+            }
+            32 => {
+                let mut raw = [0u8; 32];
+                raw.copy_from_slice(slice);
+                Ok(Self::from_sha256(raw))
+            }
+            len => Err(FractalError::ObjectCodec(format!(
+                "Invalid raw OID byte length: expected 20 or 32, got {len}"
+            ))),
+        }
+    }
+
+    /// Parses a hexadecimal string into an Oid (40 chars for SHA-1, 64 chars for SHA-256).
+    pub fn from_hex(hex_str: &str) -> FractalResult<Self> {
+        let hex = hex_str.trim();
+        match hex.len() {
+            40 => {
+                let bytes = decode_fixed_hex::<20>(hex).map_err(|decode_err| match decode_err {
+                    HexDecodeError::Length { actual, .. } => FractalError::ObjectCodec(format!(
+                        "Invalid OID hex length: expected {HEX_WIDTH}, got {actual}"
+                    )),
+                    HexDecodeError::NonHex => {
+                        FractalError::ObjectCodec(format!("Invalid hex byte in OID '{hex}'"))
+                    }
+                })?;
+                Ok(Self::from_bytes(bytes))
+            }
+            64 => {
+                let bytes = decode_fixed_hex::<32>(hex).map_err(|decode_err| match decode_err {
+                    HexDecodeError::Length { actual, .. } => FractalError::ObjectCodec(format!(
+                        "Invalid OID hex length: expected 64, got {actual}"
+                    )),
+                    HexDecodeError::NonHex => {
+                        FractalError::ObjectCodec(format!("Invalid hex byte in OID '{hex}'"))
+                    }
+                })?;
+                Ok(Self::from_sha256(bytes))
+            }
+            actual => Err(FractalError::ObjectCodec(format!(
+                "Invalid OID hex length: expected {HEX_WIDTH} or 64, got {actual}"
+            ))),
+        }
+    }
+
+    /// Parses a hexadecimal string with an explicit algorithm requirement.
+    pub fn from_hex_with_algorithm(hex_str: &str, algo: HashAlgorithm) -> FractalResult<Self> {
+        let hex = hex_str.trim();
+        let expected_len = algo.digest_length() * 2;
+        if hex.len() != expected_len {
+            return Err(FractalError::ObjectCodec(format!(
+                "Invalid OID hex length for {}: expected {expected_len}, got {}",
+                algo.as_str(),
+                hex.len()
+            )));
+        }
+        match algo {
+            HashAlgorithm::Sha1 => {
+                let bytes = decode_fixed_hex::<20>(hex).map_err(|_| {
+                    FractalError::ObjectCodec(format!("Invalid hex byte in OID '{hex}'"))
+                })?;
+                Ok(Self::from_bytes(bytes))
+            }
+            HashAlgorithm::Sha256 => {
+                let bytes = decode_fixed_hex::<32>(hex).map_err(|_| {
+                    FractalError::ObjectCodec(format!("Invalid hex byte in OID '{hex}'"))
+                })?;
+                Ok(Self::from_sha256(bytes))
+            }
+            HashAlgorithm::Sm3 => {
+                let bytes = decode_fixed_hex::<32>(hex).map_err(|_| {
+                    FractalError::ObjectCodec(format!("Invalid hex byte in OID '{hex}'"))
+                })?;
+                Ok(Self::from_sm3(bytes))
+            }
+        }
+    }
+
+    /// Access primary 20-byte binary array reference (100% backward compatible with Git SHA-1 APIs).
+    pub fn as_bytes(&self) -> &[u8; 20] {
+        let slice = &self.bytes[..20];
+        <&[u8; 20]>::try_from(slice).expect("20-byte slice conversion")
+    }
+
+    /// Access variable-length digest slice according to hash algorithm (20 or 32 bytes).
+    pub fn as_slice(&self) -> &[u8] {
+        &self.bytes[..self.algo.digest_length()]
+    }
+
+    /// Returns lowercase hexadecimal representation (40 or 64 characters).
+    pub fn to_hex(&self) -> String {
+        encode_hex(self.as_slice())
+    }
+
+    /// Returns the underlying hash algorithm family of this OID.
+    pub const fn algorithm(&self) -> HashAlgorithm {
+        self.algo
+    }
+
+    /// Self-projection retaining full digest structure.
+    pub fn to_canonical_oid(&self) -> Self {
+        *self
+    }
+
+    /// Backward-compatible alias for `to_canonical_oid`.
+    pub fn to_standard_oid(&self) -> Self {
+        *self
+    }
+
+    /// Converts this Oid into an explicit TypedOid enum.
+    pub fn to_typed(&self) -> TypedOid {
+        match self.algo {
+            HashAlgorithm::Sha1 => TypedOid::Sha1(*self.as_bytes()),
+            HashAlgorithm::Sha256 => TypedOid::Sha256(self.bytes),
+            HashAlgorithm::Sm3 => TypedOid::Sm3(self.bytes),
+        }
+    }
+}
+
+/// Multi-algorithm cryptographic object identifier enum for sovereign and standard Git trees.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Serialize, Deserialize)]
 pub enum TypedOid {
     Sha1([u8; 20]),
@@ -122,10 +246,7 @@ impl TypedOid {
 
     /// Renders the full hexadecimal representation of the digest.
     pub fn to_hex(&self) -> String {
-        match self {
-            Self::Sha1(bytes) => encode_hex(bytes),
-            Self::Sha256(bytes) | Self::Sm3(bytes) => encode_hex(bytes),
-        }
+        encode_hex(self.as_bytes())
     }
 
     /// Borrows the raw digest byte slice.
@@ -141,21 +262,30 @@ impl TypedOid {
         self.as_bytes()
     }
 
-    /// Projects this typed OID onto a canonical 20-byte Git plumbing OID.
+    /// Projects this typed OID onto a canonical OID without losing 32-byte digest precision.
     pub fn to_canonical_oid(&self) -> Oid {
         match self {
             Self::Sha1(bytes) => Oid::from_bytes(*bytes),
-            Self::Sha256(bytes) | Self::Sm3(bytes) => {
-                let mut truncated = [0u8; 20];
-                truncated.copy_from_slice(&bytes[..20]);
-                Oid::from_bytes(truncated)
-            }
+            Self::Sha256(bytes) => Oid::from_sha256(*bytes),
+            Self::Sm3(bytes) => Oid::from_sm3(*bytes),
         }
     }
 
     /// Backward-compatible alias for `to_canonical_oid`.
     pub fn to_standard_oid(&self) -> Oid {
         self.to_canonical_oid()
+    }
+}
+
+impl From<TypedOid> for Oid {
+    fn from(typed: TypedOid) -> Self {
+        typed.to_canonical_oid()
+    }
+}
+
+impl From<Oid> for TypedOid {
+    fn from(oid: Oid) -> Self {
+        oid.to_typed()
     }
 }
 
@@ -179,7 +309,21 @@ impl Serialize for Oid {
         if serializer.is_human_readable() {
             serializer.serialize_str(&self.to_hex())
         } else {
-            serializer.serialize_bytes(&self.0)
+            match self.algo {
+                HashAlgorithm::Sha1 => serializer.serialize_bytes(self.as_bytes()),
+                HashAlgorithm::Sha256 => {
+                    let mut buf = [0u8; 33];
+                    buf[0] = 0x01;
+                    buf[1..33].copy_from_slice(&self.bytes);
+                    serializer.serialize_bytes(&buf)
+                }
+                HashAlgorithm::Sm3 => {
+                    let mut buf = [0u8; 33];
+                    buf[0] = 0x02;
+                    buf[1..33].copy_from_slice(&self.bytes);
+                    serializer.serialize_bytes(&buf)
+                }
+            }
         }
     }
 }
@@ -195,7 +339,7 @@ impl<'de> Deserialize<'de> for Oid {
             type Value = Oid;
 
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("a 40-character hex string or 20 raw bytes for Oid")
+                formatter.write_str("a 40/64-character hex string or 20/32/33 raw bytes for Oid")
             }
 
             fn visit_str<E>(self, hex_text: &str) -> Result<Self::Value, E>
@@ -209,12 +353,29 @@ impl<'de> Deserialize<'de> for Oid {
             where
                 E: serde::de::Error,
             {
-                if byte_slice.len() == 20 {
-                    let mut buffer = [0u8; 20];
-                    buffer.copy_from_slice(byte_slice);
-                    Ok(Oid::from_bytes(buffer))
-                } else {
-                    Err(serde::de::Error::invalid_length(byte_slice.len(), &self))
+                match byte_slice.len() {
+                    20 => {
+                        let mut buffer = [0u8; 20];
+                        buffer.copy_from_slice(byte_slice);
+                        Ok(Oid::from_bytes(buffer))
+                    }
+                    32 => {
+                        let mut buffer = [0u8; 32];
+                        buffer.copy_from_slice(byte_slice);
+                        Ok(Oid::from_sha256(buffer))
+                    }
+                    33 => {
+                        let mut buffer = [0u8; 32];
+                        buffer.copy_from_slice(&byte_slice[1..33]);
+                        match byte_slice[0] {
+                            0x01 => Ok(Oid::from_sha256(buffer)),
+                            0x02 => Ok(Oid::from_sm3(buffer)),
+                            tag => Err(serde::de::Error::custom(format!(
+                                "Unknown OID algorithm tag {tag} in binary payload"
+                            ))),
+                        }
+                    }
+                    len => Err(serde::de::Error::invalid_length(len, &self)),
                 }
             }
 
@@ -222,13 +383,14 @@ impl<'de> Deserialize<'de> for Oid {
             where
                 A: serde::de::SeqAccess<'de>,
             {
-                let mut buffer = [0u8; 20];
-                for (index, byte_slot) in buffer.iter_mut().enumerate() {
-                    *byte_slot = seq
-                        .next_element()?
-                        .ok_or_else(|| serde::de::Error::invalid_length(index, &self))?;
+                let mut buffer = Vec::with_capacity(33);
+                while let Some(byte_val) = seq.next_element()? {
+                    buffer.push(byte_val);
+                    if buffer.len() > 33 {
+                        return Err(serde::de::Error::invalid_length(buffer.len(), &self));
+                    }
                 }
-                Ok(Oid::from_bytes(buffer))
+                self.visit_bytes(&buffer)
             }
         }
 
@@ -283,7 +445,38 @@ mod tests {
         assert_eq!(typed.as_slice().len(), 32);
         let standard = typed.to_standard_oid();
         assert_eq!(standard.as_bytes(), &sm3_bytes[..20]);
+        assert_eq!(standard.as_slice(), &sm3_bytes[..]);
         let direct = Oid::from_sm3(sm3_bytes);
         assert_eq!(standard, direct);
+        assert_eq!(direct.as_slice().len(), 32);
+        assert_eq!(direct.algorithm(), HashAlgorithm::Sm3);
+    }
+
+    #[test]
+    fn test_oid_binary_serde_preserves_algorithms() {
+        use serde::de::Deserialize;
+        let oid_sm3 = Oid::from_sm3([0xab; 32]);
+        let mut buf_sm3 = [0u8; 33];
+        buf_sm3[0] = 0x02;
+        buf_sm3[1..33].copy_from_slice(oid_sm3.as_slice());
+        let de_sm3 = Oid::deserialize(serde::de::value::BytesDeserializer::<serde::de::value::Error>::new(&buf_sm3))
+            .expect("deserialize sm3");
+        assert_eq!(de_sm3.algorithm(), HashAlgorithm::Sm3);
+        assert_eq!(de_sm3, oid_sm3);
+
+        let oid_sha256 = Oid::from_sha256([0xcd; 32]);
+        let mut buf_sha256 = [0u8; 33];
+        buf_sha256[0] = 0x01;
+        buf_sha256[1..33].copy_from_slice(oid_sha256.as_slice());
+        let de_sha256 = Oid::deserialize(serde::de::value::BytesDeserializer::<serde::de::value::Error>::new(&buf_sha256))
+            .expect("deserialize sha256");
+        assert_eq!(de_sha256.algorithm(), HashAlgorithm::Sha256);
+        assert_eq!(de_sha256, oid_sha256);
+
+        let oid_sha1 = Oid::from_bytes([0x12; 20]);
+        let de_sha1 = Oid::deserialize(serde::de::value::BytesDeserializer::<serde::de::value::Error>::new(oid_sha1.as_bytes()))
+            .expect("deserialize sha1");
+        assert_eq!(de_sha1.algorithm(), HashAlgorithm::Sha1);
+        assert_eq!(de_sha1, oid_sha1);
     }
 }

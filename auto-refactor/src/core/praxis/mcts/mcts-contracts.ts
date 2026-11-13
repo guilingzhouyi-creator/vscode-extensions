@@ -38,6 +38,10 @@ export interface CandidateStrategy {
         args?: string[];
         timeoutMs?: number;
     };
+    /** Optional rule identifier associated with candidate */
+    ruleId?: string;
+    /** Optional priority weight for search expansion */
+    priority?: number;
 }
 
 /**
@@ -81,6 +85,14 @@ export interface MctsNode {
     uctValue: number;
     /** Exploration status */
     status: 'pending' | 'evaluated' | 'promoted' | 'discarded';
+    /** Search tree ply depth (1 = root expansion, 2 = 2-ply, 3 = 3-ply) */
+    depth?: number;
+    /** Identifier of parent node in search tree */
+    parentId?: string;
+    /** Child nodes explored along this branch */
+    children?: MctsNode[];
+    /** Accumulated chain of strategies along this path */
+    strategyChain?: CandidateStrategy[];
 }
 
 /**
@@ -106,4 +118,10 @@ export interface ExplorationVerdict {
     }>;
     /** Total exploration duration in milliseconds */
     durationMs: number;
+    /** Ordered sequence of strategies in winning multi-step chain */
+    winningChain?: CandidateStrategy[];
+    /** Maximum tree depth explored during tournament */
+    treeDepthExplored?: number;
+    /** True if exploration terminated early due to timeout */
+    timedOut?: boolean;
 }

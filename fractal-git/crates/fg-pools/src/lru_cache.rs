@@ -142,7 +142,19 @@ impl<K: Hash + Eq + Clone, V> LruInner<K, V> {
         }
     }
 
-    fn insert(&mut self, key: K, value: V, size_bytes: usize) {
+    fn insert(&mut self, key: K, value: V, size_bytes: usize) -> bool {
+        if size_bytes > self.max_bytes {
+            if let Some(slot_index) = self.entries.remove(&key) {
+                if let Some(Some(ref node)) = self.nodes.get(slot_index) {
+                    self.current_bytes = self.current_bytes.saturating_sub(node.size_bytes);
+                }
+                self.detach_node(slot_index);
+                self.nodes[slot_index] = None;
+                self.free_slots.push(slot_index);
+            }
+            return false;
+        }
+
         if let Some(&slot_index) = self.entries.get(&key) {
             let old_size = if let Some(Some(ref mut node)) = self.nodes.get_mut(slot_index) {
                 let previous = node.size_bytes;
@@ -182,6 +194,7 @@ impl<K: Hash + Eq + Clone, V> LruInner<K, V> {
                 self.current_bytes = self.current_bytes.saturating_sub(evicted_size);
             }
         }
+        true
     }
 
     fn clear(&mut self) {
@@ -213,9 +226,9 @@ impl<K: Hash + Eq + Clone, V> ByteLruCache<K, V> {
         self.inner.lock().contains(key)
     }
 
-    /// Inserts an entry along with its physical byte footprint.
-    pub fn insert(&self, key: K, value: V, size_bytes: usize) {
-        self.inner.lock().insert(key, value, size_bytes);
+    /// Inserts an entry along with its physical byte footprint. Returns true if accepted, false if oversized.
+    pub fn insert(&self, key: K, value: V, size_bytes: usize) -> bool {
+        self.inner.lock().insert(key, value, size_bytes)
     }
 
     /// Current allocated memory footprint in bytes.
@@ -249,5 +262,24 @@ impl<K: Hash + Eq + Clone, V: Clone> ByteLruCache<K, V> {
     /// marking it as most-recently-used.
     pub fn get(&self, key: &K) -> Option<V> {
         self.inner.lock().get(key).cloned()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_byte_lru_oversized_key_interception() {
+        let cache = ByteLruCache::<String, Vec<u8>>::new(100);
+        assert!(cache.insert("small".to_string(), vec![1; 40], 40));
+        assert_eq!(cache.current_bytes(), 40);
+        assert_eq!(cache.len(), 1);
+
+        // Oversized entry (> 100 bytes) must be rejected without evicting "small"
+        assert!(!cache.insert("huge".to_string(), vec![2; 120], 120));
+        assert_eq!(cache.current_bytes(), 40);
+        assert_eq!(cache.len(), 1);
+        assert!(cache.contains(&"small".to_string()));
     }
 }
