@@ -28,8 +28,8 @@ func validate_and_sanitize(settings: GameSettingsAggregate) -> bool:
 	)
 
 	# 3. 分辨率合法性：低于下限则回退到安全分辨率
-	var w = settings.render_settings.get("resolution_width", _default_width())
-	var h = settings.render_settings.get("resolution_height", _default_height())
+	var w: Variant = settings.render_settings.get("resolution_width", _default_width())
+	var h: Variant = settings.render_settings.get("resolution_height", _default_height())
 	if w < _min_width() or h < _min_height():
 		settings.render_settings["resolution_width"] = _fallback_width()
 		settings.render_settings["resolution_height"] = _fallback_height()

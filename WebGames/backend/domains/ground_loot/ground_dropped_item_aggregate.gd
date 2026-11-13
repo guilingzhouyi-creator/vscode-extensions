@@ -81,7 +81,7 @@ static func create_from_declaration(canonical_id: String, catalog: ItemRegistryC
 		return {"success": false, "error_code": "EMPTY_ITEM_KEY"}
 	if catalog == null:
 		return {"success": false, "error_code": "NO_CATALOG"}
-	var proto = catalog.get_prototype(canonical_id)
+	var proto: Variant = catalog.get_prototype(canonical_id)
 	if proto == null:
 		return {"success": false, "error_code": "ITEM_NOT_REGISTERED", "canonical_id": canonical_id}
 	var item := ItemInstanceFactory.build_instance(proto, display_name if not display_name.is_empty() else proto.english_name, "DRP_")

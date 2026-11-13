@@ -63,7 +63,7 @@ static func attempt_pickup(
 				"error_message": _msg("inventory_full")
 			}
 
-	var picked_item = drop.item_entity
+	var picked_item: Variant = drop.item_entity
 	drop.item_entity = null # 移出地面实体（所有权移交背包）
 
 	# GAP-01 修复：统计接入（对称 mail/gacha/quest/shop 路径）

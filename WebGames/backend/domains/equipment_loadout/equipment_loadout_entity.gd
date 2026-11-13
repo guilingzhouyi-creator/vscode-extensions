@@ -46,7 +46,7 @@ func get_equipped_item(slot_name: String) -> ItemEntity:
 func equip(slot_name: String, item: ItemEntity) -> ItemEntity:
 	if not slots.has(slot_name):
 		return null
-	var old = slots[slot_name]
+	var old: Variant = slots[slot_name]
 	slots[slot_name] = item
 	if item is ItemEntity:
 		item.container_state = "EQUIPPED"
@@ -58,7 +58,7 @@ func equip(slot_name: String, item: ItemEntity) -> ItemEntity:
 func unequip(slot_name: String) -> ItemEntity:
 	if not slots.has(slot_name):
 		return null
-	var old = slots[slot_name]
+	var old: Variant = slots[slot_name]
 	slots[slot_name] = null
 	if old is ItemEntity:
 		old.container_state = "UNOWNED"
@@ -84,7 +84,7 @@ func unequip_item_ref(item: ItemEntity) -> String:
 func serialize() -> Dictionary:
 	var s_dict := {}
 	for k in slots:
-		var it = slots[k]
+		var it: Variant = slots[k]
 		if it is ItemEntity:
 			s_dict[k] = it.serialize()
 	return { "loadout_id": loadout_id, "loadout_name": loadout_name, "slots": s_dict }
@@ -94,7 +94,7 @@ static func deserialize(d: Dictionary) -> EquipmentLoadoutAggregate:
 	var l := EquipmentLoadoutAggregate.new()
 	l.loadout_id = d.get("loadout_id", GameConfig.get_string("domains.equipment", "loadout_defaults/fallback_id", "LOADOUT_01"))
 	l.loadout_name = d.get("loadout_name", GameConfig.get_string("domains.equipment", "loadout_defaults/fallback_name", "战备套"))
-	var raw_slots = d.get("slots", {})
+	var raw_slots: Variant = d.get("slots", {})
 	for k in raw_slots:
 		if l.slots.has(k) and raw_slots[k] is Dictionary:
 			l.slots[k] = ItemEntity.deserialize(raw_slots[k]) # 槽位键作实例判别子：同模板多件迁移 UID 互异
@@ -109,7 +109,7 @@ static func deserialize(d: Dictionary) -> EquipmentLoadoutAggregate:
 func snapshot_slots() -> Dictionary:
 	var snap := {}
 	for slot_name in slots:
-		var it = slots[slot_name]
+		var it: Variant = slots[slot_name]
 		if it is ItemEntity:
 			snap[slot_name] = it.item_uid
 	return snap
@@ -120,7 +120,7 @@ func restore_slots(snap: Dictionary, inventory: WearableInventoryAggregate = nul
 	if snap == null:
 		return
 	for slot_name in slots:
-		var cur = slots[slot_name]
+		var cur: Variant = slots[slot_name]
 		if cur is ItemEntity:
 			cur.container_state = "UNOWNED"
 		slots[slot_name] = null

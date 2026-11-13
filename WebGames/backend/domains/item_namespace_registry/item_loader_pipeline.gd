@@ -27,8 +27,8 @@ static func load_from_dict_list(catalog: ItemRegistryCatalog, items_data: Array)
 	var default_minor: String = GameConfig.get_string("domains.item_namespace_registry", "defaults/category_minor", "WEAPON_BLADE")
 
 	for item_dict in sorted_data:
-		var proto = _build_prototype(item_dict, default_minor)
-		var res = ItemRegistrySolver.register_prototype(catalog, proto)
+		var proto: Variant = _build_prototype(item_dict, default_minor)
+		var res: Variant = ItemRegistrySolver.register_prototype(catalog, proto)
 		if res.success:
 			loaded_count += 1
 			# 统一名称注册表接线：物品名称键登记（域所有者 = item，en_US 英文底座必达）
@@ -71,9 +71,7 @@ static func build_catalog_from_config() -> ItemRegistryCatalog:
 	load_all_from_config(catalog)
 	return catalog
 
-## 自动发现并加载全部 config/items/*.json 表（表名 "items.<文件名>"）：
-## MOD / DLC 新增文件即自动收录，无需改装配代码。
-static func load_all_from_config(catalog: ItemRegistryCatalog) -> Dictionary:
+static func _collect_configured_items() -> Array:
 	var table_names: Array = GameConfig.get_table_names().filter(
 		func(name): return str(name).begins_with("items.")
 	)
@@ -81,17 +79,21 @@ static func load_all_from_config(catalog: ItemRegistryCatalog) -> Dictionary:
 	var all_items: Array = []
 	var empty_items: Array = []
 	for table_name in table_names:
-		all_items.append_array(GameConfig.get_array(str(table_name), "items", empty_items))
-	return load_from_dict_list(catalog, all_items)
+		_append_config_table_items(all_items, str(table_name), empty_items)
+	return all_items
+
+static func _append_config_table_items(out_items: Array, table_name: String, empty_items: Array) -> void:
+	out_items.append_array(GameConfig.get_array(table_name, "items", empty_items))
+
+## 自动发现并加载全部 config/items/*.json 表（表名 "items.<文件名>"）：
+## MOD / DLC 新增文件即自动收录，无需改装配代码。
+static func load_all_from_config(catalog: ItemRegistryCatalog) -> Dictionary:
+	return load_from_dict_list(catalog, _collect_configured_items())
 
 ## 配置热重载回收：同步注册表与 config/items/*.json 的差异——
 ## 配置中已删除的物品自动注销（数字 ID 与名称键回空闲池），新增物品自动注册。
 static func reload_from_config(catalog: ItemRegistryCatalog) -> Dictionary:
-	var all_items: Array = []
-	var empty_items: Array = []
-	for table_name in GameConfig.get_table_names():
-		if str(table_name).begins_with("items."):
-			all_items.append_array(GameConfig.get_array(str(table_name), "items", empty_items))
+	var all_items: Array = _collect_configured_items()
 
 	var configured_ids: Dictionary = {}
 	for it in all_items:
@@ -103,7 +105,7 @@ static func reload_from_config(catalog: ItemRegistryCatalog) -> Dictionary:
 	var unregistered: Array = []
 	for canonical_id in catalog._canonical_registry.keys():
 		if not configured_ids.has(str(canonical_id)):
-			var res = ItemRegistrySolver.unregister_prototype(catalog, str(canonical_id))
+			var res: Variant = ItemRegistrySolver.unregister_prototype(catalog, str(canonical_id))
 			if res.success:
 				unregistered.append(str(canonical_id))
 

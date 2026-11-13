@@ -37,12 +37,11 @@ static func is_acyclic_dag(ast: SkillSubgraphAST) -> bool:
 	var adj: Dictionary = {}
 
 	for node_id in ast.nodes:
-		in_degree[node_id] = 0
-		adj[node_id] = []
+		_register_dag_node_bucket(node_id, in_degree, adj)
 
 	for edge in ast.edges:
-		var u = edge.get("from", "")
-		var v = edge.get("to", "")
+		var u: Variant = edge.get("from", "")
+		var v: Variant = edge.get("to", "")
 		if in_degree.has(v) and adj.has(u):
 			in_degree[v] += 1
 			adj[u].append(v)
@@ -61,6 +60,10 @@ static func is_acyclic_dag(ast: SkillSubgraphAST) -> bool:
 		_process_topological_neighbors(curr, adj, in_degree, queue)
 
 	return visited_count == ast.nodes.size()
+
+static func _register_dag_node_bucket(node_id: Variant, in_degree: Dictionary, adj: Dictionary) -> void:
+	in_degree[node_id] = 0
+	adj[node_id] = []
 
 ## 消耗拓扑排序当前节点的后继入度
 static func _process_topological_neighbors(curr: String, adj: Dictionary, in_degree: Dictionary, queue: Array[String]) -> void:

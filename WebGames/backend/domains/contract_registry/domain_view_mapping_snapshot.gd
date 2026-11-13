@@ -67,7 +67,7 @@ static func from_dto(dict: Dictionary) -> Resource:
 		return snap
 
 	snap.domain_name = String(dict.get("domain_name", ""))
-	var st = dict.get("coverage_status", "MISSING")
+	var st: Variant = dict.get("coverage_status", "MISSING")
 	if st is String:
 		match String(st).to_upper():
 			"FULL": snap.coverage_status = CoverageStatus.FULL
@@ -82,7 +82,7 @@ static func from_dto(dict: Dictionary) -> Resource:
 	snap.backend_file_count = int(dict.get("backend_file_count", 0))
 	snap.backend_static_method_count = int(dict.get("backend_static_method_count", 0))
 
-	var raw_v = dict.get("frontend_view_names", [])
+	var raw_v: Variant = dict.get("frontend_view_names", [])
 	if raw_v is Array:
 		var arr_v: Array[String] = []
 		for item in raw_v:
@@ -91,7 +91,7 @@ static func from_dto(dict: Dictionary) -> Resource:
 	else:
 		snap.frontend_view_names = []
 
-	var raw_t = dict.get("frontend_tab_names", [])
+	var raw_t: Variant = dict.get("frontend_tab_names", [])
 	if raw_t is Array:
 		var arr_t: Array[String] = []
 		for item in raw_t:
@@ -100,7 +100,7 @@ static func from_dto(dict: Dictionary) -> Resource:
 	else:
 		snap.frontend_tab_names = []
 
-	var raw_c = dict.get("contract_ids", [])
+	var raw_c: Variant = dict.get("contract_ids", [])
 	if raw_c is Array:
 		var arr_c: Array[String] = []
 		for item in raw_c:

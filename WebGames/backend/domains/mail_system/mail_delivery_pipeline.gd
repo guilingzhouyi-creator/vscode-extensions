@@ -40,26 +40,27 @@ static func claim_single_mail(
 			"claimed_items_count": 0
 		}
 
-	var claimed_gold = mail.attachment_gold
-	var claimed_crystals = mail.attachment_crystals
-	var claimed_silver = mail.attachment_silver
-	var claimed_copper = mail.attachment_copper
+	var claimed_gold: Variant = mail.attachment_gold
+	var claimed_crystals: Variant = mail.attachment_crystals
+	var claimed_silver: Variant = mail.attachment_silver
+	var claimed_copper: Variant = mail.attachment_copper
 
 	var remaining_items: Array[Dictionary] = []
 	var claimed_items_count: int = 0
 
 	var inventory_snapshot := inventory.snapshot()
 	var mail_items_snapshot := mail.attachment_items.duplicate(true)
+	var max_item_quantity: int = GameConfig.get_int("domains.inventory", "transaction/max_item_quantity", 1000)
 	for item_dict in mail.attachment_items:
 		# 注册表三元组发放：template_id 必填且须为已登记 canonical_id，
 		# 未登记附件不可提取（数据错误安全留存，等待修复后重试）
 		var item_id := str(item_dict.get("template_id", ""))
 		var item_count := int(item_dict.get("count", 1))
-		if item_count <= 0 or item_count > GameConfig.get_int("domains.inventory", "transaction/max_item_quantity", 1000):
+		if item_count <= 0 or item_count > max_item_quantity:
 			inventory.restore(inventory_snapshot)
 			mail.attachment_items = mail_items_snapshot
 			return {"success": false, "error_code": "INVALID_ATTACHMENT_COUNT"}
-		var proto = catalog.get_prototype(item_id)
+		var proto: Variant = catalog.get_prototype(item_id)
 		if proto == null:
 			remaining_items.append(item_dict)
 			continue

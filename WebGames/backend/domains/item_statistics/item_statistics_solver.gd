@@ -47,13 +47,13 @@ static func record_item_event(
 	var major := "UNCATEGORIZED"
 	var minor := "UNSPECIFIED"
 	if catalog != null:
-		var proto = catalog.get_prototype(canonical_id)
+		var proto: Variant = catalog.get_prototype(canonical_id)
 		if proto != null:
 			major = proto.category_major
 			minor = proto.category_minor
 
 	library.mount_item(canonical_id, major, minor)
-	var applied = library.apply_item_delta(canonical_id, EVENT_TO_STAT_KEY[event_name], quantity)
+	var applied: Variant = library.apply_item_delta(canonical_id, EVENT_TO_STAT_KEY[event_name], quantity)
 
 	# 旁路遥测落点（可空注入；环形缓冲 + 批量刷盘由 TelemetrySidecarEngine 承担）
 	if telemetry != null and GameConfig.get_bool("domains.item_statistics", "telemetry/record_to_sidecar", true):

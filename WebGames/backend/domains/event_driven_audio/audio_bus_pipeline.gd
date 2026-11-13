@@ -43,7 +43,7 @@ static func dispatch_sound_event(
 ) -> Dictionary:
 	var cfg_max := GameConfig.get_int("domains.event_driven_audio", "concurrency/max_per_sound", 4)
 	var max_conc := max_concurrency_per_sound if max_concurrency_per_sound >= 0 else cfg_max
-	var current_playing = active_sound_counts.get(cmd.sound_id, 0)
+	var current_playing: Variant = active_sound_counts.get(cmd.sound_id, 0)
 	if current_playing >= max_conc:
 		return {
 			"dispatched": false,
@@ -58,7 +58,7 @@ static func dispatch_sound_event(
 		AudioDispatchCommandDTO.AudioBusTrack.ME: bus_key = tracks.get("ME", "ME")
 
 	var track_master_vol: float = bus_volumes.get(bus_key, 1.0)
-	var eval_res = SpatialAudioSolver.evaluate_spatial_audio(cmd, listener_pos, track_master_vol)
+	var eval_res: Variant = SpatialAudioSolver.evaluate_spatial_audio(cmd, listener_pos, track_master_vol)
 
 	if eval_res.play:
 		active_sound_counts[cmd.sound_id] = current_playing + 1

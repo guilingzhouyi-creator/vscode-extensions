@@ -54,7 +54,7 @@ static func evaluate_devour_evolution(
 	var overload_self_damage := GameConfig.get_float("domains.monster", "devour/overload_self_damage", 9999.0)
 
 	# 统一六维底座：容纳上限按 CON 底层实际值折算（等级不变时数值亦可联动）
-	var con_capacity = monster.physiology.get_actual_value("CON") * capacity_multiplier
+	var con_capacity: Variant = monster.physiology.get_actual_value("CON") * capacity_multiplier
 	if absorbed_mana > con_capacity * overload_threshold:
 		return {
 			"status": GameConfig.get_string("domains.monster", "devour/status_overload_explosion", "OVERLOAD_EXPLOSION"),

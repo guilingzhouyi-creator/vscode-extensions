@@ -58,11 +58,11 @@ static func execute_cheat_command(
 			var count := int(args[1]) if args.size() > 1 else 1
 			count = maxi(1, count)
 			# 严格按统一英文名解析（唯一合法输入）：中文别名、数字 ID、canonical_id 一律拒绝
-			var resolved = ItemRegistrySolver.resolve_by_english_name(catalog, item_name)
+			var resolved: Variant = ItemRegistrySolver.resolve_by_english_name(catalog, item_name)
 			if not resolved.success:
 				var nf := GameConfig.get_string("narratives.admin", "give_item_not_found", "Item not found in registry: %s") % item_name
 				return { "success": false, "reason": nf }
-			var proto = catalog.get_prototype(resolved.canonical_id)
+			var proto: Variant = catalog.get_prototype(resolved.canonical_id)
 			var added := 0
 			for i in range(count):
 				var item := _build_registry_item(item_name, proto)

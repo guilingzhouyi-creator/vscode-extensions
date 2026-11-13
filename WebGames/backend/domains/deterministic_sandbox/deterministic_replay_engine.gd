@@ -66,8 +66,8 @@ static func simulate_replay(
 		var fp: Variant = fp_format % [snapshot.tick, hp, ap, dmg]
 		state_fingerprints.append(fp)
 
-	var summary_str = summary_sep.join(state_fingerprints)
-	var final_hash = summary_str.sha256_text()
+	var summary_str: String = summary_sep.join(state_fingerprints)
+	var final_hash: String = summary_str.sha256_text()
 
 	return {
 		"final_hp": hp,

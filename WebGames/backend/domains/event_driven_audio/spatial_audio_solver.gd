@@ -32,7 +32,7 @@ static func evaluate_spatial_audio(
 			"pitch": cmd.pitch_scale
 		}
 
-	var dist = listener_pos.distance_to(cmd.source_pos)
+	var dist: float = listener_pos.distance_to(cmd.source_pos)
 	if dist >= cmd.max_audible_distance:
 		return {
 			"play": false,
@@ -43,10 +43,10 @@ static func evaluate_spatial_audio(
 
 	# 线性几何声学距离衰减：1.0（贴脸）→ 0.0（可听半径边缘）
 	var dist_factor := clampf(1.0 - (dist / cmd.max_audible_distance), 0.0, 1.0)
-	var eff_vol = cmd.volume_scale * dist_factor * master_volume
+	var eff_vol: Variant = cmd.volume_scale * dist_factor * master_volume
 
 	# 左右声道水平声相 (Pan: -1.0 左, +1.0 右)
-	var delta_x = cmd.source_pos.x - listener_pos.x
+	var delta_x: Variant = cmd.source_pos.x - listener_pos.x
 	var pan := clampf(delta_x / cmd.max_audible_distance, -1.0, 1.0)
 
 	return {

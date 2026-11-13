@@ -38,7 +38,7 @@ static func evaluate(node: Dictionary, ctx: Dictionary = {}) -> bool:
 
 ## AND 语义：全子项成立（空/非法 terms 受控失败）
 static func _eval_and(node: Dictionary, ctx: Dictionary) -> bool:
-	var terms = node.get("terms", [])
+	var terms: Variant = node.get("terms", [])
 	if not terms is Array or terms.is_empty():
 		return false
 	for term in terms:
@@ -48,7 +48,7 @@ static func _eval_and(node: Dictionary, ctx: Dictionary) -> bool:
 
 ## OR 语义：任一子项成立（空/非法 terms 受控失败）
 static func _eval_or(node: Dictionary, ctx: Dictionary) -> bool:
-	var terms = node.get("terms", [])
+	var terms: Variant = node.get("terms", [])
 	if not terms is Array or terms.is_empty():
 		return false
 	for term in terms:
@@ -58,10 +58,10 @@ static func _eval_or(node: Dictionary, ctx: Dictionary) -> bool:
 
 ## NOT 语义：唯一子项取反（非单子项受控失败）
 static func _eval_not(node: Dictionary, ctx: Dictionary) -> bool:
-	var terms = node.get("terms", [])
+	var terms: Variant = node.get("terms", [])
 	if not terms is Array or terms.size() != 1:
 		return false
-	var term = terms[0]
+	var term: Variant = terms[0]
 	if not term is Dictionary:
 		return false
 	return not evaluate(term, ctx)

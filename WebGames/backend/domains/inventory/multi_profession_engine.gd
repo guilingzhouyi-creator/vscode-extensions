@@ -43,12 +43,12 @@ static func _count_ast_symbols(
 ) -> Vector2i:
 	if ast == null:
 		return Vector2i.ZERO
-	var nodes_dict = ast.nodes if "nodes" in ast else {}
+	var nodes_dict: Variant = ast.nodes if "nodes" in ast else {}
 	var phys := 0
 	var magic := 0
 	for node in nodes_dict.values():
-		var ntype = node.get("node_type", "")
-		var symbol = node.get("symbol", "")
+		var ntype: Variant = node.get("node_type", "")
+		var symbol: Variant = node.get("symbol", "")
 		if ntype == phys_node_type or symbol in phys_symbols:
 			phys += 1
 		elif ntype == magic_node_type or symbol in magic_symbols:

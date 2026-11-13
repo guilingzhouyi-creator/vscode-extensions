@@ -35,7 +35,8 @@ var _is_metric_dirty: bool = true
 ## 装配槽位映射表（wearable/slots 配置驱动，默认 7 槽全置空）
 static func _build_slot_map() -> Dictionary:
 	var map := {}
-	for slot in GameConfig.get_array("domains.inventory", "wearable/slots", ["HEAD", "CHEST", "LEGS", "FEET", "MAIN_HAND", "OFF_HAND", "BACKPACK"]):
+	var slots: Array = GameConfig.get_array("domains.inventory", "wearable/slots", ["HEAD", "CHEST", "LEGS", "FEET", "MAIN_HAND", "OFF_HAND", "BACKPACK"])
+	for slot in slots:
 		map[slot] = null
 	return map
 
@@ -73,7 +74,7 @@ func calculate_total_capacity(race_bonus: float = 0.0) -> int:
 	var capacity_slots: Array = GameConfig.get_array("domains.inventory", "wearable/capacity_slots", ["BACKPACK"])
 	var total: int = baseline_capacity
 	for slot_key in equipped_slots:
-		var slot_val = equipped_slots[slot_key]
+		var slot_val: Variant = equipped_slots[slot_key]
 		if slot_val is ItemEntity:
 			if slot_val.category == armor_category or slot_key in capacity_slots:
 				total += slot_val.volume_slots
@@ -199,7 +200,7 @@ func equip_item(slot: String, item: ItemEntity) -> bool:
 func unequip_item(slot: String) -> ItemEntity:
 	if not equipped_slots.has(slot):
 		return null
-	var item = equipped_slots[slot]
+	var item: Variant = equipped_slots[slot]
 	equipped_slots[slot] = null
 	if item is ItemEntity:
 		item.container_state = "UNOWNED"
@@ -235,7 +236,7 @@ func snapshot() -> Dictionary:
 			storage_payloads.append(item.serialize())
 	var equipped_payloads := {}
 	for slot_key in equipped_slots:
-		var slot_item = equipped_slots[slot_key]
+		var slot_item: Variant = equipped_slots[slot_key]
 		equipped_payloads[slot_key] = slot_item.serialize() if slot_item is ItemEntity else null
 	return {
 		"storage_payloads": storage_payloads,
@@ -259,7 +260,7 @@ func restore(snapshot_data: Dictionary) -> void:
 		var rebuilt_slots := {}
 		var raw_slots: Dictionary = snapshot_data.get("equipped_payloads", {})
 		for slot_key in raw_slots:
-			var raw = raw_slots[slot_key]
+			var raw: Variant = raw_slots[slot_key]
 			rebuilt_slots[slot_key] = ItemEntity.deserialize(raw) if raw is Dictionary else null
 		equipped_slots = rebuilt_slots
 	else:

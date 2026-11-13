@@ -40,7 +40,7 @@ static func handle_device_input_event(
 	event_source_type: String,
 	current_timestamp_ms: int
 ) -> bool:
-	var prev_device = state.current_device
+	var prev_device: Variant = state.current_device
 	match event_source_type.to_upper():
 		"JOYPAD_MOTION", "JOYPAD_BUTTON":
 			state.current_device = InputDeviceStateAggregate.ActiveInputDevice.GAMEPAD_CONTROLLER

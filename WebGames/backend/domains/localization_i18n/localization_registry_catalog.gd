@@ -147,6 +147,18 @@ func merge_mod_translations(
         "overridden_count": overridden_count
     }
 
+func _restore_locale_mod_keys(locale: Variant, keys: Array, orig_map: Dictionary) -> int:
+    var restored_count := 0
+    for loc_key in keys:
+        var key_str := str(loc_key)
+        if orig_map.has(key_str):
+            _locale_dictionaries[locale][key_str] = orig_map[key_str]
+        else:
+            _locale_dictionaries[locale].erase(key_str)
+        restored_count += 1
+    return restored_count
+
+
 ## 干净卸载第三方 MOD 多语言词条（恢复原有 Vanilla 原生模板，彻底消除内存残留）
 func unload_mod_translations(mod_id: String) -> int:
     if not _mod_translations.has(mod_id):
@@ -159,14 +171,7 @@ func unload_mod_translations(mod_id: String) -> int:
     for locale in mod_locales:
         var keys: Array = mod_locales[locale]
         var orig_map: Dictionary = mod_orig.get(locale, EMPTY_DICT)
-
-        for loc_key in keys:
-            var key_str := str(loc_key)
-            if orig_map.has(key_str):
-                _locale_dictionaries[locale][key_str] = orig_map[key_str]
-            else:
-                _locale_dictionaries[locale].erase(key_str)
-            cleaned_count += 1
+        cleaned_count += _restore_locale_mod_keys(locale, keys, orig_map)
 
     _mod_translations.erase(mod_id)
     _mod_original_templates.erase(mod_id)

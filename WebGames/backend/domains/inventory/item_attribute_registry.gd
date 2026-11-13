@@ -31,7 +31,7 @@ func reload_configuration() -> void:
 	_definitions.clear()
 	var raw_attrs: Dictionary = GameConfig.get_dict("domains.item_attributes", "attributes", {})
 	for attr_uid in raw_attrs.keys():
-		var raw_item = raw_attrs[attr_uid]
+		var raw_item: Variant = raw_attrs[attr_uid]
 		if not (raw_item is Dictionary):
 			continue
 		var def := ItemAttributeDefinition.from_dto(raw_item as Dictionary)

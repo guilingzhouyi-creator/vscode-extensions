@@ -115,7 +115,7 @@ func get_active_world_slot() -> String:
 func is_world_slot_placeholder(world_id: String) -> bool:
 	if world_id.is_empty() or not world_slots.has(world_id):
 		return true
-	var val = str(world_slots.get(world_id, ""))
+	var val: String = str(world_slots.get(world_id, ""))
 	return val == RESERVED_PLACEHOLDER or val == UNBOUND_WORLD_SLOT
 
 ## 绑定世界槽位
@@ -129,7 +129,7 @@ func bind_world_slot(world_id: String, slot_id: String) -> bool:
 func serialize() -> Dictionary:
 	var slots_dict := {}
 	for k in save_slot_summaries:
-		var item = save_slot_summaries[k]
+		var item: Variant = save_slot_summaries[k]
 		if item is SaveSlotSummaryDTO:
 			slots_dict[k] = item.serialize()
 		elif item is Dictionary:
@@ -191,9 +191,9 @@ static func deserialize(d: Dictionary) -> AccountProfileAggregate:
 			WORLD_DEFAULT_SP_01: "SLOT_01"
 		}
 
-	var raw_slots = d.get("save_slot_summaries", {})
+	var raw_slots: Variant = d.get("save_slot_summaries", {})
 	for k in raw_slots:
-		var slot_data = raw_slots[k]
+		var slot_data: Variant = raw_slots[k]
 		if slot_data is Dictionary:
 			acc.save_slot_summaries[k] = SaveSlotSummaryDTO.deserialize(slot_data)
 	return acc

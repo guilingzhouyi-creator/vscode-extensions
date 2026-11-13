@@ -149,7 +149,7 @@ func _valid_condition_tree(node: Dictionary) -> bool:
 		return String(node.get("kind", "")).length() > 0 and (node.get("args", {}) is Dictionary)
 	if op != "AND" and op != "OR" and op != "NOT":
 		return false
-	var terms = node.get("terms", [])
+	var terms: Variant = node.get("terms", [])
 	if not terms is Array:
 		return false
 	for term in terms:

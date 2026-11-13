@@ -54,7 +54,7 @@ static func dispatch_command(ast: ChatCommandParser.CommandAST, admin: AdminPerm
 		var msg := GameConfig.get_string("narratives.chat_command", "not_a_command", "Not a command")
 		return {"success": false, "reason": msg}
 
-	var cmd = registered_commands.get(ast.command_name, null)
+	var cmd: Variant = registered_commands.get(ast.command_name, null)
 	if cmd == null:
 		var template := GameConfig.get_string("narratives.chat_command", "unknown_chat_command", "Unknown command: /%s")
 		return {"success": false, "reason": template % ast.command_name}
@@ -68,7 +68,7 @@ static func dispatch_command(ast: ChatCommandParser.CommandAST, admin: AdminPerm
 
 ## 前缀自动补全建议（去 / 前缀 + 小写化，返回 /cmd 形式数组）
 static func get_autocomplete_suggestions(prefix: String) -> Array[String]:
-	var clean = prefix.strip_edges().to_lower()
+	var clean: String = prefix.strip_edges().to_lower()
 	if clean.begins_with("/"): clean = clean.substr(1)
 	var matches: Array[String] = []
 	for k in registered_commands:

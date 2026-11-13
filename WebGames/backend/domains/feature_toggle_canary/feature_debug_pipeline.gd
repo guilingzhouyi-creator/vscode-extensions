@@ -18,7 +18,7 @@ static func apply_debug_command(
 	feature_key: String,
 	param_value: Variant = null
 ) -> Dictionary:
-	var flag = toggle_manager.get_flag(feature_key)
+	var flag: Variant = toggle_manager.get_flag(feature_key)
 	if flag == null:
 		flag = FeatureToggleAggregate.FeatureFlagEntry.new(feature_key)
 		toggle_manager.register_flag(flag)

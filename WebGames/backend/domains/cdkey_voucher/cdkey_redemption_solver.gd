@@ -31,7 +31,7 @@ static func resolve_redemption(
 	eligibility_metrics: Dictionary = {}, # 复合门槛判定指标（，调用方注入）
 	eligibility_rules_override: Dictionary = {} # 测试/装配层注入规则；空则读配置（示例配置自动跳过）
 ) -> Dictionary:
-	var code = raw_input_code.strip_edges().to_upper()
+	var code: String = raw_input_code.strip_edges().to_upper()
 
 	# 1. 检查频控锁定
 	var limit_info: Dictionary = rate_limit_state.get(account_id, {"count": 0, "lock_until_utc": 0})
@@ -184,7 +184,7 @@ const MAX_RATE_LIMIT_ENTRIES: int = 5000
 static func purge_expired_rate_limits(rate_limit_state: Dictionary, current_time_utc: int) -> int:
 	var expired_keys: Array = []
 	for acc_id in rate_limit_state:
-		var info = rate_limit_state[acc_id]
+		var info: Variant = rate_limit_state[acc_id]
 		if info is Dictionary and info.get("lock_until_utc", 0) <= current_time_utc:
 			expired_keys.append(acc_id)
 	for acc_id in expired_keys:
@@ -201,7 +201,7 @@ static func _record_failure(account_id: String, current_time_utc: int, rate_limi
 			# 故放弃记录本次新失败（fail-closed），绝不主动解除既有锁定。
 			return
 	var info: Dictionary = rate_limit_state.get(account_id, {"count": 0, "lock_until_utc": 0})
-	var cnt = info.get("count", 0) + 1
+	var cnt: Variant = info.get("count", 0) + 1
 	var lock_until := 0
 	if cnt >= _max_failed_attempts():
 		lock_until = current_time_utc + _lockout_duration_seconds()

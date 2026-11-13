@@ -62,9 +62,9 @@ func update_expiry(current_time_utc: int) -> int:
 ## GC 清理：从后向前回收已读已提取/已读无附件且非置顶邮件至容量达标
 func _purge_old_read_mails() -> void:
 	# 从后向前扫描已读且已提取附件（或已读且无附件）、且非置顶锁定的邮件
-	var i = stored_mails.size() - 1
+	var i: Variant = stored_mails.size() - 1
 	while i >= 0 and stored_mails.size() >= _max_capacity():
-		var m = stored_mails[i]
+		var m: Variant = stored_mails[i]
 		if (not m.is_pinned) and (m.status == MailItemAggregate.MailStatus.READ_CLAIMED or (m.status == MailItemAggregate.MailStatus.READ_UNCLAIMED and not m.has_attachment)):
 			stored_mails.remove_at(i)
 		i -= 1

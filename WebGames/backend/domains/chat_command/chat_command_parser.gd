@@ -22,22 +22,22 @@ class CommandAST extends RefCounted:
 static func parse_input_line(input_text: String) -> CommandAST:
 	var ast := CommandAST.new()
 	ast.raw_text = input_text
-	var trimmed = input_text.strip_edges()
+	var trimmed: String = input_text.strip_edges()
 
 	if not trimmed.begins_with("/"):
 		ast.is_command = false
 		return ast
 
 	ast.is_command = true
-	var tokens = trimmed.substr(1).split(" ", false)
+	var tokens: PackedStringArray = trimmed.substr(1).split(" ", false)
 	if tokens.is_empty():
 		return ast
 
 	ast.command_name = tokens[0].to_lower()
 	for i in range(1, tokens.size()):
-		var token = tokens[i]
+		var token: Variant = tokens[i]
 		if token.contains("="):
-			var kv = token.split("=", false, 1)
+			var kv: PackedStringArray = token.split("=", false, 1)
 			if kv.size() == 2:
 				ast.named_arguments[kv[0]] = _infer_token_type(kv[1])
 		else:

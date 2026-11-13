@@ -8,7 +8,9 @@
 # ==============================================================================
 
 ## ItemEntity：Domain Entity / Aggregate Root
-class_name ItemEntity extends RefCounted
+class_name ItemEntity extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 # ==============================================================================
 # 一、序列化版本与分类常量
@@ -98,6 +100,7 @@ func _init() -> void:
 
 ## 状态重置与池化复用契约（ADV-PRF-002）：快速应用静态配置缓存默认值
 func reset_state() -> void:
+	super.reset_state()
 	var c := _ensure_defaults()
 	item_id = ""
 	item_uid = ""
@@ -188,7 +191,7 @@ static func deserialize(d: Dictionary, _instance_discriminator: String = "") -> 
 	item.container_state = str(d.get("container_state", item.container_state))
 	item.owner_account_id = str(d.get("owner_account_id", item.owner_account_id))
 
-	var raw_mounts = d.get("attribute_mounts", [])
+	var raw_mounts: Variant = d.get("attribute_mounts", [])
 	if raw_mounts is Array:
 		for m_data in raw_mounts:
 			if m_data is Dictionary:

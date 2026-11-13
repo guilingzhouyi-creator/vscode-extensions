@@ -155,7 +155,7 @@ static func materialize(dto: CompositeEventDTO, library: AccountItemLibraryAggre
 	if library == null:
 		return {"materialized": 0, "clamped_flows": []}
 	for flow in dto.item_flows:
-		var res = ItemStatisticsSolver.record_item_event(
+		var res: Variant = ItemStatisticsSolver.record_item_event(
 			library, str(flow["event_type"]), str(flow["canonical_id"]), int(flow["quantity"]), catalog, null
 		)
 		if res.success:
@@ -245,7 +245,7 @@ static func _materialize_raw_events(events: Array, libraries: Dictionary, catalo
 		var lib: AccountItemLibraryAggregate = libraries.get(str(prim["account_id"]), null)
 		if lib == null:
 			continue
-		var res = ItemStatisticsSolver.record_item_event(
+		var res: Variant = ItemStatisticsSolver.record_item_event(
 			lib, str(prim["event_type"]), str(prim["canonical_id"]), int(prim["quantity"]), catalog, null
 		)
 		if res.success:

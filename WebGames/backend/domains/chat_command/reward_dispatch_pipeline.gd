@@ -25,13 +25,13 @@ static func redeem_cdkey(
 	catalog: ItemRegistryCatalog,
 	library: AccountItemLibraryAggregate = null
 ) -> Dictionary:
-	var clean_key = cdkey.strip_edges().to_upper()
+	var clean_key: String = cdkey.strip_edges().to_upper()
 	var valid := _valid_cdkeys()
 	if not valid.has(clean_key):
 		var msg := GameConfig.get_string("narratives.chat_command", "cdkey_invalid", "Invalid or expired CDKey: %s") % clean_key
 		return {"success": false, "reason": msg}
 
-	var user_redeemed = redeemed_keys.get(account_id, [])
+	var user_redeemed: Variant = redeemed_keys.get(account_id, [])
 	if clean_key in user_redeemed:
 		var msg2 := GameConfig.get_string("narratives.chat_command", "cdkey_redeemed", "CDKey already redeemed by this account.")
 		return {"success": false, "reason": msg2}
@@ -42,7 +42,7 @@ static func redeem_cdkey(
 	if item_id.is_empty():
 		var msg3 := GameConfig.get_string("narratives.chat_command", "cdkey_item_id_missing", "Reward item_id missing for CDKey: %s") % clean_key
 		return {"success": false, "reason": msg3}
-	var proto = catalog.get_prototype(item_id)
+	var proto: Variant = catalog.get_prototype(item_id)
 	if proto == null:
 		var msg4 := GameConfig.get_string("narratives.chat_command", "cdkey_item_not_found", "Reward item not registered: %s") % item_id
 		return {"success": false, "reason": msg4}

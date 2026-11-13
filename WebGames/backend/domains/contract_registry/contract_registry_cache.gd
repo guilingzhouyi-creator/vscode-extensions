@@ -30,12 +30,12 @@ static func get_cached(domain: String, view: String, kind: int) -> Resource:
 		# 更新访问顺序
 		_access_order.erase(key)
 		_access_order.append(key)
-		var cached_entry = _lru_map[key]
+		var cached_entry: Variant = _lru_map[key]
 		return cached_entry.duplicate(true)
 
 	# 未命中：从索引加载
 	var entries: Array = IndexClass.find_by_domain_view(domain, view)
-	var found = null
+	var found: Variant = null
 	for e in entries:
 		if int(e.endpoint_kind) == kind:
 			found = e

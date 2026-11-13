@@ -47,19 +47,31 @@ var minion_count: int = GameConfig.get_int("domains.elite", "entity_defaults/min
 ## 违反「solver 禁 mutator（禁止 -> void 改写入参状态）」，故迁入实体自身。
 ## 词缀定义读取仍由 GenericAffixSolver.get_affix（纯函数）承担，权重池由 domains.elite 段驱动。
 ## 契约：未登记词缀安全跳过；注入后经 calculate_somatic_function 重算（等级不变、底层实际值联动）。
+const _ELITE_STAT_MOD_KEYS: Array[Array] = [
+	["str", "STR"],
+	["con", "CON"],
+	["agi", "AGI"],
+	["spr", "SPR"],
+]
+
 func apply_affixes(affix_ids: Array) -> void:
 	elite_affix_ids = affix_ids
 	if physiology == null:
 		return
 	for aff_id in affix_ids:
-		var aff: Dictionary = GenericAffixSolver.get_affix(str(aff_id))
-		if aff.is_empty():
-			continue
-		var mods: Variant = aff.get("stat_mods")
-		if not (mods is Dictionary):
-			continue
-		if mods.has("str"): physiology.base_coefficients["STR"] = float(physiology.base_coefficients.get("STR", 1.0)) * float(mods["str"])
-		if mods.has("con"): physiology.base_coefficients["CON"] = float(physiology.base_coefficients.get("CON", 1.0)) * float(mods["con"])
-		if mods.has("agi"): physiology.base_coefficients["AGI"] = float(physiology.base_coefficients.get("AGI", 1.0)) * float(mods["agi"])
-		if mods.has("spr"): physiology.base_coefficients["SPR"] = float(physiology.base_coefficients.get("SPR", 1.0)) * float(mods["spr"])
+		_apply_single_affix(str(aff_id))
 	LifeCycleAndPhysiologySolver.calculate_somatic_function(physiology)
+
+func _apply_single_affix(aff_id: String) -> void:
+	var aff: Dictionary = GenericAffixSolver.get_affix(aff_id)
+	if aff.is_empty():
+		return
+	var mods: Variant = aff.get("stat_mods")
+	if not (mods is Dictionary):
+		return
+	var mods_dict: Dictionary = mods as Dictionary
+	for pair in _ELITE_STAT_MOD_KEYS:
+		var raw_key: String = pair[0]
+		var stat_key: String = pair[1]
+		if mods_dict.has(raw_key):
+			physiology.base_coefficients[stat_key] = float(physiology.base_coefficients.get(stat_key, 1.0)) * float(mods_dict[raw_key])

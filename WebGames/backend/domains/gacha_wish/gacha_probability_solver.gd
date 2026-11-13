@@ -77,10 +77,10 @@ static func roll_single_draw(banner: GachaBannerAggregate, rng_or_seed: Variant 
 		if is_up:
 			reward_item_id = "" if banner.up_5star_item_ids.is_empty() else str(banner.up_5star_item_ids[0])
 		else:
-			var picked = rng.pick(banner.standard_5star_item_ids)
+			var picked: Variant = rng.pick(banner.standard_5star_item_ids)
 			reward_item_id = "" if picked == null else str(picked)
 
-		var pity_used = banner.current_pity_count
+		var pity_used: Variant = banner.current_pity_count
 		banner.current_pity_count = 0
 
 		return {
@@ -90,10 +90,10 @@ static func roll_single_draw(banner: GachaBannerAggregate, rng_or_seed: Variant 
 			"pity_count_used": pity_used
 		}
 	elif roll < (rate_5 + _base_4star_rate()):
-		var picked_4 = rng.pick(banner.standard_4star_item_ids)
+		var picked_4: Variant = rng.pick(banner.standard_4star_item_ids)
 		var item_4 := "" if picked_4 == null else str(picked_4)
 		return { "rarity": 4, "is_up": false, "item_id": item_4, "pity_count_used": banner.current_pity_count }
 	else:
-		var picked_3 = rng.pick(banner.standard_3star_item_ids)
+		var picked_3: Variant = rng.pick(banner.standard_3star_item_ids)
 		var item_3 := "" if picked_3 == null else str(picked_3)
 		return { "rarity": 3, "is_up": false, "item_id": item_3, "pity_count_used": banner.current_pity_count }

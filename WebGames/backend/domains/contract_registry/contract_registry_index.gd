@@ -72,7 +72,7 @@ func _parse_json_dict(text: String) -> Dictionary:
 		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_JSON_PARSE_FAIL", SystemBaseMessages.format(SystemBaseMessages.MSG_CONTRACT_JSON_PARSE_FAIL, {"error": json.get_error_message()}))
 		return {}
 
-	var data = json.get_data()
+	var data: Variant = json.get_data()
 	if not (data is Dictionary):
 		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_ROOT_NOT_DICT", SystemBaseMessages.MSG_CONTRACT_ROOT_NOT_DICT)
 		return {}
@@ -86,7 +86,7 @@ func _unpack_registry_sections(dict: Dictionary) -> bool:
 		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_SCHEMA_UNSUPPORTED", SystemBaseMessages.format(SystemBaseMessages.MSG_CONTRACT_SCHEMA_UNSUPPORTED, {"version": _schema_version, "expected": SUPPORTED_SCHEMA_VERSION}))
 		return false
 
-	var raw_infra = dict.get("infra_domains", [])
+	var raw_infra: Variant = dict.get("infra_domains", [])
 	if raw_infra is Array:
 		for item in raw_infra:
 			_infra_domains.append(String(item))
@@ -97,14 +97,14 @@ func _unpack_registry_sections(dict: Dictionary) -> bool:
 		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_VALIDATION_FAILED", SystemBaseMessages.format(SystemBaseMessages.MSG_CONTRACT_VALIDATION_FAILED, {"errors": "; ".join(errs)}))
 		return false
 
-	var raw_entries = dict.get("entries", [])
+	var raw_entries: Variant = dict.get("entries", [])
 	if raw_entries is Array:
 		for item in raw_entries:
 			if item is Dictionary:
-				var entry = EntryClass.from_dto(item as Dictionary)
+				var entry: Variant = EntryClass.from_dto(item as Dictionary)
 				_entries.append(entry)
 
-	var raw_orphans = dict.get("reverse_orphans", [])
+	var raw_orphans: Variant = dict.get("reverse_orphans", [])
 	if raw_orphans is Array:
 		for item in raw_orphans:
 			if item is Dictionary:

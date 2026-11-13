@@ -67,12 +67,14 @@ static func _commit_prototype_to_catalog(catalog: ItemRegistryCatalog, proto: It
 	var seen_aliases: Dictionary = {}
 	for alias in proto.search_aliases:
 		var key: String = str(alias).to_lower().strip_edges()
-		if key.is_empty() or seen_aliases.has(key):
-			continue
-		seen_aliases[key] = true
-		if not catalog._alias_inverted_index.has(key):
-			catalog._alias_inverted_index[key] = []
-		catalog._alias_inverted_index[key].append(proto.canonical_id)
+		if not key.is_empty() and not seen_aliases.has(key):
+			seen_aliases[key] = true
+			_append_alias_index_entry(catalog._alias_inverted_index, key, proto.canonical_id)
+
+static func _append_alias_index_entry(index: Dictionary, alias_key: String, canonical_id: String) -> void:
+	if not index.has(alias_key):
+		index[alias_key] = []
+	(index[alias_key] as Array).append(canonical_id)
 
 ## 注册物品原型模板：
 ## - 校验链：ID 格式 → canonical_id 冲突 → 展示名键唯一 → 统一英文名唯一 → 数字 ID 冲突；

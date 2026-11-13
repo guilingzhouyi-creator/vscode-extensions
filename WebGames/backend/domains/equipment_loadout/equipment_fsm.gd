@@ -66,7 +66,7 @@ static func equip_from_inventory(
 
 	# 2. 目标槽旧装备脱离穿戴（容量贡献随之释放；同步槽位分歧即受控失败）
 	if inventory.equipped_slots.has(slot_name):
-		var inv_old = inventory.unequip_item(slot_name)
+		var inv_old: Variant = inventory.unequip_item(slot_name)
 		if _is_slot_divergent(inv_old, old_item):
 			_restore_both(inventory, inventory_snapshot, loadout, loadout_snapshot)
 			return { "success": false, "error_code": "EQUIP_STATE_DIVERGENCE" }
@@ -130,7 +130,7 @@ static func unequip_to_inventory(
 
 	# 1. 先脱离穿戴（释放 UID 与容量贡献；容量相关槽位与 loadout 分歧即受控失败）
 	if inventory.equipped_slots.has(slot_name):
-		var inv_old = inventory.unequip_item(slot_name)
+		var inv_old: Variant = inventory.unequip_item(slot_name)
 		if _is_slot_divergent(inv_old, item):
 			_restore_both(inventory, inventory_snapshot, loadout, loadout_snapshot)
 			return { "success": false, "error_code": "EQUIP_STATE_DIVERGENCE" }

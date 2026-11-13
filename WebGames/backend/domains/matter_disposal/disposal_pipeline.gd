@@ -41,7 +41,7 @@ static func process_item_disposal(
 	if target_item.container_state == "LOCKED":
 		return {"success": false, "error_code": "ITEM_LOCKED"}
 
-	var res = MatterDisposalSolver.execute_disposal(player_pos, facility, target_item, passcode)
+	var res: Variant = MatterDisposalSolver.execute_disposal(player_pos, facility, target_item, passcode)
 	if not res.success:
 		return res
 
@@ -49,8 +49,8 @@ static func process_item_disposal(
 	#    注册缺失在任何库存变更之前拦截（零变异先失败）
 	var catalog := GameBootstrap.catalog()
 	var products: Array = []
-	var slag_proto = catalog.get_prototype(CANONICAL_ID_SLAG_ASH)
-	var dust_proto = catalog.get_prototype(CANONICAL_ID_MANA_DUST)
+	var slag_proto: Variant = catalog.get_prototype(CANONICAL_ID_SLAG_ASH)
+	var dust_proto: Variant = catalog.get_prototype(CANONICAL_ID_MANA_DUST)
 	if slag_proto == null or dust_proto == null:
 		return {"success": false, "error_code": "PRODUCT_NOT_REGISTERED"}
 	for i in int(res.yield_slag_ash_count):

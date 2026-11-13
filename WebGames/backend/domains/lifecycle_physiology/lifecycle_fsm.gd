@@ -13,7 +13,7 @@ class_name LifeCycleEvolutionFSM extends RefCounted
 ## 历法年轮推进：机能衰退计算（体魄求解）+ 寿元大限/死亡判定并广播年轮叙事
 static func age_character_years(sheet: CharacterPhysiologySheet, years: float) -> Dictionary:
 	sheet.raw_chronological_age += years
-	var new_sf = LifeCycleAndPhysiologySolver.calculate_somatic_function(sheet)
+	var new_sf: float = LifeCycleAndPhysiologySolver.calculate_somatic_function(sheet)
 
 	var eol_ratio := GameConfig.get_float("domains.lifecycle", "lifecycle/eol_ratio", 90.0)
 	var death_ratio := GameConfig.get_float("domains.lifecycle", "lifecycle/death_ratio", 100.0)
@@ -38,7 +38,7 @@ static func apply_rejuvenation(sheet: CharacterPhysiologySheet, rejuvenation_yea
 
 	sheet.raw_chronological_age = max(min_age, sheet.raw_chronological_age - rejuvenation_years)
 	sheet.heart_core_integrity = min(1.0, sheet.heart_core_integrity + heart_core_gain)
-	var new_sf = LifeCycleAndPhysiologySolver.calculate_somatic_function(sheet)
+	var new_sf: float = LifeCycleAndPhysiologySolver.calculate_somatic_function(sheet)
 
 	EventBusCore.get_instance().emit_narrative_by_key(
 		"lifecycle/rejuvenation", "lifecycle", [rejuvenation_years, new_sf]

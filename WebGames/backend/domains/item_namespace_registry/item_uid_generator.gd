@@ -48,7 +48,8 @@ static func validate_uid(uid: String) -> bool:
 
 ## 来源追溯：返回 UID 的域前缀（未登记返回空）
 static func prefix_of(uid: String) -> String:
-	for pfx in GameConfig.get_array("domains.item_namespace_registry", "uid/prefixes", ["GM_", "CDK_", "GAC_", "MAIL_", "SRV_"]):
+	var prefixes: Array = GameConfig.get_array("domains.item_namespace_registry", "uid/prefixes", ["GM_", "CDK_", "GAC_", "MAIL_", "SRV_"])
+	for pfx in prefixes:
 		if uid.begins_with(String(pfx)):
 			return String(pfx)
 	return ""

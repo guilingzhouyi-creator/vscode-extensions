@@ -90,10 +90,10 @@ static func settle_successful_commission(
 			"error_message": _msg("invalid_settle_state")
 		}
 
-	var split = CommissionSettlementSolver.calculate_payout_split(commission)
+	var split: Variant = CommissionSettlementSolver.calculate_payout_split(commission)
 
 	# 返还保证金 + 净赏金
-	var total_payout_gold = split["net_gold_to_adventurer"] + commission.security_deposit_required
+	var total_payout_gold: Variant = split["net_gold_to_adventurer"] + commission.security_deposit_required
 	assignee_wallet.apply_delta({
 		"gold": total_payout_gold,
 		"mana_monocrystals": split["net_crystals_to_adventurer"]

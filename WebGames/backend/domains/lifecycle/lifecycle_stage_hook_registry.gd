@@ -155,16 +155,21 @@ static func _validate_required_slots(stage_config: Dictionary, stage_key: String
 		return []
 	var required_slots: Array[String] = []
 	var seen_slots: Dictionary = {}
+	var valid: bool = true
 	for raw_slot in (raw_slots as Array):
 		if not raw_slot is String:
 			_config_error = "INVALID_REQUIRED_SLOT:" + stage_key
-			return []
+			valid = false
+			break
 		var slot: String = String(raw_slot).strip_edges()
 		if slot.is_empty() or seen_slots.has(slot):
 			_config_error = "EMPTY_OR_DUPLICATE_REQUIRED_SLOT:" + stage_key
-			return []
+			valid = false
+			break
 		seen_slots[slot] = true
 		required_slots.append(slot)
+	if not valid:
+		required_slots.clear()
 	return required_slots
 
 static func _validate_stage_aliases(stage_config: Dictionary, stage_key: String) -> Array[String]:
@@ -174,16 +179,21 @@ static func _validate_stage_aliases(stage_config: Dictionary, stage_key: String)
 		return []
 	var aliases: Array[String] = []
 	var seen_aliases: Dictionary = {}
+	var valid: bool = true
 	for raw_alias in (raw_aliases as Array):
 		if not raw_alias is String:
 			_config_error = "INVALID_STAGE_ALIAS:" + stage_key
-			return []
+			valid = false
+			break
 		var alias: String = String(raw_alias).strip_edges().to_upper()
 		if alias.is_empty() or seen_aliases.has(alias):
 			_config_error = "EMPTY_OR_DUPLICATE_STAGE_ALIAS:" + stage_key
-			return []
+			valid = false
+			break
 		seen_aliases[alias] = true
 		aliases.append(alias)
+	if not valid:
+		aliases.clear()
 	return aliases
 
 static func _register_stage_aliases(stage_key: String, aliases: Array[String], next_aliases: Dictionary) -> bool:

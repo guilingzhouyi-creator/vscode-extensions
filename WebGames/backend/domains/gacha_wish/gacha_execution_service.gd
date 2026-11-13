@@ -53,14 +53,14 @@ static func execute_multi_pull(
 	var grant_failed_count := 0
 
 	for i in range(pull_count):
-		var res = GachaProbabilitySolver.roll_single_draw(banner, pull_rng)
+		var res: Variant = GachaProbabilitySolver.roll_single_draw(banner, pull_rng)
 		drop_results.append(res)
 		if res.rarity > highest_rarity:
 			highest_rarity = res.rarity
 
 		# 注册表三元组发放：掉落 id 为 canonical_id，原型属性单一事实源；
 		# 未登记掉落或背包容量不足严格计入失败（不造临时物件）
-		var proto = catalog.get_prototype(str(res.item_id))
+		var proto: Variant = catalog.get_prototype(str(res.item_id))
 		if proto == null:
 			grant_failed_count += 1
 			continue

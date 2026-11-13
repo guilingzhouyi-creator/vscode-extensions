@@ -113,7 +113,7 @@ func get_canonical_id_by_english_name(english_name: String) -> String:
 
 ## 别名/名称倒排检索（小写化 + 去空白，未命中返回空数组）
 func search_by_alias(term: String) -> Array:
-	var key = term.to_lower().strip_edges()
+	var key: String = term.to_lower().strip_edges()
 	return _alias_inverted_index.get(key, [])
 
 # ==============================================================================

@@ -19,7 +19,7 @@ static func save_to_memory_string(settings: GameSettingsAggregate) -> String:
 
 ## 从内存 JSON 字符串反序列化加载设置配置
 static func load_from_memory_string(settings: GameSettingsAggregate, json_str: String) -> bool:
-	var parsed = JSON.parse_string(json_str)
+	var parsed: Variant = JSON.parse_string(json_str)
 	if typeof(parsed) == TYPE_DICTIONARY:
 		settings.deserialize(parsed)
 		return true
