@@ -23,9 +23,14 @@ export interface PraxisCardContext {
 }
 
 /**
- * Valid reference tier classification in the self-similar fractal hierarchy.
+ * Valid reference tier classification in the self-similar 5-tier fractal hierarchy.
  */
-export type FractalTier = 'trunk' | 'cell_main' | 'card_worktree' | 'subagent_worktree';
+export type FractalTier =
+    | 'system_trunk'
+    | 'trunk'
+    | 'cell_main'
+    | 'card_worktree'
+    | 'subagent_worktree';
 
 /**
  * Structured descriptor for a Fractal Git reference pointer.

@@ -36,16 +36,78 @@ export const GIT_FILE_MODE = Object.freeze({
 } as const);
 
 /**
- * Fractal Git Reference Prefixes & Canonical Branch Names.
+ * Canonical 5-tier Fractal Git reference prefixes & branch constants
+ * mirroring `crates/fg-core/src/constants/branch.rs`.
  */
 export const FRACTAL_REF = Object.freeze({
     PREFIX: 'refs/fractal/',
-    CELLS_PREFIX: 'refs/fractal/cells/',
+    CELL_PREFIX: 'refs/fractal/cell/',
     TRUNK: 'refs/fractal/trunk',
     SYSTEM_TRUNK: 'refs/heads/main',
     SYSTEM_BRANCH: 'main',
+    CARD_CANONICAL_LEAF: 'main',
     DEFAULT_AGENT: 'praxis-worker',
 } as const);
+
+/**
+ * Maximum byte length allowed for a single branch coordinate segment.
+ */
+export const MAX_BRANCH_SEGMENT_LEN = 63;
+
+/**
+ * Recognized workspace domain cell identifiers mirroring Rust SSOT `RECOGNIZED_CELLS`.
+ */
+export const RECOGNIZED_CELLS = Object.freeze([
+    'auto-refactor',
+    'fractal-git',
+    'workspace-timing',
+    'webgames',
+    'infra',
+    'governance',
+    'core',
+] as const);
+
+/**
+ * Canonical cell alias mappings mirroring Rust SSOT `CELL_ALIASES`.
+ */
+export const CELL_ALIASES = Object.freeze({
+    'web-games': 'webgames',
+    fractalgit: 'fractal-git',
+    timing: 'workspace-timing',
+} as const);
+
+/**
+ * Human-facing Tier 3 facade branch prefixes mirroring Rust SSOT `FACADE_TYPES`.
+ */
+export const FACADE_TYPES = Object.freeze([
+    'feat',
+    'fix',
+    'refactor',
+    'perf',
+    'docs',
+    'test',
+    'chore',
+    'style',
+    'ci',
+    'build',
+] as const);
+
+/**
+ * Ad-hoc branch prefixes prohibited under Strict branch governance.
+ */
+export const FORBIDDEN_BRANCH_PREFIXES = Object.freeze([
+    'temp',
+    'tmp',
+    'wip',
+] as const);
+
+/**
+ * Protected Tier 0 system trunk short branch names.
+ */
+export const PROTECTED_SYSTEM_TRUNKS = Object.freeze([
+    'main',
+    'master',
+] as const);
 
 /**
  * 36 Registered FGT Rules registered in scripts/common/rule-catalog.json,
