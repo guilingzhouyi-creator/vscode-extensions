@@ -131,6 +131,7 @@ Native Fractal Commands (with Git Alias Mappings):
   promotion, pm      Manage staged promotions to System Trunk with Human Elevation gate
   bench,    benchmark Run performance benchmarks (--level <1|2|3|all>, -m <mult>)
   daemon,   serve    Display protocol daemon status & IPC endpoints
+  audit,    aud      Inspect, query, pause/resume, or run background/snapshot Fractal Audit Trees
   notes              Add, inspect, or remove commit notes (list, show, add, remove)
   replace            Create, list, or delete replace refs for objects (-l, -d)
   commit-graph       Write or verify Git Commit-Graph (CGPH) generation indices

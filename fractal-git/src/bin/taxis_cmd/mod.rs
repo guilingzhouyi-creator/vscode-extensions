@@ -15,6 +15,7 @@ pub mod apply_mailbox;
 pub use apply_mailbox as am;
 pub mod apply;
 pub mod archive;
+pub mod audit_cmd;
 pub mod bench;
 pub mod bench_e2e;
 pub mod bisect;

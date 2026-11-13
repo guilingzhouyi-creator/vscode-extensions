@@ -14,9 +14,9 @@
 //! - `FGT-COR-001`: Core data model and error contract guard
 
 use super::{
-    archive, bisect, blame, bundle, clone, config, daemon, diagnostics_tool, maintenance,
-    maintenance_ops, notes_replace, pack_plumbing, project, quality, quarantine, reclaim, remote,
-    repack, submodule, unarchive,
+    archive, audit_cmd, bisect, blame, bundle, clone, config, daemon, diagnostics_tool,
+    maintenance, maintenance_ops, notes_replace, pack_plumbing, project, quality, quarantine,
+    reclaim, remote, repack, submodule, unarchive,
 };
 
 use super::registry::{cmd, CommandSpec};
@@ -43,6 +43,7 @@ pub(crate) const TABLE: &[CommandSpec] = &[
     ),
     cmd("project", &["project", "pj"], project::handle_project),
     cmd("quality", &["quality", "trace"], quality::handle_quality),
+    cmd("audit", &["audit", "aud"], audit_cmd::handle_audit),
     cmd(
         "quarantine",
         &["quarantine", "quar"],
