@@ -179,6 +179,7 @@ function projectModelProvenance(stats: readonly RuleCalibrationStats[]): {
 /**
  * Runs finding arbitration, writes `report.summary.arbitration`, and emits human review queue.
  * Fail-soft on error so reporting failures never abort a completed scan.
+ * Non-reentrant on shared `report`: mutates `summary.arbitration` sequentially without locks.
  *
  * @param passContext - Minimal pass context carrying report and logger.
  * @param reviewQueuePath - Optional NDJSON path for the human review queue.
@@ -189,6 +190,9 @@ export async function applyArbitrationPass(
     reviewQueuePath: string | undefined,
     ruleCalibrationStats: readonly RuleCalibrationStats[],
 ): Promise<void> {
+    if (!passContext?.report || !Array.isArray(passContext.report.issues)) {
+        return;
+    }
     const { report, logger } = passContext;
     try {
         const arbiter = new FindingConfidenceArbiter(

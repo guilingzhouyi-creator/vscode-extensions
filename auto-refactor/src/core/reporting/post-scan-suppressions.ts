@@ -158,6 +158,7 @@ function applySingleIssueSuppression(
 
 /**
  * Applies configured suppression rules and inline directives to all issues in the report.
+ * Non-reentrant on shared `report`: filters `report.issues` sequentially without locks.
  *
  * @param report - Scan report undergoing suppression filtering.
  * @param suppressions - Suppression rule collection.
@@ -173,6 +174,9 @@ export async function applySuppressions(
     retainedSource?: ReadonlyMap<string, string>,
     allowHostRead = true,
 ): Promise<number> {
+    if (!report || !Array.isArray(report.issues)) {
+        return 0;
+    }
     const arbiter = new FindingConfidenceArbiter();
     const index = suppressions.length > 0 ? buildSuppressionIndex(suppressions) : null;
     let suppressedCount = 0;

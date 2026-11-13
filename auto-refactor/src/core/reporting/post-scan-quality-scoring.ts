@@ -150,10 +150,14 @@ async function refreshQualityProjections(
 
 /**
  * Recomputes quality scores, tri-plane vectors, and project autonomy indices.
+ * Non-reentrant on shared `report`: mutates quality and governance fields sequentially.
  *
  * @param params - Context carrying report, resolved config, scanner, scope, and initial count.
  */
 export async function refreshQualityScores(params: RefreshQualityScoresParams): Promise<void> {
+    if (!params?.report || !Array.isArray(params.report.issues)) {
+        return;
+    }
     const { report, config, reportScanner, initialIssueCount = 0 } = params;
     const effectiveScorerArchetype = config.reviewProfile ?? config.archetype;
     const scorer =

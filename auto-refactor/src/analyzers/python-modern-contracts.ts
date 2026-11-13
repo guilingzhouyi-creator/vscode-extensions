@@ -16,22 +16,35 @@ import type { AgentActionType, Severity } from '../core/types';
 import { SEVERITY_ERROR, SEVERITY_WARNING } from '../core/types';
 import { REGEX } from '../core/constants';
 
+/** Canonical rule ID for legacy typing generics (`List`/`Dict`/`Set`/`Tuple`). */
 export const RULE_PYM_GENERIC_001 = 'PYM-GENERIC-001';
+/** Canonical rule ID for deprecated `typing` abstract collection aliases. */
 export const RULE_PYM_ABC_001 = 'PYM-ABC-001';
+/** Canonical rule ID for PEP 8 import grouping and ordering violations. */
 export const RULE_PYM_IMPORT_001 = 'PYM-IMPORT-001';
+/** Canonical rule ID for inner variable/import shadowing outer bindings. */
 export const RULE_PYM_SHADOW_001 = 'PYM-SHADOW-001';
 
+/** Default actionable fix operation kind emitted for Python token rewrites. */
 export const ACTION_REPLACE_TOKEN: AgentActionType = 'replace_token';
+/** Python keyword prefix identifying coroutine function declarations. */
 export const PYTHON_ASYNC_KEYWORD = 'async';
 
+/** Ordered PEP 8 import group display labels (`stdlib`, `third-party`, `local`). */
 export const SECTION_LABELS: readonly string[] = Object.freeze(['stdlib', 'third-party', 'local']);
+/** Section index for Python standard library imports. */
 export const SECTION_STDLIB_INDEX = 0;
+/** Section index for third-party package imports. */
 export const SECTION_THIRD_PARTY_INDEX = 1;
+/** Section index for relative/local project imports. */
 export const SECTION_LOCAL_INDEX = 2;
 
+/** Remediation message advising `collections.abc` imports. */
 export const SUGGESTION_ABC =
     'Import these names from collections.abc (the typing aliases are deprecated).';
+/** Remediation message advising PEP 8 section sorting. */
 export const SUGGESTION_IMPORT_ORDER = 'Sort each import section alphabetically by whole line.';
+/** Remediation message advising variable renaming to resolve shadowing. */
 export const SUGGESTION_SHADOW =
     'Rename the variable or use a different name to avoid shadowing the outer binding.';
 
@@ -43,6 +56,7 @@ export interface IssueSpec {
     readonly suggestion: string;
 }
 
+/** Actionable remediation template metadata keyed by rule ID. */
 export interface ActionableSpec {
     readonly action?: AgentActionType;
     readonly code: string;
@@ -50,61 +64,70 @@ export interface ActionableSpec {
     readonly templateSnippet: string;
 }
 
-export const SPEC_RAISE: IssueSpec = Object.freeze({
-    rule: 'PYM-RAISE-001',
-    severity: SEVERITY_WARNING,
-    message: '`raise` inside an except block without `from` drops the original exception chain.',
-    suggestion:
-        'Re-raise with `raise NewError(...) from exc` (or a bare `raise` to propagate unchanged).',
-});
+function freezeSpec(
+    rule: string,
+    severity: Severity,
+    message: string,
+    suggestion: string,
+): IssueSpec {
+    return Object.freeze({ rule, severity, message, suggestion });
+}
 
-export const SPEC_DEFAULT: IssueSpec = Object.freeze({
-    rule: 'PYM-DEFAULT-001',
-    severity: SEVERITY_WARNING,
-    message:
-        'Mutable default argument detected: the default is created once and shared by every call.',
-    suggestion: 'Use a `None` sentinel and build the list/dict/set inside the body.',
-});
+/** Finding descriptor for bare `raise` inside `except` blocks lacking `from`. */
+export const SPEC_RAISE: IssueSpec = freezeSpec(
+    'PYM-RAISE-001',
+    SEVERITY_WARNING,
+    '`raise` inside an except block without `from` drops the original exception chain.',
+    'Re-raise with `raise NewError(...) from exc` (or a bare `raise` to propagate unchanged).',
+);
 
-export const SPEC_OPEN: IssueSpec = Object.freeze({
-    rule: 'PYM-OPEN-001',
-    severity: SEVERITY_WARNING,
-    message: '`open()` without a `with` block leaks the file handle on error paths.',
-    suggestion:
-        'Wrap the call in `with open(...) as handle:` so the handle closes deterministically.',
-});
+/** Finding descriptor for mutable default arguments in function signatures. */
+export const SPEC_DEFAULT: IssueSpec = freezeSpec(
+    'PYM-DEFAULT-001',
+    SEVERITY_WARNING,
+    'Mutable default argument detected: the default is created once and shared by every call.',
+    'Use a `None` sentinel and build the list/dict/set inside the body.',
+);
 
-export const SPEC_ASYNC_BLOCKING: IssueSpec = Object.freeze({
-    rule: 'PYM-ASYNC-001',
-    severity: SEVERITY_ERROR,
-    message: 'Blocking call inside an async function blocks the event loop.',
-    suggestion:
-        'Use the async equivalent (asyncio.sleep, httpx, async repository) or run the blocking call in a thread.',
-});
+/** Finding descriptor for `open()` calls outside `with` context managers. */
+export const SPEC_OPEN: IssueSpec = freezeSpec(
+    'PYM-OPEN-001',
+    SEVERITY_WARNING,
+    '`open()` without a `with` block leaks the file handle on error paths.',
+    'Wrap the call in `with open(...) as handle:` so the handle closes deterministically.',
+);
 
-export const SPEC_ASYNC_ORM: IssueSpec = Object.freeze({
-    rule: 'PYM-ASYNC-001',
-    severity: SEVERITY_ERROR,
-    message: 'Synchronous ORM call inside an async function is not awaited.',
-    suggestion:
-        'Await the async session (`await session.execute(...)`) or use the async repository API.',
-});
+/** Finding descriptor for blocking I/O or sleep calls inside `async` functions. */
+export const SPEC_ASYNC_BLOCKING: IssueSpec = freezeSpec(
+    'PYM-ASYNC-001',
+    SEVERITY_ERROR,
+    'Blocking call inside an async function blocks the event loop.',
+    'Use the async equivalent (asyncio.sleep, httpx, async repository) or run the blocking call in a thread.',
+);
 
-export const SPEC_SLOTS: IssueSpec = Object.freeze({
-    rule: 'PYM-SLOTS-001',
-    severity: SEVERITY_WARNING,
-    message:
-        'Dataclass without slots=True: instances carry a __dict__ and typos create silent attributes.',
-    suggestion:
-        'Add `slots=True` (or an explicit `slots=False` when __dict__ is genuinely required).',
-});
+/** Finding descriptor for un-awaited synchronous ORM calls inside `async` functions. */
+export const SPEC_ASYNC_ORM: IssueSpec = freezeSpec(
+    'PYM-ASYNC-001',
+    SEVERITY_ERROR,
+    'Synchronous ORM call inside an async function is not awaited.',
+    'Await the async session (`await session.execute(...)`) or use the async repository API.',
+);
 
-export const SPEC_IMPORT_ORDER: IssueSpec = Object.freeze({
-    rule: RULE_PYM_IMPORT_001,
-    severity: SEVERITY_WARNING,
-    message: 'Import section order violated.',
-    suggestion: 'Group imports as stdlib → third-party → local (PEP 8), separated by blank lines.',
-});
+/** Finding descriptor for non-inheriting `@dataclass` classes omitting `slots=True`. */
+export const SPEC_SLOTS: IssueSpec = freezeSpec(
+    'PYM-SLOTS-001',
+    SEVERITY_WARNING,
+    'Dataclass without slots=True: instances carry a __dict__ and typos create silent attributes.',
+    'Add `slots=True` (or an explicit `slots=False` when __dict__ is genuinely required).',
+);
+
+/** Finding descriptor for unsorted or misgrouped PEP 8 import blocks. */
+export const SPEC_IMPORT_ORDER: IssueSpec = freezeSpec(
+    RULE_PYM_IMPORT_001,
+    SEVERITY_WARNING,
+    'Import section order violated.',
+    'Group imports as stdlib → third-party → local (PEP 8), separated by blank lines.',
+);
 
 const ACTION_ENTRIES: ReadonlyArray<readonly [string, string, string, AgentActionType?, boolean?]> =
     [
@@ -123,6 +146,7 @@ const ACTION_ENTRIES: ReadonlyArray<readonly [string, string, string, AgentActio
         [RULE_PYM_IMPORT_001, '013', 'import $1', 'simplify_control_flow'],
     ];
 
+/** Frozen lookup mapping `PYM-*` rule IDs to actionable remediation metadata. */
 export const ACTIONABLE_SPECS: Readonly<Record<string, ActionableSpec>> = Object.freeze(
     Object.fromEntries(
         ACTION_ENTRIES.map(([rule, codeId, templateSnippet, action, safeToAutomate]) => [
@@ -137,25 +161,30 @@ export const ACTIONABLE_SPECS: Readonly<Record<string, ActionableSpec>> = Object
     ),
 );
 
+/** Parsed import line record with 1-based line number and PEP 8 section index. */
 export interface ImportRecord {
     readonly line: number;
     readonly text: string;
     readonly section: number;
 }
 
+/** Python indentation block classification token. */
 export type BlockKind = typeof PYTHON_ASYNC_KEYWORD | 'def' | 'class' | 'except' | 'with' | 'other';
 
+/** Indentation-scoped Python lexical block frame. */
 export interface Block {
     readonly indent: number;
     readonly kind: BlockKind;
 }
 
+/** Callback signature for emitting Python modernization findings on a source line. */
 export type PyEmitter = (
     targetLineIndex: number,
     spec: IssueSpec,
     detail: Record<string, unknown>,
 ) => void;
 
+/** Per-line scan state passed to line-level Python rule checks. */
 export interface PyLineScanContext {
     line: string;
     trimmed: string;
@@ -163,12 +192,14 @@ export interface PyLineScanContext {
     readonly emit: PyEmitter;
 }
 
+/** Active nesting flags for the current Python indentation block stack. */
 export interface PyBlockContext {
     inExcept: boolean;
     inWith: boolean;
     inAsync: boolean;
 }
 
+/** Per-file import collection buffer used for PEP 8 import ordering analysis. */
 export interface PyImportAccumulator {
     readonly file: string;
     readonly records: ImportRecord[];
