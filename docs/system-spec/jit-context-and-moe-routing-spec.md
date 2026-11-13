@@ -39,7 +39,7 @@ flowchart LR
 
 1. **Four-Tier Prompt Budget Hierarchy**:
    - **Tier 0 (`AGENTS.md` / `CLAUDE.md`)**: Always-in-context routing matrix and non-negotiable axioms ($\le 120$ lines). Zero embedded tutorials or multi-page tables.
-   - **Tier 1 (`.agents/skills/<skill>/SKILL.md`)**: Loaded only when task triggers match `scripts/common/skill-registry.json` across all <!-- METRICS:BEGIN skill-count -->**27 项**<!-- METRICS:END skill-count --> skills. Target window $50\text{–}200$ lines (hard ceiling $\le 300$ lines).
+   - **Tier 1 (`.agents/skills/<skill>/SKILL.md`)**: Loaded only when task triggers match `scripts/common/skill-registry.json` across all <!-- METRICS:BEGIN skill-count -->**28 项**<!-- METRICS:END skill-count --> skills. Target window $50\text{–}200$ lines (hard ceiling $\le 300$ lines).
    - **Tier 2 (`references/*.md` & `docs/system-spec/*.md`)**: Loaded on demand when modifying specific mathematical models, wire protocols, or edge-case algorithms.
    - **Tier 3 (`templates/*`)**: Loaded on demand when scaffolding new analyzers, WAL checkpoints, or language modules ($\text{CC}\le 15$, $\text{Depth}\le 4$, 6-field JSDoc).
 2. **Context Dehydration & AAS v1.0 Reporting**:

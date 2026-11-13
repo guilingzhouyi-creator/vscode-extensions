@@ -1,6 +1,6 @@
 # Workspace Governance & Engineering Suite (`workspace-governance`)
 
-Unified workspace governance, multi-agent orchestration, and engineering plugin bundle consolidating <!-- METRICS:BEGIN skill-count -->**27 项**<!-- METRICS:END skill-count --> engineering skills, `AGENTS.md` rules, <!-- METRICS:BEGIN subagent-preset-count -->**27 条**<!-- METRICS:END subagent-preset-count --> SubAgent preset templates, the 4-posture DSH preset family, and isolated MCP server bindings.
+Unified workspace governance, multi-agent orchestration, and engineering plugin bundle consolidating <!-- METRICS:BEGIN skill-count -->**28 项**<!-- METRICS:END skill-count --> engineering skills, `AGENTS.md` rules, <!-- METRICS:BEGIN subagent-preset-count -->**27 条**<!-- METRICS:END subagent-preset-count --> SubAgent preset templates, the 4-posture DSH preset family, and isolated MCP server bindings.
 
 > **Asset Ownership Boundary**: `.agents/plugins/workspace-governance/` is a **workspace documentation & prompt asset bundle**, not a DSH runtime plugin. DSH loads only npm packages declared in `dsh.profile.bundles` (`$DSH_HOME/.agent-presets/<preset-id>/`), sourced from [`../../dsh/bundle/`](../../dsh/bundle/).
 
@@ -16,10 +16,10 @@ Unified workspace governance, multi-agent orchestration, and engineering plugin 
 ├── assets/logo.svg             # Vector badge (128x128)
 ├── rules/AGENTS.md             # Workspace governance pointer hub (byte-mirrored from root AGENTS.md)
 ├── agents/*.md                 # 27 orthogonal (Archetype × Posture) SubAgent presets
-└── skills/*/SKILL.md           # 27 engineering skills (byte-mirrored from .agents/skills/)
+└── skills/*/SKILL.md           # 28 engineering skills (byte-mirrored from .agents/skills/)
 ```
 
-> Both `.agents/skills/` and `.agents/plugins/workspace-governance/skills/` hold <!-- METRICS:BEGIN skill-count -->**27 项**<!-- METRICS:END skill-count --> `SKILL.md` directories, verified for 100% byte parity by `validate-skills.js`.
+> Both `.agents/skills/` and `.agents/plugins/workspace-governance/skills/` hold <!-- METRICS:BEGIN skill-count -->**28 项**<!-- METRICS:END skill-count --> `SKILL.md` directories, verified for 100% byte parity by `validate-skills.js`.
 
 ---
 
@@ -27,7 +27,7 @@ Unified workspace governance, multi-agent orchestration, and engineering plugin 
 
 1. **Governance Axiom Index (`AGENTS.md`)**:
    - Task routing matrix, 8D physical hygiene, AST complexity & density budgets ($\text{CC}\le 15$, $\text{Depth}\le 4$, $\text{ELOC}\le 900$, $\text{LOC}\le 1400$), AAS v1.0 reporting, and non-negotiable axioms.
-2. **Engineering Skills (`skills/`)**: <!-- METRICS:BEGIN skill-count -->**27 项**<!-- METRICS:END skill-count --> domain and cross-cutting skills (`auto-refactor-dev`, `sparse-moe-and-ast-routing`, `praxis-vfs-and-trajectory-learning`, `fractal-git-dev`, `webgames-workflow`, `workspace-timing-dev`, `subagent-orchestration`, `gate-governance`, `rule-catalog-governance`, `skill-governance`, `docs-archive-governance`, `complexity-budget`, `coding-craft`, `facade-discipline`, `batch-commit`, `test-benchmark-engineering`, `debugging-and-error-recovery`, `defensive-security-and-taint-safety`, `state-concurrency-and-crash-recovery`, `tiered-cache-and-wal-persistence`, `telemetry-statistical-modeling`, `algorithmic-operator-engineering`, `rust-engineering`, `interaction-design-physics`, `release-package-workflow`, `spec-driven-development`, `constraint-driven-development`).
+2. **Engineering Skills (`skills/`)**: <!-- METRICS:BEGIN skill-count -->**28 项**<!-- METRICS:END skill-count --> domain and cross-cutting skills (`auto-refactor-dev`, `sparse-moe-and-ast-routing`, `praxis-vfs-and-trajectory-learning`, `fractal-git-dev`, `taxis-daemon-and-agent-control`, `webgames-workflow`, `workspace-timing-dev`, `subagent-orchestration`, `gate-governance`, `rule-catalog-governance`, `skill-governance`, `docs-archive-governance`, `complexity-budget`, `coding-craft`, `facade-discipline`, `batch-commit`, `test-benchmark-engineering`, `debugging-and-error-recovery`, `defensive-security-and-taint-safety`, `state-concurrency-and-crash-recovery`, `tiered-cache-and-wal-persistence`, `telemetry-statistical-modeling`, `algorithmic-operator-engineering`, `rust-engineering`, `interaction-design-physics`, `release-package-workflow`, `spec-driven-development`, `constraint-driven-development`).
 3. **SubAgent Presets (`agents/`)**: <!-- METRICS:BEGIN subagent-preset-count -->**27 条**<!-- METRICS:END subagent-preset-count --> presets across `workspace`, `infra`, `wt`, `ar`, `wg`, `fg`, and `skill` archetypes (`construct`, `refactor`, `review`, `explore`, `guardian`).
 4. **MCP Services (`mcp_config.json`)**: `context7` (documentation retrieval) and `github` (repository collaboration).
 

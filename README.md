@@ -192,7 +192,7 @@ bash scripts/sh/audit-all.sh            # Linux / macOS
 | 入口 | 内容 | 何时读它 |
 | :--- | :--- | :--- |
 | [AGENTS.md](./AGENTS.md) | 工作区顶层治理总枢：按作业场景索引到技能真源与本地预审命令 | 动手改任何代码之前 |
-| [.agents/skills/](./.agents/skills) | <!-- METRICS:BEGIN skill-count -->**27 项**<!-- METRICS:END skill-count -->研发技能，分通用工程、治理底座与项目适配三层 | 需要具体作业规范时 |
+| [.agents/skills/](./.agents/skills) | <!-- METRICS:BEGIN skill-count -->**28 项**<!-- METRICS:END skill-count -->研发技能，分通用工程、治理底座与项目适配三层 | 需要具体作业规范时 |
 | [docs/system-spec/README.md](./docs/system-spec/README.md) | 系统性规范总索引：质量评分模型、脚本治理体系、门禁审计清单 | 想理解度量与门禁如何构造时 |
 | [fractal-git/docs/README.md](./fractal-git/docs/README.md) | 分形 Git 内核文档：10 大内核子系统架构、无锁引擎与对标基准 | 阅读或改动 `fractal-git/` 时 |
 | [scripts/README.md](./scripts/README.md) | 仓库级脚本库清单与职能域矩阵 | 新增脚本或排查门禁时 |
