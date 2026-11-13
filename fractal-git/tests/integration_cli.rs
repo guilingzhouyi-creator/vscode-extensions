@@ -5,6 +5,8 @@
 
 #[path = "rust/support/cli_harness.rs"]
 pub mod cli_harness;
+#[path = "rust/support/branch_test_fixtures.rs"]
+pub mod branch_test_fixtures;
 
 #[path = "rust/test_cli_contract_parity.rs"]
 mod test_cli_contract_parity;
@@ -46,6 +48,10 @@ mod test_conflict_state_parity;
 mod test_edition_capability;
 #[path = "rust/test_engineering_default_target.rs"]
 mod test_engineering_default_target;
+#[path = "rust/test_fractal_branch_fork_merge.rs"]
+mod test_fractal_branch_fork_merge;
+#[path = "rust/test_fractal_branch_worktree.rs"]
+mod test_fractal_branch_worktree;
 #[path = "rust/test_hosted_git_archive_parity.rs"]
 mod test_hosted_git_archive_parity;
 #[path = "rust/test_hosted_git_parity.rs"]
@@ -56,6 +62,16 @@ mod test_hosted_git_remote_parity;
 mod test_hosted_git_workflow_parity;
 #[path = "rust/test_inspect_commands.rs"]
 mod test_inspect_commands;
+#[path = "rust/test_kernel_cascade_migrate.rs"]
+mod test_kernel_cascade_migrate;
+#[path = "rust/test_kernel_head_penetration.rs"]
+mod test_kernel_head_penetration;
+#[path = "rust/test_kernel_lineage_reclaim.rs"]
+mod test_kernel_lineage_reclaim;
+#[path = "rust/test_kernel_policy_vault.rs"]
+mod test_kernel_policy_vault;
+#[path = "rust/test_kernel_strict_bypasses.rs"]
+mod test_kernel_strict_bypasses;
 #[path = "rust/test_lineage_commands.rs"]
 mod test_lineage_commands;
 #[path = "rust/test_list_files_parity.rs"]

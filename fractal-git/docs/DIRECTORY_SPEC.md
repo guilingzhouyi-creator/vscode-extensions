@@ -10,22 +10,22 @@
 
 | 目录路径 | 角色定位 | 核心职责与设计边界 | 允许依赖 | 严禁反向依赖 |
 | :--- | :---: | :--- | :--- | :--- |
-| **`crates/fg-core/`** | 领域核心基石 | 纯原子数据模型（`Oid`, `GitSignature`, `PraxisCardContext`, `AgentCommitMeta`、审计数据结构 `TelemetryEntry`, `AuditStatus`）与核心抽象 Trait（`OdbStore`, `RefStore`, `GateVerifier`, `WorktreeReclaimer`）。零业务依赖。 | 基础错误与序列化库 | 严禁依赖任何具体存储、算法或上层 Crate |
+| **`crates/fg-core/`** | 领域核心基石 | 纯原子数据模型（`Oid`, `GitSignature`, `PraxisCardContext`, `AgentCommitMeta`、分形分支策略与无 JSON 二进制载荷 `constants/branch.rs`, `models/branch_policy.rs`、审计数据结构 `TelemetryEntry`, `AuditStatus`）与核心抽象 Trait（`OdbStore`, `RefStore`, `GateVerifier`, `WorktreeReclaimer`）。零业务依赖。 | 基础错误与序列化库 | 严禁依赖任何具体存储、算法或上层 Crate |
 | **`crates/fg-object/`** | Git 原生对象模型 | 纯 Git 对象编解码（`GitBlob`, `GitTree`, `GitCommit`, `FileMode`）与规范二进制排序（目录尾斜杠规则）。纯数学与数据算子。 | `fg-core`, `sha1`, `flate2` | 严禁依赖拓扑、网络、存储引擎或进程调用 |
-| **`crates/fg-index/`** | 索引区与无锁虚拟树 | 消除 `.git/index.lock` 锁争用的无锁内存索引（`InMemoryIndexTree`）、规范四阶段冲突槽（`Stage 0..3`、`ConflictStageSlot`）与目录树生成回调。 | `fg-core`, `fg-object` | 严禁依赖底层物理 I/O、网络传输或业务调度 |
+| **`crates/fg-index/`** | 索引区与无锁虚拟树 | 消除 `.git/index.lock` 锁争用的无锁内存索引（`InMemoryIndexTree`）、规范四阶段冲突槽（`Stage 0..3`、`ConflictStageSlot`）与分层配置加载（`RepoConfig`）。 | `fg-core`, `fg-object` | 严禁依赖底层物理 I/O、网络传输或业务调度 |
 | **`crates/fg-algorithms/`** | 纯算法与数学算子库 | 对标 `git/xdiff`：FastCDC 变长分块滚动哈希、三方合并（`ThreeWayMerge`，快进检测与冲突判定）、内存树差分（`TreeDiff`）、Unified Diff 补丁生成（`PatchGenerator`）、DAG 拓扑排序与祖先可达性剪枝（`DagWalker`）、SpacePlan 离散磁盘水位推演算法、以及分层树状归约算法（`HierarchicalRollupFolder`）。 | `fg-core`, `sha1` | 严禁包含物理文件读写或业务状态 |
 | **`crates/fg-pools/`** | 资源池与分配管控 | 热路径循环内零堆分配约束：树节点与缓冲对象复用池（`RecyclePool`）、64KB 压缩页面缓冲池（`PageBufferPool`）、预热虚拟工作区沙箱槽位池（`SandboxPool`, `WorktreePool`）、以及 Direct-Bypass 极速自动化测试内存缓存池（`DirectBypassPool`，支持 `<20ms` 物理回收）。 | `fg-core`, `fg-object`, `parking_lot` | 严禁侵入策略守卫、业务调度或传输协议 |
-| **`crates/fg-native/`** | Taxis 原生二进制真身 | TAXC 分节容器（Header / Section Table / CRC32C / 8 字节对齐）、七类原生节（`META`/`HEAD`/`REFS`/`INDX`/`OPLG`/`PROM`/`WKTR`）、仓库布局（`RepoLayout`、守卫文件、隐藏属性）、Windows junction 与仓库标识（`repo_id` / store 路径）。**不持有任何 git 格式知识**，可脱离兼容投影独立验证。 | `fg-core`, `sha1`, `getrandom` | 严禁依赖对象编解码、传输协议或 CLI 交互 |
+| **`crates/fg-native/`** | Taxis 原生二进制真身 | TAXC 分节容器（Header / Section Table / CRC32C / 8 字节对齐）、七类原生节（`META`/`HEAD`/`REFS`/`INDX`/`OPLG`/`PROM`/`WKTR`）、内核独占隐藏加密策略保险箱（`policy_vault/`：`.taxis-policy.txp` / `.taxis-policy.seal`）、仓库布局（`RepoLayout`、守卫文件、隐藏属性）、Windows junction 与仓库标识（`repo_id` / store 路径）。**不持有任何 git 格式知识**，可脱离兼容投影独立验证。 | `fg-core`, `sha1`, `getrandom` | 严禁依赖对象编解码、传输协议或 CLI 交互 |
 | **`crates/fg-storage/`** | 真实不可变存储底座 | 松散对象存储（`LooseOdb` 原子写入 `.git/objects/`）、不可变 CAS 块后端（`CasBackend`）、崩溃安全事务预写日志（`WalJournal`）、LayerVFS 快照向 Git 对象的原子物化器（`CasToGitMaterializer`）、以及 TIPSE 原位存储解压与微分型包重打包（`in_place`, `repack_repository_low_disk`）。 | `fg-core`, `fg-object`, `fg-index`, `fg-algorithms` | 严禁依赖传输层协议或 CLI 交互 |
-| **`crates/fg-topology/`** | 自相似分形拓扑与审计链 | 自相似四层引用系统（`refs/fractal/{dept}/{cell}/{card}/{agent}`）、合并合法性断言器（`TopologyVerifier`，严守 SubAgent 仅合入父级 Card 铁律）、工作树生命周期状态机（`WorktreeStateMachine`，含 `Quarantined` 检疫态）、Path Jail 沙箱隔离契约、以及密码学防篡改遥测审计哈希链（`AuditHashChain`，支持 Win32 ACL 与 Linux `chattr +a` 操作系统级只读/仅追加物理加固）。 | `fg-core`, `fg-native`, `serde`, `chrono` | 严禁直接依赖物理存储或对象编码实现 |
+| **`crates/fg-topology/`** | 自相似分形拓扑与审计链 | 严格五层 D/F 安全分形引用文法（`refs/fractal/cell/<cell-id>/card/<card-id>/main` 及 `branch_grammar/`, `lineage/`）、合并合法性断言器（`TopologyVerifier`，严守 SubAgent 仅合入父级 Card 铁律）、工作树生命周期状态机（`WorktreeStateMachine`，含 `Quarantined` 检疫态）、Path Jail 沙箱隔离契约、以及密码学防篡改遥测审计哈希链（`AuditHashChain`，支持 Win32 ACL 与 Linux `chattr +a` 操作系统级只读/仅追加物理加固）。 | `fg-core`, `fg-native`, `serde`, `chrono` | 严禁直接依赖物理存储或对象编码实现 |
 | **`crates/fg-transport/`** | 自托管传输协议栈 | 内部 Agent 零拷贝本地 IPC（`IpcMessage`, `IpcCodec` 4 字节帧协议）与标准 Git Smart Protocol v2（`PacketLine` 4 字节 Hex 流式编解码、`ls-refs`, `fetch` 协商）。 | `fg-core`, `fg-object`, `fg-topology` | 严禁侵入存储物理层与代码审查逻辑 |
-| **`crates/fg-gate/`** | 预审门禁与内核验证器 | 协议层门禁拦截（`PreReceiveGuard`）、微秒级物理卫生与冲突标记守卫（`ConflictGuard`）、工作树与配额守卫（`QuotaGovernor`）、TKCV 内核抽象推导验证器（`KernelAstVerifier`，5 维不变式）、IKCE 内核微变异击杀率验证引擎（`KernelCanaryEngine`，击杀率 $K\ge 60\%$）、贝叶斯动态信用控制器（`AgentCreditController`，Jeffreys Beta(0.5, 0.5) 评级）、以及全自动审计钩子（`AutoAuditHook`）。 | `fg-core`, `fg-object`, `fg-topology` | 严禁依赖传输层实现细节或物理存储底层 |
+| **`crates/fg-gate/`** | 预审门禁与内核验证器 | 协议层门禁拦截（`PreReceiveGuard`）、分支准入与隐藏策略下限守卫（`branch_guard/`, `policy_floor.rs`）、微秒级物理卫生与冲突标记守卫（`ConflictGuard`）、工作树与配额守卫（`QuotaGovernor`）、TKCV 内核抽象推导验证器（`KernelAstVerifier`）、IKCE 内核微变异击杀率验证引擎（`KernelCanaryEngine`）、贝叶斯动态信用控制器（`AgentCreditController`）、以及全自动审计钩子（`AutoAuditHook`）。 | `fg-core`, `fg-object`, `fg-topology` | 严禁依赖传输层实现细节或物理存储底层 |
 | **`src/lib.rs` (根)** | 统一门面 (Facade) | 工作区根 Rust 门面，统摄并平铺导出全量 10 大内核子系统，提供高人机工学的一站式 SDK 接口。 | 全量 `crates/fg-*` | — |
-| **`src/bench/`** | 基准性能评测套件 | TB-REGRESSION 微基准测试套件与单串行端到端（E2E）克隆 vs 渐进投影评测流水线（`src/bench/e2e/`）。 | `fg-core`, `fg-storage`, `fg-algorithms`, `fg-index`, `fg-topology` | 严禁在基准热路径引入非受控 I/O 干扰 |
-| **`src/bin/taxis.rs`** | 原生 CLI 与 Git 兼容引擎 | Taxis 原生命令行二进制入口（下设 `taxis_cmd/` 78 个模块化子命令分发器，支持 `bench/st/ci/br/di/co/check/gc/serve/quality/quarantine` 等指令、JSON 输出与基准自动校验）。 | 全量 `crates/fg-*`, `serde_json` | 严禁反向被底层内核子系统依赖 |
+| **`src/bench.rs` & `src/bench/`** | 基准性能评测套件 | TB-REGRESSION 微基准测试套件入口（`src/bench.rs`）与单串行端到端（E2E）克隆 vs 渐进投影评测流水线（`src/bench/e2e/`）。 | `fg-core`, `fg-storage`, `fg-algorithms`, `fg-index`, `fg-topology` | 严禁在基准热路径引入非受控 I/O 干扰 |
+| **`src/bin/taxis.rs`** | 原生 CLI 与 Git 兼容引擎 | Taxis 原生命令行二进制入口（通过 `taxis_cmd/registry.rs` 与 `taxis_cmd/dispatch.rs` 统一注册分发 `taxis_cmd/*.rs` 模块化子命令，含 `policy`/`branch`/`bench`/`st`/`ci`/`check`/`serve`/`quarantine` 等，支持 `--json` 输出与基准自动校验）。 | 全量 `crates/fg-*`, `serde_json` | 严禁反向被底层内核子系统依赖 |
 | **`ts/`** | TypeScript 编排与客户端 | 工业化五层分工：`client/` (Praxis Agent SDK 客户端)、`vfs/` (LayerVFS 虚拟文件系统适配器)、`tui/` (一体两面终端渲染器)、`orchestration/` (多 Agent 候选变体评估与择优晋级器)、`cli/` (终端命令)。 | 顶层契约与原生桥 | 严禁在门面外泄露低级指针 |
 | **`scripts/`** | 工程构建与自测脚本 | 跨平台工程构建（`build.ps1` CRLF / `build.sh` LF `set -euo pipefail`）、自测流水线与门禁检查脚本。 | 外部编译器工具链 | 严禁硬编码规范化完整路径或 Windows 盘符 |
-| **`tests/`** | 双轨集成与基准测试 | Rust 内核子系统集成测试套件（`tests/rust/`）与 TypeScript 仿真测试（`tests/ts/`）。 | 被测项目各模块 | 严禁生产代码反向依赖测试夹具 |
+| **`tests/`** | 双轨集成与基准测试 | Rust 内核子系统集成测试套件（`tests/rust/`，共享 `tests/rust/support/cli_harness.rs` 并收敛临时沙箱至 `fractal-git/target/test_tmp/` 自动回收）与 TypeScript 仿真测试（`tests/ts/`）。 | 被测项目各模块 | 严禁生产代码反向依赖测试夹具或向根工作区 `tmp/` 写入测试残留 |
 
 ---
 
@@ -147,3 +147,7 @@ flowchart TD
 ### 3.9 场景 I：新增基准评测维度与性能回归模型
 - **归属位置**：`src/bench/e2e/<dimension>.rs`
 - **契约要求**：必须支持单串行环境隔离，避免在关键计时区触发不可控的 I/O 或操作系统调度噪声；所产出的度量指标必须提供对应的 `TB-REGRESSION` 单调性容差校验与冻结基准序列化支持。
+
+### 3.10 场景 J：新增测试沙箱与临时工作区夹具
+- **归属位置**：`fractal-git/target/test_tmp/<suite>/`（通过 `tests/rust/support/cli_harness.rs::scratch_scoped_dir` 或 crate 本地 RAII guard 分配）
+- **契约要求**：所有单测与集成测试临时目录必须收口在 `fractal-git/target/test_tmp/` 下并使用 RAII `Drop` 守卫（仅在非 panic 退出时回收，失败保留现场，并对超过 1 小时的陈旧遗留执行惰性清理），严禁直接写入 monorepo 根目录 `tmp/` 或长期滞留未清理的大体积二进制副本。
