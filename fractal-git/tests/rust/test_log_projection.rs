@@ -6,17 +6,19 @@
 //! answer the user would otherwise be unable to distinguish from a quiet repository.
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use crate::cli_harness::{compliant_commit_msg, run_taxis, run_taxis_ok, scratch_repo};
+use crate::cli_harness::{
+    compliant_commit_msg, run_taxis, run_taxis_ok, scratch_repo_guard, ScratchDirGuard,
+};
 
 /// Builds a repository whose history alternates between two directories.
 ///
 /// The result is three commits: the first adds `core/`, the second adds `docs/` only, and the third
 /// changes `core/` again. A slice over `core/**` must therefore see the first and third and hold
 /// back the middle one.
-fn alternating_repo(label: &str) -> PathBuf {
-    let repo = scratch_repo(label, "projection");
+fn alternating_repo(label: &str) -> ScratchDirGuard {
+    let repo = scratch_repo_guard(label, "projection");
     // A native Taxis repository, not a Git one. A bare `git init` here would leave no `.taxis` and
     // the binary would then adopt the enclosing workspace's object store, which is a different
     // repository entirely.

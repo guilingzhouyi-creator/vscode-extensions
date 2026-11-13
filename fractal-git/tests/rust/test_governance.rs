@@ -508,7 +508,12 @@ fn test_auto_audit_hook_receipt_and_canary_probe_closure() {
     let strict_hook = fractal_git::AutoAuditHook::new(fractal_git::HookTier::SubToCard)
         .with_require_external_runner(true);
     let unmeasured_err = strict_hook
-        .audit_source_and_test("crates/fg-gate/bonus.rs", clean_src, "// comment only", "agent-p1")
+        .audit_source_and_test(
+            "crates/fg-gate/bonus.rs",
+            clean_src,
+            "// comment only",
+            "agent-p1",
+        )
         .expect_err("explicit external runner requirement must reject unmeasured tests");
     assert!(unmeasured_err.to_string().contains("Review unavailable"));
 }

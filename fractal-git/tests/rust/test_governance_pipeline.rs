@@ -717,9 +717,15 @@ fn test_verify_and_promotion_receipt_evidence_closure() {
         ])
         .output()
         .expect("run taxis verify");
-    assert!(verify_out.status.success(), "taxis verify should pass on clean_mod.rs");
+    assert!(
+        verify_out.status.success(),
+        "taxis verify should pass on clean_mod.rs"
+    );
     let receipt_path = git_dir.join("verify-receipt.json");
-    assert!(receipt_path.is_file(), "verify-receipt.json must be written to .taxis/");
+    assert!(
+        receipt_path.is_file(),
+        "verify-receipt.json must be written to .taxis/"
+    );
 
     // 3. Promotion using verified receipt succeeds
     let verified_promo = std::process::Command::new(taxis_bin)

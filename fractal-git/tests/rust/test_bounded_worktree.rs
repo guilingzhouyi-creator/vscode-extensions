@@ -235,8 +235,9 @@ fn test_quarantine_workspace_restore_and_path_safety() {
     .expect("isolation succeeds");
 
     // Replay restoration to workspace
-    let restored = QuarantineRegistry::restore_to_workspace(&quar_dir, &record.quarantine_id, &work_root)
-        .expect("restore succeeds");
+    let restored =
+        QuarantineRegistry::restore_to_workspace(&quar_dir, &record.quarantine_id, &work_root)
+            .expect("restore succeeds");
     assert_eq!(restored.status, QuarantineStatus::Restored);
 
     let restored_file_content = std::fs::read_to_string(&target_file).unwrap();

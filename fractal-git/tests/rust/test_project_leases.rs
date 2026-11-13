@@ -378,12 +378,7 @@ fn test_disk_blackboard_store_write_guard() {
 
     // 4. Different path outside scope is permitted
     let outside = store
-        .assert_write_permitted(
-            "src/utils/log.rs",
-            Some("agent-b"),
-            Some("cell-b"),
-            now_ms,
-        )
+        .assert_write_permitted("src/utils/log.rs", Some("agent-b"), Some("cell-b"), now_ms)
         .unwrap();
     assert_eq!(outside, None);
 

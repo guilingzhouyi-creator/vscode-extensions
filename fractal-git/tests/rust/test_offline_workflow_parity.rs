@@ -7,54 +7,20 @@
 //! Dependencies & Triggers: Executed by `cargo test --test integration_cli`.
 //! Responsibilities: Twin-checkout differential comparisons across porcelain staging, low-level index
 //!   plumbing, index-backed commit materialization, maintenance hygiene, and local/bundle cloning.
-//! Exit Semantics & Design Rationale: Every test creates isolated twin repositories under `tmp/` and
-//!   compares resulting Git tree OIDs, commit payloads, `git status --short`, and `git fsck --full`.
+//! Exit Semantics & Design Rationale: Every test creates isolated twin repositories under
+//!   `target/test_tmp/offline-workflow-parity/` via RAII cleanup guards and compares resulting Git
+//!   tree OIDs, commit payloads, `git status --short`, and `git fsck --full`.
 //!
 //! Domain Governance Rules: FGT-COR-001, FGT-IDX-001, FGT-STO-001, FGT-CLI-001.
 
-use crate::cli_harness::system_git_available;
+use crate::cli_harness::{scratch_scoped_dir, system_git_available, ScratchDirGuard};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Output};
-use std::sync::atomic::{AtomicUsize, Ordering};
 
-static WORKFLOW_COUNTER: AtomicUsize = AtomicUsize::new(0);
-
-/// Removes scratch trees left behind by earlier runs of this suite.
-///
-/// A crashed or interrupted run leaves its per-PID tree behind, and removing only the exact
-/// path about to be reused let those leftovers accumulate without bound. Entries owned by the
-/// current process are kept so repeated calls inside one run stay incremental.
-fn purge_stale_scratch(base: &Path) {
-    let own_prefix = format!("{}_", std::process::id());
-    let Ok(entries) = fs::read_dir(base) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let name = entry.file_name();
-        let Some(name) = name.to_str() else {
-            continue;
-        };
-        if name.starts_with(&own_prefix) {
-            continue;
-        }
-        let _ = fs::remove_dir_all(entry.path());
-    }
-}
-
-fn scratch_dir(label: &str) -> PathBuf {
-    static PURGE: std::sync::Once = std::sync::Once::new();
-    let count = WORKFLOW_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let workspace_root = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("crate directory has workspace parent");
-    let base = workspace_root.join("tmp").join("offline-workflow-parity");
-    let _ = fs::create_dir_all(&base);
-    PURGE.call_once(|| purge_stale_scratch(&base));
-    let path = base.join(format!("{}_{}_{}", std::process::id(), count, label));
-    let _ = fs::remove_dir_all(&path);
-    fs::create_dir_all(&path).expect("create scratch dir");
-    path
+/// Allocates an isolated auto-reclaiming scratch directory under `target/test_tmp/offline-workflow-parity`.
+fn scratch_dir(label: &str) -> ScratchDirGuard {
+    scratch_scoped_dir("offline-workflow-parity", label)
 }
 
 fn strip_git_config_env(command: &mut Command) {
@@ -172,7 +138,7 @@ fn build_fixture(repo: &Path) {
     assert!(out.status.success());
 }
 
-fn twin_fixtures(label: &str) -> (PathBuf, PathBuf) {
+fn twin_fixtures(label: &str) -> (ScratchDirGuard, ScratchDirGuard) {
     let oracle = scratch_dir(&format!("{label}_git"));
     let candidate = scratch_dir(&format!("{label}_taxis"));
     build_fixture(&oracle);
@@ -187,7 +153,7 @@ fn add_rm_mv_stage_parity_matches_system_git() {
     }
     let (oracle, candidate) = twin_fixtures("stage_ops");
 
-    for repo in [&oracle, &candidate] {
+    for repo in [oracle.path(), candidate.path()] {
         write_file(repo, ".gitignore", "*.log\nbuild/\n");
         write_file(repo, "debug.log", "ignored log\n");
         write_file(repo, "build/out.bin", "ignored dir\n");
@@ -243,13 +209,13 @@ fn restore_worktree_and_staged_matches_system_git() {
     }
     let (oracle, candidate) = twin_fixtures("restore_ops");
 
-    for repo in [&oracle, &candidate] {
+    for repo in [oracle.path(), candidate.path()] {
         write_file(repo, "a.txt", "staged change\n");
     }
     run_git(&oracle, &["add", "a.txt"]);
     run_taxis_ok(&candidate, &["add", "a.txt"]);
 
-    for repo in [&oracle, &candidate] {
+    for repo in [oracle.path(), candidate.path()] {
         write_file(repo, "a.txt", "unstaged dirty edit\n");
     }
 
@@ -383,7 +349,7 @@ fn commit_from_index_preserves_partial_staging_deletions_and_all_flag() {
     let (oracle, candidate) = twin_fixtures("commit_index");
 
     // Stage one deletion (`dir/b.txt`) and one addition (`staged.txt`), while leaving `a.txt` unstaged!
-    for repo in [&oracle, &candidate] {
+    for repo in [oracle.path(), candidate.path()] {
         write_file(repo, "staged.txt", "staged content\n");
         write_file(repo, "a.txt", "unstaged modification\n");
     }
@@ -586,7 +552,7 @@ fn add_stat_cache_fast_path_preserves_unchanged_and_detects_modified_files() {
     );
 
     // Modifying a file invalidates stat cache and stages the updated blob
-    for repo in [&oracle, &candidate] {
+    for repo in [oracle.path(), candidate.path()] {
         write_file(repo, "keep.txt", "keep updated content with new length\n");
     }
     run_git(&oracle, &["add", "-A"]);
@@ -596,9 +562,6 @@ fn add_stat_cache_fast_path_preserves_unchanged_and_detects_modified_files() {
         stdout_trimmed(&run_git(&oracle, &["write-tree"])),
         "taxis add -A after file edit must re-hash and update index entry"
     );
-
-    let _ = fs::remove_dir_all(&oracle);
-    let _ = fs::remove_dir_all(&candidate);
 }
 
 #[test]
@@ -608,7 +571,7 @@ fn cherry_pick_and_revert_shared_delta_engine_roundtrip() {
     }
     let (oracle, candidate) = twin_fixtures("delta_transplant");
 
-    for repo in [&oracle, &candidate] {
+    for repo in [oracle.path(), candidate.path()] {
         run_git(repo, &["checkout", "-q", "-b", "feature"]);
         write_file(repo, "feature.txt", "feature payload\n");
         write_file(repo, "a.txt", "alpha from feature\n");
