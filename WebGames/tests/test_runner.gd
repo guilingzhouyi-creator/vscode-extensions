@@ -101,6 +101,7 @@ func _print_final_summary(passed_domains: int, total_domains: int, passed_assert
 	print("  断言通过率: %d / %d 测试项 (%.1f%%)" % [passed_assertions, total_assertions, assertion_rate])
 	print("")
 
+	NavManager.reset_instance()
 	UIBindingRegistry.reset_instance()
 
 	if failure_reports.is_empty() and passed_domains == total_domains:

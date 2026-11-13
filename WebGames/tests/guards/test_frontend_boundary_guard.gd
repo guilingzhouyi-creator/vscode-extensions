@@ -303,7 +303,8 @@ static func _test_kvirtual_list_pool_contract() -> Dictionary:
 	(reused as KVirtualList.KVirtualRow).reset_state()
 	(reused as KVirtualList.KVirtualRow).reset_state()
 	ok = ok and TestCase.assert_true(true, "reset_state 幂等")
-	# 池受硬上限约束
+	# 回收复用测试行并验证池受硬上限约束
+	list.release_row(reused)
 	var burst: Array[Control] = []
 	for i in range(KVirtualList.POOL_HARD_CAP + 16):
 		burst.append(list.acquire_row())

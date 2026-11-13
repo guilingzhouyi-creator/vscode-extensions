@@ -112,8 +112,8 @@ static func _test_modal_and_dialog_manager() -> Dictionary:
 	if modal_mgr.get_modal_count() != 0:
 		err = "Modal 关闭后计数未清零"
 
-	layer.queue_free()
-	modal_mgr.queue_free()
+	layer.free()
+	modal_mgr.free()
 
 	return {"name": test_name, "passed": err.is_empty(), "error": err}
 
@@ -199,8 +199,8 @@ static func _test_drawer_and_context_menu_manager() -> Dictionary:
 	if drawer_mgr.is_drawer_open():
 		err = "Drawer 关闭后仍处于打开状态"
 
-	layer.queue_free()
-	drawer_mgr.queue_free()
+	layer.free()
+	drawer_mgr.free()
 
 	return {"name": test_name, "passed": err.is_empty(), "error": err}
 
@@ -236,10 +236,11 @@ static func _test_three_layer_model_decoupling() -> Dictionary:
 
 	var vm := CharacterHudDecoupled.CharacterHUDViewModel.new()
 	vm.update_from_domain(domain)
+	var expected_wallet := UIIntermediary.text("ui.fe05.currency.full", {"gold": 1, "silver": 23, "copper": 45})
 	if vm.name_text != "测试勇士":
 		err = "ViewModel 昵称映射失败"
-	elif vm.wallet_formatted_string != "1 金 23 银 45 铜":
-		err = "ViewModel 钱包格式化串错误: %s" % vm.wallet_formatted_string
+	elif vm.wallet_formatted_string != expected_wallet:
+		err = "ViewModel 钱包格式化串错误: %s (expected %s)" % [vm.wallet_formatted_string, expected_wallet]
 
 	return {"name": test_name, "passed": err.is_empty(), "error": err}
 

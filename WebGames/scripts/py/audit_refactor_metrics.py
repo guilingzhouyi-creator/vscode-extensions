@@ -440,11 +440,11 @@ def _resolve_target_root(slice_name: str | None) -> Path:
 
 
 def _resolve_cli_format(opts: RefactorAuditOptions) -> str:
-    """判定传给底层 runner 的输出格式。"""
+    """判定传给底层 runner 的输出格式（run.mjs 仅支持 json/sarif/text/compact）。"""
     if opts.json_output or opts.score_only:
         return "json"
-    if opts.report_format in ("markdown", "sarif", "badge"):
-        return opts.report_format
+    if opts.report_format == "sarif":
+        return "sarif"
     return "json"
 
 
@@ -515,17 +515,19 @@ def run_refactor_audit(opts: RefactorAuditOptions | None = None, **kwargs: Any) 
         cli_format=cli_format, report_path=report_path, opts=active_opts,
     ))
 
-    ret_code, _stdout, stderr = _execute_refactor_process(cmd)
+    ret_code, stdout, stderr = _execute_refactor_process(cmd)
     if ret_code not in (0, 1):
-        print(f"【ERROR】auto-refactor 返回非零崩溃码 {ret_code}: {stderr.strip()[:200]}，审查阻断（fail-closed）。")
+        print(f"【ERROR】auto-refactor 返回非零崩溃码 {ret_code}: {stderr.strip()[:400]}，审查阻断（fail-closed）。")
         return 1
 
     raw_output = _read_temp_report(report_path)
     if raw_output is None:
-        print("【ERROR】auto-refactor 未产出报告文件，审查阻断（fail-closed）。")
+        diag = (stderr or stdout or "").strip()[:600]
+        detail = f"（exit={ret_code}，stderr: {diag}）" if diag else f"（exit={ret_code}）"
+        print(f"【ERROR】auto-refactor 未产出报告文件{detail}，审查阻断（fail-closed）。")
         return 2
 
-    if cli_format in ("markdown", "sarif", "badge"):
+    if cli_format == "sarif":
         print(raw_output)
         return 0
 

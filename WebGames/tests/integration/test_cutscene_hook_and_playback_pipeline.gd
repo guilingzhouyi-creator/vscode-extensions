@@ -275,7 +275,7 @@ static func test_tc_cs_05_player_view_and_presenter_integration() -> Dictionary:
 
 	# 3. 视口清理与解绑
 	presenter.unbind_view()
-	view.queue_free()
+	view.free()
 
 	# 4. 验证 CutsceneEventBridge 经 EventBusCore 全域解耦消费闭环（待命零接线契约）
 	var bridge := CutsceneEventBridge.new()
@@ -299,7 +299,7 @@ static func test_tc_cs_05_player_view_and_presenter_integration() -> Dictionary:
 	var bridge_finished_ok: bool = not bridge.is_consuming()
 
 	bridge.detach_all()
-	host.queue_free()
+	host.free()
 	var bridge_clean_ok: bool = not bridge.is_attached()
 
 	var bridge_ok: bool = bridge_attached_ok and bridge_consuming_ok and dynamic_view_created and bridge_finished_ok and bridge_clean_ok

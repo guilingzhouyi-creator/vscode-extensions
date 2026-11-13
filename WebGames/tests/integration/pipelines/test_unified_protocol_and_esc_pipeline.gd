@@ -185,6 +185,7 @@ static func test_tc_upe_03_hud_event_bridge_streaming_and_detach() -> Dictionary
 	})
 	var no_leak_update: bool = hud_view.wallet_gold == 12000
 
+	hud_view.free()
 	_reset_env()
 	var passed: bool = is_attached_1 and is_attached_2 and snap_received and wallet_received and is_detached and no_leak_update
 	return TestCase.make_result("TC-UPE-03: HUD 事件桥接器单源订阅与幂等解绑断言", passed)
