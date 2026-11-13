@@ -1,17 +1,121 @@
 {
   "$schema": "../config.schema.json",
   "_comment": "领域级声明式预设：Godot 游戏逻辑审查（热路径瞬态分配、对象池契约、信号泄漏、领域无头解耦）",
-  "include": [
-    "**/*.gd"
-  ],
-  "exclude": [
-    "**/test/**",
-    "**/tests/**",
-    "**/addons/**"
-  ],
+  "include": ["**/*.gd"],
+  "exclude": ["**/test/**", "**/tests/**", "**/addons/**"],
   "analyzers": {
     "gdscript-game": {
       "enabled": true
+    }
+  },
+  "trajectoryPlugin": {
+    "id": "godot-game-gdscript",
+    "language": "gdscript",
+    "tagRules": {
+      "transient-heap-allocation": {
+        "kind": "pattern",
+        "pattern": "\\bnew\\s+\\w+|\\.duplicate\\(true\\)|\\.new\\(\\)"
+      },
+      "hot-loop-gc-pressure": {
+        "kind": "pattern",
+        "pattern": "\\bnew\\s+\\w+|\\.duplicate\\(true\\)|\\.new\\(\\)"
+      },
+      "unprotected-reentrancy": {
+        "kind": "absent",
+        "pattern": "(_is_executing|_is_stopping|_cas_lock)"
+      },
+      "recursive-state-mutation": {
+        "kind": "absent",
+        "pattern": "(_is_executing|_is_stopping|_cas_lock)"
+      },
+      "hot-path-config-query": {
+        "kind": "count",
+        "pattern": "GameConfig\\.get_",
+        "flags": "g",
+        "minCount": 3
+      },
+      "stale-cache-risk": {
+        "kind": "count",
+        "pattern": "GameConfig\\.get_",
+        "flags": "g",
+        "minCount": 3
+      },
+      "stale-shim-layer": {
+        "kind": "pattern",
+        "pattern": "\\b(from_stat_mutation|apply_mutation_legacy)\\b"
+      },
+      "obsolete-compatibility-bridge": {
+        "kind": "pattern",
+        "pattern": "\\b(from_stat_mutation|apply_mutation_legacy)\\b"
+      },
+      "indirect-shim-wrapper": {
+        "kind": "pattern",
+        "pattern": "\\.apply_mutation\\(\\s*[^,)]+,\\s*[^,)]+,\\s*[^,)]+,\\s*[^,)]+"
+      },
+      "transitional-scaffolding": {
+        "kind": "pattern",
+        "pattern": "\\.apply_mutation\\(\\s*[^,)]+,\\s*[^,)]+,\\s*[^,)]+,\\s*[^,)]+"
+      },
+      "transient-bridge-boxing": {
+        "kind": "pattern",
+        "pattern": "var\\s+\\w+\\s*=\\s*\\{\\s*[\"']\\w+[\"']\\s*:\\s*\\w+"
+      },
+      "heavyweight-wrapper": {
+        "kind": "pattern",
+        "pattern": "var\\s+\\w+\\s*=\\s*\\{\\s*[\"']\\w+[\"']\\s*:\\s*\\w+"
+      },
+      "missing-debounce": {
+        "kind": "absent",
+        "pattern": "\\b(debounced_pressed|debounce|is_loading)\\b"
+      },
+      "wild-state-mutation": {
+        "kind": "pattern",
+        "pattern": "_current_state\\s*="
+      },
+      "strong-observer-leak": {
+        "kind": "dual",
+        "present": "\\b(?:_observers|_listeners|_bindings)\\.append\\(",
+        "absent": "weakref"
+      },
+      "dto-mutation-leak": {
+        "kind": "pattern",
+        "pattern": "\\b(?:snapshot|dto|_snapshot|_dto)\\.\\w+\\s*[+\\-\\*]?="
+      },
+      "bare-progress-bar": {
+        "kind": "dual",
+        "present": "\\bProgressBar\\b",
+        "absent": "\\bKStatusBar\\b"
+      },
+      "hardcoded-color-token": {
+        "kind": "dual",
+        "present": "Color\\s*\\(",
+        "absent": "DesignTokens\\."
+      },
+      "bare-control-inheritance": {
+        "kind": "dual",
+        "present": "extends\\s+Control\\b",
+        "absent": "extends\\s+(BaseScreen|BaseModal)\\b"
+      },
+      "unbounded-list-instantiation": {
+        "kind": "dual",
+        "present": "\\badd_child\\s*\\(",
+        "absent": "\\bKVirtualList\\b"
+      },
+      "unlocalized-ui-string": {
+        "kind": "dual",
+        "present": "\\.text\\s*=\\s*[\"'][^\"']+[\"']",
+        "absent": "\\btr\\s*\\("
+      },
+      "fragile-node-path": {
+        "kind": "dual",
+        "present": "\\b(?:get_parent|find_child)\\b",
+        "absent": "%[A-Za-z0-9_]+"
+      },
+      "backend-singleton-coupling": {
+        "kind": "dual",
+        "present": "\\bGameState\\.",
+        "absent": "\\bapply_snapshot\\b"
+      }
     }
   }
 }

@@ -13,6 +13,8 @@
  *   or identical revisions gracefully by returning undefined/empty lists without throwing.
  */
 
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import type {
     PraxisTrajectoryLearningInput,
     RecipeCategory,
@@ -43,15 +45,44 @@ const MIN_FUNCTION_LINES = 25;
 const MIN_BRANCH_COUNT = 3;
 const RECIPE_ID_PAD_LENGTH = 3;
 const FALLBACK_RECIPE_PREFIX = 'REC-GEN';
+const WILDCARD_LANGUAGE = '*';
 
-type TagPredicate =
+/** Compiled tag predicate evaluated against candidate source snippets. */
+export type TagPredicate =
     | { readonly kind: typeof PREDICATE_MIN_LINES; readonly minLines: number }
     | { readonly kind: typeof PREDICATE_PATTERN; readonly pattern: RegExp }
     | { readonly kind: typeof PREDICATE_ABSENT; readonly pattern: RegExp }
     | { readonly kind: typeof PREDICATE_COUNT; readonly pattern: RegExp; readonly minCount: number }
     | { readonly kind: typeof PREDICATE_DUAL; readonly present: RegExp; readonly absent: RegExp };
 
-const TAG_RULES: Readonly<Record<string, TagPredicate>> = {
+/** JSON-serializable predicate descriptor loaded from declarative preset plugins. */
+export interface SerializedTagPredicate {
+    readonly kind: TagPredicate['kind'];
+    readonly minLines?: number;
+    readonly minCount?: number;
+    readonly pattern?: string;
+    readonly flags?: string;
+    readonly present?: string;
+    readonly presentFlags?: string;
+    readonly absent?: string;
+    readonly absentFlags?: string;
+}
+
+/** Pluggable domain or language tag rule pack injected via options or preset JSON. */
+export interface TrajectoryRecipePlugin {
+    readonly id: string;
+    readonly language?: string;
+    readonly tagRules: Readonly<Record<string, TagPredicate | SerializedTagPredicate>>;
+}
+
+/** Configuration options for TrajectoryRecipeExtractor plugin hydration. */
+export interface TrajectoryRecipeExtractorOptions {
+    readonly plugins?: readonly TrajectoryRecipePlugin[];
+    readonly tagRules?: Readonly<Record<string, TagPredicate | SerializedTagPredicate>>;
+    readonly autoLoadBuiltinPresets?: boolean;
+}
+
+const GENERIC_TAG_RULES: Readonly<Record<string, TagPredicate>> = {
     'monolithic-function': { kind: PREDICATE_MIN_LINES, minLines: MIN_FUNCTION_LINES },
     'high-cyclomatic-complexity': { kind: PREDICATE_MIN_LINES, minLines: MIN_FUNCTION_LINES },
     'long-parameter-list': { kind: PREDICATE_PATTERN, pattern: /\(\s*[^)]{35,}\)/ },
@@ -72,29 +103,8 @@ const TAG_RULES: Readonly<Record<string, TagPredicate>> = {
         present: /\b(?:async|await|Promise)\b/,
         absent: /\bcatch\b/,
     },
-    'transient-heap-allocation': {
-        kind: PREDICATE_PATTERN,
-        pattern: /\bnew\s+\w+|\.duplicate\(true\)/,
-    },
-    'hot-loop-gc-pressure': { kind: PREDICATE_PATTERN, pattern: /\bnew\s+\w+|\.duplicate\(true\)/ },
-    'unprotected-reentrancy': {
-        kind: PREDICATE_ABSENT,
-        pattern: /(_is_executing|_is_stopping|_cas_lock)/,
-    },
-    'recursive-state-mutation': {
-        kind: PREDICATE_ABSENT,
-        pattern: /(_is_executing|_is_stopping|_cas_lock)/,
-    },
-    'hot-path-config-query': {
-        kind: PREDICATE_COUNT,
-        pattern: /GameConfig\.get_/g,
-        minCount: MIN_BRANCH_COUNT,
-    },
-    'stale-cache-risk': {
-        kind: PREDICATE_COUNT,
-        pattern: /GameConfig\.get_/g,
-        minCount: MIN_BRANCH_COUNT,
-    },
+    'transient-heap-allocation': { kind: PREDICATE_PATTERN, pattern: /\bnew\s+\w+/ },
+    'hot-loop-gc-pressure': { kind: PREDICATE_PATTERN, pattern: /\bnew\s+\w+/ },
     'data-clump': {
         kind: PREDICATE_PATTERN,
         pattern: /\(\s*[^,)]+,\s*[^,)]+,\s*[^,)]+,\s*[^,)]+,\s*[^,)]+/,
@@ -111,82 +121,137 @@ const TAG_RULES: Readonly<Record<string, TagPredicate>> = {
         kind: PREDICATE_PATTERN,
         pattern: /\b(if\s+step\s*==|match\s+phase|switch\s*\(stage\))/,
     },
-    'stale-shim-layer': {
-        kind: PREDICATE_PATTERN,
-        pattern: /\b(from_stat_mutation|apply_mutation_legacy)\b/,
-    },
-    'obsolete-compatibility-bridge': {
-        kind: PREDICATE_PATTERN,
-        pattern: /\b(from_stat_mutation|apply_mutation_legacy)\b/,
-    },
-    'indirect-shim-wrapper': {
-        kind: PREDICATE_PATTERN,
-        pattern: /\.apply_mutation\(\s*[^,)]+,\s*[^,)]+,\s*[^,)]+,\s*[^,)]+/,
-    },
-    'transitional-scaffolding': {
-        kind: PREDICATE_PATTERN,
-        pattern: /\.apply_mutation\(\s*[^,)]+,\s*[^,)]+,\s*[^,)]+,\s*[^,)]+/,
-    },
     'unannotated-deprecation': { kind: PREDICATE_ABSENT, pattern: /@deprecated\b/ },
     'missing-sunset-plan': { kind: PREDICATE_ABSENT, pattern: /@deprecated\b/ },
-    'transient-bridge-boxing': {
-        kind: PREDICATE_PATTERN,
-        pattern: /var\s+\w+\s*=\s*\{\s*["']\w+["']\s*:\s*\w+/,
-    },
-    'heavyweight-wrapper': {
-        kind: PREDICATE_PATTERN,
-        pattern: /var\s+\w+\s*=\s*\{\s*["']\w+["']\s*:\s*\w+/,
-    },
-    'missing-debounce': {
-        kind: PREDICATE_ABSENT,
-        pattern: /\b(debounced_pressed|debounce|is_loading)\b/,
-    },
-    'wild-state-mutation': { kind: PREDICATE_PATTERN, pattern: /_current_state\s*=/ },
-    'strong-observer-leak': {
-        kind: PREDICATE_DUAL,
-        present: /\b(?:_observers|_listeners|_bindings)\.append\(/,
-        absent: /weakref/,
-    },
-    'dto-mutation-leak': {
-        kind: PREDICATE_PATTERN,
-        pattern: /\b(?:snapshot|dto|_snapshot|_dto)\.\w+\s*[+\-\*]?=/,
-    },
-    'bare-progress-bar': {
-        kind: PREDICATE_DUAL,
-        present: /\bProgressBar\b/,
-        absent: /\bKStatusBar\b/,
-    },
-    'hardcoded-color-token': {
-        kind: PREDICATE_DUAL,
-        present: /Color\s*\(/,
-        absent: /DesignTokens\./,
-    },
-    'bare-control-inheritance': {
-        kind: PREDICATE_DUAL,
-        present: /extends\s+Control\b/,
-        absent: /extends\s+(BaseScreen|BaseModal)\b/,
-    },
-    'unbounded-list-instantiation': {
-        kind: PREDICATE_DUAL,
-        present: /\badd_child\s*\(/,
-        absent: /\bKVirtualList\b/,
-    },
-    'unlocalized-ui-string': {
-        kind: PREDICATE_DUAL,
-        present: /\.text\s*=\s*["'][^"']+["']/,
-        absent: /\btr\s*\(/,
-    },
-    'fragile-node-path': {
-        kind: PREDICATE_DUAL,
-        present: /\b(?:get_parent|find_child)\b/,
-        absent: /%[A-Za-z0-9_]+/,
-    },
-    'backend-singleton-coupling': {
-        kind: PREDICATE_DUAL,
-        present: /\bGameState\./,
-        absent: /\bapply_snapshot\b/,
-    },
 };
+
+let cachedBuiltinPlugins: readonly TrajectoryRecipePlugin[] | undefined;
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+    return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+}
+
+function nonEmptyText(value: unknown): string | undefined {
+    return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function compilePatternInput(
+    input: string | RegExp | undefined,
+    flags = '',
+    forceGlobal = false,
+): RegExp | undefined {
+    if (!input) return undefined;
+    if (input instanceof RegExp) {
+        return !forceGlobal || input.global ? input : new RegExp(input.source, `${input.flags}g`);
+    }
+    try {
+        return new RegExp(input, forceGlobal && !flags.includes('g') ? `${flags}g` : flags);
+    } catch {
+        // intentional: skip invalid user-supplied preset regex without crashing extraction
+        return undefined;
+    }
+}
+
+function compileTagPredicate(
+    spec: TagPredicate | SerializedTagPredicate,
+): TagPredicate | undefined {
+    if (spec.kind === PREDICATE_MIN_LINES) {
+        return spec.minLines && spec.minLines > 0
+            ? { kind: PREDICATE_MIN_LINES, minLines: spec.minLines }
+            : undefined;
+    }
+    const flags = 'flags' in spec ? spec.flags : undefined;
+    if (spec.kind === PREDICATE_PATTERN || spec.kind === PREDICATE_ABSENT) {
+        const compiled = compilePatternInput(spec.pattern, flags);
+        return compiled ? { kind: spec.kind, pattern: compiled } : undefined;
+    }
+    if (spec.kind === PREDICATE_COUNT) {
+        const compiled =
+            spec.minCount && spec.minCount > 0
+                ? compilePatternInput(spec.pattern, flags, true)
+                : undefined;
+        return compiled
+            ? { kind: PREDICATE_COUNT, pattern: compiled, minCount: spec.minCount! }
+            : undefined;
+    }
+    const present = compilePatternInput(
+        spec.present,
+        'presentFlags' in spec ? spec.presentFlags : undefined,
+    );
+    const absent = compilePatternInput(
+        spec.absent,
+        'absentFlags' in spec ? spec.absentFlags : undefined,
+    );
+    return present && absent ? { kind: PREDICATE_DUAL, present, absent } : undefined;
+}
+
+/**
+ * Extracts and validates a TrajectoryRecipePlugin block from a parsed preset config object.
+ *
+ * @param rawConfig - Parsed JSON config object possibly carrying trajectoryPlugin.
+ * @param fallbackId - Fallback plugin identifier if omitted in JSON.
+ * @returns Validated plugin descriptor, or undefined if absent or malformed.
+ */
+export function parsePresetTrajectoryPlugin(
+    rawConfig: unknown,
+    fallbackId = 'preset-plugin',
+): TrajectoryRecipePlugin | undefined {
+    if (!isPlainObject(rawConfig) || !isPlainObject(rawConfig.trajectoryPlugin)) return undefined;
+    const block = rawConfig.trajectoryPlugin;
+    if (!isPlainObject(block.tagRules)) return undefined;
+    const compiledRules: Record<string, TagPredicate> = {};
+    for (const [tag, rawRule] of Object.entries(block.tagRules)) {
+        const compiled = isPlainObject(rawRule)
+            ? compileTagPredicate(rawRule as unknown as SerializedTagPredicate)
+            : undefined;
+        if (compiled) compiledRules[tag] = compiled;
+    }
+    return Object.keys(compiledRules).length > 0
+        ? {
+              id: nonEmptyText(block.id) ?? fallbackId,
+              language: nonEmptyText(block.language),
+              tagRules: compiledRules,
+          }
+        : undefined;
+}
+
+/**
+ * Discovers declarative trajectoryPlugin entries from built-in preset configs once per process.
+ *
+ * @param presetDirs - Optional override directories to scan for *.config.json presets.
+ * @returns Immutable list of loaded trajectory recipe plugins.
+ */
+export function loadTrajectoryPluginsFromPresets(
+    presetDirs?: readonly string[],
+): readonly TrajectoryRecipePlugin[] {
+    if (!presetDirs && cachedBuiltinPlugins) return cachedBuiltinPlugins;
+    const searchDirs = presetDirs ?? [
+        path.resolve(__dirname, '../../../presets'),
+        path.resolve(__dirname, '../../../../presets'),
+    ];
+    const loaded: TrajectoryRecipePlugin[] = [];
+    for (const dir of searchDirs) {
+        if (!fs.existsSync(dir)) continue;
+        for (const entry of fs
+            .readdirSync(dir)
+            .filter((f) => f.endsWith('.config.json'))
+            .sort()) {
+            try {
+                const raw = JSON.parse(fs.readFileSync(path.join(dir, entry), 'utf8'));
+                const plugin = parsePresetTrajectoryPlugin(
+                    raw,
+                    entry.replace(/\.config\.json$/, ''),
+                );
+                if (plugin) loaded.push(plugin);
+            } catch {
+                // intentional: ignore unreadable or malformed optional preset files cleanly
+            }
+        }
+        if (!presetDirs && loaded.length > 0) break;
+    }
+    if (!presetDirs) cachedBuiltinPlugins = loaded;
+    return loaded;
+}
 
 /**
  * Builds a RecipePrecondition without transient object spreading.
@@ -217,6 +282,66 @@ export class TrajectoryRecipeExtractor {
     private static recipeCounter = 1;
 
     public static readonly PATTERN_DESCRIPTORS: readonly PatternDescriptor[] = PATTERN_DESCRIPTORS;
+
+    private readonly globalTagRules: Record<string, TagPredicate> = {};
+    private readonly languageTagRules = new Map<string, Record<string, TagPredicate>>();
+
+    /**
+     * Initializes an extractor with generic tag rules plus declarative preset or custom plugins.
+     *
+     * @param options - Optional plugin, inline rule, and preset path configuration.
+     */
+    constructor(options: TrajectoryRecipeExtractorOptions = {}) {
+        if (options.autoLoadBuiltinPresets !== false) {
+            for (const plugin of loadTrajectoryPluginsFromPresets()) this.registerPlugin(plugin);
+        }
+        if (options.plugins) {
+            for (const plugin of options.plugins) this.registerPlugin(plugin);
+        }
+        if (options.tagRules) {
+            this.registerPlugin({ id: 'inline-options', tagRules: options.tagRules });
+        }
+    }
+
+    /**
+     * Registers a declarative or programmatic tag-rule plugin onto this extractor instance.
+     *
+     * @param plugin - Plugin carrying optional target language scope and tag predicates.
+     * @returns Number of tag rules compiled and registered from the plugin.
+     */
+    public registerPlugin(plugin: TrajectoryRecipePlugin): number {
+        const scope =
+            plugin.language && plugin.language !== WILDCARD_LANGUAGE
+                ? plugin.language.trim()
+                : undefined;
+        const bucket = scope
+            ? (this.languageTagRules.get(scope) ?? this.languageTagRules.set(scope, {}).get(scope)!)
+            : this.globalTagRules;
+        let added = 0;
+        for (const [tag, rawPredicate] of Object.entries(plugin.tagRules)) {
+            const compiled = compileTagPredicate(rawPredicate);
+            if (compiled) {
+                bucket[tag] = compiled;
+                added++;
+            }
+        }
+        return added;
+    }
+
+    /**
+     * Counts active tag predicates visible for the given optional target language.
+     *
+     * @param language - Optional language scope to include alongside global/generic rules.
+     * @returns Total distinct tag predicate count.
+     */
+    public getTagRuleCount(language?: string): number {
+        const scoped = language ? this.languageTagRules.get(language) : undefined;
+        return new Set<string>([
+            ...Object.keys(GENERIC_TAG_RULES),
+            ...Object.keys(this.globalTagRules),
+            ...(scoped ? Object.keys(scoped) : []),
+        ]).size;
+    }
 
     /**
      * Analyze a before-and-after trajectory revision pair and synthesize a recipe if improved.
@@ -310,8 +435,9 @@ export class TrajectoryRecipeExtractor {
                 if (!lazyLines) lazyLines = code.split('\n');
                 return lazyLines;
             };
+            const effectiveLanguage = language ?? precondition.targetLanguage;
             const hasMatchingTag = precondition.antiPatternTags.some((tag) =>
-                this.detectTagInCode(tag, code, getLines),
+                this.detectTagInCode(tag, code, getLines, effectiveLanguage),
             );
             if (!hasMatchingTag) {
                 return false;
@@ -353,7 +479,14 @@ export class TrajectoryRecipeExtractor {
         const filterCode = (lines: string[]): string =>
             lines
                 .map((line) => line.trim())
-                .filter((line) => line.length > 0 && !line.startsWith('//') && !line.startsWith('/*') && !line.startsWith('*') && !line.startsWith('#'))
+                .filter(
+                    (line) =>
+                        line.length > 0 &&
+                        !line.startsWith('//') &&
+                        !line.startsWith('/*') &&
+                        !line.startsWith('*') &&
+                        !line.startsWith('#'),
+                )
                 .join('\n');
         if (filterCode(beforeLines) === filterCode(afterLines)) {
             return undefined;
@@ -361,14 +494,38 @@ export class TrajectoryRecipeExtractor {
         return {
             name: 'Verified Codemod Structural Improvement',
             category: 'defensive-guard',
-            description: 'Synthesized refactoring recipe from verified positive-delta trajectory transformation.',
-            precondition: { targetLanguage: language, minLines: 1, antiPatternTags: ['missing-guard'] },
-            operations: [this.createOp('inject-null-guard', 'module-slice', 'Apply verified structural guard or codemod transformation.')],
+            description:
+                'Synthesized refactoring recipe from verified positive-delta trajectory transformation.',
+            precondition: {
+                targetLanguage: language,
+                minLines: 1,
+                antiPatternTags: ['missing-guard'],
+            },
+            operations: [
+                this.createOp(
+                    'inject-null-guard',
+                    'module-slice',
+                    'Apply verified structural guard or codemod transformation.',
+                ),
+            ],
         };
     }
 
-    private detectTagInCode(tag: string, code: string, getLines: () => string[]): boolean {
-        const rule = TAG_RULES[tag];
+    private resolveTagRule(tag: string, language?: string): TagPredicate | undefined {
+        if (language) {
+            const scoped = this.languageTagRules.get(language)?.[tag];
+            if (scoped) return scoped;
+        }
+        return this.globalTagRules[tag] ?? GENERIC_TAG_RULES[tag];
+    }
+
+    private detectTagInCode(
+        tag: string,
+        code: string,
+        getLines: () => string[],
+        language?: string,
+    ): boolean {
+        const rule = this.resolveTagRule(tag, language);
         if (!rule) {
             return code.includes(tag);
         }
