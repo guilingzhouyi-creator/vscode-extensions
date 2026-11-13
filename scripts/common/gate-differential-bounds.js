@@ -223,10 +223,11 @@ function evaluateStagedDifferentialBounds(options = {}) {
 
 function auditSliceStep(codeFiles, steps) {
     try {
-        const { analyzeSourceText, DEFAULT_CONFIG } = require('./validate-staged-slice');
+        const { analyzeSourceText, DEFAULT_CONFIG, isEligibleSourcePath } = require('./validate-staged-slice');
         const violations = [];
         for (const f of codeFiles) {
-            if (!/\.(ts|tsx|js|jsx)$/.test(f.path)) continue;
+            const normPath = f.path.replace(/\\/g, '/');
+            if (!isEligibleSourcePath(normPath)) continue;
             const c = typeof readGitBlobText === 'function' ? readGitBlobText(`:${f.path}`) : null;
             if (!c) continue;
             const findings = analyzeSourceText(c, f.path, DEFAULT_CONFIG, null);

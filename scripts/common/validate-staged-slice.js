@@ -1264,6 +1264,7 @@ if (require.main === module) {
 module.exports = {
   DEFAULT_CONFIG,
   resolveConfig,
+  isEligibleSourcePath,
   isExportedFunction,
   calculateComplexity,
   hasLoopConstruct,
