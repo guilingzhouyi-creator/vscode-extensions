@@ -17,7 +17,7 @@ static func reconcile_client_state(
 ) -> Dictionary:
 	var base_hp: float = authoritative_server_packet.authoritative_state.get("hp", GameConfig.get_float("infrastructure.persistence", "reconciliation/default_hp", 100.0))
 	var base_ap: int = authoritative_server_packet.authoritative_state.get("ap", GameConfig.get_int("infrastructure.persistence", "reconciliation/default_ap", 0))
-	var ack_seq = authoritative_server_packet.acknowledged_sequence_number
+	var ack_seq: Variant = authoritative_server_packet.acknowledged_sequence_number
 
 	# 剔除已确认指令，保留未确认指令
 	var remaining_unacked: Array = []
@@ -31,8 +31,8 @@ static func reconcile_client_state(
 	var default_verb := GameConfig.get_string("infrastructure.persistence", "reconciliation/default_verb", "SLASH")
 	var base_ap_fallback := GameConfig.get_int("infrastructure.persistence", "reconciliation/base_ap_fallback", -2)
 	for cmd in remaining_unacked:
-		var verb = cmd.payload.get("verb", default_verb)
-		var verb_info = PhysicalVerbRegistry.get_verb(verb)
+		var verb: Variant = cmd.payload.get("verb", default_verb)
+		var verb_info: Variant = PhysicalVerbRegistry.get_verb(verb)
 		predicted_ap += int(verb_info.get("base_ap", base_ap_fallback))
 
 	return {

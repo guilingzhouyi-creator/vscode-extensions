@@ -10,7 +10,9 @@
 # ==============================================================================
 
 ## StorageObservability：Dual-Domain Storage Observability & Telemetry Collector
-class_name StorageObservability extends RefCounted
+class_name StorageObservability extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 const StorageMetricsDTO = preload("res://backend/domains/persistence_protocol/dto/storage_metrics_dto.gd")
 const AuxiliaryWorkerPool = preload("res://backend/domains/persistence_protocol/auxiliary_worker_pool.gd")
@@ -19,7 +21,7 @@ const FrameBudgetDispatcher = preload("res://backend/domains/persistence_protoco
 const BYTES_TO_MB: float = 1048576.0
 const MS_TO_SEC: float = 1000.0
 
-static var _instance = null
+static var _instance: RefCounted = null
 
 var _last_primary_recovery_ms: float = 0.0
 var _last_ttfi_ms: float = 0.0
@@ -43,6 +45,7 @@ func _init() -> void:
 
 ## 重置所有度量统计
 func reset_state() -> void:
+	super.reset_state()
 	_last_primary_recovery_ms = 0.0
 	_last_ttfi_ms = 0.0
 	_total_aux_bytes = 0

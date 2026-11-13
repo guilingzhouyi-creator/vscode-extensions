@@ -20,7 +20,7 @@ const LOG_LEVEL_INFO: String = "info"
 const LOG_RELOAD_FAIL: String = "TargetedHotReloader: node {node} reload failed; performed safe rollback preserving previous cache."
 const LOG_RELOAD_SUCCESS: String = "TargetedHotReloader: node {node} targeted reload succeeded, refreshed {count} associated nodes."
 
-static var _instance = null
+static var _instance: RefCounted = null
 
 var _dag: ResourceDependencyDAG = null
 var _cache_store: Dictionary = {} # node_id -> Variant (最新有效缓存备份)

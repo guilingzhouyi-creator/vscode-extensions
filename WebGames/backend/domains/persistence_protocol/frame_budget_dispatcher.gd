@@ -15,7 +15,7 @@ class_name FrameBudgetDispatcher extends RefCounted
 const MS_TO_USEC: float = 1000.0
 const USEC_TO_MS: float = 1000.0
 
-static var _instance = null
+static var _instance: RefCounted = null
 
 var _submission_queue: Array[Dictionary] = []
 

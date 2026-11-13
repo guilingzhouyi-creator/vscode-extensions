@@ -211,22 +211,28 @@ static func decode_from_bytes(
 	pkt.causal_deltas.clear()
 	var delta_count: int = spb.get_u8()
 	for i in range(delta_count):
-		var f_code: int = spb.get_u8()
-		var amt: float = spb.get_float()
-		var delta := HudCausalDeltaDTO.new()
-		delta.target_field = str(CODE_TO_FIELD.get(f_code, "unknown"))
-		delta.delta_amount = amt
-		pkt.causal_deltas.append(delta)
+		pkt.causal_deltas.append(_decode_causal_delta_entry(spb))
 
 	# 4. 还原行动空间
 	pkt.action_space.clear()
 	var act_count: int = spb.get_u8()
 	for i in range(act_count):
-		var dir_code: int = spb.get_u8()
-		var exec_bit: int = spb.get_u8()
-		var dir := AgentActionDirectiveDTO.new()
-		dir.directive_id = str(CODE_TO_DIR.get(dir_code, "UNKNOWN_DIRECTIVE"))
-		dir.is_executable = (exec_bit == 1)
-		pkt.action_space.append(dir)
+		pkt.action_space.append(_decode_action_directive_entry(spb))
 
 	return pkt
+
+static func _decode_causal_delta_entry(spb: StreamPeerBuffer) -> HudCausalDeltaDTO:
+	var f_code: int = spb.get_u8()
+	var amt: float = spb.get_float()
+	var delta := HudCausalDeltaDTO.new()
+	delta.target_field = str(CODE_TO_FIELD.get(f_code, "unknown"))
+	delta.delta_amount = amt
+	return delta
+
+static func _decode_action_directive_entry(spb: StreamPeerBuffer) -> AgentActionDirectiveDTO:
+	var dir_code: int = spb.get_u8()
+	var exec_bit: int = spb.get_u8()
+	var dir := AgentActionDirectiveDTO.new()
+	dir.directive_id = str(CODE_TO_DIR.get(dir_code, "UNKNOWN_DIRECTIVE"))
+	dir.is_executable = (exec_bit == 1)
+	return dir

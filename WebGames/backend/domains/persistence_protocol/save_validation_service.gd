@@ -41,32 +41,7 @@ static func validate_domains(working_data: Dictionary) -> Dictionary:
 
 	# 2. 扫描已知且启用的域结构
 	for d_id in known_domains.keys():
-		if not sanitized.has(d_id):
-			if missing_policy == "use_default":
-				sanitized[d_id] = {}
-				issues.append({
-					"type": "MISSING_DOMAIN",
-					"domain": d_id,
-					"policy": missing_policy
-				})
-			continue
-
-		var val: Variant = sanitized[d_id]
-		if not val is Dictionary:
-			if type_policy == "coerce_or_drop":
-				issues.append({
-					"type": "TYPE_MISMATCH",
-					"domain": d_id,
-					"expected": "Dictionary",
-					"actual": typeof(val),
-					"action": "dropped"
-				})
-				sanitized[d_id] = {}
-			else:
-				issues.append({
-					"type": "TYPE_MISMATCH_FATAL",
-					"domain": d_id
-				})
+		_validate_known_domain_section(sanitized, d_id, missing_policy, type_policy, issues)
 
 	var is_valid: bool = true
 	for iss in issues:
@@ -106,16 +81,51 @@ static func coerce_value(val: Variant, expected_type: int) -> Variant:
 				return val == "true" or val == "1"
 	return null
 
+static func _validate_known_domain_section(
+	sanitized: Dictionary,
+	d_id: Variant,
+	missing_policy: String,
+	type_policy: String,
+	issues: Array
+) -> void:
+	if not sanitized.has(d_id):
+		if missing_policy == "use_default":
+			sanitized[d_id] = {}
+			issues.append({
+				"type": "MISSING_DOMAIN",
+				"domain": d_id,
+				"policy": missing_policy
+			})
+		return
+
+	var val: Variant = sanitized[d_id]
+	if not val is Dictionary:
+		if type_policy == "coerce_or_drop":
+			issues.append({
+				"type": "TYPE_MISMATCH",
+				"domain": d_id,
+				"expected": "Dictionary",
+				"actual": typeof(val),
+				"action": "dropped"
+			})
+			sanitized[d_id] = {}
+		else:
+			issues.append({
+				"type": "TYPE_MISMATCH_FATAL",
+				"domain": d_id
+			})
+
 ## 获取所有已知数据域集合（来自 domains.json，仅登记实际持久化域 save.enabled，
 ## 避免为非持久化域注入空节污染存档 / 误判未知域，评审收敛 L3）
 static func _get_known_domains() -> Dictionary:
 	var map: Dictionary = {}
 	var all_entries: Array = GameConfig.get_array("infrastructure.domains", "domains", [])
+	var empty_save_cfg: Dictionary = {}
 	for entry in all_entries:
 		var id := String(entry.get("id", ""))
 		if id.is_empty():
 			continue
-		var save_cfg: Dictionary = entry.get("save", {})
+		var save_cfg: Dictionary = entry.get("save", empty_save_cfg)
 		if not bool(save_cfg.get("enabled", false)):
 			continue
 		map[id] = true

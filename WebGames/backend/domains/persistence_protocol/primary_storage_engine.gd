@@ -31,7 +31,7 @@ const DEFAULT_ACCOUNT_ID: String = "ACC_DEFAULT"
 const DEFAULT_WORLD_MODE: String = "SINGLE_PLAYER"
 const DEFAULT_MAX_HP: float = 100.0
 
-static var _instance = null
+static var _instance: RefCounted = null
 
 ## 获取单例全局静态唯一实例
 static func get_instance() -> RefCounted:

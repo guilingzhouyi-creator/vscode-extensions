@@ -61,7 +61,7 @@ static func deserialize(d: Dictionary) -> WorldInstance:
 	inst.world_time = d.get("world_time", inst.world_time)
 	inst.world_state = d.get("world_state", {})
 	inst.history_fragments.clear()
-	var raw_frags = d.get("history_fragments", [])
+	var raw_frags: Variant = d.get("history_fragments", [])
 	if raw_frags is Array:
 		for frag in raw_frags:
 			if frag is Dictionary:

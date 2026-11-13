@@ -14,7 +14,7 @@ class_name PreloadWindowGovernor extends RefCounted
 
 const DEFAULT_WINDOW_RADIUS: float = 100.0
 
-static var _instance = null
+static var _instance: RefCounted = null
 
 var _current_position: Vector2 = Vector2.ZERO
 var _current_scene_id: String = ""

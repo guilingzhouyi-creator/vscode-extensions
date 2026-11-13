@@ -40,9 +40,10 @@ static func _ensure_contracts_fresh() -> void:
 
 	_domain_contracts.clear()
 	var all_entries: Array = GameConfig.get_array("infrastructure.domains", "domains", [])
+	var empty_cfg: Dictionary = {}
 	for entry in all_entries:
 		var id := String(entry.get("id", ""))
-		var save_cfg: Dictionary = entry.get("save", {})
+		var save_cfg: Dictionary = entry.get("save", empty_cfg)
 		if not bool(save_cfg.get("enabled", false)):
 			continue
 		var contract: Variant = SaveDomainContract.from_config(id, save_cfg)

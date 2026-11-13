@@ -14,9 +14,9 @@ extends RefCounted
 const AccountSlotBindingSolver = preload("res://backend/domains/account/account_slot_binding_solver.gd")
 const WorldModAffinityManager = preload("res://backend/domains/narrative_orchestration/world_mod_affinity_manager.gd")
 const ModPackageDiscoverySolver = preload("res://backend/domains/narrative_orchestration/mod_package_discovery_solver.gd")
-const CrossWorldPerturbationBroker = preload("res://backend/domains/narrative_orchestration/cross_world_perturbation_broker.gd")
 const RuntimeModeGate = preload("res://backend/domains/persistence_protocol/runtime_mode_gate.gd")
 const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
+const WorldGatewayWorldCatalogHelper = preload("res://backend/domains/world_gateway/world_gateway_world_catalog_helper.gd")
 
 var context: WorldGatewayContextDTO = null
 var _last_probe_reports: Dictionary = {}
@@ -155,60 +155,35 @@ func select_mode(
     if not custom_mods.is_empty():
         active_mods = custom_mods.duplicate()
 
-    # 模组界域纪律气密守卫裁定（联机模式严禁加载第三方本地剧情/数值 MOD）
-    var mod_discipline_result := AntiBridgeGuard.validate_mod_realm_discipline(mode, active_mods)
-    if not bool(mod_discipline_result.get("allowed", false)):
-        return _fail(
-            str(mod_discipline_result.get("error_code", AntiBridgeGuard.SECURITY_ERR_MULTIPLAYER_MOD_POISONING)),
-            str(mod_discipline_result.get("message", "Multiplayer mode strictly forbids custom narrative paths and UI extension mods."))
-        )
-
-    # 气密级防越权守卫裁定：检查模式单向冻结（防热切换）与探针就绪报告
-    var mode_report: Variant = null
-    if mode == WorldGatewayModel.GameMode.SINGLE_PLAYER:
-        mode_report = _last_probe_reports.get("single_player", null)
-    elif mode == WorldGatewayModel.GameMode.MULTIPLAYER:
-        mode_report = _last_probe_reports.get("multiplayer", null)
-
-    var transition_guard_result := AntiBridgeGuard.validate_mode_transition(
-        context.current_phase,
-        WorldGatewayModel.GatewayPhase.MODE_SELECTED,
-        context.selected_mode,
-        mode,
-        mode_report
+    var guard_res: Dictionary = WorldGatewayWorldCatalogHelper.validate_mode_entry_guards(
+        context, mode, active_mods, _last_probe_reports
     )
-    if not bool(transition_guard_result.get("allowed", false)):
+    if not bool(guard_res.get("allowed", false)):
         return _fail(
-            str(transition_guard_result.get("error_code", "SECURITY_ERR_TRANSITION_BLOCKED")),
-            str(transition_guard_result.get("message", "Mode transition was blocked by security guard."))
-        )
-
-    if context.current_phase != WorldGatewayModel.GatewayPhase.GATEWAY_ENTERED:
-        return _fail(
-            "INVALID_TRANSITION",
-            "World gateway is not in entered state; current phase: {current_phase}.",
-            {"current_phase": context.current_phase}
+            str(guard_res.get("error_code", "SECURITY_ERR_TRANSITION_BLOCKED")),
+            str(guard_res.get("message", "Mode transition was blocked by security guard.")),
+            guard_res.get("params", {})
         )
 
     # 若为联机模式，强制卸载本地第三方模组，回退 Vanilla 原生核心并洗脱
     if mode == WorldGatewayModel.GameMode.MULTIPLAYER:
         purge_and_fallback_to_vanilla()
 
-    var slot_conversion: Dictionary = _convert_account_slots(account_slots)
+    var slot_conversion: Dictionary = WorldGatewayWorldCatalogHelper.convert_account_slots(account_slots)
     if not bool(slot_conversion.get("success", false)):
         return _fail(
             String(slot_conversion.get("error_code", "INVALID_ACCOUNT_SLOTS")),
             "Account slot configuration is invalid."
         )
 
-    var worlds_catalog := _load_worlds_catalog()
+    var worlds_catalog := WorldGatewayWorldCatalogHelper.load_worlds_catalog()
     var route_result := GameModeRoutingSolver.resolve_mode_entry(
         context.account_id, mode, worlds_catalog, slot_conversion["slots"], canary_flags, target_world_id, target_slot_id
     )
 
     if not route_result.success:
         return _fail(route_result.error_code, route_result.message)
-    var target_slot_dto: SaveSlotStateDTO = _pick_target_slot(route_result.available_slots, target_slot_id)
+    var target_slot_dto: SaveSlotStateDTO = WorldGatewayWorldCatalogHelper.pick_target_slot(route_result.available_slots, target_slot_id)
     if target_slot_dto == null:
         return _fail(
             "GATEWAY_ERR_SLOT_NOT_FOUND",
@@ -268,33 +243,6 @@ func select_mode_for_account(
         effective_world_id = account.world_state_ref
     var account_slots: Array = AccountSlotBindingSolver.to_gateway_slot_states(account, effective_world_id)
     return select_mode(mode, canary_flags, account_slots, effective_world_id, target_slot_id)
-
-func _convert_account_slots(account_slots: Array) -> Dictionary:
-    var converted: Array[SaveSlotStateDTO] = []
-    var seen_slots: Dictionary = {}
-    for item in account_slots:
-        var slot: SaveSlotStateDTO = null
-        if item is SaveSlotStateDTO:
-            slot = item
-        elif item is Dictionary:
-            slot = SaveSlotStateDTO.from_dto(item as Dictionary)
-        else:
-            return {"success": false, "error_code": "INVALID_ACCOUNT_SLOT_TYPE"}
-        if slot.slot_id.is_empty() or seen_slots.has(slot.slot_id):
-            return {"success": false, "error_code": "EMPTY_OR_DUPLICATE_ACCOUNT_SLOT"}
-        seen_slots[slot.slot_id] = true
-        converted.append(slot)
-    return {"success": true, "slots": converted}
-
-func _pick_target_slot(slots: Array, target_slot_id: String) -> SaveSlotStateDTO:
-    if not target_slot_id.is_empty():
-        for item in slots:
-            if item is SaveSlotStateDTO and item.slot_id == target_slot_id:
-                return item
-        return null
-    if slots.is_empty():
-        return null
-    return slots[0] as SaveSlotStateDTO
 
 ## 3. 关联就绪角色（创角完成或选角完成调用）
 func attach_ready_character(character_id: String) -> Dictionary:
@@ -357,7 +305,7 @@ func enter_world(target_world_id: String = "", allow_safe_degrade: bool = false)
                 )
 
             # 2. 外部虚空因果扰动同化
-            _assimilate_perturbations(effective_world_id)
+            WorldGatewayWorldCatalogHelper.assimilate_perturbations(effective_world_id)
         context.selected_world_id = effective_world_id
 
     context.current_phase = WorldGatewayModel.GatewayPhase.IN_WORLD
@@ -376,38 +324,6 @@ func enter_world(target_world_id: String = "", allow_safe_degrade: bool = false)
         "character_id": context.active_character_id
     })
     return {"success": true, "phase": context.current_phase, "context": context.to_dto()}
-
-## 记录单个虚空同化片段至世界历史（独立抽离避免循环内瞬态堆分配）
-func _append_single_perturbation_fragment(world_inst: WorldInstance, perturbation: CrossWorldPerturbationDTO) -> void:
-    var fragment: Dictionary = {
-        "event": "VOID_PERTURBATION_ASSIMILATED",
-        "type": "VOID_PERTURBATION_ASSIMILATED",
-        "perturbation_id": perturbation.perturbation_id,
-        "origin_world_id": perturbation.origin_world_id,
-        "resonance_intensity": perturbation.resonance_intensity,
-        "timestamp_utc": int(Time.get_unix_time_from_system())
-    }
-    world_inst.append_history_fragment(fragment)
-
-## 拉取并同化外部虚空因果扰动至目标单机世界
-func _assimilate_perturbations(effective_world_id: String) -> void:
-    var perturbation_broker := CrossWorldPerturbationBroker.get_instance()
-    if perturbation_broker == null:
-        return
-    var perturbations: Array[CrossWorldPerturbationDTO] = perturbation_broker.poll_perturbations_for_world(effective_world_id)
-    if perturbations.is_empty():
-        return
-    var archive_repo := WorldArchiveRepository.get_instance()
-    if archive_repo == null:
-        return
-    var world_inst: WorldInstance = archive_repo.load_world(effective_world_id)
-    if world_inst == null:
-        return
-
-    for perturbation_dto in perturbations:
-        _append_single_perturbation_fragment(world_inst, perturbation_dto)
-        perturbation_broker.mark_world_visited(perturbation_dto.perturbation_id, effective_world_id)
-    archive_repo.save_world(world_inst)
 
 ## 5. 序章向大地图探索无缝交接（水化创角终态，驱动 FSM 跃迁至 WORLD_EXPLORATION 并触发 HUD 初始同步）
 func handoff_prologue_to_world_exploration(handoff: PrologueHandoffDTO) -> Dictionary:
@@ -537,15 +453,16 @@ func switch_gateway_mode(target_mode: int, canary_flags: Dictionary = {}, accoun
 
 ## 7. 查询当前可用的世界档案与目录摘要列表
 func list_world_archives() -> Array[Dictionary]:
-    var worlds_catalog := _load_worlds_catalog()
+    var worlds_catalog := WorldGatewayWorldCatalogHelper.load_worlds_catalog()
     var result: Array[Dictionary] = []
     var registered_world_ids: Dictionary = {}
     var archive_repo := WorldArchiveRepository.get_instance()
     if archive_repo != null:
         if not archive_repo.is_loaded():
             archive_repo.load_all()
+        var empty_dto: Dictionary = {}
         for archive_summary in archive_repo.list_worlds():
-            var archive_dto_dict: Dictionary = archive_summary.to_dto() if (archive_summary != null and archive_summary.has_method("to_dto")) else {}
+            var archive_dto_dict: Dictionary = archive_summary.to_dto() if (archive_summary != null and archive_summary.has_method("to_dto")) else empty_dto
             var archive_world_id := String(archive_dto_dict.get("world_id", ""))
             if archive_world_id.is_empty():
                 continue
@@ -579,10 +496,3 @@ func _fail(error_code: String, template_message: String, format_params: Dictiona
         "message": formatted_message,
         "context": context.to_dto()
     }
-
-func _load_worlds_catalog() -> Dictionary:
-    var raw_worlds_catalog: Dictionary = GameConfig.get_dict("domains.world_gateway", "worlds_catalog", {})
-    var worlds_catalog: Dictionary = {}
-    for world_id in raw_worlds_catalog.keys():
-        worlds_catalog[world_id] = WorldInstanceDTO.from_dto(raw_worlds_catalog[world_id], world_id)
-    return worlds_catalog

@@ -47,7 +47,7 @@ class AsyncLoadTask extends RefCounted:
 	var byte_count: int = 0
 	var pool_task_id: int = -1
 
-static var _instance = null
+static var _instance: RefCounted = null
 
 const DEFAULT_MAX_CACHE_ENTRIES: int = 64
 const DEFAULT_MAX_COMPLETED_TASKS: int = 128

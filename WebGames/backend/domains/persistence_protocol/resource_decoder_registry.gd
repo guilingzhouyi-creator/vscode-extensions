@@ -50,7 +50,7 @@ class TextResourceDecoder extends StorageContractInterfaces.ResourceDecoderContr
 	func decode_payload(_raw_bytes: PackedByteArray, text: String, _entry: RefCounted) -> Dictionary:
 		return {"data": text, "error": ERR_NONE}
 
-static var _instance = null
+static var _instance: RefCounted = null
 var _decoders: Array = []
 var _default_decoder: StorageContractInterfaces.ResourceDecoderContract = null
 

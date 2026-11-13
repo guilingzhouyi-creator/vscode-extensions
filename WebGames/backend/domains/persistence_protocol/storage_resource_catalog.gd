@@ -25,7 +25,7 @@ const EXT_JSON: String = ".json"
 const DEFAULT_MANIFEST_BATCH_ID: String = "manifest_boot"
 const DEFAULT_ESTIMATED_BYTES: int = 4096
 
-static var _instance = null
+static var _instance: RefCounted = null
 
 var _entries: Dictionary = {}                # resource_id -> ResourceIndexEntryDTO
 var _table_to_entry: Dictionary = {}         # table_name -> ResourceIndexEntryDTO
@@ -72,8 +72,9 @@ func ensure_catalog_loaded() -> void:
 	var root_cat := _read_json_dict(PATH_RESOURCE_CATALOG)
 	for t in root_cat.get("critical_boot_tables", []):
 		_critical_tables[String(t)] = true
+	var empty_entry: Dictionary = {}
 	for c in root_cat.get("custom_entries", []):
-		var cd: Dictionary = c if c is Dictionary else {}
+		var cd: Dictionary = c if c is Dictionary else empty_entry
 		var dto := ResourceIndexEntryDTO.from_dict(cd) as ResourceIndexEntryDTO
 		register_entry(dto)
 

@@ -26,9 +26,12 @@ func _init(capacity: int = 32) -> void:
 	_capacity = maxi(1, capacity)
 	_slots.resize(_capacity)
 	for i in range(_capacity):
-		_slots[i] = AgentHudTelemetryPacketDTO.new()
+		_slots[i] = _create_empty_packet_slot()
 	_head = 0
 	_count = 0
+
+static func _create_empty_packet_slot() -> AgentHudTelemetryPacketDTO:
+	return AgentHudTelemetryPacketDTO.new()
 
 ## O(1) 取模写入，原位重置槽位并同步数据
 func append_packet(packet: AgentHudTelemetryPacketDTO) -> void:
@@ -55,6 +58,12 @@ func get_trajectory_window(steps: int = 8) -> Array[AgentHudTelemetryPacketDTO]:
 		out[i] = _slots[slot_idx]
 	return out
 
+static func _append_packet_deltas(pkt: AgentHudTelemetryPacketDTO, out_deltas: Array[HudCausalDeltaDTO]) -> void:
+	for d in pkt.causal_deltas:
+		if d != null:
+			out_deltas.append(d)
+
+
 ## 获取自指定序列号（大于等于 from_seq）以来的累积因果突变（直读环形槽位，零临时窗口数组分配）
 func get_cumulative_deltas(from_sequence: int = 0) -> Array[HudCausalDeltaDTO]:
 	var deltas: Array[HudCausalDeltaDTO] = []
@@ -66,9 +75,7 @@ func get_cumulative_deltas(from_sequence: int = 0) -> Array[HudCausalDeltaDTO]:
 		var pkt: AgentHudTelemetryPacketDTO = _slots[(start_idx + i) % _capacity]
 		if pkt == null or pkt.sequence_index < from_sequence:
 			continue
-		for d in pkt.causal_deltas:
-			if d != null:
-				deltas.append(d)
+		_append_packet_deltas(pkt, deltas)
 	return deltas
 
 ## 获取当前最新的遥测数据包
@@ -119,11 +126,11 @@ static func _sync_packet_data(src: AgentHudTelemetryPacketDTO, dst: AgentHudTele
 	_sync_action_space(src, dst)
 
 static func _sync_causal_deltas(src: AgentHudTelemetryPacketDTO, dst: AgentHudTelemetryPacketDTO) -> void:
-	dst.causal_deltas.clear()
+	var active_count: int = 0
 	for d in src.causal_deltas:
 		if d == null:
 			continue
-		var clone_delta := HudCausalDeltaDTO.new()
+		var clone_delta := _acquire_delta_slot(dst.causal_deltas, active_count)
 		clone_delta.delta_category = d.delta_category
 		clone_delta.target_field = d.target_field
 		clone_delta.previous_value = d.previous_value
@@ -132,14 +139,25 @@ static func _sync_causal_deltas(src: AgentHudTelemetryPacketDTO, dst: AgentHudTe
 		clone_delta.cause_identifier = d.cause_identifier
 		clone_delta.initiator = d.initiator
 		clone_delta.reason = d.reason
-		dst.causal_deltas.append(clone_delta)
+		active_count += 1
+	dst.causal_deltas.resize(active_count)
+
+static func _acquire_delta_slot(pool: Array, idx: int) -> HudCausalDeltaDTO:
+	if idx < pool.size() and pool[idx] != null:
+		return pool[idx] as HudCausalDeltaDTO
+	var created := HudCausalDeltaDTO.new()
+	if idx < pool.size():
+		pool[idx] = created
+	else:
+		pool.append(created)
+	return created
 
 static func _sync_action_space(src: AgentHudTelemetryPacketDTO, dst: AgentHudTelemetryPacketDTO) -> void:
-	dst.action_space.clear()
+	var active_count: int = 0
 	for a in src.action_space:
 		if a == null:
 			continue
-		var clone_act := AgentActionDirectiveDTO.new()
+		var clone_act := _acquire_action_slot(dst.action_space, active_count)
 		clone_act.directive_id = a.directive_id
 		clone_act.domain = a.domain
 		clone_act.description = a.description
@@ -148,7 +166,18 @@ static func _sync_action_space(src: AgentHudTelemetryPacketDTO, dst: AgentHudTel
 		clone_act.allowed_parameters = a.allowed_parameters
 		clone_act.is_executable = a.is_executable
 		clone_act.blocked_reason = a.blocked_reason
-		dst.action_space.append(clone_act)
+		active_count += 1
+	dst.action_space.resize(active_count)
+
+static func _acquire_action_slot(pool: Array, idx: int) -> AgentActionDirectiveDTO:
+	if idx < pool.size() and pool[idx] != null:
+		return pool[idx] as AgentActionDirectiveDTO
+	var created := AgentActionDirectiveDTO.new()
+	if idx < pool.size():
+		pool[idx] = created
+	else:
+		pool.append(created)
+	return created
 
 static func _sync_observation(src: AgentHudContextSliceDTO, dst: AgentHudContextSliceDTO) -> void:
 	dst.reset_state()
