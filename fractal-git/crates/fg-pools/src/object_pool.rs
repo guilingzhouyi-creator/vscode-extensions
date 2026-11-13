@@ -26,7 +26,10 @@ pub struct RecycledGuard<'a, T: Resettable> {
 impl<'a, T: Resettable> RecycledGuard<'a, T> {
     /// Detaches the item from the pool, preventing automatic return on drop.
     pub fn take(mut self) -> T {
-        // SAFETY: item ownership is transferred to caller; mem::forget prevents drop
+        // SAFETY:
+        // - Preconditions: `self.item` wraps an initialized value of type `T`.
+        // - Invariants: `std::mem::forget(self)` immediately suppresses `Drop::drop`, preventing double extraction.
+        // - Postconditions: Complete ownership of the inner `T` is transferred to the caller without recycling.
         let extracted_element = unsafe { ManuallyDrop::take(&mut self.item) };
         std::mem::forget(self);
         extracted_element
@@ -49,7 +52,10 @@ impl<'a, T: Resettable> DerefMut for RecycledGuard<'a, T> {
 
 impl<'a, T: Resettable> Drop for RecycledGuard<'a, T> {
     fn drop(&mut self) {
-        // SAFETY: item is extracted exactly once on drop to be recycled into pool
+        // SAFETY:
+        // - Preconditions: `self.item` wraps a live, initialized instance of `T` that was not taken via `take()`.
+        // - Invariants: `Drop::drop` runs exactly once at the end of the guard's lifetime.
+        // - Postconditions: The extracted item is delivered to `self.pool.release()` which resets state and returns it to storage.
         let extracted = unsafe { ManuallyDrop::take(&mut self.item) };
         self.pool.release(extracted);
     }

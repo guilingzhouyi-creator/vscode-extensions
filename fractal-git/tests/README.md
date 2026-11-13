@@ -7,7 +7,7 @@
 
 ## 目录分层架构
 
-## 深度测试套件矩阵 (911 项 Rust 确定性测试 + 3 项 TypeScript 端到端测试)
+## 深度测试套件矩阵 (1,333+ 项 Rust 确定性测试 + 73 项 TypeScript 端到端与差分测试)
 
 | 领域分类 | 测试套件文件 | 覆盖的核心机制与断言重点 |
 | :--- | :--- | :--- |
@@ -18,7 +18,7 @@
 | **Git 对等与差分** | `test_git_differential.rs`<br>`test_hosted_git_parity.rs`<br>`test_config_parity.rs`<br>`test_read_commands.rs`<br>`test_edge_porcelain.rs`<br>`test_conflict_modes.rs`<br>`test_submodules.rs` | 系统 Git baseline 57 个向量逐字节差分、托管小项目仓库全生命周期对拍、配置读写、读命令退出码、瓷器命令边缘用例、子模块路径防护 |
 | **治理生命周期与传输** | `test_governance.rs`<br>`test_governance_pipeline.rs`<br>`test_git_hooks.rs`<br>`test_operations.rs`<br>`test_interactive_operations.rs`<br>`test_pools.rs`<br>`test_refs.rs`<br>`test_uac_promotions.rs`<br>`test_self_hosted_ipc.rs`<br>`test_remote_transport.rs` | 提交信息规范与禁词拦截、分级 Hook 管道、Git 钩子执行器、操作图撤销、内存池复用、引用事务、晋级账本、IPC 帧协议与 Smart Protocol |
 | **内核验证器与独立审计** | `fg-gate` (verifier/canary/credit)<br>`fg-topology` (audit/pyramid) | TKCV 5 维形式化推导不变式断言、IKCE 内存微变异评估与无效断言甄别 ($K \ge 60\%$)、Jeffreys Beta(0.5, 0.5) 动态信用更新、`.taxis/quarantine/` 检疫隔离、`refs/fractal/telemetry/*` 独立遥测审计链单向性与 OS 级保护锁 |
-| **TypeScript 端到端** | `fractal-lifecycle.test.ts`<br>`git-parity.test.ts`<br>`workspace-orchestration.test.ts` | 门禁拦截与物理回收、Pure-TS 对象物化差分、多 Agent MCTS 候选变异体评估与优选编排 |
+| **TypeScript 端到端与对等** | `fractal-lifecycle.test.ts`<br>`git-parity.test.ts`<br>`workspace-orchestration.test.ts`<br>`quality-encoding.test.ts`<br>`quality-evidence.test.ts`<br>`binary-git-parity.test.ts` | 门禁拦截与物理回收、Pure-TS 对象物化差分、多 Agent MCTS 候选变异体评估、RFC 8785 证据签名验签与真二进制 taxis vs git 对等差分 |
 
 ---
 

@@ -124,32 +124,96 @@ fn decode_bitset_row(row_words: &[u64], fact_names: &[String]) -> Vec<String> {
     facts
 }
 
-/// Solves intra-procedural forward or backward dataflow equations using structured config object.
-pub fn solve_dataflow_configured(config: &DataflowConfig<'_>) -> DataflowResult {
-    let graph = IndexedGraph::build(config.entry, config.nodes, config.edges);
-    let total = graph.all_node_names.len();
-    let all_node_names = &graph.all_node_names;
-    let succs = &graph.succs;
-    let preds = &graph.preds;
-
+fn build_fact_index<'a>(
+    gen_map: &'a HashMap<String, Vec<String>>,
+    kill_map: &'a HashMap<String, Vec<String>>,
+) -> (Vec<String>, HashMap<&'a str, usize>) {
     let mut unique_facts: BTreeSet<&str> = BTreeSet::new();
-    for facts in config.gen_map.values() {
-        for f in facts {
-            unique_facts.insert(f.as_str());
+    for facts in gen_map.values().chain(kill_map.values()) {
+        for fact in facts {
+            unique_facts.insert(fact.as_str());
         }
     }
-    for facts in config.kill_map.values() {
-        for f in facts {
-            unique_facts.insert(f.as_str());
-        }
-    }
-
-    let fact_names: Vec<String> = unique_facts.iter().map(|&s| s.to_string()).collect();
+    let fact_names: Vec<String> = unique_facts.iter().map(|&name| name.to_string()).collect();
     let fact_to_id: HashMap<&str, usize> = unique_facts
         .into_iter()
         .enumerate()
         .map(|(id, name)| (name, id))
         .collect();
+    (fact_names, fact_to_id)
+}
+
+fn encode_fact_bits(
+    fact_map: &HashMap<String, Vec<String>>,
+    node_name: &str,
+    fact_to_id: &HashMap<&str, usize>,
+    dest_slice: &mut [u64],
+) {
+    let Some(facts) = fact_map.get(node_name) else {
+        return;
+    };
+    for fact in facts {
+        if let Some(&fid) = fact_to_id.get(fact.as_str()) {
+            dest_slice[fid / BITS_PER_U64_WORD] |= 1u64 << (fid % BITS_PER_U64_WORD);
+        }
+    }
+}
+
+fn run_dataflow_fixpoint(
+    graph: &IndexedGraph,
+    forward: bool,
+    words_per_node: usize,
+    gen_words: &[u64],
+    kill_words: &[u64],
+    in_words: &mut [u64],
+    out_words: &mut [u64],
+) -> usize {
+    let total = graph.all_node_names.len();
+    let mut iterations = 0usize;
+    let mut changed = true;
+
+    while changed && iterations < MAX_DATAFLOW_ITERATIONS {
+        changed = false;
+        iterations += 1;
+
+        for node_idx in 0..total {
+            let neighbors = if forward {
+                &graph.preds[node_idx]
+            } else {
+                &graph.succs[node_idx]
+            };
+            let node_changed = if forward {
+                step_forward_dataflow_bits(
+                    node_idx,
+                    words_per_node,
+                    neighbors,
+                    gen_words,
+                    kill_words,
+                    in_words,
+                    out_words,
+                )
+            } else {
+                step_backward_dataflow_bits(
+                    node_idx,
+                    words_per_node,
+                    neighbors,
+                    gen_words,
+                    kill_words,
+                    in_words,
+                    out_words,
+                )
+            };
+            changed |= node_changed;
+        }
+    }
+    iterations
+}
+
+/// Solves intra-procedural forward or backward dataflow equations using structured config object.
+pub fn solve_dataflow_configured(config: &DataflowConfig<'_>) -> DataflowResult {
+    let graph = IndexedGraph::build(config.entry, config.nodes, config.edges);
+    let total = graph.all_node_names.len();
+    let (fact_names, fact_to_id) = build_fact_index(config.gen_map, config.kill_map);
 
     let words_per_node = fact_names.len().div_ceil(BITS_PER_U64_WORD).max(1);
     let buf_len = total * words_per_node;
@@ -158,67 +222,44 @@ pub fn solve_dataflow_configured(config: &DataflowConfig<'_>) -> DataflowResult 
     let mut gen_words = vec![0u64; buf_len];
     let mut kill_words = vec![0u64; buf_len];
 
-    for (i, name) in all_node_names.iter().enumerate() {
-        let base = i * words_per_node;
-        if let Some(facts) = config.gen_map.get(name) {
-            for f in facts {
-                if let Some(&fid) = fact_to_id.get(f.as_str()) {
-                    gen_words[base + fid / BITS_PER_U64_WORD] |= 1u64 << (fid % BITS_PER_U64_WORD);
-                }
-            }
-        }
-        if let Some(facts) = config.kill_map.get(name) {
-            for f in facts {
-                if let Some(&fid) = fact_to_id.get(f.as_str()) {
-                    kill_words[base + fid / BITS_PER_U64_WORD] |= 1u64 << (fid % BITS_PER_U64_WORD);
-                }
-            }
-        }
+    for (node_idx, name) in graph.all_node_names.iter().enumerate() {
+        let base = node_idx * words_per_node;
+        encode_fact_bits(
+            config.gen_map,
+            name,
+            &fact_to_id,
+            &mut gen_words[base..base + words_per_node],
+        );
+        encode_fact_bits(
+            config.kill_map,
+            name,
+            &fact_to_id,
+            &mut kill_words[base..base + words_per_node],
+        );
     }
 
-    let mut iterations = 0;
-    let mut changed = true;
-
-    while changed && iterations < MAX_DATAFLOW_ITERATIONS {
-        changed = false;
-        iterations += 1;
-
-        for i in 0..total {
-            let node_changed = if config.forward {
-                step_forward_dataflow_bits(
-                    i,
-                    words_per_node,
-                    &preds[i],
-                    &gen_words,
-                    &kill_words,
-                    &mut in_words,
-                    &mut out_words,
-                )
-            } else {
-                step_backward_dataflow_bits(
-                    i,
-                    words_per_node,
-                    &succs[i],
-                    &gen_words,
-                    &kill_words,
-                    &mut in_words,
-                    &mut out_words,
-                )
-            };
-            if node_changed {
-                changed = true;
-            }
-        }
-    }
+    let iterations = run_dataflow_fixpoint(
+        &graph,
+        config.forward,
+        words_per_node,
+        &gen_words,
+        &kill_words,
+        &mut in_words,
+        &mut out_words,
+    );
 
     let mut in_map = HashMap::with_capacity(total);
     let mut out_map = HashMap::with_capacity(total);
-    for (i, name) in all_node_names.iter().enumerate() {
-        let base = i * words_per_node;
-        let in_slice = &in_words[base..base + words_per_node];
-        let out_slice = &out_words[base..base + words_per_node];
-        in_map.insert(name.clone(), decode_bitset_row(in_slice, &fact_names));
-        out_map.insert(name.clone(), decode_bitset_row(out_slice, &fact_names));
+    for (node_idx, name) in graph.all_node_names.iter().enumerate() {
+        let base = node_idx * words_per_node;
+        in_map.insert(
+            name.clone(),
+            decode_bitset_row(&in_words[base..base + words_per_node], &fact_names),
+        );
+        out_map.insert(
+            name.clone(),
+            decode_bitset_row(&out_words[base..base + words_per_node], &fact_names),
+        );
     }
 
     DataflowResult {

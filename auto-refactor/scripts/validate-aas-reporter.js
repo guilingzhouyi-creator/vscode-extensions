@@ -23,6 +23,34 @@ const { buildAasReport, toAasJson, AAS_SCHEMA_ID, render, getReporter } = requir
 
 const { runEntry } = require('./common/test-runner-harness');
 
+/**
+ * Builds a minimal location-anchored Issue fixture for AAS grouping and anchor tests.
+ *
+ * @param spec - Issue identity, rule, file path, and 1-based span coordinates.
+ * @returns Structured Issue object conforming to ScanReport schema.
+ */
+function createLineIssueFixture(spec) {
+  return {
+    id: spec.id,
+    analyzer: spec.analyzer,
+    rule: spec.rule,
+    severity: spec.severity || 'warning',
+    message: spec.message,
+    location: {
+      file: spec.file || 'src/app.ts',
+      start: { line: spec.line, column: spec.colStart || 1 },
+      end: { line: spec.line, column: spec.colEnd || 10 },
+    },
+    detail: {},
+  };
+}
+
+/**
+ * Builds a deterministic baseline ScanReport fixture covering L1-L5 topology and quality vectors.
+ *
+ * @param overrides - Partial ScanReport fields overriding default baseline properties.
+ * @returns Synthetic ScanReport payload for AAS serialization assertions.
+ */
 function createMockScanReport(overrides = {}) {
   return {
     tool: 'auto-refactor',
@@ -76,32 +104,26 @@ function createMockScanReport(overrides = {}) {
           safeToAutomate: true,
         },
       },
-      {
+      createLineIssueFixture({
         id: 'constants:magic-number:src/app.ts:5',
         analyzer: 'constants',
         rule: 'magic-number',
-        severity: 'warning',
         message: 'Magic number 42 detected.',
-        location: {
-          file: 'src/app.ts',
-          start: { line: 5, column: 8 },
-          end: { line: 5, column: 10 },
-        },
-        detail: {},
-      },
-      {
+        line: 5,
+        colStart: 8,
+        colEnd: 10,
+      }),
+      createLineIssueFixture({
         id: 'comments:CMT-HDR-001:src/utils.ts:1',
         analyzer: 'comments',
         rule: 'CMT-HDR-001',
         severity: 'info',
         message: 'Missing standard module header.',
-        location: {
-          file: 'src/utils.ts',
-          start: { line: 1, column: 1 },
-          end: { line: 1, column: 1 },
-        },
-        detail: {},
-      },
+        file: 'src/utils.ts',
+        line: 1,
+        colStart: 1,
+        colEnd: 1,
+      }),
     ],
     qualityScore: {
       compositeScore: 92.5,
@@ -140,9 +162,16 @@ function createMockScanReport(overrides = {}) {
   };
 }
 
+/**
+ * Executes the 16-gate AAS v1.0/v1.1 serialization, compression, and truthfulness suite.
+ */
 async function runTests() {
   console.log('--- Validating Agent Audit Schema (AAS v1.0) Reporter ---');
 
+  // Contract Group 1 (Tests 1-4): Schema discriminator, usability tier/confidence pass-through,
+  // L1_CONTRACT -> L5 topological ordering, file-grouped defects, and inline anchor slicing.
+  // Invariant: omitted arbitration data must omit usability rather than fabricating zero counts,
+  // and defaultVerify suppresses per-defect verify echo when matching the top-level command.
   // Test 1: Basic generation & Schema ID
   const report = createMockScanReport();
   const fileMock = {
@@ -308,6 +337,10 @@ async function runTests() {
   assert.strictEqual(aasDoc.bottlenecks[0].loss, 10);
   console.log('✔  Test 4: Quality deduction bottlenecks verified');
 
+  // Contract Group 2 (Tests 5-8): Byte-level token economy, compact CLI defaults, empty scan
+  // handling, and maxTotalDefects truncation budget accounting.
+  // Invariant: compact JSON is always the default emission mode (`pretty: true` is opt-in),
+  // and zero-defect clean scans still preserve schema metadata with PASS verdict.
   // Test 5: Token economy — every saving must be attributable to a named mechanism
   const verboseJson = JSON.stringify(report, null, 2);
   const aasDefaultJson = toAasJson(report, {
@@ -394,87 +427,61 @@ async function runTests() {
   assert.strictEqual(truncatedAas.truncated, 2, 'Must record omitted defects in truncated count');
   console.log('✔  Test 8: Defect budget and truncation tracking verified');
 
+  // Contract Group 3 (Tests 9-10): Deterministic sentence compression coverage ratchet and >= 70%
+  // compact JSON byte-reduction invariant at repository scale.
+  // Compression rules must preserve exact rule codes and identifiers while stripping filler prose,
+  // and scale reports must prove token savings without relying on post-hoc JSON minification.
   // Test 9: Sentence token compression engine
   const { compressDiagnosticSentence } = require('../dist/core/reporting/aas-reporter');
-  assert.strictEqual(
-    compressDiagnosticSentence(
+  const compressionCases = [
+    [
       "Identifier 'LOOP_HEADER_RE' contains unapproved truncated abbreviation 'RE'.",
-    ),
-    "identifier 'LOOP_HEADER_RE' unapproved abbr 'RE'",
-  );
-  assert.strictEqual(
-    compressDiagnosticSentence(
+      "identifier 'LOOP_HEADER_RE' unapproved abbr 'RE'",
+    ],
+    [
       "Identifier 'val' is vague and uninformative; lacks domain context.",
-    ),
-    "identifier 'val' lacks domain context",
-  );
-  assert.strictEqual(
-    compressDiagnosticSentence(
+      "identifier 'val' lacks domain context",
+    ],
+    [
       "Cognitive complexity (19) exceeds threshold (15) in function 'dispatchCommand'",
-    ),
-    "CC 19 > 15 in 'dispatchCommand'",
-  );
-  assert.strictEqual(
-    compressDiagnosticSentence('Effective code volume budget exceeded.'),
-    'ELOC budget exceeded',
-  );
-  assert.strictEqual(
-    compressDiagnosticSentence("Synchronous 'fs.readFileSync' blocks event loop."),
-    "sync 'fs.readFileSync' blocks event loop",
-  );
-  assert.strictEqual(compressDiagnosticSentence('Sync I/O in async method'), 'sync IO in async fn');
-  assert.strictEqual(
-    compressDiagnosticSentence('Zero transient heap allocation in hot loop bodies violated'),
-    'loop transient heap allocation',
-  );
-  assert.strictEqual(
-    compressDiagnosticSentence('Control flow nesting depth (5) exceeds limit (4)'),
-    'nesting depth 5 > 4',
-  );
-  assert.strictEqual(
-    compressDiagnosticSentence('Procedure line count (120) exceeds limit (80)'),
-    'procedure lines 120 > 80',
-  );
-  assert.strictEqual(
-    compressDiagnosticSentence('Magic number 42 detected without semantic constant.'),
-    'magic number 42',
-  );
-  assert.strictEqual(
-    compressDiagnosticSentence("Literal string 'prod' should be constant."),
-    "literal string 'prod' not constant",
-  );
-  assert.strictEqual(
-    compressDiagnosticSentence('Facade method merely delegates to inner without value-add'),
-    'trampoline pass-through',
-  );
-  assert.strictEqual(
-    compressDiagnosticSentence(
+      "CC 19 > 15 in 'dispatchCommand'",
+    ],
+    ['Effective code volume budget exceeded.', 'ELOC budget exceeded'],
+    [
+      "Synchronous 'fs.readFileSync' blocks event loop.",
+      "sync 'fs.readFileSync' blocks event loop",
+    ],
+    ['Sync I/O in async method', 'sync IO in async fn'],
+    [
+      'Zero transient heap allocation in hot loop bodies violated',
+      'loop transient heap allocation',
+    ],
+    ['Control flow nesting depth (5) exceeds limit (4)', 'nesting depth 5 > 4'],
+    ['Procedure line count (120) exceeds limit (80)', 'procedure lines 120 > 80'],
+    ['Magic number 42 detected without semantic constant.', 'magic number 42'],
+    ["Literal string 'prod' should be constant.", "literal string 'prod' not constant"],
+    ['Facade method merely delegates to inner without value-add', 'trampoline pass-through'],
+    [
       'String literal "\'use strict\'" (len=12) appears to be a hardcoded UI message or config value.',
-    ),
-    'hardcoded string "\'use strict\'" (12c)',
-  );
-  assert.strictEqual(
-    compressDiagnosticSentence('Numeric literal 42 should be extracted to a named constant.'),
-    'magic number 42',
-  );
-  assert.strictEqual(
-    compressDiagnosticSentence(
+      'hardcoded string "\'use strict\'" (12c)',
+    ],
+    ['Numeric literal 42 should be extracted to a named constant.', 'magic number 42'],
+    [
       'File has 850 lines (max 600); 12 exports. See split suggestions in detail.',
-    ),
-    'file 850 > 600 lines (12 exports)',
-  );
-  assert.strictEqual(
-    compressDiagnosticSentence(
+      'file 850 > 600 lines (12 exports)',
+    ],
+    [
       "Function 'runTask' declares 5 parameters (limit: 3); pack cohesive options into a parameter object.",
-    ),
-    "fn 'runTask' 5 > 3 params",
-  );
-  assert.strictEqual(
-    compressDiagnosticSentence(
+      "fn 'runTask' 5 > 3 params",
+    ],
+    [
       "CommonJS 'require(...)' detected in TypeScript module; use ES module 'import' syntax.",
-    ),
-    'CommonJS require() in ESM',
-  );
+      'CommonJS require() in ESM',
+    ],
+  ];
+  for (const [rawInput, expectedOutput] of compressionCases) {
+    assert.strictEqual(compressDiagnosticSentence(rawInput), expectedOutput);
+  }
 
   // Coverage ratchet: every rule that emits prose must have a compression path. Pathologically
   // long messages used to escape silently (9.8% of a real scan) because no pattern described them.
@@ -571,6 +578,10 @@ async function runTests() {
   );
   console.log('✔  Test 10: Scale report >= 70% Token savings ratchet verified');
 
+  // Contract Group 4 (Tests 11-12): Ten-dimensional AAS v1.1 breakdown, bilingual Markdown table
+  // labels, SQALE/Polyglot/Density metric truthfulness, and CAI isolation invariants.
+  // Invariant: CAI remains undefined whenever autonomy did not run (never borrows polyglot);
+  // SQALE grade, 5D tensor distances, and gaming-defense status project verbatim.
   // Test 11: Ten-Dimensional rich breakdown (AAS v1.1) and complete Markdown coverage
   const test11Report = createMockScanReport();
   const doc11 = buildAasReport(test11Report, { includeDimensionDetails: true });
@@ -584,16 +595,21 @@ async function runTests() {
   const mdReporter = getReporter('markdown');
   assert.ok(mdReporter, 'Markdown reporter plugin must be registered');
   const mdOutput = mdReporter.format(test11Report);
-  assert.ok(mdOutput.includes('代码安全'), 'Missing 代码安全');
-  assert.ok(mdOutput.includes('架构一致'), 'Missing 架构一致');
-  assert.ok(mdOutput.includes('可维护性'), 'Missing 可维护性');
-  assert.ok(mdOutput.includes('性能预算'), 'Missing 性能预算');
-  assert.ok(mdOutput.includes('技术债风险'), 'Missing 技术债风险');
-  assert.ok(mdOutput.includes('语义纯度'), 'Missing 语义纯度');
-  assert.ok(mdOutput.includes('重复率'), 'Missing 重复率');
-  assert.ok(mdOutput.includes('标准化'), 'Missing 标准化');
-  assert.ok(mdOutput.includes('现代化'), 'Missing 现代化');
-  assert.ok(mdOutput.includes('注释质量'), 'Missing 注释质量');
+  const expectedMdLabels = [
+    '代码安全',
+    '架构一致',
+    '可维护性',
+    '性能预算',
+    '技术债风险',
+    '语义纯度',
+    '重复率',
+    '标准化',
+    '现代化',
+    '注释质量',
+  ];
+  for (const label of expectedMdLabels) {
+    assert.ok(mdOutput.includes(label), `Missing ${label}`);
+  }
   console.log(
     '✔  Test 11: Ten-Dimensional rich metrics (AAS v1.1) & complete Markdown table verified',
   );
@@ -701,45 +717,43 @@ async function runTests() {
   );
   console.log('✔  Test 12: Truthful metrics mapping & CAI isolation verified');
 
+  // Contract Group 5 (Tests 13-16): Same-line anchor deduplication, identifier hygiene,
+  // ADR-Q metric omission vs legacy aliases, moreLines folding, and healthOverride overrides.
+  // Invariant: duplicate anchors on the same line are suppressed once per line when enabled,
+  // and unmeasured risk metrics remain undefined rather than defaulting to zero.
   // Test 13: Same-line anchor deduplication
   const duplicateAnchorReport = createMockScanReport({
     issues: [
-      {
+      createLineIssueFixture({
         id: 'dup:1',
         analyzer: 'constants',
         rule: 'hardcoded-string',
         severity: 'error',
         message: 'Literal string detected.',
-        location: {
-          file: 'src/app.ts',
-          start: { line: 3, column: 10 },
-          end: { line: 3, column: 16 },
-        },
-      },
-      {
+        line: 3,
+        colStart: 10,
+        colEnd: 16,
+      }),
+      createLineIssueFixture({
         id: 'dup:2',
         analyzer: 'constants',
         rule: 'magic-number',
         severity: 'error',
         message: 'Magic number detected.',
-        location: {
-          file: 'src/app.ts',
-          start: { line: 3, column: 12 },
-          end: { line: 3, column: 14 },
-        },
-      },
-      {
+        line: 3,
+        colStart: 12,
+        colEnd: 14,
+      }),
+      createLineIssueFixture({
         id: 'dup:3',
         analyzer: 'complexity',
         rule: 'high-complexity',
         severity: 'error',
         message: 'High complexity on line 5.',
-        location: {
-          file: 'src/app.ts',
-          start: { line: 5, column: 1 },
-          end: { line: 5, column: 10 },
-        },
-      },
+        line: 5,
+        colStart: 1,
+        colEnd: 10,
+      }),
     ],
   });
 

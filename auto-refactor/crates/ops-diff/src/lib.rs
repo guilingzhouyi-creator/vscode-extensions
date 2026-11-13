@@ -225,6 +225,41 @@ fn hash_line_fnv1a64(line: &str) -> u64 {
     hash
 }
 
+fn step_myers_row(
+    old: &[&str],
+    new: &[&str],
+    old_hashes: &[u64],
+    new_hashes: &[u64],
+    v: &mut [usize],
+    d: isize,
+    max: usize,
+) -> bool {
+    let n = old.len();
+    let m = new.len();
+    let mut k = -d;
+    while k <= d {
+        let k_idx = (k + max as isize) as usize;
+        let mut x = if k == -d || (k != d && v[k_idx - 1] < v[k_idx + 1]) {
+            v[k_idx + 1]
+        } else {
+            v[k_idx - 1] + 1
+        };
+        let mut y = (x as isize - k) as usize;
+
+        while x < n && y < m && old_hashes[x] == new_hashes[y] && old[x] == new[y] {
+            x += 1;
+            y += 1;
+        }
+
+        v[k_idx] = x;
+        if x >= n && y >= m {
+            return true;
+        }
+        k += 2;
+    }
+    false
+}
+
 fn compute_myers_diff(
     old: &[&str],
     new: &[&str],
@@ -244,49 +279,19 @@ fn compute_myers_diff(
     }
 
     let max = n + m;
-    let row_size = 2 * max + 1;
-    let mut v = vec![0usize; row_size];
-    v[1 + max] = 0;
-
-    // Flat triangular trace arena: row `d` covers diagonals `-d..=d` (length `2*d + 1`)
-    // and starts at index `d * d` in `trace_arena`.
+    let mut v = vec![0usize; 2 * max + 1];
     let mut trace_arena: Vec<usize> = Vec::with_capacity((max + 1).min(256).pow(2));
 
     for d in 0..=(max as isize) {
         let d_usize = d as usize;
         trace_arena.extend_from_slice(&v[(max - d_usize)..=(max + d_usize)]);
-        let mut k = -d;
-        while k <= d {
-            let k_idx = (k + max as isize) as usize;
-            let mut x = if k == -d || (k != d && v[k_idx - 1] < v[k_idx + 1]) {
-                v[k_idx + 1]
-            } else {
-                v[k_idx - 1] + 1
-            };
-            let mut y = (x as isize - k) as usize;
-
-            while x < n && y < m && old_hashes[x] == new_hashes[y] && old[x] == new[y] {
-                x += 1;
-                y += 1;
-            }
-
-            v[k_idx] = x;
-
-            if x >= n && y >= m {
-                return backtrack(&trace_arena, old, new, (offset_a, offset_b), d);
-            }
-
-            k += 2;
+        if step_myers_row(old, new, old_hashes, new_hashes, &mut v, d, max) {
+            return backtrack(&trace_arena, old, new, (offset_a, offset_b), d);
         }
     }
 
-    let mut fallback = Vec::new();
-    for i in 0..n {
-        fallback.push(DiffOp::Delete(offset_a + i));
-    }
-    for j in 0..m {
-        fallback.push(DiffOp::Insert(offset_b + j));
-    }
+    let mut fallback: Vec<DiffOp> = (0..n).map(|i| DiffOp::Delete(offset_a + i)).collect();
+    fallback.extend((0..m).map(|j| DiffOp::Insert(offset_b + j)));
     fallback
 }
 
@@ -439,7 +444,7 @@ fn bit_parallel_myers_128(pattern: &[u32], text: &[u32]) -> u32 {
     score
 }
 
-fn scalar_myers_distance(pattern: &[u32], text: &[u32]) -> u32 {
+fn trim_common_u32_affixes<'a>(pattern: &'a [u32], text: &'a [u32]) -> (&'a [u32], &'a [u32]) {
     let mut prefix = 0usize;
     let mut end_n = pattern.len();
     let mut end_m = text.len();
@@ -450,8 +455,44 @@ fn scalar_myers_distance(pattern: &[u32], text: &[u32]) -> u32 {
         end_n -= 1;
         end_m -= 1;
     }
-    let pat_mid = &pattern[prefix..end_n];
-    let txt_mid = &text[prefix..end_m];
+    (&pattern[prefix..end_n], &text[prefix..end_m])
+}
+
+fn step_scalar_myers_row(
+    pat_mid: &[u32],
+    txt_mid: &[u32],
+    v: &mut [usize],
+    d: isize,
+    max: usize,
+) -> bool {
+    let n = pat_mid.len();
+    let m = txt_mid.len();
+    let mut k = -d;
+    while k <= d {
+        let k_idx = (k + max as isize) as usize;
+        let mut x = if k == -d || (k != d && v[k_idx - 1] < v[k_idx + 1]) {
+            v[k_idx + 1]
+        } else {
+            v[k_idx - 1] + 1
+        };
+        let mut y = (x as isize - k) as usize;
+
+        while x < n && y < m && pat_mid[x] == txt_mid[y] {
+            x += 1;
+            y += 1;
+        }
+
+        v[k_idx] = x;
+        if x >= n && y >= m {
+            return true;
+        }
+        k += 2;
+    }
+    false
+}
+
+fn scalar_myers_distance(pattern: &[u32], text: &[u32]) -> u32 {
+    let (pat_mid, txt_mid) = trim_common_u32_affixes(pattern, text);
     let n = pat_mid.len();
     let m = txt_mid.len();
     if n == 0 {
@@ -461,37 +502,103 @@ fn scalar_myers_distance(pattern: &[u32], text: &[u32]) -> u32 {
         return n as u32;
     }
     let max = n + m;
-    let size = 2 * max + 1;
-    let mut v = vec![0usize; size];
-    v[1 + max] = 0;
+    let mut v = vec![0usize; 2 * max + 1];
 
     for d in 0..=(max as isize) {
-        let mut k = -d;
-        while k <= d {
-            let k_idx = (k + max as isize) as usize;
-            let mut x = if k == -d || (k != d && v[k_idx - 1] < v[k_idx + 1]) {
-                v[k_idx + 1]
-            } else {
-                v[k_idx - 1] + 1
-            };
-            let mut y = (x as isize - k) as usize;
-
-            while x < n && y < m && pat_mid[x] == txt_mid[y] {
-                x += 1;
-                y += 1;
-            }
-
-            v[k_idx] = x;
-
-            if x >= n && y >= m {
-                return d as u32;
-            }
-
-            k += 2;
+        if step_scalar_myers_row(pat_mid, txt_mid, &mut v, d, max) {
+            return d as u32;
         }
     }
 
     max as u32
+}
+
+struct HunkBuilder<'a> {
+    old_lines: &'a [&'a str],
+    new_lines: &'a [&'a str],
+    lines: Vec<String>,
+    old_start: usize,
+    old_lines_count: usize,
+    new_start: usize,
+    new_lines_count: usize,
+}
+
+impl<'a> HunkBuilder<'a> {
+    fn new(old_lines: &'a [&'a str], new_lines: &'a [&'a str]) -> Self {
+        Self {
+            old_lines,
+            new_lines,
+            lines: Vec::new(),
+            old_start: 0,
+            old_lines_count: 0,
+            new_start: 0,
+            new_lines_count: 0,
+        }
+    }
+
+    fn push_op(&mut self, op: DiffOp) {
+        match op {
+            DiffOp::Equal(old_idx, new_idx) => {
+                if self.old_start == 0 {
+                    self.old_start = old_idx + 1;
+                }
+                if self.new_start == 0 {
+                    self.new_start = new_idx + 1;
+                }
+                self.old_lines_count += 1;
+                self.new_lines_count += 1;
+                let text = self.old_lines.get(old_idx).copied().unwrap_or("");
+                self.lines.push(format!(" {text}"));
+            }
+            DiffOp::Delete(old_idx) => {
+                if self.old_start == 0 {
+                    self.old_start = old_idx + 1;
+                }
+                self.old_lines_count += 1;
+                let text = self.old_lines.get(old_idx).copied().unwrap_or("");
+                self.lines.push(format!("-{text}"));
+            }
+            DiffOp::Insert(new_idx) => {
+                if self.new_start == 0 {
+                    self.new_start = new_idx + 1;
+                }
+                self.new_lines_count += 1;
+                let text = self.new_lines.get(new_idx).copied().unwrap_or("");
+                self.lines.push(format!("+{text}"));
+            }
+        }
+    }
+
+    fn build(self) -> DiffHunk {
+        DiffHunk {
+            old_start: self.old_start.max(1) as u32,
+            old_lines: self.old_lines_count as u32,
+            new_start: self.new_start.max(1) as u32,
+            new_lines: self.new_lines_count as u32,
+            lines: self.lines,
+        }
+    }
+}
+
+fn find_hunk_end(ops: &[DiffOp], start_idx: usize, context: usize) -> usize {
+    let len = ops.len();
+    let mut hunk_end = start_idx;
+    while hunk_end < len {
+        if !matches!(ops[hunk_end], DiffOp::Equal(_, _)) {
+            hunk_end += 1;
+            continue;
+        }
+        let mut peek = hunk_end;
+        while peek < len && matches!(ops[peek], DiffOp::Equal(_, _)) {
+            peek += 1;
+        }
+        if peek - hunk_end <= context * 2 && peek < len {
+            hunk_end = peek;
+        } else {
+            return (hunk_end + context).min(len);
+        }
+    }
+    hunk_end
 }
 
 fn assemble_hunks(
@@ -502,97 +609,24 @@ fn assemble_hunks(
 ) -> Vec<DiffHunk> {
     let mut hunks = Vec::new();
     let len = ops.len();
-    let mut i = 0;
+    let mut cursor = 0;
 
-    while i < len {
-        while i < len {
-            if !matches!(ops[i], DiffOp::Equal(_, _)) {
-                break;
-            }
-            i += 1;
+    while cursor < len {
+        while cursor < len && matches!(ops[cursor], DiffOp::Equal(_, _)) {
+            cursor += 1;
         }
-
-        if i >= len {
+        if cursor >= len {
             break;
         }
 
-        let hunk_start = i.saturating_sub(context);
-        let mut hunk_end = i;
-
-        while hunk_end < len {
-            if !matches!(ops[hunk_end], DiffOp::Equal(_, _)) {
-                hunk_end += 1;
-            } else {
-                let mut eq_count = 0;
-                let mut peek = hunk_end;
-                while peek < len && matches!(ops[peek], DiffOp::Equal(_, _)) {
-                    eq_count += 1;
-                    peek += 1;
-                }
-
-                if eq_count <= context * 2 && peek < len {
-                    hunk_end = peek;
-                } else {
-                    hunk_end = (hunk_end + context).min(len);
-                    break;
-                }
-            }
+        let hunk_start = cursor.saturating_sub(context);
+        let hunk_end = find_hunk_end(ops, cursor, context);
+        let mut builder = HunkBuilder::new(old_lines, new_lines);
+        for &op in &ops[hunk_start..hunk_end] {
+            builder.push_op(op);
         }
-
-        let mut lines = Vec::new();
-        let mut old_start = 0;
-        let mut old_lines_count = 0;
-        let mut new_start = 0;
-        let mut new_lines_count = 0;
-
-        for op in &ops[hunk_start..hunk_end] {
-            match *op {
-                DiffOp::Equal(o, n) => {
-                    if old_start == 0 {
-                        old_start = o + 1;
-                    }
-                    if new_start == 0 {
-                        new_start = n + 1;
-                    }
-                    old_lines_count += 1;
-                    new_lines_count += 1;
-                    let text = old_lines.get(o).copied().unwrap_or("");
-                    lines.push(format!(" {text}"));
-                }
-                DiffOp::Delete(o) => {
-                    if old_start == 0 {
-                        old_start = o + 1;
-                    }
-                    if old_lines_count == 0 && old_start == 0 {
-                        old_start = o + 1;
-                    }
-                    old_lines_count += 1;
-                    let text = old_lines.get(o).copied().unwrap_or("");
-                    lines.push(format!("-{text}"));
-                }
-                DiffOp::Insert(n) => {
-                    if new_start == 0 {
-                        new_start = n + 1;
-                    }
-                    if new_lines_count == 0 && new_start == 0 {
-                        new_start = n + 1;
-                    }
-                    new_lines_count += 1;
-                    let text = new_lines.get(n).copied().unwrap_or("");
-                    lines.push(format!("+{text}"));
-                }
-            }
-        }
-
-        hunks.push(DiffHunk {
-            old_start: old_start.max(1) as u32,
-            old_lines: old_lines_count as u32,
-            new_start: new_start.max(1) as u32,
-            new_lines: new_lines_count as u32,
-            lines,
-        });
-
-        i = hunk_end;
+        hunks.push(builder.build());
+        cursor = hunk_end;
     }
 
     hunks

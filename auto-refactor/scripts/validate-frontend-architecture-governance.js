@@ -55,8 +55,38 @@ const { GdscriptModernAnalyzer } = require(
   path.join(__dirname, '..', 'dist', 'analyzers', 'gdscript-modern.js'),
 );
 
+/**
+ * Verifies Bad-to-Good trajectory synthesis for a presentation governance rule category.
+ *
+ * @param extractor - Configured TrajectoryRecipeExtractor instance.
+ * @param spec - Test vector containing input snippets and expected recipe metadata.
+ */
+function assertTrajectoryRecipe(extractor, spec) {
+  const recipe = extractor.extractRecipeFromTrajectory({
+    trajectoryId: spec.trajectoryId,
+    filePath: spec.filePath,
+    beforeContent: spec.beforeContent,
+    afterContent: spec.afterContent,
+  });
+  assert.ok(recipe, `${spec.caseLabel} Failed: Must synthesize ${spec.category} recipe`);
+  assert.strictEqual(
+    recipe.category,
+    spec.category,
+    `${spec.caseLabel} Failed: Wrong category for ${spec.prefix}`,
+  );
+  assert.ok(
+    recipe.recipeId.startsWith(spec.prefix),
+    `${spec.caseLabel} Failed: Recipe ID must start with ${spec.prefix}`,
+  );
+}
+
 console.log('=== Running Frontend Architecture & Governance Validation Pipeline (29 cases) ===');
 
+// Invariant Group A (CASE-01..06): Pure frontend health index math bounds in [0, 100].
+// Every index formula must remain bounded, monotonic, and deterministic on zero-input edges.
+// Debounce index measures guard coverage across async actions; FSM score penalizes wild writes;
+// layout density penalizes deep control trees; WeakRef hygiene tracks non-weak listener leaks;
+// responsive scalability and unidirectional flow protect view portability and DTO immutability.
 // CASE-01: Debounce protection index boundary and scaling invariants
 {
   const perfect = calculateDebounceProtectionIndex(10, 5, 10);
@@ -154,6 +184,9 @@ console.log('=== Running Frontend Architecture & Governance Validation Pipeline 
   console.log('  ✔ CASE-08: Family dimension routing agreement for GDM rules');
 }
 
+// Invariant Group B (CASE-09..12): Trajectory recipe synthesis for debounce, FSM, WeakRef, and UDF.
+// Debounce, state-machine-discipline, weakref-observer, and unidirectional-flow recipes must
+// extract canonical category prefixes (REC-DEB, REC-FSM, REC-WEAK, REC-UNI) from diffs.
 // CASE-09: Trajectory extractor detects interaction-debounce recipe
 {
   const extractor = new TrajectoryRecipeExtractor();
@@ -443,62 +476,44 @@ func _on_buy():
   console.log('  ✔ CASE-20: Presentation Decoupling Index (PDI) invariants');
 }
 
+// Invariant Group C (CASE-21..24): Component adoption, design tokens, and GDM registry parity.
+// Every GDM rule in RULE_REGISTRY must align with GdscriptModernAnalyzer live AST detections,
+// and presentation views must synthesize status-bar, token, and base-screen recipes cleanly.
 // CASE-21: Trajectory recipe extractor synthesizes REC-BAR, REC-TOK, and REC-EXT
 {
   const extractor = new TrajectoryRecipeExtractor();
-  // Test REC-BAR
-  const barRecipe = extractor.extractRecipeFromTrajectory({
-    trajectoryId: 'traj-bar-001',
-    filePath: 'views/hud_view.gd',
-    beforeContent: 'var bar = ProgressBar.new()\nbar.value = 50\n',
-    afterContent: 'var bar = KStatusBar.new()\nbar.set_progress(0.5)\n',
-  });
-  assert.ok(barRecipe, 'CASE-21 Failed: Must synthesize status-bar recipe');
-  assert.strictEqual(
-    barRecipe.category,
-    'status-bar-component',
-    'CASE-21 Failed: Wrong category for status bar',
-  );
-  assert.ok(
-    barRecipe.recipeId.startsWith('REC-BAR'),
-    'CASE-21 Failed: Recipe ID must start with REC-BAR',
-  );
-
-  // Test REC-TOK
-  const tokRecipe = extractor.extractRecipeFromTrajectory({
-    trajectoryId: 'traj-tok-001',
-    filePath: 'views/card_view.gd',
-    beforeContent: 'var c = Color("#ff0000")\nlabel.modulate = c\n',
-    afterContent: 'var c = DesignTokens.COLOR_ACCENT\nlabel.modulate = c\n',
-  });
-  assert.ok(tokRecipe, 'CASE-21 Failed: Must synthesize token recipe');
-  assert.strictEqual(
-    tokRecipe.category,
-    'token-standardization',
-    'CASE-21 Failed: Wrong category for token',
-  );
-  assert.ok(
-    tokRecipe.recipeId.startsWith('REC-TOK'),
-    'CASE-21 Failed: Recipe ID must start with REC-TOK',
-  );
-
-  // Test REC-EXT
-  const extRecipe = extractor.extractRecipeFromTrajectory({
-    trajectoryId: 'traj-ext-001',
-    filePath: 'views/profile_view.gd',
-    beforeContent: 'extends Control\nfunc _ready(): pass\n',
-    afterContent: 'extends BaseScreen\nfunc _ready(): pass\n',
-  });
-  assert.ok(extRecipe, 'CASE-21 Failed: Must synthesize screen base recipe');
-  assert.strictEqual(
-    extRecipe.category,
-    'screen-base-inheritance',
-    'CASE-21 Failed: Wrong category for screen base',
-  );
-  assert.ok(
-    extRecipe.recipeId.startsWith('REC-EXT'),
-    'CASE-21 Failed: Recipe ID must start with REC-EXT',
-  );
+  const specs = [
+    {
+      caseLabel: 'CASE-21',
+      trajectoryId: 'traj-bar-001',
+      filePath: 'views/hud_view.gd',
+      beforeContent: 'var bar = ProgressBar.new()\nbar.value = 50\n',
+      afterContent: 'var bar = KStatusBar.new()\nbar.set_progress(0.5)\n',
+      category: 'status-bar-component',
+      prefix: 'REC-BAR',
+    },
+    {
+      caseLabel: 'CASE-21',
+      trajectoryId: 'traj-tok-001',
+      filePath: 'views/card_view.gd',
+      beforeContent: 'var c = Color("#ff0000")\nlabel.modulate = c\n',
+      afterContent: 'var c = DesignTokens.COLOR_ACCENT\nlabel.modulate = c\n',
+      category: 'token-standardization',
+      prefix: 'REC-TOK',
+    },
+    {
+      caseLabel: 'CASE-21',
+      trajectoryId: 'traj-ext-001',
+      filePath: 'views/profile_view.gd',
+      beforeContent: 'extends Control\nfunc _ready(): pass\n',
+      afterContent: 'extends BaseScreen\nfunc _ready(): pass\n',
+      category: 'screen-base-inheritance',
+      prefix: 'REC-EXT',
+    },
+  ];
+  for (const spec of specs) {
+    assertTrajectoryRecipe(extractor, spec);
+  }
   console.log('  ✔ CASE-21: Trajectory extractor synthesizes REC-BAR, REC-TOK, REC-EXT');
 }
 
@@ -681,84 +696,58 @@ func _on_buy():
   console.log('  ✔ CASE-27: Shannon Information Entropy & AST Density anti-gaming invariants');
 }
 
+// Invariant Group E (CASE-28): Presentation scalability, localization symmetry, unique nodes,
+// and state isolation recipes synthesized via declarative preset tag predicates.
 // CASE-28: Trajectory recipe extractor synthesizes REC-VRT, REC-I18N, REC-NOD, REC-BND
 {
   const extractor = new TrajectoryRecipeExtractor();
-  // Test REC-VRT
-  const vrtRecipe = extractor.extractRecipeFromTrajectory({
-    trajectoryId: 'traj-vrt-001',
-    filePath: 'views/market_view.gd',
-    beforeContent: 'for item in items:\n\tlist.add_child(item)\n',
-    afterContent: 'var vlist = KVirtualList.new()\nvlist.sync(items)\n',
-  });
-  assert.ok(vrtRecipe, 'CASE-28 Failed: Must synthesize virtual list recipe');
-  assert.strictEqual(
-    vrtRecipe.category,
-    'virtual-list-pooling',
-    'CASE-28 Failed: Wrong category for VRT',
-  );
-  assert.ok(
-    vrtRecipe.recipeId.startsWith('REC-VRT'),
-    'CASE-28 Failed: Recipe ID must start with REC-VRT',
-  );
-
-  // Test REC-I18N
-  const i18nRecipe = extractor.extractRecipeFromTrajectory({
-    trajectoryId: 'traj-i18n-001',
-    filePath: 'views/login_view.gd',
-    beforeContent: 'label.text = "Hello World"\n',
-    afterContent: 'label.text = tr("HELLO_WORLD")\n',
-  });
-  assert.ok(i18nRecipe, 'CASE-28 Failed: Must synthesize i18n recipe');
-  assert.strictEqual(
-    i18nRecipe.category,
-    'i18n-localization',
-    'CASE-28 Failed: Wrong category for I18N',
-  );
-  assert.ok(
-    i18nRecipe.recipeId.startsWith('REC-I18N'),
-    'CASE-28 Failed: Recipe ID must start with REC-I18N',
-  );
-
-  // Test REC-NOD
-  const nodRecipe = extractor.extractRecipeFromTrajectory({
-    trajectoryId: 'traj-nod-001',
-    filePath: 'views/dialog_view.gd',
-    beforeContent: 'var p = get_parent()\n',
-    afterContent: '@onready var p = %HeaderNode\n',
-  });
-  assert.ok(nodRecipe, 'CASE-28 Failed: Must synthesize explicit node recipe');
-  assert.strictEqual(
-    nodRecipe.category,
-    'explicit-node-unique',
-    'CASE-28 Failed: Wrong category for NOD',
-  );
-  assert.ok(
-    nodRecipe.recipeId.startsWith('REC-NOD'),
-    'CASE-28 Failed: Recipe ID must start with REC-NOD',
-  );
-
-  // Test REC-BND
-  const bndRecipe = extractor.extractRecipeFromTrajectory({
-    trajectoryId: 'traj-bnd-001',
-    filePath: 'views/trade_view.gd',
-    beforeContent: 'GameState.mutate_currency(10)\n',
-    afterContent: 'func apply_snapshot(snap):\n\tupdate_ui(snap)\n',
-  });
-  assert.ok(bndRecipe, 'CASE-28 Failed: Must synthesize domain decoupling recipe');
-  assert.strictEqual(
-    bndRecipe.category,
-    'presentation-decoupling',
-    'CASE-28 Failed: Wrong category for BND',
-  );
-  assert.ok(
-    bndRecipe.recipeId.startsWith('REC-BND'),
-    'CASE-28 Failed: Recipe ID must start with REC-BND',
-  );
-
+  const specs = [
+    {
+      caseLabel: 'CASE-28',
+      trajectoryId: 'traj-vrt-001',
+      filePath: 'views/market_view.gd',
+      beforeContent: 'for item in items:\n\tlist.add_child(item)\n',
+      afterContent: 'var vlist = KVirtualList.new()\nvlist.sync(items)\n',
+      category: 'virtual-list-pooling',
+      prefix: 'REC-VRT',
+    },
+    {
+      caseLabel: 'CASE-28',
+      trajectoryId: 'traj-i18n-001',
+      filePath: 'views/login_view.gd',
+      beforeContent: 'label.text = "Hello World"\n',
+      afterContent: 'label.text = tr("HELLO_WORLD")\n',
+      category: 'i18n-localization',
+      prefix: 'REC-I18N',
+    },
+    {
+      caseLabel: 'CASE-28',
+      trajectoryId: 'traj-nod-001',
+      filePath: 'views/dialog_view.gd',
+      beforeContent: 'var p = get_parent()\n',
+      afterContent: '@onready var p = %HeaderNode\n',
+      category: 'explicit-node-unique',
+      prefix: 'REC-NOD',
+    },
+    {
+      caseLabel: 'CASE-28',
+      trajectoryId: 'traj-bnd-001',
+      filePath: 'views/trade_view.gd',
+      beforeContent: 'GameState.mutate_currency(10)\n',
+      afterContent: 'func apply_snapshot(snap):\n\tupdate_ui(snap)\n',
+      category: 'presentation-decoupling',
+      prefix: 'REC-BND',
+    },
+  ];
+  for (const spec of specs) {
+    assertTrajectoryRecipe(extractor, spec);
+  }
   console.log('  ✔ CASE-28: Trajectory extractor synthesizes REC-VRT, REC-I18N, REC-NOD, REC-BND');
 }
 
+// Invariant Group D (CASE-25..29): Boundary interoperability, anti-gaming entropy, and weights.
+// Archetype weight profiles (frontend/backend/composite) must preserve priority ordering,
+// ensuring techDebt/standardization lead frontend scoring and performance leads backend scoring.
 // CASE-29: Archetype weight tuner supports frontend, backend, composite profiles
 {
   const tuner = new ArchetypeWeightTuner();

@@ -44,14 +44,20 @@ pub fn get_peak_rss_mb() -> f64 {
         }
 
         let mut counters = std::mem::MaybeUninit::<PROCESS_MEMORY_COUNTERS>::zeroed();
-        // SAFETY: Pointer is valid, properly aligned, and `cb` matches `size_of::<PROCESS_MEMORY_COUNTERS>()`.
+        // SAFETY:
+        // - Preconditions: `counters.as_mut_ptr()` provides an aligned, non-null pointer to uninitialized `PROCESS_MEMORY_COUNTERS` memory; `(*p).cb` is initialized to `size_of::<PROCESS_MEMORY_COUNTERS>()`.
+        // - Invariants: `GetCurrentProcess()` returns a pseudo-handle that does not require closing; Win32 reads `cb` and fills at most `cb` bytes without retaining pointers.
+        // - Postconditions: Non-zero return indicates `counters` has been populated with current process memory statistics.
         let ok = unsafe {
             let p = counters.as_mut_ptr();
             (*p).cb = std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32;
             K32GetProcessMemoryInfo(GetCurrentProcess(), p, (*p).cb)
         };
         if ok != 0 {
-            // SAFETY: `K32GetProcessMemoryInfo` succeeded and filled `counters`.
+            // SAFETY:
+            // - Preconditions: `ok != 0` confirms `K32GetProcessMemoryInfo` succeeded and initialized all bytes of `counters`.
+            // - Invariants: `PROCESS_MEMORY_COUNTERS` contains only integer/pointer-sized scalar fields without drop glue.
+            // - Postconditions: `counters.assume_init()` safely produces a valid, fully initialized `PROCESS_MEMORY_COUNTERS` value.
             let init = unsafe { counters.assume_init() };
             (init.peak_working_set_size as f64) / (1024.0 * 1024.0)
         } else {

@@ -12,11 +12,12 @@
  *      and compare object ids for every vector.
  *   3. Compare canonical tree entry order with git ls-tree, covering mixed case, non-ASCII names,
  *      directory trailing-slash ordering, and mode-specific framing.
- *   4. Exit non-zero on any divergence; refuse to claim equivalence when the reference baseline is absent and
- *      the caller demanded it with --require-git.
+ *   4. Execute real binary taxis vs system git differential checks across object IDs, inflated loose
+ *      object bytes, cat-file payloads, and ls-tree canonical output.
+ *   5. Exit non-zero on any divergence; refuse to claim equivalence when the reference baseline is absent and
+ *      the caller demanded it with --require-git or --require-taxis.
  * Exit Semantics & Design Rationale: Exits 0 only after every vector matched the system git baseline. A missing
- *   git binary is reported explicitly instead of being silently treated as parity, because the
- *   earlier implementation printed an equivalence claim while comparing nothing.
+ *   git or taxis binary is reported explicitly instead of being silently treated as parity.
  */
 'use strict';
 
@@ -24,11 +25,14 @@ const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const zlib = require('zlib');
 const { execFileSync } = require('child_process');
 
 const NUL = String.fromCharCode(0);
 const MAX_REPORTED_VIOLATIONS = 40;
-const REQUIRE_GIT = process.argv.includes('--require-git');
+const REQUIRE_GIT = process.argv.includes('--require-git') || process.env.TAXIS_REQUIRE_GIT === '1';
+const REQUIRE_TAXIS = process.argv.includes('--require-taxis') || process.env.TAXIS_REQUIRE_TAXIS === '1';
+const NO_AUTO_TARGET = process.argv.includes('--no-auto-target');
 
 /**
  * Computes the lowercase hexadecimal SHA-1 of a byte buffer.
@@ -75,9 +79,6 @@ function computeBlobOid(payload) {
 /**
  * Normalizes the textual Git file mode to its canonical form.
  *
- * Git prints a tree mode as "40000"; callers and fixtures may spell it "040000". Both denote the
- * same entry, and the serialized bytes must carry the canonical spelling.
- *
  * @param {string|number} mode - Mode as text or number.
  * @returns {string} Canonical mode text.
  */
@@ -99,9 +100,6 @@ function isTreeMode(mode) {
 /**
  * Produces the comparison key Git uses for tree entries.
  *
- * Directory names take part in ordering as if a slash were appended, so "foo" the directory sorts
- * after "foo.c" while "foo-bar" sorts first. Byte order, not locale order, decides the result.
- *
  * @param {{ name: string, mode: string|number }} entry - Tree entry.
  * @returns {Buffer} UTF-8 comparison key.
  */
@@ -122,9 +120,6 @@ function compareTreeEntries(left, right) {
 
 /**
  * Serializes tree entries in canonical order.
- *
- * Each record is "<mode> <name>NUL<20-byte-object-id>". The directory trailing-slash rule applies
- * to ordering only; the stored name never contains the slash.
  *
  * @param {Array<{ name: string, mode: string|number, oid: string }>} entries - Unsorted entries.
  * @returns {{ payload: Buffer, entries: Array<object> }} Payload and canonical order.
@@ -157,15 +152,11 @@ function identityLine(identity) {
 /**
  * Serializes a commit payload.
  *
- * The message is copied verbatim; Git does not append a newline when a caller supplies a message
- * through stdin, so adding one here would change the object id.
- *
  * @param {object} fields - tree, parents, author, committer, message.
  * @returns {Buffer} Commit payload.
  */
 function encodeCommit(fields) {
-    const header = [];
-    header.push('tree ' + fields.tree);
+    const header = ['tree ' + fields.tree];
     (fields.parents || []).forEach((parent) => header.push('parent ' + parent));
     header.push('author ' + identityLine(fields.author));
     header.push('committer ' + identityLine(fields.committer));
@@ -207,15 +198,27 @@ function isGitAvailable() {
 }
 
 /**
- * Runs one git command against an isolated object database.
+ * Creates a plumbing runner handle for either `git` or `taxis`.
  *
- * @param {string} gitDir - Temporary git directory.
- * @param {Array<string>} args - Arguments after the git-dir switch.
+ * @param {string} bin - Executable path or command name.
+ * @param {string} gitDir - Bare repository directory.
+ * @param {boolean} isGit - Whether this runner is system git.
+ * @returns {{ bin: string, gitDir: string, isGit: boolean }} Runner handle.
+ */
+function makeRunner(bin, gitDir, isGit) {
+    return { bin, gitDir, isGit };
+}
+
+/**
+ * Runs one plumbing command against an isolated object database.
+ *
+ * @param {{ bin: string, gitDir: string }} runner - Target binary and repository.
+ * @param {Array<string>} args - Arguments after `--git-dir`.
  * @param {Buffer|undefined} input - Optional stdin bytes.
  * @param {object|undefined} env - Extra environment entries.
  * @returns {Buffer} Standard output bytes.
  */
-function runGit(gitDir, args, input, env) {
+function runPlumbing(runner, args, input, env) {
     const options = {
         env: Object.assign({}, process.env, env || {}),
         stdio: [input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
@@ -223,7 +226,7 @@ function runGit(gitDir, args, input, env) {
     if (input !== undefined) {
         options.input = input;
     }
-    return execFileSync('git', ['--git-dir', gitDir].concat(args), options);
+    return execFileSync(runner.bin, ['--git-dir', runner.gitDir].concat(args), options);
 }
 
 /**
@@ -243,17 +246,6 @@ function createBaselineRepository() {
 }
 
 /**
- * Writes a blob with git hash-object and returns its id.
- *
- * @param {string} gitDir - Baseline git directory.
- * @param {Buffer} payload - Blob bytes.
- * @returns {string} Object id assigned by git.
- */
-function gitWriteBlob(gitDir, payload) {
-    return runGit(gitDir, ['hash-object', '-w', '--stdin'], payload).toString('utf8').trim();
-}
-
-/**
  * Maps an entry mode to the object type mktree expects.
  *
  * @param {string|number} mode - Entry mode.
@@ -267,30 +259,39 @@ function objectTypeForMode(mode) {
 }
 
 /**
- * Writes a tree with git mktree and returns its id.
+ * Writes a blob object using the given runner and returns its OID.
  *
- * @param {string} gitDir - Baseline git directory.
- * @param {Array<{ name: string, mode: string|number, oid: string }>} entries - Unsorted entries.
- * @returns {string} Tree object id assigned by git.
+ * @param {object} runner - Plumbing runner.
+ * @param {Buffer} payload - Raw blob bytes.
+ * @returns {string} Object ID.
  */
-function gitWriteTree(gitDir, entries) {
-    const lines = entries.map((entry) => normalizeMode(entry.mode) + ' ' +
-        objectTypeForMode(entry.mode) + ' ' + entry.oid + '\t' + entry.name + '\n');
-    return runGit(gitDir, ['mktree'], Buffer.from(lines.join(''), 'utf8')).toString('utf8').trim();
+function plumbingWriteBlob(runner, payload) {
+    return runPlumbing(runner, ['hash-object', '-w', '--stdin'], payload).toString('utf8').trim();
 }
 
 /**
- * Creates a commit through git commit-tree with a fixed identity.
+ * Writes a tree object using the given runner and returns its OID.
  *
- * @param {string} gitDir - Baseline git directory.
- * @param {object} fields - tree, parents, author, committer, message.
- * @returns {string} Commit object id assigned by git.
+ * @param {object} runner - Plumbing runner.
+ * @param {Array<object>} entries - Tree entries.
+ * @returns {string} Tree OID.
  */
-function gitWriteCommit(gitDir, fields) {
+function plumbingWriteTree(runner, entries) {
+    const lines = entries.map((entry) => normalizeMode(entry.mode) + ' ' +
+        objectTypeForMode(entry.mode) + ' ' + entry.oid + '\t' + entry.name + '\n');
+    return runPlumbing(runner, ['mktree'], Buffer.from(lines.join(''), 'utf8')).toString('utf8').trim();
+}
+
+/**
+ * Writes a commit object using the given runner and returns its OID.
+ *
+ * @param {object} runner - Plumbing runner.
+ * @param {object} fields - Commit fields.
+ * @returns {string} Commit OID.
+ */
+function plumbingWriteCommit(runner, fields) {
     const args = ['commit-tree', fields.tree];
-    (fields.parents || []).forEach((parent) => {
-        args.push('-p', parent);
-    });
+    (fields.parents || []).forEach((parent) => args.push('-p', parent));
     const env = {
         GIT_AUTHOR_NAME: fields.author.name,
         GIT_AUTHOR_EMAIL: fields.author.email,
@@ -299,33 +300,30 @@ function gitWriteCommit(gitDir, fields) {
         GIT_COMMITTER_EMAIL: fields.committer.email,
         GIT_COMMITTER_DATE: fields.committer.timestamp + ' ' + fields.committer.tz,
     };
-    return runGit(gitDir, args, Buffer.from(fields.message, 'utf8'), env).toString('utf8').trim();
+    return runPlumbing(runner, args, Buffer.from(fields.message, 'utf8'), env).toString('utf8').trim();
 }
 
 /**
- * Writes an annotated tag with git mktag and returns its id.
+ * Writes an annotated tag using the given runner and returns its OID.
  *
- * @param {string} gitDir - Baseline git directory.
- * @param {object} fields - object, kind, tag, tagger, message.
- * @returns {string} Tag object id assigned by git.
+ * @param {object} runner - Plumbing runner.
+ * @param {object} fields - Tag fields.
+ * @returns {string} Tag OID.
  */
-function gitWriteTag(gitDir, fields) {
-    return runGit(gitDir, ['mktag'], encodeTag(fields)).toString('utf8').trim();
+function plumbingWriteTag(runner, fields) {
+    return runPlumbing(runner, ['mktag'], encodeTag(fields)).toString('utf8').trim();
 }
 
 /**
- * Lists tree entries in the order git stores them.
+ * Lists canonical ls-tree lines using the given runner.
  *
- * @param {string} gitDir - Baseline git directory.
- * @param {string} treeOid - Tree object id.
- * @returns {Array<string>} Entry names in canonical order.
+ * @param {object} runner - Plumbing runner.
+ * @param {string} treeOid - Tree OID.
+ * @returns {Array<string>} Formatted ls-tree lines.
  */
-function gitListTreeNames(gitDir, treeOid) {
-    const output = runGit(gitDir, ['-c', 'core.quotepath=false', 'ls-tree', treeOid]).toString('utf8');
-    return output.split('\n').filter((line) => line.length > 0).map((line) => {
-        const tab = line.indexOf('\t');
-        return line.slice(tab + 1);
-    });
+function plumbingListTreeLines(runner, treeOid) {
+    const args = runner.isGit ? ['-c', 'core.quotepath=false', 'ls-tree', treeOid] : ['ls-tree', treeOid];
+    return runPlumbing(runner, args).toString('utf8').split('\n').filter((line) => line.length > 0);
 }
 
 /**
@@ -483,12 +481,7 @@ function commitVectors(treeOid, parentOids) {
         author: signature('Parity Author', tz, 1700000000 + index),
         committer: signature('Parity Committer', tz, 1700000000 + index),
     }));
-    const all = variants.concat(zoned);
-    return all.map((vector) => Object.assign({
-        tree: treeOid,
-        author,
-        committer,
-    }, vector));
+    return variants.concat(zoned).map((vector) => Object.assign({ tree: treeOid, author, committer }, vector));
 }
 
 /**
@@ -542,144 +535,207 @@ function reportViolation(violations, message) {
 }
 
 /**
- * Builds a nested tree with the JavaScript encoder and compares it with git at every level.
+ * Inflates and compares the loose object stored in both repositories for byte-exact parity.
  *
- * @param {string} gitDir - Baseline git directory.
+ * @param {string} gitDir - System git repository directory.
+ * @param {string} taxisDir - Taxis repository directory.
+ * @param {string} oid - Expected object id.
+ * @param {string} label - Diagnostic label.
+ * @param {Array<string>} violations - Collected violations.
+ * @returns {void}
+ */
+function compareLooseObjectBytes(gitDir, taxisDir, oid, label, violations) {
+    const relPath = path.join('objects', oid.slice(0, 2), oid.slice(2));
+    const gitObjPath = path.join(gitDir, relPath);
+    const taxisObjPath = path.join(taxisDir, relPath);
+    if (!fs.existsSync(gitObjPath) || !fs.existsSync(taxisObjPath)) {
+        reportViolation(violations, 'FGT-OBJ-001 [Binary] missing loose object for ' + label + ' (' + oid + ')');
+        return;
+    }
+    try {
+        if (Buffer.compare(zlib.inflateSync(fs.readFileSync(gitObjPath)), zlib.inflateSync(fs.readFileSync(taxisObjPath))) !== 0) {
+            reportViolation(violations, 'FGT-OBJ-001 [Binary] inflated loose object byte divergence on ' + label);
+        }
+    } catch (decompErr) {
+        reportViolation(violations, 'FGT-OBJ-001 [Binary] loose object inflation failed on ' + label + ': ' + decompErr.message);
+    }
+}
+
+/**
+ * Builds a nested tree with the JS encoder and optionally compares real taxis binary vs git.
+ *
+ * @param {object} gitRunner - Git plumbing runner.
+ * @param {object|null} taxisRunner - Optional taxis plumbing runner.
  * @param {Array<object>} spec - Tree specification.
  * @param {string} label - Fixture label for diagnostics.
  * @param {Array<string>} violations - Collected violations.
  * @returns {{ oid: string, payload: Buffer }} JavaScript-encoded tree.
  */
-function verifyTreeSpec(gitDir, spec, label, violations) {
-    const entries = [];
+function verifyTreeSpec(gitRunner, taxisRunner, spec, label, violations) {
+    const gitEntries = [];
+    const taxisEntries = [];
     spec.forEach((node) => {
         if (Array.isArray(node.children)) {
-            const child = verifyTreeSpec(gitDir, node.children, label + '/' + node.name, violations);
-            entries.push({ name: node.name, mode: '40000', oid: child.oid });
+            const child = verifyTreeSpec(gitRunner, taxisRunner, node.children, label + '/' + node.name, violations);
+            gitEntries.push({ name: node.name, mode: '40000', oid: child.oid });
+            if (taxisRunner) taxisEntries.push({ name: node.name, mode: '40000', oid: child.oid });
             return;
         }
         if (normalizeMode(node.mode) === '160000') {
-            entries.push({ name: node.name, mode: '160000', oid: node.oid });
+            gitEntries.push({ name: node.name, mode: '160000', oid: node.oid });
+            if (taxisRunner) taxisEntries.push({ name: node.name, mode: '160000', oid: node.oid });
             return;
         }
         const payload = Buffer.from(node.content, 'utf8');
-        const oid = gitWriteBlob(gitDir, payload);
-        entries.push({ name: node.name, mode: node.mode, oid });
+        gitEntries.push({ name: node.name, mode: node.mode, oid: plumbingWriteBlob(gitRunner, payload) });
+        if (taxisRunner) taxisEntries.push({ name: node.name, mode: node.mode, oid: plumbingWriteBlob(taxisRunner, payload) });
     });
 
-    const encoded = encodeTree(entries);
+    const encoded = encodeTree(gitEntries);
     const javascriptOid = computeObjectOid('tree', encoded.payload);
-    const gitOid = gitWriteTree(gitDir, entries);
+    const gitOid = plumbingWriteTree(gitRunner, gitEntries);
     if (javascriptOid !== gitOid) {
-        reportViolation(violations, 'FGT-OBJ-001 tree parity failure on ' + label + ': git ' +
-            gitOid + ', engine ' + javascriptOid);
+        reportViolation(violations, 'FGT-OBJ-001 tree parity failure on ' + label + ': git ' + gitOid + ', engine ' + javascriptOid);
     }
-    const gitOrder = gitListTreeNames(gitDir, gitOid);
+    const gitLines = plumbingListTreeLines(gitRunner, gitOid);
+    const gitOrder = gitLines.map((line) => line.slice(line.indexOf('\t') + 1));
     const engineOrder = encoded.entries.map((entry) => entry.name);
     if (gitOrder.join('\n') !== engineOrder.join('\n')) {
-        reportViolation(violations, 'FGT-OBJ-001 tree ordering failure on ' + label +
-            ': git [' + gitOrder.join(', ') + '], engine [' + engineOrder.join(', ') + ']');
+        reportViolation(violations, 'FGT-OBJ-001 tree ordering failure on ' + label + ': git [' + gitOrder.join(', ') + '], engine [' + engineOrder.join(', ') + ']');
+    }
+    if (taxisRunner) {
+        const taxisOid = plumbingWriteTree(taxisRunner, taxisEntries);
+        if (taxisOid !== gitOid) {
+            reportViolation(violations, 'FGT-OBJ-001 [Binary] tree OID failure on ' + label + ': git ' + gitOid + ', taxis ' + taxisOid);
+        } else {
+            compareLooseObjectBytes(gitRunner.gitDir, taxisRunner.gitDir, gitOid, 'tree:' + label, violations);
+            if (gitLines.join('\n') !== plumbingListTreeLines(taxisRunner, taxisOid).join('\n')) {
+                reportViolation(violations, 'FGT-OBJ-001 [Binary] ls-tree output divergence on ' + label);
+            }
+        }
     }
     return { oid: javascriptOid, payload: encoded.payload };
 }
 
 /**
- * Verifies blob vectors against git hash-object.
+ * Verifies blob vectors across JS encoder, system git, and optional taxis binary.
  *
- * @param {string} gitDir - Baseline git directory.
+ * @param {object} gitRunner - Git plumbing runner.
+ * @param {object|null} taxisRunner - Optional taxis plumbing runner.
  * @param {Array<string>} violations - Collected violations.
- * @returns {number} Number of verified vectors.
+ * @returns {number} Verified vector count.
  */
-function verifyBlobVectors(gitDir, violations) {
-    blobVectors().forEach((vector) => {
-        const engineOid = computeBlobOid(vector.payload);
-        const gitOid = gitWriteBlob(gitDir, vector.payload);
-        if (engineOid !== gitOid) {
-            reportViolation(violations, 'FGT-OBJ-001 blob parity failure on ' + vector.label +
-                ': git ' + gitOid + ', engine ' + engineOid);
-        }
-    });
-    return blobVectors().length;
-}
-
-/**
- * Verifies tree vectors, including nested levels and canonical ordering.
- *
- * @param {string} gitDir - Baseline git directory.
- * @param {Array<string>} violations - Collected violations.
- * @returns {{ count: number, firstTreeOid: string }} Vector count and a reusable tree id.
- */
-function verifyTreeVectors(gitDir, violations) {
-    const vectors = treeVectors();
-    let firstTreeOid = '';
+function verifyBlobVectors(gitRunner, taxisRunner, violations) {
+    const vectors = blobVectors();
     vectors.forEach((vector) => {
-        const tree = verifyTreeSpec(gitDir, vector.spec, vector.label, violations);
-        if (firstTreeOid.length === 0) {
-            firstTreeOid = tree.oid;
-        }
-    });
-    return { count: vectors.length, firstTreeOid };
-}
-
-/**
- * Verifies commit vectors against git commit-tree.
- *
- * @param {string} gitDir - Baseline git directory.
- * @param {string} treeOid - Tree object id usable by every commit vector.
- * @param {Array<string>} parentOids - Parent commit ids.
- * @param {Array<string>} violations - Collected violations.
- * @returns {number} Number of verified vectors.
- */
-function verifyCommitVectors(gitDir, treeOid, parentOids, violations) {
-    const vectors = commitVectors(treeOid, parentOids);
-    vectors.forEach((fields) => {
-        const engineOid = computeObjectOid('commit', encodeCommit(fields));
-        const gitOid = gitWriteCommit(gitDir, fields);
+        const engineOid = computeBlobOid(vector.payload);
+        const gitOid = plumbingWriteBlob(gitRunner, vector.payload);
         if (engineOid !== gitOid) {
-            reportViolation(violations, 'FGT-OBJ-001 commit parity failure on ' + fields.label +
-                ': git ' + gitOid + ', engine ' + engineOid);
+            reportViolation(violations, 'FGT-OBJ-001 blob parity failure on ' + vector.label + ': git ' + gitOid + ', engine ' + engineOid);
+        }
+        if (taxisRunner) {
+            const taxisOid = plumbingWriteBlob(taxisRunner, vector.payload);
+            if (taxisOid !== gitOid) {
+                reportViolation(violations, 'FGT-OBJ-001 [Binary] blob OID divergence on ' + vector.label + ': git ' + gitOid + ', taxis ' + taxisOid);
+                return;
+            }
+            compareLooseObjectBytes(gitRunner.gitDir, taxisRunner.gitDir, gitOid, 'blob:' + vector.label, violations);
+            if (Buffer.compare(runPlumbing(gitRunner, ['cat-file', '-p', gitOid]), runPlumbing(taxisRunner, ['cat-file', '-p', taxisOid])) !== 0) {
+                reportViolation(violations, 'FGT-OBJ-001 [Binary] cat-file -p divergence on ' + vector.label);
+            }
         }
     });
     return vectors.length;
 }
 
 /**
- * Verifies annotated tag vectors against git mktag.
+ * Verifies tree vectors, including nested levels and canonical ordering.
  *
- * @param {string} gitDir - Baseline git directory.
+ * @param {object} gitRunner - Git plumbing runner.
+ * @param {object|null} taxisRunner - Optional taxis plumbing runner.
+ * @param {Array<string>} violations - Collected violations.
+ * @returns {{ count: number, firstTreeOid: string }} Vector count and a reusable tree id.
+ */
+function verifyTreeVectors(gitRunner, taxisRunner, violations) {
+    const vectors = treeVectors();
+    let firstTreeOid = '';
+    vectors.forEach((vector) => {
+        const tree = verifyTreeSpec(gitRunner, taxisRunner, vector.spec, vector.label, violations);
+        if (firstTreeOid.length === 0) firstTreeOid = tree.oid;
+    });
+    return { count: vectors.length, firstTreeOid };
+}
+
+/**
+ * Verifies commit vectors across JS encoder, system git, and optional taxis binary.
+ *
+ * @param {object} gitRunner - Git plumbing runner.
+ * @param {object|null} taxisRunner - Optional taxis plumbing runner.
+ * @param {string} treeOid - Tree object id usable by every commit vector.
+ * @param {Array<string>} parentOids - Parent commit ids.
+ * @param {Array<string>} violations - Collected violations.
+ * @returns {number} Number of verified vectors.
+ */
+function verifyCommitVectors(gitRunner, taxisRunner, treeOid, parentOids, violations) {
+    const vectors = commitVectors(treeOid, parentOids);
+    vectors.forEach((fields) => {
+        const engineOid = computeObjectOid('commit', encodeCommit(fields));
+        const gitOid = plumbingWriteCommit(gitRunner, fields);
+        if (engineOid !== gitOid) {
+            reportViolation(violations, 'FGT-OBJ-001 commit parity failure on ' + fields.label + ': git ' + gitOid + ', engine ' + engineOid);
+        }
+        if (taxisRunner) {
+            const taxisOid = plumbingWriteCommit(taxisRunner, fields);
+            if (taxisOid !== gitOid) {
+                reportViolation(violations, 'FGT-OBJ-001 [Binary] commit OID failure on ' + fields.label + ': git ' + gitOid + ', taxis ' + taxisOid);
+            } else {
+                compareLooseObjectBytes(gitRunner.gitDir, taxisRunner.gitDir, gitOid, 'commit:' + fields.label, violations);
+            }
+        }
+    });
+    return vectors.length;
+}
+
+/**
+ * Verifies annotated tag vectors across JS encoder, system git, and optional taxis binary.
+ *
+ * @param {object} gitRunner - Git plumbing runner.
+ * @param {object|null} taxisRunner - Optional taxis plumbing runner.
  * @param {object} targets - Object ids available as tag targets.
  * @param {Array<string>} violations - Collected violations.
  * @returns {number} Number of verified vectors.
  */
-function verifyTagVectors(gitDir, targets, violations) {
+function verifyTagVectors(gitRunner, taxisRunner, targets, violations) {
     const vectors = tagVectors(targets);
     let firstTagOid = '';
-    vectors.forEach((fields) => {
+    const checkOneTag = (fields, tagLabel) => {
         const engineOid = computeObjectOid('tag', encodeTag(fields));
-        const gitOid = gitWriteTag(gitDir, fields);
+        const gitOid = plumbingWriteTag(gitRunner, fields);
         if (engineOid !== gitOid) {
-            reportViolation(violations, 'FGT-OBJ-001 tag parity failure on ' + fields.label +
-                ': git ' + gitOid + ', engine ' + engineOid);
+            reportViolation(violations, 'FGT-OBJ-001 ' + tagLabel + ': git ' + gitOid + ', engine ' + engineOid);
         }
-        if (firstTagOid.length === 0) {
-            firstTagOid = gitOid;
+        if (taxisRunner) {
+            const taxisOid = plumbingWriteTag(taxisRunner, fields);
+            if (taxisOid !== gitOid) {
+                reportViolation(violations, 'FGT-OBJ-001 [Binary] ' + tagLabel + ': git ' + gitOid + ', taxis ' + taxisOid);
+            } else {
+                compareLooseObjectBytes(gitRunner.gitDir, taxisRunner.gitDir, gitOid, 'tag:' + fields.tag, violations);
+            }
         }
+        return gitOid;
+    };
+    vectors.forEach((fields) => {
+        const oid = checkOneTag(fields, 'tag parity failure on ' + fields.label);
+        if (firstTagOid.length === 0) firstTagOid = oid;
     });
-    // A tag targeting a tag proves the nested type header too.
     if (firstTagOid.length > 0) {
-        const nested = {
+        checkOneTag({
             object: firstTagOid,
             kind: 'tag',
             tag: 'nested-tag',
             tagger: signature('Parity Tagger', '+0000', 1700000100),
             message: 'nested tag message\n',
-        };
-        const engineOid = computeObjectOid('tag', encodeTag(nested));
-        const gitOid = gitWriteTag(gitDir, nested);
-        if (engineOid !== gitOid) {
-            reportViolation(violations, 'FGT-OBJ-001 tag-of-tag parity failure: git ' + gitOid +
-                ', engine ' + engineOid);
-        }
+        }, 'tag-of-tag parity failure');
     }
     return vectors.length + 1;
 }
@@ -687,12 +743,14 @@ function verifyTagVectors(gitDir, targets, violations) {
 /**
  * Writes the required parent commits and returns their ids.
  *
- * @param {string} gitDir - Baseline git directory.
+ * @param {object} gitRunner - Git plumbing runner.
+ * @param {object|null} taxisRunner - Optional taxis plumbing runner.
  * @param {string} treeOid - Tree object id.
  * @param {number} count - Number of parents to create.
+ * @param {Array<string>} violations - Collected violations.
  * @returns {Array<string>} Parent commit ids.
  */
-function bootstrapParentCommits(gitDir, treeOid, count) {
+function bootstrapParentCommits(gitRunner, taxisRunner, treeOid, count, violations) {
     const parents = [];
     for (let index = 0; index < count; index += 1) {
         const fields = {
@@ -702,9 +760,107 @@ function bootstrapParentCommits(gitDir, treeOid, count) {
             committer: signature('Parity Parent', '+0000', 1600000000 + index),
             message: 'parent ' + String(index) + '\n',
         };
-        parents.push(gitWriteCommit(gitDir, fields));
+        const gitOid = plumbingWriteCommit(gitRunner, fields);
+        if (taxisRunner && plumbingWriteCommit(taxisRunner, fields) !== gitOid) {
+            reportViolation(violations, 'FGT-OBJ-001 [Binary] bootstrap parent commit divergence at ' + String(index));
+        }
+        parents.push(gitOid);
     }
     return parents;
+}
+
+/**
+ * Probes whether a candidate executable responds to `taxis version`.
+ *
+ * @param {string} binPath - Candidate executable path.
+ * @returns {boolean} True when executable responds cleanly.
+ */
+function probeTaxisExec(binPath) {
+    if (!binPath || !fs.existsSync(binPath)) return false;
+    try {
+        execFileSync(binPath, ['version'], { stdio: 'ignore' });
+        return true;
+    } catch (_err) {
+        return false;
+    }
+}
+
+/**
+ * Reads an explicit --taxis-bin flag or TAXIS_BIN environment override.
+ *
+ * @returns {{ specified: boolean, value: string|null }} Explicit override info.
+ */
+function parseExplicitTaxisArg() {
+    for (let i = 0; i < process.argv.length; i += 1) {
+        const arg = process.argv[i];
+        if (arg === '--taxis-bin') {
+            return { specified: true, value: i + 1 < process.argv.length ? process.argv[i + 1] : '' };
+        }
+        if (arg.startsWith('--taxis-bin=')) {
+            return { specified: true, value: arg.slice('--taxis-bin='.length) };
+        }
+    }
+    if (process.env.TAXIS_BIN !== undefined) {
+        return { specified: true, value: process.env.TAXIS_BIN };
+    }
+    return { specified: false, value: null };
+}
+
+/**
+ * Searches Cargo target directories and PATH for an executable taxis binary.
+ *
+ * @param {string} repoRoot - Repository root path.
+ * @returns {string|null} Resolved path or null.
+ */
+function findAutoTaxisBinary(repoRoot) {
+    const exeName = process.platform === 'win32' ? 'taxis.exe' : 'taxis';
+    const dirs = [
+        process.env.CARGO_TARGET_DIR,
+        path.join(os.tmpdir(), 'taxis-cargo-target'),
+        path.join(repoRoot, 'fractal-git', 'target'),
+        path.join(repoRoot, 'target'),
+    ].filter(Boolean);
+    for (const base of dirs) {
+        for (const prof of ['release', 'debug']) {
+            const cand = path.join(base, prof, exeName);
+            if (probeTaxisExec(cand)) return cand;
+        }
+    }
+    try {
+        const probeCmd = process.platform === 'win32' ? 'where.exe' : 'which';
+        const found = execFileSync(probeCmd, [exeName], { stdio: 'pipe' }).toString('utf8').trim().split(/\r?\n/)[0];
+        if (probeTaxisExec(found)) return found;
+    } catch (_e) { /* absent */ }
+    return null;
+}
+
+/**
+ * Resolves the taxis executable path, honoring --taxis-bin, --build-taxis, and Cargo targets.
+ *
+ * @returns {{ bin: string|null, explicitError: string|null }} Resolution result.
+ */
+function resolveTaxisBinary() {
+    const explicit = parseExplicitTaxisArg();
+    if (explicit.specified) {
+        const resolved = explicit.value ? path.resolve(explicit.value) : '';
+        return probeTaxisExec(resolved)
+            ? { bin: resolved, explicitError: null }
+            : { bin: null, explicitError: 'explicit --taxis-bin / TAXIS_BIN path is missing or not executable: ' + String(explicit.value) };
+    }
+    if (NO_AUTO_TARGET) return { bin: null, explicitError: null };
+
+    const repoRoot = path.resolve(__dirname, '..', '..', '..');
+    const autoFound = findAutoTaxisBinary(repoRoot);
+    if (autoFound || !process.argv.includes('--build-taxis')) {
+        return { bin: autoFound, explicitError: null };
+    }
+    try {
+        execFileSync('cargo', ['build', '--manifest-path', path.join(repoRoot, 'fractal-git', 'Cargo.toml'), '--bin', 'taxis'], { stdio: 'inherit' });
+        const built = findAutoTaxisBinary(repoRoot);
+        return built ? { bin: built, explicitError: null } : { bin: null, explicitError: 'cargo build completed without producing taxis binary' };
+    } catch (err) {
+        return { bin: null, explicitError: 'failed to build taxis: ' + err.message };
+    }
 }
 
 /**
@@ -714,8 +870,7 @@ function bootstrapParentCommits(gitDir, treeOid, count) {
  */
 function runGitParityValidation() {
     console.log('=== [FGT-OBJ-001] Git object parity versus the system git baseline ===');
-    const gitAvailable = isGitAvailable();
-    if (!gitAvailable) {
+    if (!isGitAvailable()) {
         console.log('SKIP: system git binary is unavailable; no byte parity claim is made.');
         if (REQUIRE_GIT) {
             console.error('BLOCK: --require-git was requested but git could not be executed.');
@@ -724,43 +879,53 @@ function runGitParityValidation() {
         process.exit(0);
     }
 
+    const taxisRes = resolveTaxisBinary();
+    if (taxisRes.explicitError) {
+        console.error('BLOCK: ' + taxisRes.explicitError);
+        process.exit(1);
+    }
+    const taxisBin = taxisRes.bin;
+    if (!taxisBin && REQUIRE_TAXIS) {
+        console.error('BLOCK: --require-taxis was requested but taxis binary could not be resolved or executed.');
+        process.exit(1);
+    }
+    console.log(taxisBin ? ('Taxis Binary: ' + taxisBin) : 'NOTICE: taxis binary not located; binary differential check will be skipped.');
+
     const baseline = createBaselineRepository();
+    const taxisBaseline = taxisBin ? createBaselineRepository() : null;
+    const gitRunner = makeRunner('git', baseline.gitDir, true);
+    const taxisRunner = taxisBaseline ? makeRunner(taxisBin, taxisBaseline.gitDir, false) : null;
     const violations = [];
     let verified = 0;
     try {
-        verified += verifyBlobVectors(baseline.gitDir, violations);
-        const treeResult = verifyTreeVectors(baseline.gitDir, violations);
+        verified += verifyBlobVectors(gitRunner, taxisRunner, violations);
+        const treeResult = verifyTreeVectors(gitRunner, taxisRunner, violations);
         verified += treeResult.count;
-        const parents = bootstrapParentCommits(baseline.gitDir, treeResult.firstTreeOid, 3);
-        verified += verifyCommitVectors(baseline.gitDir, treeResult.firstTreeOid, parents, violations);
-        const blobOid = gitWriteBlob(baseline.gitDir, Buffer.from('tag target\n', 'utf8'));
-        const targets = {
-            blob: blobOid,
-            tree: treeResult.firstTreeOid,
-            commit: parents[0],
-            tag: gitWriteTag(baseline.gitDir, {
-                object: parents[0],
-                kind: 'commit',
-                tag: 'bootstrap',
-                tagger: signature('Parity Tagger', '+0000', 1700000000),
-                message: 'bootstrap tag\n',
-            }),
-        };
-        verified += verifyTagVectors(baseline.gitDir, targets, violations);
-        const version = execFileSync('git', ['--version'], { stdio: 'pipe' }).toString('utf8').trim();
-        console.log('Git Baseline: ' + version);
-        console.log('Verified vectors against the reference baseline: ' + String(verified));
+        const parents = bootstrapParentCommits(gitRunner, taxisRunner, treeResult.firstTreeOid, 3, violations);
+        verified += verifyCommitVectors(gitRunner, taxisRunner, treeResult.firstTreeOid, parents, violations);
+        const tagPayload = Buffer.from('tag target\n', 'utf8');
+        const blobOid = plumbingWriteBlob(gitRunner, tagPayload);
+        if (taxisRunner && plumbingWriteBlob(taxisRunner, tagPayload) !== blobOid) {
+            reportViolation(violations, 'FGT-OBJ-001 [Binary] bootstrap tag target blob divergence');
+        }
+        const bootTag = { object: parents[0], kind: 'commit', tag: 'bootstrap', tagger: signature('Parity Tagger', '+0000', 1700000000), message: 'bootstrap tag\n' };
+        const tagOid = plumbingWriteTag(gitRunner, bootTag);
+        if (taxisRunner && plumbingWriteTag(taxisRunner, bootTag) !== tagOid) {
+            reportViolation(violations, 'FGT-OBJ-001 [Binary] bootstrap tag divergence');
+        }
+        verified += verifyTagVectors(gitRunner, taxisRunner, { blob: blobOid, tree: treeResult.firstTreeOid, commit: parents[0], tag: tagOid }, violations);
+        console.log('Git Baseline: ' + execFileSync('git', ['--version'], { stdio: 'pipe' }).toString('utf8').trim());
+        console.log('Verified vectors against reference baseline: ' + String(verified) + (taxisRunner ? ' (JS + real taxis binary)' : ' (JS baseline)'));
     } catch (error) {
         reportViolation(violations, 'FGT-OBJ-001 reference baseline execution failed: ' + error.message);
     } finally {
         baseline.dispose();
+        if (taxisBaseline) taxisBaseline.dispose();
     }
 
     if (violations.length > 0) {
         console.error('BLOCK: ' + String(violations.length) + ' git plumbing parity violation(s):');
-        violations.slice(0, MAX_REPORTED_VIOLATIONS).forEach((violation) => {
-            console.error('  - ' + violation);
-        });
+        violations.slice(0, MAX_REPORTED_VIOLATIONS).forEach((v) => console.error('  - ' + v));
         process.exit(1);
     }
     console.log('PASS: every blob, tree, commit, and tag vector matched the system git baseline.');

@@ -98,3 +98,51 @@ pub fn validate_packetline_bounds(frame_len: usize) -> FractalResult<usize> {
     }
     Ok(frame_len)
 }
+
+/// Immutable capability manifest describing the supported wire and IPC transport invariants.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TransportCapabilities {
+    /// Local Agent IPC framing protocol version.
+    pub ipc_protocol_version: u16,
+    /// Maximum Git Smart Protocol version supported by this build.
+    pub max_smart_protocol_version: u16,
+    /// Maximum byte size permitted for a single IPC payload frame.
+    pub max_ipc_frame_payload_bytes: usize,
+    /// Maximum byte size permitted for a canonical Git pkt-line frame.
+    pub max_pkt_line_bytes: usize,
+}
+
+/// Returns the compile-time immutable capability descriptor for `fg-transport`.
+pub const fn transport_capabilities() -> TransportCapabilities {
+    TransportCapabilities {
+        ipc_protocol_version: IPC_PROTOCOL_VERSION,
+        max_smart_protocol_version: MAX_SMART_PROTOCOL_VERSION,
+        max_ipc_frame_payload_bytes: MAX_IPC_FRAME_PAYLOAD_BYTES,
+        max_pkt_line_bytes: MAX_PKT_LINE_BYTES,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn transport_capabilities_and_bounds_validators_work() {
+        let caps = transport_capabilities();
+        assert_eq!(caps.ipc_protocol_version, IPC_PROTOCOL_VERSION);
+        assert_eq!(caps.max_smart_protocol_version, MAX_SMART_PROTOCOL_VERSION);
+
+        assert_eq!(validate_ipc_frame_bounds(64).ok(), Some(64));
+        assert!(validate_ipc_frame_bounds(0).is_err());
+        assert!(validate_ipc_frame_bounds(MAX_IPC_FRAME_PAYLOAD_BYTES + 1).is_err());
+
+        assert_eq!(validate_protocol_version(1).ok(), Some(1));
+        assert_eq!(validate_protocol_version(2).ok(), Some(2));
+        assert!(validate_protocol_version(0).is_err());
+        assert!(validate_protocol_version(3).is_err());
+
+        assert_eq!(validate_packetline_bounds(4).ok(), Some(4));
+        assert!(validate_packetline_bounds(3).is_err());
+        assert!(validate_packetline_bounds(MAX_PKT_LINE_BYTES + 1).is_err());
+    }
+}

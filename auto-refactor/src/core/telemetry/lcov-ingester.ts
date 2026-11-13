@@ -119,6 +119,7 @@ function parseDaCursor(
 ): void {
     let cursor = start + LCOV_PREFIX_LEN_DA;
     let lineNo = 0;
+    let hasLineDigits = false;
     while (cursor < end) {
         const charCode = text.charCodeAt(cursor);
         if (charCode === ASCII_COMMA) {
@@ -126,22 +127,34 @@ function parseDaCursor(
         }
         if (charCode >= ASCII_ZERO && charCode <= ASCII_NINE) {
             lineNo = lineNo * DECIMAL_BASE + (charCode - ASCII_ZERO);
+            hasLineDigits = true;
+        } else {
+            return;
         }
         cursor++;
     }
-    if (cursor >= end || text.charCodeAt(cursor) !== ASCII_COMMA) {
+    if (!hasLineDigits || lineNo <= 0 || cursor >= end || text.charCodeAt(cursor) !== ASCII_COMMA) {
         return;
     }
     cursor++;
     let hitCount = 0;
+    let hasHitDigits = false;
     while (cursor < end) {
         const charCode = text.charCodeAt(cursor);
         if (charCode >= ASCII_ZERO && charCode <= ASCII_NINE) {
             hitCount = hitCount * DECIMAL_BASE + (charCode - ASCII_ZERO);
+            hasHitDigits = true;
+        } else if (charCode === ASCII_COMMA) {
+            // LCOV DA lines may carry an optional third checksum field after hit count
+            break;
+        } else {
+            return;
         }
         cursor++;
     }
-    lineHits.set(lineNo, hitCount);
+    if (hasHitDigits) {
+        lineHits.set(lineNo, hitCount);
+    }
 }
 
 /**
@@ -209,19 +222,26 @@ function handleBranchRecord(
  */
 function recordProfile(state: LcovParserState, resultMap: Map<string, FileCoverageProfile>): void {
     if (!state.currentPath) return;
-    const normalizedPath = state.currentPath.replace(/\\/g, '/');
+    const trimmedPath = state.currentPath.trim();
+    if (trimmedPath.length === 0 || trimmedPath.includes('\0')) return;
+    const normalizedPath = trimmedPath.replace(/\\/g, '/');
     let activeHits = 0;
     for (const count of state.lineHits.values()) {
         if (count > 0) activeHits++;
     }
 
     const effectiveFound = Math.max(state.linesFound, state.lineHits.size);
-    const effectiveHit = state.linesHit > 0 ? state.linesHit : activeHits;
-    const lineRatio =
-        effectiveFound > 0 ? +(effectiveHit / effectiveFound).toFixed(RATIO_PRECISION_DIGITS) : 0.0;
+    const rawLineHit = state.linesHit > 0 ? state.linesHit : activeHits;
+    const effectiveHit = effectiveFound > 0 ? Math.min(effectiveFound, rawLineHit) : 0;
+    const rawLineRatio = effectiveFound > 0 ? effectiveHit / effectiveFound : 0.0;
+    const lineRatio = +Math.min(1, Math.max(0, rawLineRatio)).toFixed(RATIO_PRECISION_DIGITS);
+    const effectiveBranchesHit =
+        state.branchesFound > 0 ? Math.min(state.branchesFound, state.branchesHit) : 0;
     const branchRatio =
         state.branchesFound > 0
-            ? +(state.branchesHit / state.branchesFound).toFixed(RATIO_PRECISION_DIGITS)
+            ? +Math.min(1, Math.max(0, effectiveBranchesHit / state.branchesFound)).toFixed(
+                  RATIO_PRECISION_DIGITS,
+              )
             : 1.0;
 
     resultMap.set(normalizedPath, {
@@ -230,7 +250,7 @@ function recordProfile(state: LcovParserState, resultMap: Map<string, FileCovera
         linesHit: effectiveHit,
         lineCoverageRatio: lineRatio,
         branchesFound: state.branchesFound,
-        branchesHit: state.branchesHit,
+        branchesHit: effectiveBranchesHit,
         branchCoverageRatio: branchRatio,
         lineHits: state.lineHits,
     });
@@ -365,6 +385,11 @@ export class LcovIngester {
             }
 
             processRecordCursor(lcovText, start, end, processingCtx);
+        }
+
+        // Flush partial final LCOV record if stream omitted trailing end_of_record sentinel.
+        if (state.currentPath) {
+            recordProfile(state, resultMap);
         }
 
         return resultMap;
@@ -594,9 +619,10 @@ function trimLcovLineBounds(
 
 function roundCoveragePercentage(hit: number, found: number, fallbackPct: number): number {
     if (found <= 0) {
-        return fallbackPct;
+        return Math.min(100, Math.max(0, fallbackPct));
     }
-    return Math.round((hit / found) * LCOV_SUMMARY_MULTIPLIER) / LCOV_SUMMARY_DIVISOR;
+    const rawPct = Math.round((hit / found) * LCOV_SUMMARY_MULTIPLIER) / LCOV_SUMMARY_DIVISOR;
+    return Math.min(100, Math.max(0, rawPct));
 }
 
 /**
