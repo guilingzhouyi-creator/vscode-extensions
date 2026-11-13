@@ -378,72 +378,52 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
     // Hot-path invariants: O(1) indexed lookups, non-blocking async I/O, bounded queues,
     // and loop-zero transient heap allocations via pre-allocated or pooled state objects.
     // Every rule in this group guards latency stability under streaming AST/file workloads.
+    // Performance contracts below assume zero per-frame allocations on critical paths.
     ...ANALYZER_HYGIENE_RULES,
-    defineRule({
-        id: 'PRF-ALG-001',
-        family: 'PRF',
-        analyzer: 'performance',
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Deep nested loops (>= 3 levels) detected, creating potential O(N^3) computational hotspots.',
-        remediation: 'Pre-index inner data using Map/Set to reduce search complexity to O(1).',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#prf-alg-001',
-    }),
-    defineRule({
-        id: 'PRF-IO-001',
-        family: 'PRF',
-        analyzer: 'performance',
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Synchronous blocking I/O invoked inside async context or high-frequency frame loop.',
-        remediation:
-            'Migrate to asynchronous non-blocking APIs to avoid blocking the event loop or main thread.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#prf-io-001',
-    }),
-    defineRule({
-        id: 'PRF-LEAK-001',
-        family: 'PRF',
-        analyzer: 'performance',
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Unbounded collection growth inside loop or timer, risking O(t) or O(n) memory leaks.',
-        remediation: 'Enforce capacity limits, LRU eviction, or periodic pruning on collections.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#prf-leak-001',
-    }),
-    defineRule({
-        id: 'PRF-MEM-001',
-        family: 'PRF',
-        analyzer: 'performance',
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Transient heap allocation inside high-frequency loop (new Array, new Object, .duplicate(true)).',
-        remediation: 'Hoist buffers or objects outside loop and reset in-place inside loop.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#prf-mem-001',
-    }),
-    defineRule({
-        id: 'PRF-MEM-002',
-        family: 'PRF',
-        analyzer: 'performance',
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Transient heap allocation in high-load hot paths; object pooling required (ADV-PRF-002).',
-        remediation:
-            'Adopt object pool pattern and invoke reset_state() upon acquisition and release.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#prf-mem-002',
-    }),
+    builtinRule(
+        'PRF-ALG-001',
+        'PRF',
+        'performance',
+        SEVERITY_WARNING,
+        'Deep nested loops (>= 3 levels) detected, creating potential O(N^3) computational hotspots.',
+        'Pre-index inner data using Map/Set to reduce search complexity to O(1).',
+    ),
+    builtinRule(
+        'PRF-IO-001',
+        'PRF',
+        'performance',
+        SEVERITY_WARNING,
+        'Synchronous blocking I/O invoked inside async context or high-frequency frame loop.',
+        'Migrate to asynchronous non-blocking APIs to avoid blocking the event loop or main thread.',
+    ),
+    builtinRule(
+        'PRF-LEAK-001',
+        'PRF',
+        'performance',
+        SEVERITY_WARNING,
+        'Unbounded collection growth inside loop or timer, risking O(t) or O(n) memory leaks.',
+        'Enforce capacity limits, LRU eviction, or periodic pruning on collections.',
+    ),
+    builtinRule(
+        'PRF-MEM-001',
+        'PRF',
+        'performance',
+        SEVERITY_WARNING,
+        'Transient heap allocation inside high-frequency loop (new Array, new Object, .duplicate(true)).',
+        'Hoist buffers or objects outside loop and reset in-place inside loop.',
+    ),
+    builtinRule(
+        'PRF-MEM-002',
+        'PRF',
+        'performance',
+        SEVERITY_WARNING,
+        'Transient heap allocation in high-load hot paths; object pooling required (ADV-PRF-002).',
+        'Adopt object pool pattern and invoke reset_state() upon acquisition and release.',
+    ),
     // ── Python 3.11+ Modernization Rules (PYM-*) ──
     // Enforces PEP 585 built-in generics, PEP 604 union syntax, PEP 615 UTC, and async safety.
     // All PYM-* entries are scoped strictly to Python and preserve zero-breaking AST fixes.
+    // Rules coordinate with PythonModernAnalyzer and AST line-tape detectors without overlap.
     pythonRule(
         'PYM-ABC-001',
         SEVERITY_ERROR,
