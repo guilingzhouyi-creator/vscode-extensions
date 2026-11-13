@@ -20,12 +20,15 @@ import type {
 } from '../scoring/scoringTypes';
 import { ALL_QUALITY_DIMENSIONS, DEFAULT_QUALITY_WEIGHTS } from '../scoring/scoringTypes';
 import { resolveQualityGrade } from '../scoring/scorer-formulas';
-import type { AasBottleneck, AasDimensionDetail, AasReportOptions } from './aas-types';
+import type { AasBottleneck, AasDimensionDetail, AasHealth, AasReportOptions } from './aas-types';
 
 const DEFAULT_BOTTLENECKS_LIMIT = 8;
 const DEFAULT_TOP_BOTTLENECKS_LIMIT = 3;
 const ROUND_SCALE_HUNDRED = 100;
 const ROUND_SCALE_THOUSAND = 1000;
+const MAX_HEALTH_SCORE = 100;
+const HEALTHY_SCORE_THRESHOLD = 90;
+const WARNING_SCORE_THRESHOLD = 75;
 
 /**
  * Projects ten-dimensional quality vector scores if present.
@@ -218,4 +221,57 @@ export function extractBottlenecks(
         if (extractedBottlenecks.length > 0) return extractedBottlenecks;
     }
     return extractFrequencyBottlenecks(report.issues, limit);
+}
+
+/**
+ * Resolves the source map for ten-dimensional quality indices with override precedence.
+ *
+ * @param report - Scan report carrying governance or quality score indices.
+ * @param override - Optional health override carrying custom dimension scores.
+ * @returns Dimension score record if available.
+ */
+export function resolveDimensionIndicesSource(
+    report: ScanReport,
+    override?: { readonly dimensions?: Partial<Record<string, number>> },
+): Record<string, number> | undefined {
+    if (override?.dimensions) return override.dimensions as Record<string, number>;
+    if (report.governance?.tenDimensions) return report.governance.tenDimensions;
+    return report.qualityScore?.indices;
+}
+
+/**
+ * Summarizes dimensional health status distribution across healthy, warning, and failing bands.
+ *
+ * @param indices - Map of dimension names to numeric scores.
+ * @returns Dimensional health summary block, or undefined when indices are absent.
+ */
+export function computeDimensionSummary(
+    indices?: Record<string, number>,
+): AasHealth['dimensionSummary'] | undefined {
+    if (!indices) return undefined;
+    let healthyCount = 0;
+    let warningCount = 0;
+    let failingCount = 0;
+    let lowestDimension: string | undefined;
+    let lowestScore = MAX_HEALTH_SCORE;
+
+    for (const [dimension, scoreValue] of Object.entries(indices)) {
+        if (typeof scoreValue !== 'number' || !Number.isFinite(scoreValue)) continue;
+        if (scoreValue >= HEALTHY_SCORE_THRESHOLD) healthyCount++;
+        else if (scoreValue >= WARNING_SCORE_THRESHOLD) warningCount++;
+        else failingCount++;
+
+        if (scoreValue < lowestScore) {
+            lowestScore = scoreValue;
+            lowestDimension = dimension;
+        }
+    }
+
+    const lowestSummary = lowestDimension
+        ? {
+              lowestDimension,
+              lowestScore: Math.round(lowestScore * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED,
+          }
+        : undefined;
+    return { healthyCount, warningCount, failingCount, ...lowestSummary };
 }
