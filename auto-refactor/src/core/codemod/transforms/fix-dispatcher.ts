@@ -18,6 +18,10 @@ import { createJsDocTemplateFix, type JsDocParam } from './jsdoc-template';
 import { createSimplifyBooleanFix } from './modern-construct';
 import { createTrampolineInlineFix } from './trampoline-inliner';
 import { createUnusedImportFix } from './unused-imports';
+import { createSimplifyTernaryFix } from './simplify-ternary';
+import { createPassthroughWrapperFix } from './passthrough-wrapper';
+import { createDeadCodeCleanFix } from './dead-code-cleaner';
+import { createJargonCleanFix } from './jargon-cleaner';
 
 interface IssueDispatchMeta {
     readonly issue: Issue;
@@ -39,7 +43,11 @@ const ANCHOR_AFTER_IMPORTS = 'after_imports';
 const CODEMOD_RULES = Object.freeze({
     booleanSimplify: 'SIM-BOOL-001',
     unusedImport: 'HYG-DED-001',
+    deadCode: 'HYG-DED-001',
     trampoline: 'ARCH-ABS-001',
+    passthroughWrapper: 'HYG-WRAP-001',
+    jargonClean: 'HYG-STB-002',
+    simplifyTernary: 'SIM-TRN-001',
 });
 const TRANSFORM_ACTIONS: Readonly<Record<string, StandardActionVerb>> = Object.freeze({
     extractConstant: 'extract_constant',
@@ -233,14 +241,66 @@ function resolveTrampolineFix(
     return fix.edits.length > 0 ? { ...fix, ruleId: issue.rule, safetyLevel } : null;
 }
 
+function resolveDeadCodeFix(
+    issue: Issue,
+    context: TransformContext,
+    safetyLevel: FixSafetyLevel,
+): FixDescriptor | null {
+    if (issue.rule !== CODEMOD_RULES.deadCode) return null;
+    const line = issue.location?.start?.line ?? 1;
+    const endLine = issue.location?.end?.line ?? line;
+    const fix = createDeadCodeCleanFix(context, { line, endLine });
+    return fix.edits.length > 0 ? { ...fix, safetyLevel } : null;
+}
+
+function resolvePassthroughWrapperFix(
+    issue: Issue,
+    context: TransformContext,
+    safetyLevel: FixSafetyLevel,
+): FixDescriptor | null {
+    if (issue.rule !== CODEMOD_RULES.passthroughWrapper) return null;
+    const line = issue.location?.start?.line ?? 1;
+    const endLine = issue.location?.end?.line ?? line;
+    const fix = createPassthroughWrapperFix(context, { line, endLine });
+    return fix.edits.length > 0 ? { ...fix, safetyLevel } : null;
+}
+
+function resolveJargonCleanFix(
+    issue: Issue,
+    context: TransformContext,
+    safetyLevel: FixSafetyLevel,
+): FixDescriptor | null {
+    if (issue.rule !== CODEMOD_RULES.jargonClean) return null;
+    const line = issue.location?.start?.line ?? 1;
+    const endLine = issue.location?.end?.line ?? line;
+    const fix = createJargonCleanFix(context, { line, endLine });
+    return fix.edits.length > 0 ? { ...fix, safetyLevel } : null;
+}
+
+function resolveSimplifyTernaryFix(
+    issue: Issue,
+    context: TransformContext,
+    safetyLevel: FixSafetyLevel,
+): FixDescriptor | null {
+    if (issue.rule !== CODEMOD_RULES.simplifyTernary) return null;
+    const line = issue.location?.start?.line ?? 1;
+    const endLine = issue.location?.end?.line ?? line;
+    const fix = createSimplifyTernaryFix(context, { line, endLine });
+    return fix.edits.length > 0 ? { ...fix, safetyLevel } : null;
+}
+
 function resolveRegisteredTransformFix(meta: IssueDispatchMeta): FixDescriptor | null {
     const { issue, context, safetyLevel, description } = meta;
     if (!context) return null;
     return (
         resolveBooleanSimplifyFix(issue, context, safetyLevel, description) ??
         resolveUnusedImportFix(issue, context, safetyLevel) ??
+        resolveDeadCodeFix(issue, context, safetyLevel) ??
         resolveJsDocContractFix(issue, context, safetyLevel) ??
-        resolveTrampolineFix(issue, context, safetyLevel)
+        resolveTrampolineFix(issue, context, safetyLevel) ??
+        resolvePassthroughWrapperFix(issue, context, safetyLevel) ??
+        resolveJargonCleanFix(issue, context, safetyLevel) ??
+        resolveSimplifyTernaryFix(issue, context, safetyLevel)
     );
 }
 
@@ -257,8 +317,12 @@ export function resolveSingleIssueFix(
     context: TransformContext | undefined,
     plannedSymbolLiteralMap?: Map<string, string>,
 ): FixDescriptor | null {
-    const actionable = issue.actionable;
-    if (!actionable) return null;
+    const actionable = issue.actionable ?? {
+        action: 'simplify_control_flow',
+        code: `AR:${issue.rule.replace(/-/g, ':')}`,
+        rationale: issue.suggestion || issue.message,
+        safeToAutomate: true,
+    };
 
     const meta: IssueDispatchMeta = {
         issue,
