@@ -10,9 +10,29 @@
 ## MapAndEcologySolver：Headless Discrete Solver / Numerical Calculator
 class_name MapAndEcologySolver extends RefCounted
 
+class WorldNavCache extends RefCounted:
+	var terrain_impedances: Dictionary = {}
+	var infinity: float = 99999999.0
+	var default_distance: float = 10.0
+
+static var _nav_cache: WorldNavCache = null
+static var _nav_cfg_ver: int = -1
+
+static func _ensure_nav_cache() -> WorldNavCache:
+	var ver: int = GameConfig.config_reload_version()
+	if _nav_cache != null and _nav_cfg_ver == ver:
+		return _nav_cache
+	var c := WorldNavCache.new()
+	c.terrain_impedances = GameConfig.get_dict("domains.world", "terrain_impedance", {})
+	c.infinity = GameConfig.get_float("domains.world", "astar/infinity", 99999999.0)
+	c.default_distance = GameConfig.get_float("domains.world", "astar/default_distance", 10.0)
+	_nav_cache = c
+	_nav_cfg_ver = ver
+	return c
+
 ## 获取两聚落节点间路径的地形移动阻抗系数
 static func get_terrain_impedance(terrain: String) -> float:
-	return GameConfig.get_float("domains.world", "terrain_impedance/" + terrain, 1.0)
+	return float(_ensure_nav_cache().terrain_impedances.get(terrain, 1.0))
 
 ## 基于图论阻抗权重的 A* 最短路径求解器
 static func solve_shortest_impedance_path(
@@ -26,42 +46,54 @@ static func solve_shortest_impedance_path(
 	if start_node_id == goal_node_id:
 		return {"success": true, "path": [start_node_id], "total_cost": 0.0}
 
-	var infinity := GameConfig.get_float("domains.world", "astar/infinity", 99999999.0)
-	var default_distance := GameConfig.get_float("domains.world", "astar/default_distance", 10.0)
+	var nav_cfg := _ensure_nav_cache()
+	var infinity: float = nav_cfg.infinity
+	var default_distance: float = nav_cfg.default_distance
+	var terrain_impedances: Dictionary = nav_cfg.terrain_impedances
 
 	var open_set: Array[String] = [start_node_id]
+	var in_open: Dictionary = {start_node_id: true}
+	var closed_set: Dictionary = {}
 	var came_from: Dictionary = {}
 	var g_score: Dictionary = {start_node_id: 0.0}
 
 	while open_set.size() > 0:
-		var current := _find_lowest_g_node(open_set, g_score, infinity)
+		var best_idx: int = _find_lowest_g_index(open_set, g_score, infinity)
+		var current: String = open_set[best_idx]
 
 		if current == goal_node_id:
 			var total_path := _reconstruct_path(came_from, current)
 			return {"success": true, "path": total_path, "total_cost": g_score.get(current, 0.0)}
 
-		open_set.erase(current)
+		var last_idx: int = open_set.size() - 1
+		if best_idx != last_idx:
+			open_set[best_idx] = open_set[last_idx]
+		open_set.pop_back()
+		in_open.erase(current)
+		closed_set[current] = true
 		var current_node: WorldMapGraphNode = all_nodes[current]
-		_relax_neighbors(current, current_node, all_nodes, g_score, came_from, open_set, default_distance, infinity)
+		_relax_neighbors(current, current_node, all_nodes, g_score, came_from, open_set, in_open, closed_set, terrain_impedances, default_distance, infinity)
 
 	return {"success": false, "path": [], "total_cost": 0.0}
 
-static func _find_lowest_g_node(open_set: Array[String], g_score: Dictionary, infinity: float) -> String:
-	var best_node := open_set[0]
-	var lowest_g: float = g_score.get(best_node, infinity)
-	for node in open_set:
-		var score: float = g_score.get(node, infinity)
+static func _find_lowest_g_index(open_set: Array[String], g_score: Dictionary, infinity: float) -> int:
+	var best_idx: int = 0
+	var lowest_g: float = g_score.get(open_set[0], infinity)
+	var count: int = open_set.size()
+	for i in range(1, count):
+		var score: float = g_score.get(open_set[i], infinity)
 		if score < lowest_g:
 			lowest_g = score
-			best_node = node
-	return best_node
+			best_idx = i
+	return best_idx
 
 static func _reconstruct_path(came_from: Dictionary, current: String) -> Array[String]:
 	var total_path: Array[String] = [current]
 	var cur := current
 	while came_from.has(cur):
 		cur = came_from[cur]
-		total_path.push_front(cur)
+		total_path.append(cur)
+	total_path.reverse()
 	return total_path
 
 static func _relax_neighbors(
@@ -71,22 +103,27 @@ static func _relax_neighbors(
 	g_score: Dictionary,
 	came_from: Dictionary,
 	open_set: Array[String],
+	in_open: Dictionary,
+	closed_set: Dictionary,
+	terrain_impedances: Dictionary,
 	default_distance: float,
 	infinity: float
 ) -> void:
+	var current_g: float = g_score.get(current, 0.0)
 	for edge in current_node.outgoing_edges:
 		var neighbor_id: String = edge.get("target_node_id", "")
-		if not all_nodes.has(neighbor_id):
+		if closed_set.has(neighbor_id) or not all_nodes.has(neighbor_id):
 			continue
 		var neighbor_node: WorldMapGraphNode = all_nodes[neighbor_id]
-		var dist: float = edge.get("distance", default_distance)
-		var imp: float = get_terrain_impedance(neighbor_node.terrain_type)
-		var tentative_g: float = g_score.get(current, 0.0) + dist * imp
+		var dist: float = float(edge.get("distance", default_distance))
+		var imp: float = float(terrain_impedances.get(neighbor_node.terrain_type, 1.0))
+		var tentative_g: float = current_g + dist * imp
 
 		if tentative_g < g_score.get(neighbor_id, infinity):
 			came_from[neighbor_id] = current
 			g_score[neighbor_id] = tentative_g
-			if not neighbor_id in open_set:
+			if not in_open.has(neighbor_id):
+				in_open[neighbor_id] = true
 				open_set.append(neighbor_id)
 
 ## 魔素畸变与兽潮爆发概率自平衡模型

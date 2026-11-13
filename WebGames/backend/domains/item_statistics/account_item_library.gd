@@ -64,7 +64,6 @@ func mount_item(canonical_id: String, category_major: String, category_minor: St
 		}
 		minor["children"][canonical_id] = item_node
 	_canonical_index[canonical_id] = [major_key, minor_key] # 索引写入（幂等覆盖）
-	_recalc_upwards(root_node, [major_key, minor_key])
 	return {"success": true, "canonical_id": canonical_id}
 
 ## 物品事件落账：递归定位叶节点 → 更新该事件累计与当前持有（减量下限 0）→ 自底向上递归聚合
@@ -125,18 +124,24 @@ func _ensure_index() -> void:
 		var major: Dictionary = root_node["children"][major_key]
 		_index_major_node(major_key, major)
 
-## 递归聚合分类子树统计（category_major 可选；缺省 = 全树）
+## 分类子树统计查询（直读增量维护 stats；全树查询仅累加一级主分类节点）
 func query_subtree(category_major: String = "", category_minor: String = "") -> Dictionary:
-	var node: Dictionary = root_node
 	if not category_major.is_empty():
 		if not root_node["children"].has(category_major):
 			return _zero_stats()
-		node = root_node["children"][category_major]
+		var major_node: Dictionary = root_node["children"][category_major]
 		if not category_minor.is_empty():
-			if not node["children"].has(category_minor):
+			if not major_node["children"].has(category_minor):
 				return _zero_stats()
-			node = node["children"][category_minor]
-	return _aggregate_recursive(node)
+			var minor_node: Dictionary = major_node["children"][category_minor]
+			return (minor_node["stats"] as Dictionary).duplicate() if minor_node.has("stats") else _aggregate_recursive(minor_node)
+		return (major_node["stats"] as Dictionary).duplicate() if major_node.has("stats") else _aggregate_recursive(major_node)
+	var agg := _zero_stats()
+	for child in root_node["children"].values():
+		var child_dict: Dictionary = child as Dictionary
+		var sub: Dictionary = child_dict["stats"] if child_dict.has("stats") else _aggregate_recursive(child_dict)
+		_accumulate_stats(agg, sub)
+	return agg
 
 ## 账号全量物品清单（递归收集叶节点）
 func query_all_items() -> Array:

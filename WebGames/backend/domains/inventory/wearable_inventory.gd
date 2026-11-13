@@ -23,9 +23,33 @@ var equipped_slots: Dictionary = _build_slot_map()
 var storage_items: Array = []
 var owner_account_id: String = ""
 
-# 性能加固：增量累加度量缓存与脏标记
+## 护甲与扩展容器槽位配置快照缓存（随 GameConfig.config_reload_version() 自动失效）
+class ArmorConfigCache extends RefCounted:
+	var armor_category: String = "ARMOR_EQUIPMENT"
+	var capacity_slot_set: Dictionary = {"BACKPACK": true}
+
+static var _armor_cfg_cache: ArmorConfigCache = null
+static var _armor_cfg_ver: int = -1
+
+static func _ensure_armor_cache() -> ArmorConfigCache:
+	var ver: int = GameConfig.config_reload_version()
+	if _armor_cfg_cache != null and _armor_cfg_ver == ver:
+		return _armor_cfg_cache
+	var c := ArmorConfigCache.new()
+	c.armor_category = GameConfig.get_string("domains.inventory", "wearable/armor_category", "ARMOR_EQUIPMENT")
+	var slots: Array = GameConfig.get_array("domains.inventory", "wearable/capacity_slots", ["BACKPACK"])
+	var slot_set: Dictionary = {}
+	for slot_name in slots:
+		slot_set[str(slot_name)] = true
+	c.capacity_slot_set = slot_set
+	_armor_cfg_cache = c
+	_armor_cfg_ver = ver
+	return c
+
+# 性能加固：增量累加度量缓存、UID 索引与脏标记
 var _cached_storage_volume: int = 0
 var _cached_total_weight: float = 0.0
+var _uid_index: Dictionary = {}
 var _is_metric_dirty: bool = true
 
 # ==============================================================================
@@ -44,13 +68,18 @@ static func _build_slot_map() -> Dictionary:
 func refresh_cached_metrics() -> void:
 	var vol: int = 0
 	var wt: float = 0.0
+	_uid_index.clear()
 	for item in storage_items:
 		if item is ItemEntity:
 			vol += item.volume_slots
 			wt += item.mass_kg
+			if not item.item_uid.is_empty():
+				_uid_index[item.item_uid] = item
 	for slot_val in equipped_slots.values():
 		if slot_val is ItemEntity:
 			wt += slot_val.mass_kg
+			if not slot_val.item_uid.is_empty():
+				_uid_index[slot_val.item_uid] = slot_val
 	_cached_storage_volume = vol
 	_cached_total_weight = wt
 	_is_metric_dirty = false
@@ -70,13 +99,14 @@ func get_metric_snapshot(race_bonus: float = 0.0) -> RefCounted:
 
 ## 总容量计算：裸身容量 0 + 护甲/背包容积合计（种族加成后向下取整）
 func calculate_total_capacity(race_bonus: float = 0.0) -> int:
-	var armor_category := GameConfig.get_string("domains.inventory", "wearable/armor_category", "ARMOR_EQUIPMENT")
-	var capacity_slots: Array = GameConfig.get_array("domains.inventory", "wearable/capacity_slots", ["BACKPACK"])
+	var armor_cfg := _ensure_armor_cache()
+	var armor_category: String = armor_cfg.armor_category
+	var capacity_slot_set: Dictionary = armor_cfg.capacity_slot_set
 	var total: int = baseline_capacity
 	for slot_key in equipped_slots:
 		var slot_val: Variant = equipped_slots[slot_key]
 		if slot_val is ItemEntity:
-			if slot_val.category == armor_category or slot_key in capacity_slots:
+			if slot_val.category == armor_category or capacity_slot_set.has(str(slot_key)):
 				total += slot_val.volume_slots
 	return int(floor(total * (1.0 + race_bonus)))
 
@@ -115,6 +145,8 @@ func add_item(item: ItemEntity, race_bonus: float = 0.0) -> bool:
 	if not _is_metric_dirty:
 		_cached_storage_volume += item.volume_slots
 		_cached_total_weight += item.mass_kg
+		if not item.item_uid.is_empty():
+			_uid_index[item.item_uid] = item
 	return true
 
 # ==============================================================================
@@ -136,13 +168,9 @@ func find_item_by_item_id(item_id: String) -> ItemEntity:
 func find_item_by_item_uid(item_uid: String) -> ItemEntity:
 	if item_uid.is_empty():
 		return null
-	for item in storage_items:
-		if item is ItemEntity and item.item_uid == item_uid:
-			return item
-	for item in equipped_slots.values():
-		if item is ItemEntity and item.item_uid == item_uid:
-			return item
-	return null
+	if _is_metric_dirty:
+		refresh_cached_metrics()
+	return _uid_index.get(item_uid, null) as ItemEntity
 
 enum RemovalOutcome {
 	NOT_FOUND = 0,
@@ -166,14 +194,16 @@ func remove_item(item: ItemEntity) -> bool:
 			_cached_storage_volume = 0
 		if _cached_total_weight < 0.0:
 			_cached_total_weight = 0.0
+		if not item.item_uid.is_empty():
+			_uid_index.erase(item.item_uid)
 	return true
 
 ## 从背包或已装备槽位统一移除指定物品，返回移除来源枚举（供销毁/追缴/分解等管线统一复用）
 func remove_owned_item(item: ItemEntity) -> RemovalOutcome:
 	if item == null:
 		return RemovalOutcome.NOT_FOUND
-	if storage_items.has(item):
-		return RemovalOutcome.REMOVED_STORAGE if remove_item(item) else RemovalOutcome.NOT_FOUND
+	if remove_item(item):
+		return RemovalOutcome.REMOVED_STORAGE
 	for slot in equipped_slots:
 		if equipped_slots[slot] == item:
 			unequip_item(slot)
@@ -194,6 +224,8 @@ func equip_item(slot: String, item: ItemEntity) -> bool:
 		item.owner_account_id = owner_account_id
 	if not _is_metric_dirty:
 		_cached_total_weight += item.mass_kg
+		if not item.item_uid.is_empty():
+			_uid_index[item.item_uid] = item
 	return true
 
 ## 卸装：清槽并返回物品（置 UNOWNED 态，增量扣减负重）
@@ -208,23 +240,21 @@ func unequip_item(slot: String) -> ItemEntity:
 			_cached_total_weight -= item.mass_kg
 			if _cached_total_weight < 0.0:
 				_cached_total_weight = 0.0
+			if not item.item_uid.is_empty():
+				_uid_index.erase(item.item_uid)
 	return item
 
 # ==============================================================================
 # 四、快照 / 恢复 / 统一序列化
 # ==============================================================================
 
-## UID 占用判定（背包 + 装备槽全域，空 UID 恒 false）
+## UID 占用判定（O(1) 哈希索引查重，空 UID 恒 false）
 func _contains_uid(item_uid: String) -> bool:
 	if item_uid.is_empty():
 		return false
-	for item in storage_items:
-		if item is ItemEntity and item.item_uid == item_uid:
-			return true
-	for item in equipped_slots.values():
-		if item is ItemEntity and item.item_uid == item_uid:
-			return true
-	return false
+	if _is_metric_dirty:
+		refresh_cached_metrics()
+	return _uid_index.has(item_uid)
 
 ## 深快照：物品级序列化往返（serialize/deserialize 重建），快照与运行实例完全解耦。
 ## 回滚可完整恢复装备槽、所有权、锁定与词缀/符文/耐久等深层字段，而非仅恢复数组结构

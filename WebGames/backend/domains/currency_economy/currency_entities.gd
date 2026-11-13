@@ -26,23 +26,74 @@ var gold: int = 0
 var platinum: int = 0
 var mana_monocrystals: int = 0 # 战略能源高阶本位货币
 
+class CurrencyConfigCache extends RefCounted:
+	var rate_copper: int = 1
+	var rate_silver: int = 100
+	var rate_gold: int = 10000
+	var rate_platinum: int = 1000000
+	var rates_map: Dictionary = {}
+	var mass_copper: float = 0.010
+	var mass_silver: float = 0.010
+	var mass_gold: float = 0.010
+	var mass_platinum: float = 0.010
+	var mass_monocrystal: float = 0.010
+	var masses_map: Dictionary = {}
+	var max_debt_copper: int = 1000000000
+
+static var _currency_cache: CurrencyConfigCache = null
+static var _currency_cfg_version: int = -1
+
+static func _ensure_currency_cache() -> CurrencyConfigCache:
+	var cfg_ver: int = GameConfig.config_reload_version()
+	if _currency_cache != null and _currency_cfg_version == cfg_ver:
+		return _currency_cache
+	var c := CurrencyConfigCache.new()
+	c.rate_copper = maxi(0, GameConfig.get_int("domains.currency", "rates/copper", 1))
+	c.rate_silver = maxi(0, GameConfig.get_int("domains.currency", "rates/silver", 1))
+	c.rate_gold = maxi(0, GameConfig.get_int("domains.currency", "rates/gold", 1))
+	c.rate_platinum = maxi(0, GameConfig.get_int("domains.currency", "rates/platinum", 1))
+	c.rates_map = {
+		COIN_COPPER: c.rate_copper,
+		COIN_SILVER: c.rate_silver,
+		COIN_GOLD: c.rate_gold,
+		COIN_PLATINUM: c.rate_platinum
+	}
+	c.mass_copper = GameConfig.get_float("domains.currency", "coin_mass_kg/copper", 0.010)
+	c.mass_silver = GameConfig.get_float("domains.currency", "coin_mass_kg/silver", 0.010)
+	c.mass_gold = GameConfig.get_float("domains.currency", "coin_mass_kg/gold", 0.010)
+	c.mass_platinum = GameConfig.get_float("domains.currency", "coin_mass_kg/platinum", 0.010)
+	c.mass_monocrystal = GameConfig.get_float("domains.currency", "coin_mass_kg/monocrystal", 0.010)
+	c.masses_map = {
+		COIN_COPPER: c.mass_copper,
+		COIN_SILVER: c.mass_silver,
+		COIN_GOLD: c.mass_gold,
+		COIN_PLATINUM: c.mass_platinum,
+		COIN_MONOCRYSTAL: c.mass_monocrystal
+	}
+	c.max_debt_copper = maxi(0, GameConfig.get_int("domains.currency", "debt/max_debt_copper", 1000000000))
+	_currency_cache = c
+	_currency_cfg_version = cfg_ver
+	return c
+
 ## 计算当前持有各类货币折算的铜币基准总价值
 func get_total_copper_value() -> int:
+	var c := _ensure_currency_cache()
 	return (
-		copper * _rate(COIN_COPPER) +
-		silver * _rate(COIN_SILVER) +
-		gold * _rate(COIN_GOLD) +
-		platinum * _rate(COIN_PLATINUM)
+		copper * c.rate_copper +
+		silver * c.rate_silver +
+		gold * c.rate_gold +
+		platinum * c.rate_platinum
 	)
 
 ## 计算当前持有货币所产生的物理负重总千克数
 func calculate_total_currency_mass_kg() -> float:
+	var c := _ensure_currency_cache()
 	return (
-		float(copper) * _mass_kg(COIN_COPPER) +
-		float(silver) * _mass_kg(COIN_SILVER) +
-		float(gold) * _mass_kg(COIN_GOLD) +
-		float(platinum) * _mass_kg(COIN_PLATINUM) +
-		float(mana_monocrystals) * _mass_kg(COIN_MONOCRYSTAL)
+		float(copper) * c.mass_copper +
+		float(silver) * c.mass_silver +
+		float(gold) * c.mass_gold +
+		float(platinum) * c.mass_platinum +
+		float(mana_monocrystals) * c.mass_monocrystal
 	)
 
 # ==============================================================================
@@ -62,7 +113,7 @@ func get_net_debt_copper() -> int:
 func incur_debt(debt_copper: int) -> Dictionary:
 	if debt_copper <= 0:
 		return {"success": false, "error_code": "NEGATIVE_AMOUNT"}
-	var max_debt := maxi(0, GameConfig.get_int("domains.currency", "debt/max_debt_copper", 1000000000))
+	var max_debt := _ensure_currency_cache().max_debt_copper
 	if get_net_debt_copper() + debt_copper > max_debt:
 		return {"success": false, "error_code": "DEBT_LIMIT_EXCEEDED"}
 	copper -= debt_copper
@@ -185,7 +236,7 @@ func try_spend(cost_copper: int) -> bool:
 ## 在单个金属层级上按汇率扣减；超额找零回铜币，返回剩余未清偿金额
 func _deduct_ladder(metal: String, remaining_to_deduct: int) -> int:
 	# 汇率来自配置且可热重载，为 0 时下面的除法会产出 inf/NaN 并污染钱包结算
-	var rate: int = maxi(1, GameConfig.get_int("domains.currency", "rates/" + metal, 1))
+	var rate: int = maxi(1, _rate(metal))
 	var available: int = get(metal)
 	var metal_needed: int = int(ceil(float(remaining_to_deduct) / float(rate)))
 	var deduct_metal: int = min(available, metal_needed)
@@ -202,7 +253,13 @@ func _deduct_ladder(metal: String, remaining_to_deduct: int) -> int:
 
 func _rate(metal: String) -> int:
 	# L3（）：折算率非负下限（Inv-VD-2）——键缺失/写 0 时 0 折算，防负数错乘放大债务
+	var c := _ensure_currency_cache()
+	if c.rates_map.has(metal):
+		return int(c.rates_map[metal])
 	return maxi(0, GameConfig.get_int("domains.currency", "rates/" + metal, 1))
 
 func _mass_kg(metal: String) -> float:
+	var c := _ensure_currency_cache()
+	if c.masses_map.has(metal):
+		return float(c.masses_map[metal])
 	return GameConfig.get_float("domains.currency", "coin_mass_kg/" + metal, 0.010)
