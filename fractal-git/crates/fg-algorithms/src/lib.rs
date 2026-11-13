@@ -18,6 +18,7 @@ pub mod math;
 pub mod merge;
 pub mod pack;
 pub mod poset;
+pub mod scoring;
 pub mod space_plan;
 pub mod succinct;
 pub mod synthetic;
