@@ -25,7 +25,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const { getSafeGitEnv, getStagedFiles: queryStagedFiles, readStagedBufferSafe, readStagedBuffersBatch, checkHeadReceipt } = require('./git-env');
 const {
   evaluateCodeMetrics,
@@ -57,7 +57,8 @@ const FAST_STAGED_GATE = 'pre-commit:fast-staged';
 const STATUS_PASS = 'PASS';
 const PROTOCOL_VERSION = '1.0.0';
 const ENCODING_UTF8 = 'utf8';
-const GIT_DIFF_COMMAND = 'git diff --cached -U0 --no-color';
+const GIT_DIFF_ARGS = Object.freeze(['diff', '--cached', '-U0', '--no-color']);
+const MAX_DIFF_BUFFER_BYTES = 64 * 1024 * 1024;
 const STDIO_PIPE = Object.freeze(['ignore', 'pipe', 'ignore']);
 const SCRIPT_NAME = 'node scripts/common/gate-fast-staged.js';
 const STEP_NAME = 'STAGED-HYGIENE-01';
@@ -107,7 +108,7 @@ const SECRET_WHITELIST_PATTERN =
   /(?:\$\{env:|CODEX_API_KEY|OPENAI_API_KEY|test-secret|mock-key|placeholder)/;
 
 const ABS_PATH_PATTERN = /(?:\b[A-Za-z]:[\\/][a-zA-Z0-9_-]+|file:\/\/\/)/;
-const ABS_PATH_WHITELIST_PATTERN = /(?:node_modules|\.gemini|file:\/\/)/;
+const ABS_PATH_WHITELIST_PATTERN = /(?:node_modules|\.gemini)/;
 
 const SLANG_FILENAME_PATTERN = /(?:^|[-_.])(?:temp|wip|new|st\d+|p\d+)(?:[-_.]|$)/i;
 
@@ -192,17 +193,14 @@ function getStagedFiles(repoRoot, explicitFiles = []) {
 }
 
 function getStagedDiff(repoRoot, range = '') {
-  const command = range ? `git diff -U0 --no-color ${range}` : GIT_DIFF_COMMAND;
-  try {
-    return execSync(command, {
-      cwd: repoRoot,
-      env: getSafeGitEnv(),
-      encoding: ENCODING_UTF8,
-      stdio: STDIO_PIPE,
-    });
-  } catch {
-    return '';
-  }
+  const args = range ? ['diff', '-U0', '--no-color', range] : GIT_DIFF_ARGS;
+  return execFileSync('git', args, {
+    cwd: repoRoot,
+    env: getSafeGitEnv(repoRoot),
+    encoding: ENCODING_UTF8,
+    stdio: STDIO_PIPE,
+    maxBuffer: MAX_DIFF_BUFFER_BYTES,
+  });
 }
 
 function isExemptSlangPath(filePath, baseName) {
@@ -845,15 +843,7 @@ function inspectStagedFile(repoRoot, file, collectors, useIndex, prefetched = nu
   }
 
   validateFileBom(buffer, file, collectors.gate2);
-  let eolBuffer = buffer;
-  if (useIndex) {
-    try {
-      eolBuffer = fs.readFileSync(path.resolve(repoRoot, file));
-    } catch {
-      eolBuffer = buffer;
-    }
-  }
-  validateFileEol(file, eolBuffer, collectors.gate2);
+  validateFileEol(file, buffer, collectors.gate2);
   validateFileTerminalNewline(content, file, collectors.gate2);
   validateFileIndent(file, content, collectors.gate2);
   validateCommentOnly(file, content, collectors.gate1);
@@ -1041,10 +1031,23 @@ function collectProjectViolations(repoRoot, stagedFiles) {
         message: `受控项目 '${lease.id}' TTL 租约已过期，提交权限已被锁定 (Commit Lockdown)。运行 'taxis project renew ${lease.id}' 续约解冻。`,
       });
     }
-  } catch {
-    // Non-fatal if resolver fails
+  } catch (err) {
+    if (err && err.code !== 'MODULE_NOT_FOUND') {
+      console.warn(`WARN project-registry-resolver failed: ${err.message}`);
+    }
   }
   return violations;
+}
+
+function collectBranchViolations(repoRoot) {
+  let gov;
+  try { gov = require('./validate-branch-governance'); } catch (err) {
+    if (err && err.code === 'MODULE_NOT_FOUND') return [];
+    return [{ ruleId: 'FGT-TOP-001', severity: SEVERITY_BLOCK, file: '.git/HEAD', message: `分支治理模块加载失败（Fail-Closed）: ${err.message}` }];
+  }
+  try { return gov.collectCurrentBranchViolation(repoRoot, SEVERITY_BLOCK); } catch (err) {
+    return [{ ruleId: 'FGT-TOP-001', severity: SEVERITY_BLOCK, file: '.git/HEAD', message: `分支治理校验失败（Fail-Closed）: ${err.message}` }];
+  }
 }
 
 /**
@@ -1135,14 +1138,21 @@ function runFastStaged() {
     reportEmptyStaging(isAgentMode);
   }
 
-  const diffText = getStagedDiff(repoRoot, range);
+  let diffText;
+  try {
+    diffText = getStagedDiff(repoRoot, range);
+  } catch (err) {
+    console.error(`✖ BLOCK  STAGED-HYGIENE-01  无法读取暂存 diff（${err.message}），拒绝放行`);
+    process.exit(1);
+  }
   const { gate3Violations, gate6Violations } = checkDiffStream(diffText);
   const projectViolations = collectProjectViolations(repoRoot, stagedFiles);
   const headViolations = !range ? checkHeadReceipt(repoRoot) : [];
+  const branchViolations = !range ? collectBranchViolations(repoRoot) : [];
 
   const buckets = [
     gate1Violations, lineEndingViolations, gate3Violations, nomenclatureViolations,
-    volumeViolations, gate6Violations, projectViolations, headViolations,
+    volumeViolations, gate6Violations, projectViolations, headViolations, branchViolations,
   ];
 
   if (buckets.some((bucket) => bucket.length > 0)) {
