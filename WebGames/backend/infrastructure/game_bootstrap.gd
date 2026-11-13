@@ -15,6 +15,8 @@ const ActivationTokenDTO = preload("res://backend/domains/version_governance/act
 const VersionedRuntimeContext = preload("res://backend/domains/version_governance/version_runtime_context.gd")
 const VersionActivationGate = preload("res://backend/domains/version_governance/version_activation_gate.gd")
 const AgentTelemetryPoolRegistry = preload("res://backend/domains/world_state/services/agent_telemetry_pool_registry.gd")
+const CombatPipelineFSM = preload("res://backend/domains/physics_thermodynamics/combat_pipeline_fsm.gd")
+const SpatialTriggerFSM = preload("res://backend/domains/spatial_movement/spatial_trigger_fsm.gd")
 const ObjectPoolManager = preload("res://backend/infrastructure/object_pool_manager.gd")
 const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
 const HumanControlLeaseManager = preload("res://backend/domains/world_state/services/human_control_lease_manager.gd")
@@ -77,6 +79,18 @@ static func assemble() -> Dictionary:
 		Callable(GameBootstrap, "_release_telemetry_pool")
 	)
 	AgentTelemetryPoolRegistry.ensure_pools_registered()
+	CombatPipelineFSM.bind_event_pool_backend(
+		Callable(GameBootstrap, "_ensure_telemetry_pool"),
+		Callable(GameBootstrap, "_acquire_telemetry_pool"),
+		Callable(GameBootstrap, "_release_telemetry_pool")
+	)
+	CombatPipelineFSM._ensure_event_pool()
+	SpatialTriggerFSM.bind_trigger_pool_backend(
+		Callable(GameBootstrap, "_ensure_telemetry_pool"),
+		Callable(GameBootstrap, "_acquire_telemetry_pool"),
+		Callable(GameBootstrap, "_release_telemetry_pool")
+	)
+	SpatialTriggerFSM._ensure_trigger_pool()
 	# EventBus 2.0 生产单例装配（配置驱动参数；幂等，get_instance 惰性创建）
 	EventBusCore.get_instance().initialize_from_config()
 	# 启动期安全巡检：清理超过保留期的历史轮转归档日志
@@ -283,6 +297,10 @@ static func _teardown_single_subsystem(subsystem_key: String) -> void:
 		"telemetry_pools":
 			AgentTelemetryPoolRegistry.bind_pool_backend(Callable(), Callable(), Callable())
 			AgentTelemetryPoolRegistry.reset_for_tests()
+			CombatPipelineFSM.bind_event_pool_backend(Callable(), Callable(), Callable())
+			CombatPipelineFSM.reset_pool_for_tests()
+			SpatialTriggerFSM.bind_trigger_pool_backend(Callable(), Callable(), Callable())
+			SpatialTriggerFSM.reset_pool_for_tests()
 		"object_pool_manager":
 			ObjectPoolManager.teardown()
 

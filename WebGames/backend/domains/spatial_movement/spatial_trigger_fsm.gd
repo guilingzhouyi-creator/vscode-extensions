@@ -13,6 +13,77 @@ extends PoolableDtoBase
 
 const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
+const POOL_SPATIAL_TRIGGERS: String = "spatial_triggers"
+const MAX_LOCAL_TRIGGER_POOL: int = 256
+
+static var _cached_default_radius: float = 5.0
+static var _radius_cfg_version: int = -1
+static var _trigger_pools_bound: bool = false
+static var _pool_ensure_cb: Callable = Callable()
+static var _pool_acquire_cb: Callable = Callable()
+static var _pool_release_cb: Callable = Callable()
+static var _local_trigger_pool: Array = []
+
+static func _get_cached_default_radius() -> float:
+	var cfg_ver: int = GameConfig.config_reload_version()
+	if _radius_cfg_version != cfg_ver:
+		_cached_default_radius = GameConfig.get_float("domains.spatial_movement", "trigger/default_radius", 5.0)
+		_radius_cfg_version = cfg_ver
+	return _cached_default_radius
+
+## 依赖倒置对象池端口绑定（与 infrastructure.ObjectPoolManager 解耦对接 spatial_triggers 池）
+static func bind_trigger_pool_backend(ensure_cb: Callable, acquire_cb: Callable, release_cb: Callable) -> void:
+	_pool_ensure_cb = ensure_cb
+	_pool_acquire_cb = acquire_cb
+	_pool_release_cb = release_cb
+	_trigger_pools_bound = false
+
+static func _ensure_trigger_pool() -> void:
+	if _trigger_pools_bound:
+		return
+	if _pool_ensure_cb.is_valid():
+		_pool_ensure_cb.call(POOL_SPATIAL_TRIGGERS, func() -> RefCounted:
+			return SpatialTriggerArea.new()
+		)
+	_trigger_pools_bound = true
+
+## 从对象池借出可复用空间触发区域实例
+static func borrow_trigger_area(p_id: String = "", p_center: Vector2 = Vector2.ZERO, p_radius: float = -1.0) -> SpatialTriggerArea:
+	_ensure_trigger_pool()
+	var area: SpatialTriggerArea = null
+	if _pool_acquire_cb.is_valid():
+		area = _pool_acquire_cb.call(POOL_SPATIAL_TRIGGERS) as SpatialTriggerArea
+	elif not _local_trigger_pool.is_empty():
+		area = _local_trigger_pool.pop_back() as SpatialTriggerArea
+		if area != null:
+			area.reset_state()
+	if area == null:
+		area = SpatialTriggerArea.new()
+	area.trigger_id = p_id
+	area.shape = TriggerShape.CIRCLE_RADIUS
+	area.center_pos = p_center
+	area.radius = p_radius if p_radius >= 0.0 else _get_cached_default_radius()
+	area.current_state = TriggerState.OUTSIDE
+	return area
+
+## 归还空间触发区域实例至对象池
+static func recycle_trigger_area(area: SpatialTriggerArea) -> void:
+	if area == null:
+		return
+	_ensure_trigger_pool()
+	if _pool_release_cb.is_valid():
+		_pool_release_cb.call(POOL_SPATIAL_TRIGGERS, area)
+		return
+	if _local_trigger_pool.size() < MAX_LOCAL_TRIGGER_POOL:
+		area.reset_state()
+		_local_trigger_pool.append(area)
+
+## 测试隔离：重置本地回退池与版本号缓存
+static func reset_pool_for_tests() -> void:
+	_trigger_pools_bound = false
+	_local_trigger_pool.clear()
+	_radius_cfg_version = -1
+
 enum TriggerShape {
 	CIRCLE_RADIUS,
 	AABB_RECTANGLE
@@ -30,7 +101,7 @@ class SpatialTriggerArea extends PoolableDtoBase:
 	var trigger_id: String
 	var shape: TriggerShape = TriggerShape.CIRCLE_RADIUS
 	var center_pos: Vector2 = Vector2.ZERO
-	var radius: float = GameConfig.get_float("domains.spatial_movement", "trigger/default_radius", 5.0)
+	var radius: float = 5.0
 	var rect_extents: Rect2 = Rect2()
 	var current_state: TriggerState = TriggerState.OUTSIDE
 
@@ -39,14 +110,14 @@ class SpatialTriggerArea extends PoolableDtoBase:
 		trigger_id = p_id
 		shape = TriggerShape.CIRCLE_RADIUS
 		center_pos = p_center
-		radius = p_radius if p_radius >= 0.0 else GameConfig.get_float("domains.spatial_movement", "trigger/default_radius", 5.0)
+		radius = p_radius if p_radius >= 0.0 else SpatialTriggerFSM._get_cached_default_radius()
 
 	func reset_state() -> void:
 		super.reset_state()
 		trigger_id = ""
 		shape = TriggerShape.CIRCLE_RADIUS
 		center_pos = Vector2.ZERO
-		radius = GameConfig.get_float("domains.spatial_movement", "trigger/default_radius", 5.0)
+		radius = SpatialTriggerFSM._get_cached_default_radius()
 		rect_extents = Rect2()
 		current_state = TriggerState.OUTSIDE
 
