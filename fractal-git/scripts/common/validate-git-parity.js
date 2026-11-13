@@ -12,11 +12,12 @@
  *      and compare object ids for every vector.
  *   3. Compare canonical tree entry order with git ls-tree, covering mixed case, non-ASCII names,
  *      directory trailing-slash ordering, and mode-specific framing.
- *   4. Exit non-zero on any divergence; refuse to claim equivalence when the reference baseline is absent and
- *      the caller demanded it with --require-git.
+ *   4. Execute real binary taxis vs system git differential checks across object IDs, inflated loose
+ *      object bytes, cat-file payloads, and ls-tree canonical output.
+ *   5. Exit non-zero on any divergence; refuse to claim equivalence when the reference baseline is absent and
+ *      the caller demanded it with --require-git or --require-taxis.
  * Exit Semantics & Design Rationale: Exits 0 only after every vector matched the system git baseline. A missing
- *   git binary is reported explicitly instead of being silently treated as parity, because the
- *   earlier implementation printed an equivalence claim while comparing nothing.
+ *   git or taxis binary is reported explicitly instead of being silently treated as parity.
  */
 'use strict';
 
@@ -24,11 +25,14 @@ const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const zlib = require('zlib');
 const { execFileSync } = require('child_process');
 
 const NUL = String.fromCharCode(0);
 const MAX_REPORTED_VIOLATIONS = 40;
 const REQUIRE_GIT = process.argv.includes('--require-git') || process.env.TAXIS_REQUIRE_GIT === '1';
+const REQUIRE_TAXIS = process.argv.includes('--require-taxis') || process.env.TAXIS_REQUIRE_TAXIS === '1';
+const NO_AUTO_TARGET = process.argv.includes('--no-auto-target');
 
 /**
  * Computes the lowercase hexadecimal SHA-1 of a byte buffer.
@@ -531,6 +535,33 @@ function reportViolation(violations, message) {
 }
 
 /**
+ * Inflates and compares the loose object stored in both repositories for byte-exact parity.
+ *
+ * @param {string} gitDir - System git repository directory.
+ * @param {string} taxisDir - Taxis repository directory.
+ * @param {string} oid - Expected object id.
+ * @param {string} label - Diagnostic label.
+ * @param {Array<string>} violations - Collected violations.
+ * @returns {void}
+ */
+function compareLooseObjectBytes(gitDir, taxisDir, oid, label, violations) {
+    const relPath = path.join('objects', oid.slice(0, 2), oid.slice(2));
+    const gitObjPath = path.join(gitDir, relPath);
+    const taxisObjPath = path.join(taxisDir, relPath);
+    if (!fs.existsSync(gitObjPath) || !fs.existsSync(taxisObjPath)) {
+        reportViolation(violations, 'FGT-OBJ-001 [Binary] missing loose object for ' + label + ' (' + oid + ')');
+        return;
+    }
+    try {
+        if (Buffer.compare(zlib.inflateSync(fs.readFileSync(gitObjPath)), zlib.inflateSync(fs.readFileSync(taxisObjPath))) !== 0) {
+            reportViolation(violations, 'FGT-OBJ-001 [Binary] inflated loose object byte divergence on ' + label);
+        }
+    } catch (decompErr) {
+        reportViolation(violations, 'FGT-OBJ-001 [Binary] loose object inflation failed on ' + label + ': ' + decompErr.message);
+    }
+}
+
+/**
  * Builds a nested tree with the JavaScript encoder and compares it with git at every level.
  *
  * @param {object} gitRunner - Git plumbing runner.
@@ -570,19 +601,31 @@ function verifyTreeSpec(gitRunner, spec, label, violations) {
 }
 
 /**
- * Verifies blob vectors against git hash-object.
+ * Verifies blob vectors across JS encoder, system git, and optional taxis binary.
  *
  * @param {object} gitRunner - Git plumbing runner.
+ * @param {object|null} taxisRunner - Optional taxis plumbing runner.
  * @param {Array<string>} violations - Collected violations.
- * @returns {number} Number of verified vectors.
+ * @returns {number} Verified vector count.
  */
-function verifyBlobVectors(gitRunner, violations) {
+function verifyBlobVectors(gitRunner, taxisRunner, violations) {
     const vectors = blobVectors();
     vectors.forEach((vector) => {
         const engineOid = computeBlobOid(vector.payload);
         const gitOid = plumbingWriteBlob(gitRunner, vector.payload);
         if (engineOid !== gitOid) {
             reportViolation(violations, 'FGT-OBJ-001 blob parity failure on ' + vector.label + ': git ' + gitOid + ', engine ' + engineOid);
+        }
+        if (taxisRunner) {
+            const taxisOid = plumbingWriteBlob(taxisRunner, vector.payload);
+            if (taxisOid !== gitOid) {
+                reportViolation(violations, 'FGT-OBJ-001 [Binary] blob OID divergence on ' + vector.label + ': git ' + gitOid + ', taxis ' + taxisOid);
+                return;
+            }
+            compareLooseObjectBytes(gitRunner.gitDir, taxisRunner.gitDir, gitOid, 'blob:' + vector.label, violations);
+            if (Buffer.compare(runPlumbing(gitRunner, ['cat-file', '-p', gitOid]), runPlumbing(taxisRunner, ['cat-file', '-p', taxisOid])) !== 0) {
+                reportViolation(violations, 'FGT-OBJ-001 [Binary] cat-file -p divergence on ' + vector.label);
+            }
         }
     });
     return vectors.length;
@@ -685,6 +728,100 @@ function bootstrapParentCommits(gitRunner, treeOid, count) {
 }
 
 /**
+ * Probes whether a candidate executable responds to `taxis version`.
+ *
+ * @param {string} binPath - Candidate executable path.
+ * @returns {boolean} True when executable responds cleanly.
+ */
+function probeTaxisExec(binPath) {
+    if (!binPath || !fs.existsSync(binPath)) return false;
+    try {
+        execFileSync(binPath, ['version'], { stdio: 'ignore' });
+        return true;
+    } catch (_err) {
+        return false;
+    }
+}
+
+/**
+ * Reads an explicit --taxis-bin flag or TAXIS_BIN environment override.
+ *
+ * @returns {{ specified: boolean, value: string|null }} Explicit override info.
+ */
+function parseExplicitTaxisArg() {
+    for (let i = 0; i < process.argv.length; i += 1) {
+        const arg = process.argv[i];
+        if (arg === '--taxis-bin') {
+            return { specified: true, value: i + 1 < process.argv.length ? process.argv[i + 1] : '' };
+        }
+        if (arg.startsWith('--taxis-bin=')) {
+            return { specified: true, value: arg.slice('--taxis-bin='.length) };
+        }
+    }
+    if (process.env.TAXIS_BIN !== undefined) {
+        return { specified: true, value: process.env.TAXIS_BIN };
+    }
+    return { specified: false, value: null };
+}
+
+/**
+ * Searches Cargo target directories and PATH for an executable taxis binary.
+ *
+ * @param {string} repoRoot - Repository root path.
+ * @returns {string|null} Resolved path or null.
+ */
+function findAutoTaxisBinary(repoRoot) {
+    const exeName = process.platform === 'win32' ? 'taxis.exe' : 'taxis';
+    const dirs = [
+        process.env.CARGO_TARGET_DIR,
+        path.join(os.tmpdir(), 'taxis-cargo-target'),
+        path.join(repoRoot, 'fractal-git', 'target'),
+        path.join(repoRoot, 'target'),
+    ].filter(Boolean);
+    for (const base of dirs) {
+        for (const prof of ['release', 'debug']) {
+            const cand = path.join(base, prof, exeName);
+            if (probeTaxisExec(cand)) return cand;
+        }
+    }
+    try {
+        const probeCmd = process.platform === 'win32' ? 'where.exe' : 'which';
+        const found = execFileSync(probeCmd, [exeName], { stdio: 'pipe' }).toString('utf8').trim().split(/\r?\n/)[0];
+        if (probeTaxisExec(found)) return found;
+    } catch (_e) { /* absent */ }
+    return null;
+}
+
+/**
+ * Resolves the taxis executable path, honoring --taxis-bin, --build-taxis, and Cargo targets.
+ *
+ * @returns {{ bin: string|null, explicitError: string|null }} Resolution result.
+ */
+function resolveTaxisBinary() {
+    const explicit = parseExplicitTaxisArg();
+    if (explicit.specified) {
+        const resolved = explicit.value ? path.resolve(explicit.value) : '';
+        return probeTaxisExec(resolved)
+            ? { bin: resolved, explicitError: null }
+            : { bin: null, explicitError: 'explicit --taxis-bin / TAXIS_BIN path is missing or not executable: ' + String(explicit.value) };
+    }
+    if (NO_AUTO_TARGET) return { bin: null, explicitError: null };
+
+    const repoRoot = path.resolve(__dirname, '..', '..', '..');
+    const autoFound = findAutoTaxisBinary(repoRoot);
+    if (autoFound || !process.argv.includes('--build-taxis')) {
+        return { bin: autoFound, explicitError: null };
+    }
+    try {
+        execFileSync('cargo', ['build', '--manifest-path', path.join(repoRoot, 'fractal-git', 'Cargo.toml'), '--bin', 'taxis'], { stdio: 'inherit' });
+        const built = findAutoTaxisBinary(repoRoot);
+        return built ? { bin: built, explicitError: null } : { bin: null, explicitError: 'cargo build completed without producing taxis binary' };
+    } catch (err) {
+        return { bin: null, explicitError: 'failed to build taxis: ' + err.message };
+    }
+}
+
+/**
  * Runs the complete parity matrix and reports the verdict.
  *
  * @returns {void}
@@ -700,12 +837,26 @@ function runGitParityValidation() {
         process.exit(0);
     }
 
+    const taxisRes = resolveTaxisBinary();
+    if (taxisRes.explicitError) {
+        console.error('BLOCK: ' + taxisRes.explicitError);
+        process.exit(1);
+    }
+    const taxisBin = taxisRes.bin;
+    if (!taxisBin && REQUIRE_TAXIS) {
+        console.error('BLOCK: --require-taxis was requested but taxis binary could not be resolved or executed.');
+        process.exit(1);
+    }
+    console.log(taxisBin ? ('Taxis Binary: ' + taxisBin) : 'NOTICE: taxis binary not located; binary differential check will be skipped.');
+
     const baseline = createBaselineRepository();
+    const taxisBaseline = taxisBin ? createBaselineRepository() : null;
     const gitRunner = makeRunner('git', baseline.gitDir, true);
+    const taxisRunner = taxisBaseline ? makeRunner(taxisBin, taxisBaseline.gitDir, false) : null;
     const violations = [];
     let verified = 0;
     try {
-        verified += verifyBlobVectors(gitRunner, violations);
+        verified += verifyBlobVectors(gitRunner, taxisRunner, violations);
         const treeResult = verifyTreeVectors(gitRunner, violations);
         verified += treeResult.count;
         const parents = bootstrapParentCommits(gitRunner, treeResult.firstTreeOid, 3);
@@ -730,6 +881,7 @@ function runGitParityValidation() {
         reportViolation(violations, 'FGT-OBJ-001 reference baseline execution failed: ' + error.message);
     } finally {
         baseline.dispose();
+        if (taxisBaseline) taxisBaseline.dispose();
     }
 
     if (violations.length > 0) {
