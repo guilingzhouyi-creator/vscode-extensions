@@ -118,65 +118,77 @@ struct PatternCandidate<'a> {
     min_len: usize,
 }
 
+const fn build_byte_rarity_lut() -> [u8; 256] {
+    let mut lut = [2u8; 256];
+    let groups: &[(&[u8], u8)] = &[
+        (b"zZqQxXjJ", 1),
+        (b"kKvVwW", 5),
+        (b"bByYpP", 10),
+        (b"_$@#`%^&|~", 15),
+        (b"fFgGmMhH", 20),
+        (b"0123456789", 25),
+        (b"uUcCdDlL", 30),
+        (b"rRnNsS", 45),
+        (b"-+/*=<>!?:", 50),
+        (b"oOiIaA", 60),
+        (b"tTeE", 75),
+        (b".,;()[]{}", 85),
+        (b" \t\r\n\"'", 100),
+    ];
+    let mut group_idx = 0usize;
+    while group_idx < groups.len() {
+        let (bytes, rarity) = groups[group_idx];
+        let mut byte_idx = 0usize;
+        while byte_idx < bytes.len() {
+            lut[bytes[byte_idx] as usize] = rarity;
+            byte_idx += 1;
+        }
+        group_idx += 1;
+    }
+    lut
+}
+
+const BYTE_RARITY_LUT: [u8; 256] = build_byte_rarity_lut();
+
 #[inline(always)]
 fn byte_rarity(b: u8) -> u8 {
-    match b {
-        b'z' | b'Z' | b'q' | b'Q' | b'x' | b'X' | b'j' | b'J' => 1,
-        b'k' | b'K' | b'v' | b'V' | b'w' | b'W' => 5,
-        b'b' | b'B' | b'y' | b'Y' | b'p' | b'P' => 10,
-        b'f' | b'F' | b'g' | b'G' | b'm' | b'M' | b'h' | b'H' => 20,
-        b'u' | b'U' | b'c' | b'C' | b'd' | b'D' | b'l' | b'L' => 30,
-        b'r' | b'R' | b'n' | b'N' | b's' | b'S' => 45,
-        b'o' | b'O' | b'i' | b'I' | b'a' | b'A' => 60,
-        b't' | b'T' | b'e' | b'E' => 75,
-        b'0'..=b'9' => 25,
-        b'_' | b'$' | b'@' | b'#' | b'~' | b'`' | b'%' | b'^' | b'&' | b'|' => 15,
-        b'-' | b'+' | b'/' | b'*' | b'=' | b'<' | b'>' | b'!' | b'?' | b':' => 50,
-        b'.' | b',' | b';' | b'(' | b')' | b'[' | b']' | b'{' | b'}' => 85,
-        b' ' | b'\t' | b'\r' | b'\n' | b'"' | b'\'' => 100,
-        _ => 2,
-    }
+    BYTE_RARITY_LUT[b as usize]
 }
 
 fn select_rarest_byte(bytes: &[u8]) -> (u8, usize) {
-    let mut min_rarity = u8::MAX;
     let mut best_byte = bytes[0];
-    let mut best_idx = 0;
-    for (i, &b) in bytes.iter().enumerate() {
+    let mut best_offset = 0usize;
+    let mut best_rarity = byte_rarity(best_byte);
+    for (idx, &b) in bytes.iter().enumerate().skip(1) {
         let rarity = byte_rarity(b);
-        if rarity < min_rarity {
-            min_rarity = rarity;
+        if rarity < best_rarity {
+            best_rarity = rarity;
             best_byte = b;
-            best_idx = i;
+            best_offset = idx;
         }
     }
-    (best_byte, best_idx)
+    (best_byte, best_offset)
+}
+
+#[inline(always)]
+fn chunk8_hits_mask(chunk: &[u8; 8], mask: &[bool; 256]) -> bool {
+    mask[chunk[0] as usize]
+        || mask[chunk[1] as usize]
+        || mask[chunk[2] as usize]
+        || mask[chunk[3] as usize]
+        || mask[chunk[4] as usize]
+        || mask[chunk[5] as usize]
+        || mask[chunk[6] as usize]
+        || mask[chunk[7] as usize]
 }
 
 #[inline(always)]
 fn has_any_candidate_byte(bytes: &[u8], mask: &[bool; 256]) -> bool {
-    let mut i = 0;
-    while i + 8 <= bytes.len() {
-        if mask[bytes[i] as usize]
-            || mask[bytes[i + 1] as usize]
-            || mask[bytes[i + 2] as usize]
-            || mask[bytes[i + 3] as usize]
-            || mask[bytes[i + 4] as usize]
-            || mask[bytes[i + 5] as usize]
-            || mask[bytes[i + 6] as usize]
-            || mask[bytes[i + 7] as usize]
-        {
-            return true;
-        }
-        i += 8;
+    let (chunks, remainder) = bytes.as_chunks::<8>();
+    if chunks.iter().any(|chunk| chunk8_hits_mask(chunk, mask)) {
+        return true;
     }
-    while i < bytes.len() {
-        if mask[bytes[i] as usize] {
-            return true;
-        }
-        i += 1;
-    }
-    false
+    remainder.iter().any(|&b| mask[b as usize])
 }
 
 fn build_pattern_candidates(patterns: &[String]) -> Vec<PatternCandidate<'_>> {
@@ -399,38 +411,43 @@ pub fn has_newline_swar(word: u64) -> bool {
     (xor.wrapping_sub(0x0101010101010101)) & (!xor) & 0x8080808080808080 != 0
 }
 
+#[inline]
+fn collect_chunk_newlines(chunk: &[u8; 8], base_offset: usize, offsets: &mut Vec<usize>) {
+    let word = u64::from_le_bytes(*chunk);
+    if !has_newline_swar(word) {
+        return;
+    }
+    for (lane, &byte_val) in chunk.iter().enumerate() {
+        if byte_val == b'\n' {
+            offsets.push(base_offset + lane);
+        }
+    }
+}
+
 /// Computes all newline byte offsets within a source buffer using 64-bit SWAR block skips.
 pub fn find_newline_offsets(bytes: &[u8]) -> Vec<usize> {
     let mut offsets = Vec::new();
-    let mut i = 0;
-    while i + 8 <= bytes.len() {
-        let chunk: [u8; 8] = [
-            bytes[i],
-            bytes[i + 1],
-            bytes[i + 2],
-            bytes[i + 3],
-            bytes[i + 4],
-            bytes[i + 5],
-            bytes[i + 6],
-            bytes[i + 7],
-        ];
-        let word = u64::from_le_bytes(chunk);
-        if has_newline_swar(word) {
-            for j in 0..8 {
-                if bytes[i + j] == b'\n' {
-                    offsets.push(i + j);
-                }
-            }
-        }
-        i += 8;
+    let (chunks, remainder) = bytes.as_chunks::<8>();
+    let mut base_offset = 0usize;
+    for chunk in chunks {
+        collect_chunk_newlines(chunk, base_offset, &mut offsets);
+        base_offset += 8;
     }
-    while i < bytes.len() {
-        if bytes[i] == b'\n' {
-            offsets.push(i);
+    for (lane, &byte_val) in remainder.iter().enumerate() {
+        if byte_val == b'\n' {
+            offsets.push(base_offset + lane);
         }
-        i += 1;
     }
     offsets
+}
+
+#[inline]
+fn count_chunk_newlines(chunk: &[u8; 8]) -> usize {
+    let word = u64::from_le_bytes(*chunk);
+    if !has_newline_swar(word) {
+        return 0;
+    }
+    chunk.iter().filter(|&&byte_val| byte_val == b'\n').count()
 }
 
 /// Fast line counter using 64-bit SWAR skipping.
@@ -438,35 +455,15 @@ pub fn count_lines_swar(bytes: &[u8]) -> usize {
     if bytes.is_empty() {
         return 0;
     }
-    let mut count = 1;
-    let mut i = 0;
-    while i + 8 <= bytes.len() {
-        let chunk: [u8; 8] = [
-            bytes[i],
-            bytes[i + 1],
-            bytes[i + 2],
-            bytes[i + 3],
-            bytes[i + 4],
-            bytes[i + 5],
-            bytes[i + 6],
-            bytes[i + 7],
-        ];
-        let word = u64::from_le_bytes(chunk);
-        if has_newline_swar(word) {
-            for j in 0..8 {
-                if bytes[i + j] == b'\n' {
-                    count += 1;
-                }
-            }
-        }
-        i += 8;
+    let mut count = 1usize;
+    let (chunks, remainder) = bytes.as_chunks::<8>();
+    for chunk in chunks {
+        count += count_chunk_newlines(chunk);
     }
-    while i < bytes.len() {
-        if bytes[i] == b'\n' {
-            count += 1;
-        }
-        i += 1;
-    }
+    count += remainder
+        .iter()
+        .filter(|&&byte_val| byte_val == b'\n')
+        .count();
     count
 }
 
@@ -513,40 +510,20 @@ pub fn count_brace_delta(line: &str) -> i32 {
     count_braces_detailed(line).delta
 }
 
-/// Evaluates Bumpy Road structural irregularity and spatial depth variance across a line span.
-pub fn evaluate_bumpy_road(lines: &[String], start_line: u32, end_line: u32) -> BumpyRoadResult {
-    const MIN_BUMPY_LINE_SPAN: usize = 20;
-    const MIN_BUMPY_SCORE_THRESHOLD: f64 = 12.0;
+const ZERO_BUMPY_ROAD: BumpyRoadResult = BumpyRoadResult {
+    bumpy_score: 0.0,
+    is_bumpy: false,
+    mean_depth: 0.0,
+    variance_depth: 0.0,
+    spikes_count: 0,
+};
 
-    let total_lines = if end_line >= start_line {
-        (end_line - start_line + 1) as usize
-    } else {
-        0
-    };
-
-    if lines.is_empty()
-        || total_lines < MIN_BUMPY_LINE_SPAN
-        || start_line < 1
-        || (end_line as usize) > lines.len()
-    {
-        return BumpyRoadResult {
-            bumpy_score: 0.0,
-            is_bumpy: false,
-            mean_depth: 0.0,
-            variance_depth: 0.0,
-            spikes_count: 0,
-        };
-    }
-
-    let start_idx = (start_line - 1) as usize;
-    let end_idx = (end_line - 1) as usize;
-
+fn compute_indent_baseline(slice: &[String]) -> (usize, i32, i64) {
     let mut non_blank_count = 0usize;
     let mut depth_sum = 0i64;
     let mut base_indent: Option<i32> = None;
 
-    // First pass: compute base indent, depth sum, non-blank count
-    for line in &lines[start_idx..=end_idx] {
+    for line in slice {
         if line.trim().is_empty() {
             continue;
         }
@@ -557,37 +534,54 @@ pub fn evaluate_bumpy_road(lines: &[String], start_line: u32, end_line: u32) -> 
         non_blank_count += 1;
     }
 
-    if non_blank_count < MIN_BUMPY_LINE_SPAN {
-        return BumpyRoadResult {
-            bumpy_score: 0.0,
-            is_bumpy: false,
-            mean_depth: 0.0,
-            variance_depth: 0.0,
-            spikes_count: 0,
-        };
-    }
+    (non_blank_count, base_indent.unwrap_or(0), depth_sum)
+}
 
-    let base = base_indent.unwrap_or(0);
-    let mean_depth = (depth_sum as f64) / (non_blank_count as f64);
+fn compute_indent_variance(slice: &[String], base: i32, mean_depth: f64) -> (f64, u32) {
     let mut variance_sum = 0.0f64;
     let mut spikes_count = 0u32;
     let mut prev_depth = 0i32;
 
-    // Second pass: compute variance and alternating spikes
-    for line in &lines[start_idx..=end_idx] {
+    for line in slice {
         if line.trim().is_empty() {
             continue;
         }
         let rel_depth = (measure_line_indent_level(line) as i32 - base).max(0);
         let diff = (rel_depth as f64) - mean_depth;
         variance_sum += diff * diff;
-
-        let delta = (rel_depth - prev_depth).abs();
-        if delta >= 2 {
+        if (rel_depth - prev_depth).abs() >= 2 {
             spikes_count += 1;
         }
         prev_depth = rel_depth;
     }
+
+    (variance_sum, spikes_count)
+}
+
+/// Evaluates Bumpy Road structural irregularity and spatial depth variance across a line span.
+pub fn evaluate_bumpy_road(lines: &[String], start_line: u32, end_line: u32) -> BumpyRoadResult {
+    const MIN_BUMPY_LINE_SPAN: usize = 20;
+    const MIN_BUMPY_SCORE_THRESHOLD: f64 = 12.0;
+
+    let total_lines = end_line
+        .checked_sub(start_line)
+        .map_or(0, |d| d as usize + 1);
+    if lines.is_empty()
+        || total_lines < MIN_BUMPY_LINE_SPAN
+        || start_line < 1
+        || (end_line as usize) > lines.len()
+    {
+        return ZERO_BUMPY_ROAD;
+    }
+
+    let slice = &lines[(start_line - 1) as usize..=(end_line - 1) as usize];
+    let (non_blank_count, base, depth_sum) = compute_indent_baseline(slice);
+    if non_blank_count < MIN_BUMPY_LINE_SPAN {
+        return ZERO_BUMPY_ROAD;
+    }
+
+    let mean_depth = (depth_sum as f64) / (non_blank_count as f64);
+    let (variance_sum, spikes_count) = compute_indent_variance(slice, base, mean_depth);
 
     let variance_depth = ((variance_sum / (non_blank_count as f64)) * 100.0).round() / 100.0;
     let mean_depth_rounded = (mean_depth * 100.0).round() / 100.0;

@@ -63,20 +63,31 @@ fn is_token_char(b: u8) -> bool {
     b.is_ascii_alphanumeric() || b == b'_' || b == b'-'
 }
 
-/// Scan a line for precise known credential patterns.
-fn scan_line_credentials(
-    line: &str,
-    line_num: u32,
-    findings: &mut Vec<SecretFinding>,
-    max_findings: usize,
-) {
-    if findings.len() >= max_findings {
-        return;
-    }
+struct PrefixedTokenSpec {
+    prefix: &'static str,
+    kind: &'static str,
+    allow_underscore: bool,
+}
 
-    let bytes = line.as_bytes();
+const PREFIXED_TOKEN_SPECS: [PrefixedTokenSpec; 3] = [
+    PrefixedTokenSpec {
+        prefix: "ghp_",
+        kind: "github-token",
+        allow_underscore: false,
+    },
+    PrefixedTokenSpec {
+        prefix: "github_pat_",
+        kind: "github-pat",
+        allow_underscore: true,
+    },
+    PrefixedTokenSpec {
+        prefix: "sk-",
+        kind: "openai-style-key",
+        allow_underscore: false,
+    },
+];
 
-    // 1. Private key header marker: BEGIN (RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY
+fn scan_private_key_header(line: &str, line_num: u32, findings: &mut Vec<SecretFinding>) -> bool {
     let key_prefixes: [&str; 6] = [
         concat!("BEGIN RSA ", "PRIVATE KEY"),
         concat!("BEGIN EC ", "PRIVATE KEY"),
@@ -96,93 +107,113 @@ fn scan_line_credentials(
                 preview: prefix.to_string(),
                 entropy: 0.0,
             });
+            return true;
+        }
+    }
+    false
+}
+
+fn scan_prefixed_token(
+    line: &str,
+    line_num: u32,
+    spec: &PrefixedTokenSpec,
+    findings: &mut Vec<SecretFinding>,
+) -> bool {
+    let Some(pos) = line.find(spec.prefix) else {
+        return false;
+    };
+    let tail = &line.as_bytes()[pos + spec.prefix.len()..];
+    let count = tail
+        .iter()
+        .take_while(|&&byte_val| {
+            byte_val.is_ascii_alphanumeric() || (spec.allow_underscore && byte_val == b'_')
+        })
+        .count();
+    if count < 20 {
+        return false;
+    }
+    let preview_len = spec.prefix.len() + count.min(30);
+    findings.push(SecretFinding {
+        rule: "secret-detected".to_string(),
+        kind: spec.kind.to_string(),
+        line: line_num,
+        column: (pos + 1) as u32,
+        message: format!("Possible secret detected (pattern: {})", spec.kind),
+        preview: line[pos..pos + preview_len].to_string(),
+        entropy: 0.0,
+    });
+    true
+}
+
+fn scan_aws_access_key(line: &str, line_num: u32, findings: &mut Vec<SecretFinding>) {
+    let Some(pos) = line.find("AKIA") else {
+        return;
+    };
+    if pos + 20 > line.len() {
+        return;
+    }
+    let tail = &line.as_bytes()[pos + 4..pos + 20];
+    if tail
+        .iter()
+        .all(|&byte_val| byte_val.is_ascii_uppercase() || byte_val.is_ascii_digit())
+    {
+        findings.push(SecretFinding {
+            rule: "secret-detected".to_string(),
+            kind: "aws-access-key".to_string(),
+            line: line_num,
+            column: (pos + 1) as u32,
+            message: "Possible secret detected (pattern: aws-access-key)".to_string(),
+            preview: line[pos..pos + 20].to_string(),
+            entropy: 0.0,
+        });
+    }
+}
+
+/// Scan a line for precise known credential patterns.
+fn scan_line_credentials(
+    line: &str,
+    line_num: u32,
+    findings: &mut Vec<SecretFinding>,
+    max_findings: usize,
+) {
+    if findings.len() >= max_findings {
+        return;
+    }
+    if scan_private_key_header(line, line_num, findings) {
+        return;
+    }
+    for spec in &PREFIXED_TOKEN_SPECS {
+        if scan_prefixed_token(line, line_num, spec, findings) {
             return;
         }
     }
+    scan_aws_access_key(line, line_num, findings);
+}
 
-    // 2. GitHub Token: "ghp_" followed by 20+ alnum
-    if let Some(pos) = line.find("ghp_") {
-        let tail = &bytes[pos + 4..];
-        let mut count = 0;
-        while count < tail.len() && tail[count].is_ascii_alphanumeric() {
-            count += 1;
-        }
-        if count >= 20 {
-            findings.push(SecretFinding {
-                rule: "secret-detected".to_string(),
-                kind: "github-token".to_string(),
-                line: line_num,
-                column: (pos + 1) as u32,
-                message: "Possible secret detected (pattern: github-token)".to_string(),
-                preview: line[pos..pos + 4 + count.min(30)].to_string(),
-                entropy: 0.0,
-            });
-            return;
-        }
+fn try_emit_entropy_finding(
+    token_bytes: &[u8],
+    line_num: u32,
+    start: usize,
+    threshold: f64,
+    findings: &mut Vec<SecretFinding>,
+) {
+    let ent = calculate_shannon_entropy(token_bytes);
+    if ent < threshold {
+        return;
     }
-
-    // 3. GitHub PAT: "github_pat_" followed by 20+ alnum/underscore
-    if let Some(pos) = line.find("github_pat_") {
-        let tail = &bytes[pos + 11..];
-        let mut count = 0;
-        while count < tail.len() && (tail[count].is_ascii_alphanumeric() || tail[count] == b'_') {
-            count += 1;
-        }
-        if count >= 20 {
-            findings.push(SecretFinding {
-                rule: "secret-detected".to_string(),
-                kind: "github-pat".to_string(),
-                line: line_num,
-                column: (pos + 1) as u32,
-                message: "Possible secret detected (pattern: github-pat)".to_string(),
-                preview: line[pos..pos + 11 + count.min(30)].to_string(),
-                entropy: 0.0,
-            });
-            return;
-        }
-    }
-
-    // 4. OpenAI style key: "sk-" followed by 20+ alnum
-    if let Some(pos) = line.find("sk-") {
-        let tail = &bytes[pos + 3..];
-        let mut count = 0;
-        while count < tail.len() && tail[count].is_ascii_alphanumeric() {
-            count += 1;
-        }
-        if count >= 20 {
-            findings.push(SecretFinding {
-                rule: "secret-detected".to_string(),
-                kind: "openai-style-key".to_string(),
-                line: line_num,
-                column: (pos + 1) as u32,
-                message: "Possible secret detected (pattern: openai-style-key)".to_string(),
-                preview: line[pos..pos + 3 + count.min(30)].to_string(),
-                entropy: 0.0,
-            });
-            return;
-        }
-    }
-
-    // 5. AWS Access Key: "AKIA" followed by 16 uppercase alphanumeric characters
-    if let Some(pos) = line.find("AKIA") {
-        if pos + 20 <= line.len() {
-            let tail = &bytes[pos + 4..pos + 20];
-            let is_aws = tail
-                .iter()
-                .all(|&b| b.is_ascii_uppercase() || b.is_ascii_digit());
-            if is_aws {
-                findings.push(SecretFinding {
-                    rule: "secret-detected".to_string(),
-                    kind: "aws-access-key".to_string(),
-                    line: line_num,
-                    column: (pos + 1) as u32,
-                    message: "Possible secret detected (pattern: aws-access-key)".to_string(),
-                    preview: line[pos..pos + 20].to_string(),
-                    entropy: 0.0,
-                });
-            }
-        }
-    }
+    let preview = String::from_utf8_lossy(&token_bytes[..token_bytes.len().min(30)]).to_string();
+    findings.push(SecretFinding {
+        rule: "high-entropy-token".to_string(),
+        kind: "high-entropy".to_string(),
+        line: line_num,
+        column: (start + 1) as u32,
+        message: format!(
+            "High-entropy token detected ({:.2} bits/char, threshold {:.2})",
+            ent, threshold
+        ),
+        preview,
+        entropy: (ent * 100.0).round() / 100.0,
+    });
 }
 
 /// Scan a line for high-entropy alphanumeric strings.
@@ -199,40 +230,24 @@ fn scan_line_entropy(
     }
 
     let bytes = line.as_bytes();
-    let mut i = 0;
+    let mut cursor = 0usize;
 
-    while i < bytes.len() {
-        if is_token_char(bytes[i]) {
-            let start = i;
-            while i < bytes.len() && is_token_char(bytes[i]) {
-                i += 1;
-            }
-            let token_bytes = &bytes[start..i];
-            if token_bytes.len() >= min_len {
-                let ent = calculate_shannon_entropy(token_bytes);
-                if ent >= threshold {
-                    let preview =
-                        String::from_utf8_lossy(&token_bytes[..token_bytes.len().min(30)])
-                            .to_string();
-                    findings.push(SecretFinding {
-                        rule: "high-entropy-token".to_string(),
-                        kind: "high-entropy".to_string(),
-                        line: line_num,
-                        column: (start + 1) as u32,
-                        message: format!(
-                            "High-entropy token detected ({:.2} bits/char, threshold {:.2})",
-                            ent, threshold
-                        ),
-                        preview,
-                        entropy: (ent * 100.0).round() / 100.0,
-                    });
-                    if findings.len() >= max_findings {
-                        return;
-                    }
-                }
-            }
-        } else {
-            i += 1;
+    while cursor < bytes.len() {
+        if !is_token_char(bytes[cursor]) {
+            cursor += 1;
+            continue;
+        }
+        let start = cursor;
+        while cursor < bytes.len() && is_token_char(bytes[cursor]) {
+            cursor += 1;
+        }
+        let token_bytes = &bytes[start..cursor];
+        if token_bytes.len() < min_len {
+            continue;
+        }
+        try_emit_entropy_finding(token_bytes, line_num, start, threshold, findings);
+        if findings.len() >= max_findings {
+            return;
         }
     }
 }
