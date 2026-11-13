@@ -9,9 +9,10 @@ mod tests {
     #[test]
     fn unregistered_rule_id_is_rejected_fail_closed() {
         let mut findings = Vec::new();
+        let fake_rule = concat!("FAKE", "-RULE-999");
         let outcome = record_finding(
             &mut findings,
-            "FAKE-RULE-999",
+            fake_rule,
             "hygiene",
             AuditSeverity::Warning,
             "src/a.ts",
@@ -31,10 +32,16 @@ mod tests {
         assert!(is_test_code_path("src/app.spec.ts"));
         assert!(is_test_code_path("tests.rs"));
         assert!(is_test_or_fixture_path("fixtures/mock.json"));
+        assert!(is_test_or_fixture_path("src/fixtures/parity-mixed/unsafe-sample.ts"));
         assert!(is_test_or_fixture_path("docs/guide.md"));
         assert!(!is_test_code_path("src/test_runner.rs"));
         assert!(!is_test_or_fixture_path("src/engine.rs"));
         assert_eq!(SourceLanguage::detect("src/main.rs"), SourceLanguage::Rust);
         assert_eq!(SourceLanguage::detect("a.TSX"), SourceLanguage::TypeScript);
+        assert_eq!(SourceLanguage::detect("helper.py"), SourceLanguage::Python);
+        assert_eq!(SourceLanguage::detect("gate.ps1"), SourceLanguage::Shell);
+        assert_eq!(SourceLanguage::detect("actor.gd"), SourceLanguage::GdScript);
+        assert_eq!(SourceLanguage::detect("main.go"), SourceLanguage::Go);
+        assert_eq!(SourceLanguage::detect("Makefile"), SourceLanguage::Other);
     }
 }
