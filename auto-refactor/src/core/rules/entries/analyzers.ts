@@ -311,93 +311,73 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-wid-001',
     }),
     // ── Documentation & Error Discipline Rules (DOC-*, ERR-*) ──
-    defineRule({
-        id: 'DOC-DUP-001',
-        family: 'DOC',
-        analyzer: 'docs',
-        canonical: true,
-        languages: ['markdown'],
-        defaultSeverity: SEVERITY_WARNING,
-        summary: 'Duplicate content lines (>= 24 chars) detected in documentation.',
-        remediation: 'Consolidate duplicate sections into a single source with cross-references.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#doc-dup-001',
-    }),
-    defineRule({
-        id: 'DOC-FEN-001',
-        family: 'DOC',
-        analyzer: 'docs',
-        canonical: true,
-        languages: ['markdown'],
-        defaultSeverity: SEVERITY_ERROR,
-        summary: 'Unclosed Markdown code fence detected.',
-        remediation:
-            'Add closing code fence backticks to prevent subsequent sections from being swallowed.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#doc-fen-001',
-    }),
-    defineRule({
-        id: 'DOC-LNK-001',
-        family: 'DOC',
-        analyzer: 'docs',
-        canonical: true,
-        languages: ['markdown'],
-        defaultSeverity: SEVERITY_WARNING,
-        summary: 'Backtick path or relative link points to non-existent file.',
-        remediation: 'Update link to valid target path or annotate as example/deprecated.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#doc-lnk-001',
-    }),
-    defineRule({
-        id: 'DOC-TRM-001',
-        family: 'DOC',
-        analyzer: 'docs',
-        canonical: true,
-        languages: ['markdown'],
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Documentation prose contains promotional slogans, hyperbolic claims, or unstandardized milestone jargon.',
-        remediation:
-            'Adopt neutral and pragmatic technical descriptions, describing concrete capabilities and verifiable architectures.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#doc-trm-001',
-    }),
-    defineRule({
-        id: 'ERR-FLT-001',
-        family: RULE_FAMILY_ERROR,
-        analyzer: ANALYZER_HYGIENE,
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Unhandled floating promise: asynchronous operation executed without await, return, void, or .catch() error handler.',
-        remediation:
-            'Awaited via await, return to caller, void discarded with void operator, or handle via .catch() to ensure asynchronous reliability.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#err-flt-001',
-    }),
-    defineRule({
-        id: 'ERR-MSG-001',
-        family: RULE_FAMILY_ERROR,
-        analyzer: ANALYZER_HYGIENE,
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Vague or empty error diagnostic message: thrown error lacks actionable diagnostic context, root cause details, or troubleshooting hints.',
-        remediation:
-            'Provide clear diagnostic context, expected versus actual states, and root cause hints to maintain high debuggability (ESR diagnostic standard).',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#err-msg-001',
-    }),
-    defineRule({
-        id: 'ERR-PRP-001',
-        family: RULE_FAMILY_ERROR,
-        analyzer: ANALYZER_HYGIENE,
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Error code re-thrown across declarations or propagating through excessive call stack hops.',
-        remediation:
-            'Unify error taxonomy with named error types and transform errors at boundary layers.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#err-prp-001',
-    }),
+    // Guards Markdown fence/link hygiene, neutral prose, floating promises, and ESR diagnostics.
+    // Error propagation invariant: boundaries transform internal exceptions into typed errors.
+    builtinRule(
+        'DOC-DUP-001',
+        'DOC',
+        'docs',
+        SEVERITY_WARNING,
+        'Duplicate content lines (>= 24 chars) detected in documentation.',
+        'Consolidate duplicate sections into a single source with cross-references.',
+        ['markdown'],
+    ),
+    builtinRule(
+        'DOC-FEN-001',
+        'DOC',
+        'docs',
+        SEVERITY_ERROR,
+        'Unclosed Markdown code fence detected.',
+        'Add closing code fence backticks to prevent subsequent sections from being swallowed.',
+        ['markdown'],
+    ),
+    builtinRule(
+        'DOC-LNK-001',
+        'DOC',
+        'docs',
+        SEVERITY_WARNING,
+        'Backtick path or relative link points to non-existent file.',
+        'Update link to valid target path or annotate as example/deprecated.',
+        ['markdown'],
+    ),
+    builtinRule(
+        'DOC-TRM-001',
+        'DOC',
+        'docs',
+        SEVERITY_WARNING,
+        'Documentation prose contains promotional slogans, hyperbolic claims, or unstandardized milestone jargon.',
+        'Adopt neutral and pragmatic technical descriptions, describing concrete capabilities and verifiable architectures.',
+        ['markdown'],
+    ),
+    // Async & error-discipline contracts: zero silent drops, contextual ESR messages, bounded hops.
+    builtinRule(
+        'ERR-FLT-001',
+        RULE_FAMILY_ERROR,
+        ANALYZER_HYGIENE,
+        SEVERITY_WARNING,
+        'Unhandled floating promise: asynchronous operation executed without await, return, void, or .catch() error handler.',
+        'Awaited via await, return to caller, void discarded with void operator, or handle via .catch() to ensure asynchronous reliability.',
+    ),
+    builtinRule(
+        'ERR-MSG-001',
+        RULE_FAMILY_ERROR,
+        ANALYZER_HYGIENE,
+        SEVERITY_WARNING,
+        'Vague or empty error diagnostic message: thrown error lacks actionable diagnostic context, root cause details, or troubleshooting hints.',
+        'Provide clear diagnostic context, expected versus actual states, and root cause hints to maintain high debuggability (ESR diagnostic standard).',
+    ),
+    builtinRule(
+        'ERR-PRP-001',
+        RULE_FAMILY_ERROR,
+        ANALYZER_HYGIENE,
+        SEVERITY_WARNING,
+        'Error code re-thrown across declarations or propagating through excessive call stack hops.',
+        'Unify error taxonomy with named error types and transform errors at boundary layers.',
+    ),
     // ── Hygiene, Performance & Python Modernization Rules (PRF-*, PYM-*) ──
+    // Hot-path invariants: O(1) indexed lookups, non-blocking async I/O, bounded queues,
+    // and loop-zero transient heap allocations via pre-allocated or pooled state objects.
+    // Every rule in this group guards latency stability under streaming AST/file workloads.
     ...ANALYZER_HYGIENE_RULES,
     defineRule({
         id: 'PRF-ALG-001',
@@ -463,6 +443,7 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
     }),
     // ── Python 3.11+ Modernization Rules (PYM-*) ──
     // Enforces PEP 585 built-in generics, PEP 604 union syntax, PEP 615 UTC, and async safety.
+    // All PYM-* entries are scoped strictly to Python and preserve zero-breaking AST fixes.
     pythonRule(
         'PYM-ABC-001',
         SEVERITY_ERROR,
