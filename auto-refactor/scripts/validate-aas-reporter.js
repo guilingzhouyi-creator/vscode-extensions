@@ -24,6 +24,28 @@ const { buildAasReport, toAasJson, AAS_SCHEMA_ID, render, getReporter } = requir
 const { runEntry } = require('./common/test-runner-harness');
 
 /**
+ * Builds a minimal location-anchored Issue fixture for AAS grouping and anchor tests.
+ *
+ * @param spec - Issue identity, rule, file path, and 1-based span coordinates.
+ * @returns Structured Issue object conforming to ScanReport schema.
+ */
+function createLineIssueFixture(spec) {
+  return {
+    id: spec.id,
+    analyzer: spec.analyzer,
+    rule: spec.rule,
+    severity: spec.severity || 'warning',
+    message: spec.message,
+    location: {
+      file: spec.file || 'src/app.ts',
+      start: { line: spec.line, column: spec.colStart || 1 },
+      end: { line: spec.line, column: spec.colEnd || 10 },
+    },
+    detail: {},
+  };
+}
+
+/**
  * Builds a deterministic baseline ScanReport fixture covering L1-L5 topology and quality vectors.
  *
  * @param overrides - Partial ScanReport fields overriding default baseline properties.
@@ -82,32 +104,26 @@ function createMockScanReport(overrides = {}) {
           safeToAutomate: true,
         },
       },
-      {
+      createLineIssueFixture({
         id: 'constants:magic-number:src/app.ts:5',
         analyzer: 'constants',
         rule: 'magic-number',
-        severity: 'warning',
         message: 'Magic number 42 detected.',
-        location: {
-          file: 'src/app.ts',
-          start: { line: 5, column: 8 },
-          end: { line: 5, column: 10 },
-        },
-        detail: {},
-      },
-      {
+        line: 5,
+        colStart: 8,
+        colEnd: 10,
+      }),
+      createLineIssueFixture({
         id: 'comments:CMT-HDR-001:src/utils.ts:1',
         analyzer: 'comments',
         rule: 'CMT-HDR-001',
         severity: 'info',
         message: 'Missing standard module header.',
-        location: {
-          file: 'src/utils.ts',
-          start: { line: 1, column: 1 },
-          end: { line: 1, column: 1 },
-        },
-        detail: {},
-      },
+        file: 'src/utils.ts',
+        line: 1,
+        colStart: 1,
+        colEnd: 1,
+      }),
     ],
     qualityScore: {
       compositeScore: 92.5,
@@ -154,6 +170,8 @@ async function runTests() {
 
   // Contract Group 1 (Tests 1-4): Schema discriminator, usability tier/confidence pass-through,
   // L1_CONTRACT -> L5 topological ordering, file-grouped defects, and inline anchor slicing.
+  // Invariant: omitted arbitration data must omit usability rather than fabricating zero counts,
+  // and defaultVerify suppresses per-defect verify echo when matching the top-level command.
   // Test 1: Basic generation & Schema ID
   const report = createMockScanReport();
   const fileMock = {
@@ -321,6 +339,8 @@ async function runTests() {
 
   // Contract Group 2 (Tests 5-8): Byte-level token economy, compact CLI defaults, empty scan
   // handling, and maxTotalDefects truncation budget accounting.
+  // Invariant: compact JSON is always the default emission mode (`pretty: true` is opt-in),
+  // and zero-defect clean scans still preserve schema metadata with PASS verdict.
   // Test 5: Token economy — every saving must be attributable to a named mechanism
   const verboseJson = JSON.stringify(report, null, 2);
   const aasDefaultJson = toAasJson(report, {
@@ -409,6 +429,8 @@ async function runTests() {
 
   // Contract Group 3 (Tests 9-10): Deterministic sentence compression coverage ratchet and >= 70%
   // compact JSON byte-reduction invariant at repository scale.
+  // Compression rules must preserve exact rule codes and identifiers while stripping filler prose,
+  // and scale reports must prove token savings without relying on post-hoc JSON minification.
   // Test 9: Sentence token compression engine
   const { compressDiagnosticSentence } = require('../dist/core/reporting/aas-reporter');
   const compressionCases = [
@@ -558,6 +580,8 @@ async function runTests() {
 
   // Contract Group 4 (Tests 11-12): Ten-dimensional AAS v1.1 breakdown, bilingual Markdown table
   // labels, SQALE/Polyglot/Density metric truthfulness, and CAI isolation invariants.
+  // Invariant: CAI remains undefined whenever autonomy did not run, never borrowing polyglot scores;
+  // SQALE grade, 5D tensor distances, and gaming-defense status project verbatim from qualityScore.
   // Test 11: Ten-Dimensional rich breakdown (AAS v1.1) and complete Markdown coverage
   const test11Report = createMockScanReport();
   const doc11 = buildAasReport(test11Report, { includeDimensionDetails: true });
@@ -695,45 +719,41 @@ async function runTests() {
 
   // Contract Group 5 (Tests 13-16): Same-line anchor deduplication, identifier hygiene,
   // ADR-Q metric omission vs legacy aliases, moreLines folding, and healthOverride overrides.
+  // Invariant: duplicate anchors on the same line are suppressed once per line when enabled,
+  // and unmeasured risk metrics remain undefined rather than defaulting to zero.
   // Test 13: Same-line anchor deduplication
   const duplicateAnchorReport = createMockScanReport({
     issues: [
-      {
+      createLineIssueFixture({
         id: 'dup:1',
         analyzer: 'constants',
         rule: 'hardcoded-string',
         severity: 'error',
         message: 'Literal string detected.',
-        location: {
-          file: 'src/app.ts',
-          start: { line: 3, column: 10 },
-          end: { line: 3, column: 16 },
-        },
-      },
-      {
+        line: 3,
+        colStart: 10,
+        colEnd: 16,
+      }),
+      createLineIssueFixture({
         id: 'dup:2',
         analyzer: 'constants',
         rule: 'magic-number',
         severity: 'error',
         message: 'Magic number detected.',
-        location: {
-          file: 'src/app.ts',
-          start: { line: 3, column: 12 },
-          end: { line: 3, column: 14 },
-        },
-      },
-      {
+        line: 3,
+        colStart: 12,
+        colEnd: 14,
+      }),
+      createLineIssueFixture({
         id: 'dup:3',
         analyzer: 'complexity',
         rule: 'high-complexity',
         severity: 'error',
         message: 'High complexity on line 5.',
-        location: {
-          file: 'src/app.ts',
-          start: { line: 5, column: 1 },
-          end: { line: 5, column: 10 },
-        },
-      },
+        line: 5,
+        colStart: 1,
+        colEnd: 10,
+      }),
     ],
   });
 
