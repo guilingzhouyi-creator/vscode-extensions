@@ -59,7 +59,7 @@ static func execute_palace_coup(
 
 	var is_success := (coup_rng.randf() < chance)
 	if is_success:
-		var old_ruler = nation.sovereign_ruler_id
+		var old_ruler: Variant = nation.sovereign_ruler_id
 		nation.sovereign_ruler_id = usurper_id
 		nation.stability_percent = _apply_stability_drop(nation.stability_percent, success_drop, success_floor)
 

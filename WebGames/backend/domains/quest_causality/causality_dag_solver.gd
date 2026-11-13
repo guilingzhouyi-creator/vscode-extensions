@@ -43,7 +43,7 @@ static func _evaluate_objective_nodes(objective_nodes: Dictionary, world_state_f
 	for node_id in objective_nodes:
 		var node: QuestObjectiveNode = objective_nodes[node_id]
 		if world_state_facts.has(node.target_state_key):
-			var cur_val = world_state_facts[node.target_state_key]
+			var cur_val: Variant = world_state_facts[node.target_state_key]
 			if cur_val == node.required_value:
 				node.is_completed = true
 

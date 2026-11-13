@@ -60,7 +60,7 @@ func enqueue_card(card: PhysicalVerbRegistry.CombatActionCardEntity) -> Dictiona
 		total_overflow_count += 1
 		match overflow_policy:
 			"DISCARD_OLDEST":
-				var discarded := cards.pop_front() as PhysicalVerbRegistry.CombatActionCardEntity
+				var discarded: PhysicalVerbRegistry.CombatActionCardEntity = cards.pop_front() as PhysicalVerbRegistry.CombatActionCardEntity
 				cards.append(card)
 				return {
 					"success": true,

@@ -20,7 +20,7 @@ static func apply_quest_settlement(
 	var bounty_triggered := false
 	for faction in quest.faction_reputation_rewards:
 		var delta: Variant = int(quest.faction_reputation_rewards[faction])
-		var current = reputation_dict.get(faction, 0) + delta
+		var current: Variant = reputation_dict.get(faction, 0) + delta
 		reputation_dict[faction] = current
 
 		# 恶名通缉判定: 阵营声望跌破阈值

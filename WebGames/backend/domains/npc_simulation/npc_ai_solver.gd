@@ -12,12 +12,12 @@ class_name NPCAIAndEvolutionSolver extends RefCounted
 
 ## 目标导向行动规划器 (GOAP Action Planner)
 static func plan_npc_next_goal(npc: AutonomousNPCEntity) -> String:
-	var p = npc.personality
+	var p: Variant = npc.personality
 	var scale_floor := GameConfig.get_float("domains.npc", "goap/scale_floor", 0.1)
 	var legacy_threshold := GameConfig.get_float("domains.npc", "goap/legacy_age_threshold", 80.0)
 	var default_trait := GameConfig.get_float("domains.npc", "goap/default_personality", 0.5)
 
-	var eff_age = npc.physiology.raw_chronological_age / max(scale_floor, npc.physiology.lifespan_scale)
+	var eff_age: Variant = npc.physiology.raw_chronological_age / max(scale_floor, npc.physiology.lifespan_scale)
 
 	# 寿元将尽大限前夕: 强制优先著书立说留传衣钵
 	if eff_age >= legacy_threshold:
@@ -29,9 +29,9 @@ static func plan_npc_next_goal(npc: AutonomousNPCEntity) -> String:
 	var w_cultivate_rationality := GameConfig.get_float("domains.npc", "goap/weights/cultivate_rationality", 1.3)
 	var w_cultivate_piety := GameConfig.get_float("domains.npc", "goap/weights/cultivate_piety", 0.5)
 
-	var score_trade = p.get("greed", default_trait) * w_trade_greed
-	var score_explore = p.get("courage", default_trait) * (w_explore_courage - p.get("rationality", default_trait) * w_explore_penalty)
-	var score_cultivate = p.get("rationality", default_trait) * w_cultivate_rationality + p.get("piety", default_trait) * w_cultivate_piety
+	var score_trade: Variant = p.get("greed", default_trait) * w_trade_greed
+	var score_explore: Variant = p.get("courage", default_trait) * (w_explore_courage - p.get("rationality", default_trait) * w_explore_penalty)
+	var score_cultivate: Variant = p.get("rationality", default_trait) * w_cultivate_rationality + p.get("piety", default_trait) * w_cultivate_piety
 
 	if score_trade > score_explore and score_trade > score_cultivate:
 		return GameConfig.get_string("domains.npc", "goap/goals/trade", "TRADE_COMMODITY")

@@ -41,11 +41,14 @@ static func _check_node_prerequisites(nid: String, node: NarrativeDAGNode, graph
 			}
 	return {"is_valid": true}
 
+static func _init_dag_buckets(nid: Variant, in_degree: Dictionary, adj_list: Dictionary) -> void:
+	in_degree[nid] = 0
+	adj_list[nid] = []
+
 ## 构建入度表、邻接表并校验悬挂边与缺失前置
 static func _build_degrees_and_edges(graph: NarrativeDAGGraphDTO, in_degree: Dictionary, adj_list: Dictionary) -> Dictionary:
 	for nid in graph.nodes.keys():
-		in_degree[nid] = 0
-		adj_list[nid] = []
+		_init_dag_buckets(nid, in_degree, adj_list)
 
 	for edge in graph.edges:
 		if not graph.nodes.has(edge.from_node_id) or not graph.nodes.has(edge.to_node_id):

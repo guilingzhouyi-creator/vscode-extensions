@@ -145,6 +145,7 @@ func step_coordinator(
 
 	# 2. 处理单回合开局预排期离散事件（hand_cap 循环外一次读取，回合内常量）
 	var hand_cap := GameConfig.get_int("domains.combat", "round_hand/hand_cap", 5)
+	var empty_pulse_ctx: Dictionary = {}
 	if current_schedule != null:
 		for pt in current_schedule.scheduled_points:
 			if not pt.is_executed and pt.trigger_time_ms <= round_elapsed_ms:
@@ -168,7 +169,7 @@ func step_coordinator(
 						"public_message": "战场增益触发：额外补充加发牌"
 					})
 				elif pt.event_kind == TimelineEventScheduleDTO.EventKind.TENSION_PULSE:
-					if _record_tension_pulse(processed_events, pt.point_id, pt.payload, {}):
+					if _record_tension_pulse(processed_events, pt.point_id, pt.payload, empty_pulse_ctx):
 						should_end_round = true
 						end_reason = "TENSION_FORCE_ADVANCE"
 

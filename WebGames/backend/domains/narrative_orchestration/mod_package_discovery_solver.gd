@@ -141,14 +141,22 @@ static func scan_installed_packs(custom_roots: Array = []) -> Array[NarrativePac
             result.append(pack_dto)
     return result
 
+static func _collect_pack_missing_deps(
+    pack_obj: NarrativePackManifestDTO,
+    pack_map: Dictionary,
+    missing_registry: Dictionary
+) -> void:
+    for dep_id in pack_obj.dependencies:
+        if not pack_map.has(dep_id):
+            missing_registry[dep_id] = true
+
+
 ## 检查清单集合中是否存在未满足的前置依赖
 static func _find_missing_dependencies(pack_map: Dictionary) -> Array[String]:
     var missing_registry: Dictionary = {}
     for pid in pack_map.keys():
         var pack_obj: NarrativePackManifestDTO = pack_map[pid]
-        for dep_id in pack_obj.dependencies:
-            if not pack_map.has(dep_id):
-                missing_registry[dep_id] = true
+        _collect_pack_missing_deps(pack_obj, pack_map, missing_registry)
 
     var missing_list: Array[String] = []
     for m in missing_registry.keys():
@@ -157,17 +165,25 @@ static func _find_missing_dependencies(pack_map: Dictionary) -> Array[String]:
     return missing_list
 
 ## 构建依赖入度表与后继邻接表
+static func _init_pack_adjacency_slot(pid: String, in_degree: Dictionary, adj_list: Dictionary) -> void:
+    in_degree[pid] = 0
+    adj_list[pid] = []
+
+
+static func _register_pack_edges(pid: String, pack_obj: NarrativePackManifestDTO, in_degree: Dictionary, adj_list: Dictionary) -> void:
+    for dep_id in pack_obj.dependencies:
+        in_degree[pid] = int(in_degree[pid]) + 1
+        var successors: Array = adj_list[dep_id]
+        successors.append(pid)
+
+
 static func _build_topology_tables(pack_map: Dictionary, in_degree: Dictionary, adj_list: Dictionary) -> void:
     for pid in pack_map.keys():
-        in_degree[pid] = 0
-        adj_list[pid] = Array()
+        _init_pack_adjacency_slot(pid, in_degree, adj_list)
 
     for pid in pack_map.keys():
         var pack_obj: NarrativePackManifestDTO = pack_map[pid]
-        for dep_id in pack_obj.dependencies:
-            in_degree[pid] = int(in_degree[pid]) + 1
-            var successors: Array = adj_list[dep_id]
-            successors.append(pid)
+        _register_pack_edges(pid, pack_obj, in_degree, adj_list)
 
 ## 针对同一拓扑层级内的节点按优先级降序、包名升序进行稳定排序
 static func _sort_tier_by_priority(tier: Array[NarrativePackManifestDTO]) -> void:

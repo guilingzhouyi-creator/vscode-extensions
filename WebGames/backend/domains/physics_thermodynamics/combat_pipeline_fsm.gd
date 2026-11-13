@@ -59,8 +59,8 @@ static func execute_action_round(
 	packet.actor_id = attacker.participant_id
 	packet.target_id = defender.participant_id
 
-	var a_verb_info = PhysicalVerbRegistry.get_verb(attacker_verb)
-	var d_verb_info = PhysicalVerbRegistry.get_verb(defender_verb)
+	var a_verb_info: Variant = PhysicalVerbRegistry.get_verb(attacker_verb)
+	var d_verb_info: Variant = PhysicalVerbRegistry.get_verb(defender_verb)
 
 	attacker.current_ap += int(a_verb_info.get("base_ap", 0))
 	defender.current_ap += int(d_verb_info.get("base_ap", 0))
@@ -78,7 +78,7 @@ static func execute_action_round(
 			defender.name, d_verb_info.name, attacker.name, a_verb_info.name
 		])
 	else:
-		var raw_dmg = PhysicsAndThermodynamicsSolver.calculate_penetration_damage(
+		var raw_dmg: Variant = PhysicsAndThermodynamicsSolver.calculate_penetration_damage(
 			attacker.weapon_mass_kg,
 			attacker.weapon_velocity,
 			attacker_verb,

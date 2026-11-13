@@ -26,7 +26,7 @@ static func _recalculate_upwards_impl(registry: Dictionary, node_path: String, v
 	visited[node_path] = true
 
 	var node: RedDotTreeNode = registry[node_path]
-	var sub_sum = node.direct_count
+	var sub_sum: Variant = node.direct_count
 	for c_path in node.children_paths:
 		var c_str := str(c_path)
 		if registry.has(c_str):

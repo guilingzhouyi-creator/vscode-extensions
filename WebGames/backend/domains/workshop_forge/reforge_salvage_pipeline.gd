@@ -56,7 +56,7 @@ static func reforge_affixes(
 	# 锁定前 lock_count 条既有词缀原样保留，未锁定槽位重掷
 	var new_affixes: Array = existing_affixes.slice(0, lock_count) if lock_count > 0 else []
 	for i in range(roll_slots):
-		var picked = reforge_rng.pick(pool)
+		var picked: Variant = reforge_rng.pick(pool)
 		if picked == null:
 			continue
 		var crafted := _craft_affix_from_entry(picked as Dictionary, reforge_rng)
@@ -72,7 +72,7 @@ static func reforge_affixes(
 static func _craft_affix_from_entry(entry: Dictionary, reforge_rng: DeterministicRNG) -> Dictionary:
 	var crafted := {}
 	for k in entry:
-		var v = entry[k]
+		var v: Variant = entry[k]
 		if v is Array and v.size() == 2:
 			crafted[k] = reforge_rng.randf_range(float(v[0]), float(v[1]))
 		else:
@@ -104,7 +104,7 @@ static func salvage_equipment(
 	var refund_rate := clampf(GameConfig.get_float("domains.workshop", "salvage/refund_rate", 0.5), 0.0, 1.0)
 	var gold_rate := GameConfig.get_int("domains.currency", "rates/gold", 10000)
 	var refund_copper := int(item.market_base_price * gold_rate * refund_rate)
-	var enhance_lvl = int(item.combat_metrics.get("enhance_level", 0))
+	var enhance_lvl: int = int(item.combat_metrics.get("enhance_level", 0))
 	var divisor := maxf(1.0, GameConfig.get_float("domains.workshop", "salvage/crystal_divisor", 3.0))
 	var refunded_crystals := int(floor(float(enhance_lvl) / divisor))
 	var wallet_result := wallet.apply_delta({"copper": refund_copper, "mana_monocrystals": refunded_crystals})

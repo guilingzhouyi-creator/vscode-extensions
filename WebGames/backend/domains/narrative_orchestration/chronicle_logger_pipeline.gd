@@ -35,7 +35,7 @@ static func log_chronicle_event(
 	summary: String
 ) -> ChronicleEntryDTO:
 	var raw_fingerprint := "%s:%s:%d:%s" % [event.event_id, event.event_title, timestamp_utc, summary]
-	var event_hash = raw_fingerprint.sha256_text().substr(0, 16).to_upper()
+	var event_hash: String = raw_fingerprint.sha256_text().substr(0, 16).to_upper()
 
 	var entry := ChronicleEntryDTO.new(event_hash, event.event_id, event.event_title, timestamp_utc, summary)
 	chronicle_history.append(entry)

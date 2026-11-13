@@ -9,7 +9,9 @@
 
 ## SpatialTriggerFSM：Domain FSM / Lifecycle Session Engine
 class_name SpatialTriggerFSM
-extends RefCounted
+extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 enum TriggerShape {
 	CIRCLE_RADIUS,
@@ -24,7 +26,7 @@ enum TriggerState {
 }
 
 ## SpatialTriggerArea：空间触发区域实体模型
-class SpatialTriggerArea extends RefCounted:
+class SpatialTriggerArea extends PoolableDtoBase:
 	var trigger_id: String
 	var shape: TriggerShape = TriggerShape.CIRCLE_RADIUS
 	var center_pos: Vector2 = Vector2.ZERO
@@ -40,6 +42,7 @@ class SpatialTriggerArea extends RefCounted:
 		radius = p_radius if p_radius >= 0.0 else GameConfig.get_float("domains.spatial_movement", "trigger/default_radius", 5.0)
 
 	func reset_state() -> void:
+		super.reset_state()
 		trigger_id = ""
 		shape = TriggerShape.CIRCLE_RADIUS
 		center_pos = Vector2.ZERO
@@ -55,7 +58,7 @@ static func evaluate_trigger_state(trigger: SpatialTriggerArea, entity_pos: Vect
 	elif trigger.shape == TriggerShape.AABB_RECTANGLE:
 		is_contained = trigger.rect_extents.has_point(entity_pos)
 
-	var prev_state = trigger.current_state
+	var prev_state: Variant = trigger.current_state
 	if is_contained:
 		if prev_state == TriggerState.OUTSIDE or prev_state == TriggerState.EXITED:
 			trigger.current_state = TriggerState.ENTERED

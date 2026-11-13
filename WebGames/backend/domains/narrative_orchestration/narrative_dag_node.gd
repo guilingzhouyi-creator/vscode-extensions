@@ -91,7 +91,7 @@ static func from_dto(d: Dictionary) -> NarrativeDAGNode:
 	node.choices.clear()
 	for c in (d.get("choices", []) as Array):
 		if c is Dictionary:
-			node.choices.append((c as Dictionary).duplicate(true))
+			_append_choice_clone(node, c as Dictionary)
 
 	node.required_prerequisites.clear()
 	for pre in (d.get("required_prerequisites", []) as Array):
@@ -103,3 +103,6 @@ static func from_dto(d: Dictionary) -> NarrativeDAGNode:
 			node.mutations_on_complete.append(m as Dictionary)
 	node.is_optional = bool(d.get("is_optional", false))
 	return node
+
+static func _append_choice_clone(node: NarrativeDAGNode, choice: Dictionary) -> void:
+	node.choices.append(choice.duplicate(true))

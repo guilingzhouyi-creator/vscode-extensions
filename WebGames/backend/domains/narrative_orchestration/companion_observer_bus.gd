@@ -101,9 +101,10 @@ func get_recent_events(limit: int = 8) -> Array[Dictionary]:
 		out[i] = _slots[slot_idx]
 	return out
 
-## 清空环形队列历史记录
+## 清空环形队列历史记录（原位复用槽位字典，循环零分配）
 func clear_history() -> void:
 	for i in range(MAX_CAPACITY):
-		_slots[i] = {}
+		if _slots[i] is Dictionary:
+			(_slots[i] as Dictionary).clear()
 	_head = 0
 	_count = 0

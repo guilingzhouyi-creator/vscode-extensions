@@ -34,7 +34,7 @@ func record_event(
 
 ## 批量提取：整批复制后清空缓冲（刷盘供上游消费）
 func flush_events_batch() -> Array:
-	var batch = _event_ring_buffer.duplicate()
+	var batch: Variant = _event_ring_buffer.duplicate()
 	_event_ring_buffer.clear()
 	return batch
 

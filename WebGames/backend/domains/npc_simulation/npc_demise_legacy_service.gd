@@ -35,12 +35,12 @@ static func process_npc_natural_demise(
 	var ast := SkillSubgraphAST.new()
 	ast.skill_name = npc.personal_name + book_name_suffix
 	ast.sentence_count = sentence_count
-	var legacy_book = GrimoireAuthoringPipeline.publish_manuscript_book(
+	var legacy_book: Variant = GrimoireAuthoringPipeline.publish_manuscript_book(
 		npc.npc_id, ast.skill_name, ast, book_price, royalty_rate
 	)
 
 	# 2. 遗产交接
-	var transferred_gold = npc.wallet.gold
+	var transferred_gold: Variant = npc.wallet.gold
 	if successor_npc != null:
 		successor_npc.wallet.gold += transferred_gold
 		npc.wallet.gold = 0

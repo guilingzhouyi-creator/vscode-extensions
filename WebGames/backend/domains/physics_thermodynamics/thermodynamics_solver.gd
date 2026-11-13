@@ -41,13 +41,13 @@ static func calculate_penetration_damage(
 	edge_sharpness: float,
 	effective_armor: float
 ) -> float:
-	var verb = PhysicalVerbRegistry.get_verb(verb_id)
+	var verb: Variant = PhysicalVerbRegistry.get_verb(verb_id)
 	var k_mom: float = verb.get("k_mom", 1.0)
 	var k_edge: float = verb.get("k_edge", 1.0)
 
 	_ensure_kinetic_cache()
 	var p := _kinetic_cache
-	var kinetic_energy = p.energy_coef * max(p.mass_floor, weapon_mass_kg) * pow(max(p.velocity_floor, velocity_m_s), 2.0)
+	var kinetic_energy: Variant = p.energy_coef * max(p.mass_floor, weapon_mass_kg) * pow(max(p.velocity_floor, velocity_m_s), 2.0)
 	var sharpness_boost: float = 1.0 + k_edge * maxf(0.0, edge_sharpness)
 	var armor_divisor: float = 1.0 + maxf(0.0, effective_armor)
 

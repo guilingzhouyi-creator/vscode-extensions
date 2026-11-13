@@ -81,21 +81,42 @@ static func _resolve_mod_prologue_dag_id(
     var by_rule_race: String = _match_rules_by_race_or_default(custom_rules, clean_race)
     return by_rule_race
 
+static func _evaluate_routing_rule(
+    raw_rule: Variant,
+    empty_cond: Dictionary,
+    origin_id: String,
+    race_id: String,
+    match_origin_only: bool
+) -> Dictionary:
+    if not (raw_rule is Dictionary):
+        return {}
+    var rule: Dictionary = raw_rule
+    var cond: Dictionary = rule.get("match_condition", empty_cond)
+    var target: String = str(rule.get("target_dag_id", "")).strip_edges()
+    if target.is_empty():
+        return {}
+    if match_origin_only:
+        var origin_match: bool = cond.has("origin_id") and str(cond.get("origin_id", "")).strip_edges() == origin_id
+        var race_ok: bool = not cond.has("race_id") or str(cond.get("race_id", "")).strip_edges() == race_id
+        return {"kind": "ORIGIN", "target": target} if (origin_match and race_ok) else {}
+    if cond.has("origin_id"):
+        return {}
+    if cond.has("race_id") and str(cond.get("race_id", "")).strip_edges() == race_id:
+        return {"kind": "RACE", "target": target}
+    if bool(cond.get("is_default", false)):
+        return {"kind": "DEFAULT", "target": target}
+    return {}
+
 static func _match_rules_by_origin(
     rules: Array,
     origin_id: String,
     race_id: String
 ) -> String:
+    var empty_cond: Dictionary = {}
     for r in rules:
-        if not (r is Dictionary):
-            continue
-        var rule: Dictionary = r
-        var cond: Dictionary = rule.get("match_condition", {})
-        if cond.has("origin_id") and str(cond.get("origin_id", "")).strip_edges() == origin_id:
-            if not cond.has("race_id") or str(cond.get("race_id", "")).strip_edges() == race_id:
-                var target: String = str(rule.get("target_dag_id", "")).strip_edges()
-                if not target.is_empty():
-                    return target
+        var matched: Dictionary = _evaluate_routing_rule(r, empty_cond, origin_id, race_id, true)
+        if not matched.is_empty():
+            return str(matched["target"])
     return ""
 
 static func _lookup_origin_bound_dag_id(origin_id: String, manifest: Dictionary) -> String:
@@ -123,30 +144,27 @@ static func _lookup_origin_bound_dag_id(origin_id: String, manifest: Dictionary)
 
 static func _match_rules_by_race_or_default(rules: Array, race_id: String) -> String:
     var default_dag_id: String = ""
+    var empty_cond: Dictionary = {}
     for r in rules:
-        if not (r is Dictionary):
+        var matched: Dictionary = _evaluate_routing_rule(r, empty_cond, "", race_id, false)
+        if matched.is_empty():
             continue
-        var rule: Dictionary = r
-        var cond: Dictionary = rule.get("match_condition", {})
-        if cond.has("origin_id"):
-            continue
-        if cond.has("race_id") and str(cond.get("race_id", "")).strip_edges() == race_id:
-            var target: String = str(rule.get("target_dag_id", "")).strip_edges()
-            if not target.is_empty():
-                return target
-        elif bool(cond.get("is_default", false)) and default_dag_id.is_empty():
-            default_dag_id = str(rule.get("target_dag_id", "")).strip_edges()
+        if str(matched["kind"]) == "RACE":
+            return str(matched["target"])
+        if default_dag_id.is_empty():
+            default_dag_id = str(matched["target"])
     return default_dag_id
 
 static func _resolve_builtin_routing_dag_id(race_id: String, origin_id: String) -> String:
     var routing_rules: Array = GameConfig.get_array("narratives.prologue_dag_catalog", "prologue_routing_rules", [])
     var selected_dag_id: String = ""
+    var empty_cond: Dictionary = {}
 
     for r in routing_rules:
         if not (r is Dictionary):
             continue
         var rule: Dictionary = r
-        var cond: Dictionary = rule.get("match_condition", {})
+        var cond: Dictionary = rule.get("match_condition", empty_cond)
         if not origin_id.is_empty() and cond.has("origin_id") and str(cond["origin_id"]) == origin_id:
             return str(rule.get("target_dag_id", ""))
         if bool(cond.get("is_default", false)):

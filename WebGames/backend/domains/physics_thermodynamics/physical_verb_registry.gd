@@ -8,7 +8,9 @@
 # ==============================================================================
 
 ## PhysicalVerbRegistry：Domain Registry / Specification Catalog
-class_name PhysicalVerbRegistry extends RefCounted
+class_name PhysicalVerbRegistry extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 static var verbs: Dictionary:
 	get:
@@ -108,7 +110,7 @@ class CombatActionCardEntity extends RefCounted:
 		}
 
 ## CombatNarrativeEventPacket：战斗叙事事件数据包模型
-class CombatNarrativeEventPacket extends RefCounted:
+class CombatNarrativeEventPacket extends PoolableDtoBase:
 	var actor_id: String = ""
 	var target_id: String = ""
 	var verb_name: String = ""
@@ -120,6 +122,7 @@ class CombatNarrativeEventPacket extends RefCounted:
 	var timestamp_tick: int = 0
 
 	func reset_state() -> void:
+		super.reset_state()
 		actor_id = ""
 		target_id = ""
 		verb_name = ""

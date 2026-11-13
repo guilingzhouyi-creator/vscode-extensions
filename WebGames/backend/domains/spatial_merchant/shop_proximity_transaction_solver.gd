@@ -51,7 +51,7 @@ static func buy_item(
 
 	var shelf_item: Dictionary = shop.shelf_inventory[item_index]
 	# 空库存/负值/非法类型数据守卫：null、非整数或负库存一律拒绝，杜绝穿透到扣款分支
-	var raw_stock = shelf_item.get("stock_count")
+	var raw_stock: Variant = shelf_item.get("stock_count")
 	if not (raw_stock is int) or int(raw_stock) < 0:
 		return {"success": false, "error_code": "INVALID_STOCK", "error_message": _msg("stock_insufficient") % 0}
 	var available_stock: int = raw_stock
@@ -63,8 +63,8 @@ static func buy_item(
 		}
 
 	# 3. 价格与钱包检定（null/非整数/负价格统一 INVALID_PRICE，扣款前拒绝）
-	var raw_gold = shelf_item.get("price_gold")
-	var raw_silver = shelf_item.get("price_silver")
+	var raw_gold: Variant = shelf_item.get("price_gold")
+	var raw_silver: Variant = shelf_item.get("price_silver")
 	if not (raw_gold is int and raw_silver is int) or int(raw_gold) < 0 or int(raw_silver) < 0:
 		return {"success": false, "error_code": "INVALID_PRICE"}
 	var unit_gold: int = raw_gold
@@ -81,11 +81,11 @@ static func buy_item(
 
 	# 4. 背包空间检定
 	var fallback_tpl := GameConfig.get_string("domains.spatial_merchant", "goods/fallback_template_id", "ITEM_GOODS")
-	var template_id = shelf_item.get("item_template_id", fallback_tpl)
+	var template_id: Variant = shelf_item.get("item_template_id", fallback_tpl)
 	var new_item: ItemEntity = null
 	if inventory != null:
 		var catalog := GameBootstrap.catalog()
-		var proto = catalog.get_prototype(str(template_id))
+		var proto: Variant = catalog.get_prototype(str(template_id))
 		if proto == null:
 			return {"success": false, "error_code": "ITEM_NOT_REGISTERED"}
 		new_item = ItemInstanceFactory.build_instance(proto, proto.english_name, "SHOP_")

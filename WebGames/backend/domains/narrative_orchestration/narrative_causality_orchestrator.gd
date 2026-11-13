@@ -16,7 +16,7 @@ static func evaluate_ast_condition(ast_node: Dictionary, world_context: Dictiona
 	if ast_node.is_empty():
 		return true
 
-	var op_type = ast_node.get("type", "LEAF")
+	var op_type: Variant = ast_node.get("type", "LEAF")
 	if op_type == "AND":
 		var conditions: Array = ast_node.get("conditions", [])
 		for cond in conditions:
@@ -34,20 +34,20 @@ static func evaluate_ast_condition(ast_node: Dictionary, world_context: Dictiona
 		return not evaluate_ast_condition(child, world_context)
 
 	# 叶子节点判定
-	var kind = ast_node.get("kind", "")
-	var target_val = ast_node.get("val", null)
+	var kind: Variant = ast_node.get("kind", "")
+	var target_val: Variant = ast_node.get("val", null)
 	match kind:
 		"TOWN_EQUALS":
 			return world_context.get("town_id", "") == target_val
 		"MIN_LEVEL":
 			return world_context.get("character_level", 1) >= int(target_val)
 		"HOUR_BETWEEN":
-			var h = world_context.get("world_hour", 12)
-			var min_h = ast_node.get("min", 0)
-			var max_h = ast_node.get("max", 24)
+			var h: Variant = world_context.get("world_hour", 12)
+			var min_h: Variant = ast_node.get("min", 0)
+			var max_h: Variant = ast_node.get("max", 24)
 			return h >= min_h and h <= max_h
 		"REPUTATION_GREATER":
-			var faction = ast_node.get("faction", "")
+			var faction: Variant = ast_node.get("faction", "")
 			var reps: Dictionary = world_context.get("reputations", {})
 			return reps.get(faction, 0) >= int(target_val)
 	return false

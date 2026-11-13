@@ -66,10 +66,12 @@ func _build_graph_indices() -> void:
 	if graph == null:
 		return
 	for edge in graph.edges:
-		var from_id: String = edge.from_node_id
-		if not _outgoing_edges_index.has(from_id):
-			_outgoing_edges_index[from_id] = []
-		_outgoing_edges_index[from_id].append(edge)
+		_append_outgoing_edge(edge.from_node_id, edge)
+
+func _append_outgoing_edge(from_id: String, edge: Variant) -> void:
+	if not _outgoing_edges_index.has(from_id):
+		_outgoing_edges_index[from_id] = []
+	(_outgoing_edges_index[from_id] as Array).append(edge)
 
 ## 校验指定活跃节点是否可执行
 func _verify_node_executable(node_id: String) -> Dictionary:
@@ -193,7 +195,7 @@ func execute_node_action(node_id: String, action_payload: Dictionary = {}) -> Di
 
 ## 取节点全部出边（常数级从邻接表中获取）
 func _get_outgoing_edges(from_id: String) -> Array[NarrativeDAGEdge]:
-	var raw = _outgoing_edges_index.get(from_id, [])
+	var raw: Variant = _outgoing_edges_index.get(from_id, [])
 	var res: Array[NarrativeDAGEdge] = []
 	for e in raw:
 		if e is NarrativeDAGEdge:
@@ -223,7 +225,7 @@ func _are_prerequisites_satisfied(node: NarrativeDAGNode) -> bool:
 
 ## 导出运行时会话状态快照（支持游戏存盘）
 func export_session_dto() -> RefCounted:
-	var dto = NarrativeDagSessionDTOClass.new()
+	var dto: Variant = NarrativeDagSessionDTOClass.new()
 	dto.graph_id = graph.graph_id if graph else ""
 	dto.active_node_ids = active_node_ids.duplicate()
 	dto.completed_node_ids = completed_node_ids.duplicate()

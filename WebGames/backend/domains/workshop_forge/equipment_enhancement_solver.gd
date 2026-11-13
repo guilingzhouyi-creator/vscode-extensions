@@ -77,7 +77,7 @@ static func attempt_enhancement(
 		return {"success": false, "error_code": crystal_result.get("error_code", "TRANSACTION_FAILED")}
 
 	var rates := _success_rates()
-	var rate = float(rates.get(str(target_lvl), _fallback_rate()))
+	var rate: float = float(rates.get(str(target_lvl), _fallback_rate()))
 	var roll := enhance_rng.randf()
 
 	if roll < rate:
