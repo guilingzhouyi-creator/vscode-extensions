@@ -231,6 +231,34 @@ function readStagedBufferSafe(repoRoot, relPath) {
 }
 
 /**
+ * Resolves effective EOL bytes for staged `.ps1` blobs, checking disk copy for accidental
+ * LF saves before honoring `.gitattributes` `cat-file --filters` CRLF smudge rules.
+ *
+ * @param {string} repoRoot - Repository root directory.
+ * @param {string} relPath - Relative path of the file from repoRoot.
+ * @param {Buffer} rawBuffer - Raw staged or disk byte buffer.
+ * @param {boolean} useIndex - Whether rawBuffer came from unsmudged index blobs.
+ * @returns {Buffer} Buffer representing effective EOL bytes.
+ */
+function readStagedEolBufferSafe(repoRoot, relPath, rawBuffer, useIndex) {
+  if (!useIndex || typeof relPath !== 'string' || !relPath.endsWith('.ps1')) return rawBuffer;
+  const root = repoRoot || DEFAULT_REPO_ROOT;
+  const fullPath = path.join(root, relPath);
+  if (fs.existsSync(fullPath)) {
+    const diskBuf = fs.readFileSync(fullPath);
+    if (!diskBuf.includes(0x0d)) return diskBuf;
+  }
+  try {
+    return runGit(['cat-file', '--filters', `:${relPath.replace(/\\/g, '/')}`], {
+      cwd: root,
+      maxBuffer: STAGED_BUFFER_MAX_BYTES,
+    });
+  } catch {
+    return rawBuffer;
+  }
+}
+
+/**
  * Reads many staged blobs in a single Git process.
  *
  * The per-file `git show ":path"` helper spawns one process per file, which
@@ -373,5 +401,6 @@ module.exports = Object.freeze({
   readStagedContentSafe,
   readStagedBufferSafe,
   readStagedBuffersBatch,
+  readStagedEolBufferSafe,
   checkHeadReceipt,
 });

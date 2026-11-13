@@ -26,7 +26,14 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { getSafeGitEnv, getStagedFiles: queryStagedFiles, readStagedBufferSafe, readStagedBuffersBatch, checkHeadReceipt } = require('./git-env');
+const {
+  getSafeGitEnv,
+  getStagedFiles: queryStagedFiles,
+  readStagedBufferSafe,
+  readStagedBuffersBatch,
+  readStagedEolBufferSafe,
+  checkHeadReceipt,
+} = require('./git-env');
 const {
   evaluateCodeMetrics,
   classifyCStyleLine,
@@ -843,7 +850,7 @@ function inspectStagedFile(repoRoot, file, collectors, useIndex, prefetched = nu
   }
 
   validateFileBom(buffer, file, collectors.gate2);
-  validateFileEol(file, buffer, collectors.gate2);
+  validateFileEol(file, readStagedEolBufferSafe(repoRoot, file, buffer, useIndex), collectors.gate2);
   validateFileTerminalNewline(content, file, collectors.gate2);
   validateFileIndent(file, content, collectors.gate2);
   validateCommentOnly(file, content, collectors.gate1);
