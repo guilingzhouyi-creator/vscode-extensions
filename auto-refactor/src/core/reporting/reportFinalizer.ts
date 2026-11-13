@@ -13,18 +13,10 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type {
-    ScanConfig,
-    ScanReport,
-    ScanSummary,
-    Issue,
-    SuppressionRule,
-    FileMetric,
-} from '../types';
+import type { ScanConfig, ScanReport, ScanSummary, Issue, FileMetric } from '../types';
 import type { Scanner } from '../analyzer';
 import { summarizeUncertainty } from './canonical-issue-builder';
 import type { Logger } from '../logger';
-import { globToRegExp } from '../file-discovery';
 import { runCyclePass } from '../dependency-graph';
 import type { ObservedConstantDeclaration } from '../architecture/constant-library-auditor';
 import { inspectConstantLibraryTopology } from '../architecture/constant-library-auditor';
@@ -38,7 +30,6 @@ import {
     handleBaselineUpdate,
     handleBaselineRatchet,
 } from './baselineManager';
-import { areAliasForms } from '../rules/aliases';
 import type { QualityScoreBreakdown } from '../scoring/scoringTypes';
 import { QualityScorer } from '../scoring/qualityScorer';
 import { synthesizeStaticQualityVector } from '../scoring/static-quality-model';
@@ -46,10 +37,8 @@ import { computeDynamicQualityVector } from '../dynamic/dynamic-quality-scorer';
 import { computeUnifiedQualityScore } from '../scoring/fusion-scorer';
 import type { GovernanceProjectProfile } from '../scoring/fusion-scorer';
 import { evaluateProjectAutonomy } from '../scoring/autonomy-scorer';
-import {
-    FindingConfidenceArbiter,
-    INLINE_DIRECTIVE_PATTERN,
-} from '../scoring/finding-confidence-arbiter';
+import { FindingConfidenceArbiter } from '../scoring/finding-confidence-arbiter';
+import { applySuppressions } from './post-scan-suppressions';
 import {
     countUncalibrated,
     resolveAdvisoryOnlyRules,
@@ -121,9 +110,6 @@ const OPT_CHECK_EMPTY_DIRECTORIES = 'checkEmptyDirectories';
 /** Default baseline comparison granularity. */
 const DEFAULT_BASELINE_GRANULARITY = 'id';
 
-/** Delimiter separating symbol hierarchies. */
-const SYMBOL_DOT_PREFIX = '.';
-
 /** Governance maturity tier classifications. */
 const TIER_INDUSTRIAL = 'industrial';
 const TIER_DEMO = 'demo';
@@ -180,9 +166,8 @@ const MSG_EMPTY_DIRECTORY_ISSUES = 'lingering empty directory finding(s)';
 /** Empty string constant for fallback representation. */
 const EMPTY_STRING = '';
 
-/** Immutable empty array singletons for zero-allocation fallbacks in hot loops. */
+/** Immutable empty array singleton for zero-allocation fallbacks in hot loops. */
 const EMPTY_ISSUES: readonly Issue[] = Object.freeze([]);
-const EMPTY_SUPPRESSIONS: readonly SuppressionRule[] = Object.freeze([]);
 
 const FINALIZED = Symbol('auto-refactor:finalized');
 
@@ -431,180 +416,6 @@ function applyEmptyDirectoryPass(context: PostScanPassContext): void {
     report.issues.push(...issues);
     computeSummary(report);
     logger.info(`${PASS_EMPTY_DIRECTORIES}: ${issues.length} ${MSG_EMPTY_DIRECTORY_ISSUES}`);
-}
-
-/** Pre-indexed fast lookup structure for suppression rules. */
-interface SuppressionIndex {
-    readonly candidateRulesByAnalyzer: Map<string, SuppressionRule[]>;
-    readonly generalRules: SuppressionRule[];
-    readonly fileMatcherByRule: Map<SuppressionRule, RegExp>;
-}
-
-/**
- * Builds an indexed suppression lookup structure for O(1) analyzer bucketing.
- *
- * @param suppressions - Declared list of suppression rules.
- * @returns Pre-indexed suppression maps.
- */
-function buildSuppressionIndex(suppressions: readonly SuppressionRule[]): SuppressionIndex {
-    const rulesByAnalyzer = new Map<string, SuppressionRule[]>();
-    const generalRules: SuppressionRule[] = [];
-    const orderIndexByRule = new Map<SuppressionRule, number>();
-    const fileMatcherByRule = new Map<SuppressionRule, RegExp>();
-
-    suppressions.forEach((rule, index) => {
-        orderIndexByRule.set(rule, index);
-        if (rule.matchFile) {
-            fileMatcherByRule.set(rule, globToRegExp(rule.matchFile.replace(/\\/g, '/')));
-        }
-        if (rule.matchAnalyzer) {
-            const bucket = rulesByAnalyzer.get(rule.matchAnalyzer) ?? [];
-            bucket.push(rule);
-            rulesByAnalyzer.set(rule.matchAnalyzer, bucket);
-        } else {
-            generalRules.push(rule);
-        }
-    });
-
-    const candidateRulesByAnalyzer = new Map<string, SuppressionRule[]>();
-    for (const analyzer of rulesByAnalyzer.keys()) {
-        const combinedRules = [
-            ...(rulesByAnalyzer.get(analyzer) ?? EMPTY_SUPPRESSIONS),
-            ...generalRules,
-        ];
-        combinedRules.sort(
-            (firstRule, secondRule) =>
-                (orderIndexByRule.get(firstRule) ?? 0) - (orderIndexByRule.get(secondRule) ?? 0),
-        );
-        candidateRulesByAnalyzer.set(analyzer, combinedRules);
-    }
-    generalRules.sort(
-        (firstRule, secondRule) =>
-            (orderIndexByRule.get(firstRule) ?? 0) - (orderIndexByRule.get(secondRule) ?? 0),
-    );
-    return { candidateRulesByAnalyzer, generalRules, fileMatcherByRule };
-}
-
-/**
- * Evaluates whether an individual issue matches any active suppression rule.
- *
- * @param issue - Issue to evaluate.
- * @param index - Pre-indexed suppression rule database.
- * @returns Matching suppression rule if applicable.
- */
-function matchSuppression(issue: Issue, index: SuppressionIndex): SuppressionRule | undefined {
-    const symbol =
-        typeof issue.detail?.function === 'string'
-            ? issue.detail.function
-            : typeof issue.detail?.name === 'string'
-              ? issue.detail.name
-              : EMPTY_STRING;
-    const candidates = index.candidateRulesByAnalyzer.get(issue.analyzer) ?? index.generalRules;
-    const normalizedFilePath = issue.location.file.replace(/\\/g, '/');
-
-    return candidates.find(
-        (rule) =>
-            (!rule.matchFile || index.fileMatcherByRule.get(rule)!.test(normalizedFilePath)) &&
-            (!rule.matchRule || areAliasForms(issue.rule, rule.matchRule)) &&
-            (!rule.matchSymbol ||
-                symbol === rule.matchSymbol ||
-                symbol.endsWith(SYMBOL_DOT_PREFIX + rule.matchSymbol)),
-    );
-}
-
-async function resolveFileDirectiveLines(
-    file: string | undefined,
-    rootDir: string,
-    retainedSource: ReadonlyMap<string, string> | undefined,
-    fileCache: Map<string, string[] | null>,
-    allowHostRead: boolean,
-): Promise<string[] | null> {
-    if (!file) return null;
-    if (fileCache.has(file)) return fileCache.get(file) ?? null;
-    let content = retainedSource?.get(file);
-    if (content === undefined && allowHostRead) {
-        const fullPath = path.isAbsolute(file) ? file : path.resolve(rootDir, file);
-        content = await fs.promises.readFile(fullPath, 'utf8').catch(() => undefined);
-    }
-    const lines = content && INLINE_DIRECTIVE_PATTERN.test(content) ? content.split('\n') : null;
-    fileCache.set(file, lines);
-    return lines;
-}
-
-function applySingleIssueSuppression(
-    issue: Issue,
-    fileLines: string[] | null,
-    arbiter: FindingConfidenceArbiter,
-    index: SuppressionIndex | null,
-): boolean {
-    if (issue.suppression) {
-        return true;
-    }
-    if (fileLines) {
-        const inlineCheck = arbiter.checkInlineSuppression(issue, fileLines);
-        if (inlineCheck.isSuppressed) {
-            issue.suppression = {
-                reason: inlineCheck.reason || 'Suppressed via inline comment directive',
-                downgraded: false,
-            };
-            return true;
-        }
-    }
-
-    if (!index) {
-        return false;
-    }
-
-    const matchedRule = matchSuppression(issue, index);
-    if (!matchedRule) {
-        return false;
-    }
-
-    issue.suppression = {
-        reason: matchedRule.reason,
-        downgraded: Boolean(matchedRule.downgradeTo),
-    };
-    if (matchedRule.downgradeTo) {
-        issue.severity = matchedRule.downgradeTo;
-    }
-    return true;
-}
-
-/**
- * Applies configured suppression rules to all issues in the report.
- *
- * @param report - Scan report undergoing suppression filtering.
- * @param suppressions - Suppression rule collection.
- * @param rootDir - Workspace root directory for resolving relative file paths.
- * @param retainedSource - Optional retained source text map from the active scanner.
- * @returns Total count of suppressed issues.
- */
-async function applySuppressions(
-    report: ScanReport,
-    suppressions: readonly SuppressionRule[],
-    rootDir: string,
-    retainedSource?: ReadonlyMap<string, string>,
-    allowHostRead = true,
-): Promise<number> {
-    const arbiter = new FindingConfidenceArbiter();
-    const index = suppressions.length > 0 ? buildSuppressionIndex(suppressions) : null;
-    let suppressedCount = 0;
-    const fileCache = new Map<string, string[] | null>();
-
-    for (const issue of report.issues) {
-        const fileLines = await resolveFileDirectiveLines(
-            issue.location?.file,
-            rootDir,
-            retainedSource,
-            fileCache,
-            allowHostRead,
-        );
-        if (applySingleIssueSuppression(issue, fileLines, arbiter, index)) {
-            suppressedCount++;
-        }
-    }
-    computeSummary(report);
-    return suppressedCount;
 }
 
 /** Dedicated baseline finalization context. */
@@ -1130,6 +941,7 @@ export async function finalizeReport(...finalizeArguments: FinalizeReportArgumen
         snapshotSource ?? reportScanner?.retainedSourceText(),
         snapshotSource === undefined,
     );
+    computeSummary(report);
     report.summary.suppressedCount = suppressedCount;
 
     if (snapshotSource) {
