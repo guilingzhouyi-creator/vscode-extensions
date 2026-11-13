@@ -11,6 +11,7 @@
 class_name GameConfig extends RefCounted
 
 const ConfigRouterEngine = preload("res://backend/infrastructure/config_router_engine.gd")
+const GameConfigLoader = preload("res://backend/infrastructure/game_config_loader.gd")
 const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
 const SystemBaseMessages = preload("res://backend/infrastructure/logging/system_base_messages.gd")
 
@@ -138,126 +139,53 @@ static func ensure_loaded() -> void:
 	if _loaded:
 		return
 	_tables.clear()
-	# 优先尝试加载单包融合模式 (Monolithic Bundle)
-	if FileAccess.file_exists(PATH_CONFIG_BUNDLE):
-		var bundle_data: Dictionary = BinaryConfigReader.load_monolithic_bundle(PATH_CONFIG_BUNDLE)
-		if not bundle_data.is_empty():
-			for t_name in bundle_data:
-				_tables[t_name] = bundle_data[t_name]
-			_loaded = true
-			_validate_required_tables()
-			return
-	_scan_dir(CONFIG_DIR, "")
+	var warnings: Array = []
+	GameConfigLoader.load_all_tables_into(_tables, _scan_failures, warnings)
+	_flush_loader_warnings(warnings)
 	_loaded = true
 	_validate_required_tables()
 
 ## 必需表校验：缺失时输出警告（防止配置漏删/改名导致业务静默回退到代码默认值）
 static func _validate_required_tables() -> void:
-	var missing: Array = []
-	for table_name in _required_tables:
-		if not _tables.has(table_name):
-			missing.append(table_name)
+	var missing: Array = GameConfigLoader.collect_missing_required(_tables, _required_tables)
 	if not missing.is_empty():
 		ErrorReporter.emit_error(LogConstants.CHANNEL_GAME_CONFIG, "REQUIRED_TABLE_MISSING", SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_REQUIRED_MISSING, {"tables": ", ".join(missing)}))
 
-## 获取统一资源目录实例（动态解耦，杜绝跨层静态强引用）
-static func _get_catalog() -> Variant:
-	if ResourceLoader.exists(PATH_STORAGE_CATALOG_SCRIPT):
-		var s = load(PATH_STORAGE_CATALOG_SCRIPT)
-		if s != null and s.has_method(METHOD_GET_INSTANCE):
-			return s.get_instance()
-	return null
-
-## JIT 靶向按需加载单个配置表（按需即时读盘，消除全局阻塞）
-static func _ensure_table_loaded_jit(table_name: String) -> void:
-	var target_name := ConfigRouterEngine.resolve_table_name(table_name)
-	if _tables.has(target_name):
-		return
-	var catalog: Variant = _get_catalog()
-	if catalog != null and catalog.has_method(METHOD_RESOLVE_CONFIG_TABLE_ENTRY):
-		var entry = catalog.resolve_config_table_entry(target_name)
-		if entry != null and not str(entry.physical_path).is_empty():
-			var path_kdat := str(entry.physical_path).trim_suffix(EXT_JSON) + EXT_KDAT
-			if FileAccess.file_exists(path_kdat):
-				_load_table(path_kdat, target_name)
-				return
-			elif FileAccess.file_exists(entry.physical_path):
-				_load_table(entry.physical_path, target_name)
-				return
-
-	# 回退至约定物理路径 (优先探测 .kdat 二进制流)
-	var parts := target_name.split(".")
-	var base_path := CONFIG_DIR + "/".join(parts)
-	if FileAccess.file_exists(base_path + EXT_KDAT):
-		_load_table(base_path + EXT_KDAT, target_name)
-	elif FileAccess.file_exists(base_path + EXT_JSON):
-		_load_table(base_path + EXT_JSON, target_name)
-
 ## 同步极速加载 L0 核心底座配置表（耗时 <= 5.0ms，建立最小可运行世界状态）
 static func ensure_l0_loaded_sync() -> int:
-	var catalog: Variant = _get_catalog()
-	var loaded_count := 0
-	if catalog != null and catalog.has_method(METHOD_GET_CRITICAL_BOOT_ENTRIES):
-		for entry in catalog.get_critical_boot_entries():
-			var t_name: String = str(entry.metadata.get("table_name", ""))
-			if not t_name.is_empty() and not _tables.has(t_name):
-				_load_table(entry.physical_path, t_name)
-				loaded_count += 1
+	var warnings: Array = []
+	var loaded_count: int = GameConfigLoader.load_l0_entries_into(_tables, _scan_failures, warnings)
+	_flush_loader_warnings(warnings)
 	_loaded = true
 	return loaded_count
 
 ## 借助双域储存并发工作池异步装载全部业务与文案配置表
 static func load_via_storage_async(on_completed: Callable = Callable()) -> void:
 	ensure_l0_loaded_sync()
-	var catalog: Variant = _get_catalog()
-	if catalog == null or not ResourceLoader.exists(PATH_AUX_WORKER_POOL_SCRIPT):
-		ensure_loaded()
-		if on_completed.is_valid():
-			on_completed.call(_tables.size())
-		return
-
-	var pool_script = load(PATH_AUX_WORKER_POOL_SCRIPT)
-	var pool: Variant = pool_script.get_instance() if pool_script != null else null
-	var batch_script = load(PATH_BATCH_LOAD_REQUEST_SCRIPT)
-	if pool == null or batch_script == null:
-		ensure_loaded()
-		if on_completed.is_valid():
-			on_completed.call(_tables.size())
-		return
-
-	var batch_req = batch_script.new(BATCH_ID_CONFIG_BULK)
-	for entry in catalog.get_entries_by_category(CAT_CONFIG):
-		var t_name: String = str(entry.metadata.get("table_name", ""))
-		if not t_name.is_empty() and not _tables.has(t_name):
-			batch_req.add_entry(entry)
-
-	batch_req.on_item_loaded = func(entry: Variant, ok: bool, data: Variant, _err: String) -> void:
+	var on_item := func(entry: Variant, ok: bool, data: Variant, _err: String) -> void:
 		if ok and (data is Dictionary):
 			var t_name: String = str(entry.metadata.get("table_name", ""))
 			if not t_name.is_empty():
 				_tables_mutex.lock()
 				_tables[t_name] = data
 				_tables_mutex.unlock()
-
-	batch_req.on_batch_completed = func(_bid: String, total: int, _failed: int) -> void:
+	var on_done := func(_bid: String, total: int, _failed: int) -> void:
 		_validate_required_tables()
 		EventBusCore.get_instance().emit_domain_event(EVENT_ALL_TABLES_READY, {"total": total})
 		if on_completed.is_valid():
 			on_completed.call(total)
-
-	pool.enqueue_batch(batch_req)
+	if not GameConfigLoader.try_enqueue_async_config_batch(_tables, on_item, on_done):
+		ensure_loaded()
+		if on_completed.is_valid():
+			on_completed.call(_tables.size())
 
 ## 加载报告：全部表名 / 缺失必需表 / 表总数（运维与调试用）
 static func describe() -> Dictionary:
 	ensure_loaded()
-	var missing: Array = []
-	for table_name in _required_tables:
-		if not _tables.has(table_name):
-			missing.append(table_name)
 	return {
 		"count": _tables.size(),
 		"tables": _tables.keys(),
-		"missing_required": missing
+		"missing_required": GameConfigLoader.collect_missing_required(_tables, _required_tables)
 	}
 
 # ==============================================================================
@@ -275,6 +203,10 @@ static func config_reload_version() -> int:
 ## 扫描失败记录（S3-01：JSON 解析失败/顶层非对象表在此登记，reload 据此拒绝发布）
 static var _scan_failures: Array = []
 
+static func _flush_loader_warnings(warnings: Array) -> void:
+	for msg in warnings:
+		push_warning(str(msg))
+
 ## 热重载：先构建新表快照，成功后原子交换；构建失败（含必需表缺失/坏配置）保留旧快照与版本。
 ## 返回 ConfigReloadResult：{ success, version, added, removed, changed, table_count [, error] }
 ## 命名注意：不可命名为 reload()——GDScript 内建 GDScript.reload() 会遮蔽同名静态方法
@@ -286,82 +218,48 @@ static func reload_config() -> Dictionary:
 	var old_loaded: bool = _loaded
 	_scan_failures = []
 
-	# 构建阶段（临时装入 _tables，成功后交换）
-	_tables.clear()
-	_scan_dir(CONFIG_DIR, "")
-	var built: Dictionary = _tables
-	_tables = old_tables # 先还原旧表（构建阶段不污染运行快照）
+	var built: Dictionary = {}
+	var warnings: Array = []
+	GameConfigLoader.scan_dir_into(CONFIG_DIR, "", built, _scan_failures, warnings)
+	_flush_loader_warnings(warnings)
 
 	if not _scan_failures.is_empty():
-		# 构建失败（存在坏配置：JSON 解析失败/顶层非对象）——保留旧快照继续服务，版本不推进
 		return {
-			"success": false,
-			"version": _reload_counter,
-			"error": "BUILD_FAILED",
-			"details": _scan_failures.duplicate(true),
-			"added": [],
-			"removed": [],
-			"changed": [],
+			"success": false, "version": _reload_counter, "error": "BUILD_FAILED",
+			"details": _scan_failures.duplicate(true), "added": [], "removed": [], "changed": [],
 			"table_count": old_tables.size()
 		}
 
-	# 必需表校验：缺表 → 拒绝发布（防止漏删/改名导致业务静默回退到代码默认值）
-	var missing: Array = []
-	for table_name in _required_tables:
-		if not built.has(table_name):
-			missing.append(table_name)
+	var missing: Array = GameConfigLoader.collect_missing_required(built, _required_tables)
 	if not missing.is_empty():
 		_tables = old_tables
 		_loaded = old_loaded
 		return {
-			"success": false,
-			"version": _reload_counter,
-			"error": "MISSING_REQUIRED_TABLE",
-			"details": missing,
-			"added": [],
-			"removed": [],
-			"changed": [],
+			"success": false, "version": _reload_counter, "error": "MISSING_REQUIRED_TABLE",
+			"details": missing, "added": [], "removed": [], "changed": [],
 			"table_count": old_tables.size()
 		}
 
 	if built.is_empty() and not old_tables.is_empty():
-		# 构建失败（扫描无结果）——保留旧快照继续服务
 		_loaded = old_loaded
 		return {
-			"success": false,
-			"version": _reload_counter,
-			"error": "BUILD_FAILED",
-			"added": [],
-			"removed": [],
-			"changed": [],
+			"success": false, "version": _reload_counter, "error": "BUILD_FAILED",
+			"added": [], "removed": [], "changed": [],
 			"table_count": old_tables.size()
 		}
 
-	# 对比新旧表集合（新增/删除/变更清单）
-	var added: Array = []
-	var changed: Array = []
-	for k in built:
-		if not old_tables.has(k):
-			added.append(k)
-		elif old_tables[k] != built[k]:
-			changed.append(k)
-	var removed: Array = []
-	for k in old_tables:
-		if not built.has(k):
-			removed.append(k)
-
-	# 原子交换新快照
+	var diff: Dictionary = GameConfigLoader.diff_table_snapshots(old_tables, built)
 	_reload_counter += 1
 	_tables = built
 	_loaded = true
-	_path_cache.clear() # 表键集可能变化，防御性清空分段缓存
-	EventBusCore.get_instance().emit_domain_event("config.security_reloaded", {"version": _reload_counter, "changed": changed})
+	_path_cache.clear()
+	EventBusCore.get_instance().emit_domain_event("config.security_reloaded", {"version": _reload_counter, "changed": diff["changed"]})
 	return {
 		"success": true,
 		"version": _reload_counter,
-		"added": added,
-		"removed": removed,
-		"changed": changed,
+		"added": diff["added"],
+		"removed": diff["removed"],
+		"changed": diff["changed"],
 		"table_count": _tables.size()
 	}
 
@@ -372,36 +270,11 @@ static func reload_all_configurations() -> Dictionary:
 ## 单子表靶向热重载（零污染、单子表原子替换）
 static func reload_subtable(subtable_name: String) -> Dictionary:
 	var resolved: String = ConfigRouterEngine.resolve_table_name(subtable_name)
-	var parts := resolved.split(".")
-	var file_path := CONFIG_DIR + "/".join(parts) + EXT_JSON
+	var load_res: Dictionary = GameConfigLoader.load_single_subtable_json(resolved)
+	if not bool(load_res.get("success", false)):
+		return load_res
 
-	if not FileAccess.file_exists(file_path):
-		return {
-			"success": false,
-			"subtable": resolved,
-			"error": "FILE_NOT_FOUND",
-			"file_path": file_path
-		}
-
-	var json := JSON.new()
-	var text := FileAccess.get_file_as_string(file_path)
-	if json.parse(text) != OK:
-		return {
-			"success": false,
-			"subtable": resolved,
-			"error": "JSON_PARSE_FAILED",
-			"details": json.get_error_message()
-		}
-
-	var data: Variant = json.get_data()
-	if not (data is Dictionary):
-		return {
-			"success": false,
-			"subtable": resolved,
-			"error": "NOT_A_JSON_OBJECT"
-		}
-
-	_tables[resolved] = data
+	_tables[resolved] = load_res.get("data", {})
 	_reload_counter += 1
 	_path_cache.clear()
 
@@ -432,7 +305,7 @@ static func get_table(table_name: String, default: Variant = {}) -> Variant:
 	ensure_loaded()
 	var target_table := ConfigRouterEngine.resolve_table_name(table_name)
 	if not _tables.has(target_table):
-		_ensure_table_loaded_jit(target_table)
+		GameConfigLoader.ensure_table_loaded_jit(target_table, _tables, _scan_failures)
 	return _tables.get(target_table, default)
 
 ## 判定指定配置表是否存在且可加载
@@ -440,7 +313,7 @@ static func has_table(table_name: String) -> bool:
 	ensure_loaded()
 	var target_table := ConfigRouterEngine.resolve_table_name(table_name)
 	if not _tables.has(target_table):
-		_ensure_table_loaded_jit(target_table)
+		GameConfigLoader.ensure_table_loaded_jit(target_table, _tables, _scan_failures)
 	return _tables.has(target_table)
 
 static func _resolve_raw_value(table_name: String, path: String) -> Variant:
@@ -448,18 +321,19 @@ static func _resolve_raw_value(table_name: String, path: String) -> Variant:
 	var route: Variant = ConfigRouterEngine.resolve_route(table_name, path)
 	var target_table: String = str(route.resolved_table)
 	if not _tables.has(target_table):
-		_ensure_table_loaded_jit(target_table)
+		GameConfigLoader.ensure_table_loaded_jit(target_table, _tables, _scan_failures)
 	var val: Variant = _lookup_path_in_table(_tables.get(target_table, {}), path)
 	if val != null:
 		return val
 	var subtables: Array = ConfigRouterEngine.get_subtables_for_domain(table_name)
+	var empty_table: Dictionary = {}
 	for sub in subtables:
 		var s_name := String(sub)
 		if s_name == target_table:
 			continue
 		if not _tables.has(s_name):
-			_ensure_table_loaded_jit(s_name)
-		var sub_val: Variant = _lookup_path_in_table(_tables.get(s_name, {}), path)
+			GameConfigLoader.ensure_table_loaded_jit(s_name, _tables, _scan_failures)
+		var sub_val: Variant = _lookup_path_in_table(_tables.get(s_name, empty_table), path)
 		if sub_val != null:
 			return sub_val
 	return null
@@ -580,55 +454,3 @@ static func _split_path(path: String) -> PackedStringArray:
 			_path_cache.erase(oldest)
 	_path_cache[path] = parts
 	return parts
-
-static func _scan_dir(dir_path: String, table_prefix: String) -> void:
-	var dir := DirAccess.open(dir_path)
-	if dir == null:
-		push_warning(SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_DIR_MISSING, {"path": dir_path}))
-		return
-	var scanned_tables: Dictionary = {}
-	# 优先加载高纯度二进制 .kdat
-	for file_name in dir.get_files():
-		if file_name.ends_with(EXT_KDAT):
-			var table_name := file_name.trim_suffix(EXT_KDAT)
-			if not table_prefix.is_empty():
-				table_name = table_prefix + "." + table_name
-			_load_table(dir_path + file_name, table_name)
-			scanned_tables[table_name] = true
-	# 回退处理 .json (若尚未被 .kdat 载入)
-	for file_name in dir.get_files():
-		if file_name.ends_with(EXT_JSON):
-			var table_name := file_name.trim_suffix(EXT_JSON)
-			if not table_prefix.is_empty():
-				table_name = table_prefix + "." + table_name
-			if not scanned_tables.has(table_name):
-				_load_table(dir_path + file_name, table_name)
-	for sub_dir in dir.get_directories():
-		var sub_prefix := sub_dir if table_prefix.is_empty() else table_prefix + "." + sub_dir
-		_scan_dir(dir_path + sub_dir + "/", sub_prefix)
-
-static func _load_table(file_path: String, table_name: String) -> void:
-	if file_path.ends_with(EXT_KDAT):
-		var kdat_data: Variant = BinaryConfigReader.load_kdat_file(file_path)
-		if kdat_data != null and (kdat_data is Dictionary):
-			_tables[table_name] = kdat_data
-			return
-		_scan_failures.append(SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_KDAT_FAIL, {"path": file_path}))
-		push_warning(SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_KDAT_WARN, {"path": file_path}))
-		return
-
-	var json := JSON.new()
-	var text := FileAccess.get_file_as_string(file_path)
-	var err := json.parse(text)
-	if err != OK:
-		_scan_failures.append(SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_JSON_FAIL, {"path": file_path, "line": json.get_error_line()}))
-		push_warning(SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_JSON_WARN, {
-			"path": file_path, "error": json.get_error_message(), "line": json.get_error_line()
-		}))
-		return
-	var data: Variant = json.get_data()
-	if data is Dictionary:
-		_tables[table_name] = data
-	else:
-		_scan_failures.append(SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_ROOT_OBJECT, {"path": file_path}))
-		push_warning(SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_ROOT_WARN, {"path": file_path}))
