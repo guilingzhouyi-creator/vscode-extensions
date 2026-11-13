@@ -36,18 +36,14 @@ pub(super) fn apply_branch_and_scope_guards(
         HeadState::Detached(_) | HeadState::Absent => None,
     });
 
-    resolve_worktree_branch_target(
-        ctx,
-        options,
-        &floor,
-        bypass.as_ref(),
-        head_short.as_deref(),
-    );
+    resolve_worktree_branch_target(ctx, options, &floor, bypass.as_ref(), head_short.as_deref());
 
     if let Some(candidate) = options.fractal_ref() {
         if !options.parent_scopes.is_empty() {
             let parent_proj = ScopeProjection::scoped(options.parent_scopes.clone());
-            if let Err(breach) = TopologyVerifier::assert_scope_subsumption(&parent_proj, projection) {
+            if let Err(breach) =
+                TopologyVerifier::assert_scope_subsumption(&parent_proj, projection)
+            {
                 reject(
                     CliTag::VERIFY_FAIL,
                     format!("Worktree scope rejected by TopologyVerifier (FGT-TOP-001): {breach}"),
@@ -58,7 +54,8 @@ pub(super) fn apply_branch_and_scope_guards(
             candidate,
             FractalRef::CardWorktree { .. } | FractalRef::SubAgentWorktree { .. }
         ) {
-            if let Err(fanout_err) = fg_topology::assert_fanout_available_in(&candidate, &ref_store) {
+            if let Err(fanout_err) = fg_topology::assert_fanout_available_in(&candidate, &ref_store)
+            {
                 reject(CliTag::ERROR, fanout_err);
             }
         }

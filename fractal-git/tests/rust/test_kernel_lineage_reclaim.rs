@@ -29,24 +29,24 @@ fn lineage_ledger_verification_and_tamper_fail_closed_on_reclaim() {
     fs::write(repo.join("worker.rs"), "pub fn work() {}\n").expect("write worker.rs");
     assert!(run_taxis(repo, &["add", "worker.rs"]).status.success());
     let worker_msg = compliant_kernel_msg("feat(worker): seed mergeable commit", "worker.rs");
-    assert!(run_taxis(repo, &["commit", "-m", &worker_msg]).status.success());
+    assert!(run_taxis(repo, &["commit", "-m", &worker_msg])
+        .status
+        .success());
     assert!(
         run_taxis(repo, &["checkout", "cell/fractal-git/card/k1/main"])
             .status
             .success()
     );
-    assert!(
-        run_taxis(
-            repo,
-            &[
-                "merge",
-                "--reclaim",
-                "cell/fractal-git/card/k1/sub/worker-1",
-            ]
-        )
-        .status
-        .success()
-    );
+    assert!(run_taxis(
+        repo,
+        &[
+            "merge",
+            "--reclaim",
+            "cell/fractal-git/card/k1/sub/worker-1",
+        ]
+    )
+    .status
+    .success());
 
     assert!(run_taxis(repo, &["checkout", "cell/fractal-git/main"])
         .status

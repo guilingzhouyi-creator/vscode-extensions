@@ -71,18 +71,22 @@ pub(super) fn guard_branch_creation(
         .map(strip_branch_prefixes)
         .or_else(|| view.head_branch().ok().flatten().map(|(b, _)| b));
 
-    let gate_outcome =
-        match BranchGuard::check_branch_creation(&floor, parent_name.as_deref(), spec.name, bypass.as_ref()) {
-            Ok(outcome) => outcome,
-            Err(err) => {
-                let msg = err.to_string();
-                if msg.contains("FGT-") {
-                    reject(CliTag::VERIFY_FAIL, msg);
-                } else {
-                    reject(CliTag::VERIFY_FAIL, format!("FGT-TOP-001: {msg}"));
-                }
+    let gate_outcome = match BranchGuard::check_branch_creation(
+        &floor,
+        parent_name.as_deref(),
+        spec.name,
+        bypass.as_ref(),
+    ) {
+        Ok(outcome) => outcome,
+        Err(err) => {
+            let msg = err.to_string();
+            if msg.contains("FGT-") {
+                reject(CliTag::VERIFY_FAIL, msg);
+            } else {
+                reject(CliTag::VERIFY_FAIL, format!("FGT-TOP-001: {msg}"));
             }
-        };
+        }
+    };
     for warning in &gate_outcome.warnings {
         eprintln!("[ADVISORY] {warning}");
     }
@@ -92,7 +96,8 @@ pub(super) fn guard_branch_creation(
             FractalRef::CardWorktree { .. } | FractalRef::SubAgentWorktree { .. }
         ) {
             let ref_store = DiskRefStore::new(git_dir);
-            if let Err(fanout_err) = fg_topology::assert_fanout_available_in(child_ref, &ref_store) {
+            if let Err(fanout_err) = fg_topology::assert_fanout_available_in(child_ref, &ref_store)
+            {
                 reject(CliTag::ERROR, fanout_err);
             }
         }

@@ -32,7 +32,10 @@ fn policy_vault_binary_encryption_deletion_recovery_and_authority_gates() {
     );
 
     let raw_vault = fs::read(&vault_path).expect("read binary vault");
-    assert!(raw_vault.starts_with(b"TXPF"), "vault must begin with TXPF magic");
+    assert!(
+        raw_vault.starts_with(b"TXPF"),
+        "vault must begin with TXPF magic"
+    );
     let trimmed = raw_vault
         .iter()
         .copied()
@@ -46,7 +49,10 @@ fn policy_vault_binary_encryption_deletion_recovery_and_authority_gates() {
     );
 
     let raw_seal = fs::read(&seal_path).expect("read seal");
-    assert!(raw_seal.starts_with(b"TXSL"), "seal must begin with TXSL magic");
+    assert!(
+        raw_seal.starts_with(b"TXSL"),
+        "seal must begin with TXSL magic"
+    );
 
     let status_out = run_taxis_with_auth(repo, &["policy", "status", "--json"], None);
     assert!(status_out.status.success());

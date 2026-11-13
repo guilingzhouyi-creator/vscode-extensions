@@ -45,7 +45,8 @@ fn head_coordinate_penetration_binds_commit_and_blackboard_without_default_leak(
 
     fs::write(repo.join("conflict.rs"), "pub fn clash() {}\n").expect("write conflict.rs");
     assert!(run_taxis(repo, &["add", "conflict.rs"]).status.success());
-    let conflict_msg = compliant_kernel_msg("feat(conflict): verify cell mismatch guard", "conflict.rs");
+    let conflict_msg =
+        compliant_kernel_msg("feat(conflict): verify cell mismatch guard", "conflict.rs");
     let clash_commit = run_taxis(repo, &["commit", "--cell", "webgames", "-m", &conflict_msg]);
     assert!(
         !clash_commit.status.success(),

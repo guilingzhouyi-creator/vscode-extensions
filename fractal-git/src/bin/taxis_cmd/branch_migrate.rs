@@ -93,7 +93,9 @@ pub(super) fn migrate_card_branch(
         );
     }
     let migrate_msg = format!("Branch: migrated {old_full_ref} to {new_full_ref}");
-    if let Err(write_err) = ref_store.update_ref_with_message(&new_full_ref, &oid, None, &migrate_msg) {
+    if let Err(write_err) =
+        ref_store.update_ref_with_message(&new_full_ref, &oid, None, &migrate_msg)
+    {
         let _ = ref_store.update_ref(&old_full_ref, &oid, None);
         reject(
             CliTag::ERROR,

@@ -46,7 +46,9 @@ impl AsRef<Path> for ScratchDirGuard {
     }
 }
 
+// DOS read-only bit cleanup is Windows-specific; `PermissionsExt` is Unix-only.
 #[cfg(windows)]
+#[allow(clippy::permissions_set_readonly_false)]
 fn clear_readonly_tree(path: &Path) {
     let Ok(entries) = std::fs::read_dir(path) else {
         return;

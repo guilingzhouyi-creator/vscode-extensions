@@ -54,7 +54,8 @@ pub(super) fn reclaim_branch(ctx: &CliContext, req: &ReclaimBranchRequest<'_>) {
         }
     }
 
-    let enforce_lineage = req.verify_lineage || (!req.force && floor.tier == BranchEnforcementTier::Strict);
+    let enforce_lineage =
+        req.verify_lineage || (!req.force && floor.tier == BranchEnforcementTier::Strict);
     if enforce_lineage {
         let ledger = LineageLedger::open(git_dir);
         match ledger.has_verified_lineage_for(&short_branch) {
