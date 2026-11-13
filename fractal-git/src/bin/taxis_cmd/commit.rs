@@ -208,6 +208,10 @@ pub fn handle_commit(ctx: &CliContext) {
     record_commit_in_operation_graph(ctx, &materialized.commit_oid, &target_ref, &actor, &witness);
     record_block_provenance(ctx, &materialized, &staged_files, agent_id, cell_id);
     touch_affected_project_leases(&ctx.git_dir, &staged_files);
+    super::daemon::daemon_transport::notify_daemon_async_audit(
+        &ctx.git_dir,
+        Some(&target_ref.to_git_ref()),
+    );
 
     output_commit_result(
         ctx,

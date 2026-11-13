@@ -112,6 +112,7 @@ pub fn handle_add(ctx: &CliContext) {
 
     if !options.dry_run {
         persist_index_state(view.git_dir(), &index_map);
+        super::daemon::daemon_transport::notify_daemon_async_audit(view.git_dir(), None);
     }
 }
 

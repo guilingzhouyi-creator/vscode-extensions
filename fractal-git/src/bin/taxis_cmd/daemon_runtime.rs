@@ -15,7 +15,7 @@
 //! - `FGT-TRN-001`: Network transport and framing guard
 
 use std::path::{Path, PathBuf};
-use std::time::Instant;
+use std::time::{Instant, SystemTime};
 
 use fg_core::constants::git::{OBJ_BLOB, OBJ_COMMIT, OBJ_TREE};
 use fg_core::error::{FractalError, FractalResult};
@@ -35,31 +35,44 @@ pub struct DaemonHotSession {
     pub(crate) index_tree: InMemoryIndexTree,
     pub(crate) cache_generation: u64,
     pub(crate) request_count: u64,
+    pub(crate) index_mtime: Option<SystemTime>,
+    pub(crate) container_mtime: Option<SystemTime>,
 }
 
 impl DaemonHotSession {
     /// Warms a new resident session from `.taxis/repo.txc` and `.git/index` on disk.
     #[must_use]
     pub fn open(git_dir: &Path) -> Self {
-        let container_doc = RepoDocument::load(&fg_native::container_path(git_dir)).ok();
-        let mut index_tree = InMemoryIndexTree::new();
-        if let Ok(git_idx) = GitIndex::load(git_dir.join("index")) {
-            for entry in git_idx.entries() {
-                let _ = index_tree.stage_oid(&entry.path, entry.mode, entry.oid);
-            }
-        }
-        if let Some(ref doc) = container_doc {
-            for entry in doc.indx.entries() {
-                let _ = index_tree.stage_oid(&entry.path, entry.mode, entry.oid);
-            }
-        }
+        let (container_doc, index_tree, index_mtime, container_mtime) =
+            load_session_from_disk(git_dir, false, false);
         Self {
             git_dir: git_dir.to_path_buf(),
             container_doc,
             index_tree,
             cache_generation: 1,
             request_count: 0,
+            index_mtime,
+            container_mtime,
         }
+    }
+
+    /// Reloads `.git/index` and `.taxis/repo.txc` if external CLI mutations altered their mtimes.
+    pub(crate) fn refresh_from_disk_if_stale(&mut self) -> bool {
+        let cur_idx_mtime = path_mtime(&self.git_dir.join("index"));
+        let cur_txc_mtime = path_mtime(&fg_native::container_path(&self.git_dir));
+        let idx_changed = cur_idx_mtime != self.index_mtime;
+        let txc_changed = cur_txc_mtime != self.container_mtime;
+        if !idx_changed && !txc_changed {
+            return false;
+        }
+        let (doc, tree, new_idx_mtime, new_txc_mtime) =
+            load_session_from_disk(&self.git_dir, idx_changed, txc_changed);
+        self.container_doc = doc;
+        self.index_tree = tree;
+        self.index_mtime = new_idx_mtime;
+        self.container_mtime = new_txc_mtime;
+        self.cache_generation += 1;
+        true
     }
 
     /// Returns the monotonic generation counter of the in-memory session cache.
@@ -84,7 +97,8 @@ impl DaemonHotSession {
     #[must_use]
     pub fn execute(&mut self, message: &IpcMessage) -> IpcDaemonReceipt {
         let started = Instant::now();
-        let cache_hit = self.request_count() > 0;
+        let disk_refreshed = self.refresh_from_disk_if_stale();
+        let cache_hit = self.request_count() > 0 && !disk_refreshed;
         self.request_count += 1;
         let outcome = match message {
             IpcMessage::Ping { timestamp_ms } => Ok(empty_receipt(
@@ -223,12 +237,69 @@ impl DaemonHotSession {
         Ok(tree_oid)
     }
 
-    pub(crate) fn flush_container(&self) {
+    pub(crate) fn flush_container(&mut self) {
         if let Some(ref doc) = self.container_doc {
             let path = fg_native::container_path(&self.git_dir);
             if path.exists() {
                 let _ = doc.save_atomic(&path);
+                self.container_mtime = path_mtime(&path);
             }
+        }
+    }
+}
+
+fn path_mtime(path: &Path) -> Option<SystemTime> {
+    std::fs::metadata(path)
+        .ok()
+        .and_then(|meta| meta.modified().ok())
+}
+
+fn load_session_from_disk(
+    git_dir: &Path,
+    idx_changed: bool,
+    txc_changed: bool,
+) -> (
+    Option<RepoDocument>,
+    InMemoryIndexTree,
+    Option<SystemTime>,
+    Option<SystemTime>,
+) {
+    let idx_path = git_dir.join("index");
+    let txc_path = fg_native::container_path(git_dir);
+    let idx_mtime = path_mtime(&idx_path);
+    let txc_mtime = path_mtime(&txc_path);
+    let container_doc = RepoDocument::load(&txc_path).ok();
+    let mut index_tree = InMemoryIndexTree::new();
+
+    let prefer_git_index = (idx_changed && !txc_changed)
+        || match (idx_mtime, txc_mtime) {
+            (Some(idx_ts), Some(txc_ts)) => idx_ts > txc_ts,
+            _ => false,
+        };
+
+    if prefer_git_index {
+        apply_container_entries(container_doc.as_ref(), &mut index_tree);
+        apply_git_index_entries(&idx_path, &mut index_tree);
+    } else {
+        apply_git_index_entries(&idx_path, &mut index_tree);
+        apply_container_entries(container_doc.as_ref(), &mut index_tree);
+    }
+
+    (container_doc, index_tree, idx_mtime, txc_mtime)
+}
+
+fn apply_git_index_entries(idx_path: &Path, index_tree: &mut InMemoryIndexTree) {
+    if let Ok(git_idx) = GitIndex::load(idx_path) {
+        for entry in git_idx.entries() {
+            let _ = index_tree.stage_oid(&entry.path, entry.mode, entry.oid);
+        }
+    }
+}
+
+fn apply_container_entries(doc_opt: Option<&RepoDocument>, index_tree: &mut InMemoryIndexTree) {
+    if let Some(doc) = doc_opt {
+        for entry in doc.indx.entries() {
+            let _ = index_tree.stage_oid(&entry.path, entry.mode, entry.oid);
         }
     }
 }
@@ -343,4 +414,56 @@ pub(crate) fn finalize_receipt(
     receipt.cache_generation = cache_generation;
     receipt.cache_hit = cache_hit;
     receipt
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use fg_index::{write_dirc_v2, IndexEntry, IndexStage};
+    use std::time::Duration;
+
+    fn dummy_entry(path: &str, oid: Oid, size: u32, mtime_seconds: u32) -> IndexEntry {
+        IndexEntry {
+            path: String::from(path),
+            mode: FileMode::RegularFile,
+            oid,
+            stage: IndexStage::Normal,
+            size,
+            mtime_seconds,
+            mtime_nanos: 0,
+            assume_valid: false,
+            skip_worktree: false,
+            intent_to_add: false,
+        }
+    }
+
+    #[test]
+    fn refresh_from_disk_if_stale_picks_up_external_git_index_write() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let git_dir = dir.path().join(".git");
+        std::fs::create_dir_all(&git_dir).expect("mkdir .git");
+        let idx_path = git_dir.join("index");
+
+        let blob_a = Oid::from_hex("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").expect("oid a");
+        let blob_b = Oid::from_hex("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb").expect("oid b");
+        write_dirc_v2(&idx_path, &[dummy_entry("src/a.rs", blob_a, 12, 1)]).expect("save idx 1");
+
+        let mut session = DaemonHotSession::open(&git_dir);
+        assert_eq!(session.entry_count(), 1);
+        assert!(!session.refresh_from_disk_if_stale());
+
+        std::thread::sleep(Duration::from_millis(25));
+        write_dirc_v2(
+            &idx_path,
+            &[
+                dummy_entry("src/a.rs", blob_a, 12, 1),
+                dummy_entry("src/b.rs", blob_b, 20, 2),
+            ],
+        )
+        .expect("save idx 2");
+
+        assert!(session.refresh_from_disk_if_stale());
+        assert_eq!(session.entry_count(), 2);
+        assert!(session.index_tree.entries().contains_key("src/b.rs"));
+    }
 }
