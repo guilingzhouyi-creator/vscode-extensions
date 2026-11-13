@@ -3,7 +3,11 @@
 //! Architecture Role: Byte-level scanner for multilang string/comment masking
 //! and line statistics, providing 100% byte-parity with ECMAScript UTF-16 AST rules.
 
-use memchr::memchr;
+mod ascii_helpers;
+
+use ascii_helpers::{
+    has_trigger_char, mask_regex_body_ascii, opens_regex_literal_ascii, scan_raw_string_ascii,
+};
 
 /// Configuration flags for source code comment and literal masking.
 #[derive(Debug, Clone, Default)]
@@ -26,14 +30,14 @@ pub struct MaskResult {
 }
 
 #[derive(Debug, Clone, Default)]
-struct MaskState {
-    in_block_comment: bool,
-    in_html_comment: bool,
-    quote: Option<char>,
-    raw_string: Option<usize>,
+pub(crate) struct MaskState {
+    pub(crate) in_block_comment: bool,
+    pub(crate) in_html_comment: bool,
+    pub(crate) quote: Option<char>,
+    pub(crate) raw_string: Option<usize>,
 }
 
-const REGEX_PREFIX_CHARS: &[u8] = b"([{,=:!&|?;+-*%<>";
+pub(crate) const REGEX_PREFIX_CHARS: &[u8] = b"([{,=:!&|?;+-*%<>";
 
 /// Tests if Unicode code point is ECMAScript whitespace or line terminator.
 #[inline]
@@ -191,143 +195,6 @@ fn mask_line(line: &str, state: &mut MaskState, config: &MaskConfig) -> String {
     let mut target = MaskTarget::new(&mut buf, &mut out);
     mask_line_into(line, state, config, &mut target);
     out
-}
-
-fn has_trigger_char(line: &str, config: &MaskConfig) -> bool {
-    if config.line_comment.is_empty() {
-        return true;
-    }
-
-    let b = line.as_bytes();
-    for q in config.quote_chars.as_bytes() {
-        if memchr(*q, b).is_some() {
-            return true;
-        }
-    }
-
-    if let Some(&first_lc) = config.line_comment.as_bytes().first() {
-        if memchr(first_lc, b).is_some() {
-            return true;
-        }
-    }
-
-    if let Some((open, _)) = &config.block_comment {
-        if let Some(&first_bc) = open.as_bytes().first() {
-            if memchr(first_bc, b).is_some() {
-                return true;
-            }
-        }
-    }
-
-    if config.regex_literals && memchr(b'/', b).is_some() {
-        return true;
-    }
-
-    if config.html_comment && memchr(b'<', b).is_some() {
-        return true;
-    }
-
-    false
-}
-
-fn opens_regex_literal_ascii(line: &[u8], index: usize) -> bool {
-    let mut back = index as isize - 1;
-    while back >= 0 {
-        let b = line[back as usize];
-        if b != b' ' && b != b'\t' {
-            return REGEX_PREFIX_CHARS.contains(&b);
-        }
-        back -= 1;
-    }
-    true
-}
-
-fn mask_regex_body_ascii(line: &[u8], index: usize, out: &mut [u8]) -> usize {
-    out[index] = b' ';
-    let mut cursor = index + 1;
-    let mut in_class = false;
-    let len = line.len();
-
-    while cursor < len {
-        let b = line[cursor];
-        out[cursor] = b' ';
-        if b == b'\\' {
-            if cursor + 1 < len {
-                out[cursor + 1] = b' ';
-            }
-            cursor += 2;
-            continue;
-        }
-        if b == b'[' {
-            in_class = true;
-        } else if b == b']' {
-            in_class = false;
-        } else if b == b'/' && !in_class {
-            cursor += 1;
-            while cursor < len && line[cursor].is_ascii_alphabetic() {
-                out[cursor] = b' ';
-                cursor += 1;
-            }
-            return cursor;
-        }
-        cursor += 1;
-    }
-    cursor
-}
-
-fn scan_raw_string_ascii(
-    line: &[u8],
-    start: usize,
-    out: &mut [u8],
-    state: &mut MaskState,
-) -> Option<usize> {
-    let len = line.len();
-    if start > 0 {
-        let prev = line[start - 1];
-        if prev.is_ascii_alphanumeric() || prev == b'_' {
-            return None;
-        }
-    }
-
-    let r_pos = if line[start] == b'r' {
-        start
-    } else {
-        start + 1
-    };
-
-    let mut pos = r_pos + 1;
-    let mut hashes = 0;
-    while pos < len && line[pos] == b'#' {
-        hashes += 1;
-        pos += 1;
-    }
-
-    if pos >= len || line[pos] != b'"' {
-        return None;
-    }
-
-    out[start..=pos].fill(b' ');
-
-    let mut cursor = pos + 1;
-    while cursor < len {
-        out[cursor] = b' ';
-        if line[cursor] == b'"'
-            && cursor + 1 + hashes <= len
-            && line[cursor + 1..cursor + 1 + hashes]
-                .iter()
-                .all(|&c| c == b'#')
-        {
-            for offset in 1..=hashes {
-                out[cursor + offset] = b' ';
-            }
-            state.raw_string = None;
-            return Some(cursor + 1 + hashes);
-        }
-        cursor += 1;
-    }
-
-    state.raw_string = Some(hashes);
-    Some(len)
 }
 
 #[inline]
