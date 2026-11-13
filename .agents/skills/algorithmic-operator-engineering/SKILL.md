@@ -1,7 +1,7 @@
 ---
 name: algorithmic-operator-engineering
 description: >-
-  【触发：算子/热路径/吞吐优化/降维/SoA/LUT/基准等价/卡顿】当涉及算法瓶颈、吞吐优化、高频循环热路径或数据表示反转(SoA)时触发。执行五步降维协议与100%差分等价基准验证。
+  【触发：bench/route/slow/jank/SoA/LUT/SWAR/SIMD】Apply 5-step SoA/LUT complexity reduction and differential parity verification on hot-loop bottlenecks.
 ---
 
 # algorithmic-operator-engineering — First-Principles Operator & Hot-Path Engineering
@@ -16,9 +16,9 @@ Guides high-throughput algorithm and operator design across `auto-refactor` (Rus
 > 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
 - **链路**：[state-concurrency-and-crash-recovery](../state-concurrency-and-crash-recovery/SKILL.md)、[rust-engineering](../rust-engineering/SKILL.md)、[webgames-workflow](../webgames-workflow/SKILL.md) → **本技能** → [test-benchmark-engineering](../test-benchmark-engineering/SKILL.md)、[telemetry-statistical-modeling](../telemetry-statistical-modeling/SKILL.md)、[interaction-design-physics](../interaction-design-physics/SKILL.md)；并行支援 `coding-craft`、`complexity-budget`、`constraint-driven-development`、`debugging-and-error-recovery`。
-- **领域**：分形版本控制内核（链上第 4 步）；另 1 个领域支援；其余 2 条领域链见 `docs/skill-catalog.md`
+- **领域**：Fractal-Git Kernel（链上第 5 步）；另 1 个领域支援；其余 2 条领域链见 `docs/skill-catalog.md`
 - **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
-- **何时联动**：taxis 输出与 git 逐字节不一致 → `fractal-git-dev` + `debugging-and-error-recovery` + `algorithmic-operator-engineering`；优化稀疏 MoE 路由与多语言惰性投影 → `sparse-moe-and-ast-routing` + `algorithmic-operator-engineering` + `tiered-cache-and-wal-persistence`
+- **何时联动**：taxis binary output differs byte-for-byte from git → `fractal-git-dev` + `taxis-daemon-and-agent-control` + `algorithmic-operator-engineering`；Optimize 5-tier Sparse MoE routing and lazy AST projection → `sparse-moe-and-ast-routing` + `algorithmic-operator-engineering` + `tiered-cache-and-wal-persistence`
 <!-- SKILL-LINKS:END -->
 
 ## 1. Five-Step Dimensional Reduction Protocol

@@ -1,7 +1,7 @@
 ---
 name: complexity-budget
 description: >-
-  【触发：重构/拆分文件/CC/Depth/ELOC/LOC/JSDoc/注水】重构大文件、优化认知复杂度(CC<=15)、缩减嵌套深度(Depth<=4)或检查体积包络(ELOC<=900)时触发。落实六字段 JSDoc 契约与循环零堆分配。
+  【触发：split/prune/bloat/nested/ELOC/CC/Depth/JSDoc】Enforce CC<=15, Depth<=4, ELOC<=900, LOC<=1400, 6-field JSDoc, and zero loop allocations when splitting hot files.
 ---
 
 # complexity-budget — AST Complexity, Dual-Track Volume & Comment Density Contract
@@ -18,15 +18,15 @@ Defines per-function AST slice budgets, control-flow flattening patterns, dual-t
 - **链路**：无（通用方法论） → **本技能** → 无（通用方法论）；并行支援 `coding-craft`、`constraint-driven-development`、`debugging-and-error-recovery`、`test-benchmark-engineering`。
 - **领域**：另 6 个领域支援
 - **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
-- **何时联动**：消融纯转发跳板与参数收敛 → `auto-refactor-dev` + `facade-discipline` + `complexity-budget`；热路径循环里出现对象分配 → `webgames-workflow` + `algorithmic-operator-engineering` + `complexity-budget`
+- **何时联动**：Split bloated modules and dissolve pass-through trampolines → `auto-refactor-dev` + `facade-discipline` + `complexity-budget`；Eliminate per-frame object allocation in gameplay loops → `webgames-workflow` + `algorithmic-operator-engineering` + `complexity-budget`
 <!-- SKILL-LINKS:END -->
 
 ## 1. Per-Function AST Slice Budgets (`GUARD-AST-001`)
 
 | Metric | Rigid Limit | Elastic Envelope | Remediation Pattern |
 | :--- | :---: | :--- | :--- |
-| **Cyclomatic / Cognitive Complexity (`CC`)** | $\text{CC} \le 15$ | • Flat loop-free `if/switch` dispatchers ($\text{Depth} \le 2$): $\text{CC} \le 25$<br/>• File-private pure functions ($\text{Depth} \le 3$, loop-free): $\text{CC} \le 18\text{–}20$ (exported API locked at $\le 15$)<br/>• `*archetype*` & `*.test.ts`: $\text{CC} \le 20$ | Extract pure helper predicates; replace cascading branches with frozen `Map` / lookup tables ([control-flow-flattening-patterns.md#三-策略映射表替代级联分支-strategy-map-dispatch](references/control-flow-flattening-patterns.md#三-策略映射表替代级联分支-strategy-map-dispatch)) |
-| **Control-Flow Nesting (`Depth`)** | $\text{Depth} \le 4$ | Target $\text{Depth} \le 2\text{–}3$; $\text{Depth} > 4$ is blocked workspace-wide (`CPX-NEST-001`) | Flatten via early guard returns (`return`/`continue`/`break`) ([control-flow-flattening-patterns.md#一-卫语句提前返回-guard-clauses](references/control-flow-flattening-patterns.md#一-卫语句提前返回-guard-clauses)) and extract loop-body `try-catch` into pure parsers ([control-flow-flattening-patterns.md#二-复杂数据管道与日志解析解耦](references/control-flow-flattening-patterns.md#二-复杂数据管道与日志解析解耦), [flat-control-flow-patterns.ts](templates/flat-control-flow-patterns.ts)) |
+| **Cyclomatic / Cognitive Complexity (`CC`)** | $\text{CC} \le 15$ | • Flat loop-free `if/switch` dispatchers ($\text{Depth} \le 2$): $\text{CC} \le 25$<br/>• File-private pure functions ($\text{Depth} \le 3$, loop-free): $\text{CC} \le 18\text{–}20$ (exported API locked at $\le 15$)<br/>• `*archetype*` & `*.test.ts`: $\text{CC} \le 20$ | Extract pure helper predicates; replace cascading branches with frozen `Map` / lookup tables ([control-flow-flattening-patterns.md#3-strategy-map-dispatch-on-to-o1-cc](references/control-flow-flattening-patterns.md#3-strategy-map-dispatch-on-to-o1-cc)) |
+| **Control-Flow Nesting (`Depth`)** | $\text{Depth} \le 4$ | Target $\text{Depth} \le 2\text{–}3$; $\text{Depth} > 4$ is blocked workspace-wide (`CPX-NEST-001`) | Flatten via early guard returns (`return`/`continue`/`break`) ([control-flow-flattening-patterns.md#1-guard-clauses-early-returns](references/control-flow-flattening-patterns.md#1-guard-clauses-early-returns)) and extract loop-body `try-catch` into pure parsers ([control-flow-flattening-patterns.md#2-isolate-parsing-pipelines-from-streaming-loops](references/control-flow-flattening-patterns.md#2-isolate-parsing-pipelines-from-streaming-loops), [flat-control-flow-patterns.ts](templates/flat-control-flow-patterns.ts)) |
 | **Single-Line Token Noise (`Noise`)** | $\text{Noise} \le 4.0$ | Ratio of non-identifier chars to identifier chars on non-blank code lines $\le 4.0$ | Extract named intermediate constants; eliminate nested ternaries and inline regex chains |
 
 ---

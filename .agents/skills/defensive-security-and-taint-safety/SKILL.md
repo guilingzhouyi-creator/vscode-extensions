@@ -1,7 +1,7 @@
 ---
 name: defensive-security-and-taint-safety
 description: >-
-  【触发：删除文件/rm/注入/污点追踪/变量遮蔽/路径穿越/清理目录】执行破坏性文件操作、清理目录、暴露端点或处理外部输入时触发。落实递归删除三步污点守卫(GUARD-DESTR-001)与只读自动变量防篡改。
+  【触发：clean/guard/bypass/corrupt/rm/taint/path/secrets】Guard recursive deletes (GUARD-DESTR-001), read-only auto vars (GUARD-VAR-001), junctions, and taint boundaries.
 ---
 
 # defensive-security-and-taint-safety — Taint Dataflow, Destructive-Op Guards & Exposure Isolation
@@ -16,9 +16,9 @@ Enforces zero-trust taint tracking for recursive file deletion (`GUARD-DESTR-001
 > 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
 - **链路**：[gate-governance](../gate-governance/SKILL.md) → **本技能** → [coding-craft](../coding-craft/SKILL.md)；并行支援 `constraint-driven-development`、`debugging-and-error-recovery`、`test-benchmark-engineering`、`algorithmic-operator-engineering`。
-- **领域**：门禁与命令面基础设施（链上第 2 步）；另 2 个领域支援
+- **领域**：Gate & Shell Infrastructure（链上第 2 步）；另 2 个领域支援
 - **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
-- **何时联动**：破坏性删除或路径穿越 → `defensive-security-and-taint-safety` + `gate-governance` + `coding-craft`；索引树并发写入或崩溃恢复 → `fractal-git-dev` + `state-concurrency-and-crash-recovery` + `defensive-security-and-taint-safety`
+- **何时联动**：Audit recursive delete or path-traversal taint risks → `defensive-security-and-taint-safety` + `gate-governance` + `coding-craft`；Concurrent index tree write crash recovery or unsafe proofs → `fractal-git-dev` + `state-concurrency-and-crash-recovery` + `defensive-security-and-taint-safety`
 <!-- SKILL-LINKS:END -->
 
 ## 1. Three-Step Taint Guard for Recursive Deletion (`GUARD-DESTR-001` / `EXT-DIR-001`)

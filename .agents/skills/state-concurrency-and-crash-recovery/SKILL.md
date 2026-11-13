@@ -1,7 +1,7 @@
 ---
 name: state-concurrency-and-crash-recovery
 description: >-
-  【触发：并发/状态机/排障/泄漏/原子落盘/幂等/崩溃恢复/Journal】涉及并发调度、句柄生命周期对称释放(PRF-LEAK-001)、异步派发器排空或崩溃恢复幂等性设计时触发。杜绝孤儿句柄与悬挂协程。
+  【触发：drain/isolate/leak/crash/async/mutex/atomic/handle】Enforce symmetric resource disposal, bounded queues, idempotent journal replay, and atomic temp-rename durability.
 ---
 
 # state-concurrency-and-crash-recovery — Bounded Concurrency, Symmetric Lifecycles & Crash-Safe Persistence
@@ -16,9 +16,9 @@ Governs stateful lifecycles, async dispatchers, and crash-safe persistence acros
 > 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
 - **链路**：[rust-engineering](../rust-engineering/SKILL.md)、[workspace-timing-dev](../workspace-timing-dev/SKILL.md) → **本技能** → [algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md)、[interaction-design-physics](../interaction-design-physics/SKILL.md)；并行支援 `coding-craft`、`complexity-budget`、`constraint-driven-development`、`debugging-and-error-recovery`。
-- **领域**：分形版本控制内核（链上第 3 步）；另 2 个领域支援；其余 1 条领域链见 `docs/skill-catalog.md`
+- **领域**：Fractal-Git Kernel（链上第 4 步）；另 2 个领域支援；其余 1 条领域链见 `docs/skill-catalog.md`
 - **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
-- **何时联动**：索引树并发写入或崩溃恢复 → `fractal-git-dev` + `state-concurrency-and-crash-recovery` + `defensive-security-and-taint-safety`；进程被杀后缓冲区数据丢失 → `workspace-timing-dev` + `state-concurrency-and-crash-recovery` + `test-benchmark-engineering`
+- **何时联动**：Persistent daemon IPC, blackboard leases, or quarantine replay → `taxis-daemon-and-agent-control` + `state-concurrency-and-crash-recovery` + `test-benchmark-engineering`；Concurrent index tree write crash recovery or unsafe proofs → `fractal-git-dev` + `state-concurrency-and-crash-recovery` + `defensive-security-and-taint-safety`
 <!-- SKILL-LINKS:END -->
 
 ## 1. Four Axioms of Concurrency & Crash Recovery

@@ -17,7 +17,7 @@ export interface RovingFocusOptions {
     readonly itemSelector: string;
     readonly orientation?: 'horizontal' | 'vertical' | 'both';
     readonly loop?: boolean;
-    readonly columns?: number; // 2D 矩阵列数，不传或 <= 1 为一维列表
+    readonly columns?: number; // 2D grid columns; <= 1 uses linear 1D navigation
     readonly onFocusChange?: (item: HTMLElement, index: number) => void;
 }
 

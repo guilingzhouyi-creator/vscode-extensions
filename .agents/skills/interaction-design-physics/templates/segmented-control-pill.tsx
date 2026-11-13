@@ -40,7 +40,7 @@ export function SegmentedControl<T extends string>({
             className={`relative inline-flex items-center rounded-full p-[2px] bg-neutral-200/60 dark:bg-neutral-800/80 ${className}`}
             style={{ containerType: 'inline-size' }}
         >
-            {/* 纯几何定位滑动指示器 */}
+            {/* Pure geometry-aligned sliding indicator */}
             {activeIndex >= 0 && (
                 <div
                     aria-hidden="true"
@@ -52,7 +52,7 @@ export function SegmentedControl<T extends string>({
                 />
             )}
 
-            {/* 各选项标签 */}
+            {/* Segmented tab labels */}
             {items.map((item) => {
                 const isSelected = item.id === selectedId;
                 return (

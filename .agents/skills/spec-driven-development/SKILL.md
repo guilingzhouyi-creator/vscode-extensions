@@ -1,7 +1,7 @@
 ---
 name: spec-driven-development
 description: >-
-  【触发：需求澄清/质询/能力拓扑/规格书/X-Y/返工】遇到模糊需求、重大架构重构或开发新特性前触发。通过每次一问消除歧义与 X-Y 问题，先确立能力拓扑图与接口契约规格，再行动手编码。
+  【触发：clarify/design/rework/churn/spec/X-Y/contract/scope】Clarify ambiguous specs one question at a time, expose X-Y traps, and lock contracts before architecture edits.
 ---
 
 # spec-driven-development — Single-Point Inquiry, Capability Mapping & Spec-First Workflow
@@ -18,7 +18,7 @@ Combines **Reverse Engineering Specification Review (Reverse ESR)** with **Spec-
 - **链路**：无（通用方法论） → **本技能** → 无（通用方法论）；并行支援 `algorithmic-operator-engineering`、`coding-craft`、`complexity-budget`、`constraint-driven-development`。
 - **领域**：另 4 个领域支援
 - **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
-- **何时联动**：新玩法先出四阶段方案 → `spec-driven-development` + `webgames-workflow` + `test-benchmark-engineering`
+- **何时联动**：Draft 4-stage spec before building new gameplay → `spec-driven-development` + `webgames-workflow` + `test-benchmark-engineering`
 <!-- SKILL-LINKS:END -->
 
 ## 1. When to Activate (and Exemptions)

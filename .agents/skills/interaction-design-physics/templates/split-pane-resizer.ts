@@ -19,7 +19,7 @@ export interface SplitPaneOptions {
     readonly direction?: 'horizontal' | 'vertical';
     readonly minRatio?: number;
     readonly maxRatio?: number;
-    readonly collapseThreshold?: number; // 默认 0.18 (<18% 自动折叠)
+    readonly collapseThreshold?: number; // Default 0.18 (<18% snaps closed)
     readonly onResize?: (ratio: number) => void;
     readonly onCollapse?: (collapsed: boolean) => void;
 }
@@ -76,7 +76,7 @@ export class SplitPaneResizer {
         this.handle.addEventListener('pointerup', this.onPointerUp);
         this.handle.addEventListener('pointercancel', this.onPointerUp);
 
-        // 挂载拖拽标记与 Iframe 防吞噬护盾
+        // Attach drag state attribute and iframe pointer-events shield
         this.container.setAttribute('data-pane-dragging', 'true');
         this.applyIframeShield(true);
     };
@@ -87,7 +87,7 @@ export class SplitPaneResizer {
         const currentCoord = this.isVertical ? e.clientY : e.clientX;
         const delta = currentCoord - this.startCoord;
 
-        // 4px 移动死区守卫
+        // 4px movement deadzone guard
         if (!this.hasExceededDeadzone) {
             if (Math.abs(delta) <= this.deadzonePx) return;
             this.hasExceededDeadzone = true;
@@ -99,7 +99,7 @@ export class SplitPaneResizer {
         const targetSize = this.startSize + delta;
         let ratio = targetSize / totalSize;
 
-        // < 18% 临界折叠门限
+        // < 18% edge collapse snap threshold
         if (ratio < this.collapseThreshold) {
             ratio = 0;
             this.onCollapse?.(true);
@@ -125,7 +125,7 @@ export class SplitPaneResizer {
     };
 
     private readonly onDoubleClick = (): void => {
-        // 双击平滑复位至 50/50 居中
+        // Snap smoothly back to 50/50 split on double-click
         this.applyRatio(0.5);
         this.onCollapse?.(false);
     };

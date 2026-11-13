@@ -1,7 +1,7 @@
 ---
 name: facade-discipline
 description: >-
-  【触发：门面/跳板/透传/ARCH-ABS/参数收敛/消融/空壳膨胀】消融<=3行纯转发跳板(ARCH-ABS-001)、压缩多形参对象(SIM-ARGS-001)或重构模块导出面时触发。确保门面具备实质承载(ARCH-FAC-001)与不可变冻结。
+  【触发：prune/refactor/bloat/dead/ARCH/facade/wrap/argobj】Dissolve <=3-line pure trampolines (ARCH-ABS-001), pack >=4 args, and enforce substantive frozen facades (>=15 ELOC).
 ---
 
 # facade-discipline — Substantive Facades, Trampoline Ablation & Behavior-Preserving Simplification
@@ -18,7 +18,7 @@ Unifies the **Substantive Facade Contract (`ARCH-FAC-001`)**, **$\le 3$-Line Tra
 - **链路**：无（通用方法论） → **本技能** → 无（通用方法论）；并行支援 `algorithmic-operator-engineering`、`coding-craft`、`complexity-budget`、`constraint-driven-development`。
 - **领域**：另 3 个领域支援
 - **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
-- **何时联动**：精简模块导出面与消除空门面 → `fractal-git-dev` + `facade-discipline` + `rust-engineering`；消融纯转发跳板与参数收敛 → `auto-refactor-dev` + `facade-discipline` + `complexity-budget`
+- **何时联动**：Enrich thin crate facades and eliminate trampolines → `fractal-git-dev` + `facade-discipline` + `rust-engineering`；Split bloated modules and dissolve pass-through trampolines → `auto-refactor-dev` + `facade-discipline` + `complexity-budget`
 <!-- SKILL-LINKS:END -->
 
 ## 1. Four Pillars of a Substantive Facade (`ARCH-FAC-001`)

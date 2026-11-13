@@ -1,23 +1,23 @@
-# 通用系统与宿主扩展高发故障谱系及 SSCCE 最小复现指南
+# Common Failure Modes & Minimal SSCCE Isolation Guide
 
-本指南整合了通用后端/内核故障断点、VS Code 扩展宿主特化故障模式以及 SSCCE（Short, Self-Contained, Correct Example）最小完整可复现构建方法。
+High-frequency failure breakpoints across services/kernels and VS Code extensions, paired with the 4-step SSCCE workflow.
 
 ---
 
-## 一、 通用软件与宿主扩展高发故障排查矩阵
+## 1. Failure Diagnostic Matrix
 
-| 故障域 | 典型症状表现 | 通用系统排查断点 | VS Code 扩展 / Webview 宿主特化断点 |
+| Domain | Typical Symptoms | Generic System Breakpoints | VS Code / Webview Breakpoints |
 | :--- | :--- | :--- | :--- |
-| **1. 启动与激活生命周期** | 启动超时、`command not found`、空指针崩溃 | 检查初始化次序是否符合单向依赖 DAG；排查异步初始化中未捕获的挂起 Promise 或死锁 | 检查 `package.json` 的 `activationEvents` 是否匹配；确认 `activate()` 无同步阻塞调用 |
-| **2. 进程通信与消息丢失 (IPC)** | 调用无响应、面板白屏、状态栏不刷新 | 核对两端序列化协议字段与版本；排查超时强杀或管道半包截断 | 打开 `Open Webview Developer Tools` 检查 CSP 策略是否拦截脚本；核对 `postMessage` 协议 |
-| **3. 异步并发与退出丢数据** | 偶发状态覆盖、重启后最近记录丢失 | 检查共享状态是否有 `isFlushing` 重入锁或 CAS 保护；核查因果时间戳 | `deactivate()` 必须返回 Promise 等待刷盘完成；依赖 Append-Only Journal 保障断电安全 |
+| **1. Startup & Activation** | Timeout, `command not found`, null panic | Check DAG init order, dangling async Promises, or deadlocks | Verify `package.json` `activationEvents` and zero sync work in `activate()` |
+| **2. IPC & Dropped Messages** | Hang, blank panel, frozen statusbar | Compare wire schema versions, timeouts, and partial pipe framing | Open `Webview Developer Tools` for CSP blocks and `postMessage` contract mismatches |
+| **3. Concurrency & Shutdown Loss** | State overwrites, lost tail frames | Check `isFlushing` reentrancy locks, CAS epochs, and monotonic ordering | Return a flush Promise from `deactivate()` and rely on Append-Only Journal replay |
 
 ---
 
-## 二、 SSCCE 最小完整可复现构建四步法
+## 2. Four-Step SSCCE Protocol
 
-面对偶发崩溃或深层竞态时，严禁在巨型业务源码中盲目打补丁，必须先剥离 SSCCE 探针：
-1. **短小 (Short, $\le 30$ 行)**：剔除 UI 渲染与上层控制器，仅保留触发异常的纯函数或状态机调用链；
-2. **自给自足 (Self-Contained)**：注入固定时间戳（`withFixedNow`）、固定随机种子（Mulberry32）与内存存储桩，零外部网络或数据库依赖；
-3. **精准暴露 (Correct Example)**：运行探针必须 100% 确定性复现目标异常堆栈（验证红灯）；
-4. **防回归沉淀**：最小修复验证绿灯后，将该探针直接固化入项目的单元测试套件。
+Never patch complex production modules blind; extract a Short, Self-Contained, Correct Example first:
+1. **Short (`<= 30` lines)**: Strip UI and outer controllers down to the pure function or state machine reproducing the fault.
+2. **Self-Contained**: Inject fixed clocks (`withFixedNow`), seeded RNG (Mulberry32), and in-memory maps with zero external network/DB I/O.
+3. **Correct Repro**: Confirm deterministic failure trace (red test) before editing production code.
+4. **Lock Regression**: Retain the minimal repro case permanently inside the unit test suite.

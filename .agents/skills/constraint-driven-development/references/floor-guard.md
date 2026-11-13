@@ -1,39 +1,39 @@
-# 底线守卫执行契约与五维对抗性证伪探针指南
+# Floor Guard Contract & Five Adversarial Falsification Probes
 
-本指南定义了暂存区底线守卫（Floor Guard）的机械判定标准，以及交割前怀疑循环（Doubt Cycle）的五类核心证伪切入点与复审记录单。
-
----
-
-## 一、 底线守卫机械判定契约 (Floor Guard Contract)
-
-- **输入源**：本地暂存区改动与未跟踪新文件（Added / Modified / Untracked）；
-- **核心判定**：
-  1. 扫描 Diff 是否新增类型或静态检查消音指令（`@ts-ignore`、`eslint-disable`、`#[allow(...)]`）；
-  2. 扫描测试套件 Diff，断言测试用例数与 `expect` / `assert!` 净增量非负，且零 `skip` 标记（`TST-SKP-001`）；
-  3. 扫描是否存在 0 字节文件（`HYG-EMP-001`）、纯注释空壳（`HYG-EMP-002`）、未决 `TODO` 或空 `catch`（`ERR-FLT-001`）；
-- **退出码语义**：`0` = 清洁通过；`1` = 检出底线突破并输出精确 `file:line` 阻断；`2` = 守卫自身环境异常（严禁静默放行）。
+Mechanical rules for staged Floor Guard checks and the pre-delivery Doubt Cycle across five adversarial fault classes.
 
 ---
 
-## 二、 五类核心对抗性证伪探针 (Adversarial Falsification Heuristics)
+## 1. Floor Guard Mechanical Contract
 
-| 证伪维度 | 典型过度自信假设 | 对抗性证伪探针 |
+- **Input**: Staged diffs and untracked added/modified files.
+- **Checks**:
+  1. Block newly introduced lint/type suppressions (`@ts-ignore`, `eslint-disable`, `#[allow(...)]`).
+  2. Assert test case and `expect`/`assert!` counts have non-negative delta with zero skipped tests (`TST-SKP-001`).
+  3. Block 0-byte files (`HYG-EMP-001`), comment-only shells (`HYG-EMP-002`), unresolved `TODO`s, and empty `catch` blocks (`ERR-FLT-001`).
+- **Exit codes**: `0` clean pass; `1` violation with `file:line`; `2` guard runtime failure (fail-closed, never auto-pass).
+
+---
+
+## 2. Five Adversarial Falsification Probes
+
+| Probe Dimension | Overconfident Assumption | Falsification Question |
 | :--- | :--- | :--- |
-| **1. 边界与退化输入** | “输入集合非空且规模适中” | 空集、单元素、跨午夜边界或超阈值（$>1500$ 行）时，是否触发除零、越界或 $O(N^2)$ 卡死？ |
-| **2. 循环内隐式堆分配** | “只是调了一个小辅助方法” | 循环体内的 `.replace()`、`.slice()`、正则编译或闭包是否在高频迭代下引发 GC 抖动（`CPX-SPACE-001` / `ADV-PRF-002` / `FGT-PRF-001`）？ |
-| **3. 异常分支资源泄漏** | “任务结束后自然释放” | 异步报错或卫语句早退分支下，Worker 监听器、定时器、文件句柄或对象池实例是否严格执行对称解绑与 `reset_state()`？ |
-| **4. 跨层引用篡改** | “直接返回内部对象更省事” | 调用方修改返回值是否会污染内部状态机？门面导出是否执行了 `Object.freeze`（`ARCH-FAC-001`）？ |
-| **5. 物理落盘半写损坏** | “直接覆写目标文件即可” | 写入中途断电或进程被杀是否损坏既有快照？是否严格走暂存文件（`.tmp`）校验后再原子 `rename`？ |
+| **1. Boundary / Degenerate Input** | "Inputs are non-empty and modest" | Do empty arrays, singletons, midnight crossings, or `>1500`-line inputs cause division by zero, OOB, or $O(N^2)$ stalls? |
+| **2. Loop Heap Allocations** | "Just a tiny helper call" | Do `.replace()`, `.slice()`, regex literals, or closures allocate inside hot loops (`CPX-SPACE-001` / `ADV-PRF-002` / `FGT-PRF-001`)? |
+| **3. Error-Path Leaks** | "Cleanup runs at task end" | On early return or async rejection, do listeners, timers, handles, and pooled objects run symmetric cleanup + `reset_state()`? |
+| **4. Shared Mutable Leaks** | "Returning internal ref is faster" | Can callers mutate returned internals? Are facade objects frozen via `Object.freeze` (`ARCH-FAC-001`)? |
+| **5. Crash Half-Write Corruption** | "Direct overwrite is fine" | Does crash mid-write leave 0-byte/truncated files instead of staging `.tmp -> rename`? |
 
 ---
 
-## 三、 对抗性复审记录单模板 (Doubt Cycle Record)
+## 3. Doubt Cycle Review Record Template
 
 ```markdown
-## 怀疑驱动对抗性复审单
-- **核心声称 (CLAIM)**：<一句话描述关键设计假设及失效影响半径>
-- **隔离切片 (ARTIFACT & CONTRACT)**：<目标文件:行号范围 + 前置/后置不变量>
-| 编号 | 怀疑切入点 (边界/堆分配/泄漏/篡改/半写) | 潜在破坏路径 | 仲裁类别 (缺陷/权衡/噪音) | 处置结果 |
+## Adversarial Doubt Review
+- **Claim**: <critical assumption & blast radius>
+- **Slice**: <file:lines + pre/post-invariants>
+| # | Probe Axis (Bounds/Alloc/Leak/Mutate/Write) | Failure Vector | Verdict (Defect/Tradeoff/Noise) | Action |
 | :--- | :--- | :--- | :--- | :--- |
 | 1 | | | | |
 ```

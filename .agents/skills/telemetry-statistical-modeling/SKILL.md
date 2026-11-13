@@ -1,7 +1,7 @@
 ---
 name: telemetry-statistical-modeling
 description: >-
-  【触发：评分/度量/跑分/统计模型/贝叶斯/CAI/注水/反刷分】开发评分器、重构度量算法或反刷分时触发。落实从 0 纯客观统计、Jeffreys Beta(0.5,0.5) 共轭后验估计与 BLOCK_GAMING_DETECTED 虚假重构熔断。
+  【触发：score/model/gaming/skew/Bayes/CAI/Beta/QED】Enforce zero-padded telemetry, Jeffreys Beta(0.5,0.5) posteriors, CAI 2.0, and BLOCK_GAMING_DETECTED circuit breaking.
 ---
 
 # telemetry-statistical-modeling — Objective Telemetry, Bayesian Posteriors & Anti-Gaming
@@ -16,9 +16,9 @@ Establishes the mathematical foundation for workspace quality scoring, Code Auto
 > 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
 - **链路**：[algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md) → **本技能** → [test-benchmark-engineering](../test-benchmark-engineering/SKILL.md)；并行支援 `coding-craft`、`complexity-budget`、`constraint-driven-development`、`debugging-and-error-recovery`。
-- **领域**：自动重构内核（链上第 6 步）
+- **领域**：Auto-Refactor Engine（链上第 6 步）
 - **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
-- **何时联动**：评分口径被注水或刷分 → `telemetry-statistical-modeling` + `constraint-driven-development` + `auto-refactor-dev`
+- **何时联动**：Detect score padding, gaming, or telemetry boundary failures → `telemetry-statistical-modeling` + `constraint-driven-development` + `auto-refactor-dev`
 <!-- SKILL-LINKS:END -->
 
 ## 1. Zero-Inflation Telemetry & Mathematical Models

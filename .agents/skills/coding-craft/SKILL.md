@@ -1,7 +1,7 @@
 ---
 name: coding-craft
 description: >-
-  【触发：写代码/重构/命名/错误处理/类型设计/SSOT/空捕获】编写、生成或审查任何代码时必须遵循。坚持命名即契约、显式失败语义、类型穷尽、最小接口暴露与单向依赖，对接 536 条 SSOT 规则。
+  【触发：write/design/review/broken/cycle/SSOT/types/export】Enforce contract naming, explicit errors, exhaustive types, minimal exports, and unidirectional dependencies.
 ---
 
 # coding-craft — Universal Coding Craft, Multi-Language Idioms & Normative Thinking
@@ -16,9 +16,9 @@ Defines function-level engineering craft invariants and 6 metacognitive constrai
 > 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
 - **链路**：[defensive-security-and-taint-safety](../defensive-security-and-taint-safety/SKILL.md) → **本技能** → [test-benchmark-engineering](../test-benchmark-engineering/SKILL.md)；并行支援 `constraint-driven-development`、`complexity-budget`、`debugging-and-error-recovery`、`algorithmic-operator-engineering`。
-- **领域**：门禁与命令面基础设施（链上第 3 步）；另 6 个领域支援
+- **领域**：Gate & Shell Infrastructure（链上第 3 步）；另 6 个领域支援
 - **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
-- **何时联动**：pwsh 与 bash 门禁语义漂移 → `gate-governance` + `coding-craft` + `debugging-and-error-recovery`；破坏性删除或路径穿越 → `defensive-security-and-taint-safety` + `gate-governance` + `coding-craft`
+- **何时联动**：PowerShell and Bash gate semantics diverge → `gate-governance` + `coding-craft` + `debugging-and-error-recovery`；Audit recursive delete or path-traversal taint risks → `defensive-security-and-taint-safety` + `gate-governance` + `coding-craft`
 <!-- SKILL-LINKS:END -->
 
 ## 1. Seven-Domain Coding Craft Matrix

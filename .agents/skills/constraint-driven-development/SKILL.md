@@ -1,7 +1,7 @@
 ---
 name: constraint-driven-development
 description: >-
-  【触发：交割/验收/证伪/Doubt/阈值下调/测试弱化/半成品】完成特性交付、声称修复完成或合入前对抗性证伪时必须触发。落实 Floor Guard 刚性底线与单调棘轮，主动推翻边界假设与脆弱实现。
+  【触发：verify/merge/bypass/partial/Doubt/Floor/ratchet/gate】Run Floor Guard ratchets and adversarial Doubt loops before delivery; forbid baseline weakening or partial hacks.
 ---
 
 # constraint-driven-development — Floor Guard, Monotonic Ratchet & Adversarial Doubt Cycle
@@ -16,9 +16,9 @@ Combines pre-coding **Floor Guard & Monotonic Ratchet** enforcement with pre-del
 > 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
 - **链路**：[batch-commit](../batch-commit/SKILL.md) → **本技能** → [docs-archive-governance](../docs-archive-governance/SKILL.md)；并行支援 `coding-craft`、`complexity-budget`、`debugging-and-error-recovery`、`test-benchmark-engineering`。
-- **领域**：工作区元治理与并行交付（链上第 2 步）；另 6 个领域支援
+- **领域**：Parallel Delivery & Meta-Governance（链上第 2 步）；另 6 个领域支援
 - **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
-- **何时联动**：并行会话改动混杂需要精准暂存 → `batch-commit` + `subagent-orchestration` + `constraint-driven-development`；评分口径被注水或刷分 → `telemetry-statistical-modeling` + `constraint-driven-development` + `auto-refactor-dev`
+- **何时联动**：Stage atomic commits alongside dirty parallel sessions → `batch-commit` + `subagent-orchestration` + `constraint-driven-development`；Detect score padding, gaming, or telemetry boundary failures → `telemetry-statistical-modeling` + `constraint-driven-development` + `auto-refactor-dev`
 <!-- SKILL-LINKS:END -->
 
 ## 1. The Six Non-Negotiable Floor Guards

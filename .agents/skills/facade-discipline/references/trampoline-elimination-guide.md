@@ -1,44 +1,28 @@
-# 空包跳板 (`ARCH-ABS-001`)、多余间接层安全消融与等价精简对照指南
+# Trampoline Dissolution (`ARCH-ABS-001`), Redundant Indirection & Equivalence Matrix
 
-本指南规范了识别、重定向与物理消融单行跳板文件及无语义委托层的标准步骤，并提供精简重构前后的等价性验证矩阵。
-
----
-
-## 一、 跳板文件与多余间接层识别判据
-
-1. **空包跳板文件 (`ARCH-ABS-001`)**：
-   - 除去文件头注释外，有效代码行 $\text{ELOC} \le 3$（或接线开销比 $\text{POR} > 0.60$ 且无不可变冻结）；
-   - 仅含 `export * from './sub'` 或单目标原样再导出，本地零实质声明（每跳产生 $+3.0\text{ units/hop}$ 认知惩罚）。
-2. **多余函数间接层 (Redundant Indirection)**：
-   - **纯委托包装**：`function save(x) { return store.save(x); }`，形参实参同名同序，未增加任何校验、转换、重试或事务边界；
-   - **单实现虚设接口**：接口仅有唯一实现类且从不在测试或策略分支中替换。
+Standard procedure for eliminating pass-through trampolines and proving behavioral/metric equivalence after simplification.
 
 ---
 
-## 二、 三步安全消融 SOP（先改引用、后删文件）
+## 1. Identifying Trampolines & Dead Indirection
 
-1. **步骤 1：全局检索引用点**：
-   `git grep -n "from ['\"].*old-trampoline['\"]"`（含动态导入、路径别名与测试桩）；
-2. **步骤 2：原子重定向至真实源头**：
-   将所有上游调用方的 `import` 直接指向底层真实实现模块，保持任一时刻仓库可构建；
-3. **步骤 3：物理移除与门禁核验**：
-   移除跳板文件，运行 `node auto-refactor/scripts/validate-facade-governance.js` 确认 `0 trampolines found`。
+1. **Empty Pass-Through File (`ARCH-ABS-001`)**: Excluding header comments, $\text{ELOC} \le 3$ (or $\text{POR} > 0.60$ without immutable freeze), holding only `export *` or single-target re-exports (`+3.0 units/hop` cognitive penalty).
+2. **Redundant Function Wrapper**: Pure passthrough `function save(x) { return store.save(x); }` adding zero validation, transformation, retry, or transaction boundary, or single-implementation interfaces never swapped in tests.
 
 ---
 
-## 三、 代码精简前后等价性验证对照矩阵（模板与范例）
+## 2. Three-Step Safe Dissolution SOP
 
-完成跳板消融、控制流平铺或多形参收敛（`SIM-ARGS-001`）后，按以下矩阵核验实测收益：
+1. **Find all callers**: `git grep -n "from ['\"].*old-trampoline['\"]"` (including dynamic imports and tests).
+2. **Redirect atomically**: Point every consumer import directly to the canonical module so builds remain green continuously.
+3. **Delete & verify**: Remove the trampoline file and run `node auto-refactor/scripts/validate-facade-governance.js` to confirm `0 trampolines found`.
 
-| 度量维度 | 重构前 (实测范例) | 重构后 (实测范例) | 变化收益与等价性断言 |
-| :--- | :--- | :--- | :--- |
-| **有效代码行 (ELOC)** | `120` | `85` | `-35 (-29%)`，消融中间跳板并合并重复解码循环（`HYG-CLN-001`） |
-| **圈复杂度 (CC)** | `16` | `9` | `-7`，深层 `if/else` 转换为卫语句早退 + 只读查表派发 |
-| **最大嵌套深度 (Depth)** | `5` | `2` | 满足 $\text{Depth} \le 4$，主干逻辑保持在缩进第 1 层 |
-| **Token 密度 ($\tau$) / POR** | $\tau=2.1, \text{POR}=0.72$ | $\tau=8.4, \text{POR}=0.22$ | 收敛 $\ge 4$ 形参为参数对象（`SIM-ARGS-001`），消除稀释与空壳 |
+---
 
-**等价性四项必检断言**：
-- [x] 全量单测 100% 通过，且**零测试断言被弱化或删除**；
-- [x] 公开导出签名保持兼容（或仅移除内部转发别名）；
-- [x] 模块首行六字段 JSDoc 架构注释完整保留（`CMT-VMD-001`）；
-- [x] `evaluate-eloc-budget.js` 与 `validate-code-density.js` 实测全绿。
+## 3. Post-Refactor Equivalence Checklist
+
+After dissolving trampolines, flattening control flow, or collapsing `>= 4` args (`SIM-ARGS-001`):
+- [x] Full test suite passes with zero relaxed or deleted assertions;
+- [x] Public exported signatures stay compatible (only internal pass-through hops removed);
+- [x] 6-field JSDoc module header preserved cleanly (`CMT-VMD-001`);
+- [x] `evaluate-eloc-budget.js` and `validate-code-density.js` pass.

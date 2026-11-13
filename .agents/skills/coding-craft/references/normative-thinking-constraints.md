@@ -1,69 +1,46 @@
-# Agent 六大高级编程规范性思维约束（Normative Cognitive Constraints）
+# Six Normative Engineering Constraints for Coding Agents
 
-本指南针对 LLM 编程智能体在复杂系统工程中最常见的六类元认知缺陷（状态泄漏、平行手写漂移、应试型凑指标、忽视负空间退化、循环内隐式分配、静默失效守卫），建立落笔前强制自检的高级工程师思维模型。
-
----
-
-## 一、 状态空间闭合思维（State-Space Algebraic Closure）
-
-### 1. 典型认知缺陷
-Agent 习惯用过程式补丁思维写状态标志（如 `let insideBlock = false`），只关注触发置为 `true` 的条件，遗忘块退出、异常中断或嵌套层级闭合时的归位条件，导致状态泄漏至后续无关代码。
-
-### 2. 刚性思维约束
-1. **让非法状态不可表示（Make Illegal States Unrepresentable）**：禁止使用 2 个以上独立布尔变量拼凑状态（$2^n$ 状态组合爆炸）；必须收敛为单一**判别联合（Discriminated Union）**或 **Type-State 类型参数**；
-2. **进入/退出不变量成对同行设计**：凡编写扫描器或状态转换，写下 `enter` 条件的同一刻必须写下基于栈深度或花括号计数的 `exit` 归位条件及 `try/finally` 异常复位。
+Pre-edit cognitive checklist targeting the six primary failure modes in automated code generation.
 
 ---
 
-## 二、 单源派生与双向闭包思维（SSOT Derivation & Bidirectional Closure）
+## 1. State-Space Algebraic Closure
 
-### 1. 典型认知缺陷
-Agent 在新增规则、分析器、门禁步骤或内核子系统时，习惯在代码、Markdown 表格、配置文件中分别手写一份字面量列表，导致“改了一处、漏了三处”的慢性漂移。
-
-### 2. 刚性思维约束
-1. **修改最小单元是三元组**：任何架构枚举或注册表变更的原子单元为 **「SSOT 真源修改 $\to$ 自动派生投影（`sync-*`） $\to$ 双向差集闭包守卫（`validate-*`）」**；
-2. **双向集合相等断言**：校验两个注册表一致时，严禁只做单向包含（$A \subseteq B$），必须同时断言 $A \setminus B = \varnothing$ 与 $B \setminus A = \varnothing$（如 `validate-family-contract.js` 对目录、分类表与映射表的三方双向对齐）。
+- **Defect**: Ad-hoc boolean flags (`insideBlock = false`) reset in happy paths only, leaking state across early returns or exceptions.
+- **Rule**: Replace multiple independent booleans with one **Discriminated Union** or **Type-State** parameter (`Make Illegal States Unrepresentable`). Write entry and exit/stack/bracket invariants together with `try/finally` restoration.
 
 ---
 
-## 三、 反机械应付（Anti-Mechanical-Gaming）与复杂度守恒思维
+## 2. SSOT Derivation & Bidirectional Closure
 
-### 1. 典型认知缺陷
-当遭遇静态门禁阻断（如 `VOL-ELOC-001` 行数超限、`CPX` 复杂度超限、`SIM-ARGS-001` 参数过多、`VOL-DIL-001` 密度过低）时，低阶 Agent 本能地采取“删注释、拆出 $\le 3$ 行空壳转发文件、把每行形参合成一长行或拆成十行空壳”等破坏架构实质的投机手段。
-
-### 2. 刚性思维约束
-1. **真实控制流化简**：降低圈复杂度只能依靠**卫语句提前返回（Guard Clauses）**、**表驱动映射（Lookup Table）**与**纯函数职责内聚提取**，严禁制造跨文件单行跳板（`ARCH-ABS-001` / `BLOCK_GAMING_DETECTED`）；
-2. **契约注释与体积双守恒**：重构前后必须保持有效注释率 $\text{ECR} \ge 0.75$、Token 密度 $\tau \in [2.5, 22.0]$ 与门面接线比 $\text{POR} \le 0.60$。
+- **Defect**: Hand-duplicating enumerations across TypeScript/Rust code, Markdown tables, and JSON configs until they drift.
+- **Rule**: Treat every registry update as the atomic triple **SSOT edit -> `sync-*` projection -> `validate-*` difference check**. Assert symmetric set equality ($A \setminus B = \varnothing$ and $B \setminus A = \varnothing$, e.g. `validate-family-contract.js`).
 
 ---
 
-## 四、 负空间（Negative Space）与边界退化思维
+## 3. Anti-Mechanical-Gaming & Complexity Conservation
 
-### 1. 典型认知缺陷
-只针对良构输入编写 Happy Path，默认外部文件一定存在、正则一定毫秒级返回、子进程一定正常退出、路径变量一定非空。
-
-### 2. 刚性思维约束（落笔前三问）
-1. **退化输入保护**：当输入为空、单行超长（$> 10\text{KB}$ Minified）、深度超过 `maxDepth` 时，是否有 $O(1)$ 短路退化分支并在模块头显式声明阈值？
-2. **破坏半径隔离**：当路径变量为空或包含 `..` 时，是否会退化指向 `/` 或 `$HOME`（`GUARD-DESTR-001`）？外部子进程挂起时是否有显式超时与 `Kill` 兜底？
-3. **失败语义唯一性**：当前函数失败时是返回 `{ ok: false, reason }` 还是抛出强类型异常？严禁返回 `null / undefined` 让调用方猜测失败原因。
+- **Defect**: Dodging `VOL-ELOC-001`, `CPX`, `SIM-ARGS-001`, or `VOL-DIL-001` by stripping comments, spawning `<= 3`-line pass-through shells, or packing statements onto one line.
+- **Rule**: Reduce complexity legitimately via **guard clauses**, **lookup tables**, and **cohesive domain helpers**—never forwarding trampolines (`ARCH-ABS-001` / `BLOCK_GAMING_DETECTED`). Preserve $\text{ECR} \ge 0.75$, $\tau \in [2.5, 22.0]$, and $\text{POR} \le 0.60$.
 
 ---
 
-## 五、 数据拓扑与零瞬态分配思维（Data-Oriented Zero-Allocation）
+## 4. Negative Space & Degenerate Bounds
 
-### 1. 典型认知缺陷
-在热路径循环中编写 `.map().filter()` 链式临时数组、字符串 `+=`、`new RegExp()` 或循环内 `.clone()` / `.new()`。
-
-### 2. 刚性思维约束
-1. **先定内存布局，后写循环控制流**：热路径循环体内部执行零堆分配审查（`CPX-SPACE-001` / `ADV-PRF-002` / `FGT-PRF-001`）；
-2. **外提与原位复用**：正则与常量表一律提升至模块顶层；高频容器通过预分配容量、游标索引推进（`queue[head++]`）或对象池 `reset_state()` / `clear()` 原位复用。
+Before coding, verify all three negative-space questions:
+1. **Degenerate inputs**: Do empty files, $>10\text{KB}$ minified lines, or deep recursion (`maxDepth`) short-circuit in $O(1)$ with explicit bounds?
+2. **Blast-radius isolation**: Can empty or `..` variables aim destructive ops at `/` or `$HOME` (`GUARD-DESTR-001`), and do spawned tools enforce timeouts + kill guards?
+3. **Single failure contract**: Return `{ ok: false, reason }` or throw typed errors explicitly—never return ambiguous `null`/`undefined`.
 
 ---
 
-## 六、 可证伪守卫思维（Falsifiable Self-Probing）
+## 5. Data-Oriented Zero-Allocation Loops
 
-### 1. 典型认知缺陷
-编写校验脚本或分析规则后，仅在当前无违规代码库上运行看到 `0 violations` 即认为完成，未能发现正则表达式因转义或锚点错误根本无法命中目标（Silent Fail-Open）。
+- Design data layout before loop control flow. Audit hot loops for zero transient heap allocations (`CPX-SPACE-001` / `ADV-PRF-002` / `FGT-PRF-001`).
+- Hoist `RegExp`/lookup constants to module scope and reuse pre-allocated buffers via cursor indices (`queue[head++]`) or `reset_state()` / `clear()`.
 
-### 2. 刚性思维约束
-- **无负样本探针即未完成**：任何新增或修改的校验守卫必须在 `runSelfProbes()` 中携带**已知必败的合成负样本**与**已知必过的正样本**，在每次启动时先自证辨别力（Discrimination Power），探针失效立即以非零退出码阻断。
+---
+
+## 6. Falsifiable Self-Probing Guards
+
+Never declare a validator done on `0 violations` alone—regex bugs fail open silently. Every custom guard must ship failing negative probes alongside passing positive probes in `runSelfProbes()` and exit non-zero if discrimination fails.

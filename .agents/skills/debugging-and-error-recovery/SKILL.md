@@ -1,7 +1,7 @@
 ---
 name: debugging-and-error-recovery
 description: >-
-  【触发：排错/报错/崩溃/单测失败/SSCCE/复现/假说/故障】遇到任何故障、测试报错或异常行为时必须使用。严格遵循观察-假说-SSCCE隔离-最小修复五步法，坚决贯彻两次受挫即停原则，严禁盲目猜修。
+  【触发：debug/triage/crash/fail/flaky/SSCCE/stack/repro】Debug via Observe-Hypothesize-SSCCE-MinimalFix and strict stop-after-2-failures discipline without guesswork.
 ---
 
 # debugging-and-error-recovery — Root-Cause Isolation, SSCCE Probes & Rule-of-Two Recovery
@@ -18,7 +18,7 @@ Governs defect localization, Short Self-Contained Correct Example (SSCCE) reprod
 - **链路**：无（通用方法论） → **本技能** → 无（通用方法论）；并行支援 `coding-craft`、`constraint-driven-development`、`test-benchmark-engineering`、`complexity-budget`。
 - **领域**：另 6 个领域支援
 - **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
-- **何时联动**：taxis 输出与 git 逐字节不一致 → `fractal-git-dev` + `debugging-and-error-recovery` + `algorithmic-operator-engineering`；Rust 与 TypeScript 输出字节不等价 → `auto-refactor-dev` + `rust-engineering` + `debugging-and-error-recovery`
+- **何时联动**：Rust native operator output diverges from TS shim → `auto-refactor-dev` + `rust-engineering` + `debugging-and-error-recovery`；GameConfig schema mismatches UI snapshot state → `webgames-workflow` + `debugging-and-error-recovery` + `coding-craft`
 <!-- SKILL-LINKS:END -->
 
 ## 1. Five-Step Scientific Debugging & SSCCE Isolation

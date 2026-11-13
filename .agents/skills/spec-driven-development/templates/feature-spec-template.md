@@ -1,22 +1,22 @@
-# 功能规格与质询决策说明书: [模块/功能名称]
+# Feature Specification & Decision Record: [Module / Feature Name]
 
-## 1. 概述、范围边界与质询决策记录
-- **问题定义与业务价值**：简述核心痛点与交付价值。
-- **范围边界**：
-  - **In Scope (本次实现)**：明确包含的能力边界。
-  - **Out of Scope (明确排除)**：本次不做或延后的内容。
-- **关键质询决策链**：
-  | 序号 | 质询焦点 | 候选项与推荐方案 | 最终锁定结论 |
+## 1. Scope, Problem Statement & Decisions
+- **Problem & Value**: Concise summary of the constraint solved and measurable deliverable.
+- **Boundaries**:
+  - **In Scope**: Explicitly included interfaces and workflows.
+  - **Out of Scope**: Deferred items and excluded surfaces.
+- **Decision Log**:
+  | # | Decision Axis | Options Considered | Locked Choice |
   | :--- | :--- | :--- | :--- |
-  | 1 | 交互形态与侵入性 | A. 轻量状态栏更新 (Recommended) / B. 模态提示 | 采纳 A |
-  | 2 | 存储与并发容灾 | A. 单工作区 Journal 追加写 (Recommended) / B. 内存态 | 采纳 A |
+  | 1 | Surface & intrusiveness | A. Non-blocking status update (Recommended) / B. Modal dialog | Adopt A |
+  | 2 | State & crash recovery | A. Append-only workspace Journal (Recommended) / B. Memory only | Adopt A |
 
-## 2. 架构设计与五层拓扑位置
-- **所属子系统**：`auto-refactor` | `workspace-timing` | `WebGames` | `fractal-git` | `scripts`
-- **分层归属**：L1 Contract / L2 Storage / L3 Core / L4 Controller / L5 Interface
-- **单向依赖边界**：列出依赖的下层接口与暴露给上层的最小符号集（如涉及宿主扩展，声明激活事件、配置作用域与双语字典键）。
+## 2. Architecture & Five-Layer Placement
+- **Subsystem**: `auto-refactor` | `workspace-timing` | `WebGames` | `fractal-git` | `scripts`
+- **Layer**: L1 Contract / L2 Storage / L3 Core / L4 Controller / L5 Interface
+- **Dependency Boundary**: Downstream interfaces consumed and minimal exported symbol set (plus activation events/i18n keys if host-facing).
 
-## 3. 核心数据模型与接口契约
+## 3. Data Model & Interface Contracts
 ```typescript
 export interface FeatureTaskPayload {
   readonly id: string;
@@ -25,14 +25,14 @@ export interface FeatureTaskPayload {
 }
 ```
 
-## 4. 负空间防御、容灾与资源预算
-- **退化与边界短路**：空输入、超大规模（$> 1500$ 行）或超时下的快速回退路径。
-- **持久化与对称生命周期**：暂存原子重命名（`.tmp -> rename`）及监听器/派发器 `flush()/dispose()` 对称释放。
-- **复杂度与内存预算**：单函数 $\text{CC} \le 15, \text{Depth} \le 4$，热路径循环零瞬态堆分配（`CPX-SPACE-001`）。
+## 4. Negative Space, Recovery & Resource Budgets
+- **Degenerate short-circuits**: Fast paths for empty input, `>1500`-line files, and timeouts.
+- **Atomic writes & teardown**: Staging (`.tmp -> rename`) plus symmetric `flush()`/`dispose()`.
+- **Complexity & memory**: $\text{CC} \le 15$, $\text{Depth} \le 4$, zero loop heap allocs (`CPX-SPACE-001`).
 
-## 5. 可证伪验收测试矩阵
-| 测试用例 ID | 场景分类 | 输入前置条件（含固定时钟/种子） | 预期输出与状态断言 |
+## 5. Falsifiable Acceptance Matrix
+| Case ID | Class | Preconditions (Fixed Clock/Seed) | Expected Assertion |
 | :--- | :--- | :--- | :--- |
-| TC-SPEC-001 | 正常流 | 提供合法有效输入载荷 | 状态成功跃迁，输出符合契约 |
-| TC-SPEC-002 | 负空间边界 | 提供空值、越界参数或损坏尾帧 | 拒绝非法输入或自动截断自愈，返回确定性错误码 |
-| TC-SPEC-003 | 故障降级 | 底层 I/O 超时或崩溃重放 | 优雅降级并保持幂等恢复，零未捕获崩溃 |
+| TC-SPEC-001 | Nominal | Valid input payload | Deterministic transition matching contract |
+| TC-SPEC-002 | Boundary | Empty / out-of-range / truncated tail | Clean rejection or tail healing; deterministic error |
+| TC-SPEC-003 | Fault / Replay | I/O timeout or crash replay | Idempotent recovery with zero uncaught throws |

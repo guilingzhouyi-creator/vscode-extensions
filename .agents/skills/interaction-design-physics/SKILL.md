@@ -1,7 +1,7 @@
 ---
 name: interaction-design-physics
 description: >-
-  【触发：界面/调样式/CSS/边框/暗色模式/输入法/抖动/套娃】编写或调整前端界面、Webview 与动效时触发。落实语义明度阶梯、单闭合边框、二阶阻尼物理模型、感知幂律渐隐及 IME 输入法互锁守卫。
+  【触发：style/design/jank/glitch/CSS/IME/dark/motion】Enforce dark lightness steps, single-border CSS, damped spring motion, power-law vignettes, and IME compose locks.
 ---
 
 # interaction-design-physics — UI Engineering & Interaction Physics Specification
@@ -16,9 +16,9 @@ Governs Webview, frontend, and client presentation layers using closed-form spri
 > 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
 - **链路**：[state-concurrency-and-crash-recovery](../state-concurrency-and-crash-recovery/SKILL.md)、[algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md) → **本技能** → [test-benchmark-engineering](../test-benchmark-engineering/SKILL.md)；并行支援 `coding-craft`、`complexity-budget`、`constraint-driven-development`、`debugging-and-error-recovery`。
-- **领域**：VS Code 扩展与计时视图（链上第 3 步）；其余 1 条领域链见 `docs/skill-catalog.md`
+- **领域**：VS Code Timing Extension（链上第 3 步）；其余 1 条领域链见 `docs/skill-catalog.md`
 - **协作专员**：不委派（主循环内加载；仅上下文污染/真并行/工具面过载时按准入判据委派）
-- **何时联动**：计时视图卡顿或丢帧 → `workspace-timing-dev` + `interaction-design-physics` + `algorithmic-operator-engineering`；卡拉尔界面动效与感知幂律渐隐 → `webgames-workflow` + `interaction-design-physics` + `test-benchmark-engineering`
+- **何时联动**：Webview jank, frame drops, or IME send glitch → `workspace-timing-dev` + `interaction-design-physics` + `algorithmic-operator-engineering`；Implement damped motion and power-law vignette curves → `webgames-workflow` + `interaction-design-physics` + `test-benchmark-engineering`
 <!-- SKILL-LINKS:END -->
 
 ## 1. Five Core Axioms of Interaction Physics

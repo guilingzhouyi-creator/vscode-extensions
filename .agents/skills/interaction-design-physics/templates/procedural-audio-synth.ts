@@ -15,7 +15,7 @@
 export interface ToneEnvelope {
     readonly attackSec: number;
     readonly decaySec: number;
-    readonly peakGain: number; // 严格 <= 0.3
+    readonly peakGain: number; // Strictly <= 0.3
 }
 
 export interface DualToneConfig {
@@ -57,18 +57,18 @@ export class ProceduralAudioSynth {
         const masterGain = ctx.createGain();
         masterGain.connect(ctx.destination);
 
-        // 消除 pop 底噪的线性微瞬态 + 指数平滑衰减
+        // Linear micro-ramp prevents pop clicks + exponential smooth decay
         masterGain.gain.setValueAtTime(0.0001, now);
         masterGain.gain.linearRampToValueAtTime(clampedGain, now + Math.max(0.003, env.attackSec));
         masterGain.gain.exponentialRampToValueAtTime(0.0001, now + env.attackSec + env.decaySec);
 
-        // 载波振荡器 (Carrier)
+        // Carrier oscillator
         const carrier = ctx.createOscillator();
         carrier.type = config.baseType ?? 'sine';
         carrier.frequency.setValueAtTime(config.baseFreq, now);
         carrier.connect(masterGain);
 
-        // 次级泛音谐波振荡器 (Harmonic)
+        // Harmonic overtone oscillator
         const harmonic = ctx.createOscillator();
         harmonic.type = config.harmonicType ?? 'triangle';
         harmonic.frequency.setValueAtTime(config.harmonicFreq, now);
@@ -113,7 +113,7 @@ export class ProceduralAudioSynth {
     public playWarning(): void {
         this.playDualTone({
             baseFreq: 330,
-            harmonicFreq: 311.13, // 微失谐警示双音
+            harmonicFreq: 311.13, // Slightly detuned warning dyad
             baseType: 'triangle',
             harmonicType: 'sine',
             envelope: {

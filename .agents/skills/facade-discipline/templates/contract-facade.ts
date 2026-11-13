@@ -51,7 +51,7 @@ export class CoreSystemFacade {
 
     constructor(deps: CoreSystemFacadeDeps) {
         const { config, telemetry, coordinator, options = {} } = deps;
-        // 1. 运行时输入防御性契约断言与参数守卫 (ARCH-FAC-001)
+        // 1. Runtime defensive contract assertions and parameter guards (ARCH-FAC-001)
         if (!config || !telemetry || !coordinator) {
             throw new Error('CoreSystemFacade requires all 3 domain services to be initialized.');
         }
@@ -69,7 +69,7 @@ export class CoreSystemFacade {
     }
 
     /**
-     * 编排三个子系统生成不可变快照 (Immutability Guarantee)
+     * Coordinate three subsystems to build an immutable snapshot
      */
     public getSystemSnapshot(): SubsystemStatusSnapshot {
         const rawSnapshot: SubsystemStatusSnapshot = {
@@ -85,12 +85,12 @@ export class CoreSystemFacade {
             });
         }
 
-        // 不可变性封装保障：杜绝外部调用方对状态进行非法突变
+        // Freeze returned snapshot to prevent external state mutation
         return Object.freeze(rawSnapshot);
     }
 
     /**
-     * 协调分发任务并记录遥测
+     * Dispatch validated task and emit telemetry
      */
     public submitTask(taskId: string, payload: unknown): boolean {
         if (!taskId || taskId.trim().length === 0) {

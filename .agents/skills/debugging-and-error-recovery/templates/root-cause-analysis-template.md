@@ -1,15 +1,15 @@
-# 缺陷根因分析单 (Root Cause Analysis)
+# Root Cause Analysis Record
 
-## 一、 缺陷基本信息
-- **缺陷标识**：`[缺陷编号]`
-- **触发场景**：复现该缺陷的完整步骤与输入。
-- **实际表现**：实际产生的错误现象或异常堆栈。
-- **预期表现**：系统在设计上应当产生的行为。
+## 1. Incident Summary
+- **Defect ID**: `[ID]`
+- **Trigger Input**: Minimal reproducible sequence and environment.
+- **Observed Behavior**: Actual error trace, state corruption, or exit status.
+- **Expected Behavior**: Contracted invariant or deterministic output.
 
-## 二、 根因诊断 (Root Cause)
-- **失效点定位**：`path/to/file.ts:行号`
-- **物理成因**：为什么会发生此问题（状态竞争 / 异常捕获缺失 / 边界溢出）。
+## 2. Root Cause Diagnosis
+- **Fault Location**: `path/to/file.ts:line`
+- **Mechanism**: Exact root cause (race condition / swallowed catch / bounds overflow).
 
-## 三、 修复方案与验证
-- **修复策略**：简述最小修复逻辑。
-- **防回归用例**：新增的测试用例文件及路径。
+## 3. Minimal Fix & Regression Proof
+- **Fix Strategy**: Smallest structural fix preserving module invariants.
+- **Regression Spec**: Path to the newly locked deterministic unit test.

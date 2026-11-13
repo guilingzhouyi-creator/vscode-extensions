@@ -7,7 +7,7 @@
  * Exit Semantics & Design Rationale: Pure CSS layout tokens guaranteeing zero horizontal overflow down to 320px.
  */
 
-/* 1. 容器上下文声明与自适应根基 */
+/* 1. Container query context root */
 .interactive-pane-root {
   container-type: inline-size;
   container-name: pane-view;
@@ -16,7 +16,7 @@
   overflow-x: hidden;
 }
 
-/* 2. CJK 防挤压与动态排版公理 */
+/* 2. CJK overflow protection & typography */
 .pane-title,
 .pane-heading {
   text-wrap: balance;
@@ -48,7 +48,7 @@
   flex-shrink: 0;
 }
 
-/* 3. 基础弹性工具栏与内容区 */
+/* 3. Flexible toolbar & content grid */
 .pane-toolbar {
   display: flex;
   align-items: center;
@@ -74,10 +74,10 @@
 }
 
 /* ==========================================================================
-   4 阶容器响应断点矩阵 (@container)
+   4-Tier Container Responsive Breakpoint Matrix (@container)
    ========================================================================== */
 
-/* 梯队 1: 双栏/中屏收窄 (< 576px) */
+/* Tier 1: Medium split pane narrow (< 576px) */
 @container pane-view (max-width: 576px) {
   .pane-toolbar {
     padding: 6px 8px;
@@ -95,7 +95,7 @@
   }
 }
 
-/* 梯队 2: 紧凑容器单列流 (< 480px) */
+/* Tier 2: Compact single-column flow (< 480px) */
 @container pane-view (max-width: 480px) {
   .pane-grid-container {
     grid-template-columns: 1fr;
@@ -112,7 +112,7 @@
   }
 }
 
-/* 梯队 3: 侧边栏/小窗 (< 384px) - 隐藏次要文本标签 */
+/* Tier 3: Sidebar / narrow pane (< 384px) - hide secondary labels */
 @container pane-view (max-width: 384px) {
   .pane-action-pill .pill-label {
     display: none;
@@ -128,7 +128,7 @@
   }
 }
 
-/* 梯队 4: 极限空间 (< 320px) - 绝对零横向溢出 */
+/* Tier 4: Minimal container (< 320px) - strictly zero horizontal overflow */
 @container pane-view (max-width: 320px) {
   .pane-toolbar {
     flex-direction: column;
