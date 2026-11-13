@@ -9,6 +9,7 @@
 //!
 //! Domain Governance Rules: FGT-GAT-001 (protocol gate facade), FGT-COR-001.
 
+pub mod audit_engine;
 pub mod authority;
 pub mod auto_audit_hook;
 pub mod branch_guard;

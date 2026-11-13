@@ -142,6 +142,16 @@ impl PreReceiveGuard {
                     reason: "Direct agent push to a bypass audit receipt is forbidden; must be issued by the commit guard".into(),
                 });
             }
+            FractalRef::AuditTrunk
+            | FractalRef::AuditCellMain { .. }
+            | FractalRef::AuditCard { .. }
+            | FractalRef::AuditSubAgent { .. } => {
+                return Err(FractalError::TopologyBreach {
+                    source_ref,
+                    target_ref: target_ref.to_git_ref(),
+                    reason: "Direct agent push to audit tree is forbidden; must be issued by kernel audit hook".into(),
+                });
+            }
             FractalRef::SubAgentWorktree { cell_id, .. } => (cell_id, "subagent"),
             FractalRef::CardWorktree { cell_id, .. } => (cell_id, "card"),
             FractalRef::CellMain { cell_id } => (cell_id, "cell main"),
@@ -179,7 +189,11 @@ impl PreReceiveGuard {
             | FractalRef::TelemetryCommit { .. }
             | FractalRef::CellTelemetryLedger { .. }
             | FractalRef::CardTelemetrySummary { .. }
-            | FractalRef::CommitBypassAudit { .. } => {
+            | FractalRef::CommitBypassAudit { .. }
+            | FractalRef::AuditTrunk
+            | FractalRef::AuditCellMain { .. }
+            | FractalRef::AuditCard { .. }
+            | FractalRef::AuditSubAgent { .. } => {
                 Err(FractalError::TopologyBreach {
                     source_ref: actor.display_name(),
                     target_ref: target_ref.to_git_ref(),
