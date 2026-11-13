@@ -37,14 +37,79 @@ import {
 import { ANALYZER_MODERN_RULES } from './analyzers-modern';
 import { ANALYZER_HYGIENE_RULES } from './analyzers-hygiene';
 
+const BUILTIN_DOCS_BASE = 'docs/04-analyzers-and-rules/01-builtin-rules.md#';
+
+/**
+ * Constructs a canonical built-in RuleDefinition anchored under the built-in rule catalog.
+ *
+ * @param id - Canonical rule identifier (e.g. `PRF-MEM-001`).
+ * @param family - Rule family grouping identifier.
+ * @param analyzer - Owning analyzer adapter name.
+ * @param defaultSeverity - Default emission severity level.
+ * @param summary - Concise invariant violation description.
+ * @param remediation - Actionable fix guidance.
+ * @param languages - Target language scope (defaults to all supported languages).
+ * @returns Frozen RuleDefinition object registered in RULE_REGISTRY.
+ */
+function builtinRule(
+    id: string,
+    family: RuleDefinition['family'],
+    analyzer: RuleDefinition['analyzer'],
+    defaultSeverity: RuleDefinition['defaultSeverity'],
+    summary: string,
+    remediation: string,
+    languages: readonly string[] = ALL_LANGUAGES,
+): RuleDefinition {
+    return defineRule({
+        id,
+        family,
+        analyzer,
+        canonical: true,
+        languages,
+        defaultSeverity,
+        summary,
+        remediation,
+        docsAnchor: `${BUILTIN_DOCS_BASE}${id.toLowerCase()}`,
+    });
+}
+
+/**
+ * Constructs a canonical Python-modernization RuleDefinition (`PYM-*`).
+ *
+ * @param id - Canonical `PYM-*` rule identifier.
+ * @param defaultSeverity - Default emission severity level.
+ * @param summary - Concise Python modernization violation summary.
+ * @param remediation - Target PEP-aligned Python syntax migration guidance.
+ * @returns Frozen RuleDefinition scoped to Python sources.
+ */
+function pythonRule(
+    id: string,
+    defaultSeverity: RuleDefinition['defaultSeverity'],
+    summary: string,
+    remediation: string,
+): RuleDefinition {
+    return builtinRule(
+        id,
+        RULE_FAMILY_PYTHON_MODERN,
+        ANALYZER_PYTHON_MODERN,
+        defaultSeverity,
+        summary,
+        remediation,
+        [LANGUAGE_PYTHON],
+    );
+}
+
 /**
  * Analyzer rule table: every rule whose owner is a built-in analyzer pack.
  *
  * The modernization and architecture families live in ./analyzers-modern and are spread here,
  * so this list stays the single ordered entry point the registry consumes.
+ * Domain invariant: every entry carries `canonical: true`, an explicit `docsAnchor` fragment,
+ * and unique IDs verified bidirectionally by `scripts/validate-rules-registry.js`.
  */
 export const ANALYZER_RULES: readonly RuleDefinition[] = [
     // ── Comment Quality & Header Contracts (CMT-*) ──
+    // Enforces 6-field module headers, 100-col comment width, and concurrency JSDoc contracts.
     defineRule({
         id: 'CMT-BAN-001',
         family: RULE_FAMILY_COMMENTS,
@@ -396,143 +461,82 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
             'Adopt object pool pattern and invoke reset_state() upon acquisition and release.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#prf-mem-002',
     }),
-    defineRule({
-        id: 'PYM-ABC-001',
-        family: RULE_FAMILY_PYTHON_MODERN,
-        analyzer: ANALYZER_PYTHON_MODERN,
-        canonical: true,
-        languages: [LANGUAGE_PYTHON],
-        defaultSeverity: SEVERITY_ERROR,
-        summary: 'Importing abstract collections from typing instead of collections.abc.',
-        remediation: 'Import abstract collections directly from collections.abc.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-abc-001',
-    }),
-    defineRule({
-        id: 'PYM-ASYNC-001',
-        family: RULE_FAMILY_PYTHON_MODERN,
-        analyzer: ANALYZER_PYTHON_MODERN,
-        canonical: true,
-        languages: [LANGUAGE_PYTHON],
-        defaultSeverity: SEVERITY_ERROR,
-        summary: 'Blocking call or un-awaited synchronous call executed inside async function.',
-        remediation: 'Migrate to asynchronous equivalents (asyncio, httpx, async repositories).',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-async-001',
-    }),
-    defineRule({
-        id: 'PYM-DATETIME-001',
-        family: RULE_FAMILY_PYTHON_MODERN,
-        analyzer: ANALYZER_PYTHON_MODERN,
-        canonical: true,
-        languages: [LANGUAGE_PYTHON],
-        defaultSeverity: SEVERITY_ERROR,
-        summary: 'Legacy timezone.utc usage detected.',
-        remediation: 'Migrate to datetime.UTC (PEP 615).',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-datetime-001',
-    }),
-    defineRule({
-        id: 'PYM-DEFAULT-001',
-        family: RULE_FAMILY_PYTHON_MODERN,
-        analyzer: ANALYZER_PYTHON_MODERN,
-        canonical: true,
-        languages: [LANGUAGE_PYTHON],
-        defaultSeverity: SEVERITY_WARNING,
-        summary: 'Mutable default argument (=[], ={}, =set()) detected in function signature.',
-        remediation:
-            'Use None as sentinel default and construct mutable collection inside function body.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-default-001',
-    }),
-    defineRule({
-        id: 'PYM-FSTRING-001',
-        family: RULE_FAMILY_PYTHON_MODERN,
-        analyzer: ANALYZER_PYTHON_MODERN,
-        canonical: true,
-        languages: [LANGUAGE_PYTHON],
-        defaultSeverity: SEVERITY_WARNING,
-        summary: 'Legacy % string formatting detected.',
-        remediation: 'Migrate to modern f-strings.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-fstring-001',
-    }),
-    defineRule({
-        id: 'PYM-GENERIC-001',
-        family: RULE_FAMILY_PYTHON_MODERN,
-        analyzer: ANALYZER_PYTHON_MODERN,
-        canonical: true,
-        languages: [LANGUAGE_PYTHON],
-        defaultSeverity: SEVERITY_ERROR,
-        summary: 'Legacy container generics from typing (List, Dict, Set, Tuple) detected.',
-        remediation: 'Use built-in generic types (list, dict, set, tuple) (PEP 585).',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-generic-001',
-    }),
-    defineRule({
-        id: 'PYM-IMPORT-001',
-        family: RULE_FAMILY_PYTHON_MODERN,
-        analyzer: ANALYZER_PYTHON_MODERN,
-        canonical: true,
-        languages: [LANGUAGE_PYTHON],
-        defaultSeverity: SEVERITY_WARNING,
-        summary: 'Module-level imports not grouped into 3 sections or not sorted alphabetically.',
-        remediation: 'Group imports according to PEP 8 and sort alphabetically within sections.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-import-001',
-    }),
-    defineRule({
-        id: 'PYM-OPEN-001',
-        family: RULE_FAMILY_PYTHON_MODERN,
-        analyzer: ANALYZER_PYTHON_MODERN,
-        canonical: true,
-        languages: [LANGUAGE_PYTHON],
-        defaultSeverity: SEVERITY_WARNING,
-        summary: 'open() call not managed within a with statement block.',
-        remediation:
-            'Wrap open() in with open(...) as handle: block to guarantee resource cleanup.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-open-001',
-    }),
-    defineRule({
-        id: 'PYM-PATH-001',
-        family: RULE_FAMILY_PYTHON_MODERN,
-        analyzer: ANALYZER_PYTHON_MODERN,
-        canonical: true,
-        languages: [LANGUAGE_PYTHON],
-        defaultSeverity: SEVERITY_WARNING,
-        summary: 'Legacy os.path usage detected.',
-        remediation: 'Migrate to pathlib.Path for object-oriented filesystem operations.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-path-001',
-    }),
-    defineRule({
-        id: 'PYM-RAISE-001',
-        family: RULE_FAMILY_PYTHON_MODERN,
-        analyzer: ANALYZER_PYTHON_MODERN,
-        canonical: true,
-        languages: [LANGUAGE_PYTHON],
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Exception raised inside except block without from clause, losing exception chain.',
-        remediation: 'Use raise X from exc to preserve chain, or bare raise to rethrow.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-raise-001',
-    }),
-    defineRule({
-        id: 'PYM-SLOTS-001',
-        family: RULE_FAMILY_PYTHON_MODERN,
-        analyzer: ANALYZER_PYTHON_MODERN,
-        canonical: true,
-        languages: [LANGUAGE_PYTHON],
-        defaultSeverity: SEVERITY_WARNING,
-        summary: 'Non-inheriting @dataclass does not declare slots=True.',
-        remediation:
-            'Add slots=True to @dataclass; if __dict__ is required, declare slots=False explicitly.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-slots-001',
-    }),
-    defineRule({
-        id: 'PYM-UNION-001',
-        family: RULE_FAMILY_PYTHON_MODERN,
-        analyzer: ANALYZER_PYTHON_MODERN,
-        canonical: true,
-        languages: [LANGUAGE_PYTHON],
-        defaultSeverity: SEVERITY_ERROR,
-        summary: 'Legacy Optional[...] or Union[...] used in type annotation or alias.',
-        remediation: 'Migrate to PEP 604 pipe syntax (X | None).',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#pym-union-001',
-    }),
+    // ── Python 3.11+ Modernization Rules (PYM-*) ──
+    // Enforces PEP 585 built-in generics, PEP 604 union syntax, PEP 615 UTC, and async safety.
+    pythonRule(
+        'PYM-ABC-001',
+        SEVERITY_ERROR,
+        'Importing abstract collections from typing instead of collections.abc.',
+        'Import abstract collections directly from collections.abc.',
+    ),
+    pythonRule(
+        'PYM-ASYNC-001',
+        SEVERITY_ERROR,
+        'Blocking call or un-awaited synchronous call executed inside async function.',
+        'Migrate to asynchronous equivalents (asyncio, httpx, async repositories).',
+    ),
+    pythonRule(
+        'PYM-DATETIME-001',
+        SEVERITY_ERROR,
+        'Legacy timezone.utc usage detected.',
+        'Migrate to datetime.UTC (PEP 615).',
+    ),
+    pythonRule(
+        'PYM-DEFAULT-001',
+        SEVERITY_WARNING,
+        'Mutable default argument (=[], ={}, =set()) detected in function signature.',
+        'Use None as sentinel default and construct mutable collection inside function body.',
+    ),
+    pythonRule(
+        'PYM-FSTRING-001',
+        SEVERITY_WARNING,
+        'Legacy % string formatting detected.',
+        'Migrate to modern f-strings.',
+    ),
+    pythonRule(
+        'PYM-GENERIC-001',
+        SEVERITY_ERROR,
+        'Legacy container generics from typing (List, Dict, Set, Tuple) detected.',
+        'Use built-in generic types (list, dict, set, tuple) (PEP 585).',
+    ),
+    pythonRule(
+        'PYM-IMPORT-001',
+        SEVERITY_WARNING,
+        'Module-level imports not grouped into 3 sections or not sorted alphabetically.',
+        'Group imports according to PEP 8 and sort alphabetically within sections.',
+    ),
+    pythonRule(
+        'PYM-OPEN-001',
+        SEVERITY_WARNING,
+        'open() call not managed within a with statement block.',
+        'Wrap open() in with open(...) as handle: block to guarantee resource cleanup.',
+    ),
+    pythonRule(
+        'PYM-PATH-001',
+        SEVERITY_WARNING,
+        'Legacy os.path usage detected.',
+        'Migrate to pathlib.Path for object-oriented filesystem operations.',
+    ),
+    pythonRule(
+        'PYM-RAISE-001',
+        SEVERITY_WARNING,
+        'Exception raised inside except block without from clause, losing exception chain.',
+        'Use raise X from exc to preserve chain, or bare raise to rethrow.',
+    ),
+    pythonRule(
+        'PYM-SLOTS-001',
+        SEVERITY_WARNING,
+        'Non-inheriting @dataclass does not declare slots=True.',
+        'Add slots=True to @dataclass; if __dict__ is required, declare slots=False explicitly.',
+    ),
+    pythonRule(
+        'PYM-UNION-001',
+        SEVERITY_ERROR,
+        'Legacy Optional[...] or Union[...] used in type annotation or alias.',
+        'Migrate to PEP 604 pipe syntax (X | None).',
+    ),
     // ── Security & Simplification Rules (SEC-*, SIM-*) ──
+    // Intercepts leaked secrets, arbitrary code execution, high-complexity dead code, and stubs.
     defineRule({
         id: 'SEC-LEAK-001',
         family: RULE_FAMILY_SECURITY,
