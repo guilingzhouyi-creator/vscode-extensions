@@ -19,7 +19,7 @@ var page_header: KPageHeader = null
 var currency_bar: KCurrencyBar = null
 var split_panel: KSplitPanel = null
 var search_bar: KSearchBar = null
-var _view = null
+var _view: Variant = null
 var _filtered_auction_indices: Array[int] = []
 
 func setup(view: BaseScreen) -> void:
@@ -267,46 +267,37 @@ func _init_price_trend_tab() -> void:
 		_view._option_price_commodity.select(0)
 		_refresh_price_trend_display()
 
-## 刷新物价走势柱状图：清空重建 7 日 ProgressBar 行（树内守卫）
+## 刷新物价走势柱状图：池化复用 ProgressBar 行节点（树内守卫）
 func _refresh_price_trend_display() -> void:
 	if _view == null or not _view.is_inside_tree() or _view._price_bars_vbox == null:
 		return
-	for child in _view._price_bars_vbox.get_children():
-		child.queue_free()
-
 	var commodity_key: String = ""
 	var selected_idx: int = _view._option_price_commodity.selected
 	if selected_idx >= 0 and selected_idx < _view._commodity_keys.size():
 		commodity_key = _view._commodity_keys[selected_idx]
 	if commodity_key.is_empty() or not _view._commodity_prices.has(commodity_key):
+		for child in _view._price_bars_vbox.get_children():
+			child.visible = false
 		return
 
 	var prices: Array = _view._commodity_prices[commodity_key]
 	var max_price: int = 1
 	for p in prices:
 		max_price = maxi(max_price, int(p))
-
 	var day_params: Dictionary = {"day": 0}
 	var value_params: Dictionary = {"value": 0}
 	for i in range(prices.size()):
-		var row := HBoxContainer.new()
-		row.alignment = BoxContainer.ALIGNMENT_BEGIN
-		var day_label := Label.new()
+		var row := _acquire_bar_row(_view._price_bars_vbox, i, [50, 80], 1.0)
+		row.visible = true
 		day_params["day"] = i + 1
-		day_label.text = UIIntermediary.text("ui.fe05.price.day", day_params)
-		day_label.custom_minimum_size = Vector2(50, 0)
-		row.add_child(day_label)
-
-		var bar: ProgressBar = KStatusBarClass.create_bar(float(prices[i]), float(max_price), Vector2(200, 24))
-		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(bar)
-
-		var price_label := Label.new()
+		(row.get_child(0) as Label).text = UIIntermediary.text("ui.fe05.price.day", day_params)
+		var bar := row.get_child(1) as ProgressBar
+		bar.max_value = float(max_price)
+		bar.value = float(prices[i])
 		value_params["value"] = int(prices[i])
-		price_label.text = UIIntermediary.text("ui.fe05.price.value", value_params)
-		price_label.custom_minimum_size = Vector2(80, 0)
-		row.add_child(price_label)
-		_view._price_bars_vbox.add_child(row)
+		(row.get_child(2) as Label).text = UIIntermediary.text("ui.fe05.price.value", value_params)
+	for i in range(prices.size(), _view._price_bars_vbox.get_child_count()):
+		_view._price_bars_vbox.get_child(i).visible = false
 
 func _on_price_commodity_selected(_index: int) -> void:
 	_refresh_price_trend_display()
@@ -390,32 +381,46 @@ func _init_resource_pool_tab() -> void:
 	]
 	_populate_resource_pools()
 
-## 填充资源池行（名称/存量条/存量/速率，动态构建节点）
+## 填充资源池行（名称/存量条/存量/速率，池化复用已有行节点）
 func _populate_resource_pools() -> void:
 	if _view == null or _view._resource_pool_vbox == null:
 		return
-	for child in _view._resource_pool_vbox.get_children():
-		child.queue_free()
-	for pool in _view._resource_pools:
-		var row := HBoxContainer.new()
-		row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	for i in range(_view._resource_pools.size()):
+		var pool: Dictionary = _view._resource_pools[i]
+		var row := _acquire_bar_row(_view._resource_pool_vbox, i, [140, 90, 70], 100.0, true)
+		row.visible = true
+		(row.get_child(0) as Label).text = UIIntermediary.text(str(pool.get("name", "ui.fe05.unknown")))
+		var bar := row.get_child(1) as ProgressBar
+		bar.max_value = float(pool.get("max", 100))
+		bar.value = float(pool.get("current", 0))
+		(row.get_child(2) as Label).text = UIIntermediary.text("ui.fe05.resource.stock", {"current": int(pool.get("current", 0)), "max": int(pool.get("max", 0))})
+		(row.get_child(3) as Label).text = UIIntermediary.text("ui.fe05.resource.rate", {"rate": int(pool.get("rate", 0))})
+	for i in range(_view._resource_pools.size(), _view._resource_pool_vbox.get_child_count()):
+		_view._resource_pool_vbox.get_child(i).visible = false
+
+## 获取或创建带进度条的池化行节点（物价走势与资源池共享行构建器，循环外分配）
+func _acquire_bar_row(vbox: VBoxContainer, index: int, col_widths: Array, default_max: float, expand_row: bool = false) -> HBoxContainer:
+	if index < vbox.get_child_count():
+		return vbox.get_child(index) as HBoxContainer
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	if expand_row:
 		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var name_label := Label.new()
-		name_label.text = UIIntermediary.text(str(pool.get("name", "ui.fe05.unknown")))
-		name_label.custom_minimum_size = Vector2(140, 0)
-		row.add_child(name_label)
-		var bar: ProgressBar = KStatusBarClass.create_bar(float(pool.get("current", 0)), float(pool.get("max", 100)), Vector2(200, 24))
-		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(bar)
-		var stock_label := Label.new()
-		stock_label.text = UIIntermediary.text("ui.fe05.resource.stock", {"current": int(pool.get("current", 0)), "max": int(pool.get("max", 0))})
-		stock_label.custom_minimum_size = Vector2(90, 0)
-		row.add_child(stock_label)
-		var rate_label := Label.new()
-		rate_label.text = UIIntermediary.text("ui.fe05.resource.rate", {"rate": int(pool.get("rate", 0))})
-		rate_label.custom_minimum_size = Vector2(70, 0)
-		row.add_child(rate_label)
-		_view._resource_pool_vbox.add_child(row)
+	var first_label := Label.new()
+	first_label.custom_minimum_size = Vector2(int(col_widths[0]), 0)
+	row.add_child(first_label)
+	var bar: ProgressBar = KStatusBarClass.create_bar(0.0, default_max, Vector2(200, 24))
+	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(bar)
+	for w_idx in range(1, col_widths.size()):
+		_add_row_label(row, int(col_widths[w_idx]))
+	vbox.add_child(row)
+	return row
+
+func _add_row_label(row: HBoxContainer, min_width: int) -> void:
+	var lbl := Label.new()
+	lbl.custom_minimum_size = Vector2(min_width, 0)
+	row.add_child(lbl)
 
 # ==============================================================================
 # 信号绑定
@@ -425,14 +430,14 @@ func _populate_resource_pools() -> void:
 func _connect_signals() -> void:
 	if _view == null:
 		return
-	_view._line_auction_search.text_changed.connect(_on_auction_search_changed)
-	_view._option_auction_category.item_selected.connect(_on_auction_category_selected)
-	_view._auction_item_list.item_selected.connect(_on_auction_item_selected)
-	_view._btn_auction_bid.pressed.connect(_on_auction_action_pressed.bind("ui.fe05.auction.bid_toast"))
-	_view._btn_auction_buyout.pressed.connect(_on_auction_action_pressed.bind("ui.fe05.auction.buyout_toast"))
-	_view._caravan_list.item_selected.connect(_on_caravan_selected)
-	_view._option_price_commodity.item_selected.connect(_on_price_commodity_selected)
-	_view._option_exchange_source.item_selected.connect(_on_exchange_source_selected)
-	_view._option_exchange_target.item_selected.connect(_on_exchange_target_selected)
-	_view._spin_exchange_amount.value_changed.connect(_on_exchange_amount_changed)
-	_view._btn_exchange_confirm.pressed.connect(_on_exchange_confirm_pressed)
+	connect_managed(_view._line_auction_search.text_changed, _on_auction_search_changed)
+	connect_managed(_view._option_auction_category.item_selected, _on_auction_category_selected)
+	connect_managed(_view._auction_item_list.item_selected, _on_auction_item_selected)
+	connect_managed(_view._btn_auction_bid.pressed, _on_auction_action_pressed.bind("ui.fe05.auction.bid_toast"))
+	connect_managed(_view._btn_auction_buyout.pressed, _on_auction_action_pressed.bind("ui.fe05.auction.buyout_toast"))
+	connect_managed(_view._caravan_list.item_selected, _on_caravan_selected)
+	connect_managed(_view._option_price_commodity.item_selected, _on_price_commodity_selected)
+	connect_managed(_view._option_exchange_source.item_selected, _on_exchange_source_selected)
+	connect_managed(_view._option_exchange_target.item_selected, _on_exchange_target_selected)
+	connect_managed(_view._spin_exchange_amount.value_changed, _on_exchange_amount_changed)
+	connect_managed(_view._btn_exchange_confirm.pressed, _on_exchange_confirm_pressed)

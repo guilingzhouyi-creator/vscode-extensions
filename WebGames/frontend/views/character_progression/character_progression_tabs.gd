@@ -11,7 +11,7 @@ extends BaseScreen
 const KItemSlotClass = preload("res://frontend/components/k_item_slot.gd")
 const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
 
-var _view = null
+var _view: Variant = null
 
 ## 绑定视图引用（由 CharacterProgressionView 在 @onready 阶段构造时调用）
 func setup(view: BaseScreen) -> void:
@@ -216,7 +216,7 @@ func _init_equipment_tab() -> void:
 	for i in _view.EQUIP_SLOT_KEYS.size():
 		var key: String = _view.EQUIP_SLOT_KEYS[i]
 		var slot_name: String = UIIntermediary.text(_view.EQUIP_SLOT_NAME_KEYS[i])
-		var item = _view.equipped_slots.get(key, null)
+		var item: Variant = _view.equipped_slots.get(key, null)
 		if item != null and item is Dictionary and item.has("name"):
 			UIIntermediary.resolve(_view._equip_slot_btns[i], "ui.fe03.equip.slot_filled_label", {"slot": slot_name, "name": item["name"]})
 		else:
@@ -234,7 +234,7 @@ func _refresh_equipment_detail(slot_idx: int) -> void:
 		UIIntermediary.resolve(_view._equip_detail_rarity_label, "ui.fe03.equip.rarity_none")
 		return
 	var key: String = _view.EQUIP_SLOT_KEYS[slot_idx]
-	var item = _view.equipped_slots.get(key, null)
+	var item: Variant = _view.equipped_slots.get(key, null)
 	if item != null and item is Dictionary:
 		if item.has("name") and item["name"] != "":
 			_view._equip_detail_name_label.text = item["name"]
@@ -283,38 +283,42 @@ func _init_inventory_tab() -> void:
 	_refresh_inventory_grid()
 	_refresh_inventory_status()
 
-## 刷新背包网格：按筛选分类动态生成物品槽位
+## 刷新背包网格：按筛选分类复用槽位节点（对象池复用，循环零堆分配）
 func _refresh_inventory_grid() -> void:
 	if _view == null or _view._inv_grid_panel == null:
 		return
-	for child in _view._inv_grid_panel.get_children():
-		child.queue_free()
 
+	var active_idx: int = 0
 	for item in _view.inventory_items:
 		var category: String = item.get("category", "")
 		if _view.inventory_current_filter != _view.InventoryFilter.ALL:
 			var filter_name: String = _view.InventoryFilter.keys()[_view.inventory_current_filter]
 			if category != filter_name:
 				continue
-		var slot := KItemSlotClass.new()
-		slot.custom_minimum_size = Vector2(90, 60)
+		var slot: KItemSlotClass = _acquire_inventory_slot(active_idx)
+		slot.visible = true
 		slot.caption = UIIntermediary.text(item.get("name", "ui.fe03.inv.unknown_item"))
 		var qty: int = int(item.get("qty", 1))
 		var category_display := UIIntermediary.text("ui.fe03.inv.filter." + category.to_lower())
-		var weight_str := "%.1f" % float(item.get("weight", 0.0))
-		var desc := UIIntermediary.text("ui.fe03.inv.item_tooltip", {
-			"name": slot.caption, "qty": qty, "category": category_display, "weight": weight_str,
-		})
+		var desc := UIIntermediary.text("ui.fe03.inv.item_tooltip", {"name": slot.caption, "qty": qty, "category": category_display, "weight": "%.1f" % float(item.get("weight", 0.0))})
 		slot.set_item_data(str(item.get("id", "")), slot.caption, desc, 1, qty)
-		_view._inv_grid_panel.add_child(slot)
+		active_idx += 1
 
-## 刷新背包状态栏：容量文案与负重进度条
+	for i in range(active_idx, _view._inv_grid_panel.get_child_count()):
+		_view._inv_grid_panel.get_child(i).visible = false
+
+func _acquire_inventory_slot(index: int) -> KItemSlotClass:
+	if index < _view._inv_grid_panel.get_child_count():
+		return _view._inv_grid_panel.get_child(index) as KItemSlotClass
+	var slot := KItemSlotClass.new()
+	slot.custom_minimum_size = Vector2(90, 60)
+	_view._inv_grid_panel.add_child(slot)
+	return slot
+
 func _refresh_inventory_status() -> void:
 	if _view == null or _view._inv_capacity_label == null:
 		return
-	UIIntermediary.resolve(_view._inv_capacity_label, "ui.fe03.inv.capacity", {
-		"cur": _view.inventory_count, "max": _view.inventory_max
-	})
+	UIIntermediary.resolve(_view._inv_capacity_label, "ui.fe03.inv.capacity", {"cur": _view.inventory_count, "max": _view.inventory_max})
 	_view._inv_weight_bar.max_value = _view.inventory_weight_max
 	_view._inv_weight_bar.value = _view.inventory_weight
 
@@ -410,18 +414,12 @@ func _load_mock_supplements() -> void:
 	_view.lore_milestones = ["ui.fe03.mock.lore.milestone1", "ui.fe03.mock.lore.milestone2", "ui.fe03.mock.lore.milestone3", "ui.fe03.mock.lore.milestone4", "ui.fe03.mock.lore.milestone5"]
 	_view.lore_achievements = ["ui.fe03.mock.lore.achievement1", "ui.fe03.mock.lore.achievement2", "ui.fe03.mock.lore.achievement3", "ui.fe03.mock.lore.achievement4", "ui.fe03.mock.lore.achievement5"]
 	_view.inventory_items = [
-		_make_item("ITEM_SWORD_MITHRIL", "ui.fe03.mock.item.sword_mithril", "WEAPON", 1, 3.5),
-		_make_item("ITEM_SWORD_IRON", "ui.fe03.mock.item.sword_iron", "WEAPON", 1, 2.8),
-		_make_item("ITEM_STAFF_MAGIC", "ui.fe03.mock.item.staff_magic", "WEAPON", 1, 1.5),
-		_make_item("ITEM_ARMOR_LEATHER", "ui.fe03.mock.item.armor_leather", "ARMOR", 1, 4.0),
-		_make_item("ITEM_HELM_IRON", "ui.fe03.mock.item.helm_iron", "ARMOR", 1, 2.0),
-		_make_item("ITEM_LEGS_CHAIN", "ui.fe03.mock.item.legs_chain", "ARMOR", 1, 3.5),
-		_make_item("ITEM_POTION_HP", "ui.fe03.mock.item.potion_hp", "CONSUMABLE", 5, 0.5),
-		_make_item("ITEM_POTION_MP", "ui.fe03.mock.item.potion_mp", "CONSUMABLE", 3, 0.5),
-		_make_item("ITEM_HERB_ANTIDOTE", "ui.fe03.mock.item.herb_antidote", "CONSUMABLE", 2, 0.1),
-		_make_item("ITEM_ORE_MITHRIL", "ui.fe03.mock.item.ore_mithril", "MATERIAL", 3, 1.0),
-		_make_item("ITEM_SCALE_DRAGON", "ui.fe03.mock.item.scale_dragon", "MATERIAL", 1, 0.8),
-		_make_item("ITEM_HERB_MAGIC", "ui.fe03.mock.item.herb_magic", "MATERIAL", 4, 0.2),
+		_make_item("ITEM_SWORD_MITHRIL", "ui.fe03.mock.item.sword_mithril", "WEAPON", 1, 3.5), _make_item("ITEM_SWORD_IRON", "ui.fe03.mock.item.sword_iron", "WEAPON", 1, 2.8),
+		_make_item("ITEM_STAFF_MAGIC", "ui.fe03.mock.item.staff_magic", "WEAPON", 1, 1.5), _make_item("ITEM_ARMOR_LEATHER", "ui.fe03.mock.item.armor_leather", "ARMOR", 1, 4.0),
+		_make_item("ITEM_HELM_IRON", "ui.fe03.mock.item.helm_iron", "ARMOR", 1, 2.0), _make_item("ITEM_LEGS_CHAIN", "ui.fe03.mock.item.legs_chain", "ARMOR", 1, 3.5),
+		_make_item("ITEM_POTION_HP", "ui.fe03.mock.item.potion_hp", "CONSUMABLE", 5, 0.5), _make_item("ITEM_POTION_MP", "ui.fe03.mock.item.potion_mp", "CONSUMABLE", 3, 0.5),
+		_make_item("ITEM_HERB_ANTIDOTE", "ui.fe03.mock.item.herb_antidote", "CONSUMABLE", 2, 0.1), _make_item("ITEM_ORE_MITHRIL", "ui.fe03.mock.item.ore_mithril", "MATERIAL", 3, 1.0),
+		_make_item("ITEM_SCALE_DRAGON", "ui.fe03.mock.item.scale_dragon", "MATERIAL", 1, 0.8), _make_item("ITEM_HERB_MAGIC", "ui.fe03.mock.item.herb_magic", "MATERIAL", 4, 0.2),
 	]
 	_view.inventory_weight = MockServiceContainer.get_instance().character().calculate_inventory_weight(_view.inventory_items)
 
@@ -429,16 +427,16 @@ func _load_mock_supplements() -> void:
 func _connect_signals() -> void:
 	if _view == null:
 		return
-	_view._pot_mode_option.item_selected.connect(_on_pot_mode_changed)
+	connect_managed(_view._pot_mode_option.item_selected, _on_pot_mode_changed)
 	for i in _view._pot_add_btns.size():
 		var idx: int = i
-		_view._pot_add_btns[i].pressed.connect(func(): _on_pot_add_pressed(idx))
-	_view._pot_confirm_btn.pressed.connect(_on_pot_confirm_pressed)
-	_view._pot_reset_btn.pressed.connect(_on_pot_reset_pressed)
-	_view._vit_age_slider.value_changed.connect(_on_vit_age_changed)
-	_view._skill_node_list.item_selected.connect(_on_skill_node_selected)
+		connect_managed(_view._pot_add_btns[i].pressed, func(): _on_pot_add_pressed(idx))
+	connect_managed(_view._pot_confirm_btn.pressed, _on_pot_confirm_pressed)
+	connect_managed(_view._pot_reset_btn.pressed, _on_pot_reset_pressed)
+	connect_managed(_view._vit_age_slider.value_changed, _on_vit_age_changed)
+	connect_managed(_view._skill_node_list.item_selected, _on_skill_node_selected)
 	for i in _view._equip_slot_btns.size():
 		var idx: int = i
-		_view._equip_slot_btns[i].pressed.connect(func(): _on_equip_slot_pressed(idx))
-	_view._inv_filter_tabs.tab_changed.connect(_on_inv_filter_changed)
-	_view._title_list.item_selected.connect(_on_title_selected)
+		connect_managed(_view._equip_slot_btns[i].pressed, func(): _on_equip_slot_pressed(idx))
+	connect_managed(_view._inv_filter_tabs.tab_changed, _on_inv_filter_changed)
+	connect_managed(_view._title_list.item_selected, _on_title_selected)

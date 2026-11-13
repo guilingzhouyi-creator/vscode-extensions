@@ -3,13 +3,13 @@
 # 文件路径: res://frontend/views/cutscene_player/cutscene_player_view.gd
 # 架构定位: Fullscreen Hardware-Accelerated Video Player & Text Placeholder View Component
 # 依赖与触发: 上游: CutscenePresenter | 下游: VideoStreamPlayer, DesignTokens
-# 职责说明: 提供全屏硬件加速 CG 视频播放与无艺术资源时的文字占位演播（Text Placeholder）；
+# 职责说明: 提供全屏硬件加速 CG 视频播放与无艺术资源时的文字演出播映（Text Placeholder）；
 #           负责黑屏淡入淡出、高精度字幕叠加、时间码倒计时与长按跳过互锁反馈；
 #           严格遵循单向快照注入 (apply_snapshot)，零内部业务逻辑与零硬编码文案。
 # 退出语义与设计依据: 表现层快照单向绑定与防误触跳过互锁规约 (Inv-VIEW-INJECTION-1 / Inv-SKIP-INTERLOCK-2)
 # ==============================================================================
 
-## CutscenePlayerView：全屏硬件加速 CG 视频播放与通用占位视口
+## CutscenePlayerView：全屏硬件加速 CG 视频播放与通用无视频文字视口
 class_name CutscenePlayerView
 extends BaseScreen
 
@@ -30,7 +30,7 @@ var _skip_prompt_box: HBoxContainer = null
 var _skip_tip_label: Label = null
 var _skip_progress_bar: ProgressBar = null
 
-# 占位/文字演出节点
+# 无视频文字演出节点
 var _placeholder_container: VBoxContainer = null
 var _placeholder_badge: Label = null
 var _placeholder_title_label: Label = null
@@ -74,10 +74,10 @@ func _ensure_assembled() -> void:
 	_video_player.name = "VideoStreamPlayer"
 	_video_player.expand = true
 	_video_player.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_video_player.finished.connect(_on_video_player_finished)
+	connect_managed(_video_player.finished, _on_video_player_finished)
 	add_child(_video_player)
 
-	# 3. 文字占位演出容器（无艺术视频时居中展示）
+	# 3. 无视频文字演出容器（无艺术视频时居中展示）
 	_setup_placeholder_ui()
 
 	# 4. 底部字幕浮层
@@ -178,7 +178,7 @@ func _setup_skip_ui() -> void:
 # 二、播放控制与流式呈现
 # ==============================================================================
 
-## 启动播放指定的视频流或文字占位演播
+## 启动播放指定的视频流或文字演出播映
 func play_stream(stream: Resource, req: Variant = null) -> void:
 	_ensure_assembled()
 	if req is Dictionary:
@@ -213,7 +213,7 @@ func play_stream(stream: Resource, req: Variant = null) -> void:
 		_video_player.volume_db = linear_to_db(volume_linear)
 		_video_player.play()
 	else:
-		# 无物理视频艺术资源或明确标记占位：激活文字/占位演出模式
+		# 无物理视频艺术资源或启用纯文字演出标记：激活文字演出模式
 		_is_placeholder_mode = true
 		_placeholder_elapsed = 0.0
 		_placeholder_duration = duration_val if duration_val > 0.0 else 3.0
@@ -260,7 +260,7 @@ func _fade_out(duration: float, on_finished: Callable = Callable()) -> void:
 	if tween != null:
 		tween.tween_property(_fade_rect, "color:a", 1.0, maxf(0.1, duration))
 		if on_finished.is_valid():
-			tween.finished.connect(on_finished)
+			connect_managed(tween.finished, on_finished)
 	elif on_finished.is_valid():
 		on_finished.call()
 
@@ -291,7 +291,7 @@ func _process(delta: float) -> void:
 	if not visible:
 		return
 
-	# 文字占位演出计时驱动（无物理视频时自动推进并触发完结）
+	# 无视频文字演出计时驱动（无物理视频时自动推进并触发完结）
 	if _is_placeholder_mode:
 		_placeholder_elapsed += delta
 		var current_tenths: int = int(floor(_placeholder_elapsed * 10.0))

@@ -55,7 +55,7 @@ var _material_current_category: int = 0
 var _material_selected_index: int = -1
 
 # 子面板委托控制器
-var _tabs = null
+var _tabs: Variant = null
 
 # ==============================================================================
 # 节点引用（场景树中以 unique_name_in_owner 标记）
@@ -140,7 +140,7 @@ func select_salvage_item(item_data: Dictionary, mock_yield: Array) -> void:
 # ==============================================================================
 
 func _ready() -> void:
-	var tabs = _get_tabs()
+	var tabs: Variant = _get_tabs()
 	_apply_theme()
 	_load_mock_data()
 	_init_header_text()
@@ -205,17 +205,17 @@ func _init_tab_titles() -> void:
 	]))
 
 func _connect_signals() -> void:
-	_btn_back.pressed.connect(_on_back_pressed)
-	_tab_container.tab_changed.connect(_on_tab_changed)
-	_option_forge_category.item_selected.connect(_on_forge_category_selected)
-	_line_forge_search.text_changed.connect(_on_forge_search_changed)
-	_forge_recipe_list.item_selected.connect(_on_forge_recipe_selected)
-	_spin_forge_quantity.value_changed.connect(_on_forge_quantity_changed)
-	_btn_forge_craft.pressed.connect(_on_forge_craft_pressed)
-	_option_dismantle_filter.item_selected.connect(_on_dismantle_filter_selected)
-	_dismantle_item_list.item_selected.connect(_on_dismantle_item_selected)
-	_spin_dismantle_quantity.value_changed.connect(_on_dismantle_quantity_changed)
-	_btn_dismantle_confirm.pressed.connect(_on_dismantle_confirm_pressed)
+	connect_managed(_btn_back.pressed, _on_back_pressed)
+	connect_managed(_tab_container.tab_changed, _on_tab_changed)
+	connect_managed(_option_forge_category.item_selected, _on_forge_category_selected)
+	connect_managed(_line_forge_search.text_changed, _on_forge_search_changed)
+	connect_managed(_forge_recipe_list.item_selected, _on_forge_recipe_selected)
+	connect_managed(_spin_forge_quantity.value_changed, _on_forge_quantity_changed)
+	connect_managed(_btn_forge_craft.pressed, _on_forge_craft_pressed)
+	connect_managed(_option_dismantle_filter.item_selected, _on_dismantle_filter_selected)
+	connect_managed(_dismantle_item_list.item_selected, _on_dismantle_item_selected)
+	connect_managed(_spin_dismantle_quantity.value_changed, _on_dismantle_quantity_changed)
+	connect_managed(_btn_dismantle_confirm.pressed, _on_dismantle_confirm_pressed)
 
 # ==============================================================================
 # Tab 1: 锻造 (FORGE)

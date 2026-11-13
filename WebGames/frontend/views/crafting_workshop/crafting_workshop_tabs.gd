@@ -16,7 +16,7 @@ const KPageHeaderClass = preload("res://frontend/components/k_page_header.gd")
 var recipe_virtual_list: KVirtualList = null
 var page_header: KPageHeader = null
 
-var _view = null
+var _view: Variant = null
 
 ## 绑定视图引用
 func setup(view: BaseScreen) -> void:
@@ -75,7 +75,7 @@ func _build_cell_panel(cell_size: Vector2, border_color: Color, border_width: in
 	var vbox := VBoxContainer.new()
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
 	panel.add_child(vbox)
-	panel.gui_input.connect(func(event: InputEvent) -> void:
+	connect_managed(panel.gui_input, func(event: InputEvent) -> void:
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			on_selected.call())
 	return panel
@@ -106,7 +106,7 @@ func _make_recipe_cell(recipe: Dictionary, catalog_index: int) -> Control:
 	vbox.add_child(_make_centered_cell_label(UIIntermediary.text(status_key), 10, status_color, true))
 	return panel
 
-## 清空配方详情为占位态
+## 清空配方详情为空态
 func _clear_recipe_detail() -> void:
 	if _view == null:
 		return
@@ -116,7 +116,7 @@ func _clear_recipe_detail() -> void:
 	UIIntermediary.resolve(_view._label_recipe_unlock_condition, "ui.fe12.recipes.unlock_none")
 	_view._recipe_material_list.clear()
 
-## 刷新配方详情：名称/稀有度/习得态/解锁条件/材料清单（越界清空占位）
+## 刷新配方详情：名称/稀有度/习得态/解锁条件/材料清单（越界重置空态）
 func _refresh_recipe_detail() -> void:
 	if _view == null:
 		return
@@ -161,7 +161,7 @@ func _on_recipe_category_changed(tab_index: int) -> void:
 # Tab 4: 材料仓库 (MATERIALS) 初始化
 # ==============================================================================
 
-## 初始化材料仓库 Tab：六分类按钮动态生成 + 默认选中首类 + 网格/详情占位
+## 初始化材料仓库 Tab：六分类按钮动态生成 + 默认选中首类 + 网格/详情空态
 func _init_materials_tab() -> void:
 	if _view == null or _view._tab_container == null:
 		return
@@ -170,21 +170,29 @@ func _init_materials_tab() -> void:
 		var section_label: Label = materials_tab.get_node_or_null("SectionLabel")
 		if section_label != null:
 			UIIntermediary.resolve(section_label, "ui.fe12.materials.section")
-	for child in _view._material_category_hbox.get_children():
-		child.queue_free()
-	for i in range(_view._material_categories.size()):
-		var btn := KButtonClass.new()
-		btn.variant = KButtonClass.StyleVariant.SECONDARY
+	var active_count: int = _view._material_categories.size()
+	for i in range(active_count):
+		var btn: Button = _acquire_material_category_button(i)
+		btn.visible = true
 		btn.text = UIIntermediary.text("ui.fe12.mat_category." + str(_view._material_categories[i]))
-		btn.toggle_mode = true
-		btn.custom_minimum_size = Vector2(72, 0)
-		var cat_idx: int = i
-		btn.pressed.connect(func(): _on_material_category_pressed(cat_idx))
-		_view._material_category_hbox.add_child(btn)
+	for i in range(active_count, _view._material_category_hbox.get_child_count()):
+		_view._material_category_hbox.get_child(i).visible = false
 	_view._material_current_category = 0
 	_refresh_material_category_buttons()
 	_populate_material_grid()
 	_clear_material_detail()
+
+## 获取或创建材料分类按钮（池化复用，绑定按索引触发，避免循环内瞬态分配）
+func _acquire_material_category_button(cat_idx: int) -> Button:
+	if cat_idx < _view._material_category_hbox.get_child_count():
+		return _view._material_category_hbox.get_child(cat_idx) as Button
+	var btn := KButtonClass.new()
+	btn.variant = KButtonClass.StyleVariant.SECONDARY
+	btn.toggle_mode = true
+	btn.custom_minimum_size = Vector2(72, 0)
+	connect_managed(btn.pressed, func(): _on_material_category_pressed(cat_idx))
+	_view._material_category_hbox.add_child(btn)
+	return btn
 
 ## 刷新分类按钮选中态（唯一高亮当前分类）
 func _refresh_material_category_buttons() -> void:
@@ -218,7 +226,7 @@ func _make_material_cell(mat: Dictionary, list_index: int) -> Control:
 	vbox.add_child(_make_centered_cell_label("x%d" % int(mat.get("qty", 0)), 11, DesignTokens.COLOR_SUCCESS_DEFAULT, true))
 	return panel
 
-## 清空材料详情为占位态
+## 清空材料详情为空态
 func _clear_material_detail() -> void:
 	if _view == null:
 		return
@@ -228,7 +236,7 @@ func _clear_material_detail() -> void:
 	UIIntermediary.resolve(_view._label_material_description, "ui.fe12.materials.desc_none")
 	UIIntermediary.resolve(_view._label_material_source, "ui.fe12.materials.source_none")
 
-## 刷新材料详情：名称/稀有度/数量/描述/获取途径（越界清空占位）
+## 刷新材料详情：名称/稀有度/数量/描述/获取途径（越界重置空态）
 func _refresh_material_detail() -> void:
 	if _view == null:
 		return
@@ -261,7 +269,7 @@ func _on_material_category_pressed(cat_idx: int) -> void:
 func _connect_signals() -> void:
 	if _view == null:
 		return
-	_view._recipe_tab_bar.tab_changed.connect(_on_recipe_category_changed)
+	connect_managed(_view._recipe_tab_bar.tab_changed, _on_recipe_category_changed)
 
 ## 稀有度字符串 → KRarityTag 整数等级
 func _rarity_str_to_level(rarity: String) -> int:
@@ -279,7 +287,7 @@ func init_recipe_virtual_list(container: Control = null) -> KVirtualList:
 		recipe_virtual_list.name = "RecipeVirtualList"
 		recipe_virtual_list.item_height = 56.0
 		recipe_virtual_list.buffer_count = 3
-		recipe_virtual_list.range_changed.connect(_on_recipe_range_changed)
+		connect_managed(recipe_virtual_list.range_changed, _on_recipe_range_changed)
 		if container != null:
 			container.add_child(recipe_virtual_list)
 	return recipe_virtual_list

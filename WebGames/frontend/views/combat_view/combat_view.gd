@@ -10,7 +10,7 @@ extends BaseScreen
 
 const SubpanelsClass = preload("res://frontend/views/combat_view/combat_subpanels.gd")
 
-var _subpanels = null
+var _subpanels: Variant = null
 func _get_subpanels():
 	if _subpanels == null:
 		_subpanels = _register_owned_subcontroller(SubpanelsClass.new())
@@ -35,7 +35,7 @@ class FloatingTextDTO extends CombatFloatingTextDTO:
 # --- 子界面 1: 战斗主界面 — 左侧战报滚动区 ---
 @onready var _battle_log_rich: RichTextLabel = $%BattleLogRich
 
-# --- 子界面 1: 战斗主界面 — 中央战斗场景占位 ---
+# --- 子界面 1: 战斗主界面 — 中央战斗场景视图 ---
 @onready var _battle_scene_placeholder: PanelContainer = $%BattleScenePlaceholder
 @onready var _battle_scene_label: Label = $%BattleSceneLabel
 
@@ -165,11 +165,11 @@ func _connect_signals() -> void:
 	for i in _skill_buttons.size():
 		var btn := _skill_buttons[i]
 		var slot_idx := i + 1
-		btn.pressed.connect(func(): _on_skill_pressed(slot_idx))
+		connect_managed(btn.pressed, func(): _on_skill_pressed(slot_idx))
 
-	_settlement_back_btn.pressed.connect(_on_settlement_back_pressed)
-	_part_break_close_btn.pressed.connect(_on_part_break_close_pressed)
-	_back_btn.pressed.connect(_on_back_pressed)
+	connect_managed(_settlement_back_btn.pressed, _on_settlement_back_pressed)
+	connect_managed(_part_break_close_btn.pressed, _on_part_break_close_pressed)
+	connect_managed(_back_btn.pressed, _on_back_pressed)
 
 # ==============================================================================
 # BOSS 与玩家状态刷新
@@ -202,7 +202,7 @@ func _refresh_player_status() -> void:
 func _refresh_skill_bar() -> void:
 	for i in _skill_buttons.size():
 		var btn: Button = _skill_buttons[i]
-		var slot_data = skill_slots[i]
+		var slot_data: Variant = skill_slots[i]
 		var skill_id: String = str(slot_data.get("skill_id", ""))
 		var cd_remain: float = float(slot_data.get("cd_remain", 0.0))
 		if skill_id.is_empty():
@@ -217,7 +217,7 @@ func _refresh_skill_bar() -> void:
 			btn.tooltip_text = UIIntermediary.text("ui.fe04.skill.tooltip_hotkey", {"key": i + 1})
 
 func _on_skill_pressed(slot_idx: int) -> void:
-	var slot_data = skill_slots[slot_idx - 1]
+	var slot_data: Variant = skill_slots[slot_idx - 1]
 	var skill_id: String = str(slot_data.get("skill_id", ""))
 	var cd_remain: float = float(slot_data.get("cd_remain", 0.0))
 	if skill_id.is_empty():

@@ -371,7 +371,7 @@ func _init_lore_tab() -> void:
 func _connect_signals() -> void:
 	if _tabs != null:
 		_tabs._connect_signals()
-	_back_btn.pressed.connect(_on_back_btn_pressed)
+	connect_managed(_back_btn.pressed, _on_back_btn_pressed)
 
 func _on_back_btn_pressed() -> void:
 	self.back()

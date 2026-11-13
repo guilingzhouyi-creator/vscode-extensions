@@ -59,7 +59,7 @@ var _auction_category_keys: Array = []
 var _resource_pools: Array = []
 
 # 子面板委托控制器
-var _tabs = null
+var _tabs: Variant = null
 
 # ------------------------------------------------------------------------------
 # 节点引用（通过 unique_name_in_owner 获取）
@@ -171,7 +171,7 @@ func calculate_total_copper_value() -> int:
 
 ## 生命周期初始化：主题/快照/七 Tab 标题与文案/各子界面装配/信号绑定（骨架零接线）
 func _ready() -> void:
-	var tabs = _get_tabs()
+	var tabs: Variant = _get_tabs()
 	_apply_theme()
 	_load_mock_snapshot()
 	tabs._init_tab_titles()
@@ -383,15 +383,15 @@ func _on_shop_confirm_pressed() -> void:
 
 ## 绑定本地 UI 交互信号（零接线：七 Tab 控件在本地脚本闭环）
 func _connect_signals() -> void:
-	_btn_back.pressed.connect(_on_back_pressed)
-	_tab_container.tab_changed.connect(_on_tab_changed)
-	_btn_mode_buy.pressed.connect(_on_mode_buy_pressed)
-	_btn_mode_sell.pressed.connect(_on_mode_sell_pressed)
-	_shop_item_list.item_selected.connect(_on_shop_item_selected)
-	_spin_shop_quantity.value_changed.connect(_on_shop_quantity_changed)
-	_btn_shop_confirm.pressed.connect(_on_shop_confirm_pressed)
+	connect_managed(_btn_back.pressed, _on_back_pressed)
+	connect_managed(_tab_container.tab_changed, _on_tab_changed)
+	connect_managed(_btn_mode_buy.pressed, _on_mode_buy_pressed)
+	connect_managed(_btn_mode_sell.pressed, _on_mode_sell_pressed)
+	connect_managed(_shop_item_list.item_selected, _on_shop_item_selected)
+	connect_managed(_spin_shop_quantity.value_changed, _on_shop_quantity_changed)
+	connect_managed(_btn_shop_confirm.pressed, _on_shop_confirm_pressed)
 
-## 主 Tab 切换：骨架阶段占位
+## 主 Tab 切换：表现层无额外副作用
 func _on_tab_changed(_tab_index: int) -> void:
 	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe05.toast.tab_switched"), NavTypes.ToastLevel.INFO, 1.0)
 

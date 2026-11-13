@@ -9,7 +9,7 @@ extends BaseScreen
 const KStatusBarClass = preload("res://frontend/components/k_status_bar.gd")
 
 var status_bar: KStatusBar = null
-var _view = null
+var _view: Variant = null
 
 func setup(view: BaseScreen) -> void:
 	_view = view
@@ -47,7 +47,7 @@ func refresh_boss_parts() -> void:
 	var parts_count: int = view.boss_parts.size()
 
 	for i in range(parts_count):
-		var part = view.boss_parts[i]
+		var part: Variant = view.boss_parts[i]
 		var part_name: String = str(part.get("part_name", "?"))
 		var hp: float = float(part.get("hp", 0.0))
 		var max_hp: float = float(part.get("max_hp", 100.0))
@@ -87,7 +87,7 @@ func _create_boss_part_row() -> HBoxContainer:
 	status_lbl.custom_minimum_size = Vector2(24, 0)
 	row.add_child(status_lbl)
 
-	row.gui_input.connect(_on_boss_part_gui_input.bind(row))
+	connect_managed(row.gui_input, _on_boss_part_gui_input.bind(row))
 	return row
 
 func _update_boss_part_row(row: HBoxContainer, part_name: String, hp: float, max_hp: float, is_broken: bool) -> void:

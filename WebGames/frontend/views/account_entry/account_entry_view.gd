@@ -146,12 +146,20 @@ func _load_mock_snapshot() -> void:
 
 func switch_state(new_state: EntryState) -> void:
     current_state = new_state
-    if splash_panel != null: splash_panel.visible = (current_state == EntryState.SPLASH)
-    if login_panel != null: login_panel.visible = (current_state == EntryState.LOGIN)
-    if register_panel != null: register_panel.visible = (current_state == EntryState.REGISTER)
-    if server_select_panel != null: server_select_panel.visible = (current_state == EntryState.SERVER_SELECT)
-    if character_select_panel != null: character_select_panel.visible = (current_state == EntryState.CHARACTER_SELECT)
-    if character_create_panel != null: character_create_panel.visible = (current_state == EntryState.CHARACTER_CREATE)
+    var panel_states: Array = [
+        [splash_panel, EntryState.SPLASH],
+        [login_panel, EntryState.LOGIN],
+        [register_panel, EntryState.REGISTER],
+        [server_select_panel, EntryState.SERVER_SELECT],
+        [character_select_panel, EntryState.CHARACTER_SELECT],
+        [character_create_panel, EntryState.CHARACTER_CREATE],
+    ]
+    for entry in panel_states:
+        _set_panel_visibility(entry[0] as Control, current_state == int(entry[1]))
+
+func _set_panel_visibility(panel: Control, is_visible: bool) -> void:
+    if panel != null:
+        panel.visible = is_visible
 
 func submit_login(username: String, password_plain: String) -> Dictionary:
     form_username = username.strip_edges()
@@ -288,24 +296,24 @@ func select_character_slot(slot_id: String) -> Dictionary:
 
 func _connect_signals() -> void:
     var tabs: AccountEntryTabs = _get_tabs()
-    splash_enter_btn.pressed.connect(_on_splash_enter_pressed)
-    login_submit_btn.pressed.connect(_on_login_submit_pressed)
-    login_goto_register_btn.pressed.connect(_on_login_goto_register_pressed)
-    login_forgot_btn.pressed.connect(_on_login_forgot_pressed)
-    register_submit_btn.pressed.connect(_on_register_submit_pressed)
-    register_back_btn.pressed.connect(_on_register_back_pressed)
-    server_confirm_btn.pressed.connect(_on_server_confirm_pressed)
-    server_back_btn.pressed.connect(_on_server_back_pressed)
-    char_slot_0_btn.pressed.connect(func(): tabs.on_char_slot_pressed(0))
-    char_slot_1_btn.pressed.connect(func(): tabs.on_char_slot_pressed(1))
-    char_slot_2_btn.pressed.connect(func(): tabs.on_char_slot_pressed(2))
-    char_enter_btn.pressed.connect(_on_char_enter_pressed)
-    char_create_btn.pressed.connect(_on_char_create_pressed)
-    char_delete_btn.pressed.connect(_on_char_delete_pressed)
-    char_back_btn.pressed.connect(_on_char_back_pressed)
-    char_reroll_btn.pressed.connect(tabs.roll_attributes)
-    char_create_confirm_btn.pressed.connect(_on_char_create_confirm_pressed)
-    char_create_back_btn.pressed.connect(_on_char_create_back_pressed)
+    connect_managed(splash_enter_btn.pressed, _on_splash_enter_pressed)
+    connect_managed(login_submit_btn.pressed, _on_login_submit_pressed)
+    connect_managed(login_goto_register_btn.pressed, _on_login_goto_register_pressed)
+    connect_managed(login_forgot_btn.pressed, _on_login_forgot_pressed)
+    connect_managed(register_submit_btn.pressed, _on_register_submit_pressed)
+    connect_managed(register_back_btn.pressed, _on_register_back_pressed)
+    connect_managed(server_confirm_btn.pressed, _on_server_confirm_pressed)
+    connect_managed(server_back_btn.pressed, _on_server_back_pressed)
+    connect_managed(char_slot_0_btn.pressed, func(): tabs.on_char_slot_pressed(0))
+    connect_managed(char_slot_1_btn.pressed, func(): tabs.on_char_slot_pressed(1))
+    connect_managed(char_slot_2_btn.pressed, func(): tabs.on_char_slot_pressed(2))
+    connect_managed(char_enter_btn.pressed, _on_char_enter_pressed)
+    connect_managed(char_create_btn.pressed, _on_char_create_pressed)
+    connect_managed(char_delete_btn.pressed, _on_char_delete_pressed)
+    connect_managed(char_back_btn.pressed, _on_char_back_pressed)
+    connect_managed(char_reroll_btn.pressed, tabs.roll_attributes)
+    connect_managed(char_create_confirm_btn.pressed, _on_char_create_confirm_pressed)
+    connect_managed(char_create_back_btn.pressed, _on_char_create_back_pressed)
 
 func _on_splash_enter_pressed() -> void:
     switch_state(EntryState.LOGIN)
