@@ -34,6 +34,14 @@ fn advance_regex_flags_u16(units: &[u16], mut cursor: usize, out: &mut [u16]) ->
     cursor
 }
 
+#[inline]
+fn step_regex_escape_u16(out: &mut [u16], cursor: usize, len: usize) -> usize {
+    if cursor + 1 < len {
+        out[cursor + 1] = 0x20;
+    }
+    cursor + 2
+}
+
 /// Masks a UTF-16 regex literal starting at `index` and returns the next scan cursor.
 pub(crate) fn mask_regex_body_u16(units: &[u16], index: usize, out: &mut [u16]) -> usize {
     out[index] = 0x20;
@@ -45,10 +53,7 @@ pub(crate) fn mask_regex_body_u16(units: &[u16], index: usize, out: &mut [u16]) 
         let unit = units[cursor];
         out[cursor] = 0x20;
         if unit == b'\\' as u16 {
-            if cursor + 1 < len {
-                out[cursor + 1] = 0x20;
-            }
-            cursor += 2;
+            cursor = step_regex_escape_u16(out, cursor, len);
             continue;
         }
         if unit == b'[' as u16 {
@@ -131,4 +136,112 @@ pub(crate) fn scan_raw_string_u16(
 
     state.raw_string = Some(hashes);
     Some(units.len())
+}
+
+#[inline]
+pub(crate) fn step_raw_string_continuation_u16(
+    units: &[u16],
+    out: &mut [u16],
+    state: &mut MaskState,
+    hashes: usize,
+    index: usize,
+    len: usize,
+) -> usize {
+    out[index] = 0x20;
+    let closes_raw = units[index] == b'"' as u16
+        && index + 1 + hashes <= len
+        && units[index + 1..index + 1 + hashes]
+            .iter()
+            .all(|&c| c == b'#' as u16);
+    if closes_raw {
+        out[index + 1..=index + hashes].fill(0x20);
+        state.raw_string = None;
+        return index + 1 + hashes;
+    }
+    index + 1
+}
+
+#[inline]
+pub(crate) fn is_raw_string_candidate_u16(units: &[u16], index: usize, len: usize) -> bool {
+    let u = units[index];
+    u == b'r' as u16
+        || ((u == b'b' as u16 || u == b'c' as u16)
+            && index + 1 < len
+            && units[index + 1] == b'r' as u16)
+}
+
+#[inline]
+pub(crate) fn step_active_quote_u16(
+    units: &[u16],
+    out: &mut [u16],
+    state: &mut MaskState,
+    active_quote: char,
+    index: usize,
+    len: usize,
+) -> usize {
+    out[index] = 0x20;
+    let u = units[index];
+    if u == b'\\' as u16 {
+        if index + 1 < len {
+            out[index + 1] = 0x20;
+        }
+        return index + 2;
+    }
+    if u == active_quote as u16 {
+        state.quote = None;
+    }
+    index + 1
+}
+
+#[inline]
+pub(crate) fn step_block_comment_u16(
+    units: &[u16],
+    out: &mut [u16],
+    state: &mut MaskState,
+    bc_close_units: Option<&[u16]>,
+    index: usize,
+) -> usize {
+    if let Some(close) = bc_close_units {
+        if !close.is_empty() && units[index..].starts_with(close) {
+            out[index..index + close.len()].fill(0x20);
+            state.in_block_comment = false;
+            return index + close.len();
+        }
+    }
+    out[index] = 0x20;
+    index + 1
+}
+
+#[inline]
+pub(crate) fn step_html_comment_u16(
+    units: &[u16],
+    out: &mut [u16],
+    state: &mut MaskState,
+    index: usize,
+) -> usize {
+    if units[index..].starts_with(&[b'-' as u16, b'-' as u16, b'>' as u16]) {
+        out[index..index + 3].fill(0x20);
+        state.in_html_comment = false;
+        return index + 3;
+    }
+    out[index] = 0x20;
+    index + 1
+}
+
+#[inline]
+pub(crate) fn step_open_quote_u16(
+    out: &mut [u16],
+    state: &mut MaskState,
+    u: u16,
+    multiline_templates: bool,
+    index: usize,
+) -> usize {
+    let quote_char = (u as u8) as char;
+    state.quote = if quote_char == '`' && !multiline_templates {
+        None
+    } else {
+        Some(quote_char)
+    };
+    out[index] = 0x20;
+    index + 1
 }

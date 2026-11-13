@@ -1,17 +1,24 @@
 //! Module: Native Acceleration Kernel — Source Masking & Spectrum Extractor
 //! Crate: ops-mask
 //! Architecture Role: Byte-level scanner for multilang string/comment masking
-//! and line statistics, providing 100% byte-parity with ECMAScript UTF-16 AST rules.
+//!   and line statistics, providing 100% byte-parity with ECMAScript UTF-16 AST rules.
+//! Dependencies & Triggers: Invoked by `auto-refactor-core` N-API bindings and engine scanners.
+//! Responsibilities:
+//!   1. Dispatch per-line masking across ASCII fast-path and UTF-16 surrogate-safe path.
+//!   2. Track multi-line comment, quote, and raw-string state across sequential lines.
+//!   3. Preserve exact line/column offsets by overwriting masked spans with ASCII spaces.
 
 mod ascii;
 mod ascii_helpers;
+mod utf16;
 mod utf16_helpers;
 
 use ascii::mask_line_ascii_into;
 use ascii_helpers::has_trigger_char;
-use utf16_helpers::{mask_regex_body_u16, opens_regex_literal_u16, scan_raw_string_u16};
+use utf16::mask_line_utf16;
 
 /// Configuration flags for source code comment and literal masking.
+/// All delimiters remain immutable per scan and match caller language profiles.
 #[derive(Debug, Clone, Default)]
 pub struct MaskConfig {
     pub line_comment: String,
@@ -23,6 +30,7 @@ pub struct MaskConfig {
 }
 
 /// Result of source code masking containing raw/masked line buffers and metrics.
+/// Guarantees `raw.len() == masked.len() == lines as usize` across all scans.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MaskResult {
     pub raw: Vec<String>,
@@ -31,6 +39,7 @@ pub struct MaskResult {
     pub non_blank_lines: u32,
 }
 
+/// Cross-line lexical state carried between consecutive source lines.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct MaskState {
     pub(crate) in_block_comment: bool,
@@ -39,6 +48,7 @@ pub(crate) struct MaskState {
     pub(crate) raw_string: Option<usize>,
 }
 
+/// Token characters whose presence immediately before `/` permits opening a regex literal.
 pub(crate) const REGEX_PREFIX_CHARS: &[u8] = b"([{,=:!&|?;+-*%<>";
 
 /// Tests if Unicode code point is ECMAScript whitespace or line terminator.
@@ -191,213 +201,13 @@ fn mask_line_into(
     }
 }
 
+/// Masks a single source line into an allocated `String` using reusable scratch space.
 fn mask_line(line: &str, state: &mut MaskState, config: &MaskConfig) -> String {
     let mut out = String::with_capacity(line.len());
     let mut buf = Vec::with_capacity(256);
     let mut target = MaskTarget::new(&mut buf, &mut out);
     mask_line_into(line, state, config, &mut target);
     out
-}
-
-#[inline]
-fn step_raw_string_continuation_u16(
-    units: &[u16],
-    out: &mut [u16],
-    state: &mut MaskState,
-    hashes: usize,
-    index: usize,
-    len: usize,
-) -> usize {
-    out[index] = 0x20;
-    if units[index] == b'"' as u16
-        && index + 1 + hashes <= len
-        && units[index + 1..index + 1 + hashes]
-            .iter()
-            .all(|&c| c == b'#' as u16)
-    {
-        for offset in 1..=hashes {
-            out[index + offset] = 0x20;
-        }
-        state.raw_string = None;
-        return index + 1 + hashes;
-    }
-    index + 1
-}
-
-#[inline]
-fn is_raw_string_candidate_u16(units: &[u16], index: usize, len: usize) -> bool {
-    let u = units[index];
-    u == b'r' as u16
-        || ((u == b'b' as u16 || u == b'c' as u16)
-            && index + 1 < len
-            && units[index + 1] == b'r' as u16)
-}
-
-#[inline]
-fn step_active_quote_u16(
-    units: &[u16],
-    out: &mut [u16],
-    state: &mut MaskState,
-    active_quote: char,
-    index: usize,
-    len: usize,
-) -> usize {
-    let q_u16 = active_quote as u16;
-    out[index] = 0x20;
-    let u = units[index];
-    if u == b'\\' as u16 {
-        if index + 1 < len {
-            out[index + 1] = 0x20;
-        }
-        return index + 2;
-    }
-    if u == q_u16 {
-        state.quote = None;
-    }
-    index + 1
-}
-
-#[inline]
-fn step_block_comment_u16(
-    units: &[u16],
-    out: &mut [u16],
-    state: &mut MaskState,
-    bc_close_units: Option<&Vec<u16>>,
-    index: usize,
-) -> usize {
-    if let Some(close) = bc_close_units {
-        if !close.is_empty() && units[index..].starts_with(close) {
-            for offset in 0..close.len() {
-                out[index + offset] = 0x20;
-            }
-            state.in_block_comment = false;
-            return index + close.len();
-        }
-    }
-    out[index] = 0x20;
-    index + 1
-}
-
-#[inline]
-fn step_html_comment_u16(
-    units: &[u16],
-    out: &mut [u16],
-    state: &mut MaskState,
-    index: usize,
-) -> usize {
-    if units[index..].starts_with(&[b'-' as u16, b'-' as u16, b'>' as u16]) {
-        out[index..index + 3].fill(0x20);
-        state.in_html_comment = false;
-        return index + 3;
-    }
-    out[index] = 0x20;
-    index + 1
-}
-
-#[inline]
-fn step_open_quote_u16(
-    out: &mut [u16],
-    state: &mut MaskState,
-    u: u16,
-    multiline_templates: bool,
-    index: usize,
-) -> usize {
-    let quote_char = (u as u8) as char;
-    state.quote = if quote_char == '`' && !multiline_templates {
-        None
-    } else {
-        Some(quote_char)
-    };
-    out[index] = 0x20;
-    index + 1
-}
-
-fn mask_line_utf16(line: &str, state: &mut MaskState, config: &MaskConfig) -> String {
-    let units: Vec<u16> = line.encode_utf16().collect();
-    let len = units.len();
-    let mut out = units.clone();
-    let mut index = 0;
-
-    let lc_units: Vec<u16> = config.line_comment.encode_utf16().collect();
-    let bc_open_units: Option<Vec<u16>> = config
-        .block_comment
-        .as_ref()
-        .map(|(o, _)| o.encode_utf16().collect());
-    let bc_close_units: Option<Vec<u16>> = config
-        .block_comment
-        .as_ref()
-        .map(|(_, c)| c.encode_utf16().collect());
-    let quote_units: Vec<u16> = config.quote_chars.encode_utf16().collect();
-    let has_double_quote = quote_units.contains(&(b'"' as u16));
-
-    while index < len {
-        if let Some(active_quote) = state.quote {
-            index = step_active_quote_u16(&units, &mut out, state, active_quote, index, len);
-            continue;
-        }
-
-        if let Some(hashes) = state.raw_string {
-            index = step_raw_string_continuation_u16(&units, &mut out, state, hashes, index, len);
-            continue;
-        }
-
-        if state.in_block_comment {
-            index = step_block_comment_u16(&units, &mut out, state, bc_close_units.as_ref(), index);
-            continue;
-        }
-
-        if state.in_html_comment {
-            index = step_html_comment_u16(&units, &mut out, state, index);
-            continue;
-        }
-
-        if !lc_units.is_empty() && units[index..].starts_with(&lc_units) {
-            out[index..len].fill(0x20);
-            return String::from_utf16_lossy(&out);
-        }
-
-        if let Some(open) = &bc_open_units {
-            if !open.is_empty() && units[index..].starts_with(open) {
-                for offset in 0..open.len() {
-                    out[index + offset] = 0x20;
-                }
-                state.in_block_comment = true;
-                index += open.len();
-                continue;
-            }
-        }
-
-        if config.html_comment
-            && units[index..].starts_with(&[b'<' as u16, b'!' as u16, b'-' as u16, b'-' as u16])
-        {
-            out[index..index + 4].fill(0x20);
-            state.in_html_comment = true;
-            index += 4;
-            continue;
-        }
-
-        let u = units[index];
-        if config.regex_literals && u == b'/' as u16 && opens_regex_literal_u16(&units, index) {
-            index = mask_regex_body_u16(&units, index, &mut out);
-            continue;
-        }
-
-        if has_double_quote && is_raw_string_candidate_u16(&units, index, len) {
-            if let Some(end_idx) = scan_raw_string_u16(&units, index, &mut out, state) {
-                index = end_idx;
-                continue;
-            }
-        }
-
-        if quote_units.contains(&u) {
-            index = step_open_quote_u16(&mut out, state, u, config.multiline_templates, index);
-            continue;
-        }
-
-        index += 1;
-    }
-
-    String::from_utf16_lossy(&out)
 }
 
 #[cfg(test)]
@@ -608,5 +418,16 @@ mod tests {
         assert_eq!(res.masked[0], "const a = 1;                       ");
         assert_eq!(res.masked[1], "inner             ");
         assert_eq!(res.masked[2], "        const b = 2;");
+    }
+
+    #[test]
+    fn test_utf16_regex_and_raw_string_parity() {
+        let code = "const p = '中'; const r = /a\\/b/u; const t = r#\"字\"#;";
+        let res = mask_source_code(code, &c_family_config());
+        assert_eq!(
+            res.masked[0].encode_utf16().count(),
+            code.encode_utf16().count()
+        );
+        assert!(res.masked[0].starts_with("const p =    ; const r =        ;"));
     }
 }

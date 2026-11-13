@@ -74,6 +74,14 @@ fn advance_regex_flags_ascii(line: &[u8], mut cursor: usize, out: &mut [u8]) -> 
     cursor
 }
 
+#[inline]
+fn step_regex_escape_ascii(out: &mut [u8], cursor: usize, len: usize) -> usize {
+    if cursor + 1 < len {
+        out[cursor + 1] = b' ';
+    }
+    cursor + 2
+}
+
 /// Masks an ASCII regex literal starting at `index` and returns the next scan cursor.
 pub(crate) fn mask_regex_body_ascii(line: &[u8], index: usize, out: &mut [u8]) -> usize {
     out[index] = b' ';
@@ -85,10 +93,7 @@ pub(crate) fn mask_regex_body_ascii(line: &[u8], index: usize, out: &mut [u8]) -
         let byte_val = line[cursor];
         out[cursor] = b' ';
         if byte_val == b'\\' {
-            if cursor + 1 < len {
-                out[cursor + 1] = b' ';
-            }
-            cursor += 2;
+            cursor = step_regex_escape_ascii(out, cursor, len);
             continue;
         }
         if byte_val == b'[' {
