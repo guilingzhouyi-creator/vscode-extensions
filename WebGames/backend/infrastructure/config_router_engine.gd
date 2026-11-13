@@ -39,6 +39,11 @@ static var _prefix_routes: Dictionary = {
 	}
 }
 
+## 零分配高频路径表解析缓存（仅缓存路由映射表名，不缓存可变配置值）
+static var _table_only_cache: Dictionary = {}
+static var _prefix_table_cache: Dictionary = {}
+static var _subtables_cache: Dictionary = {}
+
 ## 构造规范的点分子表名
 static func build_subtable_key(root_layer: String, domain_id: String, sub_table: String) -> String:
 	return "%s.%s.%s" % [root_layer, domain_id, sub_table]
@@ -48,25 +53,54 @@ static func is_subtable(table_name: String) -> bool:
 	var parts := table_name.split(".")
 	return parts.size() >= 3
 
-## 获取给定领域的全部子表清单
+## 获取给定领域的全部子表清单（带静态列表缓存）
 static func get_subtables_for_domain(domain_name: String) -> Array:
 	if _domain_subtables.has(domain_name):
 		return _domain_subtables[domain_name]
+	if _subtables_cache.has(domain_name):
+		return _subtables_cache[domain_name]
+	var out: Array = []
 	if _primary_aliases.has(domain_name):
-		return [_primary_aliases[domain_name]]
-	var parts := domain_name.split(".")
-	if parts.size() == 2 and parts[0] == "domains":
-		return ["%s.%s.core" % [parts[0], parts[1]]]
-	return []
+		out = [_primary_aliases[domain_name]]
+	elif domain_name.begins_with("domains."):
+		var dot_pos: int = domain_name.find(".", 8)
+		if dot_pos == -1:
+			out = [domain_name + ".core"]
+	_subtables_cache[domain_name] = out
+	return out
 
 ## 基础别名解析（单一表名）
 static func resolve_table_name(requested_table: String) -> String:
 	if _primary_aliases.has(requested_table):
 		return _primary_aliases[requested_table]
-	var parts := requested_table.split(".")
-	if parts.size() == 2 and parts[0] == "domains":
-		return "%s.%s.core" % [parts[0], parts[1]]
-	return requested_table
+	if _table_only_cache.has(requested_table):
+		return _table_only_cache[requested_table]
+	var resolved: String = requested_table
+	if requested_table.begins_with("domains."):
+		var dot_pos: int = requested_table.find(".", 8)
+		if dot_pos == -1:
+			resolved = requested_table + ".core"
+	_table_only_cache[requested_table] = resolved
+	return resolved
+
+## 热路径零分配目标表名解析（免除 ConfigRouteDTO 构造与数组 split）
+static func resolve_target_table(requested_table: String, path: String = "") -> String:
+	if not _prefix_routes.has(requested_table):
+		return resolve_table_name(requested_table)
+	var slash_pos: int = path.find("/")
+	var first_seg: String = path.substr(0, slash_pos) if slash_pos >= 0 else path
+	if not first_seg.is_empty():
+		var cached_sub: Variant = _prefix_table_cache.get(requested_table, null)
+		if cached_sub is Dictionary and (cached_sub as Dictionary).has(first_seg):
+			return String((cached_sub as Dictionary)[first_seg])
+		var prefix_map: Dictionary = _prefix_routes[requested_table]
+		var target_sub: String = prefix_map.get(first_seg, "")
+		if not target_sub.is_empty():
+			if not _prefix_table_cache.has(requested_table):
+				_prefix_table_cache[requested_table] = {}
+			_prefix_table_cache[requested_table][first_seg] = target_sub
+			return target_sub
+	return resolve_table_name(requested_table)
 
 ## 全要素智能路由解析（表名 + 键路径 -> ConfigRouteDTO）
 static func resolve_route(requested_table: String, path: String = "") -> ConfigRouteDTO:

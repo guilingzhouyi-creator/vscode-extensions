@@ -34,6 +34,10 @@ static var _last_chain_hash: String = LogConstants.CHAIN_GENESIS_HASH
 static var _encryption_key_override: PackedByteArray = PackedByteArray()
 static var _io_mutex: Mutex = Mutex.new()
 static var _emitting_enc_error: bool = false
+static var _cached_key_env_name: String = ""
+static var _cached_key_env_val: String = ""
+static var _cached_derived_key_32: PackedByteArray = PackedByteArray()
+static var _has_cached_derived_key: bool = false
 
 ## 单例获取与配置新鲜度守卫
 static func get_instance() -> LogFileExporter:
@@ -87,13 +91,22 @@ static func consume(record: LogRecordDTO) -> bool:
 static func _level_allowed(level: String) -> bool:
 	return LogConstants.level_weight(level) >= LogConstants.level_weight(_config.min_level)
 
-## 解析 32 字节日志加密密钥（测试注入优先，否则按 config seal_key_env 从环境变量派生）
+## 解析 32 字节日志加密密钥（测试注入优先，否则按 config seal_key_env 从环境变量派生并缓存）
 static func _resolve_encryption_key_32() -> PackedByteArray:
 	if _encryption_key_override.size() == LogConstants.AES_KEY_SIZE:
 		return _encryption_key_override
 	if _config == null or not _config.encryption_enabled:
 		return PackedByteArray()
-	return CryptoIntegrityLib.resolve_derived_key_32(_config.encryption_seal_key_env, LogConstants.ENC_DOMAIN_CONTEXT)
+	var env_name: String = _config.encryption_seal_key_env
+	var env_val: String = OS.get_environment(env_name) if not env_name.is_empty() else ""
+	if _has_cached_derived_key and _cached_key_env_name == env_name and _cached_key_env_val == env_val:
+		return _cached_derived_key_32
+	var derived := CryptoIntegrityLib.resolve_derived_key_32(env_name, LogConstants.ENC_DOMAIN_CONTEXT)
+	_cached_key_env_name = env_name
+	_cached_key_env_val = env_val
+	_cached_derived_key_32 = derived
+	_has_cached_derived_key = true
+	return derived
 
 ## 通道白名单判断（空白名单代表全通道允许）
 static func _channel_allowed(channel: String) -> bool:
@@ -306,17 +319,20 @@ static func _prune_rotated(base: String) -> void:
 		file_name = dir.get_next()
 	dir.list_dir_end()
 
-	rotated.sort_custom(func(a: String, b: String) -> bool:
-		var ka := _archive_sort_key(a, _config.file_prefix)
-		var kb := _archive_sort_key(b, _config.file_prefix)
+	var keyed: Array = []
+	for fname in rotated:
+		keyed.append({"name": fname, "key": _archive_sort_key(str(fname), _config.file_prefix)})
+	keyed.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var ka: Array = a["key"]
+		var kb: Array = b["key"]
 		if ka[0] != kb[0]:
 			return ka[0] < kb[0]
 		return ka[1] < kb[1]
 	)
-	while rotated.size() > _config.max_files:
-		var oldest: String = rotated[0]
+	var excess: int = keyed.size() - _config.max_files
+	for i in range(excess):
+		var oldest: String = str(keyed[i]["name"])
 		DirAccess.remove_absolute("%s/%s" % [_config.directory, oldest])
-		rotated.remove_at(0)
 
 # ==============================================================================
 # 四、测试复位
@@ -336,3 +352,7 @@ static func reset_for_test() -> void:
 	_last_chain_hash = LogConstants.CHAIN_GENESIS_HASH
 	_encryption_key_override = PackedByteArray()
 	_emitting_enc_error = false
+	_cached_key_env_name = ""
+	_cached_key_env_val = ""
+	_cached_derived_key_32 = PackedByteArray()
+	_has_cached_derived_key = false

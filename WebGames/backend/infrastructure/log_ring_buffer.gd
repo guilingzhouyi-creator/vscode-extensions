@@ -91,7 +91,14 @@ static func append(record: StructuredLogRecord) -> void:
 ## 查询当前环形缓冲中的记录（只读）
 static func query(from_utc: int = 0, levels: Array = [], channels: Array = []) -> Array:
 	var out: Array = []
-	for rec in _buffer:
+	var sz: int = _buffer.size()
+	if sz == 0:
+		return out
+	var start: int = _head if sz >= _capacity else 0
+	var last_seq: int = -1
+	var needs_sort: bool = false
+	for offset in range(sz):
+		var rec: StructuredLogRecord = _buffer[(start + offset) % sz] as StructuredLogRecord
 		if rec == null:
 			continue
 		if from_utc > 0 and rec.timestamp_utc < from_utc:
@@ -100,11 +107,14 @@ static func query(from_utc: int = 0, levels: Array = [], channels: Array = []) -
 			continue
 		if not channels.is_empty() and not (rec.channel in channels):
 			continue
+		if rec.sequence < last_seq:
+			needs_sort = true
+		last_seq = rec.sequence
 		out.append(rec)
-	# 环绕覆盖后存储序非时间序：按 sequence 重排，保证调用方拿到时间序
-	out.sort_custom(func(a: Variant, b: Variant) -> bool:
-		return int((a as StructuredLogRecord).sequence) < int((b as StructuredLogRecord).sequence)
-	)
+	if needs_sort:
+		out.sort_custom(func(a: Variant, b: Variant) -> bool:
+			return int((a as StructuredLogRecord).sequence) < int((b as StructuredLogRecord).sequence)
+		)
 	return out
 
 static func _matches_level(rec_level: String, levels: Array) -> bool:

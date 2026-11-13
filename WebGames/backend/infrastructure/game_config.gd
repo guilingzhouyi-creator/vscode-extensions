@@ -318,8 +318,7 @@ static func has_table(table_name: String) -> bool:
 
 static func _resolve_raw_value(table_name: String, path: String) -> Variant:
 	ensure_loaded()
-	var route: Variant = ConfigRouterEngine.resolve_route(table_name, path)
-	var target_table: String = str(route.resolved_table)
+	var target_table: String = ConfigRouterEngine.resolve_target_table(table_name, path)
 	if not _tables.has(target_table):
 		GameConfigLoader.ensure_table_loaded_jit(target_table, _tables, _scan_failures)
 	var val: Variant = _lookup_path_in_table(_tables.get(target_table, {}), path)

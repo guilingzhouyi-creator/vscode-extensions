@@ -498,9 +498,11 @@ func emit_log_record(record: LogRecordDTO) -> void:
 		else:
 			srec.trace_id = "%s_%s_%d" % [LogConstants.TRACE_PREFIX_DEFAULT, srec.channel, _record_seq]
 
+	var has_log_listeners: bool = _channel_routes.has(EventChannelDefinition.LOG_RECORD_POSTED) or _channel_routes.has(0) or _channel_routes.has(EventChannelDefinition.DOMAIN_EVENT_GENERIC)
 	var packet := borrow_packet(EventChannelDefinition.LOG_RECORD_POSTED, EventCategoryMask.SYSTEM_TELEMETRY)
 	packet.payload_dto = srec
-	packet.payload_data = srec.to_dto()
+	if has_log_listeners:
+		packet.payload_data = srec.to_dto()
 	packet.narrative_key = srec.message
 	dispatch_now(packet)
 	recycle_packet(packet)
@@ -509,17 +511,30 @@ func emit_log_record(record: LogRecordDTO) -> void:
 	TelemetryAggregate.consume(srec)
 	_dispatch_console_log(record)
 
+static var _console_cfg_version: int = -1
+static var _console_enabled_cached: bool = true
+static var _console_min_rank_cached: int = 2
+
+static func _ensure_console_log_cache() -> void:
+	var cfg_ver: int = GameConfig.config_reload_version()
+	if _console_cfg_version == cfg_ver:
+		return
+	var console_cfg: Dictionary = GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_CONSOLE, {})
+	_console_enabled_cached = bool(console_cfg.get("enabled", true))
+	var min_level: String = str(console_cfg.get("min_level", LogConstants.LEVEL_LOWER_WARN)).to_lower()
+	_console_min_rank_cached = LogConstants.level_rank(min_level)
+	_console_cfg_version = cfg_ver
+
 ## 控制台标准输出穿透分发（受 log.json/console 配置驱动，保障构建与排查端可见性）
 func _dispatch_console_log(record: LogRecordDTO) -> void:
 	if record == null:
 		return
 	if bool(record.context.get(LogConstants.KEY_MUTE_CONSOLE, false)):
 		return
-	var console_cfg: Dictionary = GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_CONSOLE, {})
-	if not bool(console_cfg.get("enabled", true)):
+	_ensure_console_log_cache()
+	if not _console_enabled_cached:
 		return
-	var min_level: String = str(console_cfg.get("min_level", LogConstants.LEVEL_LOWER_WARN)).to_lower()
-	if LogConstants.level_rank(record.level) < LogConstants.level_rank(min_level):
+	if LogConstants.level_rank(record.level) < _console_min_rank_cached:
 		return
 	var detail := str(record.context.get(LogConstants.KEY_DIAGNOSTIC_DETAIL, "")) if record.context.has(LogConstants.KEY_DIAGNOSTIC_DETAIL) else ""
 	var formatted := SystemBaseMessages.format_console_line(record.level, record.channel, record.message, record.error_code, detail)
@@ -528,9 +543,9 @@ func _dispatch_console_log(record: LogRecordDTO) -> void:
 	else:
 		print_rich(formatted)
 
-## 便捷日志入口：按 level_key + 原文构造 DTO 并委托 emit_log_record
+## 便捷日志入口：按 level_key + 原文直构 StructuredLogRecord，免除中间 DTO 二次深拷贝
 func emit_log(level_key: String, msg: String, ch: String = LogConstants.CHANNEL_SYSTEM) -> void:
-	var record := LogRecordDTO.new()
+	var record := StructuredLogRecord.new()
 	record.level = level_key
 	record.message = msg
 	record.channel = ch
