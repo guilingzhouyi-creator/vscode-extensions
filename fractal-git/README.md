@@ -40,7 +40,7 @@ fractal-git/
 ├── src/                             # Unified Rust facade (lib.rs), benchmarks (bench/) & CLI (bin/taxis)
 ├── ts/                              # TypeScript orchestration, LayerVFS adapter & Praxis SDK bridge
 ├── scripts/                         # Cross-platform build & gate scripts (audit-taxis.ps1 / build.sh)
-└── tests/                           # Deterministic Rust & TS regression suites (1,107 tests)
+└── tests/                           # Deterministic Rust & TS regression suites (1,400+ tests)
 ```
 
 ---
@@ -60,7 +60,7 @@ fractal-git/
 | `crates/fg-transport/` | Smart Protocol v2 & local IPC | Zero ref writes bypassing `pre-receive` gate |
 | `crates/fg-gate/` | TKCV 5D verifier, IKCE mutation testing, Bayesian credit | Zero blocking external network calls |
 | `src/bench/` | `TB-REGRESSION` micro-benchmarks & Level 4 E2E clone harness | Zero uncontrolled I/O jitter inside timed loops |
-| `src/bin/` | `taxis` CLI entrypoint & 78 modular subcommands (`taxis_cmd/`) | Zero reverse dependencies from `crates/*` |
+| `src/bin/` | `taxis` CLI entrypoint & 105 modular subcommands (`taxis_cmd/`) | Zero reverse dependencies from `crates/*` |
 | `ts/orchestration/` | Multi-card scheduling, variant evaluation & promotion | Zero raw Git binary pack/unpack manipulation |
 
 ---
