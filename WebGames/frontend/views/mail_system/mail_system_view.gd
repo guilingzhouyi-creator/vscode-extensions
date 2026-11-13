@@ -61,7 +61,7 @@ var stored_mails: Array = []
 var selected_mail_id: String = ""
 var search_keyword: String = ""
 var max_mailbox_capacity: int = MockServiceContainer.get_instance().mail().get_max_capacity()
-var _tabs = null
+var _tabs: Variant = null
 
 # ==============================================================================
 # 白模测试契约兼容桩
@@ -179,17 +179,17 @@ func _show_mail_detail(mail: Dictionary) -> void:
 	_label_detail_time.text = UIIntermediary.text(str(mail.get("time_key", "")))
 	_rich_text_body.text = UIIntermediary.text(str(mail.get("body_key", "")))
 
-	if _tabs != null:
-		_tabs.clear_container_children(_attachment_list_container)
 	var attach_keys: Array = mail.get("attachment_keys", [])
 	var has_attach: bool = bool(mail.get("has_attachment", false))
 	var is_claimed: bool = bool(mail.get("is_claimed", false))
 
-	if has_attach and not attach_keys.is_empty():
-		for key in attach_keys:
-			var btn := Button.new()
-			btn.text = UIIntermediary.text(str(key))
-			_attachment_list_container.add_child(btn)
+	var active_attach_count: int = attach_keys.size() if has_attach else 0
+	for i in range(active_attach_count):
+		var btn: Button = _acquire_attachment_button(i)
+		btn.visible = true
+		btn.text = UIIntermediary.text(str(attach_keys[i]))
+	for i in range(active_attach_count, _attachment_list_container.get_child_count()):
+		_attachment_list_container.get_child(i).visible = false
 
 	_btn_claim_attachment.disabled = not has_attach or is_claimed
 	_btn_reply.disabled = false
@@ -198,26 +198,34 @@ func _show_mail_detail(mail: Dictionary) -> void:
 	stored_mails = MockServiceContainer.get_instance().mail().mark_read(stored_mails, str(mail.get("mail_id", "")))
 	_refresh_mail_list()
 
+## 获取或创建邮件附件按钮（循环外分配，池化复用）
+func _acquire_attachment_button(index: int) -> Button:
+	if index < _attachment_list_container.get_child_count():
+		return _attachment_list_container.get_child(index) as Button
+	var btn := Button.new()
+	_attachment_list_container.add_child(btn)
+	return btn
+
 # ==============================================================================
 # 信号绑定与事件处理
 # ==============================================================================
 
 func _connect_signals() -> void:
-	_btn_back.pressed.connect(_on_back_pressed)
-	_category_tab_bar.tab_changed.connect(_on_category_changed)
-	_search_edit.text_changed.connect(_on_search_changed)
-	_mail_item_list.item_selected.connect(_on_mail_selected)
-	_btn_select_all.pressed.connect(_on_select_all)
-	_btn_batch_delete.pressed.connect(_on_batch_delete)
-	_btn_claim_all.pressed.connect(_on_claim_all)
+	connect_managed(_btn_back.pressed, _on_back_pressed)
+	connect_managed(_category_tab_bar.tab_changed, _on_category_changed)
+	connect_managed(_search_edit.text_changed, _on_search_changed)
+	connect_managed(_mail_item_list.item_selected, _on_mail_selected)
+	connect_managed(_btn_select_all.pressed, _on_select_all)
+	connect_managed(_btn_batch_delete.pressed, _on_batch_delete)
+	connect_managed(_btn_claim_all.pressed, _on_claim_all)
 
-	_btn_claim_attachment.pressed.connect(_on_claim_attachment)
-	_btn_reply.pressed.connect(func(): if _tabs != null: _tabs.on_reply())
-	_btn_delete_mail.pressed.connect(_on_delete_mail)
+	connect_managed(_btn_claim_attachment.pressed, _on_claim_attachment)
+	connect_managed(_btn_reply.pressed, func(): if _tabs != null: _tabs.on_reply())
+	connect_managed(_btn_delete_mail.pressed, _on_delete_mail)
 
-	_btn_add_attachment.pressed.connect(func(): if _tabs != null: _tabs.on_add_attachment())
-	_btn_send.pressed.connect(func(): if _tabs != null: _tabs.on_send())
-	_btn_save_draft.pressed.connect(func(): if _tabs != null: _tabs.on_save_draft())
+	connect_managed(_btn_add_attachment.pressed, func(): if _tabs != null: _tabs.on_add_attachment())
+	connect_managed(_btn_send.pressed, func(): if _tabs != null: _tabs.on_send())
+	connect_managed(_btn_save_draft.pressed, func(): if _tabs != null: _tabs.on_save_draft())
 
 func _on_back_pressed() -> void:
 	self.back()

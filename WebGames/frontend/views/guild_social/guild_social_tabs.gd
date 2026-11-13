@@ -15,7 +15,7 @@ enum FriendCategory {FRIEND, BLACKLIST, STRANGER}
 
 var page_header: KPageHeader = null
 var search_bar: KSearchBar = null
-var _view = null
+var _view: Variant = null
 
 func setup(view: BaseScreen) -> void:
 	_view = view
@@ -36,31 +36,31 @@ func connect_signals() -> void:
 	if _view == null:
 		return
 	# Tab 3: 聊天频道
-	_view._channel_list.item_selected.connect(_on_channel_selected)
-	_view._btn_channel_settings.pressed.connect(_on_channel_settings_pressed)
-	_view._btn_chat_send.pressed.connect(_on_chat_send_pressed)
-	_view._line_chat_input.text_submitted.connect(_on_chat_input_submitted)
+	connect_managed(_view._channel_list.item_selected, _on_channel_selected)
+	connect_managed(_view._btn_channel_settings.pressed, _on_channel_settings_pressed)
+	connect_managed(_view._btn_chat_send.pressed, _on_chat_send_pressed)
+	connect_managed(_view._line_chat_input.text_submitted, _on_chat_input_submitted)
 
 	# Tab 4: 好友系统
-	_view._line_friend_search.text_changed.connect(_on_friend_search_changed)
-	_view._friend_tab_container.tab_changed.connect(_on_friend_tab_changed)
-	_view._friend_list.item_selected.connect(_on_friend_selected)
-	_view._btn_add_friend.pressed.connect(_on_add_friend_pressed)
-	_view._btn_delete_friend.pressed.connect(_on_friend_action_pressed.bind("ui.fe09.friend.delete_toast"))
-	_view._btn_whisper_friend.pressed.connect(_on_friend_action_pressed.bind("ui.fe09.friend.whisper_toast"))
+	connect_managed(_view._line_friend_search.text_changed, _on_friend_search_changed)
+	connect_managed(_view._friend_tab_container.tab_changed, _on_friend_tab_changed)
+	connect_managed(_view._friend_list.item_selected, _on_friend_selected)
+	connect_managed(_view._btn_add_friend.pressed, _on_add_friend_pressed)
+	connect_managed(_view._btn_delete_friend.pressed, _on_friend_action_pressed.bind("ui.fe09.friend.delete_toast"))
+	connect_managed(_view._btn_whisper_friend.pressed, _on_friend_action_pressed.bind("ui.fe09.friend.whisper_toast"))
 
 	# Tab 5: NPC对话
-	_view._btn_npc_quest.pressed.connect(_on_npc_action_pressed.bind("ui.fe09.npc.quest_toast"))
-	_view._btn_npc_shop.pressed.connect(_on_npc_action_pressed.bind("ui.fe09.npc.shop_toast"))
-	_view._btn_npc_leave.pressed.connect(_on_npc_leave_pressed)
+	connect_managed(_view._btn_npc_quest.pressed, _on_npc_action_pressed.bind("ui.fe09.npc.quest_toast"))
+	connect_managed(_view._btn_npc_shop.pressed, _on_npc_action_pressed.bind("ui.fe09.npc.shop_toast"))
+	connect_managed(_view._btn_npc_leave.pressed, _on_npc_leave_pressed)
 
 	# Tab 6: 玩家交易
-	_view._my_inventory_list.item_selected.connect(_on_my_inventory_selected)
-	_view._my_trade_list.item_selected.connect(_on_my_trade_selected)
-	_view._spin_my_trade_gold.value_changed.connect(_on_trade_gold_changed)
-	_view._btn_trade_lock.pressed.connect(_on_trade_lock_pressed)
-	_view._btn_trade_confirm.pressed.connect(_on_trade_confirm_pressed)
-	_view._btn_trade_cancel.pressed.connect(_on_trade_cancel_pressed)
+	connect_managed(_view._my_inventory_list.item_selected, _on_my_inventory_selected)
+	connect_managed(_view._my_trade_list.item_selected, _on_my_trade_selected)
+	connect_managed(_view._spin_my_trade_gold.value_changed, _on_trade_gold_changed)
+	connect_managed(_view._btn_trade_lock.pressed, _on_trade_lock_pressed)
+	connect_managed(_view._btn_trade_confirm.pressed, _on_trade_confirm_pressed)
+	connect_managed(_view._btn_trade_cancel.pressed, _on_trade_cancel_pressed)
 
 # ==============================================================================
 # Mock 数据装配
@@ -139,8 +139,9 @@ func _init_chat_channels_tab() -> void:
 
 func _populate_channel_list() -> void:
 	_view._channel_list.clear()
+	var empty_msgs: Array = []
 	for channel in _view._chat_channels:
-		var msg_count: int = channel.get("messages", []).size()
+		var msg_count: int = channel.get("messages", empty_msgs).size()
 		var channel_name := UIIntermediary.text(str(channel.get("name", "")))
 		var display := UIIntermediary.text("ui.fe09.chat.channel_item", {"name": channel_name, "count": msg_count})
 		_view._channel_list.add_item(display)
@@ -283,21 +284,29 @@ func _refresh_npc_dialog_display() -> void:
 	_view._npc_title_label.text = UIIntermediary.text(str(dialog.get("npc_title", "")))
 	_view._richtext_npc_dialog.clear()
 	_view._richtext_npc_dialog.append_text(UIIntermediary.text(str(dialog.get("text", ""))))
-	_clear_dialog_options()
 	var options: Array = dialog.get("options", [])
 	for i in range(options.size()):
 		var option: Dictionary = options[i]
-		var btn := KButtonClass.new()
-		btn.variant = KButtonClass.StyleVariant.SECONDARY
+		var btn: Button = _acquire_dialog_option_button(i)
+		btn.visible = true
 		btn.text = UIIntermediary.text(str(option.get("text", "")))
-		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var action: String = str(option.get("action", "LEAVE"))
-		btn.pressed.connect(_on_dialog_option_pressed.bind(i, action))
-		_view._vbox_dialog_options.add_child(btn)
+		btn.set_meta("dialog_action", str(option.get("action", "LEAVE")))
+	for i in range(options.size(), _view._vbox_dialog_options.get_child_count()):
+		_view._vbox_dialog_options.get_child(i).visible = false
 
-func _clear_dialog_options() -> void:
-	for child in _view._vbox_dialog_options.get_children():
-		child.queue_free()
+## 获取或创建 NPC 对话选项按钮（池化复用，动态读取选项动作元数据）
+func _acquire_dialog_option_button(index: int) -> Button:
+	if index < _view._vbox_dialog_options.get_child_count():
+		return _view._vbox_dialog_options.get_child(index) as Button
+	var btn := KButtonClass.new()
+	btn.variant = KButtonClass.StyleVariant.SECONDARY
+	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	connect_managed(btn.pressed, func():
+		var act: String = str(btn.get_meta("dialog_action", "LEAVE"))
+		_on_dialog_option_pressed(index, act)
+	)
+	_view._vbox_dialog_options.add_child(btn)
+	return btn
 
 func _on_dialog_option_pressed(_option_index: int, action: String) -> void:
 	match action:

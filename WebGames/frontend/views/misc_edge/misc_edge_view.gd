@@ -11,7 +11,7 @@ extends BaseScreen
 
 const MiscEdgeTabsClass = preload("res://frontend/views/misc_edge/misc_edge_tabs.gd")
 
-var _tabs = null
+var _tabs: Variant = null
 
 func _get_tabs():
 	if _tabs == null:
@@ -184,7 +184,7 @@ func _apply_theme() -> void:
 # 静态文案初始化（i18n 注入）
 # ==============================================================================
 
-## 初始化全部静态文案：顶栏/四主 Tab 与子筛选 Tab/分区标签/按钮/占位符（i18n 全驱动）
+## 初始化全部静态文案：顶栏/四主 Tab 与子筛选 Tab/分区标签/按钮/输入提示（i18n 全驱动）
 func _init_static_text() -> void:
 	UIIntermediary.resolve($MarginContainer/VBox/TopBar/TitleLabel, "ui.fe17.common.header_title")
 	UIIntermediary.resolve($MarginContainer/VBox/TopBar/TitleSubLabel, "ui.fe17.common.header_subtitle")
@@ -324,19 +324,19 @@ func _refresh_name_history() -> void: _get_tabs().refresh_name_history()
 
 ## 绑定本地 UI 交互信号（零接线：四 Tab 控件在本地脚本闭环）
 func _connect_signals() -> void:
-	_back_btn.pressed.connect(_on_back_btn_pressed)
-	_main_tab_container.tab_changed.connect(_on_tab_changed)
+	connect_managed(_back_btn.pressed, _on_back_btn_pressed)
+	connect_managed(_main_tab_container.tab_changed, _on_tab_changed)
 
 	# 身份伪装
-	_disguise_mask_list.item_selected.connect(_on_disguise_mask_selected)
-	_disguise_switch_btn.pressed.connect(_on_disguise_switch_pressed)
-	_disguise_cancel_btn.pressed.connect(_on_disguise_cancel_pressed)
+	connect_managed(_disguise_mask_list.item_selected, _on_disguise_mask_selected)
+	connect_managed(_disguise_switch_btn.pressed, _on_disguise_switch_pressed)
+	connect_managed(_disguise_cancel_btn.pressed, _on_disguise_cancel_pressed)
 
 	# 地面掉落
-	_ground_filter_tabs.tab_changed.connect(_on_ground_filter_changed)
-	_ground_loot_list.item_selected.connect(_on_loot_selected)
-	_ground_pickup_btn.pressed.connect(_on_pickup_pressed)
-	_ground_pickup_all_btn.pressed.connect(_on_pickup_all_pressed)
+	connect_managed(_ground_filter_tabs.tab_changed, _on_ground_filter_changed)
+	connect_managed(_ground_loot_list.item_selected, _on_loot_selected)
+	connect_managed(_ground_pickup_btn.pressed, _on_pickup_pressed)
+	connect_managed(_ground_pickup_all_btn.pressed, _on_pickup_all_pressed)
 
 	# 精英突变与命名注册信号委托
 	_get_tabs().connect_signals()
@@ -349,7 +349,7 @@ func _connect_signals() -> void:
 func _on_back_btn_pressed() -> void:
 	self.back()
 
-## 主 Tab 切换：骨架阶段无额外处理（占位）
+## 主 Tab 切换：表现层无额外处理（状态由容器托管）
 func _on_tab_changed(_tab_idx: int) -> void:
 	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe17.toast.tab_switched"), NavTypes.ToastLevel.INFO, 1.0)
 

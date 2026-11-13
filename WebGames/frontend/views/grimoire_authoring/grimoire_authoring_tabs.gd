@@ -8,7 +8,7 @@ extends BaseScreen
 
 const KStatusBarClass = preload("res://frontend/components/k_status_bar.gd")
 
-var _view = null
+var _view: Variant = null
 
 var cover_styles: Array = ["classic", "rune", "shadow", "element"]
 var audiences: Array = ["novice", "mid", "high", "scholar"]
@@ -152,30 +152,41 @@ func refresh_royalty_summary() -> void:
 
 func refresh_royalty_chart() -> void:
 	var view: GrimoireAuthoringView = _view
-	for child in view._roy_chart_container.get_children():
-		child.queue_free()
 	var max_income: int = 1
 	for book in royalty_books:
 		max_income = maxi(max_income, int(book.get("income", 0)))
-	for book in royalty_books:
-		var row := HBoxContainer.new()
-		row.set("theme_override_constants/separation", 8)
-
-		var name_label := Label.new()
+	for i in range(royalty_books.size()):
+		var book: Dictionary = royalty_books[i]
+		var row := _acquire_royalty_chart_row(i)
+		row.visible = true
+		var name_label := row.get_child(0) as Label
 		name_label.text = UIIntermediary.text(str(book.get("title_key", "")))
-		name_label.custom_minimum_size = Vector2(120, 0)
-		row.add_child(name_label)
-
-		var bar: ProgressBar = KStatusBarClass.create_bar(float(book.get("income", 0)), float(max_income))
-		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(bar)
-
-		var value_label := Label.new()
+		var bar := row.get_child(1) as ProgressBar
+		bar.max_value = float(max_income)
+		bar.value = float(book.get("income", 0))
+		var value_label := row.get_child(2) as Label
 		value_label.text = UIIntermediary.text("ui.fe13.royalty.chart_value", {"amount": int(book.get("income", 0))})
-		value_label.custom_minimum_size = Vector2(100, 0)
-		row.add_child(value_label)
+	for i in range(royalty_books.size(), view._roy_chart_container.get_child_count()):
+		view._roy_chart_container.get_child(i).visible = false
 
-		view._roy_chart_container.add_child(row)
+## 获取或创建版税柱状图行节点（循环外分配）
+func _acquire_royalty_chart_row(index: int) -> HBoxContainer:
+	var view: GrimoireAuthoringView = _view
+	if index < view._roy_chart_container.get_child_count():
+		return view._roy_chart_container.get_child(index) as HBoxContainer
+	var row := HBoxContainer.new()
+	row.set("theme_override_constants/separation", 8)
+	var name_label := Label.new()
+	name_label.custom_minimum_size = Vector2(120, 0)
+	row.add_child(name_label)
+	var bar: ProgressBar = KStatusBarClass.create_bar(0.0, 1.0)
+	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(bar)
+	var value_label := Label.new()
+	value_label.custom_minimum_size = Vector2(100, 0)
+	row.add_child(value_label)
+	view._roy_chart_container.add_child(row)
+	return row
 
 func on_roy_book_selected(idx: int) -> void:
 	selected_book_idx = idx

@@ -55,7 +55,7 @@ var _banners: Array = []
 
 # 最近一次抽卡结果（十连/单抽）
 var latest_pull_results: Array = []
-var _tabs = null
+var _tabs: Variant = null
 
 # 抽卡历史日志（有界回收）
 var wish_history_log: Array = []

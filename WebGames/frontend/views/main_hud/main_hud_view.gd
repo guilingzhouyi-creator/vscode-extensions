@@ -172,11 +172,11 @@ func _on_predelete_cleanup() -> void:
 
 ## 绑定本地 UI 交互信号（零接线：小地图/动作条/聊天/菜单在本地脚本闭环）
 func _connect_signals() -> void:
-	_chat_tabs.tab_changed.connect(_on_chat_tab_changed)
-	_chat_input.text_changed.connect(_on_chat_input_text_changed)
-	_chat_input.text_submitted.connect(_on_chat_input_submitted)
-	_chat_input.focus_entered.connect(_on_chat_input_focus_entered)
-	_chat_input.focus_exited.connect(_on_chat_input_focus_exited)
+	connect_managed(_chat_tabs.tab_changed, _on_chat_tab_changed)
+	connect_managed(_chat_input.text_changed, _on_chat_input_text_changed)
+	connect_managed(_chat_input.text_submitted, _on_chat_input_submitted)
+	connect_managed(_chat_input.focus_entered, _on_chat_input_focus_entered)
+	connect_managed(_chat_input.focus_exited, _on_chat_input_focus_exited)
 	_get_subpanels().connect_signals()
 
 # ==============================================================================

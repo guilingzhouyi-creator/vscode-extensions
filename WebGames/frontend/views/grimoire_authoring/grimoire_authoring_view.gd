@@ -121,7 +121,7 @@ var _ast_node_types: Array = [
 var authored_books: Array = [] # 白模测试契约字段（TC-FE13-01 断言书库）
 var ast_editor_nodes: Array = [] # 白模测试契约字段（TC-FE13-02 断言 AST 节点）
 var ast_editor_connections: Array = [] # 白模测试契约字段（TC-FE13-02 断言连接）
-var _tabs = null
+var _tabs: Variant = null
 var _selected_category_idx: int = 0
 var _selected_grimoire_idx: int = -1
 var _filtered_grimoires: Array = []
@@ -210,30 +210,30 @@ func _init_static_text() -> void:
 
 func _connect_signals() -> void:
 	# --- Library ---
-	_lib_category_list.item_selected.connect(_on_category_selected)
-	_lib_grimoire_list.item_selected.connect(_on_grimoire_selected)
-	_lib_learn_btn.pressed.connect(_on_lib_learn_pressed)
+	connect_managed(_lib_category_list.item_selected, _on_category_selected)
+	connect_managed(_lib_grimoire_list.item_selected, _on_grimoire_selected)
+	connect_managed(_lib_learn_btn.pressed, _on_lib_learn_pressed)
 
 	# --- AST Editor ---
-	_ast_node_toolbox.item_selected.connect(_on_ast_node_selected)
-	_ast_save_btn.pressed.connect(_on_ast_save_pressed)
-	_ast_compile_btn.pressed.connect(_on_ast_compile_pressed)
-	_ast_test_btn.pressed.connect(_on_ast_test_pressed)
+	connect_managed(_ast_node_toolbox.item_selected, _on_ast_node_selected)
+	connect_managed(_ast_save_btn.pressed, _on_ast_save_pressed)
+	connect_managed(_ast_compile_btn.pressed, _on_ast_compile_pressed)
+	connect_managed(_ast_test_btn.pressed, _on_ast_test_pressed)
 
 	# --- Authoring ---
-	_auth_royalty_mode_option.item_selected.connect(func(_idx): _refresh_authoring_estimate())
-	_auth_submit_btn.pressed.connect(_on_auth_submit_pressed)
+	connect_managed(_auth_royalty_mode_option.item_selected, func(_idx): _refresh_authoring_estimate())
+	connect_managed(_auth_submit_btn.pressed, _on_auth_submit_pressed)
 
 	# --- Royalty ---
-	_roy_book_list.item_selected.connect(_on_roy_book_selected)
-	_roy_claim_btn.pressed.connect(_on_roy_claim_pressed)
+	connect_managed(_roy_book_list.item_selected, _on_roy_book_selected)
+	connect_managed(_roy_claim_btn.pressed, _on_roy_claim_pressed)
 
 	# --- Decompile ---
-	_dec_target_option.item_selected.connect(func(_idx): _refresh_decompile_detail())
-	_dec_decompile_btn.pressed.connect(_on_dec_decompile_pressed)
+	connect_managed(_dec_target_option.item_selected, func(_idx): _refresh_decompile_detail())
+	connect_managed(_dec_decompile_btn.pressed, _on_dec_decompile_pressed)
 
 	# --- 返回 ---
-	_back_btn.pressed.connect(_on_back_pressed)
+	connect_managed(_back_btn.pressed, _on_back_pressed)
 
 # ==============================================================================
 # Tab 0: LIBRARY 魔典书库
@@ -265,7 +265,7 @@ func _refresh_grimoire_list() -> void:
 		else:
 			_lib_grimoire_list.add_item(title)
 
-## 刷新魔典详情：未选中占位或完整字段（标题/作者/稀有度/描述/职业），按学习态启停学习按钮
+## 刷新魔典详情：未选中空态或完整字段（标题/作者/稀有度/描述/职业），按学习态启停学习按钮
 func _refresh_library_detail() -> void:
 	if _selected_grimoire_idx < 0 or _selected_grimoire_idx >= _filtered_grimoires.size():
 		UIIntermediary.resolve(_lib_detail_title_label, "ui.fe13.library.detail_title_none")
@@ -330,7 +330,7 @@ func _init_ast_tab() -> void:
 		var type_text: String = UIIntermediary.text(nkey + ".type")
 		UIIntermediary.resolve_item(_ast_node_toolbox, "ui.fe13.ast.toolbox_item", {"name": name, "type": type_text})
 
-## 刷新 AST 节点详情：未选中占位或名称/类型/描述
+## 刷新 AST 节点详情：未选中空态或名称/类型/描述
 func _refresh_ast_detail() -> void:
 	if _selected_ast_node_idx < 0 or _selected_ast_node_idx >= _ast_node_types.size():
 		UIIntermediary.resolve(_ast_prop_name_label, "ui.fe13.ast.prop_name_none")
@@ -348,21 +348,21 @@ func _on_ast_node_selected(idx: int) -> void:
 	_selected_ast_node_idx = idx
 	_refresh_ast_detail()
 
-## AST 保存草稿按钮（经 Toast 反馈占位，未接线）
+## AST 保存草稿按钮（经 Toast 预设反馈，未接真实后端）
 func _on_ast_save_pressed() -> void:
 	NavManager.get_instance().show_toast(
 		UIIntermediary.text("ui.fe13.ast.save_toast"),
 		NavTypes.ToastLevel.INFO
 	)
 
-## AST 编译为魔典按钮（经 Toast 反馈占位，未接线）
+## AST 编译为魔典按钮（经 Toast 预设反馈，未接真实后端）
 func _on_ast_compile_pressed() -> void:
 	NavManager.get_instance().show_toast(
 		UIIntermediary.text("ui.fe13.ast.compile_toast"),
 		NavTypes.ToastLevel.INFO
 	)
 
-## AST 测试运行按钮（经 Toast 反馈占位，未接线）
+## AST 测试运行按钮（经 Toast 预设反馈，未接真实后端）
 func _on_ast_test_pressed() -> void:
 	NavManager.get_instance().show_toast(
 		UIIntermediary.text("ui.fe13.ast.test_toast"),

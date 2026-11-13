@@ -67,22 +67,22 @@ func init_subpanels_text() -> void:
 func connect_signals() -> void:
 	if _view == null:
 		return
-	_view._minimap_zoom_in_btn.pressed.connect(on_minimap_zoom_in_pressed)
-	_view._minimap_zoom_out_btn.pressed.connect(on_minimap_zoom_out_pressed)
+	connect_managed(_view._minimap_zoom_in_btn.pressed, on_minimap_zoom_in_pressed)
+	connect_managed(_view._minimap_zoom_out_btn.pressed, on_minimap_zoom_out_pressed)
 
 	for i in _view._action_slot_buttons.size():
 		var btn: Button = _view._action_slot_buttons[i]
 		var slot_idx: int = i + 1
-		btn.pressed.connect(func(): on_action_slot_pressed(slot_idx))
+		connect_managed(btn.pressed, func(): on_action_slot_pressed(slot_idx))
 
-	_view._menu_btn_character.pressed.connect(on_menu_character_pressed)
-	_view._menu_btn_inventory.pressed.connect(on_menu_inventory_pressed)
-	_view._menu_btn_skills.pressed.connect(on_menu_skills_pressed)
-	_view._menu_btn_map.pressed.connect(on_menu_map_pressed)
-	_view._menu_btn_quests.pressed.connect(on_menu_quests_pressed)
-	_view._menu_btn_mail.pressed.connect(on_menu_mail_pressed)
-	_view._menu_btn_settings.pressed.connect(on_menu_settings_pressed)
-	_view._menu_btn_exit.pressed.connect(on_menu_exit_pressed)
+	connect_managed(_view._menu_btn_character.pressed, on_menu_character_pressed)
+	connect_managed(_view._menu_btn_inventory.pressed, on_menu_inventory_pressed)
+	connect_managed(_view._menu_btn_skills.pressed, on_menu_skills_pressed)
+	connect_managed(_view._menu_btn_map.pressed, on_menu_map_pressed)
+	connect_managed(_view._menu_btn_quests.pressed, on_menu_quests_pressed)
+	connect_managed(_view._menu_btn_mail.pressed, on_menu_mail_pressed)
+	connect_managed(_view._menu_btn_settings.pressed, on_menu_settings_pressed)
+	connect_managed(_view._menu_btn_exit.pressed, on_menu_exit_pressed)
 
 # ==============================================================================
 # 小地图

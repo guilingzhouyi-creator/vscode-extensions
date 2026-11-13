@@ -19,7 +19,7 @@ var split_panel: KSplitPanel = null
 var search_bar: KSearchBar = null
 var state_panel: KStatePanel = null
 
-var _view = null
+var _view: Variant = null
 
 var mock_mails: Array = [
 	{
@@ -187,7 +187,7 @@ func init_virtual_list(container: Control = null) -> KVirtualList:
 		virtual_list.name = "MailVirtualList"
 		virtual_list.item_height = 48.0
 		virtual_list.buffer_count = 3
-		virtual_list.range_changed.connect(_on_virtual_range_changed)
+		connect_managed(virtual_list.range_changed, _on_virtual_range_changed)
 		if container != null:
 			container.add_child(virtual_list)
 	return virtual_list

@@ -46,15 +46,15 @@ func init_static_text() -> void:
 func connect_signals() -> void:
 	if _view == null:
 		return
-	_view._mutation_filter_tabs.tab_changed.connect(_on_mutation_filter_changed)
-	_view._mutation_list.item_selected.connect(_on_mutation_selected)
-	_view._mutation_activate_btn.pressed.connect(_on_mutation_activate_pressed)
-	_view._mutation_replace_btn.pressed.connect(_on_mutation_replace_pressed)
+	connect_managed(_view._mutation_filter_tabs.tab_changed, _on_mutation_filter_changed)
+	connect_managed(_view._mutation_list.item_selected, _on_mutation_selected)
+	connect_managed(_view._mutation_activate_btn.pressed, _on_mutation_activate_pressed)
+	connect_managed(_view._mutation_replace_btn.pressed, _on_mutation_replace_pressed)
 
-	_view._name_type_option.item_selected.connect(_on_name_type_selected)
-	_view._name_check_btn.pressed.connect(_on_name_check_pressed)
-	_view._name_register_btn.pressed.connect(_on_name_register_pressed)
-	_view._name_input.text_submitted.connect(_on_name_input_submitted)
+	connect_managed(_view._name_type_option.item_selected, _on_name_type_selected)
+	connect_managed(_view._name_check_btn.pressed, _on_name_check_pressed)
+	connect_managed(_view._name_register_btn.pressed, _on_name_register_pressed)
+	connect_managed(_view._name_input.text_submitted, _on_name_input_submitted)
 
 # ==============================================================================
 # Tab 1: MUTATION 精英突变

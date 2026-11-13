@@ -14,7 +14,7 @@ const KCurrencyBarClass = preload("res://frontend/components/k_currency_bar.gd")
 var page_header: KPageHeader = null
 var currency_bar: KCurrencyBar = null
 
-var _view = null
+var _view: Variant = null
 
 func setup(view: BaseScreen) -> void:
 	_view = view
@@ -44,29 +44,43 @@ func init_static_text() -> void:
 
 func connect_signals() -> void:
 	var view: GachaWishView = _view
-	view._btn_back.pressed.connect(view._on_back_pressed)
-	view._btn_toggle_history.pressed.connect(on_toggle_history_pressed)
-	view._btn_history_close.pressed.connect(on_history_close_pressed)
-	view._btn_single_pull.pressed.connect(view._on_single_pull_pressed)
-	view._btn_ten_pull.pressed.connect(view._on_ten_pull_pressed)
-	view._btn_result_skip.pressed.connect(on_result_skip_pressed)
-	view._btn_result_detail.pressed.connect(on_result_detail_pressed)
-	view._btn_result_pull_again.pressed.connect(on_result_pull_again_pressed)
+	connect_managed(view._btn_back.pressed, view._on_back_pressed)
+	connect_managed(view._btn_toggle_history.pressed, on_toggle_history_pressed)
+	connect_managed(view._btn_history_close.pressed, on_history_close_pressed)
+	connect_managed(view._btn_single_pull.pressed, view._on_single_pull_pressed)
+	connect_managed(view._btn_ten_pull.pressed, view._on_ten_pull_pressed)
+	connect_managed(view._btn_result_skip.pressed, on_result_skip_pressed)
+	connect_managed(view._btn_result_detail.pressed, on_result_detail_pressed)
+	connect_managed(view._btn_result_pull_again.pressed, on_result_pull_again_pressed)
 
 func init_banner_switch() -> void:
 	var view: GachaWishView = _view
-	for child in view._banner_switch_hbox.get_children():
-		child.queue_free()
-	for banner in view._banners:
-		var btn := KButtonClass.new()
-		btn.variant = KButtonClass.StyleVariant.SECONDARY
+	for i in range(view._banners.size()):
+		var banner: Dictionary = view._banners[i]
+		var btn: Button = _acquire_banner_switch_button(i)
+		btn.visible = true
 		btn.text = UIIntermediary.text(str(banner.get("title", "ui.fe06.unknown")))
-		btn.toggle_mode = true
-		btn.custom_minimum_size = Vector2(140, 0)
-		var bid: String = str(banner.get("banner_id", ""))
-		btn.pressed.connect(func(): view.switch_banner(bid))
-		view._banner_switch_hbox.add_child(btn)
+		btn.set_meta("banner_id", str(banner.get("banner_id", "")))
+	for i in range(view._banners.size(), view._banner_switch_hbox.get_child_count()):
+		view._banner_switch_hbox.get_child(i).visible = false
 	refresh_banner_switch_buttons()
+
+## 获取或创建卡池切换按钮（池化复用，点击按按钮元数据解析当前 banner_id）
+func _acquire_banner_switch_button(index: int) -> Button:
+	var view: GachaWishView = _view
+	if index < view._banner_switch_hbox.get_child_count():
+		return view._banner_switch_hbox.get_child(index) as Button
+	var btn := KButtonClass.new()
+	btn.variant = KButtonClass.StyleVariant.SECONDARY
+	btn.toggle_mode = true
+	btn.custom_minimum_size = Vector2(140, 0)
+	connect_managed(btn.pressed, func():
+		var bid: String = str(btn.get_meta("banner_id", ""))
+		if not bid.is_empty():
+			view.switch_banner(bid)
+	)
+	view._banner_switch_hbox.add_child(btn)
+	return btn
 
 func refresh_banner_switch_buttons() -> void:
 	var view: GachaWishView = _view
@@ -176,7 +190,7 @@ func refresh_history_list() -> void:
 	if not view._history_item_list:
 		return
 	view._history_item_list.clear()
-	var recent = view.wish_history_log.slice(maxi(0, view.wish_history_log.size() - 50), view.wish_history_log.size())
+	var recent: Variant = view.wish_history_log.slice(maxi(0, view.wish_history_log.size() - 50), view.wish_history_log.size())
 	recent.reverse()
 	for entry in recent:
 		var name_key := str(entry.get("name", "ui.fe06.unknown"))
@@ -263,7 +277,7 @@ func on_result_pull_again_pressed() -> void:
 	_view._on_ten_pull_pressed()
 
 func load_mock_data() -> void:
-	var service = _view._gacha_service()
+	var service: Variant = _view._gacha_service()
 	var rules: Dictionary = service.get_rules() if service != null else {}
 	var banners := [
 		{

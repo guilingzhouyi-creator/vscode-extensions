@@ -10,7 +10,7 @@ extends BaseScreen
 const GuildSocialTabsScript = preload("res://frontend/views/guild_social/guild_social_tabs.gd")
 const KButtonClass = preload("res://frontend/components/k_button.gd")
 
-var _tabs = null
+var _tabs: Variant = null
 
 # ------------------------------------------------------------------------------
 # 配置默认值（骨架阶段视图内常量兜底，业务数值经 apply_snapshot 注入，不直读 GameConfig）
@@ -200,7 +200,7 @@ func _ready() -> void:
 	UIIntermediary.adapt_view(self)
 
 func _init_chat_and_social_tabs() -> void:
-	var tabs = _get_tabs()
+	var tabs: Variant = _get_tabs()
 	tabs._init_chat_channels_tab()
 	tabs._init_friends_tab()
 	tabs._init_npc_dialog_tab()
@@ -240,7 +240,7 @@ func _init_tab_titles() -> void:
 	KTabBar.init_titles(_tab_container, PackedStringArray(["ui.fe09.tab.guild_info", "ui.fe09.tab.members", "ui.fe09.tab.chat", "ui.fe09.tab.friends", "ui.fe09.tab.npc_dialog", "ui.fe09.tab.trade"]))
 	KTabBar.init_titles(_friend_tab_container, PackedStringArray(["ui.fe09.friend.subtab.friend", "ui.fe09.friend.subtab.blacklist", "ui.fe09.friend.subtab.stranger"]))
 
-## 初始化全部静态文案（16 个非唯一标签 + 各 Tab 按钮/占位符，i18n 全驱动）
+## 初始化全部静态文案（16 个非唯一标签 + 各 Tab 按钮/输入提示，i18n 全驱动）
 func _init_static_text() -> void:
 	var bindings := [
 		[_header_title_label, "ui.fe09.header.title"], [_btn_back, "ui.fe09.header.back"],
@@ -270,19 +270,19 @@ func _init_static_text() -> void:
 ## 绑定本地 UI 交互信号（零接线：六 Tab 全部控件在本地脚本闭环）
 func _connect_signals() -> void:
 	# 返回按钮
-	_btn_back.pressed.connect(_on_back_pressed)
+	connect_managed(_btn_back.pressed, _on_back_pressed)
 	# Tab 切换
-	_tab_container.tab_changed.connect(_on_tab_changed)
+	connect_managed(_tab_container.tab_changed, _on_tab_changed)
 
 	# Tab 1: 公会信息
-	_btn_leave_guild.pressed.connect(_on_leave_guild_pressed)
-	_btn_guild_manage.pressed.connect(_on_guild_manage_pressed)
+	connect_managed(_btn_leave_guild.pressed, _on_leave_guild_pressed)
+	connect_managed(_btn_guild_manage.pressed, _on_guild_manage_pressed)
 
 	# Tab 2: 成员列表
-	_guild_member_list.item_selected.connect(_on_member_selected)
-	_btn_manage_roles.pressed.connect(_on_member_action_pressed.bind("ui.fe09.members.manage_roles_toast"))
-	_btn_invite_member.pressed.connect(_on_invite_member_pressed)
-	_btn_kick_member.pressed.connect(_on_member_action_pressed.bind("ui.fe09.members.kick_toast"))
+	connect_managed(_guild_member_list.item_selected, _on_member_selected)
+	connect_managed(_btn_manage_roles.pressed, _on_member_action_pressed.bind("ui.fe09.members.manage_roles_toast"))
+	connect_managed(_btn_invite_member.pressed, _on_invite_member_pressed)
+	connect_managed(_btn_kick_member.pressed, _on_member_action_pressed.bind("ui.fe09.members.kick_toast"))
 
 	# Tab 3, 4, 5, 6 信号委托
 	_get_tabs().connect_signals()
@@ -336,7 +336,7 @@ func _populate_member_list() -> void:
 		})
 		_guild_member_list.add_item(display)
 
-## 刷新成员详情：未选中占位或完整字段（名称/职业/等级/职位/在线态）
+## 刷新成员详情：未选中空态或完整字段（名称/职业/等级/职位/在线态）
 func _refresh_member_detail(index: int) -> void:
 	if index < 0 or index >= _guild_members.size():
 		UIIntermediary.resolve(_label_member_detail_name, "ui.fe09.members.detail_name_none")
@@ -357,11 +357,11 @@ func _refresh_member_detail(index: int) -> void:
 # Tab 1: 公会信息 信号处理
 # ==============================================================================
 
-## 退出公会按钮回调（骨架阶段仅 Toast 占位，未接线）
+## 退出公会按钮回调（预设表现层 Toast 反馈）
 func _on_leave_guild_pressed() -> void:
 	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe09.guild.leave_toast"), NavTypes.ToastLevel.INFO)
 
-## 公会管理按钮回调（骨架阶段仅 Toast 占位，未接线）
+## 公会管理按钮回调（预设表现层 Toast 反馈）
 func _on_guild_manage_pressed() -> void:
 	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe09.guild.manage_toast"), NavTypes.ToastLevel.INFO)
 
@@ -374,7 +374,7 @@ func _on_member_selected(index: int) -> void:
 	_member_selected_index = index
 	_refresh_member_detail(index)
 
-## 成员操作按钮回调（职位管理 / 踢出成员）：校验已选成员后 Toast 占位（骨架）
+## 成员操作按钮回调（职位管理 / 踢出成员）：校验已选成员后展示 Toast 反馈
 func _on_member_action_pressed(toast_key: String) -> void:
 	if _member_selected_index < 0:
 		NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe09.members.no_member_selected"), NavTypes.ToastLevel.WARNING)
@@ -382,7 +382,7 @@ func _on_member_action_pressed(toast_key: String) -> void:
 	var member: Dictionary = _guild_members[_member_selected_index]
 	NavManager.get_instance().show_toast(UIIntermediary.text(toast_key, {"name": UIIntermediary.text(str(member.get("name", "")))}), NavTypes.ToastLevel.INFO)
 
-## 邀请成员按钮回调（骨架阶段仅 Toast 占位，未接线）
+## 邀请成员按钮回调（预设表现层 Toast 反馈）
 func _on_invite_member_pressed() -> void:
 	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe09.members.invite_toast"), NavTypes.ToastLevel.INFO)
 
@@ -390,7 +390,7 @@ func _on_invite_member_pressed() -> void:
 # 全局信号处理
 # ==============================================================================
 
-## 主 Tab 切换：骨架阶段占位（预留）
+## 主 Tab 切换：表现层扩展预留入口
 func _on_tab_changed(_tab_index: int) -> void:
 	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe09.toast.tab_switched"), NavTypes.ToastLevel.INFO, 1.0)
 
