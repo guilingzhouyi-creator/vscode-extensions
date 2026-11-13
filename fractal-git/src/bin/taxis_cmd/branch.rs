@@ -17,10 +17,19 @@
 use fg_algorithms::traverse::DagWalker;
 use fg_native::sections::refs::RefRecord;
 use fg_native::RepoDocument;
+use fg_topology::lineage::LineageEventKind;
 use fractal_git::constants::cli::CliTag;
 use fractal_git::fractal::refs::validate_ref_name;
-use fractal_git::{DiskRefStore, FractalRef, Oid, RefStore, TopologyVerifier};
+use fractal_git::{DiskRefStore, FractalRef, Oid, RefStore};
 
+use super::branch_migrate::{
+    migrate_card_branch, sync_container_ref_move, CardMigrationTarget, ContainerRefMove,
+};
+use super::branch_ops::{
+    assert_branch_vault_healthy, create_cascade_branch, guard_branch_creation,
+    guard_branch_delete, guard_branch_rename, record_branch_lineage, BranchCascadeRequest,
+    BranchCreateSpec, BranchLineageEntry,
+};
 use super::commit_walk::parse_commit_record;
 use super::common::{fail_fatal, fail_usage, print_json, reject, CliContext};
 use super::repo_view::RepoView;
@@ -31,12 +40,17 @@ struct BranchOptions {
     list: bool,
     all: bool,
     remotes: bool,
+    tree: bool,
     verbosity: u8,
     delete: Option<String>,
     force_delete: bool,
     rename: Option<(Option<String>, String)>,
     create: Option<(String, Option<String>)>,
     verify: Option<(String, String)>,
+    cascade: Option<String>,
+    facade: Option<String>,
+    base: Option<String>,
+    migrate: Option<(String, Option<String>)>,
 }
 
 /// Dispatches fractal branch topology verification, listing, creation, and deletion.
@@ -52,6 +66,35 @@ pub fn handle_branch(ctx: &CliContext) {
         Ok(opened) => opened,
         Err(open_err) => fail_fatal(open_err),
     };
+
+    if let Some((old_card, new_card)) = opts.migrate {
+        migrate_card_branch(
+            &view,
+            CardMigrationTarget {
+                old_name: &old_card,
+                explicit_new: new_card.as_deref(),
+            },
+            ctx,
+        );
+        return;
+    }
+
+    if let Some(ref slug) = opts.cascade {
+        let base_override = opts
+            .base
+            .as_deref()
+            .or_else(|| opts.create.as_ref().map(|(pos, _)| pos.as_str()));
+        create_cascade_branch(
+            &view,
+            &BranchCascadeRequest {
+                slug,
+                base_override,
+                facade: opts.facade.as_deref(),
+            },
+            ctx,
+        );
+        return;
+    }
 
     if let Some((old_name, new_name)) = opts.rename {
         rename_branch(&view, old_name.as_deref(), &new_name, ctx);
@@ -71,6 +114,7 @@ pub fn handle_branch(ctx: &CliContext) {
     let listing = super::branch_list::ListingOptions {
         all: opts.all,
         remotes: opts.remotes,
+        tree: opts.tree,
         verbosity: opts.verbosity,
     };
     super::branch_list::list_branches_with_options(&view, &listing, ctx);
@@ -87,6 +131,16 @@ fn parse_branch_options(args: &[String]) -> BranchOptions {
 
     if args.len() >= 3 && args[0] == "verify" {
         opts.verify = Some((args[1].clone(), args[2].clone()));
+        return opts;
+    }
+
+    if args[0] == "migrate" {
+        if args.len() < 2 {
+            fail_usage(
+                "usage: taxis branch migrate <legacy-card-branch> [<canonical-card-branch>]",
+            );
+        }
+        opts.migrate = Some((args[1].clone(), args.get(2).cloned()));
         return opts;
     }
 
@@ -123,6 +177,10 @@ fn parse_branch_options(args: &[String]) -> BranchOptions {
                 opts.remotes = true;
                 opts.list = true;
             }
+            "--tree" => {
+                opts.tree = true;
+                opts.list = true;
+            }
             "-l" | "--list" => {
                 opts.list = true;
             }
@@ -132,6 +190,25 @@ fn parse_branch_options(args: &[String]) -> BranchOptions {
             "-vv" => {
                 opts.verbosity = 2;
             }
+            "--cascade" if cursor + 1 < args.len() => {
+                opts.cascade = Some(args[cursor + 1].clone());
+                cursor += 1;
+            }
+            "--cascade" => fail_usage("slug required for --cascade"),
+            "--facade" if cursor + 1 < args.len() => {
+                opts.facade = Some(args[cursor + 1].clone());
+                cursor += 1;
+            }
+            "--facade" => fail_usage("facade type required for --facade"),
+            "--base" if cursor + 1 < args.len() => {
+                opts.base = Some(args[cursor + 1].clone());
+                cursor += 1;
+            }
+            "--base" => fail_usage("base branch required for --base"),
+            "--bypass-branch-guard" => {}
+            "--bypass-reason" | "--reason" if cursor + 1 < args.len() => {
+                cursor += 1;
+            }
             other if !other.starts_with('-') => {
                 positional.push(other);
             }
@@ -140,10 +217,16 @@ fn parse_branch_options(args: &[String]) -> BranchOptions {
         cursor += 1;
     }
 
-    if opts.delete.is_none() && opts.rename.is_none() && !positional.is_empty() {
+    if opts.delete.is_none()
+        && opts.rename.is_none()
+        && opts.cascade.is_none()
+        && !positional.is_empty()
+    {
         let branch_name = positional[0].to_string();
         let start_point = positional.get(1).map(|val| (*val).to_string());
         opts.create = Some((branch_name, start_point));
+    } else if opts.cascade.is_some() && !positional.is_empty() && opts.base.is_none() {
+        opts.base = Some(positional[0].to_string());
     } else if !opts.list && opts.delete.is_none() && opts.rename.is_none() {
         opts.list = true;
     }
@@ -158,7 +241,10 @@ fn verify_branch_merge(src: &str, dst: &str) {
 
     match (src_ref, dst_ref) {
         (Some(source_ref), Some(dest_ref)) => {
-            match TopologyVerifier::assert_legal_merge(&source_ref, &dest_ref) {
+            match fg_topology::verifier::TopologyVerifier::assert_legal_merge(
+                &source_ref,
+                &dest_ref,
+            ) {
                 Ok(_) => println!(
                     "{} Merge from '{}' into '{}' is strictly legal.",
                     CliTag::VERIFY_PASS,
@@ -179,7 +265,12 @@ fn verify_branch_merge(src: &str, dst: &str) {
 }
 
 /// Creates a new branch reference pointing to the specified start point (or HEAD).
-fn create_branch(view: &RepoView, name: &str, start_point: Option<&str>, ctx: &CliContext) {
+pub(super) fn create_branch(
+    view: &RepoView,
+    name: &str,
+    start_point: Option<&str>,
+    ctx: &CliContext,
+) {
     if name == "HEAD" || validate_ref_name(&format!("refs/heads/{name}")).is_err() {
         fail_fatal(format!("'{name}' is not a valid branch name"));
     }
@@ -204,6 +295,12 @@ fn create_branch(view: &RepoView, name: &str, start_point: Option<&str>, ctx: &C
     };
 
     let git_dir = view.git_dir();
+    let parent_name = guard_branch_creation(
+        view,
+        &BranchCreateSpec { name, start_point },
+        ctx,
+    );
+
     let ref_store = DiskRefStore::new(git_dir);
     let full_ref = format!("refs/heads/{name}");
 
@@ -241,6 +338,16 @@ fn create_branch(view: &RepoView, name: &str, start_point: Option<&str>, ctx: &C
         let _ = doc.save_atomic(&container_path);
     }
 
+    record_branch_lineage(
+        git_dir,
+        BranchLineageEntry {
+            event_kind: LineageEventKind::Fork,
+            source_ref: parent_name.as_deref().unwrap_or(""),
+            target_ref: name,
+            oid: target_oid,
+        },
+    );
+
     if ctx.json_mode {
         print_json(&serde_json::json!({
             "engine": "taxis",
@@ -253,6 +360,9 @@ fn create_branch(view: &RepoView, name: &str, start_point: Option<&str>, ctx: &C
 
 /// Deletes a local branch.
 fn delete_branch(view: &RepoView, name: &str, force: bool, ctx: &CliContext) {
+    let git_dir = view.git_dir();
+    assert_branch_vault_healthy(git_dir);
+
     let current_branch = view.head_branch().ok().flatten();
     if let Some((curr, _)) = current_branch {
         if curr == name {
@@ -267,13 +377,14 @@ fn delete_branch(view: &RepoView, name: &str, force: bool, ctx: &CliContext) {
     }
 
     let full_ref = format!("refs/heads/{name}");
-    let ref_store = DiskRefStore::new(view.git_dir());
-    let git_dir = view.git_dir();
+    let ref_store = DiskRefStore::new(git_dir);
 
     let existing_oid = match ref_store.get_ref(&full_ref) {
         Ok(Some(oid)) => oid,
         _ => reject(CliTag::ERROR, format!("error: branch '{name}' not found")),
     };
+
+    guard_branch_delete(git_dir, name, force);
 
     // Git refuses to drop a branch whose commits no other reference reaches unless it is forced.
     if !force && !is_branch_merged_into_head(view, &existing_oid) {
@@ -353,6 +464,12 @@ fn is_branch_merged_into_head(view: &RepoView, branch_oid: &Oid) -> bool {
 
 /// Renames a branch reference.
 fn rename_branch(view: &RepoView, old_name: Option<&str>, new_name: &str, ctx: &CliContext) {
+    let git_dir = view.git_dir();
+    assert_branch_vault_healthy(git_dir);
+    if new_name == "HEAD" || validate_ref_name(&format!("refs/heads/{new_name}")).is_err() {
+        fail_fatal(format!("'{new_name}' is not a valid branch name"));
+    }
+
     let effective_old = match old_name {
         Some(name) => name.to_string(),
         None => match view.head_branch() {
@@ -361,7 +478,8 @@ fn rename_branch(view: &RepoView, old_name: Option<&str>, new_name: &str, ctx: &
         },
     };
 
-    let git_dir = view.git_dir();
+    guard_branch_rename(git_dir, &effective_old, new_name);
+
     let ref_store = DiskRefStore::new(git_dir);
     let old_full_ref = format!("refs/heads/{effective_old}");
     let new_full_ref = format!("refs/heads/{new_name}");
@@ -410,14 +528,35 @@ fn rename_branch(view: &RepoView, old_name: Option<&str>, new_name: &str, ctx: &
         reject(CliTag::ERROR, err_msg);
     }
 
-    // If active branch was renamed, update HEAD
-    if let Ok(Some((curr, _))) = view.head_branch() {
-        if curr == effective_old {
-            if let Err(err) = ref_store.update_head_symbolic(&new_full_ref) {
-                reject(CliTag::ERROR, format!("write symbolic HEAD: {err}"));
-            }
+    let is_active = view
+        .head_branch()
+        .ok()
+        .flatten()
+        .is_some_and(|(curr, _)| curr == effective_old);
+    if is_active {
+        if let Err(err) = ref_store.update_head_symbolic(&new_full_ref) {
+            reject(CliTag::ERROR, format!("write symbolic HEAD: {err}"));
         }
     }
+    sync_container_ref_move(
+        git_dir,
+        &ContainerRefMove {
+            old_full_ref: &old_full_ref,
+            new_full_ref: &new_full_ref,
+            oid,
+            update_head: is_active,
+        },
+    );
+
+    record_branch_lineage(
+        git_dir,
+        BranchLineageEntry {
+            event_kind: LineageEventKind::Rename,
+            source_ref: &effective_old,
+            target_ref: new_name,
+            oid,
+        },
+    );
 
     if ctx.json_mode {
         print_json(&serde_json::json!({

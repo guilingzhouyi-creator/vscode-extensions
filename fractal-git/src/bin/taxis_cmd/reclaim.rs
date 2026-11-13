@@ -16,10 +16,25 @@ use std::path::PathBuf;
 
 use fg_native::RepoDocument;
 
-use super::common::{fail_io, print_json, CliContext};
+use super::common::{fail_io, find_arg_value, print_json, CliContext};
+use super::reclaim_branch::{reclaim_branch, ReclaimBranchRequest};
 
-/// Reclaims worktree directories registered in the repository container's `WKTR` section.
+/// Reclaims worktree directories or lineage-verified ephemeral branches (`--branch <ref>`).
 pub fn handle_reclaim(ctx: &CliContext) {
+    if let Some(target_branch) = find_arg_value(&ctx.args, &["--branch"]) {
+        let verify_lineage = ctx.args.iter().any(|a| a == "--verify-lineage");
+        let force = ctx.args.iter().any(|a| a == "--force" || a == "-f");
+        reclaim_branch(
+            ctx,
+            &ReclaimBranchRequest {
+                raw_branch: target_branch,
+                verify_lineage,
+                force,
+            },
+        );
+        return;
+    }
+
     let container_path = fg_native::container_path(&ctx.git_dir);
     if !container_path.is_file() {
         report_reclaim(ctx, 0, &[], 0);
@@ -92,10 +107,10 @@ fn report_reclaim(ctx: &CliContext, reclaimed: usize, failures: &[String], retai
         return;
     }
 
-    println!("=== Taxis Worktree & Sandbox Reclaimer ===");
-    println!("[RECLAIM] Reclaimed worktree directories: {}", reclaimed);
-    println!("[RECLAIM] Retained after failure      : {}", retained);
-    for failure in failures {
-        eprintln!("[RECLAIM] Retained '{}'", failure);
+        println!("=== Taxis Worktree & Sandbox Reclaimer ===");
+        println!("[RECLAIM] Reclaimed worktree directories: {}", reclaimed);
+        println!("[RECLAIM] Retained after failure      : {}", retained);
+        for failure in failures {
+            eprintln!("[RECLAIM] Retained '{}'", failure);
+        }
     }
-}

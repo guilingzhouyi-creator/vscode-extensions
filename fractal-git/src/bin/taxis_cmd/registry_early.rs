@@ -15,7 +15,7 @@
 
 use super::{
     branch, commit, diff, doctor, hash_object, index_plumbing, init, inspect, install, list_files,
-    projection, read, refs, relocate, stage, status, uninstall,
+    policy, projection, read, refs, relocate, stage, status, uninstall,
 };
 
 use super::registry::{cmd, CommandSpec};
@@ -23,6 +23,7 @@ use super::registry::{cmd, CommandSpec};
 /// Commands in this range of the authoritative table.
 pub(crate) const TABLE: &[CommandSpec] = &[
     cmd("init", &[], init::handle_init),
+    cmd("policy", &[], policy::handle_policy),
     cmd("install", &[], install::handle_install),
     cmd("uninstall", &[], uninstall::handle_uninstall),
     cmd("doctor", &[], doctor::handle_doctor),

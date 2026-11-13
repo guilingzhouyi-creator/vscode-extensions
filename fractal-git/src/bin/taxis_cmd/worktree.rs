@@ -206,7 +206,7 @@ fn handle_worktree_add(ctx: &CliContext) {
         );
     }
     let target_path = &ctx.args[1];
-    let options = parse_worktree_add_options(&ctx.args[2..]);
+    let mut options = parse_worktree_add_options(&ctx.args[2..]);
     let (scopes, is_full, mode) = (options.scopes.clone(), options.is_full, options.mode);
 
     let projection = if is_full {
@@ -222,16 +222,7 @@ fn handle_worktree_add(ctx: &CliContext) {
     if let Err(quota_err) = quota.assert_spawn_capacity(existing.len()) {
         reject(CliTag::ERROR, quota_err);
     }
-
-    // Fan-out is checked against the references the repository actually holds, not the worktree
-    // registry: the registry records where a checkout landed, while the reference records which
-    // fractal node exists, and only the latter answers "how many siblings does this cell have".
-    if let Some(candidate) = options.fractal_ref() {
-        let ref_store = fg_topology::refs::DiskRefStore::new(&ctx.git_dir);
-        if let Err(fanout_err) = fg_topology::assert_fanout_available_in(&candidate, &ref_store) {
-            reject(CliTag::ERROR, fanout_err);
-        }
-    }
+    super::worktree_branch_guard::apply_branch_and_scope_guards(ctx, &mut options, &projection);
 
     let bb_store = DiskBlackboardStore::new(&ctx.git_dir);
     let now_ms = std::time::SystemTime::now()
@@ -475,23 +466,31 @@ fn materialize_worktree_files(
 
 /// Parses CLI flags specific to `worktree add` command.
 /// Options accepted by `worktree add`.
-struct WorktreeAddOptions {
+pub(super) struct WorktreeAddOptions {
     /// Path envelopes the worktree may write.
-    scopes: Vec<String>,
+    pub(super) scopes: Vec<String>,
+    /// Optional parent scope envelopes against which child scopes are subsumption-checked.
+    pub(super) parent_scopes: Vec<String>,
     /// Whether the worktree materializes the full universe.
-    is_full: bool,
+    pub(super) is_full: bool,
     /// Storage mode the projection uses.
-    mode: WorktreeMode,
+    pub(super) mode: WorktreeMode,
     /// Integration cell the worktree belongs to, when one was named.
-    cell_id: Option<String>,
+    pub(super) cell_id: Option<String>,
     /// Parent Agent worktree a subagent hangs under, when one was named.
-    card_id: Option<String>,
+    pub(super) card_id: Option<String>,
     /// Subagent identifier, which makes the reference an ephemeral leaf.
-    subagent_id: Option<String>,
+    pub(super) subagent_id: Option<String>,
     /// Target branch or commit OID to project from Git ODB.
-    target_commit: Option<String>,
+    pub(super) target_commit: Option<String>,
+    /// Explicit branch flag (`--branch` / `-b`) validated against branch governance.
+    pub(super) explicit_branch: Option<String>,
+    /// Cascade child slug (`--cascade <slug>`) derived from active parent branch.
+    pub(super) cascade_slug: Option<String>,
+    /// Optional facade type (`--facade <type>`) when cascading from a Cell Main branch.
+    pub(super) facade_type: Option<String>,
     /// Whether to explicitly clone from dirty worktree instead of commit tree.
-    from_workspace: bool,
+    pub(super) from_workspace: bool,
 }
 
 impl WorktreeAddOptions {
@@ -500,7 +499,7 @@ impl WorktreeAddOptions {
     /// Creating a worktree without a reference stays supported: `worktree add` also serves plain
     /// scoped checkouts, and demanding a cell would break those callers. The reference is only
     /// formed when the caller supplies enough of the path to name one.
-    fn fractal_ref(&self) -> Option<FractalRef> {
+    pub(super) fn fractal_ref(&self) -> Option<FractalRef> {
         let cell = self.cell_id.as_ref()?;
         match (&self.card_id, &self.subagent_id) {
             (Some(card), Some(sub)) => Some(FractalRef::SubAgentWorktree {
@@ -522,12 +521,16 @@ impl WorktreeAddOptions {
 fn parse_worktree_add_options(args: &[String]) -> WorktreeAddOptions {
     let mut options = WorktreeAddOptions {
         scopes: Vec::new(),
+        parent_scopes: Vec::new(),
         is_full: false,
         mode: WorktreeMode::VirtualMemory,
         cell_id: None,
         card_id: None,
         subagent_id: None,
         target_commit: None,
+        explicit_branch: None,
+        cascade_slug: None,
+        facade_type: None,
         from_workspace: false,
     };
 
@@ -540,6 +543,10 @@ fn parse_worktree_add_options(args: &[String]) -> WorktreeAddOptions {
             }
             "--scope" if cursor + 1 < args.len() => {
                 options.scopes.push(args[cursor + 1].clone());
+                cursor += 2;
+            }
+            "--parent-scope" if cursor + 1 < args.len() => {
+                options.parent_scopes.push(args[cursor + 1].clone());
                 cursor += 2;
             }
             "--mode" if cursor + 1 < args.len() => {
@@ -562,10 +569,24 @@ fn parse_worktree_add_options(args: &[String]) -> WorktreeAddOptions {
                 options.subagent_id = Some(args[cursor + 1].clone());
                 cursor += 2;
             }
-            "--commit" | "-c" | "--branch" | "-b" | "--ref" if cursor + 1 < args.len() => {
+            "--cascade" if cursor + 1 < args.len() => {
+                options.cascade_slug = Some(args[cursor + 1].clone());
+                cursor += 2;
+            }
+            "--facade" if cursor + 1 < args.len() => {
+                options.facade_type = Some(args[cursor + 1].clone());
+                cursor += 2;
+            }
+            "--branch" | "-b" if cursor + 1 < args.len() => {
+                options.explicit_branch = Some(args[cursor + 1].clone());
+                cursor += 2;
+            }
+            "--commit" | "-c" | "--ref" if cursor + 1 < args.len() => {
                 options.target_commit = Some(args[cursor + 1].clone());
                 cursor += 2;
             }
+            "--bypass-branch-guard" => cursor += 1,
+            "--bypass-reason" | "--reason" if cursor + 1 < args.len() => cursor += 2,
             "--workspace" | "--dirty" => {
                 options.from_workspace = true;
                 cursor += 1;

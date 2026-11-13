@@ -27,6 +27,7 @@ use fg_algorithms::merge::{
 use fg_core::constants::git::OBJ_BLOB;
 use fg_core::models::{ConflictPresentationMode, FileMode, GitSignature, IndexStage, Oid};
 use fg_core::traits::OdbStore;
+use fg_gate::{BranchGovernanceFloor, BranchGuard};
 use fg_index::{InMemoryIndexTree, IndexEntry};
 use fg_object::GitCommit;
 use fg_storage::commit_materializer::{persist_commit_object, persist_index_tree};
@@ -41,6 +42,9 @@ use super::checkout::{
 };
 use super::common::{fail_io, print_json, reject, CliContext};
 use super::config::RepoConfig;
+use super::merge_lineage::{
+    maybe_reclaim_merged_source, record_merge_lineage, MergeLineageContext,
+};
 use super::operation::{record_head_operation, HeadOperationSpec};
 use super::repo_view::RepoView;
 use super::tree_view::{flatten_commit_tree, flatten_tree_for_diff, TreeEntry};
@@ -52,6 +56,7 @@ struct MergeOptions {
     no_ff: bool,
     ff_only: bool,
     abort: bool,
+    reclaim: bool,
     message: Option<String>,
     conflict_mode: Option<ConflictPresentationMode>,
 }
@@ -97,7 +102,31 @@ pub fn handle_merge(ctx: &CliContext) {
         .flatten()
         .map(|(branch_name, _)| branch_name);
 
+    let floor = BranchGovernanceFloor::resolve(view.git_dir());
+    let dest_label = effective_branch.as_deref().unwrap_or("HEAD");
+    match BranchGuard::check_merge_or_rebase(&floor, &opts.target, dest_label, false) {
+        Ok(warnings) => {
+            for warning in warnings {
+                eprintln!("[ADVISORY] {warning}");
+            }
+        }
+        Err(breach) => reject(
+            CliTag::VERIFY_FAIL,
+            format!("Merge rejected by BranchGuard (FGT-TOP-001): {breach}"),
+        ),
+    }
+
     if ours_commit == theirs_commit {
+        if opts.reclaim {
+            maybe_reclaim_merged_source(
+                &view,
+                &MergeLineageContext {
+                    source_raw: &opts.target,
+                    dest_branch: effective_branch.as_deref(),
+                    merged_commit: theirs_commit,
+                },
+            );
+        }
         if ctx.json_mode {
             print_json(&serde_json::json!({
                 "engine": "taxis",
@@ -198,6 +227,7 @@ fn parse_merge_options(args: &[String]) -> MergeOptions {
     let mut no_ff = false;
     let mut ff_only = false;
     let mut abort = false;
+    let mut reclaim = false;
     let mut message = None;
     let mut conflict_mode = None;
 
@@ -208,6 +238,7 @@ fn parse_merge_options(args: &[String]) -> MergeOptions {
             "--no-ff" => no_ff = true,
             "--ff-only" => ff_only = true,
             "--abort" => abort = true,
+            "--reclaim" => reclaim = true,
             "--conflict-mode" | "--conflict.mode" | "--conflict-style" | "--conflictstyle"
                 if cursor + 1 < args.len() =>
             {
@@ -239,6 +270,7 @@ fn parse_merge_options(args: &[String]) -> MergeOptions {
         no_ff,
         ff_only,
         abort,
+        reclaim,
         message,
         conflict_mode,
     }
@@ -330,6 +362,16 @@ fn execute_fast_forward(
     update_references(view.git_dir(), view.work_root(), theirs_commit, branch_name);
 
     record_merge_operation(view, theirs_commit, &opts.target, branch_name);
+    if opts.reclaim {
+        maybe_reclaim_merged_source(
+            view,
+            &MergeLineageContext {
+                source_raw: &opts.target,
+                dest_branch: branch_name,
+                merged_commit: theirs_commit,
+            },
+        );
+    }
 
     if ctx.json_mode {
         print_json(&serde_json::json!({
@@ -642,6 +684,16 @@ fn finish_clean_merge(m_ctx: &CleanMergeContext<'_>, merged_tree: &BTreeMap<Stri
         &m_ctx.opts.target,
         m_ctx.branch_name,
     );
+    if m_ctx.opts.reclaim {
+        maybe_reclaim_merged_source(
+            m_ctx.view,
+            &MergeLineageContext {
+                source_raw: &m_ctx.opts.target,
+                dest_branch: m_ctx.branch_name,
+                merged_commit: commit_oid,
+            },
+        );
+    }
 
     if m_ctx.ctx.json_mode {
         print_json(&serde_json::json!({
@@ -893,7 +945,7 @@ fn build_agent_conflict_slices(
     slices
 }
 
-/// Records merge operation to the OperationGraph.
+/// Records merge operation to OperationGraph and cryptographic lineage ledger.
 fn record_merge_operation(
     view: &RepoView,
     merged_commit: Oid,
@@ -908,4 +960,12 @@ fn record_merge_operation(
         command: "merge",
         description: format!("merge: {target}"),
     });
+    record_merge_lineage(
+        view,
+        &MergeLineageContext {
+            source_raw: target,
+            dest_branch: branch_name,
+            merged_commit,
+        },
+    );
 }
