@@ -35,15 +35,18 @@ pub use math::{
 };
 pub use models::{ct_eq_bytes, path_matches_scope, safe_join, validate_repo_relative_path};
 pub use models::{
+    encode_seal_record, seal_policy_envelope, unseal_policy_envelope, verify_seal_record,
     ActorIdentity, AgentCommitMeta, AgentPushContext, AuthorityClaims, AuthoritySecret,
     AuthorityTier, AutoQualityScoreEnvelope, BlackboardCollision, BlockProvenanceEntry,
-    BlockProvenanceParams, CardBlackboard, ConflictPresentationMode, DiffCoherenceMode,
-    ElevationAttestation, EnforcementTier, FastOidHasher, FastOidMap, FastOidSet, FileMode,
-    FileUid, GitSignature, HashAlgorithm, IndexStage, IntentLease, MutationBudget, Oid,
-    PatchHunkChoice, PatchPlan, PraxisCardContext, ProvenanceLedger, QuarantineRegistry,
-    RebaseAction, RebaseItem, RebasePlan, RepoPath, ReservationStatus, ReservedFileToken,
-    SliceAuthorization, StagedPromotionRequest, StagedPromotionStatus, SubmoduleEntry,
-    SubmoduleUpdateStrategy, SymbolClaim, TaxisPolicy, TypedOid, ValidatedCommitWitness,
+    BlockProvenanceParams, BranchEnforcementTier, BranchPolicySpec, CardBlackboard,
+    ConflictPresentationMode, DiffCoherenceMode, ElevationAttestation, EnforcementTier,
+    FastOidHasher, FastOidMap, FastOidSet, FileMode, FileUid, GitSignature, HashAlgorithm,
+    IndexStage, IntentLease, MutationBudget, Oid, PatchHunkChoice, PatchPlan, PraxisCardContext,
+    ProvenanceLedger, QuarantineRegistry, RebaseAction, RebaseItem, RebasePlan, RepoPath,
+    ReservationStatus, ReservedFileToken, SealedPolicyPayload, SliceAuthorization,
+    StagedPromotionRequest, StagedPromotionStatus, SubmoduleEntry, SubmoduleUpdateStrategy,
+    SymbolClaim, TaxisPolicy, TypedOid, ValidatedCommitWitness, POLICY_REPO_ID_LEN,
+    POLICY_SEAL_RECORD_LEN, POLICY_VAULT_HEADER_LEN,
 };
 pub use sanitizer::{
     format_violation_diagnostic, is_rule_id_candidate, sanitize_violation_for_user, split_rule_id,

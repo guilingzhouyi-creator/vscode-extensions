@@ -9,6 +9,7 @@ pub mod audit_chain;
 pub mod authority;
 pub mod blackboard;
 pub mod bloom;
+pub mod branch_policy;
 pub mod change_id;
 pub mod commit_witness;
 pub mod context;
@@ -49,6 +50,11 @@ pub use authority::{
 };
 pub use blackboard::{BlackboardCollision, CardBlackboard, IntentLease, SymbolClaim};
 pub use bloom::PathBloomFilter;
+pub use branch_policy::{
+    encode_seal_record, seal_policy_envelope, unseal_policy_envelope, verify_seal_record,
+    BranchEnforcementTier, BranchPolicySpec, SealedPolicyPayload, POLICY_REPO_ID_LEN,
+    POLICY_SEAL_RECORD_LEN, POLICY_VAULT_HEADER_LEN,
+};
 pub use change_id::ChangeId;
 pub use commit_witness::ValidatedCommitWitness;
 pub use context::{AgentCommitMeta, PraxisCardContext};
