@@ -27,6 +27,11 @@ use fractal_git::{
 use super::common::{find_arg_value, print_json, reject, CliContext};
 use super::verify::{compute_sm3_hex, VERIFY_RECEIPT_FILENAME};
 
+#[path = "promotion_audit.rs"]
+mod promotion_audit;
+#[path = "promotion_audit_odb.rs"]
+mod promotion_audit_odb;
+
 /// Fixture secret matching `taxis verify` when no external authority secret is configured.
 const VERIFY_FIXTURE_SECRET_BYTES: [u8; 32] = [7u8; 32];
 
@@ -110,7 +115,16 @@ struct VerifiedReceiptEvidence {
 }
 
 /// Parses and validates the Auto Quality score envelope from CLI arguments and receipt evidence.
-fn parse_auto_score(ctx: &CliContext) -> AutoQualityScoreEnvelope {
+fn parse_auto_score(
+    ctx: &CliContext,
+    candidate_oid: Oid,
+    current_time_ms: i64,
+) -> AutoQualityScoreEnvelope {
+    if let Some(envelope) =
+        promotion_audit::resolve_and_verify_audit_tree_receipt(ctx, candidate_oid, current_time_ms)
+    {
+        return envelope;
+    }
     let args = &ctx.args;
     let receipt_ev = resolve_and_verify_receipt(ctx);
     let cli_score = find_arg_value(args, &["--score"]).and_then(|val| val.parse::<f64>().ok());
@@ -307,7 +321,7 @@ fn handle_stage_request(
     let agent_uid = find_arg_value(&ctx.args, &["--agent", "--agent-uid"])
         .unwrap_or("agent-sub-001")
         .to_string();
-    let auto_score = parse_auto_score(ctx);
+    let auto_score = parse_auto_score(ctx, candidate_oid, current_time_ms);
     let composite_score = auto_score.composite_score;
     let cai_index = auto_score.cai_index;
     let cc_delta = auto_score.cyclomatic_complexity_delta;
