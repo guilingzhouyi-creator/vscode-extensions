@@ -38,6 +38,21 @@
                 "panel": "shared",
                 "close": true
             }
+        },
+        {
+            "label": "auto-audit: async daemon",
+            "type": "shell",
+            "command": "node scripts/common/async-auto-audit-daemon.js",
+            "isBackground": true,
+            "problemMatcher": [],
+            "runOptions": {
+                "runOn": "folderOpen"
+            },
+            "presentation": {
+                "reveal": "never",
+                "panel": "shared",
+                "close": true
+            }
         }
     ]
 }
