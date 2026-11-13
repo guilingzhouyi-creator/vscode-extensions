@@ -15,12 +15,6 @@
  */
 
 import type { Issue, ScanReport, Severity } from '../types';
-import type {
-    QualityDimension,
-    QualityScoreBreakdown,
-    QualityScoreRationale,
-} from '../scoring/scoringTypes';
-import { ALL_QUALITY_DIMENSIONS, DEFAULT_QUALITY_WEIGHTS } from '../scoring/scoringTypes';
 import { filterActiveTopologyBuckets, executeFileTopologyPipeline } from './agent-audit-pipeline';
 import {
     formatAnchorSlice,
@@ -29,10 +23,8 @@ import {
 } from '../guidance/agentConstraintGenerator';
 import {
     AAS_SCHEMA_ID,
-    type AasBottleneck,
     type AasCounts,
     type AasDefectRecord,
-    type AasDimensionDetail,
     type AasHealth,
     type AasReportOptions,
     type AasSeverity,
@@ -40,9 +32,13 @@ import {
     type AasVerdict,
     type AgentAuditReport,
 } from './aas-types';
-import { resolveQualityGrade } from '../scoring/scorer-formulas';
 import { buildFixRecipe, compressDiagnosticSentence } from './aas-remediation';
 import { sharedMemoryGovernor, CacheEvictionTier } from '../memory/memory-governor';
+import {
+    extractBottlenecks,
+    projectDimensionDetails,
+    projectDimensions,
+} from './aas-dimension-details';
 
 export * from './aas-types';
 export { compressDiagnosticSentence };
@@ -52,13 +48,10 @@ const DEFAULT_MAX_DEFECTS_PER_FILE = 50;
 const DEFAULT_MAX_TOTAL_DEFECTS = 500;
 const DEFAULT_CONTEXT_RADIUS = 1;
 const DEFAULT_MAX_MESSAGE_CHARS = 160;
-const DEFAULT_BOTTLENECKS_LIMIT = 8;
-const DEFAULT_TOP_BOTTLENECKS_LIMIT = 3;
 const DEFAULT_VERIFY_COMMAND = 'npm test';
 const ELLIPSIS = '…';
 
 const ROUND_SCALE_HUNDRED = 100;
-const ROUND_SCALE_THOUSAND = 1000;
 const MAX_HEALTH_SCORE = 100;
 const HEALTHY_SCORE_THRESHOLD = 90;
 const WARNING_SCORE_THRESHOLD = 75;
@@ -151,141 +144,6 @@ class AnchorCache {
         if (!content) return undefined;
         return formatAnchorSlice(content, startLine, endLine, radius);
     }
-}
-
-/**
- * Projects ten-dimensional quality vector scores if present.
- */
-function projectDimensions(
-    report: ScanReport,
-    overrideDimensions?: Partial<Record<string, number>>,
-): Partial<Record<string, number>> | undefined {
-    const sourceIndices =
-        overrideDimensions ?? report.governance?.tenDimensions ?? report.qualityScore?.indices;
-    if (!sourceIndices) return undefined;
-    const projectedScores: Record<string, number> = {};
-    for (const [dimensionName, scoreValue] of Object.entries(sourceIndices)) {
-        if (typeof scoreValue === 'number' && Number.isFinite(scoreValue)) {
-            projectedScores[dimensionName] = scoreValue;
-        }
-    }
-    return Object.keys(projectedScores).length > 0 ? projectedScores : undefined;
-}
-
-/**
- * Appends a rule loss occurrence to a dimension's loss map without in-loop allocation.
- */
-function recordRuleLoss(
-    lossMap: Map<string, { loss: number; count: number }>,
-    rule: string,
-    delta: number,
-): void {
-    const currentLoss = lossMap.get(rule);
-    if (currentLoss) {
-        currentLoss.loss += Math.abs(delta);
-        currentLoss.count += 1;
-    } else {
-        lossMap.set(rule, { loss: Math.abs(delta), count: 1 });
-    }
-}
-
-/**
- * Resolves or creates a dimension's loss map outside lexical loop.
- */
-function getOrCreateLossMap(
-    dimensionToLossesMap: Map<string, Map<string, { loss: number; count: number }>>,
-    dimension: string,
-): Map<string, { loss: number; count: number }> {
-    let lossMap = dimensionToLossesMap.get(dimension);
-    if (!lossMap) {
-        lossMap = new Map();
-        dimensionToLossesMap.set(dimension, lossMap);
-    }
-    return lossMap;
-}
-
-/**
- * Collects rule loss statistics grouped by dimension key.
- */
-function collectDimensionRuleLosses(
-    rationales?: QualityScoreRationale[],
-): Map<string, Map<string, { loss: number; count: number }>> {
-    const dimensionToLossesMap = new Map<string, Map<string, { loss: number; count: number }>>();
-    if (!rationales || rationales.length === 0) return dimensionToLossesMap;
-
-    ALL_QUALITY_DIMENSIONS.forEach((dimension) => {
-        dimensionToLossesMap.set(dimension, new Map());
-    });
-
-    for (const rationale of rationales) {
-        const lossMap = getOrCreateLossMap(dimensionToLossesMap, rationale.dimension);
-        recordRuleLoss(lossMap, rationale.rule || 'unknown', rationale.delta);
-    }
-    return dimensionToLossesMap;
-}
-
-/**
- * Derives top bottlenecks from a dimension's rule loss map.
- */
-function extractTopBottlenecks(lossMap?: Map<string, { loss: number; count: number }>): {
-    totalLoss?: number;
-    topBottlenecks?: Array<{ rule: string; loss: number; count: number }>;
-} {
-    if (!lossMap || lossMap.size === 0) return {};
-    const sorted = Array.from(lossMap.entries())
-        .map(([rule, stat]) => ({ rule, loss: stat.loss, count: stat.count }))
-        .sort((itemA, itemB) => itemB.loss - itemA.loss);
-    const totalLoss = sorted.reduce((sum, item) => sum + item.loss, 0);
-    return {
-        ...(totalLoss > 0 ? { totalLoss } : {}),
-        topBottlenecks: sorted.slice(0, DEFAULT_TOP_BOTTLENECKS_LIMIT),
-    };
-}
-
-/**
- * Projects detailed ten-dimensional metrics with weights and bottlenecks (AAS v1.1).
- */
-function projectDimensionDetails(
-    breakdown?: QualityScoreBreakdown,
-    options?: AasReportOptions,
-): Partial<Record<string, AasDimensionDetail>> | undefined {
-    if (!breakdown?.indices || !options?.includeDimensionDetails) return undefined;
-
-    const notEvaluatedSet = new Set(breakdown.notEvaluated ?? []);
-    const details: Record<string, AasDimensionDetail> = {};
-    const dimensionToLossesMap = collectDimensionRuleLosses(breakdown.rationales);
-
-    Object.entries(breakdown.indices).forEach(([dimension, scoreValue]) => {
-        if (typeof scoreValue !== 'number' || !Number.isFinite(scoreValue)) return;
-        const evaluated = !notEvaluatedSet.has(dimension as QualityDimension);
-        const fallbackWeight = (DEFAULT_QUALITY_WEIGHTS as Record<string, number>)[dimension];
-        const weightVal =
-            breakdown.weights &&
-            typeof (breakdown.weights as Record<string, number>)[dimension] === 'number'
-                ? (breakdown.weights as Record<string, number>)[dimension]
-                : fallbackWeight;
-        const bottlenecks = extractTopBottlenecks(dimensionToLossesMap.get(dimension));
-        const qualityGrade = resolveQualityGrade(scoreValue);
-
-        let confidenceField: { confidence: number } | undefined;
-        if (breakdown.confidence !== undefined) {
-            confidenceField = {
-                confidence:
-                    Math.round(breakdown.confidence * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED,
-            };
-        }
-        details[dimension] = {
-            score: Math.round(scoreValue * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED,
-            grade: qualityGrade,
-            evaluated,
-            ...(weightVal !== undefined
-                ? { weight: Math.round(weightVal * ROUND_SCALE_THOUSAND) / ROUND_SCALE_THOUSAND }
-                : {}),
-            ...confidenceField,
-            ...bottlenecks,
-        };
-    });
-    return Object.keys(details).length > 0 ? details : undefined;
 }
 
 /**
@@ -607,70 +465,6 @@ function buildHealth(report: ScanReport, counts: AasCounts, options?: AasReportO
         ...(vrf ? { vrf } : {}),
         counts,
     };
-}
-
-/**
- * Extracts deduction bottlenecks from dimensional breakdowns.
- */
-function extractDeductionBottlenecks(
-    deductions: Record<string, { entries: Array<{ rule?: string; points: number }> }>,
-    limit: number,
-): AasBottleneck[] {
-    const lossMap = new Map<string, { dimension: string; loss: number; count: number }>();
-    for (const [dimension, audit] of Object.entries(deductions)) {
-        const entries = audit?.entries;
-        if (!Array.isArray(entries)) continue;
-        for (const entry of entries) {
-            const ruleId = entry.rule || 'unknown';
-            const points = Number.isFinite(entry.points) ? entry.points : 0;
-            const current = lossMap.get(ruleId);
-            if (current) {
-                current.loss += points;
-                current.count += 1;
-            } else {
-                lossMap.set(ruleId, { dimension, loss: points, count: 1 });
-            }
-        }
-    }
-
-    return Array.from(lossMap.entries())
-        .map(([ruleId, bottleneckData]) => ({
-            rule: ruleId,
-            dim: bottleneckData.dimension,
-            loss: Math.round(bottleneckData.loss * ROUND_SCALE_HUNDRED) / ROUND_SCALE_HUNDRED,
-            count: bottleneckData.count,
-        }))
-        .sort((itemA, itemB) => itemB.loss - itemA.loss)
-        .slice(0, limit);
-}
-
-/**
- * Fallback frequency bottlenecks based on detected issue volume.
- */
-function extractFrequencyBottlenecks(issues: readonly Issue[], limit: number): AasBottleneck[] {
-    const freqMap = new Map<string, number>();
-    for (const issue of issues) {
-        freqMap.set(issue.rule, (freqMap.get(issue.rule) ?? 0) + 1);
-    }
-    return Array.from(freqMap.entries())
-        .map(([rule, count]) => ({ rule, loss: count, count }))
-        .sort((itemA, itemB) => itemB.count - itemA.count)
-        .slice(0, limit);
-}
-
-/**
- * Computes top quality bottlenecks ordered by point loss.
- */
-function extractBottlenecks(
-    report: ScanReport,
-    limit: number = DEFAULT_BOTTLENECKS_LIMIT,
-): AasBottleneck[] {
-    const deductions = report.qualityScore?.deductionsByDimension;
-    if (deductions && typeof deductions === 'object') {
-        const extractedBottlenecks = extractDeductionBottlenecks(deductions, limit);
-        if (extractedBottlenecks.length > 0) return extractedBottlenecks;
-    }
-    return extractFrequencyBottlenecks(report.issues, limit);
 }
 
 /**
