@@ -12,12 +12,30 @@
  *   or defensively validated views.
  */
 
-import type { CoverageDampingResult, FileCoverageProfile } from './lcov-ingester';
+import type { CoverageDampingResult, CoverageStatus, FileCoverageProfile } from './lcov-ingester';
 
 export * from './lcov-ingester';
 export * from './continuous-rule-sampler';
 
 const RATIO_DECIMAL_PLACES = 3;
+const VALID_COVERAGE_STATUSES: ReadonlySet<CoverageStatus> = new Set<CoverageStatus>([
+    'well_covered',
+    'moderate_coverage',
+    'uncovered_high_risk',
+    'unmonitored',
+]);
+
+function assertSafePathField(value: unknown, fieldName: string): void {
+    if (typeof value !== 'string' || value.trim().length === 0 || value.includes('\0')) {
+        throw new TypeError(`${fieldName} must be a non-empty valid file path`);
+    }
+}
+
+function assertUnitRatioField(value: unknown, fieldName: string): void {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
+        throw new TypeError(`${fieldName} must be a finite ratio in [0, 1]`);
+    }
+}
 
 /**
  * Aggregated telemetry snapshot representation across inspected repository files.
@@ -43,14 +61,19 @@ export function assertValidFileCoverageProfile(
         throw new TypeError('FileCoverageProfile must be a non-null object');
     }
     const candidate = value as Record<string, unknown>;
-    if (typeof candidate.filePath !== 'string' || candidate.filePath.length === 0) {
-        throw new TypeError('FileCoverageProfile.filePath must be a non-empty string');
-    }
-    if (typeof candidate.lineCoverageRatio !== 'number' || isNaN(candidate.lineCoverageRatio)) {
-        throw new TypeError('FileCoverageProfile.lineCoverageRatio must be a valid number');
-    }
-    if (typeof candidate.branchCoverageRatio !== 'number' || isNaN(candidate.branchCoverageRatio)) {
-        throw new TypeError('FileCoverageProfile.branchCoverageRatio must be a valid number');
+    assertSafePathField(candidate.filePath, 'FileCoverageProfile.filePath');
+    assertUnitRatioField(candidate.lineCoverageRatio, 'FileCoverageProfile.lineCoverageRatio');
+    assertUnitRatioField(candidate.branchCoverageRatio, 'FileCoverageProfile.branchCoverageRatio');
+    for (const countKey of ['linesFound', 'linesHit', 'branchesFound', 'branchesHit']) {
+        const rawCount = candidate[countKey];
+        if (
+            rawCount !== undefined &&
+            (typeof rawCount !== 'number' || !Number.isFinite(rawCount) || rawCount < 0)
+        ) {
+            throw new TypeError(
+                `FileCoverageProfile.${countKey} must be a non-negative finite number`,
+            );
+        }
     }
 }
 
@@ -67,14 +90,21 @@ export function assertValidCoverageDampingResult(
         throw new TypeError('CoverageDampingResult must be a non-null object');
     }
     const candidate = value as Record<string, unknown>;
-    if (typeof candidate.filePath !== 'string' || candidate.filePath.length === 0) {
-        throw new TypeError('CoverageDampingResult.filePath must be a non-empty string');
+    assertSafePathField(candidate.filePath, 'CoverageDampingResult.filePath');
+    if (
+        typeof candidate.dampingMultiplier !== 'number' ||
+        !Number.isFinite(candidate.dampingMultiplier) ||
+        candidate.dampingMultiplier < 0
+    ) {
+        throw new TypeError(
+            'CoverageDampingResult.dampingMultiplier must be a non-negative finite number',
+        );
     }
-    if (typeof candidate.dampingMultiplier !== 'number' || isNaN(candidate.dampingMultiplier)) {
-        throw new TypeError('CoverageDampingResult.dampingMultiplier must be a valid number');
-    }
-    if (typeof candidate.status !== 'string') {
-        throw new TypeError('CoverageDampingResult.status must be a string');
+    if (
+        typeof candidate.status !== 'string' ||
+        !VALID_COVERAGE_STATUSES.has(candidate.status as CoverageStatus)
+    ) {
+        throw new TypeError('CoverageDampingResult.status must be a recognized CoverageStatus');
     }
 }
 
@@ -82,11 +112,19 @@ export function assertValidCoverageDampingResult(
  * Creates an immutable repository-level coverage telemetry snapshot.
  *
  * @param profiles - Map of normalized file paths to coverage profiles.
+ * @param nowMs - Optional deterministic timestamp in epoch milliseconds.
  * @returns Frozen TelemetrySnapshot instance.
  */
 export function createTelemetrySnapshot(
-    profiles: Map<string, FileCoverageProfile>,
+    profiles: ReadonlyMap<string, FileCoverageProfile>,
+    nowMs: number = Date.now(),
 ): Readonly<TelemetrySnapshot> {
+    if (!profiles || typeof profiles.values !== 'function') {
+        throw new TypeError('profiles must be a valid Map instance');
+    }
+    if (!Number.isFinite(nowMs) || nowMs < 0) {
+        throw new TypeError('nowMs must be a non-negative finite timestamp');
+    }
     let totalLineRatio = 0;
     let totalBranchRatio = 0;
     let count = 0;
@@ -102,7 +140,7 @@ export function createTelemetrySnapshot(
     const avgBranch = count > 0 ? +(totalBranchRatio / count).toFixed(RATIO_DECIMAL_PLACES) : 1.0;
 
     const snapshot: TelemetrySnapshot = {
-        timestamp: Date.now(),
+        timestamp: nowMs,
         fileCount: count,
         profiles: Object.freeze(new Map(profiles)),
         averageLineCoverage: avgLine,

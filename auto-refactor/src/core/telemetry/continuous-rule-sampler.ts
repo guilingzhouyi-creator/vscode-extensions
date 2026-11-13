@@ -95,7 +95,7 @@ interface CoOccurrenceEntry {
  * @returns Binary entropy in bits in [0, 1].
  */
 export function computeBinaryEntropy(probability: number): number {
-    if (probability <= 0 || probability >= 1) {
+    if (!Number.isFinite(probability) || probability <= 0 || probability >= 1) {
         return 0;
     }
     const probActive = probability;
@@ -112,10 +112,15 @@ export function computeBinaryEntropy(probability: number): number {
  * @returns Posterior mean, 95% credible interval, and entropy.
  */
 export function computeJeffreysPosterior(hits: number, evaluations: number): PosteriorMetrics {
+    const safeHits = Number.isFinite(hits) && hits > 0 ? hits : 0;
+    const safeEvaluations =
+        Number.isFinite(evaluations) && evaluations > 0
+            ? Math.max(safeHits, evaluations)
+            : safeHits;
     const alpha0 = 0.5;
     const beta0 = 0.5;
-    const alpha = hits + alpha0;
-    const beta = Math.max(0, evaluations - hits) + beta0;
+    const alpha = safeHits + alpha0;
+    const beta = Math.max(0, safeEvaluations - safeHits) + beta0;
     const total = alpha + beta;
 
     const mean = alpha / total;
@@ -164,6 +169,16 @@ export function computeFrequencyJaccardSimilarity(
     hitsA: number,
     hitsB: number,
 ): number {
+    if (
+        !Number.isFinite(coHits) ||
+        !Number.isFinite(hitsA) ||
+        !Number.isFinite(hitsB) ||
+        coHits < 0 ||
+        hitsA < 0 ||
+        hitsB < 0
+    ) {
+        return 0;
+    }
     const union = hitsA + hitsB - coHits;
     if (union <= 0) return 0;
     const similarity = coHits / union;
@@ -194,9 +209,14 @@ export class ContinuousRuleSamplingSidecar {
      * @param options - Execution scan outcome containing filesScanned and collected issues.
      */
     public recordScan(options: RecordScanOptions): void {
+        if (!options || !Array.isArray(options.issues)) return;
         const { filesScanned, issues } = options;
-        const now = options.timestamp ?? Date.now();
-        const effectiveFiles = Math.max(0, filesScanned);
+        const now =
+            options.timestamp !== undefined && Number.isFinite(options.timestamp)
+                ? options.timestamp
+                : Date.now();
+        const effectiveFiles =
+            Number.isFinite(filesScanned) && filesScanned > 0 ? Math.floor(filesScanned) : 0;
 
         this.totalScans += 1;
         this.totalFilesEvaluated += effectiveFiles;
@@ -233,6 +253,7 @@ export class ContinuousRuleSamplingSidecar {
 
         for (let i = 0; i < issues.length; i++) {
             const issue = issues[i];
+            if (!issue) continue;
             const ruleId = issue.rule;
             if (!ruleId) continue;
 
@@ -241,7 +262,9 @@ export class ContinuousRuleSamplingSidecar {
                 scanRuleSuppressions.set(ruleId, (scanRuleSuppressions.get(ruleId) ?? 0) + 1);
             }
 
-            const fileRules = getOrCreateFileRuleSet(fileHitsMap, issue.location.file);
+            const filePath = issue.location?.file;
+            if (typeof filePath !== 'string' || filePath.length === 0) continue;
+            const fileRules = getOrCreateFileRuleSet(fileHitsMap, filePath);
             fileRules.add(ruleId);
         }
     }
