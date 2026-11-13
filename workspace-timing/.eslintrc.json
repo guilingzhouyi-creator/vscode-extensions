@@ -1,5 +1,17 @@
 {
     "root": true,
+    "env": {
+        "node": true,
+        "es2022": true,
+        "mocha": true
+    },
+    "ignorePatterns": [
+        "out/",
+        "dist/",
+        "scripts/dist/",
+        "coverage/",
+        "node_modules/"
+    ],
     "parser": "@typescript-eslint/parser",
     "plugins": [
         "@typescript-eslint"
@@ -7,6 +19,14 @@
     "extends": [
         "eslint:recommended",
         "plugin:@typescript-eslint/recommended"
+    ],
+    "overrides": [
+        {
+            "files": ["test/**/*.js"],
+            "rules": {
+                "@typescript-eslint/no-var-requires": "off"
+            }
+        }
     ],
     "rules": {
         "@typescript-eslint/no-unused-vars": [
