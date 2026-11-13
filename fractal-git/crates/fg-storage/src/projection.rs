@@ -15,6 +15,10 @@
 //! - `FGT-STO-001`: Storage layer crash safety guard
 //! - `FGT-OBJ-001`: Git object model serialization guard
 
+mod refs;
+#[cfg(test)]
+mod tests;
+
 use std::fs;
 use std::path::Path;
 
@@ -27,8 +31,10 @@ use fg_native::sections::indx::{
 };
 use fg_native::sections::meta::{LayoutMode, MetaSection};
 use fg_native::sections::oplog::{OpLogEntry, OpLogParts};
-use fg_native::sections::refs::{RefRecord, RefsSection};
+use fg_native::sections::refs::RefsSection;
 use fg_native::RepoDocument;
+
+use refs::{import_git_refs, write_git_refs};
 
 use crate::backends::odb_router::OdbRouter;
 use crate::cas_backend::CasBackend;
@@ -107,58 +113,6 @@ fn initialize_git_scaffold(git_dir: &Path) -> FractalResult<()> {
     }
 
     Ok(())
-}
-
-/// Writes all native references into `.git/refs/` hierarchy, projecting cell branches to `refs/heads/`.
-fn write_git_refs(native_dir: &Path, git_dir: &Path, refs: &RefsSection) -> FractalResult<usize> {
-    let mut written = std::collections::BTreeSet::new();
-    let mut projected_heads: Vec<(String, Oid)> = Vec::new();
-
-    for record in refs.records() {
-        write_single_git_ref(git_dir, &record.name, &record.oid, &mut written)?;
-        collect_projected_cell_branch(&record.name, record.oid, &mut projected_heads);
-    }
-
-    let refs_dir = native_dir.join("refs");
-    if refs_dir.is_dir() {
-        let mut disk_refs = RefsSection::new();
-        let _ = collect_loose_refs_recursive(&refs_dir, &refs_dir, &mut disk_refs);
-        for record in disk_refs.records() {
-            write_single_git_ref(git_dir, &record.name, &record.oid, &mut written)?;
-            collect_projected_cell_branch(&record.name, record.oid, &mut projected_heads);
-        }
-    }
-
-    for (head_ref, oid) in projected_heads {
-        write_single_git_ref(git_dir, &head_ref, &oid, &mut written)?;
-    }
-
-    Ok(written.len())
-}
-
-fn write_single_git_ref(
-    git_dir: &Path,
-    ref_name: &str,
-    oid: &Oid,
-    written: &mut std::collections::BTreeSet<String>,
-) -> FractalResult<()> {
-    let dest = git_dir.join(ref_name);
-    if let Some(parent) = dest.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    fs::write(&dest, format!("{}\n", oid.to_hex()))?;
-    written.insert(ref_name.to_string());
-    Ok(())
-}
-
-fn collect_projected_cell_branch(ref_name: &str, oid: Oid, out: &mut Vec<(String, Oid)>) {
-    if let Some(rest) = ref_name.strip_prefix("refs/fractal/cell/") {
-        if let Some((_cell, branch)) = rest.split_once('/') {
-            if !branch.is_empty() {
-                out.push((format!("refs/heads/{branch}"), oid));
-            }
-        }
-    }
 }
 
 /// Exports all objects from native CAS and ODB stores to loose Git objects.
@@ -437,7 +391,7 @@ pub fn export_native_to_git(
 }
 
 /// Prepares native repository directory layout and guard file.
-fn setup_native_scaffold(native_dir: &Path, force: bool) -> FractalResult<()> {
+pub(super) fn setup_native_scaffold(native_dir: &Path, force: bool) -> FractalResult<()> {
     let container_path = fg_native::container_path(native_dir);
     if container_path.exists() && !force {
         return Err(FractalError::CorruptStore(format!(
@@ -492,86 +446,6 @@ fn import_git_head(git_dir: &Path) -> FractalResult<HeadState> {
             target: "refs/heads/main".to_string(),
         })
     }
-}
-
-/// Ingests Git references from `packed-refs` and loose `refs/` directory.
-fn import_git_refs(git_dir: &Path) -> FractalResult<RefsSection> {
-    let mut refs = RefsSection::new();
-    let packed_path = git_dir.join("packed-refs");
-    if packed_path.is_file() {
-        let packed_refs = parse_packed_refs(&packed_path);
-        for (name, oid, peeled) in packed_refs {
-            let _ = refs.upsert(RefRecord { name, oid, peeled });
-        }
-    }
-
-    let refs_dir = git_dir.join("refs");
-    if refs_dir.is_dir() {
-        collect_loose_refs_recursive(&refs_dir, &refs_dir, &mut refs)?;
-    }
-    Ok(refs)
-}
-
-/// Parses Git `packed-refs` file preserving peeled tag associations.
-fn parse_packed_refs(path: &Path) -> Vec<(String, Oid, Option<Oid>)> {
-    let Ok(content) = fs::read_to_string(path) else {
-        return Vec::new();
-    };
-    let mut entries: Vec<(String, Oid, Option<Oid>)> = Vec::new();
-    for line in content.lines() {
-        let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with('#') {
-            continue;
-        }
-        if let Some(peeled_hex) = trimmed.strip_prefix('^') {
-            if let Ok(peeled_oid) = Oid::from_hex(peeled_hex.trim()) {
-                if let Some(last) = entries.last_mut() {
-                    last.2 = Some(peeled_oid);
-                }
-            }
-            continue;
-        }
-        if let Some((hex, name)) = trimmed.split_once(' ') {
-            if let Ok(oid) = Oid::from_hex(hex.trim()) {
-                entries.push((name.trim().to_string(), oid, None));
-            }
-        }
-    }
-    entries
-}
-
-/// Recursively scans loose reference files into a `RefsSection`.
-fn collect_loose_refs_recursive(
-    base_refs_dir: &Path,
-    current_dir: &Path,
-    refs: &mut RefsSection,
-) -> FractalResult<()> {
-    for entry in fs::read_dir(current_dir)? {
-        let entry = entry?;
-        let entry_path = entry.path();
-        if entry_path.is_dir() {
-            collect_loose_refs_recursive(base_refs_dir, &entry_path, refs)?;
-        } else if entry_path.is_file() {
-            let Ok(relative) =
-                entry_path.strip_prefix(base_refs_dir.parent().unwrap_or(base_refs_dir))
-            else {
-                continue;
-            };
-            let ref_name = relative.to_string_lossy().replace('\\', "/");
-            let Ok(content) = fs::read_to_string(&entry_path) else {
-                continue;
-            };
-            let trimmed = content.trim();
-            if let Ok(oid) = Oid::from_hex(trimmed) {
-                let _ = refs.upsert(RefRecord {
-                    name: ref_name,
-                    oid,
-                    peeled: None,
-                });
-            }
-        }
-    }
-    Ok(())
 }
 
 /// Ingests Git staging index (`.git/index`) into a native `IndxSection`.
@@ -715,144 +589,4 @@ pub fn import_git_to_native(
         head: format_head_state(&doc.head),
         repo_id: doc.meta.repo_id_hex(),
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use fg_core::models::{FileMode, IndexStage, ObjectKind};
-    use fg_core::traits::OdbStore;
-    use fg_native::sections::head::HeadState;
-    use fg_native::sections::indx::{IndexEntry as NativeIndexEntry, StatCache};
-    use fg_native::sections::meta::{LayoutMode, MetaSection};
-    use fg_native::sections::refs::RefRecord;
-    use fg_native::RepoDocument;
-    use std::path::{Path, PathBuf};
-    use std::sync::atomic::{AtomicUsize, Ordering};
-
-    struct TestDir {
-        path: PathBuf,
-    }
-
-    impl TestDir {
-        fn new(prefix: &str) -> Self {
-            static COUNTER: AtomicUsize = AtomicUsize::new(0);
-            let count = COUNTER.fetch_add(1, Ordering::Relaxed);
-            let pid = std::process::id();
-            let base = std::env::current_dir()
-                .unwrap_or_else(|_| PathBuf::from("."))
-                .join("target")
-                .join("test_tmp");
-            let _ = std::fs::create_dir_all(&base);
-            let path = base.join(format!("fg_proj_{}_{}_{}", prefix, pid, count));
-            std::fs::create_dir_all(&path).expect("Failed to create test directory");
-            Self { path }
-        }
-
-        fn path(&self) -> &Path {
-            &self.path
-        }
-    }
-
-    impl Drop for TestDir {
-        fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.path);
-        }
-    }
-
-    #[test]
-    fn test_export_and_import_roundtrip() {
-        let sandbox = TestDir::new("roundtrip");
-        let native_dir = sandbox.path().join(".taxis");
-        let git_dir = sandbox.path().join(".git");
-
-        // 1. Setup native repository
-        setup_native_scaffold(&native_dir, false).expect("setup native scaffold");
-        let cas = CasBackend::new(&native_dir);
-
-        let blob_payload = b"hello world\n";
-        let blob_oid = cas
-            .put_block(ObjectKind::Blob, blob_payload)
-            .expect("put blob");
-
-        let repo_id = [0x55u8; 16];
-        let meta = MetaSection::new(repo_id, 1000, LayoutMode::Dev);
-        let head = HeadState::Symbolic {
-            target: "refs/heads/main".to_string(),
-        };
-        let mut doc = RepoDocument::new(meta, head);
-
-        doc.refs
-            .upsert(RefRecord {
-                name: "refs/heads/main".to_string(),
-                oid: blob_oid,
-                peeled: None,
-            })
-            .expect("upsert ref");
-
-        doc.indx
-            .upsert(NativeIndexEntry {
-                path: "hello.txt".to_string(),
-                mode: FileMode::RegularFile,
-                oid: blob_oid,
-                stage: IndexStage::Normal,
-                flags: 0,
-                stat: StatCache {
-                    size: blob_payload.len() as u64,
-                    mtime_secs: 1000,
-                    mtime_nanos: 0,
-                    ctime_secs: 1000,
-                    ctime_nanos: 0,
-                    dev: 0,
-                    ino: 0,
-                    uid: 0,
-                    gid: 0,
-                },
-            })
-            .expect("upsert index");
-
-        doc.save_atomic(&fg_native::container_path(&native_dir))
-            .expect("save doc");
-
-        // 2. Export native -> git
-        let export_report = export_native_to_git(&native_dir, &git_dir, false).expect("export");
-        assert_eq!(export_report.objects_exported, 1);
-        assert_eq!(export_report.refs_exported, 1);
-        assert_eq!(export_report.index_entries_exported, 1);
-
-        // Verify git projection artifacts
-        assert!(git_dir.join("HEAD").is_file());
-        assert!(git_dir.join("config").is_file());
-        assert!(git_dir.join("refs/heads/main").is_file());
-        assert!(git_dir.join("index").is_file());
-
-        let loose_odb = LooseOdb::new(&git_dir);
-        assert!(loose_odb.has_object(&blob_oid));
-
-        let loaded_index = GitIndex::load(git_dir.join("index")).expect("load git index");
-        assert_eq!(loaded_index.len(), 1);
-        assert_eq!(loaded_index.entries()[0].path, "hello.txt");
-        assert_eq!(loaded_index.entries()[0].oid, blob_oid);
-
-        // 3. Import git -> new native
-        let new_native_dir = sandbox.path().join(".taxis_imported");
-        let import_report = import_git_to_native(&git_dir, &new_native_dir, LayoutMode::Dev, false)
-            .expect("import");
-        assert_eq!(import_report.objects_imported, 1);
-        assert_eq!(import_report.refs_imported, 1);
-        assert_eq!(import_report.index_entries_imported, 1);
-
-        let new_cas = CasBackend::new(&new_native_dir);
-        assert!(new_cas.has_block(&blob_oid));
-        let (kind, recovered) = new_cas.get_block_with_kind(&blob_oid).expect("get block");
-        assert_eq!(kind, ObjectKind::Blob);
-        assert_eq!(recovered, blob_payload);
-
-        let new_doc =
-            RepoDocument::load(&fg_native::container_path(&new_native_dir)).expect("load new doc");
-        assert_eq!(new_doc.refs.len(), 1);
-        assert_eq!(new_doc.refs.get("refs/heads/main").unwrap().oid, blob_oid);
-        assert_eq!(new_doc.indx.len(), 1);
-        assert_eq!(new_doc.indx.entries()[0].path, "hello.txt");
-    }
 }
