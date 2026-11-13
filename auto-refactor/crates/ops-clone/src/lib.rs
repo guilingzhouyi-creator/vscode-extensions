@@ -212,6 +212,28 @@ fn extract_token_trigram_hashes(tokens: &[String]) -> HashMap<(u64, u64, u64), u
     map
 }
 
+fn trigram_dot_product(
+    smaller: &HashMap<(u64, u64, u64), u32>,
+    larger: &HashMap<(u64, u64, u64), u32>,
+) -> f64 {
+    let mut dot_product = 0.0;
+    for (key, &count_a) in smaller {
+        if let Some(&count_b) = larger.get(key) {
+            dot_product += (count_a as f64) * (count_b as f64);
+        }
+    }
+    dot_product
+}
+
+fn sum_trigram_squares(map: &HashMap<(u64, u64, u64), u32>) -> f64 {
+    let mut sum_sq = 0.0;
+    for &val in map.values() {
+        let f_val = val as f64;
+        sum_sq += f_val * f_val;
+    }
+    sum_sq
+}
+
 /// Calculate cosine similarity between two token arrays using 3-gram feature vectors
 pub fn calculate_trigram_cosine_similarity(tokens_a: &[String], tokens_b: &[String]) -> f64 {
     if tokens_a.len() < 3 || tokens_b.len() < 3 {
@@ -229,34 +251,17 @@ pub fn calculate_trigram_cosine_similarity(tokens_a: &[String], tokens_b: &[Stri
         (&map_b, &map_a)
     };
 
-    let mut dot_product = 0.0;
-    for (k, &count_a) in smaller {
-        if let Some(&count_b) = larger.get(k) {
-            dot_product += (count_a as f64) * (count_b as f64);
-        }
-    }
-
+    let dot_product = trigram_dot_product(smaller, larger);
     if dot_product <= 0.0 {
         return 0.0;
     }
 
-    let mut sum_sq_a = 0.0;
-    for &val in map_a.values() {
-        sum_sq_a += (val as f64) * (val as f64);
-    }
-
-    let mut sum_sq_b = 0.0;
-    for &val in map_b.values() {
-        sum_sq_b += (val as f64) * (val as f64);
-    }
-
-    let denom = sum_sq_a.sqrt() * sum_sq_b.sqrt();
+    let denom = sum_trigram_squares(&map_a).sqrt() * sum_trigram_squares(&map_b).sqrt();
     if denom <= 0.0 {
         return 0.0;
     }
 
-    let sim = dot_product / denom;
-    let clamped = sim.clamp(0.0, 1.0);
+    let clamped = (dot_product / denom).clamp(0.0, 1.0);
     (clamped * 1e6).round() / 1e6
 }
 
@@ -302,111 +307,110 @@ pub fn count_duplicate_lines(content: &str) -> u32 {
     duplicated
 }
 
-/// Detects intra-file duplicate code blocks matching HYG-CLN-001 in hygiene.ts
-pub fn detect_clone_blocks(content: &str, min_clone_lines: u32) -> Vec<CloneBlock> {
-    let mut meaningful_lines: Vec<(usize, u32)> = Vec::new();
-
+fn collect_meaningful_line_hashes(content: &str) -> Vec<(usize, u32)> {
+    let mut meaningful = Vec::new();
     for (line_idx, raw_slice) in content.split('\n').enumerate() {
-        let line = raw_slice.strip_suffix('\r').unwrap_or(raw_slice);
-        let trimmed = line.trim();
-        if !trimmed.is_empty()
+        let trimmed = raw_slice.strip_suffix('\r').unwrap_or(raw_slice).trim();
+        let is_meaningful = !trimmed.is_empty()
             && !trimmed.starts_with("//")
             && !trimmed.starts_with('#')
             && trimmed != "{"
-            && trimmed != "}"
-        {
-            meaningful_lines.push((line_idx + 1, compute_string_hash_32(trimmed)));
+            && trimmed != "}";
+        if is_meaningful {
+            meaningful.push((line_idx + 1, compute_string_hash_32(trimmed)));
         }
     }
+    meaningful
+}
 
-    let min_k = min_clone_lines as usize;
-    if min_k == 0 || meaningful_lines.len() < min_k * 2 {
-        return Vec::new();
-    }
-
+fn find_first_rolling_clone(
+    meaningful_lines: &[(usize, u32)],
+    min_k: usize,
+    min_clone_lines: u32,
+) -> Option<CloneBlock> {
     let total = meaningful_lines.len();
     let mut block_map: HashMap<i32, usize> = HashMap::new();
-    let mut clones = Vec::new();
-
-    // Precompute 31^(min_k - 1) mod 2^32 for O(1) Rabin-Karp rolling hash update
     let highest_pow = 31i32.wrapping_pow((min_k - 1) as u32);
-    let mut h: i32 = 0;
+    let mut rolling_hash: i32 = 0;
     for item in meaningful_lines.iter().take(min_k) {
-        h = h.wrapping_mul(31).wrapping_add(item.1 as i32);
+        rolling_hash = rolling_hash.wrapping_mul(31).wrapping_add(item.1 as i32);
     }
 
-    for i in 0..=(total.saturating_sub(min_k)) {
-        if i > 0 {
-            let outgoing = (meaningful_lines[i - 1].1 as i32).wrapping_mul(highest_pow);
-            let incoming = meaningful_lines[i + min_k - 1].1 as i32;
-            h = h
+    for idx in 0..=(total.saturating_sub(min_k)) {
+        if idx > 0 {
+            let outgoing = (meaningful_lines[idx - 1].1 as i32).wrapping_mul(highest_pow);
+            let incoming = meaningful_lines[idx + min_k - 1].1 as i32;
+            rolling_hash = rolling_hash
                 .wrapping_sub(outgoing)
                 .wrapping_mul(31)
                 .wrapping_add(incoming);
         }
 
-        if let Some(&prev_idx) = block_map.get(&h) {
-            if i >= prev_idx + min_k {
-                let actual_start_line = meaningful_lines[i].0 as u32;
-                let original_line = meaningful_lines[prev_idx].0 as u32;
-                clones.push(CloneBlock {
-                    start_line: actual_start_line,
-                    original_line,
-                    line_span: min_clone_lines,
-                });
-                break;
-            }
-        } else {
-            block_map.insert(h, i);
+        let Some(&prev_idx) = block_map.get(&rolling_hash) else {
+            block_map.insert(rolling_hash, idx);
+            continue;
+        };
+        if idx >= prev_idx + min_k {
+            return Some(CloneBlock {
+                start_line: meaningful_lines[idx].0 as u32,
+                original_line: meaningful_lines[prev_idx].0 as u32,
+                line_span: min_clone_lines,
+            });
         }
     }
+    None
+}
 
-    clones
+/// Detects intra-file duplicate code blocks matching HYG-CLN-001 in hygiene.ts
+pub fn detect_clone_blocks(content: &str, min_clone_lines: u32) -> Vec<CloneBlock> {
+    let min_k = min_clone_lines as usize;
+    if min_k == 0 || content.is_empty() {
+        return Vec::new();
+    }
+    let meaningful_lines = collect_meaningful_line_hashes(content);
+    if meaningful_lines.len() < min_k * 2 {
+        return Vec::new();
+    }
+    find_first_rolling_clone(&meaningful_lines, min_k, min_clone_lines)
+        .into_iter()
+        .collect()
+}
+
+fn build_minhash_shingles(meaningful_hashes: &[u32]) -> Vec<u32> {
+    if meaningful_hashes.len() < 3 {
+        return meaningful_hashes.to_vec();
+    }
+    let mut shingles = Vec::with_capacity(meaningful_hashes.len() - 2);
+    for idx in 0..=meaningful_hashes.len() - 3 {
+        let shingle = meaningful_hashes[idx]
+            .wrapping_mul(961)
+            .wrapping_add(meaningful_hashes[idx + 1].wrapping_mul(31))
+            .wrapping_add(meaningful_hashes[idx + 2]);
+        shingles.push(shingle);
+    }
+    shingles
 }
 
 /// Computes a 64-dimension MinHash signature vector for a source file
 pub fn compute_minhash(content: &str, num_perm: usize) -> Vec<u32> {
     let num_hashes = num_perm.min(MINHASH_PERMUTATIONS);
     let mut signature = vec![u32::MAX; num_hashes];
-
-    let mut meaningful_hashes: Vec<u32> = Vec::new();
-    for raw_slice in content.split('\n') {
-        let line = raw_slice.strip_suffix('\r').unwrap_or(raw_slice);
-        let trimmed = line.trim();
-        if !trimmed.is_empty()
-            && !trimmed.starts_with("//")
-            && !trimmed.starts_with('#')
-            && trimmed != "{"
-            && trimmed != "}"
-        {
-            meaningful_hashes.push(compute_string_hash_32(trimmed));
-        }
-    }
+    let meaningful_hashes: Vec<u32> = collect_meaningful_line_hashes(content)
+        .into_iter()
+        .map(|(_, hash_val)| hash_val)
+        .collect();
 
     if meaningful_hashes.is_empty() {
         return signature;
     }
 
-    // Generate shingles: k=3 rolling shingles if >= 3 lines, else individual lines
-    let mut shingles: Vec<u32> = Vec::new();
-    if meaningful_hashes.len() >= 3 {
-        for i in 0..=meaningful_hashes.len() - 3 {
-            let shingle = meaningful_hashes[i]
-                .wrapping_mul(961)
-                .wrapping_add(meaningful_hashes[i + 1].wrapping_mul(31))
-                .wrapping_add(meaningful_hashes[i + 2]);
-            shingles.push(shingle);
-        }
-    } else {
-        shingles.extend(meaningful_hashes);
-    }
-
+    let shingles = build_minhash_shingles(&meaningful_hashes);
     for &shingle in &shingles {
-        for k in 0..num_hashes {
-            let (a, b) = HASH_COEFFS[k];
-            let hash_val = a.wrapping_mul(shingle).wrapping_add(b);
-            if hash_val < signature[k] {
-                signature[k] = hash_val;
+        for perm_idx in 0..num_hashes {
+            let (coeff_a, coeff_b) = HASH_COEFFS[perm_idx];
+            let hash_val = coeff_a.wrapping_mul(shingle).wrapping_add(coeff_b);
+            if hash_val < signature[perm_idx] {
+                signature[perm_idx] = hash_val;
             }
         }
     }
@@ -414,28 +418,30 @@ pub fn compute_minhash(content: &str, num_perm: usize) -> Vec<u32> {
     signature
 }
 
-/// Locality Sensitive Hashing (LSH) candidate pair detection across file signatures
-pub fn find_clone_pairs(signatures: &[Vec<u32>], threshold: f64) -> Vec<ClonePair> {
-    let n = signatures.len();
-    if n < 2 {
-        return Vec::new();
+fn push_bucket_pairs(bucket: &[u32], candidates: &mut HashSet<u64>) {
+    if bucket.len() < 2 {
+        return;
     }
-
-    let num_hashes = signatures[0].len();
-    let num_bands = 16usize;
-    let rows_per_band = num_hashes / num_bands;
-    if rows_per_band == 0 {
-        return Vec::new();
+    for first_idx in 0..bucket.len() {
+        for second_idx in (first_idx + 1)..bucket.len() {
+            let file_a = bucket[first_idx].min(bucket[second_idx]) as u64;
+            let file_b = bucket[first_idx].max(bucket[second_idx]) as u64;
+            candidates.insert((file_a << 32) | file_b);
+        }
     }
+}
 
-    // 1. Group file indices into LSH buckets per band using packed u64 pair keys
+fn collect_lsh_candidates(
+    signatures: &[Vec<u32>],
+    num_bands: usize,
+    rows_per_band: usize,
+) -> HashSet<u64> {
     let mut candidates: HashSet<u64> = HashSet::new();
     let mut buckets: HashMap<u32, Vec<u32>> = HashMap::new();
 
     for band in 0..num_bands {
         let start = band * rows_per_band;
         let end = start + rows_per_band;
-
         for (file_idx, sig) in signatures.iter().enumerate() {
             if sig.len() < end {
                 continue;
@@ -447,56 +453,67 @@ pub fn find_clone_pairs(signatures: &[Vec<u32>], threshold: f64) -> Vec<ClonePai
             }
             buckets.entry(band_hash).or_default().push(file_idx as u32);
         }
-
         for bucket in buckets.values() {
-            if bucket.len() >= 2 {
-                for i in 0..bucket.len() {
-                    for j in (i + 1)..bucket.len() {
-                        let a = bucket[i].min(bucket[j]) as u64;
-                        let b = bucket[i].max(bucket[j]) as u64;
-                        candidates.insert((a << 32) | b);
-                    }
-                }
-            }
+            push_bucket_pairs(bucket, &mut candidates);
         }
         buckets.clear();
     }
+    candidates
+}
 
-    // 2. Verify candidate pairs against similarity threshold
-    let mut pairs = Vec::new();
-    for pair_key in candidates {
-        let a = (pair_key >> 32) as u32;
-        let b = (pair_key & 0xFFFF_FFFF) as u32;
-        let sig_a = &signatures[a as usize];
-        let sig_b = &signatures[b as usize];
-        let total = sig_a.len().min(sig_b.len());
-        if total == 0 {
-            continue;
-        }
-
-        let mut matches = 0usize;
-        for i in 0..total {
-            if sig_a[i] == sig_b[i] {
-                matches += 1;
-            }
-        }
-
-        let similarity = matches as f64 / total as f64;
-        if similarity >= threshold {
-            pairs.push(ClonePair {
-                file_a: a,
-                file_b: b,
-                similarity,
-            });
-        }
+fn verify_lsh_candidate(
+    signatures: &[Vec<u32>],
+    pair_key: u64,
+    threshold: f64,
+) -> Option<ClonePair> {
+    let file_a = (pair_key >> 32) as u32;
+    let file_b = (pair_key & 0xFFFF_FFFF) as u32;
+    let sig_a = &signatures[file_a as usize];
+    let sig_b = &signatures[file_b as usize];
+    let total = sig_a.len().min(sig_b.len());
+    if total == 0 {
+        return None;
     }
+
+    let matches = sig_a[..total]
+        .iter()
+        .zip(&sig_b[..total])
+        .filter(|(left, right)| left == right)
+        .count();
+
+    let similarity = matches as f64 / total as f64;
+    if similarity < threshold {
+        return None;
+    }
+    Some(ClonePair {
+        file_a,
+        file_b,
+        similarity,
+    })
+}
+
+/// Locality Sensitive Hashing (LSH) candidate pair detection across file signatures
+pub fn find_clone_pairs(signatures: &[Vec<u32>], threshold: f64) -> Vec<ClonePair> {
+    if signatures.len() < 2 {
+        return Vec::new();
+    }
+    let num_bands = 16usize;
+    let rows_per_band = signatures[0].len() / num_bands;
+    if rows_per_band == 0 {
+        return Vec::new();
+    }
+
+    let candidates = collect_lsh_candidates(signatures, num_bands, rows_per_band);
+    let mut pairs: Vec<ClonePair> = candidates
+        .into_iter()
+        .filter_map(|pair_key| verify_lsh_candidate(signatures, pair_key, threshold))
+        .collect();
 
     pairs.sort_by(|p1, p2| {
         p2.similarity
             .partial_cmp(&p1.similarity)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
-
     pairs
 }
 

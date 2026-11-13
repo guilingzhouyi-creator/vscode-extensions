@@ -322,6 +322,36 @@ impl FlatScopeArena {
         Some(current_id)
     }
 
+    fn collect_ancestor_shadowing(
+        &self,
+        binding: &ScopeBinding,
+        ancestor_id: u32,
+        defects: &mut Vec<ShadowingDefect>,
+    ) {
+        let Some(ancestor_binding_indices) = self.scope_bindings.get(ancestor_id as usize) else {
+            return;
+        };
+        for &b_idx in ancestor_binding_indices {
+            let outer = &self.bindings[b_idx as usize];
+            if outer.symbol_id != binding.symbol_id {
+                continue;
+            }
+            let symbol_str = self
+                .interner
+                .resolve(binding.symbol_id)
+                .unwrap_or_default()
+                .to_string();
+            defects.push(ShadowingDefect {
+                symbol: symbol_str,
+                inner_scope_id: binding.scope_id,
+                inner_line: binding.line,
+                outer_scope_id: outer.scope_id,
+                outer_line: outer.line,
+                binding_kind: binding.kind as u8,
+            });
+        }
+    }
+
     /// Single-pass batch detection of all variable shadowing incidents across the entire arena.
     #[must_use]
     pub fn detect_all_shadowing(&self) -> Vec<ShadowingDefect> {
@@ -331,31 +361,13 @@ impl FlatScopeArena {
             let mut curr = self
                 .scopes
                 .get(binding.scope_id as usize)
-                .and_then(|s| s.parent);
+                .and_then(|scope| scope.parent);
             while let Some(ancestor_id) = curr {
-                if let Some(ancestor_binding_indices) =
-                    self.scope_bindings.get(ancestor_id as usize)
-                {
-                    for &b_idx in ancestor_binding_indices {
-                        let outer = &self.bindings[b_idx as usize];
-                        if outer.symbol_id == binding.symbol_id {
-                            let symbol_str = self
-                                .interner
-                                .resolve(binding.symbol_id)
-                                .unwrap_or_default()
-                                .to_string();
-                            defects.push(ShadowingDefect {
-                                symbol: symbol_str,
-                                inner_scope_id: binding.scope_id,
-                                inner_line: binding.line,
-                                outer_scope_id: outer.scope_id,
-                                outer_line: outer.line,
-                                binding_kind: binding.kind as u8,
-                            });
-                        }
-                    }
-                }
-                curr = self.scopes.get(ancestor_id as usize).and_then(|s| s.parent);
+                self.collect_ancestor_shadowing(binding, ancestor_id, &mut defects);
+                curr = self
+                    .scopes
+                    .get(ancestor_id as usize)
+                    .and_then(|scope| scope.parent);
             }
         }
 
