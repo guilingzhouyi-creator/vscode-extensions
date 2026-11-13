@@ -12,8 +12,7 @@
  */
 
 import * as fs from 'fs';
-import * as path from 'path';
-import type { ScanConfig, ScanReport, ScanSummary, Issue, FileMetric } from '../types';
+import type { ScanConfig, ScanReport, Issue } from '../types';
 import type { Scanner } from '../analyzer';
 import { summarizeUncertainty } from './canonical-issue-builder';
 import type { Logger } from '../logger';
@@ -37,29 +36,12 @@ import { computeDynamicQualityVector } from '../dynamic/dynamic-quality-scorer';
 import { computeUnifiedQualityScore } from '../scoring/fusion-scorer';
 import type { GovernanceProjectProfile } from '../scoring/fusion-scorer';
 import { evaluateProjectAutonomy } from '../scoring/autonomy-scorer';
-import { FindingConfidenceArbiter } from '../scoring/finding-confidence-arbiter';
 import { applySuppressions } from './post-scan-suppressions';
-import {
-    countUncalibrated,
-    resolveAdvisoryOnlyRules,
-    resolveRuleTiers,
-    stampAdjudicatedIssues,
-} from '../scoring/finding-arbitration-batch';
-import type { RuleCalibrationStats } from '../scoring/confidence-calibration';
-import { buildConfidenceModelAsset } from '../scoring/confidence-model-asset';
-import { buildReviewQueue, countNeedsHuman, writeReviewQueue } from './review-queue';
+import { applyArbitrationPass, synthesizeProjectQuant } from './post-scan-arbitration';
 import {
     recordHistoricalQualitySample,
     resolveHistoricalQualityScore,
-    RollingSamplingGovernor,
-    DEFAULT_STATE_FILENAME,
-    DEFAULT_CACHE_DIR,
 } from '../scoring/rolling-sampling-governor';
-import type { FileDebtItem, QuantitativeRiskAssessment } from '../scoring/quantitative-risk-model';
-import {
-    DEFAULT_RISK_WINDOW_SIZE,
-    evaluateQuantitativeRiskModel,
-} from '../scoring/quantitative-risk-model';
 import {
     applyAnalyzerSeverityCaps,
     enrichEvolutionAndCoverage,
@@ -675,100 +657,6 @@ async function refreshQualityProjections(
 }
 
 /**
- * Loads empirical rolling quality scores from persistent cache.
- */
-function loadRollingHistoryScores(config: ScanConfig, fallbackScore: number): number[] {
-    try {
-        const cacheDir = path.join(config.root || '.', DEFAULT_CACHE_DIR);
-        const stateFile = path.join(cacheDir, DEFAULT_STATE_FILENAME);
-        if (!fs.existsSync(stateFile)) {
-            return [fallbackScore];
-        }
-        const governor = new RollingSamplingGovernor({ stateFilePath: stateFile });
-        const samples = governor.getSamples();
-        return samples.length > 0
-            ? samples.map((sample) => sample.compositeScore)
-            : [fallbackScore];
-    } catch (error) {
-        void error;
-        return [fallbackScore];
-    }
-}
-
-interface IssueDebtAggregates {
-    readonly fileDebtsMap: Map<string, number>;
-    readonly ruleCategoryCounts: Record<string, number>;
-}
-
-/**
- * Aggregates issue counts and rule categories for spatial dispersion analysis.
- */
-function aggregateIssueDebts(issues: Issue[]): IssueDebtAggregates {
-    const fileDebtsMap = new Map<string, number>();
-    const ruleCategoryCounts: Record<string, number> = {};
-
-    for (const issue of issues) {
-        const filePath = issue.location?.file || 'unknown';
-        fileDebtsMap.set(filePath, (fileDebtsMap.get(filePath) || 0) + 1);
-
-        const rulePrefix = (issue.rule || '').match(/^([A-Z]{2,4})-/)?.[1] || 'OTHER';
-        ruleCategoryCounts[rulePrefix] = (ruleCategoryCounts[rulePrefix] || 0) + 1;
-    }
-
-    return { fileDebtsMap, ruleCategoryCounts };
-}
-
-/**
- * Synthesizes architecture dynamics and resilience quantitative indicators (ADR-Q)
- * from empirical continuous rolling sampling and file-level defect distribution.
- */
-function synthesizeProjectQuant(
-    config: ScanConfig,
-    projectQualityScore: QualityScoreBreakdown,
-    fileMetrics: FileMetric[],
-    issues: Issue[],
-): QuantitativeRiskAssessment {
-    const historyScores = loadRollingHistoryScores(config, projectQualityScore.compositeScore);
-    const { fileDebtsMap, ruleCategoryCounts } = aggregateIssueDebts(issues);
-
-    const fileDebtItems: FileDebtItem[] = fileMetrics.map((fm) => ({
-        filePath: fm.file,
-        remediationMinutes: (fileDebtsMap.get(fm.file) || 0) * 15,
-        churn30d: 1.0,
-        fanIn: fm.functions || 1.0,
-    }));
-    const fileDebtValues = fileMetrics.map((fm) => (fileDebtsMap.get(fm.file) || 0) * 15);
-
-    const complexityValues = fileMetrics
-        .map((fm) => fm.maxNestingDepth)
-        .filter(
-            (compVal): compVal is number => typeof compVal === 'number' && Number.isFinite(compVal),
-        );
-
-    const totalMinutes =
-        projectQualityScore.technicalDebt?.totalRemediationMinutes ?? issues.length * 15;
-
-    return evaluateQuantitativeRiskModel({
-        financial: {
-            totalRemediationMinutes: totalMinutes,
-            fileDebts: fileDebtItems,
-        },
-        risk: {
-            historyScores,
-            windowSize: DEFAULT_RISK_WINDOW_SIZE,
-        },
-        inequality: {
-            fileDebts: fileDebtValues,
-            ruleCategoryCounts,
-        },
-        stochastic: {
-            historyScores,
-            complexityValues,
-        },
-    });
-}
-
-/**
  * Determines whether quality scores and composite metrics should be recomputed.
  *
  * @param report - Current scan report.
@@ -792,105 +680,6 @@ function shouldRefreshQualityScores(
         !report.autonomy ||
         !report.governance
     );
-}
-
-/**
- * Projects the model asset onto the summary's provenance block.
- *
- * Omitted entirely when no evidence was supplied: an empty model would read as a deployed model
- * with zero observations, which is a different claim from "no model was used at all".
- *
- * @param stats - Accepted per-rule outcome counts.
- * @returns Partial summary fields to spread, empty when there is no evidence.
- */
-function projectModelProvenance(stats: readonly RuleCalibrationStats[]): {
-    model?: NonNullable<ScanSummary['arbitration']>['model'];
-} {
-    if (stats.length === 0) return {};
-    const asset = buildConfidenceModelAsset(stats);
-    return {
-        model: {
-            schema: asset.schema,
-            digest: asset.digest,
-            calibratedRuleCount: asset.calibratedRuleCount,
-            observationCount: asset.observationCount,
-        },
-    };
-}
-
-/**
- * Runs the finding arbitration pass and publishes its verdict on the report summary.
- *
- * Before this pass existed the arbiter ran once inside the evolution pass and only two of its
- * fields (`noisyRules`) survived; `gateVerdict`, the tier counts, the blocking count and the
- * executable patches were computed and thrown away. The consequence was that the confidence
- * tiering could not influence anything a consumer saw. Writing the verdict to
- * `report.summary.arbitration` is what makes it reachable from the exit code and from the AAS
- * report, which is the whole point of adjudicating at all.
- *
- * The human review queue is derived from the same `findings` list and its narrowest category
- * supplies `reviewQueueCount`. Deriving the counter rather than recomputing the predicate is what
- * keeps the summary and the emitted file from disagreeing about how much human work exists.
- *
- * The pass is fail-soft: arbitration is advisory metadata, and a reporting failure must never
- * turn a completed scan into a failed one, so a throw is logged and the pass is skipped.
- *
- * @param passContext - Post-scan pass context carrying the report and logger.
- * @param reviewQueuePath - Optional NDJSON path for the human review queue.
- * @param ruleCalibrationStats - Per-rule outcome counts; empty leaves every score self-reported.
- * @returns Nothing; mutates `report.summary.arbitration` and writes the queue when a path is set.
- */
-async function applyArbitrationPass(
-    passContext: PostScanPassContext,
-    reviewQueuePath: string | undefined,
-    ruleCalibrationStats: readonly RuleCalibrationStats[],
-): Promise<void> {
-    const { report, logger } = passContext;
-    try {
-        const arbiter = new FindingConfidenceArbiter(
-            ruleCalibrationStats.length > 0 ? { ruleCalibrationStats } : undefined,
-        );
-        const arbitration = arbiter.arbitrate(report.issues);
-        stampAdjudicatedIssues(arbitration.findings);
-        const advisoryOnlyRules = resolveAdvisoryOnlyRules(arbitration.findings);
-        const ruleTiers = resolveRuleTiers(arbitration.findings);
-        const queueRecords = buildReviewQueue(arbitration.findings);
-        const reviewQueueCount = countNeedsHuman(queueRecords);
-
-        report.summary.arbitration = {
-            totalEvaluated: arbitration.totalEvaluated,
-            prescriptiveCount: arbitration.prescriptiveCount,
-            actionableCount: arbitration.actionableCount,
-            advisoryCount: arbitration.advisoryCount,
-            suppressedCount: arbitration.suppressedCount,
-            prunedBySliceCount: arbitration.prunedBySliceCount,
-            blockingCount: arbitration.blockingCount,
-            gateVerdict: arbitration.gateVerdict,
-            uncalibratedCount: countUncalibrated(arbitration.findings),
-            reviewQueueCount,
-            advisoryOnlyRules,
-            ruleTiers,
-            ...projectModelProvenance(ruleCalibrationStats),
-            ...(arbitration.noisyRules && arbitration.noisyRules.length > 0
-                ? { noisyRules: arbitration.noisyRules }
-                : {}),
-            ...(arbitration.quarantinedRules && arbitration.quarantinedRules.length > 0
-                ? { quarantinedRules: arbitration.quarantinedRules }
-                : {}),
-        };
-
-        let writtenCount = 0;
-        if (reviewQueuePath) {
-            writtenCount = await writeReviewQueue(reviewQueuePath, queueRecords);
-        }
-        logger.info(
-            `${PASS_ARBITRATION}: ${arbitration.prescriptiveCount} prescriptive / ` +
-                `${arbitration.actionableCount} actionable / ${arbitration.advisoryCount} advisory, ` +
-                `${arbitration.blockingCount} blocking, ${writtenCount} queued for review`,
-        );
-    } catch (arbitrationError) {
-        logger.info(`${PASS_ARBITRATION}: degraded (${String(arbitrationError)})`);
-    }
 }
 
 /**
