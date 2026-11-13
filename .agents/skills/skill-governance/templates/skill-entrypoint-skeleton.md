@@ -1,47 +1,43 @@
 ---
 name: sample-domain-workflow
 description: >-
-  <主题领域> 核心设计、接口契约与开发工作流。指导 Agent 在该领域遵循核心规范，
-  完成特性开发、静态审查与质量门禁。
+  【触发：domain/sample/contract/gate/test/review】Standard domain engineering workflow skeleton enforcing architectural boundaries and verification gates.
 ---
 
-# sample-domain-workflow — 示例领域研发与质量规范
+# sample-domain-workflow — Domain Engineering & Quality Contract
 
-本技能规范了 `<主题领域>` 的核心架构原则、分层边界、命名契约与门禁要求。
-
----
-
-## 一、 适用场景与触发条件
-
-在以下任一场景中，必须激活本技能：
-1. **场景 1**：<典型作业场景描述>；
-2. **场景 2**：<典型作业场景描述>；
-3. **场景 3**：<执行特定验证或门禁>。
+Defines core architectural invariants, boundary rules, and gate verification for `<domain>`.
 
 ---
 
-## 二、 核心架构原则与设计红线
+## 1. Activation Scope
 
-1. **原则 1**：<详细说明核心不变式>；
-2. **原则 2**：<详细说明核心依赖流向与数据边界>；
-3. **刚性红线**：严禁 <具体违规操作>。
-
----
-
-## 三、 编码与排版规范
-
-- **单函数圈复杂度**：$\text{CC} \le 15$，嵌套深度 $\text{Depth} \le 4$；
-- **单文件双轨体积**：$\text{ELOC} \le 900 / \text{LOC} \le 1400$；
-- **换行契约**：严格保持 LF 换行（PowerShell 脚本保持 CRLF）。
+Activate when modifying `<domain>` modules, boundary contracts, or gate suites:
+1. **Scenario 1**: `<feature or module change>`;
+2. **Scenario 2**: `<boundary refactor or bugfix>`;
+3. **Scenario 3**: `<gate verification or release check>`.
 
 ---
 
-## 四、 本地构建与验证命令矩阵
+## 2. Core Invariants & Red Lines
+
+1. **Invariant 1**: `<unidirectional dependency or state contract>`;
+2. **Invariant 2**: `<failure handling and resource ownership>`;
+3. **Hard Block**: Never `<forbidden anti-pattern>`.
+
+---
+
+## 3. Complexity & Physical Hygiene
+
+- **Per-function**: $\text{CC} \le 15$, $\text{Depth} \le 4$;
+- **Per-file**: $\text{ELOC} \le 900$ / $\text{LOC} \le 1400$;
+- **EOL**: Strict `LF` (`CRLF` for `.ps1`), UTF-8 no BOM, single trailing newline.
+
+---
+
+## 4. Verification Commands
 
 ```bash
-# 1. 运行领域专属单元测试
 npm run test:fast
-
-# 2. 运行领域静态审查（示例：workspace-timing 的审查入口）
-cd workspace-timing && npm run review
+cd <subproject> && npm run review
 ```

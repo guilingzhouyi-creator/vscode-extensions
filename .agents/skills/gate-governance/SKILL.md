@@ -1,7 +1,7 @@
 ---
 name: gate-governance
 description: >-
-  【触发：门禁/全仓审查/提交门禁/脚本编写/跨平台/pwsh/bash/子进程】编写修改门禁脚本、运行全仓审查或处理跨平台脚本兼容时触发。落实 Tier 1 本地左移流式判定、工作目录隔离契约与零黑话规范。
+  【触发：lint/audit/fail/drift/pwsh/bash/CI/sandbox】Enforce Tier 1/1.5/2 gates, single-pass pre-commit streaming, pwsh/bash cwd isolation, and step-registry closure.
 ---
 
 # gate-governance — Three-Tier Isomorphic Gates & Cross-Platform Script Engineering
@@ -16,9 +16,9 @@ Defines the 3-tier gate architecture (Tier 1 Local Shift-Left $\to$ Tier 1.5 Rem
 > 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
 - **链路**：— → **本技能** → [defensive-security-and-taint-safety](../defensive-security-and-taint-safety/SKILL.md)；并行支援 `coding-craft`、`constraint-driven-development`、`complexity-budget`、`debugging-and-error-recovery`。
-- **领域**：门禁与命令面基础设施（领域入口）；另 3 个领域支援
+- **领域**：Gate & Shell Infrastructure（领域入口）；另 3 个领域支援
 - **协作专员**：原型 `infra-tool`：`infra-construct`、`infra-review`、`infra-refactor`、`infra-explore`、`infra-guardian`
-- **何时联动**：新增门禁步骤并登记语义标识 → `gate-governance` + `rule-catalog-governance` + `test-benchmark-engineering`；pwsh 与 bash 门禁语义漂移 → `gate-governance` + `coding-craft` + `debugging-and-error-recovery`
+- **何时联动**：Add gate step and register step/rule IDs → `gate-governance` + `rule-catalog-governance` + `test-benchmark-engineering`；PowerShell and Bash gate semantics diverge → `gate-governance` + `coding-craft` + `debugging-and-error-recovery`
 <!-- SKILL-LINKS:END -->
 
 ## 1. Three-Tier Isomorphic Gate Architecture
@@ -52,10 +52,10 @@ Defines the 3-tier gate architecture (Tier 1 Local Shift-Left $\to$ Tier 1.5 Rem
 
 `git diff --cached --name-only` maps staged paths to 5 controlled domains:
 - `workspace-timing/**` $\to$ `npm run compile && npm run test:fast && npm run review`
-- `auto-refactor/**` $\to$ <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count --> experts & <!-- METRICS:BEGIN rule-auto-refactor -->**377 条规则**<!-- METRICS:END rule-auto-refactor --> self-audit (`npm run gate && npm test`)
+- `auto-refactor/**` $\to$ <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count --> experts & <!-- METRICS:BEGIN rule-auto-refactor -->**377 条规则**<!-- METRICS:END rule-auto-refactor --> self-audit (`npm run build && npm run gate && npm run test:no-build`)
 - `WebGames/**` $\to$ `check-gdscript.sh`, `test-run.ps1`, config parity audit
 - `fractal-git/**` $\to$ `cargo clippy --all-targets -- -D warnings`, `cargo test`, `audit-taxis.ps1`
-- `scripts/**` / `.github/**` / `AGENTS.md` / `.agents/**` $\to$ `governance` domain (`audit-all.ps1`, `validate-skills.js`)
+- `scripts/**` / `.github/**` / `AGENTS.md` / `.agents/**` $\to$ `governance` domain (`audit-all.ps1`, `validate-skills.js`, `validate-branch-governance.js`)
 - Gate script discovery scans `scripts/`, `tools/`, `gate/`, `gates/` with `maxDepth = 2`.
 
 ---

@@ -1,22 +1,22 @@
-<type>(<scope>): <祈使句中文摘要标题，15~80 字符，描述 10~70 字符，半角冒号加空格，结尾不加句号>
+<type>(<scope>): <imperative summary, 15~80 chars total, subject 10~70 chars, ASCII ': ', no period>
 
 [Project]
 - <workspace-timing | auto-refactor | WebGames | fractal-git | governance>
 
 [Why]
-- 阐明修改的技术背景、需求动因或解决的核心痛点。说明为什么必须做此项变更（实质内容不少于 15 字符）。
+- State technical motivation and constraint resolved (>= 15 non-whitespace chars).
 
 [Added]
-- 新增的文件、模块、接口、类型契约或测试用例。（feat 提交必填，每项不少于 8 字符，无新增可省略）
+- New modules, interfaces, types, or tests (required for feat; >= 8 chars per bullet).
 
 [Changed]
-- 调整的现有逻辑、重构的方法实现、依赖调整或参数变更。（refactor/perf 提交必填，每项不少于 8 字符，无调整可省略）
+- Adjusted logic, simplified flows, dependency/parameter updates (required for refactor/perf).
 
 [Fixed]
-- 修复的异常、崩溃、竞态条件、边界失效或回归缺陷。（fix 提交必填，实质内容不少于 12 字符，无修复可省略）
+- Resolved defect, race condition, boundary failure, or crash path (required for fix; >= 12 chars).
 
 [Breaking Changes]
-- 破坏性变更的升级说明与迁移适配指南。（标题带 ! 提交必填，每项不少于 8 字符，无破坏性变更可省略）
+- Public API breaking shifts and migration guidance (required for `!`; >= 8 chars per bullet).
 
 [Verification]
-- 说明本地执行的验证命令与质性技术断言事实（实质内容不少于 12 字符）。严禁程序化套话（CMG-STY-005）与任何执行数字、耗时、统计量词或百分比流水账（CMG-STY-006）。
+- Qualitative behavioral assertions from local gate checks (>= 12 chars); zero exit codes (CMG-STY-005) or run counts/timings (CMG-STY-006).

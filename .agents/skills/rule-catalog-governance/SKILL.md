@@ -1,7 +1,7 @@
 ---
 name: rule-catalog-governance
 description: >-
-  【触发：新增规则/修改规则/SSOT/规则目录/规则登记/规则漂移/命名拓扑】增删改规则 ID、治理跨项目规则元数据或维护单源规则目录时触发。看守 3-3-3 命名拓扑与 RCFG-RULE-DRIFT 防虚构闭包。
+  【触发：sync/audit/drift/ghost/SSOT/rules/family/metrics】Maintain single-source rule-catalog.json (536 rules), 3-3-3 IDs, family taxonomy, and RCFG-RULE-DRIFT closure.
 ---
 
 # rule-catalog-governance — Single-Source Rule Catalog (SSOT) & Meta-Governance
@@ -16,9 +16,9 @@ Governs `scripts/common/rule-catalog.json` (SSOT), the 3-3-3 naming topology, th
 > 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
 - **链路**：[skill-governance](../skill-governance/SKILL.md) → **本技能** → [docs-archive-governance](../docs-archive-governance/SKILL.md)；并行支援 `coding-craft`、`constraint-driven-development`、`complexity-budget`、`debugging-and-error-recovery`。
-- **领域**：技能与规则元治理（链上第 2 步）；另 3 个领域支援
+- **领域**：Skill & Rule Meta-Governance（链上第 2 步）；另 3 个领域支援
 - **协作专员**：原型 `skill-governance`：`skill-construct`、`skill-review`、`skill-refactor`
-- **何时联动**：新增规则标识并闭合登记 → `rule-catalog-governance` + `skill-governance` + `gate-governance`；新增分析器或规则 → `auto-refactor-dev` + `sparse-moe-and-ast-routing` + `rule-catalog-governance` + `test-benchmark-engineering`
+- **何时联动**：Register rule IDs and verify bidirectional SSOT closure → `rule-catalog-governance` + `skill-governance` + `gate-governance`；Add analyzer or rule and register SSOT metadata → `auto-refactor-dev` + `sparse-moe-and-ast-routing` + `rule-catalog-governance` + `test-benchmark-engineering`
 <!-- SKILL-LINKS:END -->
 
 ## 1. Single-Source Rule Catalog (`scripts/common/rule-catalog.json`)

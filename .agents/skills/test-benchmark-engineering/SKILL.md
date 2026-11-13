@@ -1,7 +1,7 @@
 ---
 name: test-benchmark-engineering
 description: >-
-  【触发：写单测/TDD/红绿测试/基准测试/性能回归/耗时棘轮/孤儿用例】编写单元测试、性能压测或实行 TDD 时必须使用。先写失败用例，隔离确定性时钟与伪随机种子，看守单调耗时预算与零孤儿用例。
+  【触发：test/bench/flaky/orphan/TDD/clock/seed/OnceLock】Enforce red-green TDD, deterministic clocks/seeds, suite-manifest closure, and monotonic benchmark ratchets.
 ---
 
 # test-benchmark-engineering — TDD Red-Green-Refactor, Deterministic Isolation & Benchmark Ratchets
@@ -16,9 +16,9 @@ Unifies **Red-Green-Refactor TDD**, **deterministic clock/PRNG/sandbox isolation
 > 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
 - **链路**：[algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md)、[telemetry-statistical-modeling](../telemetry-statistical-modeling/SKILL.md)、[interaction-design-physics](../interaction-design-physics/SKILL.md)、[coding-craft](../coding-craft/SKILL.md) → **本技能** → [release-package-workflow](../release-package-workflow/SKILL.md)；并行支援 `constraint-driven-development`、`debugging-and-error-recovery`、`complexity-budget`、`spec-driven-development`。
-- **领域**：分形版本控制内核（链上第 5 步）；另 1 个领域支援；其余 4 条领域链见 `docs/skill-catalog.md`
+- **领域**：Fractal-Git Kernel（链上第 6 步）；另 1 个领域支援；其余 4 条领域链见 `docs/skill-catalog.md`
 - **协作专员**：原型 `git-kernel`：`fg-construct`、`fg-review`、`fg-refactor`、`fg-explore`
-- **何时联动**：新增或修改 taxis 子命令 → `fractal-git-dev` + `rust-engineering` + `test-benchmark-engineering`；新增分析器或规则 → `auto-refactor-dev` + `sparse-moe-and-ast-routing` + `rule-catalog-governance` + `test-benchmark-engineering`
+- **何时联动**：Add or update taxis CLI subcommands and plumbing → `fractal-git-dev` + `rust-engineering` + `test-benchmark-engineering`；Persistent daemon IPC, blackboard leases, or quarantine replay → `taxis-daemon-and-agent-control` + `state-concurrency-and-crash-recovery` + `test-benchmark-engineering`
 <!-- SKILL-LINKS:END -->
 
 ## 1. Red-Green-Refactor Loop & Deterministic Isolation

@@ -1,24 +1,24 @@
-# {案卷标题}（第{NN}卷：{核心主题}）
+# {Dossier Title} (Vol. {NN}: {Core Topic})
 
-> 档号: KALAR-DEV-2026-VOL{NN}-{TOPIC}  
-> 验收状态: PASS / LOCKED  
-> 归档时间: 2026-10-06  
-> 密级: 内部技术档案（只读存证，严禁擅自修改已验收历史断言）  
+> Record ID: KALAR-DEV-2026-VOL{NN}-{TOPIC}  
+> Status: PASS / LOCKED  
+> Archived: 2026-10-06  
+> Classification: Read-only engineering record (never alter accepted historical assertions)  
 
 ---
 
-## 档案元数据概要
+## Archive Metadata
 
-| 元数据字段 | 取值与登记内容 |
+| Field | Value |
 | :--- | :--- |
-| **主责实体** | 架构治理组 / 核心引擎组 |
-| **归档主题** | {技术领域与演进主题} |
-| **验收结论** | 全量回归测试矩阵 100% 通过（PASS） |
-| **真源交付物指针** | `archive/deliverables/YYYY-MM-DD_{title}.md` |
-| **只读不可变性声明** | 本文件为已验收客观历史事实，任何静态分析或规则调整不得篡改本文件内容 |
+| **Owner** | Architecture Governance / Core Engine |
+| **Topic** | {Technical Domain & Evolution Scope} |
+| **Verdict** | Full regression matrix PASS |
+| **Source Deliverable** | `archive/deliverables/YYYY-MM-DD_{title}.md` |
+| **Immutability Contract** | Sealed factual record; rule or linter refactors must not mutate historical facts |
 
 ---
 
-## 一、 交付物正文概述
+## 1. Deliverable Summary
 
-在此处展开已固化的客观交付物与架构决议内容...
+Document locked architectural decisions and verified behavioral guarantees here...

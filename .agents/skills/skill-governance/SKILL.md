@@ -1,12 +1,12 @@
 ---
 name: skill-governance
 description: >-
-  【触发：编写技能/新增skill/技能治理/同构同步/双目录同步/四件套/JIT披露】创建、修改技能、维护四件套结构(SKILL/references/templates/scripts)或同步双目录字节等价时触发。贯彻 JIT 渐进披露与 50~200 字描述契约。
+  【触发：author/sync/bloat/orphan/skills/JIT/catalog/mirror】Govern 4-part skill layout, registry triggers, JIT progressive disclosure, and 100% plugin bundle mirror parity.
 ---
 
 # skill-governance — Engineering Skill Architecture, JIT Disclosure & Mirror Parity
 
-Governs the 4-part physical layout, YAML frontmatter contract, JIT progressive disclosure, and 100% byte-identical dual-directory synchronization across all <!-- METRICS:BEGIN skill-count -->**27 项**<!-- METRICS:END skill-count --> workspace skills (comprising <!-- METRICS:BEGIN skill-doc-count -->**73 篇**<!-- METRICS:END skill-doc-count --> Markdown documents).
+Governs the 4-part physical layout, YAML frontmatter contract, JIT progressive disclosure, and 100% byte-identical dual-directory synchronization across all <!-- METRICS:BEGIN skill-count -->**28 项**<!-- METRICS:END skill-count --> workspace skills (comprising <!-- METRICS:BEGIN skill-doc-count -->**75 篇**<!-- METRICS:END skill-doc-count --> Markdown documents).
 
 ---
 
@@ -16,20 +16,20 @@ Governs the 4-part physical layout, YAML frontmatter contract, JIT progressive d
 > 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
 - **链路**：— → **本技能** → [rule-catalog-governance](../rule-catalog-governance/SKILL.md)；并行支援 `coding-craft`、`complexity-budget`、`constraint-driven-development`、`batch-commit`。
-- **领域**：技能与规则元治理（领域入口）
+- **领域**：Skill & Rule Meta-Governance（领域入口）
 - **协作专员**：原型 `skill-governance`：`skill-construct`、`skill-review`、`skill-refactor`
-- **何时联动**：新增技能或改技能描述 → `skill-governance` + `docs-archive-governance` + `batch-commit`；新增规则标识并闭合登记 → `rule-catalog-governance` + `skill-governance` + `gate-governance`
+- **何时联动**：Add or optimize skills, JIT references, and mirror parity → `skill-governance` + `docs-archive-governance` + `batch-commit`；Register rule IDs and verify bidirectional SSOT closure → `rule-catalog-governance` + `skill-governance` + `gate-governance`
 <!-- SKILL-LINKS:END -->
 
 ## 1. Three-Layer Orthogonal Skill Topology & Four-Part Layout
 
-The <!-- METRICS:BEGIN skill-count -->**27 项**<!-- METRICS:END skill-count --> skills partition into three orthogonal layers (never duplicate Layer 1/2 axioms inside Layer 3 domain skills):
+The <!-- METRICS:BEGIN skill-count -->**28 项**<!-- METRICS:END skill-count --> skills partition into three orthogonal layers (never duplicate Layer 1/2 axioms inside Layer 3 domain skills):
 
 | Layer | Scope | Member Skills | Contract |
 | :--- | :--- | :--- | :--- |
 | **Layer 1: Universal Methodology** (12) | Cross-language craft, algorithms, caching, concurrency & UI physics | `algorithmic-operator-engineering`, `coding-craft`, `complexity-budget`, `constraint-driven-development`, `debugging-and-error-recovery`, `defensive-security-and-taint-safety`, `facade-discipline`, `interaction-design-physics`, `spec-driven-development`, `state-concurrency-and-crash-recovery`, `telemetry-statistical-modeling`, `tiered-cache-and-wal-persistence` | Language-agnostic engineering/math invariants; zero project-specific path hardcoding |
 | **Layer 2: Workspace Governance** (8) | Isomorphic gates, SSOT catalogs & multi-agent orchestration | `batch-commit`, `docs-archive-governance`, `gate-governance`, `release-package-workflow`, `rule-catalog-governance`, `skill-governance`, `subagent-orchestration`, `test-benchmark-engineering` | Bound directly to `AGENTS.md`, `rule-catalog.json`, `doc-metrics.json`, and `subagent-catalog.json` |
-| **Layer 3: Domain Adapters** (7) | Subsystem architectures & language-specific toolchains | `auto-refactor-dev`, `sparse-moe-and-ast-routing`, `praxis-vfs-and-trajectory-learning`, `workspace-timing-dev`, `webgames-workflow`, `fractal-git-dev`, `rust-engineering` | Subsystem boundaries and workflows; delegates generic complexity/facade/gate rules to Layers 1–2 |
+| **Layer 3: Domain Adapters** (8) | Subsystem architectures & language-specific toolchains | `auto-refactor-dev`, `sparse-moe-and-ast-routing`, `praxis-vfs-and-trajectory-learning`, `workspace-timing-dev`, `webgames-workflow`, `fractal-git-dev`, `taxis-daemon-and-agent-control`, `rust-engineering` | Subsystem boundaries and workflows; delegates generic complexity/facade/gate rules to Layers 1–2 |
 
 Each skill under `.agents/skills/<skill-name>/` follows the 4-part layout:
 ```text

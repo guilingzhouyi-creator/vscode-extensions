@@ -1,24 +1,22 @@
-# 扩展注册表冲突自愈原理与面向用户变更日志编写指南
+# Extension Registry Self-Healing & End-User Changelog Guide
 
-本指南涵盖 `-HotSync` 本地扩展注册表（`extensions.json`）幽灵条目自愈机制，以及终端产品 `CHANGELOG.md` 的用户价值转化方法。
-
----
-
-## 一、 宿主扩展注册表幽灵条目自愈 (`Repair-ExtensionRegistry`)
-
-1. **故障成因**：本地多次打包、版本号升级或手动删除旧版扩展目录后，VS Code / Cursor 的 `~/.vscode/extensions/extensions.json` 仍保留指向已删除目录的 `relativeLocation` 指针，导致新版本被遮蔽、命令报错 `command not found` 或状态栏图标消失；
-2. **三步自愈流水线**：
-   - 解析宿主 `extensions.json` 数组；
-   - 对每条记录拼接物理路径并校验目录及 `package.json` 是否真实存在；
-   - 过滤失效幽灵条目，按 UTF-8 无 BOM 格式原子写回注册表，随后将最新构建产物同步至目标版本目录。
+Details `-HotSync` extension registry repair (`extensions.json`) and end-user translation of internal engineering changes.
 
 ---
 
-## 二、 面向终端用户的变更日志（Keep-a-Changelog）转化对照
+## 1. Self-Healing Host Extension Registry (`Repair-ExtensionRegistry`)
 
-1. **内部工程表述 $\to$ 终端用户收益转化表**：
-   - ❌ `重构 TimeAggregator.ts 消除循环内瞬态堆分配，ELOC 降至 450 行`
-   - ✅ `显著优化长周期统计数据的加载计算性能，大型工作区秒级渲染`
-   - ❌ `修复 L3-HARDCODE 门禁报错，将中文提取至 zh-CN.ts 字典`
-   - ✅ `完善状态栏与仪表板界面的多语言本地化翻译，中英文切换更加自然`
-2. **六大标准语义分组**：`Added`（新特性）、`Changed`（交互或性能优化）、`Deprecated`（弃用预告）、`Removed`（移除旧特性）、`Fixed`（用户可见缺陷修复）、`Security`（本地落盘防丢与权限加固）。
+1. **Failure Mode**: Repeated local packaging or manual folder removal leaves dangling `relativeLocation` pointers in `~/.vscode/extensions/extensions.json`, shadowing new installs and breaking commands/icons.
+2. **Three-Step Repair**: Parse `extensions.json`, validate each entry's directory + `package.json` on disk, drop phantom entries, write atomically as UTF-8 no BOM, and sync the latest build artifact into the versioned directory.
+
+---
+
+## 2. End-User Changelog Translation (Keep-a-Changelog)
+
+Translate internal rules/budgets into observable user benefits:
+- Reject: `"Refactored TimeAggregator.ts to remove loop heap allocs and cut ELOC to 450"`
+- Accept: `"Significantly faster dashboard rendering and aggregation across large workspaces"`
+- Reject: `"Fixed L3-HARDCODE violation by extracting Chinese labels to zh-CN.ts"`
+- Accept: `"Completed bilingual English/Simplified Chinese localization across status bar and dashboard views"`
+
+Use standard Keep-a-Changelog groups only: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`.

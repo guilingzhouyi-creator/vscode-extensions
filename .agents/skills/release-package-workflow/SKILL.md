@@ -1,7 +1,7 @@
 ---
 name: release-package-workflow
 description: >-
-  【触发：打包/发布/vsix/HotSync/版本号/发版日志/热同步】打包 VS Code 扩展、执行 -HotSync 热同步或编写 Keep-a-Changelog 发版日志时触发。确保产物自动轮转与用户文档零工程黑话。
+  【触发：pack/release/bump/broken/vsix/HotSync/semver/dist】Build VSIX bundles, run -HotSync rotation, bump semver cleanly, and align Keep-a-Changelog user release notes.
 ---
 
 # release-package-workflow — User-Facing Docs, VSIX Packaging, HotSync & Release Tagging
@@ -16,9 +16,9 @@ Unifies **user-facing documentation isolation (`README.md` / `CHANGELOG.md` zero
 > 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
 - **链路**：[test-benchmark-engineering](../test-benchmark-engineering/SKILL.md)、[docs-archive-governance](../docs-archive-governance/SKILL.md) → **本技能** → —；并行支援 `coding-craft`、`constraint-driven-development`、`debugging-and-error-recovery`、`gate-governance`。
-- **领域**：VS Code 扩展与计时视图（链上第 5 步）；其余 2 条领域链见 `docs/skill-catalog.md`
+- **领域**：VS Code Timing Extension（链上第 5 步）；其余 2 条领域链见 `docs/skill-catalog.md`
 - **协作专员**：原型 `vs-extension`：`wt-construct`、`wt-review`、`wt-refactor`、`wt-explore`
-- **何时联动**：打包 vsix 并热同步 → `release-package-workflow` + `workspace-timing-dev` + `gate-governance`；发版日志与版本号对齐 → `release-package-workflow` + `docs-archive-governance` + `batch-commit`
+- **何时联动**：Package vsix and run HotSync with changelog alignment → `release-package-workflow` + `workspace-timing-dev` + `gate-governance`；Align version bumps, changelogs, and milestone archives → `release-package-workflow` + `docs-archive-governance` + `batch-commit`
 <!-- SKILL-LINKS:END -->
 
 ## 1. User-Facing Documentation Isolation (`DOC-RD-001` / `DOC-CL-001`)

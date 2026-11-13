@@ -1,7 +1,7 @@
 ---
 name: docs-archive-governance
 description: >-
-  【触发：文档归档/蓝图/架构演进/README/归档清单/死链/案卷封存】编写、修改顶层架构蓝图、交付物归档、案卷封存或全宗技术档案时触发。维护 agent-native-system-blueprint 与纯正面向用户标准。
+  【触发：archive/write/stale/dead/README/link/docs/specs】Maintain blueprints, milestone archives, and end-user READMEs with live relative links and zero jargon.
 ---
 
 # docs-archive-governance — Blueprint Evolution, Read-Only Archives & Link Hygiene
@@ -16,9 +16,9 @@ Governs the autonomous system blueprint (`docs/agent-native-system-blueprint.md`
 > 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
 - **链路**：[rule-catalog-governance](../rule-catalog-governance/SKILL.md)、[constraint-driven-development](../constraint-driven-development/SKILL.md) → **本技能** → [batch-commit](../batch-commit/SKILL.md)、[release-package-workflow](../release-package-workflow/SKILL.md)；并行支援 `coding-craft`、`gate-governance`、`complexity-budget`、`debugging-and-error-recovery`。
-- **领域**：技能与规则元治理（链上第 3 步）；另 1 个领域支援；其余 1 条领域链见 `docs/skill-catalog.md`
+- **领域**：Skill & Rule Meta-Governance（链上第 3 步）；另 1 个领域支援；其余 1 条领域链见 `docs/skill-catalog.md`
 - **协作专员**：原型 `skill-governance`：`skill-construct`、`skill-review`、`skill-refactor`
-- **何时联动**：新增技能或改技能描述 → `skill-governance` + `docs-archive-governance` + `batch-commit`；发版日志与版本号对齐 → `release-package-workflow` + `docs-archive-governance` + `batch-commit`
+- **何时联动**：Add or optimize skills, JIT references, and mirror parity → `skill-governance` + `docs-archive-governance` + `batch-commit`；Align version bumps, changelogs, and milestone archives → `release-package-workflow` + `docs-archive-governance` + `batch-commit`
 <!-- SKILL-LINKS:END -->
 
 ## 1. System Blueprint Evolution (`docs/agent-native-system-blueprint.md`)
@@ -35,10 +35,10 @@ Governs the autonomous system blueprint (`docs/agent-native-system-blueprint.md`
    ```markdown
    # {Dossier Title}
 
-   > 档号: KALAR-DEV-YYYY-ST{NN}-{PPP}
-   > 验收状态: PASS / LOCKED
-   > 归档时间: YYYY-MM-DD
-   > 密级: 内部技术档案（只读存证，严禁擅自修改已验收历史断言）
+   > Record ID: KALAR-DEV-YYYY-ST{NN}-{PPP}
+   > Status: PASS / LOCKED
+   > Archived: YYYY-MM-DD
+   > Classification: Internal technical record (read-only evidence; never mutate accepted assertions)
    ```
 3. **4-Stage Design Dossier Layout**: Active feature/refactoring plan directories must contain only the 4 canonical files (`阶段1_上下文分析与影响面评估.md`, `阶段2_架构拓扑与接口契约设计.md`, `阶段3_原子施工与分步实施路线.md`, `阶段4_全量验证与回归测试断言.md`) with zero ad-hoc scratch files.
 

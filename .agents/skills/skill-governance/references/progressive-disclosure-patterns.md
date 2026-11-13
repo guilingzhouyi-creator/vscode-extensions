@@ -1,48 +1,27 @@
-# 技能 JIT 渐进式披露设计模式与架构规范
+# JIT Progressive Disclosure Patterns for Agent Skills
 
-> 档号: KALAR-DEV-SKILL-REF-001  
-> 主题: Agent 技能 JIT 渐进式披露分层设计准则  
-> 状态: PASS / LOCKED  
+## 1. Why JIT Progressive Disclosure Matters
 
----
+Context budget directly limits multi-agent instruction accuracy:
+1. **Attention Dilution**: Monolithic >500-line skill files bury rigid invariants and verification steps.
+2. **Concurrent Activation Overhead**: Tasks frequently activate 3–5 skills simultaneously; bloated prose crowds out source files.
+3. **Cognitive Layering**: Agents need scope, non-negotiable red lines, and verification commands upfront; algorithms and scaffolds load strictly on demand.
 
-## 一、 为什么需要 JIT 渐进式披露？
+## 2. Three-Tier Physical Layout
 
-在大型多智能体（Multi-Agent）与大模型辅助研发体系中，上下文窗口（Context Window）不仅是计算成本考量，更是模型注意力聚焦与指令遵循精度的核心制约瓶颈：
-1. **注意力分散风险**：若单个技能文件篇幅超过 500 行，模型在解析目标指令时容易迷失在海量细节中；
-2. **多技能并发开销**：当一个任务同时激活 3~5 项技能时，扁平超长文档将迅速撑满上下文，挤压真实代码的分析空间；
-3. **分层认知模型**：Agent 在初始调度时仅需知道“这个技能负责什么”、“有哪些绝对红线”与“如何验证”；只有在深入实施具体编码或算法时，才需要展开特定参考与样板代码。
-
----
-
-## 二、 三层渐进披露物理结构
-
-```
-[Level 1: 快速决策层]  SKILL.md (100~300 行)
-       │
-       ├─► 适用场景、触发条件与一票否决红线
-       ├─► 核心公理速查矩阵
-       └─► 必须执行的验证命令
-       │
-[Level 2: 深入规范层]  references/*.md (按需查阅)
-       │
-       ├─► 跨平台子进程隔离机制细节
-       ├─► 算法数学模型与边界证明
-       └─► 历史技术背景与方案演进
-       │
-[Level 3: 代码样板层]  templates/*.* (开箱即用)
-       │
-       ├─► 模块头部六字段 JSDoc 模板
-       ├─► 符合 AST 预算的平铺控制流样板
-       └─► 测试用例脚手架
+```text
+[Level 1: Fast Decision Entry]  SKILL.md (50~200 target, <= 300 lines)
+  ├─ Scope, triggers, rigid axioms & quick-reference matrix
+  └─ Verification commands & JIT links to Level 2/3
+[Level 2: Deep Specs on Demand] references/*.md
+  ├─ Platform isolation mechanics, formal proofs & rule taxonomies
+[Level 3: Ready-to-Use Scaffolds] templates/*.*
+  └─ Compliant code/config/spec templates (CC <= 15, Depth <= 4)
 ```
 
----
+## 3. Authoring Checklist
 
-## 三、 文档编写自查清单
-
-在向技能库提交新增或修订内容时，对照以下清单核实：
-1. **入口精简**：`SKILL.md` 中是否包含超过 30 行的代码块？如果是，应将代码抽离至 `templates/`；
-2. **指针有效**：所有涉及深层细节的章节，是否均提供了指向 `references/` 的有效相对链接；
-3. **零空链接**：每个相对链接的目标文件在磁盘上必须真实存在，无 404 悬空链接；
-4. **命名一致**：所有文件命名统一遵循 `kebab-case`。
+1. **Lean Entrypoint**: Move code blocks >30 lines into `templates/` and exhaustive specs into `references/`.
+2. **Active Linking**: Link every file under `references/`, `templates/`, and `scripts/` from a `.md` doc inside the skill (zero orphan assets).
+3. **Relative Links Only**: Verify targets exist on disk (`DOC-LNK-001`); never use drive letters or local file URI prefixes (`HC-ABS-PATH`).
+4. **Uniform Naming**: Keep all skill folders and markdown/script filenames in `kebab-case`.

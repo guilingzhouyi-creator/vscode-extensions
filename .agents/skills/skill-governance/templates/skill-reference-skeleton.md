@@ -1,31 +1,19 @@
-# {主题名称} 架构与实施深度指南
+# {Topic Title} Deep Architecture & Implementation Reference
 
-> 档号: KALAR-DEV-{THEME}-001  
-> 主题: {具体技术子主题描述}  
-> 状态: PASS / LOCKED  
+## 1. Context & Design Motivation
 
----
+Explain the root constraint, failure hazard, or scaling bottleneck addressed by this specification.
 
-## 一、 技术背景与设计动机
+## 2. Core Algorithm & Invariant Bounds
 
-阐述该技术方案的产生背景、解决的核心痛点以及架构考量...
+State formal preconditions, time/space complexity bounds, and state-transition invariants.
 
----
+## 3. Anti-Patterns & Refactoring Targets
 
-## 二、 核心算法与不变式约束
-
-详细推导核心算法步骤、时空复杂度边界、以及前置不变式...
-
----
-
-## 三、 反模式与重构指引
-
-| 反模式特征 | 潜在风险 | 推荐重构范式 |
+| Anti-Pattern | Failure Risk | Compliant Alternative |
 | :--- | :--- | :--- |
-| 示例反模式 | 内存泄漏或死锁 | 采用不可变数据流与纯函数 |
+| `<anti-pattern>` | Leak, race, or silent corruption | Bounded state machine / pure transform |
 
----
+## 4. Cross-Platform Portability
 
-## 四、 跨平台兼容性考量
-
-说明在 Windows (PowerShell) 与 Linux/macOS (Bash) 下的实现差异与防御保障...
+Document Windows (`pwsh`) and Linux/macOS (`bash`) semantic differences and fail-closed guards.

@@ -1,74 +1,49 @@
-# 提交说明六大禁词与正向技术事实转换词典
+# Commit Message Forbidden Terms & Objective Conversion Guide
 
-依据 `scripts/common/commit-msg-forbidden-terms.json` 与 `validate-commit-msg.js`，提交说明必须保持纯粹客观、高内聚的技术事实陈述。以下六类表达在提交说明中被刚性拦截：
+Based on `scripts/common/commit-msg-forbidden-terms.json` and `validate-commit-msg.js`, commit messages must present strictly objective, high-cohesion technical facts.
 
 ---
 
-## 一、 六大禁词规则判定矩阵
+## 1. Forbidden Style Rules Matrix
 
-| 规则 ID | 违规类别 | 常见拦截模式 / 关键词 | 违规根因分析 | 正向技术事实重构范式 |
+| Rule ID | Category | Blocked Examples | Root Cause | Objective Replacement Pattern |
 | :--- | :--- | :--- | :--- | :--- |
-| **`CMG-STY-001`** | 临时与敷衍用语 | `临时`, `暂存`, `凑合`, `随便`, `先这样`, `wip`, `temp`, `hack`, `quickfix` | 模糊技术边界，掩盖未决状态 | 精确说明当前改动的技术边界与前置假定，如：“实现基础分支调度，暂未支持异步流” |
-| **`CMG-STY-002`** | 过度肯定与夸大 | `绝对`, `彻底`, `完美`, `极致`, `终极`, `100%`, `工业级`, `顶尖`, `规则金字塔` | 主观注水，缺乏可信度量支持 | 陈述具体落地实现与客观保障，如：“补齐类型断言与未捕获异常防御分支” |
-| **`CMG-STY-003`** | 过度否定与贬损 | `垃圾`, `稀烂`, `恶心`, `蠢`, `笨拙`, `毫无价值`, `糟透` | 情绪化宣泄，缺乏技术事实 | 客观陈述前序缺陷与复杂度特征，如：“原实现存在 $O(n^2)$ 嵌套循环与高频堆分配” |
-| **`CMG-STY-004`** | 风格元叙事口号 | `调整语调为低调中肯`, `移除宣扬性词汇`, `优化文档表述` | 描述修辞意图而非实际代码/文档改动 | 陈述具体修改的文字与章节事实，如：“更新 README 第四节关于对象池容量的说明” |
-| **`CMG-STY-005`** | 程序化流水账 | `退出码0`, `返回0`, `各项检查通过`, `双端返回0`, `自动化门禁绿色` | 将运行环境瞬态返回值充作验证事实 | 陈述功能逻辑断言事实，如：“断言暂存区无物理空文件且各行号平移对齐” |
-| **`CMG-STY-006`** | 执行数字与量词 | `通过146套测试`, `耗时50.8s`, `覆盖419个文件`, `达标98%`, `通过率100%` | 脆弱易脆的统计数字，无质性契约内涵 | 提炼为输入输出质性技术断言，如：“断言边界空值输入下平铺返回默认安全快照” |
+| **`CMG-STY-001`** | Perfunctory / WIP prose | `wip`, `temp`, `hack`, `quickfix`, casual placeholders | Masks unfinished boundaries | State exact scope & precondition: `"Implement basic branch dispatch; async streaming excluded"` |
+| **`CMG-STY-002`** | Exaggerated claims | `100%`, `perfect`, `ultimate`, `industrial-grade`, hype labels | Subjective inflation | State concrete guarantees: `"Add type guards and explicit error propagation"` |
+| **`CMG-STY-003`** | Pejorative remarks | Abusive/dismissive phrasing about prior code | Non-technical emotion | Describe structural flaws: `"Eliminate O(n^2) nested scan and transient loop allocs"` |
+| **`CMG-STY-004`** | Style meta-prose | Claims about rewriting tone or removing hype | Describes editing style, not code | State concrete text change: `"Update object-pool capacity bounds in README §4"` |
+| **`CMG-STY-005`** | Procedural exit dumps | `exit code 0`, `returned 0`, `all checks green` | Transient runtime exit status | State qualitative assertion: `"Assert zero blank files and aligned line offsets"` |
+| **`CMG-STY-006`** | Ephemeral run counts | `146 tests passed`, `took 50.8s`, `covered 419 files` | Fragile point-in-time metrics | State input/output invariant: `"Assert empty snapshot returns default safe baseline"` |
 
 ---
 
-## 二、 `[Verification]` 质性断言重构指引
+## 2. Qualitative `[Verification]` Standard
 
-在 `[Verification]` 区块中，严禁出现程序化流水账（`CMG-STY-005`）与执行数字量词（`CMG-STY-006`）。必须遵循“输入 - 预期逻辑 - 输出结果”的**质性技术断言**原则：
-
-### 反面模式 (Anti-patterns)：
-- ❌ `pwsh pre-commit-gate.ps1 退出码0`（违规：CMG-STY-005 程序化流水账）
-- ❌ `运行 npm test，通过 243 个测试用例，耗时 3.2s`（违规：CMG-STY-006 统计数字与耗时流水账）
-- ❌ `所有门禁检查 100% 绿色通行`（违规：CMG-STY-002 夸大 + CMG-STY-006 百分比）
-
-### 正向范式 (Best Practices)：
-- ✅ `运行 commit-msg-gate 离线预审，断言结构化区块完整且无黑话代号。`
-- ✅ `运行 auto-refactor 单元测试套件，断言各分析器在边界畸形代码输入下均能稳定产出预期诊断。`
-- ✅ `运行 pre-commit-gate 预审，断言暂存区文件严格满足 LF 换行契约且 AST 切片局部复杂度在包络内。`
+Never place exit codes (`CMG-STY-005`) or run counts/timings (`CMG-STY-006`) inside `[Verification]`. State **input -> invariant -> asserted outcome**:
+- Reject: `pwsh pre-commit-gate.ps1 exit code 0` / `npm test passed 243 cases in 3.2s`
+- Accept: `Run auto-refactor test suite and verify malformed inputs emit deterministic AST diagnostics.`
+- Accept: `Run pre-commit gate and assert staged files enforce LF endings and slice CC bounds.`
 
 ---
 
-## 三、 施工批次代号清理与业务价值转化
+## 3. Ban Sprint Codenames & Enforce Rule Closure (`RCFG-RULE-DRIFT`, `CMG-STY-007`)
 
-全仓严禁在提交信息、代码注释或文件路径中使用阶段性施工批次代号（如 `p[0-9]+`、`phase[0-9]+`、`st[0-9]+`、`temp`、`new`、`wip` 等）：
+- Never use sprint/phase/wip tags (`p1`, `phase2`, `st03`, `temp`, `new-*`, `wip`) in messages, comments, or paths; convert them to domain nouns (`RingBuffer persistence`, `facade decoupling`).
+- Every rule ID cited in a commit body must already exist in `scripts/common/rule-catalog.json`.
 
-| 历史黑话 / 施工代号 | 违规根因 | 正向技术事实转化 |
+---
+
+## 4. Pronoun & Word-Boundary Guard (`CMG-STY-008`)
+
+Commit gates block first-person pronouns (`I`, `we`, `my`, `our`) via word-boundary regexes. Write imperative headers/bullets (`Add...`, `Fix...`, `Refactor...`) and write `"disk read/write"` or `"stream operations"` rather than `"I/O"` where standalone `I` could trigger boundary matching.
+
+---
+
+## 5. Type-to-Section Binding (`GUARD-MSG-001`)
+
+| Commit `<type>` | Mandatory Body Section | Expected Contract |
 | :--- | :--- | :--- |
-| `st03/phase2` | 内部施工进度代号，脱离上下文无法理解 | 转化为业务/架构功能名称，如：“卡牌抽取逻辑”或“RingBuffer 环形缓冲持久化” |
-| `p1-cleanup` | 批次代号，无技术内涵 | 转化为重构实质，如：“消融单行跳板并下沉不可变门面接口” |
-| `new-config` | 临时命名，缺乏稳定性 | 转化为具体配置定义，如：“同构化卡牌元数据资源表” |
-
----
-
-## 四、 单源规则反虚构契约 (`RCFG-RULE-DRIFT`)
-
-- 提交信息正文中提及的所有规则 ID（如 `GUARD-AST-001`、`ARCH-FAC-001`、`ADV-PRF-002`），必须在 `scripts/common/rule-catalog.json` 中真实登记；
-- 若需引入全新规则，必须先在 `scripts/common/rule-catalog.json` 中完成元数据注册，随后方可在代码、检查器与提交信息中引用。
-
----
-
-## 五、 特殊误杀防护与专业术语中文化 (CMG-STY-008)
-
-提交门禁对第一人称代词（`I`, `we`, `my`, `our`）执行边界正则拦截。部分常见专业缩写词由于单词边界匹配易产生假阳性误伤，必须遵守以下中文化转译契约：
-
-- **典型误伤词**：`I/O`（在正则 `\bI\b` 下被误杀为第一人称代词 `I`）。
-- **强制替代词**：一律转译为“磁盘读写”、“输入输出”或“异步数据流”。
-- **通用代词规避**：严禁在提交信息中使用“我们重构了……”、“我修复了……”等主观陈述，一律改写为祈使句动词开头（如“重构……”、“修复……”、“优化……”）。
-
----
-
-## 六、 提交类型与清单区块强绑定关系 (`GUARD-MSG-001`)
-
-不同提交类型（`<type>`）对应唯一的必填清单区块，遗漏将触发门禁阻断：
-
-| 提交类型 | 强制要求出现的正文区块 | 典型内容契约 |
-| :--- | :--- | :--- |
-| `feat` | `[Added / 新增内容]` 或 `[Added]` | 列出新增的模块、文件、接口或测试用例 |
-| `refactor` / `perf` | `[Changed / 变更调整]` 或 `[Changed]` | 阐述现有逻辑调整、参数收敛与内部结构演进 |
-| `fix` | `[Fixed / 修复缺陷]` 或 `[Fixed]` | 描述异常根因、崩溃场景及修复断言 |
-| 带有 `!` 破坏性变更 | `[Breaking Changes / 破坏性变更]` | 声明外部 API 破弃、参数签名变更及迁移指南 |
+| `feat` | `[Added]` | New modules, APIs, or test coverage |
+| `refactor` / `perf` | `[Changed]` | Adjusted behavior, complexity cuts, internal structure |
+| `fix` | `[Fixed]` | Root cause, failure mode, and fix assertion |
+| `!<breaking>` | `[Breaking Changes]` | Deprecated/changed public signatures and migration path |

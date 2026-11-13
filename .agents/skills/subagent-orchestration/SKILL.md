@@ -59,6 +59,7 @@ Governs the 5-layer context hierarchy (75% budget dehydration), orthogonal `(Arc
 2. **Read-First Cadence & `mark_chapter` Checkpoints**: Follow `Explore/Review (read-only) -> Construct/Refactor (scoped write) -> Guardian (verification)`, emitting re-entrant `mark_chapter` checkpoints after major milestones.
 3. **Parallel Session Mutex**: Never touch, format, or revert (`git restore .`, `git clean -fd`) files modified by external parallel sessions in `git status -s`; stage only explicit whitelist paths (`git add <files>`).
 4. **5D ELOC Clamping & Interleaved Beats**: Enforce per-file micro bounds (add $\le 120/180$, del $\le 100$) and batch admission turnover ($\ge \Theta_{\text{admission}}$), committing production code (Code Beat) separately from audit snapshots (Telemetry Beat).
+5. **5-Tier Fractal Branch Inheritance (`FGT-TOP-001`)**: When spawning isolated branches (`Workspace: "branch"`/`"share"`), enforce `main -> integration -> cell/<cell-id>/main -> cell/<cell-id>/card/<card-id>/main -> cell/<cell-id>/card/<card-id>/sub/<agent-id>`; reject ad-hoc branch names, tier-skipping forks/merges, and direct agent pushes to `main`/`integration`/`cell/*/main`. Pass `--cell`/`--card`/`--branch` to `synthesize-subagent.js` or bind `branchTopology.recommendedBranch`.
 
 ---
 

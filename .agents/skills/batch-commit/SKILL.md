@@ -1,7 +1,7 @@
 ---
 name: batch-commit
 description: >-
-  【触发：提交/分批/暂存/commit/git/预审/禁词/原子提交】当准备提交代码、分批原子提交或审查 git commit 信息时必须使用。按 6 层拓扑拆解提交，拦截 6 类黑话禁词，执行离线门禁预审与原子提交闭环。
+  【触发：commit/stage/fix/reject/block/git/5D/slang】Plan 6-layer atomic commits, strip forbidden prose, enforce 5D diff bounds, and run offline commit-msg gates.
 ---
 
 # batch-commit — Six-Layer Topological Atomic Commit & Pre-Flight Gate Workflow
@@ -16,9 +16,9 @@ Governs bottom-up 6-layer topological commit batching, parallel session isolatio
 > 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
 - **链路**：[docs-archive-governance](../docs-archive-governance/SKILL.md) → **本技能** → [constraint-driven-development](../constraint-driven-development/SKILL.md)；并行支援 `coding-craft`、`complexity-budget`、`gate-governance`、`rule-catalog-governance`。
-- **领域**：工作区元治理与并行交付（领域入口）；其余 1 条领域链见 `docs/skill-catalog.md`
+- **领域**：Parallel Delivery & Meta-Governance（领域入口）；其余 1 条领域链见 `docs/skill-catalog.md`
 - **协作专员**：原型 `workspace-meta`：`workspace-review`、`workspace-refactor`、`workspace-guardian`
-- **何时联动**：并行会话改动混杂需要精准暂存 → `batch-commit` + `subagent-orchestration` + `constraint-driven-development`；提交信息被门禁拦下 → `batch-commit` + `rule-catalog-governance` + `gate-governance`
+- **何时联动**：Stage atomic commits alongside dirty parallel sessions → `batch-commit` + `subagent-orchestration` + `constraint-driven-development`；Diagnose commit-msg-gate or forbidden-term rejection → `batch-commit` + `rule-catalog-governance` + `gate-governance`
 <!-- SKILL-LINKS:END -->
 
 ## 1. Bottom-Up Six-Layer Commit Topology
@@ -46,7 +46,7 @@ Split multi-file ($> 15$ files) or cross-layer changes into self-contained, inde
    - **Overflow Deconstruction**: Resolve `FILE_ADD_OVERFLOW` or `BATCH_ADD_OVERFLOW` by extracting cohesive algorithms into dedicated submodules (each new file receives a $360.0$ quota) or splitting commits; never lower gate thresholds. See [5d-eloc-differential-clamping-guide.md](references/5d-eloc-differential-clamping-guide.md).
 
 ### Step 2: Author Commit Message & Run Offline Pre-Flight (`commit-msg-gate`)
-1. **Header Grammar**: `<type>(<scope>): <Chinese imperative summary>` (`type` $\in$ `feat|fix|refactor|docs|test|chore|style|perf|ci|build`; total length $15 \sim 80$ chars, subject $10 \sim 70$ chars; ASCII `(` `)` and `): `; no trailing `.`/`。`; no BOM/zero-width chars; no emoji).
+1. **Header Grammar**: `<type>(<scope>): <imperative summary>` (`type` $\in$ `feat|fix|refactor|docs|test|chore|style|perf|ci|build`; total length $15 \sim 80$ chars, subject $10 \sim 70$ chars; ASCII `(` `)` and `): `; no trailing `.`; no BOM/zero-width chars; no emoji).
 2. **Mandatory Sections & Lengths**:
    - First section `[Project]` (`CMG-PRJ-001`): `- <workspace-timing | auto-refactor | WebGames | fractal-git | governance>`
    - `[Why]` ($\ge 15$ non-whitespace chars), `[Verification]` ($\ge 12$ non-whitespace chars, qualitative assertions only), plus `[Added]` (`feat`), `[Fixed]` ($\ge 12$ chars, `fix`), `[Changed]` (`refactor`/`perf`), or `[Breaking Changes]` (`!`).
@@ -55,14 +55,14 @@ Split multi-file ($> 15$ files) or cross-layer changes into self-contained, inde
 
 | Rule ID | Category | Blocked Examples | Requirement |
 | :--- | :--- | :--- | :--- |
-| `CMG-STY-001` | Perfunctory / Sprint Codenames | `wip`, `temp`, `tmp`, `暂存`, `临时方案`, `phase2`, `sprint 3`, `st7`, `w3`, `pass 2` | State exact technical scope and invariants |
-| `CMG-STY-002` | Exaggeration | `绝对`, `彻底解决`, `完美`, `100%`, `工业级`, `案卷施工`, `规则金字塔` | State concrete mechanisms and boundary cases |
-| `CMG-STY-003` | Pejorative | `垃圾`, `一团糟`, `烂代码`, `useless code`, `broken beyond repair` | State objective technical root cause |
-| `CMG-STY-004` | Meta-Narrative | `低调中肯`, `求真务实`, `移除宣扬性词汇`, `风格升级`, `全部PASS` | Describe code/doc changes directly |
-| `CMG-STY-005` | Procedural Log Dump | `退出码0`, `双端返回0`, `正常状态`, `运行完成`, `无报错` | State falsifiable behavioral assertions in `[Verification]` |
-| `CMG-STY-006` | Raw Execution Counts | `通过146套测试`, `耗时50.8s`, `419个文件`, `覆盖率98%` | Zero Arabic numerals/percentages in `[Verification]` |
+| `CMG-STY-001` | Perfunctory / Sprint Codenames | `wip`, `temp`, `tmp`, `phase2`, `sprint 3`, `st7`, `w3`, `pass 2` | State exact technical scope and invariants |
+| `CMG-STY-002` | Exaggeration | `100%`, `perfect`, `ultimate`, `industrial-grade`, hype labels | State concrete mechanisms and boundary cases |
+| `CMG-STY-003` | Pejorative | `useless code`, `broken beyond repair`, derogatory remarks | State objective technical root cause |
+| `CMG-STY-004` | Meta-Narrative | Claims about adjusting prose tone or removing hype words | Describe code/doc changes directly |
+| `CMG-STY-005` | Procedural Log Dump | `exit code 0`, `returned 0`, `all checks green` | State falsifiable behavioral assertions in `[Verification]` |
+| `CMG-STY-006` | Raw Execution Counts | `146 tests passed`, `50.8s`, `419 files`, `98% coverage` | Zero Arabic numerals/percentages in `[Verification]` |
 
-   - Also enforce `CMG-STY-008` (no first-person pronouns `I`/`we`/`my`/`our`; write `输入输出` instead of `I/O` in Chinese prose) and `RCFG-RULE-DRIFT` (every rule ID must exist in `scripts/common/rule-catalog.json`).
+   - Also enforce `CMG-STY-008` (no first-person pronouns `I`/`we`/`my`/`our`; write `"disk read/write"` instead of `I/O`) and `RCFG-RULE-DRIFT` (every rule ID must exist in `scripts/common/rule-catalog.json`).
 4. **Pre-Flight Check**:
    ```powershell
    pwsh -File scripts/ps1/commit-msg-gate.ps1 "$dir\commit_batch_N.txt"
