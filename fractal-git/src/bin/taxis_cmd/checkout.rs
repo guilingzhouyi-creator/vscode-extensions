@@ -36,7 +36,7 @@ use super::repo_view::RepoView;
 use super::status::collect_status;
 use super::switch::{
     assert_switch_branch_target, execute_orphan_branch, record_prev_head,
-    resolve_previous_head_target, take_flag_value, validate_new_branch_name,
+    resolve_previous_head_target, take_flag_value, validate_branch_fork,
 };
 use super::tree_view::{flatten_commit_tree, flatten_tree_for_diff, TreeEntry};
 
@@ -52,6 +52,10 @@ pub(crate) struct CheckoutOptions {
     pub(crate) quiet: bool,
     pub(crate) is_switch: bool,
     pub(crate) was_reset: bool,
+    pub(crate) cascade_slug: Option<String>,
+    pub(crate) facade_type: Option<String>,
+    pub(crate) bypass_branch_guard: bool,
+    pub(crate) bypass_reason: Option<String>,
 }
 
 /// Dispatches the `checkout` command: resolves targets, materializes worktrees, and updates HEAD.
@@ -93,6 +97,22 @@ pub(crate) fn execute_checkout_or_switch(ctx: &CliContext, mut opts: CheckoutOpt
         resolve_previous_head_target(&view, &mut opts);
     }
 
+    if let Some(slug) = opts.cascade_slug.clone() {
+        let floor = fg_gate::BranchGovernanceFloor::resolve(view.git_dir());
+        let base_override = (opts.target != "HEAD").then_some(opts.target.as_str());
+        let (_parent, child_short) = match super::fractal_context::derive_cascade_short_branch(
+            view.git_dir(),
+            base_override,
+            &slug,
+            opts.facade_type.as_deref(),
+            &floor,
+        ) {
+            Ok(derived) => derived,
+            Err(err) => reject(CliTag::VERIFY_FAIL, err),
+        };
+        opts.new_branch = Some(child_short);
+    }
+
     if let Some(orphan_branch) = opts.orphan.clone() {
         execute_orphan_branch(&view, &opts, &orphan_branch);
         return;
@@ -107,7 +127,7 @@ pub(crate) fn execute_checkout_or_switch(ctx: &CliContext, mut opts: CheckoutOpt
         Err(resolve_err) => {
             if let Some(ref new_b) = opts.new_branch {
                 if opts.target == "HEAD" && view.effective_head_commit().ok().flatten().is_none() {
-                    validate_new_branch_name(new_b);
+                    validate_branch_fork(&view, new_b, Some(&opts.target), &opts);
                     let head_path = view.git_dir().join("HEAD");
                     let sym_target = format!("refs/heads/{new_b}");
                     if let Err(io_err) = fs::write(&head_path, format!("ref: {sym_target}\n")) {
@@ -217,6 +237,10 @@ fn commit_subject(payload: &[u8]) -> Option<String> {
 fn parse_checkout_options(args: &[String]) -> CheckoutOptions {
     let mut new_branch: Option<&str> = None;
     let mut orphan: Option<&str> = None;
+    let mut cascade_slug: Option<String> = None;
+    let mut facade_type: Option<String> = None;
+    let mut bypass_branch_guard = false;
+    let mut bypass_reason: Option<String> = None;
     let mut force_create = false;
     let mut detach = false;
     let mut force = false;
@@ -239,8 +263,21 @@ fn parse_checkout_options(args: &[String]) -> CheckoutOptions {
                 detach = true;
                 cursor += 1;
             }
+            "--bypass-branch-guard" => {
+                bypass_branch_guard = true;
+                cursor += 1;
+            }
             "--track" | "--no-track" | "-l" | "--guess" | "--no-guess" => {
                 cursor += 1;
+            }
+            "--cascade" => {
+                cascade_slug = Some(take_flag_value(args, &mut cursor, arg).to_owned());
+            }
+            "--facade" => {
+                facade_type = Some(take_flag_value(args, &mut cursor, arg).to_owned());
+            }
+            "--bypass-reason" | "--reason" => {
+                bypass_reason = Some(take_flag_value(args, &mut cursor, arg).to_owned());
             }
             "-b" => {
                 new_branch = Some(take_flag_value(args, &mut cursor, arg));
@@ -253,6 +290,14 @@ fn parse_checkout_options(args: &[String]) -> CheckoutOptions {
                 orphan = Some(take_flag_value(args, &mut cursor, arg));
             }
             "--" => {
+                cursor += 1;
+            }
+            _ if arg.starts_with("--cascade=") => {
+                cascade_slug = Some(arg["--cascade=".len()..].to_owned());
+                cursor += 1;
+            }
+            _ if arg.starts_with("--facade=") => {
+                facade_type = Some(arg["--facade=".len()..].to_owned());
                 cursor += 1;
             }
             _ if arg.starts_with('-') && arg != "-" => {
@@ -277,6 +322,10 @@ fn parse_checkout_options(args: &[String]) -> CheckoutOptions {
         quiet,
         is_switch: false,
         was_reset: false,
+        cascade_slug,
+        facade_type,
+        bypass_branch_guard,
+        bypass_reason,
     }
 }
 
@@ -392,7 +441,7 @@ fn resolve_effective_branch(view: &RepoView, opts: &mut CheckoutOptions) -> Opti
     }
 
     if let Some(ref new_b) = opts.new_branch {
-        validate_new_branch_name(new_b);
+        validate_branch_fork(view, new_b, Some(&opts.target), opts);
         let exists = view
             .branches()
             .is_ok_and(|b| b.iter().any(|(name, _)| name == new_b));
@@ -639,6 +688,24 @@ pub(crate) fn update_dirc_index(git_dir: &Path, entries: &[IndexEntry]) {
     }
 }
 
+/// Returns the predecessor `refs/fractal/cell/<default>/<branch>` mirror ref only outside `Strict`
+/// mode and only for non-fractal compatibility branch names.
+fn legacy_compat_cell_ref(git_dir: &Path, branch: &str) -> Option<String> {
+    if branch.starts_with("refs/") || branch.starts_with("cell/") || branch == "integration" {
+        return None;
+    }
+    let floor = fg_gate::BranchGovernanceFloor::resolve(git_dir);
+    if floor.tier == fg_core::models::BranchEnforcementTier::Strict
+        || floor.spec.is_allowed_facade(branch)
+    {
+        return None;
+    }
+    Some(format!(
+        "refs/fractal/cell/{}/{branch}",
+        fg_core::constants::policy::DEFAULT_CELL_ID
+    ))
+}
+
 /// Writes the branch reference and HEAD through the ref store, returning the first failure.
 fn write_references(
     ref_store: &DiskRefStore,
@@ -652,8 +719,7 @@ fn write_references(
             } else {
                 format!("refs/heads/{branch}")
             };
-            let cell_ref = (!branch.starts_with("refs/"))
-                .then(|| format!("refs/fractal/cell/cell-default/{branch}"));
+            let cell_ref = legacy_compat_cell_ref(ref_store.git_dir(), branch);
             let head_ref_exists = ref_store.get_ref(&reference).ok().flatten().is_some();
             let cell_ref_exists = cell_ref
                 .as_deref()
@@ -762,7 +828,11 @@ pub(crate) fn update_references(
     let hook_runner = super::git_hooks::discover(git_dir, work_root);
     let previous_head = ref_store.get_ref("HEAD").ok().flatten();
     let branch_update = branch_name.map(|branch| {
-        let reference = format!("refs/heads/{branch}");
+        let reference = if branch.starts_with("refs/") {
+            branch.to_string()
+        } else {
+            format!("refs/heads/{branch}")
+        };
         let previous = ref_store.get_ref(&reference).ok().flatten();
         super::git_hooks::ReferenceUpdate {
             previous,
@@ -819,8 +889,7 @@ pub(crate) fn update_references(
                 } else {
                     format!("refs/heads/{branch}")
                 };
-                let cell_ref = (!branch.starts_with("refs/"))
-                    .then(|| format!("refs/fractal/cell/cell-default/{branch}"));
+                let cell_ref = legacy_compat_cell_ref(git_dir, branch);
                 let head_in_doc = doc.refs.get(&target_ref).is_some();
                 let cell_in_doc = cell_ref.as_deref().and_then(|c| doc.refs.get(c)).is_some();
 

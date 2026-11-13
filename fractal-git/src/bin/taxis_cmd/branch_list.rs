@@ -26,6 +26,7 @@ use super::repo_view::RepoView;
 pub(crate) struct ListingOptions {
     pub(crate) all: bool,
     pub(crate) remotes: bool,
+    pub(crate) tree: bool,
     pub(crate) verbosity: u8,
 }
 
@@ -97,6 +98,11 @@ pub(crate) fn list_branches_with_options(view: &RepoView, opts: &ListingOptions,
 
     if ctx.json_mode {
         emit_branch_list_json(view, &rows, opts.verbosity, &current);
+        return;
+    }
+
+    if opts.tree {
+        print_fractal_tree(view, &rows);
         return;
     }
 
@@ -232,6 +238,42 @@ fn read_commit_subject(view: &RepoView, oid: &Oid) -> Option<String> {
     let rec = parse_commit_record(*oid, &commit_obj.payload).ok()?;
     let first = rec.message.lines().next().unwrap_or("").trim();
     Some(first.to_string())
+}
+
+/// Renders an indented fractal topology tree view for `taxis branch --tree`.
+fn print_fractal_tree(view: &RepoView, rows: &[ListedBranchRow]) {
+    let floor = fg_gate::BranchGovernanceFloor::resolve(view.git_dir());
+    println!(
+        "Fractal Branch Topology (branch-policy: {})",
+        floor.tier.as_str()
+    );
+    for row in rows {
+        if row.is_remote {
+            println!("{} [remote] {}", row.marker, row.label);
+            continue;
+        }
+        let parsed = fractal_git::FractalRef::parse(&row.label);
+        let (indent, tier_tag) = match parsed {
+            Some(ref r) => {
+                let depth = usize::from(r.tier());
+                let legacy = if fractal_git::FractalRef::is_predecessor_card_ref(&row.label) {
+                    " [LEGACY-4SEG]"
+                } else {
+                    ""
+                };
+                ("  ".repeat(depth), format!("[Tier {}{legacy}]", r.tier()))
+            }
+            None if floor.spec.is_allowed_facade(&row.label) => {
+                ("      ".to_string(), "[Facade]".to_string())
+            }
+            None => ("  ".to_string(), "[Uncategorized]".to_string()),
+        };
+        let short_oid = row
+            .oid
+            .map(|o| format!(" {}", &o.to_hex()[..7]))
+            .unwrap_or_else(|| " [unborn]".to_string());
+        println!("{} {indent}{tier_tag} {}{short_oid}", row.marker, row.label);
+    }
 }
 
 /// Resolves configured upstream `<remote>/<branch>` from `branch.<name>.{remote,merge}`.

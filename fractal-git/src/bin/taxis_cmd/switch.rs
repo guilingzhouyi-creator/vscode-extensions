@@ -69,6 +69,54 @@ pub(crate) fn validate_new_branch_name(new_branch: &str) {
     }
 }
 
+/// Validates branch naming and enforces `BranchGuard` creation & force-reset invariants.
+pub(crate) fn validate_branch_fork(
+    view: &RepoView,
+    new_branch: &str,
+    base_target: Option<&str>,
+    opts: &CheckoutOptions,
+) {
+    validate_new_branch_name(new_branch);
+    let floor = fg_gate::BranchGovernanceFloor::resolve(view.git_dir());
+    let bypass_ctx = if opts.bypass_branch_guard {
+        Some(fg_gate::BranchBypassContext {
+            reason: opts.bypass_reason.clone().unwrap_or_default(),
+            human_authorized: fg_gate::authority::resolve_authority_secret(view.git_dir()).is_ok(),
+        })
+    } else {
+        None
+    };
+
+    let head_short = super::fractal_context::resolve_head_short_branch(view.git_dir());
+    let parent_short = match base_target {
+        Some("HEAD") | None => head_short,
+        Some(raw) => Some(super::fractal_context::strip_branch_prefixes(raw)),
+    };
+
+    match fg_gate::BranchGuard::check_branch_creation(
+        &floor,
+        parent_short.as_deref(),
+        new_branch,
+        bypass_ctx.as_ref(),
+    ) {
+        Ok(outcome) => {
+            for warning in outcome.warnings {
+                eprintln!("{warning}");
+            }
+        }
+        Err(breach) => reject(CliTag::VERIFY_FAIL, breach.to_string()),
+    }
+
+    if opts.force_create {
+        let human_auth = fg_gate::authority::resolve_authority_secret(view.git_dir()).is_ok();
+        if let Err(reset_err) =
+            fg_gate::BranchGuard::check_force_branch_reset(&floor, new_branch, human_auth)
+        {
+            reject(CliTag::VERIFY_FAIL, reset_err.to_string());
+        }
+    }
+}
+
 /// Verifies bare `switch <target>` names an existing branch rather than a bare commit OID.
 pub(crate) fn assert_switch_branch_target(view: &RepoView, target: &str) {
     if view
@@ -87,7 +135,7 @@ pub(crate) fn assert_switch_branch_target(view: &RepoView, target: &str) {
 
 /// Switches HEAD to an unborn orphan branch; `switch --orphan` clears tracked files while `checkout --orphan` keeps them.
 pub(crate) fn execute_orphan_branch(view: &RepoView, opts: &CheckoutOptions, branch: &str) {
-    validate_new_branch_name(branch);
+    validate_branch_fork(view, branch, None, opts);
     if view
         .branches()
         .is_ok_and(|list| list.iter().any(|(name, _)| name == branch))
@@ -175,6 +223,10 @@ pub(crate) fn take_flag_value<'a>(args: &'a [String], cursor: &mut usize, flag: 
 pub(crate) fn parse_switch_options(args: &[String]) -> CheckoutOptions {
     let mut new_branch: Option<&str> = None;
     let mut orphan: Option<&str> = None;
+    let mut cascade_slug: Option<String> = None;
+    let mut facade_type: Option<String> = None;
+    let mut bypass_branch_guard = false;
+    let mut bypass_reason: Option<String> = None;
     let mut force_create = false;
     let mut detach = false;
     let mut force = false;
@@ -207,6 +259,10 @@ pub(crate) fn parse_switch_options(args: &[String]) -> CheckoutOptions {
                 detach = true;
                 cursor += 1;
             }
+            "--bypass-branch-guard" => {
+                bypass_branch_guard = true;
+                cursor += 1;
+            }
             "-m"
             | "--merge"
             | "--guess"
@@ -218,6 +274,15 @@ pub(crate) fn parse_switch_options(args: &[String]) -> CheckoutOptions {
             | "--ignore-other-worktrees" => {
                 cursor += 1;
             }
+            "--cascade" => {
+                cascade_slug = Some(take_flag_value(args, &mut cursor, arg).to_owned());
+            }
+            "--facade" => {
+                facade_type = Some(take_flag_value(args, &mut cursor, arg).to_owned());
+            }
+            "--bypass-reason" | "--reason" => {
+                bypass_reason = Some(take_flag_value(args, &mut cursor, arg).to_owned());
+            }
             "-c" | "--create" => {
                 new_branch = Some(take_flag_value(args, &mut cursor, arg));
             }
@@ -227,6 +292,14 @@ pub(crate) fn parse_switch_options(args: &[String]) -> CheckoutOptions {
             }
             "--orphan" => {
                 orphan = Some(take_flag_value(args, &mut cursor, arg));
+            }
+            _ if arg.starts_with("--cascade=") => {
+                cascade_slug = Some(arg["--cascade=".len()..].to_owned());
+                cursor += 1;
+            }
+            _ if arg.starts_with("--facade=") => {
+                facade_type = Some(arg["--facade=".len()..].to_owned());
+                cursor += 1;
             }
             _ if arg.starts_with("--create=") => {
                 new_branch = Some(&arg["--create=".len()..]);
@@ -251,7 +324,7 @@ pub(crate) fn parse_switch_options(args: &[String]) -> CheckoutOptions {
         }
     }
 
-    validate_switch_mode_combination(new_branch, detach, orphan, target);
+    validate_switch_mode_combination(new_branch, cascade_slug.as_deref(), detach, orphan, target);
     let resolved_target = target.unwrap_or("HEAD").to_string();
     CheckoutOptions {
         target: resolved_target,
@@ -263,6 +336,10 @@ pub(crate) fn parse_switch_options(args: &[String]) -> CheckoutOptions {
         quiet,
         is_switch: true,
         was_reset: false,
+        cascade_slug,
+        facade_type,
+        bypass_branch_guard,
+        bypass_reason,
     }
 }
 
@@ -277,14 +354,18 @@ fn assign_switch_positional<'a>(target: &mut Option<&'a str>, value: &'a str) {
 /// Validates mutually exclusive mode combinations for `taxis switch`.
 fn validate_switch_mode_combination(
     new_branch: Option<&str>,
+    cascade_slug: Option<&str>,
     detach: bool,
     orphan: Option<&str>,
     target: Option<&str>,
 ) {
-    let mode_count =
-        usize::from(new_branch.is_some()) + usize::from(detach) + usize::from(orphan.is_some());
+    let mode_count = usize::from(new_branch.is_some() || cascade_slug.is_some())
+        + usize::from(detach)
+        + usize::from(orphan.is_some());
     if mode_count > 1 {
-        fail_usage("options '-c/-C', '-d/--detach', and '--orphan' cannot be used together");
+        fail_usage(
+            "options '-c/-C/--cascade', '-d/--detach', and '--orphan' cannot be used together",
+        );
     }
     if orphan.is_some() && target.is_some() {
         fail_usage("option '--orphan' cannot be combined with a start-point");

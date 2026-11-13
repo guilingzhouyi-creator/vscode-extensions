@@ -33,7 +33,9 @@ use fg_index::InMemoryIndexTree;
 use fg_object::GitCommit;
 use fg_storage::commit_materializer::{persist_commit_object, persist_index_tree};
 use fg_storage::LooseOdb;
+use fg_topology::lineage::{LineageEventKind, LineageLedger, LineageRecordParams};
 use fractal_git::constants::cli::CliTag;
+use fractal_git::FractalRef;
 
 use super::checkout::{
     assert_worktree_cleanliness_for, materialize_files, remove_stale_files, update_dirc_index,
@@ -41,6 +43,7 @@ use super::checkout::{
 };
 use super::commit_walk::{parse_commit_record, walk_commits, CommitRecord};
 use super::common::{fail_fatal, fail_io, print_json, reject, CliContext};
+use super::fractal_context::{extract_ref_coordinates, strip_branch_prefixes};
 use super::operation::{record_head_operation, HeadOperationSpec};
 use super::rebase_state::{
     committer_signature, conclude_rebase, format_offset_minutes, handle_rebase_abort,
@@ -454,6 +457,24 @@ pub fn handle_rebase(ctx: &CliContext) {
         .flatten()
         .map(|(branch_name, _)| branch_name);
 
+    let rebase_floor = fg_gate::BranchGovernanceFloor::resolve(view.git_dir());
+    match fg_gate::BranchGuard::check_merge_or_rebase(
+        &rebase_floor,
+        effective_branch.as_deref().unwrap_or("HEAD"),
+        &upstream_arg,
+        true,
+    ) {
+        Ok(warnings) => {
+            for warning in warnings {
+                eprintln!("{warning}");
+            }
+        }
+        Err(breach) => reject(
+            CliTag::VERIFY_FAIL,
+            format!("Rebase rejected by BranchGuard (FGT-TOP-001): {breach}"),
+        ),
+    }
+
     let bases = match super::commit_walk::build_ccd_index(&view, &[ours_commit, upstream_commit]) {
         Ok(index) => index.merge_bases(&ours_commit, &upstream_commit),
         Err(err) => fail_fatal(format!("build corrected-date index: {err}")),
@@ -761,7 +782,7 @@ fn run_shell_command(work_root: &Path, command: &str) -> bool {
     }
 }
 
-/// Records rebase operation into OperationGraph.
+/// Records rebase operation into OperationGraph and cryptographic lineage ledger.
 pub(crate) fn record_rebase_op(
     view: &RepoView,
     new_head: Oid,
@@ -776,4 +797,21 @@ pub(crate) fn record_rebase_op(
         command: "rebase",
         description: format!("rebase onto {upstream}"),
     });
+    let target_branch = branch_name.unwrap_or("HEAD");
+    let parsed = FractalRef::parse(target_branch);
+    let (cell_opt, _, _) = extract_ref_coordinates(parsed.as_ref());
+    let head_hex = new_head.to_hex();
+    let src_short = strip_branch_prefixes(upstream);
+    let dst_short = strip_branch_prefixes(target_branch);
+    LineageLedger::record_best_effort(
+        view.git_dir(),
+        &LineageRecordParams {
+            event_kind: LineageEventKind::Rebase,
+            cell_id: cell_opt.as_deref().unwrap_or(""),
+            source_ref: &src_short,
+            target_ref: &dst_short,
+            commit_oid_hex: &head_hex,
+            parent_oid_hex: "",
+        },
+    );
 }

@@ -102,6 +102,7 @@ pub fn handle_update_ref(ctx: &CliContext) {
     let ref_store = DiskRefStore::new(&ctx.git_dir);
 
     if delete {
+        assert_ref_mutation_allowed(&ctx.git_dir, ref_name, true);
         delete_ref(&ref_store, ref_name, positional.get(1));
     }
 
@@ -111,7 +112,18 @@ pub fn handle_update_ref(ctx: &CliContext) {
         print_current_ref(&ref_store, ref_name);
     };
 
+    assert_ref_mutation_allowed(&ctx.git_dir, ref_name, false);
     write_ref(ctx, &ref_store, ref_name, new_value, positional.get(2));
+}
+
+fn assert_ref_mutation_allowed(git_dir: &std::path::Path, ref_name: &str, is_delete: bool) {
+    let floor = fg_gate::BranchGovernanceFloor::resolve(git_dir);
+    let human_authorized = fg_gate::authority::resolve_authority_secret(git_dir).is_ok();
+    if let Err(err) =
+        fg_gate::BranchGuard::check_ref_mutation(&floor, ref_name, is_delete, human_authorized)
+    {
+        reject(CliTag::VERIFY_FAIL, err.to_string());
+    }
 }
 
 /// Deletes a ref, honouring the optional expected-value guard.
@@ -211,11 +223,13 @@ pub fn handle_symbolic_ref(ctx: &CliContext) {
     let ref_store = DiskRefStore::new(view.git_dir());
 
     if opts.delete {
+        assert_ref_mutation_allowed(view.git_dir(), name, true);
         delete_symbolic_ref(&ref_store, name, opts.quiet);
         return;
     }
 
     if let Some(target) = opts.positional.get(1) {
+        assert_ref_mutation_allowed(view.git_dir(), target, false);
         match ref_store.write_symbolic_ref(name, target) {
             Ok(()) => {
                 fg_core::diag_info!("refs", "pointed {name} at {target}");

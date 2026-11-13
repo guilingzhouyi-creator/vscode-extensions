@@ -178,7 +178,8 @@ fn parse_auto_score(ctx: &CliContext) -> AutoQualityScoreEnvelope {
 fn resolve_and_verify_receipt(ctx: &CliContext) -> Option<VerifiedReceiptEvidence> {
     let explicit_receipt = find_arg_value(&ctx.args, &["--receipt"]).map(PathBuf::from);
     let default_path = ctx.git_dir.join(VERIFY_RECEIPT_FILENAME);
-    let candidate_path = explicit_receipt.or_else(|| default_path.is_file().then_some(default_path));
+    let candidate_path =
+        explicit_receipt.or_else(|| default_path.is_file().then_some(default_path));
     let Some(receipt_path) = candidate_path else {
         if ctx.args.iter().any(|arg| arg == "--require-receipt") {
             reject(
@@ -189,7 +190,10 @@ fn resolve_and_verify_receipt(ctx: &CliContext) -> Option<VerifiedReceiptEvidenc
         return None;
     };
     let Ok(raw_bytes) = std::fs::read(&receipt_path) else {
-        reject(CliTag::PROMOTION_REJECTED, "cannot read verification receipt");
+        reject(
+            CliTag::PROMOTION_REJECTED,
+            "cannot read verification receipt",
+        );
     };
     Some(verify_receipt_bytes(ctx, &raw_bytes))
 }
@@ -197,7 +201,10 @@ fn resolve_and_verify_receipt(ctx: &CliContext) -> Option<VerifiedReceiptEvidenc
 /// Verifies the cryptographic signature, SM3 digest, and gate verdicts inside a receipt JSON payload.
 fn verify_receipt_bytes(ctx: &CliContext, raw_bytes: &[u8]) -> VerifiedReceiptEvidence {
     let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(raw_bytes) else {
-        reject(CliTag::PROMOTION_REJECTED, "malformed verification receipt JSON");
+        reject(
+            CliTag::PROMOTION_REJECTED,
+            "malformed verification receipt JSON",
+        );
     };
     let gates_passed = parsed["all_gates_passed"].as_bool().unwrap_or(false);
     let anti_gaming = parsed["anti_gaming_passed"].as_bool().unwrap_or(false);
@@ -208,7 +215,10 @@ fn verify_receipt_bytes(ctx: &CliContext, raw_bytes: &[u8]) -> VerifiedReceiptEv
         );
     }
     let Ok(record) = serde_json::from_value::<AuditRecord>(parsed["audit_record"].clone()) else {
-        reject(CliTag::PROMOTION_REJECTED, "verification receipt missing audit_record");
+        reject(
+            CliTag::PROMOTION_REJECTED,
+            "verification receipt missing audit_record",
+        );
     };
     let digest_claim = parsed["receipt_digest"].as_str().unwrap_or_default();
     let expected_digest = compute_sm3_hex(&record.canonical_payload());
@@ -223,7 +233,10 @@ fn verify_receipt_bytes(ctx: &CliContext, raw_bytes: &[u8]) -> VerifiedReceiptEv
             .unwrap_or_else(|err| reject(CliTag::ERROR, err))
     });
     if !record.verify_signature(&secret) {
-        reject(CliTag::PROMOTION_REJECTED, "verification receipt HMAC signature check failed");
+        reject(
+            CliTag::PROMOTION_REJECTED,
+            "verification receipt HMAC signature check failed",
+        );
     }
     let composite_score = parsed["composite_score"]
         .as_f64()
@@ -255,7 +268,10 @@ fn verify_report_argument(report_arg: Option<&str>) -> Option<String> {
         return (!raw.trim().is_empty()).then(|| raw.to_string());
     }
     let Ok(content) = std::fs::read_to_string(raw) else {
-        reject(CliTag::PROMOTION_REJECTED, "specified report file does not exist");
+        reject(
+            CliTag::PROMOTION_REJECTED,
+            "specified report file does not exist",
+        );
     };
     if content.trim().is_empty() {
         reject(CliTag::PROMOTION_REJECTED, "specified report file is empty");
@@ -267,7 +283,10 @@ fn verify_report_argument(report_arg: Option<&str>) -> Option<String> {
         if parsed["all_gates_passed"].as_bool() == Some(false)
             || parsed["anti_gaming_passed"].as_bool() == Some(false)
         {
-            reject(CliTag::PROMOTION_REJECTED, "report file indicates failed gate");
+            reject(
+                CliTag::PROMOTION_REJECTED,
+                "report file indicates failed gate",
+            );
         }
     }
     Some(content)

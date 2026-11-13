@@ -130,6 +130,18 @@ pub fn handle_git_import(ctx: &CliContext) {
         ),
     };
 
+    if let Err(vault_err) = fg_topology::PolicyVaultStore::initialize_or_regenerate(
+        &target_native,
+        fg_core::models::EnforcementTier::Strict,
+        fg_core::models::BranchEnforcementTier::Native,
+        false,
+    ) {
+        reject(
+            CliTag::ERROR,
+            format!("seal policy vault during git-import: {vault_err}"),
+        );
+    }
+
     if ctx.json_mode {
         let payload = serde_json::json!({
             "engine": "taxis",
