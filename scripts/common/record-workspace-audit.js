@@ -259,8 +259,10 @@ function renderPolyglotTableRows(breakdown) {
   if (!breakdown || typeof breakdown !== "object") return [];
   const rows = ["", MD_POLY_HEADER, "", MD_POLY_TABLE_HDR_1, MD_POLY_TABLE_HDR_2];
   for (const item of Object.values(breakdown)) {
-    const status = item.score >= GRADE_A ? STATUS_EXCELLENT : item.score >= GRADE_B ? STATUS_GOOD : STATUS_LAGGING;
-    rows.push(`| ${item.label} | ${item.files} | ${item.loc} | ${item.weight} | ${item.score.toFixed(1)} | ${status} |`);
+    const validScore = typeof item.score === "number" && Number.isFinite(item.score);
+    const status = !validScore ? STATUS_LAGGING : item.score >= GRADE_A ? STATUS_EXCELLENT : item.score >= GRADE_B ? STATUS_GOOD : STATUS_LAGGING;
+    const scoreText = validScore ? item.score.toFixed(1) : "N/A";
+    rows.push(`| ${item.label} | ${item.files} | ${item.loc} | ${item.weight} | ${scoreText} | ${status} |`);
   }
   return rows;
 }

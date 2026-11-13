@@ -109,10 +109,10 @@ function checkTaxonomyCounts(taxonomyText, rules) {
     counts.set(rule.family, (counts.get(rule.family) || 0) + 1);
   }
   const violations = [];
-  const rowRe = /^\| \*\*`([A-Z0-9]+)`\*\* \|[^|]+\|[^|]*族内 (\d+) 个 ID/gm;
+  const rowRe = /^\| \*\*`([A-Z0-9]+)`\*\* \|[^|]+\|[^|]*?(?:族内 (\d+) 个 ID|\b(\d+) IDs\b)/gm;
   for (const match of taxonomyText.matchAll(rowRe)) {
     const family = match[1];
-    const claimed = Number(match[2]);
+    const claimed = Number(match[2] || match[3]);
     const actual = counts.get(family) || 0;
     if (claimed !== actual) {
       violations.push({
@@ -126,6 +126,76 @@ function checkTaxonomyCounts(taxonomyText, rules) {
 }
 
 /**
+ * Updates the active severity bucket while scanning a family section.
+ *
+ * @param {string} line - Current markdown line.
+ * @param {string|null} currentBucket - Active severity bucket.
+ * @returns {string|null} Updated severity bucket.
+ */
+function resolveMapBucket(line, currentBucket) {
+  if (line.startsWith('- **error**')) return 'error';
+  if (line.startsWith('- warning / info')) return 'warning';
+  if (line.startsWith('#') || line.startsWith('---')) return null;
+  return currentBucket;
+}
+
+/**
+ * Indexes rule family and severity buckets declared inside `rule-family-map.md`.
+ *
+ * @param {string} mapText - Raw content of `rule-family-map.md`.
+ * @returns {Map<string, {family: string, bucket: string}>} Rule bucket lookup map.
+ */
+function indexMapBuckets(mapText) {
+  const mapBuckets = new Map();
+  for (const sec of mapText.split(/^### `/m).slice(1)) {
+    const famMatch = sec.match(/^([A-Z0-9]+)`/);
+    if (!famMatch) continue;
+    const family = famMatch[1];
+    let currentBucket = null;
+    for (const line of sec.split('\n')) {
+      if (line.startsWith('## ')) break;
+      currentBucket = resolveMapBucket(line, currentBucket);
+      if (!currentBucket) continue;
+      if (!line.startsWith('- ') && !line.startsWith('  ')) continue;
+      for (const idMatch of line.matchAll(/`([^`]+)`/g)) {
+        mapBuckets.set(idMatch[1], { family, bucket: currentBucket });
+      }
+    }
+  }
+  return mapBuckets;
+}
+
+/**
+ * Validates a single rule entry against its indexed `rule-family-map.md` bucket.
+ *
+ * @param {object} rule - Catalog rule entry.
+ * @param {Map<string, {family: string, bucket: string}>} mapBuckets - Indexed map buckets.
+ * @returns {{type: string, id: string, detail: string}|null} Violation or null when valid.
+ */
+function evaluateMapRuleEntry(rule, mapBuckets) {
+  const entry = mapBuckets.get(rule.id);
+  if (!entry) {
+    return { type: 'RULE_MISSING_FROM_MAP', id: rule.id, detail: rule.family };
+  }
+  if (entry.family !== rule.family) {
+    return {
+      type: 'MAP_FAMILY_MISMATCH',
+      id: rule.id,
+      detail: `mapped under ${entry.family}, catalog says ${rule.family}`,
+    };
+  }
+  const expectedBucket = rule.severity === 'error' ? 'error' : 'warning';
+  if (entry.bucket !== expectedBucket) {
+    return {
+      type: 'MAP_SEVERITY_MISMATCH',
+      id: rule.id,
+      detail: `mapped as ${entry.bucket}, catalog severity is ${rule.severity}`,
+    };
+  }
+  return null;
+}
+
+/**
  * Verifies every rule in `rule-catalog.json` is listed in its family section in `rule-family-map.md`
  * and placed under the matching severity bucket (`**error**` vs `warning / info`).
  *
@@ -134,44 +204,11 @@ function checkTaxonomyCounts(taxonomyText, rules) {
  * @returns {Array<{type: string, id: string, detail: string}>} Violations.
  */
 function checkMapCoverageAndSeverity(mapText, rules) {
-  const sections = mapText.split(/^### `/m).slice(1);
-  const mapBuckets = new Map();
-  for (const sec of sections) {
-    const famMatch = sec.match(/^([A-Z0-9]+)`/);
-    if (!famMatch) continue;
-    const family = famMatch[1];
-    let currentBucket = null;
-    for (const line of sec.split('\n')) {
-      if (line.startsWith('## ')) break;
-      if (line.startsWith('- **error**')) currentBucket = 'error';
-      else if (line.startsWith('- warning / info')) currentBucket = 'warning';
-      else if (line.startsWith('#') || line.startsWith('---')) currentBucket = null;
-      if (currentBucket && (line.startsWith('- ') || line.startsWith('  '))) {
-        for (const idMatch of line.matchAll(/`([^`]+)`/g)) {
-          mapBuckets.set(idMatch[1], { family, bucket: currentBucket });
-        }
-      }
-    }
-  }
+  const mapBuckets = indexMapBuckets(mapText);
   const violations = [];
   for (const rule of rules) {
-    const entry = mapBuckets.get(rule.id);
-    const expectedBucket = rule.severity === 'error' ? 'error' : 'warning';
-    if (!entry) {
-      violations.push({ type: 'RULE_MISSING_FROM_MAP', id: rule.id, detail: rule.family });
-    } else if (entry.family !== rule.family) {
-      violations.push({
-        type: 'MAP_FAMILY_MISMATCH',
-        id: rule.id,
-        detail: `mapped under ${entry.family}, catalog says ${rule.family}`,
-      });
-    } else if (entry.bucket !== expectedBucket) {
-      violations.push({
-        type: 'MAP_SEVERITY_MISMATCH',
-        id: rule.id,
-        detail: `mapped as ${entry.bucket}, catalog severity is ${rule.severity}`,
-      });
-    }
+    const violation = evaluateMapRuleEntry(rule, mapBuckets);
+    if (violation) violations.push(violation);
   }
   return violations;
 }

@@ -70,6 +70,7 @@ tests/reports/
 fractal-git/reports/
 **/reports/audit-*.json
 **/reports/refactor-metrics*.json
+**/.auto-refactor/report.*
 *.log
 err.txt
 out.txt
