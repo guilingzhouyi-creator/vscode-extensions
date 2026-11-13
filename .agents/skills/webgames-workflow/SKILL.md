@@ -1,7 +1,7 @@
 ---
 name: webgames-workflow
 description: >-
-  【触发：WebGames/Godot/GDScript/游戏逻辑/写玩法/对象池/快照注入】开发或修改 WebGames 游戏模块时必须触发。坚持全域 GameConfig 配置驱动、视图表现层单向快照注入(apply_snapshot)与循环零堆分配(ADV-PRF-002)。
+  【触发：fix/spawn/lag/alloc/Godot/GDScript/WebGames/config】Enforce GameConfig-driven logic, zero view-layer math, apply_snapshot decoupling, and zero loop alloc (ADV-PRF-002).
 ---
 
 # webgames-workflow — Godot 4.7 Headless Domain Decoupling & `GameConfig` Workflow
@@ -19,9 +19,9 @@ Governs `WebGames/` headless domain simulation, `GameConfig` SSOT tables, unidir
 > 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
 - **链路**：— → **本技能** → [algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md)；并行支援 `coding-craft`、`complexity-budget`、`constraint-driven-development`、`debugging-and-error-recovery`。
-- **领域**：游戏引擎与 Godot 视图（领域入口）
+- **领域**：Godot Game Engine（领域入口）
 - **协作专员**：原型 `game-engine`：`wg-construct`、`wg-review`、`wg-refactor`、`wg-explore`
-- **何时联动**：新玩法先出四阶段方案 → `spec-driven-development` + `webgames-workflow` + `test-benchmark-engineering`；热路径循环里出现对象分配 → `webgames-workflow` + `algorithmic-operator-engineering` + `complexity-budget`
+- **何时联动**：Draft 4-stage spec before building new gameplay → `spec-driven-development` + `webgames-workflow` + `test-benchmark-engineering`；Eliminate per-frame object allocation in gameplay loops → `webgames-workflow` + `algorithmic-operator-engineering` + `complexity-budget`
 <!-- SKILL-LINKS:END -->
 
 ## 1. Two-Round Delivery Cycle & Four-Stage Blueprint Dossier

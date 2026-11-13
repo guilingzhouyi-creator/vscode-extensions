@@ -1,7 +1,7 @@
 ---
 name: workspace-timing-dev
 description: >-
-  【触发：计时扩展/VS扩展/计时/UI国际化/环形缓冲/崩溃安全/双语字典】开发或维护 workspace-timing 扩展时触发。落实五层解耦、RingBuffer 与 Journal 双写崩溃安全、双语字典(zh-CN/en)与暗色 UI。
+  【触发：write/sync/crash/lost/timing/RingBuf/i18n/zh-CN】Govern workspace-timing 5-layer decoupling, RingBuffer+Journal crash safety, zh-CN/en i18n parity, and dark UI.
 ---
 
 # workspace-timing-dev — VS Code Extension 5-Layer Architecture, Crash Safety & Bilingual i18n
@@ -16,9 +16,9 @@ Governs the `workspace-timing/` 5-layer unidirectional architecture, RingBuffer 
 > 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
 - **链路**：— → **本技能** → [state-concurrency-and-crash-recovery](../state-concurrency-and-crash-recovery/SKILL.md)；并行支援 `algorithmic-operator-engineering`、`coding-craft`、`complexity-budget`、`constraint-driven-development`。
-- **领域**：VS Code 扩展与计时视图（领域入口）
+- **领域**：VS Code Timing Extension（领域入口）
 - **协作专员**：原型 `vs-extension`：`wt-construct`、`wt-review`、`wt-refactor`、`wt-explore`
-- **何时联动**：计时视图卡顿或丢帧 → `workspace-timing-dev` + `interaction-design-physics` + `algorithmic-operator-engineering`；进程被杀后缓冲区数据丢失 → `workspace-timing-dev` + `state-concurrency-and-crash-recovery` + `test-benchmark-engineering`
+- **何时联动**：Webview jank, frame drops, or IME send glitch → `workspace-timing-dev` + `interaction-design-physics` + `algorithmic-operator-engineering`；Buffer loss on process kill or journal replay divergence → `workspace-timing-dev` + `state-concurrency-and-crash-recovery` + `test-benchmark-engineering`
 <!-- SKILL-LINKS:END -->
 
 ## 1. Five-Layer Unidirectional Architecture & Headless Testability

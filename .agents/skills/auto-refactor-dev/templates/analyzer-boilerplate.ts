@@ -15,7 +15,7 @@ export class ExampleCustomAnalyzer implements Analyzer {
     analyze(file: string, ast: NormalizedNode, rawLines: string[]): Finding[] {
         const findings: Finding[] = [];
 
-        // 遍历统一语法树节点并匹配目标特征 (单函数圈复杂度 CC <= 15)
+        // Traverse NormalizedNode tree and match target feature (single function CC <= 15)
         ast.walk((node) => {
             if (node.kind === 'FunctionDeclaration' && node.text.includes('deprecatedOp')) {
                 findings.push({

@@ -1,7 +1,7 @@
 ---
 name: auto-refactor-dev
 description: >-
-  【触发：auto重构/分析器/内核/Praxis/重构引擎/双轨等价/流水线】开发、修改或测试 auto-refactor 项目代码时必须使用。看守 Rust 与 TS 双轨 100% 字节等价、四阶段流水线拓扑、Diff 引擎与暂存落盘规范。
+  【触发：refactor/audit/broken/skew/Praxis/Oxc/Stage0】Govern auto-refactor 6-layer engine, Rust/TS byte parity, Stage 0-3 analyzers, Praxis SDK, and telemetry guards.
 ---
 
 # auto-refactor-dev — Static Refactoring Engine, Dual-Track Operators & Praxis SDK Contract
@@ -16,19 +16,19 @@ Governs the `auto-refactor/` 6-layer architecture, Rust+TS 100% byte parity, <!-
 > 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
 - **链路**：— → **本技能** → [sparse-moe-and-ast-routing](../sparse-moe-and-ast-routing/SKILL.md)；并行支援 `algorithmic-operator-engineering`、`coding-craft`、`complexity-budget`、`constraint-driven-development`。
-- **领域**：自动重构内核（领域入口）
+- **领域**：Auto-Refactor Engine（领域入口）
 - **协作专员**：原型 `cli-engine`：`ar-construct`、`ar-review`、`ar-refactor`、`ar-explore`
-- **何时联动**：新增分析器或规则 → `auto-refactor-dev` + `sparse-moe-and-ast-routing` + `rule-catalog-governance` + `test-benchmark-engineering`；LayerVFS 沙箱分叉或轨迹配方提取调试 → `praxis-vfs-and-trajectory-learning` + `auto-refactor-dev` + `test-benchmark-engineering`
+- **何时联动**：Add analyzer or rule and register SSOT metadata → `auto-refactor-dev` + `sparse-moe-and-ast-routing` + `rule-catalog-governance` + `test-benchmark-engineering`；Debug LayerVFS forks, 3-ply MCTS, or preset recipe plugins → `praxis-vfs-and-trajectory-learning` + `auto-refactor-dev` + `test-benchmark-engineering`
 <!-- SKILL-LINKS:END -->
 
 ## 1. Six-Layer Architecture, Rust+TS Byte Parity & Project Neutrality
 
-1. **6-Layer Unidirectional Topology**: L1 Native Operators (`crates/ops-{diff,graph,pattern,mask,clone}`) $\to$ L2 `NormalizedNode` + `LineFeatureTape` + 8-language `SemanticGraph` $\to$ L3 (<!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count --> pooled analyzers & <!-- METRICS:BEGIN rule-auto-refactor -->**377 条规则**<!-- METRICS:END rule-auto-refactor -->) $\to$ L4 5-Tier Sparse MoE Router & `< 10ms` AST slice pipeline $\to$ L5 10-pillar scoring & CAI 2.0 evolution plane $\to$ L6 Praxis SDK & LayerVFS sandbox.
+1. **6-Layer Unidirectional Topology**: L1 Native Operators (`crates/ops-{diff,graph,pattern,mask,clone}`, `ops-mask` split into `ascii`/`utf16`/`tests` with 3-part `// SAFETY:` proofs) $\to$ L2 `NormalizedNode` + `LineFeatureTape` + 8-language `SemanticGraph` $\to$ L3 (<!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count --> pooled analyzers & <!-- METRICS:BEGIN rule-auto-refactor -->**377 条规则**<!-- METRICS:END rule-auto-refactor -->) $\to$ L4 5-Tier Sparse MoE Router & `< 10ms` AST slice pipeline $\to$ L5 10-pillar scoring & CAI 2.0 evolution plane $\to$ L6 Praxis SDK & LayerVFS sandbox.
 2. **Rust+TS 100% Byte Parity**: Rust N-API operators and `src/core/native/*-shim.ts` must produce 100% identical JSON key order, UTF-8/LF line-column offsets, dominator tree ordering, and 4-decimal float precision (`validate-native-parity.js` & `validate-equivalence.js`).
-3. **Project Neutrality (`validate-project-neutrality.js`)**: Core analyzers must never hardcode consumer-specific paths (`WebGames/`, `workspace-timing/`); infer `ProjectArchetype` solely from standard project manifests (`project.godot`, `package.json`, `Cargo.toml`, `go.mod`).
-4. **`PathClassifier` SSOT (`src/core/path/index.ts`)**: All path classification and exemption checks must route through `PathClassifier` predicates (`isTestFilePath`, `isFixtureOrMockPath`, `isBenchmarkPath`, `isScriptOrGatePath`, `isGeneratedOrDistPath`); ad-hoc path regexes in analyzers are forbidden.
-5. **`MemoryGovernor` Registration**: Long-lived AST symbol indices or regex/glob caches inside analyzers must register with `sharedMemoryGovernor` (`CacheEvictionTier`) or use `WeakMap` keyed on `ScanContext` / `Config`.
-6. **Elastic Debt Quota (`elastic-debt-budget.ts`)**: Critical/High technical debt budgets scale dynamically with repository volume and health score.
+3. **Project Neutrality & Preset Plugins (`validate-project-neutrality.js`)**: Core analyzers and `recipeExtractor.ts` must never hardcode consumer-specific paths (`WebGames/`, `workspace-timing/`) or DSL rules; infer `ProjectArchetype` from manifests and load project rules via preset `trajectoryPlugin` (`presets/godot-game.config.json`).
+4. **Module Boundaries & Decomposition**: Maintain cohesive domain splits (`reportFinalizer` $\to$ `post-scan-{suppressions,arbitration,quality-scoring}`, `aas-reporter` $\to$ `aas-{dimension-details,health-metrics,defect-records}`, `python-modern` $\to$ `python-modern-{contracts,shadowing}`) with zero shell trampolines (`ARCH-FAC-001 = 0`, zero `VOL-DOC-001`).
+5. **`PathClassifier` & Telemetry Hardening**: Route all path exemptions through `PathClassifier` (`src/core/path/index.ts`); validate empty paths, null bytes, non-finite metrics, and EOF-less LCOV flush boundaries in `src/core/telemetry/`. Register long-lived caches with `sharedMemoryGovernor`.
+6. **Elastic Debt Quota (`elastic-debt-budget.ts`)**: Enforce rigid Critical/High limits across `SEC-*`/`DEP-*` alongside dynamic volume scaling; route family claims through `effectiveApply(...)`.
 
 ---
 
@@ -60,11 +60,11 @@ Governs the `auto-refactor/` 6-layer architecture, Rust+TS 100% byte parity, <!-
 
 ---
 
-## 4. 门禁链与 CI 原生构建（Gate Chain & Native CI Parity）
+## 4. Gate Chain & Native CI Parity
 
-1. **全量门禁链**: `npm run gate` 串联 `gate:rust` $\to$ `build` $\to$ `format:check` $\to$ `lint` $\to$ `gate:comments` $\to$ `gate:redundancy` $\to$ `gate:self` $\to$ `self-test` $\to$ `npm test`（`ENGINE-FORMAT-42`~`ENGINE-REDUNDANCY-45` 已镜像入 `pre-push-gate`）；`audit-all --fast` 额外调度 `gate:self:slice` 增量自审。
-2. **原生双轨 Fail-Closed**: `crates/` 构建产物 `index.node` 已移出 Git 追踪（`.gitignore` 纳管）；`validate-native-parity.js` 缺失原生二进制时直接 `exit 1`，CI `auto-refactor` 作业通过 `dtolnay/rust-toolchain@stable` 与 `npm run build:native` 现场构建。
-3. **提交期与账本守卫**: `pre-commit-gate` 命中 `crates/**` 自动执行 `auto-refactor/crates` Cargo 检查，`vitest related` 强制 `--passWithNoTests=false` 拒绝零匹配静默放行；`validate-rule-dictionary-closure.js` 校验 <!-- METRICS:BEGIN rule-auto-refactor-canonical -->**360 条**<!-- METRICS:END rule-auto-refactor-canonical -->核心规则中文本地化闭包；`validate-trajectory-ledger.js` 纳管 `baseline-signatures.json` 体积与 `governance-supervisor.json` 权重归一；`audit-all` 结束时通过 `--revert-timestamp` 回滚仅时间戳漂移。
+1. **Full Gate Pipeline**: `npm run gate` chains `gate:rust` $\to$ `build` $\to$ `format:check` $\to$ `lint` $\to$ `gate:comments` $\to$ `gate:redundancy` $\to$ `gate:self` $\to$ `self-test` $\to$ `test:no-build` (eliminating duplicate `tsc` builds, mirrored in `pre-push-gate`); `audit-all --fast` schedules incremental `gate:self:slice`.
+2. **Fail-Closed Native Build**: Prebuilt `index.node` stays gitignored; `validate-native-parity.js` fails closed (exit 1) when native bindings are missing, and CI builds live via `dtolnay/rust-toolchain@stable` + `npm run build:native`.
+3. **Commit & Ledger Guards**: Changes under `crates/**` trigger Cargo workspace checks in `pre-commit-gate`; `vitest related` enforces `--passWithNoTests=false`; `validate-rule-dictionary-closure.js` verifies <!-- METRICS:BEGIN rule-auto-refactor-canonical -->**360 条**<!-- METRICS:END rule-auto-refactor-canonical --> canonical rules; `validate-trajectory-ledger.js` guards `baseline-signatures.json` and `governance-supervisor.json` weights; `audit-all` reverts timestamp-only diffs via `--revert-timestamp`.
 
 ---
 

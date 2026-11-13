@@ -1,7 +1,7 @@
 ---
 name: sparse-moe-and-ast-routing
 description: >-
-  【触发：MoE/稀疏路由/位掩码/特征磁带/预筛优化/激活降级/惰性投影】开发或优化五级稀疏 MoE 路由、32 位无符号位掩码分派、LineFeatureTape 扫描或多语言 AST 惰性投影时触发。落实零热路径冗余解析与池化复位。
+  【触发：route/mask/slow/stale/MoE/AST/tape/pool】Govern 5-tier Sparse MoE routing, uint32 bitmasks, LineFeatureTape, lazy AST/CFG projection, and analyzer pooling.
 ---
 
 # sparse-moe-and-ast-routing — 5-Tier Sparse MoE Routing, `LineFeatureTape` & Lazy AST Projection
@@ -16,9 +16,9 @@ Governs the 5-tier Sparse Mixture-of-Experts (MoE) routing cascade, 32-bit unsig
 > 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
 - **链路**：[auto-refactor-dev](../auto-refactor-dev/SKILL.md) → **本技能** → [praxis-vfs-and-trajectory-learning](../praxis-vfs-and-trajectory-learning/SKILL.md)；并行支援 `algorithmic-operator-engineering`、`coding-craft`、`complexity-budget`、`constraint-driven-development`。
-- **领域**：自动重构内核（链上第 2 步）
+- **领域**：Auto-Refactor Engine（链上第 2 步）
 - **协作专员**：原型 `cli-engine`：`ar-construct`、`ar-review`、`ar-refactor`、`ar-explore`
-- **何时联动**：新增分析器或规则 → `auto-refactor-dev` + `sparse-moe-and-ast-routing` + `rule-catalog-governance` + `test-benchmark-engineering`；优化稀疏 MoE 路由与多语言惰性投影 → `sparse-moe-and-ast-routing` + `algorithmic-operator-engineering` + `tiered-cache-and-wal-persistence`
+- **何时联动**：Add analyzer or rule and register SSOT metadata → `auto-refactor-dev` + `sparse-moe-and-ast-routing` + `rule-catalog-governance` + `test-benchmark-engineering`；Optimize 5-tier Sparse MoE routing and lazy AST projection → `sparse-moe-and-ast-routing` + `algorithmic-operator-engineering` + `tiered-cache-and-wal-persistence`
 <!-- SKILL-LINKS:END -->
 
 ## 1. Five-Tier Sparse MoE Routing Cascade
@@ -27,9 +27,9 @@ To bypass 70%–90% of redundant AST traversals with zero recall loss, every ana
 
 | Tier | Source Module | Routing Mechanism & Invariant |
 | :--- | :--- | :--- |
-| **Tier 1: File Preflight & Trigger Gate** | `src/core/scanner/file-preflight-gate.ts`<br/>`src/core/preflight/sparse-activator.ts`<br/>`src/core/scanner/trigger-catalog.ts` | Filters analyzers by extension (`LANGUAGE_ANALYZER_MATRIX`, `DOCS_EXTS`, `SHELL_EXTS`) and fast raw-buffer substring triggers (`ASYNC_TRIGGERS`, `registerDefaultTriggers` for `shell-lint` & `concurrency`) before parsing |
+| **Tier 1: File Preflight & Trigger Gate** | `src/core/scanner/file-preflight-gate.ts`<br/>`src/core/preflight/sparse-activator.ts`<br/>`src/core/scanner/trigger-catalog.ts` | Filters analyzers by extension (`LANGUAGE_ANALYZER_MATRIX`, `DOCS_EXTS`, `SHELL_EXTS`), auto-generated `FAST_PATH_ANALYZERS`, and 256-LUT / `checkFile` raw-buffer triggers before parsing |
 | **Tier 2: Macro File-Level Router** | `src/core/router/sparseRuleRouter.ts` | Prunes candidate analyzers by `DiffSemanticCategory` × `ProjectArchetype` ($\ge 70\%$ incremental bypass; Always-On Core: `hygiene`, `secrets`, `security`, `governance`) |
-| **Tier 3: Micro AST-Slice CED Gate** | `src/core/router/sparseMoEGate.ts` | Evaluates 7-bit `SliceFeatureVector` per mutated function/block, activating 10%–25% (2–4 domain experts) with automatic fallback to `complexity + governance + hygiene` |
+| **Tier 3: Micro AST-Slice CED Gate** | `src/core/router/sparseMoEGate.ts`<br/>`src/core/ast-slice/` | Extracts bounded slices via `ASTSliceExtractor` and evaluates 7-bit `SliceFeatureVector` per mutated block, activating 10%–25% (2–4 domain experts) with `complexity + governance + hygiene` fallback |
 | **Tier 4: 32-Bit Unsigned Expert Bitmask & Tape** | `src/core/constants/analyzer-bitmask.ts`<br/>`src/core/experts/{expert-catalog,expert-activation-library,grouped-dispatcher}.ts`<br/>`src/core/ast/source-mask.ts` | Encodes all <!-- METRICS:BEGIN analyzer-count -->**32 个**<!-- METRICS:END analyzer-count --> analyzers in a 32-bit bitmask (`1 << 0` .. `1 << 31`) and gates per-line checks via `LineFeatureTape` (`LINE_FLAG_*`) in $O(1)$ |
 | **Tier 5: Zero-Alloc Pooling & Lazy AST** | `src/analyzers/*.ts`<br/>`src/core/analyzer-pool.ts` | Pools all 32 analyzers via `resetState()` and defers `ctx.sourceFile` access until after fast text/tape checks pass |
 
@@ -54,9 +54,9 @@ To bypass 70%–90% of redundant AST traversals with zero recall loss, every ana
 
 1. **Mode A vs. Mode B Parsing (`oxc-parser` & Tree-Sitter)**:
    - **Mode A (Streaming Fast Path)**: Zero-materialization AST visitor for single-file complexity and syntax checks.
-   - **Mode B (Materialized Compensation)**: On-demand `NormalizedNode` and `SemanticGraph` construction across 8 ecosystems (TS/JS, Python, Rust, Go, GDScript 4, Shell, YAML, Markdown).
+   - **Mode B (Materialized Compensation)**: On-demand `NormalizedAst` / `NormalizedNode` and `SemanticGraph` construction across 8 ecosystems (TS/JS, Python, Rust, Go, GDScript 4, Shell, YAML, Markdown).
 2. **Lazy CFG / Dominator / DFG Projection**:
-   - Project Control-Flow Graphs (`CFG`), iterative Cooper-Harvey-Kennedy immediate dominators, Data-Flow Graphs (`DFG`), and cross-file `CallGraph` lazily only when Stage 2/3 analyzers request them.
+   - `CfgBuilder` projects Control-Flow Graphs (`CFG`), iterative Cooper-Harvey-Kennedy immediate dominators, Data-Flow Graphs (`DFG`), and cross-file `CallGraph` lazily only when Stage 2/3 analyzers request them.
 
 ---
 

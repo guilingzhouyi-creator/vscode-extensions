@@ -1,14 +1,14 @@
 ---
 name: fractal-git-dev
 description: >-
-  【触发：taxis/版本控制内核/CAS/偏序集/实现子命令/字节等价/FGT规则】开发或修改 fractal-git (Taxis) 模块时必须使用。看守 10 大内核子系统分层拓扑、Git Plumbing 二进制等价、偏序集冲突检测与 CAS 无锁索引树。
+  【触发：build/hash/skew/panic/taxis/CAS/Oid/Pack】Govern fractal-git 10-crate topology, multi-hash Oid, PackWindowReader, CCD v2 poset merge, and taxis subcommands.
 ---
 
 # fractal-git-dev — Taxis (`fractal-git`) 10-Crate Kernel & Plumbing Specification
 
-Governs the `fractal-git/` 10-crate unidirectional topology, 100% Git Plumbing byte parity, poset-homomorphic conflict detection (CCD v2), lock-free CAS worktree projection, `fg-pools` epoch buffers, and <!-- METRICS:BEGIN rule-fractal-git -->**37 条规则**<!-- METRICS:END rule-fractal-git --> (`FGT-*`).
+Governs the `fractal-git/` 10-crate unidirectional topology, multi-hash `Oid` (`Sha1`/`Sha256`/`Sm3`), windowed `PackFile` reading, 100% Git Plumbing byte parity (`105` subcommands), CCD v2 poset conflict detection, lock-free CAS worktree projection, `fg-pools` epoch reuse, and <!-- METRICS:BEGIN rule-fractal-git -->**37 条规则**<!-- METRICS:END rule-fractal-git --> (`FGT-*`).
 
-> For general Rust idioms (Type-State, `thiserror`, `// SAFETY:` proofs), load [rust-engineering](../rust-engineering/SKILL.md).
+> Load [rust-engineering](../rust-engineering/SKILL.md) for Rust invariants, and [taxis-daemon-and-agent-control](../taxis-daemon-and-agent-control/SKILL.md) for persistent daemon IPC, N-API, blackboard leases, quarantine, `FGT-MSG-*`, and TS control plane.
 
 ---
 
@@ -17,10 +17,10 @@ Governs the `fractal-git/` 10-crate unidirectional topology, 100% Git Plumbing b
 
 > 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
-- **链路**：— → **本技能** → [rust-engineering](../rust-engineering/SKILL.md)；并行支援 `algorithmic-operator-engineering`、`coding-craft`、`complexity-budget`、`constraint-driven-development`。
-- **领域**：分形版本控制内核（领域入口）
+- **链路**：— → **本技能** → [taxis-daemon-and-agent-control](../taxis-daemon-and-agent-control/SKILL.md)；并行支援 `algorithmic-operator-engineering`、`coding-craft`、`complexity-budget`、`constraint-driven-development`。
+- **领域**：Fractal-Git Kernel（领域入口）
 - **协作专员**：原型 `git-kernel`：`fg-construct`、`fg-review`、`fg-refactor`、`fg-explore`
-- **何时联动**：新增或修改 taxis 子命令 → `fractal-git-dev` + `rust-engineering` + `test-benchmark-engineering`；taxis 输出与 git 逐字节不一致 → `fractal-git-dev` + `debugging-and-error-recovery` + `algorithmic-operator-engineering`
+- **何时联动**：Add or update taxis CLI subcommands and plumbing → `fractal-git-dev` + `rust-engineering` + `test-benchmark-engineering`；taxis binary output differs byte-for-byte from git → `fractal-git-dev` + `taxis-daemon-and-agent-control` + `algorithmic-operator-engineering`
 <!-- SKILL-LINKS:END -->
 
 ## 1. Ten-Crate Four-Layer Unidirectional Topology (`FGT-TOP-001` / `FGT-DEP-001`)
@@ -38,47 +38,31 @@ Verified on every `Cargo.toml` edit by `node fractal-git/scripts/common/validate
 
 ## 2. Core Kernel Invariants (`FGT-*`)
 
-1. **100% Git Plumbing Byte Parity (`FGT-ALG-001` / `FGT-OBJ-001` / `FGT-IDX-001`)**:
-   - Loose object `<type> <size>\0<payload>` headers, SHA-1/SHA-256 digests, and zlib streams must match canonical Git byte-for-byte.
-   - Sort `Tree` entries with directory names treated as having a trailing `/` (`git fsck` invariant).
-   - Encode `.git/index` (`DIRC`) in network big-endian order with 8-byte alignment padding and trailing checksum (`FGT-IDX-001`).
-2. **Lock-Free CAS Virtual Worktrees & Atomic Transactions (`FGT-LCK-001` / `FGT-CAS-001` / `FGT-TRN-001` / `FGT-STO-001`)**:
-   - Forbid coarse-grained blocking `Mutex` / `RwLock` on concurrent Cell staging and index read paths (`FGT-LCK-001`).
-   - Promote virtual worktree snapshots via `AtomicU64` / `AtomicPtr` compare-and-swap loops paired with monotonic epoch counters to prevent ABA (`FGT-CAS-001`).
-   - Enforce `Staging -> Validated -> Committed` transactions with zero-residue rollback (`FGT-TRN-001`, `FGT-STO-001`). Delegate heavy worktree materialization to background async projection workers, recording fast mutations in the Dirty Ledger.
-3. **Three-Tier Poset Conflict Detection — CCD v2 (`FGT-COR-001` / `FGT-POL-001`)**:
-   - **L1 (Bloom Filter)**: Kirsch-Mitzenmacher dual-hash filter ($h_i(x) = (h_1(x) + i \cdot h_2(x)) \bmod m$) checks path-set disjointness in $O(1)$.
-   - **L2 (Poset Homomorphism)**: Commutative hunks on intersecting files merge automatically without lock contention.
-   - **L3A (Semantic Conflict Escalation)**: Non-commutative overlaps or contract breaches abort auto-merge and emit exact conflict slices.
-4. **Zero Loop Allocation & Substantive Facades (`FGT-PRF-001` / `FGT-FAC-001` / `FGT-BRG-001`)**:
-   - Borrow/return `Vec<u8>` and `String` buffers from `fg-pools` outside hot loops (`FGT-PRF-001`).
-   - Every crate `lib.rs` and `fractal-git/ts/` facade must carry substantive validation or error mapping ($\text{ELOC} \ge 15$, `FGT-FAC-001`, `FGT-BRG-001`).
-5. **Verification Zones, TKCV/IKCE & Cryptographic Telemetry (`FGT-BYP-001` / `FGT-QRN-001` / `FGT-VRF-001` / `FGT-MUT-001` / `FGT-TAU-001` / `FGT-AUD-001` / `FGT-PYR-001` / `FGT-IMPACT-001`)**:
-   - Ephemeral tests use Direct-Bypass cache (`< 20ms` reclaim, `FGT-BYP-001`); high-risk violations quarantine to `refs/fractal/quarantine/*` (`FGT-QRN-001`).
-   - Pre-Review Zone runs **TKCV** 5D static invariant checks (`< 5ms`, `FGT-VRF-001`), **IKCE** in-memory micro-mutation testing (kill rate $K \ge 60\%$, `FGT-MUT-001`, `FGT-TAU-001`), and `taxis gate-slice` 5D ELOC differential bounds (`FGT-GAT-001`).
-   - Impact slice routing in `scripts/common/impact-slice-map.js` must never widen beyond registered targets and falls back to full suite on unknown crate paths (`FGT-IMPACT-001`).
-   - Append-only `refs/fractal/telemetry/*` HMAC-SM3 hash chain with 4-tier time folding (`FGT-AUD-001`, `FGT-PYR-001`). Avoid exaggerated claims in docs (`DOC-TRM-001`, `CMG-STY-002`).
+1. **100% Git Plumbing & Multi-Hash `Oid` (`FGT-ALG-001` / `FGT-OBJ-001` / `FGT-IDX-001`)**:
+   - `fg-core::Oid` represents variable `Sha1(20)` / `Sha256(32)` / `Sm3(32)` digests with zero `unsafe` casts and lossless tagged binary serialization.
+   - Loose object `<type> <size>\0<payload>`, `Tree` trailing-`/` sorting, and big-endian `DIRC` index checksums must match canonical Git across all 57 differential vectors (`validate-git-parity.js --require-git --require-taxis`).
+2. **Windowed Pack Storage, CAS & CCD v2 (`FGT-LCK-001` / `FGT-CAS-001` / `FGT-TRN-001` / `FGT-STO-001`)**:
+   - `PackFile` uses windowed `PackWindowReader` with `checked_add` bounds (never full-file heap loads); `projection/` (`refs`/`index`/`export`/`import`) and `git_hook/` (`config`/`shell`/`process`) stay cleanly decoupled.
+   - Promote virtual worktrees via lock-free `AtomicU64`/`AtomicPtr` CAS + monotonic `epoch` (banning hot-path `Mutex`/`RwLock`), `WorktreePool` `Path::components` traversal guards, and idempotent `SandboxPool::release`.
+   - Resolve parallel edits via 3-tier CCD v2: L1 Bloom disjointness ($O(1)$) $\to$ L2 commutative poset hunks $\to$ L3A semantic conflict escalation (`FGT-COR-001`).
+3. **Zero Loop Allocation, Facades & `// SAFETY:` (`FGT-PRF-001` / `FGT-FAC-001` / `FGT-SAF-001`)**:
+   - Reuse `fg-pools` buffers (rejecting oversized keys upfront in `ByteLruCache::insert`).
+   - Enrich every crate `lib.rs` with substantive capability/bounds contracts ($\ge 15$ ELOC) and document every `unsafe` block with 3-part `Preconditions / Invariants / Postconditions` proofs.
+4. **Drop-In CLI (`105` Subcommands) & Telemetry (`FGT-AUD-001` / `FGT-PYR-001` / `FGT-IMPACT-001`)**:
+   - Support `switch -c/-C/--detach/--orphan`, `commit --amend/--no-verify/--signoff`, `branch -a` remotes, `cherry-pick --abort` rollback, and multi-slot `stash`; return structured JSON `fallback_hint` errors for restricted offline network ops (`Edition::Engineering`).
+   - Use `OnceLock` baseline template caching in `cli_harness.rs`; ensure `impact-slice-map.js` falls back cleanly on unknown crate paths (`FGT-IMPACT-001`).
 
 ---
 
-## 3. Kernel Commit Message Rules (`FGT-MSG-001` ~ `FGT-MSG-012`)
-
-`fg-gate::commit_guard` enforces its own self-contained rule family (configured via `fractal-git/commit-policy.json` floor; `.git/config` may only tighten):
-- **Format & Section Structure**: `FGT-MSG-001` (header shape, Unicode length, `!`, zero-width/emoji/period ban), `FGT-MSG-002` (section order, ASCII brackets, `- ` bullets), `FGT-MSG-003` (section minimums: Why $\ge 15$, Fixed $\ge 12$, Verification $\ge 12$, bullet $\ge 8$), `FGT-MSG-006` (non-empty sections).
-- **Vocabulary & Hygiene**: `FGT-MSG-004` (vocabulary, imperative mood, zero first-person pronouns), `FGT-MSG-005` (no `TODO`/`FIXME`/`TBD` or template `<...>`), `FGT-MSG-007` (valid `[Project]` enum), `FGT-MSG-008` (no sprint/batch codenames).
-- **Merge, Anchor & Policy Closure**: `FGT-MSG-009` (merge commit exemption by parent count $\ge 2$), `FGT-MSG-010` (`[Verification]` must cite a symbol or test name from the diff), `FGT-MSG-011` (CLI policy flag cannot weaken repo floor), `FGT-MSG-012` (all cited rule IDs registered in SSOT).
-
----
-
-## 4. Verification & JIT Assets
+## 3. Verification & JIT Assets
 
 ```powershell
 node fractal-git/scripts/common/validate-crate-topology.js
-node .agents/skills/rust-engineering/scripts/validate-rust-conformance.js
+node fractal-git/scripts/common/validate-git-parity.js --require-git --build-taxis --require-taxis
 cargo clippy --manifest-path fractal-git/Cargo.toml --all-targets -- -D warnings
 cargo test --workspace --manifest-path fractal-git/Cargo.toml
 pwsh -File fractal-git/scripts/ps1/audit-taxis.ps1
 ```
 
-- [crate-topology-and-plumbing-protocol.md](references/crate-topology-and-plumbing-protocol.md): 10-crate dependency matrix, Git Plumbing binary framing, CCD v2 poset math, and 3-tier conflict arbitration.
+- [crate-topology-and-plumbing-protocol.md](references/crate-topology-and-plumbing-protocol.md): 10-crate boundaries, multi-hash `Oid` & Plumbing frames, windowed pack protocol, and CCD v2 poset math.
 - [cell-cas-transaction-skeleton.rs](templates/cell-cas-transaction-skeleton.rs): Lock-free CAS snapshot promotion, epoch ABA guard, and atomic transaction rollback template.

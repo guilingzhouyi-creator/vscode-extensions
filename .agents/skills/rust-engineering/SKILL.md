@@ -1,7 +1,7 @@
 ---
 name: rust-engineering
 description: >-
-  【触发：Rust/Cargo/unsafe/无锁/Clippy/编写Rust/panic】编写或重构 Rust 代码时必须触发。全面贯彻 Type-State 状态机、零瞬态堆分配(FGT-PRF-001)、thiserror 强类型错误、// SAFETY: 严格证明及 Clippy 零容忍门禁。
+  【触发：unwrap/build/panic/leak/Rust/Cargo/Clippy/unsafe】Enforce Type-State, thiserror errors, zero panics/loop alloc, 3-part // SAFETY: proofs, and Clippy -D warnings.
 ---
 
 # rust-engineering — Production Rust Systems Engineering & Zero-Cost Abstraction Contract
@@ -15,10 +15,10 @@ Governs all workspace Rust crates (`fractal-git` 10 kernel crates and `auto-refa
 
 > 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
-- **链路**：[fractal-git-dev](../fractal-git-dev/SKILL.md)、[praxis-vfs-and-trajectory-learning](../praxis-vfs-and-trajectory-learning/SKILL.md) → **本技能** → [state-concurrency-and-crash-recovery](../state-concurrency-and-crash-recovery/SKILL.md)、[algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md)；并行支援 `coding-craft`、`complexity-budget`、`constraint-driven-development`、`debugging-and-error-recovery`。
-- **领域**：分形版本控制内核（链上第 2 步）；其余 1 条领域链见 `docs/skill-catalog.md`
+- **链路**：[taxis-daemon-and-agent-control](../taxis-daemon-and-agent-control/SKILL.md)、[praxis-vfs-and-trajectory-learning](../praxis-vfs-and-trajectory-learning/SKILL.md) → **本技能** → [state-concurrency-and-crash-recovery](../state-concurrency-and-crash-recovery/SKILL.md)、[algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md)；并行支援 `coding-craft`、`complexity-budget`、`constraint-driven-development`、`debugging-and-error-recovery`。
+- **领域**：Fractal-Git Kernel（链上第 3 步）；其余 1 条领域链见 `docs/skill-catalog.md`
 - **协作专员**：原型 `git-kernel`：`fg-construct`、`fg-review`、`fg-refactor`、`fg-explore`
-- **何时联动**：新增或修改 taxis 子命令 → `fractal-git-dev` + `rust-engineering` + `test-benchmark-engineering`；精简模块导出面与消除空门面 → `fractal-git-dev` + `facade-discipline` + `rust-engineering`
+- **何时联动**：Add or update taxis CLI subcommands and plumbing → `fractal-git-dev` + `rust-engineering` + `test-benchmark-engineering`；Enrich thin crate facades and eliminate trampolines → `fractal-git-dev` + `facade-discipline` + `rust-engineering`
 <!-- SKILL-LINKS:END -->
 
 ## 1. Eight Pillars of Production Rust Systems Engineering

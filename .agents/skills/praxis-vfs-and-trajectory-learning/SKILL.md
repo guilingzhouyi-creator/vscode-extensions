@@ -1,7 +1,7 @@
 ---
 name: praxis-vfs-and-trajectory-learning
 description: >-
-  【触发：LayerVFS/MCTS/轨迹学习/配方提取/虚拟分叉/沙箱联调/回滚失败】开发或调试 LayerVFS 虚拟文件沙箱、MCTS 重构树搜索、轨迹学习配方提取或 Praxis 审查门禁链时触发。保障 CAS 零落盘分叉与事务回滚闭环。
+  【触发：isolate/test/dirty/gaming/LayerVFS/MCTS/recipe/plugin】Govern LayerVFS CAS forks, 3-ply MCTS exploration, AAS auto-fix transforms, and preset trajectory plugins.
 ---
 
 # praxis-vfs-and-trajectory-learning — Praxis Review Gate Chain, LayerVFS Sandbox & Trajectory Recipe Learning
@@ -16,9 +16,9 @@ Governs the `PraxisReviewClient` SDK, the `ReviewGateChain` (`GAT-*`) differenti
 > 生成自 `scripts/common/skill-registry.json`，禁止手改；完整联动卡片见 `docs/skill-catalog.md`。
 
 - **链路**：[sparse-moe-and-ast-routing](../sparse-moe-and-ast-routing/SKILL.md) → **本技能** → [rust-engineering](../rust-engineering/SKILL.md)；并行支援 `algorithmic-operator-engineering`、`coding-craft`、`complexity-budget`、`constraint-driven-development`。
-- **领域**：自动重构内核（链上第 3 步）
+- **领域**：Auto-Refactor Engine（链上第 3 步）
 - **协作专员**：原型 `cli-engine`：`ar-construct`、`ar-review`、`ar-refactor`、`ar-explore`
-- **何时联动**：LayerVFS 沙箱分叉或轨迹配方提取调试 → `praxis-vfs-and-trajectory-learning` + `auto-refactor-dev` + `test-benchmark-engineering`
+- **何时联动**：Debug LayerVFS forks, 3-ply MCTS, or preset recipe plugins → `praxis-vfs-and-trajectory-learning` + `auto-refactor-dev` + `test-benchmark-engineering`
 <!-- SKILL-LINKS:END -->
 
 ## 1. Praxis SDK, Dual-Surface Diff & Review Gate Chain (`GAT-*`)
@@ -42,18 +42,20 @@ Governs the `PraxisReviewClient` SDK, the `ReviewGateChain` (`GAT-*`) differenti
    - Content-defined chunking (FastCDC) deduplicates file mutations into a SQLite WAL content-addressable store, achieving virtual branch fork latency `< 3ms` and atomic rollback `< 1ms`.
 2. **Controlled Physical Sandbox Projection**:
    - Materializes dirty chunks only into an isolated sandbox directory when invoking external compilers/test runners; enforces non-blocking async I/O (`PRF-IO-001`) and kills hung child processes with exit code `124`.
-3. **MCTS UCT Refactoring Tournament**:
-   - Explores candidate refactoring AST transformations via Upper Confidence Bound for Trees ($\text{UCT} = \bar{X}_j + C \sqrt{\frac{\ln N}{n_j}}$), pruning any branch that regresses cyclomatic complexity ($\Delta \text{CC} > 0$), violates `ARCH-FAC-001`, or fails sandbox verification.
+3. **MCTS 3-Ply Search & Diff Evaluation (`mcts-explorer.ts`)**:
+   - Explores configurable 3-ply non-conflicting patch trees using baseline snapshot deltas (`captureBaselineSnapshots`), pruning candidates with $\Delta \text{CC} > 0$, `ARCH-FAC-001` violations, or sandbox failures, and reaping timed-out child process trees cleanly.
 
 ---
 
-## 3. Trajectory Recipe Learning & Compact Ledger (`src/core/trajectory/`)
+## 3. Trajectory Recipe Learning, Auto-Fix Ops & Telemetry (`src/core/trajectory/`)
 
-1. **Recipe Extraction (`recipeExtractor.ts` & `recipeTypes.ts`)**:
-   - Extracts reusable transformation recipes (`BeforeAST -> AfterAST`, resolved rule IDs, net $\Delta Q$, and 5D ELOC delta) from verified refactoring trajectories (`TrajectoryLearningService`).
-   - Rejects candidate recipes that trigger `BLOCK_GAMING_DETECTED` ($\text{ELOC}_{\text{semantic}} \le 15\%$ with $\Delta_{\text{Debt}} \le 0$).
-2. **Compact Trajectory Ledger (`.refactor-trajectory/`)**:
-   - Each ledger entry must remain `< 350 bytes`, use nominal `*Ms` timestamp fields, and flush via PID-salted staging files (`stagingPath` / `compactStagingPath`) + atomic `fs.rename` (`GOV-PRF-004`).
+1. **Preset-Driven Recipe Extraction & `GOV-GAM-001`**:
+   - Extract reusable `BeforeAST -> AfterAST` recipes via `PraxisTrajectoryLearningService`, loading domain/DSL patterns from preset plugins (`loadTrajectoryPluginsFromPresets`, `presets/godot-game.config.json`) rather than core hardcoding.
+   - `ChangeQualityArbiter` aligns with `GOV-GAM-001` (`antiGaming.ts`) and passes live `newIssues` in `PatchArbiter`; reject recipes triggering `BLOCK_GAMING_DETECTED`.
+2. **AST Fix Dispatcher & Catalog Coverage (`fix-dispatcher.ts`, `diagnostic-catalog.ts`)**:
+   - Execute `PatchEngine` `insertAnchor` (`after_imports`) edits and comment-bounded AAS `actionable.patch` transforms (`SIM-TRN-001`, `HYG-WRAP-001`, `HYG-DED-001`, `HYG-STB-002`); keep `DIAGNOSTIC_CATALOG` at 377/377 rule coverage.
+3. **Compact Ledger & Outcome Calibration (`.refactor-trajectory/`, `baselines/`)**:
+   - Keep ledger entries `< 350` bytes with `*Ms` nominal timestamps and PID-salted atomic `rename` (`GOV-PRF-004`), updated via `harvest-calibration-outcomes.js`.
 
 ---
 
