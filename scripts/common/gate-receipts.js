@@ -36,6 +36,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { isProtectedBranch, validateBranchName } = require('./validate-branch-governance');
 
 const SCHEMA_VERSION = 'gate-receipt-v1', RECEIPTS_DIRNAME = 'gate-receipts', PENDING_DIRNAME = 'pending';
 const BASELINE_FILENAME = 'baseline.json', BYPASS_LOG_FILENAME = 'bypass.log';
@@ -51,7 +52,6 @@ const RECEIPT_KEY_ENV = 'DSH_GATE_RECEIPT_KEY_FILE', RECEIPT_KEY_DIRNAME = '.dsh
 const RECEIPT_KEY_BYTES = 32, RECEIPT_KEY_MODE = 0o600, SIGNATURE_HEX_LENGTH = 64;
 const RECEIPT_KEY_PATTERN = /^[0-9a-f]{64}$/i, SHA_HEX_PATTERN = /^[0-9a-f]{40}$/;
 const SIGNATURE_FIELD = 'signature', SIGNATURE_ALG_FIELD = 'signatureAlg', SIGNATURE_ALG = 'hmac-sha256';
-const GIT_ENV_KEYS = Object.freeze(['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX', 'GIT_COMMON_DIR', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES']);
 
 const USAGE = [
   '用法: node scripts/common/gate-receipts.js <命令> [选项]',
@@ -202,16 +202,12 @@ function tryWriteJson(filePath, value) {
   }
 }
 
-/**
- * Appends one JSONL record without ever leaving a truncated log line behind.
- *
- * The existing bytes are copied into the staged file first, which keeps every intermediate snapshot
- * a complete, parseable trail even when two hooks overlap.
- */
-function appendJsonLineAtomic(filePath, record) {
+function appendJsonLinesAtomic(filePath, records) {
+  if (!Array.isArray(records) || records.length === 0) return;
   const existing = fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : '';
   const prefix = existing.length > 0 && !existing.endsWith('\n') ? `${existing}\n` : existing;
-  writeFileAtomic(filePath, `${prefix}${JSON.stringify(record)}\n`);
+  const lines = records.map((record) => `${JSON.stringify(record)}\n`).join('');
+  writeFileAtomic(filePath, `${prefix}${lines}`);
 }
 
 function readJsonSafe(filePath) {
@@ -366,7 +362,9 @@ function commandMark(options) {
   const pendingPath = path.join(receiptsRoot(gitDir), PENDING_DIRNAME, `${options.ppid}.json`);
   const existing = readJsonSafe(pendingPath);
   const phases = { ...readPendingPhases(existing) };
-  phases[options.phase] = { status, at: nowIso() };
+  const entry = { status, at: nowIso() };
+  if (options.phase === 'pre-commit') entry.treeSha = gitText(['write-tree']) || '';
+  phases[options.phase] = entry;
   const record = {
     schemaVersion: SCHEMA_VERSION,
     ppid: Number(options.ppid),
@@ -400,11 +398,14 @@ function commandFinalize(options) {
   const receipts = receiptsRoot(gitDir);
   const pendingPath = path.join(receipts, PENDING_DIRNAME, `${options.ppid}.json`);
   const phases = readPendingPhases(readJsonSafe(pendingPath));
-  const verified = PHASES.every((phase) => Object.prototype.hasOwnProperty.call(phases, phase));
+  const treeSha = gitText(['rev-parse', `${headSha}^{tree}`]) || '';
+  const allPhasesPresent = PHASES.every((phase) => Object.prototype.hasOwnProperty.call(phases, phase));
+  const preCommitTree = phases['pre-commit'] && typeof phases['pre-commit'].treeSha === 'string' ? phases['pre-commit'].treeSha : '';
+  const treeMatched = preCommitTree.length === 0 || preCommitTree === treeSha;
+  const verified = allPhasesPresent && treeMatched;
   const receiptPath = path.join(receipts, `${headSha}.json`);
   const existing = readJsonSafe(receiptPath);
-  const existingTrusted = existing !== null && existing.verified === true && verifyRecordSignature(existing).ok;
-  if (existingTrusted) {
+  if (isTrustedVerifiedReceipt(existing, headSha)) {
     removePendingFile(pendingPath);
     console.log(`SKIP 收据 ${shortSha(headSha)} 已存在且 verified=true，保持不变`);
     return EXIT_OK;
@@ -412,12 +413,12 @@ function commandFinalize(options) {
   const receipt = {
     schemaVersion: SCHEMA_VERSION,
     commitSha: headSha,
-    treeSha: gitText(['rev-parse', `${headSha}^{tree}`]) || '',
+    treeSha,
     indexDigest: hashIndexListing(),
     phases,
     verified,
     bypass: !verified,
-    bypassReason: verified ? null : resolveBypassReason(),
+    bypassReason: verified ? null : (!treeMatched ? 'staged-tree-mismatch' : resolveBypassReason()),
     sourceHook: hook,
     actor: resolveActor(),
     createdAt: nowIso(),
@@ -484,15 +485,18 @@ function rewriteOneReceipt(receipts, key, pair) {
   if (oldReceipt === null) {
     return `WARN 收据重写跳过 ${shortSha(pair.oldSha)} -> ${shortSha(pair.newSha)}：旧收据不存在`;
   }
+  if (oldReceipt.commitSha !== pair.oldSha) {
+    return `WARN 收据重写跳过 ${shortSha(pair.oldSha)} -> ${shortSha(pair.newSha)}：旧收据 commitSha 不匹配`;
+  }
   const oldTrust = verifyRecordSignature(oldReceipt);
   if (!oldTrust.ok) {
     return `WARN 收据重写跳过 ${shortSha(pair.oldSha)} -> ${shortSha(pair.newSha)}：旧收据签名不可信（${oldTrust.reason}）`;
   }
   const existing = readJsonSafe(path.join(receipts, `${pair.newSha}.json`));
-  if (existing !== null && existing.verified === true && verifyRecordSignature(existing).ok) {
+  if (isTrustedVerifiedReceipt(existing, pair.newSha)) {
     return `SKIP 收据重写 ${shortSha(pair.newSha)}：已有可信收据，保持不变`;
   }
-  const verified = oldReceipt.verified === true;
+  const verified = oldReceipt.verified === true && oldReceipt.bypass === false;
   const rewritten = attachSignature(
     {
       schemaVersion: oldReceipt.schemaVersion || SCHEMA_VERSION,
@@ -625,75 +629,81 @@ function readCommitAncestors(baselineSha) {
   return ancestors;
 }
 
-/**
- * Builds the baseline exemption predicate for one pushed range.
- *
- * Contract semantics are "the commit is exempt when it is an ancestor of baseline.json's commit".
- * For ordinary pushes that is answered literally with git merge-base --is-ancestor; a very large
- * range is instead answered from one git rev-list snapshot of the baseline, which yields exactly
- * the same ancestor set, because one process per commit would otherwise dominate pre-push latency.
- *
- * @param {string} receipts - Absolute receipts root.
- * @param {number} commitCount - Number of commits in the pushed range.
- * @returns {(sha: string) => boolean} Exemption predicate.
- */
-function createBaselineExemptionLookup(receipts, commitCount) {
+function resolveBaselineSha(receipts) {
   const baseline = readJsonSafe(path.join(receipts, BASELINE_FILENAME));
-  const baselineTrusted = baseline !== null && verifyRecordSignature(baseline).ok;
-  const baselineSha = baselineTrusted && typeof baseline.commitSha === 'string' ? baseline.commitSha : '';
+  if (baseline === null || !verifyRecordSignature(baseline).ok) return '';
+  return typeof baseline.commitSha === 'string' ? baseline.commitSha : '';
+}
+
+function createBaselineExemptionLookup(baselineSha, commitCount, ancestorCache) {
   if (baselineSha.length === 0) return () => false;
-  if (commitCount <= MERGE_BASE_PROBE_LIMIT) {
+  if (commitCount <= MERGE_BASE_PROBE_LIMIT && !ancestorCache.set) {
     return (sha) => gitSucceeds(['merge-base', '--is-ancestor', sha, baselineSha]);
   }
-  const ancestors = readCommitAncestors(baselineSha);
+  if (!ancestorCache.set) ancestorCache.set = readCommitAncestors(baselineSha);
+  const ancestors = ancestorCache.set;
   return (sha) => ancestors.has(sha);
 }
 
-function hasVerifiedReceipt(receipts, sha) {
-  const receipt = readJsonSafe(path.join(receipts, `${sha}.json`));
-  if (receipt === null || receipt.verified !== true) return false;
+function isTrustedVerifiedReceipt(receipt, expectedSha) {
+  if (receipt === null || receipt.schemaVersion !== SCHEMA_VERSION) return false;
+  if (receipt.commitSha !== expectedSha) return false;
+  if (receipt.verified !== true || receipt.bypass !== false) return false;
   return verifyRecordSignature(receipt).ok;
 }
 
-function violationNote(violation) {
-  return violation.kind === 'range-error' ? '无法枚举推送提交范围' : RECEIPT_MISSING_TEXT;
+function hasVerifiedReceipt(receipts, sha) {
+  return isTrustedVerifiedReceipt(readJsonSafe(path.join(receipts, `${sha}.json`)), sha);
 }
 
-function collectRowViolations(row, receipts, violations) {
+function violationNote(violation) {
+  if (violation.kind === 'range-error') return '无法枚举推送提交范围';
+  if (violation.kind === 'range-truncated') return `推送提交超过 ${MAX_PUSH_COMMITS} 个上限且超出历史未获可信收据或基线豁免`;
+  return RECEIPT_MISSING_TEXT;
+}
+
+function collectRowViolations(row, receipts, baselineSha, ancestorCache, violations) {
   const range = resolvePushRange(row);
   if (range.error === true) {
     violations.push({ sha: row.localSha, remoteRef: row.remoteRef, kind: 'range-error' });
     return;
   }
-  if (range.truncated) {
-    console.log(`INFO 提交集合超过 ${MAX_PUSH_COMMITS} 个上限，仅处理前 ${MAX_PUSH_COMMITS} 个（按已处理集合判定）`);
-  }
-  const isExempt = createBaselineExemptionLookup(receipts, range.commits.length);
+  const isExempt = createBaselineExemptionLookup(baselineSha, range.commits.length, ancestorCache);
   for (const sha of range.commits.slice(0, MAX_PUSH_COMMITS)) {
     if (isExempt(sha)) continue;
     if (!hasVerifiedReceipt(receipts, sha)) violations.push({ sha, remoteRef: row.remoteRef, kind: 'missing-receipt' });
   }
+  if (range.truncated) {
+    const firstUnchecked = range.commits.slice(MAX_PUSH_COMMITS).find((sha) => !isExempt(sha));
+    if (firstUnchecked !== undefined) {
+      violations.push({ sha: firstUnchecked, remoteRef: row.remoteRef, kind: 'range-truncated' });
+    }
+  }
 }
 
 function collectReceiptViolations(rows, receipts) {
+  const baselineSha = resolveBaselineSha(receipts);
+  const ancestorCache = { set: null };
   const violations = [];
   for (const row of rows) {
     if (isZeroSha(row.localSha)) continue;
-    collectRowViolations(row, receipts, violations);
+    collectRowViolations(row, receipts, baselineSha, ancestorCache, violations);
   }
   return violations;
 }
 
 function recordOperatorBypass(receipts, violations) {
   const logPath = path.join(receipts, BYPASS_LOG_FILENAME);
+  const ts = nowIso();
+  const records = violations.map((violation) => ({
+    ts,
+    commit: violation.sha,
+    ref: violation.remoteRef,
+    reason: OPERATOR_BYPASS_REASON,
+  }));
   try {
+    appendJsonLinesAtomic(logPath, records);
     for (const violation of violations) {
-      appendJsonLineAtomic(logPath, {
-        ts: nowIso(),
-        commit: violation.sha,
-        ref: violation.remoteRef,
-        reason: OPERATOR_BYPASS_REASON,
-      });
       console.log(`WARN 提交 ${shortSha(violation.sha)} ${violationNote(violation)}，已按 --allow-bypass 记录豁免（ref=${violation.remoteRef}）`);
     }
   } catch (error) {
@@ -739,14 +749,14 @@ function commandVerifyReceipts(options) {
 
 function isProtectedRef(remoteRef) {
   if (!remoteRef.startsWith(PROTECTED_PREFIX)) return false;
-  return PROTECTED_BRANCHES.includes(remoteRef.slice(PROTECTED_PREFIX.length));
+  return isProtectedBranch(remoteRef.slice(PROTECTED_PREFIX.length));
 }
 
 /**
- * Applies the three ref-safety rules to one update row.
+ * Applies the ref-safety and branch-governance rules to one update row.
  *
- * Deletion is judged before any object lookup, a new branch is always a fast forward, and a remote
- * object missing locally yields INFO: an unjudgeable update must not become a proven violation.
+ * Deletion is judged before any object lookup, a new branch must conform to the 5-tier taxonomy,
+ * and a remote object missing locally yields INFO: an unjudgeable update must not become a proven violation.
  */
 function evaluateRefRow(row) {
   if (isZeroSha(row.localSha)) {
@@ -754,7 +764,13 @@ function evaluateRefRow(row) {
       ? { tag: TAG_BLOCK, note: '受保护分支删除被拒绝' }
       : { tag: TAG_PASS, note: '非受保护分支删除，放行' };
   }
-  if (isZeroSha(row.remoteSha)) return { tag: TAG_PASS, note: '新建分支，放行' };
+  if (isZeroSha(row.remoteSha)) {
+    const branchName = row.remoteRef.startsWith(PROTECTED_PREFIX) ? row.remoteRef.slice(PROTECTED_PREFIX.length) : row.remoteRef;
+    const v = validateBranchName(branchName);
+    return v.valid
+      ? { tag: TAG_PASS, note: `新建分形规范分支 (Tier ${v.tier})，放行` }
+      : { tag: TAG_BLOCK, note: `新建非标分支被拒绝 (FGT-TOP-001): ${v.error}` };
+  }
   if (!gitSucceeds(['cat-file', '-e', `${row.remoteSha}^{commit}`])) {
     return { tag: TAG_INFO, note: '远端对象本地缺失，无法判定快进关系，放行' };
   }
@@ -783,6 +799,7 @@ function commandVerifyRefs(options) {
   return violations === 0 ? EXIT_OK : EXIT_BLOCK;
 }
 
+const GIT_ENV_KEYS = Object.freeze(['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX', 'GIT_COMMON_DIR', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES']);
 function detachGitEnvironment() {
   const saved = new Map();
   for (const key of GIT_ENV_KEYS) {
@@ -883,119 +900,6 @@ function readLastJsonLine(filePath) {
   return JSON.parse(lines[lines.length - 1]);
 }
 
-function selftestMarkFinalize(repo, baseSha) {
-  return selftestCase('a) mark 两阶段 + finalize => verified=true 且 pending 已删除', () => {
-    expectSelftestExit(selftestCli(repo, ['mark', '--phase', 'pre-commit', '--ppid', '4242']), 0, 'mark pre-commit');
-    expectSelftestExit(selftestCli(repo, ['mark', '--phase', 'commit-msg', '--ppid', '4242']), 0, 'mark commit-msg');
-    expectSelftestExit(selftestCli(repo, ['finalize', '--ppid', '4242']), 0, 'finalize');
-    const receipts = selftestReceipts(repo);
-    const receipt = readJsonSafe(path.join(receipts, `${baseSha}.json`));
-    assertSelftest(receipt !== null, '收据文件不存在');
-    assertSelftest(receipt.schemaVersion === SCHEMA_VERSION, `schemaVersion=${receipt.schemaVersion}`);
-    assertSelftest(receipt.verified === true, `verified=${receipt.verified}`);
-    assertSelftest(receipt.bypass === false, `bypass=${receipt.bypass}`);
-    assertSelftest(receipt.bypassReason === null, `bypassReason=${receipt.bypassReason}`);
-    assertSelftest(receipt.actor === 'selftest@example.invalid', `actor=${receipt.actor}`);
-    assertSelftest(receipt.sourceHook === 'post-commit', `sourceHook=${receipt.sourceHook}`);
-    assertSelftest(typeof receipt.treeSha === 'string' && receipt.treeSha.length > 0, 'treeSha 缺失');
-    assertSelftest(typeof receipt.indexDigest === 'string' && receipt.indexDigest.length === 40, 'indexDigest 缺失');
-    const phases = receipt.phases;
-    assertSelftest(phases['pre-commit'] !== undefined && phases['commit-msg'] !== undefined, 'phases 不完整');
-    assertSelftest(!fs.existsSync(path.join(receipts, PENDING_DIRNAME, '4242.json')), 'pending 文件未删除');
-    return `commitSha=${shortSha(baseSha)} verified=true pending 已删除`;
-  });
-}
-
-function selftestBypassReceipt(repo, secondSha) {
-  return selftestCase('b) 无 pending finalize => verified=false, bypass=true, bypassReason 默认值', () => {
-    expectSelftestExit(selftestCli(repo, ['finalize', '--ppid', '4343']), 0, 'finalize 无 pending');
-    const receipt = readJsonSafe(path.join(selftestReceipts(repo), `${secondSha}.json`));
-    assertSelftest(receipt !== null, '收据文件不存在');
-    assertSelftest(receipt.verified === false, `verified=${receipt.verified}`);
-    assertSelftest(receipt.bypass === true, `bypass=${receipt.bypass}`);
-    assertSelftest(receipt.bypassReason === BYPASS_REASON, `bypassReason=${receipt.bypassReason}`);
-    return 'verified=false bypass=true bypassReason=no-verify-or-unrecorded';
-  });
-}
-
-function selftestBaselineExemption(repo, baselineSha) {
-  return selftestCase('c) baseline 之前的提交在 verify-receipts 中被豁免', () => {
-    expectSelftestExit(selftestCli(repo, ['baseline']), 0, 'baseline');
-    const baseline = readJsonSafe(path.join(selftestReceipts(repo), BASELINE_FILENAME));
-    assertSelftest(baseline !== null && baseline.commitSha === baselineSha, 'baseline commitSha 不符');
-    const refsFile = writeSelftestRefs(repo, 'baseline', [refLine('refs/heads/main', baselineSha, 'refs/heads/main', ZERO_SHA)]);
-    expectSelftestExit(selftestCli(repo, ['verify-receipts', '--refs-file', refsFile]), 0, 'verify-receipts baseline 豁免');
-    return `baseline=${shortSha(baselineSha)} 历史提交豁免通过`;
-  });
-}
-
-function selftestReceiptRequired(repo, remoteSha, localSha) {
-  return selftestCase('d) 新提交无收据 => exit 1；补收据后 exit 0', () => {
-    const refsFile = writeSelftestRefs(repo, 'required', [refLine('refs/heads/main', localSha, 'refs/heads/main', remoteSha)]);
-    const blocked = selftestCli(repo, ['verify-receipts', '--refs-file', refsFile]);
-    expectSelftestExit(blocked, 1, 'verify-receipts 缺收据');
-    assertSelftest(blocked.stdout.includes('BLOCK 提交'), '缺少 BLOCK 提交行');
-    expectSelftestExit(selftestCli(repo, ['mark', '--phase', 'pre-commit', '--ppid', '5151']), 0, 'mark pre-commit');
-    expectSelftestExit(selftestCli(repo, ['mark', '--phase', 'commit-msg', '--ppid', '5151']), 0, 'mark commit-msg');
-    expectSelftestExit(selftestCli(repo, ['finalize', '--ppid', '5151']), 0, 'finalize');
-    expectSelftestExit(selftestCli(repo, ['verify-receipts', '--refs-file', refsFile]), 0, 'verify-receipts 补收据后');
-    return '缺收据 exit=1，补收据 exit=0';
-  });
-}
-
-function selftestAllowBypass(repo, remoteSha, localSha) {
-  return selftestCase('e) --allow-bypass 缺收据仍 exit 0 且 bypass.log 追加一行', () => {
-    const logPath = path.join(selftestReceipts(repo), BYPASS_LOG_FILENAME);
-    const before = countNonEmptyLines(logPath);
-    const refsFile = writeSelftestRefs(repo, 'allow', [refLine('refs/heads/main', localSha, 'refs/heads/main', remoteSha)]);
-    expectSelftestExit(
-      selftestCli(repo, ['verify-receipts', '--refs-file', refsFile, '--allow-bypass']),
-      0,
-      'verify-receipts --allow-bypass',
-    );
-    const after = countNonEmptyLines(logPath);
-    assertSelftest(after === before + 1, `bypass.log 行数 ${before} -> ${after}`);
-    const entry = readLastJsonLine(logPath);
-    assertSelftest(entry.commit === localSha, `bypass.log commit=${entry.commit}`);
-    assertSelftest(entry.ref === 'refs/heads/main', `bypass.log ref=${entry.ref}`);
-    assertSelftest(entry.reason === OPERATOR_BYPASS_REASON, `bypass.log reason=${entry.reason}`);
-    assertSelftest(typeof entry.ts === 'string' && entry.ts.length > 0, 'bypass.log ts 缺失');
-    return `bypass.log +1 行 reason=${entry.reason}`;
-  });
-}
-
-function selftestRefSafety(repo, presentSha) {
-  return selftestCase('f) verify-refs 受保护分支删除 exit 1，特性分支删除 exit 0', () => {
-    const protectedRefs = writeSelftestRefs(repo, 'delete-protected', [
-      refLine('(delete)', ZERO_SHA, 'refs/heads/main', presentSha),
-    ]);
-    expectSelftestExit(selftestCli(repo, ['verify-refs', '--refs-file', protectedRefs]), 1, '删除受保护分支');
-    const featureRefs = writeSelftestRefs(repo, 'delete-feature', [
-      refLine('(delete)', ZERO_SHA, 'refs/heads/feature/cleanup', presentSha),
-    ]);
-    expectSelftestExit(selftestCli(repo, ['verify-refs', '--refs-file', featureRefs]), 0, '删除特性分支');
-    return '受保护删除 exit=1，特性删除 exit=0';
-  });
-}
-
-function selftestNonFastForward(repo, ancestorSha, localSha, divergentSha) {
-  return selftestCase('g) 非快进推送受保护分支 exit 1，普通快进 exit 0', () => {
-    const nonFastForward = writeSelftestRefs(repo, 'non-ff-protected', [
-      refLine('refs/heads/main', localSha, 'refs/heads/main', divergentSha),
-    ]);
-    expectSelftestExit(selftestCli(repo, ['verify-refs', '--refs-file', nonFastForward]), 1, '非快进受保护分支');
-    const fastForward = writeSelftestRefs(repo, 'fast-forward', [
-      refLine('refs/heads/main', localSha, 'refs/heads/main', ancestorSha),
-    ]);
-    expectSelftestExit(selftestCli(repo, ['verify-refs', '--refs-file', fastForward]), 0, '普通快进');
-    const featureNonFastForward = writeSelftestRefs(repo, 'non-ff-feature', [
-      refLine('refs/heads/topic', localSha, 'refs/heads/topic', divergentSha),
-    ]);
-    expectSelftestExit(selftestCli(repo, ['verify-refs', '--refs-file', featureNonFastForward]), 0, '非快进特性分支');
-    return '非快进受保护 exit=1，快进 exit=0，非快进特性 exit=0';
-  });
-}
-
 function selftestUnsignedReceiptBlocked(repo) {
   return selftestCase('h) 手写 {verified:true} 无签名收据 => verify-receipts exit 1', () => {
     const sha = commitSelftestFile(repo, 'unsigned.txt', 'one\n', 'unsigned target');
@@ -1056,70 +960,29 @@ function selftestRewriteAfterAmend(repo) {
   });
 }
 
-function createDivergentCommit(repo, baseSha) {
-  const branch = expectSelftestGit(repo.dir, ['rev-parse', '--abbrev-ref', 'HEAD'], '自测读取当前分支');
-  expectSelftestGit(repo.dir, ['checkout', '-q', '-b', 'selftest-side', baseSha], '自测创建旁支');
-  const sha = commitSelftestFile(repo, 'side.txt', 'side\n', 'side commit');
-  expectSelftestGit(repo.dir, ['checkout', '-q', branch], '自测切回主分支');
-  return sha;
-}
-
-function cleanupSelftestRepo(dir) {
-  try {
-    fs.rmSync(dir, { recursive: true, force: true });
-  } catch (error) {
-    process.stderr.write(`WARN 清理自测目录失败: ${error.message}\n`);
-  }
-}
-
-function reportSelftest(results) {
-  console.log('== gate-receipts selftest ==');
-  let failures = 0;
-  for (const result of results) {
-    if (!result.ok) failures += 1;
-    console.log(`  ${result.ok ? 'PASS' : 'FAIL'} ${result.label} -> ${result.detail}`);
-  }
-  console.log(`== selftest ${failures === 0 ? 'PASS' : 'FAIL'}: ${results.length - failures}/${results.length} 条断言通过 ==`);
-  return failures === 0 ? EXIT_OK : EXIT_BLOCK;
-}
-
-function executeSelftest() {
+function commandSelftest() {
+  const h = require("./lib/gate-receipts-selftest-helpers");
+  const { buildCoreSelftestCases } = require("./lib/gate-receipts-selftest-core");
+  const cfg = { schemaVersion: SCHEMA_VERSION, receiptsDirname: RECEIPTS_DIRNAME, pendingDirname: PENDING_DIRNAME, baselineFilename: BASELINE_FILENAME, bypassLogFilename: BYPASS_LOG_FILENAME, bypassReason: BYPASS_REASON, operatorBypassReason: OPERATOR_BYPASS_REASON, receiptKeyEnv: RECEIPT_KEY_ENV };
+  const saved = detachGitEnvironment();
   const repo = createSelftestRepo();
   const previousKeyEnv = process.env[RECEIPT_KEY_ENV];
-  process.env[RECEIPT_KEY_ENV] = path.join(repo.dir, 'receipt.key');
-  const results = [];
+  process.env[RECEIPT_KEY_ENV] = path.join(repo.dir, "receipt.key");
   try {
-    const baseSha = commitSelftestFile(repo, 'note.txt', 'one\n', 'base commit');
-    results.push(selftestMarkFinalize(repo, baseSha));
-    const secondSha = commitSelftestFile(repo, 'note.txt', 'two\n', 'second commit');
-    results.push(selftestBypassReceipt(repo, secondSha));
-    results.push(selftestBaselineExemption(repo, secondSha));
-    const thirdSha = commitSelftestFile(repo, 'note.txt', 'three\n', 'third commit');
-    results.push(selftestReceiptRequired(repo, secondSha, thirdSha));
-    const fourthSha = commitSelftestFile(repo, 'note.txt', 'four\n', 'fourth commit');
-    results.push(selftestAllowBypass(repo, thirdSha, fourthSha));
-    const divergentSha = createDivergentCommit(repo, secondSha);
-    results.push(selftestRefSafety(repo, fourthSha));
-    results.push(selftestNonFastForward(repo, thirdSha, fourthSha, divergentSha));
-    results.push(selftestUnsignedReceiptBlocked(repo));
-    results.push(selftestTamperedSignatureBlocked(repo));
-    results.push(selftestRewriteAfterAmend(repo));
-  } finally {
-    if (previousKeyEnv === undefined) delete process.env[RECEIPT_KEY_ENV];
-    else process.env[RECEIPT_KEY_ENV] = previousKeyEnv;
-    cleanupSelftestRepo(repo.dir);
-  }
-  return reportSelftest(results);
-}
-
-function commandSelftest() {
-  const saved = detachGitEnvironment();
-  try {
-    return executeSelftest();
+    const receiptsDir = selftestReceipts(repo);
+    const ctx = { repo, cliPath: __filename, receiptsDir, cfg };
+    const { cases } = buildCoreSelftestCases(ctx);
+    cases.push(selftestUnsignedReceiptBlocked(repo));
+    cases.push(selftestTamperedSignatureBlocked(repo));
+    cases.push(selftestRewriteAfterAmend(repo));
+    return h.reportSelftest(cases);
   } catch (error) {
     process.stderr.write(`FAIL selftest 执行异常: ${error.message}\n`);
     return EXIT_BLOCK;
   } finally {
+    if (previousKeyEnv === undefined) delete process.env[RECEIPT_KEY_ENV];
+    else process.env[RECEIPT_KEY_ENV] = previousKeyEnv;
+    h.cleanupSelftestRepo(repo.dir);
     restoreGitEnvironment(saved);
   }
 }
