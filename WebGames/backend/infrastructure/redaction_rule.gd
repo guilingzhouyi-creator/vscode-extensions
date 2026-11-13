@@ -65,7 +65,7 @@ static func _ensure_loaded() -> void:
 
 	_enabled = bool(redaction_cfg.get("enabled", true))
 	_default_mode = str(redaction_cfg.get("default_mode", MODE_MASK))
-	var rules_arr = redaction_cfg.get("rules", [])
+	var rules_arr: Variant = redaction_cfg.get("rules", [])
 	if rules_arr is Array:
 		for item in rules_arr:
 			if not (item is Dictionary):
@@ -153,7 +153,7 @@ static func _redact_dict(source: Dictionary, out_redacted_keys: Array[String]) -
 	var target: Dictionary = {}
 	for k in source.keys():
 		var key_str := str(k)
-		var val = source[k]
+		var val: Variant = source[k]
 		var matched_rule := _find_matching_rule(key_str)
 		if matched_rule != null:
 			if not (key_str in out_redacted_keys):

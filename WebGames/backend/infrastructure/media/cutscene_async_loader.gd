@@ -170,13 +170,14 @@ func poll_tasks() -> void:
 		return
 
 	var completed_ids: Array[int] = []
+	var progress_arr: Array = []
 	for task_id in _active_tasks.keys():
 		var task: AsyncMediaTask = _active_tasks[task_id]
 		if task.is_cancelled:
 			completed_ids.append(task_id)
 			continue
 
-		var progress_arr: Array = []
+		progress_arr.clear()
 		var status := ResourceLoader.load_threaded_get_status(task.resource_path, progress_arr)
 		if not progress_arr.is_empty():
 			task.progress = float(progress_arr[0])

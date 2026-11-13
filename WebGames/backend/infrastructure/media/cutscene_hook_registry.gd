@@ -55,32 +55,38 @@ func initialize_from_config() -> void:
 	var reg_data: Dictionary = GameConfig.get_dict("infrastructure.cutscene_registry", "cutscenes", {})
 	for cs_id in reg_data.keys():
 		var item: Dictionary = reg_data[cs_id]
-		var m := CutsceneManifestDTOClass.new()
-		m.cutscene_id = str(cs_id)
-		m.title_key = str(item.get("title_key", ""))
-		m.video_resource_path = str(item.get("video_resource_path", ""))
-		m.duration_sec = float(item.get("duration_sec", 3.0))
-		m.default_audio_bus = str(item.get("default_audio_bus", "BGM"))
-		m.default_volume_linear = float(item.get("default_volume_linear", 1.0))
-		m.subtitles_track_id = str(item.get("subtitles_track_id", ""))
-		m.default_skippable = bool(item.get("default_skippable", true))
-		m.is_placeholder = bool(item.get("is_placeholder", false))
-		m.placeholder_title = str(item.get("placeholder_title", ""))
-		m.placeholder_text = str(item.get("placeholder_text", ""))
-
-		var raw_tags: Variant = item.get("tags", [])
-		if raw_tags is Array:
-			for t in (raw_tags as Array):
-				m.tags.append(str(t))
-		_manifests[str(cs_id)] = m
+		_manifests[str(cs_id)] = _build_manifest_dto(str(cs_id), item)
 
 	# 2. 载入 Hook 规则
 	var hooks_arr: Array = GameConfig.get_array("infrastructure.cutscene_hooks", "hooks", [])
 	for h in hooks_arr:
 		if h is Dictionary:
-			var copied := (h as Dictionary).duplicate(true)
-			_hooks.append(copied)
-			_index_hook(copied)
+			_append_and_index_hook(h as Dictionary)
+
+func _build_manifest_dto(cs_id: String, item: Dictionary) -> CutsceneManifestDTO:
+	var m := CutsceneManifestDTOClass.new()
+	m.cutscene_id = cs_id
+	m.title_key = str(item.get("title_key", ""))
+	m.video_resource_path = str(item.get("video_resource_path", ""))
+	m.duration_sec = float(item.get("duration_sec", 3.0))
+	m.default_audio_bus = str(item.get("default_audio_bus", "BGM"))
+	m.default_volume_linear = float(item.get("default_volume_linear", 1.0))
+	m.subtitles_track_id = str(item.get("subtitles_track_id", ""))
+	m.default_skippable = bool(item.get("default_skippable", true))
+	m.is_placeholder = bool(item.get("is_placeholder", false))
+	m.placeholder_title = str(item.get("placeholder_title", ""))
+	m.placeholder_text = str(item.get("placeholder_text", ""))
+
+	var raw_tags: Variant = item.get("tags", [])
+	if raw_tags is Array:
+		for t in (raw_tags as Array):
+			m.tags.append(str(t))
+	return m
+
+func _append_and_index_hook(raw_hook: Dictionary) -> void:
+	var copied := raw_hook.duplicate(true)
+	_hooks.append(copied)
+	_index_hook(copied)
 
 # ==============================================================================
 # 三、动态注册与重载接口 (支持 MOD 开发者热扩展)

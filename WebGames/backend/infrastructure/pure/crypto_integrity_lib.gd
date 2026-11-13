@@ -223,7 +223,7 @@ static func open_log_record_envelope(
 	if plain_bytes.is_empty():
 		return {"ok": false, "data": {}, "chain_hash": chain_hash, "error": "DECRYPT_FAILED"}
 
-	var parsed = JSON.parse_string(plain_bytes.get_string_from_utf8())
+	var parsed: Variant = JSON.parse_string(plain_bytes.get_string_from_utf8())
 	if not (parsed is Dictionary):
 		return {"ok": false, "data": {}, "chain_hash": chain_hash, "error": "JSON_PARSE_FAILED"}
 	var parsed_dict: Dictionary = parsed

@@ -66,13 +66,13 @@ static func from_config() -> LogExportConfigDTO:
 	dto.max_files = int(export_dict.get("max_files", LogConstants.DEFAULT_MAX_LOG_FILES))
 	dto.min_level = str(export_dict.get("min_level", LogConstants.LEVEL_LOWER_INFO))
 	dto.batch_size = maxi(1, int(export_dict.get("batch_size", LogConstants.DEFAULT_BATCH_THRESHOLD)))
-	var enc_val = export_dict.get("encryption", {})
+	var enc_val: Variant = export_dict.get("encryption", {})
 	if enc_val is Dictionary:
 		var enc_dict: Dictionary = enc_val
 		dto.encryption_enabled = bool(enc_dict.get("enabled", false))
 		dto.encryption_seal_key_env = str(enc_dict.get("seal_key_env", LogConstants.ENC_DEFAULT_SEAL_ENV))
 		dto.hmac_chain_enabled = bool(enc_dict.get("hmac_chain", true))
-	var channels = export_dict.get("include_channels", [])
+	var channels: Variant = export_dict.get("include_channels", [])
 	if channels is Array:
 		dto.include_channels.clear()
 		for ch in channels:

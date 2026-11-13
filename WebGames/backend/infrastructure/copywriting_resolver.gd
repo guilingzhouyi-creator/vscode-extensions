@@ -39,12 +39,25 @@ static func resolve(
 		return {"success": false, "code": "COPY_KEY_INVALID", "copy_key": copy_key}
 
 	var domain := parts[0]
+	var effective_locale := locale_override.strip_edges()
 	var table_name := "copywriting." + domain
-	var entry: Dictionary = GameConfig.get_dict(table_name, parts[1], {})
+	var entry: Dictionary = {}
+	if not effective_locale.is_empty():
+		entry = GameConfig.get_dict("copywriting.%s.%s" % [domain, effective_locale], parts[1], {})
 	if entry.is_empty():
-		return {"success": false, "code": "COPY_ENTRY_MISSING", "copy_key": copy_key}
+		var base_entry: Dictionary = GameConfig.get_dict(table_name, parts[1], {})
+		if not effective_locale.is_empty() and base_entry.get(effective_locale) is Dictionary:
+			entry = base_entry.get(effective_locale, {})
+		else:
+			entry = base_entry
 
-	var template := _select_template(entry, params, outcome)
+	var template := _select_template(entry, params, outcome) if not entry.is_empty() else ""
+	if not effective_locale.is_empty():
+		var locale_dict: Dictionary = LocalizationRegistryCatalog.get_shared()._locale_dictionaries.get(effective_locale, {})
+		if locale_dict.has(copy_key):
+			template = str(locale_dict[copy_key])
+	if entry.is_empty() and template.is_empty():
+		return {"success": false, "code": "COPY_ENTRY_MISSING", "copy_key": copy_key}
 	if template.is_empty():
 		return {"success": false, "code": "COPY_TEMPLATE_MISSING", "copy_key": copy_key}
 
@@ -69,8 +82,9 @@ static func _select_template(entry: Dictionary, params: Dictionary, outcome: Str
 	else:
 		text = str(entry.get("base", str(entry.get("text", ""))))
 	var conditions: Array = entry.get("conditions", [])
+	var empty_when: Dictionary = {}
 	for cond in conditions:
-		if _state_match(cond.get("when", {}), params):
+		if _state_match(cond.get("when", empty_when), params):
 			text += str(cond.get("text", ""))
 	return text
 

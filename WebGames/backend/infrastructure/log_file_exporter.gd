@@ -122,7 +122,7 @@ static func _recover_chain_hash_if_needed(main_path: String) -> void:
 	fa.close()
 	if last_line.is_empty():
 		return
-	var parsed = JSON.parse_string(last_line)
+	var parsed: Variant = JSON.parse_string(last_line)
 	if parsed is Dictionary and parsed.has(LogConstants.ENC_KEY_CHAIN_HASH):
 		var tail_hash := str(parsed.get(LogConstants.ENC_KEY_CHAIN_HASH, ""))
 		if not tail_hash.is_empty():
@@ -182,64 +182,66 @@ static func _prepare_write_line(plain_line: String, seq: int, main_path: String)
 
 ## 内部批量刷盘（持有 _io_mutex 时调用）：先判轮转再密封落盘，保证新文件以 GENESIS 锚定
 static func _flush_unlocked() -> int:
-	if _pending_batch.is_empty() or _config == null or not _config.enabled:
+	if _pending_batch.is_empty() or _config == null or not _config.enabled or _config.directory.is_empty():
 		return 0
-	var dir := _config.directory
-	if dir.is_empty():
-		return 0
-	if not DirAccess.dir_exists_absolute(dir):
-		DirAccess.make_dir_recursive_absolute(dir)
+	if not DirAccess.dir_exists_absolute(_config.directory):
+		DirAccess.make_dir_recursive_absolute(_config.directory)
 
-	var base := "%s/%s" % [dir, _config.file_prefix]
+	var base := "%s/%s" % [_config.directory, _config.file_prefix]
 	var main_path := base + LogConstants.LOG_FILE_EXTENSION
-	var flushed_count := 0
-	var f: FileAccess = null
-	var failed_idx := -1
+	var state: Dictionary = {"handle": null, "flushed": 0, "failed_idx": -1}
 
 	for idx in range(_pending_batch.size()):
-		var plain_line := _pending_batch[idx]
-		var seq: int = _pending_seqs[idx] if idx < _pending_seqs.size() else 0
-		if _needs_rotation(main_path):
-			if f != null:
-				f.flush()
-				f.close()
-				f = null
-			_rotate_target_if_needed(base)
-
-		var prepared := _prepare_write_line(plain_line, seq, main_path)
-		if not bool(prepared.get("ok", false)):
-			failed_idx = idx
+		if not _flush_single_pending_line(idx, base, main_path, state):
+			state["failed_idx"] = idx
 			break
-		var line := str(prepared.get("line", ""))
 
-		if f == null:
-			f = _open_append_handle(main_path)
-			if f == null:
-				failed_idx = idx
-				break
+	var handle: FileAccess = state.get("handle")
+	if handle != null:
+		handle.flush()
+		handle.close()
 
-		f.store_line(line)
-		if f.get_error() != OK:
-			failed_idx = idx
-			break
-		if _config.encryption_enabled:
-			_last_chain_hash = str(prepared.get("chain_hash", _last_chain_hash))
-		_exported_count += 1
-		flushed_count += 1
-		if _cached_file_size >= 0:
-			_cached_file_size += line.to_utf8_buffer().size() + 1
-
-	if f != null:
-		f.flush()
-		f.close()
-
+	var failed_idx: int = int(state.get("failed_idx", -1))
 	if failed_idx >= 0:
 		_pending_batch = _pending_batch.slice(failed_idx)
 		_pending_seqs = _pending_seqs.slice(failed_idx)
 	else:
 		_pending_batch.clear()
 		_pending_seqs.clear()
-	return flushed_count
+	return int(state.get("flushed", 0))
+
+static func _flush_single_pending_line(idx: int, base: String, main_path: String, state: Dictionary) -> bool:
+	var plain_line: String = _pending_batch[idx]
+	var seq: int = _pending_seqs[idx] if idx < _pending_seqs.size() else 0
+	var handle: FileAccess = state.get("handle")
+	if _needs_rotation(main_path):
+		if handle != null:
+			handle.flush()
+			handle.close()
+			handle = null
+			state["handle"] = null
+		_rotate_target_if_needed(base)
+
+	var prepared := _prepare_write_line(plain_line, seq, main_path)
+	if not bool(prepared.get("ok", false)):
+		return false
+	if handle == null:
+		handle = _open_append_handle(main_path)
+		if handle == null:
+			return false
+		state["handle"] = handle
+
+	var line := str(prepared.get("line", ""))
+	handle.store_line(line)
+	if handle.get_error() != OK:
+		return false
+	if _config.encryption_enabled:
+		_last_chain_hash = str(prepared.get("chain_hash", _last_chain_hash))
+	_exported_count += 1
+	state["flushed"] = int(state.get("flushed", 0)) + 1
+	if _cached_file_size >= 0:
+		_cached_file_size += line.to_utf8_buffer().size() + 1
+	return true
 
 static func _open_append_handle(target: String) -> FileAccess:
 	if FileAccess.file_exists(target):

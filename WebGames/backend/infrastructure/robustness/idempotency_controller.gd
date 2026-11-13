@@ -48,16 +48,20 @@ func check_and_record(p_token: String, p_result_if_new: Variant = true) -> Dicti
 		"result": p_result_if_new
 	}
 
-func _evict_excess_tokens() -> void:
-	while _token_order_dict.size() >= _max_token_history:
-		var victim: String = ""
-		for k in _token_order_dict:
-			victim = String(k)
-			break
+func _evict_single_oldest_token() -> bool:
+	for k in _token_order_dict:
+		var victim: String = String(k)
 		if victim.is_empty():
-			break
+			return false
 		_token_order_dict.erase(victim)
 		_executed_tokens.erase(victim)
+		return true
+	return false
+
+func _evict_excess_tokens() -> void:
+	while _token_order_dict.size() >= _max_token_history:
+		if not _evict_single_oldest_token():
+			break
 
 ## 检查控制器中是否存在指定请求令牌
 func has_token(p_token: String) -> bool:

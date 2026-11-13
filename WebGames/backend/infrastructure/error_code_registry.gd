@@ -42,7 +42,7 @@ static func _ensure_loaded() -> void:
 	_registry.clear()
 	var catalog: Dictionary = GameConfig.get_dict(LogConstants.CFG_ERRORS_CATALOG, "errors", {})
 	for code_str in catalog.keys():
-		var raw_entry = catalog[code_str]
+		var raw_entry: Variant = catalog[code_str]
 		if raw_entry is Dictionary:
 			var entry := _create_entry(String(code_str), raw_entry)
 			_registry[entry.code] = entry
