@@ -15,7 +15,7 @@
  *     content-oriented; the heuristics are keyword-anchored so a missed modernization is
  *     preferred over a wrong rewrite suggestion.
  */
-import type { Analyzer, AnalyzerContext, Issue, AgentActionType, Severity } from '../core/types';
+import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
 import { REGEX } from '../core/constants';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
@@ -26,25 +26,95 @@ import {
     PY_ABC_TYPING_NAMES,
     SHADOW_IGNORE_NAMES,
 } from './python-modern-tables';
+import {
+    ACTION_REPLACE_TOKEN,
+    ACTIONABLE_SPECS,
+    PYTHON_ASYNC_KEYWORD,
+    RULE_PYM_ABC_001,
+    RULE_PYM_GENERIC_001,
+    RULE_PYM_IMPORT_001,
+    RULE_PYM_SHADOW_001,
+    SECTION_LABELS,
+    SECTION_LOCAL_INDEX,
+    SECTION_STDLIB_INDEX,
+    SECTION_THIRD_PARTY_INDEX,
+    SPEC_ASYNC_BLOCKING,
+    SPEC_ASYNC_ORM,
+    SPEC_DEFAULT,
+    SPEC_IMPORT_ORDER,
+    SPEC_OPEN,
+    SPEC_RAISE,
+    SPEC_SLOTS,
+    SUGGESTION_ABC,
+    SUGGESTION_IMPORT_ORDER,
+    SUGGESTION_SHADOW,
+    type Block,
+    type BlockKind,
+    type ImportRecord,
+    type IssueSpec,
+    type PyBlockContext,
+    type PyEmitter,
+    type PyImportAccumulator,
+    type PyLineScanContext,
+} from './python-modern-contracts';
 
-const RULE_PYM_PATH_001 = 'PYM-PATH-001';
-const RULE_PYM_RAISE_001 = 'PYM-RAISE-001';
-const RULE_PYM_DEFAULT_001 = 'PYM-DEFAULT-001';
-const RULE_PYM_DATETIME_001 = 'PYM-DATETIME-001';
-const RULE_PYM_UNION_001 = 'PYM-UNION-001';
-const RULE_PYM_SLOTS_001 = 'PYM-SLOTS-001';
-const RULE_PYM_ASYNC_001 = 'PYM-ASYNC-001';
-const RULE_PYM_OPEN_001 = 'PYM-OPEN-001';
-const RULE_PYM_SHADOW_001 = 'PYM-SHADOW-001';
-const RULE_PYM_FSTRING_001 = 'PYM-FSTRING-001';
-const RULE_PYM_GENERIC_001 = 'PYM-GENERIC-001';
-const RULE_PYM_ABC_001 = 'PYM-ABC-001';
-const RULE_PYM_IMPORT_001 = 'PYM-IMPORT-001';
+const PREFIX_OS_PATH = 'os.path.';
+const PYTHON_SINGLE_LINE_RULES: ReadonlyArray<{
+    readonly spec: IssueSpec;
+    readonly fastTrigger: string | readonly string[];
+    readonly matches: (line: string) => boolean;
+}> = Object.freeze([
+    {
+        spec: {
+            rule: 'PYM-PATH-001',
+            severity: SEVERITY_WARNING,
+            message: 'os.path usage: prefer pathlib.Path for path manipulation.',
+            suggestion:
+                'Build paths with pathlib.Path (`Path(...) / name`), which is OS-neutral and self-documenting.',
+        },
+        fastTrigger: PREFIX_OS_PATH,
+        matches: (line: string) => line.includes(PREFIX_OS_PATH),
+    },
+    {
+        spec: {
+            rule: 'PYM-FSTRING-001',
+            severity: SEVERITY_WARNING,
+            message: 'Percent-formatting is legacy: f-strings are faster and harder to misalign.',
+            suggestion: 'Rewrite as an f-string (`f"...{value}"`).',
+        },
+        fastTrigger: '%',
+        matches: (line: string) => REGEX.PYTHON.PERCENT_FORMAT.test(line),
+    },
+    {
+        spec: {
+            rule: 'PYM-DATETIME-001',
+            severity: SEVERITY_ERROR,
+            message: 'timezone.utc is superseded by the datetime.UTC singleton.',
+            suggestion: 'Use `datetime.UTC` (PEP 615 / ruff UP017).',
+        },
+        fastTrigger: 'timezone.utc',
+        matches: (line: string) => REGEX.PYTHON.TIMEZONE_UTC.test(line),
+    },
+    {
+        spec: {
+            rule: 'PYM-UNION-001',
+            severity: SEVERITY_ERROR,
+            message: 'Optional/Union in an annotation or alias: PEP 604 unions read better.',
+            suggestion: 'Write `X | None` / `X | Y` instead of Optional/Union.',
+        },
+        fastTrigger: ['Optional', 'Union'],
+        matches: (line: string) =>
+            REGEX.PYTHON.PEP604_ANN_ASSIGN.test(line) || REGEX.PYTHON.PEP604_ALIAS.test(line),
+    },
+]);
 
-const ACTION_APPLY_GUARD = 'apply_guard_clause';
-const ACTION_RENAME_SYMBOL = 'rename_symbol';
-const ACTION_SIMPLIFY_CONTROL = 'simplify_control_flow';
-const ACTION_REPLACE_TOKEN = 'replace_token';
+function hasFastTrigger(trigger: string | readonly string[], line: string): boolean {
+    if (typeof trigger === 'string') return line.includes(trigger);
+    for (let i = 0; i < trigger.length; i++) {
+        if (line.includes(trigger[i])) return true;
+    }
+    return false;
+}
 
 const SCOPE_KIND_MODULE = 'module';
 const SCOPE_KIND_FUNCTION = 'function';
@@ -54,7 +124,6 @@ const BLOCK_KIND_CLASS = 'class';
 const BLOCK_KIND_EXCEPT = 'except';
 const BLOCK_KIND_WITH = 'with';
 const BLOCK_KIND_OTHER = 'other';
-const PREFIX_OS_PATH = 'os.path.';
 
 const BLOCK_OPEN_RE = REGEX.PYTHON.BLOCK_OPEN;
 
@@ -75,240 +144,14 @@ const IMPORT_FROM_RE = REGEX.PYTHON.IMPORT_FROM;
 const BLOCKING_CALL_RE = REGEX.PYTHON.BLOCKING_CALL;
 const SYNC_ORM_CALL_RE = REGEX.PYTHON.SYNC_ORM_CALL;
 const AWAITED_ORM_CALL_RE = REGEX.PYTHON.AWAITED_ORM_CALL;
-const PERCENT_FORMAT_RE = REGEX.PYTHON.PERCENT_FORMAT;
 const RAISE_RE = REGEX.PYTHON.RAISE;
 
 /** Maximum number of following lines inspected for a `from` cause clause on a multi-line raise. */
 const RAISE_CAUSE_LOOKAHEAD_LINES = 5;
 
-/** Block kind for an `async def` frame; mirrors the Python `async` keyword token. */
-const PYTHON_ASYNC_KEYWORD = 'async';
 const ABC_IMPORT_RE = REGEX.PYTHON.ABC_IMPORT;
-const PY_PEP604_ANN_ASSIGN_RE = REGEX.PYTHON.PEP604_ANN_ASSIGN;
-const PY_PEP604_ALIAS_RE = REGEX.PYTHON.PEP604_ALIAS;
 const PY_DATACLASS_RE = REGEX.PYTHON.DATACLASS;
-
-const SECTION_LABEL_STDLIB = 'stdlib';
-const SECTION_LABEL_THIRD_PARTY = 'third-party';
-const SECTION_LABEL_LOCAL = 'local';
-const SECTION_LABELS: readonly string[] = Object.freeze([
-    SECTION_LABEL_STDLIB,
-    SECTION_LABEL_THIRD_PARTY,
-    SECTION_LABEL_LOCAL,
-]);
-
-const SECTION_STDLIB_INDEX = 0;
-const SECTION_THIRD_PARTY_INDEX = 1;
-const SECTION_LOCAL_INDEX = 2;
-
-const SNIPPET_PATH = 'Path($1) / $2';
-const SNIPPET_RAISE = 'raise $1 from $2';
-const SNIPPET_DEFAULT = '$1: $2 = None';
-const SNIPPET_DATETIME = 'datetime.UTC';
-const SNIPPET_UNION = '$1 | None';
-const SNIPPET_SLOTS = '@dataclass(slots=True)';
-const SNIPPET_ASYNC = 'await asyncio.to_thread($1)';
-const SNIPPET_OPEN = 'with open($1) as $2:';
-const SNIPPET_SHADOW = '$1_renamed';
-const SNIPPET_FSTRING = 'f"{$1}"';
-const SNIPPET_GENERIC = '$1[$2]';
-const SNIPPET_ABC = 'from collections.abc import $1';
-const SNIPPET_IMPORT = 'import $1';
-
-/** Issue metadata specification for constructing structured findings. */
-interface IssueSpec {
-    readonly rule: string;
-    readonly severity: Severity;
-    readonly message: string;
-    readonly suggestion: string;
-}
-
-const SPEC_PATH: IssueSpec = Object.freeze({
-    rule: RULE_PYM_PATH_001,
-    severity: SEVERITY_WARNING,
-    message: 'os.path usage: prefer pathlib.Path for path manipulation.',
-    suggestion:
-        'Build paths with pathlib.Path (`Path(...) / name`), which is OS-neutral and self-documenting.',
-});
-
-const SPEC_FSTRING: IssueSpec = Object.freeze({
-    rule: RULE_PYM_FSTRING_001,
-    severity: SEVERITY_WARNING,
-    message: 'Percent-formatting is legacy: f-strings are faster and harder to misalign.',
-    suggestion: 'Rewrite as an f-string (`f"...{value}"`).',
-});
-
-const SPEC_DATETIME: IssueSpec = Object.freeze({
-    rule: RULE_PYM_DATETIME_001,
-    severity: SEVERITY_ERROR,
-    message: 'timezone.utc is superseded by the datetime.UTC singleton.',
-    suggestion: 'Use `datetime.UTC` (PEP 615 / ruff UP017).',
-});
-
-const SPEC_UNION: IssueSpec = Object.freeze({
-    rule: RULE_PYM_UNION_001,
-    severity: SEVERITY_ERROR,
-    message: 'Optional/Union in an annotation or alias: PEP 604 unions read better.',
-    suggestion: 'Write `X | None` / `X | Y` instead of Optional/Union.',
-});
-
-const SUGGESTION_ABC =
-    'Import these names from collections.abc (the typing aliases are deprecated).';
-const SUGGESTION_IMPORT_ORDER = 'Sort each import section alphabetically by whole line.';
-const SUGGESTION_SHADOW =
-    'Rename the variable or use a different name to avoid shadowing the outer binding.';
 const TYPEOF_STRING = 'string';
-
-const SPEC_RAISE: IssueSpec = Object.freeze({
-    rule: RULE_PYM_RAISE_001,
-    severity: SEVERITY_WARNING,
-    message: '`raise` inside an except block without `from` drops the original exception chain.',
-    suggestion:
-        'Re-raise with `raise NewError(...) from exc` (or a bare `raise` to propagate unchanged).',
-});
-
-const SPEC_DEFAULT: IssueSpec = Object.freeze({
-    rule: RULE_PYM_DEFAULT_001,
-    severity: SEVERITY_WARNING,
-    message:
-        'Mutable default argument detected: the default is created once and shared by every call.',
-    suggestion: 'Use a `None` sentinel and build the list/dict/set inside the body.',
-});
-
-const SPEC_OPEN: IssueSpec = Object.freeze({
-    rule: RULE_PYM_OPEN_001,
-    severity: SEVERITY_WARNING,
-    message: '`open()` without a `with` block leaks the file handle on error paths.',
-    suggestion:
-        'Wrap the call in `with open(...) as handle:` so the handle closes deterministically.',
-});
-
-const SPEC_ASYNC_BLOCKING: IssueSpec = Object.freeze({
-    rule: RULE_PYM_ASYNC_001,
-    severity: SEVERITY_ERROR,
-    message: 'Blocking call inside an async function blocks the event loop.',
-    suggestion:
-        'Use the async equivalent (asyncio.sleep, httpx, async repository) or run the blocking call in a thread.',
-});
-
-const SPEC_ASYNC_ORM: IssueSpec = Object.freeze({
-    rule: RULE_PYM_ASYNC_001,
-    severity: SEVERITY_ERROR,
-    message: 'Synchronous ORM call inside an async function is not awaited.',
-    suggestion:
-        'Await the async session (`await session.execute(...)`) or use the async repository API.',
-});
-
-const SPEC_SLOTS: IssueSpec = Object.freeze({
-    rule: RULE_PYM_SLOTS_001,
-    severity: SEVERITY_WARNING,
-    message:
-        'Dataclass without slots=True: instances carry a __dict__ and typos create silent attributes.',
-    suggestion:
-        'Add `slots=True` (or an explicit `slots=False` when __dict__ is genuinely required).',
-});
-
-const SPEC_IMPORT_ORDER: IssueSpec = Object.freeze({
-    rule: RULE_PYM_IMPORT_001,
-    severity: SEVERITY_WARNING,
-    message: 'Import section order violated.',
-    suggestion: 'Group imports as stdlib → third-party → local (PEP 8), separated by blank lines.',
-});
-
-interface ActionableSpec {
-    readonly action?: AgentActionType;
-    readonly code: string;
-    readonly safeToAutomate?: boolean;
-    readonly templateSnippet: string;
-}
-
-interface ActionableConfigEntry {
-    readonly rule: string;
-    readonly codeId: string;
-    readonly snippet: string;
-    readonly action?: AgentActionType;
-    readonly autoSafe?: boolean;
-}
-
-const ACTIONABLE_SPECS_TABLE: readonly ActionableConfigEntry[] = [
-    { rule: RULE_PYM_PATH_001, codeId: '001', snippet: SNIPPET_PATH },
-    {
-        rule: RULE_PYM_RAISE_001,
-        codeId: '002',
-        snippet: SNIPPET_RAISE,
-        action: ACTION_APPLY_GUARD,
-    },
-    {
-        rule: RULE_PYM_DEFAULT_001,
-        codeId: '003',
-        snippet: SNIPPET_DEFAULT,
-        action: ACTION_APPLY_GUARD,
-    },
-    { rule: RULE_PYM_DATETIME_001, codeId: '004', snippet: SNIPPET_DATETIME, autoSafe: true },
-    { rule: RULE_PYM_UNION_001, codeId: '005', snippet: SNIPPET_UNION, autoSafe: true },
-    { rule: RULE_PYM_SLOTS_001, codeId: '006', snippet: SNIPPET_SLOTS },
-    {
-        rule: RULE_PYM_ASYNC_001,
-        codeId: '007',
-        snippet: SNIPPET_ASYNC,
-        action: ACTION_APPLY_GUARD,
-    },
-    {
-        rule: RULE_PYM_OPEN_001,
-        codeId: '008',
-        snippet: SNIPPET_OPEN,
-        action: ACTION_APPLY_GUARD,
-    },
-    {
-        rule: RULE_PYM_SHADOW_001,
-        codeId: '009',
-        snippet: SNIPPET_SHADOW,
-        action: ACTION_RENAME_SYMBOL,
-    },
-    { rule: RULE_PYM_FSTRING_001, codeId: '010', snippet: SNIPPET_FSTRING },
-    { rule: RULE_PYM_GENERIC_001, codeId: '011', snippet: SNIPPET_GENERIC, autoSafe: true },
-    { rule: RULE_PYM_ABC_001, codeId: '012', snippet: SNIPPET_ABC, autoSafe: true },
-    {
-        rule: RULE_PYM_IMPORT_001,
-        codeId: '013',
-        snippet: SNIPPET_IMPORT,
-        action: ACTION_SIMPLIFY_CONTROL,
-    },
-];
-
-function buildActionableSpecMap(
-    entries: readonly ActionableConfigEntry[],
-): Record<string, ActionableSpec> {
-    const map: Record<string, ActionableSpec> = {};
-    for (let entryIndex = 0; entryIndex < entries.length; entryIndex++) {
-        const configEntry = entries[entryIndex];
-        map[configEntry.rule] = {
-            action: configEntry.action ?? ACTION_REPLACE_TOKEN,
-            code: `AR:PYM:${configEntry.codeId}`,
-            safeToAutomate: configEntry.autoSafe ?? false,
-            templateSnippet: configEntry.snippet,
-        };
-    }
-    return map;
-}
-
-const ACTIONABLE_SPECS: Readonly<Record<string, ActionableSpec>> = Object.freeze(
-    buildActionableSpecMap(ACTIONABLE_SPECS_TABLE),
-);
-
-/** One module-level import statement captured for the ordering rule (PYM-IMPORT-001). */
-interface ImportRecord {
-    readonly line: number;
-    readonly text: string;
-    readonly section: number;
-}
-
-type BlockKind = typeof PYTHON_ASYNC_KEYWORD | 'def' | 'class' | 'except' | 'with' | 'other';
-
-interface Block {
-    readonly indent: number;
-    readonly kind: BlockKind;
-}
 
 /**
  * A Python lexical scope tracked for outer-scope shadowing detection (PYM-SHADOW-001).
@@ -329,81 +172,11 @@ interface ShadowingOptions {
     readonly ignoreNames: Set<string>;
 }
 
-type PyEmitter = (
-    targetLineIndex: number,
-    spec: IssueSpec,
-    detail: Record<string, unknown>,
-) => void;
-
-interface PyLineScanContext {
-    line: string;
-    trimmed: string;
-    lineIndex: number;
-    readonly emit: PyEmitter;
-}
-
-interface PyBlockContext {
-    inExcept: boolean;
-    inWith: boolean;
-    inAsync: boolean;
-}
-
 interface PyShadowContext {
     indent: number;
     readonly varScopes: VarScope[];
     readonly opts: ShadowingOptions;
     readonly emit: PyEmitter;
-}
-
-interface PyImportAccumulator {
-    readonly file: string;
-    readonly records: ImportRecord[];
-}
-
-interface PySingleLineRule {
-    readonly spec: IssueSpec;
-    readonly fastTrigger: string | readonly string[];
-    readonly matches: (line: string) => boolean;
-}
-
-const PYTHON_SINGLE_LINE_RULES: readonly PySingleLineRule[] = Object.freeze([
-    {
-        spec: SPEC_PATH,
-        fastTrigger: PREFIX_OS_PATH,
-        matches: (line: string) => line.includes(PREFIX_OS_PATH),
-    },
-    {
-        spec: SPEC_FSTRING,
-        fastTrigger: '%',
-        matches: (line: string) => PERCENT_FORMAT_RE.test(line),
-    },
-    {
-        spec: SPEC_DATETIME,
-        fastTrigger: 'timezone.utc',
-        matches: (line: string) => REGEX.PYTHON.TIMEZONE_UTC.test(line),
-    },
-    {
-        spec: SPEC_UNION,
-        fastTrigger: ['Optional', 'Union'],
-        matches: (line: string) =>
-            PY_PEP604_ANN_ASSIGN_RE.test(line) || PY_PEP604_ALIAS_RE.test(line),
-    },
-]);
-
-function containsPyTriggerToken(line: string, token: string): boolean {
-    return line.includes(token);
-}
-
-function hasFastTrigger(trigger: string | readonly string[], line: string): boolean {
-    if (typeof trigger === 'string') {
-        return containsPyTriggerToken(line, trigger);
-    }
-    for (let i = 0; i < trigger.length; i++) {
-        if (containsPyTriggerToken(line, trigger[i])) {
-            return true;
-        }
-    }
-    return false;
 }
 
 /**
