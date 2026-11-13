@@ -15,14 +15,20 @@
 
 #![allow(dead_code)]
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 use tempfile::TempDir;
+
+#[path = "sandbox_guard.rs"]
+mod sandbox_guard;
+pub use sandbox_guard::{purge_stale_scratch, ScratchDirGuard};
 
 static SCRATCH_COUNTER: AtomicUsize = AtomicUsize::new(0);
 static TEST_TMP_BASE: OnceLock<PathBuf> = OnceLock::new();
+static PURGED_SUITES: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
 
 /// Returns the cached root path for integration test scratch directories (`target/test_tmp`).
 ///
@@ -34,6 +40,7 @@ pub fn test_tmp_base() -> &'static Path {
             .join("target")
             .join("test_tmp");
         let _ = std::fs::create_dir_all(&base);
+        purge_stale_scratch(&base);
         base
     })
 }
@@ -48,6 +55,28 @@ pub fn scratch_repo(prefix: &str, label: &str) -> PathBuf {
         std::fs::create_dir_all(&path).expect("scratch repository");
     }
     path
+}
+
+/// Allocates a deterministic scratch directory wrapped in an auto-reclaiming [`ScratchDirGuard`].
+pub fn scratch_repo_guard(prefix: &str, label: &str) -> ScratchDirGuard {
+    ScratchDirGuard::new(scratch_repo(prefix, label))
+}
+
+/// Allocates an auto-reclaiming scratch directory under `target/test_tmp/<suite>`.
+pub fn scratch_scoped_dir(suite: &str, label: &str) -> ScratchDirGuard {
+    let base = test_tmp_base().join(suite);
+    let _ = std::fs::create_dir_all(&base);
+    let purged = PURGED_SUITES.get_or_init(|| Mutex::new(HashSet::new()));
+    if let Ok(mut guard) = purged.lock() {
+        if guard.insert(suite.to_string()) {
+            purge_stale_scratch(&base);
+        }
+    }
+    let count = SCRATCH_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let path = base.join(format!("{}_{}_{}", std::process::id(), count, label));
+    let _ = std::fs::remove_dir_all(&path);
+    std::fs::create_dir_all(&path).expect("create suite scratch directory");
+    ScratchDirGuard::new(path)
 }
 
 /// Allocates an isolated temporary directory under `target/test_tmp` with the given prefix.
@@ -68,7 +97,8 @@ pub fn test_temp_dir(prefix: &str) -> TempDir {
 pub fn baseline_bare_template() -> &'static Path {
     static TEMPLATE: OnceLock<PathBuf> = OnceLock::new();
     TEMPLATE.get_or_init(|| {
-        let path = test_tmp_base().join(format!("baseline_bare_template_{}.git", std::process::id()));
+        let path =
+            test_tmp_base().join(format!("baseline_bare_template_{}.git", std::process::id()));
         if !path.join("HEAD").exists() {
             let _ = std::fs::create_dir_all(&path);
             let _ = Command::new("git")
