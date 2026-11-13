@@ -94,48 +94,61 @@ func _setup_ui() -> void:
 	_lbl_caption.mouse_filter = MOUSE_FILTER_IGNORE
 	add_child(_lbl_caption)
 
+static var _cached_panel_styles: Dictionary = {}
+
+static func _get_slot_style(p_rarity: int, is_locked: bool, is_selected: bool) -> StyleBoxFlat:
+	var norm_rarity: int = p_rarity if (p_rarity >= 1 and p_rarity <= 5) else 1
+	var cache_key: int = norm_rarity | (8 if is_locked else 0) | (16 if is_selected else 0)
+	if _cached_panel_styles.has(cache_key):
+		return _cached_panel_styles[cache_key] as StyleBoxFlat
+	var style := StyleBoxFlat.new()
+	style.bg_color = DesignTokens.COLOR_SURFACE_CARD
+	style.set_corner_radius_all(4)
+	style.set_border_width_all(3 if is_selected else 2)
+	if is_selected:
+		style.border_color = DesignTokens.COLOR_ACCENT_GOLD
+	elif is_locked:
+		style.border_color = DesignTokens.COLOR_TEXT_DISABLED
+	else:
+		match norm_rarity:
+			1: style.border_color = DesignTokens.COLOR_QUALITY_COMMON
+			2: style.border_color = DesignTokens.COLOR_QUALITY_UNCOMMON
+			3: style.border_color = DesignTokens.COLOR_QUALITY_RARE
+			4: style.border_color = DesignTokens.COLOR_QUALITY_EPIC
+			5: style.border_color = DesignTokens.COLOR_QUALITY_LEGENDARY
+			_: style.border_color = DesignTokens.COLOR_QUALITY_COMMON
+	_cached_panel_styles[cache_key] = style
+	return style
+
 func _update_visuals() -> void:
 	if _border_panel == null:
 		return
 
-	var style := StyleBoxFlat.new()
-	style.bg_color = DesignTokens.COLOR_SURFACE_CARD
-	style.set_corner_radius_all(4)
-	style.border_width_bottom = 2
-	style.border_width_left = 2
-	style.border_width_right = 2
-	style.border_width_top = 2
-
-	# 品质边框色阶
-	match rarity_level:
-		1: style.border_color = DesignTokens.COLOR_QUALITY_COMMON
-		2: style.border_color = DesignTokens.COLOR_QUALITY_UNCOMMON
-		3: style.border_color = DesignTokens.COLOR_QUALITY_RARE
-		4: style.border_color = DesignTokens.COLOR_QUALITY_EPIC
-		5: style.border_color = DesignTokens.COLOR_QUALITY_LEGENDARY
-		_: style.border_color = DesignTokens.COLOR_QUALITY_COMMON
-
-	# 锁定状态：灰显 + 不可点击
-	if locked:
-		style.border_color = DesignTokens.COLOR_TEXT_DISABLED
-		modulate.a = 0.5
-	else:
-		modulate.a = 1.0
-
-	# 选中状态：边框加粗 + 金色高亮
-	if selected:
-		style.border_width_bottom = 3
-		style.border_width_left = 3
-		style.border_width_right = 3
-		style.border_width_top = 3
-		style.border_color = DesignTokens.COLOR_ACCENT_GOLD
-
-	_border_panel.add_theme_stylebox_override("panel", style)
+	modulate.a = 0.5 if locked else 1.0
+	_border_panel.add_theme_stylebox_override("panel", _get_slot_style(rarity_level, locked, selected))
 
 	if _lbl_count != null:
 		_lbl_count.text = str(count) if count > 1 else ""
 	if _lbl_caption != null and is_instance_valid(_lbl_caption):
 		_lbl_caption.text = caption
+
+## 池化复用清态契约：重置物品槽状态，杜绝跨复用残留
+func reset_state() -> void:
+	item_id = ""
+	item_name = ""
+	item_desc = ""
+	item_name_key = ""
+	item_desc_key = ""
+	rarity_level = 1
+	count = 1
+	caption = ""
+	selected = false
+	locked = false
+	tooltip_text = ""
+	modulate = Color.WHITE
+	if _icon_rect != null and is_instance_valid(_icon_rect):
+		_icon_rect.texture = null
+	_update_visuals()
 
 func set_item_data(p_id: String, p_name: String, p_desc: String, p_rarity: int, p_count: int) -> void:
 	item_id = p_id

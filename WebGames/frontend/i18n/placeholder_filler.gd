@@ -107,19 +107,36 @@ static func _to_finite_float(value: Variant) -> float:
 		return float(s) if s.is_valid_float() else 0.0
 	return 0.0
 
+static var _re_unfilled: RegEx = null
+static var _re_extract: RegEx = null
+
+static func _get_unfilled_regex() -> RegEx:
+	if _re_unfilled == null:
+		_re_unfilled = RegEx.new()
+		_re_unfilled.compile("\\{[a-zA-Z_][a-zA-Z0-9_]*\\}")
+	return _re_unfilled
+
+static func _get_extract_regex() -> RegEx:
+	if _re_extract == null:
+		_re_extract = RegEx.new()
+		_re_extract.compile("\\{([a-zA-Z_][a-zA-Z0-9_]*)\\}")
+	return _re_extract
+
 ## 千分位格式化: 5000 → "5,000"
 static func format_thousands(value: int) -> String:
 	var s := str(abs(value))
-	var result := ""
-	var count := 0
-	for i in range(s.length() - 1, -1, -1):
-		if count > 0 and count % 3 == 0:
-			result = "," + result
-		result = s[i] + result
-		count += 1
-	if value < 0:
-		result = "-" + result
-	return result
+	var n: int = s.length()
+	if n <= 3:
+		return ("-" + s) if value < 0 else s
+	var groups: PackedStringArray = PackedStringArray()
+	var end_idx: int = n
+	while end_idx > 0:
+		var start_idx: int = maxi(0, end_idx - 3)
+		groups.append(s.substr(start_idx, end_idx - start_idx))
+		end_idx = start_idx
+	groups.reverse()
+	var formatted := ",".join(groups)
+	return ("-" + formatted) if value < 0 else formatted
 
 ## 时长格式化: 125.0 → "2分05秒"
 static func _format_duration(seconds: float) -> String:
@@ -144,16 +161,11 @@ static func format_rarity(rarity_key: String) -> String:
 
 ## 检测模板中是否有未填充的占位符（验收用）
 static func has_unfilled_placeholders(text: String) -> bool:
-	# 检测 {placeholder_name} 命名占位符模式
-	var regex := RegEx.new()
-	regex.compile("\\{[a-zA-Z_][a-zA-Z0-9_]*\\}")
-	return regex.search(text) != null
+	return _get_unfilled_regex().search(text) != null
 
 ## 提取模板中所有占位符名称（调试用）
 static func extract_placeholders(template: String) -> Array:
-	var regex := RegEx.new()
-	regex.compile("\\{([a-zA-Z_][a-zA-Z0-9_]*)\\}")
 	var results: Array = []
-	for m in regex.search_all(template):
+	for m in _get_extract_regex().search_all(template):
 		results.append(m.get_string(1))
 	return results

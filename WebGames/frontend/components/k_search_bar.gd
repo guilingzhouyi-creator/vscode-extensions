@@ -53,23 +53,30 @@ func _ready() -> void:
 	UIIntermediary.resolve_placeholder(_line_edit, placeholder_key)
 	_line_edit.text_changed.connect(_on_text_changed)
 	_btn_clear.pressed.connect(clear)
+	set_process(false)
+
+static var _shared_input_style: StyleBoxFlat = null
 
 func _apply_input_style() -> void:
-	var style := StyleBoxFlat.new()
-	style.bg_color = DesignTokens.COLOR_SURFACE_CARD
-	style.set_border_width_all(1)
-	style.border_color = DesignTokens.COLOR_BORDER_DEFAULT
-	style.set_corner_radius_all(3)
-	style.content_margin_left = DesignTokens.SPACING_SM
-	style.content_margin_right = DesignTokens.SPACING_SM
-	_line_edit.add_theme_stylebox_override("normal", style)
-	_line_edit.add_theme_stylebox_override("focus", style)
+	if _shared_input_style == null:
+		var style := StyleBoxFlat.new()
+		style.bg_color = DesignTokens.COLOR_SURFACE_CARD
+		style.set_border_width_all(1)
+		style.border_color = DesignTokens.COLOR_BORDER_DEFAULT
+		style.set_corner_radius_all(3)
+		style.content_margin_left = DesignTokens.SPACING_SM
+		style.content_margin_right = DesignTokens.SPACING_SM
+		_shared_input_style = style
+	_line_edit.add_theme_stylebox_override("normal", _shared_input_style)
+	_line_edit.add_theme_stylebox_override("focus", _shared_input_style)
 
 func _process(delta: float) -> void:
 	if _debounce_remaining > 0.0:
 		_debounce_remaining -= delta
 		if _debounce_remaining <= 0.0:
 			_emit_debounced()
+	else:
+		set_process(false)
 
 func _on_text_changed() -> void:
 	var raw := _line_edit.text
@@ -77,9 +84,11 @@ func _on_text_changed() -> void:
 	_pending_query = query
 	_debounce_remaining = debounce_sec
 	_btn_clear.visible = not raw.is_empty()
+	set_process(true)
 
 func _emit_debounced() -> void:
 	_debounce_remaining = 0.0
+	set_process(false)
 	if _pending_query.length() < min_query_length:
 		if _pending_query.is_empty():
 			search_cleared.emit()
@@ -101,6 +110,7 @@ func clear() -> void:
 	_line_edit.text = ""
 	_pending_query = ""
 	_debounce_remaining = 0.0
+	set_process(false)
 	_btn_clear.visible = false
 	search_cleared.emit()
 

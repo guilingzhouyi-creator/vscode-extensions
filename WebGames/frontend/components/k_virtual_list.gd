@@ -50,8 +50,9 @@ var _current_end: int = -1
 
 ## 空闲行节点栈（LIFO：热点行节点留在池中，对齐 ADV-POOL-001）
 var _row_pool: Array[Control] = []
-## 当前活跃行映射: index -> Control
+## 当前活跃行映射: index -> Control 与反向查找表: Control -> index
 var _active_rows: Dictionary = {}
+var _row_to_index: Dictionary = {}
 
 func _ready() -> void:
 	get_v_scroll_bar().value_changed.connect(_on_scroll_changed)
@@ -77,8 +78,11 @@ static func calculate_visible_range(scroll_y: float, view_height: float, cell_h:
 func set_total_count(count: int) -> void:
 	var safe_count: int = maxi(0, count)
 	if safe_count < _total_count:
-		# 缩容：释放全部活跃行并清空行对象池，杜绝悬留脏行
-		_clear_row_pool()
+		# 缩容：仅将越界活跃行回收到池，保留池内可复用节点
+		if safe_count == 0:
+			_recycle_rows_for_range(-1, -2)
+		else:
+			_recycle_rows_for_range(_current_start, mini(_current_end, safe_count - 1))
 	_total_count = safe_count
 	_refresh_range()
 
@@ -131,16 +135,19 @@ func acquire_row_for_index(index: int) -> Control:
 		return existing
 	var row := acquire_row()
 	_active_rows[index] = row
+	_row_to_index[row] = index
 	return row
 
 ## 归还一枚行节点：同步移出活跃表 → 清态 → 入池；超池容量则直接释放（ADV-POOL-001）
 func release_row(row: Control) -> void:
 	if row == null or not is_instance_valid(row):
 		return
-	# 取消活跃登记（按节点反查下标），保证「无重复入池」
-	for idx in _active_rows.keys():
-		if _active_rows[idx] == row:
-			_active_rows.erase(idx)
+	# O(1) 反查并取消活跃登记，保证「无重复入池」
+	if _row_to_index.has(row):
+		var mapped_idx: int = int(_row_to_index[row])
+		_row_to_index.erase(row)
+		if _active_rows.get(mapped_idx) == row:
+			_active_rows.erase(mapped_idx)
 	# ADV-POOL-001 契约：归还前必须清态（优先具体实现，兼容消费方鸭子实现）
 	_reset_row_state(row)
 	row.visible = false
@@ -174,12 +181,14 @@ func _pool_capacity() -> int:
 
 ## 回收时机：可视区间变化时收回离区行
 func _recycle_rows_for_range(start_idx: int, end_idx: int) -> void:
-	for idx in _active_rows.keys():
+	var to_recycle: Array[Control] = []
+	for idx in _active_rows:
 		if idx < start_idx or idx > end_idx:
-			release_row(_active_rows[idx])
-			_active_rows.erase(idx)
+			to_recycle.append(_active_rows[idx] as Control)
+	for row in to_recycle:
+		release_row(row)
 
-## 清空活跃行与行对象池（缩容 / 视图销毁时调用），逐项释放
+## 清空活跃行与行对象池（reset_state / 视图销毁时调用），逐项释放
 func _clear_row_pool() -> void:
 	for idx in _active_rows.keys():
 		var active_row: Control = _active_rows[idx]
@@ -188,6 +197,7 @@ func _clear_row_pool() -> void:
 			_detach_from_parent(active_row)
 			_free_row_node(active_row)
 	_active_rows.clear()
+	_row_to_index.clear()
 	for pooled_row in _row_pool:
 		if pooled_row != null and is_instance_valid(pooled_row):
 			_detach_from_parent(pooled_row)

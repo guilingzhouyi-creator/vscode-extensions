@@ -86,20 +86,21 @@ func show_prompt(title: String, placeholder: String, on_submit: Callable) -> Con
 	ModalManager.get_instance().open_modal(panel, false)
 	return panel
 
+static var _shared_panel_style: StyleBoxFlat = null
+
 ## 创建基础弹窗面板骨架
 func _create_base_panel(title_text: String, message_text: String) -> PanelContainer:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(340, 160)
 
-	var bg_style := StyleBoxFlat.new()
-	bg_style.bg_color = DesignTokens.COLOR_SURFACE_PANEL
-	bg_style.set_corner_radius_all(8)
-	bg_style.border_width_bottom = 2
-	bg_style.border_width_left = 2
-	bg_style.border_width_right = 2
-	bg_style.border_width_top = 2
-	bg_style.border_color = DesignTokens.COLOR_PRIMARY
-	panel.add_theme_stylebox_override("panel", bg_style)
+	if _shared_panel_style == null:
+		var bg_style := StyleBoxFlat.new()
+		bg_style.bg_color = DesignTokens.COLOR_SURFACE_PANEL
+		bg_style.set_corner_radius_all(8)
+		bg_style.set_border_width_all(2)
+		bg_style.border_color = DesignTokens.COLOR_PRIMARY
+		_shared_panel_style = bg_style
+	panel.add_theme_stylebox_override("panel", _shared_panel_style)
 
 	var content := VBoxContainer.new()
 	content.name = "Content"
