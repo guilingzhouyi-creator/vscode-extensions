@@ -34,6 +34,9 @@ const REGISTRY_PATH = path.join(REPO_ROOT, 'scripts/common/skill-registry.json')
 const { resolveScenarioIntent, INTENT_MATCH_THRESHOLD } = require(
   path.join(REPO_ROOT, 'scripts/common/skill-registry-resolver.js'),
 );
+const { validateBranchName } = require(
+  path.join(REPO_ROOT, 'scripts/common/validate-branch-governance.js'),
+);
 
 /** 技能激活契约最多列出的技能条数；其余仅列名，避免契约退化为技能目录。 */
 const SKILL_ACTIVATION_LIMIT = 6;
@@ -115,6 +118,9 @@ const VALUE_ARG_MAP = {
   '--files': 'exclusiveFiles',
   '--workspace-mode': 'workspaceMode',
   '--dsh-mode': 'dshMode',
+  '--cell': 'cell',
+  '--card': 'card',
+  '--branch': 'branch',
 };
 
 const BOOLEAN_ARG_MAP = {
@@ -192,6 +198,9 @@ function parseCliArgs(argv) {
     workspaceMode: 'inherit',
     model: 'inherit',
     dshMode: null,
+    cell: null,
+    card: null,
+    branch: null,
     dumpAll: false,
     json: false,
     allowAdhoc: false,
@@ -312,11 +321,82 @@ ${verifySection}
 `;
 }
 
+/** 原型到单元 cell-id 的标准化映射，避免各自拼出漂移分支前缀。 */
+const ARCHETYPE_CELL_MAP = Object.freeze({
+  'vs-extension': 'workspace-timing',
+  'cli-engine': 'auto-refactor',
+  'game-engine': 'webgames',
+  'git-kernel': 'fractal-git',
+  'infra-tool': 'infra',
+  'workspace-meta': 'governance',
+  'skill-governance': 'governance',
+});
+
+/**
+ * 将自由文本规范化为小写 kebab-case 片段。
+ *
+ * @param {string} raw - 原始字符串。
+ * @param {string} fallback - 清洗后为空时的兜底片段。
+ * @returns {string} 合规 kebab-case 片段。
+ */
+function sanitizeSlug(raw, fallback) {
+  const cleaned = String(raw || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, '-')
+    .replace(/^-+|-+$/gu, '')
+    .slice(0, 28)
+    .replace(/-+$/u, '');
+  return cleaned.length > 0 ? cleaned : fallback;
+}
+
+/**
+ * 推导并校验 SubAgent 对应的五级分形分支坐标。
+ *
+ * @param {object} params - 原型、姿态与命令行参数。
+ * @returns {object} 分支拓扑坐标摘要。
+ * @throws {Error} 显式传入的分支不满足五级分形命名或单元格白名单时抛出。
+ */
+function deriveBranchTopology({ archKey, postKey, cliOptions = {} }) {
+  const cellId = sanitizeSlug(cliOptions.cell || ARCHETYPE_CELL_MAP[archKey] || 'core', 'core');
+  const cardSeed = cliOptions.card || cliOptions.taskGoal || `${archKey}-${postKey}`;
+  const cardId = sanitizeSlug(cardSeed, `${postKey}-task`);
+  const subagentId = sanitizeSlug(cliOptions.name || `${archKey}-${postKey}`, 'worker');
+  const candidate = cliOptions.branch
+    ? String(cliOptions.branch).trim()
+    : `cell/${cellId}/card/${cardId}/sub/${subagentId}`;
+  const check = validateBranchName(candidate);
+  if (!check.valid) {
+    throw new Error(`分支坐标不合规 (FGT-TOP-001): ${check.error}`);
+  }
+  return {
+    cellId,
+    cardId,
+    subagentId,
+    recommendedBranch: candidate,
+    parentCardBranch: `cell/${cellId}/card/${cardId}/main`,
+    parentCellBranch: `cell/${cellId}/main`,
+    tier: check.tier,
+    facadeFor: check.facadeFor || null,
+  };
+}
+
 function buildTaskPromptTemplate(params) {
-  const { taskGoal, archetypeObj, postureObj, exclusiveFiles = null } = params;
+  const {
+    taskGoal,
+    archetypeObj,
+    postureObj,
+    exclusiveFiles = null,
+    branchTopology = null,
+    workspaceMode = 'inherit',
+    hasExplicitBranchOpts = false,
+  } = params;
   const goalText = taskGoal || '<targeted technical task description and acceptance criteria>';
   const isReadOnly = postureObj?.toolPermissions?.enableWriteTools === false;
   const exclusiveFilesLine = formatExclusiveFilesLine(isReadOnly, exclusiveFiles);
+  const includeBranchLine = branchTopology && (workspaceMode !== 'inherit' || hasExplicitBranchOpts);
+  const branchLine = includeBranchLine
+    ? `\n- Fractal Branch (FGT-TOP-001): \`${branchTopology.recommendedBranch}\` (strict parent: \`${branchTopology.parentCardBranch}\`)`
+    : '';
 
   const verifyDirective = isReadOnly
     ? `[Pre-Delivery Verification]
@@ -325,7 +405,7 @@ Read-only mode. Provide factual file paths, line numbers, and rule IDs based on 
 Execute and pass all Layer 4 verification commands with zero High/Critical debt before delivery.`;
 
   return `[Task Scope & Zero-Intersection Path Jail]
-${exclusiveFilesLine}
+${exclusiveFilesLine}${branchLine}
 
 [Objective]
 ${goalText}
@@ -355,12 +435,18 @@ function synthesizeSingle(params) {
 
   const subagentName = cliOptions.name || presetKey || `${archKey}-${postKey}`;
   const subagentDesc = defaultDesc || `${archetypeObj.displayName} (${postureObj.displayName})`;
+  const workspaceMode = cliOptions.workspaceMode || 'inherit';
+  const branchTopology = deriveBranchTopology({ archKey, postKey, cliOptions });
+  const hasExplicitBranchOpts = Boolean(cliOptions.cell || cliOptions.card || cliOptions.branch);
   const systemPrompt = buildSystemPrompt(archetypeObj, postureObj);
   const taskPrompt = buildTaskPromptTemplate({
     taskGoal: cliOptions.taskGoal,
     archetypeObj,
     postureObj,
     exclusiveFiles: cliOptions.exclusiveFiles,
+    branchTopology,
+    workspaceMode,
+    hasExplicitBranchOpts,
   });
 
   const targetModel = cliOptions.model || postureObj.model || catalog.defaultModel || 'inherit';
@@ -373,7 +459,8 @@ function synthesizeSingle(params) {
     displayName: `${archetypeObj.displayName} (${postureObj.displayName})`,
     description: subagentDesc,
     model: targetModel,
-    workspaceMode: cliOptions.workspaceMode || 'inherit',
+    workspaceMode,
+    branchTopology,
     dshMode,
     defineArgs: {
       name: subagentName,
@@ -571,6 +658,29 @@ function runSelfProbes() {
     () => assertPresetBacked({ archKey: 'a', postKey: 'b', matchedPresetKey: 'p' }, {}),
     'ACCEPTED',
   );
+  expect(
+    'default-fractal-branch-accepted',
+    () => deriveBranchTopology({ archKey: 'git-kernel', postKey: 'construct', cliOptions: {} }),
+    'ACCEPTED',
+  );
+  expect(
+    'explicit-subagent-branch-accepted',
+    () => deriveBranchTopology({
+      archKey: 'git-kernel',
+      postKey: 'construct',
+      cliOptions: { branch: 'cell/fractal-git/card/k1/sub/fg-construct' },
+    }),
+    'ACCEPTED',
+  );
+  expect(
+    'adhoc-branch-rejected',
+    () => deriveBranchTopology({
+      archKey: 'git-kernel',
+      postKey: 'construct',
+      cliOptions: { branch: 'adhoc/random-branch' },
+    }),
+    'REJECTED',
+  );
   return failures;
 }
 
@@ -601,6 +711,9 @@ function run() {
       console.log(`• 作业姿态: ${result.posture}`);
       console.log(`• 选定模型: ${result.model} (同构继承主会话 ${result.model})`);
       console.log(`• 工作区模式: ${result.workspaceMode}`);
+      if (result.branchTopology) {
+        console.log(`• 分形分支坐标: ${result.branchTopology.recommendedBranch} (parent=${result.branchTopology.parentCardBranch})`);
+      }
       const modeLine = result.dshMode
         ? `${result.dshMode.id} (${result.dshMode.name}, posture=${result.dshMode.posture}, order=${result.dshMode.order}, terminal=${result.dshMode.terminal})`
         : '未绑定 (请显式传入 --dsh-mode wg-construct|wg-refactor|wg-review|wg-explore)';
@@ -631,5 +744,6 @@ module.exports = {
   assertExclusiveFilesInJail,
   assertNoOverrideConflict,
   assertPresetBacked,
+  deriveBranchTopology,
   runSelfProbes,
 };
