@@ -13,7 +13,7 @@
 class_name PrologueExecutionKernel
 extends RefCounted
 
-const MAX_HEADLESS_DAG_STEPS: int = 100
+const PrologueHeadlessPlaythroughRunner = preload("res://backend/domains/character_creation/prologue_headless_playthrough_runner.gd")
 
 # ==============================================================================
 # 一、启动编排（开局事件流 → 序章上下文 + 首步事件包）
@@ -316,7 +316,7 @@ static func _apply_attr_mutation(attr_name: String, delta: int, profile: Variant
 
 ## 执行无头全流程 MOD 试玩仿真并生成完整过程报告
 static func execute_headless_mod_playthrough(config: Dictionary) -> Dictionary:
-	var candidates: Array = _prepare_headless_candidates(config)
+	var candidates: Array = PrologueHeadlessPlaythroughRunner.prepare_headless_candidates(config)
 	var enabled_ids: Array = config.get("enabled_pack_ids", ["*"])
 	var adapt_res := ModPrecheckAndAdaptationSolver.precheck_and_adapt_mod_list(candidates, enabled_ids)
 	if not bool(adapt_res.get("success", false)):
@@ -398,133 +398,13 @@ static func execute_headless_mod_playthrough(config: Dictionary) -> Dictionary:
 		"choice_ptr": 0,
 		"step_index": 0
 	}
-	_run_headless_loop(engine, loop_state, transcript_steps)
+	PrologueHeadlessPlaythroughRunner.run_headless_loop(
+		engine, loop_state, transcript_steps, render_dag_node_packet, apply_dag_mutations
+	)
 
-	return _build_headless_transcript(char_name, eff_race, eff_origin, reinc_res, profile, engine, ctx, transcript_steps)
-
-static func _prepare_headless_candidates(config: Dictionary) -> Array:
-	var candidates: Array = config.get("candidate_packs", []).duplicate()
-	var mod_dirs: Array = config.get("mod_dirs", [])
-	if candidates.is_empty() and not mod_dirs.is_empty():
-		for d in mod_dirs:
-			var pkg := ModPackageDiscoverySolver.load_full_mod_package_from_dir(str(d))
-			if not pkg.is_empty():
-				candidates.append(pkg)
-	return candidates
-
-static func _step_headless_node(
-	engine: NarrativeDagExecutionEngine,
-	curr_nid: String,
-	node: NarrativeDAGNode,
-	loop_state: Dictionary
-) -> Dictionary:
-	var step_index: int = int(loop_state["step_index"])
-	var ctx: CharacterPrologueContext = loop_state["ctx"]
-	var profile: CharacterProfile = loop_state["profile"]
-	var adapted_manifest: Dictionary = loop_state["manifest"]
-	var choice_indices: Array = loop_state["choice_indices"]
-	var packet := render_dag_node_packet(node, ctx, adapted_manifest, step_index)
-	var action_payload: Dictionary = {}
-	if not node.choices.is_empty():
-		var c_idx: int = 0
-		var ptr: int = int(loop_state["choice_ptr"])
-		if ptr < choice_indices.size():
-			c_idx = clampi(int(choice_indices[ptr]), 0, node.choices.size() - 1)
-			loop_state["choice_ptr"] = ptr + 1
-		var chosen: Dictionary = node.choices[c_idx]
-		action_payload["selected_choice"] = chosen.get("choice_id", chosen.get("id", str(c_idx)))
-
-	var step_res := engine.execute_node_action(curr_nid, action_payload)
-	var raw_muts: Variant = step_res.get("mutations")
-	var mutations: Array = raw_muts if raw_muts is Array else node.mutations_on_complete
-	var applied := apply_dag_mutations(mutations, ctx, profile)
-	return {
-		"step_index": step_index,
-		"node_id": curr_nid,
-		"packet": packet.to_dto(),
-		"action_payload": action_payload,
-		"applied_mutations": applied,
-		"step_result": step_res
-	}
-
-static func _run_headless_loop(
-	engine: NarrativeDagExecutionEngine,
-	loop_state: Dictionary,
-	transcript_steps: Array[Dictionary]
-) -> void:
-	var step_guard: int = 0
-	while not engine.active_node_ids.is_empty() and not engine.is_terminated and step_guard < MAX_HEADLESS_DAG_STEPS:
-		step_guard += 1
-		var curr_nid: String = engine.active_node_ids[0]
-		var node: NarrativeDAGNode = engine.graph.nodes.get(curr_nid)
-		if node == null:
-			break
-		loop_state["step_index"] = transcript_steps.size()
-		transcript_steps.append(_step_headless_node(engine, curr_nid, node, loop_state))
-
-static func _collect_applied_mutations(transcript_steps: Array[Dictionary]) -> Array:
-	var all_mutations: Array = []
-	for step_entry in transcript_steps:
-		var raw_muts: Variant = step_entry.get("applied_mutations")
-		if raw_muts is Array:
-			all_mutations.append_array(raw_muts as Array)
-	return all_mutations
-
-static func _build_headless_transcript(
-	char_name: String,
-	eff_race: String,
-	eff_origin: String,
-	reinc_res: Dictionary,
-	profile: CharacterProfile,
-	engine: NarrativeDagExecutionEngine,
-	ctx: CharacterPrologueContext,
-	transcript_steps: Array[Dictionary]
-) -> Dictionary:
-	var all_mutations: Array = _collect_applied_mutations(transcript_steps)
-
-	var last_visited: String = ""
-	if not engine.completed_node_ids.is_empty():
-		last_visited = engine.completed_node_ids[-1]
-
-	var init_gold: int = int(reinc_res.get("initial_gold", profile.personal_resources.get("gold", 50)))
-	var starter_kit_id: String = str(reinc_res.get("starter_kit_id", ctx.assigned_starter_kit_id))
-	profile.personal_resources["gold"] = init_gold
-
-	return {
-		"schema_version": "kalar.mod_sdk.playthrough_transcript.v1",
-		"is_success": true,
-		"character_sheet": {
-			"character_name": char_name,
-			"race_id": eff_race,
-			"origin_id": eff_origin,
-			"origin_name": str(reinc_res.get("origin_name", eff_origin)),
-			"attributes": profile.attributes.duplicate(true),
-			"wallet": profile.personal_resources.duplicate(true),
-			"inventory": profile.inventory.duplicate(true),
-			"equipment": profile.equipment.duplicate(true),
-			"selected_traits": (reinc_res.get("selected_traits", []) as Array).duplicate(),
-			"initial_gold": init_gold,
-			"starter_kit_id": starter_kit_id,
-			"starter_kit_name": str(reinc_res.get("starter_kit_name", starter_kit_id))
-		},
-		"dag_routing": {
-			"target_dag_id": engine.graph.graph_id,
-			"dag_id": engine.graph.graph_id,
-			"origin_id": eff_origin,
-			"race_id": eff_race
-		},
-		"transcript_steps": transcript_steps,
-		"final_state": {
-			"is_completed": ctx.is_completed,
-			"prologue_completed": ctx.is_completed,
-			"reached_terminal": engine.is_terminated or ctx.is_completed,
-			"terminal_node_id": last_visited,
-			"completed_node_ids": engine.completed_node_ids.duplicate(),
-			"active_node_ids": engine.active_node_ids.duplicate(),
-			"is_terminated": engine.is_terminated,
-			"applied_mutations": all_mutations
-		}
-	}
+	return PrologueHeadlessPlaythroughRunner.build_headless_transcript(
+		char_name, eff_race, eff_origin, reinc_res, profile, engine, ctx, transcript_steps
+	)
 
 ## 序章步骤结构化广播：向前端暴露 channel + narrative_key + i18n_params + mutations
 ## （前端既可直显 fallback 文案，也可按 key+params 自渲染；纯结构化事件与状态解耦）。

@@ -11,6 +11,8 @@
 class_name AgentPlaythroughSession
 extends RefCounted
 
+const AgentPlaythroughSessionFactory = preload("res://backend/domains/character_creation/agent_playthrough_session_factory.gd")
+
 # ==============================================================================
 # 一、会话运行时状态字段
 # ==============================================================================
@@ -31,14 +33,14 @@ var last_diagnostic_dump: Dictionary = {}
 
 ## 启动长程交互式推演会话：加载模组、权威解算、物理水化、初始化DAG并产出首步观测包
 func start_session(config: Dictionary) -> Dictionary:
-	session_id = _prepare_session_id(config)
+	session_id = AgentPlaythroughSessionFactory.prepare_session_id(config)
 	step_index = 0
 	is_terminal = false
 	history_stack.clear()
 	last_diagnostic_dump.clear()
 
 	# 1. 预检并加载候选包
-	var manifest_res := _resolve_mod_manifest(config)
+	var manifest_res := AgentPlaythroughSessionFactory.resolve_mod_manifest(config)
 	if not bool(manifest_res.get("success", false)):
 		is_terminal = true
 		var err_code: String = str(manifest_res.get("error_code", "ERR_MOD_PRECHECK_FAILED"))
@@ -51,7 +53,7 @@ func start_session(config: Dictionary) -> Dictionary:
 	adapted_manifest = manifest_res.get("adapted_manifest", {})
 
 	# 2. 权威身世解算
-	var req := _build_creation_request(config)
+	var req := AgentPlaythroughSessionFactory.build_creation_request(config)
 	var solve_res: Dictionary = AuthoritativeReincarnationSolver.resolve_reincarnation_package(
 		req, req.request_seed, adapted_manifest
 	)
@@ -66,13 +68,13 @@ func start_session(config: Dictionary) -> Dictionary:
 		return _build_error_observation(err_code)
 
 	# 3. 角色档案构建与新手套件发放
-	profile = _build_character_profile(solve_res, req)
+	profile = AgentPlaythroughSessionFactory.build_character_profile(session_id, solve_res, req)
 	var race_id: String = str(solve_res.get("race_id", "HUMAN"))
 	var origin_id: String = str(solve_res.get("origin_id", ""))
 	StarterLoadoutDispatcher.hydrate_starter_loadout_into_profile(profile, race_id, origin_id, adapted_manifest)
 
 	# 4. 初始化序章上下文与双轨占位符
-	ctx = _build_prologue_context(solve_res, profile, req)
+	ctx = AgentPlaythroughSessionFactory.build_prologue_context(solve_res, profile, req)
 	var ph: Dictionary = ProloguePlaceholderResolver.extract_placeholders(ctx, adapted_manifest, profile)
 	for k in ph.keys():
 		ctx.runtime_placeholders[k] = ph[k]
@@ -296,96 +298,6 @@ func get_summary_transcript() -> Dictionary:
 # ==============================================================================
 # 六、辅助方法 (CC <= 8, Depth <= 2, ADV-PRF-002)
 # ==============================================================================
-
-func _prepare_session_id(config: Dictionary) -> String:
-	var sid: String = str(config.get("session_id", "")).strip_edges()
-	if not sid.is_empty():
-		return sid
-	return "sess_%d_%d" % [int(Time.get_unix_time_from_system()), int(Time.get_ticks_usec()) % 1000000]
-
-func _resolve_mod_manifest(config: Dictionary) -> Dictionary:
-	if config.has("adapted_manifest"):
-		var raw_man: Variant = config.get("adapted_manifest")
-		if raw_man is Dictionary and not (raw_man as Dictionary).is_empty():
-			return {
-				"success": true,
-				"adapted_manifest": (raw_man as Dictionary).duplicate(true)
-			}
-
-	var cand_packs: Array = config.get("candidate_packs", []).duplicate()
-	var mod_dirs: Array = config.get("mod_dirs", [])
-	if cand_packs.is_empty() and not mod_dirs.is_empty():
-		for d in mod_dirs:
-			var pkg := ModPackageDiscoverySolver.load_full_mod_package_from_dir(str(d))
-			if not pkg.is_empty():
-				cand_packs.append(pkg)
-
-	var enabled_ids: Array = config.get("enabled_pack_ids", ["*"])
-	return ModPrecheckAndAdaptationSolver.precheck_and_adapt_mod_list(cand_packs, enabled_ids)
-
-func _build_creation_request(config: Dictionary) -> AuthoritativeCharacterCreationRequestDTO:
-	if config.get("request") is AuthoritativeCharacterCreationRequestDTO:
-		return config.get("request")
-	var req := AuthoritativeCharacterCreationRequestDTO.new()
-	req.account_id = str(config.get("account_id", "agent_account"))
-	req.slot_id = int(config.get("slot_id", 0))
-	req.world_id = str(config.get("world_id", "default_world"))
-	req.character_name = str(config.get("character_name", "Hero"))
-	req.request_seed = int(config.get("request_seed", config.get("seed", 0)))
-	var raw_extra: Variant = config.get("extra_custom_fields", {})
-	if raw_extra is Dictionary:
-		req.extra_custom_fields = (raw_extra as Dictionary).duplicate(true)
-	var origin_id: String = str(config.get("origin_id", "")).strip_edges()
-	if not origin_id.is_empty():
-		req.extra_custom_fields["selected_origin_id"] = origin_id
-	var race_id: String = str(config.get("race_id", "")).strip_edges()
-	if not race_id.is_empty():
-		req.extra_custom_fields["selected_race_id"] = race_id
-	return req
-
-func _build_character_profile(solve_res: Dictionary, req: AuthoritativeCharacterCreationRequestDTO) -> CharacterProfile:
-	var prof := CharacterProfile.new()
-	prof.character_id = "char_" + session_id
-	prof.character_name = str(solve_res.get("character_name", req.character_name))
-	var attrs: Variant = solve_res.get("attributes", {})
-	if attrs is Dictionary:
-		prof.attributes = (attrs as Dictionary).duplicate(true)
-	var wallet: Variant = solve_res.get("wallet", {})
-	if wallet is Dictionary:
-		prof.personal_resources = (wallet as Dictionary).duplicate(true)
-	return prof
-
-func _build_prologue_context(solve_res: Dictionary, prof: CharacterProfile, req: AuthoritativeCharacterCreationRequestDTO) -> CharacterPrologueContext:
-	var c := CharacterPrologueContext.new()
-	c.account_id = req.account_id
-	c.character_id = prof.character_id
-	c.character_name = prof.character_name
-	c.race_id = str(solve_res.get("race_id", "HUMAN"))
-	c.gender = str(solve_res.get("gender", "OTHER"))
-	c.assigned_start_location_id = str(solve_res.get("birth_region_id", "CENTRAL_CONTINENT"))
-	c.assigned_starter_kit_id = str(solve_res.get("starter_kit_id", ""))
-	c.created_timestamp_utc = int(Time.get_unix_time_from_system())
-	c.is_active = true
-	c.current_stage = 1
-	c.step_index = 0
-
-	var origin_id: String = str(solve_res.get("origin_id", ""))
-	c.runtime_placeholders["ORIGIN_ID"] = origin_id
-	c.runtime_placeholders["origin_id"] = origin_id
-	c.runtime_placeholders["ORIGIN_NAME"] = str(solve_res.get("origin_name", origin_id))
-	c.runtime_placeholders["TRAIT_SUMMARY"] = _build_trait_summary(solve_res.get("traits_details", []))
-	return c
-
-func _build_trait_summary(traits_details: Variant) -> String:
-	if not (traits_details is Array):
-		return ""
-	var names: Array[String] = []
-	for item in (traits_details as Array):
-		if item is Dictionary:
-			var tname: String = str((item as Dictionary).get("name", "")).strip_edges()
-			if not tname.is_empty():
-				names.append(tname)
-	return " / ".join(names)
 
 func _validate_choice_legality(node: NarrativeDAGNode, choice_id: String) -> bool:
 	if node.choices.is_empty():
