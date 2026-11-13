@@ -187,9 +187,9 @@ fn set_reparse_point(link_path: &Path, buffer: &[u8]) -> NativeResult<()> {
     let mut wide_path: Vec<u16> = link_path.as_os_str().encode_wide().collect();
     wide_path.push(0);
 
-    // SAFETY: `wide_path` is a NUL-terminated UTF-16 buffer that outlives the call. The remaining
-    // arguments are scalars or nulls documented as optional; `CreateFileW` copies the name and does
-    // not retain the pointer.
+    // SAFETY: Preconditions: `wide_path` is NUL-terminated stack UTF-16.
+    // Invariants: `CreateFileW` synchronously creates/opens reparse handle without retaining pointers.
+    // Postconditions: Yields an open handle or `INVALID_HANDLE_VALUE` (checked immediately).
     let handle = unsafe {
         CreateFileW(
             wide_path.as_ptr(),
@@ -207,10 +207,9 @@ fn set_reparse_point(link_path: &Path, buffer: &[u8]) -> NativeResult<()> {
     }
 
     let mut bytes_returned: u32 = 0;
-    // SAFETY: `handle` is a live handle to the directory opened above; `buffer` is a live slice of
-    // exactly `buffer.len()` bytes, and its length is passed alongside it. The output buffer is null
-    // with a zero size because this control code produces no output, and the callee does not retain
-    // any pointer.
+    // SAFETY: Preconditions: `handle` is open; `buffer` is valid reparse data slice.
+    // Invariants: Synchronous `DeviceIoControl` executes without retaining pointers.
+    // Postconditions: Non-zero confirms `IO_REPARSE_TAG_MOUNT_POINT` was committed.
     let applied = unsafe {
         DeviceIoControl(
             handle,
@@ -229,8 +228,9 @@ fn set_reparse_point(link_path: &Path, buffer: &[u8]) -> NativeResult<()> {
         None
     };
 
-    // SAFETY: `handle` came from `CreateFileW` and has not been closed yet; closing it exactly once
-    // is the only requirement `CloseHandle` places on its argument.
+    // SAFETY: Preconditions: `handle` was successfully opened by `CreateFileW`.
+    // Invariants: Handle ownership is exclusively held here; closed exactly once.
+    // Postconditions: Kernel directory handle is closed with zero descriptor leak.
     unsafe {
         CloseHandle(handle);
     }

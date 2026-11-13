@@ -311,16 +311,19 @@ pub fn hide_directory(directory: &Path) -> NativeResult<()> {
     let mut wide_path: Vec<u16> = directory.as_os_str().encode_wide().collect();
     wide_path.push(0);
 
-    // SAFETY: `wide_path` is a NUL-terminated UTF-16 buffer that outlives both calls, which is the
-    // only requirement these two Win32 functions place on their pointer argument. Both return a
-    // status value and never retain the pointer.
+    // SAFETY:
+    // - Preconditions: `wide_path` is a non-empty, NUL-terminated UTF-16 slice living in local stack memory.
+    // - Invariants: `GetFileAttributesW` performs a read-only query on the file system and does not retain pointers.
+    // - Postconditions: Returns valid attribute bitflags or `INVALID_FILE_ATTRIBUTES` with OS error code set.
     let current_attributes = unsafe { GetFileAttributesW(wide_path.as_ptr()) };
     if current_attributes == INVALID_FILE_ATTRIBUTES {
         return Err(NativeError::Io(std::io::Error::last_os_error()));
     }
 
-    // SAFETY: same buffer and same lifetime argument as above; `SetFileAttributesW` copies the
-    // attributes and does not retain the pointer.
+    // SAFETY:
+    // - Preconditions: `wide_path` remains valid, aligned, and NUL-terminated for the duration of the FFI call.
+    // - Invariants: `SetFileAttributesW` copies attribute flags synchronously without retaining the path pointer.
+    // - Postconditions: Non-zero return confirms `FILE_ATTRIBUTE_HIDDEN` has been applied to the target directory.
     let applied = unsafe {
         SetFileAttributesW(
             wide_path.as_ptr(),

@@ -110,8 +110,10 @@ pub fn encode_hex(bytes: &[u8]) -> String {
         encoded.push(DIGITS[usize::from(byte >> 4)]);
         encoded.push(DIGITS[usize::from(byte & 0x0f)]);
     }
-    // SAFETY: every byte written comes from DIGITS, which is the ASCII hexadecimal alphabet, so
-    // the buffer is valid UTF-8 by construction.
+    // SAFETY:
+    // - Preconditions: `encoded` contains exactly `bytes.len() * 2` bytes sourced solely from `DIGITS` (`b"0123456789abcdef"`).
+    // - Invariants: All elements in `DIGITS` are ASCII bytes in range `0x30..=0x39` or `0x61..=0x66`, which are valid single-byte UTF-8 sequences.
+    // - Postconditions: The resulting `String` is guaranteed to be valid UTF-8 without re-scanning or reallocation.
     unsafe { String::from_utf8_unchecked(encoded) }
 }
 
