@@ -580,8 +580,8 @@ async function runTests() {
 
   // Contract Group 4 (Tests 11-12): Ten-dimensional AAS v1.1 breakdown, bilingual Markdown table
   // labels, SQALE/Polyglot/Density metric truthfulness, and CAI isolation invariants.
-  // Invariant: CAI remains undefined whenever autonomy did not run, never borrowing polyglot scores;
-  // SQALE grade, 5D tensor distances, and gaming-defense status project verbatim from qualityScore.
+  // Invariant: CAI remains undefined whenever autonomy did not run (never borrows polyglot);
+  // SQALE grade, 5D tensor distances, and gaming-defense status project verbatim.
   // Test 11: Ten-Dimensional rich breakdown (AAS v1.1) and complete Markdown coverage
   const test11Report = createMockScanReport();
   const doc11 = buildAasReport(test11Report, { includeDimensionDetails: true });

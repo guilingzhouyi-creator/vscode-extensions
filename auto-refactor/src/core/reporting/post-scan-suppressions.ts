@@ -156,16 +156,29 @@ function applySingleIssueSuppression(
     return true;
 }
 
+function prepareSuppressionPass(
+    report: ScanReport,
+    suppressions: readonly SuppressionRule[],
+    rootDir: string,
+): { arbiter: FindingConfidenceArbiter; index: SuppressionIndex | null } | null {
+    if (!report || !Array.isArray(report.issues) || !rootDir) {
+        return null;
+    }
+    const arbiter = new FindingConfidenceArbiter();
+    const index = suppressions.length > 0 ? buildSuppressionIndex(suppressions) : null;
+    return { arbiter, index };
+}
+
 /**
  * Applies configured suppression rules and inline directives to all issues in the report.
- * Non-reentrant on shared `report`: filters `report.issues` sequentially without locks.
  *
  * @param report - Scan report undergoing suppression filtering.
  * @param suppressions - Suppression rule collection.
  * @param rootDir - Workspace root directory for resolving relative file paths.
  * @param retainedSource - Optional retained source text map from the active scanner.
  * @param allowHostRead - Whether host disk reads are permitted when retained source misses.
- * @returns Total count of suppressed issues.
+ * @returns Total count of suppressed issues (sequential; requires external
+ *   synchronization on shared report).
  */
 export async function applySuppressions(
     report: ScanReport,
@@ -174,11 +187,11 @@ export async function applySuppressions(
     retainedSource?: ReadonlyMap<string, string>,
     allowHostRead = true,
 ): Promise<number> {
-    if (!report || !Array.isArray(report.issues)) {
+    const passState = prepareSuppressionPass(report, suppressions, rootDir);
+    if (!passState) {
         return 0;
     }
-    const arbiter = new FindingConfidenceArbiter();
-    const index = suppressions.length > 0 ? buildSuppressionIndex(suppressions) : null;
+    const { arbiter, index } = passState;
     let suppressedCount = 0;
     const fileCache = new Map<string, string[] | null>();
 

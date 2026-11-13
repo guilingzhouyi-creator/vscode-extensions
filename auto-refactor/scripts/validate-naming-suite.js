@@ -665,7 +665,7 @@ function verifyGDScriptPolyglotNaming(byRule) {
 }
 
 /**
- * Verifies `NAM-LEN-001` and AAS v1.0 actionable rename payloads across Go, GDScript, Rust, and Python.
+ * Verifies `NAM-LEN-001` and AAS v1.0 actionable rename payloads across polyglot fixtures.
  *
  * @param byRule - Lookup helper returning issues emitted for a rule ID.
  */
