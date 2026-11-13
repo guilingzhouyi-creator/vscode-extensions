@@ -48,5 +48,8 @@ mod test_remote_transport;
 #[path = "rust/test_self_hosted_ipc.rs"]
 mod test_self_hosted_ipc;
 
+#[path = "rust/async_audit_e2e/mod.rs"]
+mod test_taxis_async_audit_e2e;
+
 #[path = "rust/test_submodules.rs"]
 mod test_submodules;
