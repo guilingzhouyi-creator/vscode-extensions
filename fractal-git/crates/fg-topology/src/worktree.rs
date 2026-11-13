@@ -112,8 +112,7 @@ impl ScopeProjection {
             return true;
         }
         self.scopes.iter().any(|prefix| {
-            path_matches_scope(candidate_path, prefix)
-                || path_matches_scope(prefix, candidate_path)
+            path_matches_scope(candidate_path, prefix) || path_matches_scope(prefix, candidate_path)
         })
     }
 

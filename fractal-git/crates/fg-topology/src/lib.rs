@@ -14,9 +14,12 @@ pub mod acceptance;
 pub mod authorizer;
 pub mod bisect;
 pub mod blackboard;
+pub mod branch_grammar;
 pub mod conflict_tree;
 pub mod fanout;
+mod fractal_ref_ext;
 pub mod history_rollup;
+pub mod lineage;
 pub mod manifold;
 pub mod operation;
 pub mod project_store;
@@ -27,6 +30,9 @@ pub mod state_machine;
 pub mod submodule;
 pub mod telemetry;
 pub mod verifier;
+mod verifier_branch;
+#[cfg(test)]
+mod verifier_branch_tests;
 pub mod worktree;
 
 pub use acceptance::{read_commit_header, write_acceptance};
@@ -35,10 +41,12 @@ pub use bisect::{BisectEngine, BisectState, BisectStep};
 pub use blackboard::{DiskBlackboardStore, BLACKBOARD_DIR};
 pub use conflict_tree::{AgentConflictSliceReport, ConflictSlice, ConflictTreeManager};
 pub use fanout::{assert_fanout_available, assert_fanout_available_in};
+pub use fg_native::policy_vault::{LoadedPolicyVault, PolicyVaultState, PolicyVaultStore};
 pub use history_rollup::{
     CardMilestoneRecord, HierarchicalHistoryRollup, HierarchicalRollupFolder, MilestoneRollupEntry,
     PyramidFolder,
 };
+pub use lineage::{FractalLineageReceipt, LineageEventKind, LineageLedger, LineageRecordParams};
 pub use manifold::{Riemann5DPhaseVector, TrinityManifoldEvaluator, TrinityManifoldSnapshot};
 pub use operation::{Operation, OperationGraph, OperationMetadata, RepoViewSnapshot};
 pub use project_store::{DiskProjectStore, PROJECTS_CACHE_FILE, PROJECTS_DIR};

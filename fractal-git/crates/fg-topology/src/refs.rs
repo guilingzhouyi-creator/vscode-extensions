@@ -27,6 +27,7 @@ use std::fs;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
+use fg_core::constants::branch::CARD_CANONICAL_LEAF;
 use fg_core::constants::git::REF_HEAD;
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::Oid;
@@ -146,7 +147,8 @@ pub enum FractalRef {
     Trunk,
     /// Cell Main integration line (`refs/fractal/cell/{cell_id}/main`).
     CellMain { cell_id: String },
-    /// Card Worktree / local integration line (`refs/fractal/cell/{cell_id}/card/{card_id}`).
+    /// Card Worktree / local integration line (`refs/fractal/cell/{cell_id}/card/{card_id}/main`;
+    /// 4-segment `.../card/{card_id}` tolerated when reading existing references).
     CardWorktree { cell_id: String, card_id: String },
     /// Ephemeral SubAgent Worktree
     /// (`refs/fractal/cell/{cell_id}/card/{card_id}/sub/{subagent_id}`).
@@ -250,6 +252,20 @@ enum LooseBody {
     Symbolic(String),
 }
 
+/// Splits a reference name on `/` into a stack buffer of up to 8 components without allocating.
+pub(crate) fn split_ref_segments(input: &str) -> Option<([&str; 8], usize)> {
+    let mut parts = [""; 8];
+    let mut len = 0;
+    for seg in input.split('/') {
+        if len >= parts.len() {
+            return None;
+        }
+        parts[len] = seg;
+        len += 1;
+    }
+    Some((parts, len))
+}
+
 impl FractalRef {
     /// Formats the reference into its standard Git ref path string.
     pub fn to_git_ref(&self) -> String {
@@ -259,7 +275,10 @@ impl FractalRef {
             Self::Trunk => REF_FRACTAL_TRUNK.to_string(),
             Self::CellMain { cell_id } => format!("{}cell/{}/main", REF_FRACTAL_PREFIX, cell_id),
             Self::CardWorktree { cell_id, card_id } => {
-                format!("{}cell/{}/card/{}", REF_FRACTAL_PREFIX, cell_id, card_id)
+                format!(
+                    "{}cell/{}/card/{}/{}",
+                    REF_FRACTAL_PREFIX, cell_id, card_id, CARD_CANONICAL_LEAF
+                )
             }
             Self::SubAgentWorktree {
                 cell_id,
@@ -289,6 +308,9 @@ impl FractalRef {
 
     fn parse_system_trunk_ref(parts: &[&str]) -> Option<Self> {
         if parts.len() == 3 && parts[0] == "refs" && parts[1] == "heads" {
+            if parts[2] == "integration" {
+                return Some(Self::Trunk);
+            }
             return Some(Self::SystemTrunk {
                 branch: parts[2].to_string(),
             });
@@ -306,7 +328,9 @@ impl FractalRef {
             Some(Self::CellMain {
                 cell_id: parts[3].to_string(),
             })
-        } else if parts.len() == 6 && parts[4] == "card" {
+        } else if (parts.len() == 7 && parts[4] == "card" && parts[6] == CARD_CANONICAL_LEAF)
+            || (parts.len() == 6 && parts[4] == "card")
+        {
             Some(Self::CardWorktree {
                 cell_id: parts[3].to_string(),
                 card_id: parts[5].to_string(),
@@ -325,19 +349,22 @@ impl FractalRef {
     /// Parses a string into a strongly-typed FractalRef if it belongs to the fractal
     /// namespace or standard system heads.
     pub fn parse(ref_str: &str) -> Option<Self> {
-        let parts: Vec<&str> = ref_str.split('/').collect();
-        if let Some(system_trunk_ref) = Self::parse_system_trunk_ref(&parts) {
+        let Some((parts_buf, parts_len)) = split_ref_segments(ref_str) else {
+            return Self::from_git_ref(ref_str);
+        };
+        let parts = &parts_buf[..parts_len];
+        if let Some(system_trunk_ref) = Self::parse_system_trunk_ref(parts) {
             return Some(system_trunk_ref);
         }
 
         if parts.len() < 3 || parts[0] != "refs" || parts[1] != "fractal" {
-            return None;
+            return Self::from_git_ref(ref_str);
         }
 
         match parts[2] {
             "trunk" | "integration" => Some(Self::Trunk),
-            "cell" => Self::parse_fractal_cell_ref(&parts),
-            "telemetry" => Self::parse_fractal_telemetry_ref(&parts),
+            "cell" => Self::parse_fractal_cell_ref(parts),
+            "telemetry" => Self::parse_fractal_telemetry_ref(parts),
             _ => None,
         }
     }
@@ -520,6 +547,53 @@ struct PackedCache {
     table: std::sync::Arc<BTreeMap<String, Oid>>,
 }
 
+/// Cross-process `.lock` guard serialized beside a target reference file during CAS updates.
+struct RefLockGuard {
+    lock_path: PathBuf,
+}
+
+impl RefLockGuard {
+    fn acquire(target_path: &Path) -> FractalResult<Self> {
+        if let Some(parent) = target_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let mut lock_os = target_path.as_os_str().to_os_string();
+        lock_os.push(LOCK_SUFFIX);
+        let lock_path = PathBuf::from(lock_os);
+        for attempt in 0..20u32 {
+            match fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&lock_path)
+            {
+                Ok(_) => return Ok(Self { lock_path }),
+                Err(io_err)
+                    if io_err.kind() == std::io::ErrorKind::AlreadyExists && attempt < 19 =>
+                {
+                    std::thread::sleep(std::time::Duration::from_millis(5));
+                }
+                Err(io_err) if io_err.kind() == std::io::ErrorKind::AlreadyExists => {
+                    return Err(FractalError::RefConflict(format!(
+                        "unable to lock '{}': '{}' exists",
+                        target_path.display(),
+                        lock_path.display()
+                    )));
+                }
+                Err(io_err) => return Err(FractalError::Io(io_err)),
+            }
+        }
+        Err(FractalError::RefConflict(
+            "ref lock retries exhausted".into(),
+        ))
+    }
+}
+
+impl Drop for RefLockGuard {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.lock_path);
+    }
+}
+
 impl DiskRefStore {
     /// Constructs a filesystem-backed Git reference store targeting the given repository path.
     pub fn new(git_dir: impl Into<PathBuf>) -> Self {
@@ -527,6 +601,12 @@ impl DiskRefStore {
             git_dir: git_dir.into(),
             packed_cache: std::sync::Mutex::new(None),
         }
+    }
+
+    /// Returns the backing `.git` or `.taxis` directory path managed by this reference store.
+    #[must_use]
+    pub fn git_dir(&self) -> &Path {
+        &self.git_dir
     }
 
     /// Reads `packed-refs` through the per-store cache, re-parsing only when the file stamp moves.
@@ -619,10 +699,10 @@ impl DiskRefStore {
 
     /// Resolves one reference name through both sources, following symbolic hops.
     fn resolve_name(&self, ref_name: &str) -> FractalResult<Option<Oid>> {
-        let packed = self.packed_table()?;
+        let packed = self.packed_table_shared()?;
         let view = RefSources {
             store: self,
-            packed: &packed,
+            packed: packed.as_ref(),
         };
         view.resolve(ref_name, 0)
     }
@@ -647,14 +727,6 @@ impl DiskRefStore {
             return Ok(Some(LooseBody::Symbolic(target.to_string())));
         }
         Ok(Some(LooseBody::Direct(Oid::from_hex(&body)?)))
-    }
-
-    /// Parses the packed reference table into a name-to-object mapping.
-    fn packed_table(&self) -> FractalResult<BTreeMap<String, Oid>> {
-        // Clone out of the shared cache: callers mutate the result. The cache itself is what makes
-        // repeated resolutions cheap; a full copy of a reference table is far cheaper than
-        // re-reading and re-splitting the file.
-        Ok((*self.packed_table_shared()?).clone())
     }
 
     /// Absorbs one `packed-refs` line, skipping headers and peeled target lines.
@@ -722,10 +794,15 @@ impl DiskRefStore {
     }
 
     /// Publishes `body` at `path` through a staging file and a single rename.
-    fn write_atomic(&self, path: &Path, body: String) -> FractalResult<()> {
+    fn write_atomic(
+        &self,
+        path: &Path,
+        body: String,
+        protect_telemetry: bool,
+    ) -> FractalResult<()> {
         let _ = reset_file_write_permission(path);
         fg_core::write_file_atomic(path, body.as_bytes(), false)?;
-        if path.to_string_lossy().contains("telemetry") {
+        if protect_telemetry {
             let _ = apply_os_telemetry_protection(path);
         }
         Ok(())
@@ -885,7 +962,10 @@ impl DiskRefStore {
         if !removed {
             return Ok(false);
         }
-        self.write_atomic(&packed_path, rewritten)?;
+        self.write_atomic(&packed_path, rewritten, false)?;
+        if let Ok(mut guard) = self.packed_cache.lock() {
+            *guard = None;
+        }
         Ok(true)
     }
 
@@ -950,7 +1030,7 @@ impl DiskRefStore {
         if let Some(parent) = ref_path.parent() {
             fs::create_dir_all(parent)?;
         }
-        self.write_atomic(&ref_path, format!("ref: {target}\n"))
+        self.write_atomic(&ref_path, format!("ref: {target}\n"), false)
     }
 
     /// Points HEAD directly at one commit object, producing a detached head.
@@ -963,6 +1043,7 @@ impl DiskRefStore {
         self.write_atomic(
             &self.git_dir.join("ORIG_HEAD"),
             format!("{}\n", oid.to_hex()),
+            false,
         )
     }
 
@@ -988,15 +1069,17 @@ impl DiskRefStore {
         message: &str,
     ) -> FractalResult<()> {
         validate_ref_name(ref_name)?;
-        if let Some(fractal_ref) = FractalRef::parse(ref_name) {
+        let target_name = self.write_target(ref_name)?;
+        let path = self.ref_path(&target_name)?;
+        let _lock = RefLockGuard::acquire(&path)?;
+        let previous = self.resolve_name(&target_name)?;
+        if let Some(fractal_ref) = FractalRef::parse(&target_name) {
             fractal_ref.verify_telemetry_update_policy(
-                expected_old.copied(),
+                previous.or_else(|| expected_old.copied()),
                 Some(*new_oid),
                 false,
             )?;
         }
-        let target_name = self.write_target(ref_name)?;
-        let previous = self.resolve_name(&target_name)?;
         if let Some(expected) = expected_old {
             if previous.as_ref() != Some(expected) {
                 return Err(FractalError::RefConflict(format!(
@@ -1005,8 +1088,9 @@ impl DiskRefStore {
                 )));
             }
         }
-        let path = self.ref_path(&target_name)?;
-        self.write_atomic(&path, format!("{}\n", new_oid.to_hex()))?;
+        let protect_telemetry =
+            target_name.starts_with(fg_core::constants::refs::REF_TELEMETRY_PREFIX);
+        self.write_atomic(&path, format!("{}\n", new_oid.to_hex()), protect_telemetry)?;
         self.record_reflog(&target_name, previous.as_ref(), new_oid, message);
         if ref_name == HEAD_NAME && target_name != HEAD_NAME {
             self.record_reflog(HEAD_NAME, previous.as_ref(), new_oid, message);
@@ -1016,7 +1100,7 @@ impl DiskRefStore {
 
     /// Writes the HEAD body through the same staging rename protocol as ordinary references.
     fn write_head_body(&self, body: String) -> FractalResult<()> {
-        self.write_atomic(&self.git_dir.join(REF_HEAD), body)
+        self.write_atomic(&self.git_dir.join(REF_HEAD), body, false)
     }
 }
 
@@ -1184,5 +1268,30 @@ mod tests {
         assert!(reset_file_write_permission(&test_file).is_ok());
         let _ = fs::remove_file(&test_file);
         let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn non_telemetry_ref_in_telemetry_named_dir_stays_writable() {
+        let base = std::path::PathBuf::from("target/test_tmp/telemetry-host-dir/.git");
+        let _ = fs::remove_dir_all(base.parent().expect("parent"));
+        fs::create_dir_all(base.join("refs/heads")).expect("create test git dir");
+        let store = DiskRefStore::new(&base);
+        let oid1 = Oid::from_bytes([0x33; 20]);
+        let oid2 = Oid::from_bytes([0x44; 20]);
+        store
+            .update_ref("refs/heads/main", &oid1, None)
+            .expect("write initial branch ref");
+        let main_path = base.join("refs/heads/main");
+        assert!(
+            !fs::metadata(&main_path)
+                .expect("metadata")
+                .permissions()
+                .readonly(),
+            "ordinary branch ref must remain writable even when parent path contains 'telemetry'"
+        );
+        store
+            .update_ref("refs/heads/main", &oid2, Some(&oid1))
+            .expect("CAS update on ordinary branch ref");
+        let _ = fs::remove_dir_all(base.parent().expect("parent"));
     }
 }
