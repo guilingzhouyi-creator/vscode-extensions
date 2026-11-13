@@ -20,12 +20,7 @@ import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
 import { REGEX } from '../core/constants';
 import { createLineIssue } from '../core/rules/diagnostic-catalog';
 import { isCommentOrBlankLine, calculateIndentWidth } from '../core/ast/block-scope-utils';
-import {
-    PY_STDLIB_NAMES,
-    PY_LOCAL_ROOTS,
-    PY_ABC_TYPING_NAMES,
-    SHADOW_IGNORE_NAMES,
-} from './python-modern-tables';
+import { PY_STDLIB_NAMES, PY_LOCAL_ROOTS, PY_ABC_TYPING_NAMES } from './python-modern-tables';
 import {
     ACTION_REPLACE_TOKEN,
     ACTIONABLE_SPECS,
@@ -33,7 +28,6 @@ import {
     RULE_PYM_ABC_001,
     RULE_PYM_GENERIC_001,
     RULE_PYM_IMPORT_001,
-    RULE_PYM_SHADOW_001,
     SECTION_LABELS,
     SECTION_LOCAL_INDEX,
     SECTION_STDLIB_INDEX,
@@ -47,7 +41,6 @@ import {
     SPEC_SLOTS,
     SUGGESTION_ABC,
     SUGGESTION_IMPORT_ORDER,
-    SUGGESTION_SHADOW,
     type Block,
     type BlockKind,
     type ImportRecord,
@@ -57,6 +50,12 @@ import {
     type PyImportAccumulator,
     type PyLineScanContext,
 } from './python-modern-contracts';
+import {
+    auditVariableShadowing,
+    resolveShadowingOptions,
+    type PyShadowContext,
+    type VarScope,
+} from './python-modern-shadowing';
 
 const PREFIX_OS_PATH = 'os.path.';
 const PYTHON_SINGLE_LINE_RULES: ReadonlyArray<{
@@ -117,8 +116,6 @@ function hasFastTrigger(trigger: string | readonly string[], line: string): bool
 }
 
 const SCOPE_KIND_MODULE = 'module';
-const SCOPE_KIND_FUNCTION = 'function';
-const SCOPE_KIND_CLASS = 'class';
 const BLOCK_KIND_DEF = 'def';
 const BLOCK_KIND_CLASS = 'class';
 const BLOCK_KIND_EXCEPT = 'except';
@@ -126,20 +123,6 @@ const BLOCK_KIND_WITH = 'with';
 const BLOCK_KIND_OTHER = 'other';
 
 const BLOCK_OPEN_RE = REGEX.PYTHON.BLOCK_OPEN;
-
-/* Shadowing detection (PYM-SHADOW-001) --------------------------------------------------- */
-
-/** Direct assignment: `name = value` — excludes `==`, `+=`, `-=`, etc. */
-const ASSIGN_RE = REGEX.PYTHON.ASSIGN;
-/** for loop variable: `for x in ...:` */
-const FOR_VAR_RE = REGEX.PYTHON.FOR_VAR;
-/** with statement target: `with ... as f:` */
-const WITH_AS_RE = REGEX.PYTHON.WITH_AS;
-/** except clause target: `except Exception as e:` */
-const EXCEPT_AS_RE = REGEX.PYTHON.EXCEPT_AS;
-/** import statement: `import os` or `from sys import path` */
-const IMPORT_SIMPLE_RE = REGEX.PYTHON.IMPORT_SIMPLE;
-const IMPORT_FROM_RE = REGEX.PYTHON.IMPORT_FROM;
 
 const BLOCKING_CALL_RE = REGEX.PYTHON.BLOCKING_CALL;
 const SYNC_ORM_CALL_RE = REGEX.PYTHON.SYNC_ORM_CALL;
@@ -151,33 +134,6 @@ const RAISE_CAUSE_LOOKAHEAD_LINES = 5;
 
 const ABC_IMPORT_RE = REGEX.PYTHON.ABC_IMPORT;
 const PY_DATACLASS_RE = REGEX.PYTHON.DATACLASS;
-const TYPEOF_STRING = 'string';
-
-/**
- * A Python lexical scope tracked for outer-scope shadowing detection (PYM-SHADOW-001).
- *
- * Python has LEGB scoping — only modules, functions, classes, and comprehensions introduce
- * new scopes. Control-flow blocks (if/for/while/with/try) do NOT create new bindings; names
- * assigned inside them leak into the enclosing function / class / module scope.
- */
-interface VarScope {
-    readonly indent: number;
-    readonly kind: 'module' | 'function' | 'class';
-    readonly names: Map<string, number>; // name -> 1-based line number of first declaration
-}
-
-/** Options shape for the shadowing rule, resolved from `ctx.options.shadowing`. */
-interface ShadowingOptions {
-    readonly enabled: boolean;
-    readonly ignoreNames: Set<string>;
-}
-
-interface PyShadowContext {
-    indent: number;
-    readonly varScopes: VarScope[];
-    readonly opts: ShadowingOptions;
-    readonly emit: PyEmitter;
-}
 
 /**
  * Python modernization analyzer.
@@ -226,7 +182,7 @@ export class PythonModernAnalyzer implements Analyzer {
         const varScopes: VarScope[] = [
             { indent: -1, kind: SCOPE_KIND_MODULE, names: new Map<string, number>() },
         ];
-        const shadowOpts = this.resolveShadowingOptions(ctx.options);
+        const shadowOpts = resolveShadowingOptions(ctx.options);
         const importAcc: PyImportAccumulator = { file, records: importRecords };
 
         const scanCtx: PyLineScanContext = { line: '', trimmed: '', lineIndex: 0, emit };
@@ -264,7 +220,7 @@ export class PythonModernAnalyzer implements Analyzer {
             this.auditControlFlow(scanCtx, lines, blockCtx);
             this.auditDataclassSlots(scanCtx, lines);
             this.recordModuleImports(scanCtx, indent, blocks, importAcc);
-            this.auditVariableShadowing(scanCtx, shadowCtx);
+            auditVariableShadowing(scanCtx, shadowCtx);
 
             if (BLOCK_OPEN_RE.test(trimmed)) {
                 blocks.push({ indent, kind: this.resolveBlockKind(trimmed) });
@@ -586,285 +542,6 @@ export class PythonModernAnalyzer implements Analyzer {
             if (pattern.test(lines[scanLineIndex])) return true;
         }
         return false;
-    }
-
-    /**
-     * Resolve shadowing-rule options from the analyzer-level `options` bag.
-     *
-     * @param options - The analyzer's merged options (from `ctx.options`).
-     * @returns Normalized shadowing options with defaults applied.
-     */
-    private resolveShadowingOptions(options: Record<string, any>): ShadowingOptions {
-        const raw = (options?.shadowing ?? {}) as Record<string, unknown>;
-        const enabled = raw.enabled !== false; // default: on
-        const ignoreNames = new Set<string>(SHADOW_IGNORE_NAMES);
-        if (Array.isArray(raw.ignoreNames)) {
-            for (const name of raw.ignoreNames) {
-                if (typeof name === TYPEOF_STRING) ignoreNames.add(name);
-            }
-        }
-        return { enabled, ignoreNames };
-    }
-
-    /**
-     * Detect outer-scope variable shadowing (PYM-SHADOW-001).
-     *
-     * Heuristic, text-level implementation: tracks names per function/class/module scope
-     * on a parallel stack (`varScopes`). Assignments, for-loop variables, function
-     * parameters, `with ... as`, `except ... as`, and imports are all treated as bindings.
-     * Control-flow blocks (if/for/while/with/try) do NOT create new scopes — matching
-     * Python's actual LEGB rule.
-     *
-     * @param scanCtx - Current line scan context.
-     * @param shadowCtx - Active lexical scoping and shadowing context.
-     */
-    private auditVariableShadowing(scanCtx: PyLineScanContext, shadowCtx: PyShadowContext): void {
-        if (!shadowCtx.opts.enabled) return;
-
-        const codeOnly = scanCtx.trimmed.split('#')[0].trim();
-        const targetLine = scanCtx.lineIndex + 1;
-
-        if (this.auditDefAndClassShadowing(scanCtx.line, targetLine, shadowCtx)) {
-            return;
-        }
-        if (this.auditImportShadowing(scanCtx.line, codeOnly, targetLine, shadowCtx)) {
-            return;
-        }
-        if (this.auditContextBindingShadowing(scanCtx.line, targetLine, shadowCtx)) {
-            return;
-        }
-        this.auditAssignShadowing(scanCtx.line, targetLine, shadowCtx);
-    }
-
-    private getTopScope(shadowCtx: PyShadowContext): VarScope {
-        return shadowCtx.varScopes[shadowCtx.varScopes.length - 1];
-    }
-
-    private auditDefAndClassShadowing(
-        line: string,
-        targetLine: number,
-        shadowCtx: PyShadowContext,
-    ): boolean {
-        const enclosingScope = this.getTopScope(shadowCtx);
-        const defMatch = REGEX.SYNTAX.PYTHON_DEF_PARAMS.exec(line);
-        if (defMatch) {
-            const funcName = defMatch[1];
-            const paramsStr = defMatch[2];
-            this.registerBinding(funcName, targetLine, enclosingScope, shadowCtx);
-            const isAsync = REGEX.SYNTAX.PYTHON_ASYNC_DEF.test(line);
-            const newKind =
-                isAsync || REGEX.SYNTAX.PYTHON_DEF_KEYWORD.test(line)
-                    ? SCOPE_KIND_FUNCTION
-                    : SCOPE_KIND_CLASS;
-            const newScope: VarScope = {
-                indent: shadowCtx.indent,
-                kind: newKind,
-                names: new Map(),
-            };
-            shadowCtx.varScopes.push(newScope);
-
-            if (newKind === SCOPE_KIND_FUNCTION) {
-                const paramNames = this.extractParamNames(paramsStr);
-                for (const paramName of paramNames) {
-                    this.registerBinding(paramName, targetLine, newScope, shadowCtx);
-                }
-            }
-            return true;
-        }
-
-        if (REGEX.SYNTAX.PYTHON_CLASS_KEYWORD.test(line)) {
-            const clsMatch = REGEX.SYNTAX.PYTHON_CLASS.exec(line);
-            if (clsMatch) {
-                this.registerBinding(clsMatch[1], targetLine, enclosingScope, shadowCtx);
-            }
-            const newScope: VarScope = {
-                indent: shadowCtx.indent,
-                kind: SCOPE_KIND_CLASS,
-                names: new Map(),
-            };
-            shadowCtx.varScopes.push(newScope);
-            return true;
-        }
-
-        return false;
-    }
-
-    private auditImportShadowing(
-        line: string,
-        codeOnly: string,
-        targetLine: number,
-        shadowCtx: PyShadowContext,
-    ): boolean {
-        if (!REGEX.PYTHON.IMPORT_STMT.test(codeOnly)) return false;
-        const moduleScope = this.getTopScope(shadowCtx);
-
-        const simpleImp = IMPORT_SIMPLE_RE.exec(line);
-        if (simpleImp) {
-            this.registerBinding(simpleImp[1], targetLine, moduleScope, shadowCtx);
-        }
-        const fromImp = IMPORT_FROM_RE.exec(codeOnly);
-        if (fromImp) {
-            const namesPart = fromImp[1];
-            const items = namesPart.split(',');
-            for (const item of items) {
-                const trimmedItem = item.trim();
-                if (trimmedItem === '' || trimmedItem === '(' || trimmedItem === ')') continue;
-                const clean = trimmedItem
-                    .replace(REGEX.PYTHON.createParenStripScanner(), '')
-                    .trim();
-                if (clean === '') continue;
-                const asMatch = REGEX.PYTHON.AS_ALIAS_CAPTURE.exec(clean);
-                const name = asMatch ? asMatch[2] : clean.split(/\s+/)[0];
-                if (REGEX.PYTHON.VALID_IDENTIFIER.test(name)) {
-                    this.registerBinding(name, targetLine, moduleScope, shadowCtx);
-                }
-            }
-        }
-        return true;
-    }
-
-    private auditContextBindingShadowing(
-        line: string,
-        targetLine: number,
-        shadowCtx: PyShadowContext,
-    ): boolean {
-        const activeScope = this.getTopScope(shadowCtx);
-        const forMatch = FOR_VAR_RE.exec(line);
-        if (forMatch) {
-            this.registerBinding(forMatch[1], targetLine, activeScope, shadowCtx);
-            return true;
-        }
-
-        const withMatch = WITH_AS_RE.exec(line);
-        if (withMatch) {
-            this.registerBinding(withMatch[1], targetLine, activeScope, shadowCtx);
-            return true;
-        }
-
-        const exceptMatch = EXCEPT_AS_RE.exec(line);
-        if (exceptMatch) {
-            this.registerBinding(exceptMatch[1], targetLine, activeScope, shadowCtx);
-            return true;
-        }
-
-        return false;
-    }
-
-    private auditAssignShadowing(
-        line: string,
-        targetLine: number,
-        shadowCtx: PyShadowContext,
-    ): void {
-        const assignMatch = ASSIGN_RE.exec(line);
-        if (assignMatch) {
-            const afterEq = line.slice(assignMatch[0].length);
-            if (afterEq.startsWith('=')) return;
-            const targetScope = this.getTopScope(shadowCtx);
-            this.registerBinding(assignMatch[1], targetLine, targetScope, shadowCtx);
-        }
-    }
-
-    /**
-     * Register a binding in the current scope and emit a shadowing warning when the name
-     * already exists in any enclosing scope.
-     *
-     * @param name - The variable/parameter/function name to register.
-     * @param targetLine - 1-based line number of the declaration.
-     * @param targetScope - The scope the name belongs to.
-     * @param shadowCtx - Full shadowing options and scope stack.
-     */
-    private registerBinding(
-        name: string,
-        targetLine: number,
-        targetScope: VarScope,
-        shadowCtx: PyShadowContext,
-    ): void {
-        if (shadowCtx.opts.ignoreNames.has(name)) return;
-
-        // If the name already exists in the SAME scope, this is a reassignment, not shadowing.
-        if (targetScope.names.has(name)) return;
-
-        // Walk outer scopes (skip the current one) looking for a prior declaration.
-        let outerLine = -1;
-        const scopes = shadowCtx.varScopes;
-        for (let scopeIndex = scopes.length - 2; scopeIndex >= 0; scopeIndex--) {
-            const found = scopes[scopeIndex].names.get(name);
-            if (found !== undefined) {
-                outerLine = found;
-                break;
-            }
-        }
-
-        if (outerLine > 0) {
-            const spec: IssueSpec = {
-                rule: RULE_PYM_SHADOW_001,
-                severity: SEVERITY_WARNING,
-                message: `Variable \`${name}\` may shadow an outer-scope declaration (line ${outerLine}).`,
-                suggestion: SUGGESTION_SHADOW,
-            };
-            shadowCtx.emit(targetLine - 1, spec, {
-                name,
-                outerLine,
-                scope: targetScope.kind,
-            });
-        }
-
-        targetScope.names.set(name, targetLine);
-    }
-
-    /**
-     * Parse a Python function parameter string and return the parameter names.
-     *
-     * Handles simple names, defaults (`x=1`), type annotations (`x: int`), *args, **kwargs,
-     * and `/` / `*` positional-only / keyword-only markers. Multi-line signatures are not
-     * supported — this is a heuristic, line-level parser.
-     *
-     * @param paramsStr - The raw text inside the parentheses of a `def` line.
-     * @returns Array of parameter names in declaration order.
-     */
-    private extractParamNames(paramsStr: string): string[] {
-        const parts = this.splitParamParts(paramsStr);
-        const names: string[] = [];
-        for (const part of parts) {
-            const name = this.sanitizeParamName(part);
-            if (name) {
-                names.push(name);
-            }
-        }
-        return names;
-    }
-
-    private splitParamParts(paramsStr: string): string[] {
-        let depth = 0;
-        let current = '';
-        const parts: string[] = [];
-        for (const charToken of paramsStr) {
-            if (charToken === '(' || charToken === '[' || charToken === '{') depth++;
-            else if (charToken === ')' || charToken === ']' || charToken === '}') depth--;
-            if (charToken === ',' && depth === 0) {
-                parts.push(current);
-                current = '';
-            } else {
-                current += charToken;
-            }
-        }
-        if (current.trim() !== '') parts.push(current);
-        return parts;
-    }
-
-    private sanitizeParamName(part: string): string | null {
-        const trimmed = part.trim();
-        if (trimmed === '' || trimmed === '/' || trimmed === '*') return null;
-        let cleaned = trimmed.replace(REGEX.PYTHON.createStarPrefixStripScanner(), '').trim();
-        const eqIdx = cleaned.indexOf('=');
-        const colonIdx = cleaned.indexOf(':');
-        if (colonIdx !== -1 && (eqIdx === -1 || colonIdx < eqIdx)) {
-            cleaned = cleaned.slice(0, colonIdx).trim();
-        }
-        if (eqIdx !== -1) {
-            cleaned = cleaned.slice(0, eqIdx).trim();
-        }
-        return REGEX.PYTHON.VALID_IDENTIFIER.test(cleaned) ? cleaned : null;
     }
 
     private resolveBlockKind(trimmed: string): BlockKind {

@@ -14,6 +14,7 @@
 
 import type { AgentActionType, Severity } from '../core/types';
 import { SEVERITY_ERROR, SEVERITY_WARNING } from '../core/types';
+import { REGEX } from '../core/constants';
 
 export const RULE_PYM_GENERIC_001 = 'PYM-GENERIC-001';
 export const RULE_PYM_ABC_001 = 'PYM-ABC-001';
@@ -171,4 +172,50 @@ export interface PyBlockContext {
 export interface PyImportAccumulator {
     readonly file: string;
     readonly records: ImportRecord[];
+}
+
+function splitParamParts(paramsStr: string): string[] {
+    let depth = 0;
+    let current = '';
+    const parts: string[] = [];
+    for (const charToken of paramsStr) {
+        if (charToken === '(' || charToken === '[' || charToken === '{') depth++;
+        else if (charToken === ')' || charToken === ']' || charToken === '}') depth--;
+        if (charToken === ',' && depth === 0) {
+            parts.push(current);
+            current = '';
+        } else {
+            current += charToken;
+        }
+    }
+    if (current.trim() !== '') parts.push(current);
+    return parts;
+}
+
+function sanitizeParamName(part: string): string | null {
+    const trimmed = part.trim();
+    if (trimmed === '' || trimmed === '/' || trimmed === '*') return null;
+    let cleaned = trimmed.replace(REGEX.PYTHON.createStarPrefixStripScanner(), '').trim();
+    const eqIdx = cleaned.indexOf('=');
+    const colonIdx = cleaned.indexOf(':');
+    if (colonIdx !== -1 && (eqIdx === -1 || colonIdx < eqIdx)) {
+        cleaned = cleaned.slice(0, colonIdx).trim();
+    }
+    if (eqIdx !== -1) cleaned = cleaned.slice(0, eqIdx).trim();
+    return REGEX.PYTHON.VALID_IDENTIFIER.test(cleaned) ? cleaned : null;
+}
+
+/**
+ * Extracts normalized parameter identifier names from a Python `def` signature slice.
+ *
+ * @param paramsStr - Raw parameter list substring inside `def f(...)`.
+ * @returns Parameter identifier names in declaration order.
+ */
+export function extractPythonParamNames(paramsStr: string): string[] {
+    const names: string[] = [];
+    for (const part of splitParamParts(paramsStr)) {
+        const name = sanitizeParamName(part);
+        if (name) names.push(name);
+    }
+    return names;
 }
