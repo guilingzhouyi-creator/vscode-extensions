@@ -644,14 +644,38 @@ fn resolve_odb_actor_and_policy(
     let auth_token = find_arg_value(&ctx.args, &["--token"])
         .map(String::from)
         .or_else(|| std::env::var("TAXIS_AUTHORITY_TOKEN").ok());
+    let branch_floor = fg_gate::BranchGovernanceFloor::resolve(git_dir);
+    let mut cell_id = super::fractal_context::ActiveFractalCoordinates::resolve(
+        git_dir,
+        &ctx.args,
+        &branch_floor,
+    )
+    .map(|coords| coords.cell_id)
+    .ok();
+    if cell_id.is_none() {
+        cell_id = find_arg_value(&ctx.args, &["--branch", "-b"])
+            .and_then(FractalRef::parse)
+            .and_then(|parsed| match parsed {
+                FractalRef::CellMain { cell_id }
+                | FractalRef::CardWorktree { cell_id, .. }
+                | FractalRef::SubAgentWorktree { cell_id, .. } => Some(cell_id),
+                _ => None,
+            });
+    }
+    let cell_id = match cell_id {
+        Some(resolved) => resolved,
+        None if branch_floor.tier == fg_core::models::BranchEnforcementTier::Strict => {
+            reject(
+                CliTag::VERIFY_FAIL,
+                "FGT-TOP-001: unarchive under Strict governance requires a cell-scoped --branch or --cell <cell-id>".to_owned(),
+            );
+        }
+        None => fg_core::constants::policy::DEFAULT_CELL_ID.to_owned(),
+    };
     let agent_id = find_arg_value(&ctx.args, &["--agent"])
         .map(String::from)
         .or_else(|| std::env::var("TAXIS_AGENT_ID").ok())
         .unwrap_or_else(|| "agent-default".to_string());
-    let cell_id = find_arg_value(&ctx.args, &["--cell"])
-        .map(String::from)
-        .or_else(|| std::env::var("TAXIS_CELL_ID").ok())
-        .unwrap_or_else(|| "cell-default".to_string());
 
     let policy_name = find_arg_value(&ctx.args, &["--policy"]).unwrap_or("workspace-strict");
     let mut policy = match policy_name {
@@ -726,7 +750,23 @@ fn commit_ingested_odb_tree(
     }
 
     super::commit::verify_project_lease_authorization(git_dir, &touched_files);
-    let target_ref_name = target_ref.to_git_ref();
+    let branch_floor = fg_gate::BranchGovernanceFloor::resolve(git_dir);
+    let target_ref_name = match opts.branch.as_deref() {
+        Some(explicit)
+            if explicit.starts_with("refs/")
+                && branch_floor.tier != fg_core::models::BranchEnforcementTier::Strict =>
+        {
+            explicit.to_string()
+        }
+        Some(explicit) if branch_floor.tier == fg_core::models::BranchEnforcementTier::Strict => {
+            if let Err(err) = FractalRef::from_git_ref_checked(explicit, &branch_floor.spec, false)
+            {
+                reject(CliTag::VERIFY_FAIL, err.to_string());
+            }
+            target_ref.to_git_ref()
+        }
+        _ => target_ref.to_git_ref(),
+    };
     super::git_hooks::assert_pipeline_approved(
         &target_ref_name,
         &target_ref_name,
@@ -843,7 +883,7 @@ fn resolve_odb_target_ref(opts: &UnarchiveOptions) -> FractalRef {
             }
         } else {
             FractalRef::CellMain {
-                cell_id: "cell-default".into(),
+                cell_id: fg_core::constants::policy::DEFAULT_CELL_ID.into(),
             }
         }
     })

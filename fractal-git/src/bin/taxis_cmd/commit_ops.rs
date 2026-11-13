@@ -28,7 +28,7 @@ use fractal_git::{
 };
 
 use super::checkout::worktree_stat;
-use super::common::{find_all_arg_values, print_json, reject, CliContext};
+use super::common::{find_all_arg_values, find_arg_value, print_json, reject, CliContext};
 use super::operation::{record_head_operation, HeadOperationSpec};
 
 /// Path handed to the tree builder when the caller supplies no `--file` flag.
@@ -96,11 +96,25 @@ pub(crate) fn sync_committed_index_and_container(
     }
 
     if let Some(mut doc) = native_doc {
+        let target_git_ref = target_ref.to_git_ref();
         let _ = doc.refs.upsert(RefRecord {
-            name: target_ref.to_git_ref(),
+            name: target_git_ref.clone(),
             oid: commit_oid,
             peeled: None,
         });
+        if find_arg_value(&ctx.args, &["--target"]).is_none() {
+            if let Ok(fg_topology::HeadState::Symbolic { name, .. }) =
+                DiskRefStore::new(&ctx.git_dir).head()
+            {
+                if name != target_git_ref && !super::commit::is_protected_trunk(&name) {
+                    let _ = doc.refs.upsert(RefRecord {
+                        name,
+                        oid: commit_oid,
+                        peeled: None,
+                    });
+                }
+            }
+        }
         doc.indx = native_indx;
         let _ = doc.save_atomic(&container_path);
     }

@@ -218,20 +218,37 @@ impl RepoView {
         self.resolve_fallback_cell_head()
     }
 
+    fn active_cell_main_ref(&self) -> String {
+        if let Ok(fg_topology::HeadState::Symbolic { name, .. }) = self.refs.head() {
+            if let Some(
+                fg_topology::FractalRef::CellMain { cell_id }
+                | fg_topology::FractalRef::CardWorktree { cell_id, .. }
+                | fg_topology::FractalRef::SubAgentWorktree { cell_id, .. },
+            ) = fg_topology::FractalRef::parse(&name)
+            {
+                return format!("refs/fractal/cell/{cell_id}/main");
+            }
+        }
+        format!(
+            "refs/fractal/cell/{}/main",
+            fg_core::constants::policy::DEFAULT_CELL_ID
+        )
+    }
+
     fn resolve_advanced_cell_head(&self, name: &str, oid: Oid) -> Option<(String, Oid)> {
         if !fg_native::container_path(&self.git_dir).is_file()
             || (name != "refs/heads/main" && name != "refs/heads/trunk")
         {
             return None;
         }
-        let default_cell_ref = "refs/fractal/cell/cell-default/main";
-        let cell_oid = self.lookup_reference(default_cell_ref).ok().flatten()?;
+        let default_cell_ref = self.active_cell_main_ref();
+        let cell_oid = self.lookup_reference(&default_cell_ref).ok().flatten()?;
         if cell_oid != oid
             && self
                 .commit_parents(&cell_oid)
                 .is_ok_and(|p| p.contains(&oid))
         {
-            return Some((default_cell_ref.to_string(), cell_oid));
+            return Some((default_cell_ref, cell_oid));
         }
         None
     }
@@ -258,9 +275,9 @@ impl RepoView {
     }
 
     fn resolve_fallback_cell_head(&self) -> FractalResult<Option<(String, Oid)>> {
-        let default_cell_ref = "refs/fractal/cell/cell-default/main";
-        if let Some(oid) = self.lookup_reference(default_cell_ref)? {
-            return Ok(Some((default_cell_ref.to_string(), oid)));
+        let default_cell_ref = self.active_cell_main_ref();
+        if let Some(oid) = self.lookup_reference(&default_cell_ref)? {
+            return Ok(Some((default_cell_ref, oid)));
         }
 
         let mut cell_refs: Vec<(String, Oid)> = self
@@ -292,14 +309,17 @@ impl RepoView {
     /// Propagates reference-store failures.
     pub fn branches(&self) -> FractalResult<Vec<(String, Oid)>> {
         let prefix = "refs/heads/";
-        let cell_prefix = "refs/fractal/cell/cell-default/";
+        let compat_cell_prefix = format!(
+            "refs/fractal/cell/{}/",
+            fg_core::constants::policy::DEFAULT_CELL_ID
+        );
         let has_native_container = fg_native::container_path(&self.git_dir).is_file();
         let all_refs = self.refs.list_all()?;
         let mut by_name: std::collections::BTreeMap<String, Oid> =
             std::collections::BTreeMap::new();
         if has_native_container {
             for (name, oid) in &all_refs {
-                if let Some(short) = name.strip_prefix(cell_prefix) {
+                if let Some(short) = name.strip_prefix(&compat_cell_prefix) {
                     by_name.insert(short.to_string(), *oid);
                 }
             }
@@ -792,7 +812,10 @@ fn reference_candidates(revision: &str) -> Vec<String> {
         format!("refs/heads/{revision}"),
         format!("refs/remotes/{revision}"),
         format!("refs/remotes/{revision}/HEAD"),
-        format!("refs/fractal/cell/cell-default/{revision}"),
+        format!(
+            "refs/fractal/cell/{}/{revision}",
+            fg_core::constants::policy::DEFAULT_CELL_ID
+        ),
     ]
 }
 

@@ -32,8 +32,20 @@ fn current_now_ms() -> i64 {
 pub fn handle_blackboard(ctx: &CliContext) {
     let action = ctx.args.first().map(|a| a.as_str()).unwrap_or("list");
 
-    let card_id = find_arg_value(&ctx.args, &["--card"]).unwrap_or("card-000");
-    let cell_id = find_arg_value(&ctx.args, &["--cell"]).unwrap_or("cell-default");
+    let floor = fg_gate::BranchGovernanceFloor::resolve(&ctx.git_dir);
+    let coords = match super::fractal_context::ActiveFractalCoordinates::resolve(
+        &ctx.git_dir,
+        &ctx.args,
+        &floor,
+    ) {
+        Ok(resolved) => resolved,
+        Err(coord_err) => reject(CliTag::VERIFY_FAIL, coord_err),
+    };
+    let card_id_owned = coords
+        .card_id
+        .unwrap_or_else(|| fg_core::constants::policy::DEFAULT_CARD_ID.to_owned());
+    let card_id = card_id_owned.as_str();
+    let cell_id = coords.cell_id.as_str();
     let store = DiskBlackboardStore::new(&ctx.git_dir);
     let now_ms = current_now_ms();
 

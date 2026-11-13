@@ -48,13 +48,23 @@ pub fn handle_commit(ctx: &CliContext) {
         super::stage::stage_tracked_for_commit(ctx);
     }
 
-    let cell_id = find_arg_value(&ctx.args, &["--cell"]).unwrap_or("cell-default");
-    let card_id = find_arg_value(&ctx.args, &["--card"]).unwrap_or("card-000");
-    let agent_id = find_arg_value(&ctx.args, &["--agent"]).unwrap_or("agent-primary");
+    let branch_floor = fg_gate::BranchGovernanceFloor::resolve(&ctx.git_dir);
+    if let Err(vault_err) = fg_gate::BranchGuard::assert_vault_healthy(&branch_floor) {
+        reject(CliTag::COMMIT_GOVERNANCE_FAIL, format!("{vault_err}"));
+    }
+
     let human_author = find_arg_value(&ctx.args, &["--human"]).map(String::from);
+    let coords = resolve_commit_coordinates(ctx, &branch_floor, human_author.as_deref());
+    let cell_id = coords.cell_id.as_str();
+    let card_id_owned = find_arg_value(&ctx.args, &["--card"])
+        .map(str::to_owned)
+        .or_else(|| coords.card_id.clone())
+        .unwrap_or_else(|| fg_core::constants::policy::DEFAULT_CARD_ID.to_owned());
+    let card_id = card_id_owned.as_str();
+    let agent_id = coords.agent_id.as_str();
 
     let (git_native_default, target_ref, mut policy) =
-        resolve_commit_target_and_policy(ctx, cell_id);
+        resolve_commit_target_and_policy(ctx, cell_id, &branch_floor);
     let actor = authorize_commit_actor(
         ctx,
         (git_native_default, cell_id, agent_id),
@@ -210,13 +220,53 @@ pub fn handle_commit(ctx: &CliContext) {
     );
 }
 
+fn resolve_commit_coordinates(
+    ctx: &CliContext,
+    branch_floor: &fg_gate::BranchGovernanceFloor,
+    _human_author: Option<&str>,
+) -> super::fractal_context::ActiveFractalCoordinates {
+    match super::fractal_context::ActiveFractalCoordinates::resolve(
+        &ctx.git_dir,
+        &ctx.args,
+        branch_floor,
+    ) {
+        Ok(coords) => coords,
+        Err(coord_err) => {
+            // Allow verified human authority seed commits on Tier 0/1 trunks without a cell branch.
+            let is_authorized_human = resolve_authority_secret(&ctx.git_dir).is_ok();
+            let head_branch = super::fractal_context::resolve_head_short_branch(&ctx.git_dir);
+            let on_trunk = matches!(
+                head_branch.as_deref().and_then(FractalRef::parse),
+                Some(FractalRef::SystemTrunk { .. } | FractalRef::Trunk) | None
+            );
+            let explicit_cell = find_arg_value(&ctx.args, &["--cell"]);
+            if is_authorized_human && on_trunk && explicit_cell.is_none() {
+                super::fractal_context::ActiveFractalCoordinates {
+                    cell_id: "governance".to_owned(),
+                    card_id: find_arg_value(&ctx.args, &["--card"]).map(str::to_owned),
+                    agent_id: find_arg_value(&ctx.args, &["--agent"])
+                        .unwrap_or(fg_core::constants::policy::DEFAULT_AGENT_ID)
+                        .to_owned(),
+                    head_ref: head_branch.as_deref().and_then(FractalRef::parse),
+                    head_short_branch: head_branch,
+                    is_legacy_default_cell: false,
+                }
+            } else {
+                reject(CliTag::VERIFY_FAIL, coord_err);
+            }
+        }
+    }
+}
+
 /// Resolves default/explicit commit target reference and enforces policy floor invariants.
 fn resolve_commit_target_and_policy(
     ctx: &CliContext,
     cell_id: &str,
+    branch_floor: &fg_gate::BranchGovernanceFloor,
 ) -> (bool, FractalRef, TaxisPolicy) {
     let git_native_default = !fg_native::container_path(&ctx.git_dir).is_file()
-        && !has_taxis_governance_flags(&ctx.args);
+        && !has_taxis_governance_flags(&ctx.args)
+        && branch_floor.tier != fg_core::models::BranchEnforcementTier::Strict;
     let policy_name = find_arg_value(&ctx.args, &["--policy"]).unwrap_or(if git_native_default {
         "git-native"
     } else {
@@ -228,7 +278,7 @@ fn resolve_commit_target_and_policy(
         Some(t) => t.to_string(),
         None => {
             let head_ref =
-                active_head.unwrap_or_else(|| "refs/fractal/cell/cell-default/main".to_string());
+                active_head.unwrap_or_else(|| format!("refs/fractal/cell/{cell_id}/main"));
             engineering_default_target(head_ref, cell_id, !git_native_default)
         }
     };
@@ -888,6 +938,13 @@ fn materialize_staged_files(
     ) {
         let _ = super::git_hooks::run_reference_transaction(&hook_runner, "aborted", branch_rows);
         fail_io("advance commit reference", update_err);
+    }
+    if find_arg_value(&ctx.args, &["--target"]).is_none() {
+        if let Some(ref head_ref) = active_head {
+            if head_ref != &target_ref_name && !is_protected_trunk(head_ref) {
+                let _ = ref_store.update_ref(head_ref, &materialized.commit_oid, None);
+            }
+        }
     }
     let _ = super::git_hooks::run_reference_transaction(&hook_runner, "committed", branch_rows);
     clear_merge_state(&ctx.git_dir, !merge_heads.is_empty());

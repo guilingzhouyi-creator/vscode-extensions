@@ -152,6 +152,8 @@ fn inspect(workspace_root: &Path) -> Vec<Finding> {
     }
 
     check_guard_file(&repo_dir, &mut findings);
+    check_policy_vault(&repo_dir, &mut findings);
+    check_legacy_branches(&repo_dir, &mut findings);
     check_hidden(&repo_dir, &mut findings);
 
     findings
@@ -272,6 +274,91 @@ fn check_guard_file(repo_dir: &Path, findings: &mut Vec<Finding>) {
             status: "FAIL",
             detail: format!("cannot rewrite: {write_err}"),
         }),
+    }
+}
+
+/// Verifies presence and HMAC-SM3 integrity of hidden `.taxis-policy.txp` without auto-recreating.
+fn check_policy_vault(repo_dir: &Path, findings: &mut Vec<Finding>) {
+    match fg_topology::PolicyVaultStore::load_state(repo_dir) {
+        fg_topology::PolicyVaultState::Sealed(loaded) => {
+            findings.push(Finding {
+                check: "policy vault",
+                status: "PASS",
+                detail: format!(
+                    "verified TXPF v1 (rev={}, branch_tier={}, commit_tier={:?}, locked={})",
+                    loaded.payload.revision,
+                    loaded.payload.branch_floor,
+                    loaded.payload.commit_floor,
+                    loaded.payload.locked_by_authority
+                ),
+            });
+        }
+        fg_topology::PolicyVaultState::MissingAfterInit { expected_path, .. } => {
+            findings.push(Finding {
+                check: "policy vault",
+                status: "FAIL",
+                detail: format!(
+                    "hidden policy vault '{}' was removed; run 'taxis policy init' to regenerate and configure",
+                    expected_path.display()
+                ),
+            });
+        }
+        fg_topology::PolicyVaultState::TamperedOrCorrupt { path, reason } => {
+            findings.push(Finding {
+                check: "policy vault",
+                status: "FAIL",
+                detail: format!(
+                    "policy vault '{}' failed integrity verification ({reason}); recover via 'taxis policy init'",
+                    path.display()
+                ),
+            });
+        }
+        fg_topology::PolicyVaultState::UninitializedExternal => {
+            findings.push(Finding {
+                check: "policy vault",
+                status: "FAIL",
+                detail: "policy vault not sealed for initialized store; run 'taxis policy init'"
+                    .to_owned(),
+            });
+        }
+    }
+}
+
+/// Audits local branch refs against the repository's 5-tier taxonomy and D/F `/main` rule.
+fn check_legacy_branches(repo_dir: &Path, findings: &mut Vec<Finding>) {
+    let floor = fg_gate::BranchGovernanceFloor::resolve(repo_dir);
+    let Ok(all_refs) = fg_topology::DiskRefStore::new(repo_dir).list_all() else {
+        return;
+    };
+    let mut legacy_cards = Vec::new();
+    let mut non_canonical = Vec::new();
+    for (full_ref, _) in all_refs {
+        let Some(short) = full_ref.strip_prefix("refs/heads/") else {
+            continue;
+        };
+        if fg_topology::FractalRef::is_predecessor_card_ref(&full_ref) {
+            legacy_cards.push(short.to_owned());
+        }
+        if fg_topology::FractalRef::from_git_ref_checked(&full_ref, &floor.spec, false).is_err() {
+            non_canonical.push(short.to_owned());
+        }
+    }
+    if legacy_cards.is_empty() && non_canonical.is_empty() {
+        findings.push(Finding {
+            check: "branch taxonomy",
+            status: "PASS",
+            detail: "all local branches conform to 5-tier canonical naming".to_owned(),
+        });
+    } else {
+        findings.push(Finding {
+            check: "branch taxonomy",
+            status: "WARN",
+            detail: format!(
+                "{} non-canonical/legacy branch(es): {}; run 'taxis branch migrate' or 'taxis branch -m'",
+                non_canonical.len(),
+                non_canonical.join(", ")
+            ),
+        });
     }
 }
 

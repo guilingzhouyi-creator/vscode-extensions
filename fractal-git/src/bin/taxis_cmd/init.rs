@@ -17,10 +17,12 @@
 
 use std::path::{Path, PathBuf};
 
-use fg_core::models::ConflictPresentationMode;
+use fg_core::constants::branch::BRANCH_GOVERNANCE_ENV;
+use fg_core::models::{BranchEnforcementTier, ConflictPresentationMode, EnforcementTier};
 use fg_native::{LayoutMode, RepoDocument, RepoLayout};
 
 use super::common::{print_json, reject, CliContext};
+use super::fractal_context::{parse_branch_tier, parse_commit_tier};
 use fractal_git::constants::cli::CliTag;
 
 /// Parsed arguments for one `init` invocation.
@@ -29,6 +31,9 @@ struct InitRequest {
     release: bool,
     git_compat: bool,
     conflict_mode: ConflictPresentationMode,
+    branch_floor: BranchEnforcementTier,
+    commit_floor: EnforcementTier,
+    lock_policy: bool,
     home_root: Option<PathBuf>,
 }
 
@@ -41,6 +46,10 @@ pub fn print_init_help() {
            --dev                       Initialize with dev layout (.taxis in workspace root, default)\n\
            --release                   Initialize with release layout (global CAS store with link)\n\
            --git-compat                Generate .git compatibility projection\n\
+           --strict                    Enable strict 5-tier branch & commit governance vault\n\
+           --branch-policy <tier>      Set branch governance tier: strict, advisory, or native\n\
+           --commit-policy <tier>      Set commit governance tier: strict, conventional, or native\n\
+           --lock-policy               Seal vault with authority lock enabled\n\
            --conflict-mode <mode>      Set conflict mode: agent-algebraic, git-compat, or diff3\n\
            --workspace <dir>           Specify workspace root directory (default: current directory)\n\
            --home <dir>                Specify home directory for release stores\n\
@@ -88,7 +97,12 @@ pub fn handle_init(ctx: &CliContext) {
         RepoLayout::dev(&request.workspace_root)
     };
 
-    let created = match layout.initialize_with(&document) {
+    let created = match layout.initialize_with_policy(
+        &document,
+        request.commit_floor,
+        request.branch_floor,
+        request.lock_policy,
+    ) {
         Ok(initialized) => initialized,
         Err(init_err) => reject(CliTag::ERROR, format!("initialize repository: {init_err}")),
     };
@@ -136,6 +150,9 @@ fn parse_request(ctx: &CliContext) -> Result<InitRequest, String> {
     let mut dev = false;
     let mut git_compat = false;
     let mut conflict_mode: Option<ConflictPresentationMode> = None;
+    let mut branch_floor: Option<BranchEnforcementTier> = None;
+    let mut commit_floor: Option<EnforcementTier> = None;
+    let mut lock_policy = false;
     let mut workspace_root: Option<PathBuf> = None;
     let mut home_root: Option<PathBuf> = None;
 
@@ -146,7 +163,26 @@ fn parse_request(ctx: &CliContext) -> Result<InitRequest, String> {
             "--dev" => dev = true,
             "--release" => release = true,
             "--git-compat" => git_compat = true,
+            "--strict" => {
+                branch_floor = Some(BranchEnforcementTier::Strict);
+                commit_floor = Some(EnforcementTier::Strict);
+            }
+            "--lock-policy" => lock_policy = true,
             "--no-hide" => {}
+            "--branch-policy" | "--branch-tier" => {
+                let value = ctx.args.get(argument_cursor + 1).ok_or_else(|| {
+                    "--branch-policy requires strict, advisory, or native".to_owned()
+                })?;
+                branch_floor = Some(parse_branch_tier(value)?);
+                argument_cursor += 1;
+            }
+            "--commit-policy" | "--commit-tier" => {
+                let value = ctx.args.get(argument_cursor + 1).ok_or_else(|| {
+                    "--commit-policy requires strict, conventional, or native".to_owned()
+                })?;
+                commit_floor = Some(parse_commit_tier(value)?);
+                argument_cursor += 1;
+            }
             "--conflict-mode" | "--conflict.mode" => {
                 let value = ctx.args.get(argument_cursor + 1).ok_or_else(|| {
                     "--conflict-mode requires a mode (agent-algebraic, git-compat, diff3)"
@@ -201,11 +237,23 @@ fn parse_request(ctx: &CliContext) -> Result<InitRequest, String> {
         ConflictPresentationMode::AgentAlgebraic
     });
 
+    let mut effective_branch_floor = branch_floor.unwrap_or(BranchEnforcementTier::Native);
+    if let Ok(env_raw) = std::env::var(BRANCH_GOVERNANCE_ENV) {
+        if let Some(env_tier) = BranchEnforcementTier::parse_str(&env_raw) {
+            if env_tier > effective_branch_floor {
+                effective_branch_floor = env_tier;
+            }
+        }
+    }
+
     Ok(InitRequest {
         workspace_root: resolved_root,
         release,
         git_compat,
         conflict_mode: resolved_conflict_mode,
+        branch_floor: effective_branch_floor,
+        commit_floor: commit_floor.unwrap_or(EnforcementTier::Strict),
+        lock_policy,
         home_root,
     })
 }
@@ -268,6 +316,8 @@ fn report(
             "layout_mode": layout_class,
             "git_compat": request.git_compat,
             "conflict_mode": request.conflict_mode.as_str(),
+            "branch_policy": request.branch_floor.as_str(),
+            "commit_policy": format!("{:?}", request.commit_floor),
             "workspace_root": request.workspace_root.display().to_string(),
             "repository_dir": created.repo_dir.display().to_string(),
             "container": created.container_path.display().to_string(),
@@ -286,6 +336,10 @@ fn report(
     println!("  Container      : {}", created.container_path.display());
     println!("  Repository id  : {}", document.meta.repo_id_hex());
     println!("  Conflict mode  : {}", request.conflict_mode.as_str());
+    println!(
+        "  Branch policy  : {} (.taxis-policy.txp)",
+        request.branch_floor
+    );
     if request.git_compat {
         println!(
             "  Git compat     : projected at {}",
