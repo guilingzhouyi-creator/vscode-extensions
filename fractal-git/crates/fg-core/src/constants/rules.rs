@@ -1,6 +1,6 @@
 //! Module: fg-core — Fractal Git Domain Gate Rules SSOT
 //! File Path: crates/fg-core/src/constants/rules.rs
-//! Architecture Role: Single source of truth for all 36 registered Fractal Git domain
+//! Architecture Role: Single source of truth for all 37 registered Fractal Git domain
 //!   rules in `scripts/common/rule-catalog.json`. Enforces zero rule ID drift (`RCFG-RULE-DRIFT`).
 
 /// FGT-ALG-001: Myers diff, 3-way merge, and FastCDC chunking algorithm boundary guard.
@@ -35,6 +35,9 @@ pub const RULE_FGT_GAT_001: &str = "FGT-GAT-001";
 
 /// FGT-IDX-001: Lockless in-memory git index concurrency guard.
 pub const RULE_FGT_IDX_001: &str = "FGT-IDX-001";
+
+/// FGT-IMPACT-001: Impact-slice map narrowing and unrecognised crate fallback guard.
+pub const RULE_FGT_IMPACT_001: &str = "FGT-IMPACT-001";
 
 /// FGT-LCK-001: Lock-free in-memory index concurrency guard.
 pub const RULE_FGT_LCK_001: &str = "FGT-LCK-001";
@@ -100,7 +103,7 @@ pub const RULE_FGT_TRN_001: &str = "FGT-TRN-001";
 /// FGT-VRF-001: Taxis Kernel Code Verifier (TKCV) formal AST invariant guard.
 pub const RULE_FGT_VRF_001: &str = "FGT-VRF-001";
 
-/// Complete sorted array of all 36 registered FGT domain rule identifiers.
+/// Complete sorted array of all 37 registered FGT domain rule identifiers.
 pub const ALL_FGT_RULES: &[&str] = &[
     RULE_FGT_ALG_001,
     RULE_FGT_AUD_001,
@@ -113,6 +116,7 @@ pub const ALL_FGT_RULES: &[&str] = &[
     RULE_FGT_FAC_001,
     RULE_FGT_GAT_001,
     RULE_FGT_IDX_001,
+    RULE_FGT_IMPACT_001,
     RULE_FGT_LCK_001,
     RULE_FGT_MSG_001,
     RULE_FGT_MSG_002,
