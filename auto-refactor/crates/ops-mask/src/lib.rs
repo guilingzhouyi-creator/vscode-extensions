@@ -5,9 +5,11 @@
 
 mod ascii;
 mod ascii_helpers;
+mod utf16_helpers;
 
 use ascii::mask_line_ascii_into;
 use ascii_helpers::has_trigger_char;
+use utf16_helpers::{mask_regex_body_u16, opens_regex_literal_u16, scan_raw_string_u16};
 
 /// Configuration flags for source code comment and literal masking.
 #[derive(Debug, Clone, Default)]
@@ -195,108 +197,6 @@ fn mask_line(line: &str, state: &mut MaskState, config: &MaskConfig) -> String {
     let mut target = MaskTarget::new(&mut buf, &mut out);
     mask_line_into(line, state, config, &mut target);
     out
-}
-
-fn opens_regex_literal_u16(units: &[u16], index: usize) -> bool {
-    let mut back = index as isize - 1;
-    while back >= 0 {
-        let u = units[back as usize];
-        if u != 0x20 && u != 0x09 {
-            return u <= 127 && REGEX_PREFIX_CHARS.contains(&(u as u8));
-        }
-        back -= 1;
-    }
-    true
-}
-
-fn mask_regex_body_u16(units: &[u16], index: usize, out: &mut [u16]) -> usize {
-    out[index] = 0x20;
-    let mut cursor = index + 1;
-    let mut in_class = false;
-    let len = units.len();
-
-    while cursor < len {
-        let u = units[cursor];
-        out[cursor] = 0x20;
-        if u == b'\\' as u16 {
-            if cursor + 1 < len {
-                out[cursor + 1] = 0x20;
-            }
-            cursor += 2;
-            continue;
-        }
-        if u == b'[' as u16 {
-            in_class = true;
-        } else if u == b']' as u16 {
-            in_class = false;
-        } else if u == b'/' as u16 && !in_class {
-            cursor += 1;
-            while cursor < len
-                && (units[cursor] <= 127 && (units[cursor] as u8).is_ascii_alphabetic())
-            {
-                out[cursor] = 0x20;
-                cursor += 1;
-            }
-            return cursor;
-        }
-        cursor += 1;
-    }
-    cursor
-}
-
-fn scan_raw_string_u16(
-    units: &[u16],
-    start: usize,
-    out: &mut [u16],
-    state: &mut MaskState,
-) -> Option<usize> {
-    let len = units.len();
-    if start > 0 {
-        let prev = units[start - 1];
-        if (prev <= 127 && (prev as u8).is_ascii_alphanumeric()) || prev == b'_' as u16 {
-            return None;
-        }
-    }
-
-    let r_pos = if units[start] == b'r' as u16 {
-        start
-    } else {
-        start + 1
-    };
-
-    let mut pos = r_pos + 1;
-    let mut hashes = 0;
-    while pos < len && units[pos] == b'#' as u16 {
-        hashes += 1;
-        pos += 1;
-    }
-
-    if pos >= len || units[pos] != b'"' as u16 {
-        return None;
-    }
-
-    out[start..=pos].fill(0x20);
-
-    let mut cursor = pos + 1;
-    while cursor < len {
-        out[cursor] = 0x20;
-        if units[cursor] == b'"' as u16
-            && cursor + 1 + hashes <= len
-            && units[cursor + 1..cursor + 1 + hashes]
-                .iter()
-                .all(|&c| c == b'#' as u16)
-        {
-            for offset in 1..=hashes {
-                out[cursor + offset] = 0x20;
-            }
-            state.raw_string = None;
-            return Some(cursor + 1 + hashes);
-        }
-        cursor += 1;
-    }
-
-    state.raw_string = Some(hashes);
-    Some(len)
 }
 
 #[inline]
