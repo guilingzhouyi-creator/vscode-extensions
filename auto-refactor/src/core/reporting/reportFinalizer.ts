@@ -29,25 +29,13 @@ import {
     handleBaselineUpdate,
     handleBaselineRatchet,
 } from './baselineManager';
-import type { QualityScoreBreakdown } from '../scoring/scoringTypes';
-import { QualityScorer } from '../scoring/qualityScorer';
-import { synthesizeStaticQualityVector } from '../scoring/static-quality-model';
-import { computeDynamicQualityVector } from '../dynamic/dynamic-quality-scorer';
-import { computeUnifiedQualityScore } from '../scoring/fusion-scorer';
-import type { GovernanceProjectProfile } from '../scoring/fusion-scorer';
-import { evaluateProjectAutonomy } from '../scoring/autonomy-scorer';
 import { applySuppressions } from './post-scan-suppressions';
-import { applyArbitrationPass, synthesizeProjectQuant } from './post-scan-arbitration';
-import {
-    recordHistoricalQualitySample,
-    resolveHistoricalQualityScore,
-} from '../scoring/rolling-sampling-governor';
+import { applyArbitrationPass } from './post-scan-arbitration';
+import { refreshQualityScores } from './post-scan-quality-scoring';
 import {
     applyAnalyzerSeverityCaps,
     enrichEvolutionAndCoverage,
     loadEnrichedCalibrationStats,
-    syncAdaptiveSupervisorState,
-    synthesizeNativeGovernance,
 } from './post-scan-enrichment';
 
 export { BASELINE_GRANULARITY_GROUPED, groupCounts };
@@ -92,37 +80,6 @@ const OPT_CHECK_EMPTY_DIRECTORIES = 'checkEmptyDirectories';
 /** Default baseline comparison granularity. */
 const DEFAULT_BASELINE_GRANULARITY = 'id';
 
-/** Governance maturity tier classifications. */
-const TIER_INDUSTRIAL = 'industrial';
-const TIER_DEMO = 'demo';
-const TIER_PROTOTYPE = 'prototype';
-
-/** Governance maturity stage representations. */
-const STAGE_INDUSTRIAL_INFRASTRUCTURE = 'industrial_infrastructure';
-const STAGE_PROTOTYPE = 'prototype';
-const STAGE_PRODUCTION = 'production';
-
-/** Governance scale grade classifications. */
-const GRADE_ENTERPRISE = 'enterprise';
-const GRADE_LARGE = 'large';
-const GRADE_MEDIUM = 'medium';
-
-/** Governance scale descriptors. */
-const SCALE_MASSIVE = 'massive';
-const SCALE_LARGE = 'large';
-const SCALE_MEDIUM = 'medium';
-const SCALE_SMALL = 'small';
-
-/** Governance project archetype classifications. */
-const ARCHETYPE_LIBRARY = 'library';
-const ARCHETYPE_GAME = 'game';
-const ARCHETYPE_WEB = 'web';
-
-/** Governance architecture domain classifications. */
-const DOMAIN_CORE_FRAMEWORK = 'core_framework';
-const DOMAIN_ALGORITHM_LIB = 'algorithm_lib';
-const DOMAIN_BUSINESS_APP = 'business_app';
-
 /** User-facing diagnostic and warning notifications. */
 const WARN_EMPTY_INCLUDE_GLOBS =
     'include globs matched 0 files — declared analyzers cannot fire; check include/exclude and the scanned root';
@@ -147,9 +104,6 @@ const MSG_EMPTY_DIRECTORY_ISSUES = 'lingering empty directory finding(s)';
 
 /** Empty string constant for fallback representation. */
 const EMPTY_STRING = '';
-
-/** Immutable empty array singleton for zero-allocation fallbacks in hot loops. */
-const EMPTY_ISSUES: readonly Issue[] = Object.freeze([]);
 
 const FINALIZED = Symbol('auto-refactor:finalized');
 
@@ -433,237 +387,6 @@ async function finalizeBaseline(context: BaselineFinalizationContext): Promise<v
     }
 }
 
-/**
- * Groups issues by their originating file path for efficient per-file evaluation.
- *
- * @param issues - Flat array of detected issues.
- * @returns Map indexing issues by normalized file path.
- */
-function groupIssuesByFile(issues: readonly Issue[]): Map<string, Issue[]> {
-    const issuesByFile = new Map<string, Issue[]>();
-    for (const targetIssue of issues) {
-        const filePath = targetIssue.location?.file;
-        if (!filePath) continue;
-        const fileGroup = issuesByFile.get(filePath);
-        if (fileGroup) {
-            fileGroup.push(targetIssue);
-        } else {
-            issuesByFile.set(filePath, [targetIssue]);
-        }
-    }
-    return issuesByFile;
-}
-
-/**
- * Resolves architectural governance project profile from scan configuration.
- *
- * @param config - Resolved scan configuration.
- * @returns Mapped governance project profile metadata.
- */
-function resolveGovernanceProfile(config: ScanConfig): GovernanceProjectProfile {
-    let stage: GovernanceProjectProfile['stage'] = STAGE_PRODUCTION;
-    if (config.maturityTier === TIER_INDUSTRIAL) {
-        stage = STAGE_INDUSTRIAL_INFRASTRUCTURE;
-    } else if (config.maturityTier === TIER_DEMO || config.maturityTier === TIER_PROTOTYPE) {
-        stage = STAGE_PROTOTYPE;
-    }
-
-    let scale: GovernanceProjectProfile['scale'] = SCALE_SMALL;
-    if (config.scaleGrade === GRADE_ENTERPRISE) {
-        scale = SCALE_MASSIVE;
-    } else if (config.scaleGrade === GRADE_LARGE) {
-        scale = SCALE_LARGE;
-    } else if (config.scaleGrade === GRADE_MEDIUM) {
-        scale = SCALE_MEDIUM;
-    }
-
-    let domain: GovernanceProjectProfile['domain'] = DOMAIN_CORE_FRAMEWORK;
-    if (config.archetype === ARCHETYPE_LIBRARY) {
-        domain = DOMAIN_ALGORITHM_LIB;
-    } else if (config.archetype === ARCHETYPE_GAME || config.archetype === ARCHETYPE_WEB) {
-        domain = DOMAIN_BUSINESS_APP;
-    }
-
-    return { stage, scale, domain };
-}
-
-function collectDirtyFiles(report: ScanReport, initialIssueCount: number): Set<string> {
-    const dirtyFiles = new Set<string>();
-    const issues = report.issues;
-    for (let i = 0; i < issues.length; i++) {
-        const issue = issues[i];
-        const file = issue.location?.file;
-        if (!file) continue;
-        if (
-            i >= initialIssueCount ||
-            issue.suppression !== undefined ||
-            issue.clusteredInto !== undefined
-        ) {
-            dirtyFiles.add(file);
-        }
-    }
-    return dirtyFiles;
-}
-
-interface RefreshQualityScoresParams {
-    readonly report: ScanReport;
-    readonly config: ScanConfig;
-    readonly reportScanner: Scanner | null;
-    readonly scope: PostScanScope;
-    readonly logger: Logger;
-    readonly initialIssueCount?: number;
-    readonly snapshotSource?: ReadonlyMap<string, string>;
-}
-
-/**
- * Ensures the report carries an autonomy evaluation, reusing the one the scan already produced.
- *
- * `buildScanReport` scores autonomy with the scanner's symbol index, which is the same index this
- * pass would pass and yields the same result. Recomputing it read every file a second time — the
- * autonomy pass reads each file's import preamble — so the existing value stands unless a slice
- * scan never produced one. Extracted from `refreshQualityScores` so that adding the guard there did
- * not raise that function's cyclomatic complexity.
- *
- * @param report - Report to enrich in place.
- * @param config - Resolved scan configuration.
- * @param reportScanner - Scanner that produced the report, when it is this process's own.
- */
-function applyAutonomyScore(
-    report: ScanReport,
-    config: ScanConfig,
-    reportScanner: Scanner | null,
-): void {
-    if (report.autonomy) return;
-    report.autonomy = evaluateProjectAutonomy(
-        report.fileMetrics ?? [],
-        report.issues,
-        config,
-        reportScanner?.retainedSourceText() as Map<string, string> | undefined,
-        reportScanner && typeof reportScanner.getSymbolIndex === 'function'
-            ? reportScanner.getSymbolIndex()
-            : undefined,
-    );
-}
-
-/**
- * Recomputes quality scores, tri-plane vectors, and project autonomy indices.
- *
- * @param params - Context carrying report, resolved config, scanner, scope, and initial count.
- */
-async function refreshQualityScores(params: RefreshQualityScoresParams): Promise<void> {
-    const { report, config, reportScanner, initialIssueCount = 0 } = params;
-    const effectiveScorerArchetype = config.reviewProfile ?? config.archetype;
-    const scorer =
-        reportScanner && typeof reportScanner.getQualityScorer === 'function'
-            ? reportScanner.getQualityScorer()
-            : new QualityScorer(
-                  config.scoringWeights as unknown as Record<string, number>,
-                  effectiveScorerArchetype,
-              );
-
-    const existingScores = report.fileQualityScores;
-    const dirtyFiles = existingScores ? collectDirtyFiles(report, initialIssueCount) : null;
-    const issuesByFile = groupIssuesByFile(report.issues);
-    const fileQualityScores: Record<string, QualityScoreBreakdown> = {};
-    const fileMetrics = report.fileMetrics ?? [];
-
-    const fallbackIssues = EMPTY_ISSUES as unknown as Issue[];
-    for (const metric of fileMetrics) {
-        const cached = existingScores?.[metric.file];
-        if (cached && dirtyFiles && !dirtyFiles.has(metric.file)) {
-            fileQualityScores[metric.file] = cached;
-            continue;
-        }
-        const fileIssues = issuesByFile.get(metric.file) || fallbackIssues;
-        fileQualityScores[metric.file] = scorer.evaluateFile(
-            metric.file,
-            fileIssues,
-            metric,
-            config,
-        );
-    }
-    report.fileQualityScores = fileQualityScores;
-    const projectQualityScore = scorer.evaluateProject(
-        fileQualityScores,
-        fileMetrics,
-        config,
-        report.issues,
-    );
-    report.qualityScore = projectQualityScore;
-    await refreshQualityProjections(params, projectQualityScore);
-}
-
-/** Project static scores and source-aware enrichment without persisting snapshot history. */
-async function refreshQualityProjections(
-    params: RefreshQualityScoresParams,
-    projectQualityScore: NonNullable<ScanReport['qualityScore']>,
-): Promise<void> {
-    const { report, config, reportScanner, scope, logger } = params;
-    const fileMetrics = report.fileMetrics ?? [];
-    const staticVector = synthesizeStaticQualityVector(projectQualityScore.indices);
-    const dynamicTelemetry = config.telemetryData;
-    const dynamicVector =
-        dynamicTelemetry && dynamicTelemetry.isObserved !== false
-            ? computeDynamicQualityVector(dynamicTelemetry)
-            : undefined;
-    const historicalScore = params.snapshotSource
-        ? undefined
-        : resolveHistoricalQualityScore(config);
-    const supervisorWeights = params.snapshotSource
-        ? undefined
-        : await syncAdaptiveSupervisorState({
-              config,
-              scope,
-              historicalScore,
-              currentCompositeScore: projectQualityScore.compositeScore,
-          });
-    report.triPlaneQuality = computeUnifiedQualityScore(
-        staticVector,
-        dynamicVector,
-        historicalScore,
-        {
-            ...resolveGovernanceProfile(config),
-            supervisorWeights,
-        },
-    );
-    const totalEffectiveLines = fileMetrics.reduce(
-        (acc, item) => acc + (item.nonBlankLines || 0),
-        0,
-    );
-    if (!params.snapshotSource) {
-        recordHistoricalQualitySample(
-            config,
-            projectQualityScore.compositeScore,
-            totalEffectiveLines,
-        );
-    }
-    projectQualityScore.quant = synthesizeProjectQuant(
-        config,
-        projectQualityScore,
-        fileMetrics,
-        report.issues,
-    );
-    if (!params.snapshotSource) applyAutonomyScore(report, config, reportScanner);
-    report.governance = await synthesizeNativeGovernance({
-        report,
-        config,
-        scope,
-        // Reuse the text this scan already read; empty when retention sealed, or when the report
-        // came from a warm/daemon scan, in which case governance reads from disk instead.
-        contentByPath: params.snapshotSource ?? reportScanner?.retainedSourceText(),
-        allowHostRead: params.snapshotSource === undefined,
-        logger,
-    });
-}
-
-/**
- * Determines whether quality scores and composite metrics should be recomputed.
- *
- * @param report - Current scan report.
- * @param initialIssueCount - Count of issues before post-scan suppression.
- * @param suppressedCount - Count of suppressed issues.
- * @returns True if quality metrics require recalculation.
- */
 function shouldRefreshQualityScores(
     report: ScanReport,
     initialIssueCount: number,

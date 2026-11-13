@@ -15,6 +15,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { FileMetric, Issue, ScanConfig, ScanReport, ScanSummary } from '../types';
 import type { Logger } from '../logger';
+import type { GovernanceProjectProfile } from '../scoring/fusion-scorer';
 import type { QualityScoreBreakdown } from '../scoring/scoringTypes';
 import { FindingConfidenceArbiter } from '../scoring/finding-confidence-arbiter';
 import {
@@ -38,6 +39,38 @@ import {
 } from '../scoring/quantitative-risk-model';
 
 const PASS_ARBITRATION = 'arbitration';
+
+const STAGE_BY_TIER: Record<string, GovernanceProjectProfile['stage']> = {
+    industrial: 'industrial_infrastructure',
+    demo: 'prototype',
+    prototype: 'prototype',
+};
+
+const SCALE_BY_GRADE: Record<string, GovernanceProjectProfile['scale']> = {
+    enterprise: 'massive',
+    large: 'large',
+    medium: 'medium',
+};
+
+const DOMAIN_BY_ARCHETYPE: Record<string, GovernanceProjectProfile['domain']> = {
+    library: 'algorithm_lib',
+    game: 'business_app',
+    web: 'business_app',
+};
+
+/**
+ * Resolves architectural governance project profile from scan configuration.
+ *
+ * @param config - Resolved scan configuration.
+ * @returns Mapped governance project profile metadata.
+ */
+export function resolveGovernanceProfile(config: ScanConfig): GovernanceProjectProfile {
+    return {
+        stage: (config.maturityTier && STAGE_BY_TIER[config.maturityTier]) || 'production',
+        scale: (config.scaleGrade && SCALE_BY_GRADE[config.scaleGrade]) || 'small',
+        domain: (config.archetype && DOMAIN_BY_ARCHETYPE[config.archetype]) || 'core_framework',
+    };
+}
 
 /** Minimal pass context required by finding arbitration. */
 export interface ArbitrationPassContext {
