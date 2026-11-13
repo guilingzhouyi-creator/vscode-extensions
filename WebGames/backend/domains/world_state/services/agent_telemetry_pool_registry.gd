@@ -100,6 +100,29 @@ static func recycle_packet(packet: AgentHudTelemetryPacketDTO) -> void:
 	ensure_pools_registered()
 	_release_to_pool(POOL_PACKET, packet)
 
+## 深度递归归还遥测包及其持有的观测切片、因果差分与行动指令子树
+static func recycle_packet_tree(packet: AgentHudTelemetryPacketDTO, keep_observation: AgentHudContextSliceDTO = null) -> void:
+	if packet == null:
+		return
+	var obs := packet.observation
+	packet.observation = null
+	if obs != null and obs != keep_observation:
+		recycle_slice(obs)
+
+	if not packet.causal_deltas.is_empty():
+		for delta in packet.causal_deltas:
+			if delta != null:
+				recycle_delta(delta)
+		packet.causal_deltas.clear()
+
+	if not packet.action_space.is_empty():
+		for directive in packet.action_space:
+			if directive != null:
+				recycle_directive(directive)
+		packet.action_space.clear()
+
+	recycle_packet(packet)
+
 ## 借出上下文观测切片
 static func borrow_slice() -> AgentHudContextSliceDTO:
 	ensure_pools_registered()

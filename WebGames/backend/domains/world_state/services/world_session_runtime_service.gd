@@ -37,6 +37,9 @@ static var _runtime_save_provider: RuntimeWorldSaveProvider = null
 static var _masked_token: PackedByteArray = PackedByteArray()
 static var _token_mask_handler: Callable = Callable()
 static var _token_reveal_handler: Callable = Callable()
+static var _cached_hud_snapshot: AuthoritativeHudSnapshotDTO = null
+static var _hud_min_interval_cached: int = 50
+static var _hud_cfg_version: int = -1
 
 ## 注册外部安全混淆处理器（依赖倒置模式：由外层应用/基础设施注入，避免领域层逆向依赖基础设施）
 static func register_token_protection_handlers(masker: Callable, revealer: Callable) -> void:
@@ -222,19 +225,31 @@ static func apply_mutation_and_sync(mutations: Dictionary, now_ms: int = -1, for
 		mark_hud_dirty(true)
 	return flush_hud_sync_if_dirty(now_ms, force_push)
 
-## 按配置最小推送周期刷新脏标 HUD 快照，防止高频微突变风暴
+static func _resolve_hud_min_interval_ms() -> int:
+	var cfg_ver: int = GameConfig.config_reload_version()
+	if _hud_cfg_version != cfg_ver:
+		_hud_min_interval_cached = maxi(0, GameConfig.get_int("domains.world_state", "hud_sync/min_interval_ms", 50))
+		_hud_cfg_version = cfg_ver
+	return _hud_min_interval_cached
+
+## 按配置最小推送周期刷新脏标 HUD 快照，先短路节流与非脏路径以消除无效快照构造
 static func flush_hud_sync_if_dirty(now_ms: int = -1, force_push: bool = false) -> AuthoritativeHudSnapshotDTO:
+	if not _state.world_active or not _state.hud_dirty:
+		if _cached_hud_snapshot == null:
+			_cached_hud_snapshot = AuthoritativeHudSyncService.get_authoritative_snapshot(build_live_hud_context())
+		return _cached_hud_snapshot
+	var current_ms := now_ms if now_ms >= 0 else Time.get_ticks_msec()
+	var min_interval := _resolve_hud_min_interval_ms()
+	if not force_push and (current_ms - _state.last_hud_sync_ms) < min_interval:
+		if _cached_hud_snapshot == null:
+			_cached_hud_snapshot = AuthoritativeHudSyncService.get_authoritative_snapshot(build_live_hud_context())
+		return _cached_hud_snapshot
 	var live_ctx := build_live_hud_context()
 	var snapshot := AuthoritativeHudSyncService.get_authoritative_snapshot(live_ctx)
-	if not _state.world_active or not _state.hud_dirty:
-		return snapshot
-	var current_ms := now_ms if now_ms >= 0 else Time.get_ticks_msec()
-	var min_interval := maxi(0, GameConfig.get_int("domains.world_state", "hud_sync/min_interval_ms", 50))
-	if not force_push and (current_ms - _state.last_hud_sync_ms) < min_interval:
-		return snapshot
 	AuthoritativeHudSyncService.publish_hud_snapshot(snapshot)
 	_state.hud_dirty = false
 	_state.last_hud_sync_ms = current_ms
+	_cached_hud_snapshot = snapshot
 	return snapshot
 
 ## 构造当前活跃会话的真实 HUD 聚合上下文字典（完全由运行时状态驱动）
@@ -308,6 +323,7 @@ static func clear_world_dirty() -> void:
 static func deactivate_world_session() -> void:
 	_unregister_runtime_save_providers()
 	_state.reset_world_fields()
+	_cached_hud_snapshot = null
 
 ## 注销账号级运行时上下文与网关引用
 static func revoke_account_session() -> void:
@@ -315,6 +331,7 @@ static func revoke_account_session() -> void:
 	_state.reset_all()
 	_runtime_save_provider = null
 	_masked_token = PackedByteArray()
+	_cached_hud_snapshot = null
 
 ## 重置测试运行时状态（与 revoke_account_session 等价，保持测试隔离）
 static func reset_for_tests() -> void:

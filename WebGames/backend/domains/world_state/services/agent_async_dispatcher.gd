@@ -23,8 +23,12 @@ enum Strategy {
 var _capacity: int = 128
 var _strategy: int = Strategy.DROP_OLDEST
 var _deterministic_mode: bool = true
-var _queue: Array[AgentHudTelemetryPacketDTO] = []
+var _ring: Array[AgentHudTelemetryPacketDTO] = []
+var _q_head: int = 0
+var _q_tail: int = 0
+var _q_count: int = 0
 var _sinks: Dictionary = {} # sink_id -> Callable
+var _sink_callables: Array[Callable] = []
 
 var _total_dispatched: int = 0
 var _total_dropped: int = 0
@@ -36,8 +40,13 @@ func _init(capacity: int = 128, strategy: int = Strategy.DROP_OLDEST) -> void:
 	_capacity = maxi(1, capacity)
 	_strategy = strategy
 	_deterministic_mode = true
-	_queue.clear()
+	_ring.clear()
+	_ring.resize(_capacity)
+	_q_head = 0
+	_q_tail = 0
+	_q_count = 0
 	_sinks.clear()
+	_sink_callables.clear()
 	_total_dispatched = 0
 	_total_dropped = 0
 	_mutex = Mutex.new()
@@ -50,18 +59,25 @@ func _notification(what: int) -> void:
 			WorkerThreadPool.wait_for_task_completion(_task_id)
 			_task_id = -1
 
+func _rebuild_sink_callables_unlocked() -> void:
+	_sink_callables.clear()
+	for v in _sinks.values():
+		_sink_callables.append(v as Callable)
+
 ## 注册遥测消费下沉端点 (Callable 接收 packet: AgentHudTelemetryPacketDTO)
 func register_sink(sink_id: String, consumer: Callable) -> void:
 	if sink_id.is_empty() or not consumer.is_valid():
 		return
 	_mutex.lock()
 	_sinks[sink_id] = consumer
+	_rebuild_sink_callables_unlocked()
 	_mutex.unlock()
 
 ## 注销指定下沉端点
 func unregister_sink(sink_id: String) -> void:
 	_mutex.lock()
 	_sinks.erase(sink_id)
+	_rebuild_sink_callables_unlocked()
 	_mutex.unlock()
 
 ## 设置确定性同步模式（测试时强制单线程同步）
@@ -82,25 +98,26 @@ func dispatch_telemetry(packet: AgentHudTelemetryPacketDTO) -> bool:
 		_total_dispatched += 1
 		return true
 
-	# 非确定性后台队列调度
+	# 非确定性后台队列调度（O(1) 定容环形队列）
 	_mutex.lock()
-	if _queue.size() >= _capacity:
+	if _q_count >= _capacity:
 		match _strategy:
 			Strategy.DROP_OLDEST:
-				_queue.pop_front()
+				_ring[_q_head] = packet
+				_q_head = (_q_head + 1) % _capacity
+				_q_tail = _q_head
 				_total_dropped += 1
-			Strategy.DROP_NEWEST:
-				_total_dropped += 1
-				_mutex.unlock()
-				return false
-			Strategy.WARN_BLOCK:
+			Strategy.DROP_NEWEST, Strategy.WARN_BLOCK:
 				_total_dropped += 1
 				_mutex.unlock()
 				return false
+	else:
+		_ring[_q_tail] = packet
+		_q_tail = (_q_tail + 1) % _capacity
+		_q_count += 1
 
-	_queue.append(packet)
 	_total_dispatched += 1
-	var has_sinks: bool = not _sinks.is_empty()
+	var has_sinks: bool = not _sink_callables.is_empty()
 	_mutex.unlock()
 
 	# 仅在注册了有效消费端点时调度后台消费任务
@@ -124,8 +141,11 @@ func _process_worker_queue() -> void:
 	while true:
 		var pkt: AgentHudTelemetryPacketDTO = null
 		_mutex.lock()
-		if not _queue.is_empty():
-			pkt = _queue.pop_front()
+		if _q_count > 0:
+			pkt = _ring[_q_head]
+			_ring[_q_head] = null
+			_q_head = (_q_head + 1) % _capacity
+			_q_count -= 1
 		else:
 			_worker_running = false
 			_mutex.unlock()
@@ -137,18 +157,25 @@ func _process_worker_queue() -> void:
 
 func _notify_all_sinks(packet: AgentHudTelemetryPacketDTO) -> void:
 	_mutex.lock()
-	var sink_callables := _sinks.values()
+	var sink_callables: Array[Callable] = _sink_callables.duplicate()
 	_mutex.unlock()
 	for sink_cb in sink_callables:
-		if (sink_cb as Callable).is_valid():
-			(sink_cb as Callable).call(packet)
+		if sink_cb.is_valid():
+			sink_cb.call(packet)
 
 ## 同步排空当前队列到所有下沉端点
 func pump() -> int:
 	var pending: Array[AgentHudTelemetryPacketDTO] = []
 	_mutex.lock()
-	pending = _queue.duplicate()
-	_queue.clear()
+	if _q_count > 0:
+		pending.resize(_q_count)
+		for i in range(_q_count):
+			var idx: int = (_q_head + i) % _capacity
+			pending[i] = _ring[idx]
+			_ring[idx] = null
+		_q_head = 0
+		_q_tail = 0
+		_q_count = 0
 	_mutex.unlock()
 
 	for pkt in pending:
@@ -171,7 +198,7 @@ func flush() -> void:
 ## 获取当前排队深度
 func get_queue_depth() -> int:
 	_mutex.lock()
-	var depth := _queue.size()
+	var depth := _q_count
 	_mutex.unlock()
 	return depth
 
@@ -200,7 +227,11 @@ func clear() -> void:
 	if _task_id != -1:
 		tid = _task_id
 		_task_id = -1
-	_queue.clear()
+	for i in range(_ring.size()):
+		_ring[i] = null
+	_q_head = 0
+	_q_tail = 0
+	_q_count = 0
 	_total_dispatched = 0
 	_total_dropped = 0
 	_worker_running = false

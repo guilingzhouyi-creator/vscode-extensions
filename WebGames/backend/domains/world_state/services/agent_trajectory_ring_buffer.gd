@@ -19,14 +19,20 @@ const AgentActionDirectiveDTO = preload("res://backend/domains/world_state/dto/a
 
 var _capacity: int = 32
 var _slots: Array[AgentHudTelemetryPacketDTO] = []
+var _slot_delta_pools: Array = []
+var _slot_action_pools: Array = []
 var _head: int = 0
 var _count: int = 0
 
 func _init(capacity: int = 32) -> void:
 	_capacity = maxi(1, capacity)
 	_slots.resize(_capacity)
+	_slot_delta_pools.resize(_capacity)
+	_slot_action_pools.resize(_capacity)
 	for i in range(_capacity):
 		_slots[i] = _create_empty_packet_slot()
+		_slot_delta_pools[i] = []
+		_slot_action_pools[i] = []
 	_head = 0
 	_count = 0
 
@@ -39,7 +45,9 @@ func append_packet(packet: AgentHudTelemetryPacketDTO) -> void:
 		return
 
 	var target_slot: AgentHudTelemetryPacketDTO = _slots[_head]
-	_sync_packet_data(packet, target_slot)
+	var delta_pool: Array = _slot_delta_pools[_head] as Array
+	var action_pool: Array = _slot_action_pools[_head] as Array
+	_sync_packet_data(packet, target_slot, delta_pool, action_pool)
 
 	_head = (_head + 1) % _capacity
 	_count = mini(_capacity, _count + 1)
@@ -101,7 +109,12 @@ func clear() -> void:
 	_head = 0
 	_count = 0
 
-static func _sync_packet_data(src: AgentHudTelemetryPacketDTO, dst: AgentHudTelemetryPacketDTO) -> void:
+static func _sync_packet_data(
+	src: AgentHudTelemetryPacketDTO,
+	dst: AgentHudTelemetryPacketDTO,
+	delta_pool: Array,
+	action_pool: Array
+) -> void:
 	dst.reset_state()
 	dst.protocol_version = src.protocol_version
 	dst.packet_id = src.packet_id
@@ -120,17 +133,17 @@ static func _sync_packet_data(src: AgentHudTelemetryPacketDTO, dst: AgentHudTele
 			dst.observation = AgentHudContextSliceDTO.new()
 		_sync_observation(src.observation, dst.observation)
 
-	# 差分原位同步（单轮提取避免过深嵌套）
-	_sync_causal_deltas(src, dst)
+	# 差分原位同步（依托槽位长驻对象池，零事件帧不销毁已分配实例）
+	_sync_causal_deltas(src, dst, delta_pool)
 	# 行动空间原位同步
-	_sync_action_space(src, dst)
+	_sync_action_space(src, dst, action_pool)
 
-static func _sync_causal_deltas(src: AgentHudTelemetryPacketDTO, dst: AgentHudTelemetryPacketDTO) -> void:
+static func _sync_causal_deltas(src: AgentHudTelemetryPacketDTO, dst: AgentHudTelemetryPacketDTO, delta_pool: Array) -> void:
 	var active_count: int = 0
 	for d in src.causal_deltas:
 		if d == null:
 			continue
-		var clone_delta := _acquire_delta_slot(dst.causal_deltas, active_count)
+		var clone_delta := _acquire_delta_slot(delta_pool, active_count)
 		clone_delta.delta_category = d.delta_category
 		clone_delta.target_field = d.target_field
 		clone_delta.previous_value = d.previous_value
@@ -141,6 +154,8 @@ static func _sync_causal_deltas(src: AgentHudTelemetryPacketDTO, dst: AgentHudTe
 		clone_delta.reason = d.reason
 		active_count += 1
 	dst.causal_deltas.resize(active_count)
+	for idx in range(active_count):
+		dst.causal_deltas[idx] = delta_pool[idx]
 
 static func _acquire_delta_slot(pool: Array, idx: int) -> HudCausalDeltaDTO:
 	if idx < pool.size() and pool[idx] != null:
@@ -152,12 +167,12 @@ static func _acquire_delta_slot(pool: Array, idx: int) -> HudCausalDeltaDTO:
 		pool.append(created)
 	return created
 
-static func _sync_action_space(src: AgentHudTelemetryPacketDTO, dst: AgentHudTelemetryPacketDTO) -> void:
+static func _sync_action_space(src: AgentHudTelemetryPacketDTO, dst: AgentHudTelemetryPacketDTO, action_pool: Array) -> void:
 	var active_count: int = 0
 	for a in src.action_space:
 		if a == null:
 			continue
-		var clone_act := _acquire_action_slot(dst.action_space, active_count)
+		var clone_act := _acquire_action_slot(action_pool, active_count)
 		clone_act.directive_id = a.directive_id
 		clone_act.domain = a.domain
 		clone_act.description = a.description
@@ -168,6 +183,8 @@ static func _sync_action_space(src: AgentHudTelemetryPacketDTO, dst: AgentHudTel
 		clone_act.blocked_reason = a.blocked_reason
 		active_count += 1
 	dst.action_space.resize(active_count)
+	for idx in range(active_count):
+		dst.action_space[idx] = action_pool[idx]
 
 static func _acquire_action_slot(pool: Array, idx: int) -> AgentActionDirectiveDTO:
 	if idx < pool.size() and pool[idx] != null:

@@ -12,6 +12,14 @@
 class_name AgentActionExecutionSolver
 extends RefCounted
 
+const AgentTelemetryPoolRegistry = preload("res://backend/domains/world_state/services/agent_telemetry_pool_registry.gd")
+
+static func _recycle_action_space(action_space: Array[AgentActionDirectiveDTO]) -> void:
+	for d in action_space:
+		if d != null:
+			AgentTelemetryPoolRegistry.recycle_directive(d)
+	action_space.clear()
+
 ## 校验并执行来自专属动作通道的 AgentActionPacketDTO
 static func validate_and_execute(
 	action_pkt: AgentActionPacketDTO,
@@ -41,8 +49,9 @@ static func validate_and_execute(
 			"cause": ""
 		}
 
-	# 1. 获取当前合法的动态行动空间
-	var action_space := HomeActionSpaceSolver.resolve_action_space(snapshot, is_human_lease_active)
+	# 1. 获取当前合法的动态行动空间（校验结束后统一归还对象池）
+	var action_space: Array[AgentActionDirectiveDTO] = []
+	HomeActionSpaceSolver.resolve_action_space_into(snapshot, action_space, is_human_lease_active)
 	var target_directive: AgentActionDirectiveDTO = null
 	for d in action_space:
 		if d.directive_id == d_id:
@@ -51,6 +60,7 @@ static func validate_and_execute(
 
 	# 2. 检查指令是否在合法值域内 (Inv-ACTION-ORACLE-6)
 	if target_directive == null:
+		_recycle_action_space(action_space)
 		return {
 			"success": false,
 			"error_code": "ERR_UNKNOWN_OR_UNEXPOSED_DIRECTIVE",
@@ -60,12 +70,14 @@ static func validate_and_execute(
 	# 3. 检查指令前置条件是否满足
 	if not target_directive.is_executable:
 		var blocked: String = target_directive.blocked_reason
+		_recycle_action_space(action_space)
 		return {
 			"success": false,
 			"error_code": blocked if not blocked.is_empty() else "ERR_DIRECTIVE_BLOCKED",
 			"cause": ""
 		}
 
+	_recycle_action_space(action_space)
 	# 4. 路由派发至对应领域用例 (纯无头逻辑调用，零UI依赖)
 	return _dispatch_domain_execution(d_id, action_pkt, snapshot)
 

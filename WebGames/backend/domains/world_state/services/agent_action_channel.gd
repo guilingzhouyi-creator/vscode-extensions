@@ -12,6 +12,8 @@
 class_name AgentActionChannel
 extends RefCounted
 
+const AgentTelemetryPoolRegistry = preload("res://backend/domains/world_state/services/agent_telemetry_pool_registry.gd")
+
 ## 接收 AgentActionPacketDTO 并完成动作派发，零硬件冲突直投后端用例
 static func dispatch_action(action_pkt: AgentActionPacketDTO, context: Dictionary = {}) -> Dictionary:
 	if action_pkt == null:
@@ -34,7 +36,7 @@ static func dispatch_action(action_pkt: AgentActionPacketDTO, context: Dictionar
 			"next_packet": null
 		}
 
-	# 2. 动作执行成功后，派生最新遥测数据包并向伴侣总线广播
+	# 2. 动作执行成功后，派生最新遥测数据包并向伴侣总线广播，出口序列化后回收对象树
 	var cause: String = str(exec_res.get("cause", "AGENT_ACTION"))
 	var next_pkt: AgentHudTelemetryPacketDTO = AgentHudSliceSolver.assemble_telemetry_packet(
 		snapshot,
@@ -46,10 +48,12 @@ static func dispatch_action(action_pkt: AgentActionPacketDTO, context: Dictionar
 	)
 
 	AuthoritativeHudSyncService.publish_agent_telemetry_packet(next_pkt)
+	var serialized_packet: Dictionary = next_pkt.to_dto()
+	AgentTelemetryPoolRegistry.recycle_packet_tree(next_pkt)
 
 	return {
 		"success": true,
 		"error_code": "",
 		"cause": cause,
-		"next_packet": next_pkt.to_dto()
+		"next_packet": serialized_packet
 	}
