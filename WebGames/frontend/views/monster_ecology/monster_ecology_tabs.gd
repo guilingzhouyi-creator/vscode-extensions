@@ -16,7 +16,7 @@ const KSplitPanelClass = preload("res://frontend/components/k_split_panel.gd")
 var page_header: KPageHeader = null
 var split_panel: KSplitPanel = null
 
-var _view = null
+var _view: Variant = null
 
 # --- 选中与交互状态 ---
 var _selected_boss_idx: int = -1
@@ -151,16 +151,14 @@ func _init_subpanel_text() -> void:
 # Tab 1: WORLD_BOSS 世界BOSS
 # ==============================================================================
 
-## 重建世界 BOSS 卡片列表（名称/等级/状态模板，点击回调详情切换）
+## 刷新世界 BOSS 卡片列表（池化复用卡片按钮，循环零堆分配）
 func _populate_boss_cards() -> void:
 	if _view == null or _view._boss_card_list == null:
 		return
-	for child in _view._boss_card_list.get_children():
-		child.queue_free()
 	for i in _world_bosses.size():
 		var boss: Dictionary = _world_bosses[i]
-		var btn := KButtonClass.new()
-		btn.variant = KButtonClass.StyleVariant.SECONDARY
+		var btn: Button = _acquire_boss_card_button(i)
+		btn.visible = true
 		var boss_name := UIIntermediary.text(str(boss.get("name_key", "")))
 		var boss_status := UIIntermediary.text(str(boss.get("status_key", "")))
 		btn.text = UIIntermediary.text("ui.fe11.world_boss.card_template", {
@@ -168,17 +166,26 @@ func _populate_boss_cards() -> void:
 			"level": int(boss.get("level", 0)),
 			"status": boss_status,
 		})
-		btn.custom_minimum_size = Vector2(0, 60)
-		var idx := i
-		btn.pressed.connect(func(): _on_boss_card_pressed(idx))
-		_view._boss_card_list.add_child(btn)
+	for i in range(_world_bosses.size(), _view._boss_card_list.get_child_count()):
+		_view._boss_card_list.get_child(i).visible = false
+
+## 获取或创建世界 BOSS 卡片按钮（循环外分配）
+func _acquire_boss_card_button(idx: int) -> Button:
+	if idx < _view._boss_card_list.get_child_count():
+		return _view._boss_card_list.get_child(idx) as Button
+	var btn := KButtonClass.new()
+	btn.variant = KButtonClass.StyleVariant.SECONDARY
+	btn.custom_minimum_size = Vector2(0, 60)
+	connect_managed(btn.pressed, func(): _on_boss_card_pressed(idx))
+	_view._boss_card_list.add_child(btn)
+	return btn
 
 ## BOSS 卡片点击：记录选中索引并刷新详情
 func _on_boss_card_pressed(idx: int) -> void:
 	_selected_boss_idx = idx
 	_refresh_boss_detail()
 
-## 刷新 BOSS 详情：未选中占位或完整字段（名称/等级/状态/重生/地图/倒计时/奖励/参战数）
+## 刷新 BOSS 详情：未选中空态或完整字段（名称/等级/状态/重生/地图/倒计时/奖励/参战数）
 func _refresh_boss_detail() -> void:
 	if _view == null:
 		return
@@ -252,35 +259,44 @@ func _refresh_beast_tide_status() -> void:
 	_view._tide_defense_bar.value = defense_pct
 	UIIntermediary.resolve(_view._label_tide_defense, "ui.fe11.beast_tide.defense_pct", {"pct": "%.1f" % defense_pct})
 
-## 重建兽潮波次列表（波次号/状态/倒计时/防线百分比）
+## 刷新兽潮波次列表（池化复用 PanelContainer，循环零堆分配）
 func _populate_wave_list() -> void:
 	if _view == null or _view._tide_wave_list == null:
 		return
-	for child in _view._tide_wave_list.get_children():
-		child.queue_free()
-	for wave in _beast_tide_waves:
-		var panel := PanelContainer.new()
-		var vbox := VBoxContainer.new()
-		vbox.set("theme_override_constants/separation", 4)
-
-		var title_label := Label.new()
+	for i in range(_beast_tide_waves.size()):
+		var wave: Dictionary = _beast_tide_waves[i]
+		var panel: PanelContainer = _acquire_wave_panel(i)
+		panel.visible = true
+		var vbox := panel.get_child(0) as VBoxContainer
+		var title_label := vbox.get_child(0) as Label
 		var status_text: String = UIIntermediary.text(str(wave.get("status_key", "-")))
 		title_label.text = UIIntermediary.text("ui.fe11.beast_tide.wave_title", {
 			"wave": int(wave.get("wave", 0)),
 			"status": status_text,
 		})
-		vbox.add_child(title_label)
-
-		var detail_label := Label.new()
+		var detail_label := vbox.get_child(1) as Label
 		detail_label.text = UIIntermediary.text("ui.fe11.beast_tide.wave_detail", {
 			"countdown": _format_countdown(int(wave.get("countdown_sec", 0))),
 			"pct": "%.1f" % float(wave.get("defense_pct", 0.0)),
 		})
-		detail_label.set("theme_override_colors/font_color", DesignTokens.COLOR_TEXT_MUTED_DEFAULT)
-		vbox.add_child(detail_label)
+	for i in range(_beast_tide_waves.size(), _view._tide_wave_list.get_child_count()):
+		_view._tide_wave_list.get_child(i).visible = false
 
-		panel.add_child(vbox)
-		_view._tide_wave_list.add_child(panel)
+## 获取或创建兽潮波次面板节点（循环外分配）
+func _acquire_wave_panel(index: int) -> PanelContainer:
+	if index < _view._tide_wave_list.get_child_count():
+		return _view._tide_wave_list.get_child(index) as PanelContainer
+	var panel := PanelContainer.new()
+	var vbox := VBoxContainer.new()
+	vbox.set("theme_override_constants/separation", 4)
+	var title_label := Label.new()
+	vbox.add_child(title_label)
+	var detail_label := Label.new()
+	detail_label.set("theme_override_colors/font_color", DesignTokens.COLOR_TEXT_MUTED_DEFAULT)
+	vbox.add_child(detail_label)
+	panel.add_child(vbox)
+	_view._tide_wave_list.add_child(panel)
+	return panel
 
 ## 刷新兽潮奖励列表（第一波奖励）
 func _refresh_tide_rewards() -> void:
@@ -321,9 +337,9 @@ func _on_tide_leave_pressed() -> void:
 func _connect_signals() -> void:
 	if _view == null:
 		return
-	_view._btn_boss_challenge.pressed.connect(_on_boss_challenge_pressed)
-	_view._btn_tide_join.pressed.connect(_on_tide_join_pressed)
-	_view._btn_tide_leave.pressed.connect(_on_tide_leave_pressed)
+	connect_managed(_view._btn_boss_challenge.pressed, _on_boss_challenge_pressed)
+	connect_managed(_view._btn_tide_join.pressed, _on_tide_join_pressed)
+	connect_managed(_view._btn_tide_leave.pressed, _on_tide_leave_pressed)
 
 ## 秒数格式化：HH:MM:SS（倒计时展示）
 func _format_countdown(seconds: int) -> String:

@@ -6,7 +6,7 @@
 class_name SettingsCenterTabs
 extends BaseScreen
 
-var _view = null
+var _view: Variant = null
 
 func setup(view: BaseScreen) -> void:
 	_view = view
@@ -242,7 +242,7 @@ func start_revert_countdown() -> void:
 		_view._revert_timer = Timer.new()
 		_view._revert_timer.wait_time = 1.0
 		_view._revert_timer.autostart = false
-		_view._revert_timer.timeout.connect(on_revert_tick)
+		connect_managed(_view._revert_timer.timeout, on_revert_tick)
 		_view.add_child(_view._revert_timer)
 	if _view._revert_timer != null:
 		_view._revert_timer.start()
@@ -326,29 +326,29 @@ func on_toggle_motion_blur(checked: bool) -> void:
 func connect_signals() -> void:
 	if _view == null:
 		return
-	_view._slider_master.value_changed.connect(on_master_volume_changed)
-	_view._slider_bgm.value_changed.connect(on_bgm_volume_changed)
-	_view._slider_se.value_changed.connect(on_se_volume_changed)
-	_view._check_mute_master.toggled.connect(on_mute_master_toggled)
-	_view._check_mute_bgm.toggled.connect(on_mute_bgm_toggled)
-	_view._check_mute_se.toggled.connect(on_mute_se_toggled)
+	connect_managed(_view._slider_master.value_changed, on_master_volume_changed)
+	connect_managed(_view._slider_bgm.value_changed, on_bgm_volume_changed)
+	connect_managed(_view._slider_se.value_changed, on_se_volume_changed)
+	connect_managed(_view._check_mute_master.toggled, on_mute_master_toggled)
+	connect_managed(_view._check_mute_bgm.toggled, on_mute_bgm_toggled)
+	connect_managed(_view._check_mute_se.toggled, on_mute_se_toggled)
 
-	_view._option_resolution.item_selected.connect(on_resolution_selected)
-	_view._option_quality.item_selected.connect(on_quality_selected)
-	_view._check_fullscreen.toggled.connect(on_fullscreen_toggled)
-	_view._check_vsync.toggled.connect(on_vsync_toggled)
-	_view._btn_apply_graphics.pressed.connect(on_apply_graphics_pressed)
-	_view._btn_confirm_resolution.pressed.connect(on_confirm_resolution_pressed)
-	_view._btn_revert_resolution.pressed.connect(on_revert_resolution_pressed)
+	connect_managed(_view._option_resolution.item_selected, on_resolution_selected)
+	connect_managed(_view._option_quality.item_selected, on_quality_selected)
+	connect_managed(_view._check_fullscreen.toggled, on_fullscreen_toggled)
+	connect_managed(_view._check_vsync.toggled, on_vsync_toggled)
+	connect_managed(_view._btn_apply_graphics.pressed, on_apply_graphics_pressed)
+	connect_managed(_view._btn_confirm_resolution.pressed, on_confirm_resolution_pressed)
+	connect_managed(_view._btn_revert_resolution.pressed, on_revert_resolution_pressed)
 
-	_view._btn_reset_keys.pressed.connect(on_reset_keys_pressed)
+	connect_managed(_view._btn_reset_keys.pressed, on_reset_keys_pressed)
 
-	_view._option_language.item_selected.connect(on_language_selected)
-	_view._btn_apply_language.pressed.connect(on_apply_language_pressed)
+	connect_managed(_view._option_language.item_selected, on_language_selected)
+	connect_managed(_view._btn_apply_language.pressed, on_apply_language_pressed)
 
-	_view._check_combat_numbers.toggled.connect(on_toggle_combat_numbers)
-	_view._check_floating_text.toggled.connect(on_toggle_floating_text)
-	_view._check_vibration.toggled.connect(on_toggle_vibration)
-	_view._check_auto_save.toggled.connect(on_toggle_auto_save)
-	_view._check_bloom.toggled.connect(on_toggle_bloom)
-	_view._check_motion_blur.toggled.connect(on_toggle_motion_blur)
+	connect_managed(_view._check_combat_numbers.toggled, on_toggle_combat_numbers)
+	connect_managed(_view._check_floating_text.toggled, on_toggle_floating_text)
+	connect_managed(_view._check_vibration.toggled, on_toggle_vibration)
+	connect_managed(_view._check_auto_save.toggled, on_toggle_auto_save)
+	connect_managed(_view._check_bloom.toggled, on_toggle_bloom)
+	connect_managed(_view._check_motion_blur.toggled, on_toggle_motion_blur)

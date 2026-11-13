@@ -17,7 +17,7 @@ var page_header: KPageHeader = null
 var split_panel: KSplitPanel = null
 var state_panel: KStatePanel = null
 
-var _view = null
+var _view: Variant = null
 
 var mock_quests: Array = [
 	{
@@ -242,7 +242,7 @@ func init_quest_virtual_list(container: Control = null) -> KVirtualList:
 		quest_virtual_list.name = "QuestVirtualList"
 		quest_virtual_list.item_height = 52.0
 		quest_virtual_list.buffer_count = 3
-		quest_virtual_list.range_changed.connect(_on_quest_range_changed)
+		connect_managed(quest_virtual_list.range_changed, _on_quest_range_changed)
 		if container != null:
 			container.add_child(quest_virtual_list)
 	return quest_virtual_list

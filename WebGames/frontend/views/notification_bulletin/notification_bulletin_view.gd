@@ -124,7 +124,7 @@ var toast_queue: Array = []
 var active_modal_dialog: Dictionary = {}
 ## 红点角标计数
 var red_dot_badges: Dictionary = {}
-var _tabs = null
+var _tabs: Variant = null
 
 # ==============================================================================
 # 生命周期
@@ -173,7 +173,7 @@ func _apply_theme() -> void:
 # 静态文案初始化（i18n 注入）
 # ==============================================================================
 
-## 初始化全部静态文案：顶栏/三 Tab 标题/分类与提示/详情占位/Toast·Modal 测试台（i18n 全驱动）
+## 初始化全部静态文案：顶栏/三 Tab 标题/分类与提示/详情空态/Toast·Modal 测试台（i18n 全驱动）
 func _init_static_text() -> void:
 	_get_tabs().init_static_text()
 
@@ -281,36 +281,36 @@ func _show_modal(type: String, message: String) -> void:
 ## 绑定本地 UI 交互信号（零接线：通知/公告/红点树/Toast·Modal 测试台本地闭环）
 func _connect_signals() -> void:
 	# 返回按钮
-	_btn_back.pressed.connect(_on_back_btn_pressed)
+	connect_managed(_btn_back.pressed, _on_back_btn_pressed)
 
 	# Tab 切换
-	_main_tab_container.tab_changed.connect(_on_tab_changed)
+	connect_managed(_main_tab_container.tab_changed, _on_tab_changed)
 
 	# 通知中心
-	_notif_category_list.item_selected.connect(_on_notif_category_selected)
-	_notif_item_list.item_selected.connect(_on_notif_item_selected)
-	_btn_jump_target.pressed.connect(_on_jump_target_pressed)
-	_btn_mark_all_read.pressed.connect(_on_mark_all_read_pressed)
-	_btn_clear_notif.pressed.connect(_on_clear_notif_pressed)
+	connect_managed(_notif_category_list.item_selected, _on_notif_category_selected)
+	connect_managed(_notif_item_list.item_selected, _on_notif_item_selected)
+	connect_managed(_btn_jump_target.pressed, _on_jump_target_pressed)
+	connect_managed(_btn_mark_all_read.pressed, _on_mark_all_read_pressed)
+	connect_managed(_btn_clear_notif.pressed, _on_clear_notif_pressed)
 
 	# 公告板
-	_bulletin_tab_bar.tab_changed.connect(_on_bulletin_tab_changed)
-	_bulletin_item_list.item_selected.connect(_on_bulletin_item_selected)
+	connect_managed(_bulletin_tab_bar.tab_changed, _on_bulletin_tab_changed)
+	connect_managed(_bulletin_item_list.item_selected, _on_bulletin_item_selected)
 
 	# 红点树
-	_btn_clear_all_red_dots.pressed.connect(_on_clear_all_red_dots_pressed)
-	_red_dot_tree.item_activated.connect(_on_red_dot_item_activated)
+	connect_managed(_btn_clear_all_red_dots.pressed, _on_clear_all_red_dots_pressed)
+	connect_managed(_red_dot_tree.item_activated, _on_red_dot_item_activated)
 
 	# Toast 测试
-	_btn_toast_info.pressed.connect(func(): _show_toast("INFO", UIIntermediary.text("ui.fe14.toast.test.info")))
-	_btn_toast_success.pressed.connect(func(): _show_toast("SUCCESS", UIIntermediary.text("ui.fe14.toast.test.success")))
-	_btn_toast_warning.pressed.connect(func(): _show_toast("WARNING", UIIntermediary.text("ui.fe14.toast.test.warning")))
-	_btn_toast_error.pressed.connect(func(): _show_toast("ERROR", UIIntermediary.text("ui.fe14.toast.test.error")))
+	connect_managed(_btn_toast_info.pressed, func(): _show_toast("INFO", UIIntermediary.text("ui.fe14.toast.test.info")))
+	connect_managed(_btn_toast_success.pressed, func(): _show_toast("SUCCESS", UIIntermediary.text("ui.fe14.toast.test.success")))
+	connect_managed(_btn_toast_warning.pressed, func(): _show_toast("WARNING", UIIntermediary.text("ui.fe14.toast.test.warning")))
+	connect_managed(_btn_toast_error.pressed, func(): _show_toast("ERROR", UIIntermediary.text("ui.fe14.toast.test.error")))
 
 	# Modal 测试
-	_btn_modal_confirm.pressed.connect(func(): _show_modal("CONFIRM", UIIntermediary.text("ui.fe14.modal.test.confirm")))
-	_btn_modal_yes_no.pressed.connect(func(): _show_modal("YES_NO", UIIntermediary.text("ui.fe14.modal.test.yes_no")))
-	_btn_modal_input.pressed.connect(func(): _show_modal("INPUT", UIIntermediary.text("ui.fe14.modal.test.input")))
+	connect_managed(_btn_modal_confirm.pressed, func(): _show_modal("CONFIRM", UIIntermediary.text("ui.fe14.modal.test.confirm")))
+	connect_managed(_btn_modal_yes_no.pressed, func(): _show_modal("YES_NO", UIIntermediary.text("ui.fe14.modal.test.yes_no")))
+	connect_managed(_btn_modal_input.pressed, func(): _show_modal("INPUT", UIIntermediary.text("ui.fe14.modal.test.input")))
 
 # ==============================================================================
 # 信号回调
@@ -320,7 +320,7 @@ func _connect_signals() -> void:
 func _on_back_btn_pressed() -> void:
 	self.back()
 
-## 主 Tab 切换：骨架阶段占位
+## 主 Tab 切换：表现层无额外副作用
 func _on_tab_changed(_tab_idx: int) -> void:
 	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe14.toast.tab_switched"), NavTypes.ToastLevel.INFO, 1.0)
 
@@ -398,7 +398,7 @@ func _on_red_dot_item_activated() -> void:
 # ==============================================================================
 
 func push_toast(text: String, duration: float) -> Dictionary:
-	var item = {"text": text, "duration": duration}
+	var item: Dictionary = {"text": text, "duration": duration}
 	toast_queue.append(item)
 	return {"success": true, "toast": item}
 

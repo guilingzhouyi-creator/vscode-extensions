@@ -11,7 +11,7 @@ const KPageHeaderClass = preload("res://frontend/components/k_page_header.gd")
 
 var page_header: KPageHeader = null
 
-var _view = null
+var _view: Variant = null
 
 const BULLETIN_TAB_KEYS := [
 	"ui.fe14.bulletin.tab.all",

@@ -127,7 +127,7 @@ var _cdkey_history: Array = []
 # ==============================================================================
 
 ## 生命周期初始化：主题/四 Tab 装配/静态文案/信号绑定/视觉适配（骨架零接线）
-var _tabs = null
+var _tabs: Variant = null
 
 func _get_tabs():
 	if _tabs == null:
@@ -174,7 +174,7 @@ func _apply_theme() -> void:
 # 静态文案初始化（i18n 注入）
 # ==============================================================================
 
-## 初始化全部静态文案：顶栏/四 Tab 标题/分区标签/按钮/占位符（i18n 全驱动）
+## 初始化全部静态文案：顶栏/四 Tab 标题/分区标签/按钮/输入提示（i18n 全驱动）
 func _init_static_text() -> void:
 	# --- 顶栏 ---
 	var title_label: Label = $MainLayout/HeaderPanel/HeaderHBox/TitleLabel
@@ -223,7 +223,7 @@ func _init_save_slots() -> void:
 	_refresh_save_slot_list()
 	_refresh_slot_detail()
 
-## 刷新存档槽位列表：空槽占位/非空槽角色名+等级组合行
+## 刷新存档槽位列表：空槽默认展示/非空槽角色名+等级组合行
 func _refresh_save_slot_list() -> void:
 	if _item_list_save_slots == null:
 		return
@@ -309,19 +309,19 @@ func _refresh_cdkey_history() -> void:
 ## 绑定本地 UI 交互信号（零接线：四 Tab 全部控件在本地脚本闭环）
 func _connect_signals() -> void:
 	# 返回按钮
-	_btn_back.pressed.connect(_on_back_btn_pressed)
+	connect_managed(_btn_back.pressed, _on_back_btn_pressed)
 
 	# Tab 切换
-	_tab_container.tab_changed.connect(_on_tab_changed)
+	connect_managed(_tab_container.tab_changed, _on_tab_changed)
 
 	# 存档槽位
-	_item_list_save_slots.item_selected.connect(_on_save_slot_selected)
-	_btn_save_to_slot.pressed.connect(_on_save_to_slot_pressed)
-	_btn_load_from_slot.pressed.connect(_on_load_from_slot_pressed)
-	_btn_delete_slot.pressed.connect(_on_delete_slot_pressed)
-	_btn_export_slot.pressed.connect(_on_export_slot_pressed)
-	_check_auto_save.toggled.connect(_on_auto_save_toggled)
-	_btn_cloud_sync.pressed.connect(_on_cloud_sync_pressed)
+	connect_managed(_item_list_save_slots.item_selected, _on_save_slot_selected)
+	connect_managed(_btn_save_to_slot.pressed, _on_save_to_slot_pressed)
+	connect_managed(_btn_load_from_slot.pressed, _on_load_from_slot_pressed)
+	connect_managed(_btn_delete_slot.pressed, _on_delete_slot_pressed)
+	connect_managed(_btn_export_slot.pressed, _on_export_slot_pressed)
+	connect_managed(_check_auto_save.toggled, _on_auto_save_toggled)
+	connect_managed(_btn_cloud_sync.pressed, _on_cloud_sync_pressed)
 
 	_get_tabs().connect_signals()
 
@@ -333,7 +333,7 @@ func _connect_signals() -> void:
 func _on_back_btn_pressed() -> void:
 	self.back()
 
-## 主 Tab 切换：骨架阶段无额外处理（占位）
+## 主 Tab 切换：表现层无额外处理（状态由容器托管）
 func _on_tab_changed(_tab_idx: int) -> void:
 	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe16.toast.tab_switched"), NavTypes.ToastLevel.INFO, 1.0)
 

@@ -139,7 +139,7 @@ func _render_from_snapshot() -> void:
 		marching_routes = FrontendSnapshot.read_array(snapshot, "marching_routes")
 
 ## 生命周期初始化：主题/快照/六 Tab 标题与文案/各子界面装配/信号绑定（骨架零接线）
-var _tabs = null
+var _tabs: Variant = null
 
 func _get_tabs():
 	if _tabs == null:
@@ -260,22 +260,33 @@ func _init_world_map_tab() -> void:
 	_refresh_wmap_zoom()
 	_refresh_wmap_coord()
 
-## 动态生成地标按钮：按 Mock 坐标定位，点击回调切城镇详情
+## 刷新地标按钮：按 Mock 坐标复用节点池定位，点击回调切城镇详情
 func _spawn_landmark_buttons() -> void:
-	# 清除旧地标按钮
-	for child in _wmap_landmark_container.get_children():
-		child.queue_free()
-	# 动态生成地标按钮（坐标来自 Mock 数据）
-	for landmark in town_landmarks:
-		var btn := KButtonClass.new()
-		btn.variant = KButtonClass.StyleVariant.SECONDARY
+	for i in range(town_landmarks.size()):
+		var landmark: Dictionary = town_landmarks[i]
+		var btn: Button = _acquire_landmark_button(i)
+		btn.visible = true
 		btn.name = "Landmark_%s" % landmark.get("id", "")
 		btn.text = UIIntermediary.text(landmark.get("name", ""))
 		btn.position = Vector2(landmark.get("x", 0) - 60, landmark.get("y", 0) - 16)
-		btn.size = Vector2(120, 32)
-		var lid: String = landmark.get("id", "")
-		btn.pressed.connect(func(): _on_landmark_pressed(lid))
-		_wmap_landmark_container.add_child(btn)
+		btn.set_meta("landmark_id", str(landmark.get("id", "")))
+	for i in range(town_landmarks.size(), _wmap_landmark_container.get_child_count()):
+		_wmap_landmark_container.get_child(i).visible = false
+
+## 获取或创建地标按钮（循环外分配，按元数据动态分派）
+func _acquire_landmark_button(index: int) -> Button:
+	if index < _wmap_landmark_container.get_child_count():
+		return _wmap_landmark_container.get_child(index) as Button
+	var btn := KButtonClass.new()
+	btn.variant = KButtonClass.StyleVariant.SECONDARY
+	btn.size = Vector2(120, 32)
+	connect_managed(btn.pressed, func():
+		var lid: String = str(btn.get_meta("landmark_id", ""))
+		if not lid.is_empty():
+			_on_landmark_pressed(lid)
+	)
+	_wmap_landmark_container.add_child(btn)
+	return btn
 
 func _landmark_type_key(code: String) -> String:
 	var m := {"CAPITAL": "ui.fe10.landmark.type.capital", "TOWN": "ui.fe10.landmark.type.town", "FORTRESS": "ui.fe10.landmark.type.fortress", "DUNGEON": "ui.fe10.landmark.type.dungeon"}
@@ -315,7 +326,7 @@ func _init_town_view_tab() -> void:
 	if town_landmarks.size() > 0:
 		_show_town(town_landmarks[0])
 
-## 展示城镇详情：名称/类型/设施详情占位
+## 展示城镇详情：名称/类型/设施详情初始展示
 func _show_town(landmark: Dictionary) -> void:
 	if _town_name_label:
 		_town_name_label.text = UIIntermediary.text(landmark.get("name", "ui.fe10.town.name_default"))
@@ -346,17 +357,17 @@ func _init_pathfinding_tab() -> void: _get_tabs().init_pathfinding_tab()
 ## 绑定本地 UI 交互信号（零接线：六 Tab 控件在本地脚本闭环）
 func _connect_signals() -> void:
 	# 返回按钮
-	_back_btn.pressed.connect(_on_back_pressed)
+	connect_managed(_back_btn.pressed, _on_back_pressed)
 
 	# 大地图缩放
-	_wmap_zoom_in_btn.pressed.connect(_on_wmap_zoom_in)
-	_wmap_zoom_out_btn.pressed.connect(_on_wmap_zoom_out)
+	connect_managed(_wmap_zoom_in_btn.pressed, _on_wmap_zoom_in)
+	connect_managed(_wmap_zoom_out_btn.pressed, _on_wmap_zoom_out)
 	# 图例点击切换地标
-	_wmap_legend_list.item_selected.connect(_on_legend_selected)
+	connect_managed(_wmap_legend_list.item_selected, _on_legend_selected)
 
 	# 城镇设施 / NPC 选择
-	_town_facility_list.item_selected.connect(_on_town_facility_selected)
-	_town_npc_list.item_selected.connect(_on_town_npc_selected)
+	connect_managed(_town_facility_list.item_selected, _on_town_facility_selected)
+	connect_managed(_town_npc_list.item_selected, _on_town_npc_selected)
 
 	_get_tabs().connect_signals()
 

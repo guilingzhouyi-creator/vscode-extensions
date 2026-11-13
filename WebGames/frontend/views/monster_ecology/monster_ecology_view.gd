@@ -83,7 +83,7 @@ const CATEGORY_KEYS := [
 @onready var _btn_tide_leave: Button = $%BtnTideLeave
 
 # 子面板委托控制器
-var _tabs = null
+var _tabs: Variant = null
 
 # ==============================================================================
 # Mock 数据与状态
@@ -164,7 +164,7 @@ func _render_from_snapshot() -> void:
 # ==============================================================================
 
 func _ready() -> void:
-	var tabs = _get_tabs()
+	var tabs: Variant = _get_tabs()
 	var tm := ThemeManager.get_instance()
 	theme = tm.theme
 
@@ -215,28 +215,35 @@ func _init_text() -> void:
 # ==============================================================================
 
 func _connect_signals() -> void:
-	_line_bestiary_search.text_changed.connect(_on_search_changed)
-	_btn_back.pressed.connect(_on_back_pressed)
+	connect_managed(_line_bestiary_search.text_changed, _on_search_changed)
+	connect_managed(_btn_back.pressed, _on_back_pressed)
 
 # ==============================================================================
 # Tab 0: BESTIARY 怪物图鉴
 # ==============================================================================
 
 func _populate_category_buttons() -> void:
-	for child in _bestiary_category_hbox.get_children():
-		child.queue_free()
 	for i in CATEGORY_KEYS.size():
 		var cat_key: String = CATEGORY_KEYS[i]
-		var btn := KButtonClass.new()
-		btn.variant = KButtonClass.StyleVariant.SECONDARY
+		var btn: Button = _acquire_category_button(i)
+		btn.visible = true
 		btn.text = UIIntermediary.text(cat_key)
-		btn.toggle_mode = true
-		btn.custom_minimum_size = Vector2(0, 32)
-		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		btn.button_pressed = (i == _selected_category_idx)
-		var idx := i
-		btn.pressed.connect(func(): _on_category_pressed(idx))
-		_bestiary_category_hbox.add_child(btn)
+	for i in range(CATEGORY_KEYS.size(), _bestiary_category_hbox.get_child_count()):
+		_bestiary_category_hbox.get_child(i).visible = false
+
+## 获取或创建图鉴分类按钮（池化复用，循环外分配）
+func _acquire_category_button(idx: int) -> Button:
+	if idx < _bestiary_category_hbox.get_child_count():
+		return _bestiary_category_hbox.get_child(idx) as Button
+	var btn := KButtonClass.new()
+	btn.variant = KButtonClass.StyleVariant.SECONDARY
+	btn.toggle_mode = true
+	btn.custom_minimum_size = Vector2(0, 32)
+	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	connect_managed(btn.pressed, func(): _on_category_pressed(idx))
+	_bestiary_category_hbox.add_child(btn)
+	return btn
 
 func _on_category_pressed(idx: int) -> void:
 	_selected_category_idx = idx
@@ -255,20 +262,27 @@ func _on_search_changed(new_text: String) -> void:
 	_refresh_monster_detail()
 
 func _populate_bestiary_grid() -> void:
-	for child in _bestiary_grid.get_children():
-		child.queue_free()
 	_filtered_monsters = _get_filtered_monsters()
 	for i in _filtered_monsters.size():
 		var monster: Dictionary = _filtered_monsters[i]
-		var btn := KButtonClass.new()
-		btn.variant = KButtonClass.StyleVariant.SECONDARY
+		var btn: Button = _acquire_bestiary_card_button(i)
+		btn.visible = true
 		var discovered: bool = bool(monster.get("discovered", false))
 		btn.text = UIIntermediary.text(str(monster.get("name_key", ""))) if discovered else "???"
-		btn.custom_minimum_size = Vector2(100, 80)
 		btn.modulate = DesignTokens.COLOR_TEXT_PRIMARY if discovered else DesignTokens.COLOR_CONTENT_LOCKED
-		var idx := i
-		btn.pressed.connect(func(): _on_monster_card_pressed(idx))
-		_bestiary_grid.add_child(btn)
+	for i in range(_filtered_monsters.size(), _bestiary_grid.get_child_count()):
+		_bestiary_grid.get_child(i).visible = false
+
+## 获取或创建图鉴卡片按钮（池化复用，循环外分配）
+func _acquire_bestiary_card_button(idx: int) -> Button:
+	if idx < _bestiary_grid.get_child_count():
+		return _bestiary_grid.get_child(idx) as Button
+	var btn := KButtonClass.new()
+	btn.variant = KButtonClass.StyleVariant.SECONDARY
+	btn.custom_minimum_size = Vector2(100, 80)
+	connect_managed(btn.pressed, func(): _on_monster_card_pressed(idx))
+	_bestiary_grid.add_child(btn)
+	return btn
 
 func _get_filtered_monsters() -> Array:
 	var result: Array = []

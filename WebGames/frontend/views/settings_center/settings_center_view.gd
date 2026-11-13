@@ -91,7 +91,7 @@ var toggle_motion_blur: bool = false
 
 # 回滚倒计时计时器与子委托控制器
 var _revert_timer: Timer
-var _tabs = null
+var _tabs: Variant = null
 
 # ==============================================================================
 # 公开交互方法（白模测试契约：滑块/分辨率倒计时/语言热切）
@@ -168,9 +168,9 @@ func _init_all_text() -> void:
 
 func _connect_signals() -> void:
 	if _btn_back != null:
-		_btn_back.pressed.connect(_on_back_pressed)
+		connect_managed(_btn_back.pressed, _on_back_pressed)
 	if _tab_container != null:
-		_tab_container.tab_changed.connect(_on_tab_changed)
+		connect_managed(_tab_container.tab_changed, _on_tab_changed)
 
 func _on_tab_changed(tab_index: int) -> void:
 	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe15.toast.tab_switched"), NavTypes.ToastLevel.INFO, 1.0)

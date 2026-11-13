@@ -46,16 +46,16 @@ func init_static_text() -> void:
 func connect_signals() -> void:
 	if _view == null:
 		return
-	_view._march_from_option.item_selected.connect(_on_march_option_changed)
-	_view._march_to_option.item_selected.connect(_on_march_option_changed)
-	_view._march_start_btn.pressed.connect(_on_march_start)
-	_view._march_stop_btn.pressed.connect(_on_march_stop)
-	_view._sov_establish_btn.pressed.connect(_on_sov_establish)
-	_view._territory_list.item_selected.connect(_on_territory_selected)
-	_view._terr_upgrade_btn.pressed.connect(_on_terr_upgrade)
-	_view._pf_calc_btn.pressed.connect(_on_pf_calc)
-	_view._pf_route_list.item_selected.connect(_on_pf_route_selected)
-	_view._pf_auto_btn.pressed.connect(_on_pf_auto)
+	connect_managed(_view._march_from_option.item_selected, _on_march_option_changed)
+	connect_managed(_view._march_to_option.item_selected, _on_march_option_changed)
+	connect_managed(_view._march_start_btn.pressed, _on_march_start)
+	connect_managed(_view._march_stop_btn.pressed, _on_march_stop)
+	connect_managed(_view._sov_establish_btn.pressed, _on_sov_establish)
+	connect_managed(_view._territory_list.item_selected, _on_territory_selected)
+	connect_managed(_view._terr_upgrade_btn.pressed, _on_terr_upgrade)
+	connect_managed(_view._pf_calc_btn.pressed, _on_pf_calc)
+	connect_managed(_view._pf_route_list.item_selected, _on_pf_route_selected)
+	connect_managed(_view._pf_auto_btn.pressed, _on_pf_auto)
 
 # ==============================================================================
 # Tab 2: 行军探索 (MARCHING)
