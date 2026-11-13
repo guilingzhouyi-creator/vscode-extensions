@@ -9,7 +9,9 @@
 
 ## AuthoritativeCharacterCreationRequestDTO：Data Transfer Object (DTO)
 class_name AuthoritativeCharacterCreationRequestDTO
-extends RefCounted
+extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 # ==============================================================================
 # 一、请求契约字段
@@ -26,6 +28,7 @@ var extra_custom_fields: Dictionary = {}
 # 二、对象池与重置契约 (ADV-PRF-002)
 # ==============================================================================
 func reset_state() -> void:
+	super.reset_state()
 	account_id = ""
 	slot_id = 0
 	world_id = ""

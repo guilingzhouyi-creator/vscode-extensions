@@ -9,7 +9,9 @@
 
 ## HudUiNoticeDTO：Value Object DTO / Data Transport Model
 class_name HudUiNoticeDTO
-extends RefCounted
+extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 var notice_id: String = ""         # 唯一提示标识符 (如 "GUIDE_POTENTIAL_ALLOCATION")
 var category: String = "INFO"      # "INFO", "WARNING", "GUIDE", "MODAL"
@@ -31,6 +33,7 @@ var actions: Array[String]:        # 兼容性属性
 
 ## 重置内部数据状态，供对象池无堆分配复用
 func reset_state() -> void:
+	super.reset_state()
 	notice_id = ""
 	category = "INFO"
 	priority = 0

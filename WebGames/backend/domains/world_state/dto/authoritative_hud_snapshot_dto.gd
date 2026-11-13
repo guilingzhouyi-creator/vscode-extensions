@@ -110,10 +110,10 @@ static func _hydrate_physiology_and_wallet(data: Dictionary, dto: AuthoritativeH
 	dto.wallet_mana_monocrystals = int(data.get("wallet_mana_monocrystals", 0))
 	dto.ledger_nonce = int(data.get("ledger_nonce", 0))
 
-	var attr_values = data.get("attribute_values", {})
+	var attr_values: Variant = data.get("attribute_values", {})
 	if attr_values is Dictionary:
 		dto.attribute_values = attr_values.duplicate()
-	var attr_levels = data.get("attribute_levels", {})
+	var attr_levels: Variant = data.get("attribute_levels", {})
 	if attr_levels is Dictionary:
 		dto.attribute_levels = attr_levels.duplicate()
 
@@ -121,11 +121,11 @@ static func _hydrate_physiology_and_wallet(data: Dictionary, dto: AuthoritativeH
 	dto.title_rank_key = String(data.get("title_rank_key", ""))
 
 static func _hydrate_calendar_and_ops(data: Dictionary, dto: AuthoritativeHudSnapshotDTO) -> void:
-	var calendar_env_data = data.get("calendar_env", null)
+	var calendar_env_data: Variant = data.get("calendar_env", null)
 	if calendar_env_data is Dictionary and not calendar_env_data.is_empty():
 		dto.calendar_env = WorldCalendarEnvironmentDTO.from_dto(calendar_env_data)
 
-	var ops_bulletin = data.get("ops_bulletin_brief", {})
+	var ops_bulletin: Variant = data.get("ops_bulletin_brief", {})
 	if ops_bulletin is Dictionary:
 		dto.ops_bulletin_brief = ops_bulletin.duplicate()
 
@@ -135,16 +135,16 @@ static func _hydrate_calendar_and_ops(data: Dictionary, dto: AuthoritativeHudSna
 static func _hydrate_social_and_features(data: Dictionary, dto: AuthoritativeHudSnapshotDTO) -> void:
 	dto.guild_faction_id = String(data.get("guild_faction_id", ""))
 
-	var raw_dots = data.get("active_red_dot_paths", [])
+	var raw_dots: Variant = data.get("active_red_dot_paths", [])
 	if raw_dots is Array:
 		for dot in raw_dots:
 			dto.active_red_dot_paths.append(str(dot))
 
-	var q_track = data.get("quest_tracker", null)
+	var q_track: Variant = data.get("quest_tracker", null)
 	if q_track is Dictionary and not q_track.is_empty():
 		dto.quest_tracker = ActiveQuestTrackerDTO.from_dto(q_track)
 
-	var m_feat = data.get("mode_features", null)
+	var m_feat: Variant = data.get("mode_features", null)
 	if m_feat is Dictionary and not m_feat.is_empty():
 		dto.mode_features = ModeFeatureManifestDTO.from_dto(m_feat)
 

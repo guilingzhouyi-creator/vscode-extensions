@@ -9,7 +9,9 @@
 # ==============================================================================
 
 ## StorageMetricsDTO：Value Object DTO / Dual-Domain Storage Telemetry Metrics Model
-class_name StorageMetricsDTO extends RefCounted
+class_name StorageMetricsDTO extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 const DEFAULT_FRAME_BUDGET_MS: float = 2.0
 
@@ -34,6 +36,7 @@ var failure_retry_rate: float = 0.0
 
 ## 对象池复用重置
 func reset_state() -> void:
+	super.reset_state()
 	primary_recovery_time_ms = 0.0
 	time_to_first_interactive_ms = 0.0
 	auxiliary_throughput_mb_per_sec = 0.0

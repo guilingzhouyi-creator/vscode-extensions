@@ -9,7 +9,9 @@
 
 ## CrossWorldPerturbationDTO：Value Object DTO / Data Transport Model
 class_name CrossWorldPerturbationDTO
-extends RefCounted
+extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 var perturbation_id: String = ""
 var origin_world_id: String = ""
@@ -23,6 +25,7 @@ var visited_world_ids: Array[String] = []
 
 ## 重置实例状态为初始默认值
 func reset_state() -> void:
+    super.reset_state()
     perturbation_id = ""
     origin_world_id = ""
     emitted_timestamp_utc = 0
@@ -67,12 +70,12 @@ static func from_dto(d: Dictionary) -> CrossWorldPerturbationDTO:
     dto.flavor_i18n_key = String(d.get("flavor_i18n_key", ""))
     dto.perturbation_seed = int(d.get("perturbation_seed", 0))
 
-    var raw_tags = d.get("semantic_tags", [])
+    var raw_tags: Variant = d.get("semantic_tags", [])
     if raw_tags is Array:
         for tag in raw_tags:
             dto.semantic_tags.append(String(tag))
 
-    var raw_visited = d.get("visited_world_ids", [])
+    var raw_visited: Variant = d.get("visited_world_ids", [])
     if raw_visited is Array:
         for vw in raw_visited:
             dto.visited_world_ids.append(String(vw))

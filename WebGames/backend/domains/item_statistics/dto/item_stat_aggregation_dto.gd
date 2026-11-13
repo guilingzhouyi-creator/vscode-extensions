@@ -9,7 +9,9 @@
 
 ## ItemStatAggregationDto：物品统计聚合数据传输模型
 class_name ItemStatAggregationDto
-extends RefCounted
+extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 var total_items_tracked: int = 0
 var total_value_accumulated: int = 0
@@ -19,6 +21,7 @@ var last_updated_utc: int = 0
 
 ## 重置内部统计数据状态，供对象池无堆分配复用
 func reset_state() -> void:
+	super.reset_state()
 	total_items_tracked = 0
 	total_value_accumulated = 0
 	rarity_breakdown.clear()
@@ -40,10 +43,10 @@ static func from_dto(data: Dictionary) -> ItemStatAggregationDto:
 	var dto := ItemStatAggregationDto.new()
 	dto.total_items_tracked = int(data.get("total_items_tracked", 0))
 	dto.total_value_accumulated = int(data.get("total_value_accumulated", 0))
-	var raw_rarity = data.get("rarity_breakdown", {})
+	var raw_rarity: Variant = data.get("rarity_breakdown", {})
 	if raw_rarity is Dictionary:
 		dto.rarity_breakdown = raw_rarity.duplicate(true)
-	var raw_cat = data.get("category_counts", {})
+	var raw_cat: Variant = data.get("category_counts", {})
 	if raw_cat is Dictionary:
 		dto.category_counts = raw_cat.duplicate(true)
 	dto.last_updated_utc = int(data.get("last_updated_utc", 0))

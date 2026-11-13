@@ -9,7 +9,9 @@
 # ==============================================================================
 
 ## CancellationToken：Concurrency & Task Control Utility
-class_name CancellationToken extends RefCounted
+class_name CancellationToken extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 var _cancelled: bool = false
 var _callbacks: Array[Callable] = []
@@ -44,5 +46,6 @@ func register_callback(cb: Callable) -> void:
 
 ## 重置令牌状态（复用契约）
 func reset_state() -> void:
+	super.reset_state()
 	_cancelled = false
 	_callbacks.clear()

@@ -9,7 +9,9 @@
 # ==============================================================================
 
 ## MinimumWorldStateDTO：Value Object DTO / Minimum Viable World State Model
-class_name MinimumWorldStateDTO extends RefCounted
+class_name MinimumWorldStateDTO extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 const DEFAULT_MAX_HP: float = 100.0
 const MODE_SINGLE_PLAYER: String = "SINGLE_PLAYER"
@@ -47,6 +49,7 @@ func _init(p_account_id: String = "", p_slot_id: String = "", p_character_name: 
 
 ## 对象池复用重置
 func reset_state() -> void:
+	super.reset_state()
 	account_id = ""
 	slot_id = ""
 	character_name = ""
@@ -92,10 +95,10 @@ static func from_dict(data: Dictionary) -> RefCounted:
 		instance.max_hp = float(data.get("max_hp", DEFAULT_MAX_HP))
 		instance.play_time_seconds = int(data.get("play_time_seconds", 0))
 		instance.prologue_completed = bool(data.get("prologue_completed", false))
-		var cur_data = data.get("currency_summary", {})
+		var cur_data: Variant = data.get("currency_summary", {})
 		if cur_data is Dictionary:
 			instance.currency_summary = cur_data.duplicate()
-		var meta_data = data.get("metadata", {})
+		var meta_data: Variant = data.get("metadata", {})
 		if meta_data is Dictionary:
 			instance.metadata = meta_data.duplicate()
 	return dto

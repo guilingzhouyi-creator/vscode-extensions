@@ -9,7 +9,9 @@
 
 ## 服务端统一响应信封 DTO：封装业务结果、状态码与错误信息
 class_name UnifiedResponseEnvelopeDTO
-extends RefCounted
+extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 var request_id: String = ""              # 关联的原始请求 ID
 var success: bool = false                # 执行是否成功
@@ -31,6 +33,7 @@ var server_timestamp_ms: int = 0         # 服务端响应落盘时间戳
 
 ## 重置内部数据状态，供对象池无堆分配复用
 func reset_state() -> void:
+	super.reset_state()
 	request_id = ""
 	success = false
 	error_code = ""

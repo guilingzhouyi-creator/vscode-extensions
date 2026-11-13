@@ -9,7 +9,9 @@
 
 ## 客户端统一请求信封 DTO：封装客户端请求元数据与业务参数
 class_name ClientRequestEnvelopeDTO
-extends RefCounted
+extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 const ACTOR_HUMAN_UI: String = "HUMAN_UI"
 const ACTOR_AGENT: String = "AGENT"
@@ -27,6 +29,7 @@ var client_timestamp_ms: int = 0         # 客户端发射时毫秒时间戳
 
 ## 重置内部数据状态，供对象池无堆分配复用
 func reset_state() -> void:
+	super.reset_state()
 	request_id = ""
 	session_token = ""
 	account_id = ""

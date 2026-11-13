@@ -9,7 +9,9 @@
 
 ## AgentHudContextSliceDTO：Value Object DTO / Data Transport Model
 class_name AgentHudContextSliceDTO
-extends RefCounted
+extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 const DEFAULT_STAT_POOL: float = 100.0
 
@@ -65,6 +67,7 @@ var ui_notices: Array[HudUiNoticeDTO] = []
 
 ## 重置内部数据状态，供对象池无堆分配复用
 func reset_state() -> void:
+	super.reset_state()
 	account_id = ""
 	character_id = ""
 	character_name = ""

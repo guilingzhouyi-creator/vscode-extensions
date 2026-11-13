@@ -9,7 +9,9 @@
 # ==============================================================================
 
 ## ResourceIndexEntryDTO：Value Object DTO / Resource Index Descriptor Model
-class_name ResourceIndexEntryDTO extends RefCounted
+class_name ResourceIndexEntryDTO extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 const DEFAULT_CATEGORY: String = "config"
 const DEFAULT_PRIORITY: int = 2
@@ -51,6 +53,7 @@ func _init(
 
 ## 对象池复用重置
 func reset_state() -> void:
+	super.reset_state()
 	resource_id = ""
 	physical_path = ""
 	category = DEFAULT_CATEGORY

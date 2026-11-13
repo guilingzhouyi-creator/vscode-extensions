@@ -9,7 +9,9 @@
 
 ## AgentActionPacketDTO：Value Object DTO / Data Transport Model
 class_name AgentActionPacketDTO
-extends RefCounted
+extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 var session_id: String = ""         # 对应会话 ID
 var sequence_index: int = 0         # 响应的目标遥测包序号
@@ -23,6 +25,7 @@ var client_timestamp_ms: int = 0   # 决策产出物理时间戳
 
 ## 重置内部数据状态，供对象池无堆分配复用
 func reset_state() -> void:
+	super.reset_state()
 	session_id = ""
 	sequence_index = 0
 	directive_id = ""

@@ -9,10 +9,12 @@
 
 ## AccountRegistrationDTO：Value Object DTO / Data Transport Model
 class_name AccountRegistrationDTO
-extends RefCounted
+extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 ## 注册请求载荷（明文口令绝不序列化输出）
-class Request extends RefCounted:
+class Request extends PoolableDtoBase:
 	var username: String = ""
 	var password_plain: String = ""
 	var device_fingerprint: String = ""
@@ -20,6 +22,7 @@ class Request extends RefCounted:
 
 	## 重置内部数据状态，供对象池无堆分配复用
 	func reset_state() -> void:
+		super.reset_state()
 		username = ""
 		password_plain = ""
 		device_fingerprint = ""
@@ -52,7 +55,7 @@ class Request extends RefCounted:
 		return req
 
 ## 注册响应载荷（仅身份信息，无任何口令/哈希痕迹）
-class Response extends RefCounted:
+class Response extends PoolableDtoBase:
 	var success: bool = false
 	var is_success: bool:
 		get:
@@ -66,6 +69,7 @@ class Response extends RefCounted:
 
 	## 重置内部数据状态，供对象池无堆分配复用
 	func reset_state() -> void:
+		super.reset_state()
 		success = false
 		error_code = "OK"
 		account_id = ""

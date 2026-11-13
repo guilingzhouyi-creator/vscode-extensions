@@ -9,7 +9,9 @@
 
 ## CharacterCreationPresentationDTO：Data Transfer Object (DTO)
 class_name CharacterCreationPresentationDTO
-extends RefCounted
+extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 # ==============================================================================
 # 一、表现层契约字段
@@ -34,6 +36,7 @@ var prologue_preview: Dictionary = {}
 # 二、对象池与重置契约 (ADV-PRF-002)
 # ==============================================================================
 func reset_state() -> void:
+	super.reset_state()
 	character_id = ""
 	character_name = ""
 	origin_id = ""

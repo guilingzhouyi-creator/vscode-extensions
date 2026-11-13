@@ -9,7 +9,9 @@
 
 ## HudCausalDeltaDTO：Value Object DTO / Data Transport Model
 class_name HudCausalDeltaDTO
-extends RefCounted
+extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 var delta_category: String = ""   # "PHYSIOLOGY", "WALLET", "ASSET", "CALENDAR", "QUEST"
 var target_field: String = ""     # "hp_current", "wallet_gold", "day_phase_key"
@@ -22,6 +24,7 @@ var reason: String = ""           # 面向 Agent 解释因果的纯客观事实�
 
 ## 重置内部数据状态，供对象池无堆分配复用
 func reset_state() -> void:
+	super.reset_state()
 	delta_category = ""
 	target_field = ""
 	previous_value = null

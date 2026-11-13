@@ -9,7 +9,9 @@
 # ==============================================================================
 
 ## BatchLoadRequestDTO：Value Object DTO / Batch Resource Loading Request Model
-class_name BatchLoadRequestDTO extends RefCounted
+class_name BatchLoadRequestDTO extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 const ResourceIndexEntryDTO = preload("res://backend/domains/persistence_protocol/dto/resource_index_entry_dto.gd")
 
@@ -49,6 +51,7 @@ func add_entry(entry: ResourceIndexEntryDTO) -> void:
 
 ## 对象池复用重置
 func reset_state() -> void:
+	super.reset_state()
 	batch_id = ""
 	entries.clear()
 	on_item_loaded = Callable()

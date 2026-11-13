@@ -9,7 +9,9 @@
 
 ## AgentObservationPacketDTO：Data Transfer Object (DTO)
 class_name AgentObservationPacketDTO
-extends RefCounted
+extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 # ==============================================================================
 # 一、观测包契约字段
@@ -29,6 +31,7 @@ var diagnostic_dump: Dictionary = {} # 伴侣黑匣子现场转储字典（故�
 # 二、对象池与重置契约 (ADV-PRF-002)
 # ==============================================================================
 func reset_state() -> void:
+	super.reset_state()
 	session_id = ""
 	step_index = 0
 	current_node_id = ""
@@ -86,7 +89,7 @@ static func from_dto(raw: Dictionary) -> AgentObservationPacketDTO:
 # ==============================================================================
 # 四、动作包契约类 (AgentSessionActionDTO)
 # ==============================================================================
-class AgentSessionActionDTO extends RefCounted:
+class AgentSessionActionDTO extends PoolableDtoBase:
 	var session_id: String = ""
 	var action_type: String = "" # "CHOOSE", "ROLLBACK", "QUIT"
 	var choice_id: String = ""
@@ -94,6 +97,7 @@ class AgentSessionActionDTO extends RefCounted:
 
 	## 重置内部数据状态，供对象池无堆分配复用
 	func reset_state() -> void:
+		super.reset_state()
 		session_id = ""
 		action_type = ""
 		choice_id = ""

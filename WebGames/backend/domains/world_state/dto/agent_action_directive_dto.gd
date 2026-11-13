@@ -9,7 +9,9 @@
 
 ## AgentActionDirectiveDTO：Value Object DTO / Data Transport Model
 class_name AgentActionDirectiveDTO
-extends RefCounted
+extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 var directive_id: String = ""       # 操作唯一标识符 (如 "ALLOCATE_POTENTIAL_STAT")
 var domain: String = "ASSET"         # 领域分类 ("ASSET", "RETENTION", "ACTION", "INTERACTION", "META")
@@ -22,6 +24,7 @@ var blocked_reason: String = ""     # 阻断原因码 (如 "ERR_NO_POTENTIAL_POI
 
 ## 重置内部数据状态，供对象池无堆分配复用
 func reset_state() -> void:
+	super.reset_state()
 	directive_id = ""
 	domain = "ASSET"
 	description = ""

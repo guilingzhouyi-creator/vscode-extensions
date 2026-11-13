@@ -8,7 +8,9 @@
 # ==============================================================================
 
 ## SaveSlotSummaryDTO：Value Object DTO / Data Transport Model
-class_name SaveSlotSummaryDTO extends RefCounted
+class_name SaveSlotSummaryDTO extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 # ==============================================================================
 # 一、插槽封面元数据（默认值均来自 save_slot/defaults 配置）
@@ -93,6 +95,7 @@ static func deserialize(slot_dict: Dictionary) -> SaveSlotSummaryDTO:
 
 ## 对象池生命周期重置
 func reset_state() -> void:
+	super.reset_state()
 	slot_id = GameConfig.get_string("domains.account", "save_slot/defaults/slot_id", "SLOT_01")
 	character_name = GameConfig.get_string("domains.account", "save_slot/defaults/character_name", "Nameless Wanderer")
 	title_prefix = GameConfig.get_string("domains.account", "save_slot/defaults/title_prefix", "Apprentice Adventurer")

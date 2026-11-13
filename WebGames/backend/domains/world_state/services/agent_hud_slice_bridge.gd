@@ -10,7 +10,9 @@
 
 ## AgentHudSliceBridge：Domain Service / Stateful Telemetry Bridge Facade
 class_name AgentHudSliceBridge
-extends RefCounted
+extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 const AuthoritativeHudSyncService = preload("res://backend/domains/world_state/services/authoritative_hud_sync_service.gd")
 const AgentHudSliceSolver = preload("res://backend/domains/world_state/solvers/agent_hud_slice_solver.gd")
@@ -125,6 +127,7 @@ func get_trajectory_ring_buffer() -> AgentTrajectoryRingBuffer:
 
 ## 重置桥接器全部内部状态与时序序号
 func reset_state() -> void:
+	super.reset_state()
 	_context.clear()
 	_prev_slice = null
 	_sequence_index = 0

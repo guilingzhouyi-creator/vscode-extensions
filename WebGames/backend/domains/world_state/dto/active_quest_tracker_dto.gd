@@ -30,13 +30,13 @@ func to_dto() -> Dictionary:
 ## 从输入字典反序列化还原传输对象
 static func from_dto(data: Dictionary) -> ActiveQuestTrackerDTO:
 	var dto := ActiveQuestTrackerDTO.new()
-	var mq = data.get("main_quest", {})
+	var mq: Variant = data.get("main_quest", {})
 	if mq is Dictionary:
 		dto.main_quest = mq.duplicate()
-	var sq = data.get("side_quest", {})
+	var sq: Variant = data.get("side_quest", {})
 	if sq is Dictionary:
 		dto.side_quest = sq.duplicate()
-	var dq = data.get("daily_quest", {})
+	var dq: Variant = data.get("daily_quest", {})
 	if dq is Dictionary:
 		dto.daily_quest = dq.duplicate()
 	dto.tracked_quest_id = str(data.get("tracked_quest_id", ""))

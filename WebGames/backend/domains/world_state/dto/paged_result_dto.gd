@@ -43,7 +43,7 @@ static func from_dto(data: Dictionary) -> PagedResultDTO:
 	dto.has_next = bool(data.get("has_next", false))
 	dto.has_prev = bool(data.get("has_prev", false))
 	dto.next_cursor = String(data.get("next_cursor", ""))
-	var raw_items = data.get("items", [])
+	var raw_items: Variant = data.get("items", [])
 	if raw_items is Array:
 		dto.items = raw_items.duplicate()
 	return dto

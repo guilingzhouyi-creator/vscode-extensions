@@ -61,10 +61,10 @@ static func from_dto(data: Dictionary) -> HudStatusSnapshotDTO:
 	dto.character_name = String(data.get("character_name", ""))
 	dto.race_id = String(data.get("race_id", "HUMAN"))
 	dto.current_location_id = String(data.get("current_location_id", ""))
-	var av = data.get("attribute_values", {})
+	var av: Variant = data.get("attribute_values", {})
 	if av is Dictionary:
 		dto.attribute_values = av.duplicate()
-	var al = data.get("attribute_levels", {})
+	var al: Variant = data.get("attribute_levels", {})
 	if al is Dictionary:
 		dto.attribute_levels = al.duplicate()
 	# 除数下限守卫（Inv-HDS-3）：hp_max/ap_max 强保证 >= 1.0

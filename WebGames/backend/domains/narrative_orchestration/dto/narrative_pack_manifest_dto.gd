@@ -9,7 +9,9 @@
 
 ## NarrativePackManifestDTO：Value Object DTO / Data Transport Model
 class_name NarrativePackManifestDTO
-extends RefCounted
+extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 var pack_id: String = ""
 var pack_name: String = ""
@@ -25,6 +27,7 @@ var is_active: bool = true
 
 ## 重置实例状态为初始默认值
 func reset_state() -> void:
+    super.reset_state()
     pack_id = ""
     pack_name = ""
     version = ""
@@ -77,17 +80,17 @@ static func from_dto(d: Dictionary) -> NarrativePackManifestDTO:
     dto.root_path = String(d.get("root_path", ""))
     dto.is_active = bool(d.get("is_active", true))
 
-    var raw_deps = d.get("dependencies", [])
+    var raw_deps: Variant = d.get("dependencies", [])
     if raw_deps is Array:
         for dep in raw_deps:
             dto.dependencies.append(String(dep))
 
-    var raw_incomp = d.get("incompatible_packs", [])
+    var raw_incomp: Variant = d.get("incompatible_packs", [])
     if raw_incomp is Array:
         for incomp in raw_incomp:
             dto.incompatible_packs.append(String(incomp))
 
-    var raw_tags = d.get("semantic_tags", [])
+    var raw_tags: Variant = d.get("semantic_tags", [])
     if raw_tags is Array:
         for tag in raw_tags:
             dto.semantic_tags.append(String(tag))

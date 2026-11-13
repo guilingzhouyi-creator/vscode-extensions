@@ -9,7 +9,9 @@
 
 ## HudMutationContextDto：界面状态突变上下文数据模型
 class_name HudMutationContextDto
-extends RefCounted
+extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 var target_hud_element: String = ""
 var mutation_type: String = ""
@@ -18,6 +20,7 @@ var timestamp_utc: int = 0
 
 ## 重置内部界面突变上下文状态，供对象池无堆分配复用
 func reset_state() -> void:
+	super.reset_state()
 	target_hud_element = ""
 	mutation_type = ""
 	payload.clear()
@@ -37,7 +40,7 @@ static func from_dto(data: Dictionary) -> HudMutationContextDto:
 	var dto := HudMutationContextDto.new()
 	dto.target_hud_element = String(data.get("target_hud_element", ""))
 	dto.mutation_type = String(data.get("mutation_type", ""))
-	var raw_payload = data.get("payload", {})
+	var raw_payload: Variant = data.get("payload", {})
 	if raw_payload is Dictionary:
 		dto.payload = raw_payload.duplicate(true)
 	dto.timestamp_utc = int(data.get("timestamp_utc", 0))

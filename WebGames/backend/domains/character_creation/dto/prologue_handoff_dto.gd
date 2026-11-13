@@ -10,7 +10,9 @@
 
 ## PrologueHandoffDTO：序章向大地图状态机与 HUD 水化交接的数据传输对象
 class_name PrologueHandoffDTO
-extends RefCounted
+extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 # ==============================================================================
 # 一、核心传输字段
@@ -35,6 +37,7 @@ var timestamp_utc: int = 0
 
 ## 复位对象内部字段，满足循环零堆分配池化要求
 func reset_state() -> void:
+	super.reset_state()
 	account_id = ""
 	character_id = ""
 	character_name = ""

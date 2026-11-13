@@ -9,7 +9,9 @@
 
 ## QuestRewardContextDto：任务因果奖励发放上下文数据模型
 class_name QuestRewardContextDto
-extends RefCounted
+extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 var quest_id: String = ""
 var recipient_id: String = ""
@@ -20,6 +22,7 @@ var granted_timestamp_utc: int = 0
 
 ## 重置内部奖励上下文状态，供对象池无堆分配复用
 func reset_state() -> void:
+	super.reset_state()
 	quest_id = ""
 	recipient_id = ""
 	experience_reward = 0
@@ -44,10 +47,10 @@ static func from_dto(data: Dictionary) -> QuestRewardContextDto:
 	dto.quest_id = String(data.get("quest_id", ""))
 	dto.recipient_id = String(data.get("recipient_id", ""))
 	dto.experience_reward = int(data.get("experience_reward", 0))
-	var raw_curr = data.get("currency_rewards", {})
+	var raw_curr: Variant = data.get("currency_rewards", {})
 	if raw_curr is Dictionary:
 		dto.currency_rewards = raw_curr.duplicate(true)
-	var raw_items = data.get("item_rewards", [])
+	var raw_items: Variant = data.get("item_rewards", [])
 	if raw_items is Array:
 		for item in raw_items:
 			dto.item_rewards.append(String(item))

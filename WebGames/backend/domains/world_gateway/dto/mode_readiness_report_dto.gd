@@ -9,7 +9,9 @@
 
 ## ModeReadinessReportDTO：Value Object DTO / Data Transport Model
 class_name ModeReadinessReportDTO
-extends RefCounted
+extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 var mode: int = 0
 var is_ready: bool = false
@@ -35,6 +37,7 @@ func _init(
 
 ## 对象状态复位（支持对象池复用，ADV-PRF-002）
 func reset_state() -> void:
+	super.reset_state()
 	mode = 0
 	is_ready = false
 	status_code = ""

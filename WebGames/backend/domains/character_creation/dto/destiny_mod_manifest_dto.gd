@@ -9,7 +9,9 @@
 
 ## DestinyModManifestDTO：Data Transfer Object (DTO)
 class_name DestinyModManifestDTO
-extends RefCounted
+extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 # ==============================================================================
 # 一、模组声明清单契约字段
@@ -35,6 +37,7 @@ var custom_i18n: Dictionary = {}
 # 二、对象池与状态重置契约 (ADV-POOL-001)
 # ==============================================================================
 func reset_state() -> void:
+    super.reset_state()
     pack_id = ""
     pack_name = ""
     version = "1.0.0"

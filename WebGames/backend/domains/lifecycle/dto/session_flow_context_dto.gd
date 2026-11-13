@@ -9,7 +9,9 @@
 
 ## SessionFlowContextDTO：Value Object / Snapshot DTO
 class_name SessionFlowContextDTO
-extends RefCounted
+extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 const POOL_CONFIG_TABLE: String = "infrastructure.lifecycle"
 const POOL_CONFIG_PATH: String = "session_context_pool/max_free"
@@ -82,6 +84,7 @@ static func clear_pool() -> int:
 
 ## 重置内部数据状态，供对象池无堆分配复用
 func reset_state() -> void:
+	super.reset_state()
 	session_token = ""
 	account_id = ""
 	username = ""

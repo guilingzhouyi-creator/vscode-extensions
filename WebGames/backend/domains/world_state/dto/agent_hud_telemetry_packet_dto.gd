@@ -9,7 +9,9 @@
 
 ## AgentHudTelemetryPacketDTO：顶层遥测数据信封传输模型
 class_name AgentHudTelemetryPacketDTO
-extends RefCounted
+extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 # 一、信封元数据与控制权租约
 var protocol_version: String = "1.0.0"
@@ -36,6 +38,7 @@ var action_space: Array[AgentActionDirectiveDTO] = []
 
 ## 重置内部遥测信封与切片状态，供对象池无堆分配复用
 func reset_state() -> void:
+	super.reset_state()
 	protocol_version = "1.0.0"
 	packet_id = ""
 	sequence_index = 0

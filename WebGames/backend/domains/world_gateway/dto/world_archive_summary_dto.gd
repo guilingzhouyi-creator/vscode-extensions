@@ -9,7 +9,9 @@
 
 ## WorldArchiveSummaryDTO：Value Object DTO / Data Transport Model
 class_name WorldArchiveSummaryDTO
-extends RefCounted
+extends PoolableDtoBase
+
+const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
 var world_id: String = ""
 var world_name: String = ""
@@ -47,6 +49,7 @@ func _init(
 
 ## 对象状态复位（支持对象池复用，ADV-PRF-002）
 func reset_state() -> void:
+	super.reset_state()
 	world_id = ""
 	world_name = ""
 	mode = 1
