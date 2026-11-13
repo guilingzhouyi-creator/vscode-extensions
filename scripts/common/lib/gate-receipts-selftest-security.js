@@ -86,7 +86,9 @@ function buildSecuritySelftestCases(ctx, baseSha) {
   cases.push(selftestCase('j) post-rewrite 把旧收据重算到新 sha 并标 rewrittenFrom', () => {
     const oldSha = commitSelftestFile(repo, 'rewrite.txt', 'one\n', 'rewrite target');
     runSignedFinalize(run, '7171');
-    expectSelftestGit(repo.dir, ['commit', '-q', '--amend', '--no-edit'], '自测 amend');
+    fs.writeFileSync(path.join(repo.dir, 'rewrite.txt'), 'two\n', 'utf8');
+    expectSelftestGit(repo.dir, ['add', 'rewrite.txt'], '自测暂存 amend 文件');
+    expectSelftestGit(repo.dir, ['commit', '-q', '--amend', '-m', 'rewrite target amended'], '自测 amend');
     const newSha = expectSelftestGit(repo.dir, ['rev-parse', 'HEAD'], '自测读取 amend 后 HEAD');
     assertSelftest(newSha !== oldSha, 'amend 未改变 sha');
     expectSelftestExit(run(['rewrite'], `${oldSha} ${newSha}\n`), 0, 'rewrite');
