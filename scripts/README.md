@@ -5,7 +5,7 @@
 > 项目内私有脚本（如 `auto-refactor/scripts/*.js` 的 validate/bench 系列）不在此库，
 > 保留在各项目内部，由各自 `package.json` 引用。
 >
-> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**109 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
+> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**112 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
 
 ---
 
@@ -81,6 +81,9 @@
 | `common/` | Node.js | `gate-failure-contract.js` | gate / failure（门禁失败命名拓扑学与格式物理卫生契约：规范四段式命名、8 项 Header 注入、ANSI 脱水与 GateFailureEnvelope 模式校验） | `audit-all`、`log-rotator`、CI |
 | `common/` | Node.js | `gate-telemetry-logger.js` | telemetry / gate（门禁运行遥测与单例快照记录器：原子持久化 `<gate>-latest.json`、FIFO 历史账本 `<gate>-history.jsonl`、ANSI 脱水诊断日志 `last-<gate>.log` 与失败信封） | `pre-commit-gate`、`pre-push-gate`、本地 CLI |
 | `common/` | Node.js | `test-gate-telemetry.js` | validate / telemetry（门禁遥测记录器与诊断日志套件自测：验证快照落盘、ANSI 脱水、路径脱敏、FIFO 轮转与软失败语义） | CI、本地自测 |
+| `common/` | Node.js | `async-auto-audit-daemon.js` | audit / daemon（工程测试版 VSCode 异步后台审查与混合暂存定时提交守护进程） | `.vscode/tasks.json`、本地 CLI |
+| `common/` | Node.js | `test-async-auto-audit.js` | validate / daemon（异步后台审查、十维/ADR-Q 落盘、混合暂存自动提交与 Taxis 内核让权自测套件） | CI、本地自测 |
+| `common/` | Node.js | `verify-rust-ts-parity.js` | validate / parity（Rust 纯内核审查引擎与 TS Auto-Refactor 双端十维/SQALE/ADR-Q 对等验证门禁） | CI、Rust/TS 对等审查 |
 | `common/` | Node.js | `workspace-walker.js` | tooling / traversal（全工作区目录迭代遍历、物理黑名单过滤与文件收集 SSOT 工具） | 门禁与体积审查脚本集 |
 | `common/` | JSON | `commit-msg-forbidden-terms.json` | data / ssot（提交信息四维禁词与白名单单源字典） | `validate-commit-msg-style` |
 | `common/` | JSON | `doc-metrics.json` | data / ssot（治理文档规模指标的真源映射、渲染模板与脚本库语义登记表） | `sync-doc-metrics` |
