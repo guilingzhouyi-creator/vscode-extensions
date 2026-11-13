@@ -138,6 +138,55 @@ pub enum IpcMessage {
     DaemonReceipt {
         receipt: IpcDaemonReceipt,
     },
+    /// Authenticates a persistent local loopback TCP or UDS session using the runtime nonce token.
+    HelloAuth {
+        token: String,
+    },
+    /// Triggers asynchronous pure-Rust audit execution inside the persistent daemon scheduler.
+    ScheduleAudit {
+        #[serde(default)]
+        target_ref: Option<String>,
+        #[serde(default)]
+        force: bool,
+    },
+    /// Queries runtime status of the daemon's built-in async audit scheduler.
+    QueryAuditStatus,
+    /// Reports built-in async audit scheduler status and latest sealed metrics.
+    AuditStatus {
+        active: bool,
+        paused: bool,
+        queued_jobs: usize,
+        #[serde(default)]
+        last_review_id: Option<String>,
+        #[serde(default)]
+        last_tree_oid: Option<String>,
+        #[serde(default)]
+        last_audit_commit_oid: Option<String>,
+        #[serde(default)]
+        last_composite_score: Option<f64>,
+        #[serde(default)]
+        last_decision: Option<String>,
+        writes_audit_logs_dir: bool,
+    },
+    /// Requests the latest materialized evidence, receipt, and AAS JSON from `refs/fractal/audit/...`.
+    QueryAuditReport {
+        #[serde(default)]
+        target_ref: Option<String>,
+    },
+    /// Carries materialized `AnalysisEvidence`, `TrustedReviewReceipt`, and AAS summary JSON strings.
+    AuditReportResponse {
+        found: bool,
+        #[serde(default)]
+        audit_ref: Option<String>,
+        #[serde(default)]
+        commit_oid: Option<String>,
+        #[serde(default)]
+        evidence_json: Option<String>,
+        #[serde(default)]
+        receipt_json: Option<String>,
+        #[serde(default)]
+        aas_json: Option<String>,
+    },
 }
 
 /// Length-prefixed binary frame encoder/decoder.
@@ -206,5 +255,57 @@ impl IpcCodec {
             cursor += consumed;
         }
         Ok((decoded_frames, cursor))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ipc_audit_and_auth_frames_round_trip() {
+        let frames = [
+            IpcMessage::HelloAuth {
+                token: String::from("0123abcd"),
+            },
+            IpcMessage::ScheduleAudit {
+                target_ref: Some(String::from("refs/heads/main")),
+                force: true,
+            },
+            IpcMessage::QueryAuditStatus,
+            IpcMessage::AuditStatus {
+                active: true,
+                paused: false,
+                queued_jobs: 1,
+                last_review_id: Some(String::from("rev-001")),
+                last_tree_oid: Some(String::from("1111111111111111111111111111111111111111")),
+                last_audit_commit_oid: Some(String::from(
+                    "2222222222222222222222222222222222222222",
+                )),
+                last_composite_score: Some(98.45),
+                last_decision: Some(String::from("approved")),
+                writes_audit_logs_dir: false,
+            },
+            IpcMessage::QueryAuditReport {
+                target_ref: Some(String::from("refs/fractal/audit/trunk")),
+            },
+            IpcMessage::AuditReportResponse {
+                found: true,
+                audit_ref: Some(String::from("refs/fractal/audit/trunk")),
+                commit_oid: Some(String::from("3333333333333333333333333333333333333333")),
+                evidence_json: Some(String::from("{}")),
+                receipt_json: Some(String::from("{}")),
+                aas_json: Some(String::from("{}")),
+            },
+        ];
+
+        for msg in &frames {
+            let encoded = IpcCodec::encode(msg).expect("encode audit frame");
+            let (decoded, consumed) = IpcCodec::decode(&encoded)
+                .expect("decode audit frame")
+                .expect("complete frame");
+            assert_eq!(consumed, encoded.len());
+            assert_eq!(&decoded, msg);
+        }
     }
 }

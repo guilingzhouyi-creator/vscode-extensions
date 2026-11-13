@@ -218,4 +218,56 @@ mod tests {
         let duplicate = document.replacen('{', "{\"schemaVersion\":1,", 1);
         assert!(parse_quality_document(duplicate.as_bytes()).is_err());
     }
+
+    #[test]
+    fn ten_dimensions_and_quant_metrics_round_trip_and_reject_invalid_bounds() {
+        let mut evidence = vectors()["documents"]["evidence"].clone();
+        evidence["measurements"]["tenDimensions"] = serde_json::json!({
+            "architectureConsistency": 94.5,
+            "semanticPurity": 96.0,
+            "codeSecurity": 99.5,
+            "performanceEfficiency": 92.25,
+            "standardization": 95.0,
+            "modernity": 91.5,
+            "maintainability": 93.0,
+            "commentQuality": 89.75,
+            "duplication": 98.0,
+            "techDebtRisk": 97.5,
+            "compositeScore": 94.8,
+            "grade": "A+"
+        });
+        evidence["measurements"]["quantMetrics"] = serde_json::json!({
+            "rcr": 1.4,
+            "erq": 2.1,
+            "ddr": 1.8,
+            "edb95": 3.2,
+            "ptd": 4.5,
+            "dsi": 0.28,
+            "rcd": 1.15,
+            "ehl": 2.5,
+            "workspaceHealthScore": 93.2,
+            "autonomyRate": 0.96,
+            "polyglotIndex": 91.0,
+            "sqaleMinutes": 42.5,
+            "tdr": 0.03,
+            "confidence": 0.91
+        });
+        let raw = serde_json::to_vec(&evidence).expect("encode evidence");
+        let parsed = parse_quality_document(&raw).expect("valid extended evidence");
+        let reparsed = parse_quality_document(parsed.canonical_bytes()).expect("re-parse");
+        assert_eq!(parsed.document(), reparsed.document());
+        assert_eq!(parsed.canonical_bytes(), reparsed.canonical_bytes());
+
+        let mut extra = evidence.clone();
+        extra["measurements"]["quantMetrics"]["extraMetric"] = serde_json::json!(1.0);
+        assert!(
+            parse_quality_document(&serde_json::to_vec(&extra).expect("encode extra")).is_err()
+        );
+
+        let mut bad_score = evidence;
+        bad_score["measurements"]["tenDimensions"]["codeSecurity"] = serde_json::json!(101.0);
+        assert!(
+            parse_quality_document(&serde_json::to_vec(&bad_score).expect("encode bad")).is_err()
+        );
+    }
 }

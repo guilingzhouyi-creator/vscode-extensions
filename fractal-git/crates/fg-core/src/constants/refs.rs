@@ -59,3 +59,12 @@ pub const PATH_SEGMENT_COMMIT: &str = "commit";
 
 /// Canonical prefix for all telemetry refs (`refs/fractal/telemetry/`).
 pub const REF_TELEMETRY_PREFIX: &str = "refs/fractal/telemetry/";
+
+/// Path segment separating dedicated worktree-free fractal audit trees.
+pub const PATH_SEGMENT_AUDIT: &str = "audit";
+
+/// Canonical prefix for worktree-free fractal audit tree refs (`refs/fractal/audit/`).
+pub const REF_AUDIT_PREFIX: &str = "refs/fractal/audit/";
+
+/// Canonical trunk ref for the worktree-free fractal audit tree.
+pub const REF_AUDIT_TRUNK: &str = "refs/fractal/audit/trunk";

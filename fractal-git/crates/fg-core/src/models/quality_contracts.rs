@@ -282,7 +282,62 @@ pub enum TrialMeasurement {
     FailedMeasurement(FailedMeasurement),
 }
 
-/// Independent quality, testing, mutation and generalization observations.
+/// Finite quality percentage bounded strictly to 0.0..=100.0.
+pub type ScorePercent = f64;
+
+/// Finite IEEE-754 scalar metric bounded away from infinity and NaN.
+pub type FiniteScalar = f64;
+
+/// Ten-dimensional quality breakdown, geometric composite score, and letter grade.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TenDimensions {
+    #[serde(rename = "architectureConsistency")]
+    pub architecture_consistency: ScorePercent,
+    #[serde(rename = "semanticPurity")]
+    pub semantic_purity: ScorePercent,
+    #[serde(rename = "codeSecurity")]
+    pub code_security: ScorePercent,
+    #[serde(rename = "performanceEfficiency")]
+    pub performance_efficiency: ScorePercent,
+    pub standardization: ScorePercent,
+    pub modernity: ScorePercent,
+    pub maintainability: ScorePercent,
+    #[serde(rename = "commentQuality")]
+    pub comment_quality: ScorePercent,
+    pub duplication: ScorePercent,
+    #[serde(rename = "techDebtRisk")]
+    pub tech_debt_risk: ScorePercent,
+    #[serde(rename = "compositeScore")]
+    pub composite_score: ScorePercent,
+    pub grade: String,
+}
+
+/// ADR-Q quantitative risk, workspace health, CAI autonomy, polyglot, and SQALE metrics.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct QuantMetrics {
+    pub rcr: FiniteScalar,
+    pub erq: FiniteScalar,
+    pub ddr: FiniteScalar,
+    pub edb95: FiniteScalar,
+    pub ptd: FiniteScalar,
+    pub dsi: FiniteScalar,
+    pub rcd: FiniteScalar,
+    pub ehl: FiniteScalar,
+    #[serde(rename = "workspaceHealthScore")]
+    pub workspace_health_score: ScorePercent,
+    #[serde(rename = "autonomyRate")]
+    pub autonomy_rate: f64,
+    #[serde(rename = "polyglotIndex")]
+    pub polyglot_index: ScorePercent,
+    #[serde(rename = "sqaleMinutes")]
+    pub sqale_minutes: FiniteScalar,
+    pub tdr: FiniteScalar,
+    pub confidence: f64,
+}
+
+/// Independent quality, testing, mutation, ten-dimension, and quantitative observations.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Measurements {
@@ -293,6 +348,12 @@ pub struct Measurements {
     pub mutations: TrialMeasurement,
     #[serde(rename = "performanceMs")]
     pub performance_ms: NumberMeasurement,
+    #[serde(rename = "tenDimensions")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ten_dimensions: Option<TenDimensions>,
+    #[serde(rename = "quantMetrics")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quant_metrics: Option<QuantMetrics>,
 }
 
 /// Execution track state; a pending or failed track cannot prove completion.
