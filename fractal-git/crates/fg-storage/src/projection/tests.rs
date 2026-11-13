@@ -11,6 +11,7 @@
 use super::*;
 use fg_core::models::{FileMode, IndexStage, ObjectKind};
 use fg_core::traits::OdbStore;
+use fg_index::GitIndex;
 use fg_native::sections::head::HeadState;
 use fg_native::sections::indx::{IndexEntry as NativeIndexEntry, StatCache};
 use fg_native::sections::meta::{LayoutMode, MetaSection};
