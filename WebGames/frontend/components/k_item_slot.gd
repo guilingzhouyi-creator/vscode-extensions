@@ -48,9 +48,20 @@ func _ready() -> void:
 	_setup_ui()
 	_update_visuals()
 
-	mouse_entered.connect(_on_mouse_entered)
-	mouse_exited.connect(_on_mouse_exited)
-	gui_input.connect(_on_gui_input)
+	if not mouse_entered.is_connected(_on_mouse_entered):
+		mouse_entered.connect(_on_mouse_entered)
+	if not mouse_exited.is_connected(_on_mouse_exited):
+		mouse_exited.connect(_on_mouse_exited)
+	if not gui_input.is_connected(_on_gui_input):
+		gui_input.connect(_on_gui_input)
+
+func _exit_tree() -> void:
+	if mouse_entered.is_connected(_on_mouse_entered):
+		mouse_entered.disconnect(_on_mouse_entered)
+	if mouse_exited.is_connected(_on_mouse_exited):
+		mouse_exited.disconnect(_on_mouse_exited)
+	if gui_input.is_connected(_on_gui_input):
+		gui_input.disconnect(_on_gui_input)
 
 func _setup_ui() -> void:
 	_border_panel = PanelContainer.new()

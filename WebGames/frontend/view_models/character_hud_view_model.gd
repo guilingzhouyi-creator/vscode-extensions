@@ -99,7 +99,7 @@ class CharacterHUDViewModel extends RefCounted:
 		else:
 			hp_bar_color = DesignTokens.COLOR_SUCCESS
 
-		wallet_formatted_string = "%d 金 %d 银 %d 铜" % [domain.gold, domain.silver, domain.copper]
+		wallet_formatted_string = UIIntermediary.text("ui.fe05.currency.full", {"gold": domain.gold, "silver": domain.silver, "copper": domain.copper})
 		monocrystals_text = str(domain.monocrystals)
 
 		property_changed.emit("all", null)

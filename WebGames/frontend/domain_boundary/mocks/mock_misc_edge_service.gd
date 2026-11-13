@@ -11,9 +11,14 @@ const NAME_TYPE_FEES: Array[int] = [100, 50, 1000, 200]
 func activate_mutation(active: Array, item: Dictionary, max_slots: int) -> Dictionary:
 	if active.size() >= max_slots:
 		return {"success": false, "reason": "SLOTS_FULL", "mutations": active.duplicate(true)}
+	var target_id: String = str(item.get("id", ""))
+	var already_active: bool = false
 	for existing in active:
-		if str(existing.get("id", "")) == str(item.get("id", "")):
-			return {"success": false, "reason": "ALREADY_ACTIVE", "mutations": active.duplicate(true)}
+		if str(existing.get("id", "")) == target_id:
+			already_active = true
+			break
+	if already_active:
+		return {"success": false, "reason": "ALREADY_ACTIVE", "mutations": active.duplicate(true)}
 	var updated: Array = active.duplicate(true)
 	updated.append(item.duplicate(true))
 	return {"success": true, "mutations": updated}

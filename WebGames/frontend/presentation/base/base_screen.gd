@@ -15,6 +15,49 @@ var navigation_params: Dictionary = {}
 var snapshot: Dictionary = {}
 var ui_state_container: Control = null
 var _owned_subcontroller: Node = null
+var _managed_connections: Array[Dictionary] = []
+var _action_cooldowns_ms: Dictionary = {}
+
+## 注册受 BaseScreen 生命周期托管的信号连接（幂等防重连，节点销毁时自动对称断开）
+func connect_managed(sig: Signal, target: Callable, flags: int = 0) -> void:
+	var src: Object = sig.get_object()
+	if src == null or not is_instance_valid(src):
+		return
+	if sig.is_connected(target):
+		return
+	sig.connect(target, flags)
+	_managed_connections.append({
+		"signal_name": sig.get_name(),
+		"source_ref": weakref(src),
+		"target": target
+	})
+
+## 判定指定动作键是否处于冷却防抖窗口内（默认窗口 0ms 不拦截；非零可用于高频提交防连击）
+func try_consume_action_cooldown(action_key: String, cooldown_ms: int = 180) -> bool:
+	if cooldown_ms <= 0 or action_key.is_empty():
+		return true
+	var now_ms: int = Time.get_ticks_msec()
+	var prev_ms: int = int(_action_cooldowns_ms.get(action_key, -cooldown_ms))
+	if now_ms - prev_ms < cooldown_ms:
+		return false
+	_action_cooldowns_ms[action_key] = now_ms
+	return true
+
+## 安全断开由本视图登记的全部托管信号连接（幂等、防已释放对象悬空）
+func disconnect_managed_signals() -> void:
+	for entry in _managed_connections:
+		var src_ref: Variant = entry.get("source_ref")
+		if not (src_ref is WeakRef):
+			continue
+		var src: Variant = (src_ref as WeakRef).get_ref()
+		if src == null or not is_instance_valid(src):
+			continue
+		var sig_name: StringName = entry.get("signal_name", &"")
+		var cb: Callable = entry.get("target", Callable())
+		if cb.is_valid() and (src as Object).is_connected(sig_name, cb):
+			(src as Object).disconnect(sig_name, cb)
+	_managed_connections.clear()
+	_action_cooldowns_ms.clear()
 
 ## 页面被推入激活时调用
 func on_screen_enter(params: Dictionary = {}) -> void:
@@ -58,6 +101,7 @@ func _on_predelete_cleanup() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		_on_predelete_cleanup()
+		disconnect_managed_signals()
 		UIIntermediary.clear_view_bindings(self)
 		if is_instance_valid(_owned_subcontroller) and not _owned_subcontroller.is_inside_tree():
 			_owned_subcontroller.free()

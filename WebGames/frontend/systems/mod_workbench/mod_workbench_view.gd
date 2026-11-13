@@ -3,7 +3,7 @@
 # 文件路径: res://frontend/systems/mod_workbench/mod_workbench_view.gd
 # 架构定位: UI Placeholder Contract / Lightweight Whitebox View
 # 跨域依赖: 上游: 模组系统路由, 前端主视口 | 下游: AgentPlaythroughSession | 配置: 无 | 信号: 无
-# 职责说明: 模组工坊前端轻量白模与契约占位接口（遵循工程渐进原则：当前阶段严禁复杂 UI 渲染接线，预留会话绑定与快照重放接口契约，待核心系统成熟度达 80% 后再深度装配控件树）。
+# 职责说明: 模组工坊前端轻量白模与契约预留接口（遵循工程渐进原则：当前阶段严禁复杂 UI 渲染接线，预留会话绑定与快照重放接口契约，待核心系统成熟度达 80% 后再深度装配控件树）。
 # 设计依据: 表现层轻量化与高内聚解耦契约
 # ==============================================================================
 
@@ -35,7 +35,7 @@ func bind_session(session: AgentPlaythroughSession) -> void:
 	_workbench_state["session_id"] = session.session_id
 	_workbench_state["current_step"] = session.step_index
 
-## 获取当前工坊轻量占位状态字典
+## 获取当前工坊轻量预设状态字典
 func get_workbench_state() -> Dictionary:
 	if _bound_session != null and _bound_session is AgentPlaythroughSession:
 		var sess: AgentPlaythroughSession = _bound_session

@@ -58,19 +58,7 @@ func show_menu(pos: Vector2, items: Array) -> Control:
 	for raw_item in items:
 		if not (raw_item is Dictionary):
 			continue
-		var item: Dictionary = raw_item
-		var btn := Button.new()
-		btn.text = str(item.get("label", UIIntermediary.text("ui.common.menu.default_option")))
-		btn.disabled = bool(item.get("disabled", false))
-		btn.custom_minimum_size = Vector2(120, 28)
-
-		var cb: Callable = item.get("callback", Callable())
-		btn.pressed.connect(func():
-			hide_menu()
-			if cb.is_valid():
-				cb.call()
-		)
-		list.add_child(btn)
+		_append_menu_item_button(list, raw_item as Dictionary)
 
 	_container.add_child(_menu_panel)
 	# 入参为画布全局坐标，转换为容器本地坐标后赋值，兼容非全屏偏移容器
@@ -78,6 +66,20 @@ func show_menu(pos: Vector2, items: Array) -> Control:
 
 	menu_shown.emit(pos)
 	return _menu_panel
+
+func _append_menu_item_button(list: VBoxContainer, item: Dictionary) -> void:
+	var btn := Button.new()
+	btn.text = str(item.get("label", UIIntermediary.text("ui.common.menu.default_option")))
+	btn.disabled = bool(item.get("disabled", false))
+	btn.custom_minimum_size = Vector2(120, 28)
+
+	var cb: Callable = item.get("callback", Callable())
+	btn.pressed.connect(func():
+		hide_menu()
+		if cb.is_valid():
+			cb.call()
+	)
+	list.add_child(btn)
 
 func hide_menu() -> void:
 	var had_menu := _menu_panel != null or _dismiss_catcher != null

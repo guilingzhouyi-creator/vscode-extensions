@@ -44,8 +44,9 @@ static func resolve(node: Node, key: String, data: Dictionary = {}) -> String:
 ## 批量注入
 ## bindings: [{ "node": Node, "key": String, "data": Dictionary }, ...]
 static func resolve_batch(bindings: Array) -> void:
+	var empty_data: Dictionary = {}
 	for b in bindings:
-		resolve(b.node, b.key, b.get("data", {}))
+		resolve(b.node, b.key, b.get("data", empty_data))
 
 ## 仅翻译+填充, 不注入节点（用于动态生成文本, 如 ItemList 项）
 static func text(key: String, data: Dictionary = {}) -> String:
@@ -94,8 +95,10 @@ static func switch_locale(new_locale: String) -> void:
 static func adapt_view(view_node: Control) -> void:
 	VisualAdapter.adapt_view(view_node)
 
-## 视图销毁前解绑（防止悬空引用）
+## 视图销毁前解绑（防止悬空引用；实例未构建或已重置时短路，避免退出阶段反向重建单例）
 static func clear_view_bindings(view_node: Node) -> void:
+	if not UIBindingRegistry.has_active_instance():
+		return
 	UIBindingRegistry.get_instance().unbind_view(view_node)
 
 ## ==============================================================================

@@ -13,6 +13,10 @@ static func get_instance() -> UIBindingRegistry:
 		_instance.name = "UIBindingRegistry"
 	return _instance
 
+## 判断静态单例当前是否处于有效激活态（不触发懒加载创建）
+static func has_active_instance() -> bool:
+	return _instance != null and is_instance_valid(_instance)
+
 static func reset_instance() -> void:
 	if _instance != null and is_instance_valid(_instance):
 		_instance._bindings.clear()

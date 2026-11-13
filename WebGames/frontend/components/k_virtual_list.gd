@@ -146,9 +146,16 @@ func release_row(row: Control) -> void:
 	row.visible = false
 	if _row_pool.size() >= _pool_capacity():
 		_detach_from_parent(row)
-		row.queue_free()
+		_free_row_node(row)
 		return
 	_row_pool.append(row)
+
+## 释放脱离场景树的行节点：树内走 queue_free，已脱树走即时 free 防无头退出泄漏
+static func _free_row_node(row: Control) -> void:
+	if row.is_inside_tree():
+		row.queue_free()
+	else:
+		row.free()
 
 ## 释放前摘除父节点：池释放的行可能仍挂在消费方容器下且被其引用，
 ## 先脱父再销毁，明确所有权边界（组件只销毁自己池内的节点）
@@ -179,12 +186,12 @@ func _clear_row_pool() -> void:
 		if active_row != null and is_instance_valid(active_row):
 			_reset_row_state(active_row)
 			_detach_from_parent(active_row)
-			active_row.queue_free()
+			_free_row_node(active_row)
 	_active_rows.clear()
 	for pooled_row in _row_pool:
 		if pooled_row != null and is_instance_valid(pooled_row):
 			_detach_from_parent(pooled_row)
-			pooled_row.queue_free()
+			_free_row_node(pooled_row)
 	_row_pool.clear()
 
 ## 组件级状态复位（R-31/S2-11/S4-13，幂等）：清空行对象池与活跃登记、归零可视区间与总量。

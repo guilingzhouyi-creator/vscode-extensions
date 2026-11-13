@@ -14,6 +14,25 @@ static func get_instance() -> NavManager:
 		_instance._init_default_registry()
 	return _instance
 
+## 释放静态单例与缓存场景资源，避免测试运行器退出时残留 ObjectDB / PackedScene 引用
+static func reset_instance() -> void:
+	if _instance != null and is_instance_valid(_instance):
+		if _instance._active_transition != null and _instance._active_transition.is_valid():
+			_instance._active_transition.kill()
+		_instance._active_transition = null
+		if _instance._transitioning_old_screen != null and is_instance_valid(_instance._transitioning_old_screen):
+			_instance._transitioning_old_screen.free()
+		_instance._transitioning_old_screen = null
+		if _instance._current_screen != null and is_instance_valid(_instance._current_screen):
+			_instance._current_screen.free()
+		_instance._current_screen = null
+		_instance._scene_cache.clear()
+		_instance._screen_stack.clear()
+		_instance._screen_registry.clear()
+		_instance._app_root = null
+		_instance.free()
+	_instance = null
+
 var _app_root: AppRoot
 var _screen_stack: Array[String] = []
 var _current_screen: Control = null
