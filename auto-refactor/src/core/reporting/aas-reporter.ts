@@ -16,29 +16,24 @@
 
 import type { Issue, ScanReport, Severity } from '../types';
 import { filterActiveTopologyBuckets, executeFileTopologyPipeline } from './agent-audit-pipeline';
-import {
-    formatAnchorSlice,
-    generateVerificationDirective,
-    type AgentTopologyLayer,
-} from '../guidance/agentConstraintGenerator';
+import { type AgentTopologyLayer } from '../guidance/agentConstraintGenerator';
 import {
     AAS_SCHEMA_ID,
     type AasCounts,
     type AasDefectRecord,
     type AasReportOptions,
-    type AasSeverity,
     type AasUsability,
     type AasVerdict,
     type AgentAuditReport,
 } from './aas-types';
-import { buildFixRecipe, compressDiagnosticSentence } from './aas-remediation';
-import { sharedMemoryGovernor, CacheEvictionTier } from '../memory/memory-governor';
+import { compressDiagnosticSentence } from './aas-remediation';
 import {
     extractBottlenecks,
     projectDimensionDetails,
     projectDimensions,
 } from './aas-dimension-details';
 import { buildHealth } from './aas-health-metrics';
+import { AnchorCache, buildDefectRecord } from './aas-defect-records';
 
 export * from './aas-types';
 export { compressDiagnosticSentence };
@@ -47,31 +42,13 @@ const DEFAULT_MAX_FILES = 200;
 const DEFAULT_MAX_DEFECTS_PER_FILE = 50;
 const DEFAULT_MAX_TOTAL_DEFECTS = 500;
 const DEFAULT_CONTEXT_RADIUS = 1;
-const DEFAULT_MAX_MESSAGE_CHARS = 160;
 const DEFAULT_VERIFY_COMMAND = 'npm test';
-const ELLIPSIS = '…';
 
 const SEVERITY_ERROR: Severity = 'error';
-const SEVERITY_WARNING: Severity = 'warning';
-
-const AAS_SEV_BLOCK: AasSeverity = 'BLOCK';
-const AAS_SEV_WARN: AasSeverity = 'WARN';
-const AAS_SEV_INFO: AasSeverity = 'INFO';
 
 const VERDICT_BLOCK: AasVerdict = 'BLOCK';
 const VERDICT_WARN: AasVerdict = 'WARN';
 const VERDICT_PASS: AasVerdict = 'PASS';
-
-/**
- * Maps static analysis severity onto Agent triage severity.
- *
- * @param rawSeverity - Finding severity.
- * @returns Mapped AAS severity.
- */
-function mapSeverity(rawSeverity?: string): AasSeverity {
-    if (rawSeverity === SEVERITY_ERROR) return AAS_SEV_BLOCK;
-    return rawSeverity === SEVERITY_WARNING ? AAS_SEV_WARN : AAS_SEV_INFO;
-}
 
 /**
  * Derives executive triage verdict from aggregate severity counts.
@@ -82,169 +59,6 @@ function mapSeverity(rawSeverity?: string): AasSeverity {
 function resolveVerdict(counts: AasCounts): AasVerdict {
     if (counts.errors > 0) return VERDICT_BLOCK;
     return counts.warns > 0 ? VERDICT_WARN : VERDICT_PASS;
-}
-
-/**
- * Trims message to reasonable length for token conservation.
- *
- * @param text - Raw message string.
- * @param maxChars - Character ceiling.
- * @returns Shortened string.
- */
-function trimMessage(text: string, maxChars: number = DEFAULT_MAX_MESSAGE_CHARS): string {
-    const cleanedText = (text || '').replace(/\s+/g, ' ').trim();
-    if (cleanedText.length <= maxChars) return cleanedText;
-    return cleanedText.slice(0, Math.max(1, maxChars - 1)) + ELLIPSIS;
-}
-
-/**
- * In-memory anchor extractor avoiding direct synchronous filesystem operations.
- */
-class AnchorCache {
-    private static sequence = 0;
-    private readonly cache = new Map<string, string | null>();
-    private readonly customReader?: (relPath: string) => string | undefined;
-    private readonly unregister?: () => void;
-
-    constructor(customReader?: (relPath: string) => string | undefined) {
-        this.customReader = customReader;
-        const instanceId = ++AnchorCache.sequence;
-        const evictionTier = CacheEvictionTier.Ephemeral;
-        this.unregister = sharedMemoryGovernor.register({
-            name: `aas-reporter:anchor-cache:${instanceId}`,
-            tier: evictionTier,
-            clear: () => this.cache.clear(),
-            getSize: () => this.cache.size,
-        });
-    }
-
-    public dispose(): void {
-        this.cache.clear();
-        this.unregister?.();
-    }
-
-    public getAnchor(
-        file: string,
-        startLine: number,
-        endLine: number,
-        radius: number,
-    ): string | undefined {
-        if (!this.customReader) return undefined;
-        let content = this.cache.get(file);
-        if (content === undefined) {
-            const rawContent = this.customReader(file);
-            content = rawContent !== undefined ? rawContent : null;
-            this.cache.set(file, content);
-        }
-        if (!content) return undefined;
-        return formatAnchorSlice(content, startLine, endLine, radius);
-    }
-}
-
-/**
- * Parameter object for single defect record construction.
- */
-interface DefectRecordParams {
-    readonly issue: Issue;
-    readonly file: string;
-    readonly layer: AgentTopologyLayer;
-    readonly anchorCache: AnchorCache;
-    readonly options: AasReportOptions;
-    readonly defaultVerify: string;
-    readonly skipAnchor?: boolean;
-    /**
-     * Tier the arbitration pass assigned this issue's rule, or undefined when the pass did not
-     * run. Passed in rather than derived here: the arbiter owns tiering, and a reporter that
-     * re-derived it would be a second source of truth for the same judgement.
-     */
-    readonly tier?: 'T1' | 'T2' | 'T3';
-}
-
-/**
- * Projects the optional adjudication fields onto a defect record.
- *
- * Split out of `buildDefectRecord` so the record assembly stays a flat list of field decisions
- * rather than accumulating one branch per optional field. Both fields are omitted — never
- * defaulted — when unavailable: a consumer must be able to tell "not adjudicated" from
- * "adjudicated as certain", and only absence carries that meaning.
- *
- * @param issue - Source finding.
- * @param tier - Tier the arbitration pass assigned the finding's rule, when it ran.
- * @returns Tier and confidence fields, possibly empty.
- */
-function projectAdjudicationFields(
-    issue: Issue,
-    tier: 'T1' | 'T2' | 'T3' | undefined,
-): { tier?: 'T1' | 'T2' | 'T3'; conf?: number; also?: readonly string[] } {
-    const fields: { tier?: 'T1' | 'T2' | 'T3'; conf?: number; also?: readonly string[] } = {};
-    const resolvedTier = issue.adjudicatedTier ?? tier;
-    if (resolvedTier) fields.tier = resolvedTier;
-    const confidence = issue.adjudicatedConfidence ?? issue.evidence?.confidence;
-    if (typeof confidence === 'number' && Number.isFinite(confidence)) {
-        fields.conf = Number(confidence.toFixed(2));
-    }
-    if (issue.correlatedRules && issue.correlatedRules.length > 0) {
-        fields.also = issue.correlatedRules;
-    }
-    return fields;
-}
-
-function resolveDefectAnchor(
-    params: DefectRecordParams,
-    severityTier: AasSeverity,
-    startLine: number,
-    endLine: number,
-): string | undefined {
-    if (params.skipAnchor === true) return undefined;
-    const effectiveTier = params.issue.adjudicatedTier ?? params.tier;
-    const shouldEmit =
-        severityTier === AAS_SEV_BLOCK ||
-        effectiveTier === 'T1' ||
-        params.options.includeWarningAnchors === true;
-    if (!shouldEmit) return undefined;
-    const radius = params.options.contextRadius ?? DEFAULT_CONTEXT_RADIUS;
-    const boundedEndLine = Math.min(endLine, startLine + 1);
-    return params.anchorCache.getAnchor(params.file, startLine, boundedEndLine, radius);
-}
-
-/**
- * Converts single Issue into concise AasDefectRecord.
- */
-function buildDefectRecord(params: DefectRecordParams): AasDefectRecord {
-    const issue = params.issue;
-    const startLine = issue.location?.start?.line ?? 1;
-    const endLine = issue.location?.end?.line ?? startLine;
-    const startColumn = issue.location?.start?.column;
-    const severityTier = mapSeverity(issue.severity);
-    const rawMessage = trimMessage(issue.message);
-    const compressedMessage =
-        params.options.compressSentences !== false
-            ? compressDiagnosticSentence(rawMessage)
-            : rawMessage;
-
-    const anchor = resolveDefectAnchor(params, severityTier, startLine, endLine);
-    const fixRecipe = buildFixRecipe(issue);
-    const verifyCmd = generateVerificationDirective(
-        issue,
-        params.layer,
-        params.options.baseDir || process.cwd(),
-    ).command;
-
-    const isNonDefaultVerify = Boolean(verifyCmd && verifyCmd !== params.defaultVerify);
-
-    return {
-        line: startLine,
-        ...(startColumn !== undefined && startColumn > 1 ? { col: startColumn } : {}),
-        rule: issue.rule,
-        sev: severityTier,
-        msg: compressedMessage,
-        ...(anchor ? { anchor } : {}),
-        ...(fixRecipe ? { fix: fixRecipe } : {}),
-        ...(isNonDefaultVerify ? { verify: verifyCmd } : {}),
-        ...(params.options.includeAnalyzer && issue.analyzer ? { analyzer: issue.analyzer } : {}),
-        ...(issue.isNew ? { isNew: true } : {}),
-        ...projectAdjudicationFields(issue, params.tier),
-    };
 }
 
 /**

@@ -223,6 +223,10 @@ export function extractBottlenecks(
     return extractFrequencyBottlenecks(report.issues, limit);
 }
 
+interface DimensionOverrideSource {
+    readonly dimensions?: Partial<Record<string, number>>;
+}
+
 /**
  * Resolves the source map for ten-dimensional quality indices with override precedence.
  *
@@ -232,7 +236,7 @@ export function extractBottlenecks(
  */
 export function resolveDimensionIndicesSource(
     report: ScanReport,
-    override?: { readonly dimensions?: Partial<Record<string, number>> },
+    override?: DimensionOverrideSource,
 ): Record<string, number> | undefined {
     if (override?.dimensions) return override.dimensions as Record<string, number>;
     if (report.governance?.tenDimensions) return report.governance.tenDimensions;
