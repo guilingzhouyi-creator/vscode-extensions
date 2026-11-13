@@ -8,6 +8,7 @@
 //! - `FGT-FAC-001`: Facade substantial burden (ELOC >= 15) and validation invariant guard
 //! - `RCFG-RULE-DRIFT`: Full adherence to single source of truth rule catalog
 
+pub mod branch;
 pub mod cli;
 pub mod edition;
 pub mod errors;
@@ -17,6 +18,7 @@ pub mod policy;
 pub mod refs;
 pub mod rules;
 
+pub use branch::*;
 pub use cli::*;
 pub use edition::*;
 pub use errors::*;

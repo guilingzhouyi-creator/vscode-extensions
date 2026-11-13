@@ -330,7 +330,10 @@ pub fn apply_patch_payload(original_text: &str, patch_payload: &str) -> String {
         if let Some(hunk_header) = line.strip_prefix("@@ -") {
             let old_part = hunk_header.split('+').next().unwrap_or("").trim();
             let old_start_str = old_part.split(',').next().unwrap_or("1");
-            let target_start = old_start_str.parse::<usize>().unwrap_or(1).saturating_sub(1);
+            let target_start = old_start_str
+                .parse::<usize>()
+                .unwrap_or(1)
+                .saturating_sub(1);
 
             while orig_idx < target_start && orig_idx < clean_orig.len() {
                 output.push(clean_orig[orig_idx].clone());
