@@ -1,6 +1,6 @@
 {
   "schema": "workspace-skill-registry/v1",
-  "description": "研发技能单源注册表：描述行、领域联动链与调用含义的唯一真源；由 sync-skill-metadata.js 渲染进各 SKILL.md，由 render-skill-catalog.js 渲染成调用说明书。",
+  "description": "Single-source registry for skill activation metadata, descriptions, domain chains, and scenarios.",
   "activation": {
     "template": "【触发：{triggers}】{pitch}",
     "separator": "/",
@@ -15,104 +15,25 @@
     "maxTriggerReuse": 3,
     "classes": {
       "intent": [
-        "写",
-        "实现",
-        "重构",
-        "修复",
-        "排查",
-        "排错",
-        "提交",
-        "打包",
-        "发布",
-        "审查",
-        "调查",
-        "设计",
-        "优化",
-        "测试",
-        "归档",
-        "同步",
-        "派发",
-        "授权",
-        "校准",
-        "建模",
-        "拆分",
-        "消融",
-        "新增",
-        "修改",
-        "删除",
-        "迁移",
-        "治理",
-        "验收",
-        "澄清",
-        "回归",
-        "加固",
-        "隔离",
-        "联调",
-        "评审",
-        "校对",
-        "调样式",
-        "发版",
-        "排障"
+        "写", "实现", "重构", "修复", "排查", "排错", "提交", "打包", "发布", "审查", "调查", "设计", "优化", "测试",
+        "归档", "同步", "派发", "授权", "校准", "建模", "拆分", "消融", "新增", "修改", "删除", "迁移", "治理", "验收",
+        "澄清", "回归", "加固", "隔离", "联调", "评审", "校对", "调样式", "发版", "排障",
+        "split", "merge", "route", "mask", "debug", "verify", "build", "audit", "sync", "guard", "cache", "prune",
+        "hash", "parse", "lint", "pack", "bench", "lease", "review", "clean", "test", "commit", "fix", "write",
+        "design", "clarify", "author", "bump", "release", "archive", "isolate", "stage", "style", "score", "model",
+        "unwrap", "drain", "spawn", "deploy", "triage"
       ],
       "symptom": [
-        "报错",
-        "崩溃",
-        "卡顿",
-        "泄漏",
-        "冲突",
-        "失败",
-        "死循环",
-        "超时",
-        "漂移",
-        "膨胀",
-        "堵塞",
-        "抖动",
-        "悬挂",
-        "越界",
-        "返工",
-        "注水",
-        "套娃",
-        "降级",
-        "复发",
-        "卡住",
-        "丢失",
-        "不一致"
+        "报错", "崩溃", "卡顿", "泄漏", "冲突", "失败", "死循环", "超时", "漂移", "膨胀", "堵塞", "抖动", "悬挂",
+        "越界", "返工", "注水", "套娃", "降级", "复发", "卡住", "丢失", "不一致",
+        "crash", "leak", "drift", "stale", "bloat", "panic", "stall", "fail", "loop", "skew", "corrupt", "broken",
+        "bypass", "oom", "cycle", "slow", "jank", "rework", "orphan", "flaky", "glitch", "dead", "torn", "ghost",
+        "gaming", "lag", "nested", "reject", "partial", "churn", "block", "breach", "dirty"
       ],
       "technical": [
-        "SSOT",
-        "CAS",
-        "LUT",
-        "SoA",
-        "CSS",
-        "JSON",
-        "YAML",
-        "Rust",
-        "Cargo",
-        "taxis",
-        "Godot",
-        "GDScript",
-        "vsix",
-        "commit",
-        "audit",
-        "subagent",
-        "Praxis",
-        "ELOC",
-        "LOC",
-        "CC",
-        "Depth",
-        "JSDoc",
-        "CAI",
-        "ARCH",
-        "FGT",
-        "SSCCE",
-        "Doubt",
-        "TDD",
-        "HotSync",
-        "RingBuffer",
-        "git",
-        "pwsh",
-        "bash",
-        "X-Y"
+        "SSOT", "CAS", "LUT", "SoA", "CSS", "JSON", "YAML", "Rust", "Cargo", "taxis", "Godot", "GDScript", "vsix",
+        "commit", "audit", "subagent", "Praxis", "ELOC", "LOC", "CC", "Depth", "JSDoc", "CAI", "ARCH", "FGT", "SSCCE",
+        "Doubt", "TDD", "HotSync", "RingBuffer", "git", "pwsh", "bash", "X-Y"
       ]
     }
   },
@@ -120,31 +41,32 @@
     {
       "id": "universal-methodology",
       "order": 1,
-      "title": "通用工程与算法突破层",
-      "positioning": "跨项目复用的工程工艺、复杂度预算、证伪、调试与度量方法论；不绑定具体子项目，任何作业按需注入。"
+      "title": "Universal Methodology",
+      "positioning": "Project-agnostic engineering craft, complexity budgets, falsification, debugging, caching, and statistical telemetry."
     },
     {
       "id": "workspace-governance",
       "order": 2,
-      "title": "工作区统一治理底座",
-      "positioning": "提交、门禁、技能、规则、文档、发版、子代理与测试的统一底座；所有子项目共享同一套铁律与验证命令。"
+      "title": "Workspace Governance",
+      "positioning": "Unified commit, gate, skill, rule-catalog, docs-archive, release, subagent, and test-benchmark invariants."
     },
     {
       "id": "domain-adapter",
       "order": 3,
-      "title": "子项目领域适配器",
-      "positioning": "把通用底座落到具体子项目（auto-refactor、workspace-timing、WebGames、fractal-git、Rust）的专属契约与红线。"
+      "title": "Domain Adapters",
+      "positioning": "Subsystem-specific rules and workflows for auto-refactor, fractal-git (Taxis), workspace-timing, WebGames, and Rust."
     }
   ],
   "domains": [
     {
       "id": "git-kernel",
       "order": 1,
-      "title": "分形版本控制内核",
+      "title": "Fractal-Git Kernel",
       "subtitle": "fractal-git / Taxis",
       "archetype": "git-kernel",
       "chain": [
         "fractal-git-dev",
+        "taxis-daemon-and-agent-control",
         "rust-engineering",
         "state-concurrency-and-crash-recovery",
         "algorithmic-operator-engineering",
@@ -162,48 +84,37 @@
       ],
       "scenarios": [
         {
-          "intent": "新增或修改 taxis 子命令",
+          "intent": "Add or update taxis CLI subcommands and plumbing",
           "posture": "construct",
-          "skills": [
-            "fractal-git-dev",
-            "rust-engineering",
-            "test-benchmark-engineering"
-          ]
+          "skills": ["fractal-git-dev", "rust-engineering", "test-benchmark-engineering"]
         },
         {
-          "intent": "taxis 输出与 git 逐字节不一致",
+          "intent": "taxis binary output differs byte-for-byte from git",
           "posture": "explore",
-          "skills": [
-            "fractal-git-dev",
-            "debugging-and-error-recovery",
-            "algorithmic-operator-engineering"
-          ]
+          "skills": ["fractal-git-dev", "taxis-daemon-and-agent-control", "algorithmic-operator-engineering"]
         },
         {
-          "intent": "索引树并发写入或崩溃恢复",
+          "intent": "Persistent daemon IPC, blackboard leases, or quarantine replay",
+          "posture": "construct",
+          "skills": ["taxis-daemon-and-agent-control", "state-concurrency-and-crash-recovery", "test-benchmark-engineering"]
+        },
+        {
+          "intent": "Concurrent index tree write crash recovery or unsafe proofs",
           "posture": "explore",
-          "skills": [
-            "fractal-git-dev",
-            "state-concurrency-and-crash-recovery",
-            "defensive-security-and-taint-safety"
-          ]
+          "skills": ["fractal-git-dev", "state-concurrency-and-crash-recovery", "defensive-security-and-taint-safety"]
         },
         {
-          "intent": "精简模块导出面与消除空门面",
+          "intent": "Enrich thin crate facades and eliminate trampolines",
           "posture": "refactor",
-          "skills": [
-            "fractal-git-dev",
-            "facade-discipline",
-            "rust-engineering"
-          ]
+          "skills": ["fractal-git-dev", "facade-discipline", "rust-engineering"]
         }
       ]
     },
     {
       "id": "refactor-engine",
       "order": 2,
-      "title": "自动重构内核",
-      "subtitle": "auto-refactor Rust 与 TypeScript 双轨",
+      "title": "Auto-Refactor Engine",
+      "subtitle": "auto-refactor Rust + TypeScript",
       "archetype": "cli-engine",
       "chain": [
         "auto-refactor-dev",
@@ -227,66 +138,41 @@
       ],
       "scenarios": [
         {
-          "intent": "新增分析器或规则",
+          "intent": "Add analyzer or rule and register SSOT metadata",
           "posture": "construct",
-          "skills": [
-            "auto-refactor-dev",
-            "sparse-moe-and-ast-routing",
-            "rule-catalog-governance",
-            "test-benchmark-engineering"
-          ]
+          "skills": ["auto-refactor-dev", "sparse-moe-and-ast-routing", "rule-catalog-governance", "test-benchmark-engineering"]
         },
         {
-          "intent": "优化稀疏 MoE 路由与多语言惰性投影",
+          "intent": "Optimize 5-tier Sparse MoE routing and lazy AST projection",
           "posture": "refactor",
-          "skills": [
-            "sparse-moe-and-ast-routing",
-            "algorithmic-operator-engineering",
-            "tiered-cache-and-wal-persistence"
-          ]
+          "skills": ["sparse-moe-and-ast-routing", "algorithmic-operator-engineering", "tiered-cache-and-wal-persistence"]
         },
         {
-          "intent": "LayerVFS 沙箱分叉或轨迹配方提取调试",
+          "intent": "Debug LayerVFS forks, 3-ply MCTS, or preset recipe plugins",
           "posture": "construct",
-          "skills": [
-            "praxis-vfs-and-trajectory-learning",
-            "auto-refactor-dev",
-            "test-benchmark-engineering"
-          ]
+          "skills": ["praxis-vfs-and-trajectory-learning", "auto-refactor-dev", "test-benchmark-engineering"]
         },
         {
-          "intent": "Rust 与 TypeScript 输出字节不等价",
+          "intent": "Rust native operator output diverges from TS shim",
           "posture": "explore",
-          "skills": [
-            "auto-refactor-dev",
-            "rust-engineering",
-            "debugging-and-error-recovery"
-          ]
+          "skills": ["auto-refactor-dev", "rust-engineering", "debugging-and-error-recovery"]
         },
         {
-          "intent": "评分口径被注水或刷分",
+          "intent": "Detect score padding, gaming, or telemetry boundary failures",
           "posture": "review",
-          "skills": [
-            "telemetry-statistical-modeling",
-            "constraint-driven-development",
-            "auto-refactor-dev"
-          ]
+          "skills": ["telemetry-statistical-modeling", "constraint-driven-development", "auto-refactor-dev"]
         },
         {
-          "intent": "消融纯转发跳板与参数收敛",
+          "intent": "Split bloated modules and dissolve pass-through trampolines",
           "posture": "refactor",
-          "skills": [
-            "auto-refactor-dev",
-            "facade-discipline",
-            "complexity-budget"
-          ]
+          "skills": ["auto-refactor-dev", "facade-discipline", "complexity-budget"]
         }
       ]
     },
     {
       "id": "vs-extension",
       "order": 3,
-      "title": "VS Code 扩展与计时视图",
+      "title": "VS Code Timing Extension",
       "subtitle": "workspace-timing",
       "archetype": "vs-extension",
       "chain": [
@@ -310,47 +196,31 @@
       ],
       "scenarios": [
         {
-          "intent": "计时视图卡顿或丢帧",
+          "intent": "Webview jank, frame drops, or IME send glitch",
           "posture": "explore",
-          "skills": [
-            "workspace-timing-dev",
-            "interaction-design-physics",
-            "algorithmic-operator-engineering"
-          ]
+          "skills": ["workspace-timing-dev", "interaction-design-physics", "algorithmic-operator-engineering"]
         },
         {
-          "intent": "进程被杀后缓冲区数据丢失",
+          "intent": "Buffer loss on process kill or journal replay divergence",
           "posture": "explore",
-          "skills": [
-            "workspace-timing-dev",
-            "state-concurrency-and-crash-recovery",
-            "test-benchmark-engineering"
-          ]
+          "skills": ["workspace-timing-dev", "state-concurrency-and-crash-recovery", "test-benchmark-engineering"]
         },
         {
-          "intent": "打包 vsix 并热同步",
+          "intent": "Package vsix and run HotSync with changelog alignment",
           "posture": "construct",
-          "skills": [
-            "release-package-workflow",
-            "workspace-timing-dev",
-            "gate-governance"
-          ]
+          "skills": ["release-package-workflow", "workspace-timing-dev", "gate-governance"]
         },
         {
-          "intent": "扩展多形参函数与门面收敛",
+          "intent": "Consolidate multi-parameter APIs and extension facades",
           "posture": "refactor",
-          "skills": [
-            "workspace-timing-dev",
-            "facade-discipline",
-            "coding-craft"
-          ]
+          "skills": ["workspace-timing-dev", "facade-discipline", "coding-craft"]
         }
       ]
     },
     {
       "id": "game-engine",
       "order": 4,
-      "title": "游戏引擎与 Godot 视图",
+      "title": "Godot Game Engine",
       "subtitle": "WebGames",
       "archetype": "game-engine",
       "chain": [
@@ -369,47 +239,31 @@
       ],
       "scenarios": [
         {
-          "intent": "新玩法先出四阶段方案",
+          "intent": "Draft 4-stage spec before building new gameplay",
           "posture": "construct",
-          "skills": [
-            "spec-driven-development",
-            "webgames-workflow",
-            "test-benchmark-engineering"
-          ]
+          "skills": ["spec-driven-development", "webgames-workflow", "test-benchmark-engineering"]
         },
         {
-          "intent": "热路径循环里出现对象分配",
+          "intent": "Eliminate per-frame object allocation in gameplay loops",
           "posture": "refactor",
-          "skills": [
-            "webgames-workflow",
-            "algorithmic-operator-engineering",
-            "complexity-budget"
-          ]
+          "skills": ["webgames-workflow", "algorithmic-operator-engineering", "complexity-budget"]
         },
         {
-          "intent": "配置字段与视图快照不一致",
+          "intent": "GameConfig schema mismatches UI snapshot state",
           "posture": "explore",
-          "skills": [
-            "webgames-workflow",
-            "debugging-and-error-recovery",
-            "coding-craft"
-          ]
+          "skills": ["webgames-workflow", "debugging-and-error-recovery", "coding-craft"]
         },
         {
-          "intent": "卡拉尔界面动效与感知幂律渐隐",
+          "intent": "Implement damped motion and power-law vignette curves",
           "posture": "construct",
-          "skills": [
-            "webgames-workflow",
-            "interaction-design-physics",
-            "test-benchmark-engineering"
-          ]
+          "skills": ["webgames-workflow", "interaction-design-physics", "test-benchmark-engineering"]
         }
       ]
     },
     {
       "id": "gate-infra",
       "order": 5,
-      "title": "门禁与命令面基础设施",
+      "title": "Gate & Shell Infrastructure",
       "subtitle": "scripts / pre-commit / CI",
       "archetype": "infra-tool",
       "chain": [
@@ -427,38 +281,26 @@
       ],
       "scenarios": [
         {
-          "intent": "新增门禁步骤并登记语义标识",
+          "intent": "Add gate step and register step/rule IDs",
           "posture": "construct",
-          "skills": [
-            "gate-governance",
-            "rule-catalog-governance",
-            "test-benchmark-engineering"
-          ]
+          "skills": ["gate-governance", "rule-catalog-governance", "test-benchmark-engineering"]
         },
         {
-          "intent": "pwsh 与 bash 门禁语义漂移",
+          "intent": "PowerShell and Bash gate semantics diverge",
           "posture": "explore",
-          "skills": [
-            "gate-governance",
-            "coding-craft",
-            "debugging-and-error-recovery"
-          ]
+          "skills": ["gate-governance", "coding-craft", "debugging-and-error-recovery"]
         },
         {
-          "intent": "破坏性删除或路径穿越",
+          "intent": "Audit recursive delete or path-traversal taint risks",
           "posture": "guardian",
-          "skills": [
-            "defensive-security-and-taint-safety",
-            "gate-governance",
-            "coding-craft"
-          ]
+          "skills": ["defensive-security-and-taint-safety", "gate-governance", "coding-craft"]
         }
       ]
     },
     {
       "id": "skill-rule-governance",
       "order": 6,
-      "title": "技能与规则元治理",
+      "title": "Skill & Rule Meta-Governance",
       "subtitle": ".agents / rule-catalog",
       "archetype": "skill-governance",
       "chain": [
@@ -476,48 +318,32 @@
       ],
       "scenarios": [
         {
-          "intent": "新增技能或改技能描述",
+          "intent": "Add or optimize skills, JIT references, and mirror parity",
           "posture": "construct",
-          "skills": [
-            "skill-governance",
-            "docs-archive-governance",
-            "batch-commit"
-          ]
+          "skills": ["skill-governance", "docs-archive-governance", "batch-commit"]
         },
         {
-          "intent": "新增规则标识并闭合登记",
+          "intent": "Register rule IDs and verify bidirectional SSOT closure",
           "posture": "construct",
-          "skills": [
-            "rule-catalog-governance",
-            "skill-governance",
-            "gate-governance"
-          ]
+          "skills": ["rule-catalog-governance", "skill-governance", "gate-governance"]
         },
         {
           "intent": "技能描述命中率低或调用含义不清",
           "posture": "review",
-          "skills": [
-            "skill-governance",
-            "subagent-orchestration",
-            "coding-craft"
-          ]
+          "skills": ["skill-governance", "subagent-orchestration", "coding-craft"]
         },
         {
           "intent": "多智能体任务装配与沙箱隔离",
           "posture": "construct",
-          "skills": [
-            "subagent-orchestration",
-            "skill-governance",
-            "gate-governance"
-          ]
+          "skills": ["subagent-orchestration", "skill-governance", "gate-governance"]
         }
       ]
     },
     {
       "id": "workspace-meta",
       "order": 7,
-      "title": "工作区元治理与并行交付",
-      "subtitle": "并行会话 / 提交 / 归档 / 发版",
+      "title": "Parallel Delivery & Meta-Governance",
+      "subtitle": "commits / archive / release",
       "archetype": "workspace-meta",
       "chain": [
         "batch-commit",
@@ -536,31 +362,19 @@
       ],
       "scenarios": [
         {
-          "intent": "并行会话改动混杂需要精准暂存",
+          "intent": "Stage atomic commits alongside dirty parallel sessions",
           "posture": "guardian",
-          "skills": [
-            "batch-commit",
-            "subagent-orchestration",
-            "constraint-driven-development"
-          ]
+          "skills": ["batch-commit", "subagent-orchestration", "constraint-driven-development"]
         },
         {
-          "intent": "提交信息被门禁拦下",
+          "intent": "Diagnose commit-msg-gate or forbidden-term rejection",
           "posture": "review",
-          "skills": [
-            "batch-commit",
-            "rule-catalog-governance",
-            "gate-governance"
-          ]
+          "skills": ["batch-commit", "rule-catalog-governance", "gate-governance"]
         },
         {
-          "intent": "发版日志与版本号对齐",
+          "intent": "Align version bumps, changelogs, and milestone archives",
           "posture": "review",
-          "skills": [
-            "release-package-workflow",
-            "docs-archive-governance",
-            "batch-commit"
-          ]
+          "skills": ["release-package-workflow", "docs-archive-governance", "batch-commit"]
         }
       ]
     }
@@ -568,144 +382,88 @@
   "skills": {
     "algorithmic-operator-engineering": {
       "layer": "universal-methodology",
-      "pitch": "当涉及算法瓶颈、吞吐优化、高频循环热路径或数据表示反转(SoA)时触发。执行五步降维协议与100%差分等价基准验证。",
-      "purpose": "为算法与高频算子确立从数据表示到单趟融合的降维路径，并用差分基准与微基准证明收益真实存在。",
-      "triggers": [
-        "算子",
-        "热路径",
-        "吞吐优化",
-        "降维",
-        "SoA",
-        "LUT",
-        "基准等价",
-        "卡顿"
-      ],
+      "pitch": "Apply 5-step SoA/LUT complexity reduction and differential parity verification on hot-loop bottlenecks.",
+      "purpose": "Drop algorithmic complexity via SoA inversion, LUTs, and single-pass fusion backed by byte-parity microbenchmarks.",
+      "triggers": ["bench", "route", "slow", "jank", "SoA", "LUT", "SWAR", "SIMD"],
       "situations": [
-        "这个算子跑到百万级输入就卡住了，能降阶吗？",
-        "别只改循环，把对象图反转成 TypedArray 试试。",
-        "优化完要跑差分基准证明字节级等价，不许拍脑袋。"
+        "An operator hits O(n^2) slowdown on large repos",
+        "Object-heavy loops need TypedArray/SoA layout inversion",
+        "Optimized native code needs byte-parity proof against baseline"
       ],
       "verification": [
         "node auto-refactor/scripts/bench-hot-paths.js",
-        "cd auto-refactor && npm run build && npm test",
-        "node scripts/common/evaluate-eloc-budget.js"
+        "node auto-refactor/scripts/validate-native-benchmark.js"
       ]
     },
     "auto-refactor-dev": {
       "layer": "domain-adapter",
-      "pitch": "开发、修改或测试 auto-refactor 项目代码时必须使用。看守 Rust 与 TS 双轨 100% 字节等价、四阶段流水线拓扑、Diff 引擎与暂存落盘规范。",
-      "purpose": "回答『改引擎会不会破坏双轨等价与流水线拓扑』，产出分析器与规则改动及回归结论。",
-      "triggers": [
-        "auto重构",
-        "分析器",
-        "内核",
-        "Praxis",
-        "重构引擎",
-        "双轨等价",
-        "流水线"
-      ],
+      "pitch": "Govern auto-refactor 6-layer engine, Rust/TS byte parity, Stage 0-3 analyzers, Praxis SDK, and telemetry guards.",
+      "purpose": "Ensure engine/analyzer edits preserve Rust+TS parity, PathClassifier SSOT, project neutrality, and gate ratchets.",
+      "triggers": ["refactor", "audit", "broken", "skew", "Praxis", "Oxc", "Stage0"],
       "situations": [
-        "新增一个第二阶段分析器规则",
-        "Rust 与 TS 实现的 Diff 输出不一致",
-        "Praxis SDK 客户端协议要改签名"
+        "Add or split a built-in analyzer without losing Rust/TS parity",
+        "Audit telemetry ingesters or preset-based trajectory plugins",
+        "Run gate:rust, vitest unit suite, and native parity checks"
       ],
       "verification": [
-        "cd auto-refactor && npm run build && npm run gate && npm test && node scripts/bench-hot-paths.js",
-        "cd auto-refactor && npm test"
+        "cd auto-refactor && npm run build && npm run gate && npm test",
+        "node auto-refactor/scripts/validate-native-parity.js"
       ]
     },
     "batch-commit": {
       "layer": "workspace-governance",
-      "pitch": "当准备提交代码、分批原子提交或审查 git commit 信息时必须使用。按 6 层拓扑拆解提交，拦截 6 类黑话禁词，执行离线门禁预审与原子提交闭环。",
-      "purpose": "回答『这批改动如何拆成可独立回滚的提交』，产出分批清单与门禁预审结论。",
-      "triggers": [
-        "提交",
-        "分批",
-        "暂存",
-        "commit",
-        "git",
-        "预审",
-        "禁词",
-        "原子提交"
-      ],
+      "pitch": "Plan 6-layer atomic commits, strip forbidden prose, enforce 5D diff bounds, and run offline commit-msg gates.",
+      "purpose": "Split multi-file changes into revertible atomic commits while avoiding forbidden terms and parallel-session bleed.",
+      "triggers": ["commit", "stage", "fix", "reject", "block", "git", "5D", "slang"],
       "situations": [
-        "用户说『这些改动一起提交吧』但涉及 20 个文件",
-        "提交信息被 commit-msg-gate 拦下",
-        "需要为底层重构拆出可回滚的提交点"
+        "Split cross-layer changes into clean revertible batches",
+        "Fix commit-msg-gate rejections or STAGED-DIFF-14 overflows",
+        "Stage explicit files safely beside active parallel sessions"
       ],
       "verification": [
         "pwsh -File scripts/ps1/commit-msg-gate.ps1 <msg-file>",
-        "pwsh -File scripts/ps1/pre-commit-gate.ps1",
-        "pwsh -File scripts/ps1/audit-all.ps1"
+        "pwsh -File scripts/ps1/pre-commit-gate.ps1"
       ]
     },
     "coding-craft": {
       "layer": "universal-methodology",
-      "pitch": "编写、生成或审查任何代码时必须遵循。坚持命名即契约、显式失败语义、类型穷尽、最小接口暴露与单向依赖，对接 536 条 SSOT 规则。",
-      "purpose": "在任何代码落笔时提供命名、失败语义、类型穷尽与依赖方向的工艺判据，守住函数级质量底线。",
-      "triggers": [
-        "写代码",
-        "重构",
-        "命名",
-        "错误处理",
-        "类型设计",
-        "SSOT",
-        "空捕获"
-      ],
+      "pitch": "Enforce contract naming, explicit errors, exhaustive types, minimal exports, and unidirectional dependencies.",
+      "purpose": "Apply language-agnostic function/module craft aligned with 536 SSOT rules on every code write or review.",
+      "triggers": ["write", "design", "review", "broken", "cycle", "SSOT", "types", "export"],
       "situations": [
-        "我要新增一个导出函数，先确定命名和失败语义。",
-        "这个 catch 是空的，还有一堆 as any，按判据重写。",
-        "审查这段代码：导出面是不是过大了？"
+        "Design exported APIs with explicit Result/typed-error semantics",
+        "Eliminate empty catches, any casts, and cyclic module imports",
+        "Audit exports and dependency direction across layers"
       ],
       "verification": [
         "node scripts/common/validate-skills.js && node scripts/common/validate-family-contract.js",
-        "node scripts/common/validate-rule-id-closure.js && node scripts/common/validate-docs-consistency.js",
         "node scripts/common/evaluate-eloc-budget.js && node scripts/common/validate-code-density.js --all"
       ]
     },
     "complexity-budget": {
       "layer": "universal-methodology",
-      "pitch": "重构大文件、优化认知复杂度(CC<=15)、缩减嵌套深度(Depth<=4)或检查体积包络(ELOC<=900)时触发。落实六字段 JSDoc 契约与循环零堆分配。",
-      "purpose": "在编码与重构中量化控制流复杂度、文件体积与注释密度，把超限模块压回刚性预算内。",
-      "triggers": [
-        "重构",
-        "拆分文件",
-        "CC",
-        "Depth",
-        "ELOC",
-        "LOC",
-        "JSDoc",
-        "注水"
-      ],
+      "pitch": "Enforce CC<=15, Depth<=4, ELOC<=900, LOC<=1400, 6-field JSDoc, and zero loop allocations when splitting hot files.",
+      "purpose": "Compress nested branches into guard clauses and decompose oversized modules while eliminating VOL-DOC-001 alerts.",
+      "triggers": ["split", "prune", "bloat", "nested", "ELOC", "CC", "Depth", "JSDoc"],
       "situations": [
-        "这个文件 1200 行了，帮我拆到 ELOC 900 以内。",
-        "这个函数 CC 21、嵌套 5 层，改成卫语句提前返回。",
-        "循环里 new 了对象，按零瞬态堆分配改掉。"
+        "Split >= 800 ELOC files cleanly within dual-track budgets",
+        "Flatten nested conditionals to early-return guard clauses",
+        "Add 6-field headers to resolve VOL-DOC-001 volume notices"
       ],
       "verification": [
         "node scripts/common/evaluate-eloc-budget.js",
-        "node auto-refactor/scripts/validate-comment-governance.js",
-        "pwsh -File scripts/ps1/pre-commit-gate.ps1",
         "node scripts/common/validate-code-density.js --all"
       ]
     },
     "constraint-driven-development": {
       "layer": "universal-methodology",
-      "pitch": "完成特性交付、声称修复完成或合入前对抗性证伪时必须触发。落实 Floor Guard 刚性底线与单调棘轮，主动推翻边界假设与脆弱实现。",
-      "purpose": "在交割前用机器化底线与五步怀疑循环证伪改动，阻止阈值下调、测试弱化与半成品交付。",
-      "triggers": [
-        "交割",
-        "验收",
-        "证伪",
-        "Doubt",
-        "阈值下调",
-        "测试弱化",
-        "半成品"
-      ],
+      "pitch": "Run Floor Guard ratchets and adversarial Doubt loops before delivery; forbid baseline weakening or partial hacks.",
+      "purpose": "Falsify edge assumptions and verify complete, unrelaxed gates before claiming completion or merging.",
+      "triggers": ["verify", "merge", "bypass", "partial", "Doubt", "Floor", "ratchet", "gate"],
       "situations": [
-        "我准备声称修完了，交割前按五步怀疑循环证伪一遍。",
-        "能不能先把 baseline 阈值下调让门禁过？",
-        "这次改动语义量不到 15%，会被判刷分熔断吗？"
+        "Stress-test boundary assumptions before final merge verdict",
+        "Prevent threshold lowering or skipped assertions under failures",
+        "Verify zero placeholders, 0-byte files, or leftover TODOs"
       ],
       "verification": [
         "pwsh -File scripts/ps1/audit-all.ps1"
@@ -713,22 +471,13 @@
     },
     "debugging-and-error-recovery": {
       "layer": "universal-methodology",
-      "pitch": "遇到任何故障、测试报错或异常行为时必须使用。严格遵循观察-假说-SSCCE隔离-最小修复五步法，坚决贯彻两次受挫即停原则，严禁盲目猜修。",
-      "purpose": "在故障现场建立可复现 SSCCE 并最小修复，以两次受挫即停纪律避免盲目试错扩大战线。",
-      "triggers": [
-        "排错",
-        "报错",
-        "崩溃",
-        "单测失败",
-        "SSCCE",
-        "复现",
-        "假说",
-        "故障"
-      ],
+      "pitch": "Debug via Observe-Hypothesize-SSCCE-MinimalFix and strict stop-after-2-failures discipline without guesswork.",
+      "purpose": "Isolate root causes with minimal reproducible harnesses and halt guessing after two failed fix attempts.",
+      "triggers": ["debug", "triage", "crash", "fail", "flaky", "SSCCE", "stack", "repro"],
       "situations": [
-        "单测突然红了，报错堆栈在附件里，帮我定位。",
-        "这个问题已经修了两次还红，按两次即停先停手。",
-        "先别改生产代码，给我一个 30 行内 SSCCE 复现。"
+        "Pinpoint intermittent test or runtime crashes with an SSCCE",
+        "Halt speculative edits after two failed fix hypotheses",
+        "Trace regression origin cleanly before patching production code"
       ],
       "verification": [
         "cd auto-refactor && npm test"
@@ -736,354 +485,217 @@
     },
     "defensive-security-and-taint-safety": {
       "layer": "universal-methodology",
-      "pitch": "执行破坏性文件操作、清理目录、暴露端点或处理外部输入时触发。落实递归删除三步污点守卫(GUARD-DESTR-001)与只读自动变量防篡改。",
-      "purpose": "在破坏性操作与外部输入暴露前执行污点证明，封锁递归删除、变量遮蔽与注入类风险。",
-      "triggers": [
-        "删除文件",
-        "rm",
-        "注入",
-        "污点追踪",
-        "变量遮蔽",
-        "路径穿越",
-        "清理目录"
-      ],
+      "pitch": "Guard recursive deletes (GUARD-DESTR-001), read-only auto vars (GUARD-VAR-001), junctions, and taint boundaries.",
+      "purpose": "Enforce 3-step destination taint proofs before rm/cleanup and block credential leaks or traversal vectors.",
+      "triggers": ["clean", "guard", "bypass", "corrupt", "rm", "taint", "path", "secrets"],
       "situations": [
-        "帮我把 build 目录整个递归删掉再重建。",
-        "这个 rm -rf 的变量是外面传进来的，安全吗？",
-        "脚本里 $HOME 被赋值了，会在真机上报错吗？"
+        "Validate staging/worktree cleanup paths before recursive remove",
+        "Check Windows NTFS junctions before pruning temporary worktrees",
+        "Prevent $HOME/$PID overwrites and external-input injection"
       ],
       "verification": [
         "node scripts/common/validate-destructive-ops.js",
-        "node .agents/skills/defensive-security-and-taint-safety/templates/safe-sandbox-cleanup.js",
         "node scripts/common/validate-shell-parity.js"
       ]
     },
     "docs-archive-governance": {
       "layer": "workspace-governance",
-      "pitch": "编写、修改顶层架构蓝图、交付物归档、案卷封存或全宗技术档案时触发。维护 agent-native-system-blueprint 与纯正面向用户标准。",
-      "purpose": "回答『这份文档该归到哪、相对链接是否还活』，产出归档元数据与文档门禁结论。",
-      "triggers": [
-        "文档归档",
-        "蓝图",
-        "架构演进",
-        "README",
-        "归档清单",
-        "死链",
-        "案卷封存"
-      ],
+      "pitch": "Maintain blueprints, milestone archives, and end-user READMEs with live relative links and zero jargon.",
+      "purpose": "Keep top-level architecture blueprints and delivery records free of dead links, absolute paths, and internal slang.",
+      "triggers": ["archive", "write", "stale", "dead", "README", "link", "docs", "specs"],
       "situations": [
-        "用户要更新顶层架构蓝图文档",
-        "交付物结项后需要归档到归档目录",
-        "README 里出现死链或盘符绝对路径"
+        "Archive completed phase outcomes into roadmap artifacts",
+        "Purge drive letters, file:// URIs, or broken relative links",
+        "Keep user-facing changelogs free of engineering jargon"
       ],
       "verification": [
-        "bash scripts/sh/check-display-assets.sh",
-        "pwsh -File WebGames/scripts/ps1/audit-docs.ps1",
-        "node auto-refactor/scripts/validate-docs.js"
+        "node scripts/common/validate-doc-anchors.js",
+        "node scripts/common/validate-doc-reachability.js"
       ]
     },
     "facade-discipline": {
       "layer": "universal-methodology",
-      "pitch": "消融<=3行纯转发跳板(ARCH-ABS-001)、压缩多形参对象(SIM-ARGS-001)或重构模块导出面时触发。确保门面具备实质承载(ARCH-FAC-001)与不可变冻结。",
-      "purpose": "在重构模块导出面时消融透传跳板并判定门面承载，确保精简后行为与契约 100% 等价。",
-      "triggers": [
-        "门面",
-        "跳板",
-        "透传",
-        "ARCH-ABS",
-        "参数收敛",
-        "消融",
-        "空壳膨胀"
-      ],
+      "pitch": "Dissolve <=3-line pure trampolines (ARCH-ABS-001), pack >=4 args, and enforce substantive frozen facades (>=15 ELOC).",
+      "purpose": "Replace empty passthrough wrappers with cohesive domain facades carrying validation, freezing, or contract checks.",
+      "triggers": ["prune", "refactor", "bloat", "dead", "ARCH", "facade", "wrap", "argobj"],
       "situations": [
-        "这个 index.ts 只有三行 export，能直接内联吗？",
-        "这个门面 ELOC 只有 8，是不是空壳透传？",
-        "把五个位置参数压成一个只读参数对象。"
+        "Inline trivial index/lib trampolines adding indirection without logic",
+        "Enrich Rust crate or TS module facades above >= 15 ELOC floor",
+        "Collapse >= 4 positional parameters into typed immutable options"
       ],
       "verification": [
         "node auto-refactor/scripts/validate-facade-governance.js",
-        "node scripts/common/evaluate-eloc-budget.js",
-        "node scripts/common/validate-code-density.js"
+        "node auto-refactor/scripts/validate-redundancy-governance.js"
       ]
     },
     "fractal-git-dev": {
       "layer": "domain-adapter",
-      "pitch": "开发或修改 fractal-git (Taxis) 模块时必须使用。看守 10 大内核子系统分层拓扑、Git Plumbing 二进制等价、偏序集冲突检测与 CAS 无锁索引树。",
-      "purpose": "回答『Taxis 改动是否仍与 Git 字节等价、拓扑是否越界』，产出内核实现与门禁回归。",
-      "triggers": [
-        "taxis",
-        "版本控制内核",
-        "CAS",
-        "偏序集",
-        "实现子命令",
-        "字节等价",
-        "FGT规则"
-      ],
+      "pitch": "Govern fractal-git 10-crate topology, multi-hash Oid, PackWindowReader, CCD v2 poset merge, and taxis subcommands.",
+      "purpose": "Keep Taxis crates unidirectional, Git Plumbing byte-identical across 57 parity vectors, and CAS index trees lock-free.",
+      "triggers": ["build", "hash", "skew", "panic", "taxis", "CAS", "Oid", "Pack"],
       "situations": [
-        "修改 fg-object 的 tree 解析",
-        "taxis 与 git 的 pack 字节不一致",
-        "新增 SubAgent Cell 工作树快照逻辑"
+        "Implement or fix taxis Git drop-in commands (switch/stash/worktree)",
+        "Update fg-core::Oid multi-hash codecs or windowed PackFile readers",
+        "Maintain CCD v2 poset conflict detection and 3-part // SAFETY: proofs"
       ],
       "verification": [
         "node fractal-git/scripts/common/validate-crate-topology.js",
-        "cargo clippy --manifest-path fractal-git/Cargo.toml --all-targets -- -D warnings",
-        "cargo test --workspace --manifest-path fractal-git/Cargo.toml",
         "pwsh -File fractal-git/scripts/ps1/audit-taxis.ps1"
       ]
     },
     "gate-governance": {
       "layer": "workspace-governance",
-      "pitch": "编写修改门禁脚本、运行全仓审查或处理跨平台脚本兼容时触发。落实 Tier 1 本地左移流式判定、工作目录隔离契约与零黑话规范。",
-      "purpose": "回答『这条门禁该在哪一层拦、脚本如何跨平台可靠执行』，产出双层门禁与脚本契约。",
-      "triggers": [
-        "门禁",
-        "全仓审查",
-        "提交门禁",
-        "脚本编写",
-        "跨平台",
-        "pwsh",
-        "bash",
-        "子进程"
-      ],
+      "pitch": "Enforce Tier 1/1.5/2 gates, single-pass pre-commit streaming, pwsh/bash cwd isolation, and step-registry closure.",
+      "purpose": "Align PowerShell 7+, Bash, and Node gate scripts with remote Linux sandbox orchestration and zero-bleed execution.",
+      "triggers": ["lint", "audit", "fail", "drift", "pwsh", "bash", "CI", "sandbox"],
       "situations": [
-        "新增的 validate 脚本没接入全仓审查",
-        "pwsh 与 bash 下脚本行为不一致",
-        "门禁脚本子进程写到了错误工作目录"
+        "Update single-pass gate-differential-bounds.js --stream hooks",
+        "Debug pwsh vs bash parity mismatches or cwd isolation errors",
+        "Run Tier 1.5 remote-sandbox-test before cross-OS batched pushes"
       ],
       "verification": [
         "pwsh -File scripts/ps1/pre-commit-gate.ps1",
-        "node scripts/common/generate-rule-catalog.js --check-only",
-        "node scripts/common/validate-skills.js",
-        "node scripts/common/evaluate-eloc-budget.js"
+        "node scripts/common/test-gate-guards.js"
       ]
     },
     "interaction-design-physics": {
       "layer": "universal-methodology",
-      "pitch": "编写或调整前端界面、Webview 与动效时触发。落实语义明度阶梯、单闭合边框、二阶阻尼物理模型、感知幂律渐隐及 IME 输入法互锁守卫。",
-      "purpose": "在编写界面与动效时把明度、边框、弹簧与 IME 约束落成参数化实现，消除套娃与重排抖动。",
-      "triggers": [
-        "界面",
-        "调样式",
-        "CSS",
-        "边框",
-        "暗色模式",
-        "输入法",
-        "抖动",
-        "套娃"
-      ],
+      "pitch": "Enforce dark lightness steps, single-border CSS, damped spring motion, power-law vignettes, and IME compose locks.",
+      "purpose": "Eliminate nested borders, layout thrash, and premature IME submits via physical animation and dark-UI math.",
+      "triggers": ["style", "design", "jank", "glitch", "CSS", "IME", "dark", "motion"],
       "situations": [
-        "这个暗色模式弹窗白边太刺眼了，按语义明度改。",
-        "输入法还在组词就把消息发出去了，加互锁。",
-        "按钮内胶囊边框套了两层，按单闭合边框消掉。"
+        "Fix nested pill borders or jarring white outlines in dark mode",
+        "Block Enter submission while CJK IME composition is active",
+        "Replace linear fades with critically damped motion curves"
       ],
       "verification": [
-        "pwsh -File scripts/ps1/audit-all.ps1"
+        "cd workspace-timing && npm run test:fast"
       ]
     },
     "praxis-vfs-and-trajectory-learning": {
       "layer": "domain-adapter",
-      "pitch": "开发或调试 LayerVFS 虚拟文件沙箱、MCTS 重构树搜索、轨迹学习配方提取或 Praxis 审查门禁链时触发。保障 CAS 零落盘分叉与事务回滚闭环。",
-      "purpose": "回答『虚拟沙箱分叉是否污染磁盘、轨迹配方是否经五道门禁净化』，产出 LayerVFS 事务与轨迹配方回归结论。",
-      "triggers": [
-        "LayerVFS",
-        "MCTS",
-        "轨迹学习",
-        "配方提取",
-        "虚拟分叉",
-        "沙箱联调",
-        "回滚失败"
-      ],
+      "pitch": "Govern LayerVFS CAS forks, 3-ply MCTS exploration, AAS auto-fix transforms, and preset trajectory plugins.",
+      "purpose": "Ensure zero-spill sandbox search, real before/after quality deltas, and project-neutral trajectory recipe extraction.",
+      "triggers": ["isolate", "test", "dirty", "gaming", "LayerVFS", "MCTS", "recipe", "plugin"],
       "situations": [
-        "MCTS 搜索候选补丁时污染了物理工作区文件",
-        "历史提交轨迹噪声太多，配方提取召回率低",
-        "Praxis 审查门禁链阻断了跨文件重命名事务"
+        "Run 3-ply MCTS multi-step patches with baseline snapshot diffs",
+        "Wire AAS actionable.patch transforms (SIM-TRN-001, HYG-WRAP-001)",
+        "Load project trajectory rules cleanly from preset JSON plugins"
       ],
       "verification": [
         "cd auto-refactor && npm test",
-        "node auto-refactor/scripts/validate-trajectory-learning.js",
-        "node scripts/common/validate-skills.js"
+        "node auto-refactor/scripts/validate-trajectory-learning.js"
       ]
     },
     "release-package-workflow": {
       "layer": "workspace-governance",
-      "pitch": "打包 VS Code 扩展、执行 -HotSync 热同步或编写 Keep-a-Changelog 发版日志时触发。确保产物自动轮转与用户文档零工程黑话。",
-      "purpose": "回答『这次发版打哪个包、版本与日志怎么对齐』，产出 vsix 产物与发版闭环。",
-      "triggers": [
-        "打包",
-        "发布",
-        "vsix",
-        "HotSync",
-        "版本号",
-        "发版日志",
-        "热同步"
-      ],
+      "pitch": "Build VSIX bundles, run -HotSync rotation, bump semver cleanly, and align Keep-a-Changelog user release notes.",
+      "purpose": "Keep extension packaging, registry self-healing, and public release notes synchronized and jargon-free.",
+      "triggers": ["pack", "release", "bump", "broken", "vsix", "HotSync", "semver", "dist"],
       "situations": [
-        "用户说『打包一个新 vsix 并装到 Cursor』",
-        "准备发版但发版日志还停在旧版本",
-        "热同步后扩展注册表没自愈"
+        "Package updated VSIX and run -HotSync across IDE targets",
+        "Synchronize CHANGELOG entries after version bumps",
+        "Verify extension display assets and package hygiene"
       ],
       "verification": [
         "bash scripts/sh/check-display-assets.sh",
-        "bash scripts/sh/version-bump.sh workspace-timing patch --dry-run",
         "pwsh -File scripts/ps1/package.ps1 -HotSync"
       ]
     },
     "rule-catalog-governance": {
       "layer": "workspace-governance",
-      "pitch": "增删改规则 ID、治理跨项目规则元数据或维护单源规则目录时触发。看守 3-3-3 命名拓扑与 RCFG-RULE-DRIFT 防虚构闭包。",
-      "purpose": "回答『这个规则 ID 是否已登记、会不会被判漂移』，产出 SSOT 元数据与闭包校验结果。",
-      "triggers": [
-        "新增规则",
-        "修改规则",
-        "SSOT",
-        "规则目录",
-        "规则登记",
-        "规则漂移",
-        "命名拓扑"
-      ],
+      "pitch": "Maintain single-source rule-catalog.json (536 rules), 3-3-3 IDs, family taxonomy, and RCFG-RULE-DRIFT closure.",
+      "purpose": "Prevent unregistered rule IDs, cross-project count drift, and diagnostic/presentation deduplication coupling.",
+      "triggers": ["sync", "audit", "drift", "ghost", "SSOT", "rules", "family", "metrics"],
       "situations": [
-        "新分析器先写了规则 ID 再补登记",
-        "提交信息里引用了未登记规则 ID",
-        "规则目录计数与文档字面量对不上"
+        "Register new rule IDs across analyzer, catalog, and skill taxonomy",
+        "Run sync-doc-metrics.js --write after catalog or skill changes",
+        "Fix RCFG-RULE-DRIFT or rule-family-taxonomy count mismatches"
       ],
       "verification": [
-        "node scripts/common/generate-rule-catalog.js --check-only",
-        "node scripts/common/sync-doc-metrics.js",
-        "pwsh -File scripts/ps1/pre-commit-gate.ps1"
+        "node scripts/common/validate-rule-id-closure.js",
+        "node scripts/common/validate-family-contract.js",
+        "node scripts/common/sync-doc-metrics.js --check"
       ]
     },
     "rust-engineering": {
       "layer": "domain-adapter",
-      "pitch": "编写或重构 Rust 代码时必须触发。全面贯彻 Type-State 状态机、零瞬态堆分配(FGT-PRF-001)、thiserror 强类型错误、// SAFETY: 严格证明及 Clippy 零容忍门禁。",
-      "purpose": "回答『这段 Rust 是否达到工业级红线』，产出类型状态与零分配实现及 Clippy 干净结果。",
-      "triggers": [
-        "Rust",
-        "Cargo",
-        "unsafe",
-        "无锁",
-        "Clippy",
-        "编写Rust",
-        "panic"
-      ],
+      "pitch": "Enforce Type-State, thiserror errors, zero panics/loop alloc, 3-part // SAFETY: proofs, and Clippy -D warnings.",
+      "purpose": "Hold Rust crates in auto-refactor and fractal-git to zero-panic, zero-warning, proven-unsafe standards.",
+      "triggers": ["unwrap", "build", "panic", "leak", "Rust", "Cargo", "Clippy", "unsafe"],
       "situations": [
-        "热路径里出现 Vec 分配",
-        "写 unsafe 块却没有 SAFETY 注释",
-        "cargo clippy 报 -D warnings 失败"
+        "Audit unsafe blocks for Preconditions/Invariants/Postconditions",
+        "Replace bare panic/unwrap and &String params in production code",
+        "Pass strict workspace cargo clippy --all-targets -- -D warnings"
       ],
       "verification": [
         "node .agents/skills/rust-engineering/scripts/validate-rust-conformance.js",
-        "cargo fmt --all --manifest-path fractal-git/Cargo.toml -- --check",
-        "cargo clippy --workspace --all-targets --manifest-path fractal-git/Cargo.toml -- -D warnings",
         "cargo test --workspace --manifest-path fractal-git/Cargo.toml"
       ]
     },
     "skill-governance": {
       "layer": "workspace-governance",
-      "pitch": "创建、修改技能、维护四件套结构(SKILL/references/templates/scripts)或同步双目录字节等价时触发。贯彻 JIT 渐进披露与 50~200 字描述契约。",
-      "purpose": "回答『这个技能结构是否合规、双目录是否字节一致』，产出四件套检查与同步校验结论。",
-      "triggers": [
-        "编写技能",
-        "新增skill",
-        "技能治理",
-        "同构同步",
-        "双目录同步",
-        "四件套",
-        "JIT披露"
-      ],
+      "pitch": "Govern 4-part skill layout, registry triggers, JIT progressive disclosure, and 100% plugin bundle mirror parity.",
+      "purpose": "Keep SKILL.md entrypoints concise, orphaned assets forbidden, and plugin bundles byte-identical to .agents/skills/.",
+      "triggers": ["author", "sync", "bloat", "orphan", "skills", "JIT", "catalog", "mirror"],
       "situations": [
-        "新增技能目录但缺 references 骨架",
-        "改了根目录技能忘了同步插件副本",
-        "校验脚本报 description 超长"
+        "Create or trim skills inside 50-300 line JIT window budgets",
+        "Sync registry metadata, skill-catalog.md, and plugin mirrors",
+        "Resolve missing error-rule pointers or dead relative links"
       ],
       "verification": [
         "node scripts/common/validate-skills.js",
-        "node scripts/common/sync-skills.js --check",
-        "pwsh -File scripts/ps1/audit-all.ps1 -Fast"
+        "node scripts/common/sync-skills.js --check"
+      ]
+    },
+    "sparse-moe-and-ast-routing": {
+      "layer": "domain-adapter",
+      "pitch": "Govern 5-tier Sparse MoE routing, uint32 bitmasks, LineFeatureTape, lazy AST/CFG projection, and analyzer pooling.",
+      "purpose": "Ensure 32-bit unsigned bitmask parity (Bit 31), zero eager parsing, and O(1) resetState() reuse across analyzers.",
+      "triggers": ["route", "mask", "slow", "stale", "MoE", "AST", "tape", "pool"],
+      "situations": [
+        "Preserve unsigned (bit >>> 0) indexing on AnalyzerBit 0..31",
+        "Move expensive checks behind LineFeatureTape flags and fast triggers",
+        "Use NormalizedAst / oxc-parser slices without secondary parsing"
+      ],
+      "verification": [
+        "cd auto-refactor && npm test && node scripts/bench-hot-paths.js"
       ]
     },
     "spec-driven-development": {
       "layer": "universal-methodology",
-      "pitch": "遇到模糊需求、重大架构重构或开发新特性前触发。通过每次一问消除歧义与 X-Y 问题，先确立能力拓扑图与接口契约规格，再行动手编码。",
-      "purpose": "在编码前用单点质询把模糊需求收敛为能力拓扑与接口契约规格，避免返工与 X-Y 错解。",
-      "triggers": [
-        "需求澄清",
-        "质询",
-        "能力拓扑",
-        "规格书",
-        "X-Y",
-        "返工"
-      ],
+      "pitch": "Clarify ambiguous specs one question at a time, expose X-Y traps, and lock contracts before architecture edits.",
+      "purpose": "Eliminate costly rework by resolving ambiguity and interface boundaries prior to touching code.",
+      "triggers": ["clarify", "design", "rework", "churn", "spec", "X-Y", "contract", "scope"],
       "situations": [
-        "需求就一句话，先别写码，帮我反向问清楚。",
-        "这个重构会动持久化格式，先出规格书再动手。",
-        "确认一下这是不是 X-Y 问题，我真正要的是 X。"
+        "A vague feature request hides conflicting edge constraints",
+        "Cross-subsystem changes risk an X-Y detour without contract sign-off",
+        "Major refactoring requires staged plan approval before coding"
       ],
       "verification": [
         "pwsh -File scripts/ps1/audit-all.ps1"
       ]
     },
-    "sparse-moe-and-ast-routing": {
-      "layer": "domain-adapter",
-      "pitch": "开发或优化五级稀疏 MoE 路由、32 位无符号位掩码分派、LineFeatureTape 扫描或多语言 AST 惰性投影时触发。落实零热路径冗余解析与池化复位。",
-      "purpose": "回答『分析器是否绑定五级稀疏预筛、惰性语义图是否被提前物化』，产出位掩码路由与多语言 IR 回归结论。",
-      "triggers": [
-        "MoE",
-        "稀疏路由",
-        "位掩码",
-        "特征磁带",
-        "预筛优化",
-        "激活降级",
-        "惰性投影"
-      ],
-      "situations": [
-        "新增的分析器没有绑定AnalyzerBit或行级特征磁带预筛",
-        "非JS语言适配器过早实例化全量CFG导致扫描变慢",
-        "池化分析器未在resetState中清空上一文件的缓存字典"
-      ],
-      "verification": [
-        "cd auto-refactor && npm test",
-        "node auto-refactor/scripts/bench-hot-paths.js",
-        "node scripts/common/validate-skills.js"
-      ]
-    },
     "state-concurrency-and-crash-recovery": {
       "layer": "universal-methodology",
-      "pitch": "涉及并发调度、句柄生命周期对称释放(PRF-LEAK-001)、异步派发器排空或崩溃恢复幂等性设计时触发。杜绝孤儿句柄与悬挂协程。",
-      "purpose": "在设计并发、状态机与落盘路径时落实对称释放、原子替换与幂等回放，杜绝泄漏与半写。",
-      "triggers": [
-        "并发",
-        "状态机",
-        "排障",
-        "泄漏",
-        "原子落盘",
-        "幂等",
-        "崩溃恢复",
-        "Journal"
-      ],
+      "pitch": "Enforce symmetric resource disposal, bounded queues, idempotent journal replay, and atomic temp-rename durability.",
+      "purpose": "Prevent leaked timers/handles, OOM socket buffers, and torn writes across async dispatchers and recovery paths.",
+      "triggers": ["drain", "isolate", "leak", "crash", "async", "mutex", "atomic", "handle"],
       "situations": [
-        "扩展退出后定时器还在跑，帮我对称释放。",
-        "写配置直接覆盖出过 0 字节文件，改成原子落盘。",
-        "Journal 回放会不会重复累加？需要幂等键。"
+        "Bind socket read caps, drain backpressure, and worker rssGuard",
+        "Guarantee symmetric dispose/timer cleanup on daemon shutdown",
+        "Make WAL/journal replay idempotent across abrupt process kills"
       ],
       "verification": [
         "cd workspace-timing && npm run test:fast",
-        "cd auto-refactor && node scripts/gate-self.js",
-        "node scripts/common/validate-skills.js"
+        "cd auto-refactor && npm test"
       ]
     },
     "subagent-orchestration": {
       "layer": "workspace-governance",
       "pitch": "派发或编排 SubAgent、处理五层上下文预算治理(75% 脱水)时必须使用。强制同构模型、独占 Zero-Intersection Path Jail 物理防冲突与交叉复审。",
       "purpose": "回答『这个任务怎么拆给子 Agent 且不互相覆盖文件』，产出派发契约与隔离边界。",
-      "triggers": [
-        "subagent",
-        "派发任务",
-        "多agent协同",
-        "并发开发",
-        "隔离边界",
-        "上下文预算",
-        "交叉复审"
-      ],
+      "triggers": ["subagent", "派发任务", "多agent协同", "并发开发", "隔离边界", "上下文预算", "交叉复审"],
       "situations": [
         "两个子 Agent 同时改同一批文件",
         "主会话上下文到 75% 需要脱水",
@@ -1095,24 +707,31 @@
         "node scripts/common/validate-skills.js && node scripts/common/sync-skills.js --check"
       ]
     },
+    "taxis-daemon-and-agent-control": {
+      "layer": "domain-adapter",
+      "pitch": "Govern Taxis persistent daemon IPC, fg-native N-API, blackboard leases, quarantine, FGT-MSG/gate-slice, and TS UI.",
+      "purpose": "Guard resident Taxis IPC/N-API parity, multi-agent DiskBlackboardStore write mutexes, live Praxis/PROM gates, and binary git diffs.",
+      "triggers": ["lease", "verify", "corrupt", "breach", "daemon", "IPC", "N-API", "FGT"],
+      "situations": [
+        "Modify persistent taxis daemon IPC caching or fg-native N-API bridge",
+        "Enforce DiskBlackboardStore leases, quarantine restore, or gate-slice",
+        "Run real taxis vs git binary parity (--require-taxis) or TS tests"
+      ],
+      "verification": [
+        "npm --prefix fractal-git test",
+        "node fractal-git/scripts/common/validate-git-parity.js --require-git --build-taxis --require-taxis",
+        "node scripts/common/validate-branch-governance.js"
+      ]
+    },
     "telemetry-statistical-modeling": {
       "layer": "universal-methodology",
-      "pitch": "开发评分器、重构度量算法或反刷分时触发。落实从 0 纯客观统计、Jeffreys Beta(0.5,0.5) 共轭后验估计与 BLOCK_GAMING_DETECTED 虚假重构熔断。",
-      "purpose": "为评分器与度量算法确立无信息先验与客观统计口径，并用反刷分熔断识别虚假收益。",
-      "triggers": [
-        "评分",
-        "度量",
-        "跑分",
-        "统计模型",
-        "贝叶斯",
-        "CAI",
-        "注水",
-        "反刷分"
-      ],
+      "pitch": "Enforce zero-padded telemetry, Jeffreys Beta(0.5,0.5) posteriors, CAI 2.0, and BLOCK_GAMING_DETECTED circuit breaking.",
+      "purpose": "Keep scoring engines mathematically sound with empty-baseline calibration checks and anti-gaming detection.",
+      "triggers": ["score", "model", "gaming", "skew", "Bayes", "CAI", "Beta", "QED"],
       "situations": [
-        "新评分器能不能乘个 1.2 系数把分拉高？",
-        "样本只有 8 个，置信区间别写死 ±5%。",
-        "这次重构语义量低，会被判定为刷分吗？"
+        "Verify effectiveApply multipliers and harvest-calibration outcomes",
+        "Compute Jeffreys credible intervals or Popoviciu polyglot balance",
+        "Detect low semantic churn regressions triggering BLOCK_GAMING_DETECTED"
       ],
       "verification": [
         "node auto-refactor/scripts/validate-autonomy-scorer.js && node auto-refactor/scripts/validate-project-neutrality.js"
@@ -1120,21 +739,13 @@
     },
     "test-benchmark-engineering": {
       "layer": "workspace-governance",
-      "pitch": "编写单元测试、性能压测或实行 TDD 时必须使用。先写失败用例，隔离确定性时钟与伪随机种子，看守单调耗时预算与零孤儿用例。",
-      "purpose": "回答『这条修复该先写哪个失败用例、基准会不会回退』，产出红绿闭环与耗时棘轮数据。",
-      "triggers": [
-        "写单测",
-        "TDD",
-        "红绿测试",
-        "基准测试",
-        "性能回归",
-        "耗时棘轮",
-        "孤儿用例"
-      ],
+      "pitch": "Enforce red-green TDD, deterministic clocks/seeds, suite-manifest closure, and monotonic benchmark ratchets.",
+      "purpose": "Require reproducible failing tests before fixes, register new suites cleanly, and guard timing/latency ratchets.",
+      "triggers": ["test", "bench", "flaky", "orphan", "TDD", "clock", "seed", "OnceLock"],
       "situations": [
-        "用户报 bug 要直接改代码而不是先复现",
-        "新增测试没进 Cargo.toml 的测试注册",
-        "跨午夜定时器测试偶发失败"
+        "Register new validation scripts inside test-parallel manifest",
+        "Speed up isolated Rust integration harnesses without shared drift",
+        "Replace non-deterministic wall clocks or RNGs in unit specs"
       ],
       "verification": [
         "cd auto-refactor && npm test",
@@ -1144,68 +755,43 @@
     },
     "tiered-cache-and-wal-persistence": {
       "layer": "universal-methodology",
-      "pitch": "设计或维护多级增量缓存(L1/L2/L3)、12 因子复合指纹、拓扑反向依赖失效或 WAL 预写日志原子落盘时触发。防御内存溢出与断电半写损坏。",
-      "purpose": "为多级缓存、依赖拓扑失效与 WAL 原子落盘提供统一协议，杜绝过期脏缓存、内存膨胀与进程强杀数据损坏。",
-      "triggers": [
-        "WAL",
-        "L1L2缓存",
-        "拓扑失效",
-        "指纹校验",
-        "异步刷盘",
-        "缓存设计",
-        "缓存丢失"
-      ],
+      "pitch": "Govern L1/L2/L3 caches, ARC2 tail truncation, DAG invalidation, checkpointSync fallbacks, and PID-salted atomic WAL.",
+      "purpose": "Prevent OOM cache blowups, stale downstream graph hits, and half-written state across crashes and restarts.",
+      "triggers": ["cache", "flush", "torn", "oom", "WAL", "ARC2", "L1L2", "DAG"],
       "situations": [
-        "全仓十万文件扫描时 L2 缓存把进程内存撑爆了",
-        "被依赖头文件改了但上游调用方缓存没有失效",
-        "并发进程同时刷写缓存文件引发写入竞争或半写"
+        "Truncate corrupt ARC2 L2 delta tails before appending new frames",
+        "Add synchronous checkpoint fallback when worker threads fail",
+        "Evict transitive DAG dependents only on public signature mutations"
       ],
       "verification": [
         "cd auto-refactor && npm test",
-        "cd workspace-timing && npm run test:fast",
-        "node scripts/common/validate-skills.js"
+        "cd workspace-timing && npm run test:fast"
       ]
     },
     "webgames-workflow": {
       "layer": "domain-adapter",
-      "pitch": "开发或修改 WebGames 游戏模块时必须触发。坚持全域 GameConfig 配置驱动、视图表现层单向快照注入(apply_snapshot)与循环零堆分配(ADV-PRF-002)。",
-      "purpose": "回答『这段游戏逻辑该放哪层、配置从哪来』，产出配置驱动与快照注入实现。",
-      "triggers": [
-        "WebGames",
-        "Godot",
-        "GDScript",
-        "游戏逻辑",
-        "写玩法",
-        "对象池",
-        "快照注入"
-      ],
+      "pitch": "Enforce GameConfig-driven logic, zero view-layer math, apply_snapshot decoupling, and zero loop alloc (ADV-PRF-002).",
+      "purpose": "Keep Godot/GDScript domains decoupled from presentation nodes and free of per-frame heap allocations.",
+      "triggers": ["fix", "spawn", "lag", "alloc", "Godot", "GDScript", "WebGames", "config"],
       "situations": [
-        "视图层里直接算了游戏数值",
-        "循环里 new 对象导致每帧堆分配",
-        "新增游戏模式要扩配置字段"
+        "Move domain state transitions out of frontend Godot views",
+        "Pool nodes and pre-allocate buffers to clear ADV-PRF-002",
+        "Align GameConfig fields with snapshot bindings and headless tests"
       ],
       "verification": [
         "pwsh -File WebGames/scripts/ps1/check-gdscript.ps1 && pwsh -File WebGames/scripts/ps1/test-run.ps1",
-        "pwsh -File WebGames/scripts/ps1/audit-all.ps1"
+        "cd WebGames && pwsh scripts/ps1/audit-all.ps1"
       ]
     },
     "workspace-timing-dev": {
       "layer": "domain-adapter",
-      "pitch": "开发或维护 workspace-timing 扩展时触发。落实五层解耦、RingBuffer 与 Journal 双写崩溃安全、双语字典(zh-CN/en)与暗色 UI。",
-      "purpose": "回答『这个计时扩展改动是否破坏五层解耦与崩溃安全』，产出实现与双语 UI 校验。",
-      "triggers": [
-        "计时扩展",
-        "VS扩展",
-        "计时",
-        "UI国际化",
-        "环形缓冲",
-        "崩溃安全",
-        "双语字典"
-      ],
+      "pitch": "Govern workspace-timing 5-layer decoupling, RingBuffer+Journal crash safety, zh-CN/en i18n parity, and dark UI.",
+      "purpose": "Guard VS Code timing persistence across midnights/kills, strict declaration flags, and 100% bilingual UI parity.",
+      "triggers": ["write", "sync", "crash", "lost", "timing", "RingBuf", "i18n", "zh-CN"],
       "situations": [
-        "用户说『计时器跨午夜后数据丢了』",
-        "新增 UI 文案还没补 en 字典",
-        "Journal 重放后出现重复时间段"
+        "Harden RingBuffer + journal recovery across midnight rollovers",
+        "Add bilingual zh-CN and en strings for new dashboard telemetry",
+        "Keep tsconfig declaration:false and 5-layer imports clean"
       ],
       "verification": [
         "cd workspace-timing && npm run compile && npm run test:fast && npm run review"

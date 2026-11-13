@@ -25,6 +25,7 @@
   },
   "associatedSkills": [
     "fractal-git-dev",
+    "taxis-daemon-and-agent-control",
     "rust-engineering",
     "state-concurrency-and-crash-recovery",
     "algorithmic-operator-engineering",
