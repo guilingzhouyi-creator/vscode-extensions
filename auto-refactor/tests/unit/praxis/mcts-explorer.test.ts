@@ -18,6 +18,10 @@ import { createMctsExplorer, MctsExplorer } from '../../../src/core/praxis/mcts'
 import { createWorkspaceManager, WorkspaceManager } from '../../../src/core/praxis/vfs';
 import type { CandidateStrategy } from '../../../src/core/praxis/mcts/mcts-contracts';
 import type { PraxisCardContext } from '../../../src/core/praxis/contracts';
+import {
+    DIAGNOSTIC_CATALOG,
+    getDiagnosticCatalogCoverage,
+} from '../../../src/core/rules/diagnostic-catalog';
 
 describe('LayerVFS MCTS — Multi-Agent Exploration Tournament', () => {
     let tempDir: string;
@@ -275,5 +279,13 @@ describe('LayerVFS MCTS — Multi-Agent Exploration Tournament', () => {
 
         const verdict = await timeoutExplorer.explore(cardContext, [strat]);
         expect(verdict.timedOut).toBe(true);
+    });
+
+    it('provides expanded diagnostic catalog with high coverage and compact structure', () => {
+        const coverage = getDiagnosticCatalogCoverage();
+        expect(coverage.coveredRules).toBeGreaterThanOrEqual(300);
+        expect(coverage.coveragePercent).toBeGreaterThanOrEqual(80.0);
+        expect(DIAGNOSTIC_CATALOG['ARCH-ABS-001']).toBeDefined();
+        expect(DIAGNOSTIC_CATALOG['ARCH-ABS-001'].defaultSeverity).toBe('error');
     });
 });

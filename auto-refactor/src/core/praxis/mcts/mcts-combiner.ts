@@ -3,7 +3,8 @@
  * File Path: src/core/praxis/mcts/mcts-combiner.ts
  * Architecture Role: Evaluates mutual compatibility between candidate refactoring strategies
  *   and synthesizes consolidated multi-step candidate strategies for MCTS tree search.
- * Dependencies & Triggers: Consumes CandidateStrategy from ./mcts-contracts; invoked by MctsExplorer.
+ * Dependencies & Triggers: Consumes CandidateStrategy from ./mcts-contracts; invoked by
+ *   MctsExplorer.
  * Responsibilities:
  *   1. Detect whole-file and partial localized AST edit overlaps (spatial conflict checking);
  *   2. Determine whether a candidate strategy is mutually disjoint with an existing strategy chain;
@@ -36,7 +37,8 @@ function hasLocalizedOverlap(
 }
 
 /**
- * Checks whether two candidate strategies contain mutually conflicting file modifications or edits.
+ * Checks whether two candidate strategies contain mutually conflicting file
+ * modifications or edits.
  *
  * @param strategyA - First candidate strategy.
  * @param strategyB - Second candidate strategy.
@@ -68,7 +70,8 @@ export function hasEditConflict(
 }
 
 /**
- * Validates whether a candidate strategy is non-conflicting with all previous strategies in a chain.
+ * Validates whether a candidate strategy is non-conflicting with all previous
+ * strategies in a chain.
  *
  * @param chain - Ordered sequence of previously accepted strategies.
  * @param candidate - New candidate strategy considered for rollout.
@@ -82,7 +85,8 @@ export function isCompatibleWithChain(
 }
 
 /**
- * Synthesizes a composite CandidateStrategy combining file modifications from a chain of strategies.
+ * Synthesizes a composite CandidateStrategy combining file modifications from
+ * a chain of strategies.
  *
  * @param chain - Non-conflicting sequence of candidate strategies.
  * @returns Consolidated CandidateStrategy with merged modifications.

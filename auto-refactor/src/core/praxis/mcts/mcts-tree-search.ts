@@ -18,6 +18,7 @@ import { isCompatibleWithChain } from './mcts-combiner';
 import { evaluateIncrementalSlice } from './heuristic-evaluator';
 import type { LayerVFSWorkspace, WorkspaceManager } from '../vfs/workspace-manager';
 
+/** Configuration parameters for multi-ply MCTS tree search expansion. */
 export interface MultiPlyExpansionParams {
     cardContext: PraxisCardContext;
     base: string;
@@ -31,11 +32,18 @@ export interface MultiPlyExpansionParams {
     computeUct: (score: number, nodeVisits: number, totalVisits: number) => number;
 }
 
+/** Result descriptor produced by multi-ply tree expansion. */
 export interface MultiPlyExpansionResult {
     depthExplored: number;
     timedOut: boolean;
 }
 
+/**
+ * Applies candidate strategy modifications and localized edits to workspace.
+ * Concurrency: Asynchronous pipeline; idempotent operation.
+ * @param ws - Target LayerVFS workspace.
+ * @param strategy - Candidate strategy containing modifications.
+ */
 export async function applyStrategyToWorkspace(
     ws: LayerVFSWorkspace,
     strategy: CandidateStrategy,
@@ -48,6 +56,27 @@ export async function applyStrategyToWorkspace(
     for (const [filePath, content] of strategy.fileModifications.entries()) {
         await ws.putFile(filePath, content);
     }
+}
+
+/**
+ * Captures baseline pre-modification file snapshots for incremental evaluation.
+ * Concurrency: Asynchronous pipeline; read-only idempotent operation on workspace.
+ * @param ws - Target LayerVFS workspace holding current branch state.
+ * @param strategy - Candidate strategy whose file modifications will be evaluated.
+ * @returns Map of file paths to utf8 string snapshots.
+ */
+export async function captureBaselineSnapshots(
+    ws: LayerVFSWorkspace,
+    strategy: CandidateStrategy,
+): Promise<Map<string, string>> {
+    const snapshots = new Map<string, string>();
+    for (const filePath of strategy.fileModifications.keys()) {
+        const existing = await ws.getFile(filePath);
+        if (existing) {
+            snapshots.set(filePath, Buffer.from(existing.content).toString('utf8'));
+        }
+    }
+    return snapshots;
 }
 
 async function createChildSearchNode(
@@ -63,13 +92,16 @@ async function createChildSearchNode(
         cardId: `${params.cardContext.cardId}_p${ply}_${nextCandidate.strategyId}`,
     };
     const childWs = await params.manager.createWorkspace(childCard, params.base);
-    for (const strat of newChain) {
+    for (const strat of chain) {
         await applyStrategyToWorkspace(childWs, strat);
     }
+
+    const originalFiles = await captureBaselineSnapshots(childWs, nextCandidate);
+    await applyStrategyToWorkspace(childWs, nextCandidate);
     const score = await evaluateIncrementalSlice(nextCandidate, childWs, {
+        originalFiles,
         parentScore: parent.score,
     });
-    score.compositeScore = Math.min(100, Math.round((score.compositeScore + (ply - 1) * 0.5) * 100) / 100);
     const uctValue = params.computeUct(score.compositeScore, 1, params.totalCandidates);
 
     return {
@@ -86,6 +118,13 @@ async function createChildSearchNode(
     };
 }
 
+/**
+ * Expands MCTS search tree across subsequent plies with timeout safety.
+ * Concurrency: Asynchronous pipeline; operates across candidate workspaces.
+ * @param params - Search parameters controlling exploration limits.
+ * @param allNodesAccumulator - Node accumulator capturing explored states.
+ * @returns Result object detailing maximum explored depth and timeout status.
+ */
 export async function expandMultiPlyTree(
     params: MultiPlyExpansionParams,
     allNodesAccumulator: MctsNode[],
@@ -95,7 +134,9 @@ export async function expandMultiPlyTree(
     let timedOut = false;
 
     for (let ply = 2; ply <= params.maxDepth && !timedOut; ply++) {
-        currentPlyParents.sort((a, b) => (b.score?.compositeScore ?? 0) - (a.score?.compositeScore ?? 0));
+        currentPlyParents.sort(
+            (a, b) => (b.score?.compositeScore ?? 0) - (a.score?.compositeScore ?? 0),
+        );
         const topParents = currentPlyParents.slice(0, params.branchingFactor);
         const nextPlyNodes: MctsNode[] = [];
 

@@ -188,6 +188,8 @@ function computeScoreBreakdown(
  * Options for incremental slice evaluation.
  */
 export interface SliceEvaluationOptions {
+    /** Map of file path to baseline content before strategy application */
+    originalFiles?: ReadonlyMap<string, string>;
     /** Optional prior score from parent search node to accumulate deltas */
     parentScore?: HeuristicScore;
     /** Skip physical command execution when already validated upstream */
@@ -195,7 +197,8 @@ export interface SliceEvaluationOptions {
 }
 
 /**
- * Evaluates an incremental candidate slice in its sandboxed workspace and produces a HeuristicScore.
+ * Evaluates an incremental candidate slice in its sandboxed workspace and
+ * produces a HeuristicScore.
  *
  * Concurrency: Asynchronous pipeline; operates on an isolated workspace copy per candidate.
  * Complexity bounds: CC <= 15, Depth <= 4.
@@ -231,16 +234,11 @@ export async function evaluateIncrementalSlice(
         const currentViolations = countCodeDefects(currentStr);
         const currentCpx = estimateComplexity(currentStr);
 
-        const explicitOriginal = strategy.fileModifications.get(filePath);
-        let origStr = currentStr;
-        if (typeof explicitOriginal === 'string') {
-            origStr = explicitOriginal;
-        } else if (explicitOriginal) {
-            origStr = Buffer.from(explicitOriginal).toString('utf8');
-        }
-
-        const origViolations = countCodeDefects(origStr);
-        const origCpx = estimateComplexity(origStr);
+        const origStr = options.originalFiles?.get(filePath);
+        const origViolations = origStr !== undefined
+            ? countCodeDefects(origStr)
+            : currentViolations;
+        const origCpx = origStr !== undefined ? estimateComplexity(origStr) : currentCpx;
 
         sliceComplexityDelta += currentCpx - origCpx;
         sliceViolationDelta += currentViolations - origViolations;
@@ -271,6 +269,8 @@ export async function evaluateIncrementalSlice(
 
 /**
  * Evaluates a candidate strategy in its sandboxed workspace using incremental slice evaluation.
+ *
+ * Concurrency: Asynchronous pipeline; operates safely on isolated sandboxed LayerVFS workspaces.
  *
  * @param strategy - Candidate refactoring strategy under evaluation.
  * @param workspace - LayerVFS workspace holding candidate modifications.

@@ -25,6 +25,7 @@ import { evaluateCandidateStrategy } from './heuristic-evaluator';
 import { combineStrategies } from './mcts-combiner';
 import {
     applyStrategyToWorkspace,
+    captureBaselineSnapshots,
     expandMultiPlyTree,
 } from './mcts-tree-search';
 import { WorkspaceManager } from '../vfs/workspace-manager';
@@ -102,8 +103,11 @@ export class MctsExplorer {
                 cardId: `${cardContext.cardId}_${strategy.strategyId}`,
             };
             const candidateWs = await this.manager.createWorkspace(specificCard, base);
+            const originalFiles = await captureBaselineSnapshots(candidateWs, strategy);
             await applyStrategyToWorkspace(candidateWs, strategy);
-            const score = await evaluateCandidateStrategy(strategy, candidateWs);
+            const score = await evaluateCandidateStrategy(strategy, candidateWs, {
+                originalFiles,
+            });
             const uctValue = this.computeUct(score.compositeScore, 1, candidates.length);
 
             allNodes.push({

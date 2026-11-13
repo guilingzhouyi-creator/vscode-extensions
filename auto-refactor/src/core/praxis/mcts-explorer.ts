@@ -3,8 +3,9 @@
  * File Path: src/core/praxis/mcts-explorer.ts
  * Architecture Role: Primary root facade re-exporting Monte Carlo Tree Search (MCTS) exploration
  *   types, scheduler options, and tournament arbiter implementation.
- * Dependencies & Triggers: Consumes ./mcts/mcts-explorer, ./mcts/mcts-contracts, and ./mcts/heuristic-evaluator;
- *   consumed by Praxis review client, CLI runner, and tournament orchestration drivers.
+ * Dependencies & Triggers: Consumes ./mcts/mcts-explorer, ./mcts/mcts-contracts, and
+ *   ./mcts/heuristic-evaluator; consumed by Praxis review client, CLI runner, and tournament
+ *   orchestration drivers.
  * Responsibilities:
  *   1. Expose MctsExplorer engine and MctsExplorerOptions;
  *   2. Re-export exploration contracts, candidate strategies, and tournament verdicts;
