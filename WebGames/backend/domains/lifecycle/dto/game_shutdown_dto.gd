@@ -42,18 +42,18 @@ class Request extends RefCounted:
 		}
 
 	## 从字典重建停机请求（缺省回退默认值）
-	static func from_dto(data: Dictionary) -> Request:
+	static func from_dto(serialized_payload: Dictionary) -> Request:
 		var request := Request.new()
-		request.session_token = String(data.get("session_token", ""))
-		request.account_id = String(data.get("account_id", ""))
-		request.exit_reason = int(data.get("exit_reason", GameLifecycleModel.ExitReason.USER_DESKTOP_QUIT))
-		request.target_save_slot = String(data.get("target_save_slot", ""))
-		request.idempotency_key = String(data.get("idempotency_key", ""))
-		request.force_timeout_seconds = float(data.get("force_timeout_seconds", 5.0))
-		request.timestamp_utc = int(data.get("timestamp_utc", 0))
-		request.save_before_quit = bool(data.get("save_before_quit", true))
-		request.require_save_success = bool(data.get("require_save_success", false))
-		request.force_quit = bool(data.get("force_quit", false))
+		request.session_token = String(serialized_payload.get("session_token", ""))
+		request.account_id = String(serialized_payload.get("account_id", ""))
+		request.exit_reason = int(serialized_payload.get("exit_reason", GameLifecycleModel.ExitReason.USER_DESKTOP_QUIT))
+		request.target_save_slot = String(serialized_payload.get("target_save_slot", ""))
+		request.idempotency_key = String(serialized_payload.get("idempotency_key", ""))
+		request.force_timeout_seconds = float(serialized_payload.get("force_timeout_seconds", 5.0))
+		request.timestamp_utc = int(serialized_payload.get("timestamp_utc", 0))
+		request.save_before_quit = bool(serialized_payload.get("save_before_quit", true))
+		request.require_save_success = bool(serialized_payload.get("require_save_success", false))
+		request.force_quit = bool(serialized_payload.get("force_quit", false))
 		return request
 
 
@@ -100,32 +100,32 @@ class Response extends RefCounted:
 		}
 
 	## 从字典重建停机响应（remaining_resources 逐元素转型）
-	static func from_dto(data: Dictionary) -> Response:
+	static func from_dto(serialized_payload: Dictionary) -> Response:
 		var response := Response.new()
-		response.success = bool(data.get("success", false))
-		response.error_code = String(data.get("error_code", "OK"))
-		response.failed_stage = String(data.get("failed_stage", ""))
-		response.current_phase = int(data.get("current_phase", GameLifecycleModel.LifecyclePhase.STOPPED))
-		response.is_save_completed = bool(data.get("is_save_completed", false))
-		response.save_sha256 = String(data.get("save_sha256", ""))
-		response.remaining_resources = _extract_string_array(data.get("remaining_resources", []))
-		response.retained_resources = _extract_string_array(data.get("retained_resources", []))
-		response.timed_out_resources = _extract_string_array(data.get("timed_out_resources", []))
-		response.timed_out_stages = _extract_string_array(data.get("timed_out_stages", []))
-		response.unexecuted_resources = _extract_string_array(data.get("unexecuted_resources", []))
-		response.degraded_resources = _extract_string_array(data.get("degraded_resources", []))
-		var raw_stage_results: Variant = data.get("stage_results", [])
+		response.success = bool(serialized_payload.get("success", false))
+		response.error_code = String(serialized_payload.get("error_code", "OK"))
+		response.failed_stage = String(serialized_payload.get("failed_stage", ""))
+		response.current_phase = int(serialized_payload.get("current_phase", GameLifecycleModel.LifecyclePhase.STOPPED))
+		response.is_save_completed = bool(serialized_payload.get("is_save_completed", false))
+		response.save_sha256 = String(serialized_payload.get("save_sha256", ""))
+		response.remaining_resources = _extract_string_array(serialized_payload.get("remaining_resources", []))
+		response.retained_resources = _extract_string_array(serialized_payload.get("retained_resources", []))
+		response.timed_out_resources = _extract_string_array(serialized_payload.get("timed_out_resources", []))
+		response.timed_out_stages = _extract_string_array(serialized_payload.get("timed_out_stages", []))
+		response.unexecuted_resources = _extract_string_array(serialized_payload.get("unexecuted_resources", []))
+		response.degraded_resources = _extract_string_array(serialized_payload.get("degraded_resources", []))
+		var raw_stage_results: Variant = serialized_payload.get("stage_results", [])
 		if raw_stage_results is Array:
 			var copied_results: Array = (raw_stage_results as Array).duplicate(true)
 			for stage_result in copied_results:
 				if stage_result is Dictionary:
 					response.stage_results.append(stage_result as Dictionary)
-		response.elapsed_milliseconds = int(data.get("elapsed_milliseconds", 0))
+		response.elapsed_milliseconds = int(serialized_payload.get("elapsed_milliseconds", 0))
 		return response
 
-	static func _extract_string_array(raw_values: Variant) -> Array[String]:
-		var result: Array[String] = []
-		if raw_values is Array:
-			for value in raw_values:
-				result.append(String(value))
-		return result
+	static func _extract_string_array(raw_entries: Variant) -> Array[String]:
+		var string_entries: Array[String] = []
+		if raw_entries is Array:
+			for raw_entry in raw_entries:
+				string_entries.append(String(raw_entry))
+		return string_entries

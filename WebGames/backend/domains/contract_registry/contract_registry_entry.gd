@@ -68,10 +68,10 @@ func to_dto() -> Dictionary:
 		if mapping_item is Dictionary:
 			clean_field_mapping.append(mapping_item)
 
-	var clean_params_schema: Array[Dictionary] = []
+	var clean_parameter_schema: Array[Dictionary] = []
 	for schema_item in params_schema:
 		if schema_item is Dictionary:
-			clean_params_schema.append(schema_item)
+			clean_parameter_schema.append(schema_item)
 
 	return {
 		"contract_id": contract_id,
@@ -88,7 +88,7 @@ func to_dto() -> Dictionary:
 		"event_filter": event_filter.duplicate(true),
 		"service_path": service_path,
 		"method_name": method_name,
-		"params_schema": clean_params_schema,
+		"params_schema": clean_parameter_schema,
 		"response_dto": response_dto,
 		"breaking_change_note": breaking_change_note,
 		"coverage_marker": coverage_marker,
@@ -116,43 +116,43 @@ static func _clone_dict_array(raw_list: Variant) -> Array[Dictionary]:
 	var parsed: Array[Dictionary] = []
 	if not (raw_list is Array):
 		return parsed
-	for item in raw_list:
-		if item is Dictionary:
-			parsed.append(item as Dictionary)
+	for raw_entry in raw_list:
+		if raw_entry is Dictionary:
+			parsed.append(raw_entry as Dictionary)
 	return parsed
 
 
 ## 对偶反序列化：从字典 DTO 构建条目（Inv-CT-4 容错降级与字段守卫）
-static func from_dto(dict: Dictionary) -> Resource:
+static func from_dto(source_dictionary: Dictionary) -> Resource:
 	var entry: ContractRegistryEntry = new()
-	if dict == null or dict.is_empty():
+	if source_dictionary == null or source_dictionary.is_empty():
 		return entry
 
-	entry.contract_id = String(dict.get("contract_id", ""))
-	entry.contract_version = int(dict.get("contract_version", 1))
-	entry.domain_name = String(dict.get("domain_name", ""))
-	entry.view_name = String(dict.get("view_name", ""))
-	entry.endpoint_kind = _parse_endpoint_kind(dict.get("endpoint_kind", "DTO"))
-	entry.source_path = String(dict.get("source_path", ""))
-	entry.target_path = String(dict.get("target_path", ""))
-	entry.field_mapping = _clone_dict_array(dict.get("field_mapping", []))
-	entry.transform_kind = String(dict.get("transform_kind", "identity"))
-	entry.event_name = String(dict.get("event_name", ""))
-	entry.signal_name = String(dict.get("signal_name", ""))
+	entry.contract_id = String(source_dictionary.get("contract_id", ""))
+	entry.contract_version = int(source_dictionary.get("contract_version", 1))
+	entry.domain_name = String(source_dictionary.get("domain_name", ""))
+	entry.view_name = String(source_dictionary.get("view_name", ""))
+	entry.endpoint_kind = _parse_endpoint_kind(source_dictionary.get("endpoint_kind", "DTO"))
+	entry.source_path = String(source_dictionary.get("source_path", ""))
+	entry.target_path = String(source_dictionary.get("target_path", ""))
+	entry.field_mapping = _clone_dict_array(source_dictionary.get("field_mapping", []))
+	entry.transform_kind = String(source_dictionary.get("transform_kind", "identity"))
+	entry.event_name = String(source_dictionary.get("event_name", ""))
+	entry.signal_name = String(source_dictionary.get("signal_name", ""))
 
-	var raw_event_filter: Variant = dict.get("event_filter", {})
+	var raw_event_filter: Variant = source_dictionary.get("event_filter", {})
 	entry.event_filter = (raw_event_filter as Dictionary).duplicate(true) if raw_event_filter is Dictionary else {}
 
-	entry.service_path = String(dict.get("service_path", ""))
-	entry.method_name = String(dict.get("method_name", ""))
-	entry.params_schema = _clone_dict_array(dict.get("params_schema", []))
-	entry.response_dto = String(dict.get("response_dto", ""))
-	entry.breaking_change_note = String(dict.get("breaking_change_note", ""))
-	entry.coverage_marker = String(dict.get("coverage_marker", ""))
-	entry.infra_exempt = bool(dict.get("infra_exempt", false))
-	entry.deprecated = bool(dict.get("deprecated", false))
-	entry.replacement_contract_id = String(dict.get("replacement_contract_id", ""))
-	entry.created_at = String(dict.get("created_at", ""))
-	entry.last_reviewed_at = String(dict.get("last_reviewed_at", ""))
+	entry.service_path = String(source_dictionary.get("service_path", ""))
+	entry.method_name = String(source_dictionary.get("method_name", ""))
+	entry.params_schema = _clone_dict_array(source_dictionary.get("params_schema", []))
+	entry.response_dto = String(source_dictionary.get("response_dto", ""))
+	entry.breaking_change_note = String(source_dictionary.get("breaking_change_note", ""))
+	entry.coverage_marker = String(source_dictionary.get("coverage_marker", ""))
+	entry.infra_exempt = bool(source_dictionary.get("infra_exempt", false))
+	entry.deprecated = bool(source_dictionary.get("deprecated", false))
+	entry.replacement_contract_id = String(source_dictionary.get("replacement_contract_id", ""))
+	entry.created_at = String(source_dictionary.get("created_at", ""))
+	entry.last_reviewed_at = String(source_dictionary.get("last_reviewed_at", ""))
 
 	return entry

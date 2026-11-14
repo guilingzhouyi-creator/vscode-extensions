@@ -70,44 +70,44 @@ func _parse_json_dict(text: String) -> Dictionary:
 		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_JSON_PARSE_FAIL", SystemBaseMessages.format(SystemBaseMessages.MSG_CONTRACT_JSON_PARSE_FAIL, {"error": json.get_error_message()}))
 		return {}
 
-	var data: Variant = json.get_data()
-	if not (data is Dictionary):
+	var parsed_payload: Variant = json.get_data()
+	if not (parsed_payload is Dictionary):
 		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_ROOT_NOT_DICT", SystemBaseMessages.MSG_CONTRACT_ROOT_NOT_DICT)
 		return {}
 
-	return data as Dictionary
+	return parsed_payload as Dictionary
 
 ## 解包契约各分段结构并重建预建索引
-func _unpack_registry_sections(dict: Dictionary) -> bool:
-	_schema_version = int(dict.get("$schema_version", 0))
+func _unpack_registry_sections(registry_dictionary: Dictionary) -> bool:
+	_schema_version = int(registry_dictionary.get("$schema_version", 0))
 	if _schema_version != SUPPORTED_SCHEMA_VERSION:
 		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_SCHEMA_UNSUPPORTED", SystemBaseMessages.format(SystemBaseMessages.MSG_CONTRACT_SCHEMA_UNSUPPORTED, {"version": _schema_version, "expected": SUPPORTED_SCHEMA_VERSION}))
 		return false
 
-	var raw_infra: Variant = dict.get("infra_domains", [])
+	var raw_infra: Variant = registry_dictionary.get("infra_domains", [])
 	if raw_infra is Array:
-		for item in raw_infra:
-			_infra_domains.append(String(item))
+		for raw_domain in raw_infra:
+			_infra_domains.append(String(raw_domain))
 
-	var validation_result := validate_config(dict)
+	var validation_result := validate_config(registry_dictionary)
 	if not bool(validation_result.get("valid", false)):
 		var validation_errors: Array = validation_result.get("errors", [])
 		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_VALIDATION_FAILED", SystemBaseMessages.format(SystemBaseMessages.MSG_CONTRACT_VALIDATION_FAILED, {"errors": "; ".join(validation_errors)}))
 		return false
 
-	var raw_entries: Variant = dict.get("entries", [])
+	var raw_entries: Variant = registry_dictionary.get("entries", [])
 	if raw_entries is Array:
-		for item in raw_entries:
-			if item is Dictionary:
-				var entry: Variant = EntryClass.from_dto(item as Dictionary)
+		for raw_entry in raw_entries:
+			if raw_entry is Dictionary:
+				var entry: Variant = EntryClass.from_dto(raw_entry as Dictionary)
 				_entries.append(entry)
 
-	var raw_orphans: Variant = dict.get("reverse_orphans", [])
+	var raw_orphans: Variant = registry_dictionary.get("reverse_orphans", [])
 	if raw_orphans is Array:
-		for item in raw_orphans:
-			if item is Dictionary:
-				var orphan_dict: Dictionary = item as Dictionary
-				_reverse_orphans.append(orphan_dict)
+		for raw_orphan in raw_orphans:
+			if raw_orphan is Dictionary:
+				var orphan_dictionary: Dictionary = raw_orphan as Dictionary
+				_reverse_orphans.append(orphan_dictionary)
 
 	_rebuild_indexes()
 	return true
@@ -130,38 +130,38 @@ func _load_from_config() -> void:
 		_loaded = true
 		return
 
-	var dict := _parse_json_dict(text)
-	if dict.is_empty():
+	var registry_dictionary := _parse_json_dict(text)
+	if registry_dictionary.is_empty():
 		_loaded = true
 		return
 
-	_unpack_registry_sections(dict)
+	_unpack_registry_sections(registry_dictionary)
 	_loaded = true
 
 
 ## 配置字典结构校验（B2 门禁阻断）：schema 版本/必填字段/重复 ID/INFRA 豁免一致性逐项检查，
 ## 返回 {valid, errors}；损坏配置由 _load_from_config 拒绝装载
-static func validate_config(data: Dictionary) -> Dictionary:
+static func validate_config(config_payload: Dictionary) -> Dictionary:
 	var errors: Array[String] = []
-	if int(data.get("$schema_version", -1)) != SUPPORTED_SCHEMA_VERSION:
+	if int(config_payload.get("$schema_version", -1)) != SUPPORTED_SCHEMA_VERSION:
 		errors.append("SCHEMA_VERSION_MISMATCH")
 
-	var infra_list: Array = data.get("infra_domains", []) if data.get("infra_domains", []) is Array else []
-	var raw_entries: Array = data.get("entries", []) if data.get("entries", []) is Array else []
+	var infra_list: Array = config_payload.get("infra_domains", []) if config_payload.get("infra_domains", []) is Array else []
+	var raw_entries: Array = config_payload.get("entries", []) if config_payload.get("entries", []) is Array else []
 	var seen_ids: Dictionary = {}
-	for item in raw_entries:
-		if not item is Dictionary:
+	for raw_entry in raw_entries:
+		if not raw_entry is Dictionary:
 			errors.append("ENTRY_NOT_DICTIONARY")
 			continue
-		var contract_id := String(item.get("contract_id", ""))
-		var domain_name := String(item.get("domain_name", ""))
-		var view_name := String(item.get("view_name", ""))
+		var contract_id := String(raw_entry.get("contract_id", ""))
+		var domain_name := String(raw_entry.get("domain_name", ""))
+		var view_name := String(raw_entry.get("view_name", ""))
 		if contract_id.is_empty() or domain_name.is_empty() or view_name.is_empty():
 			errors.append("MISSING_REQUIRED_FIELD:" + contract_id)
 		if seen_ids.has(contract_id):
 			errors.append("DUPLICATE_CONTRACT_ID:" + contract_id)
 		seen_ids[contract_id] = true
-		var is_infra_exempt := bool(item.get("infra_exempt", false))
+		var is_infra_exempt := bool(raw_entry.get("infra_exempt", false))
 		if is_infra_exempt and not infra_list.has(domain_name):
 			errors.append("INFRA_EXEMPT_VIOLATION:" + contract_id)
 		elif not is_infra_exempt and infra_list.has(domain_name):

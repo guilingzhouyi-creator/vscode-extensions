@@ -35,20 +35,20 @@ static func get_cached(domain: String, view: String, kind: int) -> Resource:
 
 	# 未命中：从索引加载
 	var entries: Array = IndexClass.find_by_domain_view(domain, view)
-	var found: Variant = null
+	var matched_entry: Variant = null
 	for entry in entries:
 		if int(entry.endpoint_kind) == kind:
-			found = entry
+			matched_entry = entry
 			break
 
-	if found != null:
+	if matched_entry != null:
 		# 插入 LRU
 		if _access_order.size() >= LRU_MAX_ENTRIES:
 			var oldest_key: String = String(_access_order.pop_front())
 			_lru_map.erase(oldest_key)
-		_lru_map[key] = found
+		_lru_map[key] = matched_entry
 		_access_order.append(key)
-		return found.duplicate(true)
+		return matched_entry.duplicate(true)
 
 	return null
 

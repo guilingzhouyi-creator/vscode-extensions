@@ -61,13 +61,13 @@ func to_dto() -> Dictionary:
 
 ## 从字典重建快照（覆盖状态单形态 String 契约，数组逐元素转型）
 ## 单形态契约：int 形态已退役——生产端恒产 String；非 String 一律 DtoShapeViolation 审计拒绝
-static func from_dto(dict: Dictionary) -> Resource:
+static func from_dto(snapshot_dictionary: Dictionary) -> Resource:
 	var snapshot := new()
-	if dict == null or dict.is_empty():
+	if snapshot_dictionary == null or snapshot_dictionary.is_empty():
 		return snapshot
 
-	snapshot.domain_name = String(dict.get("domain_name", ""))
-	var raw_status: Variant = dict.get("coverage_status", "MISSING")
+	snapshot.domain_name = String(snapshot_dictionary.get("domain_name", ""))
+	var raw_status: Variant = snapshot_dictionary.get("coverage_status", "MISSING")
 	if raw_status is String:
 		match String(raw_status).to_upper():
 			"FULL": snapshot.coverage_status = CoverageStatus.FULL
@@ -79,32 +79,32 @@ static func from_dto(dict: Dictionary) -> Resource:
 		EventBusCore.get_instance().emit_log("warn", TemplateFormatter.format("DtoShapeViolation: coverage_status is not String ({type}), rejected as MISSING", {"type": str(raw_status)}))
 		snapshot.coverage_status = CoverageStatus.MISSING
 
-	snapshot.backend_file_count = int(dict.get("backend_file_count", 0))
-	snapshot.backend_static_method_count = int(dict.get("backend_static_method_count", 0))
+	snapshot.backend_file_count = int(snapshot_dictionary.get("backend_file_count", 0))
+	snapshot.backend_static_method_count = int(snapshot_dictionary.get("backend_static_method_count", 0))
 
-	var raw_views: Variant = dict.get("frontend_view_names", [])
+	var raw_views: Variant = snapshot_dictionary.get("frontend_view_names", [])
 	if raw_views is Array:
 		var parsed_views: Array[String] = []
-		for item in raw_views:
-			parsed_views.append(String(item))
+		for raw_view_name in raw_views:
+			parsed_views.append(String(raw_view_name))
 		snapshot.frontend_view_names = parsed_views
 	else:
 		snapshot.frontend_view_names = []
 
-	var raw_tabs: Variant = dict.get("frontend_tab_names", [])
+	var raw_tabs: Variant = snapshot_dictionary.get("frontend_tab_names", [])
 	if raw_tabs is Array:
 		var parsed_tabs: Array[String] = []
-		for item in raw_tabs:
-			parsed_tabs.append(String(item))
+		for raw_tab_name in raw_tabs:
+			parsed_tabs.append(String(raw_tab_name))
 		snapshot.frontend_tab_names = parsed_tabs
 	else:
 		snapshot.frontend_tab_names = []
 
-	var raw_contracts: Variant = dict.get("contract_ids", [])
+	var raw_contracts: Variant = snapshot_dictionary.get("contract_ids", [])
 	if raw_contracts is Array:
 		var parsed_contracts: Array[String] = []
-		for item in raw_contracts:
-			parsed_contracts.append(String(item))
+		for raw_contract_id in raw_contracts:
+			parsed_contracts.append(String(raw_contract_id))
 		snapshot.contract_ids = parsed_contracts
 	else:
 		snapshot.contract_ids = []

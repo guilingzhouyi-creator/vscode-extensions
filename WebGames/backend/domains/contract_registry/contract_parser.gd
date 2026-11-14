@@ -29,7 +29,7 @@ static func resolve_dto_mapping(backend_dto: Dictionary, entry: Variant) -> Dict
 	if backend_dto == null:
 		return {}
 
-	var result: Dictionary = {}
+	var mapped_fields: Dictionary = {}
 	var empty_config: Dictionary = {}
 	for mapping_rule in entry.field_mapping:
 		if not mapping_rule is Dictionary:
@@ -45,17 +45,17 @@ static func resolve_dto_mapping(backend_dto: Dictionary, entry: Variant) -> Dict
 
 		# 类型转换与安全守卫
 		var transformed_value: Variant = _apply_transform(raw_value, transform_kind, transform_config)
-		result[target_field] = transformed_value
+		mapped_fields[target_field] = transformed_value
 
-	return result
+	return mapped_fields
 
 
 ## 嵌套字段读取
-static func _get_nested_field(dict: Dictionary, path: String) -> Variant:
+static func _get_nested_field(source_dictionary: Dictionary, path: String) -> Variant:
 	if path.is_empty():
 		return null
 	var parts: PackedStringArray = path.split(".")
-	var current_node: Variant = dict
+	var current_node: Variant = source_dictionary
 	for segment in parts:
 		if current_node is Dictionary and current_node.has(segment):
 			current_node = current_node[segment]
@@ -67,12 +67,12 @@ static func _get_nested_field(dict: Dictionary, path: String) -> Variant:
 static func _cast_int_with_clamp(raw_value: Variant, transform_config: Dictionary) -> Variant:
 	if raw_value is String and not raw_value.is_valid_int():
 		return null
-	var parsed_int: int = int(raw_value)
-	if transform_config.has("clamp_min") and parsed_int < int(transform_config["clamp_min"]):
-		parsed_int = int(transform_config["clamp_min"])
-	if transform_config.has("clamp_max") and parsed_int > int(transform_config["clamp_max"]):
-		parsed_int = int(transform_config["clamp_max"])
-	return parsed_int
+	var parsed_integer: int = int(raw_value)
+	if transform_config.has("clamp_min") and parsed_integer < int(transform_config["clamp_min"]):
+		parsed_integer = int(transform_config["clamp_min"])
+	if transform_config.has("clamp_max") and parsed_integer > int(transform_config["clamp_max"]):
+		parsed_integer = int(transform_config["clamp_max"])
+	return parsed_integer
 
 
 static func _apply_cast_transform(raw_value: Variant, transform_config: Dictionary) -> Variant:
@@ -164,13 +164,13 @@ static func dispatch_ui_command(command: Dictionary) -> Dictionary:
 
 	var view_name: String = String(command.get("view_name", ""))
 	var command_id: String = String(command.get("command_id", ""))
-	var params: Dictionary = command.get("params", {}) if command.get("params", {}) is Dictionary else {}
+	var parameter_map: Dictionary = command.get("params", {}) if command.get("params", {}) is Dictionary else {}
 
 	var target_entry: Variant = _resolve_command_entry(view_name, command_id)
 	if target_entry == null:
 		return {"accepted": false, "error_code": "CT_ERR_UNKNOWN_COMMAND"}
 
-	if not _validate_params_schema(target_entry.params_schema, params):
+	if not _validate_params_schema(target_entry.params_schema, parameter_map):
 		return {"accepted": false, "error_code": "CT_ERR_SCHEMA_INVALID"}
 
 	return {
@@ -178,7 +178,7 @@ static func dispatch_ui_command(command: Dictionary) -> Dictionary:
 		"service_call_plan": {
 			"service_path": target_entry.service_path,
 			"method_name": target_entry.method_name,
-			"params": params
+			"params": parameter_map
 		}
 	}
 
@@ -194,24 +194,24 @@ static func _resolve_command_entry(view_name: String, command_id: String) -> Var
 	return null
 
 ## 校验调用参数是否符合契约 Schema 规范
-static func _validate_params_schema(schema: Array, params: Dictionary) -> bool:
+static func _validate_params_schema(schema: Array, parameter_map: Dictionary) -> bool:
 	for field_rule in schema:
 		if not (field_rule is Dictionary):
 			continue
-		if not _validate_single_param_rule(field_rule, params):
+		if not _validate_single_param_rule(field_rule, parameter_map):
 			return false
 	return true
 
 ## 校验单参数字段规则
-static func _validate_single_param_rule(rule: Dictionary, params: Dictionary) -> bool:
+static func _validate_single_param_rule(rule: Dictionary, parameter_map: Dictionary) -> bool:
 	var field_name: String = String(rule.get("name", ""))
-	var field_required: bool = bool(rule.get("required", false))
+	var is_field_required: bool = bool(rule.get("required", false))
 	var field_type: String = String(rule.get("type", ""))
 
-	if field_required and not params.has(field_name):
+	if is_field_required and not parameter_map.has(field_name):
 		return false
-	if params.has(field_name) and not field_type.is_empty():
-		return _validate_field_type(params[field_name], field_type)
+	if parameter_map.has(field_name) and not field_type.is_empty():
+		return _validate_field_type(parameter_map[field_name], field_type)
 	return true
 
 ## 校验单字段类型匹配

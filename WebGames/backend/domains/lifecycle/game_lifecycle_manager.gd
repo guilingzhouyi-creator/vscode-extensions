@@ -19,7 +19,7 @@ signal lifecycle_state_changed(previous_phase: int, new_phase: int)
 static var _instance: RefCounted = null
 
 var _current_phase: int = GameLifecycleModel.LifecyclePhase.UNINITIALIZED
-var _shutdown_in_progress: bool = false
+var _is_shutdown_in_progress: bool = false
 var _active_shutdown_request: GameShutdownDTO.Request = null
 
 ## 生命周期管理器权威单例（懒加载）
@@ -32,7 +32,7 @@ static func get_instance() -> RefCounted:
 static func reset_for_test() -> void:
 	if _instance != null:
 		_instance._current_phase = GameLifecycleModel.LifecyclePhase.UNINITIALIZED
-		_instance._shutdown_in_progress = false
+		_instance._is_shutdown_in_progress = false
 		_instance._active_shutdown_request = null
 	_instance = null
 
