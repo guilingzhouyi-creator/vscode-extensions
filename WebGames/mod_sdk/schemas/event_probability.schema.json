@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kalar.mod_sdk.event_probability.v1",
+  "title": "EventProbabilityDefinition",
+  "description": "WebGames 世界事件、概率因果链、政权预设与卡池横幅覆盖契约 (content/events/*.json)",
+  "type": "object",
+  "properties": {
+    "override_mode": {
+      "type": "string",
+      "enum": ["MERGE", "REPLACE_ENTRY", "TOTAL_PURGE"],
+      "default": "MERGE"
+    },
+    "events": {
+      "type": "object",
+      "description": "因果事件概率图定义字典（兼容 domains.event_probability）",
+      "additionalProperties": true
+    },
+    "sovereignty": {
+      "type": "object",
+      "description": "帝国/政权头衔与国名设定",
+      "additionalProperties": true
+    },
+    "gacha_banners": {
+      "type": "object",
+      "description": "卡池主题与 UP 物品池定义",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

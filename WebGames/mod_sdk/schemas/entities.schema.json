@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kalar.mod_sdk.entities.v1",
+  "title": "EntitiesDefinition",
+  "description": "WebGames NPC、怪物、精英词缀与世界首领原型覆写契约规范 (content/entities/*.json)",
+  "type": "object",
+  "properties": {
+    "override_mode": {
+      "type": "string",
+      "enum": ["MERGE", "REPLACE_ENTRY", "TOTAL_PURGE"],
+      "default": "MERGE"
+    },
+    "npcs": {
+      "type": "object",
+      "description": "NPC 域默认原型与个体名册覆盖",
+      "additionalProperties": true
+    },
+    "monsters": {
+      "type": "object",
+      "description": "怪物物种原型与掉落表覆盖",
+      "additionalProperties": true
+    },
+    "elites": {
+      "type": "object",
+      "description": "精英个体及词缀池定义",
+      "additionalProperties": true
+    },
+    "world_bosses": {
+      "type": "object",
+      "description": "世界首领实体与阶段机制定义",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

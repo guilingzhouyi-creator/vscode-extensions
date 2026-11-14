@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kalar.mod_sdk.copywriting_overlay.v1",
+  "title": "CopywritingOverlayDefinition",
+  "description": "WebGames 物品/事件条件文案与风味文本覆盖契约 (content/copywriting/*.json)",
+  "type": "object",
+  "properties": {
+    "override_mode": {
+      "type": "string",
+      "enum": ["MERGE", "REPLACE_ENTRY", "TOTAL_PURGE"],
+      "default": "MERGE"
+    },
+    "copywriting": {
+      "type": "object",
+      "properties": {
+        "item": { "type": "object", "additionalProperties": true },
+        "narrative": { "type": "object", "additionalProperties": true },
+        "probability": { "type": "object", "additionalProperties": true },
+        "bulletin": { "type": "object", "additionalProperties": true }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kalar.mod_sdk.races_catalog.v1",
+  "title": "RacesCatalogDefinition",
+  "description": "WebGames 可玩种族、基础属性与先天特质目录契约规范",
+  "type": "object",
+  "properties": {
+    "override_mode": {
+      "type": "string",
+      "enum": ["MERGE", "REPLACE_ENTRY", "TOTAL_PURGE"],
+      "default": "MERGE"
+    },
+    "races_catalog": {
+      "type": "object",
+      "description": "以 race_id 为键的种族属性字典",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "display_name": { "type": "string" },
+          "loc_name_key": { "type": "string" },
+          "allowed_genders": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1
+          },
+          "innate_traits": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "attribute_coefficients": {
+            "type": "object",
+            "additionalProperties": { "type": "number" }
+          },
+          "base_attributes": {
+            "type": "object",
+            "additionalProperties": { "type": "number" }
+          },
+          "lifespan_scale": { "type": "number", "minimum": 0.1 },
+          "canary_feature_tag": { "type": "string" },
+          "default_kit_id": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

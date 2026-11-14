@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kalar.mod_sdk.quests.v1",
+  "title": "QuestsDefinition",
+  "description": "WebGames 任务、悬赏与委托规则覆盖契约规范 (content/quests/*.json)",
+  "type": "object",
+  "properties": {
+    "override_mode": {
+      "type": "string",
+      "enum": ["MERGE", "REPLACE_ENTRY", "TOTAL_PURGE"],
+      "default": "MERGE",
+      "description": "覆盖模式"
+    },
+    "quest_defaults": {
+      "type": "object",
+      "description": "任务默认参数（如初始主线标题、声望奖惩与金币回报）",
+      "additionalProperties": true
+    },
+    "reward_items": {
+      "type": "array",
+      "description": "任务奖励物品条目清单",
+      "items": {
+        "type": "object",
+        "properties": {
+          "canonical_id": { "type": "string" },
+          "count": { "type": "integer", "minimum": 1 }
+        },
+        "required": ["canonical_id"]
+      }
+    },
+    "quests": {
+      "type": "array",
+      "description": "主线与支线任务原型定义集合",
+      "items": {
+        "type": "object",
+        "properties": {
+          "quest_id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string" },
+          "loc_title_key": { "type": "string" },
+          "prerequisites": { "type": "array", "items": { "type": "string" } },
+          "gold_reward": { "type": "integer", "minimum": 0 },
+          "faction_reputation_rewards": { "type": "object", "additionalProperties": { "type": "integer" } }
+        },
+        "required": ["quest_id"]
+      }
+    },
+    "commission_quests": {
+      "type": "object",
+      "description": "委托悬赏配置覆盖表",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kalar.mod_sdk.routing_rules.v1",
+  "title": "RoutingRulesDefinition",
+  "description": "WebGames 创角参数至序章因果图路由规则矩阵契约规范 (routing_rules.json)",
+  "type": "object",
+  "properties": {
+    "prologue_routing_rules": {
+      "type": "array",
+      "description": "有序路由匹配条目，按数组先后优先级命中首个满足条件的 target_dag_id",
+      "items": {
+        "type": "object",
+        "properties": {
+          "priority": { "type": "integer", "default": 0 },
+          "race": { "type": "string" },
+          "origin_id": { "type": "string" },
+          "birth_region": { "type": "string" },
+          "target_dag_id": {
+            "type": "string",
+            "pattern": "^DAG_[A-Z0-9_]+$"
+          },
+          "is_default": { "type": "boolean", "default": false }
+        },
+        "required": ["target_dag_id"],
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

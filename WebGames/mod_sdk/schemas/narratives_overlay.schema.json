@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kalar.mod_sdk.narratives_overlay.v1",
+  "title": "NarrativesOverlayDefinition",
+  "description": "WebGames 领域叙事文案、开局序章提示与世界观播报覆盖契约 (content/narratives/*.json)",
+  "type": "object",
+  "properties": {
+    "override_mode": {
+      "type": "string",
+      "enum": ["MERGE", "REPLACE_ENTRY", "TOTAL_PURGE"],
+      "default": "MERGE"
+    },
+    "tables": {
+      "type": "object",
+      "description": "按目标配置表名（如 narratives.world_state / narratives.quest）组织的覆盖字典",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

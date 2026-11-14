@@ -79,6 +79,46 @@
       "default": true,
       "description": "MOD 激活状态开关，若为 false 则加载引擎静态忽略"
     },
+    "pack_profile": {
+      "type": "string",
+      "enum": ["OFFICIAL_BASE", "CONTENT_ADDON", "SYSTEM_EXTENSION", "TOTAL_CONVERSION"],
+      "default": "CONTENT_ADDON",
+      "description": "模组包架构定位档位：OFFICIAL_BASE (官方基础世界包), CONTENT_ADDON (外挂剧情/种族增量扩展), SYSTEM_EXTENSION (纯规则/系统逻辑扩展), TOTAL_CONVERSION (全转换独立世界包)"
+    },
+    "is_official": {
+      "type": "boolean",
+      "default": false,
+      "description": "是否为官方签发包（联机可信需结合权威清单 content_sha256 校验，不可仅由包名推断）"
+    },
+    "trust_tier": {
+      "type": "string",
+      "enum": ["OFFICIAL", "SIGNED_PARTNER", "COMMUNITY"],
+      "default": "COMMUNITY",
+      "description": "信任签名级别"
+    },
+    "content_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "模组规范化文件内容的 64 位小写 SHA-256 摘要，用于存档锁漂移及联机权威鉴权"
+    },
+    "publisher_signature": {
+      "type": "string",
+      "description": "可选，官方及合作方发布签名载荷"
+    },
+    "provided_domains": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true,
+      "default": [],
+      "description": "声明该模组包注入或接管的领域标识符清单"
+    },
+    "has_prologue_dag": {
+      "type": "boolean",
+      "default": true,
+      "description": "是否包含开局序章 DAG 剧情图；SYSTEM_EXTENSION 或纯配置包可显式声明为 false"
+    },
     "description": {
       "type": "string",
       "maxLength": 1024,

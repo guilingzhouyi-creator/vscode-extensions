@@ -5,6 +5,7 @@
   "author": "Kalar Engine Team",
   "engine_api_version": "1.0.0",
   "tier": "TIER_1_LOGIC",
+  "pack_profile": "TOTAL_CONVERSION",
   "priority": 100,
   "dependencies": [],
   "incompatible_packs": [],

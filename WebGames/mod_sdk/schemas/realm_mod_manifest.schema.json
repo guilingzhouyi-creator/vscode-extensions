@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kalar.mod_sdk.realm_mod_manifest.v1",
+  "title": "RealmModManifestDefinition",
+  "description": "WebGames 联机服务器下发的权威 MOD 清单与 SHA-256 摘要校验契约规范",
+  "type": "object",
+  "properties": {
+    "realm_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "protocol_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "allow_client_cosmetic_only": {
+      "type": "boolean",
+      "default": false
+    },
+    "required_packs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "pack_id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+          "version": { "type": "string" },
+          "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "trust_tier": {
+            "type": "string",
+            "enum": ["OFFICIAL", "SIGNED_PARTNER", "COMMUNITY"]
+          }
+        },
+        "required": ["pack_id", "version", "content_sha256"],
+        "additionalProperties": true
+      }
+    },
+    "optional_whitelist_packs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "pack_id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+          "version": { "type": "string" },
+          "content_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        },
+        "required": ["pack_id"]
+      },
+      "default": []
+    }
+  },
+  "required": ["realm_id", "required_packs"],
+  "additionalProperties": true
+}

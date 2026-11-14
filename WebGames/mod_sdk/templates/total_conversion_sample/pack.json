@@ -6,6 +6,7 @@
   "engine_api_version": "1.0.0",
   "priority": 500,
   "tier": "TIER_3_OVERHAUL",
+  "pack_profile": "TOTAL_CONVERSION",
   "mod_tier": "TOTAL_CONVERSION",
   "override_mode": "FULL_OVERRIDE",
   "dependencies": [],

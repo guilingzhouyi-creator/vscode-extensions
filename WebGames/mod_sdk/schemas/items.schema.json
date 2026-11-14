@@ -19,8 +19,8 @@
         "properties": {
           "canonical_id": {
             "type": "string",
-            "pattern": "^KALAR:[A-Z0-9_]+:[A-Z0-9_]+:[A-Z0-9_]+$",
-            "description": "权威全局命名空间物品标识符（格式: KALAR:<MAJOR>:<MINOR>:<NAME>）"
+            "pattern": "^[A-Z0-9_]+:[A-Z0-9_]+:[A-Z0-9_]+:[A-Z0-9_]+$",
+            "description": "权威全局命名空间物品标识符（格式: <NS>:<MAJOR>:<MINOR>:<NAME>）"
           },
           "english_name": {
             "type": "string",
