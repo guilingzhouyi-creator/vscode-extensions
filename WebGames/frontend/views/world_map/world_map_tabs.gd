@@ -1,168 +1,180 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端第10卷: 世界地图 Tab 子面板控制器
+# 模块归属: frontend.views.world_map
 # 文件路径: res://frontend/views/world_map/world_map_tabs.gd
-# 职责: 承接行军探索/主权建国/领地管理/寻路规划四个 Tab 的初始化与交互
+# 架构定位: 世界地图标签页子控制器，承接行军探索、主权建国、领地管理与寻路规划交互
+# 依赖与触发: 依赖 BaseScreen / UIIntermediary / MockServiceContainer / WorldMapView
+# 职责说明: 管理行军、主权、领地和寻路四个分页的静态文案、列表刷新及控件回调
+# 退出语义与设计依据: 随宿主视图同步释放；行军与领地状态变更写回宿主并刷新界面反馈
 # ==============================================================================
+## 世界地图分页子控制器，封装行军探索、主权建国、领地与寻路面板
 class_name WorldMapTabs
 extends BaseScreen
 
 var _view: WorldMapView = null
 
-func setup(view: WorldMapView) -> void:
-	_view = view
+## 绑定宿主世界地图视图实例
+func setup(host_view: WorldMapView) -> void:
+	_view = host_view
 
 # ==============================================================================
 # 静态文案与信号
 # ==============================================================================
 
+## 初始化行军、主权、领地和寻路分页静态文案
 func init_static_text() -> void:
 	if _view == null:
 		return
-	for item in [
+	for binding_entry in [
 		[_view._march_section_label_1, "ui.fe10.march.route_section"],
 		[_view._march_from_label, "ui.fe10.march.from_label"],
 		[_view._march_to_label, "ui.fe10.march.to_label"],
 		[_view._march_section_label_2, "ui.fe10.march.preview_section"],
 		[_view._march_section_label_3, "ui.fe10.march.action_section"],
-		[_view._march_start_btn, "ui.fe10.march.start_btn"],
-		[_view._march_stop_btn, "ui.fe10.march.stop_btn"],
+		[_view._march_start_button, "ui.fe10.march.start_btn"],
+		[_view._march_stop_button, "ui.fe10.march.stop_btn"],
 		[_view._march_section_label_4, "ui.fe10.march.party_section"],
-		[_view._sov_territory_section_label, "ui.fe10.sov.territory_section"],
-		[_view._sov_nation_section_label, "ui.fe10.sov.nation_section"],
-		[_view._sov_establish_btn, "ui.fe10.sov.establish_btn"],
-		[_view._terr_list_section_label, "ui.fe10.terr.list_section"],
-		[_view._terr_detail_section_label, "ui.fe10.terr.detail_section"],
-		[_view._terr_construction_label, "ui.fe10.terr.construction_section"],
-		[_view._terr_upgrade_btn, "ui.fe10.terr.upgrade_btn"],
-		[_view._pf_start_label, "ui.fe10.pf.start_label"],
-		[_view._pf_end_label, "ui.fe10.pf.end_label"],
-		[_view._pf_calc_btn, "ui.fe10.pf.calc_btn"],
-		[_view._pf_routes_section_label, "ui.fe10.pf.routes_section"],
-		[_view._pf_route_detail_label, "ui.fe10.pf.detail_placeholder"],
-		[_view._pf_auto_btn, "ui.fe10.pf.auto_btn"]
+		[_view._sovereignty_territory_section_label, "ui.fe10.sov.territory_section"],
+		[_view._sovereignty_nation_section_label, "ui.fe10.sov.nation_section"],
+		[_view._sovereignty_establish_button, "ui.fe10.sov.establish_btn"],
+		[_view._territory_list_section_label, "ui.fe10.terr.list_section"],
+		[_view._territory_detail_section_label, "ui.fe10.terr.detail_section"],
+		[_view._territory_construction_label, "ui.fe10.terr.construction_section"],
+		[_view._territory_upgrade_button, "ui.fe10.terr.upgrade_btn"],
+		[_view._pathfinding_start_label, "ui.fe10.pf.start_label"],
+		[_view._pathfinding_end_label, "ui.fe10.pf.end_label"],
+		[_view._pathfinding_calculate_button, "ui.fe10.pf.calc_btn"],
+		[_view._pathfinding_routes_section_label, "ui.fe10.pf.routes_section"],
+		[_view._pathfinding_route_detail_label, "ui.fe10.pf.detail_placeholder"],
+		[_view._pathfinding_auto_button, "ui.fe10.pf.auto_btn"]
 	]:
-		UIIntermediary.resolve(item[0], str(item[1]))
+		UIIntermediary.resolve(binding_entry[0], str(binding_entry[1]))
 
+## 绑定行军、主权、领地和寻路控件信号
 func connect_signals() -> void:
 	if _view == null:
 		return
 	connect_managed(_view._march_from_option.item_selected, _on_march_option_changed)
 	connect_managed(_view._march_to_option.item_selected, _on_march_option_changed)
-	connect_managed(_view._march_start_btn.pressed, _on_march_start)
-	connect_managed(_view._march_stop_btn.pressed, _on_march_stop)
-	connect_managed(_view._sov_establish_btn.pressed, _on_sov_establish)
+	connect_managed(_view._march_start_button.pressed, _on_march_start)
+	connect_managed(_view._march_stop_button.pressed, _on_march_stop)
+	connect_managed(_view._sovereignty_establish_button.pressed, _on_sov_establish)
 	connect_managed(_view._territory_list.item_selected, _on_territory_selected)
-	connect_managed(_view._terr_upgrade_btn.pressed, _on_terr_upgrade)
-	connect_managed(_view._pf_calc_btn.pressed, _on_pf_calc)
-	connect_managed(_view._pf_route_list.item_selected, _on_pf_route_selected)
-	connect_managed(_view._pf_auto_btn.pressed, _on_pf_auto)
+	connect_managed(_view._territory_upgrade_button.pressed, _on_terr_upgrade)
+	connect_managed(_view._pathfinding_calculate_button.pressed, _on_pf_calc)
+	connect_managed(_view._pathfinding_route_list.item_selected, _on_pf_route_selected)
+	connect_managed(_view._pathfinding_auto_button.pressed, _on_pf_auto)
 
 # ==============================================================================
 # Tab 2: 行军探索 (MARCHING)
 # ==============================================================================
 
+## 初始化行军分页地标下拉选项与队伍状态
 func init_marching_tab() -> void:
 	if _view == null:
 		return
 	_view._march_from_option.clear()
 	_view._march_to_option.clear()
-	for landmark in _view.town_landmarks:
-		var name := UIIntermediary.text(landmark.get("name", ""))
-		_view._march_from_option.add_item(name)
-		_view._march_to_option.add_item(name)
+	for landmark_entry in _view.town_landmarks:
+		var landmark_name := UIIntermediary.text(landmark_entry.get("name", ""))
+		_view._march_from_option.add_item(landmark_name)
+		_view._march_to_option.add_item(landmark_name)
 	if _view.town_landmarks.size() >= 2:
 		_view._march_from_option.select(0)
 		_view._march_to_option.select(1)
 		refresh_march_preview()
 	refresh_march_party_status()
 
+## 刷新当前所选起止地标的行军路线、预计耗时与地形预览
 func refresh_march_preview() -> void:
 	if _view == null:
 		return
-	var from_idx := _view._march_from_option.selected
-	var to_idx := _view._march_to_option.selected
-	if from_idx < 0 or to_idx < 0 or from_idx >= _view.town_landmarks.size() or to_idx >= _view.town_landmarks.size():
+	var from_index := _view._march_from_option.selected
+	var to_index := _view._march_to_option.selected
+	if from_index < 0 or to_index < 0 or from_index >= _view.town_landmarks.size() or to_index >= _view.town_landmarks.size():
 		return
-	var from_name := UIIntermediary.text(_view.town_landmarks[from_idx].get("name", ""))
-	var to_name := UIIntermediary.text(_view.town_landmarks[to_idx].get("name", ""))
+	var from_name := UIIntermediary.text(_view.town_landmarks[from_index].get("name", ""))
+	var to_name := UIIntermediary.text(_view.town_landmarks[to_index].get("name", ""))
 	if _view._march_route_preview_label:
 		UIIntermediary.resolve(_view._march_route_preview_label, "ui.fe10.march.route", {"from": from_name, "to": to_name})
-	var hours := 0
-	var terrain := UIIntermediary.text("ui.fe10.terrain.plains")
-	for route in _view.marching_routes:
-		if route.get("from", "") == _view.town_landmarks[from_idx].get("id", "") and route.get("to", "") == _view.town_landmarks[to_idx].get("id", ""):
-			hours = route.get("hours_remain", 0)
-			terrain = UIIntermediary.text(_terrain_key(route.get("terrain", "PLAINS")))
+	var remaining_hours := 0
+	var terrain_name := UIIntermediary.text("ui.fe10.terrain.plains")
+	for route_entry in _view.marching_routes:
+		if route_entry.get("from", "") == _view.town_landmarks[from_index].get("id", "") and route_entry.get("to", "") == _view.town_landmarks[to_index].get("id", ""):
+			remaining_hours = route_entry.get("hours_remain", 0)
+			terrain_name = UIIntermediary.text(_terrain_key(route_entry.get("terrain", "PLAINS")))
 			break
-	if hours == 0 and from_idx != to_idx:
-		hours = 4
+	if remaining_hours == 0 and from_index != to_index:
+		remaining_hours = 4
 	if _view._march_eta_label:
-		UIIntermediary.resolve(_view._march_eta_label, "ui.fe10.march.eta", {"hours": hours})
+		UIIntermediary.resolve(_view._march_eta_label, "ui.fe10.march.eta", {"hours": remaining_hours})
 	if _view._march_terrain_label:
-		UIIntermediary.resolve(_view._march_terrain_label, "ui.fe10.march.terrain", {"terrain": terrain})
+		UIIntermediary.resolve(_view._march_terrain_label, "ui.fe10.march.terrain", {"terrain": terrain_name})
 
-func _terrain_key(code: String) -> String:
-	match code:
+func _terrain_key(terrain_code: String) -> String:
+	match terrain_code:
 		"PLAINS": return "ui.fe10.terrain.plains"
 		"FOREST": return "ui.fe10.terrain.forest"
 		"MOUNTAIN": return "ui.fe10.terrain.mountain"
 		"SWAMP": return "ui.fe10.terrain.swamp"
 		"DESERT": return "ui.fe10.terrain.desert"
-		_: return code
+		_: return terrain_code
 
+## 刷新行军队伍补给与行进状态文本
 func refresh_march_party_status() -> void:
 	if _view and _view._march_party_status_label:
-		var supply := UIIntermediary.text("ui.fe10.march.supply_sufficient")
+		var supply_text := UIIntermediary.text("ui.fe10.march.supply_sufficient")
 		var status_key := "ui.fe10.march.party_active" if _view._marching_active else "ui.fe10.march.party_idle"
-		UIIntermediary.resolve(_view._march_party_status_label, status_key, {"count": 6, "supply": supply})
+		UIIntermediary.resolve(_view._march_party_status_label, status_key, {"count": 6, "supply": supply_text})
 
-func _on_march_option_changed(_index: int) -> void:
+func _on_march_option_changed(_option_index: int) -> void:
 	refresh_march_preview()
 
 func _on_march_start() -> void:
 	if _view == null:
 		return
 	_view._marching_active = true
-	_view._march_start_btn.disabled = true
-	_view._march_stop_btn.disabled = false
+	_view._march_start_button.disabled = true
+	_view._march_stop_button.disabled = false
 	refresh_march_party_status()
 
 func _on_march_stop() -> void:
 	if _view == null:
 		return
 	_view._marching_active = false
-	_view._march_start_btn.disabled = false
-	_view._march_stop_btn.disabled = true
+	_view._march_start_button.disabled = false
+	_view._march_stop_button.disabled = true
 	refresh_march_party_status()
 
 # ==============================================================================
 # Tab 3: 主权建国 (SOVEREIGNTY)
 # ==============================================================================
 
+## 初始化主权分页领地列表与国家信息展示
 func init_sovereignty_tab() -> void:
 	if _view == null:
 		return
-	_view._sov_territory_list.clear()
-	for terr in _view._mock_territories:
-		_view._sov_territory_list.add_item(UIIntermediary.text(terr.get("name", "")))
+	_view._sovereignty_territory_list.clear()
+	for territory_entry in _view._mock_territories:
+		_view._sovereignty_territory_list.add_item(UIIntermediary.text(territory_entry.get("name", "")))
 	refresh_sovereignty_info()
 
+## 刷新当前国家名称、君主、人口、领地数与等级展示
 func refresh_sovereignty_info() -> void:
 	if _view == null:
 		return
-	if _view._sov_nation_name_label:
+	if _view._sovereignty_nation_name_label:
 		var nation_key: String = _view._mock_sovereignty.get("nation_name", "ui.fe10.sov.nation_name_none")
-		_view._sov_nation_name_label.text = UIIntermediary.text(nation_key)
-	if _view._sov_monarch_label:
+		_view._sovereignty_nation_name_label.text = UIIntermediary.text(nation_key)
+	if _view._sovereignty_monarch_label:
 		var monarch_name := UIIntermediary.text(_view._mock_sovereignty.get("monarch", ""))
-		UIIntermediary.resolve(_view._sov_monarch_label, "ui.fe10.sov.monarch", {"name": monarch_name})
-	if _view._sov_population_label:
-		UIIntermediary.resolve(_view._sov_population_label, "ui.fe10.sov.population", {"count": _view._mock_sovereignty.get("population", 0)})
-	if _view._sov_territory_count_label:
-		UIIntermediary.resolve(_view._sov_territory_count_label, "ui.fe10.sov.territory_count", {"count": _view._mock_sovereignty.get("territory_count", 0)})
-	if _view._sov_level_label:
+		UIIntermediary.resolve(_view._sovereignty_monarch_label, "ui.fe10.sov.monarch", {"name": monarch_name})
+	if _view._sovereignty_population_label:
+		UIIntermediary.resolve(_view._sovereignty_population_label, "ui.fe10.sov.population", {"count": _view._mock_sovereignty.get("population", 0)})
+	if _view._sovereignty_territory_count_label:
+		UIIntermediary.resolve(_view._sovereignty_territory_count_label, "ui.fe10.sov.territory_count", {"count": _view._mock_sovereignty.get("territory_count", 0)})
+	if _view._sovereignty_level_label:
 		var level_name := UIIntermediary.text(_view._mock_sovereignty.get("level", "ui.fe10.sov.level_none"))
-		UIIntermediary.resolve(_view._sov_level_label, "ui.fe10.sov.level", {"level": level_name})
+		UIIntermediary.resolve(_view._sovereignty_level_label, "ui.fe10.sov.level", {"level": level_name})
 
 func _on_sov_establish() -> void:
 	if _view == null:
@@ -175,96 +187,99 @@ func _on_sov_establish() -> void:
 		"level": "ui.fe10.mock.sov.level"
 	}
 	refresh_sovereignty_info()
-	_view._sov_establish_btn.disabled = true
-	UIIntermediary.resolve(_view._sov_establish_btn, "ui.fe10.sov.established")
+	_view._sovereignty_establish_button.disabled = true
+	UIIntermediary.resolve(_view._sovereignty_establish_button, "ui.fe10.sov.established")
 
 # ==============================================================================
 # Tab 4: 领地管理 (TERRITORY)
 # ==============================================================================
 
+## 初始化领地列表并默认显示首座领地详情
 func init_territory_tab() -> void:
 	if _view == null:
 		return
 	_view._territory_list.clear()
-	for terr in _view._mock_territories:
-		_view._territory_list.add_item(UIIntermediary.text(terr.get("name", "")))
+	for territory_entry in _view._mock_territories:
+		_view._territory_list.add_item(UIIntermediary.text(territory_entry.get("name", "")))
 	if _view._mock_territories.size() > 0:
 		show_territory_detail(_view._mock_territories[0])
 
-func show_territory_detail(terr: Dictionary) -> void:
+## 展示指定领地的资源产出、建设进度与驻防人数
+func show_territory_detail(territory_entry: Dictionary) -> void:
 	if _view == null:
 		return
-	if _view._terr_resource_label:
-		UIIntermediary.resolve(_view._terr_resource_label, "ui.fe10.terr.resource", {
-			"food": terr.get("food", 0), "wood": terr.get("wood", 0), "ore": terr.get("ore", 0)
+	if _view._territory_resource_label:
+		UIIntermediary.resolve(_view._territory_resource_label, "ui.fe10.terr.resource", {
+			"food": territory_entry.get("food", 0), "wood": territory_entry.get("wood", 0), "ore": territory_entry.get("ore", 0)
 		})
-	if _view._terr_construction_bar:
-		_view._terr_construction_bar.value = terr.get("construction", 0.0) * 100.0
-	if _view._terr_garrison_label:
-		UIIntermediary.resolve(_view._terr_garrison_label, "ui.fe10.terr.garrison", {"count": terr.get("garrison", 0)})
+	if _view._territory_construction_bar:
+		_view._territory_construction_bar.value = territory_entry.get("construction", 0.0) * 100.0
+	if _view._territory_garrison_label:
+		UIIntermediary.resolve(_view._territory_garrison_label, "ui.fe10.terr.garrison", {"count": territory_entry.get("garrison", 0)})
 
-func _on_territory_selected(index: int) -> void:
-	if _view and index >= 0 and index < _view._mock_territories.size():
-		show_territory_detail(_view._mock_territories[index])
+func _on_territory_selected(territory_index: int) -> void:
+	if _view and territory_index >= 0 and territory_index < _view._mock_territories.size():
+		show_territory_detail(_view._mock_territories[territory_index])
 
 func _on_terr_upgrade() -> void:
 	if _view == null:
 		return
-	var idx := _view._territory_list.get_selected_items()
-	if idx.size() > 0 and idx[0] < _view._mock_territories.size():
-		var result := MockServiceContainer.get_instance().world().upgrade_territory(_view._mock_territories[idx[0]])
-		if bool(result.get("success", false)):
-			_view._mock_territories[idx[0]] = result.get("territory", _view._mock_territories[idx[0]])
-			show_territory_detail(_view._mock_territories[idx[0]])
+	var selected_indices := _view._territory_list.get_selected_items()
+	if selected_indices.size() > 0 and selected_indices[0] < _view._mock_territories.size():
+		var upgrade_outcome := MockServiceContainer.get_instance().world().upgrade_territory(_view._mock_territories[selected_indices[0]])
+		if bool(upgrade_outcome.get("success", false)):
+			_view._mock_territories[selected_indices[0]] = upgrade_outcome.get("territory", _view._mock_territories[selected_indices[0]])
+			show_territory_detail(_view._mock_territories[selected_indices[0]])
 
 # ==============================================================================
 # Tab 5: 寻路规划 (PATHFINDING)
 # ==============================================================================
 
+## 初始化寻路分页起点与终点地标下拉选项
 func init_pathfinding_tab() -> void:
 	if _view == null:
 		return
-	_view._pf_start_option.clear()
-	_view._pf_end_option.clear()
-	for landmark in _view.town_landmarks:
-		var name := UIIntermediary.text(landmark.get("name", ""))
-		_view._pf_start_option.add_item(name)
-		_view._pf_end_option.add_item(name)
+	_view._pathfinding_start_option.clear()
+	_view._pathfinding_end_option.clear()
+	for landmark_entry in _view.town_landmarks:
+		var landmark_name := UIIntermediary.text(landmark_entry.get("name", ""))
+		_view._pathfinding_start_option.add_item(landmark_name)
+		_view._pathfinding_end_option.add_item(landmark_name)
 	if _view.town_landmarks.size() >= 2:
-		_view._pf_start_option.select(0)
-		_view._pf_end_option.select(1)
+		_view._pathfinding_start_option.select(0)
+		_view._pathfinding_end_option.select(1)
 
 func _on_pf_calc() -> void:
 	if _view == null:
 		return
-	var from_idx := _view._pf_start_option.selected
-	var to_idx := _view._pf_end_option.selected
-	var route_data := MockServiceContainer.get_instance().world().plan_routes(from_idx, to_idx)
-	if route_data.is_empty():
-		if _view._pf_route_detail_label:
-			UIIntermediary.resolve(_view._pf_route_detail_label, "ui.fe10.pf.same_start_end")
+	var start_index := _view._pathfinding_start_option.selected
+	var destination_index := _view._pathfinding_end_option.selected
+	var planned_routes := MockServiceContainer.get_instance().world().plan_routes(start_index, destination_index)
+	if planned_routes.is_empty():
+		if _view._pathfinding_route_detail_label:
+			UIIntermediary.resolve(_view._pathfinding_route_detail_label, "ui.fe10.pf.same_start_end")
 		return
-	_view._pf_route_list.clear()
-	var from_name := UIIntermediary.text(_view.town_landmarks[from_idx].get("name", ""))
-	var to_name := UIIntermediary.text(_view.town_landmarks[to_idx].get("name", ""))
-	for rd in route_data:
-		UIIntermediary.resolve_item(_view._pf_route_list, "ui.fe10.pf.route_item", {
-			"label": rd.label, "from": from_name, "to": to_name,
-			"hours": rd.hours, "danger": UIIntermediary.text(rd.danger_key), "cost": rd.cost,
+	_view._pathfinding_route_list.clear()
+	var start_name := UIIntermediary.text(_view.town_landmarks[start_index].get("name", ""))
+	var destination_name := UIIntermediary.text(_view.town_landmarks[destination_index].get("name", ""))
+	for route_entry in planned_routes:
+		UIIntermediary.resolve_item(_view._pathfinding_route_list, "ui.fe10.pf.route_item", {
+			"label": route_entry.label, "from": start_name, "to": destination_name,
+			"hours": route_entry.hours, "danger": UIIntermediary.text(route_entry.danger_key), "cost": route_entry.cost,
 		})
-	if _view._pf_route_detail_label:
-		UIIntermediary.resolve(_view._pf_route_detail_label, "ui.fe10.pf.routes_calculated", {"count": route_data.size()})
+	if _view._pathfinding_route_detail_label:
+		UIIntermediary.resolve(_view._pathfinding_route_detail_label, "ui.fe10.pf.routes_calculated", {"count": planned_routes.size()})
 
-func _on_pf_route_selected(index: int) -> void:
-	if _view and _view._pf_route_detail_label:
-		var detail_key := "ui.fe10.pf.route_detail_%d" % index
+func _on_pf_route_selected(route_index: int) -> void:
+	if _view and _view._pathfinding_route_detail_label:
+		var detail_key := "ui.fe10.pf.route_detail_%d" % route_index
 		var detail_text := UIIntermediary.text(detail_key)
-		UIIntermediary.resolve(_view._pf_route_detail_label, "ui.fe10.pf.route_detail", {"index": index + 1, "detail": detail_text})
+		UIIntermediary.resolve(_view._pathfinding_route_detail_label, "ui.fe10.pf.route_detail", {"index": route_index + 1, "detail": detail_text})
 
 func _on_pf_auto() -> void:
 	if _view == null:
 		return
-	if _view._pf_route_list.item_count == 0:
+	if _view._pathfinding_route_list.item_count == 0:
 		_on_pf_calc()
-	if _view._pf_route_detail_label:
-		UIIntermediary.resolve(_view._pf_route_detail_label, "ui.fe10.pf.auto_started")
+	if _view._pathfinding_route_detail_label:
+		UIIntermediary.resolve(_view._pathfinding_route_detail_label, "ui.fe10.pf.auto_started")
