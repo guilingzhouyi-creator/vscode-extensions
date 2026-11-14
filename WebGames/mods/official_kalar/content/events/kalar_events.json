@@ -1,0 +1,93 @@
+{
+  "override_mode": "MERGE",
+  "events": {
+    "EVT_BEAST_TIDE": {
+      "base_probability": 0.15,
+      "conditions": [
+        {
+          "id": "town_border",
+          "when": {
+            "kind": "TOWN_EQUALS",
+            "val": "TOWN_VALAN"
+          },
+          "factor": 1.5
+        },
+        {
+          "id": "high_level",
+          "when": {
+            "kind": "MIN_LEVEL",
+            "val": 20
+          },
+          "factor": 1.2
+        }
+      ],
+      "adjustments": [
+        {
+          "id": "reputation_buff",
+          "when": {
+            "kind": "REPUTATION_GREATER",
+            "faction": "VALAN_GUARD",
+            "val": 50
+          },
+          "delta": 0.05
+        }
+      ],
+      "links": [
+        {
+          "linked_event_id": "EVT_MARKET_CRASH",
+          "factor": 1.3
+        }
+      ]
+    },
+    "EVT_MARKET_CRASH": {
+      "base_probability": 0.08,
+      "links": []
+    }
+  },
+  "sovereignty": {
+    "title_names": {
+      "monarch": "帝王",
+      "duke": "公爵",
+      "count": "伯爵",
+      "baron": "男爵",
+      "knight": "骑士",
+      "commoner": "平民"
+    },
+    "nation_defaults": {
+      "canonical_nation_name": "卡拉尔至高神圣帝国",
+      "sovereign_ruler_id": "RULER_EMPEROR",
+      "national_treasury_gold": 100000,
+      "stability_percent": 85.0,
+      "tax_rate": 0.15,
+      "nation_id_prefix": "NATION_",
+      "founding_treasury_gold": 20000,
+      "founding_stability_percent": 100.0
+    }
+  },
+  "gacha_banners": {
+    "banner_defaults": {
+      "banner_id": "BANNER_LEGENDARY_HERO",
+      "banner_title": "【始源神兵 · 极光湮灭】限时祈愿",
+      "cost_per_pull_gold": 100,
+      "cost_per_pull_crystals": 1,
+      "fallback_title": "限时祈愿",
+      "up_5star_item_ids": [
+        "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD"
+      ],
+      "standard_5star_item_ids": [
+        "KALAR:EQUIP:ARMOR:IRON_CHEST",
+        "KALAR:MATERIAL:ORE:MITHRIL_ORE"
+      ],
+      "standard_4star_item_ids": [
+        "KALAR:EQUIP:WEAPON_BLADE:ELVEN_BOW",
+        "KALAR:EQUIP:ARMOR:RUNIC_SHIELD",
+        "KALAR:CONSUM:ALCHEMY:POTION_MANA"
+      ],
+      "standard_3star_item_ids": [
+        "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD",
+        "KALAR:CONSUM:FOOD:HEARTY_STEW",
+        "KALAR:QUEST:ARTIFACT:RELIC_FRAGMENT"
+      ]
+    }
+  }
+}

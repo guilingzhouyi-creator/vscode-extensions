@@ -1,0 +1,42 @@
+{
+  "pack_id": "official_kalar",
+  "pack_name": "卡拉尔大陆·官方起源基础包",
+  "version": "1.0.0",
+  "author": "WebGames Official",
+  "engine_api_version": "1.0.0",
+  "tier": "TIER_3_OVERHAUL",
+  "pack_profile": "OFFICIAL_BASE",
+  "is_official": true,
+  "trust_tier": "OFFICIAL",
+  "content_sha256": "fae3535438bf714fa9eb7cf49bb5d44ef3c562be2369657cbf3f5c580f828f55",
+  "priority": 1000,
+  "dependencies": [],
+  "incompatible_packs": [],
+  "semantic_tags": [
+    "official",
+    "kalar",
+    "base_world",
+    "prologue",
+    "overhaul"
+  ],
+  "provided_domains": [
+    "character_creation",
+    "starter_loadout",
+    "items",
+    "world",
+    "world_gateway",
+    "quest",
+    "npc",
+    "monster",
+    "elite",
+    "world_boss",
+    "event_probability",
+    "sovereignty",
+    "gacha",
+    "cutscenes",
+    "copywriting"
+  ],
+  "has_prologue_dag": true,
+  "is_active": true,
+  "description": "卡拉尔大陆官方基础世界观、种族出身、开局行囊、序章DAG、物品任务与过场叙事合集包。"
+}

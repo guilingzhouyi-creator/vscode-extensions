@@ -1,0 +1,76 @@
+{
+  "entry_node_id": "NODE_AWAKEN_PLAZA",
+  "terminal_node_id": "NODE_DEPART_WORLD",
+  "nodes": {
+    "NODE_AWAKEN_PLAZA": {
+      "node_type": "START_ENTRY",
+      "narrative_key": "narrative.prologue.awakening",
+      "required_prerequisites": []
+    },
+    "NODE_BRANCH_EXPLORE": {
+      "node_type": "BRANCH_CHOICE",
+      "narrative_key": "narrative.prologue.environment",
+      "required_prerequisites": [
+        "NODE_AWAKEN_PLAZA"
+      ]
+    },
+    "NODE_TALK_GUARD": {
+      "node_type": "STANDARD_STEP",
+      "narrative_key": "narrative.prologue.first_encounter",
+      "required_prerequisites": [
+        "NODE_BRANCH_EXPLORE"
+      ]
+    },
+    "NODE_DEPART_WORLD": {
+      "node_type": "TERMINAL_EXIT",
+      "narrative_key": "narrative.prologue.completed",
+      "required_prerequisites": [
+        "NODE_TALK_GUARD"
+      ],
+      "mutations_on_complete": [
+        {
+          "type": "PrologueCompleted",
+          "dag_id": "DAG_PROLOGUE_HUMAN_CAPITAL"
+        }
+      ]
+    },
+    "NODE_INSPECT_OBELISK": {
+      "node_type": "STANDARD_STEP",
+      "narrative_key": "narrative.prologue.inspect_obelisk",
+      "required_prerequisites": [
+        "NODE_BRANCH_EXPLORE"
+      ]
+    }
+  },
+  "edges": [
+    {
+      "from": "NODE_AWAKEN_PLAZA",
+      "to": "NODE_BRANCH_EXPLORE"
+    },
+    {
+      "from": "NODE_BRANCH_EXPLORE",
+      "to": "NODE_INSPECT_OBELISK",
+      "label": "走近查探符文方尖碑",
+      "branch_condition": {
+        "kind": "CHOICE_MATCH",
+        "val": "INSPECT_OBELISK"
+      },
+      "priority_weight": 10
+    },
+    {
+      "from": "NODE_BRANCH_EXPLORE",
+      "to": "NODE_TALK_GUARD",
+      "label": "径直走向要塞老兵",
+      "priority_weight": 1
+    },
+    {
+      "from": "NODE_INSPECT_OBELISK",
+      "to": "NODE_TALK_GUARD"
+    },
+    {
+      "from": "NODE_TALK_GUARD",
+      "to": "NODE_DEPART_WORLD"
+    }
+  ],
+  "dag_id": "DAG_PROLOGUE_HUMAN_CAPITAL"
+}

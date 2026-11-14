@@ -1,0 +1,681 @@
+{
+  "override_mode": "MERGE",
+  "starter_loadout": {
+    "_meta": {
+      "version": 1,
+      "domain": "starter_loadout",
+      "description": "新手装备与初始资源配置（P10.5：配置驱动发放，严禁代码写死）"
+    },
+    "race_kit_map": {
+      "HUMAN": "KIT_HUMAN_DEFAULT",
+      "ELF": "KIT_ELF_DEFAULT"
+    },
+    "starter_kits": {
+      "KIT_HUMAN_DEFAULT": {
+        "initial_gold": 50,
+        "display_weapon": "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD",
+        "initial_items": [
+          {
+            "canonical_id": "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD",
+            "count": 1
+          },
+          {
+            "canonical_id": "KALAR:CONSUM:ALCHEMY:POTION_MANA",
+            "count": 3
+          }
+        ]
+      },
+      "KIT_ELF_DEFAULT": {
+        "initial_gold": 60,
+        "display_weapon": "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD",
+        "initial_items": [
+          {
+            "canonical_id": "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD",
+            "count": 1
+          },
+          {
+            "canonical_id": "KALAR:CONSUM:ALCHEMY:POTION_MANA",
+            "count": 2
+          }
+        ]
+      }
+    },
+    "defaults": {
+      "initial_gold": 50,
+      "fallback_kit": "KIT_HUMAN_DEFAULT"
+    }
+  },
+  "magic_tiers": {
+    "rank_gradient": {
+      "rank_1": {
+        "rank": 1,
+        "level": 1,
+        "name_key": "magic.rank.rank_1",
+        "strength_weight": 1.0
+      },
+      "rank_2": {
+        "rank": 2,
+        "level": 2,
+        "name_key": "magic.rank.rank_2",
+        "strength_weight": 1.2
+      },
+      "rank_3": {
+        "rank": 3,
+        "level": 3,
+        "name_key": "magic.rank.rank_3",
+        "strength_weight": 1.5
+      },
+      "rank_4": {
+        "rank": 4,
+        "level": 4,
+        "name_key": "magic.rank.rank_4",
+        "strength_weight": 1.9
+      },
+      "rank_5": {
+        "rank": 5,
+        "level": 5,
+        "name_key": "magic.rank.rank_5",
+        "strength_weight": 2.4
+      },
+      "rank_6": {
+        "rank": 6,
+        "level": 6,
+        "name_key": "magic.rank.rank_6",
+        "strength_weight": 3.0
+      },
+      "rank_7": {
+        "rank": 7,
+        "level": 7,
+        "name_key": "magic.rank.rank_7",
+        "strength_weight": 3.8
+      },
+      "rank_8": {
+        "rank": 8,
+        "level": 8,
+        "name_key": "magic.rank.rank_8",
+        "strength_weight": 4.7
+      },
+      "rank_9": {
+        "rank": 9,
+        "level": 9,
+        "name_key": "magic.rank.rank_9",
+        "strength_weight": 5.8
+      },
+      "rank_10": {
+        "rank": 10,
+        "level": 10,
+        "name_key": "magic.rank.rank_10",
+        "strength_weight": 7.0
+      },
+      "rank_11": {
+        "rank": 11,
+        "level": 11,
+        "name_key": "magic.rank.rank_11",
+        "strength_weight": 8.5
+      }
+    },
+    "ability_tiers": {
+      "ESP": {
+        "tier": 1,
+        "reference_interval": [
+          1,
+          3
+        ],
+        "weight": 1.0,
+        "name_key": "magic.ability_tier.esp",
+        "reference_label": "magic.ability_tier.esp_ref"
+      },
+      "HEROIC": {
+        "tier": 2,
+        "reference_interval": [
+          3,
+          6
+        ],
+        "weight": 1.6,
+        "name_key": "magic.ability_tier.heroic",
+        "reference_label": "magic.ability_tier.heroic_ref"
+      },
+      "DIVINE": {
+        "tier": 3,
+        "reference_interval": [
+          6,
+          9
+        ],
+        "weight": 2.5,
+        "name_key": "magic.ability_tier.divine",
+        "reference_label": "magic.ability_tier.divine_ref"
+      },
+      "GOD": {
+        "tier": 4,
+        "reference_interval": [
+          9,
+          11
+        ],
+        "weight": 4.0,
+        "name_key": "magic.ability_tier.god",
+        "reference_label": "magic.ability_tier.god_ref"
+      },
+      "SUPERTIER": {
+        "tier": 5,
+        "reference_interval": [
+          11,
+          11
+        ],
+        "weight": 6.0,
+        "name_key": "magic.ability_tier.supertier",
+        "reference_label": "magic.ability_tier.supertier_ref",
+        "allow_break": true
+      }
+    },
+    "rank_bands": {
+      "LOW": {
+        "band": 1,
+        "interval": [
+          1,
+          3
+        ],
+        "name_key": "magic.rank_band.low"
+      },
+      "MID": {
+        "band": 2,
+        "interval": [
+          4,
+          6
+        ],
+        "name_key": "magic.rank_band.mid"
+      },
+      "HIGH": {
+        "band": 3,
+        "interval": [
+          7,
+          9
+        ],
+        "name_key": "magic.rank_band.high"
+      },
+      "SUPERTIER": {
+        "band": 4,
+        "interval": [
+          10,
+          11
+        ],
+        "name_key": "magic.rank_band.supertier"
+      }
+    },
+    "mana_aptitudes": {
+      "man_adaptor": {
+        "aptitude": 1,
+        "name_key": "magic.aptitude.man_adaptor",
+        "backfire_threshold": 1,
+        "mana_gate": true,
+        "rarity": "1_in_100"
+      },
+      "word_speaker": {
+        "aptitude": 2,
+        "name_key": "magic.aptitude.word_speaker",
+        "backfire_threshold": 3,
+        "mana_gate": false,
+        "rarity": "1_in_10000"
+      },
+      "awakened": {
+        "aptitude": 3,
+        "name_key": "magic.aptitude.awakened",
+        "backfire_threshold": 6,
+        "mana_gate": false,
+        "rarity": "1_in_1000000"
+      },
+      "heaven_ruler": {
+        "aptitude": 4,
+        "name_key": "magic.aptitude.heaven_ruler",
+        "backfire_threshold": 9,
+        "mana_gate": false,
+        "rarity": "unspecified"
+      }
+    },
+    "magic_forms": {
+      "primordial": {
+        "form": 1,
+        "name_key": "magic.form.primordial",
+        "phase_loss_min": 0.01,
+        "phase_loss_max": 0.05
+      },
+      "incantation": {
+        "form": 2,
+        "name_key": "magic.form.incantation",
+        "phase_loss_min": 0.25,
+        "phase_loss_max": 0.5
+      },
+      "integrated": {
+        "form": 3,
+        "name_key": "magic.form.integrated",
+        "phase_loss_min": 0.1,
+        "phase_loss_max": 0.3
+      },
+      "supertier": {
+        "form": 4,
+        "name_key": "magic.form.supertier",
+        "phase_loss_min": 0.01,
+        "phase_loss_max": 0.05
+      }
+    },
+    "profession_ranks": {
+      "third_rate_trickster": {
+        "rank": 1,
+        "name_key": "magic.profession_rank.third_rate_trickster",
+        "magic_domain": false
+      },
+      "second_rate_trickster": {
+        "rank": 2,
+        "name_key": "magic.profession_rank.second_rate_trickster",
+        "magic_domain": false
+      },
+      "quasi_magic_user": {
+        "rank": 3,
+        "name_key": "magic.profession_rank.quasi_magic_user",
+        "magic_domain": true
+      },
+      "novice_mage": {
+        "rank": 4,
+        "name_key": "magic.profession_rank.novice_mage",
+        "magic_domain": true
+      },
+      "intermediate_mage": {
+        "rank": 5,
+        "name_key": "magic.profession_rank.intermediate_mage",
+        "magic_domain": true
+      },
+      "senior_mage": {
+        "rank": 6,
+        "name_key": "magic.profession_rank.senior_mage",
+        "magic_domain": true
+      },
+      "platinum_mage": {
+        "rank": 7,
+        "name_key": "magic.profession_rank.platinum_mage",
+        "magic_domain": true
+      },
+      "gold_mage": {
+        "rank": 8,
+        "name_key": "magic.profession_rank.gold_mage",
+        "magic_domain": true
+      },
+      "stellar_mage": {
+        "rank": 9,
+        "name_key": "magic.profession_rank.stellar_mage",
+        "magic_domain": true
+      },
+      "legion_magistrate": {
+        "rank": 10,
+        "name_key": "magic.profession_rank.legion_magistrate",
+        "magic_domain": true
+      },
+      "royal_magistrate": {
+        "rank": 11,
+        "name_key": "magic.profession_rank.royal_magistrate",
+        "magic_domain": true
+      },
+      "holy_archmage": {
+        "rank": 12,
+        "name_key": "magic.profession_rank.holy_archmage",
+        "magic_domain": true
+      },
+      "primordial_archdemon": {
+        "rank": 13,
+        "name_key": "magic.profession_rank.primordial_archdemon",
+        "magic_domain": true
+      }
+    }
+  },
+  "magic_rules": {
+    "_meta": {
+      "sample_note": "示例数值非默认业务，正式默认值定版后收敛"
+    },
+    "attribute_schools": {
+      "LIGHT_SCHOOL": {
+        "name_key": "magic.school.light",
+        "normative_form": "LIGHT",
+        "members": [
+          "GOLD",
+          "WOOD",
+          "WATER",
+          "FIRE",
+          "EARTH"
+        ]
+      },
+      "DARK_SCHOOL": {
+        "name_key": "magic.school.dark",
+        "normative_form": "DARK",
+        "members": [
+          "WIND",
+          "THUNDER"
+        ]
+      }
+    },
+    "attributes": {
+      "GOLD": {
+        "name_key": "magic.attr.gold",
+        "school": "LIGHT_SCHOOL"
+      },
+      "WOOD": {
+        "name_key": "magic.attr.wood",
+        "school": "LIGHT_SCHOOL"
+      },
+      "WATER": {
+        "name_key": "magic.attr.water",
+        "school": "LIGHT_SCHOOL"
+      },
+      "FIRE": {
+        "name_key": "magic.attr.fire",
+        "school": "LIGHT_SCHOOL"
+      },
+      "EARTH": {
+        "name_key": "magic.attr.earth",
+        "school": "LIGHT_SCHOOL"
+      },
+      "WIND": {
+        "name_key": "magic.attr.wind",
+        "school": "DARK_SCHOOL"
+      },
+      "THUNDER": {
+        "name_key": "magic.attr.thunder",
+        "school": "DARK_SCHOOL"
+      }
+    },
+    "variants": {
+      "HOLY": {
+        "fusion_conditions": {
+          "op": "AND",
+          "terms": [
+            {
+              "args": {
+                "min_count": 1,
+                "school": "LIGHT_SCHOOL"
+              },
+              "kind": "school_attrs_learned",
+              "op": "LEAF"
+            }
+          ]
+        },
+        "fusion_mode": "ANY",
+        "name_key": "magic.variant.holy",
+        "ranked_form_branch": "HOLY",
+        "source_schools": [
+          "LIGHT_SCHOOL"
+        ],
+        "variant_of_form": 2
+      },
+      "ABYSSAL": {
+        "fusion_conditions": {
+          "op": "AND",
+          "terms": [
+            {
+              "args": {
+                "min_count": 1,
+                "school": "DARK_SCHOOL"
+              },
+              "kind": "school_attrs_learned",
+              "op": "LEAF"
+            }
+          ]
+        },
+        "fusion_mode": "ANY",
+        "name_key": "magic.variant.abyssal",
+        "ranked_form_branch": "ABYSSAL",
+        "source_schools": [
+          "DARK_SCHOOL"
+        ],
+        "variant_of_form": 2
+      }
+    },
+    "multi_cast": {
+      "allow_with_delay": true,
+      "cost_per_cast": 0,
+      "default_casts_per_play": 1,
+      "max_casts": 5,
+      "snapshot_per_play": false,
+      "target_mode": "SAME"
+    },
+    "seal": {
+      "allow_repeat_seal": false,
+      "default_duration_seconds": 0,
+      "max_seals_per_holder": 3,
+      "on_holder_lost": "DISCARD",
+      "sealed_magic_unplayable": true
+    },
+    "ascension": {
+      "allow_consecutive": false,
+      "conditions": {
+        "op": "AND",
+        "terms": []
+      },
+      "consume_on_max": false,
+      "max_rank": 11,
+      "max_steps_per_play": 1,
+      "permanent": true,
+      "transient_duration_steps": 3,
+      "temp_duration_steps": 3
+    },
+    "delay": {
+      "allow_repeat": false,
+      "attribute_snapshot": "AT_RELEASE",
+      "max_steps": 10,
+      "min_steps": 1,
+      "on_battle_end": "CANCEL",
+      "on_owner_death": "CANCEL",
+      "overflow_policy": "ACCUMULATE",
+      "release_fail_policy": "CANCEL",
+      "target_policy": "FAIL_ON_MISSING"
+    },
+    "combo_semantics": {
+      "ascend_x_delay": "DEFINED",
+      "delay_x_multi": "DEFINED",
+      "fusion_x_rank": "PARTIAL",
+      "multi_x_ascend": "DEFINED",
+      "seal_x_ascend": "DEFINED",
+      "seal_x_delay": "DEFINED",
+      "seal_x_multi": "DEFINED"
+    }
+  },
+  "quality_tiers": {
+    "tiers": {
+      "common": {
+        "tier": 1,
+        "level": 1,
+        "name_key": "quality.common",
+        "strength_weight": 1.0,
+        "rarity_weight": 1.0,
+        "color_token": "tier_1_common"
+      },
+      "fine": {
+        "tier": 2,
+        "level": 2,
+        "name_key": "quality.fine",
+        "strength_weight": 1.5,
+        "rarity_weight": 2.0,
+        "color_token": "tier_2_fine"
+      },
+      "epic": {
+        "tier": 3,
+        "level": 3,
+        "name_key": "quality.epic",
+        "strength_weight": 2.2,
+        "rarity_weight": 4.0,
+        "color_token": "tier_3_epic"
+      },
+      "legendary": {
+        "tier": 4,
+        "level": 4,
+        "name_key": "quality.legendary",
+        "strength_weight": 3.0,
+        "rarity_weight": 8.0,
+        "color_token": "tier_4_legendary"
+      },
+      "mythic": {
+        "tier": 5,
+        "level": 5,
+        "name_key": "quality.mythic",
+        "strength_weight": 4.0,
+        "rarity_weight": 16.0,
+        "color_token": "tier_5_mythic"
+      },
+      "ancient": {
+        "tier": 6,
+        "level": 6,
+        "name_key": "quality.ancient",
+        "strength_weight": 5.0,
+        "rarity_weight": 32.0,
+        "color_token": "tier_6_ancient"
+      }
+    },
+    "mythic_intervals": {
+      "quasi_artifact": {
+        "interval": 1,
+        "name_key": "quality.mythic.quasi_artifact",
+        "strength_weight": 4.0,
+        "rarity_weight": 16.0,
+        "color_token": "mythic_quasi"
+      },
+      "true_artifact": {
+        "interval": 2,
+        "name_key": "quality.mythic.true_artifact",
+        "strength_weight": 4.8,
+        "rarity_weight": 24.0,
+        "color_token": "mythic_true"
+      }
+    }
+  },
+  "cdkeys": {
+    "KALAR666": {
+      "gold": 500,
+      "crystals": 2,
+      "item_id": "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD",
+      "item_name": "【初出茅庐·玄铁剑】"
+    },
+    "KALAR888": {
+      "gold": 1000,
+      "crystals": 5,
+      "item_id": "KALAR:QUEST:ARTIFACT:RELIC_FRAGMENT",
+      "item_name": "【开服特典·圣痕吊坠】"
+    },
+    "VIP999": {
+      "gold": 5000,
+      "crystals": 20,
+      "item_id": "KALAR:CONSUM:ALCHEMY:POTION_MANA",
+      "item_name": "【始源之光·极光神符】"
+    }
+  },
+  "equipment_defaults": {
+    "loadout_defaults": {
+      "loadout_id": "LOADOUT_SET_01",
+      "loadout_name": "主战决斗装",
+      "fallback_name": "战备套",
+      "fallback_id": "LOADOUT_01"
+    },
+    "rune_modifiers": {
+      "RUNE_TITAN": {
+        "bonus_str": 5.0
+      },
+      "RUNE_ARCANE": {
+        "bonus_int": 5.0
+      },
+      "RUNE_AEGIS": {
+        "total_armor": 10.0
+      }
+    }
+  },
+  "lattice_defaults": {
+    "ast_defaults": {
+      "skill_name": "破空连斩",
+      "deserialize_skill_name": "自创式",
+      "sentence_count": 4,
+      "deserialize_sentence_count": 1
+    },
+    "manuscript_defaults": {
+      "custom_name": "古老剑谱残卷",
+      "category": "MANUSCRIPT_GRIMOIRE",
+      "royalty_percent": 0.15,
+      "market_base_price": 50,
+      "copy_circulation_count": 1,
+      "item_id_prefix": "MANUSCRIPT_",
+      "display_name_prefix": "【著书】",
+      "default_price": 100,
+      "default_royalty_rate": 0.2
+    }
+  },
+  "admin_sandbox_defaults": {
+    "give_gold_default": 10000,
+    "give_item_default_name": "【GM创世神器】",
+    "give_item_id_prefix": "GM_ITEM_",
+    "item_metrics": {
+      "edge_sharpness": 5.0,
+      "effective_armor": 50.0,
+      "volume_slots": 1
+    },
+    "advance_time_default_months": 12
+  },
+  "tables": {
+    "domains.attribute.core": {
+      "race_coefficients": {
+        "HUMAN": {
+          "STR": 1.0,
+          "AGI": 1.0,
+          "INT": 1.0,
+          "SPR": 1.0,
+          "CON": 1.0,
+          "VIT": 1.0
+        },
+        "HIGH_ELF": {
+          "STR": 0.9,
+          "AGI": 1.1,
+          "INT": 1.2,
+          "SPR": 1.1,
+          "CON": 0.9,
+          "VIT": 1.0
+        },
+        "MOUNTAIN_DWARF": {
+          "STR": 1.2,
+          "AGI": 0.9,
+          "INT": 0.9,
+          "SPR": 1.0,
+          "CON": 1.3,
+          "VIT": 1.1
+        },
+        "TIEFLING_OR_HUMAN": {
+          "STR": 1.0,
+          "AGI": 1.15,
+          "INT": 1.0,
+          "SPR": 0.9,
+          "CON": 1.0,
+          "VIT": 0.95
+        },
+        "DEFAULT": {
+          "STR": 1.0,
+          "AGI": 1.0,
+          "INT": 1.0,
+          "SPR": 1.0,
+          "CON": 1.0,
+          "VIT": 1.0
+        }
+      }
+    },
+    "domains.world_gateway.core": {
+      "single_player": {
+        "default_world_id": "WORLD_DEFAULT_SP_01"
+      }
+    },
+    "domains.account.core": {
+      "save_slot": {
+        "defaults": {
+          "current_location_name": "中洲·卡拉尔圣城",
+          "world_id": "WORLD_DEFAULT_SP_01"
+        },
+        "multi_world": {
+          "default_world_id": "WORLD_DEFAULT_SP_01",
+          "placeholder_world_ids": [
+            "WORLD_RESERVED_SP_02",
+            "WORLD_RESERVED_SP_03"
+          ]
+        }
+      }
+    }
+  }
+}

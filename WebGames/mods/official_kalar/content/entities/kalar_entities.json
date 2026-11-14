@@ -1,0 +1,148 @@
+{
+  "override_mode": "MERGE",
+  "npcs": {
+    "defaults": {
+      "personal_name": "老剑客艾尔顿",
+      "current_goal": "IDLE",
+      "personality": {
+        "courage": 0.8,
+        "greed": 0.3,
+        "benevolence": 0.7,
+        "rationality": 0.9,
+        "piety": 0.4
+      }
+    },
+    "legacy": {
+      "book_name_suffix": "之绝学心法",
+      "sentence_count": 3,
+      "book_price": 300,
+      "royalty_rate": 0.3,
+      "fallback_heir_name": "世人",
+      "idempotency_retention_seconds": 86400.0,
+      "max_retry_count": 3,
+      "fallback_heir_name_key": "npc.legacy.fallback_heir_name"
+    }
+  },
+  "monsters": {
+    "body_part_defaults": {
+      "part_id": "HEAD",
+      "part_name": "头颅",
+      "durability": 100.0,
+      "ap_penalty_on_break": 2
+    },
+    "species_defaults": {
+      "species_name": "双足飞龙",
+      "str_level": 3,
+      "con_level": 2,
+      "vit_level": 4
+    },
+    "loot": {
+      "default_drop_canonical_ids": [
+        "KALAR:MATERIAL:ORE:MITHRIL_ORE",
+        "KALAR:CONSUM:FOOD:HEARTY_STEW"
+      ]
+    }
+  },
+  "elites": {
+    "affixes": {
+      "VAMPIRIC": {
+        "name": "吸血嗜血",
+        "stat_mods": {
+          "str": 1.25
+        },
+        "lifesteal_percent": 0.2,
+        "desc": "攻击命中时吸收伤害值的 20% 恢复自身气血。"
+      },
+      "MOLTEN": {
+        "name": "熔火炎径",
+        "stat_mods": {
+          "con": 1.3
+        },
+        "fire_damage_flat": 15.0,
+        "desc": "周身环绕烈焰熔岩，受击与反击附加火焰灼烧破坏。"
+      },
+      "SWIFT": {
+        "name": "迅捷风行",
+        "stat_mods": {
+          "agi": 1.5
+        },
+        "ap_cost_reduction": 1,
+        "desc": "动作速率大幅提升，攻击动词 AP 消耗减少 1 点。"
+      },
+      "THORNY": {
+        "name": "荆棘反伤",
+        "stat_mods": {
+          "con": 1.2
+        },
+        "reflect_percent": 0.25,
+        "desc": "受到的近战物理动量侵彻伤害向攻击者反射 25%。"
+      },
+      "SPECTRAL": {
+        "name": "幽影虚化",
+        "stat_mods": {
+          "spr": 1.4
+        },
+        "physical_resistance": 0.3,
+        "desc": "灵体化躯壳，物理伤害减免 30%。"
+      }
+    },
+    "affix_pool": {
+      "global": [
+        {
+          "aff_id": "VAMPIRIC",
+          "weight": 10
+        },
+        {
+          "aff_id": "MOLTEN",
+          "weight": 8
+        },
+        {
+          "aff_id": "SWIFT",
+          "weight": 12
+        },
+        {
+          "aff_id": "THORNY",
+          "weight": 6
+        },
+        {
+          "aff_id": "SPECTRAL",
+          "weight": 4
+        }
+      ],
+      "tier_3": [
+        {
+          "aff_id": "MOLTEN",
+          "weight": 15
+        },
+        {
+          "aff_id": "SPECTRAL",
+          "weight": 12
+        },
+        {
+          "aff_id": "VAMPIRIC",
+          "weight": 5
+        }
+      ]
+    }
+  },
+  "world_bosses": {
+    "entity_defaults": {
+      "boss_uid": "BOSS_WORLD_LEVIATHAN_01",
+      "boss_title": "【天灾灭世者 · 灭烬巨龙】",
+      "species_name": "灭烬巨龙",
+      "total_phases": 3,
+      "current_phase_index": 1,
+      "phase_max_hp": 10000.0,
+      "phase_current_hp": 10000.0,
+      "mechanism_shield_hp": 0.0,
+      "is_invulnerable": false,
+      "is_channeling_wipe_spell": false,
+      "physiology": {
+        "lifespan_scale": 10.0,
+        "str_level": 5,
+        "con_level": 6,
+        "vit_level": 6
+      }
+    }
+  }
+}

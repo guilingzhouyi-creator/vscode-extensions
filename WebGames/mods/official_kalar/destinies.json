@@ -1,0 +1,435 @@
+{
+  "ui_capabilities": {
+    "origin_selection_mode": "ALLOW_MANUAL",
+    "trait_selection_mode": "ALLOW_MANUAL",
+    "allow_attribute_reroll": true
+  },
+  "custom_races": [
+    {
+      "race_id": "HUMAN",
+      "canonical_name_key": "race.human.name",
+      "is_enabled": true,
+      "canary_feature_tag": "",
+      "base_stat_modifiers": {
+        "STR": 0,
+        "CON": 0,
+        "INT": 0,
+        "AGI": 0,
+        "SPR": 0,
+        "VIT": 0
+      },
+      "innate_traits": [
+        "ADAPTABILITY"
+      ],
+      "allowed_genders": [
+        "MALE",
+        "FEMALE"
+      ],
+      "display_name": "人类",
+      "default_kit_id": "KIT_HUMAN_DEFAULT",
+      "attribute_coefficients": {
+        "STR": 1.0,
+        "AGI": 1.0,
+        "INT": 1.0,
+        "SPR": 1.0,
+        "CON": 1.0,
+        "VIT": 1.0
+      },
+      "lifespan_scale": 1.0
+    },
+    {
+      "race_id": "ELF",
+      "canonical_name_key": "race.elf.name",
+      "is_enabled": false,
+      "canary_feature_tag": "FEATURE_RACE_EXPANSION",
+      "base_stat_modifiers": {
+        "STR": -1,
+        "CON": -1,
+        "INT": 1,
+        "AGI": 1,
+        "SPR": 1,
+        "VIT": -1
+      },
+      "innate_traits": [
+        "NIGHT_VISION",
+        "MANA_SENSITIVITY"
+      ],
+      "allowed_genders": [
+        "MALE",
+        "FEMALE"
+      ],
+      "display_name": "精灵",
+      "default_kit_id": "KIT_ELF_DEFAULT"
+    }
+  ],
+  "creation_rule_overrides": {
+    "birth_regions": {
+      "CENTRAL_CONTINENT": {
+        "name": "中洲·卡拉尔圣城",
+        "climate": "TEMPERATE",
+        "mana_density": 1.0
+      },
+      "SILVER_FOREST": {
+        "name": "东洲·银月密林",
+        "climate": "MYSTIC_FOREST",
+        "mana_density": 1.4
+      },
+      "SCORCHED_CANYON": {
+        "name": "南洲·烈阳熔岩峡谷",
+        "climate": "VOLCANIC",
+        "mana_density": 1.8
+      },
+      "HOWLING_TUNDRA": {
+        "name": "北洲·狂风永冻苔原",
+        "climate": "TUNDRA",
+        "mana_density": 1.2
+      },
+      "VOID_ARCHIPELAGO": {
+        "name": "西洲·虚空破碎群岛",
+        "climate": "VOID_OCEAN",
+        "mana_density": 2.0
+      }
+    },
+    "defaults": {
+      "default_race_id": "HUMAN",
+      "fallback_origin": "IMPERIAL_NOBLE",
+      "fallback_region": "CENTRAL_CONTINENT",
+      "baseline_stat_level": 3,
+      "starting_location": "CENTRAL_CITY_PLAZA",
+      "initial_quest_line": "QUEST_PROLOGUE_01",
+      "trait_coef_scale": 0.1,
+      "heart_core_clamp_min": 0.1,
+      "heart_core_clamp_max": 1.0,
+      "initial_gold_fallback": 50,
+      "lifespan_scales": {
+        "HUMAN": 1.0,
+        "HIGH_ELF": 3.5,
+        "MOUNTAIN_DWARF": 2.0,
+        "TIEFLING_OR_HUMAN": 1.2,
+        "DEFAULT": 1.0
+      }
+    },
+    "creation_fields_schema": {
+      "name": {
+        "required": true,
+        "type": "STRING"
+      },
+      "gender": {
+        "required": true,
+        "type": "ENUM",
+        "options": [
+          "MALE",
+          "FEMALE"
+        ]
+      },
+      "race_id": {
+        "required": true,
+        "type": "ENUM",
+        "options": [
+          "HUMAN"
+        ]
+      }
+    },
+    "authoritative_reincarnation": {
+      "origins_pool": [
+        {
+          "origin_id": "IMPERIAL_NOBLE",
+          "weight": 30
+        },
+        {
+          "origin_id": "ELVEN_SCHOLAR",
+          "weight": 25
+        },
+        {
+          "origin_id": "DWARVEN_BLACKSMITH",
+          "weight": 25
+        },
+        {
+          "origin_id": "SHADOW_OUTCAST",
+          "weight": 20
+        }
+      ],
+      "origin_race_map": {
+        "IMPERIAL_NOBLE": "HUMAN",
+        "ELVEN_SCHOLAR": "ELF",
+        "DWARVEN_BLACKSMITH": "HUMAN",
+        "SHADOW_OUTCAST": "HUMAN"
+      },
+      "fallback_race": "HUMAN",
+      "fallback_origin": "IMPERIAL_NOBLE",
+      "fallback_region": "CENTRAL_CONTINENT",
+      "fallback_gender": "MALE",
+      "genders_pool": [
+        {
+          "gender": "MALE",
+          "weight": 50
+        },
+        {
+          "gender": "FEMALE",
+          "weight": 50
+        }
+      ],
+      "birth_region_map": {
+        "IMPERIAL_NOBLE": "CENTRAL_CONTINENT",
+        "ELVEN_SCHOLAR": "SILVER_FOREST",
+        "DWARVEN_BLACKSMITH": "SCORCHED_CANYON",
+        "SHADOW_OUTCAST": "VOID_ARCHIPELAGO"
+      },
+      "attribute_generation": {
+        "min_val": 1,
+        "max_val": 6,
+        "baseline": 3,
+        "total_points": 21,
+        "keys": [
+          "STR",
+          "CON",
+          "INT",
+          "AGI",
+          "SPR",
+          "VIT"
+        ]
+      },
+      "traits_allocation": {
+        "paired_presets": [
+          {
+            "positive": "PRIMORDIAL_RESONANCE",
+            "negative": "HEART_CORE_FISSURE",
+            "weight": 60
+          },
+          {
+            "positive": "GIANT_MIGHT",
+            "negative": "MANA_INSULATED",
+            "weight": 40
+          }
+        ],
+        "fallback_positive": "PRIMORDIAL_RESONANCE",
+        "fallback_negative": "HEART_CORE_FISSURE"
+      }
+    },
+    "creation_hooks": {
+      "on_character_created": [
+        "derive_physiology_and_wallet",
+        "emit_opening_narrative"
+      ],
+      "on_prologue_completed": [
+        "attach_ready_character",
+        "enter_world"
+      ]
+    }
+  },
+  "custom_origins": [
+    {
+      "origin_id": "IMPERIAL_NOBLE",
+      "name": "帝国贵族后裔",
+      "race": "HUMAN",
+      "birth_region": "CENTRAL_CONTINENT",
+      "weight": 25,
+      "initial_gold": 500,
+      "initial_reputation": 100,
+      "base_factions": {
+        "HOLY_EMPIRE": 50,
+        "MAGE_COUNCIL": 20
+      },
+      "starter_kit_id": "KIT_HUMAN_DEFAULT",
+      "prologue_dag_id": "DAG_PROLOGUE_HUMAN_CAPITAL",
+      "attribute_bonus": {
+        "INT": 2,
+        "STR": 1
+      },
+      "desc": "生于繁华行省贵族世家，自幼接受皇家剑术与宫廷礼仪培养，家族资助丰厚。"
+    },
+    {
+      "origin_id": "ELVEN_SCHOLAR",
+      "name": "精灵秘术学徒",
+      "race": "ELF",
+      "birth_region": "SILVER_FOREST",
+      "weight": 25,
+      "initial_gold": 80,
+      "initial_reputation": 40,
+      "base_factions": {
+        "FOREST_ENCLAVE": 60,
+        "HOLY_EMPIRE": 0
+      },
+      "starter_kit_id": "KIT_ELF_DEFAULT",
+      "prologue_dag_id": "DAG_PROLOGUE_ELF_SANCTUARY",
+      "attribute_bonus": {
+        "INT": 3,
+        "SPR": 1
+      },
+      "desc": "来自世界之树庇护的精灵古城，拥有天生的魔素感知力与悠长寿命。"
+    },
+    {
+      "origin_id": "DWARVEN_BLACKSMITH",
+      "name": "矮人锻造学徒",
+      "race": "HUMAN",
+      "birth_region": "SCORCHED_CANYON",
+      "weight": 25,
+      "initial_gold": 150,
+      "initial_reputation": 20,
+      "base_factions": {
+        "IRON_FORGE_LEAGUE": 60
+      },
+      "starter_kit_id": "KIT_HUMAN_DEFAULT",
+      "prologue_dag_id": "DAG_PROLOGUE_HUMAN_CAPITAL",
+      "attribute_bonus": {
+        "CON": 3,
+        "STR": 1
+      },
+      "desc": "生长于地下熔岩巨构城邦，体格极其强健，熟悉各种金属硬度与武器工艺。"
+    },
+    {
+      "origin_id": "SHADOW_OUTCAST",
+      "name": "黑市暗影游侠",
+      "race": "HUMAN",
+      "birth_region": "VOID_ARCHIPELAGO",
+      "weight": 25,
+      "initial_gold": 120,
+      "initial_reputation": 0,
+      "base_factions": {
+        "THIEVES_GUILD": 50,
+        "HOLY_EMPIRE": -30
+      },
+      "starter_kit_id": "KIT_HUMAN_DEFAULT",
+      "prologue_dag_id": "DAG_PROLOGUE_HUMAN_CAPITAL",
+      "attribute_bonus": {
+        "AGI": 3,
+        "INT": 1
+      },
+      "desc": "生长于大陆地下黑市与盗贼公会，擅长潜行暗杀与黑市违禁品销赃。"
+    }
+  ],
+  "custom_traits": [
+    {
+      "trait_id": "PRIMORDIAL_RESONANCE",
+      "name": "始源魔素共鸣",
+      "cost": 3,
+      "type": "POSITIVE",
+      "modifiers": {
+        "INT": 2
+      },
+      "special_modifiers": {
+        "mana_efficiency": 0.15
+      },
+      "desc": "对天地初始灵能具备超凡亲和力，法术能损降低 15%。"
+    },
+    {
+      "trait_id": "GIANT_MIGHT",
+      "name": "巨人之力",
+      "cost": 2,
+      "type": "POSITIVE",
+      "modifiers": {
+        "STR": 3
+      },
+      "special_modifiers": {
+        "max_carry_weight_boost": 20.0
+      },
+      "desc": "天生神力，动量侵彻伤害与负重上限显著提升。"
+    },
+    {
+      "trait_id": "IRON_WILL",
+      "name": "钢铁心智",
+      "cost": 1,
+      "type": "POSITIVE",
+      "modifiers": {
+        "SPR": 2
+      },
+      "special_modifiers": {
+        "mental_stress_resistance": 0.2
+      },
+      "desc": "神智坚如磐石，极难陷入狂暴或精神崩溃。"
+    },
+    {
+      "trait_id": "HEART_CORE_FISSURE",
+      "name": "心核裂隙",
+      "cost": -3,
+      "type": "NEGATIVE",
+      "modifiers": {
+        "VIT": -2
+      },
+      "special_modifiers": {
+        "heart_core_max": -0.15
+      },
+      "desc": "先天心核残缺，初始生理机能上限受到压制。"
+    },
+    {
+      "trait_id": "MANA_INSULATED",
+      "name": "魔素绝缘体",
+      "cost": -2,
+      "type": "NEGATIVE",
+      "modifiers": {
+        "INT": -3
+      },
+      "special_modifiers": {
+        "magic_damage_reduction": 0.2
+      },
+      "desc": "经络晦涩难引灵能，无法自如施法，但对魔法伤害有天然抗性。"
+    }
+  ],
+  "paired_presets": [
+    {
+      "preset_id": "PAIR_OFFICIAL_01",
+      "positive": "PRIMORDIAL_RESONANCE",
+      "negative": "HEART_CORE_FISSURE",
+      "weight": 60
+    },
+    {
+      "preset_id": "PAIR_OFFICIAL_02",
+      "positive": "GIANT_MIGHT",
+      "negative": "MANA_INSULATED",
+      "weight": 40
+    }
+  ],
+  "custom_starter_kits": [
+    {
+      "initial_gold": 50,
+      "display_weapon": "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD",
+      "initial_items": [
+        {
+          "canonical_id": "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD",
+          "count": 1
+        },
+        {
+          "canonical_id": "KALAR:CONSUM:ALCHEMY:POTION_MANA",
+          "count": 3
+        }
+      ],
+      "kit_id": "KIT_HUMAN_DEFAULT",
+      "name": "卡拉尔人类新兵标准行囊",
+      "race_id": "HUMAN"
+    },
+    {
+      "initial_gold": 60,
+      "display_weapon": "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD",
+      "initial_items": [
+        {
+          "canonical_id": "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD",
+          "count": 1
+        },
+        {
+          "canonical_id": "KALAR:CONSUM:ALCHEMY:POTION_MANA",
+          "count": 2
+        }
+      ],
+      "kit_id": "KIT_ELF_DEFAULT",
+      "name": "永恒圣林精灵行囊",
+      "race_id": "ELF"
+    }
+  ],
+  "custom_routing_rules": [
+    {
+      "race": "ELF",
+      "target_dag_id": "DAG_PROLOGUE_ELF_SANCTUARY",
+      "priority": 20
+    },
+    {
+      "race": "HUMAN",
+      "target_dag_id": "DAG_PROLOGUE_HUMAN_CAPITAL",
+      "priority": 10
+    },
+    {
+      "is_default": true,
+      "target_dag_id": "DAG_PROLOGUE_HUMAN_CAPITAL",
+      "priority": 0
+    }
+  ]
+}

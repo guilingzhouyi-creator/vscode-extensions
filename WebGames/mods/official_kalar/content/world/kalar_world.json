@@ -1,0 +1,92 @@
+{
+  "override_mode": "MERGE",
+  "node_defaults": {
+    "continent_id": "CENTRAL_CONTINENT",
+    "terrain_type": "PLAINS",
+    "regional_mana_density": 1.0,
+    "town_id": "TOWN_VALAN"
+  },
+  "town_defaults": {
+    "town_name": "未名要塞",
+    "governing_nation_id": "NATION_EMPIRE",
+    "population_count": 5000,
+    "public_order_percent": 85.0,
+    "food_reserve_days": 30.0,
+    "town_treasury_gold": 1500
+  },
+  "default_template": {
+    "world_id": "WORLD_DEFAULT",
+    "starting_tick": 0,
+    "starting_day": 1,
+    "region_mana_density": 1.0
+  },
+  "worlds_catalog": {
+    "WORLD_DEFAULT_SP_01": {
+      "world_id": "WORLD_DEFAULT_SP_01",
+      "world_name": "卡拉尔大陆·起源界",
+      "mode": 1,
+      "seed_value": 20260901,
+      "world_version": "1.0.0",
+      "is_active": true,
+      "max_concurrent_players": 1,
+      "canary_feature_tag": ""
+    },
+    "WORLD_CANARY_MP_01": {
+      "world_id": "WORLD_CANARY_MP_01",
+      "world_name": "卡拉尔公网·测试界域",
+      "mode": 2,
+      "seed_value": 88888888,
+      "world_version": "0.1.0-alpha",
+      "is_active": false,
+      "max_concurrent_players": 16,
+      "canary_feature_tag": "FEATURE_MULTIPLAYER_GATEWAY"
+    }
+  },
+  "birth_regions": {
+    "CENTRAL_CONTINENT": {
+      "name": "中洲·卡拉尔圣城",
+      "climate": "TEMPERATE",
+      "mana_density": 1.0
+    },
+    "SILVER_FOREST": {
+      "name": "东洲·银月密林",
+      "climate": "MYSTIC_FOREST",
+      "mana_density": 1.4
+    },
+    "SCORCHED_CANYON": {
+      "name": "南洲·烈阳熔岩峡谷",
+      "climate": "VOLCANIC",
+      "mana_density": 1.8
+    },
+    "HOWLING_TUNDRA": {
+      "name": "北洲·狂风永冻苔原",
+      "climate": "TUNDRA",
+      "mana_density": 1.2
+    },
+    "VOID_ARCHIPELAGO": {
+      "name": "西洲·虚空破碎群岛",
+      "climate": "VOID_OCEAN",
+      "mana_density": 2.0
+    }
+  },
+  "landmarks": [
+    {
+      "id": "CENTRAL_CITY_PLAZA",
+      "name": "王都·中央白石广场",
+      "continent_id": "CENTRAL_CONTINENT",
+      "terrain_type": "PLAINS"
+    },
+    {
+      "id": "VALAN_OUTPOST",
+      "name": "瓦兰先遣哨站",
+      "continent_id": "CENTRAL_CONTINENT",
+      "terrain_type": "PLAINS"
+    },
+    {
+      "id": "ELVEN_SANCTUARY_GROVE",
+      "name": "翡翠圣林·神圣古树",
+      "continent_id": "SILVER_FOREST",
+      "terrain_type": "MYSTIC_FOREST"
+    }
+  ]
+}

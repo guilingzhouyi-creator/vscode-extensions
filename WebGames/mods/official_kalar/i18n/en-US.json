@@ -1,0 +1,26 @@
+{
+  "narrative": {
+    "prologue": {
+      "awakening": "[Awakening] Morning light pierces the capital obelisk. Pioneer {PLAYER_NAME} ({RACE_ID}) opens their eyes in {START_LOCATION}...",
+      "environment": "[Observation] The streets of the nameless fortress awaken. The rune obelisk hums with faint azure mana while distant forges clang.",
+      "inspect_obelisk": "[Obelisk] Ancient Kalar celestial oaths glow along the obelisk shaft, sharpening your perception.",
+      "first_encounter": "[Encounter] A veteran fortress guard approaches briskly: 'Destiny guides you, {PLAYER_NAME}! Take this recruit loadout, including a {INITIAL_EQUIPMENT}.'",
+      "completed": "[Departure] The guard salutes and returns to post. The prologue concludes as the Kalar continent unfolds before you!",
+      "elf_grove_awaken": "[Sanctuary Awakening] Emerald dawn filters through evergreen boughs. Elven pioneer {PLAYER_NAME} touches the World Tree seed...",
+      "elf_grove_depart": "[Sanctuary Departure] Silver horns sound across the grove as the barrier fades. Grasping {INITIAL_EQUIPMENT}, you step into the mortal realm!"
+    }
+  },
+  "locations": {
+    "CENTRAL_CITY_PLAZA": "Capital Central White-Stone Plaza",
+    "VALAN_OUTPOST": "Valan Vanguard Outpost",
+    "ELVEN_SANCTUARY_GROVE": "Emerald Sanctuary Sacred Grove"
+  },
+  "items": {
+    "KALAR_EQUIP_WEAPON_BLADE_IRON_SWORD": "Recruit Iron Sword",
+    "KALAR_EQUIP_WEAPON_BLADE_MITHRIL_LONGSWORD": "Forged Mithril Longsword"
+  },
+  "npcs": {
+    "FORTRESS_GUARD": "Veteran Fortress Guard Valan",
+    "default_guide": "FORTRESS_GUARD"
+  }
+}

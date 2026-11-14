@@ -1,0 +1,31 @@
+{
+  "entry_node_id": "NODE_AWAKEN_GROVE",
+  "terminal_node_id": "NODE_DEPART_SANCTUARY",
+  "nodes": {
+    "NODE_AWAKEN_GROVE": {
+      "node_type": "START_ENTRY",
+      "narrative_key": "narrative.prologue.elf_grove_awaken",
+      "required_prerequisites": []
+    },
+    "NODE_DEPART_SANCTUARY": {
+      "node_type": "TERMINAL_EXIT",
+      "narrative_key": "narrative.prologue.elf_grove_depart",
+      "required_prerequisites": [
+        "NODE_AWAKEN_GROVE"
+      ],
+      "mutations_on_complete": [
+        {
+          "type": "PrologueCompleted",
+          "dag_id": "DAG_PROLOGUE_ELF_SANCTUARY"
+        }
+      ]
+    }
+  },
+  "edges": [
+    {
+      "from": "NODE_AWAKEN_GROVE",
+      "to": "NODE_DEPART_SANCTUARY"
+    }
+  ],
+  "dag_id": "DAG_PROLOGUE_ELF_SANCTUARY"
+}

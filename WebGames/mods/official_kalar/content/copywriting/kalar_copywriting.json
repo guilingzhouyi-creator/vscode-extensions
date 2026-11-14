@@ -1,0 +1,65 @@
+{
+  "override_mode": "MERGE",
+  "copywriting": {
+    "item": {
+      "mithril_longsword": {
+        "base": "{name}：{tier_rank} 阶品质的秘银长刃，基础市场价 {market_value}，质量 {mass_kg}kg。",
+        "conditions": [
+          {
+            "when": {
+              "quantity": 2
+            },
+            "text": "（持有 {quantity} 件）"
+          },
+          {
+            "when": {
+              "durability": 30
+            },
+            "text": "耐久将尽，剑刃已有缺口。"
+          },
+          {
+            "when": {
+              "enchant": "FLAME"
+            },
+            "text": "附魔烈焰，剑身泛红。"
+          }
+        ]
+      },
+      "iron_chest": {
+        "base": "{name}：{tier_rank} 阶品质的铁制胸甲，基础市场价 {market_value}，质量 {mass_kg}kg。",
+        "conditions": [
+          {
+            "when": {
+              "quantity": 2
+            },
+            "text": "（持有 {quantity} 件）"
+          },
+          {
+            "when": {
+              "enchant": "FROST"
+            },
+            "text": "附魔寒霜，甲面凝霜。"
+          }
+        ]
+      }
+    },
+    "narrative": {
+      "EVT_BEAST_TIDE": {
+        "base": "{town} 爆发了兽潮！{beast_count} 头魔物逼近城墙。",
+        "success": "英勇的守卫击退了兽潮，{reward_gold} 金币入库，损失 {loss_soldiers} 名卫士。",
+        "failure": "兽潮冲破城门！{town} 陷入火海，伤亡 {loss_soldiers} 人。",
+        "partial": "兽潮被遏制但未肃清，{town} 城墙破损，{reward_gold} 金币作为守城赏金。"
+      },
+      "EVT_MARKET_CRASH": {
+        "base": "{town} 市集遭遇商路断绝，物价剧烈波动，{loss_gold} 金币化为泡影。",
+        "success": "商会紧急调度物资，{town} 市集平稳渡劫，{gain_gold} 金币入账。"
+      }
+    },
+    "probability": {
+      "EVT_BEAST_TIDE": {
+        "base": "兽潮触发概率当前为 {probability_pct}%（受 {modifier_count} 项条件修正）。",
+        "success": "兽潮平息：触发概率 {probability_pct}%，关联事件影响 {adjusted_count} 项。"
+      }
+    }
+  }
+}
