@@ -52,49 +52,49 @@ func reset_state() -> void:
 
 ## 序列化当前对象为通用字典传输结构
 func to_dto() -> Dictionary:
-	var out: Dictionary = super.to_dto()
-	out[LogConstants.KEY_TRACE_ID] = trace_id
-	out[LogConstants.KEY_PARENT_SPAN_ID] = parent_span_id
-	out[LogConstants.KEY_EVENT_CATEGORY] = event_category
-	out[LogConstants.KEY_DURATION_MS] = duration_ms
-	out[LogConstants.KEY_SOURCE_FILE] = source_file
-	out[LogConstants.KEY_SOURCE_LINE] = source_line
-	out[LogConstants.KEY_REDACTED_KEYS] = redacted_keys.duplicate()
-	return out
+	var dto_dict: Dictionary = super.to_dto()
+	dto_dict[LogConstants.KEY_TRACE_ID] = trace_id
+	dto_dict[LogConstants.KEY_PARENT_SPAN_ID] = parent_span_id
+	dto_dict[LogConstants.KEY_EVENT_CATEGORY] = event_category
+	dto_dict[LogConstants.KEY_DURATION_MS] = duration_ms
+	dto_dict[LogConstants.KEY_SOURCE_FILE] = source_file
+	dto_dict[LogConstants.KEY_SOURCE_LINE] = source_line
+	dto_dict[LogConstants.KEY_REDACTED_KEYS] = redacted_keys.duplicate()
+	return dto_dict
 
 ## 深拷贝克隆当前结构化日志对象（避免中间字典反序列化堆分配损耗，ADV-PRF-002）
 func clone() -> StructuredLogRecord:
-	var c := StructuredLogRecord.new()
-	c.sequence = sequence
-	c.timestamp_utc = timestamp_utc
-	c.level = level
-	c.channel = channel
-	c.error_code = error_code
-	c.message = message
-	c.context = context.duplicate(true)
-	c.trace_id = trace_id
-	c.parent_span_id = parent_span_id
-	c.event_category = event_category
-	c.duration_ms = duration_ms
-	c.source_file = source_file
-	c.source_line = source_line
-	c.redacted_keys = redacted_keys.duplicate()
-	return c
+	var cloned_record := StructuredLogRecord.new()
+	cloned_record.sequence = sequence
+	cloned_record.timestamp_utc = timestamp_utc
+	cloned_record.level = level
+	cloned_record.channel = channel
+	cloned_record.error_code = error_code
+	cloned_record.message = message
+	cloned_record.context = context.duplicate(true)
+	cloned_record.trace_id = trace_id
+	cloned_record.parent_span_id = parent_span_id
+	cloned_record.event_category = event_category
+	cloned_record.duration_ms = duration_ms
+	cloned_record.source_file = source_file
+	cloned_record.source_line = source_line
+	cloned_record.redacted_keys = redacted_keys.duplicate()
+	return cloned_record
 
 ## 从字典反序列化还原（继承字段 + 结构化字段；context/redacted_keys 仅接受合法类型并深拷贝）
 static func from_dto(data: Dictionary) -> StructuredLogRecord:
-	var dto := StructuredLogRecord.new()
+	var record_dto := StructuredLogRecord.new()
 	if data.is_empty():
-		return dto
-	LogRecordDTO.populate_base_from_dict(dto, data)
-	dto.trace_id = str(data.get(LogConstants.KEY_TRACE_ID, ""))
-	dto.parent_span_id = str(data.get(LogConstants.KEY_PARENT_SPAN_ID, ""))
-	dto.event_category = str(data.get(LogConstants.KEY_EVENT_CATEGORY, ""))
-	dto.duration_ms = int(data.get(LogConstants.KEY_DURATION_MS, 0))
-	dto.source_file = str(data.get(LogConstants.KEY_SOURCE_FILE, ""))
-	dto.source_line = int(data.get(LogConstants.KEY_SOURCE_LINE, 0))
-	var rk: Variant = data.get(LogConstants.KEY_REDACTED_KEYS, [])
-	if rk is Array:
-		for k in (rk as Array):
-			dto.redacted_keys.append(str(k))
-	return dto
+		return record_dto
+	LogRecordDTO.populate_base_from_dict(record_dto, data)
+	record_dto.trace_id = str(data.get(LogConstants.KEY_TRACE_ID, ""))
+	record_dto.parent_span_id = str(data.get(LogConstants.KEY_PARENT_SPAN_ID, ""))
+	record_dto.event_category = str(data.get(LogConstants.KEY_EVENT_CATEGORY, ""))
+	record_dto.duration_ms = int(data.get(LogConstants.KEY_DURATION_MS, 0))
+	record_dto.source_file = str(data.get(LogConstants.KEY_SOURCE_FILE, ""))
+	record_dto.source_line = int(data.get(LogConstants.KEY_SOURCE_LINE, 0))
+	var raw_redacted_keys: Variant = data.get(LogConstants.KEY_REDACTED_KEYS, [])
+	if raw_redacted_keys is Array:
+		for redacted_key in (raw_redacted_keys as Array):
+			record_dto.redacted_keys.append(str(redacted_key))
+	return record_dto

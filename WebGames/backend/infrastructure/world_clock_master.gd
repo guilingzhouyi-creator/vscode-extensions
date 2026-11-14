@@ -20,25 +20,25 @@ var calendar_days: int = 1    # 历法天数
 var calendar_months: int = 1  # 历法月数
 var calendar_years: int = 1   # 历法年数
 
-var _clock_cfg_version: int = -1
+var _clock_config_version: int = -1
 var _hours_per_day_cached: int = 24
 var _days_per_month_cached: int = 30
 var _months_per_year_cached: int = 12
-var _cat_combat_cached: String = "combat"
-var _cat_travel_cached: String = "travel"
-var _cat_bio_cached: String = "bio"
+var _category_combat_cached: String = "combat"
+var _category_travel_cached: String = "travel"
+var _category_bio_cached: String = "bio"
 
 func _ensure_clock_cache() -> void:
-	var cfg_ver: int = GameConfig.config_reload_version()
-	if _clock_cfg_version == cfg_ver:
+	var config_version: int = GameConfig.config_reload_version()
+	if _clock_config_version == config_version:
 		return
 	_hours_per_day_cached = maxi(1, GameConfig.get_int("infrastructure.clock", "hours_per_day", 24))
 	_days_per_month_cached = maxi(1, GameConfig.get_int("infrastructure.clock", "days_per_month", 30))
 	_months_per_year_cached = maxi(1, GameConfig.get_int("infrastructure.clock", "months_per_year", 12))
-	_cat_combat_cached = EventBusCore.get_category_name("combat")
-	_cat_travel_cached = EventBusCore.get_category_name("travel")
-	_cat_bio_cached = EventBusCore.get_category_name("bio")
-	_clock_cfg_version = cfg_ver
+	_category_combat_cached = EventBusCore.get_category_name("combat")
+	_category_travel_cached = EventBusCore.get_category_name("travel")
+	_category_bio_cached = EventBusCore.get_category_name("bio")
+	_clock_config_version = config_version
 
 # ==============================================================================
 # 二、三级时钟推进
@@ -49,7 +49,7 @@ func tick_combat(delta_ticks: int = 1) -> int:
 	combat_tick += delta_ticks
 	_ensure_clock_cache()
 	EventBusCore.get_instance().emit_world_clock_advanced(
-		_cat_combat_cached, combat_tick,
+		_category_combat_cached, combat_tick,
 		EventBusCore.render_narrative("clock/combat_tick", [combat_tick, delta_ticks])
 	)
 	return combat_tick
@@ -66,7 +66,7 @@ func advance_travel_hours(hours: int = 1) -> Dictionary:
 
 	var status := get_calendar_time_dict()
 	EventBusCore.get_instance().emit_world_clock_advanced(
-		_cat_travel_cached, calendar_days,
+		_category_travel_cached, calendar_days,
 		EventBusCore.render_narrative("clock/travel_calendar", [calendar_years, calendar_months, calendar_days, travel_hours])
 	)
 	return status
@@ -91,7 +91,7 @@ func advance_calendar_months(months: int = 1) -> Dictionary:
 		calendar_years += 1
 	var status := get_calendar_time_dict()
 	EventBusCore.get_instance().emit_world_clock_advanced(
-		_cat_bio_cached, calendar_months,
+		_category_bio_cached, calendar_months,
 		EventBusCore.render_narrative("clock/bio_epoch", [calendar_years, calendar_months])
 	)
 	return status

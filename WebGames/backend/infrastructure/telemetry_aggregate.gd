@@ -35,9 +35,9 @@ class SlotMetric extends RefCounted:
 		if not _dirty:
 			return
 		_dirty = false
-		var res := StatisticsMathLib.compute_p50_p95(duration_samples)
-		p50_ms = int(res.get("p50_ms", 0))
-		p95_ms = int(res.get("p95_ms", 0))
+		var percentile_metrics := StatisticsMathLib.compute_p50_p95(duration_samples)
+		p50_ms = int(percentile_metrics.get("p50_ms", 0))
+		p95_ms = int(percentile_metrics.get("p95_ms", 0))
 
 	## 序列化槽位指标（供外部查询快照；不导出原始样本序列，防内存放大）
 	func to_dict() -> Dictionary:
@@ -78,11 +78,11 @@ static func _ensure_config() -> void:
 	if _cached_version == current_version:
 		return
 	_cached_version = current_version
-	
-	var telemetry_cfg := GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_TELEMETRY, {})
-	_enabled = bool(telemetry_cfg.get("enabled", true))
-	_window_seconds = maxi(1, int(telemetry_cfg.get("window_seconds", LogConstants.DEFAULT_TELEMETRY_WINDOW_SEC)))
-	_sample_size = maxi(LogConstants.MIN_TELEMETRY_SAMPLE_SIZE, int(telemetry_cfg.get("sample_size", LogConstants.DEFAULT_TELEMETRY_SAMPLE_SIZE)))
+
+	var telemetry_config := GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_TELEMETRY, {})
+	_enabled = bool(telemetry_config.get("enabled", true))
+	_window_seconds = maxi(1, int(telemetry_config.get("window_seconds", LogConstants.DEFAULT_TELEMETRY_WINDOW_SEC)))
+	_sample_size = maxi(LogConstants.MIN_TELEMETRY_SAMPLE_SIZE, int(telemetry_config.get("sample_size", LogConstants.DEFAULT_TELEMETRY_SAMPLE_SIZE)))
 
 # ==============================================================================
 # 三、单向消费与聚合
@@ -95,25 +95,25 @@ static func consume(record: StructuredLogRecord) -> void:
 	_ensure_config()
 	if not _enabled:
 		return
-		
+
 	var now := int(Time.get_unix_time_from_system())
 	_maybe_roll_window(now)
-	
+
 	var domain_key := record.channel if not record.channel.is_empty() else LogConstants.CHANNEL_GLOBAL
-	var cat_key := record.event_category if not record.event_category.is_empty() else LogConstants.CATEGORY_DEFAULT
-	var slot_key := "%s|%s" % [domain_key, cat_key]
-	
+	var category_key := record.event_category if not record.event_category.is_empty() else LogConstants.CATEGORY_DEFAULT
+	var slot_key := "%s|%s" % [domain_key, category_key]
+
 	var slot: SlotMetric = _slots.get(slot_key, null)
 	if slot == null:
 		slot = SlotMetric.new()
 		slot.domain = domain_key
-		slot.event_category = cat_key
+		slot.event_category = category_key
 		_slots[slot_key] = slot
-		
+
 	slot.count += 1
 	slot.total_duration_ms += record.duration_ms
 	slot.last_timestamp_utc = record.timestamp_utc if record.timestamp_utc > 0 else now
-	
+
 	if record.duration_ms > 0 or slot.duration_samples.size() == 0:
 		_track_duration(slot, record.duration_ms)
 
@@ -142,9 +142,9 @@ static func _maybe_roll_window(now_utc: int) -> void:
 static func snapshot() -> Dictionary:
 	_ensure_config()
 	var slots_dict: Dictionary = {}
-	for k in _slots.keys():
-		var slot: SlotMetric = _slots[k]
-		slots_dict[k] = slot.to_dict()
+	for slot_key in _slots.keys():
+		var slot: SlotMetric = _slots[slot_key]
+		slots_dict[slot_key] = slot.to_dict()
 	return {
 		"window_start_utc": _window_start_utc,
 		"window_seconds": _window_seconds,

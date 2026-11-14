@@ -43,34 +43,34 @@ static func format(
 
 	var parts: PackedStringArray = PackedStringArray()
 	var cursor: int = 0
-	for m in matches:
-		var m_start: int = m.get_start(0)
-		var m_end: int = m.get_end(0)
-		if m_start > cursor:
-			parts.append(template_str.substr(cursor, m_start - cursor))
-		var key := m.get_string(1)
-		var val_found: bool = false
-		var val_str: String = ""
+	for placeholder_match in matches:
+		var match_start: int = placeholder_match.get_start(0)
+		var match_end: int = placeholder_match.get_end(0)
+		if match_start > cursor:
+			parts.append(template_str.substr(cursor, match_start - cursor))
+		var key := placeholder_match.get_string(1)
+		var value_found: bool = false
+		var value_text: String = ""
 
 		if params.has(key):
-			val_found = true
-			val_str = str(params[key])
+			value_found = true
+			value_text = str(params[key])
 		elif params.has(key.to_lower()):
-			val_found = true
-			val_str = str(params[key.to_lower()])
+			value_found = true
+			value_text = str(params[key.to_lower()])
 		elif params.has(key.to_upper()):
-			val_found = true
-			val_str = str(params[key.to_upper()])
+			value_found = true
+			value_text = str(params[key.to_upper()])
 
 		var placeholder := "{" + key + "}"
-		if val_found:
-			parts.append(val_str)
+		if value_found:
+			parts.append(value_text)
 		elif not keep_unmatched:
 			var replacement := fallback_marker if not fallback_marker.is_empty() else placeholder
 			parts.append(replacement)
 		else:
 			parts.append(placeholder)
-		cursor = m_end
+		cursor = match_end
 
 	if cursor < template_str.length():
 		parts.append(template_str.substr(cursor))
@@ -83,8 +83,8 @@ static func extract_param_keys(template_str: String) -> Array[String]:
 	if template_str.is_empty():
 		return keys
 	var matches := _regex.search_all(template_str)
-	for m in matches:
-		var key := m.get_string(1)
+	for placeholder_match in matches:
+		var key := placeholder_match.get_string(1)
 		if not keys.has(key):
 			keys.append(key)
 	return keys
