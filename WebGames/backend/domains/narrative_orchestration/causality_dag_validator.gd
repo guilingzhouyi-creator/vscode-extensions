@@ -28,27 +28,27 @@ static func _validate_graph_topology_integrity(graph: NarrativeDAGGraphDTO) -> D
 
 	return {"is_valid": true}
 
-static func _check_node_prerequisites(nid: String, node: NarrativeDAGNode, graph: NarrativeDAGGraphDTO) -> Dictionary:
-	for pre in node.required_prerequisites:
-		if not graph.nodes.has(pre):
+static func _check_node_prerequisites(node_id: String, node: NarrativeDAGNode, graph: NarrativeDAGGraphDTO) -> Dictionary:
+	for prerequisite_id in node.required_prerequisites:
+		if not graph.nodes.has(prerequisite_id):
 			return {
 				"is_valid": false,
 				"error_code": "MISSING_PREREQUISITE",
 				"message": TemplateFormatter.format(
 					"Node {node_id} requires missing prerequisite: {prerequisite}",
-					{"node_id": nid, "prerequisite": pre}
+					{"node_id": node_id, "prerequisite": prerequisite_id}
 				)
 			}
 	return {"is_valid": true}
 
-static func _init_dag_buckets(nid: Variant, in_degree: Dictionary, adj_list: Dictionary) -> void:
-	in_degree[nid] = 0
-	adj_list[nid] = []
+static func _init_dag_buckets(node_id: Variant, in_degree: Dictionary, adjacency_list: Dictionary) -> void:
+	in_degree[node_id] = 0
+	adjacency_list[node_id] = []
 
 ## 构建入度表、邻接表并校验悬挂边与缺失前置
-static func _build_degrees_and_edges(graph: NarrativeDAGGraphDTO, in_degree: Dictionary, adj_list: Dictionary) -> Dictionary:
-	for nid in graph.nodes.keys():
-		_init_dag_buckets(nid, in_degree, adj_list)
+static func _build_degrees_and_edges(graph: NarrativeDAGGraphDTO, in_degree: Dictionary, adjacency_list: Dictionary) -> Dictionary:
+	for node_id in graph.nodes.keys():
+		_init_dag_buckets(node_id, in_degree, adjacency_list)
 
 	for edge in graph.edges:
 		if not graph.nodes.has(edge.from_node_id) or not graph.nodes.has(edge.to_node_id):
@@ -60,23 +60,23 @@ static func _build_degrees_and_edges(graph: NarrativeDAGGraphDTO, in_degree: Dic
 					{"from_id": edge.from_node_id, "to_id": edge.to_node_id}
 				)
 			}
-		adj_list[edge.from_node_id].append(edge.to_node_id)
+		adjacency_list[edge.from_node_id].append(edge.to_node_id)
 		in_degree[edge.to_node_id] = int(in_degree.get(edge.to_node_id, 0)) + 1
 
-	for nid in graph.nodes.keys():
-		var node: NarrativeDAGNode = graph.nodes[nid]
-		var prereq_res := _check_node_prerequisites(nid, node, graph)
-		if not prereq_res.get("is_valid", false):
-			return prereq_res
+	for node_id in graph.nodes.keys():
+		var node: NarrativeDAGNode = graph.nodes[node_id]
+		var prerequisite_result := _check_node_prerequisites(node_id, node, graph)
+		if not prerequisite_result.get("is_valid", false):
+			return prerequisite_result
 
 	return {"is_valid": true}
 
 ## 基于 Kahn 拓扑排序算法检测死锁循环依赖环
-static func _detect_cycle_kahn(graph: NarrativeDAGGraphDTO, in_degree: Dictionary, adj_list: Dictionary) -> Dictionary:
+static func _detect_cycle_kahn(graph: NarrativeDAGGraphDTO, in_degree: Dictionary, adjacency_list: Dictionary) -> Dictionary:
 	var zero_in_degree_queue: Array[String] = []
-	for nid in in_degree.keys():
-		if in_degree[nid] == 0:
-			zero_in_degree_queue.append(nid)
+	for node_id in in_degree.keys():
+		if in_degree[node_id] == 0:
+			zero_in_degree_queue.append(node_id)
 
 	var head: int = 0
 	var visited_count := 0
@@ -84,7 +84,7 @@ static func _detect_cycle_kahn(graph: NarrativeDAGGraphDTO, in_degree: Dictionar
 		var current: String = zero_in_degree_queue[head]
 		head += 1
 		visited_count += 1
-		_drain_kahn_neighbors(current, adj_list, in_degree, zero_in_degree_queue)
+		_drain_kahn_neighbors(current, adjacency_list, in_degree, zero_in_degree_queue)
 
 	if visited_count < graph.nodes.size():
 		return {
@@ -99,57 +99,57 @@ static func _detect_cycle_kahn(graph: NarrativeDAGGraphDTO, in_degree: Dictionar
 	return {"is_valid": true, "visited_count": visited_count}
 
 ## 消耗 Kahn 拓扑排序中当前节点的邻接入度
-static func _drain_kahn_neighbors(current: String, adj_list: Dictionary, in_degree: Dictionary, queue: Array[String]) -> void:
-	for neighbor in (adj_list.get(current, []) as Array):
-		var n_str := str(neighbor)
-		in_degree[n_str] = int(in_degree.get(n_str, 0)) - 1
-		if in_degree[n_str] == 0:
-			queue.append(n_str)
+static func _drain_kahn_neighbors(current: String, adjacency_list: Dictionary, in_degree: Dictionary, queue: Array[String]) -> void:
+	for neighbor in (adjacency_list.get(current, []) as Array):
+		var neighbor_id := str(neighbor)
+		in_degree[neighbor_id] = int(in_degree.get(neighbor_id, 0)) - 1
+		if in_degree[neighbor_id] == 0:
+			queue.append(neighbor_id)
 
 ## 校验非可选节点的入口可达闭包
-static func _verify_reachability(graph: NarrativeDAGGraphDTO, adj_list: Dictionary = {}) -> Dictionary:
-	var reachable := _collect_reachable_nodes(graph, adj_list)
-	for nid in graph.nodes.keys():
-		if reachable.has(nid):
+static func _verify_reachability(graph: NarrativeDAGGraphDTO, adjacency_list: Dictionary = {}) -> Dictionary:
+	var reachable := _collect_reachable_nodes(graph, adjacency_list)
+	for node_id in graph.nodes.keys():
+		if reachable.has(node_id):
 			continue
-		var node: NarrativeDAGNode = graph.nodes[nid]
+		var node: NarrativeDAGNode = graph.nodes[node_id]
 		if not node.is_optional:
 			return {
 				"is_valid": false,
 				"error_code": "UNREACHABLE_NODE",
-				"message": "非可选节点 %s 无法从入口 %s 沿边到达（孤立/断链）" % [nid, graph.entry_node_id]
+				"message": "非可选节点 %s 无法从入口 %s 沿边到达（孤立/断链）" % [node_id, graph.entry_node_id]
 			}
 	return {"is_valid": true}
 
 ## 对传入的剧情 DAG 图元进行静态拓扑校验 (Kahn 算法)
 static func validate_graph(graph: NarrativeDAGGraphDTO) -> Dictionary:
-	var integrity_res := _validate_graph_topology_integrity(graph)
-	if not integrity_res.get("is_valid", false):
-		return integrity_res
+	var integrity_result := _validate_graph_topology_integrity(graph)
+	if not integrity_result.get("is_valid", false):
+		return integrity_result
 
 	var in_degree: Dictionary = {}
-	var adj_list: Dictionary = {}
-	var degree_res := _build_degrees_and_edges(graph, in_degree, adj_list)
-	if not degree_res.get("is_valid", false):
-		return degree_res
+	var adjacency_list: Dictionary = {}
+	var degree_result := _build_degrees_and_edges(graph, in_degree, adjacency_list)
+	if not degree_result.get("is_valid", false):
+		return degree_result
 
-	var cycle_res := _detect_cycle_kahn(graph, in_degree, adj_list)
-	if not cycle_res.get("is_valid", false):
-		return cycle_res
+	var cycle_result := _detect_cycle_kahn(graph, in_degree, adjacency_list)
+	if not cycle_result.get("is_valid", false):
+		return cycle_result
 
-	var reach_res := _verify_reachability(graph, adj_list)
-	if not reach_res.get("is_valid", false):
-		return reach_res
+	var reachability_result := _verify_reachability(graph, adjacency_list)
+	if not reachability_result.get("is_valid", false):
+		return reachability_result
 
-	return {"is_valid": true, "sorted_node_count": cycle_res.get("visited_count", 0)}
+	return {"is_valid": true, "sorted_node_count": cycle_result.get("visited_count", 0)}
 
 
-static func _expand_reachable_edges(current: String, graph: NarrativeDAGGraphDTO, adj_list: Dictionary, reachable: Dictionary, frontier: Array[String]) -> void:
-	if not adj_list.is_empty():
-		var neighbors: Variant = adj_list.get(current, null)
+static func _expand_reachable_edges(current: String, graph: NarrativeDAGGraphDTO, adjacency_list: Dictionary, reachable: Dictionary, frontier: Array[String]) -> void:
+	if not adjacency_list.is_empty():
+		var neighbors: Variant = adjacency_list.get(current, null)
 		if neighbors is Array:
-			for nxt in (neighbors as Array):
-				var next_id := str(nxt)
+			for neighbor_node_id in (neighbors as Array):
+				var next_id := str(neighbor_node_id)
 				if not reachable.has(next_id):
 					reachable[next_id] = true
 					frontier.append(next_id)
@@ -163,12 +163,12 @@ static func _expand_reachable_edges(current: String, graph: NarrativeDAGGraphDTO
 			frontier.append(next_id)
 
 ## 从入口节点出发沿有向边收集可达节点集合（O(V+E) 邻接表 BFS）
-static func _collect_reachable_nodes(graph: NarrativeDAGGraphDTO, adj_list: Dictionary = {}) -> Dictionary:
+static func _collect_reachable_nodes(graph: NarrativeDAGGraphDTO, adjacency_list: Dictionary = {}) -> Dictionary:
 	var reachable := {graph.entry_node_id: true}
 	var frontier: Array[String] = [graph.entry_node_id]
 	var head: int = 0
 	while head < frontier.size():
 		var current: String = frontier[head]
 		head += 1
-		_expand_reachable_edges(current, graph, adj_list, reachable, frontier)
+		_expand_reachable_edges(current, graph, adjacency_list, reachable, frontier)
 	return reachable

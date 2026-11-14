@@ -93,16 +93,16 @@ static func calculate_decayed_resonance(original_resonance: float, emitted_times
     return original_resonance * pow(0.5, half_lives)
 
 ## 安全将 DTO 转为字典（独立函数消除循环体内堆分配）
-func _dto_to_dict(p: CrossWorldPerturbationDTO) -> Dictionary:
-    if p == null:
+func _dto_to_dict(perturbation: CrossWorldPerturbationDTO) -> Dictionary:
+    if perturbation == null:
         return {}
-    return p.to_dto()
+    return perturbation.to_dto()
 
 ## 安全将字典转为 DTO（独立函数消除循环体内堆分配）
-func _dict_to_dto(d: Dictionary) -> CrossWorldPerturbationDTO:
-    if d == null or d.is_empty():
+func _dict_to_dto(perturbation_data: Dictionary) -> CrossWorldPerturbationDTO:
+    if perturbation_data == null or perturbation_data.is_empty():
         return null
-    return CrossWorldPerturbationDTO.from_dto(d)
+    return CrossWorldPerturbationDTO.from_dto(perturbation_data)
 
 ## 从物理磁盘加载扰动账本
 func _load_ledger_from_disk() -> void:
@@ -119,39 +119,39 @@ func _load_ledger_from_disk() -> void:
 
     var content := file.get_as_text()
     file.close()
-    var parsed_val: Variant = JSON.parse_string(content)
-    if not (parsed_val is Array):
+    var parsed_value: Variant = JSON.parse_string(content)
+    if not (parsed_value is Array):
         return
 
-    var raw_list := parsed_val as Array
+    var raw_list := parsed_value as Array
     for item in raw_list:
         if item is Dictionary:
             var item_dict := item as Dictionary
-            var dto := _dict_to_dto(item_dict)
-            if dto != null and not dto.perturbation_id.is_empty():
-                _perturbations.append(dto)
-                _perturbations_by_id[dto.perturbation_id] = dto
-                _serialized_by_id[dto.perturbation_id] = _dto_to_dict(dto)
+            var perturbation_dto := _dict_to_dto(item_dict)
+            if perturbation_dto != null and not perturbation_dto.perturbation_id.is_empty():
+                _perturbations.append(perturbation_dto)
+                _perturbations_by_id[perturbation_dto.perturbation_id] = perturbation_dto
+                _serialized_by_id[perturbation_dto.perturbation_id] = _dto_to_dict(perturbation_dto)
 
 ## 原子刷盘物理账本（按扰动条目增量缓存字典序列化结果，避免每条触发全量重转）
 func _flush_ledger_to_disk() -> bool:
     var serialized_items: Array[Dictionary] = []
-    for p in _perturbations:
-        var pid := p.perturbation_id
-        var d: Dictionary = _serialized_by_id.get(pid, {})
-        if d.is_empty():
-            d = _dto_to_dict(p)
-            if not d.is_empty():
-                _serialized_by_id[pid] = d
-        if not d.is_empty():
-            serialized_items.append(d)
+    for perturbation in _perturbations:
+        var perturbation_id := perturbation.perturbation_id
+        var serialized_dict: Dictionary = _serialized_by_id.get(perturbation_id, {})
+        if serialized_dict.is_empty():
+            serialized_dict = _dto_to_dict(perturbation)
+            if not serialized_dict.is_empty():
+                _serialized_by_id[perturbation_id] = serialized_dict
+        if not serialized_dict.is_empty():
+            serialized_items.append(serialized_dict)
 
     var json_text := JSON.stringify(serialized_items)
-    var write_res: Dictionary = AtomicFileWriter.write_text_atomic(_ledger_path, json_text, {
+    var write_result: Dictionary = AtomicFileWriter.write_text_atomic(_ledger_path, json_text, {
         "tmp_suffix": ".tmp",
         "create_backup": false
     })
-    return bool(write_res.get("success", false))
+    return bool(write_result.get("success", false))
 
 ## 发射因果虚空共鸣扰动
 func emit_perturbation(perturbation: CrossWorldPerturbationDTO) -> Dictionary:
@@ -162,9 +162,9 @@ func emit_perturbation(perturbation: CrossWorldPerturbationDTO) -> Dictionary:
     if perturbation.origin_world_id.is_empty():
         return {"success": false, "error": "ERR_EMPTY_ORIGIN_WORLD_ID"}
 
-    var now_ts: int = int(Time.get_unix_time_from_system())
+    var current_timestamp: int = int(Time.get_unix_time_from_system())
     if perturbation.emitted_timestamp_utc <= 0:
-        perturbation.emitted_timestamp_utc = now_ts
+        perturbation.emitted_timestamp_utc = current_timestamp
     if perturbation.decay_half_life_seconds <= 0:
         perturbation.decay_half_life_seconds = _default_decay_half_life
     if perturbation.perturbation_seed == 0:
@@ -173,45 +173,46 @@ func emit_perturbation(perturbation: CrossWorldPerturbationDTO) -> Dictionary:
     if not perturbation.visited_world_ids.has(perturbation.origin_world_id):
         perturbation.visited_world_ids.append(perturbation.origin_world_id)
 
-    var pid := perturbation.perturbation_id
-    if _perturbations_by_id.has(pid):
-        _perturbations_by_id[pid] = perturbation
-        for i in range(_perturbations.size()):
-            if _perturbations[i].perturbation_id == pid:
-                _perturbations[i] = perturbation
+    var perturbation_id := perturbation.perturbation_id
+    if _perturbations_by_id.has(perturbation_id):
+        _perturbations_by_id[perturbation_id] = perturbation
+        for entry_index in range(_perturbations.size()):
+            if _perturbations[entry_index].perturbation_id == perturbation_id:
+                _perturbations[entry_index] = perturbation
                 break
     else:
-        _perturbations_by_id[pid] = perturbation
+        _perturbations_by_id[perturbation_id] = perturbation
         _perturbations.append(perturbation)
-    _serialized_by_id[pid] = _dto_to_dict(perturbation)
+    _serialized_by_id[perturbation_id] = _dto_to_dict(perturbation)
 
     var flushed := _flush_ledger_to_disk()
     return {
         "success": true,
-        "perturbation_id": pid,
+        "perturbation_id": perturbation_id,
         "flushed": flushed
     }
 
-## 针对指定目标世界拉取有效扰动列表（过滤同世界、已访问及已完全衰减项）
-func _is_perturbation_active(p: CrossWorldPerturbationDTO, now_ts: int) -> bool:
-    var eff_res := calculate_decayed_resonance(p.resonance_intensity, p.emitted_timestamp_utc, p.decay_half_life_seconds, now_ts)
-    return eff_res >= _min_resonance_threshold
+## 判定扰动在当前时间戳是否仍满足最小共鸣强度阈值
+func _is_perturbation_active(perturbation: CrossWorldPerturbationDTO, current_timestamp: int) -> bool:
+    var effective_resonance := calculate_decayed_resonance(perturbation.resonance_intensity, perturbation.emitted_timestamp_utc, perturbation.decay_half_life_seconds, current_timestamp)
+    return effective_resonance >= _min_resonance_threshold
 
+## 针对指定目标世界拉取有效扰动列表（过滤同世界、已访问及已完全衰减项）
 func poll_perturbations_for_world(target_world_id: String) -> Array[CrossWorldPerturbationDTO]:
     if target_world_id.is_empty():
         var empty_list: Array[CrossWorldPerturbationDTO] = []
         return empty_list
 
-    var now_ts: int = int(Time.get_unix_time_from_system())
+    var current_timestamp: int = int(Time.get_unix_time_from_system())
     var eligible: Array[CrossWorldPerturbationDTO] = []
 
-    for p in _perturbations:
-        if p.origin_world_id == target_world_id:
+    for perturbation in _perturbations:
+        if perturbation.origin_world_id == target_world_id:
             continue
-        if p.visited_world_ids.has(target_world_id):
+        if perturbation.visited_world_ids.has(target_world_id):
             continue
-        if _is_perturbation_active(p, now_ts):
-            eligible.append(p)
+        if _is_perturbation_active(perturbation, current_timestamp):
+            eligible.append(perturbation)
 
     return eligible
 
@@ -223,22 +224,22 @@ func mark_world_visited(perturbation_id: String, target_world_id: String) -> boo
     if not _perturbations_by_id.has(perturbation_id):
         return false
 
-    var p: CrossWorldPerturbationDTO = _perturbations_by_id[perturbation_id]
-    if not p.visited_world_ids.has(target_world_id):
-        p.visited_world_ids.append(target_world_id)
-        _serialized_by_id[perturbation_id] = _dto_to_dict(p)
+    var perturbation: CrossWorldPerturbationDTO = _perturbations_by_id[perturbation_id]
+    if not perturbation.visited_world_ids.has(target_world_id):
+        perturbation.visited_world_ids.append(target_world_id)
+        _serialized_by_id[perturbation_id] = _dto_to_dict(perturbation)
         _flush_ledger_to_disk()
     return true
 
 ## 清理修剪已衰减至阈值以下或超出最大容量的扰动
 func prune_decayed_perturbations() -> int:
-    var now_ts: int = int(Time.get_unix_time_from_system())
+    var current_timestamp: int = int(Time.get_unix_time_from_system())
     var retained: Array[CrossWorldPerturbationDTO] = []
     var pruned_count: int = 0
 
-    for p in _perturbations:
-        if _is_perturbation_active(p, now_ts):
-            retained.append(p)
+    for perturbation in _perturbations:
+        if _is_perturbation_active(perturbation, current_timestamp):
+            retained.append(perturbation)
         else:
             pruned_count += 1
 
@@ -251,9 +252,9 @@ func prune_decayed_perturbations() -> int:
         _perturbations = retained
         _perturbations_by_id.clear()
         _serialized_by_id.clear()
-        for p in _perturbations:
-            _perturbations_by_id[p.perturbation_id] = p
-            _serialized_by_id[p.perturbation_id] = _dto_to_dict(p)
+        for perturbation in _perturbations:
+            _perturbations_by_id[perturbation.perturbation_id] = perturbation
+            _serialized_by_id[perturbation.perturbation_id] = _dto_to_dict(perturbation)
         _flush_ledger_to_disk()
 
     return pruned_count

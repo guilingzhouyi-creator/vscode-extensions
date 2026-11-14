@@ -30,14 +30,14 @@ static func resolve_prologue_dag(
 
     var selected_dag_id: String = _resolve_builtin_routing_dag_id(race_id, origin_id)
 
-    # R4 审查修复：默认 DAG 单一事实源收敛为纯配置 is_default 规则驱动，
+    # 默认 DAG 单一事实源收敛为纯配置 is_default 规则驱动，
     # 移除代码内硬编码 fallback 字面量（配置缺失时返回 null 由上层防御）。
     if selected_dag_id.is_empty() or not catalog.has(selected_dag_id):
         return null
 
     return get_graph_by_id(selected_dag_id)
 
-## 按图编号获取已装配的 DAG 实体（R3 审查修复：复用模型 from_dto 全字段装配）
+## 按图编号获取已装配的 DAG 实体（复用模型 from_dto 全字段装配）
 static func get_graph_by_id(dag_id: String) -> NarrativeDAGGraphDTO:
     var catalog: Dictionary = GameConfig.get_dict("narratives.prologue_dag_catalog", "dag_graphs", {})
     if not catalog.has(dag_id):
@@ -60,8 +60,8 @@ static func _resolve_mod_prologue_dag_id(
 
     if manifest.is_empty():
         if not clean_origin.is_empty():
-            var builtin_orig: Dictionary = GameConfig.get_dict("domains.character_creation", "origins/" + clean_origin, {})
-            return str(builtin_orig.get("prologue_dag_id", "")).strip_edges()
+            var builtin_origin: Dictionary = GameConfig.get_dict("domains.character_creation", "origins/" + clean_origin, {})
+            return str(builtin_origin.get("prologue_dag_id", "")).strip_edges()
         return ""
 
     var custom_rules: Array = manifest.get("custom_routing_rules", [])
@@ -73,9 +73,9 @@ static func _resolve_mod_prologue_dag_id(
             return by_rule_origin
 
         # 2. 次取 origins_catalog[origin_id].prologue_dag_id 或 origin_dag_map
-        var by_origin_cfg: String = _lookup_origin_bound_dag_id(clean_origin, manifest)
-        if not by_origin_cfg.is_empty():
-            return by_origin_cfg
+        var by_origin_config: String = _lookup_origin_bound_dag_id(clean_origin, manifest)
+        if not by_origin_config.is_empty():
+            return by_origin_config
 
     # 3. 再次匹配 custom_routing_rules 中的 race_id 规则或默认规则
     var by_rule_race: String = _match_rules_by_race_or_default(custom_rules, clean_race)
@@ -83,7 +83,7 @@ static func _resolve_mod_prologue_dag_id(
 
 static func _evaluate_routing_rule(
     raw_rule: Variant,
-    empty_cond: Dictionary,
+    empty_condition: Dictionary,
     origin_id: String,
     race_id: String,
     match_origin_only: bool
@@ -91,19 +91,19 @@ static func _evaluate_routing_rule(
     if not (raw_rule is Dictionary):
         return {}
     var rule: Dictionary = raw_rule
-    var cond: Dictionary = rule.get("match_condition", empty_cond)
+    var condition: Dictionary = rule.get("match_condition", empty_condition)
     var target: String = str(rule.get("target_dag_id", "")).strip_edges()
     if target.is_empty():
         return {}
     if match_origin_only:
-        var origin_match: bool = cond.has("origin_id") and str(cond.get("origin_id", "")).strip_edges() == origin_id
-        var race_ok: bool = not cond.has("race_id") or str(cond.get("race_id", "")).strip_edges() == race_id
+        var origin_match: bool = condition.has("origin_id") and str(condition.get("origin_id", "")).strip_edges() == origin_id
+        var race_ok: bool = not condition.has("race_id") or str(condition.get("race_id", "")).strip_edges() == race_id
         return {"kind": "ORIGIN", "target": target} if (origin_match and race_ok) else {}
-    if cond.has("origin_id"):
+    if condition.has("origin_id"):
         return {}
-    if cond.has("race_id") and str(cond.get("race_id", "")).strip_edges() == race_id:
+    if condition.has("race_id") and str(condition.get("race_id", "")).strip_edges() == race_id:
         return {"kind": "RACE", "target": target}
-    if bool(cond.get("is_default", false)):
+    if bool(condition.get("is_default", false)):
         return {"kind": "DEFAULT", "target": target}
     return {}
 
@@ -112,9 +112,9 @@ static func _match_rules_by_origin(
     origin_id: String,
     race_id: String
 ) -> String:
-    var empty_cond: Dictionary = {}
-    for r in rules:
-        var matched: Dictionary = _evaluate_routing_rule(r, empty_cond, origin_id, race_id, true)
+    var empty_condition: Dictionary = {}
+    for rule_entry in rules:
+        var matched: Dictionary = _evaluate_routing_rule(rule_entry, empty_condition, origin_id, race_id, true)
         if not matched.is_empty():
             return str(matched["target"])
     return ""
@@ -126,11 +126,11 @@ static func _lookup_origin_bound_dag_id(origin_id: String, manifest: Dictionary)
         if not mapped.is_empty():
             return mapped
 
-    var origins_cat: Dictionary = manifest.get("origins_catalog", manifest.get("origins", {}))
-    if origins_cat.has(origin_id):
-        var orig_entry: Variant = origins_cat.get(origin_id)
-        if orig_entry is Dictionary:
-            var bound_dag: String = str((orig_entry as Dictionary).get("prologue_dag_id", "")).strip_edges()
+    var origins_catalog: Dictionary = manifest.get("origins_catalog", manifest.get("origins", {}))
+    if origins_catalog.has(origin_id):
+        var origin_entry: Variant = origins_catalog.get(origin_id)
+        if origin_entry is Dictionary:
+            var bound_dag: String = str((origin_entry as Dictionary).get("prologue_dag_id", "")).strip_edges()
             if not bound_dag.is_empty():
                 return bound_dag
 
@@ -144,9 +144,9 @@ static func _lookup_origin_bound_dag_id(origin_id: String, manifest: Dictionary)
 
 static func _match_rules_by_race_or_default(rules: Array, race_id: String) -> String:
     var default_dag_id: String = ""
-    var empty_cond: Dictionary = {}
-    for r in rules:
-        var matched: Dictionary = _evaluate_routing_rule(r, empty_cond, "", race_id, false)
+    var empty_condition: Dictionary = {}
+    for rule_entry in rules:
+        var matched: Dictionary = _evaluate_routing_rule(rule_entry, empty_condition, "", race_id, false)
         if matched.is_empty():
             continue
         if str(matched["kind"]) == "RACE":
@@ -158,19 +158,19 @@ static func _match_rules_by_race_or_default(rules: Array, race_id: String) -> St
 static func _resolve_builtin_routing_dag_id(race_id: String, origin_id: String) -> String:
     var routing_rules: Array = GameConfig.get_array("narratives.prologue_dag_catalog", "prologue_routing_rules", [])
     var selected_dag_id: String = ""
-    var empty_cond: Dictionary = {}
+    var empty_condition: Dictionary = {}
 
-    for r in routing_rules:
-        if not (r is Dictionary):
+    for rule_entry in routing_rules:
+        if not (rule_entry is Dictionary):
             continue
-        var rule: Dictionary = r
-        var cond: Dictionary = rule.get("match_condition", empty_cond)
-        if not origin_id.is_empty() and cond.has("origin_id") and str(cond["origin_id"]) == origin_id:
+        var rule: Dictionary = rule_entry
+        var condition: Dictionary = rule.get("match_condition", empty_condition)
+        if not origin_id.is_empty() and condition.has("origin_id") and str(condition["origin_id"]) == origin_id:
             return str(rule.get("target_dag_id", ""))
-        if bool(cond.get("is_default", false)):
+        if bool(condition.get("is_default", false)):
             if selected_dag_id.is_empty():
                 selected_dag_id = str(rule.get("target_dag_id", ""))
-        elif cond.has("race_id") and str(cond["race_id"]) == race_id:
+        elif condition.has("race_id") and str(condition["race_id"]) == race_id:
             selected_dag_id = str(rule.get("target_dag_id", ""))
             break
 
@@ -190,42 +190,42 @@ static func _resolve_or_synthesize_mod_graph(
 
     # 当 MOD 仅声明专属 prologue_dag_id / target_dag_id 时，继承默认模板结构并赋予专属 graph_id
     var template_raw: Dictionary = {}
-    for k in builtin_catalog.keys():
-        if builtin_catalog[k] is Dictionary:
-            template_raw = builtin_catalog[k] as Dictionary
+    for graph_key in builtin_catalog.keys():
+        if builtin_catalog[graph_key] is Dictionary:
+            template_raw = builtin_catalog[graph_key] as Dictionary
             break
     return assemble_graph_from_raw(dag_id, template_raw)
 
 ## 从原始叙事配置装配编排事件因果图谱
 static func assemble_graph_from_raw(dag_id: String, raw: Dictionary) -> NarrativeDAGGraphDTO:
-    var g := NarrativeDAGGraphDTO.new(dag_id)
-    g.entry_node_id = str(raw.get("entry_node_id", ""))
-    g.terminal_node_id = str(raw.get("terminal_node_id", ""))
+    var graph := NarrativeDAGGraphDTO.new(dag_id)
+    graph.entry_node_id = str(raw.get("entry_node_id", ""))
+    graph.terminal_node_id = str(raw.get("terminal_node_id", ""))
 
     var raw_nodes: Dictionary = raw.get("nodes", {})
-    for nid in raw_nodes.keys():
-        _add_single_raw_node(g, str(nid), raw_nodes[nid])
+    for node_id in raw_nodes.keys():
+        _add_single_raw_node(graph, str(node_id), raw_nodes[node_id])
 
     var raw_edges: Array = raw.get("edges", [])
-    for ed in raw_edges:
-        _add_single_raw_edge(g, ed)
+    for raw_edge in raw_edges:
+        _add_single_raw_edge(graph, raw_edge)
 
-    return g
+    return graph
 
 static func _add_single_raw_node(
-    g: NarrativeDAGGraphDTO,
-    nid: String,
+    graph: NarrativeDAGGraphDTO,
+    node_id: String,
     raw_node: Variant
 ) -> void:
     if not (raw_node is Dictionary):
         return
     var node := NarrativeDAGNode.from_dto(raw_node as Dictionary)
     if node.node_id.is_empty():
-        node.node_id = nid
-    g.add_node(node)
+        node.node_id = node_id
+    graph.add_node(node)
 
-static func _add_single_raw_edge(g: NarrativeDAGGraphDTO, raw_edge: Variant) -> void:
+static func _add_single_raw_edge(graph: NarrativeDAGGraphDTO, raw_edge: Variant) -> void:
     if not (raw_edge is Dictionary):
         return
     var edge := NarrativeDAGEdge.from_dto(raw_edge as Dictionary)
-    g.add_edge(edge)
+    graph.add_edge(edge)

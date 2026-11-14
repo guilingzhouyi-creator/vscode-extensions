@@ -34,15 +34,15 @@ func get_hook_interceptor() -> Callable:
 	return _hook_interceptor
 
 ## 以图结构初始化运行时会话：DAG 合法性校验（环检测/可达性）通过后激活入口节点并广播激活事件
-func initialize_with_graph(p_graph: NarrativeDAGGraphDTO, initial_context: Dictionary = {}) -> Dictionary:
-	if p_graph == null:
+func initialize_with_graph(target_graph: NarrativeDAGGraphDTO, initial_context: Dictionary = {}) -> Dictionary:
+	if target_graph == null:
 		return { "success": false, "error_code": "NULL_GRAPH" }
 
-	var val_res := CausalityDagValidator.validate_graph(p_graph)
-	if not val_res.get("is_valid", false):
-		return { "success": false, "error_code": val_res.get("error_code", "INVALID_GRAPH"), "details": val_res }
+	var validation_result := CausalityDagValidator.validate_graph(target_graph)
+	if not validation_result.get("is_valid", false):
+		return { "success": false, "error_code": validation_result.get("error_code", "INVALID_GRAPH"), "details": validation_result }
 
-	graph = p_graph
+	graph = target_graph
 	_build_graph_indices()
 	runtime_context = initial_context.duplicate(true)
 	active_node_ids = [graph.entry_node_id]
@@ -85,13 +85,13 @@ func _verify_node_executable(node_id: String) -> Dictionary:
 		return { "success": false, "error_code": "NODE_NOT_FOUND" }
 
 	var current_node: NarrativeDAGNode = graph.nodes[node_id]
-	for pre in current_node.required_prerequisites:
-		if not _completed_set.has(pre):
+	for prerequisite_id in current_node.required_prerequisites:
+		if not _completed_set.has(prerequisite_id):
 			return {
 				"success": false,
 				"error_code": "PREREQUISITES_NOT_MET",
-				"missing_pre": pre,
-				"message": "汇聚前置节点 %s 尚未完成" % pre
+				"missing_pre": prerequisite_id,
+				"message": "汇聚前置节点 %s 尚未完成" % prerequisite_id
 			}
 	return { "success": true }
 
@@ -102,8 +102,8 @@ func _commit_node_completion(node_id: String, current_node: NarrativeDAGNode, ac
 		completed_node_ids.append(node_id)
 		_completed_set[node_id] = true
 
-	for k in action_payload.keys():
-		runtime_context[k] = action_payload[k]
+	for payload_key in action_payload.keys():
+		runtime_context[payload_key] = action_payload[payload_key]
 
 	if _hook_interceptor.is_valid():
 		_hook_interceptor.call(graph.graph_id, node_id, false)
@@ -143,9 +143,9 @@ func _derive_downstream_activations(node_id: String, current_node: NarrativeDAGN
 	var is_branch_choice: bool = current_node.node_type == NarrativeDAGNode.NodeType.BRANCH_CHOICE
 	if is_branch_choice and matched_edges.size() > 1:
 		var chosen: NarrativeDAGEdge = matched_edges[0]
-		for i in range(1, matched_edges.size()):
-			if matched_edges[i].priority_weight > chosen.priority_weight:
-				chosen = matched_edges[i]
+		for edge_index in range(1, matched_edges.size()):
+			if matched_edges[edge_index].priority_weight > chosen.priority_weight:
+				chosen = matched_edges[edge_index]
 		matched_edges = [chosen]
 
 	for edge in matched_edges:
@@ -165,16 +165,16 @@ func _derive_downstream_activations(node_id: String, current_node: NarrativeDAGN
 
 ## 推进指定活跃节点的动作
 func execute_node_action(node_id: String, action_payload: Dictionary = {}) -> Dictionary:
-	var verify_res := _verify_node_executable(node_id)
-	if not verify_res.get("success", false):
-		return verify_res
+	var verification_result := _verify_node_executable(node_id)
+	if not verification_result.get("success", false):
+		return verification_result
 
 	var current_node: NarrativeDAGNode = graph.nodes[node_id]
 	_commit_node_completion(node_id, current_node, action_payload)
 
-	var term_res := _try_handle_terminal(node_id, current_node)
-	if not term_res.is_empty():
-		return term_res
+	var terminal_result := _try_handle_terminal(node_id, current_node)
+	if not terminal_result.is_empty():
+		return terminal_result
 
 	var newly_activated := _derive_downstream_activations(node_id, current_node)
 	if newly_activated.is_empty() and active_node_ids.is_empty() and not is_terminated:
@@ -196,61 +196,61 @@ func execute_node_action(node_id: String, action_payload: Dictionary = {}) -> Di
 ## 取节点全部出边（常数级从邻接表中获取）
 func _get_outgoing_edges(from_id: String) -> Array[NarrativeDAGEdge]:
 	var raw: Variant = _outgoing_edges_index.get(from_id, [])
-	var res: Array[NarrativeDAGEdge] = []
-	for e in raw:
-		if e is NarrativeDAGEdge:
-			res.append(e)
-	return res
+	var typed_edges: Array[NarrativeDAGEdge] = []
+	for edge_entry in raw:
+		if edge_entry is NarrativeDAGEdge:
+			typed_edges.append(edge_entry)
+	return typed_edges
 
 ## 评估出边分支条件
-func _evaluate_edge_condition(cond: Dictionary, ctx: Dictionary) -> bool:
-	if cond.is_empty():
+func _evaluate_edge_condition(condition: Dictionary, context: Dictionary) -> bool:
+	if condition.is_empty():
 		return true
-	var kind: String = str(cond.get("kind", ""))
-	var target_val: Variant = cond.get("val", null)
+	var kind: String = str(condition.get("kind", ""))
+	var target_value: Variant = condition.get("val", null)
 	match kind:
 		"CHOICE_MATCH":
-			return ctx.get("selected_choice", "") == target_val
+			return context.get("selected_choice", "") == target_value
 		"EQUALS":
-			var key: String = str(cond.get("key", ""))
-			return ctx.get(key, null) == target_val
+			var key: String = str(condition.get("key", ""))
+			return context.get(key, null) == target_value
 	return true
 
 ## 汇聚前置依赖判定：基于哈希集合 O(1) 查找
 func _are_prerequisites_satisfied(node: NarrativeDAGNode) -> bool:
-	for pre in node.required_prerequisites:
-		if not _completed_set.has(pre):
+	for prerequisite_id in node.required_prerequisites:
+		if not _completed_set.has(prerequisite_id):
 			return false
 	return true
 
 ## 导出运行时会话状态快照（支持游戏存盘）
 func export_session_dto() -> RefCounted:
-	var dto: Variant = NarrativeDagSessionDTOClass.new()
-	dto.graph_id = graph.graph_id if graph else ""
-	dto.active_node_ids = active_node_ids.duplicate()
-	dto.completed_node_ids = completed_node_ids.duplicate()
-	dto.runtime_context = runtime_context.duplicate(true)
-	dto.is_terminated = is_terminated
-	dto.snapshot_timestamp_utc = int(Time.get_unix_time_from_system())
-	return dto
+	var session_snapshot: Variant = NarrativeDagSessionDTOClass.new()
+	session_snapshot.graph_id = graph.graph_id if graph else ""
+	session_snapshot.active_node_ids = active_node_ids.duplicate()
+	session_snapshot.completed_node_ids = completed_node_ids.duplicate()
+	session_snapshot.runtime_context = runtime_context.duplicate(true)
+	session_snapshot.is_terminated = is_terminated
+	session_snapshot.snapshot_timestamp_utc = int(Time.get_unix_time_from_system())
+	return session_snapshot
 
 ## 从快照恢复运行时会话状态
-func restore_session_dto(dto: RefCounted, p_graph: NarrativeDAGGraphDTO) -> Dictionary:
-	if dto == null or p_graph == null or dto.graph_id != p_graph.graph_id:
+func restore_session_dto(session_snapshot: RefCounted, target_graph: NarrativeDAGGraphDTO) -> Dictionary:
+	if session_snapshot == null or target_graph == null or session_snapshot.graph_id != target_graph.graph_id:
 		return { "success": false, "error_code": "INVALID_RESTORE_PAYLOAD" }
-	graph = p_graph
+	graph = target_graph
 	_build_graph_indices()
 	active_node_ids.clear()
-	for nid in dto.active_node_ids:
-		active_node_ids.append(str(nid))
+	for node_id in session_snapshot.active_node_ids:
+		active_node_ids.append(str(node_id))
 	completed_node_ids.clear()
 	_completed_set.clear()
-	for cid in dto.completed_node_ids:
-		var scid := str(cid)
-		completed_node_ids.append(scid)
-		_completed_set[scid] = true
-	runtime_context = dto.runtime_context.duplicate(true)
-	is_terminated = dto.is_terminated
+	for completed_id in session_snapshot.completed_node_ids:
+		var completed_node_id := str(completed_id)
+		completed_node_ids.append(completed_node_id)
+		_completed_set[completed_node_id] = true
+	runtime_context = session_snapshot.runtime_context.duplicate(true)
+	is_terminated = session_snapshot.is_terminated
 	return { "success": true, "restored_nodes": active_node_ids.size() }
 
 ## 域事件广播
