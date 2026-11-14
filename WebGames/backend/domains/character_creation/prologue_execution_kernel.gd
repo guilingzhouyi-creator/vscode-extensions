@@ -318,69 +318,69 @@ static func _apply_attr_mutation(attribute_name: String, delta: int, profile: Va
 static func execute_headless_mod_playthrough(config: Dictionary) -> Dictionary:
 	var candidates: Array = PrologueHeadlessPlaythroughRunner.prepare_headless_candidates(config)
 	var enabled_ids: Array = config.get("enabled_pack_ids", ["*"])
-	var adapt_res := ModPrecheckAndAdaptationSolver.precheck_and_adapt_mod_list(candidates, enabled_ids)
-	if not bool(adapt_res.get("success", false)):
+	var adaptation_result := ModPrecheckAndAdaptationSolver.precheck_and_adapt_mod_list(candidates, enabled_ids)
+	if not bool(adaptation_result.get("success", false)):
 		return {
 			"schema_version": "kalar.mod_sdk.playthrough_transcript.v1",
 			"is_success": false,
-			"error_code": str(adapt_res.get("error_code", "ERR_MOD_PRECHECK_FAILED")),
-			"conflicts": adapt_res.get("conflicts", []),
-			"precheck_checklist": adapt_res.get("precheck_checklist", [])
+			"error_code": str(adaptation_result.get("error_code", "ERR_MOD_PRECHECK_FAILED")),
+			"conflicts": adaptation_result.get("conflicts", []),
+			"precheck_checklist": adaptation_result.get("precheck_checklist", [])
 		}
 
-	var adapted_manifest: Dictionary = adapt_res.get("adapted_manifest", {})
-	var seed_val: int = int(config.get("seed", config.get("seed_val", 1337)))
-	var char_name: String = str(config.get("character_name", "HeadlessTraveler")).strip_edges()
-	if char_name.is_empty():
-		char_name = "HeadlessTraveler"
+	var adapted_manifest: Dictionary = adaptation_result.get("adapted_manifest", {})
+	var seed_value: int = int(config.get("seed", config.get("seed_val", 1337)))
+	var character_name: String = str(config.get("character_name", "HeadlessTraveler")).strip_edges()
+	if character_name.is_empty():
+		character_name = "HeadlessTraveler"
 
-	var req := AuthoritativeCharacterCreationRequestDTO.new()
-	req.character_name = char_name
-	req.request_seed = seed_val
-	var req_origin: String = str(config.get("origin_id", "")).strip_edges()
-	if not req_origin.is_empty():
-		req.extra_custom_fields["selected_origin_id"] = req_origin
-	var req_trait: String = str(config.get("selected_positive_trait", "")).strip_edges()
-	if not req_trait.is_empty():
-		req.extra_custom_fields["selected_positive_trait"] = req_trait
-	var req_nonce: int = int(config.get("reroll_nonce", 0))
-	if req_nonce != 0:
-		req.extra_custom_fields["reroll_nonce"] = req_nonce
+	var creation_request := AuthoritativeCharacterCreationRequestDTO.new()
+	creation_request.character_name = character_name
+	creation_request.request_seed = seed_value
+	var requested_origin_id: String = str(config.get("origin_id", "")).strip_edges()
+	if not requested_origin_id.is_empty():
+		creation_request.extra_custom_fields["selected_origin_id"] = requested_origin_id
+	var requested_positive_trait: String = str(config.get("selected_positive_trait", "")).strip_edges()
+	if not requested_positive_trait.is_empty():
+		creation_request.extra_custom_fields["selected_positive_trait"] = requested_positive_trait
+	var reroll_nonce: int = int(config.get("reroll_nonce", 0))
+	if reroll_nonce != 0:
+		creation_request.extra_custom_fields["reroll_nonce"] = reroll_nonce
 
-	var reinc_res := AuthoritativeReincarnationSolver.resolve_reincarnation_package(req, seed_val, adapted_manifest)
-	if not bool(reinc_res.get("success", false)):
+	var reincarnation_result := AuthoritativeReincarnationSolver.resolve_reincarnation_package(creation_request, seed_value, adapted_manifest)
+	if not bool(reincarnation_result.get("success", false)):
 		return {
 			"schema_version": "kalar.mod_sdk.playthrough_transcript.v1",
 			"is_success": false,
-			"error_code": str(reinc_res.get("error_code", "ERR_REINCARNATION_FAILED"))
+			"error_code": str(reincarnation_result.get("error_code", "ERR_REINCARNATION_FAILED"))
 		}
 
-	var eff_race: String = str(config.get("race_id", reinc_res.get("race_id", "HUMAN")))
-	var eff_origin: String = str(reinc_res.get("origin_id", req_origin))
+	var effective_race: String = str(config.get("race_id", reincarnation_result.get("race_id", "HUMAN")))
+	var effective_origin: String = str(reincarnation_result.get("origin_id", requested_origin_id))
 
 	var profile := CharacterProfile.new()
-	profile.character_id = "CHAR_" + str(seed_val)
-	profile.character_name = char_name
-	profile.attributes = (reinc_res.get("attributes", {}) as Dictionary).duplicate(true)
+	profile.character_id = "CHAR_" + str(seed_value)
+	profile.character_name = character_name
+	profile.attributes = (reincarnation_result.get("attributes", {}) as Dictionary).duplicate(true)
 
-	var hydrate_res := StarterLoadoutDispatcher.hydrate_starter_loadout_into_profile(
-		profile, eff_race, eff_origin, adapted_manifest
+	var equip_result := StarterLoadoutDispatcher.hydrate_starter_loadout_into_profile(
+		profile, effective_race, effective_origin, adapted_manifest
 	)
 
-	var ctx := CharacterPrologueContext.new()
-	ctx.character_id = profile.character_id
-	ctx.character_name = char_name
-	ctx.race_id = eff_race
-	ctx.assigned_start_location_id = str(reinc_res.get("birth_region_id", "CENTRAL_CONTINENT"))
-	ctx.assigned_starter_kit_id = str(reinc_res.get("starter_kit_id", hydrate_res.get("kit_id", "")))
-	ctx.is_active = true
-	ctx.runtime_placeholders = ProloguePlaceholderResolver.extract_placeholders(ctx, adapted_manifest, profile)
-	ctx.runtime_placeholders["ORIGIN_ID"] = eff_origin
-	ctx.runtime_placeholders["origin_id"] = eff_origin
-	ctx.runtime_placeholders["ORIGIN_NAME"] = reinc_res.get("origin_name", eff_origin)
-	ctx.runtime_placeholders["origin_name"] = ctx.runtime_placeholders["ORIGIN_NAME"]
+	var prologue_context := CharacterPrologueContext.new()
+	prologue_context.character_id = profile.character_id
+	prologue_context.character_name = character_name
+	prologue_context.race_id = effective_race
+	prologue_context.assigned_start_location_id = str(reincarnation_result.get("birth_region_id", "CENTRAL_CONTINENT"))
+	prologue_context.assigned_starter_kit_id = str(reincarnation_result.get("starter_kit_id", equip_result.get("kit_id", "")))
+	prologue_context.is_active = true
+	prologue_context.runtime_placeholders = ProloguePlaceholderResolver.extract_placeholders(prologue_context, adapted_manifest, profile)
+	prologue_context.runtime_placeholders["ORIGIN_ID"] = effective_origin
+	prologue_context.runtime_placeholders["origin_id"] = effective_origin
+	prologue_context.runtime_placeholders["ORIGIN_NAME"] = reincarnation_result.get("origin_name", effective_origin)
+	prologue_context.runtime_placeholders["origin_name"] = prologue_context.runtime_placeholders["ORIGIN_NAME"]
 
-	var engine := create_dag_session(ctx, eff_origin, adapted_manifest)
+	var engine := create_dag_session(prologue_context, effective_origin, adapted_manifest)
 	if engine == null:
 		return {
 			"schema_version": "kalar.mod_sdk.playthrough_transcript.v1",
@@ -391,7 +391,7 @@ static func execute_headless_mod_playthrough(config: Dictionary) -> Dictionary:
 	var transcript_steps: Array[Dictionary] = []
 	var choice_indices: Array = config.get("choice_indices", [])
 	var loop_state: Dictionary = {
-		"ctx": ctx,
+		"ctx": prologue_context,
 		"profile": profile,
 		"manifest": adapted_manifest,
 		"choice_indices": choice_indices,
@@ -403,7 +403,7 @@ static func execute_headless_mod_playthrough(config: Dictionary) -> Dictionary:
 	)
 
 	return PrologueHeadlessPlaythroughRunner.build_headless_transcript(
-		char_name, eff_race, eff_origin, reinc_res, profile, engine, ctx, transcript_steps
+		character_name, effective_race, effective_origin, reincarnation_result, profile, engine, prologue_context, transcript_steps
 	)
 
 ## 序章步骤结构化广播：向前端暴露 channel + narrative_key + i18n_params + mutations
@@ -430,36 +430,36 @@ static func broadcast_step(
 
 ## 无头完结序章并构造标准化 PrologueHandoffDTO（衔接大地图探索与 HUD 首帧同步）
 static func complete_prologue_to_handoff(
-	ctx: CharacterPrologueContext,
+	prologue_context: CharacterPrologueContext,
 	profile: CharacterProfile = null,
 	options: Dictionary = {}
 ) -> Dictionary:
-	if ctx == null or ctx.character_id.is_empty():
+	if prologue_context == null or prologue_context.character_id.is_empty():
 		return {"success": false, "error_code": "INVALID_PROLOGUE_CONTEXT", "handoff": null}
 
-	var extra_attrs: Dictionary = options.get("extra_attrs", {}) if options.get("extra_attrs", null) is Dictionary else {}
+	var extra_attributes: Dictionary = options.get("extra_attrs", {}) if options.get("extra_attrs", null) is Dictionary else {}
 	var initial_gold: int = int(options.get("initial_gold", -1))
 	var active_mods: Array = options.get("active_mods", []) if options.get("active_mods", null) is Array else []
 	var empty_step_payload: Dictionary = {}
 
 	var safety_steps := 0
-	var last_step_res: Dictionary = {}
-	while not ctx.is_completed and safety_steps < 8:
+	var last_step_result: Dictionary = {}
+	while not prologue_context.is_completed and safety_steps < 8:
 		safety_steps += 1
-		last_step_res = advance_prologue_step(ctx, "NEXT", empty_step_payload)
-		if not bool(last_step_res.get("success", false)):
+		last_step_result = advance_prologue_step(prologue_context, "NEXT", empty_step_payload)
+		if not bool(last_step_result.get("success", false)):
 			break
 
-	ctx.is_completed = true
-	ctx.is_active = false
+	prologue_context.is_completed = true
+	prologue_context.is_active = false
 
 	var handoff := PrologueHandoffDTO.new()
-	handoff.account_id = ctx.account_id
-	handoff.character_id = ctx.character_id
-	handoff.character_name = ctx.character_name
-	handoff.race_id = ctx.race_id if not ctx.race_id.is_empty() else "HUMAN"
-	handoff.origin_id = str(ctx.runtime_placeholders.get("ORIGIN_ID", ctx.runtime_placeholders.get("origin_id", "")))
-	handoff.assigned_start_location_id = ctx.assigned_start_location_id if not ctx.assigned_start_location_id.is_empty() else "CENTRAL_CONTINENT"
+	handoff.account_id = prologue_context.account_id
+	handoff.character_id = prologue_context.character_id
+	handoff.character_name = prologue_context.character_name
+	handoff.race_id = prologue_context.race_id if not prologue_context.race_id.is_empty() else "HUMAN"
+	handoff.origin_id = str(prologue_context.runtime_placeholders.get("ORIGIN_ID", prologue_context.runtime_placeholders.get("origin_id", "")))
+	handoff.assigned_start_location_id = prologue_context.assigned_start_location_id if not prologue_context.assigned_start_location_id.is_empty() else "CENTRAL_CONTINENT"
 	handoff.active_mods = active_mods.duplicate()
 	handoff.timestamp_utc = int(Time.get_unix_time_from_system())
 
@@ -471,21 +471,36 @@ static func complete_prologue_to_handoff(
 	elif initial_gold >= 0:
 		handoff.initial_gold = initial_gold
 
-	for attr_key in extra_attrs.keys():
-		handoff.allocated_attributes[attr_key] = extra_attrs[attr_key]
+	for attribute_key in extra_attributes.keys():
+		handoff.allocated_attributes[attribute_key] = extra_attributes[attribute_key]
 
 	return {
 		"success": true,
-		"is_completed": ctx.is_completed,
-		"context": ctx,
+		"is_completed": prologue_context.is_completed,
+		"context": prologue_context,
 		"handoff": handoff
 	}
 
-static func _append_profile_inventory_items(inv: Dictionary, out_items: Array) -> void:
-	if inv.is_empty():
+static func _append_profile_inventory_items(inventory_data: Dictionary, out_items: Array) -> void:
+	if inventory_data.is_empty():
 		return
-	for item_key in inv.keys():
-		out_items.append(_make_inventory_handoff_entry(item_key, inv[item_key]))
+	var has_aggregate_buckets: bool = inventory_data.has("storage_items") or inventory_data.has("equipped_payloads")
+	if has_aggregate_buckets:
+		var storage_array: Variant = inventory_data.get("storage_items", [])
+		if storage_array is Array and not (storage_array as Array).is_empty():
+			# 初始物品移交仅在开局执行一次，提前在循环外整表深拷贝以避免逐项分配
+			var cloned_storage: Array = (storage_array as Array).duplicate(true)
+			for entry in cloned_storage:
+				if entry is Dictionary:
+					out_items.append(entry)
+		var equipped_map: Variant = inventory_data.get("equipped_payloads", {})
+		if equipped_map is Dictionary:
+			for slot_key in equipped_map.keys():
+				if equipped_map[slot_key] != null:
+					out_items.append(_make_inventory_handoff_entry(slot_key, equipped_map[slot_key]))
+		return
+	for item_key in inventory_data.keys():
+		out_items.append(_make_inventory_handoff_entry(item_key, inventory_data[item_key]))
 
-static func _make_inventory_handoff_entry(item_key: Variant, data_val: Variant) -> Dictionary:
-	return {"item_id": item_key, "data": data_val}
+static func _make_inventory_handoff_entry(item_key: Variant, item_data: Variant) -> Dictionary:
+	return {"item_id": item_key, "data": item_data}

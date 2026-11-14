@@ -3,7 +3,7 @@
 # 文件路径: res://backend/domains/character_creation/world_character_creation_orchestrator.gd
 # 架构定位: Domain Orchestrator / Service Facade
 # 依赖与触发: 上游: WorldGatewayFSM, UI/API | 下游: WorldArchiveRepository, SaveDataAccessLayer, AccountRepository, EventBusCore | 配置: config/domains/character_creation.json | 信号: character_creation.authoritative_completed
-# 职责说明: 世界内角色权威创建与时空装配事务门面。执行零信任输入防伪校验、后端权威命途解算、角色实体装配、初始装备物理入包水化、世界时钟因果锚定与历史片段只增追加、存储物理落盘与账号封面同步、网关状态自动回挂跃迁以及全景只读呈现信封组装。
+# 职责说明: 世界内角色权威创建与时空装配事务门面。执行零信任输入权威校验、后端权威命途解算、角色实体装配、初始装备实体入包装配、世界时钟因果锚定与历史片段只增追加、存储物理落盘与账号封面同步、网关状态自动回挂跃迁以及全景只读呈现信封组装。
 # 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
@@ -21,117 +21,122 @@ const FORBIDDEN_CHARS: Array[String] = [
 # ==============================================================================
 
 ## 世界内角色权威创建装配主流程
-## 执行防伪检验、权威解算、实体装配、物资水化、世界历史追加、物理落盘与网关回挂
+## 执行防篡改检验、权威解算、实体装配、物资装配、世界历史追加、物理落盘与网关回挂
 static func create_character_authoritative(
-    req: AuthoritativeCharacterCreationRequestDTO,
+    creation_request: AuthoritativeCharacterCreationRequestDTO,
     gateway_fsm: WorldGatewayFSM = null,
     adapted_mod_manifest: Dictionary = {}
 ) -> Dictionary:
-    # 1. 输入防伪卫语句核验
-    var val_res := _validate_request(req)
-    if not bool(val_res.get("valid", false)):
+    # 1. 输入防篡改卫语句核验
+    var validation_result := _validate_request(creation_request)
+    if not bool(validation_result.get("valid", false)):
         return {
             "success": false,
-            "error_code": str(val_res.get("error_code", "")),
-            "message": str(val_res.get("message", ""))
+            "error_code": str(validation_result.get("error_code", "")),
+            "message": str(validation_result.get("message", ""))
         }
-    var char_name: String = str(val_res.get("character_name", ""))
+    var character_name: String = str(validation_result.get("character_name", ""))
 
     # 2. 世界存在性核验（不存在则立即阻断）
-    var world_repo := WorldArchiveRepository.get_instance()
-    if not world_repo.has_world(req.world_id):
+    var world_repository := WorldArchiveRepository.get_instance()
+    if not world_repository.has_world(creation_request.world_id):
         return {
             "success": false,
             "error_code": "WORLD_NOT_FOUND",
-            "message": GameConfig.msg_fmt("character_creation", "world_not_found", {"world_id": req.world_id})
+            "message": GameConfig.msg_fmt("character_creation", "world_not_found", {"world_id": creation_request.world_id})
         }
 
     # 3. 权威命途解算（零信任剥离客户端伪造参数，支持单机已预检MOD合并清单）
     var effective_manifest: Dictionary = _resolve_effective_manifest(gateway_fsm, adapted_mod_manifest)
-    var solver_res: Dictionary = AuthoritativeReincarnationSolver.resolve_reincarnation_package(
-        req,
-        req.request_seed,
+    var solver_result: Dictionary = AuthoritativeReincarnationSolver.resolve_reincarnation_package(
+        creation_request,
+        creation_request.request_seed,
         effective_manifest
     )
-    if not bool(solver_res.get("success", false)):
-        return solver_res
+    if not bool(solver_result.get("success", false)):
+        return solver_result
 
     # 4. 角色三维实体组装
-    var race_id := str(solver_res.get("race_id", "HUMAN"))
-    var origin_id := str(solver_res.get("origin_id", ""))
-    var char_id := "CHAR_%s_%s_%d" % [req.account_id, req.world_id, req.slot_id]
-    var profile := _assemble_character_profile(char_id, char_name, solver_res)
-    var _phys := _assemble_physiology(race_id, solver_res.get("attributes", {}))
-    var _wallet := _assemble_wallet(profile, solver_res.get("wallet", {}))
+    var race_id := str(solver_result.get("race_id", "HUMAN"))
+    var origin_id := str(solver_result.get("origin_id", ""))
+    var character_id := "CHAR_%s_%s_%d" % [creation_request.account_id, creation_request.world_id, creation_request.slot_id]
+    var profile := _assemble_character_profile(character_id, character_name, solver_result)
+    var _physiology := _assemble_physiology(race_id, solver_result.get("attributes", {}))
+    var _wallet := _assemble_wallet(profile, solver_result.get("wallet", {}))
 
-    # 5. 初始背包装备物理水化
-    var loadout_res: Dictionary = StarterLoadoutDispatcher.hydrate_starter_loadout_into_profile(
+    # 5. 初始背包装备实体装配
+    var loadout_result: Dictionary = StarterLoadoutDispatcher.hydrate_starter_loadout_into_profile(
         profile,
         race_id,
         origin_id,
         effective_manifest
     )
-    if not bool(loadout_res.get("success", false)):
-        return loadout_res
+    if not bool(loadout_result.get("success", false)):
+        return loadout_result
 
     # 6. 世界时空连续性锚定、历史片段只增追加与世界MOD锁前置固化
-    var continuity_res := _anchor_world_continuity(world_repo, req.world_id, profile, effective_manifest)
-    if not bool(continuity_res.get("success", false)):
-        return continuity_res
-    var world_inst: WorldInstance = continuity_res.get("world_instance", null)
+    var continuity_result := _anchor_world_continuity(world_repository, creation_request.world_id, profile, effective_manifest)
+    if not bool(continuity_result.get("success", false)):
+        return continuity_result
+    var world_instance: WorldInstance = continuity_result.get("world_instance", null)
 
     # 7. 物理落盘与账号槽位封面同步绑定
-    var persist_res := _persist_slot_and_cover(req, profile, race_id, origin_id, solver_res)
-    if not bool(persist_res.get("success", false)):
-        return persist_res
+    var persist_result := _persist_slot_and_cover(creation_request, profile, race_id, origin_id, solver_result)
+    if not bool(persist_result.get("success", false)):
+        return persist_result
 
     # 8. 世界网关就绪角色回挂与状态跃迁
-    var gateway_res: Dictionary = {}
+    var gateway_result: Dictionary = {}
+    var gateway_attached := false
     if gateway_fsm != null:
-        gateway_res = gateway_fsm.attach_ready_character(profile.character_id)
+        gateway_result = gateway_fsm.attach_ready_character(profile.character_id)
+        gateway_attached = bool(gateway_result.get("success", false))
+        if not gateway_attached:
+            EventBusCore.get_instance().emit_log("warn", TemplateFormatter.format("WorldCharacterCreationOrchestrator: attach_ready_character failed: {code}", {"code": str(gateway_result.get("error_code", ""))}))
 
     # 9. 构造全景只读呈现信封
-    var pres := _build_presentation_envelope(req, profile, solver_res, loadout_res, world_inst)
+    var presentation := _build_presentation_envelope(creation_request, profile, solver_result, loadout_result, world_instance)
 
     # 10. 发布全域领域事件
-    var event_payload: Dictionary = pres.to_dto()
+    var event_payload: Dictionary = presentation.to_dto()
     EventBusCore.get_instance().emit_domain_event("character_creation.authoritative_completed", event_payload)
 
     return {
         "success": true,
         "character_id": profile.character_id,
         "character_name": profile.character_name,
-        "slot_id": req.slot_id,
-        "world_id": req.world_id,
+        "slot_id": creation_request.slot_id,
+        "world_id": creation_request.world_id,
         "profile": profile,
-        "presentation": pres,
-        "gateway_result": gateway_res
+        "presentation": presentation,
+        "gateway_result": gateway_result,
+        "gateway_attached": gateway_attached
     }
 
 ## 统一编排门面：权威创角 + 开局事件流生成 + 自动启动角色序章上下文
 static func execute_creation_and_boot_prologue(
-    req: AuthoritativeCharacterCreationRequestDTO,
+    creation_request: AuthoritativeCharacterCreationRequestDTO,
     gateway_fsm: WorldGatewayFSM = null,
     adapted_mod_manifest: Dictionary = {}
 ) -> Dictionary:
-    var create_res := create_character_authoritative(req, gateway_fsm, adapted_mod_manifest)
-    if not bool(create_res.get("success", false)):
-        return create_res
+    var creation_result := create_character_authoritative(creation_request, gateway_fsm, adapted_mod_manifest)
+    if not bool(creation_result.get("success", false)):
+        return creation_result
 
-    var profile: CharacterProfile = create_res.get("profile", null)
-    var pres: CharacterCreationPresentationDTO = create_res.get("presentation", null)
+    var profile: CharacterProfile = creation_result.get("profile", null)
+    var presentation: CharacterCreationPresentationDTO = creation_result.get("presentation", null)
     var opening := OpeningEventStreamDTO.new()
-    opening.event_id = UniqueIdGenerator.next_id("EVT_OPENING_")
-    opening.account_id = req.account_id
-    opening.slot_id = "SLOT_%02d" % req.slot_id
-    opening.world_id = req.world_id
-    opening.character_id = str(create_res.get("character_id", ""))
-    opening.character_name = str(create_res.get("character_name", ""))
-    opening.race_id = pres.race_id if pres != null else "HUMAN"
+    opening.event_id = IdGenerator.next_id("EVT_OPENING_")
+    opening.account_id = creation_request.account_id
+    opening.slot_id = "SLOT_%02d" % creation_request.slot_id
+    opening.world_id = creation_request.world_id
+    opening.character_id = str(creation_result.get("character_id", ""))
+    opening.character_name = str(creation_result.get("character_name", ""))
+    opening.race_id = presentation.race_id if presentation != null else "HUMAN"
     opening.is_first_time_creation = true
     var birth_region := ""
-    if pres != null and pres.prologue_preview is Dictionary:
-        birth_region = str(pres.prologue_preview.get("birth_region_id", ""))
+    if presentation != null and presentation.prologue_preview is Dictionary:
+        birth_region = str(presentation.prologue_preview.get("birth_region_id", ""))
     opening.starting_location_id = birth_region if not birth_region.is_empty() else "CENTRAL_CONTINENT"
     opening.opening_quest_line_id = "QUEST_PROLOGUE_MAIN_01"
     opening.timestamp_utc = int(Time.get_unix_time_from_system())
@@ -142,9 +147,9 @@ static func execute_creation_and_boot_prologue(
         return prologue_boot
 
     var prologue_context: CharacterPrologueContext = prologue_boot.get("context", null)
-    if prologue_context != null and pres != null and not pres.origin_id.is_empty():
-        prologue_context.runtime_placeholders["ORIGIN_ID"] = pres.origin_id
-        prologue_context.runtime_placeholders["origin_id"] = pres.origin_id
+    if prologue_context != null and presentation != null and not presentation.origin_id.is_empty():
+        prologue_context.runtime_placeholders["ORIGIN_ID"] = presentation.origin_id
+        prologue_context.runtime_placeholders["origin_id"] = presentation.origin_id
     if prologue_context != null and profile != null:
         prologue_context.runtime_placeholders["INITIAL_GOLD"] = str(int(profile.personal_resources.get("gold", 0)))
 
@@ -155,71 +160,74 @@ static func execute_creation_and_boot_prologue(
         "slot_id": opening.slot_id,
         "world_id": opening.world_id,
         "profile": profile,
-        "presentation": pres,
+        "presentation": presentation,
         "opening_event": opening,
         "prologue_context": prologue_context,
         "prologue_packet": prologue_boot.get("packet", null),
-        "gateway_result": create_res.get("gateway_result", {})
+        "gateway_result": creation_result.get("gateway_result", {})
     }
 
 # ==============================================================================
 # 二、输入校验与实体组装子函数 (CC <= 15, Depth <= 3)
 # ==============================================================================
 
-## 请求入参防伪卫语句校验
-static func _validate_request(req: AuthoritativeCharacterCreationRequestDTO) -> Dictionary:
-    if req == null:
+## 请求入参防篡改卫语句校验
+static func _validate_request(creation_request: AuthoritativeCharacterCreationRequestDTO) -> Dictionary:
+    if creation_request == null:
         return {"valid": false, "error_code": "INVALID_REQUEST", "message": "请求契约对象不可为空"}
 
-    var char_name := req.character_name.strip_edges()
-    if char_name.is_empty():
+    var character_name := creation_request.character_name.strip_edges()
+    if character_name.is_empty():
         return {"valid": false, "error_code": "EMPTY_NAME", "message": "角色名称不可为空"}
 
-    if char_name.length() < 2 or char_name.length() > 16:
+    if character_name.length() < 2 or character_name.length() > 16:
         return {"valid": false, "error_code": "INVALID_NAME_LENGTH", "message": "角色名称长度必须在 2 到 16 之间"}
 
-    for i in FORBIDDEN_CHARS.size():
-        if char_name.contains(FORBIDDEN_CHARS[i]):
+    for char_index in FORBIDDEN_CHARS.size():
+        if character_name.contains(FORBIDDEN_CHARS[char_index]):
             return {"valid": false, "error_code": "FORBIDDEN_CHARACTERS", "message": "角色名称包含非法特殊字符"}
 
-    if req.account_id.strip_edges().is_empty():
+    if creation_request.account_id.strip_edges().is_empty():
         return {"valid": false, "error_code": "EMPTY_ACCOUNT_ID", "message": "账号标识不可为空"}
 
-    if req.world_id.strip_edges().is_empty():
+    if creation_request.world_id.strip_edges().is_empty():
         return {"valid": false, "error_code": "EMPTY_WORLD_ID", "message": "世界标识不可为空"}
 
-    if req.slot_id <= 0:
+    if creation_request.slot_id <= 0:
         return {"valid": false, "error_code": "EMPTY_SLOT_ID", "message": "槽位编号不可为空或小于等于0"}
 
-    return {"valid": true, "character_name": char_name}
+    return {"valid": true, "character_name": character_name}
 
 ## 组装角色档案实体
-static func _assemble_character_profile(char_id: String, char_name: String, solver_res: Dictionary) -> CharacterProfile:
+static func _assemble_character_profile(character_id: String, character_name: String, solver_result: Dictionary) -> CharacterProfile:
     var profile := CharacterProfile.new()
-    profile.character_id = char_id
-    profile.character_name = char_name
-    profile.attributes = (solver_res.get("attributes", {}) as Dictionary).duplicate(true)
+    profile.character_id = character_id
+    profile.character_name = character_name
+    profile.attributes = (solver_result.get("attributes", {}) as Dictionary).duplicate(true)
+    var resolved_race := str(solver_result.get("race_id", "HUMAN"))
+    profile.character_exclusive_progress["race"] = resolved_race
+    profile.character_exclusive_progress["origin"] = str(solver_result.get("origin_id", ""))
     profile.growth_state = {
         "level": 1,
         "experience": 0,
-        "origin_id": str(solver_res.get("origin_id", "")),
-        "origin_name": str(solver_res.get("origin_name", "")),
-        "race_id": str(solver_res.get("race_id", "")),
-        "race_name": str(solver_res.get("race_name", "")),
-        "gender": str(solver_res.get("gender", "")),
-        "birth_region_id": str(solver_res.get("birth_region_id", "")),
-        "selected_traits": (solver_res.get("selected_traits", []) as Array).duplicate(true),
-        "traits_details": (solver_res.get("traits_details", []) as Array).duplicate(true)
+        "origin_id": str(solver_result.get("origin_id", "")),
+        "origin_name": str(solver_result.get("origin_name", "")),
+        "race_id": str(solver_result.get("race_id", "")),
+        "race_name": str(solver_result.get("race_name", "")),
+        "gender": str(solver_result.get("gender", "")),
+        "birth_region_id": str(solver_result.get("birth_region_id", "")),
+        "selected_traits": (solver_result.get("selected_traits", []) as Array).duplicate(true),
+        "traits_details": (solver_result.get("traits_details", []) as Array).duplicate(true)
     }
     return profile
 
 ## 组装生理档案
-static func _assemble_physiology(race_id: String, attrs_map: Dictionary) -> CharacterPhysiologySheet:
-    var phys := CharacterPhysiologySheet.new()
-    phys.race_id = race_id
-    for attr_key in attrs_map.keys():
-        phys.set_level(str(attr_key), int(attrs_map[attr_key]))
-    return phys
+static func _assemble_physiology(race_id: String, attributes_map: Dictionary) -> CharacterPhysiologySheet:
+    var physiology := CharacterPhysiologySheet.new()
+    physiology.race_id = race_id
+    for attribute_key in attributes_map.keys():
+        physiology.set_level(str(attribute_key), int(attributes_map[attribute_key]))
+    return physiology
 
 ## 组装钱包实体与个人资源映射
 static func _assemble_wallet(profile: CharacterProfile, solver_wallet: Dictionary) -> CharacterWalletEntity:
@@ -257,41 +265,41 @@ static func _resolve_effective_manifest(
 
 ## 锚定目标世界时空、只增追加出生历史片段并前置固化世界MOD锁文件
 static func _anchor_world_continuity(
-    world_repo: WorldArchiveRepository,
+    world_repository: WorldArchiveRepository,
     world_id: String,
     profile: CharacterProfile,
     effective_manifest: Dictionary = {}
 ) -> Dictionary:
-    var world_inst: WorldInstance = world_repo.load_world(world_id)
-    if world_inst == null:
+    var world_instance: WorldInstance = world_repository.load_world(world_id)
+    if world_instance == null:
         return {"success": false, "error_code": "WORLD_INSTANCE_LOAD_FAILED", "message": GameConfig.msg_fmt("character_creation", "world_instance_load_failed", {"world_id": world_id})}
 
     var birth_fragment: Dictionary = {
         "type": "CHARACTER_BORN",
         "character_id": profile.character_id,
         "character_name": profile.character_name,
-        "world_time": (world_inst.world_time as Dictionary).duplicate(true)
+        "world_time": (world_instance.world_time as Dictionary).duplicate(true)
     }
-    world_inst.append_history_fragment(birth_fragment)
-    var save_world_res: Dictionary = world_repo.save_world(world_inst)
-    if not bool(save_world_res.get("success", false)):
+    world_instance.append_history_fragment(birth_fragment)
+    var save_world_result: Dictionary = world_repository.save_world(world_instance)
+    if not bool(save_world_result.get("success", false)):
         return {"success": false, "error_code": "WORLD_SAVE_FAILED", "message": "保存世界时空连续性失败"}
 
     var enabled_pack_ids: Array = effective_manifest.get("enabled_pack_ids", [])
     if not enabled_pack_ids.is_empty():
         WorldModAffinityManager.new().save_world_mod_lock(world_id, enabled_pack_ids)
 
-    return {"success": true, "world_instance": world_inst}
+    return {"success": true, "world_instance": world_instance}
 
 ## 执行槽位物理存盘与账号封面原子绑定
 static func _persist_slot_and_cover(
-    req: AuthoritativeCharacterCreationRequestDTO,
+    creation_request: AuthoritativeCharacterCreationRequestDTO,
     profile: CharacterProfile,
     race_id: String,
     origin_id: String,
-    solver_res: Dictionary
+    solver_result: Dictionary
 ) -> Dictionary:
-    var slot_name := "SLOT_%02d" % req.slot_id
+    var slot_name := "SLOT_%02d" % creation_request.slot_id
     var save_payload: Dictionary = {
         "version": 1,
         "data": {
@@ -300,68 +308,70 @@ static func _persist_slot_and_cover(
                 "name": profile.character_name,
                 "race": race_id,
                 "origin": origin_id,
-                "gender": str(solver_res.get("gender", "")),
-                "world_id": req.world_id
+                "gender": str(solver_result.get("gender", "")),
+                "world_id": creation_request.world_id
             },
             "profile": profile.serialize(),
-            "physiology": (solver_res.get("physiology", {}) as Dictionary).duplicate(true),
+            "physiology": (solver_result.get("physiology", {}) as Dictionary).duplicate(true),
             "wallet": (profile.personal_resources.get("wallet", {}) as Dictionary).duplicate(true)
         }
     }
-    var save_dal_res: Dictionary = SaveDataAccessLayer.save_game(slot_name, save_payload)
+    var save_dal_result: Dictionary = SaveDataAccessLayer.save_game(slot_name, save_payload)
 
-    var acc_repo := AccountRepository.get_instance()
-    var account: AccountProfileAggregate = acc_repo.find_by_id(req.account_id)
+    var account_repository := AccountRepository.get_instance()
+    if account_repository != null and not account_repository.is_loaded():
+        account_repository.load_all()
+    var account: AccountProfile = account_repository.find_by_id(creation_request.account_id) if account_repository != null else null
     if account != null:
-        var slot_dto := SaveSlotSummaryDTO.new()
-        slot_dto.slot_id = slot_name
-        slot_dto.character_name = profile.character_name
-        slot_dto.world_id = req.world_id
-        slot_dto.world_slot_status = "OCCUPIED"
-        slot_dto.is_fallen = false
-        slot_dto.last_saved_time_utc = int(Time.get_unix_time_from_system())
-        slot_dto.save_file_sha256 = str(save_dal_res.get("sha256", ""))
-        slot_dto.character_profile = profile
-        account.bind_character_to_slot(slot_name, slot_dto)
-        account.bind_world_slot(req.world_id, slot_name)
-        acc_repo.save_account(account)
+        var slot_summary := SaveSlotDTO.new()
+        slot_summary.slot_id = slot_name
+        slot_summary.character_name = profile.character_name
+        slot_summary.world_id = creation_request.world_id
+        slot_summary.world_slot_status = "OCCUPIED"
+        slot_summary.is_fallen = false
+        slot_summary.last_saved_time_utc = int(Time.get_unix_time_from_system())
+        slot_summary.save_file_sha256 = str(save_dal_result.get("sha256", ""))
+        slot_summary.character_profile = profile
+        account.bind_character_to_slot(slot_name, slot_summary)
+        account.bind_world_slot(creation_request.world_id, slot_name)
+        account_repository.save_account(account)
 
-    return {"success": true, "slot_name": slot_name, "save_res": save_dal_res}
+    return {"success": true, "slot_name": slot_name, "save_res": save_dal_result}
 
 ## 组装全景只读呈现信封
 static func _build_presentation_envelope(
-    req: AuthoritativeCharacterCreationRequestDTO,
+    creation_request: AuthoritativeCharacterCreationRequestDTO,
     profile: CharacterProfile,
-    solver_res: Dictionary,
-    loadout_res: Dictionary,
-    world_inst: WorldInstance
+    solver_result: Dictionary,
+    loadout_result: Dictionary,
+    world_instance: WorldInstance
 ) -> CharacterCreationPresentationDTO:
-    var pres := CharacterCreationPresentationDTO.new()
-    pres.character_id = profile.character_id
-    pres.character_name = profile.character_name
-    pres.origin_id = str(solver_res.get("origin_id", ""))
-    pres.origin_name = str(solver_res.get("origin_name", ""))
-    pres.origin_desc = str(solver_res.get("origin_desc", ""))
-    pres.race_id = str(solver_res.get("race_id", "HUMAN"))
-    pres.race_name = str(solver_res.get("race_name", ""))
-    pres.gender = str(solver_res.get("gender", ""))
-    pres.attributes_radar = (solver_res.get("attributes", {}) as Dictionary).duplicate(true)
-    pres.physiology_summary = (solver_res.get("physiology", {}) as Dictionary).duplicate(true)
-    pres.wallet_summary = (solver_res.get("wallet", {}) as Dictionary).duplicate(true)
+    var presentation := CharacterCreationPresentationDTO.new()
+    presentation.character_id = profile.character_id
+    presentation.character_name = profile.character_name
+    presentation.origin_id = str(solver_result.get("origin_id", ""))
+    presentation.origin_name = str(solver_result.get("origin_name", ""))
+    presentation.origin_desc = str(solver_result.get("origin_desc", ""))
+    presentation.race_id = str(solver_result.get("race_id", "HUMAN"))
+    presentation.race_name = str(solver_result.get("race_name", ""))
+    presentation.gender = str(solver_result.get("gender", ""))
+    presentation.attributes_radar = (solver_result.get("attributes", {}) as Dictionary).duplicate(true)
+    presentation.physiology_summary = (solver_result.get("physiology", {}) as Dictionary).duplicate(true)
+    presentation.wallet_summary = (solver_result.get("wallet", {}) as Dictionary).duplicate(true)
 
     var starter_items: Array[Dictionary] = []
-    var raw_starter_items: Array = loadout_res.get("starter_items_summary", [])
+    var raw_starter_items: Array = loadout_result.get("starter_items_summary", [])
     starter_items.assign(raw_starter_items)
-    pres.starter_equipment = starter_items
+    presentation.starter_equipment = starter_items
 
-    pres.world_chronicle = {
-        "world_id": req.world_id,
-        "world_time": (world_inst.world_time as Dictionary).duplicate(true),
-        "history_fragments_count": world_inst.history_fragments.size()
+    presentation.world_chronicle = {
+        "world_id": creation_request.world_id,
+        "world_time": (world_instance.world_time as Dictionary).duplicate(true),
+        "history_fragments_count": world_instance.history_fragments.size()
     }
-    pres.prologue_preview = {
-        "birth_region_id": str(solver_res.get("birth_region_id", "")),
-        "base_factions": (solver_res.get("base_factions", {}) as Dictionary).duplicate(true),
-        "selected_traits": (solver_res.get("selected_traits", []) as Array).duplicate(true)
+    presentation.prologue_preview = {
+        "birth_region_id": str(solver_result.get("birth_region_id", "")),
+        "base_factions": (solver_result.get("base_factions", {}) as Dictionary).duplicate(true),
+        "selected_traits": (solver_result.get("selected_traits", []) as Array).duplicate(true)
     }
-    return pres
+    return presentation
