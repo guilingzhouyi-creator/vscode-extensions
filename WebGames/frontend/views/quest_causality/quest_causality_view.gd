@@ -1,10 +1,12 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端第7卷: 任务与因果系统视图控制器
+# 模块归属: 前端任务视图域 (fe07 任务与因果系统)
 # 文件路径: res://frontend/views/quest_causality/quest_causality_view.gd
-# 职责: 任务列表筛选、任务详情呈现、因果环 DAG 拓扑图、悬赏委托接取；
-#       4 个子界面 Tab：任务列表/任务详情/因果环DAG/悬赏通缉。
-# 骨架阶段: 零接线、不接 EventBus，仅本地 Mock 数据驱动 + 按钮点击反馈。
+# 架构定位: BaseScreen 视图控制器；承载任务列表、详情状态流转、因果环与悬赏通缉
+# 依赖与触发: 依赖 ThemeManager、UIIntermediary、MockServiceContainer 与 Tabs 委托
+# 职责说明: 维护任务列表筛选与详情池化展示，委托因果环 DAG 与悬赏页签给 Tabs 管理
+# 退出语义与设计依据: 返回操作调用 self.back()；任务与 DAG 快照由 apply_snapshot 同步
 # ==============================================================================
+## 任务与因果系统主视图控制器，负责任务筛选详情与因果环、悬赏页签协同。
 class_name QuestCausalityView
 extends BaseScreen
 
@@ -16,7 +18,7 @@ const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
 # ==============================================================================
 
 # --- 顶栏 ---
-@onready var _btn_back: Button = $%BtnBack
+@onready var _back_button: Button = $%BtnBack
 
 # --- 主 Tab 容器（4 个子界面） ---
 @onready var _tab_container: TabContainer = $%TabContainer
@@ -31,20 +33,20 @@ const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
 @onready var _label_quest_title: Label = $%LabelQuestTitle
 @onready var _label_quest_giver: Label = $%LabelQuestGiver
 @onready var _label_quest_level: Label = $%LabelQuestLevel
-@onready var _label_quest_desc: Label = $%LabelQuestDesc
-@onready var _objectives_vbox: VBoxContainer = $%ObjectivesVBox
-@onready var _rewards_vbox: VBoxContainer = $%RewardsVBox
-@onready var _btn_quest_accept: Button = $%BtnQuestAccept
-@onready var _btn_quest_abandon: Button = $%BtnQuestAbandon
-@onready var _btn_quest_submit: Button = $%BtnQuestSubmit
+@onready var _label_quest_description: Label = $%LabelQuestDesc
+@onready var _objectives_box: VBoxContainer = $%ObjectivesVBox
+@onready var _rewards_box: VBoxContainer = $%RewardsVBox
+@onready var _quest_accept_button: Button = $%BtnQuestAccept
+@onready var _quest_abandon_button: Button = $%BtnQuestAbandon
+@onready var _quest_submit_button: Button = $%BtnQuestSubmit
 
 # --- Tab 2: 因果环 DAG ---
 @onready var _dag_visual_panel: PanelContainer = $%DagVisualPanel
-@onready var _chk_show_completed: CheckBox = $%ChkShowCompleted
+@onready var _show_completed_check_box: CheckBox = $%ChkShowCompleted
 @onready var _dag_node_list: ItemList = $%DagNodeList
 @onready var _label_dag_node_name: Label = $%LabelDagNodeName
 @onready var _label_dag_node_status: Label = $%LabelDagNodeStatus
-@onready var _label_dag_chain_desc: Label = $%LabelDagChainDesc
+@onready var _label_dag_chain_description: Label = $%LabelDagChainDesc
 
 # --- Tab 3: 悬赏通缉 ---
 @onready var _bounty_tier_tab: TabContainer = $%BountyTierTab
@@ -52,7 +54,7 @@ const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
 @onready var _label_bounty_target: Label = $%LabelBountyTarget
 @onready var _label_bounty_reward: Label = $%LabelBountyReward
 @onready var _label_bounty_time: Label = $%LabelBountyTime
-@onready var _btn_bounty_accept: Button = $%BtnBountyAccept
+@onready var _bounty_accept_button: Button = $%BtnBountyAccept
 
 # --- 非唯一静态标签（i18n 迁移新增，共 15 个） ---
 @onready var _header_title_label: Label = %HeaderTitleLabel
@@ -64,15 +66,15 @@ const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
 @onready var _dag_placeholder_label: Label = %DagPlaceholderLabel
 @onready var _dag_node_list_label: Label = %DagNodeListLabel
 @onready var _bounty_section_label: Label = %BountySectionLabel
-@onready var _tier1_desc_label: Label = %Tier1Desc
-@onready var _tier2_desc_label: Label = %Tier2Desc
-@onready var _tier3_desc_label: Label = %Tier3Desc
-@onready var _tier4_desc_label: Label = %Tier4Desc
-@onready var _tier5_desc_label: Label = %Tier5Desc
+@onready var _tier1_description_label: Label = %Tier1Desc
+@onready var _tier2_description_label: Label = %Tier2Desc
+@onready var _tier3_description_label: Label = %Tier3Desc
+@onready var _tier4_description_label: Label = %Tier4Desc
+@onready var _tier5_description_label: Label = %Tier5Desc
 @onready var _bounty_target_list_label: Label = %BountyTargetListLabel
 
 # ==============================================================================
-# 状态与 Mock 数据
+# 状态与预设数据
 # ==============================================================================
 
 enum QuestFilter {ALL, AVAILABLE, ACTIVE, COMPLETED}
@@ -86,26 +88,22 @@ var _tabs: Variant = null
 var show_completed_dag: bool = true
 
 # ==============================================================================
-# 生命周期
+# 外部视图契约兼容方法（映射到视图状态，不触碰 @onready 节点）
 # ==============================================================================
 
-# ==============================================================================
-# 白模测试契约兼容桩（映射到新状态，不触碰 @onready 节点）
-# ==============================================================================
-
-## 白模测试契约桩：注入任务列表快照（经统一快照入口，不触碰 @onready 节点）
+## 兼容快照注入入口：更新任务列表。
 func set_quest_list_snapshot(quests: Array) -> void:
 	apply_snapshot({"quests": quests})
 
-## 白模测试契约桩：按 quest_id 选中任务详情（命中写 active_quest_detail）
+## 按任务编号选中任务详情并写入 active_quest_detail。
 func select_quest_detail(quest_id: String) -> Dictionary:
-	for q in quest_list:
-		if str(q.get("quest_id", "")) == quest_id or str(q.get("id", "")) == quest_id:
-			active_quest_detail = q
-			return {"success": true, "quest": q}
+	for quest_entry in quest_list:
+		if str(quest_entry.get("quest_id", "")) == quest_id or str(quest_entry.get("id", "")) == quest_id:
+			active_quest_detail = quest_entry
+			return {"success": true, "quest": quest_entry}
 	return {"success": false, "quest_id": quest_id}
 
-## 白模测试契约桩：注入因果 DAG 节点快照（经统一快照入口）
+## 兼容快照注入入口：更新因果环 DAG 节点列表。
 func set_causality_dag_snapshot(nodes: Array) -> void:
 	apply_snapshot({"causality_dag": nodes})
 
@@ -116,18 +114,18 @@ func _render_from_snapshot() -> void:
 	if snapshot.has("causality_dag"):
 		causality_dag_nodes = FrontendSnapshot.read_array(snapshot, "causality_dag")
 
-## 生命周期初始化：主题/Mock 数据/四 Tab 装配/信号绑定/视觉适配（骨架零接线）
 func _get_tabs():
 	if _tabs == null:
 		_tabs = _register_owned_subcontroller(QuestCausalityTabsClass.new())
 		_tabs.setup(self)
 	return _tabs
 
+## 生命周期初始化：应用主题、加载数据、装配四页签并绑定交互信号。
 func _ready() -> void:
 	# 1. 应用主题
 	_apply_theme()
 
-	# 2. 加载 Mock 数据
+	# 2. 加载预设数据
 	_load_mock_data()
 
 	# 3. 初始化 Tab 标题
@@ -142,7 +140,7 @@ func _ready() -> void:
 	_init_causality_dag_tab()
 	_init_bounty_tab()
 
-	# 6. 绑定信号（零接线：仅本地 UI 交互反馈）
+	# 6. 绑定信号（仅本地 UI 交互反馈）
 	_connect_signals()
 
 	# 7. 批量视觉适配
@@ -150,9 +148,9 @@ func _ready() -> void:
 
 ## 应用 ThemeManager 单例主题（null 安全）
 func _apply_theme() -> void:
-	var tm := ThemeManager.get_instance()
-	if tm.theme != null:
-		theme = tm.theme
+	var theme_manager := ThemeManager.get_instance()
+	if theme_manager.theme != null:
+		theme = theme_manager.theme
 
 # ==============================================================================
 # Tab 标题初始化
@@ -166,9 +164,9 @@ func _init_tab_titles() -> void:
 		"ui.fe07.tab.causality_dag",
 		"ui.fe07.tab.bounty",
 	]
-	for i in range(tab_keys.size()):
-		if i < _tab_container.get_tab_count():
-			UIIntermediary.resolve_tab(_tab_container, i, tab_keys[i])
+	for tab_index in range(tab_keys.size()):
+		if tab_index < _tab_container.get_tab_count():
+			UIIntermediary.resolve_tab(_tab_container, tab_index, tab_keys[tab_index])
 
 # ==============================================================================
 # 静态文案初始化（非动态数据节点，i18n 绑定）
@@ -206,20 +204,20 @@ func _init_quest_list_tab() -> void:
 ## 刷新任务列表：按状态筛选过滤并渲染条目与计数
 func _refresh_quest_list() -> void:
 	_quest_item_list.clear()
-	var count := 0
-	for q in quest_list:
-		var status: String = q.get("status", "")
-		if not _match_filter(status):
+	var visible_count := 0
+	for quest_entry in quest_list:
+		var quest_status: String = quest_entry.get("status", "")
+		if not _match_filter(quest_status):
 			continue
-		var cat_name := _category_name(q.get("category", ""))
-		var title: String = q.get("title", "")
-		var display := UIIntermediary.text("ui.fe07.quest_list.item_display", {"category": cat_name, "title": UIIntermediary.text(title)})
-		_quest_item_list.add_item(display)
-		count += 1
+		var category_name := _category_name(quest_entry.get("category", ""))
+		var quest_title: String = quest_entry.get("title", "")
+		var item_display_text := UIIntermediary.text("ui.fe07.quest_list.item_display", {"category": category_name, "title": UIIntermediary.text(quest_title)})
+		_quest_item_list.add_item(item_display_text)
+		visible_count += 1
 	if _label_quest_count:
-		UIIntermediary.resolve(_label_quest_count, "ui.fe07.quest_list.count", {"count": count})
+		UIIntermediary.resolve(_label_quest_count, "ui.fe07.quest_list.count", {"count": visible_count})
 	if _tabs != null:
-		_tabs.sync_quest_virtual_list(count)
+		_tabs.sync_quest_virtual_list(visible_count)
 
 ## 状态筛选匹配（ALL 恒真，其余按任务状态精确比对）
 func _match_filter(status: String) -> bool:
@@ -231,20 +229,20 @@ func _match_filter(status: String) -> bool:
 	return true
 
 ## 分类码 → i18n 分类名（MAIN/SIDE/COMMISSION，未命中回传原码）
-func _category_name(code: String) -> String:
-	match code:
+func _category_name(category_code: String) -> String:
+	match category_code:
 		"MAIN": return UIIntermediary.text("ui.fe07.quest_list.category.main")
 		"SIDE": return UIIntermediary.text("ui.fe07.quest_list.category.side")
 		"COMMISSION": return UIIntermediary.text("ui.fe07.quest_list.category.commission")
-		_: return code
+		_: return category_code
 
 ## 状态码 → i18n 状态名（AVAILABLE/ACTIVE/COMPLETED，未命中回传原码）
-func _status_name(code: String) -> String:
-	match code:
+func _status_name(status_code: String) -> String:
+	match status_code:
 		"AVAILABLE": return UIIntermediary.text("ui.fe07.quest_list.filter.available")
 		"ACTIVE": return UIIntermediary.text("ui.fe07.quest_list.filter.active")
 		"COMPLETED": return UIIntermediary.text("ui.fe07.quest_list.filter.completed")
-		_: return code
+		_: return status_code
 
 # ==============================================================================
 # Tab 1: 任务详情 - 初始化
@@ -257,53 +255,53 @@ func _init_quest_detail_tab() -> void:
 		_show_quest_detail(quest_list[0])
 	else:
 		UIIntermediary.resolve(_label_quest_title, "ui.fe07.quest_detail.no_quest")
-		_btn_quest_accept.disabled = true
-		_btn_quest_abandon.disabled = true
-		_btn_quest_submit.disabled = true
+		_quest_accept_button.disabled = true
+		_quest_abandon_button.disabled = true
+		_quest_submit_button.disabled = true
 
 ## 展示任务详情：标题/发布者/等级/描述/目标列表/奖励列表，按状态启停接取/放弃/提交按钮
-func _show_quest_detail(quest: Dictionary) -> void:
-	active_quest_detail = quest
+func _show_quest_detail(quest_entry: Dictionary) -> void:
+	active_quest_detail = quest_entry
 	if _label_quest_title:
-		_label_quest_title.text = UIIntermediary.text(quest.get("title", "ui.fe07.quest_detail.title_default"))
+		_label_quest_title.text = UIIntermediary.text(quest_entry.get("title", "ui.fe07.quest_detail.title_default"))
 	if _label_quest_giver:
-		UIIntermediary.resolve(_label_quest_giver, "ui.fe07.quest.giver", {"name": UIIntermediary.text(quest.get("giver", "-"))})
+		UIIntermediary.resolve(_label_quest_giver, "ui.fe07.quest.giver", {"name": UIIntermediary.text(quest_entry.get("giver", "-"))})
 	if _label_quest_level:
-		UIIntermediary.resolve(_label_quest_level, "ui.fe07.quest.level", {"level": quest.get("level_req", 0)})
-	if _label_quest_desc:
-		_label_quest_desc.text = UIIntermediary.text(quest.get("desc", ""))
+		UIIntermediary.resolve(_label_quest_level, "ui.fe07.quest.level", {"level": quest_entry.get("level_req", 0)})
+	if _label_quest_description:
+		_label_quest_description.text = UIIntermediary.text(quest_entry.get("desc", ""))
 	# 填充目标列表（池化复用 Label 节点）
-	var objectives: Array = quest.get("objectives", [])
-	for i in range(objectives.size()):
-		var lbl: Label = _acquire_detail_label(_objectives_vbox, i)
-		lbl.visible = true
-		lbl.text = UIIntermediary.text("ui.fe07.quest_detail.objective_item", {"text": UIIntermediary.text(str(objectives[i]))})
-	_hide_trailing_children(_objectives_vbox, objectives.size())
+	var objectives: Array = quest_entry.get("objectives", [])
+	for objective_index in range(objectives.size()):
+		var objective_label: Label = _acquire_detail_label(_objectives_box, objective_index)
+		objective_label.visible = true
+		objective_label.text = UIIntermediary.text("ui.fe07.quest_detail.objective_item", {"text": UIIntermediary.text(str(objectives[objective_index]))})
+	_hide_trailing_children(_objectives_box, objectives.size())
 	# 填充奖励列表（池化复用 Label 节点）
-	var rewards: Array = quest.get("rewards", [])
-	for i in range(rewards.size()):
-		var lbl: Label = _acquire_detail_label(_rewards_vbox, i)
-		lbl.visible = true
-		lbl.text = UIIntermediary.text("ui.fe07.quest_detail.reward_item", {"text": UIIntermediary.text(str(rewards[i]))})
-	_hide_trailing_children(_rewards_vbox, rewards.size())
+	var rewards: Array = quest_entry.get("rewards", [])
+	for reward_index in range(rewards.size()):
+		var reward_label: Label = _acquire_detail_label(_rewards_box, reward_index)
+		reward_label.visible = true
+		reward_label.text = UIIntermediary.text("ui.fe07.quest_detail.reward_item", {"text": UIIntermediary.text(str(rewards[reward_index]))})
+	_hide_trailing_children(_rewards_box, rewards.size())
 	# 根据状态设置按钮可用性
-	var status: String = quest.get("status", "")
-	_btn_quest_accept.disabled = (status != "AVAILABLE")
-	_btn_quest_abandon.disabled = (status != "ACTIVE")
-	_btn_quest_submit.disabled = (status != "ACTIVE")
+	var quest_status: String = quest_entry.get("status", "")
+	_quest_accept_button.disabled = (quest_status != "AVAILABLE")
+	_quest_abandon_button.disabled = (quest_status != "ACTIVE")
+	_quest_submit_button.disabled = (quest_status != "ACTIVE")
 
 ## 获取或创建目标/奖励列表项标签（循环外分配）
 func _acquire_detail_label(container: Node, index: int) -> Label:
 	if index < container.get_child_count():
 		return container.get_child(index) as Label
-	var lbl := Label.new()
-	container.add_child(lbl)
-	return lbl
+	var detail_label := Label.new()
+	container.add_child(detail_label)
+	return detail_label
 
 ## 隐藏池中未使用的尾部节点
 func _hide_trailing_children(container: Node, active_count: int) -> void:
-	for i in range(active_count, container.get_child_count()):
-		var child := container.get_child(i)
+	for child_index in range(active_count, container.get_child_count()):
+		var child := container.get_child(child_index)
 		if child is CanvasItem:
 			(child as CanvasItem).visible = false
 
@@ -319,8 +317,8 @@ func _init_causality_dag_tab() -> void:
 func _refresh_dag_node_list() -> void:
 	_get_tabs().refresh_dag_node_list()
 
-func _dag_status_name(code: String) -> String:
-	return _get_tabs().dag_status_name(code)
+func _dag_status_name(status_code: String) -> String:
+	return _get_tabs().dag_status_name(status_code)
 
 func _init_bounty_tab() -> void:
 	_get_tabs().init_bounty_tab()
@@ -330,10 +328,10 @@ func _refresh_bounty_targets(tier: int) -> void:
 
 # ==============================================================================
 
-## 绑定本地 UI 交互信号（零接线：四 Tab 全部控件在本地脚本闭环）
+## 绑定本地 UI 交互信号（四 Tab 全部控件在本地脚本闭环）
 func _connect_signals() -> void:
 	# 返回按钮
-	connect_managed(_btn_back.pressed, _on_back_pressed)
+	connect_managed(_back_button.pressed, _on_back_pressed)
 
 	# 任务列表
 	connect_managed(_quest_status_filter.item_selected, _on_quest_filter_changed)
@@ -341,18 +339,18 @@ func _connect_signals() -> void:
 	connect_managed(_quest_item_list.item_selected, _on_quest_item_selected)
 
 	# 任务详情
-	connect_managed(_btn_quest_accept.pressed, _on_quest_accept)
-	connect_managed(_btn_quest_abandon.pressed, _on_quest_abandon)
-	connect_managed(_btn_quest_submit.pressed, _on_quest_submit)
+	connect_managed(_quest_accept_button.pressed, _on_quest_accept)
+	connect_managed(_quest_abandon_button.pressed, _on_quest_abandon)
+	connect_managed(_quest_submit_button.pressed, _on_quest_submit)
 
 	# 因果环 DAG
-	connect_managed(_chk_show_completed.toggled, _on_show_completed_toggled)
+	connect_managed(_show_completed_check_box.toggled, _on_show_completed_toggled)
 	connect_managed(_dag_node_list.item_selected, _on_dag_node_selected)
 
 	# 悬赏
 	connect_managed(_bounty_tier_tab.tab_changed, _on_bounty_tier_changed)
 	connect_managed(_bounty_target_list.item_selected, _on_bounty_target_selected)
-	connect_managed(_btn_bounty_accept.pressed, _on_bounty_accept)
+	connect_managed(_bounty_accept_button.pressed, _on_bounty_accept)
 
 # ==============================================================================
 # 返回按钮
@@ -371,20 +369,19 @@ func _on_quest_filter_changed(index: int) -> void:
 	current_filter = index
 	_refresh_quest_list()
 
-## 任务分类选择：骨架阶段仅刷新列表（不做额外过滤）
+## 任务分类选择：当前仅刷新任务列表展示
 func _on_quest_category_selected(_index: int) -> void:
-	# 骨架阶段：分类选择仅刷新列表（不额外过滤）
 	_refresh_quest_list()
 
 ## 任务条目选中：定位筛选后任务并展示详情，切换到详情 Tab
 func _on_quest_item_selected(index: int) -> void:
 	# 查找当前筛选后对应的任务
-	var filtered: Array = []
-	for q in quest_list:
-		if _match_filter(q.get("status", "")):
-			filtered.append(q)
-	if index >= 0 and index < filtered.size():
-		_show_quest_detail(filtered[index])
+	var filtered_quests: Array = []
+	for quest_entry in quest_list:
+		if _match_filter(quest_entry.get("status", "")):
+			filtered_quests.append(quest_entry)
+	if index >= 0 and index < filtered_quests.size():
+		_show_quest_detail(filtered_quests[index])
 		# 切换到详情 Tab
 		_tab_container.current_tab = 1
 
@@ -408,24 +405,24 @@ func _on_quest_submit() -> void:
 func _transition_quest_status(action: String) -> void:
 	if active_quest_detail.is_empty():
 		return
-	var result := MockServiceContainer.get_instance().quest().transition_status(active_quest_detail, action)
-	if not bool(result.get("success", false)):
+	var transition_result := MockServiceContainer.get_instance().quest().transition_status(active_quest_detail, action)
+	if not bool(transition_result.get("success", false)):
 		return
-	active_quest_detail = result.get("quest", active_quest_detail)
+	active_quest_detail = transition_result.get("quest", active_quest_detail)
 	# 同步回主列表
 	_sync_quest_status(active_quest_detail)
 	_show_quest_detail(active_quest_detail)
 
 ## 任务状态变更同步回主列表（按 quest_id 匹配并在循环外深拷贝写入）
-func _sync_quest_status(quest: Dictionary) -> void:
-	var qid: String = quest.get("quest_id", "")
-	var match_idx: int = -1
-	for i in quest_list.size():
-		if quest_list[i].get("quest_id", "") == qid:
-			match_idx = i
+func _sync_quest_status(quest_entry: Dictionary) -> void:
+	var quest_id: String = quest_entry.get("quest_id", "")
+	var matched_index: int = -1
+	for quest_index in quest_list.size():
+		if quest_list[quest_index].get("quest_id", "") == quest_id:
+			matched_index = quest_index
 			break
-	if match_idx >= 0:
-		quest_list[match_idx] = quest.duplicate(true)
+	if matched_index >= 0:
+		quest_list[matched_index] = quest_entry.duplicate(true)
 
 # ==============================================================================
 # 因果环 DAG 交互
