@@ -105,11 +105,20 @@ static func get_active_session_token() -> String:
 		return str(_token_reveal_handler.call(_masked_token))
 	return _masked_token.get_string_from_utf8()
 
-## 绑定创角后的序章上下文与角色档案（供序章推进与交接使用，退出自动销毁）
-static func bind_prologue_session(prologue_context: Variant, profile: Variant = null) -> void:
+## 绑定创角后的序章上下文、角色档案、活跃 DAG 会话与适配 MOD 清单（供序章推进与交接使用，退出自动销毁）
+static func bind_prologue_session(
+	prologue_context: Variant,
+	profile: Variant = null,
+	dag_session: RefCounted = null,
+	adapted_manifest: Dictionary = {}
+) -> void:
 	_state.prologue_context = prologue_context
 	if profile != null:
 		_state.character_profile = profile
+	if dag_session != null:
+		_state.narrative_dag_session = dag_session
+	if not adapted_manifest.is_empty():
+		_state.adapted_mod_manifest = adapted_manifest.duplicate(true)
 
 ## 获取当前绑定的序章上下文
 static func get_prologue_context() -> Variant:
@@ -118,6 +127,23 @@ static func get_prologue_context() -> Variant:
 ## 获取当前绑定的角色档案
 static func get_character_profile() -> Variant:
 	return _state.character_profile
+
+## 获取当前绑定的序章 DAG 会话引擎
+static func get_prologue_dag_session() -> RefCounted:
+	return _state.narrative_dag_session
+
+## 设置当前活跃 MOD 包清单与适配上下文
+static func set_active_mod_context(active_mods: Array, adapted_manifest: Dictionary = {}) -> void:
+	_state.active_mods = active_mods.duplicate(true)
+	_state.adapted_mod_manifest = adapted_manifest.duplicate(true)
+
+## 获取当前活跃 MOD 包标识集合
+static func get_active_mods() -> Array:
+	return _state.active_mods.duplicate(true)
+
+## 获取当前已适配的 MOD 运行时清单
+static func get_adapted_mod_manifest() -> Dictionary:
+	return _state.adapted_mod_manifest.duplicate(true)
 
 ## 激活世界探索态，绑定实况上下文、挂载多域存盘提供者并推流首帧 HUD 快照
 static func activate_world_session(session_parameters: Dictionary, should_push_initial_hud: bool = true, current_time_milliseconds: int = -1) -> AuthoritativeHudSnapshotDTO:
@@ -131,8 +157,16 @@ static func activate_world_session(session_parameters: Dictionary, should_push_i
 	_state.slot_id = String(session_parameters.get("slot_id", _state.slot_id))
 	_state.character_id = String(session_parameters.get("character_id", ""))
 	_state.character_name = String(session_parameters.get("character_name", ""))
-	var race := String(session_parameters.get("race_id", "HUMAN"))
-	_state.race_id = "HUMAN" if race.is_empty() or race == "UNBOUND" else race
+	var race := String(session_parameters.get("race_id", ""))
+	_state.race_id = "" if race == "UNBOUND" else race
+	if session_parameters.has("active_mods") and session_parameters.get("active_mods") is Array:
+		_state.active_mods = (session_parameters.get("active_mods") as Array).duplicate(true)
+	elif _state.gateway_fsm != null and _state.gateway_fsm.has_method("get_active_mods"):
+		_state.active_mods = (_state.gateway_fsm.get_active_mods() as Array).duplicate(true)
+	if session_parameters.has("adapted_mod_manifest") and session_parameters.get("adapted_mod_manifest") is Dictionary:
+		_state.adapted_mod_manifest = (session_parameters.get("adapted_mod_manifest") as Dictionary).duplicate(true)
+	elif _state.gateway_fsm != null and _state.gateway_fsm.has_method("get_adapted_mod_manifest"):
+		_state.adapted_mod_manifest = (_state.gateway_fsm.get_adapted_mod_manifest() as Dictionary).duplicate(true)
 	_state.current_location_id = String(session_parameters.get("current_location_id", session_parameters.get("location_id", "")))
 	_state.game_mode = int(session_parameters.get("game_mode", WorldGatewayModel.GameMode.SINGLE_PLAYER))
 	_state.level = maxi(1, int(session_parameters.get("level", 1)))

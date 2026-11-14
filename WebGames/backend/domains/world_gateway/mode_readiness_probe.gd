@@ -14,11 +14,13 @@ extends RefCounted
 const DOMAIN_WORLD_GATEWAY_CONFIG: String = "domains.world_gateway"
 const DEFAULT_SP_ROOT_DIR: String = "user://worlds/sp/"
 const DEFAULT_SIMULATED_PING_MS: int = 24
+const ModPackageDiscoverySolver = preload("res://backend/domains/narrative_orchestration/mod_package_discovery_solver.gd")
 
-## 探测单机模式环境：校验本地存储目录可写性与配额可用性
+## 探测单机模式环境：校验本地存储目录可写性、配额可用性与基础内容 MOD 就绪态
 static func probe_single_player_environment() -> ModeReadinessReportDTO:
 	var report := ModeReadinessReportDTO.new()
 	report.mode = WorldGatewayModel.GameMode.SINGLE_PLAYER
+	var has_base_content := _has_installed_base_content_mod()
 
 	var should_check_disk: bool = GameConfig.get_bool(DOMAIN_WORLD_GATEWAY_CONFIG, "probe_policy/sp_disk_check", true)
 	if not should_check_disk:
@@ -26,7 +28,7 @@ static func probe_single_player_environment() -> ModeReadinessReportDTO:
 		report.status_code = "READY"
 		report.message = "Single-player storage environment ready (media check skipped)"
 		report.latency_ms = 0
-		report.capabilities = ["local_storage", "offline_continuity"]
+		report.capabilities = ["local_storage", "offline_continuity", "base_content_mod_ready" if has_base_content else "base_content_mod_missing"]
 		return report
 
 	var root_directory: String = GameConfig.get_string(DOMAIN_WORLD_GATEWAY_CONFIG, "local_archive/root_dir", DEFAULT_SP_ROOT_DIR)
@@ -61,8 +63,20 @@ static func probe_single_player_environment() -> ModeReadinessReportDTO:
 	report.status_code = "READY"
 	report.message = "Single-player storage environment ready"
 	report.latency_ms = 0
-	report.capabilities = ["local_storage", "offline_continuity"]
+	report.capabilities = ["local_storage", "offline_continuity", "base_content_mod_ready" if has_base_content else "base_content_mod_missing"]
 	return report
+
+
+static func _has_installed_base_content_mod() -> bool:
+	var scan_result := ModPackageDiscoverySolver.scan_installed_packs_with_diagnostics()
+	var packages: Variant = scan_result.get("packages", [])
+	if packages is Array:
+		for package_entry in (packages as Array):
+			if package_entry is NarrativePackManifestDTO:
+				var manifest_dto := package_entry as NarrativePackManifestDTO
+				if manifest_dto.pack_profile in ["OFFICIAL_BASE", "TOTAL_CONVERSION"]:
+					return true
+	return false
 
 ## 探测联机模式环境：校验服务器维护态与当前账号灰度放行资格
 static func probe_multiplayer_environment(account_id: String) -> ModeReadinessReportDTO:

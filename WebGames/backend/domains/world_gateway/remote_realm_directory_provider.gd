@@ -30,32 +30,11 @@ static func list_realms(account_id: String = "") -> Array[Dictionary]:
 		var realm_card := {
 			"realm_id": str(world_id),
 			"realm_name": str(raw_world_config.get("world_name", world_id)),
-			"ping_ms": DEFAULT_REALM_PING_MS,
+			"ping_ms": int(raw_world_config.get("ping_ms", DEFAULT_REALM_PING_MS)),
 			"status": "ONLINE" if is_active else "MAINTENANCE",
-			"is_canary": not canary_tag.is_empty()
+			"is_canary": not canary_tag.is_empty(),
+			"realm_mod_manifest": raw_world_config.get("realm_mod_manifest", [])
 		}
 		results.append(realm_card)
 
-	if results.is_empty():
-		results = _create_fallback_realms()
-
 	return results
-
-## 构建缺省保底界域列表（防止配置为空时外部崩溃）
-static func _create_fallback_realms() -> Array[Dictionary]:
-	return [
-		{
-			"realm_id": "REALM_MP_ALPHA_01",
-			"realm_name": "卡拉尔公网·天穹界域",
-			"ping_ms": FALLBACK_REALM_ALPHA_PING_MS,
-			"status": "ONLINE",
-			"is_canary": true
-		},
-		{
-			"realm_id": "REALM_MP_BETA_02",
-			"realm_name": "卡拉尔公网·深渊之渊",
-			"ping_ms": FALLBACK_REALM_BETA_PING_MS,
-			"status": "ONLINE",
-			"is_canary": false
-		}
-	]

@@ -147,7 +147,12 @@ static func _resolve_single_player_entry(
 		)
 		return routing_result
 
-	var effective_world_id := target_world_id if not target_world_id.is_empty() else GameConfig.get_string("domains.world_gateway", "single_player/default_world_id", "WORLD_DEFAULT_SP_01")
+	var effective_world_id := target_world_id if not target_world_id.is_empty() else GameConfig.get_string("domains.world_gateway", "single_player/default_world_id", "")
+	if effective_world_id.is_empty():
+		routing_result.error_code = "ERR_NO_BASE_CONTENT_MOD"
+		routing_result.message = "No default world catalog configured by active content MOD and no explicit target_world_id provided."
+		return routing_result
+
 	var world_instance: WorldInstanceDTO = all_worlds.get(effective_world_id, null)
 
 	# 动态持久化世界档案解析：若静态配置表中未显式登记，动态查询 WorldArchiveRepository
@@ -155,7 +160,7 @@ static func _resolve_single_player_entry(
 		world_instance = _resolve_world_from_repository(effective_world_id)
 
 	if world_instance == null:
-		routing_result.error_code = "GATEWAY_ERR_DEFAULT_WORLD_NOT_FOUND"
+		routing_result.error_code = "ERR_NO_BASE_CONTENT_MOD" if all_worlds.is_empty() and target_world_id.is_empty() else "GATEWAY_ERR_DEFAULT_WORLD_NOT_FOUND"
 		routing_result.message = GameConfig.msg_fmt("world_gateway", "world_data_missing", {"world_id": effective_world_id})
 		return routing_result
 

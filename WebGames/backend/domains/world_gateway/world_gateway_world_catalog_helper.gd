@@ -21,33 +21,24 @@ static func validate_mode_entry_guards(
     active_mods: Array,
     last_probe_reports: Dictionary
 ) -> Dictionary:
-    var mod_discipline_result: Dictionary = AntiBridgeGuard.validate_mod_realm_discipline(target_mode, active_mods)
-    if not bool(mod_discipline_result.get("allowed", false)):
-        return {
-            "allowed": false,
-            "error_code": str(mod_discipline_result.get("error_code", AntiBridgeGuard.SECURITY_ERR_MULTIPLAYER_MOD_POISONING)),
-            "message": str(mod_discipline_result.get("message", "Multiplayer mode strictly forbids custom narrative paths and UI extension mods.")),
-            "params": {}
-        }
-
     var mode_report: Variant = null
     if target_mode == WorldGatewayModel.GameMode.SINGLE_PLAYER:
         mode_report = last_probe_reports.get("single_player", null)
     elif target_mode == WorldGatewayModel.GameMode.MULTIPLAYER:
         mode_report = last_probe_reports.get("multiplayer", null)
 
-    var transition_guard_result: Dictionary = AntiBridgeGuard.validate_mode_transition(
+    var phase_transition_guard: Dictionary = AntiBridgeGuard.validate_mode_transition(
         context.current_phase,
         WorldGatewayModel.GatewayPhase.MODE_SELECTED,
         context.selected_mode,
         target_mode,
-        mode_report
+        null
     )
-    if not bool(transition_guard_result.get("allowed", false)):
+    if not bool(phase_transition_guard.get("allowed", false)):
         return {
             "allowed": false,
-            "error_code": str(transition_guard_result.get("error_code", "SECURITY_ERR_TRANSITION_BLOCKED")),
-            "message": str(transition_guard_result.get("message", "Mode transition was blocked by security guard.")),
+            "error_code": str(phase_transition_guard.get("error_code", "SECURITY_ERR_TRANSITION_BLOCKED")),
+            "message": str(phase_transition_guard.get("message", "Mode transition was blocked by security guard.")),
             "params": {}
         }
 
@@ -57,6 +48,30 @@ static func validate_mode_entry_guards(
             "error_code": "INVALID_TRANSITION",
             "message": "World gateway is not in entered state; current phase: {current_phase}.",
             "params": {"current_phase": context.current_phase}
+        }
+
+    var mod_discipline_result: Dictionary = AntiBridgeGuard.validate_mod_realm_discipline(target_mode, active_mods)
+    if not bool(mod_discipline_result.get("allowed", false)):
+        return {
+            "allowed": false,
+            "error_code": str(mod_discipline_result.get("error_code", AntiBridgeGuard.SECURITY_ERR_MULTIPLAYER_MOD_POISONING)),
+            "message": str(mod_discipline_result.get("message", "Multiplayer mode strictly forbids custom narrative paths and UI extension mods.")),
+            "params": {}
+        }
+
+    var probe_guard_result: Dictionary = AntiBridgeGuard.validate_mode_transition(
+        context.current_phase,
+        WorldGatewayModel.GatewayPhase.MODE_SELECTED,
+        context.selected_mode,
+        target_mode,
+        mode_report
+    )
+    if not bool(probe_guard_result.get("allowed", false)):
+        return {
+            "allowed": false,
+            "error_code": str(probe_guard_result.get("error_code", "SECURITY_ERR_TRANSITION_BLOCKED")),
+            "message": str(probe_guard_result.get("message", "Mode transition was blocked by security guard.")),
+            "params": {}
         }
 
     return {"allowed": true}
