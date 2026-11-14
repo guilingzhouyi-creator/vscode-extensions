@@ -1,12 +1,17 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端导航层: 现代化分层导航器
+# 模块归属: Frontend / Navigation
 # 文件路径: res://frontend/navigation/nav_manager.gd
-# 职责: 管理全屏 Screen 栈、模态 Modal 队列、全局 Toast 调度与视口生命周期
+# 架构定位: 前端导航核心管理器，统筹全屏界面路由栈、弹窗队列与全局轻提示调度
+# 依赖与触发: 依赖 AppRoot 容器、NavTypes 与 SceneRegistry，由各页面控制器及引导流调用
+# 职责说明: 管理全屏 Screen 栈、模态 Modal 队列、全局 Toast 调度与视口生命周期
+# 退出语义与设计依据: 场景加载或宿主校验失败时保持栈深与当前节点不变；缓存按 FIFO 有界淘汰以防内存增长
 # ==============================================================================
+## NavManager：前端分层导航管理器，负责全屏路由栈、模态队列与视口生命周期控制
 class_name NavManager
 extends Node
 
 static var _instance: NavManager
+## 获取导航管理器全局单例
 static func get_instance() -> NavManager:
 	if _instance == null:
 		_instance = NavManager.new()
@@ -43,7 +48,7 @@ var _scene_cache: Dictionary = {}
 var _active_transition: Tween = null
 var _transitioning_old_screen: Control = null
 
-## 场景缓存最大条目（R-07：防随注册表扩张无界增长；超限按插入序 FIFO 逐出）
+## 场景缓存最大条目（防随注册表扩张无界增长；超限按插入序 FIFO 逐出）
 const MAX_SCENE_CACHE_ENTRIES: int = 24
 
 ## 转场动效持续时长（秒）
@@ -52,7 +57,7 @@ const TRANSITION_DURATION: float = 0.25
 const LOG_LEVEL_WARN: String = "warn"
 const METHOD_ON_SCREEN_EXIT: String = "on_screen_exit"
 
-## 默认注册 17 个功能视图（R-28：注释计数与实现对齐）
+## 默认注册 17 个功能视图（注释计数与实现对齐）
 func _init_default_registry() -> void:
 	register_screen("account_entry", "res://frontend/views/account_entry/account_entry_view.tscn")
 	register_screen("main_hud", "res://frontend/views/main_hud/main_hud_view.tscn")
@@ -92,11 +97,11 @@ func push_screen(screen_id: String, params: Dictionary = {}, transition_type: in
 
 ## 替换当前 Screen (不追加历史深度)
 func replace_screen(screen_id: String, params: Dictionary = {}, transition_type: int = NavTypes.TransitionType.NONE) -> Control:
-	var prev_depth := _screen_stack.size()
+	var previous_depth := _screen_stack.size()
 	var result := _navigate_to(screen_id, params, true, transition_type)
-	# R-05：仅跳转成功且存在被替换项时才抹去旧栈顶，失败路径栈长度不变
-	if result != null and prev_depth > 0:
-		_screen_stack.remove_at(prev_depth - 1)
+	# 仅跳转成功且存在被替换项时才抹去旧栈顶，确保失败路径栈长度不变
+	if result != null and previous_depth > 0:
+		_screen_stack.remove_at(previous_depth - 1)
 	return result
 
 ## 弹出并返回上一 Screen（默认 SLIDE_RIGHT 回退动效）
@@ -104,12 +109,39 @@ func pop_screen(transition_type: int = NavTypes.TransitionType.SLIDE_RIGHT) -> C
 	if _screen_stack.size() <= 1:
 		EventBusCore.get_instance().emit_log(LOG_LEVEL_WARN, "NavManager: already at stack bottom, cannot pop")
 		return null
-	var prev_id: String = _screen_stack[_screen_stack.size() - 2]
-	var result := _navigate_to(prev_id, {}, false, transition_type)
-	# R-06：目标解析/跳转成功后才真正出栈，失败不回退栈深
+	var previous_screen_id: String = _screen_stack[_screen_stack.size() - 2]
+	var result := _navigate_to(previous_screen_id, {}, false, transition_type)
+	# 目标解析与跳转成功后才真正出栈，避免失败时误回退栈深
 	if result != null:
 		_screen_stack.pop_back()
 	return result
+
+## 重置导航历史栈并跳转至指定根界面（用于退回账号首页/世界网关清栈）
+func pop_to_root(root_screen_id: String = "account_entry", params: Dictionary = {}, transition_type: int = NavTypes.TransitionType.NONE) -> Control:
+	_screen_stack.clear()
+	return _navigate_to(root_screen_id, params, true, transition_type)
+
+## 清理当前已压栈的屏幕与历史栈（用于停机销毁对称回收）
+func clear_stack() -> void:
+	if _active_transition != null and _active_transition.is_valid():
+		_active_transition.kill()
+	_active_transition = null
+	_exit_and_free_screen(_transitioning_old_screen)
+	_transitioning_old_screen = null
+	_exit_and_free_screen(_current_screen)
+	_current_screen = null
+	_screen_stack.clear()
+
+## 查询 11 环全链路后续前端视图预留路由键表（不修改视图场景，仅供后续接线绑定 register_screen）
+static func get_reserved_chain_routes() -> Dictionary:
+	return {
+		"account_home": "reserved:account_home_view",
+		"world_gateway": "reserved:world_gateway_view",
+		"character_creation": "reserved:character_creation_view",
+		"prologue_story": "reserved:prologue_story_view",
+		"main_hud": "account_entry -> main_hud",
+		"esc_menu": "reserved:esc_menu_modal"
+	}
 
 ## 核心跳转与生命周期驱动
 ## 顺序契约：先加载/实例化成功，再校验可挂载，最后销毁旧屏——失败路径不破坏栈/屏一致性
@@ -135,43 +167,43 @@ func _navigate_to(screen_id: String, params: Dictionary, record_history: bool, t
 			return null
 		_cache_scene(screen_id, scene)
 
-	var inst := scene.instantiate() as Control
-	if inst == null:
+	var screen_instance := scene.instantiate() as Control
+	if screen_instance == null:
 		EventBusCore.get_instance().emit_log(
 			LOG_LEVEL_WARN,
 			TemplateFormatter.format("NavManager: scene root is not Control {scene_path}", {"scene_path": scene_path})
 		)
 		return null
 
-	# 2. 挂载前置校验（R-04：宿主无效则不入栈、不销毁旧屏，杜绝孤儿节点 + 栈/场景不一致）
+	# 2. 挂载前置校验（宿主无效则不入栈、不销毁旧屏，防止孤儿节点与栈/场景不一致）
 	if _app_root == null or _app_root.screen_container == null:
 		EventBusCore.get_instance().emit_log(
 			LOG_LEVEL_WARN,
 			TemplateFormatter.format("NavManager: host unbound, navigation rejected for {screen_id}", {"screen_id": screen_id})
 		)
-		inst.queue_free()
+		screen_instance.queue_free()
 		return null
 
 	var old_screen := _current_screen
 
 	# 3. 挂载新屏（旧屏暂保留，转场结束后释放）
-	_current_screen = inst
-	_app_root.screen_container.add_child(inst)
-	inst.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_current_screen = screen_instance
+	_app_root.screen_container.add_child(screen_instance)
+	screen_instance.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 	if transition_type == NavTypes.TransitionType.NONE or old_screen == null:
 		_exit_and_free_screen(old_screen)
 	else:
-		_play_transition(old_screen, inst, transition_type)
+		_play_transition(old_screen, screen_instance, transition_type)
 
 	# 4. 挂载成功后才写栈，保证栈与场景树恒自洽
 	if record_history:
 		_screen_stack.append(screen_id)
 
-	if inst.has_method("on_screen_enter"):
-		inst.call("on_screen_enter", params)
+	if screen_instance.has_method("on_screen_enter"):
+		screen_instance.call("on_screen_enter", params)
 
-	return inst
+	return screen_instance
 
 ## 统一触发屏幕退出钩子并安全释放
 func _exit_and_free_screen(screen: Control) -> void:
@@ -236,7 +268,7 @@ func _create_tween() -> Tween:
 		return _app_root.create_tween()
 	return Tween.new()
 
-## R-07：写入场景缓存并按插入序 FIFO 逐出，保证缓存条目有界（≤ MAX_SCENE_CACHE_ENTRIES）
+## 写入场景缓存并按插入序 FIFO 逐出，保证缓存条目有界（≤ MAX_SCENE_CACHE_ENTRIES）
 func _cache_scene(screen_id: String, scene: PackedScene) -> void:
 	if not _scene_cache.has(screen_id) and _scene_cache.size() >= MAX_SCENE_CACHE_ENTRIES:
 		var oldest_key: String = _scene_cache.keys()[0]

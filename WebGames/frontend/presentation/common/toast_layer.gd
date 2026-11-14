@@ -1,8 +1,12 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端表现层: 全局 Toast 提示管理器
+# 模块归属: Frontend / Presentation
 # 文件路径: res://frontend/presentation/common/toast_layer.gd
-# 职责: 呈现居中浮动轻提示消息流，支持自动淡出、队列堆叠与等级配色
+# 架构定位: 前端表现层全局轻提示队列容器，管理浮动提示节点池与自动淡出动效
+# 依赖与触发: 挂载于 AppRoot 顶层覆盖节点，由 NavManager 或 Toast 通知接口触发入队
+# 职责说明: 呈现居中浮动轻提示消息流，支持自动淡出、队列堆叠与等级配色
+# 退出语义与设计依据: 节点析构前遍历释放对象池内有效节点并清空队列，防止孤立 Control 内存残留
 # ==============================================================================
+## ToastLayer：全局轻提示管理器，负责消息队列堆叠、对象池复用与自动淡出
 class_name ToastLayer
 extends VBoxContainer
 
@@ -17,9 +21,9 @@ func _ready() -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
-		for p in _toast_pool:
-			if p != null and is_instance_valid(p):
-				p.free()
+		for toast_item in _toast_pool:
+			if toast_item != null and is_instance_valid(toast_item):
+				toast_item.free()
 		_toast_pool.clear()
 
 func _acquire_toast_panel() -> PanelContainer:
@@ -29,17 +33,17 @@ func _acquire_toast_panel() -> PanelContainer:
 			return reused
 	var panel := PanelContainer.new()
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var lbl := Label.new()
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	panel.add_child(lbl)
+	var toast_label := Label.new()
+	toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	panel.add_child(toast_label)
 	return panel
 
 func _recycle_toast_panel(panel: PanelContainer) -> void:
 	if panel == null or not is_instance_valid(panel):
 		return
-	var old_tw: Variant = panel.get_meta("_toast_tween", null)
-	if old_tw is Tween and (old_tw as Tween).is_valid():
-		(old_tw as Tween).kill()
+	var old_tween: Variant = panel.get_meta("_toast_tween", null)
+	if old_tween is Tween and (old_tween as Tween).is_valid():
+		(old_tween as Tween).kill()
 	panel.set_meta("_toast_tween", null)
 	if panel.get_parent() == self:
 		remove_child(panel)
@@ -58,8 +62,8 @@ func show_toast(message: String, level: int = NavTypes.ToastLevel.INFO, duration
 		_recycle_toast_panel(oldest)
 
 	var panel := _acquire_toast_panel()
-	var lbl := panel.get_child(0) as Label
-	lbl.text = message
+	var toast_label := panel.get_child(0) as Label
+	toast_label.text = message
 
 	var text_color := DesignTokens.COLOR_TEXT_DEFAULT
 	match level:
@@ -70,7 +74,7 @@ func show_toast(message: String, level: int = NavTypes.ToastLevel.INFO, duration
 		NavTypes.ToastLevel.ERROR:
 			text_color = DesignTokens.COLOR_DANGER_DEFAULT
 
-	lbl.add_theme_color_override("font_color", text_color)
+	toast_label.add_theme_color_override("font_color", text_color)
 	panel.modulate.a = 0.0
 	add_child(panel)
 

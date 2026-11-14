@@ -1,12 +1,19 @@
 # ==============================================================================
-# 卡拉尔世界引擎 - 前端 i18n 文本解析器 (独立解耦词库)
+# 模块归属: 前端国际化渲染层 (Frontend · i18n Text Resolver)
 # 文件路径: res://frontend/i18n/ui_text_resolver.gd
-# 职责: 统一解析 i18n key 并填充参数，直接读取配置词典，解耦后端反射依赖
+# 架构定位: Decoupled Localization Dictionary Resolver
+# 依赖与触发: 上游: UIIntermediary, UIBindingRegistry | 下游: PlaceholderFiller, GameConfig, config/i18n/*.json
+# 职责说明: 加载并缓存多语言 JSON 词库，统一检索 i18n 键并委派 PlaceholderFiller 完成单次参数填充。
+# 退出语义与设计依据: 独立解耦词库与单引擎参数填充防重复加工契约
 # ==============================================================================
+
+## UITextResolver：前端多语言词库加载与文本模板解析器
 class_name UITextResolver
 extends RefCounted
 
 static var _instance: UITextResolver
+
+## 获取多语言文本解析器全局单例
 static func get_instance() -> UITextResolver:
 	if _instance == null:
 		_instance = UITextResolver.new()
@@ -30,18 +37,15 @@ func _load_locale_dict(locale: String, path: String) -> void:
 	var content := file.get_as_text()
 	file.close()
 
-	var json_res: Variant = JSON.parse_string(content)
-	if json_res is Dictionary:
-		_dictionaries[locale] = json_res
+	var parsed_json: Variant = JSON.parse_string(content)
+	if parsed_json is Dictionary:
+		_dictionaries[locale] = parsed_json
 
 ## 核心翻译函数: resolve(key, params) → 翻译后模板字符串（已填充参数）
-## R-02 单引擎收敛：本函数只负责「取模板」，参数填充唯一由 PlaceholderFiller 承担，
-## 杜绝「resolve 裸替换 → PlaceholderFiller 再填充」的双引擎重复消费导致格式化空转。
 static func resolve(key: String, params: Dictionary = {}) -> String:
-	var inst := get_instance()
-	var template := inst._get_raw_text(key)
+	var resolver := get_instance()
+	var template := resolver._get_raw_text(key)
 	if template.is_empty():
-		# 尝试从 frontend.views 配置兜底
 		var fallback_views := GameConfig.get_string("frontend.views", key, "")
 		if not fallback_views.is_empty():
 			return PlaceholderFiller.fill(fallback_views, params)
@@ -65,8 +69,8 @@ func _get_raw_text(key: String) -> String:
 	return ""
 
 static func set_locale(locale: String) -> void:
-	var inst := get_instance()
-	inst.current_locale = locale
+	var resolver := get_instance()
+	resolver.current_locale = locale
 
 static func get_current_locale() -> String:
 	return get_instance().current_locale
@@ -79,5 +83,5 @@ static func is_cjk_locale() -> bool:
 	return loc.begins_with("zh") or loc.begins_with("ja") or loc.begins_with("ko")
 
 static func has_key(key: String) -> bool:
-	var inst := get_instance()
-	return not inst._get_raw_text(key).is_empty()
+	var resolver := get_instance()
+	return not resolver._get_raw_text(key).is_empty()

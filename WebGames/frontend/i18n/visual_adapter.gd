@@ -1,9 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 - 动态视觉适配器
+# 模块归属: 前端国际化渲染层 (Frontend · i18n Visual Text Adapter)
 # 文件路径: res://frontend/i18n/visual_adapter.gd
-# 职责: 根据 UI 类型、可用空间、文本长度、语言特性进行字号/换行/截断动态适配
-# 边界: 不修改文本内容, 不做语言转换, 只调整视觉呈现参数
+# 架构定位: Language-Aware UI Typography & Overflow Adapter
+# 依赖与触发: 上游: UIIntermediary | 下游: UITextResolver
+# 职责说明: 根据控件类型、可用宽度、文本长度及 CJK/拉丁字符宽度比例，动态调整字号、换行与截断策略，不改写原始语义文本。
+# 退出语义与设计依据: 显示层非破坏性溢出截断与 CJK/拉丁差异化字宽估算契约
 # ==============================================================================
+
+## VisualAdapter：多语言 UI 文本字号缩放与溢出裁剪适配器
 class_name VisualAdapter
 extends RefCounted
 
@@ -14,8 +18,8 @@ const FONT_SIZE_MIN_CJK := 14
 const FONT_SIZE_MIN_LATIN := 12
 const ELLIPSIS_CHAR := "…"
 
-## R-14 宽度估算系数：全角(中日韩)近似 1.0em、半角(拉丁)近似 0.5em
-## 旧实现统一用 0.6 低估 CJK 宽度，导致中文标题被误判溢出并错误降字号
+## 宽度估算系数：全角(中日韩)近似 1.0em、半角(拉丁)近似 0.5em
+## 避免统一采用低估值系数导致中文标题被误判溢出并错误缩小字号
 const CJK_WIDTH_RATIO := 1.0
 const LATIN_WIDTH_RATIO := 0.5
 
@@ -104,7 +108,6 @@ static func adapt_button(button: Button, text: String) -> void:
 				fitted = true
 				break
 
-	# R-15 兜底：逐级降字号仍溢出时，启用裁剪 + 省略号，保证按钮文案不溢出
 	if not fitted and estimated_width > avail_width * 0.85:
 		button.clip_text = true
 		button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -112,7 +115,6 @@ static func adapt_button(button: Button, text: String) -> void:
 	button.add_theme_font_size_override("font_size", current_size)
 
 ## 适配 Tab 标题
-## R-16：按 tab_index 粒度仅对该项标题生效（不再改写整容器字号）
 static func adapt_tab_title(container: TabContainer, text: String, tab_index: int) -> void:
 	if container == null:
 		return
@@ -144,8 +146,6 @@ static func _truncate_for_tab(text: String, font_size: int) -> String:
 	return text.substr(0, budget - 1) + ELLIPSIS_CHAR
 
 ## 适配 ItemList 项
-## R-17：改用 ItemList 显示层溢出策略（text_overrun_behavior），不再破坏性改写源文本，
-## 语言切换/刷新后可完整还原原文
 static func adapt_item_list_item(item_list: ItemList, _text: String, _index: int) -> void:
 	if item_list == null:
 		return

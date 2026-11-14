@@ -1,8 +1,12 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端表现层: 通用 UI 状态机容器
+# 模块归属: Frontend / Presentation
 # 文件路径: res://frontend/presentation/common/ui_state_container.gd
-# 职责: 统一呈现 INITIAL, LOADING, READY, EMPTY, ERROR 五大核心可视化状态
+# 架构定位: 前端表现层通用五态容器，封装初始、加载、就绪、空态与错误态视图切换
+# 依赖与触发: 挂载于 BaseScreen 内容区，由页面逻辑按数据加载阶段切换状态与绑定重试
+# 职责说明: 统一呈现 INITIAL, LOADING, READY, EMPTY, ERROR 五大核心可视化状态
+# 退出语义与设计依据: 状态切换仅切换对应分支节点可见性并保留回调引用，缺失节点时按需安全构建
 # ==============================================================================
+## UIStateContainer：通用 UI 状态机容器，统一管理五种页面展示态与重试绑定
 class_name UIStateContainer
 extends Control
 
@@ -53,23 +57,23 @@ func _setup_internal_nodes() -> void:
 		add_child(empty_node)
 
 	if error_node == null:
-		var err_container := VBoxContainer.new()
-		err_container.name = "ErrorView"
-		err_container.alignment = BoxContainer.ALIGNMENT_CENTER
-		err_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		var error_container := VBoxContainer.new()
+		error_container.name = "ErrorView"
+		error_container.alignment = BoxContainer.ALIGNMENT_CENTER
+		error_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 		error_label = Label.new()
 		error_label.text = UIIntermediary.text("ui.common.state.error")
 		error_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		error_label.add_theme_color_override("font_color", DesignTokens.COLOR_DANGER_DEFAULT)
-		err_container.add_child(error_label)
+		error_container.add_child(error_label)
 
 		retry_button = Button.new()
 		retry_button.text = UIIntermediary.text("ui.common.state.retry")
 		retry_button.pressed.connect(_on_retry_pressed)
-		err_container.add_child(retry_button)
+		error_container.add_child(retry_button)
 
-		error_node = err_container
+		error_node = error_container
 		add_child(error_node)
 
 ## 切换状态并更新可见性
@@ -95,13 +99,13 @@ func set_ready_view(node: Control) -> void:
 	set_state(_current_state)
 
 ## 绑定错误重试回调
-func bind_retry_callback(cb: Callable) -> void:
-	retry_callback = cb
+func bind_retry_callback(callback: Callable) -> void:
+	retry_callback = callback
 
 ## 自定义错误文案
-func set_error_message(msg: String) -> void:
+func set_error_message(message: String) -> void:
 	if error_label != null:
-		error_label.text = msg
+		error_label.text = message
 
 func _on_retry_pressed() -> void:
 	set_state(State.LOADING)
@@ -111,8 +115,8 @@ func _on_retry_pressed() -> void:
 func _create_placeholder_view(text: String, text_color: Color) -> Control:
 	var box := CenterContainer.new()
 	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	var lbl := Label.new()
-	lbl.text = text
-	lbl.add_theme_color_override("font_color", text_color)
-	box.add_child(lbl)
+	var placeholder_label := Label.new()
+	placeholder_label.text = text
+	placeholder_label.add_theme_color_override("font_color", text_color)
+	box.add_child(placeholder_label)
 	return box

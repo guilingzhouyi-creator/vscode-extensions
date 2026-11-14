@@ -1,10 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 - 占位符填充器
+# 模块归属: 前端国际化渲染层 (Frontend · i18n Placeholder Formatting)
 # 文件路径: res://frontend/i18n/placeholder_filler.gd
-# 职责: 将业务数据填充到 i18n 翻译模板的 {param} 占位符中
-# 数据流: 翻译模板 + 业务数据字典 → 填充后的最终文本
-# 边界: 不做语言转换, 不做布局调整, 不含业务判断
+# 架构定位: Pure Template Placeholder Formatter
+# 依赖与触发: 上游: UITextResolver, KCurrencyBar | 下游: GameConfig
+# 职责说明: 将业务数据按精确键名与类型守卫格式化后填充至 i18n 模板的 {param} 占位符，不含语言转换与布局逻辑。
+# 退出语义与设计依据: 精确键匹配防误命中与 int64/有限浮点数边界防御契约
 # ==============================================================================
+
+## PlaceholderFiller：i18n 模板占位符替换与数值安全格式化工具
 class_name PlaceholderFiller
 extends RefCounted
 
@@ -23,24 +26,24 @@ static func fill(template: String, data: Dictionary) -> String:
 		return template
 
 	var result := template
-	for m in matches:
-		var key := m.get_string(1)
-		var val_found: bool = false
-		var raw_val: Variant = null
+	for regex_match in matches:
+		var key := regex_match.get_string(1)
+		var value_found: bool = false
+		var raw_value: Variant = null
 
 		if data.has(key):
-			val_found = true
-			raw_val = data[key]
+			value_found = true
+			raw_value = data[key]
 		elif data.has(key.to_lower()):
-			val_found = true
-			raw_val = data[key.to_lower()]
+			value_found = true
+			raw_value = data[key.to_lower()]
 		elif data.has(key.to_upper()):
-			val_found = true
-			raw_val = data[key.to_upper()]
+			value_found = true
+			raw_value = data[key.to_upper()]
 
-		if val_found:
+		if value_found:
 			var token := "{" + key + "}"
-			result = result.replace(token, _format_value(key, raw_val))
+			result = result.replace(token, _format_value(key, raw_value))
 
 	return result
 
@@ -52,20 +55,16 @@ static func fill_batch(template: String, data_array: Array) -> Array:
 	return results
 
 ## 数值格式化: 依据「精确键名 + 受控后缀 + 值类型守卫」推断格式化策略
-## ── A/TC-精度契约 ─────────────────────────────────────────────
-## 收敛前缺陷：以 `key.find("time")` / `find("rate")` 之类的**子串匹配**推断语义，
-## 导致两类误命中——①展示文本被二次加工（`time`="刚刚" → "0分00秒"；
-## `rate`="3.5000" → "3%"）；②无关键名连带命中（`rate_limit`/`moderate` 含 "rate"、
-## `timestamp` 含 "time"）。收敛后改为**精确键匹配 + 受控后缀**（`*_amount`/`*_percent`
-## 等显式约定），并前置**值类型守卫**：非 int/float 的取值（String/其它）一律原样
-## 输出，从根上杜绝「已格式化文本被再次当数值加工」。
+## ── 精度与防误命中契约 ─────────────────────────────────────────────
+## 采用精确键匹配与受控后缀（*_amount/*_percent 等显式约定），避免子串匹配误加工
+## 展示文本或无关字段；前置值类型守卫确保非数值类型原样输出，不重复加工已格式化文本。
 static func _format_value(key: String, value: Variant) -> String:
 	# 值类型守卫：仅数值类型参与格式化；展示型取值（String/Bool/容器等）原样透传
 	if not (value is int or value is float):
 		return str(value)
 
 	var key_lower := key.to_lower()
-	# R-25 int64 原生路径：int 不经 float 回转（>2^53 会丢精度），仅 float 走有限性防御
+	# int64 原生路径：int 不经 float 回转（>2^53 会丢失精度），仅 float 走有限性防御
 	var is_int := value is int
 	var numeric := _to_finite_float(value)
 
@@ -96,15 +95,15 @@ static func _format_value(key: String, value: Variant) -> String:
 	# 默认: 数值原样转字符串（count/level/total/value 等计数与标尺类不额外加工）
 	return str(value)
 
-## 有限性/类型安全数值转换（R-02 边界防御）：仅接受 int/float/合法 String，
+## 有限性/类型安全数值转换边界防御：仅接受 int/float/合法 String，
 ## 非有限（NaN/INF）与非法类型一律回落 0.0，杜绝 int(NAN)/float({}) 异常
 static func _to_finite_float(value: Variant) -> float:
 	if value is int or value is float:
-		var f := float(value)
-		return f if is_finite(f) else 0.0
+		var float_value := float(value)
+		return float_value if is_finite(float_value) else 0.0
 	if value is String:
-		var s: String = value
-		return float(s) if s.is_valid_float() else 0.0
+		var text_value: String = value
+		return float(text_value) if text_value.is_valid_float() else 0.0
 	return 0.0
 
 static var _re_unfilled: RegEx = null
@@ -124,16 +123,16 @@ static func _get_extract_regex() -> RegEx:
 
 ## 千分位格式化: 5000 → "5,000"
 static func format_thousands(value: int) -> String:
-	var s := str(abs(value))
-	var n: int = s.length()
-	if n <= 3:
-		return ("-" + s) if value < 0 else s
+	var digits_text := str(abs(value))
+	var digit_count: int = digits_text.length()
+	if digit_count <= 3:
+		return ("-" + digits_text) if value < 0 else digits_text
 	var groups: PackedStringArray = PackedStringArray()
-	var end_idx: int = n
-	while end_idx > 0:
-		var start_idx: int = maxi(0, end_idx - 3)
-		groups.append(s.substr(start_idx, end_idx - start_idx))
-		end_idx = start_idx
+	var end_index: int = digit_count
+	while end_index > 0:
+		var start_index: int = maxi(0, end_index - 3)
+		groups.append(digits_text.substr(start_index, end_index - start_index))
+		end_index = start_index
 	groups.reverse()
 	var formatted := ",".join(groups)
 	return ("-" + formatted) if value < 0 else formatted
@@ -166,6 +165,6 @@ static func has_unfilled_placeholders(text: String) -> bool:
 ## 提取模板中所有占位符名称（调试用）
 static func extract_placeholders(template: String) -> Array:
 	var results: Array = []
-	for m in _get_extract_regex().search_all(template):
-		results.append(m.get_string(1))
+	for regex_match in _get_extract_regex().search_all(template):
+		results.append(regex_match.get_string(1))
 	return results

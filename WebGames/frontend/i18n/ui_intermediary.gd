@@ -1,10 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 - UI 可视化配置中间体编排层
+# 模块归属: 前端国际化渲染层 (Frontend · i18n UI Intermediary Mediator)
 # 文件路径: res://frontend/i18n/ui_intermediary.gd
-# 职责: 统一编排 翻译→填充→适配→注入, 作为业务数据与视觉 UI 之间的标准适配层
-# 数据流: 业务数据 → [中间体] → i18n Key/翻译 → Placeholder 填充 → 视觉 UI 渲染
-# 边界: 属于适配与编排层, 不取代业务逻辑、i18n 核心机制或具体 UI 组件
+# 架构定位: UI Localization & Visual Adaptation Facade
+# 依赖与触发: 上游: Frontend Views, BaseScreen, 通用组件 | 下游: UITextResolver, VisualAdapter, UIBindingRegistry
+# 职责说明: 统一编排翻译、占位符填充、视觉自适应缩放与弱引用绑定注册，作为业务数据与 UI 节点的标准适配中枢。
+# 退出语义与设计依据: 单引擎参数填充与退出阶段免重建短路契约
 # ==============================================================================
+
+## UIIntermediary：前端 i18n 文本解析、适配与节点绑定统一门面
 class_name UIIntermediary
 extends RefCounted
 
@@ -26,7 +29,6 @@ static func get_instance() -> UIIntermediary:
 ## data: 业务数据字典 (如 {"amount": 5000, "name": "阿尔托莉雅"})
 ## 返回: 填充后的最终文本
 static func resolve(node: Node, key: String, data: Dictionary = {}) -> String:
-	# 1-2. i18n 翻译 + 占位符填充（R-02 单引擎：UITextResolver.resolve 已内置 PlaceholderFiller 填充）
 	var filled := UITextResolver.resolve(key, data)
 
 	# 3. 注入 UI 节点
@@ -45,12 +47,11 @@ static func resolve(node: Node, key: String, data: Dictionary = {}) -> String:
 ## bindings: [{ "node": Node, "key": String, "data": Dictionary }, ...]
 static func resolve_batch(bindings: Array) -> void:
 	var empty_data: Dictionary = {}
-	for b in bindings:
-		resolve(b.node, b.key, b.get("data", empty_data))
+	for binding in bindings:
+		resolve(binding.node, binding.key, binding.get("data", empty_data))
 
 ## 仅翻译+填充, 不注入节点（用于动态生成文本, 如 ItemList 项）
 static func text(key: String, data: Dictionary = {}) -> String:
-	# R-02 单引擎：resolve 已内置占位符填充，无需二次 PlaceholderFiller.fill
 	return UITextResolver.resolve(key, data)
 
 ## 翻译+填充+绑定, 但延迟注入（用于 TabContainer 标题等需要时机的场景）

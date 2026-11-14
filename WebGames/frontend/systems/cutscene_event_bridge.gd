@@ -99,9 +99,9 @@ func attach_host(host_container: Control) -> void:
 
 ## 解绑视口与宿主，注销总线监听（幂等·防泄漏）
 func detach_all() -> void:
-	for tok in _bus_tokens:
-		if tok != null and tok.has_method("unbind"):
-			tok.unbind()
+	for token in _bus_tokens:
+		if token != null and token.has_method("unbind"):
+			token.unbind()
 	_bus_tokens.clear()
 
 	_disconnect_active_view()
@@ -191,18 +191,18 @@ func _handle_cutscene_progress(payload: Dictionary) -> void:
 	if view == null:
 		return
 
-	var cur_time: float = float(payload.get("current_time", 0.0))
+	var current_time: float = float(payload.get("current_time", 0.0))
 	var progress: float = float(payload.get("progress", 0.0))
 	var subtitle: String = str(payload.get("subtitle", ""))
 
 	view.apply_snapshot({
 		"cutscene_id": _current_cutscene_id,
-		"current_time_sec": cur_time,
+		"current_time_sec": current_time,
 		"progress_ratio": progress,
 		"active_subtitle_text": subtitle
 	})
 
-	presentation_progress.emit(cur_time, progress, subtitle)
+	presentation_progress.emit(current_time, progress, subtitle)
 
 func _conclude_cutscene(payload: Dictionary, target_signal: Signal) -> void:
 	var view := get_active_view()
@@ -245,7 +245,7 @@ func _acquire_media_resource(path: String) -> Resource:
 	return null
 
 # ==============================================================================
-# 五、视口信号反向反馈闭环
+# 五、视口信号反向反馈链路
 # ==============================================================================
 
 func _on_view_playback_finished() -> void:

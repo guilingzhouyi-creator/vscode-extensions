@@ -1,8 +1,12 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端表现层: 全屏一级界面抽象基类
+# 模块归属: Frontend / Presentation
 # 文件路径: res://frontend/presentation/base/base_screen.gd
-# 职责: 规范全屏一级视图的标准生命周期时序、统一快照注入入口与五态容器挂载点
+# 架构定位: 前端表现层全屏界面基类，规范一级视图生命周期、信号托管与状态容器挂载
+# 依赖与触发: 由各一级功能视图继承，由 NavManager 注入参数并驱动进退场回调
+# 职责说明: 规范全屏一级视图的标准生命周期时序、统一快照注入入口与五态容器挂载点
+# 退出语义与设计依据: 退场或析构时批量解绑托管信号与防抖状态，防止悬空 Callable 回调泄漏
 # ==============================================================================
+## BaseScreen：全屏一级界面抽象基类，统一生命周期、信号托管与五态容器入口
 class_name BaseScreen
 extends Control
 
@@ -19,16 +23,16 @@ var _managed_connections: Array[Dictionary] = []
 var _action_cooldowns_ms: Dictionary = {}
 
 ## 注册受 BaseScreen 生命周期托管的信号连接（幂等防重连，节点销毁时自动对称断开）
-func connect_managed(sig: Signal, target: Callable, flags: int = 0) -> void:
-	var src: Object = sig.get_object()
-	if src == null or not is_instance_valid(src):
+func connect_managed(target_signal: Signal, target: Callable, flags: int = 0) -> void:
+	var source_object: Object = target_signal.get_object()
+	if source_object == null or not is_instance_valid(source_object):
 		return
-	if sig.is_connected(target):
+	if target_signal.is_connected(target):
 		return
-	sig.connect(target, flags)
+	target_signal.connect(target, flags)
 	_managed_connections.append({
-		"signal_name": sig.get_name(),
-		"source_ref": weakref(src),
+		"signal_name": target_signal.get_name(),
+		"source_ref": weakref(source_object),
 		"target": target
 	})
 
@@ -37,8 +41,8 @@ func try_consume_action_cooldown(action_key: String, cooldown_ms: int = 180) -> 
 	if cooldown_ms <= 0 or action_key.is_empty():
 		return true
 	var now_ms: int = Time.get_ticks_msec()
-	var prev_ms: int = int(_action_cooldowns_ms.get(action_key, -cooldown_ms))
-	if now_ms - prev_ms < cooldown_ms:
+	var previous_ms: int = int(_action_cooldowns_ms.get(action_key, -cooldown_ms))
+	if now_ms - previous_ms < cooldown_ms:
 		return false
 	_action_cooldowns_ms[action_key] = now_ms
 	return true
@@ -46,16 +50,16 @@ func try_consume_action_cooldown(action_key: String, cooldown_ms: int = 180) -> 
 ## 安全断开由本视图登记的全部托管信号连接（幂等、防已释放对象悬空）
 func disconnect_managed_signals() -> void:
 	for entry in _managed_connections:
-		var src_ref: Variant = entry.get("source_ref")
-		if not (src_ref is WeakRef):
+		var source_ref: Variant = entry.get("source_ref")
+		if not (source_ref is WeakRef):
 			continue
-		var src: Variant = (src_ref as WeakRef).get_ref()
-		if src == null or not is_instance_valid(src):
+		var source_object: Variant = (source_ref as WeakRef).get_ref()
+		if source_object == null or not is_instance_valid(source_object):
 			continue
-		var sig_name: StringName = entry.get("signal_name", &"")
-		var cb: Callable = entry.get("target", Callable())
-		if cb.is_valid() and (src as Object).is_connected(sig_name, cb):
-			(src as Object).disconnect(sig_name, cb)
+		var signal_name: StringName = entry.get("signal_name", &"")
+		var target_callable: Callable = entry.get("target", Callable())
+		if target_callable.is_valid() and (source_object as Object).is_connected(signal_name, target_callable):
+			(source_object as Object).disconnect(signal_name, target_callable)
 	_managed_connections.clear()
 	_action_cooldowns_ms.clear()
 
@@ -89,9 +93,9 @@ func _render_from_snapshot() -> void:
 	pass
 
 ## 注册由本视图独占持有的子控制器（页面销毁时自动安全释放）
-func _register_owned_subcontroller(ctrl: Node) -> Node:
-	_owned_subcontroller = ctrl
-	return ctrl
+func _register_owned_subcontroller(controller: Node) -> Node:
+	_owned_subcontroller = controller
+	return controller
 
 ## 子类扩展清理钩子（销毁前最先触发）
 func _on_predelete_cleanup() -> void:
@@ -169,11 +173,11 @@ func _ensure_currency_bar(current: Control, bar_script: Script, show_gold: bool 
 			current.set("show_crystals", true)
 	return current
 
-func _ensure_search_bar(current: Control, search_script: Script, ph_key: String = "") -> Control:
+func _ensure_search_bar(current: Control, search_script: Script, placeholder_key: String = "") -> Control:
 	if current == null:
 		current = search_script.new() as Control
-		if not ph_key.is_empty():
-			current.set("placeholder_key", ph_key)
+		if not placeholder_key.is_empty():
+			current.set("placeholder_key", placeholder_key)
 	return current
 
 func _ensure_state_panel(current: Control, state_script: Script) -> Control:
