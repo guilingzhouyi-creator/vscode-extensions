@@ -81,3 +81,25 @@ static func pack_results(domain_name: String, results: Array[Dictionary]) -> Dic
 		"all_passed": all_ok,
 		"results": results
 	}
+
+## -----------------------------------------------------------------------------
+## 官方 MOD 测试夹具挂载与对称卸载助手
+## -----------------------------------------------------------------------------
+static func mount_official_kalar_for_test(item_catalog: Variant = null) -> Dictionary:
+	var official_pkg: Dictionary = ModPackageDiscoverySolver.load_full_mod_package_from_dir("res://mods/official_kalar")
+	if official_pkg.is_empty():
+		return {"success": false, "error_code": "ERR_OFFICIAL_MOD_MISSING"}
+	var adapt_res: Dictionary = ModPrecheckAndAdaptationSolver.precheck_and_adapt_mod_list([official_pkg], ["official_kalar"])
+	var override_summary: Dictionary = Tier3ContentOverrideLoader.apply_enabled_packages([official_pkg], item_catalog)
+	WorldSessionRuntimeService.set_active_mod_context(["official_kalar"], adapt_res.get("adapted_manifest", {}))
+	return {
+		"success": bool(adapt_res.get("success", false)) and bool(override_summary.get("success", false)),
+		"package": official_pkg,
+		"adaptation": adapt_res,
+		"override_summary": override_summary
+	}
+
+static func unmount_mod_overlay_for_test(item_catalog: Variant = null) -> void:
+	Tier3ContentOverrideLoader.revert_all_overrides(item_catalog)
+	GameConfig.clear_mod_overlay_tables()
+	WorldSessionRuntimeService.set_active_mod_context([], {})
