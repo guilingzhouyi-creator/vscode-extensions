@@ -53,16 +53,16 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从输入字典反序列化还原传输对象
-static func from_dto(raw_data: Dictionary) -> AuthoritativeCharacterCreationRequestDTO:
+static func from_dto(serialized_request: Dictionary) -> AuthoritativeCharacterCreationRequestDTO:
 	var request_dto := AuthoritativeCharacterCreationRequestDTO.new()
-	if raw_data.is_empty():
+	if serialized_request.is_empty():
 		return request_dto
-	request_dto.account_id = str(raw_data.get("account_id", ""))
-	request_dto.slot_id = int(raw_data.get("slot_id", 0))
-	request_dto.world_id = str(raw_data.get("world_id", ""))
-	request_dto.character_name = str(raw_data.get("character_name", ""))
-	request_dto.request_seed = int(raw_data.get("request_seed", 0))
-	var extra: Variant = raw_data.get("extra_custom_fields", {})
+	request_dto.account_id = str(serialized_request.get("account_id", ""))
+	request_dto.slot_id = int(serialized_request.get("slot_id", 0))
+	request_dto.world_id = str(serialized_request.get("world_id", ""))
+	request_dto.character_name = str(serialized_request.get("character_name", ""))
+	request_dto.request_seed = int(serialized_request.get("request_seed", 0))
+	var extra: Variant = serialized_request.get("extra_custom_fields", {})
 	if extra is Dictionary:
 		request_dto.extra_custom_fields = (extra as Dictionary).duplicate(true)
 	return request_dto

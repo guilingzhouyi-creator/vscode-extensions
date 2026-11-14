@@ -73,24 +73,24 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从字典数据构造还原交接对象
-static func from_dto(raw_data: Dictionary) -> PrologueHandoffDTO:
+static func from_dto(serialized_handoff: Dictionary) -> PrologueHandoffDTO:
 	var handoff := PrologueHandoffDTO.new()
-	if raw_data.is_empty():
+	if serialized_handoff.is_empty():
 		return handoff
-	handoff.account_id = str(raw_data.get("account_id", ""))
-	handoff.character_id = str(raw_data.get("character_id", ""))
-	handoff.character_name = str(raw_data.get("character_name", ""))
-	handoff.race_id = str(raw_data.get("race_id", "HUMAN"))
-	handoff.origin_id = str(raw_data.get("origin_id", ""))
-	var raw_attributes: Variant = raw_data.get("allocated_attributes", {})
+	handoff.account_id = str(serialized_handoff.get("account_id", ""))
+	handoff.character_id = str(serialized_handoff.get("character_id", ""))
+	handoff.character_name = str(serialized_handoff.get("character_name", ""))
+	handoff.race_id = str(serialized_handoff.get("race_id", "HUMAN"))
+	handoff.origin_id = str(serialized_handoff.get("origin_id", ""))
+	var raw_attributes: Variant = serialized_handoff.get("allocated_attributes", {})
 	handoff.allocated_attributes = (raw_attributes as Dictionary).duplicate(true) if raw_attributes is Dictionary else {}
-	var raw_items: Variant = raw_data.get("initial_inventory_items", [])
+	var raw_items: Variant = serialized_handoff.get("initial_inventory_items", [])
 	handoff.initial_inventory_items = (raw_items as Array).duplicate(true) if raw_items is Array else []
-	handoff.initial_gold = int(raw_data.get("initial_gold", 0))
-	handoff.assigned_start_location_id = str(raw_data.get("assigned_start_location_id", "CENTRAL_CONTINENT"))
-	var raw_mods: Variant = raw_data.get("active_mods", [])
-	handoff.active_mods = (raw_mods as Array).duplicate(true) if raw_mods is Array else []
-	var raw_mutations: Variant = raw_data.get("applied_mutations", [])
+	handoff.initial_gold = int(serialized_handoff.get("initial_gold", 0))
+	handoff.assigned_start_location_id = str(serialized_handoff.get("assigned_start_location_id", "CENTRAL_CONTINENT"))
+	var raw_active_mods: Variant = serialized_handoff.get("active_mods", [])
+	handoff.active_mods = (raw_active_mods as Array).duplicate(true) if raw_active_mods is Array else []
+	var raw_mutations: Variant = serialized_handoff.get("applied_mutations", [])
 	handoff.applied_mutations = (raw_mutations as Array).duplicate(true) if raw_mutations is Array else []
-	handoff.timestamp_utc = int(raw_data.get("timestamp_utc", 0))
+	handoff.timestamp_utc = int(serialized_handoff.get("timestamp_utc", 0))
 	return handoff

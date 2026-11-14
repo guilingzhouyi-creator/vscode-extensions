@@ -89,42 +89,42 @@ static func unwrap_adapted_manifest(raw_manifest: Dictionary) -> Dictionary:
     return raw_manifest
 
 ## 从输入字典反序列化还原传输对象
-static func from_dto(raw_data: Dictionary, fallback_pack_id: String = "") -> DestinyModManifestDTO:
+static func from_dto(serialized_manifest: Dictionary, fallback_pack_id: String = "") -> DestinyModManifestDTO:
     var manifest_dto := DestinyModManifestDTO.new()
-    if raw_data.is_empty():
+    if serialized_manifest.is_empty():
         manifest_dto.pack_id = fallback_pack_id.strip_edges()
         manifest_dto.pack_name = manifest_dto.pack_id
         return manifest_dto
 
-    var raw_id: String = str(raw_data.get("pack_id", "")).strip_edges()
+    var raw_id: String = str(serialized_manifest.get("pack_id", "")).strip_edges()
     manifest_dto.pack_id = raw_id if not raw_id.is_empty() else fallback_pack_id.strip_edges()
-    var raw_name: String = str(raw_data.get("pack_name", "")).strip_edges()
+    var raw_name: String = str(serialized_manifest.get("pack_name", "")).strip_edges()
     manifest_dto.pack_name = raw_name if not raw_name.is_empty() else manifest_dto.pack_id
-    manifest_dto.version = str(raw_data.get("version", "1.0.0"))
-    manifest_dto.priority = int(raw_data.get("priority", 100))
-    manifest_dto.root_path = str(raw_data.get("root_path", ""))
+    manifest_dto.version = str(serialized_manifest.get("version", "1.0.0"))
+    manifest_dto.priority = int(serialized_manifest.get("priority", 100))
+    manifest_dto.root_path = str(serialized_manifest.get("root_path", ""))
 
-    var raw_dag_graphs: Variant = raw_data.get("dag_graphs", {})
+    var raw_dag_graphs: Variant = serialized_manifest.get("dag_graphs", {})
     if raw_dag_graphs is Dictionary:
         manifest_dto.dag_graphs = (raw_dag_graphs as Dictionary).duplicate(true)
 
-    var raw_i18n: Variant = raw_data.get("custom_i18n", {})
+    var raw_i18n: Variant = serialized_manifest.get("custom_i18n", {})
     if raw_i18n is Dictionary:
         manifest_dto.custom_i18n = (raw_i18n as Dictionary).duplicate(true)
 
-    _populate_string_array(raw_data.get("dependencies", []), manifest_dto.dependencies)
-    _populate_string_array(raw_data.get("incompatible_packs", []), manifest_dto.incompatible_packs)
+    _populate_string_array(serialized_manifest.get("dependencies", []), manifest_dto.dependencies)
+    _populate_string_array(serialized_manifest.get("incompatible_packs", []), manifest_dto.incompatible_packs)
 
-    var raw_ui_capabilities: Variant = raw_data.get("ui_capabilities", {})
+    var raw_ui_capabilities: Variant = serialized_manifest.get("ui_capabilities", {})
     if raw_ui_capabilities is Dictionary:
         manifest_dto.ui_capabilities = (raw_ui_capabilities as Dictionary).duplicate(true)
 
-    _populate_origins_array(raw_data.get("custom_origins", []), manifest_dto.custom_origins)
-    _populate_indexed_dict(raw_data.get("custom_traits", {}), manifest_dto.custom_traits, "trait_id", Callable(DestinyModManifestDTO, "_normalize_trait_dict"))
-    _populate_dict_array(raw_data.get("paired_presets", []), manifest_dto.paired_presets)
-    _populate_indexed_dict(raw_data.get("custom_starter_kits", {}), manifest_dto.custom_starter_kits, "kit_id", Callable(DestinyModManifestDTO, "_normalize_kit_dict"))
+    _populate_origins_array(serialized_manifest.get("custom_origins", []), manifest_dto.custom_origins)
+    _populate_indexed_dict(serialized_manifest.get("custom_traits", {}), manifest_dto.custom_traits, "trait_id", Callable(DestinyModManifestDTO, "_normalize_trait_dict"))
+    _populate_dict_array(serialized_manifest.get("paired_presets", []), manifest_dto.paired_presets)
+    _populate_indexed_dict(serialized_manifest.get("custom_starter_kits", {}), manifest_dto.custom_starter_kits, "kit_id", Callable(DestinyModManifestDTO, "_normalize_kit_dict"))
 
-    var raw_rules: Variant = raw_data.get("custom_routing_rules", raw_data.get("routing_rules", []))
+    var raw_rules: Variant = serialized_manifest.get("custom_routing_rules", serialized_manifest.get("routing_rules", []))
     _populate_dict_array(raw_rules, manifest_dto.custom_routing_rules)
     return manifest_dto
 
@@ -137,8 +137,8 @@ static func _populate_string_array(raw_value: Variant, target: Array[String]) ->
     if not (raw_value is Array):
         return
     var source_array: Array = raw_value
-    for item in source_array:
-        var trimmed_text: String = str(item).strip_edges()
+    for raw_entry in source_array:
+        var trimmed_text: String = str(raw_entry).strip_edges()
         if not trimmed_text.is_empty():
             target.append(trimmed_text)
 
@@ -147,24 +147,24 @@ static func _populate_dict_array(raw_value: Variant, target: Array[Dictionary]) 
     if not (raw_value is Array):
         return
     var cloned_array: Array = (raw_value as Array).duplicate(true)
-    for item in cloned_array:
-        if item is Dictionary:
-            target.append(item as Dictionary)
+    for raw_entry in cloned_array:
+        if raw_entry is Dictionary:
+            target.append(raw_entry as Dictionary)
 
 static func _populate_origins_array(raw_value: Variant, target: Array[Dictionary]) -> void:
     target.clear()
     if raw_value is Array:
         var cloned_array: Array = (raw_value as Array).duplicate(true)
-        for item in cloned_array:
-            if item is Dictionary:
-                var entry: Dictionary = item as Dictionary
+        for origin_entry in cloned_array:
+            if origin_entry is Dictionary:
+                var entry: Dictionary = origin_entry as Dictionary
                 _normalize_origin_entry(entry)
                 target.append(entry)
         return
     if raw_value is Dictionary:
-        var cloned_dict: Dictionary = (raw_value as Dictionary).duplicate(true)
-        for origin_key in cloned_dict.keys():
-            var raw_entry: Variant = cloned_dict[origin_key]
+        var cloned_origin_map: Dictionary = (raw_value as Dictionary).duplicate(true)
+        for origin_key in cloned_origin_map.keys():
+            var raw_entry: Variant = cloned_origin_map[origin_key]
             if raw_entry is Dictionary:
                 var entry: Dictionary = raw_entry as Dictionary
                 _normalize_origin_entry(entry, str(origin_key))
@@ -186,35 +186,35 @@ static func _populate_indexed_dict(raw_value: Variant, target: Dictionary, id_ke
     target.clear()
     if raw_value is Array:
         var cloned_array: Array = (raw_value as Array).duplicate(true)
-        for item in cloned_array:
-            if item is Dictionary:
-                var item_dict: Dictionary = item as Dictionary
-                var key_id: String = str(item_dict.get(id_key, "")).strip_edges()
+        for array_entry in cloned_array:
+            if array_entry is Dictionary:
+                var entry_map: Dictionary = array_entry as Dictionary
+                var key_id: String = str(entry_map.get(id_key, "")).strip_edges()
                 if not key_id.is_empty():
-                    normalizer.call(item_dict)
-                    target[key_id] = item_dict
+                    normalizer.call(entry_map)
+                    target[key_id] = entry_map
     elif raw_value is Dictionary:
-        var cloned_dict: Dictionary = (raw_value as Dictionary).duplicate(true)
-        for entry_key in cloned_dict.keys():
-            var entry: Variant = cloned_dict[entry_key]
+        var cloned_entries_map: Dictionary = (raw_value as Dictionary).duplicate(true)
+        for entry_key in cloned_entries_map.keys():
+            var entry: Variant = cloned_entries_map[entry_key]
             if entry is Dictionary:
-                var entry_dict: Dictionary = entry as Dictionary
-                if not entry_dict.has(id_key):
-                    entry_dict[id_key] = str(entry_key)
-                normalizer.call(entry_dict)
-                target[str(entry_key)] = entry_dict
+                var entry_map: Dictionary = entry as Dictionary
+                if not entry_map.has(id_key):
+                    entry_map[id_key] = str(entry_key)
+                normalizer.call(entry_map)
+                target[str(entry_key)] = entry_map
 
-static func _normalize_trait_dict(trait_dict: Dictionary) -> void:
-    if trait_dict.has("polarity"):
-        var polarity_text: String = str(trait_dict.get("polarity", "")).to_upper()
+static func _normalize_trait_dict(trait_entry: Dictionary) -> void:
+    if trait_entry.has("polarity"):
+        var polarity_text: String = str(trait_entry.get("polarity", "")).to_upper()
         if polarity_text.contains("POS"):
-            trait_dict["type"] = "POSITIVE"
+            trait_entry["type"] = "POSITIVE"
         elif polarity_text.contains("NEG"):
-            trait_dict["type"] = "NEGATIVE"
-        elif not trait_dict.has("type"):
-            trait_dict["type"] = polarity_text
-    elif not trait_dict.has("polarity") and trait_dict.has("type"):
-        trait_dict["polarity"] = trait_dict["type"]
+            trait_entry["type"] = "NEGATIVE"
+        elif not trait_entry.has("type"):
+            trait_entry["type"] = polarity_text
+    elif not trait_entry.has("polarity") and trait_entry.has("type"):
+        trait_entry["polarity"] = trait_entry["type"]
 
 static func _normalize_kit_gold(kit: Dictionary) -> void:
     var has_initial_gold: bool = kit.has("initial_gold")

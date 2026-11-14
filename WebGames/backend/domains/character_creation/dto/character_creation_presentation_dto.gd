@@ -77,40 +77,40 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从输入字典反序列化还原传输对象
-static func from_dto(raw_data: Dictionary) -> CharacterCreationPresentationDTO:
+static func from_dto(serialized_presentation: Dictionary) -> CharacterCreationPresentationDTO:
 	var presentation_dto := CharacterCreationPresentationDTO.new()
-	if raw_data.is_empty():
+	if serialized_presentation.is_empty():
 		return presentation_dto
-	presentation_dto.character_id = str(raw_data.get("character_id", ""))
-	presentation_dto.character_name = str(raw_data.get("character_name", ""))
-	presentation_dto.origin_id = str(raw_data.get("origin_id", ""))
-	presentation_dto.origin_name = str(raw_data.get("origin_name", ""))
-	presentation_dto.origin_desc = str(raw_data.get("origin_desc", ""))
-	presentation_dto.race_id = str(raw_data.get("race_id", ""))
-	presentation_dto.race_name = str(raw_data.get("race_name", ""))
-	presentation_dto.gender = str(raw_data.get("gender", ""))
+	presentation_dto.character_id = str(serialized_presentation.get("character_id", ""))
+	presentation_dto.character_name = str(serialized_presentation.get("character_name", ""))
+	presentation_dto.origin_id = str(serialized_presentation.get("origin_id", ""))
+	presentation_dto.origin_name = str(serialized_presentation.get("origin_name", ""))
+	presentation_dto.origin_desc = str(serialized_presentation.get("origin_desc", ""))
+	presentation_dto.race_id = str(serialized_presentation.get("race_id", ""))
+	presentation_dto.race_name = str(serialized_presentation.get("race_name", ""))
+	presentation_dto.gender = str(serialized_presentation.get("gender", ""))
 
-	var raw_attributes: Variant = raw_data.get("attributes_radar", {})
+	var raw_attributes: Variant = serialized_presentation.get("attributes_radar", {})
 	if raw_attributes is Dictionary:
 		presentation_dto.attributes_radar = (raw_attributes as Dictionary).duplicate(true)
-	var raw_physiology: Variant = raw_data.get("physiology_summary", {})
+	var raw_physiology: Variant = serialized_presentation.get("physiology_summary", {})
 	if raw_physiology is Dictionary:
 		presentation_dto.physiology_summary = (raw_physiology as Dictionary).duplicate(true)
-	var wallet: Variant = raw_data.get("wallet_summary", {})
+	var wallet: Variant = serialized_presentation.get("wallet_summary", {})
 	if wallet is Dictionary:
 		presentation_dto.wallet_summary = (wallet as Dictionary).duplicate(true)
-	var raw_equipment: Variant = raw_data.get("starter_equipment", [])
+	var raw_equipment: Variant = serialized_presentation.get("starter_equipment", [])
 	if raw_equipment is Array:
 		var cloned_equipment_list: Array = (raw_equipment as Array).duplicate(true)
 		var equipment_list: Array[Dictionary] = []
-		for item in cloned_equipment_list:
-			if item is Dictionary:
-				equipment_list.append(item as Dictionary)
+		for equipment_entry in cloned_equipment_list:
+			if equipment_entry is Dictionary:
+				equipment_list.append(equipment_entry as Dictionary)
 		presentation_dto.starter_equipment = equipment_list
-	var raw_chronicle: Variant = raw_data.get("world_chronicle", {})
+	var raw_chronicle: Variant = serialized_presentation.get("world_chronicle", {})
 	if raw_chronicle is Dictionary:
 		presentation_dto.world_chronicle = (raw_chronicle as Dictionary).duplicate(true)
-	var raw_prologue: Variant = raw_data.get("prologue_preview", {})
+	var raw_prologue: Variant = serialized_presentation.get("prologue_preview", {})
 	if raw_prologue is Dictionary:
 		presentation_dto.prologue_preview = (raw_prologue as Dictionary).duplicate(true)
 	return presentation_dto

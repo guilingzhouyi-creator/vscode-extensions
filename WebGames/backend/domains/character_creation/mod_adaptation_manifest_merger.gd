@@ -19,38 +19,38 @@ static func build_adapted_manifest(
 ) -> Dictionary:
     var accumulator: Dictionary = _create_base_merge_accumulator()
 
-    var allow_manual_origin: bool = false
-    var allow_manual_trait: bool = false
-    var allow_reroll: bool = false
+    var is_manual_origin_allowed: bool = false
+    var is_manual_trait_allowed: bool = false
+    var is_attribute_reroll_allowed: bool = false
 
     for manifest_dto in enabled_manifests:
         if str(manifest_dto.ui_capabilities.get("origin_selection_mode", "")) == "ALLOW_MANUAL":
-            allow_manual_origin = true
+            is_manual_origin_allowed = true
         if str(manifest_dto.ui_capabilities.get("trait_selection_mode", "")) == "ALLOW_MANUAL":
-            allow_manual_trait = true
+            is_manual_trait_allowed = true
         if bool(manifest_dto.ui_capabilities.get("allow_attribute_reroll", false)):
-            allow_reroll = true
+            is_attribute_reroll_allowed = true
 
         _merge_single_pack_assets(manifest_dto, accumulator)
 
-    var traits_dict: Dictionary = accumulator["traits"]
+    var traits_map: Dictionary = accumulator["traits"]
     var origins_catalog: Dictionary = accumulator["origins_catalog"]
     return {
         "enabled_pack_ids": enabled_ids.duplicate(),
         "ui_controls": {
-            "allow_manual_origin_select": allow_manual_origin,
-            "allow_manual_trait_select": allow_manual_trait,
-            "allow_attribute_reroll": allow_reroll,
-            "origin_selection_mode": "ALLOW_MANUAL" if allow_manual_origin else "FORCE_RANDOM",
-            "trait_selection_mode": "ALLOW_MANUAL" if allow_manual_trait else "FORCE_RANDOM"
+            "allow_manual_origin_select": is_manual_origin_allowed,
+            "allow_manual_trait_select": is_manual_trait_allowed,
+            "allow_attribute_reroll": is_attribute_reroll_allowed,
+            "origin_selection_mode": "ALLOW_MANUAL" if is_manual_origin_allowed else "FORCE_RANDOM",
+            "trait_selection_mode": "ALLOW_MANUAL" if is_manual_trait_allowed else "FORCE_RANDOM"
         },
         "origins_pool": accumulator["origins_pool"],
         "origins_catalog": origins_catalog,
         "origins": origins_catalog,
         "origin_race_map": accumulator["origin_race_map"],
         "birth_region_map": accumulator["birth_region_map"],
-        "traits": traits_dict,
-        "traits_catalog": traits_dict,
+        "traits": traits_map,
+        "traits_catalog": traits_map,
         "paired_presets": accumulator["paired_presets"],
         "starter_kits": accumulator["starter_kits"],
         "race_kit_map": accumulator["race_kit_map"],
