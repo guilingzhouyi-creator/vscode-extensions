@@ -1,6 +1,6 @@
 # ==============================================================================
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
-# 文件路径: res://backend/domains/currency_economy/mana_standard_solver.gd
+# 文件路径: res://backend/domains/currency_economy/currency_and_mana_standard_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/currency.json | 信号: EventBus 领域广播
 # 职责说明: 魔单晶本位购买力平价 (PPP) 换算、七大洲汇率跨国套利收益求解。 本位换算常数由 config/currency.json 驱动。

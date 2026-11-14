@@ -1,6 +1,6 @@
 # ==============================================================================
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
-# 文件路径: res://backend/domains/currency_economy/currency_entities.gd
+# 文件路径: res://backend/domains/currency_economy/character_wallet_entity.gd
 # 架构定位: Domain Logic Component
 # 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/currency.json | 信号: EventBus 领域广播
 # 职责说明: 铜/银/金/白金换算比率、物理负重约束与战略能源魔单晶本位。 换算比率与单币质量由 config/currency.json 驱动，代码零硬编码。
@@ -26,6 +26,7 @@ var gold: int = 0
 var platinum: int = 0
 var mana_monocrystals: int = 0 # 战略能源高阶本位货币
 
+## CurrencyConfigCache：货币汇率与质量配置缓存
 class CurrencyConfigCache extends RefCounted:
 	var rate_copper: int = 1
 	var rate_silver: int = 100
@@ -41,59 +42,59 @@ class CurrencyConfigCache extends RefCounted:
 	var max_debt_copper: int = 1000000000
 
 static var _currency_cache: CurrencyConfigCache = null
-static var _currency_cfg_version: int = -1
+static var _currency_config_version: int = -1
 
 static func _ensure_currency_cache() -> CurrencyConfigCache:
-	var cfg_ver: int = GameConfig.config_reload_version()
-	if _currency_cache != null and _currency_cfg_version == cfg_ver:
+	var config_version: int = GameConfig.config_reload_version()
+	if _currency_cache != null and _currency_config_version == config_version:
 		return _currency_cache
-	var c := CurrencyConfigCache.new()
-	c.rate_copper = maxi(0, GameConfig.get_int("domains.currency", "rates/copper", 1))
-	c.rate_silver = maxi(0, GameConfig.get_int("domains.currency", "rates/silver", 1))
-	c.rate_gold = maxi(0, GameConfig.get_int("domains.currency", "rates/gold", 1))
-	c.rate_platinum = maxi(0, GameConfig.get_int("domains.currency", "rates/platinum", 1))
-	c.rates_map = {
-		COIN_COPPER: c.rate_copper,
-		COIN_SILVER: c.rate_silver,
-		COIN_GOLD: c.rate_gold,
-		COIN_PLATINUM: c.rate_platinum
+	var cache := CurrencyConfigCache.new()
+	cache.rate_copper = maxi(0, GameConfig.get_int("domains.currency", "rates/copper", 1))
+	cache.rate_silver = maxi(0, GameConfig.get_int("domains.currency", "rates/silver", 1))
+	cache.rate_gold = maxi(0, GameConfig.get_int("domains.currency", "rates/gold", 1))
+	cache.rate_platinum = maxi(0, GameConfig.get_int("domains.currency", "rates/platinum", 1))
+	cache.rates_map = {
+		COIN_COPPER: cache.rate_copper,
+		COIN_SILVER: cache.rate_silver,
+		COIN_GOLD: cache.rate_gold,
+		COIN_PLATINUM: cache.rate_platinum
 	}
-	c.mass_copper = GameConfig.get_float("domains.currency", "coin_mass_kg/copper", 0.010)
-	c.mass_silver = GameConfig.get_float("domains.currency", "coin_mass_kg/silver", 0.010)
-	c.mass_gold = GameConfig.get_float("domains.currency", "coin_mass_kg/gold", 0.010)
-	c.mass_platinum = GameConfig.get_float("domains.currency", "coin_mass_kg/platinum", 0.010)
-	c.mass_monocrystal = GameConfig.get_float("domains.currency", "coin_mass_kg/monocrystal", 0.010)
-	c.masses_map = {
-		COIN_COPPER: c.mass_copper,
-		COIN_SILVER: c.mass_silver,
-		COIN_GOLD: c.mass_gold,
-		COIN_PLATINUM: c.mass_platinum,
-		COIN_MONOCRYSTAL: c.mass_monocrystal
+	cache.mass_copper = GameConfig.get_float("domains.currency", "coin_mass_kg/copper", 0.010)
+	cache.mass_silver = GameConfig.get_float("domains.currency", "coin_mass_kg/silver", 0.010)
+	cache.mass_gold = GameConfig.get_float("domains.currency", "coin_mass_kg/gold", 0.010)
+	cache.mass_platinum = GameConfig.get_float("domains.currency", "coin_mass_kg/platinum", 0.010)
+	cache.mass_monocrystal = GameConfig.get_float("domains.currency", "coin_mass_kg/monocrystal", 0.010)
+	cache.masses_map = {
+		COIN_COPPER: cache.mass_copper,
+		COIN_SILVER: cache.mass_silver,
+		COIN_GOLD: cache.mass_gold,
+		COIN_PLATINUM: cache.mass_platinum,
+		COIN_MONOCRYSTAL: cache.mass_monocrystal
 	}
-	c.max_debt_copper = maxi(0, GameConfig.get_int("domains.currency", "debt/max_debt_copper", 1000000000))
-	_currency_cache = c
-	_currency_cfg_version = cfg_ver
-	return c
+	cache.max_debt_copper = maxi(0, GameConfig.get_int("domains.currency", "debt/max_debt_copper", 1000000000))
+	_currency_cache = cache
+	_currency_config_version = config_version
+	return cache
 
 ## 计算当前持有各类货币折算的铜币基准总价值
 func get_total_copper_value() -> int:
-	var c := _ensure_currency_cache()
+	var cache := _ensure_currency_cache()
 	return (
-		copper * c.rate_copper +
-		silver * c.rate_silver +
-		gold * c.rate_gold +
-		platinum * c.rate_platinum
+		copper * cache.rate_copper +
+		silver * cache.rate_silver +
+		gold * cache.rate_gold +
+		platinum * cache.rate_platinum
 	)
 
 ## 计算当前持有货币所产生的物理负重总千克数
 func calculate_total_currency_mass_kg() -> float:
-	var c := _ensure_currency_cache()
+	var cache := _ensure_currency_cache()
 	return (
-		float(copper) * c.mass_copper +
-		float(silver) * c.mass_silver +
-		float(gold) * c.mass_gold +
-		float(platinum) * c.mass_platinum +
-		float(mana_monocrystals) * c.mass_monocrystal
+		float(copper) * cache.mass_copper +
+		float(silver) * cache.mass_silver +
+		float(gold) * cache.mass_gold +
+		float(platinum) * cache.mass_platinum +
+		float(mana_monocrystals) * cache.mass_monocrystal
 	)
 
 # ==============================================================================
@@ -133,9 +134,9 @@ func apply_delta(delta: Dictionary) -> Dictionary:
 func apply_transaction(delta: Dictionary, allow_signed: bool = false) -> Dictionary:
 	if delta == null:
 		return {"success": false, "error_code": "INVALID_DELTA"}
-	var key_err := _validate_transaction_keys(delta)
-	if not key_err.is_empty():
-		return key_err
+	var key_error := _validate_transaction_keys(delta)
+	if not key_error.is_empty():
+		return key_error
 
 	var calc_result := _calculate_transaction_values(delta, allow_signed)
 	if not bool(calc_result.get("ok", false)):
@@ -168,10 +169,10 @@ func _calculate_transaction_values(delta: Dictionary, allow_signed: bool) -> Dic
 	return {"ok": true, "values": next_values}
 
 ## 校验并计算单币种字段增量
-func _apply_field_delta(current: int, val: Variant, allow_signed: bool) -> Dictionary:
-	if not (val is int or val is float):
+func _apply_field_delta(current: int, raw_value: Variant, allow_signed: bool) -> Dictionary:
+	if not (raw_value is int or raw_value is float):
 		return {"ok": false, "error_code": "INVALID_AMOUNT"}
-	var amount := int(val)
+	var amount := int(raw_value)
 	if not allow_signed and amount < 0:
 		return {"ok": false, "error_code": "NEGATIVE_AMOUNT"}
 	var candidate: int = current + amount
@@ -197,69 +198,20 @@ func _validate_debt_limit(values: Dictionary) -> bool:
 func to_dictionary() -> Dictionary:
 	return {"copper": copper, "silver": silver, "gold": gold, "platinum": platinum, "mana_monocrystals": mana_monocrystals}
 
-## 从基础字典数据恢复对象状态
-func from_dictionary(values: Dictionary) -> void:
-	for field in CURRENCY_FIELDS:
-		if values.has(field):
-			set(field, int(values[field]))
-
-## 按铜币总价的阶梯支出：足额才扣（铜→银→金→白金，高等级币拆零找零回铜币）。
-## 返回 false 时钱包分文未动（含防御性中途不足分支，正常情况下由总额预检保证不触发）。
-## 注意与「单/双币种定向扣减」的语义差异：本方法按折算总额扣，银不够金来凑；
-## 想要保持「只看指定币种字段」的判定请继续使用显式字段操作。
-func try_spend(cost_copper: int) -> bool:
-	if cost_copper <= 0:
-		return false
-	var total_val := get_total_copper_value()
-	if total_val < cost_copper:
-		return false
-
-	var remaining_to_deduct := cost_copper
-
-	var deduct_copper: int = min(copper, remaining_to_deduct)
-	copper -= deduct_copper
-	remaining_to_deduct -= deduct_copper
-
-	if remaining_to_deduct > 0:
-		remaining_to_deduct = _deduct_ladder("silver", remaining_to_deduct)
-
-	if remaining_to_deduct > 0:
-		remaining_to_deduct = _deduct_ladder("gold", remaining_to_deduct)
-
-	if remaining_to_deduct > 0:
-		remaining_to_deduct = _deduct_ladder("platinum", remaining_to_deduct)
-
-	if remaining_to_deduct > 0:
-		return false
-	return true
-
-## 在单个金属层级上按汇率扣减；超额找零回铜币，返回剩余未清偿金额
-func _deduct_ladder(metal: String, remaining_to_deduct: int) -> int:
-	# 汇率来自配置且可热重载，为 0 时下面的除法会产出 inf/NaN 并污染钱包结算
-	var rate: int = maxi(1, _rate(metal))
-	var available: int = get(metal)
-	var metal_needed: int = int(ceil(float(remaining_to_deduct) / float(rate)))
-	var deduct_metal: int = min(available, metal_needed)
-	set(metal, available - deduct_metal)
-	var metal_val: int = deduct_metal * rate
-	if metal_val > remaining_to_deduct:
-		copper += (metal_val - remaining_to_deduct)
-		return 0
-	return remaining_to_deduct - metal_val
 
 # ==============================================================================
 # 配置读取
 # ==============================================================================
 
 func _rate(metal: String) -> int:
-	# L3（）：折算率非负下限（Inv-VD-2）——键缺失/写 0 时 0 折算，防负数错乘放大债务
-	var c := _ensure_currency_cache()
-	if c.rates_map.has(metal):
-		return int(c.rates_map[metal])
+	# L3：折算率非负下限（Inv-VD-2）——键缺失/写 0 时 0 折算，防负数错乘放大债务
+	var cache := _ensure_currency_cache()
+	if cache.rates_map.has(metal):
+		return int(cache.rates_map[metal])
 	return maxi(0, GameConfig.get_int("domains.currency", "rates/" + metal, 1))
 
 func _mass_kg(metal: String) -> float:
-	var c := _ensure_currency_cache()
-	if c.masses_map.has(metal):
-		return float(c.masses_map[metal])
+	var cache := _ensure_currency_cache()
+	if cache.masses_map.has(metal):
+		return float(cache.masses_map[metal])
 	return GameConfig.get_float("domains.currency", "coin_mass_kg/" + metal, 0.010)
