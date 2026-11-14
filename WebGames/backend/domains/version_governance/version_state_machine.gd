@@ -43,26 +43,26 @@ func transition_to(new_state: int) -> bool:
 	}, "【VersionStateMachine】非法状态跃迁：无法从 %d 跃迁至 %d" % [current_state, new_state])
 	return false
 
-func _is_valid_transition(from_s: int, to_s: int) -> bool:
+func _is_valid_transition(from_state: int, to_state: int) -> bool:
 	# 异常状态允许从任何在途状态跃迁入
-	if to_s in [State.FAILED, State.REJECTED, State.REVOKED, State.ROLLED_BACK]:
+	if to_state in [State.FAILED, State.REJECTED, State.REVOKED, State.ROLLED_BACK]:
 		return true
 	# 异常态恢复路径（防终态死锁）：失败重试 / 授权重授 / 校验驳回重试
-	if from_s == State.FAILED and to_s == State.DOWNLOADING:
+	if from_state == State.FAILED and to_state == State.DOWNLOADING:
 		return true # 下载/挂载失败后重试拉取
-	if from_s == State.REVOKED and to_s == State.AUTHORIZED:
+	if from_state == State.REVOKED and to_state == State.AUTHORIZED:
 		return true # 授权被撤销后中心重发令牌，重新获得运行资格
-	if from_s == State.REJECTED and (to_s == State.DOWNLOADING or to_s == State.DISCOVERED):
+	if from_state == State.REJECTED and (to_state == State.DOWNLOADING or to_state == State.DISCOVERED):
 		return true # 校验/签名驳回后清理脏包并允许重新触发拉取或重新发现
 	# 正向单向流动规则
-	match from_s:
-		State.DISCOVERED: return to_s == State.ASSIGNED
-		State.ASSIGNED: return to_s == State.PUSHED
-		State.PUSHED: return to_s == State.AUTHORIZED
-		State.AUTHORIZED: return to_s == State.DOWNLOADING
-		State.DOWNLOADING: return to_s == State.VERIFIED
-		State.VERIFIED: return to_s == State.STAGED
-		State.STAGED: return to_s == State.ACTIVATED
-		State.ACTIVATED: return to_s == State.RUNNING
-		State.ROLLED_BACK: return to_s == State.RUNNING # 回滚至基线后恢复运行态
+	match from_state:
+		State.DISCOVERED: return to_state == State.ASSIGNED
+		State.ASSIGNED: return to_state == State.PUSHED
+		State.PUSHED: return to_state == State.AUTHORIZED
+		State.AUTHORIZED: return to_state == State.DOWNLOADING
+		State.DOWNLOADING: return to_state == State.VERIFIED
+		State.VERIFIED: return to_state == State.STAGED
+		State.STAGED: return to_state == State.ACTIVATED
+		State.ACTIVATED: return to_state == State.RUNNING
+		State.ROLLED_BACK: return to_state == State.RUNNING # 回滚至基线后恢复运行态
 		_: return false

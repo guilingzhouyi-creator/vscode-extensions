@@ -16,20 +16,20 @@ const CHUNK_SIZE_BYTES: int = 65536 # 64 KB 硬件对齐缓冲区
 static func _hash_file_sha256(file_path: String) -> Dictionary:
 	if not FileAccess.file_exists(file_path):
 		return {"ok": false, "sha256": "", "error": "FILE_NOT_FOUND"}
-	var fa := FileAccess.open(file_path, FileAccess.READ)
-	if fa == null:
+	var file_access := FileAccess.open(file_path, FileAccess.READ)
+	if file_access == null:
 		return {"ok": false, "sha256": "", "error": "FILE_OPEN_FAILED"}
-	var ctx := HashingContext.new()
-	if ctx.start(HashingContext.HASH_SHA256) != OK:
-		fa.close()
+	var hashing_context := HashingContext.new()
+	if hashing_context.start(HashingContext.HASH_SHA256) != OK:
+		file_access.close()
 		return {"ok": false, "sha256": "", "error": "HASHING_CONTEXT_INIT_FAILED"}
-	while not fa.eof_reached():
-		var chunk := fa.get_buffer(CHUNK_SIZE_BYTES)
+	while not file_access.eof_reached():
+		var chunk := file_access.get_buffer(CHUNK_SIZE_BYTES)
 		if chunk.is_empty():
 			break
-		ctx.update(chunk)
-	var digest := ctx.finish()
-	fa.close()
+		hashing_context.update(chunk)
+	var digest := hashing_context.finish()
+	file_access.close()
 	return {"ok": true, "sha256": digest.hex_encode().to_lower(), "error": ""}
 
 ## 流式分块计算并校验文件的 SHA-256

@@ -17,13 +17,13 @@ const GrayPolicyDTO = preload("res://backend/domains/version_governance/gray_pol
 static func compute_user_hash_bucket(user_id: String) -> int:
 	if user_id.is_empty():
 		return 99 # 空用户默认落在最高边界
-	var hash_val: int = 5381
+	var hash_value: int = 5381
 	var bytes := user_id.to_utf8_buffer()
-	for b in bytes:
-		hash_val = ((hash_val << 5) + hash_val) ^ int(b)
+	for byte_value in bytes:
+		hash_value = ((hash_value << 5) + hash_value) ^ int(byte_value)
 	# 符号位掩码归一（恒非负，杜绝 absi(INT64_MIN) 仍为负的理论边界偏置），
 	# 再映射到 [0, 99]
-	return (hash_val & 0x7FFFFFFFFFFFFFFF) % 100
+	return (hash_value & 0x7FFFFFFFFFFFFFFF) % 100
 
 ## 多维正交策略判定评估
 static func evaluate_eligibility(user_id: String, channel: String, ring: int, region: String, policy: GrayPolicyDTO) -> bool:
