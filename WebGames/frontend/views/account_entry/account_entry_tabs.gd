@@ -99,10 +99,24 @@ func init_character_create_text() -> void:
     UIIntermediary.resolve(view.char_create_confirm_btn, "ui.fe01.char_create.create")
     UIIntermediary.resolve(view.char_create_back_btn, "ui.fe01.char_create.back")
     view.char_origin_option.clear()
-    var origin_keys: Array = ["noble", "commoner", "orphan", "mercenary", "scholar"]
-    for origin_key in origin_keys:
-        view.char_origin_option.add_item(UIIntermediary.text("ui.fe01.char_create.origin_" + str(origin_key)))
     apply_mod_creation_ui_adaptation()
+
+## 从后端角色创建服务拉取当前世界激活 MOD 的创角选项与受控适配器快照
+func refresh_creation_ui_snapshot() -> void:
+    var view: AccountEntryView = _view
+    if view == null:
+        return
+    var character_service: ICharacterService = ServiceLocator.get_instance().character()
+    if character_service == null:
+        return
+    character_service.get_creation_ui_snapshot_async(
+        view.current_account_id,
+        view.current_session_token,
+        func(response_payload: Dictionary) -> void:
+            if bool(response_payload.get("success", false)):
+                var data_map: Dictionary = response_payload.get("data", response_payload) as Dictionary
+                sync_mod_creation_snapshot(data_map)
+    )
 
 ## 按单机MOD创角控制权限刷新出身、特质列表与重随按钮状态
 func apply_mod_creation_ui_adaptation() -> void:
@@ -194,13 +208,12 @@ func populate_character_slots() -> void:
     if view.char_slot_0_btn != null:
         view.char_slot_0_btn.button_pressed = true
 
-## 初始化创角默认天赋选项列表
+## 初始化创角天赋选项列表（优先使用当前 MOD 创角快照特质）
 func populate_talent_list() -> void:
     var view: AccountEntryView = _view
     view.char_talent_list.clear()
-    var talent_keys: Array = ["godly_strength", "eidetic", "sword", "magic", "iron", "wind"]
-    for talent_key in talent_keys:
-        UIIntermediary.resolve_item(view.char_talent_list, "ui.fe01.char_create.talent_" + str(talent_key))
+    if not view.available_traits_list.is_empty():
+        _populate_mod_traits_list(view)
 
 ## 调用认证服务重随六维初始属性并刷新面板显示
 func roll_attributes() -> void:
@@ -277,21 +290,19 @@ func _apply_selected_char_slot_ui(view: AccountEntryView, slot_entry: Dictionary
         })
     _set_char_action_buttons(view, true)
 
-## 将种族代码映射为本地化显示名称
+## 将种族代码映射为本地化显示名称（由 MOD i18n 动态提供，缺失则返回原代码）
 func race_to_name(race_key: String) -> String:
-    match race_key.to_upper():
-        "HUMAN": return UIIntermediary.text("ui.fe01.char_select.race_human")
-        "ELF": return UIIntermediary.text("ui.fe01.char_select.race_elf")
-        "DWARF": return UIIntermediary.text("ui.fe01.char_select.race_dwarf")
-        _: return race_key
+    if race_key.is_empty() or race_key.to_upper() == "UNKNOWN":
+        return race_key
+    var translated := UIIntermediary.text("ui.fe01.char_select.race_" + race_key.to_lower())
+    return race_key if translated.begins_with("ui.fe01.") else translated
 
-## 将出身城镇代码映射为本地化显示名称
+## 将出身城镇代码映射为本地化显示名称（由 MOD i18n 动态提供，缺失则返回原代码）
 func town_to_name(town_key: String) -> String:
-    match town_key.to_upper():
-        "VALAN_CAPITAL": return UIIntermediary.text("ui.fe01.char_select.town_valan")
-        "SILVER_GROVE": return UIIntermediary.text("ui.fe01.char_select.town_silver")
-        "IRON_FORTRESS": return UIIntermediary.text("ui.fe01.char_select.town_iron")
-        _: return town_key
+    if town_key.is_empty() or town_key.to_upper() == "UNKNOWN":
+        return town_key
+    var translated := UIIntermediary.text("ui.fe01.char_select.town_" + town_key.to_lower())
+    return town_key if translated.begins_with("ui.fe01.") else translated
 
 ## 同步单机MOD创角预检清单、可选出身/特质与权限开关快照
 func sync_mod_creation_snapshot(snapshot_payload: Dictionary) -> void:

@@ -85,7 +85,7 @@ var character_name: String = ""
 # 快捷栏动作槽位 (1~8)
 # ==============================================================================
 
-var action_bar_slots: Array = [ {"slot": 1, "skill_id": "SKILL_SLASH", "cd_remain": 0.0, "icon": "res://icon.svg"}, {"slot": 2, "skill_id": "SKILL_FIREBALL", "cd_remain": 3.5, "icon": "res://icon.svg"}]
+var action_bar_slots: Array = [ {"slot": 1, "skill_id": "SKILL_SLOT_1", "cd_remain": 0.0, "icon": "res://icon.svg"}, {"slot": 2, "skill_id": "SKILL_SLOT_2", "cd_remain": 3.5, "icon": "res://icon.svg"}]
 
 # ==============================================================================
 # 聊天频道与战报终端消息流（聊天滚动区：有界回收，超出即从头部弹出）
@@ -139,8 +139,13 @@ func _ready() -> void:
 	stat_hp_current = 100.0; stat_hp_max = 100.0
 	stat_mp_current = 50.0; stat_mp_max = 50.0
 	stat_ap_current = 10.0; stat_ap_max = 10.0
-	wallet_gold = 12580; wallet_mana_crystals = 5
-	character_name = UIIntermediary.text("ui.fe02.mock.char_name")
+	var is_mock_mode := (ServiceLocator.get_mode() == "mock")
+	if is_mock_mode:
+		wallet_gold = 12580; wallet_mana_crystals = 5
+		character_name = UIIntermediary.text("ui.fe02.mock.char_name")
+	else:
+		wallet_gold = 0; wallet_mana_crystals = 0
+		character_name = ""
 	_init_hud_text()
 	_refresh_status_bars(); _refresh_wallet(); _refresh_clock(); _refresh_character_name()
 	_refresh_minimap_coords()
@@ -148,12 +153,12 @@ func _ready() -> void:
 	UIIntermediary.resolve_placeholder(_chat_input, "ui.fe02.chat.input_placeholder")
 	_refresh_chat_view()
 	append_terminal_log("SYSTEM", UIIntermediary.text("ui.fe02.chat.mock.welcome"))
-	append_terminal_log("WORLD", UIIntermediary.text("ui.fe02.chat.mock.world_msg", {"name": character_name}))
-	append_terminal_log("GUILD", UIIntermediary.text("ui.fe02.chat.mock.guild_msg", {"name": UIIntermediary.text("ui.fe02.mock.name_meryl")}))
-	append_battle_log("COMBAT", UIIntermediary.text("ui.fe02.battle_log.mock.combat_hit", {"damage": 128}))
-	append_battle_log("COMBAT", UIIntermediary.text("ui.fe02.battle_log.mock.combat_hit_back", {"damage": 15}))
-	append_battle_log("SKILL", UIIntermediary.text("ui.fe02.battle_log.mock.skill_cd_ready", {"skill": UIIntermediary.text("ui.fe02.skill.SKILL_FIREBALL")}))
-	append_battle_log("LOOT", UIIntermediary.text("ui.fe02.battle_log.mock.loot"))
+	if is_mock_mode:
+		append_terminal_log("WORLD", UIIntermediary.text("ui.fe02.chat.mock.world_msg", {"name": character_name}))
+		append_terminal_log("GUILD", UIIntermediary.text("ui.fe02.chat.mock.guild_msg", {"name": UIIntermediary.text("ui.fe02.mock.name_meryl")}))
+		append_battle_log("COMBAT", UIIntermediary.text("ui.fe02.battle_log.mock.combat_hit", {"damage": 128}))
+		append_battle_log("COMBAT", UIIntermediary.text("ui.fe02.battle_log.mock.combat_hit_back", {"damage": 15}))
+		append_battle_log("LOOT", UIIntermediary.text("ui.fe02.battle_log.mock.loot"))
 	_refresh_quest_tracker()
 	completion_visible = false; _completion_panel.visible = false
 	main_menu_visible = false; _main_menu_panel.visible = false
@@ -254,6 +259,9 @@ func _render_from_snapshot() -> void:
 	wallet_mana_crystals = hud_snapshot.mana_monocrystals
 	if snapshot.has("character_name") or snapshot.has("nickname"):
 		character_name = hud_snapshot.character_name
+	if snapshot.get("action_bar_slots") is Array:
+		action_bar_slots = (snapshot.get("action_bar_slots") as Array).duplicate(true)
+		_init_action_bar()
 	_refresh_status_bars()
 	_refresh_wallet()
 	_refresh_character_name()

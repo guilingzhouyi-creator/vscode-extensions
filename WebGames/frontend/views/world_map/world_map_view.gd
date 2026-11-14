@@ -120,8 +120,7 @@ var _mock_sovereignty: Dictionary = {}
 # 行军队伍状态（本地交互模拟）
 var _marching_active: bool = false
 
-# 地标 ID → i18n key 映射
-const LANDMARK_NAME_KEYS := {"VALAN_CAPITAL": "ui.fe10.mock.landmark.valan_capital", "SILVER_GROVE": "ui.fe10.mock.landmark.silver_grove", "IRON_FORTRESS": "ui.fe10.mock.landmark.iron_fortress", "DRAGON_PEAK": "ui.fe10.mock.landmark.dragon_peak"}
+# 地标名称仅由快照 name / name_key 动态提供，视图层零硬编码地标映射表
 
 # ==============================================================================
 # 外部交互与快照入口
@@ -193,11 +192,14 @@ func _load_mock_snapshot() -> void:
 		return
 	if world_map.has("landmarks"):
 		town_landmarks = FrontendSnapshot.read_array(world_map, "landmarks")
-		# 将地标名称替换为 i18n key
+		# 保留快照传入的 i18n name_key 或直接透传地标展示名
 		for landmark_entry in town_landmarks:
-			var landmark_id: String = landmark_entry.get("id", "")
-			if LANDMARK_NAME_KEYS.has(landmark_id):
-				landmark_entry["name"] = LANDMARK_NAME_KEYS[landmark_id]
+			var landmark_id: String = str(landmark_entry.get("id", ""))
+			var name_key: String = str(landmark_entry.get("name_key", ""))
+			if not name_key.is_empty():
+				landmark_entry["name"] = name_key
+			elif str(landmark_entry.get("name", "")).is_empty():
+				landmark_entry["name"] = landmark_id
 	if world_map.has("marching_routes"):
 		marching_routes = FrontendSnapshot.read_array(world_map, "marching_routes")
 	if world_map.has("town_facilities"):

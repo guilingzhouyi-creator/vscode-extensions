@@ -291,7 +291,7 @@ func on_menu_exit_to_gateway_pressed(gateway: RefCounted = null) -> void:
 	)
 	var _response: Variant = UnifiedProtocolDispatcher.dispatch_request(request, active_gateway)
 	HudEventBridge.get_instance().detach_hud()
-	NavManager.get_instance().replace_screen("account_entry")
+	NavManager.get_instance().replace_screen("world_gateway")
 
 ## 执行保存并退出游戏：派发退出请求、解绑 HUD 并关闭场景树。
 func on_menu_quit_game_pressed() -> void:

@@ -40,7 +40,7 @@ var selected_character_slot: String = ""
 var form_username: String = ""
 var form_password: String = ""
 var form_character_name: String = ""
-var form_selected_race: String = "HUMAN"
+var form_selected_race: String = ""
 
 # 视图呈现数据快照
 var server_list: Array = []
@@ -125,7 +125,8 @@ var _rolled_attributes: Dictionary = {}
 @onready var char_create_back_btn: Button = %CharCreateBackBtn
 
 func _init() -> void:
-    _load_mock_snapshot()
+    if ServiceLocator.get_mode() == "mock":
+        _load_mock_snapshot()
 
 func _ready() -> void:
     var theme_manager := ThemeManager.get_instance()
@@ -344,6 +345,11 @@ func _on_login_submit_pressed() -> void:
         login_error_label.modulate = DesignTokens.COLOR_DANGER_DEFAULT
     else:
         login_error_label.text = ""
+        if is_inside_tree():
+            NavManager.get_instance().push_screen("world_gateway", {
+                "account_id": current_account_id,
+                "token": current_session_token
+            })
 
 func _on_login_goto_register_pressed() -> void:
     switch_state(EntryState.REGISTER)
@@ -392,10 +398,15 @@ func _on_char_enter_pressed() -> void:
         return
     _get_tabs().advance_gateway_to_world()
     NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe01.toast.entering_world"), NavTypes.ToastLevel.SUCCESS)
-    NavManager.get_instance().push_screen("main_hud", {"slot": selected_character_slot})
+    NavManager.get_instance().push_screen("prologue", {
+        "account_id": current_account_id,
+        "token": current_session_token,
+        "slot": selected_character_slot
+    })
 
 func _on_char_create_pressed() -> void:
     switch_state(EntryState.CHARACTER_CREATE)
+    _get_tabs().refresh_creation_ui_snapshot()
 
 func _on_char_delete_pressed() -> void:
     if selected_character_slot.is_empty():
@@ -406,7 +417,7 @@ func _on_char_back_pressed() -> void:
     switch_state(EntryState.SERVER_SELECT)
 
 ## 提交角色创建请求并写入槽位列表
-func create_character(character_name: String, race: String = "HUMAN") -> Dictionary:
+func create_character(character_name: String, race: String = "") -> Dictionary:
     form_character_name = character_name.strip_edges()
     form_selected_race = race
     if form_character_name.is_empty():
@@ -417,7 +428,7 @@ func create_character(character_name: String, race: String = "HUMAN") -> Diction
         if bool(backend_reply.get("_handled", false)):
             return backend_reply.get("result", {}) as Dictionary
 
-    var created_slot := {"slot_id": "SLOT_NEW", "name": form_character_name, "race": form_selected_race, "class": "Novice", "level": 1, "town": "VALAN_CAPITAL", "empty": false}
+    var created_slot := {"slot_id": "SLOT_NEW", "name": form_character_name, "race": form_selected_race, "class": "Novice", "level": 1, "town": "", "empty": false}
     for slot_index in range(character_slots.size()):
         if character_slots[slot_index].get("empty", false) or str(character_slots[slot_index].get("name", "")) == "":
             character_slots[slot_index] = created_slot

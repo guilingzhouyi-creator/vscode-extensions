@@ -83,7 +83,7 @@ func connect_signals() -> void:
 	connect_managed(_view._line_edit_gm_input.text_submitted, _on_gm_input_submitted)
 	connect_managed(_view._gm_god_mode_button.pressed, func(): execute_gm_command("/godmode on"))
 	connect_managed(_view._gm_give_item_button.pressed, func(): execute_gm_command("/give gold 10000"))
-	connect_managed(_view._gm_teleport_button.pressed, func(): execute_gm_command("/teleport VALAN_CAPITAL"))
+	connect_managed(_view._gm_teleport_button.pressed, func(): execute_gm_command("/teleport SANCTUARY"))
 	connect_managed(_view._gm_spawn_mob_button.pressed, func(): execute_gm_command("/spawnmob WOLF 3"))
 	connect_managed(_view._gm_set_time_button.pressed, func(): execute_gm_command("/settime 12:00"))
 
@@ -99,8 +99,8 @@ func init_replay() -> void:
 	if _view == null:
 		return
 	_view._replay_entries = [
-		{ "id": "R001", "title_key": "ui.fe16.mock.replay.dragon_peak", "scene": "DRAGON_PEAK", "level": 45, "duration_sec": 180, "frames": 10800, "date": "2026-08-31 22:00" },
-		{ "id": "R002", "title_key": "ui.fe16.mock.replay.iron_fortress", "scene": "IRON_FORTRESS", "level": 40, "duration_sec": 240, "frames": 14400, "date": "2026-08-30 15:30" },
+		{ "id": "R001", "title_key": "ui.fe16.mock.replay.training_ground", "scene": "SANDBOX_ARENA", "level": 45, "duration_sec": 180, "frames": 10800, "date": "2026-08-31 22:00" },
+		{ "id": "R002", "title_key": "ui.fe16.mock.replay.training_ground", "scene": "SANDBOX_BASTION", "level": 40, "duration_sec": 240, "frames": 14400, "date": "2026-08-30 15:30" },
 		{ "id": "R003", "title_key": "ui.fe16.mock.replay.training_ground", "scene": "TRAINING_GROUND", "level": 45, "duration_sec": 60, "frames": 3600, "date": "2026-08-29 10:00" },
 	]
 	refresh_replay_list()
