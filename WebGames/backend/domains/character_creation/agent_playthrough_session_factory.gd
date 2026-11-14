@@ -49,7 +49,7 @@ static func build_creation_request(config: Dictionary) -> AuthoritativeCharacter
 	var creation_request: AuthoritativeCharacterCreationRequestDTO = AuthoritativeCharacterCreationRequestDTO.new()
 	creation_request.account_id = str(config.get("account_id", "agent_account"))
 	creation_request.slot_id = int(config.get("slot_id", 0))
-	creation_request.world_id = str(config.get("world_id", "default_world"))
+	creation_request.world_id = str(config.get("world_id", ""))
 	creation_request.character_name = str(config.get("character_name", "Hero"))
 	creation_request.request_seed = int(config.get("request_seed", config.get("seed", 0)))
 	var raw_extra: Variant = config.get("extra_custom_fields", {})
@@ -92,9 +92,10 @@ static func build_prologue_context(
 	prologue_context.account_id = creation_request.account_id
 	prologue_context.character_id = character_profile.character_id
 	prologue_context.character_name = character_profile.character_name
-	prologue_context.race_id = str(solve_result.get("race_id", "HUMAN"))
-	prologue_context.gender = str(solve_result.get("gender", "OTHER"))
-	prologue_context.assigned_start_location_id = str(solve_result.get("birth_region_id", "CENTRAL_CONTINENT"))
+	prologue_context.race_id = str(solve_result.get("race_id", ""))
+	prologue_context.gender = str(solve_result.get("gender", ""))
+	prologue_context.origin_id = str(solve_result.get("origin_id", ""))
+	prologue_context.assigned_start_location_id = str(solve_result.get("birth_region_id", ""))
 	prologue_context.assigned_starter_kit_id = str(solve_result.get("starter_kit_id", ""))
 	prologue_context.created_timestamp_utc = int(Time.get_unix_time_from_system())
 	prologue_context.is_active = true

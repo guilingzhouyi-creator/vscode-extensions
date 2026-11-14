@@ -69,7 +69,7 @@ func start_session(config: Dictionary) -> Dictionary:
 
 	# 3. 角色档案构建与新手套件发放
 	profile = AgentPlaythroughSessionFactory.build_character_profile(session_id, solve_result, creation_request)
-	var race_id: String = str(solve_result.get("race_id", "HUMAN"))
+	var race_id: String = str(solve_result.get("race_id", ""))
 	var origin_id: String = str(solve_result.get("origin_id", ""))
 	StarterLoadoutDispatcher.hydrate_starter_loadout_into_profile(profile, race_id, origin_id, adapted_manifest)
 
@@ -256,10 +256,11 @@ func get_current_observation() -> Dictionary:
 		packet.hydrated_text = str(text_result.get("text", ""))
 		packet.available_choices = _extract_choices_for_node(node)
 	elif is_terminal:
-		packet.hydrated_text = "序章推演已完结"
+		var custom_i18n: Dictionary = adapted_manifest.get("custom_i18n", {})
+		packet.hydrated_text = str(custom_i18n.get("narrative/prologue/completed", "PROLOGUE_COMPLETED"))
 		packet.available_choices = [{
 			"choice_id": "ENTER_WORLD",
-			"text": "进入世界",
+			"text": str(custom_i18n.get("ui/common/enter_world", "ENTER_WORLD")),
 			"action": "ENTER_WORLD",
 			"target_node_id": ""
 		}]
@@ -327,17 +328,18 @@ func _extract_choices_for_node(node: NarrativeDAGNode) -> Array[Dictionary]:
 			})
 		return extracted_choices
 
+	var custom_i18n: Dictionary = adapted_manifest.get("custom_i18n", {})
 	if node.node_type == NarrativeDAGNode.NodeType.TERMINAL_EXIT or is_terminal:
 		extracted_choices.append({
 			"choice_id": "ENTER_WORLD",
-			"text": "进入世界",
+			"text": str(custom_i18n.get("ui/common/enter_world", "ENTER_WORLD")),
 			"action": "ENTER_WORLD",
 			"target_node_id": ""
 		})
 	else:
 		extracted_choices.append({
 			"choice_id": "NEXT",
-			"text": "继续",
+			"text": str(custom_i18n.get("ui/common/continue", "NEXT")),
 			"action": "NEXT",
 			"target_node_id": ""
 		})

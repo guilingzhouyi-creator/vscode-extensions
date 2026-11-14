@@ -45,7 +45,9 @@ static func build_creation_ui_snapshot(
     return {
         "enabled_pack_ids": enabled_ids.duplicate(),
         "precheck_checklist": precheck_checklist.duplicate(true),
+        "has_base_content_mod": bool(adapted_manifest.get("has_base_content_mod", not available_origins.is_empty())),
         "ui_controls": (adapted_manifest.get("ui_controls", {}) as Dictionary).duplicate(true),
+        "available_races": (adapted_manifest.get("races_catalog", {}) as Dictionary).duplicate(true),
         "available_origins": available_origins,
         "available_trait_pairs": available_trait_pairs,
         "traits_catalog": traits.duplicate(true)
@@ -64,15 +66,15 @@ static func _append_ui_origin_snapshot_item(
     out_origins.append({
         "origin_id": origin_id,
         "name": str(origin_config.get("name", origin_id)),
-        "race_id": str(origin_race_map.get(origin_id, origin_config.get("race_id", origin_config.get("race", "HUMAN")))),
-        "birth_region_id": str(birth_region_map.get(origin_id, origin_config.get("birth_region_id", "CENTRAL_CONTINENT"))),
+        "race_id": str(origin_race_map.get(origin_id, origin_config.get("race_id", origin_config.get("race", "")))),
+        "birth_region_id": str(birth_region_map.get(origin_id, origin_config.get("birth_region_id", ""))),
         "desc": str(origin_config.get("desc", "")),
         "weight": int(pool_entry.get("weight", origin_config.get("weight", 20))),
-        "initial_gold": int(origin_config.get("initial_gold", 50)),
+        "initial_gold": int(origin_config.get("initial_gold", 0)),
         "attribute_bonus": (origin_config.get("attribute_bonus", {}) as Dictionary).duplicate(true),
         "starter_kit_id": str(origin_config.get("starter_kit_id", "")),
         "prologue_dag_id": str(origin_config.get("prologue_dag_id", "")),
-        "pack_id": str(origin_config.get("pack_id", "VANILLA"))
+        "pack_id": str(origin_config.get("pack_id", ""))
     })
 
 

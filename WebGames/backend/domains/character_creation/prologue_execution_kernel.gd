@@ -14,83 +14,94 @@ class_name PrologueExecutionKernel
 extends RefCounted
 
 const PrologueHeadlessPlaythroughRunner = preload("res://backend/domains/character_creation/prologue_headless_playthrough_runner.gd")
+const PrologueDagStepHelper = preload("res://backend/domains/character_creation/prologue_dag_step_helper.gd")
 
 # ==============================================================================
 # 一、启动编排（开局事件流 → 序章上下文 + 首步事件包）
 # ==============================================================================
 
-## 启动角色序章，产出初始化结构化事件流。
-## 契约：opening 为空或 character_id 为空返回 INVALID_OPENING；种族默认经
-##       config 键 defaults/default_race_id 驱动（既有键）；内部顺序执行
-##       上下文构建 → 模板参数提取 → 新手套件发放 → 突变事件列表 → 首步事件包。
-static func boot_character_prologue(opening: OpeningEventStreamDTO, race_id: String = "", should_allow_default_fallback: bool = true) -> Dictionary:
+## 启动角色序章：必须经因果 DAG 图元实例化并驱动首步节点包（废除线性四阶段固定回退）。
+## 契约：opening 为空或 character_id 为空返回 INVALID_OPENING；无有效内容 MOD 或缺失对应 DAG
+##       时按 Fail-Closed 返回 ERR_NO_BASE_CONTENT_MOD / MOD_ERR_MISSING_PROLOGUE_DAG。
+static func boot_character_prologue(
+	opening: OpeningEventStreamDTO,
+	race_id: String = "",
+	_should_allow_default_fallback: bool = false,
+	adapted_mod_manifest: Dictionary = {},
+	profile: Variant = null
+) -> Dictionary:
 	if opening == null or opening.character_id.is_empty():
 		return {"success": false, "error_code": "INVALID_OPENING", "message": "开局事件包缺失或角色 ID 为空"}
 
-	var effective_race := race_id if not race_id.is_empty() else opening.race_id
+	var effective_race := race_id.strip_edges() if not race_id.strip_edges().is_empty() else opening.race_id.strip_edges()
 	if effective_race.is_empty() or effective_race == "UNBOUND":
-		if not should_allow_default_fallback:
-			return {"success": false, "error_code": "UNBOUND_RACE_ID", "unwired_slot": "race_id", "message": "种族标识未接线(UNBOUND)，禁止静默回退默认种族"}
-		effective_race = GameConfig.get_string("domains.character_creation", "defaults/default_race_id", "HUMAN")
+		return {"success": false, "error_code": "UNBOUND_RACE_ID", "unwired_slot": "race_id", "message": "种族标识未接线(UNBOUND)，禁止静默回退默认种族"}
 
-	var prologue_context := CharacterPrologueContext.new()
-	prologue_context.account_id = opening.account_id
-	prologue_context.character_id = opening.character_id
-	prologue_context.character_name = opening.character_name
-	prologue_context.race_id = effective_race
-	prologue_context.assigned_start_location_id = opening.starting_location_id
-	prologue_context.assigned_opening_quest_id = opening.opening_quest_line_id
-	prologue_context.created_timestamp_utc = int(Time.get_unix_time_from_system())
-	prologue_context.is_active = true
-	prologue_context.current_stage = 1
-	prologue_context.step_index = 0
+	var manifest: Dictionary = DestinyModManifestDTO.unwrap_adapted_manifest(adapted_mod_manifest)
+	var prologue_context := PrologueDagStepHelper.create_initial_prologue_context(opening, effective_race, manifest, profile)
 
-	# 1. 提取并缓存初始模板参数
-	var runtime_placeholders := ProloguePlaceholderResolver.extract_placeholders(prologue_context)
+	# 1. 提取并缓存初始模板参数（优先消费已适配 MOD manifest 与 profile）
+	var runtime_placeholders := ProloguePlaceholderResolver.extract_placeholders(prologue_context, manifest, profile)
+	for placeholder_key in prologue_context.runtime_placeholders.keys():
+		if not runtime_placeholders.has(placeholder_key):
+			runtime_placeholders[placeholder_key] = prologue_context.runtime_placeholders[placeholder_key]
 	prologue_context.runtime_placeholders = runtime_placeholders
 
 	# 2. 发放初始装备（幂等保护在 Dispatcher 内）
-	var kit_result := StarterLoadoutDispatcher.dispatch_starter_kit(prologue_context)
+	var kit_result := StarterLoadoutDispatcher.dispatch_starter_kit(prologue_context, manifest)
+	if not bool(kit_result.get("success", false)):
+		return kit_result
 
-	# 3. 结构化事件列表（事件与状态彻底解耦）
-	var structured_mutations: Array[Dictionary] = [
+	# 3. 初始化因果 DAG 会话并 Fail-Closed 阻断缺失
+	var dag_session := create_dag_session(prologue_context, prologue_context.origin_id, manifest)
+	if dag_session == null:
+		var has_catalog_fallback := not GameConfig.get_dict("narratives.prologue_dag_catalog", "dag_graphs", {}).is_empty()
+		var failure_code := "ERR_NO_BASE_CONTENT_MOD" if (manifest.is_empty() and not has_catalog_fallback) else "MOD_ERR_MISSING_PROLOGUE_DAG"
+		return {
+			"success": false,
+			"error_code": failure_code,
+			"message": "No matching prologue DAG graph found for active MOD manifest (Fail-Closed)."
+		}
+
+	prologue_context.active_dag_session = dag_session
+	prologue_context.current_dag_id = dag_session.graph.graph_id
+	var entry_node := PrologueDagStepHelper.resolve_active_dag_node(dag_session)
+	prologue_context.current_node_id = entry_node.node_id if entry_node != null else dag_session.graph.entry_node_id
+
+	# 4. 结构化初始化突变 + 首步 DAG 节点数据包
+	var initial_mutations: Array[Dictionary] = [
 		{"type": "CharacterCreated", "character_id": prologue_context.character_id, "name": prologue_context.character_name},
 		{"type": "LocationAssigned", "location_id": prologue_context.assigned_start_location_id},
 		{"type": "EquipmentGranted", "kit_id": kit_result.get("kit_id", ""), "gold": kit_result.get("gold", 0)},
 		{"type": "DialogueReady", "npc_target": runtime_placeholders.get("NPC_TARGET", "")}
 	]
+	var packet := render_dag_node_packet(entry_node, prologue_context, manifest, 0)
+	var existing_mutations: Variant = packet.reserved_payload.get("mutations", [])
+	var combined_mutations: Array = initial_mutations.duplicate()
+	if existing_mutations is Array:
+		combined_mutations.append_array(existing_mutations as Array)
+	packet.reserved_payload["mutations"] = combined_mutations
 
-	# 4. 生成第一步事件数据包（阶段配置经 domains.character_creation prologue_stages 驱动）
-	var stages_config: Dictionary = GameConfig.get_dict("domains.character_creation", "prologue_stages", {})
-	var stage1_config: Dictionary = stages_config.get("1", {})
-	var stage1_key := str(stage1_config.get("narrative_key", "narrative/prologue/awakening"))
-	var template := GameConfig.get_string(
-		"narratives.prologue_i18n", stage1_key,
-		"【苏醒】晨曦降临，开拓者 {PLAYER_NAME} 缓缓睁开双眼……"
-	)
-	var text_result := ProloguePlaceholderResolver.resolve_template(template, prologue_context.runtime_placeholders)
-
-	var packet := PrologueEventPacketDTO.new()
-	packet.account_id = prologue_context.account_id
-	packet.character_id = prologue_context.character_id
-	packet.character_name = prologue_context.character_name
-	packet.current_stage = 1
-	packet.step_index = 0
-	packet.narrative_text = text_result.get("text", "")
-	packet.available_actions = _to_string_array(stage1_config.get("available_actions", ["WAKE_UP", "NEXT"]))
-	packet.reserved_payload = {"mutations": structured_mutations}
-
-	return {"success": true, "context": prologue_context, "packet": packet, "kit": kit_result}
+	broadcast_step(packet, entry_node.narrative_key if entry_node != null else "", prologue_context.runtime_placeholders)
+	return {
+		"success": true,
+		"context": prologue_context,
+		"packet": packet,
+		"kit": kit_result,
+		"dag_session": dag_session,
+		"adapted_mod_manifest": manifest
+	}
 
 # ==============================================================================
-# 二、配置驱动单向阶段流转（Stage 1 -> 2 -> 3 -> 4 完整流程完结）
+# 二、统一因果 DAG 状态机步进流转 (DAG Execution & Choice Validation)
 # ==============================================================================
 
-## 推进角色序章单向阶段流转（阶段表由 domains.character_creation prologue_stages 配置驱动）。
+## 推进角色序章当前活跃 DAG 节点并结算突变事件与下一节点渲染
 static func advance_prologue_step(
 	prologue_context: CharacterPrologueContext,
 	action: String = "NEXT",
-	action_payload: Dictionary = {}
+	action_payload: Dictionary = {},
+	profile: Variant = null
 ) -> Dictionary:
 	if prologue_context == null:
 		return {"success": false, "error_code": "NULL_CONTEXT", "message": "序章上下文为空"}
@@ -99,45 +110,74 @@ static func advance_prologue_step(
 	if not prologue_context.is_active:
 		return {"success": false, "error_code": "INACTIVE_CONTEXT", "message": "序章上下文未激活"}
 
+	var dag_session := PrologueDagStepHelper.ensure_context_dag_session(prologue_context, create_dag_session)
+	if dag_session == null:
+		return {"success": false, "error_code": "MOD_ERR_MISSING_PROLOGUE_DAG", "message": "当前序章缺少有效因果 DAG 会话 (Fail-Closed)"}
+
+	var active_node := PrologueDagStepHelper.resolve_active_dag_node(dag_session)
+	if active_node == null:
+		return {"success": false, "error_code": "ERR_PROLOGUE_NO_ACTIVE_NODE", "message": "当前序章不存在活跃 DAG 节点"}
+
+	var choice_id := str(action_payload.get("choice_id", action)).strip_edges()
+	if not PrologueDagStepHelper.is_dag_choice_valid(active_node, choice_id):
+		return {"success": false, "error_code": "ERR_PROLOGUE_INVALID_CHOICE", "message": "所选分支动作无效: " + choice_id}
+
+	var step_payload := action_payload.duplicate(true)
+	step_payload["selected_choice"] = choice_id
 	for payload_key in action_payload.keys():
 		prologue_context.runtime_placeholders[payload_key] = action_payload[payload_key]
+
+	var execution_result: Dictionary = dag_session.execute_node_action(active_node.node_id, step_payload)
+	if not bool(execution_result.get("success", false)):
+		return {
+			"success": false,
+			"error_code": str(execution_result.get("error_code", "ERR_PROLOGUE_ADVANCE_FAILED")),
+			"message": str(execution_result.get("message", "DAG 节点推进失败"))
+		}
+
+	var raw_mutations: Variant = execution_result.get("mutations", active_node.mutations_on_complete)
+	var mutations_list: Array = raw_mutations if raw_mutations is Array else []
+	var settled_mutations := apply_dag_mutations(mutations_list, prologue_context, profile)
 
 	prologue_context.current_stage += 1
 	prologue_context.step_index += 1
 
-	var stages_config: Dictionary = GameConfig.get_dict("domains.character_creation", "prologue_stages", {})
-	var stage_key := str(mini(prologue_context.current_stage, 4))
-	var stage_definition: Dictionary = stages_config.get(stage_key, stages_config.get("4", {}))
-	var is_terminal := bool(stage_definition.get("is_terminal", prologue_context.current_stage >= 4))
-	if is_terminal:
-		prologue_context.current_stage = int(stage_key)
+	var next_node: NarrativeDAGNode = null
+	var settled_terminal_node: NarrativeDAGNode = null
+	if dag_session.is_terminated or dag_session.active_node_ids.is_empty():
 		prologue_context.is_completed = true
 		prologue_context.is_active = false
+		prologue_context.current_node_id = ""
+	else:
+		next_node = PrologueDagStepHelper.resolve_active_dag_node(dag_session)
+		if PrologueDagStepHelper.should_auto_settle_terminal_node(next_node, dag_session):
+			settled_terminal_node = next_node
+			settled_mutations.append_array(PrologueDagStepHelper.execute_terminal_exit_node(
+				dag_session, next_node, step_payload, prologue_context, profile, apply_dag_mutations
+			))
+			next_node = null
+		else:
+			prologue_context.current_node_id = next_node.node_id if next_node != null else ""
 
-	var stage_narrative_key := str(stage_definition.get("narrative_key", "narrative/prologue/completed"))
-	var available_actions := _to_string_array(stage_definition.get("available_actions", ["ENTER_WORLD"]))
-	var mutations := _build_stage_mutations(prologue_context, str(stage_definition.get("mutation_type", "PrologueCompleted")), action)
+	var display_node: NarrativeDAGNode = settled_terminal_node if settled_terminal_node != null else next_node
+	var display_narrative_key: String = display_node.narrative_key if display_node != null else active_node.narrative_key
+	var packet: PrologueEventPacketDTO = PrologueDagStepHelper.build_post_step_packet(
+		prologue_context,
+		dag_session,
+		display_node,
+		settled_mutations,
+		display_narrative_key,
+		render_dag_node_packet
+	)
+	broadcast_step(packet, display_narrative_key, prologue_context.runtime_placeholders)
 
-	var template := GameConfig.get_string("narratives.prologue_i18n", stage_narrative_key, "")
-	var text_result := ProloguePlaceholderResolver.resolve_template(template, prologue_context.runtime_placeholders)
-
-	var packet := PrologueEventPacketDTO.new()
-	packet.account_id = prologue_context.account_id
-	packet.character_id = prologue_context.character_id
-	packet.character_name = prologue_context.character_name
-	packet.current_stage = prologue_context.current_stage
-	packet.step_index = prologue_context.step_index
-	packet.narrative_text = text_result.get("text", "")
-	packet.available_actions = available_actions
-	packet.reserved_payload = {"mutations": mutations}
-
-	broadcast_step(packet, stage_narrative_key, prologue_context.runtime_placeholders)
 	if prologue_context.is_completed:
 		var creation_hooks: Dictionary = GameConfig.get_dict("domains.character_creation", "creation_hooks", {})
 		EventBusCore.get_instance().emit_domain_event("prologue.completed", {
 			"account_id": prologue_context.account_id,
 			"character_id": prologue_context.character_id,
 			"race_id": prologue_context.race_id,
+			"dag_id": prologue_context.current_dag_id,
 			"configured_hooks": creation_hooks.get("on_prologue_completed", [])
 		})
 
@@ -145,27 +185,9 @@ static func advance_prologue_step(
 		"success": true,
 		"context": prologue_context,
 		"packet": packet,
-		"is_completed": prologue_context.is_completed
+		"is_completed": prologue_context.is_completed,
+		"dag_session": dag_session
 	}
-
-
-static func _to_string_array(raw_value: Variant) -> Array[String]:
-	var string_items: Array[String] = []
-	if raw_value is Array:
-		for raw_entry in raw_value:
-			string_items.append(str(raw_entry))
-	return string_items
-
-
-static func _build_stage_mutations(prologue_context: CharacterPrologueContext, mutation_type: String, action: String) -> Array[Dictionary]:
-	var mutations: Array[Dictionary] = []
-	if mutation_type == "EnvironmentExplored":
-		mutations.append({"type": "EnvironmentExplored", "location": prologue_context.assigned_start_location_id, "action": action})
-	elif mutation_type == "DialogueTriggered":
-		mutations.append({"type": "DialogueTriggered", "npc": prologue_context.runtime_placeholders.get("NPC_TARGET", "UNBOUND_NPC"), "action": action})
-	else:
-		mutations.append({"type": mutation_type, "character_id": prologue_context.character_id, "step_index": prologue_context.step_index})
-	return mutations
 
 # ==============================================================================
 # 三、会话衔接与结构化广播
@@ -208,11 +230,14 @@ static func render_dag_node_packet(
 	)
 
 	var actions: Array[String] = []
+	var formatted_choices: Array[Dictionary] = []
 	if not node.choices.is_empty():
 		for choice_entry in node.choices:
-			var action_name: String = str(choice_entry.get("action", choice_entry.get("choice_id", choice_entry.get("id", "")))).strip_edges()
+			var localized_choice := _localize_dag_choice(choice_entry, prologue_context, adapted_mod_manifest)
+			var action_name: String = str(localized_choice.get("action", "")).strip_edges()
 			if not action_name.is_empty():
 				actions.append(action_name)
+			formatted_choices.append(localized_choice)
 	if actions.is_empty():
 		if node.node_type == NarrativeDAGNode.NodeType.TERMINAL_EXIT:
 			actions.append("ENTER_WORLD")
@@ -228,12 +253,42 @@ static func render_dag_node_packet(
 	packet.narrative_text = str(text_result.get("text", ""))
 	packet.available_actions = actions
 	packet.reserved_payload = {
+		"dag_id": prologue_context.current_dag_id,
 		"node_id": node.node_id,
 		"node_type": node.node_type,
-		"choices": node.choices.duplicate(true),
+		"choices": formatted_choices,
+		"cutscene_trigger": node.cutscene_trigger,
 		"mutations": node.mutations_on_complete.duplicate(true)
 	}
 	return packet
+
+
+static func _localize_dag_choice(
+	choice_entry: Dictionary,
+	prologue_context: CharacterPrologueContext,
+	adapted_mod_manifest: Dictionary
+) -> Dictionary:
+	var action_id := str(choice_entry.get("action", choice_entry.get("choice_id", choice_entry.get("id", "")))).strip_edges()
+	var choice_id := str(choice_entry.get("choice_id", action_id)).strip_edges()
+	var raw_text := str(choice_entry.get("text", choice_entry.get("desc", ""))).strip_edges()
+	var label_key := str(choice_entry.get("text_key", choice_entry.get("narrative_key", ""))).strip_edges()
+	var resolved_text := raw_text
+	if not label_key.is_empty():
+		var text_result := ProloguePlaceholderResolver.resolve_narrative_key(
+			label_key,
+			prologue_context.runtime_placeholders,
+			adapted_mod_manifest,
+			raw_text if not raw_text.is_empty() else action_id
+		)
+		resolved_text = str(text_result.get("text", raw_text))
+	if resolved_text.is_empty():
+		resolved_text = choice_id
+	return {
+		"choice_id": choice_id,
+		"action": action_id if not action_id.is_empty() else choice_id,
+		"text": resolved_text,
+		"target_node_id": str(choice_entry.get("target_node_id", ""))
+	}
 
 static func _apply_mutation_entry(
 	mutation_entry: Variant,
@@ -355,7 +410,7 @@ static func execute_headless_mod_playthrough(config: Dictionary) -> Dictionary:
 			"error_code": str(reincarnation_result.get("error_code", "ERR_REINCARNATION_FAILED"))
 		}
 
-	var effective_race: String = str(config.get("race_id", reincarnation_result.get("race_id", "HUMAN")))
+	var effective_race: String = str(config.get("race_id", reincarnation_result.get("race_id", ""))).strip_edges()
 	var effective_origin: String = str(reincarnation_result.get("origin_id", requested_origin_id))
 
 	var profile := CharacterProfile.new()
@@ -371,8 +426,10 @@ static func execute_headless_mod_playthrough(config: Dictionary) -> Dictionary:
 	prologue_context.character_id = profile.character_id
 	prologue_context.character_name = character_name
 	prologue_context.race_id = effective_race
-	prologue_context.assigned_start_location_id = str(reincarnation_result.get("birth_region_id", "CENTRAL_CONTINENT"))
+	prologue_context.origin_id = effective_origin
+	prologue_context.assigned_start_location_id = str(reincarnation_result.get("birth_region_id", ""))
 	prologue_context.assigned_starter_kit_id = str(reincarnation_result.get("starter_kit_id", loadout_result.get("kit_id", "")))
+	prologue_context.active_mod_manifest = adapted_manifest.duplicate(true)
 	prologue_context.is_active = true
 	prologue_context.runtime_placeholders = ProloguePlaceholderResolver.extract_placeholders(prologue_context, adapted_manifest, profile)
 	prologue_context.runtime_placeholders["ORIGIN_ID"] = effective_origin
@@ -444,9 +501,14 @@ static func complete_prologue_to_handoff(
 
 	var safety_steps := 0
 	var last_step_result: Dictionary = {}
-	while not prologue_context.is_completed and safety_steps < 8:
+	while not prologue_context.is_completed and safety_steps < 64:
 		safety_steps += 1
-		last_step_result = advance_prologue_step(prologue_context, "NEXT", empty_step_payload)
+		var dag_session := PrologueDagStepHelper.ensure_context_dag_session(prologue_context, create_dag_session)
+		if dag_session == null:
+			return {"success": false, "error_code": "MOD_ERR_MISSING_PROLOGUE_DAG", "handoff": null}
+		var active_node := PrologueDagStepHelper.resolve_active_dag_node(dag_session)
+		var next_choice := _pick_default_choice_for_node(active_node)
+		last_step_result = advance_prologue_step(prologue_context, next_choice, empty_step_payload, profile)
 		if not bool(last_step_result.get("success", false)):
 			break
 
@@ -457,9 +519,9 @@ static func complete_prologue_to_handoff(
 	handoff.account_id = prologue_context.account_id
 	handoff.character_id = prologue_context.character_id
 	handoff.character_name = prologue_context.character_name
-	handoff.race_id = prologue_context.race_id if not prologue_context.race_id.is_empty() else "HUMAN"
-	handoff.origin_id = str(prologue_context.runtime_placeholders.get("ORIGIN_ID", prologue_context.runtime_placeholders.get("origin_id", "")))
-	handoff.assigned_start_location_id = prologue_context.assigned_start_location_id if not prologue_context.assigned_start_location_id.is_empty() else "CENTRAL_CONTINENT"
+	handoff.race_id = prologue_context.race_id
+	handoff.origin_id = str(prologue_context.runtime_placeholders.get("ORIGIN_ID", prologue_context.origin_id))
+	handoff.assigned_start_location_id = prologue_context.assigned_start_location_id
 	handoff.active_mods = active_mods.duplicate()
 	handoff.timestamp_utc = int(Time.get_unix_time_from_system())
 
@@ -488,7 +550,6 @@ static func _append_profile_inventory_items(inventory_payload: Dictionary, colle
 	if has_aggregate_buckets:
 		var storage_array: Variant = inventory_payload.get("storage_items", [])
 		if storage_array is Array and not (storage_array as Array).is_empty():
-			# 初始物品移交仅在开局执行一次，提前在循环外整表深拷贝以避免逐项分配
 			var cloned_storage: Array = (storage_array as Array).duplicate(true)
 			for entry in cloned_storage:
 				if entry is Dictionary:
@@ -497,10 +558,15 @@ static func _append_profile_inventory_items(inventory_payload: Dictionary, colle
 		if equipped_map is Dictionary:
 			for slot_key in equipped_map.keys():
 				if equipped_map[slot_key] != null:
-					collected_items.append(_make_inventory_handoff_entry(slot_key, equipped_map[slot_key]))
+					collected_items.append({"item_id": slot_key, "data": equipped_map[slot_key]})
 		return
 	for inventory_key in inventory_payload.keys():
-		collected_items.append(_make_inventory_handoff_entry(inventory_key, inventory_payload[inventory_key]))
+		collected_items.append({"item_id": inventory_key, "data": inventory_payload[inventory_key]})
 
-static func _make_inventory_handoff_entry(inventory_key: Variant, item_payload: Variant) -> Dictionary:
-	return {"item_id": inventory_key, "data": item_payload}
+static func _pick_default_choice_for_node(node: NarrativeDAGNode) -> String:
+	if node != null and not node.choices.is_empty():
+		var first_choice: Dictionary = node.choices[0]
+		var choice_id := str(first_choice.get("choice_id", first_choice.get("action", first_choice.get("id", "")))).strip_edges()
+		if not choice_id.is_empty():
+			return choice_id
+	return "NEXT"

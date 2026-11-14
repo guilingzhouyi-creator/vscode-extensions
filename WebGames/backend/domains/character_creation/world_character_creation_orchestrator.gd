@@ -46,8 +46,14 @@ static func create_character_authoritative(
             "message": GameConfig.msg_fmt("character_creation", "world_not_found", {"world_id": creation_request.world_id})
         }
 
-    # 3. 权威命途解算（零信任剥离客户端伪造参数，支持单机已预检MOD合并清单）
+    # 3. 权威命途解算（Fail-Closed：未挂载基础/全转化内容 MOD 严禁创角）
     var effective_manifest: Dictionary = _resolve_effective_manifest(gateway_fsm, adapted_mod_manifest)
+    if effective_manifest.is_empty() or not bool(effective_manifest.get("has_base_content_mod", false)):
+        return {
+            "success": false,
+            "error_code": "ERR_NO_BASE_CONTENT_MOD",
+            "message": "No active base or total-conversion content MOD mounted; character creation is blocked."
+        }
     var solver_result: Dictionary = AuthoritativeReincarnationSolver.resolve_reincarnation_package(
         creation_request,
         creation_request.request_seed,
@@ -57,7 +63,7 @@ static func create_character_authoritative(
         return solver_result
 
     # 4. 角色三维实体组装
-    var race_id := str(solver_result.get("race_id", "HUMAN"))
+    var race_id := str(solver_result.get("race_id", ""))
     var origin_id := str(solver_result.get("origin_id", ""))
     var character_id := "CHAR_%s_%s_%d" % [creation_request.account_id, creation_request.world_id, creation_request.slot_id]
     var profile := _assemble_character_profile(character_id, character_name, solver_result)
@@ -75,7 +81,8 @@ static func create_character_authoritative(
         return loadout_result
 
     # 6. 世界时空连续性锚定、历史片段只增追加与世界MOD锁前置固化
-    var continuity_result := _anchor_world_continuity(world_repository, creation_request.world_id, profile, effective_manifest)
+    var lock_source_packs: Array = gateway_fsm.get_active_mods() if gateway_fsm != null and not gateway_fsm.get_active_mods().is_empty() else effective_manifest.get("enabled_pack_ids", [])
+    var continuity_result := _anchor_world_continuity(world_repository, creation_request.world_id, profile, effective_manifest, lock_source_packs)
     if not bool(continuity_result.get("success", false)):
         return continuity_result
     var world_instance: WorldInstance = continuity_result.get("world_instance", null)
@@ -109,11 +116,12 @@ static func create_character_authoritative(
         "world_id": creation_request.world_id,
         "profile": profile,
         "presentation": presentation,
+        "adapted_mod_manifest": effective_manifest,
         "gateway_result": gateway_result,
         "gateway_attached": is_gateway_attached
     }
 
-## 统一编排门面：权威创角 + 开局事件流生成 + 自动启动角色序章上下文
+## 统一编排门面：权威创角 + 开局事件流生成 + 自动启动角色序章因果 DAG 会话
 static func execute_creation_and_boot_prologue(
     creation_request: AuthoritativeCharacterCreationRequestDTO,
     gateway_fsm: WorldGatewayFSM = null,
@@ -123,6 +131,7 @@ static func execute_creation_and_boot_prologue(
     if not bool(creation_result.get("success", false)):
         return creation_result
 
+    var effective_manifest: Dictionary = creation_result.get("adapted_mod_manifest", {})
     var profile: CharacterProfile = creation_result.get("profile", null)
     var presentation: CharacterCreationPresentationDTO = creation_result.get("presentation", null)
     var opening := OpeningEventStreamDTO.new()
@@ -132,22 +141,27 @@ static func execute_creation_and_boot_prologue(
     opening.world_id = creation_request.world_id
     opening.character_id = str(creation_result.get("character_id", ""))
     opening.character_name = str(creation_result.get("character_name", ""))
-    opening.race_id = presentation.race_id if presentation != null else "HUMAN"
+    opening.race_id = presentation.race_id if presentation != null else ""
     opening.is_first_time_creation = true
     var birth_region := ""
+    var origins_catalog: Dictionary = effective_manifest.get("origins_catalog", {})
+    var origin_entry: Dictionary = origins_catalog.get(presentation.origin_id if presentation != null else "", {})
     if presentation != null and presentation.prologue_preview is Dictionary:
         birth_region = str(presentation.prologue_preview.get("birth_region_id", ""))
-    opening.starting_location_id = birth_region if not birth_region.is_empty() else "CENTRAL_CONTINENT"
-    opening.opening_quest_line_id = "QUEST_PROLOGUE_MAIN_01"
+    opening.starting_location_id = birth_region
+    opening.opening_quest_line_id = str(origin_entry.get("opening_quest_line_id", ""))
+    if presentation != null and not presentation.origin_id.is_empty():
+        opening.narrative_context["origin_id"] = presentation.origin_id
     opening.timestamp_utc = int(Time.get_unix_time_from_system())
 
     EventBusCore.get_instance().emit_domain_event("opening_narrative.triggered", opening.to_dto())
-    var prologue_boot := PrologueExecutionKernel.boot_character_prologue(opening, opening.race_id, true)
+    var prologue_boot := PrologueExecutionKernel.boot_character_prologue(opening, opening.race_id, false, effective_manifest, profile)
     if not bool(prologue_boot.get("success", false)):
         return prologue_boot
 
     var prologue_context: CharacterPrologueContext = prologue_boot.get("context", null)
     if prologue_context != null and presentation != null and not presentation.origin_id.is_empty():
+        prologue_context.origin_id = presentation.origin_id
         prologue_context.runtime_placeholders["ORIGIN_ID"] = presentation.origin_id
         prologue_context.runtime_placeholders["origin_id"] = presentation.origin_id
     if prologue_context != null and profile != null:
@@ -164,6 +178,8 @@ static func execute_creation_and_boot_prologue(
         "opening_event": opening,
         "prologue_context": prologue_context,
         "prologue_packet": prologue_boot.get("packet", null),
+        "dag_session": prologue_boot.get("dag_session", null),
+        "adapted_mod_manifest": effective_manifest,
         "gateway_result": creation_result.get("gateway_result", {})
     }
 
@@ -204,7 +220,7 @@ static func _assemble_character_profile(character_id: String, character_name: St
     profile.character_id = character_id
     profile.character_name = character_name
     profile.attributes = (solver_result.get("attributes", {}) as Dictionary).duplicate(true)
-    var resolved_race := str(solver_result.get("race_id", "HUMAN"))
+    var resolved_race := str(solver_result.get("race_id", ""))
     profile.character_exclusive_progress["race"] = resolved_race
     profile.character_exclusive_progress["origin"] = str(solver_result.get("origin_id", ""))
     profile.growth_state = {
@@ -232,7 +248,7 @@ static func _assemble_physiology(race_id: String, attributes_map: Dictionary) ->
 ## 组装钱包实体与个人资源映射
 static func _assemble_wallet(profile: CharacterProfile, solver_wallet: Dictionary) -> CharacterWalletEntity:
     var wallet := CharacterWalletEntity.new()
-    wallet.gold = int(solver_wallet.get("gold", 50))
+    wallet.gold = int(solver_wallet.get("gold", 0))
     wallet.copper = wallet.gold * 100
 
     profile.personal_resources = {
@@ -252,7 +268,7 @@ static func _assemble_wallet(profile: CharacterProfile, solver_wallet: Dictionar
 # 三、时空连续性、物理持久化与信封组装
 # ==============================================================================
 
-## 解析生效的多MOD合并清单（显式入参优先，否则回退读取网关已预检清单）
+## 解析生效的多MOD合并清单（显式入参优先，否则回退读取网关已预检清单或活跃会话模组上下文）
 static func _resolve_effective_manifest(
     gateway_fsm: WorldGatewayFSM,
     adapted_mod_manifest: Dictionary
@@ -261,14 +277,15 @@ static func _resolve_effective_manifest(
         return adapted_mod_manifest
     if gateway_fsm != null:
         return gateway_fsm.get_adapted_mod_manifest()
-    return {}
+    return WorldSessionRuntimeService.get_adapted_mod_manifest()
 
 ## 锚定目标世界时空、只增追加出生历史片段并前置固化世界MOD锁文件
 static func _anchor_world_continuity(
     world_repository: WorldArchiveRepository,
     world_id: String,
     profile: CharacterProfile,
-    effective_manifest: Dictionary = {}
+    effective_manifest: Dictionary = {},
+    lock_source_packs: Array = []
 ) -> Dictionary:
     var world_instance: WorldInstance = world_repository.load_world(world_id)
     if world_instance == null:
@@ -285,9 +302,8 @@ static func _anchor_world_continuity(
     if not bool(save_world_result.get("success", false)):
         return {"success": false, "error_code": "WORLD_SAVE_FAILED", "message": "保存世界时空连续性失败"}
 
-    var enabled_pack_ids: Array = effective_manifest.get("enabled_pack_ids", [])
-    if not enabled_pack_ids.is_empty():
-        WorldModAffinityManager.new().save_world_mod_lock(world_id, enabled_pack_ids)
+    var lock_packs: Array = lock_source_packs if not lock_source_packs.is_empty() else effective_manifest.get("enabled_pack_ids", [])
+    WorldModAffinityManager.new().save_world_mod_lock(world_id, lock_packs)
 
     return {"success": true, "world_instance": world_instance}
 
@@ -352,7 +368,7 @@ static func _build_presentation_envelope(
     presentation.origin_id = str(solver_result.get("origin_id", ""))
     presentation.origin_name = str(solver_result.get("origin_name", ""))
     presentation.origin_desc = str(solver_result.get("origin_desc", ""))
-    presentation.race_id = str(solver_result.get("race_id", "HUMAN"))
+    presentation.race_id = str(solver_result.get("race_id", ""))
     presentation.race_name = str(solver_result.get("race_name", ""))
     presentation.gender = str(solver_result.get("gender", ""))
     presentation.attributes_radar = (solver_result.get("attributes", {}) as Dictionary).duplicate(true)

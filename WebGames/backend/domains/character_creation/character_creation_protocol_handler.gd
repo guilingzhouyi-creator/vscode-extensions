@@ -21,6 +21,7 @@ const PrologueExecutionKernel = preload("res://backend/domains/character_creatio
 const PrologueCutscenePort = preload("res://backend/domains/character_creation/prologue_cutscene_port.gd")
 const PrologueHandoffDTO = preload("res://backend/domains/character_creation/dto/prologue_handoff_dto.gd")
 const CreationUiSnapshotBuilder = preload("res://backend/domains/character_creation/creation_ui_snapshot_builder.gd")
+const PrologueDagStepHelper = preload("res://backend/domains/character_creation/prologue_dag_step_helper.gd")
 const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
 const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
 
@@ -79,7 +80,9 @@ static func dispatch_creation(request: ClientRequestEnvelopeDTO, gateway: Varian
 			var prologue_context: CharacterPrologueContext = creation_flow_result.get("prologue_context", null)
 			var profile: Variant = creation_flow_result.get("profile", null)
 			var bound_slot_name := "SLOT_%02d" % creation_request.slot_id
-			WorldSessionRuntimeService.bind_prologue_session(prologue_context, profile)
+			var dag_session: Variant = creation_flow_result.get("dag_session", prologue_context.active_dag_session if prologue_context != null else null)
+			var effective_manifest: Dictionary = creation_flow_result.get("adapted_mod_manifest", gateway.get_adapted_mod_manifest() if gateway != null else {})
+			WorldSessionRuntimeService.bind_prologue_session(prologue_context, profile, dag_session, effective_manifest)
 			if gateway != null and gateway.context != null:
 				gateway.context.selected_slot_id = bound_slot_name
 			var presentation: Variant = creation_flow_result.get("presentation", null)
@@ -89,6 +92,7 @@ static func dispatch_creation(request: ClientRequestEnvelopeDTO, gateway: Varian
 				"slot_id": bound_slot_name,
 				"world_id": String(creation_flow_result.get("world_id", "")),
 				"prologue_started": prologue_context != null,
+				"prologue_state": _build_prologue_state_payload(prologue_context),
 				"presentation": presentation.to_dto() if (presentation != null and presentation.has_method("to_dto")) else {}
 			}
 			return UnifiedProtocolFactory.create_response(
@@ -98,22 +102,11 @@ static func dispatch_creation(request: ClientRequestEnvelopeDTO, gateway: Varian
 	return UnifiedProtocolFactory.create_unhandled_action_response(request.request_id, request.action_type)
 
 static func _build_prologue_state_payload(prologue_context: CharacterPrologueContext) -> Dictionary:
-	var stages_config: Dictionary = GameConfig.get_dict("domains.character_creation", "prologue_stages", {})
-	var stage_key := str(clampi(prologue_context.current_stage, 1, 4))
-	var stage_definition: Dictionary = stages_config.get(stage_key, stages_config.get("1", {}))
-	var narrative_key := str(stage_definition.get("narrative_key", "narrative/prologue/awakening"))
-	var template := GameConfig.get_string("narratives.prologue_i18n", narrative_key, "")
-	var text_result := ProloguePlaceholderResolver.resolve_template(template, prologue_context.runtime_placeholders)
-	return {
-		"character_id": prologue_context.character_id,
-		"character_name": prologue_context.character_name,
-		"current_stage": prologue_context.current_stage,
-		"step_index": prologue_context.step_index,
-		"is_active": prologue_context.is_active,
-		"is_completed": prologue_context.is_completed,
-		"narrative_text": str(text_result.get("text", "")),
-		"available_actions": stage_definition.get("available_actions", ["NEXT"])
-	}
+	return PrologueDagStepHelper.build_active_state_payload(
+		prologue_context,
+		PrologueExecutionKernel.create_dag_session,
+		PrologueExecutionKernel.render_dag_node_packet
+	)
 
 ## 分发角色序章阶段客户端协议动作（启动、状态查询、推进、完结/跳过与世界探索交接）
 static func dispatch_prologue(request: ClientRequestEnvelopeDTO, gateway: Variant) -> UnifiedResponseEnvelopeDTO:
@@ -127,8 +120,13 @@ static func dispatch_prologue(request: ClientRequestEnvelopeDTO, gateway: Varian
 				return UnifiedProtocolFactory.create_response(
 					request.request_id, false, {}, "ERR_NO_PROLOGUE_CONTEXT", "Active prologue context is missing."
 				)
+			var start_payload := _build_prologue_state_payload(prologue_context)
+			if start_payload.is_empty():
+				return UnifiedProtocolFactory.create_response(
+					request.request_id, false, {}, "MOD_ERR_MISSING_PROLOGUE_DAG", "Prologue DAG graph missing from active MOD manifest."
+				)
 			return UnifiedProtocolFactory.create_response(
-				request.request_id, true, _build_prologue_state_payload(prologue_context), "", "Prologue session is ready."
+				request.request_id, true, start_payload, "", "Prologue session is ready."
 			)
 
 		"GET_PROLOGUE_STATE":
@@ -145,13 +143,22 @@ static func dispatch_prologue(request: ClientRequestEnvelopeDTO, gateway: Varian
 				return UnifiedProtocolFactory.create_response(
 					request.request_id, false, {}, "ERR_NO_PROLOGUE_CONTEXT", "Active prologue context is missing."
 				)
-			var step_result := PrologueExecutionKernel.advance_prologue_step(prologue_context, str(payload_map.get("choice_id", "NEXT")), payload_map)
+			var choice_identifier := str(payload_map.get("choice_id", payload_map.get("action", "NEXT"))).strip_edges()
+			var step_result := PrologueExecutionKernel.advance_prologue_step(prologue_context, choice_identifier, payload_map, profile)
 			var is_step_succeeded := bool(step_result.get("success", false))
 			var step_packet: Variant = step_result.get("packet", null)
+			var current_state := _build_prologue_state_payload(prologue_context)
 			var step_payload := {
+				"dag_id": str(current_state.get("dag_id", prologue_context.current_dag_id)),
+				"node_id": str(current_state.get("node_id", prologue_context.current_node_id)),
+				"node_type": int(current_state.get("node_type", 1)),
 				"current_stage": prologue_context.current_stage,
 				"step_index": prologue_context.step_index,
 				"is_completed": prologue_context.is_completed,
+				"narrative_text": str(current_state.get("narrative_text", "")),
+				"choices": current_state.get("choices", []),
+				"available_actions": current_state.get("available_actions", []),
+				"cutscene_trigger": str(current_state.get("cutscene_trigger", "")),
 				"packet": step_packet.to_dto() if (step_packet != null and step_packet.has_method("to_dto")) else {}
 			}
 			return UnifiedProtocolFactory.create_response(
