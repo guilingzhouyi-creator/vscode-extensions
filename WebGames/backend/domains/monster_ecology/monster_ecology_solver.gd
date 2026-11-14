@@ -19,7 +19,7 @@ static func apply_part_damage(
 	if not monster.body_parts.has(part_id):
 		return { "success": false, "broken": false, "ap_penalty": 0 }
 
-	var part: MonsterAggregateEntity.MonsterBodyPart = monster.body_parts[part_id]
+	var part: MonsterBodyPart = monster.body_parts[part_id]
 	if part.is_severed:
 		return { "success": true, "broken": true, "already_broken": true, "ap_penalty": 0 }
 
