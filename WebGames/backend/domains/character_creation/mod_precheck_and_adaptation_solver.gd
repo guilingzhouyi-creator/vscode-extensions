@@ -71,13 +71,13 @@ static func precheck_and_adapt_mod_list(
     var has_non_compliant_enabled: bool = false
 
     for raw_pack in candidate_packs:
-        var single_res: Dictionary = precheck_single_mod(raw_pack)
-        var manifest_dto: DestinyModManifestDTO = single_res.get("manifest")
-        var pid: String = manifest_dto.pack_id
-        var is_enabled: bool = enable_all or (not pid.is_empty() and enabled_set.has(pid))
-        var is_compliant: bool = bool(single_res.get("valid", false))
+        var single_result: Dictionary = precheck_single_mod(raw_pack)
+        var manifest_dto: DestinyModManifestDTO = single_result.get("manifest")
+        var pack_id: String = manifest_dto.pack_id
+        var is_enabled: bool = enable_all or (not pack_id.is_empty() and enabled_set.has(pack_id))
+        var is_compliant: bool = bool(single_result.get("valid", false))
 
-        var check_item: Dictionary = _build_checklist_item(single_res, is_compliant, is_enabled)
+        var check_item: Dictionary = _build_checklist_item(single_result, is_compliant, is_enabled)
         precheck_checklist.append(check_item)
 
         if is_enabled:
@@ -85,7 +85,7 @@ static func precheck_and_adapt_mod_list(
                 has_non_compliant_enabled = true
             else:
                 enabled_manifests.append(manifest_dto)
-                enabled_ids_out.append(pid)
+                enabled_ids_out.append(pack_id)
 
     if has_non_compliant_enabled:
         return _build_adaptation_failure(
@@ -95,22 +95,22 @@ static func precheck_and_adapt_mod_list(
             []
         )
 
-    var incomp_conflicts: Array[Dictionary] = _detect_incompatible_conflicts(enabled_manifests, enabled_ids_out)
-    if not incomp_conflicts.is_empty():
+    var incompatible_conflicts: Array[Dictionary] = _detect_incompatible_conflicts(enabled_manifests, enabled_ids_out)
+    if not incompatible_conflicts.is_empty():
         return _build_adaptation_failure(
             "ERR_MOD_INCOMPATIBLE_CONFLICT",
             enabled_ids_out,
             precheck_checklist,
-            incomp_conflicts
+            incompatible_conflicts
         )
 
-    var dup_conflicts: Array[Dictionary] = _detect_duplicate_id_conflicts(enabled_manifests)
-    if not dup_conflicts.is_empty():
+    var duplicate_conflicts: Array[Dictionary] = _detect_duplicate_id_conflicts(enabled_manifests)
+    if not duplicate_conflicts.is_empty():
         return _build_adaptation_failure(
             "ERR_MOD_DUPLICATE_ID_CONFLICT",
             enabled_ids_out,
             precheck_checklist,
-            dup_conflicts
+            duplicate_conflicts
         )
 
     var ui_conflicts: Array[Dictionary] = _detect_ui_policy_conflicts(enabled_manifests)
@@ -122,14 +122,14 @@ static func precheck_and_adapt_mod_list(
             ui_conflicts
         )
 
-    var topo_conflicts: Array[Dictionary] = []
-    var sorted_manifests: Array[DestinyModManifestDTO] = _topological_sort_manifests(enabled_manifests, topo_conflicts)
-    if not topo_conflicts.is_empty():
+    var topology_conflicts: Array[Dictionary] = []
+    var sorted_manifests: Array[DestinyModManifestDTO] = _topological_sort_manifests(enabled_manifests, topology_conflicts)
+    if not topology_conflicts.is_empty():
         return _build_adaptation_failure(
             "ERR_MOD_INCOMPATIBLE_CONFLICT",
             enabled_ids_out,
             precheck_checklist,
-            topo_conflicts
+            topology_conflicts
         )
 
     var adapted_manifest: Dictionary = ModAdaptationManifestMerger.build_adapted_manifest(sorted_manifests, enabled_ids_out)
@@ -154,36 +154,36 @@ static func precheck_and_adapt_mod_list(
 # ==============================================================================
 
 static func _build_enabled_lookup(enabled_pack_ids: Array) -> Dictionary:
-    var out: Dictionary = {}
+    var enabled_lookup: Dictionary = {}
     for item in enabled_pack_ids:
         var clean_id: String = str(item).strip_edges()
         if not clean_id.is_empty():
-            out[clean_id] = true
-    return out
+            enabled_lookup[clean_id] = true
+    return enabled_lookup
 
 static func _build_checklist_item(
-    single_res: Dictionary,
+    single_result: Dictionary,
     is_compliant: bool,
     is_enabled: bool
 ) -> Dictionary:
     return {
-        "pack_id": str(single_res.get("pack_id", "")),
-        "pack_name": str(single_res.get("pack_name", "")),
+        "pack_id": str(single_result.get("pack_id", "")),
+        "pack_name": str(single_result.get("pack_name", "")),
         "is_compliant": is_compliant,
         "is_enabled": is_enabled,
-        "error_code": str(single_res.get("error_code", "")),
-        "errors": (single_res.get("errors", []) as Array).duplicate(true)
+        "error_code": str(single_result.get("error_code", "")),
+        "errors": (single_result.get("errors", []) as Array).duplicate(true)
     }
 
 static func _build_adaptation_failure(
-    err_code: String,
+    error_code: String,
     enabled_ids: Array[String],
     checklist: Array[Dictionary],
     conflicts: Array[Dictionary]
 ) -> Dictionary:
     return {
         "success": false,
-        "error_code": err_code,
+        "error_code": error_code,
         "enabled_pack_ids": enabled_ids,
         "precheck_checklist": checklist,
         "conflicts": conflicts,
@@ -197,48 +197,48 @@ static func _detect_incompatible_conflicts(
 ) -> Array[Dictionary]:
     var conflicts: Array[Dictionary] = []
     var active_lookup: Dictionary = _build_enabled_lookup(enabled_ids)
-    for dto in enabled_manifests:
-        _check_pack_incompatibilities(dto, active_lookup, conflicts)
+    for manifest_dto in enabled_manifests:
+        _check_pack_incompatibilities(manifest_dto, active_lookup, conflicts)
     return conflicts
 
 static func _check_pack_incompatibilities(
-    dto: DestinyModManifestDTO,
+    manifest_dto: DestinyModManifestDTO,
     active_lookup: Dictionary,
     conflicts: Array[Dictionary]
 ) -> void:
-    for inc_id in dto.incompatible_packs:
-        if active_lookup.has(inc_id):
+    for incompatible_id in manifest_dto.incompatible_packs:
+        if active_lookup.has(incompatible_id):
             _append_conflict(
                 conflicts,
                 "ERR_MOD_INCOMPATIBLE_CONFLICT",
-                dto.pack_id,
-                inc_id,
-                "启用包存在显式互斥声明: %s <-> %s" % [dto.pack_id, inc_id]
+                manifest_dto.pack_id,
+                incompatible_id,
+                "启用包存在显式互斥声明: %s <-> %s" % [manifest_dto.pack_id, incompatible_id]
             )
-    for dep_id in dto.dependencies:
-        if not active_lookup.has(dep_id):
+    for dependency_id in manifest_dto.dependencies:
+        if not active_lookup.has(dependency_id):
             _append_conflict(
                 conflicts,
                 "ERR_MOD_INCOMPATIBLE_CONFLICT",
-                dto.pack_id,
-                dep_id,
-                "启用包缺少前置依赖包: %s 需要 %s" % [dto.pack_id, dep_id]
+                manifest_dto.pack_id,
+                dependency_id,
+                "启用包缺少前置依赖包: %s 需要 %s" % [manifest_dto.pack_id, dependency_id]
             )
 
 static func _new_list() -> Array:
     return []
 
-static func _record_dependencies(manifest_dto: DestinyModManifestDTO, dto_map: Dictionary, adj: Dictionary, in_degree: Dictionary) -> void:
-    for dep_id in manifest_dto.dependencies:
-        if dto_map.has(dep_id):
-            adj[dep_id].append(manifest_dto.pack_id)
+static func _record_dependencies(manifest_dto: DestinyModManifestDTO, manifest_by_pack_id: Dictionary, adjacency_map: Dictionary, in_degree: Dictionary) -> void:
+    for dependency_id in manifest_dto.dependencies:
+        if manifest_by_pack_id.has(dependency_id):
+            adjacency_map[dependency_id].append(manifest_dto.pack_id)
             in_degree[manifest_dto.pack_id] = in_degree[manifest_dto.pack_id] + 1
 
 static func _decrement_dependents(dependents: Array, in_degree: Dictionary, queue: Array[String]) -> void:
-    for v_pid in dependents:
-        in_degree[v_pid] = in_degree[v_pid] - 1
-        if in_degree[v_pid] == 0:
-            queue.append(v_pid)
+    for dependent_pack_id in dependents:
+        in_degree[dependent_pack_id] = in_degree[dependent_pack_id] - 1
+        if in_degree[dependent_pack_id] == 0:
+            queue.append(dependent_pack_id)
 
 static func _topological_sort_manifests(
     manifests: Array[DestinyModManifestDTO],
@@ -248,27 +248,27 @@ static func _topological_sort_manifests(
         return manifests
 
     var in_degree: Dictionary = {}
-    var adj: Dictionary = {}
-    var dto_map: Dictionary = {}
+    var adjacency_map: Dictionary = {}
+    var manifest_by_pack_id: Dictionary = {}
 
-    for dto in manifests:
-        dto_map[dto.pack_id] = dto
-        in_degree[dto.pack_id] = 0
-        adj[dto.pack_id] = _new_list()
+    for manifest_dto in manifests:
+        manifest_by_pack_id[manifest_dto.pack_id] = manifest_dto
+        in_degree[manifest_dto.pack_id] = 0
+        adjacency_map[manifest_dto.pack_id] = _new_list()
 
-    for dto in manifests:
-        _record_dependencies(dto, dto_map, adj, in_degree)
+    for manifest_dto in manifests:
+        _record_dependencies(manifest_dto, manifest_by_pack_id, adjacency_map, in_degree)
 
     var queue: Array[String] = []
-    for pid in in_degree.keys():
-        if in_degree[pid] == 0:
-            queue.append(pid)
+    for pack_id in in_degree.keys():
+        if in_degree[pack_id] == 0:
+            queue.append(pack_id)
 
     var sorted_out: Array[DestinyModManifestDTO] = []
     while not queue.is_empty():
-        var u_pid: String = queue.pop_front()
-        sorted_out.append(dto_map[u_pid])
-        var dependents: Array = adj.get(u_pid, _new_list())
+        var source_pack_id: String = queue.pop_front()
+        sorted_out.append(manifest_by_pack_id[source_pack_id])
+        var dependents: Array = adjacency_map.get(source_pack_id, _new_list())
         _decrement_dependents(dependents, in_degree, queue)
 
     if sorted_out.size() < manifests.size():
@@ -291,32 +291,32 @@ static func _detect_duplicate_id_conflicts(
     var seen_traits: Dictionary = {}
     var seen_kits: Dictionary = {}
 
-    for dto in enabled_manifests:
-        _check_pack_duplicate_ids(dto, seen_origins, seen_traits, seen_kits, conflicts)
+    for manifest_dto in enabled_manifests:
+        _check_pack_duplicate_ids(manifest_dto, seen_origins, seen_traits, seen_kits, conflicts)
 
     return conflicts
 
 static func _check_pack_duplicate_ids(
-    dto: DestinyModManifestDTO,
+    manifest_dto: DestinyModManifestDTO,
     seen_origins: Dictionary,
     seen_traits: Dictionary,
     seen_kits: Dictionary,
     conflicts: Array[Dictionary]
 ) -> void:
-    for orig in dto.custom_origins:
-        var oid: String = str(orig.get("origin_id", "")).strip_edges()
-        if not oid.is_empty():
-            _record_or_conflict_id(oid, dto.pack_id, seen_origins, "origin_id", conflicts)
+    for origin_entry in manifest_dto.custom_origins:
+        var origin_id: String = str(origin_entry.get("origin_id", "")).strip_edges()
+        if not origin_id.is_empty():
+            _record_or_conflict_id(origin_id, manifest_dto.pack_id, seen_origins, "origin_id", conflicts)
 
-    for tid in dto.custom_traits.keys():
-        var trait_key: String = str(tid).strip_edges()
+    for trait_id in manifest_dto.custom_traits.keys():
+        var trait_key: String = str(trait_id).strip_edges()
         if not trait_key.is_empty():
-            _record_or_conflict_id(trait_key, dto.pack_id, seen_traits, "trait_id", conflicts)
+            _record_or_conflict_id(trait_key, manifest_dto.pack_id, seen_traits, "trait_id", conflicts)
 
-    for kid in dto.custom_starter_kits.keys():
-        var kit_key: String = str(kid).strip_edges()
+    for kit_id in manifest_dto.custom_starter_kits.keys():
+        var kit_key: String = str(kit_id).strip_edges()
         if not kit_key.is_empty():
-            _record_or_conflict_id(kit_key, dto.pack_id, seen_kits, "kit_id", conflicts)
+            _record_or_conflict_id(kit_key, manifest_dto.pack_id, seen_kits, "kit_id", conflicts)
 
 static func _record_or_conflict_id(
     entity_id: String,
@@ -326,14 +326,14 @@ static func _record_or_conflict_id(
     conflicts: Array[Dictionary]
 ) -> void:
     if seen_map.has(entity_id):
-        var prev_pack: String = str(seen_map[entity_id])
-        if prev_pack != pack_id:
+        var previous_pack_id: String = str(seen_map[entity_id])
+        if previous_pack_id != pack_id:
             _append_conflict(
                 conflicts,
                 "ERR_MOD_DUPLICATE_ID_CONFLICT",
-                prev_pack,
+                previous_pack_id,
                 pack_id,
-                "多包定义了重复的 %s [%s]: %s vs %s" % [id_kind, entity_id, prev_pack, pack_id]
+                "多包定义了重复的 %s [%s]: %s vs %s" % [id_kind, entity_id, previous_pack_id, pack_id]
             )
     else:
         seen_map[entity_id] = pack_id
@@ -347,18 +347,18 @@ static func _detect_ui_policy_conflicts(
     var trait_manual_pack: String = ""
     var trait_random_pack: String = ""
 
-    for dto in enabled_manifests:
-        var o_mode: String = str(dto.ui_capabilities.get("origin_selection_mode", "INHERIT")).strip_edges()
-        if o_mode == "ALLOW_MANUAL" and origin_manual_pack.is_empty():
-            origin_manual_pack = dto.pack_id
-        elif o_mode == "FORCE_RANDOM" and origin_random_pack.is_empty():
-            origin_random_pack = dto.pack_id
+    for manifest_dto in enabled_manifests:
+        var origin_mode: String = str(manifest_dto.ui_capabilities.get("origin_selection_mode", "INHERIT")).strip_edges()
+        if origin_mode == "ALLOW_MANUAL" and origin_manual_pack.is_empty():
+            origin_manual_pack = manifest_dto.pack_id
+        elif origin_mode == "FORCE_RANDOM" and origin_random_pack.is_empty():
+            origin_random_pack = manifest_dto.pack_id
 
-        var t_mode: String = str(dto.ui_capabilities.get("trait_selection_mode", "INHERIT")).strip_edges()
-        if t_mode == "ALLOW_MANUAL" and trait_manual_pack.is_empty():
-            trait_manual_pack = dto.pack_id
-        elif t_mode == "FORCE_RANDOM" and trait_random_pack.is_empty():
-            trait_random_pack = dto.pack_id
+        var trait_mode: String = str(manifest_dto.ui_capabilities.get("trait_selection_mode", "INHERIT")).strip_edges()
+        if trait_mode == "ALLOW_MANUAL" and trait_manual_pack.is_empty():
+            trait_manual_pack = manifest_dto.pack_id
+        elif trait_mode == "FORCE_RANDOM" and trait_random_pack.is_empty():
+            trait_random_pack = manifest_dto.pack_id
 
     if not origin_manual_pack.is_empty() and not origin_random_pack.is_empty():
         _append_conflict(
@@ -383,13 +383,13 @@ static func _detect_ui_policy_conflicts(
 static func _append_conflict(
     conflicts: Array[Dictionary],
     code: String,
-    pack_a: String,
-    pack_b: String,
-    msg: String
+    first_pack_id: String,
+    second_pack_id: String,
+    message: String
 ) -> void:
     conflicts.append({
         "error_code": code,
-        "pack_a": pack_a,
-        "pack_b": pack_b,
-        "message": msg
+        "pack_a": first_pack_id,
+        "pack_b": second_pack_id,
+        "message": message
     })
