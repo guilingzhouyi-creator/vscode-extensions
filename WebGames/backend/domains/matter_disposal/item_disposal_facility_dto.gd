@@ -30,10 +30,10 @@ var mana_dust_yield_ratio: float = GameConfig.get_float("domains.matter_disposal
 
 ## 处置设施 DTO 构造（方法/坐标/操作半径）
 func _init(
-	p_method: DisposalMethod = DisposalMethod.TOWN_HIGH_HEAT_FURNACE,
-	p_pos: Vector2 = Vector2.ZERO,
-	p_radius: float = DEFAULT_MAX_OPERATE_RADIUS
+	initial_method: DisposalMethod = DisposalMethod.TOWN_HIGH_HEAT_FURNACE,
+	initial_position: Vector2 = Vector2.ZERO,
+	initial_radius: float = DEFAULT_MAX_OPERATE_RADIUS
 ) -> void:
-	method = p_method
-	facility_pos = p_pos
-	max_operate_radius = p_radius
+	method = initial_method
+	facility_pos = initial_position
+	max_operate_radius = initial_radius

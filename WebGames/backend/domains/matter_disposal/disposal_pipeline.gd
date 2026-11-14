@@ -3,7 +3,7 @@
 # 文件路径: res://backend/domains/matter_disposal/disposal_pipeline.gd
 # 架构定位: Business Pipeline / Transaction Safe Orchestrator
 # 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/matter_disposal.json | 信号: EventBus 领域广播
-# 职责说明: 执行物品销毁、从背包扣除并将生成的炉渣与魔素尘埃按产量逐件回流进背包 （：产物实例数 == yield_count == 统计记账数，物质守恒； 已穿戴物品销毁时与 loadout 侧联动清槽，杜绝双簿记悬挂引用）
+# 职责说明: 执行物品销毁、从背包扣除并将生成的炉渣与魔素尘埃按产量逐件回流进背包 （物质守恒：产物实例数 == yield_count == 统计记账数；已穿戴物品销毁时与 loadout 侧联动清槽，杜绝双簿记悬挂引用）
 # 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
@@ -23,7 +23,7 @@ static func process_item_disposal(
 	inventory: WearableInventoryAggregate,
 	item_id: String,
 	passcode: String = "",
-	library: AccountItemLibraryAggregate = null,
+	library: AccountItemLibrary = null,
 	loadout: EquipmentLoadoutAggregate = null
 ) -> Dictionary:
 	if inventory == null or item_id.is_empty():
@@ -41,25 +41,25 @@ static func process_item_disposal(
 	if target_item.container_state == "LOCKED":
 		return {"success": false, "error_code": "ITEM_LOCKED"}
 
-	var res: Variant = MatterDisposalSolver.execute_disposal(player_pos, facility, target_item, passcode)
-	if not res.success:
-		return res
+	var disposal_result: Variant = MatterDisposalSolver.execute_disposal(player_pos, facility, target_item, passcode)
+	if not disposal_result.success:
+		return disposal_result
 
 	# 1. 预先按产量逐件构建规范产物实体（注册表三元组 + from_payload，每件独立 UID）；
 	#    注册缺失在任何库存变更之前拦截（零变异先失败）
 	var catalog := GameBootstrap.catalog()
 	var products: Array = []
-	var slag_proto: Variant = catalog.get_prototype(CANONICAL_ID_SLAG_ASH)
-	var dust_proto: Variant = catalog.get_prototype(CANONICAL_ID_MANA_DUST)
-	if slag_proto == null or dust_proto == null:
+	var slag_prototype: Variant = catalog.get_prototype(CANONICAL_ID_SLAG_ASH)
+	var dust_prototype: Variant = catalog.get_prototype(CANONICAL_ID_MANA_DUST)
+	if slag_prototype == null or dust_prototype == null:
 		return {"success": false, "error_code": "PRODUCT_NOT_REGISTERED"}
-	for i in int(res.yield_slag_ash_count):
-		var slag_item := ItemInstanceFactory.build_instance(slag_proto, _msg("slag_ash_name"), "DSP_")
+	for slag_index in int(disposal_result.yield_slag_ash_count):
+		var slag_item := ItemInstanceFactory.build_instance(slag_prototype, _msg("slag_ash_name"), "DSP_")
 		# 保留历史短 item_id 供展示/查询消费方兼容；template_id 恒为注册 canonical
 		slag_item.item_id = ITEM_ID_SLAG_ASH
 		products.append(slag_item)
-	for i in int(res.yield_mana_dust_count):
-		var dust_item := ItemInstanceFactory.build_instance(dust_proto, _msg("mana_dust_name"), "DSP_")
+	for dust_index in int(disposal_result.yield_mana_dust_count):
+		var dust_item := ItemInstanceFactory.build_instance(dust_prototype, _msg("mana_dust_name"), "DSP_")
 		dust_item.item_id = ITEM_ID_MANA_DUST
 		products.append(dust_item)
 
@@ -96,16 +96,16 @@ static func process_item_disposal(
 		})
 
 	if library != null:
-		if res.yield_slag_ash_count > 0:
-			ItemStatisticsSolver.record_item_event(library, ItemStatisticsSolver.EVENT_ITEM_FORGED, CANONICAL_ID_SLAG_ASH, res.yield_slag_ash_count, null, null, {
+		if disposal_result.yield_slag_ash_count > 0:
+			ItemStatisticsSolver.record_item_event(library, ItemStatisticsSolver.EVENT_ITEM_FORGED, CANONICAL_ID_SLAG_ASH, disposal_result.yield_slag_ash_count, null, null, {
 				"transaction_id": item_id
 			})
-		if res.yield_mana_dust_count > 0:
-			ItemStatisticsSolver.record_item_event(library, ItemStatisticsSolver.EVENT_ITEM_FORGED, CANONICAL_ID_MANA_DUST, res.yield_mana_dust_count, null, null, {
+		if disposal_result.yield_mana_dust_count > 0:
+			ItemStatisticsSolver.record_item_event(library, ItemStatisticsSolver.EVENT_ITEM_FORGED, CANONICAL_ID_MANA_DUST, disposal_result.yield_mana_dust_count, null, null, {
 				"transaction_id": item_id
 			})
 
-	return res
+	return disposal_result
 
 # ==============================================================================
 # 配置读取
