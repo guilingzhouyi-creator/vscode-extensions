@@ -32,7 +32,9 @@ mod tests {
         assert!(is_test_code_path("src/app.spec.ts"));
         assert!(is_test_code_path("tests.rs"));
         assert!(is_test_or_fixture_path("fixtures/mock.json"));
-        assert!(is_test_or_fixture_path("src/fixtures/parity-mixed/unsafe-sample.ts"));
+        assert!(is_test_or_fixture_path(
+            "src/fixtures/parity-mixed/unsafe-sample.ts"
+        ));
         assert!(is_test_or_fixture_path("docs/guide.md"));
         assert!(!is_test_code_path("src/test_runner.rs"));
         assert!(!is_test_or_fixture_path("src/engine.rs"));

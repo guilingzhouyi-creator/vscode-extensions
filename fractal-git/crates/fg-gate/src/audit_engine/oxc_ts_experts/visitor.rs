@@ -61,7 +61,14 @@ impl<'s> OxcTsVisitor<'s> {
             return;
         }
         let line = self.line_of(span_start);
-        match build_registered_finding(rule_id, analyzer, severity, self.rel_path, line, String::from(msg)) {
+        match build_registered_finding(
+            rule_id,
+            analyzer,
+            severity,
+            self.rel_path,
+            line,
+            String::from(msg),
+        ) {
             Ok(finding) => self.findings.push(finding),
             Err(gate_err) => self.deferred_error = Some(gate_err),
         }
@@ -92,7 +99,10 @@ impl<'s> OxcTsVisitor<'s> {
         }
         if self.control_depth == 5 {
             self.emit(
-                "CPX-NEST-001", "complexity", AuditSeverity::Warning, span_start,
+                "CPX-NEST-001",
+                "complexity",
+                AuditSeverity::Warning,
+                span_start,
                 "Control-flow nesting depth exceeds budget (> 4)",
             );
         }
@@ -107,7 +117,10 @@ impl<'s> OxcTsVisitor<'s> {
         self.function_complexities.push(f64::from(cc));
         if cc > 15 {
             self.emit(
-                "high-complexity", "complexity", AuditSeverity::Warning, span_start,
+                "high-complexity",
+                "complexity",
+                AuditSeverity::Warning,
+                span_start,
                 &format!("{label} cyclomatic complexity {cc} exceeds ceiling 15"),
             );
         }
@@ -115,9 +128,13 @@ impl<'s> OxcTsVisitor<'s> {
 }
 
 impl<'a, 's> Visit<'a> for OxcTsVisitor<'s> {
-    fn visit_program(&mut self, program: &Program<'a>) { walk::walk_program(self, program); }
+    fn visit_program(&mut self, program: &Program<'a>) {
+        walk::walk_program(self, program);
+    }
     fn visit_import_declaration(&mut self, decl: &ImportDeclaration<'a>) {
-        if let Some(specifier) = decl.source.value.as_str() { classify_import_specifier(self, specifier); }
+        if let Some(specifier) = decl.source.value.as_str() {
+            classify_import_specifier(self, specifier);
+        }
         walk::walk_import_declaration(self, decl);
     }
     fn visit_export_declaration(&mut self, decl: &ExportDeclaration<'a>) {
@@ -157,43 +174,110 @@ impl<'a, 's> Visit<'a> for OxcTsVisitor<'s> {
     fn visit_new_expression(&mut self, expr: &NewExpression<'a>) {
         if let Expression::Identifier(ident) = &expr.callee {
             if ident.name.as_str() == "Function" {
-                self.emit("SEC-VUL-001", "security", AuditSeverity::Error, expr.span.start, "Dynamic `new Function(...)` execution detected");
+                self.emit(
+                    "SEC-VUL-001",
+                    "security",
+                    AuditSeverity::Error,
+                    expr.span.start,
+                    "Dynamic `new Function(...)` execution detected",
+                );
             }
         }
         walk::walk_new_expression(self, expr);
     }
     fn visit_variable_declaration(&mut self, decl: &VariableDeclaration<'a>) {
         if decl.kind == VariableDeclarationKind::Var {
-            self.emit("TSM-VAR-001", "typescript-modern", AuditSeverity::Warning, decl.span.start, "Obsolete `var` declaration detected; replace with `const` or `let`");
+            self.emit(
+                "TSM-VAR-001",
+                "typescript-modern",
+                AuditSeverity::Warning,
+                decl.span.start,
+                "Obsolete `var` declaration detected; replace with `const` or `let`",
+            );
         }
         walk::walk_variable_declaration(self, decl);
     }
     fn visit_ts_any_keyword(&mut self, kw: &TSAnyKeyword) {
         if self.is_ts && !self.is_test_file {
-            self.emit("TSM-ANY-001", "typescript-modern", AuditSeverity::Warning, kw.span.start, "Explicit `any` escape hatch undermines strict TypeScript type safety");
+            self.emit(
+                "TSM-ANY-001",
+                "typescript-modern",
+                AuditSeverity::Warning,
+                kw.span.start,
+                "Explicit `any` escape hatch undermines strict TypeScript type safety",
+            );
         }
     }
     fn visit_catch_clause(&mut self, clause: &CatchClause<'a>) {
         self.bump_cc(1);
         if clause.body.body.is_empty() {
-            self.emit("ERR-FLT-001", "governance", AuditSeverity::Warning, clause.span.start, "Empty catch block silently swallows exceptions");
+            self.emit(
+                "ERR-FLT-001",
+                "governance",
+                AuditSeverity::Warning,
+                clause.span.start,
+                "Empty catch block silently swallows exceptions",
+            );
         }
         walk::walk_catch_clause(self, clause);
     }
-    fn visit_if_statement(&mut self, s: &IfStatement<'a>) { self.bump_cc(1); self.enter_nesting(s.span.start); walk::walk_if_statement(self, s); self.exit_nesting(); }
-    fn visit_for_statement(&mut self, s: &ForStatement<'a>) { self.bump_cc(1); self.enter_nesting(s.span.start); walk::walk_for_statement(self, s); self.exit_nesting(); }
-    fn visit_for_in_statement(&mut self, s: &ForInStatement<'a>) { self.bump_cc(1); self.enter_nesting(s.span.start); walk::walk_for_in_statement(self, s); self.exit_nesting(); }
-    fn visit_for_of_statement(&mut self, s: &ForOfStatement<'a>) { self.bump_cc(1); self.enter_nesting(s.span.start); walk::walk_for_of_statement(self, s); self.exit_nesting(); }
-    fn visit_while_statement(&mut self, s: &WhileStatement<'a>) { self.bump_cc(1); self.enter_nesting(s.span.start); walk::walk_while_statement(self, s); self.exit_nesting(); }
-    fn visit_do_while_statement(&mut self, s: &DoWhileStatement<'a>) { self.bump_cc(1); self.enter_nesting(s.span.start); walk::walk_do_while_statement(self, s); self.exit_nesting(); }
+    fn visit_if_statement(&mut self, s: &IfStatement<'a>) {
+        self.bump_cc(1);
+        self.enter_nesting(s.span.start);
+        walk::walk_if_statement(self, s);
+        self.exit_nesting();
+    }
+    fn visit_for_statement(&mut self, s: &ForStatement<'a>) {
+        self.bump_cc(1);
+        self.enter_nesting(s.span.start);
+        walk::walk_for_statement(self, s);
+        self.exit_nesting();
+    }
+    fn visit_for_in_statement(&mut self, s: &ForInStatement<'a>) {
+        self.bump_cc(1);
+        self.enter_nesting(s.span.start);
+        walk::walk_for_in_statement(self, s);
+        self.exit_nesting();
+    }
+    fn visit_for_of_statement(&mut self, s: &ForOfStatement<'a>) {
+        self.bump_cc(1);
+        self.enter_nesting(s.span.start);
+        walk::walk_for_of_statement(self, s);
+        self.exit_nesting();
+    }
+    fn visit_while_statement(&mut self, s: &WhileStatement<'a>) {
+        self.bump_cc(1);
+        self.enter_nesting(s.span.start);
+        walk::walk_while_statement(self, s);
+        self.exit_nesting();
+    }
+    fn visit_do_while_statement(&mut self, s: &DoWhileStatement<'a>) {
+        self.bump_cc(1);
+        self.enter_nesting(s.span.start);
+        walk::walk_do_while_statement(self, s);
+        self.exit_nesting();
+    }
     fn visit_switch_statement(&mut self, s: &SwitchStatement<'a>) {
         self.bump_cc(u32::try_from(s.cases.len()).unwrap_or(1));
         self.enter_nesting(s.span.start);
         walk::walk_switch_statement(self, s);
         self.exit_nesting();
     }
-    fn visit_try_statement(&mut self, s: &TryStatement<'a>) { self.enter_nesting(s.span.start); walk::walk_try_statement(self, s); self.exit_nesting(); }
-    fn visit_logical_expression(&mut self, e: &LogicalExpression<'a>) { self.bump_cc(1); walk::walk_logical_expression(self, e); }
-    fn visit_conditional_expression(&mut self, e: &oxc_ast::ast::ConditionalExpression<'a>) { self.bump_cc(1); walk::walk_conditional_expression(self, e); }
-    fn visit_binary_expression(&mut self, e: &oxc_ast::ast::BinaryExpression<'a>) { check_tautology_binary(self, e); walk::walk_binary_expression(self, e); }
+    fn visit_try_statement(&mut self, s: &TryStatement<'a>) {
+        self.enter_nesting(s.span.start);
+        walk::walk_try_statement(self, s);
+        self.exit_nesting();
+    }
+    fn visit_logical_expression(&mut self, e: &LogicalExpression<'a>) {
+        self.bump_cc(1);
+        walk::walk_logical_expression(self, e);
+    }
+    fn visit_conditional_expression(&mut self, e: &oxc_ast::ast::ConditionalExpression<'a>) {
+        self.bump_cc(1);
+        walk::walk_conditional_expression(self, e);
+    }
+    fn visit_binary_expression(&mut self, e: &oxc_ast::ast::BinaryExpression<'a>) {
+        check_tautology_binary(self, e);
+        walk::walk_binary_expression(self, e);
+    }
 }

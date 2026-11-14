@@ -53,9 +53,13 @@ fn collect_resolved_edges(
 ) {
     for specifier in imports {
         if let Some(target_file) = resolve_relative_ts_import(source_file, specifier, known_files) {
-            edge_list.push(vec![String::from(source_file), String::from(target_file)]);
+            push_resolved_edge(source_file, target_file, edge_list);
         }
     }
+}
+
+fn push_resolved_edge(source_file: &str, target_file: &str, edge_list: &mut Vec<Vec<String>>) {
+    edge_list.push(vec![String::from(source_file), String::from(target_file)]);
 }
 
 fn append_cycle_finding(cycle: &[String], findings: &mut Vec<AuditFinding>) -> FractalResult<()> {
@@ -66,7 +70,10 @@ fn append_cycle_finding(cycle: &[String], findings: &mut Vec<AuditFinding>) -> F
             AuditSeverity::Warning,
             root_file,
             1,
-            format!("Circular module dependency cycle detected: {}", cycle.join(" -> ")),
+            format!(
+                "Circular module dependency cycle detected: {}",
+                cycle.join(" -> ")
+            ),
         )?);
     }
     Ok(())

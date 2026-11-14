@@ -1,7 +1,7 @@
 //! Module: fg-gate — Physical Hygiene Pattern Matchers & Secret Guards
 //! File Path: crates/fg-gate/src/audit_engine/hygiene_expert/patterns.rs
 //! Architecture Role: Per-line static checks for merge conflicts, forbidden indentation, local path
-//!   leaks, credential token patterns, and banned sprint markers inside comments.
+//!   leaks, credential token patterns, and banned task markers inside comments.
 //! Dependencies & Triggers: Called by `hygiene_expert::scan_lines_hygiene`.
 //! Responsibilities: Group line scan arguments cleanly (`LineScanContext`) and avoid raw pattern
 //!   literals that self-trigger `PATH-LEAK` or `SECRET-LEAK` scanners.
@@ -77,7 +77,10 @@ pub(crate) fn inspect_single_line_patterns(
             String::from("Potential hardcoded secret, API token, or private key literal detected"),
         )?;
     }
-    if !ctx.skip_path_checks && is_pure_comment_line(ctx.trimmed) && contains_banned_marker(ctx.trimmed) {
+    if !ctx.skip_path_checks
+        && is_pure_comment_line(ctx.trimmed)
+        && contains_banned_marker(ctx.trimmed)
+    {
         record_finding(
             findings,
             "CMT-TRM-001",
@@ -140,9 +143,11 @@ fn contains_banned_marker(trimmed: &str) -> bool {
     let raw = trimmed.as_bytes();
     TOKENS.iter().any(|token| {
         trimmed.find(token).is_some_and(|pos| {
-            let before_ok = pos == 0 || (!raw[pos - 1].is_ascii_alphanumeric() && raw[pos - 1] != b'_');
+            let before_ok =
+                pos == 0 || (!raw[pos - 1].is_ascii_alphanumeric() && raw[pos - 1] != b'_');
             let end = pos + token.len();
-            let after_ok = end >= raw.len() || (!raw[end].is_ascii_alphanumeric() && raw[end] != b'_');
+            let after_ok =
+                end >= raw.len() || (!raw[end].is_ascii_alphanumeric() && raw[end] != b'_');
             before_ok && after_ok
         })
     })

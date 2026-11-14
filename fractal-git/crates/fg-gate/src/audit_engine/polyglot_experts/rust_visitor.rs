@@ -78,7 +78,13 @@ impl<'a> RustSynVisitor<'a> {
         if !Self::has_doc_comment(attrs) {
             let line = self.find_pattern_line(ident);
             let message = format!("Public Rust {kind_label} missing Rustdoc comment (///)");
-            self.emit("CMT-DOC-001", "comments", AuditSeverity::Warning, line, &message);
+            self.emit(
+                "CMT-DOC-001",
+                "comments",
+                AuditSeverity::Warning,
+                line,
+                &message,
+            );
         }
     }
 

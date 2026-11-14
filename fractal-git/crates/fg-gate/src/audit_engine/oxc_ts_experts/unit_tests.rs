@@ -34,17 +34,29 @@ mod tests {
             "  if (a) { if (b) { if (c) { if (d) { if (e) { return 1; } } } } }\n",
             "  return 0;\n}\n"
         );
-        let slice = SnapshotFileSlice { rel_path: "src/nested.ts", content: code.as_bytes() };
+        let slice = SnapshotFileSlice {
+            rel_path: "src/nested.ts",
+            content: code.as_bytes(),
+        };
         let analysis = analyze_typescript_ast(&slice).expect("oxc analyze");
         assert!(analysis.max_nesting_depth >= 5);
-        assert!(analysis.findings.iter().any(|f| f.rule_id == "CPX-NEST-001"));
-        assert!(analysis.findings.iter().any(|f| f.rule_id == "SIM-ARGS-001"));
+        assert!(analysis
+            .findings
+            .iter()
+            .any(|f| f.rule_id == "CPX-NEST-001"));
+        assert!(analysis
+            .findings
+            .iter()
+            .any(|f| f.rule_id == "SIM-ARGS-001"));
     }
 
     #[test]
     fn oxc_exempts_top_level_tests_dir_from_any_and_jsdoc_noise() {
         let code = b"export function helper(payload: any) {\n  return payload;\n}\n";
-        let slice = SnapshotFileSlice { rel_path: "tests/foo.ts", content: code };
+        let slice = SnapshotFileSlice {
+            rel_path: "tests/foo.ts",
+            content: code,
+        };
         let analysis = analyze_typescript_ast(&slice).expect("oxc test path");
         assert!(!analysis.findings.iter().any(|f| f.rule_id == "TSM-ANY-001"));
         assert!(!analysis.findings.iter().any(|f| f.rule_id == "CMT-DOC-001"));
