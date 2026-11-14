@@ -17,22 +17,22 @@ static func filter_radial_deadzone(
 	inner_deadzone: float = -1.0,
 	outer_deadzone: float = -1.0
 ) -> Vector2:
-	var cfg_inner := GameConfig.get_float("domains.hardware_input", "stick_deadzone/inner", 0.15)
-	var cfg_outer := GameConfig.get_float("domains.hardware_input", "stick_deadzone/outer", 0.95)
-	var inner := inner_deadzone if inner_deadzone >= 0.0 else cfg_inner
-	var outer := outer_deadzone if outer_deadzone >= 0.0 else cfg_outer
-	var raw_mag: float = raw_stick_vector.length()
-	if raw_mag <= inner:
+	var configured_inner := GameConfig.get_float("domains.hardware_input", "stick_deadzone/inner", 0.15)
+	var configured_outer := GameConfig.get_float("domains.hardware_input", "stick_deadzone/outer", 0.95)
+	var inner := inner_deadzone if inner_deadzone >= 0.0 else configured_inner
+	var outer := outer_deadzone if outer_deadzone >= 0.0 else configured_outer
+	var raw_magnitude: float = raw_stick_vector.length()
+	if raw_magnitude <= inner:
 		return Vector2.ZERO
 
-	if raw_mag >= outer:
+	if raw_magnitude >= outer:
 		return raw_stick_vector.normalized()
 
 	# L1（）：死区区间守卫（Inv-VD-1）——outer<=inner（倒置/相等配置/热重载）时
 	# 旧实现分母 ≤0 → 除零或负 magnitude（标量反向后摇杆反向）；下限 EPS 只防崩溃不改正常映射精度
 	var deadzone_span := maxf(0.01, outer - inner)
-	var normalized_mag: float = (raw_mag - inner) / deadzone_span
-	return raw_stick_vector.normalized() * normalized_mag
+	var normalized_magnitude: float = (raw_magnitude - inner) / deadzone_span
+	return raw_stick_vector.normalized() * normalized_magnitude
 
 ## 设备输入事件分派：按键类型 → 活跃设备热切换（返回是否发生切换）
 static func handle_device_input_event(
@@ -40,7 +40,7 @@ static func handle_device_input_event(
 	event_source_type: String,
 	current_timestamp_ms: int
 ) -> bool:
-	var prev_device: Variant = state.current_device
+	var previous_device: Variant = state.current_device
 	match event_source_type.to_upper():
 		"JOYPAD_MOTION", "JOYPAD_BUTTON":
 			state.current_device = InputDeviceStateAggregate.ActiveInputDevice.GAMEPAD_CONTROLLER
@@ -50,4 +50,4 @@ static func handle_device_input_event(
 			state.current_device = InputDeviceStateAggregate.ActiveInputDevice.TOUCH_SCREEN
 
 	state.last_input_timestamp_ms = current_timestamp_ms
-	return prev_device != state.current_device # 返回是否发生设备热切换
+	return previous_device != state.current_device # 返回是否发生设备热切换

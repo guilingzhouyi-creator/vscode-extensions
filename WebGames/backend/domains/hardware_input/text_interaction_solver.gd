@@ -11,13 +11,13 @@
 class_name TextInteractionSolver extends RefCounted
 
 ## 鼠标点击命中：点击坐标是否落在文字热区内（配置化灵敏度扩展）
-static func hit_test_mouse_click(click_pos: Vector2, hot_area: Rect2, sensitivity: float = -1.0) -> bool:
+static func hit_test_mouse_click(click_position: Vector2, hot_area: Rect2, sensitivity: float = -1.0) -> bool:
 	if hot_area.size == Vector2.ZERO:
 		return false
-	var sens: float = sensitivity if sensitivity >= 0.0 else GameConfig.get_float("domains.hardware_input", "mouse/sensitivity_scalar", 1.0)
+	var effective_sensitivity: float = sensitivity if sensitivity >= 0.0 else GameConfig.get_float("domains.hardware_input", "mouse/sensitivity_scalar", 1.0)
 	var expand_ratio: float = GameConfig.get_float("domains.hardware_input", "mouse/click_hot_area_expand_ratio", 0.1)
-	var expanded: Rect2 = hot_area.grow(hot_area.size.length() * (sens - 1.0) * expand_ratio)
-	return expanded.has_point(click_pos)
+	var expanded: Rect2 = hot_area.grow(hot_area.size.length() * (effective_sensitivity - 1.0) * expand_ratio)
+	return expanded.has_point(click_position)
 
 ## 键盘快捷键分发：action_name → 绑定表（配置驱动，可重绑定）
 static func dispatch_shortcut(action_name: String, state: InputDeviceStateAggregate) -> Dictionary:
@@ -40,11 +40,11 @@ static func handle_hardware_event(state: InputDeviceStateAggregate, event_type: 
 
 ## 文案：取快捷键提示（配置驱动，未命中回退键名）
 static func shortcut_prompt(action_name: String, state: InputDeviceStateAggregate) -> String:
-	var res := dispatch_shortcut(action_name, state)
-	if not res.success:
+	var dispatch_result := dispatch_shortcut(action_name, state)
+	if not dispatch_result.success:
 		return "[%s]" % action_name
-	var bindings: Array = res.bindings
-	for b in bindings:
-		if String(b).begins_with("Key_"):
-			return "[%s]" % String(b).replace("Key_", "")
+	var bindings: Array = dispatch_result.bindings
+	for binding in bindings:
+		if String(binding).begins_with("Key_"):
+			return "[%s]" % String(binding).replace("Key_", "")
 	return "[%s]" % String(bindings[0]) if not bindings.is_empty() else "[%s]" % action_name

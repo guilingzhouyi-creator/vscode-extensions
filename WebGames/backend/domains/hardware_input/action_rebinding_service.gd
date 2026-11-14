@@ -21,11 +21,11 @@ static func rebind_action(
 	if not state.action_mappings.has(action_name):
 		state.action_mappings[action_name] = []
 
-	var arr: Array = state.action_mappings[action_name]
-	if binding_index >= 0 and binding_index < arr.size():
-		arr[binding_index] = new_binding
+	var bindings: Array = state.action_mappings[action_name]
+	if binding_index >= 0 and binding_index < bindings.size():
+		bindings[binding_index] = new_binding
 		return true
-	elif binding_index == arr.size():
-		arr.append(new_binding)
+	elif binding_index == bindings.size():
+		bindings.append(new_binding)
 		return true
 	return false

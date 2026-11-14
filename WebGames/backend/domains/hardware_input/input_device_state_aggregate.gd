@@ -51,23 +51,23 @@ static func _merge_joypad_keys(raw_keys: Array, existing: Array) -> Array:
 const EMPTY_KEY_ARRAY: Array = []
 
 func _init() -> void:
-	var cfg_shortcuts: Dictionary = GameConfig.get_dict("domains.hardware_input", "keyboard_shortcuts", {})
-	for act_key in cfg_shortcuts.keys():
-		var raw_keys: Variant = cfg_shortcuts[act_key]
+	var configured_shortcuts: Dictionary = GameConfig.get_dict("domains.hardware_input", "keyboard_shortcuts", {})
+	for action_key in configured_shortcuts.keys():
+		var raw_keys: Variant = configured_shortcuts[action_key]
 		if raw_keys is Array:
-			var existing: Array = action_mappings.get(act_key, EMPTY_KEY_ARRAY)
-			action_mappings[str(act_key)] = _merge_joypad_keys(raw_keys as Array, existing)
+			var existing: Array = action_mappings.get(action_key, EMPTY_KEY_ARRAY)
+			action_mappings[str(action_key)] = _merge_joypad_keys(raw_keys as Array, existing)
 
 ## 解析 ESC 菜单栏动作路由配置（domains.hardware_input escape_menu_actions）
 static func resolve_escape_menu_action(action_key: String) -> Dictionary:
-	var menu_cfg: Dictionary = GameConfig.get_dict("domains.hardware_input", "escape_menu_actions", {})
-	if not menu_cfg.has(action_key):
+	var menu_config: Dictionary = GameConfig.get_dict("domains.hardware_input", "escape_menu_actions", {})
+	if not menu_config.has(action_key):
 		return {"success": false, "error_code": "UNKNOWN_ESCAPE_ACTION", "action_key": action_key}
-	var entry: Dictionary = menu_cfg[action_key]
-	var out := entry.duplicate(true)
-	out["success"] = true
-	out["action_key"] = action_key
-	return out
+	var entry: Dictionary = menu_config[action_key]
+	var action_payload := entry.duplicate(true)
+	action_payload["success"] = true
+	action_payload["action_key"] = action_key
+	return action_payload
 
 ## 按当前设备输出 UI 按键提示（手柄/键鼠各自首选绑定，空映射返回问号标识）
 func get_ui_button_prompt(action_name: String) -> String:
@@ -75,12 +75,12 @@ func get_ui_button_prompt(action_name: String) -> String:
 	if bindings.is_empty():
 		return "[?]"
 	if current_device == ActiveInputDevice.GAMEPAD_CONTROLLER:
-		for b in bindings:
-			if b.begins_with("Joypad_"):
-				return "(%s)" % b.replace("Joypad_", "")
+		for binding in bindings:
+			if binding.begins_with("Joypad_"):
+				return "(%s)" % binding.replace("Joypad_", "")
 		return "(A)"
 	else:
-		for b in bindings:
-			if b.begins_with("Key_"):
-				return "[%s]" % b.replace("Key_", "")
+		for binding in bindings:
+			if binding.begins_with("Key_"):
+				return "[%s]" % binding.replace("Key_", "")
 		return "[E]"
