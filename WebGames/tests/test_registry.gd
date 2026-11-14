@@ -165,6 +165,8 @@ const TestFullChainBackendProtocolAndLifecyclePipeline = preload("res://tests/in
 const TestAccountRegistrationAndRealReloadPipeline = preload("res://tests/integration/pipelines/test_account_registration_and_real_reload_pipeline.gd")
 # 客户端交互协议空间标准化与边界适配器验收流水线
 const TestClientProtocolSpaceAndBoundaryPipeline = preload("res://tests/integration/pipelines/test_client_protocol_space_and_boundary_pipeline.gd")
+# Tier 3 MOD 运行时差分加载、统一磁盘发现与结构化诊断验收流水线
+const TestTier3ContentOverridePipeline = preload("res://tests/integration/pipelines/test_tier3_content_override_pipeline.gd")
 
 # 前端 17 大系统白模与表现层测试套件
 const TestFE01AccountEntry = preload("res://tests/unit/frontend/test_fe_01_account_entry.gd")
@@ -268,10 +270,11 @@ static func get_all_test_classes() -> Array:
 		TestFullLifecycleChainAndEscFlowPipeline,
 		TestFullChainBackendProtocolAndLifecyclePipeline,
 		TestAccountRegistrationAndRealReloadPipeline,
-		TestClientProtocolSpaceAndBoundaryPipeline
+		TestClientProtocolSpaceAndBoundaryPipeline,
+		TestTier3ContentOverridePipeline
 	]
 
-## 前端测试套件（17 大系统 + 6 前端基建与边界套件 = 23；全域 116 后端与横切 + 23 前端 = 139 套件）
+## 前端测试套件（17 大系统 + 6 前端基建与边界套件 = 23；全域 117 后端与横切 + 23 前端 = 140 套件）
 static func get_frontend_test_classes() -> Array:
 	return [
 		TestFE01AccountEntry, TestFE02MainHUD, TestFE03CharacterProgression,
@@ -285,7 +288,7 @@ static func get_frontend_test_classes() -> Array:
 		TestFrontendRobustness, TestFrontendErrorDomain
 	]
 
-## 全域测试套件（后端业务域 + 横切基础设施 + 前端 23 = 全域共 139 套件）
+## 全域测试套件（后端业务域 + 横切基础设施 + 前端 23 = 全域共 140 套件）
 static func get_all_engine_test_classes() -> Array:
 	var list := get_all_test_classes()
 	list.append_array(get_frontend_test_classes())
