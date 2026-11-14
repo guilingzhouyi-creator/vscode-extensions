@@ -1,0 +1,192 @@
+[gd_scene load_steps=2 format=3 uid="uid://c8worldgateway1"]
+
+[ext_resource type="Script" path="res://frontend/views/world_gateway/world_gateway_view.gd" id="1_world_gateway"]
+
+[node name="WorldGatewayView" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_world_gateway")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.06, 0.08, 0.12, 1)
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 20
+
+[node name="MainVBox" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="HeaderPanel" type="PanelContainer" parent="Margin/MainVBox"]
+layout_mode = 2
+
+[node name="HeaderHBox" type="HBoxContainer" parent="Margin/MainVBox/HeaderPanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="Margin/MainVBox/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 24
+text = "WORLD GATEWAY"
+
+[node name="ModeStatusLabel" type="Label" parent="Margin/MainVBox/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "SINGLE_PLAYER"
+
+[node name="SwitchModeBtn" type="Button" parent="Margin/MainVBox/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "SWITCH MODE"
+
+[node name="OpenModWorkbenchBtn" type="Button" parent="Margin/MainVBox/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "MOD WORKBENCH"
+
+[node name="LogoutAccountBtn" type="Button" parent="Margin/MainVBox/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "LOGOUT"
+
+[node name="QuitGameBtn" type="Button" parent="Margin/MainVBox/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "QUIT"
+
+[node name="BaseModBannerLabel" type="Label" parent="Margin/MainVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 2
+text = ""
+
+[node name="ModeTabContainer" type="TabContainer" parent="Margin/MainVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="SinglePlayerTab" type="HBoxContainer" parent="Margin/MainVBox/ModeTabContainer"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="WorldListVBox" type="VBoxContainer" parent="Margin/MainVBox/ModeTabContainer/SinglePlayerTab"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="WorldListHeaderLabel" type="Label" parent="Margin/MainVBox/ModeTabContainer/SinglePlayerTab/WorldListVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "SAVED WORLDS"
+
+[node name="WorldArchiveList" type="ItemList" parent="Margin/MainVBox/ModeTabContainer/SinglePlayerTab/WorldListVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="WorldCreateHBox" type="HBoxContainer" parent="Margin/MainVBox/ModeTabContainer/SinglePlayerTab/WorldListVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="NewWorldIdEdit" type="LineEdit" parent="Margin/MainVBox/ModeTabContainer/SinglePlayerTab/WorldListVBox/WorldCreateHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "world_id"
+
+[node name="CreateWorldBtn" type="Button" parent="Margin/MainVBox/ModeTabContainer/SinglePlayerTab/WorldListVBox/WorldCreateHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "CREATE WORLD"
+
+[node name="WorldDetailVBox" type="VBoxContainer" parent="Margin/MainVBox/ModeTabContainer/SinglePlayerTab"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="WorldDetailTitleLabel" type="Label" parent="Margin/MainVBox/ModeTabContainer/SinglePlayerTab/WorldDetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "WORLD DIAGNOSTICS"
+
+[node name="WorldDetailRichLabel" type="RichTextLabel" parent="Margin/MainVBox/ModeTabContainer/SinglePlayerTab/WorldDetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = true
+
+[node name="WorldActionsHBox" type="HBoxContainer" parent="Margin/MainVBox/ModeTabContainer/SinglePlayerTab/WorldDetailVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="EnterWorldBtn" type="Button" parent="Margin/MainVBox/ModeTabContainer/SinglePlayerTab/WorldDetailVBox/WorldActionsHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "ENTER WORLD"
+
+[node name="DeleteWorldBtn" type="Button" parent="Margin/MainVBox/ModeTabContainer/SinglePlayerTab/WorldDetailVBox/WorldActionsHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "DELETE WORLD"
+
+[node name="RefreshWorldsBtn" type="Button" parent="Margin/MainVBox/ModeTabContainer/SinglePlayerTab/WorldDetailVBox/WorldActionsHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "REFRESH"
+
+[node name="MultiplayerTab" type="VBoxContainer" parent="Margin/MainVBox/ModeTabContainer"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="RealmListHeaderLabel" type="Label" parent="Margin/MainVBox/ModeTabContainer/MultiplayerTab"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "REMOTE REALMS"
+
+[node name="RemoteRealmList" type="ItemList" parent="Margin/MainVBox/ModeTabContainer/MultiplayerTab"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="RealmDigestStatusLabel" type="Label" parent="Margin/MainVBox/ModeTabContainer/MultiplayerTab"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 2
+text = ""
+
+[node name="RealmActionsHBox" type="HBoxContainer" parent="Margin/MainVBox/ModeTabContainer/MultiplayerTab"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="VerifyRealmBtn" type="Button" parent="Margin/MainVBox/ModeTabContainer/MultiplayerTab/RealmActionsHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "VERIFY DIGEST & JOIN"
+
+[node name="RefreshRealmsBtn" type="Button" parent="Margin/MainVBox/ModeTabContainer/MultiplayerTab/RealmActionsHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "REFRESH REALMS"
