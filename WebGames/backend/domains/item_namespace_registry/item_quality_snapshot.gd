@@ -89,11 +89,11 @@ func to_dto() -> Dictionary:
 
 ## 从字典反序列化还原（缺省字段回退默认等级与权重）
 static func from_dto(data: Dictionary) -> ItemQualitySnapshot:
-	var snap := ItemQualitySnapshot.new()
-	snap.canonical_id = str(data.get("canonical_id", ""))
-	snap.tier = int(data.get("tier", QualityTier.COMMON))
-	snap.mythic_interval = int(data.get("mythic_interval", MythicInterval.NONE))
-	snap.tier_level = int(data.get("tier_level", tier_to_level(snap.tier)))
-	snap.strength_weight = float(data.get("strength_weight", 1.0))
-	snap.rarity_weight = float(data.get("rarity_weight", 1.0))
-	return snap
+	var snapshot := ItemQualitySnapshot.new()
+	snapshot.canonical_id = str(data.get("canonical_id", ""))
+	snapshot.tier = int(data.get("tier", QualityTier.COMMON))
+	snapshot.mythic_interval = int(data.get("mythic_interval", MythicInterval.NONE))
+	snapshot.tier_level = int(data.get("tier_level", tier_to_level(snapshot.tier)))
+	snapshot.strength_weight = float(data.get("strength_weight", 1.0))
+	snapshot.rarity_weight = float(data.get("rarity_weight", 1.0))
+	return snapshot

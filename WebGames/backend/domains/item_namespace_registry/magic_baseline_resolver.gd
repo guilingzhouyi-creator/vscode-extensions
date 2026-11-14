@@ -35,17 +35,17 @@ func resolve(magic_form: int, magic_rank: int, mana_aptitude: int, profession_ra
 		return {"success": false, "code": "REGISTRY_NOT_READY"}
 	if not MagicTierSnapshot.is_god_form_pair_valid(magic_rank, magic_form):
 		return {"success": false, "code": "SUPERTIER_FORM_MISMATCH"}
-	var rank_bl: Dictionary = _registry.get_rank_baseline(magic_rank)
-	if rank_bl.is_empty():
+	var rank_baseline: Dictionary = _registry.get_rank_baseline(magic_rank)
+	if rank_baseline.is_empty():
 		return {"success": false, "code": "UNREGISTERED_RANK"}
-	var form_bl: Dictionary = _registry.get_form_baseline(magic_form)
-	if form_bl.is_empty():
+	var form_baseline: Dictionary = _registry.get_form_baseline(magic_form)
+	if form_baseline.is_empty():
 		return {"success": false, "code": "UNREGISTERED_FORM"}
-	var aptitude_bl: Dictionary = _registry.get_aptitude_baseline(mana_aptitude)
-	if aptitude_bl.is_empty():
+	var aptitude_baseline: Dictionary = _registry.get_aptitude_baseline(mana_aptitude)
+	if aptitude_baseline.is_empty():
 		return {"success": false, "code": "UNREGISTERED_APTITUDE"}
-	var profession_bl: Dictionary = _registry.get_profession_rank_baseline(profession_rank)
-	if profession_bl.is_empty():
+	var profession_baseline: Dictionary = _registry.get_profession_rank_baseline(profession_rank)
+	if profession_baseline.is_empty():
 		return {"success": false, "code": "UNREGISTERED_PROFESSION"}
 	return {
 		"success": true,
@@ -55,18 +55,18 @@ func resolve(magic_form: int, magic_rank: int, mana_aptitude: int, profession_ra
 		"rank_band": MagicRankBandResolver.rank_to_band(magic_rank, _registry),
 		"mana_aptitude": mana_aptitude,
 		"profession_rank": profession_rank,
-		"strength_weight": rank_bl.get("strength_weight", 1.0),
-		"phase_loss_min": form_bl.get("phase_loss_min", 0.0),
-		"phase_loss_max": form_bl.get("phase_loss_max", 0.0),
-		"backfire_threshold": aptitude_bl.get("backfire_threshold", 1),
-		"magic_domain": profession_bl.get("magic_domain", false),
+		"strength_weight": rank_baseline.get("strength_weight", 1.0),
+		"phase_loss_min": form_baseline.get("phase_loss_min", 0.0),
+		"phase_loss_max": form_baseline.get("phase_loss_max", 0.0),
+		"backfire_threshold": aptitude_baseline.get("backfire_threshold", 1),
+		"magic_domain": profession_baseline.get("magic_domain", false),
 	}
 
 # ==============================================================================
 # 三、便捷查询
 # ==============================================================================
 
-## 便捷查询：直接取位阶强度权重（未登记/未就绪安全兜底 1.0，不抛 Fatal）
+## 便捷查询：直接取位阶强度权重（未登记/未就绪安全回退 1.0，不抛 Fatal）
 func get_strength_weight(magic_rank: int) -> float:
 	var result := resolve(
 		MagicTierSnapshot.MagicForm.INCANTATION,

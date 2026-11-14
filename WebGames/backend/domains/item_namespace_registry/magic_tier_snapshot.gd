@@ -98,10 +98,10 @@ var backfire_threshold: int = 1        # 资质反噬阈值（配置驱动）
 # ==============================================================================
 
 ## 阶位单调映射：MagicRank -> 1~11（唯一事实源，严格递增，禁跨级倒置）。
-## 非法值返回 0（显式未登记哨兵——不静默伪装为一阶；仅展示层允许配置化安全兜底）
+## 非法值返回 0（显式未登记哨兵——不静默伪装为一阶；仅展示层允许配置化安全回退）
 static func rank_to_level(rank: MagicRank) -> int:
-	var v: int = int(rank)
-	return v if v >= 1 and v <= 11 else 0
+	var rank_value: int = int(rank)
+	return rank_value if rank_value >= 1 and rank_value <= 11 else 0
 
 ## 高阶位阶判定（RANK_10 / RANK_11，即能力分级真神区间 9~11 的高端）
 static func is_god_rank(rank: MagicRank) -> bool:
@@ -139,16 +139,16 @@ func to_dto() -> Dictionary:
 
 ## 从字典反序列化还原（缺省字段回退默认枚举与权重）
 static func from_dto(data: Dictionary) -> MagicTierSnapshot:
-	var snap := MagicTierSnapshot.new()
-	snap.canonical_id = str(data.get("canonical_id", ""))
-	snap.magic_form = int(data.get("magic_form", MagicForm.INCANTATION))
-	snap.magic_rank = int(data.get("magic_rank", MagicRank.RANK_1))
-	snap.ability_tier = int(data.get("ability_tier", AbilityTier.ESP))
-	snap.rank_band = int(data.get("rank_band", MagicRankBand.LOW))
-	snap.mana_aptitude = int(data.get("mana_aptitude", ManaAptitude.MANA_ADAPTOR))
-	snap.profession_rank = int(data.get("profession_rank", ProfessionRank.NOVICE_MAGE))
-	snap.strength_weight = float(data.get("strength_weight", 1.0))
-	snap.phase_loss_min = float(data.get("phase_loss_min", 0.0))
-	snap.phase_loss_max = float(data.get("phase_loss_max", 0.0))
-	snap.backfire_threshold = int(data.get("backfire_threshold", 1))
-	return snap
+	var snapshot := MagicTierSnapshot.new()
+	snapshot.canonical_id = str(data.get("canonical_id", ""))
+	snapshot.magic_form = int(data.get("magic_form", MagicForm.INCANTATION))
+	snapshot.magic_rank = int(data.get("magic_rank", MagicRank.RANK_1))
+	snapshot.ability_tier = int(data.get("ability_tier", AbilityTier.ESP))
+	snapshot.rank_band = int(data.get("rank_band", MagicRankBand.LOW))
+	snapshot.mana_aptitude = int(data.get("mana_aptitude", ManaAptitude.MANA_ADAPTOR))
+	snapshot.profession_rank = int(data.get("profession_rank", ProfessionRank.NOVICE_MAGE))
+	snapshot.strength_weight = float(data.get("strength_weight", 1.0))
+	snapshot.phase_loss_min = float(data.get("phase_loss_min", 0.0))
+	snapshot.phase_loss_max = float(data.get("phase_loss_max", 0.0))
+	snapshot.backfire_threshold = int(data.get("backfire_threshold", 1))
+	return snapshot

@@ -39,7 +39,7 @@ class ItemPrototypeTemplate extends RefCounted:
 	var category_major: String = CATEGORY_MAJOR_EQUIPMENT
 	var category_minor: String = GameConfig.get_string("domains.item_namespace_registry", "defaults/category_minor", "WEAPON_BLADE")
 	var tier_rank: int = GameConfig.get_int("domains.item_namespace_registry", "defaults/tier_rank", DEFAULT_TIER_RANK)                     # 品阶 (1:普通, 2:精良, 3:稀有, 4:史诗, 5:传说, 6:神圣)
-	var quality_tier: int = -1     # 品质等级 (: 1普通~6古代；-1=未声明，默认不参与解析)
+	var quality_tier: int = -1     # 品质等级 (1普通~6古代；-1=未声明，默认不参与解析)
 	var mythic_interval: int = 0   # 神话区间端点 (0=无, 1=准神器, 2=真神器；仅 quality_tier=5 神话级生效)
 	var default_mass_kg: float = GameConfig.get_float("domains.item_namespace_registry", "defaults/default_mass_kg", DEFAULT_MASS_KG)
 	var default_volume_slots: int = GameConfig.get_int("domains.item_namespace_registry", "defaults/default_volume_slots", DEFAULT_VOLUME_SLOTS)
@@ -48,29 +48,29 @@ class ItemPrototypeTemplate extends RefCounted:
 
 	## 构造：全量注入（english_name 注册前小写归一，杜绝大小写冲突）
 	func _init(
-		p_id: String = "",
-		p_num: int = 0,
-		p_loc_name: String = "",
-		p_major: String = CATEGORY_MAJOR_EQUIPMENT,
-		p_minor: String = "WEAPON_BLADE",
-		p_tier: int = DEFAULT_TIER_RANK,
-		p_mass: float = DEFAULT_MASS_KG,
-		p_vol: int = DEFAULT_VOLUME_SLOTS,
-		p_price: int = DEFAULT_MARKET_VALUE,
-		p_aliases: Array = [],
-		p_english: String = ""
+		initial_canonical_id: String = "",
+		initial_numeric_id: int = 0,
+		initial_loc_name_key: String = "",
+		initial_category_major: String = CATEGORY_MAJOR_EQUIPMENT,
+		initial_category_minor: String = "WEAPON_BLADE",
+		initial_tier_rank: int = DEFAULT_TIER_RANK,
+		initial_mass_kg: float = DEFAULT_MASS_KG,
+		initial_volume_slots: int = DEFAULT_VOLUME_SLOTS,
+		initial_market_value: int = DEFAULT_MARKET_VALUE,
+		initial_aliases: Array = [],
+		initial_english_name: String = ""
 	) -> void:
-		canonical_id = p_id
-		english_name = p_english.strip_edges().to_lower()  # 注册前归一：查重/索引/解析统一小写，杜绝大小写冲突
-		numeric_id = p_num
-		loc_name_key = p_loc_name
-		category_major = p_major
-		category_minor = p_minor
-		tier_rank = p_tier
-		default_mass_kg = p_mass
-		default_volume_slots = p_vol
-		base_market_value = p_price
-		search_aliases = p_aliases
+		canonical_id = initial_canonical_id
+		english_name = initial_english_name.strip_edges().to_lower()  # 注册前归一：查重/索引/解析统一小写，杜绝大小写冲突
+		numeric_id = initial_numeric_id
+		loc_name_key = initial_loc_name_key
+		category_major = initial_category_major
+		category_minor = initial_category_minor
+		tier_rank = initial_tier_rank
+		default_mass_kg = initial_mass_kg
+		default_volume_slots = initial_volume_slots
+		base_market_value = initial_market_value
+		search_aliases = initial_aliases
 
 # ==============================================================================
 # 三、注册表索引状态

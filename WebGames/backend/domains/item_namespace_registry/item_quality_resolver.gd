@@ -40,28 +40,28 @@ func resolve(canonical_id: String, declared_tier: int, declared_interval: int) -
 	var interval_baseline: Dictionary = {}
 	if declared_interval != ItemQualitySnapshot.MythicInterval.NONE:
 		interval_baseline = _registry.get_mythic_interval_baseline(declared_interval)
-	var snap := ItemQualitySnapshot.new()
-	snap.canonical_id = canonical_id
-	snap.tier = declared_tier
-	snap.mythic_interval = declared_interval
-	snap.tier_level = ItemQualitySnapshot.tier_to_level(declared_tier)
-	snap.strength_weight = float(interval_baseline.get("strength_weight", baseline.get("strength_weight", 1.0)))
-	snap.rarity_weight = float(interval_baseline.get("rarity_weight", baseline.get("rarity_weight", 1.0)))
+	var snapshot := ItemQualitySnapshot.new()
+	snapshot.canonical_id = canonical_id
+	snapshot.tier = declared_tier
+	snapshot.mythic_interval = declared_interval
+	snapshot.tier_level = ItemQualitySnapshot.tier_to_level(declared_tier)
+	snapshot.strength_weight = float(interval_baseline.get("strength_weight", baseline.get("strength_weight", 1.0)))
+	snapshot.rarity_weight = float(interval_baseline.get("rarity_weight", baseline.get("rarity_weight", 1.0)))
 	return {
 		"success": true,
-		"snapshot": snap.to_dto(),
+		"snapshot": snapshot.to_dto(),
 		"canonical_id": canonical_id,
 		"tier": declared_tier,
 		"mythic_interval": declared_interval,
-		"strength_weight": snap.strength_weight,
-		"rarity_weight": snap.rarity_weight,
+		"strength_weight": snapshot.strength_weight,
+		"rarity_weight": snapshot.rarity_weight,
 	}
 
 # ==============================================================================
 # 三、便捷查询
 # ==============================================================================
 
-## 便捷查询：直接取强度基线（未登记/未就绪返回安全兜底 1.0，不抛 Fatal）
+## 便捷查询：直接取强度基线（未登记/未就绪返回安全回退 1.0，不抛 Fatal）
 func get_strength_weight(canonical_id: String, declared_tier: int, declared_interval: int) -> float:
 	var result := resolve(canonical_id, declared_tier, declared_interval)
 	return float(result.get("strength_weight", 1.0))

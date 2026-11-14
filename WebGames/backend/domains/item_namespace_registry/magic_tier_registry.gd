@@ -33,36 +33,36 @@ var _ready: bool = false
 
 ## 重载全量魔法基线配置（阶位/能力分级/档次/资质/形态/称号），校验不变量后装配索引并登记名称键
 func reload_configuration() -> void:
-	# 严格类型化取值器 + 安全兜底（禁 Variant get_value）
-	var ranks_cfg: Dictionary = GameConfig.get_dict(CONFIG_TABLE, "rank_gradient", {})
-	var tiers_cfg: Dictionary = GameConfig.get_dict(CONFIG_TABLE, "ability_tiers", {})
-	var bands_cfg: Dictionary = GameConfig.get_dict(CONFIG_TABLE, "rank_bands", {})
-	var aptitudes_cfg: Dictionary = GameConfig.get_dict(CONFIG_TABLE, "mana_aptitudes", {})
-	var forms_cfg: Dictionary = GameConfig.get_dict(CONFIG_TABLE, "magic_forms", {})
-	var professions_cfg: Dictionary = GameConfig.get_dict(CONFIG_TABLE, "profession_ranks", {})
+	# 严格类型化取值器 + 安全回退（禁 Variant get_value）
+	var ranks_config: Dictionary = GameConfig.get_dict(CONFIG_TABLE, "rank_gradient", {})
+	var tiers_config: Dictionary = GameConfig.get_dict(CONFIG_TABLE, "ability_tiers", {})
+	var bands_config: Dictionary = GameConfig.get_dict(CONFIG_TABLE, "rank_bands", {})
+	var aptitudes_config: Dictionary = GameConfig.get_dict(CONFIG_TABLE, "mana_aptitudes", {})
+	var forms_config: Dictionary = GameConfig.get_dict(CONFIG_TABLE, "magic_forms", {})
+	var professions_config: Dictionary = GameConfig.get_dict(CONFIG_TABLE, "profession_ranks", {})
 	_ranks.clear()
-	for key in ranks_cfg:
-		var entry: Dictionary = ranks_cfg[key]
+	for key in ranks_config:
+		var entry: Dictionary = ranks_config[key]
 		_ranks[int(entry.get("rank", 0))] = entry
 	_tiers.clear()
-	for key in tiers_cfg:
-		var entry: Dictionary = tiers_cfg[key]
+	for key in tiers_config:
+		var entry: Dictionary = tiers_config[key]
 		_tiers[int(entry.get("tier", 0))] = entry
 	_bands.clear()
-	for key in bands_cfg:
-		var entry: Dictionary = bands_cfg[key]
+	for key in bands_config:
+		var entry: Dictionary = bands_config[key]
 		_bands[int(entry.get("band", 0))] = entry
 	_aptitudes.clear()
-	for key in aptitudes_cfg:
-		var entry: Dictionary = aptitudes_cfg[key]
+	for key in aptitudes_config:
+		var entry: Dictionary = aptitudes_config[key]
 		_aptitudes[int(entry.get("aptitude", 0))] = entry
 	_forms.clear()
-	for key in forms_cfg:
-		var entry: Dictionary = forms_cfg[key]
+	for key in forms_config:
+		var entry: Dictionary = forms_config[key]
 		_forms[int(entry.get("form", 0))] = entry
 	_profession_ranks.clear()
-	for key in professions_cfg:
-		var entry: Dictionary = professions_cfg[key]
+	for key in professions_config:
+		var entry: Dictionary = professions_config[key]
 		_profession_ranks[int(entry.get("rank", 0))] = entry
 	_ready = _validate_invariants()
 	if _ready:
@@ -83,12 +83,12 @@ func _collect_tier_candidates_for_rank(rank: int) -> Array:
 
 func _find_band_for_rank(rank: int) -> int:
 	for band_key in _bands:
-		var b_entry: Dictionary = _bands[band_key]
-		var raw_interval: Variant = b_entry.get("interval")
+		var band_entry: Dictionary = _bands[band_key]
+		var raw_interval: Variant = band_entry.get("interval")
 		if raw_interval is Array:
-			var b_interval := raw_interval as Array
-			if b_interval.size() >= 2 and rank >= int(b_interval[0]) and rank <= int(b_interval[1]):
-				return int(b_entry.get("band", 0))
+			var band_interval := raw_interval as Array
+			if band_interval.size() >= 2 and rank >= int(band_interval[0]) and rank <= int(band_interval[1]):
+				return int(band_entry.get("band", 0))
 	return 0
 
 ## 装配期构建 rank 反查索引（能力分级候选 / 阶位档次）——
@@ -132,8 +132,8 @@ func _validate_ranks_continuity() -> bool:
 	for rank in _ranks:
 		rank_levels.append(int(_ranks[rank].get("level", 0)))
 	rank_levels.sort()
-	for i in range(rank_levels.size()):
-		if rank_levels[i] != i + 1:
+	for level_index in range(rank_levels.size()):
+		if rank_levels[level_index] != level_index + 1:
 			return false
 	return true
 
@@ -146,9 +146,9 @@ func _validate_tiers_intervals() -> bool:
 		var interval := raw_interval as Array
 		if interval.size() < 2:
 			return false
-		var interval_lo: int = int(interval[0])
-		var interval_hi: int = int(interval[1])
-		if interval_lo < 1 or interval_hi > 11 or interval_lo > interval_hi:
+		var interval_min: int = int(interval[0])
+		var interval_max: int = int(interval[1])
+		if interval_min < 1 or interval_max > 11 or interval_min > interval_max:
 			return false
 	return true
 
@@ -164,35 +164,35 @@ func _validate_bands_coverage() -> bool:
 		var interval := raw_interval as Array
 		if interval.size() < 2:
 			return false
-		var blo: int = int(interval[0])
-		var bhi: int = int(interval[1])
-		if blo < 1 or bhi > 11 or blo > bhi:
+		var band_min: int = int(interval[0])
+		var band_max: int = int(interval[1])
+		if band_min < 1 or band_max > 11 or band_min > band_max:
 			return false
-		band_intervals.append([blo, bhi])
+		band_intervals.append([band_min, band_max])
 	band_intervals.sort()
 	var cursor := 1
-	for iv in band_intervals:
-		if int(iv[0]) > cursor:
+	for band_range in band_intervals:
+		if int(band_range[0]) > cursor:
 			return false
-		cursor = max(cursor, int(iv[1]) + 1)
+		cursor = max(cursor, int(band_range[1]) + 1)
 	return cursor == 12
 
 func _validate_aptitudes_monotonicity() -> bool:
 	var thresholds: Array[int] = []
-	for a in _aptitudes:
-		thresholds.append(int(_aptitudes[a].get("backfire_threshold", 0)))
+	for aptitude_key in _aptitudes:
+		thresholds.append(int(_aptitudes[aptitude_key].get("backfire_threshold", 0)))
 	thresholds.sort()
-	for i in range(thresholds.size() - 1):
-		if thresholds[i] >= thresholds[i + 1]:
+	for threshold_index in range(thresholds.size() - 1):
+		if thresholds[threshold_index] >= thresholds[threshold_index + 1]:
 			return false
 	return true
 
 func _validate_profession_ranks() -> bool:
 	var seen_magic_domain := false
-	for rank_idx in range(1, 14):
-		if not _profession_ranks.has(rank_idx):
+	for rank_index in range(1, 14):
+		if not _profession_ranks.has(rank_index):
 			return false
-		var entry: Dictionary = _profession_ranks[rank_idx]
+		var entry: Dictionary = _profession_ranks[rank_index]
 		if entry.is_empty():
 			return false
 		var is_magic: bool = bool(entry.get("magic_domain", false))
@@ -204,10 +204,10 @@ func _validate_profession_ranks() -> bool:
 
 func _validate_forms_loss() -> bool:
 	for form in _forms:
-		var f_entry: Dictionary = _forms[form]
-		var f_lo: float = float(f_entry.get("phase_loss_min", 0.0))
-		var f_hi: float = float(f_entry.get("phase_loss_max", 0.0))
-		if not is_finite(f_lo) or not is_finite(f_hi) or f_lo > f_hi:
+		var form_entry: Dictionary = _forms[form]
+		var loss_min: float = float(form_entry.get("phase_loss_min", 0.0))
+		var loss_max: float = float(form_entry.get("phase_loss_max", 0.0))
+		if not is_finite(loss_min) or not is_finite(loss_max) or loss_min > loss_max:
 			return false
 	return true
 
@@ -256,7 +256,7 @@ func is_mana_gate_passed(aptitude: int) -> bool:
 # ==============================================================================
 
 ## 统一名称注册表接线：魔法 name_key 全量登记（域所有者 = magic）。
-## 英文兜底 = 键本体（英文即机器可读名）；跨域冲突 → 注册表拒绝就绪并告警。
+## 英文默认回退 = 键本体（英文即机器可读名）；跨域冲突 → 注册表拒绝就绪并告警。
 func _register_name_keys() -> void:
 	var shared := LocalizationRegistryCatalog.get_shared()
 	var collisions: Array = []
@@ -276,16 +276,16 @@ func _register_name_keys() -> void:
 		_ready = false
 		ErrorReporter.emit_warning("item_namespace_registry", "NAME_KEY_COLLISION", TemplateFormatter.format("MagicTierRegistry: cross-domain name key collisions: {collisions}", {"collisions": JSON.stringify(collisions)}))
 
-## 单条目名称键登记（域所有者 magic，英文兜底键本体；跨域冲突入列）
+## 单条目名称键登记（域所有者 magic，英文默认回退键本体；跨域冲突入列）
 func _register_one(shared: LocalizationRegistryCatalog, entry: Dictionary, collisions: Array) -> void:
 	var key: String = str(entry.get("name_key", ""))
 	if key.is_empty():
 		return
-	# 英文底座优先取词典文件值（config/i18n/en_US.json），未登记时兜底键本体
-	var en_name: String = str(shared._locale_dictionaries.get("en_US", {}).get(key, key))
-	var res := shared.register_name_key(key, "magic", en_name)
-	if not res.success:
-		collisions.append(res)
+	# 英文底座优先取词典文件值（config/i18n/en_US.json），未登记时默认回退键本体
+	var english_name: String = str(shared._locale_dictionaries.get("en_US", {}).get(key, key))
+	var register_result := shared.register_name_key(key, "magic", english_name)
+	if not register_result.success:
+		collisions.append(register_result)
 
 ## 按配置节与整数字段从 domains.magic_tiers 查询单条基线条目（未命中返回空字典）
 static func lookup_config_entry(section: String, id_field: String, target_id: int) -> Dictionary:

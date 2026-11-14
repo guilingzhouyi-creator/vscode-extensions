@@ -22,18 +22,18 @@ var _tiers: Dictionary = {}            # tier(int) -> 基线字典 {level, name_
 var _mythic_intervals: Dictionary = {} # interval(int) -> 区间端点基线 {name_key, strength_weight, rarity_weight, color_token}
 var _ready: bool = false
 
-## 重载配置：严格类型化取值器 + 安全兜底（禁 Variant get_value），校验四项硬性不变量
+## 重载配置：严格类型化取值器 + 安全回退（禁 Variant get_value），校验四项硬性不变量
 func reload_configuration() -> void:
-	# 严格类型化取值器 + 安全兜底（禁 Variant get_value）
-	var tiers_cfg: Dictionary = GameConfig.get_dict(CONFIG_TABLE, "tiers", {})
-	var intervals_cfg: Dictionary = GameConfig.get_dict(CONFIG_TABLE, "mythic_intervals", {})
+	# 严格类型化取值器 + 安全回退（禁 Variant get_value）
+	var tiers_config: Dictionary = GameConfig.get_dict(CONFIG_TABLE, "tiers", {})
+	var intervals_config: Dictionary = GameConfig.get_dict(CONFIG_TABLE, "mythic_intervals", {})
 	_tiers.clear()
-	for tier_key in tiers_cfg:
-		var entry: Dictionary = tiers_cfg[tier_key]
+	for tier_key in tiers_config:
+		var entry: Dictionary = tiers_config[tier_key]
 		_tiers[int(entry.get("tier", 0))] = entry
 	_mythic_intervals.clear()
-	for interval_key in intervals_cfg:
-		var interval_entry: Dictionary = intervals_cfg[interval_key]
+	for interval_key in intervals_config:
+		var interval_entry: Dictionary = intervals_config[interval_key]
 		_mythic_intervals[int(interval_entry.get("interval", 0))] = interval_entry
 	_ready = _validate_invariants()
 
@@ -54,8 +54,8 @@ func _validate_invariants() -> bool:
 	for tier in _tiers:
 		levels.append(int(_tiers[tier].get("level", 0)))
 	levels.sort()
-	for i in range(levels.size()):
-		if levels[i] != i + 1:
+	for level_index in range(levels.size()):
+		if levels[level_index] != level_index + 1:
 			return false  # 等级序断裂或倒置
 	var quasi: float = 0.0
 	var true_artifact: float = 0.0

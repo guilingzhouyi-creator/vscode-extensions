@@ -14,29 +14,29 @@ class_name ItemInstanceFactory extends RefCounted
 # 一、实例构建统一入口
 # ==============================================================================
 
-## 构建实例：proto 原型 + 显示名 + UID 前缀（必为已登记前缀）+ 兼容 item_id 前缀
-## 品质透传（）：proto 声明 quality_tier 时经统一基线解析写入快照；未声明零影响。
+## 构建实例：prototype 原型 + 显示名 + UID 前缀（必为已登记前缀）+ 兼容 item_id 前缀
+## 品质透传：prototype 声明 quality_tier 时经统一基线解析写入快照；未声明零影响。
 ## 新增可选参 quality_registry——发放热循环（十连/批量邮件/任务奖励）可传入
-## 装配期单例复用，缺省经 GameBootstrap.quality_tier_registry() 懒装配兜底，杜绝每实例
+## 装配期单例复用，缺省经 GameBootstrap.quality_tier_registry() 懒装配安全回退，杜绝每实例
 ## new()+reload_configuration() 整表重建（调用方既有签名零破坏）。
 static func build_instance(
-	proto: ItemRegistryCatalog.ItemPrototypeTemplate,
+	prototype: ItemRegistryCatalog.ItemPrototypeTemplate,
 	display_name: String,
 	uid_prefix: String,
 	item_id_prefix: String = "",
 	quality_registry: QualityTierRegistry = null
 ) -> ItemEntity:
-	var item := ItemEntity.from_payload(ItemRegistrySolver.build_instance_payload(proto, display_name))
+	var item := ItemEntity.from_payload(ItemRegistrySolver.build_instance_payload(prototype, display_name))
 	item.item_uid = ItemUIDGenerator.generate_uid(uid_prefix)
 	if not item_id_prefix.is_empty():
-		item.item_id = UniqueIdGenerator.next_id(item_id_prefix)
-	if proto.quality_tier > 0:
+		item.item_id = IdGenerator.next_id(item_id_prefix)
+	if prototype.quality_tier > 0:
 		var registry: QualityTierRegistry = quality_registry
 		if registry == null:
 			registry = GameBootstrap.quality_tier_registry()
 		if registry != null and registry.is_ready():
 			var resolver := ItemQualityResolver.new(registry)
-			var qr := resolver.resolve(proto.canonical_id, proto.quality_tier, proto.mythic_interval)
-			if qr.get("success", false):
-				item.quality_snapshot = qr.get("snapshot", {})
+			var quality_result := resolver.resolve(prototype.canonical_id, prototype.quality_tier, prototype.mythic_interval)
+			if quality_result.get("success", false):
+				item.quality_snapshot = quality_result.get("snapshot", {})
 	return item

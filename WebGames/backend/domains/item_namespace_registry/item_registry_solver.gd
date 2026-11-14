@@ -34,42 +34,42 @@ static func _make_error(code: String, message: String) -> Dictionary:
 		"message": message
 	}
 
-static func _validate_prototype_identity(catalog: ItemRegistryCatalog, proto: ItemRegistryCatalog.ItemPrototypeTemplate) -> Dictionary:
-	if not validate_canonical_id_format(proto.canonical_id):
+static func _validate_prototype_identity(catalog: ItemRegistryCatalog, prototype: ItemRegistryCatalog.ItemPrototypeTemplate) -> Dictionary:
+	if not validate_canonical_id_format(prototype.canonical_id):
 		return _make_error("ERR_INVALID_ID_FORMAT", _msg_fmt("invalid_id_format"))
-	if catalog._canonical_registry.has(proto.canonical_id):
-		return _make_error("ERR_ID_COLLISION", _msg_fmt("id_collision", {"canonical_id": proto.canonical_id}))
-	if proto.english_name.is_empty():
-		return _make_error("ERR_ENGLISH_NAME_MISSING", _msg_fmt("english_name_missing", {"canonical_id": proto.canonical_id}))
-	if not _is_valid_english_name(proto.english_name):
-		return _make_error("ERR_ENGLISH_NAME_INVALID", _msg_fmt("english_name_invalid", {"english_name": proto.english_name}))
+	if catalog._canonical_registry.has(prototype.canonical_id):
+		return _make_error("ERR_ID_COLLISION", _msg_fmt("id_collision", {"canonical_id": prototype.canonical_id}))
+	if prototype.english_name.is_empty():
+		return _make_error("ERR_ENGLISH_NAME_MISSING", _msg_fmt("english_name_missing", {"canonical_id": prototype.canonical_id}))
+	if not _is_valid_english_name(prototype.english_name):
+		return _make_error("ERR_ENGLISH_NAME_INVALID", _msg_fmt("english_name_invalid", {"english_name": prototype.english_name}))
 	return {}
 
-static func _validate_prototype_uniqueness(catalog: ItemRegistryCatalog, proto: ItemRegistryCatalog.ItemPrototypeTemplate) -> Dictionary:
-	if not proto.loc_name_key.is_empty() and catalog._loc_key_to_canonical.has(proto.loc_name_key):
-		return _make_error("ERR_NAME_KEY_COLLISION", _msg_fmt("name_key_collision", {"loc_name_key": proto.loc_name_key}))
-	if catalog._english_name_to_canonical.has(proto.english_name):
-		return _make_error("ERR_ENGLISH_NAME_COLLISION", _msg_fmt("english_name_collision", {"english_name": proto.english_name}))
-	if proto.numeric_id <= 0:
-		proto.numeric_id = catalog.allocate_numeric_id()
-	elif catalog._numeric_to_canonical.has(proto.numeric_id):
-		return _make_error("ERR_NUMERIC_COLLISION", _msg_fmt("numeric_id_collision", {"numeric_id": proto.numeric_id}))
+static func _validate_prototype_uniqueness(catalog: ItemRegistryCatalog, prototype: ItemRegistryCatalog.ItemPrototypeTemplate) -> Dictionary:
+	if not prototype.loc_name_key.is_empty() and catalog._loc_key_to_canonical.has(prototype.loc_name_key):
+		return _make_error("ERR_NAME_KEY_COLLISION", _msg_fmt("name_key_collision", {"loc_name_key": prototype.loc_name_key}))
+	if catalog._english_name_to_canonical.has(prototype.english_name):
+		return _make_error("ERR_ENGLISH_NAME_COLLISION", _msg_fmt("english_name_collision", {"english_name": prototype.english_name}))
+	if prototype.numeric_id <= 0:
+		prototype.numeric_id = catalog.allocate_numeric_id()
+	elif catalog._numeric_to_canonical.has(prototype.numeric_id):
+		return _make_error("ERR_NUMERIC_COLLISION", _msg_fmt("numeric_id_collision", {"numeric_id": prototype.numeric_id}))
 	return {}
 
-static func _commit_prototype_to_catalog(catalog: ItemRegistryCatalog, proto: ItemRegistryCatalog.ItemPrototypeTemplate) -> void:
-	catalog._canonical_registry[proto.canonical_id] = proto
-	catalog._numeric_to_canonical[proto.numeric_id] = proto.canonical_id
-	catalog.occupy_numeric_id(proto.numeric_id)
-	if not proto.loc_name_key.is_empty():
-		catalog._loc_key_to_canonical[proto.loc_name_key] = proto.canonical_id
-	catalog._english_name_to_canonical[proto.english_name] = proto.canonical_id
+static func _commit_prototype_to_catalog(catalog: ItemRegistryCatalog, prototype: ItemRegistryCatalog.ItemPrototypeTemplate) -> void:
+	catalog._canonical_registry[prototype.canonical_id] = prototype
+	catalog._numeric_to_canonical[prototype.numeric_id] = prototype.canonical_id
+	catalog.occupy_numeric_id(prototype.numeric_id)
+	if not prototype.loc_name_key.is_empty():
+		catalog._loc_key_to_canonical[prototype.loc_name_key] = prototype.canonical_id
+	catalog._english_name_to_canonical[prototype.english_name] = prototype.canonical_id
 
 	var seen_aliases: Dictionary = {}
-	for alias in proto.search_aliases:
+	for alias in prototype.search_aliases:
 		var key: String = str(alias).to_lower().strip_edges()
 		if not key.is_empty() and not seen_aliases.has(key):
 			seen_aliases[key] = true
-			_append_alias_index_entry(catalog._alias_inverted_index, key, proto.canonical_id)
+			_append_alias_index_entry(catalog._alias_inverted_index, key, prototype.canonical_id)
 
 static func _append_alias_index_entry(index: Dictionary, alias_key: String, canonical_id: String) -> void:
 	if not index.has(alias_key):
@@ -80,20 +80,20 @@ static func _append_alias_index_entry(index: Dictionary, alias_key: String, cano
 ## - 校验链：ID 格式 → canonical_id 冲突 → 展示名键唯一 → 统一英文名唯一 → 数字 ID 冲突；
 ## - numeric_id <= 0 时自动递增分配（回收的空闲 ID 优先复用）；
 ## - 别名索引去重（空别名与同物品重复别名忽略，跨物品同义词保留多值）。
-static func register_prototype(catalog: ItemRegistryCatalog, proto: ItemRegistryCatalog.ItemPrototypeTemplate) -> Dictionary:
-	var id_err: Dictionary = _validate_prototype_identity(catalog, proto)
-	if not id_err.is_empty():
-		return id_err
+static func register_prototype(catalog: ItemRegistryCatalog, prototype: ItemRegistryCatalog.ItemPrototypeTemplate) -> Dictionary:
+	var identity_error: Dictionary = _validate_prototype_identity(catalog, prototype)
+	if not identity_error.is_empty():
+		return identity_error
 
-	var uniq_err: Dictionary = _validate_prototype_uniqueness(catalog, proto)
-	if not uniq_err.is_empty():
-		return uniq_err
+	var uniqueness_error: Dictionary = _validate_prototype_uniqueness(catalog, prototype)
+	if not uniqueness_error.is_empty():
+		return uniqueness_error
 
-	_commit_prototype_to_catalog(catalog, proto)
+	_commit_prototype_to_catalog(catalog, prototype)
 	return {
 		"success": true,
-		"canonical_id": proto.canonical_id,
-		"numeric_id": proto.numeric_id
+		"canonical_id": prototype.canonical_id,
+		"numeric_id": prototype.numeric_id
 	}
 
 # ==============================================================================
@@ -103,15 +103,15 @@ static func register_prototype(catalog: ItemRegistryCatalog, proto: ItemRegistry
 ## 注销物品原型（配置删除后的回收入口）：
 ## 同步清理倒排索引、英文名索引、数字映射、名称键索引与主注册表，并将数字 ID 释放回空闲池。
 static func unregister_prototype(catalog: ItemRegistryCatalog, canonical_id: String) -> Dictionary:
-	var proto: Variant = catalog._canonical_registry.get(canonical_id)
-	if proto == null:
+	var prototype: Variant = catalog._canonical_registry.get(canonical_id)
+	if prototype == null:
 		return {
 			"success": false,
 			"error_code": "ERR_NOT_FOUND",
 			"message": _msg_fmt("not_found", {"canonical_id": canonical_id})
 		}
 
-	for alias in proto.search_aliases:
+	for alias in prototype.search_aliases:
 		var key: String = str(alias).to_lower().strip_edges()
 		if catalog._alias_inverted_index.has(key):
 			var ids: Array = catalog._alias_inverted_index[key]
@@ -119,18 +119,18 @@ static func unregister_prototype(catalog: ItemRegistryCatalog, canonical_id: Str
 			if ids.is_empty():
 				catalog._alias_inverted_index.erase(key)
 
-	catalog._numeric_to_canonical.erase(proto.numeric_id)
-	catalog.release_numeric_id(proto.numeric_id)
-	if not proto.loc_name_key.is_empty():
-		catalog._loc_key_to_canonical.erase(proto.loc_name_key)
-	if not proto.english_name.is_empty():
-		catalog._english_name_to_canonical.erase(proto.english_name)
+	catalog._numeric_to_canonical.erase(prototype.numeric_id)
+	catalog.release_numeric_id(prototype.numeric_id)
+	if not prototype.loc_name_key.is_empty():
+		catalog._loc_key_to_canonical.erase(prototype.loc_name_key)
+	if not prototype.english_name.is_empty():
+		catalog._english_name_to_canonical.erase(prototype.english_name)
 	catalog._canonical_registry.erase(canonical_id)
 
 	return {
 		"success": true,
 		"canonical_id": canonical_id,
-		"numeric_id": proto.numeric_id
+		"numeric_id": prototype.numeric_id
 	}
 
 ## 严格按统一英文名解析（GM /give 唯一合法入口）：
@@ -144,12 +144,12 @@ static func resolve_by_english_name(catalog: ItemRegistryCatalog, name: String) 
 ## 由原型构建物品实例载荷（服务器批量发放 / GM 发放共用）：
 ## template_id 落 canonical_id，质量/体积取原型值（原型为单一事实源，载荷不再携带物理属性）；
 ## 显示名由调用方传入（呈现层配置，i18n 由前端按 loc_name_key 适配）。
-static func build_instance_payload(proto: ItemRegistryCatalog.ItemPrototypeTemplate, display_name: String) -> Dictionary:
+static func build_instance_payload(prototype: ItemRegistryCatalog.ItemPrototypeTemplate, display_name: String) -> Dictionary:
 	return {
-		"template_id": proto.canonical_id,
+		"template_id": prototype.canonical_id,
 		"name": display_name,
-		"mass_kg": proto.default_mass_kg,
-		"volume_slots": proto.default_volume_slots
+		"mass_kg": prototype.default_mass_kg,
+		"volume_slots": prototype.default_volume_slots
 	}
 
 ## 检索（前端命名空间搜索 UI 用）：canonical_id 直击 → 统一英文名 → 多语言别名倒排命中
@@ -169,9 +169,9 @@ static func resolve_search_term(catalog: ItemRegistryCatalog, search_term: Strin
 
 ## 统一英文名格式断言：仅允许小写字母/数字/下划线（底层规范化标准）
 static func _is_valid_english_name(name: String) -> bool:
-	for i in range(name.length()):
-		var c := name[i]
-		if not (c >= "a" and c <= "z") and not (c >= "0" and c <= "9") and c != "_":
+	for char_index in range(name.length()):
+		var current_char := name[char_index]
+		if not (current_char >= "a" and current_char <= "z") and not (current_char >= "0" and current_char <= "9") and current_char != "_":
 			return false
 	return true
 

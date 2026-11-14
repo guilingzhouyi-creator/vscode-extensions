@@ -27,17 +27,17 @@ static func load_from_dict_list(catalog: ItemRegistryCatalog, items_data: Array)
 	var default_minor: String = GameConfig.get_string("domains.item_namespace_registry", "defaults/category_minor", "WEAPON_BLADE")
 
 	for item_dict in sorted_data:
-		var proto: Variant = _build_prototype(item_dict, default_minor)
-		var res: Variant = ItemRegistrySolver.register_prototype(catalog, proto)
-		if res.success:
+		var prototype: Variant = _build_prototype(item_dict, default_minor)
+		var register_result: Variant = ItemRegistrySolver.register_prototype(catalog, prototype)
+		if register_result.success:
 			loaded_count += 1
 			# 统一名称注册表接线：物品名称键登记（域所有者 = item，en_US 英文底座必达）
-			var loc_key: String = str(item_dict.get("loc_name_key", ""))
-			if not loc_key.is_empty():
+			var localized_name_key: String = str(item_dict.get("loc_name_key", ""))
+			if not localized_name_key.is_empty():
 				LocalizationRegistryCatalog.get_shared().register_name_key(
-					loc_key, "item", str(item_dict.get("english_name", loc_key)))
+					localized_name_key, "item", str(item_dict.get("english_name", localized_name_key)))
 		else:
-			error_list.append(res)
+			error_list.append(register_result)
 
 	return {
 		"success": error_list.is_empty(),
@@ -96,30 +96,30 @@ static func reload_from_config(catalog: ItemRegistryCatalog) -> Dictionary:
 	var all_items: Array = _collect_configured_items()
 
 	var configured_ids: Dictionary = {}
-	for it in all_items:
-		if it is Dictionary:
-			var cid := str((it as Dictionary).get("canonical_id", ""))
-			if not cid.is_empty():
-				configured_ids[cid] = true
+	for raw_item in all_items:
+		if raw_item is Dictionary:
+			var configured_id := str((raw_item as Dictionary).get("canonical_id", ""))
+			if not configured_id.is_empty():
+				configured_ids[configured_id] = true
 
 	var unregistered: Array = []
-	for canonical_id in catalog._canonical_registry.keys():
-		if not configured_ids.has(str(canonical_id)):
-			var res: Variant = ItemRegistrySolver.unregister_prototype(catalog, str(canonical_id))
-			if res.success:
-				unregistered.append(str(canonical_id))
+	for registered_id in catalog._canonical_registry.keys():
+		if not configured_ids.has(str(registered_id)):
+			var unregister_result: Variant = ItemRegistrySolver.unregister_prototype(catalog, str(registered_id))
+			if unregister_result.success:
+				unregistered.append(str(registered_id))
 
 	# 2) 增量注册：仅注册配置中尚未登记的新物品（已存在的保持原数字 ID 不变）
 	var new_items: Array = []
 	for item_dict in all_items:
-		var cid := str(item_dict.get("canonical_id", ""))
-		if not cid.is_empty() and not catalog._canonical_registry.has(cid):
+		var candidate_id := str(item_dict.get("canonical_id", ""))
+		if not candidate_id.is_empty() and not catalog._canonical_registry.has(candidate_id):
 			new_items.append(item_dict)
-	var load_res := load_from_dict_list(catalog, new_items)
+	var load_result := load_from_dict_list(catalog, new_items)
 	return {
 		"unregistered": unregistered,
-		"registered_count": load_res.get("loaded_count", 0),
-		"errors": load_res.get("errors", [])
+		"registered_count": load_result.get("loaded_count", 0),
+		"errors": load_result.get("errors", [])
 	}
 
 # ==============================================================================
