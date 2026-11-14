@@ -57,17 +57,17 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从输入字典反序列化还原传输对象
-static func from_dto(data: Dictionary) -> ClientRequestEnvelopeDTO:
+static func from_dto(serialized_payload: Dictionary) -> ClientRequestEnvelopeDTO:
 	var envelope := ClientRequestEnvelopeDTO.new()
-	envelope.request_id = str(data.get("request_id", ""))
-	envelope.session_token = str(data.get("session_token", ""))
-	envelope.account_id = str(data.get("account_id", ""))
-	envelope.character_id = str(data.get("character_id", ""))
-	envelope.actor_type = str(data.get("actor_type", ACTOR_HUMAN_UI))
-	envelope.domain = str(data.get("domain", ""))
-	envelope.action_type = str(data.get("action_type", ""))
-	var raw_payload: Variant = data.get("payload", {})
+	envelope.request_id = str(serialized_payload.get("request_id", ""))
+	envelope.session_token = str(serialized_payload.get("session_token", ""))
+	envelope.account_id = str(serialized_payload.get("account_id", ""))
+	envelope.character_id = str(serialized_payload.get("character_id", ""))
+	envelope.actor_type = str(serialized_payload.get("actor_type", ACTOR_HUMAN_UI))
+	envelope.domain = str(serialized_payload.get("domain", ""))
+	envelope.action_type = str(serialized_payload.get("action_type", ""))
+	var raw_payload: Variant = serialized_payload.get("payload", {})
 	envelope.payload = (raw_payload as Dictionary).duplicate(true) if raw_payload is Dictionary else {}
-	envelope.lease_nonce = int(data.get("lease_nonce", 0))
-	envelope.client_timestamp_ms = int(data.get("client_timestamp_ms", 0))
+	envelope.lease_nonce = int(serialized_payload.get("lease_nonce", 0))
+	envelope.client_timestamp_ms = int(serialized_payload.get("client_timestamp_ms", 0))
 	return envelope

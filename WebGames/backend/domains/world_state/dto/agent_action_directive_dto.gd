@@ -34,11 +34,11 @@ func reset_state() -> void:
 	is_executable = true
 	blocked_reason = ""
 
-static func _reset_dict(target_dict: Dictionary) -> Dictionary:
-	if target_dict.is_read_only():
+static func _reset_dict(target_dictionary: Dictionary) -> Dictionary:
+	if target_dictionary.is_read_only():
 		return {}
-	target_dict.clear()
-	return target_dict
+	target_dictionary.clear()
+	return target_dictionary
 
 ## 序列化当前对象为通用字典传输结构
 func to_dto() -> Dictionary:
@@ -60,14 +60,14 @@ func to_dto() -> Dictionary:
 	return payload
 
 ## 从输入字典反序列化还原传输对象
-static func from_dto(data: Dictionary) -> AgentActionDirectiveDTO:
+static func from_dto(serialized_payload: Dictionary) -> AgentActionDirectiveDTO:
 	var directive := AgentActionDirectiveDTO.new()
-	directive.directive_id = str(data.get("directive_id", ""))
-	directive.domain = str(data.get("domain", "ASSET"))
-	directive.description = str(data.get("description", ""))
-	directive.cost_payload = data.get("cost_payload", {}).duplicate(true)
-	directive.preconditions = data.get("preconditions", {}).duplicate(true)
-	directive.allowed_parameters = data.get("allowed_parameters", {}).duplicate(true)
-	directive.is_executable = bool(data.get("is_executable", true))
-	directive.blocked_reason = str(data.get("blocked_reason", ""))
+	directive.directive_id = str(serialized_payload.get("directive_id", ""))
+	directive.domain = str(serialized_payload.get("domain", "ASSET"))
+	directive.description = str(serialized_payload.get("description", ""))
+	directive.cost_payload = serialized_payload.get("cost_payload", {}).duplicate(true)
+	directive.preconditions = serialized_payload.get("preconditions", {}).duplicate(true)
+	directive.allowed_parameters = serialized_payload.get("allowed_parameters", {}).duplicate(true)
+	directive.is_executable = bool(serialized_payload.get("is_executable", true))
+	directive.blocked_reason = str(serialized_payload.get("blocked_reason", ""))
 	return directive

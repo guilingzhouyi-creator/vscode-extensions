@@ -57,18 +57,18 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从输入字典反序列化还原传输对象
-static func from_dto(data_dict: Dictionary) -> UnifiedResponseEnvelopeDTO:
+static func from_dto(serialized_payload: Dictionary) -> UnifiedResponseEnvelopeDTO:
 	var response := UnifiedResponseEnvelopeDTO.new()
-	response.request_id = str(data_dict.get("request_id", ""))
-	if data_dict.has("is_success"):
-		response.success = bool(data_dict.get("is_success", false))
+	response.request_id = str(serialized_payload.get("request_id", ""))
+	if serialized_payload.has("is_success"):
+		response.success = bool(serialized_payload.get("is_success", false))
 	else:
-		response.success = bool(data_dict.get("success", false))
-	response.error_code = str(data_dict.get("error_code", ""))
-	response.error_message = str(data_dict.get("error_message", ""))
-	var raw_payload: Variant = data_dict.get("payload", data_dict.get("data", {}))
+		response.success = bool(serialized_payload.get("success", false))
+	response.error_code = str(serialized_payload.get("error_code", ""))
+	response.error_message = str(serialized_payload.get("error_message", ""))
+	var raw_payload: Variant = serialized_payload.get("payload", serialized_payload.get("data", {}))
 	response.data = (raw_payload as Dictionary).duplicate(true) if raw_payload is Dictionary else {}
-	var raw_causal_delta: Variant = data_dict.get("causal_delta", {})
+	var raw_causal_delta: Variant = serialized_payload.get("causal_delta", {})
 	response.causal_delta = (raw_causal_delta as Dictionary).duplicate(true) if raw_causal_delta is Dictionary else {}
-	response.server_timestamp_ms = int(data_dict.get("server_timestamp_ms", 0))
+	response.server_timestamp_ms = int(serialized_payload.get("server_timestamp_ms", 0))
 	return response

@@ -60,14 +60,14 @@ func reset_state() -> void:
 ## 序列化当前遥测数据信封为字典结构
 func to_dto() -> Dictionary:
 	var delta_entries: Array[Dictionary] = []
-	for delta_item in causal_deltas:
-		if delta_item != null:
-			delta_entries.append(delta_item.to_dto())
+	for delta_entry in causal_deltas:
+		if delta_entry != null:
+			delta_entries.append(delta_entry.to_dto())
 
 	var action_entries: Array[Dictionary] = []
-	for action_item in action_space:
-		if action_item != null:
-			action_entries.append(action_item.to_dto())
+	for action_entry in action_space:
+		if action_entry != null:
+			action_entries.append(action_entry.to_dto())
 
 	return {
 		"envelope": {
@@ -91,37 +91,37 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从输入字典反序列化解析还原遥测数据信封传输对象
-static func from_dto(data: Dictionary) -> AgentHudTelemetryPacketDTO:
+static func from_dto(serialized_payload: Dictionary) -> AgentHudTelemetryPacketDTO:
 	var packet := AgentHudTelemetryPacketDTO.new()
-	var envelope_data: Dictionary = data.get("envelope", {})
-	packet.protocol_version = str(envelope_data.get("protocol_version", "1.0.0"))
-	packet.packet_id = str(envelope_data.get("packet_id", ""))
-	packet.sequence_index = int(envelope_data.get("sequence_index", 0))
-	packet.timestamp_ms = int(envelope_data.get("timestamp_ms", 0))
-	packet.domain = str(envelope_data.get("domain", "HOME_HUD"))
-	packet.is_terminal = bool(envelope_data.get("is_terminal", false))
+	var envelope_payload: Dictionary = serialized_payload.get("envelope", {})
+	packet.protocol_version = str(envelope_payload.get("protocol_version", "1.0.0"))
+	packet.packet_id = str(envelope_payload.get("packet_id", ""))
+	packet.sequence_index = int(envelope_payload.get("sequence_index", 0))
+	packet.timestamp_ms = int(envelope_payload.get("timestamp_ms", 0))
+	packet.domain = str(envelope_payload.get("domain", "HOME_HUD"))
+	packet.is_terminal = bool(envelope_payload.get("is_terminal", false))
 
-	var lease: Dictionary = envelope_data.get("control_lease", {})
+	var lease: Dictionary = envelope_payload.get("control_lease", {})
 	packet.human_interaction_state = str(lease.get("human_interaction_state", "IDLE"))
 	packet.agent_control_mode = str(lease.get("agent_control_mode", "READ_WRITE"))
 	packet.active_operator = str(lease.get("active_operator", "IDLE"))
 	packet.is_writable = bool(lease.get("is_writable", true))
 	packet.preempted_by_human = bool(lease.get("preempted_by_human", false))
 
-	var observation_dict: Dictionary = data.get("observation", {})
-	if not observation_dict.is_empty():
-		packet.observation = AgentHudContextSliceDTO.from_dto(observation_dict)
+	var observation_payload: Dictionary = serialized_payload.get("observation", {})
+	if not observation_payload.is_empty():
+		packet.observation = AgentHudContextSliceDTO.from_dto(observation_payload)
 
 	packet.causal_deltas.clear()
-	var raw_deltas: Array = data.get("causal_deltas", [])
-	for delta_item in raw_deltas:
-		if delta_item is Dictionary:
-			packet.causal_deltas.append(HudCausalDeltaDTO.from_dto(delta_item))
+	var raw_deltas: Array = serialized_payload.get("causal_deltas", [])
+	for delta_entry in raw_deltas:
+		if delta_entry is Dictionary:
+			packet.causal_deltas.append(HudCausalDeltaDTO.from_dto(delta_entry))
 
 	packet.action_space.clear()
-	var raw_actions: Array = data.get("action_space", [])
-	for action_item in raw_actions:
-		if action_item is Dictionary:
-			packet.action_space.append(AgentActionDirectiveDTO.from_dto(action_item))
+	var raw_actions: Array = serialized_payload.get("action_space", [])
+	for action_entry in raw_actions:
+		if action_entry is Dictionary:
+			packet.action_space.append(AgentActionDirectiveDTO.from_dto(action_entry))
 
 	return packet

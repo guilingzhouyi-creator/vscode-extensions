@@ -54,25 +54,25 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从输入字典反序列化还原传输对象
-static func from_dto(data: Dictionary) -> HudStatusSnapshotDTO:
+static func from_dto(serialized_payload: Dictionary) -> HudStatusSnapshotDTO:
 	var snapshot := HudStatusSnapshotDTO.new()
-	snapshot.account_id = String(data.get("account_id", ""))
-	snapshot.character_id = String(data.get("character_id", ""))
-	snapshot.character_name = String(data.get("character_name", ""))
-	snapshot.race_id = String(data.get("race_id", "HUMAN"))
-	snapshot.current_location_id = String(data.get("current_location_id", ""))
-	var attribute_values_data: Variant = data.get("attribute_values", {})
-	if attribute_values_data is Dictionary:
-		snapshot.attribute_values = attribute_values_data.duplicate()
-	var attribute_levels_data: Variant = data.get("attribute_levels", {})
-	if attribute_levels_data is Dictionary:
-		snapshot.attribute_levels = attribute_levels_data.duplicate()
+	snapshot.account_id = String(serialized_payload.get("account_id", ""))
+	snapshot.character_id = String(serialized_payload.get("character_id", ""))
+	snapshot.character_name = String(serialized_payload.get("character_name", ""))
+	snapshot.race_id = String(serialized_payload.get("race_id", "HUMAN"))
+	snapshot.current_location_id = String(serialized_payload.get("current_location_id", ""))
+	var raw_attribute_values: Variant = serialized_payload.get("attribute_values", {})
+	if raw_attribute_values is Dictionary:
+		snapshot.attribute_values = raw_attribute_values.duplicate()
+	var raw_attribute_levels: Variant = serialized_payload.get("attribute_levels", {})
+	if raw_attribute_levels is Dictionary:
+		snapshot.attribute_levels = raw_attribute_levels.duplicate()
 	# 除数下限守卫（Inv-HDS-3）：hp_max/ap_max 强保证 >= 1.0
-	snapshot.hp_current = maxf(0.0, float(data.get("hp_current", 0.0)))
-	snapshot.hp_max = maxf(1.0, float(data.get("hp_max", 100.0)))
-	snapshot.ap_current = maxf(0.0, float(data.get("ap_current", 0.0)))
-	snapshot.ap_max = maxf(1.0, float(data.get("ap_max", 10.0)))
-	snapshot.wallet_gold = int(data.get("wallet_gold", 0))
-	snapshot.wallet_mana_monocrystals = int(data.get("wallet_mana_monocrystals", 0))
-	snapshot.timestamp_utc = int(data.get("timestamp_utc", 0))
+	snapshot.hp_current = maxf(0.0, float(serialized_payload.get("hp_current", 0.0)))
+	snapshot.hp_max = maxf(1.0, float(serialized_payload.get("hp_max", 100.0)))
+	snapshot.ap_current = maxf(0.0, float(serialized_payload.get("ap_current", 0.0)))
+	snapshot.ap_max = maxf(1.0, float(serialized_payload.get("ap_max", 10.0)))
+	snapshot.wallet_gold = int(serialized_payload.get("wallet_gold", 0))
+	snapshot.wallet_mana_monocrystals = int(serialized_payload.get("wallet_mana_monocrystals", 0))
+	snapshot.timestamp_utc = int(serialized_payload.get("timestamp_utc", 0))
 	return snapshot

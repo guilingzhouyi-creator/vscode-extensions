@@ -34,16 +34,16 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从输入字典反序列化还原传输对象
-static func from_dto(data: Dictionary) -> PagedResultDTO:
+static func from_dto(serialized_payload: Dictionary) -> PagedResultDTO:
 	var paged_result := PagedResultDTO.new()
-	paged_result.page_index = maxi(0, int(data.get("page_index", 0)))
-	paged_result.page_size = maxi(1, int(data.get("page_size", 10)))
-	paged_result.total_count = maxi(0, int(data.get("total_count", 0)))
-	paged_result.total_pages = maxi(0, int(data.get("total_pages", 0)))
-	paged_result.has_next = bool(data.get("has_next", false))
-	paged_result.has_prev = bool(data.get("has_prev", false))
-	paged_result.next_cursor = String(data.get("next_cursor", ""))
-	var raw_items: Variant = data.get("items", [])
+	paged_result.page_index = maxi(0, int(serialized_payload.get("page_index", 0)))
+	paged_result.page_size = maxi(1, int(serialized_payload.get("page_size", 10)))
+	paged_result.total_count = maxi(0, int(serialized_payload.get("total_count", 0)))
+	paged_result.total_pages = maxi(0, int(serialized_payload.get("total_pages", 0)))
+	paged_result.has_next = bool(serialized_payload.get("has_next", false))
+	paged_result.has_prev = bool(serialized_payload.get("has_prev", false))
+	paged_result.next_cursor = String(serialized_payload.get("next_cursor", ""))
+	var raw_items: Variant = serialized_payload.get("items", [])
 	if raw_items is Array:
 		paged_result.items = raw_items.duplicate()
 	return paged_result

@@ -81,72 +81,72 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从输入字典反序列化还原传输对象
-static func from_dto(data: Dictionary) -> AuthoritativeHudSnapshotDTO:
+static func from_dto(serialized_payload: Dictionary) -> AuthoritativeHudSnapshotDTO:
 	var snapshot := AuthoritativeHudSnapshotDTO.new()
-	_populate_identity(data, snapshot)
-	_populate_physiology_and_wallet(data, snapshot)
-	_populate_calendar_and_ops(data, snapshot)
-	_populate_social_and_features(data, snapshot)
+	_populate_identity(serialized_payload, snapshot)
+	_populate_physiology_and_wallet(serialized_payload, snapshot)
+	_populate_calendar_and_ops(serialized_payload, snapshot)
+	_populate_social_and_features(serialized_payload, snapshot)
 	return snapshot
 
-static func _populate_identity(data: Dictionary, snapshot: AuthoritativeHudSnapshotDTO) -> void:
-	snapshot.account_id = String(data.get("account_id", ""))
-	snapshot.character_id = String(data.get("character_id", ""))
-	snapshot.character_name = String(data.get("character_name", ""))
-	snapshot.race_id = String(data.get("race_id", "HUMAN"))
-	snapshot.current_location_id = String(data.get("current_location_id", data.get("current_location", "")))
-	snapshot.level = maxi(1, int(data.get("level", 1)))
+static func _populate_identity(serialized_payload: Dictionary, snapshot: AuthoritativeHudSnapshotDTO) -> void:
+	snapshot.account_id = String(serialized_payload.get("account_id", ""))
+	snapshot.character_id = String(serialized_payload.get("character_id", ""))
+	snapshot.character_name = String(serialized_payload.get("character_name", ""))
+	snapshot.race_id = String(serialized_payload.get("race_id", "HUMAN"))
+	snapshot.current_location_id = String(serialized_payload.get("current_location_id", serialized_payload.get("current_location", "")))
+	snapshot.level = maxi(1, int(serialized_payload.get("level", 1)))
 
-static func _populate_physiology_and_wallet(data: Dictionary, snapshot: AuthoritativeHudSnapshotDTO) -> void:
+static func _populate_physiology_and_wallet(serialized_payload: Dictionary, snapshot: AuthoritativeHudSnapshotDTO) -> void:
 	# 生理上限守卫强保证 >= 1.0
-	snapshot.hp_current = maxf(0.0, float(data.get("hp_current", 0.0)))
-	snapshot.hp_max = maxf(1.0, float(data.get("hp_max", 100.0)))
-	snapshot.mp_current = maxf(0.0, float(data.get("mp_current", 0.0)))
-	snapshot.mp_max = maxf(1.0, float(data.get("mp_max", 100.0)))
-	snapshot.ap_current = maxf(0.0, float(data.get("ap_current", 0.0)))
-	snapshot.ap_max = maxf(1.0, float(data.get("ap_max", 10.0)))
+	snapshot.hp_current = maxf(0.0, float(serialized_payload.get("hp_current", 0.0)))
+	snapshot.hp_max = maxf(1.0, float(serialized_payload.get("hp_max", 100.0)))
+	snapshot.mp_current = maxf(0.0, float(serialized_payload.get("mp_current", 0.0)))
+	snapshot.mp_max = maxf(1.0, float(serialized_payload.get("mp_max", 100.0)))
+	snapshot.ap_current = maxf(0.0, float(serialized_payload.get("ap_current", 0.0)))
+	snapshot.ap_max = maxf(1.0, float(serialized_payload.get("ap_max", 10.0)))
 
-	snapshot.wallet_gold = int(data.get("wallet_gold", 0))
-	snapshot.wallet_mana_monocrystals = int(data.get("wallet_mana_monocrystals", 0))
-	snapshot.ledger_nonce = int(data.get("ledger_nonce", 0))
+	snapshot.wallet_gold = int(serialized_payload.get("wallet_gold", 0))
+	snapshot.wallet_mana_monocrystals = int(serialized_payload.get("wallet_mana_monocrystals", 0))
+	snapshot.ledger_nonce = int(serialized_payload.get("ledger_nonce", 0))
 
-	var attribute_values_data: Variant = data.get("attribute_values", {})
-	if attribute_values_data is Dictionary:
-		snapshot.attribute_values = attribute_values_data.duplicate()
-	var attribute_levels_data: Variant = data.get("attribute_levels", {})
-	if attribute_levels_data is Dictionary:
-		snapshot.attribute_levels = attribute_levels_data.duplicate()
+	var raw_attribute_values: Variant = serialized_payload.get("attribute_values", {})
+	if raw_attribute_values is Dictionary:
+		snapshot.attribute_values = raw_attribute_values.duplicate()
+	var raw_attribute_levels: Variant = serialized_payload.get("attribute_levels", {})
+	if raw_attribute_levels is Dictionary:
+		snapshot.attribute_levels = raw_attribute_levels.duplicate()
 
-	snapshot.unallocated_potential_points = maxi(0, int(data.get("unallocated_potential_points", 0)))
-	snapshot.title_rank_key = String(data.get("title_rank_key", ""))
+	snapshot.unallocated_potential_points = maxi(0, int(serialized_payload.get("unallocated_potential_points", 0)))
+	snapshot.title_rank_key = String(serialized_payload.get("title_rank_key", ""))
 
-static func _populate_calendar_and_ops(data: Dictionary, snapshot: AuthoritativeHudSnapshotDTO) -> void:
-	var calendar_env_data: Variant = data.get("calendar_env", null)
-	if calendar_env_data is Dictionary and not calendar_env_data.is_empty():
-		snapshot.calendar_env = WorldCalendarEnvironmentDTO.from_dto(calendar_env_data)
+static func _populate_calendar_and_ops(serialized_payload: Dictionary, snapshot: AuthoritativeHudSnapshotDTO) -> void:
+	var raw_calendar_environment: Variant = serialized_payload.get("calendar_env", null)
+	if raw_calendar_environment is Dictionary and not raw_calendar_environment.is_empty():
+		snapshot.calendar_env = WorldCalendarEnvironmentDTO.from_dto(raw_calendar_environment)
 
-	var ops_bulletin: Variant = data.get("ops_bulletin_brief", {})
+	var ops_bulletin: Variant = serialized_payload.get("ops_bulletin_brief", {})
 	if ops_bulletin is Dictionary:
 		snapshot.ops_bulletin_brief = ops_bulletin.duplicate()
 
-	snapshot.unread_mail_count = maxi(0, int(data.get("unread_mail_count", 0)))
-	snapshot.gacha_pity_counter = maxi(0, int(data.get("gacha_pity_counter", 0)))
+	snapshot.unread_mail_count = maxi(0, int(serialized_payload.get("unread_mail_count", 0)))
+	snapshot.gacha_pity_counter = maxi(0, int(serialized_payload.get("gacha_pity_counter", 0)))
 
-static func _populate_social_and_features(data: Dictionary, snapshot: AuthoritativeHudSnapshotDTO) -> void:
-	snapshot.guild_faction_id = String(data.get("guild_faction_id", ""))
+static func _populate_social_and_features(serialized_payload: Dictionary, snapshot: AuthoritativeHudSnapshotDTO) -> void:
+	snapshot.guild_faction_id = String(serialized_payload.get("guild_faction_id", ""))
 
-	var raw_dots: Variant = data.get("active_red_dot_paths", [])
+	var raw_dots: Variant = serialized_payload.get("active_red_dot_paths", [])
 	if raw_dots is Array:
 		for red_dot_path in raw_dots:
 			snapshot.active_red_dot_paths.append(str(red_dot_path))
 
-	var quest_tracker_data: Variant = data.get("quest_tracker", null)
-	if quest_tracker_data is Dictionary and not quest_tracker_data.is_empty():
-		snapshot.quest_tracker = ActiveQuestTrackerDTO.from_dto(quest_tracker_data)
+	var raw_quest_tracker: Variant = serialized_payload.get("quest_tracker", null)
+	if raw_quest_tracker is Dictionary and not raw_quest_tracker.is_empty():
+		snapshot.quest_tracker = ActiveQuestTrackerDTO.from_dto(raw_quest_tracker)
 
-	var mode_features_data: Variant = data.get("mode_features", null)
-	if mode_features_data is Dictionary and not mode_features_data.is_empty():
-		snapshot.mode_features = ModeFeatureManifestDTO.from_dto(mode_features_data)
+	var raw_mode_features: Variant = serialized_payload.get("mode_features", null)
+	if raw_mode_features is Dictionary and not raw_mode_features.is_empty():
+		snapshot.mode_features = ModeFeatureManifestDTO.from_dto(raw_mode_features)
 
 ## 兼容层：降级转换为精简版老快照 HudStatusSnapshotDTO（零字段断裂）
 func to_legacy_snapshot() -> HudStatusSnapshotDTO:

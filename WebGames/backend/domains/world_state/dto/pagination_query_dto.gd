@@ -37,11 +37,11 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从输入字典反序列化还原传输对象
-static func from_dto(data: Dictionary) -> PaginationQueryDTO:
-	var raw_index := int(data.get("page_index", 0))
-	var raw_size := int(data.get("page_size", DEFAULT_PAGE_SIZE))
-	var cursor := String(data.get("cursor_token", ""))
-	var filter := String(data.get("filter_tag", ""))
+static func from_dto(serialized_payload: Dictionary) -> PaginationQueryDTO:
+	var raw_index := int(serialized_payload.get("page_index", 0))
+	var raw_size := int(serialized_payload.get("page_size", DEFAULT_PAGE_SIZE))
+	var cursor := String(serialized_payload.get("cursor_token", ""))
+	var filter := String(serialized_payload.get("filter_tag", ""))
 	return PaginationQueryDTO.new(raw_index, raw_size, cursor, filter)
 
 ## 创建并返回包含默认字段的空白实体模型

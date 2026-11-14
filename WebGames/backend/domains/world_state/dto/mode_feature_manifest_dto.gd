@@ -40,14 +40,14 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从输入字典反序列化还原传输对象
-static func from_dto(data: Dictionary) -> ModeFeatureManifestDTO:
+static func from_dto(serialized_payload: Dictionary) -> ModeFeatureManifestDTO:
 	var manifest := ModeFeatureManifestDTO.new()
-	manifest.game_mode = int(data.get("game_mode", 0))
-	manifest.show_matchmaking = bool(data.get("show_matchmaking", data.get("party_matchmaking_enabled", false)))
-	manifest.show_online_chat = bool(data.get("show_online_chat", false))
-	manifest.show_real_money_shop = bool(data.get("show_real_money_shop", false))
-	manifest.show_cross_server_guild = bool(data.get("show_cross_server_guild", false))
-	manifest.enable_offline_cdkey = bool(data.get("enable_offline_cdkey", false))
-	manifest.enable_offline_gacha = bool(data.get("enable_offline_gacha", false))
-	manifest.enable_local_story_mail = bool(data.get("enable_local_story_mail", false))
+	manifest.game_mode = int(serialized_payload.get("game_mode", 0))
+	manifest.show_matchmaking = bool(serialized_payload.get("show_matchmaking", serialized_payload.get("party_matchmaking_enabled", false)))
+	manifest.show_online_chat = bool(serialized_payload.get("show_online_chat", false))
+	manifest.show_real_money_shop = bool(serialized_payload.get("show_real_money_shop", false))
+	manifest.show_cross_server_guild = bool(serialized_payload.get("show_cross_server_guild", false))
+	manifest.enable_offline_cdkey = bool(serialized_payload.get("enable_offline_cdkey", false))
+	manifest.enable_offline_gacha = bool(serialized_payload.get("enable_offline_gacha", false))
+	manifest.enable_local_story_mail = bool(serialized_payload.get("enable_local_story_mail", false))
 	return manifest

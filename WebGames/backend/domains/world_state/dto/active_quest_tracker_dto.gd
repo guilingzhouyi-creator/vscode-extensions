@@ -28,17 +28,17 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从输入字典反序列化还原传输对象
-static func from_dto(data: Dictionary) -> ActiveQuestTrackerDTO:
+static func from_dto(serialized_payload: Dictionary) -> ActiveQuestTrackerDTO:
 	var tracker := ActiveQuestTrackerDTO.new()
-	var main_quest_data: Variant = data.get("main_quest", {})
-	if main_quest_data is Dictionary:
-		tracker.main_quest = main_quest_data.duplicate()
-	var side_quest_data: Variant = data.get("side_quest", {})
-	if side_quest_data is Dictionary:
-		tracker.side_quest = side_quest_data.duplicate()
-	var daily_quest_data: Variant = data.get("daily_quest", {})
-	if daily_quest_data is Dictionary:
-		tracker.daily_quest = daily_quest_data.duplicate()
-	tracker.tracked_quest_id = str(data.get("tracked_quest_id", ""))
-	tracker.is_completable = bool(data.get("is_completable", false))
+	var raw_main_quest: Variant = serialized_payload.get("main_quest", {})
+	if raw_main_quest is Dictionary:
+		tracker.main_quest = raw_main_quest.duplicate()
+	var raw_side_quest: Variant = serialized_payload.get("side_quest", {})
+	if raw_side_quest is Dictionary:
+		tracker.side_quest = raw_side_quest.duplicate()
+	var raw_daily_quest: Variant = serialized_payload.get("daily_quest", {})
+	if raw_daily_quest is Dictionary:
+		tracker.daily_quest = raw_daily_quest.duplicate()
+	tracker.tracked_quest_id = str(serialized_payload.get("tracked_quest_id", ""))
+	tracker.is_completable = bool(serialized_payload.get("is_completable", false))
 	return tracker

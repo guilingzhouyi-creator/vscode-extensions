@@ -48,14 +48,14 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从输入字典反序列化还原传输对象
-static func from_dto(data: Dictionary) -> HudCausalDeltaDTO:
+static func from_dto(serialized_payload: Dictionary) -> HudCausalDeltaDTO:
 	var delta := HudCausalDeltaDTO.new()
-	delta.delta_category = str(data.get("delta_category", ""))
-	delta.target_field = str(data.get("target_field", ""))
-	delta.previous_value = data.get("previous_value", null)
-	delta.current_value = data.get("current_value", null)
-	delta.delta_amount = float(data.get("delta_amount", 0.0))
-	delta.cause_identifier = str(data.get("cause_identifier", ""))
-	delta.initiator = str(data.get("initiator", "SYSTEM_TICK_SIMULATION"))
-	delta.reason = str(data.get("reason", ""))
+	delta.delta_category = str(serialized_payload.get("delta_category", ""))
+	delta.target_field = str(serialized_payload.get("target_field", ""))
+	delta.previous_value = serialized_payload.get("previous_value", null)
+	delta.current_value = serialized_payload.get("current_value", null)
+	delta.delta_amount = float(serialized_payload.get("delta_amount", 0.0))
+	delta.cause_identifier = str(serialized_payload.get("cause_identifier", ""))
+	delta.initiator = str(serialized_payload.get("initiator", "SYSTEM_TICK_SIMULATION"))
+	delta.reason = str(serialized_payload.get("reason", ""))
 	return delta

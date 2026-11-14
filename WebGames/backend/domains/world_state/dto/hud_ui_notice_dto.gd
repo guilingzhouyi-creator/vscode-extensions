@@ -57,16 +57,16 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从输入字典反序列化还原传输对象
-static func from_dto(data: Dictionary) -> HudUiNoticeDTO:
+static func from_dto(serialized_payload: Dictionary) -> HudUiNoticeDTO:
 	var notice := HudUiNoticeDTO.new()
-	notice.notice_id = str(data.get("notice_id", ""))
-	notice.category = str(data.get("category", "INFO"))
-	notice.priority = int(data.get("priority", 0))
-	notice.title = str(data.get("title", ""))
-	notice.body_text = str(data.get("body_text", data.get("message_text", "")))
-	notice.is_modal = bool(data.get("is_modal", false))
+	notice.notice_id = str(serialized_payload.get("notice_id", ""))
+	notice.category = str(serialized_payload.get("category", "INFO"))
+	notice.priority = int(serialized_payload.get("priority", 0))
+	notice.title = str(serialized_payload.get("title", ""))
+	notice.body_text = str(serialized_payload.get("body_text", serialized_payload.get("message_text", "")))
+	notice.is_modal = bool(serialized_payload.get("is_modal", false))
 	notice.action_directive_ids.clear()
-	var raw_actions: Array = data.get("action_directive_ids", data.get("actions", []))
-	for action_item in raw_actions:
-		notice.action_directive_ids.append(str(action_item))
+	var raw_actions: Array = serialized_payload.get("action_directive_ids", serialized_payload.get("actions", []))
+	for directive_entry in raw_actions:
+		notice.action_directive_ids.append(str(directive_entry))
 	return notice
