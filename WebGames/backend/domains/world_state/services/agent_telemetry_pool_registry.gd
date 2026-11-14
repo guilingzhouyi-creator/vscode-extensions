@@ -4,7 +4,7 @@
 # 架构定位: Domain Service / Object Pool Orchestration & Bridge
 # 依赖与触发: 上游: AgentHudSliceSolver, HomeActionSpaceSolver | 下游: Agent DTOs, 注入式池后端端口 | 配置: config/infrastructure/object_pool.json
 # 职责说明: 面向 Agent 遥测高频推演的深度对象池化注册与借还门面。
-#           通过依赖倒置端口接入基础设施池管理器，并提供领域内有界 LIFO 兜底栈，集中守恒借还且阻断跨层倒置依赖。
+#           通过依赖倒置端口接入基础设施池管理器，并提供领域内有界 LIFO 安全回退栈，集中守恒借还且阻断跨层倒置依赖。
 # 退出语义与设计依据: 高承压对象池与数据导向无头处理器架构规范 (Inv-DEEP-POOL-CONSERVATION-1, ADV-PRF-002)
 # ==============================================================================
 
@@ -25,47 +25,47 @@ const MAX_LOCAL_POOL_CAPACITY: int = 256
 const METHOD_RESET_STATE: String = "reset_state"
 
 static var _pools_registered: bool = false
-static var _backend_ensure_cb: Callable = Callable()
-static var _backend_acquire_cb: Callable = Callable()
-static var _backend_release_cb: Callable = Callable()
+static var _backend_ensure_callback: Callable = Callable()
+static var _backend_acquire_callback: Callable = Callable()
+static var _backend_release_callback: Callable = Callable()
 static var _local_pools: Dictionary = {}
 
 ## 基础设施层依赖倒置注入端口：由装配入口绑定 ObjectPoolManager 回调
-static func bind_pool_backend(ensure_cb: Callable, acquire_cb: Callable, release_cb: Callable) -> void:
-	_backend_ensure_cb = ensure_cb
-	_backend_acquire_cb = acquire_cb
-	_backend_release_cb = release_cb
+static func bind_pool_backend(ensure_callback: Callable, acquire_callback: Callable, release_callback: Callable) -> void:
+	_backend_ensure_callback = ensure_callback
+	_backend_acquire_callback = acquire_callback
+	_backend_release_callback = release_callback
 	_pools_registered = false
 
 static func _ensure_pool(pool_name: String, factory: Callable) -> void:
-	if _backend_ensure_cb.is_valid():
-		_backend_ensure_cb.call(pool_name, factory)
+	if _backend_ensure_callback.is_valid():
+		_backend_ensure_callback.call(pool_name, factory)
 		return
 	if not _local_pools.has(pool_name):
 		_local_pools[pool_name] = []
 
 static func _acquire_from_pool(pool_name: String) -> RefCounted:
-	if _backend_acquire_cb.is_valid():
-		return _backend_acquire_cb.call(pool_name) as RefCounted
+	if _backend_acquire_callback.is_valid():
+		return _backend_acquire_callback.call(pool_name) as RefCounted
 	var stack: Array = _local_pools.get(pool_name, [])
 	if not stack.is_empty():
-		var obj: RefCounted = stack.pop_back()
-		if obj != null and obj.has_method(METHOD_RESET_STATE):
-			obj.reset_state()
-		return obj
+		var pooled_object: RefCounted = stack.pop_back()
+		if pooled_object != null and pooled_object.has_method(METHOD_RESET_STATE):
+			pooled_object.reset_state()
+		return pooled_object
 	return null
 
-static func _release_to_pool(pool_name: String, obj: RefCounted) -> void:
-	if _backend_release_cb.is_valid():
-		_backend_release_cb.call(pool_name, obj)
+static func _release_to_pool(pool_name: String, pooled_object: RefCounted) -> void:
+	if _backend_release_callback.is_valid():
+		_backend_release_callback.call(pool_name, pooled_object)
 		return
 	if not _local_pools.has(pool_name):
 		_local_pools[pool_name] = []
 	var stack: Array = _local_pools[pool_name]
 	if stack.size() < MAX_LOCAL_POOL_CAPACITY:
-		if obj.has_method(METHOD_RESET_STATE):
-			obj.reset_state()
-		stack.append(obj)
+		if pooled_object.has_method(METHOD_RESET_STATE):
+			pooled_object.reset_state()
+		stack.append(pooled_object)
 
 ## 确保所有 Agent 专用池均已在池后端登记
 static func ensure_pools_registered() -> void:
@@ -88,9 +88,9 @@ static func ensure_pools_registered() -> void:
 ## 借出遥测数据包外壳
 static func borrow_packet() -> AgentHudTelemetryPacketDTO:
 	ensure_pools_registered()
-	var obj := _acquire_from_pool(POOL_PACKET) as AgentHudTelemetryPacketDTO
-	if obj != null:
-		return obj
+	var pooled_packet := _acquire_from_pool(POOL_PACKET) as AgentHudTelemetryPacketDTO
+	if pooled_packet != null:
+		return pooled_packet
 	return AgentHudTelemetryPacketDTO.new()
 
 ## 归还遥测数据包
@@ -104,10 +104,10 @@ static func recycle_packet(packet: AgentHudTelemetryPacketDTO) -> void:
 static func recycle_packet_tree(packet: AgentHudTelemetryPacketDTO, keep_observation: AgentHudContextSliceDTO = null) -> void:
 	if packet == null:
 		return
-	var obs := packet.observation
+	var observation_slice := packet.observation
 	packet.observation = null
-	if obs != null and obs != keep_observation:
-		recycle_slice(obs)
+	if observation_slice != null and observation_slice != keep_observation:
+		recycle_slice(observation_slice)
 
 	if not packet.causal_deltas.is_empty():
 		for delta in packet.causal_deltas:
@@ -126,9 +126,9 @@ static func recycle_packet_tree(packet: AgentHudTelemetryPacketDTO, keep_observa
 ## 借出上下文观测切片
 static func borrow_slice() -> AgentHudContextSliceDTO:
 	ensure_pools_registered()
-	var obj := _acquire_from_pool(POOL_SLICE) as AgentHudContextSliceDTO
-	if obj != null:
-		return obj
+	var pooled_slice := _acquire_from_pool(POOL_SLICE) as AgentHudContextSliceDTO
+	if pooled_slice != null:
+		return pooled_slice
 	return AgentHudContextSliceDTO.new()
 
 ## 归还上下文观测切片
@@ -141,9 +141,9 @@ static func recycle_slice(slice: AgentHudContextSliceDTO) -> void:
 ## 借出行动指令对象
 static func borrow_directive() -> AgentActionDirectiveDTO:
 	ensure_pools_registered()
-	var obj := _acquire_from_pool(POOL_DIRECTIVE) as AgentActionDirectiveDTO
-	if obj != null:
-		return obj
+	var pooled_directive := _acquire_from_pool(POOL_DIRECTIVE) as AgentActionDirectiveDTO
+	if pooled_directive != null:
+		return pooled_directive
 	return AgentActionDirectiveDTO.new()
 
 ## 归还行动指令对象
@@ -156,9 +156,9 @@ static func recycle_directive(directive: AgentActionDirectiveDTO) -> void:
 ## 借出因果差分对象
 static func borrow_delta() -> HudCausalDeltaDTO:
 	ensure_pools_registered()
-	var obj := _acquire_from_pool(POOL_DELTA) as HudCausalDeltaDTO
-	if obj != null:
-		return obj
+	var pooled_delta := _acquire_from_pool(POOL_DELTA) as HudCausalDeltaDTO
+	if pooled_delta != null:
+		return pooled_delta
 	return HudCausalDeltaDTO.new()
 
 ## 归还因果差分对象

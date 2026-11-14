@@ -5,7 +5,7 @@
 # 依赖与触发: 上游: AgentActionPacketDTO | 下游: AuthoritativeHudSnapshotDTO, HomeActionSpaceSolver | 配置: config/domains/world_state/core.json
 # 职责说明: 面向 Agent 的动作校验与前置派发求解器。
 #           执行指令白名单校验、前置条件动态判定、人类操作抢占阻断与无头领域服务直投。
-# 退出语义与设计依据: 主页HUD面向Agent结构化切片流与行动空间双轨适配引擎施工细则 (Inv-ACTION-ORACLE-6, Inv-HUMAN-PREEMPTION-SOLVER-7)
+# 退出语义与设计依据: 主页HUD面向Agent结构化切片流与行动空间双通道适配引擎设计规范 (Inv-ACTION-ORACLE-6, Inv-HUMAN-PREEMPTION-SOLVER-7)
 # ==============================================================================
 
 ## AgentActionExecutionSolver：Domain Solver / Action Dispatch & Execution Oracle
@@ -15,26 +15,26 @@ extends RefCounted
 const AgentTelemetryPoolRegistry = preload("res://backend/domains/world_state/services/agent_telemetry_pool_registry.gd")
 
 static func _recycle_action_space(action_space: Array[AgentActionDirectiveDTO]) -> void:
-	for d in action_space:
-		if d != null:
-			AgentTelemetryPoolRegistry.recycle_directive(d)
+	for directive in action_space:
+		if directive != null:
+			AgentTelemetryPoolRegistry.recycle_directive(directive)
 	action_space.clear()
 
 ## 校验并执行来自专属动作通道的 AgentActionPacketDTO
 static func validate_and_execute(
-	action_pkt: AgentActionPacketDTO,
+	action_packet: AgentActionPacketDTO,
 	snapshot: AuthoritativeHudSnapshotDTO,
 	is_human_lease_active: bool = false
 ) -> Dictionary:
-	if action_pkt == null:
+	if action_packet == null:
 		return {
 			"success": false,
 			"error_code": "ERR_NULL_ACTION_PACKET",
 			"cause": ""
 		}
 
-	var d_id: String = _extract_directive_id(action_pkt)
-	if d_id.is_empty():
+	var directive_id: String = _extract_directive_id(action_packet)
+	if directive_id.is_empty():
 		return {
 			"success": false,
 			"error_code": "ERR_EMPTY_DIRECTIVE",
@@ -53,9 +53,9 @@ static func validate_and_execute(
 	var action_space: Array[AgentActionDirectiveDTO] = []
 	HomeActionSpaceSolver.resolve_action_space_into(snapshot, action_space, is_human_lease_active)
 	var target_directive: AgentActionDirectiveDTO = null
-	for d in action_space:
-		if d.directive_id == d_id:
-			target_directive = d
+	for directive in action_space:
+		if directive.directive_id == directive_id:
+			target_directive = directive
 			break
 
 	# 2. 检查指令是否在合法值域内 (Inv-ACTION-ORACLE-6)
@@ -79,42 +79,42 @@ static func validate_and_execute(
 
 	_recycle_action_space(action_space)
 	# 4. 路由派发至对应领域用例 (纯无头逻辑调用，零UI依赖)
-	return _dispatch_domain_execution(d_id, action_pkt, snapshot)
+	return _dispatch_domain_execution(directive_id, action_packet, snapshot)
 
-static func _extract_directive_id(pkt: AgentActionPacketDTO) -> String:
-	if not pkt.directive_id.is_empty():
-		return pkt.directive_id
-	if not pkt.action_id.is_empty():
-		return pkt.action_id
+static func _extract_directive_id(packet: AgentActionPacketDTO) -> String:
+	if not packet.directive_id.is_empty():
+		return packet.directive_id
+	if not packet.action_id.is_empty():
+		return packet.action_id
 	return ""
 
-static func _extract_params(pkt: AgentActionPacketDTO) -> Dictionary:
-	if not pkt.params.is_empty():
-		return pkt.params
-	if not pkt.parameters.is_empty():
-		return pkt.parameters
+static func _extract_params(packet: AgentActionPacketDTO) -> Dictionary:
+	if not packet.params.is_empty():
+		return packet.params
+	if not packet.parameters.is_empty():
+		return packet.parameters
 	return {}
 
 static func _dispatch_domain_execution(
 	directive_id: String,
-	action_pkt: AgentActionPacketDTO,
+	action_packet: AgentActionPacketDTO,
 	snapshot: AuthoritativeHudSnapshotDTO
 ) -> Dictionary:
-	var params := _extract_params(action_pkt)
+	var params := _extract_params(action_packet)
 
 	match directive_id:
 		"ALLOCATE_POTENTIAL_STAT", "ALLOCATE_POTENTIAL":
-			var stat: String = str(params.get("stat_target", params.get("stat", params.get("attribute", "STR"))))
-			var pts: int = int(params.get("points", params.get("amount", 1)))
-			if stat.is_empty() or pts <= 0 or snapshot.unallocated_potential_points < pts:
+			var target_stat: String = str(params.get("stat_target", params.get("stat", params.get("attribute", "STR"))))
+			var points: int = int(params.get("points", params.get("amount", 1)))
+			if target_stat.is_empty() or points <= 0 or snapshot.unallocated_potential_points < points:
 				return {
 					"success": false,
 					"error_code": "ERR_INVALID_STAT_PARAMS",
 					"cause": ""
 				}
-			snapshot.unallocated_potential_points -= pts
-			var curr_val: float = float(snapshot.attribute_values.get(stat, 10.0))
-			snapshot.attribute_values[stat] = curr_val + float(pts)
+			snapshot.unallocated_potential_points -= points
+			var current_value: float = float(snapshot.attribute_values.get(target_stat, 10.0))
+			snapshot.attribute_values[target_stat] = current_value + float(points)
 			return {
 				"success": true,
 				"error_code": "",

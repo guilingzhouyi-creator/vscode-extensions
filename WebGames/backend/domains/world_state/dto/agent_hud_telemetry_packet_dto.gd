@@ -4,7 +4,7 @@
 # 架构定位: 顶层遥测数据信封传输模型
 # 依赖与触发: 上游: AgentHudSliceSolver | 下游: CompanionObserverBus, LLM 决策客户端 | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
 # 职责说明: 面向 LLM 逐包解读的标准原子遥测数据包外壳契约，封装信封与控制权租约、纯净观测、单步因果差分及动态行动空间。
-# 退出语义与设计依据: 主页HUD面向Agent结构化切片流与行动空间双轨适配引擎规约 (Inv-STANDARD-PACKET-ENVELOPE-1, Inv-HUMAN-SUPREMACY-PREEMPTION-10)
+# 退出语义与设计依据: 主页HUD面向Agent结构化切片流与行动空间双通道适配引擎规约 (Inv-STANDARD-PACKET-ENVELOPE-1, Inv-HUMAN-SUPREMACY-PREEMPTION-10)
 # ==============================================================================
 
 ## AgentHudTelemetryPacketDTO：顶层遥测数据信封传输模型
@@ -59,15 +59,15 @@ func reset_state() -> void:
 
 ## 序列化当前遥测数据信封为字典结构
 func to_dto() -> Dictionary:
-	var deltas_arr: Array[Dictionary] = []
-	for d in causal_deltas:
-		if d != null:
-			deltas_arr.append(d.to_dto())
+	var delta_entries: Array[Dictionary] = []
+	for delta_item in causal_deltas:
+		if delta_item != null:
+			delta_entries.append(delta_item.to_dto())
 
-	var actions_arr: Array[Dictionary] = []
-	for a in action_space:
-		if a != null:
-			actions_arr.append(a.to_dto())
+	var action_entries: Array[Dictionary] = []
+	for action_item in action_space:
+		if action_item != null:
+			action_entries.append(action_item.to_dto())
 
 	return {
 		"envelope": {
@@ -86,42 +86,42 @@ func to_dto() -> Dictionary:
 			}
 		},
 		"observation": observation.to_dto() if observation != null else {},
-		"causal_deltas": deltas_arr,
-		"action_space": actions_arr
+		"causal_deltas": delta_entries,
+		"action_space": action_entries
 	}
 
 ## 从输入字典反序列化解析还原遥测数据信封传输对象
 static func from_dto(data: Dictionary) -> AgentHudTelemetryPacketDTO:
-	var pkt := AgentHudTelemetryPacketDTO.new()
-	var env: Dictionary = data.get("envelope", {})
-	pkt.protocol_version = str(env.get("protocol_version", "1.0.0"))
-	pkt.packet_id = str(env.get("packet_id", ""))
-	pkt.sequence_index = int(env.get("sequence_index", 0))
-	pkt.timestamp_ms = int(env.get("timestamp_ms", 0))
-	pkt.domain = str(env.get("domain", "HOME_HUD"))
-	pkt.is_terminal = bool(env.get("is_terminal", false))
+	var packet := AgentHudTelemetryPacketDTO.new()
+	var envelope_data: Dictionary = data.get("envelope", {})
+	packet.protocol_version = str(envelope_data.get("protocol_version", "1.0.0"))
+	packet.packet_id = str(envelope_data.get("packet_id", ""))
+	packet.sequence_index = int(envelope_data.get("sequence_index", 0))
+	packet.timestamp_ms = int(envelope_data.get("timestamp_ms", 0))
+	packet.domain = str(envelope_data.get("domain", "HOME_HUD"))
+	packet.is_terminal = bool(envelope_data.get("is_terminal", false))
 
-	var lease: Dictionary = env.get("control_lease", {})
-	pkt.human_interaction_state = str(lease.get("human_interaction_state", "IDLE"))
-	pkt.agent_control_mode = str(lease.get("agent_control_mode", "READ_WRITE"))
-	pkt.active_operator = str(lease.get("active_operator", "IDLE"))
-	pkt.is_writable = bool(lease.get("is_writable", true))
-	pkt.preempted_by_human = bool(lease.get("preempted_by_human", false))
+	var lease: Dictionary = envelope_data.get("control_lease", {})
+	packet.human_interaction_state = str(lease.get("human_interaction_state", "IDLE"))
+	packet.agent_control_mode = str(lease.get("agent_control_mode", "READ_WRITE"))
+	packet.active_operator = str(lease.get("active_operator", "IDLE"))
+	packet.is_writable = bool(lease.get("is_writable", true))
+	packet.preempted_by_human = bool(lease.get("preempted_by_human", false))
 
-	var obs_dict: Dictionary = data.get("observation", {})
-	if not obs_dict.is_empty():
-		pkt.observation = AgentHudContextSliceDTO.from_dto(obs_dict)
+	var observation_dict: Dictionary = data.get("observation", {})
+	if not observation_dict.is_empty():
+		packet.observation = AgentHudContextSliceDTO.from_dto(observation_dict)
 
-	pkt.causal_deltas.clear()
+	packet.causal_deltas.clear()
 	var raw_deltas: Array = data.get("causal_deltas", [])
-	for d in raw_deltas:
-		if d is Dictionary:
-			pkt.causal_deltas.append(HudCausalDeltaDTO.from_dto(d))
+	for delta_item in raw_deltas:
+		if delta_item is Dictionary:
+			packet.causal_deltas.append(HudCausalDeltaDTO.from_dto(delta_item))
 
-	pkt.action_space.clear()
+	packet.action_space.clear()
 	var raw_actions: Array = data.get("action_space", [])
-	for a in raw_actions:
-		if a is Dictionary:
-			pkt.action_space.append(AgentActionDirectiveDTO.from_dto(a))
+	for action_item in raw_actions:
+		if action_item is Dictionary:
+			packet.action_space.append(AgentActionDirectiveDTO.from_dto(action_item))
 
-	return pkt
+	return packet
