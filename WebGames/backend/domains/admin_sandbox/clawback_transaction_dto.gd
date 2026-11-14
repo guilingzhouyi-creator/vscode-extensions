@@ -22,19 +22,20 @@ var item_id: String = ""
 var instance_id: String = ""
 var audit_id: String = ""
 
+## 构造资产追缴事务上下文载荷
 func _init(
-	p_admin: AdminPermissionAggregate = null,
-	p_mode: String = "online",
-	p_target_key: String = "",
-	p_amount: int = 0,
-	p_reason: String = "",
-	p_wallet: CharacterWalletEntity = null,
-	p_audit_id: String = ""
+	initial_admin: AdminPermissionAggregate = null,
+	initial_mode: String = "online",
+	initial_target_key: String = "",
+	initial_amount: int = 0,
+	initial_reason: String = "",
+	initial_wallet: CharacterWalletEntity = null,
+	initial_audit_id: String = ""
 ) -> void:
-	admin = p_admin
-	mode = p_mode
-	target_key = p_target_key
-	amount = p_amount
-	reason = p_reason
-	wallet = p_wallet
-	audit_id = p_audit_id
+	admin = initial_admin
+	mode = initial_mode
+	target_key = initial_target_key
+	amount = initial_amount
+	reason = initial_reason
+	wallet = initial_wallet
+	audit_id = initial_audit_id

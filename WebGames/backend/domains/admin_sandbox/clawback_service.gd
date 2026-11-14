@@ -35,10 +35,11 @@ class ClawbackContext extends PoolableDtoBase:
 	var canonical_id: String = ""
 	var quantity: int = 0
 	var inventory: WearableInventoryAggregate = null
-	var library: AccountItemLibraryAggregate = null
+	var library: AccountItemLibrary = null
 	var item_id: String = ""
 	var item_uid: String = ""
 
+	## 重置追缴请求上下文状态，供对象池无堆分配复用
 	func reset_state() -> void:
 		super.reset_state()
 		admin = null
@@ -69,19 +70,19 @@ static func _begin_clawback_tx(
 	var gate := _gate(admin, mode)
 	if not gate.success:
 		return {"ok": false, "response": gate}
-	var tx_id: String = audit_id if not audit_id.is_empty() else "%s_%s" % [default_prefix, str(Time.get_ticks_usec())]
-	if _processed_audits.has(tx_id):
-		return {"ok": false, "response": {"success": false, "error_code": "IDEMPOTENCY_REPLAY", "audit_id": tx_id}}
-	return {"ok": true, "tx_id": tx_id}
+	var transaction_id: String = audit_id if not audit_id.is_empty() else "%s_%s" % [default_prefix, str(Time.get_ticks_usec())]
+	if _processed_audits.has(transaction_id):
+		return {"ok": false, "response": {"success": false, "error_code": "IDEMPOTENCY_REPLAY", "audit_id": transaction_id}}
+	return {"ok": true, "tx_id": transaction_id}
 
 static func _commit_clawback_tx(
 	admin: AdminPermissionAggregate,
 	action: String,
-	tx_id: String,
+	transaction_id: String,
 	details: Dictionary
 ) -> void:
 	_audit(admin, action, details)
-	_processed_audits[tx_id] = true
+	_processed_audits[transaction_id] = true
 	_prune_processed_audits()
 
 ## 当前运行模式（联机服务端宿主默认 online；单机进程在配置里置 standalone）
@@ -89,10 +90,10 @@ static func current_run_mode() -> String:
 	return GameConfig.get_string("infrastructure.admin", "run/mode", RUN_MODE_ONLINE)
 
 ## 强类型上下文货币追缴入口（供运营后台与可扩展工作流调用）
-static func clawback_currency_with_context(ctx: ClawbackContext) -> Dictionary:
-	if ctx == null:
+static func clawback_currency_with_context(context: ClawbackContext) -> Dictionary:
+	if context == null:
 		return {"success": false, "error_code": "CLAWBACK_INVALID_TARGET"}
-	return clawback_currency(ctx.admin, ctx.mode, ctx.currency_key, ctx.amount, ctx.reason, ctx.wallet, ctx.audit_id)
+	return clawback_currency(context.admin, context.mode, context.currency_key, context.amount, context.reason, context.wallet, context.audit_id)
 
 ## 货币追缴：按币种回扣非法刷取金额，支持扣至负数（超额部分记为欠账/赤字，
 ## 钱包 is_in_debt 语义；负数余额即对运营方的欠账，可由 get_net_debt_copper 查询）
@@ -105,27 +106,27 @@ static func clawback_currency(
 	wallet: CharacterWalletEntity,
 	audit_id: String = ""
 ) -> Dictionary:
-	var tx_begin := _begin_clawback_tx(admin, mode, "CLAWBACK_%s" % currency_key, audit_id)
-	if not bool(tx_begin.get("ok", false)):
+	var transaction_begin := _begin_clawback_tx(admin, mode, "CLAWBACK_%s" % currency_key, audit_id)
+	if not bool(transaction_begin.get("ok", false)):
 		if not _gate(admin, mode).success:
-			return tx_begin["response"]
+			return transaction_begin["response"]
 		if wallet == null or amount <= 0 or not _currency_keys().has(currency_key):
 			return {"success": false, "error_code": "CLAWBACK_INVALID_TARGET"}
-		return tx_begin["response"]
+		return transaction_begin["response"]
 	if wallet == null or amount <= 0 or not _currency_keys().has(currency_key):
 		return {"success": false, "error_code": "CLAWBACK_INVALID_TARGET"}
-	var tx_id: String = str(tx_begin["tx_id"])
+	var transaction_id: String = str(transaction_begin["tx_id"])
 
 	var balance_before := _wallet_balance(wallet, currency_key)
 	var delta := {}
 	delta[currency_key] = - amount
 	var applied := wallet.apply_transaction(delta, true)
 	if not applied.get("success", false):
-		return {"success": false, "error_code": applied.get("error_code", "CLAWBACK_NOT_ATOMIC"), "audit_id": tx_id}
+		return {"success": false, "error_code": applied.get("error_code", "CLAWBACK_NOT_ATOMIC"), "audit_id": transaction_id}
 	var balance_after := _wallet_balance(wallet, currency_key)
 	var into_debt := wallet.is_in_debt()
-	_commit_clawback_tx(admin, "CLAWBACK_CURRENCY", tx_id, {
-		"audit_id": tx_id,
+	_commit_clawback_tx(admin, "CLAWBACK_CURRENCY", transaction_id, {
+		"audit_id": transaction_id,
 		"reason": reason, "currency_key": currency_key,
 		"requested": amount, "actual_clawed": amount,
 		"balance_before": balance_before, "balance_after": balance_after,
@@ -140,14 +141,14 @@ static func clawback_currency(
 		"balance_after": balance_after,
 		"into_debt": into_debt,
 		"net_debt_copper": wallet.get_net_debt_copper(),
-		"audit_id": tx_id
+		"audit_id": transaction_id
 	}
 
 ## 强类型上下文原型物品追缴入口
-static func clawback_item_prototype_with_context(ctx: ClawbackContext) -> Dictionary:
-	if ctx == null:
+static func clawback_item_prototype_with_context(context: ClawbackContext) -> Dictionary:
+	if context == null:
 		return {"success": false, "error_code": "CLAWBACK_INVALID_TARGET"}
-	return clawback_item_prototype(ctx.admin, ctx.mode, ctx.canonical_id, ctx.quantity, ctx.reason, ctx.inventory, ctx.library, ctx.audit_id)
+	return clawback_item_prototype(context.admin, context.mode, context.canonical_id, context.quantity, context.reason, context.inventory, context.library, context.audit_id)
 
 ## 原型物品追缴：按 canonical_id 回扣指定数量的同原型实例，超额钳制到实际持有数
 static func clawback_item_prototype(
@@ -157,24 +158,24 @@ static func clawback_item_prototype(
 	quantity: int,
 	reason: String,
 	inventory: WearableInventoryAggregate,
-	library: AccountItemLibraryAggregate = null,
+	library: AccountItemLibrary = null,
 	audit_id: String = ""
 ) -> Dictionary:
-	var tx_begin := _begin_clawback_tx(admin, mode, "CLAWBACK_ITEM_%s" % canonical_id, audit_id)
-	if not bool(tx_begin.get("ok", false)):
+	var transaction_begin := _begin_clawback_tx(admin, mode, "CLAWBACK_ITEM_%s" % canonical_id, audit_id)
+	if not bool(transaction_begin.get("ok", false)):
 		var gate_check: Dictionary = _gate(admin, mode)
 		if not gate_check.success:
 			return gate_check
 		if inventory == null or canonical_id.is_empty() or quantity <= 0:
 			return {"success": false, "error_code": "CLAWBACK_INVALID_TARGET", "message": _msg("clawback_invalid_target")}
-		return tx_begin["response"]
+		return transaction_begin["response"]
 	if inventory == null or canonical_id.is_empty() or quantity <= 0:
 		return {
 			"success": false,
 			"error_code": "CLAWBACK_INVALID_TARGET",
 			"message": _msg("clawback_invalid_target")
 		}
-	var tx_id: String = str(tx_begin["tx_id"])
+	var transaction_id: String = str(transaction_begin["tx_id"])
 	var inventory_snapshot := inventory.snapshot()
 
 	var matches: Array = []
@@ -191,16 +192,16 @@ static func clawback_item_prototype(
 			"error_code": "CLAWBACK_NOTHING_TO_CLAW",
 			"message": _msg("clawback_nothing_to_claw")
 		}
-	for i in range(actual):
-		if inventory.remove_owned_item(matches[i]) == WearableInventoryAggregate.RemovalOutcome.NOT_FOUND:
+	for match_index in range(actual):
+		if inventory.remove_owned_item(matches[match_index]) == WearableInventoryAggregate.RemovalOutcome.NOT_FOUND:
 			inventory.restore(inventory_snapshot)
-			return {"success": false, "error_code": "CLAWBACK_NOT_ATOMIC", "audit_id": tx_id}
+			return {"success": false, "error_code": "CLAWBACK_NOT_ATOMIC", "audit_id": transaction_id}
 	if library != null:
 		ItemStatisticsSolver.record_item_event(library, ItemStatisticsSolver.EVENT_ITEM_CLAWED_BACK, canonical_id, actual, null, null, {
 			"transaction_id": "CLAWBACK_ITEM"
 		})
-	_commit_clawback_tx(admin, "CLAWBACK_ITEM_PROTOTYPE", tx_id, {
-		"audit_id": tx_id,
+	_commit_clawback_tx(admin, "CLAWBACK_ITEM_PROTOTYPE", transaction_id, {
+		"audit_id": transaction_id,
 		"reason": reason, "canonical_id": canonical_id,
 		"requested": quantity, "actual_clawed": actual, "clamped": actual < quantity
 	})
@@ -210,14 +211,14 @@ static func clawback_item_prototype(
 		"requested": quantity,
 		"actual_clawed": actual,
 		"clamped": actual < quantity,
-		"audit_id": tx_id
+		"audit_id": transaction_id
 	}
 
 ## 强类型上下文实例物品追缴入口
-static func clawback_item_instance_with_context(ctx: ClawbackContext) -> Dictionary:
-	if ctx == null:
+static func clawback_item_instance_with_context(context: ClawbackContext) -> Dictionary:
+	if context == null:
 		return {"success": false, "error_code": "CLAWBACK_INVALID_TARGET"}
-	return clawback_item_instance(ctx.admin, ctx.mode, ctx.item_id, ctx.reason, ctx.inventory, ctx.library, ctx.item_uid, ctx.audit_id)
+	return clawback_item_instance(context.admin, context.mode, context.item_id, context.reason, context.inventory, context.library, context.item_uid, context.audit_id)
 
 ## 实例物品追缴：按 item_uid 精确回扣（权威），item_id 兼容回退（针对定向刷取的唯一实例）
 static func clawback_item_instance(
@@ -226,26 +227,26 @@ static func clawback_item_instance(
 	item_id: String,
 	reason: String,
 	inventory: WearableInventoryAggregate,
-	library: AccountItemLibraryAggregate = null,
+	library: AccountItemLibrary = null,
 	item_uid: String = "",
 	audit_id: String = ""
 ) -> Dictionary:
 	var key_part: String = item_uid if not item_uid.is_empty() else item_id
-	var tx_begin := _begin_clawback_tx(admin, mode, "CLAWBACK_INSTANCE_%s" % key_part, audit_id)
-	if not bool(tx_begin.get("ok", false)):
+	var transaction_begin := _begin_clawback_tx(admin, mode, "CLAWBACK_INSTANCE_%s" % key_part, audit_id)
+	if not bool(transaction_begin.get("ok", false)):
 		var gate_check: Dictionary = _gate(admin, mode)
 		if not gate_check.success:
 			return gate_check
 		if inventory == null or (item_id.is_empty() and item_uid.is_empty()):
 			return {"success": false, "error_code": "CLAWBACK_INVALID_TARGET", "message": _msg("clawback_invalid_target")}
-		return tx_begin["response"]
+		return transaction_begin["response"]
 	if inventory == null or (item_id.is_empty() and item_uid.is_empty()):
 		return {
 			"success": false,
 			"error_code": "CLAWBACK_INVALID_TARGET",
 			"message": _msg("clawback_invalid_target")
 		}
-	var tx_id: String = str(tx_begin["tx_id"])
+	var transaction_id: String = str(transaction_begin["tx_id"])
 
 	var item: ItemEntity = inventory.find_item_by_item_uid(item_uid) if not item_uid.is_empty() else inventory.find_item_by_item_id(item_id)
 	if item == null:
@@ -255,17 +256,17 @@ static func clawback_item_instance(
 			"message": _msg("clawback_nothing_to_claw")
 		}
 	if inventory.remove_owned_item(item) == WearableInventoryAggregate.RemovalOutcome.NOT_FOUND:
-		return {"success": false, "error_code": "CLAWBACK_NOT_ATOMIC", "audit_id": tx_id}
+		return {"success": false, "error_code": "CLAWBACK_NOT_ATOMIC", "audit_id": transaction_id}
 	if library != null:
 		ItemStatisticsSolver.record_item_event(library, ItemStatisticsSolver.EVENT_ITEM_CLAWED_BACK, item.template_id, 1, null, null, {
 			"uid": item.item_uid,
 			"transaction_id": "CLAWBACK_ITEM"
 		})
-	_commit_clawback_tx(admin, "CLAWBACK_ITEM_INSTANCE", tx_id, {
-		"audit_id": tx_id,
+	_commit_clawback_tx(admin, "CLAWBACK_ITEM_INSTANCE", transaction_id, {
+		"audit_id": transaction_id,
 		"reason": reason, "item_id": item_id, "item_uid": item.item_uid, "template_id": item.template_id, "actual_clawed": 1
 	})
-	return {"success": true, "item_id": item_id, "item_uid": item.item_uid, "template_id": item.template_id, "actual_clawed": 1, "audit_id": tx_id}
+	return {"success": true, "item_id": item_id, "item_uid": item.item_uid, "template_id": item.template_id, "actual_clawed": 1, "audit_id": transaction_id}
 
 # ==============================================================================
 # 内部实现

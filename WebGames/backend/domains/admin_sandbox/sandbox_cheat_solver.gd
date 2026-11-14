@@ -18,8 +18,8 @@ static func execute_cheat_command(
 	context: Dictionary
 ) -> Dictionary:
 	if not admin.has_permission(AdminPermissionAggregate.AdminLevel.LEVEL_GAME_MASTER):
-		var msg := GameConfig.get_string("narratives.admin", "insufficient_permission", "Insufficient GM permissions.")
-		return { "success": false, "reason": msg }
+		var reason_message := GameConfig.get_string("narratives.admin", "insufficient_permission", "Insufficient GM permissions.")
+		return { "success": false, "reason": reason_message }
 
 	match command_name:
 		"GOD_MODE":
@@ -30,7 +30,7 @@ static func execute_cheat_command(
 				for stat_key in AttributeConversionEngine.DEFAULT_STAT_LIST:
 					sheet.set_level(stat_key, AttributeConversionEngine.max_level())
 					sheet.set_progress(stat_key, 1.0)
-				LifeCycleAndPhysiologySolver.calculate_somatic_function(sheet)
+				LifecycleAndPhysiologySolver.calculate_somatic_function(sheet)
 				EventBusCore.get_instance().emit_narrative_by_key(
 					"admin/god_mode", "system", [AttributeConversionEngine.max_level()]
 				)
@@ -44,15 +44,15 @@ static func execute_cheat_command(
 				EventBusCore.get_instance().emit_narrative_by_key("admin/give_gold", "system", [amount])
 				return { "success": true, "gold_added": amount }
 		"GIVE_ITEM":
-			var inv: WearableInventoryAggregate = context.get("inventory", null)
-			if inv == null:
-				var no_inv := GameConfig.get_string("narratives.admin", "give_item_no_inventory", "No inventory context for give item.")
-				return { "success": false, "reason": no_inv }
+			var inventory: WearableInventoryAggregate = context.get("inventory", null)
+			if inventory == null:
+				var no_inventory_message := GameConfig.get_string("narratives.admin", "give_item_no_inventory", "No inventory context for give item.")
+				return { "success": false, "reason": no_inventory_message }
 			# 物品注册表必填（严格按统一英文名发放，无兼容临时物件路径）
 			var catalog: ItemRegistryCatalog = context.get("catalog", null)
 			if catalog == null:
-				var no_reg := GameConfig.get_string("narratives.admin", "give_item_no_registry", "No item registry context for give item.")
-				return { "success": false, "reason": no_reg }
+				var no_registry_message := GameConfig.get_string("narratives.admin", "give_item_no_registry", "No item registry context for give item.")
+				return { "success": false, "reason": no_registry_message }
 			var default_name := GameConfig.get_string("infrastructure.admin", "sandbox/give_item_default_name", "【GM创世神器】")
 			var item_name: Variant = str(args[0]) if args.size() > 0 else default_name
 			var count := int(args[1]) if args.size() > 1 else 1
@@ -60,18 +60,18 @@ static func execute_cheat_command(
 			# 严格按统一英文名解析（唯一合法输入）：中文别名、数字 ID、canonical_id 一律拒绝
 			var resolved: Variant = ItemRegistrySolver.resolve_by_english_name(catalog, item_name)
 			if not resolved.success:
-				var nf := GameConfig.get_string("narratives.admin", "give_item_not_found", "Item not found in registry: %s") % item_name
-				return { "success": false, "reason": nf }
-			var proto: Variant = catalog.get_prototype(resolved.canonical_id)
+				var not_found_message := GameConfig.get_string("narratives.admin", "give_item_not_found", "Item not found in registry: %s") % item_name
+				return { "success": false, "reason": not_found_message }
+			var prototype: Variant = catalog.get_prototype(resolved.canonical_id)
 			var added := 0
-			for i in range(count):
-				var item := _build_registry_item(item_name, proto)
-				if inv.add_item(item):
+			for item_index in range(count):
+				var item := _build_registry_item(item_name, prototype)
+				if inventory.add_item(item):
 					added += 1
 			EventBusCore.get_instance().emit_narrative_by_key("admin/give_item", "system", [item_name])
-			var stats_lib: AccountItemLibraryAggregate = context.get("item_stats_library", null)
-			if stats_lib != null and added > 0:
-				ItemStatisticsSolver.record_item_event(stats_lib, ItemStatisticsSolver.EVENT_ITEM_GRANTED, resolved.canonical_id, added, catalog, null, {
+			var stats_library: AccountItemLibrary = context.get("item_stats_library", null)
+			if stats_library != null and added > 0:
+				ItemStatisticsSolver.record_item_event(stats_library, ItemStatisticsSolver.EVENT_ITEM_GRANTED, resolved.canonical_id, added, catalog, null, {
 					"transaction_id": "GIVE_ITEM"
 				})
 			return { "success": true, "item_name": item_name, "count_added": added, "canonical_id": resolved.canonical_id }
@@ -88,7 +88,7 @@ static func execute_cheat_command(
 	return { "success": false, "reason": template % command_name }
 
 ## 构造 GM 发放物品实例（与服务器批量发放共用 build_instance_payload + 权威 UID）：
-## template_id 落 canonical_id，质量/体积取原型值；实例 uid 前缀 GM_，item_id 走 UniqueIdGenerator（兼容）。
-static func _build_registry_item(item_name: String, proto: ItemRegistryCatalog.ItemPrototypeTemplate) -> ItemEntity:
+## template_id 落 canonical_id，质量/体积取原型值；实例 uid 前缀 GM_，item_id 走 IdGenerator（兼容）。
+static func _build_registry_item(item_name: String, prototype: ItemRegistryCatalog.ItemPrototypeTemplate) -> ItemEntity:
 	var prefix := GameConfig.get_string("infrastructure.admin", "sandbox/give_item_id_prefix", "GM_ITEM_")
-	return ItemInstanceFactory.build_instance(proto, item_name, "GM_", prefix)
+	return ItemInstanceFactory.build_instance(prototype, item_name, "GM_", prefix)

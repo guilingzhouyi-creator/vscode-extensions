@@ -1,6 +1,6 @@
 # ==============================================================================
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
-# 文件路径: res://backend/domains/admin_sandbox/admin_permission_entity.gd
+# 文件路径: res://backend/domains/admin_sandbox/admin_permission_aggregate.gd
 # 架构定位: Domain Entity / Aggregate Root
 # 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: currency_economy | 配置: infrastructure.admin.json | 信号: EventBus 领域广播
 # 职责说明: 玩家/巡查/GM/RootAdmin 4 级基于角色的权限访问控制 (RBAC) 矩阵契约 盐与口令由 config/infrastructure/admin.json 驱动（支持配置化轮换）。
