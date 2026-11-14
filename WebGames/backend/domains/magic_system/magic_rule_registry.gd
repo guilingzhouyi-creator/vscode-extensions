@@ -85,15 +85,15 @@ func _school_members_valid(school: Dictionary) -> bool:
 	return true
 
 func _variant_sources_valid(variant: Dictionary) -> bool:
-	for src in variant.get("source_schools", []):
-		if not _schools.has(String(src)):
+	for source_school in variant.get("source_schools", []):
+		if not _schools.has(String(source_school)):
 			return false
 	return true
 
 ## 校验属性与大类双向闭合
 func _validate_school_attribute_closure() -> bool:
-	for attr_id in _attributes:
-		var entry: Dictionary = _attributes[attr_id]
+	for attribute_id in _attributes:
+		var entry: Dictionary = _attributes[attribute_id]
 		if not _schools.has(String(entry.get("school", ""))):
 			return false
 	for school_id in _schools:
@@ -111,16 +111,16 @@ func _validate_variants() -> bool:
 		var raw_conditions: Variant = variant.get("fusion_conditions")
 		if not (raw_conditions is Dictionary) or not _valid_condition_tree(raw_conditions as Dictionary):
 			return false
-		var vof := int(variant.get("variant_of_form", 0))
-		if vof < 1 or vof > 4:
+		var variant_form := int(variant.get("variant_of_form", 0))
+		if variant_form < 1 or variant_form > 4:
 			return false
 	return true
 
 ## 校验连携组合语义枚举合法性
 func _validate_combo_semantics() -> bool:
 	for combo_key in _combo_semantics:
-		var val := String(_combo_semantics[combo_key])
-		if val != COMBO_DEFINED and val != COMBO_PARTIAL and val != COMBO_UNDEFINED:
+		var semantic_value := String(_combo_semantics[combo_key])
+		if semantic_value != COMBO_DEFINED and semantic_value != COMBO_PARTIAL and semantic_value != COMBO_UNDEFINED:
 			return false
 	return true
 
@@ -134,9 +134,9 @@ func _validate_numerical_bounds() -> bool:
 		return false
 	if not _valid_condition_tree(_ascension.get("conditions", {})):
 		return false
-	var dl_min := int(_delay.get("min_steps", 0))
-	var dl_max := int(_delay.get("max_steps", 0))
-	if dl_min < 0 or dl_max < dl_min:
+	var min_delay_steps := int(_delay.get("min_steps", 0))
+	var max_delay_steps := int(_delay.get("max_steps", 0))
+	if min_delay_steps < 0 or max_delay_steps < min_delay_steps:
 		return false
 	return true
 
@@ -230,10 +230,10 @@ func delay_config() -> Dictionary:
 
 ## 组合语义查询：DEFINED / PARTIAL / BND_NOT_DEFINED（未登记亦返回待定义，禁静默猜测）
 func combo_semantic(combo_key: String) -> String:
-	var val := String(_combo_semantics.get(combo_key, COMBO_UNDEFINED))
-	if val != COMBO_DEFINED and val != COMBO_PARTIAL:
+	var semantic_value := String(_combo_semantics.get(combo_key, COMBO_UNDEFINED))
+	if semantic_value != COMBO_DEFINED and semantic_value != COMBO_PARTIAL:
 		return COMBO_UNDEFINED
-	return val
+	return semantic_value
 
 ## 全量配置导出（遥测/统计/审计只读引用）
 func export_config() -> Dictionary:

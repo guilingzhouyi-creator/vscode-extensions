@@ -24,11 +24,11 @@ func config() -> Dictionary:
 
 ## 设置延时：校验步数合法域与重复延时，入队待触发状态
 func schedule(trigger: MagicRuleTrigger) -> Dictionary:
-	var cfg := _config if not _config.is_empty() else {
+	var resolved_config := _config if not _config.is_empty() else {
 		"min_steps": 1, "max_steps": 10, "allow_repeat": false
 	}
-	var min_steps := int(cfg.get("min_steps", 1))
-	var max_steps := int(cfg.get("max_steps", 10))
+	var min_steps := int(resolved_config.get("min_steps", 1))
+	var max_steps := int(resolved_config.get("max_steps", 10))
 	if trigger.remain_steps < min_steps or trigger.remain_steps > max_steps:
 		return {
 			"success": false,
@@ -36,7 +36,7 @@ func schedule(trigger: MagicRuleTrigger) -> Dictionary:
 			"min_steps": min_steps,
 			"max_steps": max_steps,
 		}
-	var allow_repeat := bool(cfg.get("allow_repeat", false))
+	var allow_repeat := bool(resolved_config.get("allow_repeat", false))
 	if not allow_repeat and _has_pending_magic(trigger.holder_id, trigger.magic_ref):
 		return {"success": false, "error_code": "ALREADY_DELAYED", "magic_ref": trigger.magic_ref}
 	_pending.append(trigger)

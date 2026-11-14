@@ -14,33 +14,33 @@ extends RefCounted
 const FORM_PRIMORDIAL: int = PhysicalVerbRegistry.MagicForm.PRIMORDIAL
 
 ## 单次攻击伤害解析（纯适配，经真实管线）：
-##   card : 权威行动卡 CombatActionCardEntity（verb_type/base_potency/magic_form 驱动）
-##   rank : 当前位阶（1~11，独立维度；作为上下文供未来技能路径权重扩展）
-##   ctx  : { weapon_mass_kg, weapon_velocity, edge_sharpness, effective_armor,
-##            is_magic, raw_mana, sentence_count, projection_distance_m, resist_elem }
+##   card    : 权威行动卡 CombatActionCardEntity（verb_type/base_potency/magic_form 驱动）
+##   rank    : 当前位阶（1~11，独立维度；作为上下文供未来技能路径权重扩展）
+##   context : { weapon_mass_kg, weapon_velocity, edge_sharpness, effective_armor,
+##               is_magic, raw_mana, sentence_count, projection_distance_m, resist_elem }
 ## 返回 { success, damage, via_pipeline, rank, verb_type }
 static func resolve_attack(
 	card: PhysicalVerbRegistry.CombatActionCardEntity,
 	rank: int,
-	ctx: Dictionary = {}
+	context: Dictionary = {}
 ) -> Dictionary:
 	if card == null:
 		return {"success": false, "error_code": "CARD_NOT_DEFINED"}
-	var is_magic := bool(ctx.get("is_magic", false)) or not card.magic_ref.is_empty()
+	var is_magic := bool(context.get("is_magic", false)) or not card.magic_ref.is_empty()
 	if is_magic:
-		return _resolve_magic(card, rank, ctx)
-	return _resolve_physical(card, rank, ctx)
+		return _resolve_magic(card, rank, context)
+	return _resolve_physical(card, rank, context)
 
 ## 物理伤害：直接委托既有动量侵彻管线（零旁路公式）
 static func _resolve_physical(
 	card: PhysicalVerbRegistry.CombatActionCardEntity,
 	rank: int,
-	ctx: Dictionary
+	context: Dictionary
 ) -> Dictionary:
-	var mass := float(ctx.get("weapon_mass_kg", 2.5))
-	var velocity := float(ctx.get("weapon_velocity", 6.0))
-	var edge := float(ctx.get("edge_sharpness", 1.2))
-	var armor := float(ctx.get("effective_armor", 5.0))
+	var mass := float(context.get("weapon_mass_kg", 2.5))
+	var velocity := float(context.get("weapon_velocity", 6.0))
+	var edge := float(context.get("edge_sharpness", 1.2))
+	var armor := float(context.get("effective_armor", 5.0))
 	var damage := PhysicsAndThermodynamicsSolver.calculate_penetration_damage(
 		mass, velocity, card.verb_type, edge, armor
 	)
@@ -56,23 +56,23 @@ static func _resolve_physical(
 static func _resolve_magic(
 	card: PhysicalVerbRegistry.CombatActionCardEntity,
 	rank: int,
-	ctx: Dictionary
+	context: Dictionary
 ) -> Dictionary:
-	var raw_mana := float(ctx.get("raw_mana", card.base_potency))
+	var raw_mana := float(context.get("raw_mana", card.base_potency))
 	var is_primordial := int(card.magic_form) == FORM_PRIMORDIAL
-	var sentence_count := int(ctx.get("sentence_count", 0))
-	var distance_m := float(ctx.get("projection_distance_m", 0.0))
-	var phase := PhysicsAndThermodynamicsSolver.calculate_mana_phase_transition_loss(
-		raw_mana, is_primordial, sentence_count, distance_m
+	var sentence_count := int(context.get("sentence_count", 0))
+	var distance_meters := float(context.get("projection_distance_m", 0.0))
+	var phase_loss := PhysicsAndThermodynamicsSolver.calculate_mana_phase_transition_loss(
+		raw_mana, is_primordial, sentence_count, distance_meters
 	)
-	var resist := clampf(float(ctx.get("resist_elem", 0.0)), 0.0, 1.0)
-	var damage := float(phase.get("effective_output", 0.0)) * (1.0 - resist)
+	var resist := clampf(float(context.get("resist_elem", 0.0)), 0.0, 1.0)
+	var damage := float(phase_loss.get("effective_output", 0.0)) * (1.0 - resist)
 	return {
 		"success": true,
 		"damage": damage,
 		"via_pipeline": "calculate_mana_phase_transition_loss",
-		"effective_output": float(phase.get("effective_output", 0.0)),
-		"total_loss_ratio": float(phase.get("total_loss_ratio", 0.0)),
+		"effective_output": float(phase_loss.get("effective_output", 0.0)),
+		"total_loss_ratio": float(phase_loss.get("total_loss_ratio", 0.0)),
 		"rank": clampi(int(rank), 1, 11),
 		"magic_form": int(card.magic_form),
 	}

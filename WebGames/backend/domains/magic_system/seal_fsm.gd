@@ -38,7 +38,7 @@ static func apply_seal(
 		return {"success": false, "error_code": "SEAL_SLOT_FULL", "max_seals": max_seals}
 
 	var state := MagicRuleState.new()
-	state.state_id = UniqueIdGenerator.next_id("SEAL_")
+	state.state_id = IdGenerator.next_id("SEAL_")
 	state.kind = MagicRuleState.StateKind.SEAL
 	state.status = MagicRuleState.StateStatus.ACTIVE
 	state.holder_id = holder_id

@@ -45,14 +45,14 @@ static func from_registry_entry(school_id_in: String, entry: Dictionary) -> Magi
 
 ## 由注册表配置条目构造派生变体
 static func variant_from_registry_entry(variant_id_in: String, entry: Dictionary) -> MagicVariant:
-	var v := MagicVariant.new()
-	v.variant_id = variant_id_in
-	v.source_schools = entry.get("source_schools", []).duplicate()
-	v.fusion_mode = str(entry.get("fusion_mode", "ANY"))
-	v.fusion_conditions = entry.get("fusion_conditions", {}).duplicate(true)
-	v.variant_of_form = int(entry.get("variant_of_form", 2))
-	v.name_key = str(entry.get("name_key", ""))
-	return v
+	var magic_variant := MagicVariant.new()
+	magic_variant.variant_id = variant_id_in
+	magic_variant.source_schools = entry.get("source_schools", []).duplicate()
+	magic_variant.fusion_mode = str(entry.get("fusion_mode", "ANY"))
+	magic_variant.fusion_conditions = entry.get("fusion_conditions", {}).duplicate(true)
+	magic_variant.variant_of_form = int(entry.get("variant_of_form", 2))
+	magic_variant.name_key = str(entry.get("name_key", ""))
+	return magic_variant
 
 ## 查询实体或配置中是否包含指定名称的属性
 func has_attribute(attribute_id: String) -> bool:

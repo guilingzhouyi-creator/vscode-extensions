@@ -25,11 +25,11 @@ static func _casts_of(card: PhysicalVerbRegistry.CombatActionCardEntity) -> int:
 ## 校验一次打出的合法性（次数上限/魔法引用存在）
 static func validate_play(
 	card: PhysicalVerbRegistry.CombatActionCardEntity,
-	mc_config: Dictionary = {}
+	multi_cast_config: Dictionary = {}
 ) -> Dictionary:
 	if card == null:
 		return {"success": false, "error_code": "MISSING_CONTEXT"}
-	var max_casts := int(mc_config.get("max_casts", 5))
+	var max_casts := int(multi_cast_config.get("max_casts", 5))
 	var casts := _casts_of(card)
 	if casts < 1 or casts > max_casts:
 		return {
@@ -44,30 +44,30 @@ static func validate_play(
 static func execute_play(
 	card: PhysicalVerbRegistry.CombatActionCardEntity,
 	rank: int,
-	ctx: Dictionary = {},
-	mc_config: Dictionary = {}
+	context: Dictionary = {},
+	multi_cast_config: Dictionary = {}
 ) -> Dictionary:
-	var check := validate_play(card, mc_config)
+	var check := validate_play(card, multi_cast_config)
 	if not check.get("success", false):
 		return check
 	var cast_count := int(check["cast_count"])
-	var snapshot_mode := bool(mc_config.get("snapshot_per_play", false))
-	var target_mode := String(mc_config.get("target_mode", "SAME"))
-	var target_pool: Array = ctx.get("target_pool", [])
+	var snapshot_mode := bool(multi_cast_config.get("snapshot_per_play", false))
+	var target_mode := String(multi_cast_config.get("target_mode", "SAME"))
+	var target_pool: Array = context.get("target_pool", [])
 	var hit_results: Array = []
-	var hit_ctx := ctx.duplicate()
+	var hit_context := context.duplicate()
 	if snapshot_mode:
-		hit_ctx["snapshot_locked"] = true
+		hit_context["snapshot_locked"] = true
 	# SEQUENTIAL 逐击复用同一上下文就地更新 target_id；SAME/无池共享初始化 target_id
-	# （MagicSettlementSolver.resolve_attack 仅只读 ctx，已核验无逐击就地写入，循环内零堆分配）
+	# （MagicSettlementSolver.resolve_attack 仅只读 context，已核验无逐击就地写入，循环内零堆分配）
 	var sequential := target_mode == "SEQUENTIAL" and not target_pool.is_empty()
 	if not sequential and target_mode == "SAME":
-		if not hit_ctx.has("target_id"):
-			hit_ctx["target_id"] = str(ctx.get("target_id", ""))
-	for i in range(cast_count):
+		if not hit_context.has("target_id"):
+			hit_context["target_id"] = str(context.get("target_id", ""))
+	for cast_index in range(cast_count):
 		if sequential:
-			hit_ctx["target_id"] = str(target_pool[i % target_pool.size()])
-		var hit := MagicSettlementSolver.resolve_attack(card, rank, hit_ctx)
+			hit_context["target_id"] = str(target_pool[cast_index % target_pool.size()])
+		var hit := MagicSettlementSolver.resolve_attack(card, rank, hit_context)
 		if not hit.get("success", false):
 			return hit
 		hit_results.append(hit)

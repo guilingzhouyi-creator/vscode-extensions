@@ -16,70 +16,70 @@ const OP_OR: String = "OR"
 const OP_NOT: String = "NOT"
 const OP_LEAF: String = "LEAF"
 
-## 求值入口：node = {op, terms / kind + args}；ctx 提供运行时事实。
+## 求值入口：node = {op, terms / kind + args}；context 提供运行时事实。
 ## 内置 LEAF kind：
-##   - "school_attrs_learned": args {school, min_count}，ctx.learned_by_school[String]
-##   - "holder_rank_gte":      args {min_rank}，ctx.holder_rank（当前位阶）
-##   - "variant_flag":         args {variant}，ctx.variant_flags（Array[String]）
-static func evaluate(node: Dictionary, ctx: Dictionary = {}) -> bool:
+##   - "school_attrs_learned": args {school, min_count}，context.learned_by_school[String]
+##   - "holder_rank_gte":      args {min_rank}，context.holder_rank（当前位阶）
+##   - "variant_flag":         args {variant}，context.variant_flags（Array[String]）
+static func evaluate(node: Dictionary, context: Dictionary = {}) -> bool:
 	if node.is_empty():
 		return false
 	var op := String(node.get("op", ""))
 	match op:
 		OP_AND:
-			return _eval_and(node, ctx)
+			return _eval_and(node, context)
 		OP_OR:
-			return _eval_or(node, ctx)
+			return _eval_or(node, context)
 		OP_NOT:
-			return _eval_not(node, ctx)
+			return _eval_not(node, context)
 		OP_LEAF:
-			return _eval_leaf(node, ctx)
+			return _eval_leaf(node, context)
 	return false  # 未知操作符：受控失败，不猜测
 
 ## AND 语义：全子项成立（空/非法 terms 受控失败）
-static func _eval_and(node: Dictionary, ctx: Dictionary) -> bool:
+static func _eval_and(node: Dictionary, context: Dictionary) -> bool:
 	var terms: Variant = node.get("terms", [])
 	if not terms is Array or terms.is_empty():
 		return false
 	for term in terms:
-		if not term is Dictionary or not evaluate(term, ctx):
+		if not term is Dictionary or not evaluate(term, context):
 			return false
 	return true
 
 ## OR 语义：任一子项成立（空/非法 terms 受控失败）
-static func _eval_or(node: Dictionary, ctx: Dictionary) -> bool:
+static func _eval_or(node: Dictionary, context: Dictionary) -> bool:
 	var terms: Variant = node.get("terms", [])
 	if not terms is Array or terms.is_empty():
 		return false
 	for term in terms:
-		if term is Dictionary and evaluate(term, ctx):
+		if term is Dictionary and evaluate(term, context):
 			return true
 	return false
 
 ## NOT 语义：唯一子项取反（非单子项受控失败）
-static func _eval_not(node: Dictionary, ctx: Dictionary) -> bool:
+static func _eval_not(node: Dictionary, context: Dictionary) -> bool:
 	var terms: Variant = node.get("terms", [])
 	if not terms is Array or terms.size() != 1:
 		return false
 	var term: Variant = terms[0]
 	if not term is Dictionary:
 		return false
-	return not evaluate(term, ctx)
+	return not evaluate(term, context)
 
 ## LEAF 求值：按 kind 分派（school_attrs_learned/holder_rank_gte/variant_flag），未知种类受控失败
-static func _eval_leaf(node: Dictionary, ctx: Dictionary) -> bool:
+static func _eval_leaf(node: Dictionary, context: Dictionary) -> bool:
 	var kind := String(node.get("kind", ""))
 	var args: Dictionary = node.get("args", {})
 	match kind:
 		"school_attrs_learned":
-			var learned: Dictionary = ctx.get("learned_by_school", {})
+			var learned: Dictionary = context.get("learned_by_school", {})
 			var school := String(args.get("school", ""))
 			var min_count := int(args.get("min_count", 1))
 			return int(learned.get(school, 0)) >= min_count
 		"holder_rank_gte":
 			var min_rank := int(args.get("min_rank", 1))
-			return int(ctx.get("holder_rank", 0)) >= min_rank
+			return int(context.get("holder_rank", 0)) >= min_rank
 		"variant_flag":
-			var flags: Array = ctx.get("variant_flags", [])
+			var flags: Array = context.get("variant_flags", [])
 			return flags.has(String(args.get("variant", "")))
 	return false  # 未知 LEAF 种类：受控失败，不静默放行
