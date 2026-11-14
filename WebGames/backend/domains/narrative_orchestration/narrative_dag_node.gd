@@ -30,6 +30,7 @@ var required_prerequisites: Array[String] = []
 ## 条件汇聚/动态解锁引擎使用——勿将运行逻辑依赖于此字段的求值结果）
 var completion_condition_ast: Dictionary = {}
 var mutations_on_complete: Array[Dictionary] = []
+var cutscene_trigger: String = ""
 var is_optional: bool = false
 
 ## 构造节点（ID/类型/叙事键默认装配）
@@ -66,6 +67,7 @@ func to_dto() -> Dictionary:
 		"required_prerequisites": required_prerequisites.duplicate(),
 		"completion_condition_ast": completion_condition_ast.duplicate(true),
 		"mutations_on_complete": mutations_on_complete.duplicate(true),
+		"cutscene_trigger": cutscene_trigger,
 		"is_optional": is_optional
 	}
 
@@ -101,6 +103,7 @@ static func from_dto(serialized_payload: Dictionary) -> NarrativeDAGNode:
 	for mutation_entry in (serialized_payload.get("mutations_on_complete", []) as Array):
 		if mutation_entry is Dictionary:
 			node.mutations_on_complete.append(mutation_entry as Dictionary)
+	node.cutscene_trigger = str(serialized_payload.get("cutscene_trigger", "")).strip_edges()
 	node.is_optional = bool(serialized_payload.get("is_optional", false))
 	return node
 

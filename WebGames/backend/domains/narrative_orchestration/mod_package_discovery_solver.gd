@@ -11,13 +11,17 @@
 class_name ModPackageDiscoverySolver
 extends RefCounted
 
-const TIER0_BUILTIN_PATH: String = "res://config/narratives/packs/"
+const ModPackageArchiveReader = preload("res://backend/domains/narrative_orchestration/mod_package_archive_reader.gd")
+
+const TIER0_MODS_DEV_PATH: String = "res://mods/"
 const TIER1_MODS_REL_PATH: String = "mods/narratives/"
 const TIER1_MODS_ROOT_PATH: String = "mods/"
 const TIER2_USER_SANDBOX_PATH: String = "user://mods/narratives/"
 const TIER2_USER_ROOT_PATH: String = "user://mods/"
 const MANIFEST_FILENAME: String = "pack.json"
+const ALT_MANIFEST_FILENAME: String = "manifest.json"
 const LOG_CHANNEL: String = "mod_narrative"
+const SUPPORTED_ENGINE_API_MAJOR: int = 1
 const EMPTY_LIST: Array = []
 
 ## 去重追加规范化扫描根目录，维持由低到高覆写顺序
@@ -27,7 +31,7 @@ static func _append_unique_root(resolved_roots: Array[String], root_path: String
         return
     resolved_roots.append(cleaned_path)
 
-## 获取统一分级 MOD 发现根目录列表（同时兼容顶层 mods/<pack_id> 与 mods/narratives/<pack_id>）
+## 获取统一分级 MOD 发现根目录列表（配置驱动，工程版包含 res://mods/，发行版隔离至可执行同级与用户沙盒）
 static func get_discovery_roots(custom_roots: Array = []) -> Array[String]:
     if not custom_roots.is_empty():
         var roots: Array[String] = []
@@ -35,20 +39,26 @@ static func get_discovery_roots(custom_roots: Array = []) -> Array[String]:
             _append_unique_root(roots, String(root_entry))
         return roots
 
+    var discovery_config: Dictionary = GameConfig.get_dict("domains.narrative_orchestration", "mod_discovery", {})
     var resolved_roots: Array[String] = []
-    # Tier 0: 内置核心包路径
-    _append_unique_root(resolved_roots, TIER0_BUILTIN_PATH)
 
-    # Tier 1: 开发期或外部可执行程序同级安装目录
-    if OS.has_feature("editor"):
-        _append_unique_root(resolved_roots, "res://mods/")
+    if GameBootstrap.is_engineering_build():
+        var dev_root := String(discovery_config.get("packages_root", TIER0_MODS_DEV_PATH)).strip_edges()
+        if not dev_root.is_empty():
+            _append_unique_root(resolved_roots, dev_root)
+            _append_unique_root(resolved_roots, dev_root.path_join("narratives/"))
+        _append_unique_root(resolved_roots, TIER0_MODS_DEV_PATH)
         _append_unique_root(resolved_roots, "res://mods/narratives/")
     else:
         var executable_directory := OS.get_executable_path().get_base_dir()
+        var install_rel := String(discovery_config.get("mods_install_rel", TIER1_MODS_ROOT_PATH)).strip_edges()
+        _append_unique_root(resolved_roots, executable_directory.path_join(install_rel))
         _append_unique_root(resolved_roots, executable_directory.path_join(TIER1_MODS_ROOT_PATH))
         _append_unique_root(resolved_roots, executable_directory.path_join(TIER1_MODS_REL_PATH))
 
-    # Tier 2: 用户沙盒数据目录（顶层目录优先于子目录作为最终覆写层级）
+    var sandbox_root := String(discovery_config.get("mods_user_sandbox", TIER2_USER_ROOT_PATH)).strip_edges()
+    if not sandbox_root.is_empty():
+        _append_unique_root(resolved_roots, sandbox_root)
     _append_unique_root(resolved_roots, TIER2_USER_ROOT_PATH)
     _append_unique_root(resolved_roots, TIER2_USER_SANDBOX_PATH)
     return resolved_roots
@@ -126,8 +136,47 @@ static func collect_directory_entries(directory_path: String) -> Dictionary:
     file_names.sort()
     return {"dirs": directory_names, "files": file_names}
 
+static func _register_discovered_pack(
+    discovered_map: Dictionary,
+    discovery_order: Array[String],
+    conflicts: Array[Dictionary],
+    manifest_entry: NarrativePackManifestDTO
+) -> void:
+    if manifest_entry == null:
+        return
+    var pack_id := manifest_entry.pack_id.strip_edges()
+    if pack_id.is_empty():
+        return
+    if discovered_map.has(pack_id):
+        var existing_entry: NarrativePackManifestDTO = discovered_map[pack_id]
+        conflicts.append({
+            "error_code": "MOD_ERR_PACK_ID_CONFLICT",
+            "pack_id": pack_id,
+            "kept_root": existing_entry.root_path,
+            "incoming_root": manifest_entry.root_path,
+            "existing_official": existing_entry.is_official or existing_entry.pack_profile == "OFFICIAL_BASE"
+        })
+        if existing_entry.is_official or existing_entry.pack_profile == "OFFICIAL_BASE":
+            ErrorReporter.emit_error(
+                LOG_CHANNEL,
+                "MOD_ERR_PACK_ID_CONFLICT",
+                TemplateFormatter.format("Duplicate pack_id collision against official base blocked: {pack_id}", {"pack_id": pack_id}),
+                {"pack_id": pack_id, "kept_root": existing_entry.root_path, "rejected_root": manifest_entry.root_path}
+            )
+            return
+        # 非官方包遵循由低到高发现根的受控覆写顺序（高优先级用户沙盒可覆盖同 id 本地开发包）
+        discovered_map[pack_id] = manifest_entry
+        return
+    discovery_order.append(pack_id)
+    discovered_map[pack_id] = manifest_entry
+
 ## 扫描指定单个根目录下的全部子目录清单与 .kmod 归档包
-static func _scan_single_root_directory(root_path: String, discovered_map: Dictionary, discovery_order: Array[String]) -> void:
+static func _scan_single_root_directory(
+    root_path: String,
+    discovered_map: Dictionary,
+    discovery_order: Array[String],
+    conflicts: Array[Dictionary]
+) -> void:
     var entries: Dictionary = collect_directory_entries(root_path)
     var directory_names: Array = entries.get("dirs", [])
     for entry_directory_variant in directory_names:
@@ -135,11 +184,7 @@ static func _scan_single_root_directory(root_path: String, discovered_map: Dicti
         var subdirectory_path := root_path.path_join(entry_name)
         var manifest_file := subdirectory_path.path_join(MANIFEST_FILENAME)
         var manifest_entry := _parse_manifest_at_path(manifest_file, entry_name)
-        if manifest_entry != null:
-            var pack_id := manifest_entry.pack_id
-            if not discovered_map.has(pack_id):
-                discovery_order.append(pack_id)
-            discovered_map[pack_id] = manifest_entry
+        _register_discovered_pack(discovered_map, discovery_order, conflicts, manifest_entry)
 
     var file_names: Array = entries.get("files", [])
     for entry_file_variant in file_names:
@@ -147,27 +192,46 @@ static func _scan_single_root_directory(root_path: String, discovered_map: Dicti
         if entry_file.ends_with(".kmod"):
             var kmod_file := root_path.path_join(entry_file)
             var kmod_manifest := _parse_manifest_from_kmod(kmod_file, entry_file.get_basename())
-            if kmod_manifest != null:
-                var kmod_pack_id := kmod_manifest.pack_id
-                if not discovered_map.has(kmod_pack_id):
-                    discovery_order.append(kmod_pack_id)
-                discovered_map[kmod_pack_id] = kmod_manifest
+            _register_discovered_pack(discovered_map, discovery_order, conflicts, kmod_manifest)
 
-## 扫描指定或级联根目录下包含 pack.json 的所有包清单
-static func scan_installed_packs(custom_roots: Array = []) -> Array[NarrativePackManifestDTO]:
+## 扫描指定或级联根目录下包含 pack.json 的所有包清单（含冲突诊断；默认仅保留 is_active == true）
+static func scan_installed_packs_with_diagnostics(custom_roots: Array = [], include_inactive: bool = false) -> Dictionary:
     var roots: Array[String] = get_discovery_roots(custom_roots)
     var discovered_map: Dictionary = {}
     var discovery_order: Array[String] = []
+    var conflicts: Array[Dictionary] = []
 
     for root_directory in roots:
-        _scan_single_root_directory(root_directory, discovered_map, discovery_order)
+        _scan_single_root_directory(root_directory, discovered_map, discovery_order, conflicts)
 
     var discovered_manifests: Array[NarrativePackManifestDTO] = []
+    var inactive_manifests: Array[NarrativePackManifestDTO] = []
     for pack_id in discovery_order:
         var manifest_entry: NarrativePackManifestDTO = discovered_map.get(pack_id, null)
-        if manifest_entry != null:
+        if manifest_entry == null:
+            continue
+        if manifest_entry.is_active or include_inactive:
             discovered_manifests.append(manifest_entry)
-    return discovered_manifests
+        else:
+            inactive_manifests.append(manifest_entry)
+
+    return {
+        "packs": discovered_manifests,
+        "inactive_packs": inactive_manifests,
+        "conflicts": conflicts,
+        "discovery_roots": roots
+    }
+
+## 扫描指定或级联根目录下包含 pack.json 的所有已激活包清单
+static func scan_installed_packs(custom_roots: Array = [], include_inactive: bool = false) -> Array[NarrativePackManifestDTO]:
+    var discovery_report: Dictionary = scan_installed_packs_with_diagnostics(custom_roots, include_inactive)
+    var packs_variant: Variant = discovery_report.get("packs", [])
+    var typed_packs: Array[NarrativePackManifestDTO] = []
+    if packs_variant is Array:
+        for manifest_entry in (packs_variant as Array):
+            if manifest_entry is NarrativePackManifestDTO:
+                typed_packs.append(manifest_entry as NarrativePackManifestDTO)
+    return typed_packs
 
 static func _collect_pack_missing_deps(
     pack_manifest: NarrativePackManifestDTO,
@@ -240,7 +304,29 @@ static func _process_kahn_tier(
                 next_tier.append(pack_map[successor_id])
     return next_tier
 
-## 执行基于 Kahn 算法的 DAG 依赖拓扑排序
+static func _validate_manifest_compatibility(pack_map: Dictionary) -> Dictionary:
+    for pack_id in pack_map.keys():
+        var manifest_entry: NarrativePackManifestDTO = pack_map[pack_id]
+        if not manifest_entry.engine_api_version.is_empty():
+            var parts := manifest_entry.engine_api_version.split(".")
+            if parts.is_empty() or not parts[0].is_valid_int() or parts[0].to_int() != SUPPORTED_ENGINE_API_MAJOR:
+                return {
+                    "success": false,
+                    "error": "MOD_ERR_INCOMPATIBLE_VERSION",
+                    "pack_id": pack_id,
+                    "engine_api_version": manifest_entry.engine_api_version
+                }
+        for incompatible_id in manifest_entry.incompatible_packs:
+            if pack_map.has(incompatible_id):
+                return {
+                    "success": false,
+                    "error": "ERR_MOD_INCOMPATIBLE_CONFLICT",
+                    "pack_id": pack_id,
+                    "conflict_with": incompatible_id
+                }
+    return {"success": true}
+
+## 执行基于 Kahn 算法的 DAG 依赖拓扑排序（含 Semver 版本与互斥冲突前置门禁）
 static func sort_and_resolve_dependencies(manifests: Array) -> Dictionary:
     if manifests.is_empty():
         var empty_manifests: Array[NarrativePackManifestDTO] = []
@@ -256,6 +342,10 @@ static func sort_and_resolve_dependencies(manifests: Array) -> Dictionary:
         elif manifest_entry is Dictionary:
             var converted := NarrativePackManifestDTO.from_dto(manifest_entry as Dictionary)
             pack_map[converted.pack_id] = converted
+
+    var compat_result := _validate_manifest_compatibility(pack_map)
+    if not bool(compat_result.get("success", false)):
+        return compat_result
 
     var missing := _find_missing_dependencies(pack_map)
     if not missing.is_empty():
@@ -309,19 +399,6 @@ static func _read_json_file(file_path: String) -> Variant:
         ErrorReporter.emit_error(LOG_CHANNEL, "CONFIG_JSON_PARSE_FAIL", TemplateFormatter.format("MOD JSON parse syntax error: {path}", {"path": file_path}), {"file_path": file_path})
     return parsed
 
-## 递归展平 i18n 嵌套字典为点分键与斜杠键
-static func _flatten_i18n_dict(source_dictionary: Dictionary, prefix: String, target: Dictionary) -> void:
-    for entry_key in source_dictionary.keys():
-        var full_key := (prefix + "." + str(entry_key)) if not prefix.is_empty() else str(entry_key)
-        var raw_entry: Variant = source_dictionary[entry_key]
-        if raw_entry is Dictionary:
-            _flatten_i18n_dict(raw_entry as Dictionary, full_key, target)
-        else:
-            var flattened_text := str(raw_entry)
-            target[full_key] = flattened_text
-            target[full_key.replace(".", "/")] = flattened_text
-            target[full_key.replace("/", ".")] = flattened_text
-
 ## 列出指定子目录下的全部 .json 文件完整路径
 static func _list_json_files(directory_path: String) -> Array[String]:
     var files: Array[String] = []
@@ -346,7 +423,7 @@ static func _scan_mod_i18n(mod_directory: String, target_i18n: Dictionary) -> vo
     for file_path in _list_json_files(mod_directory.path_join("i18n")):
         var raw_json: Variant = _read_json_file(file_path)
         if raw_json is Dictionary:
-            _flatten_i18n_dict(raw_json as Dictionary, "", target_i18n)
+            ModPackageArchiveReader.flatten_i18n_dict(raw_json as Dictionary, "", target_i18n)
 
 ## 加载 destinies.json 与 routing_rules.json 并合并入 MOD 包字典
 static func _load_destinies_and_routing(mod_directory: String, package_payload: Dictionary) -> void:
@@ -354,7 +431,8 @@ static func _load_destinies_and_routing(mod_directory: String, package_payload: 
     if raw_destinies is Dictionary:
         var destinies_payload: Dictionary = raw_destinies
         var keys_to_merge: Array[String] = [
-            "ui_capabilities", "custom_origins", "custom_traits",
+            "ui_capabilities", "custom_races", "creation_rule_overrides",
+            "custom_origins", "custom_traits",
             "paired_presets", "custom_starter_kits", "custom_routing_rules"
         ]
         for config_key in keys_to_merge:
@@ -364,6 +442,11 @@ static func _load_destinies_and_routing(mod_directory: String, package_payload: 
     var raw_routing: Variant = _read_json_file(mod_directory.path_join("routing_rules.json"))
     if raw_routing is Dictionary:
         var routing_payload: Dictionary = raw_routing
+        if routing_payload.get("prologue_routing_rules") is Array:
+            var existing_prologue_rules: Array = package_payload.get("prologue_routing_rules", [])
+            for prologue_rule_entry in (routing_payload.get("prologue_routing_rules") as Array):
+                existing_prologue_rules.append(prologue_rule_entry)
+            package_payload["prologue_routing_rules"] = existing_prologue_rules
         var raw_rules: Variant = routing_payload.get("custom_routing_rules", routing_payload.get("routing_rules", []))
         if raw_rules is Array:
             var existing_rules: Array = package_payload.get("custom_routing_rules", [])
@@ -379,7 +462,7 @@ static func _load_destinies_and_routing(mod_directory: String, package_payload: 
 ## 从指定目录完整读取并组装单包数据字典
 static func load_full_mod_package_from_dir(mod_directory: String) -> Dictionary:
     if mod_directory.ends_with(".kmod"):
-        return _load_full_package_from_kmod(mod_directory)
+        return ModPackageArchiveReader.load_full_package_from_kmod(mod_directory)
 
     var manifest_path := mod_directory.path_join(MANIFEST_FILENAME)
     var pack_raw: Variant = _read_json_file(manifest_path)
@@ -400,84 +483,70 @@ static func load_full_mod_package_from_dir(mod_directory: String) -> Dictionary:
     package_payload["root_path"] = mod_directory
     return package_payload
 
-## 辅助函数：安全读取 .kmod 归档包内的 JSON 字典文件
-static func _read_kmod_json_dict(reader: ZIPReader, entry_path: String) -> Dictionary:
-    var raw: Variant = JSON.parse_string(reader.read_file(entry_path).get_string_from_utf8())
-    return (raw as Dictionary) if (raw is Dictionary) else {}
 
-## 辅助函数：将单个 .kmod 条目解析并装配至包聚合容器
-static func _apply_kmod_entry(
-    reader: ZIPReader,
-    entry_path: String,
-    package_payload: Dictionary,
-    dag_graphs: Dictionary,
-    custom_i18n: Dictionary
-) -> void:
-    if entry_path.begins_with("dag_graphs/") and entry_path.ends_with(".json"):
-        var raw := _read_kmod_json_dict(reader, entry_path)
-        if raw.is_empty():
-            return
-        var stem := entry_path.get_file().get_basename()
-        var dag_id := str(raw.get("dag_id", raw.get("graph_id", stem)))
-        dag_graphs[dag_id] = raw
-    elif entry_path.begins_with("i18n/") and entry_path.ends_with(".json"):
-        var raw := _read_kmod_json_dict(reader, entry_path)
-        if not raw.is_empty():
-            _flatten_i18n_dict(raw, "", custom_i18n)
-    elif entry_path == "destinies.json":
-        var raw := _read_kmod_json_dict(reader, entry_path)
-        for config_key in ["ui_capabilities", "custom_origins", "custom_traits", "paired_presets", "custom_starter_kits", "custom_routing_rules"]:
-            if raw.has(config_key):
-                package_payload[config_key] = raw[config_key]
-    elif entry_path == "routing_rules.json":
-        var raw := _read_kmod_json_dict(reader, entry_path)
-        var raw_rules: Variant = raw.get("custom_routing_rules", raw.get("routing_rules", []))
-        if raw_rules is Array:
-            var existing: Array = package_payload.get("custom_routing_rules", [])
-            existing.append_array(raw_rules as Array)
-            package_payload["custom_routing_rules"] = existing
+## 收集目录下可稳定参与 SHA-256 内容哈希计算的文件相对路径
+static func _collect_hashable_files_recursive(directory_path: String, relative_prefix: String, out_relative_paths: Array[String]) -> void:
+    var entries: Dictionary = collect_directory_entries(directory_path)
+    for sub_variant in entries.get("dirs", []):
+        var subdirectory_name := str(sub_variant)
+        var next_prefix := (relative_prefix + "/" + subdirectory_name) if not relative_prefix.is_empty() else subdirectory_name
+        _collect_hashable_files_recursive(directory_path.path_join(subdirectory_name), next_prefix, out_relative_paths)
+    for file_variant in entries.get("files", []):
+        var file_name := str(file_variant)
+        if file_name.ends_with(".uid") or file_name.ends_with(".import"):
+            continue
+        if file_name == MANIFEST_FILENAME and relative_prefix.is_empty():
+            continue
+        var next_file := (relative_prefix + "/" + file_name) if not relative_prefix.is_empty() else file_name
+        out_relative_paths.append(next_file)
 
-## 从 .kmod 归档包完整读取并组装 MOD 数据字典
-static func _load_full_package_from_kmod(kmod_path: String) -> Dictionary:
-    var reader := ZIPReader.new()
-    if reader.open(kmod_path) != OK:
-        ErrorReporter.emit_error(LOG_CHANNEL, "CONFIG_FILE_READ_FAIL", TemplateFormatter.format("Failed to open .kmod archive package: {path}", {"path": kmod_path}), {"file_path": kmod_path})
-        return {}
-    var files := reader.get_files()
-    var manifest_payload: Dictionary = {}
-    if reader.file_exists("pack.json"):
-        manifest_payload = _read_kmod_json_dict(reader, "pack.json")
-    elif reader.file_exists("manifest.json"):
-        manifest_payload = _read_kmod_json_dict(reader, "manifest.json")
-    if manifest_payload.is_empty():
-        reader.close()
-        return {}
-    var package_payload: Dictionary = manifest_payload.duplicate(true)
-    var dag_graphs: Dictionary = package_payload.get("dag_graphs", {})
-    var custom_i18n: Dictionary = package_payload.get("custom_i18n", {})
-    for entry_path in files:
-        _apply_kmod_entry(reader, entry_path, package_payload, dag_graphs, custom_i18n)
-    reader.close()
-    package_payload["dag_graphs"] = dag_graphs
-    package_payload["custom_i18n"] = custom_i18n
-    package_payload["root_path"] = kmod_path
-    return package_payload
+## 计算目录型或 .kmod MOD 包内容确定性 SHA-256 摘要（跳过根清单与编辑器伴生文件避免自引用环）
+static func compute_package_content_sha256(package_root: String) -> String:
+    var sha_hasher := HashingContext.new()
+    sha_hasher.start(HashingContext.HASH_SHA256)
+    if package_root.ends_with(".kmod"):
+        return ModPackageArchiveReader.compute_kmod_sha256(package_root, sha_hasher)
+    if not DirAccess.dir_exists_absolute(package_root):
+        return ""
+    var relative_paths: Array[String] = []
+    _collect_hashable_files_recursive(package_root, "", relative_paths)
+    relative_paths.sort()
+    for relative_file in relative_paths:
+        var absolute_file := package_root.path_join(relative_file)
+        sha_hasher.update(relative_file.to_utf8_buffer())
+        sha_hasher.update(FileAccess.get_file_as_bytes(absolute_file))
+    return sha_hasher.finish().hex_encode()
 
-## 扫描三级级联目录并按拓扑排序顺序组装已安装的全量 MOD 包数组
-static func scan_installed_full_mod_packages(custom_roots: Array = []) -> Array[Dictionary]:
-    var installed_packs: Array[NarrativePackManifestDTO] = scan_installed_packs(custom_roots)
+## 扫描三级级联目录并按拓扑排序组装已激活的全量 MOD 包及诊断结果（环依赖/冲突严格拒载 fail-closed）
+static func scan_installed_full_mod_packages_with_diagnostics(custom_roots: Array = []) -> Dictionary:
+    var scan_diag: Dictionary = scan_installed_packs_with_diagnostics(custom_roots, false)
+    var installed_packs: Array[NarrativePackManifestDTO] = []
+    for manifest_entry in (scan_diag.get("packs", []) as Array):
+        if manifest_entry is NarrativePackManifestDTO:
+            installed_packs.append(manifest_entry as NarrativePackManifestDTO)
+
     var sort_result: Dictionary = sort_and_resolve_dependencies(installed_packs)
-
-    var ordered_packs: Array = []
-    if bool(sort_result.get("success", false)):
-        ordered_packs = sort_result.get("sorted_packs", [])
-    else:
-        var error_code := str(sort_result.get("error", "CONFIG_VALIDATION_FAILED"))
-        var error_message := TemplateFormatter.format("MOD dependency topological sort failed: {error}", {"error": error_code})
-        ErrorReporter.emit_error(LOG_CHANNEL, "CONFIG_VALIDATION_FAILED", error_message, sort_result)
-        ordered_packs = installed_packs
-
     var loaded_packages: Array[Dictionary] = []
+    if not bool(sort_result.get("success", false)):
+        var raw_error := str(sort_result.get("error", "CONFIG_VALIDATION_FAILED"))
+        var registered_code := "MOD_ERR_CYCLE_DETECTED" if raw_error == "ERR_CYCLIC_DEPENDENCY" else (
+            "MOD_ERR_INCOMPATIBLE_VERSION" if raw_error == "MOD_ERR_INCOMPATIBLE_VERSION" else "CONFIG_VALIDATION_FAILED"
+        )
+        ErrorReporter.emit_error(
+            LOG_CHANNEL,
+            registered_code,
+            TemplateFormatter.format("MOD dependency topological sort failed (fail-closed): {error}", {"error": raw_error}),
+            sort_result
+        )
+        return {
+            "success": false,
+            "error_code": raw_error,
+            "packages": loaded_packages,
+            "sort_result": sort_result,
+            "conflicts": scan_diag.get("conflicts", [])
+        }
+
+    var ordered_packs: Array = sort_result.get("sorted_packs", [])
     for pack_entry in ordered_packs:
         var root_path: String = ""
         if pack_entry is NarrativePackManifestDTO:
@@ -489,4 +558,18 @@ static func scan_installed_full_mod_packages(custom_roots: Array = []) -> Array[
             if not full_package.is_empty():
                 loaded_packages.append(full_package)
 
-    return loaded_packages
+    return {
+        "success": true,
+        "packages": loaded_packages,
+        "sort_result": sort_result,
+        "conflicts": scan_diag.get("conflicts", [])
+    }
+
+## 扫描三级级联目录并按拓扑排序顺序组装已激活的全量 MOD 包数组（失败时安全返回空数组）
+static func scan_installed_full_mod_packages(custom_roots: Array = []) -> Array[Dictionary]:
+    var diag := scan_installed_full_mod_packages_with_diagnostics(custom_roots)
+    var typed_packages: Array[Dictionary] = []
+    for pkg in (diag.get("packages", []) as Array):
+        if pkg is Dictionary:
+            typed_packages.append(pkg as Dictionary)
+    return typed_packages

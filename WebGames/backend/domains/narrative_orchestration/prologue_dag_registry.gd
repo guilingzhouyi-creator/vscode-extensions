@@ -15,7 +15,7 @@ extends RefCounted
 # 一、序章剧情 DAG 动态路由解析 (Race + Origin + MOD Routing)
 # ==============================================================================
 
-## 依据角色种族、身世标识与适配后的 MOD 清单动态匹配并解析专属序章 DAG
+## 依据角色种族、身世标识与适配后的 MOD 清单动态匹配并解析专属序章 DAG（无内置默认合成，缺失返回 null）
 static func resolve_prologue_dag(
     race_id: String,
     origin_id: String = "",
@@ -26,16 +26,12 @@ static func resolve_prologue_dag(
 
     var mod_dag_id: String = _resolve_mod_prologue_dag_id(race_id, origin_id, manifest)
     if not mod_dag_id.is_empty():
-        return _resolve_or_synthesize_mod_graph(mod_dag_id, catalog, manifest)
+        return _resolve_declared_dag_graph(mod_dag_id, catalog, manifest)
 
     var selected_dag_id: String = _resolve_builtin_routing_dag_id(race_id, origin_id)
-
-    # 默认 DAG 单一事实源收敛为纯配置 is_default 规则驱动，
-    # 移除代码内硬编码 fallback 字面量（配置缺失时返回 null 由上层防御）。
-    if selected_dag_id.is_empty() or not catalog.has(selected_dag_id):
+    if selected_dag_id.is_empty():
         return null
-
-    return get_graph_by_id(selected_dag_id)
+    return _resolve_declared_dag_graph(selected_dag_id, catalog, manifest)
 
 ## 按图编号获取已装配的 DAG 实体（复用模型 from_dto 全字段装配）
 static func get_graph_by_id(dag_id: String) -> NarrativeDAGGraphDTO:
@@ -176,25 +172,20 @@ static func _resolve_builtin_routing_dag_id(race_id: String, origin_id: String) 
 
     return selected_dag_id
 
-static func _resolve_or_synthesize_mod_graph(
+static func _resolve_declared_dag_graph(
     dag_id: String,
-    builtin_catalog: Dictionary,
+    catalog: Dictionary,
     manifest: Dictionary
 ) -> NarrativeDAGGraphDTO:
     var mod_graphs: Dictionary = manifest.get("dag_graphs", manifest.get("custom_dag_graphs", {}))
     if mod_graphs.has(dag_id) and mod_graphs[dag_id] is Dictionary:
         return assemble_graph_from_raw(dag_id, mod_graphs[dag_id] as Dictionary)
 
-    if builtin_catalog.has(dag_id):
-        return get_graph_by_id(dag_id)
+    if catalog.has(dag_id) and catalog[dag_id] is Dictionary:
+        return assemble_graph_from_raw(dag_id, catalog[dag_id] as Dictionary)
 
-    # 当 MOD 仅声明专属 prologue_dag_id / target_dag_id 时，继承默认模板结构并赋予专属 graph_id
-    var template_raw: Dictionary = {}
-    for graph_key in builtin_catalog.keys():
-        if builtin_catalog[graph_key] is Dictionary:
-            template_raw = builtin_catalog[graph_key] as Dictionary
-            break
-    return assemble_graph_from_raw(dag_id, template_raw)
+    # Fail-Closed：禁止从模板目录合成未知 DAG，缺失时返回 null 交由上层阻断 (MOD_ERR_MISSING_PROLOGUE_DAG)
+    return null
 
 ## 从原始叙事配置装配编排事件因果图谱
 static func assemble_graph_from_raw(dag_id: String, raw: Dictionary) -> NarrativeDAGGraphDTO:
