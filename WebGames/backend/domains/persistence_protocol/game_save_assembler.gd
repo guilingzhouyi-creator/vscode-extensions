@@ -33,55 +33,55 @@ static func get_migration(from_version: String) -> Dictionary:
 ## 返回 { "data": Dictionary（可直接作 SaveManager.save_game 的 payload["data"]）,
 ##        "saved": 已收集领域, "skipped": 注册但缺 serialize 的领域 }
 static func build_save_payload(providers: Dictionary) -> Dictionary:
-	var data: Dictionary = {}
+	var assembled_domains_payload: Dictionary = {}
 	var saved: Array[String] = []
 	var skipped: Array[String] = []
 	for entry in _manifest_entries():
-		var id: String = String(entry.get("id", ""))
-		if not providers.has(id):
+		var domain_id: String = String(entry.get("id", ""))
+		if not providers.has(domain_id):
 			continue
-		var domain_aggregate: Variant = providers[id]
+		var domain_aggregate: Variant = providers[domain_id]
 		if domain_aggregate == null or not domain_aggregate.has_method("serialize"):
-			skipped.append(id)
+			skipped.append(domain_id)
 			continue
-		data[id] = domain_aggregate.serialize()
-		saved.append(id)
-	return {"data": data, "saved": saved, "skipped": skipped}
+		assembled_domains_payload[domain_id] = domain_aggregate.serialize()
+		saved.append(domain_id)
+	return {"data": assembled_domains_payload, "saved": saved, "skipped": skipped}
 
 ## 回写存档数据：按清单顺序调用各领域静态 deserialize（经 Callable 统一形态）。
 ## consumers: { 领域 id -> Callable }，如 Callable(ItemEntity, "deserialize")。
 ## 返回 { "restored": {领域 id -> 实例}, "missing": 存档有数据但未注册的领域,
 ##        "skipped": 注册了但反序列化返回 null 的领域 }
-static func apply_save_data(data: Dictionary, consumers: Dictionary) -> Dictionary:
+static func apply_save_data(domains_payload: Dictionary, consumers: Dictionary) -> Dictionary:
 	var restored: Dictionary = {}
 	var missing: Array[String] = []
 	var skipped: Array[String] = []
 	for entry in _manifest_entries():
-		var id: String = String(entry.get("id", ""))
-		if not data.has(id):
+		var domain_id: String = String(entry.get("id", ""))
+		if not domains_payload.has(domain_id):
 			continue
-		if not consumers.has(id):
-			missing.append(id)
+		if not consumers.has(domain_id):
+			missing.append(domain_id)
 			continue
-		var deserializer: Variant = consumers[id]
+		var deserializer: Variant = consumers[domain_id]
 		if not deserializer is Callable:
-			skipped.append(id)
+			skipped.append(domain_id)
 			continue
-		var restored_object: Variant = (deserializer as Callable).call(data[id])
+		var restored_object: Variant = (deserializer as Callable).call(domains_payload[domain_id])
 		if restored_object == null:
-			skipped.append(id)
+			skipped.append(domain_id)
 			continue
-		restored[id] = restored_object
+		restored[domain_id] = restored_object
 	return {"restored": restored, "missing": missing, "skipped": skipped}
 
 ## 存档版本兼容校验与链式迁移：将 save_version 迁移到当前配置版本。
 ## 空版本（legacy 档）视作兼容原样通过；异版且无迁移链 → 明确不兼容并给出 error。
 ## 返回 { "compatible": bool, "version": 最终版本, "data": 处理后数据 [, "error"] }
-static func migrate_save_data(data: Dictionary, save_version: String) -> Dictionary:
+static func migrate_save_data(save_payload: Dictionary, save_version: String) -> Dictionary:
 	var current: String = GameConfig.get_string("infrastructure.persistence", "format_version", "1.0.0")
 	if save_version.is_empty() or save_version == current:
-		return {"compatible": true, "version": current, "data": data}
-	var working: Dictionary = data
+		return {"compatible": true, "version": current, "data": save_payload}
+	var working: Dictionary = save_payload
 	var current_version: String = save_version
 	var visited: Array[String] = []
 	while current_version != current:
@@ -103,13 +103,13 @@ static func validate_registration(providers: Dictionary, consumers: Dictionary) 
 	var providers_without_consumer: Array[String] = []
 	var registered_count: int = 0
 	for entry in _manifest_entries():
-		var id: String = String(entry.get("id", ""))
-		if not providers.has(id):
+		var domain_id: String = String(entry.get("id", ""))
+		if not providers.has(domain_id):
 			continue
 		registered_count += 1
-		var consumer: Variant = consumers.get(id)
+		var consumer: Variant = consumers.get(domain_id)
 		if consumer == null or not (consumer is Callable):
-			providers_without_consumer.append(id)
+			providers_without_consumer.append(domain_id)
 	return {
 		"balanced": providers_without_consumer.is_empty(),
 		"providers_without_consumer": providers_without_consumer,
@@ -124,10 +124,10 @@ static func _manifest_entries() -> Array:
 
 ## UID 单轨迁移判定器：只读递归扫描存档 payload 中实例物品 item_uid 的
 ## 旧档前缀（LGC_ 等自定义或历史判定，脱离配置真源）计数。
-static func audit_legacy_uid(payload_data: Dictionary, custom_prefixes: Array = ["LGC_"]) -> Dictionary:
+static func audit_legacy_uid(save_payload: Dictionary, custom_prefixes: Array = ["LGC_"]) -> Dictionary:
 	var prefixes: Array = custom_prefixes
 	var report: Dictionary = {"total_instances": 0, "legacy_uid_count": 0, "legacy_prefixes": prefixes, "legacy_samples": []}
-	_scan_uid_node(payload_data, prefixes, report)
+	_scan_uid_node(save_payload, prefixes, report)
 	report["migration_complete"] = int(report["legacy_uid_count"]) == 0
 	return report
 
@@ -137,11 +137,11 @@ static func _has_legacy_prefix(uid: String, prefixes: Array) -> bool:
 			return true
 	return false
 
-static func _inspect_item_uid_entry(item_dict: Dictionary, prefixes: Array, report: Dictionary) -> void:
-	if not item_dict.has("item_uid"):
+static func _inspect_item_uid_entry(item_payload: Dictionary, prefixes: Array, report: Dictionary) -> void:
+	if not item_payload.has("item_uid"):
 		return
 	report["total_instances"] = int(report["total_instances"]) + 1
-	var uid: String = String(item_dict.get("item_uid", ""))
+	var uid: String = String(item_payload.get("item_uid", ""))
 	if not _has_legacy_prefix(uid, prefixes):
 		return
 	report["legacy_uid_count"] = int(report["legacy_uid_count"]) + 1
@@ -152,10 +152,10 @@ static func _inspect_item_uid_entry(item_dict: Dictionary, prefixes: Array, repo
 ## 递归扫描：含 item_uid 键的字典计一实例；前缀命中计一 legacy（样本截前 5 条）
 static func _scan_uid_node(node: Variant, prefixes: Array, report: Dictionary) -> void:
 	if node is Dictionary:
-		var node_dict: Dictionary = node
-		_inspect_item_uid_entry(node_dict, prefixes, report)
-		for child_value in node_dict.values():
-			_scan_uid_node(child_value, prefixes, report)
+		var node_payload: Dictionary = node
+		_inspect_item_uid_entry(node_payload, prefixes, report)
+		for child_entry in node_payload.values():
+			_scan_uid_node(child_entry, prefixes, report)
 	elif node is Array:
-		for child_value in node:
-			_scan_uid_node(child_value, prefixes, report)
+		for child_entry in node:
+			_scan_uid_node(child_entry, prefixes, report)

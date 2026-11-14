@@ -87,24 +87,24 @@ func to_dict() -> Dictionary:
 	}
 
 ## 反序列化为 DTO 实例
-static func from_dict(data: Dictionary) -> RefCounted:
+static func from_dict(serialized_payload: Dictionary) -> RefCounted:
 	var state_instance: RefCounted = new(
-		String(data.get("account_id", "")),
-		String(data.get("slot_id", "")),
-		String(data.get("character_name", "")),
-		String(data.get("world_mode", MODE_SINGLE_PLAYER))
+		String(serialized_payload.get("account_id", "")),
+		String(serialized_payload.get("slot_id", "")),
+		String(serialized_payload.get("character_name", "")),
+		String(serialized_payload.get("world_mode", MODE_SINGLE_PLAYER))
 	)
 	var typed_instance := state_instance as MinimumWorldStateDTO
 	if typed_instance != null:
-		typed_instance.level = int(data.get("level", 1))
-		typed_instance.current_hp = float(data.get("current_hp", DEFAULT_MAX_HP))
-		typed_instance.max_hp = float(data.get("max_hp", DEFAULT_MAX_HP))
-		typed_instance.play_time_seconds = int(data.get("play_time_seconds", 0))
-		typed_instance.prologue_completed = bool(data.get("prologue_completed", false))
-		var currency_data: Variant = data.get("currency_summary", {})
-		if currency_data is Dictionary:
-			typed_instance.currency_summary = currency_data.duplicate()
-		var meta_data: Variant = data.get("metadata", {})
-		if meta_data is Dictionary:
-			typed_instance.metadata = meta_data.duplicate()
+		typed_instance.level = int(serialized_payload.get("level", 1))
+		typed_instance.current_hp = float(serialized_payload.get("current_hp", DEFAULT_MAX_HP))
+		typed_instance.max_hp = float(serialized_payload.get("max_hp", DEFAULT_MAX_HP))
+		typed_instance.play_time_seconds = int(serialized_payload.get("play_time_seconds", 0))
+		typed_instance.prologue_completed = bool(serialized_payload.get("prologue_completed", false))
+		var raw_currency_payload: Variant = serialized_payload.get("currency_summary", {})
+		if raw_currency_payload is Dictionary:
+			typed_instance.currency_summary = raw_currency_payload.duplicate()
+		var raw_metadata_payload: Variant = serialized_payload.get("metadata", {})
+		if raw_metadata_payload is Dictionary:
+			typed_instance.metadata = raw_metadata_payload.duplicate()
 	return state_instance

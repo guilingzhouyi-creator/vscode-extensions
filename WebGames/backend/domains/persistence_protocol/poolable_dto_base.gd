@@ -11,7 +11,7 @@
 class_name PoolableDtoBase
 extends RefCounted
 
-var _pool_active: bool = true
+var _is_pool_active: bool = true
 var _pool_generation: int = 0
 var _pool_reuse_count: int = 0
 
@@ -21,19 +21,19 @@ func reset_state() -> void:
 
 ## 标记对象从对象池租出，进入活跃使用态并递增复用计数
 func mark_pooled_acquire() -> void:
-	_pool_active = true
+	_is_pool_active = true
 	_pool_reuse_count += 1
 
 ## 标记对象归还对象池并执行状态重置，避免重复归还
 func mark_pooled_release() -> void:
-	if not _pool_active:
+	if not _is_pool_active:
 		return
-	_pool_active = false
+	_is_pool_active = false
 	reset_state()
 
 ## 返回当前实例是否处于对象池活跃租出状态
 func is_pool_active() -> bool:
-	return _pool_active
+	return _is_pool_active
 
 ## 返回当前实例经历的重置代数（用于检测过期句柄复用）
 func get_pool_generation() -> int:

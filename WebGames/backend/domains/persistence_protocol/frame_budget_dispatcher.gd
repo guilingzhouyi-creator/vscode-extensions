@@ -32,7 +32,7 @@ func _init() -> void:
 func enqueue_submission(action: Callable, priority: int = 1) -> void:
 	if not action.is_valid():
 		return
-	var item := {
+	var submission_entry := {
 		"action": action,
 		"priority": priority,
 		"enqueued_at": Time.get_ticks_usec()
@@ -41,7 +41,7 @@ func enqueue_submission(action: Callable, priority: int = 1) -> void:
 	var insert_index := 0
 	while insert_index < _submission_queue.size() and _submission_queue[insert_index]["priority"] <= priority:
 		insert_index += 1
-	_submission_queue.insert(insert_index, item)
+	_submission_queue.insert(insert_index, submission_entry)
 
 ## 获取当前待执行任务总数
 func get_pending_count() -> int:
@@ -54,8 +54,8 @@ static var _budget_config_cached: float = 2.0
 static var _budget_config_version: int = -1
 
 ## 单帧预算切片执行
-func pump_slice(budget_override_ms: float = -1.0) -> Dictionary:
-	var max_budget: float = budget_override_ms
+func pump_slice(budget_override_milliseconds: float = -1.0) -> Dictionary:
+	var max_budget: float = budget_override_milliseconds
 	if max_budget <= 0.0:
 		var config_version: int = GameConfig.config_reload_version()
 		if _budget_config_version != config_version:
@@ -63,24 +63,24 @@ func pump_slice(budget_override_ms: float = -1.0) -> Dictionary:
 			_budget_config_version = config_version
 		max_budget = _budget_config_cached
 	
-	var budget_usec := int(max_budget * MS_TO_USEC)
+	var budget_microseconds := int(max_budget * MS_TO_USEC)
 	var start_ticks := Time.get_ticks_usec()
 	var executed := 0
-	var budget_exhausted := false
+	var is_budget_exhausted := false
 	var start_epoch: int = _clear_epoch
 	var execution_index: int = 0
 	var initial_count: int = _submission_queue.size()
 
 	while execution_index < initial_count and execution_index < _submission_queue.size() and _clear_epoch == start_epoch:
-		var now := Time.get_ticks_usec()
-		var elapsed := now - start_ticks
-		if elapsed >= budget_usec:
-			budget_exhausted = true
+		var current_ticks := Time.get_ticks_usec()
+		var elapsed := current_ticks - start_ticks
+		if elapsed >= budget_microseconds:
+			is_budget_exhausted = true
 			break
 
-		var item: Dictionary = _submission_queue[execution_index]
+		var submission_entry: Dictionary = _submission_queue[execution_index]
 		execution_index += 1
-		var action: Callable = item["action"]
+		var action: Callable = submission_entry["action"]
 		if action.is_valid():
 			action.call()
 			executed += 1
@@ -91,12 +91,12 @@ func pump_slice(budget_override_ms: float = -1.0) -> Dictionary:
 		else:
 			_submission_queue = _submission_queue.slice(execution_index)
 
-	var total_elapsed_ms := float(Time.get_ticks_usec() - start_ticks) / USEC_TO_MS
+	var total_elapsed_milliseconds := float(Time.get_ticks_usec() - start_ticks) / USEC_TO_MS
 
 	return {
 		"executed_count": executed,
-		"elapsed_ms": total_elapsed_ms,
-		"budget_exhausted": budget_exhausted,
+		"elapsed_ms": total_elapsed_milliseconds,
+		"budget_exhausted": is_budget_exhausted,
 		"remaining_count": _submission_queue.size()
 	}
 

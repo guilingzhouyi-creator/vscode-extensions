@@ -75,8 +75,8 @@ func register_decoder(decoder: StorageContractInterfaces.ResourceDecoderContract
 func get_decoder_for_entry(entry: ResourceIndexEntryDTO) -> StorageContractInterfaces.ResourceDecoderContract:
 	if entry == null:
 		return _default_decoder
-	for decoder_item in _decoders:
-		var decoder := decoder_item as StorageContractInterfaces.ResourceDecoderContract
+	for decoder_entry in _decoders:
+		var decoder := decoder_entry as StorageContractInterfaces.ResourceDecoderContract
 		if decoder != null and decoder.can_decode(entry):
 			return decoder
 	return _default_decoder

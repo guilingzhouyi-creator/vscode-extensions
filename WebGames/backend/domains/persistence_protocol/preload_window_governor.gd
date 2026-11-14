@@ -42,24 +42,24 @@ func get_window_radius() -> float:
 	return _window_radius
 
 ## 判定目标资源是否落在当前预加载窗口内
-func is_within_window(target_pos: Vector2, target_scene_id: String) -> bool:
+func is_within_window(target_position: Vector2, target_scene_id: String) -> bool:
 	if not _current_scene_id.is_empty() and not target_scene_id.is_empty():
 		if _current_scene_id != target_scene_id:
 			return false
-	var dist := _current_position.distance_to(target_pos)
-	return dist <= _window_radius
+	var distance := _current_position.distance_to(target_position)
+	return distance <= _window_radius
 
 ## 批量过滤出落在窗口内部的候选资源列表
 func filter_candidates(candidates: Array) -> Array:
 	var filtered: Array = []
-	for item in candidates:
-		if not item is Dictionary:
+	for raw_candidate in candidates:
+		if not raw_candidate is Dictionary:
 			continue
-		var candidate_dict: Dictionary = item
-		var candidate_position: Vector2 = candidate_dict.get("position", _current_position)
-		var candidate_scene_id: String = String(candidate_dict.get("scene_id", _current_scene_id))
+		var candidate_payload: Dictionary = raw_candidate
+		var candidate_position: Vector2 = candidate_payload.get("position", _current_position)
+		var candidate_scene_id: String = String(candidate_payload.get("scene_id", _current_scene_id))
 		if is_within_window(candidate_position, candidate_scene_id):
-			filtered.append(candidate_dict)
+			filtered.append(candidate_payload)
 	return filtered
 
 ## 获取当前窗口运行摘要

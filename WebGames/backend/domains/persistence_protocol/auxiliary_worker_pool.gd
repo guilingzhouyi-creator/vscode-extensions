@@ -67,7 +67,7 @@ var _max_cache_entries: int = DEFAULT_MAX_CACHE_ENTRIES
 var _active_batches: Dictionary = {}   # batch_id -> BatchLoadRequestDTO
 var _state_mutex: Mutex = Mutex.new()
 
-var _deterministic_mode: bool = true
+var _is_deterministic_mode: bool = true
 
 ## 获取单例全局静态唯一实例
 static func get_instance() -> RefCounted:
@@ -86,12 +86,12 @@ func _init() -> void:
 	_cache_fifo_head = 0
 	_active_batches = {}
 	_state_mutex = Mutex.new()
-	var force_sync: bool = GameConfig.get_bool("infrastructure.storage", "deterministic/force_sync_in_tests", true)
-	_deterministic_mode = force_sync or OS.has_feature(FEATURE_TEMPLATE) == false
+	var should_force_sync: bool = GameConfig.get_bool("infrastructure.storage", "deterministic/force_sync_in_tests", true)
+	_is_deterministic_mode = should_force_sync or OS.has_feature(FEATURE_TEMPLATE) == false
 
 ## 设置测试用确定性同步执行模式
-func set_deterministic_mode(enabled: bool) -> void:
-	_deterministic_mode = enabled
+func set_deterministic_mode(is_enabled: bool) -> void:
+	_is_deterministic_mode = is_enabled
 
 ## 异步排队加载资源（依据优先级保序插入）
 func request_resource_async(
@@ -105,12 +105,12 @@ func request_resource_async(
 
 	# 1. 缓存命中短路
 	_state_mutex.lock()
-	var cache_hit: bool = _cached_results.has(resource_path)
-	var cached_value: Variant = _cached_results.get(resource_path, null) if cache_hit else null
+	var is_cache_hit: bool = _cached_results.has(resource_path)
+	var cached_payload: Variant = _cached_results.get(resource_path, null) if is_cache_hit else null
 	_state_mutex.unlock()
-	if cache_hit:
+	if is_cache_hit:
 		if callback.is_valid():
-			callback.call(true, cached_value, StorageContractInterfaces.ERR_NONE)
+			callback.call(true, cached_payload, StorageContractInterfaces.ERR_NONE)
 		return 0
 
 	# 2. 检查背压上限（随 GameConfig.config_reload_version() 缓存）
@@ -136,7 +136,7 @@ func request_resource_async(
 	task.start_time_usec = Time.get_ticks_usec()
 
 	# 3. 直接驱动调度（避免无意义先 insert 再立即 erase）
-	_execute_task(task, _deterministic_mode)
+	_execute_task(task, _is_deterministic_mode)
 
 	return task.task_id
 
@@ -160,12 +160,12 @@ func enqueue_batch(batch_request: Variant) -> String:
 	for entry in batch.entries:
 		var token: Variant = batch.cancellation_token
 		var priority_level: int = entry.priority
-		var path: String = entry.physical_path if not entry.physical_path.is_empty() else entry.resource_id
-		request_resource_async(path, priority_level, token, func(succeeded: bool, data: Variant, error_code: String):
-			batch.loaded_count += int(succeeded)
-			batch.failed_count += int(not succeeded)
+		var target_resource_path: String = entry.physical_path if not entry.physical_path.is_empty() else entry.resource_id
+		request_resource_async(target_resource_path, priority_level, token, func(is_succeeded: bool, resource_payload: Variant, error_code: String):
+			batch.loaded_count += int(is_succeeded)
+			batch.failed_count += int(not is_succeeded)
 			if batch.on_item_loaded.is_valid():
-				batch.on_item_loaded.call(entry, succeeded, data, error_code)
+				batch.on_item_loaded.call(entry, is_succeeded, resource_payload, error_code)
 			if batch.is_completed():
 				_active_batches.erase(batch_id)
 				if batch.on_batch_completed.is_valid():
@@ -174,25 +174,25 @@ func enqueue_batch(batch_request: Variant) -> String:
 
 	return batch.batch_id
 
-func _cancel_task_instance(task: AsyncLoadTask, notify_callback: bool) -> void:
+func _cancel_task_instance(task: AsyncLoadTask, should_notify_callback: bool) -> void:
 	task.status = STATUS_CANCELLED
 	task.error_code = StorageContractInterfaces.ERR_TASK_CANCELLED
-	if notify_callback and task.callback.is_valid():
+	if should_notify_callback and task.callback.is_valid():
 		task.callback.call(false, null, StorageContractInterfaces.ERR_TASK_CANCELLED)
 
 ## 取消加载任务（支持传入任务 ID 或 CancellationToken）
 func cancel_task(target: Variant) -> bool:
 	if target is CancellationToken:
-		var cancelled_any := false
+		var has_cancelled_any := false
 		var queue_index := _pending_queue.size() - 1
 		while queue_index >= 0:
 			if _pending_queue[queue_index].token == target:
 				var pending_task: AsyncLoadTask = _pending_queue[queue_index]
 				_pending_queue.remove_at(queue_index)
 				_cancel_task_instance(pending_task, true)
-				cancelled_any = true
+				has_cancelled_any = true
 			queue_index -= 1
-		return cancelled_any
+		return has_cancelled_any
 
 	var target_task_id := int(target)
 	for queue_index in range(_pending_queue.size()):
@@ -220,7 +220,7 @@ func _run_task_execution(task: AsyncLoadTask) -> void:
 	_notify_task_finished(task)
 
 ## 任务执行调度（支持确定性同步或 WorkerThreadPool 异步派发）
-func _execute_task(task: AsyncLoadTask, sync_mode: bool) -> void:
+func _execute_task(task: AsyncLoadTask, is_synchronous_mode: bool) -> void:
 	if task.token != null and task.token.is_cancelled():
 		_cancel_task_instance(task, false)
 		_notify_task_finished(task)
@@ -228,7 +228,7 @@ func _execute_task(task: AsyncLoadTask, sync_mode: bool) -> void:
 
 	task.status = STATUS_RUNNING
 
-	if sync_mode:
+	if is_synchronous_mode:
 		_run_task_execution(task)
 	else:
 		_state_mutex.lock()
@@ -238,55 +238,55 @@ func _execute_task(task: AsyncLoadTask, sync_mode: bool) -> void:
 		task.pool_task_id = WorkerThreadPool.add_task(_run_task_execution.bind(task), is_high_priority, TASK_THREAD_PREFIX + str(task.task_id))
 
 ## 插入缓存并执行环形 FIFO 淘汰，保障缓存字典规模有界且零 pop_front 挪移
-func _cache_result(path: String, data: Variant) -> void:
+func _cache_result(resource_path: String, resource_payload: Variant) -> void:
 	_state_mutex.lock()
-	if _cached_results.has(path):
-		_cached_results[path] = data
+	if _cached_results.has(resource_path):
+		_cached_results[resource_path] = resource_payload
 		_state_mutex.unlock()
 		return
 	if _cache_keys_fifo.size() < _max_cache_entries:
-		_cached_results[path] = data
-		_cache_keys_fifo.append(path)
+		_cached_results[resource_path] = resource_payload
+		_cache_keys_fifo.append(resource_path)
 	elif _max_cache_entries > 0:
 		var oldest_key: String = _cache_keys_fifo[_cache_fifo_head]
 		_cached_results.erase(oldest_key)
-		_cache_keys_fifo[_cache_fifo_head] = path
+		_cache_keys_fifo[_cache_fifo_head] = resource_path
 		_cache_fifo_head = (_cache_fifo_head + 1) % _cache_keys_fifo.size()
-		_cached_results[path] = data
+		_cached_results[resource_path] = resource_payload
 	_state_mutex.unlock()
 
 ## 底层纯 IO 与反序列化算子（可在非主线程安全执行）
-static func _load_resource_payload(path: String) -> Dictionary:
-	if path.ends_with(".kdat"):
-		if not FileAccess.file_exists(path):
+static func _load_resource_payload(resource_path: String) -> Dictionary:
+	if resource_path.ends_with(".kdat"):
+		if not FileAccess.file_exists(resource_path):
 			return {"error": StorageContractInterfaces.ERR_NOT_FOUND}
-		var kdat_data: Variant = BinaryConfigReader.load_kdat_file(path)
-		if kdat_data == null:
+		var binary_config_payload: Variant = BinaryConfigReader.load_kdat_file(resource_path)
+		if binary_config_payload == null:
 			return {"error": StorageContractInterfaces.ERR_CORRUPT}
-		var file_handle := FileAccess.open(path, FileAccess.READ)
+		var file_handle := FileAccess.open(resource_path, FileAccess.READ)
 		var byte_length: int = file_handle.get_length() if file_handle != null else 0
 		if file_handle != null:
 			file_handle.close()
-		return {"data": kdat_data, "byte_count": byte_length}
+		return {"data": binary_config_payload, "byte_count": byte_length}
 
-	if not FileAccess.file_exists(path):
+	if not FileAccess.file_exists(resource_path):
 		return {"error": StorageContractInterfaces.ERR_NOT_FOUND}
 
-	var file := FileAccess.open(path, FileAccess.READ)
+	var file := FileAccess.open(resource_path, FileAccess.READ)
 	if file == null:
 		return {"error": StorageContractInterfaces.ERR_IO_FAIL}
 
 	var content_text := file.get_as_text()
-	var byte_len := content_text.length()
+	var byte_length := content_text.length()
 	file.close()
 
-	if path.ends_with(EXT_JSON):
+	if resource_path.ends_with(EXT_JSON):
 		var json := JSON.new()
 		if json.parse(content_text) != OK:
 			return {"error": StorageContractInterfaces.ERR_CORRUPT}
-		return {"data": json.get_data(), "byte_count": byte_len}
+		return {"data": json.get_data(), "byte_count": byte_length}
 
-	return {"data": content_text, "byte_count": byte_len}
+	return {"data": content_text, "byte_count": byte_length}
 
 ## 完成后通知
 func _notify_task_finished(task: AsyncLoadTask) -> void:
@@ -295,8 +295,8 @@ func _notify_task_finished(task: AsyncLoadTask) -> void:
 		_running_tasks.erase(task.task_id)
 	_state_mutex.unlock()
 	if task.callback.is_valid():
-		var ok := (task.status == STATUS_COMPLETED)
-		task.callback.call(ok, task.result_data, task.error_code)
+		var is_succeeded := (task.status == STATUS_COMPLETED)
+		task.callback.call(is_succeeded, task.result_data, task.error_code)
 		task.callback = Callable() # 立即释放回调闭包，阻断外部大对象与 DTO 连锁强引用常驻
 
 	_state_mutex.lock()
@@ -326,9 +326,9 @@ func pump_completed_tasks(max_count: int = DEFAULT_PUMP_BATCH_SIZE) -> int:
 ## 获取已缓存资源
 func get_cached_resource(resource_path: String) -> Variant:
 	_state_mutex.lock()
-	var cached_value: Variant = _cached_results.get(resource_path, null)
+	var cached_payload: Variant = _cached_results.get(resource_path, null)
 	_state_mutex.unlock()
-	return cached_value
+	return cached_payload
 
 ## 清理闲置资源
 func evict_idle_resources() -> int:

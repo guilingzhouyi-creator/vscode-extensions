@@ -53,55 +53,55 @@ func quick_restore_minimal_state(slot_id: String) -> Dictionary:
 	var load_result: Dictionary = SaveManager.load_game(clean_slot)
 	
 	if not bool(load_result.get("success", false)):
-		var elapsed_fail := float(Time.get_ticks_usec() - start_ticks) / USEC_TO_MS
+		var elapsed_failure_milliseconds := float(Time.get_ticks_usec() - start_ticks) / USEC_TO_MS
 		return {
 			"success": false,
 			"error_code": load_result.get("error_code", "RESTORE_FAILED"),
-			"duration_ms": elapsed_fail,
+			"duration_ms": elapsed_failure_milliseconds,
 			"state": null
 		}
 
-	var data: Dictionary = load_result.get("data", {})
-	var meta: Dictionary = load_result.get("meta", {})
-	var min_state := _extract_minimal_state(clean_slot, data, meta)
-	var elapsed_ms := float(Time.get_ticks_usec() - start_ticks) / USEC_TO_MS
+	var save_domains_payload: Dictionary = load_result.get("data", {})
+	var save_metadata: Dictionary = load_result.get("meta", {})
+	var minimal_state := _extract_minimal_state(clean_slot, save_domains_payload, save_metadata)
+	var elapsed_milliseconds := float(Time.get_ticks_usec() - start_ticks) / USEC_TO_MS
 
 	var max_budget := GameConfig.get_float("infrastructure.storage", "primary/minimal_state/max_restore_budget_ms", 5.0)
-	if elapsed_ms > max_budget:
-		EventBusCore.get_instance().emit_log(LOG_LEVEL_WARN, TemplateFormatter.format(LOG_RESTORE_TIMEOUT, {"duration": "%.2f" % elapsed_ms, "budget": "%.2f" % max_budget}))
+	if elapsed_milliseconds > max_budget:
+		EventBusCore.get_instance().emit_log(LOG_LEVEL_WARN, TemplateFormatter.format(LOG_RESTORE_TIMEOUT, {"duration": "%.2f" % elapsed_milliseconds, "budget": "%.2f" % max_budget}))
 
 	return {
 		"success": true,
-		"state": min_state,
-		"duration_ms": elapsed_ms,
+		"state": minimal_state,
+		"duration_ms": elapsed_milliseconds,
 		"verified": bool(load_result.get("verified", true)),
 		"stage": STAGE_MINIMAL_RESTORE_READY
 	}
 
 ## 从完整或部分载荷提取最小状态 DTO
-func _extract_minimal_state(slot_id: String, data: Dictionary, meta: Dictionary) -> MinimumWorldStateDTO:
-	var account_data: Dictionary = data.get("account", {})
-	var char_data: Dictionary = data.get("character", {})
-	var life_data: Dictionary = data.get("lifecycle", {})
-	var wallet_data: Dictionary = data.get("currency_economy", {})
+func _extract_minimal_state(slot_id: String, save_domains_payload: Dictionary, save_metadata: Dictionary) -> MinimumWorldStateDTO:
+	var account_payload: Dictionary = save_domains_payload.get("account", {})
+	var character_payload: Dictionary = save_domains_payload.get("character", {})
+	var lifecycle_payload: Dictionary = save_domains_payload.get("lifecycle", {})
+	var wallet_payload: Dictionary = save_domains_payload.get("currency_economy", {})
 
-	var account_id: String = String(account_data.get("account_id", DEFAULT_ACCOUNT_ID))
-	var char_name: String = String(char_data.get("name", slot_id))
-	var world_mode: String = String(data.get("world_mode", DEFAULT_WORLD_MODE))
+	var account_id: String = String(account_payload.get("account_id", DEFAULT_ACCOUNT_ID))
+	var character_name: String = String(character_payload.get("name", slot_id))
+	var world_mode: String = String(save_domains_payload.get("world_mode", DEFAULT_WORLD_MODE))
 
-	var world_state := MinimumWorldStateDTO.new(account_id, slot_id, char_name, world_mode)
-	world_state.level = int(char_data.get("level", 1))
-	world_state.current_hp = float(life_data.get("hp", DEFAULT_MAX_HP))
-	world_state.max_hp = float(life_data.get("max_hp", DEFAULT_MAX_HP))
-	world_state.play_time_seconds = int(meta.get("play_time_seconds", 0))
-	world_state.prologue_completed = bool(data.get("prologue_completed", false))
+	var world_state := MinimumWorldStateDTO.new(account_id, slot_id, character_name, world_mode)
+	world_state.level = int(character_payload.get("level", 1))
+	world_state.current_hp = float(lifecycle_payload.get("hp", DEFAULT_MAX_HP))
+	world_state.max_hp = float(lifecycle_payload.get("max_hp", DEFAULT_MAX_HP))
+	world_state.play_time_seconds = int(save_metadata.get("play_time_seconds", 0))
+	world_state.prologue_completed = bool(save_domains_payload.get("prologue_completed", false))
 	world_state.currency_summary = {
-		"gold": int(wallet_data.get("gold", 0)),
-		"crystals": int(wallet_data.get("crystals", 0))
+		"gold": int(wallet_payload.get("gold", 0)),
+		"crystals": int(wallet_payload.get("crystals", 0))
 	}
 	world_state.metadata = {
-		"signature_sha256": meta.get("signature_sha256", ""),
-		"created_timestamp": meta.get("created_timestamp", 0)
+		"signature_sha256": save_metadata.get("signature_sha256", ""),
+		"created_timestamp": save_metadata.get("created_timestamp", 0)
 	}
 	return world_state
 

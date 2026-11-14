@@ -13,22 +13,22 @@ class_name CancellationToken extends PoolableDtoBase
 
 const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
-var _cancelled: bool = false
+var _is_cancelled: bool = false
 var _callbacks: Array[Callable] = []
 
 func _init() -> void:
-	_cancelled = false
+	_is_cancelled = false
 	_callbacks = []
 
 ## 判定当前令牌是否已取消
 func is_cancelled() -> bool:
-	return _cancelled
+	return _is_cancelled
 
 ## 触发取消通知
 func cancel() -> void:
-	if _cancelled:
+	if _is_cancelled:
 		return
-	_cancelled = true
+	_is_cancelled = true
 	var callbacks_snapshot := _callbacks.duplicate()
 	_callbacks.clear()
 	for callback in callbacks_snapshot:
@@ -39,7 +39,7 @@ func cancel() -> void:
 func register_callback(callback: Callable) -> void:
 	if not callback.is_valid():
 		return
-	if _cancelled:
+	if _is_cancelled:
 		callback.call()
 		return
 	_callbacks.append(callback)
@@ -47,5 +47,5 @@ func register_callback(callback: Callable) -> void:
 ## 重置令牌状态（复用契约）
 func reset_state() -> void:
 	super.reset_state()
-	_cancelled = false
+	_is_cancelled = false
 	_callbacks.clear()

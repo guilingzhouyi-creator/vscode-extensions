@@ -76,18 +76,18 @@ func to_dict() -> Dictionary:
 	}
 
 ## 反序列化为 DTO 实例
-static func from_dict(data: Dictionary) -> RefCounted:
+static func from_dict(serialized_payload: Dictionary) -> RefCounted:
 	var entry_instance: RefCounted = new()
 	var typed_entry := entry_instance as ResourceIndexEntryDTO
 	if typed_entry != null:
-		typed_entry.resource_id = String(data.get("resource_id", ""))
-		typed_entry.physical_path = String(data.get("physical_path", ""))
-		typed_entry.category = String(data.get("category", DEFAULT_CATEGORY))
-		typed_entry.priority = int(data.get("priority", DEFAULT_PRIORITY))
-		typed_entry.estimated_bytes = int(data.get("estimated_bytes", 0))
-		var raw_dependencies: Array = data.get("dependencies", [])
+		typed_entry.resource_id = String(serialized_payload.get("resource_id", ""))
+		typed_entry.physical_path = String(serialized_payload.get("physical_path", ""))
+		typed_entry.category = String(serialized_payload.get("category", DEFAULT_CATEGORY))
+		typed_entry.priority = int(serialized_payload.get("priority", DEFAULT_PRIORITY))
+		typed_entry.estimated_bytes = int(serialized_payload.get("estimated_bytes", 0))
+		var raw_dependencies: Array = serialized_payload.get("dependencies", [])
 		typed_entry.dependencies.clear()
 		for dependency_id in raw_dependencies:
 			typed_entry.dependencies.append(String(dependency_id))
-		typed_entry.metadata = Dictionary(data.get("metadata", {})).duplicate(true)
+		typed_entry.metadata = Dictionary(serialized_payload.get("metadata", {})).duplicate(true)
 	return entry_instance

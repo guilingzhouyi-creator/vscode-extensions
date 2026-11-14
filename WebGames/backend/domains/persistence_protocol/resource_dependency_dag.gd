@@ -81,28 +81,28 @@ func _dfs_cycle(node: String, color: Dictionary) -> bool:
 ## 计算指定节点变更时的受影响失效子图（BFS / 拓扑序展开）
 ## 返回受影响节点列表（包含 changed_node 自身在首位，后随下游拓扑受影响节点）
 func get_invalidation_subgraph(changed_node: String) -> Array[String]:
-	var result: Array[String] = []
+	var subgraph_nodes: Array[String] = []
 	if changed_node.is_empty():
-		return result
+		return subgraph_nodes
 
-	result.append(changed_node)
+	subgraph_nodes.append(changed_node)
 	var queue: Array[String] = [changed_node]
 	var visited: Dictionary = {changed_node: true}
 
 	while not queue.is_empty():
 		var current_node: String = queue.pop_front()
-		_expand_downstream_nodes(current_node, visited, queue, result)
+		_expand_downstream_nodes(current_node, visited, queue, subgraph_nodes)
 
-	return result
+	return subgraph_nodes
 
-func _expand_downstream_nodes(current_node: String, visited: Dictionary, queue: Array[String], result: Array[String]) -> void:
+func _expand_downstream_nodes(current_node: String, visited: Dictionary, queue: Array[String], subgraph_nodes: Array[String]) -> void:
 	var downstream: Array = _downstream_edges.get(current_node, [])
-	for dep in downstream:
-		var dep_str := String(dep)
-		if not visited.has(dep_str):
-			visited[dep_str] = true
-			queue.append(dep_str)
-			result.append(dep_str)
+	for dependency_entry in downstream:
+		var dependency_id := String(dependency_entry)
+		if not visited.has(dependency_id):
+			visited[dependency_id] = true
+			queue.append(dependency_id)
+			subgraph_nodes.append(dependency_id)
 
 ## 清除所有依赖记录
 func clear() -> void:

@@ -15,29 +15,29 @@ static func reconcile_client_state(
 	authoritative_server_packet: ServerEventPacket,
 	pending_input_queue: Array
 ) -> Dictionary:
-	var base_hp: float = authoritative_server_packet.authoritative_state.get("hp", GameConfig.get_float("infrastructure.persistence", "reconciliation/default_hp", 100.0))
-	var base_ap: int = authoritative_server_packet.authoritative_state.get("ap", GameConfig.get_int("infrastructure.persistence", "reconciliation/default_ap", 0))
+	var base_health_points: float = authoritative_server_packet.authoritative_state.get("hp", GameConfig.get_float("infrastructure.persistence", "reconciliation/default_hp", 100.0))
+	var base_action_points: int = authoritative_server_packet.authoritative_state.get("ap", GameConfig.get_int("infrastructure.persistence", "reconciliation/default_ap", 0))
 	var acknowledged_sequence: Variant = authoritative_server_packet.acknowledged_sequence_number
 
 	# 剔除已确认指令，保留未确认指令
-	var remaining_unacked: Array = []
+	var unacknowledged_commands: Array = []
 	for command in pending_input_queue:
 		if command.sequence_number > acknowledged_sequence:
-			remaining_unacked.append(command)
+			unacknowledged_commands.append(command)
 
 	# 重放未确认指令
-	var predicted_hp := base_hp
-	var predicted_ap := base_ap
+	var predicted_health_points := base_health_points
+	var predicted_action_points := base_action_points
 	var default_verb := GameConfig.get_string("infrastructure.persistence", "reconciliation/default_verb", "SLASH")
-	var base_ap_fallback := GameConfig.get_int("infrastructure.persistence", "reconciliation/base_ap_fallback", -2)
-	for command in remaining_unacked:
+	var fallback_action_points := GameConfig.get_int("infrastructure.persistence", "reconciliation/base_ap_fallback", -2)
+	for command in unacknowledged_commands:
 		var verb: Variant = command.payload.get("verb", default_verb)
-		var verb_info: Variant = PhysicalVerbRegistry.get_verb(verb)
-		predicted_ap += int(verb_info.get("base_ap", base_ap_fallback))
+		var verb_definition: Variant = PhysicalVerbRegistry.get_verb(verb)
+		predicted_action_points += int(verb_definition.get("base_ap", fallback_action_points))
 
 	return {
-		"reconciled_hp": predicted_hp,
-		"reconciled_ap": predicted_ap,
-		"remaining_unacked_count": remaining_unacked.size(),
-		"replayed_commands": remaining_unacked
+		"reconciled_hp": predicted_health_points,
+		"reconciled_ap": predicted_action_points,
+		"remaining_unacked_count": unacknowledged_commands.size(),
+		"replayed_commands": unacknowledged_commands
 	}
