@@ -81,5 +81,5 @@ func _write_report(path: String, report: Dictionary) -> void:
 	if file == null:
 		push_error("BenchRunner: 无法写入报告 %s (err=%d)" % [path, FileAccess.get_open_error()])
 		return
-	file.store_string(JSON.stringify(report, "\t"))
+	file.store_string(JSON.stringify(report, "  ") + "\n")
 	file.close()

@@ -132,14 +132,16 @@ def main() -> int:
     text = "\n".join(md)
     if args.md:
         Path(args.md).parent.mkdir(parents=True, exist_ok=True)
-        Path(args.md).write_text(text + "\n", encoding="utf-8")
+        with Path(args.md).open("w", encoding="utf-8", newline="\n") as handle:
+            handle.write(text + "\n")
         print(f"【report-sweep】中位数表已写入: {args.md}")
     else:
         print(text)
 
     if args.out:
         Path(args.out).parent.mkdir(parents=True, exist_ok=True)
-        Path(args.out).write_text(json.dumps(merged, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        with Path(args.out).open("w", encoding="utf-8", newline="\n") as handle:
+            handle.write(json.dumps(merged, indent=2, ensure_ascii=False) + "\n")
         print(f"【report-sweep】合并报告已写入: {args.out}")
     return 0
 
