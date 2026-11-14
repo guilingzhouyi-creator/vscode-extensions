@@ -19,16 +19,16 @@ var children_paths: Array = []
 
 ## 红点树节点构造（路径/父路径/直计数/聚合计数/子路径）
 func _init(
-	p_path: String = "",
-	p_parent: String = "",
-	p_count: int = 0,
-	p_children: Array = []
+	initial_node_path: String = "",
+	initial_parent_path: String = "",
+	initial_direct_count: int = 0,
+	initial_children_paths: Array = []
 ) -> void:
-	node_path = p_path
-	parent_path = p_parent
-	direct_count = p_count
-	total_aggregated_count = p_count
-	children_paths = p_children
+	node_path = initial_node_path
+	parent_path = initial_parent_path
+	direct_count = initial_direct_count
+	total_aggregated_count = initial_direct_count
+	children_paths = initial_children_paths
 
 ## NotificationDTO：系统通知数据传输模型
 class NotificationDTO extends RefCounted:
@@ -45,16 +45,16 @@ class NotificationDTO extends RefCounted:
 
 	## 通知 DTO 构造（ID/类型/标题键/内容键/参数/自动关闭秒数）
 	func _init(
-		p_id: String = "",
-		p_type: NoticeType = NoticeType.TOAST,
-		p_title: String = "",
-		p_content: String = "",
-		p_params: Dictionary = {},
-		p_dismiss: float = DEFAULT_AUTO_DISMISS_SECONDS
+		initial_notice_id: String = "",
+		initial_type: NoticeType = NoticeType.TOAST,
+		initial_title_key: String = "",
+		initial_content_key: String = "",
+		initial_params: Dictionary = {},
+		initial_dismiss_seconds: float = DEFAULT_AUTO_DISMISS_SECONDS
 	) -> void:
-		notice_id = p_id
-		type = p_type
-		title_loc_key = p_title
-		content_loc_key = p_content
-		params = p_params
-		auto_dismiss_seconds = p_dismiss
+		notice_id = initial_notice_id
+		type = initial_type
+		title_loc_key = initial_title_key
+		content_loc_key = initial_content_key
+		params = initial_params
+		auto_dismiss_seconds = initial_dismiss_seconds
