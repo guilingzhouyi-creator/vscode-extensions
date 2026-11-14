@@ -30,23 +30,23 @@ static func reset_for_tests() -> void:
 		_instance.detach_hud()
 		_instance = null
 
-var _view_ref: WeakRef = null
+var _view_weak_reference: WeakRef = null
 var _is_attached: bool = false
 var _bus_tokens: Array = []
 
 ## 返回当前是否已绑定有效且未释放的主页 HUD 视图引用。
 func is_attached() -> bool:
-	return _is_attached and _view_ref != null and _view_ref.get_ref() != null
+	return _is_attached and _view_weak_reference != null and _view_weak_reference.get_ref() != null
 
 ## 绑定主页 HUD 视图宿主（幂等）
-func attach_hud(view: MainHUDView) -> void:
-	if view == null:
+func attach_hud(hud_view: MainHUDView) -> void:
+	if hud_view == null:
 		return
-	if _is_attached and _view_ref != null and _view_ref.get_ref() == view:
+	if _is_attached and _view_weak_reference != null and _view_weak_reference.get_ref() == hud_view:
 		return
 	detach_hud()
 
-	_view_ref = weakref(view)
+	_view_weak_reference = weakref(hud_view)
 	_is_attached = true
 	_setup_bus_subscriptions()
 
@@ -56,7 +56,7 @@ func detach_hud() -> void:
 		if token != null and token.has_method("unbind"):
 			token.unbind()
 	_bus_tokens.clear()
-	_view_ref = null
+	_view_weak_reference = null
 	_is_attached = false
 
 func _setup_bus_subscriptions() -> void:
@@ -71,81 +71,81 @@ func _setup_bus_subscriptions() -> void:
 	for token in tokens:
 		_bus_tokens.append(token)
 
-func _extract_packet_payload(packet: Variant, unwrap_nested: bool = true) -> Dictionary:
-	var payload: Dictionary = {}
-	if packet == null:
-		return payload
-	if packet is Dictionary:
-		payload = (packet as Dictionary).duplicate(true)
-		return payload
-	var payload_object: Variant = packet.get("payload_obj")
+func _extract_packet_payload(event_packet: Variant, unwrap_nested: bool = true) -> Dictionary:
+	var event_payload: Dictionary = {}
+	if event_packet == null:
+		return event_payload
+	if event_packet is Dictionary:
+		event_payload = (event_packet as Dictionary).duplicate(true)
+		return event_payload
+	var payload_object: Variant = event_packet.get("payload_obj")
 	if payload_object is Dictionary:
-		payload.merge(payload_object as Dictionary, true)
+		event_payload.merge(payload_object as Dictionary, true)
 	elif payload_object != null and payload_object.has_method("to_dto"):
 		var object_snapshot: Variant = payload_object.call("to_dto")
 		if object_snapshot is Dictionary:
-			payload.merge(object_snapshot as Dictionary, true)
-	if packet.get("payload_data") is Dictionary:
-		var raw_data: Dictionary = packet.payload_data as Dictionary
-		payload.merge(raw_data, true)
-		if unwrap_nested and raw_data.has("payload") and raw_data.get("payload") is Dictionary:
-			payload.merge(raw_data.get("payload") as Dictionary, true)
-	return payload
+			event_payload.merge(object_snapshot as Dictionary, true)
+	if event_packet.get("payload_data") is Dictionary:
+		var raw_payload: Dictionary = event_packet.payload_data as Dictionary
+		event_payload.merge(raw_payload, true)
+		if unwrap_nested and raw_payload.has("payload") and raw_payload.get("payload") is Dictionary:
+			event_payload.merge(raw_payload.get("payload") as Dictionary, true)
+	return event_payload
 
-func _format_clock_display(calendar_data: Dictionary) -> String:
-	var clock_text := str(calendar_data.get("clock_display", calendar_data.get("display", "")))
-	if clock_text.is_empty() and (calendar_data.has("calendar_years") or calendar_data.has("travel_hours") or calendar_data.has("calendar_days")):
+func _format_clock_display(calendar_payload: Dictionary) -> String:
+	var clock_text := str(calendar_payload.get("clock_display", calendar_payload.get("display", "")))
+	if clock_text.is_empty() and (calendar_payload.has("calendar_years") or calendar_payload.has("travel_hours") or calendar_payload.has("calendar_days")):
 		clock_text = "Y%d-M%02d-D%02d %02d:00 (%s)" % [
-			int(calendar_data.get("calendar_years", 1)),
-			int(calendar_data.get("calendar_months", 1)),
-			int(calendar_data.get("calendar_days", 1)),
-			int(calendar_data.get("travel_hours", 0)) % 24,
-			str(calendar_data.get("day_phase_key", ""))
+			int(calendar_payload.get("calendar_years", 1)),
+			int(calendar_payload.get("calendar_months", 1)),
+			int(calendar_payload.get("calendar_days", 1)),
+			int(calendar_payload.get("travel_hours", 0)) % 24,
+			str(calendar_payload.get("day_phase_key", ""))
 		]
 	return clock_text
 
-func _build_hud_snapshot_dict(payload: Dictionary) -> Dictionary:
-	var snapshot_dict := {
-		"account_id": payload.get("account_id", ""),
-		"character_name": payload.get("character_name", ""),
-		"hp_current": float(payload.get("hp_current", 100.0)),
-		"hp_max": float(payload.get("hp_max", 100.0)),
-		"mp_current": float(payload.get("mp_current", 50.0)),
-		"mp_max": float(payload.get("mp_max", 50.0)),
-		"ap_current": float(payload.get("ap_current", 10.0)),
-		"ap_max": float(payload.get("ap_max", 10.0)),
-		"gold": int(payload.get("wallet_gold", payload.get("gold", 0))),
-		"mana_monocrystals": int(payload.get("wallet_mana_monocrystals", payload.get("mana_monocrystals", 0))),
-		"level": int(payload.get("level", 1))
+func _build_hud_snapshot_dict(event_payload: Dictionary) -> Dictionary:
+	var snapshot_payload := {
+		"account_id": event_payload.get("account_id", ""),
+		"character_name": event_payload.get("character_name", ""),
+		"hp_current": float(event_payload.get("hp_current", 100.0)),
+		"hp_max": float(event_payload.get("hp_max", 100.0)),
+		"mp_current": float(event_payload.get("mp_current", 50.0)),
+		"mp_max": float(event_payload.get("mp_max", 50.0)),
+		"ap_current": float(event_payload.get("ap_current", 10.0)),
+		"ap_max": float(event_payload.get("ap_max", 10.0)),
+		"gold": int(event_payload.get("wallet_gold", event_payload.get("gold", 0))),
+		"mana_monocrystals": int(event_payload.get("wallet_mana_monocrystals", event_payload.get("mana_monocrystals", 0))),
+		"level": int(event_payload.get("level", 1))
 	}
-	var calendar_data: Dictionary = payload.get("calendar_env") as Dictionary if payload.get("calendar_env") is Dictionary else payload
-	var clock_text := _format_clock_display(calendar_data)
+	var calendar_payload: Dictionary = event_payload.get("calendar_env") as Dictionary if event_payload.get("calendar_env") is Dictionary else event_payload
+	var clock_text := _format_clock_display(calendar_payload)
 	if not clock_text.is_empty():
-		snapshot_dict["clock_display"] = clock_text
-	return snapshot_dict
+		snapshot_payload["clock_display"] = clock_text
+	return snapshot_payload
 
-func _apply_partial_snapshot(view: MainHUDView, patch: Dictionary) -> void:
-	var merged: Dictionary = view.snapshot.duplicate(true) if view.snapshot is Dictionary else {}
+func _apply_partial_snapshot(hud_view: MainHUDView, snapshot_patch: Dictionary) -> void:
+	var merged_snapshot: Dictionary = hud_view.snapshot.duplicate(true) if hud_view.snapshot is Dictionary else {}
 	var defaults := {
-		"hp_current": view.stat_hp_current,
-		"hp_max": view.stat_hp_max,
-		"mp_current": view.stat_mp_current,
-		"mp_max": view.stat_mp_max,
-		"ap_current": view.stat_ap_current,
-		"ap_max": view.stat_ap_max,
-		"character_name": view.character_name,
-		"gold": view.wallet_gold,
-		"mana_monocrystals": view.wallet_mana_crystals
+		"hp_current": hud_view.stat_hp_current,
+		"hp_max": hud_view.stat_hp_max,
+		"mp_current": hud_view.stat_mp_current,
+		"mp_max": hud_view.stat_mp_max,
+		"ap_current": hud_view.stat_ap_current,
+		"ap_max": hud_view.stat_ap_max,
+		"character_name": hud_view.character_name,
+		"gold": hud_view.wallet_gold,
+		"mana_monocrystals": hud_view.wallet_mana_crystals
 	}
 	for field_key in defaults.keys():
-		if not merged.has(field_key):
-			merged[field_key] = defaults[field_key]
-	for patch_key in patch.keys():
-		merged[patch_key] = patch[patch_key]
-	view.apply_snapshot(merged)
+		if not merged_snapshot.has(field_key):
+			merged_snapshot[field_key] = defaults[field_key]
+	for patch_key in snapshot_patch.keys():
+		merged_snapshot[patch_key] = snapshot_patch[patch_key]
+	hud_view.apply_snapshot(merged_snapshot)
 
 ## 主动向后端拉取当前常驻 HUD 权威状态快照（避免残留本地 Mock 初值）
-func pull_hud_snapshot_async(callback: Callable = Callable()) -> void:
+func pull_hud_snapshot_async(result_callback: Callable = Callable()) -> void:
 	var token := WorldSessionRuntimeService.get_active_session_token()
 	var account_id := WorldSessionRuntimeService.get_active_account_id()
 	var character_id := WorldSessionRuntimeService.get_active_character_id()
@@ -157,36 +157,36 @@ func pull_hud_snapshot_async(callback: Callable = Callable()) -> void:
 		account_id,
 		character_id
 	)
-	var response := UnifiedProtocolDispatcher.dispatch_request(request_envelope)
-	if response.success and response.data is Dictionary:
-		var view: MainHUDView = _get_view()
-		if view != null:
-			var raw_snapshot: Variant = response.data.get("hud_snapshot", response.data)
-			var snapshot_dict: Dictionary = raw_snapshot as Dictionary if raw_snapshot is Dictionary else response.data
-			view.apply_snapshot(_build_hud_snapshot_dict(snapshot_dict))
-		if callback.is_valid():
-			callback.call({"success": true, "data": response.data})
+	var service_response := UnifiedProtocolDispatcher.dispatch_request(request_envelope)
+	if service_response.success and service_response.data is Dictionary:
+		var hud_view: MainHUDView = _get_view()
+		if hud_view != null:
+			var raw_snapshot: Variant = service_response.data.get("hud_snapshot", service_response.data)
+			var snapshot_payload: Dictionary = raw_snapshot as Dictionary if raw_snapshot is Dictionary else service_response.data
+			hud_view.apply_snapshot(_build_hud_snapshot_dict(snapshot_payload))
+		if result_callback.is_valid():
+			result_callback.call({"success": true, "data": service_response.data})
 		return
-	if callback.is_valid():
-		callback.call({"success": false, "error_code": response.error_code, "message": response.error_message})
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": service_response.error_code, "message": service_response.error_message})
 
-func _resolve_active_view_payload(packet: Variant, out_payload: Dictionary, unwrap_nested: bool = true, require_non_empty: bool = true) -> MainHUDView:
-	var view: MainHUDView = _get_view()
-	if view == null:
+func _resolve_active_view_payload(event_packet: Variant, out_payload: Dictionary, unwrap_nested: bool = true, require_non_empty: bool = true) -> MainHUDView:
+	var hud_view: MainHUDView = _get_view()
+	if hud_view == null:
 		return null
 	out_payload.clear()
-	out_payload.merge(_extract_packet_payload(packet, unwrap_nested))
+	out_payload.merge(_extract_packet_payload(event_packet, unwrap_nested))
 	if require_non_empty and out_payload.is_empty():
 		return null
-	return view
+	return hud_view
 
-func _on_stat_mutated(packet: Variant) -> void:
-	var payload: Dictionary = {}
-	var view: MainHUDView = _resolve_active_view_payload(packet, payload)
-	if view == null:
+func _on_stat_mutated(event_packet: Variant) -> void:
+	var event_payload: Dictionary = {}
+	var hud_view: MainHUDView = _resolve_active_view_payload(event_packet, event_payload)
+	if hud_view == null:
 		return
-	var stat_name := str(payload.get("stat_name", "")).strip_edges().to_lower()
-	var new_value := float(payload.get("new_value", 0.0))
+	var stat_name := str(event_payload.get("stat_name", "")).strip_edges().to_lower()
+	var new_value := float(event_payload.get("new_value", 0.0))
 	var patch_snapshot: Dictionary = {}
 	match stat_name:
 		"hp", "hp_current":
@@ -200,55 +200,55 @@ func _on_stat_mutated(packet: Variant) -> void:
 		"mana_monocrystals", "wallet_mana_monocrystals":
 			patch_snapshot["mana_monocrystals"] = int(new_value)
 	if not patch_snapshot.is_empty():
-		_apply_partial_snapshot(view, patch_snapshot)
+		_apply_partial_snapshot(hud_view, patch_snapshot)
 
-func _on_clock_advanced(packet: Variant) -> void:
-	var payload: Dictionary = {}
-	var view: MainHUDView = _resolve_active_view_payload(packet, payload, true, false)
-	if view == null:
+func _on_clock_advanced(event_packet: Variant) -> void:
+	var event_payload: Dictionary = {}
+	var hud_view: MainHUDView = _resolve_active_view_payload(event_packet, event_payload, true, false)
+	if hud_view == null:
 		return
-	var clock_text := _format_clock_display(payload)
+	var clock_text := _format_clock_display(event_payload)
 	if not clock_text.is_empty():
-		_apply_partial_snapshot(view, {"clock_display": clock_text})
+		_apply_partial_snapshot(hud_view, {"clock_display": clock_text})
 
-func _on_authoritative_snapshot_received(packet: Variant) -> void:
-	var payload: Dictionary = {}
-	var view: MainHUDView = _resolve_active_view_payload(packet, payload)
-	if view == null:
+func _on_authoritative_snapshot_received(event_packet: Variant) -> void:
+	var event_payload: Dictionary = {}
+	var hud_view: MainHUDView = _resolve_active_view_payload(event_packet, event_payload)
+	if hud_view == null:
 		return
-	var next_snapshot := _build_hud_snapshot_dict(payload)
-	if not next_snapshot.has("clock_display") and view.snapshot is Dictionary and view.snapshot.has("clock_display"):
-		next_snapshot["clock_display"] = view.snapshot["clock_display"]
-	view.apply_snapshot(next_snapshot)
+	var next_snapshot := _build_hud_snapshot_dict(event_payload)
+	if not next_snapshot.has("clock_display") and hud_view.snapshot is Dictionary and hud_view.snapshot.has("clock_display"):
+		next_snapshot["clock_display"] = hud_view.snapshot["clock_display"]
+	hud_view.apply_snapshot(next_snapshot)
 
-func _on_wallet_mutated(packet: Variant) -> void:
-	var payload: Dictionary = {}
-	var view: MainHUDView = _resolve_active_view_payload(packet, payload, true, false)
-	if view == null:
+func _on_wallet_mutated(event_packet: Variant) -> void:
+	var event_payload: Dictionary = {}
+	var hud_view: MainHUDView = _resolve_active_view_payload(event_packet, event_payload, true, false)
+	if hud_view == null:
 		return
-	var gold: int = int(payload.get("current_gold", payload.get("gold", view.wallet_gold)))
-	var crystals: int = int(payload.get("current_crystals", payload.get("crystals", view.wallet_mana_crystals)))
-	_apply_partial_snapshot(view, {
+	var gold: int = int(event_payload.get("current_gold", event_payload.get("gold", hud_view.wallet_gold)))
+	var crystals: int = int(event_payload.get("current_crystals", event_payload.get("crystals", hud_view.wallet_mana_crystals)))
+	_apply_partial_snapshot(hud_view, {
 		"gold": gold,
 		"mana_monocrystals": crystals
 	})
 
-func _on_prologue_advanced(packet: Variant) -> void:
-	var view: MainHUDView = _get_view()
-	if view == null:
+func _on_prologue_advanced(event_packet: Variant) -> void:
+	var hud_view: MainHUDView = _get_view()
+	if hud_view == null:
 		return
-	var payload := _extract_packet_payload(packet, false)
-	var text: String = str(payload.get("narrative_text", payload.get("text", "")))
-	if not text.is_empty():
-		view.append_terminal_log("NARRATIVE", text)
+	var event_payload := _extract_packet_payload(event_packet, false)
+	var narrative_text: String = str(event_payload.get("narrative_text", event_payload.get("text", "")))
+	if not narrative_text.is_empty():
+		hud_view.append_terminal_log("NARRATIVE", narrative_text)
 
-func _on_world_entered(_packet: Variant) -> void:
-	var view: MainHUDView = _get_view()
-	if view == null:
+func _on_world_entered(_event_packet: Variant) -> void:
+	var hud_view: MainHUDView = _get_view()
+	if hud_view == null:
 		return
-	view.append_battle_log("SYSTEM", UIIntermediary.text("ui.fe02.battle_log.world_synced"))
+	hud_view.append_battle_log("SYSTEM", UIIntermediary.text("ui.fe02.battle_log.world_synced"))
 
 func _get_view() -> MainHUDView:
-	if not _is_attached or _view_ref == null:
+	if not _is_attached or _view_weak_reference == null:
 		return null
-	return _view_ref.get_ref() as MainHUDView
+	return _view_weak_reference.get_ref() as MainHUDView

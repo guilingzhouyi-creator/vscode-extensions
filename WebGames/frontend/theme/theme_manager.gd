@@ -46,10 +46,10 @@ func _init_theme() -> void:
 ## 新增分类只需加配置行，前端零改动
 func _load_category_colors() -> void:
 	var categories := GameConfig.get_dict("infrastructure.event_categories", "", {})
-	for key in categories:
-		var entry: Dictionary = categories[key]
-		var category_name: String = str(entry.get("name", key))
-		var hex_color: String = str(entry.get("color", "#94a3b8"))
+	for category_key in categories:
+		var category_entry: Dictionary = categories[category_key]
+		var category_name: String = str(category_entry.get("name", category_key))
+		var hex_color: String = str(category_entry.get("color", "#94a3b8"))
 		category_colors[category_name.to_upper()] = Color.html(hex_color)
 
 ## 获取指定分类的颜色，未命中回退默认色

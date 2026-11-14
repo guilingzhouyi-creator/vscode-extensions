@@ -22,8 +22,8 @@ signal presentation_skipped(cutscene_id: String)
 
 static var _instance: CutsceneEventBridge = null
 
-var _view_ref: WeakRef = null
-var _host_ref: WeakRef = null
+var _view_weak_reference: WeakRef = null
+var _host_weak_reference: WeakRef = null
 var _dynamic_view: CutscenePlayerView = null
 var _is_attached: bool = false
 var _bus_tokens: Array = []
@@ -50,8 +50,8 @@ static func reset_for_tests() -> void:
 func is_attached() -> bool:
 	if not _is_attached:
 		return false
-	var has_view: bool = _view_ref != null and _view_ref.get_ref() != null
-	var has_host: bool = _host_ref != null and _host_ref.get_ref() != null
+	var has_view: bool = _view_weak_reference != null and _view_weak_reference.get_ref() != null
+	var has_host: bool = _host_weak_reference != null and _host_weak_reference.get_ref() != null
 	return has_view or has_host
 
 ## 查询当前是否处于演播消费中
@@ -64,8 +64,8 @@ func get_active_cutscene_id() -> String:
 
 ## 获取当前正在呈现的视口控件实体
 func get_active_view() -> CutscenePlayerView:
-	if _view_ref != null and _view_ref.get_ref() != null:
-		return _view_ref.get_ref() as CutscenePlayerView
+	if _view_weak_reference != null and _view_weak_reference.get_ref() != null:
+		return _view_weak_reference.get_ref() as CutscenePlayerView
 	return _dynamic_view
 
 # ==============================================================================
@@ -73,27 +73,27 @@ func get_active_view() -> CutscenePlayerView:
 # ==============================================================================
 
 ## 静态绑定已有视口实例（幂等）
-func attach_view(view: CutscenePlayerView) -> void:
-	if view == null:
+func attach_view(player_view: CutscenePlayerView) -> void:
+	if player_view == null:
 		return
-	if _is_attached and _view_ref != null and _view_ref.get_ref() == view:
+	if _is_attached and _view_weak_reference != null and _view_weak_reference.get_ref() == player_view:
 		return
 	detach_all()
 
-	_view_ref = weakref(view)
+	_view_weak_reference = weakref(player_view)
 	_is_attached = true
-	_connect_view_signals(view)
+	_connect_view_signals(player_view)
 	_setup_bus_subscriptions()
 
 ## 挂载 UI 根/弹窗宿主容器（由总线事件驱动动态装配视口）
 func attach_host(host_container: Control) -> void:
 	if host_container == null:
 		return
-	if _is_attached and _host_ref != null and _host_ref.get_ref() == host_container:
+	if _is_attached and _host_weak_reference != null and _host_weak_reference.get_ref() == host_container:
 		return
 	detach_all()
 
-	_host_ref = weakref(host_container)
+	_host_weak_reference = weakref(host_container)
 	_is_attached = true
 	_setup_bus_subscriptions()
 
@@ -107,27 +107,27 @@ func detach_all() -> void:
 	_disconnect_active_view()
 	_cleanup_dynamic_view()
 
-	_view_ref = null
-	_host_ref = null
+	_view_weak_reference = null
+	_host_weak_reference = null
 	_is_attached = false
 	_current_cutscene_id = ""
 	_is_placeholder_active = false
 
-func _connect_view_signals(view: CutscenePlayerView) -> void:
-	if view == null:
+func _connect_view_signals(player_view: CutscenePlayerView) -> void:
+	if player_view == null:
 		return
-	if not view.playback_finished.is_connected(_on_view_playback_finished):
-		view.playback_finished.connect(_on_view_playback_finished)
-	if not view.skip_requested.is_connected(_on_view_skip_requested):
-		view.skip_requested.connect(_on_view_skip_requested)
+	if not player_view.playback_finished.is_connected(_on_view_playback_finished):
+		player_view.playback_finished.connect(_on_view_playback_finished)
+	if not player_view.skip_requested.is_connected(_on_view_skip_requested):
+		player_view.skip_requested.connect(_on_view_skip_requested)
 
 func _disconnect_active_view() -> void:
-	var view: CutscenePlayerView = get_active_view()
-	if view != null:
-		if view.playback_finished.is_connected(_on_view_playback_finished):
-			view.playback_finished.disconnect(_on_view_playback_finished)
-		if view.skip_requested.is_connected(_on_view_skip_requested):
-			view.skip_requested.disconnect(_on_view_skip_requested)
+	var player_view: CutscenePlayerView = get_active_view()
+	if player_view != null:
+		if player_view.playback_finished.is_connected(_on_view_playback_finished):
+			player_view.playback_finished.disconnect(_on_view_playback_finished)
+		if player_view.skip_requested.is_connected(_on_view_skip_requested):
+			player_view.skip_requested.disconnect(_on_view_skip_requested)
 
 func _cleanup_dynamic_view() -> void:
 	if _dynamic_view != null:
@@ -151,51 +151,51 @@ func _setup_bus_subscriptions() -> void:
 	var token := bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, _on_domain_packet)
 	_bus_tokens.append(token)
 
-func _on_domain_packet(packet: Variant) -> void:
-	var wrapper: Dictionary = packet.payload_data if packet != null and packet.get("payload_data") is Dictionary else {}
+func _on_domain_packet(domain_packet: Variant) -> void:
+	var wrapper: Dictionary = domain_packet.payload_data if domain_packet != null and domain_packet.get("payload_data") is Dictionary else {}
 	var channel: String = str(wrapper.get("channel", ""))
 	if not channel.begins_with("cutscene."):
 		return
 
-	var payload: Dictionary = wrapper.get("payload", {}) if wrapper.get("payload", {}) is Dictionary else wrapper
+	var cutscene_payload: Dictionary = wrapper.get("payload", {}) if wrapper.get("payload", {}) is Dictionary else wrapper
 
 	match channel:
 		"cutscene.started":
-			_handle_cutscene_started(payload)
+			_handle_cutscene_started(cutscene_payload)
 		"cutscene.playback_progress":
-			_handle_cutscene_progress(payload)
+			_handle_cutscene_progress(cutscene_payload)
 		"cutscene.finished":
-			_handle_cutscene_finished(payload)
+			_handle_cutscene_finished(cutscene_payload)
 		"cutscene.skipped":
-			_handle_cutscene_skipped(payload)
+			_handle_cutscene_skipped(cutscene_payload)
 
 # ==============================================================================
 # 四、具体消费处理逻辑
 # ==============================================================================
 
-func _handle_cutscene_started(payload: Dictionary) -> void:
-	_current_cutscene_id = str(payload.get("cutscene_id", ""))
-	_is_placeholder_active = bool(payload.get("is_placeholder", false))
+func _handle_cutscene_started(cutscene_payload: Dictionary) -> void:
+	_current_cutscene_id = str(cutscene_payload.get("cutscene_id", ""))
+	_is_placeholder_active = bool(cutscene_payload.get("is_placeholder", false))
 
-	var view := _resolve_or_create_view()
-	if view == null:
+	var player_view := _resolve_or_create_view()
+	if player_view == null:
 		return
 
-	var stream := _acquire_media_resource(str(payload.get("video_path", "")))
-	view.play_stream(stream, payload)
+	var stream := _acquire_media_resource(str(cutscene_payload.get("video_path", "")))
+	player_view.play_stream(stream, cutscene_payload)
 
 	presentation_started.emit(_current_cutscene_id, _is_placeholder_active)
 
-func _handle_cutscene_progress(payload: Dictionary) -> void:
-	var view := get_active_view()
-	if view == null:
+func _handle_cutscene_progress(cutscene_payload: Dictionary) -> void:
+	var player_view := get_active_view()
+	if player_view == null:
 		return
 
-	var current_time: float = float(payload.get("current_time", 0.0))
-	var progress: float = float(payload.get("progress", 0.0))
-	var subtitle: String = str(payload.get("subtitle", ""))
+	var current_time: float = float(cutscene_payload.get("current_time", 0.0))
+	var progress: float = float(cutscene_payload.get("progress", 0.0))
+	var subtitle: String = str(cutscene_payload.get("subtitle", ""))
 
-	view.apply_snapshot({
+	player_view.apply_snapshot({
 		"cutscene_id": _current_cutscene_id,
 		"current_time_sec": current_time,
 		"progress_ratio": progress,
@@ -204,44 +204,44 @@ func _handle_cutscene_progress(payload: Dictionary) -> void:
 
 	presentation_progress.emit(current_time, progress, subtitle)
 
-func _conclude_cutscene(payload: Dictionary, target_signal: Signal) -> void:
-	var view := get_active_view()
-	var fade_out_sec: float = float(payload.get("fade_out_sec", 0.5))
-	if view != null:
-		view.stop_and_dismiss(fade_out_sec)
+func _conclude_cutscene(cutscene_payload: Dictionary, target_signal: Signal) -> void:
+	var player_view := get_active_view()
+	var fade_out_seconds: float = float(cutscene_payload.get("fade_out_sec", 0.5))
+	if player_view != null:
+		player_view.stop_and_dismiss(fade_out_seconds)
 
-	var cs_id := _current_cutscene_id
+	var finished_cutscene_id := _current_cutscene_id
 	_current_cutscene_id = ""
-	target_signal.emit(cs_id)
+	target_signal.emit(finished_cutscene_id)
 
-func _handle_cutscene_finished(payload: Dictionary) -> void:
-	_conclude_cutscene(payload, presentation_finished)
+func _handle_cutscene_finished(cutscene_payload: Dictionary) -> void:
+	_conclude_cutscene(cutscene_payload, presentation_finished)
 
-func _handle_cutscene_skipped(payload: Dictionary) -> void:
-	_conclude_cutscene(payload, presentation_skipped)
+func _handle_cutscene_skipped(cutscene_payload: Dictionary) -> void:
+	_conclude_cutscene(cutscene_payload, presentation_skipped)
 
 func _resolve_or_create_view() -> CutscenePlayerView:
-	var view := get_active_view()
-	if view != null:
-		return view
+	var player_view := get_active_view()
+	if player_view != null:
+		return player_view
 
-	if _host_ref != null and _host_ref.get_ref() != null:
-		var host: Control = _host_ref.get_ref() as Control
+	if _host_weak_reference != null and _host_weak_reference.get_ref() != null:
+		var host_container: Control = _host_weak_reference.get_ref() as Control
 		_dynamic_view = CutscenePlayerViewClass.new()
-		host.add_child(_dynamic_view)
+		host_container.add_child(_dynamic_view)
 		_connect_view_signals(_dynamic_view)
 		return _dynamic_view
 
 	return null
 
-func _acquire_media_resource(path: String) -> Resource:
-	if path.is_empty():
+func _acquire_media_resource(resource_path: String) -> Resource:
+	if resource_path.is_empty():
 		return null
 	var loader := CutsceneAsyncLoader.get_instance()
-	if loader != null and loader.is_resource_ready(path):
-		return loader.get_loaded_resource(path)
-	if ResourceLoader.has_cached(path):
-		return ResourceLoader.load(path)
+	if loader != null and loader.is_resource_ready(resource_path):
+		return loader.get_loaded_resource(resource_path)
+	if ResourceLoader.has_cached(resource_path):
+		return ResourceLoader.load(resource_path)
 	return null
 
 # ==============================================================================
@@ -249,11 +249,11 @@ func _acquire_media_resource(path: String) -> Resource:
 # ==============================================================================
 
 func _on_view_playback_finished() -> void:
-	var orch := CutsceneOrchestrator.get_instance()
-	if orch != null:
-		orch.finish_cutscene()
+	var cutscene_orchestrator := CutsceneOrchestrator.get_instance()
+	if cutscene_orchestrator != null:
+		cutscene_orchestrator.finish_cutscene()
 
 func _on_view_skip_requested() -> void:
-	var orch := CutsceneOrchestrator.get_instance()
-	if orch != null:
-		orch.skip_cutscene()
+	var cutscene_orchestrator := CutsceneOrchestrator.get_instance()
+	if cutscene_orchestrator != null:
+		cutscene_orchestrator.skip_cutscene()
