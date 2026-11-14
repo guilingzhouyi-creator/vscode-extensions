@@ -98,7 +98,11 @@ pub fn evaluate_file_quality(
         }
     }
     let lines = metric.map_or(DEFAULT_SCALE_REFERENCE_LINES, |e| {
-        (if e.non_blank_lines > 0 { e.non_blank_lines } else { e.lines }) as f64
+        (if e.non_blank_lines > 0 {
+            e.non_blank_lines
+        } else {
+            e.lines
+        }) as f64
     });
     let scale_factor = (lines / DEFAULT_SCALE_REFERENCE_LINES).max(1.0);
     let indices = apply_scale_damped_scores(&linear_points, scale_factor, metric, curve);
@@ -133,7 +137,11 @@ pub fn evaluate_project_quality(
     let (mut weighted_dims, mut linear_sum) = ([0.0_f64; 10], [0.0_f64; 10]);
     let (mut total_weight, mut sum_comp, mut sum_comp_sq) = (0.0_f64, 0.0_f64, 0.0_f64);
     for &(metric, file_score) in file_scores {
-        let w_lines = if metric.non_blank_lines > 0 { metric.non_blank_lines } else { metric.lines.max(1) };
+        let w_lines = if metric.non_blank_lines > 0 {
+            metric.non_blank_lines
+        } else {
+            metric.lines.max(1)
+        };
         let weight = (w_lines.max(1)) as f64;
         total_weight += weight;
         sum_comp += file_score.composite_score;
@@ -143,7 +151,11 @@ pub fn evaluate_project_quality(
             linear_sum[dim_idx] += file_score.linear_points[dim_idx];
         }
     }
-    let divisor = if total_weight > 0.0 { total_weight } else { 1.0 };
+    let divisor = if total_weight > 0.0 {
+        total_weight
+    } else {
+        1.0
+    };
     let project_scale = (total_weight / DEFAULT_SCALE_REFERENCE_LINES).max(1.0);
     let mut project_indices = [0.0_f64; 10];
     let dims = QualityDimension::all();
@@ -161,7 +173,11 @@ pub fn evaluate_project_quality(
     );
     let n = file_scores.len() as f64;
     let mean_comp = sum_comp / n;
-    let std_dev = round_two(((sum_comp_sq / n) - (mean_comp * mean_comp)).max(0.0).sqrt());
+    let std_dev = round_two(
+        ((sum_comp_sq / n) - (mean_comp * mean_comp))
+            .max(0.0)
+            .sqrt(),
+    );
     EvaluatedQualityScore {
         indices: project_indices,
         linear_points: linear_sum,

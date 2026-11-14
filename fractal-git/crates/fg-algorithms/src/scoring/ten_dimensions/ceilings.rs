@@ -8,24 +8,43 @@
 
 use super::taxonomy::{FileMetricSummary, QualityDimension};
 
+/// Maximum nominal score for a single quality dimension.
 pub const DIMENSION_MAX_SCORE: f64 = 100.0;
+/// Minimal epistemic deduction reserving room below theoretical perfection.
 pub const MIN_EPISTEMIC_GAP: f64 = 0.01;
+/// Theoretical upper ceiling permitted for composite quality scores.
 pub const THEORETICAL_SCORE_CEILING: f64 = 99.99;
+/// Decimal rounding scale multiplier (`10^2`).
 pub const SCORE_ROUNDING: f64 = 100.0;
+/// Precision scaling multiplier (`10^4`) for micro-ratio outputs.
 pub const SCALE_FACTOR_PRECISION: f64 = 10_000.0;
+/// Minimum score required for Grade `A+`.
 pub const GRADE_A_PLUS_MIN: f64 = 90.0;
+/// Minimum score required for Grade `A`.
 pub const GRADE_A_MIN: f64 = 80.0;
+/// Minimum score required for Grade `B`.
 pub const GRADE_B_MIN: f64 = 70.0;
+/// Minimum score required for Grade `C`.
 pub const GRADE_C_MIN: f64 = 60.0;
+/// Minimum score required for Grade `D`.
 pub const GRADE_D_MIN: f64 = 50.0;
+/// Lower bound for Bayesian sample confidence.
 pub const CONFIDENCE_FLOOR: f64 = 0.6;
+/// Line count saturation cap for confidence ramp.
 pub const CONFIDENCE_LINE_CAP: f64 = 300.0;
+/// Denominator scaling line counts toward confidence saturation.
 pub const CONFIDENCE_LINE_SCALE: f64 = 750.0;
+/// Project scale multiplier converting benchmark ELOC into saturation mass.
 pub const PROJECT_SCALE_FACTOR: f64 = 20.0;
+/// Baseline ELOC reference divisor for single-file normalization.
 pub const DEFAULT_SCALE_REFERENCE_LINES: f64 = 100.0;
+/// Popoviciu variance normalization sigma ceiling.
 pub const POPOVICIU_MAX_SIGMA: f64 = 50.0;
+/// Default cross-dimension dispersion penalty weight.
 pub const DEFAULT_DISPERSION_PENALTY_RATIO: f64 = 0.5;
+/// Canonical maximum AST control nesting depth budget.
 pub const MAX_NESTING_DEPTH: usize = 4;
+/// Canonical exported symbol ceiling per module.
 pub const MAX_EXPORTED_SYMBOLS: usize = 30;
 
 /// Security ceiling configuration mirroring `SecurityCeilingScoringConfig`.
@@ -43,8 +62,13 @@ pub struct SecurityCeilingConfig {
 impl Default for SecurityCeilingConfig {
     fn default() -> Self {
         Self {
-            export_weight: 0.6, loc_weight: 0.4, export_limit: 30.0, loc_limit: 500.0,
-            max_discount: 0.5, baseline_lines: 100.0, epistemic_base_reserve: 0.25,
+            export_weight: 0.6,
+            loc_weight: 0.4,
+            export_limit: 30.0,
+            loc_limit: 500.0,
+            max_discount: 0.5,
+            baseline_lines: 100.0,
+            epistemic_base_reserve: 0.25,
         }
     }
 }
@@ -64,8 +88,12 @@ pub struct EpistemicCeilingConfig {
 impl Default for EpistemicCeilingConfig {
     fn default() -> Self {
         Self {
-            base_reserve: 0.25, max_surface_discount: 0.55, volume_half_point_lines: 2500.0,
-            export_surface_half_point: 80.0, volume_weight: 0.7, export_weight: 0.3,
+            base_reserve: 0.25,
+            max_surface_discount: 0.55,
+            volume_half_point_lines: 2500.0,
+            export_surface_half_point: 80.0,
+            volume_weight: 0.7,
+            export_weight: 0.3,
             baseline_lines: 100.0,
         }
     }
@@ -86,8 +114,11 @@ pub struct QualityCurveConfig {
 impl Default for QualityCurveConfig {
     fn default() -> Self {
         Self {
-            composite_index_floor: 15.0, saturation_halfpoint: 30.0, macro_file_knee_scale: 10.0,
-            macro_file_log_weight: 2.0, micro_file_floor_scale: 0.2,
+            composite_index_floor: 15.0,
+            saturation_halfpoint: 30.0,
+            macro_file_knee_scale: 10.0,
+            macro_file_log_weight: 2.0,
+            micro_file_floor_scale: 0.2,
             security_ceiling: SecurityCeilingConfig::default(),
             epistemic_ceiling: EpistemicCeilingConfig::default(),
         }
@@ -106,7 +137,9 @@ pub fn compute_security_ceiling(
     config: &SecurityCeilingConfig,
 ) -> f64 {
     let exp_symbols = metric.map_or(0.0, |entry| entry.exported_symbols as f64);
-    let lines = metric.map_or(scale_factor * config.baseline_lines, |e| e.non_blank_lines as f64);
+    let lines = metric.map_or(scale_factor * config.baseline_lines, |e| {
+        e.non_blank_lines as f64
+    });
     let exp_term = config.export_weight * (exp_symbols.max(0.0) / config.export_limit).tanh();
     let loc_term = config.loc_weight * (lines.max(0.0) / config.loc_limit).tanh();
     let reserve = config.epistemic_base_reserve.max(MIN_EPISTEMIC_GAP);
@@ -122,10 +155,16 @@ pub fn compute_epistemic_ceiling(
     config: &EpistemicCeilingConfig,
 ) -> f64 {
     let exp_symbols = metric.map_or(0.0, |entry| entry.exported_symbols as f64);
-    let lines = metric.map_or(scale_factor * config.baseline_lines, |e| e.non_blank_lines as f64);
+    let lines = metric.map_or(scale_factor * config.baseline_lines, |e| {
+        e.non_blank_lines as f64
+    });
     let load = config.volume_weight * (lines.max(0.0) / config.volume_half_point_lines)
         + config.export_weight * (exp_symbols.max(0.0) / config.export_surface_half_point);
-    let saturated = if load.is_finite() && load > 0.0 { load / (1.0 + load) } else { 0.0 };
+    let saturated = if load.is_finite() && load > 0.0 {
+        load / (1.0 + load)
+    } else {
+        0.0
+    };
     let reserve = config.base_reserve.max(MIN_EPISTEMIC_GAP);
     let discount = reserve + config.max_surface_discount * saturated;
     round_two(DIMENSION_MAX_SCORE - discount).min(DIMENSION_MAX_SCORE - MIN_EPISTEMIC_GAP)

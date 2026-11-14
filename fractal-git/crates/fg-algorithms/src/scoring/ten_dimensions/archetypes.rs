@@ -63,7 +63,10 @@ impl ProjectArchetype {
 
 /// Tunes quality dimension weights with mass invariance matching `ArchetypeWeightTuner`.
 #[must_use]
-pub fn tune_archetype_weights(archetype: ProjectArchetype, base: QualityWeightVector) -> QualityWeightVector {
+pub fn tune_archetype_weights(
+    archetype: ProjectArchetype,
+    base: QualityWeightVector,
+) -> QualityWeightVector {
     if archetype == ProjectArchetype::DefaultBalanced {
         return base;
     }
@@ -75,17 +78,23 @@ pub fn tune_archetype_weights(archetype: ProjectArchetype, base: QualityWeightVe
         unnorm[idx] = base.values[idx] * muls[idx];
         unnorm_mass += unnorm[idx];
     }
-    if unnorm_mass <= 0.0 { return base; }
+    if unnorm_mass <= 0.0 {
+        return base;
+    }
     let scale = base_mass / unnorm_mass;
     let (mut rounded, mut rounded_mass) = ([0.0_f64; 10], 0.0);
     for idx in 0..10 {
         rounded[idx] = round6(unnorm[idx] * scale);
         rounded_mass += rounded[idx];
     }
-    if rounded_mass <= 0.0 { return base; }
+    if rounded_mass <= 0.0 {
+        return base;
+    }
     let corr = base_mass / rounded_mass;
     let mut out = [0.0_f64; 10];
-    for idx in 0..10 { out[idx] = round6(rounded[idx] * corr); }
+    for idx in 0..10 {
+        out[idx] = round6(rounded[idx] * corr);
+    }
     QualityWeightVector { values: out }
 }
 
@@ -94,10 +103,22 @@ const EXACT_RULE_DIM: &[(&str, QualityDimension)] = &[
     ("secret-detected", QualityDimension::CodeSecurity),
     ("high-entropy-token", QualityDimension::CodeSecurity),
     ("import-cycle", QualityDimension::ArchitectureConsistency),
-    ("disallowed-import", QualityDimension::ArchitectureConsistency),
-    ("clean-layer-violation", QualityDimension::ArchitectureConsistency),
-    ("loop-transient-allocation", QualityDimension::PerformanceEfficiency),
-    ("expensive-loop-operation", QualityDimension::PerformanceEfficiency),
+    (
+        "disallowed-import",
+        QualityDimension::ArchitectureConsistency,
+    ),
+    (
+        "clean-layer-violation",
+        QualityDimension::ArchitectureConsistency,
+    ),
+    (
+        "loop-transient-allocation",
+        QualityDimension::PerformanceEfficiency,
+    ),
+    (
+        "expensive-loop-operation",
+        QualityDimension::PerformanceEfficiency,
+    ),
     ("GOV-GAM-001", QualityDimension::Maintainability),
     ("high-complexity", QualityDimension::Maintainability),
     ("large-file", QualityDimension::Maintainability),
@@ -111,40 +132,69 @@ const EXACT_RULE_DIM: &[(&str, QualityDimension)] = &[
 ];
 
 const PREFIX_RULE_DIM: &[(&str, QualityDimension)] = &[
-    ("SEC", QualityDimension::CodeSecurity), ("FGT-SAF", QualityDimension::CodeSecurity),
-    ("GUARD-DESTR", QualityDimension::CodeSecurity), ("ARCH", QualityDimension::ArchitectureConsistency),
-    ("DAT-LAY", QualityDimension::ArchitectureConsistency), ("DAT-DEF", QualityDimension::ArchitectureConsistency),
-    ("DEP-LAZ", QualityDimension::ArchitectureConsistency), ("DEP-RES", QualityDimension::ArchitectureConsistency),
-    ("DEP-INV", QualityDimension::ArchitectureConsistency), ("FGT-DEP", QualityDimension::ArchitectureConsistency),
-    ("FGT-BRG", QualityDimension::ArchitectureConsistency), ("FGT-COR", QualityDimension::ArchitectureConsistency),
-    ("FGT-TOP", QualityDimension::ArchitectureConsistency), ("PRF", QualityDimension::PerformanceEfficiency),
-    ("FGT-PRF", QualityDimension::PerformanceEfficiency), ("FGT-LCK", QualityDimension::PerformanceEfficiency),
-    ("FGT-ALG", QualityDimension::PerformanceEfficiency), ("ADV-PRF", QualityDimension::PerformanceEfficiency),
-    ("CMP", QualityDimension::PerformanceEfficiency), ("CPX-TIME", QualityDimension::PerformanceEfficiency),
-    ("CPX-SPACE", QualityDimension::PerformanceEfficiency), ("CPX-AMP", QualityDimension::PerformanceEfficiency),
-    ("DAT", QualityDimension::PerformanceEfficiency), ("CPX", QualityDimension::Maintainability),
-    ("VOL-", QualityDimension::Maintainability), ("ERR", QualityDimension::Maintainability),
-    ("STDLIB-PANIC", QualityDimension::Maintainability), ("STDLIB-RECURSION", QualityDimension::Maintainability),
-    ("SIM-TRN", QualityDimension::Maintainability), ("SIM-BOOL", QualityDimension::Maintainability),
-    ("SIM-ELSE", QualityDimension::Maintainability), ("SIM-GUARD", QualityDimension::Maintainability),
-    ("FGT-ERR", QualityDimension::Maintainability), ("CMT", QualityDimension::CommentQuality),
-    ("DOC", QualityDimension::CommentQuality), ("VSC-I18N", QualityDimension::CommentQuality),
-    ("CONST", QualityDimension::Duplication), ("GOV-TYP", QualityDimension::SemanticPurity),
-    ("NUM", QualityDimension::SemanticPurity), ("HYG-DED", QualityDimension::SemanticPurity),
-    ("HYG-WRAP", QualityDimension::SemanticPurity), ("TSM", QualityDimension::Modernity),
-    ("RSM", QualityDimension::Modernity), ("PYM", QualityDimension::Modernity),
-    ("MOD", QualityDimension::Modernity), ("TST", QualityDimension::Modernity),
-    ("GDM", QualityDimension::Modernity), ("GOM", QualityDimension::Modernity),
+    ("SEC", QualityDimension::CodeSecurity),
+    ("FGT-SAF", QualityDimension::CodeSecurity),
+    ("GUARD-DESTR", QualityDimension::CodeSecurity),
+    ("ARCH", QualityDimension::ArchitectureConsistency),
+    ("DAT-LAY", QualityDimension::ArchitectureConsistency),
+    ("DAT-DEF", QualityDimension::ArchitectureConsistency),
+    ("DEP-LAZ", QualityDimension::ArchitectureConsistency),
+    ("DEP-RES", QualityDimension::ArchitectureConsistency),
+    ("DEP-INV", QualityDimension::ArchitectureConsistency),
+    ("FGT-DEP", QualityDimension::ArchitectureConsistency),
+    ("FGT-BRG", QualityDimension::ArchitectureConsistency),
+    ("FGT-COR", QualityDimension::ArchitectureConsistency),
+    ("FGT-TOP", QualityDimension::ArchitectureConsistency),
+    ("PRF", QualityDimension::PerformanceEfficiency),
+    ("FGT-PRF", QualityDimension::PerformanceEfficiency),
+    ("FGT-LCK", QualityDimension::PerformanceEfficiency),
+    ("FGT-ALG", QualityDimension::PerformanceEfficiency),
+    ("ADV-PRF", QualityDimension::PerformanceEfficiency),
+    ("CMP", QualityDimension::PerformanceEfficiency),
+    ("CPX-TIME", QualityDimension::PerformanceEfficiency),
+    ("CPX-SPACE", QualityDimension::PerformanceEfficiency),
+    ("CPX-AMP", QualityDimension::PerformanceEfficiency),
+    ("DAT", QualityDimension::PerformanceEfficiency),
+    ("CPX", QualityDimension::Maintainability),
+    ("VOL-", QualityDimension::Maintainability),
+    ("ERR", QualityDimension::Maintainability),
+    ("STDLIB-PANIC", QualityDimension::Maintainability),
+    ("STDLIB-RECURSION", QualityDimension::Maintainability),
+    ("SIM-TRN", QualityDimension::Maintainability),
+    ("SIM-BOOL", QualityDimension::Maintainability),
+    ("SIM-ELSE", QualityDimension::Maintainability),
+    ("SIM-GUARD", QualityDimension::Maintainability),
+    ("FGT-ERR", QualityDimension::Maintainability),
+    ("CMT", QualityDimension::CommentQuality),
+    ("DOC", QualityDimension::CommentQuality),
+    ("VSC-I18N", QualityDimension::CommentQuality),
+    ("CONST", QualityDimension::Duplication),
+    ("GOV-TYP", QualityDimension::SemanticPurity),
+    ("NUM", QualityDimension::SemanticPurity),
+    ("HYG-DED", QualityDimension::SemanticPurity),
+    ("HYG-WRAP", QualityDimension::SemanticPurity),
+    ("TSM", QualityDimension::Modernity),
+    ("RSM", QualityDimension::Modernity),
+    ("PYM", QualityDimension::Modernity),
+    ("MOD", QualityDimension::Modernity),
+    ("TST", QualityDimension::Modernity),
+    ("GDM", QualityDimension::Modernity),
+    ("GOM", QualityDimension::Modernity),
 ];
 
 /// Maps a rule identifier to its primary owning quality dimension via longest-prefix SSOT.
 #[must_use]
 pub fn family_dimension_of(rule_id: &str) -> Option<QualityDimension> {
-    if rule_id.is_empty() { return None; }
+    if rule_id.is_empty() {
+        return None;
+    }
     if let Some((_, dim)) = EXACT_RULE_DIM.iter().find(|(id, _)| *id == rule_id) {
         return Some(*dim);
     }
-    if let Some((_, dim)) = PREFIX_RULE_DIM.iter().find(|(pfx, _)| rule_id.starts_with(pfx)) {
+    if let Some((_, dim)) = PREFIX_RULE_DIM
+        .iter()
+        .find(|(pfx, _)| rule_id.starts_with(pfx))
+    {
         return Some(*dim);
     }
     Some(QualityDimension::Standardization)

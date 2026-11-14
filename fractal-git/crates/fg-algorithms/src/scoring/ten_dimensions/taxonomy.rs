@@ -47,9 +47,16 @@ impl QualityDimension {
     #[must_use]
     pub const fn all() -> [Self; 10] {
         [
-            Self::ArchitectureConsistency, Self::SemanticPurity, Self::CodeSecurity,
-            Self::PerformanceEfficiency, Self::Standardization, Self::Modernity,
-            Self::Maintainability, Self::CommentQuality, Self::Duplication, Self::TechDebtRisk,
+            Self::ArchitectureConsistency,
+            Self::SemanticPurity,
+            Self::CodeSecurity,
+            Self::PerformanceEfficiency,
+            Self::Standardization,
+            Self::Modernity,
+            Self::Maintainability,
+            Self::CommentQuality,
+            Self::Duplication,
+            Self::TechDebtRisk,
         ]
     }
 
@@ -117,6 +124,10 @@ pub struct QualityWeightVector {
 
 impl Default for QualityWeightVector {
     fn default() -> Self {
-        Self { values: [0.111, 0.093, 0.139, 0.102, 0.083, 0.074, 0.111, 0.074, 0.093, 0.120] }
+        Self {
+            values: [
+                0.111, 0.093, 0.139, 0.102, 0.083, 0.074, 0.111, 0.074, 0.093, 0.120,
+            ],
+        }
     }
 }
