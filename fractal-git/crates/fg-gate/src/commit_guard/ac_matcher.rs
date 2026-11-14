@@ -117,4 +117,38 @@ impl AcMatcher {
         }
         best
     }
+
+    /// Marks `matched[meta.index] = true` for every whole-term match inside `haystack`.
+    pub(crate) fn mark_whole_term_matches(&self, haystack: &str, matched: &mut [bool]) {
+        if self.dfa.patterns.is_empty() || haystack.is_empty() {
+            return;
+        }
+        let mut remaining = matched.len();
+        let mut state = ROOT_STATE;
+        for (idx, &byte) in haystack.as_bytes().iter().enumerate() {
+            state = self.dfa.next_state[state][byte as usize] as usize;
+            if self.dfa.out_head[state] == OUT_NONE {
+                continue;
+            }
+            let end = idx + 1;
+            let done = self.visit_state_outputs(state, end, &mut |meta, match_end| {
+                if let Some(slot) = matched.get_mut(meta.index) {
+                    if !*slot {
+                        let start = match_end.saturating_sub(meta.byte_len);
+                        if has_whole_term_boundaries(haystack, start, match_end, meta.has_cjk) {
+                            *slot = true;
+                            remaining = remaining.saturating_sub(1);
+                            if remaining == 0 {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                false
+            });
+            if done {
+                return;
+            }
+        }
+    }
 }

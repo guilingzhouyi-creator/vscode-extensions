@@ -16,6 +16,7 @@ pub(crate) mod ac_matcher;
 pub mod coherence;
 pub mod declaration;
 pub mod lexicon;
+pub(crate) mod policy_matcher;
 pub mod project;
 pub mod rewrite;
 pub mod rule_ids;
@@ -714,15 +715,17 @@ impl CommitMessageGuard {
             ));
         }
 
-        for forbidden in &policy.forbidden_terms {
-            if lexicon::contains_whole_term(&prepared, &forbidden.to_lowercase()) {
+        policy_matcher::for_each_matching_policy_term(
+            &prepared,
+            &policy.forbidden_terms,
+            |forbidden| {
                 violations.push(format!(
                     "{}: Commit message contains forbidden term '{}'",
                     fg_core::constants::rules::RULE_FGT_MSG_004,
                     forbidden
                 ));
-            }
-        }
+            },
+        );
 
         let ver_entry = sections.iter().find(|(key, _)| {
             let lower = key.to_lowercase();

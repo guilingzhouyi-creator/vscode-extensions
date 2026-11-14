@@ -10,10 +10,132 @@
 //! Domain Governance Rules: FGT-MSG-007 (project attribution).
 
 use fg_core::models::TaxisPolicy;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::Path;
+use std::time::{Duration, Instant};
 
 use super::sections::{SectionScan, SectionSlot};
+
+const LEASE_CACHE_TTL: Duration = Duration::from_millis(250);
+
+struct CachedFrozenLeases {
+    initialized: bool,
+    refreshed_at: Instant,
+    frozen: Vec<(String, String)>,
+}
+
+thread_local! {
+    static CWD_FROZEN_LEASE_CACHE: RefCell<CachedFrozenLeases> = RefCell::new(CachedFrozenLeases {
+        initialized: false,
+        refreshed_at: Instant::now(),
+        frozen: Vec::new(),
+    });
+}
+
+fn collect_frozen_entries_from_value(
+    leases_val: &serde_json::Value,
+    out: &mut Vec<(String, String)>,
+) {
+    let collect_one = |entry_val: &serde_json::Value, dst: &mut Vec<(String, String)>| {
+        let Some(raw_id) = entry_val.get("id").and_then(|val| val.as_str()) else {
+            return;
+        };
+        let Some(raw_status) = entry_val.get("status").and_then(|val| val.as_str()) else {
+            return;
+        };
+        if raw_status.eq_ignore_ascii_case("frozen") {
+            let canonical_id = normalize_project_alias(raw_id.trim()).to_string();
+            dst.push((raw_id.to_string(), canonical_id));
+        }
+    };
+    if let Some(map) = leases_val.as_object() {
+        for entry_val in map.values() {
+            collect_one(entry_val, out);
+        }
+    } else if let Some(arr) = leases_val.as_array() {
+        for entry_val in arr {
+            collect_one(entry_val, out);
+        }
+    }
+}
+
+fn load_frozen_leases_from_file(cache_path: &Path, out: &mut Vec<(String, String)>) -> bool {
+    let Ok(content) = std::fs::read_to_string(cache_path) else {
+        return false;
+    };
+    let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content) else {
+        return false;
+    };
+    if let Some(leases_val) = parsed.get("leases") {
+        collect_frozen_entries_from_value(leases_val, out);
+    }
+    true
+}
+
+fn load_cwd_frozen_leases() -> Vec<(String, String)> {
+    let mut frozen = Vec::new();
+    let Ok(current_path) = std::env::current_dir() else {
+        return frozen;
+    };
+    for ancestor in current_path.ancestors() {
+        let taxis_cache = ancestor
+            .join(".taxis")
+            .join("projects")
+            .join("active_projects.json");
+        if taxis_cache.is_file() && load_frozen_leases_from_file(&taxis_cache, &mut frozen) {
+            return frozen;
+        }
+        let git_cache = ancestor
+            .join(".git")
+            .join("projects")
+            .join("active_projects.json");
+        if git_cache.is_file() && load_frozen_leases_from_file(&git_cache, &mut frozen) {
+            return frozen;
+        }
+        let runtime_cache = ancestor
+            .join(".taxis")
+            .join("runtime")
+            .join("active_projects.json");
+        if runtime_cache.is_file() && load_frozen_leases_from_file(&runtime_cache, &mut frozen) {
+            return frozen;
+        }
+    }
+    frozen
+}
+
+fn push_frozen_violation(raw_id: &str, violations: &mut Vec<String>) {
+    violations.push(format!(
+        "{}: Project '{}' TTL lease has expired and is Frozen; commit privileges locked",
+        fg_core::constants::rules::RULE_FGT_MSG_007,
+        raw_id
+    ));
+}
+
+fn check_cached_cwd_leases(declared: &[String], violations: &mut Vec<String>) {
+    CWD_FROZEN_LEASE_CACHE.with(|cell| {
+        let now = Instant::now();
+        let mut cached = cell.borrow_mut();
+        let stale = !cached.initialized
+            || now.saturating_duration_since(cached.refreshed_at) >= LEASE_CACHE_TTL;
+        if stale {
+            cached.initialized = true;
+            cached.refreshed_at = now;
+            cached.frozen = load_cwd_frozen_leases();
+        }
+        if cached.frozen.is_empty() {
+            return;
+        }
+        for (raw_id, canonical_id) in &cached.frozen {
+            if declared
+                .iter()
+                .any(|candidate| normalize_project_alias(candidate.as_str()) == canonical_id)
+            {
+                push_frozen_violation(raw_id, violations);
+            }
+        }
+    });
+}
 
 /// Normalizes project aliases (`web-games` -> `webgames`, `fractalgit` -> `fractal-git`, `timing` -> `workspace-timing`).
 fn normalize_project_alias(raw: &str) -> &str {
@@ -193,13 +315,16 @@ pub fn check_project_tag(
         return;
     }
     // Exact comparison, not substring: `fractal-git-evil` must not satisfy `fractal-git`.
-    let allowed: Vec<String> = policy
-        .allowed_projects
-        .iter()
-        .map(|name| name.trim().to_lowercase())
-        .collect();
     for project in &declared {
-        if !allowed.iter().any(|candidate| candidate == project) {
+        let is_allowed = policy.allowed_projects.iter().any(|candidate| {
+            let trimmed = candidate.trim();
+            if trimmed.is_ascii() && project.is_ascii() {
+                trimmed.eq_ignore_ascii_case(project)
+            } else {
+                trimmed.to_lowercase() == *project
+            }
+        });
+        if !is_allowed {
             violations.push(format!(
                 "{}: Project '{}' is not in the controlled list: {:?}",
                 fg_core::constants::rules::RULE_FGT_MSG_007,
@@ -209,7 +334,5 @@ pub fn check_project_tag(
         }
     }
 
-    if let Ok(current_path) = std::env::current_dir() {
-        check_project_leases_at(&current_path, &declared, violations);
-    }
+    check_cached_cwd_leases(&declared, violations);
 }
