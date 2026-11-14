@@ -39,7 +39,8 @@
       },
       "sub_tables": [
         "domains.inventory.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "physics_thermodynamics",
@@ -53,7 +54,8 @@
       "test": "res://tests/unit/domains/test_physics_thermodynamics.gd",
       "test_symbol": "TestPhysicsDomain",
       "phase": 1,
-      "depends_on": []
+      "depends_on": [],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "world_navigation",
@@ -75,7 +77,8 @@
       },
       "sub_tables": [
         "domains.world.core"
-      ]
+      ],
+      "narrative_scope": "mod_content"
     },
     {
       "id": "lattice_skill_book",
@@ -97,7 +100,8 @@
       },
       "sub_tables": [
         "domains.lattice.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "deterministic_sandbox",
@@ -109,7 +113,8 @@
       "depends_on": [],
       "sub_tables": [
         "domains.deterministic.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "persistence_protocol",
@@ -130,7 +135,8 @@
           "allow": false,
           "requires_rebuild": false
         }
-      }
+      },
+      "narrative_scope": "engine_system"
     },
     {
       "id": "lifecycle_physiology",
@@ -152,7 +158,8 @@
       },
       "sub_tables": [
         "domains.lifecycle.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "monster_ecology",
@@ -164,7 +171,8 @@
       "depends_on": [],
       "sub_tables": [
         "domains.monster.core"
-      ]
+      ],
+      "narrative_scope": "mod_content"
     },
     {
       "id": "quest_causality",
@@ -188,7 +196,8 @@
       },
       "sub_tables": [
         "domains.quest.core"
-      ]
+      ],
+      "narrative_scope": "mod_content"
     },
     {
       "id": "currency_economy",
@@ -210,7 +219,8 @@
       },
       "sub_tables": [
         "domains.currency.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "trading_logistics",
@@ -222,7 +232,8 @@
       "depends_on": [],
       "sub_tables": [
         "domains.trading.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "npc_simulation",
@@ -234,7 +245,8 @@
       "depends_on": [],
       "sub_tables": [
         "domains.npc.core"
-      ]
+      ],
+      "narrative_scope": "mod_content"
     },
     {
       "id": "sovereignty_realm",
@@ -246,7 +258,8 @@
       "depends_on": [],
       "sub_tables": [
         "domains.sovereignty.core"
-      ]
+      ],
+      "narrative_scope": "mod_content"
     },
     {
       "id": "account",
@@ -270,7 +283,8 @@
       },
       "sub_tables": [
         "domains.account.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "character_creation",
@@ -292,7 +306,8 @@
       },
       "sub_tables": [
         "domains.character_creation.core"
-      ]
+      ],
+      "narrative_scope": "mod_content"
     },
     {
       "id": "potential_growth",
@@ -304,7 +319,8 @@
       "depends_on": [],
       "sub_tables": [
         "domains.potential.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "gacha_wish",
@@ -319,7 +335,8 @@
       ],
       "sub_tables": [
         "domains.gacha.core"
-      ]
+      ],
+      "narrative_scope": "mod_content"
     },
     {
       "id": "equipment_loadout",
@@ -331,7 +348,8 @@
       "depends_on": [],
       "sub_tables": [
         "domains.equipment.core"
-      ]
+      ],
+      "narrative_scope": "mod_content"
     },
     {
       "id": "workshop_forge",
@@ -345,7 +363,8 @@
       ],
       "sub_tables": [
         "domains.workshop.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "admin_sandbox",
@@ -358,7 +377,8 @@
         "currency_economy"
       ],
       "config_exempt": true,
-      "exempt_reason": "GM 沙盒属基础设施层，复用 infrastructure.admin（权限盐/口令/审计阈值）为分层规范所要求"
+      "exempt_reason": "GM 沙盒属基础设施层，复用 infrastructure.admin（权限盐/口令/审计阈值）为分层规范所要求",
+      "narrative_scope": "engine_system"
     },
     {
       "id": "chat_command",
@@ -370,7 +390,8 @@
       "depends_on": [],
       "sub_tables": [
         "domains.chat_command.core"
-      ]
+      ],
+      "narrative_scope": "mod_content"
     },
     {
       "id": "elite_mutation",
@@ -382,7 +403,8 @@
       "depends_on": [],
       "sub_tables": [
         "domains.elite.core"
-      ]
+      ],
+      "narrative_scope": "mod_content"
     },
     {
       "id": "world_boss",
@@ -394,7 +416,8 @@
       "depends_on": [],
       "sub_tables": [
         "domains.world_boss.core"
-      ]
+      ],
+      "narrative_scope": "mod_content"
     },
     {
       "id": "cdkey_voucher",
@@ -406,7 +429,8 @@
       "depends_on": [],
       "sub_tables": [
         "domains.cdkey_voucher.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "mail_system",
@@ -420,7 +444,8 @@
       ],
       "sub_tables": [
         "domains.mail_system.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "game_settings",
@@ -442,7 +467,8 @@
       },
       "sub_tables": [
         "domains.game_settings.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "organization_guild",
@@ -456,7 +482,8 @@
       ],
       "sub_tables": [
         "domains.organization_guild.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "commission_quest",
@@ -468,7 +495,8 @@
       "depends_on": [],
       "sub_tables": [
         "domains.commission_quest.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "identity_disguise",
@@ -480,7 +508,8 @@
       "depends_on": [],
       "sub_tables": [
         "domains.identity_disguise.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "spatial_merchant",
@@ -494,7 +523,8 @@
       ],
       "sub_tables": [
         "domains.spatial_merchant.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "spatial_movement",
@@ -508,7 +538,8 @@
       ],
       "sub_tables": [
         "domains.spatial_movement.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "hardware_input",
@@ -520,7 +551,8 @@
       "depends_on": [],
       "sub_tables": [
         "domains.hardware_input.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "ground_loot",
@@ -534,7 +566,8 @@
       ],
       "sub_tables": [
         "domains.ground_loot.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "matter_disposal",
@@ -548,7 +581,8 @@
       ],
       "sub_tables": [
         "domains.matter_disposal.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "narrative_orchestration",
@@ -560,7 +594,8 @@
       "depends_on": [],
       "sub_tables": [
         "domains.narrative_orchestration.core"
-      ]
+      ],
+      "narrative_scope": "mod_content"
     },
     {
       "id": "item_namespace_registry",
@@ -572,7 +607,8 @@
       "depends_on": [],
       "sub_tables": [
         "domains.item_namespace_registry.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "feature_toggle_canary",
@@ -584,7 +620,8 @@
       "depends_on": [],
       "sub_tables": [
         "domains.feature_toggle_canary.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "localization_i18n",
@@ -596,7 +633,8 @@
       "depends_on": [],
       "sub_tables": [
         "domains.localization_i18n.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "event_driven_audio",
@@ -608,7 +646,8 @@
       "depends_on": [],
       "sub_tables": [
         "domains.event_driven_audio.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "notification_red_dot",
@@ -620,7 +659,8 @@
       "depends_on": [],
       "sub_tables": [
         "domains.notification_red_dot.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "bulletin_board_maintenance",
@@ -632,7 +672,8 @@
       "depends_on": [],
       "sub_tables": [
         "domains.bulletin_board_maintenance.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "telemetry_account_lifecycle",
@@ -644,7 +685,8 @@
       "depends_on": [],
       "sub_tables": [
         "domains.telemetry_account_lifecycle.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "world_state",
@@ -658,7 +700,8 @@
       ],
       "sub_tables": [
         "domains.world_state.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "event_extractor",
@@ -673,7 +716,8 @@
       ],
       "sub_tables": [
         "domains.event_extractor.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "item_statistics",
@@ -685,7 +729,8 @@
       "depends_on": [],
       "sub_tables": [
         "domains.item_statistics.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "magic_system",
@@ -697,7 +742,8 @@
       "depends_on": [],
       "sub_tables": [
         "domains.magic_rules.core"
-      ]
+      ],
+      "narrative_scope": "engine_system"
     },
     {
       "id": "world_gateway",
@@ -712,7 +758,8 @@
       ],
       "sub_tables": [
         "domains.world_gateway.core"
-      ]
+      ],
+      "narrative_scope": "mod_content"
     }
   ]
 }

@@ -87,7 +87,7 @@
       "title_prefix": "Apprentice Adventurer",
       "profession_tier_name": "Novice Walker Tier 1",
       "apparent_age": 20,
-      "current_location_name": "中洲·卡拉尔圣城",
+      "current_location_name": "",
       "play_time_seconds": 0,
       "is_permadeath_mode": false,
       "is_fallen": false,
@@ -95,14 +95,11 @@
       "save_file_sha256": "",
       "prologue_completed": false,
       "world_slot_status": "OCCUPIED",
-      "world_id": "WORLD_DEFAULT_SP_01"
+      "world_id": ""
     },
     "multi_world": {
-      "default_world_id": "WORLD_DEFAULT_SP_01",
-      "placeholder_world_ids": [
-        "WORLD_RESERVED_SP_02",
-        "WORLD_RESERVED_SP_03"
-      ],
+      "default_world_id": "",
+      "placeholder_world_ids": [],
       "max_worlds": 3
     }
   },
@@ -111,21 +108,5 @@
     "encrypted": false,
     "allowed": []
   },
-  "cdkeys": {
-    "KALAR666": {
-      "gold": 500,
-      "crystals": 2,
-      "item_name": "【初出茅庐·玄铁剑】"
-    },
-    "KALAR888": {
-      "gold": 1000,
-      "crystals": 5,
-      "item_name": "【开服特典·圣痕吊坠】"
-    },
-    "VIP999": {
-      "gold": 5000,
-      "crystals": 20,
-      "item_name": "【始源之光·极光神符】"
-    }
-  }
+  "cdkeys": {}
 }

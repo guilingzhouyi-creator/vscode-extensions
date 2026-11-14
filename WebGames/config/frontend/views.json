@@ -218,7 +218,7 @@
     "default_text_lifetime": 1.0
   },
   "fe05_economy_trade": {
-    "default_shop_title": "瓦尔兰老铁匠杂货铺",
+    "default_shop_title": "ui.fe05.mock.shop.default_title",
     "sell_back_ratio": 0.7,
     "commodity_prices": {},
     "default_shop_items": [
@@ -420,7 +420,7 @@
     "trade_partner": "ui.fe09.mock.trade_partner"
   },
   "fe10_world_map": {
-    "default_town_id": "TOWN_VALAN",
+    "default_town_id": "TOWN_START",
     "min_zoom": 0.5,
     "max_zoom": 3.0,
     "default_zoom": 1.0

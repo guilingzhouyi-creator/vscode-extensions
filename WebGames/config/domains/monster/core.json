@@ -1,12 +1,12 @@
 {
   "body_part_defaults": {
     "part_id": "HEAD",
-    "part_name": "头颅",
+    "part_name": "",
     "durability": 100.0,
     "ap_penalty_on_break": 2
   },
   "species_defaults": {
-    "species_name": "双足飞龙",
+    "species_name": "",
     "str_level": 3,
     "con_level": 2,
     "vit_level": 4
@@ -36,9 +36,6 @@
     "rage_max": 100.0
   },
   "loot": {
-    "default_drop_canonical_ids": [
-      "KALAR:MATERIAL:ORE:MITHRIL_ORE",
-      "KALAR:CONSUM:FOOD:HEARTY_STEW"
-    ]
+    "default_drop_canonical_ids": []
   }
 }

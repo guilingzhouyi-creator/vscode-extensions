@@ -376,6 +376,36 @@
       "severity": "error",
       "message_key": "errors/security_transition_blocked",
       "domain": "world_gateway"
+    },
+    "ERR_NO_BASE_CONTENT_MOD": {
+      "severity": "error",
+      "message_key": "errors/no_base_content_mod",
+      "domain": "world_gateway"
+    },
+    "MOD_ERR_PACK_ID_CONFLICT": {
+      "severity": "error",
+      "message_key": "errors/mod_pack_id_conflict",
+      "domain": "narrative_orchestration"
+    },
+    "MOD_ERR_CYCLE_DETECTED": {
+      "severity": "error",
+      "message_key": "errors/mod_cycle_detected",
+      "domain": "narrative_orchestration"
+    },
+    "MOD_ERR_INCOMPATIBLE_VERSION": {
+      "severity": "error",
+      "message_key": "errors/mod_incompatible_version",
+      "domain": "narrative_orchestration"
+    },
+    "MOD_ERR_REALM_DIGEST_MISMATCH": {
+      "severity": "error",
+      "message_key": "errors/mod_realm_digest_mismatch",
+      "domain": "world_gateway"
+    },
+    "MOD_ERR_MISSING_PROLOGUE_DAG": {
+      "severity": "error",
+      "message_key": "errors/mod_missing_prologue_dag",
+      "domain": "character_creation"
     }
   }
 }

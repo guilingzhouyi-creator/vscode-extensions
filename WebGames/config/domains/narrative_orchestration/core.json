@@ -3,9 +3,9 @@
     "priority_weight": 100
   },
   "mod_discovery": {
-    "packages_root": "res://config/narratives/packs/",
-    "mods_install_rel": "mods/narratives/",
-    "mods_user_sandbox": "user://mods/narratives/",
+    "packages_root": "res://mods/",
+    "mods_install_rel": "mods/",
+    "mods_user_sandbox": "user://mods/",
     "manifest_file": "pack.json",
     "supported_formats": [
       ".json"

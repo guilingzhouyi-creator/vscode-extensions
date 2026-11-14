@@ -1,8 +1,8 @@
 {
   "loadout_defaults": {
     "loadout_id": "LOADOUT_SET_01",
-    "loadout_name": "主战决斗装",
-    "fallback_name": "战备套",
+    "loadout_name": "",
+    "fallback_name": "",
     "fallback_id": "LOADOUT_01"
   },
   "slots": [
@@ -17,15 +17,5 @@
     "RING_1",
     "RING_2"
   ],
-  "rune_modifiers": {
-    "RUNE_TITAN": {
-      "bonus_str": 5.0
-    },
-    "RUNE_ARCANE": {
-      "bonus_int": 5.0
-    },
-    "RUNE_AEGIS": {
-      "total_armor": 10.0
-    }
-  }
+  "rune_modifiers": {}
 }

@@ -1,8 +1,8 @@
 {
   "entity_defaults": {
     "boss_uid": "BOSS_WORLD_LEVIATHAN_01",
-    "boss_title": "【天灾灭世者 · 灭烬巨龙】",
-    "species_name": "灭烬巨龙",
+    "boss_title": "",
+    "species_name": "",
     "total_phases": 3,
     "current_phase_index": 1,
     "phase_max_hp": 10000.0,

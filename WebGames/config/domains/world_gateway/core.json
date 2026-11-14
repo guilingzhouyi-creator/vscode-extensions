@@ -30,7 +30,7 @@
     ]
   },
   "single_player": {
-    "default_world_id": "WORLD_DEFAULT_SP_01",
+    "default_world_id": "",
     "default_slot_id": "SLOT_SP_01",
     "max_slots_baseline": 1,
     "max_worlds_baseline": 1
@@ -69,26 +69,5 @@
       ]
     }
   },
-  "worlds_catalog": {
-    "WORLD_DEFAULT_SP_01": {
-      "world_id": "WORLD_DEFAULT_SP_01",
-      "world_name": "卡拉尔大陆·起源界",
-      "mode": 1,
-      "seed_value": 20260901,
-      "world_version": "1.0.0",
-      "is_active": true,
-      "max_concurrent_players": 1,
-      "canary_feature_tag": ""
-    },
-    "WORLD_CANARY_MP_01": {
-      "world_id": "WORLD_CANARY_MP_01",
-      "world_name": "卡拉尔公网·测试界域",
-      "mode": 2,
-      "seed_value": 88888888,
-      "world_version": "0.1.0-alpha",
-      "is_active": false,
-      "max_concurrent_players": 16,
-      "canary_feature_tag": "FEATURE_MULTIPLAYER_GATEWAY"
-    }
-  }
+  "worlds_catalog": {}
 }

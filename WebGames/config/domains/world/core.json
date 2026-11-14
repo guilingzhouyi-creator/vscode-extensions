@@ -26,14 +26,14 @@
     "empty_party_policy": "reject"
   },
   "node_defaults": {
-    "continent_id": "CENTRAL_CONTINENT",
+    "continent_id": "",
     "terrain_type": "PLAINS",
     "regional_mana_density": 1.0,
-    "town_id": "TOWN_VALAN"
+    "town_id": ""
   },
   "town_defaults": {
-    "town_name": "未名要塞",
-    "governing_nation_id": "NATION_EMPIRE",
+    "town_name": "",
+    "governing_nation_id": "",
     "population_count": 5000,
     "public_order_percent": 85.0,
     "food_reserve_days": 30.0,
@@ -45,7 +45,7 @@
     "ticks_per_day": 20
   },
   "default_template": {
-    "world_id": "WORLD_DEFAULT",
+    "world_id": "",
     "starting_tick": 0,
     "starting_day": 1,
     "region_mana_density": 1.0

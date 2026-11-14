@@ -1,5 +1,5 @@
 {
-  "service_mode": "mock",
+  "service_mode": "real",
   "player": {
     "name": "阿尔托莉雅",
     "display_name": "阿尔托莉雅 (玩家同构体)",

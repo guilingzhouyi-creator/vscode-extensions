@@ -1,12 +1,12 @@
 {
   "ast_defaults": {
-    "skill_name": "破空连斩",
-    "deserialize_skill_name": "自创式",
+    "skill_name": "",
+    "deserialize_skill_name": "",
     "sentence_count": 4,
     "deserialize_sentence_count": 1
   },
   "manuscript_defaults": {
-    "custom_name": "古老剑谱残卷",
+    "custom_name": "",
     "category": "MANUSCRIPT_GRIMOIRE",
     "royalty_percent": 0.15,
     "market_base_price": 50,

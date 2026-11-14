@@ -26,8 +26,8 @@
     "commoner": "平民"
   },
   "nation_defaults": {
-    "canonical_nation_name": "卡拉尔至高神圣帝国",
-    "sovereign_ruler_id": "RULER_EMPEROR",
+    "canonical_nation_name": "",
+    "sovereign_ruler_id": "",
     "national_treasury_gold": 100000,
     "stability_percent": 85.0,
     "tax_rate": 0.15,

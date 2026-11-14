@@ -70,5 +70,11 @@
   "gateway_not_bound": "World gateway instance is not bound.",
   "null_request": "Request envelope cannot be null.",
   "invalid_esc_action": "Unrecognized ESC menu action.",
-  "security_transition_blocked": "Mode transition was blocked by security guard."
+  "security_transition_blocked": "Mode transition was blocked by security guard.",
+  "no_base_content_mod": "No base or total-conversion content mod package is mounted.",
+  "mod_pack_id_conflict": "Duplicate mod pack_id collision detected across discovery roots.",
+  "mod_cycle_detected": "Cyclic or unsatisfied dependency detected in mod load graph.",
+  "mod_incompatible_version": "Mod package fails engine API compatibility or mutual exclusion constraints.",
+  "mod_realm_digest_mismatch": "Authoritative realm mod manifest SHA-256 digest mismatch.",
+  "mod_missing_prologue_dag": "No valid prologue DAG graph found in mounted content mods."
 }
