@@ -36,82 +36,82 @@ class ProfessionArchetype extends RefCounted:
 
 static func _count_ast_symbols(
 	ast: Variant,
-	phys_node_type: String,
+	physical_node_type: String,
 	magic_node_type: String,
-	phys_symbols: Array,
+	physical_symbols: Array,
 	magic_symbols: Array
 ) -> Vector2i:
 	if ast == null:
 		return Vector2i.ZERO
 	var nodes_dict: Variant = ast.nodes if "nodes" in ast else {}
-	var phys := 0
-	var magic := 0
+	var physical_count := 0
+	var magic_count := 0
 	for node in nodes_dict.values():
-		var ntype: Variant = node.get("node_type", "")
+		var node_type: Variant = node.get("node_type", "")
 		var symbol: Variant = node.get("symbol", "")
-		if ntype == phys_node_type or symbol in phys_symbols:
-			phys += 1
-		elif ntype == magic_node_type or symbol in magic_symbols:
-			magic += 1
-	return Vector2i(phys, magic)
+		if node_type == physical_node_type or symbol in physical_symbols:
+			physical_count += 1
+		elif node_type == magic_node_type or symbol in magic_symbols:
+			magic_count += 1
+	return Vector2i(physical_count, magic_count)
 
 ## 技能图云聚类评估：物理/魔法符号计数达阈值授予 Sword Master/Archmage/Spellblade 位格
 static func evaluate_active_professions(mastered_asts: Array) -> Array[ProfessionArchetype]:
 	var result: Array[ProfessionArchetype] = []
-	var phys_count: int = 0
+	var physical_count: int = 0
 	var magic_count: int = 0
 
-	var phys_symbols: Array = GameConfig.get_array("domains.inventory", "profession/symbols/physical", ["STAB", "SLASH", "PARRY", "BLOCK", "LUNGE", "CLEAVE"])
+	var physical_symbols: Array = GameConfig.get_array("domains.inventory", "profession/symbols/physical", ["STAB", "SLASH", "PARRY", "BLOCK", "LUNGE", "CLEAVE"])
 	var magic_symbols: Array = GameConfig.get_array("domains.inventory", "profession/symbols/magic", ["FLAME", "FROST", "ARCANE", "BOLT", "HEAL"])
-	var phys_node_type := GameConfig.get_string("domains.inventory", "profession/node_types/physical", "PHYSICAL_VERB")
+	var physical_node_type := GameConfig.get_string("domains.inventory", "profession/node_types/physical", "PHYSICAL_VERB")
 	var magic_node_type := GameConfig.get_string("domains.inventory", "profession/node_types/magic", "MAGIC_RUNE")
-	var phys_threshold := GameConfig.get_int("domains.inventory", "profession/phys_threshold", 10)
+	var physical_threshold := GameConfig.get_int("domains.inventory", "profession/phys_threshold", 10)
 	var magic_threshold := GameConfig.get_int("domains.inventory", "profession/magic_threshold", 10)
-	var sb_phys_threshold := GameConfig.get_int("domains.inventory", "profession/spellblade_phys_threshold", 8)
-	var sb_magic_threshold := GameConfig.get_int("domains.inventory", "profession/spellblade_magic_threshold", 8)
+	var spellblade_physical_threshold := GameConfig.get_int("domains.inventory", "profession/spellblade_phys_threshold", 8)
+	var spellblade_magic_threshold := GameConfig.get_int("domains.inventory", "profession/spellblade_magic_threshold", 8)
 	var rank_divisor := maxi(1, GameConfig.get_int("domains.inventory", "profession/rank_divisor", 10))
-	var sb_rank_tier := GameConfig.get_int("domains.inventory", "profession/spellblade_rank_tier", 2)
+	var spellblade_rank_tier := GameConfig.get_int("domains.inventory", "profession/spellblade_rank_tier", 2)
 	var sword_master: Dictionary = GameConfig.get_dict("domains.inventory", "profession/titles/sword_master", {})
 	var archmage: Dictionary = GameConfig.get_dict("domains.inventory", "profession/titles/archmage", {})
 	var spellblade: Dictionary = GameConfig.get_dict("domains.inventory", "profession/titles/spellblade", {})
 
 	for ast in mastered_asts:
-		var counts := _count_ast_symbols(ast, phys_node_type, magic_node_type, phys_symbols, magic_symbols)
-		phys_count += counts.x
+		var counts := _count_ast_symbols(ast, physical_node_type, magic_node_type, physical_symbols, magic_symbols)
+		physical_count += counts.x
 		magic_count += counts.y
 
-	if phys_count >= phys_threshold:
-		var p := ProfessionArchetype.new()
-		p.profession_id = sword_master.get("id", "SWORD_MASTER")
-		p.canonical_name = sword_master.get("name", "Sword Master")
-		p.rank_tier = int(1 + floor(phys_count / float(rank_divisor)))
-		p.stat_modifiers = sword_master.get("modifiers", {})
-		result.append(p)
+	if physical_count >= physical_threshold:
+		var archetype := ProfessionArchetype.new()
+		archetype.profession_id = sword_master.get("id", "SWORD_MASTER")
+		archetype.canonical_name = sword_master.get("name", "Sword Master")
+		archetype.rank_tier = int(1 + floor(physical_count / float(rank_divisor)))
+		archetype.stat_modifiers = sword_master.get("modifiers", {})
+		result.append(archetype)
 
 	if magic_count >= magic_threshold:
-		var p := ProfessionArchetype.new()
-		p.profession_id = archmage.get("id", "ARCHMAGE")
-		p.canonical_name = archmage.get("name", "Holy Archmage")
-		p.rank_tier = int(1 + floor(magic_count / float(rank_divisor)))
-		p.stat_modifiers = archmage.get("modifiers", {})
-		result.append(p)
+		var archetype := ProfessionArchetype.new()
+		archetype.profession_id = archmage.get("id", "ARCHMAGE")
+		archetype.canonical_name = archmage.get("name", "Holy Archmage")
+		archetype.rank_tier = int(1 + floor(magic_count / float(rank_divisor)))
+		archetype.stat_modifiers = archmage.get("modifiers", {})
+		result.append(archetype)
 
-	if phys_count >= sb_phys_threshold and magic_count >= sb_magic_threshold:
-		var p := ProfessionArchetype.new()
-		p.profession_id = spellblade.get("id", "SPELLBLADE")
-		p.canonical_name = spellblade.get("name", "Spellblade")
-		p.rank_tier = sb_rank_tier
-		p.stat_modifiers = spellblade.get("modifiers", {})
-		result.append(p)
+	if physical_count >= spellblade_physical_threshold and magic_count >= spellblade_magic_threshold:
+		var archetype := ProfessionArchetype.new()
+		archetype.profession_id = spellblade.get("id", "SPELLBLADE")
+		archetype.canonical_name = spellblade.get("name", "Spellblade")
+		archetype.rank_tier = spellblade_rank_tier
+		archetype.stat_modifiers = spellblade.get("modifiers", {})
+		result.append(archetype)
 
 	return result
 
 ## 同步角色职业：评估后逐位格广播晋升事件与叙事文案
 static func sync_character_professions(character_id: String, mastered_asts: Array) -> Array[ProfessionArchetype]:
 	var archetypes: Array[ProfessionArchetype] = evaluate_active_professions(mastered_asts)
-	for p in archetypes:
-		EventBusCore.get_instance().emit_profession_promoted(character_id, p.serialize())
+	for archetype in archetypes:
+		EventBusCore.get_instance().emit_profession_promoted(character_id, archetype.serialize())
 		EventBusCore.get_instance().emit_narrative_by_key(
-			"inventory/profession_promoted", "profession", [character_id, p.canonical_name, p.rank_tier]
+			"inventory/profession_promoted", "profession", [character_id, archetype.canonical_name, archetype.rank_tier]
 		)
 	return archetypes

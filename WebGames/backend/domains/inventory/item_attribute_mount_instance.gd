@@ -3,7 +3,7 @@
 # 文件路径: res://backend/domains/inventory/item_attribute_mount_instance.gd
 # 架构定位: Domain Logic Component
 # 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/inventory.json | 信号: EventBus 领域广播
-# 职责说明: 承载 Item UID 与 Attribute UID 关联、实例动态浮动数值、可见性状态与防伪审计。 可见性三态（可见/隐藏/已鉴定）控制数值与机制生效边界。
+# 职责说明: 承载 Item UID 与 Attribute UID 关联、实例动态浮动数值、可见性状态与防篡改审计。 可见性三态（可见/隐藏/已鉴定）控制数值与机制生效边界。
 # 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
@@ -40,64 +40,64 @@ var appraisal_audit: Dictionary = {
 # 二、DTO 转换
 # ==============================================================================
 
-## 从字典重建挂载实例（分类/可见性双形态解析 + 防伪审计载荷深拷贝）
-static func from_dto(d: Dictionary) -> ItemAttributeMountInstance:
-	var inst := ItemAttributeMountInstance.new()
-	if d == null:
-		return inst
+## 从字典重建挂载实例（分类/可见性双形态解析 + 防篡改审计载荷深拷贝）
+static func from_dto(data: Dictionary) -> ItemAttributeMountInstance:
+	var instance := ItemAttributeMountInstance.new()
+	if data == null:
+		return instance
 
-	inst.mount_id = str(d.get("mount_id", ""))
-	inst.item_uid = str(d.get("item_uid", ""))
-	inst.attribute_uid = str(d.get("attribute_uid", ""))
+	instance.mount_id = str(data.get("mount_id", ""))
+	instance.item_uid = str(data.get("item_uid", ""))
+	instance.attribute_uid = str(data.get("attribute_uid", ""))
 
-	var cat_str := str(d.get("category", "INCREMENT")).to_upper()
-	match cat_str:
+	var category_text := str(data.get("category", "INCREMENT")).to_upper()
+	match category_text:
 		"DECREMENT":
-			inst.category = ItemAttributeDefinition.AttributeCategory.DECREMENT
+			instance.category = ItemAttributeDefinition.AttributeCategory.DECREMENT
 		"SPECIAL_AFFIX":
-			inst.category = ItemAttributeDefinition.AttributeCategory.SPECIAL_AFFIX
+			instance.category = ItemAttributeDefinition.AttributeCategory.SPECIAL_AFFIX
 		_:
-			inst.category = ItemAttributeDefinition.AttributeCategory.INCREMENT
+			instance.category = ItemAttributeDefinition.AttributeCategory.INCREMENT
 
-	inst.current_value = float(d.get("current_value", 0.0))
+	instance.current_value = float(data.get("current_value", 0.0))
 
-	var vis_str := str(d.get("visibility", "VISIBLE")).to_upper()
-	match vis_str:
+	var visibility_text := str(data.get("visibility", "VISIBLE")).to_upper()
+	match visibility_text:
 		"HIDDEN":
-			inst.visibility = VisibilityState.HIDDEN
+			instance.visibility = VisibilityState.HIDDEN
 		"APPRAISED":
-			inst.visibility = VisibilityState.APPRAISED
+			instance.visibility = VisibilityState.APPRAISED
 		_:
-			inst.visibility = VisibilityState.VISIBLE
+			instance.visibility = VisibilityState.VISIBLE
 
-	inst.is_active = bool(d.get("is_active", true))
-	inst.appraisal_audit = (d.get("appraisal_audit", {}) as Dictionary).duplicate(true)
+	instance.is_active = bool(data.get("is_active", true))
+	instance.appraisal_audit = (data.get("appraisal_audit", {}) as Dictionary).duplicate(true)
 
-	return inst
+	return instance
 
 ## 序列化挂载实例为字典（枚举转字符串 + 审计载荷深拷贝）
 func to_dto() -> Dictionary:
-	var cat_str := "INCREMENT"
+	var category_text := "INCREMENT"
 	match category:
 		ItemAttributeDefinition.AttributeCategory.DECREMENT:
-			cat_str = "DECREMENT"
+			category_text = "DECREMENT"
 		ItemAttributeDefinition.AttributeCategory.SPECIAL_AFFIX:
-			cat_str = "SPECIAL_AFFIX"
+			category_text = "SPECIAL_AFFIX"
 
-	var vis_str := "VISIBLE"
+	var visibility_text := "VISIBLE"
 	match visibility:
 		VisibilityState.HIDDEN:
-			vis_str = "HIDDEN"
+			visibility_text = "HIDDEN"
 		VisibilityState.APPRAISED:
-			vis_str = "APPRAISED"
+			visibility_text = "APPRAISED"
 
 	return {
 		"mount_id": mount_id,
 		"item_uid": item_uid,
 		"attribute_uid": attribute_uid,
-		"category": cat_str,
+		"category": category_text,
 		"current_value": current_value,
-		"visibility": vis_str,
+		"visibility": visibility_text,
 		"is_active": is_active,
 		"appraisal_audit": appraisal_audit.duplicate(true)
 	}

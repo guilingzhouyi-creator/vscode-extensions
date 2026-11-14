@@ -52,70 +52,70 @@ var synergy_tags: Array = []
 # ==============================================================================
 
 ## 从字典重建属性定义（ABC 分类/计算类型双形态解析，value_min 非负钳制）
-static func from_dto(d: Dictionary) -> ItemAttributeDefinition:
-	var def := ItemAttributeDefinition.new()
-	if d == null:
-		return def
+static func from_dto(data: Dictionary) -> ItemAttributeDefinition:
+	var definition := ItemAttributeDefinition.new()
+	if data == null:
+		return definition
 
-	def.attribute_uid = str(d.get("attribute_uid", ""))
-	def.canonical_id = str(d.get("canonical_id", ""))
+	definition.attribute_uid = str(data.get("attribute_uid", ""))
+	definition.canonical_id = str(data.get("canonical_id", ""))
 
-	var cat_str := str(d.get("category", "INCREMENT")).to_upper()
-	match cat_str:
+	var category_text := str(data.get("category", "INCREMENT")).to_upper()
+	match category_text:
 		"DECREMENT":
-			def.category = AttributeCategory.DECREMENT
+			definition.category = AttributeCategory.DECREMENT
 		"SPECIAL_AFFIX":
-			def.category = AttributeCategory.SPECIAL_AFFIX
+			definition.category = AttributeCategory.SPECIAL_AFFIX
 		_:
-			def.category = AttributeCategory.INCREMENT
+			definition.category = AttributeCategory.INCREMENT
 
-	def.target_stat = str(d.get("target_stat", ""))
+	definition.target_stat = str(data.get("target_stat", ""))
 
-	var calc_str := str(d.get("calculation_type", "FLAT_ADD")).to_upper()
-	match calc_str:
+	var calculation_text := str(data.get("calculation_type", "FLAT_ADD")).to_upper()
+	match calculation_text:
 		"PERCENT_ADD":
-			def.calculation_type = CalculationType.PERCENT_ADD
+			definition.calculation_type = CalculationType.PERCENT_ADD
 		"BOOLEAN_FLAG":
-			def.calculation_type = CalculationType.BOOLEAN_FLAG
+			definition.calculation_type = CalculationType.BOOLEAN_FLAG
 		"TAG_TRIGGER":
-			def.calculation_type = CalculationType.TAG_TRIGGER
+			definition.calculation_type = CalculationType.TAG_TRIGGER
 		_:
-			def.calculation_type = CalculationType.FLAT_ADD
+			definition.calculation_type = CalculationType.FLAT_ADD
 
-	def.base_value = float(d.get("base_value", 0.0))
-	def.value_min = maxf(0.0, float(d.get("value_min", 0.0)))
-	def.value_max = float(d.get("value_max", 99999.0))
-	def.affix_score = maxf(0.0, float(d.get("affix_score", 0.0)))
-	def.appraisal_requirement = (d.get("appraisal_requirement", {}) as Dictionary).duplicate(true)
-	def.conflict_tags = (d.get("conflict_tags", []) as Array).duplicate(true)
-	def.synergy_tags = (d.get("synergy_tags", []) as Array).duplicate(true)
+	definition.base_value = float(data.get("base_value", 0.0))
+	definition.value_min = maxf(0.0, float(data.get("value_min", 0.0)))
+	definition.value_max = float(data.get("value_max", 99999.0))
+	definition.affix_score = maxf(0.0, float(data.get("affix_score", 0.0)))
+	definition.appraisal_requirement = (data.get("appraisal_requirement", {}) as Dictionary).duplicate(true)
+	definition.conflict_tags = (data.get("conflict_tags", []) as Array).duplicate(true)
+	definition.synergy_tags = (data.get("synergy_tags", []) as Array).duplicate(true)
 
-	return def
+	return definition
 
 ## 序列化属性定义为字典（枚举转字符串 + 数组深拷贝）
 func to_dto() -> Dictionary:
-	var cat_str := "INCREMENT"
+	var category_text := "INCREMENT"
 	match category:
 		AttributeCategory.DECREMENT:
-			cat_str = "DECREMENT"
+			category_text = "DECREMENT"
 		AttributeCategory.SPECIAL_AFFIX:
-			cat_str = "SPECIAL_AFFIX"
+			category_text = "SPECIAL_AFFIX"
 
-	var calc_str := "FLAT_ADD"
+	var calculation_text := "FLAT_ADD"
 	match calculation_type:
 		CalculationType.PERCENT_ADD:
-			calc_str = "PERCENT_ADD"
+			calculation_text = "PERCENT_ADD"
 		CalculationType.BOOLEAN_FLAG:
-			calc_str = "BOOLEAN_FLAG"
+			calculation_text = "BOOLEAN_FLAG"
 		CalculationType.TAG_TRIGGER:
-			calc_str = "TAG_TRIGGER"
+			calculation_text = "TAG_TRIGGER"
 
 	return {
 		"attribute_uid": attribute_uid,
 		"canonical_id": canonical_id,
-		"category": cat_str,
+		"category": category_text,
 		"target_stat": target_stat,
-		"calculation_type": calc_str,
+		"calculation_type": calculation_text,
 		"base_value": base_value,
 		"value_min": value_min,
 		"value_max": value_max,

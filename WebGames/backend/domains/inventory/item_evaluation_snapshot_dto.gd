@@ -48,20 +48,20 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从字典重建结算快照（缺省回退默认值 + 逐容器转型）
-static func from_dto(d: Dictionary) -> ItemEvaluationSnapshotDTO:
-	var dto := ItemEvaluationSnapshotDTO.new()
-	if d == null:
-		return dto
+static func from_dto(data: Dictionary) -> ItemEvaluationSnapshotDTO:
+	var snapshot := ItemEvaluationSnapshotDTO.new()
+	if data == null:
+		return snapshot
 
-	dto.item_uid = str(d.get("item_uid", ""))
-	dto.original_tier_rank = int(d.get("original_tier_rank", 1))
-	dto.effective_tier_rank = int(d.get("effective_tier_rank", 1))
-	dto.is_tier_promoted = bool(d.get("is_tier_promoted", false))
-	dto.total_affix_score = float(d.get("total_affix_score", 0.0))
-	dto.active_stats = (d.get("active_stats", {}) as Dictionary).duplicate(true)
-	dto.raw_increment_stats = (d.get("raw_increment_stats", {}) as Dictionary).duplicate(true)
-	dto.raw_decrement_stats = (d.get("raw_decrement_stats", {}) as Dictionary).duplicate(true)
-	dto.active_affix_uids = (d.get("active_affix_uids", []) as Array).duplicate(true)
-	dto.suppressed_affix_uids = (d.get("suppressed_affix_uids", []) as Array).duplicate(true)
+	snapshot.item_uid = str(data.get("item_uid", ""))
+	snapshot.original_tier_rank = int(data.get("original_tier_rank", 1))
+	snapshot.effective_tier_rank = int(data.get("effective_tier_rank", 1))
+	snapshot.is_tier_promoted = bool(data.get("is_tier_promoted", false))
+	snapshot.total_affix_score = float(data.get("total_affix_score", 0.0))
+	snapshot.active_stats = (data.get("active_stats", {}) as Dictionary).duplicate(true)
+	snapshot.raw_increment_stats = (data.get("raw_increment_stats", {}) as Dictionary).duplicate(true)
+	snapshot.raw_decrement_stats = (data.get("raw_decrement_stats", {}) as Dictionary).duplicate(true)
+	snapshot.active_affix_uids = (data.get("active_affix_uids", []) as Array).duplicate(true)
+	snapshot.suppressed_affix_uids = (data.get("suppressed_affix_uids", []) as Array).duplicate(true)
 
-	return dto
+	return snapshot

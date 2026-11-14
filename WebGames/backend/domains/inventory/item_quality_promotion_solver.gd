@@ -33,18 +33,18 @@ static func evaluate_quality_promotion(
 	mounts: Array,
 	definitions_by_uid: Dictionary
 ) -> QualityPromotionResult:
-	var res := QualityPromotionResult.new()
-	res.original_tier_rank = original_tier
-	res.effective_tier_rank = original_tier
+	var result := QualityPromotionResult.new()
+	result.original_tier_rank = original_tier
+	result.effective_tier_rank = original_tier
 
 	var total_score: float = 0.0
 	var active_affix_count: int = 0
 	var max_affixes: int = GameConfig.get_int("domains.item_attributes", "global_limits/max_special_affixes_per_item", 3)
 
-	for m in mounts:
-		if not (m is ItemAttributeMountInstance):
+	for mount_entry in mounts:
+		if not (mount_entry is ItemAttributeMountInstance):
 			continue
-		var mount: ItemAttributeMountInstance = m
+		var mount: ItemAttributeMountInstance = mount_entry
 
 		if mount.category != ItemAttributeDefinition.AttributeCategory.SPECIAL_AFFIX:
 			continue
@@ -53,38 +53,38 @@ static func evaluate_quality_promotion(
 		if mount.visibility != ItemAttributeMountInstance.VisibilityState.APPRAISED or not mount.is_active:
 			continue
 
-		var def: ItemAttributeDefinition = definitions_by_uid.get(mount.attribute_uid, null)
-		if def == null:
+		var definition: ItemAttributeDefinition = definitions_by_uid.get(mount.attribute_uid, null)
+		if definition == null:
 			continue
 
-		total_score += def.affix_score
+		total_score += definition.affix_score
 		active_affix_count += 1
 		if active_affix_count >= max_affixes:
 			break
 
-	res.total_affix_score = total_score
-	res.affix_count = active_affix_count
+	result.total_affix_score = total_score
+	result.affix_count = active_affix_count
 
 	# 阶梯阈值比对
-	var t6: float = GameConfig.get_float("domains.item_attributes", "quality_upgrade_thresholds/tier_6", 1000.0)
-	var t5: float = GameConfig.get_float("domains.item_attributes", "quality_upgrade_thresholds/tier_5", 500.0)
-	var t4: float = GameConfig.get_float("domains.item_attributes", "quality_upgrade_thresholds/tier_4", 260.0)
-	var t3: float = GameConfig.get_float("domains.item_attributes", "quality_upgrade_thresholds/tier_3", 120.0)
-	var t2: float = GameConfig.get_float("domains.item_attributes", "quality_upgrade_thresholds/tier_2", 50.0)
+	var tier_6_threshold: float = GameConfig.get_float("domains.item_attributes", "quality_upgrade_thresholds/tier_6", 1000.0)
+	var tier_5_threshold: float = GameConfig.get_float("domains.item_attributes", "quality_upgrade_thresholds/tier_5", 500.0)
+	var tier_4_threshold: float = GameConfig.get_float("domains.item_attributes", "quality_upgrade_thresholds/tier_4", 260.0)
+	var tier_3_threshold: float = GameConfig.get_float("domains.item_attributes", "quality_upgrade_thresholds/tier_3", 120.0)
+	var tier_2_threshold: float = GameConfig.get_float("domains.item_attributes", "quality_upgrade_thresholds/tier_2", 50.0)
 
 	var calculated_tier: int = original_tier
-	if total_score >= t6:
+	if total_score >= tier_6_threshold:
 		calculated_tier = maxi(calculated_tier, 6) # 传说
-	elif total_score >= t5:
+	elif total_score >= tier_5_threshold:
 		calculated_tier = maxi(calculated_tier, 5) # 远古
-	elif total_score >= t4:
+	elif total_score >= tier_4_threshold:
 		calculated_tier = maxi(calculated_tier, 4) # 史诗
-	elif total_score >= t3:
+	elif total_score >= tier_3_threshold:
 		calculated_tier = maxi(calculated_tier, 3) # 稀有
-	elif total_score >= t2:
+	elif total_score >= tier_2_threshold:
 		calculated_tier = maxi(calculated_tier, 2) # 精良
 
-	res.effective_tier_rank = calculated_tier
-	res.is_promoted = (calculated_tier > original_tier)
+	result.effective_tier_rank = calculated_tier
+	result.is_promoted = (calculated_tier > original_tier)
 
-	return res
+	return result

@@ -14,6 +14,7 @@ extends RefCounted
 # ==============================================================================
 # 一、度量字段
 # ==============================================================================
+## 读取默认最大负重阈值（千克）
 static func get_default_max_carry_weight_kg() -> float:
 	return GameConfig.get_float("domains.inventory.core", "wearable/max_carry_weight_kg", 50.0)
 
@@ -27,19 +28,19 @@ var is_full: bool = false
 
 ## 构造：全量注入并即时推导超载/满格布尔（weight 超限 or 容量用满）
 func _init(
-	p_used_vol: int = 0,
-	p_cap: int = 0,
-	p_mass: float = 0.0,
-	p_max_wt: float = 50.0,
-	p_count: int = 0
+	initial_used_volume_slots: int = 0,
+	initial_total_capacity_slots: int = 0,
+	initial_total_mass_kg: float = 0.0,
+	initial_max_carry_weight_kg: float = 50.0,
+	initial_item_count: int = 0
 ) -> void:
-	used_volume_slots = p_used_vol
-	total_capacity_slots = p_cap
-	total_mass_kg = p_mass
-	max_carry_weight_kg = p_max_wt
-	item_count = p_count
-	is_overweight = (p_mass > p_max_wt)
-	is_full = (p_cap > 0 and p_used_vol >= p_cap)
+	used_volume_slots = initial_used_volume_slots
+	total_capacity_slots = initial_total_capacity_slots
+	total_mass_kg = initial_total_mass_kg
+	max_carry_weight_kg = initial_max_carry_weight_kg
+	item_count = initial_item_count
+	is_overweight = (initial_total_mass_kg > initial_max_carry_weight_kg)
+	is_full = (initial_total_capacity_slots > 0 and initial_used_volume_slots >= initial_total_capacity_slots)
 
 # ==============================================================================
 # 二、DTO 转换
@@ -59,14 +60,14 @@ func to_dto() -> Dictionary:
 
 ## 从字典反序列化（缺省字段回退默认；空字典返回全默认快照）
 static func from_dto(data: Dictionary) -> RefCounted:
-	var snap: InventoryMetricSnapshot = InventoryMetricSnapshot.new()
+	var snapshot: InventoryMetricSnapshot = InventoryMetricSnapshot.new()
 	if data.is_empty():
-		return snap
-	snap.total_capacity_slots = int(data.get("total_capacity_slots", 0))
-	snap.used_volume_slots = int(data.get("used_volume_slots", 0))
-	snap.total_mass_kg = float(data.get("total_mass_kg", 0.0))
-	snap.max_carry_weight_kg = float(data.get("max_carry_weight_kg", get_default_max_carry_weight_kg()))
-	snap.item_count = int(data.get("item_count", 0))
-	snap.is_overweight = bool(data.get("is_overweight", false))
-	snap.is_full = bool(data.get("is_full", false))
-	return snap
+		return snapshot
+	snapshot.total_capacity_slots = int(data.get("total_capacity_slots", 0))
+	snapshot.used_volume_slots = int(data.get("used_volume_slots", 0))
+	snapshot.total_mass_kg = float(data.get("total_mass_kg", 0.0))
+	snapshot.max_carry_weight_kg = float(data.get("max_carry_weight_kg", get_default_max_carry_weight_kg()))
+	snapshot.item_count = int(data.get("item_count", 0))
+	snapshot.is_overweight = bool(data.get("is_overweight", false))
+	snapshot.is_full = bool(data.get("is_full", false))
+	return snapshot
