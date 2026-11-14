@@ -160,6 +160,8 @@ static func get_domain_data(domain_id: String) -> Dictionary:
 		"extreme_sample":
 			return { "hp_current": 0.0, "hp_max": 1.0, "amount": 9223372036854775807 }
 		_:
+			# 未登记域不返回非空默认回退，确保「非空」断言可证伪。
+			# 可诊断性说明：此处不得使用 push_warning（全库 push_warning 散落零容忍，
 			# 且前端严禁后端 ErrorReporter 直连），拼写错误的 domain_id 由
 			# 「非空断言被空字典证伪」的契约测试路径暴露。
 			return {}

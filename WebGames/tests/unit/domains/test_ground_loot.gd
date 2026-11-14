@@ -21,7 +21,7 @@ static func _test_pickup_add_item_and_statistics() -> Dictionary:
 	chest.category = "ARMOR_EQUIPMENT"
 	chest.volume_slots = 6
 	inv.equip_item("CHEST", chest)
-	var lib := AccountItemLibraryAggregate.new("ACC_HERO")
+	var lib := AccountItemLibrary.new("ACC_HERO")
 	var res = GroundLootPickupSolver.attempt_pickup("ACC_HERO", Vector2.ZERO, drop, inv, lib)
 
 	var stats_ok := false
@@ -200,7 +200,7 @@ static func _test_monster_kill_to_pickup_closed_loop() -> Dictionary:
 	chest.category = "ARMOR_EQUIPMENT"
 	chest.volume_slots = 10
 	inv.equip_item("CHEST", chest)
-	var lib := AccountItemLibraryAggregate.new("ACC_HERO")
+	var lib := AccountItemLibrary.new("ACC_HERO")
 	var first: GroundDroppedItemAggregate = listener.get_active_drops()[baseline]
 	var pickup = listener.attempt_pickup_from_ground("ACC_HERO", Vector2.ZERO, first.drop_id, inv, lib)
 	var picked_ok: bool = pickup.get("success", false) \

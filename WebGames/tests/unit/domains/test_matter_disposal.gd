@@ -137,7 +137,7 @@ static func _test_multi_yield_mass_conservation() -> Dictionary:
 	inv.add_item(sword)
 
 	var furnace := ItemDisposalFacilityDTO.new(ItemDisposalFacilityDTO.DisposalMethod.TOWN_HIGH_HEAT_FURNACE, Vector2(2, 2), 3.0)
-	var lib := AccountItemLibraryAggregate.new("ACC_CONSERVE")
+	var lib := AccountItemLibrary.new("ACC_CONSERVE")
 	# 签名：(pos, facility, inventory, item_id, passcode="", library=null, loadout=null)
 	var res = DisposalPipeline.process_item_disposal(Vector2(2, 2), furnace, inv, "HEAVY_GREATSWORD", "", lib)
 

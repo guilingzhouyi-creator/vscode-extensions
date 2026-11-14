@@ -28,18 +28,18 @@ static func run_all_tests() -> Dictionary:
 	return { "domain": "Domain 15: 角色创生与种族资质分配", "all_passed": all_passed, "results": results }
 
 static func test_dice_and_point_buy() -> Dictionary:
-	var roll_val = AttributeInitializationSolver.roll_4d6_drop_lowest()
+	var roll_val = AttributeInitSolver.roll_4d6_drop_lowest()
 	var in_range = (roll_val >= 3 and roll_val <= 18)
 	# 掷骰映射统一等级（1~6）
-	var mapped = AttributeInitializationSolver.map_roll_to_level(roll_val)
+	var mapped = AttributeInitSolver.map_roll_to_level(roll_val)
 	var mapped_ok = mapped >= AttributeConversionEngine.min_level() and mapped <= AttributeConversionEngine.max_level()
 
 	# 天平购点（统一等级 1~6，每级消耗 = 等级数，池 21）
 	var valid_alloc := { "STR": 5, "CON": 4, "INT": 4, "AGI": 3, "SPR": 2, "VIT": 2 } # 20 点
-	var res_valid = AttributeInitializationSolver.validate_point_buy_allocation(valid_alloc, 21)
+	var res_valid = AttributeInitSolver.validate_point_buy_allocation(valid_alloc, 21)
 
 	var invalid_alloc := { "STR": 7, "CON": 4, "INT": 4, "AGI": 3, "SPR": 2, "VIT": 2 } # 7 超出 [1, 6]
-	var res_invalid = AttributeInitializationSolver.validate_point_buy_allocation(invalid_alloc, 21)
+	var res_invalid = AttributeInitSolver.validate_point_buy_allocation(invalid_alloc, 21)
 
 	var passed = in_range and mapped_ok and res_valid.valid and (not res_invalid.valid)
 	return { "test": "TC-CREATE-01: 4d6 掷骰映射统一等级与 21 购点等级约束", "passed": passed }

@@ -28,7 +28,7 @@ static func run_all_tests() -> Dictionary:
 	}
 
 static func test_group_compose() -> Dictionary:
-	var lib := AccountItemLibraryAggregate.new("ACC_001")
+	var lib := AccountItemLibrary.new("ACC_001")
 	var catalog := ItemLoaderPipeline.build_catalog_from_config()
 	var batch := [
 		{
@@ -65,7 +65,7 @@ static func test_group_compose() -> Dictionary:
 	}
 
 static func test_materialize_floor_equivalence() -> Dictionary:
-	var lib := AccountItemLibraryAggregate.new("ACC_002")
+	var lib := AccountItemLibrary.new("ACC_002")
 	var catalog := ItemLoaderPipeline.build_catalog_from_config()
 	# 预置当前持有 2
 	ItemStatisticsSolver.record_item_event(lib, ItemStatisticsSolver.EVENT_ITEM_GRANTED, "KALAR:CONSUM:ALCHEMY:POTION_MANA", 2, catalog)
@@ -101,7 +101,7 @@ static func test_rule_driven_and_raw_fallback() -> Dictionary:
 		],
 		"projections": {}
 	}
-	var lib := AccountItemLibraryAggregate.new("ACC_003")
+	var lib := AccountItemLibrary.new("ACC_003")
 	var catalog := ItemLoaderPipeline.build_catalog_from_config()
 	var telemetry := TelemetrySidecarEngine.new()
 	var batch := [
@@ -118,7 +118,7 @@ static func test_rule_driven_and_raw_fallback() -> Dictionary:
 		and (evts.size() == 1) and (evts[0].event_name == "transaction.custom_test")
 
 	# 空键守卫：无 transaction_id 事件不组合、逐条落账（不吞没）
-	var lib2 := AccountItemLibraryAggregate.new("ACC_004")
+	var lib2 := AccountItemLibrary.new("ACC_004")
 	var batch_raw := [
 		{
 			"account_id": "ACC_004", "event_type": "item.granted",
@@ -138,8 +138,8 @@ static func test_rule_driven_and_raw_fallback() -> Dictionary:
 	}
 
 static func test_uid_isolation_and_idempotency() -> Dictionary:
-	var lib_a := AccountItemLibraryAggregate.new("ACC_A")
-	var lib_b := AccountItemLibraryAggregate.new("ACC_B")
+	var lib_a := AccountItemLibrary.new("ACC_A")
+	var lib_b := AccountItemLibrary.new("ACC_B")
 	var catalog := ItemLoaderPipeline.build_catalog_from_config()
 	var batch := [
 		{
@@ -183,8 +183,8 @@ static func test_uid_isolation_and_idempotency() -> Dictionary:
 static func test_composite_key_no_separator_collision() -> Dictionary:
 	# L10：长度前缀组合键消除 "|" 拼接碰撞——
 	# account="A|B"+txn="TX" 与 account="A"+txn="B|TX"（旧 KEY_SEP 拼接出同键 → 跨账号并组污染）
-	var lib_a := AccountItemLibraryAggregate.new("A|B")
-	var lib_b := AccountItemLibraryAggregate.new("A")
+	var lib_a := AccountItemLibrary.new("A|B")
+	var lib_b := AccountItemLibrary.new("A")
 	var catalog := ItemLoaderPipeline.build_catalog_from_config()
 	var batch := [
 		{

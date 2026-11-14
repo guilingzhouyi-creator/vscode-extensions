@@ -21,7 +21,7 @@ static func run_all_tests() -> Dictionary:
 static func test_monster_isomorphic_structure() -> Dictionary:
 	var m := MonsterAggregateEntity.new()
 	m.monster_id = "DRAGON_01"
-	var p_wing := MonsterAggregateEntity.MonsterBodyPart.new()
+	var p_wing := MonsterBodyPart.new()
 	p_wing.part_id = "WING"
 	p_wing.durability_max = 50.0
 	p_wing.durability_current = 50.0
@@ -33,7 +33,7 @@ static func test_monster_isomorphic_structure() -> Dictionary:
 
 static func test_part_destruction_and_ap_penalty() -> Dictionary:
 	var m := MonsterAggregateEntity.new()
-	var p_wing := MonsterAggregateEntity.MonsterBodyPart.new()
+	var p_wing := MonsterBodyPart.new()
 	p_wing.part_id = "WING"
 	p_wing.durability_current = 30.0
 	p_wing.durability_max = 30.0

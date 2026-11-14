@@ -18,8 +18,8 @@ static func run_all_tests() -> Dictionary:
 			break
 	return { "domain": "Domain 09: 任务系统与因果事件链", "all_passed": all_passed, "results": results }
 
-static func _build_dual_path_quest(quest_id: String = "") -> QuestObjectiveNode.QuestCausalityAggregate:
-	var quest := QuestObjectiveNode.QuestCausalityAggregate.new()
+static func _build_dual_path_quest(quest_id: String = "") -> QuestCausalityAggregate:
+	var quest := QuestCausalityAggregate.new()
 	if not quest_id.is_empty():
 		quest.quest_id = quest_id
 	var n_combat := QuestObjectiveNode.new()
@@ -53,7 +53,7 @@ static func test_stealth_branch_resolution() -> Dictionary:
 	return { "test": "TC-QST-02: 隐匿潜行偷取分支非暴力达成断言", "passed": passed, "type": res.solution_type }
 
 static func test_faction_reputation_and_bounty() -> Dictionary:
-	var quest := QuestObjectiveNode.QuestCausalityAggregate.new()
+	var quest := QuestCausalityAggregate.new()
 	quest.quest_title = "劫掠帝国运粮队"
 	quest.faction_reputation_rewards = { "EMPIRE": -60, "REBELS": 50 }
 	var cur_rep := { "EMPIRE": 0, "REBELS": 0 }

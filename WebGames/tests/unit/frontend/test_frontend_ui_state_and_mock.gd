@@ -50,7 +50,7 @@ static func _test_ui_state_container_retry_callback() -> Dictionary:
 ## 3. 验证角色三层解耦链严格遵循约束与零除防御（HudViewModel 已归并至该链）
 static func _test_hud_view_model_invariants() -> Dictionary:
 	# 故意注入非法的 0/负上限
-	var dto := CharacterHudDecoupled.CharacterTransportDTO.new()
+	var dto := CharacterHudViewModel.CharacterTransportDTO.new()
 	dto.nickname = "阿尔托莉雅"
 	dto.hp_current = 50.0
 	dto.hp_maximum = 0.0
@@ -59,7 +59,7 @@ static func _test_hud_view_model_invariants() -> Dictionary:
 	dto.coins_copper_total = 100
 	dto.mana_monocrystals = 5
 
-	var domain := CharacterHudDecoupled.CharacterDomainModel.from_dto(dto)
+	var domain := CharacterHudViewModel.CharacterDomainModel.from_dto(dto)
 	var zero_div_prevented: bool = (domain.max_hp >= 1.0 and domain.ap_max >= 1.0)
 	var wallet_copper_ok: bool = (domain.gold * 10000 + domain.silver * 100 + domain.copper) == 100
 	var wallet_ok: bool = wallet_copper_ok and (domain.monocrystals == 5)

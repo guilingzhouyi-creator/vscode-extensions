@@ -247,7 +247,7 @@ static func test_clawback_service() -> Dictionary:
 		var item := ItemEntity.from_payload(ItemRegistrySolver.build_instance_payload(
 			catalog.get_prototype("KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD"), "mithril_longsword"
 		))
-		item.item_id = UniqueIdGenerator.next_id("GM_ITEM_")
+		item.item_id = IdGenerator.next_id("GM_ITEM_")
 		inv.add_item(item)
 	var r_proto = ClawbackService.clawback_item_prototype(
 		gm, online, "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD", 5, ClawbackService.REASON_MANUAL_AUDIT, inv

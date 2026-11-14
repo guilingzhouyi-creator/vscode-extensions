@@ -93,6 +93,7 @@ func close_drawer(drawer: Control = null) -> void:
 func get_active_drawer() -> Control:
 	return _active_drawer
 
+## 查询当前是否存在处于打开状态的抽屉
 func is_drawer_open() -> bool:
 	return _active_drawer != null
 

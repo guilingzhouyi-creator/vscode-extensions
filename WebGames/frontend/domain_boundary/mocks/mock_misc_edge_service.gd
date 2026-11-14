@@ -38,6 +38,7 @@ func replace_last_mutation(active: Array, item: Dictionary) -> Dictionary:
 	updated.append(item.duplicate(true))
 	return {"success": true, "mutations": updated}
 
+## 按索引拾取地面掉落物品并从掉落列表副本中移除
 func pickup_loot(loot: Array, index: int) -> Dictionary:
 	if index < 0 or index >= loot.size():
 		return {"success": false, "reason": "INVALID_INDEX", "loot": loot.duplicate(true)}
@@ -46,6 +47,7 @@ func pickup_loot(loot: Array, index: int) -> Dictionary:
 	updated.remove_at(index)
 	return {"success": true, "loot": updated, "item": item}
 
+## 根据命名类型索引返回对应更名费用，索引越界时安全回退至默认首档费用
 func get_name_type_fee(type_index: int) -> int:
 	if type_index < 0 or type_index >= NAME_TYPE_FEES.size():
 		return NAME_TYPE_FEES[0]

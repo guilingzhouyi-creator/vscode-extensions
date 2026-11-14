@@ -200,14 +200,14 @@ static func _fake_migrate(d: Dictionary) -> Dictionary:
 	return d
 
 static func test_client_prediction_reconciliation() -> Dictionary:
-	var server_pkt := KalarSaveSchema.ServerEventPacket.new()
+	var server_pkt := ServerEventPacket.new()
 	server_pkt.server_frame_tick = 100
 	server_pkt.acknowledged_sequence_number = 3
 	server_pkt.authoritative_state = { "hp": 85.0, "ap": 2 }
 
 	var unacked_cmds: Array = []
 	for i in range(1, 6): # seq 1..5, acked <= 3, 剩余 4, 5 (2条)
-		var cmd := KalarSaveSchema.ClientCommandPacket.new()
+		var cmd := ClientCommandPacket.new()
 		cmd.sequence_number = i
 		cmd.payload = { "verb": "SLASH" } # base_ap = -3
 		unacked_cmds.append(cmd)

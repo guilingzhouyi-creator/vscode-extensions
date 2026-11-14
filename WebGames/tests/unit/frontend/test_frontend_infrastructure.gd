@@ -209,7 +209,7 @@ static func _test_three_layer_model_decoupling() -> Dictionary:
 	var test_name := "test_three_layer_model_decoupling"
 	var err := ""
 
-	var dto := CharacterHudDecoupled.CharacterTransportDTO.new()
+	var dto := CharacterHudViewModel.CharacterTransportDTO.new()
 	dto.character_id = "char_99"
 	dto.nickname = "测试勇士"
 	dto.level_raw = 15
@@ -218,7 +218,7 @@ static func _test_three_layer_model_decoupling() -> Dictionary:
 	dto.coins_copper_total = 12345 # 1金 23银 45铜
 	dto.mana_monocrystals = 8
 
-	var domain := CharacterHudDecoupled.CharacterDomainModel.from_dto(dto)
+	var domain := CharacterHudViewModel.CharacterDomainModel.from_dto(dto)
 	if domain.gold != 1 or domain.silver != 23 or domain.copper != 45:
 		err = "货币三元组折算错误"
 	elif domain.get_health_ratio() != 0.2:
@@ -234,7 +234,7 @@ static func _test_three_layer_model_decoupling() -> Dictionary:
 		if safe_ratio != 1.0:
 			err = "零除安全比率未正确钳制至 1.0"
 
-	var vm := CharacterHudDecoupled.CharacterHUDViewModel.new()
+	var vm := CharacterHudViewModel.CharacterHUDViewModel.new()
 	vm.update_from_domain(domain)
 	var expected_wallet := UIIntermediary.text("ui.fe05.currency.full", {"gold": 1, "silver": 23, "copper": 45})
 	if vm.name_text != "测试勇士":

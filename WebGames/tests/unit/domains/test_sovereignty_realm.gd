@@ -19,7 +19,7 @@ static func run_all_tests() -> Dictionary:
 	return { "domain": "Domain 13: 身份爵位与主权建国", "all_passed": all_passed, "results": results }
 
 static func test_nation_realm_entity() -> Dictionary:
-	var nation := KnighthoodTitle.NationRealmAggregate.new()
+	var nation := NationRealmAggregate.new()
 	nation.nation_id = "NATION_EMPIRE"
 	var s = nation.serialize()
 	var passed = (s.nation_id == "NATION_EMPIRE") and (nation.stability_percent == 85.0)
@@ -40,17 +40,17 @@ static func test_sovereignty_founding_and_palace_coup() -> Dictionary:
 static func test_stability_monotonic_no_rise() -> Dictionary:
 	# M7：政变稳定性单调不升（Inv-ON-3）——
 	# 红证：旧 max(floor, cur-drop) 使低于下限的稳定性被失败政变抬升（20 → 40）
-	var low := KnighthoodTitle.NationRealmAggregate.new()
+	var low := NationRealmAggregate.new()
 	low.stability_percent = 20.0 # 低于 failure_floor=40
 	NationSovereigntyAndCoupFSM.execute_palace_coup(low, "USURPER", 0.0) # 必失败
 	var low_ok = is_equal_approx(low.stability_percent, 20.0) # 不抬升
 
-	var high := KnighthoodTitle.NationRealmAggregate.new()
+	var high := NationRealmAggregate.new()
 	high.stability_percent = 60.0
 	NationSovereigntyAndCoupFSM.execute_palace_coup(high, "USURPER", 0.0)
 	var high_ok = is_equal_approx(high.stability_percent, 45.0) # 60-15 正常下跌
 
-	var suc := KnighthoodTitle.NationRealmAggregate.new()
+	var suc := NationRealmAggregate.new()
 	suc.stability_percent = 100.0
 	NationSovereigntyAndCoupFSM.execute_palace_coup(suc, "USURPER", 1.0) # 必成功
 	var suc_ok = is_equal_approx(suc.stability_percent, 65.0) # 100-35 正常下跌

@@ -33,7 +33,7 @@ static func run_all_tests() -> Dictionary:
 
 ## TC-TWE-S4-01: 任务图结构校验（空路径 → QUEST_GRAPH_INVALID，完成标记不变）
 static func _test_quest_graph_invalid() -> Dictionary:
-	var quest := QuestObjectiveNode.QuestCausalityAggregate.new()
+	var quest := QuestCausalityAggregate.new()
 	quest.quest_id = "TWE_QUEST_1"
 	var node := QuestObjectiveNode.new()
 	node.target_state_key = "state.beast_slain"

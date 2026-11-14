@@ -29,7 +29,7 @@ static func run_all_tests() -> Dictionary:
 	}
 
 static func test_event_intake_and_tree_update() -> Dictionary:
-	var lib := AccountItemLibraryAggregate.new("ACC_001")
+	var lib := AccountItemLibrary.new("ACC_001")
 	var catalog := ItemLoaderPipeline.build_catalog_from_config()
 	var telemetry := TelemetrySidecarEngine.new()
 
@@ -56,7 +56,7 @@ static func test_event_intake_and_tree_update() -> Dictionary:
 	}
 
 static func test_recursive_subtree_aggregation() -> Dictionary:
-	var lib := AccountItemLibraryAggregate.new("ACC_002")
+	var lib := AccountItemLibrary.new("ACC_002")
 	var catalog := ItemLoaderPipeline.build_catalog_from_config()
 	# 装备两件（不同小类）+ 消耗品一件（不同大类）
 	ItemStatisticsSolver.record_item_event(lib, ItemStatisticsSolver.EVENT_ITEM_GRANTED, "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD", 3, catalog)
@@ -78,8 +78,8 @@ static func test_recursive_subtree_aggregation() -> Dictionary:
 	}
 
 static func test_account_uid_isolation() -> Dictionary:
-	var lib_a := AccountItemLibraryAggregate.new("ACC_A")
-	var lib_b := AccountItemLibraryAggregate.new("ACC_B")
+	var lib_a := AccountItemLibrary.new("ACC_A")
+	var lib_b := AccountItemLibrary.new("ACC_B")
 	var catalog := ItemLoaderPipeline.build_catalog_from_config()
 	ItemStatisticsSolver.record_item_event(lib_a, ItemStatisticsSolver.EVENT_ITEM_GRANTED, "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD", 2, catalog)
 
@@ -94,7 +94,7 @@ static func test_account_uid_isolation() -> Dictionary:
 	}
 
 static func test_consumption_floor_clamp() -> Dictionary:
-	var lib := AccountItemLibraryAggregate.new("ACC_003")
+	var lib := AccountItemLibrary.new("ACC_003")
 	var catalog := ItemLoaderPipeline.build_catalog_from_config()
 	ItemStatisticsSolver.record_item_event(lib, ItemStatisticsSolver.EVENT_ITEM_GRANTED, "KALAR:CONSUM:ALCHEMY:POTION_MANA", 3, catalog)
 
@@ -112,8 +112,8 @@ static func test_consumption_floor_clamp() -> Dictionary:
 	}
 
 static func test_global_aggregation_rbac_gate() -> Dictionary:
-	var lib_a := AccountItemLibraryAggregate.new("ACC_A")
-	var lib_b := AccountItemLibraryAggregate.new("ACC_B")
+	var lib_a := AccountItemLibrary.new("ACC_A")
+	var lib_b := AccountItemLibrary.new("ACC_B")
 	var catalog := ItemLoaderPipeline.build_catalog_from_config()
 	ItemStatisticsSolver.record_item_event(lib_a, ItemStatisticsSolver.EVENT_ITEM_GRANTED, "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD", 2, catalog)
 	ItemStatisticsSolver.record_item_event(lib_b, ItemStatisticsSolver.EVENT_ITEM_GRANTED, "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD", 3, catalog)
@@ -135,18 +135,18 @@ static func test_global_aggregation_rbac_gate() -> Dictionary:
 ## canonical 索引 O(1) 定位——挂载后 find 命中即返；
 ## 模拟反序列化（新实例仅塞 root_node）后索引懒重建仍可 O(1) 定位，语义与线性扫等价。
 static func test_canonical_index_after_restore() -> Dictionary:
-	var lib := AccountItemLibraryAggregate.new("ACC_IDX")
+	var lib := AccountItemLibrary.new("ACC_IDX")
 	lib.mount_item("KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD", "EQUIPMENT", "WEAPON_BLADE")
 	lib.mount_item("KALAR:CONSUM:ALCHEMY:POTION_MANA", "CONSUMABLE", "ALCHEMY")
-	lib.apply_item_delta("KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD", AccountItemLibraryAggregate.STAT_GAINED, 3)
+	lib.apply_item_delta("KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD", AccountItemLibrary.STAT_GAINED, 3)
 
 	var found: Dictionary = lib.find_item_node("KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD")
 	var direct_ok: bool = not found.is_empty() \
 		and str(found["path"][0]) == "EQUIPMENT" and str(found["path"][1]) == "WEAPON_BLADE" \
-		and int(found["node"]["stats"].get(AccountItemLibraryAggregate.STAT_CURRENT, 0)) == 3
+		and int(found["node"]["stats"].get(AccountItemLibrary.STAT_CURRENT, 0)) == 3
 
 	# 反序列化重建：新实例只塞 root_node（索引为空）→ 首查触发懒重建仍命中且路径正确
-	var restored := AccountItemLibraryAggregate.new("ACC_IDX")
+	var restored := AccountItemLibrary.new("ACC_IDX")
 	restored.root_node = lib.serialize()["root_node"]
 	var found2: Dictionary = restored.find_item_node("KALAR:CONSUM:ALCHEMY:POTION_MANA")
 	var lazy_ok: bool = not found2.is_empty() \

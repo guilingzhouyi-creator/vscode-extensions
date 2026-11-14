@@ -49,10 +49,12 @@ func generate_roster(count: int) -> Array:
 		})
 	return members
 
+## 读取 GameConfig 管理角色白名单，判定目标职位是否拥有管理权限
 func can_manage(user_role: String) -> bool:
 	var allowed_roles: Array = GameConfig.get_array(RULES_SECTION, RULES_KEY + "/manage_roles", ["LEADER", "OFFICER"])
 	return user_role in allowed_roles
 
+## 推进面对面交易锁定、确认或取消状态机，阻断非法越序操作
 func trade_transition(state: Dictionary, action: String) -> Dictionary:
 	var locked := bool(state.get("locked", false))
 	var confirmed := bool(state.get("confirmed", false))

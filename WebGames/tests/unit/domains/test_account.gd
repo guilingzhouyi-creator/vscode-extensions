@@ -4,7 +4,7 @@
 # ==============================================================================
 class_name TestAccountDomain extends RefCounted
 
-const AccountProfileAggregate = preload("res://backend/domains/account/account_profile.gd")
+const AccountProfile = preload("res://backend/domains/account/account_profile.gd")
 const AuthService = preload("res://backend/domains/account/auth_service.gd")
 const AccountSlotBindingSolver = preload("res://backend/domains/account/account_slot_binding_solver.gd")
 const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
@@ -38,13 +38,13 @@ static func test_guest_account_creation() -> Dictionary:
 	return {"test": "TC-ACC-01: 游客离线账户创建与设备指纹绑定", "passed": passed}
 
 static func test_save_slot_isolation() -> Dictionary:
-	var acc := AccountProfileAggregate.new()
-	var slot1 := SaveSlotSummaryDTO.new()
+	var acc := AccountProfile.new()
+	var slot1 := SaveSlotDTO.new()
 	slot1.slot_id = "SLOT_01"
 	slot1.character_name = "战士艾伦"
 	slot1.is_permadeath_mode = false
 
-	var slot2 := SaveSlotSummaryDTO.new()
+	var slot2 := SaveSlotDTO.new()
 	slot2.slot_id = "SLOT_02"
 	slot2.character_name = "法师甘道夫"
 	slot2.is_permadeath_mode = true
@@ -56,7 +56,7 @@ static func test_save_slot_isolation() -> Dictionary:
 	return {"test": "TC-ACC-02: 多角色插槽元数据独立隔离与死斗标记", "passed": passed}
 
 static func test_local_auth_authentication() -> Dictionary:
-	var acc := AccountProfileAggregate.new()
+	var acc := AccountProfile.new()
 	acc.account_id = "ACC_001"
 	acc.username = "Arthur"
 	acc.password_hash_sha256 = AuthService.hash_password("Excalibur123")
@@ -67,8 +67,8 @@ static func test_local_auth_authentication() -> Dictionary:
 	return {"test": "TC-ACC-03: 本地加盐哈希鉴权与会话Token签发", "passed": passed}
 
 static func test_slot_binding_and_next_available() -> Dictionary:
-	var acc := AccountProfileAggregate.new()
-	var dto1 := SaveSlotSummaryDTO.new()
+	var acc := AccountProfile.new()
+	var dto1 := SaveSlotDTO.new()
 	dto1.character_name = "游侠A"
 	var res1 := acc.bind_character_to_slot("SLOT_01", dto1)
 	var next_id := acc.get_next_available_slot_id()
@@ -78,7 +78,7 @@ static func test_slot_binding_and_next_available() -> Dictionary:
 	return {"test": "TC-ACC-04: 槽位绑定幂等与空槽推算", "passed": passed}
 
 static func test_device_fingerprint_mismatch() -> Dictionary:
-	var acc := AccountProfileAggregate.new()
+	var acc := AccountProfile.new()
 	acc.account_id = "ACC_002"
 	acc.username = "Lancelot"
 	acc.password_hash_sha256 = AuthService.hash_password("Camelot123")
@@ -91,11 +91,11 @@ static func test_device_fingerprint_mismatch() -> Dictionary:
 	return {"test": "TC-ACC-05: 设备指纹强校验与Token时效", "passed": passed}
 
 static func test_entitlements_round_trip() -> Dictionary:
-	var acc := AccountProfileAggregate.new()
+	var acc := AccountProfile.new()
 	acc.account_id = "ACC_ROUND"
 	acc.entitlements.append("TIER_PREMIUM")
 	acc.entitlements.append("SEASON_2026")
-	var restored := AccountProfileAggregate.deserialize(acc.serialize())
+	var restored := AccountProfile.deserialize(acc.serialize())
 	var passed: bool = restored != null \
 		and restored.entitlements.has("TIER_PREMIUM") \
 		and restored.entitlements.has("SEASON_2026") \
@@ -106,18 +106,18 @@ static func test_entitlements_seal_tamper() -> Dictionary:
 	# 密封密钥经环境供给——测试显式注入受控测试密钥（缺钥或删封条均失败关闭）
 	var prev_key := OS.get_environment("KALAR_ENTITLEMENT_KEY")
 	OS.set_environment("KALAR_ENTITLEMENT_KEY", "test-seal-key-v1")
-	var acc := AccountProfileAggregate.new()
+	var acc := AccountProfile.new()
 	acc.account_id = "ACC_SEAL"
 	acc.entitlements.append("TIER_PREMIUM")
 	var saved := acc.serialize()
 	# 篡改存档：追加未授权资格 -> 密封重算不符 -> 权限回退空（fail-safe）
 	var tampered := saved.duplicate(true)
 	tampered["entitlements"] = ["TIER_PREMIUM", "EVIL_GRANT"]
-	var restored := AccountProfileAggregate.deserialize(tampered)
+	var restored := AccountProfile.deserialize(tampered)
 	# 删封条绕过：entitlements_seal 为空时同样必须 Fail-Closed 清空权限
 	var stripped := saved.duplicate(true)
 	stripped["entitlements_seal"] = ""
-	var restored_stripped := AccountProfileAggregate.deserialize(stripped)
+	var restored_stripped := AccountProfile.deserialize(stripped)
 	OS.set_environment("KALAR_ENTITLEMENT_KEY", prev_key)
 	var passed: bool = restored != null and restored.entitlements.is_empty() \
 		and restored_stripped != null and restored_stripped.entitlements.is_empty()
@@ -125,13 +125,13 @@ static func test_entitlements_seal_tamper() -> Dictionary:
 
 static func test_character_creation_in_slot() -> Dictionary:
 	var repo := AccountRepository.get_instance()
-	var acc := AccountProfileAggregate.new()
+	var acc := AccountProfile.new()
 	acc.account_id = "ACC_003"
 	acc.username = "Artoria"
 	repo.save_account(acc)
 
 	var res := AccountSlotBindingSolver.create_character_in_slot(acc, "SLOT_01", "阿尔托莉雅", "见习冒险者", false)
-	var repo_acc: AccountProfileAggregate = repo.find_by_id("ACC_003")
+	var repo_acc: AccountProfile = repo.find_by_id("ACC_003")
 	var repo_synced: bool = repo_acc != null and repo_acc.is_slot_occupied("SLOT_01") \
 		and repo_acc.get_summary_by_slot("SLOT_01").character_name == "阿尔托莉雅"
 
@@ -164,7 +164,7 @@ static func test_character_creation_in_slot() -> Dictionary:
 ## 容器尺寸 ≤ 上限；过期条目先于有效条目被清理（过期优先裁剪语义）。
 static func test_session_cap_pruning() -> Dictionary:
 	AuthService.clear_sessions()
-	var acc := AccountProfileAggregate.new()
+	var acc := AccountProfile.new()
 	acc.account_id = "ACC_CAP"
 	acc.username = "CapUser"
 	acc.password_hash_sha256 = AuthService.hash_password("CapPass123")
@@ -200,7 +200,7 @@ static func test_session_cap_pruning() -> Dictionary:
 ## 单轨盐鉴权契约：标准盐鉴权/错口令拒绝/未加盐旧口令严格拦截/反序列化缺失默认值重设
 static func test_salt_single_track_authentication() -> Dictionary:
 	var pass_plain := "StandardPass123"
-	var acc := AccountProfileAggregate.new()
+	var acc := AccountProfile.new()
 	acc.account_id = "ACC_SINGLE_SALT"
 	acc.username = "StandardUser"
 	acc.salt_version = 1
@@ -214,14 +214,14 @@ static func test_salt_single_track_authentication() -> Dictionary:
 	var wrong_pass_rejected: bool = not AuthService.authenticate_local("StandardUser", "WrongPass", acc).get("success", true)
 
 	# 3. 历史未加盐裸哈希账户在单轨加盐体系下严格拦截拒绝
-	var raw_hash_acc := AccountProfileAggregate.new()
+	var raw_hash_acc := AccountProfile.new()
 	raw_hash_acc.account_id = "ACC_RAW_HASH"
 	raw_hash_acc.username = "RawUser"
 	raw_hash_acc.password_hash_sha256 = pass_plain.sha256_text()
 	var raw_rejected: bool = not AuthService.authenticate_local("RawUser", pass_plain, raw_hash_acc).get("success", true)
 
 	# 4. 反序列化缺省 salt_version 自动重设默认值 1
-	var deserialized := AccountProfileAggregate.deserialize({"account_id": "ACC_DESER", "username": "DeserUser"})
+	var deserialized := AccountProfile.deserialize({"account_id": "ACC_DESER", "username": "DeserUser"})
 	var default_salt_ok: bool = deserialized.salt_version == 1
 
 	var passed: bool = standard_ok and wrong_pass_rejected and raw_rejected and default_salt_ok

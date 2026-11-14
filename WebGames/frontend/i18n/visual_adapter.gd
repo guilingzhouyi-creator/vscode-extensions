@@ -108,6 +108,7 @@ static func adapt_button(button: Button, text: String) -> void:
 				fitted = true
 				break
 
+	# 安全回退：逐级降低字号后仍溢出时启用裁剪与省略号，防止按钮文案越界
 	if not fitted and estimated_width > avail_width * 0.85:
 		button.clip_text = true
 		button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -115,6 +116,7 @@ static func adapt_button(button: Button, text: String) -> void:
 	button.add_theme_font_size_override("font_size", current_size)
 
 ## 适配 Tab 标题
+## 按 tab_index 粒度仅对该项标题生效，不改写整容器字号
 static func adapt_tab_title(container: TabContainer, text: String, tab_index: int) -> void:
 	if container == null:
 		return
@@ -146,6 +148,8 @@ static func _truncate_for_tab(text: String, font_size: int) -> String:
 	return text.substr(0, budget - 1) + ELLIPSIS_CHAR
 
 ## 适配 ItemList 项
+## 采用 ItemList 显示层溢出策略（text_overrun_behavior），不破坏性改写源文本，
+## 确保语言切换或刷新后可完整还原原文
 static func adapt_item_list_item(item_list: ItemList, _text: String, _index: int) -> void:
 	if item_list == null:
 		return

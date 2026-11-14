@@ -29,8 +29,8 @@ static func run_all_tests() -> Dictionary:
 	return {"domain": "角色死亡与世界连续性及权限体系", "all_passed": all_passed, "results": results}
 
 static func test_death_clears_character_only() -> Dictionary:
-	var acc := AccountProfileAggregate.new()
-	var dto := SaveSlotSummaryDTO.new()
+	var acc := AccountProfile.new()
+	var dto := SaveSlotDTO.new()
 	dto.slot_id = "SLOT_01"
 	dto.character_name = "死者A"
 	var profile := CharacterProfile.new()
@@ -46,8 +46,8 @@ static func test_death_clears_character_only() -> Dictionary:
 	return {"test": "TC-WS-01: 死亡仅精确清理角色本体白名单", "passed": passed}
 
 static func test_world_continues_after_death() -> Dictionary:
-	var acc := AccountProfileAggregate.new()
-	var dto := SaveSlotSummaryDTO.new()
+	var acc := AccountProfile.new()
+	var dto := SaveSlotDTO.new()
 	dto.slot_id = "SLOT_01"
 	dto.character_name = "死者B"
 	var profile := CharacterProfile.new()
@@ -80,7 +80,7 @@ static func test_recombination_stub_on() -> Dictionary:
 	return {"test": "TC-WS-05: 重组预留（config 覆盖开启 → RECOMBINED_STUB + 片段数派生 world_id）", "passed": passed}
 
 static func test_entitlement_gate() -> Dictionary:
-	var acc := AccountProfileAggregate.new()
+	var acc := AccountProfile.new()
 	acc.account_id = "ACC_P08"
 	var granted := EntitlementService.add_entitlement(acc, "offline")
 	var has_ok := EntitlementService.has_entitlement(acc, "offline")
@@ -92,13 +92,13 @@ static func test_entitlement_gate() -> Dictionary:
 static func test_entitlement_seal() -> Dictionary:
 	# P39 清单 6：密封密钥经环境供给（生产缺失即失败关闭）——测试显式注入受控测试密钥
 	OS.set_environment("KALAR_ENTITLEMENT_KEY", "test-seal-key-v1")
-	var acc := AccountProfileAggregate.new()
+	var acc := AccountProfile.new()
 	acc.account_id = "ACC_SEAL"
 	EntitlementService.add_entitlement(acc, "offline")
 	EntitlementService.add_entitlement(acc, "online")
 	var seal := EntitlementService.seal_entitlements(acc)
 	var ok_same := EntitlementService.verify_seal(acc, seal)
-	var tampered := AccountProfileAggregate.new()
+	var tampered := AccountProfile.new()
 	tampered.account_id = "ACC_SEAL"
 	tampered.entitlements = ["online", "offline", "hacked"]
 	var fail_tamper := not EntitlementService.verify_seal(tampered, seal)
@@ -106,8 +106,8 @@ static func test_entitlement_seal() -> Dictionary:
 	return {"test": "TC-WS-07: 权限指纹安全存储（篡改本地无效）", "passed": passed}
 
 static func test_death_idempotent() -> Dictionary:
-	var acc := AccountProfileAggregate.new()
-	var dto := SaveSlotSummaryDTO.new()
+	var acc := AccountProfile.new()
+	var dto := SaveSlotDTO.new()
 	dto.slot_id = "SLOT_01"
 	dto.character_name = "死者幂等"
 	var profile := CharacterProfile.new()
@@ -121,8 +121,8 @@ static func test_death_idempotent() -> Dictionary:
 	return {"test": "TC-WS-08: 重复死亡幂等拒绝且不重复追加历史", "passed": passed}
 
 static func test_fallen_slot_rebindable() -> Dictionary:
-	var acc := AccountProfileAggregate.new()
-	var dto := SaveSlotSummaryDTO.new()
+	var acc := AccountProfile.new()
+	var dto := SaveSlotDTO.new()
 	dto.slot_id = "SLOT_01"
 	dto.character_name = "旧角色"
 	var profile := CharacterProfile.new()
@@ -131,7 +131,7 @@ static func test_fallen_slot_rebindable() -> Dictionary:
 	acc.bind_character_to_slot("SLOT_01", dto)
 	CharacterDeathSolver.handle_character_death(acc, "SLOT_01", null)
 	var rebind := AccountSlotBindingSolver.create_character_in_slot(acc, "SLOT_01", "新角色")
-	var new_dto: SaveSlotSummaryDTO = acc.get_summary_by_slot("SLOT_01")
+	var new_dto: SaveSlotDTO = acc.get_summary_by_slot("SLOT_01")
 	var passed: bool = rebind.success and new_dto != null and not new_dto.is_fallen and new_dto.character_name == "新角色" and new_dto.character_profile == null
 	return {"test": "TC-WS-09: fallen 槽位可重挂新角色（零继承，slot_id 稳定）", "passed": passed}
 
@@ -152,10 +152,10 @@ static func test_world_time_day_advances() -> Dictionary:
 	return {"test": "TC-WS-11: 世界时间 tick 单调 + 每 20 tick 联动 day", "passed": passed}
 
 static func test_seal_order_independent() -> Dictionary:
-	var acc_a := AccountProfileAggregate.new()
+	var acc_a := AccountProfile.new()
 	acc_a.account_id = "ACC_ORDER"
 	acc_a.entitlements = ["offline", "online"]
-	var acc_b := AccountProfileAggregate.new()
+	var acc_b := AccountProfile.new()
 	acc_b.account_id = "ACC_ORDER"
 	acc_b.entitlements = ["online", "offline"]
 	var seal_a := EntitlementService.seal_entitlements(acc_a)
@@ -168,7 +168,7 @@ static func test_recombination_config_override() -> Dictionary:
 	return {"test": "TC-WS-13: 空模板回退官方默认世界模板", "passed": passed}
 
 static func test_world_ref_persists() -> Dictionary:
-	var acc := AccountProfileAggregate.new()
+	var acc := AccountProfile.new()
 	acc.account_id = "ACC_WORLD_REF"
 	var res := AccountSlotBindingSolver.create_character_in_slot(acc, "SLOT_01", "世界引用角色")
 	var ref_ok: String = res.get("world_state_ref", "")

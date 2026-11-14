@@ -19,7 +19,7 @@ static func run_all_tests() -> Dictionary:
 	return { "domain": "Domain 03: 七大洲阻抗寻路与城镇定居点", "all_passed": all_passed, "results": results }
 
 static func test_town_settlement_entity() -> Dictionary:
-	var town := WorldMapGraphNode.TownSettlementAggregate.new()
+	var town := TownSettlementAggregate.new()
 	town.town_id = "TOWN_001"
 	town.town_name = "苍穹王城"
 	var s = town.serialize()

@@ -13,6 +13,7 @@ extends RefCounted
 
 ## 单例
 static var _instance: UIIntermediary
+## 获取 UI 中间体门面全局单例
 static func get_instance() -> UIIntermediary:
 	if _instance == null:
 		_instance = UIIntermediary.new()
@@ -29,6 +30,7 @@ static func get_instance() -> UIIntermediary:
 ## data: 业务数据字典 (如 {"amount": 5000, "name": "阿尔托莉雅"})
 ## 返回: 填充后的最终文本
 static func resolve(node: Node, key: String, data: Dictionary = {}) -> String:
+	# 1-2. i18n 翻译 + 占位符填充（UITextResolver.resolve 已内置单引擎 PlaceholderFiller 填充）
 	var filled := UITextResolver.resolve(key, data)
 
 	# 3. 注入 UI 节点
@@ -52,6 +54,7 @@ static func resolve_batch(bindings: Array) -> void:
 
 ## 仅翻译+填充, 不注入节点（用于动态生成文本, 如 ItemList 项）
 static func text(key: String, data: Dictionary = {}) -> String:
+	# resolve 已内置占位符填充，无需二次调用 PlaceholderFiller.fill
 	return UITextResolver.resolve(key, data)
 
 ## 翻译+填充+绑定, 但延迟注入（用于 TabContainer 标题等需要时机的场景）

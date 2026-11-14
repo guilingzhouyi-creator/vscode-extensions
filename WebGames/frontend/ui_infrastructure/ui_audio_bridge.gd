@@ -37,17 +37,22 @@ func play_hover(volume_db: float = 0.0) -> void:
 func play_click(volume_db: float = 0.0) -> void:
 	play_sfx.emit(UISfxType.CLICK, volume_db)
 
+## 触发操作成功音效信号
 func play_success(volume_db: float = 0.0) -> void:
 	play_sfx.emit(UISfxType.SUCCESS, volume_db)
 
+## 触发操作警告音效信号
 func play_warn(volume_db: float = 0.0) -> void:
 	play_sfx.emit(UISfxType.WARN, volume_db)
 
+## 触发操作错误音效信号
 func play_error(volume_db: float = 0.0) -> void:
 	play_sfx.emit(UISfxType.ERROR, volume_db)
 
+## 触发弹窗打开音效信号
 func play_modal_open(volume_db: float = 0.0) -> void:
 	play_sfx.emit(UISfxType.MODAL_OPEN, volume_db)
 
+## 触发弹窗关闭音效信号
 func play_modal_close(volume_db: float = 0.0) -> void:
 	play_sfx.emit(UISfxType.MODAL_CLOSE, volume_db)

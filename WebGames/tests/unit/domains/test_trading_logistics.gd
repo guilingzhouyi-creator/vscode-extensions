@@ -36,7 +36,7 @@ static func test_dumping_market_shock() -> Dictionary:
 	return { "test": "TC-TRD-02: 大宗倾销引发局部集市价格暴跌断言", "passed": passed, "price": p_after_dump }
 
 static func test_caravan_logistics_and_arrival() -> Dictionary:
-	var caravan := TownMarketCommodity.TradeCaravanEntity.new()
+	var caravan := TradeCaravanEntity.new()
 	caravan.caravan_id = "CARAVAN_01"
 	caravan.destination_town_id = "TOWN_EMPIRE"
 	caravan.guards_count = 20
