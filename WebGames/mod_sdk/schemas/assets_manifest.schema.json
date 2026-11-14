@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "kalar.mod_sdk.assets_manifest.v1",
   "title": "AssetsManifestDefinition",
-  "description": "卡拉尔世界引擎 模组美术与音视频资产清单契约规范 (assets_manifest.json)",
+  "description": "卡拉尔世界引擎 模组美术与音视频资产清单契约规范 (assets/manifest.json)",
   "type": "object",
   "properties": {
     "manifest_version": {
@@ -14,7 +14,12 @@
     "pack_id": {
       "type": "string",
       "pattern": "^[a-z0-9_]+$",
-      "description": "所属 MOD 的唯一标识符"
+      "description": "可选：所属 MOD 的唯一标识符"
+    },
+    "asset_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "清单内登记的有效资产文件总数（不含 .import/.uid 等引擎元数据伴生文件）"
     },
     "total_size_bytes": {
       "type": "integer",
@@ -29,29 +34,34 @@
         "properties": {
           "path": {
             "type": "string",
-            "pattern": "^assets/.*$",
-            "description": "相对于 MOD 根目录的资产相对路径，严禁包含 '..' 路径遍历字符"
+            "pattern": "^(?!.*\\.\\.).+$",
+            "description": "相对于 assets/ 目录或 MOD 根目录的资产相对路径，禁止包含 '..' 路径遍历字符"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["image", "audio", "font", "shader", "model", "video"],
+            "description": "cook_assets.py 输出的标准资产类别：image / audio / font / shader / model / video"
           },
           "virtual_uri": {
             "type": "string",
-            "pattern": "^mod://[a-z0-9_]+/assets/.*$",
-            "description": "统一虚拟资产寻址定位符（如 mod://my_mod/assets/textures/hero.webp）"
+            "pattern": "^mod://([a-z0-9_]+/)?assets/.*$",
+            "description": "可选：统一虚拟资产寻址定位符（如 mod://my_mod/assets/textures/hero.webp）"
           },
           "asset_type": {
             "type": "string",
-            "enum": ["TEXTURE", "AUDIO", "FONT", "SHADER"],
-            "description": "资产类别：TEXTURE(图片/贴图), AUDIO(背景乐/音效), FONT(排版字体), SHADER(纯文本着色器)"
+            "enum": ["TEXTURE", "AUDIO", "FONT", "SHADER", "MODEL", "VIDEO"],
+            "description": "可选兼容字段：大写资产大类名称"
           },
           "format": {
             "type": "string",
-            "enum": ["WEBP", "PNG", "OGG", "WAV", "TTF", "WOFF2", "GDSHADER"],
-            "description": "合规媒体容器/编码格式（严禁可执行二进制格式）"
+            "enum": ["WEBP", "PNG", "OGG", "WAV", "TTF", "OTF", "GDSHADER", "GLTF", "GLB", "OGV"],
+            "description": "可选兼容字段：合规媒体容器/编码格式"
           },
           "size_bytes": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 31457280,
-            "description": "文件物理字节大小（图片上限 15MB，音频上限 30MB）"
+            "maximum": 52428800,
+            "description": "文件物理字节大小（图片 <= 15MB，音频/模型 <= 30MB，字体/着色器 <= 10MB，过场视频 <= 50MB）"
           },
           "sha256": {
             "type": "string",
@@ -74,13 +84,10 @@
         },
         "required": [
           "path",
-          "virtual_uri",
-          "asset_type",
-          "format",
           "size_bytes",
           "sha256"
         ],
-        "additionalProperties": false
+        "additionalProperties": true
       }
     },
     "security": {
@@ -100,7 +107,6 @@
   },
   "required": [
     "manifest_version",
-    "pack_id",
     "assets"
   ],
   "additionalProperties": true

@@ -5,6 +5,7 @@
   "author": "Kalar Engine Team",
   "engine_api_version": "1.0.0",
   "priority": 200,
+  "tier": "TIER_2_AUDIOVISUAL",
   "mod_tier": "AUDIO_VISUAL",
   "dependencies": [],
   "incompatible_packs": [],
