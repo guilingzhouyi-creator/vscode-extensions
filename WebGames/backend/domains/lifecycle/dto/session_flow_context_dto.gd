@@ -135,17 +135,17 @@ func has_unwired_slot(slot_name: String) -> bool:
 		return false
 	return unwired_slots.has(slot_name)
 
-static func _dup_dict_field(raw_val: Variant, deep_copy: bool) -> Dictionary:
-	var d: Dictionary = Dictionary(raw_val) if raw_val != null else {}
+static func _dup_dict_field(raw_value: Variant, deep_copy: bool) -> Dictionary:
+	var dict_value: Dictionary = Dictionary(raw_value) if raw_value != null else {}
 	if deep_copy:
-		return d.duplicate(true)
-	return d
+		return dict_value.duplicate(true)
+	return dict_value
 
-static func _dup_array_field(raw_val: Variant, deep_copy: bool) -> Array:
-	var a: Array = Array(raw_val) if raw_val != null else []
+static func _dup_array_field(raw_value: Variant, deep_copy: bool) -> Array:
+	var array_value: Array = Array(raw_value) if raw_value != null else []
 	if deep_copy:
-		return a.duplicate(true)
-	return a
+		return array_value.duplicate(true)
+	return array_value
 
 ## 序列化当前对象为通用字典传输结构
 func to_dto(deep_copy: bool = false) -> Dictionary:
@@ -176,30 +176,30 @@ func to_dto(deep_copy: bool = false) -> Dictionary:
 
 ## 从输入字典反序列化还原传输对象
 static func from_dto(data: Dictionary, deep_copy: bool = false) -> SessionFlowContextDTO:
-	var dto := SessionFlowContextDTO.new()
-	dto.session_token = str(data.get("session_token", ""))
-	dto.account_id = str(data.get("account_id", ""))
-	dto.username = str(data.get("username", ""))
-	dto.current_slot_id = str(data.get("current_slot_id", ""))
-	dto.character_id = str(data.get("character_id", ""))
-	dto.character_name = str(data.get("character_name", ""))
-	dto.gender = str(data.get("gender", ""))
-	dto.race_id = str(data.get("race_id", ""))
-	dto.current_world_id = str(data.get("current_world_id", ""))
-	dto.game_mode = int(data.get("game_mode", 0))
-	dto.current_stage_index = int(data.get("current_stage_index", 0))
-	dto.is_esc_menu_open = bool(data.get("is_esc_menu_open", false))
-	dto.is_active = bool(data.get("is_active", true))
-	dto.account_snapshot = _dup_dict_field(data.get("account_snapshot", {}), deep_copy)
-	dto.gateway_slot_states = _dup_array_field(data.get("gateway_slot_states", []), deep_copy)
-	dto.physiology_snapshot = _dup_dict_field(data.get("physiology_snapshot", {}), deep_copy)
-	dto.wallet_snapshot = _dup_dict_field(data.get("wallet_snapshot", {}), deep_copy)
-	dto.opening_event_snapshot = _dup_dict_field(data.get("opening_event_snapshot", {}), deep_copy)
-	dto.hud_snapshot = _dup_dict_field(data.get("hud_snapshot", {}), deep_copy)
-	dto.shutdown_snapshot = _dup_dict_field(data.get("shutdown_snapshot", {}), deep_copy)
-	dto.stage_results = _dup_dict_field(data.get("stage_results", {}), deep_copy)
+	var context := SessionFlowContextDTO.new()
+	context.session_token = str(data.get("session_token", ""))
+	context.account_id = str(data.get("account_id", ""))
+	context.username = str(data.get("username", ""))
+	context.current_slot_id = str(data.get("current_slot_id", ""))
+	context.character_id = str(data.get("character_id", ""))
+	context.character_name = str(data.get("character_name", ""))
+	context.gender = str(data.get("gender", ""))
+	context.race_id = str(data.get("race_id", ""))
+	context.current_world_id = str(data.get("current_world_id", ""))
+	context.game_mode = int(data.get("game_mode", 0))
+	context.current_stage_index = int(data.get("current_stage_index", 0))
+	context.is_esc_menu_open = bool(data.get("is_esc_menu_open", false))
+	context.is_active = bool(data.get("is_active", true))
+	context.account_snapshot = _dup_dict_field(data.get("account_snapshot", {}), deep_copy)
+	context.gateway_slot_states = _dup_array_field(data.get("gateway_slot_states", []), deep_copy)
+	context.physiology_snapshot = _dup_dict_field(data.get("physiology_snapshot", {}), deep_copy)
+	context.wallet_snapshot = _dup_dict_field(data.get("wallet_snapshot", {}), deep_copy)
+	context.opening_event_snapshot = _dup_dict_field(data.get("opening_event_snapshot", {}), deep_copy)
+	context.hud_snapshot = _dup_dict_field(data.get("hud_snapshot", {}), deep_copy)
+	context.shutdown_snapshot = _dup_dict_field(data.get("shutdown_snapshot", {}), deep_copy)
+	context.stage_results = _dup_dict_field(data.get("stage_results", {}), deep_copy)
 	var slots: Array = Array(data.get("unwired_slots", []))
-	dto.unwired_slots = []
-	for s in slots:
-		dto.unwired_slots.append(str(s))
-	return dto
+	context.unwired_slots = []
+	for slot_entry in slots:
+		context.unwired_slots.append(str(slot_entry))
+	return context

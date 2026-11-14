@@ -11,7 +11,7 @@
 class_name GameShutdownDTO
 extends RefCounted
 
-const GameLifecycleModel = preload("res://backend/domains/lifecycle/lifecycle_model.gd")
+const GameLifecycleModel = preload("res://backend/domains/lifecycle/game_lifecycle_model.gd")
 
 ## 停机请求 DTO
 class Request extends RefCounted:
@@ -43,18 +43,18 @@ class Request extends RefCounted:
 
 	## 从字典重建停机请求（缺省回退默认值）
 	static func from_dto(data: Dictionary) -> Request:
-		var req := Request.new()
-		req.session_token = String(data.get("session_token", ""))
-		req.account_id = String(data.get("account_id", ""))
-		req.exit_reason = int(data.get("exit_reason", GameLifecycleModel.ExitReason.USER_DESKTOP_QUIT))
-		req.target_save_slot = String(data.get("target_save_slot", ""))
-		req.idempotency_key = String(data.get("idempotency_key", ""))
-		req.force_timeout_seconds = float(data.get("force_timeout_seconds", 5.0))
-		req.timestamp_utc = int(data.get("timestamp_utc", 0))
-		req.save_before_quit = bool(data.get("save_before_quit", true))
-		req.require_save_success = bool(data.get("require_save_success", false))
-		req.force_quit = bool(data.get("force_quit", false))
-		return req
+		var request := Request.new()
+		request.session_token = String(data.get("session_token", ""))
+		request.account_id = String(data.get("account_id", ""))
+		request.exit_reason = int(data.get("exit_reason", GameLifecycleModel.ExitReason.USER_DESKTOP_QUIT))
+		request.target_save_slot = String(data.get("target_save_slot", ""))
+		request.idempotency_key = String(data.get("idempotency_key", ""))
+		request.force_timeout_seconds = float(data.get("force_timeout_seconds", 5.0))
+		request.timestamp_utc = int(data.get("timestamp_utc", 0))
+		request.save_before_quit = bool(data.get("save_before_quit", true))
+		request.require_save_success = bool(data.get("require_save_success", false))
+		request.force_quit = bool(data.get("force_quit", false))
+		return request
 
 
 ## 停机响应 DTO
@@ -63,8 +63,8 @@ class Response extends RefCounted:
 	var is_success: bool:
 		get:
 			return success
-		set(val):
-			success = val
+		set(value):
+			success = value
 	var error_code: String = "OK"
 	var failed_stage: String = ""
 	var current_phase: int = GameLifecycleModel.LifecyclePhase.STOPPED
@@ -101,27 +101,27 @@ class Response extends RefCounted:
 
 	## 从字典重建停机响应（remaining_resources 逐元素转型）
 	static func from_dto(data: Dictionary) -> Response:
-		var resp := Response.new()
-		resp.success = bool(data.get("success", false))
-		resp.error_code = String(data.get("error_code", "OK"))
-		resp.failed_stage = String(data.get("failed_stage", ""))
-		resp.current_phase = int(data.get("current_phase", GameLifecycleModel.LifecyclePhase.STOPPED))
-		resp.is_save_completed = bool(data.get("is_save_completed", false))
-		resp.save_sha256 = String(data.get("save_sha256", ""))
-		resp.remaining_resources = _extract_string_array(data.get("remaining_resources", []))
-		resp.retained_resources = _extract_string_array(data.get("retained_resources", []))
-		resp.timed_out_resources = _extract_string_array(data.get("timed_out_resources", []))
-		resp.timed_out_stages = _extract_string_array(data.get("timed_out_stages", []))
-		resp.unexecuted_resources = _extract_string_array(data.get("unexecuted_resources", []))
-		resp.degraded_resources = _extract_string_array(data.get("degraded_resources", []))
+		var response := Response.new()
+		response.success = bool(data.get("success", false))
+		response.error_code = String(data.get("error_code", "OK"))
+		response.failed_stage = String(data.get("failed_stage", ""))
+		response.current_phase = int(data.get("current_phase", GameLifecycleModel.LifecyclePhase.STOPPED))
+		response.is_save_completed = bool(data.get("is_save_completed", false))
+		response.save_sha256 = String(data.get("save_sha256", ""))
+		response.remaining_resources = _extract_string_array(data.get("remaining_resources", []))
+		response.retained_resources = _extract_string_array(data.get("retained_resources", []))
+		response.timed_out_resources = _extract_string_array(data.get("timed_out_resources", []))
+		response.timed_out_stages = _extract_string_array(data.get("timed_out_stages", []))
+		response.unexecuted_resources = _extract_string_array(data.get("unexecuted_resources", []))
+		response.degraded_resources = _extract_string_array(data.get("degraded_resources", []))
 		var raw_stage_results: Variant = data.get("stage_results", [])
 		if raw_stage_results is Array:
 			var copied_results: Array = (raw_stage_results as Array).duplicate(true)
 			for stage_result in copied_results:
 				if stage_result is Dictionary:
-					resp.stage_results.append(stage_result as Dictionary)
-		resp.elapsed_milliseconds = int(data.get("elapsed_milliseconds", 0))
-		return resp
+					response.stage_results.append(stage_result as Dictionary)
+		response.elapsed_milliseconds = int(data.get("elapsed_milliseconds", 0))
+		return response
 
 	static func _extract_string_array(raw_values: Variant) -> Array[String]:
 		var result: Array[String] = []

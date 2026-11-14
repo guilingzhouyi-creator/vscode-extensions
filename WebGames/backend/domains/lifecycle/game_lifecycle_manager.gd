@@ -11,7 +11,7 @@
 class_name GameLifecycleManager
 extends RefCounted
 
-const GameLifecycleModel = preload("res://backend/domains/lifecycle/lifecycle_model.gd")
+const GameLifecycleModel = preload("res://backend/domains/lifecycle/game_lifecycle_model.gd")
 const GameShutdownDTO = preload("res://backend/domains/lifecycle/dto/game_shutdown_dto.gd")
 
 signal lifecycle_state_changed(previous_phase: int, new_phase: int)
@@ -20,7 +20,7 @@ static var _instance: RefCounted = null
 
 var _current_phase: int = GameLifecycleModel.LifecyclePhase.UNINITIALIZED
 var _shutdown_in_progress: bool = false
-var _active_shutdown_req: GameShutdownDTO.Request = null
+var _active_shutdown_request: GameShutdownDTO.Request = null
 
 ## 生命周期管理器权威单例（懒加载）
 static func get_instance() -> RefCounted:
@@ -33,7 +33,7 @@ static func reset_for_test() -> void:
 	if _instance != null:
 		_instance._current_phase = GameLifecycleModel.LifecyclePhase.UNINITIALIZED
 		_instance._shutdown_in_progress = false
-		_instance._active_shutdown_req = null
+		_instance._active_shutdown_request = null
 	_instance = null
 
 ## 当前生命周期阶段
@@ -55,20 +55,20 @@ func is_stopped() -> bool:
 ## 推进状态跃迁（写权限内部收敛，Inv-EX-1 / Inv-EX-2）
 func transition_to(target_phase: int) -> bool:
 	if not _is_valid_transition(_current_phase, target_phase):
-		var prev_name := GameLifecycleModel.get_phase_name(_current_phase)
+		var previous_name := GameLifecycleModel.get_phase_name(_current_phase)
 		var target_name := GameLifecycleModel.get_phase_name(target_phase)
-		EventBusCore.get_instance().emit_log("warn", TemplateFormatter.format("Illegal lifecycle phase transition intercepted: {previous} -> {target}.", {"previous": prev_name, "target": target_name}))
+		EventBusCore.get_instance().emit_log("warn", TemplateFormatter.format("Illegal lifecycle phase transition intercepted: {previous} -> {target}.", {"previous": previous_name, "target": target_name}))
 		return false
 
-	var prev := _current_phase
+	var previous_phase := _current_phase
 	_current_phase = target_phase
-	lifecycle_state_changed.emit(prev, target_phase)
+	lifecycle_state_changed.emit(previous_phase, target_phase)
 
 	# 接入统一 EventBus 广播
 	EventBusCore.get_instance().emit_domain_event("lifecycle.phase_changed", {
-		"previous_phase": prev,
+		"previous_phase": previous_phase,
 		"new_phase": target_phase,
-		"previous_name": GameLifecycleModel.get_phase_name(prev),
+		"previous_name": GameLifecycleModel.get_phase_name(previous_phase),
 		"new_name": GameLifecycleModel.get_phase_name(target_phase),
 		"timestamp_utc": int(Time.get_unix_time_from_system())
 	})

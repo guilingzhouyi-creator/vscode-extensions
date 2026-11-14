@@ -23,8 +23,8 @@ static func validate_slots(payload: Dictionary, required_slots: Array[String]) -
 	if sentinel.is_empty():
 		return {"valid": false, "error_code": "INVALID_UNBOUND_SENTINEL_CONFIG", "unwired_slot": "UNBOUND_SENTINEL"}
 	for slot in required_slots:
-		var val: Variant = payload.get(slot, null)
-		if val == null or (val is String and (val.is_empty() or val == sentinel)):
+		var slot_value: Variant = payload.get(slot, null)
+		if slot_value == null or (slot_value is String and (slot_value.is_empty() or slot_value == sentinel)):
 			return {
 				"valid": false,
 				"error_code": "UNBOUND_" + slot.to_upper(),
@@ -39,9 +39,9 @@ static func detect_unwired_slots(payload: Dictionary, candidate_slots: Array[Str
 	if sentinel.is_empty():
 		return candidate_slots.duplicate()
 	for slot in candidate_slots:
-		var val: Variant = payload.get(slot, null)
-		if val == null:
+		var slot_value: Variant = payload.get(slot, null)
+		if slot_value == null:
 			unwired.append(slot)
-		elif val is String and (String(val).is_empty() or String(val) == sentinel):
+		elif slot_value is String and (String(slot_value).is_empty() or String(slot_value) == sentinel):
 			unwired.append(slot)
 	return unwired

@@ -18,20 +18,20 @@ var is_critical: bool = false
 var cleanup_action: Callable = Callable()
 
 ## 资源描述符构造（注册时由 lifecycle 配置覆盖策略字段）
-func _init(id: String = "", prio: int = 100, critical: bool = true, action: Callable = Callable()) -> void:
-	resource_id = id
-	priority = prio
-	is_critical = critical
-	cleanup_action = action
+func _init(initial_resource_id: String = "", initial_priority: int = 100, initial_is_critical: bool = true, initial_cleanup_action: Callable = Callable()) -> void:
+	resource_id = initial_resource_id
+	priority = initial_priority
+	is_critical = initial_is_critical
+	cleanup_action = initial_cleanup_action
 
 ## 执行释放回调：无效回调或非 Dictionary 结果均按失败处理
 func execute_cleanup() -> Dictionary:
 	if not cleanup_action.is_valid():
 		return {"success": false, "error_code": "INVALID_CLEANUP_CALLABLE", "resource_id": resource_id}
 
-	var res: Variant = cleanup_action.call()
-	if not res is Dictionary:
+	var raw_result: Variant = cleanup_action.call()
+	if not raw_result is Dictionary:
 		return {"success": false, "error_code": "INVALID_CLEANUP_RESULT", "resource_id": resource_id}
-	var result: Dictionary = (res as Dictionary).duplicate()
+	var result: Dictionary = (raw_result as Dictionary).duplicate()
 	result["resource_id"] = resource_id
 	return result

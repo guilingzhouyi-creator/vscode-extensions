@@ -29,104 +29,104 @@ static func clear_hooks() -> void:
 
 ## 向指定生命周期阶段注册前置或后置回调钩子
 static func register_hook(stage_identifier: String, callable: Callable, hook_type: String = "post") -> void:
-	var norm_id := _normalize_stage_key(stage_identifier)
-	if norm_id.is_empty():
+	var normalized_stage_id := _normalize_stage_key(stage_identifier)
+	if normalized_stage_id.is_empty():
 		return
 	if hook_type == "pre":
-		_register_to_table(_pre_hooks, norm_id, callable)
+		_register_to_table(_pre_hooks, normalized_stage_id, callable)
 	else:
-		_register_to_table(_post_hooks, norm_id, callable)
+		_register_to_table(_post_hooks, normalized_stage_id, callable)
 
-static func _register_to_table(table: Dictionary, norm_id: String, callable: Callable) -> void:
-	if not table.has(norm_id):
-		table[norm_id] = []
-	var list: Array = table[norm_id]
+static func _register_to_table(table: Dictionary, normalized_stage_id: String, callable: Callable) -> void:
+	if not table.has(normalized_stage_id):
+		table[normalized_stage_id] = []
+	var list: Array = table[normalized_stage_id]
 	list.append(callable)
 
 ## 获取指定阶段注册的所有可执行回调钩子
 static func get_hooks(stage_identifier: String, hook_type: String = "post") -> Array:
-	var norm_id := _normalize_stage_key(stage_identifier)
-	if norm_id.is_empty():
+	var normalized_stage_id := _normalize_stage_key(stage_identifier)
+	if normalized_stage_id.is_empty():
 		return []
 	var table: Dictionary = _pre_hooks if hook_type == "pre" else _post_hooks
-	if not table.has(norm_id):
+	if not table.has(normalized_stage_id):
 		return []
-	return table[norm_id]
+	return table[normalized_stage_id]
 
 ## 执行指定阶段注册的全部钩子函数
-static func execute_stage(stage_identifier: String, ctx: SessionFlowContextDTO, payload: Dictionary = {}) -> Dictionary:
+static func execute_stage(stage_identifier: String, flow_context: SessionFlowContextDTO, payload: Dictionary = {}) -> Dictionary:
 	if not _ensure_config_index():
 		return {"success": false, "error_code": "INVALID_STAGE_CONFIG", "details": _config_error}
-	var norm_id := _normalize_stage_key(stage_identifier)
-	if norm_id.is_empty():
+	var normalized_stage_id := _normalize_stage_key(stage_identifier)
+	if normalized_stage_id.is_empty():
 		return {"success": false, "error_code": "UNKNOWN_STAGE", "stage_key": stage_identifier}
-	var cfg: Dictionary = _stage_configs.get(norm_id, {})
+	var stage_config: Dictionary = _stage_configs.get(normalized_stage_id, {})
 
-	var req_slots := _extract_required_slots(cfg)
-	var guard_res := UnwiredSlotGuardSolver.validate_slots(payload, req_slots)
-	if not bool(guard_res.get("valid", false)):
-		var slot_err: String = str(guard_res.get("unwired_slot", ""))
-		ctx.mark_slot_unwired(slot_err)
+	var required_slots := _extract_required_slots(stage_config)
+	var guard_result := UnwiredSlotGuardSolver.validate_slots(payload, required_slots)
+	if not bool(guard_result.get("valid", false)):
+		var unwired_slot_name: String = str(guard_result.get("unwired_slot", ""))
+		flow_context.mark_slot_unwired(unwired_slot_name)
 		return {
 			"success": false,
-			"error_code": str(guard_res.get("error_code", "UNBOUND_SLOT")),
-			"stage_key": norm_id,
-			"unwired_slot": slot_err
+			"error_code": str(guard_result.get("error_code", "UNBOUND_SLOT")),
+			"stage_key": normalized_stage_id,
+			"unwired_slot": unwired_slot_name
 		}
 
-	_invoke_hook_list(_pre_hooks.get(norm_id, []), ctx, payload)
+	_invoke_hook_list(_pre_hooks.get(normalized_stage_id, []), flow_context, payload)
 
-	var stage_idx: int = int(cfg.get("stage_index", 0))
-	ctx.current_stage_index = stage_idx
-	_apply_payload_to_context(ctx, payload)
-	ctx.stage_results[norm_id] = {"success": true, "stage_index": stage_idx, "payload": payload}
+	var stage_index: int = int(stage_config.get("stage_index", 0))
+	flow_context.current_stage_index = stage_index
+	_apply_payload_to_context(flow_context, payload)
+	flow_context.stage_results[normalized_stage_id] = {"success": true, "stage_index": stage_index, "payload": payload}
 
-	_invoke_hook_list(_post_hooks.get(norm_id, []), ctx, payload)
+	_invoke_hook_list(_post_hooks.get(normalized_stage_id, []), flow_context, payload)
 
 	return {
 		"success": true,
 		"error_code": "",
-		"stage_key": norm_id,
-		"stage_index": stage_idx,
-		"context": ctx.to_dto()
+		"stage_key": normalized_stage_id,
+		"stage_index": stage_index,
+		"context": flow_context.to_dto()
 	}
 
-static func _invoke_hook_list(hooks: Array, ctx: SessionFlowContextDTO, payload: Dictionary) -> void:
-	for h in hooks:
-		if h is Callable:
-			(h as Callable).call(ctx, payload)
+static func _invoke_hook_list(hooks: Array, flow_context: SessionFlowContextDTO, payload: Dictionary) -> void:
+	for hook in hooks:
+		if hook is Callable:
+			(hook as Callable).call(flow_context, payload)
 
-static func _apply_payload_to_context(ctx: SessionFlowContextDTO, payload: Dictionary) -> void:
+static func _apply_payload_to_context(flow_context: SessionFlowContextDTO, payload: Dictionary) -> void:
 	if payload.has("session_token"):
-		ctx.session_token = str(payload.get("session_token", ""))
+		flow_context.session_token = str(payload.get("session_token", ""))
 	if payload.has("account_id"):
-		ctx.account_id = str(payload.get("account_id", ""))
+		flow_context.account_id = str(payload.get("account_id", ""))
 	if payload.has("username"):
-		ctx.username = str(payload.get("username", ""))
+		flow_context.username = str(payload.get("username", ""))
 	if payload.has("slot_id"):
-		ctx.current_slot_id = str(payload.get("slot_id", ""))
+		flow_context.current_slot_id = str(payload.get("slot_id", ""))
 	if payload.has("character_id"):
-		ctx.character_id = str(payload.get("character_id", ""))
+		flow_context.character_id = str(payload.get("character_id", ""))
 	if payload.has("character_name"):
-		ctx.character_name = str(payload.get("character_name", ""))
+		flow_context.character_name = str(payload.get("character_name", ""))
 	if payload.has("gender"):
-		ctx.gender = str(payload.get("gender", ""))
+		flow_context.gender = str(payload.get("gender", ""))
 	if payload.has("race_id"):
-		ctx.race_id = str(payload.get("race_id", ""))
+		flow_context.race_id = str(payload.get("race_id", ""))
 	if payload.has("world_id"):
-		ctx.current_world_id = str(payload.get("world_id", ""))
+		flow_context.current_world_id = str(payload.get("world_id", ""))
 	if payload.has("game_mode"):
-		ctx.game_mode = int(payload.get("game_mode", 0))
+		flow_context.game_mode = int(payload.get("game_mode", 0))
 	if payload.has("is_esc_menu_open"):
-		ctx.is_esc_menu_open = bool(payload.get("is_esc_menu_open", false))
+		flow_context.is_esc_menu_open = bool(payload.get("is_esc_menu_open", false))
 	if payload.has("hud_snapshot"):
-		ctx.hud_snapshot = Dictionary(payload.get("hud_snapshot", {}))
+		flow_context.hud_snapshot = Dictionary(payload.get("hud_snapshot", {}))
 	if payload.has("account_snapshot"):
-		ctx.account_snapshot = Dictionary(payload.get("account_snapshot", {}))
+		flow_context.account_snapshot = Dictionary(payload.get("account_snapshot", {}))
 
-static func _extract_required_slots(cfg: Dictionary) -> Array[String]:
+static func _extract_required_slots(stage_config: Dictionary) -> Array[String]:
 	var result: Array[String] = []
-	var raw_slots: Variant = cfg.get("required_slots", [])
+	var raw_slots: Variant = stage_config.get("required_slots", [])
 	if not raw_slots is Array:
 		return result
 	for slot in raw_slots:
@@ -216,20 +216,20 @@ static func _ensure_config_index() -> bool:
 	if current_version == _config_version and not _stage_configs.is_empty():
 		return true
 
-	var pipeline_cfg: Dictionary = GameConfig.get_dict("infrastructure.lifecycle", "session_stage_pipeline", {})
-	if pipeline_cfg.is_empty():
+	var pipeline_config: Dictionary = GameConfig.get_dict("infrastructure.lifecycle", "session_stage_pipeline", {})
+	if pipeline_config.is_empty():
 		_config_error = "EMPTY_STAGE_PIPELINE"
 		return false
 
 	var next_configs: Dictionary = {}
 	var next_aliases: Dictionary = {}
 	var seen_indices: Dictionary = {}
-	for raw_stage_key in pipeline_cfg:
+	for raw_stage_key in pipeline_config:
 		var stage_key: String = String(raw_stage_key).strip_edges().to_upper()
 		if stage_key.is_empty() or next_configs.has(stage_key):
 			_config_error = "INVALID_OR_DUPLICATE_STAGE_KEY"
 			return false
-		var raw_stage_config: Variant = pipeline_cfg[raw_stage_key]
+		var raw_stage_config: Variant = pipeline_config[raw_stage_key]
 		if not raw_stage_config is Dictionary:
 			_config_error = "STAGE_CONFIG_NOT_OBJECT:" + stage_key
 			return false
