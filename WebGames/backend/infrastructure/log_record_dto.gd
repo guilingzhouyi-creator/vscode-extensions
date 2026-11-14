@@ -53,12 +53,12 @@ func reset_state() -> void:
 
 ## 序列化为字典（timestamp 缺省时落当前系统时间；context 深拷贝隔离调用方改写）
 func to_dto() -> Dictionary:
-	var ts := timestamp_utc
-	if ts <= 0:
-		ts = int(Time.get_unix_time_from_system())
+	var effective_timestamp := timestamp_utc
+	if effective_timestamp <= 0:
+		effective_timestamp = int(Time.get_unix_time_from_system())
 	return {
 		"sequence": sequence,
-		"timestamp_utc": ts,
+		"timestamp_utc": effective_timestamp,
 		"level": level,
 		"channel": channel,
 		"error_code": error_code,
@@ -67,21 +67,21 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从输入字典填充基类结构化日志字段（供 LogRecordDTO 与 StructuredLogRecord 复用）
-static func populate_base_from_dict(dto: LogRecordDTO, data: Dictionary) -> void:
-	if dto == null or data.is_empty():
+static func populate_base_from_dict(target_dto: LogRecordDTO, data: Dictionary) -> void:
+	if target_dto == null or data.is_empty():
 		return
-	dto.sequence = int(data.get("sequence", 0))
-	dto.timestamp_utc = int(data.get("timestamp_utc", 0))
-	dto.level = str(data.get(LogConstants.KEY_LEVEL, LogConstants.LEVEL_INFO))
-	dto.channel = str(data.get("channel", ""))
-	dto.error_code = str(data.get("error_code", ""))
-	dto.message = str(data.get("message", ""))
-	var ctx: Variant = data.get("context", {})
-	if ctx is Dictionary:
-		dto.context = (ctx as Dictionary).duplicate(true)
+	target_dto.sequence = int(data.get("sequence", 0))
+	target_dto.timestamp_utc = int(data.get("timestamp_utc", 0))
+	target_dto.level = str(data.get(LogConstants.KEY_LEVEL, LogConstants.LEVEL_INFO))
+	target_dto.channel = str(data.get("channel", ""))
+	target_dto.error_code = str(data.get("error_code", ""))
+	target_dto.message = str(data.get("message", ""))
+	var raw_context: Variant = data.get("context", {})
+	if raw_context is Dictionary:
+		target_dto.context = (raw_context as Dictionary).duplicate(true)
 
 ## 从字典反序列化还原记录（字段缺省用默认值；context 仅接受 Dictionary 并深拷贝）
 static func from_dto(data: Dictionary) -> LogRecordDTO:
-	var dto := LogRecordDTO.new()
-	populate_base_from_dict(dto, data)
-	return dto
+	var record_dto := LogRecordDTO.new()
+	populate_base_from_dict(record_dto, data)
+	return record_dto

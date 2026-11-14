@@ -35,16 +35,16 @@ static func clear() -> int:
 	_head = 0
 	return count
 
-## 测试专用容量覆盖（cap<=0 恢复配置驱动；cap>0 强制容量并重建）
-static func set_capacity_override_for_test(cap: int) -> void:
-	if cap <= 0:
+## 测试专用容量覆盖（capacity_override<=0 恢复配置驱动；capacity_override>0 强制容量并重建）
+static func set_capacity_override_for_test(capacity_override: int) -> void:
+	if capacity_override <= 0:
 		_capacity_override = -1
 		_cached_version = -2
 		_capacity = LogConstants.DEFAULT_RING_BUFFER_CAPACITY
 		_ensure_capacity_fresh()
 	else:
-		_capacity_override = cap
-		_capacity = cap
+		_capacity_override = capacity_override
+		_capacity = capacity_override
 		_rebuild()
 
 ## 容量新鲜度守卫：配置热重载版本变化时按 log.json 重新读取容量
@@ -56,10 +56,10 @@ static func _ensure_capacity_fresh() -> void:
 		return
 	_cached_version = current_version
 
-	var new_cap := GameConfig.get_int(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_RING_CAPACITY, LogConstants.DEFAULT_RING_BUFFER_CAPACITY)
-	new_cap = maxi(1, new_cap)
-	if new_cap != _capacity:
-		_capacity = new_cap
+	var configured_capacity := GameConfig.get_int(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_RING_CAPACITY, LogConstants.DEFAULT_RING_BUFFER_CAPACITY)
+	configured_capacity = maxi(1, configured_capacity)
+	if configured_capacity != _capacity:
+		_capacity = configured_capacity
 		_rebuild()
 
 ## 重建缓冲：超容时按 sequence 重排仅保留最近 _capacity 条（容量收缩有界收敛）
@@ -90,36 +90,36 @@ static func append(record: StructuredLogRecord) -> void:
 
 ## 查询当前环形缓冲中的记录（只读）
 static func query(from_utc: int = 0, levels: Array = [], channels: Array = []) -> Array:
-	var out: Array = []
-	var sz: int = _buffer.size()
-	if sz == 0:
-		return out
-	var start: int = _head if sz >= _capacity else 0
-	var last_seq: int = -1
+	var matched_records: Array = []
+	var buffer_size: int = _buffer.size()
+	if buffer_size == 0:
+		return matched_records
+	var start: int = _head if buffer_size >= _capacity else 0
+	var last_sequence: int = -1
 	var needs_sort: bool = false
-	for offset in range(sz):
-		var rec: StructuredLogRecord = _buffer[(start + offset) % sz] as StructuredLogRecord
-		if rec == null:
+	for offset in range(buffer_size):
+		var record: StructuredLogRecord = _buffer[(start + offset) % buffer_size] as StructuredLogRecord
+		if record == null:
 			continue
-		if from_utc > 0 and rec.timestamp_utc < from_utc:
+		if from_utc > 0 and record.timestamp_utc < from_utc:
 			continue
-		if not levels.is_empty() and not _matches_level(rec.level, levels):
+		if not levels.is_empty() and not _matches_level(record.level, levels):
 			continue
-		if not channels.is_empty() and not (rec.channel in channels):
+		if not channels.is_empty() and not (record.channel in channels):
 			continue
-		if rec.sequence < last_seq:
+		if record.sequence < last_sequence:
 			needs_sort = true
-		last_seq = rec.sequence
-		out.append(rec)
+		last_sequence = record.sequence
+		matched_records.append(record)
 	if needs_sort:
-		out.sort_custom(func(a: Variant, b: Variant) -> bool:
-			return int((a as StructuredLogRecord).sequence) < int((b as StructuredLogRecord).sequence)
+		matched_records.sort_custom(func(left_record: Variant, right_record: Variant) -> bool:
+			return int((left_record as StructuredLogRecord).sequence) < int((right_record as StructuredLogRecord).sequence)
 		)
-	return out
+	return matched_records
 
-static func _matches_level(rec_level: String, levels: Array) -> bool:
-	for lvl in levels:
-		if rec_level.nocasecmp_to(str(lvl)) == 0:
+static func _matches_level(record_level: String, levels: Array) -> bool:
+	for level_item in levels:
+		if record_level.nocasecmp_to(str(level_item)) == 0:
 			return true
 	return false
 

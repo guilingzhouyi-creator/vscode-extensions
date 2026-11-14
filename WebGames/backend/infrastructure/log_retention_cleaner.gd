@@ -23,23 +23,23 @@ static func reset_state() -> void:
 	_last_sweep = 0
 
 static func _resolve_cutoff_seconds(now: int, force: bool) -> int:
-	var retention_cfg: Dictionary = GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_RETENTION, {})
-	if not bool(retention_cfg.get("enabled", true)):
+	var retention_config: Dictionary = GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_RETENTION, {})
+	if not bool(retention_config.get("enabled", true)):
 		return -1
-	var max_days: int = int(retention_cfg.get("max_days", LogConstants.DEFAULT_RETENTION_DAYS))
+	var max_days: int = int(retention_config.get("max_days", LogConstants.DEFAULT_RETENTION_DAYS))
 	if max_days <= 0:
 		return -1
-	var interval: int = int(retention_cfg.get("cleanup_interval_seconds", LogConstants.DEFAULT_CLEANUP_INTERVAL_SEC))
+	var interval: int = int(retention_config.get("cleanup_interval_seconds", LogConstants.DEFAULT_CLEANUP_INTERVAL_SEC))
 	if not force and (_last_sweep > 0 and now - _last_sweep < interval):
 		return -1
 	_last_sweep = now
 	return max_days * LogConstants.SECONDS_PER_DAY
 
-static func _is_expired_archive_file(f: String, main_file: String, prefix: String, now: int, cutoff_seconds: int) -> bool:
-	if f == main_file or not LogConstants.is_rotated_archive_filename(f, prefix):
+static func _is_expired_archive_file(file_name: String, main_file: String, prefix: String, now: int, cutoff_seconds: int) -> bool:
+	if file_name == main_file or not LogConstants.is_rotated_archive_filename(file_name, prefix):
 		return false
-	var ts: int = _extract_timestamp(f, prefix)
-	return ts > 0 and (now - ts) > cutoff_seconds
+	var file_timestamp: int = _extract_timestamp(file_name, prefix)
+	return file_timestamp > 0 and (now - file_timestamp) > cutoff_seconds
 
 ## 执行归档日志清理：删除超过 max_days 的过期轮转归档文件（保留主文件）
 static func sweep(now_utc: int = -1, force: bool = false) -> int:
@@ -51,14 +51,14 @@ static func sweep(now_utc: int = -1, force: bool = false) -> int:
 	var dir_path: String = GameConfig.get_string(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_EXPORT_DIR, LogConstants.DEFAULT_LOG_DIR)
 	var prefix: String = GameConfig.get_string(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_EXPORT_PREFIX, LogConstants.DEFAULT_LOG_PREFIX)
 	var main_file: String = prefix + LogConstants.LOG_FILE_EXTENSION
-	var da: DirAccess = DirAccess.open(dir_path)
-	if da == null:
+	var dir_access: DirAccess = DirAccess.open(dir_path)
+	if dir_access == null:
 		return 0
 
 	var removed: int = 0
-	for f in da.get_files():
-		if _is_expired_archive_file(f, main_file, prefix, now, cutoff_seconds):
-			var file_full: String = "%s/%s" % [dir_path, f]
+	for file_name in dir_access.get_files():
+		if _is_expired_archive_file(file_name, main_file, prefix, now, cutoff_seconds):
+			var file_full: String = "%s/%s" % [dir_path, file_name]
 			if DirAccess.remove_absolute(file_full) == OK:
 				removed += 1
 	return removed

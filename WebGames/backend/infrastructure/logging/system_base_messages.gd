@@ -66,12 +66,12 @@ static func format(template_str: String, params: Dictionary = {}) -> String:
 
 ## 优先从 config/infrastructure/log.json events 读取配置文案模板，缺省回退合规标准英文底座文本
 static func resolve_event_or_base(event_code: String, base_template: String, params: Dictionary = {}) -> String:
-	var cfg_tmpl: String = GameConfig.get_string(
+	var config_template: String = GameConfig.get_string(
 		LogConstants.CFG_LOG_TABLE,
 		"%s/%s" % [LogConstants.CFG_PATH_EVENTS, event_code],
 		""
 	)
-	var chosen := cfg_tmpl if not cfg_tmpl.is_empty() else base_template
+	var chosen := config_template if not config_template.is_empty() else base_template
 	return format(chosen, params)
 
 ## 统一格式化标准控制台输出行（消除多处格式串散落拼接）
@@ -82,8 +82,8 @@ static func format_console_line(
 	error_code: String = "",
 	diagnostic_detail: String = ""
 ) -> String:
-	var ch := channel if not channel.is_empty() else LogConstants.CHANNEL_SYSTEM
-	var formatted := "[%s][%s] %s" % [level.to_upper(), ch, message]
+	var resolved_channel := channel if not channel.is_empty() else LogConstants.CHANNEL_SYSTEM
+	var formatted := "[%s][%s] %s" % [level.to_upper(), resolved_channel, message]
 	if not diagnostic_detail.is_empty():
 		formatted += " | detail: %s" % diagnostic_detail
 	if not error_code.is_empty():

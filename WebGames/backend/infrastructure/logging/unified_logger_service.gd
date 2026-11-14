@@ -37,7 +37,7 @@ class LogRecord extends RefCounted:
 	var correlation_id: String = ""
 	var context: Dictionary = {}
 	var message: String = ""
-	
+
 	## 序列化为字典（遥测/导出用）
 	func to_dict() -> Dictionary:
 		return {
@@ -100,17 +100,17 @@ func get_catalog() -> Dictionary:
 ## 加载配置表模板库
 func load_catalog_from_dict(catalog_config: Dictionary) -> void:
 	if catalog_config.has("events") and catalog_config["events"] is Dictionary:
-		var evs: Dictionary = catalog_config["events"]
-		for code in evs:
-			_message_catalog[str(code)] = str(evs[code])
+		var events_dict: Dictionary = catalog_config["events"]
+		for code in events_dict:
+			_message_catalog[str(code)] = str(events_dict[code])
 
 ## 从 GameConfig.log 统一加载英文事件码模板（配置驱动，Inv-RM-11）
 func load_from_game_config() -> void:
-	var tbl: Dictionary = GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_EVENTS, {})
-	if tbl.is_empty():
-		tbl = GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_UNIFIED_EVENTS, {})
-	for code in tbl:
-		_message_catalog[str(code)] = str(tbl[code])
+	var events_table: Dictionary = GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_EVENTS, {})
+	if events_table.is_empty():
+		events_table = GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_UNIFIED_EVENTS, {})
+	for code in events_table:
+		_message_catalog[str(code)] = str(events_table[code])
 
 ## 记录日志统一核心 API
 func log_event(
@@ -122,21 +122,21 @@ func log_event(
 ) -> LogRecord:
 	if severity_level < _min_severity:
 		return null
-	
+
 	var template: String = str(_message_catalog.get(event_code, SystemBaseMessages.MSG_FALLBACK_EVENT))
-	var formatted_msg: String = _format_message(template, event_params, event_code, domain_name)
-	
-	var rec := LogRecord.new()
-	rec.event_code = event_code
-	rec.domain = domain_name
-	rec.severity = severity_level
-	rec.timestamp = Time.get_unix_time_from_system()
-	rec.correlation_id = correlation_id
-	rec.context = event_params.duplicate(true)
-	rec.message = formatted_msg
-	
-	_dispatch_record(rec)
-	return rec
+	var formatted_message: String = _format_message(template, event_params, event_code, domain_name)
+
+	var record := LogRecord.new()
+	record.event_code = event_code
+	record.domain = domain_name
+	record.severity = severity_level
+	record.timestamp = Time.get_unix_time_from_system()
+	record.correlation_id = correlation_id
+	record.context = event_params.duplicate(true)
+	record.message = formatted_message
+
+	_dispatch_record(record)
+	return record
 
 # ==============================================================================
 # 三、网络隔离与模板格式化
@@ -158,34 +158,34 @@ func _format_message(template_str: String, event_params: Dictionary, event_code:
 
 ## 多路分发输出 Sink（先统一构造期脱敏，再收敛至 RingBuffer / EventBusCore 管线，Inv-LS-2 & Inv-LG-3）
 func _dispatch_record(log_record: LogRecord) -> void:
-	var srec := _to_structured_record(log_record)
+	var structured_record := _to_structured_record(log_record)
 	# 同步写回已脱敏消息与上下文，防止调用方持有的 LogRecord 留存明文凭据
-	log_record.message = srec.message
-	log_record.context = srec.context.duplicate(true)
+	log_record.message = structured_record.message
+	log_record.context = structured_record.context.duplicate(true)
 
 	# 1. 内存有界环形缓冲（注入式或回退至 EventBusCore 全局中枢）
 	if _ring_buffer != null and _ring_buffer.has_method("push_record"):
-		_ring_buffer.call("push_record", srec.to_dto())
+		_ring_buffer.call("push_record", structured_record.to_dto())
 	else:
 		# 收敛：委托至 EventBusCore 统一广播中枢（签发单调 sequence 并扇出至 LogRingBuffer、LogFileExporter 与 TelemetryAggregate）
 		if _mute_console:
-			srec.context[LogConstants.KEY_MUTE_CONSOLE] = true
-		var eb := EventBusCore.get_instance()
-		if eb != null:
-			eb.emit_log_record(srec)
+			structured_record.context[LogConstants.KEY_MUTE_CONSOLE] = true
+		var event_bus := EventBusCore.get_instance()
+		if event_bus != null:
+			event_bus.emit_log_record(structured_record)
 		else:
-			# 极端无总线环境优雅回退
-			LogFileExporter.consume(srec)
-			LogRingBuffer.append(srec)
-			TelemetryAggregate.consume(srec)
-		log_record.sequence = srec.sequence
+			# 极端无总线环境安全回退
+			LogFileExporter.consume(structured_record)
+			LogRingBuffer.append(structured_record)
+			TelemetryAggregate.consume(structured_record)
+		log_record.sequence = structured_record.sequence
 
 		if _metric_sink != null and _metric_sink.has_method("record_metric"):
 			_metric_sink.call("record_metric", LogConstants.METRIC_LOG_EVENT_COUNT, LogConstants.CATEGORY_LOG_VOLUME, 1.0, {
 				LogConstants.KEY_DOMAIN: log_record.domain,
 				LogConstants.KEY_SEVERITY: _get_severity_name(log_record.severity)
 			})
-	
+
 	# 2. 控制台输出格式化（总线为空且未静音时本地穿透，避免漏打）
 	if not _mute_console and EventBusCore.get_instance() == null:
 		var formatted_line := SystemBaseMessages.format_unified_console_line(
@@ -200,16 +200,16 @@ func _dispatch_record(log_record: LogRecord) -> void:
 			print_rich(formatted_line)
 
 func _to_structured_record(log_record: LogRecord) -> StructuredLogRecord:
-	var srec := StructuredLogRecord.new()
-	srec.level = _map_severity_to_level(log_record.severity)
-	srec.channel = log_record.domain
-	srec.message = log_record.message
-	srec.error_code = log_record.event_code
-	srec.trace_id = log_record.correlation_id
-	srec.timestamp_utc = int(log_record.timestamp)
-	srec.event_category = log_record.domain
-	RedactionRule.apply_to_record(srec, log_record.context)
-	return srec
+	var structured_record := StructuredLogRecord.new()
+	structured_record.level = _map_severity_to_level(log_record.severity)
+	structured_record.channel = log_record.domain
+	structured_record.message = log_record.message
+	structured_record.error_code = log_record.event_code
+	structured_record.trace_id = log_record.correlation_id
+	structured_record.timestamp_utc = int(log_record.timestamp)
+	structured_record.event_category = log_record.domain
+	RedactionRule.apply_to_record(structured_record, log_record.context)
+	return structured_record
 
 func _map_severity_to_level(severity_level: Severity) -> String:
 	match severity_level:
