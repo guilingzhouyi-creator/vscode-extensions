@@ -13,23 +13,23 @@ extends RefCounted
 
 ## 结构化缓存：移动核心参数
 class MovementParams extends RefCounted:
-	var agi_ref: float = 10.0
-	var agi_factor_per: float = 0.005
-	var agi_min: float = 0.5
+	var agility_reference: float = 10.0
+	var agility_factor_per_point: float = 0.005
+	var agility_factor_min: float = 0.5
 	var load_threshold: float = 30.0
 	var load_divisor: float = 100.0
-	var load_min: float = 0.2
+	var load_penalty_min: float = 0.2
 	var impedance_floor: float = 0.1
-	var facing_thresh_sq: float = 0.0001
+	var facing_threshold_squared: float = 0.0001
 
 static var _alias_table: Dictionary = {}
-static var _params_cache: MovementParams = null
+static var _cached_movement_parameters: MovementParams = null
 ## 缓存构建时的配置热重载版本（不一致即重建，修复热重载失效）
 static var _cached_config_version: int = -1
 
 ## 缓存新鲜度守卫：未构建或配置热重载版本推进时触发重建
 static func _ensure_cache_fresh() -> void:
-	if _params_cache == null or _cached_config_version != GameConfig.config_reload_version():
+	if _cached_movement_parameters == null or _cached_config_version != GameConfig.config_reload_version():
 		init_or_rebuild_cache()
 
 ## 预编译倒排索引表与结构化参数（启动首用或配置热重载版本推进时触发）
@@ -59,16 +59,16 @@ static func init_or_rebuild_cache() -> void:
 
 	_alias_table = table
 
-	var params := MovementParams.new()
-	params.agi_ref = GameConfig.get_float("domains.spatial_movement", "movement/agi_reference_stat", 10.0)
-	params.agi_factor_per = GameConfig.get_float("domains.spatial_movement", "movement/agi_factor_per_point", 0.005)
-	params.agi_min = GameConfig.get_float("domains.spatial_movement", "movement/agi_factor_min", 0.5)
-	params.load_threshold = GameConfig.get_float("domains.spatial_movement", "movement/load_threshold_kg", 30.0)
-	params.load_divisor = GameConfig.get_float("domains.spatial_movement", "movement/load_excess_divisor", 100.0)
-	params.load_min = GameConfig.get_float("domains.spatial_movement", "movement/load_penalty_min", 0.2)
-	params.impedance_floor = GameConfig.get_float("domains.spatial_movement", "movement/impedance_floor", 0.1)
-	params.facing_thresh_sq = GameConfig.get_float("domains.spatial_movement", "movement/facing_threshold_sq", 0.0001)
-	_params_cache = params
+	var movement_parameters := MovementParams.new()
+	movement_parameters.agility_reference = GameConfig.get_float("domains.spatial_movement", "movement/agi_reference_stat", 10.0)
+	movement_parameters.agility_factor_per_point = GameConfig.get_float("domains.spatial_movement", "movement/agi_factor_per_point", 0.005)
+	movement_parameters.agility_factor_min = GameConfig.get_float("domains.spatial_movement", "movement/agi_factor_min", 0.5)
+	movement_parameters.load_threshold = GameConfig.get_float("domains.spatial_movement", "movement/load_threshold_kg", 30.0)
+	movement_parameters.load_divisor = GameConfig.get_float("domains.spatial_movement", "movement/load_excess_divisor", 100.0)
+	movement_parameters.load_penalty_min = GameConfig.get_float("domains.spatial_movement", "movement/load_penalty_min", 0.2)
+	movement_parameters.impedance_floor = GameConfig.get_float("domains.spatial_movement", "movement/impedance_floor", 0.1)
+	movement_parameters.facing_threshold_squared = GameConfig.get_float("domains.spatial_movement", "movement/facing_threshold_sq", 0.0001)
+	_cached_movement_parameters = movement_parameters
 	_cached_config_version = GameConfig.config_reload_version()
 
 static func _register_aliases_for_vector(table: Dictionary, raw_aliases: Array, direction_vector: Vector2) -> void:
@@ -105,16 +105,16 @@ static func calculate_effective_speed(
 	terrain_impedance_multiplier: float = 1.0
 ) -> float:
 	_ensure_cache_fresh()
-	var cached_params := _params_cache
-	var agility_factor := 1.0 + (agility_stat - cached_params.agi_ref) * cached_params.agi_factor_per
-	agility_factor = maxf(cached_params.agi_min, agility_factor)
+	var cached_parameters := _cached_movement_parameters
+	var agility_factor := 1.0 + (agility_stat - cached_parameters.agility_reference) * cached_parameters.agility_factor_per_point
+	agility_factor = maxf(cached_parameters.agility_factor_min, agility_factor)
 
 	var load_penalty := 1.0
-	if total_load_kg > cached_params.load_threshold:
-		var excess := total_load_kg - cached_params.load_threshold
-		load_penalty = maxf(cached_params.load_min, 1.0 - (excess / cached_params.load_divisor))
+	if total_load_kg > cached_parameters.load_threshold:
+		var excess := total_load_kg - cached_parameters.load_threshold
+		load_penalty = maxf(cached_parameters.load_penalty_min, 1.0 - (excess / cached_parameters.load_divisor))
 
-	var safe_impedance := maxf(cached_params.impedance_floor, terrain_impedance_multiplier)
+	var safe_impedance := maxf(cached_parameters.impedance_floor, terrain_impedance_multiplier)
 	return (base_speed * agility_factor * load_penalty) / safe_impedance
 
 ## 位移应用：累加坐标并越过阈值时更新朝向
@@ -124,6 +124,6 @@ static func apply_displacement(
 ) -> Vector2:
 	location.local_coordinates += delta_vector
 	_ensure_cache_fresh()
-	if delta_vector.length_squared() > _params_cache.facing_thresh_sq:
+	if delta_vector.length_squared() > _cached_movement_parameters.facing_threshold_squared:
 		location.orientation_facing = delta_vector.normalized()
 	return location.local_coordinates

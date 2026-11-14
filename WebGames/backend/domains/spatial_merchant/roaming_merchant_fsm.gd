@@ -15,13 +15,13 @@ extends RefCounted
 static func spawn_roaming_peddler(
 	shop_id: String,
 	town_id: String,
-	spawn_pos: Vector2,
+	spawn_position: Vector2,
 	current_time_utc: int,
 	stay_duration_seconds: int = 7200
 ) -> MerchantShopAggregate:
 	var peddler := MerchantShopAggregate.new(shop_id, _msg("roaming_merchant_name"), MerchantShopAggregate.ShopType.ROAMING_LEYLINE_PEDDLER)
 	peddler.location_town_id = town_id
-	peddler.local_position = spawn_pos
+	peddler.local_position = spawn_position
 	peddler.is_temporary = true
 	peddler.despawn_timestamp_utc = current_time_utc + stay_duration_seconds
 	return peddler

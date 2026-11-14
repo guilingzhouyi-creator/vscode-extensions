@@ -37,8 +37,8 @@ static func consume_event_channel(
 	var adjustments: Dictionary = channels[channel]
 	var applied: Array = []
 	var total_delta := 0.0
-	for stat in adjustments:
-		var adjustment_result: Variant = apply_dynamic_adjustment(sheet, str(stat), float(adjustments[stat]))
+	for stat_key in adjustments:
+		var adjustment_result: Variant = apply_dynamic_adjustment(sheet, str(stat_key), float(adjustments[stat_key]))
 		if adjustment_result.success:
 			applied.append(adjustment_result)
 			total_delta += float(adjustment_result.actual_delta)
@@ -64,13 +64,13 @@ static func apply_dynamic_adjustment(
 	var current_actual := sheet.get_actual_value(stat_name)
 	var target := maxf(floor_value, current_actual + delta)
 	var actual_delta := target - current_actual
-	var floor_hit := current_actual + delta < floor_value
+	var is_floor_hit := current_actual + delta < floor_value
 
 	if is_equal_approx(actual_delta, 0.0):
 		return {
 			"success": true, "stat_name": stat_name,
 			"requested_delta": delta, "actual_delta": 0.0,
-			"new_value": current_actual, "floor_hit": floor_hit
+			"new_value": current_actual, "floor_hit": is_floor_hit
 		}
 
 	sheet.dynamic_adjustments[stat_name] = float(sheet.dynamic_adjustments.get(stat_name, 0.0)) + actual_delta
@@ -78,5 +78,5 @@ static func apply_dynamic_adjustment(
 	return {
 		"success": true, "stat_name": stat_name,
 		"requested_delta": delta, "actual_delta": actual_delta,
-		"new_value": target, "floor_hit": floor_hit
+		"new_value": target, "floor_hit": is_floor_hit
 	}

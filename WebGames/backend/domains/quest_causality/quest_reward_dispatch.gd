@@ -22,12 +22,12 @@ static func _grant_entry_instances(
 	library: AccountItemLibrary
 ) -> int:
 	for grant_index in range(count):
-		var item: ItemEntity = ItemInstanceFactory.build_instance(item_prototype, item_prototype.english_name, "QST_")
-		if not inventory.add_item(item):
+		var reward_item: ItemEntity = ItemInstanceFactory.build_instance(item_prototype, item_prototype.english_name, "QST_")
+		if not inventory.add_item(reward_item):
 			return -1
 		if library != null:
 			ItemStatisticsSolver.record_item_event(library, ItemStatisticsSolver.EVENT_ITEM_GRANTED, canonical_id, 1, catalog, null, {
-				"uid": item.item_uid,
+				"uid": reward_item.item_uid,
 				"transaction_id": effective_transaction_id
 			})
 	return count
@@ -76,8 +76,8 @@ static func dispatch_item_rewards(reward_items: Array, catalog: ItemRegistryCata
 		granted += int(step_result.get("granted", 0))
 
 	EventBusCore.get_instance().emit_domain_event("quest.reward_dispatched", {"args": [granted], "summary": {"granted": granted}})
-	var result: Dictionary = {"success": true, "granted": granted, "transaction_id": effective_transaction_id}
-	_completed_transactions[effective_transaction_id] = result.duplicate(true)
+	var dispatch_result: Dictionary = {"success": true, "granted": granted, "transaction_id": effective_transaction_id}
+	_completed_transactions[effective_transaction_id] = dispatch_result.duplicate(true)
 	# 有界保留：超容量按插入序裁剪最旧记录（内存有界，防无限增长）
 	FifoBudget.trim_oldest(_completed_transactions, GameConfig.get_int("infrastructure.admin", "idempotency/max_records", 1000))
-	return result
+	return dispatch_result

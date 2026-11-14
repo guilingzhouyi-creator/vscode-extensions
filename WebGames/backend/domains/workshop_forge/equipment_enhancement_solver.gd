@@ -32,8 +32,8 @@ static func _fallback_rate() -> float:
 ## 强化成本：金币指数公式 + 晶石门槛（7 级起收晶石）
 static func calculate_enhance_cost(current_level: int) -> Dictionary:
 	var gold_base := GameConfig.get_int("domains.workshop", "enhancement/cost_formula/gold_base", 50)
-	var gold_exp := GameConfig.get_float("domains.workshop", "enhancement/cost_formula/gold_exp", 2.0)
-	var gold := int(gold_base * pow(float(current_level + 1), gold_exp))
+	var gold_exponent := GameConfig.get_float("domains.workshop", "enhancement/cost_formula/gold_exp", 2.0)
+	var gold := int(gold_base * pow(float(current_level + 1), gold_exponent))
 	var threshold := GameConfig.get_int("domains.workshop", "enhancement/cost_formula/crystal_threshold_level", 7)
 	var crystal_cost_above := GameConfig.get_int("domains.workshop", "enhancement/cost_formula/crystal_cost_above_threshold", 1)
 	var crystals := crystal_cost_above if current_level >= threshold else 0
@@ -41,19 +41,19 @@ static func calculate_enhance_cost(current_level: int) -> Dictionary:
 
 ## rng 为空时回退共享实例；传入实例即可复现强化成败序列
 static func attempt_enhancement(
-	item: ItemEntity,
+	equipment_item: ItemEntity,
 	wallet: CharacterWalletEntity,
-	use_protection_scroll: bool = false,
+	should_use_protection_scroll: bool = false,
 	rng: DeterministicRNG = null,
 	transaction_id: String = ""
 ) -> Dictionary:
-	if item == null or wallet == null:
+	if equipment_item == null or wallet == null:
 		return {"success": false, "error_code": "MISSING_CONTEXT"}
-	var resolved_transaction_id := transaction_id if not transaction_id.is_empty() else "ENHANCE_%s_%s" % [item.item_uid, str(Time.get_ticks_usec())]
+	var resolved_transaction_id := transaction_id if not transaction_id.is_empty() else "ENHANCE_%s_%s" % [equipment_item.item_uid, str(Time.get_ticks_usec())]
 	if _completed_transactions.has(resolved_transaction_id):
 		return _completed_transactions[resolved_transaction_id]
 	var enhance_rng := DeterministicRNG.resolve(rng)
-	var current_level: int = int(item.combat_metrics.get("enhance_level", 0))
+	var current_level: int = int(equipment_item.combat_metrics.get("enhance_level", 0))
 	var max_level := _max_level()
 	if current_level >= max_level:
 		var max_level_message := GameConfig.get_string("narratives.workshop", "enhance_max_level", "Item reached max enhance level (+%d)" % max_level)
@@ -81,33 +81,33 @@ static func attempt_enhancement(
 	var roll := enhance_rng.randf()
 
 	if roll < rate:
-		item.combat_metrics["enhance_level"] = target_level
+		equipment_item.combat_metrics["enhance_level"] = target_level
 		var edge_multiplier := GameConfig.get_float("domains.workshop", "enhancement/stat_multipliers/edge_sharpness", 1.10)
 		var armor_multiplier := GameConfig.get_float("domains.workshop", "enhancement/stat_multipliers/effective_armor", 1.10)
 		var price_multiplier := GameConfig.get_float("domains.workshop", "enhancement/stat_multipliers/market_price", 1.30)
-		item.combat_metrics["edge_sharpness"] = float(item.combat_metrics.get("edge_sharpness", 1.0)) * edge_multiplier
-		item.combat_metrics["effective_armor"] = float(item.combat_metrics.get("effective_armor", 0.0)) * armor_multiplier
-		item.market_base_price = int(float(item.market_base_price) * price_multiplier)
+		equipment_item.combat_metrics["edge_sharpness"] = float(equipment_item.combat_metrics.get("edge_sharpness", 1.0)) * edge_multiplier
+		equipment_item.combat_metrics["effective_armor"] = float(equipment_item.combat_metrics.get("effective_armor", 0.0)) * armor_multiplier
+		equipment_item.market_base_price = int(float(equipment_item.market_base_price) * price_multiplier)
 
 		EventBusCore.get_instance().emit_narrative_by_key(
-			"workshop/enhance_success", "economy", [item.custom_name, target_level]
+			"workshop/enhance_success", "economy", [equipment_item.custom_name, target_level]
 		)
-		var result := {"success": true, "result": "ENHANCED", "new_level": target_level, "transaction_id": resolved_transaction_id}
-		_completed_transactions[resolved_transaction_id] = result.duplicate(true)
+		var enhancement_result := {"success": true, "result": "ENHANCED", "new_level": target_level, "transaction_id": resolved_transaction_id}
+		_completed_transactions[resolved_transaction_id] = enhancement_result.duplicate(true)
 		_prune_completed()
-		return result
+		return enhancement_result
 	else:
 		var new_level := current_level
 		var degrade_threshold := GameConfig.get_int("domains.workshop", "enhancement/penalty/degrade_threshold", 10)
 		var min_level := GameConfig.get_int("domains.workshop", "enhancement/penalty/min_level", 0)
-		if current_level >= degrade_threshold and not use_protection_scroll:
+		if current_level >= degrade_threshold and not should_use_protection_scroll:
 			new_level = max(min_level, current_level - 1)
-			item.combat_metrics["enhance_level"] = new_level
+			equipment_item.combat_metrics["enhance_level"] = new_level
 
 		EventBusCore.get_instance().emit_narrative_by_key(
-			"workshop/enhance_fail", "economy", [item.custom_name, new_level]
+			"workshop/enhance_fail", "economy", [equipment_item.custom_name, new_level]
 		)
-		var result := {"success": true, "result": "FAILED", "new_level": new_level, "transaction_id": resolved_transaction_id}
-		_completed_transactions[resolved_transaction_id] = result.duplicate(true)
+		var enhancement_result := {"success": true, "result": "FAILED", "new_level": new_level, "transaction_id": resolved_transaction_id}
+		_completed_transactions[resolved_transaction_id] = enhancement_result.duplicate(true)
 		_prune_completed()
-		return result
+		return enhancement_result

@@ -35,10 +35,10 @@ static func advance_caravan_progress(
 			"trading/caravan_ambushed", "caravan", [caravan.caravan_id]
 		)
 
-	var arrived := (caravan.progress_ratio >= max_progress)
-	if arrived:
+	var is_arrived := (caravan.progress_ratio >= max_progress)
+	if is_arrived:
 		EventBusCore.get_instance().emit_narrative_by_key(
 			"trading/caravan_arrived", "caravan", [caravan.caravan_id, caravan.destination_town_id]
 		)
 
-	return {"progress": caravan.progress_ratio, "is_ambushed": is_ambushed, "arrived": arrived}
+	return {"progress": caravan.progress_ratio, "is_ambushed": is_ambushed, "arrived": is_arrived}

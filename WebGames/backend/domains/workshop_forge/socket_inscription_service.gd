@@ -11,28 +11,28 @@
 class_name SocketInscriptionService extends RefCounted
 
 ## 符文铭刻：孔位占满拦截 → 追加符文并广播铭刻叙事
-static func inscribe_rune(item: ItemEntity, rune_id: String) -> Dictionary:
+static func inscribe_rune(equipment_item: ItemEntity, rune_id: String) -> Dictionary:
 	var default_sockets := GameConfig.get_int("domains.workshop", "socket/default_total_sockets", 2)
-	var total_sockets: int = int(item.affix_sockets.get("total_sockets", default_sockets))
-	var runes: Array = item.affix_sockets.get("imprinted_runes", [])
+	var total_sockets: int = int(equipment_item.affix_sockets.get("total_sockets", default_sockets))
+	var runes: Array = equipment_item.affix_sockets.get("imprinted_runes", [])
 
 	if runes.size() >= total_sockets:
 		var reason_message := GameConfig.get_string("narratives.workshop", "no_socket", "No available sockets on item.")
 		return { "success": false, "reason": reason_message }
 
 	runes.append(rune_id)
-	item.affix_sockets["imprinted_runes"] = runes
+	equipment_item.affix_sockets["imprinted_runes"] = runes
 
 	EventBusCore.get_instance().emit_narrative_by_key(
-		"workshop/inscribe_success", "economy", [rune_id, item.custom_name, runes.size(), total_sockets]
+		"workshop/inscribe_success", "economy", [rune_id, equipment_item.custom_name, runes.size(), total_sockets]
 	)
 	return { "success": true, "socket_index": runes.size() - 1, "runes": runes }
 
 ## 打孔开槽：达上限拒绝，否则孔位 +1
-static func add_socket_to_item(item: ItemEntity, max_limit: int = -1) -> bool:
-	var limit := max_limit if max_limit >= 0 else GameConfig.get_int("domains.workshop", "socket/max_limit", 4)
-	var current_sockets: int = int(item.affix_sockets.get("total_sockets", GameConfig.get_int("domains.workshop", "socket/default_total_sockets", 2)))
-	if current_sockets >= limit:
+static func add_socket_to_item(equipment_item: ItemEntity, max_limit: int = -1) -> bool:
+	var socket_limit := max_limit if max_limit >= 0 else GameConfig.get_int("domains.workshop", "socket/max_limit", 4)
+	var current_sockets: int = int(equipment_item.affix_sockets.get("total_sockets", GameConfig.get_int("domains.workshop", "socket/default_total_sockets", 2)))
+	if current_sockets >= socket_limit:
 		return false
-	item.affix_sockets["total_sockets"] = current_sockets + 1
+	equipment_item.affix_sockets["total_sockets"] = current_sockets + 1
 	return true

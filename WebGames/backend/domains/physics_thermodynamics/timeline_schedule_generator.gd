@@ -117,17 +117,17 @@ static func _sample_discrete_timestamps(
 	min_spacing: int,
 	rng: RefCounted = null
 ) -> Array[int]:
-	var result: Array[int] = []
+	var sampled_timestamps: Array[int] = []
 	if count <= 0:
-		return result
+		return sampled_timestamps
 
 	var usable_window := max_duration_ms - (count * min_spacing)
 	if usable_window <= 0:
 		# 间距过大时安全回退为线性均匀分布
 		var step := int(float(max_duration_ms) / float(count + 1))
 		for step_index in range(count):
-			result.append((step_index + 1) * step)
-		return result
+			sampled_timestamps.append((step_index + 1) * step)
+		return sampled_timestamps
 
 	var current_mark := 500 # 避开回合刚开始的瞬时
 	var step_slot := int(float(usable_window) / float(count))
@@ -135,8 +135,8 @@ static func _sample_discrete_timestamps(
 		var jitter: int = int(rng.randi_range(0, step_slot)) if rng else int(step_slot / 2)
 		var candidate_timestamp: int = current_mark + jitter
 		candidate_timestamp = clampi(candidate_timestamp, 100, max_duration_ms - 200)
-		result.append(candidate_timestamp)
+		sampled_timestamps.append(candidate_timestamp)
 		current_mark = candidate_timestamp + min_spacing
 
-	result.sort()
-	return result
+	sampled_timestamps.sort()
+	return sampled_timestamps

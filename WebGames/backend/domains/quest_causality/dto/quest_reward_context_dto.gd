@@ -42,17 +42,17 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从字典数据反序列化还原奖励发放上下文传输对象
-static func from_dto(data: Dictionary) -> QuestRewardContextDto:
+static func from_dto(dto_payload: Dictionary) -> QuestRewardContextDto:
 	var context_dto := QuestRewardContextDto.new()
-	context_dto.quest_id = String(data.get("quest_id", ""))
-	context_dto.recipient_id = String(data.get("recipient_id", ""))
-	context_dto.experience_reward = int(data.get("experience_reward", 0))
-	var raw_currencies: Variant = data.get("currency_rewards", {})
+	context_dto.quest_id = String(dto_payload.get("quest_id", ""))
+	context_dto.recipient_id = String(dto_payload.get("recipient_id", ""))
+	context_dto.experience_reward = int(dto_payload.get("experience_reward", 0))
+	var raw_currencies: Variant = dto_payload.get("currency_rewards", {})
 	if raw_currencies is Dictionary:
 		context_dto.currency_rewards = raw_currencies.duplicate(true)
-	var raw_items: Variant = data.get("item_rewards", [])
+	var raw_items: Variant = dto_payload.get("item_rewards", [])
 	if raw_items is Array:
-		for item in raw_items:
-			context_dto.item_rewards.append(String(item))
-	context_dto.granted_timestamp_utc = int(data.get("granted_timestamp_utc", 0))
+		for reward_item_id in raw_items:
+			context_dto.item_rewards.append(String(reward_item_id))
+	context_dto.granted_timestamp_utc = int(dto_payload.get("granted_timestamp_utc", 0))
 	return context_dto

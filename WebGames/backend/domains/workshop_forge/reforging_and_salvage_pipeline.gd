@@ -25,14 +25,14 @@ static func _pool() -> Array:
 ## 锁定重掷契约：lock_count > 0 表示锁定前 N 条既有词缀（保护符/魔单晶
 ## 消耗按配置收取并在同一事务内扣除），其余槽位重掷；余额不足拒绝且不改动物品。
 static func reforge_affixes(
-	item: ItemEntity,
+	equipment_item: ItemEntity,
 	lock_count: int = 0,
 	rng: DeterministicRNG = null,
 	wallet: CharacterWalletEntity = null
 ) -> Dictionary:
-	if item == null:
+	if equipment_item == null:
 		return {"success": false, "error_code": "MISSING_CONTEXT"}
-	var existing_affixes: Array = item.affix_sockets.get("dynamic_affixes", [])
+	var existing_affixes: Array = equipment_item.affix_sockets.get("dynamic_affixes", [])
 	if lock_count < 0 or lock_count > existing_affixes.size():
 		return {"success": false, "error_code": "INVALID_LOCK_COUNT"}
 	var affix_count := GameConfig.get_int("domains.workshop", "reforge/affix_count", 2)
@@ -48,9 +48,9 @@ static func reforge_affixes(
 		var total_lock_cost := lock_cost_per * lock_count
 		if wallet.mana_monocrystals < total_lock_cost:
 			return {"success": false, "error_code": "INSUFFICIENT_RESOURCES"}
-		var pay := wallet.apply_transaction({"mana_monocrystals": - total_lock_cost}, true)
-		if not pay.get("success", false):
-			return {"success": false, "error_code": pay.get("error_code", "INSUFFICIENT_RESOURCES")}
+		var payment_result := wallet.apply_transaction({"mana_monocrystals": - total_lock_cost}, true)
+		if not payment_result.get("success", false):
+			return {"success": false, "error_code": payment_result.get("error_code", "INSUFFICIENT_RESOURCES")}
 	var reforge_rng := DeterministicRNG.resolve(rng)
 	var pool: Array = _pool()
 	# 锁定前 lock_count 条既有词缀原样保留，未锁定槽位重掷
@@ -62,49 +62,49 @@ static func reforge_affixes(
 		var crafted := _craft_affix_from_entry(picked as Dictionary, reforge_rng)
 		new_affixes.append(crafted)
 
-	item.affix_sockets["dynamic_affixes"] = new_affixes
+	equipment_item.affix_sockets["dynamic_affixes"] = new_affixes
 
 	EventBusCore.get_instance().emit_narrative_by_key(
-		"workshop/reforge_success", "economy", [item.custom_name, new_affixes.size()]
+		"workshop/reforge_success", "economy", [equipment_item.custom_name, new_affixes.size()]
 	)
 	return {"success": true, "affixes": new_affixes, "locked_count": lock_count}
 
 static func _craft_affix_from_entry(entry: Dictionary, reforge_rng: DeterministicRNG) -> Dictionary:
 	var crafted := {}
-	for stat_key in entry:
-		var stat_range: Variant = entry[stat_key]
-		if stat_range is Array and stat_range.size() == 2:
-			crafted[stat_key] = reforge_rng.randf_range(float(stat_range[0]), float(stat_range[1]))
+	for attribute_key in entry:
+		var attribute_range: Variant = entry[attribute_key]
+		if attribute_range is Array and attribute_range.size() == 2:
+			crafted[attribute_key] = reforge_rng.randf_range(float(attribute_range[0]), float(attribute_range[1]))
 		else:
-			crafted[stat_key] = stat_range
+			crafted[attribute_key] = attribute_range
 	return crafted
 
 ## 装备分解：锁定态拦截 → 原子移除（失败回滚库存快照）→ 返还材料金币并记物品销毁遥测
 static func salvage_equipment(
-	item: ItemEntity,
+	equipment_item: ItemEntity,
 	wallet: CharacterWalletEntity,
 	inventory: WearableInventoryAggregate,
 	library: AccountItemLibrary = null
 ) -> Dictionary:
-	if item == null or wallet == null or inventory == null:
+	if equipment_item == null or wallet == null or inventory == null:
 		return {"success": false, "error_code": "MISSING_CONTEXT"}
-	if item.container_state == "LOCKED":
+	if equipment_item.container_state == "LOCKED":
 		return {"success": false, "error_code": "ITEM_LOCKED"}
 	var inventory_snapshot := inventory.snapshot()
-	var remove_outcome := inventory.remove_owned_item(item)
+	var remove_outcome := inventory.remove_owned_item(equipment_item)
 	if remove_outcome == WearableInventoryAggregate.RemovalOutcome.NOT_FOUND:
 		return {"success": false, "error_code": "ITEM_NOT_IN_INVENTORY"}
 	if remove_outcome == WearableInventoryAggregate.RemovalOutcome.UNEQUIPPED_SLOT:
-		item.container_state = "DESTROYED"
-	if library != null and not item.template_id.is_empty():
-		ItemStatisticsSolver.record_item_event(library, ItemStatisticsSolver.EVENT_ITEM_DESTROYED, item.template_id, 1, null, null, {
-			"transaction_id": item.item_id
+		equipment_item.container_state = "DESTROYED"
+	if library != null and not equipment_item.template_id.is_empty():
+		ItemStatisticsSolver.record_item_event(library, ItemStatisticsSolver.EVENT_ITEM_DESTROYED, equipment_item.template_id, 1, null, null, {
+			"transaction_id": equipment_item.item_id
 		})
 
 	var refund_rate := clampf(GameConfig.get_float("domains.workshop", "salvage/refund_rate", 0.5), 0.0, 1.0)
 	var gold_rate := GameConfig.get_int("domains.currency", "rates/gold", 10000)
-	var refund_copper := int(item.market_base_price * gold_rate * refund_rate)
-	var enhance_level: int = int(item.combat_metrics.get("enhance_level", 0))
+	var refund_copper := int(equipment_item.market_base_price * gold_rate * refund_rate)
+	var enhance_level: int = int(equipment_item.combat_metrics.get("enhance_level", 0))
 	var divisor := maxf(1.0, GameConfig.get_float("domains.workshop", "salvage/crystal_divisor", 3.0))
 	var refunded_crystals := int(floor(float(enhance_level) / divisor))
 	var wallet_result := wallet.apply_delta({"copper": refund_copper, "mana_monocrystals": refunded_crystals})
@@ -113,6 +113,6 @@ static func salvage_equipment(
 		return {"success": false, "error_code": "SALVAGE_NOT_ATOMIC"}
 
 	EventBusCore.get_instance().emit_narrative_by_key(
-		"workshop/salvage_success", "economy", [item.custom_name, refund_copper, refunded_crystals]
+		"workshop/salvage_success", "economy", [equipment_item.custom_name, refund_copper, refunded_crystals]
 	)
 	return {"success": true, "refund_copper": refund_copper, "refund_crystals": refunded_crystals}

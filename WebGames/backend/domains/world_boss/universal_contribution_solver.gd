@@ -17,10 +17,10 @@ static func calculate_leaderboard(boss: WorldBossAggregate) -> Array[Dictionary]
 	var tanking_weight := GameConfig.get_float("domains.world_boss", "contribution/weights/tanking", 0.5)
 	var heal_weight := GameConfig.get_float("domains.world_boss", "contribution/weights/heal", 0.8)
 	for participant_id in boss.battle_contribution_ledger:
-		var data: Dictionary = boss.battle_contribution_ledger[participant_id]
-		var damage_amount: float = float(data.get("damage", 0.0))
-		var tanking_amount: float = float(data.get("tanking", 0.0))
-		var heal_amount: float = float(data.get("heal", 0.0))
+		var contribution_entry: Dictionary = boss.battle_contribution_ledger[participant_id]
+		var damage_amount: float = float(contribution_entry.get("damage", 0.0))
+		var tanking_amount: float = float(contribution_entry.get("tanking", 0.0))
+		var heal_amount: float = float(contribution_entry.get("heal", 0.0))
 		var score: float = damage_amount * damage_weight + tanking_amount * tanking_weight + heal_amount * heal_weight
 		board.append({"participant_id": participant_id, "score": score, "damage": damage_amount})
 

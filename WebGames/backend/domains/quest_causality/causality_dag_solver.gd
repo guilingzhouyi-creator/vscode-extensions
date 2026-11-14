@@ -27,9 +27,9 @@ static func evaluate_quest_completion(
 	# 2. 检查多手段路径 (只要有一条完整路径满足，即判定达成)
 	var satisfied_path_type := ""
 	for path in quest.solution_paths:
-		var path_eval := _evaluate_solution_path(path, quest.objective_nodes)
-		if path_eval.get("satisfied", false):
-			satisfied_path_type = str(path_eval.get("solution_type", ""))
+		var path_evaluation := _evaluate_solution_path(path, quest.objective_nodes)
+		if path_evaluation.get("satisfied", false):
+			satisfied_path_type = str(path_evaluation.get("solution_type", ""))
 			quest.is_quest_finished = true
 			break
 

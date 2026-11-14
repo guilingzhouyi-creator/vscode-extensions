@@ -57,18 +57,18 @@ static var _timeline_config_version: int = -1
 static func _ensure_timeline_cache() -> void:
 	if _timeline_cache != null and _timeline_config_version == GameConfig.config_reload_version():
 		return
-	var timeline_params := TimelineParams.new()
-	timeline_params.dispatch_min_ms = maxi(1, GameConfig.get_int("domains.combat", "tertiary_timeline/dispatch_interval_min_ms", 1200))
-	timeline_params.dispatch_max_ms = maxi(timeline_params.dispatch_min_ms, GameConfig.get_int("domains.combat", "tertiary_timeline/dispatch_interval_max_ms", 2800))
-	timeline_params.tension_min_ms = maxi(1, GameConfig.get_int("domains.combat", "tertiary_timeline/tension_interval_min_ms", 4500))
-	timeline_params.tension_max_ms = maxi(timeline_params.tension_min_ms, GameConfig.get_int("domains.combat", "tertiary_timeline/tension_interval_max_ms", 8500))
-	timeline_params.tension_types = GameConfig.get_array("domains.combat", "tertiary_timeline/tension_types", [
+	var timeline_parameters := TimelineParams.new()
+	timeline_parameters.dispatch_min_ms = maxi(1, GameConfig.get_int("domains.combat", "tertiary_timeline/dispatch_interval_min_ms", 1200))
+	timeline_parameters.dispatch_max_ms = maxi(timeline_parameters.dispatch_min_ms, GameConfig.get_int("domains.combat", "tertiary_timeline/dispatch_interval_max_ms", 2800))
+	timeline_parameters.tension_min_ms = maxi(1, GameConfig.get_int("domains.combat", "tertiary_timeline/tension_interval_min_ms", 4500))
+	timeline_parameters.tension_max_ms = maxi(timeline_parameters.tension_min_ms, GameConfig.get_int("domains.combat", "tertiary_timeline/tension_interval_max_ms", 8500))
+	timeline_parameters.tension_types = GameConfig.get_array("domains.combat", "tertiary_timeline/tension_types", [
 		"PRESSURE_SURGE", "ENVIRONMENT_PULSE", "FORCE_ROUND_ADVANCE"
 	]).duplicate()
-	timeline_params.tension_payloads.clear()
-	for tension_type in timeline_params.tension_types:
-		timeline_params.tension_payloads[tension_type] = {"tension_type": tension_type}
-	_timeline_cache = timeline_params
+	timeline_parameters.tension_payloads.clear()
+	for tension_type in timeline_parameters.tension_types:
+		timeline_parameters.tension_payloads[tension_type] = {"tension_type": tension_type}
+	_timeline_cache = timeline_parameters
 	_timeline_config_version = GameConfig.config_reload_version()
 
 ## 初始化组件或实体的内部运行状态
@@ -91,15 +91,15 @@ func advance_time(delta_ms: int) -> Array[TimelineEventPointDTO]:
 	var target_time := current_timeline_ms + delta_ms
 
 	# 零分配快速短路：检查是否存在到期事件
-	var has_due := false
+	var has_due_events := false
 	for timeline_event in scheduled_events:
 		if timeline_event.trigger_time_ms <= target_time:
-			has_due = true
+			has_due_events = true
 			break
 
 	current_timeline_ms = target_time
 
-	if not has_due:
+	if not has_due_events:
 		return []
 
 	var fired_events: Array[TimelineEventPointDTO] = []
@@ -126,8 +126,8 @@ func advance_time(delta_ms: int) -> Array[TimelineEventPointDTO]:
 ## 生成下一随机发放点（返回式；trigger 严格 > current_timeline_ms，M8 收敛：原 _schedule_* 原地 append 改返回式）
 func _build_next_dispatch_event() -> TimelineEventPointDTO:
 	_ensure_timeline_cache()
-	var timeline_params := _timeline_cache
-	var delta := rng.randi_range(timeline_params.dispatch_min_ms, timeline_params.dispatch_max_ms) if rng else timeline_params.dispatch_min_ms
+	var timeline_parameters := _timeline_cache
+	var delta := rng.randi_range(timeline_parameters.dispatch_min_ms, timeline_parameters.dispatch_max_ms) if rng else timeline_parameters.dispatch_min_ms
 
 	event_counter += 1
 	var timeline_event := TimelineEventPointDTO.new()
@@ -139,10 +139,10 @@ func _build_next_dispatch_event() -> TimelineEventPointDTO:
 ## 生成下一回内紧张点（返回式；空 tension_types 池回退 PRESSURE_SURGE，复用预分配 payload 字典）
 func _build_next_tension_event() -> TimelineEventPointDTO:
 	_ensure_timeline_cache()
-	var timeline_params := _timeline_cache
-	var delta := rng.randi_range(timeline_params.tension_min_ms, timeline_params.tension_max_ms) if rng else timeline_params.tension_min_ms
+	var timeline_parameters := _timeline_cache
+	var delta := rng.randi_range(timeline_parameters.tension_min_ms, timeline_parameters.tension_max_ms) if rng else timeline_parameters.tension_min_ms
 
-	var tension_types: Array = timeline_params.tension_types
+	var tension_types: Array = timeline_parameters.tension_types
 	var pick_index := rng.randi_range(0, tension_types.size() - 1) if (rng and not tension_types.is_empty()) else 0
 	var selected_type: String = tension_types[pick_index] if not tension_types.is_empty() else "PRESSURE_SURGE"
 
@@ -151,8 +151,8 @@ func _build_next_tension_event() -> TimelineEventPointDTO:
 	timeline_event.event_id = "EVT_TENSION_%d" % event_counter
 	timeline_event.event_type = TimelineEventType.TENSION_PULSE
 	timeline_event.trigger_time_ms = current_timeline_ms + delta
-	if timeline_params.tension_payloads.has(selected_type):
-		timeline_event.payload = (timeline_params.tension_payloads[selected_type] as Dictionary).duplicate(false)
+	if timeline_parameters.tension_payloads.has(selected_type):
+		timeline_event.payload = (timeline_parameters.tension_payloads[selected_type] as Dictionary).duplicate(false)
 	else:
 		timeline_event.payload = {"tension_type": selected_type}
 	return timeline_event

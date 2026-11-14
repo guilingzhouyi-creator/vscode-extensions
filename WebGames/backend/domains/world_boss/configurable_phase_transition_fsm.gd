@@ -41,18 +41,18 @@ static func apply_boss_damage(
 
 	boss.phase_current_hp = maxf(0.0, boss.phase_current_hp - actual_damage)
 
-	var phase_transition_triggered := false
+	var is_phase_transition_triggered := false
 	var is_boss_defeated := false
 
 	if boss.phase_current_hp <= 0.0:
 		if boss.current_phase_index < boss.total_phases:
 			boss.current_phase_index += 1
 			boss.phase_current_hp = boss.phase_max_hp
-			phase_transition_triggered = true
+			is_phase_transition_triggered = true
 
-			var str_mult := GameConfig.get_float("domains.world_boss", "phase_transition/str_multiplier", 1.25)
+			var strength_multiplier := GameConfig.get_float("domains.world_boss", "phase_transition/str_multiplier", 1.25)
 			# 转相乘性强化 = L2 系数修正（乘性）：等级不变，底层实际值联动
-			boss.physiology.base_coefficients["STR"] = float(boss.physiology.base_coefficients.get("STR", 1.0)) * str_mult
+			boss.physiology.base_coefficients["STR"] = float(boss.physiology.base_coefficients.get("STR", 1.0)) * strength_multiplier
 			boss.mechanism_shield_hp = GameConfig.get_float("domains.world_boss", "phase_transition/shield_hp", 1000.0)
 			boss.is_channeling_wipe_spell = true
 
@@ -85,6 +85,6 @@ static func apply_boss_damage(
 		"actual_damage": actual_damage,
 		"phase_current_hp": boss.phase_current_hp,
 		"current_phase": boss.current_phase_index,
-		"phase_transition": phase_transition_triggered,
+		"phase_transition": is_phase_transition_triggered,
 		"defeated": is_boss_defeated
 	}

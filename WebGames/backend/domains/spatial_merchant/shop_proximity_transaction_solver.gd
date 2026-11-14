@@ -13,14 +13,14 @@ extends RefCounted
 
 ## 空间邻近检定：肉身距离 D ≤ 交互半径 R
 static func check_spatial_proximity(
-	player_pos: Vector2,
+	player_position: Vector2,
 	shop: MerchantShopAggregate
 ) -> bool:
-	return SpatialProximitySolver.is_within_radius_2d(player_pos, shop.local_position, shop.interaction_radius_meters)
+	return SpatialProximitySolver.is_within_radius_2d(player_position, shop.local_position, shop.interaction_radius_meters)
 
 ## 货架购买五段流水：邻近/货架库存/价格钱包/背包空间检定后原子扣款扣库存（失败回滚快照）
 static func buy_item(
-	player_pos: Vector2,
+	player_position: Vector2,
 	shop: MerchantShopAggregate,
 	item_index: int,
 	buy_count: int,
@@ -34,7 +34,7 @@ static func buy_item(
 	if buy_count <= 0 or buy_count > max_buy_count:
 		return {"success": false, "error_code": "INVALID_BUY_COUNT"}
 	# 1. 空间邻近检定
-	if not check_spatial_proximity(player_pos, shop):
+	if not check_spatial_proximity(player_position, shop):
 		return {
 			"success": false,
 			"error_code": "OUT_OF_PROXIMITY_RANGE",
@@ -80,15 +80,15 @@ static func buy_item(
 		}
 
 	# 4. 背包空间检定
-	var fallback_tpl := GameConfig.get_string("domains.spatial_merchant", "goods/fallback_template_id", "ITEM_GOODS")
-	var template_id: Variant = shelf_item.get("item_template_id", fallback_tpl)
+	var fallback_template_id := GameConfig.get_string("domains.spatial_merchant", "goods/fallback_template_id", "ITEM_GOODS")
+	var template_id: Variant = shelf_item.get("item_template_id", fallback_template_id)
 	var new_item: ItemEntity = null
 	if inventory != null:
 		var catalog := GameBootstrap.catalog()
-		var proto: Variant = catalog.get_prototype(str(template_id))
-		if proto == null:
+		var item_prototype: Variant = catalog.get_prototype(str(template_id))
+		if item_prototype == null:
 			return {"success": false, "error_code": "ITEM_NOT_REGISTERED"}
-		new_item = ItemInstanceFactory.build_instance(proto, proto.english_name, "SHOP_")
+		new_item = ItemInstanceFactory.build_instance(item_prototype, item_prototype.english_name, "SHOP_")
 		new_item.mass_kg *= float(buy_count)
 		new_item.volume_slots *= buy_count
 	var wallet_snapshot := wallet.to_dictionary()
@@ -105,12 +105,12 @@ static func buy_item(
 		ItemStatisticsSolver.record_item_event(library, ItemStatisticsSolver.EVENT_ITEM_GRANTED, template_id, buy_count)
 
 	# 5. 执行扣款与库存扣减
-	var paid := wallet.apply_transaction({"gold": -total_gold, "silver": -total_silver}, true)
-	if not paid.get("success", false):
+	var payment_result := wallet.apply_transaction({"gold": -total_gold, "silver": -total_silver}, true)
+	if not payment_result.get("success", false):
 		if inventory != null:
 			inventory.restore(inventory_snapshot)
 		wallet.from_dictionary(wallet_snapshot)
-		return {"success": false, "error_code": paid.get("error_code", "TRANSACTION_FAILED")}
+		return {"success": false, "error_code": payment_result.get("error_code", "TRANSACTION_FAILED")}
 	shelf_item["stock_count"] = available_stock - buy_count
 
 	return {

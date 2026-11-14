@@ -14,7 +14,7 @@ class_name PhysicsAndThermodynamicsSolver extends RefCounted
 ## calculate_penetration_damage 每击原本 3 次 GameConfig 路径查找（kinetic 段）——
 ## 缓存后每击仅一次版本比对 + 字段复制（动词常数仍走 get_verb 字典引用）。
 class KineticParams extends RefCounted:
-	var energy_coef: float = 0.5
+	var energy_coefficient: float = 0.5
 	var mass_floor: float = 0.1
 	var velocity_floor: float = 0.1
 	var min_loss_floor: float = 0.001
@@ -36,29 +36,29 @@ static func _ensure_kinetic_cache() -> KineticParams:
 	var config_version: int = GameConfig.config_reload_version()
 	if _kinetic_cache != null and _kinetic_config_version == config_version:
 		return _kinetic_cache
-	var kinetic_params := KineticParams.new()
-	kinetic_params.energy_coef = GameConfig.get_float("domains.combat", "kinetic/energy_coef", 0.5)
-	kinetic_params.mass_floor = GameConfig.get_float("domains.combat", "kinetic/mass_floor", 0.1)
-	kinetic_params.velocity_floor = GameConfig.get_float("domains.combat", "kinetic/velocity_floor", 0.1)
-	kinetic_params.min_loss_floor = GameConfig.get_float("domains.combat", "phase_transition/primordial_min_loss_floor", 0.001)
-	kinetic_params.primordial_step1_loss = GameConfig.get_float("domains.combat", "phase_transition/primordial_step1_loss", 0.03)
-	kinetic_params.incantation_step1_base = GameConfig.get_float("domains.combat", "phase_transition/incantation_step1_base", 0.25)
-	kinetic_params.incantation_step1_per_sentence = GameConfig.get_float("domains.combat", "phase_transition/incantation_step1_per_sentence", 0.03)
-	kinetic_params.incantation_step1_min = GameConfig.get_float("domains.combat", "phase_transition/incantation_step1_min", 0.25)
-	kinetic_params.incantation_step1_max = GameConfig.get_float("domains.combat", "phase_transition/incantation_step1_max", 0.50)
-	kinetic_params.step2_base = GameConfig.get_float("domains.combat", "phase_transition/step2_base", 0.10)
-	kinetic_params.step2_per_meter = GameConfig.get_float("domains.combat", "phase_transition/step2_per_meter", 0.01)
-	kinetic_params.step2_min = GameConfig.get_float("domains.combat", "phase_transition/step2_min", 0.10)
-	kinetic_params.step2_max = GameConfig.get_float("domains.combat", "phase_transition/step2_max", 0.30)
-	_kinetic_cache = kinetic_params
+	var kinetic_parameters := KineticParams.new()
+	kinetic_parameters.energy_coefficient = GameConfig.get_float("domains.combat", "kinetic/energy_coef", 0.5)
+	kinetic_parameters.mass_floor = GameConfig.get_float("domains.combat", "kinetic/mass_floor", 0.1)
+	kinetic_parameters.velocity_floor = GameConfig.get_float("domains.combat", "kinetic/velocity_floor", 0.1)
+	kinetic_parameters.min_loss_floor = GameConfig.get_float("domains.combat", "phase_transition/primordial_min_loss_floor", 0.001)
+	kinetic_parameters.primordial_step1_loss = GameConfig.get_float("domains.combat", "phase_transition/primordial_step1_loss", 0.03)
+	kinetic_parameters.incantation_step1_base = GameConfig.get_float("domains.combat", "phase_transition/incantation_step1_base", 0.25)
+	kinetic_parameters.incantation_step1_per_sentence = GameConfig.get_float("domains.combat", "phase_transition/incantation_step1_per_sentence", 0.03)
+	kinetic_parameters.incantation_step1_min = GameConfig.get_float("domains.combat", "phase_transition/incantation_step1_min", 0.25)
+	kinetic_parameters.incantation_step1_max = GameConfig.get_float("domains.combat", "phase_transition/incantation_step1_max", 0.50)
+	kinetic_parameters.step2_base = GameConfig.get_float("domains.combat", "phase_transition/step2_base", 0.10)
+	kinetic_parameters.step2_per_meter = GameConfig.get_float("domains.combat", "phase_transition/step2_per_meter", 0.01)
+	kinetic_parameters.step2_min = GameConfig.get_float("domains.combat", "phase_transition/step2_min", 0.10)
+	kinetic_parameters.step2_max = GameConfig.get_float("domains.combat", "phase_transition/step2_max", 0.30)
+	_kinetic_cache = kinetic_parameters
 	_kinetic_config_version = config_version
-	return kinetic_params
+	return kinetic_parameters
 
 ## 物理动量侵彻伤害求解器
 ## D_phys = 0.5 * m * v^2 * k_mom * (1 + k_edge * S_edge) / (1 + Armor_eff)
 static func calculate_penetration_damage(
 	weapon_mass_kg: float,
-	velocity_meters_per_sec: float,
+	velocity_meters_per_second: float,
 	verb_id: String,
 	edge_sharpness: float,
 	effective_armor: float
@@ -67,8 +67,8 @@ static func calculate_penetration_damage(
 	var momentum_coefficient: float = verb.get("k_mom", 1.0)
 	var edge_coefficient: float = verb.get("k_edge", 1.0)
 
-	var kinetic_params := _ensure_kinetic_cache()
-	var kinetic_energy: Variant = kinetic_params.energy_coef * max(kinetic_params.mass_floor, weapon_mass_kg) * pow(max(kinetic_params.velocity_floor, velocity_meters_per_sec), 2.0)
+	var kinetic_parameters := _ensure_kinetic_cache()
+	var kinetic_energy: Variant = kinetic_parameters.energy_coefficient * max(kinetic_parameters.mass_floor, weapon_mass_kg) * pow(max(kinetic_parameters.velocity_floor, velocity_meters_per_second), 2.0)
 	var sharpness_boost: float = 1.0 + edge_coefficient * maxf(0.0, edge_sharpness)
 	var armor_divisor: float = 1.0 + maxf(0.0, effective_armor)
 
@@ -83,23 +83,23 @@ static func calculate_mana_phase_transition_loss(
 	sentence_count: int,
 	projection_distance_meters: float
 ) -> Dictionary:
-	var kinetic_params := _ensure_kinetic_cache()
+	var kinetic_parameters := _ensure_kinetic_cache()
 	var step1_loss_ratio: float
 	if is_primordial:
-		step1_loss_ratio = maxf(kinetic_params.min_loss_floor, kinetic_params.primordial_step1_loss)
+		step1_loss_ratio = maxf(kinetic_parameters.min_loss_floor, kinetic_parameters.primordial_step1_loss)
 	else:
 		step1_loss_ratio = clampf(
-			kinetic_params.incantation_step1_base + kinetic_params.incantation_step1_per_sentence * float(sentence_count),
-			kinetic_params.incantation_step1_min,
-			kinetic_params.incantation_step1_max
+			kinetic_parameters.incantation_step1_base + kinetic_parameters.incantation_step1_per_sentence * float(sentence_count),
+			kinetic_parameters.incantation_step1_min,
+			kinetic_parameters.incantation_step1_max
 		)
 
 	var step2_loss_ratio: float = clampf(
-		kinetic_params.step2_base + kinetic_params.step2_per_meter * maxf(0.0, projection_distance_meters),
-		kinetic_params.step2_min,
-		kinetic_params.step2_max
+		kinetic_parameters.step2_base + kinetic_parameters.step2_per_meter * maxf(0.0, projection_distance_meters),
+		kinetic_parameters.step2_min,
+		kinetic_parameters.step2_max
 	)
-	var total_loss_ratio := clampf(1.0 - (1.0 - step1_loss_ratio) * (1.0 - step2_loss_ratio), kinetic_params.min_loss_floor, 0.9999)
+	var total_loss_ratio := clampf(1.0 - (1.0 - step1_loss_ratio) * (1.0 - step2_loss_ratio), kinetic_parameters.min_loss_floor, 0.9999)
 	var effective_energy_output := raw_mana_input * (1.0 - total_loss_ratio)
 
 	return {

@@ -17,18 +17,18 @@ class_name MarketElasticityAndTradingSolver extends RefCounted
 static func calculate_market_price(commodity: TownMarketCommodity, world_tick: int = 0) -> int:
 	# L1（）：供需分母下限守卫（Inv-VD-1）——floor 与 supply 双 0 时 0/0 → inf/NaN 污染定价
 	var safe_supply_floor := maxf(1.0, GameConfig.get_float("domains.trading", "market/safe_supply_floor", 1.0))
-	var price_mult_min := GameConfig.get_float("domains.trading", "market/price_mult_min", 0.2)
-	var price_mult_max := GameConfig.get_float("domains.trading", "market/price_mult_max", 5.0)
+	var price_multiplier_min := GameConfig.get_float("domains.trading", "market/price_mult_min", 0.2)
+	var price_multiplier_max := GameConfig.get_float("domains.trading", "market/price_mult_max", 5.0)
 	var min_price := GameConfig.get_int("domains.trading", "market/min_price", 1)
 
 	var safe_supply: float = maxf(safe_supply_floor, commodity.supply_units)
 	var supply_gap: float = (commodity.demand_units - commodity.supply_units) / safe_supply
-	var price_mult: float = clampf(1.0 + commodity.elasticity_coef * supply_gap, price_mult_min, price_mult_max)
-	var base_result: int = maxi(min_price, int(round(float(commodity.base_price) * price_mult)))
+	var price_multiplier: float = clampf(1.0 + commodity.elasticity_coef * supply_gap, price_multiplier_min, price_multiplier_max)
+	var base_market_price: int = maxi(min_price, int(round(float(commodity.base_price) * price_multiplier)))
 
 	if world_tick > 0 and GameConfig.get_bool("domains.economy", "dynamic_market/enabled", true):
-		return _apply_dynamic_factors(commodity, base_result, world_tick)
-	return base_result
+		return _apply_dynamic_factors(commodity, base_market_price, world_tick)
+	return base_market_price
 
 ## 动态因子：世界时间相位 + 成交量反馈 + 均值回归 + 单轮变化率上限（确定性纯函数）
 static func _apply_dynamic_factors(commodity: TownMarketCommodity, base_price: int, world_tick: int) -> int:
@@ -53,10 +53,10 @@ static func _apply_dynamic_factors(commodity: TownMarketCommodity, base_price: i
 		var max_delta := float(commodity.last_price) * rate_max
 		dynamic_price = clampf(dynamic_price, float(commodity.last_price) - max_delta, float(commodity.last_price) + max_delta)
 
-	var result := maxi(GameConfig.get_int("domains.trading", "market/min_price", 1), int(round(dynamic_price)))
-	commodity.last_price = result
+	var rounded_market_price := maxi(GameConfig.get_int("domains.trading", "market/min_price", 1), int(round(dynamic_price)))
+	commodity.last_price = rounded_market_price
 	commodity.last_price_tick = world_tick
-	return result
+	return rounded_market_price
 
 ## 大宗商贸倾销价格冲击与砸盘求解器
 static func simulate_dumping_impact(commodity: TownMarketCommodity, dumped_quantity: float) -> int:

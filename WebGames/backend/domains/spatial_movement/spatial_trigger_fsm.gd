@@ -18,7 +18,7 @@ const MAX_LOCAL_TRIGGER_POOL: int = 256
 
 static var _cached_default_radius: float = 5.0
 static var _radius_config_version: int = -1
-static var _trigger_pools_bound: bool = false
+static var _is_trigger_pools_bound: bool = false
 static var _pool_ensure_callback: Callable = Callable()
 static var _pool_acquire_callback: Callable = Callable()
 static var _pool_release_callback: Callable = Callable()
@@ -36,16 +36,16 @@ static func bind_trigger_pool_backend(ensure_callback: Callable, acquire_callbac
 	_pool_ensure_callback = ensure_callback
 	_pool_acquire_callback = acquire_callback
 	_pool_release_callback = release_callback
-	_trigger_pools_bound = false
+	_is_trigger_pools_bound = false
 
 static func _ensure_trigger_pool() -> void:
-	if _trigger_pools_bound:
+	if _is_trigger_pools_bound:
 		return
 	if _pool_ensure_callback.is_valid():
 		_pool_ensure_callback.call(POOL_SPATIAL_TRIGGERS, func() -> RefCounted:
 			return SpatialTriggerArea.new()
 		)
-	_trigger_pools_bound = true
+	_is_trigger_pools_bound = true
 
 ## 从对象池借出可复用空间触发区域实例
 static func borrow_trigger_area(initial_trigger_id: String = "", initial_center: Vector2 = Vector2.ZERO, initial_radius: float = -1.0) -> SpatialTriggerArea:
@@ -80,7 +80,7 @@ static func recycle_trigger_area(area: SpatialTriggerArea) -> void:
 
 ## 测试隔离：重置本地回退池与版本号缓存
 static func reset_pool_for_tests() -> void:
-	_trigger_pools_bound = false
+	_is_trigger_pools_bound = false
 	_local_trigger_pool.clear()
 	_radius_config_version = -1
 
@@ -123,12 +123,12 @@ class SpatialTriggerArea extends PoolableDtoBase:
 		current_state = TriggerState.OUTSIDE
 
 ## 触发状态求值：圆形/AABB 包含判定 → ENTERED/INSIDE/EXITED/OUTSIDE 状态机迁移
-static func evaluate_trigger_state(trigger: SpatialTriggerArea, entity_pos: Vector2) -> TriggerState:
+static func evaluate_trigger_state(trigger: SpatialTriggerArea, entity_position: Vector2) -> TriggerState:
 	var is_contained := false
 	if trigger.shape == TriggerShape.CIRCLE_RADIUS:
-		is_contained = SpatialProximitySolver.is_within_radius_2d(entity_pos, trigger.center_pos, trigger.radius)
+		is_contained = SpatialProximitySolver.is_within_radius_2d(entity_position, trigger.center_pos, trigger.radius)
 	elif trigger.shape == TriggerShape.AABB_RECTANGLE:
-		is_contained = trigger.rect_extents.has_point(entity_pos)
+		is_contained = trigger.rect_extents.has_point(entity_position)
 
 	var previous_state: Variant = trigger.current_state
 	if is_contained:
@@ -149,13 +149,13 @@ static func evaluate_entity_trigger_state(
 	registry: RefCounted,
 	trigger: SpatialTriggerArea,
 	entity_id: String,
-	entity_pos: Vector2
+	entity_position: Vector2
 ) -> TriggerState:
 	var is_contained := false
 	if trigger.shape == TriggerShape.CIRCLE_RADIUS:
-		is_contained = entity_pos.distance_to(trigger.center_pos) <= trigger.radius
+		is_contained = entity_position.distance_to(trigger.center_pos) <= trigger.radius
 	elif trigger.shape == TriggerShape.AABB_RECTANGLE:
-		is_contained = trigger.rect_extents.has_point(entity_pos)
+		is_contained = trigger.rect_extents.has_point(entity_position)
 
 	var previous_state: int = registry.get_state(trigger.trigger_id, entity_id) if registry else TriggerState.OUTSIDE
 	var new_state: TriggerState = previous_state

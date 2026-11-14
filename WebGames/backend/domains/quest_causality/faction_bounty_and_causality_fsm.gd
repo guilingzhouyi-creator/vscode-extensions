@@ -14,18 +14,18 @@ class_name FactionBountyAndCausalityFSM extends RefCounted
 static func apply_quest_settlement(
 	character_id: String,
 	quest: QuestCausalityAggregate,
-	reputation_dict: Dictionary
+	reputation_map: Dictionary
 ) -> Dictionary:
 	var bounty_threshold := GameConfig.get_int("domains.quest", "bounty/trigger_threshold", -50)
-	var bounty_triggered := false
+	var is_bounty_triggered := false
 	for faction in quest.faction_reputation_rewards:
 		var delta: Variant = int(quest.faction_reputation_rewards[faction])
-		var current: Variant = reputation_dict.get(faction, 0) + delta
-		reputation_dict[faction] = current
+		var current: Variant = reputation_map.get(faction, 0) + delta
+		reputation_map[faction] = current
 
 		# 恶名通缉判定: 阵营声望跌破阈值
 		if current <= bounty_threshold:
-			bounty_triggered = true
+			is_bounty_triggered = true
 			EventBusCore.get_instance().emit_narrative_by_key(
 				"quest/bounty_triggered", "bounty", [character_id, faction, current]
 			)
@@ -34,4 +34,4 @@ static func apply_quest_settlement(
 		"quest/quest_settled", "quest", [quest.quest_title, character_id, quest.gold_reward]
 	)
 
-	return { "reputations": reputation_dict, "bounty_triggered": bounty_triggered }
+	return { "reputations": reputation_map, "bounty_triggered": is_bounty_triggered }
