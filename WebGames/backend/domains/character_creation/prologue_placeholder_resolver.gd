@@ -131,20 +131,20 @@ static func resolve_template(template_text: String, placeholders: Dictionary) ->
 	var matches := _regex.search_all(template_text)
 	for regex_match in matches:
 		var key := regex_match.get_string(1)
-		var value_found: bool = false
+		var is_value_found: bool = false
 		var value_text: String = ""
 
 		if placeholders.has(key):
-			value_found = true
+			is_value_found = true
 			value_text = str(placeholders[key])
 		elif placeholders.has(key.to_upper()):
-			value_found = true
+			is_value_found = true
 			value_text = str(placeholders[key.to_upper()])
 		elif placeholders.has(key.to_lower()):
-			value_found = true
+			is_value_found = true
 			value_text = str(placeholders[key.to_lower()])
 
-		if value_found:
+		if is_value_found:
 			result_text = result_text.replace("{%s}" % key, value_text)
 		else:
 			if not missing.has(key):

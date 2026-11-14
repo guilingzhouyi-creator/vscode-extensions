@@ -94,13 +94,13 @@ static func hydrate_starter_loadout_into_profile(
         inventory_aggregate.owner_account_id = profile.character_id
 
     # 4. 物品元数据哈希预取（ADV-PRF-001：循环前构建 O(1) 字典查找集）
-    var items_spec_map: Dictionary = _build_items_spec_lookup()
+    var item_specification_map: Dictionary = _build_items_spec_lookup()
 
     # 5. 物品实体装配与入包
     var raw_items: Array = kit_config.get("initial_items", [])
     var display_weapon: String = str(kit_config.get("display_weapon", ""))
     var summary_array: Array[Dictionary] = []
-    var empty_spec: Dictionary = {}
+    var empty_specification: Dictionary = {}
 
     for entry in raw_items:
         if not (entry is Dictionary):
@@ -109,15 +109,15 @@ static func hydrate_starter_loadout_into_profile(
         if canonical_id.is_empty():
             continue
         var count: int = maxi(1, int(entry.get("count", 1)))
-        var raw_spec: Variant = items_spec_map.get(canonical_id)
-        var spec_dict: Dictionary = raw_spec if raw_spec is Dictionary else empty_spec
+        var raw_specification: Variant = item_specification_map.get(canonical_id)
+        var specification_map: Dictionary = raw_specification if raw_specification is Dictionary else empty_specification
 
         _equip_item_batch(
             inventory_aggregate,
             canonical_id,
             count,
             display_weapon,
-            spec_dict,
+            specification_map,
             summary_array
         )
 
@@ -196,11 +196,11 @@ static func _resolve_mod_kit_id_for_origin(origin_id: String, manifest: Dictiona
     return ""
 
 static func _find_kit_id_in_origins_array(origin_id: String, custom_origins: Array) -> String:
-    for item in custom_origins:
-        if item is Dictionary:
-            var origin_dict: Dictionary = item
-            if str(origin_dict.get("origin_id", "")).strip_edges() == origin_id:
-                return str(origin_dict.get("starter_kit_id", "")).strip_edges()
+    for origin_entry in custom_origins:
+        if origin_entry is Dictionary:
+            var origin_map: Dictionary = origin_entry
+            if str(origin_map.get("origin_id", "")).strip_edges() == origin_id:
+                return str(origin_map.get("starter_kit_id", "")).strip_edges()
     return ""
 
 static func _lookup_kit_config_by_id(kit_id: String, manifest: Dictionary) -> Dictionary:
@@ -214,26 +214,26 @@ static func _lookup_kit_config_by_id(kit_id: String, manifest: Dictionary) -> Di
 
 static func _build_items_spec_lookup() -> Dictionary:
     var all_items: Array = GameConfig.get_array("items.core", "items", [])
-    var items_spec_map: Dictionary = {}
-    for spec in all_items:
-        if spec is Dictionary:
-            var spec_canonical_id: String = str(spec.get("canonical_id", ""))
-            if not spec_canonical_id.is_empty():
-                items_spec_map[spec_canonical_id] = spec
-    return items_spec_map
+    var item_specification_map: Dictionary = {}
+    for item_entry in all_items:
+        if item_entry is Dictionary:
+            var entry_canonical_id: String = str(item_entry.get("canonical_id", ""))
+            if not entry_canonical_id.is_empty():
+                item_specification_map[entry_canonical_id] = item_entry
+    return item_specification_map
 
 static func _equip_item_batch(
     inventory_aggregate: WearableInventoryAggregate,
     canonical_id: String,
     count: int,
     display_weapon: String,
-    item_spec: Dictionary,
-    out_summary: Array[Dictionary]
+    item_specification: Dictionary,
+    summary_entries: Array[Dictionary]
 ) -> void:
-    var category: String = _resolve_item_category(canonical_id, item_spec)
-    var mass_kg: float = float(item_spec.get("default_mass_kg", 1.0))
-    var volume_slots: int = int(item_spec.get("default_volume_slots", 1))
-    var custom_name: String = _resolve_item_name(canonical_id, item_spec)
+    var category: String = _resolve_item_category(canonical_id, item_specification)
+    var mass_kg: float = float(item_specification.get("default_mass_kg", 1.0))
+    var volume_slots: int = int(item_specification.get("default_volume_slots", 1))
+    var custom_name: String = _resolve_item_name(canonical_id, item_specification)
 
     for _item_index in range(count):
         _instantiate_and_equip_or_store(
@@ -244,7 +244,7 @@ static func _equip_item_batch(
             volume_slots,
             custom_name,
             display_weapon,
-            out_summary
+            summary_entries
         )
 
 static func _instantiate_and_equip_or_store(
@@ -255,43 +255,43 @@ static func _instantiate_and_equip_or_store(
     volume_slots: int,
     custom_name: String,
     display_weapon: String,
-    out_summary: Array[Dictionary]
+    summary_entries: Array[Dictionary]
 ) -> void:
-    var item := ItemEntity.new()
-    item.item_id = canonical_id
-    item.template_id = canonical_id
-    item.custom_name = custom_name
-    item.category = category
-    item.mass_kg = mass_kg
-    item.volume_slots = volume_slots
-    item.item_uid = WearableInventoryAggregate.ItemUIDGenerator.generate_uid("SRV_")
+    var spawned_item := ItemEntity.new()
+    spawned_item.item_id = canonical_id
+    spawned_item.template_id = canonical_id
+    spawned_item.custom_name = custom_name
+    spawned_item.category = category
+    spawned_item.mass_kg = mass_kg
+    spawned_item.volume_slots = volume_slots
+    spawned_item.item_uid = WearableInventoryAggregate.ItemUIDGenerator.generate_uid("SRV_")
 
     var equipped_slot: String = ""
     # 若为主手武器且主手空闲，则优先装备
     if (canonical_id == display_weapon or category.begins_with("WEAPON_")) and inventory_aggregate.equipped_slots.get("MAIN_HAND") == null:
-        if inventory_aggregate.equip_item("MAIN_HAND", item):
+        if inventory_aggregate.equip_item("MAIN_HAND", spawned_item):
             equipped_slot = "MAIN_HAND"
 
     if equipped_slot.is_empty():
-        if not inventory_aggregate.add_item(item):
+        if not inventory_aggregate.add_item(spawned_item):
             # 裸身容量为 0 时安全回退：直接入 storage_items 确保新手初始物资不丢失
-            item.container_state = "INVENTORY"
-            item.owner_account_id = inventory_aggregate.owner_account_id
-            inventory_aggregate.storage_items.append(item)
+            spawned_item.container_state = "INVENTORY"
+            spawned_item.owner_account_id = inventory_aggregate.owner_account_id
+            inventory_aggregate.storage_items.append(spawned_item)
         equipped_slot = "INVENTORY"
 
-    out_summary.append({
+    summary_entries.append({
         "canonical_id": canonical_id,
-        "item_id": item.item_id,
-        "item_uid": item.item_uid,
+        "item_id": spawned_item.item_id,
+        "item_uid": spawned_item.item_uid,
         "custom_name": custom_name,
         "category": category,
         "count": 1,
         "slot": equipped_slot
     })
 
-static func _resolve_item_category(canonical_id: String, item_spec: Dictionary) -> String:
-    var minor_category: String = str(item_spec.get("category_minor", ""))
+static func _resolve_item_category(canonical_id: String, item_specification: Dictionary) -> String:
+    var minor_category: String = str(item_specification.get("category_minor", ""))
     if not minor_category.is_empty():
         return minor_category
     if canonical_id.contains("WEAPON_BLADE"):
@@ -306,11 +306,11 @@ static func _resolve_item_category(canonical_id: String, item_spec: Dictionary) 
         return ItemEntity.CATEGORY_CONSUMABLE_POTION
     return ItemEntity.CATEGORY_QUEST_MISC
 
-static func _resolve_item_name(canonical_id: String, item_spec: Dictionary) -> String:
-    var aliases: Array = item_spec.get("search_aliases", [])
+static func _resolve_item_name(canonical_id: String, item_specification: Dictionary) -> String:
+    var aliases: Array = item_specification.get("search_aliases", [])
     if not aliases.is_empty():
         return str(aliases[0])
-    var english_name: String = str(item_spec.get("english_name", ""))
+    var english_name: String = str(item_specification.get("english_name", ""))
     if not english_name.is_empty():
         return english_name
     match canonical_id:

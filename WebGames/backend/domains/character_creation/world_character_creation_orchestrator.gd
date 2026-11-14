@@ -87,11 +87,11 @@ static func create_character_authoritative(
 
     # 8. 世界网关就绪角色回挂与状态跃迁
     var gateway_result: Dictionary = {}
-    var gateway_attached := false
+    var is_gateway_attached := false
     if gateway_fsm != null:
         gateway_result = gateway_fsm.attach_ready_character(profile.character_id)
-        gateway_attached = bool(gateway_result.get("success", false))
-        if not gateway_attached:
+        is_gateway_attached = bool(gateway_result.get("success", false))
+        if not is_gateway_attached:
             EventBusCore.get_instance().emit_log("warn", TemplateFormatter.format("WorldCharacterCreationOrchestrator: attach_ready_character failed: {code}", {"code": str(gateway_result.get("error_code", ""))}))
 
     # 9. 构造全景只读呈现信封
@@ -110,7 +110,7 @@ static func create_character_authoritative(
         "profile": profile,
         "presentation": presentation,
         "gateway_result": gateway_result,
-        "gateway_attached": gateway_attached
+        "gateway_attached": is_gateway_attached
     }
 
 ## 统一编排门面：权威创角 + 开局事件流生成 + 自动启动角色序章上下文
@@ -183,8 +183,8 @@ static func _validate_request(creation_request: AuthoritativeCharacterCreationRe
     if character_name.length() < 2 or character_name.length() > 16:
         return {"valid": false, "error_code": "INVALID_NAME_LENGTH", "message": "角色名称长度必须在 2 到 16 之间"}
 
-    for char_index in FORBIDDEN_CHARS.size():
-        if character_name.contains(FORBIDDEN_CHARS[char_index]):
+    for character_index in FORBIDDEN_CHARS.size():
+        if character_name.contains(FORBIDDEN_CHARS[character_index]):
             return {"valid": false, "error_code": "FORBIDDEN_CHARACTERS", "message": "角色名称包含非法特殊字符"}
 
     if creation_request.account_id.strip_edges().is_empty():
@@ -316,7 +316,7 @@ static func _persist_slot_and_cover(
             "wallet": (profile.personal_resources.get("wallet", {}) as Dictionary).duplicate(true)
         }
     }
-    var save_dal_result: Dictionary = SaveDataAccessLayer.save_game(slot_name, save_payload)
+    var save_data_access_result: Dictionary = SaveDataAccessLayer.save_game(slot_name, save_payload)
 
     var account_repository := AccountRepository.get_instance()
     if account_repository != null and not account_repository.is_loaded():
@@ -330,13 +330,13 @@ static func _persist_slot_and_cover(
         slot_summary.world_slot_status = "OCCUPIED"
         slot_summary.is_fallen = false
         slot_summary.last_saved_time_utc = int(Time.get_unix_time_from_system())
-        slot_summary.save_file_sha256 = str(save_dal_result.get("sha256", ""))
+        slot_summary.save_file_sha256 = str(save_data_access_result.get("sha256", ""))
         slot_summary.character_profile = profile
         account.bind_character_to_slot(slot_name, slot_summary)
         account.bind_world_slot(creation_request.world_id, slot_name)
         account_repository.save_account(account)
 
-    return {"success": true, "slot_name": slot_name, "save_res": save_dal_result}
+    return {"success": true, "slot_name": slot_name, "save_res": save_data_access_result}
 
 ## 组装全景只读呈现信封
 static func _build_presentation_envelope(

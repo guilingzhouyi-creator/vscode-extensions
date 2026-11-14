@@ -51,20 +51,20 @@ func to_dto() -> Dictionary:
 
 ## 从字典反序列化开局事件流（缺省字段安全回退默认值，空字典返回空包）。
 ## 契约：is_first_time_creation 缺省按 true 默认回退（首次创建语义安全默认）。
-static func from_dto(raw_data: Dictionary) -> OpeningEventStreamDTO:
+static func from_dto(serialized_event_stream: Dictionary) -> OpeningEventStreamDTO:
 	var stream_dto := OpeningEventStreamDTO.new()
-	if raw_data.is_empty():
+	if serialized_event_stream.is_empty():
 		return stream_dto
-	stream_dto.event_id = str(raw_data.get("event_id", ""))
-	stream_dto.account_id = str(raw_data.get("account_id", ""))
-	stream_dto.slot_id = str(raw_data.get("slot_id", ""))
-	stream_dto.world_id = str(raw_data.get("world_id", ""))
-	stream_dto.character_id = str(raw_data.get("character_id", ""))
-	stream_dto.character_name = str(raw_data.get("character_name", ""))
-	stream_dto.race_id = str(raw_data.get("race_id", ""))
-	stream_dto.is_first_time_creation = bool(raw_data.get("is_first_time_creation", true))
-	stream_dto.starting_location_id = str(raw_data.get("starting_location_id", ""))
-	stream_dto.opening_quest_line_id = str(raw_data.get("opening_quest_line_id", ""))
-	stream_dto.timestamp_utc = int(raw_data.get("timestamp_utc", 0))
-	stream_dto.narrative_context = (raw_data.get("narrative_context", {}) as Dictionary).duplicate(true)
+	stream_dto.event_id = str(serialized_event_stream.get("event_id", ""))
+	stream_dto.account_id = str(serialized_event_stream.get("account_id", ""))
+	stream_dto.slot_id = str(serialized_event_stream.get("slot_id", ""))
+	stream_dto.world_id = str(serialized_event_stream.get("world_id", ""))
+	stream_dto.character_id = str(serialized_event_stream.get("character_id", ""))
+	stream_dto.character_name = str(serialized_event_stream.get("character_name", ""))
+	stream_dto.race_id = str(serialized_event_stream.get("race_id", ""))
+	stream_dto.is_first_time_creation = bool(serialized_event_stream.get("is_first_time_creation", true))
+	stream_dto.starting_location_id = str(serialized_event_stream.get("starting_location_id", ""))
+	stream_dto.opening_quest_line_id = str(serialized_event_stream.get("opening_quest_line_id", ""))
+	stream_dto.timestamp_utc = int(serialized_event_stream.get("timestamp_utc", 0))
+	stream_dto.narrative_context = (serialized_event_stream.get("narrative_context", {}) as Dictionary).duplicate(true)
 	return stream_dto

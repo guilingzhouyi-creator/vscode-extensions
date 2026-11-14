@@ -17,10 +17,10 @@ const MAX_HEADLESS_DAG_STEPS: int = 100
 ## 解析无头试玩的候选 MOD 包列表（支持内联 candidate_packs 与磁盘目录扫描）
 static func prepare_headless_candidates(config: Dictionary) -> Array:
 	var candidates: Array = config.get("candidate_packs", []).duplicate()
-	var mod_dirs: Array = config.get("mod_dirs", [])
-	if candidates.is_empty() and not mod_dirs.is_empty():
-		for mod_dir in mod_dirs:
-			var loaded_package: Dictionary = ModPackageDiscoverySolver.load_full_mod_package_from_dir(str(mod_dir))
+	var mod_directories: Array = config.get("mod_dirs", [])
+	if candidates.is_empty() and not mod_directories.is_empty():
+		for mod_directory in mod_directories:
+			var loaded_package: Dictionary = ModPackageDiscoverySolver.load_full_mod_package_from_dir(str(mod_directory))
 			if not loaded_package.is_empty():
 				candidates.append(loaded_package)
 	return candidates
@@ -31,8 +31,8 @@ static func run_headless_loop(
 	engine: NarrativeDagExecutionEngine,
 	loop_state: Dictionary,
 	transcript_steps: Array[Dictionary],
-	render_packet_fn: Callable,
-	apply_mutations_fn: Callable
+	render_packet_callable: Callable,
+	apply_mutations_callable: Callable
 ) -> void:
 	var step_guard: int = 0
 	while not engine.active_node_ids.is_empty() and not engine.is_terminated and step_guard < MAX_HEADLESS_DAG_STEPS:
@@ -42,7 +42,7 @@ static func run_headless_loop(
 		if node == null:
 			break
 		loop_state["step_index"] = transcript_steps.size()
-		transcript_steps.append(_step_headless_node(engine, current_node_id, node, loop_state, render_packet_fn, apply_mutations_fn))
+		transcript_steps.append(_step_headless_node(engine, current_node_id, node, loop_state, render_packet_callable, apply_mutations_callable))
 
 
 ## 组装无头全流程 MOD 试玩标准报告信封
@@ -108,8 +108,8 @@ static func _step_headless_node(
 	current_node_id: String,
 	node: NarrativeDAGNode,
 	loop_state: Dictionary,
-	render_packet_fn: Callable,
-	apply_mutations_fn: Callable
+	render_packet_callable: Callable,
+	apply_mutations_callable: Callable
 ) -> Dictionary:
 	var step_index: int = int(loop_state["step_index"])
 	var prologue_context: CharacterPrologueContext = loop_state["ctx"]
@@ -117,7 +117,7 @@ static func _step_headless_node(
 	var adapted_manifest: Dictionary = loop_state["manifest"]
 	var choice_indices: Array = loop_state["choice_indices"]
 
-	var raw_packet: Variant = render_packet_fn.call(node, prologue_context, adapted_manifest, step_index)
+	var raw_packet: Variant = render_packet_callable.call(node, prologue_context, adapted_manifest, step_index)
 	var packet_dto: Dictionary = (raw_packet as PrologueEventPacketDTO).to_dto() if raw_packet is PrologueEventPacketDTO else {}
 
 	var action_payload: Dictionary = {}
@@ -133,7 +133,7 @@ static func _step_headless_node(
 	var step_result: Dictionary = engine.execute_node_action(current_node_id, action_payload)
 	var raw_mutations: Variant = step_result.get("mutations")
 	var mutations: Array = raw_mutations if raw_mutations is Array else node.mutations_on_complete
-	var raw_applied: Variant = apply_mutations_fn.call(mutations, prologue_context, profile)
+	var raw_applied: Variant = apply_mutations_callable.call(mutations, prologue_context, profile)
 	var applied: Array = raw_applied as Array if raw_applied is Array else []
 
 	return {

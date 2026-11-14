@@ -23,9 +23,9 @@ extends RefCounted
 static func commit_creation_and_bind_slot(
 	request: CharacterCreationRequestDTO,
 	slot_state: Dictionary,
-	race_def: RaceDefinitionDTO
+	race_definition: RaceDefinitionDTO
 ) -> Dictionary:
-	var result := {}
+	var binding_result := {}
 	if request == null or slot_state.is_empty():
 		return {"success": false, "error_code": "INVALID_INPUT", "message": "请求或档位数据为空"}
 
@@ -41,7 +41,7 @@ static func commit_creation_and_bind_slot(
 	var new_character_id := "CHAR_%s_%s" % [account_id, slot_id]
 
 	# 2. 后端权威生成属性等级（L1 层；L2 系数/L3 实值由既有生理底座承接）
-	var baseline_stats := CharacterBaselineAttributeSolver.generate_baseline_attributes(race_def)
+	var baseline_stats := CharacterBaselineAttributeSolver.generate_baseline_attributes(race_definition)
 	var attribute_levels: Dictionary = baseline_stats.get("attribute_levels", {})
 
 	# 3. 构造角色档案与生理表/钱包实体（打通 Stage ④ -> Stage ⑥ HUD 同步）
@@ -58,7 +58,7 @@ static func commit_creation_and_bind_slot(
 	wallet.gold = GameConfig.get_int("domains.character_creation", "defaults/initial_gold_fallback", 50)
 
 	# 4. 绑定档位（原地回写；首次创建标记消费后置 false）
-	var was_first_creation := bool(slot_state.get("is_first_creation", true))
+	var is_first_creation := bool(slot_state.get("is_first_creation", true))
 	slot_state["bound_character_id"] = new_character_id
 	slot_state["is_occupied"] = true
 	slot_state["is_first_creation"] = false
@@ -73,7 +73,7 @@ static func commit_creation_and_bind_slot(
 	opening.character_id = new_character_id
 	opening.character_name = request.character_name
 	opening.race_id = request.selected_race_id
-	opening.is_first_time_creation = was_first_creation
+	opening.is_first_time_creation = is_first_creation
 	opening.starting_location_id = GameConfig.get_string("domains.character_creation", "defaults/starting_location", "CENTRAL_CITY_PLAZA")
 	opening.opening_quest_line_id = GameConfig.get_string("domains.character_creation", "defaults/initial_quest_line", "QUEST_PROLOGUE_01")
 	opening.timestamp_utc = int(Time.get_unix_time_from_system())
@@ -81,14 +81,14 @@ static func commit_creation_and_bind_slot(
 		"welcome_message": GameConfig.msg_fmt("character_creation", "welcome_message", {"character_name": request.character_name})
 	}
 
-	result["success"] = true
-	result["character_profile"] = profile
-	result["physiology_sheet"] = sheet
-	result["wallet"] = wallet
-	result["opening_event"] = opening
-	result["attribute_levels"] = attribute_levels
-	result["slot_state"] = slot_state
-	return result
+	binding_result["success"] = true
+	binding_result["character_profile"] = profile
+	binding_result["physiology_sheet"] = sheet
+	binding_result["wallet"] = wallet
+	binding_result["opening_event"] = opening
+	binding_result["attribute_levels"] = attribute_levels
+	binding_result["slot_state"] = slot_state
+	return binding_result
 
 
 static func _build_physiology_sheet(race_id: String, attribute_levels: Dictionary) -> CharacterPhysiologySheet:

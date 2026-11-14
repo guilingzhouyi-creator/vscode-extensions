@@ -29,21 +29,21 @@ static func has_runner() -> bool:
 	return _runner.is_valid()
 
 ## 通过抽象端口调度指定 ID 过场动画（未注入执行器时安全无副作用降级）
-static func dispatch_cutscene(cutscene_id: String, skip_requested: bool = false) -> Dictionary:
+static func dispatch_cutscene(cutscene_id: String, is_skip_requested: bool = false) -> Dictionary:
 	if cutscene_id.strip_edges().is_empty():
 		return {"success": false, "skipped": false, "cutscene_id": "", "executed": false}
 	if not _runner.is_valid():
 		_last_dispatch_receipt = {
 			"cutscene_id": cutscene_id,
-			"skipped": skip_requested,
+			"skipped": is_skip_requested,
 			"executed": false,
 			"timestamp_utc": int(Time.get_unix_time_from_system())
 		}
-		return {"success": true, "skipped": skip_requested, "cutscene_id": cutscene_id, "executed": false}
-	var call_result: Variant = _runner.call(cutscene_id, skip_requested)
+		return {"success": true, "skipped": is_skip_requested, "cutscene_id": cutscene_id, "executed": false}
+	var call_result: Variant = _runner.call(cutscene_id, is_skip_requested)
 	var receipt: Dictionary = (call_result as Dictionary).duplicate() if call_result is Dictionary else {}
 	receipt["cutscene_id"] = cutscene_id
-	receipt["skipped"] = skip_requested
+	receipt["skipped"] = is_skip_requested
 	receipt["executed"] = true
 	receipt["timestamp_utc"] = int(Time.get_unix_time_from_system())
 	_last_dispatch_receipt = receipt

@@ -62,19 +62,19 @@ static func precheck_and_adapt_mod_list(
     candidate_packs: Array,
     enabled_pack_ids: Array = ["*"]
 ) -> Dictionary:
-    var enable_all: bool = enabled_pack_ids.has("*")
+    var is_all_enabled: bool = enabled_pack_ids.has("*")
     var enabled_set: Dictionary = _build_enabled_lookup(enabled_pack_ids)
 
     var precheck_checklist: Array[Dictionary] = []
     var enabled_manifests: Array[DestinyModManifestDTO] = []
-    var enabled_ids_out: Array[String] = []
+    var collected_enabled_pack_ids: Array[String] = []
     var has_non_compliant_enabled: bool = false
 
     for raw_pack in candidate_packs:
         var single_result: Dictionary = precheck_single_mod(raw_pack)
         var manifest_dto: DestinyModManifestDTO = single_result.get("manifest")
         var pack_id: String = manifest_dto.pack_id
-        var is_enabled: bool = enable_all or (not pack_id.is_empty() and enabled_set.has(pack_id))
+        var is_enabled: bool = is_all_enabled or (not pack_id.is_empty() and enabled_set.has(pack_id))
         var is_compliant: bool = bool(single_result.get("valid", false))
 
         var check_item: Dictionary = _build_checklist_item(single_result, is_compliant, is_enabled)
@@ -85,21 +85,21 @@ static func precheck_and_adapt_mod_list(
                 has_non_compliant_enabled = true
             else:
                 enabled_manifests.append(manifest_dto)
-                enabled_ids_out.append(pack_id)
+                collected_enabled_pack_ids.append(pack_id)
 
     if has_non_compliant_enabled:
         return _build_adaptation_failure(
             "ERR_MOD_COMPLIANCE_FAILED",
-            enabled_ids_out,
+            collected_enabled_pack_ids,
             precheck_checklist,
             []
         )
 
-    var incompatible_conflicts: Array[Dictionary] = _detect_incompatible_conflicts(enabled_manifests, enabled_ids_out)
+    var incompatible_conflicts: Array[Dictionary] = _detect_incompatible_conflicts(enabled_manifests, collected_enabled_pack_ids)
     if not incompatible_conflicts.is_empty():
         return _build_adaptation_failure(
             "ERR_MOD_INCOMPATIBLE_CONFLICT",
-            enabled_ids_out,
+            collected_enabled_pack_ids,
             precheck_checklist,
             incompatible_conflicts
         )
@@ -108,7 +108,7 @@ static func precheck_and_adapt_mod_list(
     if not duplicate_conflicts.is_empty():
         return _build_adaptation_failure(
             "ERR_MOD_DUPLICATE_ID_CONFLICT",
-            enabled_ids_out,
+            collected_enabled_pack_ids,
             precheck_checklist,
             duplicate_conflicts
         )
@@ -117,7 +117,7 @@ static func precheck_and_adapt_mod_list(
     if not ui_conflicts.is_empty():
         return _build_adaptation_failure(
             "ERR_MOD_UI_POLICY_CONFLICT",
-            enabled_ids_out,
+            collected_enabled_pack_ids,
             precheck_checklist,
             ui_conflicts
         )
@@ -127,22 +127,22 @@ static func precheck_and_adapt_mod_list(
     if not topology_conflicts.is_empty():
         return _build_adaptation_failure(
             "ERR_MOD_INCOMPATIBLE_CONFLICT",
-            enabled_ids_out,
+            collected_enabled_pack_ids,
             precheck_checklist,
             topology_conflicts
         )
 
-    var adapted_manifest: Dictionary = ModAdaptationManifestMerger.build_adapted_manifest(sorted_manifests, enabled_ids_out)
+    var adapted_manifest: Dictionary = ModAdaptationManifestMerger.build_adapted_manifest(sorted_manifests, collected_enabled_pack_ids)
     var creation_ui_snapshot: Dictionary = CreationUiSnapshotBuilder.build_creation_ui_snapshot(
         adapted_manifest,
         precheck_checklist,
-        enabled_ids_out
+        collected_enabled_pack_ids
     )
 
     return {
         "success": true,
         "error_code": "",
-        "enabled_pack_ids": enabled_ids_out,
+        "enabled_pack_ids": collected_enabled_pack_ids,
         "precheck_checklist": precheck_checklist,
         "conflicts": [],
         "adapted_manifest": adapted_manifest,
@@ -155,8 +155,8 @@ static func precheck_and_adapt_mod_list(
 
 static func _build_enabled_lookup(enabled_pack_ids: Array) -> Dictionary:
     var enabled_lookup: Dictionary = {}
-    for item in enabled_pack_ids:
-        var clean_id: String = str(item).strip_edges()
+    for raw_pack_id in enabled_pack_ids:
+        var clean_id: String = str(raw_pack_id).strip_edges()
         if not clean_id.is_empty():
             enabled_lookup[clean_id] = true
     return enabled_lookup
@@ -264,14 +264,14 @@ static func _topological_sort_manifests(
         if in_degree[pack_id] == 0:
             queue.append(pack_id)
 
-    var sorted_out: Array[DestinyModManifestDTO] = []
+    var sorted_manifests_list: Array[DestinyModManifestDTO] = []
     while not queue.is_empty():
         var source_pack_id: String = queue.pop_front()
-        sorted_out.append(manifest_by_pack_id[source_pack_id])
+        sorted_manifests_list.append(manifest_by_pack_id[source_pack_id])
         var dependents: Array = adjacency_map.get(source_pack_id, _new_list())
         _decrement_dependents(dependents, in_degree, queue)
 
-    if sorted_out.size() < manifests.size():
+    if sorted_manifests_list.size() < manifests.size():
         _append_conflict(
             conflicts,
             "ERR_MOD_INCOMPATIBLE_CONFLICT",
@@ -281,7 +281,7 @@ static func _topological_sort_manifests(
         )
         return manifests
 
-    return sorted_out
+    return sorted_manifests_list
 
 static func _detect_duplicate_id_conflicts(
     enabled_manifests: Array[DestinyModManifestDTO]

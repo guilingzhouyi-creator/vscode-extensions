@@ -23,13 +23,13 @@ const PrologueHeadlessPlaythroughRunner = preload("res://backend/domains/charact
 ## 契约：opening 为空或 character_id 为空返回 INVALID_OPENING；种族默认经
 ##       config 键 defaults/default_race_id 驱动（既有键）；内部顺序执行
 ##       上下文构建 → 模板参数提取 → 新手套件发放 → 突变事件列表 → 首步事件包。
-static func boot_character_prologue(opening: OpeningEventStreamDTO, race_id: String = "", allow_default_fallback: bool = true) -> Dictionary:
+static func boot_character_prologue(opening: OpeningEventStreamDTO, race_id: String = "", should_allow_default_fallback: bool = true) -> Dictionary:
 	if opening == null or opening.character_id.is_empty():
 		return {"success": false, "error_code": "INVALID_OPENING", "message": "开局事件包缺失或角色 ID 为空"}
 
 	var effective_race := race_id if not race_id.is_empty() else opening.race_id
 	if effective_race.is_empty() or effective_race == "UNBOUND":
-		if not allow_default_fallback:
+		if not should_allow_default_fallback:
 			return {"success": false, "error_code": "UNBOUND_RACE_ID", "unwired_slot": "race_id", "message": "种族标识未接线(UNBOUND)，禁止静默回退默认种族"}
 		effective_race = GameConfig.get_string("domains.character_creation", "defaults/default_race_id", "HUMAN")
 
@@ -114,11 +114,11 @@ static func advance_prologue_step(
 		prologue_context.is_completed = true
 		prologue_context.is_active = false
 
-	var narrative_sub_key := str(stage_definition.get("narrative_key", "narrative/prologue/completed"))
+	var stage_narrative_key := str(stage_definition.get("narrative_key", "narrative/prologue/completed"))
 	var available_actions := _to_string_array(stage_definition.get("available_actions", ["ENTER_WORLD"]))
 	var mutations := _build_stage_mutations(prologue_context, str(stage_definition.get("mutation_type", "PrologueCompleted")), action)
 
-	var template := GameConfig.get_string("narratives.prologue_i18n", narrative_sub_key, "")
+	var template := GameConfig.get_string("narratives.prologue_i18n", stage_narrative_key, "")
 	var text_result := ProloguePlaceholderResolver.resolve_template(template, prologue_context.runtime_placeholders)
 
 	var packet := PrologueEventPacketDTO.new()
@@ -131,7 +131,7 @@ static func advance_prologue_step(
 	packet.available_actions = available_actions
 	packet.reserved_payload = {"mutations": mutations}
 
-	broadcast_step(packet, narrative_sub_key, prologue_context.runtime_placeholders)
+	broadcast_step(packet, stage_narrative_key, prologue_context.runtime_placeholders)
 	if prologue_context.is_completed:
 		var creation_hooks: Dictionary = GameConfig.get_dict("domains.character_creation", "creation_hooks", {})
 		EventBusCore.get_instance().emit_domain_event("prologue.completed", {
@@ -152,8 +152,8 @@ static func advance_prologue_step(
 static func _to_string_array(raw_value: Variant) -> Array[String]:
 	var string_items: Array[String] = []
 	if raw_value is Array:
-		for item in raw_value:
-			string_items.append(str(item))
+		for raw_entry in raw_value:
+			string_items.append(str(raw_entry))
 	return string_items
 
 
@@ -268,7 +268,7 @@ static func apply_dag_mutations(
 
 static func _apply_single_mutation(
 	mutation_type: String,
-	mutation_data: Dictionary,
+	mutation_payload: Dictionary,
 	prologue_context: CharacterPrologueContext,
 	profile: Variant
 ) -> void:
@@ -277,14 +277,14 @@ static func _apply_single_mutation(
 			prologue_context.is_completed = true
 			prologue_context.is_active = false
 		"GoldGranted", "ModifyGold":
-			var gold_delta: int = int(mutation_data.get("amount", mutation_data.get("gold", mutation_data.get("delta", 0))))
+			var gold_delta: int = int(mutation_payload.get("amount", mutation_payload.get("gold", mutation_payload.get("delta", 0))))
 			_apply_gold_mutation(gold_delta, prologue_context, profile)
 		"AttributeModified":
-			var attribute_name: String = str(mutation_data.get("attribute", mutation_data.get("attr", "")))
-			var delta: int = int(mutation_data.get("delta", mutation_data.get("value", 0)))
+			var attribute_name: String = str(mutation_payload.get("attribute", mutation_payload.get("attr", "")))
+			var delta: int = int(mutation_payload.get("delta", mutation_payload.get("value", 0)))
 			_apply_attr_mutation(attribute_name, delta, profile)
 		"LocationAssigned":
-			var location_id: String = str(mutation_data.get("location_id", mutation_data.get("location", "")))
+			var location_id: String = str(mutation_payload.get("location_id", mutation_payload.get("location", "")))
 			if not location_id.is_empty():
 				prologue_context.assigned_start_location_id = location_id
 				prologue_context.runtime_placeholders["START_LOCATION"] = location_id
@@ -363,7 +363,7 @@ static func execute_headless_mod_playthrough(config: Dictionary) -> Dictionary:
 	profile.character_name = character_name
 	profile.attributes = (reincarnation_result.get("attributes", {}) as Dictionary).duplicate(true)
 
-	var equip_result := StarterLoadoutDispatcher.hydrate_starter_loadout_into_profile(
+	var loadout_result := StarterLoadoutDispatcher.hydrate_starter_loadout_into_profile(
 		profile, effective_race, effective_origin, adapted_manifest
 	)
 
@@ -372,7 +372,7 @@ static func execute_headless_mod_playthrough(config: Dictionary) -> Dictionary:
 	prologue_context.character_name = character_name
 	prologue_context.race_id = effective_race
 	prologue_context.assigned_start_location_id = str(reincarnation_result.get("birth_region_id", "CENTRAL_CONTINENT"))
-	prologue_context.assigned_starter_kit_id = str(reincarnation_result.get("starter_kit_id", equip_result.get("kit_id", "")))
+	prologue_context.assigned_starter_kit_id = str(reincarnation_result.get("starter_kit_id", loadout_result.get("kit_id", "")))
 	prologue_context.is_active = true
 	prologue_context.runtime_placeholders = ProloguePlaceholderResolver.extract_placeholders(prologue_context, adapted_manifest, profile)
 	prologue_context.runtime_placeholders["ORIGIN_ID"] = effective_origin
@@ -413,14 +413,14 @@ static func execute_headless_mod_playthrough(config: Dictionary) -> Dictionary:
 static func broadcast_step(
 	packet: PrologueEventPacketDTO,
 	narrative_key: String,
-	params: Dictionary
+	i18n_parameters: Dictionary
 ) -> void:
 	var bus := EventBusCore.get_instance()
 	if bus == null:
 		return
 	var payload: Dictionary = packet.to_dto()
 	payload["narrative_key"] = narrative_key
-	payload["i18n_params"] = params.duplicate(true)
+	payload["i18n_params"] = i18n_parameters.duplicate(true)
 	bus.emit_domain_event("prologue.step_advanced", payload)
 	# 同步投递富文本文字战报（category 经既有 event_categories 键解析，未命中回退大写）
 	bus.emit_narrative(packet.narrative_text, "narrative", {
@@ -481,26 +481,26 @@ static func complete_prologue_to_handoff(
 		"handoff": handoff
 	}
 
-static func _append_profile_inventory_items(inventory_data: Dictionary, out_items: Array) -> void:
-	if inventory_data.is_empty():
+static func _append_profile_inventory_items(inventory_payload: Dictionary, collected_items: Array) -> void:
+	if inventory_payload.is_empty():
 		return
-	var has_aggregate_buckets: bool = inventory_data.has("storage_items") or inventory_data.has("equipped_payloads")
+	var has_aggregate_buckets: bool = inventory_payload.has("storage_items") or inventory_payload.has("equipped_payloads")
 	if has_aggregate_buckets:
-		var storage_array: Variant = inventory_data.get("storage_items", [])
+		var storage_array: Variant = inventory_payload.get("storage_items", [])
 		if storage_array is Array and not (storage_array as Array).is_empty():
 			# 初始物品移交仅在开局执行一次，提前在循环外整表深拷贝以避免逐项分配
 			var cloned_storage: Array = (storage_array as Array).duplicate(true)
 			for entry in cloned_storage:
 				if entry is Dictionary:
-					out_items.append(entry)
-		var equipped_map: Variant = inventory_data.get("equipped_payloads", {})
+					collected_items.append(entry)
+		var equipped_map: Variant = inventory_payload.get("equipped_payloads", {})
 		if equipped_map is Dictionary:
 			for slot_key in equipped_map.keys():
 				if equipped_map[slot_key] != null:
-					out_items.append(_make_inventory_handoff_entry(slot_key, equipped_map[slot_key]))
+					collected_items.append(_make_inventory_handoff_entry(slot_key, equipped_map[slot_key]))
 		return
-	for item_key in inventory_data.keys():
-		out_items.append(_make_inventory_handoff_entry(item_key, inventory_data[item_key]))
+	for inventory_key in inventory_payload.keys():
+		collected_items.append(_make_inventory_handoff_entry(inventory_key, inventory_payload[inventory_key]))
 
-static func _make_inventory_handoff_entry(item_key: Variant, item_data: Variant) -> Dictionary:
-	return {"item_id": item_key, "data": item_data}
+static func _make_inventory_handoff_entry(inventory_key: Variant, item_payload: Variant) -> Dictionary:
+	return {"item_id": inventory_key, "data": item_payload}
