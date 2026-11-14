@@ -22,7 +22,7 @@ func mark_read(mails: Array, mail_id: String) -> Array:
 	return mails
 
 ## 按 mail_id 集合批量删除 → 新邮件数组
-func delete_by_ids(mails: Array, ids: Array) -> Array:
+func delete_by_ids(mails: Array, mail_ids: Array) -> Array:
 	EventBusCore.get_instance().emit_log("error", "IMailService.delete_by_ids: pure virtual method must be implemented by subclass")
 	return mails
 

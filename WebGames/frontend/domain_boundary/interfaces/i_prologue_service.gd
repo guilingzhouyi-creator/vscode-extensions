@@ -12,25 +12,25 @@ class_name IPrologueService
 extends RefCounted
 
 ## 异步启动当前激活角色的序章上下文
-func start_prologue_async(_account_id: String, _token: String, _payload: Dictionary, callback: Callable) -> void:
+func start_prologue_async(_account_id: String, _token: String, _request_payload: Dictionary, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IPrologueService.start_prologue_async: not implemented")
-	if callback.is_valid():
-		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 异步只读查询当前序章阶段与文本快照
-func get_prologue_state_async(_account_id: String, _token: String, callback: Callable) -> void:
+func get_prologue_state_async(_account_id: String, _token: String, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IPrologueService.get_prologue_state_async: not implemented")
-	if callback.is_valid():
-		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 异步推进序章单步选择（choice_id -> 阶段演进与事件数据包）
-func advance_prologue_async(_account_id: String, _token: String, _choice_id: String, _payload: Dictionary, callback: Callable) -> void:
+func advance_prologue_async(_account_id: String, _token: String, _choice_id: String, _request_payload: Dictionary, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IPrologueService.advance_prologue_async: not implemented")
-	if callback.is_valid():
-		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 异步完结或跳过序章并触发大世界探索交接与首帧 HUD 同步
-func complete_prologue_async(_account_id: String, _token: String, _cutscene_id: String = "", _skip: bool = false, callback: Callable = Callable()) -> void:
+func complete_prologue_async(_account_id: String, _token: String, _cutscene_id: String = "", _should_skip: bool = false, result_callback: Callable = Callable()) -> void:
 	EventBusCore.get_instance().emit_log("error", "IPrologueService.complete_prologue_async: not implemented")
-	if callback.is_valid():
-		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})

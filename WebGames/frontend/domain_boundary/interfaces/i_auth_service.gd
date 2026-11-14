@@ -18,32 +18,32 @@ const PREVIEW_ATTR_MAX: int = 18
 ## 生成标准前端创角六维预览资质点（8~18 确定性采样，前后端边界单源复用）
 static func build_preview_attribute_spread() -> Dictionary:
 	var rng: DeterministicRNG = DeterministicRNG.global()
-	var attrs: Dictionary = {}
+	var attribute_spread: Dictionary = {}
 	for attribute_key in PREVIEW_ATTR_KEYS:
-		attrs[attribute_key] = rng.randi_range(PREVIEW_ATTR_MIN, PREVIEW_ATTR_MAX)
+		attribute_spread[attribute_key] = rng.randi_range(PREVIEW_ATTR_MIN, PREVIEW_ATTR_MAX)
 	return {
 		"success": true,
-		"attrs": attrs
+		"attrs": attribute_spread
 	}
 
-## 异步登录契约 (callback: func(result: Dictionary) -> void)
-func login_async(username: String, password_plain: String, callback: Callable) -> void:
+## 异步登录契约 (result_callback: func(result: Dictionary) -> void)
+func login_async(username: String, password_plain: String, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IAuthService.login_async: pure virtual method must be implemented by subclass")
 
 ## 异步注册契约 (对齐 AccountRegistrationDTO)
-func register_async(username: String, password_plain: String, callback: Callable) -> void:
+func register_async(username: String, password_plain: String, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IAuthService.register_async: pure virtual method must be implemented by subclass")
 
 ## 获取服务器列表契约
-func get_servers_async(callback: Callable) -> void:
+func get_servers_async(result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IAuthService.get_servers_async: pure virtual method must be implemented by subclass")
 
 ## 获取角色槽位列表契约
-func get_characters_async(account_id: String, callback: Callable) -> void:
+func get_characters_async(account_id: String, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IAuthService.get_characters_async: pure virtual method must be implemented by subclass")
 
 ## 创角请求契约
-func create_character_async(account_id: String, request_data: Dictionary, callback: Callable) -> void:
+func create_character_async(account_id: String, request_payload: Dictionary, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IAuthService.create_character_async: pure virtual method must be implemented by subclass")
 
 ## 六维资质骰点契约（返回 {success: true, attrs: {STR/AGI/CON/INT/WIS/CHA}}）
@@ -52,29 +52,29 @@ func roll_attribute_spread() -> Dictionary:
 	return {"success": false, "error_code": "NOT_IMPLEMENTED"}
 
 ## 异步资质骰点契约（对齐 ROLL_CHARACTER_PREVIEW 动作）
-func roll_attributes_async(callback: Callable) -> void:
+func roll_attributes_async(result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IAuthService.roll_attributes_async: pure virtual method must be implemented by subclass")
 
-## 异步注销/吊销令牌契约 (callback: func(result: Dictionary) -> void)
-func revoke_token(token: String, callback: Callable = Callable()) -> void:
+## 异步注销/吊销令牌契约 (result_callback: func(result: Dictionary) -> void)
+func revoke_token(token: String, result_callback: Callable = Callable()) -> void:
 	EventBusCore.get_instance().emit_log("error", "IAuthService.revoke_token: pure virtual method must be implemented by subclass")
 
 ## 异步退出账号契约 (对齐 LOGOUT_ACCOUNT)
-func logout_async(account_id: String, token: String, callback: Callable = Callable()) -> void:
+func logout_async(account_id: String, token: String, result_callback: Callable = Callable()) -> void:
 	EventBusCore.get_instance().emit_log("error", "IAuthService.logout_async: pure virtual method must be implemented by subclass")
 
 ## 异步游客免密快捷登录契约 (对齐 LOGIN_GUEST)
-func login_guest_async(_device_fingerprint: String = "", callback: Callable = Callable()) -> void:
+func login_guest_async(_device_fingerprint: String = "", result_callback: Callable = Callable()) -> void:
 	EventBusCore.get_instance().emit_log("error", "IAuthService.login_guest_async: pure virtual method must be implemented by subclass")
-	if callback.is_valid():
-		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 异步清除指定角色槽位契约 (对齐 CLEAR_SLOT)
-func clear_slot_async(_account_id: String, _token: String, _slot_id: String, callback: Callable = Callable()) -> void:
+func clear_slot_async(_account_id: String, _token: String, _slot_id: String, result_callback: Callable = Callable()) -> void:
 	EventBusCore.get_instance().emit_log("error", "IAuthService.clear_slot_async: pure virtual method must be implemented by subclass")
-	if callback.is_valid():
-		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 异步拉取账号首页视图模型契约 (对齐 GET_ACCOUNT_HOME_VIEW_MODEL)
-func get_account_home_async(account_id: String, token: String, callback: Callable = Callable(), _locale: String = "") -> void:
+func get_account_home_async(account_id: String, token: String, result_callback: Callable = Callable(), _locale: String = "") -> void:
 	EventBusCore.get_instance().emit_log("error", "IAuthService.get_account_home_async: pure virtual method must be implemented by subclass")

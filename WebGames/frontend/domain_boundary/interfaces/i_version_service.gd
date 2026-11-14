@@ -12,5 +12,5 @@ class_name IVersionService
 extends RefCounted
 
 ## 异步检查客户端版本与灰度分群状态
-func check_version_async(callback: Callable) -> void:
+func check_version_async(result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IVersionService.check_version_async: pure virtual method must be implemented by subclass")

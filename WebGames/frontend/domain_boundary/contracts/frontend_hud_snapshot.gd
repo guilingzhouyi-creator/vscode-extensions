@@ -59,28 +59,28 @@ func to_dictionary() -> Dictionary:
 	}
 
 ## 从权威快照字典反序列化为强类型 FrontendHudSnapshot，并对缺省/越界字段执行安全钳制
-static func from_dictionary(data: Dictionary) -> FrontendHudSnapshot:
+static func from_dictionary(snapshot_payload: Dictionary) -> FrontendHudSnapshot:
 	var snapshot := FrontendHudSnapshot.new()
-	snapshot.character_id = read_string(data, "character_id")
-	var resolved_name := read_string(data, "character_name", "")
+	snapshot.character_id = read_string(snapshot_payload, "character_id")
+	var resolved_name := read_string(snapshot_payload, "character_name", "")
 	if resolved_name.is_empty():
-		resolved_name = read_string(data, "nickname", "")
+		resolved_name = read_string(snapshot_payload, "nickname", "")
 	snapshot.character_name = resolved_name
-	snapshot.race_name = read_string(data, "race_name")
-	snapshot.location_name = read_string(data, "location_name")
-	snapshot.level = maxi(1, read_int(data, "level", 1))
-	snapshot.hp_max = maxf(1.0, read_float(data, "hp_max", 1.0))
-	snapshot.hp_current = clampf(read_float(data, "hp_current", 0.0), 0.0, snapshot.hp_max)
-	snapshot.mp_max = maxf(1.0, read_float(data, "mp_max", 1.0))
-	snapshot.mp_current = clampf(read_float(data, "mp_current", 0.0), 0.0, snapshot.mp_max)
-	snapshot.ap_max = maxf(1.0, read_float(data, "ap_max", 1.0))
-	snapshot.ap_current = clampf(read_float(data, "ap_current", 0.0), 0.0, snapshot.ap_max)
-	snapshot.gold = maxi(0, read_int(data, "gold", 0))
-	snapshot.silver = maxi(0, read_int(data, "silver", 0))
-	snapshot.copper = maxi(0, read_int(data, "copper", 0))
-	var crystals := maxi(0, read_int(data, "mana_monocrystals", -1))
+	snapshot.race_name = read_string(snapshot_payload, "race_name")
+	snapshot.location_name = read_string(snapshot_payload, "location_name")
+	snapshot.level = maxi(1, read_int(snapshot_payload, "level", 1))
+	snapshot.hp_max = maxf(1.0, read_float(snapshot_payload, "hp_max", 1.0))
+	snapshot.hp_current = clampf(read_float(snapshot_payload, "hp_current", 0.0), 0.0, snapshot.hp_max)
+	snapshot.mp_max = maxf(1.0, read_float(snapshot_payload, "mp_max", 1.0))
+	snapshot.mp_current = clampf(read_float(snapshot_payload, "mp_current", 0.0), 0.0, snapshot.mp_max)
+	snapshot.ap_max = maxf(1.0, read_float(snapshot_payload, "ap_max", 1.0))
+	snapshot.ap_current = clampf(read_float(snapshot_payload, "ap_current", 0.0), 0.0, snapshot.ap_max)
+	snapshot.gold = maxi(0, read_int(snapshot_payload, "gold", 0))
+	snapshot.silver = maxi(0, read_int(snapshot_payload, "silver", 0))
+	snapshot.copper = maxi(0, read_int(snapshot_payload, "copper", 0))
+	var crystals := maxi(0, read_int(snapshot_payload, "mana_monocrystals", -1))
 	if crystals < 0:
-		crystals = maxi(0, read_int(data, "monocrystals", 0))
+		crystals = maxi(0, read_int(snapshot_payload, "monocrystals", 0))
 	snapshot.mana_monocrystals = crystals
 	return snapshot
 

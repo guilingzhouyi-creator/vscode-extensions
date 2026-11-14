@@ -19,9 +19,9 @@ signal value_changed(current: float, maximum: float)
 @export var show_text: bool = true
 @export var bar_color: Color = DesignTokens.COLOR_PRIMARY
 
-var _vbox: VBoxContainer
+var _vertical_container: VBoxContainer
 var _title_label: Label
-var _hbox: HBoxContainer
+var _bar_row: HBoxContainer
 var _progress_bar: ProgressBar
 var _value_label: Label
 
@@ -29,21 +29,21 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	mouse_filter = MOUSE_FILTER_IGNORE
 
-	_vbox = VBoxContainer.new()
-	_vbox.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
-	_vbox.add_theme_constant_override("separation", DesignTokens.SPACING_XS)
-	add_child(_vbox)
+	_vertical_container = VBoxContainer.new()
+	_vertical_container.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	_vertical_container.add_theme_constant_override("separation", DesignTokens.SPACING_XS)
+	add_child(_vertical_container)
 
 	_title_label = Label.new()
 	_title_label.add_theme_font_size_override("font_size", DesignTokens.FONT_SIZE_BODY)
 	_title_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_SECONDARY)
 	_title_label.mouse_filter = MOUSE_FILTER_IGNORE
-	_vbox.add_child(_title_label)
+	_vertical_container.add_child(_title_label)
 
-	_hbox = HBoxContainer.new()
-	_hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_hbox.add_theme_constant_override("separation", DesignTokens.SPACING_SM)
-	_vbox.add_child(_hbox)
+	_bar_row = HBoxContainer.new()
+	_bar_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_bar_row.add_theme_constant_override("separation", DesignTokens.SPACING_SM)
+	_vertical_container.add_child(_bar_row)
 
 	_progress_bar = ProgressBar.new()
 	_progress_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -51,25 +51,25 @@ func _ready() -> void:
 	_progress_bar.max_value = 100.0
 	_progress_bar.value = 0.0
 	_apply_bar_style()
-	_hbox.add_child(_progress_bar)
+	_bar_row.add_child(_progress_bar)
 
 	_value_label = Label.new()
 	_value_label.add_theme_font_size_override("font_size", DesignTokens.FONT_SIZE_BODY)
 	_value_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_PRIMARY)
 	_value_label.mouse_filter = MOUSE_FILTER_IGNORE
 	_value_label.visible = show_text
-	_hbox.add_child(_value_label)
+	_bar_row.add_child(_value_label)
 
 	if not label_key.is_empty():
 		UIIntermediary.resolve(_title_label, label_key)
 
 func _apply_bar_style() -> void:
-	var bg_style := StyleBoxFlat.new()
-	bg_style.bg_color = DesignTokens.COLOR_SURFACE_CARD
-	bg_style.set_corner_radius_all(3)
-	bg_style.set_border_width_all(1)
-	bg_style.border_color = DesignTokens.COLOR_BORDER_DEFAULT
-	_progress_bar.add_theme_stylebox_override("background", bg_style)
+	var background_style := StyleBoxFlat.new()
+	background_style.bg_color = DesignTokens.COLOR_SURFACE_CARD
+	background_style.set_corner_radius_all(3)
+	background_style.set_border_width_all(1)
+	background_style.border_color = DesignTokens.COLOR_BORDER_DEFAULT
+	_progress_bar.add_theme_stylebox_override("background", background_style)
 
 	var fill_style := StyleBoxFlat.new()
 	fill_style.bg_color = bar_color
@@ -97,17 +97,17 @@ func get_progress_bar() -> ProgressBar:
 
 ## 静态工厂：创建已应用上限安全钳制与最小尺寸的独立 ProgressBar 实例
 static func create_bar(current: float, maximum: float, minimum_size: Vector2 = Vector2.ZERO) -> ProgressBar:
-	var bar := ProgressBar.new()
-	bar.min_value = 0.0
-	bar.max_value = maxf(maximum, 1.0)
-	bar.value = clampf(current, bar.min_value, bar.max_value)
-	bar.custom_minimum_size = minimum_size
-	return bar
+	var progress_bar := ProgressBar.new()
+	progress_bar.min_value = 0.0
+	progress_bar.max_value = maxf(maximum, 1.0)
+	progress_bar.value = clampf(current, progress_bar.min_value, progress_bar.max_value)
+	progress_bar.custom_minimum_size = minimum_size
+	return progress_bar
 
 ## 静态方法：为任意 ProgressBar + Label 组合刷新进度（无需替换为 KStatusBar 节点即可使用）
-static func refresh_bar(bar: ProgressBar, label: Label, current: float, maximum: float) -> void:
-	if bar != null and is_instance_valid(bar):
-		bar.value = current
-		bar.max_value = maximum
-	if label != null and is_instance_valid(label):
-		label.text = "%.0f / %.0f" % [current, maximum]
+static func refresh_bar(progress_bar: ProgressBar, value_label: Label, current: float, maximum: float) -> void:
+	if progress_bar != null and is_instance_valid(progress_bar):
+		progress_bar.value = current
+		progress_bar.max_value = maximum
+	if value_label != null and is_instance_valid(value_label):
+		value_label.text = "%.0f / %.0f" % [current, maximum]

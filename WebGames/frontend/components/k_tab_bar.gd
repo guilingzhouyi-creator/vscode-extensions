@@ -22,24 +22,24 @@ func _ready() -> void:
 	tab_changed.connect(_on_tab_changed)
 
 ## 注册单个 Tab 标题（i18n key 驱动，不注册语言切换绑定）
-func register_tab(index: int, title_key: String) -> void:
-	UIIntermediary.resolve_tab(self, index, title_key)
+func register_tab(tab_index: int, title_key: String) -> void:
+	UIIntermediary.resolve_tab(self, tab_index, title_key)
 
 ## 批量初始化所有 Tab 标题（语言切换时需外部重新调用刷新）
-func init_all_titles(keys: PackedStringArray) -> void:
-	for tab_index in range(keys.size()):
-		UIIntermediary.resolve_tab(self, tab_index, keys[tab_index])
+func init_all_titles(title_keys: PackedStringArray) -> void:
+	for tab_index in range(title_keys.size()):
+		UIIntermediary.resolve_tab(self, tab_index, title_keys[tab_index])
 
 ## 获取当前选中 Tab 索引
 func get_current_tab_index() -> int:
 	return current_tab
 
 ## Tab 切换钩子（tab_changed 信号由 TabContainer 原生派发，子类可覆写此方法响应切换）
-func _on_tab_changed(tab: int) -> void:
+func _on_tab_changed(_tab_index: int) -> void:
 	pass
 
 ## 静态方法：为任意 TabContainer 批量初始化 i18n 标题（无需替换为 KTabBar 节点即可使用）
-static func init_titles(container: TabContainer, keys: PackedStringArray) -> void:
-	for tab_index in range(keys.size()):
+static func init_titles(container: TabContainer, title_keys: PackedStringArray) -> void:
+	for tab_index in range(title_keys.size()):
 		if tab_index < container.get_tab_count():
-			UIIntermediary.resolve_tab(container, tab_index, keys[tab_index])
+			UIIntermediary.resolve_tab(container, tab_index, title_keys[tab_index])

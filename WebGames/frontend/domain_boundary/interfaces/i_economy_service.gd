@@ -22,12 +22,12 @@ func calculate_total_copper(gold: int, silver: int, copper: int) -> int:
 	return 0
 
 ## 铜币总值 → 金/银/铜拆分（{gold, silver, copper}）
-func split_copper(total: int) -> Dictionary:
+func split_copper(total_copper: int) -> Dictionary:
 	EventBusCore.get_instance().emit_log("error", "IEconomyService.split_copper: pure virtual method must be implemented by subclass")
 	return {}
 
 ## 货币索引 → 单位铜值（0=金 1=银 2=铜 3=魔单晶）
-func get_currency_copper(index: int) -> int:
+func get_currency_copper(currency_index: int) -> int:
 	EventBusCore.get_instance().emit_log("error", "IEconomyService.get_currency_copper: pure virtual method must be implemented by subclass")
 	return 1
 
@@ -42,7 +42,7 @@ func calculate_exchange_rate(source_copper: int, target_copper: int) -> float:
 	return 0.0
 
 ## 兑换结果
-func calculate_exchange_result(amount: int, rate: float) -> float:
+func calculate_exchange_result(amount: int, exchange_rate: float) -> float:
 	EventBusCore.get_instance().emit_log("error", "IEconomyService.calculate_exchange_result: pure virtual method must be implemented by subclass")
 	return 0.0
 

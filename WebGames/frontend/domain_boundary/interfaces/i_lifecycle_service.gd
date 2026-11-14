@@ -12,31 +12,31 @@ class_name ILifecycleService
 extends RefCounted
 
 ## 异步请求暂停主循环与锁定后台 Agent 控制 (PAUSE_GAME)
-func pause_game_async(_account_id: String, _token: String, _reason: String = "ESC_MENU", callback: Callable = Callable()) -> void:
+func pause_game_async(_account_id: String, _token: String, _reason: String = "ESC_MENU", result_callback: Callable = Callable()) -> void:
 	EventBusCore.get_instance().emit_log("error", "ILifecycleService.pause_game_async: not implemented")
-	if callback.is_valid():
-		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 异步请求恢复主循环运行 (RESUME_GAME)
-func resume_game_async(_account_id: String, _token: String, callback: Callable = Callable()) -> void:
+func resume_game_async(_account_id: String, _token: String, result_callback: Callable = Callable()) -> void:
 	EventBusCore.get_instance().emit_log("error", "ILifecycleService.resume_game_async: not implemented")
-	if callback.is_valid():
-		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 异步退回账号首页菜单（保存+退出网关+注销会话，保留引擎装配）(LOGOUT_TO_MENU)
-func logout_to_menu_async(_account_id: String, _token: String, _target_save_slot: String = "", _save_before_quit: bool = true, callback: Callable = Callable()) -> void:
+func logout_to_menu_async(_account_id: String, _token: String, _target_save_slot: String = "", _save_before_quit: bool = true, result_callback: Callable = Callable()) -> void:
 	EventBusCore.get_instance().emit_log("error", "ILifecycleService.logout_to_menu_async: not implemented")
-	if callback.is_valid():
-		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 异步请求五阶段安全优雅停机退出游戏 (REQUEST_GRACEFUL_SHUTDOWN)
-func request_graceful_shutdown_async(_account_id: String, _token: String, _options: Dictionary = {}, callback: Callable = Callable()) -> void:
+func request_graceful_shutdown_async(_account_id: String, _token: String, _options: Dictionary = {}, result_callback: Callable = Callable()) -> void:
 	EventBusCore.get_instance().emit_log("error", "ILifecycleService.request_graceful_shutdown_async: not implemented")
-	if callback.is_valid():
-		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 异步请求强制降级停机恢复 (FORCE_SHUTDOWN)
-func force_shutdown_async(_account_id: String, _token: String, _options: Dictionary = {}, callback: Callable = Callable()) -> void:
+func force_shutdown_async(_account_id: String, _token: String, _options: Dictionary = {}, result_callback: Callable = Callable()) -> void:
 	EventBusCore.get_instance().emit_log("error", "ILifecycleService.force_shutdown_async: not implemented")
-	if callback.is_valid():
-		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})

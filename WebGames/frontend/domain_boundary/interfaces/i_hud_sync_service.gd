@@ -12,22 +12,22 @@ class_name IHudSyncService
 extends RefCounted
 
 ## 异步拉取权威 HUD 快照 (对齐 PULL_HUD_SNAPSHOT)
-func pull_authoritative_snapshot_async(_account_id: String, _token: String, _character_id: String, callback: Callable) -> void:
+func pull_authoritative_snapshot_async(_account_id: String, _token: String, _character_id: String, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IHudSyncService.pull_authoritative_snapshot_async: not implemented")
-	if callback.is_valid():
-		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 异步推进世界时钟并触发常驻 HUD 节流同步 (对齐 TICK_WORLD_CLOCK)
-func tick_world_clock_async(_account_id: String, _token: String, _character_id: String, _mutations: Dictionary, callback: Callable) -> void:
+func tick_world_clock_async(_account_id: String, _token: String, _character_id: String, _mutations: Dictionary, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IHudSyncService.tick_world_clock_async: not implemented")
-	if callback.is_valid():
-		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 异步派发主页 HUD 支持指令（如 ALLOCATE_POTENTIAL_STAT / REST_AND_ADVANCE_TIME 等）
-func dispatch_hud_directive_async(_account_id: String, _token: String, _character_id: String, _action_type: String, _payload: Dictionary, callback: Callable) -> void:
+func dispatch_hud_directive_async(_account_id: String, _token: String, _character_id: String, _action_type: String, _directive_payload: Dictionary, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IHudSyncService.dispatch_hud_directive_async: not implemented")
-	if callback.is_valid():
-		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 订阅常驻 HUD 多信道事件（返回订阅令牌数组供对称退订）
 func subscribe_hud_channels(_callbacks: Dictionary) -> Array:

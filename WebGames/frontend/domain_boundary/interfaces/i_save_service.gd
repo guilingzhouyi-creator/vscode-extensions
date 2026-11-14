@@ -16,27 +16,27 @@ func get_replay_speeds() -> Array:
 	EventBusCore.get_instance().emit_log("error", "ISaveService.get_replay_speeds: pure virtual method must be implemented by subclass")
 	return []
 
-## 回放帧推进（钳制到 [0, total]）
-func advance_replay(current: int, total: int, step: int) -> int:
+## 回放帧推进（钳制到 [0, total_frames]）
+func advance_replay(current_frame: int, total_frames: int, frame_step: int) -> int:
 	EventBusCore.get_instance().emit_log("error", "ISaveService.advance_replay: pure virtual method must be implemented by subclass")
-	return current
+	return current_frame
 
 ## 回放速度档位切换（direction: -1 减速 / +1 加速）
-func change_replay_speed(current: float, direction: int) -> float:
+func change_replay_speed(current_speed: float, direction: int) -> float:
 	EventBusCore.get_instance().emit_log("error", "ISaveService.change_replay_speed: pure virtual method must be implemented by subclass")
-	return current
+	return current_speed
 
 ## 进度条比例 → 当前帧
-func frame_from_ratio(ratio: float, total: int) -> int:
+func frame_from_ratio(progress_ratio: float, total_frames: int) -> int:
 	EventBusCore.get_instance().emit_log("error", "ISaveService.frame_from_ratio: pure virtual method must be implemented by subclass")
 	return 0
 
 ## 写入槽位（返回新槽位副本）
-func write_slot(slot: Dictionary, payload: Dictionary) -> Dictionary:
+func write_slot(slot_record: Dictionary, slot_payload: Dictionary) -> Dictionary:
 	EventBusCore.get_instance().emit_log("error", "ISaveService.write_slot: pure virtual method must be implemented by subclass")
-	return slot
+	return slot_record
 
 ## 清空槽位（返回新槽位副本）
-func clear_slot(slot: Dictionary) -> Dictionary:
+func clear_slot(slot_record: Dictionary) -> Dictionary:
 	EventBusCore.get_instance().emit_log("error", "ISaveService.clear_slot: pure virtual method must be implemented by subclass")
-	return slot
+	return slot_record

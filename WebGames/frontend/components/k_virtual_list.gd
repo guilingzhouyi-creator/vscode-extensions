@@ -64,16 +64,16 @@ func _ready() -> void:
 	get_v_scroll_bar().value_changed.connect(_on_scroll_changed)
 
 ## 核心算法：基于滚动偏移量求解可视单元格索引闭区间 [start_index, end_index]
-static func calculate_visible_range(scroll_y: float, view_height: float, cell_height: float, total: int, buffer: int = 2) -> Vector2i:
-	if total <= 0 or cell_height <= 0.0:
+static func calculate_visible_range(scroll_y: float, view_height: float, cell_height: float, total_count: int, buffer_rows: int = 2) -> Vector2i:
+	if total_count <= 0 or cell_height <= 0.0:
 		return Vector2i(-1, -1)
 
 	var safe_view_height: float = maxf(view_height, cell_height)
-	var raw_start: int = int(floor(scroll_y / cell_height)) - buffer
-	var raw_end: int = int(ceil((scroll_y + safe_view_height) / cell_height)) + buffer
+	var raw_start: int = int(floor(scroll_y / cell_height)) - buffer_rows
+	var raw_end: int = int(ceil((scroll_y + safe_view_height) / cell_height)) + buffer_rows
 
-	var start_index: int = clampi(raw_start, 0, total - 1)
-	var end_index: int = clampi(raw_end, 0, total - 1)
+	var start_index: int = clampi(raw_start, 0, total_count - 1)
+	var end_index: int = clampi(raw_end, 0, total_count - 1)
 
 	if start_index > end_index:
 		return Vector2i(-1, -1)
@@ -92,7 +92,7 @@ func set_total_count(count: int) -> void:
 	_total_count = safe_count
 	_refresh_range()
 
-func _on_scroll_changed(_value: float) -> void:
+func _on_scroll_changed(_scroll_value: float) -> void:
 	_refresh_range()
 
 func _refresh_range() -> void:
@@ -136,13 +136,13 @@ func acquire_row() -> Control:
 	return fresh
 
 ## 按可视索引取用行节点：命中当前活跃行则复用，否则取池/新建并登记为活跃
-func acquire_row_for_index(index: int) -> Control:
-	var existing: Control = _active_rows.get(index)
+func acquire_row_for_index(row_index: int) -> Control:
+	var existing: Control = _active_rows.get(row_index)
 	if existing != null and is_instance_valid(existing):
 		return existing
 	var row := acquire_row()
-	_active_rows[index] = row
-	_row_to_index[row] = index
+	_active_rows[row_index] = row
+	_row_to_index[row] = row_index
 	return row
 
 ## 归还一枚行节点：同步移出活跃表 → 清态 → 入池；超池容量则直接释放（ADV-POOL-001）
@@ -183,8 +183,8 @@ func _pool_capacity() -> int:
 	var view_height: float = size.y
 	if view_height <= 0.0:
 		view_height = 400.0
-	var visible_cap: int = int(ceil(view_height / maxf(item_height, 1.0))) + 2 * buffer_count
-	return clampi(visible_cap, 0, POOL_HARD_CAP)
+	var visible_capacity: int = int(ceil(view_height / maxf(item_height, 1.0))) + 2 * buffer_count
+	return clampi(visible_capacity, 0, POOL_HARD_CAP)
 
 ## 回收时机：可视区间变化时收回离区行
 func _recycle_rows_for_range(start_index: int, end_index: int) -> void:
@@ -220,8 +220,8 @@ func reset_state() -> void:
 	_current_end = -1
 
 ## 视图销毁钩子：清空行对象池，杜绝泄漏
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE:
+func _notification(notification_type: int) -> void:
+	if notification_type == NOTIFICATION_PREDELETE:
 		_clear_row_pool()
 
 ## 当前空闲池深度（自测/诊断用）

@@ -44,6 +44,6 @@ func reset_gesture() -> void:
 	EventBusCore.get_instance().emit_log("error", "IChatCommandSession.reset_gesture: pure virtual method must be implemented by subclass")
 
 ## Tab 手势判定（返回 is_tab / is_single_tap / is_double_tap）
-func feed_gesture(key_code: String, timestamp_msec: int) -> Dictionary:
+func feed_gesture(key_code: String, timestamp_milliseconds: int) -> Dictionary:
 	EventBusCore.get_instance().emit_log("error", "IChatCommandSession.feed_gesture: pure virtual method must be implemented by subclass")
 	return {}

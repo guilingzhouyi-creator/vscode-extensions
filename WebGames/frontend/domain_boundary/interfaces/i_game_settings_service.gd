@@ -12,25 +12,25 @@ class_name IGameSettingsService
 extends RefCounted
 
 ## 异步读取当前权威游戏设置快照 (GET_GAME_SETTINGS)
-func get_settings_async(_account_id: String, _token: String, callback: Callable) -> void:
+func get_settings_async(_account_id: String, _token: String, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IGameSettingsService.get_settings_async: not implemented")
-	if callback.is_valid():
-		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 异步应用设置变更（支持持久化与分辨率回滚守护）(APPLY_GAME_SETTINGS)
-func apply_settings_async(_account_id: String, _token: String, _patch: Dictionary, callback: Callable) -> void:
+func apply_settings_async(_account_id: String, _token: String, _settings_patch: Dictionary, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IGameSettingsService.apply_settings_async: not implemented")
-	if callback.is_valid():
-		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 异步确认待验证的分辨率修改 (CONFIRM_GAME_SETTINGS)
-func confirm_resolution_async(_account_id: String, _token: String, callback: Callable) -> void:
+func confirm_resolution_async(_account_id: String, _token: String, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IGameSettingsService.confirm_resolution_async: not implemented")
-	if callback.is_valid():
-		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 异步重置设置回默认配置 (RESET_GAME_SETTINGS)
-func reset_defaults_async(_account_id: String, _token: String, callback: Callable) -> void:
+func reset_defaults_async(_account_id: String, _token: String, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IGameSettingsService.reset_defaults_async: not implemented")
-	if callback.is_valid():
-		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})

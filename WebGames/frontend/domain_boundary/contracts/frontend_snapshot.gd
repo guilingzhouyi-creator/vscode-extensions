@@ -19,27 +19,27 @@ func to_dictionary() -> Dictionary:
 ## 防御性读取工具（缺省 / 越界 / 类型漂移输入安全回退）
 ## -----------------------------------------------------------------------------
 ## 安全读取字符串字段，缺失时返回指定默认回退值
-static func read_string(data: Dictionary, key: String, fallback: String = "") -> String:
-	return str(data.get(key, fallback))
+static func read_string(snapshot_payload: Dictionary, field_key: String, fallback_value: String = "") -> String:
+	return str(snapshot_payload.get(field_key, fallback_value))
 
 ## 安全读取整型字段，缺失时返回指定默认回退值
-static func read_int(data: Dictionary, key: String, fallback: int = 0) -> int:
-	return int(data.get(key, fallback))
+static func read_int(snapshot_payload: Dictionary, field_key: String, fallback_value: int = 0) -> int:
+	return int(snapshot_payload.get(field_key, fallback_value))
 
 ## 安全读取浮点字段，缺失时返回指定默认回退值
-static func read_float(data: Dictionary, key: String, fallback: float = 0.0) -> float:
-	return float(data.get(key, fallback))
+static func read_float(snapshot_payload: Dictionary, field_key: String, fallback_value: float = 0.0) -> float:
+	return float(snapshot_payload.get(field_key, fallback_value))
 
 ## 安全读取布尔字段，缺失时返回指定默认回退值
-static func read_bool(data: Dictionary, key: String, fallback: bool = false) -> bool:
-	return bool(data.get(key, fallback))
+static func read_bool(snapshot_payload: Dictionary, field_key: String, fallback_value: bool = false) -> bool:
+	return bool(snapshot_payload.get(field_key, fallback_value))
 
 ## 安全读取数组字段并执行深拷贝，非数组类型时返回空数组以隔离外部引用篡改
-static func read_array(data: Dictionary, key: String) -> Array:
-	var value: Variant = data.get(key, [])
-	return value.duplicate(true) if value is Array else []
+static func read_array(snapshot_payload: Dictionary, field_key: String) -> Array:
+	var raw_value: Variant = snapshot_payload.get(field_key, [])
+	return raw_value.duplicate(true) if raw_value is Array else []
 
 ## 安全读取字典字段并执行深拷贝，非字典类型时返回空字典以隔离外部引用篡改
-static func read_dict(data: Dictionary, key: String) -> Dictionary:
-	var value: Variant = data.get(key, {})
-	return value.duplicate(true) if value is Dictionary else {}
+static func read_dict(snapshot_payload: Dictionary, field_key: String) -> Dictionary:
+	var raw_value: Variant = snapshot_payload.get(field_key, {})
+	return raw_value.duplicate(true) if raw_value is Dictionary else {}

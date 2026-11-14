@@ -12,7 +12,7 @@ class_name IGuildService
 extends RefCounted
 
 ## 生成公会成员名单（等级/贡献/角色/在线态按规则生成）
-func generate_roster(count: int) -> Array:
+func generate_roster(member_count: int) -> Array:
 	EventBusCore.get_instance().emit_log("error", "IGuildService.generate_roster: pure virtual method must be implemented by subclass")
 	return []
 
@@ -21,7 +21,7 @@ func can_manage(user_role: String) -> bool:
 	EventBusCore.get_instance().emit_log("error", "IGuildService.can_manage: pure virtual method must be implemented by subclass")
 	return false
 
-## 交易状态机跃迁（action: lock / confirm / cancel）→ {success, locked, confirmed}
-func trade_transition(state: Dictionary, action: String) -> Dictionary:
+## 交易状态机跃迁（trade_action: lock / confirm / cancel）→ {success, locked, confirmed}
+func trade_transition(trade_state: Dictionary, trade_action: String) -> Dictionary:
 	EventBusCore.get_instance().emit_log("error", "IGuildService.trade_transition: pure virtual method must be implemented by subclass")
 	return {"success": false, "error_code": "NOT_IMPLEMENTED"}

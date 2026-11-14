@@ -12,17 +12,17 @@ class_name IMiscEdgeService
 extends RefCounted
 
 ## 激活突变（槽位上限与重复校验）→ {success, mutations, reason}
-func activate_mutation(active: Array, item: Dictionary, max_slots: int) -> Dictionary:
+func activate_mutation(active_mutations: Array, mutation_entry: Dictionary, max_slots: int) -> Dictionary:
 	EventBusCore.get_instance().emit_log("error", "IMiscEdgeService.activate_mutation: pure virtual method must be implemented by subclass")
 	return {"success": false, "reason": "NOT_IMPLEMENTED"}
 
 ## 替换末位已激活突变 → {success, mutations, reason}
-func replace_last_mutation(active: Array, item: Dictionary) -> Dictionary:
+func replace_last_mutation(active_mutations: Array, mutation_entry: Dictionary) -> Dictionary:
 	EventBusCore.get_instance().emit_log("error", "IMiscEdgeService.replace_last_mutation: pure virtual method must be implemented by subclass")
 	return {"success": false, "reason": "NOT_IMPLEMENTED"}
 
 ## 拾取掉落物 → {success, loot, item, reason}
-func pickup_loot(loot: Array, index: int) -> Dictionary:
+func pickup_loot(loot_entries: Array, loot_index: int) -> Dictionary:
 	EventBusCore.get_instance().emit_log("error", "IMiscEdgeService.pickup_loot: pure virtual method must be implemented by subclass")
 	return {"success": false, "reason": "NOT_IMPLEMENTED"}
 
