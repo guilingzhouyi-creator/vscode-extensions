@@ -14,7 +14,7 @@ class_name LatticeDecompilerService extends RefCounted
 static func optimize_lattice_path(ast: SkillSubgraphAST, learner_int: float) -> Dictionary:
 	var path_reduction := GameConfig.get_float("domains.lattice", "decompiler/path_reduction", 0.35) # 空间拓扑测地线缩短 35%
 	var loss_coefficient := GameConfig.get_float("domains.lattice", "decompiler/loss_coefficient", 0.40)
-	# L1: 归一化分母下限守卫（Inv-VD-1）——配置 0 时 float 除零产出 inf 污染能量损耗指标
+	# 归一化分母下限守卫（Inv-VD-1）——配置 0 时 float 除零产出 inf 污染能量损耗指标
 	var learner_normalize := maxf(1.0, GameConfig.get_float("domains.lattice", "decompiler/learner_normalize", 50.0))
 	var min_sentences := GameConfig.get_int("domains.lattice", "decompiler/min_sentences", 1)
 
@@ -34,17 +34,17 @@ static func optimize_lattice_path(ast: SkillSubgraphAST, learner_int: float) -> 
 ## 检测技能 DAG 图中是否存在死循环/环路 (拓扑合法性校验)
 static func is_acyclic_dag(ast: SkillSubgraphAST) -> bool:
 	var in_degree: Dictionary = {}
-	var adj: Dictionary = {}
+	var adjacency: Dictionary = {}
 
 	for node_id in ast.nodes:
-		_register_dag_node_bucket(node_id, in_degree, adj)
+		_register_dag_node_bucket(node_id, in_degree, adjacency)
 
 	for edge in ast.edges:
-		var u: Variant = edge.get("from", "")
-		var v: Variant = edge.get("to", "")
-		if in_degree.has(v) and adj.has(u):
-			in_degree[v] += 1
-			adj[u].append(v)
+		var from_node_id: Variant = edge.get("from", "")
+		var to_node_id: Variant = edge.get("to", "")
+		if in_degree.has(to_node_id) and adjacency.has(from_node_id):
+			in_degree[to_node_id] += 1
+			adjacency[from_node_id].append(to_node_id)
 
 	var queue: Array[String] = []
 	for node_id in in_degree:
@@ -54,39 +54,39 @@ static func is_acyclic_dag(ast: SkillSubgraphAST) -> bool:
 	var head: int = 0
 	var visited_count := 0
 	while head < queue.size():
-		var curr: String = queue[head]
+		var current_node_id: String = queue[head]
 		head += 1
 		visited_count += 1
-		_process_topological_neighbors(curr, adj, in_degree, queue)
+		_process_topological_neighbors(current_node_id, adjacency, in_degree, queue)
 
 	return visited_count == ast.nodes.size()
 
-static func _register_dag_node_bucket(node_id: Variant, in_degree: Dictionary, adj: Dictionary) -> void:
+static func _register_dag_node_bucket(node_id: Variant, in_degree: Dictionary, adjacency: Dictionary) -> void:
 	in_degree[node_id] = 0
-	adj[node_id] = []
+	adjacency[node_id] = []
 
 ## 消耗拓扑排序当前节点的后继入度
-static func _process_topological_neighbors(curr: String, adj: Dictionary, in_degree: Dictionary, queue: Array[String]) -> void:
-	for nxt in adj.get(curr, []):
-		in_degree[nxt] -= 1
-		if in_degree[nxt] == 0:
-			queue.append(nxt)
+static func _process_topological_neighbors(current_node_id: String, adjacency: Dictionary, in_degree: Dictionary, queue: Array[String]) -> void:
+	for next_node_id in adjacency.get(current_node_id, []):
+		in_degree[next_node_id] -= 1
+		if in_degree[next_node_id] == 0:
+			queue.append(next_node_id)
 
 ## 为技能子图 AST 生成唯一拓扑签名
 static func generate_ast_signature(ast: SkillSubgraphAST) -> String:
 	var prefix := GameConfig.get_string("domains.lattice", "decompiler/signature_prefix", "AST:")
-	var title_sep := GameConfig.get_string("domains.lattice", "decompiler/signature_title_sep", ":")
+	var title_separator := GameConfig.get_string("domains.lattice", "decompiler/signature_title_sep", ":")
 	var node_format := GameConfig.get_string("domains.lattice", "decompiler/signature_node_format", "%s:%s;")
 
 	var sorted_keys: Array = ast.nodes.keys()
 	sorted_keys.sort()
 	var parts := PackedStringArray()
 	parts.resize(sorted_keys.size() + 1)
-	parts[0] = prefix + ast.skill_name + title_sep
-	for idx in range(sorted_keys.size()):
-		var k: Variant = sorted_keys[idx]
-		var n: Dictionary = ast.nodes[k]
-		parts[idx + 1] = node_format % [k, n.get("symbol", "")]
+	parts[0] = prefix + ast.skill_name + title_separator
+	for node_index in range(sorted_keys.size()):
+		var node_key: Variant = sorted_keys[node_index]
+		var node_data: Dictionary = ast.nodes[node_key]
+		parts[node_index + 1] = node_format % [node_key, node_data.get("symbol", "")]
 
 	ast.signature_hash = "".join(parts).sha256_text()
 	return ast.signature_hash

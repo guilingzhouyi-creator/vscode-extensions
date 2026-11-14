@@ -17,7 +17,7 @@ static func publish_manuscript_book(
 	source_ast: SkillSubgraphAST,
 	base_market_price: int = -1,
 	royalty_rate: float = -1.0
-) -> SkillSubgraphAST.ManuscriptItemEntity:
+) -> ManuscriptItemEntity:
 	var price := base_market_price
 	if price < 0:
 		price = GameConfig.get_int("domains.lattice", "manuscript_defaults/default_price", 100)
@@ -35,8 +35,8 @@ static func publish_manuscript_book(
 	LatticeDecompilerService.generate_ast_signature(source_ast)
 
 	# 2. 实例化典籍手稿实体
-	var manuscript := SkillSubgraphAST.ManuscriptItemEntity.new()
-	manuscript.item_id = UniqueIdGenerator.next_id(id_prefix)
+	var manuscript := ManuscriptItemEntity.new()
+	manuscript.item_id = IdGenerator.next_id(id_prefix)
 	manuscript.custom_name = name_prefix + book_title
 	manuscript.author_character_id = author_id
 	manuscript.imprinted_ast = source_ast
@@ -53,7 +53,7 @@ static func publish_manuscript_book(
 	return manuscript
 
 ## 结算技能书手稿按销量计算的版税收益
-static func settle_book_royalties(manuscript: SkillSubgraphAST.ManuscriptItemEntity, copies_sold: int) -> int:
+static func settle_book_royalties(manuscript: ManuscriptItemEntity, copies_sold: int) -> int:
 	var total_gross := copies_sold * manuscript.market_base_price
 	var author_payout := int(floor(float(total_gross) * manuscript.royalty_percent))
 	manuscript.copy_circulation_count += copies_sold
