@@ -61,11 +61,11 @@ func precheck_and_configure_single_player_mods(candidate_packs: Array, enabled_p
     if not bool(precheck_result.get("success", false)):
         adapted_mod_manifest.clear()
         creation_ui_snapshot.clear()
-        var err_code: String = str(precheck_result.get("error_code", precheck_result.get("error", "ERR_MOD_PRECHECK_FAILED")))
+        var error_code: String = str(precheck_result.get("error_code", precheck_result.get("error", "ERR_MOD_PRECHECK_FAILED")))
         var fail_dict: Dictionary = precheck_result.duplicate(true)
         fail_dict["success"] = false
-        fail_dict["error_code"] = err_code
-        fail_dict["error"] = err_code
+        fail_dict["error_code"] = error_code
+        fail_dict["error"] = error_code
         if not fail_dict.has("precheck_checklist"):
             fail_dict["precheck_checklist"] = []
         if not fail_dict.has("conflicts"):
@@ -74,8 +74,8 @@ func precheck_and_configure_single_player_mods(candidate_packs: Array, enabled_p
 
     var raw_manifest: Variant = precheck_result.get("adapted_manifest", {})
     adapted_mod_manifest = (raw_manifest as Dictionary).duplicate(true) if raw_manifest is Dictionary else {}
-    var raw_ui_snap: Variant = precheck_result.get("creation_ui_snapshot", {})
-    creation_ui_snapshot = (raw_ui_snap as Dictionary).duplicate(true) if raw_ui_snap is Dictionary else {}
+    var raw_ui_snapshot: Variant = precheck_result.get("creation_ui_snapshot", {})
+    creation_ui_snapshot = (raw_ui_snapshot as Dictionary).duplicate(true) if raw_ui_snapshot is Dictionary else {}
     var raw_enabled: Variant = precheck_result.get("enabled_pack_ids", [])
     active_mods = (raw_enabled as Array).duplicate(true) if raw_enabled is Array else []
 
@@ -96,12 +96,12 @@ func discover_and_configure_single_player_mods(custom_roots: Array = [], enabled
     var candidates: Array[Dictionary] = ModPackageDiscoverySolver.scan_installed_full_mod_packages(custom_roots)
     return precheck_and_configure_single_player_mods(candidates, enabled_pack_ids)
 
-## 强制净化卸载本地第三方模组并回退 Vanilla 原生核心与洗脱内存
+## 强制净化卸载本地第三方模组并回退 Vanilla 原生核心及重置清理内存
 func purge_and_fallback_to_vanilla() -> void:
     var cleaned_mods: Array = []
-    for m in active_mods:
-        if AntiBridgeGuard.is_vanilla_pack(m):
-            cleaned_mods.append(m)
+    for mod_entry in active_mods:
+        if AntiBridgeGuard.is_vanilla_pack(mod_entry):
+            cleaned_mods.append(mod_entry)
     active_mods = cleaned_mods
     adapted_mod_manifest.clear()
     creation_ui_snapshot.clear()
@@ -155,17 +155,17 @@ func select_mode(
     if not custom_mods.is_empty():
         active_mods = custom_mods.duplicate()
 
-    var guard_res: Dictionary = WorldGatewayWorldCatalogHelper.validate_mode_entry_guards(
+    var guard_result: Dictionary = WorldGatewayWorldCatalogHelper.validate_mode_entry_guards(
         context, mode, active_mods, _last_probe_reports
     )
-    if not bool(guard_res.get("allowed", false)):
+    if not bool(guard_result.get("allowed", false)):
         return _fail(
-            str(guard_res.get("error_code", "SECURITY_ERR_TRANSITION_BLOCKED")),
-            str(guard_res.get("message", "Mode transition was blocked by security guard.")),
-            guard_res.get("params", {})
+            str(guard_result.get("error_code", "SECURITY_ERR_TRANSITION_BLOCKED")),
+            str(guard_result.get("message", "Mode transition was blocked by security guard.")),
+            guard_result.get("params", {})
         )
 
-    # 若为联机模式，强制卸载本地第三方模组，回退 Vanilla 原生核心并洗脱
+    # 若为联机模式，强制卸载本地第三方模组，回退 Vanilla 原生核心并重置清理
     if mode == WorldGatewayModel.GameMode.MULTIPLAYER:
         purge_and_fallback_to_vanilla()
 
@@ -183,8 +183,8 @@ func select_mode(
 
     if not route_result.success:
         return _fail(route_result.error_code, route_result.message)
-    var target_slot_dto: SaveSlotStateDTO = WorldGatewayWorldCatalogHelper.pick_target_slot(route_result.available_slots, target_slot_id)
-    if target_slot_dto == null:
+    var target_slot: SaveSlotStateDTO = WorldGatewayWorldCatalogHelper.pick_target_slot(route_result.available_slots, target_slot_id)
+    if target_slot == null:
         return _fail(
             "GATEWAY_ERR_SLOT_NOT_FOUND",
             "Specified save slot not found: {target_slot_id}.",
@@ -198,14 +198,14 @@ func select_mode(
         RuntimeModeGate.Mode.ONLINE if mode == WorldGatewayModel.GameMode.MULTIPLAYER else RuntimeModeGate.Mode.SINGLE_PLAYER
     )
 
-    context.selected_slot_id = target_slot_dto.slot_id
-    context.is_first_time_creation = (target_slot_dto.bound_character_id.is_empty() or target_slot_dto.is_first_creation)
+    context.selected_slot_id = target_slot.slot_id
+    context.is_first_time_creation = (target_slot.bound_character_id.is_empty() or target_slot.is_first_creation)
 
     # 若为新开档或角色未就绪，流转至待创角/选角阶段
     if context.is_first_time_creation:
         context.current_phase = WorldGatewayModel.GatewayPhase.CHARACTER_PENDING
     else:
-        context.active_character_id = target_slot_dto.bound_character_id
+        context.active_character_id = target_slot.bound_character_id
         context.current_phase = WorldGatewayModel.GatewayPhase.SLOT_WORLD_RESOLVED
 
     var gateway_hooks_map: Dictionary = GameConfig.get_dict("domains.world_gateway", "gateway_hooks", {})
@@ -224,7 +224,7 @@ func select_mode(
 ## 根据账户属性与配置决策适配的游戏入口模式
 func select_mode_for_account(
     mode: int,
-    account: AccountProfileAggregate,
+    account: AccountProfile,
     canary_flags: Dictionary = {},
     target_world_id: String = "",
     target_slot_id: String = ""
@@ -309,14 +309,16 @@ func enter_world(target_world_id: String = "", allow_safe_degrade: bool = false)
         context.selected_world_id = effective_world_id
 
     context.current_phase = WorldGatewayModel.GatewayPhase.IN_WORLD
-    WorldSessionRuntimeService.activate_world_session({
+    var hud_context: Dictionary = {
         "account_id": context.account_id,
         "gateway": self,
         "world_id": context.selected_world_id,
         "slot_id": context.selected_slot_id,
         "character_id": context.active_character_id,
         "game_mode": context.selected_mode
-    }, false)
+    }
+    _populate_existing_character_context(hud_context)
+    WorldSessionRuntimeService.activate_world_session(hud_context, false)
     _notify_event("world_gateway.world_entered", {
         "account_id": context.account_id,
         "world_id": context.selected_world_id,
@@ -325,7 +327,79 @@ func enter_world(target_world_id: String = "", allow_safe_degrade: bool = false)
     })
     return {"success": true, "phase": context.current_phase, "context": context.to_dto()}
 
-## 5. 序章向大地图探索无缝交接（水化创角终态，驱动 FSM 跃迁至 WORLD_EXPLORATION 并触发 HUD 初始同步）
+func _populate_existing_character_context(hud_context: Dictionary) -> void:
+    var existing_profile: Variant = WorldSessionRuntimeService.get_character_profile()
+    if existing_profile != null:
+        hud_context["character_profile"] = existing_profile
+    var existing_prologue: Variant = WorldSessionRuntimeService.get_prologue_context()
+    if existing_prologue != null:
+        hud_context["prologue_context"] = existing_prologue
+    _populate_world_instance_context(hud_context, true)
+    _populate_account_slot_context(hud_context)
+
+
+func _populate_world_instance_context(hud_context: Dictionary, ensure_loaded: bool) -> void:
+    if context.selected_world_id.is_empty():
+        return
+    var world_repository := WorldArchiveRepository.get_instance()
+    if world_repository == null:
+        return
+    if ensure_loaded and not world_repository.is_loaded():
+        world_repository.load_all()
+    var world_instance := world_repository.load_world(context.selected_world_id)
+    if world_instance != null:
+        hud_context["world_instance"] = world_instance
+
+
+func _resolve_selected_slot_binding() -> Dictionary:
+    if context.account_id.is_empty() or context.selected_slot_id.is_empty():
+        return {}
+    var account_repository := AccountRepository.get_instance()
+    if account_repository == null:
+        return {}
+    if not account_repository.is_loaded():
+        account_repository.load_all()
+    var account := account_repository.find_by_id(context.account_id)
+    if account == null or not account.save_slot_summaries.has(context.selected_slot_id):
+        return {}
+    var slot_summary: SaveSlotDTO = account.save_slot_summaries[context.selected_slot_id]
+    if slot_summary == null:
+        return {}
+    return {
+        "account_repository": account_repository,
+        "account": account,
+        "slot_summary": slot_summary
+    }
+
+
+func _populate_account_slot_context(hud_context: Dictionary) -> void:
+    var slot_binding := _resolve_selected_slot_binding()
+    if slot_binding.is_empty():
+        return
+    var slot_summary: SaveSlotDTO = slot_binding["slot_summary"]
+    _apply_slot_summary_to_hud_context(hud_context, slot_summary)
+
+
+func _apply_slot_summary_to_hud_context(hud_context: Dictionary, slot_summary: SaveSlotDTO) -> void:
+    if not slot_summary.character_name.is_empty():
+        hud_context["character_name"] = slot_summary.character_name
+    if not slot_summary.current_location_name.is_empty():
+        hud_context["current_location_id"] = slot_summary.current_location_name
+    if slot_summary.character_profile != null:
+        _apply_character_profile_to_hud_context(hud_context, slot_summary.character_profile)
+
+
+func _apply_character_profile_to_hud_context(hud_context: Dictionary, character_profile: Variant) -> void:
+    hud_context["character_profile"] = character_profile
+    if character_profile.attributes is Dictionary:
+        hud_context["attribute_levels"] = (character_profile.attributes as Dictionary).duplicate()
+    if character_profile.personal_resources is Dictionary:
+        hud_context["wallet_gold"] = int(character_profile.personal_resources.get("gold", 0))
+    if character_profile.growth_state is Dictionary:
+        hud_context["level"] = maxi(1, int(character_profile.growth_state.get("level", 1)))
+        hud_context["race_id"] = str(character_profile.growth_state.get("race_id", "HUMAN"))
+
+## 5. 序章向大地图探索无缝交接（状态装配创角终态，驱动 FSM 跃迁至 WORLD_EXPLORATION 并触发 HUD 初始同步）
 func handoff_prologue_to_world_exploration(handoff: PrologueHandoffDTO) -> Dictionary:
     if handoff == null or handoff.character_id.is_empty():
         return _fail(
@@ -336,11 +410,9 @@ func handoff_prologue_to_world_exploration(handoff: PrologueHandoffDTO) -> Dicti
     if not handoff.active_mods.is_empty():
         active_mods = handoff.active_mods.duplicate()
     context.active_character_id = handoff.character_id
-    if not handoff.assigned_start_location_id.is_empty():
-        context.selected_world_id = handoff.assigned_start_location_id
 
-    var game_loop_stack := GameLoopStateStack.new()
-    game_loop_stack.switch_to(GameLoopStateStack.EngineState.WORLD_EXPLORATION, {
+    var game_loop_stack := GameLoopFSM.new()
+    game_loop_stack.switch_to(GameLoopFSM.EngineState.WORLD_EXPLORATION, {
         "character_id": handoff.character_id,
         "character_name": handoff.character_name,
         "location_id": handoff.assigned_start_location_id,
@@ -353,7 +425,7 @@ func handoff_prologue_to_world_exploration(handoff: PrologueHandoffDTO) -> Dicti
 
     context.current_phase = WorldGatewayModel.GatewayPhase.IN_WORLD
 
-    var hud_ctx: Dictionary = {
+    var hud_context: Dictionary = {
         "account_id": context.account_id,
         "gateway": self,
         "world_id": context.selected_world_id,
@@ -364,10 +436,16 @@ func handoff_prologue_to_world_exploration(handoff: PrologueHandoffDTO) -> Dicti
         "game_mode": context.selected_mode,
         "wallet_gold": handoff.initial_gold,
         "current_location_id": handoff.assigned_start_location_id,
-        "attribute_values": handoff.allocated_attributes.duplicate(true)
+        "attribute_levels": handoff.allocated_attributes.duplicate(true),
+        "attribute_values": handoff.allocated_attributes.duplicate(true),
+        "character_profile": WorldSessionRuntimeService.get_character_profile(),
+        "prologue_context": WorldSessionRuntimeService.get_prologue_context()
     }
-    WorldSessionRuntimeService.activate_world_session(hud_ctx, false)
-    var snapshot: AuthoritativeHudSnapshotDTO = AuthoritativeHudSyncService.trigger_initial_sync(hud_ctx)
+    _populate_world_instance_context(hud_context, false)
+    _mark_selected_slot_prologue_completed()
+
+    WorldSessionRuntimeService.activate_world_session(hud_context, false)
+    var snapshot: AuthoritativeHudSnapshotDTO = AuthoritativeHudSyncService.trigger_initial_sync(hud_context)
 
     _notify_event("world_gateway.prologue_handed_off", {
         "account_id": context.account_id,
@@ -384,16 +462,25 @@ func handoff_prologue_to_world_exploration(handoff: PrologueHandoffDTO) -> Dicti
         "handoff": handoff.to_dto()
     }
 
+func _mark_selected_slot_prologue_completed() -> void:
+    var slot_binding := _resolve_selected_slot_binding()
+    if slot_binding.is_empty():
+        return
+    var slot_summary: SaveSlotDTO = slot_binding["slot_summary"]
+    slot_summary.prologue_completed = true
+    var account_repository: AccountRepository = slot_binding["account_repository"]
+    account_repository.save_account(slot_binding["account"])
+
 ## 退出世界回到世界栏主界面（门面方法，等价于 exit_to_gateway）
 func exit_world() -> Dictionary:
     return exit_to_gateway()
 
-## 5. 退回世界栏主界面并实施内存全量洗脱 (Full Memory Scrubbing + 探针与模式闸门复位)
+## 5. 退回世界栏主界面并实施内存全量重置清理 (Full Memory Scrubbing + 探针与模式闸门复位)
 func exit_to_gateway() -> Dictionary:
     WorldSessionRuntimeService.deactivate_world_session()
     RuntimeModeGate.set_mode(RuntimeModeGate.Mode.SINGLE_PLAYER)
 
-    # 全量洗脱重置运行时所有模式、槽位、世界与角色状态
+    # 全量重置清理运行时所有模式、槽位、世界与角色状态
     context.selected_mode = WorldGatewayModel.GameMode.UNSELECTED
     context.selected_slot_id = ""
     context.selected_world_id = ""
@@ -423,9 +510,35 @@ func exit_to_gateway() -> Dictionary:
         "message": "Gateway memory successfully scrubbed and returned to entered state."
     }
 
-## 6. 切换运行网关模式（仅允许已洗脱的 GATEWAY_ENTERED 状态；活跃世界内强拦截热切换）
+## 5.1 账号注销清理（重置清理世界/槽位/MOD 与账号绑定，复位至认证前初始待命态）
+func logout() -> Dictionary:
+    var exited_account_id := context.account_id
+    WorldSessionRuntimeService.deactivate_world_session()
+    RuntimeModeGate.set_mode(RuntimeModeGate.Mode.SINGLE_PLAYER)
+    context.selected_mode = WorldGatewayModel.GameMode.UNSELECTED
+    context.selected_slot_id = ""
+    context.selected_world_id = ""
+    context.active_character_id = ""
+    context.is_first_time_creation = false
+    context.account_id = ""
+    context.current_phase = WorldGatewayModel.GatewayPhase.AUTHENTICATED
+    active_mods.clear()
+    adapted_mod_manifest.clear()
+    creation_ui_snapshot.clear()
+    _last_probe_reports.clear()
+    _notify_event("world_gateway.account_logged_out", {
+        "account_id": exited_account_id,
+        "phase": context.current_phase
+    })
+    return {
+        "success": true,
+        "phase": context.current_phase,
+        "context": context.to_dto()
+    }
+
+## 6. 切换运行网关模式（仅允许已重置清理的 GATEWAY_ENTERED 状态；活跃世界内强拦截热切换）
 func switch_gateway_mode(target_mode: int, canary_flags: Dictionary = {}, account_slots: Array = [],
-		target_world_id: String = "", target_slot_id: String = "", custom_mods: Array = []) -> Dictionary:
+        target_world_id: String = "", target_slot_id: String = "", custom_mods: Array = []) -> Dictionary:
     var is_hot_swap_blocked := GameConfig.get_bool("domains.world_gateway", "gateway_policy/block_hot_swap_while_world_active", true)
     var hot_swap_error_code := GameConfig.get_string("domains.world_gateway", "gateway_policy/err_hot_swap_blocked", "ERR_HOT_SWAP_BLOCKED_IN_ACTIVE_WORLD")
     if is_hot_swap_blocked and (context.current_phase == WorldGatewayModel.GatewayPhase.IN_WORLD or WorldSessionRuntimeService.has_active_world()):
@@ -456,23 +569,23 @@ func list_world_archives() -> Array[Dictionary]:
     var worlds_catalog := WorldGatewayWorldCatalogHelper.load_worlds_catalog()
     var result: Array[Dictionary] = []
     var registered_world_ids: Dictionary = {}
-    var archive_repo := WorldArchiveRepository.get_instance()
-    if archive_repo != null:
-        if not archive_repo.is_loaded():
-            archive_repo.load_all()
-        var empty_dto: Dictionary = {}
-        for archive_summary in archive_repo.list_worlds():
-            var archive_dto_dict: Dictionary = archive_summary.to_dto() if (archive_summary != null and archive_summary.has_method("to_dto")) else empty_dto
-            var archive_world_id := String(archive_dto_dict.get("world_id", ""))
+    var archive_repository := WorldArchiveRepository.get_instance()
+    if archive_repository != null:
+        if not archive_repository.is_loaded():
+            archive_repository.load_all()
+        var empty_summary: Dictionary = {}
+        for archive_summary in archive_repository.list_worlds():
+            var archive_summary_dict: Dictionary = archive_summary.to_dto() if (archive_summary != null and archive_summary.has_method("to_dto")) else empty_summary
+            var archive_world_id := String(archive_summary_dict.get("world_id", ""))
             if archive_world_id.is_empty():
                 continue
             registered_world_ids[archive_world_id] = true
-            result.append(archive_dto_dict)
+            result.append(archive_summary_dict)
     for world_id in worlds_catalog.keys():
         if registered_world_ids.has(world_id):
             continue
-        var world_instance_dto: Variant = worlds_catalog[world_id]
-        result.append(_format_catalog_archive_entry(world_id, world_instance_dto))
+        var world_entry: Variant = worlds_catalog[world_id]
+        result.append(_format_catalog_archive_entry(world_id, world_entry))
     return result
 
 func _format_catalog_archive_entry(world_id: Variant, world_instance_dto: Variant) -> Dictionary:

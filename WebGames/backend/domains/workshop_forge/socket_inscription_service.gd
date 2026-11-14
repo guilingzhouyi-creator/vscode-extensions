@@ -17,8 +17,8 @@ static func inscribe_rune(item: ItemEntity, rune_id: String) -> Dictionary:
 	var runes: Array = item.affix_sockets.get("imprinted_runes", [])
 
 	if runes.size() >= total_sockets:
-		var msg := GameConfig.get_string("narratives.workshop", "no_socket", "No available sockets on item.")
-		return { "success": false, "reason": msg }
+		var reason_message := GameConfig.get_string("narratives.workshop", "no_socket", "No available sockets on item.")
+		return { "success": false, "reason": reason_message }
 
 	runes.append(rune_id)
 	item.affix_sockets["imprinted_runes"] = runes
@@ -31,8 +31,8 @@ static func inscribe_rune(item: ItemEntity, rune_id: String) -> Dictionary:
 ## 打孔开槽：达上限拒绝，否则孔位 +1
 static func add_socket_to_item(item: ItemEntity, max_limit: int = -1) -> bool:
 	var limit := max_limit if max_limit >= 0 else GameConfig.get_int("domains.workshop", "socket/max_limit", 4)
-	var cur_sockets: int = int(item.affix_sockets.get("total_sockets", GameConfig.get_int("domains.workshop", "socket/default_total_sockets", 2)))
-	if cur_sockets >= limit:
+	var current_sockets: int = int(item.affix_sockets.get("total_sockets", GameConfig.get_int("domains.workshop", "socket/default_total_sockets", 2)))
+	if current_sockets >= limit:
 		return false
-	item.affix_sockets["total_sockets"] = cur_sockets + 1
+	item.affix_sockets["total_sockets"] = current_sockets + 1
 	return true
