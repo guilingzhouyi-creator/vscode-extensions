@@ -3,7 +3,7 @@
 # 文件路径: res://backend/domains/character_creation/character_baseline_attribute_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
-# 职责说明: 角色创建阶段基础六维（STR/CON/INT/AGI/SPR/VIT）一律由后端依据种族 定义配置封闭派生（L1 等级层基线 + 种族修正），严禁信任前端传入的任何 初始属性值（前端伪造 STR/CON 等一律由请求侧丢弃，见 CharacterCreationService 防伪守卫）。 关联细则: 阶段2 §2.2（后端权威属性派生求解器）
+# 职责说明: 角色创建阶段基础六维（STR/CON/INT/AGI/SPR/VIT）一律由后端依据种族 定义配置封闭派生（L1 等级层基线 + 种族修正），严禁信任前端传入的任何 初始属性值（前端伪造 STR/CON 等一律由请求侧丢弃，见 CharacterCreationService 防篡改守卫）。 关联细则: 阶段2 §2.2（后端权威属性派生求解器）
 # 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
@@ -17,26 +17,25 @@ extends RefCounted
 
 ## 由后端根据种族定义与初始规则确定性生成基础属性等级（L1 1~6）。
 ## 契约：基线等级经 clampi 收敛进 [point_buy/min, point_buy/max]（防配置越界直写输出，
-##       Inv-VD-3，）；种族修正仅作用于已存在键并再次收敛；race_def 为 null 时
+##       Inv-VD-3）；种族修正仅作用于已存在键并再次收敛；race_def 为 null 时
 ##       按人族 HUMAN 派生，返回 { attribute_levels, race_id }。
 static func generate_baseline_attributes(race_def: RaceDefinitionDTO) -> Dictionary:
 	var min_level := GameConfig.get_int("domains.character_creation", "attribute_init/point_buy/min", 1)
 	var max_level := GameConfig.get_int("domains.character_creation", "attribute_init/point_buy/max", 6)
-	# L11（）：基线等级统一收敛进 1~6 级域（Inv-VD-3）——无种族修正分支此前
-	# 配置越界值直写输出（save_slot_character_binder 直写不校验），现与修正分支同域收敛
+	# 统一收敛域校验（Inv-VD-3）：确保无种族修正分支与修正分支同样收敛至 1~6 级域
 	var base_level := clampi(GameConfig.get_int("domains.character_creation", "defaults/baseline_stat_level", 3), min_level, max_level)
 
 	var base_levels := {}
-	for stat_k in AttributeConversionEngine.DEFAULT_STAT_LIST:
-		base_levels[stat_k] = base_level
+	for stat_key in AttributeConversionEngine.DEFAULT_STAT_LIST:
+		base_levels[stat_key] = base_level
 
 	# 叠加种族修正（人族全维平衡；扩展种族经配置基准确认后放行）
 	if race_def != null and not race_def.base_stat_modifiers.is_empty():
-		for stat_k in race_def.base_stat_modifiers.keys():
-			if not base_levels.has(stat_k):
+		for stat_key in race_def.base_stat_modifiers.keys():
+			if not base_levels.has(stat_key):
 				continue
-			var mod_val: int = int(race_def.base_stat_modifiers[stat_k])
-			base_levels[stat_k] = clampi(int(base_levels[stat_k]) + mod_val, min_level, max_level)
+			var modifier_value: int = int(race_def.base_stat_modifiers[stat_key])
+			base_levels[stat_key] = clampi(int(base_levels[stat_key]) + modifier_value, min_level, max_level)
 
 	return {
 		"attribute_levels": base_levels,

@@ -7,8 +7,8 @@
 # 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
-## AttributeInitializationSolver：Headless Discrete Solver / Numerical Calculator
-class_name AttributeInitializationSolver extends RefCounted
+## AttributeInitSolver：Headless Discrete Solver / Numerical Calculator
+class_name AttributeInitSolver extends RefCounted
 
 # ==============================================================================
 # 一、骰制配置（config/domains/character_creation.json attribute_init/dice/*）
@@ -31,34 +31,34 @@ static func _drop_lowest() -> int:
 # ==============================================================================
 
 ## 4d6 掷骰去最低求和；rng 为空时回退共享实例，传入实例即可复现同一组掷骰结果。
-## 契约：drop_lowest 收敛到 [0, size-1]（保底保留 1 骰），返回 [1, 24] 区间骰值总和。
+## 契约：drop_lowest 收敛到 [0, size-1]（至少保留 1 骰），返回 [1, 24] 区间骰值总和。
 static func roll_4d6_drop_lowest(rng: DeterministicRNG = null) -> int:
 	var dice_rng := DeterministicRNG.resolve(rng)
 	var rolls: Array = []
-	var cnt := _dice_count()
+	var dice_count := _dice_count()
 	var sides := _dice_sides()
-	for i in range(cnt):
+	for roll_index in range(dice_count):
 		rolls.append(dice_rng.randi_range(1, sides))
 	rolls.sort()
-	# L1（）：drop_lowest 域收敛（Inv-VD-1/域内）——负值配置以负起点 range 越界访问
-	#（rolls[-size-1] 运行错误）；≥cnt 则静默全丢（sum=0 恒 1 级）。收敛保底至少保留 1 骰
+	# 域收敛（Inv-VD-1/域内）：负值配置会以负起点 range 越界访问
+	# （rolls[-size-1] 运行错误）；≥dice_count 则静默全丢（sum=0 恒 1 级）。下限收敛至少保留 1 骰
 	var drop := clampi(_drop_lowest(), 0, maxi(0, rolls.size() - 1))
 	var sum := 0
-	for i in range(drop, rolls.size()):
-		sum += int(rolls[i])
+	for kept_index in range(drop, rolls.size()):
+		sum += int(rolls[kept_index])
 	return sum
 
 ## 六维共用同一 RNG 实例，保证「一个种子 = 一整套属性」。
 ## 契约：六维各掷一轮 4d6 后映射为统一等级，返回六维等级字典（确定性可复现）。
 static func generate_rolled_attributes(rng: DeterministicRNG = null) -> Dictionary:
-	var attr_rng := DeterministicRNG.resolve(rng)
+	var attribute_rng := DeterministicRNG.resolve(rng)
 	return {
-		"STR": map_roll_to_level(roll_4d6_drop_lowest(attr_rng)),
-		"CON": map_roll_to_level(roll_4d6_drop_lowest(attr_rng)),
-		"INT": map_roll_to_level(roll_4d6_drop_lowest(attr_rng)),
-		"AGI": map_roll_to_level(roll_4d6_drop_lowest(attr_rng)),
-		"SPR": map_roll_to_level(roll_4d6_drop_lowest(attr_rng)),
-		"VIT": map_roll_to_level(roll_4d6_drop_lowest(attr_rng))
+		"STR": map_roll_to_level(roll_4d6_drop_lowest(attribute_rng)),
+		"CON": map_roll_to_level(roll_4d6_drop_lowest(attribute_rng)),
+		"INT": map_roll_to_level(roll_4d6_drop_lowest(attribute_rng)),
+		"AGI": map_roll_to_level(roll_4d6_drop_lowest(attribute_rng)),
+		"SPR": map_roll_to_level(roll_4d6_drop_lowest(attribute_rng)),
+		"VIT": map_roll_to_level(roll_4d6_drop_lowest(attribute_rng))
 	}
 
 ## 天命掷骰结果 → 统一等级：3~18 线性映射到 1~6 级，上限随配置联动。
@@ -72,25 +72,25 @@ static func map_roll_to_level(roll: int) -> int:
 # ==============================================================================
 
 ## 天平购点校验（统一等级 1~6）：每级消耗 = 等级数（1 级 1 点 … 6 级 6 点）。
-## 契约：六维键缺失按 min 兜底；越界或总消耗超限返回 { valid:false, reason }，
+## 契约：六维键缺失按 min 默认回退；越界或总消耗超限返回 { valid:false, reason }，
 ##       通过返回 { valid:true, total_spent, remaining_points }（无副作用）。
 static func validate_point_buy_allocation(allocated_stats: Dictionary, max_points: int = -1) -> Dictionary:
 	var required_keys: Array = GameConfig.get_array("domains.character_creation", "attribute_init/point_buy/required_keys", AttributeConversionEngine.DEFAULT_STAT_LIST)
 	var total_limit := max_points if max_points >= 0 else GameConfig.get_int("domains.character_creation", "attribute_init/point_buy/total_points", 21)
-	var min_v := AttributeConversionEngine.min_level()
-	var max_v := AttributeConversionEngine.max_level()
+	var min_level := AttributeConversionEngine.min_level()
+	var max_level := AttributeConversionEngine.max_level()
 	var total_spent := 0
 	var out_of_range_template := GameConfig.get_string("narratives.character_creation", "point_buy_out_of_range", "Attribute %s out of range [%d, %d]: %d")
 
 	for stat_key in required_keys:
-		var stat_value: int = int(allocated_stats.get(stat_key, min_v))
-		if stat_value < min_v or stat_value > max_v:
-			var msg := out_of_range_template % [stat_key, min_v, max_v, stat_value]
-			return { "valid": false, "reason": msg }
+		var stat_value: int = int(allocated_stats.get(stat_key, min_level))
+		if stat_value < min_level or stat_value > max_level:
+			var out_of_range_message := out_of_range_template % [stat_key, min_level, max_level, stat_value]
+			return { "valid": false, "reason": out_of_range_message }
 		total_spent += stat_value
 
 	if total_spent > total_limit:
-		var msg2 := GameConfig.get_string("narratives.character_creation", "point_buy_exceed", "Total points spent %d exceeds limit %d") % [total_spent, total_limit]
-		return { "valid": false, "reason": msg2 }
+		var exceed_message := GameConfig.get_string("narratives.character_creation", "point_buy_exceed", "Total points spent %d exceeds limit %d") % [total_spent, total_limit]
+		return { "valid": false, "reason": exceed_message }
 
 	return { "valid": true, "total_spent": total_spent, "remaining_points": total_limit - total_spent }

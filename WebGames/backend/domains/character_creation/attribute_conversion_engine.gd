@@ -34,36 +34,36 @@ class AttributeConfigCache extends RefCounted:
 	var segs: Dictionary = {}
 	var race_table: Dictionary = {}
 	var human_base_map: Dictionary = {}
-	var attr_coef_map: Dictionary = {}
+	var attribute_coefficient_map: Dictionary = {}
 	var prefix_sums: Array[float] = []
 
-static var _attr_cache: AttributeConfigCache = null
-static var _attr_cfg_version: int = -1
+static var _attribute_cache: AttributeConfigCache = null
+static var _attribute_config_version: int = -1
 
-static func _ensure_attr_cache() -> AttributeConfigCache:
-	var cfg_ver: int = GameConfig.config_reload_version()
-	if _attr_cache != null and _attr_cfg_version == cfg_ver:
-		return _attr_cache
-	var c := AttributeConfigCache.new()
-	c.min_lv = GameConfig.get_int("domains.attribute", "levels/min", 1)
-	c.max_lv = GameConfig.get_int("domains.attribute", "levels/max", 6)
-	c.dead_ratio = GameConfig.get_float("domains.attribute", "dead_ratio", 0.5)
-	c.exp_reshape_default = GameConfig.get_float("domains.attribute", "experience_reshape_default", 1.0)
-	c.segs = GameConfig.get_dict("domains.attribute", "segment_increments", {})
-	c.race_table = GameConfig.get_dict("domains.attribute", "race_coefficients", {})
-	var raw_hb: Dictionary = GameConfig.get_dict("domains.attribute", "human_base", {})
-	var raw_ac: Dictionary = GameConfig.get_dict("domains.attribute", "attribute_coefficients", {})
-	for attr in DEFAULT_STAT_LIST:
-		c.human_base_map[attr] = float(raw_hb.get(attr, 100.0))
-		c.attr_coef_map[attr] = float(raw_ac.get(attr, 1.0))
-	var limit: int = maxi(1, c.max_lv)
-	c.prefix_sums.resize(limit + 1)
-	c.prefix_sums[0] = 0.0
-	for i in range(1, limit + 1):
-		c.prefix_sums[i] = c.prefix_sums[i - 1] + float(c.segs.get(str(i), 1.0))
-	_attr_cache = c
-	_attr_cfg_version = cfg_ver
-	return c
+static func _ensure_attribute_cache() -> AttributeConfigCache:
+	var config_version: int = GameConfig.config_reload_version()
+	if _attribute_cache != null and _attribute_config_version == config_version:
+		return _attribute_cache
+	var config_cache := AttributeConfigCache.new()
+	config_cache.min_lv = GameConfig.get_int("domains.attribute", "levels/min", 1)
+	config_cache.max_lv = GameConfig.get_int("domains.attribute", "levels/max", 6)
+	config_cache.dead_ratio = GameConfig.get_float("domains.attribute", "dead_ratio", 0.5)
+	config_cache.exp_reshape_default = GameConfig.get_float("domains.attribute", "experience_reshape_default", 1.0)
+	config_cache.segs = GameConfig.get_dict("domains.attribute", "segment_increments", {})
+	config_cache.race_table = GameConfig.get_dict("domains.attribute", "race_coefficients", {})
+	var raw_human_base: Dictionary = GameConfig.get_dict("domains.attribute", "human_base", {})
+	var raw_attribute_coefficients: Dictionary = GameConfig.get_dict("domains.attribute", "attribute_coefficients", {})
+	for attribute_name in DEFAULT_STAT_LIST:
+		config_cache.human_base_map[attribute_name] = float(raw_human_base.get(attribute_name, 100.0))
+		config_cache.attribute_coefficient_map[attribute_name] = float(raw_attribute_coefficients.get(attribute_name, 1.0))
+	var limit: int = maxi(1, config_cache.max_lv)
+	config_cache.prefix_sums.resize(limit + 1)
+	config_cache.prefix_sums[0] = 0.0
+	for segment_index in range(1, limit + 1):
+		config_cache.prefix_sums[segment_index] = config_cache.prefix_sums[segment_index - 1] + float(config_cache.segs.get(str(segment_index), 1.0))
+	_attribute_cache = config_cache
+	_attribute_config_version = config_version
+	return config_cache
 
 # ==============================================================================
 # 二、等级域（L1 等级层）
@@ -71,109 +71,109 @@ static func _ensure_attr_cache() -> AttributeConfigCache:
 
 ## 最小等级（config/domains/attribute.json levels/min，默认 1）
 static func min_level() -> int:
-	return _ensure_attr_cache().min_lv
+	return _ensure_attribute_cache().min_lv
 
 ## 最大等级（config/domains/attribute.json levels/max，默认 6）
 static func max_level() -> int:
-	return _ensure_attr_cache().max_lv
+	return _ensure_attribute_cache().max_lv
 
 ## 等级域规则校验（统一 1~6 级，越界返回 false）
 static func validate_level(level: int) -> bool:
-	var c := _ensure_attr_cache()
-	return level >= c.min_lv and level <= c.max_lv
+	var config_cache := _ensure_attribute_cache()
+	return level >= config_cache.min_lv and level <= config_cache.max_lv
 
 # ==============================================================================
 # 三、系数（L2 中间系数结构层）
 # ==============================================================================
 
 ## 人类基准（每级基准值，config/domains/attribute.json human_base/*，默认 100.0）
-static func human_base(attr: String) -> float:
-	var c := _ensure_attr_cache()
-	if c.human_base_map.has(attr):
-		return float(c.human_base_map[attr])
-	return GameConfig.get_float("domains.attribute", "human_base/%s" % attr, 100.0)
+static func human_base(attribute_name: String) -> float:
+	var config_cache := _ensure_attribute_cache()
+	if config_cache.human_base_map.has(attribute_name):
+		return float(config_cache.human_base_map[attribute_name])
+	return GameConfig.get_float("domains.attribute", "human_base/%s" % attribute_name, 100.0)
 
 ## 属性系数数组（平衡调节，config/domains/attribute.json attribute_coefficients/*，默认 1.0）
-static func attribute_coefficient(attr: String) -> float:
-	var c := _ensure_attr_cache()
-	if c.attr_coef_map.has(attr):
-		return float(c.attr_coef_map[attr])
-	return GameConfig.get_float("domains.attribute", "attribute_coefficients/%s" % attr, 1.0)
+static func attribute_coefficient(attribute_name: String) -> float:
+	var config_cache := _ensure_attribute_cache()
+	if config_cache.attribute_coefficient_map.has(attribute_name):
+		return float(config_cache.attribute_coefficient_map[attribute_name])
+	return GameConfig.get_float("domains.attribute", "attribute_coefficients/%s" % attribute_name, 1.0)
 
 ## 种族系数数组（身世/天赋 = 系数修正，创角时叠加进此表；种族缺失回退 DEFAULT 行，默认 1.0）
-static func race_coefficient(race: String, attr: String) -> float:
-	var table: Dictionary = _ensure_attr_cache().race_table
+static func race_coefficient(race: String, attribute_name: String) -> float:
+	var table: Dictionary = _ensure_attribute_cache().race_table
 	var entry: Dictionary = table.get(race, table.get("DEFAULT", {}))
-	return float(entry.get(attr, 1.0))
+	return float(entry.get(attribute_name, 1.0))
 
 ## 阅历修饰系数默认值（config/domains/attribute.json experience_reshape_default，默认 1.0）
 static func experience_reshape_default() -> float:
-	return _ensure_attr_cache().exp_reshape_default
+	return _ensure_attribute_cache().exp_reshape_default
 
 # ==============================================================================
 # 四、成长曲线（分段非线性）
 # ==============================================================================
 
-## 连续等级量 q ∈ [0, max_level) 对应成长倍数：
-## 死区 q ≤ dead_ratio → 0（STR 参考 0~50 全零，其余按基准同比缩放）；
+## 连续等级量 continuous_level ∈ [0, max_level) 对应成长倍数：
+## 死区 continuous_level ≤ dead_ratio → 0（STR 参考 0~50 全零，其余按基准同比缩放）；
 ## 段 1 在死区后重新线性化（保证曲线连续）；段增量系数数组可配置（默认 Σ=6）。
-static func growth_units(q: float) -> float:
-	var c := _ensure_attr_cache()
-	var dead_ratio: float = c.dead_ratio
-	if q <= dead_ratio:
+static func growth_units(continuous_level: float) -> float:
+	var config_cache := _ensure_attribute_cache()
+	var dead_ratio: float = config_cache.dead_ratio
+	if continuous_level <= dead_ratio:
 		return 0.0
-	var segs: Dictionary = c.segs
-	var max_lv: int = c.max_lv
-	if q >= float(max_lv):
-		if max_lv >= 0 and max_lv < c.prefix_sums.size():
-			return c.prefix_sums[max_lv]
-		return _segment_sum(segs, max_lv)
-	if q <= 1.0:
-		var seg1: float = float(segs.get("1", 1.0))
-		return seg1 * (q - dead_ratio) / (1.0 - dead_ratio)
-	var n: int = int(ceil(q)) # 当前段 2..max
-	var before: float = c.prefix_sums[n - 1] if (n - 1) >= 0 and (n - 1) < c.prefix_sums.size() else _segment_sum(segs, n - 1)
-	var seg_n: float = float(segs.get(str(n), 1.0))
-	return before + (q - float(n - 1)) * seg_n
+	var segment_increments: Dictionary = config_cache.segs
+	var max_level_value: int = config_cache.max_lv
+	if continuous_level >= float(max_level_value):
+		if max_level_value >= 0 and max_level_value < config_cache.prefix_sums.size():
+			return config_cache.prefix_sums[max_level_value]
+		return _segment_sum(segment_increments, max_level_value)
+	if continuous_level <= 1.0:
+		var first_segment_increment: float = float(segment_increments.get("1", 1.0))
+		return first_segment_increment * (continuous_level - dead_ratio) / (1.0 - dead_ratio)
+	var segment_index: int = int(ceil(continuous_level)) # 当前段 2..max
+	var before: float = config_cache.prefix_sums[segment_index - 1] if (segment_index - 1) >= 0 and (segment_index - 1) < config_cache.prefix_sums.size() else _segment_sum(segment_increments, segment_index - 1)
+	var segment_increment: float = float(segment_increments.get(str(segment_index), 1.0))
+	return before + (continuous_level - float(segment_index - 1)) * segment_increment
 
 ## 段增量系数前缀和：前 upto 段系数累加（满级倍数 = 各段增量之和）
-static func _segment_sum(segs: Dictionary, upto: int) -> float:
+static func _segment_sum(segment_increments: Dictionary, upto: int) -> float:
 	var total := 0.0
-	for i in range(1, upto + 1):
-		total += float(segs.get(str(i), 1.0))
+	for segment_index in range(1, upto + 1):
+		total += float(segment_increments.get(str(segment_index), 1.0))
 	return total
 
 # ==============================================================================
 # 五、三层合成（L3 实际值域）
 # ==============================================================================
 
-## 实际值 = 人类基准 × 成长曲线(q) × 系数积 + 动态调整值（L3 实际值域）。
+## 实际值 = 人类基准 × 成长曲线(continuous_level) × 系数积 + 动态调整值（L3 实际值域）。
 ## 契约：progress 钳制 [0,1]；experience_reshape 钳制非负（防负系数倒转曲线）；
-##       base_coef 缺省 -1 时回退配置种族系数；动态调整直加/直减永久不逆转。
+##       base_coefficient 缺省 -1 时回退配置种族系数；动态调整直加/直减永久不逆转。
 ## 性能：纯静态零分配，可在循环内安全调用。
 static func convert_to_actual(
 	race: String,
-	attr: String,
+	attribute_name: String,
 	level: int,
 	progress: float,
 	experience_reshape: float,
 	dynamic_adjustment: float,
-	base_coef: float = -1.0
+	base_coefficient: float = -1.0
 ) -> float:
-	var q: float = (float(level) - 1.0) + clamp(progress, 0.0, 1.0)
-	var rc: float = base_coef if base_coef >= 0.0 else race_coefficient(race, attr)
-	var coef: float = rc * attribute_coefficient(attr) * max(0.0, experience_reshape)
-	return human_base(attr) * growth_units(q) * coef + dynamic_adjustment
+	var continuous_level: float = (float(level) - 1.0) + clamp(progress, 0.0, 1.0)
+	var effective_race_coefficient: float = base_coefficient if base_coefficient >= 0.0 else race_coefficient(race, attribute_name)
+	var combined_coefficient: float = effective_race_coefficient * attribute_coefficient(attribute_name) * max(0.0, experience_reshape)
+	return human_base(attribute_name) * growth_units(continuous_level) * combined_coefficient + dynamic_adjustment
 
 ## 从生理表聚合换算（消费方统一入口）：等级 → 底层实际能力值。
 ## 系数 = 先天基础系数（种族×天赋，缺省回退配置表）× 阅历调节系数（L2）。
-static func sheet_actual_value(sheet: CharacterPhysiologySheet, attr: String) -> float:
+static func sheet_actual_value(sheet: CharacterPhysiologySheet, attribute_name: String) -> float:
 	return convert_to_actual(
 		sheet.race_id,
-		attr,
-		int(sheet.attribute_levels.get(attr, 1)),
-		float(sheet.attribute_progress.get(attr, 0.0)),
-		float(sheet.get_experience_reshape(attr)),
-		float(sheet.dynamic_adjustments.get(attr, 0.0)),
-		sheet.get_base_coefficient(attr)
+		attribute_name,
+		int(sheet.attribute_levels.get(attribute_name, 1)),
+		float(sheet.attribute_progress.get(attribute_name, 0.0)),
+		float(sheet.get_experience_reshape(attribute_name)),
+		float(sheet.dynamic_adjustments.get(attribute_name, 0.0)),
+		sheet.get_base_coefficient(attribute_name)
 	)

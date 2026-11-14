@@ -21,7 +21,7 @@ var world_id: String = ""                # 目标世界 ID
 var character_name: String = ""          # 角色展示名唯一源头（display_name）
 var selected_race_id: String = "HUMAN"   # 目标种族（经 races_catalog 配置校验）
 var selected_gender: String = "MALE"     # 目标性别（经种族 allowed_genders 校验）
-var extra_custom_fields: Dictionary = {} # 扩展自定义字段（战斗属性键会被防伪守卫丢弃）
+var extra_custom_fields: Dictionary = {} # 扩展自定义字段（战斗属性键会被防篡改守卫丢弃）
 
 # ==============================================================================
 # 二、序列化与反序列化
@@ -41,15 +41,15 @@ func to_dto() -> Dictionary:
 
 ## 从字典反序列化创角请求（缺省字段安全回退默认值，空字典返回空请求）。
 ## 契约：输入 d 不做键集校验，缺失字段按各自默认值补齐（旧档兼容）。
-static func from_dto(d: Dictionary) -> CharacterCreationRequestDTO:
-	var req := CharacterCreationRequestDTO.new()
-	if d.is_empty():
-		return req
-	req.account_id = str(d.get("account_id", ""))
-	req.slot_id = str(d.get("slot_id", ""))
-	req.world_id = str(d.get("world_id", ""))
-	req.character_name = str(d.get("character_name", ""))
-	req.selected_race_id = str(d.get("selected_race_id", "HUMAN"))
-	req.selected_gender = str(d.get("selected_gender", "MALE"))
-	req.extra_custom_fields = (d.get("extra_custom_fields", {}) as Dictionary).duplicate(true)
-	return req
+static func from_dto(raw_data: Dictionary) -> CharacterCreationRequestDTO:
+	var request_dto := CharacterCreationRequestDTO.new()
+	if raw_data.is_empty():
+		return request_dto
+	request_dto.account_id = str(raw_data.get("account_id", ""))
+	request_dto.slot_id = str(raw_data.get("slot_id", ""))
+	request_dto.world_id = str(raw_data.get("world_id", ""))
+	request_dto.character_name = str(raw_data.get("character_name", ""))
+	request_dto.selected_race_id = str(raw_data.get("selected_race_id", "HUMAN"))
+	request_dto.selected_gender = str(raw_data.get("selected_gender", "MALE"))
+	request_dto.extra_custom_fields = (raw_data.get("extra_custom_fields", {}) as Dictionary).duplicate(true)
+	return request_dto
