@@ -58,25 +58,26 @@ static func _ensure_crc_table() -> void:
 	if not _crc_table.is_empty():
 		return
 	_crc_table.resize(256)
-	for i in range(256):
-		var c: int = i
-		for _j in range(8):
-			if (c & 1) != 0:
-				c = 0xEDB88320 ^ ((c >> 1) & 0x7FFFFFFF)
+	for byte_index in range(256):
+		var crc_value: int = byte_index
+		for _bit_index in range(8):
+			# GDScript int 为有符号 64 位，右移后需掩码消除符号位扩展以对齐无符号 32 位逻辑右移
+			if (crc_value & 1) != 0:
+				crc_value = 0xEDB88320 ^ ((crc_value >> 1) & 0x7FFFFFFF)
 			else:
-				c = (c >> 1) & 0x7FFFFFFF
-		_crc_table[i] = c
+				crc_value = (crc_value >> 1) & 0x7FFFFFFF
+		_crc_table[byte_index] = crc_value
 
 ## 计算二进制字节数组的 CRC-32 校验和
 static func compute_crc32(bytes: PackedByteArray) -> int:
 	_ensure_crc_table()
-	var c: int = 0xFFFFFFFF
-	var sz: int = bytes.size()
-	for i in range(sz):
-		var b: int = bytes[i]
-		var idx: int = (c ^ b) & 0xFF
-		c = _crc_table[idx] ^ ((c >> 8) & 0x00FFFFFF)
-	return (c ^ 0xFFFFFFFF) & 0xFFFFFFFF
+	var crc_value: int = 0xFFFFFFFF
+	var byte_count: int = bytes.size()
+	for byte_index in range(byte_count):
+		var byte_value: int = bytes[byte_index]
+		var table_index: int = (crc_value ^ byte_value) & 0xFF
+		crc_value = _crc_table[table_index] ^ ((crc_value >> 8) & 0x00FFFFFF)
+	return (crc_value ^ 0xFFFFFFFF) & 0xFFFFFFFF
 
 # ==============================================================================
 # 三、核心解码与文件加载 API
@@ -98,28 +99,28 @@ static func load_kdat_buffer(buffer: PackedByteArray) -> Variant:
 	if buffer.size() < HEADER_SIZE:
 		return null
 
-	var header_buf := StreamPeerBuffer.new()
-	header_buf.data_array = buffer
-	header_buf.big_endian = false
+	var header_stream := StreamPeerBuffer.new()
+	header_stream.data_array = buffer
+	header_stream.big_endian = false
 
-	var magic: int = header_buf.get_u32()
-	var version: int = header_buf.get_u16()
-	var flags: int = header_buf.get_u16()
-	var compress_type: int = header_buf.get_u8()
-	var _payload_type: int = header_buf.get_u8()
-	var header_len: int = header_buf.get_u16()
-	var uncompressed_size: int = header_buf.get_u32()
-	var compressed_size: int = header_buf.get_u32()
-	var crc32_val: int = header_buf.get_u32()
+	var magic: int = header_stream.get_u32()
+	var version: int = header_stream.get_u16()
+	var flags: int = header_stream.get_u16()
+	var compress_type: int = header_stream.get_u8()
+	var _payload_type: int = header_stream.get_u8()
+	var header_length: int = header_stream.get_u16()
+	var uncompressed_size: int = header_stream.get_u32()
+	var compressed_size: int = header_stream.get_u32()
+	var expected_crc32: int = header_stream.get_u32()
 
 	if magic != MAGIC_KDAT or version != FORMAT_VERSION:
 		return null
-	if buffer.size() < header_len + compressed_size:
+	if buffer.size() < header_length + compressed_size:
 		return null
 
-	var payload_slice := buffer.slice(header_len, header_len + compressed_size)
+	var payload_slice := buffer.slice(header_length, header_length + compressed_size)
 	var actual_crc: int = compute_crc32(payload_slice)
-	if actual_crc != crc32_val:
+	if actual_crc != expected_crc32:
 		return null
 
 	var payload_to_decompress: PackedByteArray
@@ -150,26 +151,26 @@ static func load_kdat_buffer(buffer: PackedByteArray) -> Variant:
 
 ## 解析解压后的原始载荷流（含字符串池与 TLV 根节点）
 static func _decode_payload_stream(raw_payload: PackedByteArray) -> Variant:
-	var buf := StreamPeerBuffer.new()
-	buf.data_array = raw_payload
-	buf.big_endian = false
+	var stream := StreamPeerBuffer.new()
+	stream.data_array = raw_payload
+	stream.big_endian = false
 
 	# 1. 解析首部字符串池
-	var pool_len: int = buf.get_u16()
+	var pool_size: int = stream.get_u16()
 	var pool: Array[String] = []
-	pool.resize(pool_len)
-	for i in range(pool_len):
-		var s_len: int = buf.get_u16()
-		pool[i] = buf.get_utf8_string(s_len)
+	pool.resize(pool_size)
+	for entry_index in range(pool_size):
+		var string_length: int = stream.get_u16()
+		pool[entry_index] = stream.get_utf8_string(string_length)
 
 	# 2. 递归解析 TLV
-	return _decode_tlv_value(buf, pool)
+	return _decode_tlv_value(stream, pool)
 
 ## 递归解析单个 TLV 数据项（形参 <= 5）
-static func _decode_tlv_value(buf: StreamPeerBuffer, pool: Array[String]) -> Variant:
-	if buf.get_position() >= buf.get_size():
+static func _decode_tlv_value(stream: StreamPeerBuffer, pool: Array[String]) -> Variant:
+	if stream.get_position() >= stream.get_size():
 		return null
-	var tag: int = buf.get_u8()
+	var tag: int = stream.get_u8()
 
 	if tag == TAG_NIL:
 		return null
@@ -178,43 +179,43 @@ static func _decode_tlv_value(buf: StreamPeerBuffer, pool: Array[String]) -> Var
 	if tag == TAG_BOOL_TRUE:
 		return true
 	if tag == TAG_INT32:
-		return buf.get_32()
+		return stream.get_32()
 	if tag == TAG_INT64:
-		return buf.get_64()
+		return stream.get_64()
 	if tag == TAG_FLOAT64:
-		return buf.get_double()
+		return stream.get_double()
 	if tag == TAG_STRING:
-		var s_len: int = buf.get_u16()
-		return buf.get_utf8_string(s_len)
+		var string_length: int = stream.get_u16()
+		return stream.get_utf8_string(string_length)
 	if tag == TAG_STRING_REF:
-		var idx: int = buf.get_u16()
-		if idx < pool.size():
-			return pool[idx]
+		var pool_index: int = stream.get_u16()
+		if pool_index < pool.size():
+			return pool[pool_index]
 		return ""
 	if tag == TAG_ARRAY:
-		var count: int = buf.get_u32()
-		var arr: Array = []
-		arr.resize(count)
-		for i in range(count):
-			arr[i] = _decode_tlv_value(buf, pool)
-		return arr
+		var count: int = stream.get_u32()
+		var decoded_array: Array = []
+		decoded_array.resize(count)
+		for element_index in range(count):
+			decoded_array[element_index] = _decode_tlv_value(stream, pool)
+		return decoded_array
 	if tag == TAG_DICT:
-		var count: int = buf.get_u32()
-		var d: Dictionary = {}
-		for _i in range(count):
-			var k: String = str(_decode_tlv_value(buf, pool))
-			var v: Variant = _decode_tlv_value(buf, pool)
-			d[k] = v
-		return d
+		var count: int = stream.get_u32()
+		var decoded_dictionary: Dictionary = {}
+		for _entry_index in range(count):
+			var entry_key: String = str(_decode_tlv_value(stream, pool))
+			var entry_value: Variant = _decode_tlv_value(stream, pool)
+			decoded_dictionary[entry_key] = entry_value
+		return decoded_dictionary
 	if tag == TAG_BINARY_BLOB:
-		var data_len: int = buf.get_u32()
-		var mime_len: int = buf.get_u16()
-		var mime: String = buf.get_utf8_string(mime_len)
-		var blob_data: PackedByteArray = buf.data_array.slice(buf.get_position(), buf.get_position() + data_len)
-		buf.seek(buf.get_position() + data_len)
+		var data_length: int = stream.get_u32()
+		var mime_length: int = stream.get_u16()
+		var mime_type: String = stream.get_utf8_string(mime_length)
+		var blob_data: PackedByteArray = stream.data_array.slice(stream.get_position(), stream.get_position() + data_length)
+		stream.seek(stream.get_position() + data_length)
 		return {
 			"__type": "binary_blob",
-			"mime_type": mime,
+			"mime_type": mime_type,
 			"data": blob_data
 		}
 	return null
@@ -241,15 +242,15 @@ static func load_monolithic_bundle(file_path: String) -> Dictionary:
 	for entry in (toc_list as Array):
 		if not (entry is Dictionary):
 			continue
-		var t_name: String = str(entry.get("table_name", ""))
+		var table_name: String = str(entry.get("table_name", ""))
 		var offset: int = int(entry.get("offset", 0))
 		var length: int = int(entry.get("length", 0))
-		if t_name.is_empty() or offset + length > payload.size():
+		if table_name.is_empty() or offset + length > payload.size():
 			continue
 
 		var table_slice := payload.slice(offset, offset + length)
 		var table_data: Variant = _decode_payload_stream(table_slice)
 		if table_data != null and (table_data is Dictionary):
-			result[t_name] = table_data
+			result[table_name] = table_data
 
 	return result

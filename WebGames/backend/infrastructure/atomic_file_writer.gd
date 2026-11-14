@@ -16,11 +16,11 @@ const DEFAULT_BACKUP_SUFFIX: String = ".bak"
 const DEFAULT_BACKUP_RETENTION: int = 1
 const DEFAULT_BACKUP_FAIL_POLICY: String = "continue"
 
-static var _tmp_seq: int = 0
+static var _temporary_sequence_number: int = 0
 
-static func _next_tmp_id() -> int:
-    _tmp_seq += 1
-    return _tmp_seq
+static func _next_temporary_id() -> int:
+    _temporary_sequence_number += 1
+    return _temporary_sequence_number
 
 ## 确保目标目录存在（幂等递归创建）
 static func ensure_directory(dir_path: String) -> bool:
@@ -31,40 +31,40 @@ static func ensure_directory(dir_path: String) -> bool:
     return DirAccess.make_dir_recursive_absolute(dir_path) == OK
 
 ## 清理目录内遗留的孤儿临时文件，返回实际删除数量
-static func cleanup_orphan_tmp_files(dir_path: String, tmp_suffix: String = DEFAULT_TMP_SUFFIX) -> int:
-    if dir_path.is_empty() or tmp_suffix.is_empty():
+static func cleanup_orphan_tmp_files(dir_path: String, temporary_suffix: String = DEFAULT_TMP_SUFFIX) -> int:
+    if dir_path.is_empty() or temporary_suffix.is_empty():
         return 0
-    var dir := DirAccess.open(dir_path)
-    if dir == null:
+    var dir_access := DirAccess.open(dir_path)
+    if dir_access == null:
         return 0
     var base_dir: String = dir_path if dir_path.ends_with("/") else dir_path + "/"
-    var removed: int = 0
-    dir.list_dir_begin()
-    var fname: String = dir.get_next()
-    while not fname.is_empty():
-        if not dir.current_is_dir() and fname.ends_with(tmp_suffix):
-            if DirAccess.remove_absolute(base_dir + fname) == OK:
-                removed += 1
-        fname = dir.get_next()
-    dir.list_dir_end()
-    return removed
+    var removed_count: int = 0
+    dir_access.list_dir_begin()
+    var file_name: String = dir_access.get_next()
+    while not file_name.is_empty():
+        if not dir_access.current_is_dir() and file_name.ends_with(temporary_suffix):
+            if DirAccess.remove_absolute(base_dir + file_name) == OK:
+                removed_count += 1
+        file_name = dir_access.get_next()
+    dir_access.list_dir_end()
+    return removed_count
 
 ## 从指定备份路径经临时文件原子替换恢复目标正档
-static func restore_from_backup(file_path: String, bak_path: String) -> bool:
-    if file_path.is_empty() or bak_path.is_empty():
+static func restore_from_backup(file_path: String, backup_path: String) -> bool:
+    if file_path.is_empty() or backup_path.is_empty():
         return false
-    if not FileAccess.file_exists(bak_path):
+    if not FileAccess.file_exists(backup_path):
         return false
-    var fa := FileAccess.open(bak_path, FileAccess.READ)
-    if fa == null:
+    var file_handle := FileAccess.open(backup_path, FileAccess.READ)
+    if file_handle == null:
         return false
-    var bak_content := fa.get_as_text()
-    var read_err := fa.get_error()
-    fa.close()
-    if read_err != OK and read_err != ERR_FILE_EOF:
+    var backup_content := file_handle.get_as_text()
+    var read_error := file_handle.get_error()
+    file_handle.close()
+    if read_error != OK and read_error != ERR_FILE_EOF:
         return false
-    var res := replace_via_tmp(file_path, bak_content, DEFAULT_TMP_SUFFIX)
-    return bool(res.get("success", false))
+    var replace_result := replace_via_tmp(file_path, backup_content, DEFAULT_TMP_SUFFIX)
+    return bool(replace_result.get("success", false))
 
 ## 按最大保留代数执行历史备份轮转（.bak -> .bak.1 -> .bak.2 ...）
 static func rotate_backups(
@@ -74,10 +74,11 @@ static func rotate_backups(
 ) -> void:
     if file_path.is_empty() or backup_suffix.is_empty() or retention <= 1:
         return
-    var idx: int = retention - 1
-    while idx >= 1:
-        _shift_backup_version(file_path, backup_suffix, idx)
-        idx -= 1
+    # 从最老一代倒序平移，防止覆盖尚未迁移的上一代备份文件
+    var backup_index: int = retention - 1
+    while backup_index >= 1:
+        _shift_backup_version(file_path, backup_suffix, backup_index)
+        backup_index -= 1
 
 ## 将文本直接写入目标路径（无临时文件与备份保护）
 static func write_text_direct(file_path: String, content: String) -> Dictionary:
@@ -97,11 +98,11 @@ static func write_text_direct(file_path: String, content: String) -> Dictionary:
 static func replace_via_tmp(
     file_path: String,
     content: String,
-    tmp_suffix: String = DEFAULT_TMP_SUFFIX
+    temporary_suffix: String = DEFAULT_TMP_SUFFIX
 ) -> Dictionary:
     return write_text_atomic(file_path, content, {
         "atomic_enabled": true,
-        "tmp_suffix": tmp_suffix,
+        "tmp_suffix": temporary_suffix,
         "create_backup": false
     })
 
@@ -122,11 +123,12 @@ static func write_text_atomic(
 
     ensure_directory(file_path.get_base_dir())
 
-    var tmp_suffix: String = str(options.get("tmp_suffix", DEFAULT_TMP_SUFFIX))
-    if tmp_suffix.is_empty():
-        tmp_suffix = DEFAULT_TMP_SUFFIX
-    var tmp_path: String = "%s.%d_%d%s" % [file_path, OS.get_process_id(), _next_tmp_id(), tmp_suffix]
-    if not _write_text_handle(tmp_path, content):
+    var temporary_suffix: String = str(options.get("tmp_suffix", DEFAULT_TMP_SUFFIX))
+    if temporary_suffix.is_empty():
+        temporary_suffix = DEFAULT_TMP_SUFFIX
+    # 拼入进程 ID 与进程内单调序号，避免同目录并发写手互相覆盖临时文件
+    var temporary_path: String = "%s.%d_%d%s" % [file_path, OS.get_process_id(), _next_temporary_id(), temporary_suffix]
+    if not _write_text_handle(temporary_path, content):
         return {
             "success": false,
             "error_stage": "tmp_open",
@@ -134,30 +136,30 @@ static func write_text_atomic(
             "backup_error": OK
         }
 
-    var backup_res: Dictionary = _prepare_backup_before_replace(file_path, tmp_path, options)
-    if not bool(backup_res.get("ok", false)):
+    var backup_result: Dictionary = _prepare_backup_before_replace(file_path, temporary_path, options)
+    if not bool(backup_result.get("ok", false)):
         return {
             "success": false,
             "error_stage": "backup",
-            "error_code": int(backup_res.get("backup_error", ERR_FILE_CANT_WRITE)),
-            "backup_error": int(backup_res.get("backup_error", ERR_FILE_CANT_WRITE))
+            "error_code": int(backup_result.get("backup_error", ERR_FILE_CANT_WRITE)),
+            "backup_error": int(backup_result.get("backup_error", ERR_FILE_CANT_WRITE))
         }
 
-    var rename_err: int = DirAccess.rename_absolute(tmp_path, file_path)
-    var backup_err: int = int(backup_res.get("backup_error", OK))
-    if rename_err != OK:
-        DirAccess.remove_absolute(tmp_path)
+    var rename_error: int = DirAccess.rename_absolute(temporary_path, file_path)
+    var backup_error: int = int(backup_result.get("backup_error", OK))
+    if rename_error != OK:
+        DirAccess.remove_absolute(temporary_path)
         return {
             "success": false,
             "error_stage": "rename",
-            "error_code": rename_err,
-            "backup_error": backup_err
+            "error_code": rename_error,
+            "backup_error": backup_error
         }
-    return {"success": true, "error_stage": "", "error_code": OK, "backup_error": backup_err}
+    return {"success": true, "error_stage": "", "error_code": OK, "backup_error": backup_error}
 
 static func _prepare_backup_before_replace(
     file_path: String,
-    tmp_path: String,
+    temporary_path: String,
     options: Dictionary
 ) -> Dictionary:
     if not bool(options.get("create_backup", true)) or not FileAccess.file_exists(file_path):
@@ -169,39 +171,40 @@ static func _prepare_backup_before_replace(
     var retention: int = int(options.get("backup_retention", DEFAULT_BACKUP_RETENTION))
     rotate_backups(file_path, backup_suffix, retention)
 
-    var bak_path: String = file_path + backup_suffix
-    var backup_err: int = DirAccess.copy_absolute(file_path, bak_path)
-    if backup_err != OK:
+    var backup_path: String = file_path + backup_suffix
+    var backup_error: int = DirAccess.copy_absolute(file_path, backup_path)
+    if backup_error != OK:
         var policy: String = str(options.get("backup_fail_policy", DEFAULT_BACKUP_FAIL_POLICY))
         if policy == "abort":
-            DirAccess.remove_absolute(tmp_path)
-            return {"ok": false, "backup_error": backup_err}
-    return {"ok": true, "backup_error": backup_err}
+            DirAccess.remove_absolute(temporary_path)
+            return {"ok": false, "backup_error": backup_error}
+    return {"ok": true, "backup_error": backup_error}
 
 static func _write_text_handle(target_path: String, content: String) -> bool:
     var file: FileAccess = FileAccess.open(target_path, FileAccess.WRITE)
     if file == null:
         return false
     file.store_string(content)
-    var write_err: int = file.get_error()
+    var write_error: int = file.get_error()
     file.flush()
-    var flush_err: int = file.get_error()
+    var flush_error: int = file.get_error()
     file.close()
-    return write_err == OK and flush_err == OK
+    return write_error == OK and flush_error == OK
 
-static func _shift_backup_version(file_path: String, bak_suffix: String, version_idx: int) -> void:
-    var src: String = file_path + bak_suffix if version_idx == 1 else file_path + bak_suffix + "." + str(version_idx - 1)
-    var dst: String = file_path + bak_suffix + "." + str(version_idx)
-    if not FileAccess.file_exists(src):
+static func _shift_backup_version(file_path: String, backup_suffix: String, version_index: int) -> void:
+    var source_path: String = file_path + backup_suffix if version_index == 1 else file_path + backup_suffix + "." + str(version_index - 1)
+    var destination_path: String = file_path + backup_suffix + "." + str(version_index)
+    if not FileAccess.file_exists(source_path):
         return
-    var staged_old := "%s.shifting_%d" % [dst, _next_tmp_id()]
-    var had_dst := FileAccess.file_exists(dst)
-    if had_dst:
-        if DirAccess.rename_absolute(dst, staged_old) != OK:
+    # 先把既有目标备份移至暂存名，防止 rename 失败时原备份丢失
+    var staged_old := "%s.shifting_%d" % [destination_path, _next_temporary_id()]
+    var had_destination := FileAccess.file_exists(destination_path)
+    if had_destination:
+        if DirAccess.rename_absolute(destination_path, staged_old) != OK:
             return
-    var rename_err := DirAccess.rename_absolute(src, dst)
-    if rename_err != OK:
-        if had_dst and FileAccess.file_exists(staged_old):
-            DirAccess.rename_absolute(staged_old, dst)
-    elif had_dst and FileAccess.file_exists(staged_old):
+    var rename_error := DirAccess.rename_absolute(source_path, destination_path)
+    if rename_error != OK:
+        if had_destination and FileAccess.file_exists(staged_old):
+            DirAccess.rename_absolute(staged_old, destination_path)
+    elif had_destination and FileAccess.file_exists(staged_old):
         DirAccess.remove_absolute(staged_old)

@@ -26,7 +26,7 @@ static var _param_regex: RegEx = RegEx.create_from_string(r"\{([a-z_][a-z0-9_]*)
 
 ## 统一文案解析：copy_key（<域>.<条目>.<字段>）→ 配置模板 → {param} 填充
 ## - conditions：params 状态匹配 when → 拼接 text 段；
-## - outcome：结果分支（success/failure/partial…），缺省 base 兜底；
+## - outcome：结果分支（success/failure/partial…），缺省回退 base；
 ## - 纯模板：无条件/分支时直接填充（公告/概率文案）。
 static func resolve(
 	copy_key: String,
@@ -93,20 +93,20 @@ static func _state_match(when: Dictionary, params: Dictionary) -> bool:
 	for key in when.keys():
 		if not params.has(key):
 			return false
-		var want: Variant = when[key]
-		var got: Variant = params[key]
-		if want is float or want is int:
-			if float(got) < float(want):
+		var expected_value: Variant = when[key]
+		var actual_value: Variant = params[key]
+		if expected_value is float or expected_value is int:
+			if float(actual_value) < float(expected_value):
 				return false
-		elif str(got) != str(want):
+		elif str(actual_value) != str(expected_value):
 			return false
 	return true
 
 ## 占位符未填充扫描（一处实现，域解析器共用）
 static func _missing_params(template: String, params: Dictionary) -> Array:
 	var missing: Array = []
-	for m in _param_regex.search_all(template):
-		var name := m.get_string(1)
-		if not params.has(name):
-			missing.append(name)
+	for regex_match in _param_regex.search_all(template):
+		var param_name := regex_match.get_string(1)
+		if not params.has(param_name):
+			missing.append(param_name)
 	return missing

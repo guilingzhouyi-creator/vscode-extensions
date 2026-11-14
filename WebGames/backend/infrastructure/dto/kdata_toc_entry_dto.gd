@@ -50,10 +50,10 @@ func to_dict() -> Dictionary:
 
 ## 从字典数据构造并装配 DTO 实例
 static func from_dict(data: Dictionary) -> KDataTOCEntryDTO:
-	var dto := KDataTOCEntryDTO.new()
-	dto.table_name = str(data.get("table_name", ""))
-	dto.offset = int(data.get("offset", 0))
-	dto.length = int(data.get("length", 0))
-	dto.uncompressed_length = int(data.get("uncompressed_length", 0))
-	dto.crc32 = int(data.get("crc32", 0))
-	return dto
+	var entry_dto := KDataTOCEntryDTO.new()
+	entry_dto.table_name = str(data.get("table_name", ""))
+	entry_dto.offset = int(data.get("offset", 0))
+	entry_dto.length = int(data.get("length", 0))
+	entry_dto.uncompressed_length = int(data.get("uncompressed_length", 0))
+	entry_dto.crc32 = int(data.get("crc32", 0))
+	return entry_dto

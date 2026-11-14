@@ -30,17 +30,17 @@ const FNV_PRIME: int = 0x01000193
 
 ## 对二进制字节流执行对称 LCG 掩码反解/混淆（由于异或对称性，加混淆与解混淆相同）
 static func unmask_stream(payload: PackedByteArray, key_seed: int = DEFAULT_MASK_KEY_SEED) -> PackedByteArray:
-	var sz: int = payload.size()
-	if sz == 0:
+	var payload_size: int = payload.size()
+	if payload_size == 0:
 		return PackedByteArray()
 
-	var out: PackedByteArray = payload.duplicate()
+	var result_bytes: PackedByteArray = payload.duplicate()
 	var seed: int = key_seed & 0xFFFFFFFF
-	for i in range(sz):
+	for byte_index in range(payload_size):
 		seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF
 		var mask_byte: int = (seed >> 16) & 0xFF
-		out[i] = out[i] ^ mask_byte
-	return out
+		result_bytes[byte_index] = result_bytes[byte_index] ^ mask_byte
+	return result_bytes
 
 ## 对二进制流执行掩码混淆（直接委托对称 unmask_stream）
 static func mask_stream(payload: PackedByteArray, key_seed: int = DEFAULT_MASK_KEY_SEED) -> PackedByteArray:
@@ -56,13 +56,14 @@ static func derive_key_seed(seed_material: String) -> int:
 		return DEFAULT_MASK_KEY_SEED
 
 	var utf8_bytes: PackedByteArray = seed_material.to_utf8_buffer()
-	var hash_val: int = FNV_OFFSET_BASIS
-	var sz: int = utf8_bytes.size()
-	for i in range(sz):
-		hash_val = hash_val ^ utf8_bytes[i]
-		hash_val = (hash_val * FNV_PRIME) & 0xFFFFFFFF
+	var hash_value: int = FNV_OFFSET_BASIS
+	var byte_count: int = utf8_bytes.size()
+	for byte_index in range(byte_count):
+		hash_value = hash_value ^ utf8_bytes[byte_index]
+		hash_value = (hash_value * FNV_PRIME) & 0xFFFFFFFF
 
-	return hash_val if hash_val != 0 else DEFAULT_MASK_KEY_SEED
+	# 防止 FNV-1a 碰撞至 0 导致后续掩码流退化为常量状态
+	return hash_value if hash_value != 0 else DEFAULT_MASK_KEY_SEED
 
 ## 对内存敏感令牌字符串执行即时掩码混淆，避免在进程堆中留存明文
 static func mask_in_memory_token(token: String, key_seed: int = DEFAULT_MASK_KEY_SEED) -> PackedByteArray:

@@ -26,10 +26,14 @@ var resolved_table: String = ""          # 解析后物理表名 (如 "domains.c
 var resolved_path: String = ""           # 解析后目标键路径
 var resolution_mode: int = RouteResolutionMode.DIRECT_PASSTHROUGH
 
-func _init(p_requested: String = "", p_resolved: String = "", p_mode: int = RouteResolutionMode.DIRECT_PASSTHROUGH) -> void:
-	requested_table = p_requested
-	resolved_table = p_resolved
-	resolution_mode = p_mode
+func _init(
+	initial_requested_table: String = "",
+	initial_resolved_table: String = "",
+	initial_resolution_mode: int = RouteResolutionMode.DIRECT_PASSTHROUGH
+) -> void:
+	requested_table = initial_requested_table
+	resolved_table = initial_resolved_table
+	resolution_mode = initial_resolution_mode
 
 ## 序列化为纯字典
 func to_dict() -> Dictionary:

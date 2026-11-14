@@ -24,8 +24,8 @@ const DEFAULT_MODE: SyncMode = SyncMode.OFFLINE_TEXT
 var mode: SyncMode = DEFAULT_MODE
 
 ## 构造：指定同步模式（默认单机文字版）
-func _init(p_mode: SyncMode = DEFAULT_MODE) -> void:
-	mode = p_mode
+func _init(initial_mode: SyncMode = DEFAULT_MODE) -> void:
+	mode = initial_mode
 
 # ==============================================================================
 # 二、权威校验与快照差分
@@ -43,9 +43,9 @@ func diff_snapshot(old_state: Dictionary, new_state: Dictionary) -> Dictionary:
 	if old_state.is_empty() or new_state.is_empty():
 		return {"success": false, "error_code": "EMPTY_SNAPSHOT"}
 	var diff: Dictionary = {}
-	for k in new_state:
-		if old_state.get(k) != new_state.get(k):
-			diff[k] = new_state[k]
+	for state_key in new_state:
+		if old_state.get(state_key) != new_state.get(state_key):
+			diff[state_key] = new_state[state_key]
 	return {"success": true, "diff": diff, "has_diff": not diff.is_empty()}
 
 ## 配置驱动：同步模式经 infrastructure.admin 预留（统一读取 sync/mode 配置路径）

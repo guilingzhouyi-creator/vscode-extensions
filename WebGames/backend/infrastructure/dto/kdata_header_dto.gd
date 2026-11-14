@@ -79,40 +79,40 @@ func validate() -> bool:
 
 ## 序列化为 32 字节 PackedByteArray
 func serialize() -> PackedByteArray:
-	var buf := StreamPeerBuffer.new()
-	buf.big_endian = false
-	buf.put_u32(magic)
-	buf.put_u16(version)
-	buf.put_u16(flags)
-	buf.put_u8(compress_type)
-	buf.put_u8(payload_type)
-	buf.put_u16(header_length)
-	buf.put_u32(uncompressed_size)
-	buf.put_u32(compressed_size)
-	buf.put_u32(crc32)
-	buf.put_u32(0) # 保留字段 1
-	buf.put_u32(0) # 保留字段 2
-	return buf.data_array
+	var stream_buffer := StreamPeerBuffer.new()
+	stream_buffer.big_endian = false
+	stream_buffer.put_u32(magic)
+	stream_buffer.put_u16(version)
+	stream_buffer.put_u16(flags)
+	stream_buffer.put_u8(compress_type)
+	stream_buffer.put_u8(payload_type)
+	stream_buffer.put_u16(header_length)
+	stream_buffer.put_u32(uncompressed_size)
+	stream_buffer.put_u32(compressed_size)
+	stream_buffer.put_u32(crc32)
+	stream_buffer.put_u32(0) # 保留字段 1
+	stream_buffer.put_u32(0) # 保留字段 2
+	return stream_buffer.data_array
 
 ## 从字节数组反序列化并解析 Header（形参 <= 5）
 static func deserialize(bytes: PackedByteArray) -> KDataHeaderDTO:
 	if bytes.size() < HEADER_SIZE:
 		return null
-	var buf := StreamPeerBuffer.new()
-	buf.data_array = bytes
-	buf.big_endian = false
+	var stream_buffer := StreamPeerBuffer.new()
+	stream_buffer.data_array = bytes
+	stream_buffer.big_endian = false
 
-	var dto := KDataHeaderDTO.new()
-	dto.magic = buf.get_u32()
-	dto.version = buf.get_u16()
-	dto.flags = buf.get_u16()
-	dto.compress_type = buf.get_u8()
-	dto.payload_type = buf.get_u8()
-	dto.header_length = buf.get_u16()
-	dto.uncompressed_size = buf.get_u32()
-	dto.compressed_size = buf.get_u32()
-	dto.crc32 = buf.get_u32()
+	var header_dto := KDataHeaderDTO.new()
+	header_dto.magic = stream_buffer.get_u32()
+	header_dto.version = stream_buffer.get_u16()
+	header_dto.flags = stream_buffer.get_u16()
+	header_dto.compress_type = stream_buffer.get_u8()
+	header_dto.payload_type = stream_buffer.get_u8()
+	header_dto.header_length = stream_buffer.get_u16()
+	header_dto.uncompressed_size = stream_buffer.get_u32()
+	header_dto.compressed_size = stream_buffer.get_u32()
+	header_dto.crc32 = stream_buffer.get_u32()
 
-	if not dto.validate():
+	if not header_dto.validate():
 		return null
-	return dto
+	return header_dto
