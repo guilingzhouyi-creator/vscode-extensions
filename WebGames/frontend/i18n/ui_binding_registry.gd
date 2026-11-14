@@ -39,41 +39,41 @@ var _bindings: Array[Dictionary] = []
 var _binding_index: Dictionary = {}
 
 ## 注册节点的 i18n 绑定 (使用 weakref 弱引用)
-func bind(node: Node, key: String, params: Dictionary = {}) -> void:
-	if node == null or not is_instance_valid(node):
+func bind(target_node: Node, i18n_key: String, binding_parameters: Dictionary = {}) -> void:
+	if target_node == null or not is_instance_valid(target_node):
 		return
 
 	# 通过 instance_id 索引 O(1) 命中既有有效绑定则原地更新，避免 O(n) 线性扫描
-	var node_id: int = node.get_instance_id()
+	var node_id: int = target_node.get_instance_id()
 	if _binding_index.has(node_id):
 		var existing_index: int = _binding_index[node_id]
 		if existing_index >= 0 and existing_index < _bindings.size() \
-				and _bindings[existing_index].ref.get_ref() == node:
-			_bindings[existing_index].key = key
-			_bindings[existing_index].params = params
+				and _bindings[existing_index].ref.get_ref() == target_node:
+			_bindings[existing_index].key = i18n_key
+			_bindings[existing_index].params = binding_parameters
 			return
 
 	_bindings.append({
-		"ref": weakref(node),
-		"key": key,
-		"params": params,
-		"type": _detect_node_type(node)
+		"ref": weakref(target_node),
+		"key": i18n_key,
+		"params": binding_parameters,
+		"type": _detect_node_type(target_node)
 	})
 	_binding_index[node_id] = _bindings.size() - 1
 
 ## 解除绑定
-func unbind(node: Node) -> void:
+func unbind(target_node: Node) -> void:
 	for binding_index in range(_bindings.size() - 1, -1, -1):
-		var target: Variant = _bindings[binding_index].ref.get_ref()
-		if target == null or target == node:
+		var bound_node: Variant = _bindings[binding_index].ref.get_ref()
+		if bound_node == null or bound_node == target_node:
 			_bindings.remove_at(binding_index)
 	_rebuild_binding_index()
 
 ## 解除一个视图下的所有绑定
 func unbind_view(view_node: Node) -> void:
 	for binding_index in range(_bindings.size() - 1, -1, -1):
-		var target: Variant = _bindings[binding_index].ref.get_ref()
-		if target == null or target == view_node or _is_descendant_of(target, view_node):
+		var bound_node: Variant = _bindings[binding_index].ref.get_ref()
+		if bound_node == null or bound_node == view_node or _is_descendant_of(bound_node, view_node):
 			_bindings.remove_at(binding_index)
 	_rebuild_binding_index()
 
@@ -82,41 +82,41 @@ func refresh_all() -> void:
 	var dead_indices: Array[int] = []
 	for binding_index in range(_bindings.size()):
 		var binding := _bindings[binding_index]
-		var node: Variant = binding.ref.get_ref()
-		if node == null or not is_instance_valid(node):
+		var bound_node: Variant = binding.ref.get_ref()
+		if bound_node == null or not is_instance_valid(bound_node):
 			dead_indices.append(binding_index)
 			continue
 
 		# UITextResolver.resolve 已内置 PlaceholderFiller 填充，避免二次解析空转
-		_apply_text(node, UITextResolver.resolve(binding.key, binding.params), binding.type)
+		_apply_text(bound_node, UITextResolver.resolve(binding.key, binding.params), binding.type)
 
 	# 倒序清理失效节点，并重建去重索引以对齐数组下标
 	if not dead_indices.is_empty():
-		for dead_pos in range(dead_indices.size() - 1, -1, -1):
-			_bindings.remove_at(dead_indices[dead_pos])
+		for dead_index_position in range(dead_indices.size() - 1, -1, -1):
+			_bindings.remove_at(dead_indices[dead_index_position])
 		_rebuild_binding_index()
 
 ## 重建去重索引（数组移除后下标整体漂移，统一重建保证索引与数组恒一致）
 func _rebuild_binding_index() -> void:
 	_binding_index.clear()
 	for binding_index in range(_bindings.size()):
-		var target: Object = _bindings[binding_index].ref.get_ref()
-		if target != null and is_instance_valid(target):
-			_binding_index[target.get_instance_id()] = binding_index
+		var bound_node: Object = _bindings[binding_index].ref.get_ref()
+		if bound_node != null and is_instance_valid(bound_node):
+			_binding_index[bound_node.get_instance_id()] = binding_index
 
-func _apply_text(node: Node, text_value: String, binding_type: String) -> void:
+func _apply_text(target_node: Node, rendered_text: String, binding_type: String) -> void:
 	match binding_type:
 		"text":
-			if node is Label:
-				(node as Label).text = text_value
-			elif node is RichTextLabel:
-				(node as RichTextLabel).text = text_value
+			if target_node is Label:
+				(target_node as Label).text = rendered_text
+			elif target_node is RichTextLabel:
+				(target_node as RichTextLabel).text = rendered_text
 		"button":
-			if node is Button:
-				(node as Button).text = text_value
+			if target_node is Button:
+				(target_node as Button).text = rendered_text
 		"placeholder":
-			if node is LineEdit:
-				(node as LineEdit).placeholder_text = text_value
+			if target_node is LineEdit:
+				(target_node as LineEdit).placeholder_text = rendered_text
 
 ## 返回当前活跃注册的绑定记录总数
 func count() -> int:
@@ -124,24 +124,24 @@ func count() -> int:
 
 ## 收集当前所有已绑定节点对应的 i18n 键名列表
 func get_all_keys() -> Array:
-	var keys: Array = []
+	var bound_keys: Array = []
 	for binding in _bindings:
-		keys.append(binding.key)
-	return keys
+		bound_keys.append(binding.key)
+	return bound_keys
 
-func _detect_node_type(node: Node) -> String:
-	if node is Button:
+func _detect_node_type(target_node: Node) -> String:
+	if target_node is Button:
 		return "button"
-	elif node is LineEdit:
+	elif target_node is LineEdit:
 		return "placeholder"
 	return "text"
 
-func _is_descendant_of(child: Node, parent: Node) -> bool:
-	if child == null or parent == null:
+func _is_descendant_of(child_node: Node, parent_node: Node) -> bool:
+	if child_node == null or parent_node == null:
 		return false
-	var ancestor := child.get_parent()
+	var ancestor := child_node.get_parent()
 	while ancestor != null:
-		if ancestor == parent:
+		if ancestor == parent_node:
 			return true
 		ancestor = ancestor.get_parent()
 	return false

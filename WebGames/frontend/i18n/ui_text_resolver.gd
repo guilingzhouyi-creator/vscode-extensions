@@ -34,40 +34,40 @@ func _load_locale_dict(locale: String, path: String) -> void:
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
 		return
-	var content := file.get_as_text()
+	var raw_json_text := file.get_as_text()
 	file.close()
 
-	var parsed_json: Variant = JSON.parse_string(content)
+	var parsed_json: Variant = JSON.parse_string(raw_json_text)
 	if parsed_json is Dictionary:
 		_dictionaries[locale] = parsed_json
 
-## 核心翻译函数: resolve(key, params) → 翻译后模板字符串（已填充参数）
+## 核心翻译函数: resolve(i18n_key, template_payload) → 翻译后模板字符串（已填充参数）
 ## 单引擎模板解析收敛：本函数只负责提取模板，参数填充唯一由 PlaceholderFiller 承担，
 ## 防止先裸替换再填充造成的二次消费与格式化空转。
-static func resolve(key: String, params: Dictionary = {}) -> String:
+static func resolve(i18n_key: String, template_payload: Dictionary = {}) -> String:
 	var resolver := get_instance()
-	var template := resolver._get_raw_text(key)
-	if template.is_empty():
+	var template_text := resolver._get_raw_text(i18n_key)
+	if template_text.is_empty():
 		# 尝试从 frontend.views 配置回退检索模板
-		var fallback_views := GameConfig.get_string("frontend.views", key, "")
+		var fallback_views := GameConfig.get_string("frontend.views", i18n_key, "")
 		if not fallback_views.is_empty():
-			return PlaceholderFiller.fill(fallback_views, params)
+			return PlaceholderFiller.fill(fallback_views, template_payload)
 		# 若 key 自身已是包含空格或大括号的英文底座模板/人读消息，直接填充参数输出，避免被包装成 [key]
-		if key.contains(" ") or key.contains("{"):
-			return PlaceholderFiller.fill(key, params)
-		return "[" + key + "]"
+		if i18n_key.contains(" ") or i18n_key.contains("{"):
+			return PlaceholderFiller.fill(i18n_key, template_payload)
+		return "[" + i18n_key + "]"
 
-	return PlaceholderFiller.fill(template, params)
+	return PlaceholderFiller.fill(template_text, template_payload)
 
 ## 原始文案检索 (当前语言 ➔ 回退语言)
-func _get_raw_text(key: String) -> String:
-	var dict: Dictionary = _dictionaries.get(current_locale, {})
-	if dict.has(key):
-		return str(dict[key])
+func _get_raw_text(i18n_key: String) -> String:
+	var locale_dictionary: Dictionary = _dictionaries.get(current_locale, {})
+	if locale_dictionary.has(i18n_key):
+		return str(locale_dictionary[i18n_key])
 
-	var fb_dict: Dictionary = _dictionaries.get(fallback_locale, {})
-	if fb_dict.has(key):
-		return str(fb_dict[key])
+	var fallback_dictionary: Dictionary = _dictionaries.get(fallback_locale, {})
+	if fallback_dictionary.has(i18n_key):
+		return str(fallback_dictionary[i18n_key])
 
 	return ""
 
@@ -86,10 +86,10 @@ static func get_fallback_locale() -> String:
 
 ## 判断当前语言是否属于全角中日韩（CJK）字符体系，用于字号与宽度估算适配
 static func is_cjk_locale() -> bool:
-	var loc := get_current_locale().to_lower()
-	return loc.begins_with("zh") or loc.begins_with("ja") or loc.begins_with("ko")
+	var normalized_locale := get_current_locale().to_lower()
+	return normalized_locale.begins_with("zh") or normalized_locale.begins_with("ja") or normalized_locale.begins_with("ko")
 
 ## 检查指定 i18n 键在当前语言或回退词库中是否存在有效词条
-static func has_key(key: String) -> bool:
+static func has_key(i18n_key: String) -> bool:
 	var resolver := get_instance()
-	return not resolver._get_raw_text(key).is_empty()
+	return not resolver._get_raw_text(i18n_key).is_empty()

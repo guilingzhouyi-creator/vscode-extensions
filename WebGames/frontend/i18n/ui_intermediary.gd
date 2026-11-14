@@ -25,70 +25,70 @@ static func get_instance() -> UIIntermediary:
 ## ==============================================================================
 
 ## 单节点注入
-## node: 要注入文本的 UI 节点 (Label/Button/LineEdit/RichTextLabel)
-## key: i18n key (如 "ui.fe01.splash.logo")
-## data: 业务数据字典 (如 {"amount": 5000, "name": "阿尔托莉雅"})
+## target_node: 要注入文本的 UI 节点 (Label/Button/LineEdit/RichTextLabel)
+## i18n_key: i18n key (如 "ui.fe01.splash.logo")
+## template_payload: 业务数据字典 (如 {"amount": 5000, "name": "阿尔托莉雅"})
 ## 返回: 填充后的最终文本
-static func resolve(node: Node, key: String, data: Dictionary = {}) -> String:
+static func resolve(target_node: Node, i18n_key: String, template_payload: Dictionary = {}) -> String:
 	# 1-2. i18n 翻译 + 占位符填充（UITextResolver.resolve 已内置单引擎 PlaceholderFiller 填充）
-	var filled := UITextResolver.resolve(key, data)
+	var rendered_text := UITextResolver.resolve(i18n_key, template_payload)
 
 	# 3. 注入 UI 节点
-	_inject_text(node, filled)
+	_inject_text(target_node, rendered_text)
 
 	# 4. 视觉适配
-	VisualAdapter.adapt_label(node, filled)
+	VisualAdapter.adapt_label(target_node, rendered_text)
 
 	# 5. 注册绑定（语言切换时自动刷新）
 	var registry := UIBindingRegistry.get_instance()
-	registry.bind(node, key, data)
+	registry.bind(target_node, i18n_key, template_payload)
 
-	return filled
+	return rendered_text
 
 ## 批量注入
 ## bindings: [{ "node": Node, "key": String, "data": Dictionary }, ...]
 static func resolve_batch(bindings: Array) -> void:
-	var empty_data: Dictionary = {}
+	var empty_payload: Dictionary = {}
 	for binding in bindings:
-		resolve(binding.node, binding.key, binding.get("data", empty_data))
+		resolve(binding.node, binding.key, binding.get("data", empty_payload))
 
 ## 仅翻译+填充, 不注入节点（用于动态生成文本, 如 ItemList 项）
-static func text(key: String, data: Dictionary = {}) -> String:
+static func text(i18n_key: String, template_payload: Dictionary = {}) -> String:
 	# resolve 已内置占位符填充，无需二次调用 PlaceholderFiller.fill
-	return UITextResolver.resolve(key, data)
+	return UITextResolver.resolve(i18n_key, template_payload)
 
 ## 翻译+填充+绑定, 但延迟注入（用于 TabContainer 标题等需要时机的场景）
-static func resolve_deferred(node: Node, key: String, data: Dictionary = {}) -> String:
-	var filled := UITextResolver.resolve(key, data)
+static func resolve_deferred(target_node: Node, i18n_key: String, template_payload: Dictionary = {}) -> String:
+	var rendered_text := UITextResolver.resolve(i18n_key, template_payload)
 	var registry := UIBindingRegistry.get_instance()
-	registry.bind(node, key, data)
-	return filled
+	registry.bind(target_node, i18n_key, template_payload)
+	return rendered_text
 
 ## Tab 标题注入
-static func resolve_tab(container: TabContainer, tab_index: int, key: String, data: Dictionary = {}) -> String:
-	var filled := UITextResolver.resolve(key, data)
-	container.set_tab_title(tab_index, filled)
-	VisualAdapter.adapt_tab_title(container, filled, tab_index)
+static func resolve_tab(container: TabContainer, tab_index: int, i18n_key: String, template_payload: Dictionary = {}) -> String:
+	var rendered_text := UITextResolver.resolve(i18n_key, template_payload)
+	container.set_tab_title(tab_index, rendered_text)
+	VisualAdapter.adapt_tab_title(container, rendered_text, tab_index)
 	# Tab 标题不注册绑定（TabContainer 的 set_tab_title 需要索引, 绑定刷新需特殊处理）
-	return filled
+	return rendered_text
 
 ## ItemList 项注入
-static func resolve_item(item_list: ItemList, text_key: String, data: Dictionary = {}, index: int = -1) -> int:
-	var filled := UITextResolver.resolve(text_key, data)
-	if index < 0:
-		index = item_list.add_item(filled)
+static func resolve_item(item_list: ItemList, text_key: String, template_payload: Dictionary = {}, target_index: int = -1) -> int:
+	var rendered_text := UITextResolver.resolve(text_key, template_payload)
+	if target_index < 0:
+		target_index = item_list.add_item(rendered_text)
 	else:
-		item_list.set_item_text(index, filled)
-	VisualAdapter.adapt_item_list_item(item_list, filled, index if index >= 0 else item_list.item_count - 1)
-	return index
+		item_list.set_item_text(target_index, rendered_text)
+	VisualAdapter.adapt_item_list_item(item_list, rendered_text, target_index if target_index >= 0 else item_list.item_count - 1)
+	return target_index
 
 ## LineEdit 占位符注入
-static func resolve_placeholder(line_edit: LineEdit, key: String, data: Dictionary = {}) -> String:
-	var filled := UITextResolver.resolve(key, data)
-	line_edit.placeholder_text = filled
+static func resolve_placeholder(line_edit: LineEdit, i18n_key: String, template_payload: Dictionary = {}) -> String:
+	var rendered_text := UITextResolver.resolve(i18n_key, template_payload)
+	line_edit.placeholder_text = rendered_text
 	var registry := UIBindingRegistry.get_instance()
-	registry.bind(line_edit, key, data)
-	return filled
+	registry.bind(line_edit, i18n_key, template_payload)
+	return rendered_text
 
 ## 语言切换入口
 static func switch_locale(new_locale: String) -> void:
@@ -110,12 +110,12 @@ static func clear_view_bindings(view_node: Node) -> void:
 ## ==============================================================================
 
 ## 将文本注入到 UI 节点
-static func _inject_text(node: Node, text: String) -> void:
-	if node is Label:
-		(node as Label).text = text
-	elif node is Button:
-		(node as Button).text = text
-	elif node is RichTextLabel:
-		(node as RichTextLabel).text = text
-	elif node is LineEdit:
-		(node as LineEdit).placeholder_text = text
+static func _inject_text(target_node: Node, rendered_text: String) -> void:
+	if target_node is Label:
+		(target_node as Label).text = rendered_text
+	elif target_node is Button:
+		(target_node as Button).text = rendered_text
+	elif target_node is RichTextLabel:
+		(target_node as RichTextLabel).text = rendered_text
+	elif target_node is LineEdit:
+		(target_node as LineEdit).placeholder_text = rendered_text
