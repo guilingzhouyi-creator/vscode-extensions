@@ -1,8 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端通用组件: 分栏面板 (KSplitPanel)
+# 模块归属: 前端通用组件层 (Frontend · Reusable UI Components)
 # 文件路径: res://frontend/components/k_split_panel.gd
-# 职责: 统一封装左列表 + 右详情的分栏布局，提供左右内容挂载点与占比控制
+# 架构定位: Reusable Layout Component (KSplitPanel)
+# 依赖与触发: 上游: 主从详情界面与列表视图 | 下游: DesignTokens
+# 职责说明: 统一封装左列表 + 右详情的分栏布局容器，提供左右内容插槽挂载与分隔线控制。
+# 退出语义与设计依据: 表现层通用布局容器解耦与子节点安全替换契约
 # ==============================================================================
+
+## KSplitPanel：通用左右双栏自适应布局组件
 class_name KSplitPanel
 extends Control
 
@@ -58,9 +63,11 @@ func _make_separator_style() -> StyleBoxFlat:
 	style.bg_color = DesignTokens.COLOR_BORDER_DEFAULT
 	return style
 
+## 获取左侧分栏面板控件
 func get_left_panel() -> Control:
 	return _left_panel
 
+## 获取右侧分栏面板控件
 func get_right_panel() -> Control:
 	return _right_panel
 

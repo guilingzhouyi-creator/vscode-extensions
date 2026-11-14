@@ -1,8 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端通用组件: 状态面板 (KStatePanel)
+# 模块归属: 前端通用组件层 (Frontend · Reusable UI Components)
 # 文件路径: res://frontend/components/k_state_panel.gd
-# 职责: 统一封装空状态 / 加载中 / 错误 / 就绪四种面板态，提供 i18n 文案与重试回调入口
+# 架构定位: Reusable Atomic Component (KStatePanel)
+# 依赖与触发: 上游: UIStateContainer 与异步数据视图 | 下游: DesignTokens, UIIntermediary
+# 职责说明: 统一封装空状态 / 加载中 / 错误 / 就绪四种面板态，提供 i18n 文案绑定与重试回调入口。
+# 退出语义与设计依据: 异步视图四态视觉互斥收敛契约
 # ==============================================================================
+
+## KStatePanel：异步视图四态（加载/就绪/空/错误）覆盖面板组件
 class_name KStatePanel
 extends Control
 
@@ -17,9 +22,9 @@ signal retry_requested()
 
 var _vbox: VBoxContainer
 var _icon_rect: TextureRect
-var _lbl_title: Label
-var _lbl_desc: Label
-var _btn_retry: Button
+var _title_label: Label
+var _description_label: Label
+var _retry_button: Button
 
 var _empty_key: String = "ui.common.empty"
 var _error_key: String = "ui.common.error"
@@ -51,76 +56,81 @@ func _ready() -> void:
 	_icon_rect.mouse_filter = MOUSE_FILTER_IGNORE
 	_vbox.add_child(_icon_rect)
 
-	_lbl_title = Label.new()
-	_lbl_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_lbl_title.add_theme_font_size_override("font_size", DesignTokens.FONT_SIZE_TITLE_MD)
-	_lbl_title.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_SECONDARY)
-	_lbl_title.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_lbl_title.mouse_filter = MOUSE_FILTER_IGNORE
-	_vbox.add_child(_lbl_title)
+	_title_label = Label.new()
+	_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_title_label.add_theme_font_size_override("font_size", DesignTokens.FONT_SIZE_TITLE_MD)
+	_title_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_SECONDARY)
+	_title_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_title_label.mouse_filter = MOUSE_FILTER_IGNORE
+	_vbox.add_child(_title_label)
 
-	_lbl_desc = Label.new()
-	_lbl_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_lbl_desc.add_theme_font_size_override("font_size", DesignTokens.FONT_SIZE_BODY)
-	_lbl_desc.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_MUTED)
-	_lbl_desc.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_lbl_desc.mouse_filter = MOUSE_FILTER_IGNORE
-	_vbox.add_child(_lbl_desc)
+	_description_label = Label.new()
+	_description_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_description_label.add_theme_font_size_override("font_size", DesignTokens.FONT_SIZE_BODY)
+	_description_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_MUTED)
+	_description_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_description_label.mouse_filter = MOUSE_FILTER_IGNORE
+	_vbox.add_child(_description_label)
 
-	_btn_retry = Button.new()
-	_btn_retry.text = UIIntermediary.text("ui.common.retry")
-	_btn_retry.add_theme_font_size_override("font_size", DesignTokens.FONT_SIZE_BODY)
-	_btn_retry.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_PRIMARY)
-	_btn_retry.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_btn_retry.visible = false
-	_btn_retry.pressed.connect(_on_retry_pressed)
-	_vbox.add_child(_btn_retry)
+	_retry_button = Button.new()
+	_retry_button.text = UIIntermediary.text("ui.common.retry")
+	_retry_button.add_theme_font_size_override("font_size", DesignTokens.FONT_SIZE_BODY)
+	_retry_button.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_PRIMARY)
+	_retry_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_retry_button.visible = false
+	_retry_button.pressed.connect(_on_retry_pressed)
+	_vbox.add_child(_retry_button)
 
 	set_state(State.READY)
 
 func _on_retry_pressed() -> void:
 	retry_requested.emit()
 
+## 切换当前状态面板枚举态并同步更新图标、文案与重试按钮可见性
 func set_state(state: int) -> void:
 	_current_state = state
 	match state:
 		State.LOADING:
 			_icon_rect.visible = false
-			_lbl_title.text = UIIntermediary.text(_loading_key)
-			_lbl_desc.visible = false
-			_btn_retry.visible = false
+			_title_label.text = UIIntermediary.text(_loading_key)
+			_description_label.visible = false
+			_retry_button.visible = false
 			visible = true
 		State.EMPTY:
 			_icon_rect.texture = empty_icon
 			_icon_rect.visible = empty_icon != null
-			_lbl_title.text = UIIntermediary.text(_empty_key)
-			_lbl_desc.visible = false
-			_btn_retry.visible = false
+			_title_label.text = UIIntermediary.text(_empty_key)
+			_description_label.visible = false
+			_retry_button.visible = false
 			visible = true
 		State.ERROR:
 			_icon_rect.texture = error_icon
 			_icon_rect.visible = error_icon != null
-			_lbl_title.text = UIIntermediary.text(_error_key)
-			_lbl_desc.visible = false
-			_btn_retry.visible = true
+			_title_label.text = UIIntermediary.text(_error_key)
+			_description_label.visible = false
+			_retry_button.visible = true
 			visible = true
 		State.READY:
 			visible = false
 
+## 设置空态提示文案的 i18n 键（当前处于空态时立即刷新显示）
 func set_empty_text(key: String) -> void:
 	_empty_key = key
-	if _current_state == State.EMPTY and _lbl_title != null:
-		_lbl_title.text = UIIntermediary.text(key)
+	if _current_state == State.EMPTY and _title_label != null:
+		_title_label.text = UIIntermediary.text(key)
 
+## 设置错误态提示文案的 i18n 键（当前处于错误态时立即刷新显示）
 func set_error_text(key: String) -> void:
 	_error_key = key
-	if _current_state == State.ERROR and _lbl_title != null:
-		_lbl_title.text = UIIntermediary.text(key)
+	if _current_state == State.ERROR and _title_label != null:
+		_title_label.text = UIIntermediary.text(key)
 
+## 设置加载态提示文案的 i18n 键（当前处于加载态时立即刷新显示）
 func set_loading_text(key: String) -> void:
 	_loading_key = key
-	if _current_state == State.LOADING and _lbl_title != null:
-		_lbl_title.text = UIIntermediary.text(key)
+	if _current_state == State.LOADING and _title_label != null:
+		_title_label.text = UIIntermediary.text(key)
 
+## 绑定重试按钮点击后的外部回调
 func bind_retry(callback: Callable) -> void:
 	retry_requested.connect(callback)

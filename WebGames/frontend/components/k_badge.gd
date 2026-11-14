@@ -1,8 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端通用组件: 树状红点徽标 (KBadge)
+# 模块归属: 前端通用组件层 (Frontend · Reusable UI Components)
 # 文件路径: res://frontend/components/k_badge.gd
-# 职责: 响应 RedDotTreeManager 路径状态变更，自动显示/隐藏红点或数字徽章
+# 架构定位: Reusable Atomic Component (KBadge)
+# 依赖与触发: 上游: 宿主按钮与菜单项 | 下游: RedDotTreeManager, DesignTokens
+# 职责说明: 响应 RedDotTreeManager 路径状态变更，自动显示/隐藏红点或数字徽章（>99 折叠为 99+）。
+# 退出语义与设计依据: 原子组件状态单向订阅与节点树退出自动解绑契约
 # ==============================================================================
+
+## KBadge：树状红点通知数字徽标组件
 class_name KBadge
 extends Control
 
@@ -12,15 +17,15 @@ const RedDotTreeManager = preload("res://frontend/ui_infrastructure/red_dot_tree
 signal count_changed(count: int)
 
 @export var red_dot_path: String = "":
-	set(val):
-		red_dot_path = val
+	set(value):
+		red_dot_path = value
 		_refresh_from_manager()
 
 @export var show_count: bool = true
 @export var severity_level: int = 0 # 0: ERROR 红, 1: WARNING 黄, 2: INFO 蓝
 
 var _panel: PanelContainer
-var _lbl_count: Label
+var _count_label: Label
 
 func _ready() -> void:
 	custom_minimum_size = Vector2(16, 16)
@@ -45,13 +50,13 @@ func _setup_ui() -> void:
 	_panel.add_theme_stylebox_override("panel", style)
 	add_child(_panel)
 
-	_lbl_count = Label.new()
-	_lbl_count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_lbl_count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_lbl_count.add_theme_font_size_override("font_size", DesignTokens.FONT_SIZE_CAPTION)
-	_lbl_count.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_PRIMARY)
-	_lbl_count.mouse_filter = MOUSE_FILTER_IGNORE
-	_panel.add_child(_lbl_count)
+	_count_label = Label.new()
+	_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_count_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_count_label.add_theme_font_size_override("font_size", DesignTokens.FONT_SIZE_CAPTION)
+	_count_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_PRIMARY)
+	_count_label.mouse_filter = MOUSE_FILTER_IGNORE
+	_panel.add_child(_count_label)
 
 func _get_severity_color() -> Color:
 	match severity_level:
@@ -75,11 +80,11 @@ func _apply_count(count: int) -> void:
 		return
 
 	visible = true
-	if _lbl_count != null:
+	if _count_label != null:
 		if show_count:
-			_lbl_count.text = "99+" if count > 99 else str(count)
+			_count_label.text = "99+" if count > 99 else str(count)
 		else:
-			_lbl_count.text = ""
+			_count_label.text = ""
 
 	count_changed.emit(count)
 

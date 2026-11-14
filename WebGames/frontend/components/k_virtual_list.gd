@@ -1,14 +1,19 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端通用组件: 高性能虚拟滚动列表 (KVirtualList)
+# 模块归属: 前端通用组件层 (Frontend · Reusable UI Components)
 # 文件路径: res://frontend/components/k_virtual_list.gd
-# 职责: 计算视口可视元素索引区间并提供行节点对象池（acquire/release + reset_state 契约）
+# 架构定位: High-Performance Virtualized List & Row Pool (KVirtualList)
+# 依赖与触发: 上游: 大规模背包/日志/列表视图 | 下游: KVirtualRow
+# 职责说明: 计算视口可视元素索引闭区间并提供行节点对象池（acquire/release 与 reset_state 复位契约）。
+# 退出语义与设计依据: 对象池零瞬态分配契约 (ADV-POOL-001 / ADV-PRF-002) 与池容量硬上限约束
 # ==============================================================================
+
+## KVirtualList：支持行节点对象池复用的虚拟滚动列表容器
 class_name KVirtualList
 extends ScrollContainer
 
-signal range_changed(start_idx: int, end_idx: int)
+signal range_changed(start_index: int, end_index: int)
 
-## 行对象池硬上限（R-31 / ADV-POOL-001：防池无界膨胀，魔法数字入常量）
+## 行对象池硬上限（ADV-POOL-001：防止极端大视口下空闲行池无界膨胀）
 const POOL_HARD_CAP: int = 128
 const METHOD_RESET_STATE: String = "reset_state"
 
@@ -17,9 +22,10 @@ const METHOD_RESET_STATE: String = "reset_state"
 ## ① 断开上一行数据绑定（i18n 键 / 文本 / 进度 / 选中态清零）；
 ## ② 复位内部状态（可见性由消费方经 acquire_row 复位）；
 ## ③ 不得销毁自身（严禁 queue_free）；④ 幂等（多次调用结果一致）。
-## 收敛前 release_row 仅对消费方 Control 做 `has_method("reset_state")` 鸭子调用，
-## 无具体实现可被断言；本类提供可实例化、可被契约测试直接断言的具体实现。
+## 早期 release_row 仅对消费方 Control 做 `has_method("reset_state")` 鸭子调用，
+## 无具体实现可供契约校验；本类提供可实例化、可直接验证复位行为的具体实现。
 ## ------------------------------------------------------------------------------
+## KVirtualRow：内置于 KVirtualList 的池化行控件基类实现
 class KVirtualRow extends Control:
 	## 上一行绑定的 i18n 键与业务数据（复用前必须清空，杜绝脏状态串行）
 	var bound_key: String = ""
@@ -57,22 +63,22 @@ var _row_to_index: Dictionary = {}
 func _ready() -> void:
 	get_v_scroll_bar().value_changed.connect(_on_scroll_changed)
 
-## 核心算法：基于滚动偏移量求解可视单元格索引闭区间 [start_idx, end_idx]
-static func calculate_visible_range(scroll_y: float, view_height: float, cell_h: float, total: int, buffer: int = 2) -> Vector2i:
-	if total <= 0 or cell_h <= 0.0:
+## 核心算法：基于滚动偏移量求解可视单元格索引闭区间 [start_index, end_index]
+static func calculate_visible_range(scroll_y: float, view_height: float, cell_height: float, total: int, buffer: int = 2) -> Vector2i:
+	if total <= 0 or cell_height <= 0.0:
 		return Vector2i(-1, -1)
 
-	var safe_view_h: float = maxf(view_height, cell_h)
-	var raw_start: int = int(floor(scroll_y / cell_h)) - buffer
-	var raw_end: int = int(ceil((scroll_y + safe_view_h) / cell_h)) + buffer
+	var safe_view_height: float = maxf(view_height, cell_height)
+	var raw_start: int = int(floor(scroll_y / cell_height)) - buffer
+	var raw_end: int = int(ceil((scroll_y + safe_view_height) / cell_height)) + buffer
 
-	var start_idx: int = clampi(raw_start, 0, total - 1)
-	var end_idx: int = clampi(raw_end, 0, total - 1)
+	var start_index: int = clampi(raw_start, 0, total - 1)
+	var end_index: int = clampi(raw_end, 0, total - 1)
 
-	if start_idx > end_idx:
+	if start_index > end_index:
 		return Vector2i(-1, -1)
 
-	return Vector2i(start_idx, end_idx)
+	return Vector2i(start_index, end_index)
 
 ## 更新总数据项
 func set_total_count(count: int) -> void:
@@ -86,28 +92,29 @@ func set_total_count(count: int) -> void:
 	_total_count = safe_count
 	_refresh_range()
 
-func _on_scroll_changed(_val: float) -> void:
+func _on_scroll_changed(_value: float) -> void:
 	_refresh_range()
 
 func _refresh_range() -> void:
 	var scroll_y: float = float(get_v_scroll_bar().value)
-	var view_h: float = size.y
-	if view_h <= 0.0:
-		view_h = 400.0
+	var view_height: float = size.y
+	if view_height <= 0.0:
+		view_height = 400.0
 
-	var range_res := calculate_visible_range(scroll_y, view_h, item_height, _total_count, buffer_count)
-	if range_res.x != _current_start or range_res.y != _current_end:
-		_current_start = range_res.x
-		_current_end = range_res.y
+	var visible_range := calculate_visible_range(scroll_y, view_height, item_height, _total_count, buffer_count)
+	if visible_range.x != _current_start or visible_range.y != _current_end:
+		_current_start = visible_range.x
+		_current_end = visible_range.y
 		# 回收时机：可视区间变化时收回离区行（入区行由消费方经 acquire_row_for_index 取用）
 		_recycle_rows_for_range(_current_start, _current_end)
 		range_changed.emit(_current_start, _current_end)
 
+## 获取当前可视单元格索引闭区间 [start_index, end_index]
 func get_current_range() -> Vector2i:
 	return Vector2i(_current_start, _current_end)
 
 # ==============================================================================
-# 行对象池（R-31 / ADV-POOL-001：仅组件层落地 + 接口预留，不接线消费方）
+# 行对象池（ADV-POOL-001：组件层提供池化实现与接口预留，不主动耦合业务消费方）
 # ==============================================================================
 
 ## 统一复位单行池化节点内部状态（KVirtualRow 具体类优先，兼容外部鸭子实现）
@@ -144,10 +151,10 @@ func release_row(row: Control) -> void:
 		return
 	# O(1) 反查并取消活跃登记，保证「无重复入池」
 	if _row_to_index.has(row):
-		var mapped_idx: int = int(_row_to_index[row])
+		var mapped_index: int = int(_row_to_index[row])
 		_row_to_index.erase(row)
-		if _active_rows.get(mapped_idx) == row:
-			_active_rows.erase(mapped_idx)
+		if _active_rows.get(mapped_index) == row:
+			_active_rows.erase(mapped_index)
 	# ADV-POOL-001 契约：归还前必须清态（优先具体实现，兼容消费方鸭子实现）
 	_reset_row_state(row)
 	row.visible = false
@@ -173,25 +180,25 @@ func _detach_from_parent(row: Control) -> void:
 
 ## 池容量上界 = 可视区间容量 + 2*buffer，并受 POOL_HARD_CAP 硬约束
 func _pool_capacity() -> int:
-	var view_h: float = size.y
-	if view_h <= 0.0:
-		view_h = 400.0
-	var visible_cap: int = int(ceil(view_h / maxf(item_height, 1.0))) + 2 * buffer_count
+	var view_height: float = size.y
+	if view_height <= 0.0:
+		view_height = 400.0
+	var visible_cap: int = int(ceil(view_height / maxf(item_height, 1.0))) + 2 * buffer_count
 	return clampi(visible_cap, 0, POOL_HARD_CAP)
 
 ## 回收时机：可视区间变化时收回离区行
-func _recycle_rows_for_range(start_idx: int, end_idx: int) -> void:
+func _recycle_rows_for_range(start_index: int, end_index: int) -> void:
 	var to_recycle: Array[Control] = []
-	for idx in _active_rows:
-		if idx < start_idx or idx > end_idx:
-			to_recycle.append(_active_rows[idx] as Control)
+	for row_index in _active_rows:
+		if row_index < start_index or row_index > end_index:
+			to_recycle.append(_active_rows[row_index] as Control)
 	for row in to_recycle:
 		release_row(row)
 
 ## 清空活跃行与行对象池（reset_state / 视图销毁时调用），逐项释放
 func _clear_row_pool() -> void:
-	for idx in _active_rows.keys():
-		var active_row: Control = _active_rows[idx]
+	for row_index in _active_rows.keys():
+		var active_row: Control = _active_rows[row_index]
 		if active_row != null and is_instance_valid(active_row):
 			_reset_row_state(active_row)
 			_detach_from_parent(active_row)
@@ -204,7 +211,7 @@ func _clear_row_pool() -> void:
 			_free_row_node(pooled_row)
 	_row_pool.clear()
 
-## 组件级状态复位（R-31/S2-11/S4-13，幂等）：清空行对象池与活跃登记、归零可视区间与总量。
+## 组件级状态复位（幂等）：清空行对象池与活跃登记、归零可视区间与总量。
 ## 供视图销毁 / 重挂载时调用，确保复用前无脏状态；多次调用结果一致（幂等）。
 func reset_state() -> void:
 	_clear_row_pool()

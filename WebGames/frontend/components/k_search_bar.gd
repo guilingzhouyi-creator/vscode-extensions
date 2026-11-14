@@ -1,8 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端通用组件: 搜索输入栏 (KSearchBar)
+# 模块归属: 前端通用组件层 (Frontend · Reusable UI Components)
 # 文件路径: res://frontend/components/k_search_bar.gd
-# 职责: 封装 LineEdit + 清除按钮，提供防抖搜索回调与输入归一化
+# 架构定位: Reusable Atomic Component (KSearchBar)
+# 依赖与触发: 上游: 列表过滤与图鉴搜索界面 | 下游: DesignTokens, UIIntermediary
+# 职责说明: 封装 LineEdit 与一键清除按钮，提供输入去抖回调、空白归一化与长度门槛过滤。
+# 退出语义与设计依据: 高频输入去抖节流与零冗余信号派发契约
 # ==============================================================================
+
+## KSearchBar：带输入去抖与一键清空的通用搜索栏组件
 class_name KSearchBar
 extends Control
 
@@ -17,7 +22,7 @@ signal search_cleared()
 
 var _hbox: HBoxContainer
 var _line_edit: LineEdit
-var _btn_clear: Button
+var _clear_button: Button
 
 var _pending_query: String = ""
 var _debounce_remaining: float = 0.0
@@ -41,18 +46,18 @@ func _ready() -> void:
 	_apply_input_style()
 	_hbox.add_child(_line_edit)
 
-	_btn_clear = Button.new()
-	_btn_clear.text = "x"
-	_btn_clear.custom_minimum_size = Vector2(28, 28)
-	_btn_clear.add_theme_font_size_override("font_size", DesignTokens.FONT_SIZE_BODY)
-	_btn_clear.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_SECONDARY)
-	_btn_clear.add_theme_color_override("font_hover_color", DesignTokens.COLOR_TEXT_PRIMARY)
-	_btn_clear.visible = false
-	_hbox.add_child(_btn_clear)
+	_clear_button = Button.new()
+	_clear_button.text = "x"
+	_clear_button.custom_minimum_size = Vector2(28, 28)
+	_clear_button.add_theme_font_size_override("font_size", DesignTokens.FONT_SIZE_BODY)
+	_clear_button.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_SECONDARY)
+	_clear_button.add_theme_color_override("font_hover_color", DesignTokens.COLOR_TEXT_PRIMARY)
+	_clear_button.visible = false
+	_hbox.add_child(_clear_button)
 
 	UIIntermediary.resolve_placeholder(_line_edit, placeholder_key)
 	_line_edit.text_changed.connect(_on_text_changed)
-	_btn_clear.pressed.connect(clear)
+	_clear_button.pressed.connect(clear)
 	set_process(false)
 
 static var _shared_input_style: StyleBoxFlat = null
@@ -79,11 +84,11 @@ func _process(delta: float) -> void:
 		set_process(false)
 
 func _on_text_changed() -> void:
-	var raw := _line_edit.text
-	var query := raw.strip_edges().to_lower()
+	var raw_text := _line_edit.text
+	var query := raw_text.strip_edges().to_lower()
 	_pending_query = query
 	_debounce_remaining = debounce_sec
-	_btn_clear.visible = not raw.is_empty()
+	_clear_button.visible = not raw_text.is_empty()
 	set_process(true)
 
 func _emit_debounced() -> void:
@@ -98,21 +103,25 @@ func _emit_debounced() -> void:
 	else:
 		search_changed.emit(_pending_query)
 
+## 获取当前去空白并小写归一化后的搜索关键词
 func get_query() -> String:
 	return _line_edit.text.strip_edges().to_lower()
 
+## 更新输入框占位文本的 i18n 键并立即解析刷新
 func set_placeholder(key: String) -> void:
 	placeholder_key = key
 	if _line_edit != null:
 		UIIntermediary.resolve_placeholder(_line_edit, key)
 
+## 清空输入文本与待触发去抖计时器，并发出清空信号
 func clear() -> void:
 	_line_edit.text = ""
 	_pending_query = ""
 	_debounce_remaining = 0.0
 	set_process(false)
-	_btn_clear.visible = false
+	_clear_button.visible = false
 	search_cleared.emit()
 
+## 将键盘输入焦点聚焦至搜索框
 func focus() -> void:
 	_line_edit.grab_focus()

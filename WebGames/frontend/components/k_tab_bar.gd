@@ -1,8 +1,12 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端通用组件: 标签栏 (KTabBar)
+# 模块归属: 前端通用组件层 (Frontend · Reusable UI Components)
 # 文件路径: res://frontend/components/k_tab_bar.gd
-# 职责: 统一封装 TabContainer 的 i18n 驱动标题注入与动态 Tab 注册
+# 架构定位: Reusable Navigation Tab Component (KTabBar)
+# 依赖与触发: 上游: 多分页容器视图 | 下游: UIIntermediary
+# 职责说明: 统一封装 TabContainer 的 i18n 驱动标题注入与动态 Tab 注册，支持静态辅助初始化。
+# 退出语义与设计依据: 多语言分页标题集中解析契约
 # ==============================================================================
+
 class_name KTabBar
 extends TabContainer
 
@@ -22,8 +26,8 @@ func register_tab(index: int, title_key: String) -> void:
 
 ## 批量初始化所有 Tab 标题（语言切换时需外部重新调用刷新）
 func init_all_titles(keys: PackedStringArray) -> void:
-	for i in range(keys.size()):
-		UIIntermediary.resolve_tab(self, i, keys[i])
+	for tab_index in range(keys.size()):
+		UIIntermediary.resolve_tab(self, tab_index, keys[tab_index])
 
 ## 获取当前选中 Tab 索引
 func get_current_tab_index() -> int:
@@ -35,6 +39,6 @@ func _on_tab_changed(tab: int) -> void:
 
 ## 静态方法：为任意 TabContainer 批量初始化 i18n 标题（无需替换为 KTabBar 节点即可使用）
 static func init_titles(container: TabContainer, keys: PackedStringArray) -> void:
-	for i in range(keys.size()):
-		if i < container.get_tab_count():
-			UIIntermediary.resolve_tab(container, i, keys[i])
+	for tab_index in range(keys.size()):
+		if tab_index < container.get_tab_count():
+			UIIntermediary.resolve_tab(container, tab_index, keys[tab_index])

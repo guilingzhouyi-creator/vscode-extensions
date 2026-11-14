@@ -1,8 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端通用组件: 稀有度标签 (KRarityTag)
+# 模块归属: 前端通用组件层 (Frontend · Reusable UI Components)
 # 文件路径: res://frontend/components/k_rarity_tag.gd
-# 职责: 统一封装稀有度色块与文字标签，按品质等级自动映射颜色与 i18n 文案
+# 架构定位: Reusable Atomic Component (KRarityTag)
+# 依赖与触发: 上游: 道具详情、抽卡与图鉴界面 | 下游: DesignTokens, UIIntermediary
+# 职责说明: 统一封装稀有度色块与文字标签，按品质等级自动映射色彩令牌与 i18n 文案。
+# 退出语义与设计依据: 品质色阶单一真源映射契约
 # ==============================================================================
+
+## KRarityTag：物品与角色稀有度等级标签组件
 class_name KRarityTag
 extends Control
 
@@ -14,8 +19,9 @@ const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
 
 var _hbox: HBoxContainer
 var _color_rect: ColorRect
-var _lbl_name: Label
+var _name_label: Label
 
+## 根据品质等级（1~5）映射对应稀有度语义颜色，越界回退至普通品质颜色
 static func get_rarity_color(level: int) -> Color:
 	match level:
 		1: return DesignTokens.COLOR_QUALITY_COMMON
@@ -25,6 +31,7 @@ static func get_rarity_color(level: int) -> Color:
 		5: return DesignTokens.COLOR_QUALITY_LEGENDARY
 		_: return DesignTokens.COLOR_QUALITY_COMMON
 
+## 根据品质等级（1~5）映射对应国际化词库键名
 static func get_rarity_name_key(level: int) -> String:
 	match level:
 		1: return "ui.rarity.common"
@@ -64,13 +71,13 @@ func _ready() -> void:
 	_color_rect.mouse_filter = MOUSE_FILTER_IGNORE
 	_hbox.add_child(_color_rect)
 
-	_lbl_name = Label.new()
-	_lbl_name.add_theme_font_size_override("font_size", DesignTokens.FONT_SIZE_CAPTION)
-	_lbl_name.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_PRIMARY)
-	_lbl_name.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_lbl_name.mouse_filter = MOUSE_FILTER_IGNORE
-	_lbl_name.visible = show_label
-	_hbox.add_child(_lbl_name)
+	_name_label = Label.new()
+	_name_label.add_theme_font_size_override("font_size", DesignTokens.FONT_SIZE_CAPTION)
+	_name_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_PRIMARY)
+	_name_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_name_label.mouse_filter = MOUSE_FILTER_IGNORE
+	_name_label.visible = show_label
+	_hbox.add_child(_name_label)
 
 	_apply_rarity()
 
@@ -78,9 +85,10 @@ func _apply_rarity() -> void:
 	var color := get_rarity_color(rarity_level)
 	if _color_rect != null:
 		_color_rect.color = color
-	if _lbl_name != null and show_label:
-		_lbl_name.text = UIIntermediary.text(get_rarity_name_key(rarity_level))
+	if _name_label != null and show_label:
+		_name_label.text = UIIntermediary.text(get_rarity_name_key(rarity_level))
 
+## 设置并钳制稀有度等级（[1, 5]），同步刷新色块与文案
 func set_rarity(level: int) -> void:
 	rarity_level = clampi(level, 1, 5)
 	_apply_rarity()

@@ -1,20 +1,26 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端核心: 应用生命周期状态机
+# 模块归属: 前端核心层 (Frontend · App Lifecycle State Machine)
 # 文件路径: res://frontend/app/app_lifecycle_fsm.gd
-# 职责: 规范管理客户端 13 态应用级生命周期，单向合法转移校验，阻断非法状态跳跃
+# 架构定位: Client Application Lifecycle Finite State Machine
+# 依赖与触发: 上游: AppBootstrap, NavManager, 视图控制器 | 下游: EventBusCore, TemplateFormatter
+# 职责说明: 规范管理客户端 14 态应用级生命周期，执行单向合法转移校验，阻断非法状态跳跃。
+# 退出语义与设计依据: 客户端状态机单向转移白名单与非侵入观察契约
 # ==============================================================================
+
+## AppLifecycleFSM：客户端应用级生命周期有限状态机
 class_name AppLifecycleFSM
 extends RefCounted
 
 # ==============================================================================
-# 一、13 大应用状态枚举
+# 一、应用生命周期状态枚举
 # ==============================================================================
 
 enum AppState {
 	BOOT,           # 冷启动环境侦测、基础单例装配
 	INITIALIZING,   # 本地配置与着色器预热
 	AUTHENTICATING, # 账号登录、验证码核验、服务器选择
-	MAIN_MENU,      # 角色选择与创角界面
+	MAIN_MENU,      # 账号首页与角色选择界面
+	WORLD_GATEWAY,  # 世界网关、模式探测与世界档案/创角选档入口
 	LOBBY,          # 城镇主界面、社交与工坊主面板
 	MATCHMAKING,    # 跨服匹配中、队伍组建中
 	LOADING,        # 战斗副本/大世界场景资源加载
@@ -29,6 +35,8 @@ enum AppState {
 signal state_changed(from_state: AppState, to_state: AppState, context: Dictionary)
 
 static var _instance: AppLifecycleFSM
+
+## 获取应用生命周期状态机全局单例
 static func get_instance() -> AppLifecycleFSM:
 	if _instance == null:
 		_instance = AppLifecycleFSM.new()
@@ -38,12 +46,15 @@ var _current_state: AppState = AppState.BOOT
 var _previous_state: AppState = AppState.BOOT
 var _context: Dictionary = {}
 
+## 获取当前所处的应用生命周期状态
 func get_current_state() -> AppState:
 	return _current_state
 
+## 获取上一次转移前的应用生命周期状态
 func get_previous_state() -> AppState:
 	return _previous_state
 
+## 获取当前状态附带的上下文快照字典
 func get_context() -> Dictionary:
 	return _context
 
@@ -58,19 +69,21 @@ func can_transition(to_state: AppState) -> bool:
 		AppState.INITIALIZING:
 			return to_state in [AppState.AUTHENTICATING, AppState.ERROR]
 		AppState.AUTHENTICATING:
-			return to_state in [AppState.MAIN_MENU, AppState.LOBBY, AppState.ERROR, AppState.DISCONNECTED]
+			return to_state in [AppState.MAIN_MENU, AppState.WORLD_GATEWAY, AppState.LOBBY, AppState.ERROR, AppState.DISCONNECTED]
 		AppState.MAIN_MENU:
-			return to_state in [AppState.LOBBY, AppState.AUTHENTICATING, AppState.ERROR]
+			return to_state in [AppState.WORLD_GATEWAY, AppState.LOBBY, AppState.LOADING, AppState.AUTHENTICATING, AppState.ERROR]
+		AppState.WORLD_GATEWAY:
+			return to_state in [AppState.MAIN_MENU, AppState.LOBBY, AppState.LOADING, AppState.IN_GAME, AppState.AUTHENTICATING, AppState.ERROR]
 		AppState.LOBBY:
-			return to_state in [AppState.MATCHMAKING, AppState.LOADING, AppState.IN_GAME, AppState.AUTHENTICATING, AppState.DISCONNECTED, AppState.ERROR]
+			return to_state in [AppState.MATCHMAKING, AppState.LOADING, AppState.IN_GAME, AppState.WORLD_GATEWAY, AppState.MAIN_MENU, AppState.AUTHENTICATING, AppState.DISCONNECTED, AppState.ERROR]
 		AppState.MATCHMAKING:
 			return to_state in [AppState.LOADING, AppState.LOBBY, AppState.DISCONNECTED, AppState.ERROR]
 		AppState.LOADING:
-			return to_state in [AppState.IN_GAME, AppState.LOBBY, AppState.DISCONNECTED, AppState.ERROR]
+			return to_state in [AppState.IN_GAME, AppState.LOBBY, AppState.WORLD_GATEWAY, AppState.DISCONNECTED, AppState.ERROR]
 		AppState.IN_GAME:
-			return to_state in [AppState.PAUSED, AppState.RESULT, AppState.LOBBY, AppState.DISCONNECTED, AppState.ERROR]
+			return to_state in [AppState.PAUSED, AppState.RESULT, AppState.LOBBY, AppState.WORLD_GATEWAY, AppState.MAIN_MENU, AppState.AUTHENTICATING, AppState.DISCONNECTED, AppState.ERROR]
 		AppState.PAUSED:
-			return to_state in [AppState.IN_GAME, AppState.LOBBY, AppState.DISCONNECTED, AppState.ERROR]
+			return to_state in [AppState.IN_GAME, AppState.LOBBY, AppState.WORLD_GATEWAY, AppState.MAIN_MENU, AppState.AUTHENTICATING, AppState.DISCONNECTED, AppState.ERROR]
 		AppState.RESULT:
 			return to_state in [AppState.LOBBY, AppState.MATCHMAKING, AppState.DISCONNECTED, AppState.ERROR]
 		AppState.DISCONNECTED:
@@ -115,6 +128,7 @@ func get_state_name(state: AppState) -> String:
 		AppState.INITIALIZING: return "INITIALIZING"
 		AppState.AUTHENTICATING: return "AUTHENTICATING"
 		AppState.MAIN_MENU: return "MAIN_MENU"
+		AppState.WORLD_GATEWAY: return "WORLD_GATEWAY"
 		AppState.LOBBY: return "LOBBY"
 		AppState.MATCHMAKING: return "MATCHMAKING"
 		AppState.LOADING: return "LOADING"

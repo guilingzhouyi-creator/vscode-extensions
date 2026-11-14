@@ -1,8 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端通用组件: 返回按钮 (KBackButton)
+# 模块归属: 前端通用组件层 (Frontend · Reusable UI Components)
 # 文件路径: res://frontend/components/k_back_button.gd
-# 职责: 统一封装返回按钮视觉风格、防连击与点击音效，点击后触发 ViewRouter 回退
+# 架构定位: Reusable Atomic Component (KBackButton)
+# 依赖与触发: 上游: 页面视图控制器 | 下游: DesignTokens, UIAudioBridge, NavManager
+# 职责说明: 统一封装返回按钮视觉风格、防连击拦截与点击音效，点击后按配置触发导航栈回退。
+# 退出语义与设计依据: 原子组件单一职责与防连击交互契约
 # ==============================================================================
+
+## KBackButton：通用返回导航按钮组件
 class_name KBackButton
 extends Button
 

@@ -1,8 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端通用组件: 标准交互按钮 (KButton)
+# 模块归属: 前端通用组件层 (Frontend · Reusable UI Components)
 # 文件路径: res://frontend/components/k_button.gd
-# 职责: 统一封装按钮视觉风格、防重复快速连击 (Debounce) 与全局 UI 音效派发
+# 架构定位: Reusable Atomic Component (KButton)
+# 依赖与触发: 上游: 全域交互界面与弹窗 | 下游: DesignTokens, UIAudioBridge, UIIntermediary
+# 职责说明: 统一封装标准按钮多态视觉风格、防重复快速连击 (Debounce)、加载态锁定与 UI 音效派发。
+# 退出语义与设计依据: 原子控件防连击与异步加载态防重入契约
 # ==============================================================================
+
+## KButton：标准防连击与加载态交互按钮组件
 class_name KButton
 extends Button
 
@@ -24,25 +29,25 @@ signal debounced_pressed()
 @export var debounce_sec: float = DesignTokens.DEBOUNCE_DELAY
 
 var is_loading: bool = false:
-	set(val):
-		if is_loading == val:
+	set(value):
+		if is_loading == value:
 			return
-		is_loading = val
+		is_loading = value
 		if is_loading:
-			_orig_text = text
+			_original_text = text
 			_was_disabled = disabled
 			text = UIIntermediary.text("ui.common.processing")
 			disabled = true
 		else:
-			text = _orig_text
+			text = _original_text
 			disabled = _was_disabled
 
-var _orig_text: String = ""
+var _original_text: String = ""
 var _was_disabled: bool = false
 var _last_press_time: float = -100.0
 
 func _ready() -> void:
-	_orig_text = text
+	_original_text = text
 	pressed.connect(_on_internal_pressed)
 	mouse_entered.connect(_on_mouse_entered)
 	mouse_exited.connect(_on_mouse_exited)

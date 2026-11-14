@@ -1,8 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端通用组件: 货币显示条 (KCurrencyBar)
+# 模块归属: 前端通用组件层 (Frontend · Reusable UI Components)
 # 文件路径: res://frontend/components/k_currency_bar.gd
-# 职责: 统一封装金/银/铜/水晶多货币图标+数值的横向展示，纯渲染无业务逻辑
+# 架构定位: Reusable Atomic Component (KCurrencyBar)
+# 依赖与触发: 上游: HUD 与商店交易界面 | 下游: DesignTokens, PlaceholderFiller
+# 职责说明: 统一封装金/银/铜/水晶多货币图标与千分位数值的横向展示，纯渲染无业务逻辑。
+# 退出语义与设计依据: 表现层纯展示零业务运算契约
 # ==============================================================================
+
+## KCurrencyBar：多货币横向展示条组件
 class_name KCurrencyBar
 extends Control
 
@@ -20,10 +25,10 @@ const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
 @export var crystals_icon: Texture2D = null
 
 var _hbox: HBoxContainer
-var _lbl_gold: Label
-var _lbl_silver: Label
-var _lbl_copper: Label
-var _lbl_crystals: Label
+var _gold_label: Label
+var _silver_label: Label
+var _copper_label: Label
+var _crystals_label: Label
 
 func _ready() -> void:
 	mouse_filter = MOUSE_FILTER_IGNORE
@@ -34,13 +39,13 @@ func _ready() -> void:
 	add_child(_hbox)
 
 	if show_gold:
-		_lbl_gold = _build_currency_group(gold_icon, DesignTokens.COLOR_ACCENT_GOLD)
+		_gold_label = _build_currency_group(gold_icon, DesignTokens.COLOR_ACCENT_GOLD)
 	if show_silver:
-		_lbl_silver = _build_currency_group(silver_icon, DesignTokens.COLOR_TEXT_SECONDARY)
+		_silver_label = _build_currency_group(silver_icon, DesignTokens.COLOR_TEXT_SECONDARY)
 	if show_copper:
-		_lbl_copper = _build_currency_group(copper_icon, DesignTokens.COLOR_TEXT_MUTED)
+		_copper_label = _build_currency_group(copper_icon, DesignTokens.COLOR_TEXT_MUTED)
 	if show_crystals:
-		_lbl_crystals = _build_currency_group(crystals_icon, DesignTokens.COLOR_INFO)
+		_crystals_label = _build_currency_group(crystals_icon, DesignTokens.COLOR_INFO)
 
 func _build_currency_group(icon: Texture2D, text_color: Color) -> Label:
 	var icon_rect := TextureRect.new()
@@ -60,24 +65,29 @@ func _build_currency_group(icon: Texture2D, text_color: Color) -> Label:
 	_hbox.add_child(label)
 	return label
 
+## 批量刷新金/银/铜/水晶四种货币显示数值
 func set_currency(gold: int, silver: int, copper: int, crystals: int = 0) -> void:
 	set_gold(gold)
 	set_silver(silver)
 	set_copper(copper)
 	set_crystals(crystals)
 
-func set_gold(val: int) -> void:
-	if _lbl_gold != null:
-		_lbl_gold.text = PlaceholderFiller.format_thousands(val)
+## 更新金币显示数值（自动应用千分位格式化）
+func set_gold(amount: int) -> void:
+	if _gold_label != null:
+		_gold_label.text = PlaceholderFiller.format_thousands(amount)
 
-func set_silver(val: int) -> void:
-	if _lbl_silver != null:
-		_lbl_silver.text = str(val)
+## 更新银币显示数值
+func set_silver(amount: int) -> void:
+	if _silver_label != null:
+		_silver_label.text = str(amount)
 
-func set_copper(val: int) -> void:
-	if _lbl_copper != null:
-		_lbl_copper.text = str(val)
+## 更新铜币显示数值
+func set_copper(amount: int) -> void:
+	if _copper_label != null:
+		_copper_label.text = str(amount)
 
-func set_crystals(val: int) -> void:
-	if _lbl_crystals != null:
-		_lbl_crystals.text = PlaceholderFiller.format_thousands(val)
+## 更新水晶显示数值（自动应用千分位格式化）
+func set_crystals(amount: int) -> void:
+	if _crystals_label != null:
+		_crystals_label.text = PlaceholderFiller.format_thousands(amount)

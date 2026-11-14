@@ -1,8 +1,12 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端核心: 应用骨架装配器
+# 模块归属: 前端核心层 (Frontend · App Lifecycle & Bootstrap)
 # 文件路径: res://frontend/app/app_bootstrap.gd
-# 职责: 应用启动装配：初始化导航器、Mock 服务容器、全局主题并推入默认入口视图
+# 架构定位: Application Bootstrap & Infrastructure Wiring Facade
+# 依赖与触发: 上游: AppRoot._ready() | 下游: NavManager, AppLifecycleFSM, ServiceLocator, UI 管理器
+# 职责说明: 应用启动装配：初始化导航器、基础设施服务容器、全局主题并推入默认入口视图。
+# 退出语义与设计依据: 单例惰性装配与重复引导幂等保护契约
 # ==============================================================================
+
 class_name AppBootstrap
 extends RefCounted
 
@@ -16,14 +20,13 @@ const UIAudioBridge = preload("res://frontend/ui_infrastructure/ui_audio_bridge.
 const AppLifecycleFSM = preload("res://frontend/app/app_lifecycle_fsm.gd")
 const ServiceLocator = preload("res://frontend/domain_boundary/service_locator.gd")
 
-## 引导幂等守卫（R-27：重复引导不再重跑生命周期与默认入口压栈）
 static var _bootstrapped: bool = false
 
 ## 应用骨架装配（幂等：重复调用仅幂等重绑导航根与 UI 基础设施，不重跑生命周期/入口压栈）
 static func bootstrap(app_root: AppRoot) -> void:
 	# 1. 绑定分层导航器（幂等重绑）
-	var nav := NavManager.get_instance()
-	nav.bind_root(app_root)
+	var nav_manager := NavManager.get_instance()
+	nav_manager.bind_root(app_root)
 
 	# 2. 初始化 UI 基础设施管理器（幂等重绑）
 	if app_root != null:
@@ -37,7 +40,6 @@ static func bootstrap(app_root: AppRoot) -> void:
 	FocusInputManager.get_instance()
 	UIAudioBridge.get_instance()
 
-	# R-27：已完成一次完整引导则仅保留上述幂等重绑，跳过生命周期驱动与入口压栈
 	if _bootstrapped:
 		return
 	_bootstrapped = true
@@ -47,12 +49,12 @@ static func bootstrap(app_root: AppRoot) -> void:
 	_drive_lifecycle_boot(services)
 
 	# 4. 应用全局主题
-	var theme_mgr := ThemeManager.get_instance()
+	var theme_manager := ThemeManager.get_instance()
 	if app_root != null:
-		app_root.theme = theme_mgr.theme
+		app_root.theme = theme_manager.theme
 
 	# 5. 推入默认入口视图（账号入口）
-	nav.push_screen("account_entry")
+	nav_manager.push_screen("account_entry")
 
 ## 启动态推进：BOOT → INITIALIZING →（版本握手）→ AUTHENTICATING
 static func _drive_lifecycle_boot(services: ServiceContainer) -> void:
