@@ -167,6 +167,14 @@ const TestAccountRegistrationAndRealReloadPipeline = preload("res://tests/integr
 const TestClientProtocolSpaceAndBoundaryPipeline = preload("res://tests/integration/pipelines/test_client_protocol_space_and_boundary_pipeline.gd")
 # Tier 3 MOD 运行时差分加载、统一磁盘发现与结构化诊断验收流水线
 const TestTier3ContentOverridePipeline = preload("res://tests/integration/pipelines/test_tier3_content_override_pipeline.gd")
+# Phase 130 零 MOD Fail-Closed 全链路验证流水线
+const TestZeroModFailClosedPipeline = preload("res://tests/integration/pipelines/test_zero_mod_fail_closed_pipeline.gd")
+# Phase 130 纯插件化异世界 MOD 组合叠加与零泄漏隔离流水线
+const TestPluginModCompositionAndIsolation = preload("res://tests/integration/pipelines/test_plugin_mod_composition_and_isolation.gd")
+# Phase 130 真实前端场景与 RealServiceContainer 全链路无头推演流水线
+const TestRealFrontendGatewayWorkbenchPrologue = preload("res://tests/integration/pipelines/test_real_frontend_gateway_workbench_prologue.gd")
+# Phase 130 世界档案 MOD 锁重入复原与漂移阻断验收流水线
+const TestWorldModLockReentryAndDrift = preload("res://tests/integration/pipelines/test_world_mod_lock_reentry_and_drift.gd")
 
 # 前端 17 大系统白模与表现层测试套件
 const TestFE01AccountEntry = preload("res://tests/unit/frontend/test_fe_01_account_entry.gd")
@@ -271,10 +279,14 @@ static func get_all_test_classes() -> Array:
 		TestFullChainBackendProtocolAndLifecyclePipeline,
 		TestAccountRegistrationAndRealReloadPipeline,
 		TestClientProtocolSpaceAndBoundaryPipeline,
-		TestTier3ContentOverridePipeline
+		TestTier3ContentOverridePipeline,
+		TestZeroModFailClosedPipeline,
+		TestPluginModCompositionAndIsolation,
+		TestRealFrontendGatewayWorkbenchPrologue,
+		TestWorldModLockReentryAndDrift
 	]
 
-## 前端测试套件（17 大系统 + 6 前端基建与边界套件 = 23；全域 117 后端与横切 + 23 前端 = 140 套件）
+## 前端测试套件（17 大系统 + 6 前端基建与边界套件 = 23；全域 121 后端与横切 + 23 前端 = 144 套件）
 static func get_frontend_test_classes() -> Array:
 	return [
 		TestFE01AccountEntry, TestFE02MainHUD, TestFE03CharacterProgression,
@@ -288,7 +300,7 @@ static func get_frontend_test_classes() -> Array:
 		TestFrontendRobustness, TestFrontendErrorDomain
 	]
 
-## 全域测试套件（后端业务域 + 横切基础设施 + 前端 23 = 全域共 140 套件）
+## 全域测试套件（后端业务域 + 横切基础设施 + 前端 23 = 全域共 144 套件）
 static func get_all_engine_test_classes() -> Array:
 	var list := get_all_test_classes()
 	list.append_array(get_frontend_test_classes())
