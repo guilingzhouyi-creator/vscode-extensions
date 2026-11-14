@@ -117,12 +117,12 @@ func serialize() -> Dictionary:
 	}
 
 ## 时钟状态反序列化（缺省字段回退默认历法）
-func deserialize(data: Dictionary) -> void:
-	combat_tick = data.get("combat_tick", 0)
-	travel_hours = data.get("travel_hours", 0)
-	calendar_days = data.get("calendar_days", 1)
-	calendar_months = data.get("calendar_months", 1)
-	calendar_years = data.get("calendar_years", 1)
+func deserialize(serialized_clock: Dictionary) -> void:
+	combat_tick = serialized_clock.get("combat_tick", 0)
+	travel_hours = serialized_clock.get("travel_hours", 0)
+	calendar_days = serialized_clock.get("calendar_days", 1)
+	calendar_months = serialized_clock.get("calendar_months", 1)
+	calendar_years = serialized_clock.get("calendar_years", 1)
 
 # ==============================================================================
 # 三、配置读取（历法常数，clock.json 驱动）

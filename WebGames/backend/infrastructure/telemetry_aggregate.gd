@@ -60,7 +60,7 @@ static var _slots: Dictionary = {}        # "domain|event_category" -> SlotMetri
 static var _window_start_utc: int = 0
 static var _sample_size: int = LogConstants.DEFAULT_TELEMETRY_SAMPLE_SIZE
 static var _window_seconds: int = LogConstants.DEFAULT_TELEMETRY_WINDOW_SEC
-static var _enabled: bool = true
+static var _is_enabled: bool = true
 static var _cached_version: int = -2
 
 ## 测试复位：清空全部槽位并恢复默认配置（避免跨用例状态残留）
@@ -69,7 +69,7 @@ static func reset_state() -> void:
 	_window_start_utc = 0
 	_sample_size = LogConstants.DEFAULT_TELEMETRY_SAMPLE_SIZE
 	_window_seconds = LogConstants.DEFAULT_TELEMETRY_WINDOW_SEC
-	_enabled = true
+	_is_enabled = true
 	_cached_version = -2
 
 ## 配置新鲜度守卫：热重载版本变化时按 log.json telemetry 段重读启用/窗口/样本参数
@@ -80,7 +80,7 @@ static func _ensure_config() -> void:
 	_cached_version = current_version
 
 	var telemetry_config := GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_TELEMETRY, {})
-	_enabled = bool(telemetry_config.get("enabled", true))
+	_is_enabled = bool(telemetry_config.get("enabled", true))
 	_window_seconds = maxi(1, int(telemetry_config.get("window_seconds", LogConstants.DEFAULT_TELEMETRY_WINDOW_SEC)))
 	_sample_size = maxi(LogConstants.MIN_TELEMETRY_SAMPLE_SIZE, int(telemetry_config.get("sample_size", LogConstants.DEFAULT_TELEMETRY_SAMPLE_SIZE)))
 
@@ -93,7 +93,7 @@ static func consume(record: StructuredLogRecord) -> void:
 	if record == null:
 		return
 	_ensure_config()
-	if not _enabled:
+	if not _is_enabled:
 		return
 
 	var now := int(Time.get_unix_time_from_system())
@@ -141,12 +141,12 @@ static func _maybe_roll_window(now_utc: int) -> void:
 ## 快照导出当前窗口遥测指标（只读供外部查询）
 static func snapshot() -> Dictionary:
 	_ensure_config()
-	var slots_dict: Dictionary = {}
+	var slots_map: Dictionary = {}
 	for slot_key in _slots.keys():
 		var slot: SlotMetric = _slots[slot_key]
-		slots_dict[slot_key] = slot.to_dict()
+		slots_map[slot_key] = slot.to_dict()
 	return {
 		"window_start_utc": _window_start_utc,
 		"window_seconds": _window_seconds,
-		"slots": slots_dict,
+		"slots": slots_map,
 	}

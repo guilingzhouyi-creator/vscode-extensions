@@ -52,15 +52,15 @@ func reset_state() -> void:
 
 ## 序列化当前对象为通用字典传输结构
 func to_dto() -> Dictionary:
-	var dto_dict: Dictionary = super.to_dto()
-	dto_dict[LogConstants.KEY_TRACE_ID] = trace_id
-	dto_dict[LogConstants.KEY_PARENT_SPAN_ID] = parent_span_id
-	dto_dict[LogConstants.KEY_EVENT_CATEGORY] = event_category
-	dto_dict[LogConstants.KEY_DURATION_MS] = duration_ms
-	dto_dict[LogConstants.KEY_SOURCE_FILE] = source_file
-	dto_dict[LogConstants.KEY_SOURCE_LINE] = source_line
-	dto_dict[LogConstants.KEY_REDACTED_KEYS] = redacted_keys.duplicate()
-	return dto_dict
+	var dto_map: Dictionary = super.to_dto()
+	dto_map[LogConstants.KEY_TRACE_ID] = trace_id
+	dto_map[LogConstants.KEY_PARENT_SPAN_ID] = parent_span_id
+	dto_map[LogConstants.KEY_EVENT_CATEGORY] = event_category
+	dto_map[LogConstants.KEY_DURATION_MS] = duration_ms
+	dto_map[LogConstants.KEY_SOURCE_FILE] = source_file
+	dto_map[LogConstants.KEY_SOURCE_LINE] = source_line
+	dto_map[LogConstants.KEY_REDACTED_KEYS] = redacted_keys.duplicate()
+	return dto_map
 
 ## 深拷贝克隆当前结构化日志对象（避免中间字典反序列化堆分配损耗，ADV-PRF-002）
 func clone() -> StructuredLogRecord:
@@ -82,18 +82,18 @@ func clone() -> StructuredLogRecord:
 	return cloned_record
 
 ## 从字典反序列化还原（继承字段 + 结构化字段；context/redacted_keys 仅接受合法类型并深拷贝）
-static func from_dto(data: Dictionary) -> StructuredLogRecord:
+static func from_dto(record_payload: Dictionary) -> StructuredLogRecord:
 	var record_dto := StructuredLogRecord.new()
-	if data.is_empty():
+	if record_payload.is_empty():
 		return record_dto
-	LogRecordDTO.populate_base_from_dict(record_dto, data)
-	record_dto.trace_id = str(data.get(LogConstants.KEY_TRACE_ID, ""))
-	record_dto.parent_span_id = str(data.get(LogConstants.KEY_PARENT_SPAN_ID, ""))
-	record_dto.event_category = str(data.get(LogConstants.KEY_EVENT_CATEGORY, ""))
-	record_dto.duration_ms = int(data.get(LogConstants.KEY_DURATION_MS, 0))
-	record_dto.source_file = str(data.get(LogConstants.KEY_SOURCE_FILE, ""))
-	record_dto.source_line = int(data.get(LogConstants.KEY_SOURCE_LINE, 0))
-	var raw_redacted_keys: Variant = data.get(LogConstants.KEY_REDACTED_KEYS, [])
+	LogRecordDTO.populate_base_from_dict(record_dto, record_payload)
+	record_dto.trace_id = str(record_payload.get(LogConstants.KEY_TRACE_ID, ""))
+	record_dto.parent_span_id = str(record_payload.get(LogConstants.KEY_PARENT_SPAN_ID, ""))
+	record_dto.event_category = str(record_payload.get(LogConstants.KEY_EVENT_CATEGORY, ""))
+	record_dto.duration_ms = int(record_payload.get(LogConstants.KEY_DURATION_MS, 0))
+	record_dto.source_file = str(record_payload.get(LogConstants.KEY_SOURCE_FILE, ""))
+	record_dto.source_line = int(record_payload.get(LogConstants.KEY_SOURCE_LINE, 0))
+	var raw_redacted_keys: Variant = record_payload.get(LogConstants.KEY_REDACTED_KEYS, [])
 	if raw_redacted_keys is Array:
 		for redacted_key in (raw_redacted_keys as Array):
 			record_dto.redacted_keys.append(str(redacted_key))

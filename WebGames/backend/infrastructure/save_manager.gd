@@ -26,16 +26,16 @@ static var _forbidden_tokens: Array[String] = [
 
 ## 确保存档目录存在（递归创建，幂等）；并按 recovery/orphan_tmp_cleanup 清理孤儿临时文件
 static func ensure_save_directory() -> void:
-	var save_dir := _save_dir()
-	AtomicFileWriter.ensure_directory(save_dir)
-	_cleanup_orphan_tmp_files(save_dir)
+	var save_directory := _save_dir()
+	AtomicFileWriter.ensure_directory(save_directory)
+	_cleanup_orphan_tmp_files(save_directory)
 
 ## 孤儿临时文件清理（存档韧性契约）：原子写在 rename 前被中断会遗留 *{tmp_suffix}
 ## 文件，既不参与校验也不被任何流程回收，长期累积占用存档目录。启动/写档入口按配置清理并留痕。
-static func _cleanup_orphan_tmp_files(save_dir: String) -> void:
+static func _cleanup_orphan_tmp_files(save_directory: String) -> void:
 	if not GameConfig.get_bool("infrastructure.persistence", "recovery/orphan_tmp_cleanup", true):
 		return
-	var removed := AtomicFileWriter.cleanup_orphan_tmp_files(save_dir, _tmp_suffix())
+	var removed := AtomicFileWriter.cleanup_orphan_tmp_files(save_directory, _tmp_suffix())
 	if removed > 0:
 		EventBusCore.get_instance().emit_log("warn", _msg("orphan_tmp_cleaned", {"count": removed}))
 
@@ -65,12 +65,12 @@ static func save_game(save_name: String, payload: Dictionary) -> Dictionary:
 
 	ensure_save_directory()
 	var file_path := _save_dir() + save_name + _save_extension()
-	var save_exists := FileAccess.file_exists(file_path)
-	var backup_exists := FileAccess.file_exists(file_path + _backup_suffix())
+	var has_existing_save := FileAccess.file_exists(file_path)
+	var has_existing_backup := FileAccess.file_exists(file_path + _backup_suffix())
 
-	var data_dict: Dictionary = payload.get("data", {})
-	var canonical_data_str := JSON.stringify(data_dict)
-	var sha256_hash := compute_sha256(canonical_data_str)
+	var save_payload: Dictionary = payload.get("data", {})
+	var canonical_data_text := JSON.stringify(save_payload)
+	var sha256_hash := compute_sha256(canonical_data_text)
 
 	var full_envelope := {
 		"format_version": GameConfig.get_string("infrastructure.persistence", "format_version", "1.0.0"),
@@ -78,21 +78,21 @@ static func save_game(save_name: String, payload: Dictionary) -> Dictionary:
 		"save_name": save_name,
 		"created_timestamp": Time.get_unix_time_from_system(),
 		"signature_sha256": sha256_hash,
-		"data_json": canonical_data_str
+		"data_json": canonical_data_text
 	}
 
-	var json_str := JSON.stringify(full_envelope, "\t")
+	var envelope_json_text := JSON.stringify(full_envelope, "\t")
 
-	var write_result := _atomic_write(file_path, json_str)
+	var write_result := _atomic_write(file_path, envelope_json_text)
 	if not write_result.is_empty():
 		write_result["stage"] = "WRITE_TMP"
-		write_result["save_exists"] = save_exists
-		write_result["backup_exists"] = backup_exists
-		write_result["recovery"] = _restore_hint(save_exists, backup_exists)
+		write_result["save_exists"] = has_existing_save
+		write_result["backup_exists"] = has_existing_backup
+		write_result["recovery"] = _restore_hint(has_existing_save, has_existing_backup)
 		return write_result
 
-	var preview_len := GameConfig.get_int("infrastructure.persistence", "hash_preview_len", 8)
-	EventBusCore.get_instance().emit_log("info", _msg("save_success", {"path": file_path, "hash": sha256_hash.substr(0, preview_len)}))
+	var hash_preview_length := GameConfig.get_int("infrastructure.persistence", "hash_preview_len", 8)
+	EventBusCore.get_instance().emit_log("info", _msg("save_success", {"path": file_path, "hash": sha256_hash.substr(0, hash_preview_length)}))
 	return {
 		"success": true,
 		"stage": "COMMIT",
@@ -133,13 +133,13 @@ static func load_game(save_name: String) -> Dictionary:
 	var envelope: Variant = json.get_data()
 	if not envelope is Dictionary:
 		return _fail_or_recover("load", "INVALID_ENVELOPE", _msg("invalid_envelope"), save_name)
-	var envelope_dict: Dictionary = envelope
+	var envelope_map: Dictionary = envelope
 
 	# format_version 方向闸门（Inv-DF-4）：旧引擎不得静默直通未来版本存档，
 	# 低于最低支持版本亦拒绝（迁移链外）。当前单版本：min == current（配置驱动）
 	var current_version := GameConfig.get_string("infrastructure.persistence", "format_version", "1.0.0")
 	var min_supported := GameConfig.get_string("infrastructure.persistence", "min_supported_version", "1.0.0")
-	var envelope_version: String = String(envelope_dict.get("format_version", ""))
+	var envelope_version: String = String(envelope_map.get("format_version", ""))
 	if envelope_version.is_empty():
 		return _fail_or_recover("load", "INVALID_ENVELOPE", SystemBaseMessages.MSG_SAVE_MISSING_FORMAT_VERSION, save_name)
 	if _version_newer_than(envelope_version, current_version):
@@ -148,26 +148,26 @@ static func load_game(save_name: String) -> Dictionary:
 		return _fail("load", "VERSION_TOO_OLD", _msg("version_too_old", {"version": envelope_version}))
 
 	# 校验对象与消费对象必须是同一字节序列：仅信任被签名的 data_json
-	var raw_data_str: String = envelope_dict.get("data_json", "")
-	var recorded_hash: String = envelope_dict.get("signature_sha256", "")
+	var raw_data_json: String = envelope_map.get("data_json", "")
+	var recorded_hash: String = envelope_map.get("signature_sha256", "")
 
-	if raw_data_str.is_empty():
+	if raw_data_json.is_empty():
 		return _fail_or_recover("load", "INVALID_ENVELOPE", _msg("invalid_envelope"), save_name)
 
-	var calculated_hash := compute_sha256(raw_data_str)
+	var calculated_hash := compute_sha256(raw_data_json)
 	if not CryptoIntegrityLib.constant_time_equals(calculated_hash, recorded_hash):
 		return _fail_or_recover("load", "CHECKSUM_MISMATCH", _msg("checksum_mismatch"), save_name, {"recorded": recorded_hash, "calculated": calculated_hash})
 
 	# 从已被校验的字节序列反序列化，杜绝 data / data_json 不一致
-	var data_json := JSON.new()
-	if data_json.parse(raw_data_str) != OK:
-		return _fail_or_recover("load", "JSON_PARSE_FAIL", _msg("json_parse_fail", {"line": data_json.get_error_line(), "error": data_json.get_error_message()}), save_name)
-	var parsed: Variant = data_json.get_data()
+	var payload_json_parser := JSON.new()
+	if payload_json_parser.parse(raw_data_json) != OK:
+		return _fail_or_recover("load", "JSON_PARSE_FAIL", _msg("json_parse_fail", {"line": payload_json_parser.get_error_line(), "error": payload_json_parser.get_error_message()}), save_name)
+	var parsed: Variant = payload_json_parser.get_data()
 	if not parsed is Dictionary:
 		return _fail_or_recover("load", "INVALID_ENVELOPE", _msg("invalid_envelope"), save_name)
 
 	EventBusCore.get_instance().emit_log("info", _msg("load_success", {"path": file_path}))
-	return {"success": true, "data": parsed, "meta": envelope_dict, "verified": true, "stage": "LOAD", "error_code": ""}
+	return {"success": true, "data": parsed, "meta": envelope_map, "verified": true, "stage": "LOAD", "error_code": ""}
 
 # ==============================================================================
 # 四、备份恢复
@@ -196,24 +196,24 @@ static func restore_backup(save_name: String) -> Dictionary:
 	var backup_json := JSON.new()
 	if backup_json.parse(backup_content) != OK:
 		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt", {"path": backup_json.get_error_message()}))
-	var backup_data: Variant = backup_json.get_data()
-	if not backup_data is Dictionary:
+	var parsed_backup: Variant = backup_json.get_data()
+	if not parsed_backup is Dictionary:
 		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt", {"path": SystemBaseMessages.MSG_SAVE_TOPLEVEL_NOT_OBJECT}))
-	var backup_envelope: Dictionary = backup_data
+	var backup_envelope: Dictionary = parsed_backup
 	var backup_version: String = String(backup_envelope.get("format_version", ""))
 	var current_version := GameConfig.get_string("infrastructure.persistence", "format_version", "1.0.0")
 	var min_version := GameConfig.get_string("infrastructure.persistence", "min_supported_version", "1.0.0")
 	if backup_version.is_empty() or _version_newer_than(backup_version, current_version) or _version_newer_than(min_version, backup_version):
 		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt", {"path": SystemBaseMessages.MSG_SAVE_UNVERIFIED_BACKUP}))
-	var backup_data_json: String = String(backup_envelope.get("data_json", ""))
+	var backup_payload_json: String = String(backup_envelope.get("data_json", ""))
 	var backup_signature: String = String(backup_envelope.get("signature_sha256", ""))
-	if backup_data_json.is_empty() or backup_signature.is_empty():
+	if backup_payload_json.is_empty() or backup_signature.is_empty():
 		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt", {"path": SystemBaseMessages.MSG_SAVE_NO_VALID_PAYLOAD}))
-	if not CryptoIntegrityLib.constant_time_equals(compute_sha256(backup_data_json), backup_signature):
+	if not CryptoIntegrityLib.constant_time_equals(compute_sha256(backup_payload_json), backup_signature):
 		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt", {"path": SystemBaseMessages.MSG_SAVE_UNVERIFIED_BACKUP}))
-	var inner := JSON.new()
-	if inner.parse(backup_data_json) != OK or not (inner.get_data() is Dictionary):
-		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt", {"path": inner.get_error_message()}))
+	var payload_json_parser := JSON.new()
+	if payload_json_parser.parse(backup_payload_json) != OK or not (payload_json_parser.get_data() is Dictionary):
+		return _fail(OP_RESTORE, "BACKUP_CORRUPT", _msg("backup_corrupt", {"path": payload_json_parser.get_error_message()}))
 
 	# 2. 写恢复临时文件并原子交换至正档（不先删除正档）
 	var replace_result: Dictionary = AtomicFileWriter.replace_via_tmp(file_path, backup_content, _tmp_suffix())
@@ -242,7 +242,7 @@ static func _fail(stage: String, error_code: String, error_text: String) -> Dict
 ## 契约：① 仅损坏类错误码走本出口（版本方向闸门 / 文件缺失不参与，避免掩盖真实错误）；
 ## ② 恢复深度硬上限 1（_recovering 守卫，防 .bak 亦坏时的无界递归）；
 ## ③ 恢复或重读任一不成功，一律回退原始失败结果，绝不美化失败语义。
-static var _recovering: bool = false
+static var _is_recovering: bool = false
 
 static func _auto_restore_enabled() -> bool:
 	return GameConfig.get_bool("infrastructure.persistence", "recovery/auto_restore_enabled", true)
@@ -257,17 +257,17 @@ static func _fail_or_recover(
 	var base := _fail(stage, error_code, error_text)
 	if not extra.is_empty():
 		base.merge(extra, true)
-	if _recovering or not _auto_restore_enabled():
+	if _is_recovering or not _auto_restore_enabled():
 		return base
 	var file_path := _save_dir() + save_name + _save_extension()
 	if not FileAccess.file_exists(file_path + _backup_suffix()):
 		return base
-	_recovering = true
+	_is_recovering = true
 	var restore_result := restore_backup(save_name)
 	var reloaded: Dictionary = {}
 	if bool(restore_result.get("success", false)):
 		reloaded = load_game(save_name)
-	_recovering = false
+	_is_recovering = false
 	if not reloaded.is_empty() and bool(reloaded.get("success", false)):
 		EventBusCore.get_instance().emit_log("warn", _msg("auto_restored", {"path": save_name}))
 		reloaded["auto_restored"] = true
@@ -276,19 +276,19 @@ static func _fail_or_recover(
 	return base
 
 ## 恢复建议：正档或备份存在性提示（供调用方决定 restore_backup）
-static func _restore_hint(save_exists: bool, backup_exists: bool) -> String:
-	if backup_exists:
+static func _restore_hint(has_existing_save: bool, has_existing_backup: bool) -> String:
+	if has_existing_backup:
 		return "restore_backup"
-	if save_exists:
+	if has_existing_save:
 		return "keep_existing"
 	return ""
 
 ## 返回空 Dictionary 表示成功；否则为失败结果字典
 static func _atomic_write(file_path: String, content: String) -> Dictionary:
-	var atomic_enabled: bool = GameConfig.get_bool("infrastructure.persistence", "atomic_write/enabled", true)
+	var is_atomic_enabled: bool = GameConfig.get_bool("infrastructure.persistence", "atomic_write/enabled", true)
 	var policy: String = GameConfig.get_string("infrastructure.persistence", "atomic_write/backup_fail_policy", "abort")
 	var write_result: Dictionary = AtomicFileWriter.write_text_atomic(file_path, content, {
-		"atomic_enabled": atomic_enabled,
+		"atomic_enabled": is_atomic_enabled,
 		"tmp_suffix": _tmp_suffix(),
 		"create_backup": true,
 		"backup_suffix": _backup_suffix(),
@@ -340,8 +340,8 @@ static func _version_newer_than(left_version: String, right_version: String) -> 
 	return false
 
 ## 日志文案查表与动态占位符注入（infrastructure.persistence messages 段，未登记回传 key）
-static func _msg(key: String, params: Dictionary = {}) -> String:
+static func _msg(key: String, parameters: Dictionary = {}) -> String:
 	var template_text := GameConfig.get_string("infrastructure.persistence", "messages/" + key, key)
-	if params.is_empty():
+	if parameters.is_empty():
 		return template_text
-	return TemplateFormatter.format(template_text, params)
+	return TemplateFormatter.format(template_text, parameters)
