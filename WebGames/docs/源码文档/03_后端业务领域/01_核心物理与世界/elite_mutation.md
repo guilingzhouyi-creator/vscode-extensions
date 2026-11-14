@@ -8,7 +8,7 @@
 
 | 文件路径 | 核心类 | 角色定位 | 核心接口与配置键 |
 | :--- | :--- | :--- | :--- |
-| [elite_monster_entity.gd](../../../../backend/domains/elite_mutation/elite_monster_entity.gd) | `EliteMonsterAggregate` | 精英怪物聚合体 | 声明 `EliteGrade` 枚举与 `apply_affixes()`；默认值取自 `domains.elite:entity_defaults/*` |
+| [elite_monster_aggregate.gd](../../../../backend/domains/elite_mutation/elite_monster_aggregate.gd) | `EliteMonsterAggregate` | 精英怪物聚合体 | 声明 `EliteGrade` 枚举与 `apply_affixes()`；默认值取自 `domains.elite:entity_defaults/*` |
 | [generic_affix_solver.gd](../../../../backend/domains/elite_mutation/generic_affix_solver.gd) | `GenericAffixSolver` | 词缀定义与概率抽取 | `get_affix()`、`roll_random_affixes()`；读取 `affixes` 与分级池 `affix_pool/tier_%d` |
 | [generic_berserk_fsm.gd](../../../../backend/domains/elite_mutation/generic_berserk_fsm.gd) | `GenericBerserkFSM` | 血线/超时狂暴状态机 | `check_and_trigger_berserk()` 消费 `berserk_fsm/{duration_ticks_threshold,rage_level,str_multiplier}` 并执行 L2 乘性增益 |
 

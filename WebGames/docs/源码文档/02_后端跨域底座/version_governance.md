@@ -15,7 +15,7 @@
 | [version_activation_gate.gd](../../../backend/domains/version_governance/version_activation_gate.gd) | `VersionActivationGate` | 双保险激活阻断门禁 | `evaluate_startup_eligibility()`、`evaluate_runtime_world_entry()` |
 | [patch_integrity_verifier.gd](../../../backend/domains/version_governance/patch_integrity_verifier.gd) | `PatchIntegrityVerifier` | 分块流式指纹校验器 | `compute_file_sha256()`、`verify_file_sha256()` |
 | [dynamic_pack_mount_manager.gd](../../../backend/domains/version_governance/dynamic_pack_mount_manager.gd) | `DynamicPackMountManager` | Godot VFS 增量挂载管理器 | `mount_patch_pack()`、`get_active_mounted_version()`、`get_mounted_packs()`、`reset_for_tests()` |
-| [version_runtime_context.gd](../../../backend/domains/version_governance/version_runtime_context.gd) | `VersionedRuntimeContext` | 版本隔离运行时上下文 | `assemble_context()`、`dispose()` |
+| [versioned_runtime_context.gd](../../../backend/domains/version_governance/versioned_runtime_context.gd) | `VersionedRuntimeContext` | 版本隔离运行时上下文 | `assemble_context()`、`dispose()` |
 | [version_state_machine.gd](../../../backend/domains/version_governance/version_state_machine.gd) | `VersionStateMachine` | 版本生命周期单向状态机 | `transition_to()`（管控 9 大正常态与 4 大异常态） |
 
 ---

@@ -8,8 +8,8 @@
 
 | 文件路径 | 核心类 | 角色定位 | 公开接口与配置键 |
 | :--- | :--- | :--- | :--- |
-| [npc_entities.gd](../../../../backend/domains/npc_simulation/npc_entities.gd) | `AutonomousNPCEntity` | 自主 NPC 聚合实体 | 承载 Big-5 性格矩阵与社交羁绊图谱；默认取自 `domains.npc:defaults/*` |
-| [npc_ai_solver.gd](../../../../backend/domains/npc_simulation/npc_ai_solver.gd) | `NPCAIAndEvolutionSolver` | GOAP 行动规划求解器 | `plan_npc_next_goal()` 按 `goap/weights/*` 与 `legacy_age_threshold` 择定修炼/探索/经商/传承目标 |
+| [autonomous_npc_entity.gd](../../../../backend/domains/npc_simulation/autonomous_npc_entity.gd) | `AutonomousNPCEntity` | 自主 NPC 聚合实体 | 承载 Big-5 性格矩阵与社交羁绊图谱；默认取自 `domains.npc:defaults/*` |
+| [npc_ai_and_evolution_solver.gd](../../../../backend/domains/npc_simulation/npc_ai_and_evolution_solver.gd) | `NPCAIAndEvolutionSolver` | GOAP 行动规划求解器 | `plan_npc_next_goal()` 按 `goap/weights/*` 与 `legacy_age_threshold` 择定修炼/探索/经商/传承目标 |
 | [npc_demise_legacy_service.gd](../../../../backend/domains/npc_simulation/npc_demise_legacy_service.gd) | `NPCDemiseLegacyService` | 坐化著书与传承服务 | `process_npc_natural_demise()` 生成绝笔典籍手稿并移交遗产给门徒（`legacy/*`） |
 
 ---

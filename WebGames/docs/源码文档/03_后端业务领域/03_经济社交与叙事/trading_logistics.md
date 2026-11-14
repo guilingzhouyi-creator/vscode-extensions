@@ -8,8 +8,8 @@
 
 | 文件路径 | 核心类 | 角色定位 | 公开接口与配置驱动 |
 | :--- | :--- | :--- | :--- |
-| [trading_entities.gd](../../../../backend/domains/trading_logistics/trading_entities.gd) | `TownMarketCommodity` | 集市商品与商队实体 | 读取 `domains.trading:{commodity_defaults,caravan_defaults}/*` |
-| [market_elasticity_solver.gd](../../../../backend/domains/trading_logistics/market_elasticity_solver.gd) | `MarketElasticityAndTradingSolver` | 供需弹性纯求解器 | `calculate_market_price()`、`simulate_dumping_impact()`（结合共享表 `domains.economy:dynamic_market/*` 衰减与涨跌幅限制） |
+| [town_market_commodity.gd](../../../../backend/domains/trading_logistics/town_market_commodity.gd) | `TownMarketCommodity` | 集市商品与商队实体 | 读取 `domains.trading:{commodity_defaults,caravan_defaults}/*` |
+| [market_elasticity_and_trading_solver.gd](../../../../backend/domains/trading_logistics/market_elasticity_and_trading_solver.gd) | `MarketElasticityAndTradingSolver` | 供需弹性纯求解器 | `calculate_market_price()`、`simulate_dumping_impact()`（结合共享表 `domains.economy:dynamic_market/*` 衰减与涨跌幅限制） |
 | [caravan_logistics_fsm.gd](../../../../backend/domains/trading_logistics/caravan_logistics_fsm.gd) | `CaravanLogisticsFSM` | 商队运输与劫掠状态机 | `advance_caravan_progress()` 计算沿途遇袭与护卫减伤结转 |
 
 ---

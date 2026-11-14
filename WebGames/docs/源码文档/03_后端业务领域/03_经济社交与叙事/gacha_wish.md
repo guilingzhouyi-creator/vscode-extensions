@@ -8,7 +8,7 @@
 
 | 文件路径 | 核心类 | 角色定位 | 公开接口与约束说明 |
 | :--- | :--- | :--- | :--- |
-| [gacha_banner_entity.gd](../../../../backend/domains/gacha_wish/gacha_banner_entity.gd) | `GachaBannerAggregate` | 卡池与保底状态聚合体 | `snapshot_progress()`、`restore_progress()`、`serialize()`/`deserialize()` |
+| [gacha_banner_aggregate.gd](../../../../backend/domains/gacha_wish/gacha_banner_aggregate.gd) | `GachaBannerAggregate` | 卡池与保底状态聚合体 | `snapshot_progress()`、`restore_progress()`、`serialize()`/`deserialize()` |
 | [gacha_probability_solver.gd](../../../../backend/domains/gacha_wish/gacha_probability_solver.gd) | `GachaProbabilitySolver` | 软硬保底概率求解器 | `calculate_current_5star_rate()`、`roll_single_draw()`（批量调用严格共用同一个 `DeterministicRNG` 实例） |
 | [gacha_execution_service.gd](../../../../backend/domains/gacha_wish/gacha_execution_service.gd) | `GachaExecutionService` | 十连扣款与入包服务 | `execute_multi_pull()` 扣除金币/魔单晶后通过物品注册表三元组 `canonical_id` 实例化入包 |
 

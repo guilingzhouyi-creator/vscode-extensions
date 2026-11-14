@@ -8,8 +8,8 @@
 
 | 文件路径 | 核心类 | 角色定位 | 核心接口与配置驱动 |
 | :--- | :--- | :--- | :--- |
-| [authority_state_machine.gd](../../../../backend/domains/deterministic_sandbox/authority_state_machine.gd) | `AuthorityTriStateMachine` | 权威三态流转状态机 | 定义 `AuthorityMode`（单机/预测/权威）；提供 `transition_mode()` 与 `audit_input_continuity()` 检测 `ap_overflow_threshold` 及 `max_allowed_desync_ticks` |
-| [deterministic_entities.gd](../../../../backend/domains/deterministic_sandbox/deterministic_entities.gd) | `DeterministicInputSnapshot` | 帧同步输入快照实体 | 记录 `tick` 对齐编号、输入指令、随机种子并支持 `serialize()` |
+| [authority_tri_state_machine.gd](../../../../backend/domains/deterministic_sandbox/authority_tri_state_machine.gd) | `AuthorityTriStateMachine` | 权威三态流转状态机 | 定义 `AuthorityMode`（单机/预测/权威）；提供 `transition_mode()` 与 `audit_input_continuity()` 检测 `ap_overflow_threshold` 及 `max_allowed_desync_ticks` |
+| [deterministic_input_snapshot.gd](../../../../backend/domains/deterministic_sandbox/deterministic_input_snapshot.gd) | `DeterministicInputSnapshot` | 帧同步输入快照实体 | 记录 `tick` 对齐编号、输入指令、随机种子并支持 `serialize()` |
 | [deterministic_replay_engine.gd](../../../../backend/domains/deterministic_sandbox/deterministic_replay_engine.gd) | `DeterministicReplayEngine` | 无状态确定性回放引擎 | `simulate_replay()` 生成标准化系统状态指纹（`fingerprint/format`）；`verify_energy_conservation()` 执行伤害能量守恒差值断言 |
 
 ---

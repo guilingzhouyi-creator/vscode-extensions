@@ -11,13 +11,13 @@
 ```text
 已实现：
   - [单机底层持久化原子写与SHA-256完整性校验]：SaveManager (backend/infrastructure/save_manager.gd:48-112) 具备完整的原子写（.tmp -> .bak -> rename）与 SHA-256 签名校验机制，可作为退出保存的可靠底层。
-  - [跨域存档组装器]：GameSaveAssembler (backend/domains/persistence_protocol/save_assembler.gd:29-43) 具备收集全域序列化数据并构建 payload 的标准方法。
+  - [跨域存档组装器]：GameSaveAssembler (backend/domains/persistence_protocol/game_save_assembler.gd:29-43) 具备收集全域序列化数据并构建 payload 的标准方法。
   - [会话注销能力基建]：AuthService (backend/domains/account/auth_service.gd:126-136) 具备 revoke_token() 与 clear_sessions() 的单机静态实现。
   - [前端国际化退出文本定义]：ui.json 中已配置 "ui.fe02.battle_log.exit_game" 词条，UIIntermediary 可正常解析文案。
 
 部分实现：
   - [HUD 菜单退出按钮触发]：MainHUDView (frontend/views/main_hud/main_hud_view.gd:63, 670-671) 存在 _menu_btn_exit 控件与其点击回调 _on_menu_exit_pressed()，但该回调仅向战报聊天框输出一条本地系统文本，未发起退出确认弹窗，未调用任何后端通信或状态变更。
-  - [引擎主循环状态栈]：GameLoopStateStack (backend/infrastructure/game_loop_fsm.gd:10-18) 定义了 7 种引擎状态并支持序列化，但枚举仅覆盖到 COMBAT/SETTLEMENT/PAUSED_MODAL，缺失退出态，且在运行时未被作为全局单例调度。
+  - [引擎主循环状态栈]：GameLoopFSM (backend/infrastructure/game_loop_fsm.gd:10-18) 定义了 7 种引擎状态并支持序列化，但枚举仅覆盖到 COMBAT/SETTLEMENT/PAUSED_MODAL，缺失退出态，且在运行时未被作为全局单例调度。
 
 未实现：
   - [前端退出确认模态框/退出过渡页面]：缺失二次确认对话框（防误触）、保存中遮罩（Saving Overlay）、退回登录页/退回桌面的路由编排。
@@ -84,7 +84,7 @@ Resource Manager (SaveManager落盘 ➔ EventBus注销 ➔ AuthService会话清�
 | **UIIntermediary**<br/>(`frontend/i18n/`) | `UITextResolver`<br/>`PlaceholderFiller` | `MainHUDView`<br/>各前端视图 | **合理** (仅文本编排) | 保持现状 | 仅用于退出弹窗文案解析。 |
 | **Exit API / 契约层**<br/>(*待建*) | `ContractRegistry`<br/>`DTO 校验器` | 前端页面 / 退出控制器 | **尚未实现** | **必须新建** | 建立 `CMD_STOP_GAME` 契约端点，规范请求/响应结构。 |
 | **GameLifecycleService**<br/>(*待建*) | `GameLifecycleFSM`<br/>`SaveManager`<br/>`AuthService` | API 契约层 | **尚未实现** | **必须新建** | 退出用例门面服务，编排保存、清理、停机次序。 |
-| **GameLoopStateStack**<br/>(`backend/infrastructure/`) | `EventBus` | 仅单元测试 / 局部孤立调用 | **不合理** (脱离主循环，缺退出态) | **需要调整** | 扩展 `STOPPING`、`STOPPED` 枚举，或与全局生命周期体系合流。 |
+| **GameLoopFSM**<br/>(`backend/infrastructure/`) | `EventBus` | 仅单元测试 / 局部孤立调用 | **不合理** (脱离主循环，缺退出态) | **需要调整** | 扩展 `STOPPING`、`STOPPED` 枚举，或与全局生命周期体系合流。 |
 | **WorldGatewayFSM**<br/>(`backend/domains/world_gateway/`) | `EventBus`<br/>`GameModeRoutingSolver` | 进世界调用方 | **不合理** (单向无逆向退网关) | **需要调整** | 增加 `exit_world()` 跃迁，允许退回 `AUTHENTICATED` 状态。 |
 | **SaveManager**<br/>(`backend/infrastructure/`) | `DirAccess`<br/>`FileAccess`<br/>`GameConfig` | `test_persistence_protocol.gd`<br/>(生产退出未挂接) | **合理** (纯粹持久化原子工具) | **需要挂接** | 由生命周期停机链在进入 `STOPPING` 态时显式调用。 |
 | **AuthService**<br/>(`backend/domains/account/`) | `GameConfig`<br/>`DeterministicRNG` | 鉴权各方<br/>(退出未挂接) | **合理** (会话管理独立) | **需要挂接** | 停机时由生命周期管理器调用 `revoke_token()` 销毁当前会话。 |

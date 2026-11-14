@@ -8,9 +8,9 @@
 
 | 文件路径 | 核心类 | 角色定位 | 公开接口与配置键 |
 | :--- | :--- | :--- | :--- |
-| [sovereignty_entities.gd](../../../../backend/domains/sovereignty_realm/sovereignty_entities.gd) | `KnighthoodTitle` | 爵位封地与主权国实体 | 声明 `TitleRank` 枚举及 `serialize()`；读取 `fief_defaults/*` 与 `nation_defaults/*` |
-| [feoffment_solver.gd](../../../../backend/domains/sovereignty_realm/feoffment_solver.gd) | `SovereigntyAndFeoffmentSolver` | 爵位晋升与封赏评估器 | `evaluate_knighthood_promotion()`、`get_title_name()` 比对战功与声望配置阈值（`promotion_thresholds/*`） |
-| [nation_sovereignty_fsm.gd](../../../../backend/domains/sovereignty_realm/nation_sovereignty_fsm.gd) | `NationSovereigntyAndCoupFSM` | 建国与宫廷政变状态机 | `establish_new_sovereign_nation()`、`execute_palace_coup()` 结算政变成功/失败稳定性跌落与权力更迭 |
+| [knighthood_title.gd](../../../../backend/domains/sovereignty_realm/knighthood_title.gd) | `KnighthoodTitle` | 爵位封地与主权国实体 | 声明 `TitleRank` 枚举及 `serialize()`；读取 `fief_defaults/*` 与 `nation_defaults/*` |
+| [sovereignty_and_feoffment_solver.gd](../../../../backend/domains/sovereignty_realm/sovereignty_and_feoffment_solver.gd) | `SovereigntyAndFeoffmentSolver` | 爵位晋升与封赏评估器 | `evaluate_knighthood_promotion()`、`get_title_name()` 比对战功与声望配置阈值（`promotion_thresholds/*`） |
+| [nation_sovereignty_and_coup_fsm.gd](../../../../backend/domains/sovereignty_realm/nation_sovereignty_and_coup_fsm.gd) | `NationSovereigntyAndCoupFSM` | 建国与宫廷政变状态机 | `establish_new_sovereign_nation()`、`execute_palace_coup()` 结算政变成功/失败稳定性跌落与权力更迭 |
 
 ---
 

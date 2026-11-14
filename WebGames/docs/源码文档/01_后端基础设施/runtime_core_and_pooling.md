@@ -9,11 +9,11 @@
 | 文件路径 | 核心类 | 职责定位 |
 | :--- | :--- | :--- |
 | [game_bootstrap.gd](../../../backend/infrastructure/game_bootstrap.gd) | `GameBootstrap` | 全引擎幂等启动装配中枢；提供 `assemble()` 与版本门禁入口 `assemble_versioned()`，暴露全局注册表访问口 |
-| [game_loop_fsm.gd](../../../backend/infrastructure/game_loop_fsm.gd) | `GameLoopStateStack` | 7 态顶层主循环状态栈（`BOOT_INIT`、`LOGIN_AUTH`、`CHARACTER_SELECT`、`WORLD_EXPLORATION`、`COMBAT_ENCOUNTER`、`SETTLEMENT_REWARD`、`PAUSED_MODAL`）；支持 `push_state()`、`pop_state()`、`switch_to()` 与序列化 |
+| [game_loop_fsm.gd](../../../backend/infrastructure/game_loop_fsm.gd) | `GameLoopFSM` | 7 态顶层主循环状态栈（`BOOT_INIT`、`LOGIN_AUTH`、`CHARACTER_SELECT`、`WORLD_EXPLORATION`、`COMBAT_ENCOUNTER`、`SETTLEMENT_REWARD`、`PAUSED_MODAL`）；支持 `push_state()`、`pop_state()`、`switch_to()` 与序列化 |
 | [headless_batch_pipeline.gd](../../../backend/infrastructure/headless_batch_pipeline.gd) | `HeadlessBatchPipeline` | 无头批处理运动学推演入口 `step_kinematics()` |
 | [world_clock_master.gd](../../../backend/infrastructure/world_clock_master.gd) | `WorldClockMaster` | 战斗帧步进（`tick_combat()`）与大地图小时/日/月三级历法推进引擎（读取 `infrastructure.clock`），支持快照序列化 |
 | [deterministic_rng.gd](../../../backend/infrastructure/deterministic_rng.gd) | `DeterministicRNG` | 配置驱动 LCG 确定性伪随机源；提供 `from_seed()`、`global()`、`reseed_global()`、`resolve()`、`randf()` |
-| [id_generator.gd](../../../backend/infrastructure/id_generator.gd) | `UniqueIdGenerator` | 基于前缀与单调序号防碰撞的唯一业务 ID 生成器 `next_id(prefix)` |
+| [id_generator.gd](../../../backend/infrastructure/id_generator.gd) | `IdGenerator` | 基于前缀与单调序号防碰撞的唯一业务 ID 生成器 `next_id(prefix)` |
 | [spatial_proximity_solver.gd](../../../backend/infrastructure/spatial_proximity_solver.gd) | `SpatialProximitySolver` | 统一 2D/3D 圆形邻近判定 `is_within_radius_2d()` 与 `is_within_radius_3d()`（含边界） |
 | [fifo_budget.gd](../../../backend/infrastructure/fifo_budget.gd) | `FifoBudget` | 固定长度队列 FIFO 淘汰裁剪原语 `trim_oldest()` |
 | [soa_entity_buffer.gd](../../../backend/infrastructure/soa_entity_buffer.gd) | `SoAEntityBuffer` | 结构体数组（Structure of Arrays）连续内存缓冲区，支持对齐校验 `is_aligned()`、池化 `reset_state()` 与扩容 |

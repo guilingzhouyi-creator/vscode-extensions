@@ -8,7 +8,7 @@
 
 | 文件路径 | 核心类 | 角色定位 | 公开接口与配置驱动 |
 | :--- | :--- | :--- | :--- |
-| [equipment_loadout_entity.gd](../../../../backend/domains/equipment_loadout/equipment_loadout_entity.gd) | `EquipmentLoadoutAggregate` | 战备槽位聚合体 | `get_equipped_item()`、`equip()`、`unequip()`、`unequip_item_ref()`、`snapshot_slots()`、`restore_slots()`、`serialize()`/`deserialize()` |
+| [equipment_loadout_aggregate.gd](../../../../backend/domains/equipment_loadout/equipment_loadout_aggregate.gd) | `EquipmentLoadoutAggregate` | 战备槽位聚合体 | `get_equipped_item()`、`equip()`、`unequip()`、`unequip_item_ref()`、`snapshot_slots()`、`restore_slots()`、`serialize()`/`deserialize()` |
 | [equipment_fsm.gd](../../../../backend/domains/equipment_loadout/equipment_fsm.gd) | `EquipmentFSM` | 穿卸与容量联动状态机 | `equip_from_inventory()`、`unequip_to_inventory()` 校验槽位合法性与背包容量（`WearableInventoryAggregate` 为唯一容量真源） |
 | [equipment_modifier_evaluator.gd](../../../../backend/domains/equipment_loadout/equipment_modifier_evaluator.gd) | `EquipmentModifierEvaluator` | 战备词缀聚合评估器 | `evaluate_total_modifiers()`、`apply_loadout_to_physiology()` 遍历槽位累加前缀/后缀/符文加成至独立生理副本 |
 

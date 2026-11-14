@@ -10,7 +10,7 @@
 | :--- | :--- | :--- | :--- |
 | [quest_entities.gd](../../../../backend/domains/quest_causality/quest_entities.gd) | `QuestObjectiveNode` | 因果 DAG 目标节点 | 默认配置读取自 `domains.quest:node_defaults/*` 与 `quest_defaults/*` |
 | [causality_dag_solver.gd](../../../../backend/domains/quest_causality/causality_dag_solver.gd) | `CausalityDAGSolver` | 因果分支评估器 | `evaluate_quest_completion()` 根据事实状态图评估多路线完成条件 |
-| [faction_bounty_fsm.gd](../../../../backend/domains/quest_causality/faction_bounty_fsm.gd) | `FactionBountyAndCausalityFSM` | 阵营声望与悬赏状态机 | `apply_quest_settlement()` 结算声望偏移并在越过 `bounty/trigger_threshold` 时触发通缉令 |
+| [faction_bounty_and_causality_fsm.gd](../../../../backend/domains/quest_causality/faction_bounty_and_causality_fsm.gd) | `FactionBountyAndCausalityFSM` | 阵营声望与悬赏状态机 | `apply_quest_settlement()` 结算声望偏移并在越过 `bounty/trigger_threshold` 时触发通缉令 |
 | [quest_reward_dispatch.gd](../../../../backend/domains/quest_causality/quest_reward_dispatch.gd) | `QuestRewardDispatch` | 权威奖励物品发放器 | `dispatch_item_rewards()` 通过 `ItemInstanceFactory` 签发 `QST_` 前缀权威 UID（背包满则原子拦截） |
 | [quest_reward_context_dto.gd](../../../../backend/domains/quest_causality/dto/quest_reward_context_dto.gd) | `QuestRewardContextDto` | 任务奖励上下文 DTO | 支持池化 `reset_state()` 与双向序列化 |
 

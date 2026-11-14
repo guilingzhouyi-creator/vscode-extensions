@@ -8,9 +8,9 @@
 
 | 文件路径 | 核心类 | 角色定位 | 关键公开接口与职责 |
 | :--- | :--- | :--- | :--- |
-| [physiology_entities.gd](../../../../backend/domains/lifecycle_physiology/physiology_entities.gd) | `CharacterPhysiologySheet` | 生理属性与寿命核心容器 | 声明 `PhysicalConstitution`、`ManaAptitude`；管理 L1 等级/进度、L2 阅历系数、L3 实际值计算（`get_actual_value()`、`get_actual_values()`、`duplicate_physiology()`、`serialize()`） |
-| [lifecycle_solver.gd](../../../../backend/domains/lifecycle_physiology/lifecycle_solver.gd) | `LifeCycleAndPhysiologySolver` | 机能衰退与反噬纯求解器 | `calculate_somatic_function()`（SF 衰退指数模型）与 `evaluate_mana_backfire_risk()`（按资质阈值评估精神反噬风险） |
-| [lifecycle_fsm.gd](../../../../backend/domains/lifecycle_physiology/lifecycle_fsm.gd) | `LifeCycleEvolutionFSM` | 年轮与大限状态机 | `age_character_years()`（年龄推进、大限/死亡临界比例判定）、`apply_rejuvenation()`（心核完整度恢复） |
+| [character_physiology_sheet.gd](../../../../backend/domains/lifecycle_physiology/character_physiology_sheet.gd) | `CharacterPhysiologySheet` | 生理属性与寿命核心容器 | 声明 `PhysicalConstitution`、`ManaAptitude`；管理 L1 等级/进度、L2 阅历系数、L3 实际值计算（`get_actual_value()`、`get_actual_values()`、`duplicate_physiology()`、`serialize()`） |
+| [lifecycle_and_physiology_solver.gd](../../../../backend/domains/lifecycle_physiology/lifecycle_and_physiology_solver.gd) | `LifecycleAndPhysiologySolver` | 机能衰退与反噬纯求解器 | `calculate_somatic_function()`（SF 衰退指数模型）与 `evaluate_mana_backfire_risk()`（按资质阈值评估精神反噬风险） |
+| [lifecycle_evolution_fsm.gd](../../../../backend/domains/lifecycle_physiology/lifecycle_evolution_fsm.gd) | `LifecycleEvolutionFSM` | 年轮与大限状态机 | `age_character_years()`（年龄推进、大限/死亡临界比例判定）、`apply_rejuvenation()`（心核完整度恢复） |
 
 ---
 

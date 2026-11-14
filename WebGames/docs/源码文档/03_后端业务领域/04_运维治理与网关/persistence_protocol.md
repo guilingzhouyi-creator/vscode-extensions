@@ -10,15 +10,15 @@
 | 文件路径 | 核心类 | 关键公开接口与职责 |
 | :--- | :--- | :--- |
 | [save_data_access_layer.gd](../../../../backend/domains/persistence_protocol/save_data_access_layer.gd) | `SaveDataAccessLayer` | 统一存取门面：`register_provider()`、`mark_dirty()`、`get_dirty_domains()`、`build_save_payload()`、`apply_save_data()`、`save_game()` |
-| [save_assembler.gd](../../../../backend/domains/persistence_protocol/save_assembler.gd) | `GameSaveAssembler` | 按 `domains.json` 清单序保证 SHA 稳定装配与迁移调度：`register_migration()`、`build_save_payload()`、`migrate_save_data()` |
+| [game_save_assembler.gd](../../../../backend/domains/persistence_protocol/game_save_assembler.gd) | `GameSaveAssembler` | 按 `domains.json` 清单序保证 SHA 稳定装配与迁移调度：`register_migration()`、`build_save_payload()`、`migrate_save_data()` |
 | [save_domain_contract.gd](../../../../backend/domains/persistence_protocol/save_domain_contract.gd) | `SaveDomainContract` | 封装单域序列化配置与 Provider/Consumer 反射绑定 |
 | [save_migration_engine.gd](../../../../backend/domains/persistence_protocol/save_migration_engine.gd) | `SaveMigrationEngine` | 三级版本（Domain/Schema/Save）链式演进与失败回滚：`migrate_domain()`、`migrate()`、`load_rules_from_config()` |
 | [save_validation_service.gd](../../../../backend/domains/persistence_protocol/save_validation_service.gd) | `SaveValidationService` | 依据 `infrastructure.persistence:validation_rules/*` 执行缺失补齐与类型强转 `validate_domains()` |
-| [save_schema_entities.gd](../../../../backend/domains/persistence_protocol/save_schema_entities.gd) | `KalarSaveSchema` | `.kalar_save` 前后端命令与事件契约模型 |
+| [kalar_save_schema.gd](../../../../backend/domains/persistence_protocol/kalar_save_schema.gd) | `KalarSaveSchema` | `.kalar_save` 前后端命令与事件契约模型 |
 | [runtime_mode_gate.gd](../../../../backend/domains/persistence_protocol/runtime_mode_gate.gd) | `RuntimeModeGate` | 在模式/数据源/生命周期/入口四层实施单机与联机物理隔离，阻断联机态本地热更新污染 |
 | [editor_hot_reload_manager.gd](../../../../backend/domains/persistence_protocol/editor_hot_reload_manager.gd) | `EditorHotReloadManager` | 单机编辑器配置变更检测与白名单热更新：`detect_changes()`、`apply_hot_reload()` |
-| [reconciliation_solver.gd](../../../../backend/domains/persistence_protocol/reconciliation_solver.gd) | `PersistenceAndReconciliationSolver` | `reconcile_client_state()` 权威帧与未确认客户端输入队列调和求解 |
-| [server_broadcaster.gd](../../../../backend/domains/persistence_protocol/server_broadcaster.gd) | `ServerAuthoritativeBroadcaster` | `broadcast_authoritative_frame()` 权威状态帧封包广播 |
+| [persistence_and_reconciliation_solver.gd](../../../../backend/domains/persistence_protocol/persistence_and_reconciliation_solver.gd) | `PersistenceAndReconciliationSolver` | `reconcile_client_state()` 权威帧与未确认客户端输入队列调和求解 |
+| [server_authoritative_broadcaster.gd](../../../../backend/domains/persistence_protocol/server_authoritative_broadcaster.gd) | `ServerAuthoritativeBroadcaster` | `broadcast_authoritative_frame()` 权威状态帧封包广播 |
 
 ### 2. 双域存储、异步工作池与增量热重载
 | 文件路径 | 核心类 | 关键公开接口与约束 |

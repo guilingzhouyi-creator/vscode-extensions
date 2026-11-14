@@ -16,7 +16,7 @@
 | [ping_pong_ring_buffer.gd](../../../backend/infrastructure/event_bus/ping_pong_ring_buffer.gd) | `PingPongRingBuffer` | 读写隔离的双区乒乓环形缓冲，实现 `enqueue()` 与 `flush_frame()` 帧批交换 |
 | [event_bus_subscription_token.gd](../../../backend/infrastructure/event_bus/event_bus_subscription_token.gd) | `EventBusSubscriptionToken` | 订阅凭据句柄，绑定回调目标、掩码与活跃态并提供安全解绑 `unbind()` |
 | [headless_spatial_hash_grid_3d.gd](../../../backend/infrastructure/event_bus/headless_spatial_hash_grid_3d.gd) | `HeadlessSpatialHashGrid3D` | 无头 3D/2D 空间网格哈希索引；支持按位置半径精准路由 `dispatch_spatial()` 与 `dispatch_packet()` |
-| [visual_presentation_adapter.gd](../../../backend/infrastructure/event_bus/visual_presentation_adapter.gd) | `IVisualPresentationAdapter` | 表现层视觉同步抽象适配器接口（生灭、位移、Cue 特效、空间爆发） |
+| [i_visual_presentation_adapter.gd](../../../backend/infrastructure/event_bus/i_visual_presentation_adapter.gd) | `IVisualPresentationAdapter` | 表现层视觉同步抽象适配器接口（生灭、位移、Cue 特效、空间爆发） |
 | [headless_presentation_mock_adapter.gd](../../../backend/infrastructure/event_bus/headless_presentation_mock_adapter.gd) | `HeadlessPresentationMockAdapter` | 无头测试用表现适配器记录桩实现 |
 | [visual_cue_dto.gd](../../../backend/infrastructure/event_bus/visual_cue_dto.gd) | `VisualCueDTO` | 视觉提示与空间表现数据包 |
 

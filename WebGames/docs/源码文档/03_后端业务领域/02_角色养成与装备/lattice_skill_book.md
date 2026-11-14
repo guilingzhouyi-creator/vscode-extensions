@@ -8,7 +8,7 @@
 
 | 文件路径 | 核心类 | 角色定位 | 核心接口与配置键 |
 | :--- | :--- | :--- | :--- |
-| [skill_lattice_entities.gd](../../../../backend/domains/lattice_skill_book/skill_lattice_entities.gd) | `SkillSubgraphAST` | 技能子图实体与典籍模型 | `serialize()`/`deserialize()`；读取 `domains.lattice:ast_defaults/*` 与 `manuscript_defaults/*` |
+| [skill_subgraph_ast.gd](../../../../backend/domains/lattice_skill_book/skill_subgraph_ast.gd) | `SkillSubgraphAST` | 技能子图实体与典籍模型 | `serialize()`/`deserialize()`；读取 `domains.lattice:ast_defaults/*` 与 `manuscript_defaults/*` |
 | [lattice_decompiler_service.gd](../../../../backend/domains/lattice_skill_book/lattice_decompiler_service.gd) | `LatticeDecompilerService` | AST 剪枝优化与拓扑签名 | `optimize_lattice_path()`（降能损）、`is_acyclic_dag()`（环路检测）、`generate_ast_signature()` |
 | [grimoire_authoring_pipeline.gd](../../../../backend/domains/lattice_skill_book/grimoire_authoring_pipeline.gd) | `GrimoireAuthoringPipeline` | 著书出版与版税结算管线 | `publish_manuscript_book()`、`settle_book_royalties()`（计算发行份数、基础定价与版税分润） |
 

@@ -10,11 +10,11 @@
 | 文件路径 | 核心类 | 职责与核心接口 |
 | :--- | :--- | :--- |
 | [attribute_conversion_engine.gd](../../../../backend/domains/character_creation/attribute_conversion_engine.gd) | `AttributeConversionEngine` | 三层属性换算唯一入口（L1 等级 -> L2 系数 -> L3 实际值域）；消费 `domains.attribute`；提供 `convert_to_actual()`、`sheet_actual_value()`、`validate_level()` |
-| [attribute_init_solver.gd](../../../../backend/domains/character_creation/attribute_init_solver.gd) | `AttributeInitializationSolver` | 天命掷骰（4d6 去最低）与 27 点购点校验：`generate_rolled_attributes()`、`validate_point_buy_allocation()` |
+| [attribute_init_solver.gd](../../../../backend/domains/character_creation/attribute_init_solver.gd) | `AttributeInitSolver` | 天命掷骰（4d6 去最低）与 27 点购点校验：`generate_rolled_attributes()`、`validate_point_buy_allocation()` |
 | [character_baseline_attribute_solver.gd](../../../../backend/domains/character_creation/character_baseline_attribute_solver.gd) | `CharacterBaselineAttributeSolver` | 从种族配置封闭派生六维基线，零信任拒绝客户端伪造属性值 |
 | [authoritative_reincarnation_solver.gd](../../../../backend/domains/character_creation/authoritative_reincarnation_solver.gd) | `AuthoritativeReincarnationSolver` | `resolve_reincarnation_package()` 确定性解算身世、种族、天赋对与六维 |
 | [innate_trait_registry.gd](../../../../backend/domains/character_creation/innate_trait_registry.gd) | `InnateTraitRegistry` | 正负先天天赋因果点数守恒天平：`calculate_trait_karma_balance()`、`validate_traits_selection()` |
-| [reincarnation_origin.gd](../../../../backend/domains/character_creation/reincarnation_origin.gd) | `ReincarnationOriginEngine` | `get_origin()`、`get_birth_region()` 种族与地缘出生点表查询 |
+| [reincarnation_origin_engine.gd](../../../../backend/domains/character_creation/reincarnation_origin_engine.gd) | `ReincarnationOriginEngine` | `get_origin()`、`get_birth_region()` 种族与地缘出生点表查询 |
 
 ### 2. 创角事务编排、新手水化与状态机
 | 文件路径 | 核心类 | 职责与核心接口 |

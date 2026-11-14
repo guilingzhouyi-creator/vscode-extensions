@@ -10,7 +10,7 @@
 | 文件路径 | 核心类 | 关键公开接口与约束 |
 | :--- | :--- | :--- |
 | [item_entity.gd](../../../../backend/domains/inventory/item_entity.gd) | `ItemEntity` | 物品物理常数（硬度/刃口/有效护甲/距离）与 `from_payload()`、`mount_attribute()`、`reset_state()`、`serialize()`/`deserialize()` |
-| [wearable_inventory.gd](../../../../backend/domains/inventory/wearable_inventory.gd) | `WearableInventoryAggregate` | 裸身容量为 0、容积由已穿戴装备暗格聚合；提供 `add_item()`、`find_item_by_item_id()`、`find_item_by_item_uid()`、`remove_item()`、`equip_item()`、`snapshot()`/`restore()` |
+| [wearable_inventory_aggregate.gd](../../../../backend/domains/inventory/wearable_inventory_aggregate.gd) | `WearableInventoryAggregate` | 裸身容量为 0、容积由已穿戴装备暗格聚合；提供 `add_item()`、`find_item_by_item_id()`、`find_item_by_item_uid()`、`remove_item()`、`equip_item()`、`snapshot()`/`restore()` |
 | [inventory_metric_snapshot.gd](../../../../backend/domains/inventory/inventory_metric_snapshot.gd) | `InventoryMetricSnapshot` | 随身负重、容积、超载与满格度量快照 DTO |
 | [inventory_transaction.gd](../../../../backend/domains/inventory/inventory_transaction.gd) | `InventoryTransaction` | 保存库存/装备/钱包前镜像并提供 `is_duplicate()`、`commit()`、`rollback()`、`prune_completed()` |
 

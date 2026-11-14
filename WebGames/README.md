@@ -113,7 +113,7 @@ DeterministicRNG.reseed_global(seed)           # 整局复现开关
 
 ## 共享底座约定
 
-- **唯一 ID**：业务 ID 一律 `UniqueIdGenerator.next_id(prefix)`（同毫秒重复生成自动追加序号防碰撞）；
+- **唯一 ID**：业务 ID 一律 `IdGenerator.next_id(prefix)`（同毫秒重复生成自动追加序号防碰撞）；
   时间戳作为哈希签名因子（GM 审计签名、登录 token）不属 ID 生成，继续手写。
 - **邻近判定**：圆形半径包含判定一律 `SpatialMath.within_radius(a, b, radius)`（边界点属圆内）；
   可听域等「边界排除」语义不适用，须自行比较。

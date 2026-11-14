@@ -9,7 +9,7 @@
 | 文件路径 | 核心类 | 架构角色 | 关键职责与公开方法 |
 | :--- | :--- | :--- | :--- |
 | [physical_verb_registry.gd](../../../../backend/domains/physics_thermodynamics/physical_verb_registry.gd) | `PhysicalVerbRegistry` | 动词与卡牌注册表 | 八大物理动词侵彻常数、`MagicForm` 枚举、`get_verb()`、`card_defaults()`、`reset_state()` |
-| [thermodynamics_solver.gd](../../../../backend/domains/physics_thermodynamics/thermodynamics_solver.gd) | `PhysicsAndThermodynamicsSolver` | 物理与热力学求解器 | `calculate_penetration_damage()`（动量刃口侵彻）、`calculate_mana_phase_transition_loss()`（始源直驱 vs 咒术两步能损） |
+| [physics_and_thermodynamics_solver.gd](../../../../backend/domains/physics_thermodynamics/physics_and_thermodynamics_solver.gd) | `PhysicsAndThermodynamicsSolver` | 物理与热力学求解器 | `calculate_penetration_damage()`（动量刃口侵彻）、`calculate_mana_phase_transition_loss()`（始源直驱 vs 咒术两步能损） |
 | [combat_initiative_solver.gd](../../../../backend/domains/physics_thermodynamics/combat_initiative_solver.gd) | `CombatInitiativeSolver` | 先手与势能求解器 | `evaluate_initiative()` 敏捷/感知/等级加权与三级平局决胜算法 |
 | [combat_hand_generator.gd](../../../../backend/domains/physics_thermodynamics/combat_hand_generator.gd) | `CombatHandGenerator` | 手牌生成器 | 分离手牌数量随机与牌型抽取，`evaluate_base_hand_count()`、`apply_special_modifiers()`、`draw_cards_for_turn()` |
 | [combat_hand_draw_dto.gd](../../../../backend/domains/physics_thermodynamics/combat_hand_draw_dto.gd) | `CombatHandDrawDTO` | 手牌抽取 DTO | 承载发牌规格与合法 `0` 手牌裁决结果 |

@@ -8,9 +8,9 @@
 
 | 文件路径 | 核心类 | 角色定位 | 核心接口与配置键 |
 | :--- | :--- | :--- | :--- |
-| [currency_entities.gd](../../../../backend/domains/currency_economy/currency_entities.gd) | `CharacterWalletEntity` | 多币种钱包聚合实体 | `apply_delta()`（增量账本）、`apply_transaction()`、`try_spend()`（阶梯找零扣除）、`calculate_total_currency_mass_kg()`、`incur_debt()`；读取 `domains.currency:{rates,coin_mass_kg,debt}/*` |
-| [currency_sinks_fsm.gd](../../../../backend/domains/currency_economy/currency_sinks_fsm.gd) | `CurrencySinksAndFaucetsFSM` | 通胀水池消费状态机 | `apply_rigid_sink_transaction()` 执行刚性货币回收 |
-| [mana_standard_solver.gd](../../../../backend/domains/currency_economy/mana_standard_solver.gd) | `CurrencyAndManaStandardSolver` | 魔单晶本位求解器 | `convert_mana_crystals_to_gold()`、`calculate_cross_continent_arbitrage()` |
+| [character_wallet_entity.gd](../../../../backend/domains/currency_economy/character_wallet_entity.gd) | `CharacterWalletEntity` | 多币种钱包聚合实体 | `apply_delta()`（增量账本）、`apply_transaction()`、`try_spend()`（阶梯找零扣除）、`calculate_total_currency_mass_kg()`、`incur_debt()`；读取 `domains.currency:{rates,coin_mass_kg,debt}/*` |
+| [currency_sinks_and_faucets_fsm.gd](../../../../backend/domains/currency_economy/currency_sinks_and_faucets_fsm.gd) | `CurrencySinksAndFaucetsFSM` | 通胀水池消费状态机 | `apply_rigid_sink_transaction()` 执行刚性货币回收 |
+| [currency_and_mana_standard_solver.gd](../../../../backend/domains/currency_economy/currency_and_mana_standard_solver.gd) | `CurrencyAndManaStandardSolver` | 魔单晶本位求解器 | `convert_mana_crystals_to_gold()`、`calculate_cross_continent_arbitrage()` |
 
 ---
 

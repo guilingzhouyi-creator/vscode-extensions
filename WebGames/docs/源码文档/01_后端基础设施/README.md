@@ -28,5 +28,5 @@ graph TD
 | [event_bus.md](event_bus.md) | `event_bus/*` 全部事件总线子系统 | 11 | 整数信道、掩码过滤、对象池与双环形缓冲、3D 空间哈希分发、表现适配器 |
 | [logging_and_telemetry.md](logging_and_telemetry.md) | `logging/*`、`log_*`、`RedactionRule`、`TelemetryAggregate`、`ErrorCodeRegistry`、`ErrorReporter`、`profiling/*` | 15 | 结构化日志链路、四模上下文脱敏、防篡改加密导出、错误码登记与耗时分位 |
 | [persistence_and_security.md](persistence_and_security.md) | `AtomicFileWriter`、`SaveManager`、`AuthoritySyncStub`、`ClientSecretVault`、`pure/*`、`robustness/*` | 8 | 三阶段原子写盘、单字段 SHA-256 存档信封、纯计算密码学域库与幂等器 |
-| [runtime_core_and_pooling.md](runtime_core_and_pooling.md) | `GameBootstrap`、`GameLoopStateStack`、`WorldClockMaster`、`DeterministicRNG`、`ObjectPool*`、`SoAEntityBuffer`、`resource_governance/*` 等 | 22 | 冷启动装配、主循环状态栈、LCG 确定性随机、对象池与 SoA 缓冲、资源寿命治理 |
+| [runtime_core_and_pooling.md](runtime_core_and_pooling.md) | `GameBootstrap`、`GameLoopFSM`、`WorldClockMaster`、`DeterministicRNG`、`ObjectPool*`、`SoAEntityBuffer`、`resource_governance/*` 等 | 22 | 冷启动装配、主循环状态栈、LCG 确定性随机、对象池与 SoA 缓冲、资源寿命治理 |
 | [media_and_cutscene.md](media_and_cutscene.md) | `media/*` 与 `media/dto/*` | 7 | CG 过场编排状态机、异步预加载器、钩子注册与降级文字演播 |

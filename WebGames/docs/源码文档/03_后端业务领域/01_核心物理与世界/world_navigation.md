@@ -8,9 +8,9 @@
 
 | 文件路径 | 核心类 | 角色定位 | 公开接口与配置路径 |
 | :--- | :--- | :--- | :--- |
-| [world_map_entities.gd](../../../../backend/domains/world_navigation/world_map_entities.gd) | `WorldMapGraphNode` | 图节点与城镇聚合 | `serialize()`；读取 `domains.world:node_defaults/*` 与 `town_defaults/*` |
-| [map_ecology_solver.gd](../../../../backend/domains/world_navigation/map_ecology_solver.gd) | `MapAndEcologySolver` | 阻抗寻路与风险纯求解器 | `get_terrain_impedance()`、`solve_shortest_impedance_path()`、`evaluate_beast_swarm_risk()`；读取 `astar/*` 与 `swarm_risk/*` |
-| [world_travel_fsm.gd](../../../../backend/domains/world_navigation/world_travel_fsm.gd) | `WorldTravelAndSettlementFSM` | 行军与入城状态机 | `execute_marching_step()` 计算时间流逝、按人数与耗时消耗口粮并触发城镇抵达状态转移 |
+| [world_map_graph_node.gd](../../../../backend/domains/world_navigation/world_map_graph_node.gd) | `WorldMapGraphNode` | 图节点与城镇聚合 | `serialize()`；读取 `domains.world:node_defaults/*` 与 `town_defaults/*` |
+| [map_and_ecology_solver.gd](../../../../backend/domains/world_navigation/map_and_ecology_solver.gd) | `MapAndEcologySolver` | 阻抗寻路与风险纯求解器 | `get_terrain_impedance()`、`solve_shortest_impedance_path()`、`evaluate_beast_swarm_risk()`；读取 `astar/*` 与 `swarm_risk/*` |
+| [world_travel_and_settlement_fsm.gd](../../../../backend/domains/world_navigation/world_travel_and_settlement_fsm.gd) | `WorldTravelAndSettlementFSM` | 行军与入城状态机 | `execute_marching_step()` 计算时间流逝、按人数与耗时消耗口粮并触发城镇抵达状态转移 |
 
 ---
 

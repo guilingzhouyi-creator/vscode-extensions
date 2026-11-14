@@ -261,7 +261,7 @@
       "save": {
         "enabled": true,
         "domain_version": 1,
-        "serializer": "AccountProfileAggregate",
+        "serializer": "AccountProfile",
         "strategy": "full",
         "hot_reload": {
           "allow": false,

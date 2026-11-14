@@ -8,7 +8,7 @@
 
 | 文件路径 | 核心类 | 角色定位 | 关键公开接口与配置消费 |
 | :--- | :--- | :--- | :--- |
-| [lifecycle_model.gd](../../../backend/domains/lifecycle/lifecycle_model.gd) | `GameLifecycleModel` | 枚举与阶段语义定义 | `get_phase_name()`、`get_reason_name()` |
+| [game_lifecycle_model.gd](../../../backend/domains/lifecycle/game_lifecycle_model.gd) | `GameLifecycleModel` | 枚举与阶段语义定义 | `get_phase_name()`、`get_reason_name()` |
 | [game_lifecycle_manager.gd](../../../backend/domains/lifecycle/game_lifecycle_manager.gd) | `GameLifecycleManager` | 生命周期状态权威单例 | `get_instance()`、`reset_for_test()`、`get_current_phase()`、`is_running()`、`is_stopping()`、`is_stopped()`、`transition_to()` |
 | [game_lifecycle_service.gd](../../../backend/domains/lifecycle/game_lifecycle_service.gd) | `GameLifecycleService` | 多阶段安全停机编排器 | `register_shutdown_resource()`、`clear_shutdown_resources()`；读取 `infrastructure.lifecycle` 中 `policies/*` 与 `shutdown_hooks/*` |
 | [lifecycle_stage_hook_registry.gd](../../../backend/domains/lifecycle/lifecycle_stage_hook_registry.gd) | `LifecycleStageHookRegistry` | 十阶段配置驱动钩子引擎 | `invalidate_cache()`、`clear_hooks()`、`register_hook()`、`get_hooks()`、`execute_stage()`；消费 `infrastructure.lifecycle:session_stage_pipeline` |

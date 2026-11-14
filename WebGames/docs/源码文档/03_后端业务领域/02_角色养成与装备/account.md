@@ -8,14 +8,14 @@
 
 | 文件路径 | 核心类 | 角色定位 | 关键公开接口 |
 | :--- | :--- | :--- | :--- |
-| [account_profile.gd](../../../../backend/domains/account/account_profile.gd) | `AccountProfileAggregate` | 账户聚合根 | `get_summary_by_slot()`、`bind_character_to_slot()`、`get_world_slots()`、`bind_world_slot()`、`serialize()`/`deserialize()` |
+| [account_profile.gd](../../../../backend/domains/account/account_profile.gd) | `AccountProfile` | 账户聚合根 | `get_summary_by_slot()`、`bind_character_to_slot()`、`get_world_slots()`、`bind_world_slot()`、`serialize()`/`deserialize()` |
 | [account_repository.gd](../../../../backend/domains/account/account_repository.gd) | `AccountRepository` | 双索引物理仓储单例 | `load_all()`、`find_by_id()`、`find_by_username()`、`get_account_shard_path()`、`set_custom_registry_path()` |
 | [auth_service.gd](../../../../backend/domains/account/auth_service.gd) | `AuthService` | 鉴权与会话服务 | `create_guest_account()`、`register_account()`、`authenticate_local()`、`composite_authenticate()`、`validate_token()`、`revoke_token()` |
 | [account_slot_binding_solver.gd](../../../../backend/domains/account/account_slot_binding_solver.gd) | `AccountSlotBindingSolver` | 槽位绑定求解器 | `create_character_in_slot_context()`、`quick_create_in_next_slot()`、`to_gateway_slot_states()`、`clear_slot()` |
 | [entitlement_service.gd](../../../../backend/domains/account/entitlement_service.gd) | `EntitlementService` | 账号权限与密封鉴权 | `has_entitlement()`、`add_entitlement()`、`seal_entitlements()`、`verify_seal()` |
 | [character_profile.gd](../../../../backend/domains/account/character_profile.gd) | `CharacterProfile` | 角色本体容器 | `has_payload()`、`clear_payload()`、`is_fresh()`、`serialize()`/`deserialize()` |
 | [character_death_solver.gd](../../../../backend/domains/account/character_death_solver.gd) | `CharacterDeathSolver` | 角色死亡白名单清理 | `handle_character_death()`、`spawn_fresh_character()`（仅清角色本体，世界时钟与历史只增不回退） |
-| [save_slot_dto.gd](../../../../backend/domains/account/save_slot_dto.gd) | `SaveSlotSummaryDTO` | 槽位封面轻量 DTO | `attach_character_profile()`、`clear_character_payload()`、`serialize()`/`deserialize()` |
+| [save_slot_dto.gd](../../../../backend/domains/account/save_slot_dto.gd) | `SaveSlotDTO` | 槽位封面轻量 DTO | `attach_character_profile()`、`clear_character_payload()`、`serialize()`/`deserialize()` |
 | [account_composite_auth_dto.gd](../../../../backend/domains/account/dto/account_composite_auth_dto.gd) | `AccountCompositeAuthDTO` | 复合注册/登录 DTO | 支持双模流转序列化与池化 `reset_state()` |
 | [account_registration_dto.gd](../../../../backend/domains/account/dto/account_registration_dto.gd) | `AccountRegistrationDTO` | 注册入参 DTO | 限制 `password_plain` 仅存内存请求体，禁入日志/存档 |
 | [account_slot_creation_dto.gd](../../../../backend/domains/account/dto/account_slot_creation_dto.gd) | `AccountSlotCreationDTO` | 槽位创建参数 DTO | 收口多参数上下文 |
