@@ -25,27 +25,27 @@ static func validate_domains(working_data: Dictionary) -> Dictionary:
 	# 1. 扫描未知域
 	var keys_to_remove: Array[String] = []
 	for domain_key in sanitized.keys():
-		var d_key := String(domain_key)
-		if not known_domains.has(d_key):
+		var domain_name := String(domain_key)
+		if not known_domains.has(domain_name):
 			issues.append({
 				"type": "UNKNOWN_DOMAIN",
-				"domain": d_key,
+				"domain": domain_name,
 				"policy": unknown_policy
 			})
 			if unknown_policy == "warn_and_skip":
-				EventBusCore.get_instance().emit_log("warn", TemplateFormatter.format("SaveValidationService: save contains unknown domain [{domain}], skipped per policy.", {"domain": d_key}))
-				keys_to_remove.append(d_key)
+				EventBusCore.get_instance().emit_log("warn", TemplateFormatter.format("SaveValidationService: save contains unknown domain [{domain}], skipped per policy.", {"domain": domain_name}))
+				keys_to_remove.append(domain_name)
 
 	for rem_key in keys_to_remove:
 		sanitized.erase(rem_key)
 
 	# 2. 扫描已知且启用的域结构
-	for d_id in known_domains.keys():
-		_validate_known_domain_section(sanitized, d_id, missing_policy, type_policy, issues)
+	for domain_id in known_domains.keys():
+		_validate_known_domain_section(sanitized, domain_id, missing_policy, type_policy, issues)
 
 	var is_valid: bool = true
-	for iss in issues:
-		if iss.get("type", "") == "TYPE_MISMATCH_FATAL":
+	for issue in issues:
+		if issue.get("type", "") == "TYPE_MISMATCH_FATAL":
 			is_valid = false
 			break
 
@@ -56,63 +56,63 @@ static func validate_domains(working_data: Dictionary) -> Dictionary:
 	}
 
 ## 字段级安全转换：支持 int/float/str/bool 互相容错
-static func coerce_value(val: Variant, expected_type: int) -> Variant:
-	if typeof(val) == expected_type:
-		return val
+static func coerce_value(raw_value: Variant, expected_type: int) -> Variant:
+	if typeof(raw_value) == expected_type:
+		return raw_value
 	match expected_type:
 		TYPE_INT:
-			if val is float:
-				return int(val)
-			if val is String and (val as String).is_valid_int():
-				return (val as String).to_int()
-			if val is bool:
-				return 1 if val else 0
+			if raw_value is float:
+				return int(raw_value)
+			if raw_value is String and (raw_value as String).is_valid_int():
+				return (raw_value as String).to_int()
+			if raw_value is bool:
+				return 1 if raw_value else 0
 		TYPE_FLOAT:
-			if val is int:
-				return float(val)
-			if val is String and (val as String).is_valid_float():
-				return (val as String).to_float()
+			if raw_value is int:
+				return float(raw_value)
+			if raw_value is String and (raw_value as String).is_valid_float():
+				return (raw_value as String).to_float()
 		TYPE_STRING:
-			return str(val)
+			return str(raw_value)
 		TYPE_BOOL:
-			if val is int or val is float:
-				return val != 0
-			if val is String:
-				return val == "true" or val == "1"
+			if raw_value is int or raw_value is float:
+				return raw_value != 0
+			if raw_value is String:
+				return raw_value == "true" or raw_value == "1"
 	return null
 
 static func _validate_known_domain_section(
 	sanitized: Dictionary,
-	d_id: Variant,
+	domain_id: Variant,
 	missing_policy: String,
 	type_policy: String,
 	issues: Array
 ) -> void:
-	if not sanitized.has(d_id):
+	if not sanitized.has(domain_id):
 		if missing_policy == "use_default":
-			sanitized[d_id] = {}
+			sanitized[domain_id] = {}
 			issues.append({
 				"type": "MISSING_DOMAIN",
-				"domain": d_id,
+				"domain": domain_id,
 				"policy": missing_policy
 			})
 		return
 
-	var val: Variant = sanitized[d_id]
-	if not val is Dictionary:
+	var section_value: Variant = sanitized[domain_id]
+	if not section_value is Dictionary:
 		if type_policy == "coerce_or_drop":
 			issues.append({
 				"type": "TYPE_MISMATCH",
-				"domain": d_id,
+				"domain": domain_id,
 				"expected": "Dictionary",
-				"actual": typeof(val),
+				"actual": typeof(section_value),
 				"action": "dropped"
 			})
-			sanitized[d_id] = {}
+			sanitized[domain_id] = {}
 		else:
 			issues.append({
 				"type": "TYPE_MISMATCH_FATAL",
-				"domain": d_id
+				"domain": domain_id
 			})
 
 ## 获取所有已知数据域集合（来自 domains.json，仅登记实际持久化域 save.enabled，
@@ -120,13 +120,13 @@ static func _validate_known_domain_section(
 static func _get_known_domains() -> Dictionary:
 	var map: Dictionary = {}
 	var all_entries: Array = GameConfig.get_array("infrastructure.domains", "domains", [])
-	var empty_save_cfg: Dictionary = {}
+	var empty_save_config: Dictionary = {}
 	for entry in all_entries:
 		var id := String(entry.get("id", ""))
 		if id.is_empty():
 			continue
-		var save_cfg: Dictionary = entry.get("save", empty_save_cfg)
-		if not bool(save_cfg.get("enabled", false)):
+		var save_config: Dictionary = entry.get("save", empty_save_config)
+		if not bool(save_config.get("enabled", false)):
 			continue
 		map[id] = true
 	return map

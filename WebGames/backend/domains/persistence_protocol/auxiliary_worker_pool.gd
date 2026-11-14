@@ -52,8 +52,8 @@ static var _instance: RefCounted = null
 const DEFAULT_MAX_CACHE_ENTRIES: int = 64
 const DEFAULT_MAX_COMPLETED_TASKS: int = 128
 
-static var _queue_cap_cached: int = 128
-static var _queue_cap_cfg_ver: int = -1
+static var _queue_capacity_cached: int = 128
+static var _queue_capacity_config_version: int = -1
 
 var _task_counter: int = 0
 var _pending_queue: Array[AsyncLoadTask] = []
@@ -106,19 +106,19 @@ func request_resource_async(
 	# 1. 缓存命中短路
 	_state_mutex.lock()
 	var cache_hit: bool = _cached_results.has(resource_path)
-	var cached_val: Variant = _cached_results.get(resource_path, null) if cache_hit else null
+	var cached_value: Variant = _cached_results.get(resource_path, null) if cache_hit else null
 	_state_mutex.unlock()
 	if cache_hit:
 		if callback.is_valid():
-			callback.call(true, cached_val, StorageContractInterfaces.ERR_NONE)
+			callback.call(true, cached_value, StorageContractInterfaces.ERR_NONE)
 		return 0
 
 	# 2. 检查背压上限（随 GameConfig.config_reload_version() 缓存）
-	var ver: int = GameConfig.config_reload_version()
-	if _queue_cap_cfg_ver != ver:
-		_queue_cap_cached = GameConfig.get_int("infrastructure.storage", "auxiliary/thread_pool/queue_capacity", 128)
-		_queue_cap_cfg_ver = ver
-	var max_capacity: int = _queue_cap_cached
+	var config_version: int = GameConfig.config_reload_version()
+	if _queue_capacity_config_version != config_version:
+		_queue_capacity_cached = GameConfig.get_int("infrastructure.storage", "auxiliary/thread_pool/queue_capacity", 128)
+		_queue_capacity_config_version = config_version
+	var max_capacity: int = _queue_capacity_cached
 	if _pending_queue.size() >= max_capacity:
 		EventBusCore.get_instance().emit_log(LOG_LEVEL_WARN, TemplateFormatter.format(LOG_QUEUE_FULL, {"path": resource_path}))
 		if callback.is_valid():
@@ -154,20 +154,20 @@ func enqueue_batch(batch_request: Variant) -> String:
 	if batch.batch_id.is_empty():
 		batch.batch_id = BATCH_ID_PREFIX + str(_task_counter)
 
-	var b_id := batch.batch_id
-	_active_batches[b_id] = batch
+	var batch_id := batch.batch_id
+	_active_batches[batch_id] = batch
 
 	for entry in batch.entries:
 		var token: Variant = batch.cancellation_token
-		var prio: int = entry.priority
+		var priority_level: int = entry.priority
 		var path: String = entry.physical_path if not entry.physical_path.is_empty() else entry.resource_id
-		request_resource_async(path, prio, token, func(ok: bool, data: Variant, err: String):
-			batch.loaded_count += int(ok)
-			batch.failed_count += int(not ok)
+		request_resource_async(path, priority_level, token, func(succeeded: bool, data: Variant, error_code: String):
+			batch.loaded_count += int(succeeded)
+			batch.failed_count += int(not succeeded)
 			if batch.on_item_loaded.is_valid():
-				batch.on_item_loaded.call(entry, ok, data, err)
+				batch.on_item_loaded.call(entry, succeeded, data, error_code)
 			if batch.is_completed():
-				_active_batches.erase(b_id)
+				_active_batches.erase(batch_id)
 				if batch.on_batch_completed.is_valid():
 					batch.on_batch_completed.call(batch.batch_id, batch.total_count, batch.failed_count)
 		)
@@ -184,38 +184,38 @@ func _cancel_task_instance(task: AsyncLoadTask, notify_callback: bool) -> void:
 func cancel_task(target: Variant) -> bool:
 	if target is CancellationToken:
 		var cancelled_any := false
-		var i := _pending_queue.size() - 1
-		while i >= 0:
-			if _pending_queue[i].token == target:
-				var t: AsyncLoadTask = _pending_queue[i]
-				_pending_queue.remove_at(i)
-				_cancel_task_instance(t, true)
+		var queue_index := _pending_queue.size() - 1
+		while queue_index >= 0:
+			if _pending_queue[queue_index].token == target:
+				var pending_task: AsyncLoadTask = _pending_queue[queue_index]
+				_pending_queue.remove_at(queue_index)
+				_cancel_task_instance(pending_task, true)
 				cancelled_any = true
-			i -= 1
+			queue_index -= 1
 		return cancelled_any
 
-	var tid := int(target)
-	for i in range(_pending_queue.size()):
-		if _pending_queue[i].task_id == tid:
-			var t: AsyncLoadTask = _pending_queue[i]
-			_pending_queue.remove_at(i)
-			_cancel_task_instance(t, true)
+	var target_task_id := int(target)
+	for queue_index in range(_pending_queue.size()):
+		if _pending_queue[queue_index].task_id == target_task_id:
+			var pending_task: AsyncLoadTask = _pending_queue[queue_index]
+			_pending_queue.remove_at(queue_index)
+			_cancel_task_instance(pending_task, true)
 			return true
-	if _running_tasks.has(tid):
-		_cancel_task_instance(_running_tasks[tid] as AsyncLoadTask, false)
+	if _running_tasks.has(target_task_id):
+		_cancel_task_instance(_running_tasks[target_task_id] as AsyncLoadTask, false)
 		return true
 	return false
 
 func _run_task_execution(task: AsyncLoadTask) -> void:
-	var res := _load_resource_payload(task.resource_path)
+	var load_result := _load_resource_payload(task.resource_path)
 	task.duration_ms = float(Time.get_ticks_usec() - task.start_time_usec) / USEC_TO_MS
-	if res.has("error") and str(res["error"]) != StorageContractInterfaces.ERR_NONE:
+	if load_result.has("error") and str(load_result["error"]) != StorageContractInterfaces.ERR_NONE:
 		task.status = STATUS_FAILED
-		task.error_code = String(res["error"])
+		task.error_code = String(load_result["error"])
 	else:
 		task.status = STATUS_COMPLETED
-		task.result_data = res.get("data", null)
-		task.byte_count = int(res.get("byte_count", 0))
+		task.result_data = load_result.get("data", null)
+		task.byte_count = int(load_result.get("byte_count", 0))
 		_cache_result(task.resource_path, task.result_data)
 	_notify_task_finished(task)
 
@@ -234,8 +234,8 @@ func _execute_task(task: AsyncLoadTask, sync_mode: bool) -> void:
 		_state_mutex.lock()
 		_running_tasks[task.task_id] = task
 		_state_mutex.unlock()
-		var is_high_prio := (task.priority <= StorageContractInterfaces.LoadPriority.HIGH)
-		task.pool_task_id = WorkerThreadPool.add_task(_run_task_execution.bind(task), is_high_prio, TASK_THREAD_PREFIX + str(task.task_id))
+		var is_high_priority := (task.priority <= StorageContractInterfaces.LoadPriority.HIGH)
+		task.pool_task_id = WorkerThreadPool.add_task(_run_task_execution.bind(task), is_high_priority, TASK_THREAD_PREFIX + str(task.task_id))
 
 ## 插入缓存并执行环形 FIFO 淘汰，保障缓存字典规模有界且零 pop_front 挪移
 func _cache_result(path: String, data: Variant) -> void:
@@ -263,11 +263,11 @@ static func _load_resource_payload(path: String) -> Dictionary:
 		var kdat_data: Variant = BinaryConfigReader.load_kdat_file(path)
 		if kdat_data == null:
 			return {"error": StorageContractInterfaces.ERR_CORRUPT}
-		var f := FileAccess.open(path, FileAccess.READ)
-		var b_len: int = f.get_length() if f != null else 0
-		if f != null:
-			f.close()
-		return {"data": kdat_data, "byte_count": b_len}
+		var file_handle := FileAccess.open(path, FileAccess.READ)
+		var byte_length: int = file_handle.get_length() if file_handle != null else 0
+		if file_handle != null:
+			file_handle.close()
+		return {"data": kdat_data, "byte_count": byte_length}
 
 	if not FileAccess.file_exists(path):
 		return {"error": StorageContractInterfaces.ERR_NOT_FOUND}
@@ -326,9 +326,9 @@ func pump_completed_tasks(max_count: int = DEFAULT_PUMP_BATCH_SIZE) -> int:
 ## 获取已缓存资源
 func get_cached_resource(resource_path: String) -> Variant:
 	_state_mutex.lock()
-	var val: Variant = _cached_results.get(resource_path, null)
+	var cached_value: Variant = _cached_results.get(resource_path, null)
 	_state_mutex.unlock()
-	return val
+	return cached_value
 
 ## 清理闲置资源
 func evict_idle_resources() -> int:
@@ -343,9 +343,9 @@ func evict_idle_resources() -> int:
 ## 获取待执行及正在执行队列总大小
 func get_queue_size() -> int:
 	_state_mutex.lock()
-	var sz: int = _pending_queue.size() + _running_tasks.size()
+	var total_size: int = _pending_queue.size() + _running_tasks.size()
 	_state_mutex.unlock()
-	return sz
+	return total_size
 
 ## 测试重置
 static func reset_for_tests() -> void:

@@ -69,37 +69,37 @@ func ensure_catalog_loaded() -> void:
 		return
 	_loaded = true
 
-	var root_cat := _read_json_dict(PATH_RESOURCE_CATALOG)
-	for t in root_cat.get("critical_boot_tables", []):
-		_critical_tables[String(t)] = true
+	var catalog_root := _read_json_dict(PATH_RESOURCE_CATALOG)
+	for table_name in catalog_root.get("critical_boot_tables", []):
+		_critical_tables[String(table_name)] = true
 	var empty_entry: Dictionary = {}
-	for c in root_cat.get("custom_entries", []):
-		var cd: Dictionary = c if c is Dictionary else empty_entry
-		var dto := ResourceIndexEntryDTO.from_dict(cd) as ResourceIndexEntryDTO
-		register_entry(dto)
+	for raw_custom_entry in catalog_root.get("custom_entries", []):
+		var custom_dict: Dictionary = raw_custom_entry if raw_custom_entry is Dictionary else empty_entry
+		var resource_entry := ResourceIndexEntryDTO.from_dict(custom_dict) as ResourceIndexEntryDTO
+		register_entry(resource_entry)
 
-	var root_dom := _read_json_dict(PATH_DOMAINS_JSON)
-	for entry in root_dom.get("domains", []):
+	var domains_root := _read_json_dict(PATH_DOMAINS_JSON)
+	for entry in domains_root.get("domains", []):
 		_register_domain_entry(entry)
 
 ## 遍历单领域条目登记配置与子表
 func _register_domain_entry(entry: Variant) -> void:
-	var ed: Dictionary = entry if entry is Dictionary else {}
-	var cfg_t: String = ed.get("config", "")
-	if not cfg_t.is_empty():
-		_register_inferred_table(cfg_t, StorageContractInterfaces.LoadPriority.NORMAL)
-	var nar_t: String = ed.get("narrative", "")
-	if not nar_t.is_empty():
-		_register_inferred_table(nar_t, StorageContractInterfaces.LoadPriority.LOW)
-	for sub_table in ed.get("sub_tables", []):
-		var st_str := String(sub_table)
-		if not st_str.is_empty():
-			_register_inferred_table(st_str, StorageContractInterfaces.LoadPriority.NORMAL)
+	var entry_dict: Dictionary = entry if entry is Dictionary else {}
+	var config_table: String = entry_dict.get("config", "")
+	if not config_table.is_empty():
+		_register_inferred_table(config_table, StorageContractInterfaces.LoadPriority.NORMAL)
+	var narrative_table: String = entry_dict.get("narrative", "")
+	if not narrative_table.is_empty():
+		_register_inferred_table(narrative_table, StorageContractInterfaces.LoadPriority.LOW)
+	for sub_table in entry_dict.get("sub_tables", []):
+		var sub_table_name := String(sub_table)
+		if not sub_table_name.is_empty():
+			_register_inferred_table(sub_table_name, StorageContractInterfaces.LoadPriority.NORMAL)
 
 ## 推导并注册配置表条目
-func _register_inferred_table(table_name: String, default_prio: int) -> void:
-	var res_id := PREFIX_CONFIG_KEY + table_name
-	if _entries.has(res_id):
+func _register_inferred_table(table_name: String, default_priority: int) -> void:
+	var resource_id := PREFIX_CONFIG_KEY + table_name
+	if _entries.has(resource_id):
 		return
 	var parts := table_name.split(".")
 	var rel_path := PREFIX_CONFIG_DIR + "/".join(parts) + EXT_JSON
@@ -107,10 +107,10 @@ func _register_inferred_table(table_name: String, default_prio: int) -> void:
 		var core_path := PREFIX_CONFIG_DIR + "/".join(parts) + "/core" + EXT_JSON
 		if FileAccess.file_exists(core_path):
 			rel_path = core_path
-	var prio := default_prio
+	var resolved_priority := default_priority
 	if _critical_tables.has(table_name) or _critical_tables.has(table_name + ".core"):
-		prio = StorageContractInterfaces.LoadPriority.CRITICAL
-	var entry := ResourceIndexEntryDTO.new(res_id, rel_path, CAT_CONFIG, prio)
+		resolved_priority = StorageContractInterfaces.LoadPriority.CRITICAL
+	var entry := ResourceIndexEntryDTO.new(resource_id, rel_path, CAT_CONFIG, resolved_priority)
 	entry.estimated_bytes = DEFAULT_ESTIMATED_BYTES
 	entry.metadata["table_name"] = table_name
 	register_entry(entry)
@@ -120,17 +120,17 @@ func register_entry(entry: ResourceIndexEntryDTO) -> void:
 	if entry == null or entry.resource_id.is_empty():
 		return
 	_entries[entry.resource_id] = entry
-	var t_name: String = String(entry.metadata.get("table_name", ""))
-	if t_name.is_empty() and entry.resource_id.begins_with(PREFIX_CONFIG_KEY):
-		t_name = entry.resource_id.substr(PREFIX_CONFIG_KEY.length())
-	if not t_name.is_empty():
-		_table_to_entry[t_name] = entry
-		if t_name.ends_with(".core"):
-			var base_name := t_name.substr(0, t_name.length() - 5)
+	var table_name: String = String(entry.metadata.get("table_name", ""))
+	if table_name.is_empty() and entry.resource_id.begins_with(PREFIX_CONFIG_KEY):
+		table_name = entry.resource_id.substr(PREFIX_CONFIG_KEY.length())
+	if not table_name.is_empty():
+		_table_to_entry[table_name] = entry
+		if table_name.ends_with(".core"):
+			var base_name := table_name.substr(0, table_name.length() - 5)
 			if not _table_to_entry.has(base_name):
 				_table_to_entry[base_name] = entry
-		elif not _table_to_entry.has(t_name + ".core"):
-			_table_to_entry[t_name + ".core"] = entry
+		elif not _table_to_entry.has(table_name + ".core"):
+			_table_to_entry[table_name + ".core"] = entry
 
 	if not _entries_by_category.has(entry.category):
 		_entries_by_category[entry.category] = []
@@ -150,10 +150,10 @@ func resolve_config_table_entry(table_name: String) -> ResourceIndexEntryDTO:
 	ensure_catalog_loaded()
 	if _table_to_entry.has(table_name):
 		return _table_to_entry[table_name]
-	var res_id := PREFIX_CONFIG_KEY + table_name
-	if _entries.has(res_id):
-		return _entries[res_id]
-	# 未知动态表实时推导兜底
+	var resource_id := PREFIX_CONFIG_KEY + table_name
+	if _entries.has(resource_id):
+		return _entries[resource_id]
+	# 未知动态表实时推导安全回退
 	_register_inferred_table(table_name, StorageContractInterfaces.LoadPriority.NORMAL)
 	return _table_to_entry.get(table_name, null)
 
@@ -176,9 +176,9 @@ func get_critical_boot_entries() -> Array:
 	ensure_catalog_loaded()
 	var result: Array = []
 	for entry in _entries.values():
-		var e := entry as ResourceIndexEntryDTO
-		if e != null and e.priority == StorageContractInterfaces.LoadPriority.CRITICAL:
-			result.append(e)
+		var typed_entry := entry as ResourceIndexEntryDTO
+		if typed_entry != null and typed_entry.priority == StorageContractInterfaces.LoadPriority.CRITICAL:
+			result.append(typed_entry)
 	return result
 
 ## 依据世界状态构建异步批量装载请求清单
@@ -186,9 +186,9 @@ func build_manifest_for_state(_state: Variant) -> BatchLoadRequestDTO:
 	ensure_catalog_loaded()
 	var batch := BatchLoadRequestDTO.new(DEFAULT_MANIFEST_BATCH_ID)
 	for entry in _entries.values():
-		var e := entry as ResourceIndexEntryDTO
-		if e != null and e.priority > StorageContractInterfaces.LoadPriority.CRITICAL:
-			batch.add_entry(e)
+		var typed_entry := entry as ResourceIndexEntryDTO
+		if typed_entry != null and typed_entry.priority > StorageContractInterfaces.LoadPriority.CRITICAL:
+			batch.add_entry(typed_entry)
 	return batch
 
 ## 测试重置
