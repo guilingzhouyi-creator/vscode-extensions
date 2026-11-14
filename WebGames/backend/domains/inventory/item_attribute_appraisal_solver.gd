@@ -3,7 +3,7 @@
 # 文件路径: res://backend/domains/inventory/item_attribute_appraisal_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/inventory.json | 信号: EventBus 领域广播
-# 职责说明: 判定 C 类特殊词缀鉴定条件、执行状态跃迁至 APPRAISED 并生成服务端防伪凭证。 条件：鉴定技能等级 + 专属知识体系（unlocked_lores），配置驱动零硬编码。
+# 职责说明: 判定 C 类特殊词缀鉴定条件、执行状态跃迁至 APPRAISED 并生成服务端防篡改凭证。 条件：鉴定技能等级 + 专属知识体系（unlocked_lores），配置驱动零硬编码。
 # 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
@@ -42,82 +42,82 @@ class AppraisalResultDTO extends RefCounted:
 ## 执行 C 类特殊词缀的鉴定操作
 static func appraise_mount_attribute(
 	mount: ItemAttributeMountInstance,
-	def: ItemAttributeDefinition,
+	definition: ItemAttributeDefinition,
 	appraisal_context: Dictionary
 ) -> AppraisalResultDTO:
-	var res := AppraisalResultDTO.new()
-	if mount == null or def == null:
-		res.success = false
-		res.error_code = "INVALID_MOUNT_OR_DEF"
-		res.message = "挂载实例或属性定义为空"
-		return res
+	var result := AppraisalResultDTO.new()
+	if mount == null or definition == null:
+		result.success = false
+		result.error_code = "INVALID_MOUNT_OR_DEF"
+		result.message = "挂载实例或属性定义为空"
+		return result
 
-	res.previous_state = mount.visibility
+	result.previous_state = mount.visibility
 
 	# 非特殊词缀无需鉴定
 	if mount.category != ItemAttributeDefinition.AttributeCategory.SPECIAL_AFFIX:
-		res.success = true
-		res.message = "非隐藏属性，无需鉴定"
-		res.new_state = mount.visibility
-		return res
+		result.success = true
+		result.message = "非隐藏属性，无需鉴定"
+		result.new_state = mount.visibility
+		return result
 
 	# 已经处于鉴定态
 	if mount.visibility == ItemAttributeMountInstance.VisibilityState.APPRAISED:
-		res.success = true
-		res.message = "该属性此前已完成鉴定"
-		res.new_state = mount.visibility
-		return res
+		result.success = true
+		result.message = "该属性此前已完成鉴定"
+		result.new_state = mount.visibility
+		return result
 
 	# 校验鉴定技能等级要求
-	var req_skill: int = int(def.appraisal_requirement.get("min_skill_level", 1))
+	var required_skill_level: int = int(definition.appraisal_requirement.get("min_skill_level", 1))
 	var player_skill: int = int(appraisal_context.get("appraisal_skill_level", 0))
-	if player_skill < req_skill:
-		res.success = false
-		res.error_code = "SKILL_LEVEL_INSUFFICIENT"
-		res.message = "鉴定技能等级不足 (需要: %d, 当前: %d)" % [req_skill, player_skill]
-		res.new_state = mount.visibility
-		return res
+	if player_skill < required_skill_level:
+		result.success = false
+		result.error_code = "SKILL_LEVEL_INSUFFICIENT"
+		result.message = "鉴定技能等级不足 (需要: %d, 当前: %d)" % [required_skill_level, player_skill]
+		result.new_state = mount.visibility
+		return result
 
 	# 校验专属知识体系要求 (unlocked_lores)
-	var req_lore: String = str(def.appraisal_requirement.get("required_lore", ""))
-	if not req_lore.is_empty():
+	var required_lore: String = str(definition.appraisal_requirement.get("required_lore", ""))
+	if not required_lore.is_empty():
 		var lores: Array = appraisal_context.get("unlocked_lores", [])
-		if not lores.has(req_lore):
-			res.success = false
-			res.error_code = "REQUIRED_LORE_MISSING"
-			res.message = "缺少必要的专业知识体系: %s" % req_lore
-			res.new_state = mount.visibility
-			return res
+		if not lores.has(required_lore):
+			result.success = false
+			result.error_code = "REQUIRED_LORE_MISSING"
+			result.message = "缺少必要的专业知识体系: %s" % required_lore
+			result.new_state = mount.visibility
+			return result
 
 	# 条件全部满足：执行服务端权威状态跃迁
 	mount.visibility = ItemAttributeMountInstance.VisibilityState.APPRAISED
 	mount.is_active = true
 
-	var now_ts: int = int(Time.get_unix_time_from_system())
+	var current_timestamp: int = int(Time.get_unix_time_from_system())
 	var actor_id: String = str(appraisal_context.get("actor_id", "SERVER_APPRAISER"))
-	var audit_sig := _generate_audit_signature(mount.item_uid, mount.attribute_uid, now_ts, actor_id)
+	var audit_signature := _generate_audit_signature(mount.item_uid, mount.attribute_uid, current_timestamp, actor_id)
 
 	mount.appraisal_audit = {
 		"is_appraised": true,
-		"appraised_timestamp": now_ts,
+		"appraised_timestamp": current_timestamp,
 		"appraiser_actor_id": actor_id,
-		"audit_signature": audit_sig
+		"audit_signature": audit_signature
 	}
 
-	res.success = true
-	res.error_code = ""
-	res.message = "词缀鉴定成功，特殊机制已激活"
-	res.audit_token = audit_sig
-	res.new_state = ItemAttributeMountInstance.VisibilityState.APPRAISED
+	result.success = true
+	result.error_code = ""
+	result.message = "词缀鉴定成功，特殊机制已激活"
+	result.audit_token = audit_signature
+	result.new_state = ItemAttributeMountInstance.VisibilityState.APPRAISED
 
-	return res
+	return result
 
 # ==============================================================================
-# 三、防伪签名生成
+# 三、防篡改签名生成
 # ==============================================================================
 
-## 服务端防伪签名生成算法（SHA-256 + 加盐，盐来自 appraisal_rules 配置）
-static func _generate_audit_signature(item_uid: String, attr_uid: String, timestamp: int, actor_id: String) -> String:
+## 服务端防篡改签名生成算法（SHA-256 + 加盐，盐来自 appraisal_rules 配置）
+static func _generate_audit_signature(item_uid: String, attribute_uid: String, timestamp: int, actor_id: String) -> String:
 	var salt := GameConfig.get_string("domains.item_attributes", "appraisal_rules/anti_spoof_salt", "KALAR_AFFIX_AUDIT_SALT_V1")
-	var payload := "%s:%s:%d:%s:%s" % [item_uid, attr_uid, timestamp, actor_id, salt]
+	var payload := "%s:%s:%d:%s:%s" % [item_uid, attribute_uid, timestamp, actor_id, salt]
 	return payload.sha256_text()

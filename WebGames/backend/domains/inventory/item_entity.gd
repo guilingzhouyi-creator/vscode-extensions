@@ -51,29 +51,29 @@ static var _defaults_config_version: int = -1
 static func _ensure_defaults() -> ItemDefaultsCache:
 	if _defaults_cache != null and _defaults_config_version == GameConfig.config_reload_version():
 		return _defaults_cache
-	var c := ItemDefaultsCache.new()
-	c.custom_name = GameConfig.get_string("domains.inventory", "item_defaults/custom_name", "未命名物品")
-	c.category = GameConfig.get_string("domains.inventory", "item_defaults/category", CATEGORY_QUEST_MISC)
-	c.mass_kg = GameConfig.get_float("domains.inventory", "item_defaults/mass_kg", 1.0)
-	c.volume_slots = GameConfig.get_int("domains.inventory", "item_defaults/volume_slots", 1)
-	c.durability = GameConfig.get_float("domains.inventory", "item_defaults/durability", 100.0)
-	c.material_hardness = GameConfig.get_float("domains.inventory", "item_defaults/material_hardness", 10.0)
-	c.combat_metrics = {
+	var defaults_cache := ItemDefaultsCache.new()
+	defaults_cache.custom_name = GameConfig.get_string("domains.inventory", "item_defaults/custom_name", "未命名物品")
+	defaults_cache.category = GameConfig.get_string("domains.inventory", "item_defaults/category", CATEGORY_QUEST_MISC)
+	defaults_cache.mass_kg = GameConfig.get_float("domains.inventory", "item_defaults/mass_kg", 1.0)
+	defaults_cache.volume_slots = GameConfig.get_int("domains.inventory", "item_defaults/volume_slots", 1)
+	defaults_cache.durability = GameConfig.get_float("domains.inventory", "item_defaults/durability", 100.0)
+	defaults_cache.material_hardness = GameConfig.get_float("domains.inventory", "item_defaults/material_hardness", 10.0)
+	defaults_cache.combat_metrics = {
 		"edge_sharpness": GameConfig.get_float("domains.inventory", "item_defaults/combat_metrics/edge_sharpness", 1.0),
 		"reach_meters": GameConfig.get_float("domains.inventory", "item_defaults/combat_metrics/reach_meters", 1.0),
 		"effective_armor": GameConfig.get_float("domains.inventory", "item_defaults/combat_metrics/effective_armor", 0.0),
 		"elemental_resistances": {}
 	}
-	c.affix_sockets = {
+	defaults_cache.affix_sockets = {
 		"total_sockets": GameConfig.get_int("domains.inventory", "item_defaults/total_sockets", 2),
 		"imprinted_runes": [],
 		"dynamic_affixes": []
 	}
-	c.market_base_price = GameConfig.get_int("domains.inventory", "item_defaults/market_base_price", 10)
-	c.deserialize_name = GameConfig.get_string("domains.inventory", "item_defaults/deserialize_name", "未知物品")
-	_defaults_cache = c
+	defaults_cache.market_base_price = GameConfig.get_int("domains.inventory", "item_defaults/market_base_price", 10)
+	defaults_cache.deserialize_name = GameConfig.get_string("domains.inventory", "item_defaults/deserialize_name", "未知物品")
+	_defaults_cache = defaults_cache
 	_defaults_config_version = GameConfig.config_reload_version()
-	return c
+	return defaults_cache
 
 var item_id: String = ""
 # 实例全局唯一 UID（权威/可追溯/幂等）：发放来源前缀 + 单调计数 + 校验尾
@@ -101,20 +101,20 @@ func _init() -> void:
 ## 状态重置与池化复用契约（ADV-PRF-002）：快速应用静态配置缓存默认值
 func reset_state() -> void:
 	super.reset_state()
-	var c := _ensure_defaults()
+	var defaults_cache := _ensure_defaults()
 	item_id = ""
 	item_uid = ""
 	template_id = ""
-	custom_name = c.custom_name
-	category = c.category
-	mass_kg = c.mass_kg
-	volume_slots = c.volume_slots
-	durability_current = c.durability
-	durability_max = c.durability
-	material_hardness = c.material_hardness
-	combat_metrics = c.combat_metrics.duplicate(true)
-	affix_sockets = c.affix_sockets.duplicate(true)
-	market_base_price = c.market_base_price
+	custom_name = defaults_cache.custom_name
+	category = defaults_cache.category
+	mass_kg = defaults_cache.mass_kg
+	volume_slots = defaults_cache.volume_slots
+	durability_current = defaults_cache.durability
+	durability_max = defaults_cache.durability
+	material_hardness = defaults_cache.material_hardness
+	combat_metrics = defaults_cache.combat_metrics.duplicate(true)
+	affix_sockets = defaults_cache.affix_sockets.duplicate(true)
+	market_base_price = defaults_cache.market_base_price
 	quality_snapshot.clear()
 	container_state = "UNOWNED"
 	owner_account_id = ""
@@ -127,11 +127,11 @@ func reset_state() -> void:
 ## 序列化物品为字典（attribute_mounts 转为 DTO 数组，嵌套容器深拷贝）
 func serialize() -> Dictionary:
 	var mounts_dto: Array = []
-	for m in attribute_mounts:
-		if m is ItemAttributeMountInstance:
-			mounts_dto.append(m.to_dto())
-		elif m is Dictionary:
-			mounts_dto.append(m)
+	for mount_entry in attribute_mounts:
+		if mount_entry is ItemAttributeMountInstance:
+			mounts_dto.append(mount_entry.to_dto())
+		elif mount_entry is Dictionary:
+			mounts_dto.append(mount_entry)
 
 	return {
 		"serialization_version": SERIALIZATION_VERSION,
@@ -161,41 +161,41 @@ func mount_attribute(mount: ItemAttributeMountInstance) -> void:
 		attribute_mounts.append(mount)
 
 ## 反序列化：缺键一律沿用字段初值（即 item_defaults 配置缺省），默认值单点化于此。
-## 两处刻意保留的差异兜底：custom_name 走独立的 deserialize_name 键（损坏存档回落
+## 两处刻意保留的差异默认回退：custom_name 走独立的 deserialize_name 键（损坏存档回落
 ## 「未知物品」而非「未命名物品」）；combat_metrics / affix_sockets 缺键回落空字典
 ## （非配置富缺省，与既有存档兼容语义一致）。
-static func deserialize(d: Dictionary, _instance_discriminator: String = "") -> ItemEntity:
+static func deserialize(data: Dictionary, _instance_discriminator: String = "") -> ItemEntity:
 	var item := ItemEntity.new()
-	if d == null:
+	if data == null:
 		return item
-	item.item_id = str(d.get("item_id", item.item_id))
-	item.item_uid = d.get("item_uid", "")
-	item.template_id = str(d.get("template_id", item.template_id))
+	item.item_id = str(data.get("item_id", item.item_id))
+	item.item_uid = data.get("item_uid", "")
+	item.template_id = str(data.get("template_id", item.template_id))
 	# 缺省 UID 重设默认值：自动分配新架构标准服务端发放 UID（权威/可追溯/合规）
 	if item.item_uid.is_empty():
-		var gen_uid := ItemUIDGenerator.generate_uid("SRV_")
-		if gen_uid.is_empty():
-			gen_uid = "SRV_00000001" + "SRV_1".sha256_text().substr(0, 2)
-		item.item_uid = gen_uid
-	item.custom_name = d.get("custom_name", _ensure_defaults().deserialize_name)
-	item.category = d.get("category", item.category)
-	item.mass_kg = maxf(0.0, float(d.get("mass_kg", item.mass_kg)))
-	item.volume_slots = maxi(0, int(d.get("volume_slots", item.volume_slots)))
-	item.durability_current = clampf(float(d.get("durability_current", item.durability_current)), 0.0, maxf(0.0, float(d.get("durability_max", item.durability_max))))
-	item.durability_max = maxf(0.0, float(d.get("durability_max", item.durability_max)))
-	item.material_hardness = maxf(0.0, float(d.get("material_hardness", item.material_hardness)))
-	item.combat_metrics = (d.get("combat_metrics", {}) as Dictionary).duplicate(true) if d.get("combat_metrics", {}) is Dictionary else {}
-	item.affix_sockets = (d.get("affix_sockets", {}) as Dictionary).duplicate(true) if d.get("affix_sockets", {}) is Dictionary else {}
-	item.market_base_price = maxi(0, int(d.get("market_base_price", item.market_base_price)))
-	item.quality_snapshot = (d.get("quality_snapshot", {}) as Dictionary).duplicate(true) if d.get("quality_snapshot", {}) is Dictionary else {}
-	item.container_state = str(d.get("container_state", item.container_state))
-	item.owner_account_id = str(d.get("owner_account_id", item.owner_account_id))
+		var generated_uid := ItemUIDGenerator.generate_uid("SRV_")
+		if generated_uid.is_empty():
+			generated_uid = "SRV_00000001" + "SRV_1".sha256_text().substr(0, 2)
+		item.item_uid = generated_uid
+	item.custom_name = data.get("custom_name", _ensure_defaults().deserialize_name)
+	item.category = data.get("category", item.category)
+	item.mass_kg = maxf(0.0, float(data.get("mass_kg", item.mass_kg)))
+	item.volume_slots = maxi(0, int(data.get("volume_slots", item.volume_slots)))
+	item.durability_current = clampf(float(data.get("durability_current", item.durability_current)), 0.0, maxf(0.0, float(data.get("durability_max", item.durability_max))))
+	item.durability_max = maxf(0.0, float(data.get("durability_max", item.durability_max)))
+	item.material_hardness = maxf(0.0, float(data.get("material_hardness", item.material_hardness)))
+	item.combat_metrics = (data.get("combat_metrics", {}) as Dictionary).duplicate(true) if data.get("combat_metrics", {}) is Dictionary else {}
+	item.affix_sockets = (data.get("affix_sockets", {}) as Dictionary).duplicate(true) if data.get("affix_sockets", {}) is Dictionary else {}
+	item.market_base_price = maxi(0, int(data.get("market_base_price", item.market_base_price)))
+	item.quality_snapshot = (data.get("quality_snapshot", {}) as Dictionary).duplicate(true) if data.get("quality_snapshot", {}) is Dictionary else {}
+	item.container_state = str(data.get("container_state", item.container_state))
+	item.owner_account_id = str(data.get("owner_account_id", item.owner_account_id))
 
-	var raw_mounts: Variant = d.get("attribute_mounts", [])
+	var raw_mounts: Variant = data.get("attribute_mounts", [])
 	if raw_mounts is Array:
-		for m_data in raw_mounts:
-			if m_data is Dictionary:
-				item.attribute_mounts.append(ItemAttributeMountInstance.from_dto(m_data))
+		for mount_data in raw_mounts:
+			if mount_data is Dictionary:
+				item.attribute_mounts.append(ItemAttributeMountInstance.from_dto(mount_data))
 
 	return item
 
@@ -205,7 +205,7 @@ static func deserialize(d: Dictionary, _instance_discriminator: String = "") -> 
 ##   name（custom_name / item_name）——显示名；
 ##   mass_kg / volume_slots —— 物理属性。
 ## fallback_* 仅在 payload 未提供对应键时生效；未提供的字段保持本实体配置初值
-## （fallback_mass_kg 传负值、fallback_volume_slots 传 0 表示「无领域兜底，回落配置初值」）。
+## （fallback_mass_kg 传负值、fallback_volume_slots 传 0 表示「无领域默认回退，回落配置初值」）。
 static func from_payload(
 	payload: Dictionary,
 	fallback_template_id: String = "",
@@ -214,20 +214,20 @@ static func from_payload(
 	fallback_volume_slots: int = 0
 ) -> ItemEntity:
 	var item := ItemEntity.new()
-	var tpl := ""
+	var resolved_template_id := ""
 	if payload.has("item_id"):
 		item.item_id = str(payload["item_id"])
-		tpl = str(payload.get("template_id", item.item_id))
+		resolved_template_id = str(payload.get("template_id", item.item_id))
 	elif payload.has("template_id"):
-		tpl = str(payload["template_id"])
-		item.item_id = tpl
+		resolved_template_id = str(payload["template_id"])
+		item.item_id = resolved_template_id
 	elif payload.has("item_template_id"):
-		tpl = str(payload["item_template_id"])
-		item.item_id = tpl
+		resolved_template_id = str(payload["item_template_id"])
+		item.item_id = resolved_template_id
 	else:
-		tpl = fallback_template_id
-		item.item_id = tpl
-	item.template_id = tpl
+		resolved_template_id = fallback_template_id
+		item.item_id = resolved_template_id
+	item.template_id = resolved_template_id
 	if payload.has("name"):
 		item.custom_name = str(payload["name"])
 	elif payload.has("custom_name"):
