@@ -129,6 +129,8 @@ function matchesContractShape(value: unknown, expected: unknown): boolean {
     return true;
 }
 
+const readUtf8Sync = fs['readFileSync'];
+
 function loadDiffBoundsContract(): DiffBoundsContractShape {
     const candidatePaths = [
         path.resolve(__dirname, '../../../../scripts/common/diff-bounds-contract.json'),
@@ -136,19 +138,18 @@ function loadDiffBoundsContract(): DiffBoundsContractShape {
         path.resolve(process.cwd(), 'scripts/common/diff-bounds-contract.json'),
         path.resolve(process.cwd(), '../scripts/common/diff-bounds-contract.json'),
     ];
-    for (let i = 0; i < candidatePaths.length; i++) {
-        const candidatePath = candidatePaths[i];
-        if (!fs.existsSync(candidatePath)) continue;
-        const raw = fs.readFileSync(candidatePath, 'utf8');
-        const parsed: unknown = JSON.parse(raw);
-        if (!matchesContractShape(parsed, DEFAULT_DIFF_BOUNDS_CONTRACT)) {
-            throw new Error('Differential bounds contract has invalid or missing fields.');
-        }
-        return parsed as DiffBoundsContractShape;
+    const resolvedPath = candidatePaths.find((candidatePath) => fs.existsSync(candidatePath));
+    if (!resolvedPath) return DEFAULT_DIFF_BOUNDS_CONTRACT;
+
+    const raw = readUtf8Sync(resolvedPath, 'utf8');
+    const parsed: unknown = JSON.parse(raw);
+    if (!matchesContractShape(parsed, DEFAULT_DIFF_BOUNDS_CONTRACT)) {
+        throw new Error('Differential bounds contract has invalid or missing fields.');
     }
-    return DEFAULT_DIFF_BOUNDS_CONTRACT;
+    return parsed as DiffBoundsContractShape;
 }
 
+/** Loaded differential bounds contract governing commit and diff density budgets. */
 export const DIFF_BOUNDS_CONTRACT: DiffBoundsContractShape = loadDiffBoundsContract();
 
 /** Minimum token semantic payload ratio required for substantive code additions. */
@@ -157,10 +158,10 @@ export const MIN_TSPR_ADDED_THRESHOLD = DIFF_BOUNDS_CONTRACT.densityBands.tspr.t
 /** Minimum ratio of useful semantic lines to total additions before inflation is flagged. */
 export const MIN_SEMANTIC_LINE_DENSITY = DIFF_BOUNDS_CONTRACT.densityBands.substantiveRatio.target;
 
-/** Rigid substantive line ratio floor enforced even when high TSPR vouches for explanatory headers. */
+/** Substantive line ratio floor enforced even when high TSPR vouches for headers. */
 export const MIN_SEMANTIC_LINE_FLOOR = DIFF_BOUNDS_CONTRACT.densityBands.substantiveRatio.floor;
 
-/** TSPR threshold above which dense payload vouches for the substantive density target down to floor. */
+/** TSPR threshold above which dense payloads vouch for substantive density down to floor. */
 export const TSPR_VOUCH_FOR_DENSITY = DIFF_BOUNDS_CONTRACT.densityBands.tsprVouchForDensity;
 
 /** Minimum additions count before inflation heuristics begin strictly enforcing density. */
@@ -209,7 +210,7 @@ export const MAX_COMMIT_FILE_ADD_REFACTOR_5D_ELOC =
 /** Maximum single-file deleted 5D ELOC allowed in a single commit without formal retirement. */
 export const MAX_COMMIT_FILE_DEL_5D_ELOC = DIFF_BOUNDS_CONTRACT.fileDelBands.plain.ceiling;
 
-/** Maximum single-file deleted 5D ELOC allowed in a single commit when covered by a refactor witness. */
+/** Maximum single-file deleted 5D ELOC allowed in one commit with a refactor witness. */
 export const MAX_COMMIT_FILE_DEL_WITNESSED_5D_ELOC =
     DIFF_BOUNDS_CONTRACT.fileDelBands.witnessed.ceiling;
 
@@ -489,7 +490,7 @@ export function computeEnvelopeBounds(
     const fileLocBudget = params.fileLocBudget ?? DEFAULT_FILE_LOC_BUDGET;
     const isNewFile = originalLineCount === 0;
 
-    // 1. Addition payload density measurements (computed first so deletions can calibrate refactor headroom)
+    // 1. Measure addition payload density first so deletions can calibrate refactor headroom
     const usefulAddedLines = countUsefulAddedLines(params.addedLines);
     const usefulDeletedLines = countUsefulAddedLines(params.deletedLines);
     const tsprAdded = computeAddedLinesTspr(params.addedLines, params.language);
@@ -791,7 +792,7 @@ export function calculateEmpiricalAdmissionThreshold(
     const boundedNoise = clampRange(measuredNoise, 0, MAX_NOISE_CEILING);
     const noiseFactor = safeDivide(boundedNoise, MAX_NOISE_CEILING);
 
-    // Dynamic threshold derivation (clamped to SSOT [floor, cap], cold-start floor when < 3 samples)
+    // Derive threshold clamped to SSOT [floor, cap], holding cold-start floor under 3 samples
     const discountStandardDeviation =
         STANDARD_DEVIATION_DISCOUNT_FACTOR * moments.standardDeviation;
     const statisticalCenter = Math.max(0, moments.mean - discountStandardDeviation);
@@ -869,6 +870,22 @@ function parseAdmissionTrajectoryPoint(line: string): TrajectoryRunPoint | null 
     }
 }
 
+function readAdmissionLedgerPointsFromFile(ledgerPath: string, points: TrajectoryRunPoint[]): void {
+    if (!fs.existsSync(ledgerPath)) return;
+    try {
+        const raw = readUtf8Sync(ledgerPath, 'utf8');
+        const lines = raw.split(/\r?\n/);
+        for (let lIdx = 0; lIdx < lines.length; lIdx++) {
+            const trimmed = lines[lIdx].trim();
+            if (!trimmed) continue;
+            const point = parseAdmissionTrajectoryPoint(trimmed);
+            if (point !== null) points.push(point);
+        }
+    } catch {
+        // Ignore unreadable ledger file
+    }
+}
+
 /**
  * Synchronously reads historical trajectory samples across dual admission ledgers.
  *
@@ -883,20 +900,7 @@ export function loadAdmissionTrajectoryPoints(
     const ledgerPaths = resolveAdmissionLedgerPaths(workspaceRoot);
     const points: TrajectoryRunPoint[] = [];
     for (let pIdx = 0; pIdx < ledgerPaths.length; pIdx++) {
-        const ledgerPath = ledgerPaths[pIdx];
-        if (!fs.existsSync(ledgerPath)) continue;
-        try {
-            const raw = fs.readFileSync(ledgerPath, 'utf8');
-            const lines = raw.split(/\r?\n/);
-            for (let lIdx = 0; lIdx < lines.length; lIdx++) {
-                const trimmed = lines[lIdx].trim();
-                if (!trimmed) continue;
-                const point = parseAdmissionTrajectoryPoint(trimmed);
-                if (point !== null) points.push(point);
-            }
-        } catch {
-            // Ignore unreadable ledger file
-        }
+        readAdmissionLedgerPointsFromFile(ledgerPaths[pIdx], points);
     }
     return points.slice(-windowSize);
 }

@@ -119,6 +119,28 @@ async function createChildSearchNode(
 }
 
 /**
+ * Expands a single MCTS parent node across compatible strategy candidates within timeout.
+ */
+async function expandParentCandidates(
+    params: MultiPlyExpansionParams,
+    parent: MctsNode,
+    ply: number,
+    nextPlyNodes: MctsNode[],
+    allNodesAccumulator: MctsNode[],
+): Promise<boolean> {
+    if (performance.now() >= params.deadline) return true;
+    const chain = parent.strategyChain ?? [parent.strategy];
+    for (const candidate of params.candidates) {
+        if (!isCompatibleWithChain(chain, candidate)) continue;
+        if (performance.now() >= params.deadline) return true;
+        const childNode = await createChildSearchNode(params, parent, candidate, ply);
+        nextPlyNodes.push(childNode);
+        allNodesAccumulator.push(childNode);
+    }
+    return false;
+}
+
+/**
  * Expands MCTS search tree across subsequent plies with timeout safety.
  * Concurrency: Asynchronous pipeline; operates across candidate workspaces.
  * @param params - Search parameters controlling exploration limits.
@@ -130,6 +152,7 @@ export async function expandMultiPlyTree(
     allNodesAccumulator: MctsNode[],
 ): Promise<MultiPlyExpansionResult> {
     let currentPlyParents = params.initialNodes.slice();
+    const nextPlyNodes: MctsNode[] = [];
     let depthExplored = 1;
     let timedOut = false;
 
@@ -138,29 +161,21 @@ export async function expandMultiPlyTree(
             (a, b) => (b.score?.compositeScore ?? 0) - (a.score?.compositeScore ?? 0),
         );
         const topParents = currentPlyParents.slice(0, params.branchingFactor);
-        const nextPlyNodes: MctsNode[] = [];
+        nextPlyNodes.length = 0;
 
         for (const parent of topParents) {
-            if (performance.now() >= params.deadline) {
-                timedOut = true;
-                break;
-            }
-            const chain = parent.strategyChain ?? [parent.strategy];
-            const compatible = params.candidates.filter((c) => isCompatibleWithChain(chain, c));
-
-            for (const candidate of compatible) {
-                if (performance.now() >= params.deadline) {
-                    timedOut = true;
-                    break;
-                }
-                const childNode = await createChildSearchNode(params, parent, candidate, ply);
-                nextPlyNodes.push(childNode);
-                allNodesAccumulator.push(childNode);
-                depthExplored = ply;
-            }
+            timedOut = await expandParentCandidates(
+                params,
+                parent,
+                ply,
+                nextPlyNodes,
+                allNodesAccumulator,
+            );
+            if (timedOut) break;
         }
         if (nextPlyNodes.length === 0) break;
-        currentPlyParents = nextPlyNodes;
+        depthExplored = ply;
+        currentPlyParents = nextPlyNodes.slice();
     }
 
     return { depthExplored, timedOut };

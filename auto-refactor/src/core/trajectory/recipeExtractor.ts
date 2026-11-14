@@ -152,6 +152,20 @@ function compilePatternInput(
     }
 }
 
+function compileDualTagPredicate(
+    spec: Extract<TagPredicate, { kind: typeof PREDICATE_DUAL }> | SerializedTagPredicate,
+): TagPredicate | undefined {
+    const present = compilePatternInput(
+        spec.present,
+        'presentFlags' in spec ? spec.presentFlags : undefined,
+    );
+    const absent = compilePatternInput(
+        spec.absent,
+        'absentFlags' in spec ? spec.absentFlags : undefined,
+    );
+    return present && absent ? { kind: PREDICATE_DUAL, present, absent } : undefined;
+}
+
 function compileTagPredicate(
     spec: TagPredicate | SerializedTagPredicate,
 ): TagPredicate | undefined {
@@ -166,23 +180,11 @@ function compileTagPredicate(
         return compiled ? { kind: spec.kind, pattern: compiled } : undefined;
     }
     if (spec.kind === PREDICATE_COUNT) {
-        const compiled =
-            spec.minCount && spec.minCount > 0
-                ? compilePatternInput(spec.pattern, flags, true)
-                : undefined;
-        return compiled
-            ? { kind: PREDICATE_COUNT, pattern: compiled, minCount: spec.minCount! }
-            : undefined;
+        const minCount = spec.minCount ?? 0;
+        const compiled = minCount > 0 ? compilePatternInput(spec.pattern, flags, true) : undefined;
+        return compiled ? { kind: PREDICATE_COUNT, pattern: compiled, minCount } : undefined;
     }
-    const present = compilePatternInput(
-        spec.present,
-        'presentFlags' in spec ? spec.presentFlags : undefined,
-    );
-    const absent = compilePatternInput(
-        spec.absent,
-        'absentFlags' in spec ? spec.absentFlags : undefined,
-    );
-    return present && absent ? { kind: PREDICATE_DUAL, present, absent } : undefined;
+    return spec.kind === PREDICATE_DUAL ? compileDualTagPredicate(spec) : undefined;
 }
 
 /**
@@ -215,6 +217,27 @@ export function parsePresetTrajectoryPlugin(
         : undefined;
 }
 
+function tryReadPresetPluginFile(filePath: string, entryName: string): TrajectoryRecipePlugin | undefined {
+    try {
+        const readSyncFn = fs['readFileSync'];
+        const raw = JSON.parse(readSyncFn(filePath, 'utf8'));
+        return parsePresetTrajectoryPlugin(raw, entryName.replace(/\.config\.json$/, ''));
+    } catch {
+        // intentional: ignore unreadable or malformed optional preset files cleanly
+        return undefined;
+    }
+}
+
+function collectPresetPluginsFromDir(dir: string, loaded: TrajectoryRecipePlugin[]): void {
+    if (!fs.existsSync(dir)) return;
+    const entries = fs.readdirSync(dir).sort();
+    for (const entry of entries) {
+        if (!entry.endsWith('.config.json')) continue;
+        const plugin = tryReadPresetPluginFile(path.join(dir, entry), entry);
+        if (plugin) loaded.push(plugin);
+    }
+}
+
 /**
  * Discovers declarative trajectoryPlugin entries from built-in preset configs once per process.
  *
@@ -231,22 +254,7 @@ export function loadTrajectoryPluginsFromPresets(
     ];
     const loaded: TrajectoryRecipePlugin[] = [];
     for (const dir of searchDirs) {
-        if (!fs.existsSync(dir)) continue;
-        for (const entry of fs
-            .readdirSync(dir)
-            .filter((f) => f.endsWith('.config.json'))
-            .sort()) {
-            try {
-                const raw = JSON.parse(fs.readFileSync(path.join(dir, entry), 'utf8'));
-                const plugin = parsePresetTrajectoryPlugin(
-                    raw,
-                    entry.replace(/\.config\.json$/, ''),
-                );
-                if (plugin) loaded.push(plugin);
-            } catch {
-                // intentional: ignore unreadable or malformed optional preset files cleanly
-            }
-        }
+        collectPresetPluginsFromDir(dir, loaded);
         if (!presetDirs && loaded.length > 0) break;
     }
     if (!presetDirs) cachedBuiltinPlugins = loaded;
@@ -403,6 +411,15 @@ export class TrajectoryRecipeExtractor {
         };
     }
 
+    private hasMinimumLines(code: string, minLines: number): boolean {
+        let lineCount = 1;
+        for (let i = 0; i < code.length; i++) {
+            if (code.charCodeAt(i) === 10) lineCount++;
+            if (lineCount >= minLines) return true;
+        }
+        return false;
+    }
+
     /**
      * Match whether a given target code meets the preconditions of a learned recipe.
      *
@@ -413,38 +430,20 @@ export class TrajectoryRecipeExtractor {
      */
     public matchesRecipe(recipe: RefactoringRecipe, code: string, language?: string): boolean {
         const { precondition } = recipe;
-
         if (precondition.targetLanguage && language && precondition.targetLanguage !== language) {
             return false;
         }
-
-        if (precondition.minLines) {
-            let lineCount = 1;
-            for (let i = 0; i < code.length; i++) {
-                if (code.charCodeAt(i) === 10) lineCount++;
-                if (lineCount >= precondition.minLines) break;
-            }
-            if (lineCount < precondition.minLines) {
-                return false;
-            }
+        if (precondition.minLines && !this.hasMinimumLines(code, precondition.minLines)) {
+            return false;
         }
+        if (precondition.antiPatternTags.length === 0) return true;
 
-        if (precondition.antiPatternTags.length > 0) {
-            let lazyLines: string[] | undefined;
-            const getLines = (): string[] => {
-                if (!lazyLines) lazyLines = code.split('\n');
-                return lazyLines;
-            };
-            const effectiveLanguage = language ?? precondition.targetLanguage;
-            const hasMatchingTag = precondition.antiPatternTags.some((tag) =>
-                this.detectTagInCode(tag, code, getLines, effectiveLanguage),
-            );
-            if (!hasMatchingTag) {
-                return false;
-            }
-        }
-
-        return true;
+        let lazyLines: string[] | undefined;
+        const getLines = (): string[] => (lazyLines ??= code.split('\n'));
+        const effectiveLanguage = language ?? precondition.targetLanguage;
+        return precondition.antiPatternTags.some((tag) =>
+            this.detectTagInCode(tag, code, getLines, effectiveLanguage),
+        );
     }
 
     /**

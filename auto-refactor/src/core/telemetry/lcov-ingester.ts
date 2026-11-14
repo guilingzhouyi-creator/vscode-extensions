@@ -107,6 +107,36 @@ interface LcovParserState {
     lineHits: Map<number, number>;
 }
 
+interface CursorIntParseResult {
+    readonly value: number;
+    readonly nextCursor: number;
+    readonly valid: boolean;
+    readonly hitComma: boolean;
+}
+
+function scanUnsignedCursorInt(
+    text: string,
+    startCursor: number,
+    end: number,
+): CursorIntParseResult {
+    let cursor = startCursor;
+    let value = 0;
+    let hasDigits = false;
+    while (cursor < end) {
+        const charCode = text.charCodeAt(cursor);
+        if (charCode === ASCII_COMMA) {
+            return { value, nextCursor: cursor, valid: hasDigits, hitComma: true };
+        }
+        if (charCode < ASCII_ZERO || charCode > ASCII_NINE) {
+            return { value: 0, nextCursor: cursor, valid: false, hitComma: false };
+        }
+        value = value * DECIMAL_BASE + (charCode - ASCII_ZERO);
+        hasDigits = true;
+        cursor++;
+    }
+    return { value, nextCursor: cursor, valid: hasDigits, hitComma: false };
+}
+
 /**
  * Fast zero-allocation DA record parser using integer cursor traversal.
  * Parses 'DA:<lineNo>,<hitCount>' without creating any substring allocations.
@@ -117,43 +147,12 @@ function parseDaCursor(
     end: number,
     lineHits: Map<number, number>,
 ): void {
-    let cursor = start + LCOV_PREFIX_LEN_DA;
-    let lineNo = 0;
-    let hasLineDigits = false;
-    while (cursor < end) {
-        const charCode = text.charCodeAt(cursor);
-        if (charCode === ASCII_COMMA) {
-            break;
-        }
-        if (charCode >= ASCII_ZERO && charCode <= ASCII_NINE) {
-            lineNo = lineNo * DECIMAL_BASE + (charCode - ASCII_ZERO);
-            hasLineDigits = true;
-        } else {
-            return;
-        }
-        cursor++;
-    }
-    if (!hasLineDigits || lineNo <= 0 || cursor >= end || text.charCodeAt(cursor) !== ASCII_COMMA) {
-        return;
-    }
-    cursor++;
-    let hitCount = 0;
-    let hasHitDigits = false;
-    while (cursor < end) {
-        const charCode = text.charCodeAt(cursor);
-        if (charCode >= ASCII_ZERO && charCode <= ASCII_NINE) {
-            hitCount = hitCount * DECIMAL_BASE + (charCode - ASCII_ZERO);
-            hasHitDigits = true;
-        } else if (charCode === ASCII_COMMA) {
-            // LCOV DA lines may carry an optional third checksum field after hit count
-            break;
-        } else {
-            return;
-        }
-        cursor++;
-    }
-    if (hasHitDigits) {
-        lineHits.set(lineNo, hitCount);
+    const linePart = scanUnsignedCursorInt(text, start + LCOV_PREFIX_LEN_DA, end);
+    if (!linePart.valid || !linePart.hitComma || linePart.value <= 0) return;
+
+    const hitPart = scanUnsignedCursorInt(text, linePart.nextCursor + 1, end);
+    if (hitPart.valid) {
+        lineHits.set(linePart.value, hitPart.value);
     }
 }
 
@@ -344,6 +343,15 @@ export class LcovIngester {
         return this.parseLcov(lcovText);
     }
 
+    private trimCursorBounds(lcovText: string, pos: number, nextNewline: number): [number, number] {
+        let end = nextNewline;
+        if (end > pos && lcovText.charCodeAt(end - 1) === ASCII_CR) end--;
+        let start = pos;
+        while (start < end && lcovText.charCodeAt(start) <= ASCII_SPACE) start++;
+        while (end > start && lcovText.charCodeAt(end - 1) <= ASCII_SPACE) end--;
+        return [start, end];
+    }
+
     public parseLcov(lcovText: string): Map<string, FileCoverageProfile> {
         const resultMap = new Map<string, FileCoverageProfile>();
         if (!lcovText || typeof lcovText !== 'string') {
@@ -365,26 +373,11 @@ export class LcovIngester {
 
         while (pos < textLen) {
             const nextNewline = findNextLineBreak(lcovText, pos, textLen);
-            let endPos = nextNewline;
-            if (endPos > pos && lcovText.charCodeAt(endPos - 1) === ASCII_CR) {
-                endPos--;
-            }
-
-            let start = pos;
-            while (start < endPos && lcovText.charCodeAt(start) <= ASCII_SPACE) {
-                start++;
-            }
-            let end = endPos;
-            while (end > start && lcovText.charCodeAt(end - 1) <= ASCII_SPACE) {
-                end--;
-            }
-
+            const [start, end] = this.trimCursorBounds(lcovText, pos, nextNewline);
             pos = nextNewline + 1;
-            if (start >= end) {
-                continue;
+            if (start < end) {
+                processRecordCursor(lcovText, start, end, processingCtx);
             }
-
-            processRecordCursor(lcovText, start, end, processingCtx);
         }
 
         // Flush partial final LCOV record if stream omitted trailing end_of_record sentinel.

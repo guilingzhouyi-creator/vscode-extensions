@@ -591,6 +591,42 @@ export class FeedbackIncidentLedger {
 
 const syncFsWriteText = fs.writeFileSync.bind(fs);
 const syncFsReadText = fs.readFileSync.bind(fs);
+const WEIGHT_SUM_MIN = 0.99;
+const WEIGHT_SUM_MAX = 1.01;
+let stagingTempSequence = 0;
+
+/** Generate a process- and call-unique staging temp path in the target directory. */
+function buildUniqueStagingPath(destinationPath: string): string {
+    stagingTempSequence += 1;
+    return `${destinationPath}.${process.pid}.${stagingTempSequence}.tmp`;
+}
+
+/** Validate and convex-normalize tri-plane fusion weights to sum cleanly to 1.000. */
+function normalizeSupervisorWeights(weights: Partial<FusionWeights>): FusionWeights | null {
+    const { Ws, Wd, Wf } = weights;
+    if (
+        typeof Ws !== 'number' ||
+        typeof Wd !== 'number' ||
+        typeof Wf !== 'number' ||
+        !Number.isFinite(Ws) ||
+        !Number.isFinite(Wd) ||
+        !Number.isFinite(Wf) ||
+        Ws < 0 ||
+        Wd < 0 ||
+        Wf < 0
+    ) {
+        return null;
+    }
+    const sum = Ws + Wd + Wf;
+    if (sum <= 0) return null;
+    if (sum >= WEIGHT_SUM_MIN && sum <= WEIGHT_SUM_MAX) {
+        return { [PROP_WS]: Ws, [PROP_WD]: Wd, [PROP_WF]: Wf };
+    }
+    const normWd = Math.round((Wd / sum) * WEIGHT_ROUND_FACTOR) / WEIGHT_ROUND_FACTOR;
+    const normWf = Math.round((Wf / sum) * WEIGHT_ROUND_FACTOR) / WEIGHT_ROUND_FACTOR;
+    const normWs = Math.round((1.0 - normWd - normWf) * WEIGHT_ROUND_FACTOR) / WEIGHT_ROUND_FACTOR;
+    return { [PROP_WS]: normWs, [PROP_WD]: normWd, [PROP_WF]: normWf };
+}
 
 /**
  * Isolated I/O barrier for synchronous ledger snapshot operations.
@@ -628,7 +664,7 @@ export const PraxisIoBarrier = {
     writeAtomicSync(destinationPath: string, payload: string): void {
         const parentDirectory = path.dirname(destinationPath);
         fs.mkdirSync(parentDirectory, { recursive: true });
-        const stagingPath = `${destinationPath}.tmp`;
+        const stagingPath = buildUniqueStagingPath(destinationPath);
         syncFsWriteText(stagingPath, payload, ENCODING_UTF8);
         fs.renameSync(stagingPath, destinationPath);
     },
@@ -674,21 +710,28 @@ function reportSnapshotLoadFailure(filePath: string, operation: string, cause: u
  * @param candidate - Parsed JSON value.
  * @returns The snapshot when it conforms to the current version, otherwise null.
  */
+function hasValidSnapshotMetadata(candidate: Partial<GovernanceLedgerSnapshot>): boolean {
+    if (candidate.version !== GOVERNANCE_SNAPSHOT_VERSION) return false;
+    if (typeof candidate.lastUpdated !== 'string' || typeof candidate.projectProfile !== 'string') {
+        return false;
+    }
+    if (!Array.isArray(candidate.demotedRules) || !Array.isArray(candidate.boostedPatterns)) {
+        return false;
+    }
+    return (
+        typeof candidate.activeIncidents === 'number' &&
+        typeof candidate.evolutionStepsCount === 'number'
+    );
+}
+
 function acceptGovernanceSnapshot(candidate: unknown): GovernanceLedgerSnapshot | null {
     if (typeof candidate !== 'object' || candidate === null) return null;
     const snapshot = candidate as Partial<GovernanceLedgerSnapshot>;
-    if (snapshot.version !== GOVERNANCE_SNAPSHOT_VERSION) return null;
-    if (typeof snapshot.lastUpdated !== 'string') return null;
-    if (typeof snapshot.projectProfile !== 'string') return null;
+    if (!hasValidSnapshotMetadata(snapshot)) return null;
     const weights = snapshot.learnedWeights;
     if (typeof weights !== 'object' || weights === null) return null;
-    const { Ws, Wd, Wf } = weights as Partial<FusionWeights>;
-    if (typeof Ws !== 'number' || typeof Wd !== 'number' || typeof Wf !== 'number') return null;
-    if (!Array.isArray(snapshot.demotedRules) || !Array.isArray(snapshot.boostedPatterns))
-        return null;
-    if (typeof snapshot.activeIncidents !== 'number') return null;
-    if (typeof snapshot.evolutionStepsCount !== 'number') return null;
-    return snapshot as GovernanceLedgerSnapshot;
+    const normalized = normalizeSupervisorWeights(weights as Partial<FusionWeights>);
+    return normalized ? ({ ...snapshot, learnedWeights: normalized } as GovernanceLedgerSnapshot) : null;
 }
 
 /**
@@ -940,21 +983,9 @@ export class FeedbackAdaptiveSupervisor {
      */
     public applyImportedLedgerSnapshot(snapshot: GovernanceLedgerSnapshot): void {
         if (snapshot.learnedWeights) {
-            const {
-                Ws: weightStatic,
-                Wd: weightDynamic,
-                Wf: weightFeedback,
-            } = snapshot.learnedWeights;
-            if (
-                typeof weightStatic === 'number' &&
-                typeof weightDynamic === 'number' &&
-                typeof weightFeedback === 'number'
-            ) {
-                this.currentWeights = {
-                    [PROP_WS]: weightStatic,
-                    [PROP_WD]: weightDynamic,
-                    [PROP_WF]: weightFeedback,
-                };
+            const normalized = normalizeSupervisorWeights(snapshot.learnedWeights);
+            if (normalized) {
+                this.currentWeights = normalized;
             }
         }
     }
@@ -1028,7 +1059,7 @@ export class FeedbackAdaptiveSupervisor {
         this.snapshotMemoryCache.set(diskPath, snapshot);
         const parentDirectory = path.dirname(filePath);
         await fs.promises.mkdir(parentDirectory, { recursive: true });
-        const stagingPath = `${filePath}.tmp`;
+        const stagingPath = buildUniqueStagingPath(filePath);
         try {
             await fs.promises.writeFile(
                 stagingPath,
