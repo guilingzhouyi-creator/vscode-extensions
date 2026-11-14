@@ -15,16 +15,16 @@ const RealProtocolBridge = preload("res://frontend/domain_boundary/services/real
 const AuthoritativeHudSyncService = preload("res://backend/domains/world_state/services/authoritative_hud_sync_service.gd")
 
 ## 异步向后端拉取当前活跃角色的权威 HUD 快照
-func pull_authoritative_snapshot_async(account_id: String, token: String, character_id: String, callback: Callable) -> void:
-	RealProtocolBridge.dispatch_and_reply("world_state", "PULL_HUD_SNAPSHOT", {}, account_id, token, callback, "data", {}, character_id)
+func pull_authoritative_snapshot_async(account_id: String, token: String, character_id: String, result_callback: Callable) -> void:
+	RealProtocolBridge.dispatch_and_reply("world_state", "PULL_HUD_SNAPSHOT", {}, account_id, token, result_callback, "data", {}, character_id)
 
 ## 异步触发世界时钟推进与状态增量同步
-func tick_world_clock_async(account_id: String, token: String, character_id: String, mutations: Dictionary, callback: Callable) -> void:
-	RealProtocolBridge.dispatch_and_reply("world_state", "TICK_WORLD_CLOCK", mutations, account_id, token, callback, "data", {}, character_id)
+func tick_world_clock_async(account_id: String, token: String, character_id: String, mutations: Dictionary, result_callback: Callable) -> void:
+	RealProtocolBridge.dispatch_and_reply("world_state", "TICK_WORLD_CLOCK", mutations, account_id, token, result_callback, "data", {}, character_id)
 
 ## 异步派发主页 HUD 控制指令至世界状态统一调度器
-func dispatch_hud_directive_async(account_id: String, token: String, character_id: String, action_type: String, payload: Dictionary, callback: Callable) -> void:
-	RealProtocolBridge.dispatch_and_reply("world_state", action_type, payload, account_id, token, callback, "data", {}, character_id)
+func dispatch_hud_directive_async(account_id: String, token: String, character_id: String, action_type: String, directive_payload: Dictionary, result_callback: Callable) -> void:
+	RealProtocolBridge.dispatch_and_reply("world_state", action_type, directive_payload, account_id, token, result_callback, "data", {}, character_id)
 
 ## 订阅常驻 HUD 多信道后端事件，返回可用于退订的令牌数组
 func subscribe_hud_channels(callbacks: Dictionary) -> Array:

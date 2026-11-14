@@ -20,7 +20,7 @@ const WorldSessionRuntimeService = preload("res://backend/domains/world_state/se
 static func dispatch_human(
 	domain: String,
 	action_type: String,
-	payload: Dictionary,
+	request_payload: Dictionary,
 	account_id: String,
 	token: String,
 	character_id: String = ""
@@ -28,55 +28,55 @@ static func dispatch_human(
 	var effective_account_id := account_id if not account_id.is_empty() else WorldSessionRuntimeService.get_active_account_id()
 	var effective_token := token if not token.is_empty() else WorldSessionRuntimeService.get_active_session_token()
 	var effective_character_id := character_id if not character_id.is_empty() else WorldSessionRuntimeService.get_active_character_id()
-	var request_envelope := UnifiedProtocolFactory.create_human_request(domain, action_type, payload, effective_token, effective_account_id, effective_character_id)
+	var request_envelope := UnifiedProtocolFactory.create_human_request(domain, action_type, request_payload, effective_token, effective_account_id, effective_character_id)
 	return UnifiedProtocolDispatcher.dispatch_request(request_envelope)
 
 ## 基于显式凭证分发协议请求并按规范结构触发异步回调
 static func dispatch_and_reply(
 	domain: String,
 	action_type: String,
-	payload: Dictionary,
+	request_payload: Dictionary,
 	account_id: String,
 	token: String,
-	callback: Callable,
+	result_callback: Callable,
 	result_key: String = "data",
 	fallback_value: Variant = {},
 	character_id: String = ""
 ) -> void:
-	var response := dispatch_human(domain, action_type, payload, account_id, token, character_id)
-	reply_callback(callback, response, result_key, fallback_value)
+	var service_response := dispatch_human(domain, action_type, request_payload, account_id, token, character_id)
+	reply_callback(result_callback, service_response, result_key, fallback_value)
 
 ## 自动读取当前活跃会话凭证（Account/Token/Character）分发动作用信封
 static func dispatch_active_session(
 	domain: String,
 	action_type: String,
 	extra_payload: Dictionary,
-	callback: Callable,
+	result_callback: Callable,
 	result_key: String = "data",
 	fallback_value: Variant = {}
 ) -> void:
 	var account_id := WorldSessionRuntimeService.get_active_account_id()
-	var payload := {"account_id": account_id}
+	var session_payload := {"account_id": account_id}
 	if not extra_payload.is_empty():
-		payload.merge(extra_payload, true)
-	var response := dispatch_human(domain, action_type, payload, account_id, WorldSessionRuntimeService.get_active_session_token())
-	reply_callback(callback, response, result_key, fallback_value)
+		session_payload.merge(extra_payload, true)
+	var service_response := dispatch_human(domain, action_type, session_payload, account_id, WorldSessionRuntimeService.get_active_session_token())
+	reply_callback(result_callback, service_response, result_key, fallback_value)
 
 ## 将后端 UnifiedResponseEnvelopeDTO 统一解包为前端领域边界回调字典
 static func reply_callback(
-	callback: Callable,
-	response: UnifiedResponseEnvelopeDTO,
+	result_callback: Callable,
+	service_response: UnifiedResponseEnvelopeDTO,
 	result_key: String = "data",
 	fallback_value: Variant = {}
 ) -> void:
-	if not callback.is_valid() or response == null:
+	if not result_callback.is_valid() or service_response == null:
 		return
-	var output_value: Variant = response.data
+	var output_value: Variant = service_response.data
 	if result_key != "data":
-		output_value = response.data.get(result_key, fallback_value) if response.data is Dictionary else fallback_value
-	callback.call({
-		"success": response.success,
-		"error_code": response.error_code,
-		"message": response.error_message,
+		output_value = service_response.data.get(result_key, fallback_value) if service_response.data is Dictionary else fallback_value
+	result_callback.call({
+		"success": service_response.success,
+		"error_code": service_response.error_code,
+		"message": service_response.error_message,
 		result_key: output_value
 	})

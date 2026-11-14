@@ -11,50 +11,50 @@ extends "res://frontend/domain_boundary/interfaces/i_game_settings_service.gd"
 const RealProtocolBridge = preload("res://frontend/domain_boundary/services/real_protocol_bridge.gd")
 
 ## 异步拉取权威游戏设置快照
-func get_settings_async(account_id: String, token: String, callback: Callable) -> void:
+func get_settings_async(account_id: String, token: String, result_callback: Callable) -> void:
 	RealProtocolBridge.dispatch_and_reply(
 		"game_settings",
 		"GET_GAME_SETTINGS",
 		{},
 		account_id,
 		token,
-		callback
+		result_callback
 	)
 
 ## 异步向后端提交并应用游戏设置补丁
 func apply_settings_async(
 	account_id: String,
 	token: String,
-	patch: Dictionary,
-	callback: Callable
+	settings_patch: Dictionary,
+	result_callback: Callable
 ) -> void:
 	RealProtocolBridge.dispatch_and_reply(
 		"game_settings",
 		"APPLY_GAME_SETTINGS",
-		patch,
+		settings_patch,
 		account_id,
 		token,
-		callback
+		result_callback
 	)
 
 ## 异步确认待验证的新分辨率设置
-func confirm_resolution_async(account_id: String, token: String, callback: Callable) -> void:
+func confirm_resolution_async(account_id: String, token: String, result_callback: Callable) -> void:
 	RealProtocolBridge.dispatch_and_reply(
 		"game_settings",
 		"CONFIRM_GAME_SETTINGS",
 		{},
 		account_id,
 		token,
-		callback
+		result_callback
 	)
 
 ## 异步将游戏设置恢复为默认权威配置
-func reset_defaults_async(account_id: String, token: String, callback: Callable) -> void:
+func reset_defaults_async(account_id: String, token: String, result_callback: Callable) -> void:
 	RealProtocolBridge.dispatch_and_reply(
 		"game_settings",
 		"RESET_GAME_SETTINGS",
 		{},
 		account_id,
 		token,
-		callback
+		result_callback
 	)

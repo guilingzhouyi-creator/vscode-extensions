@@ -15,7 +15,7 @@ func pause_game_async(
 	account_id: String,
 	token: String,
 	reason: String = "ESC_MENU",
-	callback: Callable = Callable()
+	result_callback: Callable = Callable()
 ) -> void:
 	RealProtocolBridge.dispatch_and_reply(
 		"lifecycle",
@@ -23,14 +23,14 @@ func pause_game_async(
 		{"reason": reason},
 		account_id,
 		token,
-		callback
+		result_callback
 	)
 
 ## 异步向后端发送恢复游戏运行指令
 func resume_game_async(
 	account_id: String,
 	token: String,
-	callback: Callable = Callable()
+	result_callback: Callable = Callable()
 ) -> void:
 	RealProtocolBridge.dispatch_and_reply(
 		"lifecycle",
@@ -38,7 +38,7 @@ func resume_game_async(
 		{},
 		account_id,
 		token,
-		callback
+		result_callback
 	)
 
 ## 异步请求保存并退出至账号首页菜单（执行软重置）
@@ -47,19 +47,19 @@ func logout_to_menu_async(
 	token: String,
 	target_save_slot: String = "",
 	save_before_quit: bool = true,
-	callback: Callable = Callable()
+	result_callback: Callable = Callable()
 ) -> void:
 	RealProtocolBridge.dispatch_and_reply("lifecycle", "LOGOUT_TO_MENU", {
 		"slot_id": target_save_slot,
 		"save_before_quit": save_before_quit
-	}, account_id, token, callback)
+	}, account_id, token, result_callback)
 
 ## 异步请求执行五阶段安全优雅停机并持久化会话状态
 func request_graceful_shutdown_async(
 	account_id: String,
 	token: String,
 	options: Dictionary = {},
-	callback: Callable = Callable()
+	result_callback: Callable = Callable()
 ) -> void:
 	RealProtocolBridge.dispatch_and_reply(
 		"lifecycle",
@@ -67,7 +67,7 @@ func request_graceful_shutdown_async(
 		options,
 		account_id,
 		token,
-		callback
+		result_callback
 	)
 
 ## 异步请求强制停机降级退出
@@ -75,7 +75,7 @@ func force_shutdown_async(
 	account_id: String,
 	token: String,
 	options: Dictionary = {},
-	callback: Callable = Callable()
+	result_callback: Callable = Callable()
 ) -> void:
 	RealProtocolBridge.dispatch_and_reply(
 		"lifecycle",
@@ -83,5 +83,5 @@ func force_shutdown_async(
 		options,
 		account_id,
 		token,
-		callback
+		result_callback
 	)

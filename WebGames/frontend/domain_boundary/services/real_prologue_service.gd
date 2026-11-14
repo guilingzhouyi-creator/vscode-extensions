@@ -14,27 +14,27 @@ const RealProtocolBridge = preload("res://frontend/domain_boundary/services/real
 func start_prologue_async(
 	account_id: String,
 	token: String,
-	payload: Dictionary,
-	callback: Callable
+	request_payload: Dictionary,
+	result_callback: Callable
 ) -> void:
 	RealProtocolBridge.dispatch_and_reply(
 		"prologue",
 		"START_PROLOGUE",
-		payload,
+		request_payload,
 		account_id,
 		token,
-		callback
+		result_callback
 	)
 
 ## 异步查询当前序章所处阶段与只读状态快照
-func get_prologue_state_async(account_id: String, token: String, callback: Callable) -> void:
+func get_prologue_state_async(account_id: String, token: String, result_callback: Callable) -> void:
 	RealProtocolBridge.dispatch_and_reply(
 		"prologue",
 		"GET_PROLOGUE_STATE",
 		{},
 		account_id,
 		token,
-		callback
+		result_callback
 	)
 
 ## 异步提交序章分支选择并推演下一阶段剧情节点
@@ -42,10 +42,10 @@ func advance_prologue_async(
 	account_id: String,
 	token: String,
 	choice_id: String,
-	payload: Dictionary,
-	callback: Callable
+	request_payload: Dictionary,
+	result_callback: Callable
 ) -> void:
-	var step_payload := payload.duplicate(true)
+	var step_payload := request_payload.duplicate(true)
 	step_payload["choice_id"] = choice_id if not choice_id.is_empty() else "NEXT"
 	RealProtocolBridge.dispatch_and_reply(
 		"prologue",
@@ -53,7 +53,7 @@ func advance_prologue_async(
 		step_payload,
 		account_id,
 		token,
-		callback
+		result_callback
 	)
 
 ## 异步完结或跳过序章剧情并触发大世界探索交接
@@ -61,16 +61,16 @@ func complete_prologue_async(
 	account_id: String,
 	token: String,
 	cutscene_id: String = "",
-	skip: bool = false,
-	callback: Callable = Callable()
+	should_skip: bool = false,
+	result_callback: Callable = Callable()
 ) -> void:
-	var action := "SKIP_PROLOGUE" if skip else "COMPLETE_PROLOGUE"
+	var prologue_action := "SKIP_PROLOGUE" if should_skip else "COMPLETE_PROLOGUE"
 	var done_payload := {"cutscene_id": cutscene_id} if not cutscene_id.is_empty() else {}
 	RealProtocolBridge.dispatch_and_reply(
 		"prologue",
-		action,
+		prologue_action,
 		done_payload,
 		account_id,
 		token,
-		callback
+		result_callback
 	)
