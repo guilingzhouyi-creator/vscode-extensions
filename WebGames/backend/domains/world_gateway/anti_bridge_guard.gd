@@ -26,7 +26,7 @@ static func validate_mode_transition(
 	target_mode: int,
 	probe_report: Variant = null
 ) -> Dictionary:
-	# 1. 模式单向冻结：若已选定模式且尝试直接切换至不同模式，必须经退网关全量洗脱
+	# 1. 模式单向冻结：若已选定模式且尝试直接切换至不同模式，必须经退网关全量重置清理
 	if current_mode != WorldGatewayModel.GameMode.UNSELECTED and target_mode != current_mode:
 		return {
 			"allowed": false,
@@ -55,23 +55,23 @@ static func validate_mode_transition(
 ## 检查探针报告就绪态
 static func _check_probe_readiness(probe_report: Variant) -> Dictionary:
 	var is_ready: bool = true
-	var probe_msg: String = ""
+	var probe_message: String = ""
 
 	if probe_report is Object:
 		if "is_ready" in probe_report:
 			is_ready = bool(probe_report.get("is_ready"))
 		if "message" in probe_report:
-			probe_msg = str(probe_report.get("message"))
+			probe_message = str(probe_report.get("message"))
 	elif probe_report is Dictionary:
 		is_ready = bool(probe_report.get("is_ready", true))
-		probe_msg = str(probe_report.get("message", ""))
+		probe_message = str(probe_report.get("message", ""))
 
 	if not is_ready:
-		var detail_msg := probe_msg if not probe_msg.is_empty() else "Environment not ready"
+		var detail_message := probe_message if not probe_message.is_empty() else "Environment not ready"
 		return {
 			"allowed": false,
 			"error_code": SECURITY_ERR_MODE_NOT_READY,
-			"message": TemplateFormatter.format("Target mode probe diagnostics not ready: {detail}", {"detail": detail_msg})
+			"message": TemplateFormatter.format("Target mode probe diagnostics not ready: {detail}", {"detail": detail_message})
 		}
 
 	return {"allowed": true, "error_code": "", "message": ""}
@@ -118,8 +118,8 @@ static func validate_slot_mode_affinity(slot_mode: int, target_mode: int, slot_m
 		}
 
 	if target_mode == WorldGatewayModel.GameMode.MULTIPLAYER and not slot_mods.is_empty():
-		for m in slot_mods:
-			if not _is_vanilla_pack(m):
+		for mod_entry in slot_mods:
+			if not _is_vanilla_pack(mod_entry):
 				return {
 					"allowed": false,
 					"error_code": SECURITY_ERR_SLOT_MODE_POISONING,
@@ -139,34 +139,34 @@ static func is_vanilla_pack(mod_entry: Variant) -> bool:
 ## 模组官方 Vanilla 判定底层解算
 static func _is_vanilla_pack(mod_entry: Variant) -> bool:
 	if mod_entry is String:
-		var mod_str := (mod_entry as String).to_lower()
-		return mod_str == "vanilla" or mod_str.begins_with("vanilla_") or mod_str.begins_with("official_") or mod_str == "core_vanilla"
+		var mod_name := (mod_entry as String).to_lower()
+		return mod_name == "vanilla" or mod_name.begins_with("vanilla_") or mod_name.begins_with("official_") or mod_name == "core_vanilla"
 
-	var pid: String = ""
+	var pack_id: String = ""
 	var is_vanilla_flag: bool = false
 	var author: String = ""
 
 	if mod_entry is Dictionary:
 		var mod_dict: Dictionary = mod_entry as Dictionary
 		is_vanilla_flag = bool(mod_dict.get("is_vanilla", false)) or bool(mod_dict.get("is_official", false))
-		pid = str(mod_dict.get("pack_id", mod_dict.get("id", "")))
+		pack_id = str(mod_dict.get("pack_id", mod_dict.get("id", "")))
 		author = str(mod_dict.get("author", ""))
 	elif mod_entry is Object:
-		var obj: Object = mod_entry as Object
-		if "is_vanilla" in obj:
-			is_vanilla_flag = bool(obj.get("is_vanilla"))
-		if not is_vanilla_flag and "is_official" in obj:
-			is_vanilla_flag = bool(obj.get("is_official"))
-		if "pack_id" in obj:
-			pid = str(obj.get("pack_id"))
-		if "author" in obj:
-			author = str(obj.get("author"))
+		var mod_object: Object = mod_entry as Object
+		if "is_vanilla" in mod_object:
+			is_vanilla_flag = bool(mod_object.get("is_vanilla"))
+		if not is_vanilla_flag and "is_official" in mod_object:
+			is_vanilla_flag = bool(mod_object.get("is_official"))
+		if "pack_id" in mod_object:
+			pack_id = str(mod_object.get("pack_id"))
+		if "author" in mod_object:
+			author = str(mod_object.get("author"))
 
 	if is_vanilla_flag:
 		return true
 
-	var pid_lower := pid.to_lower()
-	if pid_lower == "vanilla" or pid_lower.begins_with("vanilla_") or pid_lower.begins_with("official_") or pid_lower == "core_vanilla":
+	var pack_id_lower := pack_id.to_lower()
+	if pack_id_lower == "vanilla" or pack_id_lower.begins_with("vanilla_") or pack_id_lower.begins_with("official_") or pack_id_lower == "core_vanilla":
 		return true
 
 	var author_lower := author.to_lower()

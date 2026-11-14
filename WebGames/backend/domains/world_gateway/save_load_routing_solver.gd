@@ -3,8 +3,8 @@
 # 文件路径: res://backend/domains/world_gateway/save_load_routing_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
 # 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: account, persistence_protocol, character_creation, world_state, lifecycle | 配置: config/domains/world_gateway.json | 信号: EventBus 领域广播
-# 职责说明: 求解二次载入双轨流向（边界 A 序章重放重初始化 vs 边界 B 成熟存档直载），提供占位符世界槽位校验与 ESC 停机串联。
-# 退出语义与设计依据: 业务域第一性原理 / 二次载入与双轨路由契约规范
+# 职责说明: 求解二次载入双通道流向（边界 A 序章重放重初始化 vs 边界 B 成熟存档直载），提供占位符世界槽位校验与 ESC 停机串联。
+# 退出语义与设计依据: 业务域第一性原理 / 二次载入与双通道路由契约规范
 # ==============================================================================
 
 ## SaveLoadRoutingSolver：Headless Discrete Solver / Numerical Calculator
@@ -16,16 +16,16 @@ const PrologueExecutionKernel = preload("res://backend/domains/character_creatio
 const OpeningEventStreamDTO = preload("res://backend/domains/character_creation/opening_event_stream_dto.gd")
 const AuthoritativeHudSyncService = preload("res://backend/domains/world_state/services/authoritative_hud_sync_service.gd")
 const GameLifecycleService = preload("res://backend/domains/lifecycle/game_lifecycle_service.gd")
-const GameLifecycleModel = preload("res://backend/domains/lifecycle/lifecycle_model.gd")
+const GameLifecycleModel = preload("res://backend/domains/lifecycle/game_lifecycle_model.gd")
 const GameShutdownDTO = preload("res://backend/domains/lifecycle/dto/game_shutdown_dto.gd")
-const CharacterPhysiologySheet = preload("res://backend/domains/lifecycle_physiology/physiology_entities.gd")
-const CharacterWalletEntity = preload("res://backend/domains/currency_economy/currency_entities.gd")
+const CharacterPhysiologySheet = preload("res://backend/domains/lifecycle_physiology/character_physiology_sheet.gd")
+const CharacterWalletEntity = preload("res://backend/domains/currency_economy/character_wallet_entity.gd")
 
 const ENTRY_PATH_PROLOGUE_REPLAY: int = 1
 const ENTRY_PATH_DIRECT_RESTORE: int = 2
 
 ## 二次载入路径判定纯函数：边界 A（序章重放重初始化）与边界 B（成熟存档直载）精准分流
-static func evaluate_entry_path(slot: SaveSlotSummaryDTO) -> int:
+static func evaluate_entry_path(slot: SaveSlotDTO) -> int:
 	if slot == null:
 		return ENTRY_PATH_PROLOGUE_REPLAY
 	if not slot.prologue_completed:
@@ -35,24 +35,24 @@ static func evaluate_entry_path(slot: SaveSlotSummaryDTO) -> int:
 	return ENTRY_PATH_DIRECT_RESTORE
 
 ## 世界槽位与占位符防御校验
-static func validate_world_slot(account: AccountProfileAggregate, world_id: String, allow_default_fallback: bool = true) -> Dictionary:
+static func validate_world_slot(account: AccountProfile, world_id: String, allow_default_fallback: bool = true) -> Dictionary:
 	var target_id := world_id
 	if target_id.is_empty():
 		if not allow_default_fallback:
 			return {"success": false, "error_code": "UNBOUND_WORLD_ID", "message": "Target world slot not specified"}
-		target_id = AccountProfileAggregate.WORLD_DEFAULT_SP_01
+		target_id = AccountProfile.WORLD_DEFAULT_SP_01
 
 	if account != null and account.is_world_slot_placeholder(target_id):
 		if not allow_default_fallback:
 			return {"success": false, "error_code": "UNBOUND_WORLD_SLOT", "message": "Target world slot is unbound or in placeholder state"}
-		target_id = AccountProfileAggregate.WORLD_DEFAULT_SP_01
+		target_id = AccountProfile.WORLD_DEFAULT_SP_01
 
 	return {"success": true, "world_id": target_id}
 
 ## 执行边界 A：序章重放与初始生理/货币重新派发
 static func _execute_prologue_replay_branch(
-	account: AccountProfileAggregate,
-	slot: SaveSlotSummaryDTO,
+	account: AccountProfile,
+	slot: SaveSlotDTO,
 	context: Dictionary,
 	allow_default_fallback: bool
 ) -> Dictionary:
@@ -67,28 +67,28 @@ static func _execute_prologue_replay_branch(
 		opening.opening_quest_line_id = "quest_prologue_01"
 		opening.race_id = "HUMAN"
 
-	var boot_res := PrologueExecutionKernel.boot_character_prologue(opening, opening.race_id, allow_default_fallback)
-	if not bool(boot_res.get("success", false)):
-		return boot_res
+	var boot_result := PrologueExecutionKernel.boot_character_prologue(opening, opening.race_id, allow_default_fallback)
+	if not bool(boot_result.get("success", false)):
+		return boot_result
 
 	return {
 		"success": true,
 		"entry_path": ENTRY_PATH_PROLOGUE_REPLAY,
 		"replayed": true,
 		"slot_id": slot.slot_id,
-		"prologue_context": boot_res.get("context", null),
-		"event_packet": boot_res.get("packet", null),
-		"starter_kit": boot_res.get("kit", {})
+		"prologue_context": boot_result.get("context", null),
+		"event_packet": boot_result.get("packet", null),
+		"starter_kit": boot_result.get("kit", {})
 	}
 
 ## 执行边界 B：成熟物理存档反装配与各业务域状态恢复
-static func _execute_direct_restore_branch(slot: SaveSlotSummaryDTO) -> Dictionary:
-	var load_res := SaveDataAccessLayer.load_game(slot.slot_id)
+static func _execute_direct_restore_branch(slot: SaveSlotDTO) -> Dictionary:
+	var load_result := SaveDataAccessLayer.load_game(slot.slot_id)
 	var applied_domains: Dictionary = {}
-	var has_physical_save := bool(load_res.get("success", false))
+	var has_physical_save := bool(load_result.get("success", false))
 
-	if has_physical_save and load_res.get("data", null) is Dictionary:
-		var save_payload: Dictionary = load_res["data"]
+	if has_physical_save and load_result.get("data", null) is Dictionary:
+		var save_payload: Dictionary = load_result["data"]
 		applied_domains = SaveDataAccessLayer.apply_save_data(save_payload)
 
 	return {
@@ -102,8 +102,8 @@ static func _execute_direct_restore_branch(slot: SaveSlotSummaryDTO) -> Dictiona
 
 ## 二次载入总调度引擎
 static func execute_secondary_load(context: Dictionary) -> Dictionary:
-	var account: AccountProfileAggregate = context.get("account", null)
-	var slot: SaveSlotSummaryDTO = context.get("slot", null)
+	var account: AccountProfile = context.get("account", null)
+	var slot: SaveSlotDTO = context.get("slot", null)
 	var target_world_id: String = String(context.get("target_world_id", ""))
 	var allow_default_fallback: bool = bool(context.get("allow_default_fallback", true))
 
@@ -112,10 +112,10 @@ static func execute_secondary_load(context: Dictionary) -> Dictionary:
 	if slot == null:
 		return {"success": false, "error_code": "ERR_SLOT_MISSING", "message": "Target save slot summary missing"}
 
-	var world_val := validate_world_slot(account, target_world_id, allow_default_fallback)
-	if not bool(world_val.get("success", false)):
-		return world_val
-	var effective_world_id: String = world_val["world_id"]
+	var world_validation := validate_world_slot(account, target_world_id, allow_default_fallback)
+	if not bool(world_validation.get("success", false)):
+		return world_validation
+	var effective_world_id: String = world_validation["world_id"]
 
 	var path: int = evaluate_entry_path(slot)
 	var load_result: Dictionary = {}
@@ -130,19 +130,19 @@ static func execute_secondary_load(context: Dictionary) -> Dictionary:
 
 ## HUD 汇聚同步：无论是序章重放还是成熟直载，统一生成并广播主页快照
 static func synchronize_hud_entry(
-	account: AccountProfileAggregate,
-	slot: SaveSlotSummaryDTO,
+	account: AccountProfile,
+	slot: SaveSlotDTO,
 	physiology: CharacterPhysiologySheet = null,
 	wallet: CharacterWalletEntity = null
 ) -> HudStatusSnapshotDTO:
-	var char_id := slot.character_name.sha256_text().substr(0, 16)
+	var character_id := slot.character_name.sha256_text().substr(0, 16)
 	var race_id := ""
 	if physiology != null and not physiology.race_id.is_empty():
 		race_id = physiology.race_id
 
-	var auth_snapshot: AuthoritativeHudSnapshotDTO = AuthoritativeHudSyncService.trigger_initial_sync({
+	var authoritative_snapshot: AuthoritativeHudSnapshotDTO = AuthoritativeHudSyncService.trigger_initial_sync({
 		"account_id": account.account_id,
-		"character_id": char_id,
+		"character_id": character_id,
 		"character_name": slot.character_name,
 		"race_id": race_id,
 		"physiology": physiology,
@@ -150,7 +150,7 @@ static func synchronize_hud_entry(
 		"current_location_id": slot.current_location_name,
 		"allow_default_fallback": true
 	})
-	return auth_snapshot.to_legacy_snapshot()
+	return authoritative_snapshot.to_legacy_snapshot()
 
 ## ESC 呼出菜单项配置获取
 static func get_esc_menu_options() -> Array[Dictionary]:
@@ -167,8 +167,8 @@ static func execute_esc_exit(
 	providers: Dictionary = {},
 	allow_default_fallback: bool = true
 ) -> GameShutdownDTO.Response:
-	var req := GameShutdownDTO.Request.new()
-	req.exit_reason = GameLifecycleModel.ExitReason.USER_DESKTOP_QUIT
-	req.target_save_slot = slot_id
-	req.idempotency_key = "ESC_EXIT_" + slot_id + "_" + str(Time.get_ticks_usec())
-	return GameLifecycleService.execute_graceful_shutdown(req, providers, allow_default_fallback)
+	var shutdown_request := GameShutdownDTO.Request.new()
+	shutdown_request.exit_reason = GameLifecycleModel.ExitReason.USER_DESKTOP_QUIT
+	shutdown_request.target_save_slot = slot_id
+	shutdown_request.idempotency_key = "ESC_EXIT_" + slot_id + "_" + str(Time.get_ticks_usec())
+	return GameLifecycleService.execute_graceful_shutdown(shutdown_request, providers, allow_default_fallback)

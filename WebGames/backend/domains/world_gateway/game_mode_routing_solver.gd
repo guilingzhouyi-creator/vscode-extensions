@@ -21,23 +21,23 @@ class RoutingResultDTO extends RefCounted:
 	var requires_character_creation: bool = false
 
 
-## 从 world_gateway.json canary_features 段装配默认灰度旗标（配置驱动闭环）。
-## 调用方未注入 canary_flags 时兜底使用，避免灰度配置零消费导致联机/多档恒关闭。
+## 从 world_gateway.json canary_features 段装配默认灰度旗标（配置驱动完整链路）。
+## 调用方未注入 canary_flags 时默认回退使用，避免灰度配置零消费导致联机/多档恒关闭。
 static func load_default_canary_flags() -> Dictionary:
 	var raw: Dictionary = GameConfig.get_dict("domains.world_gateway", "canary_features", {})
 	var flags := {}
 	for feature_key in raw.keys():
-		var cfg: Dictionary = raw[feature_key]
-		flags[str(feature_key)] = _create_flag_entry(str(feature_key), cfg)
+		var feature_config: Dictionary = raw[feature_key]
+		flags[str(feature_key)] = _create_flag_entry(str(feature_key), feature_config)
 	return flags
 
 ## 构建灰度旗标条目（解耦循环内瞬态分配）
-static func _create_flag_entry(feature_key: String, cfg: Dictionary) -> FeatureToggleAggregate.FeatureFlagEntry:
+static func _create_flag_entry(feature_key: String, feature_config: Dictionary) -> FeatureToggleAggregate.FeatureFlagEntry:
 	return FeatureToggleAggregate.FeatureFlagEntry.new(
 		feature_key,
-		_strategy_from_name(str(cfg.get("strategy", "GLOBAL_DISABLED"))),
-		int(cfg.get("rollout_percentage", 0)),
-		(cfg.get("whitelist", []) as Array).duplicate()
+		_strategy_from_name(str(feature_config.get("strategy", "GLOBAL_DISABLED"))),
+		int(feature_config.get("rollout_percentage", 0)),
+		(feature_config.get("whitelist", []) as Array).duplicate()
 	)
 
 
@@ -102,10 +102,10 @@ static func _check_slot_affinity_for_multiplayer(account_slots: Array, target_sl
 
 
 static func _resolve_multiplayer_entry(account_id: String, canary_flags: Dictionary, routing_result: RoutingResultDTO) -> RoutingResultDTO:
-	var mp_flag: Variant = canary_flags.get("FEATURE_MULTIPLAYER_GATEWAY", null)
+	var multiplayer_flag: Variant = canary_flags.get("FEATURE_MULTIPLAYER_GATEWAY", null)
 	var is_enabled := false
-	if mp_flag != null and CanaryRolloutSolver != null:
-		is_enabled = CanaryRolloutSolver.is_feature_enabled_for_account(mp_flag, account_id)
+	if multiplayer_flag != null and CanaryRolloutSolver != null:
+		is_enabled = CanaryRolloutSolver.is_feature_enabled_for_account(multiplayer_flag, account_id)
 	if not is_enabled:
 		routing_result.error_code = "GATEWAY_ERR_MULTIPLAYER_DISABLED"
 		routing_result.message = TemplateFormatter.format(
@@ -196,7 +196,7 @@ static func _resolve_effective_slots(
 	account_slots: Array,
 	canary_flags: Dictionary,
 	target_slot_id: String,
-	res: RoutingResultDTO
+	routing_result: RoutingResultDTO
 ) -> Array:
 	if account_slots.is_empty():
 		var slot_id := target_slot_id if not target_slot_id.is_empty() else GameConfig.get_string("domains.world_gateway", "single_player/default_slot_id", "SLOT_SP_01")
@@ -219,8 +219,8 @@ static func _resolve_effective_slots(
 		for item in account_slots:
 			if item is SaveSlotStateDTO and item.slot_id == target_slot_id:
 				return [item]
-		res.error_code = "GATEWAY_ERR_SLOT_NOT_FOUND"
-		res.message = GameConfig.msg_fmt("world_gateway", "slot_not_found", {"slot_id": target_slot_id})
+		routing_result.error_code = "GATEWAY_ERR_SLOT_NOT_FOUND"
+		routing_result.message = GameConfig.msg_fmt("world_gateway", "slot_not_found", {"slot_id": target_slot_id})
 		return []
 
 	if can_multislot:

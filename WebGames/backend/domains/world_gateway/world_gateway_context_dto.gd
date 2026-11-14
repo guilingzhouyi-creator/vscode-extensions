@@ -35,16 +35,16 @@ func to_dto() -> Dictionary:
 
 
 ## 从字典重建网关上下文（缺省回退 AUTHENTICATED/UNSELECTED 初态）
-static func from_dto(d: Dictionary) -> WorldGatewayContextDTO:
-	var ctx := WorldGatewayContextDTO.new()
-	if d.is_empty():
-		return ctx
-	ctx.account_id = str(d.get("account_id", ""))
-	ctx.current_phase = int(d.get("current_phase", WorldGatewayModel.GatewayPhase.AUTHENTICATED))
-	ctx.selected_mode = int(d.get("selected_mode", WorldGatewayModel.GameMode.UNSELECTED))
-	ctx.selected_slot_id = str(d.get("selected_slot_id", ""))
-	ctx.selected_world_id = str(d.get("selected_world_id", ""))
-	ctx.active_character_id = str(d.get("active_character_id", ""))
-	ctx.is_first_time_creation = bool(d.get("is_first_time_creation", false))
-	ctx.active_canary_features = (d.get("active_canary_features", []) as Array).duplicate()
-	return ctx
+static func from_dto(data: Dictionary) -> WorldGatewayContextDTO:
+	var gateway_context := WorldGatewayContextDTO.new()
+	if data.is_empty():
+		return gateway_context
+	gateway_context.account_id = str(data.get("account_id", ""))
+	gateway_context.current_phase = int(data.get("current_phase", WorldGatewayModel.GatewayPhase.AUTHENTICATED))
+	gateway_context.selected_mode = int(data.get("selected_mode", WorldGatewayModel.GameMode.UNSELECTED))
+	gateway_context.selected_slot_id = str(data.get("selected_slot_id", ""))
+	gateway_context.selected_world_id = str(data.get("selected_world_id", ""))
+	gateway_context.active_character_id = str(data.get("active_character_id", ""))
+	gateway_context.is_first_time_creation = bool(data.get("is_first_time_creation", false))
+	gateway_context.active_canary_features = (data.get("active_canary_features", []) as Array).duplicate()
+	return gateway_context

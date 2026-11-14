@@ -34,16 +34,16 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从字典重建档位状态（空字典回退默认开档态）
-static func from_dto(d: Dictionary) -> SaveSlotStateDTO:
-	var dto := SaveSlotStateDTO.new()
-	if d.is_empty():
-		return dto
-	dto.slot_id = str(d.get("slot_id", ""))
-	dto.account_id = str(d.get("account_id", ""))
-	dto.bound_world_id = str(d.get("bound_world_id", ""))
-	dto.bound_character_id = str(d.get("bound_character_id", ""))
-	dto.is_occupied = bool(d.get("is_occupied", false))
-	dto.is_first_creation = bool(d.get("is_first_creation", true))
-	dto.created_timestamp_utc = int(d.get("created_timestamp_utc", 0))
-	dto.last_played_timestamp_utc = int(d.get("last_played_timestamp_utc", 0))
-	return dto
+static func from_dto(data: Dictionary) -> SaveSlotStateDTO:
+	var slot_state := SaveSlotStateDTO.new()
+	if data.is_empty():
+		return slot_state
+	slot_state.slot_id = str(data.get("slot_id", ""))
+	slot_state.account_id = str(data.get("account_id", ""))
+	slot_state.bound_world_id = str(data.get("bound_world_id", ""))
+	slot_state.bound_character_id = str(data.get("bound_character_id", ""))
+	slot_state.is_occupied = bool(data.get("is_occupied", false))
+	slot_state.is_first_creation = bool(data.get("is_first_creation", true))
+	slot_state.created_timestamp_utc = int(data.get("created_timestamp_utc", 0))
+	slot_state.last_played_timestamp_utc = int(data.get("last_played_timestamp_utc", 0))
+	return slot_state

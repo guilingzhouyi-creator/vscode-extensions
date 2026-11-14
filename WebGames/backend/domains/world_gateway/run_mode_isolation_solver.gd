@@ -3,7 +3,7 @@
 # 文件路径: res://backend/domains/world_gateway/run_mode_isolation_solver.gd
 # 架构定位: Headless Mode Isolation Solver / Zero-Network Fast-Path Guard
 # 依赖与触发: 上游: WorldGatewayFSM, AuthoritySyncStub | 下游: WorldGatewayModel | 配置: config/domains/world_gateway.json | 信号: 无
-# 职责说明: 针对首个发行体验版提供单机与联机双轨环境的严格隔离；
+# 职责说明: 针对首个发行体验版提供单机与联机双通道环境的严格隔离；
 #           单机模式实行 100% 离线、零网络轮询、本地权威与瞬时同步的高效性能快道；
 #           联机模式严格作为待命存根预留 (Stub)，快速失败拦截并杜绝任何空跑轮询协程污染单机热路径。
 # 退出语义与设计依据: 首发单机纯粹性与联机存根防线架构规约 (Inv-MODE-ISO-1)

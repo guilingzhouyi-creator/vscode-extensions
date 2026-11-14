@@ -110,21 +110,21 @@ static func assimilate_perturbations(effective_world_id: String) -> void:
     var perturbations: Array[CrossWorldPerturbationDTO] = perturbation_broker.poll_perturbations_for_world(effective_world_id)
     if perturbations.is_empty():
         return
-    var archive_repo := WorldArchiveRepository.get_instance()
-    if archive_repo == null:
+    var archive_repository := WorldArchiveRepository.get_instance()
+    if archive_repository == null:
         return
-    var world_inst: WorldInstance = archive_repo.load_world(effective_world_id)
-    if world_inst == null:
+    var world_instance: WorldInstance = archive_repository.load_world(effective_world_id)
+    if world_instance == null:
         return
 
-    for perturbation_dto in perturbations:
-        _append_single_perturbation_fragment(world_inst, perturbation_dto)
-        perturbation_broker.mark_world_visited(perturbation_dto.perturbation_id, effective_world_id)
-    archive_repo.save_world(world_inst)
+    for perturbation in perturbations:
+        _append_single_perturbation_fragment(world_instance, perturbation)
+        perturbation_broker.mark_world_visited(perturbation.perturbation_id, effective_world_id)
+    archive_repository.save_world(world_instance)
 
 
 static func _append_single_perturbation_fragment(
-    world_inst: WorldInstance,
+    world_instance: WorldInstance,
     perturbation: CrossWorldPerturbationDTO
 ) -> void:
     var fragment: Dictionary = {
@@ -135,4 +135,4 @@ static func _append_single_perturbation_fragment(
         "resonance_intensity": perturbation.resonance_intensity,
         "timestamp_utc": int(Time.get_unix_time_from_system())
     }
-    world_inst.append_history_fragment(fragment)
+    world_instance.append_history_fragment(fragment)

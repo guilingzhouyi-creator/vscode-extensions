@@ -20,20 +20,21 @@ var message: String = ""
 var latency_ms: int = 0
 var capabilities: Array = []
 
+## 构造模式就绪探测报告 DTO
 func _init(
-	p_mode: int = 0,
-	p_is_ready: bool = false,
-	p_status_code: String = "",
-	p_message: String = "",
-	p_latency_ms: int = 0,
-	p_capabilities: Array = []
+	initial_mode: int = 0,
+	initial_is_ready: bool = false,
+	initial_status_code: String = "",
+	initial_message: String = "",
+	initial_latency_ms: int = 0,
+	initial_capabilities: Array = []
 ) -> void:
-	mode = p_mode
-	is_ready = p_is_ready
-	status_code = p_status_code
-	message = p_message
-	latency_ms = p_latency_ms
-	capabilities = p_capabilities.duplicate()
+	mode = initial_mode
+	is_ready = initial_is_ready
+	status_code = initial_status_code
+	message = initial_message
+	latency_ms = initial_latency_ms
+	capabilities = initial_capabilities.duplicate()
 
 ## 对象状态复位（支持对象池复用，ADV-PRF-002）
 func reset_state() -> void:
@@ -57,18 +58,18 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从字典还原构建 DTO 实例
-static func from_dto(d: Dictionary) -> ModeReadinessReportDTO:
-	if d.is_empty():
+static func from_dto(data: Dictionary) -> ModeReadinessReportDTO:
+	if data.is_empty():
 		return ModeReadinessReportDTO.new()
-	var dto := ModeReadinessReportDTO.new()
-	dto.mode = int(d.get("mode", 0))
-	dto.is_ready = bool(d.get("is_ready", false))
-	dto.status_code = String(d.get("status_code", ""))
-	dto.message = String(d.get("message", ""))
-	dto.latency_ms = int(d.get("latency_ms", 0))
-	var raw_caps: Variant = d.get("capabilities", [])
-	if raw_caps is Array:
-		dto.capabilities = (raw_caps as Array).duplicate()
+	var report := ModeReadinessReportDTO.new()
+	report.mode = int(data.get("mode", 0))
+	report.is_ready = bool(data.get("is_ready", false))
+	report.status_code = String(data.get("status_code", ""))
+	report.message = String(data.get("message", ""))
+	report.latency_ms = int(data.get("latency_ms", 0))
+	var raw_capabilities: Variant = data.get("capabilities", [])
+	if raw_capabilities is Array:
+		report.capabilities = (raw_capabilities as Array).duplicate()
 	else:
-		dto.capabilities = []
-	return dto
+		report.capabilities = []
+	return report

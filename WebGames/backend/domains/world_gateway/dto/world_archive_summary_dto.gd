@@ -24,28 +24,29 @@ var created_timestamp_utc: int = 0
 var last_played_timestamp_utc: int = 0
 var is_active: bool = true
 
+## 构造世界档案摘要 DTO
 func _init(
-	p_world_id: String = "",
-	p_world_name: String = "",
-	p_mode: int = 1,
-	p_seed_value: int = 0,
-	p_current_tick: int = 0,
-	p_current_day: int = 1,
-	p_character_count: int = 0,
-	p_created_timestamp_utc: int = 0,
-	p_last_played_timestamp_utc: int = 0,
-	p_is_active: bool = true
+	initial_world_id: String = "",
+	initial_world_name: String = "",
+	initial_mode: int = 1,
+	initial_seed_value: int = 0,
+	initial_current_tick: int = 0,
+	initial_current_day: int = 1,
+	initial_character_count: int = 0,
+	initial_created_timestamp_utc: int = 0,
+	initial_last_played_timestamp_utc: int = 0,
+	initial_is_active: bool = true
 ) -> void:
-	world_id = p_world_id
-	world_name = p_world_name
-	mode = p_mode
-	seed_value = p_seed_value
-	current_tick = p_current_tick
-	current_day = p_current_day
-	character_count = p_character_count
-	created_timestamp_utc = p_created_timestamp_utc
-	last_played_timestamp_utc = p_last_played_timestamp_utc
-	is_active = p_is_active
+	world_id = initial_world_id
+	world_name = initial_world_name
+	mode = initial_mode
+	seed_value = initial_seed_value
+	current_tick = initial_current_tick
+	current_day = initial_current_day
+	character_count = initial_character_count
+	created_timestamp_utc = initial_created_timestamp_utc
+	last_played_timestamp_utc = initial_last_played_timestamp_utc
+	is_active = initial_is_active
 
 ## 对象状态复位（支持对象池复用，ADV-PRF-002）
 func reset_state() -> void:
@@ -77,18 +78,18 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从字典还原构建 DTO 实例
-static func from_dto(d: Dictionary) -> WorldArchiveSummaryDTO:
-	if d.is_empty():
+static func from_dto(data: Dictionary) -> WorldArchiveSummaryDTO:
+	if data.is_empty():
 		return WorldArchiveSummaryDTO.new()
-	var dto := WorldArchiveSummaryDTO.new()
-	dto.world_id = String(d.get("world_id", ""))
-	dto.world_name = String(d.get("world_name", ""))
-	dto.mode = int(d.get("mode", 1))
-	dto.seed_value = int(d.get("seed_value", 0))
-	dto.current_tick = int(d.get("current_tick", 0))
-	dto.current_day = int(d.get("current_day", 1))
-	dto.character_count = int(d.get("character_count", 0))
-	dto.created_timestamp_utc = int(d.get("created_timestamp_utc", 0))
-	dto.last_played_timestamp_utc = int(d.get("last_played_timestamp_utc", 0))
-	dto.is_active = bool(d.get("is_active", true))
-	return dto
+	var summary := WorldArchiveSummaryDTO.new()
+	summary.world_id = String(data.get("world_id", ""))
+	summary.world_name = String(data.get("world_name", ""))
+	summary.mode = int(data.get("mode", 1))
+	summary.seed_value = int(data.get("seed_value", 0))
+	summary.current_tick = int(data.get("current_tick", 0))
+	summary.current_day = int(data.get("current_day", 1))
+	summary.character_count = int(data.get("character_count", 0))
+	summary.created_timestamp_utc = int(data.get("created_timestamp_utc", 0))
+	summary.last_played_timestamp_utc = int(data.get("last_played_timestamp_utc", 0))
+	summary.is_active = bool(data.get("is_active", true))
+	return summary

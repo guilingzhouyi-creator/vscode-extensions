@@ -33,8 +33,8 @@ static func probe_single_player_environment() -> ModeReadinessReportDTO:
 	if not root_dir.ends_with("/"):
 		root_dir += "/"
 
-	var dir_err := DirAccess.make_dir_recursive_absolute(root_dir)
-	if dir_err != OK and dir_err != ERR_ALREADY_EXISTS:
+	var mkdir_error := DirAccess.make_dir_recursive_absolute(root_dir)
+	if mkdir_error != OK and mkdir_error != ERR_ALREADY_EXISTS:
 		report.is_ready = false
 		report.status_code = "DIR_UNWRITABLE"
 		report.message = TemplateFormatter.format("Failed to create local archive directory: {dir}", {"dir": root_dir})
@@ -87,10 +87,10 @@ static func probe_multiplayer_environment(account_id: String) -> ModeReadinessRe
 		return report
 
 	var flags: Dictionary = GameModeRoutingSolver.load_default_canary_flags()
-	var mp_flag: Variant = flags.get("FEATURE_MULTIPLAYER_GATEWAY", null)
+	var multiplayer_flag: Variant = flags.get("FEATURE_MULTIPLAYER_GATEWAY", null)
 	var is_enabled: bool = false
-	if mp_flag != null and CanaryRolloutSolver != null:
-		is_enabled = CanaryRolloutSolver.is_feature_enabled_for_account(mp_flag, account_id)
+	if multiplayer_flag != null and CanaryRolloutSolver != null:
+		is_enabled = CanaryRolloutSolver.is_feature_enabled_for_account(multiplayer_flag, account_id)
 
 	if not is_enabled:
 		report.is_ready = false
