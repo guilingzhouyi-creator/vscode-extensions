@@ -50,15 +50,15 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从输入字典反序列化还原传输对象
-static func from_dto(data: Dictionary) -> RefCounted:
+static func from_dto(serialized_dto: Dictionary) -> RefCounted:
 	var delta_record := ItemStatDeltaDTO.new()
-	if data.is_empty():
+	if serialized_dto.is_empty():
 		return delta_record
-	delta_record.canonical_id = str(data.get("canonical_id", ""))
-	delta_record.category_major = str(data.get("category_major", ""))
-	delta_record.category_minor = str(data.get("category_minor", ""))
-	delta_record.stat_key = str(data.get("stat_key", ""))
-	delta_record.delta_quantity = int(data.get("delta_quantity", 0))
-	delta_record.actual_applied = int(data.get("actual_applied", 0))
-	delta_record.current_leaf_quantity = int(data.get("current_leaf_quantity", 0))
+	delta_record.canonical_id = str(serialized_dto.get("canonical_id", ""))
+	delta_record.category_major = str(serialized_dto.get("category_major", ""))
+	delta_record.category_minor = str(serialized_dto.get("category_minor", ""))
+	delta_record.stat_key = str(serialized_dto.get("stat_key", ""))
+	delta_record.delta_quantity = int(serialized_dto.get("delta_quantity", 0))
+	delta_record.actual_applied = int(serialized_dto.get("actual_applied", 0))
+	delta_record.current_leaf_quantity = int(serialized_dto.get("current_leaf_quantity", 0))
 	return delta_record

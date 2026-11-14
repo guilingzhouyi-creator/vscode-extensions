@@ -76,13 +76,13 @@ func apply_item_delta(canonical_id: String, event_stat_key: String, quantity: in
 	if found.is_empty():
 		return {"success": false, "reason": "item not mounted"}
 	var stats: Dictionary = found["node"]["stats"]
-	var consumes_current := event_stat_key != STAT_GAINED and event_stat_key != STAT_FORGED
+	var should_consume_current := event_stat_key != STAT_GAINED and event_stat_key != STAT_FORGED
 	var previous_current: int = int(stats.get(STAT_CURRENT, 0))
 	stats[event_stat_key] = int(stats.get(event_stat_key, 0)) + quantity
 	var actual_delta := quantity
-	if consumes_current:
+	if should_consume_current:
 		actual_delta = mini(quantity, previous_current) # 下限 0：当前持有不可减成负数
-	var current_delta := quantity if not consumes_current else -actual_delta
+	var current_delta := quantity if not should_consume_current else -actual_delta
 	stats[STAT_CURRENT] = previous_current + current_delta
 	_apply_delta_upwards(root_node, [found["path"][0], found["path"][1]], event_stat_key, Vector2i(quantity, current_delta))
 	return {
@@ -137,18 +137,18 @@ func query_subtree(category_major: String = "", category_minor: String = "") -> 
 			var minor_node: Dictionary = major_node["children"][category_minor]
 			return (minor_node["stats"] as Dictionary).duplicate() if minor_node.has("stats") else _aggregate_recursive(minor_node)
 		return (major_node["stats"] as Dictionary).duplicate() if major_node.has("stats") else _aggregate_recursive(major_node)
-	var agg := _zero_stats()
+	var aggregated_metrics := _zero_stats()
 	for child in root_node["children"].values():
-		var child_dict: Dictionary = child as Dictionary
-		var sub: Dictionary = child_dict["stats"] if child_dict.has("stats") else _aggregate_recursive(child_dict)
-		_accumulate_stats(agg, sub)
-	return agg
+		var child_node: Dictionary = child as Dictionary
+		var child_metrics: Dictionary = child_node["stats"] if child_node.has("stats") else _aggregate_recursive(child_node)
+		_accumulate_stats(aggregated_metrics, child_metrics)
+	return aggregated_metrics
 
 ## 账号全量物品清单（递归收集叶节点）
 func query_all_items() -> Array:
-	var out: Array = []
-	_collect_items_recursive(root_node, out)
-	return out
+	var collected_items: Array = []
+	_collect_items_recursive(root_node, collected_items)
+	return collected_items
 
 ## 序列化当前实体或对象状态为字典结构
 func serialize() -> Dictionary:
@@ -181,9 +181,9 @@ static func _aggregate_recursive(node: Dictionary) -> Dictionary:
 	return aggregated_stats
 
 ## 递归收集物品叶节点
-static func _collect_items_recursive(node: Dictionary, out: Array) -> void:
+static func _collect_items_recursive(node: Dictionary, collected_items: Array) -> void:
 	if node.get("type") == NODE_ITEM:
-		out.append({
+		collected_items.append({
 			"canonical_id": node["canonical_id"],
 			"category_major": node["category_major"],
 			"category_minor": node["category_minor"],
@@ -191,7 +191,7 @@ static func _collect_items_recursive(node: Dictionary, out: Array) -> void:
 		})
 		return
 	for child in node["children"].values():
-		_collect_items_recursive(child, out)
+		_collect_items_recursive(child, collected_items)
 
 static func _resolve_category_nodes(root: Dictionary, path: Array) -> Array[Dictionary]:
 	var nodes: Array[Dictionary] = []

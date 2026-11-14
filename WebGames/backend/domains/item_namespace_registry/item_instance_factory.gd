@@ -26,10 +26,10 @@ static func build_instance(
 	item_id_prefix: String = "",
 	quality_registry: QualityTierRegistry = null
 ) -> ItemEntity:
-	var item := ItemEntity.from_payload(ItemRegistrySolver.build_instance_payload(prototype, display_name))
-	item.item_uid = ItemUIDGenerator.generate_uid(uid_prefix)
+	var item_instance := ItemEntity.from_payload(ItemRegistrySolver.build_instance_payload(prototype, display_name))
+	item_instance.item_uid = ItemUIDGenerator.generate_uid(uid_prefix)
 	if not item_id_prefix.is_empty():
-		item.item_id = IdGenerator.next_id(item_id_prefix)
+		item_instance.item_id = IdGenerator.next_id(item_id_prefix)
 	if prototype.quality_tier > 0:
 		var registry: QualityTierRegistry = quality_registry
 		if registry == null:
@@ -38,5 +38,5 @@ static func build_instance(
 			var resolver := ItemQualityResolver.new(registry)
 			var quality_result := resolver.resolve(prototype.canonical_id, prototype.quality_tier, prototype.mythic_interval)
 			if quality_result.get("success", false):
-				item.quality_snapshot = quality_result.get("snapshot", {})
-	return item
+				item_instance.quality_snapshot = quality_result.get("snapshot", {})
+	return item_instance

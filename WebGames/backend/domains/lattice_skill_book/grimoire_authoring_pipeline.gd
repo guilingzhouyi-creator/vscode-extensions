@@ -29,7 +29,7 @@ static func publish_manuscript_book(
 	var id_prefix := GameConfig.get_string("domains.lattice", "manuscript_defaults/item_id_prefix", "MANUSCRIPT_")
 	var name_prefix := GameConfig.get_string("domains.lattice", "manuscript_defaults/display_name_prefix", "【著书】")
 	var initial_circulation := GameConfig.get_int("domains.lattice", "manuscript_defaults/copy_circulation_count", 1)
-	var hash_preview_len := GameConfig.get_int("domains.lattice", "decompiler/hash_preview_len", 8)
+	var hash_preview_length := GameConfig.get_int("domains.lattice", "decompiler/hash_preview_len", 8)
 
 	# 1. 签名与拓扑审计
 	LatticeDecompilerService.generate_ast_signature(source_ast)
@@ -46,7 +46,7 @@ static func publish_manuscript_book(
 
 	EventBusCore.get_instance().emit_narrative_by_key(
 		"lattice/book_published", "grimoire",
-		[author_id, manuscript.custom_name, source_ast.signature_hash.substr(0, hash_preview_len)],
+		[author_id, manuscript.custom_name, source_ast.signature_hash.substr(0, hash_preview_length)],
 		{ "book_id": manuscript.item_id, "author_id": author_id, "price": price, "hash": source_ast.signature_hash }
 	)
 

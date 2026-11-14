@@ -63,5 +63,5 @@ func resolve(canonical_id: String, declared_tier: int, declared_interval: int) -
 
 ## 便捷查询：直接取强度基线（未登记/未就绪返回安全回退 1.0，不抛 Fatal）
 func get_strength_weight(canonical_id: String, declared_tier: int, declared_interval: int) -> float:
-	var result := resolve(canonical_id, declared_tier, declared_interval)
-	return float(result.get("strength_weight", 1.0))
+	var resolution_result := resolve(canonical_id, declared_tier, declared_interval)
+	return float(resolution_result.get("strength_weight", 1.0))

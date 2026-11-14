@@ -138,17 +138,17 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从字典反序列化还原（缺省字段回退默认枚举与权重）
-static func from_dto(data: Dictionary) -> MagicTierSnapshot:
+static func from_dto(serialized_snapshot: Dictionary) -> MagicTierSnapshot:
 	var snapshot := MagicTierSnapshot.new()
-	snapshot.canonical_id = str(data.get("canonical_id", ""))
-	snapshot.magic_form = int(data.get("magic_form", MagicForm.INCANTATION))
-	snapshot.magic_rank = int(data.get("magic_rank", MagicRank.RANK_1))
-	snapshot.ability_tier = int(data.get("ability_tier", AbilityTier.ESP))
-	snapshot.rank_band = int(data.get("rank_band", MagicRankBand.LOW))
-	snapshot.mana_aptitude = int(data.get("mana_aptitude", ManaAptitude.MANA_ADAPTOR))
-	snapshot.profession_rank = int(data.get("profession_rank", ProfessionRank.NOVICE_MAGE))
-	snapshot.strength_weight = float(data.get("strength_weight", 1.0))
-	snapshot.phase_loss_min = float(data.get("phase_loss_min", 0.0))
-	snapshot.phase_loss_max = float(data.get("phase_loss_max", 0.0))
-	snapshot.backfire_threshold = int(data.get("backfire_threshold", 1))
+	snapshot.canonical_id = str(serialized_snapshot.get("canonical_id", ""))
+	snapshot.magic_form = int(serialized_snapshot.get("magic_form", MagicForm.INCANTATION))
+	snapshot.magic_rank = int(serialized_snapshot.get("magic_rank", MagicRank.RANK_1))
+	snapshot.ability_tier = int(serialized_snapshot.get("ability_tier", AbilityTier.ESP))
+	snapshot.rank_band = int(serialized_snapshot.get("rank_band", MagicRankBand.LOW))
+	snapshot.mana_aptitude = int(serialized_snapshot.get("mana_aptitude", ManaAptitude.MANA_ADAPTOR))
+	snapshot.profession_rank = int(serialized_snapshot.get("profession_rank", ProfessionRank.NOVICE_MAGE))
+	snapshot.strength_weight = float(serialized_snapshot.get("strength_weight", 1.0))
+	snapshot.phase_loss_min = float(serialized_snapshot.get("phase_loss_min", 0.0))
+	snapshot.phase_loss_max = float(serialized_snapshot.get("phase_loss_max", 0.0))
+	snapshot.backfire_threshold = int(serialized_snapshot.get("backfire_threshold", 1))
 	return snapshot

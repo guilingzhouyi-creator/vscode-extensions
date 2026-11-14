@@ -68,9 +68,9 @@ func resolve(magic_form: int, magic_rank: int, mana_aptitude: int, profession_ra
 
 ## 便捷查询：直接取位阶强度权重（未登记/未就绪安全回退 1.0，不抛 Fatal）
 func get_strength_weight(magic_rank: int) -> float:
-	var result := resolve(
+	var resolution_result := resolve(
 		MagicTierSnapshot.MagicForm.INCANTATION,
 		magic_rank,
 		MagicTierSnapshot.ManaAptitude.MANA_ADAPTOR,
 		MagicTierSnapshot.ProfessionRank.NOVICE_MAGE)
-	return float(result.get("strength_weight", 1.0))
+	return float(resolution_result.get("strength_weight", 1.0))

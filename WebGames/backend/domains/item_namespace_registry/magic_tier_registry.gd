@@ -188,7 +188,7 @@ func _validate_aptitudes_monotonicity() -> bool:
 	return true
 
 func _validate_profession_ranks() -> bool:
-	var seen_magic_domain := false
+	var has_seen_magic_domain := false
 	for rank_index in range(1, 14):
 		if not _profession_ranks.has(rank_index):
 			return false
@@ -197,8 +197,8 @@ func _validate_profession_ranks() -> bool:
 			return false
 		var is_magic: bool = bool(entry.get("magic_domain", false))
 		if is_magic:
-			seen_magic_domain = true
-		elif seen_magic_domain:
+			has_seen_magic_domain = true
+		elif has_seen_magic_domain:
 			return false
 	return true
 

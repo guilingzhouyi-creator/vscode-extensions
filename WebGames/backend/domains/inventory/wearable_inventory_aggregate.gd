@@ -69,12 +69,12 @@ func refresh_cached_metrics() -> void:
 	var total_volume: int = 0
 	var total_weight: float = 0.0
 	_uid_index.clear()
-	for item in storage_items:
-		if item is ItemEntity:
-			total_volume += item.volume_slots
-			total_weight += item.mass_kg
-			if not item.item_uid.is_empty():
-				_uid_index[item.item_uid] = item
+	for stored_item in storage_items:
+		if stored_item is ItemEntity:
+			total_volume += stored_item.volume_slots
+			total_weight += stored_item.mass_kg
+			if not stored_item.item_uid.is_empty():
+				_uid_index[stored_item.item_uid] = stored_item
 	for slot_item in equipped_slots.values():
 		if slot_item is ItemEntity:
 			total_weight += slot_item.mass_kg
@@ -117,36 +117,36 @@ func calculate_total_weight() -> float:
 	return _cached_total_weight
 
 ## 入包判定：空引用/负值/重复 UID/容积超限/负重超限 逐项拦截（复用增量缓存）
-func can_add_item(item: ItemEntity, race_bonus: float = 0.0) -> bool:
-	if item == null or item.mass_kg < 0.0 or item.volume_slots < 0:
+func can_add_item(candidate_item: ItemEntity, race_bonus: float = 0.0) -> bool:
+	if candidate_item == null or candidate_item.mass_kg < 0.0 or candidate_item.volume_slots < 0:
 		return false
-	if _contains_uid(item.item_uid):
+	if _contains_uid(candidate_item.item_uid):
 		return false
 	if _is_metric_dirty:
 		refresh_cached_metrics()
 	var current_volume := _cached_storage_volume
 	var max_volume: int = calculate_total_capacity(race_bonus)
-	if current_volume + item.volume_slots > max_volume:
+	if current_volume + candidate_item.volume_slots > max_volume:
 		return false
-	if _cached_total_weight + item.mass_kg > max_carry_weight_kg:
+	if _cached_total_weight + candidate_item.mass_kg > max_carry_weight_kg:
 		return false
 	return true
 
 ## 入包：校验通过后追加（空 UID 生成 SRV_ 前缀 ID，置容器态与属主，增量累加缓存）
-func add_item(item: ItemEntity, race_bonus: float = 0.0) -> bool:
-	if not can_add_item(item, race_bonus):
+func add_item(target_item: ItemEntity, race_bonus: float = 0.0) -> bool:
+	if not can_add_item(target_item, race_bonus):
 		return false
-	if item.item_uid.is_empty():
-		item.item_uid = ItemUIDGenerator.generate_uid("SRV_")
-	storage_items.append(item)
-	item.container_state = "INVENTORY"
+	if target_item.item_uid.is_empty():
+		target_item.item_uid = ItemUIDGenerator.generate_uid("SRV_")
+	storage_items.append(target_item)
+	target_item.container_state = "INVENTORY"
 	if not owner_account_id.is_empty():
-		item.owner_account_id = owner_account_id
+		target_item.owner_account_id = owner_account_id
 	if not _is_metric_dirty:
-		_cached_storage_volume += item.volume_slots
-		_cached_total_weight += item.mass_kg
-		if not item.item_uid.is_empty():
-			_uid_index[item.item_uid] = item
+		_cached_storage_volume += target_item.volume_slots
+		_cached_total_weight += target_item.mass_kg
+		if not target_item.item_uid.is_empty():
+			_uid_index[target_item.item_uid] = target_item
 	return true
 
 # ==============================================================================
@@ -156,12 +156,12 @@ func add_item(item: ItemEntity, race_bonus: float = 0.0) -> bool:
 ## 按 item_id 查找背包内首个物品（不存在返回 null）；
 ## 返回实例可直接交给 remove_item 完成按 id 移除
 func find_item_by_item_id(item_id: String) -> ItemEntity:
-	for item in storage_items:
-		if item is ItemEntity and item.item_id == item_id:
-			return item
-	for item in equipped_slots.values():
-		if item is ItemEntity and item.item_id == item_id:
-			return item
+	for stored_item in storage_items:
+		if stored_item is ItemEntity and stored_item.item_id == item_id:
+			return stored_item
+	for equipped_item in equipped_slots.values():
+		if equipped_item is ItemEntity and equipped_item.item_id == item_id:
+			return equipped_item
 	return null
 
 ## 按权威 item_uid 精确查找（UID 优先于 item_id，防同模板多实例误命中）
@@ -179,70 +179,70 @@ enum RemovalOutcome {
 }
 
 ## 按实例引用移除物品（存在并成功移除返回 true，否则 false，增量扣减缓存）
-func remove_item(item: ItemEntity) -> bool:
-	if item == null:
+func remove_item(target_item: ItemEntity) -> bool:
+	if target_item == null:
 		return false
-	var item_index := storage_items.find(item)
+	var item_index := storage_items.find(target_item)
 	if item_index < 0:
 		return false
 	storage_items.remove_at(item_index)
-	item.container_state = "UNOWNED"
+	target_item.container_state = "UNOWNED"
 	if not _is_metric_dirty:
-		_cached_storage_volume -= item.volume_slots
-		_cached_total_weight -= item.mass_kg
+		_cached_storage_volume -= target_item.volume_slots
+		_cached_total_weight -= target_item.mass_kg
 		if _cached_storage_volume < 0:
 			_cached_storage_volume = 0
 		if _cached_total_weight < 0.0:
 			_cached_total_weight = 0.0
-		if not item.item_uid.is_empty():
-			_uid_index.erase(item.item_uid)
+		if not target_item.item_uid.is_empty():
+			_uid_index.erase(target_item.item_uid)
 	return true
 
 ## 从背包或已装备槽位统一移除指定物品，返回移除来源枚举（供销毁/追缴/分解等管线统一复用）
-func remove_owned_item(item: ItemEntity) -> RemovalOutcome:
-	if item == null:
+func remove_owned_item(target_item: ItemEntity) -> RemovalOutcome:
+	if target_item == null:
 		return RemovalOutcome.NOT_FOUND
-	if remove_item(item):
+	if remove_item(target_item):
 		return RemovalOutcome.REMOVED_STORAGE
 	for slot in equipped_slots:
-		if equipped_slots[slot] == item:
+		if equipped_slots[slot] == target_item:
 			unequip_item(slot)
 			return RemovalOutcome.UNEQUIPPED_SLOT
 	return RemovalOutcome.NOT_FOUND
 
 ## 装备：槽位存在/槽空/UID 未占用校验，置 EQUIPPED 态并归属（增量累加负重）
-func equip_item(slot: String, item: ItemEntity) -> bool:
-	if not equipped_slots.has(slot) or item == null:
+func equip_item(slot: String, equipment_item: ItemEntity) -> bool:
+	if not equipped_slots.has(slot) or equipment_item == null:
 		return false
-	if item.item_uid.is_empty():
-		item.item_uid = ItemUIDGenerator.generate_uid("SRV_")
-	if equipped_slots[slot] != null or _contains_uid(item.item_uid):
+	if equipment_item.item_uid.is_empty():
+		equipment_item.item_uid = ItemUIDGenerator.generate_uid("SRV_")
+	if equipped_slots[slot] != null or _contains_uid(equipment_item.item_uid):
 		return false
-	equipped_slots[slot] = item
-	item.container_state = "EQUIPPED"
+	equipped_slots[slot] = equipment_item
+	equipment_item.container_state = "EQUIPPED"
 	if not owner_account_id.is_empty():
-		item.owner_account_id = owner_account_id
+		equipment_item.owner_account_id = owner_account_id
 	if not _is_metric_dirty:
-		_cached_total_weight += item.mass_kg
-		if not item.item_uid.is_empty():
-			_uid_index[item.item_uid] = item
+		_cached_total_weight += equipment_item.mass_kg
+		if not equipment_item.item_uid.is_empty():
+			_uid_index[equipment_item.item_uid] = equipment_item
 	return true
 
 ## 卸装：清槽并返回物品（置 UNOWNED 态，增量扣减负重）
 func unequip_item(slot: String) -> ItemEntity:
 	if not equipped_slots.has(slot):
 		return null
-	var item: Variant = equipped_slots[slot]
+	var unequipped_item: Variant = equipped_slots[slot]
 	equipped_slots[slot] = null
-	if item is ItemEntity:
-		item.container_state = "UNOWNED"
+	if unequipped_item is ItemEntity:
+		unequipped_item.container_state = "UNOWNED"
 		if not _is_metric_dirty:
-			_cached_total_weight -= item.mass_kg
+			_cached_total_weight -= unequipped_item.mass_kg
 			if _cached_total_weight < 0.0:
 				_cached_total_weight = 0.0
-			if not item.item_uid.is_empty():
-				_uid_index.erase(item.item_uid)
-	return item
+			if not unequipped_item.item_uid.is_empty():
+				_uid_index.erase(unequipped_item.item_uid)
+	return unequipped_item
 
 # ==============================================================================
 # 四、快照 / 恢复 / 统一序列化
@@ -261,9 +261,9 @@ func _contains_uid(item_uid: String) -> bool:
 ## （深快照设计：就地深层字段支持完整回滚，浅拷贝对物品深层字段的就地变更无法回滚）。
 func snapshot() -> Dictionary:
 	var storage_payloads: Array = []
-	for item in storage_items:
-		if item is ItemEntity:
-			storage_payloads.append(item.serialize())
+	for stored_item in storage_items:
+		if stored_item is ItemEntity:
+			storage_payloads.append(stored_item.serialize())
 	var equipped_payloads := {}
 	for slot_key in equipped_slots:
 		var slot_item: Variant = equipped_slots[slot_key]
@@ -276,19 +276,19 @@ func snapshot() -> Dictionary:
 
 ## 快照恢复：唯一入口仅接受 snapshot() 深载荷（storage_payloads/equipped_payloads），
 ## 按载荷重建全新实例（含 item_uid，保持实例可追溯性）；旧引用快照浅拷贝路径已退役
-func restore(snapshot_data: Dictionary) -> void:
-	if snapshot_data == null:
+func restore(snapshot_payload: Dictionary) -> void:
+	if snapshot_payload == null:
 		return
-	owner_account_id = str(snapshot_data.get("owner_account_id", owner_account_id))
-	if snapshot_data.has("storage_payloads"):
+	owner_account_id = str(snapshot_payload.get("owner_account_id", owner_account_id))
+	if snapshot_payload.has("storage_payloads"):
 		# 深快照路径：按载荷重建全新实例（含 item_uid，保持实例可追溯性）
 		var rebuilt_storage: Array = []
-		for raw_payload in snapshot_data.get("storage_payloads", []):
+		for raw_payload in snapshot_payload.get("storage_payloads", []):
 			if raw_payload is Dictionary:
 				rebuilt_storage.append(ItemEntity.deserialize(raw_payload))
 		storage_items = rebuilt_storage
 		var rebuilt_slots := {}
-		var raw_slots: Dictionary = snapshot_data.get("equipped_payloads", {})
+		var raw_slots: Dictionary = snapshot_payload.get("equipped_payloads", {})
 		for slot_key in raw_slots:
 			var raw_payload: Variant = raw_slots[slot_key]
 			rebuilt_slots[slot_key] = ItemEntity.deserialize(raw_payload) if raw_payload is Dictionary else null
@@ -298,12 +298,12 @@ func restore(snapshot_data: Dictionary) -> void:
 		ErrorReporter.emit_warning("wearable_inventory", "RESTORE_PAYLOAD_MISSING", "Wearable inventory snapshot missing storage_payloads; recovered as empty container.")
 		storage_items = []
 		equipped_slots = {}
-	for item in storage_items:
-		if item is ItemEntity:
-			item.container_state = "INVENTORY"
-	for item in equipped_slots.values():
-		if item is ItemEntity:
-			item.container_state = "EQUIPPED"
+	for stored_item in storage_items:
+		if stored_item is ItemEntity:
+			stored_item.container_state = "INVENTORY"
+	for equipped_item in equipped_slots.values():
+		if equipped_item is ItemEntity:
+			equipped_item.container_state = "EQUIPPED"
 	_is_metric_dirty = true
 	refresh_cached_metrics()
 
@@ -312,7 +312,7 @@ func serialize() -> Dictionary:
 	return snapshot()
 
 ## 统一数据标准反序列化（Inv-SV-2）：静态工厂方法重构聚合
-static func deserialize(data: Dictionary) -> WearableInventoryAggregate:
+static func deserialize(serialized_inventory: Dictionary) -> WearableInventoryAggregate:
 	var inventory := WearableInventoryAggregate.new()
-	inventory.restore(data)
+	inventory.restore(serialized_inventory)
 	return inventory

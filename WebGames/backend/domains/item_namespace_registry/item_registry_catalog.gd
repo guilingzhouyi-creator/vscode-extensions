@@ -50,7 +50,7 @@ class ItemPrototypeTemplate extends RefCounted:
 	func _init(
 		initial_canonical_id: String = "",
 		initial_numeric_id: int = 0,
-		initial_loc_name_key: String = "",
+		initial_localization_name_key: String = "",
 		initial_category_major: String = CATEGORY_MAJOR_EQUIPMENT,
 		initial_category_minor: String = "WEAPON_BLADE",
 		initial_tier_rank: int = DEFAULT_TIER_RANK,
@@ -63,7 +63,7 @@ class ItemPrototypeTemplate extends RefCounted:
 		canonical_id = initial_canonical_id
 		english_name = initial_english_name.strip_edges().to_lower()  # 注册前归一：查重/索引/解析统一小写，杜绝大小写冲突
 		numeric_id = initial_numeric_id
-		loc_name_key = initial_loc_name_key
+		loc_name_key = initial_localization_name_key
 		category_major = initial_category_major
 		category_minor = initial_category_minor
 		tier_rank = initial_tier_rank
@@ -81,7 +81,7 @@ var _canonical_registry: Dictionary = {}
 # 压缩数字 ID -> Canonical String ID
 var _numeric_to_canonical: Dictionary = {}
 # 本地化展示名键 -> Canonical String ID（名称键唯一性校验索引）
-var _loc_key_to_canonical: Dictionary = {}
+var _localization_key_to_canonical: Dictionary = {}
 # 统一英文名（小写）-> Canonical String ID（GM 命令/底层规范化解析索引）
 var _english_name_to_canonical: Dictionary = {}
 # 别名/名称倒排索引 (lowercase_term -> Array[canonical_id])
@@ -100,12 +100,12 @@ func get_prototype(canonical_id: String) -> ItemPrototypeTemplate:
 	return _canonical_registry.get(canonical_id, null)
 
 ## 压缩数字 ID 反查 canonical_id（未占用返回空串）
-func get_canonical_id_by_numeric(num_id: int) -> String:
-	return _numeric_to_canonical.get(num_id, "")
+func get_canonical_id_by_numeric(numeric_id: int) -> String:
+	return _numeric_to_canonical.get(numeric_id, "")
 
 ## 本地化展示键反查 canonical_id（未登记返回空串）
-func get_canonical_id_by_loc_key(loc_key: String) -> String:
-	return _loc_key_to_canonical.get(loc_key, "")
+func get_canonical_id_by_loc_key(localization_key: String) -> String:
+	return _localization_key_to_canonical.get(localization_key, "")
 
 ## 统一英文名（小写归一）反查 canonical_id（未登记返回空串）
 func get_canonical_id_by_english_name(english_name: String) -> String:
@@ -130,20 +130,20 @@ func allocate_numeric_id() -> int:
 	return _highest_numeric_id
 
 ## 显式占用指定数字 ID（配置直填场景）：从空闲池移除并刷新高水位
-func occupy_numeric_id(num_id: int) -> void:
-	if num_id <= 0:
+func occupy_numeric_id(numeric_id: int) -> void:
+	if numeric_id <= 0:
 		return
-	_freed_numeric_ids.erase(num_id)
-	if num_id > _highest_numeric_id:
-		_highest_numeric_id = num_id
+	_freed_numeric_ids.erase(numeric_id)
+	if numeric_id > _highest_numeric_id:
+		_highest_numeric_id = numeric_id
 
 ## 释放数字 ID 回空闲池（删除回收）：仍在占用或已在池中则忽略
-func release_numeric_id(num_id: int) -> void:
-	if num_id <= 0:
+func release_numeric_id(numeric_id: int) -> void:
+	if numeric_id <= 0:
 		return
-	if _numeric_to_canonical.has(num_id):
+	if _numeric_to_canonical.has(numeric_id):
 		return
-	if _freed_numeric_ids.has(num_id):
+	if _freed_numeric_ids.has(numeric_id):
 		return
-	_freed_numeric_ids.append(num_id)
+	_freed_numeric_ids.append(numeric_id)
 	_freed_numeric_ids.sort()

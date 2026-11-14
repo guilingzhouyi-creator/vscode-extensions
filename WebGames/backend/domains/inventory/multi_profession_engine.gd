@@ -43,10 +43,10 @@ static func _count_ast_symbols(
 ) -> Vector2i:
 	if ast == null:
 		return Vector2i.ZERO
-	var nodes_dict: Variant = ast.nodes if "nodes" in ast else {}
+	var node_map: Variant = ast.nodes if "nodes" in ast else {}
 	var physical_count := 0
 	var magic_count := 0
-	for node in nodes_dict.values():
+	for node in node_map.values():
 		var node_type: Variant = node.get("node_type", "")
 		var symbol: Variant = node.get("symbol", "")
 		if node_type == physical_node_type or symbol in physical_symbols:
@@ -57,7 +57,7 @@ static func _count_ast_symbols(
 
 ## 技能图云聚类评估：物理/魔法符号计数达阈值授予 Sword Master/Archmage/Spellblade 位格
 static func evaluate_active_professions(mastered_asts: Array) -> Array[ProfessionArchetype]:
-	var result: Array[ProfessionArchetype] = []
+	var active_archetypes: Array[ProfessionArchetype] = []
 	var physical_count: int = 0
 	var magic_count: int = 0
 
@@ -86,7 +86,7 @@ static func evaluate_active_professions(mastered_asts: Array) -> Array[Professio
 		archetype.canonical_name = sword_master.get("name", "Sword Master")
 		archetype.rank_tier = int(1 + floor(physical_count / float(rank_divisor)))
 		archetype.stat_modifiers = sword_master.get("modifiers", {})
-		result.append(archetype)
+		active_archetypes.append(archetype)
 
 	if magic_count >= magic_threshold:
 		var archetype := ProfessionArchetype.new()
@@ -94,7 +94,7 @@ static func evaluate_active_professions(mastered_asts: Array) -> Array[Professio
 		archetype.canonical_name = archmage.get("name", "Holy Archmage")
 		archetype.rank_tier = int(1 + floor(magic_count / float(rank_divisor)))
 		archetype.stat_modifiers = archmage.get("modifiers", {})
-		result.append(archetype)
+		active_archetypes.append(archetype)
 
 	if physical_count >= spellblade_physical_threshold and magic_count >= spellblade_magic_threshold:
 		var archetype := ProfessionArchetype.new()
@@ -102,9 +102,9 @@ static func evaluate_active_professions(mastered_asts: Array) -> Array[Professio
 		archetype.canonical_name = spellblade.get("name", "Spellblade")
 		archetype.rank_tier = spellblade_rank_tier
 		archetype.stat_modifiers = spellblade.get("modifiers", {})
-		result.append(archetype)
+		active_archetypes.append(archetype)
 
-	return result
+	return active_archetypes
 
 ## 同步角色职业：评估后逐位格广播晋升事件与叙事文案
 static func sync_character_professions(character_id: String, mastered_asts: Array) -> Array[ProfessionArchetype]:

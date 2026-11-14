@@ -17,25 +17,25 @@ extends RefCounted
 
 ## 批量注册：按 canonical_id 排序保证自动递增数字 ID 的确定性（跨平台/跨文件稳定）。
 ## numeric_id <= 0 的条目由 ItemRegistrySolver 自动递增分配（回收的空闲 ID 优先复用）。
-static func load_from_dict_list(catalog: ItemRegistryCatalog, items_data: Array) -> Dictionary:
-	var sorted_data := items_data.duplicate()
-	sorted_data.sort_custom(
-		func(a, b): return str(a.get("canonical_id", "")) < str(b.get("canonical_id", ""))
+static func load_from_dict_list(catalog: ItemRegistryCatalog, items_payload: Array) -> Dictionary:
+	var sorted_entries := items_payload.duplicate()
+	sorted_entries.sort_custom(
+		func(left_item, right_item): return str(left_item.get("canonical_id", "")) < str(right_item.get("canonical_id", ""))
 	)
 	var loaded_count := 0
 	var error_list: Array[Dictionary] = []
 	var default_minor: String = GameConfig.get_string("domains.item_namespace_registry", "defaults/category_minor", "WEAPON_BLADE")
 
-	for item_dict in sorted_data:
-		var prototype: Variant = _build_prototype(item_dict, default_minor)
+	for item_entry in sorted_entries:
+		var prototype: Variant = _build_prototype(item_entry, default_minor)
 		var register_result: Variant = ItemRegistrySolver.register_prototype(catalog, prototype)
 		if register_result.success:
 			loaded_count += 1
 			# 统一名称注册表接线：物品名称键登记（域所有者 = item，en_US 英文底座必达）
-			var localized_name_key: String = str(item_dict.get("loc_name_key", ""))
+			var localized_name_key: String = str(item_entry.get("loc_name_key", ""))
 			if not localized_name_key.is_empty():
 				LocalizationRegistryCatalog.get_shared().register_name_key(
-					localized_name_key, "item", str(item_dict.get("english_name", localized_name_key)))
+					localized_name_key, "item", str(item_entry.get("english_name", localized_name_key)))
 		else:
 			error_list.append(register_result)
 
@@ -46,19 +46,19 @@ static func load_from_dict_list(catalog: ItemRegistryCatalog, items_data: Array)
 	}
 
 ## 单个物品原型模板构建工厂（从热循环解耦实例化开销）
-static func _build_prototype(item_dict: Dictionary, default_minor: String) -> ItemRegistryCatalog.ItemPrototypeTemplate:
+static func _build_prototype(item_entry: Dictionary, default_minor: String) -> ItemRegistryCatalog.ItemPrototypeTemplate:
 	return ItemRegistryCatalog.ItemPrototypeTemplate.new(
-		item_dict.get("canonical_id", ""),
-		item_dict.get("numeric_id", 0),
-		item_dict.get("loc_name_key", ""),
-		item_dict.get("category_major", ItemRegistryCatalog.CATEGORY_MAJOR_EQUIPMENT),
-		item_dict.get("category_minor", default_minor),
-		item_dict.get("tier_rank", ItemRegistryCatalog.DEFAULT_TIER_RANK),
-		item_dict.get("default_mass_kg", ItemRegistryCatalog.DEFAULT_MASS_KG),
-		item_dict.get("default_volume_slots", ItemRegistryCatalog.DEFAULT_VOLUME_SLOTS),
-		item_dict.get("base_market_value", ItemRegistryCatalog.DEFAULT_MARKET_VALUE),
-		item_dict.get("search_aliases", []),
-		item_dict.get("english_name", "")
+		item_entry.get("canonical_id", ""),
+		item_entry.get("numeric_id", 0),
+		item_entry.get("loc_name_key", ""),
+		item_entry.get("category_major", ItemRegistryCatalog.CATEGORY_MAJOR_EQUIPMENT),
+		item_entry.get("category_minor", default_minor),
+		item_entry.get("tier_rank", ItemRegistryCatalog.DEFAULT_TIER_RANK),
+		item_entry.get("default_mass_kg", ItemRegistryCatalog.DEFAULT_MASS_KG),
+		item_entry.get("default_volume_slots", ItemRegistryCatalog.DEFAULT_VOLUME_SLOTS),
+		item_entry.get("base_market_value", ItemRegistryCatalog.DEFAULT_MARKET_VALUE),
+		item_entry.get("search_aliases", []),
+		item_entry.get("english_name", "")
 	)
 
 # ==============================================================================
@@ -73,7 +73,7 @@ static func build_catalog_from_config() -> ItemRegistryCatalog:
 
 static func _collect_configured_items() -> Array:
 	var table_names: Array = GameConfig.get_table_names().filter(
-		func(name): return str(name).begins_with("items.")
+		func(table_name): return str(table_name).begins_with("items.")
 	)
 	table_names.sort()
 	var all_items: Array = []
@@ -82,16 +82,58 @@ static func _collect_configured_items() -> Array:
 		_append_config_table_items(all_items, str(table_name), empty_items)
 	return all_items
 
-static func _append_config_table_items(out_items: Array, table_name: String, empty_items: Array) -> void:
-	out_items.append_array(GameConfig.get_array(table_name, "items", empty_items))
+static func _append_config_table_items(collected_items: Array, table_name: String, empty_items: Array) -> void:
+	collected_items.append_array(GameConfig.get_array(table_name, "items", empty_items))
 
 ## 自动发现并加载全部 config/items/*.json 表（表名 "items.<文件名>"）：
 ## MOD / DLC 新增文件即自动收录，无需改装配代码。
 static func load_all_from_config(catalog: ItemRegistryCatalog) -> Dictionary:
 	return load_from_dict_list(catalog, _collect_configured_items())
 
+## 判定已有物品原型与最新配置条目是否发生字段变化
+static func _is_prototype_modified(
+	existing_prototype: ItemRegistryCatalog.ItemPrototypeTemplate,
+	candidate_entry: Dictionary,
+	default_minor_category: String
+) -> bool:
+	var target_minor := str(candidate_entry.get("category_minor", default_minor_category))
+	var target_major := str(candidate_entry.get("category_major", ItemRegistryCatalog.CATEGORY_MAJOR_EQUIPMENT))
+	var target_tier := int(candidate_entry.get("tier_rank", ItemRegistryCatalog.DEFAULT_TIER_RANK))
+	var target_mass := float(candidate_entry.get("default_mass_kg", ItemRegistryCatalog.DEFAULT_MASS_KG))
+	var target_volume := int(candidate_entry.get("default_volume_slots", ItemRegistryCatalog.DEFAULT_VOLUME_SLOTS))
+	var target_value := int(candidate_entry.get("base_market_value", ItemRegistryCatalog.DEFAULT_MARKET_VALUE))
+	var target_localization_key := str(candidate_entry.get("loc_name_key", ""))
+	var target_english_name := str(candidate_entry.get("english_name", ""))
+	if existing_prototype.category_major != target_major or existing_prototype.category_minor != target_minor:
+		return true
+	if existing_prototype.tier_rank != target_tier or not is_equal_approx(existing_prototype.default_mass_kg, target_mass):
+		return true
+	if existing_prototype.default_volume_slots != target_volume or existing_prototype.base_market_value != target_value:
+		return true
+	if existing_prototype.loc_name_key != target_localization_key or existing_prototype.english_name != target_english_name:
+		return true
+	return false
+
+static func _enqueue_modified_item_entry(
+	catalog: ItemRegistryCatalog,
+	candidate_entry: Dictionary,
+	candidate_id: String,
+	default_minor_category: String,
+	new_items: Array
+) -> bool:
+	var existing_prototype: ItemRegistryCatalog.ItemPrototypeTemplate = catalog._canonical_registry[candidate_id]
+	if not _is_prototype_modified(existing_prototype, candidate_entry, default_minor_category):
+		return false
+	var preserved_numeric := existing_prototype.numeric_id
+	ItemRegistrySolver.unregister_prototype(catalog, candidate_id)
+	var replacement_entry: Dictionary = candidate_entry.duplicate(true)
+	if int(replacement_entry.get("numeric_id", 0)) <= 0:
+		replacement_entry["numeric_id"] = preserved_numeric
+	new_items.append(replacement_entry)
+	return true
+
 ## 配置热重载回收：同步注册表与 config/items/*.json 的差异——
-## 配置中已删除的物品自动注销（数字 ID 与名称键回空闲池），新增物品自动注册。
+## 配置中已删除的物品自动注销（数字 ID 与名称键回空闲池），已修改物品原位更新，新增物品自动注册。
 static func reload_from_config(catalog: ItemRegistryCatalog) -> Dictionary:
 	var all_items: Array = _collect_configured_items()
 
@@ -109,15 +151,25 @@ static func reload_from_config(catalog: ItemRegistryCatalog) -> Dictionary:
 			if unregister_result.success:
 				unregistered.append(str(registered_id))
 
-	# 2) 增量注册：仅注册配置中尚未登记的新物品（已存在的保持原数字 ID 不变）
+	# 2) 已登记物品若字段发生覆写（如 Tier 3 模组覆盖），保留原数字 ID 执行原位更新；新物品走增量注册
+	var default_minor_category: String = GameConfig.get_string("domains.item_namespace_registry", "defaults/category_minor", "WEAPON_BLADE")
+	var updated_count: int = 0
 	var new_items: Array = []
-	for item_dict in all_items:
-		var candidate_id := str(item_dict.get("canonical_id", ""))
-		if not candidate_id.is_empty() and not catalog._canonical_registry.has(candidate_id):
-			new_items.append(item_dict)
+	for item_entry in all_items:
+		if not (item_entry is Dictionary):
+			continue
+		var candidate_entry: Dictionary = item_entry
+		var candidate_id := str(candidate_entry.get("canonical_id", ""))
+		if candidate_id.is_empty():
+			continue
+		if not catalog._canonical_registry.has(candidate_id):
+			new_items.append(candidate_entry)
+		elif _enqueue_modified_item_entry(catalog, candidate_entry, candidate_id, default_minor_category, new_items):
+			updated_count += 1
 	var load_result := load_from_dict_list(catalog, new_items)
 	return {
 		"unregistered": unregistered,
+		"updated_count": updated_count,
 		"registered_count": load_result.get("loaded_count", 0),
 		"errors": load_result.get("errors", [])
 	}
@@ -127,8 +179,8 @@ static func reload_from_config(catalog: ItemRegistryCatalog) -> Dictionary:
 # ==============================================================================
 
 ## 判断物品是否存在于配置数据（canonical_id 匹配）
-static func _has_item(items_data: Array, canonical_id: String) -> bool:
-	for item_dict in items_data:
-		if str(item_dict.get("canonical_id", "")) == canonical_id:
+static func _has_item(items_payload: Array, canonical_id: String) -> bool:
+	for item_entry in items_payload:
+		if str(item_entry.get("canonical_id", "")) == canonical_id:
 			return true
 	return false

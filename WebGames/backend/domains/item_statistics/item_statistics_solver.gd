@@ -37,7 +37,7 @@ static func record_item_event(
 	quantity: int,
 	catalog: ItemRegistryCatalog = null,
 	telemetry: TelemetrySidecarEngine = null,
-	meta: Dictionary = {}
+	metadata: Dictionary = {}
 ) -> Dictionary:
 	if not GameConfig.get_bool("domains.item_statistics", "enabled", true):
 		return {"success": false, "reason": "item_statistics disabled"}
@@ -47,10 +47,10 @@ static func record_item_event(
 	var major := "UNCATEGORIZED"
 	var minor := "UNSPECIFIED"
 	if catalog != null:
-		var proto: Variant = catalog.get_prototype(canonical_id)
-		if proto != null:
-			major = proto.category_major
-			minor = proto.category_minor
+		var item_prototype: Variant = catalog.get_prototype(canonical_id)
+		if item_prototype != null:
+			major = item_prototype.category_major
+			minor = item_prototype.category_minor
 
 	library.mount_item(canonical_id, major, minor)
 	var applied: Variant = library.apply_item_delta(canonical_id, EVENT_TO_STAT_KEY[event_name], quantity)
@@ -63,8 +63,8 @@ static func record_item_event(
 			"category_major": major,
 			"category_minor": minor
 		}
-		for meta_key in meta:
-			payload[meta_key] = meta[meta_key]
+		for metadata_key in metadata:
+			payload[metadata_key] = metadata[metadata_key]
 		telemetry.record_event(event_name, library.account_id, payload)
 
 	return {
@@ -101,9 +101,9 @@ static func query_account_all(library: AccountItemLibrary) -> Array:
 # 全局聚合（跨账号，按 canonical_id）：RBAC 门禁
 # ==============================================================================
 
-static func _accumulate_library_stats(aggregated_stats: Dictionary, stats: Dictionary) -> void:
+static func _accumulate_library_stats(aggregated_stats: Dictionary, library_stats: Dictionary) -> void:
 	for stat_key in AccountItemLibrary.STAT_KEYS:
-		aggregated_stats[stat_key] = int(aggregated_stats[stat_key]) + int(stats.get(stat_key, 0))
+		aggregated_stats[stat_key] = int(aggregated_stats[stat_key]) + int(library_stats.get(stat_key, 0))
 
 ## 跨账户查询全局物品聚合统计数据
 static func query_global_item_stats(

@@ -39,15 +39,15 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从字典数据反序列化还原统计聚合数据传输对象
-static func from_dto(data: Dictionary) -> ItemStatAggregationDto:
+static func from_dto(serialized_dto: Dictionary) -> ItemStatAggregationDto:
 	var stat_aggregation := ItemStatAggregationDto.new()
-	stat_aggregation.total_items_tracked = int(data.get("total_items_tracked", 0))
-	stat_aggregation.total_value_accumulated = int(data.get("total_value_accumulated", 0))
-	var raw_rarity: Variant = data.get("rarity_breakdown", {})
+	stat_aggregation.total_items_tracked = int(serialized_dto.get("total_items_tracked", 0))
+	stat_aggregation.total_value_accumulated = int(serialized_dto.get("total_value_accumulated", 0))
+	var raw_rarity: Variant = serialized_dto.get("rarity_breakdown", {})
 	if raw_rarity is Dictionary:
 		stat_aggregation.rarity_breakdown = raw_rarity.duplicate(true)
-	var raw_categories: Variant = data.get("category_counts", {})
+	var raw_categories: Variant = serialized_dto.get("category_counts", {})
 	if raw_categories is Dictionary:
 		stat_aggregation.category_counts = raw_categories.duplicate(true)
-	stat_aggregation.last_updated_utc = int(data.get("last_updated_utc", 0))
+	stat_aggregation.last_updated_utc = int(serialized_dto.get("last_updated_utc", 0))
 	return stat_aggregation

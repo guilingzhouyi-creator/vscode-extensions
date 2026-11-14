@@ -28,13 +28,13 @@ static func resolve(
 		return {"success": false, "code": "UNREGISTERED_ITEM", "canonical_id": canonical_id}
 
 	# 参数注入：仅取 prototype 已注册字段（白名单）+ state 运行时状态；禁新属性定义
-	var params := _build_params(prototype, state)
+	var template_parameters := _build_params(prototype, state)
 
 	# 文本生成：统一文案核心——copy_key 用 english_name（canonical_id
 	# 含冒号不符合三段式键规范）；conditions 条件段拼接 + {param} 填充 + 未填充
 	# 拦截 + 描述键登记（跨域唯一）均在共享核心一处实现。
 	return CopywritingResolver.resolve(
-		"item." + prototype.english_name + ".desc", params, "", locale_override)
+		"item." + prototype.english_name + ".desc", template_parameters, "", locale_override)
 
 # ==============================================================================
 # 二、参数注入（白名单）
@@ -42,7 +42,7 @@ static func resolve(
 
 ## 参数注入：仅取 prototype 已注册字段（白名单）+ state 运行时状态；禁新属性定义
 static func _build_params(prototype: ItemRegistryCatalog.ItemPrototypeTemplate, state: Dictionary) -> Dictionary:
-	var params: Dictionary = {
+	var template_parameters: Dictionary = {
 		"name": str(prototype.english_name),
 		"tier_rank": prototype.tier_rank,
 		"mass_kg": prototype.default_mass_kg,
@@ -50,5 +50,5 @@ static func _build_params(prototype: ItemRegistryCatalog.ItemPrototypeTemplate, 
 		"market_value": prototype.base_market_value,
 	}
 	for state_key in state.keys():
-		params[state_key] = state[state_key]
-	return params
+		template_parameters[state_key] = state[state_key]
+	return template_parameters

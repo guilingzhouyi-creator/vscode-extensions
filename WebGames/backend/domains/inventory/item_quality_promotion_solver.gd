@@ -33,9 +33,9 @@ static func evaluate_quality_promotion(
 	mounts: Array,
 	definitions_by_uid: Dictionary
 ) -> QualityPromotionResult:
-	var result := QualityPromotionResult.new()
-	result.original_tier_rank = original_tier
-	result.effective_tier_rank = original_tier
+	var promotion_result := QualityPromotionResult.new()
+	promotion_result.original_tier_rank = original_tier
+	promotion_result.effective_tier_rank = original_tier
 
 	var total_score: float = 0.0
 	var active_affix_count: int = 0
@@ -62,8 +62,8 @@ static func evaluate_quality_promotion(
 		if active_affix_count >= max_affixes:
 			break
 
-	result.total_affix_score = total_score
-	result.affix_count = active_affix_count
+	promotion_result.total_affix_score = total_score
+	promotion_result.affix_count = active_affix_count
 
 	# 阶梯阈值比对
 	var tier_6_threshold: float = GameConfig.get_float("domains.item_attributes", "quality_upgrade_thresholds/tier_6", 1000.0)
@@ -84,7 +84,7 @@ static func evaluate_quality_promotion(
 	elif total_score >= tier_2_threshold:
 		calculated_tier = maxi(calculated_tier, 2) # 精良
 
-	result.effective_tier_rank = calculated_tier
-	result.is_promoted = (calculated_tier > original_tier)
+	promotion_result.effective_tier_rank = calculated_tier
+	promotion_result.is_promoted = (calculated_tier > original_tier)
 
-	return result
+	return promotion_result

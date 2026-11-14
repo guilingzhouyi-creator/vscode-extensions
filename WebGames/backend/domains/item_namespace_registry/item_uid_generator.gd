@@ -23,8 +23,8 @@ static func generate_uid(prefix: String) -> String:
 	if _counter < 0:
 		_counter = _initial_counter()
 	_counter += 1
-	var count_str := str(_counter).pad_zeros(_count_width())
-	return prefix + count_str + _checksum(prefix, _counter)
+	var count_text := str(_counter).pad_zeros(_count_width())
+	return prefix + count_text + _checksum(prefix, _counter)
 
 ## 校验：常规 UID 需前缀登记 + 长度匹配 + 校验尾重算比对（防篡改）
 static func validate_uid(uid: String) -> bool:
@@ -32,26 +32,26 @@ static func validate_uid(uid: String) -> bool:
 	for prefix in prefixes:
 		if String(prefix).is_empty():
 			continue
-		var pfx := String(prefix)
-		if not uid.begins_with(pfx):
+		var candidate_prefix := String(prefix)
+		if not uid.begins_with(candidate_prefix):
 			continue
-		var body := uid.substr(pfx.length())
+		var body := uid.substr(candidate_prefix.length())
 		var width := _count_width()
 		if body.length() != width + 2:
 			return false
-		var count_str := body.substr(0, width)
-		if not count_str.is_valid_int():
+		var count_text := body.substr(0, width)
+		if not count_text.is_valid_int():
 			return false
 		var check := body.substr(width, 2)
-		return check == _checksum(pfx, count_str.to_int())
+		return check == _checksum(candidate_prefix, count_text.to_int())
 	return false
 
 ## 来源追溯：返回 UID 的域前缀（未登记返回空）
 static func prefix_of(uid: String) -> String:
 	var prefixes: Array = GameConfig.get_array("domains.item_namespace_registry", "uid/prefixes", ["GM_", "CDK_", "GAC_", "MAIL_", "SRV_"])
-	for pfx in prefixes:
-		if uid.begins_with(String(pfx)):
-			return String(pfx)
+	for candidate_prefix in prefixes:
+		if uid.begins_with(String(candidate_prefix)):
+			return String(candidate_prefix)
 	return ""
 
 ## 单调计数持久化入口：外部落盘后经此续增（重启防重复）

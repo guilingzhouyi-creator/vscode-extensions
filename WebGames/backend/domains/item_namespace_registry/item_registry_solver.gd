@@ -46,7 +46,7 @@ static func _validate_prototype_identity(catalog: ItemRegistryCatalog, prototype
 	return {}
 
 static func _validate_prototype_uniqueness(catalog: ItemRegistryCatalog, prototype: ItemRegistryCatalog.ItemPrototypeTemplate) -> Dictionary:
-	if not prototype.loc_name_key.is_empty() and catalog._loc_key_to_canonical.has(prototype.loc_name_key):
+	if not prototype.loc_name_key.is_empty() and catalog._localization_key_to_canonical.has(prototype.loc_name_key):
 		return _make_error("ERR_NAME_KEY_COLLISION", _msg_fmt("name_key_collision", {"loc_name_key": prototype.loc_name_key}))
 	if catalog._english_name_to_canonical.has(prototype.english_name):
 		return _make_error("ERR_ENGLISH_NAME_COLLISION", _msg_fmt("english_name_collision", {"english_name": prototype.english_name}))
@@ -61,7 +61,7 @@ static func _commit_prototype_to_catalog(catalog: ItemRegistryCatalog, prototype
 	catalog._numeric_to_canonical[prototype.numeric_id] = prototype.canonical_id
 	catalog.occupy_numeric_id(prototype.numeric_id)
 	if not prototype.loc_name_key.is_empty():
-		catalog._loc_key_to_canonical[prototype.loc_name_key] = prototype.canonical_id
+		catalog._localization_key_to_canonical[prototype.loc_name_key] = prototype.canonical_id
 	catalog._english_name_to_canonical[prototype.english_name] = prototype.canonical_id
 
 	var seen_aliases: Dictionary = {}
@@ -122,7 +122,7 @@ static func unregister_prototype(catalog: ItemRegistryCatalog, canonical_id: Str
 	catalog._numeric_to_canonical.erase(prototype.numeric_id)
 	catalog.release_numeric_id(prototype.numeric_id)
 	if not prototype.loc_name_key.is_empty():
-		catalog._loc_key_to_canonical.erase(prototype.loc_name_key)
+		catalog._localization_key_to_canonical.erase(prototype.loc_name_key)
 	if not prototype.english_name.is_empty():
 		catalog._english_name_to_canonical.erase(prototype.english_name)
 	catalog._canonical_registry.erase(canonical_id)
@@ -169,12 +169,12 @@ static func resolve_search_term(catalog: ItemRegistryCatalog, search_term: Strin
 
 ## 统一英文名格式断言：仅允许小写字母/数字/下划线（底层规范化标准）
 static func _is_valid_english_name(name: String) -> bool:
-	for char_index in range(name.length()):
-		var current_char := name[char_index]
-		if not (current_char >= "a" and current_char <= "z") and not (current_char >= "0" and current_char <= "9") and current_char != "_":
+	for character_index in range(name.length()):
+		var current_character := name[character_index]
+		if not (current_character >= "a" and current_character <= "z") and not (current_character >= "0" and current_character <= "9") and current_character != "_":
 			return false
 	return true
 
 ## 错误文案查表并注入 {param} 命名占位符（item_namespace_registry 域）
-static func _msg_fmt(key: String, params: Dictionary = {}) -> String:
-	return GameConfig.msg_fmt("item_namespace_registry", key, params)
+static func _msg_fmt(key: String, format_parameters: Dictionary = {}) -> String:
+	return GameConfig.msg_fmt("item_namespace_registry", key, format_parameters)
