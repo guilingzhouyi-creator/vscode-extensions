@@ -1,6 +1,6 @@
 # 配置管理、子表路由与模板解析 (`config_and_routing`)
 
-> 对应源码：`backend/infrastructure/` 下配置中心、路由器、`.kdat` 二进制解码器及文本模板工具共 **8 个**脚本，承担全引擎配置的加载、热更新、子表重定向与文案插值职责。
+> 对应源码：`backend/infrastructure/` 下配置中心、I/O 加载器、路由器、`.kdat` 二进制解码器及文本模板工具共 **9 个**脚本，承担全引擎配置的加载、按需 JIT 读盘、热更新、子表重定向与文案插值职责。
 
 ---
 
@@ -8,7 +8,8 @@
 
 | 文件路径 | 核心类 | 基类 | 核心职责与关键接口 |
 | :--- | :--- | :--- | :--- |
-| [game_config.gd](../../../backend/infrastructure/game_config.gd) | `GameConfig` | `RefCounted` | 全域配置中央快照容器；提供 `ensure_loaded()`、`ensure_l0_loaded_sync()`、`load_via_storage_async()`、`reload_config()`、`config_reload_version()` 及 `get_int/float/string/bool/dict/array`、`msg()` |
+| [game_config.gd](../../../backend/infrastructure/game_config.gd) | `GameConfig` | `RefCounted` | 全域配置中央快照与模组覆盖层门面；提供 `ensure_loaded()`、`ensure_l0_loaded_sync()`、`load_via_storage_async()`、`reload_config()`、`apply_mod_overlay_tables()`、`clear_mod_overlay_tables()`、`config_reload_version()` 及 `get_int/float/string/bool/dict/array`、`msg()` |
+| [game_config_loader.gd](../../../backend/infrastructure/game_config_loader.gd) | `GameConfigLoader` | `RefCounted` | 承担物理目录扫描、`.kdat`/`.json` 单表加载、JIT 按需读盘、异步工作池装载及热重载快照差异计算，实现查询门面与 I/O 构表分层解耦 |
 | [config_router_engine.gd](../../../backend/infrastructure/config_router_engine.gd) | `ConfigRouterEngine` | `RefCounted` | 点分表名与键前缀智能路由器；提供 `resolve_table_name()`、`resolve_route()`、`get_subtables_for_domain()`、`build_subtable_key()`、`is_subtable()` |
 | [config_route_dto.gd](../../../backend/infrastructure/config_route_dto.gd) | `ConfigRouteDTO` | `RefCounted` | 路由解析结果值对象；携带 `root_layer`、`domain_id`、`sub_table_id` 与 `RouteResolutionMode` 枚举（直通/别名/前缀分派） |
 | [binary_config_reader.gd](../../../backend/infrastructure/binary_config_reader.gd) | `BinaryConfigReader` | `RefCounted` | `.kdat` 紧凑二进制配置解码器；实现魔数 `0x4B444154` 校验、`compute_crc32()`、`load_kdat_file()`、`load_kdat_buffer()`、`load_monolithic_bundle()` |

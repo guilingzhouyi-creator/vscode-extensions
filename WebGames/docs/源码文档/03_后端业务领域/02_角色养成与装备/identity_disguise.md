@@ -1,6 +1,6 @@
 # 易容伪装与因果穿透 (`identity_disguise`)
 
-> 对应源码：`backend/domains/identity_disguise/`（3 个 `.gd`）。支持玩家和 NPC 持有不可变 UUID 与多套假名面具，通过伪装精密度与洞察抗衡检定判断是否识破，并在识破瞬间将假名恶名 100% 合并穿透回真身。
+> 对应源码：`backend/domains/identity_disguise/`（3 个 `.gd`）。支持玩家和 NPC 持有不可变 UUID 与多套假名面具，通过伪装精密度与洞察抗衡检定判断是否识破，并在识破后将假名关联的恶名合并计入真身。
 
 ---
 

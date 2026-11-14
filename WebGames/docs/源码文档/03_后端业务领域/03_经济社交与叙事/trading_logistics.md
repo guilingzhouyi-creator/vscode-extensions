@@ -1,6 +1,6 @@
 # 供需价格弹性与跨大陆商队物流 (`trading_logistics`)
 
-> 对应源码：`backend/domains/trading_logistics/`（3 个 `.gd`）。建模城镇局部商品库存与供需价格弹性、动态市场均值回归定价方程及商队护卫遇袭风险状态推进。
+> 对应源码：`backend/domains/trading_logistics/`（4 个 `.gd`）。建模城镇局部商品库存与供需价格弹性、动态市场均值回归定价方程及商队护卫遇袭风险状态推进。
 
 ---
 
@@ -8,7 +8,8 @@
 
 | 文件路径 | 核心类 | 角色定位 | 公开接口与配置驱动 |
 | :--- | :--- | :--- | :--- |
-| [town_market_commodity.gd](../../../../backend/domains/trading_logistics/town_market_commodity.gd) | `TownMarketCommodity` | 集市商品与商队实体 | 读取 `domains.trading:{commodity_defaults,caravan_defaults}/*` |
+| [town_market_commodity.gd](../../../../backend/domains/trading_logistics/town_market_commodity.gd) | `TownMarketCommodity` | 集市商品实体 | 读取 `domains.trading:commodity_defaults/*` |
+| [trade_caravan_entity.gd](../../../../backend/domains/trading_logistics/trade_caravan_entity.gd) | `TradeCaravanEntity` | 跨国商队行动实体 | 记录起止城镇、货单、护卫与行进进度（`caravan_defaults/*`） |
 | [market_elasticity_and_trading_solver.gd](../../../../backend/domains/trading_logistics/market_elasticity_and_trading_solver.gd) | `MarketElasticityAndTradingSolver` | 供需弹性纯求解器 | `calculate_market_price()`、`simulate_dumping_impact()`（结合共享表 `domains.economy:dynamic_market/*` 衰减与涨跌幅限制） |
 | [caravan_logistics_fsm.gd](../../../../backend/domains/trading_logistics/caravan_logistics_fsm.gd) | `CaravanLogisticsFSM` | 商队运输与劫掠状态机 | `advance_caravan_progress()` 计算沿途遇袭与护卫减伤结转 |
 

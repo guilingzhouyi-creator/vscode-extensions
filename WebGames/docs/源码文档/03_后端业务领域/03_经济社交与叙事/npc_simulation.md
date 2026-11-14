@@ -1,6 +1,6 @@
 # NPC 自主演算与寿命传承 (`npc_simulation`)
 
-> 对应源码：`backend/domains/npc_simulation/`（3 个 `.gd`）。坚持 NPC 与玩家 100% 生理底座同构，结合五维性格矩阵驱动 GOAP 目标规划，并在 NPC 大限来临时完成著书立说与弟子遗产交接。
+> 对应源码：`backend/domains/npc_simulation/`（3 个 `.gd`）。使 NPC 与玩家共用同构生理底座，结合五维性格矩阵驱动 GOAP 目标规划，并在 NPC 寿终时完成著书与弟子遗产交接。
 
 ---
 

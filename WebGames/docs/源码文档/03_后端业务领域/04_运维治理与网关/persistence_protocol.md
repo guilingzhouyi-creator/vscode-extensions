@@ -1,6 +1,6 @@
 # 持久化协议、双域存储与定向热重载 (`persistence_protocol`)
 
-> 对应源码：`backend/domains/persistence_protocol/`（**25 个** `.gd`，含 `dto/`）。本域作为基础设施型豁免领域（`config_exempt: true`），承接两大核心工程系统：其一是**全域数据存取门面、脏标持久化与三级版本迁移管线**；其二是**主要状态与辅助资源严格隔离的双域存储架构**（含优先级异步工作池、主线程帧预算切片与依赖 DAG 定向增量热重载）。
+> 对应源码：`backend/domains/persistence_protocol/`（**28 个** `.gd`，含 `dto/`）。本域作为基础设施型豁免领域（`config_exempt: true`），承接两大核心工程系统：其一是**全域数据存取门面、脏标持久化、指令/事件数据包与三级版本迁移管线**；其二是**主要状态与辅助资源隔离的双域存储架构**（含优先级异步工作池、主线程帧预算切片与依赖 DAG 定向增量热重载）。
 
 ---
 
@@ -10,6 +10,9 @@
 | 文件路径 | 核心类 | 关键公开接口与职责 |
 | :--- | :--- | :--- |
 | [save_data_access_layer.gd](../../../../backend/domains/persistence_protocol/save_data_access_layer.gd) | `SaveDataAccessLayer` | 统一存取门面：`register_provider()`、`mark_dirty()`、`get_dirty_domains()`、`build_save_payload()`、`apply_save_data()`、`save_game()` |
+| [poolable_dto_base.gd](../../../../backend/domains/persistence_protocol/poolable_dto_base.gd) | `PoolableDtoBase` | 领域层可池化 DTO 统一基类契约，提供状态重置与零堆分配复用协议（遵循单向依赖） |
+| [client_command_packet.gd](../../../../backend/domains/persistence_protocol/client_command_packet.gd) | `ClientCommandPacket` | 客户端指令数据包实体，封装命令序号、类型、时间戳与载荷 |
+| [server_event_packet.gd](../../../../backend/domains/persistence_protocol/server_event_packet.gd) | `ServerEventPacket` | 服务端事件数据包实体，承载帧刻度、确认序号与权威状态载荷 |
 | [game_save_assembler.gd](../../../../backend/domains/persistence_protocol/game_save_assembler.gd) | `GameSaveAssembler` | 按 `domains.json` 清单序保证 SHA 稳定装配与迁移调度：`register_migration()`、`build_save_payload()`、`migrate_save_data()` |
 | [save_domain_contract.gd](../../../../backend/domains/persistence_protocol/save_domain_contract.gd) | `SaveDomainContract` | 封装单域序列化配置与 Provider/Consumer 反射绑定 |
 | [save_migration_engine.gd](../../../../backend/domains/persistence_protocol/save_migration_engine.gd) | `SaveMigrationEngine` | 三级版本（Domain/Schema/Save）链式演进与失败回滚：`migrate_domain()`、`migrate()`、`load_rules_from_config()` |

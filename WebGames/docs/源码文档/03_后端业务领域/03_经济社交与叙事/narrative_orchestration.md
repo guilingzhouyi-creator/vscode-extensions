@@ -1,6 +1,6 @@
 # 全域因果剧情流、DAG 编排与跨世界扰动 (`narrative_orchestration`)
 
-> 对应源码：`backend/domains/narrative_orchestration/`（**18 个** `.gd`，含 `dto/`）。负责世界/地缘/个人三级叙事编排、基于 Kahn 算法的剧情 DAG 拓扑无环校验与运行时推进、事件概率/描述解耦解析、MOD 多包级联扫描与依赖拓扑加载、世界 MOD 绑定锁，以及跨世界因果虚空扰动队列与伴侣观察总线。
+> 对应源码：`backend/domains/narrative_orchestration/`（**22 个** `.gd`，含 `dto/`）。负责世界/地缘/个人三级叙事编排、基于 Kahn 算法的剧情 DAG 拓扑无环校验与运行时推进、事件概率/描述解耦解析、MOD 多级路径扫描与依赖拓扑加载、Tier 3 `content/` 运行时差分覆盖、`GameConfig` 覆盖层管理、世界 MOD 绑定锁，以及跨世界因果虚空扰动队列与伴侣观察总线。
 
 ---
 
@@ -29,7 +29,11 @@
 ### 3. MOD 多包拓扑发现、世界亲和锁与跨世界共鸣
 | 文件路径 | 核心类 | 核心职责与公开接口 |
 | :--- | :--- | :--- |
-| [mod_package_discovery_solver.gd](../../../../backend/domains/narrative_orchestration/mod_package_discovery_solver.gd) | `ModPackageDiscoverySolver` | 三级路径扫描与 Kahn 拓扑排序依赖解析：`get_discovery_roots()`、`scan_installed_packs()`、`sort_and_resolve_dependencies()`、`load_full_mod_package_from_dir()` |
+| [mod_package_discovery_solver.gd](../../../../backend/domains/narrative_orchestration/mod_package_discovery_solver.gd) | `ModPackageDiscoverySolver` | 多级 `mods/` 与 `mods/narratives/` 路径扫描（含去重）及 Kahn 拓扑排序依赖解析：`get_discovery_roots()`、`scan_installed_packs()`、`sort_and_resolve_dependencies()`、`load_full_mod_package_from_dir()` |
+| [tier3_content_override_loader.gd](../../../../backend/domains/narrative_orchestration/tier3_content_override_loader.gd) | `Tier3ContentOverrideLoader` | 编排已启用模组 Tier 3 `content/` 差分加载与生命周期恢复（`apply_enabled_packages()`、`revert_all_overrides()`）并同步 `ItemLoaderPipeline` |
+| [tier3_content_record_parser.gd](../../../../backend/domains/narrative_orchestration/tier3_content_record_parser.gd) | `Tier3ContentRecordParser` | 扫描模组目录与 `.kmod` 压缩包内 `content/{items,skills,rules,world}/*.json` 并提供策略归一化与字典深合并 |
+| [tier3_item_skill_override_applier.gd](../../../../backend/domains/narrative_orchestration/tier3_item_skill_override_applier.gd) | `Tier3ItemSkillOverrideApplier` | 将 `items` 与 `skills` 差分载荷按 `MERGE`/`REPLACE_ENTRY`/`TOTAL_PURGE` 写入工作表（`items.mod_overrides`、`domains.combat.mechanics`） |
+| [tier3_rules_world_override_applier.gd](../../../../backend/domains/narrative_orchestration/tier3_rules_world_override_applier.gd) | `Tier3RulesWorldOverrideApplier` | 将 `rules` 与 `world` 差分载荷覆写至核心公式、创角限制、经济容量与世界拓扑工作表 |
 | [world_mod_affinity_manager.gd](../../../../backend/domains/narrative_orchestration/world_mod_affinity_manager.gd) | `WorldModAffinityManager` | 管理单机世界专属 MOD 锁定清单防坏档：`verify_and_bind_world_mods()`、`load_world_mod_lock()` |
 | [cross_world_perturbation_broker.gd](../../../../backend/domains/narrative_orchestration/cross_world_perturbation_broker.gd) | `CrossWorldPerturbationBroker` | 跨世界虚空共鸣发布、半衰期衰减修剪与防重访轮询：`emit_perturbation()`、`poll_perturbations_for_world()`、`prune_decayed_perturbations()` |
 | [companion_observer_bus.gd](../../../../backend/domains/narrative_orchestration/companion_observer_bus.gd) | `CompanionObserverBus` | 非侵入式定长 32 槽环形伴侣观察总线：`register_observer()`、`broadcast_event()`、`get_recent_events()` |

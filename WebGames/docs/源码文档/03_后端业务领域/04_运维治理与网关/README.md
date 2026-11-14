@@ -1,6 +1,6 @@
 # 04 运维治理与网关集群
 
-> 本集群收录持久化与双域存储协议、世界网关与模式隔离、GM 审计与资产追缴、全局设置、灰度熔断、i18n 本地化、事件驱动音频、红点通知、维护公告、旁路遥测与事件抽取、多硬件输入共 **12 个**后端业务领域（合计 68 个 `.gd` 文件）。
+> 本集群收录持久化与双域存储协议、世界网关与模式隔离、GM 审计与资产追缴、全局设置、灰度熔断、i18n 本地化、事件驱动音频、红点通知、维护公告、旁路遥测与事件抽取、多硬件输入共 **12 个**后端业务领域（合计 81 个 `.gd` 文件）。
 
 ---
 
@@ -8,10 +8,10 @@
 
 | 文档 | 领域 ID (`domains.json`) | 脚本数 | 配置主表 | 测试入口 |
 | :--- | :--- | :---: | :--- | :--- |
-| [persistence_protocol.md](persistence_protocol.md) | `persistence_protocol` | 25 | `infrastructure.persistence`（豁免复用） | [test_persistence_protocol.gd](../../../../tests/unit/domains/test_persistence_protocol.gd) |
-| [world_gateway.md](world_gateway.md) | `world_gateway` | 15 | `domains.world_gateway.core` | [test_world_gateway.gd](../../../../tests/unit/domains/test_world_gateway.gd) |
+| [persistence_protocol.md](persistence_protocol.md) | `persistence_protocol` | 28 | `infrastructure.persistence`（豁免复用） | [test_persistence_protocol.gd](../../../../tests/unit/domains/test_persistence_protocol.gd) |
+| [world_gateway.md](world_gateway.md) | `world_gateway` | 16 | `domains.world_gateway.core` | [test_world_gateway.gd](../../../../tests/unit/domains/test_world_gateway.gd) |
 | [admin_sandbox.md](admin_sandbox.md) | `admin_sandbox` | 6 | `infrastructure.admin`（豁免复用） | [test_admin_sandbox.gd](../../../../tests/unit/domains/test_admin_sandbox.gd) |
-| [game_settings.md](game_settings.md) | `game_settings` | 3 | `domains.game_settings.core` | [test_game_settings.gd](../../../../tests/unit/domains/test_game_settings.gd) |
+| [game_settings.md](game_settings.md) | `game_settings` | 4 | `domains.game_settings.core` | [test_game_settings.gd](../../../../tests/unit/domains/test_game_settings.gd) |
 | [feature_toggle_canary.md](feature_toggle_canary.md) | `feature_toggle_canary` | 3 | `domains.feature_toggle_canary.core` | [test_feature_toggle_canary.gd](../../../../tests/unit/domains/test_feature_toggle_canary.gd) |
 | [localization_i18n.md](localization_i18n.md) | `localization_i18n` | 5 | `domains.localization_i18n.core` | [test_localization_i18n.gd](../../../../tests/unit/domains/test_localization_i18n.gd) |
 | [event_driven_audio.md](event_driven_audio.md) | `event_driven_audio` | 3 | `domains.event_driven_audio.core` | [test_event_driven_audio.gd](../../../../tests/unit/domains/test_event_driven_audio.gd) |

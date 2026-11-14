@@ -1,4 +1,4 @@
-# 后天潜能成长与双轨洗点 (`potential_growth`)
+# 后天潜能成长与属性重塑 (`potential_growth`)
 
 > 对应源码：`backend/domains/potential_growth/`（4 个 `.gd`）。采用“阅历突破授点 + 破阶递减加点 + 事件驱动底层实际值永久修正 + 因果洗点重塑”替代传统等级数值膨胀体系。
 
