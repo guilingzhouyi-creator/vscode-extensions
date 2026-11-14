@@ -1,6 +1,6 @@
 # 03 后端业务领域 (`backend/domains/`)
 
-> 本分卷收录 `WebGames/backend/domains/` 下在 [domains.json](../../../config/infrastructure/domains.json) 显式登记的 **47 个业务领域**（合计 327 个 `.gd` 脚本），按功能相关性划分为四大集群目录，并严格按源码目录名 `1:1` 编写 `<domain_id>.md` 技术参考。
+> 本分卷收录 `WebGames/backend/domains/` 下在 [domains.json](../../../config/infrastructure/domains.json) 显式登记的 **47 个业务领域**（合计 349 个 `.gd` 脚本），按功能相关性划分为四大集群目录，并严格按源码目录名 `1:1` 编写 `<domain_id>.md` 技术参考。
 > 另注：`backend/domains/` 下 `contract_registry`、`lifecycle`、`version_governance` 三个跨域基础设施豁免目录独立归档于 [02_后端跨域底座](../02_后端跨域底座/README.md)。
 
 ---

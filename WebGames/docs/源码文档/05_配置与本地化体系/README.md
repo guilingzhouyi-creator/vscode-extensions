@@ -1,6 +1,6 @@
 # 05 配置与本地化体系 (`config/`)
 
-> 本分卷映射 [WebGames/config/](../../../config/) 全部 **131 个** JSON 配置文件及其运行时加载与文案水化引擎，构成本项目「零硬编码、配置驱动」的单一事实来源（SSOT）。
+> 本分卷映射 [WebGames/config/](../../../config/) 全部 **131 个** JSON 配置文件及其运行时加载与文案插值引擎，构成配置驱动与无硬编码参数的单一数据来源（SSOT）。
 
 ---
 
@@ -24,7 +24,7 @@ graph TD
 | `config/frontend/` | 3 | `frontend.ui`、`frontend.views`、`frontend.views.hud_event_bridge` | `ServiceLocator`、8 个前端语义白名单视图与事件桥接路由 |
 | `config/items/` | 1 | `items.core` | 全量物品原型库与三元组校验（`canonical_id` / `english_name` / `loc_name_key`） |
 | `config/narratives/` | 49 | `narratives.<name>` | 后端 `GameConfig.msg()` 与 `EventBusCore.emit_narrative_by_key()` |
-| `config/copywriting/` | 4 | `copywriting.<name>`（`bulletin` / `item` / `narrative` / `probability`） | `CopywritingResolver` 结构化模板条件水化 |
+| `config/copywriting/` | 4 | `copywriting.<name>`（`bulletin` / `item` / `narrative` / `probability`） | `CopywritingResolver` 结构化模板条件渲染 |
 | `config/i18n/` | 2 | `zh_CN.json` / `en_US.json` | 前端 `UITextResolver` 独立双语界面词典（各 1,936 行键值对） |
 
 ---
