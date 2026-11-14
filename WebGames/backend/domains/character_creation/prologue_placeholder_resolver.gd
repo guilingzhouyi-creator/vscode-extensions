@@ -23,96 +23,96 @@ static var _regex: RegEx = RegEx.create_from_string(r"\{([a-zA-Z0-9_]+)\}")
 # ==============================================================================
 
 ## 从角色序章上下文动态收集运行时占位符字典。
-## 契约：ctx 为空返回空字典；起始地点/初始装备/NPC 名经 narratives.prologue_i18n
+## 契约：prologue_context 为空返回空字典；起始地点/初始装备/NPC 名经 narratives.prologue_i18n
 ##       表解析，键缺失回退各自原始 ID（杜绝硬编码地理名/道具名）。
 static func extract_placeholders(
-	ctx: CharacterPrologueContext,
+	prologue_context: CharacterPrologueContext,
 	adapted_mod_manifest: Dictionary = {},
 	profile: Variant = null
 ) -> Dictionary:
-	var dict: Dictionary = {}
-	if ctx == null:
-		return dict
+	var placeholders: Dictionary = {}
+	if prologue_context == null:
+		return placeholders
 
-	dict["PLAYER_NAME"] = ctx.character_name
-	dict["CHARACTER_NAME"] = ctx.character_name
-	dict["CHARACTER_ID"] = ctx.character_id
-	dict["RACE_ID"] = ctx.race_id
-	dict["GENDER"] = ctx.gender
+	placeholders["PLAYER_NAME"] = prologue_context.character_name
+	placeholders["CHARACTER_NAME"] = prologue_context.character_name
+	placeholders["CHARACTER_ID"] = prologue_context.character_id
+	placeholders["RACE_ID"] = prologue_context.race_id
+	placeholders["GENDER"] = prologue_context.gender
 
 	# 起始地点展示名（查后端剧情 i18n 地理表；缺失回退地点 ID）
-	dict["START_LOCATION"] = GameConfig.get_string(
-		"narratives.prologue_i18n", "locations/" + ctx.assigned_start_location_id, ctx.assigned_start_location_id
+	placeholders["START_LOCATION"] = GameConfig.get_string(
+		"narratives.prologue_i18n", "locations/" + prologue_context.assigned_start_location_id, prologue_context.assigned_start_location_id
 	)
 
 	# 初始装备展示名
-	var kit_id := ctx.assigned_starter_kit_id
+	var kit_id := prologue_context.assigned_starter_kit_id
 	if kit_id.is_empty():
-		kit_id = GameConfig.get_string("domains.starter_loadout", "race_kit_map/" + ctx.race_id, "")
-	var kit_cfg: Dictionary = GameConfig.get_dict("domains.starter_loadout", "starter_kits/" + kit_id, {})
-	var weapon_canonical: String = str(kit_cfg.get("display_weapon", ""))
+		kit_id = GameConfig.get_string("domains.starter_loadout", "race_kit_map/" + prologue_context.race_id, "")
+	var kit_config: Dictionary = GameConfig.get_dict("domains.starter_loadout", "starter_kits/" + kit_id, {})
+	var weapon_canonical: String = str(kit_config.get("display_weapon", ""))
 	if not weapon_canonical.is_empty():
 		var weapon_key := weapon_canonical.replace(":", "_")
-		dict["INITIAL_EQUIPMENT"] = GameConfig.get_string(
+		placeholders["INITIAL_EQUIPMENT"] = GameConfig.get_string(
 			"narratives.prologue_i18n", "items/" + weapon_key,
 			GameConfig.get_string("narratives.prologue_i18n", "items/" + weapon_canonical, weapon_canonical)
 		)
 	else:
-		dict["INITIAL_EQUIPMENT"] = ""
+		placeholders["INITIAL_EQUIPMENT"] = ""
 
 	# 序章接引人
 	var npc_target: String = GameConfig.get_string("narratives.prologue_i18n", "npcs/default_guide", "FORTRESS_GUARD")
-	dict["NPC_TARGET"] = GameConfig.get_string("narratives.prologue_i18n", "npcs/" + npc_target, npc_target)
-	dict["EVENT_RESULT"] = "SUCCESS"
+	placeholders["NPC_TARGET"] = GameConfig.get_string("narratives.prologue_i18n", "npcs/" + npc_target, npc_target)
+	placeholders["EVENT_RESULT"] = "SUCCESS"
 
 	# 身世、区域、套件与金币等衍生占位符
-	_populate_extended_placeholders(ctx, adapted_mod_manifest, profile, kit_id, dict)
+	_populate_extended_placeholders(prologue_context, adapted_mod_manifest, profile, kit_id, placeholders)
 
 	# 写入所有键的小写形式及 race 别名
-	var keys_to_lower: Array = dict.keys()
-	for k in keys_to_lower:
-		dict[str(k).to_lower()] = dict[k]
-	dict["race"] = dict["RACE_ID"]
+	var keys_to_lower: Array = placeholders.keys()
+	for placeholder_key in keys_to_lower:
+		placeholders[str(placeholder_key).to_lower()] = placeholders[placeholder_key]
+	placeholders["race"] = placeholders["RACE_ID"]
 
-	return dict
+	return placeholders
 
 static func _populate_extended_placeholders(
-	ctx: CharacterPrologueContext,
+	prologue_context: CharacterPrologueContext,
 	manifest: Dictionary,
 	profile: Variant,
 	kit_id: String,
-	dict: Dictionary
+	placeholders: Dictionary
 ) -> void:
-	var origin_id: String = str(ctx.runtime_placeholders.get("ORIGIN_ID", ctx.runtime_placeholders.get("origin_id", "")))
+	var origin_id: String = str(prologue_context.runtime_placeholders.get("ORIGIN_ID", prologue_context.runtime_placeholders.get("origin_id", "")))
 	if origin_id.is_empty() and profile is Dictionary:
 		origin_id = str((profile as Dictionary).get("origin_id", ""))
-	dict["ORIGIN_ID"] = origin_id
+	placeholders["ORIGIN_ID"] = origin_id
 
-	var origins_cat: Dictionary = manifest.get("origins_catalog", manifest.get("origins", {}))
-	var orig_cfg: Dictionary = origins_cat.get(origin_id, {})
-	dict["ORIGIN_NAME"] = str(orig_cfg.get("name", origin_id))
+	var origins_catalog: Dictionary = manifest.get("origins_catalog", manifest.get("origins", {}))
+	var origin_config: Dictionary = origins_catalog.get(origin_id, {})
+	placeholders["ORIGIN_NAME"] = str(origin_config.get("name", origin_id))
 
 	var birth_region_map: Dictionary = manifest.get("birth_region_map", {})
-	dict["BIRTH_REGION"] = str(birth_region_map.get(origin_id, str(orig_cfg.get("birth_region_id", "CENTRAL_CONTINENT"))))
+	placeholders["BIRTH_REGION"] = str(birth_region_map.get(origin_id, str(origin_config.get("birth_region_id", "CENTRAL_CONTINENT"))))
 
-	dict["TRAIT_SUMMARY"] = str(ctx.runtime_placeholders.get("TRAIT_SUMMARY", ctx.runtime_placeholders.get("trait_summary", "")))
+	placeholders["TRAIT_SUMMARY"] = str(prologue_context.runtime_placeholders.get("TRAIT_SUMMARY", prologue_context.runtime_placeholders.get("trait_summary", "")))
 
 	var mod_kits: Dictionary = manifest.get("starter_kits", manifest.get("custom_starter_kits", {}))
 	var kit_name: String = str(mod_kits.get(kit_id, {}).get("name", kit_id))
-	dict["STARTER_KIT_NAME"] = kit_name
+	placeholders["STARTER_KIT_NAME"] = kit_name
 
-	var gold_val: int = 50
+	var gold_value: int = 50
 	if profile != null:
 		if profile is CharacterProfile:
-			gold_val = int((profile as CharacterProfile).personal_resources.get("gold", 50))
+			gold_value = int((profile as CharacterProfile).personal_resources.get("gold", 50))
 		elif profile is Dictionary:
-			var pr: Dictionary = (profile as Dictionary).get("personal_resources", (profile as Dictionary).get("wallet", {}))
-			gold_val = int(pr.get("gold", 50))
-	elif ctx.runtime_placeholders.has("INITIAL_GOLD"):
-		gold_val = int(ctx.runtime_placeholders["INITIAL_GOLD"])
-	elif ctx.runtime_placeholders.has("STARTER_GOLD"):
-		gold_val = int(ctx.runtime_placeholders["STARTER_GOLD"])
-	dict["INITIAL_GOLD"] = str(gold_val)
+			var personal_resources: Dictionary = (profile as Dictionary).get("personal_resources", (profile as Dictionary).get("wallet", {}))
+			gold_value = int(personal_resources.get("gold", 50))
+	elif prologue_context.runtime_placeholders.has("INITIAL_GOLD"):
+		gold_value = int(prologue_context.runtime_placeholders["INITIAL_GOLD"])
+	elif prologue_context.runtime_placeholders.has("STARTER_GOLD"):
+		gold_value = int(prologue_context.runtime_placeholders["STARTER_GOLD"])
+	placeholders["INITIAL_GOLD"] = str(gold_value)
 
 # ==============================================================================
 # 三、模板解析与安全降级替换
@@ -121,31 +121,31 @@ static func _populate_extended_placeholders(
 ## 将模板中的 {KEY} 替换为运行时实值；未匹配占位符注入安全降级标记并返回清单。
 ## 契约：空模板返回成功空文本；缺失占位符替换为 [UNKNOWN:KEY]（不抛异常），
 ##       success 取 missing 是否为空；替换为单遍顺序执行（确定性）。
-static func resolve_template(template_str: String, placeholders: Dictionary) -> Dictionary:
-	if template_str.is_empty():
+static func resolve_template(template_text: String, placeholders: Dictionary) -> Dictionary:
+	if template_text.is_empty():
 		return { "success": true, "text": "", "missing_placeholders": [] }
 
 	var missing: Array[String] = []
-	var result_text := template_str
+	var result_text := template_text
 
-	var matches := _regex.search_all(template_str)
-	for m in matches:
-		var key := m.get_string(1)
-		var val_found: bool = false
-		var val_str: String = ""
+	var matches := _regex.search_all(template_text)
+	for regex_match in matches:
+		var key := regex_match.get_string(1)
+		var value_found: bool = false
+		var value_text: String = ""
 
 		if placeholders.has(key):
-			val_found = true
-			val_str = str(placeholders[key])
+			value_found = true
+			value_text = str(placeholders[key])
 		elif placeholders.has(key.to_upper()):
-			val_found = true
-			val_str = str(placeholders[key.to_upper()])
+			value_found = true
+			value_text = str(placeholders[key.to_upper()])
 		elif placeholders.has(key.to_lower()):
-			val_found = true
-			val_str = str(placeholders[key.to_lower()])
+			value_found = true
+			value_text = str(placeholders[key.to_lower()])
 
-		if val_found:
-			result_text = result_text.replace("{%s}" % key, val_str)
+		if value_found:
+			result_text = result_text.replace("{%s}" % key, value_text)
 		else:
 			if not missing.has(key):
 				missing.append(key)
@@ -184,10 +184,10 @@ static func resolve_narrative_key(
 	if target_text.is_empty():
 		target_text = narrative_key
 
-	var res := resolve_template(target_text, placeholders)
+	var template_result := resolve_template(target_text, placeholders)
 	return {
-		"text": res.get("text", ""),
-		"unresolved_keys": res.get("missing_placeholders", []),
-		"success": res.get("success", false),
-		"missing_placeholders": res.get("missing_placeholders", [])
+		"text": template_result.get("text", ""),
+		"unresolved_keys": template_result.get("missing_placeholders", []),
+		"success": template_result.get("success", false),
+		"missing_placeholders": template_result.get("missing_placeholders", [])
 	}

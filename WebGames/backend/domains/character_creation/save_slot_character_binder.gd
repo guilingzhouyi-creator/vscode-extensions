@@ -25,7 +25,7 @@ static func commit_creation_and_bind_slot(
 	slot_state: Dictionary,
 	race_def: RaceDefinitionDTO
 ) -> Dictionary:
-	var res := {}
+	var result := {}
 	if request == null or slot_state.is_empty():
 		return {"success": false, "error_code": "INVALID_INPUT", "message": "请求或档位数据为空"}
 
@@ -38,7 +38,7 @@ static func commit_creation_and_bind_slot(
 		return {"success": false, "error_code": "SLOT_ALREADY_OCCUPIED", "message": "目标档位已存在角色，禁止覆盖创建"}
 
 	# 1. 派生唯一角色 ID（档位维度稳定；账号下 slot 唯一 → 角色 ID 唯一）
-	var new_char_id := "CHAR_%s_%s" % [account_id, slot_id]
+	var new_character_id := "CHAR_%s_%s" % [account_id, slot_id]
 
 	# 2. 后端权威生成属性等级（L1 层；L2 系数/L3 实值由既有生理底座承接）
 	var baseline_stats := CharacterBaselineAttributeSolver.generate_baseline_attributes(race_def)
@@ -46,7 +46,7 @@ static func commit_creation_and_bind_slot(
 
 	# 3. 构造角色档案与生理表/钱包实体（打通 Stage ④ -> Stage ⑥ HUD 同步）
 	var profile := CharacterProfile.new()
-	profile.character_id = new_char_id
+	profile.character_id = new_character_id
 	profile.character_name = request.character_name
 	profile.attributes = {
 		"race_id": request.selected_race_id,
@@ -59,18 +59,18 @@ static func commit_creation_and_bind_slot(
 
 	# 4. 绑定档位（原地回写；首次创建标记消费后置 false）
 	var was_first_creation := bool(slot_state.get("is_first_creation", true))
-	slot_state["bound_character_id"] = new_char_id
+	slot_state["bound_character_id"] = new_character_id
 	slot_state["is_occupied"] = true
 	slot_state["is_first_creation"] = false
 	slot_state["last_played_timestamp_utc"] = int(Time.get_unix_time_from_system())
 
 	# 5. 生成开局事件包
 	var opening := OpeningEventStreamDTO.new()
-	opening.event_id = "EVT_OPENING_%s" % new_char_id
+	opening.event_id = "EVT_OPENING_%s" % new_character_id
 	opening.account_id = account_id
 	opening.slot_id = slot_id
 	opening.world_id = str(slot_state.get("bound_world_id", request.world_id))
-	opening.character_id = new_char_id
+	opening.character_id = new_character_id
 	opening.character_name = request.character_name
 	opening.race_id = request.selected_race_id
 	opening.is_first_time_creation = was_first_creation
@@ -81,25 +81,25 @@ static func commit_creation_and_bind_slot(
 		"welcome_message": GameConfig.msg_fmt("character_creation", "welcome_message", {"character_name": request.character_name})
 	}
 
-	res["success"] = true
-	res["character_profile"] = profile
-	res["physiology_sheet"] = sheet
-	res["wallet"] = wallet
-	res["opening_event"] = opening
-	res["attribute_levels"] = attribute_levels
-	res["slot_state"] = slot_state
-	return res
+	result["success"] = true
+	result["character_profile"] = profile
+	result["physiology_sheet"] = sheet
+	result["wallet"] = wallet
+	result["opening_event"] = opening
+	result["attribute_levels"] = attribute_levels
+	result["slot_state"] = slot_state
+	return result
 
 
 static func _build_physiology_sheet(race_id: String, attribute_levels: Dictionary) -> CharacterPhysiologySheet:
 	var sheet := CharacterPhysiologySheet.new()
 	sheet.race_id = race_id
 	for stat_key in AttributeConversionEngine.DEFAULT_STAT_LIST:
-		var lv := int(attribute_levels.get(stat_key, AttributeConversionEngine.min_level()))
-		if not sheet.set_level(stat_key, lv):
+		var stat_level := int(attribute_levels.get(stat_key, AttributeConversionEngine.min_level()))
+		if not sheet.set_level(stat_key, stat_level):
 			sheet.set_level(stat_key, AttributeConversionEngine.min_level())
 		sheet.base_coefficients[stat_key] = AttributeConversionEngine.race_coefficient(race_id, stat_key)
 	var lifespan_scales: Dictionary = GameConfig.get_dict("domains.character_creation", "defaults/lifespan_scales", {})
 	sheet.lifespan_scale = float(lifespan_scales.get(race_id, lifespan_scales.get("DEFAULT", 1.0)))
-	LifeCycleAndPhysiologySolver.calculate_somatic_function(sheet)
+	LifecycleAndPhysiologySolver.calculate_somatic_function(sheet)
 	return sheet

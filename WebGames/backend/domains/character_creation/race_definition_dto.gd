@@ -41,20 +41,20 @@ func to_dto() -> Dictionary:
 
 ## 从字典反序列化种族定义（Array[String] 字段逐元素转换，禁整表 duplicate 赋类型化数组）。
 ## 契约：空字典返回默认人族定义；缺失字段按各自默认值补齐（旧档兼容）。
-static func from_dto(d: Dictionary) -> RaceDefinitionDTO:
-	var dto := RaceDefinitionDTO.new()
-	if d.is_empty():
-		return dto
-	dto.race_id = str(d.get("race_id", "HUMAN"))
-	dto.canonical_name_key = str(d.get("canonical_name_key", ""))
-	dto.is_enabled = bool(d.get("is_enabled", true))
-	dto.canary_feature_tag = str(d.get("canary_feature_tag", ""))
-	dto.base_stat_modifiers = (d.get("base_stat_modifiers", {}) as Dictionary).duplicate(true)
+static func from_dto(raw_data: Dictionary) -> RaceDefinitionDTO:
+	var definition_dto := RaceDefinitionDTO.new()
+	if raw_data.is_empty():
+		return definition_dto
+	definition_dto.race_id = str(raw_data.get("race_id", "HUMAN"))
+	definition_dto.canonical_name_key = str(raw_data.get("canonical_name_key", ""))
+	definition_dto.is_enabled = bool(raw_data.get("is_enabled", true))
+	definition_dto.canary_feature_tag = str(raw_data.get("canary_feature_tag", ""))
+	definition_dto.base_stat_modifiers = (raw_data.get("base_stat_modifiers", {}) as Dictionary).duplicate(true)
 	# Array[String] 字段逐元素转换（禁止整表 duplicate 赋给类型化数组，避免运行时类型错误）
-	dto.innate_traits.clear()
-	for t in (d.get("innate_traits", []) as Array):
-		dto.innate_traits.append(str(t))
-	dto.allowed_genders.clear()
-	for g in (d.get("allowed_genders", ["MALE", "FEMALE"]) as Array):
-		dto.allowed_genders.append(str(g))
-	return dto
+	definition_dto.innate_traits.clear()
+	for trait_id in (raw_data.get("innate_traits", []) as Array):
+		definition_dto.innate_traits.append(str(trait_id))
+	definition_dto.allowed_genders.clear()
+	for gender_name in (raw_data.get("allowed_genders", ["MALE", "FEMALE"]) as Array):
+		definition_dto.allowed_genders.append(str(gender_name))
+	return definition_dto
