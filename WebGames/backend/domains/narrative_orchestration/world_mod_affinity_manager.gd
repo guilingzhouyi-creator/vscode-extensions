@@ -61,26 +61,37 @@ func load_world_mod_lock(world_id: String) -> Dictionary:
 		lock_payload["locked_packs"] = []
 	return lock_payload
 
-## 提取包对象的基础字典（独立提取以避免循环体内瞬态堆分配）
+## 提取包对象的基础字典（包含 pack_id/version/content_sha256/priority，避免循环体内瞬态堆分配）
 func _serialize_pack_entry(pack_entry: Variant) -> Dictionary:
 	if pack_entry is Dictionary:
-		return (pack_entry as Dictionary).duplicate()
+		var source_map := pack_entry as Dictionary
+		return {
+			"pack_id": String(source_map.get("pack_id", source_map.get("id", ""))).strip_edges(),
+			"version": String(source_map.get("version", "1.0.0")).strip_edges(),
+			"content_sha256": String(source_map.get("content_sha256", "")).strip_edges(),
+			"priority": int(source_map.get("priority", 100)),
+			"pack_profile": String(source_map.get("pack_profile", "")).strip_edges(),
+			"is_official": bool(source_map.get("is_official", false))
+		}
 	if pack_entry is String:
 		return {
-			"pack_id": String(pack_entry),
+			"pack_id": String(pack_entry).strip_edges(),
 			"version": "1.0.0",
+			"content_sha256": "",
 			"priority": 100
 		}
 	if pack_entry != null and pack_entry.has_method("to_dto"):
-		return pack_entry.to_dto()
+		var raw_dto: Variant = pack_entry.to_dto()
+		if raw_dto is Dictionary:
+			return _serialize_pack_entry(raw_dto)
 	if pack_entry != null and "pack_id" in pack_entry:
-		var pack_id: String = String(pack_entry.pack_id)
-		var pack_version: String = String(pack_entry.version) if "version" in pack_entry else "1.0.0"
-		var pack_priority: int = int(pack_entry.priority) if "priority" in pack_entry else 100
 		return {
-			"pack_id": pack_id,
-			"version": pack_version,
-			"priority": pack_priority
+			"pack_id": String(pack_entry.pack_id).strip_edges(),
+			"version": String(pack_entry.version) if "version" in pack_entry else "1.0.0",
+			"content_sha256": String(pack_entry.content_sha256) if "content_sha256" in pack_entry else "",
+			"priority": int(pack_entry.priority) if "priority" in pack_entry else 100,
+			"pack_profile": String(pack_entry.pack_profile) if "pack_profile" in pack_entry else "",
+			"is_official": bool(pack_entry.is_official) if "is_official" in pack_entry else false
 		}
 	return {}
 
@@ -128,6 +139,72 @@ func _extract_id_from_entry(pack_entry: Variant) -> String:
 		return String(pack_entry.pack_id)
 	return ""
 
+## 构建当前已安装 MOD 包索引（pack_id -> serialized metadata）
+func _build_installed_pack_index(installed_packs: Array) -> Dictionary:
+	var installed_index: Dictionary = {}
+	for installed_pack in installed_packs:
+		var serialized := _serialize_pack_entry(installed_pack)
+		var installed_pack_id := String(serialized.get("pack_id", "")).strip_edges()
+		if not installed_pack_id.is_empty():
+			installed_index[installed_pack_id] = serialized
+	return installed_index
+
+
+## 仅只读诊断世界锁与已安装包之间的一致性、缺失与摘要/版本漂移
+func diagnose_world_mods(world_id: String, installed_packs: Array) -> Dictionary:
+	var lock_payload := load_world_mod_lock(world_id)
+	var has_lock_file: bool = bool(lock_payload.get("exists", false))
+	var installed_index := _build_installed_pack_index(installed_packs)
+	var locked_list: Array = lock_payload.get("locked_packs", [])
+	var missing_packs: Array[String] = []
+	var version_drifts: Array[Dictionary] = []
+	var digest_drifts: Array[Dictionary] = []
+	var locked_ids: Array[String] = []
+
+	for locked_pack in locked_list:
+		_collect_lock_entry_drift(locked_pack, installed_index, locked_ids, missing_packs, version_drifts, digest_drifts)
+
+	return {
+		"world_id": world_id,
+		"has_lock_file": has_lock_file,
+		"locked_pack_ids": locked_ids,
+		"locked_packs": locked_list.duplicate(true),
+		"missing_packs": missing_packs,
+		"version_drifts": version_drifts,
+		"digest_drifts": digest_drifts,
+		"is_clean": missing_packs.is_empty() and digest_drifts.is_empty() and version_drifts.is_empty()
+	}
+
+
+func _collect_lock_entry_drift(
+	locked_pack: Variant,
+	installed_index: Dictionary,
+	locked_ids: Array[String],
+	missing_packs: Array[String],
+	version_drifts: Array[Dictionary],
+	digest_drifts: Array[Dictionary]
+) -> void:
+	var locked_id := _extract_id_from_entry(locked_pack).strip_edges()
+	if locked_id.is_empty():
+		return
+	locked_ids.append(locked_id)
+	if not installed_index.has(locked_id):
+		missing_packs.append(locked_id)
+		return
+	if not (locked_pack is Dictionary):
+		return
+	var locked_map := locked_pack as Dictionary
+	var installed_map := installed_index[locked_id] as Dictionary
+	var locked_version := String(locked_map.get("version", "")).strip_edges()
+	var installed_version := String(installed_map.get("version", "")).strip_edges()
+	if not locked_version.is_empty() and not installed_version.is_empty() and locked_version != installed_version:
+		version_drifts.append({"pack_id": locked_id, "locked": locked_version, "installed": installed_version})
+	var locked_sha := String(locked_map.get("content_sha256", "")).strip_edges()
+	var installed_sha := String(installed_map.get("content_sha256", "")).strip_edges()
+	if not locked_sha.is_empty() and not installed_sha.is_empty() and locked_sha != installed_sha:
+		digest_drifts.append({"pack_id": locked_id, "locked": locked_sha, "installed": installed_sha})
+
+
 ## 对比当前世界锁定的 MOD 列表与当前安装的 MOD 并执行绑定裁定
 func verify_and_bind_world_mods(world_id: String, installed_packs: Array, should_allow_safe_degrade: bool = false) -> Dictionary:
 	if world_id.is_empty():
@@ -148,34 +225,29 @@ func verify_and_bind_world_mods(world_id: String, installed_packs: Array, should
 			"locked_count": installed_packs.size()
 		}
 
-	# 2. 已有锁文件，收集已安装与已锁定标识集合
-	var installed_set: Dictionary = {}
-	for installed_pack in installed_packs:
-		var installed_pack_id := _extract_id_from_entry(installed_pack)
-		if not installed_pack_id.is_empty():
-			installed_set[installed_pack_id] = true
+	var diagnostic := diagnose_world_mods(world_id, installed_packs)
+	var missing_packs: Array[String] = diagnostic["missing_packs"]
+	var digest_drifts: Array[Dictionary] = diagnostic["digest_drifts"]
+	var version_drifts: Array[Dictionary] = diagnostic["version_drifts"]
 
-	var locked_list: Array = lock_payload.get("locked_packs", [])
-	var missing_packs: Array[String] = []
-	for locked_pack in locked_list:
-		var locked_pack_id := _extract_id_from_entry(locked_pack)
-		if not locked_pack_id.is_empty() and not installed_set.has(locked_pack_id):
-			missing_packs.append(locked_pack_id)
-
-	# 3. 校验通过：无缺失 MOD
-	if missing_packs.is_empty():
+	# 3. 校验通过：无缺失且无不可逆摘要漂移
+	if missing_packs.is_empty() and digest_drifts.is_empty():
 		return {
 			"success": true,
 			"status": "VERIFIED",
-			"world_id": world_id
+			"world_id": world_id,
+			"version_drifts": version_drifts
 		}
 
-	# 4. 缺少关键 MOD 且不允许安全降级：拦截防坏档
+	# 4. 缺少关键 MOD 或摘要冲突且不允许安全降级：拦截防坏档
 	if not should_allow_safe_degrade:
+		var failure_code := "ERR_MISSING_CRITICAL_MOD" if not missing_packs.is_empty() else "MOD_ERR_REALM_DIGEST_MISMATCH"
 		return {
 			"success": false,
-			"error": "ERR_MISSING_CRITICAL_MOD",
-			"missing_packs": missing_packs
+			"error": failure_code,
+			"missing_packs": missing_packs,
+			"digest_drifts": digest_drifts,
+			"version_drifts": version_drifts
 		}
 
 	# 5. 缺少 MOD 但允许降级：向 WorldInstance 追加 MOD_DETACHED 历史片段并回退安全存根
@@ -185,6 +257,7 @@ func verify_and_bind_world_mods(world_id: String, installed_packs: Array, should
 		"success": true,
 		"status": "DEGRADED",
 		"missing_packs": missing_packs,
+		"digest_drifts": digest_drifts,
 		"world_id": world_id
 	}
 

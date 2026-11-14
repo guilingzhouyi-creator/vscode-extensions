@@ -56,6 +56,20 @@ static func _classify_relative_content_path(relative_path: String) -> String:
 		return "rules"
 	if normalized == "world.json" or normalized.begins_with("content/world/"):
 		return "world"
+	if normalized.begins_with("content/entities/"):
+		return "entities"
+	if normalized.begins_with("content/quests/"):
+		return "quests"
+	if normalized.begins_with("content/events/"):
+		return "events"
+	if normalized.begins_with("content/narratives/"):
+		return "narratives"
+	if normalized.begins_with("content/copywriting/"):
+		return "copywriting"
+	if normalized.begins_with("content/races/"):
+		return "races"
+	if normalized.begins_with("cutscenes/"):
+		return "cutscenes"
 	return ""
 
 static func _collect_directory_content_records(package_root: String) -> Array[Dictionary]:
@@ -66,13 +80,14 @@ static func _collect_directory_content_records(package_root: String) -> Array[Di
 		if FileAccess.file_exists(top_file_path):
 			_append_json_file_record(collected, top_filename, top_file_path)
 
-	var content_directory := package_root.path_join("content")
-	if DirAccess.dir_exists_absolute(content_directory):
-		var subpaths: Array[String] = []
-		_scan_json_relative_paths(content_directory, "content", subpaths)
-		subpaths.sort()
-		for rel_path in subpaths:
-			_append_json_file_record(collected, rel_path, package_root.path_join(rel_path))
+	for subdir_name in ["content", "cutscenes"]:
+		var scan_directory := package_root.path_join(subdir_name)
+		if DirAccess.dir_exists_absolute(scan_directory):
+			var subpaths: Array[String] = []
+			_scan_json_relative_paths(scan_directory, subdir_name, subpaths)
+			subpaths.sort()
+			for rel_path in subpaths:
+				_append_json_file_record(collected, rel_path, package_root.path_join(rel_path))
 	return collected
 
 static func _scan_json_relative_paths(directory_path: String, relative_prefix: String, collected_paths: Array[String]) -> void:
@@ -125,10 +140,10 @@ static func _collect_kmod_content_records(kmod_path: String) -> Array[Dictionary
 	reader.close()
 	return collected
 
-## 确保目标工作配置表存在并登记为已修改表
+## 确保目标工作配置表存在（必要时加载纯净基础表深拷贝）并登记为已修改表
 static func ensure_working_table(working_tables: Dictionary, touched_tables: Dictionary, table_name: String) -> Dictionary:
 	if not working_tables.has(table_name):
-		working_tables[table_name] = {}
+		working_tables[table_name] = GameConfig.get_base_table_copy(table_name)
 	touched_tables[table_name] = true
 	return working_tables[table_name] as Dictionary
 
