@@ -44,7 +44,7 @@ static func resolve_reincarnation_package(
 
     # 3. 基础文案与元数据查询
     var origin_name: String = str(origin_config.get("name", origin_id))
-    var origin_desc: String = str(origin_config.get("desc", ""))
+    var origin_description: String = str(origin_config.get("desc", ""))
     var race_name: String = _resolve_race_display_name(race_id)
 
     # 4. 权威六维属性解算（点数加权 + 身世加成 + [1, 6] 刚性约束）
@@ -74,7 +74,7 @@ static func resolve_reincarnation_package(
         "character_name": character_name,
         "origin_id": origin_id,
         "origin_name": origin_name,
-        "origin_desc": origin_desc,
+        "origin_desc": origin_description,
         "race_id": race_id,
         "race_name": race_name,
         "gender": gender,
@@ -217,9 +217,9 @@ static func _resolve_race_display_name(race_id: String) -> String:
     var race_config: Dictionary = GameConfig.get_dict("domains.character_creation", "races_catalog/" + race_id, {})
     var name_key: String = str(race_config.get("canonical_name_key", ""))
     if not name_key.is_empty():
-        var loc_name: String = LocalizationSolver.resolve_name_key(LocalizationRegistryCatalog.get_shared(), name_key)
-        if not loc_name.is_empty() and loc_name != "[%s]" % name_key:
-            return loc_name
+        var localized_name: String = LocalizationSolver.resolve_name_key(LocalizationRegistryCatalog.get_shared(), name_key)
+        if not localized_name.is_empty() and localized_name != "[%s]" % name_key:
+            return localized_name
     match race_id:
         "HUMAN":
             return "人类"
@@ -325,10 +325,10 @@ static func _match_manual_trait_pair(extra_fields: Dictionary, pairs: Array) -> 
 static func _is_matching_preset_entry(entry: Variant, selected_positive: String, selected_negative: String) -> bool:
     if not (entry is Dictionary):
         return false
-    var entry_dict: Dictionary = entry
-    if str(entry_dict.get("positive", "")) != selected_positive:
+    var entry_map: Dictionary = entry
+    if str(entry_map.get("positive", "")) != selected_positive:
         return false
-    if not selected_negative.is_empty() and str(entry_dict.get("negative", "")) != selected_negative:
+    if not selected_negative.is_empty() and str(entry_map.get("negative", "")) != selected_negative:
         return false
     return true
 
@@ -365,17 +365,17 @@ static func _build_traits_result(
 # ==============================================================================
 
 static func _derive_physiology(attributes: Dictionary) -> Dictionary:
-    var con: int = int(attributes.get("CON", 3))
-    var int_stat: int = int(attributes.get("INT", 3))
-    var vit: int = int(attributes.get("VIT", 3))
-    var str_stat: int = int(attributes.get("STR", 3))
+    var constitution_stat: int = int(attributes.get("CON", 3))
+    var intelligence_stat: int = int(attributes.get("INT", 3))
+    var vitality_stat: int = int(attributes.get("VIT", 3))
+    var strength_stat: int = int(attributes.get("STR", 3))
 
     return {
-        "max_hp": con * 20,
-        "current_hp": con * 20,
-        "max_mana": int_stat * 15,
-        "current_mana": int_stat * 15,
-        "max_stamina": vit * 10,
-        "current_stamina": vit * 10,
-        "carry_capacity_kg": 50.0 + (str_stat * 5.0)
+        "max_hp": constitution_stat * 20,
+        "current_hp": constitution_stat * 20,
+        "max_mana": intelligence_stat * 15,
+        "current_mana": intelligence_stat * 15,
+        "max_stamina": vitality_stat * 10,
+        "current_stamina": vitality_stat * 10,
+        "carry_capacity_kg": 50.0 + (strength_stat * 5.0)
     }

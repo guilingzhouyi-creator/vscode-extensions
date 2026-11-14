@@ -31,10 +31,10 @@ static func resolve_mod_manifest(config: Dictionary) -> Dictionary:
 			}
 
 	var candidate_packs: Array = config.get("candidate_packs", []).duplicate()
-	var mod_dirs: Array = config.get("mod_dirs", [])
-	if candidate_packs.is_empty() and not mod_dirs.is_empty():
-		for mod_dir in mod_dirs:
-			var loaded_package: Dictionary = ModPackageDiscoverySolver.load_full_mod_package_from_dir(str(mod_dir))
+	var mod_directories: Array = config.get("mod_dirs", [])
+	if candidate_packs.is_empty() and not mod_directories.is_empty():
+		for mod_directory in mod_directories:
+			var loaded_package: Dictionary = ModPackageDiscoverySolver.load_full_mod_package_from_dir(str(mod_directory))
 			if not loaded_package.is_empty():
 				candidate_packs.append(loaded_package)
 
@@ -114,9 +114,9 @@ static func build_trait_summary(traits_details: Variant) -> String:
 	if not (traits_details is Array):
 		return ""
 	var names: Array[String] = []
-	for item in (traits_details as Array):
-		if item is Dictionary:
-			var trait_name: String = str((item as Dictionary).get("name", "")).strip_edges()
+	for trait_entry in (traits_details as Array):
+		if trait_entry is Dictionary:
+			var trait_name: String = str((trait_entry as Dictionary).get("name", "")).strip_edges()
 			if not trait_name.is_empty():
 				names.append(trait_name)
 	return " / ".join(names)

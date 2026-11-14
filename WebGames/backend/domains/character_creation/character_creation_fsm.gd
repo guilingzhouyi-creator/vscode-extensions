@@ -65,18 +65,18 @@ func set_character_name(character_name: String) -> Dictionary:
 		}
 
 	var trimmed := character_name.strip_edges()
-	var min_len: int = GameConfig.get_int("domains.character_creation", "rules/min_name_length", 2)
-	var max_len: int = GameConfig.get_int("domains.character_creation", "rules/max_name_length", 16)
-	var banned_chars: Array = GameConfig.get_array("domains.character_creation", "rules/disallowed_name_characters", [])
+	var min_length: int = GameConfig.get_int("domains.character_creation", "rules/min_name_length", 2)
+	var max_length: int = GameConfig.get_int("domains.character_creation", "rules/max_name_length", 16)
+	var banned_characters: Array = GameConfig.get_array("domains.character_creation", "rules/disallowed_name_characters", [])
 
-	if trimmed.length() < min_len or trimmed.length() > max_len:
+	if trimmed.length() < min_length or trimmed.length() > max_length:
 		return {
 			"success": false,
 			"error_code": "INVALID_NAME_LENGTH",
-			"message": GameConfig.msg_fmt("character_creation", "name_length_invalid", {"min": min_len, "max": max_len})
+			"message": GameConfig.msg_fmt("character_creation", "name_length_invalid", {"min": min_length, "max": max_length})
 		}
-	for ch in banned_chars:
-		if trimmed.contains(str(ch)):
+	for disallowed_character in banned_characters:
+		if trimmed.contains(str(disallowed_character)):
 			return {"success": false, "error_code": "DISALLOWED_NAME_CHARACTER", "message": "Character name contains disallowed characters."}
 
 	draft_request.character_name = trimmed
@@ -86,7 +86,7 @@ func set_character_name(character_name: String) -> Dictionary:
 ## 2. 设定性别（种族允许性别枚举校验）。
 ## 契约：仅 GENDER_SELECT_PENDING 可调用；race_def 为空或性别不在
 ##       allowed_genders 时返回 GENDER_NOT_ALLOWED；成功后跃迁 EXTENSIONS_PENDING。
-func set_gender(gender_str: String, race_def: RaceDefinitionDTO) -> Dictionary:
+func set_gender(gender_text: String, race_definition: RaceDefinitionDTO) -> Dictionary:
 	if current_step != CreationStep.GENDER_SELECT_PENDING:
 		return {
 			"success": false,
@@ -94,8 +94,8 @@ func set_gender(gender_str: String, race_def: RaceDefinitionDTO) -> Dictionary:
 			"message": TemplateFormatter.format("Selecting gender is not permitted in current step: {step}.", {"step": current_step})
 		}
 
-	var gender_upper := gender_str.to_upper()
-	if race_def == null or not race_def.allowed_genders.has(gender_upper):
+	var gender_upper := gender_text.to_upper()
+	if race_definition == null or not race_definition.allowed_genders.has(gender_upper):
 		return {"success": false, "error_code": "GENDER_NOT_ALLOWED", "message": "Selected gender is not permitted for the specified race."}
 
 	draft_request.selected_gender = gender_upper

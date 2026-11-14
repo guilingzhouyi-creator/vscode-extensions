@@ -164,9 +164,9 @@ func step(action: Dictionary) -> Dictionary:
 		return _build_error_observation(error_code)
 
 	var action_payload: Dictionary = {}
-	var raw_params: Variant = action.get("params", {})
-	if raw_params is Dictionary:
-		action_payload = (raw_params as Dictionary).duplicate(true)
+	var raw_parameters: Variant = action.get("params", {})
+	if raw_parameters is Dictionary:
+		action_payload = (raw_parameters as Dictionary).duplicate(true)
 	action_payload["selected_choice"] = choice_id
 
 	var execution_result: Dictionary = engine.execute_node_action(active_node_id, action_payload)

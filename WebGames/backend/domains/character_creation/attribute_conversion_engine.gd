@@ -27,11 +27,11 @@ const STAT_VIT: String = "VIT"
 const DEFAULT_STAT_LIST: Array[String] = [STAT_STR, STAT_CON, STAT_INT, STAT_AGI, STAT_SPR, STAT_VIT]
 
 class AttributeConfigCache extends RefCounted:
-	var min_lv: int = 1
-	var max_lv: int = 6
+	var min_level: int = 1
+	var max_level: int = 6
 	var dead_ratio: float = 0.5
-	var exp_reshape_default: float = 1.0
-	var segs: Dictionary = {}
+	var experience_reshape_default: float = 1.0
+	var segment_increments: Dictionary = {}
 	var race_table: Dictionary = {}
 	var human_base_map: Dictionary = {}
 	var attribute_coefficient_map: Dictionary = {}
@@ -45,22 +45,22 @@ static func _ensure_attribute_cache() -> AttributeConfigCache:
 	if _attribute_cache != null and _attribute_config_version == config_version:
 		return _attribute_cache
 	var config_cache := AttributeConfigCache.new()
-	config_cache.min_lv = GameConfig.get_int("domains.attribute", "levels/min", 1)
-	config_cache.max_lv = GameConfig.get_int("domains.attribute", "levels/max", 6)
+	config_cache.min_level = GameConfig.get_int("domains.attribute", "levels/min", 1)
+	config_cache.max_level = GameConfig.get_int("domains.attribute", "levels/max", 6)
 	config_cache.dead_ratio = GameConfig.get_float("domains.attribute", "dead_ratio", 0.5)
-	config_cache.exp_reshape_default = GameConfig.get_float("domains.attribute", "experience_reshape_default", 1.0)
-	config_cache.segs = GameConfig.get_dict("domains.attribute", "segment_increments", {})
+	config_cache.experience_reshape_default = GameConfig.get_float("domains.attribute", "experience_reshape_default", 1.0)
+	config_cache.segment_increments = GameConfig.get_dict("domains.attribute", "segment_increments", {})
 	config_cache.race_table = GameConfig.get_dict("domains.attribute", "race_coefficients", {})
 	var raw_human_base: Dictionary = GameConfig.get_dict("domains.attribute", "human_base", {})
 	var raw_attribute_coefficients: Dictionary = GameConfig.get_dict("domains.attribute", "attribute_coefficients", {})
 	for attribute_name in DEFAULT_STAT_LIST:
 		config_cache.human_base_map[attribute_name] = float(raw_human_base.get(attribute_name, 100.0))
 		config_cache.attribute_coefficient_map[attribute_name] = float(raw_attribute_coefficients.get(attribute_name, 1.0))
-	var limit: int = maxi(1, config_cache.max_lv)
+	var limit: int = maxi(1, config_cache.max_level)
 	config_cache.prefix_sums.resize(limit + 1)
 	config_cache.prefix_sums[0] = 0.0
 	for segment_index in range(1, limit + 1):
-		config_cache.prefix_sums[segment_index] = config_cache.prefix_sums[segment_index - 1] + float(config_cache.segs.get(str(segment_index), 1.0))
+		config_cache.prefix_sums[segment_index] = config_cache.prefix_sums[segment_index - 1] + float(config_cache.segment_increments.get(str(segment_index), 1.0))
 	_attribute_cache = config_cache
 	_attribute_config_version = config_version
 	return config_cache
@@ -71,16 +71,16 @@ static func _ensure_attribute_cache() -> AttributeConfigCache:
 
 ## 最小等级（config/domains/attribute.json levels/min，默认 1）
 static func min_level() -> int:
-	return _ensure_attribute_cache().min_lv
+	return _ensure_attribute_cache().min_level
 
 ## 最大等级（config/domains/attribute.json levels/max，默认 6）
 static func max_level() -> int:
-	return _ensure_attribute_cache().max_lv
+	return _ensure_attribute_cache().max_level
 
 ## 等级域规则校验（统一 1~6 级，越界返回 false）
 static func validate_level(level: int) -> bool:
 	var config_cache := _ensure_attribute_cache()
-	return level >= config_cache.min_lv and level <= config_cache.max_lv
+	return level >= config_cache.min_level and level <= config_cache.max_level
 
 # ==============================================================================
 # 三、系数（L2 中间系数结构层）
@@ -108,7 +108,7 @@ static func race_coefficient(race: String, attribute_name: String) -> float:
 
 ## 阅历修饰系数默认值（config/domains/attribute.json experience_reshape_default，默认 1.0）
 static func experience_reshape_default() -> float:
-	return _ensure_attribute_cache().exp_reshape_default
+	return _ensure_attribute_cache().experience_reshape_default
 
 # ==============================================================================
 # 四、成长曲线（分段非线性）
@@ -122,8 +122,8 @@ static func growth_units(continuous_level: float) -> float:
 	var dead_ratio: float = config_cache.dead_ratio
 	if continuous_level <= dead_ratio:
 		return 0.0
-	var segment_increments: Dictionary = config_cache.segs
-	var max_level_value: int = config_cache.max_lv
+	var segment_increments: Dictionary = config_cache.segment_increments
+	var max_level_value: int = config_cache.max_level
 	if continuous_level >= float(max_level_value):
 		if max_level_value >= 0 and max_level_value < config_cache.prefix_sums.size():
 			return config_cache.prefix_sums[max_level_value]
@@ -137,9 +137,9 @@ static func growth_units(continuous_level: float) -> float:
 	return before + (continuous_level - float(segment_index - 1)) * segment_increment
 
 ## 段增量系数前缀和：前 upto 段系数累加（满级倍数 = 各段增量之和）
-static func _segment_sum(segment_increments: Dictionary, upto: int) -> float:
+static func _segment_sum(segment_increments: Dictionary, segment_limit: int) -> float:
 	var total := 0.0
-	for segment_index in range(1, upto + 1):
+	for segment_index in range(1, segment_limit + 1):
 		total += float(segment_increments.get(str(segment_index), 1.0))
 	return total
 

@@ -22,7 +22,7 @@ static func create_diagnostic_dump(
 	error_code: String,
 	failing_pack_id: String,
 	failing_node_id: String,
-	context_data: Dictionary = {}
+	context_payload: Dictionary = {}
 ) -> Dictionary:
 	var now_timestamp_utc: int = int(Time.get_unix_time_from_system())
 	var bus := CompanionObserverBus.get_instance()
@@ -30,7 +30,7 @@ static func create_diagnostic_dump(
 	if bus != null:
 		event_tail = bus.get_recent_events(DEFAULT_TAIL_LIMIT)
 
-	var character_snapshot: Dictionary = _extract_character_snapshot(context_data)
+	var character_snapshot: Dictionary = _extract_character_snapshot(context_payload)
 	var sanitized_code: String = error_code if not error_code.is_empty() else "UNKNOWN"
 	var dump_id: String = "dump_%d_%s" % [now_timestamp_utc, sanitized_code]
 
@@ -42,24 +42,24 @@ static func create_diagnostic_dump(
 		"failing_node_id": failing_node_id,
 		"recent_event_tail": event_tail,
 		"character_snapshot": character_snapshot,
-		"context_data": context_data.duplicate(true)
+		"context_data": context_payload.duplicate(true)
 	}
 
 # ==============================================================================
 # 二、数据提取辅助方法 (CC <= 5, Depth <= 2)
 # ==============================================================================
 
-static func _extract_character_snapshot(context_data: Dictionary) -> Dictionary:
-	if context_data.is_empty():
+static func _extract_character_snapshot(context_payload: Dictionary) -> Dictionary:
+	if context_payload.is_empty():
 		return {}
 
-	if context_data.has("character_snapshot"):
-		var snapshot_value: Variant = context_data.get("character_snapshot")
+	if context_payload.has("character_snapshot"):
+		var snapshot_value: Variant = context_payload.get("character_snapshot")
 		if snapshot_value is Dictionary:
 			return (snapshot_value as Dictionary).duplicate(true)
 
-	if context_data.has("profile"):
-		var profile_value: Variant = context_data.get("profile")
+	if context_payload.has("profile"):
+		var profile_value: Variant = context_payload.get("profile")
 		if profile_value is CharacterProfile:
 			return (profile_value as CharacterProfile).serialize()
 		if profile_value is Dictionary:

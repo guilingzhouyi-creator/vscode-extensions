@@ -65,26 +65,26 @@ func to_dto() -> Dictionary:
 	return payload
 
 ## 从输入字典反序列化还原传输对象
-static func from_dto(raw_data: Dictionary) -> AgentObservationPacketDTO:
+static func from_dto(serialized_packet: Dictionary) -> AgentObservationPacketDTO:
 	var packet_dto := AgentObservationPacketDTO.new()
-	if raw_data.is_empty():
+	if serialized_packet.is_empty():
 		return packet_dto
-	packet_dto.session_id = str(raw_data.get("session_id", ""))
-	packet_dto.step_index = int(raw_data.get("step_index", 0))
-	packet_dto.current_node_id = str(raw_data.get("current_node_id", ""))
-	packet_dto.hydrated_text = str(raw_data.get("hydrated_text", ""))
-	var raw_choices: Variant = raw_data.get("available_choices", [])
+	packet_dto.session_id = str(serialized_packet.get("session_id", ""))
+	packet_dto.step_index = int(serialized_packet.get("step_index", 0))
+	packet_dto.current_node_id = str(serialized_packet.get("current_node_id", ""))
+	packet_dto.hydrated_text = str(serialized_packet.get("hydrated_text", ""))
+	var raw_choices: Variant = serialized_packet.get("available_choices", [])
 	if raw_choices is Array:
 		var cloned_choices: Array = (raw_choices as Array).duplicate(true)
 		for choice_entry in cloned_choices:
 			if choice_entry is Dictionary:
 				packet_dto.available_choices.append(choice_entry as Dictionary)
-	var raw_snapshot: Variant = raw_data.get("character_snapshot", {})
+	var raw_snapshot: Variant = serialized_packet.get("character_snapshot", {})
 	if raw_snapshot is Dictionary:
 		packet_dto.character_snapshot = (raw_snapshot as Dictionary).duplicate(true)
-	packet_dto.is_terminal = bool(raw_data.get("is_terminal", false))
-	packet_dto.error_code = str(raw_data.get("error_code", ""))
-	var raw_dump: Variant = raw_data.get("diagnostic_dump", {})
+	packet_dto.is_terminal = bool(serialized_packet.get("is_terminal", false))
+	packet_dto.error_code = str(serialized_packet.get("error_code", ""))
+	var raw_dump: Variant = serialized_packet.get("diagnostic_dump", {})
 	if raw_dump is Dictionary:
 		packet_dto.diagnostic_dump = (raw_dump as Dictionary).duplicate(true)
 	return packet_dto
@@ -116,14 +116,14 @@ class AgentSessionActionDTO extends PoolableDtoBase:
 		}
 
 	## 从输入字典反序列化还原传输对象
-	static func from_dto(raw_data: Dictionary) -> AgentSessionActionDTO:
+	static func from_dto(serialized_action: Dictionary) -> AgentSessionActionDTO:
 		var action_dto := AgentSessionActionDTO.new()
-		if raw_data.is_empty():
+		if serialized_action.is_empty():
 			return action_dto
-		action_dto.session_id = str(raw_data.get("session_id", ""))
-		action_dto.action_type = str(raw_data.get("action_type", ""))
-		action_dto.choice_id = str(raw_data.get("choice_id", ""))
-		var raw_params: Variant = raw_data.get("params", {})
-		if raw_params is Dictionary:
-			action_dto.params = (raw_params as Dictionary).duplicate(true)
+		action_dto.session_id = str(serialized_action.get("session_id", ""))
+		action_dto.action_type = str(serialized_action.get("action_type", ""))
+		action_dto.choice_id = str(serialized_action.get("choice_id", ""))
+		var raw_parameters: Variant = serialized_action.get("params", {})
+		if raw_parameters is Dictionary:
+			action_dto.params = (raw_parameters as Dictionary).duplicate(true)
 		return action_dto

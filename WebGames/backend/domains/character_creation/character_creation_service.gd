@@ -48,9 +48,9 @@ static func create_new_character(
 		sheet.base_coefficients[stat_key] = AttributeConversionEngine.race_coefficient(sheet.race_id, stat_key)
 		default_stat_set[stat_key] = true
 	for trait_id in selected_trait_ids:
-		var trait_info: Dictionary = InnateTraitRegistry.get_trait(str(trait_id))
-		if not trait_info.is_empty():
-			_apply_single_trait_modifiers(trait_info, sheet, default_stat_set, coefficient_scale, heart_clamp_min, heart_clamp_max)
+		var trait_definition: Dictionary = InnateTraitRegistry.get_trait(str(trait_id))
+		if not trait_definition.is_empty():
+			_apply_single_trait_modifiers(trait_definition, sheet, default_stat_set, coefficient_scale, heart_clamp_min, heart_clamp_max)
 
 	# 寿命尺度按种族映射（缺失回退 DEFAULT 行）
 	var lifespan_scales: Dictionary = GameConfig.get_dict("domains.character_creation", "defaults/lifespan_scales", {})
@@ -81,14 +81,14 @@ static func create_new_character(
 
 ## 遍历应用单个特质的属性与核心度修正（平铺单层循环，消除 PRF-ALG-001 嵌套热点）
 static func _apply_single_trait_modifiers(
-	trait_info: Dictionary,
+	trait_definition: Dictionary,
 	sheet: CharacterPhysiologySheet,
 	default_stat_set: Dictionary,
 	coefficient_scale: float,
 	heart_clamp_min: float,
 	heart_clamp_max: float
 ) -> void:
-	var modifiers: Dictionary = trait_info.get("modifiers", {})
+	var modifiers: Dictionary = trait_definition.get("modifiers", {})
 	for stat_key in modifiers:
 		if default_stat_set.has(stat_key):
 			sheet.base_coefficients[stat_key] = float(sheet.base_coefficients.get(stat_key, 1.0)) * (1.0 + float(modifiers[stat_key]) * coefficient_scale)
@@ -126,14 +126,14 @@ static func process_character_creation(
 		})
 
 	# 1. 种族可用性与灰度校验（races_catalog 配置驱动，不写死种族清单）
-	var races_dict: Dictionary = GameConfig.get_dict("domains.character_creation", "races_catalog", {})
-	var race_data: Dictionary = races_dict.get(request.selected_race_id, {})
-	if race_data.is_empty():
+	var races_map: Dictionary = GameConfig.get_dict("domains.character_creation", "races_catalog", {})
+	var race_entry: Dictionary = races_map.get(request.selected_race_id, {})
+	if race_entry.is_empty():
 		return {"success": false, "error_code": "RACE_NOT_FOUND", "message": GameConfig.msg_fmt("character_creation", "race_not_found", {"race_id": request.selected_race_id})}
 
-	var race_def := RaceDefinitionDTO.from_dto(race_data)
-	if not race_def.is_enabled:
-		var tag := race_def.canary_feature_tag
+	var race_definition := RaceDefinitionDTO.from_dto(race_entry)
+	if not race_definition.is_enabled:
+		var tag := race_definition.canary_feature_tag
 		var canary_flag: Variant = canary_flags.get(tag, null)
 		var is_open := false
 		if canary_flag != null:
@@ -158,7 +158,7 @@ static func process_character_creation(
 	if not name_result.get("success", false):
 		return name_result
 
-	var gender_result := fsm.set_gender(request.selected_gender, race_def)
+	var gender_result := fsm.set_gender(request.selected_gender, race_definition)
 	if not gender_result.get("success", false):
 		return gender_result
 
@@ -167,7 +167,7 @@ static func process_character_creation(
 		return extensions_result
 
 	# 3. 提交持久化与档位绑定（原子：占用拦截/唯一 ID/事件包生成）
-	var bind_result := SaveSlotCharacterBinder.commit_creation_and_bind_slot(request, slot_state, race_def)
+	var bind_result := SaveSlotCharacterBinder.commit_creation_and_bind_slot(request, slot_state, race_definition)
 	if not bind_result.get("success", false):
 		return {"success": false, "error_code": bind_result.get("error_code", ""), "message": bind_result.get("message", "")}
 

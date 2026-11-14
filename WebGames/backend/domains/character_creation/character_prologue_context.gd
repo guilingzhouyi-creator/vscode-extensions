@@ -70,22 +70,22 @@ func serialize() -> Dictionary:
 
 ## 从字典反序列化序章执行上下文（缺省字段回退默认值，占位符深拷贝）。
 ## 契约：空字典返回全新空上下文；未知键安全忽略（旧档兼容）。
-static func deserialize(raw_data: Dictionary) -> CharacterPrologueContext:
+static func deserialize(serialized_context: Dictionary) -> CharacterPrologueContext:
 	var prologue_context := CharacterPrologueContext.new()
-	if raw_data.is_empty():
+	if serialized_context.is_empty():
 		return prologue_context
-	prologue_context.account_id = str(raw_data.get("account_id", ""))
-	prologue_context.character_id = str(raw_data.get("character_id", ""))
-	prologue_context.character_name = str(raw_data.get("character_name", ""))
-	prologue_context.race_id = str(raw_data.get("race_id", "HUMAN"))
-	prologue_context.gender = str(raw_data.get("gender", "OTHER"))
-	prologue_context.assigned_start_location_id = str(raw_data.get("assigned_start_location_id", ""))
-	prologue_context.assigned_opening_quest_id = str(raw_data.get("assigned_opening_quest_id", ""))
-	prologue_context.assigned_starter_kit_id = str(raw_data.get("assigned_starter_kit_id", ""))
-	prologue_context.current_stage = int(raw_data.get("current_stage", 0))
-	prologue_context.step_index = int(raw_data.get("step_index", 0))
-	prologue_context.is_active = bool(raw_data.get("is_active", false))
-	prologue_context.is_completed = bool(raw_data.get("is_completed", false))
-	prologue_context.created_timestamp_utc = int(raw_data.get("created_timestamp_utc", 0))
-	prologue_context.runtime_placeholders = (raw_data.get("runtime_placeholders", {}) as Dictionary).duplicate(true)
+	prologue_context.account_id = str(serialized_context.get("account_id", ""))
+	prologue_context.character_id = str(serialized_context.get("character_id", ""))
+	prologue_context.character_name = str(serialized_context.get("character_name", ""))
+	prologue_context.race_id = str(serialized_context.get("race_id", "HUMAN"))
+	prologue_context.gender = str(serialized_context.get("gender", "OTHER"))
+	prologue_context.assigned_start_location_id = str(serialized_context.get("assigned_start_location_id", ""))
+	prologue_context.assigned_opening_quest_id = str(serialized_context.get("assigned_opening_quest_id", ""))
+	prologue_context.assigned_starter_kit_id = str(serialized_context.get("assigned_starter_kit_id", ""))
+	prologue_context.current_stage = int(serialized_context.get("current_stage", 0))
+	prologue_context.step_index = int(serialized_context.get("step_index", 0))
+	prologue_context.is_active = bool(serialized_context.get("is_active", false))
+	prologue_context.is_completed = bool(serialized_context.get("is_completed", false))
+	prologue_context.created_timestamp_utc = int(serialized_context.get("created_timestamp_utc", 0))
+	prologue_context.runtime_placeholders = (serialized_context.get("runtime_placeholders", {}) as Dictionary).duplicate(true)
 	return prologue_context

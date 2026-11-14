@@ -41,15 +41,15 @@ func to_dto() -> Dictionary:
 
 ## 从字典反序列化创角请求（缺省字段安全回退默认值，空字典返回空请求）。
 ## 契约：输入 d 不做键集校验，缺失字段按各自默认值补齐（旧档兼容）。
-static func from_dto(raw_data: Dictionary) -> CharacterCreationRequestDTO:
+static func from_dto(serialized_request: Dictionary) -> CharacterCreationRequestDTO:
 	var request_dto := CharacterCreationRequestDTO.new()
-	if raw_data.is_empty():
+	if serialized_request.is_empty():
 		return request_dto
-	request_dto.account_id = str(raw_data.get("account_id", ""))
-	request_dto.slot_id = str(raw_data.get("slot_id", ""))
-	request_dto.world_id = str(raw_data.get("world_id", ""))
-	request_dto.character_name = str(raw_data.get("character_name", ""))
-	request_dto.selected_race_id = str(raw_data.get("selected_race_id", "HUMAN"))
-	request_dto.selected_gender = str(raw_data.get("selected_gender", "MALE"))
-	request_dto.extra_custom_fields = (raw_data.get("extra_custom_fields", {}) as Dictionary).duplicate(true)
+	request_dto.account_id = str(serialized_request.get("account_id", ""))
+	request_dto.slot_id = str(serialized_request.get("slot_id", ""))
+	request_dto.world_id = str(serialized_request.get("world_id", ""))
+	request_dto.character_name = str(serialized_request.get("character_name", ""))
+	request_dto.selected_race_id = str(serialized_request.get("selected_race_id", "HUMAN"))
+	request_dto.selected_gender = str(serialized_request.get("selected_gender", "MALE"))
+	request_dto.extra_custom_fields = (serialized_request.get("extra_custom_fields", {}) as Dictionary).duplicate(true)
 	return request_dto

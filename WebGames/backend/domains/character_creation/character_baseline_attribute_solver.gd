@@ -19,7 +19,7 @@ extends RefCounted
 ## 契约：基线等级经 clampi 收敛进 [point_buy/min, point_buy/max]（防配置越界直写输出，
 ##       Inv-VD-3）；种族修正仅作用于已存在键并再次收敛；race_def 为 null 时
 ##       按人族 HUMAN 派生，返回 { attribute_levels, race_id }。
-static func generate_baseline_attributes(race_def: RaceDefinitionDTO) -> Dictionary:
+static func generate_baseline_attributes(race_definition: RaceDefinitionDTO) -> Dictionary:
 	var min_level := GameConfig.get_int("domains.character_creation", "attribute_init/point_buy/min", 1)
 	var max_level := GameConfig.get_int("domains.character_creation", "attribute_init/point_buy/max", 6)
 	# 统一收敛域校验（Inv-VD-3）：确保无种族修正分支与修正分支同样收敛至 1~6 级域
@@ -30,14 +30,14 @@ static func generate_baseline_attributes(race_def: RaceDefinitionDTO) -> Diction
 		base_levels[stat_key] = base_level
 
 	# 叠加种族修正（人族全维平衡；扩展种族经配置基准确认后放行）
-	if race_def != null and not race_def.base_stat_modifiers.is_empty():
-		for stat_key in race_def.base_stat_modifiers.keys():
+	if race_definition != null and not race_definition.base_stat_modifiers.is_empty():
+		for stat_key in race_definition.base_stat_modifiers.keys():
 			if not base_levels.has(stat_key):
 				continue
-			var modifier_value: int = int(race_def.base_stat_modifiers[stat_key])
+			var modifier_value: int = int(race_definition.base_stat_modifiers[stat_key])
 			base_levels[stat_key] = clampi(int(base_levels[stat_key]) + modifier_value, min_level, max_level)
 
 	return {
 		"attribute_levels": base_levels,
-		"race_id": race_def.race_id if race_def != null else "HUMAN"
+		"race_id": race_definition.race_id if race_definition != null else "HUMAN"
 	}

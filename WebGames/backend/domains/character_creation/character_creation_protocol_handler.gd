@@ -26,21 +26,21 @@ const UnifiedProtocolFactory = preload("res://backend/domains/world_state/servic
 
 ## 分发角色创建阶段客户端协议动作（UI 快照读取、命途预览摇骰、权威创角）
 static func dispatch_creation(request: ClientRequestEnvelopeDTO, gateway: Variant) -> UnifiedResponseEnvelopeDTO:
-	var payload_dict: Dictionary = request.payload if request.payload is Dictionary else {}
+	var payload_map: Dictionary = request.payload if request.payload is Dictionary else {}
 	var creation_request := AuthoritativeCharacterCreationRequestDTO.new()
 	creation_request.account_id = request.account_id
-	creation_request.slot_id = maxi(1, int(payload_dict.get("slot_index", 1)))
-	var raw_world_id := str(payload_dict.get("world_id", "")).strip_edges()
+	creation_request.slot_id = maxi(1, int(payload_map.get("slot_index", 1)))
+	var raw_world_id := str(payload_map.get("world_id", "")).strip_edges()
 	if raw_world_id.is_empty() and gateway != null and gateway.context != null:
 		raw_world_id = str(gateway.context.selected_world_id).strip_edges()
 	creation_request.world_id = raw_world_id
-	creation_request.character_name = str(payload_dict.get("character_name", ""))
-	creation_request.request_seed = int(payload_dict.get("request_seed", 0))
-	if payload_dict.get("extra_custom_fields") is Dictionary:
-		creation_request.extra_custom_fields = (payload_dict.get("extra_custom_fields") as Dictionary).duplicate(true)
+	creation_request.character_name = str(payload_map.get("character_name", ""))
+	creation_request.request_seed = int(payload_map.get("request_seed", 0))
+	if payload_map.get("extra_custom_fields") is Dictionary:
+		creation_request.extra_custom_fields = (payload_map.get("extra_custom_fields") as Dictionary).duplicate(true)
 	for option_key in ["selected_origin_id", "selected_positive_trait", "selected_negative_trait", "reroll_nonce", "gender", "starter_kit_id"]:
-		if payload_dict.has(option_key) and not creation_request.extra_custom_fields.has(option_key):
-			creation_request.extra_custom_fields[option_key] = payload_dict[option_key]
+		if payload_map.has(option_key) and not creation_request.extra_custom_fields.has(option_key):
+			creation_request.extra_custom_fields[option_key] = payload_map[option_key]
 
 	match request.action_type:
 		"GET_CREATION_UI_SNAPSHOT":
@@ -83,7 +83,7 @@ static func dispatch_creation(request: ClientRequestEnvelopeDTO, gateway: Varian
 			if gateway != null and gateway.context != null:
 				gateway.context.selected_slot_id = bound_slot_name
 			var presentation: Variant = creation_flow_result.get("presentation", null)
-			var response_data := {
+			var response_payload := {
 				"character_id": String(creation_flow_result.get("character_id", "")),
 				"character_name": String(creation_flow_result.get("character_name", "")),
 				"slot_id": bound_slot_name,
@@ -92,7 +92,7 @@ static func dispatch_creation(request: ClientRequestEnvelopeDTO, gateway: Varian
 				"presentation": presentation.to_dto() if (presentation != null and presentation.has_method("to_dto")) else {}
 			}
 			return UnifiedProtocolFactory.create_response(
-				request.request_id, true, response_data, "", "Character creation and prologue initialization completed."
+				request.request_id, true, response_payload, "", "Character creation and prologue initialization completed."
 			)
 
 	return UnifiedProtocolFactory.create_unhandled_action_response(request.request_id, request.action_type)
@@ -117,7 +117,7 @@ static func _build_prologue_state_payload(prologue_context: CharacterPrologueCon
 
 ## 分发角色序章阶段客户端协议动作（启动、状态查询、推进、完结/跳过与世界探索交接）
 static func dispatch_prologue(request: ClientRequestEnvelopeDTO, gateway: Variant) -> UnifiedResponseEnvelopeDTO:
-	var payload_dict: Dictionary = request.payload if request.payload is Dictionary else {}
+	var payload_map: Dictionary = request.payload if request.payload is Dictionary else {}
 	var prologue_context := WorldSessionRuntimeService.get_prologue_context() as CharacterPrologueContext
 	var profile := WorldSessionRuntimeService.get_character_profile() as CharacterProfile
 
@@ -145,19 +145,19 @@ static func dispatch_prologue(request: ClientRequestEnvelopeDTO, gateway: Varian
 				return UnifiedProtocolFactory.create_response(
 					request.request_id, false, {}, "ERR_NO_PROLOGUE_CONTEXT", "Active prologue context is missing."
 				)
-			var step_result := PrologueExecutionKernel.advance_prologue_step(prologue_context, str(payload_dict.get("choice_id", "NEXT")), payload_dict)
-			var is_step_ok := bool(step_result.get("success", false))
+			var step_result := PrologueExecutionKernel.advance_prologue_step(prologue_context, str(payload_map.get("choice_id", "NEXT")), payload_map)
+			var is_step_succeeded := bool(step_result.get("success", false))
 			var step_packet: Variant = step_result.get("packet", null)
-			var step_data := {
+			var step_payload := {
 				"current_stage": prologue_context.current_stage,
 				"step_index": prologue_context.step_index,
 				"is_completed": prologue_context.is_completed,
 				"packet": step_packet.to_dto() if (step_packet != null and step_packet.has_method("to_dto")) else {}
 			}
 			return UnifiedProtocolFactory.create_response(
-				request.request_id, is_step_ok, step_data,
-				"" if is_step_ok else String(step_result.get("error_code", "ERR_PROLOGUE_ADVANCE_FAILED")),
-				"Prologue step advanced successfully." if is_step_ok else String(step_result.get("message", "Failed to advance prologue."))
+				request.request_id, is_step_succeeded, step_payload,
+				"" if is_step_succeeded else String(step_result.get("error_code", "ERR_PROLOGUE_ADVANCE_FAILED")),
+				"Prologue step advanced successfully." if is_step_succeeded else String(step_result.get("message", "Failed to advance prologue."))
 			)
 
 		"COMPLETE_PROLOGUE", "SKIP_PROLOGUE":
@@ -165,15 +165,15 @@ static func dispatch_prologue(request: ClientRequestEnvelopeDTO, gateway: Varian
 				return UnifiedProtocolFactory.create_response(
 					request.request_id, false, {}, "ERR_NO_PROLOGUE_CONTEXT", "Active prologue context is missing."
 				)
-			var cutscene_id := str(payload_dict.get("cutscene_id", ""))
+			var cutscene_id := str(payload_map.get("cutscene_id", ""))
 			if not cutscene_id.is_empty():
 				PrologueCutscenePort.dispatch_cutscene(cutscene_id, request.action_type == "SKIP_PROLOGUE")
 			var completion_result := PrologueExecutionKernel.complete_prologue_to_handoff(
 				prologue_context,
 				profile,
 				{
-					"extra_attrs": payload_dict.get("extra_attributes", {}) if payload_dict.get("extra_attributes") is Dictionary else {},
-					"initial_gold": int(payload_dict.get("initial_gold", -1)),
+					"extra_attrs": payload_map.get("extra_attributes", {}) if payload_map.get("extra_attributes") is Dictionary else {},
+					"initial_gold": int(payload_map.get("initial_gold", -1)),
 					"active_mods": gateway.active_mods if gateway != null else [],
 				}
 			)
@@ -199,17 +199,17 @@ static func dispatch_prologue(request: ClientRequestEnvelopeDTO, gateway: Varian
 					"prologue_context": prologue_context
 				}, true)
 				handoff_result = {"success": true, "snapshot": world_snapshot}
-			var is_handoff_ok := bool(handoff_result.get("success", false))
+			var is_handoff_succeeded := bool(handoff_result.get("success", false))
 			var snapshot_object: Variant = handoff_result.get("snapshot", null)
-			var snapshot_dict: Dictionary = snapshot_object.to_dto() if (snapshot_object != null and snapshot_object.has_method("to_dto")) else {}
+			var snapshot_map: Dictionary = snapshot_object.to_dto() if (snapshot_object != null and snapshot_object.has_method("to_dto")) else {}
 			return UnifiedProtocolFactory.create_response(
-				request.request_id, is_handoff_ok, {
-					"completed": is_handoff_ok,
+				request.request_id, is_handoff_succeeded, {
+					"completed": is_handoff_succeeded,
 					"handoff": handoff.to_dto() if handoff != null else {},
-					"initial_hud_snapshot": snapshot_dict
+					"initial_hud_snapshot": snapshot_map
 				},
-				"" if is_handoff_ok else String(handoff_result.get("error_code", "ERR_PROLOGUE_HANDOFF_FAILED")),
-				"Prologue completed and exploration handed off with initial HUD synchronization." if is_handoff_ok else String(handoff_result.get("message", "Prologue handoff failed."))
+				"" if is_handoff_succeeded else String(handoff_result.get("error_code", "ERR_PROLOGUE_HANDOFF_FAILED")),
+				"Prologue completed and exploration handed off with initial HUD synchronization." if is_handoff_succeeded else String(handoff_result.get("message", "Prologue handoff failed."))
 			)
 
 	return UnifiedProtocolFactory.create_unhandled_action_response(request.request_id, request.action_type)
