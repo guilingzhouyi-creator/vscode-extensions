@@ -22,17 +22,17 @@ static func _prune_completed() -> void:
 ## 接取委托：幂等键 → 状态/资质/保证金逐级校验 → 扣保证金置进行中并写期限
 static func accept_commission(
 	commission: CommissionAggregate,
-	assignee_acc_id: String,
+	assignee_account_id: String,
 	adventurer_tier: CommissionAggregate.CommissionTier,
 	assignee_wallet: CharacterWalletEntity,
 	current_time_utc: int,
 	duration_seconds: int = 86400,
-	transaction_id: String = "" # GAP-03 可选幂等键
+	transaction_id: String = "" # 可选幂等键
 ) -> Dictionary:
-	var tx_id := transaction_id if not transaction_id.is_empty() \
+	var resolved_tx_id := transaction_id if not transaction_id.is_empty() \
 		else "COMMISSION_ACCEPT_%s_%s" % [commission.commission_id, str(Time.get_ticks_usec())]
-	if _completed_transactions.has(tx_id):
-		return _completed_transactions[tx_id]
+	if _completed_transactions.has(resolved_tx_id):
+		return _completed_transactions[resolved_tx_id]
 
 	if commission.status != CommissionAggregate.CommissionStatus.POSTED_AVAILABLE:
 		return {
@@ -58,7 +58,7 @@ static func accept_commission(
 	# 扣除保证金
 	assignee_wallet.gold -= commission.security_deposit_required
 	commission.status = CommissionAggregate.CommissionStatus.ACCEPTED_IN_PROGRESS
-	commission.assignee_account_id = assignee_acc_id
+	commission.assignee_account_id = assignee_account_id
 	commission.accept_timestamp_utc = current_time_utc
 	commission.deadline_timestamp_utc = current_time_utc + duration_seconds
 
@@ -67,7 +67,7 @@ static func accept_commission(
 		"commission_id": commission.commission_id,
 		"deadline_utc": commission.deadline_timestamp_utc
 	}
-	_completed_transactions[tx_id] = result.duplicate(true)
+	_completed_transactions[resolved_tx_id] = result.duplicate(true)
 	_prune_completed()
 	return result
 
@@ -76,12 +76,12 @@ static func settle_successful_commission(
 	commission: CommissionAggregate,
 	assignee_wallet: CharacterWalletEntity,
 	guild_treasury: OrganizationAggregate,
-	transaction_id: String = "" # GAP-03 可选幂等键
+	transaction_id: String = "" # 可选幂等键
 ) -> Dictionary:
-	var tx_id := transaction_id if not transaction_id.is_empty() \
+	var resolved_tx_id := transaction_id if not transaction_id.is_empty() \
 		else "COMMISSION_SETTLE_%s_%s" % [commission.commission_id, str(Time.get_ticks_usec())]
-	if _completed_transactions.has(tx_id):
-		return _completed_transactions[tx_id]
+	if _completed_transactions.has(resolved_tx_id):
+		return _completed_transactions[resolved_tx_id]
 
 	if commission.status != CommissionAggregate.CommissionStatus.ACCEPTED_IN_PROGRESS and commission.status != CommissionAggregate.CommissionStatus.COMPLETED_PENDING:
 		return {
@@ -90,28 +90,28 @@ static func settle_successful_commission(
 			"error_message": _msg("invalid_settle_state")
 		}
 
-	var split: Variant = CommissionSettlementSolver.calculate_payout_split(commission)
+	var payout_split: Variant = CommissionSettlementSolver.calculate_payout_split(commission)
 
 	# 返还保证金 + 净赏金
-	var total_payout_gold: Variant = split["net_gold_to_adventurer"] + commission.security_deposit_required
+	var total_payout_gold: Variant = payout_split["net_gold_to_adventurer"] + commission.security_deposit_required
 	assignee_wallet.apply_delta({
 		"gold": total_payout_gold,
-		"mana_monocrystals": split["net_crystals_to_adventurer"]
+		"mana_monocrystals": payout_split["net_crystals_to_adventurer"]
 	})
 
 	if guild_treasury != null:
-		guild_treasury.treasury_gold_coins += split["tax_gold_to_guild"]
-		guild_treasury.treasury_mana_crystals += split["tax_crystals_to_guild"]
+		guild_treasury.treasury_gold_coins += payout_split["tax_gold_to_guild"]
+		guild_treasury.treasury_mana_crystals += payout_split["tax_crystals_to_guild"]
 
 	commission.status = CommissionAggregate.CommissionStatus.SETTLED_SUCCESS
 
 	var result := {
 		"success": true,
 		"total_gold_received": total_payout_gold,
-		"crystals_received": split["net_crystals_to_adventurer"],
-		"guild_tax_gold": split["tax_gold_to_guild"]
+		"crystals_received": payout_split["net_crystals_to_adventurer"],
+		"guild_tax_gold": payout_split["tax_gold_to_guild"]
 	}
-	_completed_transactions[tx_id] = result.duplicate(true)
+	_completed_transactions[resolved_tx_id] = result.duplicate(true)
 	_prune_completed()
 	return result
 
@@ -119,12 +119,12 @@ static func settle_successful_commission(
 static func handle_commission_breach(
 	commission: CommissionAggregate,
 	guild_treasury: OrganizationAggregate,
-	transaction_id: String = "" # GAP-03 可选幂等键
+	transaction_id: String = "" # 可选幂等键
 ) -> Dictionary:
-	var tx_id := transaction_id if not transaction_id.is_empty() \
+	var resolved_tx_id := transaction_id if not transaction_id.is_empty() \
 		else "COMMISSION_BREACH_%s_%s" % [commission.commission_id, str(Time.get_ticks_usec())]
-	if _completed_transactions.has(tx_id):
-		return _completed_transactions[tx_id]
+	if _completed_transactions.has(resolved_tx_id):
+		return _completed_transactions[resolved_tx_id]
 
 	if commission.status != CommissionAggregate.CommissionStatus.ACCEPTED_IN_PROGRESS:
 		return {
@@ -142,7 +142,7 @@ static func handle_commission_breach(
 		"forfeited_deposit": commission.security_deposit_required,
 		"penalty_applied": true
 	}
-	_completed_transactions[tx_id] = result.duplicate(true)
+	_completed_transactions[resolved_tx_id] = result.duplicate(true)
 	_prune_completed()
 	return result
 

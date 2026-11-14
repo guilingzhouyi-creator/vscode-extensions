@@ -18,17 +18,18 @@ var accept_time_utc: int = 0
 var timeout_duration_sec: int = 0
 var metadata: Dictionary = {}
 
+## 构造委托接取数据传输对象。
 func _init(
-	p_commission_id: String = "",
-	p_character_id: String = "",
-	p_guild_id: String = "",
-	p_accept_time_utc: int = 0,
-	p_timeout_duration_sec: int = 0,
-	p_metadata: Dictionary = {}
+	initial_commission_id: String = "",
+	initial_character_id: String = "",
+	initial_guild_id: String = "",
+	initial_accept_time_utc: int = 0,
+	initial_timeout_duration_seconds: int = 0,
+	initial_metadata: Dictionary = {}
 ) -> void:
-	commission_id = p_commission_id
-	character_id = p_character_id
-	guild_id = p_guild_id
-	accept_time_utc = p_accept_time_utc
-	timeout_duration_sec = p_timeout_duration_sec
-	metadata = p_metadata
+	commission_id = initial_commission_id
+	character_id = initial_character_id
+	guild_id = initial_guild_id
+	accept_time_utc = initial_accept_time_utc
+	timeout_duration_sec = initial_timeout_duration_seconds
+	metadata = initial_metadata

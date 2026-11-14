@@ -48,8 +48,13 @@ var accept_timestamp_utc: int = 0
 var deadline_timestamp_utc: int = 0
 
 ## 委托聚合构造（ID/标题/阶位门槛/赏金）
-func _init(p_id: String = "", p_title: String = "", p_tier: CommissionTier = CommissionTier.WOOD, p_reward: int = 100) -> void:
-	commission_id = p_id
-	title_key = p_title
-	required_tier = p_tier
-	reward_gold = p_reward
+func _init(
+	initial_id: String = "",
+	initial_title: String = "",
+	initial_tier: CommissionTier = CommissionTier.WOOD,
+	initial_reward: int = 100
+) -> void:
+	commission_id = initial_id
+	title_key = initial_title
+	required_tier = initial_tier
+	reward_gold = initial_reward
