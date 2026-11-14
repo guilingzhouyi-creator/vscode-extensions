@@ -22,10 +22,10 @@ static func _verbs() -> Dictionary:
 
 ## 按动词 ID 取常数（未登记回退 _fallback 默认）
 static func get_verb(verb_id: String) -> Dictionary:
-	var verbs := _verbs()
-	if verbs.has(verb_id):
-		return verbs[verb_id]
-	return verbs.get("_fallback", {})
+	var verb_table := _verbs()
+	if verb_table.has(verb_id):
+		return verb_table[verb_id]
+	return verb_table.get("_fallback", {})
 
 ## 卡牌默认值静态缓存（模式：配置热重载版本推进自动失效重建）。
 ## CombatActionCardEntity 每张构造原本触发 10 次 GameConfig 路径查找（其中多数字段
@@ -75,23 +75,23 @@ class CombatActionCardEntity extends RefCounted:
 	var ap_cost: int = -2
 	var base_potency: float = 20.0
 	var required_weapon_category: String = "WEAPON_BLADE"
-	# ---- 收编扩展（可选字段，非魔法卡保持默认，配置段兜底） ----
+	# ---- 收编扩展（可选字段，非魔法卡保持默认，配置段默认回退） ----
 	var card_category: String = "ATTACK"
 	var magic_ref: String = ""
 	var effects: Array = []
 	var card_pool: String = "random"
 
 	func _init() -> void:
-		var d: Dictionary = PhysicalVerbRegistry.card_defaults()
-		verb_type = d.get("verb_type", verb_type)
-		magic_form = int(d.get("magic_form", magic_form))
-		ap_cost = int(d.get("ap_cost", ap_cost))
-		base_potency = float(d.get("base_potency", base_potency))
-		required_weapon_category = d.get("required_weapon_category", required_weapon_category)
-		card_category = d.get("card_category", card_category)
-		magic_ref = d.get("magic_ref", magic_ref)
-		effects = (d.get("effects", []) as Array).duplicate()
-		card_pool = d.get("card_pool", card_pool)
+		var defaults: Dictionary = PhysicalVerbRegistry.card_defaults()
+		verb_type = defaults.get("verb_type", verb_type)
+		magic_form = int(defaults.get("magic_form", magic_form))
+		ap_cost = int(defaults.get("ap_cost", ap_cost))
+		base_potency = float(defaults.get("base_potency", base_potency))
+		required_weapon_category = defaults.get("required_weapon_category", required_weapon_category)
+		card_category = defaults.get("card_category", card_category)
+		magic_ref = defaults.get("magic_ref", magic_ref)
+		effects = (defaults.get("effects", []) as Array).duplicate()
+		card_pool = defaults.get("card_pool", card_pool)
 
 	## 序列化行动卡牌为字典（effects 深拷贝）
 	func to_dto() -> Dictionary:
@@ -121,6 +121,7 @@ class CombatNarrativeEventPacket extends PoolableDtoBase:
 	var narrative_text: String = ""
 	var timestamp_tick: int = 0
 
+	## 重置战斗叙事事件数据包状态，供对象池无堆分配复用
 	func reset_state() -> void:
 		super.reset_state()
 		actor_id = ""

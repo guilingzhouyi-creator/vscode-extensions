@@ -40,15 +40,15 @@ static func apply_special_modifiers(
 ) -> Dictionary:
 	var delta := 0
 	var applied_ids: Array[String] = []
-	for mod in modifiers:
-		var m_id: String = mod.get("modifier_id", "")
-		var m_delta: int = int(mod.get("hand_count_delta", 0))
-		var is_absolute_zero: bool = bool(mod.get("force_zero_hand", false))
+	for modifier in modifiers:
+		var modifier_id: String = modifier.get("modifier_id", "")
+		var modifier_delta: int = int(modifier.get("hand_count_delta", 0))
+		var is_absolute_zero: bool = bool(modifier.get("force_zero_hand", false))
 		if is_absolute_zero:
-			applied_ids.append(m_id)
+			applied_ids.append(modifier_id)
 			return {"final_count": 0, "modifier_delta": -base_count, "applied": applied_ids}
-		delta += m_delta
-		applied_ids.append(m_id)
+		delta += modifier_delta
+		applied_ids.append(modifier_id)
 
 	var final_count := maxi(0, base_count + delta)
 	return {"final_count": final_count, "modifier_delta": delta, "applied": applied_ids}
@@ -58,35 +58,35 @@ static func draw_cards_for_turn(
 	spec: CombatHandDrawDTO.HandDrawSpecDTO,
 	rng: DeterministicRNG
 ) -> CombatHandDrawDTO.HandDrawResultDTO:
-	var res: CombatHandDrawDTO.HandDrawResultDTO = CombatHandDrawDTOClass.HandDrawResultDTO.new()
-	res.base_random_count = evaluate_base_hand_count(spec.is_first_encounter, rng)
+	var draw_result: CombatHandDrawDTO.HandDrawResultDTO = CombatHandDrawDTOClass.HandDrawResultDTO.new()
+	draw_result.base_random_count = evaluate_base_hand_count(spec.is_first_encounter, rng)
 
-	var mod_res := apply_special_modifiers(res.base_random_count, spec.special_modifiers)
-	res.final_draw_count = mod_res.final_count
-	res.modifier_delta = mod_res.modifier_delta
-	res.applied_modifiers = mod_res.applied
-	res.is_zero_hand_state = (res.final_draw_count == 0)
+	var modifier_result := apply_special_modifiers(draw_result.base_random_count, spec.special_modifiers)
+	draw_result.final_draw_count = modifier_result.final_count
+	draw_result.modifier_delta = modifier_result.modifier_delta
+	draw_result.applied_modifiers = modifier_result.applied
+	draw_result.is_zero_hand_state = (draw_result.final_draw_count == 0)
 
 	# 牌型随机抽取与实例创建
 	var drawn_cards: Array = []
-	for i in range(res.final_draw_count):
+	for card_index in range(draw_result.final_draw_count):
 		var card := _instantiate_card_from_pool(rng)
-		card.card_id = "CARD_GEN_%d_%d" % [spec.current_round, i + 1]
+		card.card_id = "CARD_GEN_%d_%d" % [spec.current_round, card_index + 1]
 		drawn_cards.append(card)
-	res.actual_cards = drawn_cards
-	return res
+	draw_result.actual_cards = drawn_cards
+	return draw_result
 
 ## 离散概率分布采样求解器
-static func _sample_discrete_distribution(weights: Dictionary, rng: DeterministicRNG, default_val: int) -> int:
+static func _sample_discrete_distribution(weights: Dictionary, rng: DeterministicRNG, default_count: int) -> int:
 	if weights.is_empty():
-		return default_val
+		return default_count
 	var roll := (rng.randf() if rng else 0.5)
-	var accum := 0.0
-	for k in weights.keys():
-		accum += float(weights[k])
-		if roll <= accum:
-			return int(k)
-	return default_val
+	var cumulative_weight := 0.0
+	for count_key in weights.keys():
+		cumulative_weight += float(weights[count_key])
+		if roll <= cumulative_weight:
+			return int(count_key)
+	return default_count
 
 ## 动态卡池实体实例化
 static func _instantiate_card_from_pool(rng: DeterministicRNG) -> PhysicalVerbRegistry.CombatActionCardEntity:

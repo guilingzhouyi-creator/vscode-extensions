@@ -37,7 +37,7 @@ var cards: Array[PhysicalVerbRegistry.CombatActionCardEntity] = []
 var total_overflow_count: int = 0
 var accumulated_overflow_energy: int = 0
 
-## 初始化待发栏：属主/容量（配置兜底）/清空统计
+## 初始化待发栏：属主/容量（配置默认回退）/清空统计
 func initialize(in_owner_id: String, capacity: int = -1) -> void:
 	owner_id = in_owner_id
 	if capacity > 0:
@@ -89,21 +89,21 @@ func enqueue_card(card: PhysicalVerbRegistry.CombatActionCardEntity) -> Dictiona
 
 ## 消耗/打出手牌
 func pop_card(card_id: String) -> PhysicalVerbRegistry.CombatActionCardEntity:
-	for i in range(cards.size()):
-		if cards[i].card_id == card_id:
-			var card := cards[i]
-			cards.remove_at(i)
+	for card_index in range(cards.size()):
+		if cards[card_index].card_id == card_id:
+			var card := cards[card_index]
+			cards.remove_at(card_index)
 			return card
 	return null
 
 ## 待发栏快照（容量/满载/溢出统计/卡牌列表）
 func get_snapshot() -> StagingBarSnapshotDTO:
-	var snap := StagingBarSnapshotDTO.new()
-	snap.owner_id = owner_id
-	snap.max_capacity = max_capacity
-	snap.is_full = (cards.size() >= max_capacity)
-	snap.total_overflow_count = total_overflow_count
-	snap.accumulated_overflow_energy = accumulated_overflow_energy
-	for c in cards:
-		snap.card_slots.append(c.to_dto())
-	return snap
+	var snapshot := StagingBarSnapshotDTO.new()
+	snapshot.owner_id = owner_id
+	snapshot.max_capacity = max_capacity
+	snapshot.is_full = (cards.size() >= max_capacity)
+	snapshot.total_overflow_count = total_overflow_count
+	snapshot.accumulated_overflow_energy = accumulated_overflow_energy
+	for card in cards:
+		snapshot.card_slots.append(card.to_dto())
+	return snapshot

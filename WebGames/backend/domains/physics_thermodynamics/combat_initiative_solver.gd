@@ -91,24 +91,24 @@ static func evaluate_initiative(
 	result.seed_used = rng.get_state() if rng else 0
 	result.start_utc = int(Time.get_unix_time_from_system())
 
-	var w_agi := GameConfig.get_float("domains.combat", "initiative_model/weight_agility", 1.0)
-	var w_per := GameConfig.get_float("domains.combat", "initiative_model/weight_perception", 0.8)
-	var w_lvl := GameConfig.get_float("domains.combat", "initiative_model/weight_level", 0.5)
+	var agility_weight := GameConfig.get_float("domains.combat", "initiative_model/weight_agility", 1.0)
+	var perception_weight := GameConfig.get_float("domains.combat", "initiative_model/weight_perception", 0.8)
+	var level_weight := GameConfig.get_float("domains.combat", "initiative_model/weight_level", 0.5)
 	var jitter_min := GameConfig.get_int("domains.combat", "initiative_model/jitter_min", -2)
 	var jitter_max := GameConfig.get_int("domains.combat", "initiative_model/jitter_max", 2)
 	var ap_lead_bonus := GameConfig.get_int("domains.combat", "initiative_model/lead_ap_bonus", 2)
 
-	var player_base := player.base_agility * w_agi + player.base_perception * w_per + float(player.level) * w_lvl
-	var enemy_base := enemy.base_agility * w_agi + enemy.base_perception * w_per + float(enemy.level) * w_lvl
+	var player_base := player.base_agility * agility_weight + player.base_perception * perception_weight + float(player.level) * level_weight
+	var enemy_base := enemy.base_agility * agility_weight + enemy.base_perception * perception_weight + float(enemy.level) * level_weight
 
-	var player_mod := 1.0 + player.equip_speed_modifier + player.temporary_buff_modifier
-	var enemy_mod := 1.0 + enemy.equip_speed_modifier + enemy.temporary_buff_modifier
+	var player_speed_modifier := 1.0 + player.equip_speed_modifier + player.temporary_buff_modifier
+	var enemy_speed_modifier := 1.0 + enemy.equip_speed_modifier + enemy.temporary_buff_modifier
 
 	var player_jitter := float(rng.randi_range(jitter_min, jitter_max)) if rng else 0.0
 	var enemy_jitter := float(rng.randi_range(jitter_min, jitter_max)) if rng else 0.0
 
-	player.calculated_score = (player_base * player_mod) + player_jitter
-	enemy.calculated_score = (enemy_base * enemy_mod) + enemy_jitter
+	player.calculated_score = (player_base * player_speed_modifier) + player_jitter
+	enemy.calculated_score = (enemy_base * enemy_speed_modifier) + enemy_jitter
 
 	# 胜负与平局决胜判定 (Tie-Breaker)
 	if abs(player.calculated_score - enemy.calculated_score) > 0.001:

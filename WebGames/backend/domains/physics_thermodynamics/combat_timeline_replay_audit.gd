@@ -46,20 +46,20 @@ func initialize(in_battle_id: String, in_seed: int) -> void:
 ## 记录一步：自增序号 + 时间戳/回合/动作类型/演员/事件数据
 func record_step(timeline_ms: int, round_number: int, action_type: String, actor_id: String, event_data: Dictionary) -> void:
 	step_counter += 1
-	var rec := StepRecordDTO.new()
-	rec.step_index = step_counter
-	rec.timeline_ms = timeline_ms
-	rec.round_number = round_number
-	rec.action_type = action_type
-	rec.actor_id = actor_id
-	rec.event_data = event_data
-	records.append(rec)
+	var step_record := StepRecordDTO.new()
+	step_record.step_index = step_counter
+	step_record.timeline_ms = timeline_ms
+	step_record.round_number = round_number
+	step_record.action_type = action_type
+	step_record.actor_id = actor_id
+	step_record.event_data = event_data
+	records.append(step_record)
 
 ## 导出确定性重放载荷（战斗 ID/种子/总步数/记录序列）
 func export_replay_payload() -> Dictionary:
 	var serialized: Array[Dictionary] = []
-	for r in records:
-		serialized.append(r.to_dto())
+	for step_record in records:
+		serialized.append(step_record.to_dto())
 	return {
 		"battle_id": battle_id,
 		"initial_seed": initial_seed,

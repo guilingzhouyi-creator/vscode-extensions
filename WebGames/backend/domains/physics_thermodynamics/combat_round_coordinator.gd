@@ -54,7 +54,7 @@ var resolved_client_events: Array[Dictionary] = []
 ## 不随抽牌递增；同一步 ADD_DRAW 循环/多事件并发/无引擎模式下保证每次发放 ID 唯一。
 ## 序号在战斗实例内单调递增、不随回合复位——跨轮卡牌（end_of_round_policy=KEEP）
 ## 不再出现 CARD_AUTO_N 重复，引用唯一性跨轮成立）
-var _card_id_seq: int = 0
+var _card_id_sequence: int = 0
 ## 回合结算可观察状态（切轮会立即归零计时，结算标志先落盘供表现层快照读取）
 var is_round_concluded_state: bool = false
 var last_round_end_reason: String = ""
@@ -76,7 +76,7 @@ func initialize(
 	max_round_ms = GameConfig.get_int("domains.combat", "round_lifecycle/max_round_duration_ms", 10000)
 	current_schedule = null
 	resolved_client_events.clear()
-	_card_id_seq = 0
+	_card_id_sequence = 0
 	is_round_concluded_state = false
 	last_round_end_reason = ""
 
@@ -90,11 +90,11 @@ func set_round_schedule(schedule: TimelineEventScheduleDTO) -> void:
 
 func _record_normal_draw(processed_events: Array[Dictionary], event_id: String, extra_fields: Dictionary) -> void:
 	var drawn_card := _draw_random_card_from_pool()
-	var queue_res: Dictionary = player_staging.enqueue_card(drawn_card) if player_staging else {}
+	var queue_result: Dictionary = player_staging.enqueue_card(drawn_card) if player_staging else {}
 	var entry := {
 		"event_id": event_id,
 		"type": "CARD_DISPATCHED",
-		"queue_res": queue_res
+		"queue_res": queue_result
 	}
 	entry.merge(extra_fields, true)
 	processed_events.append(entry)
@@ -105,20 +105,20 @@ func _record_normal_draw(processed_events: Array[Dictionary], event_id: String, 
 	})
 
 func _record_tension_pulse(processed_events: Array[Dictionary], event_id: String, payload: Dictionary, extra_fields: Dictionary) -> bool:
-	var t_type: String = payload.get("tension_type", "PRESSURE_SURGE")
+	var tension_type: String = payload.get("tension_type", "PRESSURE_SURGE")
 	var entry := {
 		"event_id": event_id,
 		"type": "TENSION_APPLIED",
-		"tension_type": t_type
+		"tension_type": tension_type
 	}
 	entry.merge(extra_fields, true)
 	processed_events.append(entry)
 	resolved_client_events.append({
 		"kind": "TENSION_PULSE",
-		"tension_type": t_type,
+		"tension_type": tension_type,
 		"public_message": "战场紧张度突变"
 	})
-	return t_type == "FORCE_ROUND_ADVANCE"
+	return tension_type == "FORCE_ROUND_ADVANCE"
 
 ## 步进协调：时间推进 -> 派发事件 -> 待发栏入队 -> 回合结束条件判定
 func step_coordinator(
@@ -135,29 +135,29 @@ func step_coordinator(
 	var end_reason := ""
 
 	# 1. 处理 timeline_engine 事件（空转引擎=零调度事件，语义等价旧 null）
-	for evt in fired_events:
-		if evt.event_type == TertiaryTimelineEngine.TimelineEventType.RANDOM_DISPATCH:
-			_record_normal_draw(processed_events, evt.event_id, {"time_ms": evt.trigger_time_ms})
-		elif evt.event_type == TertiaryTimelineEngine.TimelineEventType.TENSION_PULSE:
-			if _record_tension_pulse(processed_events, evt.event_id, evt.payload, {"time_ms": evt.trigger_time_ms}):
+	for timeline_event in fired_events:
+		if timeline_event.event_type == TertiaryTimelineEngine.TimelineEventType.RANDOM_DISPATCH:
+			_record_normal_draw(processed_events, timeline_event.event_id, {"time_ms": timeline_event.trigger_time_ms})
+		elif timeline_event.event_type == TertiaryTimelineEngine.TimelineEventType.TENSION_PULSE:
+			if _record_tension_pulse(processed_events, timeline_event.event_id, timeline_event.payload, {"time_ms": timeline_event.trigger_time_ms}):
 				should_end_round = true
 				end_reason = "TENSION_FORCE_ADVANCE"
 
 	# 2. 处理单回合开局预排期离散事件（hand_cap 循环外一次读取，回合内常量）
 	var hand_cap := GameConfig.get_int("domains.combat", "round_hand/hand_cap", 5)
-	var empty_pulse_ctx: Dictionary = {}
+	var empty_pulse_context: Dictionary = {}
 	if current_schedule != null:
-		for pt in current_schedule.scheduled_points:
-			if not pt.is_executed and pt.trigger_time_ms <= round_elapsed_ms:
-				pt.is_executed = true
-				if pt.event_kind == TimelineEventScheduleDTO.EventKind.NORMAL_DRAW:
-					_record_normal_draw(processed_events, pt.point_id, {"event_kind": "NORMAL_DRAW"})
-				elif pt.event_kind == TimelineEventScheduleDTO.EventKind.ADD_DRAW:
+		for scheduled_point in current_schedule.scheduled_points:
+			if not scheduled_point.is_executed and scheduled_point.trigger_time_ms <= round_elapsed_ms:
+				scheduled_point.is_executed = true
+				if scheduled_point.event_kind == TimelineEventScheduleDTO.EventKind.NORMAL_DRAW:
+					_record_normal_draw(processed_events, scheduled_point.point_id, {"event_kind": "NORMAL_DRAW"})
+				elif scheduled_point.event_kind == TimelineEventScheduleDTO.EventKind.ADD_DRAW:
 					# bonus_cards 无界钳制——payload 来自外部 DTO，防御性封口到 [0, hand_cap]
-					var bonus_cards := clampi(int(pt.payload.get("extra_bonus_cards", 1)), 0, hand_cap)
+					var bonus_cards := clampi(int(scheduled_point.payload.get("extra_bonus_cards", 1)), 0, hand_cap)
 					_draw_bonus_cards(bonus_cards)
 					processed_events.append({
-						"event_id": pt.point_id,
+						"event_id": scheduled_point.point_id,
 						"type": "CARD_DISPATCHED",
 						"event_kind": "ADD_DRAW",
 						"bonus_count": bonus_cards
@@ -168,8 +168,8 @@ func step_coordinator(
 						"drawn": bonus_cards,
 						"public_message": "战场增益触发：额外补充加发牌"
 					})
-				elif pt.event_kind == TimelineEventScheduleDTO.EventKind.TENSION_PULSE:
-					if _record_tension_pulse(processed_events, pt.point_id, pt.payload, empty_pulse_ctx):
+				elif scheduled_point.event_kind == TimelineEventScheduleDTO.EventKind.TENSION_PULSE:
+					if _record_tension_pulse(processed_events, scheduled_point.point_id, scheduled_point.payload, empty_pulse_context):
 						should_end_round = true
 						end_reason = "TENSION_FORCE_ADVANCE"
 
@@ -181,8 +181,8 @@ func step_coordinator(
 		# 核心不变量 Inv-TR-3 / Inv-TR2-4：检查是否仍有未决事件
 		var has_pending_events := false
 		if current_schedule != null:
-			for pt in current_schedule.scheduled_points:
-				if not pt.is_executed:
+			for scheduled_point in current_schedule.scheduled_points:
+				if not scheduled_point.is_executed:
 					has_pending_events = true
 					break
 
@@ -200,7 +200,7 @@ func step_coordinator(
 			end_reason = "ROUND_TIME_LIMIT_REACHED"
 
 	var active_round_id := current_round
-	var curr_timeline_ms := timeline_engine.current_timeline_ms
+	var current_timeline_ms := timeline_engine.current_timeline_ms
 	if should_end_round:
 		# 结算态先落盘（切轮会归零计时，先记录供表现层快照可观察本次结算）
 		is_round_concluded_state = true
@@ -209,7 +209,7 @@ func step_coordinator(
 
 	return {
 		"round": active_round_id,
-		"timeline_ms": curr_timeline_ms,
+		"timeline_ms": current_timeline_ms,
 		"round_elapsed_ms": round_elapsed_ms,
 		"events_fired": processed_events,
 		"round_ended": should_end_round,
@@ -227,8 +227,8 @@ func _transition_to_next_round(reason: String) -> void:
 ## 从行动卡池动态发放一张卡（RANDOM_DISPATCH 时间轴事件触发时）
 func _draw_random_card_from_pool() -> PhysicalVerbRegistry.CombatActionCardEntity:
 	var card := PhysicalVerbRegistry.CombatActionCardEntity.new()
-	_card_id_seq += 1
-	card.card_id = "CARD_AUTO_%d" % _card_id_seq
+	_card_id_sequence += 1
+	card.card_id = "CARD_AUTO_%d" % _card_id_sequence
 	card.card_name = "动态发放行动卡"
 	card.verb_type = "SLASH"
 	card.ap_cost = -2
@@ -239,38 +239,38 @@ func _draw_random_card_from_pool() -> PhysicalVerbRegistry.CombatActionCardEntit
 func _draw_bonus_cards(bonus_cards: int) -> void:
 	if not player_staging:
 		return
-	for _i in range(bonus_cards):
+	for _bonus_index in range(bonus_cards):
 		var bonus_card := _draw_random_card_from_pool()
 		player_staging.enqueue_card(bonus_card)
 
 ## 回合协调快照（轮次/计时/时间轴/双方待发栏状态）
 func get_snapshot() -> CombatRoundCoordinatorSnapshotDTO:
-	var snap := CombatRoundCoordinatorSnapshotDTO.new()
-	snap.round_number = current_round
-	snap.round_start_timeline_ms = round_start_timeline_ms
-	snap.round_duration_ms = round_elapsed_ms
+	var snapshot := CombatRoundCoordinatorSnapshotDTO.new()
+	snapshot.round_number = current_round
+	snapshot.round_start_timeline_ms = round_start_timeline_ms
+	snapshot.round_duration_ms = round_elapsed_ms
 	if timeline_engine:
-		snap.timeline_state = {
+		snapshot.timeline_state = {
 			"current_timeline_ms": timeline_engine.current_timeline_ms,
 			"event_counter": timeline_engine.event_counter,
 			"scheduled_count": timeline_engine.scheduled_events.size(),
 		}
 	if player_staging:
-		snap.player_staging_state = player_staging.get_snapshot().to_dto()
+		snapshot.player_staging_state = player_staging.get_snapshot().to_dto()
 	if enemy_staging:
-		snap.enemy_staging_state = enemy_staging.get_snapshot().to_dto()
-	return snap
+		snapshot.enemy_staging_state = enemy_staging.get_snapshot().to_dto()
+	return snapshot
 
 ## 表现层只读脱敏快照（技术上封死未决事件倒计时与未来卡牌预测）
 func get_client_snapshot() -> CombatTimelineClientDTO.PresenterSnapshotDTO:
-	var snap := CombatTimelineClientDTO.PresenterSnapshotDTO.new()
-	snap.round_number = current_round
-	snap.progress_ratio = clampf(float(round_elapsed_ms) / float(maxi(1, max_round_ms)), 0.0, 1.0)
+	var snapshot := CombatTimelineClientDTO.PresenterSnapshotDTO.new()
+	snapshot.round_number = current_round
+	snapshot.progress_ratio = clampf(float(round_elapsed_ms) / float(maxi(1, max_round_ms)), 0.0, 1.0)
 	# 读取落盘结算态（而非用已复位的计时重算，切轮归零后仍可观察本次结算）
-	snap.is_round_concluded = is_round_concluded_state
-	snap.conclude_reason = last_round_end_reason
-	snap.current_hand_count = player_staging.cards.size() if player_staging else 0
-	snap.is_zero_hand_active = (snap.current_hand_count == 0)
+	snapshot.is_round_concluded = is_round_concluded_state
+	snapshot.conclude_reason = last_round_end_reason
+	snapshot.current_hand_count = player_staging.cards.size() if player_staging else 0
+	snapshot.is_zero_hand_active = (snapshot.current_hand_count == 0)
 	# 浅拷贝即可：元素为一次性 append、从不修改的小字典（避免表现层每帧双重深拷贝）
-	snap.resolved_events = resolved_client_events.duplicate()
-	return snap
+	snapshot.resolved_events = resolved_client_events.duplicate()
+	return snapshot

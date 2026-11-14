@@ -41,13 +41,13 @@ class HandDrawResultDTO extends RefCounted:
 	## 序列化当前对象为通用字典传输结构
 	func to_dto() -> Dictionary:
 		var cards_dto: Array = []
-		for c in actual_cards:
-			if c != null and c.has_method("to_dto"):
-				cards_dto.append(c.to_dto())
-			elif c != null:
-				var c_id: String = str(c.get("card_id")) if c.get("card_id") != null else ""
-				var v_type: String = str(c.get("verb_type")) if c.get("verb_type") != null else ""
-				cards_dto.append({"card_id": c_id, "verb_type": v_type})
+		for card_entry in actual_cards:
+			if card_entry != null and card_entry.has_method("to_dto"):
+				cards_dto.append(card_entry.to_dto())
+			elif card_entry != null:
+				var card_id: String = str(card_entry.get("card_id")) if card_entry.get("card_id") != null else ""
+				var verb_type: String = str(card_entry.get("verb_type")) if card_entry.get("verb_type") != null else ""
+				cards_dto.append({"card_id": card_id, "verb_type": verb_type})
 		return {
 			"base_random_count": base_random_count,
 			"modifier_delta": modifier_delta,
