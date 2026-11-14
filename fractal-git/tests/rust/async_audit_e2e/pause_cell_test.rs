@@ -44,9 +44,11 @@ fn test_taxis_pause_resume_cli_wakeup_and_multi_cell_promotion() {
         "//! CLI staged module.\n\n/// Doubles an integer.\npub fn twice(val: i32) -> i32 {\n    val.saturating_mul(2)\n}\n",
     )
     .expect("write cli_mod.rs");
-    assert!(run_taxis_cli(repo_dir, &["add", "src/cli_mod.rs"], TEST_AUTHORITY_HEX)
-        .status
-        .success());
+    assert!(
+        run_taxis_cli(repo_dir, &["add", "src/cli_mod.rs"], TEST_AUTHORITY_HEX)
+            .status
+            .success()
+    );
     let commit_msg = concat!(
         "feat(cli): add cli_mod while paused\n\n[Project]\nfractal-git\n\n[Why]\n",
         "Verify background daemon audit pause and resume lifecycle across CLI mutations cleanly.\n\n",
@@ -54,16 +56,22 @@ fn test_taxis_pause_resume_cli_wakeup_and_multi_cell_promotion() {
         "[Changed]\n- Recorded cell sandbox commit while automatic audit scheduling was paused.\n\n",
         "[Verification]\n- Verified pub fn twice symbol and staged blob for src/cli_mod.rs under cargo test."
     );
-    assert!(run_taxis_cli(repo_dir, &["commit", "-m", commit_msg], TEST_AUTHORITY_HEX)
-        .status
-        .success());
+    assert!(
+        run_taxis_cli(repo_dir, &["commit", "-m", commit_msg], TEST_AUTHORITY_HEX)
+            .status
+            .success()
+    );
     std::thread::sleep(Duration::from_millis(200));
     assert!(!taxis_dir.join("refs/fractal/audit/trunk").exists());
 
-    assert!(run_taxis_cli(repo_dir, &["--json", "audit", "resume"], TEST_AUTHORITY_HEX)
-        .status
-        .success());
-    let resumed = wait_for_audit_status(repo_dir, |val| val["last_audit_commit_oid"].as_str().is_some());
+    assert!(
+        run_taxis_cli(repo_dir, &["--json", "audit", "resume"], TEST_AUTHORITY_HEX)
+            .status
+            .success()
+    );
+    let resumed = wait_for_audit_status(repo_dir, |val| {
+        val["last_audit_commit_oid"].as_str().is_some()
+    });
     assert_eq!(resumed["paused"], Value::Bool(false));
     let first_tree_oid = resumed["last_tree_oid"].as_str().expect("tree").to_owned();
 
@@ -73,25 +81,38 @@ fn test_taxis_pause_resume_cli_wakeup_and_multi_cell_promotion() {
         "//! Live wakeup helper.\n\n/// Returns constant three.\npub const THREE: i32 = 3;\n",
     )
     .expect("write wake_extra.rs");
-    assert!(run_taxis_cli(repo_dir, &["add", "src/wake_extra.rs"], TEST_AUTHORITY_HEX)
-        .status
-        .success());
+    assert!(
+        run_taxis_cli(repo_dir, &["add", "src/wake_extra.rs"], TEST_AUTHORITY_HEX)
+            .status
+            .success()
+    );
     let updated = wait_for_audit_status(repo_dir, |val| {
-        val["last_tree_oid"].as_str().is_some_and(|tree| tree != first_tree_oid)
+        val["last_tree_oid"]
+            .as_str()
+            .is_some_and(|tree| tree != first_tree_oid)
     });
-    assert_eq!(updated["last_decision"], Value::String(String::from("approved")));
+    assert_eq!(
+        updated["last_decision"],
+        Value::String(String::from("approved"))
+    );
 
     let alpha_req = make_ipc_commit(
         "refs/fractal/cell/alpha/main",
         Vec::new(),
-        &[("src/alpha.rs", "//! Cell alpha.\n\n/// Alpha identity.\npub fn alpha_id() -> u32 {\n    1\n}\n")],
+        &[(
+            "src/alpha.rs",
+            "//! Cell alpha.\n\n/// Alpha identity.\npub fn alpha_id() -> u32 {\n    1\n}\n",
+        )],
         "feat(alpha): commit cell alpha cleanly",
         1_790_000_100,
     );
     let beta_req = make_ipc_commit(
         "refs/fractal/cell/beta/main",
         Vec::new(),
-        &[("src/beta.rs", "//! Cell beta.\n\n/// Beta identity.\npub fn beta_id() -> u32 {\n    2\n}\n")],
+        &[(
+            "src/beta.rs",
+            "//! Cell beta.\n\n/// Beta identity.\npub fn beta_id() -> u32 {\n    2\n}\n",
+        )],
         "feat(beta): commit cell beta cleanly",
         1_790_000_120,
     );
@@ -99,29 +120,75 @@ fn test_taxis_pause_resume_cli_wakeup_and_multi_cell_promotion() {
     let beta_oid = expect_commit_oid(&daemon_meta, &beta_req, "beta");
 
     let deadline = Instant::now() + Duration::from_secs(10);
-    while !taxis_dir.join("refs/fractal/audit/cell/alpha/main").is_file()
-        || !taxis_dir.join("refs/fractal/audit/cell/beta/main").is_file()
+    while !taxis_dir
+        .join("refs/fractal/audit/cell/alpha/main")
+        .is_file()
+        || !taxis_dir
+            .join("refs/fractal/audit/cell/beta/main")
+            .is_file()
     {
-        assert!(Instant::now() < deadline, "timed out waiting for cell audit refs");
+        assert!(
+            Instant::now() < deadline,
+            "timed out waiting for cell audit refs"
+        );
         std::thread::sleep(Duration::from_millis(40));
     }
 
     assert!(run_taxis_cli(
         repo_dir,
-        &["promotion", "stage", "--oid", &alpha_oid, "--agent", "alpha", "--summary", "Promote cell alpha", "--require-audit-tree"],
+        &[
+            "promotion",
+            "stage",
+            "--oid",
+            &alpha_oid,
+            "--agent",
+            "alpha",
+            "--summary",
+            "Promote cell alpha",
+            "--require-audit-tree"
+        ],
         TEST_AUTHORITY_HEX,
-    ).status.success());
+    )
+    .status
+    .success());
     assert!(run_taxis_cli(
         repo_dir,
-        &["promotion", "reject", "--operator", "e2e-op", "--reason", "clear slot before staging cell beta"],
+        &[
+            "promotion",
+            "reject",
+            "--operator",
+            "e2e-op",
+            "--reason",
+            "clear slot before staging cell beta"
+        ],
         TEST_AUTHORITY_HEX,
-    ).status.success());
+    )
+    .status
+    .success());
     assert!(run_taxis_cli(
         repo_dir,
-        &["promotion", "stage", "--oid", &beta_oid, "--agent", "beta", "--summary", "Promote cell beta", "--require-audit-tree"],
+        &[
+            "promotion",
+            "stage",
+            "--oid",
+            &beta_oid,
+            "--agent",
+            "beta",
+            "--summary",
+            "Promote cell beta",
+            "--require-audit-tree"
+        ],
         TEST_AUTHORITY_HEX,
-    ).status.success());
+    )
+    .status
+    .success());
 
-    assert!(run_taxis_cli(repo_dir, &["--json", "daemon", "stop"], TEST_AUTHORITY_HEX).status.success());
-    assert!(daemon_1.wait_exit(Duration::from_secs(6)).is_some_and(|st| st.success()));
+    assert!(
+        run_taxis_cli(repo_dir, &["--json", "daemon", "stop"], TEST_AUTHORITY_HEX)
+            .status
+            .success()
+    );
+    assert!(daemon_1
+        .wait_exit(Duration::from_secs(6))
+        .is_some_and(|st| st.success()));
 }

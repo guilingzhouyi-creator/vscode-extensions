@@ -57,8 +57,13 @@ fn test_taxis_persistent_async_audit_lifecycle_and_sealed_promotion() {
     assert_eq!(status["active"], Value::Bool(true));
     assert_eq!(status["paused"], Value::Bool(false));
     assert_eq!(status["writes_audit_logs_dir"], Value::Bool(false));
-    assert_eq!(status["last_decision"], Value::String(String::from("approved")));
-    assert!(status["last_composite_score"].as_f64().is_some_and(|s| s >= 90.0));
+    assert_eq!(
+        status["last_decision"],
+        Value::String(String::from("approved"))
+    );
+    assert!(status["last_composite_score"]
+        .as_f64()
+        .is_some_and(|s| s >= 90.0));
     assert!(taxis_dir.join("refs/fractal/audit/trunk").is_file());
     assert!(!repo_dir.join(".audit-logs").exists() && !taxis_dir.join(".audit-logs").exists());
 
@@ -85,18 +90,36 @@ fn test_taxis_persistent_async_audit_lifecycle_and_sealed_promotion() {
     let bad_secret = run_taxis_cli(
         repo_dir,
         &[
-            "promotion", "stage", "--oid", &commit_oid_1, "--agent", "agent-e2e",
-            "--summary", "Forged authority secret check", "--require-audit-tree",
+            "promotion",
+            "stage",
+            "--oid",
+            &commit_oid_1,
+            "--agent",
+            "agent-e2e",
+            "--summary",
+            "Forged authority secret check",
+            "--require-audit-tree",
         ],
         WRONG_AUTHORITY_HEX,
     );
-    assert!(!bad_secret.status.success(), "forged secret must fail closed");
+    assert!(
+        !bad_secret.status.success(),
+        "forged secret must fail closed"
+    );
 
     let valid_stage = run_taxis_cli(
         repo_dir,
         &[
-            "--json", "promotion", "stage", "--oid", &commit_oid_1, "--agent", "agent-e2e",
-            "--summary", "Sealed audit tree promotion stage", "--require-audit-tree",
+            "--json",
+            "promotion",
+            "stage",
+            "--oid",
+            &commit_oid_1,
+            "--agent",
+            "agent-e2e",
+            "--summary",
+            "Sealed audit tree promotion stage",
+            "--require-audit-tree",
         ],
         TEST_AUTHORITY_HEX,
     );
@@ -108,7 +131,10 @@ fn test_taxis_persistent_async_audit_lifecycle_and_sealed_promotion() {
         vec![commit_oid_1],
         &[
             ("src/math.rs", CLEAN_MATH_SRC),
-            ("src/extra.rs", "/// Extra constant.\npub const FLAG: u8 = 1;\n"),
+            (
+                "src/extra.rs",
+                "/// Extra constant.\npub const FLAG: u8 = 1;\n",
+            ),
         ],
         "feat(math): add extra unaudited module",
         1_790_000_060,
@@ -117,8 +143,15 @@ fn test_taxis_persistent_async_audit_lifecycle_and_sealed_promotion() {
     let stale_stage = run_taxis_cli(
         repo_dir,
         &[
-            "promotion", "stage", "--oid", &commit_oid_2, "--agent", "agent-e2e",
-            "--summary", "Mismatched candidate tree check", "--require-audit-tree",
+            "promotion",
+            "stage",
+            "--oid",
+            &commit_oid_2,
+            "--agent",
+            "agent-e2e",
+            "--summary",
+            "Mismatched candidate tree check",
+            "--require-audit-tree",
         ],
         TEST_AUTHORITY_HEX,
     );
@@ -126,7 +159,9 @@ fn test_taxis_persistent_async_audit_lifecycle_and_sealed_promotion() {
 
     let stop_out = run_taxis_cli(repo_dir, &["--json", "daemon", "stop"], TEST_AUTHORITY_HEX);
     assert!(stop_out.status.success());
-    let exit_status = daemon_guard.wait_exit(Duration::from_secs(6)).expect("daemon exit");
+    let exit_status = daemon_guard
+        .wait_exit(Duration::from_secs(6))
+        .expect("daemon exit");
     assert!(exit_status.success());
     assert!(!meta_path.exists());
     assert!(!repo_dir.join(".audit-logs").exists() && !taxis_dir.join(".audit-logs").exists());

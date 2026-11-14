@@ -127,10 +127,14 @@ fn read_single_response_frame<S: Read>(stream: &mut S) -> FractalResult<IpcMessa
         }
         let read_count = stream.read(&mut chunk)?;
         if read_count == 0 {
-            return Err(FractalError::ObjectCodec(String::from(
-                "daemon closed IPC connection before returning full response frame",
-            )));
+            return Err(err_closed_before_response());
         }
         buffer.extend_from_slice(&chunk[..read_count]);
     }
+}
+
+fn err_closed_before_response() -> FractalError {
+    FractalError::ObjectCodec(String::from(
+        "daemon closed IPC connection before returning full response frame",
+    ))
 }

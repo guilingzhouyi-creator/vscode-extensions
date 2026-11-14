@@ -79,9 +79,7 @@ pub fn read_authenticated_request<S: Read>(
         };
         buffer.extend_from_slice(&chunk[..read_count]);
         if buffer.len() > 8 * 1024 * 1024 {
-            return Err(FractalError::ObjectCodec(String::from(
-                "IPC request exceeded 8 MiB frame limit",
-            )));
+            return Err(err_ipc_frame_limit());
         }
     }
 }
@@ -95,21 +93,31 @@ fn process_decoded_auth_frames(
         match frame {
             IpcMessage::HelloAuth { token } => {
                 if !ct_eq_bytes(token.as_bytes(), expected_token_hex.as_bytes()) {
-                    return Err(FractalError::AccessDenied(String::from(
-                        "invalid loopback daemon authentication token",
-                    )));
+                    return Err(err_invalid_daemon_token());
                 }
                 *auth_verified = true;
             }
             other => {
                 if !*auth_verified {
-                    return Err(FractalError::AccessDenied(String::from(
-                        "unauthenticated IPC command rejected prior to HelloAuth",
-                    )));
+                    return Err(err_unauthenticated_ipc());
                 }
                 return Ok(Some(other.clone()));
             }
         }
     }
     Ok(None)
+}
+
+fn err_ipc_frame_limit() -> FractalError {
+    FractalError::ObjectCodec(String::from("IPC request exceeded 8 MiB frame limit"))
+}
+
+fn err_invalid_daemon_token() -> FractalError {
+    FractalError::AccessDenied(String::from("invalid loopback daemon authentication token"))
+}
+
+fn err_unauthenticated_ipc() -> FractalError {
+    FractalError::AccessDenied(String::from(
+        "unauthenticated IPC command rejected prior to HelloAuth",
+    ))
 }

@@ -36,10 +36,14 @@ fn test_taxis_duplicate_daemon_rejection_and_stale_discovery_reclaim() {
         !dup_out.status.success(),
         "duplicate daemon start must reject when active daemon holds IPC"
     );
-    assert!(run_taxis_cli(repo_dir, &["--json", "daemon", "stop"], TEST_AUTHORITY_HEX)
-        .status
-        .success());
-    assert!(daemon_1.wait_exit(Duration::from_secs(6)).is_some_and(|st| st.success()));
+    assert!(
+        run_taxis_cli(repo_dir, &["--json", "daemon", "stop"], TEST_AUTHORITY_HEX)
+            .status
+            .success()
+    );
+    assert!(daemon_1
+        .wait_exit(Duration::from_secs(6))
+        .is_some_and(|st| st.success()));
 
     let dead_listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind ephemeral");
     let dead_endpoint = dead_listener.local_addr().expect("local addr").to_string();
@@ -64,8 +68,12 @@ fn test_taxis_duplicate_daemon_rejection_and_stale_discovery_reclaim() {
     });
     assert!(restarted["active"] == Value::Bool(true));
 
-    assert!(run_taxis_cli(repo_dir, &["--json", "daemon", "stop"], TEST_AUTHORITY_HEX)
-        .status
-        .success());
-    assert!(daemon_2.wait_exit(Duration::from_secs(6)).is_some_and(|st| st.success()));
+    assert!(
+        run_taxis_cli(repo_dir, &["--json", "daemon", "stop"], TEST_AUTHORITY_HEX)
+            .status
+            .success()
+    );
+    assert!(daemon_2
+        .wait_exit(Duration::from_secs(6))
+        .is_some_and(|st| st.success()));
 }

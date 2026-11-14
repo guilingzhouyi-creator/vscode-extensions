@@ -19,9 +19,7 @@ use fg_core::error::FractalResult;
 use serde::{Deserialize, Serialize};
 
 pub use auth::read_authenticated_request;
-pub use client_probe::{
-    notify_daemon_async_audit, probe_daemon_alive, send_daemon_ipc_request,
-};
+pub use client_probe::{notify_daemon_async_audit, probe_daemon_alive, send_daemon_ipc_request};
 pub use listener::{bind_persistent_listener, write_daemon_meta_atomic, PlatformListener};
 
 /// Discovery filename written under `<repo>/.taxis/` while Taxis daemon owns async auditing.
@@ -102,7 +100,11 @@ pub fn set_audit_paused(git_dir: &Path, paused: bool) -> FractalResult<()> {
 /// Removes stale daemon discovery/stop/socket files left behind by an ungraceful exit.
 pub fn cleanup_stale_daemon_files(git_dir: &Path) {
     let runtime_dir = resolve_taxis_runtime_dir(git_dir);
-    for file_name in [DAEMON_META_FILENAME, DAEMON_STOP_FILENAME, DAEMON_SOCK_FILENAME] {
+    for file_name in [
+        DAEMON_META_FILENAME,
+        DAEMON_STOP_FILENAME,
+        DAEMON_SOCK_FILENAME,
+    ] {
         let candidate = runtime_dir.join(file_name);
         if candidate.exists() {
             let _ = std::fs::remove_file(&candidate);
