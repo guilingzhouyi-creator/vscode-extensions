@@ -10,18 +10,18 @@ extends "res://frontend/domain_boundary/interfaces/i_game_settings_service.gd"
 
 var simulate_delay_ms: int = MockBaseService.DEFAULT_SIMULATE_DELAY_MS
 
-func _init(delay_ms: int = MockBaseService.DEFAULT_SIMULATE_DELAY_MS) -> void:
-	simulate_delay_ms = delay_ms
+func _init(delay_milliseconds: int = MockBaseService.DEFAULT_SIMULATE_DELAY_MS) -> void:
+	simulate_delay_ms = delay_milliseconds
 
 ## 模拟异步拉取当前游戏设置快照
-func get_settings_async(_account_id: String, _token: String, callback: Callable) -> void:
-	var result := {
+func get_settings_async(_account_id: String, _token: String, result_callback: Callable) -> void:
+	var service_response := {
 		"success": true,
 		"data": {"settings": {}}
 	}
 	MockBaseService.delayed_call(
-		callback,
-		result,
+		result_callback,
+		service_response,
 		simulate_delay_ms
 	)
 
@@ -29,39 +29,39 @@ func get_settings_async(_account_id: String, _token: String, callback: Callable)
 func apply_settings_async(
 	_account_id: String,
 	_token: String,
-	patch: Dictionary,
-	callback: Callable
+	settings_patch: Dictionary,
+	result_callback: Callable
 ) -> void:
-	var result := {
+	var service_response := {
 		"success": true,
-		"data": {"applied_settings": patch.duplicate(true)}
+		"data": {"applied_settings": settings_patch.duplicate(true)}
 	}
 	MockBaseService.delayed_call(
-		callback,
-		result,
+		result_callback,
+		service_response,
 		simulate_delay_ms
 	)
 
 ## 模拟异步确认待生效的分辨率改动
-func confirm_resolution_async(_account_id: String, _token: String, callback: Callable) -> void:
-	var result := {
+func confirm_resolution_async(_account_id: String, _token: String, result_callback: Callable) -> void:
+	var service_response := {
 		"success": true,
 		"data": {"is_pending_confirm": false}
 	}
 	MockBaseService.delayed_call(
-		callback,
-		result,
+		result_callback,
+		service_response,
 		simulate_delay_ms
 	)
 
 ## 模拟异步将游戏设置恢复为默认配置
-func reset_defaults_async(_account_id: String, _token: String, callback: Callable) -> void:
-	var result := {
+func reset_defaults_async(_account_id: String, _token: String, result_callback: Callable) -> void:
+	var service_response := {
 		"success": true,
 		"data": {"settings": {}}
 	}
 	MockBaseService.delayed_call(
-		callback,
-		result,
+		result_callback,
+		service_response,
 		simulate_delay_ms
 	)

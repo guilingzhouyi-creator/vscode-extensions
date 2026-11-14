@@ -14,27 +14,27 @@ extends ICharacterService
 const IAuthService = preload("res://frontend/domain_boundary/interfaces/i_auth_service.gd")
 
 ## 模拟异步创建角色并返回组装后的角色槽位摘要
-func create_character_async(account_id: String, token: String, request_data: Dictionary, callback: Callable) -> void:
-	var char_name := str(request_data.get("name", "MockHero"))
-	var new_char := {
-		"slot_id": str(request_data.get("slot_id", "SLOT_01")),
-		"name": char_name,
-		"race": str(request_data.get("race", "HUMAN")),
+func create_character_async(account_id: String, token: String, request_payload: Dictionary, result_callback: Callable) -> void:
+	var character_name := str(request_payload.get("name", "MockHero"))
+	var created_character := {
+		"slot_id": str(request_payload.get("slot_id", "SLOT_01")),
+		"name": character_name,
+		"race": str(request_payload.get("race", "HUMAN")),
 		"class": "Novice",
 		"level": 1,
 		"empty": false
 	}
-	if callback.is_valid():
-		callback.call({"success": true, "character": new_char})
+	if result_callback.is_valid():
+		result_callback.call({"success": true, "character": created_character})
 
 ## 模拟异步触发六维预览属性骰点
-func roll_attributes_async(callback: Callable) -> void:
-	if callback.is_valid():
-		callback.call(IAuthService.build_preview_attribute_spread())
+func roll_attributes_async(result_callback: Callable) -> void:
+	if result_callback.is_valid():
+		result_callback.call(IAuthService.build_preview_attribute_spread())
 
 ## 模拟异步返回创角命途轮盘预览快照
-func roll_destiny_preview_async(_account_id: String, _token: String, _request_data: Dictionary, callback: Callable) -> void:
-	MockBaseService.delayed_call(callback, {
+func roll_destiny_preview_async(_account_id: String, _token: String, _request_payload: Dictionary, result_callback: Callable) -> void:
+	MockBaseService.delayed_call(result_callback, {
 		"success": true,
 		"data": {
 			"race_id": "HUMAN",
@@ -44,8 +44,8 @@ func roll_destiny_preview_async(_account_id: String, _token: String, _request_da
 	}, MockBaseService.DEFAULT_SIMULATE_DELAY_MS)
 
 ## 模拟异步拉取创角界面只读配置快照
-func get_creation_ui_snapshot_async(_account_id: String, _token: String, callback: Callable) -> void:
-	MockBaseService.delayed_call(callback, {
+func get_creation_ui_snapshot_async(_account_id: String, _token: String, result_callback: Callable) -> void:
+	MockBaseService.delayed_call(result_callback, {
 		"success": true,
 		"data": {"creation_ui_snapshot": {"available_origins": [], "available_trait_pairs": []}}
 	}, MockBaseService.DEFAULT_SIMULATE_DELAY_MS)

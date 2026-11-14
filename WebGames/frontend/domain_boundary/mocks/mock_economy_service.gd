@@ -31,11 +31,11 @@ func calculate_total_copper(gold: int, silver: int, copper: int) -> int:
 	return gold * per_gold + silver * per_silver + copper
 
 ## 将铜币总值拆分为金/银/铜三元结构字典
-func split_copper(total: int) -> Dictionary:
+func split_copper(total_copper: int) -> Dictionary:
 	var per_gold := int(get_rules().get("copper_per_gold", 10000))
 	var per_silver := int(get_rules().get("copper_per_silver", 100))
-	var gold := total / per_gold
-	var remainder := total % per_gold
+	var gold := total_copper / per_gold
+	var remainder := total_copper % per_gold
 	return {
 		"gold": gold,
 		"silver": remainder / per_silver,
@@ -43,8 +43,8 @@ func split_copper(total: int) -> Dictionary:
 	}
 
 ## 按货币索引（0=金, 1=银, 2=铜, 3=魔单晶）返回单位铜值
-func get_currency_copper(index: int) -> int:
-	match index:
+func get_currency_copper(currency_index: int) -> int:
+	match currency_index:
 		0:
 			return int(get_rules().get("copper_per_gold", 10000))
 		1:
@@ -56,10 +56,10 @@ func get_currency_copper(index: int) -> int:
 
 ## 计算商店买入或按回购折扣折算的卖出总价
 func calculate_shop_total(base_price: int, quantity: int, is_sell: bool) -> int:
-	var total := base_price * quantity
+	var total_price := base_price * quantity
 	if is_sell:
-		return int(float(total) * float(get_rules().get("sell_back_ratio", 0.7)))
-	return total
+		return int(float(total_price) * float(get_rules().get("sell_back_ratio", 0.7)))
+	return total_price
 
 ## 根据源/目标货币铜值计算兑换比率（目标铜值非正时安全返回 0.0）
 func calculate_exchange_rate(source_copper: int, target_copper: int) -> float:
@@ -68,23 +68,23 @@ func calculate_exchange_rate(source_copper: int, target_copper: int) -> float:
 	return float(source_copper) / float(target_copper)
 
 ## 按输入金额与汇率计算兑换目标金额
-func calculate_exchange_result(amount: int, rate: float) -> float:
-	return float(amount) * rate
+func calculate_exchange_result(amount: int, exchange_rate: float) -> float:
+	return float(amount) * exchange_rate
 
 ## 确定性生成指定商品的 7 日历史模拟物价走势序列
 func generate_price_series(commodity_key: String) -> Array:
-	var base := 50
+	var base_price := 50
 	match commodity_key:
 		"ui.fe05.commodity.wood":
-			base = 30
+			base_price = 30
 		"ui.fe05.commodity.herbs":
-			base = 45
+			base_price = 45
 		"ui.fe05.commodity.mana_crystal":
-			base = 200
+			base_price = 200
 		"ui.fe05.commodity.copper_ore":
-			base = 15
+			base_price = 15
 	var prices: Array = []
 	for day_index in range(7):
-		var sampled_price := base + int(sin(day_index * 1.2) * base * 0.1) + day_index * 2
+		var sampled_price := base_price + int(sin(day_index * 1.2) * base_price * 0.1) + day_index * 2
 		prices.append(max(1, sampled_price))
 	return prices

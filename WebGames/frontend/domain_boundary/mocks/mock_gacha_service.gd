@@ -51,56 +51,56 @@ func get_rules() -> Dictionary:
 	}
 
 ## 基于当前保底水位确定性生成指定次数的祈愿掉落列表
-func generate_drops(count: int, pity_5star: int, pity_4star: int) -> Array:
+func generate_drops(pull_count: int, pity_5star: int, pity_4star: int) -> Array:
 	var rng := DeterministicRNG.resolve(null)
-	var drops: Array = []
-	for pull_index in range(maxi(0, count)):
-		var roll: float = rng.randf()
+	var drop_entries: Array = []
+	for pull_index in range(maxi(0, pull_count)):
+		var roll_sample: float = rng.randf()
 		var rarity := "3"
-		var name_str: String = POOL_3[pull_index % POOL_3.size()]
-		if roll < BASE_RATE_5STAR or (pity_5star + pull_index) >= PITY_5STAR_HARD - 1:
+		var item_name: String = POOL_3[pull_index % POOL_3.size()]
+		if roll_sample < BASE_RATE_5STAR or (pity_5star + pull_index) >= PITY_5STAR_HARD - 1:
 			rarity = "5"
-			name_str = POOL_5[pull_index % POOL_5.size()]
-		elif roll < BASE_RATE_5STAR + BASE_RATE_4STAR or (pity_4star + pull_index) >= PITY_4STAR_HARD - 1:
+			item_name = POOL_5[pull_index % POOL_5.size()]
+		elif roll_sample < BASE_RATE_5STAR + BASE_RATE_4STAR or (pity_4star + pull_index) >= PITY_4STAR_HARD - 1:
 			rarity = "4"
-			name_str = POOL_4[pull_index % POOL_4.size()]
+			item_name = POOL_4[pull_index % POOL_4.size()]
 		var is_recent: bool = rng.randf() < NEW_FLAG_RATE
-		drops.append({
-			"name": name_str,
+		drop_entries.append({
+			"name": item_name,
 			"rarity": rarity,
 			"is_recently_added": is_recent,
 			"is_new": is_recent,
 		})
-	return drops
+	return drop_entries
 
 ## 结算单次或十连抽卡，更新保底计数器与品质分布统计（支持测试注入掉落样本）
-func resolve_pull(state: Dictionary, pull_count: int, injected_drops: Array = []) -> Dictionary:
-	var pity_five_star := int(state.get("pity_5star", 0))
-	var pity_four_star := int(state.get("pity_4star", 0))
-	var pity_counter := int(state.get("pity_counter", 0))
-	var total_pulls := int(state.get("total_pull_count", 0))
-	var rarity_counts: Dictionary = (state.get("rarity_counts", {}) as Dictionary).duplicate()
+func resolve_pull(gacha_state: Dictionary, pull_count: int, injected_drops: Array = []) -> Dictionary:
+	var pity_five_star := int(gacha_state.get("pity_5star", 0))
+	var pity_four_star := int(gacha_state.get("pity_4star", 0))
+	var pity_counter := int(gacha_state.get("pity_counter", 0))
+	var total_pulls := int(gacha_state.get("total_pull_count", 0))
+	var rarity_counts: Dictionary = (gacha_state.get("rarity_counts", {}) as Dictionary).duplicate()
 
-	var drops: Array = injected_drops.duplicate(true) if not injected_drops.is_empty() \
+	var drop_entries: Array = injected_drops.duplicate(true) if not injected_drops.is_empty() \
 		else generate_drops(pull_count, pity_five_star, pity_four_star)
 
-	for drop in drops:
-		var rarity := str(drop.get("rarity", "3"))
+	for drop_entry in drop_entries:
+		var rarity := str(drop_entry.get("rarity", "3"))
 		rarity_counts[rarity] = int(rarity_counts.get(rarity, 0)) + 1
 
 	pity_counter += pull_count
 	pity_five_star += pull_count
 	pity_four_star += pull_count
 	total_pulls += pull_count
-	var has_five_star := _has_rarity(drops, "5")
+	var has_five_star := _has_rarity(drop_entries, "5")
 	if has_five_star:
 		pity_five_star = 0
-	if has_five_star or _has_rarity(drops, "4"):
+	if has_five_star or _has_rarity(drop_entries, "4"):
 		pity_four_star = 0
 
 	return {
 		"success": true,
-		"results": drops,
+		"results": drop_entries,
 		"pity_counter": pity_counter,
 		"pity_5star": pity_five_star,
 		"pity_4star": pity_four_star,
@@ -109,17 +109,17 @@ func resolve_pull(state: Dictionary, pull_count: int, injected_drops: Array = []
 	}
 
 ## 校验账户余额并结算抽卡消耗扣费
-func purchase(currency: int, pull_count: int) -> Dictionary:
-	var cost := _cost_of(pull_count)
-	if currency < cost:
-		return {"success": false, "error_code": "INSUFFICIENT_CURRENCY", "cost": cost, "balance": currency}
-	return {"success": true, "cost": cost, "balance": currency - cost}
+func purchase(currency_balance: int, pull_count: int) -> Dictionary:
+	var pull_cost := _cost_of(pull_count)
+	if currency_balance < pull_cost:
+		return {"success": false, "error_code": "INSUFFICIENT_CURRENCY", "cost": pull_cost, "balance": currency_balance}
+	return {"success": true, "cost": pull_cost, "balance": currency_balance - pull_cost}
 
 func _cost_of(pull_count: int) -> int:
 	return COST_TEN if pull_count >= 10 else COST_SINGLE * maxi(1, pull_count)
 
-func _has_rarity(drops: Array, rarity: String) -> bool:
-	for drop in drops:
-		if str(drop.get("rarity", "")) == rarity:
+func _has_rarity(drop_entries: Array, rarity: String) -> bool:
+	for drop_entry in drop_entries:
+		if str(drop_entry.get("rarity", "")) == rarity:
 			return true
 	return false

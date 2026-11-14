@@ -29,7 +29,7 @@ func estimate_authoring_income(royalty_mode_index: int) -> Dictionary:
 
 ## 汇总已出版魔典列表的总版税收益
 func sum_royalties(books: Array) -> Dictionary:
-	var total := 0
+	var total_royalties := 0
 	for book in books:
-		total += int(book.get("income", 0))
-	return {"success": true, "total": total}
+		total_royalties += int(book.get("income", 0))
+	return {"success": true, "total": total_royalties}

@@ -36,9 +36,9 @@ const ROLE_KEYS := [
 ]
 
 ## 确定性生成指定数量的模拟公会成员名单列表
-func generate_roster(count: int) -> Array:
+func generate_roster(member_count: int) -> Array:
 	var members: Array = []
-	for member_index in range(maxi(0, count)):
+	for member_index in range(maxi(0, member_count)):
 		members.append({
 			"name": MEMBER_NAME_KEYS[member_index % MEMBER_NAME_KEYS.size()],
 			"class": CLASS_KEYS[member_index % CLASS_KEYS.size()],
@@ -55,21 +55,21 @@ func can_manage(user_role: String) -> bool:
 	return user_role in allowed_roles
 
 ## 推进面对面交易锁定、确认或取消状态机，阻断非法越序操作
-func trade_transition(state: Dictionary, action: String) -> Dictionary:
-	var locked := bool(state.get("locked", false))
-	var confirmed := bool(state.get("confirmed", false))
-	match action:
+func trade_transition(trade_state: Dictionary, trade_action: String) -> Dictionary:
+	var is_locked := bool(trade_state.get("locked", false))
+	var is_confirmed := bool(trade_state.get("confirmed", false))
+	match trade_action:
 		"lock":
-			if confirmed:
-				return {"success": false, "error_code": "TRADE_CONFIRMED", "locked": locked, "confirmed": confirmed}
-			locked = not locked
+			if is_confirmed:
+				return {"success": false, "error_code": "TRADE_CONFIRMED", "locked": is_locked, "confirmed": is_confirmed}
+			is_locked = not is_locked
 		"confirm":
-			if not locked:
-				return {"success": false, "error_code": "TRADE_NOT_LOCKED", "locked": locked, "confirmed": confirmed}
-			confirmed = true
+			if not is_locked:
+				return {"success": false, "error_code": "TRADE_NOT_LOCKED", "locked": is_locked, "confirmed": is_confirmed}
+			is_confirmed = true
 		"cancel":
-			locked = false
-			confirmed = false
+			is_locked = false
+			is_confirmed = false
 		_:
-			return {"success": false, "error_code": "INVALID_ACTION", "locked": locked, "confirmed": confirmed}
-	return {"success": true, "locked": locked, "confirmed": confirmed}
+			return {"success": false, "error_code": "INVALID_ACTION", "locked": is_locked, "confirmed": is_confirmed}
+	return {"success": true, "locked": is_locked, "confirmed": is_confirmed}

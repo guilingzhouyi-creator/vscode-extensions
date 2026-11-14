@@ -18,35 +18,35 @@ const DEFAULT_SIMULATE_DELAY_MS: int = 200
 ## - delay_ms <= 0 或回调无效 → 同步立即回调（测试/离线上下文）
 ## - 无 SceneTree 环境（纯脚本上下文）→ 同步立即安全回退
 ## - 否则经 SceneTree.create_timer 延迟触发，模拟真实网络往返
-static func delayed_call(callback: Callable, result: Dictionary, delay_ms: int = DEFAULT_SIMULATE_DELAY_MS) -> void:
-	if delay_ms <= 0 or not callback.is_valid():
-		callback.call(result)
+static func delayed_call(result_callback: Callable, operation_result: Dictionary, delay_milliseconds: int = DEFAULT_SIMULATE_DELAY_MS) -> void:
+	if delay_milliseconds <= 0 or not result_callback.is_valid():
+		result_callback.call(operation_result)
 		return
-	var tree := Engine.get_main_loop() as SceneTree
-	if tree == null:
-		callback.call(result)
+	var scene_tree := Engine.get_main_loop() as SceneTree
+	if scene_tree == null:
+		result_callback.call(operation_result)
 		return
 	var callback_wrapper := func() -> void:
 		# 超时回调触发时复查有效性，防止定时器等待期间接收方已释放导致悬空调用崩溃
-		if not callback.is_valid():
+		if not result_callback.is_valid():
 			return
-		callback.call(result)
-	tree.create_timer(float(delay_ms) / 1000.0).timeout.connect(callback_wrapper)
+		result_callback.call(operation_result)
+	scene_tree.create_timer(float(delay_milliseconds) / 1000.0).timeout.connect(callback_wrapper)
 
 ## 统一构造成功响应字典（浅拷贝注入附加数据，消除各服务重复样板）
-static func reply_success(data: Dictionary = {}) -> Dictionary:
-	var result: Dictionary = { "success": true }
-	for key in data.keys():
-		result[key] = data[key]
-	return result
+static func reply_success(extra_payload: Dictionary = {}) -> Dictionary:
+	var service_response: Dictionary = { "success": true }
+	for field_key in extra_payload.keys():
+		service_response[field_key] = extra_payload[field_key]
+	return service_response
 
 ## 统一构造错误响应字典（标准化 error_code 与 message）
-static func reply_error(code: String, message: String, extra: Dictionary = {}) -> Dictionary:
-	var result: Dictionary = {
+static func reply_error(error_code: String, error_message: String, extra_payload: Dictionary = {}) -> Dictionary:
+	var service_response: Dictionary = {
 		"success": false,
-		"error_code": code,
-		"message": message
+		"error_code": error_code,
+		"message": error_message
 	}
-	for key in extra.keys():
-		result[key] = extra[key]
-	return result
+	for field_key in extra_payload.keys():
+		service_response[field_key] = extra_payload[field_key]
+	return service_response

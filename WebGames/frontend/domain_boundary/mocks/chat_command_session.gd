@@ -43,5 +43,5 @@ func reset_gesture() -> void:
 	_tab_detector.reset()
 
 ## 输入按键码与毫秒时间戳，判定单次或双击 Tab 补全手势
-func feed_gesture(key_code: String, timestamp_msec: int) -> Dictionary:
-	return _tab_detector.feed_key_press(key_code, timestamp_msec)
+func feed_gesture(key_code: String, timestamp_milliseconds: int) -> Dictionary:
+	return _tab_detector.feed_key_press(key_code, timestamp_milliseconds)

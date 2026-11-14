@@ -12,11 +12,11 @@ class_name IWorldService
 extends RefCounted
 
 ## 获取 HUD 权威状态快照 (对齐 HudStatusSnapshotDTO)
-func get_hud_snapshot_async(character_id: String, callback: Callable) -> void:
+func get_hud_snapshot_async(character_id: String, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IWorldService.get_hud_snapshot_async: pure virtual method must be implemented by subclass")
 
 ## 获取小地图地标与行军路线
-func get_map_landmarks_async(callback: Callable) -> void:
+func get_map_landmarks_async(result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IWorldService.get_map_landmarks_async: pure virtual method must be implemented by subclass")
 
 ## 寻路规划：起终点索引 → 候选路线数组（视图只渲染）
@@ -31,65 +31,65 @@ func plan_routes(from_index: int, to_index: int) -> Array:
 
 ## 领地升级：建设完成与驻军提升规则（返回新领地副本）
 func upgrade_territory(territory: Dictionary) -> Dictionary:
-	var updated: Dictionary = territory.duplicate(true)
-	updated["construction"] = 1.0
-	updated["garrison"] = int(updated.get("garrison", 0)) + 10
-	return {"success": true, "territory": updated}
+	var updated_territory: Dictionary = territory.duplicate(true)
+	updated_territory["construction"] = 1.0
+	updated_territory["garrison"] = int(updated_territory.get("garrison", 0)) + 10
+	return {"success": true, "territory": updated_territory}
 
 ## 异步进入网关契约 (对齐 ENTER_GATEWAY)
-func enter_gateway_async(account_id: String, token: String, callback: Callable) -> void:
+func enter_gateway_async(account_id: String, token: String, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IWorldService.enter_gateway_async: pure virtual method must be implemented by subclass")
 
 ## 异步探针就绪度探测契约 (对齐 PROBE_MODES)
-func probe_modes_async(account_id: String, token: String, callback: Callable) -> void:
+func probe_modes_async(account_id: String, token: String, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IWorldService.probe_modes_async: pure virtual method must be implemented by subclass")
 
 ## 异步世界档案列表查询契约 (对齐 LIST_WORLDS)
-func list_worlds_async(account_id: String, token: String, callback: Callable) -> void:
+func list_worlds_async(account_id: String, token: String, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IWorldService.list_worlds_async: pure virtual method must be implemented by subclass")
 
 ## 异步模式与槽位选择契约 (对齐 SELECT_MODE)
-func select_mode_async(account_id: String, token: String, mode_id: int, account_slots: Array, callback: Callable, _options: Dictionary = {}) -> void:
+func select_mode_async(account_id: String, token: String, mode_id: int, account_slots: Array, result_callback: Callable, _options: Dictionary = {}) -> void:
 	EventBusCore.get_instance().emit_log("error", "IWorldService.select_mode_async: pure virtual method must be implemented by subclass")
 
 ## 异步选档/建档进入世界契约 (对齐 SELECT_OR_CREATE_WORLD)
-func select_or_create_world_async(account_id: String, token: String, world_id: String, mode_id: int, callback: Callable, _options: Dictionary = {}) -> void:
+func select_or_create_world_async(account_id: String, token: String, world_id: String, mode_id: int, result_callback: Callable, _options: Dictionary = {}) -> void:
 	EventBusCore.get_instance().emit_log("error", "IWorldService.select_or_create_world_async: pure virtual method must be implemented by subclass")
 
 ## 异步关联就绪角色至网关契约 (对齐 ATTACH_READY_CHARACTER)
-func attach_ready_character_async(_account_id: String, _token: String, _character_id: String, callback: Callable) -> void:
+func attach_ready_character_async(_account_id: String, _token: String, _character_id: String, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IWorldService.attach_ready_character_async: pure virtual method must be implemented by subclass")
-	if callback.is_valid():
-		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 异步正式进入指定世界档案契约 (对齐 ENTER_WORLD，用于已存在角色直接入界)
-func enter_world_async(_account_id: String, _token: String, _world_id: String, _allow_safe_degrade: bool, callback: Callable) -> void:
+func enter_world_async(_account_id: String, _token: String, _world_id: String, _allow_safe_degrade: bool, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IWorldService.enter_world_async: pure virtual method must be implemented by subclass")
-	if callback.is_valid():
-		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 异步发现并预检单机显性命途 MOD 契约 (对齐 DISCOVER_MODS)
-func discover_mods_async(_account_id: String, _token: String, _enabled_pack_ids: Array, callback: Callable) -> void:
+func discover_mods_async(_account_id: String, _token: String, _enabled_pack_ids: Array, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IWorldService.discover_mods_async: pure virtual method must be implemented by subclass")
-	if callback.is_valid():
-		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 异步查询联机界域只读卡片列表契约 (对齐 LIST_REMOTE_REALMS)
-func list_remote_realms_async(_account_id: String, _token: String, callback: Callable) -> void:
+func list_remote_realms_async(_account_id: String, _token: String, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IWorldService.list_remote_realms_async: pure virtual method must be implemented by subclass")
-	if callback.is_valid():
-		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 异步删除指定世界档案契约 (对齐 DELETE_WORLD)
-func delete_world_async(_account_id: String, _token: String, _world_id: String, callback: Callable) -> void:
+func delete_world_async(_account_id: String, _token: String, _world_id: String, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IWorldService.delete_world_async: pure virtual method must be implemented by subclass")
-	if callback.is_valid():
-		callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
 ## 异步切换网关模式契约 (对齐 SWITCH_GATEWAY_MODE)
-func switch_gateway_mode_async(account_id: String, token: String, target_mode: int, callback: Callable, _options: Dictionary = {}) -> void:
+func switch_gateway_mode_async(account_id: String, token: String, target_mode: int, result_callback: Callable, _options: Dictionary = {}) -> void:
 	EventBusCore.get_instance().emit_log("error", "IWorldService.switch_gateway_mode_async: pure virtual method must be implemented by subclass")
 
 ## 异步退出世界退回网关契约 (对齐 EXIT_WORLD_TO_GATEWAY)
-func exit_world_to_gateway_async(account_id: String, token: String, callback: Callable, _options: Dictionary = {}) -> void:
+func exit_world_to_gateway_async(account_id: String, token: String, result_callback: Callable, _options: Dictionary = {}) -> void:
 	EventBusCore.get_instance().emit_log("error", "IWorldService.exit_world_to_gateway_async: pure virtual method must be implemented by subclass")

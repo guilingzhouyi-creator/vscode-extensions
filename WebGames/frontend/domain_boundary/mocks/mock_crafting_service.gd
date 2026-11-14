@@ -19,5 +19,5 @@ func preview_enhance_rate(target_level: int) -> Dictionary:
 	var decay := GameConfig.get_float(RULES_SECTION, RULES_KEY + "/success_rate_decay_per_level", 0.05)
 	var min_rate := GameConfig.get_float(RULES_SECTION, RULES_KEY + "/min_success_rate", 0.1)
 	var max_rate := GameConfig.get_float(RULES_SECTION, RULES_KEY + "/max_success_rate", 1.0)
-	var rate := clampf(1.0 - float(maxi(0, target_level)) * decay, min_rate, max_rate)
-	return {"success": true, "rate": rate}
+	var success_rate := clampf(1.0 - float(maxi(0, target_level)) * decay, min_rate, max_rate)
+	return {"success": true, "rate": success_rate}
