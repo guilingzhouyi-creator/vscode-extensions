@@ -27,6 +27,7 @@ var extra_custom_fields: Dictionary = {}
 # ==============================================================================
 # 二、对象池与重置契约 (ADV-PRF-002)
 # ==============================================================================
+## 重置内部数据状态，供对象池无堆分配复用
 func reset_state() -> void:
 	super.reset_state()
 	account_id = ""
@@ -39,6 +40,8 @@ func reset_state() -> void:
 # ==============================================================================
 # 三、序列化与工厂方法
 # ==============================================================================
+
+## 序列化当前创角请求为通用字典传输结构
 func to_dto() -> Dictionary:
 	return {
 		"account_id": account_id,
@@ -50,16 +53,16 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从输入字典反序列化还原传输对象
-static func from_dto(d: Dictionary) -> AuthoritativeCharacterCreationRequestDTO:
-	var dto := AuthoritativeCharacterCreationRequestDTO.new()
-	if d.is_empty():
-		return dto
-	dto.account_id = str(d.get("account_id", ""))
-	dto.slot_id = int(d.get("slot_id", 0))
-	dto.world_id = str(d.get("world_id", ""))
-	dto.character_name = str(d.get("character_name", ""))
-	dto.request_seed = int(d.get("request_seed", 0))
-	var extra: Variant = d.get("extra_custom_fields", {})
+static func from_dto(raw_data: Dictionary) -> AuthoritativeCharacterCreationRequestDTO:
+	var request_dto := AuthoritativeCharacterCreationRequestDTO.new()
+	if raw_data.is_empty():
+		return request_dto
+	request_dto.account_id = str(raw_data.get("account_id", ""))
+	request_dto.slot_id = int(raw_data.get("slot_id", 0))
+	request_dto.world_id = str(raw_data.get("world_id", ""))
+	request_dto.character_name = str(raw_data.get("character_name", ""))
+	request_dto.request_seed = int(raw_data.get("request_seed", 0))
+	var extra: Variant = raw_data.get("extra_custom_fields", {})
 	if extra is Dictionary:
-		dto.extra_custom_fields = (extra as Dictionary).duplicate(true)
-	return dto
+		request_dto.extra_custom_fields = (extra as Dictionary).duplicate(true)
+	return request_dto

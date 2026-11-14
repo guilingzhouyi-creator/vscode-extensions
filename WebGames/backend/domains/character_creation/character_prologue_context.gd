@@ -27,7 +27,7 @@ var gender: String = "OTHER"     # 性别
 
 var assigned_start_location_id: String = ""   # 起始地点 ID（开场事件流注入）
 var assigned_opening_quest_id: String = ""    # 开局主线引导 ID
-var assigned_starter_kit_id: String = ""      # 新手套件 ID（未指派按种族兜底映射）
+var assigned_starter_kit_id: String = ""      # 新手套件 ID（未指派按种族默认回退映射）
 
 # ==============================================================================
 # 三、序章单向阶段流转
@@ -70,22 +70,22 @@ func serialize() -> Dictionary:
 
 ## 从字典反序列化序章执行上下文（缺省字段回退默认值，占位符深拷贝）。
 ## 契约：空字典返回全新空上下文；未知键安全忽略（旧档兼容）。
-static func deserialize(d: Dictionary) -> CharacterPrologueContext:
-	var ctx := CharacterPrologueContext.new()
-	if d.is_empty():
-		return ctx
-	ctx.account_id = str(d.get("account_id", ""))
-	ctx.character_id = str(d.get("character_id", ""))
-	ctx.character_name = str(d.get("character_name", ""))
-	ctx.race_id = str(d.get("race_id", "HUMAN"))
-	ctx.gender = str(d.get("gender", "OTHER"))
-	ctx.assigned_start_location_id = str(d.get("assigned_start_location_id", ""))
-	ctx.assigned_opening_quest_id = str(d.get("assigned_opening_quest_id", ""))
-	ctx.assigned_starter_kit_id = str(d.get("assigned_starter_kit_id", ""))
-	ctx.current_stage = int(d.get("current_stage", 0))
-	ctx.step_index = int(d.get("step_index", 0))
-	ctx.is_active = bool(d.get("is_active", false))
-	ctx.is_completed = bool(d.get("is_completed", false))
-	ctx.created_timestamp_utc = int(d.get("created_timestamp_utc", 0))
-	ctx.runtime_placeholders = (d.get("runtime_placeholders", {}) as Dictionary).duplicate(true)
-	return ctx
+static func deserialize(raw_data: Dictionary) -> CharacterPrologueContext:
+	var prologue_context := CharacterPrologueContext.new()
+	if raw_data.is_empty():
+		return prologue_context
+	prologue_context.account_id = str(raw_data.get("account_id", ""))
+	prologue_context.character_id = str(raw_data.get("character_id", ""))
+	prologue_context.character_name = str(raw_data.get("character_name", ""))
+	prologue_context.race_id = str(raw_data.get("race_id", "HUMAN"))
+	prologue_context.gender = str(raw_data.get("gender", "OTHER"))
+	prologue_context.assigned_start_location_id = str(raw_data.get("assigned_start_location_id", ""))
+	prologue_context.assigned_opening_quest_id = str(raw_data.get("assigned_opening_quest_id", ""))
+	prologue_context.assigned_starter_kit_id = str(raw_data.get("assigned_starter_kit_id", ""))
+	prologue_context.current_stage = int(raw_data.get("current_stage", 0))
+	prologue_context.step_index = int(raw_data.get("step_index", 0))
+	prologue_context.is_active = bool(raw_data.get("is_active", false))
+	prologue_context.is_completed = bool(raw_data.get("is_completed", false))
+	prologue_context.created_timestamp_utc = int(raw_data.get("created_timestamp_utc", 0))
+	prologue_context.runtime_placeholders = (raw_data.get("runtime_placeholders", {}) as Dictionary).duplicate(true)
+	return prologue_context

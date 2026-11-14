@@ -34,10 +34,10 @@ static func has_trait(trait_id: String) -> bool:
 ## 契约：未登记特质 ID 安全跳过（不计入净和）；净和可为负（多选缺陷）。
 static func calculate_trait_karma_balance(selected_trait_ids: Array) -> int:
 	var net_karma := 0
-	var t := _traits()
-	for tid in selected_trait_ids:
-		if t.has(tid):
-			net_karma += int(t[tid].get("cost", 0))
+	var traits_catalog := _traits()
+	for trait_id in selected_trait_ids:
+		if traits_catalog.has(trait_id):
+			net_karma += int(traits_catalog[trait_id].get("cost", 0))
 	return net_karma
 
 ## 特质选择校验：因果净和不得超过 max_allowed_karma 上限。
@@ -46,6 +46,6 @@ static func calculate_trait_karma_balance(selected_trait_ids: Array) -> int:
 static func validate_traits_selection(selected_trait_ids: Array, max_allowed_karma: int = 0) -> Dictionary:
 	var balance := calculate_trait_karma_balance(selected_trait_ids)
 	if balance > max_allowed_karma:
-		var msg := GameConfig.get_string("narratives.character_creation", "karma_exceed", "Karma cost %d exceeds allowance %d") % [balance, max_allowed_karma]
-		return { "valid": false, "balance": balance, "reason": msg }
+		var reason_text := GameConfig.get_string("narratives.character_creation", "karma_exceed", "Karma cost %d exceeds allowance %d") % [balance, max_allowed_karma]
+		return { "valid": false, "balance": balance, "reason": reason_text }
 	return { "valid": true, "balance": balance }

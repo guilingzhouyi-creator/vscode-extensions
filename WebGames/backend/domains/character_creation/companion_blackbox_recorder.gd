@@ -24,24 +24,24 @@ static func create_diagnostic_dump(
 	failing_node_id: String,
 	context_data: Dictionary = {}
 ) -> Dictionary:
-	var now_ts: int = int(Time.get_unix_time_from_system())
+	var now_timestamp_utc: int = int(Time.get_unix_time_from_system())
 	var bus := CompanionObserverBus.get_instance()
 	var event_tail: Array[Dictionary] = []
 	if bus != null:
 		event_tail = bus.get_recent_events(DEFAULT_TAIL_LIMIT)
 
-	var char_snapshot: Dictionary = _extract_character_snapshot(context_data)
+	var character_snapshot: Dictionary = _extract_character_snapshot(context_data)
 	var sanitized_code: String = error_code if not error_code.is_empty() else "UNKNOWN"
-	var dump_id: String = "dump_%d_%s" % [now_ts, sanitized_code]
+	var dump_id: String = "dump_%d_%s" % [now_timestamp_utc, sanitized_code]
 
 	return {
 		"dump_id": dump_id,
-		"timestamp": now_ts,
+		"timestamp": now_timestamp_utc,
 		"error_code": error_code,
 		"failing_pack_id": failing_pack_id,
 		"failing_node_id": failing_node_id,
 		"recent_event_tail": event_tail,
-		"character_snapshot": char_snapshot,
+		"character_snapshot": character_snapshot,
 		"context_data": context_data.duplicate(true)
 	}
 
@@ -54,15 +54,15 @@ static func _extract_character_snapshot(context_data: Dictionary) -> Dictionary:
 		return {}
 
 	if context_data.has("character_snapshot"):
-		var snap: Variant = context_data.get("character_snapshot")
-		if snap is Dictionary:
-			return (snap as Dictionary).duplicate(true)
+		var snapshot_value: Variant = context_data.get("character_snapshot")
+		if snapshot_value is Dictionary:
+			return (snapshot_value as Dictionary).duplicate(true)
 
 	if context_data.has("profile"):
-		var prof: Variant = context_data.get("profile")
-		if prof is CharacterProfile:
-			return (prof as CharacterProfile).serialize()
-		if prof is Dictionary:
-			return (prof as Dictionary).duplicate(true)
+		var profile_value: Variant = context_data.get("profile")
+		if profile_value is CharacterProfile:
+			return (profile_value as CharacterProfile).serialize()
+		if profile_value is Dictionary:
+			return (profile_value as Dictionary).duplicate(true)
 
 	return {}

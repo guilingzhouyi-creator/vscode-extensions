@@ -37,10 +37,10 @@ static func build_creation_ui_snapshot(
             )
 
     var available_trait_pairs: Array[Dictionary] = []
-    for idx in range(paired_presets.size()):
-        var preset_entry: Variant = paired_presets[idx]
+    for pair_index in range(paired_presets.size()):
+        var preset_entry: Variant = paired_presets[pair_index]
         if preset_entry is Dictionary:
-            _append_ui_trait_pair_snapshot_item(idx, preset_entry as Dictionary, traits, available_trait_pairs)
+            _append_ui_trait_pair_snapshot_item(pair_index, preset_entry as Dictionary, traits, available_trait_pairs)
 
     return {
         "enabled_pack_ids": enabled_ids.duplicate(),
@@ -59,20 +59,20 @@ static func _append_ui_origin_snapshot_item(
     birth_region_map: Dictionary,
     out_origins: Array[Dictionary]
 ) -> void:
-    var oid: String = str(pool_entry.get("origin_id", ""))
-    var cfg: Dictionary = origins_catalog.get(oid, {})
+    var origin_id: String = str(pool_entry.get("origin_id", ""))
+    var origin_config: Dictionary = origins_catalog.get(origin_id, {})
     out_origins.append({
-        "origin_id": oid,
-        "name": str(cfg.get("name", oid)),
-        "race_id": str(origin_race_map.get(oid, cfg.get("race_id", cfg.get("race", "HUMAN")))),
-        "birth_region_id": str(birth_region_map.get(oid, cfg.get("birth_region_id", "CENTRAL_CONTINENT"))),
-        "desc": str(cfg.get("desc", "")),
-        "weight": int(pool_entry.get("weight", cfg.get("weight", 20))),
-        "initial_gold": int(cfg.get("initial_gold", 50)),
-        "attribute_bonus": (cfg.get("attribute_bonus", {}) as Dictionary).duplicate(true),
-        "starter_kit_id": str(cfg.get("starter_kit_id", "")),
-        "prologue_dag_id": str(cfg.get("prologue_dag_id", "")),
-        "pack_id": str(cfg.get("pack_id", "VANILLA"))
+        "origin_id": origin_id,
+        "name": str(origin_config.get("name", origin_id)),
+        "race_id": str(origin_race_map.get(origin_id, origin_config.get("race_id", origin_config.get("race", "HUMAN")))),
+        "birth_region_id": str(birth_region_map.get(origin_id, origin_config.get("birth_region_id", "CENTRAL_CONTINENT"))),
+        "desc": str(origin_config.get("desc", "")),
+        "weight": int(pool_entry.get("weight", origin_config.get("weight", 20))),
+        "initial_gold": int(origin_config.get("initial_gold", 50)),
+        "attribute_bonus": (origin_config.get("attribute_bonus", {}) as Dictionary).duplicate(true),
+        "starter_kit_id": str(origin_config.get("starter_kit_id", "")),
+        "prologue_dag_id": str(origin_config.get("prologue_dag_id", "")),
+        "pack_id": str(origin_config.get("pack_id", "VANILLA"))
     })
 
 
@@ -82,17 +82,17 @@ static func _append_ui_trait_pair_snapshot_item(
     traits: Dictionary,
     out_pairs: Array[Dictionary]
 ) -> void:
-    var pos_id: String = str(preset.get("positive", ""))
-    var neg_id: String = str(preset.get("negative", ""))
-    var pos_cfg: Dictionary = traits.get(pos_id, {})
-    var neg_cfg: Dictionary = traits.get(neg_id, {})
+    var positive_id: String = str(preset.get("positive", ""))
+    var negative_id: String = str(preset.get("negative", ""))
+    var positive_config: Dictionary = traits.get(positive_id, {})
+    var negative_config: Dictionary = traits.get(negative_id, {})
     out_pairs.append({
         "pair_index": pair_index,
-        "positive": pos_id,
-        "positive_name": str(pos_cfg.get("name", pos_id)),
-        "positive_cost": int(pos_cfg.get("cost", 0)),
-        "negative": neg_id,
-        "negative_name": str(neg_cfg.get("name", neg_id)),
-        "negative_cost": int(neg_cfg.get("cost", 0)),
+        "positive": positive_id,
+        "positive_name": str(positive_config.get("name", positive_id)),
+        "positive_cost": int(positive_config.get("cost", 0)),
+        "negative": negative_id,
+        "negative_name": str(negative_config.get("name", negative_id)),
+        "negative_cost": int(negative_config.get("cost", 0)),
         "weight": int(preset.get("weight", 50))
     })

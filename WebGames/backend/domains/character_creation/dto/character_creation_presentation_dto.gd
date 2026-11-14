@@ -35,6 +35,7 @@ var prologue_preview: Dictionary = {}
 # ==============================================================================
 # 二、对象池与重置契约 (ADV-PRF-002)
 # ==============================================================================
+## 重置内部数据状态，供对象池无堆分配复用
 func reset_state() -> void:
 	super.reset_state()
 	character_id = ""
@@ -55,6 +56,8 @@ func reset_state() -> void:
 # ==============================================================================
 # 三、序列化与工厂方法
 # ==============================================================================
+
+## 序列化当前创角展示对象为通用字典传输结构
 func to_dto() -> Dictionary:
 	return {
 		"character_id": character_id,
@@ -74,40 +77,40 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从输入字典反序列化还原传输对象
-static func from_dto(d: Dictionary) -> CharacterCreationPresentationDTO:
-	var dto := CharacterCreationPresentationDTO.new()
-	if d.is_empty():
-		return dto
-	dto.character_id = str(d.get("character_id", ""))
-	dto.character_name = str(d.get("character_name", ""))
-	dto.origin_id = str(d.get("origin_id", ""))
-	dto.origin_name = str(d.get("origin_name", ""))
-	dto.origin_desc = str(d.get("origin_desc", ""))
-	dto.race_id = str(d.get("race_id", ""))
-	dto.race_name = str(d.get("race_name", ""))
-	dto.gender = str(d.get("gender", ""))
+static func from_dto(raw_data: Dictionary) -> CharacterCreationPresentationDTO:
+	var presentation_dto := CharacterCreationPresentationDTO.new()
+	if raw_data.is_empty():
+		return presentation_dto
+	presentation_dto.character_id = str(raw_data.get("character_id", ""))
+	presentation_dto.character_name = str(raw_data.get("character_name", ""))
+	presentation_dto.origin_id = str(raw_data.get("origin_id", ""))
+	presentation_dto.origin_name = str(raw_data.get("origin_name", ""))
+	presentation_dto.origin_desc = str(raw_data.get("origin_desc", ""))
+	presentation_dto.race_id = str(raw_data.get("race_id", ""))
+	presentation_dto.race_name = str(raw_data.get("race_name", ""))
+	presentation_dto.gender = str(raw_data.get("gender", ""))
 
-	var attr: Variant = d.get("attributes_radar", {})
-	if attr is Dictionary:
-		dto.attributes_radar = (attr as Dictionary).duplicate(true)
-	var phys: Variant = d.get("physiology_summary", {})
-	if phys is Dictionary:
-		dto.physiology_summary = (phys as Dictionary).duplicate(true)
-	var wallet: Variant = d.get("wallet_summary", {})
+	var raw_attributes: Variant = raw_data.get("attributes_radar", {})
+	if raw_attributes is Dictionary:
+		presentation_dto.attributes_radar = (raw_attributes as Dictionary).duplicate(true)
+	var raw_physiology: Variant = raw_data.get("physiology_summary", {})
+	if raw_physiology is Dictionary:
+		presentation_dto.physiology_summary = (raw_physiology as Dictionary).duplicate(true)
+	var wallet: Variant = raw_data.get("wallet_summary", {})
 	if wallet is Dictionary:
-		dto.wallet_summary = (wallet as Dictionary).duplicate(true)
-	var equip: Variant = d.get("starter_equipment", [])
-	if equip is Array:
-		var raw_equip_arr: Array = (equip as Array).duplicate(true)
-		var equip_arr: Array[Dictionary] = []
-		for item in raw_equip_arr:
+		presentation_dto.wallet_summary = (wallet as Dictionary).duplicate(true)
+	var raw_equipment: Variant = raw_data.get("starter_equipment", [])
+	if raw_equipment is Array:
+		var cloned_equipment_list: Array = (raw_equipment as Array).duplicate(true)
+		var equipment_list: Array[Dictionary] = []
+		for item in cloned_equipment_list:
 			if item is Dictionary:
-				equip_arr.append(item as Dictionary)
-		dto.starter_equipment = equip_arr
-	var chron: Variant = d.get("world_chronicle", {})
-	if chron is Dictionary:
-		dto.world_chronicle = (chron as Dictionary).duplicate(true)
-	var prol: Variant = d.get("prologue_preview", {})
-	if prol is Dictionary:
-		dto.prologue_preview = (prol as Dictionary).duplicate(true)
-	return dto
+				equipment_list.append(item as Dictionary)
+		presentation_dto.starter_equipment = equipment_list
+	var raw_chronicle: Variant = raw_data.get("world_chronicle", {})
+	if raw_chronicle is Dictionary:
+		presentation_dto.world_chronicle = (raw_chronicle as Dictionary).duplicate(true)
+	var raw_prologue: Variant = raw_data.get("prologue_preview", {})
+	if raw_prologue is Dictionary:
+		presentation_dto.prologue_preview = (raw_prologue as Dictionary).duplicate(true)
+	return presentation_dto
