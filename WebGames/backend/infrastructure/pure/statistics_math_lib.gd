@@ -16,16 +16,16 @@ const LogConstants = preload("res://backend/infrastructure/logging/log_constants
 # 一、静态编译内联脱敏正则（全局复用零重复编译）
 # ==============================================================================
 
-static var _inline_kv_secret_re: RegEx = RegEx.create_from_string(
+static var _inline_key_value_secret_regex: RegEx = RegEx.create_from_string(
 	r"(?i)([\"']?\b(?:password|passwd|pwd|secret|token|session_token|access_token|refresh_token|auth_token|api_key|apikey|seal_key|private_key|client_secret)\b[\"']?\s*[:=]\s*[\"']?)([^\s,;&'\x22}\]]+)"
 )
-static var _inline_bearer_re: RegEx = RegEx.create_from_string(
+static var _inline_bearer_regex: RegEx = RegEx.create_from_string(
 	r"(?i)\b(bearer|basic)\s+([A-Za-z0-9._\-+/=]{6,})"
 )
-static var _inline_email_re: RegEx = RegEx.create_from_string(
+static var _inline_email_regex: RegEx = RegEx.create_from_string(
 	r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b"
 )
-static var _inline_home_path_re: RegEx = RegEx.create_from_string(
+static var _inline_home_path_regex: RegEx = RegEx.create_from_string(
 	r"(?i)((?:[A-Z]:[/\\]Users[/\\]|/(?:Users|home)/))([^/\\\s'\x22,;}\]]+)"
 )
 
@@ -75,21 +75,21 @@ static func mask_string(raw_value: String, prefix_length: int, suffix_length: in
 static func scrub_inline_secrets(message: String, mask_token: String = LogConstants.DEFAULT_MASK_REPLACEMENT) -> String:
 	if message.is_empty():
 		return message
-	var has_kv := ("=" in message) or (":" in message)
+	var has_key_value_delimiter := ("=" in message) or (":" in message)
 	var has_auth := (message.findn("bearer") != -1) or (message.findn("basic") != -1)
 	var has_email := "@" in message
 	var has_path := ("Users" in message) or ("/home/" in message)
-	if not has_kv and not has_auth and not has_email and not has_path:
+	if not has_key_value_delimiter and not has_auth and not has_email and not has_path:
 		return message
 	var scrubbed_text := message
-	if has_kv and _inline_kv_secret_re != null:
-		scrubbed_text = _inline_kv_secret_re.sub(scrubbed_text, "$1" + mask_token, true)
-	if has_auth and _inline_bearer_re != null:
-		scrubbed_text = _inline_bearer_re.sub(scrubbed_text, "$1 " + mask_token, true)
-	if has_email and _inline_email_re != null:
-		scrubbed_text = _inline_email_re.sub(scrubbed_text, mask_token, true)
-	if has_path and _inline_home_path_re != null:
-		scrubbed_text = _inline_home_path_re.sub(scrubbed_text, "$1" + mask_token, true)
+	if has_key_value_delimiter and _inline_key_value_secret_regex != null:
+		scrubbed_text = _inline_key_value_secret_regex.sub(scrubbed_text, "$1" + mask_token, true)
+	if has_auth and _inline_bearer_regex != null:
+		scrubbed_text = _inline_bearer_regex.sub(scrubbed_text, "$1 " + mask_token, true)
+	if has_email and _inline_email_regex != null:
+		scrubbed_text = _inline_email_regex.sub(scrubbed_text, mask_token, true)
+	if has_path and _inline_home_path_regex != null:
+		scrubbed_text = _inline_home_path_regex.sub(scrubbed_text, "$1" + mask_token, true)
 	return scrubbed_text
 
 ## 从调用栈提取首个非跳过白名单的源文件 basename 与行号（杜绝绝对路径泄漏）

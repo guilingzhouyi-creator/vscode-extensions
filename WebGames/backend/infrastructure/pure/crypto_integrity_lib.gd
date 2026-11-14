@@ -21,9 +21,9 @@ static func sha256_hex(content: String) -> String:
 	return content.sha256_text()
 
 ## 加盐域隔离摘要：防止低熵 ID（如短账号、序号）遭受彩虹表反查
-static func salted_hash_hex(value: String, salt: String = "", domain_tag: String = LogConstants.DEFAULT_SALT_DOMAIN) -> String:
+static func salted_hash_hex(input_text: String, salt: String = "", domain_tag: String = LogConstants.DEFAULT_SALT_DOMAIN) -> String:
 	var effective_salt := salt if not salt.is_empty() else domain_tag
-	var material := "%s|%s|%s" % [domain_tag, effective_salt, value]
+	var material := "%s|%s|%s" % [domain_tag, effective_salt, input_text]
 	return material.sha256_text()
 
 ## 计算原生 HMAC-SHA256 原始字节序列（Fail-Closed：空密钥返回空数组）
@@ -38,22 +38,22 @@ static func hmac_sha256_hex(key: PackedByteArray, payload: PackedByteArray) -> S
 	return digest.hex_encode() if not digest.is_empty() else ""
 
 ## 便捷字符串输入 HMAC-SHA256 签名（UTF-8 编码，空密钥返回空串）
-static func hmac_sha256_text(key_str: String, payload_str: String) -> String:
-	if key_str.is_empty():
+static func hmac_sha256_text(secret_key_text: String, payload_text: String) -> String:
+	if secret_key_text.is_empty():
 		return ""
-	return hmac_sha256_hex(key_str.to_utf8_buffer(), payload_str.to_utf8_buffer())
+	return hmac_sha256_hex(secret_key_text.to_utf8_buffer(), payload_text.to_utf8_buffer())
 
 ## 常量时间字符串相等性比对（防时序侧信道攻击，等长/不等长输入均完整遍历 max 长度不提前短路）
 static func constant_time_equals(left_text: String, right_text: String) -> bool:
 	var left_bytes := left_text.to_utf8_buffer()
 	var right_bytes := right_text.to_utf8_buffer()
 	var max_length: int = maxi(left_bytes.size(), right_bytes.size())
-	var diff: int = left_bytes.size() ^ right_bytes.size()
+	var xor_difference: int = left_bytes.size() ^ right_bytes.size()
 	for byte_index in range(max_length):
 		var left_byte: int = int(left_bytes[byte_index]) if byte_index < left_bytes.size() else 0
 		var right_byte: int = int(right_bytes[byte_index]) if byte_index < right_bytes.size() else 0
-		diff |= left_byte ^ right_byte
-	return diff == 0
+		xor_difference |= left_byte ^ right_byte
+	return xor_difference == 0
 
 ## 32 字节主密钥域隔离次级子密钥派生算子（用于严格分离 AES 加密密钥与 HMAC 认证密钥）
 static func derive_subkey_32(master_key_32: PackedByteArray, subkey_context: String) -> PackedByteArray:
@@ -82,18 +82,18 @@ static func derive_key_32(secret_material: String, domain_context: String = LogC
 	return key if key.size() == LogConstants.AES_KEY_SIZE else PackedByteArray()
 
 ## 统一受控环境密封密钥加载（从 GameConfig 指定环境变量获取，严禁回退明文配置元数据）
-static func resolve_seal_key_bytes(config_table: String, config_path: String, fallback_env: String = "") -> PackedByteArray:
-	var env_name := GameConfig.get_string(config_table, config_path, fallback_env)
-	if env_name.is_empty():
+static func resolve_seal_key_bytes(config_table: String, config_path: String, fallback_environment_var: String = "") -> PackedByteArray:
+	var environment_variable_name := GameConfig.get_string(config_table, config_path, fallback_environment_var)
+	if environment_variable_name.is_empty():
 		return PackedByteArray()
-	var secret_value := OS.get_environment(env_name)
+	var secret_value := OS.get_environment(environment_variable_name)
 	return secret_value.to_utf8_buffer() if not secret_value.is_empty() else PackedByteArray()
 
 ## 从指定环境变量读取密钥原语并派生 32 字节（256-bit）对称加密/验签密钥
-static func resolve_derived_key_32(env_name: String, domain_context: String = LogConstants.ENC_DOMAIN_CONTEXT) -> PackedByteArray:
-	if env_name.is_empty():
+static func resolve_derived_key_32(environment_variable_name: String, domain_context: String = LogConstants.ENC_DOMAIN_CONTEXT) -> PackedByteArray:
+	if environment_variable_name.is_empty():
 		return PackedByteArray()
-	var raw_secret := OS.get_environment(env_name)
+	var raw_secret := OS.get_environment(environment_variable_name)
 	if raw_secret.is_empty():
 		return PackedByteArray()
 	return derive_key_32(raw_secret, domain_context)
@@ -103,9 +103,9 @@ static func resolve_derived_key_32(env_name: String, domain_context: String = Lo
 # ==============================================================================
 
 ## PKCS7 标准块填充（block_size 默认 16 字节）
-static func pkcs7_pad(data: PackedByteArray, block_size: int = LogConstants.AES_BLOCK_SIZE) -> PackedByteArray:
-	var padding_length: int = block_size - (data.size() % block_size)
-	var padded_bytes := data.duplicate()
+static func pkcs7_pad(raw_bytes: PackedByteArray, block_size: int = LogConstants.AES_BLOCK_SIZE) -> PackedByteArray:
+	var padding_length: int = block_size - (raw_bytes.size() % block_size)
+	var padded_bytes := raw_bytes.duplicate()
 	var original_size := padded_bytes.size()
 	padded_bytes.resize(original_size + padding_length)
 	for byte_index in range(original_size, padded_bytes.size()):
@@ -129,39 +129,39 @@ static func pkcs7_unpad(padded: PackedByteArray, block_size: int = LogConstants.
 	return padded.slice(0, padded_size - padding_length)
 
 ## AES-256-CBC 加密并输出 Base64 密文串
-static func aes_cbc_encrypt_b64(plaintext: PackedByteArray, key_32: PackedByteArray, iv_16: PackedByteArray) -> String:
-	if key_32.size() != LogConstants.AES_KEY_SIZE or iv_16.size() != LogConstants.AES_BLOCK_SIZE:
+static func aes_cbc_encrypt_b64(plaintext: PackedByteArray, key_32: PackedByteArray, initialization_vector: PackedByteArray) -> String:
+	if key_32.size() != LogConstants.AES_KEY_SIZE or initialization_vector.size() != LogConstants.AES_BLOCK_SIZE:
 		return ""
-	var aes := AESContext.new()
-	if aes.start(AESContext.MODE_CBC_ENCRYPT, key_32, iv_16) != OK:
+	var aes_context := AESContext.new()
+	if aes_context.start(AESContext.MODE_CBC_ENCRYPT, key_32, initialization_vector) != OK:
 		return ""
 	var padded := pkcs7_pad(plaintext, LogConstants.AES_BLOCK_SIZE)
-	var encrypted := aes.update(padded)
-	aes.finish()
+	var encrypted := aes_context.update(padded)
+	aes_context.finish()
 	return Marshalls.raw_to_base64(encrypted) if not encrypted.is_empty() else ""
 
 ## AES-256-CBC Base64 解密并还原原始字节序列（失败返回空数组）
-static func aes_cbc_decrypt_b64(cipher_b64: String, key_32: PackedByteArray, iv_16: PackedByteArray) -> PackedByteArray:
-	if cipher_b64.is_empty() or key_32.size() != LogConstants.AES_KEY_SIZE or iv_16.size() != LogConstants.AES_BLOCK_SIZE:
+static func aes_cbc_decrypt_b64(ciphertext_base64: String, key_32: PackedByteArray, initialization_vector: PackedByteArray) -> PackedByteArray:
+	if ciphertext_base64.is_empty() or key_32.size() != LogConstants.AES_KEY_SIZE or initialization_vector.size() != LogConstants.AES_BLOCK_SIZE:
 		return PackedByteArray()
-	var raw_cipher := Marshalls.base64_to_raw(cipher_b64)
+	var raw_cipher := Marshalls.base64_to_raw(ciphertext_base64)
 	if raw_cipher.is_empty() or (raw_cipher.size() % LogConstants.AES_BLOCK_SIZE) != 0:
 		return PackedByteArray()
-	var aes := AESContext.new()
-	if aes.start(AESContext.MODE_CBC_DECRYPT, key_32, iv_16) != OK:
+	var aes_context := AESContext.new()
+	if aes_context.start(AESContext.MODE_CBC_DECRYPT, key_32, initialization_vector) != OK:
 		return PackedByteArray()
-	var decrypted := aes.update(raw_cipher)
-	aes.finish()
+	var decrypted := aes_context.update(raw_cipher)
+	aes_context.finish()
 	return pkcs7_unpad(decrypted, LogConstants.AES_BLOCK_SIZE)
 
 # ==============================================================================
 # 三、防篡改哈希链与 Encrypt-then-MAC 日志密封信封
 # ==============================================================================
 
-## 计算单调递增审计哈希链节点：SHA256(previous_hash | sequence | payload_str)
-static func compute_chain_digest(previous_hash: String, sequence: int, payload_str: String) -> String:
+## 计算单调递增审计哈希链节点：SHA256(previous_hash | sequence | payload_text)
+static func compute_chain_digest(previous_hash: String, sequence: int, payload_text: String) -> String:
 	var normalized_previous_hash := previous_hash if not previous_hash.is_empty() else LogConstants.CHAIN_GENESIS_HASH
-	return ("%s|%d|%s" % [normalized_previous_hash, sequence, payload_str]).sha256_text()
+	return ("%s|%d|%s" % [normalized_previous_hash, sequence, payload_text]).sha256_text()
 
 ## 构造 Encrypt-then-MAC 安全日志加密信封（先派生独立 AES/HMAC 子密钥并 AES-256-CBC 加密，再附链哈希与 HMAC-SHA256 认证）
 static func seal_log_record_envelope(
@@ -174,19 +174,19 @@ static func seal_log_record_envelope(
 		return {}
 	var encryption_key := derive_subkey_32(key_32, LogConstants.ENC_SUBKEY_AES_CONTEXT)
 	var mac_key := derive_subkey_32(key_32, LogConstants.ENC_SUBKEY_HMAC_CONTEXT)
-	var iv_16 := Crypto.new().generate_random_bytes(LogConstants.AES_BLOCK_SIZE)
-	var ciphertext_base64 := aes_cbc_encrypt_b64(record_json.to_utf8_buffer(), encryption_key, iv_16)
+	var initialization_vector := Crypto.new().generate_random_bytes(LogConstants.AES_BLOCK_SIZE)
+	var ciphertext_base64 := aes_cbc_encrypt_b64(record_json.to_utf8_buffer(), encryption_key, initialization_vector)
 	if ciphertext_base64.is_empty():
 		return {}
-	var iv_hex := iv_16.hex_encode()
+	var initialization_vector_hex := initialization_vector.hex_encode()
 	var chain_hash := compute_chain_digest(previous_chain_hash, sequence, ciphertext_base64)
-	var mac_payload := "%d:%s:%d:%s:%s:%s" % [LogConstants.ENC_VERSION_V1, LogConstants.ENC_ALGO_AES_256_CBC, sequence, iv_hex, ciphertext_base64, chain_hash]
+	var mac_payload := "%d:%s:%d:%s:%s:%s" % [LogConstants.ENC_VERSION_V1, LogConstants.ENC_ALGO_AES_256_CBC, sequence, initialization_vector_hex, ciphertext_base64, chain_hash]
 	var mac_hex := hmac_sha256_hex(mac_key, mac_payload.to_utf8_buffer())
 	return {
 		LogConstants.ENC_KEY_VERSION: LogConstants.ENC_VERSION_V1,
 		LogConstants.ENC_KEY_ALGO: LogConstants.ENC_ALGO_AES_256_CBC,
 		LogConstants.ENC_KEY_SEQUENCE: sequence,
-		LogConstants.ENC_KEY_IV: iv_hex,
+		LogConstants.ENC_KEY_IV: initialization_vector_hex,
 		LogConstants.ENC_KEY_CIPHERTEXT: ciphertext_base64,
 		LogConstants.ENC_KEY_CHAIN_HASH: chain_hash,
 		LogConstants.ENC_KEY_MAC: mac_hex,
@@ -196,7 +196,7 @@ static func seal_log_record_envelope(
 static func open_log_record_envelope(
 	envelope: Dictionary,
 	key_32: PackedByteArray,
-	verify_mac: bool = true
+	should_verify_mac: bool = true
 ) -> Dictionary:
 	if not is_encrypted_envelope(envelope):
 		return {"ok": false, "data": {}, "chain_hash": "", "error": "INVALID_ENVELOPE"}
@@ -204,36 +204,36 @@ static func open_log_record_envelope(
 		return {"ok": false, "data": {}, "chain_hash": "", "error": "INVALID_KEY_SIZE"}
 
 	var version := int(envelope.get(LogConstants.ENC_KEY_VERSION, LogConstants.ENC_VERSION_V1))
-	var algo := str(envelope.get(LogConstants.ENC_KEY_ALGO, LogConstants.ENC_ALGO_AES_256_CBC))
+	var algorithm_name := str(envelope.get(LogConstants.ENC_KEY_ALGO, LogConstants.ENC_ALGO_AES_256_CBC))
 	var sequence_number := int(envelope.get(LogConstants.ENC_KEY_SEQUENCE, 0))
-	var iv_hex := str(envelope.get(LogConstants.ENC_KEY_IV, ""))
+	var initialization_vector_hex := str(envelope.get(LogConstants.ENC_KEY_IV, ""))
 	var ciphertext_base64 := str(envelope.get(LogConstants.ENC_KEY_CIPHERTEXT, ""))
 	var chain_hash := str(envelope.get(LogConstants.ENC_KEY_CHAIN_HASH, ""))
 	var mac_hex := str(envelope.get(LogConstants.ENC_KEY_MAC, ""))
 
-	if verify_mac:
+	if should_verify_mac:
 		var mac_key := derive_subkey_32(key_32, LogConstants.ENC_SUBKEY_HMAC_CONTEXT)
-		var mac_payload := "%d:%s:%d:%s:%s:%s" % [version, algo, sequence_number, iv_hex, ciphertext_base64, chain_hash]
+		var mac_payload := "%d:%s:%d:%s:%s:%s" % [version, algorithm_name, sequence_number, initialization_vector_hex, ciphertext_base64, chain_hash]
 		var expected_mac := hmac_sha256_hex(mac_key, mac_payload.to_utf8_buffer())
 		if not constant_time_equals(expected_mac, mac_hex):
 			return {"ok": false, "data": {}, "chain_hash": chain_hash, "error": LogConstants.LOG_ERR_MAC_MISMATCH}
 
 	var encryption_key := derive_subkey_32(key_32, LogConstants.ENC_SUBKEY_AES_CONTEXT)
-	var iv_bytes := iv_hex.hex_decode()
-	var plain_bytes := aes_cbc_decrypt_b64(ciphertext_base64, encryption_key, iv_bytes)
+	var initialization_vector_bytes := initialization_vector_hex.hex_decode()
+	var plain_bytes := aes_cbc_decrypt_b64(ciphertext_base64, encryption_key, initialization_vector_bytes)
 	if plain_bytes.is_empty():
 		return {"ok": false, "data": {}, "chain_hash": chain_hash, "error": "DECRYPT_FAILED"}
 
 	var parsed: Variant = JSON.parse_string(plain_bytes.get_string_from_utf8())
 	if not (parsed is Dictionary):
 		return {"ok": false, "data": {}, "chain_hash": chain_hash, "error": "JSON_PARSE_FAILED"}
-	var parsed_dict: Dictionary = parsed
-	if parsed_dict.has(LogConstants.KEY_SEQUENCE) and int(parsed_dict.get(LogConstants.KEY_SEQUENCE, sequence_number)) != sequence_number:
+	var parsed_payload: Dictionary = parsed
+	if parsed_payload.has(LogConstants.KEY_SEQUENCE) and int(parsed_payload.get(LogConstants.KEY_SEQUENCE, sequence_number)) != sequence_number:
 		return {"ok": false, "data": {}, "chain_hash": chain_hash, "error": "SEQUENCE_MISMATCH"}
-	return {"ok": true, "data": parsed_dict, "chain_hash": chain_hash, "error": ""}
+	return {"ok": true, "data": parsed_payload, "chain_hash": chain_hash, "error": ""}
 
 ## 判断 JSON 字典是否为本引擎加密日志信封格式
-static func is_encrypted_envelope(candidate_dict: Dictionary) -> bool:
-	return candidate_dict.get(LogConstants.ENC_KEY_ALGO, "") == LogConstants.ENC_ALGO_AES_256_CBC \
-		and candidate_dict.has(LogConstants.ENC_KEY_CIPHERTEXT) \
-		and candidate_dict.has(LogConstants.ENC_KEY_IV)
+static func is_encrypted_envelope(candidate_envelope: Dictionary) -> bool:
+	return candidate_envelope.get(LogConstants.ENC_KEY_ALGO, "") == LogConstants.ENC_ALGO_AES_256_CBC \
+		and candidate_envelope.has(LogConstants.ENC_KEY_CIPHERTEXT) \
+		and candidate_envelope.has(LogConstants.ENC_KEY_IV)

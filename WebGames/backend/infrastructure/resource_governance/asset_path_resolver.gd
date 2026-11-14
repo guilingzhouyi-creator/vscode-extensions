@@ -55,7 +55,7 @@ const DIR_ASSETS: String = "assets"
 const PREFIX_ASSETS: String = "assets/"
 
 static var _instance: AssetPathResolver = null
-static var _override_env_for_test: String = ""
+static var _override_environment_for_test: String = ""
 static var _override_roots_for_test: Array[String] = []
 
 # ==============================================================================
@@ -69,8 +69,8 @@ static func get_instance() -> AssetPathResolver:
 	return _instance
 
 ## 测试环境模拟指定运行模式（隔离测试）
-static func set_test_environment_override(env_name: String) -> void:
-	_override_env_for_test = env_name
+static func set_test_environment_override(environment_mode: String) -> void:
+	_override_environment_for_test = environment_mode
 
 ## 测试环境模拟指定 MOD 根目录级联列表（隔离测试）
 static func set_test_roots_override(roots: Array[String]) -> void:
@@ -78,14 +78,14 @@ static func set_test_roots_override(roots: Array[String]) -> void:
 
 ## 重置测试环境覆写
 static func reset_for_tests() -> void:
-	_override_env_for_test = ""
+	_override_environment_for_test = ""
 	_override_roots_for_test.clear()
 	_instance = null
 
 ## 评估当前运行环境（工程版 vs 发行版）
 static func get_current_build_mode() -> String:
-	if not _override_env_for_test.is_empty():
-		return _override_env_for_test
+	if not _override_environment_for_test.is_empty():
+		return _override_environment_for_test
 
 	# 编辑器环境或测试环境均归为工程版
 	if OS.has_feature("editor") or OS.has_feature("test"):
@@ -147,8 +147,8 @@ static func get_mod_discovery_roots() -> Array[String]:
 		roots.append(ROOT_MODS_TIER0_DEV)
 
 	# 发行版或独立运行：检索可执行文件同级 mods/
-	var exe_dir := OS.get_executable_path().get_base_dir()
-	roots.append(exe_dir.path_join(ROOT_MODS_TIER1_STANDALONE))
+	var executable_directory := OS.get_executable_path().get_base_dir()
+	roots.append(executable_directory.path_join(ROOT_MODS_TIER1_STANDALONE))
 
 	# 用户安全数据沙盒目录（全环境默认回退，支持创意工坊与动态下载）
 	roots.append(ROOT_MODS_TIER2_USER_SANDBOX)
@@ -157,25 +157,25 @@ static func get_mod_discovery_roots() -> Array[String]:
 ## 解析指定 MOD 内部艺术资源的物理路径（支持三级级联探测与防路径穿越）
 static func resolve_mod_asset_path(mod_id: String, relative_asset_path: String) -> String:
 	var clean_mod_id := sanitize_identifier(mod_id)
-	var safe_rel_path := sanitize_sandbox_path(relative_asset_path)
+	var safe_relative_path := sanitize_sandbox_path(relative_asset_path)
 
-	if clean_mod_id.is_empty() or safe_rel_path.is_empty():
+	if clean_mod_id.is_empty() or safe_relative_path.is_empty():
 		return ""
 
 	var candidate_roots := get_mod_discovery_roots()
-	for root_dir in candidate_roots:
-		var target_path := root_dir.path_join(clean_mod_id).path_join(DIR_ASSETS).path_join(safe_rel_path)
+	for root_directory in candidate_roots:
+		var target_path := root_directory.path_join(clean_mod_id).path_join(DIR_ASSETS).path_join(safe_relative_path)
 		if asset_exists(target_path):
 			return target_path
 		# 兼容剧情模组专用子目录 (mods/narratives/<mod_id>/assets/...)
-		var narrative_path := root_dir.path_join("narratives").path_join(clean_mod_id).path_join(DIR_ASSETS).path_join(safe_rel_path)
+		var narrative_path := root_directory.path_join("narratives").path_join(clean_mod_id).path_join(DIR_ASSETS).path_join(safe_relative_path)
 		if asset_exists(narrative_path):
 			return narrative_path
 
 	# 若三级级联均未探测到物理文件，返回首选沙盒物理路径（供资源探测或新建装配）
 	if is_engineering_build():
-		return ROOT_MODS_TIER0_DEV.path_join(clean_mod_id).path_join(DIR_ASSETS).path_join(safe_rel_path)
-	return ROOT_MODS_TIER2_USER_SANDBOX.path_join(clean_mod_id).path_join(DIR_ASSETS).path_join(safe_rel_path)
+		return ROOT_MODS_TIER0_DEV.path_join(clean_mod_id).path_join(DIR_ASSETS).path_join(safe_relative_path)
+	return ROOT_MODS_TIER2_USER_SANDBOX.path_join(clean_mod_id).path_join(DIR_ASSETS).path_join(safe_relative_path)
 
 # ==============================================================================
 # 五、通用 URI 协议解析引擎 (Unified URI Scheme)
@@ -189,8 +189,8 @@ static func resolve_unified_uri(uri_or_path: String, fallback_mod_id: String = "
 
 	# 1. 官方资产协议：official://media/cutscenes/intro.ogv -> res://assets/media/cutscenes/intro.ogv
 	if trimmed.begins_with(SCHEME_OFFICIAL):
-		var sub := trimmed.trim_prefix(SCHEME_OFFICIAL)
-		return ROOT_OFFICIAL_ASSETS.path_join(sanitize_sandbox_path(sub))
+		var relative_subpath := trimmed.trim_prefix(SCHEME_OFFICIAL)
+		return ROOT_OFFICIAL_ASSETS.path_join(sanitize_sandbox_path(relative_subpath))
 
 	# 2. 模组资产协议：mod://my_mod/assets/video.ogv 或 mod://assets/video.ogv (需 fallback_mod_id)
 	if trimmed.begins_with(SCHEME_MOD):
@@ -203,18 +203,18 @@ static func resolve_unified_uri(uri_or_path: String, fallback_mod_id: String = "
 	# 4. 无协议纯相对路径：若提供了 fallback_mod_id 则解析为 MOD 资产，否则作为官方资产相对路径
 	if not fallback_mod_id.is_empty():
 		return resolve_mod_asset_path(fallback_mod_id, trimmed)
-	var rel_clean := sanitize_sandbox_path(trimmed)
-	if rel_clean.begins_with(PREFIX_ASSETS):
-		rel_clean = rel_clean.trim_prefix(PREFIX_ASSETS)
-	return ROOT_OFFICIAL_ASSETS.path_join(rel_clean)
+	var clean_relative_path := sanitize_sandbox_path(trimmed)
+	if clean_relative_path.begins_with(PREFIX_ASSETS):
+		clean_relative_path = clean_relative_path.trim_prefix(PREFIX_ASSETS)
+	return ROOT_OFFICIAL_ASSETS.path_join(clean_relative_path)
 
 static func _resolve_mod_scheme_uri(uri: String, fallback_mod_id: String) -> String:
 	var raw_path := uri.trim_prefix(SCHEME_MOD).trim_prefix("/")
-	var slash_pos := raw_path.find("/")
+	var slash_index := raw_path.find("/")
 
-	if slash_pos > 0:
-		var first_segment := raw_path.substr(0, slash_pos)
-		var rest_path := raw_path.substr(slash_pos + 1)
+	if slash_index > 0:
+		var first_segment := raw_path.substr(0, slash_index)
+		var rest_path := raw_path.substr(slash_index + 1)
 		# 若第一段是 assets，说明格式为 mod://assets/path，借用 fallback_mod_id
 		if first_segment == DIR_ASSETS and not fallback_mod_id.is_empty():
 			return resolve_mod_asset_path(fallback_mod_id, rest_path)

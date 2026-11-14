@@ -112,14 +112,14 @@ func to_dict() -> Dictionary:
 	}
 
 ## 从字典恢复描述符
-static func from_dict(raw_data: Dictionary) -> RefCounted:
+static func from_dict(descriptor_payload: Dictionary) -> RefCounted:
 	var descriptor := ResourceLifecycleDescriptor.new(
-		str(raw_data.get("resource_id", "")),
+		str(descriptor_payload.get("resource_id", "")),
 		null,
-		int(raw_data.get("category", ResourceCategory.CUSTOM_OBJECT)) as ResourceCategory,
-		str(raw_data.get("owner", ""))
+		int(descriptor_payload.get("category", ResourceCategory.CUSTOM_OBJECT)) as ResourceCategory,
+		str(descriptor_payload.get("owner", ""))
 	)
-	descriptor.current_state = int(raw_data.get("state", LifecycleState.UNINITIALIZED)) as LifecycleState
-	descriptor.created_timestamp = float(raw_data.get("created_at", 0.0))
-	descriptor.last_transition_timestamp = float(raw_data.get("last_transition_at", descriptor.created_timestamp))
+	descriptor.current_state = int(descriptor_payload.get("state", LifecycleState.UNINITIALIZED)) as LifecycleState
+	descriptor.created_timestamp = float(descriptor_payload.get("created_at", 0.0))
+	descriptor.last_transition_timestamp = float(descriptor_payload.get("last_transition_at", descriptor.created_timestamp))
 	return descriptor

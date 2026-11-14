@@ -12,7 +12,7 @@ class_name IdempotencyController extends RefCounted
 
 ## 执行操作记录字典: operation_token -> { "executed_at": float, "result": Variant }
 var _executed_tokens: Dictionary = {}
-var _token_order_dict: Dictionary = {} # 有序集合（Dictionary 保持插入序），O(1) FIFO 淘汰
+var _token_order_map: Dictionary = {} # 有序集合（Dictionary 保持插入序），O(1) FIFO 淘汰
 var _max_token_history: int = 200
 
 func _init(max_history: int = 200) -> void:
@@ -20,7 +20,7 @@ func _init(max_history: int = 200) -> void:
 
 ## 检查并执行幂等性保护
 ## 返回: { "already_executed": bool, "result": Variant }
-func check_and_record(operation_token: String, result_if_new: Variant = true) -> Dictionary:
+func check_and_record(operation_token: String, recorded_outcome: Variant = true) -> Dictionary:
 	if operation_token.is_empty():
 		return {
 			"already_executed": false,
@@ -39,27 +39,27 @@ func check_and_record(operation_token: String, result_if_new: Variant = true) ->
 
 	_executed_tokens[operation_token] = {
 		"executed_at": Time.get_unix_time_from_system(),
-		"result": result_if_new
+		"result": recorded_outcome
 	}
-	_token_order_dict[operation_token] = true
+	_token_order_map[operation_token] = true
 
 	return {
 		"already_executed": false,
-		"result": result_if_new
+		"result": recorded_outcome
 	}
 
 func _evict_single_oldest_token() -> bool:
-	for token_key in _token_order_dict:
+	for token_key in _token_order_map:
 		var victim: String = String(token_key)
 		if victim.is_empty():
 			return false
-		_token_order_dict.erase(victim)
+		_token_order_map.erase(victim)
 		_executed_tokens.erase(victim)
 		return true
 	return false
 
 func _evict_excess_tokens() -> void:
-	while _token_order_dict.size() >= _max_token_history:
+	while _token_order_map.size() >= _max_token_history:
 		if not _evict_single_oldest_token():
 			break
 
@@ -82,7 +82,7 @@ func get_result(operation_token: String, default_value: Variant = null) -> Varia
 func reset() -> int:
 	var count := _executed_tokens.size()
 	_executed_tokens.clear()
-	_token_order_dict.clear()
+	_token_order_map.clear()
 	return count
 
 ## 获取控制器历史记录队列长度
@@ -93,10 +93,10 @@ func history_size() -> int:
 var _token_order: Array[String]:
 	get:
 		var ordered_tokens: Array[String] = []
-		for token_key in _token_order_dict:
+		for token_key in _token_order_map:
 			ordered_tokens.append(String(token_key))
 		return ordered_tokens
-	set(value):
-		_token_order_dict.clear()
-		for token_key in value:
-			_token_order_dict[String(token_key)] = true
+	set(new_token_order):
+		_token_order_map.clear()
+		for token_key in new_token_order:
+			_token_order_map[String(token_key)] = true

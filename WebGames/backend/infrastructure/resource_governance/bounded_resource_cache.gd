@@ -12,20 +12,20 @@ class_name BoundedResourceCache extends RefCounted
 
 const CachePolicySpec = preload("res://backend/infrastructure/resource_governance/cache_policy_spec.gd")
 
-var _spec: CachePolicySpec
+var _policy_specification: CachePolicySpec
 var _store: Dictionary = {}
-var _access_order_dict: Dictionary = {} # 有序集合（Dictionary 保持插入序）用于 LRU/FIFO 追踪，O(1) 触达/淘汰
+var _access_order_map: Dictionary = {} # 有序集合（Dictionary 保持插入序）用于 LRU/FIFO 追踪，O(1) 触达/淘汰
 var _timestamps: Dictionary = {} # key -> float (秒)
 
-func _init(policy_spec: CachePolicySpec = null) -> void:
-	if policy_spec != null:
-		_spec = policy_spec
+func _init(policy_specification: CachePolicySpec = null) -> void:
+	if policy_specification != null:
+		_policy_specification = policy_specification
 	else:
-		_spec = CachePolicySpec.new("default_cache", 100)
+		_policy_specification = CachePolicySpec.new("default_cache", 100)
 
 ## 获取当前缓存策略规范
 func get_spec() -> CachePolicySpec:
-	return _spec
+	return _policy_specification
 
 ## 放入条目，超出容量时自动触发淘汰
 func put(cache_key: String, cache_value: Variant) -> void:
@@ -36,17 +36,17 @@ func put(cache_key: String, cache_value: Variant) -> void:
 	if _store.has(cache_key):
 		_store[cache_key] = cache_value
 		_timestamps[cache_key] = Time.get_unix_time_from_system()
-		if _spec.eviction_policy == CachePolicySpec.EvictionPolicy.LRU:
+		if _policy_specification.eviction_policy == CachePolicySpec.EvictionPolicy.LRU:
 			_touch(cache_key)
 		return
 
 	# 容量已满，执行驱逐
-	while _store.size() >= _spec.max_capacity:
+	while _store.size() >= _policy_specification.max_capacity:
 		_evict_one()
 
 	_store[cache_key] = cache_value
 	_timestamps[cache_key] = Time.get_unix_time_from_system()
-	_access_order_dict[cache_key] = true
+	_access_order_map[cache_key] = true
 
 ## 获取条目，支持 TTL 过期淘汰
 func get_val(cache_key: String, default_value: Variant = null) -> Variant:
@@ -54,14 +54,14 @@ func get_val(cache_key: String, default_value: Variant = null) -> Variant:
 		return default_value
 
 	# TTL 过期检查
-	if _spec.eviction_policy == CachePolicySpec.EvictionPolicy.TTL:
+	if _policy_specification.eviction_policy == CachePolicySpec.EvictionPolicy.TTL:
 		var created_time: float = float(_timestamps.get(cache_key, 0.0))
 		var current_time: float = Time.get_unix_time_from_system()
-		if current_time - created_time > _spec.ttl_seconds:
+		if current_time - created_time > _policy_specification.ttl_seconds:
 			_remove_internal(cache_key)
 			return default_value
 
-	if _spec.eviction_policy == CachePolicySpec.EvictionPolicy.LRU:
+	if _policy_specification.eviction_policy == CachePolicySpec.EvictionPolicy.LRU:
 		_touch(cache_key)
 
 	return _store[cache_key]
@@ -79,20 +79,20 @@ func remove(cache_key: String) -> bool:
 
 ## 驱逐单个条目（按策略分支，O(1) 均摊）
 func _evict_one() -> void:
-	if _access_order_dict.is_empty():
+	if _access_order_map.is_empty():
 		return
 	# TTL 优先淘汰过期条目，其次按 LRU/FIFO 头部淘汰（直接迭代字典避免 keys() 建临时数组）
-	if _spec.eviction_policy == CachePolicySpec.EvictionPolicy.TTL:
+	if _policy_specification.eviction_policy == CachePolicySpec.EvictionPolicy.TTL:
 		var now := Time.get_unix_time_from_system()
-		for entry_key in _access_order_dict:
-			var ttl_key := String(entry_key)
-			var created := float(_timestamps.get(ttl_key, 0.0))
-			if now - created > _spec.ttl_seconds:
-				_remove_internal(ttl_key)
+		for entry_key in _access_order_map:
+			var expiration_key := String(entry_key)
+			var created := float(_timestamps.get(expiration_key, 0.0))
+			if now - created > _policy_specification.ttl_seconds:
+				_remove_internal(expiration_key)
 				return
 	# LRU/FIFO/MANUAL 均淘汰有序集合头部（LRU 头部即最久未访，FIFO 头部即最早插入）
 	var victim_key: String = ""
-	for entry_key in _access_order_dict:
+	for entry_key in _access_order_map:
 		victim_key = String(entry_key)
 		break
 	if not victim_key.is_empty():
@@ -101,17 +101,17 @@ func _evict_one() -> void:
 func _remove_internal(cache_key: String) -> void:
 	_store.erase(cache_key)
 	_timestamps.erase(cache_key)
-	_access_order_dict.erase(cache_key)
+	_access_order_map.erase(cache_key)
 
 func _touch(cache_key: String) -> void:
 	# O(1) 均摊：先删后插移到尾部，保持 LRU 尾部为最近
-	if _access_order_dict.has(cache_key):
-		_access_order_dict.erase(cache_key)
-	_access_order_dict[cache_key] = true
+	if _access_order_map.has(cache_key):
+		_access_order_map.erase(cache_key)
+	_access_order_map[cache_key] = true
 
 ## 热更/场景重置清理通道
 func clear_on_hot_reload() -> void:
-	if _spec.allow_hot_reload_clear:
+	if _policy_specification.allow_hot_reload_clear:
 		clear()
 
 ## 清空当前容器或管理器内的所有记录与缓存
@@ -119,7 +119,7 @@ func clear() -> int:
 	var count := _store.size()
 	_store.clear()
 	_timestamps.clear()
-	_access_order_dict.clear()
+	_access_order_map.clear()
 	return count
 
 ## 获取当前缓冲区内存储的有效元素数量

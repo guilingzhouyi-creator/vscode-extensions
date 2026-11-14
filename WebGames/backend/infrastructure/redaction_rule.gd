@@ -37,14 +37,14 @@ class RuleEntry extends RefCounted:
 # ==============================================================================
 
 static var _rules: Array[RuleEntry] = []
-static var _enabled: bool = true
+static var _is_enabled: bool = true
 static var _default_mode: String = MODE_MASK
 static var _cached_version: int = -2
 
 ## 测试复位：清空规则并恢复默认配置（避免跨用例状态残留）
 static func reset_state() -> void:
 	_rules.clear()
-	_enabled = true
+	_is_enabled = true
 	_default_mode = MODE_MASK
 	_cached_version = -2
 
@@ -58,19 +58,19 @@ static func _ensure_loaded() -> void:
 
 	var redaction_config := GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_REDACTION, {})
 	if redaction_config.is_empty():
-		_enabled = true
+		_is_enabled = true
 		_default_mode = MODE_MASK
 		_init_default_rules()
 		return
 
-	_enabled = bool(redaction_config.get("enabled", true))
+	_is_enabled = bool(redaction_config.get("enabled", true))
 	_default_mode = str(redaction_config.get("default_mode", MODE_MASK))
 	var rules_array: Variant = redaction_config.get("rules", [])
 	if rules_array is Array:
-		for item in rules_array:
-			if not (item is Dictionary):
+		for rule_item in rules_array:
+			if not (rule_item is Dictionary):
 				continue
-			var entry := _build_rule_entry(item)
+			var entry := _build_rule_entry(rule_item)
 			if entry != null:
 				_rules.append(entry)
 
@@ -82,14 +82,14 @@ static func _init_default_rules() -> void:
 		{"field_pattern": "password|passwd|password_hash|secret|seal_key|hmac_secret|aes_key|master_secret|cookie", "mask_mode": MODE_DROP},
 		{"field_pattern": "account_id", "mask_mode": MODE_HASH}
 	]
-	for item in defaults:
-		var entry := _build_rule_entry(item)
+	for default_rule in defaults:
+		var entry := _build_rule_entry(default_rule)
 		if entry != null:
 			_rules.append(entry)
 
 ## 规则条目工厂：编译正则并构造规则实例（单点装配，提取自循环外）
-static func _build_rule_entry(item: Dictionary) -> RuleEntry:
-	var pattern := str(item.get("field_pattern", ""))
+static func _build_rule_entry(rule_config: Dictionary) -> RuleEntry:
+	var pattern := str(rule_config.get("field_pattern", ""))
 	if pattern.is_empty():
 		return null
 	var compiled_regex := RegEx.new()
@@ -97,11 +97,11 @@ static func _build_rule_entry(item: Dictionary) -> RuleEntry:
 		return null
 	var entry := RuleEntry.new()
 	entry.regex = compiled_regex
-	entry.mask_mode = str(item.get("mask_mode", MODE_MASK))
-	entry.mask_prefix_len = int(item.get("mask_prefix_len", LogConstants.DEFAULT_MASK_PREFIX_LEN))
-	entry.mask_suffix_len = int(item.get("mask_suffix_len", LogConstants.DEFAULT_MASK_SUFFIX_LEN))
-	entry.replace_with = str(item.get("replace_with", LogConstants.DEFAULT_MASK_REPLACEMENT))
-	entry.salt = str(item.get("salt", ""))
+	entry.mask_mode = str(rule_config.get("mask_mode", MODE_MASK))
+	entry.mask_prefix_len = int(rule_config.get("mask_prefix_len", LogConstants.DEFAULT_MASK_PREFIX_LEN))
+	entry.mask_suffix_len = int(rule_config.get("mask_suffix_len", LogConstants.DEFAULT_MASK_SUFFIX_LEN))
+	entry.replace_with = str(rule_config.get("replace_with", LogConstants.DEFAULT_MASK_REPLACEMENT))
+	entry.salt = str(rule_config.get("salt", ""))
 	return entry
 
 # ==============================================================================
@@ -109,18 +109,18 @@ static func _build_rule_entry(item: Dictionary) -> RuleEntry:
 # ==============================================================================
 
 ## 对 context 字典执行深层脱敏处理，返回 {"dict": masked_dict, "redacted_keys": Array[String]}
-static func apply(dict: Dictionary) -> Dictionary:
+static func apply(context_map: Dictionary) -> Dictionary:
 	_ensure_loaded()
-	if not _enabled or dict.is_empty():
+	if not _is_enabled or context_map.is_empty():
 		return {
-			"dict": dict.duplicate(true),
+			"dict": context_map.duplicate(true),
 			"redacted_keys": []
 		}
 
 	var redacted_keys: Array[String] = []
-	var result_dict := _redact_dict(dict, redacted_keys)
+	var redacted_map := _redact_dict(context_map, redacted_keys)
 	return {
-		"dict": result_dict,
+		"dict": redacted_map,
 		"redacted_keys": redacted_keys
 	}
 
@@ -135,29 +135,29 @@ static func apply_to_record(record: StructuredLogRecord, raw_context: Dictionary
 	if raw_redacted_keys is Array:
 		for redacted_key in (raw_redacted_keys as Array):
 			record.redacted_keys.append(str(redacted_key))
-	if _enabled and not record.message.is_empty():
+	if _is_enabled and not record.message.is_empty():
 		var scrubbed_message := StatisticsMathLib.scrub_inline_secrets(record.message)
 		if scrubbed_message != record.message:
 			record.message = scrubbed_message
 			if not (LogConstants.KEY_MESSAGE in record.redacted_keys):
 				record.redacted_keys.append(LogConstants.KEY_MESSAGE)
 
-static func _find_matching_rule(key_str: String) -> RuleEntry:
+static func _find_matching_rule(field_key: String) -> RuleEntry:
 	for rule in _rules:
-		if rule.regex != null and rule.regex.search(key_str) != null:
+		if rule.regex != null and rule.regex.search(field_key) != null:
 			return rule
 	return null
 
 ## 递归脱敏字典：先匹配键名规则（防敏感键以嵌套字典/数组形态逃逸）；未命中时继续下钻容器或执行内联凭据二次清洗
-static func _redact_dict(source: Dictionary, out_redacted_keys: Array[String]) -> Dictionary:
+static func _redact_dict(source: Dictionary, redacted_keys: Array[String]) -> Dictionary:
 	var target: Dictionary = {}
 	for entry_key in source.keys():
-		var key_str := str(entry_key)
+		var key_text := str(entry_key)
 		var entry_value: Variant = source[entry_key]
-		var matched_rule := _find_matching_rule(key_str)
+		var matched_rule := _find_matching_rule(key_text)
 		if matched_rule != null:
-			if not (key_str in out_redacted_keys):
-				out_redacted_keys.append(key_str)
+			if not (key_text in redacted_keys):
+				redacted_keys.append(key_text)
 			match matched_rule.mask_mode:
 				MODE_DROP:
 					pass
@@ -172,31 +172,31 @@ static func _redact_dict(source: Dictionary, out_redacted_keys: Array[String]) -
 			continue
 
 		if entry_value is Dictionary:
-			target[entry_key] = _redact_dict(entry_value, out_redacted_keys)
+			target[entry_key] = _redact_dict(entry_value, redacted_keys)
 		elif entry_value is Array:
-			target[entry_key] = _redact_array(entry_value, out_redacted_keys, key_str)
+			target[entry_key] = _redact_array(entry_value, redacted_keys, key_text)
 		elif entry_value is String:
 			var cleaned := StatisticsMathLib.scrub_inline_secrets(entry_value)
-			if cleaned != entry_value and not (key_str in out_redacted_keys):
-				out_redacted_keys.append(key_str)
+			if cleaned != entry_value and not (key_text in redacted_keys):
+				redacted_keys.append(key_text)
 			target[entry_key] = cleaned
 		else:
 			target[entry_key] = entry_value
 	return target
 
 ## 递归脱敏数组：逐项下钻字典/数组，其余字符串按需清洗并记录所属键审计痕迹
-static func _redact_array(source: Array, out_redacted_keys: Array[String], parent_key: String = "") -> Array:
+static func _redact_array(source: Array, redacted_keys: Array[String], parent_key: String = "") -> Array:
 	var target: Array = []
-	for item in source:
-		if item is Dictionary:
-			target.append(_redact_dict(item, out_redacted_keys))
-		elif item is Array:
-			target.append(_redact_array(item, out_redacted_keys, parent_key))
-		elif item is String:
-			var cleaned := StatisticsMathLib.scrub_inline_secrets(item)
-			if cleaned != item and not parent_key.is_empty() and not (parent_key in out_redacted_keys):
-				out_redacted_keys.append(parent_key)
+	for element in source:
+		if element is Dictionary:
+			target.append(_redact_dict(element, redacted_keys))
+		elif element is Array:
+			target.append(_redact_array(element, redacted_keys, parent_key))
+		elif element is String:
+			var cleaned := StatisticsMathLib.scrub_inline_secrets(element)
+			if cleaned != element and not parent_key.is_empty() and not (parent_key in redacted_keys):
+				redacted_keys.append(parent_key)
 			target.append(cleaned)
 		else:
-			target.append(item)
+			target.append(element)
 	return target
