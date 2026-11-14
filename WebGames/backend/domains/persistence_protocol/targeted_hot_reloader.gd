@@ -64,14 +64,14 @@ func trigger_reload(changed_node: String, reload_resolver: Callable = Callable()
 	# 2. 依次定向重载失效节点
 	for node in invalidation_list:
 		if reload_resolver.is_valid():
-			var step_res: Dictionary = reload_resolver.call(node)
-			if not bool(step_res.get("success", false)):
+			var step_result: Dictionary = reload_resolver.call(node)
+			if not bool(step_result.get("success", false)):
 				failed_node = node
 				rollback_performed = true
 				EventBusCore.get_instance().emit_log(LOG_LEVEL_WARN, TemplateFormatter.format(LOG_RELOAD_FAIL, {"node": node}))
 				break
 			else:
-				_cache_store[node] = step_res.get("data", null)
+				_cache_store[node] = step_result.get("data", null)
 				reloaded_count += 1
 		else:
 			# 无解析器时仅完成子图受影响标记并推进计数

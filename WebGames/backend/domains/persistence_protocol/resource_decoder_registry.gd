@@ -25,10 +25,10 @@ const ERR_NO_DECODER: String = "ERR_NO_DECODER"
 class JSONResourceDecoder extends StorageContractInterfaces.ResourceDecoderContract:
 	## 判定输入资源条目是否支持当前格式解码
 	func can_decode(entry: RefCounted) -> bool:
-		var e := entry as ResourceIndexEntryDTO
-		if e == null:
+		var typed_entry := entry as ResourceIndexEntryDTO
+		if typed_entry == null:
 			return false
-		return e.category == CAT_CONFIG or e.physical_path.ends_with(EXT_JSON)
+		return typed_entry.category == CAT_CONFIG or typed_entry.physical_path.ends_with(EXT_JSON)
 
 	## 对二进制或文本输入载荷执行反序列化解码
 	func decode_payload(_raw_bytes: PackedByteArray, text: String, _entry: RefCounted) -> Dictionary:
@@ -41,10 +41,10 @@ class JSONResourceDecoder extends StorageContractInterfaces.ResourceDecoderContr
 class TextResourceDecoder extends StorageContractInterfaces.ResourceDecoderContract:
 	## 判定输入资源条目是否支持当前格式解码
 	func can_decode(entry: RefCounted) -> bool:
-		var e := entry as ResourceIndexEntryDTO
-		if e == null:
+		var typed_entry := entry as ResourceIndexEntryDTO
+		if typed_entry == null:
 			return false
-		return e.category == CAT_TEXT or not e.physical_path.ends_with(EXT_JSON)
+		return typed_entry.category == CAT_TEXT or not typed_entry.physical_path.ends_with(EXT_JSON)
 
 	## 对二进制或文本输入载荷执行反序列化解码
 	func decode_payload(_raw_bytes: PackedByteArray, text: String, _entry: RefCounted) -> Dictionary:
@@ -75,10 +75,10 @@ func register_decoder(decoder: StorageContractInterfaces.ResourceDecoderContract
 func get_decoder_for_entry(entry: ResourceIndexEntryDTO) -> StorageContractInterfaces.ResourceDecoderContract:
 	if entry == null:
 		return _default_decoder
-	for d in _decoders:
-		var dec := d as StorageContractInterfaces.ResourceDecoderContract
-		if dec != null and dec.can_decode(entry):
-			return dec
+	for decoder_item in _decoders:
+		var decoder := decoder_item as StorageContractInterfaces.ResourceDecoderContract
+		if decoder != null and decoder.can_decode(entry):
+			return decoder
 	return _default_decoder
 
 ## 直接解码载荷

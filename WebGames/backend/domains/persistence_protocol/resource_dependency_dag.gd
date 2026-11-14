@@ -70,10 +70,10 @@ func _dfs_cycle(node: String, color: Dictionary) -> bool:
 	color[node] = COLOR_VISITING # 访问中
 	var downstream: Array = _downstream_edges.get(node, [])
 	for next_node in downstream:
-		var c: int = color.get(next_node, COLOR_UNVISITED)
-		if c == COLOR_VISITING:
+		var node_color: int = color.get(next_node, COLOR_UNVISITED)
+		if node_color == COLOR_VISITING:
 			return true # 环路命中
-		if c == COLOR_UNVISITED and _dfs_cycle(next_node, color):
+		if node_color == COLOR_UNVISITED and _dfs_cycle(next_node, color):
 			return true
 	color[node] = COLOR_VISITED # 已完成
 	return false
@@ -90,13 +90,13 @@ func get_invalidation_subgraph(changed_node: String) -> Array[String]:
 	var visited: Dictionary = {changed_node: true}
 
 	while not queue.is_empty():
-		var cur: String = queue.pop_front()
-		_expand_downstream_nodes(cur, visited, queue, result)
+		var current_node: String = queue.pop_front()
+		_expand_downstream_nodes(current_node, visited, queue, result)
 
 	return result
 
-func _expand_downstream_nodes(cur: String, visited: Dictionary, queue: Array[String], result: Array[String]) -> void:
-	var downstream: Array = _downstream_edges.get(cur, [])
+func _expand_downstream_nodes(current_node: String, visited: Dictionary, queue: Array[String], result: Array[String]) -> void:
+	var downstream: Array = _downstream_edges.get(current_node, [])
 	for dep in downstream:
 		var dep_str := String(dep)
 		if not visited.has(dep_str):

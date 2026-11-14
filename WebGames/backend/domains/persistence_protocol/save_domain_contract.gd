@@ -22,16 +22,16 @@ var _provider_instance: Variant = null
 var _consumer_callable: Variant = null
 
 ## 从 domains.json 的 save 配置段构建契约对象
-static func from_config(p_domain_id: String, cfg: Dictionary) -> RefCounted:
+static func from_config(target_domain_id: String, save_config: Dictionary) -> RefCounted:
 	var contract := SaveDomainContract.new()
-	contract.domain_id = p_domain_id
-	contract.enabled = bool(cfg.get("enabled", false))
-	contract.domain_version = int(cfg.get("domain_version", 1))
-	contract.serializer_class_name = String(cfg.get("serializer", ""))
-	contract.strategy = String(cfg.get("strategy", "full"))
-	var hr_cfg: Dictionary = cfg.get("hot_reload", {})
-	contract.hot_reload_allow = bool(hr_cfg.get("allow", false))
-	contract.requires_rebuild = bool(hr_cfg.get("requires_rebuild", false))
+	contract.domain_id = target_domain_id
+	contract.enabled = bool(save_config.get("enabled", false))
+	contract.domain_version = int(save_config.get("domain_version", 1))
+	contract.serializer_class_name = String(save_config.get("serializer", ""))
+	contract.strategy = String(save_config.get("strategy", "full"))
+	var hot_reload_config: Dictionary = save_config.get("hot_reload", {})
+	contract.hot_reload_allow = bool(hot_reload_config.get("allow", false))
+	contract.requires_rebuild = bool(hot_reload_config.get("requires_rebuild", false))
 	return contract
 
 ## 注册运行时数据提供者（实现 serialize() -> Dictionary 的聚合对象或字典）
@@ -73,7 +73,7 @@ func serialize_provider() -> Dictionary:
 	if _provider_instance is Dictionary:
 		return (_provider_instance as Dictionary).duplicate(true)
 	if _provider_instance.has_method("serialize"):
-		var res: Variant = _provider_instance.serialize()
-		if res is Dictionary:
-			return res as Dictionary
+		var serialized_data: Variant = _provider_instance.serialize()
+		if serialized_data is Dictionary:
+			return serialized_data as Dictionary
 	return {}

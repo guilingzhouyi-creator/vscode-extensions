@@ -40,8 +40,8 @@ static func is_online() -> bool:
 	return _mode == Mode.ONLINE
 
 ## 注入联机专用权威数据源
-static func set_online_data_source(src: Variant) -> void:
-	_online_data_source = src
+static func set_online_data_source(data_source: Variant) -> void:
+	_online_data_source = data_source
 
 ## 获取当前模式下的活动数据源（四层隔离之二：数据源隔离）
 static func get_active_data_source() -> Variant:

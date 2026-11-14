@@ -29,20 +29,20 @@ func cancel() -> void:
 	if _cancelled:
 		return
 	_cancelled = true
-	var cbs := _callbacks.duplicate()
+	var callbacks_snapshot := _callbacks.duplicate()
 	_callbacks.clear()
-	for cb in cbs:
-		if cb.is_valid():
-			cb.call()
+	for callback in callbacks_snapshot:
+		if callback.is_valid():
+			callback.call()
 
 ## 注册取消回调
-func register_callback(cb: Callable) -> void:
-	if not cb.is_valid():
+func register_callback(callback: Callable) -> void:
+	if not callback.is_valid():
 		return
 	if _cancelled:
-		cb.call()
+		callback.call()
 		return
-	_callbacks.append(cb)
+	_callbacks.append(callback)
 
 ## 重置令牌状态（复用契约）
 func reset_state() -> void:

@@ -16,9 +16,9 @@ const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/
 static var _domain_migrations: Dictionary = {} # key = "domain:ver" -> { "to": int, "fn": Callable }
 
 ## 注册域级数据迁移（单域独立演进，Inv-SV-4）
-static func register_domain_migration(domain_id: String, from_ver: int, to_ver: int, migrate_fn: Callable) -> void:
-	var key := "%s:%d" % [domain_id, from_ver]
-	_domain_migrations[key] = {"to": to_ver, "fn": migrate_fn}
+static func register_domain_migration(domain_id: String, from_version: int, to_version: int, migrate_fn: Callable) -> void:
+	var key := "%s:%d" % [domain_id, from_version]
+	_domain_migrations[key] = {"to": to_version, "fn": migrate_fn}
 
 ## 检查是否存在域级迁移
 static func has_domain_migration(mig_key: String) -> bool:
@@ -31,21 +31,21 @@ static func get_domain_migration(mig_key: String) -> Dictionary:
 	return _domain_migrations.get(mig_key, {})
 
 ## 域级独立迁移算法：单域版本演进，不触碰整档 Save Version（Inv-SV-4）
-static func migrate_domain(domain_id: String, domain_data: Dictionary, from_ver: int) -> Dictionary:
+static func migrate_domain(domain_id: String, domain_data: Dictionary, from_version: int) -> Dictionary:
 	var contract: Variant = SaveDataAccessLayer.get_contract(domain_id)
-	var target_ver: int = int(contract.domain_version) if contract != null else from_ver
+	var target_version: int = int(contract.domain_version) if contract != null else from_version
 	var working := domain_data.duplicate(true)
-	var ver: int = from_ver
+	var current_version: int = from_version
 
-	while ver < target_ver:
-		var mig_key := "%s:%d" % [domain_id, ver]
+	while current_version < target_version:
+		var mig_key := "%s:%d" % [domain_id, current_version]
 		if not has_domain_migration(mig_key):
 			return {
 				"success": false,
 				"error_code": "DOMAIN_MIGRATION_PATH_BROKEN",
 				"domain_id": domain_id,
-				"at_version": ver,
-				"target_version": target_ver
+				"at_version": current_version,
+				"target_version": target_version
 			}
 		var step: Dictionary = get_domain_migration(mig_key)
 		var fn: Callable = step.get("fn", Callable())
@@ -58,9 +58,9 @@ static func migrate_domain(domain_id: String, domain_data: Dictionary, from_ver:
 		var step_result: Variant = fn.call(working)
 		if step_result is Dictionary:
 			working = step_result as Dictionary
-		ver = int(step.get("to", ver + 1))
+		current_version = int(step.get("to", current_version + 1))
 
-	return {"success": true, "data": working, "final_version": ver}
+	return {"success": true, "data": working, "final_version": current_version}
 
 ## 整档迁移执行：复制 -> 链式迁移 -> 校验 -> 提交/回滚（Inv-SV-7）
 static func migrate(data: Dictionary, detected_version: String) -> Dictionary:
@@ -112,10 +112,10 @@ static func load_rules_from_config() -> Dictionary:
 	if not chain.has(current):
 		issues.append("CHAIN_MISSING_CURRENT_%s" % current)
 	# 静态校验：整档迁移链相邻版本间必须已注册迁移函数（GameSaveAssembler 注册表）
-	for i in range(chain.size() - 1):
-		var from_v := String(chain[i])
-		if not GameSaveAssembler.has_migration(from_v):
-			issues.append("MISSING_MIGRATION_%s" % from_v)
+	for chain_index in range(chain.size() - 1):
+		var from_version := String(chain[chain_index])
+		if not GameSaveAssembler.has_migration(from_version):
+			issues.append("MISSING_MIGRATION_%s" % from_version)
 	if issues.is_empty():
 		EventBusCore.get_instance().emit_log("info", TemplateFormatter.format("SaveMigrationEngine: migration config loaded: chain={chain}.", {"chain": str(chain)}))
 	else:

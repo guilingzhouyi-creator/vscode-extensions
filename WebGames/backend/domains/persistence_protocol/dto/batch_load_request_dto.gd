@@ -39,9 +39,10 @@ var loaded_count: int = 0
 ## 失败/取消计数
 var failed_count: int = 0
 
-func _init(p_batch_id: String = "") -> void:
+## 初始化批量资源加载请求传输对象。
+func _init(initial_batch_id: String = "") -> void:
 	reset_state()
-	batch_id = p_batch_id
+	batch_id = initial_batch_id
 
 ## 添加资源条目
 func add_entry(entry: ResourceIndexEntryDTO) -> void:

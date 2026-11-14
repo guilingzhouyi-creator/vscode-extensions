@@ -31,11 +31,17 @@ var currency_summary: Dictionary = {
 }
 var metadata: Dictionary = {}
 
-func _init(p_account_id: String = "", p_slot_id: String = "", p_character_name: String = "", p_world_mode: String = MODE_SINGLE_PLAYER) -> void:
-	account_id = p_account_id
-	slot_id = p_slot_id
-	character_name = p_character_name
-	world_mode = p_world_mode
+## 初始化最小可运行世界状态传输对象。
+func _init(
+	initial_account_id: String = "",
+	initial_slot_id: String = "",
+	initial_character_name: String = "",
+	initial_world_mode: String = MODE_SINGLE_PLAYER
+) -> void:
+	account_id = initial_account_id
+	slot_id = initial_slot_id
+	character_name = initial_character_name
+	world_mode = initial_world_mode
 	level = 1
 	current_hp = DEFAULT_MAX_HP
 	max_hp = DEFAULT_MAX_HP
@@ -82,23 +88,23 @@ func to_dict() -> Dictionary:
 
 ## 反序列化为 DTO 实例
 static func from_dict(data: Dictionary) -> RefCounted:
-	var dto: RefCounted = new(
+	var state_instance: RefCounted = new(
 		String(data.get("account_id", "")),
 		String(data.get("slot_id", "")),
 		String(data.get("character_name", "")),
 		String(data.get("world_mode", MODE_SINGLE_PLAYER))
 	)
-	var instance := dto as MinimumWorldStateDTO
-	if instance != null:
-		instance.level = int(data.get("level", 1))
-		instance.current_hp = float(data.get("current_hp", DEFAULT_MAX_HP))
-		instance.max_hp = float(data.get("max_hp", DEFAULT_MAX_HP))
-		instance.play_time_seconds = int(data.get("play_time_seconds", 0))
-		instance.prologue_completed = bool(data.get("prologue_completed", false))
-		var cur_data: Variant = data.get("currency_summary", {})
-		if cur_data is Dictionary:
-			instance.currency_summary = cur_data.duplicate()
+	var typed_instance := state_instance as MinimumWorldStateDTO
+	if typed_instance != null:
+		typed_instance.level = int(data.get("level", 1))
+		typed_instance.current_hp = float(data.get("current_hp", DEFAULT_MAX_HP))
+		typed_instance.max_hp = float(data.get("max_hp", DEFAULT_MAX_HP))
+		typed_instance.play_time_seconds = int(data.get("play_time_seconds", 0))
+		typed_instance.prologue_completed = bool(data.get("prologue_completed", false))
+		var currency_data: Variant = data.get("currency_summary", {})
+		if currency_data is Dictionary:
+			typed_instance.currency_summary = currency_data.duplicate()
 		var meta_data: Variant = data.get("metadata", {})
 		if meta_data is Dictionary:
-			instance.metadata = meta_data.duplicate()
-	return dto
+			typed_instance.metadata = meta_data.duplicate()
+	return state_instance

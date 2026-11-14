@@ -55,11 +55,11 @@ func filter_candidates(candidates: Array) -> Array:
 	for item in candidates:
 		if not item is Dictionary:
 			continue
-		var d: Dictionary = item
-		var pos: Vector2 = d.get("position", _current_position)
-		var s_id: String = String(d.get("scene_id", _current_scene_id))
-		if is_within_window(pos, s_id):
-			filtered.append(d)
+		var candidate_dict: Dictionary = item
+		var candidate_position: Vector2 = candidate_dict.get("position", _current_position)
+		var candidate_scene_id: String = String(candidate_dict.get("scene_id", _current_scene_id))
+		if is_within_window(candidate_position, candidate_scene_id):
+			filtered.append(candidate_dict)
 	return filtered
 
 ## 获取当前窗口运行摘要

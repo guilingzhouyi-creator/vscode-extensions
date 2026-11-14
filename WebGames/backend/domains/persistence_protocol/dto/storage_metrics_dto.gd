@@ -63,16 +63,16 @@ func to_dict() -> Dictionary:
 
 ## 反序列化为 DTO 实例
 static func from_dict(data: Dictionary) -> RefCounted:
-	var dto: RefCounted = new()
-	var instance := dto as StorageMetricsDTO
-	if instance != null:
-		instance.primary_recovery_time_ms = float(data.get("primary_recovery_time_ms", 0.0))
-		instance.time_to_first_interactive_ms = float(data.get("time_to_first_interactive_ms", 0.0))
-		instance.auxiliary_throughput_mb_per_sec = float(data.get("auxiliary_throughput_mb_per_sec", 0.0))
-		instance.main_thread_io_wait_ms = float(data.get("main_thread_io_wait_ms", 0.0))
-		instance.queue_length = int(data.get("queue_length", 0))
-		instance.cache_hit_rate = float(data.get("cache_hit_rate", 0.0))
-		instance.peak_memory_mb = float(data.get("peak_memory_mb", 0.0))
-		instance.frame_submission_budget_ms = float(data.get("frame_submission_budget_ms", DEFAULT_FRAME_BUDGET_MS))
-		instance.failure_retry_rate = float(data.get("failure_retry_rate", 0.0))
-	return dto
+	var metrics_instance: RefCounted = new()
+	var typed_metrics := metrics_instance as StorageMetricsDTO
+	if typed_metrics != null:
+		typed_metrics.primary_recovery_time_ms = float(data.get("primary_recovery_time_ms", 0.0))
+		typed_metrics.time_to_first_interactive_ms = float(data.get("time_to_first_interactive_ms", 0.0))
+		typed_metrics.auxiliary_throughput_mb_per_sec = float(data.get("auxiliary_throughput_mb_per_sec", 0.0))
+		typed_metrics.main_thread_io_wait_ms = float(data.get("main_thread_io_wait_ms", 0.0))
+		typed_metrics.queue_length = int(data.get("queue_length", 0))
+		typed_metrics.cache_hit_rate = float(data.get("cache_hit_rate", 0.0))
+		typed_metrics.peak_memory_mb = float(data.get("peak_memory_mb", 0.0))
+		typed_metrics.frame_submission_budget_ms = float(data.get("frame_submission_budget_ms", DEFAULT_FRAME_BUDGET_MS))
+		typed_metrics.failure_retry_rate = float(data.get("failure_retry_rate", 0.0))
+	return metrics_instance
