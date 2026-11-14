@@ -3,7 +3,7 @@
 # 文件路径: res://backend/domains/character_creation/agent_playthrough_session.gd
 # 架构定位: Domain Workflow Controller / Playthrough Session
 # 依赖与触发: 上游: Gateway, ModWorkbenchView | 下游: NarrativeDagExecutionEngine, PrologueExecutionKernel, CompanionObserverBus, CompanionBlackboxRecorder | 配置: config/domains/character_creation/core.json | 信号: CompanionObserverBus
-# 职责说明: 长程交互式推演会话控制器；编排模组预检适配、身世权威解算、装备物理水化与因果 DAG 逐步推演，维护历史快照调用栈（支持确定性无损回滚与分支跳转），向伴侣总线广播生命周期事件并输出标准观测包。
+# 职责说明: 长程交互式推演会话控制器；编排模组预检适配、身世权威解算、装备实体装配与因果 DAG 逐步推演，维护历史快照调用栈（支持确定性无损回滚与分支跳转），向伴侣总线广播生命周期事件并输出标准观测包。
 # 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
@@ -20,7 +20,7 @@ const AgentPlaythroughSessionFactory = preload("res://backend/domains/character_
 var session_id: String = ""
 var step_index: int = 0
 var engine: NarrativeDagExecutionEngine = null
-var ctx: CharacterPrologueContext = null
+var prologue_context: CharacterPrologueContext = null
 var profile: CharacterProfile = null
 var adapted_manifest: Dictionary = {}
 var is_terminal: bool = false
@@ -31,7 +31,7 @@ var last_diagnostic_dump: Dictionary = {}
 # 二、推演启动核心入口 (Start Session)
 # ==============================================================================
 
-## 启动长程交互式推演会话：加载模组、权威解算、物理水化、初始化DAG并产出首步观测包
+## 启动长程交互式推演会话：加载模组、权威解算、装备装配、初始化DAG并产出首步观测包
 func start_session(config: Dictionary) -> Dictionary:
 	session_id = AgentPlaythroughSessionFactory.prepare_session_id(config)
 	step_index = 0
@@ -40,57 +40,57 @@ func start_session(config: Dictionary) -> Dictionary:
 	last_diagnostic_dump.clear()
 
 	# 1. 预检并加载候选包
-	var manifest_res := AgentPlaythroughSessionFactory.resolve_mod_manifest(config)
-	if not bool(manifest_res.get("success", false)):
+	var manifest_result := AgentPlaythroughSessionFactory.resolve_mod_manifest(config)
+	if not bool(manifest_result.get("success", false)):
 		is_terminal = true
-		var err_code: String = str(manifest_res.get("error_code", "ERR_MOD_PRECHECK_FAILED"))
-		last_diagnostic_dump = CompanionBlackboxRecorder.create_diagnostic_dump(err_code, "", "", {
+		var error_code: String = str(manifest_result.get("error_code", "ERR_MOD_PRECHECK_FAILED"))
+		last_diagnostic_dump = CompanionBlackboxRecorder.create_diagnostic_dump(error_code, "", "", {
 			"config": config,
-			"manifest_res": manifest_res
+			"manifest_res": manifest_result
 		})
-		_notify_diagnostic_dump(err_code)
-		return _build_error_observation(err_code)
-	adapted_manifest = manifest_res.get("adapted_manifest", {})
+		_notify_diagnostic_dump(error_code)
+		return _build_error_observation(error_code)
+	adapted_manifest = manifest_result.get("adapted_manifest", {})
 
 	# 2. 权威身世解算
-	var req := AgentPlaythroughSessionFactory.build_creation_request(config)
-	var solve_res: Dictionary = AuthoritativeReincarnationSolver.resolve_reincarnation_package(
-		req, req.request_seed, adapted_manifest
+	var creation_request := AgentPlaythroughSessionFactory.build_creation_request(config)
+	var solve_result: Dictionary = AuthoritativeReincarnationSolver.resolve_reincarnation_package(
+		creation_request, creation_request.request_seed, adapted_manifest
 	)
-	if not bool(solve_res.get("success", false)):
+	if not bool(solve_result.get("success", false)):
 		is_terminal = true
-		var err_code: String = str(solve_res.get("error_code", "REINCARNATION_FAILED"))
-		last_diagnostic_dump = CompanionBlackboxRecorder.create_diagnostic_dump(err_code, "", "", {
-			"req": req.to_dto(),
-			"solve_res": solve_res
+		var error_code: String = str(solve_result.get("error_code", "REINCARNATION_FAILED"))
+		last_diagnostic_dump = CompanionBlackboxRecorder.create_diagnostic_dump(error_code, "", "", {
+			"req": creation_request.to_dto(),
+			"solve_res": solve_result
 		})
-		_notify_diagnostic_dump(err_code)
-		return _build_error_observation(err_code)
+		_notify_diagnostic_dump(error_code)
+		return _build_error_observation(error_code)
 
 	# 3. 角色档案构建与新手套件发放
-	profile = AgentPlaythroughSessionFactory.build_character_profile(session_id, solve_res, req)
-	var race_id: String = str(solve_res.get("race_id", "HUMAN"))
-	var origin_id: String = str(solve_res.get("origin_id", ""))
+	profile = AgentPlaythroughSessionFactory.build_character_profile(session_id, solve_result, creation_request)
+	var race_id: String = str(solve_result.get("race_id", "HUMAN"))
+	var origin_id: String = str(solve_result.get("origin_id", ""))
 	StarterLoadoutDispatcher.hydrate_starter_loadout_into_profile(profile, race_id, origin_id, adapted_manifest)
 
-	# 4. 初始化序章上下文与双轨占位符
-	ctx = AgentPlaythroughSessionFactory.build_prologue_context(solve_res, profile, req)
-	var ph: Dictionary = ProloguePlaceholderResolver.extract_placeholders(ctx, adapted_manifest, profile)
-	for k in ph.keys():
-		ctx.runtime_placeholders[k] = ph[k]
+	# 4. 初始化序章上下文与双通道占位符
+	prologue_context = AgentPlaythroughSessionFactory.build_prologue_context(solve_result, profile, creation_request)
+	var placeholders: Dictionary = ProloguePlaceholderResolver.extract_placeholders(prologue_context, adapted_manifest, profile)
+	for placeholder_key in placeholders.keys():
+		prologue_context.runtime_placeholders[placeholder_key] = placeholders[placeholder_key]
 
 	# 5. 构建通用因果 DAG 会话
-	engine = PrologueExecutionKernel.create_dag_session(ctx, origin_id, adapted_manifest)
+	engine = PrologueExecutionKernel.create_dag_session(prologue_context, origin_id, adapted_manifest)
 	if engine == null:
 		is_terminal = true
-		var err_code := "DAG_NOT_FOUND"
-		last_diagnostic_dump = CompanionBlackboxRecorder.create_diagnostic_dump(err_code, "", "", {
-			"race_id": ctx.race_id,
+		var error_code := "DAG_NOT_FOUND"
+		last_diagnostic_dump = CompanionBlackboxRecorder.create_diagnostic_dump(error_code, "", "", {
+			"race_id": prologue_context.race_id,
 			"origin_id": origin_id,
 			"profile": profile.serialize()
 		})
-		_notify_diagnostic_dump(err_code)
-		return _build_error_observation(err_code)
+		_notify_diagnostic_dump(error_code)
+		return _build_error_observation(error_code)
 
 	is_terminal = engine.is_terminated
 	_record_history_snapshot()
@@ -102,8 +102,8 @@ func start_session(config: Dictionary) -> Dictionary:
 			"session_id": session_id,
 			"step_index": step_index,
 			"current_node_id": _get_active_node_id(),
-			"character_name": ctx.character_name,
-			"race_id": ctx.race_id,
+			"character_name": prologue_context.character_name,
+			"race_id": prologue_context.race_id,
 			"origin_id": origin_id
 		})
 
@@ -115,13 +115,13 @@ func start_session(config: Dictionary) -> Dictionary:
 
 ## 推进推演单步：校验分支合法性、执行节点动作、应用突变、压栈快照并广播事件
 func step(action: Dictionary) -> Dictionary:
-	var act_type: String = str(action.get("action_type", "")).to_upper()
+	var action_type: String = str(action.get("action_type", "")).to_upper()
 	var choice_id: String = str(action.get("choice_id", action.get("action", ""))).strip_edges()
 
-	if act_type == "ROLLBACK" or choice_id.to_upper() == "ROLLBACK":
+	if action_type == "ROLLBACK" or choice_id.to_upper() == "ROLLBACK":
 		return rollback()
 
-	if act_type == "QUIT" or choice_id.to_upper() == "QUIT":
+	if action_type == "QUIT" or choice_id.to_upper() == "QUIT":
 		is_terminal = true
 		var bus := CompanionObserverBus.get_instance()
 		if bus != null:
@@ -137,31 +137,31 @@ func step(action: Dictionary) -> Dictionary:
 	if engine == null or engine.graph == null:
 		return _build_error_observation("ENGINE_NOT_INITIALIZED")
 
-	var active_nid := _get_active_node_id()
-	if active_nid.is_empty():
+	var active_node_id := _get_active_node_id()
+	if active_node_id.is_empty():
 		is_terminal = true
 		return _build_error_observation("NO_ACTIVE_NODE")
 
-	var current_node: NarrativeDAGNode = engine.graph.nodes.get(active_nid)
+	var current_node: NarrativeDAGNode = engine.graph.nodes.get(active_node_id)
 	if current_node == null:
 		is_terminal = true
-		var err_code := "NODE_NOT_FOUND"
-		last_diagnostic_dump = CompanionBlackboxRecorder.create_diagnostic_dump(err_code, "", active_nid, {
+		var error_code := "NODE_NOT_FOUND"
+		last_diagnostic_dump = CompanionBlackboxRecorder.create_diagnostic_dump(error_code, "", active_node_id, {
 			"session_id": session_id,
 			"step_index": step_index
 		})
-		_notify_diagnostic_dump(err_code)
-		return _build_error_observation(err_code)
+		_notify_diagnostic_dump(error_code)
+		return _build_error_observation(error_code)
 
 	if not _validate_choice_legality(current_node, choice_id):
-		var err_code := "INVALID_CHOICE"
-		last_diagnostic_dump = CompanionBlackboxRecorder.create_diagnostic_dump(err_code, "", active_nid, {
+		var error_code := "INVALID_CHOICE"
+		last_diagnostic_dump = CompanionBlackboxRecorder.create_diagnostic_dump(error_code, "", active_node_id, {
 			"session_id": session_id,
 			"attempted_choice": choice_id,
 			"available_choices": current_node.choices
 		})
-		_notify_diagnostic_dump(err_code)
-		return _build_error_observation(err_code)
+		_notify_diagnostic_dump(error_code)
+		return _build_error_observation(error_code)
 
 	var action_payload: Dictionary = {}
 	var raw_params: Variant = action.get("params", {})
@@ -169,24 +169,24 @@ func step(action: Dictionary) -> Dictionary:
 		action_payload = (raw_params as Dictionary).duplicate(true)
 	action_payload["selected_choice"] = choice_id
 
-	var exec_res: Dictionary = engine.execute_node_action(active_nid, action_payload)
-	if not bool(exec_res.get("success", false)):
-		var err_code: String = str(exec_res.get("error_code", "EXECUTION_FAILED"))
-		last_diagnostic_dump = CompanionBlackboxRecorder.create_diagnostic_dump(err_code, "", active_nid, {
+	var execution_result: Dictionary = engine.execute_node_action(active_node_id, action_payload)
+	if not bool(execution_result.get("success", false)):
+		var error_code: String = str(execution_result.get("error_code", "EXECUTION_FAILED"))
+		last_diagnostic_dump = CompanionBlackboxRecorder.create_diagnostic_dump(error_code, "", active_node_id, {
 			"session_id": session_id,
 			"step_index": step_index,
 			"action_payload": action_payload,
-			"exec_res": exec_res
+			"exec_res": execution_result
 		})
-		_notify_diagnostic_dump(err_code)
-		return _build_error_observation(err_code)
+		_notify_diagnostic_dump(error_code)
+		return _build_error_observation(error_code)
 
-	var mutations: Array = exec_res.get("mutations", [])
+	var mutations: Array = execution_result.get("mutations", [])
 	if not mutations.is_empty():
-		PrologueExecutionKernel.apply_dag_mutations(mutations, ctx, profile)
+		PrologueExecutionKernel.apply_dag_mutations(mutations, prologue_context, profile)
 
 	step_index += 1
-	is_terminal = engine.is_terminated or (ctx != null and ctx.is_completed) or _is_current_node_terminal()
+	is_terminal = engine.is_terminated or (prologue_context != null and prologue_context.is_completed) or _is_current_node_terminal()
 
 	_record_history_snapshot(choice_id)
 
@@ -209,13 +209,13 @@ func step(action: Dictionary) -> Dictionary:
 ## 回滚至上一历史状态（栈深 > 1 时弹出栈顶并恢复上一快照）
 func rollback() -> Dictionary:
 	if history_stack.size() <= 1:
-		var cur := get_current_observation()
-		cur["error_code"] = "CANNOT_ROLLBACK_INITIAL_STEP"
-		return cur
+		var current_observation := get_current_observation()
+		current_observation["error_code"] = "CANNOT_ROLLBACK_INITIAL_STEP"
+		return current_observation
 
 	history_stack.pop_back()
-	var prev_snap: Dictionary = history_stack[history_stack.size() - 1]
-	_restore_from_snapshot(prev_snap)
+	var previous_snapshot: Dictionary = history_stack[history_stack.size() - 1]
+	_restore_from_snapshot(previous_snapshot)
 
 	var bus := CompanionObserverBus.get_instance()
 	if bus != null:
@@ -241,19 +241,19 @@ func get_current_observation() -> Dictionary:
 	if engine == null or engine.graph == null:
 		return packet.to_dto()
 
-	var active_nid := _get_active_node_id()
-	packet.current_node_id = active_nid
+	var active_node_id := _get_active_node_id()
+	packet.current_node_id = active_node_id
 
-	if not active_nid.is_empty() and engine.graph.nodes.has(active_nid):
-		var node: NarrativeDAGNode = engine.graph.nodes[active_nid]
-		var ph: Dictionary = ctx.runtime_placeholders if ctx != null else {}
-		var text_res := ProloguePlaceholderResolver.resolve_narrative_key(
+	if not active_node_id.is_empty() and engine.graph.nodes.has(active_node_id):
+		var node: NarrativeDAGNode = engine.graph.nodes[active_node_id]
+		var placeholders: Dictionary = prologue_context.runtime_placeholders if prologue_context != null else {}
+		var text_result := ProloguePlaceholderResolver.resolve_narrative_key(
 			node.narrative_key,
-			ph,
+			placeholders,
 			adapted_manifest,
 			node.inline_text
 		)
-		packet.hydrated_text = str(text_res.get("text", ""))
+		packet.hydrated_text = str(text_result.get("text", ""))
 		packet.available_choices = _extract_choices_for_node(node)
 	elif is_terminal:
 		packet.hydrated_text = "序章推演已完结"
@@ -272,17 +272,17 @@ func get_current_observation() -> Dictionary:
 ## 获取推演会话完整文字记录与状态摘要
 func get_summary_transcript() -> Dictionary:
 	var transcript_steps: Array[Dictionary] = []
-	for snap in history_stack:
+	for snapshot_entry in history_stack:
 		transcript_steps.append({
-			"step_index": snap.get("step_index", 0),
-			"node_id": snap.get("active_node_id", ""),
-			"chosen_action": snap.get("chosen_action", "")
+			"step_index": snapshot_entry.get("step_index", 0),
+			"node_id": snapshot_entry.get("active_node_id", ""),
+			"chosen_action": snapshot_entry.get("chosen_action", "")
 		})
 
 	var completed: Array[String] = []
 	if engine != null:
-		for nid in engine.completed_node_ids:
-			completed.append(str(nid))
+		for node_id in engine.completed_node_ids:
+			completed.append(str(node_id))
 
 	return {
 		"is_success": true,
@@ -304,44 +304,44 @@ func _validate_choice_legality(node: NarrativeDAGNode, choice_id: String) -> boo
 		return true
 	if choice_id.is_empty():
 		return false
-	for c in node.choices:
-		var cid: String = str(c.get("choice_id", c.get("id", c.get("action", "")))).strip_edges()
-		if cid == choice_id:
+	for choice_entry in node.choices:
+		var candidate_choice_id: String = str(choice_entry.get("choice_id", choice_entry.get("id", choice_entry.get("action", "")))).strip_edges()
+		if candidate_choice_id == choice_id:
 			return true
-		var target_nid: String = str(c.get("target_node_id", "")).strip_edges()
-		if not target_nid.is_empty() and target_nid == choice_id:
+		var target_node_id: String = str(choice_entry.get("target_node_id", "")).strip_edges()
+		if not target_node_id.is_empty() and target_node_id == choice_id:
 			return true
 	return false
 
 func _extract_choices_for_node(node: NarrativeDAGNode) -> Array[Dictionary]:
-	var out: Array[Dictionary] = []
+	var extracted_choices: Array[Dictionary] = []
 	if not node.choices.is_empty():
-		for c in node.choices:
-			var cid: String = str(c.get("choice_id", c.get("id", c.get("action", "")))).strip_edges()
-			var txt: String = str(c.get("text", c.get("desc", cid)))
-			out.append({
-				"choice_id": cid,
-				"text": txt,
-				"action": cid,
-				"target_node_id": str(c.get("target_node_id", ""))
+		for choice_entry in node.choices:
+			var resolved_choice_id: String = str(choice_entry.get("choice_id", choice_entry.get("id", choice_entry.get("action", "")))).strip_edges()
+			var choice_text: String = str(choice_entry.get("text", choice_entry.get("desc", resolved_choice_id)))
+			extracted_choices.append({
+				"choice_id": resolved_choice_id,
+				"text": choice_text,
+				"action": resolved_choice_id,
+				"target_node_id": str(choice_entry.get("target_node_id", ""))
 			})
-		return out
+		return extracted_choices
 
 	if node.node_type == NarrativeDAGNode.NodeType.TERMINAL_EXIT or is_terminal:
-		out.append({
+		extracted_choices.append({
 			"choice_id": "ENTER_WORLD",
 			"text": "进入世界",
 			"action": "ENTER_WORLD",
 			"target_node_id": ""
 		})
 	else:
-		out.append({
+		extracted_choices.append({
 			"choice_id": "NEXT",
 			"text": "继续",
 			"action": "NEXT",
 			"target_node_id": ""
 		})
-	return out
+	return extracted_choices
 
 func _build_character_snapshot() -> Dictionary:
 	if profile == null:
@@ -349,74 +349,74 @@ func _build_character_snapshot() -> Dictionary:
 	return {
 		"character_id": profile.character_id,
 		"character_name": profile.character_name,
-		"race_id": ctx.race_id if ctx != null else "",
-		"origin_id": str(ctx.runtime_placeholders.get("ORIGIN_ID", "")) if ctx != null else "",
+		"race_id": prologue_context.race_id if prologue_context != null else "",
+		"origin_id": str(prologue_context.runtime_placeholders.get("ORIGIN_ID", "")) if prologue_context != null else "",
 		"attributes": profile.attributes.duplicate(true),
 		"personal_resources": profile.personal_resources.duplicate(true),
 		"inventory": profile.inventory.duplicate(true),
 		"equipment": profile.equipment.duplicate(true)
 	}
 
-func _build_error_observation(err_code: String) -> Dictionary:
+func _build_error_observation(error_code: String) -> Dictionary:
 	var packet := AgentObservationPacketDTO.new()
 	packet.session_id = session_id
 	packet.step_index = step_index
 	packet.current_node_id = _get_active_node_id()
 	packet.is_terminal = is_terminal
-	packet.error_code = err_code
+	packet.error_code = error_code
 	if not last_diagnostic_dump.is_empty():
 		packet.diagnostic_dump = last_diagnostic_dump.duplicate(true)
 	if profile != null:
 		packet.character_snapshot = _build_character_snapshot()
 	return packet.to_dto()
 
-func _notify_diagnostic_dump(err_code: String) -> void:
+func _notify_diagnostic_dump(error_code: String) -> void:
 	var bus := CompanionObserverBus.get_instance()
 	if bus != null and not last_diagnostic_dump.is_empty():
 		bus.broadcast_event("diagnostic_dump_recorded", {
 			"session_id": session_id,
-			"error_code": err_code,
+			"error_code": error_code,
 			"dump": last_diagnostic_dump
 		})
 
 func _record_history_snapshot(chosen_action: String = "") -> void:
-	var snap: Dictionary = {
+	var snapshot: Dictionary = {
 		"step_index": step_index,
 		"is_terminal": is_terminal,
 		"chosen_action": chosen_action,
 		"active_node_id": _get_active_node_id(),
 		"engine_dto": engine.export_session_dto() if engine != null else null,
-		"ctx_dto": ctx.serialize() if ctx != null else {},
+		"ctx_dto": prologue_context.serialize() if prologue_context != null else {},
 		"profile_dto": profile.serialize() if profile != null else {}
 	}
-	history_stack.append(snap)
+	history_stack.append(snapshot)
 
-func _restore_from_snapshot(snap: Dictionary) -> void:
-	step_index = int(snap.get("step_index", 0))
-	is_terminal = bool(snap.get("is_terminal", false))
+func _restore_from_snapshot(snapshot: Dictionary) -> void:
+	step_index = int(snapshot.get("step_index", 0))
+	is_terminal = bool(snapshot.get("is_terminal", false))
 
-	if engine != null and engine.graph != null and snap.get("engine_dto") != null:
-		engine.restore_session_dto(snap.get("engine_dto"), engine.graph)
+	if engine != null and engine.graph != null and snapshot.get("engine_dto") != null:
+		engine.restore_session_dto(snapshot.get("engine_dto"), engine.graph)
 
-	if snap.has("ctx_dto") and ctx != null:
-		var raw_ctx: Variant = snap.get("ctx_dto")
-		if raw_ctx is Dictionary:
-			ctx = CharacterPrologueContext.deserialize(raw_ctx as Dictionary)
+	if snapshot.has("ctx_dto") and prologue_context != null:
+		var raw_context: Variant = snapshot.get("ctx_dto")
+		if raw_context is Dictionary:
+			prologue_context = CharacterPrologueContext.deserialize(raw_context as Dictionary)
 
-	if snap.has("profile_dto") and profile != null:
-		var raw_prof: Variant = snap.get("profile_dto")
-		if raw_prof is Dictionary:
-			profile = CharacterProfile.deserialize(raw_prof as Dictionary)
+	if snapshot.has("profile_dto") and profile != null:
+		var raw_profile: Variant = snapshot.get("profile_dto")
+		if raw_profile is Dictionary:
+			profile = CharacterProfile.deserialize(raw_profile as Dictionary)
 
 func _is_current_node_terminal() -> bool:
 	if engine == null or engine.graph == null:
 		return true
-	var nid := _get_active_node_id()
-	if nid.is_empty():
+	var node_id := _get_active_node_id()
+	if node_id.is_empty():
 		return true
-	if nid == engine.graph.terminal_node_id:
+	if node_id == engine.graph.terminal_node_id:
 		return true
-	var node: NarrativeDAGNode = engine.graph.nodes.get(nid)
+	var node: NarrativeDAGNode = engine.graph.nodes.get(node_id)
 	if node != null and node.node_type == NarrativeDAGNode.NodeType.TERMINAL_EXIT:
 		return true
 	return false

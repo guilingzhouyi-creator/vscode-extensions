@@ -17,61 +17,61 @@ extends RefCounted
 
 ## 根据权威角色创建请求 DTO、确定性种子与适配后的 MOD 清单解算身世、种族、性别、出生地、六维属性与天赋对
 static func resolve_reincarnation_package(
-    req: AuthoritativeCharacterCreationRequestDTO,
-    seed_val: int = 0,
+    creation_request: AuthoritativeCharacterCreationRequestDTO,
+    seed_value: int = 0,
     adapted_mod_manifest: Dictionary = {}
 ) -> Dictionary:
-    if req == null:
+    if creation_request == null:
         return { "success": false, "error_code": "INVALID_REQUEST", "message": "请求对象不可为空" }
 
-    var char_name: String = req.character_name.strip_edges()
-    if char_name.is_empty():
+    var character_name: String = creation_request.character_name.strip_edges()
+    if character_name.is_empty():
         return { "success": false, "error_code": "EMPTY_NAME", "message": "角色名称不可为空" }
 
     var manifest: Dictionary = DestinyModManifestDTO.unwrap_adapted_manifest(adapted_mod_manifest)
     var ui_controls: Dictionary = manifest.get("ui_controls", {})
 
     # 1. 种子确定性收敛（当 MOD 显式开启 allow_attribute_reroll 时允许混入 reroll_nonce）
-    var effective_seed: int = _compute_effective_seed(req, char_name, seed_val, ui_controls)
+    var effective_seed: int = _compute_effective_seed(creation_request, character_name, seed_value, ui_controls)
     var rng := DeterministicRNG.from_seed(effective_seed)
 
     # 2. 身世抽取与受控自选验签（未开启自选或所选 ID 非法时强制忽略 extra_custom_fields 按权重随机抽取）
-    var origin_id: String = _resolve_origin_with_mod(rng, req, manifest, ui_controls)
-    var origin_cfg: Dictionary = _resolve_origin_config(origin_id, manifest)
-    var race_id: String = _resolve_race_with_mod(origin_id, origin_cfg, manifest)
+    var origin_id: String = _resolve_origin_with_mod(rng, creation_request, manifest, ui_controls)
+    var origin_config: Dictionary = _resolve_origin_config(origin_id, manifest)
+    var race_id: String = _resolve_race_with_mod(origin_id, origin_config, manifest)
     var gender: String = _pick_gender(rng)
-    var birth_region_id: String = _resolve_birth_region_with_mod(origin_id, origin_cfg, manifest)
+    var birth_region_id: String = _resolve_birth_region_with_mod(origin_id, origin_config, manifest)
 
     # 3. 基础文案与元数据查询
-    var origin_name: String = str(origin_cfg.get("name", origin_id))
-    var origin_desc: String = str(origin_cfg.get("desc", ""))
+    var origin_name: String = str(origin_config.get("name", origin_id))
+    var origin_desc: String = str(origin_config.get("desc", ""))
     var race_name: String = _resolve_race_display_name(race_id)
 
     # 4. 权威六维属性解算（点数加权 + 身世加成 + [1, 6] 刚性约束）
-    var attributes: Dictionary = _resolve_attributes(rng, origin_cfg)
+    var attributes: Dictionary = _resolve_attributes(rng, origin_config)
 
     # 5. 权威因果平衡天赋对选定（支持受控自选验签或加权抽取）
-    var traits_res: Dictionary = _resolve_traits_with_mod(rng, req, manifest, ui_controls)
+    var traits_result: Dictionary = _resolve_traits_with_mod(rng, creation_request, manifest, ui_controls)
 
     # 6. 生理概况、钱包与套件/序章路由元数据衍生
     var default_gold: int = GameConfig.get_int("domains.character_creation", "defaults/initial_gold_fallback", 50)
-    var initial_gold: int = int(origin_cfg.get("initial_gold", default_gold))
-    var initial_reputation: int = int(origin_cfg.get("initial_reputation", 0))
+    var initial_gold: int = int(origin_config.get("initial_gold", default_gold))
+    var initial_reputation: int = int(origin_config.get("initial_reputation", 0))
     var wallet: Dictionary = {
         "gold": initial_gold,
         "reputation": initial_reputation
     }
     var physiology: Dictionary = _derive_physiology(attributes)
-    var starter_kit_id: String = _resolve_origin_starter_kit_id(origin_id, origin_cfg, manifest)
-    var prologue_dag_id: String = _resolve_origin_prologue_dag_id(origin_id, origin_cfg, manifest)
+    var starter_kit_id: String = _resolve_origin_starter_kit_id(origin_id, origin_config, manifest)
+    var prologue_dag_id: String = _resolve_origin_prologue_dag_id(origin_id, origin_config, manifest)
 
     return {
         "success": true,
         "seed_used": effective_seed,
-        "account_id": req.account_id,
-        "slot_id": req.slot_id,
-        "world_id": req.world_id,
-        "character_name": char_name,
+        "account_id": creation_request.account_id,
+        "slot_id": creation_request.slot_id,
+        "world_id": creation_request.world_id,
+        "character_name": character_name,
         "origin_id": origin_id,
         "origin_name": origin_name,
         "origin_desc": origin_desc,
@@ -80,12 +80,12 @@ static func resolve_reincarnation_package(
         "gender": gender,
         "birth_region_id": birth_region_id,
         "attributes": attributes,
-        "selected_traits": traits_res.get("traits", []),
-        "traits_details": traits_res.get("traits_details", []),
+        "selected_traits": traits_result.get("traits", []),
+        "traits_details": traits_result.get("traits_details", []),
         "wallet": wallet,
         "initial_gold": initial_gold,
         "physiology": physiology,
-        "base_factions": origin_cfg.get("base_factions", {}),
+        "base_factions": origin_config.get("base_factions", {}),
         "starter_kit_id": starter_kit_id,
         "prologue_dag_id": prologue_dag_id
     }
@@ -95,21 +95,21 @@ static func resolve_reincarnation_package(
 # ==============================================================================
 
 static func _compute_effective_seed(
-    req: AuthoritativeCharacterCreationRequestDTO,
-    char_name: String,
-    seed_val: int,
+    creation_request: AuthoritativeCharacterCreationRequestDTO,
+    character_name: String,
+    seed_value: int,
     ui_controls: Dictionary
 ) -> int:
-    var effective_seed: int = seed_val
+    var effective_seed: int = seed_value
     if effective_seed == 0:
-        effective_seed = req.request_seed
+        effective_seed = creation_request.request_seed
     if effective_seed == 0:
-        effective_seed = int((req.account_id + char_name + str(req.slot_id)).hash())
+        effective_seed = int((creation_request.account_id + character_name + str(creation_request.slot_id)).hash())
     if effective_seed == 0:
         effective_seed = 1337
 
     if bool(ui_controls.get("allow_attribute_reroll", false)):
-        var reroll_nonce: int = int(req.extra_custom_fields.get("reroll_nonce", 0))
+        var reroll_nonce: int = int(creation_request.extra_custom_fields.get("reroll_nonce", 0))
         if reroll_nonce != 0:
             effective_seed = int((str(effective_seed) + "_REROLL_" + str(reroll_nonce)).hash())
             if effective_seed == 0:
@@ -119,15 +119,15 @@ static func _compute_effective_seed(
 
 static func _resolve_origin_with_mod(
     rng: DeterministicRNG,
-    req: AuthoritativeCharacterCreationRequestDTO,
+    creation_request: AuthoritativeCharacterCreationRequestDTO,
     manifest: Dictionary,
     ui_controls: Dictionary
 ) -> String:
     var origins_catalog: Dictionary = _get_merged_origins_catalog(manifest)
     if bool(ui_controls.get("allow_manual_origin_select", false)):
-        var selected_oid: String = str(req.extra_custom_fields.get("selected_origin_id", "")).strip_edges()
-        if not selected_oid.is_empty() and origins_catalog.has(selected_oid):
-            return selected_oid
+        var selected_origin_id: String = str(creation_request.extra_custom_fields.get("selected_origin_id", "")).strip_edges()
+        if not selected_origin_id.is_empty() and origins_catalog.has(selected_origin_id):
+            return selected_origin_id
 
     var pool: Array = manifest.get("origins_pool", [])
     if pool.is_empty():
@@ -148,9 +148,9 @@ static func _pick_origin_from_pool(rng: DeterministicRNG, pool: Array) -> String
     return fallback
 
 static func _get_merged_origins_catalog(manifest: Dictionary) -> Dictionary:
-    var cat: Variant = manifest.get("origins_catalog", manifest.get("origins", null))
-    if cat is Dictionary and not (cat as Dictionary).is_empty():
-        return cat as Dictionary
+    var catalog_variant: Variant = manifest.get("origins_catalog", manifest.get("origins", null))
+    if catalog_variant is Dictionary and not (catalog_variant as Dictionary).is_empty():
+        return catalog_variant as Dictionary
     return GameConfig.get_dict("domains.character_creation", "origins", {})
 
 static func _resolve_origin_config(origin_id: String, manifest: Dictionary) -> Dictionary:
@@ -161,13 +161,13 @@ static func _resolve_origin_config(origin_id: String, manifest: Dictionary) -> D
             return entry as Dictionary
     return GameConfig.get_dict("domains.character_creation", "origins/" + origin_id, {})
 
-static func _resolve_race_with_mod(origin_id: String, origin_cfg: Dictionary, manifest: Dictionary) -> String:
+static func _resolve_race_with_mod(origin_id: String, origin_config: Dictionary, manifest: Dictionary) -> String:
     var race_map: Dictionary = manifest.get("origin_race_map", {})
     if race_map.has(origin_id):
         return str(race_map.get(origin_id, "HUMAN"))
-    var cfg_race: String = str(origin_cfg.get("race_id", origin_cfg.get("race", ""))).strip_edges()
-    if not cfg_race.is_empty():
-        return cfg_race
+    var config_race: String = str(origin_config.get("race_id", origin_config.get("race", ""))).strip_edges()
+    if not config_race.is_empty():
+        return config_race
     return _resolve_race(origin_id)
 
 static func _resolve_race(origin_id: String) -> String:
@@ -185,13 +185,13 @@ static func _pick_gender(rng: DeterministicRNG) -> String:
         return str((picked as Dictionary).get("gender", fallback))
     return fallback
 
-static func _resolve_birth_region_with_mod(origin_id: String, origin_cfg: Dictionary, manifest: Dictionary) -> String:
+static func _resolve_birth_region_with_mod(origin_id: String, origin_config: Dictionary, manifest: Dictionary) -> String:
     var region_map: Dictionary = manifest.get("birth_region_map", {})
     if region_map.has(origin_id):
         return str(region_map.get(origin_id, "CENTRAL_CONTINENT"))
-    var cfg_region: String = str(origin_cfg.get("birth_region_id", "")).strip_edges()
-    if not cfg_region.is_empty():
-        return cfg_region
+    var config_region: String = str(origin_config.get("birth_region_id", "")).strip_edges()
+    if not config_region.is_empty():
+        return config_region
     return _resolve_birth_region(origin_id)
 
 static func _resolve_birth_region(origin_id: String) -> String:
@@ -199,23 +199,23 @@ static func _resolve_birth_region(origin_id: String) -> String:
     var fallback: String = GameConfig.get_string("domains.character_creation", "authoritative_reincarnation/fallback_region", "CENTRAL_CONTINENT")
     return str(region_map.get(origin_id, fallback))
 
-static func _resolve_origin_starter_kit_id(origin_id: String, origin_cfg: Dictionary, manifest: Dictionary) -> String:
-    var from_cfg: String = str(origin_cfg.get("starter_kit_id", "")).strip_edges()
-    if not from_cfg.is_empty():
-        return from_cfg
+static func _resolve_origin_starter_kit_id(origin_id: String, origin_config: Dictionary, manifest: Dictionary) -> String:
+    var from_config: String = str(origin_config.get("starter_kit_id", "")).strip_edges()
+    if not from_config.is_empty():
+        return from_config
     var kit_map: Dictionary = manifest.get("origin_kit_map", {})
     return str(kit_map.get(origin_id, "")).strip_edges()
 
-static func _resolve_origin_prologue_dag_id(origin_id: String, origin_cfg: Dictionary, manifest: Dictionary) -> String:
-    var from_cfg: String = str(origin_cfg.get("prologue_dag_id", "")).strip_edges()
-    if not from_cfg.is_empty():
-        return from_cfg
+static func _resolve_origin_prologue_dag_id(origin_id: String, origin_config: Dictionary, manifest: Dictionary) -> String:
+    var from_config: String = str(origin_config.get("prologue_dag_id", "")).strip_edges()
+    if not from_config.is_empty():
+        return from_config
     var dag_map: Dictionary = manifest.get("origin_dag_map", {})
     return str(dag_map.get(origin_id, "")).strip_edges()
 
 static func _resolve_race_display_name(race_id: String) -> String:
-    var race_cfg: Dictionary = GameConfig.get_dict("domains.character_creation", "races_catalog/" + race_id, {})
-    var name_key: String = str(race_cfg.get("canonical_name_key", ""))
+    var race_config: Dictionary = GameConfig.get_dict("domains.character_creation", "races_catalog/" + race_id, {})
+    var name_key: String = str(race_config.get("canonical_name_key", ""))
     if not name_key.is_empty():
         var loc_name: String = LocalizationSolver.resolve_name_key(LocalizationRegistryCatalog.get_shared(), name_key)
         if not loc_name.is_empty() and loc_name != "[%s]" % name_key:
@@ -236,45 +236,45 @@ static func _resolve_race_display_name(race_id: String) -> String:
 # 三、六维属性与因果天赋解算 (CC <= 15, Depth <= 3)
 # ==============================================================================
 
-static func _resolve_attributes(rng: DeterministicRNG, origin_cfg: Dictionary) -> Dictionary:
-    var attr_cfg: Dictionary = GameConfig.get_dict("domains.character_creation", "authoritative_reincarnation/attribute_generation", {})
-    var keys: Array = attr_cfg.get("keys", AttributeConversionEngine.DEFAULT_STAT_LIST)
-    var min_val: int = int(attr_cfg.get("min_val", 1))
-    var max_val: int = int(attr_cfg.get("max_val", 6))
-    var baseline: int = int(attr_cfg.get("baseline", 3))
-    var total_points: int = int(attr_cfg.get("total_points", 21))
+static func _resolve_attributes(rng: DeterministicRNG, origin_config: Dictionary) -> Dictionary:
+    var attribute_config: Dictionary = GameConfig.get_dict("domains.character_creation", "authoritative_reincarnation/attribute_generation", {})
+    var keys: Array = attribute_config.get("keys", AttributeConversionEngine.DEFAULT_STAT_LIST)
+    var min_value: int = int(attribute_config.get("min_val", 1))
+    var max_value: int = int(attribute_config.get("max_val", 6))
+    var baseline: int = int(attribute_config.get("baseline", 3))
+    var total_points: int = int(attribute_config.get("total_points", 21))
 
-    var attrs: Dictionary = {}
-    for k in keys:
-        attrs[str(k)] = baseline
+    var attributes: Dictionary = {}
+    for stat_key in keys:
+        attributes[str(stat_key)] = baseline
 
     var remaining: int = total_points - (keys.size() * baseline)
     var available_keys: Array = keys.duplicate()
     while remaining > 0 and not available_keys.is_empty():
-        var pick_idx: int = rng.randi_range(0, available_keys.size() - 1)
-        var k_picked: String = str(available_keys[pick_idx])
-        var curr_val: int = int(attrs[k_picked])
-        if curr_val < max_val:
-            attrs[k_picked] = curr_val + 1
+        var pick_index: int = rng.randi_range(0, available_keys.size() - 1)
+        var picked_key: String = str(available_keys[pick_index])
+        var current_value: int = int(attributes[picked_key])
+        if current_value < max_value:
+            attributes[picked_key] = current_value + 1
             remaining -= 1
         else:
-            available_keys.remove_at(pick_idx)
+            available_keys.remove_at(pick_index)
 
-    var bonus: Dictionary = origin_cfg.get("attribute_bonus", {})
-    for bonus_k in bonus:
-        var k_str: String = str(bonus_k)
-        if attrs.has(k_str):
-            attrs[k_str] = int(attrs[k_str]) + int(bonus[bonus_k])
+    var bonus: Dictionary = origin_config.get("attribute_bonus", {})
+    for bonus_key in bonus:
+        var bonus_key_text: String = str(bonus_key)
+        if attributes.has(bonus_key_text):
+            attributes[bonus_key_text] = int(attributes[bonus_key_text]) + int(bonus[bonus_key])
 
-    for k in keys:
-        var k_str: String = str(k)
-        attrs[k_str] = clampi(int(attrs[k_str]), min_val, max_val)
+    for stat_key in keys:
+        var stat_key_text: String = str(stat_key)
+        attributes[stat_key_text] = clampi(int(attributes[stat_key_text]), min_value, max_value)
 
-    return attrs
+    return attributes
 
 static func _resolve_traits_with_mod(
     rng: DeterministicRNG,
-    req: AuthoritativeCharacterCreationRequestDTO,
+    creation_request: AuthoritativeCharacterCreationRequestDTO,
     manifest: Dictionary,
     ui_controls: Dictionary
 ) -> Dictionary:
@@ -282,80 +282,80 @@ static func _resolve_traits_with_mod(
     if pairs.is_empty():
         pairs = GameConfig.get_array("domains.character_creation", "authoritative_reincarnation/traits_allocation/paired_presets", [])
 
-    var all_traits_cfg: Dictionary = manifest.get("traits", manifest.get("traits_catalog", {}))
-    if all_traits_cfg.is_empty():
-        all_traits_cfg = GameConfig.get_dict("domains.character_creation", "traits", {})
+    var all_traits_config: Dictionary = manifest.get("traits", manifest.get("traits_catalog", {}))
+    if all_traits_config.is_empty():
+        all_traits_config = GameConfig.get_dict("domains.character_creation", "traits", {})
 
-    var fallback_pos: String = GameConfig.get_string("domains.character_creation", "authoritative_reincarnation/traits_allocation/fallback_positive", "PRIMORDIAL_RESONANCE")
-    var fallback_neg: String = GameConfig.get_string("domains.character_creation", "authoritative_reincarnation/traits_allocation/fallback_negative", "HEART_CORE_FISSURE")
+    var fallback_positive: String = GameConfig.get_string("domains.character_creation", "authoritative_reincarnation/traits_allocation/fallback_positive", "PRIMORDIAL_RESONANCE")
+    var fallback_negative: String = GameConfig.get_string("domains.character_creation", "authoritative_reincarnation/traits_allocation/fallback_negative", "HEART_CORE_FISSURE")
 
     var matched_pair: Dictionary = {}
     if bool(ui_controls.get("allow_manual_trait_select", false)):
-        matched_pair = _match_manual_trait_pair(req.extra_custom_fields, pairs)
+        matched_pair = _match_manual_trait_pair(creation_request.extra_custom_fields, pairs)
 
-    var pos_trait: String = fallback_pos
-    var neg_trait: String = fallback_neg
+    var positive_trait: String = fallback_positive
+    var negative_trait: String = fallback_negative
     if not matched_pair.is_empty():
-        pos_trait = str(matched_pair.get("positive", fallback_pos))
-        neg_trait = str(matched_pair.get("negative", fallback_neg))
+        positive_trait = str(matched_pair.get("positive", fallback_positive))
+        negative_trait = str(matched_pair.get("negative", fallback_negative))
     elif not pairs.is_empty():
         var picked: Variant = rng.pick_weighted(pairs, "weight")
         if picked is Dictionary:
-            pos_trait = str((picked as Dictionary).get("positive", fallback_pos))
-            neg_trait = str((picked as Dictionary).get("negative", fallback_neg))
+            positive_trait = str((picked as Dictionary).get("positive", fallback_positive))
+            negative_trait = str((picked as Dictionary).get("negative", fallback_negative))
 
-    return _build_traits_result(pos_trait, neg_trait, all_traits_cfg)
+    return _build_traits_result(positive_trait, negative_trait, all_traits_config)
 
 static func _match_manual_trait_pair(extra_fields: Dictionary, pairs: Array) -> Dictionary:
     if extra_fields.has("selected_trait_pair_index"):
-        var idx: int = int(extra_fields.get("selected_trait_pair_index", -1))
-        if idx >= 0 and idx < pairs.size() and pairs[idx] is Dictionary:
-            return pairs[idx] as Dictionary
+        var pair_index: int = int(extra_fields.get("selected_trait_pair_index", -1))
+        if pair_index >= 0 and pair_index < pairs.size() and pairs[pair_index] is Dictionary:
+            return pairs[pair_index] as Dictionary
 
-    var sel_pos: String = str(extra_fields.get("selected_positive_trait", "")).strip_edges()
-    if sel_pos.is_empty():
+    var selected_positive: String = str(extra_fields.get("selected_positive_trait", "")).strip_edges()
+    if selected_positive.is_empty():
         return {}
-    var sel_neg: String = str(extra_fields.get("selected_negative_trait", "")).strip_edges()
+    var selected_negative: String = str(extra_fields.get("selected_negative_trait", "")).strip_edges()
 
     for entry in pairs:
-        if _is_matching_preset_entry(entry, sel_pos, sel_neg):
+        if _is_matching_preset_entry(entry, selected_positive, selected_negative):
             return entry as Dictionary
     return {}
 
-static func _is_matching_preset_entry(entry: Variant, sel_pos: String, sel_neg: String) -> bool:
+static func _is_matching_preset_entry(entry: Variant, selected_positive: String, selected_negative: String) -> bool:
     if not (entry is Dictionary):
         return false
-    var d: Dictionary = entry
-    if str(d.get("positive", "")) != sel_pos:
+    var entry_dict: Dictionary = entry
+    if str(entry_dict.get("positive", "")) != selected_positive:
         return false
-    if not sel_neg.is_empty() and str(d.get("negative", "")) != sel_neg:
+    if not selected_negative.is_empty() and str(entry_dict.get("negative", "")) != selected_negative:
         return false
     return true
 
 static func _build_traits_result(
-    pos_trait: String,
-    neg_trait: String,
-    all_traits_cfg: Dictionary
+    positive_trait: String,
+    negative_trait: String,
+    all_traits_config: Dictionary
 ) -> Dictionary:
-    var pos_detail: Dictionary = all_traits_cfg.get(pos_trait, {})
-    var neg_detail: Dictionary = all_traits_cfg.get(neg_trait, {})
+    var positive_detail: Dictionary = all_traits_config.get(positive_trait, {})
+    var negative_detail: Dictionary = all_traits_config.get(negative_trait, {})
 
     return {
-        "traits": [pos_trait, neg_trait],
+        "traits": [positive_trait, negative_trait],
         "traits_details": [
             {
-                "trait_id": pos_trait,
-                "name": str(pos_detail.get("name", pos_trait)),
+                "trait_id": positive_trait,
+                "name": str(positive_detail.get("name", positive_trait)),
                 "type": "POSITIVE",
-                "cost": int(pos_detail.get("cost", 3)),
-                "desc": str(pos_detail.get("desc", ""))
+                "cost": int(positive_detail.get("cost", 3)),
+                "desc": str(positive_detail.get("desc", ""))
             },
             {
-                "trait_id": neg_trait,
-                "name": str(neg_detail.get("name", neg_trait)),
+                "trait_id": negative_trait,
+                "name": str(negative_detail.get("name", negative_trait)),
                 "type": "NEGATIVE",
-                "cost": int(neg_detail.get("cost", -3)),
-                "desc": str(neg_detail.get("desc", ""))
+                "cost": int(negative_detail.get("cost", -3)),
+                "desc": str(negative_detail.get("desc", ""))
             }
         ]
     }
