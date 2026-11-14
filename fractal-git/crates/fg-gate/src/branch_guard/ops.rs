@@ -34,7 +34,11 @@ impl BranchGuard {
             {
                 if let (Some(ref old_ref), Some(ref new_ref)) = (&old_parsed, &new_parsed) {
                     return TopologyVerifier::assert_legal_rename(
-                        old_ref, new_ref, old_raw, new_raw, allow_card_migrate,
+                        old_ref,
+                        new_ref,
+                        old_raw,
+                        new_raw,
+                        allow_card_migrate,
                     );
                 }
                 return Err(FractalError::TopologyBreach {
@@ -47,7 +51,11 @@ impl BranchGuard {
             }
             if let (Some(ref old_ref), Some(ref new_ref)) = (&old_parsed, &new_parsed) {
                 TopologyVerifier::assert_legal_rename(
-                    old_ref, new_ref, old_raw, new_raw, allow_card_migrate,
+                    old_ref,
+                    new_ref,
+                    old_raw,
+                    new_raw,
+                    allow_card_migrate,
                 )?;
             }
             return Ok(());
@@ -55,7 +63,13 @@ impl BranchGuard {
 
         let old_ref = FractalRef::from_git_ref_checked(old_raw, &floor.spec, true)?;
         let new_ref = FractalRef::from_git_ref_checked(new_raw, &floor.spec, false)?;
-        TopologyVerifier::assert_legal_rename(&old_ref, &new_ref, old_raw, new_raw, allow_card_migrate)
+        TopologyVerifier::assert_legal_rename(
+            &old_ref,
+            &new_ref,
+            old_raw,
+            new_raw,
+            allow_card_migrate,
+        )
     }
 
     /// Validates `taxis branch -d / -D` against trunk and CellMain deletion protections.
@@ -146,7 +160,10 @@ impl BranchGuard {
             }
             return Ok(());
         }
-        if floor.tier != BranchEnforcementTier::Strict || ref_name == "HEAD" || ref_name == "refs/fractal/trunk" {
+        if floor.tier != BranchEnforcementTier::Strict
+            || ref_name == "HEAD"
+            || ref_name == "refs/fractal/trunk"
+        {
             return Ok(());
         }
         if ref_name.starts_with("refs/heads/") || ref_name.starts_with("refs/fractal/cell/") {

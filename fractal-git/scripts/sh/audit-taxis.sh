@@ -250,8 +250,22 @@ else
     PROMO_ROOT="${TMPDIR:-/tmp}/taxis-promotion-ledger-$$"
     mkdir -p "${PROMO_ROOT}"
     trap 'rm -rf "${PROMO_ROOT:-}"' EXIT
+    PROMO_TAXIS_BIN=""
+    for target_root in "${CARGO_TARGET_DIR:-}" "${PROJECT_ROOT}/target"; do
+        [[ -n "${target_root}" ]] || continue
+        for profile in release debug; do
+            if [[ -x "${target_root}/${profile}/taxis" ]]; then
+                PROMO_TAXIS_BIN="${target_root}/${profile}/taxis"
+                break 2
+            fi
+        done
+    done
     PROMO_INIT_STATUS=0
-    "${CARGO_CMD}" run --quiet --manifest-path "${MANIFEST_PATH}" --bin taxis -- init --dev --workspace "${PROMO_ROOT}" >/dev/null 2>&1 || PROMO_INIT_STATUS=$?
+    if [[ -n "${PROMO_TAXIS_BIN}" ]]; then
+        "${PROMO_TAXIS_BIN}" init --dev --workspace "${PROMO_ROOT}" >/dev/null 2>&1 || PROMO_INIT_STATUS=$?
+    else
+        "${CARGO_CMD}" run --quiet --manifest-path "${MANIFEST_PATH}" --bin taxis -- init --dev --workspace "${PROMO_ROOT}" >/dev/null 2>&1 || PROMO_INIT_STATUS=$?
+    fi
     if [[ "${PROMO_INIT_STATUS}" -ne 0 ]]; then
         write_step_verdict "PROMOTION-BRIDGE-05" BLOCK "晋级演练仓库初始化失败，无法验证暂存链路"
         exit 1
@@ -264,26 +278,28 @@ else
         CANDIDATE_OID="0000000000000000000000000000000000000000"
     fi
     PROMO_STATUS=0
+    PROMO_ARGS=(
+        promotion request
+        --git-dir "${PROMO_ROOT}/.taxis"
+        --candidate "${CANDIDATE_OID}"
+        --agent "taxis-auditor"
+        --score "${COMPOSITE_SCORE}"
+        --cai "${CAI_SCORE}"
+        --ci-lower "${CI_LOWER}"
+        --summary "In-house self-audit verified: clean topology, zero-alloc boundary, ${PASSED_TOTAL} passing tests, and TB-REGRESSION baseline ratchet preserved."
+    )
     if [[ "${JSON_MODE}" -eq 1 ]]; then
-        "${CARGO_CMD}" run --manifest-path "${MANIFEST_PATH}" --bin taxis -- promotion request \
-            --git-dir "${PROMO_ROOT}/.taxis" \
-            --candidate "${CANDIDATE_OID}" \
-            --agent "taxis-auditor" \
-            --score "${COMPOSITE_SCORE}" \
-            --cai "${CAI_SCORE}" \
-            --ci-lower "${CI_LOWER}" \
-            --summary "In-house self-audit verified: clean topology, zero-alloc boundary, ${PASSED_TOTAL} passing tests, and TB-REGRESSION baseline ratchet preserved." \
-            >/dev/null 2>&1 || PROMO_STATUS=$?
+        if [[ -n "${PROMO_TAXIS_BIN}" ]]; then
+            "${PROMO_TAXIS_BIN}" "${PROMO_ARGS[@]}" >/dev/null 2>&1 || PROMO_STATUS=$?
+        else
+            "${CARGO_CMD}" run --manifest-path "${MANIFEST_PATH}" --bin taxis -- "${PROMO_ARGS[@]}" >/dev/null 2>&1 || PROMO_STATUS=$?
+        fi
     else
-        "${CARGO_CMD}" run --manifest-path "${MANIFEST_PATH}" --bin taxis -- promotion request \
-            --git-dir "${PROMO_ROOT}/.taxis" \
-            --candidate "${CANDIDATE_OID}" \
-            --agent "taxis-auditor" \
-            --score "${COMPOSITE_SCORE}" \
-            --cai "${CAI_SCORE}" \
-            --ci-lower "${CI_LOWER}" \
-            --summary "In-house self-audit verified: clean topology, zero-alloc boundary, ${PASSED_TOTAL} passing tests, and TB-REGRESSION baseline ratchet preserved." \
-            || PROMO_STATUS=$?
+        if [[ -n "${PROMO_TAXIS_BIN}" ]]; then
+            "${PROMO_TAXIS_BIN}" "${PROMO_ARGS[@]}" || PROMO_STATUS=$?
+        else
+            "${CARGO_CMD}" run --manifest-path "${MANIFEST_PATH}" --bin taxis -- "${PROMO_ARGS[@]}" || PROMO_STATUS=$?
+        fi
     fi
     if [[ "${PROMO_STATUS}" -ne 0 ]]; then
         write_step_verdict "PROMOTION-BRIDGE-05" BLOCK "自举晋级暂存请求失败"

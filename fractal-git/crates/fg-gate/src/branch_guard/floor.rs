@@ -115,7 +115,13 @@ impl BranchGovernanceFloor {
         }
 
         let (tier, source) = apply_env_ratchet(base_tier, base_source);
-        Self { tier, spec, declared, vault_health, source }
+        Self {
+            tier,
+            spec,
+            declared,
+            vault_health,
+            source,
+        }
     }
 }
 
@@ -140,7 +146,11 @@ fn overlay_active_leases(git_dir: &Path, spec: &mut BranchPolicySpec) {
             continue;
         }
         let normalized = spec.normalize_cell(&lease.id).to_owned();
-        if !spec.recognized_cells.iter().any(|existing| existing == &normalized) {
+        if !spec
+            .recognized_cells
+            .iter()
+            .any(|existing| existing == &normalized)
+        {
             spec.recognized_cells.push(normalized);
         }
     }

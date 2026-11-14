@@ -33,6 +33,52 @@ const RE_UNWRAP_EXPECT = /\.(?:unwrap|expect)\s*\(/;
 const RE_PANIC_MACRO = /\b(?:panic!|todo!|unimplemented!)\s*\(/;
 const RE_TEST_ATTR = /^\s*#\[cfg\(test\)\]/;
 const RE_MOD_OPEN = /\bmod\s+[A-Za-z0-9_]+\s*\{/;
+const RE_MOD_DECL = /^(?:pub(?:\([^)]*\))?\s+)?mod\s+([A-Za-z0-9_]+)\s*;/;
+
+/**
+ * Resolves the filesystem candidates for a child Rust module `mod <name>;`.
+ *
+ * @param {string} parentFile - Declaring module file path.
+ * @param {string} modName - Child module identifier.
+ * @returns {string[]} Resolved file candidates (`<name>.rs` and `<name>/mod.rs`).
+ */
+function resolveChildModulePaths(parentFile, modName) {
+  const base = path.basename(parentFile);
+  const anchorDir =
+    base === 'mod.rs' || base === 'lib.rs' || base === 'main.rs'
+      ? path.dirname(parentFile)
+      : path.join(path.dirname(parentFile), path.basename(parentFile, '.rs'));
+  return [path.resolve(anchorDir, `${modName}.rs`), path.resolve(anchorDir, modName, 'mod.rs')];
+}
+
+/**
+ * Identifies external test modules declared via `#[cfg(test)] mod <name>;` in parent modules.
+ *
+ * @param {string[]} rustFiles - Discovered Rust files under crates/ and src/bin/.
+ * @returns {Set<string>} Resolved paths of explicit `#[cfg(test)]` external submodules.
+ */
+function collectExternalTestModules(rustFiles) {
+  const declared = new Set();
+  for (const file of rustFiles) {
+    const lines = fs.readFileSync(file, 'utf8').split('\n');
+    let pendingTest = false;
+    for (const rawLine of lines) {
+      const trimmed = rawLine.trim();
+      if (RE_TEST_ATTR.test(trimmed)) {
+        pendingTest = true;
+        continue;
+      }
+      if (!pendingTest || trimmed.startsWith('#[')) continue;
+      pendingTest = false;
+      const modMatch = trimmed.match(RE_MOD_DECL);
+      if (!modMatch) continue;
+      for (const candidate of resolveChildModulePaths(file, modMatch[1])) {
+        declared.add(candidate);
+      }
+    }
+  }
+  return declared;
+}
 
 /**
  * Counts net brace openings on a single line.
@@ -299,7 +345,9 @@ function runZeroAllocBoundaryCheck() {
   collectRustSources(BIN_DIR, rustFiles);
   console.log(`Auditing ${rustFiles.length} production Rust source files across kernel subsystems...`);
 
+  const externalTestModules = collectExternalTestModules(rustFiles);
   for (const file of rustFiles) {
+    if (externalTestModules.has(path.resolve(file))) continue;
     scanRustFile(file, violations);
   }
 

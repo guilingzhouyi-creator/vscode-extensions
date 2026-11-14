@@ -15,9 +15,7 @@ use fg_topology::{FractalRef, TopologyVerifier};
 
 use crate::policy_floor::PolicyVaultHealth;
 
-pub use floor::{
-    BranchBypassContext, BranchFloorSource, BranchGateOutcome, BranchGovernanceFloor,
-};
+pub use floor::{BranchBypassContext, BranchFloorSource, BranchGateOutcome, BranchGovernanceFloor};
 
 /// Stateful fail-closed validator across all Taxis branch mutation entrypoints.
 pub struct BranchGuard;
@@ -63,33 +61,51 @@ impl BranchGuard {
                 if let (Some(ref parent), Some(ref child)) = (&parent_ref, &parsed_loose) {
                     TopologyVerifier::assert_legal_fork(parent, child)?;
                 }
-                Ok(BranchGateOutcome { warnings: Vec::new(), parsed_child: parsed_loose })
+                Ok(BranchGateOutcome {
+                    warnings: Vec::new(),
+                    parsed_child: parsed_loose,
+                })
             }
             BranchEnforcementTier::Advisory => {
                 if let (Some(ref parent), Some(ref child)) = (&parent_ref, &parsed_loose) {
                     TopologyVerifier::assert_legal_fork(parent, child)?;
                 }
                 let mut warnings = Vec::new();
-                let parsed_child = match FractalRef::from_git_ref_checked(child_raw, &floor.spec, false) {
-                    Ok(valid) => Some(valid),
-                    Err(advisory_err) => {
-                        warnings.push(format!("FGT-TOP-001 (advisory): {advisory_err}"));
-                        parsed_loose
-                    }
-                };
-                Ok(BranchGateOutcome { warnings, parsed_child })
+                let parsed_child =
+                    match FractalRef::from_git_ref_checked(child_raw, &floor.spec, false) {
+                        Ok(valid) => Some(valid),
+                        Err(advisory_err) => {
+                            warnings.push(format!("FGT-TOP-001 (advisory): {advisory_err}"));
+                            parsed_loose
+                        }
+                    };
+                Ok(BranchGateOutcome {
+                    warnings,
+                    parsed_child,
+                })
             }
             BranchEnforcementTier::Strict => {
                 if let Some(ctx) = bypass {
                     Self::validate_bypass_context(ctx, child_raw)?;
                     return Ok(BranchGateOutcome {
-                        warnings: vec![format!("FGT-GAT-001 (audited bypass for '{}'): {}", child_raw, ctx.reason)],
+                        warnings: vec![format!(
+                            "FGT-GAT-001 (audited bypass for '{}'): {}",
+                            child_raw, ctx.reason
+                        )],
                         parsed_child: parsed_loose,
                     });
                 }
                 let strict_child = FractalRef::from_git_ref_checked(child_raw, &floor.spec, false)?;
-                Self::assert_strict_parent_fork(&strict_child, parent_ref.as_ref(), parent_raw, child_raw)?;
-                Ok(BranchGateOutcome { warnings: Vec::new(), parsed_child: Some(strict_child) })
+                Self::assert_strict_parent_fork(
+                    &strict_child,
+                    parent_ref.as_ref(),
+                    parent_raw,
+                    child_raw,
+                )?;
+                Ok(BranchGateOutcome {
+                    warnings: Vec::new(),
+                    parsed_child: Some(strict_child),
+                })
             }
         }
     }

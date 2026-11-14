@@ -234,8 +234,14 @@ function runPlumbing(runner, args, input, env) {
  *
  * @returns {{ gitDir: string, dispose: Function }} Baseline environment.
  */
+function resolveParityTempBase() {
+    const raw = process.env.TAXIS_PARITY_TMPDIR || path.resolve(__dirname, '..', '..', 'target', 'test_tmp');
+    fs.mkdirSync(raw, { recursive: true });
+    return raw;
+}
+
 function createBaselineRepository() {
-    const gitDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fractal-git-parity-'));
+    const gitDir = fs.mkdtempSync(path.join(resolveParityTempBase(), 'fractal-git-parity-'));
     execFileSync('git', ['init', '--quiet', '--bare', gitDir], { stdio: 'ignore' });
     return {
         gitDir,

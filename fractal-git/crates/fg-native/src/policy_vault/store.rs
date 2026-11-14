@@ -70,11 +70,21 @@ impl PolicyVaultStore {
 
         let container_id = match read_container_repo_id(&container_path) {
             Ok(found) => found,
-            Err(reason) => return PolicyVaultState::TamperedOrCorrupt { path: container_path, reason },
+            Err(reason) => {
+                return PolicyVaultState::TamperedOrCorrupt {
+                    path: container_path,
+                    reason,
+                }
+            }
         };
         let seal_id = match read_verified_seal(&seal_path) {
             Ok(found) => found,
-            Err(reason) => return PolicyVaultState::TamperedOrCorrupt { path: seal_path, reason },
+            Err(reason) => {
+                return PolicyVaultState::TamperedOrCorrupt {
+                    path: seal_path,
+                    reason,
+                }
+            }
         };
         if let (Some(left), Some(right)) = (container_id.as_ref(), seal_id.as_ref()) {
             if !ct_eq_bytes(left, right) {
@@ -87,7 +97,10 @@ impl PolicyVaultStore {
         let bound_repo_id = container_id.or(seal_id);
         if !vault_path.is_file() {
             return if bound_repo_id.is_some() {
-                PolicyVaultState::MissingAfterInit { common_dir, expected_path: vault_path }
+                PolicyVaultState::MissingAfterInit {
+                    common_dir,
+                    expected_path: vault_path,
+                }
             } else {
                 PolicyVaultState::UninitializedExternal
             };
@@ -114,9 +127,10 @@ impl PolicyVaultStore {
                 seal_path,
                 payload,
             })),
-            Err(unseal_err) => {
-                PolicyVaultState::TamperedOrCorrupt { path: vault_path, reason: unseal_err.to_string() }
-            }
+            Err(unseal_err) => PolicyVaultState::TamperedOrCorrupt {
+                path: vault_path,
+                reason: unseal_err.to_string(),
+            },
         }
     }
 
@@ -134,13 +148,16 @@ impl PolicyVaultStore {
         if let Ok(Some(container_id)) = read_container_repo_id(&container_path) {
             if !ct_eq_bytes(&container_id, &payload.repo_id) {
                 return Err(FractalError::AuthProofInvalid(
-                    "cannot seal policy vault with a repo_id that differs from container META".to_owned(),
+                    "cannot seal policy vault with a repo_id that differs from container META"
+                        .to_owned(),
                 ));
             }
         }
         let (mut salt, mut nonce) = ([0u8; POLICY_REPO_ID_LEN], [0u8; POLICY_REPO_ID_LEN]);
-        fill_random_bytes(&mut salt).map_err(|e| FractalError::PolicyViolation(format!("CSPRNG salt error: {e}")))?;
-        fill_random_bytes(&mut nonce).map_err(|e| FractalError::PolicyViolation(format!("CSPRNG nonce error: {e}")))?;
+        fill_random_bytes(&mut salt)
+            .map_err(|e| FractalError::PolicyViolation(format!("CSPRNG salt error: {e}")))?;
+        fill_random_bytes(&mut nonce)
+            .map_err(|e| FractalError::PolicyViolation(format!("CSPRNG nonce error: {e}")))?;
         let seal_path = Self::seal_path(&common_dir);
         let vault_path = Self::vault_path(&common_dir);
         let seal_bytes = encode_seal_record(&payload.repo_id);
@@ -149,7 +166,12 @@ impl PolicyVaultStore {
         restrict_and_hide_file(&seal_path);
         write_file_atomic(&vault_path, &envelope, true)?;
         restrict_and_hide_file(&vault_path);
-        Ok(LoadedPolicyVault { common_dir, vault_path, seal_path, payload: payload.clone() })
+        Ok(LoadedPolicyVault {
+            common_dir,
+            vault_path,
+            seal_path,
+            payload: payload.clone(),
+        })
     }
 
     /// Writes the initial sealed policy vault during native `taxis init`.
@@ -187,15 +209,18 @@ impl PolicyVaultStore {
         locked_by_authority: bool,
     ) -> FractalResult<LoadedPolicyVault> {
         let common_dir = Self::resolve_common_repo_dir(repo_or_git_dir);
-        let container_id =
-            read_container_repo_id(&common_dir.join(CONTAINER_FILE_NAME)).map_err(FractalError::CorruptStore)?;
-        let seal_id = read_verified_seal(&Self::seal_path(&common_dir)).ok().flatten();
+        let container_id = read_container_repo_id(&common_dir.join(CONTAINER_FILE_NAME))
+            .map_err(FractalError::CorruptStore)?;
+        let seal_id = read_verified_seal(&Self::seal_path(&common_dir))
+            .ok()
+            .flatten();
         let repo_id = match container_id.or(seal_id) {
             Some(bound) => bound,
             None => {
                 let mut generated = [0u8; POLICY_REPO_ID_LEN];
-                fill_random_bytes(&mut generated)
-                    .map_err(|e| FractalError::PolicyViolation(format!("CSPRNG repo_id error: {e}")))?;
+                fill_random_bytes(&mut generated).map_err(|e| {
+                    FractalError::PolicyViolation(format!("CSPRNG repo_id error: {e}"))
+                })?;
                 generated
             }
         };

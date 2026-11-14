@@ -96,7 +96,9 @@ fn rename_and_delete_protections_block_trunk_and_cross_cell() {
     )
     .is_ok());
     assert!(BranchGuard::check_branch_delete(&floor, "integration", true, true).is_err());
-    assert!(BranchGuard::check_branch_delete(&floor, "cell/fractal-git/main", true, false).is_err());
+    assert!(
+        BranchGuard::check_branch_delete(&floor, "cell/fractal-git/main", true, false).is_err()
+    );
     assert!(BranchGuard::check_branch_delete(&floor, "cell/fractal-git/main", true, true).is_ok());
 }
 
@@ -113,5 +115,7 @@ fn ref_mutation_blocks_rogue_head_in_strict_and_allows_remotes() {
         false
     )
     .is_ok());
-    assert!(BranchGuard::check_ref_mutation(&floor, "refs/remotes/origin/foo", false, false).is_ok());
+    assert!(
+        BranchGuard::check_ref_mutation(&floor, "refs/remotes/origin/foo", false, false).is_ok()
+    );
 }

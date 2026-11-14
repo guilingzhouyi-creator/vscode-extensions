@@ -376,8 +376,27 @@ if ($statusQuality -ne "PASS" -or -not $cargoCmd) {
         # A promotion is staged into the repository container, so the ledger refuses to run in a
         # directory that has none. Creating the container through `taxis init` keeps this probe on
         # the same path an operator takes; hand-writing the file would test a state no command makes.
-        $promoInitArgs = @("run", "--manifest-path", $ManifestPath, "--bin", "taxis", "--", "init", "--dev", "--workspace", $promoLedgerRoot)
-        $procPromoInit = Invoke-AuditChild -FilePath $cargoCmd -ArgumentList $promoInitArgs -Label "promotion-init"
+        $promoTaxisBin = $null
+        $targetRoots = @()
+        if ($env:CARGO_TARGET_DIR) { $targetRoots += $env:CARGO_TARGET_DIR }
+        $targetRoots += (Join-Path $ProjectRoot "target")
+        foreach ($targetRoot in $targetRoots) {
+            foreach ($profile in @("release", "debug")) {
+                $candidate = Join-Path (Join-Path $targetRoot $profile) "taxis.exe"
+                if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+                    $promoTaxisBin = $candidate
+                    break
+                }
+            }
+            if ($promoTaxisBin) { break }
+        }
+        $promoInitExe = if ($promoTaxisBin) { $promoTaxisBin } else { $cargoCmd }
+        $promoInitArgs = if ($promoTaxisBin) {
+            @("init", "--dev", "--workspace", $promoLedgerRoot)
+        } else {
+            @("run", "--manifest-path", $ManifestPath, "--bin", "taxis", "--", "init", "--dev", "--workspace", $promoLedgerRoot)
+        }
+        $procPromoInit = Invoke-AuditChild -FilePath $promoInitExe -ArgumentList $promoInitArgs -Label "promotion-init"
         if ($procPromoInit.ExitCode -ne 0) {
             Write-StepVerdict -StepId "PROMOTION-BRIDGE-05" -Status "BLOCK" -Detail "晋级演练仓库初始化失败，无法验证暂存链路"
             $failures.Add("PROMOTION-BRIDGE-05")
@@ -391,8 +410,8 @@ if ($statusQuality -ne "PASS" -or -not $cargoCmd) {
             if ($candidateOid -notmatch '^[0-9a-f]{40}$') {
                 $candidateOid = "0000000000000000000000000000000000000000"
             }
-            $promoArgs = @(
-                "run", "--manifest-path", $ManifestPath, "--bin", "taxis", "--", "promotion", "request",
+            $promoTailArgs = @(
+                "promotion", "request",
                 "--git-dir", (Join-Path $promoLedgerRoot ".taxis"),
                 "--candidate", $candidateOid,
                 "--agent", "taxis-auditor",
@@ -401,11 +420,17 @@ if ($statusQuality -ne "PASS" -or -not $cargoCmd) {
                 "--ci-lower", $ciLower.ToString("F1"),
                 "--summary", "In-house self-audit verified: clean topology, zero-alloc boundary, $passedTotal passing tests, and TB-REGRESSION baseline ratchet preserved."
             )
+            $promoExe = if ($promoTaxisBin) { $promoTaxisBin } else { $cargoCmd }
+            $promoArgs = if ($promoTaxisBin) {
+                $promoTailArgs
+            } else {
+                @("run", "--manifest-path", $ManifestPath, "--bin", "taxis", "--") + $promoTailArgs
+            }
             # 落盘断言检查的是容器本身：账本是容器的一个节，不存在独立的账本文件。
             # 先前这里断言 `fractal/staged_promotions.json`，那个文件在账本二进制化后已不存在，
             # 于是「命令成功」被固定误判为「未落盘」——断言的名字换了，它看守的对象也必须换。
             $promoContainerFile = Join-Path (Join-Path $promoLedgerRoot ".taxis") "repo.txc"
-            $procPromo = Invoke-AuditChild -FilePath $cargoCmd -ArgumentList $promoArgs -Label "promotion"
+            $procPromo = Invoke-AuditChild -FilePath $promoExe -ArgumentList $promoArgs -Label "promotion"
             if ($procPromo.ExitCode -ne 0) {
                 Write-StepVerdict -StepId "PROMOTION-BRIDGE-05" -Status "BLOCK" -Detail "自举晋级暂存请求失败"
                 $failures.Add("PROMOTION-BRIDGE-05")
