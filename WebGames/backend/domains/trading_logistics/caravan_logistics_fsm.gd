@@ -12,7 +12,7 @@ class_name CaravanLogisticsFSM extends RefCounted
 
 ## 商队进度推进：进度封顶 + 劫镖风险判定（危险度×系数 − 护卫×保护）→ 遇袭/运抵叙事广播
 static func advance_caravan_progress(
-	caravan: TownMarketCommodity.TradeCaravanEntity,
+	caravan: TradeCaravanEntity,
 	delta_progress: float,
 	route_danger_level: float, # 0.0 ~ 1.0
 	rng: DeterministicRNG = null
