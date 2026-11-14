@@ -21,6 +21,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 const { evaluateWorkspaceQuant } = require('./evaluate-workspace-quant');
 const { ensureLf, stripAnsi } = require('./gate-failure-contract');
+const { buildEloc5dSummary, renderEloc5dMarkdown } = require('./lib/workspace-eloc-rollup');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const AUDIT_LOG_DIR = path.join(REPO_ROOT, '.audit-logs');
@@ -510,7 +511,16 @@ function renderMarkdownDashboard(data) {
     ...(data.tenDimensions && typeof data.tenDimensions === 'object'
       ? renderDimensionTableRows(data.tenDimensions)
       : [MD_DIM_DEGRADED_NOTICE]),
+    ...(data.rawTenDimensions && typeof data.rawTenDimensions === 'object'
+      ? [
+          '',
+          '#### 🔍 auto-refactor 静态引擎未折算原始十维得分 (Raw Engine 10D)',
+          '',
+          ...renderDimensionTableRows(data.rawTenDimensions),
+        ]
+      : []),
     ...(data.quant && typeof data.quant === 'object' ? renderQuantTableRows(data.quant) : []),
+    ...renderEloc5dMarkdown(data.eloc5dSummary),
     '',
   ];
 
@@ -621,7 +631,9 @@ function buildNormalizedPayload(inputPayload) {
       inputPayload.catalogCountConsistent != null ? Boolean(inputPayload.catalogCountConsistent) : null,
     projects: inputPayload.projects || {},
     projectScores: inputPayload.projectScores || {},
+    rawTenDimensions: inputPayload.rawTenDimensions || null,
     tenDimensions: inputPayload.tenDimensions || inputPayload.qualityVector || null,
+    eloc5dSummary: inputPayload.eloc5dSummary || buildEloc5dSummary(REPO_ROOT),
     quant,
     failures,
   };
@@ -667,6 +679,8 @@ function buildAasSnapshot(normalized) {
     subsystems: normalized.projects,
     projectScores: normalized.projectScores,
     dimensions: normalized.tenDimensions,
+    ...(normalized.rawTenDimensions ? { rawDimensions: normalized.rawTenDimensions } : {}),
+    ...(normalized.eloc5dSummary ? { eloc5d: normalized.eloc5dSummary } : {}),
     failures: normalized.failures,
     defaultVerify: 'pwsh -File scripts/ps1/audit-all.ps1',
   };

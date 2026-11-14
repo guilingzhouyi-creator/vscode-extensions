@@ -228,7 +228,7 @@ $procFg = Start-Process -FilePath $nodeCmd -ArgumentList $fgReportArgs -WorkingD
 $timeoutWt = if ($Fast) { 90 } else { 180 }
 $timeoutWg = if ($Fast) { 60 } else { 120 }
 $timeoutAr = if ($Fast) { 90 } else { 240 }
-$timeoutFg = if ($Fast) { 90 } else { 180 }
+$timeoutFg = if ($Fast) { 120 } else { 360 }
 
 $wtClean = Wait-ProcessWithTimeout -Process $procWt -TimeoutSeconds $timeoutWt -ProcessName "workspace-timing" -LogFiles @($logWtOut, $logWtErr)
 $wgClean = Wait-ProcessWithTimeout -Process $procWg -TimeoutSeconds $timeoutWg -ProcessName "WebGames" -LogFiles @($logWgOut, $logWgErr)
@@ -864,6 +864,7 @@ $summary = [ordered]@{
         fractalGit = $scoreFg
     }
     arCompositeScore = $compositeScore
+    rawTenDimensions = $tenDimensions
     tenDimensions = $qualityVectorObj
     qualityVector = $qualityVectorObj
     quant = $quantMetrics

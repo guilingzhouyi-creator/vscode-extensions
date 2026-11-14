@@ -19,6 +19,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync, execSync } = require('child_process');
+const { buildEloc5dSummary, renderEloc5dMarkdown } = require('./lib/workspace-eloc-rollup');
 
 const SCORE_FLOOR = 15.0;
 const THEORETICAL_SCORE_CEILING = 99.75;
@@ -642,6 +643,14 @@ function appendGithubStepSummary(summaryFile, summary, elapsedSec) {
   md += `> **耗时**: ${elapsedSec}s &nbsp;|&nbsp; **全局状态**: ${globalStatus}\n\n`;
   md += '### 🎯 auto-refactor 静态引擎十维工程质量全景指数\n\n';
   md += formatStepSummaryTenDimensions(summary.tenDimensions, summary.arCompositeScore);
+  if (summary.rawTenDimensions) {
+    md += '#### 🔍 auto-refactor 静态引擎未折算原始十维得分 (Raw Engine 10D)\n\n';
+    md += formatStepSummaryTenDimensions(summary.rawTenDimensions, summary.arCompositeScore);
+  }
+  const elocMdLines = renderEloc5dMarkdown(summary.eloc5dSummary);
+  if (elocMdLines.length > 0) {
+    md += elocMdLines.join('\n') + '\n';
+  }
   try {
     fs.appendFileSync(summaryFile, md, 'utf8');
   } catch (_) {
@@ -853,8 +862,10 @@ function main() {
       fractalGit: scoreFg,
     },
     arCompositeScore: arBase.compositeScore,
+    rawTenDimensions: arBase.tenDimensions || null,
     tenDimensions,
     qualityVector: tenDimensions,
+    eloc5dSummary: buildEloc5dSummary(state.rootDir),
     quant: null,
   };
 

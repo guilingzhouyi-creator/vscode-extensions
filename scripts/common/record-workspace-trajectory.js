@@ -166,26 +166,45 @@ function extractCanonicalVector(baseline) {
 }
 
 /**
- * Resolves the four-tier ELOC counters from a baseline snapshot.
- *
- * Only the real `trajectory.runEloc` block may supply these counters. When it is absent the
- * counters are reported as unavailable rather than estimated: a per-file average would silently
- * diverge from the real density and the ledger would look authoritative while being fabricated.
+ * Resolves live 5D ELOC counters from the active codebase and Git differential, falling back to
+ * `baseline.trajectory.runEloc` only when live workspace measurement is unavailable.
  *
  * @param {object|null} baseline - Parsed self-audit baseline.
- * @returns {{proc: number|null, uniq: number|null, chg: number|null, sem: number|null, available: boolean}}
- *   Counters plus an availability flag; every counter is null when unavailable.
+ * @param {string} [root] - Repository root for live codebase/diff ELOC measurement.
+ * @returns {{proc: number|null, uniq: number|null, chg: number|null, sem: number|null, reloc: number, cosm: number, available: boolean}}
+ *   Counters plus an availability flag.
  */
-function resolveElocCounters(baseline) {
+function resolveElocCounters(baseline, root) {
+  if (root) {
+    try {
+      const { collectLiveDiff5DEloc } = require('./lib/workspace-eloc-rollup');
+      const live = collectLiveDiff5DEloc(root);
+      if (live && live.available) {
+        return {
+          proc: Number(live.processedEloc) || 0,
+          uniq: Number(live.uniqueEloc) || 0,
+          chg: Number(live.changedEloc) || 0,
+          sem: Number(live.semanticEloc) || 0,
+          reloc: Number(live.relocatedEloc) || 0,
+          cosm: Number(live.cosmeticEloc) || 0,
+          available: true,
+        };
+      }
+    } catch {
+      // Fallback to baseline snapshot counters if live diff inspection fails.
+    }
+  }
   const runEloc = baseline?.trajectory?.runEloc;
   if (!runEloc) {
-    return { proc: null, uniq: null, chg: null, sem: null, available: false };
+    return { proc: null, uniq: null, chg: null, sem: null, reloc: 0, cosm: 0, available: false };
   }
   return {
     proc: Number(runEloc.processed) || 0,
     uniq: Number(runEloc.unique) || 0,
     chg: Number(runEloc.changed) || 0,
     sem: Number(runEloc.semantic) || 0,
+    reloc: 0,
+    cosm: 0,
     available: true,
   };
 }
@@ -371,10 +390,10 @@ function resolveLedgerTargets(root, commitLedger) {
  * @param {object} previous - Previous record, used to carry the before score forward.
  * @returns {{record: object, elocAvailable: boolean}} Record body fragments.
  */
-function buildRecordPayload(baseline, previous) {
+function buildRecordPayload(baseline, previous, root) {
   const scoreVal = extractCanonicalScore(baseline);
   const vector = extractCanonicalVector(baseline);
-  const eloc = resolveElocCounters(baseline);
+  const eloc = resolveElocCounters(baseline, root);
   const debt = extractDebtCounters(baseline);
   const scoreBef = previous && previous.score && typeof previous.score.aft === 'number'
     ? previous.score.aft
@@ -383,9 +402,18 @@ function buildRecordPayload(baseline, previous) {
   return {
     elocAvailable: eloc.available,
     record: {
-      // 四层 ELOC 计数缺席时整块省略：写入 null 或 0 都会被下游当成真实测量值。
+      // 五维 ELOC 计数缺席时整块省略：写入 null 或 0 都会被下游当成真实测量值。
       ...(eloc.available
-        ? { eloc: { proc: eloc.proc, uniq: eloc.uniq, chg: eloc.chg, sem: eloc.sem, reloc: 0, cosm: 0 } }
+        ? {
+            eloc: {
+              proc: eloc.proc,
+              uniq: eloc.uniq,
+              chg: eloc.chg,
+              sem: eloc.sem,
+              reloc: eloc.reloc || 0,
+              cosm: eloc.cosm || 0,
+            },
+          }
         : { elocUnavailable: true }),
       score: {
         bef: scoreBef,
@@ -432,7 +460,7 @@ function main() {
   const previous =
     readPreviousRecord(activeRunsPath) ||
     (commitLedger ? null : readPreviousRecord(trackedRunsPath));
-  const payload = buildRecordPayload(baseline, previous);
+  const payload = buildRecordPayload(baseline, previous, root);
 
   const record = {
     t: Date.now(),

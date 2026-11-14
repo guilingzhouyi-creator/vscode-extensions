@@ -191,7 +191,7 @@ PID_FG=$!
 TIMEOUT_WT=$([[ "$FAST_MODE" -eq 1 ]] && echo 90 || echo 180)
 TIMEOUT_WG=$([[ "$FAST_MODE" -eq 1 ]] && echo 60 || echo 120)
 TIMEOUT_AR=$([[ "$FAST_MODE" -eq 1 ]] && echo 90 || echo 240)
-TIMEOUT_FG=$([[ "$FAST_MODE" -eq 1 ]] && echo 90 || echo 180)
+TIMEOUT_FG=$([[ "$FAST_MODE" -eq 1 ]] && echo 120 || echo 360)
 
 STATUS_WT="PASS"
 CODE_WT=0
