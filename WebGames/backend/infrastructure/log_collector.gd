@@ -19,21 +19,21 @@ const StatisticsMathLib = preload("res://backend/infrastructure/pure/statistics_
 
 static var _active_trace_id: String = ""
 static var _sequence_number: int = 0
-static var _caller_capture_enabled: bool = true
+static var _is_caller_capture_enabled: bool = true
 
 ## 测试复位：清空活跃链路 ID 与序号（避免跨用例状态残留）
 static func reset_state() -> void:
 	_active_trace_id = ""
 	_sequence_number = 0
-	_caller_capture_enabled = true
+	_is_caller_capture_enabled = true
 
 ## 设置是否抓取调用方调用栈（热循环压测时可临时关闭，降低反射开销）
-static func set_caller_capture_enabled(enabled: bool) -> void:
-	_caller_capture_enabled = enabled
+static func set_caller_capture_enabled(is_enabled: bool) -> void:
+	_is_caller_capture_enabled = is_enabled
 
 ## 是否已启用调用栈提取
 static func is_caller_capture_enabled() -> bool:
-	return _caller_capture_enabled
+	return _is_caller_capture_enabled
 
 ## 业务入口调用：签发新链路追踪 ID（战斗回合开始/交易开启/管线启动）
 static func begin_trace(custom_id: String = "") -> String:
@@ -85,9 +85,9 @@ static func log(
 		record.trace_id = _derived_trace_id(channel)
 
 	# 提取调用方信息（委托纯算子域库提取 basename，杜绝绝对路径）
-	var caller_info := StatisticsMathLib.extract_caller_from_stack(get_stack(), ["log_collector.gd"]) if _caller_capture_enabled else {}
-	record.source_file = str(caller_info.get(LogConstants.KEY_SOURCE_FILE, ""))
-	record.source_line = int(caller_info.get(LogConstants.KEY_SOURCE_LINE, 0))
+	var caller_metadata := StatisticsMathLib.extract_caller_from_stack(get_stack(), ["log_collector.gd"]) if _is_caller_capture_enabled else {}
+	record.source_file = str(caller_metadata.get(LogConstants.KEY_SOURCE_FILE, ""))
+	record.source_line = int(caller_metadata.get(LogConstants.KEY_SOURCE_LINE, 0))
 
 	# 构造期脱敏（Inv-LS-2 安全红线）：入流前同时对 context 与 message 正文执行脱敏
 	RedactionRule.apply_to_record(record, context)

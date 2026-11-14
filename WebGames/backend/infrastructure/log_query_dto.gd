@@ -40,13 +40,13 @@ class Criteria extends RefCounted:
 	
 	## 页码（从 1 起始）
 	var page: int = 1:
-		set(val):
-			page = maxi(1, val)
+		set(new_page):
+			page = maxi(1, new_page)
 			
 	## 每页大小（钳制在 [1, MAX_QUERY_PAGE_SIZE] 区间）
 	var page_size: int = LogConstants.DEFAULT_QUERY_PAGE_SIZE:
-		set(val):
-			page_size = clampi(val, 1, LogConstants.MAX_QUERY_PAGE_SIZE)
+		set(new_page_size):
+			page_size = clampi(new_page_size, 1, LogConstants.MAX_QUERY_PAGE_SIZE)
 
 # ==============================================================================
 # 二、查询结果（Result）

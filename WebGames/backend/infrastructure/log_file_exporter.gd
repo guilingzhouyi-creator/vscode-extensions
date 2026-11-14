@@ -32,10 +32,10 @@ static var _pending_sequences: Array[int] = []
 static var _batch_threshold: int = LogConstants.DEFAULT_BATCH_THRESHOLD # 攒批阈值（默认 1 即刻写）
 static var _last_chain_hash: String = LogConstants.CHAIN_GENESIS_HASH
 static var _encryption_key_override: PackedByteArray = PackedByteArray()
-static var _io_mutex: Mutex = Mutex.new()
-static var _emitting_encryption_error: bool = false
-static var _cached_key_env_name: String = ""
-static var _cached_key_env_value: String = ""
+static var _file_mutex: Mutex = Mutex.new()
+static var _is_emitting_encryption_error: bool = false
+static var _cached_key_environment_name: String = ""
+static var _cached_key_environment_value: String = ""
 static var _cached_derived_key_32: PackedByteArray = PackedByteArray()
 static var _has_cached_derived_key: bool = false
 
@@ -69,20 +69,20 @@ static func _ensure_config_fresh() -> void:
 static func consume(record: LogRecordDTO) -> bool:
 	if record == null:
 		return false
-	_io_mutex.lock()
+	_file_mutex.lock()
 	_ensure_config_fresh()
 	if not _config.enabled:
-		_io_mutex.unlock()
+		_file_mutex.unlock()
 		return false
 	if not _level_allowed(record.level) or not _channel_allowed(record.channel):
-		_io_mutex.unlock()
+		_file_mutex.unlock()
 		return false
 	# 单一签发源：广播链路已带序号则原样保留，仅直调未签发记录在此补号
 	if record.sequence == 0:
 		_fallback_sequence_number += 1
 		record.sequence = _fallback_sequence_number
 	var write_succeeded := _append_to_file(record)
-	_io_mutex.unlock()
+	_file_mutex.unlock()
 	if not write_succeeded and _config != null and _config.encryption_enabled and _resolve_encryption_key_32().size() != LogConstants.AES_KEY_SIZE:
 		_emit_encryption_fail_closed_alert(LogConstants.EVENT_LOG_ENCRYPTION_FALLBACK, SystemBaseMessages.MSG_LOG_ENCRYPTION_UNAVAILABLE)
 	return write_succeeded
@@ -97,13 +97,13 @@ static func _resolve_encryption_key_32() -> PackedByteArray:
 		return _encryption_key_override
 	if _config == null or not _config.encryption_enabled:
 		return PackedByteArray()
-	var env_name: String = _config.encryption_seal_key_env
-	var env_value: String = OS.get_environment(env_name) if not env_name.is_empty() else ""
-	if _has_cached_derived_key and _cached_key_env_name == env_name and _cached_key_env_value == env_value:
+	var environment_variable_name: String = _config.encryption_seal_key_env
+	var environment_variable_value: String = OS.get_environment(environment_variable_name) if not environment_variable_name.is_empty() else ""
+	if _has_cached_derived_key and _cached_key_environment_name == environment_variable_name and _cached_key_environment_value == environment_variable_value:
 		return _cached_derived_key_32
-	var derived := CryptoIntegrityLib.resolve_derived_key_32(env_name, LogConstants.ENC_DOMAIN_CONTEXT)
-	_cached_key_env_name = env_name
-	_cached_key_env_value = env_value
+	var derived := CryptoIntegrityLib.resolve_derived_key_32(environment_variable_name, LogConstants.ENC_DOMAIN_CONTEXT)
+	_cached_key_environment_name = environment_variable_name
+	_cached_key_environment_value = environment_variable_value
 	_cached_derived_key_32 = derived
 	_has_cached_derived_key = true
 	return derived
@@ -143,19 +143,19 @@ static func _recover_chain_hash_if_needed(main_path: String) -> void:
 
 ## 密钥缺失或加密失败静默回退阻断告警（带重入保护防递归风暴）
 static func _emit_encryption_fail_closed_alert(code: String, detail: String) -> void:
-	if _emitting_encryption_error:
+	if _is_emitting_encryption_error:
 		return
-	_emitting_encryption_error = true
+	_is_emitting_encryption_error = true
 	ErrorReporter.emit_error(LogConstants.CHANNEL_SYSTEM, code, detail)
-	_emitting_encryption_error = false
+	_is_emitting_encryption_error = false
 
 ## 高效流式追加写：Fail-Closed 加密前检与有界重试队列（密封延迟到轮转之后，杜绝跨轮转断链）
 static func _append_to_file(record: LogRecordDTO) -> bool:
-	var dir := _config.directory
-	if dir.is_empty():
+	var export_directory := _config.directory
+	if export_directory.is_empty():
 		return false
-	if not DirAccess.dir_exists_absolute(dir):
-		DirAccess.make_dir_recursive_absolute(dir)
+	if not DirAccess.dir_exists_absolute(export_directory):
+		DirAccess.make_dir_recursive_absolute(export_directory)
 
 	var plain_json := JSON.stringify(record.to_dto())
 	if _config.encryption_enabled and _resolve_encryption_key_32().size() != LogConstants.AES_KEY_SIZE:
@@ -174,9 +174,9 @@ static func _append_to_file(record: LogRecordDTO) -> bool:
 
 ## 线程安全批量刷盘入口
 static func flush() -> int:
-	_io_mutex.lock()
+	_file_mutex.lock()
 	var count := _flush_unlocked()
-	_io_mutex.unlock()
+	_file_mutex.unlock()
 	return count
 
 static func _prepare_write_line(plain_line: String, sequence_number: int, main_path: String) -> Dictionary:
@@ -296,8 +296,8 @@ static func _rotate_target_if_needed(base: String) -> String:
 static func _archive_sort_key(filename: String, prefix: String) -> Array[int]:
 	var without_prefix := filename.substr(prefix.length() + 1)
 	if without_prefix.ends_with(LogConstants.LOG_FILE_EXTENSION):
-		var raw := without_prefix.left(without_prefix.length() - LogConstants.LOG_FILE_EXTENSION.length())
-		var parts := raw.split("_")
+		var timestamp_suffix := without_prefix.left(without_prefix.length() - LogConstants.LOG_FILE_EXTENSION.length())
+		var parts := timestamp_suffix.split("_")
 		var timestamp := parts[0].to_int() if parts[0].is_valid_int() else 0
 		var sequence_number := parts[1].to_int() if (parts.size() > 1 and parts[1].is_valid_int()) else 0
 		return [timestamp, sequence_number]
@@ -307,17 +307,17 @@ static func _archive_sort_key(filename: String, prefix: String) -> Array[int]:
 static func _prune_rotated(base: String) -> void:
 	if _config.max_files <= 0:
 		return
-	var dir := DirAccess.open(_config.directory)
-	if dir == null:
+	var directory_access := DirAccess.open(_config.directory)
+	if directory_access == null:
 		return
 	var rotated: Array = []
-	dir.list_dir_begin()
-	var file_name := dir.get_next()
+	directory_access.list_dir_begin()
+	var file_name := directory_access.get_next()
 	while not file_name.is_empty():
-		if not dir.current_is_dir() and LogConstants.is_rotated_archive_filename(file_name, _config.file_prefix):
+		if not directory_access.current_is_dir() and LogConstants.is_rotated_archive_filename(file_name, _config.file_prefix):
 			rotated.append(file_name)
-		file_name = dir.get_next()
-	dir.list_dir_end()
+		file_name = directory_access.get_next()
+	directory_access.list_dir_end()
 
 	var keyed: Array = []
 	for archive_name in rotated:
@@ -351,8 +351,8 @@ static func reset_for_test() -> void:
 	_batch_threshold = LogConstants.DEFAULT_BATCH_THRESHOLD
 	_last_chain_hash = LogConstants.CHAIN_GENESIS_HASH
 	_encryption_key_override = PackedByteArray()
-	_emitting_encryption_error = false
-	_cached_key_env_name = ""
-	_cached_key_env_value = ""
+	_is_emitting_encryption_error = false
+	_cached_key_environment_name = ""
+	_cached_key_environment_value = ""
 	_cached_derived_key_32 = PackedByteArray()
 	_has_cached_derived_key = false

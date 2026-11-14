@@ -67,21 +67,21 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从输入字典填充基类结构化日志字段（供 LogRecordDTO 与 StructuredLogRecord 复用）
-static func populate_base_from_dict(target_dto: LogRecordDTO, data: Dictionary) -> void:
-	if target_dto == null or data.is_empty():
+static func populate_base_from_dict(target_dto: LogRecordDTO, record_payload: Dictionary) -> void:
+	if target_dto == null or record_payload.is_empty():
 		return
-	target_dto.sequence = int(data.get("sequence", 0))
-	target_dto.timestamp_utc = int(data.get("timestamp_utc", 0))
-	target_dto.level = str(data.get(LogConstants.KEY_LEVEL, LogConstants.LEVEL_INFO))
-	target_dto.channel = str(data.get("channel", ""))
-	target_dto.error_code = str(data.get("error_code", ""))
-	target_dto.message = str(data.get("message", ""))
-	var raw_context: Variant = data.get("context", {})
+	target_dto.sequence = int(record_payload.get("sequence", 0))
+	target_dto.timestamp_utc = int(record_payload.get("timestamp_utc", 0))
+	target_dto.level = str(record_payload.get(LogConstants.KEY_LEVEL, LogConstants.LEVEL_INFO))
+	target_dto.channel = str(record_payload.get("channel", ""))
+	target_dto.error_code = str(record_payload.get("error_code", ""))
+	target_dto.message = str(record_payload.get("message", ""))
+	var raw_context: Variant = record_payload.get("context", {})
 	if raw_context is Dictionary:
 		target_dto.context = (raw_context as Dictionary).duplicate(true)
 
 ## 从字典反序列化还原记录（字段缺省用默认值；context 仅接受 Dictionary 并深拷贝）
-static func from_dto(data: Dictionary) -> LogRecordDTO:
+static func from_dto(record_payload: Dictionary) -> LogRecordDTO:
 	var record_dto := LogRecordDTO.new()
-	populate_base_from_dict(record_dto, data)
+	populate_base_from_dict(record_dto, record_payload)
 	return record_dto

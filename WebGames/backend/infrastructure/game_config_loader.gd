@@ -39,14 +39,14 @@ static func get_catalog() -> Variant:
 
 
 ## 按优先级装载全量配置表（Monolithic Bundle 优先，回退递归目录扫描）
-static func load_all_tables_into(out_tables: Dictionary, scan_failures: Array, scan_warnings: Array = []) -> void:
+static func load_all_tables_into(target_tables: Dictionary, scan_failures: Array, scan_warnings: Array = []) -> void:
 	if FileAccess.file_exists(PATH_CONFIG_BUNDLE):
-		var bundle_data: Dictionary = BinaryConfigReader.load_monolithic_bundle(PATH_CONFIG_BUNDLE)
-		if not bundle_data.is_empty():
-			for table_name in bundle_data:
-				out_tables[table_name] = bundle_data[table_name]
+		var bundle_tables: Dictionary = BinaryConfigReader.load_monolithic_bundle(PATH_CONFIG_BUNDLE)
+		if not bundle_tables.is_empty():
+			for table_name in bundle_tables:
+				target_tables[table_name] = bundle_tables[table_name]
 			return
-	scan_dir_into(CONFIG_DIR, "", out_tables, scan_failures, scan_warnings)
+	scan_dir_into(CONFIG_DIR, "", target_tables, scan_failures, scan_warnings)
 
 
 ## JIT 靶向按需加载单个配置表（消除冷启动全局阻塞）
@@ -132,10 +132,10 @@ static func load_single_subtable_json(resolved: String) -> Dictionary:
 	if json.parse(text) != OK:
 		return {"success": false, "subtable": resolved, "error": "JSON_PARSE_FAILED", "details": json.get_error_message()}
 
-	var data: Variant = json.get_data()
-	if not (data is Dictionary):
+	var parsed_payload: Variant = json.get_data()
+	if not (parsed_payload is Dictionary):
 		return {"success": false, "subtable": resolved, "error": "NOT_A_JSON_OBJECT"}
-	return {"success": true, "data": data}
+	return {"success": true, "data": parsed_payload}
 
 
 ## 检测当前快照缺失的必需配置表清单
@@ -165,48 +165,48 @@ static func diff_table_snapshots(old_tables: Dictionary, built_tables: Dictionar
 
 ## 递归扫描配置目录并加载 (.kdat 优先于 .json)
 static func scan_dir_into(
-	dir_path: String,
+	directory_path: String,
 	table_prefix: String,
-	out_tables: Dictionary,
+	target_tables: Dictionary,
 	scan_failures: Array,
 	scan_warnings: Array = []
 ) -> void:
-	var dir := DirAccess.open(dir_path)
-	if dir == null:
-		scan_warnings.append(SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_DIR_MISSING, {"path": dir_path}))
+	var directory_access := DirAccess.open(directory_path)
+	if directory_access == null:
+		scan_warnings.append(SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_DIR_MISSING, {"path": directory_path}))
 		return
 	var scanned_tables: Dictionary = {}
-	for file_name in dir.get_files():
+	for file_name in directory_access.get_files():
 		if file_name.ends_with(EXT_KDAT):
 			var table_name: String = file_name.trim_suffix(EXT_KDAT)
 			if not table_prefix.is_empty():
 				table_name = table_prefix + "." + table_name
-			load_single_table_into(dir_path + file_name, table_name, out_tables, scan_failures, scan_warnings)
+			load_single_table_into(directory_path + file_name, table_name, target_tables, scan_failures, scan_warnings)
 			scanned_tables[table_name] = true
-	for file_name in dir.get_files():
+	for file_name in directory_access.get_files():
 		if file_name.ends_with(EXT_JSON):
 			var table_name: String = file_name.trim_suffix(EXT_JSON)
 			if not table_prefix.is_empty():
 				table_name = table_prefix + "." + table_name
 			if not scanned_tables.has(table_name):
-				load_single_table_into(dir_path + file_name, table_name, out_tables, scan_failures, scan_warnings)
-	for sub_dir in dir.get_directories():
-		var sub_prefix: String = sub_dir if table_prefix.is_empty() else table_prefix + "." + sub_dir
-		scan_dir_into(dir_path + sub_dir + "/", sub_prefix, out_tables, scan_failures, scan_warnings)
+				load_single_table_into(directory_path + file_name, table_name, target_tables, scan_failures, scan_warnings)
+	for subdirectory in directory_access.get_directories():
+		var subtable_prefix: String = subdirectory if table_prefix.is_empty() else table_prefix + "." + subdirectory
+		scan_dir_into(directory_path + subdirectory + "/", subtable_prefix, target_tables, scan_failures, scan_warnings)
 
 
-## 加载单张 .kdat 或 .json 表文件写入 out_tables
+## 加载单张 .kdat 或 .json 表文件写入 target_tables
 static func load_single_table_into(
 	file_path: String,
 	table_name: String,
-	out_tables: Dictionary,
+	target_tables: Dictionary,
 	scan_failures: Array,
 	scan_warnings: Array = []
 ) -> void:
 	if file_path.ends_with(EXT_KDAT):
-		var kdat_data: Variant = BinaryConfigReader.load_kdat_file(file_path)
-		if kdat_data != null and (kdat_data is Dictionary):
-			out_tables[table_name] = kdat_data
+		var kdat_payload: Variant = BinaryConfigReader.load_kdat_file(file_path)
+		if kdat_payload != null and (kdat_payload is Dictionary):
+			target_tables[table_name] = kdat_payload
 			return
 		scan_failures.append(SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_KDAT_FAIL, {"path": file_path}))
 		scan_warnings.append(SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_KDAT_WARN, {"path": file_path}))
@@ -221,9 +221,9 @@ static func load_single_table_into(
 			"path": file_path, "error": json.get_error_message(), "line": json.get_error_line()
 		}))
 		return
-	var data: Variant = json.get_data()
-	if data is Dictionary:
-		out_tables[table_name] = data
+	var parsed_payload: Variant = json.get_data()
+	if parsed_payload is Dictionary:
+		target_tables[table_name] = parsed_payload
 	else:
 		scan_failures.append(SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_ROOT_OBJECT, {"path": file_path}))
 		scan_warnings.append(SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_ROOT_WARN, {"path": file_path}))

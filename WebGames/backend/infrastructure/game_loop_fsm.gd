@@ -81,8 +81,8 @@ func serialize() -> Dictionary:
 	return {"stack": state_stack.duplicate(), "current": current_state, "context": global_context.duplicate()}
 
 ## 状态栈反序列化（帧范围校验 + 空栈安全回退 BOOT_INIT）
-func deserialize(data: Dictionary) -> void:
-	var raw_stack: Array = data.get("stack", [EngineState.BOOT_INIT])
+func deserialize(serialized_state: Dictionary) -> void:
+	var raw_stack: Array = serialized_state.get("stack", [EngineState.BOOT_INIT])
 	state_stack = []
 	for raw_state in raw_stack:
 		var state_value := int(raw_state)
@@ -91,9 +91,9 @@ func deserialize(data: Dictionary) -> void:
 	if state_stack.is_empty():
 		# 防止持久化数据全部无效导致状态栈为空而违反栈顶单活不变式
 		state_stack.append(EngineState.BOOT_INIT)
-	var current_value := int(data.get("current", state_stack.back()))
+	var current_value := int(serialized_state.get("current", state_stack.back()))
 	if current_value >= EngineState.BOOT_INIT and current_value <= EngineState.PAUSED_MODAL:
 		current_state = current_value as EngineState
 	else:
 		current_state = state_stack.back()
-	global_context = Dictionary(data.get("context", {}))
+	global_context = Dictionary(serialized_state.get("context", {}))

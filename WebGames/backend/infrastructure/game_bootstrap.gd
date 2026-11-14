@@ -50,7 +50,7 @@ static func _release_telemetry_pool(pool_name: String, pooled_object: RefCounted
 # 一、装配状态与单例引用
 # ==============================================================================
 
-static var _assembled: bool = false
+static var _is_assembled: bool = false
 static var _catalog: ItemRegistryCatalog = null
 static var _magic_registry: MagicTierRegistry = null  # 魔法体系统一登记注册表（唯一装配）
 static var _magic_rules: MagicRuleRegistry = null     # 统一魔法规则注册表（唯一装配）
@@ -64,7 +64,7 @@ static var _active_context: VersionedRuntimeContext = null # 当前激活的版�
 
 ## 全域装配（幂等）：重复调用零开销，返回装配快照（物品数 / 已注册命令数）
 static func assemble() -> Dictionary:
-	if _assembled:
+	if _is_assembled:
 		return {
 			"success": true,
 			"already_assembled": true,
@@ -116,7 +116,7 @@ static func assemble() -> Dictionary:
 		Callable(ClientSecretVault, "reveal_in_memory_token")
 	)
 	GmCommandCatalog.register_default_commands()
-	_assembled = true
+	_is_assembled = true
 	return {
 		"success": true,
 		"already_assembled": false,
@@ -149,15 +149,15 @@ static func assemble_versioned(target_version: String, token: ActivationTokenDTO
 		if GameConfig.has("infrastructure.version_manifest", "releases/" + target_version + "/version_code"):
 			version_code = GameConfig.get_int("infrastructure.version_manifest", "releases/" + target_version + "/version_code", 10000)
 		_active_context = VersionedRuntimeContext.new(target_version, version_code, token)
-		var context_assembled := _active_context.assemble_context()
-		if not context_assembled:
+		var is_context_assembled := _active_context.assemble_context()
+		if not is_context_assembled:
 			return {"success": false, "error_code": "CONTEXT_ASSEMBLY_FAILED"}
 
 	_catalog = _active_context.catalog
 	_magic_registry = _active_context.magic_registry
 	_magic_rules = _active_context.magic_rules
 	_quality_registry = _active_context.quality_registry
-	_assembled = true
+	_is_assembled = true
 	return {
 		"success": true,
 		"version": target_version,
@@ -172,10 +172,10 @@ static func get_active_context() -> VersionedRuntimeContext:
 
 ## 装配前置安全检查：管理密钥/会话 TTL/货币欠账下限齐备才放行（防半成品装配）
 static func _security_ready() -> bool:
-	var ttl := GameConfig.get_int("infrastructure.admin", "session/ttl_seconds", 0)
+	var time_to_live_seconds := GameConfig.get_int("infrastructure.admin", "session/ttl_seconds", 0)
 	var key_id := GameConfig.get_string("infrastructure.admin", "security/seal_key_id", "")
 	var debt_limit := GameConfig.get_int("domains.currency", "debt/max_debt_copper", -1)
-	return ttl > 0 and not key_id.is_empty() and debt_limit >= 0
+	return time_to_live_seconds > 0 and not key_id.is_empty() and debt_limit >= 0
 
 # ==============================================================================
 # 三、装配后共享单例访问
@@ -213,11 +213,11 @@ static func quality_tier_registry() -> QualityTierRegistry:
 
 ## 查询全域引导装配流水线是否已全部就绪
 static func is_assembled() -> bool:
-	return _assembled
+	return _is_assembled
 
 ## 全域反装配（对称幂等）：按生命周期配置拓扑逆序清理各域运行时会话、租约、仓储、对象池并重置装配标记
 static func teardown() -> Dictionary:
-	if not _assembled:
+	if not _is_assembled:
 		return {
 			"success": true,
 			"already_teared_down": true
@@ -257,7 +257,7 @@ static func teardown() -> Dictionary:
 		_active_context = null
 
 	# 复位装配标记
-	_assembled = false
+	_is_assembled = false
 
 	# 广播引擎反装配完成事件（统一 EventBus 接入）
 	EventBusCore.get_instance().emit_domain_event("engine.teardown_completed", {
@@ -306,19 +306,19 @@ static func _teardown_single_subsystem(subsystem_key: String) -> void:
 			ObjectPoolManager.teardown()
 
 ## 依赖倒置过场播放适配器：由领域端口 PrologueCutscenePort 在无头或主线程安全调度 CutsceneOrchestrator
-static func _run_prologue_cutscene_hook(cutscene_id: String, skip_requested: bool) -> Dictionary:
+static func _run_prologue_cutscene_hook(cutscene_id: String, is_skip_requested: bool) -> Dictionary:
 	var orchestrator := CutsceneOrchestrator.get_instance()
 	if orchestrator == null:
 		return {"success": false, "error_code": "CUTSCENE_ORCHESTRATOR_UNAVAILABLE"}
 	var play_result := orchestrator.play_by_id(cutscene_id, {"headless": true})
-	var skipped := false
-	if skip_requested:
-		skipped = orchestrator.skip_cutscene()
-	if not skipped and orchestrator.is_playing():
+	var is_skipped := false
+	if is_skip_requested:
+		is_skipped = orchestrator.skip_cutscene()
+	if not is_skipped and orchestrator.is_playing():
 		orchestrator.finish_cutscene()
 	return {
 		"success": bool(play_result.get("success", false)),
 		"cutscene_id": cutscene_id,
-		"skipped": skipped,
+		"skipped": is_skipped,
 		"is_placeholder": bool(play_result.get("is_placeholder", false))
 	}

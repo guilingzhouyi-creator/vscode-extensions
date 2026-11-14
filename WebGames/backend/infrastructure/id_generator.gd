@@ -14,7 +14,7 @@ class_name IdGenerator extends RefCounted
 # 一、状态
 # ==============================================================================
 
-static var _last_tick_msec: int = -1  # 上一次生成的时间戳（毫秒，同毫秒碰撞检测基准）
+static var _last_tick_milliseconds: int = -1  # 上一次生成的时间戳（毫秒，同毫秒碰撞检测基准）
 static var _same_tick_count: int = 0  # 同毫秒内已生成次数（追加序号来源）
 
 # ==============================================================================
@@ -24,10 +24,10 @@ static var _same_tick_count: int = 0  # 同毫秒内已生成次数（追加序�
 ## 生成 "<prefix><毫秒时间戳>"；同毫秒重复调用时追加 "_<序号>" 保证进程内唯一
 static func next_id(prefix: String) -> String:
 	var tick := Time.get_ticks_msec()
-	if tick == _last_tick_msec:
+	if tick == _last_tick_milliseconds:
 		_same_tick_count += 1
 	else:
-		_last_tick_msec = tick
+		_last_tick_milliseconds = tick
 		_same_tick_count = 0
 	var suffix := str(tick) if _same_tick_count == 0 else str(tick) + "_" + str(_same_tick_count)
 	return prefix + suffix

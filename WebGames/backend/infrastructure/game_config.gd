@@ -22,6 +22,8 @@ const SystemBaseMessages = preload("res://backend/infrastructure/logging/system_
 const CONFIG_DIR: String = "res://config/"
 
 static var _tables: Dictionary = {}
+static var _base_tables: Dictionary = {}
+static var _active_mod_overlays: Array[String] = []
 static var _loaded: bool = false
 static var _tables_mutex: Mutex = Mutex.new()
 
@@ -139,9 +141,12 @@ static func ensure_loaded() -> void:
 	if _loaded:
 		return
 	_tables.clear()
+	_base_tables.clear()
+	_active_mod_overlays.clear()
 	var warnings: Array = []
 	GameConfigLoader.load_all_tables_into(_tables, _scan_failures, warnings)
 	_flush_loader_warnings(warnings)
+	_base_tables = _tables.duplicate(true)
 	_loaded = true
 	_validate_required_tables()
 
@@ -162,19 +167,20 @@ static func ensure_l0_loaded_sync() -> int:
 ## 借助双域储存并发工作池异步装载全部业务与文案配置表
 static func load_via_storage_async(on_completed: Callable = Callable()) -> void:
 	ensure_l0_loaded_sync()
-	var on_item := func(entry: Variant, ok: bool, data: Variant, _err: String) -> void:
-		if ok and (data is Dictionary):
+	var on_table_loaded := func(entry: Variant, is_succeeded: bool, table_payload: Variant, _error_code: String) -> void:
+		if is_succeeded and (table_payload is Dictionary):
 			var table_name: String = str(entry.metadata.get("table_name", ""))
 			if not table_name.is_empty():
 				_tables_mutex.lock()
-				_tables[table_name] = data
+				_tables[table_name] = table_payload
+				_base_tables[table_name] = (table_payload as Dictionary).duplicate(true)
 				_tables_mutex.unlock()
-	var on_done := func(_bid: String, total: int, _failed: int) -> void:
+	var on_done := func(_batch_id: String, total: int, _failed: int) -> void:
 		_validate_required_tables()
 		EventBusCore.get_instance().emit_domain_event(EVENT_ALL_TABLES_READY, {"total": total})
 		if on_completed.is_valid():
 			on_completed.call(total)
-	if not GameConfigLoader.try_enqueue_async_config_batch(_tables, on_item, on_done):
+	if not GameConfigLoader.try_enqueue_async_config_batch(_tables, on_table_loaded, on_done):
 		ensure_loaded()
 		if on_completed.is_valid():
 			on_completed.call(_tables.size())
@@ -215,7 +221,7 @@ static func reload_config() -> Dictionary:
 	# 深拷贝旧快照：GDScript Dictionary 为引用类型，若直接赋值则与 _tables 同体，
 	# 后续 _tables.clear() 会连带清空旧快照，使失败路径回滚退化为空操作、added/changed/removed 恒空。
 	var old_tables: Dictionary = _tables.duplicate(true)
-	var old_loaded: bool = _loaded
+	var was_loaded: bool = _loaded
 	_scan_failures = []
 
 	var built: Dictionary = {}
@@ -233,7 +239,7 @@ static func reload_config() -> Dictionary:
 	var missing: Array = GameConfigLoader.collect_missing_required(built, _required_tables)
 	if not missing.is_empty():
 		_tables = old_tables
-		_loaded = old_loaded
+		_loaded = was_loaded
 		return {
 			"success": false, "version": _reload_counter, "error": "MISSING_REQUIRED_TABLE",
 			"details": missing, "added": [], "removed": [], "changed": [],
@@ -241,31 +247,133 @@ static func reload_config() -> Dictionary:
 		}
 
 	if built.is_empty() and not old_tables.is_empty():
-		_loaded = old_loaded
+		_loaded = was_loaded
 		return {
 			"success": false, "version": _reload_counter, "error": "BUILD_FAILED",
 			"added": [], "removed": [], "changed": [],
 			"table_count": old_tables.size()
 		}
 
-	var diff: Dictionary = GameConfigLoader.diff_table_snapshots(old_tables, built)
+	var snapshot_differences: Dictionary = GameConfigLoader.diff_table_snapshots(old_tables, built)
 	_reload_counter += 1
 	_tables = built
+	_base_tables = built.duplicate(true)
+	_active_mod_overlays.clear()
 	_loaded = true
 	_path_cache.clear()
-	EventBusCore.get_instance().emit_domain_event("config.security_reloaded", {"version": _reload_counter, "changed": diff["changed"]})
+	EventBusCore.get_instance().emit_domain_event("config.security_reloaded", {"version": _reload_counter, "changed": snapshot_differences["changed"]})
 	return {
 		"success": true,
 		"version": _reload_counter,
-		"added": diff["added"],
-		"removed": diff["removed"],
-		"changed": diff["changed"],
+		"added": snapshot_differences["added"],
+		"removed": snapshot_differences["removed"],
+		"changed": snapshot_differences["changed"],
 		"table_count": _tables.size()
 	}
 
 ## 别名委托 reload_config()
 static func reload_all_configurations() -> Dictionary:
 	return reload_config()
+
+## 查询是否存在激活状态的模组运行时配置覆盖层
+static func has_active_mod_overlay() -> bool:
+	return not _active_mod_overlays.is_empty()
+
+## 获取当前激活的模组覆盖层来源包 ID 列表
+static func get_active_mod_overlay_packs() -> Array[String]:
+	return _active_mod_overlays.duplicate()
+
+## 返回基础配置表快照副本（不受已激活模组运行时覆盖层影响）
+static func get_base_tables_snapshot() -> Dictionary:
+	ensure_loaded()
+	if _base_tables.is_empty() and not _tables.is_empty():
+		_base_tables = _tables.duplicate(true)
+	return _base_tables.duplicate(true)
+
+static func _erase_prefixed_tables(rebuilt_tables: Dictionary, purged_prefix: String) -> void:
+	if purged_prefix.is_empty():
+		return
+	var matched_keys: Array[String] = []
+	for candidate_key in rebuilt_tables.keys():
+		var table_key_name := String(candidate_key)
+		if table_key_name.begins_with(purged_prefix):
+			matched_keys.append(table_key_name)
+	for matched_key in matched_keys:
+		rebuilt_tables.erase(matched_key)
+
+static func _copy_overlay_table_into(rebuilt_tables: Dictionary, overlay_table_name: String, table_content: Dictionary) -> void:
+	rebuilt_tables[overlay_table_name] = table_content.duplicate(true)
+
+## 应用模组运行时配置覆盖层（仅变更内存表快照并递增热重载版本，不改写磁盘 JSON）
+static func apply_mod_overlay_tables(
+	overlay_tables: Dictionary,
+	applied_pack_identifiers: Array = [],
+	purged_table_prefixes: Array = []
+) -> Dictionary:
+	ensure_loaded()
+	if _base_tables.is_empty() and not _tables.is_empty():
+		_base_tables = _tables.duplicate(true)
+
+	var rebuilt_tables: Dictionary = _base_tables.duplicate(true)
+	for raw_prefix in purged_table_prefixes:
+		_erase_prefixed_tables(rebuilt_tables, String(raw_prefix))
+
+	var overlaid_table_names: Array[String] = []
+	for raw_table_key in overlay_tables.keys():
+		var overlay_table_name := String(raw_table_key)
+		var table_content: Variant = overlay_tables[raw_table_key]
+		if table_content is Dictionary:
+			_copy_overlay_table_into(rebuilt_tables, overlay_table_name, table_content as Dictionary)
+			overlaid_table_names.append(overlay_table_name)
+
+	_reload_counter += 1
+	_tables = rebuilt_tables
+	_path_cache.clear()
+	_active_mod_overlays.clear()
+	for raw_pack_identifier in applied_pack_identifiers:
+		var pack_identifier := String(raw_pack_identifier).strip_edges()
+		if not pack_identifier.is_empty() and not _active_mod_overlays.has(pack_identifier):
+			_active_mod_overlays.append(pack_identifier)
+
+	EventBusCore.get_instance().emit_domain_event("config.mod_overlay_applied", {
+		"version": _reload_counter,
+		"pack_ids": _active_mod_overlays.duplicate(),
+		"tables": overlaid_table_names
+	})
+	return {
+		"success": true,
+		"version": _reload_counter,
+		"pack_ids": _active_mod_overlays.duplicate(),
+		"overlaid_tables": overlaid_table_names
+	}
+
+## 清空模组运行时覆盖层并原子还原至基础配置快照
+static func clear_mod_overlay_tables() -> Dictionary:
+	ensure_loaded()
+	if _active_mod_overlays.is_empty():
+		return {
+			"success": true,
+			"had_overlay": false,
+			"version": _reload_counter
+		}
+
+	if not _base_tables.is_empty():
+		_tables = _base_tables.duplicate(true)
+	var cleared_packs: Array[String] = _active_mod_overlays.duplicate()
+	_active_mod_overlays.clear()
+	_reload_counter += 1
+	_path_cache.clear()
+
+	EventBusCore.get_instance().emit_domain_event("config.mod_overlay_cleared", {
+		"version": _reload_counter,
+		"cleared_packs": cleared_packs
+	})
+	return {
+		"success": true,
+		"had_overlay": true,
+		"version": _reload_counter,
+		"cleared_packs": cleared_packs
+	}
 
 ## 单子表靶向热重载（零污染、单子表原子替换）
 static func reload_subtable(subtable_name: String) -> Dictionary:
@@ -275,6 +383,7 @@ static func reload_subtable(subtable_name: String) -> Dictionary:
 		return load_result
 
 	_tables[resolved] = load_result.get("data", {})
+	_base_tables[resolved] = (_tables[resolved] as Dictionary).duplicate(true)
 	_reload_counter += 1
 	_path_cache.clear()
 
@@ -302,38 +411,43 @@ static func get_table_names() -> Array:
 	ensure_loaded()
 	return _tables.keys()
 
+static func _ensure_table_loaded_jit_with_base(target_table: String) -> void:
+	if _tables.has(target_table):
+		return
+	GameConfigLoader.ensure_table_loaded_jit(target_table, _tables, _scan_failures)
+	if _tables.has(target_table) and not _base_tables.has(target_table):
+		var loaded_table: Variant = _tables[target_table]
+		if loaded_table is Dictionary:
+			_base_tables[target_table] = (loaded_table as Dictionary).duplicate(true)
+
 ## 返回整张配置表（path 为空即取表根）
 static func get_table(table_name: String, default: Variant = {}) -> Variant:
 	ensure_loaded()
 	var target_table := ConfigRouterEngine.resolve_table_name(table_name)
-	if not _tables.has(target_table):
-		GameConfigLoader.ensure_table_loaded_jit(target_table, _tables, _scan_failures)
+	_ensure_table_loaded_jit_with_base(target_table)
 	return _tables.get(target_table, default)
 
 ## 判定指定配置表是否存在且可加载
 static func has_table(table_name: String) -> bool:
 	ensure_loaded()
 	var target_table := ConfigRouterEngine.resolve_table_name(table_name)
-	if not _tables.has(target_table):
-		GameConfigLoader.ensure_table_loaded_jit(target_table, _tables, _scan_failures)
+	_ensure_table_loaded_jit_with_base(target_table)
 	return _tables.has(target_table)
 
 static func _resolve_raw_value(table_name: String, path: String) -> Variant:
 	ensure_loaded()
 	var target_table: String = ConfigRouterEngine.resolve_target_table(table_name, path)
-	if not _tables.has(target_table):
-		GameConfigLoader.ensure_table_loaded_jit(target_table, _tables, _scan_failures)
+	_ensure_table_loaded_jit_with_base(target_table)
 	var raw_value: Variant = _lookup_path_in_table(_tables.get(target_table, {}), path)
 	if raw_value != null:
 		return raw_value
 	var subtables: Array = ConfigRouterEngine.get_subtables_for_domain(table_name)
 	var empty_table: Dictionary = {}
-	for sub in subtables:
-		var subtable_name := String(sub)
+	for subtable_entry in subtables:
+		var subtable_name := String(subtable_entry)
 		if subtable_name == target_table:
 			continue
-		if not _tables.has(subtable_name):
-			GameConfigLoader.ensure_table_loaded_jit(subtable_name, _tables, _scan_failures)
+		_ensure_table_loaded_jit_with_base(subtable_name)
 		var subtable_value: Variant = _lookup_path_in_table(_tables.get(subtable_name, empty_table), path)
 		if subtable_value != null:
 			return subtable_value
@@ -378,9 +492,9 @@ static func get_float(table_name: String, path: String, default: float = 0.0) ->
 	return default
 
 ## 读取配置表指定路径的布尔值
-static func get_bool(table_name: String, path: String, default: bool = false) -> bool:
-	var raw_value: Variant = get_value(table_name, path, default)
-	return raw_value if raw_value is bool else default
+static func get_bool(table_name: String, path: String, is_default_enabled: bool = false) -> bool:
+	var raw_value: Variant = get_value(table_name, path, is_default_enabled)
+	return raw_value if raw_value is bool else is_default_enabled
 
 ## 读取配置表指定路径的字典结构
 static func get_dict(table_name: String, path: String, default: Dictionary = {}) -> Dictionary:
@@ -429,10 +543,10 @@ static func msg(domain_id: String, key: String) -> String:
 
 ## 领域文案统一格式化读取：表 = narratives.<domain_id>，获取模板后经 TemplateFormatter 执行 {param} 填充。
 ## 支持大小写键名自适应容错，未命中配置键回退 fallback 或 key 本身。
-static func msg_fmt(domain_id: String, key: String, params: Dictionary = {}, fallback: String = "") -> String:
+static func msg_fmt(domain_id: String, key: String, parameters: Dictionary = {}, fallback: String = "") -> String:
 	var default_text := fallback if not fallback.is_empty() else key
 	var template_text := get_string("narratives." + domain_id, key, default_text)
-	return TemplateFormatter.format(template_text, params)
+	return TemplateFormatter.format(template_text, parameters)
 
 # ==============================================================================
 # 五、内部实现（路径解析 / 目录扫描 / 表加载）
