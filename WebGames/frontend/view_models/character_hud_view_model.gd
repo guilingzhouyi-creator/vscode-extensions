@@ -1,10 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 视图模型: 角色与主页HUD三层模型解耦
+# 模块归属: Frontend / ViewModels
 # 文件路径: res://frontend/view_models/character_hud_view_model.gd
-# 职责: 落地 Transport DTO ➔ Frontend Domain Model ➔ Reactive ViewModel 三层契约，
-#       提供零除安全守卫与货币四级资产格式化，严禁表现层直接暴露底层传输字段
+# 架构定位: 视图模型层三层转换模型，封装角色传输载荷、前端领域模型与响应式视图模型
+# 依赖与触发: 依赖 DesignTokens 与 UIIntermediary，由角色与主页 HUD 桥接层实例化并更新
+# 职责说明: 落地 Transport DTO 到 Frontend Domain Model 再到 Reactive ViewModel 的三层契约与格式化
+# 退出语义与设计依据: 纯引用计数数据模型，提供零除守卫与非有限数保护，销毁时随引用自动回收
 # ==============================================================================
-class_name CharacterHudDecoupled
+## CharacterHudViewModel：角色与主页 HUD 三层视图模型容器，提供零除守卫与货币格式化
+class_name CharacterHudViewModel
 extends RefCounted
 
 const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
@@ -46,28 +49,28 @@ class CharacterDomainModel extends RefCounted:
 		return clampf(ap_current / safe_max, 0.0, 1.0)
 
 	## 转换自 DTO
-	static func from_dto(dto: CharacterTransportDTO) -> CharacterDomainModel:
+	static func from_dto(transport_data: CharacterTransportDTO) -> CharacterDomainModel:
 		var model := CharacterDomainModel.new()
-		model.id = dto.character_id
-		model.name = dto.nickname
-		model.level = maxi(1, dto.level_raw)
-		model.current_hp = dto.hp_current
-		model.max_hp = maxf(1.0, dto.hp_maximum)
-		model.ap_current = dto.ap_current
-		model.ap_max = maxf(1.0, dto.ap_maximum)
-		model.monocrystals = maxi(0, dto.mana_monocrystals)
+		model.id = transport_data.character_id
+		model.name = transport_data.nickname
+		model.level = maxi(1, transport_data.level_raw)
+		model.current_hp = transport_data.hp_current
+		model.max_hp = maxf(1.0, transport_data.hp_maximum)
+		model.ap_current = transport_data.ap_current
+		model.ap_max = maxf(1.0, transport_data.ap_maximum)
+		model.monocrystals = maxi(0, transport_data.mana_monocrystals)
 
 		# 铜币折算为金/银/铜三元组
-		var total_copper: int = maxi(0, dto.coins_copper_total)
+		var total_copper: int = maxi(0, transport_data.coins_copper_total)
 		model.gold = total_copper / 10000
-		var rem: int = total_copper % 10000
-		model.silver = rem / 100
-		model.copper = rem % 100
+		var remainder_copper: int = total_copper % 10000
+		model.silver = remainder_copper / 100
+		model.copper = remainder_copper % 100
 		return model
 
 ## 3. 视图模型 (面向 UI 渲染的呈现包装)
 class CharacterHUDViewModel extends RefCounted:
-	signal property_changed(prop_name: String, new_val: Variant)
+	signal property_changed(property_name: String, new_value: Variant)
 
 	var character_id: String = ""
 	var name_text: String = ""
@@ -85,10 +88,10 @@ class CharacterHUDViewModel extends RefCounted:
 		character_id = domain.id
 		name_text = domain.name
 		level_badge = "Lv.%d" % domain.level
-		# R-08：先经有限性守卫 + clamp（上限 ≥1）再取整，杜绝 current_hp 未 clamp 与 int(NAN)/int(INF) 异常整数
-		var safe_cur: float = domain.current_hp if is_finite(domain.current_hp) else 0.0
+		# 先经有限性守卫与区间夹紧（上限 ≥1）再取整，防止未夹紧或 NaN/INF 产生异常整数
+		var safe_current: float = domain.current_hp if is_finite(domain.current_hp) else 0.0
 		var safe_max: float = domain.max_hp if (is_finite(domain.max_hp) and domain.max_hp >= 1.0) else 1.0
-		hp_display_text = "%d / %d" % [int(clampf(safe_cur, 0.0, safe_max)), int(safe_max)]
+		hp_display_text = "%d / %d" % [int(clampf(safe_current, 0.0, safe_max)), int(safe_max)]
 		hp_progress_ratio = domain.get_health_ratio()
 
 		# 血量危险阈值自动换色

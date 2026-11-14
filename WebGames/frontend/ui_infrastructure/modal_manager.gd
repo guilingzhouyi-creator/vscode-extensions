@@ -1,8 +1,12 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - UI基础设施: 模态弹窗管理器
+# 模块归属: Frontend / UIInfrastructure
 # 文件路径: res://frontend/ui_infrastructure/modal_manager.gd
-# 职责: 管理全屏业务模态弹窗（背包、合成、抽卡等），提供暗色遮罩、弹窗栈与点击拦截
+# 架构定位: UI 基础设施模态弹窗管理器，维护全局弹窗栈、背景点击遮罩与共享遮罩创建助手
+# 依赖与触发: 依赖 DesignTokens 与 EventBusCore，由 AppRoot 绑定并供 DialogManager 与视图调用
+# 职责说明: 管理全屏业务模态弹窗（背包、合成、抽卡等），提供暗色遮罩、弹窗栈与点击拦截
+# 退出语义与设计依据: 关闭弹窗时从栈顶或指定槽位移除并释放节点，同时动态对齐剩余栈顶下方遮罩可见性
 # ==============================================================================
+## ModalManager：全局模态弹窗栈管理器，负责弹窗堆栈调度、暗色遮罩维护与共享容器构建
 class_name ModalManager
 extends Node
 
@@ -12,6 +16,7 @@ signal modal_opened(modal: Control)
 signal modal_closed(modal: Control)
 
 static var _instance: ModalManager
+## 获取模态弹窗管理器全局单例
 static func get_instance() -> ModalManager:
 	if _instance == null:
 		_instance = ModalManager.new()
@@ -78,10 +83,10 @@ func open_modal(modal: Control, dismiss_on_backdrop: bool = false) -> bool:
 		_modal_container.add_child(modal)
 		modal.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 
-	var existing_idx := _modal_stack.find(modal)
-	if existing_idx >= 0:
-		_modal_stack.remove_at(existing_idx)
-		_dismiss_flags.remove_at(existing_idx)
+	var existing_index := _modal_stack.find(modal)
+	if existing_index >= 0:
+		_modal_stack.remove_at(existing_index)
+		_dismiss_flags.remove_at(existing_index)
 
 	_modal_stack.append(modal)
 	_dismiss_flags.append(dismiss_on_backdrop)
@@ -98,10 +103,10 @@ func close_modal(modal: Control = null) -> void:
 		return
 
 	var target: Control = modal if modal != null else _modal_stack.back()
-	var idx := _modal_stack.find(target)
-	if idx >= 0:
-		_modal_stack.remove_at(idx)
-		_dismiss_flags.remove_at(idx)
+	var modal_index := _modal_stack.find(target)
+	if modal_index >= 0:
+		_modal_stack.remove_at(modal_index)
+		_dismiss_flags.remove_at(modal_index)
 		target.visible = false
 		modal_closed.emit(target)
 		target.queue_free()
@@ -113,9 +118,11 @@ func close_all_modals() -> void:
 	while not _modal_stack.is_empty():
 		close_modal()
 
+## 获取当前已打开的模态弹窗数量
 func get_modal_count() -> int:
 	return _modal_stack.size()
 
+## 获取位于弹窗栈最顶层的当前活跃模态控件
 func get_top_modal() -> Control:
 	return _modal_stack.back() if not _modal_stack.is_empty() else null
 

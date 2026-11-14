@@ -1,16 +1,18 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端状态层: 战斗响应式数据模型
+# 模块归属: Frontend / ViewModels
 # 文件路径: res://frontend/view_models/combat_view_model.gd
-# 职责: 承载战斗视图的 BOSS 血量/部位状态/战报日志/飘字请求
-# 边界: 中性默认值（不内嵌业务演示数据），数据一律经 update_from_snapshot 注入
+# 架构定位: 前端状态层战斗响应式视图模型，承载战斗双方状态、战报列表与飘字事件流
+# 依赖与触发: 依赖 FrontendSnapshot 防御读取，由战斗桥接层调用 update_from_snapshot 驱动 UI 刷新
+# 职责说明: 承载战斗视图的 BOSS 血量、部位状态、战报日志与飘字请求
+# 退出语义与设计依据: 中性默认值且不内嵌演示数据；日志按有界队列逐出旧条目，数值经过有限性守卫防 NaN/INF 污染
 # ==============================================================================
+## CombatViewModel：战斗响应式视图模型，负责战斗快照状态投影与有界战报事件分发
 class_name CombatViewModel
 extends RefCounted
 
 signal data_changed()
-signal floating_text_requested(text: String, is_crit: bool, is_heal: bool, pos: Vector2)
+signal floating_text_requested(text: String, is_crit: bool, is_heal: bool, target_position: Vector2)
 
-## 战报日志条数上限（防无界增长；R-09：超出时裁剪最旧，严禁魔法数字）
 const MAX_BATTLE_LOGS: int = 100
 
 var boss_name: String = ""
@@ -29,12 +31,10 @@ var player_ap_max: float = 1.0
 var battle_logs: Array[Dictionary] = []
 
 ## 按快照字典增量更新战斗数据
-## R-03/R-09：数值经有限性守卫 + clamp、部位改防御读取；缺失键保持既有值（契约零回归）
 func update_from_snapshot(snapshot: Dictionary) -> void:
 	boss_name = str(snapshot.get("boss_name", boss_name))
 	boss_hp_max = maxf(1.0, _safe_float(snapshot.get("boss_max_hp", boss_hp_max), boss_hp_max))
 	boss_hp_current = clampf(_safe_float(snapshot.get("boss_hp", boss_hp_current), boss_hp_current), 0.0, boss_hp_max)
-	# R-03：非 Array（含 null）经防御读取返回 []，杜绝原 as Array 得 null → .duplicate() 空引用崩溃
 	if snapshot.has("boss_parts"):
 		boss_parts = FrontendSnapshot.read_array(snapshot, "boss_parts")
 
@@ -48,12 +48,10 @@ func update_from_snapshot(snapshot: Dictionary) -> void:
 
 	data_changed.emit()
 
-## R-03/R-09：非有限值（NaN/INF）经守卫回落 fallback，杜绝 int(NAN) 等异常整数
 static func _safe_float(value: Variant, fallback: float = 0.0) -> float:
-	var f := float(value)
-	return f if is_finite(f) else fallback
+	var numeric_value := float(value)
+	return numeric_value if is_finite(numeric_value) else fallback
 
-## 追加战斗日志（R-09：超上限时裁剪最旧，保持有界）
 func append_log(category: String, message: String) -> void:
 	while battle_logs.size() >= MAX_BATTLE_LOGS:
 		battle_logs.remove_at(0)
@@ -65,5 +63,5 @@ func append_log(category: String, message: String) -> void:
 	data_changed.emit()
 
 ## 请求飘字
-func request_floating_text(text: String, is_crit: bool, is_heal: bool, pos: Vector2) -> void:
-	floating_text_requested.emit(text, is_crit, is_heal, pos)
+func request_floating_text(text: String, is_crit: bool, is_heal: bool, target_position: Vector2) -> void:
+	floating_text_requested.emit(text, is_crit, is_heal, target_position)

@@ -1,12 +1,13 @@
 # ==============================================================================
-# 模块归属: 表现层 / 界面系统 (Frontend · 模组工坊系统 (Mod Workbench))
+# 模块归属: Frontend / Systems (模组工坊系统 Mod Workbench)
 # 文件路径: res://frontend/systems/mod_workbench/mod_workbench_view.gd
 # 架构定位: UI Placeholder Contract / Lightweight Whitebox View
-# 跨域依赖: 上游: 模组系统路由, 前端主视口 | 下游: AgentPlaythroughSession | 配置: 无 | 信号: 无
-# 职责说明: 模组工坊前端轻量白模与契约预留接口（遵循工程渐进原则：当前阶段严禁复杂 UI 渲染接线，预留会话绑定与快照重放接口契约，待核心系统成熟度达 80% 后再深度装配控件树）。
-# 设计依据: 表现层轻量化与高内聚解耦契约
+# 依赖与触发: 上游: 模组系统路由与前端主视口 | 下游: AgentPlaythroughSession
+# 职责说明: 模组工坊前端轻量白模与契约预留接口（预留会话绑定与快照重放接口契约，暂不装配复杂控件树）
+# 退出语义与设计依据: 保持表现层轻量化与高内聚解耦，仅维护只读快照副本与弱耦合会话引用
 # ==============================================================================
 
+## ModWorkbenchView：模组工坊轻量占位视图，提供推演会话绑定与快照重放契约接口
 class_name ModWorkbenchView
 extends Control
 
@@ -38,10 +39,10 @@ func bind_session(session: AgentPlaythroughSession) -> void:
 ## 获取当前工坊轻量预设状态字典
 func get_workbench_state() -> Dictionary:
 	if _bound_session != null and _bound_session is AgentPlaythroughSession:
-		var sess: AgentPlaythroughSession = _bound_session
-		_workbench_state["session_id"] = sess.session_id
-		_workbench_state["current_step"] = sess.step_index
-		_workbench_state["is_terminal"] = sess.is_terminal
+		var active_session: AgentPlaythroughSession = _bound_session
+		_workbench_state["session_id"] = active_session.session_id
+		_workbench_state["current_step"] = active_session.step_index
+		_workbench_state["is_terminal"] = active_session.is_terminal
 	return _workbench_state.duplicate(true)
 
 ## 应用推演或工坊快照数据

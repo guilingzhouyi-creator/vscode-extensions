@@ -1,17 +1,22 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - UI基础设施: 上下文右键菜单管理器
+# 模块归属: Frontend / UIInfrastructure
 # 文件路径: res://frontend/ui_infrastructure/context_menu_manager.gd
-# 职责: 管理任意屏幕坐标弹出的快捷上下文菜单（装备操作、玩家互动菜单）
+# 架构定位: UI 基础设施上下文菜单管理器，负责动态构建与复用全局右键操作菜单及外围点击关闭
+# 依赖与触发: 依赖 DesignTokens 与 ModalManager 容器回退助手，由 AppRoot 绑定并在菜单触发时显示
+# 职责说明: 管理任意屏幕坐标弹出的快捷上下文菜单（装备操作、玩家互动菜单）
+# 退出语义与设计依据: 节点销毁前主动释放未挂载的菜单与遮罩实例；关闭或点击外部区域仅隐藏并复用按钮池
 # ==============================================================================
+## ContextMenuManager：上下文右键菜单管理器，负责菜单定位、按钮复用池与点击收起控制
 class_name ContextMenuManager
 extends Node
 
 const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
 
-signal menu_shown(pos: Vector2)
+signal menu_shown(menu_position: Vector2)
 signal menu_hidden()
 
 static var _instance: ContextMenuManager
+## 获取上下文菜单管理器全局单例
 static func get_instance() -> ContextMenuManager:
 	if _instance == null:
 		_instance = ContextMenuManager.new()
@@ -36,6 +41,7 @@ func _notification(what: int) -> void:
 		_menu_list = null
 		_dismiss_catcher = null
 
+## 绑定菜单承载的 CanvasLayer 与容器节点
 func bind_layer(layer: CanvasLayer, container: Control = null) -> void:
 	_layer = layer
 	_container = container if container != null else ModalManager.ensure_fallback_container(layer, "ContextMenuManagerFallbackContainer")
@@ -70,7 +76,8 @@ func _ensure_menu_nodes() -> void:
 			_menu_panel.get_parent().remove_child(_menu_panel)
 		_container.add_child(_menu_panel)
 
-func show_menu(pos: Vector2, items: Array) -> Control:
+## 在指定全局坐标处显示上下文菜单项列表
+func show_menu(menu_position: Vector2, items: Array) -> Control:
 	hide_menu()
 	if _container == null:
 		return null
@@ -79,41 +86,42 @@ func show_menu(pos: Vector2, items: Array) -> Control:
 	_dismiss_catcher.visible = true
 	_menu_panel.visible = true
 
-	var active_idx: int = 0
+	var active_index: int = 0
 	for raw_item in items:
 		if not (raw_item is Dictionary):
 			continue
-		_configure_menu_item_button(active_idx, raw_item as Dictionary)
-		active_idx += 1
-	for j in range(active_idx, _menu_list.get_child_count()):
-		(_menu_list.get_child(j) as Control).visible = false
+		_configure_menu_item_button(active_index, raw_item as Dictionary)
+		active_index += 1
+	for hidden_index in range(active_index, _menu_list.get_child_count()):
+		(_menu_list.get_child(hidden_index) as Control).visible = false
 
 	# 入参为画布全局坐标，转换为容器本地坐标后赋值，兼容非全屏偏移容器
-	_menu_panel.position = _container.get_global_transform().affine_inverse() * pos
+	_menu_panel.position = _container.get_global_transform().affine_inverse() * menu_position
 
-	menu_shown.emit(pos)
+	menu_shown.emit(menu_position)
 	return _menu_panel
 
-func _configure_menu_item_button(idx: int, item: Dictionary) -> void:
-	var btn: Button = null
-	if idx < _menu_list.get_child_count():
-		btn = _menu_list.get_child(idx) as Button
-		btn.visible = true
+func _configure_menu_item_button(item_index: int, item: Dictionary) -> void:
+	var menu_button: Button = null
+	if item_index < _menu_list.get_child_count():
+		menu_button = _menu_list.get_child(item_index) as Button
+		menu_button.visible = true
 	else:
-		btn = Button.new()
-		btn.custom_minimum_size = Vector2(120, 28)
-		btn.pressed.connect(_on_menu_item_pressed.bind(btn))
-		_menu_list.add_child(btn)
-	btn.text = str(item.get("label", UIIntermediary.text("ui.common.menu.default_option")))
-	btn.disabled = bool(item.get("disabled", false))
-	btn.set_meta("_menu_cb", item.get("callback", Callable()))
+		menu_button = Button.new()
+		menu_button.custom_minimum_size = Vector2(120, 28)
+		menu_button.pressed.connect(_on_menu_item_pressed.bind(menu_button))
+		_menu_list.add_child(menu_button)
+	menu_button.text = str(item.get("label", UIIntermediary.text("ui.common.menu.default_option")))
+	menu_button.disabled = bool(item.get("disabled", false))
+	menu_button.set_meta("_menu_cb", item.get("callback", Callable()))
 
-func _on_menu_item_pressed(btn: Button) -> void:
-	var cb: Variant = btn.get_meta("_menu_cb", Callable())
+func _on_menu_item_pressed(menu_button: Button) -> void:
+	var menu_callback: Variant = menu_button.get_meta("_menu_cb", Callable())
 	hide_menu()
-	if cb is Callable and (cb as Callable).is_valid():
-		(cb as Callable).call()
+	if menu_callback is Callable and (menu_callback as Callable).is_valid():
+		(menu_callback as Callable).call()
 
+## 隐藏当前打开的上下文菜单并关闭外部点击捕获
 func hide_menu() -> void:
 	var had_menu := is_menu_open()
 	if _menu_panel != null and is_instance_valid(_menu_panel):
@@ -123,6 +131,7 @@ func hide_menu() -> void:
 	if had_menu:
 		menu_hidden.emit()
 
+## 查询上下文菜单当前是否处于可见状态
 func is_menu_open() -> bool:
 	return _menu_panel != null and is_instance_valid(_menu_panel) and _menu_panel.visible
 

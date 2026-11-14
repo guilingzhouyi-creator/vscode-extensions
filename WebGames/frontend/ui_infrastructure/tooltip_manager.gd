@@ -1,8 +1,12 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - UI基础设施: 悬浮提示气泡管理器
+# 模块归属: Frontend / UIInfrastructure
 # 文件路径: res://frontend/ui_infrastructure/tooltip_manager.gd
-# 职责: 接管全局 Hover / 长按提示气泡，实现屏幕边缘防碰撞自动翻转 (Flip Algorithm)
+# 架构定位: UI 基础设施悬浮提示气泡管理器，实现悬停文案展示与屏幕边缘翻转定位算法
+# 依赖与触发: 依赖 DesignTokens 与 ModalManager 容器回退助手，由 AppRoot 绑定并由交互组件触发
+# 职责说明: 接管全局 Hover 与长按提示气泡，实现屏幕边缘防碰撞自动翻转算法
+# 退出语义与设计依据: 单气泡节点按需惰性构建并复用，隐藏仅切换可见性与状态位，不触发频繁节点销毁
 # ==============================================================================
+## TooltipManager：全局悬浮提示气泡管理器，提供边缘防碰撞翻转计算与气泡显隐控制
 class_name TooltipManager
 extends Node
 
@@ -12,6 +16,7 @@ signal tooltip_shown(text: String)
 signal tooltip_hidden()
 
 static var _instance: TooltipManager
+## 获取悬浮提示气泡管理器全局单例
 static func get_instance() -> TooltipManager:
 	if _instance == null:
 		_instance = TooltipManager.new()
@@ -21,9 +26,10 @@ static func get_instance() -> TooltipManager:
 var _layer: CanvasLayer
 var _container: Control
 var _bubble_panel: PanelContainer
-var _lbl_text: Label
+var _text_label: Label
 var _is_visible: bool = false
 
+## 绑定气泡宿主的 CanvasLayer 与容器节点并预构建气泡面板
 func bind_layer(layer: CanvasLayer, container: Control = null) -> void:
 	_layer = layer
 	_container = container if container != null else ModalManager.ensure_fallback_container(layer, "TooltipManagerFallbackContainer")
@@ -47,53 +53,53 @@ func _ensure_bubble() -> void:
 	style.border_color = DesignTokens.COLOR_PRIMARY
 	_bubble_panel.add_theme_stylebox_override("panel", style)
 
-	_lbl_text = Label.new()
-	_lbl_text.add_theme_font_size_override("font_size", DesignTokens.FONT_SIZE_BODY)
-	_lbl_text.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_PRIMARY)
-	_bubble_panel.add_child(_lbl_text)
+	_text_label = Label.new()
+	_text_label.add_theme_font_size_override("font_size", DesignTokens.FONT_SIZE_BODY)
+	_text_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_PRIMARY)
+	_bubble_panel.add_child(_text_label)
 
 	_container.add_child(_bubble_panel)
 
 ## 核心防碰撞翻转坐标算法
 static func calculate_tooltip_pos(target_rect: Rect2, tooltip_size: Vector2, viewport_size: Vector2) -> Vector2:
 	var gap: float = 8.0
-	var pos := Vector2.ZERO
+	var tooltip_position := Vector2.ZERO
 
 	# 水平轴：优先右侧，右侧放不下则翻转到左侧
 	if target_rect.position.x + target_rect.size.x + gap + tooltip_size.x <= viewport_size.x:
-		pos.x = target_rect.position.x + target_rect.size.x + gap
+		tooltip_position.x = target_rect.position.x + target_rect.size.x + gap
 	else:
-		pos.x = target_rect.position.x - tooltip_size.x - gap
+		tooltip_position.x = target_rect.position.x - tooltip_size.x - gap
 
 	# 垂直轴：优先对齐顶端，底部溢出则向上修正
-	pos.y = target_rect.position.y
-	if pos.y + tooltip_size.y > viewport_size.y:
-		pos.y = maxf(0.0, viewport_size.y - tooltip_size.y - gap)
+	tooltip_position.y = target_rect.position.y
+	if tooltip_position.y + tooltip_size.y > viewport_size.y:
+		tooltip_position.y = maxf(0.0, viewport_size.y - tooltip_size.y - gap)
 
-	# 兜底钳制在可视区内
-	pos.x = clampf(pos.x, 0.0, maxf(0.0, viewport_size.x - tooltip_size.x))
-	pos.y = clampf(pos.y, 0.0, maxf(0.0, viewport_size.y - tooltip_size.y))
-	return pos
+	# 安全回退钳制在可视区内
+	tooltip_position.x = clampf(tooltip_position.x, 0.0, maxf(0.0, viewport_size.x - tooltip_size.x))
+	tooltip_position.y = clampf(tooltip_position.y, 0.0, maxf(0.0, viewport_size.y - tooltip_size.y))
+	return tooltip_position
 
 ## 显示悬浮提示
 func show_tooltip(target_rect: Rect2, text: String, _extra_data: Dictionary = {}) -> void:
 	if _container == null:
 		_ensure_bubble()
-	if _bubble_panel == null or _lbl_text == null:
+	if _bubble_panel == null or _text_label == null:
 		return
 
-	_lbl_text.text = text
+	_text_label.text = text
 	_bubble_panel.visible = true
 	_is_visible = true
 
-	var vp_size: Vector2 = _container.get_viewport_rect().size if _container.is_inside_tree() else Vector2(1920, 1080)
-	var tip_size: Vector2 = _bubble_panel.get_combined_minimum_size()
-	if tip_size.x <= 0:
-		tip_size = Vector2(180, 48)
+	var viewport_size: Vector2 = _container.get_viewport_rect().size if _container.is_inside_tree() else Vector2(1920, 1080)
+	var tooltip_size: Vector2 = _bubble_panel.get_combined_minimum_size()
+	if tooltip_size.x <= 0:
+		tooltip_size = Vector2(180, 48)
 
-	var calculated_pos := calculate_tooltip_pos(target_rect, tip_size, vp_size)
+	var calculated_position := calculate_tooltip_pos(target_rect, tooltip_size, viewport_size)
 	# 目标矩形为画布全局坐标，转换为容器本地坐标后赋值，兼容非全屏偏移容器
-	_bubble_panel.position = _container.get_global_transform().affine_inverse() * calculated_pos
+	_bubble_panel.position = _container.get_global_transform().affine_inverse() * calculated_position
 
 	tooltip_shown.emit(text)
 
@@ -104,5 +110,6 @@ func hide_tooltip() -> void:
 	_is_visible = false
 	tooltip_hidden.emit()
 
+## 查询悬浮提示气泡当前是否可见
 func is_tooltip_visible() -> bool:
 	return _is_visible

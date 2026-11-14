@@ -1,8 +1,12 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - UI基础设施: 键鼠与手柄焦点管理器
+# 模块归属: Frontend / UIInfrastructure
 # 文件路径: res://frontend/ui_infrastructure/focus_input_manager.gd
-# 职责: 管理模态弹窗打开时的 FocusTrap 焦点捕获与关闭后的原焦点恢复
+# 架构定位: UI 基础设施焦点管理单例，维护模态弹窗场景下的 Focus Trap 历史栈与恢复
+# 依赖与触发: 依赖 Godot Control / Viewport GUI 焦点接口，由模态弹窗或视图控制器入栈/出栈调用
+# 职责说明: 管理模态弹窗打开时的 FocusTrap 焦点捕获与关闭后的原焦点恢复
+# 退出语义与设计依据: 出栈前先校验历史焦点控件有效性（is_instance_valid 且仍在树内），防止悬空节点抢焦异常
 # ==============================================================================
+## FocusInputManager：键鼠与手柄焦点栈管理器，负责 Focus Trap 捕获与历史焦点恢复
 class_name FocusInputManager
 extends RefCounted
 
@@ -52,9 +56,9 @@ func get_trap_depth() -> int:
 
 func _find_first_focusable(node: Node) -> Control:
 	if node is Control:
-		var ctrl: Control = node
-		if ctrl.focus_mode != Control.FOCUS_NONE and ctrl.visible:
-			return ctrl
+		var control_node: Control = node
+		if control_node.focus_mode != Control.FOCUS_NONE and control_node.visible:
+			return control_node
 
 	for child in node.get_children():
 		var found := _find_first_focusable(child)

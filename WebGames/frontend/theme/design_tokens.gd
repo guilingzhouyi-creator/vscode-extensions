@@ -1,9 +1,12 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端设计系统: 设计令牌规范 (Design Tokens)
+# 模块归属: Frontend / Theme
 # 文件路径: res://frontend/theme/design_tokens.gd
-# 职责: 集中定义全域色彩语义、8px 栅格间距、排版字阶、动效时长与视口层级常量，
-#       消灭所有前端业务组件与场景中的魔法值硬编码。
+# 架构定位: 前端设计系统唯一真源常量库，定义色彩、间距、字号、动效、缓存上限与层级常量
+# 依赖与触发: 纯静态常量定义，无前置依赖；由 ThemeManager、通用组件与各视图引用
+# 职责说明: 集中定义全域色彩语义、8px 栅格间距、排版字阶、动效时长与视口层级常量
+# 退出语义与设计依据: 无状态常量定义文件，只读访问，不持有运行时状态或需要销毁的资源
 # ==============================================================================
+## DesignTokens：前端设计令牌规范库，统一提供色彩、间距、排版、动效与层级真源常量
 class_name DesignTokens
 extends RefCounted
 
@@ -42,15 +45,12 @@ const COLOR_QUALITY_RARE: Color = Color(0.20, 0.50, 1.0, 1.0)
 const COLOR_QUALITY_EPIC: Color = Color(0.65, 0.25, 0.95, 1.0)
 const COLOR_QUALITY_LEGENDARY: Color = Color(1.0, 0.55, 0.0, 1.0)
 
-# ── 主题兜底色板（R-18 单一真源）─────────────────────────────────────────────
 # ThemeManager 的 DEFAULT_* 与 views 的展示语义色一律引用本组，杜绝各自复写；
-# 取值与收敛前逐位一致，保证 A6「可见性等价对照」零差异。
-const COLOR_BG_DEFAULT: Color = Color(0.06, 0.08, 0.12, 1.0) # 根背景兜底
-const COLOR_SURFACE_DEFAULT: Color = Color(0.10, 0.14, 0.20, 1.0) # 面板/卡片兜底
-const COLOR_BORDER_DEFAULT: Color = Color(0.18, 0.25, 0.35, 1.0) # 描边兜底
+const COLOR_BG_DEFAULT: Color = Color(0.06, 0.08, 0.12, 1.0) # 根背景默认回退
+const COLOR_SURFACE_DEFAULT: Color = Color(0.10, 0.14, 0.20, 1.0) # 面板/卡片默认回退
+const COLOR_BORDER_DEFAULT: Color = Color(0.18, 0.25, 0.35, 1.0) # 描边默认回退
 const COLOR_BUTTON_PRESSED: Color = Color(0.20, 0.30, 0.45, 1.0) # 按钮按下态
 
-# ── 视图展示语义色板（R-18：全部消费方引用本组）─────────────────────────────
 const COLOR_TEXT_DEFAULT: Color = Color(0.88, 0.91, 0.95, 1.0) # 主文本
 const COLOR_TEXT_MUTED_DEFAULT: Color = Color(0.56, 0.62, 0.72, 1.0) # 次要文本
 const COLOR_ACCENT_DEFAULT: Color = Color(0.38, 0.75, 0.98, 1.0) # 交互高亮
@@ -58,7 +58,6 @@ const COLOR_SUCCESS_DEFAULT: Color = Color(0.20, 0.83, 0.60, 1.0) # 成功反馈
 const COLOR_WARNING_DEFAULT: Color = Color(0.95, 0.78, 0.26, 1.0) # 警告反馈
 const COLOR_DANGER_DEFAULT: Color = Color(0.97, 0.53, 0.53, 1.0) # 危险反馈
 
-# ── 半透明遮罩 / 描边 / 灰化（R-18）────────────────────────────────────────
 const COLOR_OVERLAY_DIM: Color = Color(0.0, 0.0, 0.0, 0.4) # Loading 半透明遮罩
 const COLOR_TEXT_OUTLINE: Color = Color(0.0, 0.0, 0.0, 0.8) # 飘字描边
 const COLOR_DISABLED_DIM: Color = Color(0.5, 0.5, 0.5, 0.6) # 破损/禁用灰化
@@ -110,13 +109,11 @@ const SCENE_CACHE_MAX: int = 32 # 场景实例缓存条目上限（FIFO 逐出�
 const BATTLE_LOG_MAX: int = 200 # 战报日志条目上限（超出裁最旧）
 
 # ==============================================================================
-# 六、视口 CanvasLayer Z-Index 严格规约（唯一真源 / R-19）
 # ──────────────────────────────────────────────────────────────────────────────
 # 本组为层级唯一权威定义：nav_types.LayerLevel 与 app_root.tscn 六层数值均与之一致
 # （BACKGROUND=-10 / SCREEN=0 / HUD=10 / MODAL=50 / OVERLAY=80 / DEBUG=100）。
 # 收敛前 design_tokens 另声明 OVERLAY=100 / DEBUG=120 且 DRAWER=30 / POPOVER=70 /
 # TOAST=85——与场景实际层位冲突且 DRAWER/POPOVER/TOAST 无对应真实层，属幽灵常量，
-# 已依 TC-「六层级数值三方一致、幽灵常量 0」一并删除。
 # ==============================================================================
 
 const Z_INDEX_BACKGROUND: int = -10 # 动态星空 / 城镇背景

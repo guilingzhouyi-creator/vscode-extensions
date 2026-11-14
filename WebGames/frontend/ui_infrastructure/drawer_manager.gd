@@ -1,8 +1,12 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - UI基础设施: 边缘侧滑抽屉管理器
+# 模块归属: Frontend / UIInfrastructure
 # 文件路径: res://frontend/ui_infrastructure/drawer_manager.gd
-# 职责: 管理从屏幕左/右/底侧滑出的抽屉面板（快速背包、任务速查、队伍面板）
+# 架构定位: UI 基础设施边缘侧滑抽屉管理器，统一控制单实例侧滑抽屉与背景遮罩交互
+# 依赖与触发: 依赖 DesignTokens 与 ModalManager 遮罩创建助手，由 AppRoot 绑定宿主层并由视图触发
+# 职责说明: 管理从屏幕左/右/底侧滑出的抽屉面板（快速背包、任务速查、队伍面板）
+# 退出语义与设计依据: 打开新抽屉前先关闭旧抽屉以维持单抽屉互斥不变式，点击背景遮罩自动安全收起
 # ==============================================================================
+## DrawerManager：边缘侧滑抽屉管理器，负责抽屉停靠锚点、互斥开关与遮罩协同
 class_name DrawerManager
 extends Node
 
@@ -19,6 +23,7 @@ signal drawer_opened(drawer: Control, side: EdgeSide)
 signal drawer_closed(drawer: Control)
 
 static var _instance: DrawerManager
+## 获取抽屉管理器全局单例
 static func get_instance() -> DrawerManager:
 	if _instance == null:
 		_instance = DrawerManager.new()
@@ -30,6 +35,7 @@ var _container: Control
 var _active_drawer: Control
 var _backdrop: ColorRect
 
+## 绑定抽屉挂载的 CanvasLayer 与承载容器
 func bind_layer(layer: CanvasLayer, container: Control = null) -> void:
 	_layer = layer
 	_container = container if container != null else ModalManager.ensure_fallback_container(layer, "DrawerManagerFallbackContainer")
@@ -83,6 +89,7 @@ func close_drawer(drawer: Control = null) -> void:
 
 	drawer_closed.emit(target)
 
+## 获取当前处于打开状态的抽屉控件
 func get_active_drawer() -> Control:
 	return _active_drawer
 
