@@ -101,13 +101,21 @@ function isTokenIdentCharCode(code: number): boolean {
 }
 
 function containsExactToken(line: string, token: string): boolean {
-    let idx = line.indexOf(token);
-    while (idx !== -1) {
-        const prevOk = idx === 0 || !isTokenIdentCharCode(line.charCodeAt(idx - 1));
-        const end = idx + token.length;
-        const nextOk = end >= line.length || !isTokenIdentCharCode(line.charCodeAt(end));
-        if (prevOk && nextOk) return true;
-        idx = line.indexOf(token, end);
+    const tokenLen = token.length;
+    if (tokenLen === 0 || line.length < tokenLen) return false;
+    const limit = line.length - tokenLen;
+    for (let pos = 0; pos <= limit; pos++) {
+        if (pos > 0 && isTokenIdentCharCode(line.charCodeAt(pos - 1))) continue;
+        const end = pos + tokenLen;
+        if (end < line.length && isTokenIdentCharCode(line.charCodeAt(end))) continue;
+        let matched = true;
+        for (let k = 0; k < tokenLen; k++) {
+            if (line.charCodeAt(pos + k) !== token.charCodeAt(k)) {
+                matched = false;
+                break;
+            }
+        }
+        if (matched) return true;
     }
     return false;
 }

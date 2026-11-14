@@ -60,7 +60,7 @@ import {
 const PREFIX_OS_PATH = 'os.path.';
 const PYTHON_SINGLE_LINE_RULES: ReadonlyArray<{
     readonly spec: IssueSpec;
-    readonly fastTrigger: string | readonly string[];
+    readonly fastTrigger: string | RegExp;
     readonly matches: (line: string) => boolean;
 }> = Object.freeze([
     {
@@ -101,18 +101,14 @@ const PYTHON_SINGLE_LINE_RULES: ReadonlyArray<{
             message: 'Optional/Union in an annotation or alias: PEP 604 unions read better.',
             suggestion: 'Write `X | None` / `X | Y` instead of Optional/Union.',
         },
-        fastTrigger: ['Optional', 'Union'],
+        fastTrigger: /Optional|Union/,
         matches: (line: string) =>
             REGEX.PYTHON.PEP604_ANN_ASSIGN.test(line) || REGEX.PYTHON.PEP604_ALIAS.test(line),
     },
 ]);
 
-function hasFastTrigger(trigger: string | readonly string[], line: string): boolean {
-    if (typeof trigger === 'string') return line.includes(trigger);
-    for (let i = 0; i < trigger.length; i++) {
-        if (line.includes(trigger[i])) return true;
-    }
-    return false;
+function hasFastTrigger(trigger: string | RegExp, line: string): boolean {
+    return typeof trigger === 'string' ? line.includes(trigger) : trigger.test(line);
 }
 
 const SCOPE_KIND_MODULE = 'module';

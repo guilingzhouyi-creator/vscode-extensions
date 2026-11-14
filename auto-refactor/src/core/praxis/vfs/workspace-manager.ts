@@ -152,11 +152,11 @@ export class WorkspaceManager {
     }
 
     /**
-     * Exports and optionally persists a quarantine snapshot of a workspace into .taxis/quarantine format.
+     * Exports and persists a workspace quarantine snapshot in .taxis/quarantine format.
      *
      * @param workspaceId - Branch ID or task card ID.
      * @param reason - Reason for quarantine isolation.
-     * @param quarantineDir - Optional filesystem destination to write patch files and quarantine_registry.json.
+     * @param quarantineDir - Optional folder for patch files and quarantine_registry.json.
      */
     public async exportQuarantineSnapshot(
         workspaceId: string,

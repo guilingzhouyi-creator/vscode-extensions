@@ -121,24 +121,14 @@ function resolveCoreHealthFields(
     override?: Partial<AasHealth> & { readonly dimensions?: Partial<Record<string, number>> },
 ): Pick<AasHealth, 'score' | 'grade' | 'density' | 'tensorSummary' | 'pillars'> {
     const governance = report.governance;
-    const qualityScore = report.qualityScore;
-    const rawScore = governance
-        ? governance.hierarchicalCompositeScore
-        : qualityScore?.compositeScore;
-    const rawGrade = governance ? governance.grade : qualityScore?.grade;
-    const rawDensity = governance
-        ? governance.effectiveCodeDensity
-        : qualityScore?.effectiveCodeDensity;
-    const rawTensor = governance
-        ? governance.densityTensorSummary
-        : qualityScore?.densityTensorSummary;
-
-    const candidateScore = override?.score !== undefined ? override.score : (rawScore ?? null);
+    const source = governance ?? report.qualityScore;
+    const rawScore = governance ? governance.hierarchicalCompositeScore : report.qualityScore?.compositeScore;
+    const candidateScore = override?.score ?? rawScore ?? null;
     return {
         score: roundMetric(candidateScore) ?? null,
-        grade: override?.grade ?? rawGrade ?? 'N/A',
-        density: roundMetric(override?.density ?? rawDensity),
-        tensorSummary: override?.tensorSummary ?? rawTensor,
+        grade: override?.grade ?? source?.grade ?? 'N/A',
+        density: roundMetric(override?.density ?? source?.effectiveCodeDensity),
+        tensorSummary: override?.tensorSummary ?? source?.densityTensorSummary,
         pillars: override?.pillars ?? governance?.eightPillars?.pillars,
     };
 }

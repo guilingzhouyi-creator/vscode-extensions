@@ -24,18 +24,6 @@ const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
 
-if (!process.env.NODE_PATH) {
-  const timingNm = path.join(ROOT, '..', 'workspace-timing', 'node_modules');
-  if (fs.existsSync(timingNm)) {
-    process.env.NODE_PATH = timingNm;
-    try {
-      require('module').Module._initPaths();
-    } catch {
-      // Best-effort path init
-    }
-  }
-}
-
 const DIR_DIST = 'dist';
 const DIR_BASELINES = 'baselines';
 const CONFIG_FILENAME = 'auto-refactor.config.json';

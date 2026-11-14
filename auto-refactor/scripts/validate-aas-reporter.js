@@ -607,8 +607,9 @@ async function runTests() {
     '现代化',
     '注释质量',
   ];
+  const foundMdLabels = new Set(mdOutput.match(new RegExp(expectedMdLabels.join('|'), 'g')) ?? []);
   for (const label of expectedMdLabels) {
-    assert.ok(mdOutput.includes(label), `Missing ${label}`);
+    assert.ok(foundMdLabels.has(label), `Missing ${label}`);
   }
   console.log(
     '✔  Test 11: Ten-Dimensional rich metrics (AAS v1.1) & complete Markdown table verified',

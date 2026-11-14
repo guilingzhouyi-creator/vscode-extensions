@@ -73,24 +73,12 @@ function getDbgPatterns(identifiers: string[]): CachedDbgPattern[] {
     return patterns;
 }
 
-const TOKEN_CONSOLE_DOT = 'console.';
-
 function selectPresentDbgPatterns(identifiers: string[], content: string): CachedDbgPattern[] {
     const candidates = getDbgPatterns(identifiers);
     const active: CachedDbgPattern[] = [];
-    let checkedConsolePrefix = false;
-    let hasConsolePrefix = false;
-
     for (let i = 0; i < candidates.length; i++) {
         const pat = candidates[i];
-        if (pat.id.startsWith(TOKEN_CONSOLE_DOT)) {
-            if (!checkedConsolePrefix) {
-                checkedConsolePrefix = true;
-                hasConsolePrefix = content.includes(TOKEN_CONSOLE_DOT);
-            }
-            if (!hasConsolePrefix) continue;
-        }
-        if (content.includes(pat.id)) {
+        if (pat.wordRe.test(content)) {
             active.push(pat);
         }
     }
@@ -127,7 +115,6 @@ function checkDebugLine(
 
     for (let pIdx = 0; pIdx < patterns.length; pIdx++) {
         const pat = patterns[pIdx];
-        if (!line.includes(pat.id)) continue;
         const matchResult = pat.wordRe.exec(line);
         if (!matchResult || !pat.callRe.test(line)) continue;
 

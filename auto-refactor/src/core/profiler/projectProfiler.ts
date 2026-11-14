@@ -135,7 +135,7 @@ const IGNORED_DIRS = new Set([
  * Maximum number of files sampled when counting language distribution; bounds discovery cost on
  * very large trees.
  */
-const LANGUAGE_SAMPLE_MAX_FILES = 500;
+const LANGUAGE_SAMPLE_MAX_FILES = 2000;
 
 /**
  * Maximum directory depth descended by the language sampling walk, relative to the project root

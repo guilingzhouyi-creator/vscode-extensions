@@ -674,6 +674,11 @@ export function resolveConfig(overrides: ConfigOverrides = {}): ScanConfig {
         classifyLiterals,
         granularRules,
         literalPolicy: mergeLiteralPolicy(base.literalPolicy, fileCfg.literalPolicy),
+        persistGovernanceSnapshot: resolveFlag(
+            overrides.persistGovernanceSnapshot,
+            fileCfg.persistGovernanceSnapshot,
+            true,
+        ),
         ...assembleExecutionOptions(base, fileCfg, overrides),
         ...assembleReportingOptions(base, fileCfg, overrides),
         ...assembleDomainOptions(root, base, fileCfg, overrides),

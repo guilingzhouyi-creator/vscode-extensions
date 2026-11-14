@@ -821,6 +821,8 @@ export interface ScanConfig {
     sparseRouting?: boolean;
     /** Explicit review profile targeting frontend, backend, or composite quality audit. */
     reviewProfile?: import('./scoring/scoringTypes').QualityReviewProfile;
+    /** When false, suppresses disk writes to `.refactor-trajectory/governance-supervisor.json`. */
+    persistGovernanceSnapshot?: boolean;
 }
 
 /**

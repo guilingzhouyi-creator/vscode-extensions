@@ -464,7 +464,8 @@ async function persistSupervisorSnapshotIfNeeded(options: {
     readonly evolved: boolean;
     readonly config: ScanConfig;
 }): Promise<void> {
-    if (options.config.cacheEnabled === false) return;
+    if (options.config.cacheEnabled === false || options.config.persistGovernanceSnapshot === false)
+        return;
     const trajectoryDir = path.join(options.rootDir, DIR_TRAJECTORY);
     const shouldInitSnapshot = !options.hadSnapshot && (await directoryExistsAsync(trajectoryDir));
     if (!options.evolved && !shouldInitSnapshot) return;

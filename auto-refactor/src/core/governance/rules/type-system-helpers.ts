@@ -61,19 +61,13 @@ function containsOpenParen(part: string): boolean {
     return part.includes('(');
 }
 
+const EXPORT_WORD_RE = /\bexport\b/;
+
 /**
  * Evaluates whether a line contains an export keyword token without array allocations.
  */
 function lineHasExportKeyword(line: string): boolean {
-    let pos = line.indexOf(EXPORT_KEYWORD);
-    while (pos !== -1) {
-        const prevOk = pos === 0 || !isIdentCharCode(line.charCodeAt(pos - 1));
-        const end = pos + EXPORT_KEYWORD_LEN;
-        const nextOk = end >= line.length || !isIdentCharCode(line.charCodeAt(end));
-        if (prevOk && nextOk) return true;
-        pos = line.indexOf(EXPORT_KEYWORD, end);
-    }
-    return false;
+    return EXPORT_WORD_RE.test(line);
 }
 
 const MAX_SIGNATURE_SCAN_LINES = 40;
@@ -231,7 +225,7 @@ export function checkGdFunctionSignature(
 export function checkUnsafeAny(masked: string[], violations: GovernanceViolation[]): void {
     for (let i = 0; i < masked.length; i++) {
         const line = masked[i];
-        if (!line.includes(KEYWORD_ANY) || !REGEX.SYNTAX.TS_ANY_KEYWORD.test(line)) continue;
+        if (!REGEX.SYNTAX.TS_ANY_KEYWORD.test(line)) continue;
         const trimmed = line.trim();
         if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
         if (REGEX.SYNTAX.TS_ANY_TYPE.test(line) && !REGEX.COMMENT.ESLINT_DISABLE.test(line)) {
@@ -361,24 +355,15 @@ function inspectExportedLine(
     violations: GovernanceViolation[],
 ): void {
     const line = masked[idx];
-    if (!line.includes(EXPORT_KEYWORD)) return;
-    const hasFnToken = line.includes(KEYWORD_FUNCTION);
-    const hasConstToken = line.includes(KEYWORD_CONST);
-    if (!hasFnToken && !hasConstToken) return;
     if (!lineHasExportKeyword(line)) return;
-
-    const hasFn = hasFnToken && EXPORT_FN_KEYWORD_RE.test(line);
-    const hasConst = hasConstToken && EXPORT_CONST_KEYWORD_RE.test(line);
-    if (!hasFn && !hasConst) return;
-
     const trimmed = line.trim();
     if (trimmed.startsWith('//') || trimmed.startsWith('*')) return;
     if (REGEX.COMMENT.ESLINT_DISABLE.test(line)) return;
 
-    if (hasFn) {
+    if (EXPORT_FN_KEYWORD_RE.test(line)) {
         inspectExportedDeclaration(masked, idx, violations, EXPORT_FN_SPEC);
     }
-    if (hasConst) {
+    if (EXPORT_CONST_KEYWORD_RE.test(line)) {
         inspectExportedDeclaration(masked, idx, violations, EXPORT_ARROW_SPEC);
     }
 }

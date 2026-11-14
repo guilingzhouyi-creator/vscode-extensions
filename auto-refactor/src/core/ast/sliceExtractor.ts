@@ -14,6 +14,7 @@ import type { ASTSliceNode } from '../router/sliceTypes';
 export * from '../router/sliceExtractor';
 export * from '../router/sliceTypes';
 
+/** Extracts AST diff slices between old and new file contents using the default extractor. */
 export function extractASTSlices(
     filePath: string,
     oldContent: string,
@@ -23,10 +24,12 @@ export function extractASTSlices(
     return defaultASTSliceExtractor.extractSlices(filePath, oldContent, newContent, changedLines);
 }
 
+/** Instantiates a fresh AST slice extractor instance. */
 export function createASTSliceExtractor(): ASTSliceExtractor {
     return new ASTSliceExtractor();
 }
 
+/** Filters AST slice nodes by their primary mutation classification. */
 export function filterSlicesByMutationKind(
     slices: readonly ASTSliceNode[],
     kind: string,
@@ -34,6 +37,7 @@ export function filterSlicesByMutationKind(
     return slices.filter((slice) => slice.primaryKind === kind);
 }
 
+/** Summarizes slice mutation counts across signature, control flow, I/O, async, and type axes. */
 export function summarizeSliceVectors(
     slices: readonly ASTSliceNode[],
 ): Record<string, number> {

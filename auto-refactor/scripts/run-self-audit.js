@@ -392,6 +392,8 @@ function resolveAuditScanConfig(options) {
     cache: true,
     cacheDir: path.join(ROOT, '.auto-refactor-cache', DIR_SELF_AUDIT_CACHE),
     logLevel: RUN_LOG_LEVEL_WARN,
+    persistGovernanceSnapshot:
+      options.persist !== false && !options.skipTrajectoryWrite && !options.trajectoryDir,
     ...options.scanOptions,
   };
 }

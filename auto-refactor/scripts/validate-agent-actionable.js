@@ -23,6 +23,8 @@ async function main() {
   // 1. Test scan emitting actionable for constants in sample code
   const report = await scan({
     include: ['samples/sample.ts'],
+    cache: false,
+    persistGovernanceSnapshot: false,
     config: {
       analyzers: {
         constants: true,

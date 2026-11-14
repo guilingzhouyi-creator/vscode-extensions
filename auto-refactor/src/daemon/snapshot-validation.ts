@@ -133,6 +133,7 @@ export function resolveValidatedSnapshotConfig(
         archetype: typeof rawArch === 'string' ? (rawArch as ProjectArchetype) : undefined,
         cache: false,
         sparseRouting: false,
+        persistGovernanceSnapshot: false,
         logLevel: resolveSnapshotLogLevel(configJson),
         signal,
     });
@@ -145,6 +146,7 @@ export function resolveValidatedSnapshotConfig(
         analyzers: resolveSnapshotAnalyzers(configJson.analyzers, baseResolved.analyzers),
         cacheEnabled: false,
         sparseRouting: false,
+        persistGovernanceSnapshot: false,
         signal,
     };
     if (!resolved.archetype || !VALID_ARCHETYPES.has(resolved.archetype)) {

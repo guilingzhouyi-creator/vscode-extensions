@@ -164,9 +164,8 @@ function validatePathParity(lines: string[], normalizedPath: string): Governance
     const scanLimit = Math.min(PATH_DECL_SCAN_LINES, lines.length);
     for (let i = 0; i < scanLimit; i++) {
         const line = lines[i];
-        if (!line.includes('@file') && !line.includes('文件路径')) continue;
-        if (!COMMENT_PREFIX_RE.test(line)) continue;
         if (!PATH_DECL_TAG_RE.test(line)) continue;
+        if (!COMMENT_PREFIX_RE.test(line)) continue;
         const match = PATH_DECL_RE.exec(line);
         if (!match || !match[1]) continue;
 
