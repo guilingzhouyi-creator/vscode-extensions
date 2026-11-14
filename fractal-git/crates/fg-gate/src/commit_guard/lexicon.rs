@@ -13,7 +13,10 @@
 //! Domain Governance Rules: FGT-MSG-004 (vocabulary), FGT-MSG-005 (unresolved markers),
 //!   FGT-MSG-008 (batch codenames).
 
+use super::ac_matcher::AcMatcher;
 use std::borrow::Cow;
+use std::collections::HashSet;
+use std::sync::OnceLock;
 
 /// A detected lexical violation.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -635,12 +638,41 @@ fn mask_uppercase_rule_ids(line: &str) -> Cow<'_, str> {
     }
 }
 
+/// Returns compiled Aho-Corasick matcher for multi-word forbidden phrases.
+fn multiword_phrase_matcher() -> &'static AcMatcher {
+    static MATCHER: OnceLock<AcMatcher> = OnceLock::new();
+    MATCHER.get_or_init(|| {
+        AcMatcher::compile(
+            MULTIWORD_FORBIDDEN_PHRASES.iter().copied().enumerate(),
+            2048,
+        )
+    })
+}
+
+/// Returns compiled Aho-Corasick matcher for CJK containment terms.
+fn cjk_containment_matcher() -> &'static AcMatcher {
+    static MATCHER: OnceLock<AcMatcher> = OnceLock::new();
+    MATCHER
+        .get_or_init(|| AcMatcher::compile(CJK_CONTAINMENT_TERMS.iter().copied().enumerate(), 512))
+}
+
+/// Returns compiled Aho-Corasick matcher for exempt whitelist phrases.
+fn whitelist_phrase_matcher() -> &'static AcMatcher {
+    static MATCHER: OnceLock<AcMatcher> = OnceLock::new();
+    MATCHER.get_or_init(|| AcMatcher::compile(WHITELIST_PHRASES.iter().copied().enumerate(), 1024))
+}
+
+/// Returns O(1) lookup set of single-token forbidden terms.
+fn forbidden_word_set() -> &'static HashSet<&'static str> {
+    static WORD_SET: OnceLock<HashSet<&'static str>> = OnceLock::new();
+    WORD_SET.get_or_init(|| sorted_all_forbidden_table().iter().copied().collect())
+}
+
 /// Finds the first multi-word forbidden ASCII phrase via whole-term boundary matching.
 fn find_multiword_forbidden_phrase(scrubbed: &str) -> Option<&'static str> {
-    MULTIWORD_FORBIDDEN_PHRASES
-        .iter()
-        .copied()
-        .find(|phrase| contains_whole_term(scrubbed, phrase))
+    multiword_phrase_matcher()
+        .find_min_whole_term_index(scrubbed)
+        .and_then(|idx| MULTIWORD_FORBIDDEN_PHRASES.get(idx).copied())
 }
 
 /// Prepares a message for policy-specific term matching.
@@ -657,10 +689,7 @@ pub fn scrub_for_policy_terms(message: &str) -> String {
 /// prohibited sub-term could fire, and each removal leaves whitespace behind so surrounding tokens
 /// remain delimited.
 fn subtract_whitelist<'a>(lower: &'a str) -> Cow<'a, str> {
-    if !WHITELIST_PHRASES
-        .iter()
-        .any(|phrase| lower.contains(phrase))
-    {
+    if !whitelist_phrase_matcher().has_any_substring(lower.as_bytes()) {
         return Cow::Borrowed(lower);
     }
     static ORDERED: std::sync::OnceLock<Vec<&'static str>> = std::sync::OnceLock::new();
@@ -734,19 +763,16 @@ fn is_cjk_char(character: char) -> bool {
 /// Maps one token to the rule it violates, if any.
 fn classify_token(token: &str) -> Option<&'static str> {
     if token.is_ascii() {
-        if sorted_all_forbidden_table().binary_search(&token).is_ok() {
+        if forbidden_word_set().contains(token) {
             return Some(fg_core::constants::rules::RULE_FGT_MSG_004);
         }
         return None;
     }
 
-    if CJK_CONTAINMENT_TERMS
-        .iter()
-        .any(|term| token.contains(term))
-    {
+    if cjk_containment_matcher().has_any_substring(token.as_bytes()) {
         return Some(fg_core::constants::rules::RULE_FGT_MSG_004);
     }
-    if sorted_all_forbidden_table().binary_search(&token).is_ok() {
+    if forbidden_word_set().contains(token) {
         return Some(fg_core::constants::rules::RULE_FGT_MSG_004);
     }
     None
@@ -975,5 +1001,26 @@ mod tests {
             find_batch_codename("sprint 2 then w3"),
             Some("w3".to_string())
         );
+    }
+
+    #[test]
+    fn ac_multiword_matchers_match_linear_reference() {
+        let cases = [
+            "refactor(fg-gate): reuse cached automaton without copying",
+            "attempt template matching for quick fixup without errors",
+            "apply quick fix and hack before exit code 0 check",
+            "使用临时文件验证后移除临时补丁",
+            "all tests passed and 100% safe without error",
+            "check `temp_buffer` and wip-flag with oracle hint",
+        ];
+        for sample in cases {
+            let masked = sample.to_lowercase();
+            let actual_mw = find_multiword_forbidden_phrase(&masked);
+            let expected_mw = MULTIWORD_FORBIDDEN_PHRASES
+                .iter()
+                .copied()
+                .find(|phrase| contains_whole_term(&masked, phrase));
+            assert_eq!(actual_mw, expected_mw, "multiword diverged on {sample:?}");
+        }
     }
 }

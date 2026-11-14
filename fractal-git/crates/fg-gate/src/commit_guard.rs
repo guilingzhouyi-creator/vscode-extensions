@@ -11,6 +11,8 @@
 //!
 //! Domain Governance Rules: FGT-GAT-001 (gate governance), FGT-COR-001.
 
+pub(crate) mod ac_compiler;
+pub(crate) mod ac_matcher;
 pub mod coherence;
 pub mod declaration;
 pub mod lexicon;
