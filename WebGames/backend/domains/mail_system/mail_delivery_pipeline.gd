@@ -51,26 +51,26 @@ static func claim_single_mail(
 	var inventory_snapshot := inventory.snapshot()
 	var mail_items_snapshot := mail.attachment_items.duplicate(true)
 	var max_item_quantity: int = GameConfig.get_int("domains.inventory", "transaction/max_item_quantity", 1000)
-	for item_dict in mail.attachment_items:
+	for attachment_entry in mail.attachment_items:
 		# 注册表三元组发放：template_id 必填且须为已登记 canonical_id，
 		# 未登记附件不可提取（数据错误安全留存，等待修复后重试）
-		var item_id := str(item_dict.get("template_id", ""))
-		var item_count := int(item_dict.get("count", 1))
+		var item_id := str(attachment_entry.get("template_id", ""))
+		var item_count := int(attachment_entry.get("count", 1))
 		if item_count <= 0 or item_count > max_item_quantity:
 			inventory.restore(inventory_snapshot)
 			mail.attachment_items = mail_items_snapshot
 			return {"success": false, "error_code": "INVALID_ATTACHMENT_COUNT"}
 		var prototype: Variant = catalog.get_prototype(item_id)
 		if prototype == null:
-			remaining_items.append(item_dict)
+			remaining_items.append(attachment_entry)
 			continue
-		var display_name := str(item_dict.get("name", _msg("attachment_item")))
-		var delivered := _deliver_items(prototype, display_name, item_id, item_count, mail.mail_id, inventory, library, catalog)
-		claimed_items_count += delivered
-		if delivered < item_count:
+		var display_name := str(attachment_entry.get("name", _msg("attachment_item")))
+		var delivered_count := _deliver_items(prototype, display_name, item_id, item_count, mail.mail_id, inventory, library, catalog)
+		claimed_items_count += delivered_count
+		if delivered_count < item_count:
 			var remaining: Dictionary = {
 				"template_id": item_id,
-				"count": item_count - delivered,
+				"count": item_count - delivered_count,
 				"name": display_name
 			}
 			remaining_items.append(remaining)
@@ -97,7 +97,7 @@ static func claim_single_mail(
 	else:
 		mail.status = MailItemAggregate.MailStatus.READ_UNCLAIMED
 
-	var result := {
+	var claim_result := {
 		"success": true,
 		"error_code": "OK",
 		"claimed_gold": claimed_gold,
@@ -106,10 +106,10 @@ static func claim_single_mail(
 		"remaining_items_count": remaining_items.size()
 	}
 	if mail.status == MailItemAggregate.MailStatus.READ_CLAIMED:
-		_claimed_results[_claim_cache_key(mail)] = result.duplicate(true)
+		_claimed_results[_claim_cache_key(mail)] = claim_result.duplicate(true)
 		# 有界保留：超容量按插入序裁剪最旧记录（内存有界，防无限增长；单次快照裁剪）
 		FifoBudget.trim_oldest(_claimed_results, GameConfig.get_int("infrastructure.admin", "idempotency/max_records", 1000))
-	return result
+	return claim_result
 
 ## 一键领取所有未领邮件的附件奖励
 static func claim_all_mails(
@@ -151,19 +151,19 @@ static func _deliver_items(
 	library: AccountItemLibrary,
 	catalog: ItemRegistryCatalog
 ) -> int:
-	var delivered := 0
+	var delivered_count := 0
 	for item_index in range(item_count):
-		var item := ItemInstanceFactory.build_instance(prototype, display_name, "MAIL_")
-		if not inventory.add_item(item):
+		var attached_item := ItemInstanceFactory.build_instance(prototype, display_name, "MAIL_")
+		if not inventory.add_item(attached_item):
 			break
-		delivered += 1
+		delivered_count += 1
 		if library != null:
 			ItemStatisticsSolver.record_item_event(library, ItemStatisticsSolver.EVENT_ITEM_GRANTED, item_id, 1, catalog, null, {
-				"uid": item.item_uid,
+				"uid": attached_item.item_uid,
 				"transaction_id": mail_id,
 				"rule_id": "rule_mail_claim"
 			})
-	return delivered
+	return delivered_count
 
 # ==============================================================================
 # 配置读取

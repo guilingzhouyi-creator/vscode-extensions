@@ -15,9 +15,9 @@ const MAX_LOCAL_COMBAT_EVENT_POOL: int = 256
 
 class CombatParticipantDefaults extends RefCounted:
 	var name: String = "战士"
-	var hp: float = 100.0
-	var max_hp: float = 100.0
-	var ap: int = 0
+	var health_points: float = 100.0
+	var max_health_points: float = 100.0
+	var action_points: int = 0
 	var weapon_mass_kg: float = 2.5
 	var weapon_velocity: float = 6.0
 	var edge_sharpness: float = 1.2
@@ -27,7 +27,7 @@ class CombatParticipantDefaults extends RefCounted:
 
 static var _defaults_cache: CombatParticipantDefaults = null
 static var _defaults_config_version: int = -1
-static var _event_pools_bound: bool = false
+static var _is_event_pools_bound: bool = false
 static var _event_ensure_callback: Callable = Callable()
 static var _event_acquire_callback: Callable = Callable()
 static var _event_release_callback: Callable = Callable()
@@ -39,9 +39,9 @@ static func _ensure_participant_defaults() -> CombatParticipantDefaults:
 		return _defaults_cache
 	var defaults := CombatParticipantDefaults.new()
 	defaults.name = GameConfig.get_string("domains.combat", "participant_defaults/name", "战士")
-	defaults.hp = GameConfig.get_float("domains.combat", "participant_defaults/hp", 100.0)
-	defaults.max_hp = GameConfig.get_float("domains.combat", "participant_defaults/max_hp", 100.0)
-	defaults.ap = GameConfig.get_int("domains.combat", "participant_defaults/ap", 0)
+	defaults.health_points = GameConfig.get_float("domains.combat", "participant_defaults/hp", 100.0)
+	defaults.max_health_points = GameConfig.get_float("domains.combat", "participant_defaults/max_hp", 100.0)
+	defaults.action_points = GameConfig.get_int("domains.combat", "participant_defaults/ap", 0)
 	defaults.weapon_mass_kg = GameConfig.get_float("domains.combat", "participant_defaults/weapon_mass_kg", 2.5)
 	defaults.weapon_velocity = GameConfig.get_float("domains.combat", "participant_defaults/weapon_velocity", 6.0)
 	defaults.edge_sharpness = GameConfig.get_float("domains.combat", "participant_defaults/edge_sharpness", 1.2)
@@ -57,16 +57,16 @@ static func bind_event_pool_backend(ensure_callback: Callable, acquire_callback:
 	_event_ensure_callback = ensure_callback
 	_event_acquire_callback = acquire_callback
 	_event_release_callback = release_callback
-	_event_pools_bound = false
+	_is_event_pools_bound = false
 
 static func _ensure_event_pool() -> void:
-	if _event_pools_bound:
+	if _is_event_pools_bound:
 		return
 	if _event_ensure_callback.is_valid():
 		_event_ensure_callback.call(POOL_COMBAT_EVENTS, func() -> RefCounted:
 			return PhysicalVerbRegistry.CombatNarrativeEventPacket.new()
 		)
-	_event_pools_bound = true
+	_is_event_pools_bound = true
 
 ## 从对象池借出战斗叙事事件包（无配置注入时回退本地有界池）
 static func borrow_combat_event() -> PhysicalVerbRegistry.CombatNarrativeEventPacket:
@@ -96,7 +96,7 @@ static func recycle_combat_event(packet: PhysicalVerbRegistry.CombatNarrativeEve
 
 ## 测试隔离：重置本地事件池与参数缓存
 static func reset_pool_for_tests() -> void:
-	_event_pools_bound = false
+	_is_event_pools_bound = false
 	_local_event_pool.clear()
 	_defaults_cache = null
 	_defaults_config_version = -1
@@ -118,9 +118,9 @@ class CombatParticipant extends RefCounted:
 	func _init() -> void:
 		var defaults: CombatParticipantDefaults = CombatPipelineFSM._ensure_participant_defaults()
 		name = defaults.name
-		current_hp = defaults.hp
-		max_hp = defaults.max_hp
-		current_ap = defaults.ap
+		current_hp = defaults.health_points
+		max_hp = defaults.max_health_points
+		current_ap = defaults.action_points
 		weapon_mass_kg = defaults.weapon_mass_kg
 		weapon_velocity = defaults.weapon_velocity
 		edge_sharpness = defaults.edge_sharpness
@@ -133,9 +133,9 @@ class CombatParticipant extends RefCounted:
 ## defense_multipliers）——缓存后每次动作仅一次版本比对 + 字段复制。
 class CombatSettlementParams extends RefCounted:
 	var interrupt_verbs: Array = ["PARRY", "INTER"]
-	var ap_penalty: int = 2
-	var block_mult: float = 0.35
-	var parry_mult: float = 0.50
+	var action_points_penalty: int = 2
+	var block_multiplier: float = 0.35
+	var parry_multiplier: float = 0.50
 	var monster_drop_ids: Array = []
 
 static var _settlement_cache: CombatSettlementParams = null
@@ -145,24 +145,24 @@ static var _settlement_config_version: int = -1
 static func _ensure_settlement_cache() -> void:
 	if _settlement_cache != null and _settlement_config_version == GameConfig.config_reload_version():
 		return
-	var settlement_params := CombatSettlementParams.new()
-	settlement_params.interrupt_verbs = GameConfig.get_array("domains.combat", "interrupt_verbs", ["PARRY", "INTER"])
-	settlement_params.ap_penalty = GameConfig.get_int("domains.combat", "interrupt/ap_penalty", 2)
-	settlement_params.block_mult = GameConfig.get_float("domains.combat", "defense_multipliers/block", 0.35)
-	settlement_params.parry_mult = GameConfig.get_float("domains.combat", "defense_multipliers/parry", 0.50)
-	settlement_params.monster_drop_ids = GameConfig.get_array("domains.monster", "loot/default_drop_canonical_ids", [])
-	_settlement_cache = settlement_params
+	var settlement_parameters := CombatSettlementParams.new()
+	settlement_parameters.interrupt_verbs = GameConfig.get_array("domains.combat", "interrupt_verbs", ["PARRY", "INTER"])
+	settlement_parameters.action_points_penalty = GameConfig.get_int("domains.combat", "interrupt/ap_penalty", 2)
+	settlement_parameters.block_multiplier = GameConfig.get_float("domains.combat", "defense_multipliers/block", 0.35)
+	settlement_parameters.parry_multiplier = GameConfig.get_float("domains.combat", "defense_multipliers/parry", 0.50)
+	settlement_parameters.monster_drop_ids = GameConfig.get_array("domains.monster", "loot/default_drop_canonical_ids", [])
+	_settlement_cache = settlement_parameters
 	_settlement_config_version = GameConfig.config_reload_version()
 
-## 推进并结算当前动作轮次的所有参战行为（支持传入复用的 out_packet 避免堆分配）
+## 推进并结算当前动作轮次的所有参战行为（支持传入复用的 output_packet 避免堆分配）
 static func execute_action_round(
 	attacker: CombatParticipant,
 	attacker_verb: String,
 	defender: CombatParticipant,
 	defender_verb: String,
-	out_packet: PhysicalVerbRegistry.CombatNarrativeEventPacket = null
+	output_packet: PhysicalVerbRegistry.CombatNarrativeEventPacket = null
 ) -> PhysicalVerbRegistry.CombatNarrativeEventPacket:
-	var packet: PhysicalVerbRegistry.CombatNarrativeEventPacket = out_packet
+	var packet: PhysicalVerbRegistry.CombatNarrativeEventPacket = output_packet
 	if packet != null:
 		packet.reset_state()
 	else:
@@ -170,23 +170,23 @@ static func execute_action_round(
 	packet.actor_id = attacker.participant_id
 	packet.target_id = defender.participant_id
 
-	var attacker_verb_info: Variant = PhysicalVerbRegistry.get_verb(attacker_verb)
-	var defender_verb_info: Variant = PhysicalVerbRegistry.get_verb(defender_verb)
+	var attacker_verb_definition: Variant = PhysicalVerbRegistry.get_verb(attacker_verb)
+	var defender_verb_definition: Variant = PhysicalVerbRegistry.get_verb(defender_verb)
 
-	attacker.current_ap += int(attacker_verb_info.get("base_ap", 0))
-	defender.current_ap += int(defender_verb_info.get("base_ap", 0))
+	attacker.current_ap += int(attacker_verb_definition.get("base_ap", 0))
+	defender.current_ap += int(defender_verb_definition.get("base_ap", 0))
 
 	# 打断与防反判定: 若防守方使用 PARRY/INTER 且当前处于蓄力拦截窗口，判定打断
 	_ensure_settlement_cache()
-	var settlement_params := _settlement_cache
+	var settlement_parameters := _settlement_cache
 	var is_interrupted := false
-	if defender_verb in settlement_params.interrupt_verbs and attacker.current_ap < 0:
+	if defender_verb in settlement_parameters.interrupt_verbs and attacker.current_ap < 0:
 		is_interrupted = true
 		attacker.is_staggered = true
-		attacker.current_ap -= settlement_params.ap_penalty # 额外失衡惩罚
+		attacker.current_ap -= settlement_parameters.action_points_penalty # 额外失衡惩罚
 		packet.is_interrupted = true
 		packet.narrative_text = EventBusCore.render_narrative("combat/parry_interrupt", [
-			defender.name, defender_verb_info.name, attacker.name, attacker_verb_info.name
+			defender.name, defender_verb_definition.name, attacker.name, attacker_verb_definition.name
 		])
 	else:
 		var raw_damage: Variant = PhysicsAndThermodynamicsSolver.calculate_penetration_damage(
@@ -200,9 +200,9 @@ static func execute_action_round(
 		# 防御姿态减伤
 		var defense_multiplier := 1.0
 		if defender_verb == "BLOCK":
-			defense_multiplier = settlement_params.block_mult
+			defense_multiplier = settlement_parameters.block_multiplier
 		elif defender_verb == "PARRY":
-			defense_multiplier = settlement_params.parry_mult
+			defense_multiplier = settlement_parameters.parry_multiplier
 
 		var final_damage: float = raw_damage * defense_multiplier
 		defender.current_hp = maxf(0.0, defender.current_hp - final_damage)
@@ -211,7 +211,7 @@ static func execute_action_round(
 		packet.absorbed_damage = raw_damage - final_damage
 		packet.final_damage = final_damage
 		packet.narrative_text = EventBusCore.render_narrative("combat/strike_hit", [
-			attacker.name, attacker_verb_info.name, final_damage, defender.name, defender.current_hp
+			attacker.name, attacker_verb_definition.name, final_damage, defender.name, defender.current_hp
 		])
 
 		# 怪物阵亡 → 发射 monster.killed（掉落声明由监听器登记为活跃掉落物）

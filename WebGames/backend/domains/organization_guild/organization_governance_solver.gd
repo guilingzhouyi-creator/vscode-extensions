@@ -12,30 +12,30 @@ class_name OrganizationGovernanceSolver
 extends RefCounted
 
 ## 职位 RBAC 操作许可判定：三类动作白名单（会长独占/官员及以上/成员及以上）按配置逐级匹配
-static func can_perform_action(org: OrganizationAggregate, operator_account_id: String, action: String) -> bool:
-	if not org.member_roster.has(operator_account_id):
+static func can_perform_action(organization: OrganizationAggregate, operator_account_id: String, action: String) -> bool:
+	if not organization.member_roster.has(operator_account_id):
 		return false
 
-	var role: OrganizationAggregate.GuildRole = org.get_member_role(operator_account_id)
-	var master_only: Array = GameConfig.get_array("domains.organization_guild", "rbac/actions/guild_master_only", ["DISBAND_GUILD", "DECLARE_WAR", "TRANSFER_LEADERSHIP"])
-	var officer_up: Array = GameConfig.get_array("domains.organization_guild", "rbac/actions/officer_and_above", ["WITHDRAW_TREASURY", "UPGRADE_TECH", "KICK_MEMBER"])
-	var member_up: Array = GameConfig.get_array("domains.organization_guild", "rbac/actions/member_and_above", ["ACCEPT_COMMISSION", "DEPOSIT_TREASURY"])
-	if action in master_only:
+	var role: OrganizationAggregate.GuildRole = organization.get_member_role(operator_account_id)
+	var master_only_actions: Array = GameConfig.get_array("domains.organization_guild", "rbac/actions/guild_master_only", ["DISBAND_GUILD", "DECLARE_WAR", "TRANSFER_LEADERSHIP"])
+	var officer_and_above_actions: Array = GameConfig.get_array("domains.organization_guild", "rbac/actions/officer_and_above", ["WITHDRAW_TREASURY", "UPGRADE_TECH", "KICK_MEMBER"])
+	var member_and_above_actions: Array = GameConfig.get_array("domains.organization_guild", "rbac/actions/member_and_above", ["ACCEPT_COMMISSION", "DEPOSIT_TREASURY"])
+	if action in master_only_actions:
 		return role == OrganizationAggregate.GuildRole.GUILD_MASTER
-	if action in officer_up:
+	if action in officer_and_above_actions:
 		return role >= OrganizationAggregate.GuildRole.OFFICER
-	if action in member_up:
+	if action in member_and_above_actions:
 		return role >= OrganizationAggregate.GuildRole.NOVICE
 	return false
 
 ## 金库出纳：权限/负值符号守卫（Inv-VD-2）/余额三级校验后扣减
 static func withdraw_from_treasury(
-	org: OrganizationAggregate,
+	organization: OrganizationAggregate,
 	operator_account_id: String,
 	amount_gold: int,
 	amount_crystals: int
 ) -> Dictionary:
-	if not can_perform_action(org, operator_account_id, "WITHDRAW_TREASURY"):
+	if not can_perform_action(organization, operator_account_id, "WITHDRAW_TREASURY"):
 		return {
 			"success": false,
 			"error_code": "PERMISSION_DENIED",
@@ -51,15 +51,15 @@ static func withdraw_from_treasury(
 			"error_message": _msg("treasury_invalid_amount")
 		}
 
-	if org.treasury_gold_coins < amount_gold or org.treasury_mana_crystals < amount_crystals:
+	if organization.treasury_gold_coins < amount_gold or organization.treasury_mana_crystals < amount_crystals:
 		return {
 			"success": false,
 			"error_code": "INSUFFICIENT_TREASURY",
 			"error_message": _msg("treasury_insufficient")
 		}
 
-	org.treasury_gold_coins -= amount_gold
-	org.treasury_mana_crystals -= amount_crystals
+	organization.treasury_gold_coins -= amount_gold
+	organization.treasury_mana_crystals -= amount_crystals
 	return {
 		"success": true,
 		"withdrawn_gold": amount_gold,
@@ -68,22 +68,22 @@ static func withdraw_from_treasury(
 
 ## 外交宣战状态机：DECLARE_WAR 权限校验后写入目标组织外交关系
 static func set_diplomatic_stance(
-	org: OrganizationAggregate,
+	organization: OrganizationAggregate,
 	operator_account_id: String,
-	target_org_id: String,
+	target_organization_id: String,
 	new_stance: OrganizationAggregate.DiplomaticStance
 ) -> Dictionary:
-	if not can_perform_action(org, operator_account_id, "DECLARE_WAR"):
+	if not can_perform_action(organization, operator_account_id, "DECLARE_WAR"):
 		return {
 			"success": false,
 			"error_code": "PERMISSION_DENIED",
 			"error_message": _msg("diplomacy_permission_denied")
 		}
 
-	org.diplomatic_relations[target_org_id] = new_stance
+	organization.diplomatic_relations[target_organization_id] = new_stance
 	return {
 		"success": true,
-		"target_org_id": target_org_id,
+		"target_org_id": target_organization_id,
 		"new_stance": new_stance
 	}
 

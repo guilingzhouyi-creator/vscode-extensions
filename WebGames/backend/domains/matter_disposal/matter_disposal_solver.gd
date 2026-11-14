@@ -13,7 +13,7 @@ extends RefCounted
 
 ## 执行物品物理销毁并更新背包与掉落
 static func execute_disposal(
-	player_pos: Vector2,
+	player_position: Vector2,
 	facility: ItemDisposalFacilityDTO,
 	target_item: ItemEntity,
 	security_passcode: String = ""
@@ -28,24 +28,24 @@ static func execute_disposal(
 
 	# 2. 空间距离检定 (便携溶剂无距离限制)
 	if facility.method != ItemDisposalFacilityDTO.DisposalMethod.PORTABLE_ACID_SOLVENT:
-		if player_pos.distance_to(facility.facility_pos) > facility.max_operate_radius:
+		if player_position.distance_to(facility.facility_pos) > facility.max_operate_radius:
 			return {
 				"success": false,
 				"error_code": "OUT_OF_FACILITY_RANGE",
 				"error_message": _msg("facility_too_far") % facility.max_operate_radius
 			}
 
-	var valuable_thr := GameConfig.get_int("domains.matter_disposal", "safety/valuable_enhance_threshold", 7)
+	var valuable_threshold := GameConfig.get_int("domains.matter_disposal", "safety/valuable_enhance_threshold", 7)
 	var confirm_code := GameConfig.get_string("domains.matter_disposal", "safety/confirm_passcode", "CONFIRM_DESTROY")
 	if target_item == null:
 		return {"success": false, "error_code": "INVALID_ITEM"}
 	# `combat_metrics.enhance_level` is the canonical runtime field.  The
 	# legacy socket key is read only as a migration fallback for older saves;
 	# canonical data always wins when both fields are present.
-	var enh_level := int(target_item.combat_metrics.get("enhance_level", 0))
+	var enhancement_level := int(target_item.combat_metrics.get("enhance_level", 0))
 	if not target_item.combat_metrics.has("enhance_level"):
-		enh_level = int(target_item.affix_sockets.get("enhancement_level", 0))
-	if enh_level >= valuable_thr and security_passcode != confirm_code:
+		enhancement_level = int(target_item.affix_sockets.get("enhancement_level", 0))
+	if enhancement_level >= valuable_threshold and security_passcode != confirm_code:
 		return {
 			"success": false,
 			"error_code": "VALUABLE_LOCK_ACTIVE",

@@ -44,7 +44,7 @@ func initialize(in_battle_id: String, in_seed: int) -> void:
 	step_counter = 0
 
 ## 记录一步：自增序号 + 时间戳/回合/动作类型/演员/事件数据
-func record_step(timeline_ms: int, round_number: int, action_type: String, actor_id: String, event_data: Dictionary) -> void:
+func record_step(timeline_ms: int, round_number: int, action_type: String, actor_id: String, event_payload: Dictionary) -> void:
 	step_counter += 1
 	var step_record := StepRecordDTO.new()
 	step_record.step_index = step_counter
@@ -52,7 +52,7 @@ func record_step(timeline_ms: int, round_number: int, action_type: String, actor
 	step_record.round_number = round_number
 	step_record.action_type = action_type
 	step_record.actor_id = actor_id
-	step_record.event_data = event_data
+	step_record.event_data = event_payload
 	records.append(step_record)
 
 ## 导出确定性重放载荷（战斗 ID/种子/总步数/记录序列）

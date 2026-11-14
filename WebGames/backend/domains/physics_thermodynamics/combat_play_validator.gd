@@ -15,27 +15,27 @@ extends RefCounted
 ## current_ap 为参与者当前势能；返回受控失败码或放行。
 static func validate_play(
 	card: PhysicalVerbRegistry.CombatActionCardEntity,
-	hand: Array,
-	current_ap: int
+	held_cards: Array,
+	current_action_points: int
 ) -> Dictionary:
 	if card == null or card.card_id.is_empty():
 		return {"success": false, "error_code": "CARD_NOT_DEFINED"}
-	if not _hand_contains(hand, card.card_id):
+	if not _hand_contains(held_cards, card.card_id):
 		return {"success": false, "error_code": "HAND_NOT_CONTAIN", "card_id": card.card_id}
 
 	var stagger_min := GameConfig.get_int("domains.combat", "ap_axis/stagger_min", -10)
 	var guard_verbs: Array = GameConfig.get_array("domains.combat", "guard_verbs", ["PARRY", "BLOCK", "INTER"])
-	if current_ap < 0:
-		if current_ap < stagger_min:
-			return {"success": false, "error_code": "AP_OVERFLOW_BELOW_STAGGER", "ap": current_ap}
+	if current_action_points < 0:
+		if current_action_points < stagger_min:
+			return {"success": false, "error_code": "AP_OVERFLOW_BELOW_STAGGER", "ap": current_action_points}
 		if not _is_guard_card(card, guard_verbs):
 			return {
 				"success": false,
 				"error_code": "AP_INSUFFICIENT_OR_STAGGERED",
-				"ap": current_ap,
+				"ap": current_action_points,
 				"card_id": card.card_id,
 			}
-	return {"success": true, "card_id": card.card_id, "ap": current_ap}
+	return {"success": true, "card_id": card.card_id, "ap": current_action_points}
 
 ## 防御类放行判定：物理防御动词 或 效果层声明 guard/defense 的卡
 static func _is_guard_card(card: PhysicalVerbRegistry.CombatActionCardEntity, guard_verbs: Array) -> bool:
@@ -48,11 +48,11 @@ static func _is_guard_card(card: PhysicalVerbRegistry.CombatActionCardEntity, gu
 				return true
 	return false
 
-static func _hand_contains(hand: Array, card_id: String) -> bool:
-	for item in hand:
-		if item is PhysicalVerbRegistry.CombatActionCardEntity:
-			if item.card_id == card_id:
+static func _hand_contains(held_cards: Array, card_id: String) -> bool:
+	for card_entry in held_cards:
+		if card_entry is PhysicalVerbRegistry.CombatActionCardEntity:
+			if card_entry.card_id == card_id:
 				return true
-		elif str(item) == card_id:
+		elif str(card_entry) == card_id:
 			return true
 	return false

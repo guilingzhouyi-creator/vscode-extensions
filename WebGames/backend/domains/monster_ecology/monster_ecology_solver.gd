@@ -24,12 +24,12 @@ static func apply_part_damage(
 		return { "success": true, "broken": true, "already_broken": true, "ap_penalty": 0 }
 
 	part.durability_current = max(0.0, part.durability_current - damage)
-	var broken := false
+	var is_broken := false
 	var penalty := 0
 
 	if part.durability_current <= 0.0:
 		part.is_severed = true
-		broken = true
+		is_broken = true
 		penalty = part.ap_penalty_on_break
 		if part_id == GameConfig.get_string("domains.monster", "devour/core_part_id", "HEART_CORE"):
 			monster.physiology.heart_core_integrity = 0.0
@@ -38,7 +38,7 @@ static func apply_part_damage(
 		"success": true,
 		"part_id": part_id,
 		"current_durability": part.durability_current,
-		"broken": broken,
+		"broken": is_broken,
 		"ap_penalty": penalty
 	}
 
@@ -54,8 +54,8 @@ static func evaluate_devour_evolution(
 	var overload_self_damage := GameConfig.get_float("domains.monster", "devour/overload_self_damage", 9999.0)
 
 	# 统一六维底座：容纳上限按 CON 底层实际值折算（等级不变时数值亦可联动）
-	var con_capacity: Variant = monster.physiology.get_actual_value("CON") * capacity_multiplier
-	if absorbed_mana > con_capacity * overload_threshold:
+	var constitution_capacity: Variant = monster.physiology.get_actual_value("CON") * capacity_multiplier
+	if absorbed_mana > constitution_capacity * overload_threshold:
 		return {
 			"status": GameConfig.get_string("domains.monster", "devour/status_overload_explosion", "OVERLOAD_EXPLOSION"),
 			"success": false,

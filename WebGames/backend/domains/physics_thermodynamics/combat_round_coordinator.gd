@@ -143,8 +143,8 @@ func step_coordinator(
 				should_end_round = true
 				end_reason = "TENSION_FORCE_ADVANCE"
 
-	# 2. 处理单回合开局预排期离散事件（hand_cap 循环外一次读取，回合内常量）
-	var hand_cap := GameConfig.get_int("domains.combat", "round_hand/hand_cap", 5)
+	# 2. 处理单回合开局预排期离散事件（hand_capacity 循环外一次读取，回合内常量）
+	var hand_capacity := GameConfig.get_int("domains.combat", "round_hand/hand_cap", 5)
 	var empty_pulse_context: Dictionary = {}
 	if current_schedule != null:
 		for scheduled_point in current_schedule.scheduled_points:
@@ -153,8 +153,8 @@ func step_coordinator(
 				if scheduled_point.event_kind == TimelineEventScheduleDTO.EventKind.NORMAL_DRAW:
 					_record_normal_draw(processed_events, scheduled_point.point_id, {"event_kind": "NORMAL_DRAW"})
 				elif scheduled_point.event_kind == TimelineEventScheduleDTO.EventKind.ADD_DRAW:
-					# bonus_cards 无界钳制——payload 来自外部 DTO，防御性封口到 [0, hand_cap]
-					var bonus_cards := clampi(int(scheduled_point.payload.get("extra_bonus_cards", 1)), 0, hand_cap)
+					# bonus_cards 无界钳制——payload 来自外部 DTO，防御性封口到 [0, hand_capacity]
+					var bonus_cards := clampi(int(scheduled_point.payload.get("extra_bonus_cards", 1)), 0, hand_capacity)
 					_draw_bonus_cards(bonus_cards)
 					processed_events.append({
 						"event_id": scheduled_point.point_id,
@@ -174,8 +174,8 @@ func step_coordinator(
 						end_reason = "TENSION_FORCE_ADVANCE"
 
 	# 小回合结束条件检查：AP耗尽且无手牌 / 超过最大动次时限 / 紧张点强制打断
-	var auto_pass_ap := GameConfig.get_bool("domains.combat", "round_lifecycle/auto_pass_on_ap_exhausted", true)
-	var auto_pass_hand := GameConfig.get_bool("domains.combat", "round_lifecycle/auto_pass_on_hand_empty", true)
+	var should_pass_on_empty_action_points := GameConfig.get_bool("domains.combat", "round_lifecycle/auto_pass_on_ap_exhausted", true)
+	var should_pass_on_empty_hand := GameConfig.get_bool("domains.combat", "round_lifecycle/auto_pass_on_hand_empty", true)
 
 	if not should_end_round:
 		# 核心不变量 Inv-TR-3 / Inv-TR2-4：检查是否仍有未决事件
@@ -186,10 +186,10 @@ func step_coordinator(
 					has_pending_events = true
 					break
 
-		if auto_pass_ap and auto_pass_hand:
-			var player_has_no_ap := (player_participant != null and player_participant.current_ap <= 0)
-			var player_has_no_hand := (player_staging != null and player_staging.cards.is_empty())
-			if player_has_no_ap and player_has_no_hand:
+		if should_pass_on_empty_action_points and should_pass_on_empty_hand:
+			var is_player_out_of_action_points := (player_participant != null and player_participant.current_ap <= 0)
+			var is_player_staging_empty := (player_staging != null and player_staging.cards.is_empty())
+			if is_player_out_of_action_points and is_player_staging_empty:
 				# 若预排期中仍有未决时间轴事件，严禁掐断！时钟持续推进保活
 				if not has_pending_events:
 					should_end_round = true

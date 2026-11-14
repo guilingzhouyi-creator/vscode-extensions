@@ -54,9 +54,9 @@ func enqueue_card(card: PhysicalVerbRegistry.CombatActionCardEntity) -> Dictiona
 		return {"success": false, "reason": "NULL_CARD"}
 
 	var overflow_policy := GameConfig.get_string("domains.combat", "staging_bar/overflow_policy", "DISCARD_OLDEST")
-	var was_full := cards.size() >= max_capacity
+	var is_currently_full := cards.size() >= max_capacity
 
-	if was_full:
+	if is_currently_full:
 		total_overflow_count += 1
 		match overflow_policy:
 			"DISCARD_OLDEST":
@@ -69,12 +69,12 @@ func enqueue_card(card: PhysicalVerbRegistry.CombatActionCardEntity) -> Dictiona
 					"inserted_card_id": card.card_id
 				}
 			"CONVERT_AP":
-				var bonus_ap := GameConfig.get_int("domains.combat", "staging_bar/overflow_ap_bonus", 1)
-				accumulated_overflow_energy += bonus_ap
+				var bonus_action_points := GameConfig.get_int("domains.combat", "staging_bar/overflow_ap_bonus", 1)
+				accumulated_overflow_energy += bonus_action_points
 				return {
 					"success": true,
 					"action": "OVERFLOW_CONVERT_AP",
-					"bonus_ap": bonus_ap,
+					"bonus_ap": bonus_action_points,
 					"rejected_card_id": card.card_id
 				}
 			_:

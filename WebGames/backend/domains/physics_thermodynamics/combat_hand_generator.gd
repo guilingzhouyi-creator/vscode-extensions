@@ -55,13 +55,13 @@ static func apply_special_modifiers(
 
 ## 阶段 C：根据最终数量执行卡池实体实例化 (牌型随机)
 static func draw_cards_for_turn(
-	spec: CombatHandDrawDTO.HandDrawSpecDTO,
+	draw_specification: CombatHandDrawDTO.HandDrawSpecDTO,
 	rng: DeterministicRNG
 ) -> CombatHandDrawDTO.HandDrawResultDTO:
 	var draw_result: CombatHandDrawDTO.HandDrawResultDTO = CombatHandDrawDTOClass.HandDrawResultDTO.new()
-	draw_result.base_random_count = evaluate_base_hand_count(spec.is_first_encounter, rng)
+	draw_result.base_random_count = evaluate_base_hand_count(draw_specification.is_first_encounter, rng)
 
-	var modifier_result := apply_special_modifiers(draw_result.base_random_count, spec.special_modifiers)
+	var modifier_result := apply_special_modifiers(draw_result.base_random_count, draw_specification.special_modifiers)
 	draw_result.final_draw_count = modifier_result.final_count
 	draw_result.modifier_delta = modifier_result.modifier_delta
 	draw_result.applied_modifiers = modifier_result.applied
@@ -71,7 +71,7 @@ static func draw_cards_for_turn(
 	var drawn_cards: Array = []
 	for card_index in range(draw_result.final_draw_count):
 		var card := _instantiate_card_from_pool(rng)
-		card.card_id = "CARD_GEN_%d_%d" % [spec.current_round, card_index + 1]
+		card.card_id = "CARD_GEN_%d_%d" % [draw_specification.current_round, card_index + 1]
 		drawn_cards.append(card)
 	draw_result.actual_cards = drawn_cards
 	return draw_result

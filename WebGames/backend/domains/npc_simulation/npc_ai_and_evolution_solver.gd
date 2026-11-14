@@ -11,13 +11,13 @@
 class_name NPCAIAndEvolutionSolver extends RefCounted
 
 ## 目标导向行动规划器 (GOAP Action Planner)
-static func plan_npc_next_goal(npc: AutonomousNPCEntity) -> String:
-	var personality: Variant = npc.personality
+static func plan_npc_next_goal(npc_entity: AutonomousNPCEntity) -> String:
+	var personality: Variant = npc_entity.personality
 	var scale_floor := GameConfig.get_float("domains.npc", "goap/scale_floor", 0.1)
 	var legacy_threshold := GameConfig.get_float("domains.npc", "goap/legacy_age_threshold", 80.0)
 	var default_trait := GameConfig.get_float("domains.npc", "goap/default_personality", 0.5)
 
-	var effective_age: Variant = npc.physiology.raw_chronological_age / max(scale_floor, npc.physiology.lifespan_scale)
+	var effective_age: Variant = npc_entity.physiology.raw_chronological_age / max(scale_floor, npc_entity.physiology.lifespan_scale)
 
 	# 寿元将尽大限前夕: 强制优先著书立说留传衣钵
 	if effective_age >= legacy_threshold:

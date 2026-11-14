@@ -32,12 +32,12 @@ static func get_verb(verb_id: String) -> Dictionary:
 ## 被调用方立即覆写）——热路径每回合 ~50~90 次查找，无头后端并发战斗线性放大；
 ## 缓存后构造仅一次版本比对 + 字段复制，配置变更经 config_reload_version 自动重建。
 static var _card_defaults: Dictionary = {}
-static var _card_defaults_ready: bool = false
+static var _is_card_defaults_ready: bool = false
 static var _card_defaults_config_version: int = -1
 
 ## 卡牌默认值缓存新鲜度守卫：未构建或配置热重载版本推进时触发重建
 static func _ensure_card_defaults() -> void:
-	if _card_defaults_ready and _card_defaults_config_version == GameConfig.config_reload_version():
+	if _is_card_defaults_ready and _card_defaults_config_version == GameConfig.config_reload_version():
 		return
 	_card_defaults = {
 		"verb_type": GameConfig.get_string("domains.combat", "card_defaults/verb_type", "SLASH"),
@@ -51,7 +51,7 @@ static func _ensure_card_defaults() -> void:
 		"card_pool": GameConfig.get_string("domains.combat", "card_pool_defaults/card_pool", "random"),
 	}
 	_card_defaults_config_version = GameConfig.config_reload_version()
-	_card_defaults_ready = true
+	_is_card_defaults_ready = true
 
 ## 卡牌默认值缓存访问（供测试断言与外部读取；构造路径走 _init 复制）
 static func card_defaults() -> Dictionary:

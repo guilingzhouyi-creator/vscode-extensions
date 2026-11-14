@@ -11,14 +11,14 @@
 class_name SwarmResonanceAndAIFSM extends RefCounted
 
 ## 怪物 AI 发卡决策：按 AP 势能区间（防御/调整/暴怒重击/斩击）选择动词
-static func evaluate_monster_ai_action(monster: MonsterAggregateEntity, current_ap: int) -> String:
+static func evaluate_monster_ai_action(monster: MonsterAggregateEntity, current_action_points: int) -> String:
 	# AP < 0 时倾向于防御/调整姿态 (BLOCK/PARRY)，AP >= 0 时发动大威力攻击 (SLASH/CRUSH)
-	var guard_low_ap := GameConfig.get_int("domains.monster", "ai/guard_low_ap", -2)
-	var guard_high_ap := GameConfig.get_int("domains.monster", "ai/guard_high_ap", 0)
+	var guard_low_action_points := GameConfig.get_int("domains.monster", "ai/guard_low_ap", -2)
+	var guard_high_action_points := GameConfig.get_int("domains.monster", "ai/guard_high_ap", 0)
 	var rage_crush_threshold := GameConfig.get_float("domains.monster", "ai/rage_crush_threshold", 50.0)
-	if current_ap < guard_low_ap:
+	if current_action_points < guard_low_action_points:
 		return GameConfig.get_string("domains.monster", "ai/verbs/BLOCK", "BLOCK")
-	elif current_ap < guard_high_ap:
+	elif current_action_points < guard_high_action_points:
 		return GameConfig.get_string("domains.monster", "ai/verbs/PARRY", "PARRY")
 	elif monster.rage_level > rage_crush_threshold:
 		return GameConfig.get_string("domains.monster", "ai/verbs/CRUSH", "CRUSH")

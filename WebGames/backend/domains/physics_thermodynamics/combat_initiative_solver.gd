@@ -42,20 +42,20 @@ class ParticipantInitiativeSpec extends RefCounted:
 		}
 
 	## 从字典重建参与者规格（缺省回退默认值）
-	static func from_dto(data: Dictionary) -> ParticipantInitiativeSpec:
-		var spec := ParticipantInitiativeSpec.new()
-		spec.participant_id = str(data.get("participant_id", ""))
-		spec.name = str(data.get("name", ""))
-		spec.is_player = bool(data.get("is_player", true))
-		spec.base_agility = float(data.get("base_agility", 10.0))
-		spec.base_perception = float(data.get("base_perception", 10.0))
-		spec.level = int(data.get("level", 1))
-		spec.equip_speed_modifier = float(data.get("equip_speed_modifier", 0.0))
-		spec.temporary_buff_modifier = float(data.get("temporary_buff_modifier", 0.0))
-		spec.calculated_score = float(data.get("calculated_score", 0.0))
-		spec.initial_ap_bonus = int(data.get("initial_ap_bonus", 0))
-		spec.is_first_mover = bool(data.get("is_first_mover", false))
-		return spec
+	static func from_dto(serialized_participant: Dictionary) -> ParticipantInitiativeSpec:
+		var participant_initiative := ParticipantInitiativeSpec.new()
+		participant_initiative.participant_id = str(serialized_participant.get("participant_id", ""))
+		participant_initiative.name = str(serialized_participant.get("name", ""))
+		participant_initiative.is_player = bool(serialized_participant.get("is_player", true))
+		participant_initiative.base_agility = float(serialized_participant.get("base_agility", 10.0))
+		participant_initiative.base_perception = float(serialized_participant.get("base_perception", 10.0))
+		participant_initiative.level = int(serialized_participant.get("level", 1))
+		participant_initiative.equip_speed_modifier = float(serialized_participant.get("equip_speed_modifier", 0.0))
+		participant_initiative.temporary_buff_modifier = float(serialized_participant.get("temporary_buff_modifier", 0.0))
+		participant_initiative.calculated_score = float(serialized_participant.get("calculated_score", 0.0))
+		participant_initiative.initial_ap_bonus = int(serialized_participant.get("initial_ap_bonus", 0))
+		participant_initiative.is_first_mover = bool(serialized_participant.get("is_first_mover", false))
+		return participant_initiative
 
 ## BattleInitiativeResultDTO：战斗先攻求解结果传输模型
 class BattleInitiativeResultDTO extends RefCounted:
@@ -85,18 +85,18 @@ static func evaluate_initiative(
 	enemy: ParticipantInitiativeSpec,
 	rng: DeterministicRNG
 ) -> BattleInitiativeResultDTO:
-	var result := BattleInitiativeResultDTO.new()
-	result.player_spec = player
-	result.enemy_spec = enemy
-	result.seed_used = rng.get_state() if rng else 0
-	result.start_utc = int(Time.get_unix_time_from_system())
+	var initiative_result := BattleInitiativeResultDTO.new()
+	initiative_result.player_spec = player
+	initiative_result.enemy_spec = enemy
+	initiative_result.seed_used = rng.get_state() if rng else 0
+	initiative_result.start_utc = int(Time.get_unix_time_from_system())
 
 	var agility_weight := GameConfig.get_float("domains.combat", "initiative_model/weight_agility", 1.0)
 	var perception_weight := GameConfig.get_float("domains.combat", "initiative_model/weight_perception", 0.8)
 	var level_weight := GameConfig.get_float("domains.combat", "initiative_model/weight_level", 0.5)
 	var jitter_min := GameConfig.get_int("domains.combat", "initiative_model/jitter_min", -2)
 	var jitter_max := GameConfig.get_int("domains.combat", "initiative_model/jitter_max", 2)
-	var ap_lead_bonus := GameConfig.get_int("domains.combat", "initiative_model/lead_ap_bonus", 2)
+	var action_points_lead_bonus := GameConfig.get_int("domains.combat", "initiative_model/lead_ap_bonus", 2)
 
 	var player_base := player.base_agility * agility_weight + player.base_perception * perception_weight + float(player.level) * level_weight
 	var enemy_base := enemy.base_agility * agility_weight + enemy.base_perception * perception_weight + float(enemy.level) * level_weight
@@ -113,46 +113,46 @@ static func evaluate_initiative(
 	# 胜负与平局决胜判定 (Tie-Breaker)
 	if abs(player.calculated_score - enemy.calculated_score) > 0.001:
 		if player.calculated_score > enemy.calculated_score:
-			result.first_mover_id = player.participant_id
-			result.tie_broken_by = "SCORE"
+			initiative_result.first_mover_id = player.participant_id
+			initiative_result.tie_broken_by = "SCORE"
 			player.is_first_mover = true
-			player.initial_ap_bonus = ap_lead_bonus
-			result.initial_ap_diff = ap_lead_bonus
+			player.initial_ap_bonus = action_points_lead_bonus
+			initiative_result.initial_ap_diff = action_points_lead_bonus
 		else:
-			result.first_mover_id = enemy.participant_id
-			result.tie_broken_by = "SCORE"
+			initiative_result.first_mover_id = enemy.participant_id
+			initiative_result.tie_broken_by = "SCORE"
 			enemy.is_first_mover = true
-			enemy.initial_ap_bonus = ap_lead_bonus
-			result.initial_ap_diff = -ap_lead_bonus
+			enemy.initial_ap_bonus = action_points_lead_bonus
+			initiative_result.initial_ap_diff = -action_points_lead_bonus
 	else:
 		# 二级决胜：纯敏捷比对
 		if abs(player.base_agility - enemy.base_agility) > 0.001:
 			if player.base_agility > enemy.base_agility:
-				result.first_mover_id = player.participant_id
-				result.tie_broken_by = "AGI_FALLBACK"
+				initiative_result.first_mover_id = player.participant_id
+				initiative_result.tie_broken_by = "AGI_FALLBACK"
 				player.is_first_mover = true
 				player.initial_ap_bonus = 1
-				result.initial_ap_diff = 1
+				initiative_result.initial_ap_diff = 1
 			else:
-				result.first_mover_id = enemy.participant_id
-				result.tie_broken_by = "AGI_FALLBACK"
+				initiative_result.first_mover_id = enemy.participant_id
+				initiative_result.tie_broken_by = "AGI_FALLBACK"
 				enemy.is_first_mover = true
 				enemy.initial_ap_bonus = 1
-				result.initial_ap_diff = -1
+				initiative_result.initial_ap_diff = -1
 		else:
 			# 三级决胜：50/50 确定性随机硬币
 			var coin := rng.randi_range(0, 1) if rng else 0
 			if coin == 0:
-				result.first_mover_id = player.participant_id
-				result.tie_broken_by = "RNG_TIEBREAKER"
+				initiative_result.first_mover_id = player.participant_id
+				initiative_result.tie_broken_by = "RNG_TIEBREAKER"
 				player.is_first_mover = true
 				player.initial_ap_bonus = 1
-				result.initial_ap_diff = 1
+				initiative_result.initial_ap_diff = 1
 			else:
-				result.first_mover_id = enemy.participant_id
-				result.tie_broken_by = "RNG_TIEBREAKER"
+				initiative_result.first_mover_id = enemy.participant_id
+				initiative_result.tie_broken_by = "RNG_TIEBREAKER"
 				enemy.is_first_mover = true
 				enemy.initial_ap_bonus = 1
-				result.initial_ap_diff = -1
+				initiative_result.initial_ap_diff = -1
 
-	return result
+	return initiative_result

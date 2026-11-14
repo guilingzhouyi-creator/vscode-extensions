@@ -49,12 +49,12 @@ class NotificationDTO extends RefCounted:
 		initial_type: NoticeType = NoticeType.TOAST,
 		initial_title_key: String = "",
 		initial_content_key: String = "",
-		initial_params: Dictionary = {},
+		initial_parameter_map: Dictionary = {},
 		initial_dismiss_seconds: float = DEFAULT_AUTO_DISMISS_SECONDS
 	) -> void:
 		notice_id = initial_notice_id
 		type = initial_type
 		title_loc_key = initial_title_key
 		content_loc_key = initial_content_key
-		params = initial_params
+		params = initial_parameter_map
 		auto_dismiss_seconds = initial_dismiss_seconds

@@ -16,14 +16,14 @@ static var _committed_npc_ids: Dictionary = {}
 
 ## NPC 自然坐化流程：来源校验 + 幂等提交 → 著书立说 → 遗产交接 → 幂等索引写入（有界裁剪）
 static func process_npc_natural_demise(
-	npc: AutonomousNPCEntity,
-	successor_npc: AutonomousNPCEntity
+	npc_entity: AutonomousNPCEntity,
+	successor_npc_entity: AutonomousNPCEntity
 ) -> Dictionary:
 	# 0. 来源校验 + 幂等：来源 NPC 必须有效且未提交过传承
-	if npc == null or npc.npc_id.is_empty():
+	if npc_entity == null or npc_entity.npc_id.is_empty():
 		return { "success": false, "code": "NPC_INVALID" }
-	if _committed_npc_ids.has(npc.npc_id):
-		return { "success": false, "code": "LEGACY_ALREADY_COMMITTED", "npc_id": npc.npc_id }
+	if _committed_npc_ids.has(npc_entity.npc_id):
+		return { "success": false, "code": "LEGACY_ALREADY_COMMITTED", "npc_id": npc_entity.npc_id }
 
 	var book_name_suffix := GameConfig.get_string("domains.npc", "legacy/book_name_suffix", "之绝学心法")
 	var sentence_count := GameConfig.get_int("domains.npc", "legacy/sentence_count", 3)
@@ -32,27 +32,27 @@ static func process_npc_natural_demise(
 	var fallback_heir := GameConfig.get_string("domains.npc", "legacy/fallback_heir_name", "世人")
 
 	# 1. 著书立说留传后世
-	var ast := SkillSubgraphAST.new()
-	ast.skill_name = npc.personal_name + book_name_suffix
-	ast.sentence_count = sentence_count
+	var legacy_subgraph_ast := SkillSubgraphAST.new()
+	legacy_subgraph_ast.skill_name = npc_entity.personal_name + book_name_suffix
+	legacy_subgraph_ast.sentence_count = sentence_count
 	var legacy_book: Variant = GrimoireAuthoringPipeline.publish_manuscript_book(
-		npc.npc_id, ast.skill_name, ast, book_price, royalty_rate
+		npc_entity.npc_id, legacy_subgraph_ast.skill_name, legacy_subgraph_ast, book_price, royalty_rate
 	)
 
 	# 2. 遗产交接
-	var transferred_gold: Variant = npc.wallet.gold
-	if successor_npc != null:
-		successor_npc.wallet.gold += transferred_gold
-		npc.wallet.gold = 0
+	var transferred_gold: Variant = npc_entity.wallet.gold
+	if successor_npc_entity != null:
+		successor_npc_entity.wallet.gold += transferred_gold
+		npc_entity.wallet.gold = 0
 
 	EventBusCore.get_instance().emit_narrative_by_key(
 		"npc/demise_legacy", "society",
-		[npc.personal_name, legacy_book.custom_name, transferred_gold,
-		successor_npc.personal_name if successor_npc else fallback_heir]
+		[npc_entity.personal_name, legacy_book.custom_name, transferred_gold,
+		successor_npc_entity.personal_name if successor_npc_entity else fallback_heir]
 	)
 
 	# 提交成功后写入幂等索引（防重复发书/转账；失败路径不记录）
-	_committed_npc_ids[npc.npc_id] = true
+	_committed_npc_ids[npc_entity.npc_id] = true
 	# 无界补上限——写入后按 committed_ids/max_entries 最旧先出裁剪（原「压缩清理」注释契约落地）
 	FifoBudget.trim_oldest(_committed_npc_ids, GameConfig.get_int("domains.npc", "committed_ids/max_entries", 5000))
 

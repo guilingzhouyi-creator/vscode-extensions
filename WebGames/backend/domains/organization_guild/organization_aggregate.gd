@@ -70,10 +70,10 @@ var member_roster: Dictionary = {}
 var diplomatic_relations: Dictionary = {}
 
 ## 组织聚合构造（ID/名称/类型）
-func _init(initial_org_id: String = "", initial_name: String = "", initial_org_type: OrganizationType = OrganizationType.PLAYER_CREATED_CUSTOM) -> void:
-	org_id = initial_org_id
+func _init(initial_organization_id: String = "", initial_name: String = "", initial_organization_type: OrganizationType = OrganizationType.PLAYER_CREATED_CUSTOM) -> void:
+	org_id = initial_organization_id
 	localized_name = initial_name
-	org_type = initial_org_type
+	org_type = initial_organization_type
 
 ## 登记成员入花名册（默认见习）
 func add_member(member_account_id: String, member_character_name: String, role: GuildRole = GuildRole.NOVICE) -> void:

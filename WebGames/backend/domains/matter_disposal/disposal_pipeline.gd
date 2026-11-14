@@ -18,7 +18,7 @@ const CANONICAL_ID_MANA_DUST: String = "KALAR:MATERIAL:DISPOSAL:MANA_DUST"
 
 ## 执行物品销毁分解因果判定与产物计算
 static func process_item_disposal(
-	player_pos: Vector2,
+	player_position: Vector2,
 	facility: ItemDisposalFacilityDTO,
 	inventory: WearableInventoryAggregate,
 	item_id: String,
@@ -41,7 +41,7 @@ static func process_item_disposal(
 	if target_item.container_state == "LOCKED":
 		return {"success": false, "error_code": "ITEM_LOCKED"}
 
-	var disposal_result: Variant = MatterDisposalSolver.execute_disposal(player_pos, facility, target_item, passcode)
+	var disposal_result: Variant = MatterDisposalSolver.execute_disposal(player_position, facility, target_item, passcode)
 	if not disposal_result.success:
 		return disposal_result
 
