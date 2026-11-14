@@ -4,7 +4,7 @@
 # 架构定位: Domain Runtime State Service / Session & HUD Resident Coordinator
 # 依赖与触发: 上游: AuthService, WorldGatewayFSM, UnifiedProtocolDispatcher | 下游: AuthoritativeHudSyncService, SaveDataAccessLayer | 配置: config/domains/world_state/core.json
 # 职责说明: 托管后端全 11 环会话运行时真源，维持主页 HUD 常驻状态拉取、脏标节流事件推送、真实多域存盘提供者挂载与退出对称回收。
-# 退出语义与设计依据: 卡拉尔后端全链路闭环规约 (Inv-SESSION-VAULT-3, Inv-ADV-PRF-002, Inv-SYMMETRIC-TEARDOWN-4)
+# 退出语义与设计依据: 卡拉尔后端全链路运行规约 (Inv-SESSION-VAULT-3, Inv-ADV-PRF-002, Inv-SYMMETRIC-TEARDOWN-4)
 # ==============================================================================
 
 ## WorldSessionRuntimeService：后端全链运行时会话与常驻 HUD 托管服务
@@ -24,6 +24,7 @@ class RuntimeWorldSaveProvider extends RefCounted:
 		if owner_state != null:
 			_state_ref = weakref(owner_state)
 
+	## 序列化当前运行时会话状态为多域存盘快照
 	func serialize() -> Dictionary:
 		if _state_ref == null:
 			return {}
@@ -39,7 +40,7 @@ static var _token_mask_handler: Callable = Callable()
 static var _token_reveal_handler: Callable = Callable()
 static var _cached_hud_snapshot: AuthoritativeHudSnapshotDTO = null
 static var _hud_min_interval_cached: int = 50
-static var _hud_cfg_version: int = -1
+static var _hud_config_version: int = -1
 
 ## 注册外部安全混淆处理器（依赖倒置模式：由外层应用/基础设施注入，避免领域层逆向依赖基础设施）
 static func register_token_protection_handlers(masker: Callable, revealer: Callable) -> void:
@@ -49,6 +50,7 @@ static func register_token_protection_handlers(masker: Callable, revealer: Calla
 ## 激活已鉴权的账号级会话上下文
 static func activate_authenticated_session(account_id: String, raw_token: String = "", gateway: Variant = null) -> void:
 	_state.account_id = account_id
+	_state.is_authenticated = not account_id.is_empty()
 	_state.session_token_hash = raw_token.sha256_text() if not raw_token.is_empty() else ""
 	if raw_token.is_empty():
 		_masked_token = PackedByteArray()
@@ -69,7 +71,11 @@ static func get_gateway() -> Variant:
 
 ## 判断当前是否存在活跃账号会话
 static func has_authenticated_session() -> bool:
-	return not _state.account_id.is_empty()
+	return _state.is_authenticated and not _state.account_id.is_empty()
+
+## 判断当前活跃会话是否持有真实鉴权会话令牌哈希
+static func has_session_token() -> bool:
+	return not _state.session_token_hash.is_empty()
 
 ## 判断当前是否正处于世界探索激活态
 static func has_active_world() -> bool:
@@ -100,8 +106,8 @@ static func get_active_session_token() -> String:
 	return _masked_token.get_string_from_utf8()
 
 ## 绑定创角后的序章上下文与角色档案（供序章推进与交接使用，退出自动销毁）
-static func bind_prologue_session(prologue_ctx: Variant, profile: Variant = null) -> void:
-	_state.prologue_context = prologue_ctx
+static func bind_prologue_session(prologue_context: Variant, profile: Variant = null) -> void:
+	_state.prologue_context = prologue_context
 	if profile != null:
 		_state.character_profile = profile
 
@@ -146,11 +152,24 @@ static func activate_world_session(params: Dictionary, push_initial_hud: bool = 
 	_state.gacha_pity_counter = maxi(0, int(params.get("gacha_pity_counter", 0)))
 	_state.guild_faction_id = String(params.get("guild_faction_id", ""))
 	_state.title_rank_key = String(params.get("title_rank_key", ""))
+	_state.calendar_years = maxi(1, int(params.get("calendar_years", 1)))
+	_state.calendar_months = clampi(int(params.get("calendar_months", 1)), 1, 12)
+	_state.calendar_days = clampi(int(params.get("calendar_days", 1)), 1, 30)
+	_state.travel_hours = clampi(int(params.get("travel_hours", 0)), 0, 23)
+	_state.mana_density_tier = maxi(1, int(params.get("mana_density_tier", 1)))
+	var raw_ops: Variant = params.get("ops_bulletin_brief", {})
+	_state.ops_bulletin_brief = (raw_ops as Dictionary).duplicate() if raw_ops is Dictionary else {}
+	_state.active_red_dot_paths.clear()
+	var raw_dots: Variant = params.get("active_red_dot_paths", [])
+	if raw_dots is Array:
+		for dot in raw_dots:
+			_state.active_red_dot_paths.append(str(dot))
+	_state.quest_tracker = params.get("quest_tracker", null)
 
-	var raw_av: Variant = params.get("attribute_values", params.get("attributes", {}))
-	_state.attribute_values = (raw_av as Dictionary).duplicate() if raw_av is Dictionary else {}
-	var raw_al: Variant = params.get("attribute_levels", {})
-	_state.attribute_levels = (raw_al as Dictionary).duplicate() if raw_al is Dictionary else {}
+	var raw_attribute_values: Variant = params.get("attribute_values", params.get("attributes", {}))
+	_state.attribute_values = (raw_attribute_values as Dictionary).duplicate() if raw_attribute_values is Dictionary else {}
+	var raw_attribute_levels: Variant = params.get("attribute_levels", {})
+	_state.attribute_levels = (raw_attribute_levels as Dictionary).duplicate() if raw_attribute_levels is Dictionary else {}
 	_state.world_instance = params.get("world_instance", null)
 	_state.character_profile = params.get("character_profile", null)
 	_state.prologue_context = params.get("prologue_context", null)
@@ -158,9 +177,11 @@ static func activate_world_session(params: Dictionary, push_initial_hud: bool = 
 	var raw_providers: Variant = params.get("providers", {})
 	_state.extra_providers = (raw_providers as Dictionary).duplicate() if raw_providers is Dictionary else {}
 	_state.world_active = true
+	_state.is_paused = false
 	_state.hud_dirty = false
 	_state.world_dirty = false
 	_state.last_hud_sync_ms = now_ms if now_ms >= 0 else Time.get_ticks_msec()
+	_cached_hud_snapshot = null
 
 	_register_runtime_save_providers()
 	if push_initial_hud:
@@ -188,53 +209,122 @@ static func set_guard_flags(in_combat: bool, in_cutscene: bool = false, is_dead:
 	_state.in_cutscene = in_cutscene
 	_state.is_dead = is_dead
 
+## 设置暂停挂起状态（供 ESC 菜单与 Lifecycle 服务协同）
+static func set_paused(paused: bool) -> void:
+	_state.is_paused = paused
+
 ## 增量应用钱包、属性或时钟突变并按最小间隔节流推送 HUD
 static func apply_mutation_and_sync(mutations: Dictionary, now_ms: int = -1, force_push: bool = false) -> AuthoritativeHudSnapshotDTO:
 	if not _state.world_active:
 		return AuthoritativeHudSyncService.get_authoritative_snapshot(mutations)
-	var changed_hud := false
-	if mutations.has("wallet_gold_delta"):
-		var old_g := _state.wallet_gold
-		_state.wallet_gold += int(mutations.get("wallet_gold_delta", 0))
-		_state.ledger_nonce += 1
-		AuthoritativeHudSyncService.publish_wallet_mutation(_state.account_id, "gold", old_g, _state.wallet_gold, String(mutations.get("reason", "runtime_mutation")))
+	var changed_hud := _apply_wallet_and_vital_mutations(mutations)
+	if _apply_progression_and_meta_mutations(mutations):
 		changed_hud = true
-	if mutations.has("hp_delta"):
-		var old_hp := _state.hp_current
-		_state.hp_current = clampf(_state.hp_current + float(mutations.get("hp_delta", 0.0)), 0.0, _state.hp_max)
-		AuthoritativeHudSyncService.publish_stat_mutation(_state.character_id, "HP", old_hp, _state.hp_current, String(mutations.get("cause", "runtime_mutation")))
-		changed_hud = true
-	if mutations.has("stat_deltas") and mutations.get("stat_deltas") is Dictionary:
-		var sdeltas: Dictionary = mutations.get("stat_deltas")
-		for stat_key in sdeltas.keys():
-			var old_v := float(_state.attribute_values.get(stat_key, 0.0))
-			var new_v := old_v + float(sdeltas[stat_key])
-			_state.attribute_values[stat_key] = new_v
-			AuthoritativeHudSyncService.publish_stat_mutation(_state.character_id, String(stat_key), old_v, new_v, String(mutations.get("cause", "runtime_mutation")))
-			changed_hud = true
 	if mutations.has("clock_hours_delta"):
-		var delta_hours := maxi(0, int(mutations.get("clock_hours_delta", 0)))
-		if delta_hours > 0:
-			_state.travel_hours += delta_hours
-			var env := WorldCalendarEnvironmentResolver.resolve_environment(
-				_state.calendar_years, _state.calendar_months, _state.calendar_days, _state.travel_hours, _state.mana_density_tier
-			)
-			AuthoritativeHudSyncService.publish_clock_tick(env)
+		if _advance_calendar_hours(maxi(0, int(mutations.get("clock_hours_delta", 0)))):
 			changed_hud = true
 	if changed_hud:
 		mark_hud_dirty(true)
 	return flush_hud_sync_if_dirty(now_ms, force_push)
 
+static func _apply_wallet_and_vital_mutations(mutations: Dictionary) -> bool:
+	var changed := false
+	var reason := String(mutations.get("reason", "runtime_mutation"))
+	var cause := String(mutations.get("cause", "runtime_mutation"))
+	if mutations.has("wallet_gold_delta"):
+		var old_gold := _state.wallet_gold
+		_state.wallet_gold = maxi(0, _state.wallet_gold + int(mutations.get("wallet_gold_delta", 0)))
+		_state.ledger_nonce += 1
+		AuthoritativeHudSyncService.publish_wallet_mutation(_state.account_id, "gold", old_gold, _state.wallet_gold, reason)
+		changed = true
+	if mutations.has("wallet_mana_monocrystals_delta"):
+		var old_crystals := _state.wallet_mana_monocrystals
+		_state.wallet_mana_monocrystals = maxi(0, _state.wallet_mana_monocrystals + int(mutations.get("wallet_mana_monocrystals_delta", 0)))
+		_state.ledger_nonce += 1
+		AuthoritativeHudSyncService.publish_wallet_mutation(_state.account_id, "mana_monocrystals", old_crystals, _state.wallet_mana_monocrystals, reason)
+		changed = true
+	if mutations.has("hp_delta"):
+		var old_hp := _state.hp_current
+		_state.hp_current = clampf(_state.hp_current + float(mutations.get("hp_delta", 0.0)), 0.0, _state.hp_max)
+		AuthoritativeHudSyncService.publish_stat_mutation(_state.character_id, "HP", old_hp, _state.hp_current, cause)
+		changed = true
+	if mutations.has("mp_delta"):
+		var old_mp := _state.mp_current
+		_state.mp_current = clampf(_state.mp_current + float(mutations.get("mp_delta", 0.0)), 0.0, _state.mp_max)
+		AuthoritativeHudSyncService.publish_stat_mutation(_state.character_id, "MP", old_mp, _state.mp_current, cause)
+		changed = true
+	if mutations.has("ap_delta"):
+		var old_ap := _state.ap_current
+		_state.ap_current = clampf(_state.ap_current + float(mutations.get("ap_delta", 0.0)), 0.0, _state.ap_max)
+		AuthoritativeHudSyncService.publish_stat_mutation(_state.character_id, "AP", old_ap, _state.ap_current, cause)
+		changed = true
+	return changed
+
+static func _apply_progression_and_meta_mutations(mutations: Dictionary) -> bool:
+	var changed := false
+	var cause := String(mutations.get("cause", "runtime_mutation"))
+	if mutations.has("stat_deltas") and mutations.get("stat_deltas") is Dictionary:
+		var stat_deltas: Dictionary = mutations.get("stat_deltas")
+		for stat_key in stat_deltas.keys():
+			var old_value := float(_state.attribute_values.get(stat_key, 0.0))
+			var new_value := old_value + float(stat_deltas[stat_key])
+			_state.attribute_values[stat_key] = new_value
+			AuthoritativeHudSyncService.publish_stat_mutation(_state.character_id, String(stat_key), old_value, new_value, cause)
+			changed = true
+	if mutations.has("location_id") or mutations.has("current_location_id"):
+		_state.current_location_id = String(mutations.get("current_location_id", mutations.get("location_id", _state.current_location_id)))
+		changed = true
+	if mutations.has("level"):
+		_state.level = maxi(1, int(mutations.get("level", _state.level)))
+		changed = true
+	if mutations.has("unallocated_potential_points"):
+		_state.unallocated_potential_points = maxi(0, int(mutations.get("unallocated_potential_points", _state.unallocated_potential_points)))
+		changed = true
+	if mutations.has("unread_mail_count"):
+		_state.unread_mail_count = maxi(0, int(mutations.get("unread_mail_count", _state.unread_mail_count)))
+		changed = true
+	elif mutations.has("unread_mail_delta"):
+		_state.unread_mail_count = maxi(0, _state.unread_mail_count + int(mutations.get("unread_mail_delta", 0)))
+		changed = true
+	if mutations.has("active_red_dot_paths") and mutations.get("active_red_dot_paths") is Array:
+		_state.active_red_dot_paths.clear()
+		for dot in (mutations.get("active_red_dot_paths") as Array):
+			_state.active_red_dot_paths.append(str(dot))
+		changed = true
+	return changed
+
+static func _advance_calendar_hours(delta_hours: int) -> bool:
+	if delta_hours <= 0:
+		return false
+	var total_hours := _state.travel_hours + delta_hours
+	var add_days := total_hours / 24
+	_state.travel_hours = total_hours % 24
+	if add_days > 0:
+		var day_zero := (_state.calendar_days - 1) + add_days
+		var add_months := day_zero / 30
+		_state.calendar_days = (day_zero % 30) + 1
+		if add_months > 0:
+			var month_zero := (_state.calendar_months - 1) + add_months
+			_state.calendar_years += month_zero / 12
+			_state.calendar_months = (month_zero % 12) + 1
+	var environment := WorldCalendarEnvironmentResolver.resolve_environment(
+		_state.calendar_years, _state.calendar_months, _state.calendar_days, _state.travel_hours, _state.mana_density_tier
+	)
+	AuthoritativeHudSyncService.publish_clock_tick(environment)
+	return true
+
 static func _resolve_hud_min_interval_ms() -> int:
-	var cfg_ver: int = GameConfig.config_reload_version()
-	if _hud_cfg_version != cfg_ver:
+	var config_version: int = GameConfig.config_reload_version()
+	if _hud_config_version != config_version:
 		_hud_min_interval_cached = maxi(0, GameConfig.get_int("domains.world_state", "hud_sync/min_interval_ms", 50))
-		_hud_cfg_version = cfg_ver
+		_hud_config_version = config_version
 	return _hud_min_interval_cached
 
 ## 按配置最小推送周期刷新脏标 HUD 快照，先短路节流与非脏路径以消除无效快照构造
 static func flush_hud_sync_if_dirty(now_ms: int = -1, force_push: bool = false) -> AuthoritativeHudSnapshotDTO:
-	if not _state.world_active or not _state.hud_dirty:
+	if not _state.world_active:
+		return AuthoritativeHudSyncService.get_authoritative_snapshot(build_live_hud_context())
+	if not _state.hud_dirty:
 		if _cached_hud_snapshot == null:
 			_cached_hud_snapshot = AuthoritativeHudSyncService.get_authoritative_snapshot(build_live_hud_context())
 		return _cached_hud_snapshot
@@ -244,8 +334,8 @@ static func flush_hud_sync_if_dirty(now_ms: int = -1, force_push: bool = false) 
 		if _cached_hud_snapshot == null:
 			_cached_hud_snapshot = AuthoritativeHudSyncService.get_authoritative_snapshot(build_live_hud_context())
 		return _cached_hud_snapshot
-	var live_ctx := build_live_hud_context()
-	var snapshot := AuthoritativeHudSyncService.get_authoritative_snapshot(live_ctx)
+	var live_context := build_live_hud_context()
+	var snapshot := AuthoritativeHudSyncService.get_authoritative_snapshot(live_context)
 	AuthoritativeHudSyncService.publish_hud_snapshot(snapshot)
 	_state.hud_dirty = false
 	_state.last_hud_sync_ms = current_ms
@@ -294,10 +384,10 @@ static func pull_authoritative_hud_snapshot() -> AuthoritativeHudSnapshotDTO:
 
 ## 拉取精简标准 HudStatusSnapshotDTO
 static func pull_basic_hud_snapshot() -> HudStatusSnapshotDTO:
-	var auth_snap := pull_authoritative_hud_snapshot()
-	var basic := auth_snap.to_legacy_snapshot()
-	basic.current_location_id = _state.current_location_id
-	return basic
+	var authoritative_snapshot := pull_authoritative_hud_snapshot()
+	var basic_snapshot := authoritative_snapshot.to_legacy_snapshot()
+	basic_snapshot.current_location_id = _state.current_location_id
+	return basic_snapshot
 
 ## 构建 ESC 系统菜单后端权威状态视图
 static func get_esc_menu_state() -> Dictionary:
@@ -312,6 +402,7 @@ static func get_esc_menu_state() -> Dictionary:
 		"in_combat": _state.in_combat,
 		"in_cutscene": _state.in_cutscene,
 		"is_dead": _state.is_dead,
+		"is_paused": _state.is_paused,
 		"allowed_actions": GameConfig.get_array("domains.world_state", "esc_menu/allowed_actions", [])
 	}
 
@@ -353,13 +444,13 @@ static func _register_runtime_save_providers() -> void:
 	SaveDataAccessLayer.register_provider("world_state", _runtime_save_provider)
 	keys_to_track.append("world_state")
 	for extra_key in _state.extra_providers.keys():
-		var d_key := String(extra_key)
-		SaveDataAccessLayer.register_provider(d_key, _state.extra_providers[extra_key])
-		if not keys_to_track.has(d_key):
-			keys_to_track.append(d_key)
+		var domain_key := String(extra_key)
+		SaveDataAccessLayer.register_provider(domain_key, _state.extra_providers[extra_key])
+		if not keys_to_track.has(domain_key):
+			keys_to_track.append(domain_key)
 	_state.registered_provider_keys = keys_to_track
 
 static func _unregister_runtime_save_providers() -> void:
-	for k in _state.registered_provider_keys:
-		SaveDataAccessLayer.unregister_provider(k)
+	for provider_key in _state.registered_provider_keys:
+		SaveDataAccessLayer.unregister_provider(provider_key)
 	_state.registered_provider_keys.clear()
