@@ -43,18 +43,18 @@ func to_dto() -> Dictionary:
 
 ## 从字典反序列化序章事件包（available_actions 逐元素转型，防类型化数组赋值错误）。
 ## 契约：空字典返回空包；available_actions 逐元素 str() 转换（禁整表 duplicate 赋类型化数组）。
-static func from_dto(d: Dictionary) -> PrologueEventPacketDTO:
+static func from_dto(raw_data: Dictionary) -> PrologueEventPacketDTO:
 	var packet := PrologueEventPacketDTO.new()
-	if d.is_empty():
+	if raw_data.is_empty():
 		return packet
-	packet.account_id = str(d.get("account_id", ""))
-	packet.character_id = str(d.get("character_id", ""))
-	packet.character_name = str(d.get("character_name", ""))
-	packet.current_stage = int(d.get("current_stage", 0))
-	packet.step_index = int(d.get("step_index", 0))
-	packet.narrative_text = str(d.get("narrative_text", ""))
+	packet.account_id = str(raw_data.get("account_id", ""))
+	packet.character_id = str(raw_data.get("character_id", ""))
+	packet.character_name = str(raw_data.get("character_name", ""))
+	packet.current_stage = int(raw_data.get("current_stage", 0))
+	packet.step_index = int(raw_data.get("step_index", 0))
+	packet.narrative_text = str(raw_data.get("narrative_text", ""))
 	packet.available_actions.clear()
-	for a in (d.get("available_actions", []) as Array):
-		packet.available_actions.append(str(a))
-	packet.reserved_payload = (d.get("reserved_payload", {}) as Dictionary).duplicate(true)
+	for action_name in (raw_data.get("available_actions", []) as Array):
+		packet.available_actions.append(str(action_name))
+	packet.reserved_payload = (raw_data.get("reserved_payload", {}) as Dictionary).duplicate(true)
 	return packet

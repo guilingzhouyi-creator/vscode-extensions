@@ -40,8 +40,8 @@ static func dispatch_cutscene(cutscene_id: String, skip_requested: bool = false)
 			"timestamp_utc": int(Time.get_unix_time_from_system())
 		}
 		return {"success": true, "skipped": skip_requested, "cutscene_id": cutscene_id, "executed": false}
-	var res: Variant = _runner.call(cutscene_id, skip_requested)
-	var receipt: Dictionary = (res as Dictionary).duplicate() if res is Dictionary else {}
+	var call_result: Variant = _runner.call(cutscene_id, skip_requested)
+	var receipt: Dictionary = (call_result as Dictionary).duplicate() if call_result is Dictionary else {}
 	receipt["cutscene_id"] = cutscene_id
 	receipt["skipped"] = skip_requested
 	receipt["executed"] = true

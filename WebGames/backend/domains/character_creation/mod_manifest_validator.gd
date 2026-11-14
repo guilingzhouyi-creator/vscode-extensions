@@ -23,38 +23,38 @@ const STARTER_KIT_MAX_ITEMS: int = 10
 
 ## 校验单个命途 MOD 声明清单的预算边界、因果平衡与初始套件合法性
 static func precheck_single_mod(manifest_input: Variant, base_manifest: Variant = null) -> Dictionary:
-	var dto: DestinyModManifestDTO = _coerce_to_manifest_dto(manifest_input)
+	var manifest_dto: DestinyModManifestDTO = _coerce_to_manifest_dto(manifest_input)
 	var errors: Array[Dictionary] = []
 
-	if dto.pack_id.strip_edges().is_empty():
+	if manifest_dto.pack_id.strip_edges().is_empty():
 		_append_error(errors, "ERR_DESTINY_EMPTY_PACK_ID", "MOD pack_id 不可为空")
 
-	_validate_ui_capabilities(dto.ui_capabilities, errors)
-	_validate_custom_origins(dto.custom_origins, errors)
-	_validate_origin_references(dto, errors, base_manifest)
-	_validate_paired_presets(dto.paired_presets, dto.custom_traits, errors)
-	_validate_custom_starter_kits(dto.custom_starter_kits, errors)
-	_validate_dag_graphs(dto.dag_graphs, errors)
+	_validate_ui_capabilities(manifest_dto.ui_capabilities, errors)
+	_validate_custom_origins(manifest_dto.custom_origins, errors)
+	_validate_origin_references(manifest_dto, errors, base_manifest)
+	_validate_paired_presets(manifest_dto.paired_presets, manifest_dto.custom_traits, errors)
+	_validate_custom_starter_kits(manifest_dto.custom_starter_kits, errors)
+	_validate_dag_graphs(manifest_dto.dag_graphs, errors)
 
 	var first_code: String = ""
 	var error_code_list: Array = []
 	if not errors.is_empty():
 		first_code = str(errors[0].get("error_code", ""))
-		for err in errors:
-			var c: String = str(err.get("error_code", ""))
-			if not c.is_empty() and not error_code_list.has(c):
-				error_code_list.append(c)
+		for error_entry in errors:
+			var error_code: String = str(error_entry.get("error_code", ""))
+			if not error_code.is_empty() and not error_code_list.has(error_code):
+				error_code_list.append(error_code)
 
 	var is_ok: bool = errors.is_empty()
 	return {
 		"valid": is_ok,
 		"is_compliant": is_ok,
-		"pack_id": dto.pack_id,
-		"pack_name": dto.pack_name,
+		"pack_id": manifest_dto.pack_id,
+		"pack_name": manifest_dto.pack_name,
 		"error_code": first_code,
 		"errors": error_code_list,
 		"error_details": errors,
-		"manifest": dto
+		"manifest": manifest_dto
 	}
 
 static func _coerce_to_manifest_dto(manifest_input: Variant) -> DestinyModManifestDTO:
@@ -70,14 +70,14 @@ static func _append_error(errors: Array[Dictionary], code: String, message: Stri
 		"message": message
 	})
 
-static func _validate_ui_capabilities(ui_caps: Dictionary, errors: Array[Dictionary]) -> void:
-	if ui_caps.has("origin_selection_mode"):
-		var origin_mode: String = str(ui_caps.get("origin_selection_mode", "")).strip_edges()
+static func _validate_ui_capabilities(ui_capabilities: Dictionary, errors: Array[Dictionary]) -> void:
+	if ui_capabilities.has("origin_selection_mode"):
+		var origin_mode: String = str(ui_capabilities.get("origin_selection_mode", "")).strip_edges()
 		if not origin_mode.is_empty() and not VALID_UI_MODES.has(origin_mode):
 			_append_error(errors, "ERR_DESTINY_INVALID_UI_MODE", "非法的 origin_selection_mode: " + origin_mode)
 
-	if ui_caps.has("trait_selection_mode"):
-		var trait_mode: String = str(ui_caps.get("trait_selection_mode", "")).strip_edges()
+	if ui_capabilities.has("trait_selection_mode"):
+		var trait_mode: String = str(ui_capabilities.get("trait_selection_mode", "")).strip_edges()
 		if not trait_mode.is_empty() and not VALID_UI_MODES.has(trait_mode):
 			_append_error(errors, "ERR_DESTINY_INVALID_UI_MODE", "非法的 trait_selection_mode: " + trait_mode)
 
@@ -86,24 +86,24 @@ static func _validate_custom_origins(custom_origins: Array[Dictionary], errors: 
 		_validate_single_origin_entry(origin_entry, errors)
 
 static func _validate_single_origin_entry(origin_entry: Dictionary, errors: Array[Dictionary]) -> void:
-	var orig_id: String = str(origin_entry.get("origin_id", "")).strip_edges()
+	var origin_id: String = str(origin_entry.get("origin_id", "")).strip_edges()
 	var bonus: Variant = origin_entry.get("attribute_bonus", {})
 	var net_sum: int = 0
 	var stat_exceeded: bool = false
 
 	if bonus is Dictionary:
 		var bonus_dict: Dictionary = bonus
-		for k in bonus_dict.keys():
-			var val: int = int(bonus_dict[k])
-			if val < ATTR_BONUS_MIN or val > ATTR_BONUS_MAX:
+		for stat_key in bonus_dict.keys():
+			var bonus_value: int = int(bonus_dict[stat_key])
+			if bonus_value < ATTR_BONUS_MIN or bonus_value > ATTR_BONUS_MAX:
 				stat_exceeded = true
-			net_sum += val
+			net_sum += bonus_value
 
 	if stat_exceeded or net_sum < ATTR_NET_SUM_MIN or net_sum > ATTR_NET_SUM_MAX:
 		_append_error(
 			errors,
 			"ERR_DESTINY_STAT_BUDGET_EXCEEDED",
-			"身世属性修正预算超限: " + orig_id
+			"身世属性修正预算超限: " + origin_id
 		)
 
 	var gold: int = int(origin_entry.get("initial_gold", 0))
@@ -111,7 +111,7 @@ static func _validate_single_origin_entry(origin_entry: Dictionary, errors: Arra
 		_append_error(
 			errors,
 			"ERR_DESTINY_GOLD_CAP_EXCEEDED",
-			"身世初始金币超出 [0, 1000] 区间: " + orig_id
+			"身世初始金币超出 [0, 1000] 区间: " + origin_id
 		)
 
 static func _validate_paired_presets(
@@ -120,8 +120,8 @@ static func _validate_paired_presets(
 	errors: Array[Dictionary]
 ) -> void:
 	var combined_traits: Dictionary = GameConfig.get_dict("domains.character_creation", "traits", {}).duplicate(true)
-	for tid in custom_traits.keys():
-		combined_traits[str(tid)] = custom_traits[tid]
+	for trait_id in custom_traits.keys():
+		combined_traits[str(trait_id)] = custom_traits[trait_id]
 
 	for preset in paired_presets:
 		_validate_single_preset_pair(preset, combined_traits, errors)
@@ -131,29 +131,29 @@ static func _validate_single_preset_pair(
 	combined_traits: Dictionary,
 	errors: Array[Dictionary]
 ) -> void:
-	var pos_id: String = str(preset.get("positive", "")).strip_edges()
-	var neg_id: String = str(preset.get("negative", "")).strip_edges()
-	if pos_id.is_empty() or neg_id.is_empty():
+	var positive_id: String = str(preset.get("positive", "")).strip_edges()
+	var negative_id: String = str(preset.get("negative", "")).strip_edges()
+	if positive_id.is_empty() or negative_id.is_empty():
 		_append_error(errors, "ERR_DESTINY_CAUSALITY_IMBALANCE", "配对天赋存在空 ID")
 		return
-	if not combined_traits.has(pos_id) or not combined_traits.has(neg_id):
+	if not combined_traits.has(positive_id) or not combined_traits.has(negative_id):
 		_append_error(errors, "ERR_DESTINY_CAUSALITY_IMBALANCE", "配对天赋引用了未定义的天赋 ID")
 		return
 
-	var pos_cfg: Dictionary = combined_traits.get(pos_id, {})
-	var neg_cfg: Dictionary = combined_traits.get(neg_id, {})
-	var pos_type: String = str(pos_cfg.get("type", ""))
-	var neg_type: String = str(neg_cfg.get("type", ""))
-	var pos_cost: int = int(pos_cfg.get("cost", 0))
-	var neg_cost: int = int(neg_cfg.get("cost", 0))
+	var positive_config: Dictionary = combined_traits.get(positive_id, {})
+	var negative_config: Dictionary = combined_traits.get(negative_id, {})
+	var positive_type: String = str(positive_config.get("type", ""))
+	var negative_type: String = str(negative_config.get("type", ""))
+	var positive_cost: int = int(positive_config.get("cost", 0))
+	var negative_cost: int = int(negative_config.get("cost", 0))
 
-	var type_valid: bool = (pos_type == "POSITIVE" and pos_cost > 0 and neg_type == "NEGATIVE" and neg_cost < 0)
-	var balance_valid: bool = absi(pos_cost + neg_cost) <= CAUSALITY_NET_TOLERANCE
+	var type_valid: bool = (positive_type == "POSITIVE" and positive_cost > 0 and negative_type == "NEGATIVE" and negative_cost < 0)
+	var balance_valid: bool = absi(positive_cost + negative_cost) <= CAUSALITY_NET_TOLERANCE
 	if not type_valid or not balance_valid:
 		_append_error(
 			errors,
 			"ERR_DESTINY_CAUSALITY_IMBALANCE",
-			"正负天赋极性错误或净代价超出 [-1, 1] 因果平衡限制: %s / %s" % [pos_id, neg_id]
+			"正负天赋极性错误或净代价超出 [-1, 1] 因果平衡限制: %s / %s" % [positive_id, negative_id]
 		)
 
 static func _validate_custom_starter_kits(custom_kits: Dictionary, errors: Array[Dictionary]) -> void:
@@ -170,14 +170,14 @@ static func _validate_single_starter_kit(
 		return
 
 	var kit_dict: Dictionary = raw_kit
-	var items_val: Variant = kit_dict.get("initial_items", [])
-	if not (items_val is Array):
+	var items_value: Variant = kit_dict.get("initial_items", [])
+	if not (items_value is Array):
 		_append_error(errors, "ERR_DESTINY_KIT_INVALID", "套件 initial_items 必须为数组: " + kit_id)
 		return
 
-	var items_arr: Array = items_val
+	var items_array: Array = items_value
 	var total_count: int = 0
-	for item_entry in items_arr:
+	for item_entry in items_array:
 		var step_count: int = _validate_and_count_kit_item(item_entry)
 		if step_count <= 0:
 			_append_error(errors, "ERR_DESTINY_KIT_INVALID", "套件物品 canonical_id 为空或数量非法: " + kit_id)
@@ -190,31 +190,31 @@ static func _validate_single_starter_kit(
 static func _validate_and_count_kit_item(item_entry: Variant) -> int:
 	if not (item_entry is Dictionary):
 		return -1
-	var d: Dictionary = item_entry
-	var cid: String = str(d.get("canonical_id", "")).strip_edges()
-	var count: int = int(d.get("count", 1))
-	if cid.is_empty() or count <= 0:
+	var item_dict: Dictionary = item_entry
+	var canonical_id: String = str(item_dict.get("canonical_id", "")).strip_edges()
+	var count: int = int(item_dict.get("count", 1))
+	if canonical_id.is_empty() or count <= 0:
 		return -1
 	return count
 
-static func _validate_origin_references(dto: DestinyModManifestDTO, errors: Array[Dictionary], _base_manifest: Variant = null) -> void:
+static func _validate_origin_references(manifest_dto: DestinyModManifestDTO, errors: Array[Dictionary], _base_manifest: Variant = null) -> void:
 	var builtin_kits: Dictionary = GameConfig.get_dict("domains.starter_loadout", "starter_kits", {})
 	var builtin_dags: Dictionary = GameConfig.get_dict("narratives.prologue_dag_catalog", "dag_graphs", {})
-	for orig in dto.custom_origins:
-		var kid: String = str(orig.get("starter_kit_id", "")).strip_edges()
-		if not kid.is_empty() and not dto.custom_starter_kits.has(kid) and not builtin_kits.has(kid):
-			_append_error(errors, "ERR_DESTINY_UNKNOWN_KIT_REF", "未定义的套件引用: " + kid)
-		var did: String = str(orig.get("prologue_dag_id", "")).strip_edges()
-		if not dto.dag_graphs.is_empty() and not did.is_empty() and not dto.dag_graphs.has(did) and not builtin_dags.has(did):
-			_append_error(errors, "ERR_DESTINY_UNKNOWN_DAG_REF", "未定义的剧情DAG引用: " + did)
+	for origin_entry in manifest_dto.custom_origins:
+		var kit_id: String = str(origin_entry.get("starter_kit_id", "")).strip_edges()
+		if not kit_id.is_empty() and not manifest_dto.custom_starter_kits.has(kit_id) and not builtin_kits.has(kit_id):
+			_append_error(errors, "ERR_DESTINY_UNKNOWN_KIT_REF", "未定义的套件引用: " + kit_id)
+		var dag_id: String = str(origin_entry.get("prologue_dag_id", "")).strip_edges()
+		if not manifest_dto.dag_graphs.is_empty() and not dag_id.is_empty() and not manifest_dto.dag_graphs.has(dag_id) and not builtin_dags.has(dag_id):
+			_append_error(errors, "ERR_DESTINY_UNKNOWN_DAG_REF", "未定义的剧情DAG引用: " + dag_id)
 
 static func _validate_dag_graphs(dag_graphs: Dictionary, errors: Array[Dictionary]) -> void:
-	for gid in dag_graphs.keys():
-		var raw_g: Variant = dag_graphs[gid]
-		if not (raw_g is Dictionary):
-			_append_error(errors, "ERR_DESTINY_INVALID_DAG_GRAPH", "非法DAG定义: " + str(gid))
+	for graph_id in dag_graphs.keys():
+		var raw_graph: Variant = dag_graphs[graph_id]
+		if not (raw_graph is Dictionary):
+			_append_error(errors, "ERR_DESTINY_INVALID_DAG_GRAPH", "非法DAG定义: " + str(graph_id))
 			continue
-		var g := PrologueDagRegistry.assemble_graph_from_raw(str(gid), raw_g as Dictionary)
-		var val_res := CausalityDagValidator.validate_graph(g)
-		if not bool(val_res.get("is_valid", false)):
-			_append_error(errors, "ERR_DESTINY_INVALID_DAG_GRAPH", "DAG校验失败: %s" % str(gid))
+		var graph_model := PrologueDagRegistry.assemble_graph_from_raw(str(graph_id), raw_graph as Dictionary)
+		var validation_result := CausalityDagValidator.validate_graph(graph_model)
+		if not bool(validation_result.get("is_valid", false)):
+			_append_error(errors, "ERR_DESTINY_INVALID_DAG_GRAPH", "DAG校验失败: %s" % str(graph_id))
