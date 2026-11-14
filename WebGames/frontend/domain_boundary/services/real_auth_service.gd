@@ -144,9 +144,7 @@ func create_character_async(account_id: String, request_payload: Dictionary, res
         _emit_error_callback(result_callback, "ERR_ACCOUNT_NOT_FOUND")
         return
 
-    var chosen_race: String = str(request_payload.get("race", "HUMAN")).strip_edges()
-    if chosen_race.is_empty():
-        chosen_race = "HUMAN"
+    var chosen_race: String = str(request_payload.get("race", "")).strip_edges()
     var creation_context := AccountSlotCreationDTO.new({
         "account": account_profile,
         "slot_id": str(request_payload.get("slot_id", "")),

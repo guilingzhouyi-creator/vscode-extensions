@@ -217,3 +217,80 @@ func exit_world_to_gateway_async(
 		{"success": true},
 		simulate_delay_ms
 	)
+
+## 模拟异步发现已安装 MOD 包列表
+func list_installed_mods_async(
+	_account_id: String,
+	_token: String,
+	_custom_roots: Array,
+	result_callback: Callable
+) -> void:
+	var mock_packs: Array = [
+		{
+			"pack_id": "mock_sandbox_base",
+			"display_name": "Sandbox Base Pack",
+			"version": "1.0.0",
+			"pack_profile": "TOTAL_CONVERSION",
+			"is_official": false,
+			"has_prologue_dag": true,
+			"content_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+			"dependencies": []
+		}
+	]
+	MockBaseService.delayed_call(
+		result_callback,
+		{"success": true, "data": {"installed_packs": mock_packs, "selected_pack_ids": ["mock_sandbox_base"]}},
+		simulate_delay_ms
+	)
+
+## 模拟异步设置当前选定的 MOD 包列表
+func set_mod_selection_async(
+	_account_id: String,
+	_token: String,
+	selected_pack_ids: Array,
+	result_callback: Callable
+) -> void:
+	MockBaseService.delayed_call(
+		result_callback,
+		{"success": true, "data": {"selected_pack_ids": selected_pack_ids.duplicate()}},
+		simulate_delay_ms
+	)
+
+## 模拟异步执行 MOD 栈预检
+func precheck_mod_stack_async(
+	_account_id: String,
+	_token: String,
+	enabled_pack_ids: Array,
+	result_callback: Callable
+) -> void:
+	MockBaseService.delayed_call(
+		result_callback,
+		{"success": true, "data": {"enabled_pack_ids": enabled_pack_ids.duplicate(), "has_base_content_mod": not enabled_pack_ids.is_empty()}},
+		simulate_delay_ms
+	)
+
+## 模拟异步查询世界存档 MOD 只读诊断
+func get_world_mod_diagnostics_async(
+	_account_id: String,
+	_token: String,
+	world_id: String,
+	result_callback: Callable
+) -> void:
+	MockBaseService.delayed_call(
+		result_callback,
+		{"success": true, "data": {"world_id": world_id, "status": "MATCHED", "locked_mods": [], "missing_mods": [], "digest_mismatches": []}},
+		simulate_delay_ms
+	)
+
+## 模拟异步校验联机界域 MOD 清单摘要
+func verify_realm_manifest_async(
+	_account_id: String,
+	_token: String,
+	realm_mod_manifest: Array,
+	result_callback: Callable
+) -> void:
+	MockBaseService.delayed_call(
+		result_callback,
+		{"success": true, "data": {"verified": true, "manifest_count": realm_mod_manifest.size()}},
+		simulate_delay_ms
+	)

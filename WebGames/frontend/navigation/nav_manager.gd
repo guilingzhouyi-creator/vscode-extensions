@@ -57,9 +57,12 @@ const TRANSITION_DURATION: float = 0.25
 const LOG_LEVEL_WARN: String = "warn"
 const METHOD_ON_SCREEN_EXIT: String = "on_screen_exit"
 
-## 默认注册 17 个功能视图（注释计数与实现对齐）
+## 默认注册 20 个功能视图（注释计数与实现对齐）
 func _init_default_registry() -> void:
 	register_screen("account_entry", "res://frontend/views/account_entry/account_entry_view.tscn")
+	register_screen("world_gateway", "res://frontend/views/world_gateway/world_gateway_view.tscn")
+	register_screen("mod_workbench", "res://frontend/views/mod_workbench/mod_workbench_screen.tscn")
+	register_screen("prologue", "res://frontend/views/prologue/prologue_view.tscn")
 	register_screen("main_hud", "res://frontend/views/main_hud/main_hud_view.tscn")
 	register_screen("character_progression", "res://frontend/views/character_progression/character_progression_view.tscn")
 	register_screen("combat_view", "res://frontend/views/combat_view/combat_view.tscn")
@@ -132,14 +135,15 @@ func clear_stack() -> void:
 	_current_screen = null
 	_screen_stack.clear()
 
-## 查询 11 环全链路后续前端视图预留路由键表（不修改视图场景，仅供后续接线绑定 register_screen）
+## 查询全链路前端视图路由键表（已注册 world_gateway/prologue/mod_workbench 并保留兼容键）
 static func get_reserved_chain_routes() -> Dictionary:
 	return {
-		"account_home": "reserved:account_home_view",
-		"world_gateway": "reserved:world_gateway_view",
-		"character_creation": "reserved:character_creation_view",
-		"prologue_story": "reserved:prologue_story_view",
-		"main_hud": "account_entry -> main_hud",
+		"account_home": "account_entry",
+		"world_gateway": "res://frontend/views/world_gateway/world_gateway_view.tscn",
+		"mod_workbench": "res://frontend/views/mod_workbench/mod_workbench_screen.tscn",
+		"character_creation": "account_entry",
+		"prologue_story": "res://frontend/views/prologue/prologue_view.tscn",
+		"main_hud": "account_entry -> world_gateway -> prologue -> main_hud",
 		"esc_menu": "reserved:esc_menu_modal"
 	}
 
@@ -186,12 +190,14 @@ func _navigate_to(screen_id: String, navigation_parameters: Dictionary, should_r
 
 	var old_screen := _current_screen
 
-	# 3. 挂载新屏（旧屏暂保留，转场结束后释放）
+	# 3. 挂载新屏（旧屏暂保留，转场结束后释放；无头同步初始化期显式触发 NOTIFICATION_READY 绑定 @onready）
 	_current_screen = screen_instance
 	_app_root.screen_container.add_child(screen_instance)
+	if not screen_instance.is_node_ready():
+		screen_instance.notification(Node.NOTIFICATION_READY)
 	screen_instance.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
-	if transition_type == NavTypes.TransitionType.NONE or old_screen == null:
+	if transition_type == NavTypes.TransitionType.NONE or old_screen == null or _app_root == null or not _app_root.is_inside_tree():
 		_exit_and_free_screen(old_screen)
 	else:
 		_play_transition(old_screen, screen_instance, transition_type)

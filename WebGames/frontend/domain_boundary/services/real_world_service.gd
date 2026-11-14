@@ -31,7 +31,7 @@ func get_hud_snapshot_async(character_id: String, result_callback: Callable) -> 
 
 ## 获取小地图地标与行军路线
 func get_map_landmarks_async(result_callback: Callable) -> void:
-	var landmarks: Array = GameConfig.get_array("domains.world_map", "landmarks", [])
+	var landmarks: Array = GameConfig.get_array("domains.world", "landmarks", [])
 	if result_callback.is_valid():
 		result_callback.call({
 			"success": true,
@@ -112,3 +112,23 @@ func switch_gateway_mode_async(account_id: String, token: String, target_mode: i
 ## 异步退出世界退回网关契约实现
 func exit_world_to_gateway_async(account_id: String, token: String, result_callback: Callable, options: Dictionary = {}) -> void:
 	_dispatch_gateway_action("EXIT_WORLD_TO_GATEWAY", account_id, token, options, result_callback)
+
+## 异步发现已安装官方与三方 MOD 包列表契约实现
+func list_installed_mods_async(account_id: String, token: String, custom_roots: Array, result_callback: Callable) -> void:
+	_dispatch_gateway_action("LIST_INSTALLED_MODS", account_id, token, {"custom_roots": custom_roots}, result_callback)
+
+## 异步更新当前会话选定的 MOD 包列表契约实现
+func set_mod_selection_async(account_id: String, token: String, selected_pack_ids: Array, result_callback: Callable) -> void:
+	_dispatch_gateway_action("SET_MOD_SELECTION", account_id, token, {"selected_pack_ids": selected_pack_ids}, result_callback)
+
+## 异步执行多 MOD 栈静态预检契约实现
+func precheck_mod_stack_async(account_id: String, token: String, enabled_pack_ids: Array, result_callback: Callable) -> void:
+	_dispatch_gateway_action("PRECHECK_MODS", account_id, token, {"enabled_pack_ids": enabled_pack_ids}, result_callback)
+
+## 异步查询指定世界存档只读 MOD 锁定诊断契约实现
+func get_world_mod_diagnostics_async(account_id: String, token: String, world_id: String, result_callback: Callable) -> void:
+	_dispatch_gateway_action("GET_WORLD_MOD_DIAGNOSTICS", account_id, token, {"world_id": world_id}, result_callback)
+
+## 异步校验联机界域权威清单 SHA-256 摘要契约实现
+func verify_realm_manifest_async(account_id: String, token: String, realm_mod_manifest: Array, result_callback: Callable) -> void:
+	_dispatch_gateway_action("VERIFY_REALM_MANIFEST", account_id, token, {"realm_mod_manifest": realm_mod_manifest}, result_callback)

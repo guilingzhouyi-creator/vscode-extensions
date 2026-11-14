@@ -49,6 +49,8 @@ func attach_hud(hud_view: MainHUDView) -> void:
 	_view_weak_reference = weakref(hud_view)
 	_is_attached = true
 	_setup_bus_subscriptions()
+	if ServiceLocator.get_mode() != "mock" and WorldSessionRuntimeService.has_active_world():
+		pull_hud_snapshot_async()
 
 ## 解绑主页 HUD 并注销事件总线监听（幂等·防泄漏）
 func detach_hud() -> void:
@@ -118,6 +120,12 @@ func _build_hud_snapshot_dict(event_payload: Dictionary) -> Dictionary:
 		"mana_monocrystals": int(event_payload.get("wallet_mana_monocrystals", event_payload.get("mana_monocrystals", 0))),
 		"level": int(event_payload.get("level", 1))
 	}
+	if event_payload.has("location_name"):
+		snapshot_payload["location_name"] = str(event_payload.get("location_name", ""))
+	if event_payload.has("race_name"):
+		snapshot_payload["race_name"] = str(event_payload.get("race_name", ""))
+	if event_payload.get("action_bar_slots") is Array:
+		snapshot_payload["action_bar_slots"] = (event_payload.get("action_bar_slots") as Array).duplicate(true)
 	var calendar_payload: Dictionary = event_payload.get("calendar_env") as Dictionary if event_payload.get("calendar_env") is Dictionary else event_payload
 	var clock_text := _format_clock_display(calendar_payload)
 	if not clock_text.is_empty():

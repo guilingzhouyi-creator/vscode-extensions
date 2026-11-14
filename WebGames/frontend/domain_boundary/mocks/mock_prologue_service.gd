@@ -18,24 +18,43 @@ var _is_completed: bool = false
 func _init(delay_milliseconds: int = MockBaseService.DEFAULT_SIMULATE_DELAY_MS) -> void:
 	simulate_delay_ms = delay_milliseconds
 
-## 模拟异步初始化序章进度至第 1 阶段并重置完结标志
+## 模拟异步初始化序章进度至第 1 节点并重置完结标志
 func start_prologue_async(_account_id: String, _token: String, _request_payload: Dictionary, result_callback: Callable) -> void:
 	_current_stage = 1
 	_is_completed = false
-	MockBaseService.delayed_call(result_callback, {"success": true, "data": {"current_stage": 1, "is_completed": false}}, simulate_delay_ms)
+	MockBaseService.delayed_call(result_callback, {"success": true, "data": _build_mock_node_state("")}, simulate_delay_ms)
 
-## 模拟异步查询当前序章阶段号与完结状态
+## 模拟异步查询当前序章 DAG 节点与完结状态
 func get_prologue_state_async(_account_id: String, _token: String, result_callback: Callable) -> void:
-	MockBaseService.delayed_call(result_callback, {"success": true, "data": {"current_stage": _current_stage, "is_completed": _is_completed}}, simulate_delay_ms)
+	MockBaseService.delayed_call(result_callback, {"success": true, "data": _build_mock_node_state("")}, simulate_delay_ms)
 
-## 模拟异步推进单步序章阶段并在抵达第 4 阶段时标记完结
-func advance_prologue_async(_account_id: String, _token: String, _choice_id: String, _request_payload: Dictionary, result_callback: Callable) -> void:
+## 模拟异步推进单步序章 DAG 并在抵达终末节点时标记完结
+func advance_prologue_async(_account_id: String, _token: String, choice_id: String, _request_payload: Dictionary, result_callback: Callable) -> void:
 	_current_stage = mini(4, _current_stage + 1)
 	_is_completed = (_current_stage >= 4)
-	MockBaseService.delayed_call(result_callback, {"success": true, "data": {"current_stage": _current_stage, "is_completed": _is_completed}}, simulate_delay_ms)
+	MockBaseService.delayed_call(result_callback, {"success": true, "data": _build_mock_node_state(choice_id)}, simulate_delay_ms)
 
 ## 模拟异步直接完结或跳过序章并输出空交接快照载荷
 func complete_prologue_async(_account_id: String, _token: String, _cutscene_id: String = "", _should_skip: bool = false, result_callback: Callable = Callable()) -> void:
 	_current_stage = 4
 	_is_completed = true
 	MockBaseService.delayed_call(result_callback, {"success": true, "data": {"completed": true, "handoff": {}, "initial_hud_snapshot": {}}}, simulate_delay_ms)
+
+func _build_mock_node_state(last_choice_id: String) -> Dictionary:
+	var node_id := "mock_node_%d" % _current_stage
+	var choices: Array = []
+	if not _is_completed:
+		choices = [{"choice_id": "CONTINUE", "label": "Continue", "text_key": "ui.prologue.choice.continue"}]
+	return {
+		"dag_id": "mock_sandbox_prologue",
+		"node_id": node_id,
+		"node_type": "END" if _is_completed else "CHOICE",
+		"current_stage": _current_stage,
+		"step_index": _current_stage,
+		"is_completed": _is_completed,
+		"last_choice_id": last_choice_id,
+		"narrative_text": "",
+		"choices": choices,
+		"available_actions": ["CONTINUE"] if not _is_completed else [],
+		"cutscene_trigger": ""
+	}

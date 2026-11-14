@@ -67,6 +67,18 @@ func disconnect_managed_signals() -> void:
 func on_screen_enter(screen_parameters: Dictionary = {}) -> void:
 	navigation_params = screen_parameters.duplicate()
 
+## 将导航参数中的会话与世界上下文同步到视图实例属性（单源收敛，消除各屏重复赋值）
+func _sync_navigation_context_properties(screen_parameters: Dictionary, extra_key_map: Dictionary = {}) -> void:
+	if screen_parameters.has("account_id") and "current_account_id" in self:
+		set("current_account_id", str(screen_parameters.get("account_id", "")))
+	if screen_parameters.has("token") and "current_session_token" in self:
+		set("current_session_token", str(screen_parameters.get("token", "")))
+	for navigation_key in extra_key_map.keys():
+		if screen_parameters.has(navigation_key):
+			var target_property := str(extra_key_map[navigation_key])
+			if target_property in self:
+				set(target_property, str(screen_parameters.get(navigation_key, "")))
+
 ## 页面被弹出或销毁时调用（默认清理本视图 i18n 绑定，防悬挂引用）
 func on_screen_exit() -> void:
 	UIIntermediary.clear_view_bindings(self)

@@ -19,7 +19,7 @@ func create_character_async(account_id: String, token: String, request_payload: 
 	var created_character := {
 		"slot_id": str(request_payload.get("slot_id", "SLOT_01")),
 		"name": character_name,
-		"race": str(request_payload.get("race", "HUMAN")),
+		"race": str(request_payload.get("race", "MOCK_RACE")),
 		"class": "Novice",
 		"level": 1,
 		"empty": false
@@ -37,8 +37,8 @@ func roll_destiny_preview_async(_account_id: String, _token: String, _request_pa
 	MockBaseService.delayed_call(result_callback, {
 		"success": true,
 		"data": {
-			"race_id": "HUMAN",
-			"origin_id": "IMPERIAL_NOBLE",
+			"race_id": "MOCK_RACE",
+			"origin_id": "MOCK_ORIGIN",
 			"attributes": {"STR": 4, "CON": 3, "INT": 4, "AGI": 3, "SPR": 3, "VIT": 4}
 		}
 	}, MockBaseService.DEFAULT_SIMULATE_DELAY_MS)

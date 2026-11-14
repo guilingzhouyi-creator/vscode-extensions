@@ -93,3 +93,35 @@ func switch_gateway_mode_async(account_id: String, token: String, target_mode: i
 ## 异步退出世界退回网关契约 (对齐 EXIT_WORLD_TO_GATEWAY)
 func exit_world_to_gateway_async(account_id: String, token: String, result_callback: Callable, _options: Dictionary = {}) -> void:
 	EventBusCore.get_instance().emit_log("error", "IWorldService.exit_world_to_gateway_async: pure virtual method must be implemented by subclass")
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+
+## 异步发现已安装官方与三方 MOD 包列表契约 (对齐 LIST_INSTALLED_MODS)
+func list_installed_mods_async(_account_id: String, _token: String, _custom_roots: Array, result_callback: Callable) -> void:
+	EventBusCore.get_instance().emit_log("error", "IWorldService.list_installed_mods_async: pure virtual method must be implemented by subclass")
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+
+## 异步更新当前会话选定的 MOD 包列表契约 (对齐 SET_MOD_SELECTION)
+func set_mod_selection_async(_account_id: String, _token: String, _selected_pack_ids: Array, result_callback: Callable) -> void:
+	EventBusCore.get_instance().emit_log("error", "IWorldService.set_mod_selection_async: pure virtual method must be implemented by subclass")
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+
+## 异步执行多 MOD 栈静态预检契约 (对齐 PRECHECK_MODS)
+func precheck_mod_stack_async(_account_id: String, _token: String, _enabled_pack_ids: Array, result_callback: Callable) -> void:
+	EventBusCore.get_instance().emit_log("error", "IWorldService.precheck_mod_stack_async: pure virtual method must be implemented by subclass")
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+
+## 异步查询指定世界存档的只读 MOD 锁定诊断契约 (对齐 GET_WORLD_MOD_DIAGNOSTICS)
+func get_world_mod_diagnostics_async(_account_id: String, _token: String, _world_id: String, result_callback: Callable) -> void:
+	EventBusCore.get_instance().emit_log("error", "IWorldService.get_world_mod_diagnostics_async: pure virtual method must be implemented by subclass")
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+
+## 异步校验联机界域权威清单 SHA-256 摘要契约 (对齐 VERIFY_REALM_MANIFEST)
+func verify_realm_manifest_async(_account_id: String, _token: String, _realm_mod_manifest: Array, result_callback: Callable) -> void:
+	EventBusCore.get_instance().emit_log("error", "IWorldService.verify_realm_manifest_async: pure virtual method must be implemented by subclass")
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})

@@ -17,20 +17,20 @@ static func get_domain_data(domain_id: String) -> Dictionary:
 		"account":
 			return {
 				"default_servers": [
-					{ "id": "LOCAL_OFFLINE", "name": "单机离线·瓦尔兰大陆", "status": "ONLINE", "ping_ms": 0 },
-					{ "id": "SERVER_01", "name": "启蒙之森 [电信]", "status": "ONLINE", "ping_ms": 18 },
-					{ "id": "SERVER_02", "name": "永夜深渊 [网通]", "status": "MAINTENANCE", "ping_ms": 999 }
+					{ "id": "LOCAL_OFFLINE", "name": "Local Offline Sandbox", "status": "ONLINE", "ping_ms": 0 },
+					{ "id": "SERVER_01", "name": "Sandbox Realm 01", "status": "ONLINE", "ping_ms": 18 },
+					{ "id": "SERVER_02", "name": "Sandbox Realm 02", "status": "MAINTENANCE", "ping_ms": 999 }
 				],
 				"character_slots": [
-					{ "slot_id": "SLOT_01", "name": "阿尔托莉雅", "race": "HUMAN", "class": "SwordSaint", "level": 25, "town": "VALAN_CAPITAL", "empty": false },
-					{ "slot_id": "SLOT_02", "name": "梅莉尔", "race": "ELF", "class": "ArchMage", "level": 18, "town": "SILVER_GROVE", "empty": false },
+					{ "slot_id": "SLOT_01", "name": "SandboxHero01", "race": "MOCK_RACE", "class": "Vanguard", "level": 25, "town": "SANDBOX_HUB", "empty": false },
+					{ "slot_id": "SLOT_02", "name": "SandboxHero02", "race": "MOCK_MAGE", "class": "Arcanist", "level": 18, "town": "OUTPOST_WEST", "empty": false },
 					{ "slot_id": "SLOT_03", "name": "", "race": "", "class": "", "level": 0, "town": "", "empty": true }
 				]
 			}
 		"character":
 			return {
-				"name": "阿尔托莉雅",
-				"title": "剑道宗师 / 圣魔导师 / 极效魔剑士",
+				"name": "SandboxHero01",
+				"title": "Vanguard / Arcanist",
 				"age_years": 20,
 				"age_months": 5,
 				"attributes": {
@@ -39,10 +39,10 @@ static func get_domain_data(domain_id: String) -> Dictionary:
 				"potential_points": 5,
 				"vitality": { "sf": 0.72, "msf": 0.85, "hunger": 80, "energy": 65 },
 				"equipped_slots": {
-					"MAIN_HAND": { "name": "秘银长剑", "rarity": "RARE", "atk": 28 },
+					"MAIN_HAND": { "name": "Mock Steel Blade", "rarity": "RARE", "atk": 28 },
 					"OFF_HAND": null,
 					"HEAD": null,
-					"CHEST": { "name": "精制皮甲", "rarity": "COMMON", "def": 12 },
+					"CHEST": { "name": "Mock Hide Armor", "rarity": "COMMON", "def": 12 },
 					"LEGS": null,
 					"FEET": null,
 					"NECK": null,
@@ -54,10 +54,10 @@ static func get_domain_data(domain_id: String) -> Dictionary:
 			}
 		"hud_snapshot":
 			return {
-				"character_id": "CHAR_ARTORIA_01",
-				"character_name": "阿尔托莉雅",
-				"race_name": "HUMAN",
-				"location_name": "瓦尔兰王都",
+				"character_id": "CHAR_MOCK_01",
+				"character_name": "SandboxHero01",
+				"race_name": "MOCK_RACE",
+				"location_name": "SANDBOX_HUB",
 				"hp_current": 100.0,
 				"hp_max": 100.0,
 				"ap_current": 10.0,
@@ -71,14 +71,14 @@ static func get_domain_data(domain_id: String) -> Dictionary:
 			}
 		"combat":
 			return {
-				"boss_name": "炎狱魔龙",
+				"boss_name": "Sandbox Construct Alpha",
 				"boss_hp": 8500.0,
 				"boss_max_hp": 12000.0,
 				"boss_parts": [
-					{ "part_name": "龙头", "hp": 2000.0, "max_hp": 2000.0, "is_broken": false },
-					{ "part_name": "左翼", "hp": 800.0, "max_hp": 1500.0, "is_broken": false },
-					{ "part_name": "右翼", "hp": 0.0, "max_hp": 1500.0, "is_broken": true },
-					{ "part_name": "龙尾", "hp": 1000.0, "max_hp": 1000.0, "is_broken": false }
+					{ "part_name": "Core Head", "hp": 2000.0, "max_hp": 2000.0, "is_broken": false },
+					{ "part_name": "Left Wing", "hp": 800.0, "max_hp": 1500.0, "is_broken": false },
+					{ "part_name": "Right Wing", "hp": 0.0, "max_hp": 1500.0, "is_broken": true },
+					{ "part_name": "Tail", "hp": 1000.0, "max_hp": 1000.0, "is_broken": false }
 				],
 				"player_hp_current": 100.0,
 				"player_hp_max": 100.0,
@@ -88,13 +88,13 @@ static func get_domain_data(domain_id: String) -> Dictionary:
 		"world_map":
 			return {
 				"landmarks": [
-					{ "id": "VALAN_CAPITAL", "name": "瓦尔兰王都", "type": "CAPITAL", "x": 320, "y": 180 },
-					{ "id": "SILVER_GROVE", "name": "银林精灵村", "type": "TOWN", "x": 180, "y": 250 },
-					{ "id": "IRON_FORTRESS", "name": "铁岩要塞", "type": "FORTRESS", "x": 450, "y": 120 },
-					{ "id": "DRAGON_PEAK", "name": "龙脊峰", "type": "DUNGEON", "x": 560, "y": 280 }
+					{ "id": "SANDBOX_HUB", "name": "Sandbox Hub", "type": "CAPITAL", "x": 320, "y": 180 },
+					{ "id": "OUTPOST_WEST", "name": "Western Outpost", "type": "TOWN", "x": 180, "y": 250 },
+					{ "id": "BASTION_NORTH", "name": "Northern Bastion", "type": "FORTRESS", "x": 450, "y": 120 },
+					{ "id": "RUINS_EAST", "name": "Eastern Ruins", "type": "DUNGEON", "x": 560, "y": 280 }
 				],
 				"marching_routes": [
-					{ "from": "VALAN_CAPITAL", "to": "IRON_FORTRESS", "hours_remain": 6, "terrain": "PLAINS" }
+					{ "from": "SANDBOX_HUB", "to": "BASTION_NORTH", "hours_remain": 6, "terrain": "PLAINS" }
 				],
 				"town_facilities": [
 					{ "id": "FAC_INN", "name": "ui.fe10.mock.fac.inn.name", "desc": "ui.fe10.mock.fac.inn.desc" },
@@ -122,11 +122,11 @@ static func get_domain_data(domain_id: String) -> Dictionary:
 		"economy":
 			return {
 				"wallet": { "gold": 50, "silver": 20, "copper": 500, "mana_monocrystals": 5 },
-				"shop_title": "瓦尔兰老铁匠杂货铺",
+				"shop_title": "Sandbox General Store",
 				"shop_items": [
-					{ "id": "IRON_SWORD", "name": "铁剑", "price_copper": 5000, "stock": 12 },
-					{ "id": "HEALTH_POTION", "name": "治疗药水", "price_copper": 800, "stock": 45 },
-					{ "id": "MANA_CRYSTAL_S", "name": "小型魔单晶", "price_copper": 12000, "stock": 3 }
+					{ "id": "ITEM_SWORD_MOCK", "name": "Mock Iron Sword", "price_copper": 5000, "stock": 12 },
+					{ "id": "ITEM_POTION_MOCK", "name": "Mock Healing Potion", "price_copper": 800, "stock": 45 },
+					{ "id": "ITEM_CRYSTAL_MOCK", "name": "Mock Mana Shard", "price_copper": 12000, "stock": 3 }
 				],
 				"price_trend": [
 					{ "day": -6, "iron_ore": 85 },
@@ -140,17 +140,17 @@ static func get_domain_data(domain_id: String) -> Dictionary:
 			}
 		"guild":
 			return {
-				"guild_name": "拂晓骑士团",
+				"guild_name": "Sandbox Vanguard Guild",
 				"level": 5,
 				"members_count": 28,
-				"notice": "今晚八点公会领地首领战，请各位团员准时集合。"
+				"notice": "Sandbox guild drill scheduled at 20:00."
 			}
 		"mail":
 			return {
 				"unread_count": 2,
 				"mails": [
-					{ "id": "MAIL_01", "title": "开服拓荒先驱补给", "sender": "系统管理员", "date": "2026-09-09", "read": false },
-					{ "id": "MAIL_02", "title": "维护补偿", "sender": "运营团队", "date": "2026-09-08", "read": true }
+					{ "id": "MAIL_01", "title": "Sandbox Pioneer Supply", "sender": "System", "date": "2026-09-09", "read": false },
+					{ "id": "MAIL_02", "title": "Maintenance Notice", "sender": "System", "date": "2026-09-08", "read": true }
 				]
 			}
 		# 可证伪的空态夹具：「非空」类断言注入本域即被证伪

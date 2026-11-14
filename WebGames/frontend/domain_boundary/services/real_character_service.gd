@@ -30,8 +30,8 @@ func _build_creation_payload(request_payload: Dictionary) -> Dictionary:
 		"slot_index": slot_index,
 		"request_seed": int(request_payload.get("request_seed", 0)),
 		"extra_custom_fields": {
-			"race": str(request_payload.get("race", "HUMAN")),
-			"class": str(request_payload.get("class", "Novice")),
+			"race": str(request_payload.get("race", "")),
+			"class": str(request_payload.get("class", "")),
 			"title_prefix": str(request_payload.get("title_prefix", "")),
 			"is_permadeath": bool(request_payload.get("is_permadeath", false))
 		}

@@ -82,11 +82,11 @@ static func get_instance() -> ServiceContainer:
 				_instance = MockServiceContainer.get_instance()
 	return _instance
 
-## 获取当前服务模式（从 custom_mode 覆盖或 frontend.ui.service_mode 配置读取，默认 mock）
+## 获取当前服务模式（从 custom_mode 覆盖或 frontend.ui.service_mode 配置读取，默认 real）
 static func get_mode() -> String:
 	if not _custom_mode.is_empty():
 		return _custom_mode
-	return GameConfig.get_string("frontend.ui", "service_mode", "mock")
+	return GameConfig.get_string("frontend.ui", "service_mode", "real")
 
 ## 重置定位器单例（测试隔离 / teardown 用）——清空已解析的容器引用与激活网关
 static func reset() -> void:

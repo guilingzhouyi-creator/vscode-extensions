@@ -73,10 +73,10 @@ func create_character_async(account_id: String, request_payload: Dictionary, res
 		# 槽位 ID 采用两位定宽补零，避免槽位数 >= 10 时破坏 SLOT_01 格式约定
 		"slot_id": "SLOT_%02d" % (_mock_characters.size() + 1),
 		"name": character_name,
-		"race": str(request_payload.get("race", "HUMAN")),
+		"race": str(request_payload.get("race", "MOCK_RACE")),
 		"class": "Novice",
 		"level": 1,
-		"town": "VALAN_CAPITAL",
+		"town": "SANDBOX_HUB",
 		"empty": false
 	}
 
