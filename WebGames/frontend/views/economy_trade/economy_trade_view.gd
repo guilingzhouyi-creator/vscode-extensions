@@ -1,10 +1,14 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端第5卷: 经济与交易系统视图控制器
+# 模块归属: 前端表现层 (Frontend · 第5卷 经济与交易系统视图控制器)
 # 文件路径: res://frontend/views/economy_trade/economy_trade_view.gd
-# 职责: 钱包四级货币资产展示、地缘商铺货架浏览、集市拍卖行与物流运费预估、
-#       物价波动曲线、货币兑换所与资源水池总览
-#       骨架阶段：纯 UI 交互，Mock 数据驱动，不接 EventBus，所有逻辑本地闭环
+# 架构定位: Presentation View Controller / Snapshot-Driven Screen
+# 依赖与触发: 上游: NavManager, MockServiceContainer, FrontendSnapshot, GameConfig
+#           下游: EconomyTradeTabs, UIIntermediary, KTabBar, ThemeManager
+# 职责说明: 钱包四级货币展示、商铺货架浏览、拍卖行、物流运费、物价走势、
+#           货币兑换所与资源水池展示，部分页签交互委托 EconomyTradeTabs 驱动。
+# 退出语义与设计依据: 表现层快照单向绑定与进度条行节点池化复用契约
 # ==============================================================================
+## EconomyTradeView：第5卷经济与交易七页签视图控制器
 class_name EconomyTradeView
 extends BaseScreen
 
@@ -67,31 +71,31 @@ var _tabs: Variant = null
 
 # --- 全局 ---
 @onready var _tab_container: TabContainer = %TabContainer
-@onready var _btn_back: Button = %BtnBack
+@onready var _back_button: Button = %BtnBack
 
 # --- Tab 1: 钱包资产 (WALLET) ---
-@onready var _label_gold_val: Label = %LabelGoldVal
-@onready var _label_silver_val: Label = %LabelSilverVal
-@onready var _label_copper_val: Label = %LabelCopperVal
-@onready var _label_crystal_val: Label = %LabelCrystalVal
+@onready var _label_gold_value: Label = %LabelGoldVal
+@onready var _label_silver_value: Label = %LabelSilverVal
+@onready var _label_copper_value: Label = %LabelCopperVal
+@onready var _label_crystal_value: Label = %LabelCrystalVal
 @onready var _label_total_value: Label = %LabelTotalValue
 @onready var _wallet_item_list: ItemList = %WalletItemList
 
 # --- Tab 2: 商店交易 (SHOP) ---
 @onready var _label_shop_title: Label = %LabelShopTitle
-@onready var _btn_mode_buy: Button = %BtnModeBuy
-@onready var _btn_mode_sell: Button = %BtnModeSell
+@onready var _mode_buy_button: Button = %BtnModeBuy
+@onready var _mode_sell_button: Button = %BtnModeSell
 @onready var _shop_item_list: ItemList = %ShopItemList
 @onready var _spin_shop_quantity: SpinBox = %SpinShopQuantity
 @onready var _label_shop_total: Label = %LabelShopTotal
-@onready var _btn_shop_confirm: Button = %BtnShopConfirm
+@onready var _shop_confirm_button: Button = %BtnShopConfirm
 
 # --- Tab 3: 拍卖行 (AUCTION) ---
 @onready var _line_auction_search: LineEdit = %LineAuctionSearch
 @onready var _option_auction_category: OptionButton = %OptionAuctionCategory
 @onready var _auction_item_list: ItemList = %AuctionItemList
-@onready var _btn_auction_bid: Button = %BtnAuctionBid
-@onready var _btn_auction_buyout: Button = %BtnAuctionBuyout
+@onready var _auction_bid_button: Button = %BtnAuctionBid
+@onready var _auction_buyout_button: Button = %BtnAuctionBuyout
 @onready var _auction_my_list: ItemList = %AuctionMyList
 
 # --- Tab 4: 商队物流 (LOGISTICS) ---
@@ -101,7 +105,7 @@ var _tabs: Variant = null
 
 # --- Tab 5: 物价波动 (PRICE_TREND) ---
 @onready var _option_price_commodity: OptionButton = %OptionPriceCommodity
-@onready var _price_bars_vbox: VBoxContainer = %PriceBarsVBox
+@onready var _price_bars_box: VBoxContainer = %PriceBarsVBox
 
 # --- Tab 6: 货币兑换 (EXCHANGE) ---
 @onready var _option_exchange_source: OptionButton = %OptionExchangeSource
@@ -109,10 +113,10 @@ var _tabs: Variant = null
 @onready var _spin_exchange_amount: SpinBox = %SpinExchangeAmount
 @onready var _label_exchange_rate: Label = %LabelExchangeRate
 @onready var _label_exchange_result: Label = %LabelExchangeResult
-@onready var _btn_exchange_confirm: Button = %BtnExchangeConfirm
+@onready var _exchange_confirm_button: Button = %BtnExchangeConfirm
 
 # --- Tab 7: 资源水池 (RESOURCE_POOL) ---
-@onready var _resource_pool_vbox: VBoxContainer = %ResourcePoolVBox
+@onready var _resource_pool_box: VBoxContainer = %ResourcePoolVBox
 
 # ==============================================================================
 # 子面板委托与初始化
@@ -125,10 +129,10 @@ func _get_tabs():
 	return _tabs
 
 # ==============================================================================
-# 公开交互方法（白模测试契约：钱包快照/商铺货架/物价走势/货币换算）
+# 公开交互方法（钱包快照/商铺货架/物价走势/货币换算）
 # ==============================================================================
 
-## 白模测试契约桩：注入钱包快照（经统一快照入口）
+## 注入钱包快照（经统一快照入口）
 func set_wallet_snapshot(gold: int, silver: int, copper: int, crystals: int) -> void:
 	apply_snapshot({
 		"wallet_gold": gold,
@@ -137,11 +141,11 @@ func set_wallet_snapshot(gold: int, silver: int, copper: int, crystals: int) -> 
 		"wallet_crystals": crystals,
 	})
 
-## 白模测试契约桩：注入商铺货架快照（经统一快照入口）
+## 注入商铺货架快照（经统一快照入口）
 func set_shop_shelves_snapshot(title: String, shelves: Array) -> void:
 	apply_snapshot({"shop_title": title, "shop_shelves": shelves})
 
-## 白模测试契约桩：注入 7 日物价走势快照（经统一快照入口）
+## 注入 7 日物价走势快照（经统一快照入口）
 func set_price_trend_snapshot(history: Array) -> void:
 	apply_snapshot({"price_trend": history})
 
@@ -169,7 +173,7 @@ func calculate_total_copper_value() -> int:
 # 生命周期
 # ==============================================================================
 
-## 生命周期初始化：主题/快照/七 Tab 标题与文案/各子界面装配/信号绑定（骨架零接线）
+## 生命周期初始化：主题/快照/七 Tab 标题与文案/各子界面装配/信号绑定
 func _ready() -> void:
 	var tabs: Variant = _get_tabs()
 	_apply_theme()
@@ -189,9 +193,9 @@ func _ready() -> void:
 
 ## 应用 ThemeManager 单例主题（null 安全）
 func _apply_theme() -> void:
-	var tm := ThemeManager.get_instance()
-	if tm.theme != null:
-		theme = tm.theme
+	var theme_manager := ThemeManager.get_instance()
+	if theme_manager.theme != null:
+		theme = theme_manager.theme
 
 # ==============================================================================
 # Mock 数据加载（经 domain_boundary 快照服务读取，不接后端）
@@ -199,17 +203,17 @@ func _apply_theme() -> void:
 
 ## 从 domain_boundary 快照服务加载经济域快照（钱包/商铺/走势）
 func _load_mock_snapshot() -> void:
-	var economy := MockServiceContainer.get_instance().snapshot_data().load_snapshot("economy")
-	if economy.is_empty():
+	var economy_snapshot := MockServiceContainer.get_instance().snapshot_data().load_snapshot("economy")
+	if economy_snapshot.is_empty():
 		return
-	var wallet: Dictionary = economy.get("wallet", {})
+	var wallet: Dictionary = economy_snapshot.get("wallet", {})
 	wallet_gold = int(wallet.get("gold", 0))
 	wallet_silver = int(wallet.get("silver", 0))
 	wallet_copper = int(wallet.get("copper", 0))
 	wallet_mana_monocrystals = int(wallet.get("mana_monocrystals", 0))
-	shop_title = str(economy.get("shop_title", shop_title))
-	shop_shelves = FrontendSnapshot.read_array(economy, "shop_items")
-	price_trend_history = FrontendSnapshot.read_array(economy, "price_trend")
+	shop_title = str(economy_snapshot.get("shop_title", shop_title))
+	shop_shelves = FrontendSnapshot.read_array(economy_snapshot, "shop_items")
+	price_trend_history = FrontendSnapshot.read_array(economy_snapshot, "price_trend")
 
 
 # ==============================================================================
@@ -224,15 +228,15 @@ func _init_wallet_tab() -> void:
 func _refresh_wallet_display() -> void:
 	if not is_inside_tree():
 		return
-	_label_gold_val.text = str(wallet_gold)
-	_label_silver_val.text = str(wallet_silver)
-	_label_copper_val.text = str(wallet_copper)
-	_label_crystal_val.text = str(wallet_mana_monocrystals)
+	_label_gold_value.text = str(wallet_gold)
+	_label_silver_value.text = str(wallet_silver)
+	_label_copper_value.text = str(wallet_copper)
+	_label_crystal_value.text = str(wallet_mana_monocrystals)
 	var total_copper := calculate_total_copper_value()
-	var parts := MockServiceContainer.get_instance().economy().split_copper(total_copper)
-	var gold_part := int(parts.get("gold", 0))
-	var silver_part := int(parts.get("silver", 0))
-	var copper_part := int(parts.get("copper", 0))
+	var currency_parts := MockServiceContainer.get_instance().economy().split_copper(total_copper)
+	var gold_part := int(currency_parts.get("gold", 0))
+	var silver_part := int(currency_parts.get("silver", 0))
+	var copper_part := int(currency_parts.get("copper", 0))
 	UIIntermediary.resolve(_label_total_value, "ui.fe05.wallet.total_breakdown", {
 		"gold": gold_part, "silver": silver_part, "copper": copper_part, "total": total_copper
 	})
@@ -268,14 +272,14 @@ func _resolve_shop_title() -> void:
 
 ## 刷新商店模式按钮选中态与确认按钮文案（买/卖）
 func _refresh_shop_mode() -> void:
-	_btn_mode_buy.button_pressed = (_shop_mode == ShopMode.BUY)
-	_btn_mode_sell.button_pressed = (_shop_mode == ShopMode.SELL)
+	_mode_buy_button.button_pressed = (_shop_mode == ShopMode.BUY)
+	_mode_sell_button.button_pressed = (_shop_mode == ShopMode.SELL)
 	if _shop_mode == ShopMode.BUY:
-		UIIntermediary.resolve(_btn_shop_confirm, "ui.fe05.shop.confirm_buy")
+		UIIntermediary.resolve(_shop_confirm_button, "ui.fe05.shop.confirm_buy")
 	else:
-		UIIntermediary.resolve(_btn_shop_confirm, "ui.fe05.shop.confirm_sell")
+		UIIntermediary.resolve(_shop_confirm_button, "ui.fe05.shop.confirm_sell")
 
-## 填充商店货架列表（无 Mock 数据时 GameConfig 默认货架兜底）
+## 填充商店货架列表（无 Mock 数据时使用默认货架清单）
 func _populate_shop_list() -> void:
 	if _shop_item_list == null:
 		return
@@ -286,14 +290,14 @@ func _populate_shop_list() -> void:
 			{"id": "HEALTH_POTION", "name": "ui.fe05.mock.shop.health_potion", "price_copper": 800, "stock": 45},
 			{"id": "MANA_CRYSTAL_S", "name": "ui.fe05.mock.shop.mana_crystal_s", "price_copper": 12000, "stock": 3},
 		]
-	for item in shop_shelves:
-		var item_name := UIIntermediary.text(str(item.get("name", "ui.fe05.unknown")))
-		var display := UIIntermediary.text("ui.fe05.shop.item_display", {
+	for shelf_entry in shop_shelves:
+		var item_name := UIIntermediary.text(str(shelf_entry.get("name", "ui.fe05.unknown")))
+		var display_text := UIIntermediary.text("ui.fe05.shop.item_display", {
 			"name": item_name,
-			"price": _format_currency(int(item.get("price_copper", 0))),
-			"stock": int(item.get("stock", 0)),
+			"price": _format_currency(int(shelf_entry.get("price_copper", 0))),
+			"stock": int(shelf_entry.get("stock", 0)),
 		})
-		_shop_item_list.add_item(display)
+		_shop_item_list.add_item(display_text)
 
 ## 刷新交易合计：按买/卖模式计算并渲染（卖出乘回购折扣）
 func _refresh_shop_total() -> void:
@@ -303,19 +307,19 @@ func _refresh_shop_total() -> void:
 	if _shop_selected_index < 0 or _shop_selected_index >= shop_shelves.size():
 		UIIntermediary.resolve(_label_shop_total, "ui.fe05.shop.select_prompt")
 		return
-	var item: Dictionary = shop_shelves[_shop_selected_index]
-	var base_price := int(item.get("price_copper", 0))
-	var qty := int(_spin_shop_quantity.value)
+	var shelf_entry: Dictionary = shop_shelves[_shop_selected_index]
+	var base_price := int(shelf_entry.get("price_copper", 0))
+	var quantity := int(_spin_shop_quantity.value)
 	var is_sell := _shop_mode == ShopMode.SELL
-	var total := MockServiceContainer.get_instance().economy().calculate_shop_total(base_price, qty, is_sell)
-	var sell_ratio := int(float(MockServiceContainer.get_instance().economy().get_rules().get("sell_back_ratio", 0.7)) * 100.0)
+	var total_copper := MockServiceContainer.get_instance().economy().calculate_shop_total(base_price, quantity, is_sell)
+	var sell_ratio_percent := int(float(MockServiceContainer.get_instance().economy().get_rules().get("sell_back_ratio", 0.7)) * 100.0)
 	if is_sell:
 		UIIntermediary.resolve(_label_shop_total, "ui.fe05.shop.sell_total", {
-			"price": _format_currency(total), "ratio": sell_ratio
+			"price": _format_currency(total_copper), "ratio": sell_ratio_percent
 		})
 	else:
 		UIIntermediary.resolve(_label_shop_total, "ui.fe05.shop.buy_total", {
-			"price": _format_currency(total)
+			"price": _format_currency(total_copper)
 		})
 
 ## 刷新商店显示：标题/货架/合计（树内守卫）
@@ -353,7 +357,7 @@ func _on_shop_item_selected(_index: int) -> void:
 	_refresh_shop_total()
 
 ## 商店数量变化：刷新合计
-func _on_shop_quantity_changed(_value: float) -> void:
+func _on_shop_quantity_changed(_quantity_value: float) -> void:
 	_refresh_shop_total()
 
 ## 商店确认按钮：未选拦截，经 Toast 反馈交易确认
@@ -365,14 +369,14 @@ func _on_shop_confirm_pressed() -> void:
 			NavTypes.ToastLevel.WARNING
 		)
 		return
-	var item: Dictionary = shop_shelves[selected[0]]
-	var qty := int(_spin_shop_quantity.value)
-	var action := UIIntermediary.text("ui.fe05.shop.mode_buy") if _shop_mode == ShopMode.BUY else UIIntermediary.text("ui.fe05.shop.mode_sell")
+	var shelf_entry: Dictionary = shop_shelves[selected[0]]
+	var quantity := int(_spin_shop_quantity.value)
+	var action_label := UIIntermediary.text("ui.fe05.shop.mode_buy") if _shop_mode == ShopMode.BUY else UIIntermediary.text("ui.fe05.shop.mode_sell")
 	NavManager.get_instance().show_toast(
 		UIIntermediary.text("ui.fe05.shop.confirm_toast", {
-			"action": action,
-			"name": UIIntermediary.text(str(item.get("name", "ui.fe05.unknown"))),
-			"count": qty,
+			"action": action_label,
+			"name": UIIntermediary.text(str(shelf_entry.get("name", "ui.fe05.unknown"))),
+			"count": quantity,
 		}),
 		NavTypes.ToastLevel.INFO
 	)
@@ -381,15 +385,15 @@ func _on_shop_confirm_pressed() -> void:
 # 信号绑定与工具方法
 # ==============================================================================
 
-## 绑定本地 UI 交互信号（零接线：七 Tab 控件在本地脚本闭环）
+## 绑定本地 UI 交互信号（七 Tab 控件本地交互闭环）
 func _connect_signals() -> void:
-	connect_managed(_btn_back.pressed, _on_back_pressed)
+	connect_managed(_back_button.pressed, _on_back_pressed)
 	connect_managed(_tab_container.tab_changed, _on_tab_changed)
-	connect_managed(_btn_mode_buy.pressed, _on_mode_buy_pressed)
-	connect_managed(_btn_mode_sell.pressed, _on_mode_sell_pressed)
+	connect_managed(_mode_buy_button.pressed, _on_mode_buy_pressed)
+	connect_managed(_mode_sell_button.pressed, _on_mode_sell_pressed)
 	connect_managed(_shop_item_list.item_selected, _on_shop_item_selected)
 	connect_managed(_spin_shop_quantity.value_changed, _on_shop_quantity_changed)
-	connect_managed(_btn_shop_confirm.pressed, _on_shop_confirm_pressed)
+	connect_managed(_shop_confirm_button.pressed, _on_shop_confirm_pressed)
 
 ## 主 Tab 切换：表现层无额外副作用
 func _on_tab_changed(_tab_index: int) -> void:
@@ -401,10 +405,10 @@ func _on_back_pressed() -> void:
 
 ## 将铜币数量格式化为可读字符串（拆分规则经服务）
 func _format_currency(copper_amount: int) -> String:
-	var parts := MockServiceContainer.get_instance().economy().split_copper(copper_amount)
-	var gold := int(parts.get("gold", 0))
-	var silver := int(parts.get("silver", 0))
-	var copper := int(parts.get("copper", 0))
+	var currency_parts := MockServiceContainer.get_instance().economy().split_copper(copper_amount)
+	var gold := int(currency_parts.get("gold", 0))
+	var silver := int(currency_parts.get("silver", 0))
+	var copper := int(currency_parts.get("copper", 0))
 	if gold > 0:
 		return UIIntermediary.text("ui.fe05.currency.full", {"gold": gold, "silver": silver, "copper": copper})
 	elif silver > 0:

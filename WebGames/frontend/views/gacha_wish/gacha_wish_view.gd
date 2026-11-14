@@ -1,13 +1,14 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端第6卷: 抽卡祈愿系统视图控制器
+# 模块归属: 前端表现层 (Frontend · 第6卷 抽卡祈愿系统视图控制器)
 # 文件路径: res://frontend/views/gacha_wish/gacha_wish_view.gd
-# 职责: 祈愿卡池切换、单抽/十连抽演出动画状态机、保底进度条与历史记录展示；
-#       三段式界面：
-#       - WISH_MAIN 祈愿主界面（卡池切换 + UP 展示 + 单抽/十连 + 保底进度）；
-#       - WISH_RESULT 结果弹窗（默认隐藏，网格 + 稀有度边框 + NEW 标记 + 跳过/详情/再来）；
-#       - PITY_HISTORY 保底历史（侧面板默认隐藏，统计 + 历史列表）。
-# 骨架阶段：零接线、不接 EventBus，仅本地 Mock 数据驱动 + 按钮点击反馈。
+# 架构定位: Presentation View Controller / Snapshot-Driven Screen
+# 依赖与触发: 上游: NavManager, MockServiceContainer, FrontendSnapshot
+#           下游: GachaWishTabs, UIIntermediary, KButtonClass, KRarityTag
+# 职责说明: 祈愿卡池切换、单抽与十连抽动画状态机、保底进度条与历史记录展示；
+#           概率计算与抽卡结算经域边界服务只读获取，子面板交互委托 GachaWishTabs。
+# 退出语义与设计依据: 表现层快照单向绑定与抽卡结果卡片池化复用契约 (ADV-PRF-002)
 # ==============================================================================
+## GachaWishView：第6卷祈愿主界面、保底历史与抽卡结果弹窗视图控制器
 class_name GachaWishView
 extends BaseScreen
 
@@ -36,7 +37,7 @@ enum WishAnimationState {IDLE, PULLING_ANIM, RESULT_REVEAL}
 var anim_state: WishAnimationState = WishAnimationState.IDLE
 
 # ==============================================================================
-# 祈愿数据快照（骨架阶段 Mock 驱动）
+# 祈愿数据快照（本地快照驱动）
 # ==============================================================================
 
 # 当前卡池
@@ -74,11 +75,11 @@ var result_overlay_visible: bool = false
 # ==============================================================================
 
 # --- 顶部标题栏 ---
-@onready var _btn_toggle_history: Button = %BtnToggleHistory
-@onready var _btn_back: Button = %BtnBack
+@onready var _toggle_history_button: Button = %BtnToggleHistory
+@onready var _back_button: Button = %BtnBack
 
 # --- WISH_MAIN: 卡池切换 ---
-@onready var _banner_switch_hbox: HBoxContainer = %BannerSwitchHBox
+@onready var _banner_switch_box: HBoxContainer = %BannerSwitchHBox
 
 # --- WISH_MAIN: 卡池封面 ---
 @onready var _label_banner_title: Label = %LabelBannerTitle
@@ -98,14 +99,14 @@ var result_overlay_visible: bool = false
 
 # --- WISH_MAIN: 抽卡按钮区 ---
 @onready var _label_currency: Label = %LabelCurrency
-@onready var _btn_single_pull: Button = %BtnSinglePull
+@onready var _single_pull_button: Button = %BtnSinglePull
 @onready var _label_single_cost: Label = %LabelSingleCost
-@onready var _btn_ten_pull: Button = %BtnTenPull
+@onready var _ten_pull_button: Button = %BtnTenPull
 @onready var _label_ten_cost: Label = %LabelTenCost
 
 # --- PITY_HISTORY: 保底与历史侧面板 ---
 @onready var _history_panel: PanelContainer = %HistoryPanel
-@onready var _btn_history_close: Button = %BtnHistoryClose
+@onready var _history_close_button: Button = %BtnHistoryClose
 @onready var _label_total_pulls: Label = %LabelTotalPulls
 @onready var _label_rarity_stats: Label = %LabelRarityStats
 @onready var _label_probability: Label = %LabelProbability
@@ -116,21 +117,21 @@ var result_overlay_visible: bool = false
 @onready var _result_panel: PanelContainer = %ResultPanel
 @onready var _label_result_title: Label = %LabelResultTitle
 @onready var _result_items_grid: GridContainer = %ResultItemsGrid
-@onready var _btn_result_skip: Button = %BtnResultSkip
-@onready var _btn_result_detail: Button = %BtnResultDetail
-@onready var _btn_result_pull_again: Button = %BtnResultPullAgain
+@onready var _result_skip_button: Button = %BtnResultSkip
+@onready var _result_detail_button: Button = %BtnResultDetail
+@onready var _result_pull_again_button: Button = %BtnResultPullAgain
 
 # ==============================================================================
-# 公开交互方法（白模测试契约：卡池切换 / 抽卡预演 / 保底重置）
+# 公开交互方法（卡池切换 / 抽卡预演 / 保底重置）
 # ==============================================================================
 
-## 白模测试契约桩：切换当前卡池并刷新封面/切换按钮态
+## 切换当前卡池并刷新封面与切换按钮态
 func switch_banner(banner_id: String) -> void:
 	current_banner_id = banner_id
 	_refresh_banner_display()
 	_refresh_banner_switch_buttons()
 
-## 白模测试契约桩：执行抽卡预演（服务结算掉落/保底/统计，视图只更新展示态与动画）
+## 执行抽卡预演（服务结算掉落与保底统计，视图只更新展示态与动画）
 func execute_pull_preview(pull_count: int, mock_drops: Array) -> Dictionary:
 	anim_state = WishAnimationState.PULLING_ANIM
 	var service := _gacha_service()
@@ -167,7 +168,7 @@ func reset_animation_state() -> void:
 # 生命周期
 # ==============================================================================
 
-## 生命周期初始化：主题/Mock/文案/卡池切换/封面/UP/保底/货币/概率/历史/结果弹窗/信号（骨架零接线）
+## 生命周期初始化：主题/快照/文案/卡池切换/封面/UP/保底/货币/概率/历史/结果弹窗/信号
 func _get_tabs():
 	if _tabs == null:
 		_tabs = _register_owned_subcontroller(GachaWishTabsClass.new())
@@ -191,9 +192,9 @@ func _ready() -> void:
 
 ## 应用 ThemeManager 单例主题（null 安全）
 func _apply_theme() -> void:
-	var tm := ThemeManager.get_instance()
-	if tm.theme != null:
-		theme = tm.theme
+	var theme_manager := ThemeManager.get_instance()
+	if theme_manager.theme != null:
+		theme = theme_manager.theme
 
 # ==============================================================================
 # 静态文案初始化（非 unique_name 节点通过路径访问，unique_name 节点直接引用）
@@ -214,7 +215,7 @@ func _render_from_snapshot() -> void:
 
 # ==============================================================================
 
-## 绑定本地 UI 交互信号（零接线：历史开关/抽卡/结果弹窗控件本地闭环）
+## 绑定本地 UI 交互信号（历史开关/抽卡/结果弹窗控件本地闭环）
 func _connect_signals() -> void:
 	_get_tabs().connect_signals()
 
@@ -246,18 +247,18 @@ func _refresh_up_items() -> void:
 
 ## 刷新保底进度条与文案（保底阈值经服务规则只读获取）
 func _refresh_pity_bars() -> void:
-	var pity_5_hard := _rule_int("pity_5star_hard", 90)
-	var pity_4_hard := _rule_int("pity_4star_hard", 10)
+	var pity_5star_hard_limit := _rule_int("pity_5star_hard", 90)
+	var pity_4star_hard_limit := _rule_int("pity_4star_hard", 10)
 	if _pity_5star_bar:
-		_pity_5star_bar.max_value = pity_5_hard
+		_pity_5star_bar.max_value = pity_5star_hard_limit
 		_pity_5star_bar.value = pity_5star
 	if _label_pity_5star:
-		UIIntermediary.resolve(_label_pity_5star, "ui.fe06.pity.5star", {"cur": pity_5star, "max": pity_5_hard})
+		UIIntermediary.resolve(_label_pity_5star, "ui.fe06.pity.5star", {"cur": pity_5star, "max": pity_5star_hard_limit})
 	if _pity_4star_bar:
-		_pity_4star_bar.max_value = pity_4_hard
+		_pity_4star_bar.max_value = pity_4star_hard_limit
 		_pity_4star_bar.value = pity_4star
 	if _label_pity_4star:
-		UIIntermediary.resolve(_label_pity_4star, "ui.fe06.pity.4star", {"cur": pity_4star, "max": pity_4_hard})
+		UIIntermediary.resolve(_label_pity_4star, "ui.fe06.pity.4star", {"cur": pity_4star, "max": pity_4star_hard_limit})
 
 # ==============================================================================
 # WISH_MAIN: 货币与抽卡消耗刷新
@@ -303,7 +304,7 @@ func _refresh_history_list() -> void:
 	_get_tabs().refresh_history_list()
 
 # ==============================================================================
-# WISH_MAIN: 抽卡执行（骨架阶段 Mock 驱动）
+# WISH_MAIN: 抽卡执行（本地快照驱动）
 # ==============================================================================
 
 ## 单抽按钮：服务校验余额并扣费，服务生成掉落后执行预演/刷新/展示结果
