@@ -33,70 +33,70 @@ static func _restore_both(inventory: WearableInventoryAggregate, inventory_snaps
 ##       成功返回 { success, equipped, swapped_out } 并广播 equip_success 叙事。
 static func equip_from_inventory(
 	slot_name: String,
-	item: ItemEntity,
+	target_item: ItemEntity,
 	loadout: EquipmentLoadoutAggregate,
 	inventory: WearableInventoryAggregate
 ) -> Dictionary:
 	if not loadout.slots.has(slot_name):
 		var error_message := GameConfig.get_string("narratives.equipment", "invalid_slot", "Invalid equipment slot: %s") % slot_name
 		return { "success": false, "error_code": "INVALID_SLOT", "reason": error_message }
-	if item == null:
+	if target_item == null:
 		return { "success": false, "error_code": "INVALID_ITEM", "reason": "Item cannot be null." }
 	if inventory == null:
 		return { "success": false, "error_code": "MISSING_INVENTORY" }
-	if not inventory.storage_items.has(item):
+	if not inventory.storage_items.has(target_item):
 		return { "success": false, "error_code": "ITEM_NOT_IN_INVENTORY" }
 
-	var old_item: ItemEntity = loadout.get_equipped_item(slot_name)
+	var previous_item: ItemEntity = loadout.get_equipped_item(slot_name)
 
 	# 分歧预检（纯读）先行——命中即零快照受控失败；原步骤2分歧检查保留为防御
 	# （分歧时快照未发生任何变更，restore 无实际效果——直接返回与回滚路径状态完全等价）
 	if inventory.equipped_slots.has(slot_name):
 		var inventory_precheck_item: ItemEntity = inventory.equipped_slots[slot_name]
-		if _is_slot_divergent(inventory_precheck_item, old_item):
+		if _is_slot_divergent(inventory_precheck_item, previous_item):
 			return { "success": false, "error_code": "EQUIP_STATE_DIVERGENCE" }
 
 	var inventory_snapshot := inventory.snapshot()
 	var loadout_snapshot := loadout.slots.duplicate()
 
 	# 1. 新装备脱离背包（释放 UID 与背包槽位，can_add_item 的 UID 去重要求先离原容器）
-	if not inventory.remove_item(item):
+	if not inventory.remove_item(target_item):
 		inventory.restore(inventory_snapshot)
 		return { "success": false, "error_code": "ITEM_NOT_IN_INVENTORY" }
 
 	# 2. 目标槽旧装备脱离穿戴（容量贡献随之释放；同步槽位分歧即受控失败）
 	if inventory.equipped_slots.has(slot_name):
 		var inventory_old_item: Variant = inventory.unequip_item(slot_name)
-		if _is_slot_divergent(inventory_old_item, old_item):
+		if _is_slot_divergent(inventory_old_item, previous_item):
 			_restore_both(inventory, inventory_snapshot, loadout, loadout_snapshot)
 			return { "success": false, "error_code": "EQUIP_STATE_DIVERGENCE" }
 
 	# 3. 新装备入穿戴（容量模型即时反映新穿戴状态）
-	if inventory.equipped_slots.has(slot_name) and not inventory.equip_item(slot_name, item):
+	if inventory.equipped_slots.has(slot_name) and not inventory.equip_item(slot_name, target_item):
 		_restore_both(inventory, inventory_snapshot, loadout, loadout_snapshot)
 		return { "success": false, "error_code": "EQUIP_SYNC_FAILED" }
 
 	# 4. 旧装备回装背包：此刻容量已按新穿戴计，此检定即真实守卫点
-	if old_item != null:
-		if not inventory.can_add_item(old_item):
+	if previous_item != null:
+		if not inventory.can_add_item(previous_item):
 			_restore_both(inventory, inventory_snapshot, loadout, loadout_snapshot)
-			var error_message := GameConfig.get_string("narratives.equipment", "capacity_exceeded", "Inventory capacity or carry weight exceeded: %s") % old_item.custom_name
+			var error_message := GameConfig.get_string("narratives.equipment", "capacity_exceeded", "Inventory capacity or carry weight exceeded: %s") % previous_item.custom_name
 			return { "success": false, "error_code": "INVENTORY_CAPACITY_EXCEEDED", "reason": error_message }
-		if not inventory.add_item(old_item):
+		if not inventory.add_item(previous_item):
 			_restore_both(inventory, inventory_snapshot, loadout, loadout_snapshot)
-			var error_message := GameConfig.get_string("narratives.equipment", "capacity_exceeded", "Inventory capacity or carry weight exceeded: %s") % old_item.custom_name
+			var error_message := GameConfig.get_string("narratives.equipment", "capacity_exceeded", "Inventory capacity or carry weight exceeded: %s") % previous_item.custom_name
 			return { "success": false, "error_code": "INVENTORY_CAPACITY_EXCEEDED", "reason": error_message }
 
 	# 5. loadout 侧提交与确认
-	loadout.equip(slot_name, item)
-	if loadout.get_equipped_item(slot_name) != item:
+	loadout.equip(slot_name, target_item)
+	if loadout.get_equipped_item(slot_name) != target_item:
 		_restore_both(inventory, inventory_snapshot, loadout, loadout_snapshot)
 		return { "success": false, "error_code": "EQUIP_COMMIT_FAILED" }
 
 	EventBusCore.get_instance().emit_narrative_by_key(
-		"equipment/equip_success", "combat", [slot_name, item.custom_name]
+		"equipment/equip_success", "combat", [slot_name, target_item.custom_name]
 	)
-	return { "success": true, "equipped": item, "swapped_out": old_item }
+	return { "success": true, "equipped": target_item, "swapped_out": previous_item }
 
 # ==============================================================================
 # 三、卸下（穿戴 → 背包，带快照回滚）
@@ -114,15 +114,15 @@ static func unequip_to_inventory(
 		return { "success": false, "error_code": "INVALID_SLOT" }
 	if inventory == null:
 		return { "success": false, "error_code": "MISSING_INVENTORY" }
-	var item: ItemEntity = loadout.get_equipped_item(slot_name)
-	if item == null:
+	var equipped_item: ItemEntity = loadout.get_equipped_item(slot_name)
+	if equipped_item == null:
 		var error_message := GameConfig.get_string("narratives.equipment", "no_item_in_slot", "No item equipped in slot: %s") % slot_name
 		return { "success": false, "error_code": "NO_ITEM_IN_SLOT", "reason": error_message }
 
 	# 分歧预检（纯读）先行——命中即零快照受控失败；原步骤1分歧检查保留为防御
 	if inventory.equipped_slots.has(slot_name):
 		var inventory_precheck_item: ItemEntity = inventory.equipped_slots[slot_name]
-		if _is_slot_divergent(inventory_precheck_item, item):
+		if _is_slot_divergent(inventory_precheck_item, equipped_item):
 			return { "success": false, "error_code": "EQUIP_STATE_DIVERGENCE" }
 
 	var inventory_snapshot := inventory.snapshot()
@@ -131,23 +131,23 @@ static func unequip_to_inventory(
 	# 1. 先脱离穿戴（释放 UID 与容量贡献；容量相关槽位与 loadout 分歧即受控失败）
 	if inventory.equipped_slots.has(slot_name):
 		var inventory_old_item: Variant = inventory.unequip_item(slot_name)
-		if _is_slot_divergent(inventory_old_item, item):
+		if _is_slot_divergent(inventory_old_item, equipped_item):
 			_restore_both(inventory, inventory_snapshot, loadout, loadout_snapshot)
 			return { "success": false, "error_code": "EQUIP_STATE_DIVERGENCE" }
 
 	# 2. 负重/容量防御性预检（防超容或负重溢出破坏不变量）
-	if not inventory.can_add_item(item):
+	if not inventory.can_add_item(equipped_item):
 		_restore_both(inventory, inventory_snapshot, loadout, loadout_snapshot)
-		var error_message := GameConfig.get_string("narratives.equipment", "capacity_exceeded", "Inventory capacity or carry weight exceeded: %s") % item.custom_name
+		var error_message := GameConfig.get_string("narratives.equipment", "capacity_exceeded", "Inventory capacity or carry weight exceeded: %s") % equipped_item.custom_name
 		return { "success": false, "error_code": "INVENTORY_CAPACITY_EXCEEDED", "reason": error_message }
 
 	# 3. loadout 侧卸下提交后入背包
 	loadout.unequip(slot_name)
-	if not inventory.add_item(item):
+	if not inventory.add_item(equipped_item):
 		_restore_both(inventory, inventory_snapshot, loadout, loadout_snapshot)
 		return { "success": false, "error_code": "INVENTORY_COMMIT_FAILED" }
 
 	EventBusCore.get_instance().emit_narrative_by_key(
-		"equipment/unequip_success", "combat", [slot_name, item.custom_name]
+		"equipment/unequip_success", "combat", [slot_name, equipped_item.custom_name]
 	)
-	return { "success": true, "unequipped_item": item }
+	return { "success": true, "unequipped_item": equipped_item }

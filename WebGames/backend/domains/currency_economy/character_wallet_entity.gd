@@ -131,19 +131,19 @@ func apply_delta(delta: Dictionary) -> Dictionary:
 	return apply_transaction(delta, false)
 
 ## 统一钱包提交边界。普通奖励只允许非负增量；扣款/追缴必须明确声明 signed。
-func apply_transaction(delta: Dictionary, allow_signed: bool = false) -> Dictionary:
+func apply_transaction(delta: Dictionary, can_allow_signed: bool = false) -> Dictionary:
 	if delta == null:
 		return {"success": false, "error_code": "INVALID_DELTA"}
 	var key_error := _validate_transaction_keys(delta)
 	if not key_error.is_empty():
 		return key_error
 
-	var calc_result := _calculate_transaction_values(delta, allow_signed)
-	if not bool(calc_result.get("ok", false)):
-		return Dictionary(calc_result.get("error", {}))
+	var calculation_result := _calculate_transaction_values(delta, can_allow_signed)
+	if not bool(calculation_result.get("ok", false)):
+		return Dictionary(calculation_result.get("error", {}))
 
-	var next_values: Dictionary = calc_result.get("values", {})
-	if allow_signed and not _validate_debt_limit(next_values):
+	var next_values: Dictionary = calculation_result.get("values", {})
+	if can_allow_signed and not _validate_debt_limit(next_values):
 		return {"success": false, "error_code": "DEBT_LIMIT_EXCEEDED"}
 
 	from_dictionary(next_values)
@@ -157,23 +157,23 @@ func _validate_transaction_keys(delta: Dictionary) -> Dictionary:
 	return {}
 
 ## 计算交易后余额并执行类型/符号/溢出校验
-func _calculate_transaction_values(delta: Dictionary, allow_signed: bool) -> Dictionary:
+func _calculate_transaction_values(delta: Dictionary, can_allow_signed: bool) -> Dictionary:
 	var next_values := to_dictionary()
 	for field in CURRENCY_FIELDS:
 		if not delta.has(field):
 			continue
-		var check := _apply_field_delta(int(next_values[field]), delta[field], allow_signed)
+		var check := _apply_field_delta(int(next_values[field]), delta[field], can_allow_signed)
 		if not bool(check.get("ok", false)):
 			return {"ok": false, "error": {"success": false, "error_code": check.get("error_code", ""), "currency": field}}
 		next_values[field] = int(check.get("result", 0))
 	return {"ok": true, "values": next_values}
 
 ## 校验并计算单币种字段增量
-func _apply_field_delta(current: int, raw_value: Variant, allow_signed: bool) -> Dictionary:
+func _apply_field_delta(current: int, raw_value: Variant, can_allow_signed: bool) -> Dictionary:
 	if not (raw_value is int or raw_value is float):
 		return {"ok": false, "error_code": "INVALID_AMOUNT"}
 	var amount := int(raw_value)
-	if not allow_signed and amount < 0:
+	if not can_allow_signed and amount < 0:
 		return {"ok": false, "error_code": "NEGATIVE_AMOUNT"}
 	var candidate: int = current + amount
 	if _is_overflow(amount, current, candidate):

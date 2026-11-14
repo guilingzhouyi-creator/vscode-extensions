@@ -50,10 +50,10 @@ static func dispatch_rewards_via_mail(
 	mail.attachment_items = item_templates.duplicate(true)
 	mail.sent_timestamp_utc = Time.get_unix_time_from_system()
 
-	var delivered: bool = mailbox.receive_mail(mail)
+	var is_delivered: bool = mailbox.receive_mail(mail)
 	return {
-		"success": delivered,
-		"error_code": "" if delivered else "MAIL_DELIVERY_FAILED",
+		"success": is_delivered,
+		"error_code": "" if is_delivered else "MAIL_DELIVERY_FAILED",
 		"mail_id": mail.mail_id,
 		"has_attachment": mail.has_attachment
 	}

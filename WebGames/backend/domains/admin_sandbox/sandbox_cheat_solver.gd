@@ -14,7 +14,7 @@ class_name SandboxCheatSolver extends RefCounted
 static func execute_cheat_command(
 	admin: AdminPermissionAggregate,
 	command_name: String,
-	args: Array,
+	command_arguments: Array,
 	context: Dictionary
 ) -> Dictionary:
 	if not admin.has_permission(AdminPermissionAggregate.AdminLevel.LEVEL_GAME_MASTER):
@@ -27,9 +27,9 @@ static func execute_cheat_command(
 			if sheet:
 				sheet.heart_core_integrity = 1.0
 				# 统一六维底座：全属性提升至 6 级满级（等级域经统一规则校验）
-				for stat_key in AttributeConversionEngine.DEFAULT_STAT_LIST:
-					sheet.set_level(stat_key, AttributeConversionEngine.max_level())
-					sheet.set_progress(stat_key, 1.0)
+				for attribute_key in AttributeConversionEngine.DEFAULT_STAT_LIST:
+					sheet.set_level(attribute_key, AttributeConversionEngine.max_level())
+					sheet.set_progress(attribute_key, 1.0)
 				LifecycleAndPhysiologySolver.calculate_somatic_function(sheet)
 				EventBusCore.get_instance().emit_narrative_by_key(
 					"admin/god_mode", "system", [AttributeConversionEngine.max_level()]
@@ -38,7 +38,7 @@ static func execute_cheat_command(
 		"GIVE_GOLD":
 			var wallet: CharacterWalletEntity = context.get("wallet", null)
 			var default_gold := GameConfig.get_int("infrastructure.admin", "sandbox/give_gold_default", 10000)
-			var amount: Variant = int(args[0]) if args.size() > 0 else default_gold
+			var amount: Variant = int(command_arguments[0]) if command_arguments.size() > 0 else default_gold
 			if wallet:
 				wallet.apply_delta({ "gold": amount })
 				EventBusCore.get_instance().emit_narrative_by_key("admin/give_gold", "system", [amount])
@@ -54,8 +54,8 @@ static func execute_cheat_command(
 				var no_registry_message := GameConfig.get_string("narratives.admin", "give_item_no_registry", "No item registry context for give item.")
 				return { "success": false, "reason": no_registry_message }
 			var default_name := GameConfig.get_string("infrastructure.admin", "sandbox/give_item_default_name", "【GM创世神器】")
-			var item_name: Variant = str(args[0]) if args.size() > 0 else default_name
-			var count := int(args[1]) if args.size() > 1 else 1
+			var item_name: Variant = str(command_arguments[0]) if command_arguments.size() > 0 else default_name
+			var count := int(command_arguments[1]) if command_arguments.size() > 1 else 1
 			count = maxi(1, count)
 			# 严格按统一英文名解析（唯一合法输入）：中文别名、数字 ID、canonical_id 一律拒绝
 			var resolved: Variant = ItemRegistrySolver.resolve_by_english_name(catalog, item_name)
@@ -65,20 +65,20 @@ static func execute_cheat_command(
 			var prototype: Variant = catalog.get_prototype(resolved.canonical_id)
 			var added := 0
 			for item_index in range(count):
-				var item := _build_registry_item(item_name, prototype)
-				if inventory.add_item(item):
+				var granted_item := _build_registry_item(item_name, prototype)
+				if inventory.add_item(granted_item):
 					added += 1
 			EventBusCore.get_instance().emit_narrative_by_key("admin/give_item", "system", [item_name])
-			var stats_library: AccountItemLibrary = context.get("item_stats_library", null)
-			if stats_library != null and added > 0:
-				ItemStatisticsSolver.record_item_event(stats_library, ItemStatisticsSolver.EVENT_ITEM_GRANTED, resolved.canonical_id, added, catalog, null, {
+			var item_statistics_library: AccountItemLibrary = context.get("item_stats_library", null)
+			if item_statistics_library != null and added > 0:
+				ItemStatisticsSolver.record_item_event(item_statistics_library, ItemStatisticsSolver.EVENT_ITEM_GRANTED, resolved.canonical_id, added, catalog, null, {
 					"transaction_id": "GIVE_ITEM"
 				})
 			return { "success": true, "item_name": item_name, "count_added": added, "canonical_id": resolved.canonical_id }
 		"ADVANCE_TIME":
 			var clock: WorldClockMaster = context.get("clock", null)
 			var default_months := GameConfig.get_int("infrastructure.admin", "sandbox/advance_time_default_months", 12)
-			var months: Variant = int(args[0]) if args.size() > 0 else default_months
+			var months: Variant = int(command_arguments[0]) if command_arguments.size() > 0 else default_months
 			if clock:
 				clock.advance_calendar_months(months)
 				EventBusCore.get_instance().emit_narrative_by_key("admin/advance_time", "system", [months])

@@ -53,9 +53,9 @@ static func seal_passkey(passkey_plain: String) -> String:
 static func _normalize_permissions(permissions: Array) -> Array:
 	var normalized: Array = []
 	for permission in permissions:
-		var value := str(permission).strip_edges().to_upper()
-		if not value.is_empty() and not normalized.has(value):
-			normalized.append(value)
+		var normalized_permission := str(permission).strip_edges().to_upper()
+		if not normalized_permission.is_empty() and not normalized.has(normalized_permission):
+			normalized.append(normalized_permission)
 	normalized.sort()
 	return normalized
 
@@ -65,14 +65,14 @@ func elevate_permission(passkey_plain: String, target_level: int) -> bool:
 		return false
 	var expected_hash := seal_passkey(passkey_plain)
 	var keys: Array = _passkeys()
-	var matched := false
+	var has_matched := false
 	for key in keys:
 		var configured := str(key)
 		var configured_hash := configured if configured.length() == 64 else seal_passkey(configured)
 		if configured_hash == expected_hash:
-			matched = true
+			has_matched = true
 			break
-	if matched:
+	if has_matched:
 		current_level = target_level
 		session_passkey_hash = expected_hash
 		granted_permissions = _normalize_permissions(GameConfig.get_array("infrastructure.admin", "admin/permissions", []))

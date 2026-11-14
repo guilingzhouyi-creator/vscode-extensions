@@ -49,22 +49,22 @@ static func registered_count() -> int:
 	return maxi(0, registered_commands.size())
 
 ## 指令分发：非指令/未知/权限不足逐级拦截后调用处理器
-static func dispatch_command(ast: ChatCommandParser.CommandAST, admin: AdminPermissionAggregate, context: Dictionary) -> Dictionary:
-	if not ast.is_command:
+static func dispatch_command(command_ast: ChatCommandParser.CommandAST, admin: AdminPermissionAggregate, context: Dictionary) -> Dictionary:
+	if not command_ast.is_command:
 		var error_reason := GameConfig.get_string("narratives.chat_command", "not_a_command", "Not a command")
 		return {"success": false, "reason": error_reason}
 
-	var command_entry: Variant = registered_commands.get(ast.command_name, null)
+	var command_entry: Variant = registered_commands.get(command_ast.command_name, null)
 	if command_entry == null:
 		var template := GameConfig.get_string("narratives.chat_command", "unknown_chat_command", "Unknown command: /%s")
-		return {"success": false, "reason": template % ast.command_name}
+		return {"success": false, "reason": template % command_ast.command_name}
 
 	if not admin.has_permission(command_entry.min_level):
 		var permission_template := GameConfig.get_string("narratives.chat_command", "permission_denied", "Permission denied for command: /%s")
-		return {"success": false, "reason": permission_template % ast.command_name}
+		return {"success": false, "reason": permission_template % command_ast.command_name}
 
 	var handler: Callable = command_entry.handler
-	return handler.call(ast, context)
+	return handler.call(command_ast, context)
 
 ## 前缀自动补全建议（去 / 前缀 + 小写化，返回 /cmd 形式数组）
 static func get_autocomplete_suggestions(prefix: String) -> Array[String]:

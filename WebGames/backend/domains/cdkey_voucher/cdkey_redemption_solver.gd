@@ -34,8 +34,8 @@ static func resolve_redemption(
 	var code: String = raw_input_code.strip_edges().to_upper()
 
 	# 1. 检查频控锁定
-	var limit_info: Dictionary = rate_limit_state.get(account_id, {"count": 0, "lock_until_utc": 0})
-	if limit_info.get("lock_until_utc", 0) > current_time_utc:
+	var account_rate_limit_state: Dictionary = rate_limit_state.get(account_id, {"count": 0, "lock_until_utc": 0})
+	if account_rate_limit_state.get("lock_until_utc", 0) > current_time_utc:
 		return {
 			"success": false,
 			"error_code": "RATE_LIMITED",

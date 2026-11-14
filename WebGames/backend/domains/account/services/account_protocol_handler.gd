@@ -38,15 +38,15 @@ static func _load_account_or_null(account_id: String) -> AccountProfile:
 
 ## 分发处理账号领域客户端协议请求（注册、登录、游客登录、角色槽位查询/清理、注销与首页视图模型）
 static func dispatch(request: ClientRequestEnvelopeDTO, _gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
-	var payload_dict: Dictionary = request.payload if request.payload is Dictionary else {}
+	var request_payload: Dictionary = request.payload if request.payload is Dictionary else {}
 	match request.action_type:
 		"REGISTER_ACCOUNT":
 			var register_request := AccountRegistrationDTO.Request.new()
-			register_request.username = str(payload_dict.get("username", ""))
-			register_request.password_plain = str(payload_dict.get("password_plain", ""))
-			register_request.device_fingerprint = str(payload_dict.get("device_fingerprint", ""))
-			var auto_login := bool(payload_dict.get("auto_login", false))
-			if auto_login:
+			register_request.username = str(request_payload.get("username", ""))
+			register_request.password_plain = str(request_payload.get("password_plain", ""))
+			register_request.device_fingerprint = str(request_payload.get("device_fingerprint", ""))
+			var should_auto_login := bool(request_payload.get("auto_login", false))
+			if should_auto_login:
 				var auth_result := AuthService.register_and_login(register_request, true)
 				if bool(auth_result.get("success", false)):
 					_activate_gateway_session(String(auth_result.get("account_id", "")), String(auth_result.get("session_token", "")))
@@ -64,11 +64,11 @@ static func dispatch(request: ClientRequestEnvelopeDTO, _gateway: WorldGatewayFS
 
 		"LOGIN_LOCAL", "LOGIN_COMPOSITE":
 			var composite_request := AccountCompositeAuthDTO.Request.new()
-			composite_request.username = str(payload_dict.get("username", ""))
-			composite_request.password_plain = str(payload_dict.get("password_plain", ""))
-			composite_request.device_fingerprint = str(payload_dict.get("device_fingerprint", ""))
+			composite_request.username = str(request_payload.get("username", ""))
+			composite_request.password_plain = str(request_payload.get("password_plain", ""))
+			composite_request.device_fingerprint = str(request_payload.get("device_fingerprint", ""))
 			var default_mode := AccountCompositeAuthDTO.MODE_LOGIN_ONLY if request.action_type == "LOGIN_LOCAL" else AccountCompositeAuthDTO.MODE_AUTO
-			composite_request.action_mode = str(payload_dict.get("action_mode", default_mode))
+			composite_request.action_mode = str(request_payload.get("action_mode", default_mode))
 			var auth_response := AuthService.composite_authenticate(composite_request)
 			if auth_response.success:
 				_activate_gateway_session(auth_response.account_id, auth_response.session_token)
@@ -83,7 +83,7 @@ static func dispatch(request: ClientRequestEnvelopeDTO, _gateway: WorldGatewayFS
 			)
 
 		"LOGIN_GUEST":
-			var device_fingerprint := str(payload_dict.get("device_fingerprint", ""))
+			var device_fingerprint := str(request_payload.get("device_fingerprint", ""))
 			var guest_account := AuthService.create_guest_account(device_fingerprint)
 			var guest_repository := AccountRepository.get_instance()
 			if guest_repository != null:
@@ -110,7 +110,7 @@ static func dispatch(request: ClientRequestEnvelopeDTO, _gateway: WorldGatewayFS
 			)
 
 		"LIST_CHARACTERS":
-			var target_account_id := str(payload_dict.get("account_id", request.account_id))
+			var target_account_id := str(request_payload.get("account_id", request.account_id))
 			var listed_account := _load_account_or_null(target_account_id)
 			var slots := AccountSlotBindingSolver.to_frontend_character_slots(listed_account) if listed_account != null else []
 			return UnifiedProtocolFactory.create_response(
@@ -120,19 +120,19 @@ static func dispatch(request: ClientRequestEnvelopeDTO, _gateway: WorldGatewayFS
 			)
 
 		"CLEAR_SLOT":
-			var clear_account_id := str(payload_dict.get("account_id", request.account_id))
-			var clear_slot_id := str(payload_dict.get("slot_id", ""))
+			var clear_account_id := str(request_payload.get("account_id", request.account_id))
+			var clear_slot_id := str(request_payload.get("slot_id", ""))
 			var clear_account := _load_account_or_null(clear_account_id)
 			if clear_account == null:
 				return UnifiedProtocolFactory.create_response(
 					request.request_id, false, {}, "ERR_ACCOUNT_NOT_FOUND", "Target account not found"
 				)
 			var clear_result := AccountSlotBindingSolver.clear_slot(clear_account, clear_slot_id)
-			var clear_succeeded := bool(clear_result.get("success", false))
+			var is_clear_succeeded := bool(clear_result.get("success", false))
 			return UnifiedProtocolFactory.create_response(
-				request.request_id, clear_succeeded, clear_result,
-				"" if clear_succeeded else String(clear_result.get("error_code", "ERR_CLEAR_SLOT_FAILED")),
-				"Slot cleared successfully" if clear_succeeded else "Failed to clear character slot"
+				request.request_id, is_clear_succeeded, clear_result,
+				"" if is_clear_succeeded else String(clear_result.get("error_code", "ERR_CLEAR_SLOT_FAILED")),
+				"Slot cleared successfully" if is_clear_succeeded else "Failed to clear character slot"
 			)
 
 		"LOGOUT_ACCOUNT":
@@ -140,19 +140,19 @@ static func dispatch(request: ClientRequestEnvelopeDTO, _gateway: WorldGatewayFS
 			if active_gateway != null:
 				active_gateway.logout()
 			var logout_result := AuthService.logout_session(request.session_token, request.account_id)
-			var logout_succeeded := bool(logout_result.get("success", false))
+			var is_logout_succeeded := bool(logout_result.get("success", false))
 			WorldSessionRuntimeService.revoke_account_session()
 			HumanControlLeaseManager.release_lease()
-			var home_view_model := AccountHomeViewModelBuilder.build_account_home_view_model("", str(payload_dict.get("locale", "")))
+			var home_view_model := AccountHomeViewModelBuilder.build_account_home_view_model("", str(request_payload.get("locale", "")))
 			logout_result["account_home_vm"] = home_view_model
 			return UnifiedProtocolFactory.create_response(
-				request.request_id, logout_succeeded, logout_result,
-				"" if logout_succeeded else String(logout_result.get("error_code", "ERR_LOGOUT_FAILED")),
-				"Account logged out and runtime credentials revoked" if logout_succeeded else "Logout failed"
+				request.request_id, is_logout_succeeded, logout_result,
+				"" if is_logout_succeeded else String(logout_result.get("error_code", "ERR_LOGOUT_FAILED")),
+				"Account logged out and runtime credentials revoked" if is_logout_succeeded else "Logout failed"
 			)
 
 		"GET_ACCOUNT_HOME_VIEW_MODEL":
-			var home_view_model := AccountHomeViewModelBuilder.build_account_home_view_model(request.session_token, str(payload_dict.get("locale", "")))
+			var home_view_model := AccountHomeViewModelBuilder.build_account_home_view_model(request.session_token, str(request_payload.get("locale", "")))
 			return UnifiedProtocolFactory.create_response(
 				request.request_id, true, home_view_model, "", "Account home view model retrieved successfully"
 			)

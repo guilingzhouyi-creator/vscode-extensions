@@ -19,16 +19,16 @@ static func _accumulate_stat_map(stat_map: Dictionary, total_modifiers: Dictiona
 		if total_modifiers.has(stat_key):
 			total_modifiers[stat_key] += float(stat_map[stat_key])
 
-static func _accumulate_slot_item(item: ItemEntity, rune_definitions: Dictionary, total_modifiers: Dictionary) -> void:
-	total_modifiers["total_mass_kg"] += item.mass_kg
-	total_modifiers["total_armor"] += float(item.combat_metrics.get("effective_armor", 0.0))
+static func _accumulate_slot_item(equipped_item: ItemEntity, rune_definitions: Dictionary, total_modifiers: Dictionary) -> void:
+	total_modifiers["total_mass_kg"] += equipped_item.mass_kg
+	total_modifiers["total_armor"] += float(equipped_item.combat_metrics.get("effective_armor", 0.0))
 
-	var dynamic_affixes: Array = item.affix_sockets.get("dynamic_affixes", [])
+	var dynamic_affixes: Array = equipped_item.affix_sockets.get("dynamic_affixes", [])
 	for dynamic_affix in dynamic_affixes:
 		if dynamic_affix is Dictionary:
 			_accumulate_stat_map(dynamic_affix, total_modifiers)
 
-	var runes: Array = item.affix_sockets.get("imprinted_runes", [])
+	var runes: Array = equipped_item.affix_sockets.get("imprinted_runes", [])
 	for rune_id in runes:
 		var raw_definition: Variant = rune_definitions.get(str(rune_id))
 		if raw_definition is Dictionary:
@@ -47,9 +47,9 @@ static func evaluate_total_modifiers(loadout: EquipmentLoadoutAggregate) -> Dict
 	var rune_definitions: Dictionary = GameConfig.get_dict("domains.equipment", "rune_modifiers", {})
 
 	for slot_name in loadout.slots:
-		var item: ItemEntity = loadout.slots[slot_name]
-		if item != null:
-			_accumulate_slot_item(item, rune_definitions, total_modifiers)
+		var equipped_item: ItemEntity = loadout.slots[slot_name]
+		if equipped_item != null:
+			_accumulate_slot_item(equipped_item, rune_definitions, total_modifiers)
 
 	return total_modifiers
 

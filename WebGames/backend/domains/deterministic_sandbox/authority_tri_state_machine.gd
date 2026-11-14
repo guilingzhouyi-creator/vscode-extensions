@@ -52,11 +52,11 @@ func transition_mode(new_mode: int) -> bool:
 
 ## 输入连续性审计：脱同步超阈 / AP 透支（时序作弊）拦截，合法返回 VERIFIED_VALID
 ## 契约：|client_tick - server_tick| > max_allowed_desync_ticks → DESYNC_DETECTED；
-##       current_ap + command_ap_cost < 透支阈值 → CHEAT_DETECTED（valid=false）；
+##       current_action_points + command_action_points_cost < 透支阈值 → CHEAT_DETECTED（valid=false）；
 ##       状态/原因文案键来自 config/deterministic.json 的 authority.status / reasons。
 ## 性能：常量级判定，无循环与瞬态分配。
-func audit_input_continuity(client_tick: int, server_tick: int, command_ap_cost: int, current_ap: int) -> Dictionary:
-	var ap_overflow_threshold: int = GameConfig.get_int("domains.deterministic", "authority/ap_overflow_threshold", -10)
+func audit_input_continuity(client_tick: int, server_tick: int, command_action_points_cost: int, current_action_points: int) -> Dictionary:
+	var action_points_overflow_threshold: int = GameConfig.get_int("domains.deterministic", "authority/ap_overflow_threshold", -10)
 
 	var tick_gap: int = absi(client_tick - server_tick)
 	if tick_gap > max_allowed_desync_ticks:
@@ -67,7 +67,7 @@ func audit_input_continuity(client_tick: int, server_tick: int, command_ap_cost:
 		}
 
 	# 时序作弊拦截：AP 透支严重且无合法势能（单帧消耗远大于存量）
-	if current_ap + command_ap_cost < ap_overflow_threshold:
+	if current_action_points + command_action_points_cost < action_points_overflow_threshold:
 		return {
 			"status": GameConfig.get_string("domains.deterministic", "authority/status/cheat", "CHEAT_DETECTED"),
 			"valid": false,

@@ -15,51 +15,51 @@ const BUILTIN_COMMANDS: Array[String] = ["give", "gold", "god", "time"]
 
 ## 注册内置 GM 命令（启动装配时调用；具名静态 handler，防静态注册表悬垂 Callable）
 static func register_default_commands() -> void:
-	var gm_level: int = AdminPermissionAggregate.AdminLevel.LEVEL_GAME_MASTER
+	var required_admin_level: int = AdminPermissionAggregate.AdminLevel.LEVEL_GAME_MASTER
 	CommandRegistryEngine.register_command(
-		"give", _give_handler, gm_level,
+		"give", _give_handler, required_admin_level,
 		"发放注册表物品", "用法: /give <统一英文名> [数量]（如 /give mithril_longsword 3）"
 	)
 	CommandRegistryEngine.register_command(
-		"gold", _gold_handler, gm_level,
+		"gold", _gold_handler, required_admin_level,
 		"发放金币", "用法: /gold <数量>"
 	)
 	CommandRegistryEngine.register_command(
-		"god", _god_handler, gm_level,
+		"god", _god_handler, required_admin_level,
 		"上帝模式", "用法: /god"
 	)
 	CommandRegistryEngine.register_command(
-		"time", _time_handler, gm_level,
+		"time", _time_handler, required_admin_level,
 		"世界时钟快进", "用法: /time <月数>"
 	)
 
 ## 注销内置 GM 命令（测试隔离与热重载场景调用）
 static func unregister_default_commands() -> void:
-	for cmd in BUILTIN_COMMANDS:
-		CommandRegistryEngine.unregister_command(str(cmd))
+	for command_spec in BUILTIN_COMMANDS:
+		CommandRegistryEngine.unregister_command(str(command_spec))
 
 ## 具名静态 handler（禁 lambda）：从 context 取 admin 与领域对象，桥接沙盒求解器。
 ## 参数规范（唯一合法形态）：/give <统一英文名> [数量]；不接受 "id" 前缀、中文名或数字 ID。
-static func _give_handler(ast: Variant, context: Dictionary) -> Dictionary:
+static func _give_handler(command_ast: Variant, context: Dictionary) -> Dictionary:
 	var admin: AdminPermissionAggregate = context.get("admin", null)
 	if admin == null:
 		return {"success": false, "reason": "NO_ADMIN_CONTEXT"}
-	return SandboxCheatSolver.execute_cheat_command(admin, "GIVE_ITEM", ast.raw_arguments, context)
+	return SandboxCheatSolver.execute_cheat_command(admin, "GIVE_ITEM", command_ast.raw_arguments, context)
 
-static func _gold_handler(ast: Variant, context: Dictionary) -> Dictionary:
+static func _gold_handler(command_ast: Variant, context: Dictionary) -> Dictionary:
 	var admin: AdminPermissionAggregate = context.get("admin", null)
 	if admin == null:
 		return {"success": false, "reason": "NO_ADMIN_CONTEXT"}
-	return SandboxCheatSolver.execute_cheat_command(admin, "GIVE_GOLD", ast.raw_arguments, context)
+	return SandboxCheatSolver.execute_cheat_command(admin, "GIVE_GOLD", command_ast.raw_arguments, context)
 
-static func _god_handler(ast: Variant, context: Dictionary) -> Dictionary:
+static func _god_handler(command_ast: Variant, context: Dictionary) -> Dictionary:
 	var admin: AdminPermissionAggregate = context.get("admin", null)
 	if admin == null:
 		return {"success": false, "reason": "NO_ADMIN_CONTEXT"}
-	return SandboxCheatSolver.execute_cheat_command(admin, "GOD_MODE", ast.raw_arguments, context)
+	return SandboxCheatSolver.execute_cheat_command(admin, "GOD_MODE", command_ast.raw_arguments, context)
 
-static func _time_handler(ast: Variant, context: Dictionary) -> Dictionary:
+static func _time_handler(command_ast: Variant, context: Dictionary) -> Dictionary:
 	var admin: AdminPermissionAggregate = context.get("admin", null)
 	if admin == null:
 		return {"success": false, "reason": "NO_ADMIN_CONTEXT"}
-	return SandboxCheatSolver.execute_cheat_command(admin, "ADVANCE_TIME", ast.raw_arguments, context)
+	return SandboxCheatSolver.execute_cheat_command(admin, "ADVANCE_TIME", command_ast.raw_arguments, context)

@@ -18,16 +18,16 @@ static func _valid_cdkeys() -> Dictionary:
 ## 兑换核销：货币入账 + 注册表物品发放；item_id 按 canonical_id 解析，
 ## 缺失/未登记/背包满一律严格拒绝且不消耗兑换码。
 static func redeem_cdkey(
-	cdkey: String,
+	cdkey_code: String,
 	account_id: String,
 	wallet: CharacterWalletEntity,
 	inventory: WearableInventoryAggregate,
 	catalog: ItemRegistryCatalog,
 	library: AccountItemLibrary = null
 ) -> Dictionary:
-	var clean_key: String = cdkey.strip_edges().to_upper()
-	var valid := _valid_cdkeys()
-	if not valid.has(clean_key):
+	var clean_key: String = cdkey_code.strip_edges().to_upper()
+	var valid_cdkeys := _valid_cdkeys()
+	if not valid_cdkeys.has(clean_key):
 		var invalid_message := GameConfig.get_string("narratives.chat_command", "cdkey_invalid", "Invalid or expired CDKey: %s") % clean_key
 		return {"success": false, "reason": invalid_message}
 
@@ -36,7 +36,7 @@ static func redeem_cdkey(
 		var redeemed_message := GameConfig.get_string("narratives.chat_command", "cdkey_redeemed", "CDKey already redeemed by this account.")
 		return {"success": false, "reason": redeemed_message}
 
-	var reward: Dictionary = valid[clean_key] as Dictionary
+	var reward: Dictionary = valid_cdkeys[clean_key] as Dictionary
 	# 注册表三元组发放：item_id 必填且须为已登记 canonical_id
 	var item_id := str(reward.get("item_id", ""))
 	if item_id.is_empty():
@@ -49,10 +49,10 @@ static func redeem_cdkey(
 
 	var fallback := GameConfig.get_string("domains.chat_command", "item_defaults/custom_name", "神秘礼包")
 	var display_name := str(reward.get("item_name", fallback))
-	var item := ItemInstanceFactory.build_instance(prototype, display_name, "CDK_", GameConfig.get_string("domains.chat_command", "reward/item_id_prefix", "CDKEY_REWARD_"))
+	var reward_item := ItemInstanceFactory.build_instance(prototype, display_name, "CDK_", GameConfig.get_string("domains.chat_command", "reward/item_id_prefix", "CDKEY_REWARD_"))
 	# 原子性：先落物品，成功后才入账货币并核销兑换码——任一步失败整体回滚（货币未动、码未消耗），
 	# 杜绝「背包满 → 反复重试刷取金币」漏洞
-	if not inventory.add_item(item):
+	if not inventory.add_item(reward_item):
 		var inventory_full_message := GameConfig.get_string("narratives.chat_command", "cdkey_inventory_full", "Inventory full, reward not granted: %s") % clean_key
 		return {"success": false, "reason": inventory_full_message}
 

@@ -14,13 +14,13 @@ extends RefCounted
 ## 切换系统维护状态并向全局广播维护公告
 static func set_maintenance(
 	board: BulletinBoardAggregate,
-	enable_maintenance: bool,
+	should_enable_maintenance: bool,
 	duration_seconds: int = 3600,
 	current_utc: int = 0,
 	custom_message: String = ""
 ) -> Dictionary:
-	board.server_maintenance_mode = enable_maintenance
-	board.maintenance_end_timestamp_utc = current_utc + duration_seconds if enable_maintenance else 0
+	board.server_maintenance_mode = should_enable_maintenance
+	board.maintenance_end_timestamp_utc = current_utc + duration_seconds if should_enable_maintenance else 0
 	# 未显式指定时回退到配置文案，避免同一句公告在代码里多处重复
 	board.maintenance_notice_msg = custom_message if custom_message != "" else _notice_message()
 

@@ -53,12 +53,12 @@ static func evaluate(metrics: Dictionary, rules: Dictionary) -> Dictionary:
 		return { "allowed": true, "combinator": combinator, "failed_rule_id": "", "failed_metric": "" }
 
 	for rule in rule_list:
-		var passed := _evaluate_rule(metrics, rule)
+		var is_rule_passed := _evaluate_rule(metrics, rule)
 		if rule.get("negate", false):
-			passed = not passed
-		if combinator == "OR" and passed:
+			is_rule_passed = not is_rule_passed
+		if combinator == "OR" and is_rule_passed:
 			return { "allowed": true, "combinator": combinator, "failed_rule_id": "", "failed_metric": "" }
-		if combinator == "AND" and not passed:
+		if combinator == "AND" and not is_rule_passed:
 			return {
 				"allowed": false,
 				"combinator": combinator,
@@ -67,12 +67,12 @@ static func evaluate(metrics: Dictionary, rules: Dictionary) -> Dictionary:
 			}
 
 	# AND 全过 或 OR 全败
-	var all_passed := (combinator != "OR")
+	var is_all_passed := (combinator != "OR")
 	return {
-		"allowed": all_passed,
+		"allowed": is_all_passed,
 		"combinator": combinator,
-		"failed_rule_id": "" if all_passed else String(rule_list[rule_list.size() - 1].get("rule_id", "")),
-		"failed_metric": "" if all_passed else String(rule_list[rule_list.size() - 1].get("metric_key", ""))
+		"failed_rule_id": "" if is_all_passed else String(rule_list[rule_list.size() - 1].get("rule_id", "")),
+		"failed_metric": "" if is_all_passed else String(rule_list[rule_list.size() - 1].get("metric_key", ""))
 	}
 
 ## 单规则判定（operator 白名单外的非法配置受控判定失败）

@@ -19,8 +19,8 @@ class_name DeterministicReplayEngine extends RefCounted
 ##       不产生部分指纹；返回 { final_hp, final_ap, total_damage, final_hash, step_count }。
 ## 性能：单遍输入扫描 + 单遍回放循环，无嵌套瞬态分配。
 static func simulate_replay(
-	initial_hp: float,
-	initial_ap: int,
+	initial_health_points: float,
+	initial_action_points: int,
 	inputs: Array
 ) -> Dictionary:
 	# 0. 输入预扫描：tick 严格递增非负、action 必须在 PhysicalVerbRegistry
@@ -45,8 +45,8 @@ static func simulate_replay(
 	var fingerprint_format := GameConfig.get_string("domains.deterministic", "fingerprint/format", "T%d:HP%.1f:AP%d:D%.1f")
 	var summary_separator := GameConfig.get_string("domains.deterministic", "fingerprint/summary_separator", ";")
 
-	var hp := initial_hp
-	var ap := initial_ap
+	var health_points := initial_health_points
+	var action_points := initial_action_points
 	var total_damage_dealt: float = 0.0
 	var state_fingerprints: Array[String] = []
 
@@ -56,22 +56,22 @@ static func simulate_replay(
 		var roll: float = float(lcg_value % lcg_modulus) / float(lcg_modulus)
 
 		var verb: Dictionary = PhysicalVerbRegistry.get_verb(snapshot.action_command)
-		var base_ap: int = int(verb.get("base_ap", -2))
-		ap += base_ap
+		var base_action_points: int = int(verb.get("base_ap", -2))
+		action_points += base_action_points
 
 		var step_damage: float = base_damage * float(verb.get("k_mom", 1.0)) * (1.0 + random_coefficient * roll)
 		total_damage_dealt += step_damage
-		hp = maxf(0.0, hp - step_damage)
+		health_points = maxf(0.0, health_points - step_damage)
 
-		var step_fingerprint: Variant = fingerprint_format % [snapshot.tick, hp, ap, step_damage]
+		var step_fingerprint: Variant = fingerprint_format % [snapshot.tick, health_points, action_points, step_damage]
 		state_fingerprints.append(step_fingerprint)
 
 	var summary_text: String = summary_separator.join(state_fingerprints)
 	var final_hash: String = summary_text.sha256_text()
 
 	return {
-		"final_hp": hp,
-		"final_ap": ap,
+		"final_hp": health_points,
+		"final_ap": action_points,
 		"total_damage": total_damage_dealt,
 		"final_hash": final_hash,
 		"step_count": inputs.size()

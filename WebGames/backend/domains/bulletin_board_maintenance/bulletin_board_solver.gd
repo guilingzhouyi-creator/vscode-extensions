@@ -22,12 +22,12 @@ static func check_login_permission(
 
 	if board.server_maintenance_mode:
 		if not is_gm_account:
-			var remain_secs := maxi(0, board.maintenance_end_timestamp_utc - current_utc)
+			var remaining_seconds := maxi(0, board.maintenance_end_timestamp_utc - current_utc)
 			return {
 				"allow_login": false,
 				"error_code": "ERR_SERVER_MAINTENANCE",
-				"remain_seconds": remain_secs,
-				"message": _msg("remaining_minutes") % [board.maintenance_notice_msg, int(remain_secs / 60.0)]
+				"remain_seconds": remaining_seconds,
+				"message": _msg("remaining_minutes") % [board.maintenance_notice_msg, int(remaining_seconds / 60.0)]
 			}
 
 	return { "allow_login": true, "message": _msg("entry_allowed") }

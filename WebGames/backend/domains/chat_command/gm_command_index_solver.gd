@@ -67,8 +67,8 @@ func page_pool_size() -> int:
 ## 查询补全页：前缀过滤「最近窗口」，窗口为空时回退默认命令目录；
 ## 返回的 entries 来自回收页缓冲池（同一次查询内的数组对象会被后续查询复用）。
 func query(prefix: String) -> Dictionary:
-	var matched := _filtered(prefix)
-	var total: int = min(matched.size(), _window_size())
+	var matched_commands := _filtered(prefix)
+	var total: int = min(matched_commands.size(), _window_size())
 	var page_size := maxi(1, _page_size())
 	var total_pages := ceili(float(total) / float(page_size)) if total > 0 else 0
 	_cursor_page = clampi(_cursor_page, 0, maxi(0, total_pages - 1))
@@ -76,7 +76,7 @@ func query(prefix: String) -> Dictionary:
 	if total_pages > 0:
 		var start := _cursor_page * page_size
 		for entry_index in range(start, min(start + page_size, total)):
-			entries.append(matched[entry_index])
+			entries.append(matched_commands[entry_index])
 	return {
 		"success": true,
 		"entries": entries,
@@ -102,10 +102,10 @@ func reset_cursor() -> void:
 
 ## 最近适配补全：返回最近使用中首个前缀匹配的命令（MRU 序），未命中返回空
 func apply_recent_completion(prefix: String) -> Dictionary:
-	var matched := _filtered(prefix)
-	if matched.is_empty():
+	var matched_commands := _filtered(prefix)
+	if matched_commands.is_empty():
 		return {"success": false, "command": ""}
-	return {"success": true, "command": "/" + str(matched[0])}
+	return {"success": true, "command": "/" + str(matched_commands[0])}
 
 # ==============================================================================
 # 内部实现

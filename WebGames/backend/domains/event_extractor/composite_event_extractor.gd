@@ -127,10 +127,10 @@ static func _merge_primitive_into_dto(composite_event: CompositeEventDTO, primit
 	var currency_delta_map: Dictionary = primitive_event.get("currency_delta", {})
 	for currency_key in currency_delta_map:
 		composite_event.add_currency_delta(str(currency_key), int(currency_delta_map[currency_key]))
-	var meta_map: Dictionary = primitive_event.get("meta", {})
-	for meta_key in meta_map:
-		if not composite_event.meta.has(meta_key):
-			composite_event.meta[meta_key] = meta_map[meta_key]
+	var metadata_map: Dictionary = primitive_event.get("meta", {})
+	for metadata_key in metadata_map:
+		if not composite_event.meta.has(metadata_key):
+			composite_event.meta[metadata_key] = metadata_map[metadata_key]
 	if composite_event.timestamp_utc == 0:
 		composite_event.timestamp_utc = int(primitive_event.get("timestamp_utc", 0))
 
@@ -219,16 +219,16 @@ static func _normalize_primitive(raw_event: Variant) -> Dictionary:
 			"timestamp_utc": telemetry_event.timestamp_utc
 		}
 	elif raw_event is Dictionary:
-		var event_dict: Dictionary = raw_event
+		var event_dictionary: Dictionary = raw_event
 		primitive_event = {
-			"account_id": str(event_dict.get("account_id", "")),
-			"event_type": str(event_dict.get("event_type", "")),
-			"canonical_id": str(event_dict.get("canonical_id", "")),
-			"quantity": int(event_dict.get("quantity", 0)),
-			"transaction_id": str(event_dict.get("transaction_id", "")),
-			"currency_delta": event_dict.get("currency_delta", {}),
-			"meta": event_dict.get("meta", {}),
-			"timestamp_utc": int(event_dict.get("timestamp_utc", 0))
+			"account_id": str(event_dictionary.get("account_id", "")),
+			"event_type": str(event_dictionary.get("event_type", "")),
+			"canonical_id": str(event_dictionary.get("canonical_id", "")),
+			"quantity": int(event_dictionary.get("quantity", 0)),
+			"transaction_id": str(event_dictionary.get("transaction_id", "")),
+			"currency_delta": event_dictionary.get("currency_delta", {}),
+			"meta": event_dictionary.get("meta", {}),
+			"timestamp_utc": int(event_dictionary.get("timestamp_utc", 0))
 		}
 	else:
 		return {}
@@ -255,8 +255,8 @@ static func _materialize_raw_events(events: Array, libraries: Dictionary, catalo
 ## 规则解析：优先采用原始事件 meta.rule_id 显式指定的规则（多规则同源事件时消歧）；
 ## 缺省回退 source_event 首匹配；无规则命中回退 raw（逐条/原始组合）
 static func _resolve_rule(primitive_event: Dictionary, grouping_rules: Array) -> Dictionary:
-	var meta: Dictionary = primitive_event.get("meta", {})
-	var explicit_id := str(meta.get("rule_id", ""))
+	var metadata_map: Dictionary = primitive_event.get("meta", {})
+	var explicit_id := str(metadata_map.get("rule_id", ""))
 	if not explicit_id.is_empty():
 		for raw_rule in grouping_rules:
 			var rule: Dictionary = raw_rule as Dictionary

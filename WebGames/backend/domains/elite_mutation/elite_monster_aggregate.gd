@@ -69,9 +69,9 @@ func _apply_single_affix(affix_id: String) -> void:
 	var stat_modifiers: Variant = affix_definition.get("stat_mods")
 	if not (stat_modifiers is Dictionary):
 		return
-	var modifiers_dict: Dictionary = stat_modifiers as Dictionary
+	var stat_modifiers_map: Dictionary = stat_modifiers as Dictionary
 	for pair in _ELITE_STAT_MOD_KEYS:
 		var raw_key: String = pair[0]
 		var stat_key: String = pair[1]
-		if modifiers_dict.has(raw_key):
-			physiology.base_coefficients[stat_key] = float(physiology.base_coefficients.get(stat_key, 1.0)) * float(modifiers_dict[raw_key])
+		if stat_modifiers_map.has(raw_key):
+			physiology.base_coefficients[stat_key] = float(physiology.base_coefficients.get(stat_key, 1.0)) * float(stat_modifiers_map[raw_key])

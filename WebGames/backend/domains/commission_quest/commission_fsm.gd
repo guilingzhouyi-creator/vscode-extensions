@@ -29,10 +29,10 @@ static func accept_commission(
 	duration_seconds: int = 86400,
 	transaction_id: String = "" # 可选幂等键
 ) -> Dictionary:
-	var resolved_tx_id := transaction_id if not transaction_id.is_empty() \
+	var resolved_transaction_id := transaction_id if not transaction_id.is_empty() \
 		else "COMMISSION_ACCEPT_%s_%s" % [commission.commission_id, str(Time.get_ticks_usec())]
-	if _completed_transactions.has(resolved_tx_id):
-		return _completed_transactions[resolved_tx_id]
+	if _completed_transactions.has(resolved_transaction_id):
+		return _completed_transactions[resolved_transaction_id]
 
 	if commission.status != CommissionAggregate.CommissionStatus.POSTED_AVAILABLE:
 		return {
@@ -62,14 +62,14 @@ static func accept_commission(
 	commission.accept_timestamp_utc = current_time_utc
 	commission.deadline_timestamp_utc = current_time_utc + duration_seconds
 
-	var result := {
+	var acceptance_result := {
 		"success": true,
 		"commission_id": commission.commission_id,
 		"deadline_utc": commission.deadline_timestamp_utc
 	}
-	_completed_transactions[resolved_tx_id] = result.duplicate(true)
+	_completed_transactions[resolved_transaction_id] = acceptance_result.duplicate(true)
 	_prune_completed()
-	return result
+	return acceptance_result
 
 ## 交付验收结算：返还保证金 + 净赏金入账，公会税入金库，置 SETTLED_SUCCESS
 static func settle_successful_commission(
@@ -78,10 +78,10 @@ static func settle_successful_commission(
 	guild_treasury: OrganizationAggregate,
 	transaction_id: String = "" # 可选幂等键
 ) -> Dictionary:
-	var resolved_tx_id := transaction_id if not transaction_id.is_empty() \
+	var resolved_transaction_id := transaction_id if not transaction_id.is_empty() \
 		else "COMMISSION_SETTLE_%s_%s" % [commission.commission_id, str(Time.get_ticks_usec())]
-	if _completed_transactions.has(resolved_tx_id):
-		return _completed_transactions[resolved_tx_id]
+	if _completed_transactions.has(resolved_transaction_id):
+		return _completed_transactions[resolved_transaction_id]
 
 	if commission.status != CommissionAggregate.CommissionStatus.ACCEPTED_IN_PROGRESS and commission.status != CommissionAggregate.CommissionStatus.COMPLETED_PENDING:
 		return {
@@ -105,15 +105,15 @@ static func settle_successful_commission(
 
 	commission.status = CommissionAggregate.CommissionStatus.SETTLED_SUCCESS
 
-	var result := {
+	var settlement_result := {
 		"success": true,
 		"total_gold_received": total_payout_gold,
 		"crystals_received": payout_split["net_crystals_to_adventurer"],
 		"guild_tax_gold": payout_split["tax_gold_to_guild"]
 	}
-	_completed_transactions[resolved_tx_id] = result.duplicate(true)
+	_completed_transactions[resolved_transaction_id] = settlement_result.duplicate(true)
 	_prune_completed()
-	return result
+	return settlement_result
 
 ## 违约处置：没收保证金进公会金库，置 FAILED_DEFAULTED
 static func handle_commission_breach(
@@ -121,10 +121,10 @@ static func handle_commission_breach(
 	guild_treasury: OrganizationAggregate,
 	transaction_id: String = "" # 可选幂等键
 ) -> Dictionary:
-	var resolved_tx_id := transaction_id if not transaction_id.is_empty() \
+	var resolved_transaction_id := transaction_id if not transaction_id.is_empty() \
 		else "COMMISSION_BREACH_%s_%s" % [commission.commission_id, str(Time.get_ticks_usec())]
-	if _completed_transactions.has(resolved_tx_id):
-		return _completed_transactions[resolved_tx_id]
+	if _completed_transactions.has(resolved_transaction_id):
+		return _completed_transactions[resolved_transaction_id]
 
 	if commission.status != CommissionAggregate.CommissionStatus.ACCEPTED_IN_PROGRESS:
 		return {
@@ -137,14 +137,14 @@ static func handle_commission_breach(
 		guild_treasury.treasury_gold_coins += commission.security_deposit_required
 
 	commission.status = CommissionAggregate.CommissionStatus.FAILED_DEFAULTED
-	var result := {
+	var breach_result := {
 		"success": true,
 		"forfeited_deposit": commission.security_deposit_required,
 		"penalty_applied": true
 	}
-	_completed_transactions[resolved_tx_id] = result.duplicate(true)
+	_completed_transactions[resolved_transaction_id] = breach_result.duplicate(true)
 	_prune_completed()
-	return result
+	return breach_result
 
 # ==============================================================================
 # 配置读取

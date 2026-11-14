@@ -15,31 +15,31 @@ class_name GenericBerserkFSM extends RefCounted
 # ==============================================================================
 
 ## 狂暴触发判定：血线阈值或战斗超时 → L2 系数乘性修正 + 狂暴等级 + 叙事广播
-## 契约：已狂暴时直接返回 true（幂等，不重复叠加）；max_hp 下限钳制 1.0 防除零；
+## 契约：已狂暴时直接返回 true（幂等，不重复叠加）；max_health_points 下限钳制 1.0 防除零；
 ##       HP 占比 ≤ berserk_health_threshold 或 combat_duration_ticks 超阈即触发。
 static func check_and_trigger_berserk(
 	monster: EliteMonsterAggregate,
-	current_hp: float,
-	max_hp: float,
+	current_health_points: float,
+	max_health_points: float,
 	combat_duration_ticks: int = 0
 ) -> bool:
 	if monster.is_berserk:
 		return true
 
-	var hp_ratio: float = current_hp / maxf(1.0, max_hp)
+	var health_ratio: float = current_health_points / maxf(1.0, max_health_points)
 	var ticks_threshold := GameConfig.get_int("domains.elite", "berserk_fsm/duration_ticks_threshold", 500)
-	var time_exceeded := (combat_duration_ticks >= ticks_threshold)
+	var is_time_exceeded := (combat_duration_ticks >= ticks_threshold)
 
-	if hp_ratio <= monster.berserk_health_threshold or time_exceeded:
+	if health_ratio <= monster.berserk_health_threshold or is_time_exceeded:
 		monster.is_berserk = true
-		var str_mult := GameConfig.get_float("domains.elite", "berserk_fsm/str_multiplier", 1.50)
+		var strength_multiplier := GameConfig.get_float("domains.elite", "berserk_fsm/str_multiplier", 1.50)
 		# 狂暴 = L2 系数修正（乘性）：等级不变，底层实际值联动
-		monster.physiology.base_coefficients["STR"] = float(monster.physiology.base_coefficients.get("STR", 1.0)) * str_mult
+		monster.physiology.base_coefficients["STR"] = float(monster.physiology.base_coefficients.get("STR", 1.0)) * strength_multiplier
 		monster.rage_level = GameConfig.get_float("domains.elite", "berserk_fsm/rage_level", 100.0)
 
-		var pct := int((str_mult - 1.0) * 100)
+		var bonus_percentage := int((strength_multiplier - 1.0) * 100)
 		EventBusCore.get_instance().emit_narrative_by_key(
-			"elite/berserk_trigger", "eco_swarm", [monster.species_name, pct]
+			"elite/berserk_trigger", "eco_swarm", [monster.species_name, bonus_percentage]
 		)
 		return true
 

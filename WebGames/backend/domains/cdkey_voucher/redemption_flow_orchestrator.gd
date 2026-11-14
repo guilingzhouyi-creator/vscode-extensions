@@ -118,7 +118,7 @@ static func compensate_stale_pending(
 ) -> Dictionary:
 	if not GameConfig.get_bool("domains.cdkey_voucher", "redemption/compensation/enabled", true):
 		return {"success": true, "scanned": 0, "retried": 0, "released": 0, "skipped": 0}
-	var ttl_seconds := maxi(0, GameConfig.get_int("domains.cdkey_voucher", "redemption/compensation/ttl_seconds", 180))
+	var time_to_live_seconds := maxi(0, GameConfig.get_int("domains.cdkey_voucher", "redemption/compensation/ttl_seconds", 180))
 	var max_retry := maxi(0, GameConfig.get_int("domains.cdkey_voucher", "redemption/compensation/max_retry", 3))
 	var scanned := 0
 	var retried := 0
@@ -145,7 +145,7 @@ static func compensate_stale_pending(
 			_records.erase(transaction_id)
 			released += 1
 			continue
-		if current_time_utc - pending_since < ttl_seconds:
+		if current_time_utc - pending_since < time_to_live_seconds:
 			skipped += 1
 			continue
 		# 到期重试：投递（mail_id 由派发管线唯一生成，避免重试冲突信箱同 id）

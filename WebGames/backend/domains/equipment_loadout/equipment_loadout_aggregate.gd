@@ -43,13 +43,13 @@ func get_equipped_item(slot_name: String) -> ItemEntity:
 	return slots.get(slot_name, null)
 
 ## 装备：替换旧物（旧物置 UNOWNED）并置新物 EQUIPPED，返回旧物
-func equip(slot_name: String, item: ItemEntity) -> ItemEntity:
+func equip(slot_name: String, equipment_item: ItemEntity) -> ItemEntity:
 	if not slots.has(slot_name):
 		return null
 	var previous_item: Variant = slots[slot_name]
-	slots[slot_name] = item
-	if item is ItemEntity:
-		item.container_state = "EQUIPPED"
+	slots[slot_name] = equipment_item
+	if equipment_item is ItemEntity:
+		equipment_item.container_state = "EQUIPPED"
 	if previous_item is ItemEntity:
 		previous_item.container_state = "UNOWNED"
 	return previous_item
@@ -66,13 +66,13 @@ func unequip(slot_name: String) -> ItemEntity:
 
 ## 按实例引用反查槽位并卸下（处置销毁已穿戴物品时与 inventory 侧联动清槽）；
 ## 未持有该实例返回空串。O(槽位数) 线性查找，槽位数为个位数常数。
-func unequip_item_ref(item: ItemEntity) -> String:
-	if item == null:
+func unequip_item_ref(target_item: ItemEntity) -> String:
+	if target_item == null:
 		return ""
 	for slot_name in slots:
-		if slots[slot_name] == item:
+		if slots[slot_name] == target_item:
 			slots[slot_name] = null
-			item.container_state = "UNOWNED"
+			target_item.container_state = "UNOWNED"
 			return slot_name
 	return ""
 
@@ -90,11 +90,11 @@ func serialize() -> Dictionary:
 	return { "loadout_id": loadout_id, "loadout_name": loadout_name, "slots": serialized_slots }
 
 ## 从字典重建战备套（槽位键作实例判别子，同模板多件迁移 UID 互异）
-static func deserialize(data: Dictionary) -> EquipmentLoadoutAggregate:
+static func deserialize(serialized_loadout: Dictionary) -> EquipmentLoadoutAggregate:
 	var loadout := EquipmentLoadoutAggregate.new()
-	loadout.loadout_id = data.get("loadout_id", GameConfig.get_string("domains.equipment", "loadout_defaults/fallback_id", "LOADOUT_01"))
-	loadout.loadout_name = data.get("loadout_name", GameConfig.get_string("domains.equipment", "loadout_defaults/fallback_name", "战备套"))
-	var raw_slots: Variant = data.get("slots", {})
+	loadout.loadout_id = serialized_loadout.get("loadout_id", GameConfig.get_string("domains.equipment", "loadout_defaults/fallback_id", "LOADOUT_01"))
+	loadout.loadout_name = serialized_loadout.get("loadout_name", GameConfig.get_string("domains.equipment", "loadout_defaults/fallback_name", "战备套"))
+	var raw_slots: Variant = serialized_loadout.get("slots", {})
 	for slot_key in raw_slots:
 		if loadout.slots.has(slot_key) and raw_slots[slot_key] is Dictionary:
 			loadout.slots[slot_key] = ItemEntity.deserialize(raw_slots[slot_key]) # 槽位键作实例判别子：同模板多件迁移 UID 互异
@@ -127,7 +127,7 @@ func restore_slots(slot_snapshot: Dictionary, inventory: WearableInventoryAggreg
 	for slot_name in slot_snapshot:
 		if not slots.has(slot_name):
 			continue
-		var item: ItemEntity = inventory.find_item_by_item_uid(str(slot_snapshot[slot_name])) if inventory != null else null
-		if item != null:
-			slots[slot_name] = item
-			item.container_state = "EQUIPPED"
+		var restored_item: ItemEntity = inventory.find_item_by_item_uid(str(slot_snapshot[slot_name])) if inventory != null else null
+		if restored_item != null:
+			slots[slot_name] = restored_item
+			restored_item.container_state = "EQUIPPED"

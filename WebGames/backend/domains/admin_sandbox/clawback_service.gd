@@ -179,12 +179,12 @@ static func clawback_item_prototype(
 	var inventory_snapshot := inventory.snapshot()
 
 	var matches: Array = []
-	for item in inventory.storage_items:
-		if item is ItemEntity and item.template_id == canonical_id:
-			matches.append(item)
-	for item in inventory.equipped_slots.values():
-		if item is ItemEntity and item.template_id == canonical_id:
-			matches.append(item)
+	for stored_item in inventory.storage_items:
+		if stored_item is ItemEntity and stored_item.template_id == canonical_id:
+			matches.append(stored_item)
+	for equipped_item in inventory.equipped_slots.values():
+		if equipped_item is ItemEntity and equipped_item.template_id == canonical_id:
+			matches.append(equipped_item)
 	var actual := mini(quantity, matches.size())
 	if actual <= 0:
 		return {
@@ -248,25 +248,25 @@ static func clawback_item_instance(
 		}
 	var transaction_id: String = str(transaction_begin["tx_id"])
 
-	var item: ItemEntity = inventory.find_item_by_item_uid(item_uid) if not item_uid.is_empty() else inventory.find_item_by_item_id(item_id)
-	if item == null:
+	var target_item: ItemEntity = inventory.find_item_by_item_uid(item_uid) if not item_uid.is_empty() else inventory.find_item_by_item_id(item_id)
+	if target_item == null:
 		return {
 			"success": false,
 			"error_code": "CLAWBACK_NOTHING_TO_CLAW",
 			"message": _msg("clawback_nothing_to_claw")
 		}
-	if inventory.remove_owned_item(item) == WearableInventoryAggregate.RemovalOutcome.NOT_FOUND:
+	if inventory.remove_owned_item(target_item) == WearableInventoryAggregate.RemovalOutcome.NOT_FOUND:
 		return {"success": false, "error_code": "CLAWBACK_NOT_ATOMIC", "audit_id": transaction_id}
 	if library != null:
-		ItemStatisticsSolver.record_item_event(library, ItemStatisticsSolver.EVENT_ITEM_CLAWED_BACK, item.template_id, 1, null, null, {
-			"uid": item.item_uid,
+		ItemStatisticsSolver.record_item_event(library, ItemStatisticsSolver.EVENT_ITEM_CLAWED_BACK, target_item.template_id, 1, null, null, {
+			"uid": target_item.item_uid,
 			"transaction_id": "CLAWBACK_ITEM"
 		})
 	_commit_clawback_tx(admin, "CLAWBACK_ITEM_INSTANCE", transaction_id, {
 		"audit_id": transaction_id,
-		"reason": reason, "item_id": item_id, "item_uid": item.item_uid, "template_id": item.template_id, "actual_clawed": 1
+		"reason": reason, "item_id": item_id, "item_uid": target_item.item_uid, "template_id": target_item.template_id, "actual_clawed": 1
 	})
-	return {"success": true, "item_id": item_id, "item_uid": item.item_uid, "template_id": item.template_id, "actual_clawed": 1, "audit_id": transaction_id}
+	return {"success": true, "item_id": item_id, "item_uid": target_item.item_uid, "template_id": target_item.template_id, "actual_clawed": 1, "audit_id": transaction_id}
 
 # ==============================================================================
 # 内部实现
