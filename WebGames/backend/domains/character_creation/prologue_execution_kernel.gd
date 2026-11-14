@@ -33,138 +33,138 @@ static func boot_character_prologue(opening: OpeningEventStreamDTO, race_id: Str
 			return {"success": false, "error_code": "UNBOUND_RACE_ID", "unwired_slot": "race_id", "message": "种族标识未接线(UNBOUND)，禁止静默回退默认种族"}
 		effective_race = GameConfig.get_string("domains.character_creation", "defaults/default_race_id", "HUMAN")
 
-	var ctx := CharacterPrologueContext.new()
-	ctx.account_id = opening.account_id
-	ctx.character_id = opening.character_id
-	ctx.character_name = opening.character_name
-	ctx.race_id = effective_race
-	ctx.assigned_start_location_id = opening.starting_location_id
-	ctx.assigned_opening_quest_id = opening.opening_quest_line_id
-	ctx.created_timestamp_utc = int(Time.get_unix_time_from_system())
-	ctx.is_active = true
-	ctx.current_stage = 1
-	ctx.step_index = 0
+	var prologue_context := CharacterPrologueContext.new()
+	prologue_context.account_id = opening.account_id
+	prologue_context.character_id = opening.character_id
+	prologue_context.character_name = opening.character_name
+	prologue_context.race_id = effective_race
+	prologue_context.assigned_start_location_id = opening.starting_location_id
+	prologue_context.assigned_opening_quest_id = opening.opening_quest_line_id
+	prologue_context.created_timestamp_utc = int(Time.get_unix_time_from_system())
+	prologue_context.is_active = true
+	prologue_context.current_stage = 1
+	prologue_context.step_index = 0
 
 	# 1. 提取并缓存初始模板参数
-	var runtime_placeholders := ProloguePlaceholderResolver.extract_placeholders(ctx)
-	ctx.runtime_placeholders = runtime_placeholders
+	var runtime_placeholders := ProloguePlaceholderResolver.extract_placeholders(prologue_context)
+	prologue_context.runtime_placeholders = runtime_placeholders
 
 	# 2. 发放初始装备（幂等保护在 Dispatcher 内）
-	var kit_result := StarterLoadoutDispatcher.dispatch_starter_kit(ctx)
+	var kit_result := StarterLoadoutDispatcher.dispatch_starter_kit(prologue_context)
 
 	# 3. 结构化事件列表（事件与状态彻底解耦）
 	var structured_mutations: Array[Dictionary] = [
-		{"type": "CharacterCreated", "character_id": ctx.character_id, "name": ctx.character_name},
-		{"type": "LocationAssigned", "location_id": ctx.assigned_start_location_id},
+		{"type": "CharacterCreated", "character_id": prologue_context.character_id, "name": prologue_context.character_name},
+		{"type": "LocationAssigned", "location_id": prologue_context.assigned_start_location_id},
 		{"type": "EquipmentGranted", "kit_id": kit_result.get("kit_id", ""), "gold": kit_result.get("gold", 0)},
 		{"type": "DialogueReady", "npc_target": runtime_placeholders.get("NPC_TARGET", "")}
 	]
 
 	# 4. 生成第一步事件数据包（阶段配置经 domains.character_creation prologue_stages 驱动）
-	var stages_cfg: Dictionary = GameConfig.get_dict("domains.character_creation", "prologue_stages", {})
-	var stage1_cfg: Dictionary = stages_cfg.get("1", {})
-	var stage1_key := str(stage1_cfg.get("narrative_key", "narrative/prologue/awakening"))
+	var stages_config: Dictionary = GameConfig.get_dict("domains.character_creation", "prologue_stages", {})
+	var stage1_config: Dictionary = stages_config.get("1", {})
+	var stage1_key := str(stage1_config.get("narrative_key", "narrative/prologue/awakening"))
 	var template := GameConfig.get_string(
 		"narratives.prologue_i18n", stage1_key,
 		"【苏醒】晨曦降临，开拓者 {PLAYER_NAME} 缓缓睁开双眼……"
 	)
-	var text_res := ProloguePlaceholderResolver.resolve_template(template, ctx.runtime_placeholders)
+	var text_result := ProloguePlaceholderResolver.resolve_template(template, prologue_context.runtime_placeholders)
 
 	var packet := PrologueEventPacketDTO.new()
-	packet.account_id = ctx.account_id
-	packet.character_id = ctx.character_id
-	packet.character_name = ctx.character_name
+	packet.account_id = prologue_context.account_id
+	packet.character_id = prologue_context.character_id
+	packet.character_name = prologue_context.character_name
 	packet.current_stage = 1
 	packet.step_index = 0
-	packet.narrative_text = text_res.get("text", "")
-	packet.available_actions = _to_string_array(stage1_cfg.get("available_actions", ["WAKE_UP", "NEXT"]))
+	packet.narrative_text = text_result.get("text", "")
+	packet.available_actions = _to_string_array(stage1_config.get("available_actions", ["WAKE_UP", "NEXT"]))
 	packet.reserved_payload = {"mutations": structured_mutations}
 
-	return {"success": true, "context": ctx, "packet": packet, "kit": kit_result}
+	return {"success": true, "context": prologue_context, "packet": packet, "kit": kit_result}
 
 # ==============================================================================
-# 二、配置驱动单向阶段流转（Stage 1 -> 2 -> 3 -> 4 闭环完结）
+# 二、配置驱动单向阶段流转（Stage 1 -> 2 -> 3 -> 4 完整流程完结）
 # ==============================================================================
 
 ## 推进角色序章单向阶段流转（阶段表由 domains.character_creation prologue_stages 配置驱动）。
 static func advance_prologue_step(
-	ctx: CharacterPrologueContext,
+	prologue_context: CharacterPrologueContext,
 	action: String = "NEXT",
 	action_payload: Dictionary = {}
 ) -> Dictionary:
-	if ctx == null:
+	if prologue_context == null:
 		return {"success": false, "error_code": "NULL_CONTEXT", "message": "序章上下文为空"}
-	if ctx.is_completed:
+	if prologue_context.is_completed:
 		return {"success": false, "error_code": "PROLOGUE_ALREADY_COMPLETED", "message": "该角色序章已完结"}
-	if not ctx.is_active:
+	if not prologue_context.is_active:
 		return {"success": false, "error_code": "INACTIVE_CONTEXT", "message": "序章上下文未激活"}
 
 	for payload_key in action_payload.keys():
-		ctx.runtime_placeholders[payload_key] = action_payload[payload_key]
+		prologue_context.runtime_placeholders[payload_key] = action_payload[payload_key]
 
-	ctx.current_stage += 1
-	ctx.step_index += 1
+	prologue_context.current_stage += 1
+	prologue_context.step_index += 1
 
-	var stages_cfg: Dictionary = GameConfig.get_dict("domains.character_creation", "prologue_stages", {})
-	var stage_key := str(mini(ctx.current_stage, 4))
-	var stage_def: Dictionary = stages_cfg.get(stage_key, stages_cfg.get("4", {}))
-	var is_term := bool(stage_def.get("is_terminal", ctx.current_stage >= 4))
-	if is_term:
-		ctx.current_stage = int(stage_key)
-		ctx.is_completed = true
-		ctx.is_active = false
+	var stages_config: Dictionary = GameConfig.get_dict("domains.character_creation", "prologue_stages", {})
+	var stage_key := str(mini(prologue_context.current_stage, 4))
+	var stage_definition: Dictionary = stages_config.get(stage_key, stages_config.get("4", {}))
+	var is_terminal := bool(stage_definition.get("is_terminal", prologue_context.current_stage >= 4))
+	if is_terminal:
+		prologue_context.current_stage = int(stage_key)
+		prologue_context.is_completed = true
+		prologue_context.is_active = false
 
-	var narrative_sub_key := str(stage_def.get("narrative_key", "narrative/prologue/completed"))
-	var available_actions := _to_string_array(stage_def.get("available_actions", ["ENTER_WORLD"]))
-	var mutations := _build_stage_mutations(ctx, str(stage_def.get("mutation_type", "PrologueCompleted")), action)
+	var narrative_sub_key := str(stage_definition.get("narrative_key", "narrative/prologue/completed"))
+	var available_actions := _to_string_array(stage_definition.get("available_actions", ["ENTER_WORLD"]))
+	var mutations := _build_stage_mutations(prologue_context, str(stage_definition.get("mutation_type", "PrologueCompleted")), action)
 
 	var template := GameConfig.get_string("narratives.prologue_i18n", narrative_sub_key, "")
-	var text_res := ProloguePlaceholderResolver.resolve_template(template, ctx.runtime_placeholders)
+	var text_result := ProloguePlaceholderResolver.resolve_template(template, prologue_context.runtime_placeholders)
 
 	var packet := PrologueEventPacketDTO.new()
-	packet.account_id = ctx.account_id
-	packet.character_id = ctx.character_id
-	packet.character_name = ctx.character_name
-	packet.current_stage = ctx.current_stage
-	packet.step_index = ctx.step_index
-	packet.narrative_text = text_res.get("text", "")
+	packet.account_id = prologue_context.account_id
+	packet.character_id = prologue_context.character_id
+	packet.character_name = prologue_context.character_name
+	packet.current_stage = prologue_context.current_stage
+	packet.step_index = prologue_context.step_index
+	packet.narrative_text = text_result.get("text", "")
 	packet.available_actions = available_actions
 	packet.reserved_payload = {"mutations": mutations}
 
-	broadcast_step(packet, narrative_sub_key, ctx.runtime_placeholders)
-	if ctx.is_completed:
+	broadcast_step(packet, narrative_sub_key, prologue_context.runtime_placeholders)
+	if prologue_context.is_completed:
 		var creation_hooks: Dictionary = GameConfig.get_dict("domains.character_creation", "creation_hooks", {})
 		EventBusCore.get_instance().emit_domain_event("prologue.completed", {
-			"account_id": ctx.account_id,
-			"character_id": ctx.character_id,
-			"race_id": ctx.race_id,
+			"account_id": prologue_context.account_id,
+			"character_id": prologue_context.character_id,
+			"race_id": prologue_context.race_id,
 			"configured_hooks": creation_hooks.get("on_prologue_completed", [])
 		})
 
 	return {
 		"success": true,
-		"context": ctx,
+		"context": prologue_context,
 		"packet": packet,
-		"is_completed": ctx.is_completed
+		"is_completed": prologue_context.is_completed
 	}
 
 
-static func _to_string_array(raw: Variant) -> Array[String]:
-	var out: Array[String] = []
-	if raw is Array:
-		for item in raw:
-			out.append(str(item))
-	return out
+static func _to_string_array(raw_value: Variant) -> Array[String]:
+	var string_items: Array[String] = []
+	if raw_value is Array:
+		for item in raw_value:
+			string_items.append(str(item))
+	return string_items
 
 
-static func _build_stage_mutations(ctx: CharacterPrologueContext, mutation_type: String, action: String) -> Array[Dictionary]:
+static func _build_stage_mutations(prologue_context: CharacterPrologueContext, mutation_type: String, action: String) -> Array[Dictionary]:
 	var mutations: Array[Dictionary] = []
 	if mutation_type == "EnvironmentExplored":
-		mutations.append({"type": "EnvironmentExplored", "location": ctx.assigned_start_location_id, "action": action})
+		mutations.append({"type": "EnvironmentExplored", "location": prologue_context.assigned_start_location_id, "action": action})
 	elif mutation_type == "DialogueTriggered":
-		mutations.append({"type": "DialogueTriggered", "npc": ctx.runtime_placeholders.get("NPC_TARGET", "UNBOUND_NPC"), "action": action})
+		mutations.append({"type": "DialogueTriggered", "npc": prologue_context.runtime_placeholders.get("NPC_TARGET", "UNBOUND_NPC"), "action": action})
 	else:
-		mutations.append({"type": mutation_type, "character_id": ctx.character_id, "step_index": ctx.step_index})
+		mutations.append({"type": mutation_type, "character_id": prologue_context.character_id, "step_index": prologue_context.step_index})
 	return mutations
 
 # ==============================================================================
@@ -172,47 +172,47 @@ static func _build_stage_mutations(ctx: CharacterPrologueContext, mutation_type:
 # ==============================================================================
 
 ## 为指定角色序章上下文动态创建并初始化 通用因果 DAG 编排引擎会话。
-## 契约：ctx 为空或该种族/身世无对应 DAG 时返回 null（调用方判空降级为顺序推进）。
+## 契约：prologue_context 为空或该种族/身世无对应 DAG 时返回 null（调用方判空降级为顺序推进）。
 static func create_dag_session(
-	ctx: CharacterPrologueContext,
+	prologue_context: CharacterPrologueContext,
 	origin_id: String = "",
 	adapted_mod_manifest: Dictionary = {}
 ) -> NarrativeDagExecutionEngine:
-	if ctx == null:
+	if prologue_context == null:
 		return null
 	var effective_origin: String = origin_id
 	if effective_origin.is_empty():
-		effective_origin = str(ctx.runtime_placeholders.get("ORIGIN_ID", ctx.runtime_placeholders.get("origin_id", "")))
-	var dag := PrologueDagRegistry.resolve_prologue_dag(ctx.race_id, effective_origin, adapted_mod_manifest)
+		effective_origin = str(prologue_context.runtime_placeholders.get("ORIGIN_ID", prologue_context.runtime_placeholders.get("origin_id", "")))
+	var dag := PrologueDagRegistry.resolve_prologue_dag(prologue_context.race_id, effective_origin, adapted_mod_manifest)
 	if dag == null:
 		return null
 	var engine := NarrativeDagExecutionEngine.new()
-	engine.initialize_with_graph(dag, ctx.runtime_placeholders)
+	engine.initialize_with_graph(dag, prologue_context.runtime_placeholders)
 	return engine
 
 ## 将当前活跃的 DAG 节点渲染为 PrologueEventPacketDTO 数据包
 static func render_dag_node_packet(
 	node: NarrativeDAGNode,
-	ctx: CharacterPrologueContext,
+	prologue_context: CharacterPrologueContext,
 	adapted_mod_manifest: Dictionary = {},
 	step_index: int = 0
 ) -> PrologueEventPacketDTO:
-	if node == null or ctx == null:
+	if node == null or prologue_context == null:
 		return PrologueEventPacketDTO.new()
 
-	var text_res := ProloguePlaceholderResolver.resolve_narrative_key(
+	var text_result := ProloguePlaceholderResolver.resolve_narrative_key(
 		node.narrative_key,
-		ctx.runtime_placeholders,
+		prologue_context.runtime_placeholders,
 		adapted_mod_manifest,
 		node.inline_text
 	)
 
 	var actions: Array[String] = []
 	if not node.choices.is_empty():
-		for c in node.choices:
-			var act: String = str(c.get("action", c.get("choice_id", c.get("id", "")))).strip_edges()
-			if not act.is_empty():
-				actions.append(act)
+		for choice_entry in node.choices:
+			var action_name: String = str(choice_entry.get("action", choice_entry.get("choice_id", choice_entry.get("id", "")))).strip_edges()
+			if not action_name.is_empty():
+				actions.append(action_name)
 	if actions.is_empty():
 		if node.node_type == NarrativeDAGNode.NodeType.TERMINAL_EXIT:
 			actions.append("ENTER_WORLD")
@@ -220,12 +220,12 @@ static func render_dag_node_packet(
 			actions.append("NEXT")
 
 	var packet := PrologueEventPacketDTO.new()
-	packet.account_id = ctx.account_id
-	packet.character_id = ctx.character_id
-	packet.character_name = ctx.character_name
-	packet.current_stage = ctx.current_stage
+	packet.account_id = prologue_context.account_id
+	packet.character_id = prologue_context.character_id
+	packet.character_name = prologue_context.character_name
+	packet.current_stage = prologue_context.current_stage
 	packet.step_index = step_index
-	packet.narrative_text = str(text_res.get("text", ""))
+	packet.narrative_text = str(text_result.get("text", ""))
 	packet.available_actions = actions
 	packet.reserved_payload = {
 		"node_id": node.node_id,
@@ -237,82 +237,82 @@ static func render_dag_node_packet(
 
 static func _apply_mutation_entry(
 	mutation_entry: Variant,
-	ctx: CharacterPrologueContext,
+	prologue_context: CharacterPrologueContext,
 	profile: Variant,
 	settled: Array[Dictionary]
 ) -> void:
 	if mutation_entry is Dictionary:
 		var mutation_record: Dictionary = (mutation_entry as Dictionary).duplicate(true)
-		var m_type: String = str(mutation_record.get("type", mutation_record.get("event", "")))
-		_apply_single_mutation(m_type, mutation_record, ctx, profile)
+		var mutation_type: String = str(mutation_record.get("type", mutation_record.get("event", "")))
+		_apply_single_mutation(mutation_type, mutation_record, prologue_context, profile)
 		settled.append(mutation_record)
 	elif mutation_entry is String:
 		var label_record: Dictionary = {"type": str(mutation_entry)}
-		_apply_single_mutation(str(mutation_entry), label_record, ctx, profile)
+		_apply_single_mutation(str(mutation_entry), label_record, prologue_context, profile)
 		settled.append(label_record)
 
 ## 执行并应用 DAG 节点突变（PrologueCompleted、Gold、Attribute、Location）
 static func apply_dag_mutations(
 	mutations: Array,
-	ctx: CharacterPrologueContext,
+	prologue_context: CharacterPrologueContext,
 	profile: Variant = null
 ) -> Array[Dictionary]:
 	var settled: Array[Dictionary] = []
-	if ctx == null:
+	if prologue_context == null:
 		return settled
 
 	for mutation_entry in mutations:
-		_apply_mutation_entry(mutation_entry, ctx, profile, settled)
+		_apply_mutation_entry(mutation_entry, prologue_context, profile, settled)
 
 	return settled
 
 static func _apply_single_mutation(
-	m_type: String,
-	d: Dictionary,
-	ctx: CharacterPrologueContext,
+	mutation_type: String,
+	mutation_data: Dictionary,
+	prologue_context: CharacterPrologueContext,
 	profile: Variant
 ) -> void:
-	match m_type:
+	match mutation_type:
 		"PrologueCompleted":
-			ctx.is_completed = true
-			ctx.is_active = false
+			prologue_context.is_completed = true
+			prologue_context.is_active = false
 		"GoldGranted", "ModifyGold":
-			var gold_delta: int = int(d.get("amount", d.get("gold", d.get("delta", 0))))
-			_apply_gold_mutation(gold_delta, ctx, profile)
+			var gold_delta: int = int(mutation_data.get("amount", mutation_data.get("gold", mutation_data.get("delta", 0))))
+			_apply_gold_mutation(gold_delta, prologue_context, profile)
 		"AttributeModified":
-			var attr_name: String = str(d.get("attribute", d.get("attr", "")))
-			var delta: int = int(d.get("delta", d.get("value", 0)))
-			_apply_attr_mutation(attr_name, delta, profile)
+			var attribute_name: String = str(mutation_data.get("attribute", mutation_data.get("attr", "")))
+			var delta: int = int(mutation_data.get("delta", mutation_data.get("value", 0)))
+			_apply_attr_mutation(attribute_name, delta, profile)
 		"LocationAssigned":
-			var loc_id: String = str(d.get("location_id", d.get("location", "")))
-			if not loc_id.is_empty():
-				ctx.assigned_start_location_id = loc_id
-				ctx.runtime_placeholders["START_LOCATION"] = loc_id
-				ctx.runtime_placeholders["start_location"] = loc_id
+			var location_id: String = str(mutation_data.get("location_id", mutation_data.get("location", "")))
+			if not location_id.is_empty():
+				prologue_context.assigned_start_location_id = location_id
+				prologue_context.runtime_placeholders["START_LOCATION"] = location_id
+				prologue_context.runtime_placeholders["start_location"] = location_id
 
-static func _apply_gold_mutation(gold_delta: int, ctx: CharacterPrologueContext, profile: Variant) -> void:
+static func _apply_gold_mutation(gold_delta: int, prologue_context: CharacterPrologueContext, profile: Variant) -> void:
 	if profile != null:
 		if profile is CharacterProfile:
-			var curr: int = int((profile as CharacterProfile).personal_resources.get("gold", 0))
-			(profile as CharacterProfile).personal_resources["gold"] = curr + gold_delta
+			var current_gold: int = int((profile as CharacterProfile).personal_resources.get("gold", 0))
+			(profile as CharacterProfile).personal_resources["gold"] = current_gold + gold_delta
 		elif profile is Dictionary:
-			var personal_res: Dictionary = (profile as Dictionary).get("personal_resources", {})
-			personal_res["gold"] = int(personal_res.get("gold", 0)) + gold_delta
-			(profile as Dictionary)["personal_resources"] = personal_res
-	var prev_gold: int = int(ctx.runtime_placeholders.get("INITIAL_GOLD", ctx.runtime_placeholders.get("STARTER_GOLD", 0)))
-	ctx.runtime_placeholders["INITIAL_GOLD"] = str(prev_gold + gold_delta)
-	ctx.runtime_placeholders["initial_gold"] = ctx.runtime_placeholders["INITIAL_GOLD"]
+			var personal_resources: Dictionary = (profile as Dictionary).get("personal_resources", {})
+			personal_resources["gold"] = int(personal_resources.get("gold", 0)) + gold_delta
+			(profile as Dictionary)["personal_resources"] = personal_resources
+	var previous_gold: int = int(prologue_context.runtime_placeholders.get("INITIAL_GOLD", prologue_context.runtime_placeholders.get("STARTER_GOLD", 0)))
+	prologue_context.runtime_placeholders["INITIAL_GOLD"] = str(previous_gold + gold_delta)
+	prologue_context.runtime_placeholders["initial_gold"] = prologue_context.runtime_placeholders["INITIAL_GOLD"]
 
-static func _apply_attr_mutation(attr_name: String, delta: int, profile: Variant) -> void:
-	if attr_name.is_empty() or profile == null:
+static func _apply_attr_mutation(attribute_name: String, delta: int, profile: Variant) -> void:
+	if attribute_name.is_empty() or profile == null:
 		return
 	if profile is CharacterProfile:
-		var curr_val: int = int((profile as CharacterProfile).attributes.get(attr_name, 0))
-		(profile as CharacterProfile).attributes[attr_name] = curr_val + delta
+		var current_value: int = int((profile as CharacterProfile).attributes.get(attribute_name, 0))
+		(profile as CharacterProfile).attributes[attribute_name] = current_value + delta
 	elif profile is Dictionary:
-		var attrs: Dictionary = (profile as Dictionary).get("attributes", {})
-		attrs[attr_name] = int(attrs.get(attr_name, 0)) + delta
-		(profile as Dictionary)["attributes"] = attrs
+		var attributes: Dictionary = (profile as Dictionary).get("attributes", {})
+		attributes[attribute_name] = int(attributes.get(attribute_name, 0)) + delta
+		(profile as Dictionary)["attributes"] = attributes
 
 ## 执行无头全流程 MOD 试玩仿真并生成完整过程报告
 static func execute_headless_mod_playthrough(config: Dictionary) -> Dictionary:
