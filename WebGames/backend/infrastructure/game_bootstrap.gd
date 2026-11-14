@@ -28,6 +28,8 @@ const WorldArchiveRepository = preload("res://backend/domains/world_state/world_
 const AuthService = preload("res://backend/domains/account/auth_service.gd")
 const PrologueCutscenePort = preload("res://backend/domains/character_creation/prologue_cutscene_port.gd")
 const CutsceneOrchestrator = preload("res://backend/infrastructure/media/cutscene_orchestrator.gd")
+const CutsceneHookRegistry = preload("res://backend/infrastructure/media/cutscene_hook_registry.gd")
+const AssetPathResolver = preload("res://backend/infrastructure/resource_governance/asset_path_resolver.gd")
 const ClientSecretVault = preload("res://backend/infrastructure/client_secret_vault.gd")
 const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
 const SystemBaseMessages = preload("res://backend/infrastructure/logging/system_base_messages.gd")
@@ -211,9 +213,35 @@ static func quality_tier_registry() -> QualityTierRegistry:
 	_quality_registry.reload_configuration()
 	return _quality_registry
 
+## 判断当前是否运行于工程开发构建（统一代理 AssetPathResolver，隔离领域层静态引用）
+static func is_engineering_build() -> bool:
+	return AssetPathResolver.is_engineering_build()
+
 ## 查询全域引导装配流水线是否已全部就绪
 static func is_assembled() -> bool:
 	return _is_assembled
+
+## 在 MOD 覆盖层切换或清空后，同步重载下游魔法、品质、物品、过场注册表及官方基座资产映射
+static func reload_domain_registries_from_config(item_catalog: Variant = null, official_mod_id: String = "") -> Dictionary:
+	AssetPathResolver.set_active_official_mod_id(official_mod_id)
+	var summary: Dictionary = {}
+	if _magic_registry != null:
+		_magic_registry.reload_configuration()
+		summary["magic_tiers_reloaded"] = true
+	if _magic_rules != null:
+		_magic_rules.reload_configuration()
+		summary["magic_rules_reloaded"] = true
+	if _quality_registry != null:
+		_quality_registry.reload_configuration()
+		summary["quality_tiers_reloaded"] = true
+	CutsceneHookRegistry.get_instance().initialize_from_config()
+	summary["cutscene_hooks_reloaded"] = true
+	var target_catalog: Variant = item_catalog if item_catalog != null else _catalog
+	if target_catalog is ItemRegistryCatalog:
+		summary["item_catalog_sync"] = ItemLoaderPipeline.reload_from_config(target_catalog as ItemRegistryCatalog)
+	else:
+		summary["item_catalog_sync"] = {"skipped": true}
+	return summary
 
 ## 全域反装配（对称幂等）：按生命周期配置拓扑逆序清理各域运行时会话、租约、仓储、对象池并重置装配标记
 static func teardown() -> Dictionary:
@@ -255,6 +283,9 @@ static func teardown() -> Dictionary:
 	if _active_context != null:
 		_active_context.dispose()
 		_active_context = null
+	GameConfig.clear_mod_overlay_tables()
+	AssetPathResolver.set_active_official_mod_id("")
+	CutsceneHookRegistry.get_instance().initialize_from_config()
 
 	# 复位装配标记
 	_is_assembled = false

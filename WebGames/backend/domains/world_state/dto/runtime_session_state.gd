@@ -18,11 +18,14 @@ var account_id: String = ""
 var is_authenticated: bool = false
 var session_token_hash: String = ""
 var gateway_fsm: Variant = null
+var active_mods: Array = []
+var adapted_mod_manifest: Dictionary = {}
+var narrative_dag_session: RefCounted = null
 var world_id: String = ""
 var slot_id: String = ""
 var character_id: String = ""
 var character_name: String = ""
-var race_id: String = "HUMAN"
+var race_id: String = ""
 var current_location_id: String = ""
 var game_mode: int = WorldGatewayModel.GameMode.SINGLE_PLAYER
 var level: int = 1
@@ -70,9 +73,12 @@ func reset_world_fields() -> void:
 	slot_id = ""
 	character_id = ""
 	character_name = ""
-	race_id = "HUMAN"
+	race_id = ""
 	current_location_id = ""
 	game_mode = WorldGatewayModel.GameMode.UNSELECTED
+	active_mods.clear()
+	adapted_mod_manifest.clear()
+	narrative_dag_session = null
 	level = 1
 	hp_current = 100.0
 	hp_max = 100.0

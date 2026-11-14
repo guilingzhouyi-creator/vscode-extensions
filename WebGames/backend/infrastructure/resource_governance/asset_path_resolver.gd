@@ -57,6 +57,7 @@ const PREFIX_ASSETS: String = "assets/"
 static var _instance: AssetPathResolver = null
 static var _override_environment_for_test: String = ""
 static var _override_roots_for_test: Array[String] = []
+static var _active_official_mod_id: String = ""
 
 # ==============================================================================
 # 二、单例与环境模式判定
@@ -80,7 +81,16 @@ static func set_test_roots_override(roots: Array[String]) -> void:
 static func reset_for_tests() -> void:
 	_override_environment_for_test = ""
 	_override_roots_for_test.clear()
+	_active_official_mod_id = ""
 	_instance = null
+
+## 设定当前挂载的官方基础 MOD 标识（清空时传递空字符串）
+static func set_active_official_mod_id(pack_id: String) -> void:
+	_active_official_mod_id = sanitize_identifier(pack_id)
+
+## 获取当前激活的官方基础 MOD 标识
+static func get_active_official_mod_id() -> String:
+	return _active_official_mod_id
 
 ## 评估当前运行环境（工程版 vs 发行版）
 static func get_current_build_mode() -> String:
@@ -109,7 +119,7 @@ static func is_release_build() -> bool:
 # 三、官方艺术资产标准化寻址
 # ==============================================================================
 
-## 解析官方艺术资产物理路径（形参 <= 5）
+## 解析官方艺术资产物理路径（优先检索已激活的官方基础 MOD，缺失时回退至引擎内置基础设施资产根）
 static func resolve_official_asset_path(category: String, relative_subpath: String) -> String:
 	var clean_category := category.strip_edges().trim_prefix("/").trim_suffix("/")
 	var clean_subpath := relative_subpath.strip_edges().trim_prefix("/")
@@ -119,9 +129,12 @@ static func resolve_official_asset_path(category: String, relative_subpath: Stri
 	if clean_subpath.begins_with("assets/"):
 		clean_subpath = clean_subpath.trim_prefix("assets/")
 
-	if clean_category.is_empty():
-		return ROOT_OFFICIAL_ASSETS.path_join(clean_subpath)
-	return ROOT_OFFICIAL_ASSETS.path_join(clean_category).path_join(clean_subpath)
+	var joined_subpath := clean_subpath if clean_category.is_empty() else clean_category.path_join(clean_subpath)
+	if not _active_official_mod_id.is_empty():
+		var mod_candidate := resolve_mod_asset_path(_active_official_mod_id, joined_subpath)
+		if asset_exists(mod_candidate):
+			return mod_candidate
+	return ROOT_OFFICIAL_ASSETS.path_join(joined_subpath)
 
 ## 快捷解析官方 CG 视频资产物理路径
 static func resolve_official_cutscene_path(video_filename: String) -> String:
@@ -171,11 +184,41 @@ static func resolve_mod_asset_path(mod_id: String, relative_asset_path: String) 
 		var narrative_path := root_directory.path_join("narratives").path_join(clean_mod_id).path_join(DIR_ASSETS).path_join(safe_relative_path)
 		if asset_exists(narrative_path):
 			return narrative_path
+		var kmod_path := root_directory.path_join(clean_mod_id + ".kmod")
+		if FileAccess.file_exists(kmod_path) and _kmod_has_asset(kmod_path, DIR_ASSETS.path_join(safe_relative_path)):
+			return kmod_path + "!/" + DIR_ASSETS.path_join(safe_relative_path)
 
 	# 若三级级联均未探测到物理文件，返回首选沙盒物理路径（供资源探测或新建装配）
 	if is_engineering_build():
 		return ROOT_MODS_TIER0_DEV.path_join(clean_mod_id).path_join(DIR_ASSETS).path_join(safe_relative_path)
 	return ROOT_MODS_TIER2_USER_SANDBOX.path_join(clean_mod_id).path_join(DIR_ASSETS).path_join(safe_relative_path)
+
+static func _kmod_has_asset(kmod_path: String, inner_rel_path: String) -> bool:
+	var reader := ZIPReader.new()
+	if reader.open(kmod_path) != OK:
+		return false
+	var exists := reader.file_exists(inner_rel_path)
+	reader.close()
+	return exists
+
+## 从松散目录或 .kmod!/assets/... 虚路径流式读取二进制资产字节流
+static func read_mod_asset_bytes(uri_or_path: String, fallback_mod_id: String = "") -> PackedByteArray:
+	var resolved := resolve_unified_uri(uri_or_path, fallback_mod_id)
+	if resolved.is_empty():
+		return PackedByteArray()
+	var kmod_sep := resolved.find(".kmod!/")
+	if kmod_sep != -1:
+		var kmod_file := resolved.substr(0, kmod_sep + 5)
+		var inner_path := resolved.substr(kmod_sep + 7)
+		var reader := ZIPReader.new()
+		if reader.open(kmod_file) != OK:
+			return PackedByteArray()
+		var asset_bytes := reader.read_file(inner_path) if reader.file_exists(inner_path) else PackedByteArray()
+		reader.close()
+		return asset_bytes
+	if FileAccess.file_exists(resolved):
+		return FileAccess.get_file_as_bytes(resolved)
+	return PackedByteArray()
 
 # ==============================================================================
 # 五、通用 URI 协议解析引擎 (Unified URI Scheme)
@@ -187,10 +230,10 @@ static func resolve_unified_uri(uri_or_path: String, fallback_mod_id: String = "
 	if trimmed.is_empty():
 		return ""
 
-	# 1. 官方资产协议：official://media/cutscenes/intro.ogv -> res://assets/media/cutscenes/intro.ogv
+	# 1. 官方资产协议：official://... 优先查已激活官方 MOD 包，否则映射 res://assets/...
 	if trimmed.begins_with(SCHEME_OFFICIAL):
-		var relative_subpath := trimmed.trim_prefix(SCHEME_OFFICIAL)
-		return ROOT_OFFICIAL_ASSETS.path_join(sanitize_sandbox_path(relative_subpath))
+		var relative_subpath := sanitize_sandbox_path(trimmed.trim_prefix(SCHEME_OFFICIAL))
+		return resolve_official_asset_path("", relative_subpath)
 
 	# 2. 模组资产协议：mod://my_mod/assets/video.ogv 或 mod://assets/video.ogv (需 fallback_mod_id)
 	if trimmed.begins_with(SCHEME_MOD):

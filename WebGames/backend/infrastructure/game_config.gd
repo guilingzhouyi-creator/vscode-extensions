@@ -24,6 +24,8 @@ const CONFIG_DIR: String = "res://config/"
 static var _tables: Dictionary = {}
 static var _base_tables: Dictionary = {}
 static var _active_mod_overlays: Array[String] = []
+static var _active_mod_layers: Array[Dictionary] = []
+static var _purged_prefixes: Array[String] = []
 static var _loaded: bool = false
 static var _tables_mutex: Mutex = Mutex.new()
 
@@ -143,6 +145,8 @@ static func ensure_loaded() -> void:
 	_tables.clear()
 	_base_tables.clear()
 	_active_mod_overlays.clear()
+	_active_mod_layers.clear()
+	_purged_prefixes.clear()
 	var warnings: Array = []
 	GameConfigLoader.load_all_tables_into(_tables, _scan_failures, warnings)
 	_flush_loader_warnings(warnings)
@@ -256,10 +260,14 @@ static func reload_config() -> Dictionary:
 
 	var snapshot_differences: Dictionary = GameConfigLoader.diff_table_snapshots(old_tables, built)
 	_reload_counter += 1
-	_tables = built
 	_base_tables = built.duplicate(true)
-	_active_mod_overlays.clear()
 	_loaded = true
+	if _active_mod_layers.is_empty():
+		_tables = built
+		_active_mod_overlays.clear()
+		_purged_prefixes.clear()
+	else:
+		_rebuild_tables_from_active_layers()
 	_path_cache.clear()
 	EventBusCore.get_instance().emit_domain_event("config.security_reloaded", {"version": _reload_counter, "changed": snapshot_differences["changed"]})
 	return {
@@ -290,6 +298,18 @@ static func get_base_tables_snapshot() -> Dictionary:
 		_base_tables = _tables.duplicate(true)
 	return _base_tables.duplicate(true)
 
+## 按表名获取不受运行时模组覆盖影响的纯净基础表深拷贝（必要时 JIT 从磁盘装入基础快照）
+static func get_base_table_copy(table_name: String) -> Dictionary:
+	ensure_loaded()
+	var resolved_name: String = ConfigRouterEngine.resolve_table_name(table_name)
+	if not _base_tables.has(resolved_name):
+		var loaded_from_disk: Dictionary = {}
+		GameConfigLoader.ensure_table_loaded_jit(resolved_name, loaded_from_disk, _scan_failures)
+		if loaded_from_disk.has(resolved_name) and loaded_from_disk[resolved_name] is Dictionary:
+			_base_tables[resolved_name] = (loaded_from_disk[resolved_name] as Dictionary).duplicate(true)
+	var base_entry: Variant = _base_tables.get(resolved_name, {})
+	return (base_entry as Dictionary).duplicate(true) if (base_entry is Dictionary) else {}
+
 static func _erase_prefixed_tables(rebuilt_tables: Dictionary, purged_prefix: String) -> void:
 	if purged_prefix.is_empty():
 		return
@@ -304,6 +324,140 @@ static func _erase_prefixed_tables(rebuilt_tables: Dictionary, purged_prefix: St
 static func _copy_overlay_table_into(rebuilt_tables: Dictionary, overlay_table_name: String, table_content: Dictionary) -> void:
 	rebuilt_tables[overlay_table_name] = table_content.duplicate(true)
 
+static func _is_table_purged(table_name: String) -> bool:
+	for purged_prefix in _purged_prefixes:
+		if not purged_prefix.is_empty() and table_name.begins_with(purged_prefix):
+			return true
+	return false
+
+static func _normalize_layer_entry(
+	overlay_tables: Dictionary,
+	applied_pack_identifiers: Array,
+	purged_table_prefixes: Array
+) -> Dictionary:
+	var normalized_packs: Array[String] = []
+	for raw_pack_id in applied_pack_identifiers:
+		var clean_id := String(raw_pack_id).strip_edges()
+		if not clean_id.is_empty() and not normalized_packs.has(clean_id):
+			normalized_packs.append(clean_id)
+	var normalized_prefixes: Array[String] = []
+	for raw_prefix in purged_table_prefixes:
+		var clean_prefix := String(raw_prefix)
+		if not clean_prefix.is_empty() and not normalized_prefixes.has(clean_prefix):
+			normalized_prefixes.append(clean_prefix)
+	return {
+		"pack_ids": normalized_packs,
+		"overlay_tables": overlay_tables.duplicate(true),
+		"purged_table_prefixes": normalized_prefixes
+	}
+
+static func _apply_layer_purged_prefixes(
+	rebuilt_tables: Dictionary,
+	layer_prefixes: Variant
+) -> void:
+	if not (layer_prefixes is Array):
+		return
+	for raw_prefix in (layer_prefixes as Array):
+		var prefix_text := String(raw_prefix)
+		if prefix_text.is_empty():
+			continue
+		if not _purged_prefixes.has(prefix_text):
+			_purged_prefixes.append(prefix_text)
+		_erase_prefixed_tables(rebuilt_tables, prefix_text)
+
+static func _apply_layer_overlay_tables(
+	rebuilt_tables: Dictionary,
+	layer_tables: Variant,
+	overlaid_table_names: Array[String]
+) -> void:
+	if not (layer_tables is Dictionary):
+		return
+	for raw_table_key in (layer_tables as Dictionary).keys():
+		var overlay_table_name := String(raw_table_key)
+		var table_content: Variant = (layer_tables as Dictionary)[raw_table_key]
+		if table_content is Dictionary:
+			_copy_overlay_table_into(rebuilt_tables, overlay_table_name, table_content as Dictionary)
+			if not overlaid_table_names.has(overlay_table_name):
+				overlaid_table_names.append(overlay_table_name)
+
+static func _append_layer_pack_ids(layer_packs: Variant) -> void:
+	if not (layer_packs is Array):
+		return
+	for raw_pack_id in (layer_packs as Array):
+		var clean_id := String(raw_pack_id).strip_edges()
+		if not clean_id.is_empty() and not _active_mod_overlays.has(clean_id):
+			_active_mod_overlays.append(clean_id)
+
+static func _rebuild_tables_from_active_layers() -> Array[String]:
+	var rebuilt_tables: Dictionary = _base_tables.duplicate(true)
+	_purged_prefixes.clear()
+	_active_mod_overlays.clear()
+	var overlaid_table_names: Array[String] = []
+	for layer_entry in _active_mod_layers:
+		_apply_layer_purged_prefixes(rebuilt_tables, layer_entry.get("purged_table_prefixes", []))
+		_apply_layer_overlay_tables(rebuilt_tables, layer_entry.get("overlay_tables", {}), overlaid_table_names)
+		_append_layer_pack_ids(layer_entry.get("pack_ids", []))
+	_tables = rebuilt_tables
+	return overlaid_table_names
+
+## 应用有序模组层栈（每项含 pack_ids/pack_id、overlay_tables、purged_table_prefixes），原子重放构建最终表快照
+static func apply_mod_overlay_stack(layers: Array) -> Dictionary:
+	ensure_loaded()
+	if _base_tables.is_empty() and not _tables.is_empty():
+		_base_tables = _tables.duplicate(true)
+	_active_mod_layers.clear()
+	for raw_layer in layers:
+		if not (raw_layer is Dictionary):
+			continue
+		var layer_record: Dictionary = raw_layer
+		var raw_packs: Array = []
+		if layer_record.get("pack_ids") is Array:
+			raw_packs = layer_record["pack_ids"] as Array
+		elif not String(layer_record.get("pack_id", "")).strip_edges().is_empty():
+			raw_packs = [String(layer_record["pack_id"])]
+		var overlay_map: Dictionary = (layer_record.get("overlay_tables", {}) as Dictionary) if (layer_record.get("overlay_tables") is Dictionary) else {}
+		var purge_list: Array = (layer_record.get("purged_table_prefixes", []) as Array) if (layer_record.get("purged_table_prefixes") is Array) else []
+		_active_mod_layers.append(_normalize_layer_entry(overlay_map, raw_packs, purge_list))
+	_reload_counter += 1
+	var overlaid_table_names := _rebuild_tables_from_active_layers()
+	_path_cache.clear()
+	EventBusCore.get_instance().emit_domain_event("config.mod_overlay_applied", {
+		"version": _reload_counter,
+		"pack_ids": _active_mod_overlays.duplicate(),
+		"tables": overlaid_table_names
+	})
+	return {
+		"success": true,
+		"version": _reload_counter,
+		"pack_ids": _active_mod_overlays.duplicate(),
+		"overlaid_tables": overlaid_table_names
+	}
+
+## 追加单层模组运行时配置覆盖并按全量活跃层重算最终表快照（非破坏性叠层）
+static func push_mod_overlay_layer(
+	pack_id: String,
+	overlay_tables: Dictionary,
+	purged_table_prefixes: Array = []
+) -> Dictionary:
+	ensure_loaded()
+	if _base_tables.is_empty() and not _tables.is_empty():
+		_base_tables = _tables.duplicate(true)
+	_active_mod_layers.append(_normalize_layer_entry(overlay_tables, [pack_id], purged_table_prefixes))
+	_reload_counter += 1
+	var overlaid_table_names := _rebuild_tables_from_active_layers()
+	_path_cache.clear()
+	EventBusCore.get_instance().emit_domain_event("config.mod_overlay_applied", {
+		"version": _reload_counter,
+		"pack_ids": _active_mod_overlays.duplicate(),
+		"tables": overlaid_table_names
+	})
+	return {
+		"success": true,
+		"version": _reload_counter,
+		"pack_ids": _active_mod_overlays.duplicate(),
+		"overlaid_tables": overlaid_table_names
+	}
+
 ## 应用模组运行时配置覆盖层（仅变更内存表快照并递增热重载版本，不改写磁盘 JSON）
 static func apply_mod_overlay_tables(
 	overlay_tables: Dictionary,
@@ -314,26 +468,11 @@ static func apply_mod_overlay_tables(
 	if _base_tables.is_empty() and not _tables.is_empty():
 		_base_tables = _tables.duplicate(true)
 
-	var rebuilt_tables: Dictionary = _base_tables.duplicate(true)
-	for raw_prefix in purged_table_prefixes:
-		_erase_prefixed_tables(rebuilt_tables, String(raw_prefix))
-
-	var overlaid_table_names: Array[String] = []
-	for raw_table_key in overlay_tables.keys():
-		var overlay_table_name := String(raw_table_key)
-		var table_content: Variant = overlay_tables[raw_table_key]
-		if table_content is Dictionary:
-			_copy_overlay_table_into(rebuilt_tables, overlay_table_name, table_content as Dictionary)
-			overlaid_table_names.append(overlay_table_name)
-
+	_active_mod_layers.clear()
+	_active_mod_layers.append(_normalize_layer_entry(overlay_tables, applied_pack_identifiers, purged_table_prefixes))
 	_reload_counter += 1
-	_tables = rebuilt_tables
+	var overlaid_table_names := _rebuild_tables_from_active_layers()
 	_path_cache.clear()
-	_active_mod_overlays.clear()
-	for raw_pack_identifier in applied_pack_identifiers:
-		var pack_identifier := String(raw_pack_identifier).strip_edges()
-		if not pack_identifier.is_empty() and not _active_mod_overlays.has(pack_identifier):
-			_active_mod_overlays.append(pack_identifier)
 
 	EventBusCore.get_instance().emit_domain_event("config.mod_overlay_applied", {
 		"version": _reload_counter,
@@ -350,7 +489,7 @@ static func apply_mod_overlay_tables(
 ## 清空模组运行时覆盖层并原子还原至基础配置快照
 static func clear_mod_overlay_tables() -> Dictionary:
 	ensure_loaded()
-	if _active_mod_overlays.is_empty():
+	if _active_mod_overlays.is_empty() and _active_mod_layers.is_empty() and _purged_prefixes.is_empty():
 		return {
 			"success": true,
 			"had_overlay": false,
@@ -361,6 +500,8 @@ static func clear_mod_overlay_tables() -> Dictionary:
 		_tables = _base_tables.duplicate(true)
 	var cleared_packs: Array[String] = _active_mod_overlays.duplicate()
 	_active_mod_overlays.clear()
+	_active_mod_layers.clear()
+	_purged_prefixes.clear()
 	_reload_counter += 1
 	_path_cache.clear()
 
@@ -412,7 +553,7 @@ static func get_table_names() -> Array:
 	return _tables.keys()
 
 static func _ensure_table_loaded_jit_with_base(target_table: String) -> void:
-	if _tables.has(target_table):
+	if _tables.has(target_table) or _is_table_purged(target_table):
 		return
 	GameConfigLoader.ensure_table_loaded_jit(target_table, _tables, _scan_failures)
 	if _tables.has(target_table) and not _base_tables.has(target_table):

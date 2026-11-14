@@ -21,9 +21,15 @@ var pack_id: String = ""
 var pack_name: String = ""
 var version: String = "1.0.0"
 var priority: int = 100
+var pack_profile: String = "CONTENT_ADDON"
+var is_official: bool = false
+var content_sha256: String = ""
+var has_prologue_dag: bool = true
 var dependencies: Array[String] = []
 var incompatible_packs: Array[String] = []
 var ui_capabilities: Dictionary = {}
+var custom_races: Dictionary = {}
+var creation_rule_overrides: Dictionary = {}
 var custom_origins: Array[Dictionary] = []
 var custom_traits: Dictionary = {}
 var paired_presets: Array[Dictionary] = []
@@ -43,9 +49,15 @@ func reset_state() -> void:
     pack_name = ""
     version = "1.0.0"
     priority = 100
+    pack_profile = "CONTENT_ADDON"
+    is_official = false
+    content_sha256 = ""
+    has_prologue_dag = true
     dependencies.clear()
     incompatible_packs.clear()
     ui_capabilities.clear()
+    custom_races.clear()
+    creation_rule_overrides.clear()
     custom_origins.clear()
     custom_traits.clear()
     paired_presets.clear()
@@ -66,9 +78,15 @@ func to_dto() -> Dictionary:
         "pack_name": pack_name,
         "version": version,
         "priority": priority,
+        "pack_profile": pack_profile,
+        "is_official": is_official,
+        "content_sha256": content_sha256,
+        "has_prologue_dag": has_prologue_dag,
         "dependencies": dependencies.duplicate(),
         "incompatible_packs": incompatible_packs.duplicate(),
         "ui_capabilities": ui_capabilities.duplicate(true),
+        "custom_races": custom_races.duplicate(true),
+        "creation_rule_overrides": creation_rule_overrides.duplicate(true),
         "custom_origins": custom_origins.duplicate(true),
         "custom_traits": custom_traits.duplicate(true),
         "paired_presets": paired_presets.duplicate(true),
@@ -102,6 +120,13 @@ static func from_dto(serialized_manifest: Dictionary, fallback_pack_id: String =
     manifest_dto.pack_name = raw_name if not raw_name.is_empty() else manifest_dto.pack_id
     manifest_dto.version = str(serialized_manifest.get("version", "1.0.0"))
     manifest_dto.priority = int(serialized_manifest.get("priority", 100))
+    var raw_profile: String = str(serialized_manifest.get("pack_profile", "")).strip_edges().to_upper()
+    if raw_profile.is_empty() and str(serialized_manifest.get("mod_tier", "")).strip_edges().to_upper() == "TOTAL_CONVERSION":
+        raw_profile = "TOTAL_CONVERSION"
+    manifest_dto.pack_profile = raw_profile if not raw_profile.is_empty() else "CONTENT_ADDON"
+    manifest_dto.is_official = bool(serialized_manifest.get("is_official", manifest_dto.pack_profile == "OFFICIAL_BASE"))
+    manifest_dto.content_sha256 = str(serialized_manifest.get("content_sha256", "")).strip_edges()
+    manifest_dto.has_prologue_dag = bool(serialized_manifest.get("has_prologue_dag", true))
     manifest_dto.root_path = str(serialized_manifest.get("root_path", ""))
 
     var raw_dag_graphs: Variant = serialized_manifest.get("dag_graphs", {})
@@ -118,6 +143,11 @@ static func from_dto(serialized_manifest: Dictionary, fallback_pack_id: String =
     var raw_ui_capabilities: Variant = serialized_manifest.get("ui_capabilities", {})
     if raw_ui_capabilities is Dictionary:
         manifest_dto.ui_capabilities = (raw_ui_capabilities as Dictionary).duplicate(true)
+
+    _populate_indexed_dict(serialized_manifest.get("custom_races", {}), manifest_dto.custom_races, "race_id", Callable(DestinyModManifestDTO, "_normalize_race_dict"))
+    var raw_rule_overrides: Variant = serialized_manifest.get("creation_rule_overrides", {})
+    if raw_rule_overrides is Dictionary:
+        manifest_dto.creation_rule_overrides = (raw_rule_overrides as Dictionary).duplicate(true)
 
     _populate_origins_array(serialized_manifest.get("custom_origins", []), manifest_dto.custom_origins)
     _populate_indexed_dict(serialized_manifest.get("custom_traits", {}), manifest_dto.custom_traits, "trait_id", Callable(DestinyModManifestDTO, "_normalize_trait_dict"))
@@ -204,6 +234,13 @@ static func _populate_indexed_dict(raw_value: Variant, target: Dictionary, id_ke
                 normalizer.call(entry_map)
                 target[str(entry_key)] = entry_map
 
+static func _normalize_race_dict(race_entry: Dictionary) -> void:
+    if race_entry.has("id") and not race_entry.has("race_id"):
+        race_entry["race_id"] = race_entry["id"]
+    elif race_entry.has("race_id") and not race_entry.has("id"):
+        race_entry["id"] = race_entry["race_id"]
+
+
 static func _normalize_trait_dict(trait_entry: Dictionary) -> void:
     if trait_entry.has("polarity"):
         var polarity_text: String = str(trait_entry.get("polarity", "")).to_upper()
@@ -224,8 +261,8 @@ static func _normalize_kit_gold(kit: Dictionary) -> void:
     elif has_bonus and not has_initial_gold:
         kit["initial_gold"] = kit["bonus_gold"]
     elif not has_initial_gold and not has_bonus:
-        kit["initial_gold"] = 50
-        kit["bonus_gold"] = 50
+        kit["initial_gold"] = 0
+        kit["bonus_gold"] = 0
 
 static func _build_items_from_init(initial_items: Array) -> Array[Dictionary]:
     var new_items: Array[Dictionary] = []

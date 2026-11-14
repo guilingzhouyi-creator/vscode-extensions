@@ -21,12 +21,12 @@ const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/pool
 var account_id: String = ""
 var character_id: String = ""
 var character_name: String = ""
-var race_id: String = "HUMAN"
+var race_id: String = ""
 var origin_id: String = ""
 var allocated_attributes: Dictionary = {}
 var initial_inventory_items: Array = []
 var initial_gold: int = 0
-var assigned_start_location_id: String = "CENTRAL_CONTINENT"
+var assigned_start_location_id: String = ""
 var active_mods: Array = []
 var applied_mutations: Array = []
 var timestamp_utc: int = 0
@@ -41,12 +41,12 @@ func reset_state() -> void:
 	account_id = ""
 	character_id = ""
 	character_name = ""
-	race_id = "HUMAN"
+	race_id = ""
 	origin_id = ""
 	allocated_attributes.clear()
 	initial_inventory_items.clear()
 	initial_gold = 0
-	assigned_start_location_id = "CENTRAL_CONTINENT"
+	assigned_start_location_id = ""
 	active_mods.clear()
 	applied_mutations.clear()
 	timestamp_utc = 0
@@ -80,14 +80,14 @@ static func from_dto(serialized_handoff: Dictionary) -> PrologueHandoffDTO:
 	handoff.account_id = str(serialized_handoff.get("account_id", ""))
 	handoff.character_id = str(serialized_handoff.get("character_id", ""))
 	handoff.character_name = str(serialized_handoff.get("character_name", ""))
-	handoff.race_id = str(serialized_handoff.get("race_id", "HUMAN"))
+	handoff.race_id = str(serialized_handoff.get("race_id", ""))
 	handoff.origin_id = str(serialized_handoff.get("origin_id", ""))
 	var raw_attributes: Variant = serialized_handoff.get("allocated_attributes", {})
 	handoff.allocated_attributes = (raw_attributes as Dictionary).duplicate(true) if raw_attributes is Dictionary else {}
 	var raw_items: Variant = serialized_handoff.get("initial_inventory_items", [])
 	handoff.initial_inventory_items = (raw_items as Array).duplicate(true) if raw_items is Array else []
 	handoff.initial_gold = int(serialized_handoff.get("initial_gold", 0))
-	handoff.assigned_start_location_id = str(serialized_handoff.get("assigned_start_location_id", "CENTRAL_CONTINENT"))
+	handoff.assigned_start_location_id = str(serialized_handoff.get("assigned_start_location_id", ""))
 	var raw_active_mods: Variant = serialized_handoff.get("active_mods", [])
 	handoff.active_mods = (raw_active_mods as Array).duplicate(true) if raw_active_mods is Array else []
 	var raw_mutations: Variant = serialized_handoff.get("applied_mutations", [])

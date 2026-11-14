@@ -18,6 +18,14 @@ var pack_name: String = ""
 var version: String = ""
 var author: String = ""
 var engine_api_version: String = ""
+var tier: String = "TIER_1_LOGIC"
+var pack_profile: String = "CONTENT_ADDON"
+var is_official: bool = false
+var trust_tier: String = "COMMUNITY"
+var content_sha256: String = ""
+var publisher_signature: String = ""
+var provided_domains: Array[String] = []
+var has_prologue_dag: bool = true
 var priority: int = 100
 var dependencies: Array[String] = []
 var incompatible_packs: Array[String] = []
@@ -33,6 +41,14 @@ func reset_state() -> void:
     version = ""
     author = ""
     engine_api_version = ""
+    tier = "TIER_1_LOGIC"
+    pack_profile = "CONTENT_ADDON"
+    is_official = false
+    trust_tier = "COMMUNITY"
+    content_sha256 = ""
+    publisher_signature = ""
+    provided_domains.clear()
+    has_prologue_dag = true
     priority = 100
     dependencies.clear()
     incompatible_packs.clear()
@@ -51,12 +67,23 @@ func to_dto() -> Dictionary:
     var tags_copy: Array[String] = []
     tags_copy.assign(semantic_tags.duplicate())
 
+    var domains_copy: Array[String] = []
+    domains_copy.assign(provided_domains.duplicate())
+
     return {
         "pack_id": pack_id,
         "pack_name": pack_name,
         "version": version,
         "author": author,
         "engine_api_version": engine_api_version,
+        "tier": tier,
+        "pack_profile": pack_profile,
+        "is_official": is_official,
+        "trust_tier": trust_tier,
+        "content_sha256": content_sha256,
+        "publisher_signature": publisher_signature,
+        "provided_domains": domains_copy,
+        "has_prologue_dag": has_prologue_dag,
         "priority": priority,
         "dependencies": dependencies_copy,
         "incompatible_packs": incompatible_copy,
@@ -76,9 +103,24 @@ static func from_dto(serialized_payload: Dictionary) -> NarrativePackManifestDTO
     manifest.version = String(serialized_payload.get("version", ""))
     manifest.author = String(serialized_payload.get("author", ""))
     manifest.engine_api_version = String(serialized_payload.get("engine_api_version", ""))
+    manifest.tier = String(serialized_payload.get("tier", "TIER_1_LOGIC"))
+    var raw_profile: String = String(serialized_payload.get("pack_profile", "")).strip_edges().to_upper()
+    if raw_profile.is_empty() and String(serialized_payload.get("mod_tier", "")).strip_edges().to_upper() == "TOTAL_CONVERSION":
+        raw_profile = "TOTAL_CONVERSION"
+    manifest.pack_profile = raw_profile if not raw_profile.is_empty() else "CONTENT_ADDON"
+    manifest.is_official = bool(serialized_payload.get("is_official", false))
+    manifest.trust_tier = String(serialized_payload.get("trust_tier", "OFFICIAL" if manifest.is_official else "COMMUNITY"))
+    manifest.content_sha256 = String(serialized_payload.get("content_sha256", "")).strip_edges().to_lower()
+    manifest.publisher_signature = String(serialized_payload.get("publisher_signature", ""))
+    manifest.has_prologue_dag = bool(serialized_payload.get("has_prologue_dag", true))
     manifest.priority = int(serialized_payload.get("priority", 100))
     manifest.root_path = String(serialized_payload.get("root_path", ""))
     manifest.is_active = bool(serialized_payload.get("is_active", true))
+
+    var raw_domains: Variant = serialized_payload.get("provided_domains", [])
+    if raw_domains is Array:
+        for domain_id in raw_domains:
+            manifest.provided_domains.append(String(domain_id))
 
     var raw_dependencies: Variant = serialized_payload.get("dependencies", [])
     if raw_dependencies is Array:
