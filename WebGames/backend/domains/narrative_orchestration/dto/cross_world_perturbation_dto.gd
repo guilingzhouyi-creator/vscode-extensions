@@ -57,25 +57,25 @@ func to_dto() -> Dictionary:
     }
 
 ## 从字典安全反序列化为 CrossWorldPerturbationDTO 实例
-static func from_dto(data: Dictionary) -> CrossWorldPerturbationDTO:
+static func from_dto(serialized_payload: Dictionary) -> CrossWorldPerturbationDTO:
     var perturbation := CrossWorldPerturbationDTO.new()
-    if data == null or data.is_empty():
+    if serialized_payload == null or serialized_payload.is_empty():
         return perturbation
 
-    perturbation.perturbation_id = String(data.get("perturbation_id", ""))
-    perturbation.origin_world_id = String(data.get("origin_world_id", ""))
-    perturbation.emitted_timestamp_utc = int(data.get("emitted_timestamp_utc", 0))
-    perturbation.resonance_intensity = float(data.get("resonance_intensity", 1.0))
-    perturbation.decay_half_life_seconds = int(data.get("decay_half_life_seconds", 86400))
-    perturbation.flavor_i18n_key = String(data.get("flavor_i18n_key", ""))
-    perturbation.perturbation_seed = int(data.get("perturbation_seed", 0))
+    perturbation.perturbation_id = String(serialized_payload.get("perturbation_id", ""))
+    perturbation.origin_world_id = String(serialized_payload.get("origin_world_id", ""))
+    perturbation.emitted_timestamp_utc = int(serialized_payload.get("emitted_timestamp_utc", 0))
+    perturbation.resonance_intensity = float(serialized_payload.get("resonance_intensity", 1.0))
+    perturbation.decay_half_life_seconds = int(serialized_payload.get("decay_half_life_seconds", 86400))
+    perturbation.flavor_i18n_key = String(serialized_payload.get("flavor_i18n_key", ""))
+    perturbation.perturbation_seed = int(serialized_payload.get("perturbation_seed", 0))
 
-    var raw_tags: Variant = data.get("semantic_tags", [])
+    var raw_tags: Variant = serialized_payload.get("semantic_tags", [])
     if raw_tags is Array:
         for tag in raw_tags:
             perturbation.semantic_tags.append(String(tag))
 
-    var raw_visited: Variant = data.get("visited_world_ids", [])
+    var raw_visited: Variant = serialized_payload.get("visited_world_ids", [])
     if raw_visited is Array:
         for visited_world_id in raw_visited:
             perturbation.visited_world_ids.append(String(visited_world_id))

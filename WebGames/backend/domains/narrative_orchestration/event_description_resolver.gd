@@ -16,7 +16,7 @@ extends RefCounted
 static func resolve(
 	event_id: String,
 	context: Dictionary = {},
-	result: Dictionary = {},
+	execution_result: Dictionary = {},
 	locale_override: String = ""
 ) -> Dictionary:
 	# 配置存在性检查（迁移至文案单一真源 copywriting.narrative；顶层键即 event_id）
@@ -25,20 +25,20 @@ static func resolve(
 		return {"success": false, "code": "EVENT_DESC_MISSING", "event_id": event_id}
 
 	# 参数注入：context + result 只读合并（outcome 为分支选择键，不入文本参数）
-	var params := _build_params(context, result)
+	var template_parameters := _build_params(context, execution_result)
 
 	# 文本生成：统一文案核心——outcome 结果分支（缺省回退 base）+ 未填充
 	# 拦截 + 描述键登记（跨域唯一）在共享核心一处实现。
 	# 统一文案键三段式：<域 narrative>.<条目 事件ID>.<字段 desc>
 	return CopywritingResolver.resolve(
-		"narrative." + event_id + ".desc", params, str(result.get("outcome", "base")), locale_override)
+		"narrative." + event_id + ".desc", template_parameters, str(execution_result.get("outcome", "base")), locale_override)
 
 ## 参数注入：context（事件上下文）+ result（事件执行结果）只读合并（outcome 除外）
-static func _build_params(context: Dictionary, result: Dictionary) -> Dictionary:
-	var params: Dictionary = {}
+static func _build_params(context: Dictionary, execution_result: Dictionary) -> Dictionary:
+	var template_parameters: Dictionary = {}
 	for key in context.keys():
-		params[key] = context[key]
-	for key in result.keys():
+		template_parameters[key] = context[key]
+	for key in execution_result.keys():
 		if str(key) != "outcome":
-			params[key] = result[key]
-	return params
+			template_parameters[key] = execution_result[key]
+	return template_parameters

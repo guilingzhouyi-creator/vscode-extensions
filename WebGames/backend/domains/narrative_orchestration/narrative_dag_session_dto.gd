@@ -38,14 +38,14 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从输入字典反序列化还原传输对象
-static func from_dto(data: Dictionary) -> RefCounted:
+static func from_dto(serialized_payload: Dictionary) -> RefCounted:
 	var session: NarrativeDagSessionDTO = NarrativeDagSessionDTO.new()
-	if data.is_empty():
+	if serialized_payload.is_empty():
 		return session
-	session.graph_id = str(data.get("graph_id", ""))
-	session.active_node_ids.assign(data.get("active_node_ids", []))
-	session.completed_node_ids.assign(data.get("completed_node_ids", []))
-	session.runtime_context = (data.get("runtime_context", {}) as Dictionary).duplicate(true)
-	session.is_terminated = bool(data.get("is_terminated", false))
-	session.snapshot_timestamp_utc = int(data.get("snapshot_timestamp_utc", 0))
+	session.graph_id = str(serialized_payload.get("graph_id", ""))
+	session.active_node_ids.assign(serialized_payload.get("active_node_ids", []))
+	session.completed_node_ids.assign(serialized_payload.get("completed_node_ids", []))
+	session.runtime_context = (serialized_payload.get("runtime_context", {}) as Dictionary).duplicate(true)
+	session.is_terminated = bool(serialized_payload.get("is_terminated", false))
+	session.snapshot_timestamp_utc = int(serialized_payload.get("snapshot_timestamp_utc", 0))
 	return session

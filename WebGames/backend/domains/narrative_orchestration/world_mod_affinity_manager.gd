@@ -45,8 +45,8 @@ func load_world_mod_lock(world_id: String) -> Dictionary:
 	var content := file.get_as_text()
 	file.close()
 
-	var parsed_value: Variant = JSON.parse_string(content)
-	if not (parsed_value is Dictionary):
+	var parsed_lock: Variant = JSON.parse_string(content)
+	if not (parsed_lock is Dictionary):
 		return {
 			"exists": false,
 			"error": "ERR_LOCK_FILE_CORRUPTED",
@@ -54,29 +54,29 @@ func load_world_mod_lock(world_id: String) -> Dictionary:
 			"locked_packs": []
 		}
 
-	var result := (parsed_value as Dictionary).duplicate()
-	result["exists"] = true
-	result["world_id"] = world_id
-	if not result.has("locked_packs"):
-		result["locked_packs"] = []
-	return result
+	var lock_payload := (parsed_lock as Dictionary).duplicate()
+	lock_payload["exists"] = true
+	lock_payload["world_id"] = world_id
+	if not lock_payload.has("locked_packs"):
+		lock_payload["locked_packs"] = []
+	return lock_payload
 
 ## 提取包对象的基础字典（独立提取以避免循环体内瞬态堆分配）
-func _serialize_pack_entry(item: Variant) -> Dictionary:
-	if item is Dictionary:
-		return (item as Dictionary).duplicate()
-	if item is String:
+func _serialize_pack_entry(pack_entry: Variant) -> Dictionary:
+	if pack_entry is Dictionary:
+		return (pack_entry as Dictionary).duplicate()
+	if pack_entry is String:
 		return {
-			"pack_id": String(item),
+			"pack_id": String(pack_entry),
 			"version": "1.0.0",
 			"priority": 100
 		}
-	if item != null and item.has_method("to_dto"):
-		return item.to_dto()
-	if item != null and "pack_id" in item:
-		var pack_id: String = String(item.pack_id)
-		var pack_version: String = String(item.version) if "version" in item else "1.0.0"
-		var pack_priority: int = int(item.priority) if "priority" in item else 100
+	if pack_entry != null and pack_entry.has_method("to_dto"):
+		return pack_entry.to_dto()
+	if pack_entry != null and "pack_id" in pack_entry:
+		var pack_id: String = String(pack_entry.pack_id)
+		var pack_version: String = String(pack_entry.version) if "version" in pack_entry else "1.0.0"
+		var pack_priority: int = int(pack_entry.priority) if "priority" in pack_entry else 100
 		return {
 			"pack_id": pack_id,
 			"version": pack_version,
@@ -119,25 +119,25 @@ func save_world_mod_lock(world_id: String, active_packs: Array) -> Dictionary:
 	}
 
 ## 提取包标识（独立提取以避免循环体内瞬态堆分配）
-func _extract_id_from_entry(item: Variant) -> String:
-	if item is String:
-		return String(item)
-	if item is Dictionary:
-		return String((item as Dictionary).get("pack_id", ""))
-	if item != null and "pack_id" in item:
-		return String(item.pack_id)
+func _extract_id_from_entry(pack_entry: Variant) -> String:
+	if pack_entry is String:
+		return String(pack_entry)
+	if pack_entry is Dictionary:
+		return String((pack_entry as Dictionary).get("pack_id", ""))
+	if pack_entry != null and "pack_id" in pack_entry:
+		return String(pack_entry.pack_id)
 	return ""
 
 ## 对比当前世界锁定的 MOD 列表与当前安装的 MOD 并执行绑定裁定
-func verify_and_bind_world_mods(world_id: String, installed_packs: Array, allow_safe_degrade: bool = false) -> Dictionary:
+func verify_and_bind_world_mods(world_id: String, installed_packs: Array, should_allow_safe_degrade: bool = false) -> Dictionary:
 	if world_id.is_empty():
 		return {"success": false, "error": "ERR_EMPTY_WORLD_ID"}
 
-	var lock_data := load_world_mod_lock(world_id)
-	var lock_exists: bool = bool(lock_data.get("exists", false))
+	var lock_payload := load_world_mod_lock(world_id)
+	var has_lock_file: bool = bool(lock_payload.get("exists", false))
 
 	# 1. 若初次进入且无锁文件，自动以当前 active_packs 固化创建锁文件
-	if not lock_exists:
+	if not has_lock_file:
 		var save_result := save_world_mod_lock(world_id, installed_packs)
 		if not bool(save_result.get("success", false)):
 			return {"success": false, "error": "ERR_LOCK_INITIALIZE_FAILED"}
@@ -155,7 +155,7 @@ func verify_and_bind_world_mods(world_id: String, installed_packs: Array, allow_
 		if not installed_pack_id.is_empty():
 			installed_set[installed_pack_id] = true
 
-	var locked_list: Array = lock_data.get("locked_packs", [])
+	var locked_list: Array = lock_payload.get("locked_packs", [])
 	var missing_packs: Array[String] = []
 	for locked_pack in locked_list:
 		var locked_pack_id := _extract_id_from_entry(locked_pack)
@@ -171,7 +171,7 @@ func verify_and_bind_world_mods(world_id: String, installed_packs: Array, allow_
 		}
 
 	# 4. 缺少关键 MOD 且不允许安全降级：拦截防坏档
-	if not allow_safe_degrade:
+	if not should_allow_safe_degrade:
 		return {
 			"success": false,
 			"error": "ERR_MISSING_CRITICAL_MOD",

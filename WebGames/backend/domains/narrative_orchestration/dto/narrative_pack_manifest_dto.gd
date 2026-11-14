@@ -66,31 +66,31 @@ func to_dto() -> Dictionary:
     }
 
 ## 从字典安全反序列化为 NarrativePackManifestDTO 实例
-static func from_dto(data: Dictionary) -> NarrativePackManifestDTO:
+static func from_dto(serialized_payload: Dictionary) -> NarrativePackManifestDTO:
     var manifest := NarrativePackManifestDTO.new()
-    if data == null or data.is_empty():
+    if serialized_payload == null or serialized_payload.is_empty():
         return manifest
 
-    manifest.pack_id = String(data.get("pack_id", ""))
-    manifest.pack_name = String(data.get("pack_name", ""))
-    manifest.version = String(data.get("version", ""))
-    manifest.author = String(data.get("author", ""))
-    manifest.engine_api_version = String(data.get("engine_api_version", ""))
-    manifest.priority = int(data.get("priority", 100))
-    manifest.root_path = String(data.get("root_path", ""))
-    manifest.is_active = bool(data.get("is_active", true))
+    manifest.pack_id = String(serialized_payload.get("pack_id", ""))
+    manifest.pack_name = String(serialized_payload.get("pack_name", ""))
+    manifest.version = String(serialized_payload.get("version", ""))
+    manifest.author = String(serialized_payload.get("author", ""))
+    manifest.engine_api_version = String(serialized_payload.get("engine_api_version", ""))
+    manifest.priority = int(serialized_payload.get("priority", 100))
+    manifest.root_path = String(serialized_payload.get("root_path", ""))
+    manifest.is_active = bool(serialized_payload.get("is_active", true))
 
-    var raw_dependencies: Variant = data.get("dependencies", [])
+    var raw_dependencies: Variant = serialized_payload.get("dependencies", [])
     if raw_dependencies is Array:
         for dependency_id in raw_dependencies:
             manifest.dependencies.append(String(dependency_id))
 
-    var raw_incompatible: Variant = data.get("incompatible_packs", [])
+    var raw_incompatible: Variant = serialized_payload.get("incompatible_packs", [])
     if raw_incompatible is Array:
         for incompatible_id in raw_incompatible:
             manifest.incompatible_packs.append(String(incompatible_id))
 
-    var raw_tags: Variant = data.get("semantic_tags", [])
+    var raw_tags: Variant = serialized_payload.get("semantic_tags", [])
     if raw_tags is Array:
         for tag in raw_tags:
             manifest.semantic_tags.append(String(tag))

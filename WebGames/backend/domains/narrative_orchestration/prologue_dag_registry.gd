@@ -86,7 +86,7 @@ static func _evaluate_routing_rule(
     empty_condition: Dictionary,
     origin_id: String,
     race_id: String,
-    match_origin_only: bool
+    should_match_origin_only: bool
 ) -> Dictionary:
     if not (raw_rule is Dictionary):
         return {}
@@ -95,10 +95,10 @@ static func _evaluate_routing_rule(
     var target: String = str(rule.get("target_dag_id", "")).strip_edges()
     if target.is_empty():
         return {}
-    if match_origin_only:
-        var origin_match: bool = condition.has("origin_id") and str(condition.get("origin_id", "")).strip_edges() == origin_id
-        var race_ok: bool = not condition.has("race_id") or str(condition.get("race_id", "")).strip_edges() == race_id
-        return {"kind": "ORIGIN", "target": target} if (origin_match and race_ok) else {}
+    if should_match_origin_only:
+        var is_origin_matched: bool = condition.has("origin_id") and str(condition.get("origin_id", "")).strip_edges() == origin_id
+        var is_race_matched: bool = not condition.has("race_id") or str(condition.get("race_id", "")).strip_edges() == race_id
+        return {"kind": "ORIGIN", "target": target} if (is_origin_matched and is_race_matched) else {}
     if condition.has("origin_id"):
         return {}
     if condition.has("race_id") and str(condition.get("race_id", "")).strip_edges() == race_id:
@@ -136,9 +136,9 @@ static func _lookup_origin_bound_dag_id(origin_id: String, manifest: Dictionary)
 
     var custom_origins: Variant = manifest.get("custom_origins", [])
     if custom_origins is Array:
-        for item in custom_origins as Array:
-            if item is Dictionary and str((item as Dictionary).get("origin_id", "")).strip_edges() == origin_id:
-                return str((item as Dictionary).get("prologue_dag_id", "")).strip_edges()
+        for origin_entry in custom_origins as Array:
+            if origin_entry is Dictionary and str((origin_entry as Dictionary).get("origin_id", "")).strip_edges() == origin_id:
+                return str((origin_entry as Dictionary).get("prologue_dag_id", "")).strip_edges()
 
     return ""
 

@@ -93,13 +93,13 @@ func get_recent_events(limit: int = 8) -> Array[Dictionary]:
 	if effective_limit <= 0:
 		return []
 
-	var out: Array[Dictionary] = []
-	out.resize(effective_limit)
+	var recent_events: Array[Dictionary] = []
+	recent_events.resize(effective_limit)
 	var start_index: int = (_head - effective_limit + MAX_CAPACITY) % MAX_CAPACITY
 	for offset in range(effective_limit):
 		var slot_index: int = (start_index + offset) % MAX_CAPACITY
-		out[offset] = _slots[slot_index]
-	return out
+		recent_events[offset] = _slots[slot_index]
+	return recent_events
 
 ## 清空环形队列历史记录（原位复用槽位字典，循环零分配）
 func clear_history() -> void:

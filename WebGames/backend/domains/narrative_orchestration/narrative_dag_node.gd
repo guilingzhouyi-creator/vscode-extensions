@@ -70,38 +70,38 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从字典重建节点（node_type 支持字符串枚举或整型，空字典回退默认）
-static func from_dto(data: Dictionary) -> NarrativeDAGNode:
+static func from_dto(serialized_payload: Dictionary) -> NarrativeDAGNode:
 	var node := NarrativeDAGNode.new()
-	if data.is_empty():
+	if serialized_payload.is_empty():
 		return node
-	node.node_id = str(data.get("node_id", ""))
-	var raw_type: Variant = data.get("node_type", NodeType.STANDARD_STEP)
+	node.node_id = str(serialized_payload.get("node_id", ""))
+	var raw_type: Variant = serialized_payload.get("node_type", NodeType.STANDARD_STEP)
 	node.node_type = parse_node_type(str(raw_type)) if raw_type is String else int(raw_type)
-	node.narrative_key = str(data.get("narrative_key", ""))
+	node.narrative_key = str(serialized_payload.get("narrative_key", ""))
 
-	var raw_inline: Variant = data.get("inline_text", "")
+	var raw_inline: Variant = serialized_payload.get("inline_text", "")
 	if raw_inline is Dictionary:
-		var inline_dict: Dictionary = raw_inline
-		node.inline_text = str(inline_dict.get("zh_CN", inline_dict.get("zh-CN", "")))
-		if node.inline_text.is_empty() and not inline_dict.is_empty():
-			node.inline_text = str(inline_dict.values()[0])
+		var localized_text_map: Dictionary = raw_inline
+		node.inline_text = str(localized_text_map.get("zh_CN", localized_text_map.get("zh-CN", "")))
+		if node.inline_text.is_empty() and not localized_text_map.is_empty():
+			node.inline_text = str(localized_text_map.values()[0])
 	else:
 		node.inline_text = str(raw_inline)
 
 	node.choices.clear()
-	for choice_entry in (data.get("choices", []) as Array):
+	for choice_entry in (serialized_payload.get("choices", []) as Array):
 		if choice_entry is Dictionary:
 			_append_choice_clone(node, choice_entry as Dictionary)
 
 	node.required_prerequisites.clear()
-	for prerequisite_id in (data.get("required_prerequisites", []) as Array):
+	for prerequisite_id in (serialized_payload.get("required_prerequisites", []) as Array):
 		node.required_prerequisites.append(str(prerequisite_id))
-	node.completion_condition_ast = (data.get("completion_condition_ast", {}) as Dictionary).duplicate(true)
+	node.completion_condition_ast = (serialized_payload.get("completion_condition_ast", {}) as Dictionary).duplicate(true)
 	node.mutations_on_complete.clear()
-	for mutation_entry in (data.get("mutations_on_complete", []) as Array):
+	for mutation_entry in (serialized_payload.get("mutations_on_complete", []) as Array):
 		if mutation_entry is Dictionary:
 			node.mutations_on_complete.append(mutation_entry as Dictionary)
-	node.is_optional = bool(data.get("is_optional", false))
+	node.is_optional = bool(serialized_payload.get("is_optional", false))
 	return node
 
 static func _append_choice_clone(node: NarrativeDAGNode, choice: Dictionary) -> void:

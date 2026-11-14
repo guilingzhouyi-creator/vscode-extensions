@@ -29,8 +29,8 @@ static func resolve(event_id: String, world_context: Dictionary) -> Dictionary:
 	# 1) 条件修正：world_context 满足的条件组合 → 修正系数（只读上下文，不写事件状态）
 	var conditions: Array = entry.get("conditions", [])
 	for condition_entry in conditions:
-		var condition_when: Dictionary = condition_entry.get("when", _EMPTY_DICT)
-		if NarrativeCausalityOrchestrator.evaluate_ast_condition(condition_when, world_context):
+		var condition_ast: Dictionary = condition_entry.get("when", _EMPTY_DICT)
+		if NarrativeCausalityOrchestrator.evaluate_ast_condition(condition_ast, world_context):
 			var factor: float = float(condition_entry.get("factor", 1.0))
 			probability *= factor
 			modifiers.append({"kind": "condition", "id": str(condition_entry.get("id", "")), "factor": factor})
@@ -38,8 +38,8 @@ static func resolve(event_id: String, world_context: Dictionary) -> Dictionary:
 	# 2) 动态调整：buff/环境修正（配置驱动，禁止内嵌事件执行指令）
 	var adjustments: Array = entry.get("adjustments", [])
 	for adjustment_entry in adjustments:
-		var adjustment_when: Dictionary = adjustment_entry.get("when", _EMPTY_DICT)
-		if NarrativeCausalityOrchestrator.evaluate_ast_condition(adjustment_when, world_context):
+		var adjustment_ast: Dictionary = adjustment_entry.get("when", _EMPTY_DICT)
+		if NarrativeCausalityOrchestrator.evaluate_ast_condition(adjustment_ast, world_context):
 			var delta: float = float(adjustment_entry.get("delta", 0.0))
 			probability += delta
 			modifiers.append({"kind": "adjustment", "id": str(adjustment_entry.get("id", "")), "delta": delta})
@@ -47,10 +47,10 @@ static func resolve(event_id: String, world_context: Dictionary) -> Dictionary:
 	# 3) 事件关联：关联事件已触发 → 概率联动（经事件状态上下文只读查询）
 	var links: Array = entry.get("links", [])
 	var triggered: Array = world_context.get("event_state.triggered", [])
-	for link in links:
-		if str(link.get("linked_event_id", "")) in triggered:
-			probability *= float(link.get("factor", 1.0))
-			adjusted_by.append(str(link.get("linked_event_id", "")))
+	for link_entry in links:
+		if str(link_entry.get("linked_event_id", "")) in triggered:
+			probability *= float(link_entry.get("factor", 1.0))
+			adjusted_by.append(str(link_entry.get("linked_event_id", "")))
 
 	# 值域钳制：确定性 0~1（越界配置在 audit 启动校验拦截，此处安全回退钳制）
 	probability = clampf(probability, 0.0, 1.0)

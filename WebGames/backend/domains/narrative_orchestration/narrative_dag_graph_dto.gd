@@ -35,10 +35,10 @@ func add_edge(edge: NarrativeDAGEdge) -> void:
 
 ## 序列化为字典（节点/边递归 DTO）
 func to_dto() -> Dictionary:
-	var nodes_dict: Dictionary = {}
+	var serialized_nodes: Dictionary = {}
 	for node_id in nodes.keys():
 		var node: NarrativeDAGNode = nodes[node_id]
-		nodes_dict[node_id] = node.to_dto()
+		serialized_nodes[node_id] = node.to_dto()
 
 	var serialized_edges: Array[Dictionary] = []
 	for edge in edges:
@@ -50,25 +50,25 @@ func to_dto() -> Dictionary:
 		"dag_id": resolved_graph_id,
 		"entry_node_id": entry_node_id,
 		"terminal_node_id": terminal_node_id,
-		"nodes": nodes_dict,
+		"nodes": serialized_nodes,
 		"edges": serialized_edges
 	}
 
 ## 从字典重建图（节点/边逐条反序列化）
-static func from_dto(data: Dictionary) -> NarrativeDAGGraphDTO:
-	var resolved_graph_id := str(data.get("dag_id", data.get("graph_id", "")))
+static func from_dto(serialized_payload: Dictionary) -> NarrativeDAGGraphDTO:
+	var resolved_graph_id := str(serialized_payload.get("dag_id", serialized_payload.get("graph_id", "")))
 	var graph := NarrativeDAGGraphDTO.new(resolved_graph_id)
 	graph.dag_id = resolved_graph_id
 	graph.graph_id = resolved_graph_id
-	graph.entry_node_id = str(data.get("entry_node_id", ""))
-	graph.terminal_node_id = str(data.get("terminal_node_id", ""))
+	graph.entry_node_id = str(serialized_payload.get("entry_node_id", ""))
+	graph.terminal_node_id = str(serialized_payload.get("terminal_node_id", ""))
 
-	var raw_nodes: Dictionary = data.get("nodes", {})
+	var raw_nodes: Dictionary = serialized_payload.get("nodes", {})
 	for node_id in raw_nodes.keys():
 		var node := NarrativeDAGNode.from_dto(raw_nodes[node_id] as Dictionary)
 		graph.add_node(node)
 
-	var raw_edges: Array = data.get("edges", [])
+	var raw_edges: Array = serialized_payload.get("edges", [])
 	for raw_edge in raw_edges:
 		var edge := NarrativeDAGEdge.from_dto(raw_edge as Dictionary)
 		graph.add_edge(edge)

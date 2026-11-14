@@ -99,10 +99,10 @@ func _dto_to_dict(perturbation: CrossWorldPerturbationDTO) -> Dictionary:
     return perturbation.to_dto()
 
 ## 安全将字典转为 DTO（独立函数消除循环体内堆分配）
-func _dict_to_dto(perturbation_data: Dictionary) -> CrossWorldPerturbationDTO:
-    if perturbation_data == null or perturbation_data.is_empty():
+func _dict_to_dto(perturbation_payload: Dictionary) -> CrossWorldPerturbationDTO:
+    if perturbation_payload == null or perturbation_payload.is_empty():
         return null
-    return CrossWorldPerturbationDTO.from_dto(perturbation_data)
+    return CrossWorldPerturbationDTO.from_dto(perturbation_payload)
 
 ## 从物理磁盘加载扰动账本
 func _load_ledger_from_disk() -> void:
@@ -119,32 +119,32 @@ func _load_ledger_from_disk() -> void:
 
     var content := file.get_as_text()
     file.close()
-    var parsed_value: Variant = JSON.parse_string(content)
-    if not (parsed_value is Array):
+    var parsed_entries: Variant = JSON.parse_string(content)
+    if not (parsed_entries is Array):
         return
 
-    var raw_list := parsed_value as Array
-    for item in raw_list:
-        if item is Dictionary:
-            var item_dict := item as Dictionary
-            var perturbation_dto := _dict_to_dto(item_dict)
-            if perturbation_dto != null and not perturbation_dto.perturbation_id.is_empty():
-                _perturbations.append(perturbation_dto)
-                _perturbations_by_id[perturbation_dto.perturbation_id] = perturbation_dto
-                _serialized_by_id[perturbation_dto.perturbation_id] = _dto_to_dict(perturbation_dto)
+    var raw_list := parsed_entries as Array
+    for raw_entry in raw_list:
+        if raw_entry is Dictionary:
+            var entry_payload := raw_entry as Dictionary
+            var perturbation_entry := _dict_to_dto(entry_payload)
+            if perturbation_entry != null and not perturbation_entry.perturbation_id.is_empty():
+                _perturbations.append(perturbation_entry)
+                _perturbations_by_id[perturbation_entry.perturbation_id] = perturbation_entry
+                _serialized_by_id[perturbation_entry.perturbation_id] = _dto_to_dict(perturbation_entry)
 
 ## 原子刷盘物理账本（按扰动条目增量缓存字典序列化结果，避免每条触发全量重转）
 func _flush_ledger_to_disk() -> bool:
     var serialized_items: Array[Dictionary] = []
     for perturbation in _perturbations:
         var perturbation_id := perturbation.perturbation_id
-        var serialized_dict: Dictionary = _serialized_by_id.get(perturbation_id, {})
-        if serialized_dict.is_empty():
-            serialized_dict = _dto_to_dict(perturbation)
-            if not serialized_dict.is_empty():
-                _serialized_by_id[perturbation_id] = serialized_dict
-        if not serialized_dict.is_empty():
-            serialized_items.append(serialized_dict)
+        var serialized_entry: Dictionary = _serialized_by_id.get(perturbation_id, {})
+        if serialized_entry.is_empty():
+            serialized_entry = _dto_to_dict(perturbation)
+            if not serialized_entry.is_empty():
+                _serialized_by_id[perturbation_id] = serialized_entry
+        if not serialized_entry.is_empty():
+            serialized_items.append(serialized_entry)
 
     var json_text := JSON.stringify(serialized_items)
     var write_result: Dictionary = AtomicFileWriter.write_text_atomic(_ledger_path, json_text, {
@@ -185,11 +185,11 @@ func emit_perturbation(perturbation: CrossWorldPerturbationDTO) -> Dictionary:
         _perturbations.append(perturbation)
     _serialized_by_id[perturbation_id] = _dto_to_dict(perturbation)
 
-    var flushed := _flush_ledger_to_disk()
+    var is_flushed := _flush_ledger_to_disk()
     return {
         "success": true,
         "perturbation_id": perturbation_id,
-        "flushed": flushed
+        "flushed": is_flushed
     }
 
 ## 判定扰动在当前时间戳是否仍满足最小共鸣强度阈值

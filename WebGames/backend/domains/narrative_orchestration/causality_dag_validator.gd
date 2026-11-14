@@ -99,12 +99,12 @@ static func _detect_cycle_kahn(graph: NarrativeDAGGraphDTO, in_degree: Dictionar
 	return {"is_valid": true, "visited_count": visited_count}
 
 ## 消耗 Kahn 拓扑排序中当前节点的邻接入度
-static func _drain_kahn_neighbors(current: String, adjacency_list: Dictionary, in_degree: Dictionary, queue: Array[String]) -> void:
+static func _drain_kahn_neighbors(current: String, adjacency_list: Dictionary, in_degree: Dictionary, frontier_queue: Array[String]) -> void:
 	for neighbor in (adjacency_list.get(current, []) as Array):
 		var neighbor_id := str(neighbor)
 		in_degree[neighbor_id] = int(in_degree.get(neighbor_id, 0)) - 1
 		if in_degree[neighbor_id] == 0:
-			queue.append(neighbor_id)
+			frontier_queue.append(neighbor_id)
 
 ## 校验非可选节点的入口可达闭包
 static func _verify_reachability(graph: NarrativeDAGGraphDTO, adjacency_list: Dictionary = {}) -> Dictionary:

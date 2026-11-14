@@ -38,12 +38,12 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从字典重建边（空字典回退默认权重 100）
-static func from_dto(data: Dictionary) -> NarrativeDAGEdge:
+static func from_dto(serialized_payload: Dictionary) -> NarrativeDAGEdge:
 	var edge := NarrativeDAGEdge.new()
-	if data.is_empty():
+	if serialized_payload.is_empty():
 		return edge
-	edge.from_node_id = str(data.get("from_node_id", data.get("from", "")))
-	edge.to_node_id = str(data.get("to_node_id", data.get("to", "")))
-	edge.branch_condition = (data.get("branch_condition", {}) as Dictionary).duplicate(true)
-	edge.priority_weight = int(data.get("priority_weight", 100))
+	edge.from_node_id = str(serialized_payload.get("from_node_id", serialized_payload.get("from", "")))
+	edge.to_node_id = str(serialized_payload.get("to_node_id", serialized_payload.get("to", "")))
+	edge.branch_condition = (serialized_payload.get("branch_condition", {}) as Dictionary).duplicate(true)
+	edge.priority_weight = int(serialized_payload.get("priority_weight", 100))
 	return edge

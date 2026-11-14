@@ -16,20 +16,20 @@ static func evaluate_ast_condition(ast_node: Dictionary, world_context: Dictiona
 	if ast_node.is_empty():
 		return true
 
-	var op_type: Variant = ast_node.get("type", "LEAF")
-	if op_type == "AND":
+	var operator_type: Variant = ast_node.get("type", "LEAF")
+	if operator_type == "AND":
 		var conditions: Array = ast_node.get("conditions", [])
-		for cond in conditions:
-			if not evaluate_ast_condition(cond, world_context):
+		for child_condition in conditions:
+			if not evaluate_ast_condition(child_condition, world_context):
 				return false
 		return true
-	elif op_type == "OR":
+	elif operator_type == "OR":
 		var conditions: Array = ast_node.get("conditions", [])
-		for cond in conditions:
-			if evaluate_ast_condition(cond, world_context):
+		for child_condition in conditions:
+			if evaluate_ast_condition(child_condition, world_context):
 				return true
 		return false
-	elif op_type == "NOT":
+	elif operator_type == "NOT":
 		var child: Dictionary = ast_node.get("condition", {})
 		return not evaluate_ast_condition(child, world_context)
 
@@ -59,19 +59,19 @@ static func arbitrate_and_trigger(
 	current_time_utc: int
 ) -> Array[NarrativeEventAggregate]:
 	var eligible_events: Array[NarrativeEventAggregate] = []
-	for event_item in events:
-		if not event_item.is_repeatable and event_item.has_triggered:
+	for event_entry in events:
+		if not event_entry.is_repeatable and event_entry.has_triggered:
 			continue
-		if evaluate_ast_condition(event_item.trigger_conditions_ast, world_context):
-			eligible_events.append(event_item)
+		if evaluate_ast_condition(event_entry.trigger_conditions_ast, world_context):
+			eligible_events.append(event_entry)
 
 	# 按优先级降序排序 (权重高者优先)
 	eligible_events.sort_custom(func(first_event: NarrativeEventAggregate, second_event: NarrativeEventAggregate):
 		return first_event.priority_weight > second_event.priority_weight
 	)
 
-	for event_item in eligible_events:
-		event_item.has_triggered = true
-		event_item.triggered_timestamp_utc = current_time_utc
+	for event_entry in eligible_events:
+		event_entry.has_triggered = true
+		event_entry.triggered_timestamp_utc = current_time_utc
 
 	return eligible_events
