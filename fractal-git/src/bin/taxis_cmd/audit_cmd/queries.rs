@@ -12,7 +12,9 @@ use fractal_git::{IpcMessage, LooseOdb};
 use serde_json::Value;
 
 use crate::taxis_cmd::common::{find_arg_value, print_json, reject, CliContext};
-use crate::taxis_cmd::daemon::daemon_scheduler::{query_latest_audit_report, resolve_audit_target_ref};
+use crate::taxis_cmd::daemon::daemon_scheduler::{
+    query_latest_audit_report, resolve_audit_target_ref,
+};
 use crate::taxis_cmd::daemon::daemon_transport::{read_daemon_meta, send_daemon_ipc_request};
 
 pub(super) fn handle_audit_latest(ctx: &CliContext) {

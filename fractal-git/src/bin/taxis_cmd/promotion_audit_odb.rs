@@ -17,9 +17,7 @@ use fg_core::traits::OdbStore;
 use fg_topology::audit_tree::AuditTreeMaterializer;
 use fg_topology::refs::FractalRef;
 use fractal_git::constants::cli::CliTag;
-use fractal_git::{
-    compute_jeffreys_credible_lower, AutoQualityScoreEnvelope, LooseOdb, Oid,
-};
+use fractal_git::{compute_jeffreys_credible_lower, AutoQualityScoreEnvelope, LooseOdb, Oid};
 
 use crate::taxis_cmd::common::reject;
 

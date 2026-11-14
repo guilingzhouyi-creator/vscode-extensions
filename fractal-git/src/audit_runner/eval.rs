@@ -9,7 +9,7 @@
 use std::time::Instant;
 
 use fg_algorithms::scoring::{
-    build_quant_metrics_dto, evaluate_anti_gaming_conjunction, evaluate_adrq_risk,
+    build_quant_metrics_dto, evaluate_adrq_risk, evaluate_anti_gaming_conjunction,
     evaluate_cai_autonomy_rate, evaluate_project_quality, evaluate_technical_debt, AdrqInputs,
     AntiGamingInputs, EvaluatedQualityScore, FileMetricSummary, QualityCurveConfig,
 };
@@ -17,9 +17,7 @@ use fg_core::error::FractalResult;
 use fg_core::models::quality_encoding::{canonical_review_json, canonical_review_sm3};
 use fg_gate::audit_engine::audit_snapshot_slices;
 
-use super::binding::{
-    build_review_binding, determine_receipt_decision, seal_trusted_receipt,
-};
+use super::binding::{build_review_binding, determine_receipt_decision, seal_trusted_receipt};
 use super::cai_eval::{
     build_cai_inputs, compute_adrq_yield_pair, compute_manifest_sm3_hex, compute_pattern_penalty,
     count_severities, hex_sm3,

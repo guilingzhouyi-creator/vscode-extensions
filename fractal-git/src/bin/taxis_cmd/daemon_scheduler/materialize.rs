@@ -35,7 +35,9 @@ pub(super) struct MaterializeArgs<'a> {
     pub(super) cloned: ClonedSnapshotData,
 }
 
-pub(super) fn materialize_cloned_snapshot(args: MaterializeArgs<'_>) -> FractalResult<Option<String>> {
+pub(super) fn materialize_cloned_snapshot(
+    args: MaterializeArgs<'_>,
+) -> FractalResult<Option<String>> {
     if args.cloned.files.is_empty() {
         return Ok(None);
     }
@@ -127,11 +129,26 @@ pub(super) fn materialize_cloned_snapshot(args: MaterializeArgs<'_>) -> FractalR
         outcome.receipt.payload.decision
     );
     let entries = [
-        AuditArtifactEntry { path: "manifest/files.json", payload: &manifest_bytes },
-        AuditArtifactEntry { path: "evidence/analysis.json", payload: &outcome.evidence_canonical_bytes },
-        AuditArtifactEntry { path: "receipt/trusted.json", payload: &outcome.receipt_canonical_bytes },
-        AuditArtifactEntry { path: "reports/aas-v1.json", payload: &outcome.aas_summary_json },
-        AuditArtifactEntry { path: "reports/summary.md", payload: outcome.markdown_report.as_bytes() },
+        AuditArtifactEntry {
+            path: "manifest/files.json",
+            payload: &manifest_bytes,
+        },
+        AuditArtifactEntry {
+            path: "evidence/analysis.json",
+            payload: &outcome.evidence_canonical_bytes,
+        },
+        AuditArtifactEntry {
+            path: "receipt/trusted.json",
+            payload: &outcome.receipt_canonical_bytes,
+        },
+        AuditArtifactEntry {
+            path: "reports/aas-v1.json",
+            payload: &outcome.aas_summary_json,
+        },
+        AuditArtifactEntry {
+            path: "reports/summary.md",
+            payload: outcome.markdown_report.as_bytes(),
+        },
     ];
     let materialized = AuditTreeMaterializer::materialize_with_upward_rollup(
         &odb,

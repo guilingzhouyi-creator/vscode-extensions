@@ -4,7 +4,7 @@
 //!   inventories from persisted `refs/fractal/audit/*` tree objects.
 //! Dependencies & Triggers: Called by `hydration.rs` at daemon startup or test restart recovery.
 //! Responsibilities: Parse loose ODB audit commit trees safely without mutating disk state.
-//! Exit Semantics & Design Rationale: Graceful `Option` returns skip corrupt/legacy objects.
+//! Exit Semantics & Design Rationale: Graceful `Option` returns skip corrupt or superseded objects.
 
 use std::collections::BTreeMap;
 

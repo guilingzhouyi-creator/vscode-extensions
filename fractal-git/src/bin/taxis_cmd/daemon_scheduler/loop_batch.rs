@@ -38,12 +38,8 @@ pub(super) fn run_scheduler_loop(
         match receiver.recv_timeout(Duration::from_millis(100)) {
             Ok(trigger) => {
                 ctx.queued_jobs.fetch_sub(1, Ordering::Relaxed);
-                let batch = drain_burst_triggers(
-                    &receiver,
-                    trigger,
-                    &ctx.queued_jobs,
-                    ctx.config.quiet_ms,
-                );
+                let batch =
+                    drain_burst_triggers(&receiver, trigger, &ctx.queued_jobs, ctx.config.quiet_ms);
                 for entry in &batch {
                     if ctx.stop_flag.load(Ordering::Relaxed) || is_audit_paused(&ctx.git_dir) {
                         break;

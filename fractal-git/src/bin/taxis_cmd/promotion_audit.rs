@@ -15,12 +15,12 @@ use fractal_git::audit_runner::verify_sealed_receipt_for_promotion;
 use fractal_git::constants::cli::CliTag;
 use fractal_git::{AutoQualityScoreEnvelope, DiskRefStore, LooseOdb, Oid};
 
+use super::promotion_audit_odb::{
+    load_and_verify_evidence_envelope, read_candidate_commit_tree_oid,
+};
 use crate::taxis_cmd::common::{find_arg_value, reject, CliContext};
 use crate::taxis_cmd::daemon::daemon_scheduler::{
     is_self_owned_audit_or_telemetry_ref, resolve_audit_target_ref,
-};
-use super::promotion_audit_odb::{
-    load_and_verify_evidence_envelope, read_candidate_commit_tree_oid,
 };
 
 fn resolve_audit_ref_for_candidate(

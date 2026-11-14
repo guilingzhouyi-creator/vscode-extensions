@@ -33,7 +33,9 @@ pub(super) struct CycleDispatchArgs<'a> {
     pub(super) force: bool,
 }
 
-pub(super) fn dispatch_scheduled_cycle(args: &CycleDispatchArgs<'_>) -> FractalResult<Option<String>> {
+pub(super) fn dispatch_scheduled_cycle(
+    args: &CycleDispatchArgs<'_>,
+) -> FractalResult<Option<String>> {
     if let Some(ref_name) = args.source_ref {
         if let Some(cloned) = load_committed_ref_snapshot(args.git_dir, ref_name)? {
             return materialize_cloned_snapshot(MaterializeArgs {
