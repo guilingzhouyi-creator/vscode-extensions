@@ -1132,5 +1132,6 @@ module.exports = {
   isBenignConstantCatalog,
   getLanguageVerbosityFactor,
   isAuditableCodeFile,
+  findRepoCodeFiles,
   getStagedFiles,
 };
