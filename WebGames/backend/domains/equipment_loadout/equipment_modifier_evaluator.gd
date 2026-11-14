@@ -14,44 +14,44 @@ class_name EquipmentModifierEvaluator extends RefCounted
 # 一、战备词缀聚合求值
 # ==============================================================================
 
-static func _accumulate_stat_map(stat_map: Dictionary, total_mods: Dictionary) -> void:
-	for stat_k in stat_map:
-		if total_mods.has(stat_k):
-			total_mods[stat_k] += float(stat_map[stat_k])
+static func _accumulate_stat_map(stat_map: Dictionary, total_modifiers: Dictionary) -> void:
+	for stat_key in stat_map:
+		if total_modifiers.has(stat_key):
+			total_modifiers[stat_key] += float(stat_map[stat_key])
 
-static func _accumulate_slot_item(item: ItemEntity, rune_defs: Dictionary, total_mods: Dictionary) -> void:
-	total_mods["total_mass_kg"] += item.mass_kg
-	total_mods["total_armor"] += float(item.combat_metrics.get("effective_armor", 0.0))
+static func _accumulate_slot_item(item: ItemEntity, rune_definitions: Dictionary, total_modifiers: Dictionary) -> void:
+	total_modifiers["total_mass_kg"] += item.mass_kg
+	total_modifiers["total_armor"] += float(item.combat_metrics.get("effective_armor", 0.0))
 
 	var dynamic_affixes: Array = item.affix_sockets.get("dynamic_affixes", [])
-	for aff in dynamic_affixes:
-		if aff is Dictionary:
-			_accumulate_stat_map(aff, total_mods)
+	for dynamic_affix in dynamic_affixes:
+		if dynamic_affix is Dictionary:
+			_accumulate_stat_map(dynamic_affix, total_modifiers)
 
 	var runes: Array = item.affix_sockets.get("imprinted_runes", [])
-	for r in runes:
-		var raw_def: Variant = rune_defs.get(str(r))
-		if raw_def is Dictionary:
-			_accumulate_stat_map(raw_def as Dictionary, total_mods)
+	for rune_id in runes:
+		var raw_definition: Variant = rune_definitions.get(str(rune_id))
+		if raw_definition is Dictionary:
+			_accumulate_stat_map(raw_definition as Dictionary, total_modifiers)
 
 ## 聚合战备全槽词缀：前缀/后缀/符文修正 → 六维属性与抗性总和（rune_modifiers 配置驱动）
-## 契约：空槽安全跳过；动态词缀/符文键名不在 total_mods 白名单内的自动忽略（不报错）。
+## 契约：空槽安全跳过；动态词缀/符文键名不在 total_modifiers 白名单内的自动忽略（不报错）。
 ## 性能：配置表外提至槽位循环外单次查询，无嵌套瞬态分配。
 static func evaluate_total_modifiers(loadout: EquipmentLoadoutAggregate) -> Dictionary:
-	var total_mods: Dictionary = {
+	var total_modifiers: Dictionary = {
 		"bonus_str": 0.0, "bonus_con": 0.0, "bonus_int": 0.0,
 		"bonus_agi": 0.0, "bonus_spr": 0.0, "bonus_vit": 0.0,
 		"total_armor": 0.0, "total_mass_kg": 0.0,
 		"slash_boost": 0.0, "stab_boost": 0.0, "mana_efficiency": 0.0
 	}
-	var rune_defs: Dictionary = GameConfig.get_dict("domains.equipment", "rune_modifiers", {})
+	var rune_definitions: Dictionary = GameConfig.get_dict("domains.equipment", "rune_modifiers", {})
 
 	for slot_name in loadout.slots:
 		var item: ItemEntity = loadout.slots[slot_name]
 		if item != null:
-			_accumulate_slot_item(item, rune_defs, total_mods)
+			_accumulate_slot_item(item, rune_definitions, total_modifiers)
 
-	return total_mods
+	return total_modifiers
 
 # ==============================================================================
 # 二、词缀作用于 L3 实际值域
@@ -63,15 +63,15 @@ static func apply_loadout_to_physiology(
 	loadout: EquipmentLoadoutAggregate,
 	base_sheet: CharacterPhysiologySheet
 ) -> CharacterPhysiologySheet:
-	var mods: Dictionary = evaluate_total_modifiers(loadout)
+	var modifiers: Dictionary = evaluate_total_modifiers(loadout)
 	# 词缀加成作用于 L3 实际值域（等级不变、底层能力联动）：基于副本叠加，不污染存档
 	var active_sheet: CharacterPhysiologySheet = base_sheet.duplicate_physiology()
 	var bonus_map: Dictionary = {
-		"STR": mods["bonus_str"], "CON": mods["bonus_con"], "INT": mods["bonus_int"],
-		"AGI": mods["bonus_agi"], "SPR": mods["bonus_spr"], "VIT": mods["bonus_vit"]
+		"STR": modifiers["bonus_str"], "CON": modifiers["bonus_con"], "INT": modifiers["bonus_int"],
+		"AGI": modifiers["bonus_agi"], "SPR": modifiers["bonus_spr"], "VIT": modifiers["bonus_vit"]
 	}
 	for stat_key in bonus_map:
 		active_sheet.dynamic_adjustments[stat_key] = float(active_sheet.dynamic_adjustments.get(stat_key, 0.0)) + float(bonus_map[stat_key])
 
-	LifeCycleAndPhysiologySolver.calculate_somatic_function(active_sheet)
+	LifecycleAndPhysiologySolver.calculate_somatic_function(active_sheet)
 	return active_sheet
