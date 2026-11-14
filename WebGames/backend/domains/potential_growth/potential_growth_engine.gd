@@ -22,9 +22,9 @@ func grant_potential_points(points: int, reason: String = "") -> int:
 	unassigned_potential_points += safe_points
 	lifetime_potential_earned += safe_points
 
-	var r := reason if not reason.is_empty() else GameConfig.get_string("domains.potential", "growth/default_reason", "ENLIGHTENMENT")
+	var effective_reason := reason if not reason.is_empty() else GameConfig.get_string("domains.potential", "growth/default_reason", "ENLIGHTENMENT")
 	EventBusCore.get_instance().emit_narrative_by_key(
-		"potential/grant_points", "lifecycle", [r, safe_points, unassigned_potential_points]
+		"potential/grant_points", "lifecycle", [effective_reason, safe_points, unassigned_potential_points]
 	)
 	return unassigned_potential_points
 
@@ -37,11 +37,11 @@ func serialize() -> Dictionary:
 	}
 
 ## 从字典重建：M9 收敛——lifetime 非负先行，unassigned 夹紧于 [0, lifetime]（Inv-TX-3 序关系）
-static func deserialize(d: Dictionary) -> PotentialGrowthEngine:
-	var eng := PotentialGrowthEngine.new()
+static func deserialize(data: Dictionary) -> PotentialGrowthEngine:
+	var engine := PotentialGrowthEngine.new()
 	# M9 收敛：先收敛 lifetime 非负，再夹紧 unassigned ∈ [0, lifetime]（Inv-TX-3 序关系），
 	# 损坏/篡改存档不得让「未分配 > 终生获得」进入洗点成本计算（负成本=反向增发）
-	eng.lifetime_potential_earned = maxi(0, int(d.get("lifetime_potential_earned", 0)))
-	eng.unassigned_potential_points = clampi(int(d.get("unassigned_potential_points", 0)), 0, eng.lifetime_potential_earned)
-	eng.allocated_points_history = d.get("allocated_points_history", {})
-	return eng
+	engine.lifetime_potential_earned = maxi(0, int(data.get("lifetime_potential_earned", 0)))
+	engine.unassigned_potential_points = clampi(int(data.get("unassigned_potential_points", 0)), 0, engine.lifetime_potential_earned)
+	engine.allocated_points_history = data.get("allocated_points_history", {})
+	return engine

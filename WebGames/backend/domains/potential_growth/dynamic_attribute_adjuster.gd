@@ -38,10 +38,10 @@ static func consume_event_channel(
 	var applied: Array = []
 	var total_delta := 0.0
 	for stat in adjustments:
-		var res: Variant = apply_dynamic_adjustment(sheet, str(stat), float(adjustments[stat]))
-		if res.success:
-			applied.append(res)
-			total_delta += float(res.actual_delta)
+		var adjustment_result: Variant = apply_dynamic_adjustment(sheet, str(stat), float(adjustments[stat]))
+		if adjustment_result.success:
+			applied.append(adjustment_result)
+			total_delta += float(adjustment_result.actual_delta)
 
 	EventBusCore.get_instance().emit_domain_event(EVENT_CHANNEL_ADJUSTED, {
 		"args": [channel, total_delta],
@@ -60,11 +60,11 @@ static func apply_dynamic_adjustment(
 	if not stat_name in allowed:
 		return { "success": false, "error_code": "INVALID_STAT", "stat_name": stat_name }
 
-	var floor_val := GameConfig.get_float("domains.potential", "dynamic_adjust/floor", 0.0)
+	var floor_value := GameConfig.get_float("domains.potential", "dynamic_adjust/floor", 0.0)
 	var current_actual := sheet.get_actual_value(stat_name)
-	var target := maxf(floor_val, current_actual + delta)
+	var target := maxf(floor_value, current_actual + delta)
 	var actual_delta := target - current_actual
-	var floor_hit := current_actual + delta < floor_val
+	var floor_hit := current_actual + delta < floor_value
 
 	if is_equal_approx(actual_delta, 0.0):
 		return {
@@ -74,7 +74,7 @@ static func apply_dynamic_adjustment(
 		}
 
 	sheet.dynamic_adjustments[stat_name] = float(sheet.dynamic_adjustments.get(stat_name, 0.0)) + actual_delta
-	LifeCycleAndPhysiologySolver.calculate_somatic_function(sheet)
+	LifecycleAndPhysiologySolver.calculate_somatic_function(sheet)
 	return {
 		"success": true, "stat_name": stat_name,
 		"requested_delta": delta, "actual_delta": actual_delta,

@@ -35,34 +35,34 @@ static func allocate_targeted_point(
 ) -> Dictionary:
 	var allowed: Array = GameConfig.get_array("domains.potential", "growth/stat_list", DEFAULT_STAT_LIST)
 	if not stat_name in allowed:
-		var msg := GameConfig.get_string("narratives.potential", "invalid_stat", "Invalid stat name: %s") % stat_name
-		return { "success": false, "reason": msg }
+		var invalid_stat_reason := GameConfig.get_string("narratives.potential", "invalid_stat", "Invalid stat name: %s") % stat_name
+		return { "success": false, "reason": invalid_stat_reason }
 
-	var cur_level: int = sheet.get_level(stat_name)
-	if cur_level >= AttributeConversionEngine.max_level():
-		var msg_max := GameConfig.get_string("narratives.potential", "max_level_reached", "Attribute %s already at max level %d") % [stat_name, AttributeConversionEngine.max_level()]
-		return { "success": false, "reason": msg_max }
+	var current_level: int = sheet.get_level(stat_name)
+	if current_level >= AttributeConversionEngine.max_level():
+		var max_level_reason := GameConfig.get_string("narratives.potential", "max_level_reached", "Attribute %s already at max level %d") % [stat_name, AttributeConversionEngine.max_level()]
+		return { "success": false, "reason": max_level_reason }
 
-	var cost := calculate_point_cost_for_next_stat(cur_level)
+	var cost := calculate_point_cost_for_next_stat(current_level)
 	if engine.unassigned_potential_points < cost:
-		var msg2 := GameConfig.get_string("narratives.potential", "not_enough_points", "Not enough potential points. Need %d, have %d") % [cost, engine.unassigned_potential_points]
-		return { "success": false, "reason": msg2 }
+		var insufficient_points_reason := GameConfig.get_string("narratives.potential", "not_enough_points", "Not enough potential points. Need %d, have %d") % [cost, engine.unassigned_potential_points]
+		return { "success": false, "reason": insufficient_points_reason }
 
 	engine.unassigned_potential_points -= cost
 	engine.allocated_points_history[stat_name] = engine.allocated_points_history.get(stat_name, 0) + cost
 
 	# 统一规则校验：等级提升经 set_level（1~6 级上限），失败整体回滚
-	if not sheet.set_level(stat_name, cur_level + 1):
+	if not sheet.set_level(stat_name, current_level + 1):
 		engine.unassigned_potential_points += cost
 		engine.allocated_points_history[stat_name] = engine.allocated_points_history.get(stat_name, 0) - cost
-		var msg3 := GameConfig.get_string("narratives.potential", "max_level_reached", "Attribute %s already at max level %d") % [stat_name, AttributeConversionEngine.max_level()]
-		return { "success": false, "reason": msg3 }
+		var rollback_reason := GameConfig.get_string("narratives.potential", "max_level_reached", "Attribute %s already at max level %d") % [stat_name, AttributeConversionEngine.max_level()]
+		return { "success": false, "reason": rollback_reason }
 
-	LifeCycleAndPhysiologySolver.calculate_somatic_function(sheet)
+	LifecycleAndPhysiologySolver.calculate_somatic_function(sheet)
 	return {
 		"success": true,
 		"cost": cost,
-		"new_level": cur_level + 1,
+		"new_level": current_level + 1,
 		"new_actual_value": sheet.get_actual_value(stat_name),
 		"remaining_points": engine.unassigned_potential_points
 	}
