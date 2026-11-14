@@ -42,12 +42,12 @@ var active_modifiers: Array[Dictionary] = []
 
 ## 转换为内部领域数据传输模型
 func to_internal_dto() -> Dictionary:
-	var pts: Array[Dictionary] = []
-	for p in scheduled_points:
-		pts.append(p.to_internal_dict())
+	var serialized_points: Array[Dictionary] = []
+	for scheduled_point in scheduled_points:
+		serialized_points.append(scheduled_point.to_internal_dict())
 	return {
 		"round_number": round_number,
 		"max_round_duration_ms": max_round_duration_ms,
-		"scheduled_points": pts,
+		"scheduled_points": serialized_points,
 		"active_modifiers": active_modifiers.duplicate(true),
 	}

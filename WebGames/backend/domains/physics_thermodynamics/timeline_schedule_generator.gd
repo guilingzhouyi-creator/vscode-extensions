@@ -32,18 +32,18 @@ static func generate_round_schedule(
 
 	# 跨回合修饰显式消费：跳过已消费项，应用增量，按生命周期递减并置消费标记
 	var consumed_modifiers: Array[Dictionary] = []
-	for mod in pending_modifiers:
-		if mod == null or mod.is_consumed:
+	for modifier in pending_modifiers:
+		if modifier == null or modifier.is_consumed:
 			continue
-		if mod.event_count_delta != 0:
-			event_count_min = maxi(1, event_count_min + mod.event_count_delta)
-			event_count_max = maxi(event_count_min, event_count_max + mod.event_count_delta)
-		if mod.min_spacing_delta != 0:
-			min_spacing = maxi(500, min_spacing + mod.min_spacing_delta)
-		mod.lifetime_rounds -= 1
-		if mod.lifetime_rounds <= 0:
-			mod.is_consumed = true
-		consumed_modifiers.append(mod.to_internal_dict())
+		if modifier.event_count_delta != 0:
+			event_count_min = maxi(1, event_count_min + modifier.event_count_delta)
+			event_count_max = maxi(event_count_min, event_count_max + modifier.event_count_delta)
+		if modifier.min_spacing_delta != 0:
+			min_spacing = maxi(500, min_spacing + modifier.min_spacing_delta)
+		modifier.lifetime_rounds -= 1
+		if modifier.lifetime_rounds <= 0:
+			modifier.is_consumed = true
+		consumed_modifiers.append(modifier.to_internal_dict())
 	# 本回合实际生效的修饰留痕（来源/生命周期/消费标记齐全，可审计）
 	schedule.active_modifiers = consumed_modifiers
 
@@ -63,14 +63,14 @@ static func generate_round_schedule(
 	var has_tension := false
 	var has_draw := false
 
-	for idx in range(timestamps.size()):
+	for point_index in range(timestamps.size()):
 		var kind := _sample_event_kind(event_weights, rng)
-		var pt := _build_scheduled_point(round_number, idx, timestamps[idx], kind)
+		var scheduled_point := _build_scheduled_point(round_number, point_index, timestamps[point_index], kind)
 		if kind == TimelineEventScheduleDTO.EventKind.TENSION_PULSE:
 			has_tension = true
 		else:
 			has_draw = true
-		points.append(pt)
+		points.append(scheduled_point)
 
 	# 结构保证（Inv-TR-4 精神）：每回合至少 1 个普通发牌点与 1 个紧张点，防回合空转/无张力
 	if not has_draw and not points.is_empty():
@@ -83,25 +83,25 @@ static func generate_round_schedule(
 	return schedule
 
 ## 构建单时间戳调度点（解耦循环内瞬态分配）
-static func _build_scheduled_point(round_number: int, idx: int, timestamp: int, kind: int) -> TimelineEventScheduleDTO.ScheduledPoint:
-	var pt := TimelineEventScheduleDTO.ScheduledPoint.new()
-	pt.point_id = "ROUND_%d_EVT_%d" % [round_number, idx + 1]
-	pt.trigger_time_ms = timestamp
-	pt.event_kind = kind
+static func _build_scheduled_point(round_number: int, point_index: int, timestamp: int, kind: int) -> TimelineEventScheduleDTO.ScheduledPoint:
+	var scheduled_point := TimelineEventScheduleDTO.ScheduledPoint.new()
+	scheduled_point.point_id = "ROUND_%d_EVT_%d" % [round_number, point_index + 1]
+	scheduled_point.trigger_time_ms = timestamp
+	scheduled_point.event_kind = kind
 	match kind:
 		TimelineEventScheduleDTO.EventKind.ADD_DRAW:
-			pt.payload = {"extra_bonus_cards": 1}
+			scheduled_point.payload = {"extra_bonus_cards": 1}
 		TimelineEventScheduleDTO.EventKind.TENSION_PULSE:
-			pt.payload = {"tension_type": "PRESSURE_SURGE"}
-	return pt
+			scheduled_point.payload = {"tension_type": "PRESSURE_SURGE"}
+	return scheduled_point
 
 ## 按配置权重表加权采样事件类型（event_type_weights，权重合计由 value_domain 归一门禁校验）
 static func _sample_event_kind(weights: Dictionary, rng: RefCounted = null) -> int:
 	var roll: float = float(rng.randf()) if rng else 0.5
-	var accum := 0.0
+	var cumulative_weight := 0.0
 	for kind_name in weights.keys():
-		accum += float(weights[kind_name])
-		if roll <= accum:
+		cumulative_weight += float(weights[kind_name])
+		if roll <= cumulative_weight:
 			match str(kind_name):
 				"ADD_DRAW":
 					return TimelineEventScheduleDTO.EventKind.ADD_DRAW
@@ -123,20 +123,20 @@ static func _sample_discrete_timestamps(
 
 	var usable_window := max_duration_ms - (count * min_spacing)
 	if usable_window <= 0:
-		# 间距过大兜底线性均匀分布
+		# 间距过大时安全回退为线性均匀分布
 		var step := int(float(max_duration_ms) / float(count + 1))
-		for i in range(count):
-			result.append((i + 1) * step)
+		for step_index in range(count):
+			result.append((step_index + 1) * step)
 		return result
 
 	var current_mark := 500 # 避开回合刚开始的瞬时
 	var step_slot := int(float(usable_window) / float(count))
-	for i in range(count):
+	for step_index in range(count):
 		var jitter: int = int(rng.randi_range(0, step_slot)) if rng else int(step_slot / 2)
-		var t: int = current_mark + jitter
-		t = clampi(t, 100, max_duration_ms - 200)
-		result.append(t)
-		current_mark = t + min_spacing
+		var candidate_timestamp: int = current_mark + jitter
+		candidate_timestamp = clampi(candidate_timestamp, 100, max_duration_ms - 200)
+		result.append(candidate_timestamp)
+		current_mark = candidate_timestamp + min_spacing
 
 	result.sort()
 	return result
