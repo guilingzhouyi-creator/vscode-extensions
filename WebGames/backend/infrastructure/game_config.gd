@@ -164,10 +164,10 @@ static func load_via_storage_async(on_completed: Callable = Callable()) -> void:
 	ensure_l0_loaded_sync()
 	var on_item := func(entry: Variant, ok: bool, data: Variant, _err: String) -> void:
 		if ok and (data is Dictionary):
-			var t_name: String = str(entry.metadata.get("table_name", ""))
-			if not t_name.is_empty():
+			var table_name: String = str(entry.metadata.get("table_name", ""))
+			if not table_name.is_empty():
 				_tables_mutex.lock()
-				_tables[t_name] = data
+				_tables[table_name] = data
 				_tables_mutex.unlock()
 	var on_done := func(_bid: String, total: int, _failed: int) -> void:
 		_validate_required_tables()
@@ -200,12 +200,12 @@ static var _reload_counter: int = 0
 static func config_reload_version() -> int:
 	return _reload_counter
 
-## 扫描失败记录（S3-01：JSON 解析失败/顶层非对象表在此登记，reload 据此拒绝发布）
+## 扫描失败记录（JSON 解析失败或顶层非对象表在此登记，reload 据此拒绝发布）
 static var _scan_failures: Array = []
 
 static func _flush_loader_warnings(warnings: Array) -> void:
-	for msg in warnings:
-		push_warning(str(msg))
+	for warning_message in warnings:
+		push_warning(str(warning_message))
 
 ## 热重载：先构建新表快照，成功后原子交换；构建失败（含必需表缺失/坏配置）保留旧快照与版本。
 ## 返回 ConfigReloadResult：{ success, version, added, removed, changed, table_count [, error] }
@@ -270,11 +270,11 @@ static func reload_all_configurations() -> Dictionary:
 ## 单子表靶向热重载（零污染、单子表原子替换）
 static func reload_subtable(subtable_name: String) -> Dictionary:
 	var resolved: String = ConfigRouterEngine.resolve_table_name(subtable_name)
-	var load_res: Dictionary = GameConfigLoader.load_single_subtable_json(resolved)
-	if not bool(load_res.get("success", false)):
-		return load_res
+	var load_result: Dictionary = GameConfigLoader.load_single_subtable_json(resolved)
+	if not bool(load_result.get("success", false)):
+		return load_result
 
-	_tables[resolved] = load_res.get("data", {})
+	_tables[resolved] = load_result.get("data", {})
 	_reload_counter += 1
 	_path_cache.clear()
 
@@ -292,6 +292,8 @@ static func reload_subtable(subtable_name: String) -> Dictionary:
 # ==============================================================================
 # 四、泛用取值与类型化取值
 # ==============================================================================
+
+## 查询全量配置表是否已完成初始化加载
 static func is_loaded() -> bool:
 	return _loaded
 
@@ -321,20 +323,20 @@ static func _resolve_raw_value(table_name: String, path: String) -> Variant:
 	var target_table: String = ConfigRouterEngine.resolve_target_table(table_name, path)
 	if not _tables.has(target_table):
 		GameConfigLoader.ensure_table_loaded_jit(target_table, _tables, _scan_failures)
-	var val: Variant = _lookup_path_in_table(_tables.get(target_table, {}), path)
-	if val != null:
-		return val
+	var raw_value: Variant = _lookup_path_in_table(_tables.get(target_table, {}), path)
+	if raw_value != null:
+		return raw_value
 	var subtables: Array = ConfigRouterEngine.get_subtables_for_domain(table_name)
 	var empty_table: Dictionary = {}
 	for sub in subtables:
-		var s_name := String(sub)
-		if s_name == target_table:
+		var subtable_name := String(sub)
+		if subtable_name == target_table:
 			continue
-		if not _tables.has(s_name):
-			GameConfigLoader.ensure_table_loaded_jit(s_name, _tables, _scan_failures)
-		var sub_val: Variant = _lookup_path_in_table(_tables.get(s_name, empty_table), path)
-		if sub_val != null:
-			return sub_val
+		if not _tables.has(subtable_name):
+			GameConfigLoader.ensure_table_loaded_jit(subtable_name, _tables, _scan_failures)
+		var subtable_value: Variant = _lookup_path_in_table(_tables.get(subtable_name, empty_table), path)
+		if subtable_value != null:
+			return subtable_value
 	return null
 
 ## 判断「表 + 多级路径」是否存在
@@ -343,81 +345,81 @@ static func has(table_name: String, path: String) -> bool:
 
 ## 泛用取值：任意类型，未命中或类型不符时返回 default（不抛错）
 static func get_value(table_name: String, path: String, default: Variant = null) -> Variant:
-	var val: Variant = _resolve_raw_value(table_name, path)
-	return val if val != null else default
+	var raw_value: Variant = _resolve_raw_value(table_name, path)
+	return raw_value if raw_value != null else default
 
 ## 类型化取值（带数值/字符串宽松转换与默认值回退，未命中一律回退 default）
 static func get_string(table_name: String, path: String, default: String = "") -> String:
-	var v: Variant = get_value(table_name, path, default)
-	if v is String:
-		return v
-	if v is int or v is float or v is bool:
-		return str(v)
+	var raw_value: Variant = get_value(table_name, path, default)
+	if raw_value is String:
+		return raw_value
+	if raw_value is int or raw_value is float or raw_value is bool:
+		return str(raw_value)
 	return default
 
 ## 读取配置表指定路径的整型数值
 static func get_int(table_name: String, path: String, default: int = 0) -> int:
-	var v: Variant = get_value(table_name, path, default)
-	if v is int:
-		return v
-	if v is float:
-		return int(v)
-	if v is String and (v as String).is_valid_int():
-		return (v as String).to_int()
+	var raw_value: Variant = get_value(table_name, path, default)
+	if raw_value is int:
+		return raw_value
+	if raw_value is float:
+		return int(raw_value)
+	if raw_value is String and (raw_value as String).is_valid_int():
+		return (raw_value as String).to_int()
 	return default
 
 ## 读取配置表指定路径的浮点数值
 static func get_float(table_name: String, path: String, default: float = 0.0) -> float:
-	var v: Variant = get_value(table_name, path, default)
-	if v is float or v is int:
-		return float(v)
-	if v is String and (v as String).is_valid_float():
-		return (v as String).to_float()
+	var raw_value: Variant = get_value(table_name, path, default)
+	if raw_value is float or raw_value is int:
+		return float(raw_value)
+	if raw_value is String and (raw_value as String).is_valid_float():
+		return (raw_value as String).to_float()
 	return default
 
 ## 读取配置表指定路径的布尔值
 static func get_bool(table_name: String, path: String, default: bool = false) -> bool:
-	var v: Variant = get_value(table_name, path, default)
-	return v if v is bool else default
+	var raw_value: Variant = get_value(table_name, path, default)
+	return raw_value if raw_value is bool else default
 
 ## 读取配置表指定路径的字典结构
 static func get_dict(table_name: String, path: String, default: Dictionary = {}) -> Dictionary:
-	var v: Variant = get_value(table_name, path, default)
-	return v if v is Dictionary else default
+	var raw_value: Variant = get_value(table_name, path, default)
+	return raw_value if raw_value is Dictionary else default
 
 ## 读取配置表指定路径的数组列表
 static func get_array(table_name: String, path: String, default: Array = []) -> Array:
-	var v: Variant = get_value(table_name, path, default)
-	return v if v is Array else default
+	var raw_value: Variant = get_value(table_name, path, default)
+	return raw_value if raw_value is Array else default
 
 ## 批量取值（热路径一次取参）。单次 ensure_loaded + 单次取表根，
 ## 逐路径复用 _split_path 分段缓存，与逐键 get_value(table, p, null) 逐位等价
 ## （含数组下标路径；缺失路径不含键、不抛错——调用方自带默认回退）。
 static func get_many(table_name: String, paths: PackedStringArray) -> Dictionary:
 	ensure_loaded()
-	var out: Dictionary = {}
+	var collected_values: Dictionary = {}
 	for path in paths:
 		if path.is_empty():
 			continue
-		var val: Variant = get_value(table_name, path, null)
-		if val != null:
-			out[path] = val
-	return out
+		var raw_value: Variant = get_value(table_name, path, null)
+		if raw_value != null:
+			collected_values[path] = raw_value
+	return collected_values
 
 static func _lookup_path_in_table(table: Variant, path: String) -> Variant:
-	var cur: Variant = table
+	var current_node: Variant = table
 	for part in _split_path(path):
-		if cur is Dictionary and cur.has(part):
-			cur = cur[part]
-		elif cur is Array and part.is_valid_int():
-			var idx := part.to_int()
-			if idx >= 0 and idx < (cur as Array).size():
-				cur = (cur as Array)[idx]
+		if current_node is Dictionary and current_node.has(part):
+			current_node = current_node[part]
+		elif current_node is Array and part.is_valid_int():
+			var array_index := part.to_int()
+			if array_index >= 0 and array_index < (current_node as Array).size():
+				current_node = (current_node as Array)[array_index]
 			else:
 				return null
 		else:
 			return null
-	return cur
+	return current_node
 
 ## 领域文案统一读取：表 = narratives.<domain_id>，未命中回退键名本身。
 ## 各领域 `_msg(key)` 私有助手一律一行委托到此（语义单点化，改动只需改这一处）；
@@ -429,8 +431,8 @@ static func msg(domain_id: String, key: String) -> String:
 ## 支持大小写键名自适应容错，未命中配置键回退 fallback 或 key 本身。
 static func msg_fmt(domain_id: String, key: String, params: Dictionary = {}, fallback: String = "") -> String:
 	var default_text := fallback if not fallback.is_empty() else key
-	var tpl := get_string("narratives." + domain_id, key, default_text)
-	return TemplateFormatter.format(tpl, params)
+	var template_text := get_string("narratives." + domain_id, key, default_text)
+	return TemplateFormatter.format(template_text, params)
 
 # ==============================================================================
 # 五、内部实现（路径解析 / 目录扫描 / 表加载）
@@ -446,8 +448,8 @@ static func _split_path(path: String) -> PackedStringArray:
 	# （超限时淘汰最旧条目，对齐 BoundedResourceCache 语义，热重载仍整体清空）
 	if _path_cache.size() >= PATH_CACHE_MAX_ENTRIES:
 		var oldest: String = ""
-		for k in _path_cache:
-			oldest = String(k)
+		for cache_key in _path_cache:
+			oldest = String(cache_key)
 			break
 		if not oldest.is_empty():
 			_path_cache.erase(oldest)

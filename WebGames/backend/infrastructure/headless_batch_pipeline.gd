@@ -21,25 +21,26 @@ static func step_kinematics(buffer: SoAEntityBuffer, delta_time: float, damping:
 	if count <= 0 or delta_time <= 0.0:
 		return 0
 
-	var px: PackedFloat32Array = buffer.pos_x
-	var py: PackedFloat32Array = buffer.pos_y
-	var vx: PackedFloat32Array = buffer.vel_x
-	var vy: PackedFloat32Array = buffer.vel_y
-	var fl: PackedInt32Array = buffer.flags
+	# 局部变量缓存 Packed 数组引用，避免在紧凑热循环中反复经属性访问器取数组
+	var positions_x: PackedFloat32Array = buffer.pos_x
+	var positions_y: PackedFloat32Array = buffer.pos_y
+	var velocities_x: PackedFloat32Array = buffer.vel_x
+	var velocities_y: PackedFloat32Array = buffer.vel_y
+	var entity_flags: PackedInt32Array = buffer.flags
 
 	var processed := 0
-	for i in range(count):
-		if (fl[i] & FLAG_MASK_INACTIVE) != 0:
+	for entity_index in range(count):
+		if (entity_flags[entity_index] & FLAG_MASK_INACTIVE) != 0:
 			continue
-		px[i] = px[i] + vx[i] * delta_time
-		py[i] = py[i] + vy[i] * delta_time
+		positions_x[entity_index] = positions_x[entity_index] + velocities_x[entity_index] * delta_time
+		positions_y[entity_index] = positions_y[entity_index] + velocities_y[entity_index] * delta_time
 		if damping < 1.0:
-			vx[i] = vx[i] * damping
-			vy[i] = vy[i] * damping
+			velocities_x[entity_index] = velocities_x[entity_index] * damping
+			velocities_y[entity_index] = velocities_y[entity_index] * damping
 		processed += 1
 
-	buffer.pos_x = px
-	buffer.pos_y = py
-	buffer.vel_x = vx
-	buffer.vel_y = vy
+	buffer.pos_x = positions_x
+	buffer.pos_y = positions_y
+	buffer.vel_x = velocities_x
+	buffer.vel_y = velocities_y
 	return processed

@@ -55,26 +55,26 @@ var include_channels: Array[String] = []
 
 ## 从 GameConfig 中解析 export 段（缺省安全回退）
 static func from_config() -> LogExportConfigDTO:
-	var dto := LogExportConfigDTO.new()
+	var config_dto := LogExportConfigDTO.new()
 	var export_dict: Dictionary = GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_EXPORT, {})
 	if export_dict.is_empty():
-		return dto
-	dto.enabled = bool(export_dict.get("enabled", false))
-	dto.directory = str(export_dict.get("directory", LogConstants.DEFAULT_LOG_DIR))
-	dto.file_prefix = str(export_dict.get("file_prefix", LogConstants.DEFAULT_LOG_PREFIX))
-	dto.max_bytes = int(export_dict.get("max_bytes", LogConstants.DEFAULT_MAX_LOG_BYTES))
-	dto.max_files = int(export_dict.get("max_files", LogConstants.DEFAULT_MAX_LOG_FILES))
-	dto.min_level = str(export_dict.get("min_level", LogConstants.LEVEL_LOWER_INFO))
-	dto.batch_size = maxi(1, int(export_dict.get("batch_size", LogConstants.DEFAULT_BATCH_THRESHOLD)))
-	var enc_val: Variant = export_dict.get("encryption", {})
-	if enc_val is Dictionary:
-		var enc_dict: Dictionary = enc_val
-		dto.encryption_enabled = bool(enc_dict.get("enabled", false))
-		dto.encryption_seal_key_env = str(enc_dict.get("seal_key_env", LogConstants.ENC_DEFAULT_SEAL_ENV))
-		dto.hmac_chain_enabled = bool(enc_dict.get("hmac_chain", true))
+		return config_dto
+	config_dto.enabled = bool(export_dict.get("enabled", false))
+	config_dto.directory = str(export_dict.get("directory", LogConstants.DEFAULT_LOG_DIR))
+	config_dto.file_prefix = str(export_dict.get("file_prefix", LogConstants.DEFAULT_LOG_PREFIX))
+	config_dto.max_bytes = int(export_dict.get("max_bytes", LogConstants.DEFAULT_MAX_LOG_BYTES))
+	config_dto.max_files = int(export_dict.get("max_files", LogConstants.DEFAULT_MAX_LOG_FILES))
+	config_dto.min_level = str(export_dict.get("min_level", LogConstants.LEVEL_LOWER_INFO))
+	config_dto.batch_size = maxi(1, int(export_dict.get("batch_size", LogConstants.DEFAULT_BATCH_THRESHOLD)))
+	var encryption_raw: Variant = export_dict.get("encryption", {})
+	if encryption_raw is Dictionary:
+		var encryption_dict: Dictionary = encryption_raw
+		config_dto.encryption_enabled = bool(encryption_dict.get("enabled", false))
+		config_dto.encryption_seal_key_env = str(encryption_dict.get("seal_key_env", LogConstants.ENC_DEFAULT_SEAL_ENV))
+		config_dto.hmac_chain_enabled = bool(encryption_dict.get("hmac_chain", true))
 	var channels: Variant = export_dict.get("include_channels", [])
 	if channels is Array:
-		dto.include_channels.clear()
-		for ch in channels:
-			dto.include_channels.append(str(ch))
-	return dto
+		config_dto.include_channels.clear()
+		for channel_item in channels:
+			config_dto.include_channels.append(str(channel_item))
+	return config_dto

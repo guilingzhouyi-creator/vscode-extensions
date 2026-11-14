@@ -7,8 +7,8 @@
 # 退出语义与设计依据: 全局游戏主循环状态机规范
 # ==============================================================================
 
-## GameLoopStateStack：Deterministic Game Loop FSM
-class_name GameLoopStateStack extends RefCounted
+## GameLoopFSM：Deterministic Game Loop FSM
+class_name GameLoopFSM extends RefCounted
 
 # ==============================================================================
 # 一、状态枚举与状态
@@ -80,19 +80,20 @@ func stack_depth() -> int:
 func serialize() -> Dictionary:
 	return {"stack": state_stack.duplicate(), "current": current_state, "context": global_context.duplicate()}
 
-## 状态栈反序列化（帧范围校验 + 空栈兜底 BOOT_INIT）
+## 状态栈反序列化（帧范围校验 + 空栈安全回退 BOOT_INIT）
 func deserialize(data: Dictionary) -> void:
-	var arr: Array = data.get("stack", [EngineState.BOOT_INIT])
+	var raw_stack: Array = data.get("stack", [EngineState.BOOT_INIT])
 	state_stack = []
-	for v in arr:
-		var s := int(v)
-		if s >= EngineState.BOOT_INIT and s <= EngineState.PAUSED_MODAL:
-			state_stack.append(s as EngineState)
+	for raw_state in raw_stack:
+		var state_value := int(raw_state)
+		if state_value >= EngineState.BOOT_INIT and state_value <= EngineState.PAUSED_MODAL:
+			state_stack.append(state_value as EngineState)
 	if state_stack.is_empty():
+		# 防止持久化数据全部无效导致状态栈为空而违反栈顶单活不变式
 		state_stack.append(EngineState.BOOT_INIT)
-	var cur := int(data.get("current", state_stack.back()))
-	if cur >= EngineState.BOOT_INIT and cur <= EngineState.PAUSED_MODAL:
-		current_state = cur as EngineState
+	var current_value := int(data.get("current", state_stack.back()))
+	if current_value >= EngineState.BOOT_INIT and current_value <= EngineState.PAUSED_MODAL:
+		current_state = current_value as EngineState
 	else:
 		current_state = state_stack.back()
 	global_context = Dictionary(data.get("context", {}))

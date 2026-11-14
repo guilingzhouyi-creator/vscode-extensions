@@ -23,19 +23,19 @@ static var _instance: LogFileExporter = null
 static var _config: LogExportConfigDTO = null
 static var _config_version: int = -1
 # 直调回退序号：仅当记录未被 EventBus 签发（sequence == 0，如单测直调 consume）时使用；
-# 正常广播链路序号由 EventBus._record_seq 唯一签发，此处仅在直调缺号场景补号（Inv-LG-3 单一签发源）
-static var _fallback_seq: int = 0
+# 正常广播链路序号由 EventBusCore._record_sequence_number 唯一签发，此处仅在直调缺号场景补号（Inv-LG-3 单一签发源）
+static var _fallback_sequence_number: int = 0
 static var _exported_count: int = 0      # 实际已落盘成功的记录数（Inv-LG-3 对账）
 static var _cached_file_size: int = -1   # 内存缓存主日志当前字节大小（防每行冗余 open 探查）
 static var _pending_batch: Array[String] = [] # 异步/批处理暂存缓冲
-static var _pending_seqs: Array[int] = []
+static var _pending_sequences: Array[int] = []
 static var _batch_threshold: int = LogConstants.DEFAULT_BATCH_THRESHOLD # 攒批阈值（默认 1 即刻写）
 static var _last_chain_hash: String = LogConstants.CHAIN_GENESIS_HASH
 static var _encryption_key_override: PackedByteArray = PackedByteArray()
 static var _io_mutex: Mutex = Mutex.new()
-static var _emitting_enc_error: bool = false
+static var _emitting_encryption_error: bool = false
 static var _cached_key_env_name: String = ""
-static var _cached_key_env_val: String = ""
+static var _cached_key_env_value: String = ""
 static var _cached_derived_key_32: PackedByteArray = PackedByteArray()
 static var _has_cached_derived_key: bool = false
 
@@ -79,13 +79,13 @@ static func consume(record: LogRecordDTO) -> bool:
 		return false
 	# 单一签发源：广播链路已带序号则原样保留，仅直调未签发记录在此补号
 	if record.sequence == 0:
-		_fallback_seq += 1
-		record.sequence = _fallback_seq
-	var ok := _append_to_file(record)
+		_fallback_sequence_number += 1
+		record.sequence = _fallback_sequence_number
+	var write_succeeded := _append_to_file(record)
 	_io_mutex.unlock()
-	if not ok and _config != null and _config.encryption_enabled and _resolve_encryption_key_32().size() != LogConstants.AES_KEY_SIZE:
+	if not write_succeeded and _config != null and _config.encryption_enabled and _resolve_encryption_key_32().size() != LogConstants.AES_KEY_SIZE:
 		_emit_encryption_fail_closed_alert(LogConstants.EVENT_LOG_ENCRYPTION_FALLBACK, SystemBaseMessages.MSG_LOG_ENCRYPTION_UNAVAILABLE)
-	return ok
+	return write_succeeded
 
 ## 级别权重判断：debug < info < warn < error；record 级别 >= min_level 才允许落盘
 static func _level_allowed(level: String) -> bool:
@@ -98,12 +98,12 @@ static func _resolve_encryption_key_32() -> PackedByteArray:
 	if _config == null or not _config.encryption_enabled:
 		return PackedByteArray()
 	var env_name: String = _config.encryption_seal_key_env
-	var env_val: String = OS.get_environment(env_name) if not env_name.is_empty() else ""
-	if _has_cached_derived_key and _cached_key_env_name == env_name and _cached_key_env_val == env_val:
+	var env_value: String = OS.get_environment(env_name) if not env_name.is_empty() else ""
+	if _has_cached_derived_key and _cached_key_env_name == env_name and _cached_key_env_value == env_value:
 		return _cached_derived_key_32
 	var derived := CryptoIntegrityLib.resolve_derived_key_32(env_name, LogConstants.ENC_DOMAIN_CONTEXT)
 	_cached_key_env_name = env_name
-	_cached_key_env_val = env_val
+	_cached_key_env_value = env_value
 	_cached_derived_key_32 = derived
 	_has_cached_derived_key = true
 	return derived
@@ -122,17 +122,17 @@ static func _recover_chain_hash_if_needed(main_path: String) -> void:
 		return
 	if not FileAccess.file_exists(main_path):
 		return
-	var fa := FileAccess.open(main_path, FileAccess.READ)
-	if fa == null:
+	var file_handle := FileAccess.open(main_path, FileAccess.READ)
+	if file_handle == null:
 		return
 	var last_line := ""
 	var scanned := 0
-	while not fa.eof_reached() and scanned < LogConstants.MAX_DISK_SCAN_LINES:
+	while not file_handle.eof_reached() and scanned < LogConstants.MAX_DISK_SCAN_LINES:
 		scanned += 1
-		var line := fa.get_line().strip_edges()
+		var line := file_handle.get_line().strip_edges()
 		if not line.is_empty():
 			last_line = line
-	fa.close()
+	file_handle.close()
 	if last_line.is_empty():
 		return
 	var parsed: Variant = JSON.parse_string(last_line)
@@ -141,13 +141,13 @@ static func _recover_chain_hash_if_needed(main_path: String) -> void:
 		if not tail_hash.is_empty():
 			_last_chain_hash = tail_hash
 
-## 密钥缺失或加密失败闭环告警（带重入保护防递归风暴）
+## 密钥缺失或加密失败静默回退阻断告警（带重入保护防递归风暴）
 static func _emit_encryption_fail_closed_alert(code: String, detail: String) -> void:
-	if _emitting_enc_error:
+	if _emitting_encryption_error:
 		return
-	_emitting_enc_error = true
+	_emitting_encryption_error = true
 	ErrorReporter.emit_error(LogConstants.CHANNEL_SYSTEM, code, detail)
-	_emitting_enc_error = false
+	_emitting_encryption_error = false
 
 ## 高效流式追加写：Fail-Closed 加密前检与有界重试队列（密封延迟到轮转之后，杜绝跨轮转断链）
 static func _append_to_file(record: LogRecordDTO) -> bool:
@@ -163,10 +163,10 @@ static func _append_to_file(record: LogRecordDTO) -> bool:
 
 	if _pending_batch.size() >= MAX_PENDING_RETRY_BATCH:
 		_pending_batch.remove_at(0)
-		if not _pending_seqs.is_empty():
-			_pending_seqs.remove_at(0)
+		if not _pending_sequences.is_empty():
+			_pending_sequences.remove_at(0)
 	_pending_batch.append(plain_json)
-	_pending_seqs.append(record.sequence)
+	_pending_sequences.append(record.sequence)
 
 	if LogConstants.is_critical_level(record.level) or _pending_batch.size() >= _batch_threshold:
 		return _flush_unlocked() > 0
@@ -179,7 +179,7 @@ static func flush() -> int:
 	_io_mutex.unlock()
 	return count
 
-static func _prepare_write_line(plain_line: String, seq: int, main_path: String) -> Dictionary:
+static func _prepare_write_line(plain_line: String, sequence_number: int, main_path: String) -> Dictionary:
 	if not _config.encryption_enabled:
 		return {"ok": true, "line": plain_line, "chain_hash": _last_chain_hash}
 	var key_32 := _resolve_encryption_key_32()
@@ -187,8 +187,8 @@ static func _prepare_write_line(plain_line: String, seq: int, main_path: String)
 		return {"ok": false}
 	if _config.hmac_chain_enabled:
 		_recover_chain_hash_if_needed(main_path)
-	var prev := _last_chain_hash if _config.hmac_chain_enabled else LogConstants.CHAIN_GENESIS_HASH
-	var sealed := CryptoIntegrityLib.seal_log_record_envelope(plain_line, seq, key_32, prev)
+	var previous_chain_hash := _last_chain_hash if _config.hmac_chain_enabled else LogConstants.CHAIN_GENESIS_HASH
+	var sealed := CryptoIntegrityLib.seal_log_record_envelope(plain_line, sequence_number, key_32, previous_chain_hash)
 	if sealed.is_empty():
 		return {"ok": false}
 	return {"ok": true, "line": JSON.stringify(sealed), "chain_hash": str(sealed.get(LogConstants.ENC_KEY_CHAIN_HASH, _last_chain_hash))}
@@ -204,9 +204,9 @@ static func _flush_unlocked() -> int:
 	var main_path := base + LogConstants.LOG_FILE_EXTENSION
 	var state: Dictionary = {"handle": null, "flushed": 0, "failed_idx": -1}
 
-	for idx in range(_pending_batch.size()):
-		if not _flush_single_pending_line(idx, base, main_path, state):
-			state["failed_idx"] = idx
+	for batch_index in range(_pending_batch.size()):
+		if not _flush_single_pending_line(batch_index, base, main_path, state):
+			state["failed_idx"] = batch_index
 			break
 
 	var handle: FileAccess = state.get("handle")
@@ -214,18 +214,18 @@ static func _flush_unlocked() -> int:
 		handle.flush()
 		handle.close()
 
-	var failed_idx: int = int(state.get("failed_idx", -1))
-	if failed_idx >= 0:
-		_pending_batch = _pending_batch.slice(failed_idx)
-		_pending_seqs = _pending_seqs.slice(failed_idx)
+	var failed_index: int = int(state.get("failed_idx", -1))
+	if failed_index >= 0:
+		_pending_batch = _pending_batch.slice(failed_index)
+		_pending_sequences = _pending_sequences.slice(failed_index)
 	else:
 		_pending_batch.clear()
-		_pending_seqs.clear()
+		_pending_sequences.clear()
 	return int(state.get("flushed", 0))
 
-static func _flush_single_pending_line(idx: int, base: String, main_path: String, state: Dictionary) -> bool:
-	var plain_line: String = _pending_batch[idx]
-	var seq: int = _pending_seqs[idx] if idx < _pending_seqs.size() else 0
+static func _flush_single_pending_line(batch_index: int, base: String, main_path: String, state: Dictionary) -> bool:
+	var plain_line: String = _pending_batch[batch_index]
+	var sequence_number: int = _pending_sequences[batch_index] if batch_index < _pending_sequences.size() else 0
 	var handle: FileAccess = state.get("handle")
 	if _needs_rotation(main_path):
 		if handle != null:
@@ -235,7 +235,7 @@ static func _flush_single_pending_line(idx: int, base: String, main_path: String
 			state["handle"] = null
 		_rotate_target_if_needed(base)
 
-	var prepared := _prepare_write_line(plain_line, seq, main_path)
+	var prepared := _prepare_write_line(plain_line, sequence_number, main_path)
 	if not bool(prepared.get("ok", false)):
 		return false
 	if handle == null:
@@ -258,10 +258,10 @@ static func _flush_single_pending_line(idx: int, base: String, main_path: String
 
 static func _open_append_handle(target: String) -> FileAccess:
 	if FileAccess.file_exists(target):
-		var f := FileAccess.open(target, FileAccess.READ_WRITE)
-		if f != null:
-			f.seek_end()
-		return f
+		var file_handle := FileAccess.open(target, FileAccess.READ_WRITE)
+		if file_handle != null:
+			file_handle.seek_end()
+		return file_handle
 	return FileAccess.open(target, FileAccess.WRITE)
 
 static func _needs_rotation(main_path: String) -> bool:
@@ -269,10 +269,10 @@ static func _needs_rotation(main_path: String) -> bool:
 		return false
 	if _cached_file_size < 0:
 		if FileAccess.file_exists(main_path):
-			var check_f := FileAccess.open(main_path, FileAccess.READ)
-			_cached_file_size = check_f.get_length() if check_f != null else 0
-			if check_f != null:
-				check_f.close()
+			var check_file := FileAccess.open(main_path, FileAccess.READ)
+			_cached_file_size = check_file.get_length() if check_file != null else 0
+			if check_file != null:
+				check_file.close()
 		else:
 			_cached_file_size = 0
 	return _cached_file_size >= _config.max_bytes
@@ -298,9 +298,9 @@ static func _archive_sort_key(filename: String, prefix: String) -> Array[int]:
 	if without_prefix.ends_with(LogConstants.LOG_FILE_EXTENSION):
 		var raw := without_prefix.left(without_prefix.length() - LogConstants.LOG_FILE_EXTENSION.length())
 		var parts := raw.split("_")
-		var ts := parts[0].to_int() if parts[0].is_valid_int() else 0
-		var seq_num := parts[1].to_int() if (parts.size() > 1 and parts[1].is_valid_int()) else 0
-		return [ts, seq_num]
+		var timestamp := parts[0].to_int() if parts[0].is_valid_int() else 0
+		var sequence_number := parts[1].to_int() if (parts.size() > 1 and parts[1].is_valid_int()) else 0
+		return [timestamp, sequence_number]
 	return [0, 0]
 
 ## 裁剪旧归档文件：按数值时间戳保留最近 max_files 份轮转文件，超出上限时删除最旧文件
@@ -320,18 +320,18 @@ static func _prune_rotated(base: String) -> void:
 	dir.list_dir_end()
 
 	var keyed: Array = []
-	for fname in rotated:
-		keyed.append({"name": fname, "key": _archive_sort_key(str(fname), _config.file_prefix)})
-	keyed.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		var ka: Array = a["key"]
-		var kb: Array = b["key"]
-		if ka[0] != kb[0]:
-			return ka[0] < kb[0]
-		return ka[1] < kb[1]
+	for archive_name in rotated:
+		keyed.append({"name": archive_name, "key": _archive_sort_key(str(archive_name), _config.file_prefix)})
+	keyed.sort_custom(func(left_entry: Dictionary, right_entry: Dictionary) -> bool:
+		var left_key: Array = left_entry["key"]
+		var right_key: Array = right_entry["key"]
+		if left_key[0] != right_key[0]:
+			return left_key[0] < right_key[0]
+		return left_key[1] < right_key[1]
 	)
 	var excess: int = keyed.size() - _config.max_files
-	for i in range(excess):
-		var oldest: String = str(keyed[i]["name"])
+	for delete_index in range(excess):
+		var oldest: String = str(keyed[delete_index]["name"])
 		DirAccess.remove_absolute("%s/%s" % [_config.directory, oldest])
 
 # ==============================================================================
@@ -343,16 +343,16 @@ static func reset_for_test() -> void:
 	_instance = null
 	_config = null
 	_config_version = -1
-	_fallback_seq = 0
+	_fallback_sequence_number = 0
 	_exported_count = 0
 	_cached_file_size = -1
 	_pending_batch.clear()
-	_pending_seqs.clear()
+	_pending_sequences.clear()
 	_batch_threshold = LogConstants.DEFAULT_BATCH_THRESHOLD
 	_last_chain_hash = LogConstants.CHAIN_GENESIS_HASH
 	_encryption_key_override = PackedByteArray()
-	_emitting_enc_error = false
+	_emitting_encryption_error = false
 	_cached_key_env_name = ""
-	_cached_key_env_val = ""
+	_cached_key_env_value = ""
 	_cached_derived_key_32 = PackedByteArray()
 	_has_cached_derived_key = false
