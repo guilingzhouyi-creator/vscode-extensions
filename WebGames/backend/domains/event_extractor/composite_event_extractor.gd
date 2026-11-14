@@ -16,8 +16,8 @@ extends RefCounted
 static func _encode_composite_key(parts: Array) -> String:
 	var key := ""
 	for part in parts:
-		var s := str(part)
-		key += "%d:%s" % [s.length(), s]
+		var part_text := str(part)
+		key += "%d:%s" % [part_text.length(), part_text]
 	return key
 
 # ==============================================================================
@@ -58,23 +58,23 @@ static func extract(
 			raw_materialized_count += _materialize_raw_events(group["events"], libraries, catalog)
 			processed_keys[group_key] = true
 			continue
-		var dto := compose_group(group, _rule_by_id(str(group["rule_id"]), grouping_rules))
-		var val_res := CompositeEventDTO.validate_dto(dto)
-		if not val_res.valid:
+		var composite_event := compose_group(group, _rule_by_id(str(group["rule_id"]), grouping_rules))
+		var validation_result := CompositeEventDTO.validate_dto(composite_event)
+		if not validation_result.valid:
 			invalid_dto_count += 1
 			continue
-		var lib: AccountItemLibraryAggregate = libraries.get(dto.account_id, null)
-		var mat := materialize(dto, lib, catalog)
-		materialized_flows += int(mat.materialized)
-		clamped_flows.append_array(mat.clamped_flows)
-		projection_results.append(project(dto, projections, str(group["projection"])))
+		var library: AccountItemLibrary = libraries.get(composite_event.account_id, null)
+		var materialize_result := materialize(composite_event, library, catalog)
+		materialized_flows += int(materialize_result.materialized)
+		clamped_flows.append_array(materialize_result.clamped_flows)
+		projection_results.append(project(composite_event, projections, str(group["projection"])))
 		# 组合事件遥测落点（原始事件已由来源记录，此处仅记录组合事件）
 		if telemetry != null:
-			telemetry.record_event(dto.event_name, dto.account_id, {
-				"transaction_id": dto.transaction_id,
-				"item_flows": dto.item_flows,
-				"currency_delta": dto.currency_delta,
-				"timestamp_utc": dto.timestamp_utc
+			telemetry.record_event(composite_event.event_name, composite_event.account_id, {
+				"transaction_id": composite_event.transaction_id,
+				"item_flows": composite_event.item_flows,
+				"currency_delta": composite_event.currency_delta,
+				"timestamp_utc": composite_event.timestamp_utc
 			})
 		processed_keys[group_key] = true
 		composed_count += 1
@@ -106,66 +106,66 @@ static func _new_group_entry(rule_id: String, account_id: String, transaction_id
 ## 以 (rule_id, account_id, transaction_id) 三元组为组合键分组原始事件批次
 static func group_primitive_events(batch: Array, grouping_rules: Array) -> Dictionary:
 	var groups := {}
-	for evt in batch:
-		var prim := _normalize_primitive(evt)
-		if prim.is_empty():
+	for raw_event in batch:
+		var primitive_event := _normalize_primitive(raw_event)
+		if primitive_event.is_empty():
 			continue
-		var rule := _resolve_rule(prim, grouping_rules)
+		var rule := _resolve_rule(primitive_event, grouping_rules)
 		var rule_id := str(rule.get("rule_id", "raw"))
-		var key := _encode_composite_key([rule_id, prim["account_id"], prim["transaction_id"]])
+		var key := _encode_composite_key([rule_id, primitive_event["account_id"], primitive_event["transaction_id"]])
 		if not groups.has(key):
-			groups[key] = _new_group_entry(rule_id, str(prim["account_id"]), str(prim["transaction_id"]), str(rule.get("projection", "")))
-		groups[key]["events"].append(prim)
+			groups[key] = _new_group_entry(rule_id, str(primitive_event["account_id"]), str(primitive_event["transaction_id"]), str(rule.get("projection", "")))
+		groups[key]["events"].append(primitive_event)
 	return groups
 
 # ==============================================================================
 # 步骤2 组合
 # ==============================================================================
 
-static func _merge_primitive_into_dto(dto: CompositeEventDTO, prim: Dictionary) -> void:
-	dto.add_item_flow(str(prim["canonical_id"]), str(prim["event_type"]), int(prim["quantity"]))
-	var cd: Dictionary = prim.get("currency_delta", {})
-	for k in cd:
-		dto.add_currency_delta(str(k), int(cd[k]))
-	var meta: Dictionary = prim.get("meta", {})
-	for k in meta:
-		if not dto.meta.has(k):
-			dto.meta[k] = meta[k]
-	if dto.timestamp_utc == 0:
-		dto.timestamp_utc = int(prim.get("timestamp_utc", 0))
+static func _merge_primitive_into_dto(composite_event: CompositeEventDTO, primitive_event: Dictionary) -> void:
+	composite_event.add_item_flow(str(primitive_event["canonical_id"]), str(primitive_event["event_type"]), int(primitive_event["quantity"]))
+	var currency_delta_map: Dictionary = primitive_event.get("currency_delta", {})
+	for currency_key in currency_delta_map:
+		composite_event.add_currency_delta(str(currency_key), int(currency_delta_map[currency_key]))
+	var meta_map: Dictionary = primitive_event.get("meta", {})
+	for meta_key in meta_map:
+		if not composite_event.meta.has(meta_key):
+			composite_event.meta[meta_key] = meta_map[meta_key]
+	if composite_event.timestamp_utc == 0:
+		composite_event.timestamp_utc = int(primitive_event.get("timestamp_utc", 0))
 
 ## 每组折叠为一个 CompositeEventDTO：物品流按 (canonical_id, event_type) 求和、货币增量合并
 static func compose_group(group: Dictionary, rule: Dictionary) -> CompositeEventDTO:
-	var dto := CompositeEventDTO.new()
-	dto.event_name = str(rule.get("composite_event", "transaction.composed"))
-	dto.account_id = str(group["account_id"])
-	dto.transaction_id = str(group["transaction_id"])
-	for prim in group["events"]:
-		_merge_primitive_into_dto(dto, prim)
-	return dto
+	var composite_event := CompositeEventDTO.new()
+	composite_event.event_name = str(rule.get("composite_event", "transaction.composed"))
+	composite_event.account_id = str(group["account_id"])
+	composite_event.transaction_id = str(group["transaction_id"])
+	for primitive_event in group["events"]:
+		_merge_primitive_into_dto(composite_event, primitive_event)
+	return composite_event
 
 # ==============================================================================
 # 步骤3 物化
 # ==============================================================================
 
 ## 组合事件批量落账号 UID 递归树（复用 ItemStatisticsSolver 既有路径，减量下限 0）
-static func materialize(dto: CompositeEventDTO, library: AccountItemLibraryAggregate, catalog: ItemRegistryCatalog) -> Dictionary:
+static func materialize(composite_event: CompositeEventDTO, library: AccountItemLibrary, catalog: ItemRegistryCatalog) -> Dictionary:
 	var materialized := 0
 	var clamped_flows: Array = []
 	if library == null:
 		return {"materialized": 0, "clamped_flows": []}
-	for flow in dto.item_flows:
-		var res: Variant = ItemStatisticsSolver.record_item_event(
+	for flow in composite_event.item_flows:
+		var record_result: Variant = ItemStatisticsSolver.record_item_event(
 			library, str(flow["event_type"]), str(flow["canonical_id"]), int(flow["quantity"]), catalog, null
 		)
-		if res.success:
+		if record_result.success:
 			materialized += 1
-			if int(res.actual_quantity) < int(flow["quantity"]):
+			if int(record_result.actual_quantity) < int(flow["quantity"]):
 				clamped_flows.append({
 					"canonical_id": str(flow["canonical_id"]),
 					"event_type": str(flow["event_type"]),
 					"requested": int(flow["quantity"]),
-					"actual": int(res.actual_quantity)
+					"actual": int(record_result.actual_quantity)
 				})
 	return {"materialized": materialized, "clamped_flows": clamped_flows}
 
@@ -173,28 +173,28 @@ static func materialize(dto: CompositeEventDTO, library: AccountItemLibraryAggre
 # 步骤4 投影
 # ==============================================================================
 
-static func _ensure_item_projection_subdict(items: Dictionary, cid: String) -> Dictionary:
-	if not items.has(cid):
-		items[cid] = {}
-	return items[cid]
+static func _ensure_item_projection_subdict(items: Dictionary, canonical_id: String) -> Dictionary:
+	if not items.has(canonical_id):
+		items[canonical_id] = {}
+	return items[canonical_id]
 
 ## 配置驱动派生视图：按账号汇总物品流与货币增量
-static func project(dto: CompositeEventDTO, projections: Dictionary, projection_name: String) -> Dictionary:
+static func project(composite_event: CompositeEventDTO, projections: Dictionary, projection_name: String) -> Dictionary:
 	var rule: Dictionary = projections.get(projection_name, {})
 	var items := {}
-	for flow in dto.item_flows:
-		var cid := str(flow["canonical_id"])
+	for flow in composite_event.item_flows:
+		var canonical_id := str(flow["canonical_id"])
 		var event_type := str(flow["event_type"])
-		var sub: Dictionary = _ensure_item_projection_subdict(items, cid)
-		sub[event_type] = int(sub.get(event_type, 0)) + int(flow["quantity"])
+		var item_bucket: Dictionary = _ensure_item_projection_subdict(items, canonical_id)
+		item_bucket[event_type] = int(item_bucket.get(event_type, 0)) + int(flow["quantity"])
 	return {
 		"projection": projection_name,
 		"scope": str(rule.get("scope", "account")),
-		"account_id": dto.account_id,
-		"transaction_id": dto.transaction_id,
+		"account_id": composite_event.account_id,
+		"transaction_id": composite_event.transaction_id,
 		"items": items,
-		"currency_delta": dto.currency_delta,
-		"item_flow_count": dto.item_flows.size()
+		"currency_delta": composite_event.currency_delta,
+		"item_flow_count": composite_event.item_flows.size()
 	}
 
 # ==============================================================================
@@ -203,73 +203,73 @@ static func project(dto: CompositeEventDTO, projections: Dictionary, projection_
 
 ## 原始事件归一化：兼容 TelemetryEventDTO（环形缓冲批次）与 Dictionary 两种来源；
 ## 非法事件（非六类/空 canonical_id/数量非正）返回空字典（跳过）
-static func _normalize_primitive(evt: Variant) -> Dictionary:
-	var prim := {}
-	if evt is TelemetryEventDTO:
-		var dto: TelemetryEventDTO = evt
-		var payload: Dictionary = dto.payload_attributes
-		prim = {
-			"account_id": dto.account_id,
-			"event_type": dto.event_name,
+static func _normalize_primitive(raw_event: Variant) -> Dictionary:
+	var primitive_event := {}
+	if raw_event is TelemetryEventDTO:
+		var telemetry_event: TelemetryEventDTO = raw_event
+		var payload: Dictionary = telemetry_event.payload_attributes
+		primitive_event = {
+			"account_id": telemetry_event.account_id,
+			"event_type": telemetry_event.event_name,
 			"canonical_id": str(payload.get("canonical_id", "")),
 			"quantity": int(payload.get("quantity", 0)),
 			"transaction_id": str(payload.get("transaction_id", "")),
 			"currency_delta": payload.get("currency_delta", {}),
 			"meta": {"source": "telemetry_sidecar"},
-			"timestamp_utc": dto.timestamp_utc
+			"timestamp_utc": telemetry_event.timestamp_utc
 		}
-	elif evt is Dictionary:
-		var d: Dictionary = evt
-		prim = {
-			"account_id": str(d.get("account_id", "")),
-			"event_type": str(d.get("event_type", "")),
-			"canonical_id": str(d.get("canonical_id", "")),
-			"quantity": int(d.get("quantity", 0)),
-			"transaction_id": str(d.get("transaction_id", "")),
-			"currency_delta": d.get("currency_delta", {}),
-			"meta": d.get("meta", {}),
-			"timestamp_utc": int(d.get("timestamp_utc", 0))
+	elif raw_event is Dictionary:
+		var event_dict: Dictionary = raw_event
+		primitive_event = {
+			"account_id": str(event_dict.get("account_id", "")),
+			"event_type": str(event_dict.get("event_type", "")),
+			"canonical_id": str(event_dict.get("canonical_id", "")),
+			"quantity": int(event_dict.get("quantity", 0)),
+			"transaction_id": str(event_dict.get("transaction_id", "")),
+			"currency_delta": event_dict.get("currency_delta", {}),
+			"meta": event_dict.get("meta", {}),
+			"timestamp_utc": int(event_dict.get("timestamp_utc", 0))
 		}
 	else:
 		return {}
-	if prim["account_id"].is_empty() or prim["canonical_id"].is_empty() or int(prim["quantity"]) <= 0:
+	if primitive_event["account_id"].is_empty() or primitive_event["canonical_id"].is_empty() or int(primitive_event["quantity"]) <= 0:
 		return {}
-	if not CompositeEventDTO.is_valid_event_type(str(prim["event_type"])):
+	if not CompositeEventDTO.is_valid_event_type(str(primitive_event["event_type"])):
 		return {}
-	return prim
+	return primitive_event
 
 ## 空键守卫物化：无事务键的原始事件逐条落账（等价原逐条行为，不吞没）
 static func _materialize_raw_events(events: Array, libraries: Dictionary, catalog: ItemRegistryCatalog) -> int:
 	var count := 0
-	for prim in events:
-		var lib: AccountItemLibraryAggregate = libraries.get(str(prim["account_id"]), null)
-		if lib == null:
+	for primitive_event in events:
+		var library: AccountItemLibrary = libraries.get(str(primitive_event["account_id"]), null)
+		if library == null:
 			continue
-		var res: Variant = ItemStatisticsSolver.record_item_event(
-			lib, str(prim["event_type"]), str(prim["canonical_id"]), int(prim["quantity"]), catalog, null
+		var record_result: Variant = ItemStatisticsSolver.record_item_event(
+			library, str(primitive_event["event_type"]), str(primitive_event["canonical_id"]), int(primitive_event["quantity"]), catalog, null
 		)
-		if res.success:
+		if record_result.success:
 			count += 1
 	return count
 
 ## 规则解析：优先采用原始事件 meta.rule_id 显式指定的规则（多规则同源事件时消歧）；
 ## 缺省回退 source_event 首匹配；无规则命中回退 raw（逐条/原始组合）
-static func _resolve_rule(prim: Dictionary, grouping_rules: Array) -> Dictionary:
-	var meta: Dictionary = prim.get("meta", {})
+static func _resolve_rule(primitive_event: Dictionary, grouping_rules: Array) -> Dictionary:
+	var meta: Dictionary = primitive_event.get("meta", {})
 	var explicit_id := str(meta.get("rule_id", ""))
 	if not explicit_id.is_empty():
-		for r in grouping_rules:
-			var rule: Dictionary = r as Dictionary
+		for raw_rule in grouping_rules:
+			var rule: Dictionary = raw_rule as Dictionary
 			if rule.is_empty():
 				continue
 			if str(rule.get("rule_id", "")) == explicit_id:
 				return rule
 		return {"rule_id": "raw", "composite_event": "transaction.raw", "projection": ""}
-	return _match_rule(str(prim["event_type"]), grouping_rules)
+	return _match_rule(str(primitive_event["event_type"]), grouping_rules)
 
 static func _match_rule(event_type: String, grouping_rules: Array) -> Dictionary:
-	for r in grouping_rules:
-		var rule: Dictionary = r as Dictionary
+	for raw_rule in grouping_rules:
+		var rule: Dictionary = raw_rule as Dictionary
 		if rule.is_empty():
 			continue
 		if str(rule.get("source_event", "")) == event_type:
@@ -277,8 +277,8 @@ static func _match_rule(event_type: String, grouping_rules: Array) -> Dictionary
 	return {"rule_id": "raw", "composite_event": "transaction.raw", "projection": ""}
 
 static func _rule_by_id(rule_id: String, grouping_rules: Array) -> Dictionary:
-	for r in grouping_rules:
-		var rule: Dictionary = r as Dictionary
+	for raw_rule in grouping_rules:
+		var rule: Dictionary = raw_rule as Dictionary
 		if rule.is_empty():
 			continue
 		if str(rule.get("rule_id", "")) == rule_id:

@@ -36,23 +36,23 @@ func add_currency_delta(currency_key: String, delta: int) -> void:
 # ==============================================================================
 
 ## DTO 完整性校验：账号/事务键非空、事件名非空、物品流事件类型合法且数量为正
-static func validate_dto(dto: CompositeEventDTO) -> Dictionary:
+static func validate_dto(event_data: CompositeEventDTO) -> Dictionary:
 	var violations: Array[String] = []
-	if dto.account_id.is_empty():
+	if event_data.account_id.is_empty():
 		violations.append("account_id 为空")
-	if dto.transaction_id.is_empty():
+	if event_data.transaction_id.is_empty():
 		violations.append("transaction_id 为空（组合键缺失）")
-	if dto.event_name.is_empty():
+	if event_data.event_name.is_empty():
 		violations.append("event_name 为空")
-	for flow in dto.item_flows:
-		var f: Dictionary = flow as Dictionary
-		if f.is_empty() or f.get("canonical_id", "") == "":
+	for flow in event_data.item_flows:
+		var flow_dict: Dictionary = flow as Dictionary
+		if flow_dict.is_empty() or flow_dict.get("canonical_id", "") == "":
 			violations.append("item_flow 缺少 canonical_id")
 			continue
-		if not is_valid_event_type(str(f.get("event_type", ""))):
-			violations.append("item_flow 非法事件类型: %s" % str(f.get("event_type", "")))
-		if int(f.get("quantity", 0)) <= 0:
-			violations.append("item_flow 数量必须为正: %s" % str(f.get("canonical_id", "")))
+		if not is_valid_event_type(str(flow_dict.get("event_type", ""))):
+			violations.append("item_flow 非法事件类型: %s" % str(flow_dict.get("event_type", "")))
+		if int(flow_dict.get("quantity", 0)) <= 0:
+			violations.append("item_flow 数量必须为正: %s" % str(flow_dict.get("canonical_id", "")))
 	if not violations.is_empty():
 		return { "valid": false, "violations": violations }
 	return { "valid": true }
