@@ -11,7 +11,7 @@
 class_name GameLifecycleService
 extends RefCounted
 
-const GameLifecycleModel = preload("res://backend/domains/lifecycle/lifecycle_model.gd")
+const GameLifecycleModel = preload("res://backend/domains/lifecycle/game_lifecycle_model.gd")
 const GameShutdownDTO = preload("res://backend/domains/lifecycle/dto/game_shutdown_dto.gd")
 const GameLifecycleManager = preload("res://backend/domains/lifecycle/game_lifecycle_manager.gd")
 const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
@@ -37,10 +37,10 @@ static func register_shutdown_resource(descriptor: ShutdownResourceDescriptor) -
 	descriptor.priority = int(policy["priority"])
 	descriptor.timeout_ms = int(policy["timeout_ms"])
 	descriptor.is_critical = bool(policy["is_critical"])
-	var idx := 0
-	while idx < _shutdown_resources.size() and _shutdown_resources[idx].priority >= descriptor.priority:
-		idx += 1
-	_shutdown_resources.insert(idx, descriptor)
+	var insert_index := 0
+	while insert_index < _shutdown_resources.size() and _shutdown_resources[insert_index].priority >= descriptor.priority:
+		insert_index += 1
+	_shutdown_resources.insert(insert_index, descriptor)
 	return true
 
 static func _is_integer_variant(value: Variant) -> bool:
@@ -85,8 +85,8 @@ static func _prepare_shutdown_resources() -> Dictionary:
 		descriptor.priority = int(policy["priority"])
 		descriptor.timeout_ms = int(policy["timeout_ms"])
 		descriptor.is_critical = bool(policy["is_critical"])
-	_shutdown_resources.sort_custom(func(a: ShutdownResourceDescriptor, b: ShutdownResourceDescriptor) -> bool:
-		return a.priority > b.priority
+	_shutdown_resources.sort_custom(func(first_descriptor: ShutdownResourceDescriptor, second_descriptor: ShutdownResourceDescriptor) -> bool:
+		return first_descriptor.priority > second_descriptor.priority
 	)
 	return {"success": true, "error_code": ""}
 
@@ -117,47 +117,47 @@ static func clear_shutdown_resources() -> int:
 	return count
 
 ## 停机前置状态守卫与初始化跃迁
-static func _guard_shutdown_entry(fsm: Variant, cur_phase: int, resp: GameShutdownDTO.Response) -> bool:
+static func _guard_shutdown_entry(fsm: Variant, current_phase: int, response: GameShutdownDTO.Response) -> bool:
 	if fsm.is_stopping():
-		resp.success = false
-		resp.error_code = "ALREADY_STOPPING"
+		response.success = false
+		response.error_code = "ALREADY_STOPPING"
 		return false
-	if cur_phase == GameLifecycleModel.LifecyclePhase.STOP_FAILED:
-		resp.success = false
-		resp.error_code = "PREVIOUS_SHUTDOWN_FAILED"
+	if current_phase == GameLifecycleModel.LifecyclePhase.STOP_FAILED:
+		response.success = false
+		response.error_code = "PREVIOUS_SHUTDOWN_FAILED"
 		return false
 
 	if fsm.is_stopped():
-		resp.success = true
-		resp.error_code = "ALREADY_STOPPED"
+		response.success = true
+		response.error_code = "ALREADY_STOPPED"
 		return false
 
 	# 若尚未初始化，先初始化并跃迁至 RUNNING，支持直接停机
-	if cur_phase == GameLifecycleModel.LifecyclePhase.UNINITIALIZED:
+	if current_phase == GameLifecycleModel.LifecyclePhase.UNINITIALIZED:
 		fsm.transition_to(GameLifecycleModel.LifecyclePhase.BOOT_INITIALIZING)
 		fsm.transition_to(GameLifecycleModel.LifecyclePhase.RUNNING)
 
 	if not fsm.transition_to(GameLifecycleModel.LifecyclePhase.STOPPING):
-		resp.success = false
-		resp.error_code = "TRANSITION_REJECTED"
+		response.success = false
+		response.error_code = "TRANSITION_REJECTED"
 		return false
 
 	return true
 
-static func _record_shutdown_failure(resp: GameShutdownDTO.Response, stage: String, error_code: String) -> void:
-	if resp.failed_stage.is_empty():
-		resp.failed_stage = stage
-		resp.error_code = error_code
+static func _record_shutdown_failure(response: GameShutdownDTO.Response, stage: String, error_code: String) -> void:
+	if response.failed_stage.is_empty():
+		response.failed_stage = stage
+		response.error_code = error_code
 
-static func _execute_registered_shutdown_resources(resp: GameShutdownDTO.Response) -> Dictionary:
+static func _execute_registered_shutdown_resources(response: GameShutdownDTO.Response) -> Dictionary:
 	var stop_noncritical: bool = false
 	var critical_failure: bool = false
 	var critical_error_code: String = ""
 	for descriptor in _shutdown_resources:
 		if stop_noncritical and not descriptor.is_critical:
-			resp.unexecuted_resources.append(descriptor.resource_id)
-			resp.remaining_resources.append(descriptor.resource_id)
-			resp.retained_resources.append(descriptor.resource_id)
+			response.unexecuted_resources.append(descriptor.resource_id)
+			response.remaining_resources.append(descriptor.resource_id)
+			response.retained_resources.append(descriptor.resource_id)
 			continue
 		var started_usec: int = Time.get_ticks_usec()
 		var cleanup_result: Dictionary = descriptor.execute_cleanup()
@@ -165,22 +165,22 @@ static func _execute_registered_shutdown_resources(resp: GameShutdownDTO.Respons
 		var timed_out: bool = descriptor.timeout_ms > 0 and elapsed_ms > descriptor.timeout_ms
 		var succeeded: bool = bool(cleanup_result.get("success", false))
 		if timed_out:
-			resp.timed_out_resources.append(descriptor.resource_id)
-			resp.degraded_resources.append(descriptor.resource_id)
+			response.timed_out_resources.append(descriptor.resource_id)
+			response.degraded_resources.append(descriptor.resource_id)
 			stop_noncritical = true
 			if descriptor.is_critical:
 				critical_failure = true
 				critical_error_code = "CRITICAL_RESOURCE_TIMEOUT"
-				_record_shutdown_failure(resp, "execute_resource_descriptors", critical_error_code)
+				_record_shutdown_failure(response, "execute_resource_descriptors", critical_error_code)
 		if not succeeded:
-			resp.remaining_resources.append(descriptor.resource_id)
-			resp.retained_resources.append(descriptor.resource_id)
-			resp.degraded_resources.append(descriptor.resource_id)
+			response.remaining_resources.append(descriptor.resource_id)
+			response.retained_resources.append(descriptor.resource_id)
+			response.degraded_resources.append(descriptor.resource_id)
 			if descriptor.is_critical:
 				critical_failure = true
 				stop_noncritical = true
 				critical_error_code = "CRITICAL_RESOURCE_CLEANUP_FAILED"
-				_record_shutdown_failure(resp, "execute_resource_descriptors", critical_error_code)
+				_record_shutdown_failure(response, "execute_resource_descriptors", critical_error_code)
 	if critical_failure:
 		return {"success": false, "error_code": critical_error_code}
 	return {"success": true, "error_code": ""}
@@ -192,56 +192,56 @@ class ShutdownStageContext extends RefCounted:
 	var providers: Dictionary = {}
 	var allow_default_fallback: bool = true
 	var fsm: Variant
-	var resp: GameShutdownDTO.Response
+	var response: GameShutdownDTO.Response
 	var bus: Variant
 	var save_timeout: float = 3.0
 	var force_timeout: float = 2.0
 
-static func _execute_shutdown_stage(ctx: ShutdownStageContext) -> Dictionary:
+static func _execute_shutdown_stage(stage_context: ShutdownStageContext) -> Dictionary:
 	var stage_started_ms: int = Time.get_ticks_msec()
 	var stage_success: bool = true
 	var stage_error: String = ""
-	match ctx.stage:
+	match stage_context.stage:
 		"freeze_inputs":
 			_freeze_world_and_inputs()
 		"flush_saves":
 			var save_result: Dictionary = {}
 			var auto_save_policy := GameConfig.get_bool("infrastructure.lifecycle", "policies/auto_save_on_exit", true)
-			if ctx.request.save_before_quit and auto_save_policy:
-				save_result = _flush_domain_saves(ctx.request.target_save_slot, ctx.providers, ctx.allow_default_fallback)
-				ctx.resp.is_save_completed = bool(save_result.get("success", false))
-				ctx.resp.save_sha256 = String(save_result.get("sha256", ""))
-				if not ctx.resp.is_save_completed:
+			if stage_context.request.save_before_quit and auto_save_policy:
+				save_result = _flush_domain_saves(stage_context.request.target_save_slot, stage_context.providers, stage_context.allow_default_fallback)
+				stage_context.response.is_save_completed = bool(save_result.get("success", false))
+				stage_context.response.save_sha256 = String(save_result.get("sha256", ""))
+				if not stage_context.response.is_save_completed:
 					stage_success = false
 					stage_error = String(save_result.get("error_code", "SAVE_FLUSH_FAILED"))
-					ctx.resp.degraded_resources.append("flush_saves")
+					stage_context.response.degraded_resources.append("flush_saves")
 					var allow_degraded := GameConfig.get_bool("infrastructure.lifecycle", "policies/allow_degraded_shutdown_on_save_failure", true)
-					var strict_save := (ctx.request.require_save_success and not ctx.request.force_quit) or (not allow_degraded and not ctx.request.force_quit)
+					var strict_save := (stage_context.request.require_save_success and not stage_context.request.force_quit) or (not allow_degraded and not stage_context.request.force_quit)
 					if strict_save:
-						_record_shutdown_failure(ctx.resp, "flush_saves", stage_error)
-			if ctx.bus != null:
-				ctx.bus.emit_domain_event("lifecycle.save_completed", {
-					"success": ctx.resp.is_save_completed,
-					"slot": ctx.request.target_save_slot,
-					"sha256": ctx.resp.save_sha256,
+						_record_shutdown_failure(stage_context.response, "flush_saves", stage_error)
+			if stage_context.bus != null:
+				stage_context.bus.emit_domain_event("lifecycle.save_completed", {
+					"success": stage_context.response.is_save_completed,
+					"slot": stage_context.request.target_save_slot,
+					"sha256": stage_context.response.save_sha256,
 					"error_code": stage_error
 				})
 		"execute_resource_descriptors":
-			var resource_result: Dictionary = _execute_registered_shutdown_resources(ctx.resp)
+			var resource_result: Dictionary = _execute_registered_shutdown_resources(stage_context.response)
 			stage_success = bool(resource_result.get("success", false))
 			stage_error = String(resource_result.get("error_code", ""))
 		"revoke_session":
-			if not ctx.resp.failed_stage.is_empty():
+			if not stage_context.response.failed_stage.is_empty():
 				stage_success = false
 				stage_error = "SKIPPED_DUE_TO_PRIOR_FAILURE"
-			elif not ctx.request.session_token.is_empty():
-				AuthService.revoke_token(ctx.request.session_token)
-				if ctx.bus != null:
-					ctx.bus.emit_domain_event("lifecycle.session_revoked", {
-						"token_prefix": ctx.request.session_token.substr(0, min(8, ctx.request.session_token.length()))
+			elif not stage_context.request.session_token.is_empty():
+				AuthService.revoke_token(stage_context.request.session_token)
+				if stage_context.bus != null:
+					stage_context.bus.emit_domain_event("lifecycle.session_revoked", {
+						"token_prefix": stage_context.request.session_token.substr(0, min(8, stage_context.request.session_token.length()))
 					})
 		"teardown_bootstrap":
-			if not ctx.resp.failed_stage.is_empty():
+			if not stage_context.response.failed_stage.is_empty():
 				stage_success = false
 				stage_error = "SKIPPED_DUE_TO_PRIOR_FAILURE"
 			else:
@@ -249,17 +249,17 @@ static func _execute_shutdown_stage(ctx: ShutdownStageContext) -> Dictionary:
 				if not bool(teardown_result.get("success", false)):
 					stage_success = false
 					stage_error = "BOOTSTRAP_TEARDOWN_FAILED"
-					ctx.resp.remaining_resources.append("bootstrap_teardown_failed")
-					ctx.resp.retained_resources.append("bootstrap_teardown_failed")
-					_record_shutdown_failure(ctx.resp, ctx.stage, stage_error)
+					stage_context.response.remaining_resources.append("bootstrap_teardown_failed")
+					stage_context.response.retained_resources.append("bootstrap_teardown_failed")
+					_record_shutdown_failure(stage_context.response, stage_context.stage, stage_error)
 	var elapsed_ms: int = Time.get_ticks_msec() - stage_started_ms
-	var timeout_seconds: float = ctx.save_timeout if ctx.stage == "flush_saves" else (ctx.force_timeout if ctx.stage == "teardown_bootstrap" else 0.0)
+	var timeout_seconds: float = stage_context.save_timeout if stage_context.stage == "flush_saves" else (stage_context.force_timeout if stage_context.stage == "teardown_bootstrap" else 0.0)
 	if timeout_seconds > 0.0 and elapsed_ms > int(timeout_seconds * 1000.0):
 		stage_success = false
 		stage_error = "STAGE_TIMEOUT"
-		_mark_phase_timeout(ctx.fsm, ctx.resp, ctx.bus, ctx.stage)
+		_mark_phase_timeout(stage_context.fsm, stage_context.response, stage_context.bus, stage_context.stage)
 	return {
-		"stage": ctx.stage,
+		"stage": stage_context.stage,
 		"success": stage_success,
 		"error_code": stage_error,
 		"elapsed_milliseconds": elapsed_ms
@@ -273,32 +273,32 @@ static func execute_graceful_shutdown(
 ) -> GameShutdownDTO.Response:
 	var fsm: Variant = GameLifecycleManager.get_instance()
 	var start_time := Time.get_ticks_msec()
-	var resp := GameShutdownDTO.Response.new()
-	var cur_phase: int = int(fsm.get_current_phase())
-	resp.current_phase = cur_phase
+	var response := GameShutdownDTO.Response.new()
+	var current_phase: int = int(fsm.get_current_phase())
+	response.current_phase = current_phase
 	var shutdown_timeout := GameConfig.get_float("infrastructure.lifecycle", "timeouts/shutdown_timeout_seconds", 5.0)
 	var save_timeout := GameConfig.get_float("infrastructure.lifecycle", "timeouts/save_flush_timeout_seconds", 3.0)
 	var force_timeout := GameConfig.get_float("infrastructure.lifecycle", "timeouts/force_kill_timeout_seconds", 2.0)
 	var shutdown_hooks: Dictionary = GameConfig.get_dict("infrastructure.lifecycle", "shutdown_hooks", {})
 	var shutdown_plan: Dictionary = _validate_shutdown_stage_order(shutdown_hooks)
 	if not bool(shutdown_plan.get("success", false)):
-		resp.error_code = String(shutdown_plan.get("error_code", "INVALID_SHUTDOWN_STAGE_ORDER"))
-		resp.failed_stage = "preflight"
-		resp.elapsed_milliseconds = Time.get_ticks_msec() - start_time
-		return resp
+		response.error_code = String(shutdown_plan.get("error_code", "INVALID_SHUTDOWN_STAGE_ORDER"))
+		response.failed_stage = "preflight"
+		response.elapsed_milliseconds = Time.get_ticks_msec() - start_time
+		return response
 	var resource_plan: Dictionary = _prepare_shutdown_resources()
 	if not bool(resource_plan.get("success", false)):
-		resp.error_code = String(resource_plan.get("error_code", "INVALID_SHUTDOWN_RESOURCE_POLICY"))
-		resp.failed_stage = "preflight"
-		resp.elapsed_milliseconds = Time.get_ticks_msec() - start_time
-		return resp
+		response.error_code = String(resource_plan.get("error_code", "INVALID_SHUTDOWN_RESOURCE_POLICY"))
+		response.failed_stage = "preflight"
+		response.elapsed_milliseconds = Time.get_ticks_msec() - start_time
+		return response
 
-	if not _guard_shutdown_entry(fsm, cur_phase, resp):
-		return resp
+	if not _guard_shutdown_entry(fsm, current_phase, response):
+		return response
 	if _shutdown_execution_active:
-		resp.success = false
-		resp.error_code = "ALREADY_STOPPING"
-		return resp
+		response.success = false
+		response.error_code = "ALREADY_STOPPING"
+		return response
 	_shutdown_execution_active = true
 	var bus: EventBusCore = EventBusCore.get_instance()
 
@@ -315,64 +315,64 @@ static func execute_graceful_shutdown(
 			{"exit_reason": GameLifecycleModel.get_reason_name(request.exit_reason)}
 		))
 
-	var ctx := ShutdownStageContext.new()
-	ctx.request = request
-	ctx.providers = providers
-	ctx.allow_default_fallback = allow_default_fallback
-	ctx.fsm = fsm
-	ctx.resp = resp
-	ctx.bus = bus
-	ctx.save_timeout = save_timeout
-	ctx.force_timeout = force_timeout
+	var stage_context := ShutdownStageContext.new()
+	stage_context.request = request
+	stage_context.providers = providers
+	stage_context.allow_default_fallback = allow_default_fallback
+	stage_context.fsm = fsm
+	stage_context.response = response
+	stage_context.bus = bus
+	stage_context.save_timeout = save_timeout
+	stage_context.force_timeout = force_timeout
 
 	var total_timeout_recorded: bool = false
 	var stage_order: Array[String] = shutdown_plan["stage_order"]
 	for stage in stage_order:
-		ctx.stage = stage
-		var stage_result: Dictionary = _execute_shutdown_stage(ctx)
-		resp.stage_results.append(stage_result)
+		stage_context.stage = stage
+		var stage_result: Dictionary = _execute_shutdown_stage(stage_context)
+		response.stage_results.append(stage_result)
 		if not total_timeout_recorded and _deadline_exceeded(start_time, shutdown_timeout):
-			_mark_phase_timeout(fsm, resp, bus, "shutdown_total")
+			_mark_phase_timeout(fsm, response, bus, "shutdown_total")
 			total_timeout_recorded = true
 
 	_shutdown_execution_active = false
 	_shutdown_resources.clear()
-	if resp.failed_stage.is_empty():
+	if response.failed_stage.is_empty():
 		if fsm.transition_to(GameLifecycleModel.LifecyclePhase.STOPPED):
-			resp.success = true
-			resp.error_code = "OK"
+			response.success = true
+			response.error_code = "OK"
 		else:
-			_record_shutdown_failure(resp, "finalize", "STOP_TRANSITION_REJECTED")
+			_record_shutdown_failure(response, "finalize", "STOP_TRANSITION_REJECTED")
 	else:
 		if int(fsm.get_current_phase()) == GameLifecycleModel.LifecyclePhase.STOPPING:
 			fsm.transition_to(GameLifecycleModel.LifecyclePhase.STOP_FAILED)
-		resp.success = false
-	resp.current_phase = int(fsm.get_current_phase())
-	resp.elapsed_milliseconds = Time.get_ticks_msec() - start_time
+		response.success = false
+	response.current_phase = int(fsm.get_current_phase())
+	response.elapsed_milliseconds = Time.get_ticks_msec() - start_time
 
 	if bus != null:
 		bus.emit_domain_event("lifecycle.shutdown_completed", {
-			"elapsed_ms": resp.elapsed_milliseconds,
-			"success": resp.success,
-			"error_code": resp.error_code,
-			"is_save_completed": resp.is_save_completed,
+			"elapsed_ms": response.elapsed_milliseconds,
+			"success": response.success,
+			"error_code": response.error_code,
+			"is_save_completed": response.is_save_completed,
 			"timestamp_utc": int(Time.get_unix_time_from_system())
 		})
 		bus.emit_log("info", TemplateFormatter.format(
 			"Graceful shutdown pipeline closed; elapsed time: {elapsed_ms} ms.",
-			{"elapsed_ms": resp.elapsed_milliseconds}
+			{"elapsed_ms": response.elapsed_milliseconds}
 		))
 
-	return resp
+	return response
 
 ## 记录停机截止失败；同步回调仅在返回后检测，不能由当前流程强制中断
-static func _mark_phase_timeout(fsm: Variant, resp: GameShutdownDTO.Response, bus: Variant, phase_label: String) -> void:
+static func _mark_phase_timeout(fsm: Variant, response: GameShutdownDTO.Response, bus: Variant, phase_label: String) -> void:
 	if fsm != null and int(fsm.get_current_phase()) == GameLifecycleModel.LifecyclePhase.STOPPING:
 		fsm.transition_to(GameLifecycleModel.LifecyclePhase.STOP_FAILED)
-	if not resp.timed_out_stages.has(phase_label):
-		resp.timed_out_stages.append(phase_label)
-	_record_shutdown_failure(resp, phase_label, "SHUTDOWN_STAGE_TIMEOUT")
-	resp.remaining_resources.append("phase_timeout:%s" % phase_label)
+	if not response.timed_out_stages.has(phase_label):
+		response.timed_out_stages.append(phase_label)
+	_record_shutdown_failure(response, phase_label, "SHUTDOWN_STAGE_TIMEOUT")
+	response.remaining_resources.append("phase_timeout:%s" % phase_label)
 	if bus != null:
 		bus.emit_log("warn", TemplateFormatter.format(
 			"Shutdown phase '{phase_label}' timed out; synchronous callback returned, continuing asynchronous cleanup.",
@@ -410,11 +410,13 @@ static func _flush_domain_saves(target_slot: String, providers: Dictionary = {},
 			}
 	var slot_name := target_slot if not target_slot.is_empty() else "quicksave_exit"
 	var registered: Array[String] = []
-	for d_id in providers.keys():
-		SaveDataAccessLayer.register_provider(String(d_id), providers[d_id])
-		registered.append(String(d_id))
+	for domain_id in providers.keys():
+		SaveDataAccessLayer.register_provider(String(domain_id), providers[domain_id])
+		registered.append(String(domain_id))
 	var payload := SaveDataAccessLayer.build_save_payload()
 	var result := SaveDataAccessLayer.save_game(slot_name, payload)
-	for d_id in registered:
-		SaveDataAccessLayer.unregister_provider(d_id)
+	for domain_id in registered:
+		SaveDataAccessLayer.unregister_provider(domain_id)
 	return result
+
+## 暂停/恢复主循环状态切换（与 GameLifecycleManager RUNNING <-> PAUSED 同步）
