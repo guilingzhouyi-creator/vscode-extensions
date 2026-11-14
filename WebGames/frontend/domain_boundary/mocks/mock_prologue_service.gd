@@ -12,30 +12,30 @@ class_name MockPrologueService
 extends "res://frontend/domain_boundary/interfaces/i_prologue_service.gd"
 
 var simulate_delay_ms: int = MockBaseService.DEFAULT_SIMULATE_DELAY_MS
-var _stage: int = 1
-var _completed: bool = false
+var _current_stage: int = 1
+var _is_completed: bool = false
 
-func _init(delay_ms: int = MockBaseService.DEFAULT_SIMULATE_DELAY_MS) -> void:
-	simulate_delay_ms = delay_ms
+func _init(delay_milliseconds: int = MockBaseService.DEFAULT_SIMULATE_DELAY_MS) -> void:
+	simulate_delay_ms = delay_milliseconds
 
 ## 模拟异步初始化序章进度至第 1 阶段并重置完结标志
-func start_prologue_async(_account_id: String, _token: String, _payload: Dictionary, callback: Callable) -> void:
-	_stage = 1
-	_completed = false
-	MockBaseService.delayed_call(callback, {"success": true, "data": {"current_stage": 1, "is_completed": false}}, simulate_delay_ms)
+func start_prologue_async(_account_id: String, _token: String, _request_payload: Dictionary, result_callback: Callable) -> void:
+	_current_stage = 1
+	_is_completed = false
+	MockBaseService.delayed_call(result_callback, {"success": true, "data": {"current_stage": 1, "is_completed": false}}, simulate_delay_ms)
 
 ## 模拟异步查询当前序章阶段号与完结状态
-func get_prologue_state_async(_account_id: String, _token: String, callback: Callable) -> void:
-	MockBaseService.delayed_call(callback, {"success": true, "data": {"current_stage": _stage, "is_completed": _completed}}, simulate_delay_ms)
+func get_prologue_state_async(_account_id: String, _token: String, result_callback: Callable) -> void:
+	MockBaseService.delayed_call(result_callback, {"success": true, "data": {"current_stage": _current_stage, "is_completed": _is_completed}}, simulate_delay_ms)
 
 ## 模拟异步推进单步序章阶段并在抵达第 4 阶段时标记完结
-func advance_prologue_async(_account_id: String, _token: String, _choice_id: String, _payload: Dictionary, callback: Callable) -> void:
-	_stage = mini(4, _stage + 1)
-	_completed = (_stage >= 4)
-	MockBaseService.delayed_call(callback, {"success": true, "data": {"current_stage": _stage, "is_completed": _completed}}, simulate_delay_ms)
+func advance_prologue_async(_account_id: String, _token: String, _choice_id: String, _request_payload: Dictionary, result_callback: Callable) -> void:
+	_current_stage = mini(4, _current_stage + 1)
+	_is_completed = (_current_stage >= 4)
+	MockBaseService.delayed_call(result_callback, {"success": true, "data": {"current_stage": _current_stage, "is_completed": _is_completed}}, simulate_delay_ms)
 
 ## 模拟异步直接完结或跳过序章并输出空交接快照载荷
-func complete_prologue_async(_account_id: String, _token: String, _cutscene_id: String = "", _skip: bool = false, callback: Callable = Callable()) -> void:
-	_stage = 4
-	_completed = true
-	MockBaseService.delayed_call(callback, {"success": true, "data": {"completed": true, "handoff": {}, "initial_hud_snapshot": {}}}, simulate_delay_ms)
+func complete_prologue_async(_account_id: String, _token: String, _cutscene_id: String = "", _should_skip: bool = false, result_callback: Callable = Callable()) -> void:
+	_current_stage = 4
+	_is_completed = true
+	MockBaseService.delayed_call(result_callback, {"success": true, "data": {"completed": true, "handoff": {}, "initial_hud_snapshot": {}}}, simulate_delay_ms)

@@ -10,27 +10,27 @@ extends IWorldService
 
 var simulate_delay_ms: int = MockBaseService.DEFAULT_SIMULATE_DELAY_MS
 
-func _init(delay_ms: int = MockBaseService.DEFAULT_SIMULATE_DELAY_MS) -> void:
-	simulate_delay_ms = delay_ms
+func _init(delay_milliseconds: int = MockBaseService.DEFAULT_SIMULATE_DELAY_MS) -> void:
+	simulate_delay_ms = delay_milliseconds
 
 ## 模拟异步拉取角色 HUD 状态快照副本
-func get_hud_snapshot_async(character_id: String, callback: Callable) -> void:
-	var snapshot := MockDataCatalog.get_domain_data("hud_snapshot")
+func get_hud_snapshot_async(character_id: String, result_callback: Callable) -> void:
+	var hud_snapshot_payload := MockDataCatalog.get_domain_data("hud_snapshot")
 	MockBaseService.delayed_call(
-		callback,
+		result_callback,
 		{
 			"success": true,
-			"snapshot": snapshot.duplicate(true)
+			"snapshot": hud_snapshot_payload.duplicate(true)
 		},
 		simulate_delay_ms
 	)
 
 ## 模拟异步获取世界地图地标列表副本
-func get_map_landmarks_async(callback: Callable) -> void:
-	var map_data := MockDataCatalog.get_domain_data("world_map")
-	var landmarks: Array = map_data.get("landmarks", [])
+func get_map_landmarks_async(result_callback: Callable) -> void:
+	var map_payload := MockDataCatalog.get_domain_data("world_map")
+	var landmarks: Array = map_payload.get("landmarks", [])
 	MockBaseService.delayed_call(
-		callback,
+		result_callback,
 		{
 			"success": true,
 			"landmarks": landmarks.duplicate(true)
@@ -39,9 +39,9 @@ func get_map_landmarks_async(callback: Callable) -> void:
 	)
 
 ## 模拟异步进入世界网关并列出可用世界列表
-func enter_gateway_async(account_id: String, token: String, callback: Callable) -> void:
+func enter_gateway_async(account_id: String, token: String, result_callback: Callable) -> void:
 	MockBaseService.delayed_call(
-		callback,
+		result_callback,
 		{
 			"success": true,
 			"account_id": account_id,
@@ -51,9 +51,9 @@ func enter_gateway_async(account_id: String, token: String, callback: Callable) 
 	)
 
 ## 模拟异步探测运行模式就绪度报告
-func probe_modes_async(account_id: String, token: String, callback: Callable) -> void:
+func probe_modes_async(account_id: String, token: String, result_callback: Callable) -> void:
 	MockBaseService.delayed_call(
-		callback,
+		result_callback,
 		{
 			"success": true,
 			"probe_reports": {}
@@ -62,9 +62,9 @@ func probe_modes_async(account_id: String, token: String, callback: Callable) ->
 	)
 
 ## 模拟异步拉取账号下历史世界档案列表
-func list_worlds_async(account_id: String, token: String, callback: Callable) -> void:
+func list_worlds_async(account_id: String, token: String, result_callback: Callable) -> void:
 	MockBaseService.delayed_call(
-		callback,
+		result_callback,
 		{
 			"success": true,
 			"worlds": []
@@ -78,11 +78,11 @@ func select_mode_async(
 	token: String,
 	mode_id: int,
 	account_slots: Array,
-	callback: Callable,
+	result_callback: Callable,
 	_options: Dictionary = {}
 ) -> void:
 	MockBaseService.delayed_call(
-		callback,
+		result_callback,
 		{
 			"success": true,
 			"mode_id": mode_id
@@ -96,11 +96,11 @@ func select_or_create_world_async(
 	token: String,
 	world_id: String,
 	mode_id: int,
-	callback: Callable,
+	result_callback: Callable,
 	_options: Dictionary = {}
 ) -> void:
 	MockBaseService.delayed_call(
-		callback,
+		result_callback,
 		{
 			"success": true,
 			"world_id": world_id,
@@ -114,10 +114,10 @@ func attach_ready_character_async(
 	_account_id: String,
 	_token: String,
 	character_id: String,
-	callback: Callable
+	result_callback: Callable
 ) -> void:
 	MockBaseService.delayed_call(
-		callback,
+		result_callback,
 		{
 			"success": true,
 			"data": {"character_id": character_id}
@@ -131,10 +131,10 @@ func enter_world_async(
 	_token: String,
 	world_id: String,
 	_allow_safe_degrade: bool,
-	callback: Callable
+	result_callback: Callable
 ) -> void:
 	MockBaseService.delayed_call(
-		callback,
+		result_callback,
 		{
 			"success": true,
 			"data": {"world_id": world_id}
@@ -147,10 +147,10 @@ func discover_mods_async(
 	_account_id: String,
 	_token: String,
 	_enabled_pack_ids: Array,
-	callback: Callable
+	result_callback: Callable
 ) -> void:
 	MockBaseService.delayed_call(
-		callback,
+		result_callback,
 		{
 			"success": true,
 			"data": {"enabled_pack_ids": []}
@@ -159,9 +159,9 @@ func discover_mods_async(
 	)
 
 ## 模拟异步查询联机界域只读列表
-func list_remote_realms_async(_account_id: String, _token: String, callback: Callable) -> void:
+func list_remote_realms_async(_account_id: String, _token: String, result_callback: Callable) -> void:
 	MockBaseService.delayed_call(
-		callback,
+		result_callback,
 		{
 			"success": true,
 			"realms": []
@@ -174,10 +174,10 @@ func delete_world_async(
 	_account_id: String,
 	_token: String,
 	world_id: String,
-	callback: Callable
+	result_callback: Callable
 ) -> void:
 	MockBaseService.delayed_call(
-		callback,
+		result_callback,
 		{
 			"success": true,
 			"data": {
@@ -193,11 +193,11 @@ func switch_gateway_mode_async(
 	account_id: String,
 	token: String,
 	target_mode: int,
-	callback: Callable,
+	result_callback: Callable,
 	_options: Dictionary = {}
 ) -> void:
 	MockBaseService.delayed_call(
-		callback,
+		result_callback,
 		{
 			"success": true,
 			"target_mode": target_mode
@@ -209,11 +209,11 @@ func switch_gateway_mode_async(
 func exit_world_to_gateway_async(
 	account_id: String,
 	token: String,
-	callback: Callable,
+	result_callback: Callable,
 	_options: Dictionary = {}
 ) -> void:
 	MockBaseService.delayed_call(
-		callback,
+		result_callback,
 		{"success": true},
 		simulate_delay_ms
 	)

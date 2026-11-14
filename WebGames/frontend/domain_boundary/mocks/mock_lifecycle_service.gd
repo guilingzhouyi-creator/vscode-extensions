@@ -10,23 +10,23 @@ extends "res://frontend/domain_boundary/interfaces/i_lifecycle_service.gd"
 
 var simulate_delay_ms: int = MockBaseService.DEFAULT_SIMULATE_DELAY_MS
 
-func _init(delay_ms: int = MockBaseService.DEFAULT_SIMULATE_DELAY_MS) -> void:
-	simulate_delay_ms = delay_ms
+func _init(delay_milliseconds: int = MockBaseService.DEFAULT_SIMULATE_DELAY_MS) -> void:
+	simulate_delay_ms = delay_milliseconds
 
 ## 模拟异步请求暂停游戏运行
 func pause_game_async(
 	_account_id: String,
 	_token: String,
 	_reason: String = "ESC_MENU",
-	callback: Callable = Callable()
+	result_callback: Callable = Callable()
 ) -> void:
-	var payload := {
+	var service_response := {
 		"success": true,
 		"data": {"is_paused": true}
 	}
 	MockBaseService.delayed_call(
-		callback,
-		payload,
+		result_callback,
+		service_response,
 		simulate_delay_ms
 	)
 
@@ -34,15 +34,15 @@ func pause_game_async(
 func resume_game_async(
 	_account_id: String,
 	_token: String,
-	callback: Callable = Callable()
+	result_callback: Callable = Callable()
 ) -> void:
-	var payload := {
+	var service_response := {
 		"success": true,
 		"data": {"is_paused": false}
 	}
 	MockBaseService.delayed_call(
-		callback,
-		payload,
+		result_callback,
+		service_response,
 		simulate_delay_ms
 	)
 
@@ -52,15 +52,15 @@ func logout_to_menu_async(
 	_token: String,
 	_target_save_slot: String = "",
 	_save_before_quit: bool = true,
-	callback: Callable = Callable()
+	result_callback: Callable = Callable()
 ) -> void:
-	var payload := {
+	var service_response := {
 		"success": true,
 		"data": {"returned_to_menu": true}
 	}
 	MockBaseService.delayed_call(
-		callback,
-		payload,
+		result_callback,
+		service_response,
 		simulate_delay_ms
 	)
 
@@ -69,15 +69,15 @@ func request_graceful_shutdown_async(
 	_account_id: String,
 	_token: String,
 	_options: Dictionary = {},
-	callback: Callable = Callable()
+	result_callback: Callable = Callable()
 ) -> void:
-	var payload := {
+	var service_response := {
 		"success": true,
 		"data": {"graceful_shutdown": true}
 	}
 	MockBaseService.delayed_call(
-		callback,
-		payload,
+		result_callback,
+		service_response,
 		simulate_delay_ms
 	)
 
@@ -86,14 +86,14 @@ func force_shutdown_async(
 	_account_id: String,
 	_token: String,
 	_options: Dictionary = {},
-	callback: Callable = Callable()
+	result_callback: Callable = Callable()
 ) -> void:
-	var payload := {
+	var service_response := {
 		"success": true,
 		"data": {"force_shutdown": true}
 	}
 	MockBaseService.delayed_call(
-		callback,
-		payload,
+		result_callback,
+		service_response,
 		simulate_delay_ms
 	)

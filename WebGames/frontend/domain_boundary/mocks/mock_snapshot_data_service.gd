@@ -14,9 +14,9 @@ extends ISnapshotDataService
 ## 从 MockDataCatalog 单一模拟数据源加载指定域快照并返回深拷贝副本
 func load_snapshot(domain_id: String) -> Dictionary:
 	# 模拟快照数据单一集中物化于 MockDataCatalog，避免跨文件重复硬编码样本
-	var data: Variant = MockDataCatalog.get_domain_data(domain_id)
-	if data is Dictionary:
-		return (data as Dictionary).duplicate(true)
-	if data is Array:
-		return {"items": (data as Array).duplicate(true)}
+	var domain_payload: Variant = MockDataCatalog.get_domain_data(domain_id)
+	if domain_payload is Dictionary:
+		return (domain_payload as Dictionary).duplicate(true)
+	if domain_payload is Array:
+		return {"items": (domain_payload as Array).duplicate(true)}
 	return {}

@@ -18,16 +18,16 @@ const TRANSITIONS := {
 }
 
 ## 校验任务前置状态并执行 accept/abandon/submit 合法状态跃迁，返回更新后的任务副本
-func transition_status(quest: Dictionary, action: String) -> Dictionary:
+func transition_status(quest: Dictionary, quest_action: String) -> Dictionary:
 	if quest.is_empty():
 		return {"success": false, "error_code": "EMPTY_QUEST"}
-	if not TRANSITIONS.has(action):
+	if not TRANSITIONS.has(quest_action):
 		return {"success": false, "error_code": "INVALID_ACTION"}
-	var rule: Dictionary = TRANSITIONS[action]
-	var current := str(quest.get("status", ""))
-	var allowed: Array = rule.get("from", [])
-	if not (current in allowed):
-		return {"success": false, "error_code": "INVALID_TRANSITION", "from": current, "action": action}
-	var updated: Dictionary = quest.duplicate(true)
-	updated["status"] = str(rule.get("to", current))
-	return {"success": true, "quest": updated, "action": action}
+	var transition_rule: Dictionary = TRANSITIONS[quest_action]
+	var current_status := str(quest.get("status", ""))
+	var allowed_statuses: Array = transition_rule.get("from", [])
+	if not (current_status in allowed_statuses):
+		return {"success": false, "error_code": "INVALID_TRANSITION", "from": current_status, "action": quest_action}
+	var updated_quest: Dictionary = quest.duplicate(true)
+	updated_quest["status"] = str(transition_rule.get("to", current_status))
+	return {"success": true, "quest": updated_quest, "action": quest_action}

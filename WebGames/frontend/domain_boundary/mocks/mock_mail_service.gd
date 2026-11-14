@@ -20,36 +20,36 @@ func get_max_capacity() -> int:
 
 ## 将指定 ID 的邮件标记为已读并返回深拷贝后的邮件列表
 func mark_read(mails: Array, mail_id: String) -> Array:
-	var updated: Array = mails.duplicate(true)
-	for mail in updated:
-		if str(mail.get("mail_id", "")) == mail_id:
-			mail["is_read"] = true
+	var updated_mails: Array = mails.duplicate(true)
+	for mail_entry in updated_mails:
+		if str(mail_entry.get("mail_id", "")) == mail_id:
+			mail_entry["is_read"] = true
 			break
-	return updated
+	return updated_mails
 
 ## 按给定邮件 ID 列表过滤删除邮件并返回保留列表
-func delete_by_ids(mails: Array, ids: Array) -> Array:
-	var kept: Array = []
-	for mail in mails:
-		if not ids.has(str(mail.get("mail_id", ""))):
-			kept.append(mail)
-	return kept
+func delete_by_ids(mails: Array, mail_ids: Array) -> Array:
+	var remaining_mails: Array = []
+	for mail_entry in mails:
+		if not mail_ids.has(str(mail_entry.get("mail_id", ""))):
+			remaining_mails.append(mail_entry)
+	return remaining_mails
 
 ## 一键领取所有未领附件邮件并返回更新后的列表与领取计数
 func claim_all(mails: Array) -> Dictionary:
-	var updated: Array = mails.duplicate(true)
-	var claimed := 0
-	for mail in updated:
-		if bool(mail.get("has_attachment", false)) and not bool(mail.get("is_claimed", false)):
-			mail["is_claimed"] = true
-			claimed += 1
-	return {"success": true, "mails": updated, "claimed_count": claimed}
+	var updated_mails: Array = mails.duplicate(true)
+	var claimed_count := 0
+	for mail_entry in updated_mails:
+		if bool(mail_entry.get("has_attachment", false)) and not bool(mail_entry.get("is_claimed", false)):
+			mail_entry["is_claimed"] = true
+			claimed_count += 1
+	return {"success": true, "mails": updated_mails, "claimed_count": claimed_count}
 
 ## 领取单封指定邮件的附件并返回操作结果
 func claim_one(mails: Array, mail_id: String) -> Dictionary:
-	var updated: Array = mails.duplicate(true)
-	for mail in updated:
-		if str(mail.get("mail_id", "")) == mail_id:
-			mail["is_claimed"] = true
-			return {"success": true, "mails": updated, "mail_id": mail_id}
-	return {"success": false, "error_code": "MAIL_NOT_FOUND", "mails": updated}
+	var updated_mails: Array = mails.duplicate(true)
+	for mail_entry in updated_mails:
+		if str(mail_entry.get("mail_id", "")) == mail_id:
+			mail_entry["is_claimed"] = true
+			return {"success": true, "mails": updated_mails, "mail_id": mail_id}
+	return {"success": false, "error_code": "MAIL_NOT_FOUND", "mails": updated_mails}

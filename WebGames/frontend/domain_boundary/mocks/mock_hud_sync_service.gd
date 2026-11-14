@@ -10,18 +10,18 @@ extends "res://frontend/domain_boundary/interfaces/i_hud_sync_service.gd"
 
 var simulate_delay_ms: int = MockBaseService.DEFAULT_SIMULATE_DELAY_MS
 
-func _init(delay_ms: int = MockBaseService.DEFAULT_SIMULATE_DELAY_MS) -> void:
-	simulate_delay_ms = delay_ms
+func _init(delay_milliseconds: int = MockBaseService.DEFAULT_SIMULATE_DELAY_MS) -> void:
+	simulate_delay_ms = delay_milliseconds
 
 ## 模拟异步拉取常驻主页 HUD 权威快照副本
 func pull_authoritative_snapshot_async(
 	_account_id: String,
 	_token: String,
 	_character_id: String,
-	callback: Callable
+	result_callback: Callable
 ) -> void:
 	var hud_snapshot := MockDataCatalog.get_domain_data("hud_snapshot")
-	var payload := {
+	var service_response := {
 		"success": true,
 		"data": {
 			"hud_snapshot": hud_snapshot.duplicate(true),
@@ -29,8 +29,8 @@ func pull_authoritative_snapshot_async(
 		}
 	}
 	MockBaseService.delayed_call(
-		callback,
-		payload,
+		result_callback,
+		service_response,
 		simulate_delay_ms
 	)
 
@@ -40,17 +40,17 @@ func tick_world_clock_async(
 	_token: String,
 	_character_id: String,
 	mutations: Dictionary,
-	callback: Callable
+	result_callback: Callable
 ) -> void:
 	var hud_snapshot := MockDataCatalog.get_domain_data("hud_snapshot").duplicate(true)
 	hud_snapshot["delta_hours"] = int(mutations.get("clock_hours_delta", 0))
-	var payload := {
+	var service_response := {
 		"success": true,
 		"data": {"hud_snapshot": hud_snapshot}
 	}
 	MockBaseService.delayed_call(
-		callback,
-		payload,
+		result_callback,
+		service_response,
 		simulate_delay_ms
 	)
 
@@ -60,19 +60,19 @@ func dispatch_hud_directive_async(
 	_token: String,
 	_character_id: String,
 	action_type: String,
-	payload: Dictionary,
-	callback: Callable
+	directive_payload: Dictionary,
+	result_callback: Callable
 ) -> void:
-	var result := {
+	var service_response := {
 		"success": true,
 		"data": {
 			"directive_id": action_type,
-			"payload": payload.duplicate(true)
+			"payload": directive_payload.duplicate(true)
 		}
 	}
 	MockBaseService.delayed_call(
-		callback,
-		result,
+		result_callback,
+		service_response,
 		simulate_delay_ms
 	)
 

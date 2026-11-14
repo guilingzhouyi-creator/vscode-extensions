@@ -17,37 +17,37 @@ const REPLAY_SPEEDS: Array[float] = [0.25, 0.5, 1.0, 2.0, 4.0, 8.0]
 func get_replay_speeds() -> Array:
 	return REPLAY_SPEEDS.duplicate()
 
-## 按给定步长推进回放帧号并安全钳制到 [0, total] 区间
-func advance_replay(current: int, total: int, step: int) -> int:
-	return clampi(current + step, 0, maxi(0, total))
+## 按给定步长推进回放帧号并安全钳制到 [0, total_frames] 区间
+func advance_replay(current_frame: int, total_frames: int, frame_step: int) -> int:
+	return clampi(current_frame + frame_step, 0, maxi(0, total_frames))
 
 ## 根据当前倍速与步进方向（-1/1）切换上一档或下一档回放速度
-func change_replay_speed(current: float, direction: int) -> float:
-	var current_index := REPLAY_SPEEDS.find(current)
+func change_replay_speed(current_speed: float, direction: int) -> float:
+	var current_index := REPLAY_SPEEDS.find(current_speed)
 	if current_index < 0:
-		return current
+		return current_speed
 	return REPLAY_SPEEDS[clampi(current_index + direction, 0, REPLAY_SPEEDS.size() - 1)]
 
 ## 将 [0.0, 1.0] 归一化进度条比例映射为离散帧序号
-func frame_from_ratio(ratio: float, total: int) -> int:
-	return int(clampf(ratio, 0.0, 1.0) * float(maxi(0, total)))
+func frame_from_ratio(progress_ratio: float, total_frames: int) -> int:
+	return int(clampf(progress_ratio, 0.0, 1.0) * float(maxi(0, total_frames)))
 
 ## 将角色元数据写入目标存档槽位副本并标记为非空
-func write_slot(slot: Dictionary, payload: Dictionary) -> Dictionary:
-	var updated: Dictionary = slot.duplicate(true)
-	updated["empty"] = false
-	updated["char_name_key"] = str(payload.get("char_name_key", "ui.fe16.mock.char.artoria"))
-	updated["level"] = int(payload.get("level", 45))
-	updated["playtime_sec"] = int(payload.get("playtime_sec", 86400))
-	updated["save_date"] = str(payload.get("save_date", "2026-09-01 00:00"))
-	return updated
+func write_slot(slot_record: Dictionary, slot_payload: Dictionary) -> Dictionary:
+	var updated_slot: Dictionary = slot_record.duplicate(true)
+	updated_slot["empty"] = false
+	updated_slot["char_name_key"] = str(slot_payload.get("char_name_key", "ui.fe16.mock.char.artoria"))
+	updated_slot["level"] = int(slot_payload.get("level", 45))
+	updated_slot["playtime_sec"] = int(slot_payload.get("playtime_sec", 86400))
+	updated_slot["save_date"] = str(slot_payload.get("save_date", "2026-09-01 00:00"))
+	return updated_slot
 
 ## 清空目标存档槽位副本并重置等级与时长字段
-func clear_slot(slot: Dictionary) -> Dictionary:
-	var updated: Dictionary = slot.duplicate(true)
-	updated["empty"] = true
-	updated["char_name"] = ""
-	updated["level"] = 0
-	updated["playtime_sec"] = 0
-	updated["save_date"] = ""
-	return updated
+func clear_slot(slot_record: Dictionary) -> Dictionary:
+	var updated_slot: Dictionary = slot_record.duplicate(true)
+	updated_slot["empty"] = true
+	updated_slot["char_name"] = ""
+	updated_slot["level"] = 0
+	updated_slot["playtime_sec"] = 0
+	updated_slot["save_date"] = ""
+	return updated_slot

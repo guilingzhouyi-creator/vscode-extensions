@@ -13,12 +13,12 @@ extends IVersionService
 
 var simulate_delay_ms: int = MockBaseService.DEFAULT_SIMULATE_DELAY_MS
 
-func _init(delay_ms: int = MockBaseService.DEFAULT_SIMULATE_DELAY_MS) -> void:
-	simulate_delay_ms = delay_ms
+func _init(delay_milliseconds: int = MockBaseService.DEFAULT_SIMULATE_DELAY_MS) -> void:
+	simulate_delay_ms = delay_milliseconds
 
 ## 模拟异步检测客户端版本号兼容性与热更新需求
-func check_version_async(callback: Callable) -> void:
-	MockBaseService.delayed_call(callback, {
+func check_version_async(result_callback: Callable) -> void:
+	MockBaseService.delayed_call(result_callback, {
 		"success": true,
 		"client_version": "0.4.9",
 		"latest_version": "0.4.9",
