@@ -198,6 +198,55 @@ func _validate_debt_limit(values: Dictionary) -> bool:
 func to_dictionary() -> Dictionary:
 	return {"copper": copper, "silver": silver, "gold": gold, "platinum": platinum, "mana_monocrystals": mana_monocrystals}
 
+## 从基础字典数据恢复对象状态
+func from_dictionary(values: Dictionary) -> void:
+	for field in CURRENCY_FIELDS:
+		if values.has(field):
+			set(field, int(values[field]))
+
+## 按铜币总价的阶梯支出：足额才扣（铜→银→金→白金，高等级币拆零找零回铜币）。
+## 返回 false 时钱包分文未动（含防御性中途不足分支，正常情况下由总额预检保证不触发）。
+## 注意与「单/双币种定向扣减」的语义差异：本方法按折算总额扣，银不够金来凑；
+## 想要保持「只看指定币种字段」的判定请继续使用显式字段操作。
+func try_spend(cost_copper: int) -> bool:
+	if cost_copper <= 0:
+		return false
+	var total_copper_value := get_total_copper_value()
+	if total_copper_value < cost_copper:
+		return false
+
+	var remaining_to_deduct := cost_copper
+
+	var deduct_copper: int = min(copper, remaining_to_deduct)
+	copper -= deduct_copper
+	remaining_to_deduct -= deduct_copper
+
+	if remaining_to_deduct > 0:
+		remaining_to_deduct = _deduct_ladder("silver", remaining_to_deduct)
+
+	if remaining_to_deduct > 0:
+		remaining_to_deduct = _deduct_ladder("gold", remaining_to_deduct)
+
+	if remaining_to_deduct > 0:
+		remaining_to_deduct = _deduct_ladder("platinum", remaining_to_deduct)
+
+	if remaining_to_deduct > 0:
+		return false
+	return true
+
+## 在单个金属层级上按汇率扣减；超额找零回铜币，返回剩余未清偿金额
+func _deduct_ladder(metal: String, remaining_to_deduct: int) -> int:
+	# 汇率来自配置且可热重载，为 0 时下面的除法会产出 inf/NaN 并污染钱包结算
+	var rate: int = maxi(1, _rate(metal))
+	var available: int = get(metal)
+	var metal_needed: int = int(ceil(float(remaining_to_deduct) / float(rate)))
+	var deduct_metal: int = min(available, metal_needed)
+	set(metal, available - deduct_metal)
+	var metal_value: int = deduct_metal * rate
+	if metal_value > remaining_to_deduct:
+		copper += (metal_value - remaining_to_deduct)
+		return 0
+	return remaining_to_deduct - metal_value
 
 # ==============================================================================
 # 配置读取
