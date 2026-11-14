@@ -112,24 +112,48 @@ mod tests {
             sub_audit.to_git_ref(),
             "refs/fractal/audit/cell/cell-a/card/card-9/sub/sub-2"
         );
-        assert_eq!(FractalRef::parse(&sub_audit.to_git_ref()), Some(sub_audit.clone()));
+        assert_eq!(
+            FractalRef::parse(&sub_audit.to_git_ref()),
+            Some(sub_audit.clone())
+        );
 
         let card_audit = sub_audit.parent().expect("card audit parent");
-        assert_eq!(card_audit.to_git_ref(), "refs/fractal/audit/cell/cell-a/card/card-9/main");
-        assert_eq!(FractalRef::parse(&card_audit.to_git_ref()), Some(card_audit.clone()));
+        assert_eq!(
+            card_audit.to_git_ref(),
+            "refs/fractal/audit/cell/cell-a/card/card-9/main"
+        );
+        assert_eq!(
+            FractalRef::parse(&card_audit.to_git_ref()),
+            Some(card_audit.clone())
+        );
 
         let cell_audit = card_audit.parent().expect("cell audit parent");
-        assert_eq!(cell_audit.to_git_ref(), "refs/fractal/audit/cell/cell-a/main");
-        assert_eq!(FractalRef::parse(&cell_audit.to_git_ref()), Some(cell_audit.clone()));
+        assert_eq!(
+            cell_audit.to_git_ref(),
+            "refs/fractal/audit/cell/cell-a/main"
+        );
+        assert_eq!(
+            FractalRef::parse(&cell_audit.to_git_ref()),
+            Some(cell_audit.clone())
+        );
 
         let trunk_audit = cell_audit.parent().expect("trunk audit parent");
         assert_eq!(trunk_audit, FractalRef::AuditTrunk);
         assert_eq!(trunk_audit.to_git_ref(), "refs/fractal/audit/trunk");
-        assert_eq!(FractalRef::parse("refs/fractal/audit/trunk"), Some(FractalRef::AuditTrunk));
+        assert_eq!(
+            FractalRef::parse("refs/fractal/audit/trunk"),
+            Some(FractalRef::AuditTrunk)
+        );
 
         let oid1 = Oid::from_bytes([0x55; 20]);
-        assert!(trunk_audit.verify_telemetry_update_policy(None, Some(oid1), false).is_ok());
-        assert!(trunk_audit.verify_telemetry_update_policy(None, Some(oid1), true).is_err());
-        assert!(trunk_audit.verify_telemetry_update_policy(Some(oid1), None, false).is_err());
+        assert!(trunk_audit
+            .verify_telemetry_update_policy(None, Some(oid1), false)
+            .is_ok());
+        assert!(trunk_audit
+            .verify_telemetry_update_policy(None, Some(oid1), true)
+            .is_err());
+        assert!(trunk_audit
+            .verify_telemetry_update_policy(Some(oid1), None, false)
+            .is_err());
     }
 }

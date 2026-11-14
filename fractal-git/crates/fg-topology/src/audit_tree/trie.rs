@@ -40,33 +40,44 @@ pub(crate) fn insert_trie_entry(
     blob_oid: Oid,
 ) -> FractalResult<()> {
     let mut parts = rel_path.split('/').peekable();
-    let mut current = node;
-    while let Some(segment) = parts.next() {
-        if segment.is_empty() {
-            return Err(FractalError::PolicyViolation(format!(
-                "empty segment in audit path '{rel_path}'"
-            )));
-        }
-        if parts.peek().is_none() {
-            current.insert(String::from(segment), TreeNode::Blob(blob_oid));
-            return Ok(());
-        }
-        let entry = current
-            .entry(String::from(segment))
-            .or_insert_with(|| TreeNode::Dir(BTreeMap::new()));
-        match entry {
-            TreeNode::Dir(child_map) => current = child_map,
-            TreeNode::Blob(_) => {
-                return Err(FractalError::PolicyViolation(format!(
-                    "audit tree file/dir collision on '{rel_path}'"
-                )));
-            }
-        }
-    }
-    Ok(())
+    insert_segments(node, &mut parts, rel_path, blob_oid)
 }
 
-pub(crate) fn cmp_git_tree_key(a_name: &str, a_is_dir: bool, b_name: &str, b_is_dir: bool) -> Ordering {
+fn insert_segments(
+    current: &mut BTreeMap<String, TreeNode>,
+    parts: &mut std::iter::Peekable<std::str::Split<'_, char>>,
+    rel_path: &str,
+    blob_oid: Oid,
+) -> FractalResult<()> {
+    let Some(segment) = parts.next() else {
+        return Ok(());
+    };
+    if segment.is_empty() {
+        return Err(FractalError::PolicyViolation(format!(
+            "empty segment in audit path '{rel_path}'"
+        )));
+    }
+    if parts.peek().is_none() {
+        current.insert(segment.to_owned(), TreeNode::Blob(blob_oid));
+        return Ok(());
+    }
+    if !current.contains_key(segment) {
+        current.insert(segment.to_owned(), TreeNode::Dir(BTreeMap::new()));
+    }
+    let Some(TreeNode::Dir(child_map)) = current.get_mut(segment) else {
+        return Err(FractalError::PolicyViolation(format!(
+            "audit tree file/dir collision on '{rel_path}'"
+        )));
+    };
+    insert_segments(child_map, parts, rel_path, blob_oid)
+}
+
+pub(crate) fn cmp_git_tree_key(
+    a_name: &str,
+    a_is_dir: bool,
+    b_name: &str,
+    b_is_dir: bool,
+) -> Ordering {
     let mut a_bytes = a_name.as_bytes().iter().copied();
     let mut b_bytes = b_name.as_bytes().iter().copied();
     loop {
@@ -77,10 +88,18 @@ pub(crate) fn cmp_git_tree_key(a_name: &str, a_is_dir: bool, b_name: &str, b_is_
             },
             (None, None) => return a_is_dir.cmp(&b_is_dir),
             (None, Some(bc)) => {
-                return if a_is_dir { b'/'.cmp(&bc) } else { Ordering::Less };
+                return if a_is_dir {
+                    b'/'.cmp(&bc)
+                } else {
+                    Ordering::Less
+                };
             }
             (Some(ac), None) => {
-                return if b_is_dir { ac.cmp(&b'/') } else { Ordering::Greater };
+                return if b_is_dir {
+                    ac.cmp(&b'/')
+                } else {
+                    Ordering::Greater
+                };
             }
         }
     }

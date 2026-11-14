@@ -110,11 +110,21 @@ impl AuditTreeMaterializer {
         let tree_oid = write_tree_node(odb, &root_trie)?;
         let prev_oid = spec.target_ref.read_oid(git_dir)?;
         let commit_payload = format_audit_commit_payload(
-            tree_oid, prev_oid, spec.rollup_parents, spec.author, spec.source_commit, spec.message,
+            tree_oid,
+            prev_oid,
+            spec.rollup_parents,
+            spec.author,
+            spec.source_commit,
+            spec.message,
         );
         let commit_oid = odb.write_object(OBJ_COMMIT, commit_payload.as_bytes())?;
-        spec.target_ref.verify_telemetry_update_policy(prev_oid, Some(commit_oid), false)?;
-        DiskRefStore::new(git_dir).update_ref(&spec.target_ref.to_git_ref(), &commit_oid, prev_oid.as_ref())?;
+        spec.target_ref
+            .verify_telemetry_update_policy(prev_oid, Some(commit_oid), false)?;
+        DiskRefStore::new(git_dir).update_ref(
+            &spec.target_ref.to_git_ref(),
+            &commit_oid,
+            prev_oid.as_ref(),
+        )?;
         Ok(AuditMaterializeResult {
             target_ref: spec.target_ref.to_git_ref(),
             commit_oid,
@@ -143,19 +153,37 @@ impl AuditTreeMaterializer {
                 child_tree_oid: cur_tree.to_hex(),
                 source_commit_oid: spec.source_commit.map(|oid| oid.to_hex()),
             };
-            let rollup_json = serde_json::to_vec_pretty(&meta)
-                .map_err(|err| FractalError::ObjectCodec(format!("failed to encode rollup meta: {err}")))?;
-            let rollup_path = format!("rollups/{}.json", sanitize_ref_component(&meta.child_ref));
-            let mut merged: Vec<AuditArtifactEntry<'_>> = Vec::with_capacity(spec.entries.len() + 1);
-            merged.extend_from_slice(spec.entries);
-            merged.push(AuditArtifactEntry { path: &rollup_path, payload: &rollup_json });
-            let msg = format!("audit-rollup: inherit {} -> {}\n", meta.child_ref, parent_ref.to_git_ref());
-            let parents = [cur_commit];
-            let p_res = Self::materialize_commit(odb, git_dir, &AuditCommitSpec {
-                target_ref: &parent_ref, message: &msg, author: spec.author,
-                source_commit: spec.source_commit, rollup_parents: &parents, entries: &merged,
+            let rollup_json = serde_json::to_vec_pretty(&meta).map_err(|err| {
+                FractalError::ObjectCodec(format!("failed to encode rollup meta: {err}"))
             })?;
-            base.rolled_up_refs.push((p_res.target_ref, p_res.commit_oid));
+            let rollup_path = format!("rollups/{}.json", sanitize_ref_component(&meta.child_ref));
+            let mut merged: Vec<AuditArtifactEntry<'_>> =
+                Vec::with_capacity(spec.entries.len() + 1);
+            merged.extend_from_slice(spec.entries);
+            merged.push(AuditArtifactEntry {
+                path: &rollup_path,
+                payload: &rollup_json,
+            });
+            let msg = format!(
+                "audit-rollup: inherit {} -> {}\n",
+                meta.child_ref,
+                parent_ref.to_git_ref()
+            );
+            let parents = [cur_commit];
+            let p_res = Self::materialize_commit(
+                odb,
+                git_dir,
+                &AuditCommitSpec {
+                    target_ref: &parent_ref,
+                    message: &msg,
+                    author: spec.author,
+                    source_commit: spec.source_commit,
+                    rollup_parents: &parents,
+                    entries: &merged,
+                },
+            )?;
+            base.rolled_up_refs
+                .push((p_res.target_ref, p_res.commit_oid));
             cur_ref = parent_ref;
             cur_commit = p_res.commit_oid;
             cur_tree = p_res.tree_oid;
@@ -209,16 +237,25 @@ impl AuditTreeMaterializer {
             let raw = odb.read_object(&commit_oid)?;
             let (kind, payload) = parse_loose_header(&raw)?;
             if kind != ObjectKind::Commit {
-                return Err(FractalError::ObjectCodec(format!("{commit_oid} is not a commit object")));
+                return Err(FractalError::ObjectCodec(format!(
+                    "{commit_oid} is not a commit object"
+                )));
             }
             let header = parse_commit_header(payload)?;
             let parents = collect_commit_parents(payload)?;
             cursor = parents.first().copied();
-            let timestamp_sec = header.committer.split_whitespace().nth_back(1)
-                .and_then(|s| s.parse::<i64>().ok()).unwrap_or(0);
+            let timestamp_sec = header
+                .committer
+                .split_whitespace()
+                .nth_back(1)
+                .and_then(|s| s.parse::<i64>().ok())
+                .unwrap_or(0);
             traces.push(AuditCommitTrace {
-                commit_oid, tree_oid: header.tree, parents,
-                summary: extract_commit_summary_line(payload), timestamp_sec,
+                commit_oid,
+                tree_oid: header.tree,
+                parents,
+                summary: extract_commit_summary_line(payload),
+                timestamp_sec,
             });
         }
         Ok(traces)

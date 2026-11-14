@@ -66,16 +66,23 @@ fn read_verified_blob(odb: &impl OdbStore, entry_oid: &Oid) -> FractalResult<Opt
     Ok(Some(blob_payload.to_vec()))
 }
 
-pub(crate) fn lookup_tree_entry(payload: &[u8], target: &str) -> FractalResult<Option<(bool, Oid)>> {
+pub(crate) fn lookup_tree_entry(
+    payload: &[u8],
+    target: &str,
+) -> FractalResult<Option<(bool, Oid)>> {
     let mut cursor = 0usize;
     while cursor < payload.len() {
         let Some(space_rel) = payload[cursor..].iter().position(|&b| b == b' ') else {
-            return Err(FractalError::ObjectCodec("malformed tree entry mode".into()));
+            return Err(FractalError::ObjectCodec(
+                "malformed tree entry mode".into(),
+            ));
         };
         let mode_slice = &payload[cursor..cursor + space_rel];
         let name_start = cursor + space_rel + 1;
         let Some(nul_rel) = payload[name_start..].iter().position(|&b| b == 0) else {
-            return Err(FractalError::ObjectCodec("malformed tree entry name".into()));
+            return Err(FractalError::ObjectCodec(
+                "malformed tree entry name".into(),
+            ));
         };
         let name_slice = std::str::from_utf8(&payload[name_start..name_start + nul_rel])
             .map_err(|_| FractalError::ObjectCodec("non-utf8 tree entry name".into()))?;
