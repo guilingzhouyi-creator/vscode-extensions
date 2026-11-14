@@ -95,11 +95,11 @@ static func encode_to_bytes(packet: AgentHudTelemetryPacketDTO) -> PackedByteArr
 	if packet == null:
 		return PackedByteArray()
 
-	var spb := _get_encoder()
+	var stream_buffer := _get_encoder()
 
 	# 1. 头部信封 (16 字节)
-	spb.put_u32(MAGIC_HEADER)
-	spb.put_u8(PROTOCOL_VER)
+	stream_buffer.put_u32(MAGIC_HEADER)
+	stream_buffer.put_u8(PROTOCOL_VER)
 
 	var flags: int = 0
 	if packet.preempted_by_human:
@@ -110,47 +110,47 @@ static func encode_to_bytes(packet: AgentHudTelemetryPacketDTO) -> PackedByteArr
 		flags |= 4
 	if packet.observation != null:
 		flags |= 8
-	spb.put_u8(flags)
+	stream_buffer.put_u8(flags)
 
-	spb.put_u16(packet.sequence_index & 0xFFFF)
-	spb.put_64(packet.timestamp_ms)
+	stream_buffer.put_u16(packet.sequence_index & 0xFFFF)
+	stream_buffer.put_64(packet.timestamp_ms)
 
 	# 2. 纯净观测切片标量
 	if packet.observation != null:
-		var obs := packet.observation
-		spb.put_u16(obs.level)
-		spb.put_u8(int(clampf(obs.hp_ratio * RATIO_BYTE_SCALE, 0.0, RATIO_BYTE_SCALE)))
-		spb.put_u8(int(clampf(obs.mp_ratio * RATIO_BYTE_SCALE, 0.0, RATIO_BYTE_SCALE)))
-		spb.put_u8(int(clampf(obs.ap_ratio * RATIO_BYTE_SCALE, 0.0, RATIO_BYTE_SCALE)))
-		spb.put_float(obs.hp_current)
-		spb.put_float(obs.hp_max)
-		spb.put_float(obs.ap_current)
-		spb.put_float(obs.ap_max)
-		spb.put_u32(maxi(0, obs.wallet_gold))
-		spb.put_u16(maxi(0, obs.unallocated_potential_points))
-		spb.put_u16(maxi(0, obs.unread_mail_count))
-		var phase_code: int = int(PHASE_TO_CODE.get(obs.day_phase_key, 0))
-		spb.put_u8(phase_code)
+		var observation_slice := packet.observation
+		stream_buffer.put_u16(observation_slice.level)
+		stream_buffer.put_u8(int(clampf(observation_slice.hp_ratio * RATIO_BYTE_SCALE, 0.0, RATIO_BYTE_SCALE)))
+		stream_buffer.put_u8(int(clampf(observation_slice.mp_ratio * RATIO_BYTE_SCALE, 0.0, RATIO_BYTE_SCALE)))
+		stream_buffer.put_u8(int(clampf(observation_slice.ap_ratio * RATIO_BYTE_SCALE, 0.0, RATIO_BYTE_SCALE)))
+		stream_buffer.put_float(observation_slice.hp_current)
+		stream_buffer.put_float(observation_slice.hp_max)
+		stream_buffer.put_float(observation_slice.ap_current)
+		stream_buffer.put_float(observation_slice.ap_max)
+		stream_buffer.put_u32(maxi(0, observation_slice.wallet_gold))
+		stream_buffer.put_u16(maxi(0, observation_slice.unallocated_potential_points))
+		stream_buffer.put_u16(maxi(0, observation_slice.unread_mail_count))
+		var phase_code: int = int(PHASE_TO_CODE.get(observation_slice.day_phase_key, 0))
+		stream_buffer.put_u8(phase_code)
 
 	# 3. 因果差分列表
 	var delta_count: int = mini(255, packet.causal_deltas.size())
-	spb.put_u8(delta_count)
-	for i in range(delta_count):
-		var d: HudCausalDeltaDTO = packet.causal_deltas[i]
-		var f_code: int = int(FIELD_TO_CODE.get(d.target_field, 0))
-		spb.put_u8(f_code)
-		spb.put_float(d.delta_amount)
+	stream_buffer.put_u8(delta_count)
+	for delta_index in range(delta_count):
+		var delta_item: HudCausalDeltaDTO = packet.causal_deltas[delta_index]
+		var field_code: int = int(FIELD_TO_CODE.get(delta_item.target_field, 0))
+		stream_buffer.put_u8(field_code)
+		stream_buffer.put_float(delta_item.delta_amount)
 
 	# 4. 动态行动空间指令集
-	var act_count: int = mini(255, packet.action_space.size())
-	spb.put_u8(act_count)
-	for i in range(act_count):
-		var a: AgentActionDirectiveDTO = packet.action_space[i]
-		var dir_code: int = int(DIR_TO_CODE.get(a.directive_id, 0))
-		spb.put_u8(dir_code)
-		spb.put_u8(1 if a.is_executable else 0)
+	var action_count: int = mini(255, packet.action_space.size())
+	stream_buffer.put_u8(action_count)
+	for action_index in range(action_count):
+		var directive_item: AgentActionDirectiveDTO = packet.action_space[action_index]
+		var directive_code: int = int(DIR_TO_CODE.get(directive_item.directive_id, 0))
+		stream_buffer.put_u8(directive_code)
+		stream_buffer.put_u8(1 if directive_item.is_executable else 0)
 
-	return spb.data_array
+	return stream_buffer.data_array
 
 ## 从 PackedByteArray 字节流反解为 AgentHudTelemetryPacketDTO (支持原位槽位复用)
 static func decode_from_bytes(
@@ -160,79 +160,79 @@ static func decode_from_bytes(
 	if bytes.size() < 16:
 		return null
 
-	var spb := _get_decoder(bytes)
+	var stream_buffer := _get_decoder(bytes)
 
 	# 1. 头部魔数与协议校验
-	var magic: int = spb.get_u32()
+	var magic: int = stream_buffer.get_u32()
 	if magic != MAGIC_HEADER:
 		return null
-	var ver: int = spb.get_u8()
-	if ver != PROTOCOL_VER:
+	var protocol_version: int = stream_buffer.get_u8()
+	if protocol_version != PROTOCOL_VER:
 		return null
 
-	var pkt: AgentHudTelemetryPacketDTO = out_packet if out_packet != null else AgentHudTelemetryPacketDTO.new()
-	pkt.reset_state()
-	pkt.protocol_version = "1.0.0"
+	var packet: AgentHudTelemetryPacketDTO = out_packet if out_packet != null else AgentHudTelemetryPacketDTO.new()
+	packet.reset_state()
+	packet.protocol_version = "1.0.0"
 
-	var flags: int = spb.get_u8()
-	pkt.preempted_by_human = (flags & 1) != 0
-	pkt.is_writable = (flags & 2) != 0
-	pkt.is_terminal = (flags & 4) != 0
-	var has_obs: bool = (flags & 8) != 0
+	var flags: int = stream_buffer.get_u8()
+	packet.preempted_by_human = (flags & 1) != 0
+	packet.is_writable = (flags & 2) != 0
+	packet.is_terminal = (flags & 4) != 0
+	var has_observation: bool = (flags & 8) != 0
 
-	pkt.sequence_index = spb.get_u16()
-	pkt.timestamp_ms = spb.get_64()
-	pkt.packet_id = "pkt_home_%d_%04d" % [int(pkt.timestamp_ms / 1000), pkt.sequence_index]
-	pkt.human_interaction_state = "ACTIVE" if pkt.preempted_by_human else "IDLE"
-	pkt.agent_control_mode = "READ_ONLY_OBSERVER" if pkt.preempted_by_human else "READ_WRITE"
-	pkt.active_operator = "HUMAN_PLAYER" if pkt.preempted_by_human else "AGENT"
+	packet.sequence_index = stream_buffer.get_u16()
+	packet.timestamp_ms = stream_buffer.get_64()
+	packet.packet_id = "pkt_home_%d_%04d" % [int(packet.timestamp_ms / 1000), packet.sequence_index]
+	packet.human_interaction_state = "ACTIVE" if packet.preempted_by_human else "IDLE"
+	packet.agent_control_mode = "READ_ONLY_OBSERVER" if packet.preempted_by_human else "READ_WRITE"
+	packet.active_operator = "HUMAN_PLAYER" if packet.preempted_by_human else "AGENT"
 
 	# 2. 还原纯净观测切片
-	if has_obs:
-		if pkt.observation == null:
-			pkt.observation = AgentHudContextSliceDTO.new()
-		pkt.observation.reset_state()
-		var obs := pkt.observation
-		obs.level = spb.get_u16()
-		obs.hp_ratio = float(spb.get_u8()) / RATIO_BYTE_SCALE
-		obs.mp_ratio = float(spb.get_u8()) / RATIO_BYTE_SCALE
-		obs.ap_ratio = float(spb.get_u8()) / RATIO_BYTE_SCALE
-		obs.hp_current = spb.get_float()
-		obs.hp_max = spb.get_float()
-		obs.ap_current = spb.get_float()
-		obs.ap_max = spb.get_float()
-		obs.wallet_gold = spb.get_u32()
-		obs.unallocated_potential_points = spb.get_u16()
-		obs.unread_mail_count = spb.get_u16()
-		var phase_code: int = spb.get_u8()
-		obs.day_phase_key = str(CODE_TO_PHASE.get(phase_code, "UNKNOWN"))
+	if has_observation:
+		if packet.observation == null:
+			packet.observation = AgentHudContextSliceDTO.new()
+		packet.observation.reset_state()
+		var observation_slice := packet.observation
+		observation_slice.level = stream_buffer.get_u16()
+		observation_slice.hp_ratio = float(stream_buffer.get_u8()) / RATIO_BYTE_SCALE
+		observation_slice.mp_ratio = float(stream_buffer.get_u8()) / RATIO_BYTE_SCALE
+		observation_slice.ap_ratio = float(stream_buffer.get_u8()) / RATIO_BYTE_SCALE
+		observation_slice.hp_current = stream_buffer.get_float()
+		observation_slice.hp_max = stream_buffer.get_float()
+		observation_slice.ap_current = stream_buffer.get_float()
+		observation_slice.ap_max = stream_buffer.get_float()
+		observation_slice.wallet_gold = stream_buffer.get_u32()
+		observation_slice.unallocated_potential_points = stream_buffer.get_u16()
+		observation_slice.unread_mail_count = stream_buffer.get_u16()
+		var phase_code: int = stream_buffer.get_u8()
+		observation_slice.day_phase_key = str(CODE_TO_PHASE.get(phase_code, "UNKNOWN"))
 
 	# 3. 还原因果差分
-	pkt.causal_deltas.clear()
-	var delta_count: int = spb.get_u8()
-	for i in range(delta_count):
-		pkt.causal_deltas.append(_decode_causal_delta_entry(spb))
+	packet.causal_deltas.clear()
+	var delta_count: int = stream_buffer.get_u8()
+	for delta_index in range(delta_count):
+		packet.causal_deltas.append(_decode_causal_delta_entry(stream_buffer))
 
 	# 4. 还原行动空间
-	pkt.action_space.clear()
-	var act_count: int = spb.get_u8()
-	for i in range(act_count):
-		pkt.action_space.append(_decode_action_directive_entry(spb))
+	packet.action_space.clear()
+	var action_count: int = stream_buffer.get_u8()
+	for action_index in range(action_count):
+		packet.action_space.append(_decode_action_directive_entry(stream_buffer))
 
-	return pkt
+	return packet
 
-static func _decode_causal_delta_entry(spb: StreamPeerBuffer) -> HudCausalDeltaDTO:
-	var f_code: int = spb.get_u8()
-	var amt: float = spb.get_float()
+static func _decode_causal_delta_entry(stream_buffer: StreamPeerBuffer) -> HudCausalDeltaDTO:
+	var field_code: int = stream_buffer.get_u8()
+	var delta_amount: float = stream_buffer.get_float()
 	var delta := HudCausalDeltaDTO.new()
-	delta.target_field = str(CODE_TO_FIELD.get(f_code, "unknown"))
-	delta.delta_amount = amt
+	delta.target_field = str(CODE_TO_FIELD.get(field_code, "unknown"))
+	delta.delta_amount = delta_amount
 	return delta
 
-static func _decode_action_directive_entry(spb: StreamPeerBuffer) -> AgentActionDirectiveDTO:
-	var dir_code: int = spb.get_u8()
-	var exec_bit: int = spb.get_u8()
-	var dir := AgentActionDirectiveDTO.new()
-	dir.directive_id = str(CODE_TO_DIR.get(dir_code, "UNKNOWN_DIRECTIVE"))
-	dir.is_executable = (exec_bit == 1)
-	return dir
+static func _decode_action_directive_entry(stream_buffer: StreamPeerBuffer) -> AgentActionDirectiveDTO:
+	var directive_code: int = stream_buffer.get_u8()
+	var executable_flag: int = stream_buffer.get_u8()
+	var directive := AgentActionDirectiveDTO.new()
+	directive.directive_id = str(CODE_TO_DIR.get(directive_code, "UNKNOWN_DIRECTIVE"))
+	directive.is_executable = (executable_flag == 1)
+	return directive
