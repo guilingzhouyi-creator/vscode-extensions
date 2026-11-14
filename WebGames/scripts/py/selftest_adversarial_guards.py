@@ -24,6 +24,7 @@ import audit_script_comment
 import audit_secrets
 from lib.arch_guard_rules import check_tc_arch_12, check_tc_arch_13, check_tc_arch_14
 from lib.audit_sdk_protocol_rules import _check_esc_action_enum_parity
+from gd import style_rules
 
 ensure_utf8_stdout()
 
@@ -149,6 +150,34 @@ def _test_case_sensitive_res_and_esc_drift() -> list[str]:
     return failures
 
 
+def _test_gd_strict_style_evasion() -> list[str]:
+    """对抗样本 5：验证后端与非视图前端六字段路径、类与文件对齐、文档注释、黑话及缩写声明必被拦截。"""
+    failures: list[str] = []
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        bad_dir = root / "backend" / "domains" / "probe"
+        bad_dir.mkdir(parents=True, exist_ok=True)
+        bad_gd = bad_dir / "probe_sample.gd"
+        bad_gd.write_text(
+            "# 模块归属: Test\n"
+            "# 文件路径: res://backend/domains/probe/stale_name.gd\n"
+            "# 职责说明: R-18 临时兜底测试\n"
+            "class_name WrongClassName extends RefCounted\n"
+            "func do_work(req: Dictionary) -> void:\n"
+            "\tvar res: int = 0\n"
+            "\tfor k in req.keys():\n"
+            "\t\tres += int(k)\n",
+            encoding="utf-8",
+        )
+        violations: list[str] = []
+        style_rules.audit_file(bad_gd, violations, base_root=root)
+        joined = "\n".join(violations)
+        for tag in ("STYLE-HDR-001", "STYLE-CLS-001", "STYLE-DOC-001", "STYLE-JRG-001", "STYLE-NAM-002"):
+            if tag not in joined:
+                failures.append(f"gd/style_rules 对抗样本未拦截 {tag} (实得: {violations})")
+    return failures
+
+
 def main() -> int:
     """CLI 入口：运行脚本库对抗性逃逸全量自检并返回退出码。"""
     failures: list[str] = []
@@ -156,6 +185,7 @@ def main() -> int:
     failures.extend(_test_quote_masking_hardcode())
     failures.extend(_test_arch_log_and_crypto_evasion())
     failures.extend(_test_case_sensitive_res_and_esc_drift())
+    failures.extend(_test_gd_strict_style_evasion())
 
     if failures:
         for item in failures:

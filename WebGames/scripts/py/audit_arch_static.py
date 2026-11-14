@@ -594,11 +594,11 @@ def check_tc_arch_08(ctx: ArchitectureAuditContext) -> list[dict[str, Any]]:
   else:
     _, content = ctx.gd_sources.get(solver_path, ("", ""))
     if re.search(r"\bGameLoopStateStack\b", content):
-      violations_b.append("account_slot_binding_solver.gd 严禁引用 GameLoopStateStack 符号")
+      violations_b.append("account_slot_binding_solver.gd 严禁引用 GameLoopFSM 符号")
 
   return [
     make_result("TC-ARCH-08A: 全量业务领域严禁包含基础设施层预加载路径", violations_a),
-    make_result("TC-ARCH-08B: 账号槽位解算器严禁引用 GameLoopStateStack", violations_b),
+    make_result("TC-ARCH-08B: 账号槽位解算器严禁引用 GameLoopFSM", violations_b),
   ]
 
 

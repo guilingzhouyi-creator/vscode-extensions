@@ -14,15 +14,15 @@ const SnapshotEnvironmentGuard = preload("res://dev_harness/snapshot_mode/snapsh
 const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
 const SessionFlowContextDTO = preload("res://backend/domains/lifecycle/dto/session_flow_context_dto.gd")
 const GameLifecycleManager = preload("res://backend/domains/lifecycle/game_lifecycle_manager.gd")
-const GameLifecycleModel = preload("res://backend/domains/lifecycle/lifecycle_model.gd")
+const GameLifecycleModel = preload("res://backend/domains/lifecycle/game_lifecycle_model.gd")
 const AuthoritativeHudSyncService = preload("res://backend/domains/world_state/services/authoritative_hud_sync_service.gd")
 const HudStatusSnapshotDTO = preload("res://backend/domains/world_state/dto/hud_status_snapshot_dto.gd")
-const CharacterPhysiologySheet = preload("res://backend/domains/lifecycle_physiology/physiology_entities.gd")
-const CharacterWalletEntity = preload("res://backend/domains/currency_economy/currency_entities.gd")
+const CharacterPhysiologySheet = preload("res://backend/domains/lifecycle_physiology/character_physiology_sheet.gd")
+const CharacterWalletEntity = preload("res://backend/domains/currency_economy/character_wallet_entity.gd")
 const AuthService = preload("res://backend/domains/account/auth_service.gd")
 const RuntimeModeGate = preload("res://backend/domains/persistence_protocol/runtime_mode_gate.gd")
 const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
-const AccountProfileAggregate = preload("res://backend/domains/account/account_profile.gd")
+const AccountProfile = preload("res://backend/domains/account/account_profile.gd")
 
 const STAGE_INDEX_HUD_SYNC: int = 6
 const STAGE_INDEX_FULL_EXIT: int = 10
@@ -284,7 +284,7 @@ static func _acquire_and_populate_context(snapshot: TestSnapshotBundleDTO) -> Se
 static func _hydrate_account_to_repository(snapshot: TestSnapshotBundleDTO) -> String:
     if snapshot.account_id.is_empty() and snapshot.username.is_empty():
         return ""
-    var acc := AccountProfileAggregate.new()
+    var acc := AccountProfile.new()
     acc.account_id = snapshot.account_id if not snapshot.account_id.is_empty() else "ACC_DEV_INJECTED"
     acc.username = snapshot.username if not snapshot.username.is_empty() else "DevAdventurer"
     acc.active_slot_id = snapshot.slot_id if not snapshot.slot_id.is_empty() else "SLOT_01"

@@ -67,14 +67,14 @@ def _iter_gd_sources(
 
 # 持久化核心实体聚合根列表与声明文件路径映射
 CORE_PERSISTENCE_CLASSES: tuple[tuple[str, str], ...] = (
-  ("AccountProfileAggregate", "backend/domains/account/account_profile.gd"),
+  ("AccountProfile", "backend/domains/account/account_profile.gd"),
   ("CharacterProfile", "backend/domains/account/character_profile.gd"),
   ("CharacterPrologueContext", "backend/domains/character_creation/character_prologue_context.gd"),
-  ("WearableInventoryAggregate", "backend/domains/inventory/wearable_inventory.gd"),
+  ("WearableInventoryAggregate", "backend/domains/inventory/wearable_inventory_aggregate.gd"),
   ("WorldInstance", "backend/domains/world_state/world_instance.gd"),
-  ("SaveSlotSummaryDTO", "backend/domains/account/save_slot_dto.gd"),
-  ("EquipmentLoadoutAggregate", "backend/domains/equipment_loadout/equipment_loadout_entity.gd"),
-  ("SkillSubgraphAST", "backend/domains/lattice_skill_book/skill_lattice_entities.gd"),
+  ("SaveSlotDTO", "backend/domains/account/save_slot_dto.gd"),
+  ("EquipmentLoadoutAggregate", "backend/domains/equipment_loadout/equipment_loadout_aggregate.gd"),
+  ("SkillSubgraphAST", "backend/domains/lattice_skill_book/skill_subgraph_ast.gd"),
 )
 
 

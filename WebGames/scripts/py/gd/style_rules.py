@@ -25,6 +25,13 @@ from gd.gd_common import (
     GDFileCache,
     get_gd_files,
 )
+from gd.strict_governance_rules import (
+    CLASS_NAME_STRICT_RE,
+    check_strict_class_and_docs,
+    check_strict_header,
+    check_strict_jargon_and_decls,
+    is_strict_governance_target,
+)
 STYLE_CLASS_NAME_RE = re.compile(r"\bclass_name\s+([A-Za-z_][A-Za-z0-9_]*)")
 STYLE_INNER_CLASS_RE = re.compile(r"^\s*class\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:extends\s+[A-Za-z0-9_]+)?\s*:")
 STYLE_FUNC_RE = re.compile(r"^\s*(?:static\s+)?func\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
@@ -32,16 +39,16 @@ STYLE_VAR_RE = re.compile(r"^\s*(?:static\s+)?var\s+([A-Za-z_][A-Za-z0-9_]*)\s*[
 STYLE_CONST_RE = re.compile(r"^\s*(?:static\s+)?const\s+([A-Za-z_][A-Za-z0-9_]*)\s*[:=]")
 PENDING_MARKER_RE = re.compile(r"#.*\b(TODO|FIXME|XXX|HACK)\b")
 HEADER_MUST = ("文件路径:", "职责")
-
-CLASS_NAME_STRICT_RE = re.compile(r"^[A-Z][A-Za-z0-9]*$")
 ALLOWED_SHORT_FUNCS = frozenset({"on", "to", "as", "is", "up", "in"})
 
 
 def _audit_file_header(rel: Path, lines: list[str], text: str, violations: list[str]) -> None:
     """校验文件头部注释与全局调用禁令。"""
-    head = "\n".join(lines[:14])
+    head = "\n".join(lines[:15])
     rel_posix = rel.as_posix()
-    if not rel_posix.startswith("tests/"):
+    if is_strict_governance_target(rel_posix):
+        check_strict_header(rel, rel_posix, head, violations)
+    elif not rel_posix.startswith("tests/"):
         for marker in HEADER_MUST:
             if marker not in head:
                 violations.append(f"{rel}: 文件头缺少「{marker}」注释")
@@ -119,9 +126,11 @@ def _audit_line_style(rel: Path, i: int, ln: str, violations: list[str]) -> None
     _check_style_const_and_marker(rel, i, ln, violations)
 
 
-def audit_file(path: Path, violations: list[str]) -> None:
+def audit_file(path: Path, violations: list[str], base_root: Path | None = None) -> None:
     """对单个 .gd 文件进行编码风格与头部注释静态检查。"""
-    rel = path.relative_to(ROOT)
+    root_dir = base_root if base_root is not None else ROOT
+    rel = path.relative_to(root_dir)
+    rel_posix = rel.as_posix()
     if not FILE_NAME_RE.match(path.name):
         violations.append(f"{rel}: 文件名应为 snake_case（{path.name}）")
     try:
@@ -131,6 +140,13 @@ def audit_file(path: Path, violations: list[str]) -> None:
         return
 
     _audit_file_header(rel, lines, text, violations)
+    if is_strict_governance_target(rel_posix):
+        check_strict_class_and_docs(
+            rel, path.name, lines, violations, STYLE_CLASS_NAME_RE, STYLE_FUNC_RE
+        )
+        check_strict_jargon_and_decls(
+            rel, lines, violations, STYLE_FUNC_RE, STYLE_VAR_RE
+        )
 
     for i, ln in enumerate(lines, 1):
         _audit_line_style(rel, i, ln, violations)
