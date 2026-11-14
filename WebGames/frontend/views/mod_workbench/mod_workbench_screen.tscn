@@ -1,0 +1,143 @@
+[gd_scene load_steps=2 format=3 uid="uid://c8modworkbnch1"]
+
+[ext_resource type="Script" path="res://frontend/views/mod_workbench/mod_workbench_screen.gd" id="1_mod_workbench"]
+
+[node name="ModWorkbenchScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_mod_workbench")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.06, 0.08, 0.12, 1)
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 20
+
+[node name="MainVBox" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="HeaderPanel" type="PanelContainer" parent="Margin/MainVBox"]
+layout_mode = 2
+
+[node name="HeaderHBox" type="HBoxContainer" parent="Margin/MainVBox/HeaderPanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="Margin/MainVBox/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 24
+text = "MOD WORKBENCH"
+
+[node name="SummaryBadgeLabel" type="Label" parent="Margin/MainVBox/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = ""
+
+[node name="SaveAndPrecheckBtn" type="Button" parent="Margin/MainVBox/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "APPLY & PRECHECK"
+
+[node name="BackBtn" type="Button" parent="Margin/MainVBox/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "BACK"
+
+[node name="ScanBarHBox" type="HBoxContainer" parent="Margin/MainVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="CustomRootEdit" type="LineEdit" parent="Margin/MainVBox/ScanBarHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "user://mods/"
+
+[node name="RescanPacksBtn" type="Button" parent="Margin/MainVBox/ScanBarHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "RESCAN MODS"
+
+[node name="SplitHBox" type="HBoxContainer" parent="Margin/MainVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 16
+
+[node name="LeftPackVBox" type="VBoxContainer" parent="Margin/MainVBox/SplitHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="InstalledHeaderLabel" type="Label" parent="Margin/MainVBox/SplitHBox/LeftPackVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "INSTALLED MOD PACKS"
+
+[node name="InstalledPackList" type="ItemList" parent="Margin/MainVBox/SplitHBox/LeftPackVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="OrderControlsHBox" type="HBoxContainer" parent="Margin/MainVBox/SplitHBox/LeftPackVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="TogglePackBtn" type="Button" parent="Margin/MainVBox/SplitHBox/LeftPackVBox/OrderControlsHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "ENABLE / DISABLE"
+
+[node name="MoveUpBtn" type="Button" parent="Margin/MainVBox/SplitHBox/LeftPackVBox/OrderControlsHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "MOVE UP"
+
+[node name="MoveDownBtn" type="Button" parent="Margin/MainVBox/SplitHBox/LeftPackVBox/OrderControlsHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "MOVE DOWN"
+
+[node name="RightDetailVBox" type="VBoxContainer" parent="Margin/MainVBox/SplitHBox"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="DetailHeaderLabel" type="Label" parent="Margin/MainVBox/SplitHBox/RightDetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "PACK MANIFEST & DAG PRECHECK"
+
+[node name="PackDetailRichLabel" type="RichTextLabel" parent="Margin/MainVBox/SplitHBox/RightDetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = true
+
+[node name="PrecheckRichLabel" type="RichTextLabel" parent="Margin/MainVBox/SplitHBox/RightDetailVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = true
