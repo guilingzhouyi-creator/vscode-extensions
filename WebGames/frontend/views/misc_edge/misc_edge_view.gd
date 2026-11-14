@@ -1,11 +1,12 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端第17卷: 边缘与杂项系统视图控制器
+# 模块归属: 前端边缘系统视图域 (fe17 边缘与杂项系统)
 # 文件路径: res://frontend/views/misc_edge/misc_edge_view.gd
-# 职责: 假名面具切换(恶名/声望隔离)、精英突变词条激活与组合预览、
-#       地面拾取邻近提示框与规范命名空间检索；
-#       4 个 Tab 子界面由 MainTabContainer 承载，右下角返回按钮调 BaseScreen.back()。
-# 骨架阶段: 零接线、不接 EventBus，仅本地 Mock 数据驱动 + 按钮点击反馈。
+# 架构定位: BaseScreen 视图控制器；承载身份伪装、精英突变、地面拾取与规范命名
+# 依赖与触发: 依赖 ThemeManager、UIIntermediary、MockServiceContainer 与 MiscEdgeTabs
+# 职责说明: 管理身份伪装面具与地面掉落拾取交互，并委托页签子控制器处理突变与命名
+# 退出语义与设计依据: 返回操作调用 self.back()；突变与命名页签委托 MiscEdgeTabs
 # ==============================================================================
+## 边缘与杂项系统主视图控制器，协调身份伪装、突变词条、地面拾取与命名注册页签。
 class_name MiscEdgeView
 extends BaseScreen
 
@@ -55,9 +56,9 @@ enum NameType {CHARACTER, PET, GUILD, TITLE}
 @onready var _disguise_mask_list: ItemList = $%DisguiseMaskList
 @onready var _disguise_detail_name_label: Label = $%DisguiseDetailNameLabel
 @onready var _disguise_detail_origin_label: Label = $%DisguiseDetailOriginLabel
-@onready var _disguise_detail_desc_label: Label = $%DisguiseDetailDescLabel
-@onready var _disguise_cancel_btn: Button = $%DisguiseCancelBtn
-@onready var _disguise_switch_btn: Button = $%DisguiseSwitchBtn
+@onready var _disguise_detail_description_label: Label = $%DisguiseDetailDescLabel
+@onready var _disguise_cancel_button: Button = $%DisguiseCancelBtn
+@onready var _disguise_switch_button: Button = $%DisguiseSwitchBtn
 
 # --- Tab 1: MUTATION 精英突变 ---
 @onready var _mutation_filter_tabs: TabContainer = $%MutationFilterTabs
@@ -67,28 +68,28 @@ enum NameType {CHARACTER, PET, GUILD, TITLE}
 @onready var _mutation_detail_effect_label: Label = $%MutationDetailEffectLabel
 @onready var _mutation_detail_source_label: Label = $%MutationDetailSourceLabel
 @onready var _mutation_combo_preview_label: Label = $%MutationComboPreviewLabel
-@onready var _mutation_replace_btn: Button = $%MutationReplaceBtn
-@onready var _mutation_activate_btn: Button = $%MutationActivateBtn
+@onready var _mutation_replace_button: Button = $%MutationReplaceBtn
+@onready var _mutation_activate_button: Button = $%MutationActivateBtn
 
 # --- Tab 2: GROUND_DROP 地面掉落 ---
 @onready var _ground_filter_tabs: TabContainer = $%GroundFilterTabs
 @onready var _ground_range_label: Label = $%GroundRangeLabel
 @onready var _ground_item_count_label: Label = $%GroundItemCountLabel
 @onready var _ground_loot_list: ItemList = $%GroundLootList
-@onready var _ground_pickup_all_btn: Button = $%GroundPickupAllBtn
-@onready var _ground_pickup_btn: Button = $%GroundPickupBtn
+@onready var _ground_pickup_all_button: Button = $%GroundPickupAllBtn
+@onready var _ground_pickup_button: Button = $%GroundPickupBtn
 
 # --- Tab 3: NAME_REGISTRY 命名注册 ---
 @onready var _name_type_option: OptionButton = $%NameTypeOption
 @onready var _name_input: LineEdit = $%NameInput
-@onready var _name_check_btn: Button = $%NameCheckBtn
+@onready var _name_check_button: Button = $%NameCheckBtn
 @onready var _name_check_result_label: Label = $%NameCheckResultLabel
 @onready var _name_fee_label: Label = $%NameFeeLabel
-@onready var _name_register_btn: Button = $%NameRegisterBtn
+@onready var _name_register_button: Button = $%NameRegisterBtn
 @onready var _name_history_list: ItemList = $%NameHistoryList
 
 # --- 底部操作栏 ---
-@onready var _back_btn: Button = $%BackBtn
+@onready var _back_button: Button = $%BackBtn
 
 # ==============================================================================
 # 常量
@@ -111,16 +112,16 @@ var displayed_character_name: String = ""
 ## 伪装 Mock 数据列表
 var _disguise_masks: Array = []
 ## 当前选中的伪装索引
-var _selected_disguise_idx: int = -1
+var _selected_disguise_index: int = -1
 ## 伪装持续时间（秒，0 = 未启用）
 var _disguise_duration: float = 0.0
 ## 识破风险（0.0~1.0）
 var _disguise_detect_risk: float = 0.0
 
 ## 突变词条 Mock 数据
-var _mutation_data: Array = []
+var _mutation_entries: Array = []
 ## 当前选中的突变索引
-var _selected_mutation_idx: int = -1
+var _selected_mutation_index: int = -1
 ## 已激活的突变词条列表（最多 3 个）
 var _active_mutations: Array = []
 ## 当前突变筛选
@@ -129,7 +130,7 @@ var _mutation_filter: MutationFilter = MutationFilter.AVAILABLE
 ## 地面掉落 Mock 数据
 var ground_nearby_loot: Array = []
 ## 当前选中的掉落物索引
-var _selected_loot_idx: int = -1
+var _selected_loot_index: int = -1
 ## 当前地面筛选
 var _ground_filter: GroundFilter = GroundFilter.ALL
 ## 拾取范围（米）
@@ -144,7 +145,7 @@ var _name_history: Array = []
 # 生命周期
 # ==============================================================================
 
-## 生命周期初始化：主题/四 Tab 装配/静态文案/信号绑定/视觉适配（骨架零接线）
+## 生命周期初始化：完成主题应用、四页签装配、静态文案绑定与视觉适配。
 func _ready() -> void:
 	# 1. 应用主题
 	_apply_theme()
@@ -164,7 +165,7 @@ func _ready() -> void:
 	# 6. 初始化静态文案（i18n 注入）
 	_init_static_text()
 
-	# 7. 绑定信号（零接线：仅本地 UI 交互反馈）
+	# 7. 绑定信号（仅本地 UI 交互反馈）
 	_connect_signals()
 
 	# 8. 视图加载后批量视觉适配
@@ -176,9 +177,9 @@ func _ready() -> void:
 
 ## 应用 ThemeManager 单例主题（null 安全）
 func _apply_theme() -> void:
-	var tm := ThemeManager.get_instance()
-	if tm.theme != null:
-		theme = tm.theme
+	var theme_manager := ThemeManager.get_instance()
+	if theme_manager.theme != null:
+		theme = theme_manager.theme
 
 # ==============================================================================
 # 静态文案初始化（i18n 注入）
@@ -188,15 +189,15 @@ func _apply_theme() -> void:
 func _init_static_text() -> void:
 	UIIntermediary.resolve($MarginContainer/VBox/TopBar/TitleLabel, "ui.fe17.common.header_title")
 	UIIntermediary.resolve($MarginContainer/VBox/TopBar/TitleSubLabel, "ui.fe17.common.header_subtitle")
-	UIIntermediary.resolve(_back_btn, "ui.fe17.common.back")
+	UIIntermediary.resolve(_back_button, "ui.fe17.common.back")
 	KTabBar.init_titles(_main_tab_container, PackedStringArray(["ui.fe17.disguise.tab_title", "ui.fe17.mutation.tab_title", "ui.fe17.ground_drop.tab_title", "ui.fe17.name_registry.tab_title"]))
 	UIIntermediary.resolve($MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseLeftPanel/DisguiseMaskListLabel, "ui.fe17.disguise.mask_list_label")
 	UIIntermediary.resolve($MarginContainer/VBox/MainTabContainer/DisguiseTab/DisguiseRightPanel/DisguiseDetailSectionLabel, "ui.fe17.disguise.detail_section_label")
-	UIIntermediary.resolve(_disguise_cancel_btn, "ui.fe17.disguise.btn_cancel")
-	UIIntermediary.resolve(_disguise_switch_btn, "ui.fe17.disguise.btn_switch")
+	UIIntermediary.resolve(_disguise_cancel_button, "ui.fe17.disguise.btn_cancel")
+	UIIntermediary.resolve(_disguise_switch_button, "ui.fe17.disguise.btn_switch")
 	KTabBar.init_titles(_ground_filter_tabs, PackedStringArray(["ui.fe17.ground_drop.filter_all", "ui.fe17.ground_drop.filter_equipment", "ui.fe17.ground_drop.filter_material", "ui.fe17.ground_drop.filter_consumable"]))
-	UIIntermediary.resolve(_ground_pickup_all_btn, "ui.fe17.ground_drop.btn_pickup_all")
-	UIIntermediary.resolve(_ground_pickup_btn, "ui.fe17.ground_drop.btn_pickup")
+	UIIntermediary.resolve(_ground_pickup_all_button, "ui.fe17.ground_drop.btn_pickup_all")
+	UIIntermediary.resolve(_ground_pickup_button, "ui.fe17.ground_drop.btn_pickup")
 	_get_tabs().init_static_text()
 
 # ==============================================================================
@@ -220,9 +221,9 @@ func _init_disguise() -> void:
 ## 刷新伪装面具列表（名称填充）
 func _refresh_disguise_mask_list() -> void:
 	_disguise_mask_list.clear()
-	for mask in _disguise_masks:
-		var name := UIIntermediary.text(mask.get("name_key", ""))
-		_disguise_mask_list.add_item(name)
+	for mask_entry in _disguise_masks:
+		var mask_name := UIIntermediary.text(mask_entry.get("name_key", ""))
+		_disguise_mask_list.add_item(mask_name)
 
 ## 刷新当前身份展示：真实身份/伪装身份分派（名称/种族/职业/等级/状态/持续/风险）
 func _refresh_disguise_current() -> void:
@@ -237,11 +238,11 @@ func _refresh_disguise_current() -> void:
 		UIIntermediary.resolve(_disguise_detect_risk_label, "ui.fe17.disguise.risk_none")
 		_disguise_detect_risk_bar.value = 0.0
 	else:
-		for mask in _disguise_masks:
-			if mask.get("id", "") == current_disguise_mask_id:
-				UIIntermediary.resolve(_disguise_current_name_label, "ui.fe17.disguise.current_name", {"name": UIIntermediary.text(mask.get("name_key", ""))})
-				UIIntermediary.resolve(_disguise_current_race_label, "ui.fe17.disguise.race_label", {"race": UIIntermediary.text(mask.get("race_key", ""))})
-				UIIntermediary.resolve(_disguise_current_class_label, "ui.fe17.disguise.class_label", {"class": UIIntermediary.text(mask.get("class_key", ""))})
+		for mask_entry in _disguise_masks:
+			if mask_entry.get("id", "") == current_disguise_mask_id:
+				UIIntermediary.resolve(_disguise_current_name_label, "ui.fe17.disguise.current_name", {"name": UIIntermediary.text(mask_entry.get("name_key", ""))})
+				UIIntermediary.resolve(_disguise_current_race_label, "ui.fe17.disguise.race_label", {"race": UIIntermediary.text(mask_entry.get("race_key", ""))})
+				UIIntermediary.resolve(_disguise_current_class_label, "ui.fe17.disguise.class_label", {"class": UIIntermediary.text(mask_entry.get("class_key", ""))})
 				UIIntermediary.resolve(_disguise_current_level_label, "ui.fe17.disguise.level_label", {"level": 45})
 				UIIntermediary.resolve(_disguise_status_label, "ui.fe17.disguise.status_disguised")
 				break
@@ -251,18 +252,18 @@ func _refresh_disguise_current() -> void:
 		_disguise_detect_risk_bar.value = 15.0
 
 func _refresh_disguise_detail() -> void:
-	if _selected_disguise_idx < 0 or _selected_disguise_idx >= _disguise_masks.size():
+	if _selected_disguise_index < 0 or _selected_disguise_index >= _disguise_masks.size():
 		UIIntermediary.resolve(_disguise_detail_name_label, "ui.fe17.disguise.detail_select_prompt")
 		UIIntermediary.resolve(_disguise_detail_origin_label, "ui.fe17.disguise.detail_origin_default")
-		UIIntermediary.resolve(_disguise_detail_desc_label, "ui.fe17.disguise.detail_desc_prompt")
+		UIIntermediary.resolve(_disguise_detail_description_label, "ui.fe17.disguise.detail_desc_prompt")
 		return
-	var mask: Dictionary = _disguise_masks[_selected_disguise_idx]
-	var name := UIIntermediary.text(mask.get("name_key", ""))
-	UIIntermediary.resolve(_disguise_detail_name_label, "ui.fe17.disguise.detail_name", {"name": name})
-	var origin := UIIntermediary.text(mask.get("origin_key", ""))
-	UIIntermediary.resolve(_disguise_detail_origin_label, "ui.fe17.disguise.detail_origin_label", {"origin": origin})
-	var desc := UIIntermediary.text(mask.get("desc_key", ""))
-	UIIntermediary.resolve(_disguise_detail_desc_label, "ui.fe17.disguise.detail_desc", {"desc": desc})
+	var mask_entry: Dictionary = _disguise_masks[_selected_disguise_index]
+	var mask_name := UIIntermediary.text(mask_entry.get("name_key", ""))
+	UIIntermediary.resolve(_disguise_detail_name_label, "ui.fe17.disguise.detail_name", {"name": mask_name})
+	var mask_origin := UIIntermediary.text(mask_entry.get("origin_key", ""))
+	UIIntermediary.resolve(_disguise_detail_origin_label, "ui.fe17.disguise.detail_origin_label", {"origin": mask_origin})
+	var mask_description := UIIntermediary.text(mask_entry.get("desc_key", ""))
+	UIIntermediary.resolve(_disguise_detail_description_label, "ui.fe17.disguise.detail_desc", {"desc": mask_description})
 
 # ==============================================================================
 # Tab 1: MUTATION 精英突变委托
@@ -293,16 +294,16 @@ func _init_ground_drop() -> void:
 ## 刷新地面掉落列表：按分类筛选并渲染名称+剩余时间行
 func _refresh_ground_loot_list() -> void:
 	_ground_loot_list.clear()
-	for item in ground_nearby_loot:
-		var item_type: int = int(item.get("type", 0))
+	for loot_entry in ground_nearby_loot:
+		var item_type: int = int(loot_entry.get("type", 0))
 		# 根据筛选过滤
 		if _ground_filter != GroundFilter.ALL and item_type != _ground_filter:
 			continue
-		var remain: int = int(item.get("remain_sec", 0))
-		var remain_str := "%02d:%02d" % [remain / 60, remain % 60]
-		var item_name := UIIntermediary.text(item.get("name_key", ""))
-		var list_item := UIIntermediary.text("ui.fe17.ground_drop.list_item", {"name": item_name, "time": remain_str})
-		_ground_loot_list.add_item(list_item)
+		var remain_seconds: int = int(loot_entry.get("remain_sec", 0))
+		var remain_text := "%02d:%02d" % [remain_seconds / 60, remain_seconds % 60]
+		var item_name := UIIntermediary.text(loot_entry.get("name_key", ""))
+		var loot_item_text := UIIntermediary.text("ui.fe17.ground_drop.list_item", {"name": item_name, "time": remain_text})
+		_ground_loot_list.add_item(loot_item_text)
 
 ## 刷新地面状态：拾取范围 + 可见/总数计数
 func _refresh_ground_status() -> void:
@@ -322,21 +323,21 @@ func _refresh_name_history() -> void: _get_tabs().refresh_name_history()
 # 信号绑定
 # ==============================================================================
 
-## 绑定本地 UI 交互信号（零接线：四 Tab 控件在本地脚本闭环）
+## 绑定本地 UI 交互信号（四 Tab 控件在本地脚本闭环）
 func _connect_signals() -> void:
-	connect_managed(_back_btn.pressed, _on_back_btn_pressed)
+	connect_managed(_back_button.pressed, _on_back_btn_pressed)
 	connect_managed(_main_tab_container.tab_changed, _on_tab_changed)
 
 	# 身份伪装
 	connect_managed(_disguise_mask_list.item_selected, _on_disguise_mask_selected)
-	connect_managed(_disguise_switch_btn.pressed, _on_disguise_switch_pressed)
-	connect_managed(_disguise_cancel_btn.pressed, _on_disguise_cancel_pressed)
+	connect_managed(_disguise_switch_button.pressed, _on_disguise_switch_pressed)
+	connect_managed(_disguise_cancel_button.pressed, _on_disguise_cancel_pressed)
 
 	# 地面掉落
 	connect_managed(_ground_filter_tabs.tab_changed, _on_ground_filter_changed)
 	connect_managed(_ground_loot_list.item_selected, _on_loot_selected)
-	connect_managed(_ground_pickup_btn.pressed, _on_pickup_pressed)
-	connect_managed(_ground_pickup_all_btn.pressed, _on_pickup_all_pressed)
+	connect_managed(_ground_pickup_button.pressed, _on_pickup_pressed)
+	connect_managed(_ground_pickup_all_button.pressed, _on_pickup_all_pressed)
 
 	# 精英突变与命名注册信号委托
 	_get_tabs().connect_signals()
@@ -350,22 +351,22 @@ func _on_back_btn_pressed() -> void:
 	self.back()
 
 ## 主 Tab 切换：表现层无额外处理（状态由容器托管）
-func _on_tab_changed(_tab_idx: int) -> void:
+func _on_tab_changed(_tab_index: int) -> void:
 	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe17.toast.tab_switched"), NavTypes.ToastLevel.INFO, 1.0)
 
 # --- 身份伪装 ---
 
 ## 面具条目选中：记录索引并刷新详情
-func _on_disguise_mask_selected(idx: int) -> void:
-	_selected_disguise_idx = idx
+func _on_disguise_mask_selected(mask_index: int) -> void:
+	_selected_disguise_index = mask_index
 	_refresh_disguise_detail()
 
 ## 切换伪装按钮：应用选中面具并刷新当前身份展示
 func _on_disguise_switch_pressed() -> void:
-	if _selected_disguise_idx < 0 or _selected_disguise_idx >= _disguise_masks.size():
+	if _selected_disguise_index < 0 or _selected_disguise_index >= _disguise_masks.size():
 		return
-	var mask: Dictionary = _disguise_masks[_selected_disguise_idx]
-	apply_disguise_mask(mask.get("id", ""), mask.get("name", ""))
+	var mask_entry: Dictionary = _disguise_masks[_selected_disguise_index]
+	apply_disguise_mask(mask_entry.get("id", ""), mask_entry.get("name", ""))
 	_refresh_disguise_current()
 
 ## 取消伪装按钮：清除面具 ID、恢复真实名并刷新展示
@@ -376,52 +377,54 @@ func _on_disguise_cancel_pressed() -> void:
 	_refresh_disguise_current()
 
 # --- 精英突变委托 ---
-func _on_mutation_filter_changed(tab_idx: int) -> void: _get_tabs()._on_mutation_filter_changed(tab_idx)
-func _on_mutation_selected(idx: int) -> void: _get_tabs()._on_mutation_selected(idx)
+func _on_mutation_filter_changed(tab_index: int) -> void: _get_tabs()._on_mutation_filter_changed(tab_index)
+func _on_mutation_selected(mutation_index: int) -> void: _get_tabs()._on_mutation_selected(mutation_index)
 func _on_mutation_activate_pressed() -> void: _get_tabs()._on_mutation_activate_pressed()
 func _on_mutation_replace_pressed() -> void: _get_tabs()._on_mutation_replace_pressed()
 
 # --- 地面掉落 ---
 
 ## 地面分类筛选切换：更新筛选并重置选中、刷新列表/状态
-func _on_ground_filter_changed(tab_idx: int) -> void:
-	_ground_filter = tab_idx as GroundFilter
-	_selected_loot_idx = -1
+func _on_ground_filter_changed(tab_index: int) -> void:
+	_ground_filter = tab_index as GroundFilter
+	_selected_loot_index = -1
 	_refresh_ground_loot_list()
 	_refresh_ground_status()
 
 ## 掉落物条目选中：记录索引
-func _on_loot_selected(idx: int) -> void:
-	_selected_loot_idx = idx
+func _on_loot_selected(loot_index: int) -> void:
+	_selected_loot_index = loot_index
 
 ## 拾取按钮：拾取规则经服务（索引守卫 + 移除），成功后回写并刷新
 func _on_pickup_pressed() -> void:
-	var result := MockServiceContainer.get_instance().misc_edge().pickup_loot(ground_nearby_loot, _selected_loot_idx)
-	if not bool(result.get("success", false)):
+	var pickup_result := MockServiceContainer.get_instance().misc_edge().pickup_loot(ground_nearby_loot, _selected_loot_index)
+	if not bool(pickup_result.get("success", false)):
 		return
-	ground_nearby_loot = result.get("loot", ground_nearby_loot)
-	_selected_loot_idx = -1
+	ground_nearby_loot = pickup_result.get("loot", ground_nearby_loot)
+	_selected_loot_index = -1
 	_refresh_ground_loot_list()
 	_refresh_ground_status()
 
-## 全部拾取按钮：清空掉落物并刷新列表/状态（骨架桩）
+## 全部拾取按钮：清空附近掉落物并刷新列表与状态展示。
 func _on_pickup_all_pressed() -> void:
 	ground_nearby_loot.clear()
-	_selected_loot_idx = -1
+	_selected_loot_index = -1
 	_refresh_ground_loot_list()
 	_refresh_ground_status()
 
 # --- 命名注册委托 ---
-func _on_name_type_selected(idx: int) -> void: _get_tabs()._on_name_type_selected(idx)
+func _on_name_type_selected(name_type_index: int) -> void: _get_tabs()._on_name_type_selected(name_type_index)
 func _on_name_check_pressed() -> void: _get_tabs()._on_name_check_pressed()
 func _on_name_register_pressed() -> void: _get_tabs()._on_name_register_pressed()
 func _on_name_input_submitted(text: String) -> void: _get_tabs()._on_name_input_submitted(text)
 
+## 应用指定伪装面具编码与假名展示。
 func apply_disguise_mask(mask_id: String, fake_name: String) -> void:
 	current_disguise_mask_id = mask_id
 	var default_name: String = UIIntermediary.text("ui.fe17.mock.char.real_name")
 	displayed_character_name = fake_name if mask_id != "" else default_name
 
+## 兼容快照注入入口：更新地面邻近掉落物列表。
 func set_ground_nearby_loot_snapshot(loot_items: Array) -> void:
 	apply_snapshot({"ground_loot": loot_items})
 
@@ -433,6 +436,7 @@ func _render_from_snapshot() -> void:
 	if _ground_range_label != null and _ground_item_count_label != null:
 		_refresh_ground_status()
 
+## 记录并归一化命名空间检索关键词，返回查询载荷。
 func search_item_namespace(keyword: String) -> Dictionary:
 	search_query_keyword = keyword.strip_edges()
 	return {"success": true, "query": search_query_keyword}
