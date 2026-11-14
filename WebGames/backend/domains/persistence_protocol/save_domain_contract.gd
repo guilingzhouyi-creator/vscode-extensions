@@ -73,7 +73,7 @@ func serialize_provider() -> Dictionary:
 	if _provider_instance is Dictionary:
 		return (_provider_instance as Dictionary).duplicate(true)
 	if _provider_instance.has_method("serialize"):
-		var serialized_data: Variant = _provider_instance.serialize()
-		if serialized_data is Dictionary:
-			return serialized_data as Dictionary
+		var serialized_payload: Variant = _provider_instance.serialize()
+		if serialized_payload is Dictionary:
+			return serialized_payload as Dictionary
 	return {}

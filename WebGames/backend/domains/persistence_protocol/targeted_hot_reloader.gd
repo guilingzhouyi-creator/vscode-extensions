@@ -22,7 +22,7 @@ const LOG_RELOAD_SUCCESS: String = "TargetedHotReloader: node {node} targeted re
 
 static var _instance: RefCounted = null
 
-var _dag: ResourceDependencyDAG = null
+var _dependency_dag: ResourceDependencyDAG = null
 var _cache_store: Dictionary = {} # node_id -> Variant (最新有效缓存备份)
 
 ## 获取单例全局静态唯一实例
@@ -32,17 +32,17 @@ static func get_instance() -> RefCounted:
 	return _instance
 
 func _init() -> void:
-	_dag = ResourceDependencyDAG.new()
+	_dependency_dag = ResourceDependencyDAG.new()
 	_cache_store = {}
 
 ## 获取内置依赖 DAG 引用
 func get_dag() -> ResourceDependencyDAG:
-	return _dag
+	return _dependency_dag
 
 ## 设置某个节点的已知缓存备份（用于失败回退）
-func set_cached_backup(node_id: String, data: Variant) -> void:
+func set_cached_backup(node_id: String, backup_payload: Variant) -> void:
 	if not node_id.is_empty():
-		_cache_store[node_id] = data
+		_cache_store[node_id] = backup_payload
 
 ## 获取指定节点的有效备份
 func get_cached_backup(node_id: String) -> Variant:
@@ -56,9 +56,9 @@ func trigger_reload(changed_node: String, reload_resolver: Callable = Callable()
 		return {"success": false, "affected_nodes": [], "reloaded_count": 0, "error": ERR_EMPTY_NODE}
 
 	# 1. 依据 DAG 计算失效影响范围
-	var invalidation_list: Array[String] = _dag.get_invalidation_subgraph(changed_node)
+	var invalidation_list: Array[String] = _dependency_dag.get_invalidation_subgraph(changed_node)
 	var reloaded_count := 0
-	var rollback_performed := false
+	var has_performed_rollback := false
 	var failed_node := ""
 
 	# 2. 依次定向重载失效节点
@@ -67,7 +67,7 @@ func trigger_reload(changed_node: String, reload_resolver: Callable = Callable()
 			var step_result: Dictionary = reload_resolver.call(node)
 			if not bool(step_result.get("success", false)):
 				failed_node = node
-				rollback_performed = true
+				has_performed_rollback = true
 				EventBusCore.get_instance().emit_log(LOG_LEVEL_WARN, TemplateFormatter.format(LOG_RELOAD_FAIL, {"node": node}))
 				break
 			else:
@@ -77,7 +77,7 @@ func trigger_reload(changed_node: String, reload_resolver: Callable = Callable()
 			# 无解析器时仅完成子图受影响标记并推进计数
 			reloaded_count += 1
 
-	if rollback_performed:
+	if has_performed_rollback:
 		return {
 			"success": false,
 			"affected_nodes": invalidation_list,
@@ -97,6 +97,6 @@ func trigger_reload(changed_node: String, reload_resolver: Callable = Callable()
 ## 测试重置
 static func reset_for_tests() -> void:
 	if _instance != null:
-		_instance._dag.clear()
+		_instance._dependency_dag.clear()
 		_instance._cache_store.clear()
 	_instance = null

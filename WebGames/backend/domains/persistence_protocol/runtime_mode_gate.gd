@@ -20,7 +20,7 @@ class OnlineAuthoritativeSource extends RefCounted:
 	pass
 
 static var _mode: Mode = Mode.SINGLE_PLAYER
-static var _online_data_source: Variant = null
+static var _online_storage_source: Variant = null
 static var _default_online_source: OnlineAuthoritativeSource = OnlineAuthoritativeSource.new()
 
 ## 设置当前运行模式（启动时装配，或联机登录切换）
@@ -40,13 +40,13 @@ static func is_online() -> bool:
 	return _mode == Mode.ONLINE
 
 ## 注入联机专用权威数据源
-static func set_online_data_source(data_source: Variant) -> void:
-	_online_data_source = data_source
+static func set_online_data_source(storage_source: Variant) -> void:
+	_online_storage_source = storage_source
 
 ## 获取当前模式下的活动数据源（四层隔离之二：数据源隔离）
 static func get_active_data_source() -> Variant:
 	if _mode == Mode.ONLINE:
-		return _online_data_source if _online_data_source != null else _default_online_source
+		return _online_storage_source if _online_storage_source != null else _default_online_source
 	return SaveManager
 
 ## 是否允许热更新（四层隔离之三：生命周期隔离）
@@ -56,4 +56,4 @@ static func is_hot_reload_enabled() -> bool:
 ## 测试重置
 static func reset_for_tests() -> void:
 	_mode = Mode.SINGLE_PLAYER
-	_online_data_source = null
+	_online_storage_source = null

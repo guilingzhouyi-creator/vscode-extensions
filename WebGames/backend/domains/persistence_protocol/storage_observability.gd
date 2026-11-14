@@ -24,9 +24,9 @@ const MS_TO_SEC: float = 1000.0
 static var _instance: RefCounted = null
 
 var _last_primary_recovery_ms: float = 0.0
-var _last_ttfi_ms: float = 0.0
-var _total_aux_bytes: int = 0
-var _total_aux_elapsed_ms: float = 0.0
+var _last_first_interactive_ms: float = 0.0
+var _total_auxiliary_bytes: int = 0
+var _total_auxiliary_elapsed_ms: float = 0.0
 var _main_thread_io_wait_ms: float = 0.0
 
 var _total_requests: int = 0
@@ -47,9 +47,9 @@ func _init() -> void:
 func reset_state() -> void:
 	super.reset_state()
 	_last_primary_recovery_ms = 0.0
-	_last_ttfi_ms = 0.0
-	_total_aux_bytes = 0
-	_total_aux_elapsed_ms = 0.0
+	_last_first_interactive_ms = 0.0
+	_total_auxiliary_bytes = 0
+	_total_auxiliary_elapsed_ms = 0.0
 	_main_thread_io_wait_ms = 0.0
 	_total_requests = 0
 	_cache_hits = 0
@@ -57,12 +57,12 @@ func reset_state() -> void:
 	_peak_memory_bytes = 0
 
 ## 记录主数据恢复耗时与 TTFI
-func record_primary_recovery(duration_ms: float, ttfi_ms: float = 0.0) -> void:
+func record_primary_recovery(duration_ms: float, time_to_first_interactive_ms: float = 0.0) -> void:
 	_last_primary_recovery_ms = duration_ms
-	if ttfi_ms > 0.0:
-		_last_ttfi_ms = ttfi_ms
+	if time_to_first_interactive_ms > 0.0:
+		_last_first_interactive_ms = time_to_first_interactive_ms
 	else:
-		_last_ttfi_ms = duration_ms
+		_last_first_interactive_ms = duration_ms
 
 ## 记录辅助资源加载度量
 func record_auxiliary_load(byte_count: int, duration_ms: float, is_failure: bool = false, is_cache_hit: bool = false) -> void:
@@ -72,8 +72,8 @@ func record_auxiliary_load(byte_count: int, duration_ms: float, is_failure: bool
 	if is_failure:
 		_failed_requests += 1
 	else:
-		_total_aux_bytes += byte_count
-		_total_aux_elapsed_ms += duration_ms
+		_total_auxiliary_bytes += byte_count
+		_total_auxiliary_elapsed_ms += duration_ms
 
 ## 记录主线程阻塞 IO 等待耗时
 func record_main_thread_wait(duration_ms: float) -> void:
@@ -83,13 +83,13 @@ func record_main_thread_wait(duration_ms: float) -> void:
 func get_metrics_snapshot() -> StorageMetricsDTO:
 	var metrics_snapshot := StorageMetricsDTO.new()
 	metrics_snapshot.primary_recovery_time_ms = _last_primary_recovery_ms
-	metrics_snapshot.time_to_first_interactive_ms = _last_ttfi_ms
+	metrics_snapshot.time_to_first_interactive_ms = _last_first_interactive_ms
 
 	# 吞吐量 MB/s = (bytes / BYTES_TO_MB) / (elapsed_ms / MS_TO_SEC)
-	if _total_aux_elapsed_ms > 0.0:
-		var total_mb := float(_total_aux_bytes) / BYTES_TO_MB
-		var total_seconds := _total_aux_elapsed_ms / MS_TO_SEC
-		metrics_snapshot.auxiliary_throughput_mb_per_sec = total_mb / total_seconds
+	if _total_auxiliary_elapsed_ms > 0.0:
+		var total_megabytes := float(_total_auxiliary_bytes) / BYTES_TO_MB
+		var total_seconds := _total_auxiliary_elapsed_ms / MS_TO_SEC
+		metrics_snapshot.auxiliary_throughput_mb_per_sec = total_megabytes / total_seconds
 	else:
 		metrics_snapshot.auxiliary_throughput_mb_per_sec = 0.0
 

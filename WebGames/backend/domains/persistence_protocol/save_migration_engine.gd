@@ -16,30 +16,30 @@ const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/
 static var _domain_migrations: Dictionary = {} # key = "domain:ver" -> { "to": int, "fn": Callable }
 
 ## 注册域级数据迁移（单域独立演进，Inv-SV-4）
-static func register_domain_migration(domain_id: String, from_version: int, to_version: int, migrate_fn: Callable) -> void:
+static func register_domain_migration(domain_id: String, from_version: int, to_version: int, migration_callable: Callable) -> void:
 	var key := "%s:%d" % [domain_id, from_version]
-	_domain_migrations[key] = {"to": to_version, "fn": migrate_fn}
+	_domain_migrations[key] = {"to": to_version, "fn": migration_callable}
 
 ## 检查是否存在域级迁移
-static func has_domain_migration(mig_key: String) -> bool:
-	if mig_key.is_empty():
+static func has_domain_migration(migration_key: String) -> bool:
+	if migration_key.is_empty():
 		return false
-	return _domain_migrations.has(mig_key)
+	return _domain_migrations.has(migration_key)
 
 ## 获取域级迁移条目
-static func get_domain_migration(mig_key: String) -> Dictionary:
-	return _domain_migrations.get(mig_key, {})
+static func get_domain_migration(migration_key: String) -> Dictionary:
+	return _domain_migrations.get(migration_key, {})
 
 ## 域级独立迁移算法：单域版本演进，不触碰整档 Save Version（Inv-SV-4）
-static func migrate_domain(domain_id: String, domain_data: Dictionary, from_version: int) -> Dictionary:
+static func migrate_domain(domain_id: String, domain_payload: Dictionary, from_version: int) -> Dictionary:
 	var contract: Variant = SaveDataAccessLayer.get_contract(domain_id)
 	var target_version: int = int(contract.domain_version) if contract != null else from_version
-	var working := domain_data.duplicate(true)
+	var working := domain_payload.duplicate(true)
 	var current_version: int = from_version
 
 	while current_version < target_version:
-		var mig_key := "%s:%d" % [domain_id, current_version]
-		if not has_domain_migration(mig_key):
+		var migration_key := "%s:%d" % [domain_id, current_version]
+		if not has_domain_migration(migration_key):
 			return {
 				"success": false,
 				"error_code": "DOMAIN_MIGRATION_PATH_BROKEN",
@@ -47,15 +47,15 @@ static func migrate_domain(domain_id: String, domain_data: Dictionary, from_vers
 				"at_version": current_version,
 				"target_version": target_version
 			}
-		var step: Dictionary = get_domain_migration(mig_key)
-		var fn: Callable = step.get("fn", Callable())
-		if not fn.is_valid():
+		var step: Dictionary = get_domain_migration(migration_key)
+		var migration_callable: Callable = step.get("fn", Callable())
+		if not migration_callable.is_valid():
 			return {
 				"success": false,
 				"error_code": "DOMAIN_MIGRATION_PATH_BROKEN",
 				"domain_id": domain_id
 			}
-		var step_result: Variant = fn.call(working)
+		var step_result: Variant = migration_callable.call(working)
 		if step_result is Dictionary:
 			working = step_result as Dictionary
 		current_version = int(step.get("to", current_version + 1))
@@ -63,38 +63,38 @@ static func migrate_domain(domain_id: String, domain_data: Dictionary, from_vers
 	return {"success": true, "data": working, "final_version": current_version}
 
 ## 整档迁移执行：复制 -> 链式迁移 -> 校验 -> 提交/回滚（Inv-SV-7）
-static func migrate(data: Dictionary, detected_version: String) -> Dictionary:
+static func migrate(save_payload: Dictionary, detected_version: String) -> Dictionary:
 	var target_version: String = GameConfig.get_string("infrastructure.persistence", "format_version", "1.0.0")
 	if detected_version.is_empty() or detected_version == target_version:
-		return {"success": true, "data": data.duplicate(true), "steps": []}
+		return {"success": true, "data": save_payload.duplicate(true), "steps": []}
 
 	# 1. 深度复制工作副本，绝不原地污染（Inv-SV-7）
-	var working: Dictionary = data.duplicate(true)
-	var result: Dictionary = GameSaveAssembler.migrate_save_data(working, detected_version)
-	if not bool(result.get("compatible", false)):
+	var working: Dictionary = save_payload.duplicate(true)
+	var migration_result: Dictionary = GameSaveAssembler.migrate_save_data(working, detected_version)
+	if not bool(migration_result.get("compatible", false)):
 		return {
 			"success": false,
 			"error_code": "MIGRATION_PATH_BROKEN",
-			"at_version": result.get("version", detected_version),
-			"partial": result.get("data", working)
+			"at_version": migration_result.get("version", detected_version),
+			"partial": migration_result.get("data", working)
 		}
 
-	var migrated_data: Dictionary = result.get("data", working)
+	var migrated_payload: Dictionary = migration_result.get("data", working)
 
 	# 2. 迁移后校验（缺失字段补充默认值，格式不符丢弃/报错）
-	var validation: Dictionary = SaveValidationService.validate_domains(migrated_data)
+	var validation: Dictionary = SaveValidationService.validate_domains(migrated_payload)
 	if not bool(validation.get("is_valid", true)):
 		return {
 			"success": false,
 			"error_code": "MIGRATION_VALIDATION_FAIL",
 			"issues": validation.get("issues", []),
-			"partial": migrated_data
+			"partial": migrated_payload
 		}
 
 	var steps: Array = [detected_version]
 	return {
 		"success": true,
-		"data": validation.get("sanitized", migrated_data),
+		"data": validation.get("sanitized", migrated_payload),
 		"steps": steps
 	}
 

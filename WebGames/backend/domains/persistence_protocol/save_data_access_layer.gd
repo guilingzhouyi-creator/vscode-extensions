@@ -16,11 +16,11 @@ const RuntimeModeGate = preload("res://backend/domains/persistence_protocol/runt
 static var _domain_contracts: Dictionary = {}   # domain_id -> SaveDomainContract
 static var _dirty_domains: Dictionary = {}      # domain_id -> true
 static var _config_version: int = -1
-static var _mock_busy_for_test: bool = false
+static var _is_mock_busy_for_test: bool = false
 
 ## 测试专用：设置模拟存档繁忙/阻断状态
-static func set_mock_busy_for_test(busy: bool) -> void:
-	_mock_busy_for_test = busy
+static func set_mock_busy_for_test(is_busy: bool) -> void:
+	_is_mock_busy_for_test = is_busy
 
 ## 确保存档域契约与配置最新（热重载版本推进时平滑重建，保持已注册对象）
 static func _ensure_contracts_fresh() -> void:
@@ -42,16 +42,16 @@ static func _ensure_contracts_fresh() -> void:
 	var all_entries: Array = GameConfig.get_array("infrastructure.domains", "domains", [])
 	var empty_config: Dictionary = {}
 	for entry in all_entries:
-		var id := String(entry.get("id", ""))
+		var contract_domain_id := String(entry.get("id", ""))
 		var save_config: Dictionary = entry.get("save", empty_config)
 		if not bool(save_config.get("enabled", false)):
 			continue
-		var contract: Variant = SaveDomainContract.from_config(id, save_config)
-		if old_providers.has(id):
-			contract.register_provider(old_providers[id])
-		if old_consumers.has(id):
-			contract.register_consumer(old_consumers[id])
-		_domain_contracts[id] = contract
+		var contract: Variant = SaveDomainContract.from_config(contract_domain_id, save_config)
+		if old_providers.has(contract_domain_id):
+			contract.register_provider(old_providers[contract_domain_id])
+		if old_consumers.has(contract_domain_id):
+			contract.register_consumer(old_consumers[contract_domain_id])
+		_domain_contracts[contract_domain_id] = contract
 
 ## 注册特定数据域的运行期数据提供者聚合
 static func register_provider(domain_id: String, instance: Variant) -> void:
@@ -140,21 +140,21 @@ static func build_save_payload(domain_ids: Array = []) -> Dictionary:
 	return GameSaveAssembler.build_save_payload(providers)
 
 ## 统一反序列化分发入口：反向流回写数据（Inv-SV-6）
-static func apply_save_data(data: Dictionary, consumer_domain_ids: Array = []) -> Dictionary:
+static func apply_save_data(domains_payload: Dictionary, consumer_domain_ids: Array = []) -> Dictionary:
 	_ensure_contracts_fresh()
 	var consumers: Dictionary = {}
-	var targets: Array = consumer_domain_ids if not consumer_domain_ids.is_empty() else data.keys()
+	var targets: Array = consumer_domain_ids if not consumer_domain_ids.is_empty() else domains_payload.keys()
 	for domain_id in targets:
 		var contract: Variant = _domain_contracts.get(domain_id, null)
 		if contract == null or not contract.is_consumer_registered():
 			continue
 		consumers[domain_id] = contract.get_consumer_callable()
-	return GameSaveAssembler.apply_save_data(data, consumers)
+	return GameSaveAssembler.apply_save_data(domains_payload, consumers)
 
 ## 统一存档写盘门面：四层隔离判定 + 空壳档阻断 + 原子写
 static func save_game(slot_name: String, payload: Dictionary = {}) -> Dictionary:
 	# 0. 模拟环境阻断守卫（支持测试模拟服务拦截）
-	if _mock_busy_for_test:
+	if _is_mock_busy_for_test:
 		return { "success": false, "error_code": "ERR_SAVE_GUARD_BLOCKED", "save_status": "BLOCKED" }
 
 	# 1. 运行模式隔离闸门拦截（Inv-SV-8）
@@ -170,8 +170,8 @@ static func save_game(slot_name: String, payload: Dictionary = {}) -> Dictionary
 		target_payload = { "data": payload.duplicate(true) }
 
 	# 3. 审查 L2 空壳档阻断（providers 全空时严禁静默写空档）
-	var data_dict: Dictionary = target_payload.get("data", {})
-	if data_dict.is_empty():
+	var domains_payload: Dictionary = target_payload.get("data", {})
+	if domains_payload.is_empty():
 		ErrorReporter.emit_error("save_data_access_layer", "EMPTY_SAVE_BLOCKED", "Empty save write rejected: all domain data providers empty.", {
 			"slot": slot_name
 		})
@@ -200,30 +200,30 @@ static func flush_dirty(slot_name: String = "quicksave_dirty") -> Dictionary:
 
 	# 1. 仅重序列化脏域（增量装配）
 	var dirty_payload := build_save_payload(dirty_ids)
-	var dirty_data: Dictionary = dirty_payload.get("data", {})
-	if dirty_data.is_empty():
+	var dirty_domains_payload: Dictionary = dirty_payload.get("data", {})
+	if dirty_domains_payload.is_empty():
 		clear_dirty()
 		return { "success": false, "written": 0, "error_code": "EMPTY_SAVE_BLOCKED" }
 
 	# 2. 读取既有全量档，将脏域数据合并覆盖（非脏域原样保留，Inv-SV-10）
-	var merged_data: Dictionary = dirty_data
+	var merged_domains_payload: Dictionary = dirty_domains_payload
 	var existing := SaveManager.load_game(slot_name)
 	if bool(existing.get("success", false)) and existing.get("data", null) is Dictionary:
-		merged_data = (existing["data"] as Dictionary).duplicate(true)
-		for domain_id in dirty_data.keys():
-			merged_data[domain_id] = dirty_data[domain_id]
+		merged_domains_payload = (existing["data"] as Dictionary).duplicate(true)
+		for domain_id in dirty_domains_payload.keys():
+			merged_domains_payload[domain_id] = dirty_domains_payload[domain_id]
 
-	var result := save_game(slot_name, { "data": merged_data })
-	result["written"] = dirty_ids.size()
+	var save_operation_result := save_game(slot_name, { "data": merged_domains_payload })
+	save_operation_result["written"] = dirty_ids.size()
 	# 写盘成功后才清除脏标记（评审收敛 L2）：失败时保留脏域，供下次 flush 重试，
 	# 避免介质错误/空壳判定等场景下增量更新静默丢失且不再重试
-	if bool(result.get("success", false)):
+	if bool(save_operation_result.get("success", false)):
 		clear_dirty()
-	return result
+	return save_operation_result
 
 ## 测试重置
 static func reset_for_tests() -> void:
 	_domain_contracts.clear()
 	_dirty_domains.clear()
 	_config_version = -1
-	_mock_busy_for_test = false
+	_is_mock_busy_for_test = false
