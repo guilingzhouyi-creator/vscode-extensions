@@ -26,9 +26,9 @@ use super::branch_migrate::{
     migrate_card_branch, sync_container_ref_move, CardMigrationTarget, ContainerRefMove,
 };
 use super::branch_ops::{
-    assert_branch_vault_healthy, create_cascade_branch, guard_branch_creation,
-    guard_branch_delete, guard_branch_rename, record_branch_lineage, BranchCascadeRequest,
-    BranchCreateSpec, BranchLineageEntry,
+    assert_branch_vault_healthy, create_cascade_branch, guard_branch_creation, guard_branch_delete,
+    guard_branch_rename, record_branch_lineage, BranchCascadeRequest, BranchCreateSpec,
+    BranchLineageEntry,
 };
 use super::commit_walk::parse_commit_record;
 use super::common::{fail_fatal, fail_usage, print_json, reject, CliContext};
@@ -295,11 +295,7 @@ pub(super) fn create_branch(
     };
 
     let git_dir = view.git_dir();
-    let parent_name = guard_branch_creation(
-        view,
-        &BranchCreateSpec { name, start_point },
-        ctx,
-    );
+    let parent_name = guard_branch_creation(view, &BranchCreateSpec { name, start_point }, ctx);
 
     let ref_store = DiskRefStore::new(git_dir);
     let full_ref = format!("refs/heads/{name}");

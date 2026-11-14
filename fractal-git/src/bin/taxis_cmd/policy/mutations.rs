@@ -17,11 +17,7 @@ use super::super::common::{fail_usage, find_arg_value, reject, CliContext};
 use super::super::fractal_context::{parse_branch_tier, parse_commit_tier};
 use super::{load_sealed_or_reject, report_sealed_summary, require_authority};
 
-fn persist_updated_vault(
-    ctx: &CliContext,
-    operation: &str,
-    loaded: &mut LoadedPolicyVault,
-) {
+fn persist_updated_vault(ctx: &CliContext, operation: &str, loaded: &mut LoadedPolicyVault) {
     loaded.payload.revision = loaded.payload.revision.saturating_add(1);
     loaded.payload.updated_at_secs = current_unix_seconds();
     let saved = match PolicyVaultStore::save_sealed(&ctx.git_dir, &loaded.payload) {
@@ -131,7 +127,11 @@ pub(super) fn handle_add_cell(ctx: &CliContext) {
         .iter()
         .any(|existing| existing == cell_id);
     if !already_exists {
-        loaded.payload.branch_spec.recognized_cells.push(cell_id.to_owned());
+        loaded
+            .payload
+            .branch_spec
+            .recognized_cells
+            .push(cell_id.to_owned());
         persist_updated_vault(ctx, "add_cell", &mut loaded);
         return;
     }

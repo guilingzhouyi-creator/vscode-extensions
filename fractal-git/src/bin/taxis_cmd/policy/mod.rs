@@ -96,11 +96,7 @@ pub(super) fn load_sealed_or_reject(git_dir: &Path, action: &str) -> LoadedPolic
     }
 }
 
-pub(super) fn report_sealed_summary(
-    ctx: &CliContext,
-    operation: &str,
-    loaded: &LoadedPolicyVault,
-) {
+pub(super) fn report_sealed_summary(ctx: &CliContext, operation: &str, loaded: &LoadedPolicyVault) {
     let p = &loaded.payload;
     if ctx.json_mode {
         print_json(&serde_json::json!({

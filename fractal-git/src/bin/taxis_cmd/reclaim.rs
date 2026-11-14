@@ -107,10 +107,10 @@ fn report_reclaim(ctx: &CliContext, reclaimed: usize, failures: &[String], retai
         return;
     }
 
-        println!("=== Taxis Worktree & Sandbox Reclaimer ===");
-        println!("[RECLAIM] Reclaimed worktree directories: {}", reclaimed);
-        println!("[RECLAIM] Retained after failure      : {}", retained);
-        for failure in failures {
-            eprintln!("[RECLAIM] Retained '{}'", failure);
-        }
+    println!("=== Taxis Worktree & Sandbox Reclaimer ===");
+    println!("[RECLAIM] Reclaimed worktree directories: {}", reclaimed);
+    println!("[RECLAIM] Retained after failure      : {}", retained);
+    for failure in failures {
+        eprintln!("[RECLAIM] Retained '{}'", failure);
     }
+}

@@ -84,7 +84,11 @@ impl ActiveFractalCoordinates {
         let (cell_id, is_legacy_default_cell) = match explicit_cell.or(head_cell) {
             Some(cell) => {
                 if floor.tier == BranchEnforcementTier::Strict
-                    && !floor.spec.recognized_cells.iter().any(|allowed| allowed == &cell)
+                    && !floor
+                        .spec
+                        .recognized_cells
+                        .iter()
+                        .any(|allowed| allowed == &cell)
                 {
                     return Err(format!(
                         "FGT-TOP-001: unrecognized domain cell '{cell}'; register via 'taxis policy add-cell {cell}' or checkout a recognized cell branch (allowed: {})",

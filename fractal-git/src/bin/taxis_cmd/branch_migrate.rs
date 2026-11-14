@@ -1,11 +1,11 @@
 //! Module: taxis_cmd::branch_migrate — Card Ref D/F Migration & Container Sync
 //! File Path: src/bin/taxis_cmd/branch_migrate.rs
-//! Architecture Role: Upgrades legacy 4-segment card refs (`cell/<c>/card/<k>`) to 5-segment
+//! Architecture Role: Upgrades prior 4-segment card refs (`cell/<c>/card/<k>`) to 5-segment
 //!   D/F-safe canonical branches (`cell/<c>/card/<k>/main`) and syncs container refs on moves.
 //! Dependencies & Triggers: Dispatched by `taxis branch migrate`.
-//! Responsibilities: Remove legacy loose refs prior to writing `/main`, update symbolic `HEAD`,
+//! Responsibilities: Remove prior 4-segment loose refs prior to writing `/main`, update symbolic `HEAD`,
 //!   synchronize `repo.txc`, and append cryptographic `LineageEventKind::Migrate` receipts.
-//! Exit Semantics & Design Rationale: Rolls back deleted legacy loose ref if canonical write fails.
+//! Exit Semantics & Design Rationale: Rolls back deleted prior 4-segment loose ref if canonical write fails.
 
 use std::path::Path;
 
