@@ -29,9 +29,9 @@ func execute_cleanup() -> Dictionary:
 	if not cleanup_action.is_valid():
 		return {"success": false, "error_code": "INVALID_CLEANUP_CALLABLE", "resource_id": resource_id}
 
-	var raw_result: Variant = cleanup_action.call()
-	if not raw_result is Dictionary:
+	var cleanup_payload: Variant = cleanup_action.call()
+	if not cleanup_payload is Dictionary:
 		return {"success": false, "error_code": "INVALID_CLEANUP_RESULT", "resource_id": resource_id}
-	var result: Dictionary = (raw_result as Dictionary).duplicate()
-	result["resource_id"] = resource_id
-	return result
+	var normalized_result: Dictionary = (cleanup_payload as Dictionary).duplicate()
+	normalized_result["resource_id"] = resource_id
+	return normalized_result

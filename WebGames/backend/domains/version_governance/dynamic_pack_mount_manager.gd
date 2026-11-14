@@ -15,25 +15,25 @@ extends RefCounted
 static var _mounted_packs: Array[Dictionary] = []
 
 ## 动态挂载增量 PCK 资源包 (覆盖式物理挂载)
-static func mount_patch_pack(pck_path: String, version_str: String, priority: int = 100) -> bool:
-	if not FileAccess.file_exists(pck_path):
-		EventBusCore.get_instance().emit_log("error", TemplateFormatter.format("PackMount failed: patch file does not exist: {path}", {"path": pck_path}))
+static func mount_patch_pack(pack_path: String, version_text: String, priority: int = 100) -> bool:
+	if not FileAccess.file_exists(pack_path):
+		EventBusCore.get_instance().emit_log("error", TemplateFormatter.format("PackMount failed: patch file does not exist: {path}", {"path": pack_path}))
 		return false
 
 	# 利用 Godot 原生虚拟文件系统，replace_files = true 执行覆盖式挂载
-	var success := ProjectSettings.load_resource_pack(pck_path, true)
-	if not success:
-		EventBusCore.get_instance().emit_log("error", TemplateFormatter.format("PackMount failed: Godot engine load_resource_pack returned failure: {path}", {"path": pck_path}))
+	var is_loaded := ProjectSettings.load_resource_pack(pack_path, true)
+	if not is_loaded:
+		EventBusCore.get_instance().emit_log("error", TemplateFormatter.format("PackMount failed: Godot engine load_resource_pack returned failure: {path}", {"path": pack_path}))
 		return false
 
 	_mounted_packs.append({
-		"path": pck_path,
-		"version": version_str,
+		"path": pack_path,
+		"version": version_text,
 		"priority": priority
 	})
 	# 按优先级升序重排，确保高优先级覆盖低优先级
-	_mounted_packs.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		return int(a.get("priority", 0)) < int(b.get("priority", 0))
+	_mounted_packs.sort_custom(func(left_pack: Dictionary, right_pack: Dictionary) -> bool:
+		return int(left_pack.get("priority", 0)) < int(right_pack.get("priority", 0))
 	)
 	return true
 

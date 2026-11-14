@@ -37,21 +37,21 @@ static func register_hook(stage_identifier: String, callable: Callable, hook_typ
 	else:
 		_register_to_table(_post_hooks, normalized_stage_id, callable)
 
-static func _register_to_table(table: Dictionary, normalized_stage_id: String, callable: Callable) -> void:
-	if not table.has(normalized_stage_id):
-		table[normalized_stage_id] = []
-	var list: Array = table[normalized_stage_id]
-	list.append(callable)
+static func _register_to_table(hook_table: Dictionary, normalized_stage_id: String, callable: Callable) -> void:
+	if not hook_table.has(normalized_stage_id):
+		hook_table[normalized_stage_id] = []
+	var hook_list: Array = hook_table[normalized_stage_id]
+	hook_list.append(callable)
 
 ## 获取指定阶段注册的所有可执行回调钩子
 static func get_hooks(stage_identifier: String, hook_type: String = "post") -> Array:
 	var normalized_stage_id := _normalize_stage_key(stage_identifier)
 	if normalized_stage_id.is_empty():
 		return []
-	var table: Dictionary = _pre_hooks if hook_type == "pre" else _post_hooks
-	if not table.has(normalized_stage_id):
+	var hook_table: Dictionary = _pre_hooks if hook_type == "pre" else _post_hooks
+	if not hook_table.has(normalized_stage_id):
 		return []
-	return table[normalized_stage_id]
+	return hook_table[normalized_stage_id]
 
 ## 执行指定阶段注册的全部钩子函数
 static func execute_stage(stage_identifier: String, flow_context: SessionFlowContextDTO, payload: Dictionary = {}) -> Dictionary:
@@ -125,13 +125,13 @@ static func _apply_payload_to_context(flow_context: SessionFlowContextDTO, paylo
 		flow_context.account_snapshot = Dictionary(payload.get("account_snapshot", {}))
 
 static func _extract_required_slots(stage_config: Dictionary) -> Array[String]:
-	var result: Array[String] = []
+	var required_slots: Array[String] = []
 	var raw_slots: Variant = stage_config.get("required_slots", [])
 	if not raw_slots is Array:
-		return result
-	for slot in raw_slots:
-		result.append(String(slot))
-	return result
+		return required_slots
+	for slot_entry in raw_slots:
+		required_slots.append(String(slot_entry))
+	return required_slots
 
 static func _validate_stage_index(stage_config: Dictionary, stage_key: String, seen_indices: Dictionary) -> int:
 	var raw_stage_index: Variant = stage_config.get("stage_index", null)
@@ -155,20 +155,20 @@ static func _validate_required_slots(stage_config: Dictionary, stage_key: String
 		return []
 	var required_slots: Array[String] = []
 	var seen_slots: Dictionary = {}
-	var valid: bool = true
+	var is_valid: bool = true
 	for raw_slot in (raw_slots as Array):
 		if not raw_slot is String:
 			_config_error = "INVALID_REQUIRED_SLOT:" + stage_key
-			valid = false
+			is_valid = false
 			break
-		var slot: String = String(raw_slot).strip_edges()
-		if slot.is_empty() or seen_slots.has(slot):
+		var slot_key: String = String(raw_slot).strip_edges()
+		if slot_key.is_empty() or seen_slots.has(slot_key):
 			_config_error = "EMPTY_OR_DUPLICATE_REQUIRED_SLOT:" + stage_key
-			valid = false
+			is_valid = false
 			break
-		seen_slots[slot] = true
-		required_slots.append(slot)
-	if not valid:
+		seen_slots[slot_key] = true
+		required_slots.append(slot_key)
+	if not is_valid:
 		required_slots.clear()
 	return required_slots
 
@@ -179,20 +179,20 @@ static func _validate_stage_aliases(stage_config: Dictionary, stage_key: String)
 		return []
 	var aliases: Array[String] = []
 	var seen_aliases: Dictionary = {}
-	var valid: bool = true
+	var is_valid: bool = true
 	for raw_alias in (raw_aliases as Array):
 		if not raw_alias is String:
 			_config_error = "INVALID_STAGE_ALIAS:" + stage_key
-			valid = false
+			is_valid = false
 			break
-		var alias: String = String(raw_alias).strip_edges().to_upper()
-		if alias.is_empty() or seen_aliases.has(alias):
+		var alias_key: String = String(raw_alias).strip_edges().to_upper()
+		if alias_key.is_empty() or seen_aliases.has(alias_key):
 			_config_error = "EMPTY_OR_DUPLICATE_STAGE_ALIAS:" + stage_key
-			valid = false
+			is_valid = false
 			break
-		seen_aliases[alias] = true
-		aliases.append(alias)
-	if not valid:
+		seen_aliases[alias_key] = true
+		aliases.append(alias_key)
+	if not is_valid:
 		aliases.clear()
 	return aliases
 

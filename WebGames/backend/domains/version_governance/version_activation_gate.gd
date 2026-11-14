@@ -27,8 +27,8 @@ static func evaluate_startup_eligibility(installed_version: String, token: Activ
 			"reason": "未持有版本运行授权令牌"
 		}
 
-	var now_sec := int(Time.get_unix_time_from_system())
-	if not token.is_eligible_at(now_sec):
+	var now_seconds := int(Time.get_unix_time_from_system())
+	if not token.is_eligible_at(now_seconds):
 		return {
 			"allowed": false,
 			"error_code": "ACTIVATION_TOKEN_EXPIRED",

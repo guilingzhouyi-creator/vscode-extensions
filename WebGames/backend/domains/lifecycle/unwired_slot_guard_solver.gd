@@ -22,26 +22,26 @@ static func validate_slots(payload: Dictionary, required_slots: Array[String]) -
 	var sentinel: String = _get_unbound_sentinel()
 	if sentinel.is_empty():
 		return {"valid": false, "error_code": "INVALID_UNBOUND_SENTINEL_CONFIG", "unwired_slot": "UNBOUND_SENTINEL"}
-	for slot in required_slots:
-		var slot_value: Variant = payload.get(slot, null)
-		if slot_value == null or (slot_value is String and (slot_value.is_empty() or slot_value == sentinel)):
+	for slot_key in required_slots:
+		var raw_slot_entry: Variant = payload.get(slot_key, null)
+		if raw_slot_entry == null or (raw_slot_entry is String and (raw_slot_entry.is_empty() or raw_slot_entry == sentinel)):
 			return {
 				"valid": false,
-				"error_code": "UNBOUND_" + slot.to_upper(),
-				"unwired_slot": slot
+				"error_code": "UNBOUND_" + slot_key.to_upper(),
+				"unwired_slot": slot_key
 			}
 	return {"valid": true, "error_code": "", "unwired_slot": ""}
 
 ## 扫描检测上下文中所有未接线的悬空插槽
 static func detect_unwired_slots(payload: Dictionary, candidate_slots: Array[String]) -> Array[String]:
-	var unwired: Array[String] = []
+	var unwired_slots: Array[String] = []
 	var sentinel: String = _get_unbound_sentinel()
 	if sentinel.is_empty():
 		return candidate_slots.duplicate()
-	for slot in candidate_slots:
-		var slot_value: Variant = payload.get(slot, null)
-		if slot_value == null:
-			unwired.append(slot)
-		elif slot_value is String and (String(slot_value).is_empty() or String(slot_value) == sentinel):
-			unwired.append(slot)
-	return unwired
+	for slot_key in candidate_slots:
+		var raw_slot_entry: Variant = payload.get(slot_key, null)
+		if raw_slot_entry == null:
+			unwired_slots.append(slot_key)
+		elif raw_slot_entry is String and (String(raw_slot_entry).is_empty() or String(raw_slot_entry) == sentinel):
+			unwired_slots.append(slot_key)
+	return unwired_slots
