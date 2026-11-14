@@ -16,35 +16,36 @@ var _tokens: Array[EventSubscriptionToken] = []
 var _is_disposed: bool = false
 
 ## 订阅指定信号，并纳管生成的注销令牌
-func subscribe(p_sig: Signal, p_callable: Callable) -> bool:
-	if _is_disposed or p_sig.is_null() or p_callable.is_null():
+func subscribe(target_signal: Signal, target_callable: Callable) -> bool:
+	if _is_disposed or target_signal.is_null() or target_callable.is_null():
 		return false
-	if p_sig.is_connected(p_callable):
+	if target_signal.is_connected(target_callable):
 		return false # 防重复绑定
-	
-	var err: Error = p_sig.connect(p_callable)
-	if err != OK:
+
+	var connect_error: Error = target_signal.connect(target_callable)
+	if connect_error != OK:
 		return false
-	
-	var token := EventSubscriptionToken.new(p_sig, p_callable)
+
+	var token := EventSubscriptionToken.new(target_signal, target_callable)
 	_tokens.append(token)
 	return true
 
 ## 解绑指定信号
-func unsubscribe_from(p_sig: Signal, p_callable: Callable) -> bool:
-	for i in range(_tokens.size() - 1, -1, -1):
-		var tok: EventSubscriptionToken = _tokens[i]
-		if tok.source_signal == p_sig and tok.callable_target == p_callable:
-			tok.unsubscribe()
-			_tokens.remove_at(i)
+func unsubscribe_from(target_signal: Signal, target_callable: Callable) -> bool:
+	# 倒序遍历以便安全原地移除数组元素
+	for token_index in range(_tokens.size() - 1, -1, -1):
+		var token: EventSubscriptionToken = _tokens[token_index]
+		if token.source_signal == target_signal and token.callable_target == target_callable:
+			token.unsubscribe()
+			_tokens.remove_at(token_index)
 			return true
 	return false
 
 ## 释放全部托管订阅（宿主销毁或重置时调用）
 func clear() -> int:
 	var cleared_count: int = 0
-	for tok in _tokens:
-		if tok.unsubscribe():
+	for token in _tokens:
+		if token.unsubscribe():
 			cleared_count += 1
 	_tokens.clear()
 	return cleared_count
@@ -52,8 +53,8 @@ func clear() -> int:
 ## 获取当前存活订阅数
 func get_active_subscription_count() -> int:
 	var count: int = 0
-	for tok in _tokens:
-		if tok.is_active:
+	for token in _tokens:
+		if token.is_active:
 			count += 1
 	return count
 

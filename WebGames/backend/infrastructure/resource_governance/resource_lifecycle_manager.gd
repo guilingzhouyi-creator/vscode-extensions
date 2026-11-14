@@ -17,53 +17,53 @@ var _tracked_resources: Dictionary = {}
 
 ## 注册非 RefCounted 对象进入生命周期治理
 func track_resource(
-	p_res_id: String,
-	p_target: Object,
-	p_category: ResourceLifecycleDescriptor.ResourceCategory = ResourceLifecycleDescriptor.ResourceCategory.CUSTOM_OBJECT,
-	p_owner_name: String = ""
+	resource_id: String,
+	target_object: Object,
+	category: ResourceLifecycleDescriptor.ResourceCategory = ResourceLifecycleDescriptor.ResourceCategory.CUSTOM_OBJECT,
+	owner_name: String = ""
 ) -> ResourceLifecycleDescriptor:
-	if p_res_id.is_empty() or p_target == null:
+	if resource_id.is_empty() or target_object == null:
 		return null
-	if _tracked_resources.has(p_res_id):
-		return _tracked_resources[p_res_id] as ResourceLifecycleDescriptor
-	
-	var desc := ResourceLifecycleDescriptor.new(p_res_id, p_target, p_category, p_owner_name)
-	desc.transition_to(ResourceLifecycleDescriptor.LifecycleState.INITIALIZED)
-	_tracked_resources[p_res_id] = desc
-	return desc
+	if _tracked_resources.has(resource_id):
+		return _tracked_resources[resource_id] as ResourceLifecycleDescriptor
+
+	var descriptor := ResourceLifecycleDescriptor.new(resource_id, target_object, category, owner_name)
+	descriptor.transition_to(ResourceLifecycleDescriptor.LifecycleState.INITIALIZED)
+	_tracked_resources[resource_id] = descriptor
+	return descriptor
 
 ## 获取指定资源的描述符
-func get_descriptor(p_res_id: String) -> ResourceLifecycleDescriptor:
-	if _tracked_resources.has(p_res_id):
-		return _tracked_resources[p_res_id] as ResourceLifecycleDescriptor
+func get_descriptor(resource_id: String) -> ResourceLifecycleDescriptor:
+	if _tracked_resources.has(resource_id):
+		return _tracked_resources[resource_id] as ResourceLifecycleDescriptor
 	return null
 
 ## 标记资源使用开始
-func mark_in_use(p_res_id: String) -> bool:
-	if not _tracked_resources.has(p_res_id):
+func mark_in_use(resource_id: String) -> bool:
+	if not _tracked_resources.has(resource_id):
 		return false
-	var desc: ResourceLifecycleDescriptor = _tracked_resources[p_res_id]
-	return desc.transition_to(ResourceLifecycleDescriptor.LifecycleState.IN_USE)
+	var descriptor: ResourceLifecycleDescriptor = _tracked_resources[resource_id]
+	return descriptor.transition_to(ResourceLifecycleDescriptor.LifecycleState.IN_USE)
 
 ## 标记资源进入闲置
-func mark_idle(p_res_id: String) -> bool:
-	if not _tracked_resources.has(p_res_id):
+func mark_idle(resource_id: String) -> bool:
+	if not _tracked_resources.has(resource_id):
 		return false
-	var desc: ResourceLifecycleDescriptor = _tracked_resources[p_res_id]
-	return desc.transition_to(ResourceLifecycleDescriptor.LifecycleState.IDLE)
+	var descriptor: ResourceLifecycleDescriptor = _tracked_resources[resource_id]
+	return descriptor.transition_to(ResourceLifecycleDescriptor.LifecycleState.IDLE)
 
 ## 安全释放并物理销毁资源
-func dispose_resource(p_res_id: String) -> bool:
-	if not _tracked_resources.has(p_res_id):
+func dispose_resource(resource_id: String) -> bool:
+	if not _tracked_resources.has(resource_id):
 		return false
-	var desc: ResourceLifecycleDescriptor = _tracked_resources[p_res_id]
-	_tracked_resources.erase(p_res_id)
-	
-	# 先转移至 RELEASED
-	desc.transition_to(ResourceLifecycleDescriptor.LifecycleState.RELEASED)
-	
+	var descriptor: ResourceLifecycleDescriptor = _tracked_resources[resource_id]
+	_tracked_resources.erase(resource_id)
+
+	# 先转移至 RELEASED 再释放对象，防止回调或重入查询误判状态
+	descriptor.transition_to(ResourceLifecycleDescriptor.LifecycleState.RELEASED)
+
 	# 执行物理资源回收，双重校验防 Double Free
-	var target: Object = desc.get_target_instance()
+	var target: Object = descriptor.get_target_instance()
 	if target != null and is_instance_valid(target):
 		if target is Node:
 			var node: Node = target as Node
@@ -72,8 +72,8 @@ func dispose_resource(p_res_id: String) -> bool:
 			node.free()
 		elif not (target is RefCounted):
 			target.free()
-	
-	desc.mark_disposed()
+
+	descriptor.mark_disposed()
 	return true
 
 ## 全量清理所有受控资源（退出、场景切换或测试重置时调用）
@@ -90,9 +90,9 @@ func dispose_all() -> int:
 func get_live_metrics() -> Dictionary:
 	var active_nodes: int = 0
 	var active_others: int = 0
-	for res_id in _tracked_resources:
-		var desc: ResourceLifecycleDescriptor = _tracked_resources[res_id]
-		if desc.target_category == ResourceLifecycleDescriptor.ResourceCategory.UI_CONTROL_NODE:
+	for tracked_id in _tracked_resources:
+		var descriptor: ResourceLifecycleDescriptor = _tracked_resources[tracked_id]
+		if descriptor.target_category == ResourceLifecycleDescriptor.ResourceCategory.UI_CONTROL_NODE:
 			active_nodes += 1
 		else:
 			active_others += 1

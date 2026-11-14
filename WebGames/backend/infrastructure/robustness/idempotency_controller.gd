@@ -15,20 +15,20 @@ var _executed_tokens: Dictionary = {}
 var _token_order_dict: Dictionary = {} # 有序集合（Dictionary 保持插入序），O(1) FIFO 淘汰
 var _max_token_history: int = 200
 
-func _init(p_max_history: int = 200) -> void:
-	_max_token_history = maxi(10, p_max_history)
+func _init(max_history: int = 200) -> void:
+	_max_token_history = maxi(10, max_history)
 
 ## 检查并执行幂等性保护
 ## 返回: { "already_executed": bool, "result": Variant }
-func check_and_record(p_token: String, p_result_if_new: Variant = true) -> Dictionary:
-	if p_token.is_empty():
+func check_and_record(operation_token: String, result_if_new: Variant = true) -> Dictionary:
+	if operation_token.is_empty():
 		return {
 			"already_executed": false,
 			"result": null
 		}
 
-	if _executed_tokens.has(p_token):
-		var entry: Dictionary = _executed_tokens[p_token]
+	if _executed_tokens.has(operation_token):
+		var entry: Dictionary = _executed_tokens[operation_token]
 		return {
 			"already_executed": true,
 			"result": entry.get("result", null)
@@ -37,20 +37,20 @@ func check_and_record(p_token: String, p_result_if_new: Variant = true) -> Dicti
 	# 淘汰超额历史令牌（O(1) 均摊，Dictionary 有序集合头部即最旧）
 	_evict_excess_tokens()
 
-	_executed_tokens[p_token] = {
+	_executed_tokens[operation_token] = {
 		"executed_at": Time.get_unix_time_from_system(),
-		"result": p_result_if_new
+		"result": result_if_new
 	}
-	_token_order_dict[p_token] = true
+	_token_order_dict[operation_token] = true
 
 	return {
 		"already_executed": false,
-		"result": p_result_if_new
+		"result": result_if_new
 	}
 
 func _evict_single_oldest_token() -> bool:
-	for k in _token_order_dict:
-		var victim: String = String(k)
+	for token_key in _token_order_dict:
+		var victim: String = String(token_key)
 		if victim.is_empty():
 			return false
 		_token_order_dict.erase(victim)
@@ -64,19 +64,19 @@ func _evict_excess_tokens() -> void:
 			break
 
 ## 检查控制器中是否存在指定请求令牌
-func has_token(p_token: String) -> bool:
-	if p_token.is_empty():
+func has_token(operation_token: String) -> bool:
+	if operation_token.is_empty():
 		return false
-	return _executed_tokens.has(p_token)
+	return _executed_tokens.has(operation_token)
 
 ## 获取指定令牌对应的缓存执行结果
-func get_result(p_token: String, p_default: Variant = null) -> Variant:
-	if p_token.is_empty():
-		return p_default
-	if _executed_tokens.has(p_token):
-		var entry: Dictionary = _executed_tokens[p_token]
-		return entry.get("result", p_default)
-	return p_default
+func get_result(operation_token: String, default_value: Variant = null) -> Variant:
+	if operation_token.is_empty():
+		return default_value
+	if _executed_tokens.has(operation_token):
+		var entry: Dictionary = _executed_tokens[operation_token]
+		return entry.get("result", default_value)
+	return default_value
 
 ## 重置控制器历史记录与内部哈希表
 func reset() -> int:
@@ -92,11 +92,11 @@ func history_size() -> int:
 ## 兼容旧 Array 形态（测试/归档链路可能读 _token_order）
 var _token_order: Array[String]:
 	get:
-		var arr: Array[String] = []
-		for k in _token_order_dict:
-			arr.append(String(k))
-		return arr
+		var ordered_tokens: Array[String] = []
+		for token_key in _token_order_dict:
+			ordered_tokens.append(String(token_key))
+		return ordered_tokens
 	set(value):
 		_token_order_dict.clear()
-		for k in value:
-			_token_order_dict[String(k)] = true
+		for token_key in value:
+			_token_order_dict[String(token_key)] = true

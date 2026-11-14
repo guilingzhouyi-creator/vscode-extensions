@@ -23,14 +23,14 @@ var flags: PackedInt32Array = PackedInt32Array()
 
 ## 校验结构体内内存块数据结构是否物理对齐
 func is_aligned() -> bool:
-	var c := active_count
+	var required_count := active_count
 	return (
-		entity_ids.size() >= c and
-		pos_x.size() >= c and
-		pos_y.size() >= c and
-		vel_x.size() >= c and
-		vel_y.size() >= c and
-		flags.size() >= c
+		entity_ids.size() >= required_count and
+		pos_x.size() >= required_count and
+		pos_y.size() >= required_count and
+		vel_x.size() >= required_count and
+		vel_y.size() >= required_count and
+		flags.size() >= required_count
 	)
 
 ## 重置内部数据状态，供对象池无堆分配复用

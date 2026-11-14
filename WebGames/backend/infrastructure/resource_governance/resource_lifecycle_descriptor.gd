@@ -42,18 +42,19 @@ var last_transition_timestamp: float = 0.0
 var _weak_target: WeakRef = null
 
 func _init(
-	p_id: String = "",
-	p_target: Object = null,
-	p_cat: ResourceCategory = ResourceCategory.CUSTOM_OBJECT,
-	p_owner: String = ""
+	initial_resource_id: String = "",
+	target_object: Object = null,
+	initial_category: ResourceCategory = ResourceCategory.CUSTOM_OBJECT,
+	initial_owner_name: String = ""
 ) -> void:
-	resource_id = p_id
-	target_category = p_cat
-	owner_name = p_owner
+	resource_id = initial_resource_id
+	target_category = initial_category
+	owner_name = initial_owner_name
 	created_timestamp = Time.get_unix_time_from_system()
 	last_transition_timestamp = created_timestamp
-	if p_target != null:
-		_weak_target = weakref(p_target)
+	if target_object != null:
+		# 使用弱引用持有目标实例，防止生命周期描述符自身阻止垃圾回收
+		_weak_target = weakref(target_object)
 
 ## 获取底层实例（若已被物理回收则返回 null）
 func get_target_instance() -> Object:
@@ -67,12 +68,12 @@ func is_alive() -> bool:
 	return target != null and is_instance_valid(target)
 
 ## 推进状态机单向流转（严格单向校验，防止逆流与非法跳跃）
-func transition_to(p_next_state: LifecycleState) -> bool:
+func transition_to(next_state: LifecycleState) -> bool:
 	if current_state == LifecycleState.DISPOSED:
 		return false # 已销毁状态不可再转移
-	
+
 	var is_valid: bool = false
-	match p_next_state:
+	match next_state:
 		LifecycleState.INITIALIZED:
 			is_valid = (current_state == LifecycleState.UNINITIALIZED)
 		LifecycleState.IN_USE:
@@ -85,9 +86,9 @@ func transition_to(p_next_state: LifecycleState) -> bool:
 			is_valid = (current_state == LifecycleState.RELEASED or current_state == LifecycleState.UNINITIALIZED or current_state == LifecycleState.INITIALIZED)
 		_:
 			is_valid = false
-	
+
 	if is_valid:
-		current_state = p_next_state
+		current_state = next_state
 		last_transition_timestamp = Time.get_unix_time_from_system()
 		return true
 	return false
@@ -111,14 +112,14 @@ func to_dict() -> Dictionary:
 	}
 
 ## 从字典恢复描述符
-static func from_dict(p_data: Dictionary) -> RefCounted:
-	var desc := ResourceLifecycleDescriptor.new(
-		str(p_data.get("resource_id", "")),
+static func from_dict(raw_data: Dictionary) -> RefCounted:
+	var descriptor := ResourceLifecycleDescriptor.new(
+		str(raw_data.get("resource_id", "")),
 		null,
-		int(p_data.get("category", ResourceCategory.CUSTOM_OBJECT)) as ResourceCategory,
-		str(p_data.get("owner", ""))
+		int(raw_data.get("category", ResourceCategory.CUSTOM_OBJECT)) as ResourceCategory,
+		str(raw_data.get("owner", ""))
 	)
-	desc.current_state = int(p_data.get("state", LifecycleState.UNINITIALIZED)) as LifecycleState
-	desc.created_timestamp = float(p_data.get("created_at", 0.0))
-	desc.last_transition_timestamp = float(p_data.get("last_transition_at", desc.created_timestamp))
-	return desc
+	descriptor.current_state = int(raw_data.get("state", LifecycleState.UNINITIALIZED)) as LifecycleState
+	descriptor.created_timestamp = float(raw_data.get("created_at", 0.0))
+	descriptor.last_transition_timestamp = float(raw_data.get("last_transition_at", descriptor.created_timestamp))
+	return descriptor

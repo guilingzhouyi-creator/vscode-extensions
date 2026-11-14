@@ -19,77 +19,78 @@ enum FaultSeverity {
 }
 
 ## 安全整数清洗（防御越界、负数、null 与非法字符串类型）
-static func sanitize_int(p_val: Variant, p_min: int, p_max: int, p_default: int) -> int:
-	if p_val == null:
-		return p_default
-	if not (p_val is int or p_val is float or p_val is String):
-		return p_default
-	
-	var num: int = 0
-	if p_val is String:
-		var s: String = (p_val as String).strip_edges()
-		if not s.is_valid_int():
-			return p_default
-		num = s.to_int()
+static func sanitize_int(raw_value: Variant, min_value: int, max_value: int, default_value: int) -> int:
+	if raw_value == null:
+		return default_value
+	if not (raw_value is int or raw_value is float or raw_value is String):
+		return default_value
+
+	var sanitized_number: int = 0
+	if raw_value is String:
+		var trimmed_text: String = (raw_value as String).strip_edges()
+		if not trimmed_text.is_valid_int():
+			return default_value
+		sanitized_number = trimmed_text.to_int()
 	else:
-		num = int(p_val)
-	
-	return clampi(num, p_min, p_max)
+		sanitized_number = int(raw_value)
+
+	return clampi(sanitized_number, min_value, max_value)
 
 ## 安全浮点数清洗（防御 NaN、INF 与超界）
-static func sanitize_float(p_val: Variant, p_min: float, p_max: float, p_default: float) -> float:
-	if p_val == null:
-		return p_default
-	if not (p_val is float or p_val is int or p_val is String):
-		return p_default
-	
-	var num: float = 0.0
-	if p_val is String:
-		var s: String = (p_val as String).strip_edges()
-		if not s.is_valid_float():
-			return p_default
-		num = s.to_float()
+static func sanitize_float(raw_value: Variant, min_value: float, max_value: float, default_value: float) -> float:
+	if raw_value == null:
+		return default_value
+	if not (raw_value is float or raw_value is int or raw_value is String):
+		return default_value
+
+	var sanitized_number: float = 0.0
+	if raw_value is String:
+		var trimmed_text: String = (raw_value as String).strip_edges()
+		if not trimmed_text.is_valid_float():
+			return default_value
+		sanitized_number = trimmed_text.to_float()
 	else:
-		num = float(p_val)
-	
-	if is_nan(num) or is_inf(num):
-		return p_default
-	return clampf(num, p_min, p_max)
+		sanitized_number = float(raw_value)
+
+	# 显式拦截 NaN 与无穷大，避免 clampf 透传异常浮点状态
+	if is_nan(sanitized_number) or is_inf(sanitized_number):
+		return default_value
+	return clampf(sanitized_number, min_value, max_value)
 
 ## 安全字符串清洗（防御空与非法转义、前后空格）
-static func sanitize_string(p_val: Variant, p_default: String = "") -> String:
-	if p_val == null:
-		return p_default
-	return str(p_val).strip_edges()
+static func sanitize_string(raw_value: Variant, default_value: String = "") -> String:
+	if raw_value == null:
+		return default_value
+	return str(raw_value).strip_edges()
 
 ## 安全字典清洗（确保非空并提供深拷贝隔离保护）
-static func sanitize_dict(p_val: Variant) -> Dictionary:
-	if p_val == null or not (p_val is Dictionary):
+static func sanitize_dict(raw_value: Variant) -> Dictionary:
+	if raw_value == null or not (raw_value is Dictionary):
 		return {}
-	return (p_val as Dictionary).duplicate(true)
+	return (raw_value as Dictionary).duplicate(true)
 
 ## 安全数组清洗（提供深拷贝隔离保护与长度上限截断）
-static func sanitize_array(p_val: Variant, p_max_len: int = -1) -> Array:
-	if p_val == null or not (p_val is Array):
+static func sanitize_array(raw_value: Variant, max_length: int = -1) -> Array:
+	if raw_value == null or not (raw_value is Array):
 		return []
-	var arr: Array = (p_val as Array).duplicate(true)
-	if p_max_len > 0 and arr.size() > p_max_len:
-		arr.resize(p_max_len)
-	return arr
+	var sanitized_array: Array = (raw_value as Array).duplicate(true)
+	if max_length > 0 and sanitized_array.size() > max_length:
+		sanitized_array.resize(max_length)
+	return sanitized_array
 
 ## 错误结构化判定与归类
-static func classify_error(p_code: String, p_context: Dictionary = {}) -> Dictionary:
+static func classify_error(error_code: String, context: Dictionary = {}) -> Dictionary:
 	var severity: FaultSeverity = FaultSeverity.RECOVERABLE
-	if p_code.begins_with("FATAL_") or p_code.begins_with("CRIT_"):
+	if error_code.begins_with("FATAL_") or error_code.begins_with("CRIT_"):
 		severity = FaultSeverity.SYSTEM_FATAL
-	elif p_code.begins_with("CFG_") or p_code.begins_with("CONFIG_"):
+	elif error_code.begins_with("CFG_") or error_code.begins_with("CONFIG_"):
 		severity = FaultSeverity.CONFIG_ERROR
-	elif p_code.begins_with("REJECT_") or p_code.begins_with("BIZ_"):
+	elif error_code.begins_with("REJECT_") or error_code.begins_with("BIZ_"):
 		severity = FaultSeverity.BUSINESS_REJECT
-	
+
 	return {
-		"code": p_code,
+		"code": error_code,
 		"severity": severity,
 		"is_recoverable": (severity == FaultSeverity.RECOVERABLE or severity == FaultSeverity.BUSINESS_REJECT),
-		"context": p_context
+		"context": context
 	}
