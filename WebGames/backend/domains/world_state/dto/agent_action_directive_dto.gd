@@ -4,7 +4,7 @@
 # 架构定位: Value Object DTO / Data Transport Model
 # 依赖与触发: 上游: HomeActionSpaceSolver | 下游: AgentHudTelemetryPacketDTO | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
 # 职责说明: 动态行动空间离散指令描述传输对象，面向 LLM 声明操作语义、代价载荷、前置依赖与当前可执行性。
-# 退出语义与设计依据: 主页HUD面向Agent结构化切片流与行动空间双轨适配引擎施工细则 (Inv-ACTION-SPACE-PRUNING-6)
+# 退出语义与设计依据: 主页HUD面向Agent结构化切片流与行动空间双通道适配引擎设计规范 (Inv-ACTION-SPACE-PRUNING-6)
 # ==============================================================================
 
 ## AgentActionDirectiveDTO：Value Object DTO / Data Transport Model
@@ -28,40 +28,46 @@ func reset_state() -> void:
 	directive_id = ""
 	domain = "ASSET"
 	description = ""
-	cost_payload.clear()
-	preconditions.clear()
-	allowed_parameters.clear()
+	cost_payload = _reset_dict(cost_payload)
+	preconditions = _reset_dict(preconditions)
+	allowed_parameters = _reset_dict(allowed_parameters)
 	is_executable = true
 	blocked_reason = ""
 
+static func _reset_dict(target_dict: Dictionary) -> Dictionary:
+	if target_dict.is_read_only():
+		return {}
+	target_dict.clear()
+	return target_dict
+
 ## 序列化当前对象为通用字典传输结构
 func to_dto() -> Dictionary:
-	var d: Dictionary = {
+	var payload: Dictionary = {
 		"directive_id": directive_id,
 		"domain": domain,
 		"is_executable": is_executable
 	}
 	if not description.is_empty():
-		d["description"] = description
+		payload["description"] = description
 	if not cost_payload.is_empty():
-		d["cost_payload"] = cost_payload.duplicate(true)
+		payload["cost_payload"] = cost_payload.duplicate(true)
 	if not preconditions.is_empty():
-		d["preconditions"] = preconditions.duplicate(true)
+		payload["preconditions"] = preconditions.duplicate(true)
 	if not allowed_parameters.is_empty():
-		d["allowed_parameters"] = allowed_parameters.duplicate(true)
+		payload["allowed_parameters"] = allowed_parameters.duplicate(true)
 	if not blocked_reason.is_empty():
-		d["blocked_reason"] = blocked_reason
-	return d
+		payload["blocked_reason"] = blocked_reason
+	return payload
 
 ## 从输入字典反序列化还原传输对象
 static func from_dto(data: Dictionary) -> AgentActionDirectiveDTO:
-	var dto := AgentActionDirectiveDTO.new()
-	dto.directive_id = str(data.get("directive_id", ""))
-	dto.domain = str(data.get("domain", "ASSET"))
-	dto.description = str(data.get("description", ""))
-	dto.cost_payload = data.get("cost_payload", {}).duplicate(true)
-	dto.preconditions = data.get("preconditions", {}).duplicate(true)
-	dto.allowed_parameters = data.get("allowed_parameters", {}).duplicate(true)
-	dto.is_executable = bool(data.get("is_executable", true))
-	dto.blocked_reason = str(data.get("blocked_reason", ""))
-	return dto
+	var directive := AgentActionDirectiveDTO.new()
+	directive.directive_id = str(data.get("directive_id", ""))
+	directive.domain = str(data.get("domain", "ASSET"))
+	directive.description = str(data.get("description", ""))
+	directive.cost_payload = data.get("cost_payload", {}).duplicate(true)
+	directive.preconditions = data.get("preconditions", {}).duplicate(true)
+	directive.allowed_parameters = data.get("allowed_parameters", {}).duplicate(true)
+	directive.is_executable = bool(data.get("is_executable", true))
+	directive.blocked_reason = str(data.get("blocked_reason", ""))
+	return directive

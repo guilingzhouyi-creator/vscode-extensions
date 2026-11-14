@@ -35,15 +35,15 @@ func to_dto() -> Dictionary:
 
 ## 从输入字典反序列化还原传输对象
 static func from_dto(data: Dictionary) -> PagedResultDTO:
-	var dto := PagedResultDTO.new()
-	dto.page_index = maxi(0, int(data.get("page_index", 0)))
-	dto.page_size = maxi(1, int(data.get("page_size", 10)))
-	dto.total_count = maxi(0, int(data.get("total_count", 0)))
-	dto.total_pages = maxi(0, int(data.get("total_pages", 0)))
-	dto.has_next = bool(data.get("has_next", false))
-	dto.has_prev = bool(data.get("has_prev", false))
-	dto.next_cursor = String(data.get("next_cursor", ""))
+	var paged_result := PagedResultDTO.new()
+	paged_result.page_index = maxi(0, int(data.get("page_index", 0)))
+	paged_result.page_size = maxi(1, int(data.get("page_size", 10)))
+	paged_result.total_count = maxi(0, int(data.get("total_count", 0)))
+	paged_result.total_pages = maxi(0, int(data.get("total_pages", 0)))
+	paged_result.has_next = bool(data.get("has_next", false))
+	paged_result.has_prev = bool(data.get("has_prev", false))
+	paged_result.next_cursor = String(data.get("next_cursor", ""))
 	var raw_items: Variant = data.get("items", [])
 	if raw_items is Array:
-		dto.items = raw_items.duplicate()
-	return dto
+		paged_result.items = raw_items.duplicate()
+	return paged_result

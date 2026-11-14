@@ -38,17 +38,17 @@ static func slice_array(source_array: Array, query: PaginationQueryDTO) -> Paged
 	result.total_count = total_count
 	result.total_pages = ceili(float(total_count) / float(page_size))
 
-	var start_idx: int = page_index * page_size
-	if start_idx >= total_count:
+	var start_index: int = page_index * page_size
+	if start_index >= total_count:
 		result.has_next = false
 		result.has_prev = page_index > 0
 		result.next_cursor = ""
 		result.items = []
 		return result
 
-	var end_idx: int = mini(start_idx + page_size, total_count)
-	result.items = source_array.slice(start_idx, end_idx)
-	result.has_next = end_idx < total_count
+	var end_index: int = mini(start_index + page_size, total_count)
+	result.items = source_array.slice(start_index, end_index)
+	result.has_next = end_index < total_count
 	result.has_prev = page_index > 0
 	result.next_cursor = str(page_index + 1) if result.has_next else ""
 

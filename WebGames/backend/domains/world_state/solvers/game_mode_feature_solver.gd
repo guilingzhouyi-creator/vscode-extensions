@@ -17,7 +17,7 @@ const MODE_MULTIPLAYER: int = 2
 
 ## 根据游戏运行模式静态解析特性清单
 ## 单机：启用本地剧情邮件、离线兑换码与抽卡；禁用联机匹配与公网社交商户
-## 联机：启用匹配、在线聊天、跨服公会与商户；禁用离线兜底系统
+## 联机：启用匹配、在线聊天、跨服公会与商户；禁用离线本地回退系统
 ## 默认/未知：全量安全沙盒隔离，全部特性关闭
 static func resolve_features(game_mode: int) -> ModeFeatureManifestDTO:
 	var manifest := ModeFeatureManifestDTO.new()

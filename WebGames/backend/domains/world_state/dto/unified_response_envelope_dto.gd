@@ -7,7 +7,7 @@
 # 退出语义与设计依据: 纯数据模型无退出码；设计依据: 卡拉尔服务端统一响应信封规范与零堆分配对象池契约 (Inv-UNIFIED-ENVELOPE-1, Inv-ZERO-HEAP-POOL-3)
 # ==============================================================================
 
-## 服务端统一响应信封 DTO：封装业务结果、状态码与错误信息
+## UnifiedResponseEnvelopeDTO：服务端统一响应信封 DTO，封装业务结果、状态码与错误信息
 class_name UnifiedResponseEnvelopeDTO
 extends PoolableDtoBase
 
@@ -18,16 +18,16 @@ var success: bool = false                # 执行是否成功
 var is_success: bool:                    # 兼容别名属性 (对齐 Mod SDK 语义契约)
 	get:
 		return success
-	set(val):
-		success = val
+	set(value):
+		success = value
 var error_code: String = ""              # 错误码 (无错误为空)
 var error_message: String = ""           # 本地化展示文案 Key 或调试信息
 var data: Dictionary = {}                # 业务返回实体数据
 var payload: Dictionary:                 # 兼容别名属性 (对齐 Mod SDK 载荷契约)
 	get:
 		return data
-	set(val):
-		data = val
+	set(value):
+		data = value
 var causal_delta: Dictionary = {}        # 操作引发的因果突变 (供 HUD 增量刷新与伴侣总线记录)
 var server_timestamp_ms: int = 0         # 服务端响应落盘时间戳
 
@@ -58,17 +58,17 @@ func to_dto() -> Dictionary:
 
 ## 从输入字典反序列化还原传输对象
 static func from_dto(data_dict: Dictionary) -> UnifiedResponseEnvelopeDTO:
-	var resp := UnifiedResponseEnvelopeDTO.new()
-	resp.request_id = str(data_dict.get("request_id", ""))
+	var response := UnifiedResponseEnvelopeDTO.new()
+	response.request_id = str(data_dict.get("request_id", ""))
 	if data_dict.has("is_success"):
-		resp.success = bool(data_dict.get("is_success", false))
+		response.success = bool(data_dict.get("is_success", false))
 	else:
-		resp.success = bool(data_dict.get("success", false))
-	resp.error_code = str(data_dict.get("error_code", ""))
-	resp.error_message = str(data_dict.get("error_message", ""))
-	var raw_d: Variant = data_dict.get("payload", data_dict.get("data", {}))
-	resp.data = (raw_d as Dictionary).duplicate(true) if raw_d is Dictionary else {}
-	var raw_c: Variant = data_dict.get("causal_delta", {})
-	resp.causal_delta = (raw_c as Dictionary).duplicate(true) if raw_c is Dictionary else {}
-	resp.server_timestamp_ms = int(data_dict.get("server_timestamp_ms", 0))
-	return resp
+		response.success = bool(data_dict.get("success", false))
+	response.error_code = str(data_dict.get("error_code", ""))
+	response.error_message = str(data_dict.get("error_message", ""))
+	var raw_payload: Variant = data_dict.get("payload", data_dict.get("data", {}))
+	response.data = (raw_payload as Dictionary).duplicate(true) if raw_payload is Dictionary else {}
+	var raw_causal_delta: Variant = data_dict.get("causal_delta", {})
+	response.causal_delta = (raw_causal_delta as Dictionary).duplicate(true) if raw_causal_delta is Dictionary else {}
+	response.server_timestamp_ms = int(data_dict.get("server_timestamp_ms", 0))
+	return response

@@ -37,11 +37,11 @@ func to_dto() -> Dictionary:
 
 ## 从字典数据反序列化还原界面状态突变上下文传输对象
 static func from_dto(data: Dictionary) -> HudMutationContextDto:
-	var dto := HudMutationContextDto.new()
-	dto.target_hud_element = String(data.get("target_hud_element", ""))
-	dto.mutation_type = String(data.get("mutation_type", ""))
+	var mutation_context := HudMutationContextDto.new()
+	mutation_context.target_hud_element = String(data.get("target_hud_element", ""))
+	mutation_context.mutation_type = String(data.get("mutation_type", ""))
 	var raw_payload: Variant = data.get("payload", {})
 	if raw_payload is Dictionary:
-		dto.payload = raw_payload.duplicate(true)
-	dto.timestamp_utc = int(data.get("timestamp_utc", 0))
-	return dto
+		mutation_context.payload = raw_payload.duplicate(true)
+	mutation_context.timestamp_utc = int(data.get("timestamp_utc", 0))
+	return mutation_context

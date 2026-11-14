@@ -40,11 +40,11 @@ static func resolve_environment(
 	travel_hours: int,
 	mana_tier: int = 1
 ) -> WorldCalendarEnvironmentDTO:
-	var dto := WorldCalendarEnvironmentDTO.new()
-	dto.calendar_years = maxi(0, years)
-	dto.calendar_months = maxi(1, months)
-	dto.calendar_days = maxi(1, days)
-	dto.travel_hours = maxi(0, travel_hours)
-	dto.day_phase_key = resolve_day_phase(travel_hours)
-	dto.mana_density_tier = maxi(1, mana_tier)
-	return dto
+	var environment := WorldCalendarEnvironmentDTO.new()
+	environment.calendar_years = maxi(0, years)
+	environment.calendar_months = maxi(1, months)
+	environment.calendar_days = maxi(1, days)
+	environment.travel_hours = maxi(0, travel_hours)
+	environment.day_phase_key = resolve_day_phase(travel_hours)
+	environment.mana_density_tier = maxi(1, mana_tier)
+	return environment

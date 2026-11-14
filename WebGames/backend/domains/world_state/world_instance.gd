@@ -15,11 +15,11 @@ var world_time: Dictionary = {"tick": 0, "day": 1, "month": 1, "year": 1}
 var world_state: Dictionary = {}
 var history_fragments: Array[Dictionary] = []
 
-func _init(p_world_id: String = "") -> void:
-	world_id = p_world_id
+func _init(initial_world_id: String = "") -> void:
+	world_id = initial_world_id
 
 ## 世界时间推进（单调递增，死亡不重置；tick 每 ticks_per_day 联动 day）。
-## 契约（）：旧档缺字段按默认归一化补齐，tick/day/month/year 不允许负值或倒退。
+## 契约：旧档缺字段按默认归一化补齐，tick/day/month/year 不允许负值或倒退。
 func advance_world_time(units: int = 1) -> void:
 	if units <= 0:
 		return
@@ -37,10 +37,10 @@ func advance_world_time(units: int = 1) -> void:
 func _normalize_world_time() -> void:
 	var defaults := {"tick": 0, "day": 1, "month": 1, "year": 1}
 	for key in defaults:
-		var v: int = int(world_time.get(key, defaults[key]))
-		if v < 0:
-			v = defaults[key]
-		world_time[key] = v
+		var field_value: int = int(world_time.get(key, defaults[key]))
+		if field_value < 0:
+			field_value = defaults[key]
+		world_time[key] = field_value
 
 ## 追加历史影响片段（只增不改 + 有界回收，防无限增长）
 func append_history_fragment(fragment: Dictionary) -> void:
@@ -56,14 +56,14 @@ func serialize() -> Dictionary:
 	return {"world_id": world_id, "world_time": world_time.duplicate(), "world_state": world_state.duplicate(), "history_fragments": history_fragments.duplicate()}
 
 ## 从字典结构反序列化恢复实体或对象状态
-static func deserialize(d: Dictionary) -> WorldInstance:
-	var inst := WorldInstance.new(String(d.get("world_id", "")))
-	inst.world_time = d.get("world_time", inst.world_time)
-	inst.world_state = d.get("world_state", {})
-	inst.history_fragments.clear()
-	var raw_frags: Variant = d.get("history_fragments", [])
-	if raw_frags is Array:
-		for frag in raw_frags:
-			if frag is Dictionary:
-				inst.history_fragments.append(frag)
-	return inst
+static func deserialize(data: Dictionary) -> WorldInstance:
+	var instance := WorldInstance.new(String(data.get("world_id", "")))
+	instance.world_time = data.get("world_time", instance.world_time)
+	instance.world_state = data.get("world_state", {})
+	instance.history_fragments.clear()
+	var raw_fragments: Variant = data.get("history_fragments", [])
+	if raw_fragments is Array:
+		for fragment_item in raw_fragments:
+			if fragment_item is Dictionary:
+				instance.history_fragments.append(fragment_item)
+	return instance

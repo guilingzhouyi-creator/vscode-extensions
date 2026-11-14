@@ -25,7 +25,7 @@ const HudUiNoticeDTO = preload("res://backend/domains/world_state/dto/hud_ui_not
 const HudCausalDeltaDTO = preload("res://backend/domains/world_state/dto/hud_causal_delta_dto.gd")
 
 var _context: Dictionary = {}
-var _prev_slice: AgentHudContextSliceDTO = null
+var _previous_slice: AgentHudContextSliceDTO = null
 var _sequence_index: int = 0
 var _pending_ui_notices: Array[HudUiNoticeDTO] = []
 var _human_interacting: bool = false
@@ -34,19 +34,19 @@ var _trajectory_ring: AgentTrajectoryRingBuffer = null
 var _async_dispatcher: AgentAsyncDispatcher = null
 
 func _init() -> void:
-	var ring_cap: int = 32
+	var ring_capacity: int = 32
 	if GameConfig.has_table("domains.world_state"):
-		ring_cap = GameConfig.get_int("domains.world_state", "agent_telemetry_stream/ring_buffer_capacity", 32)
-	_trajectory_ring = AgentTrajectoryRingBuffer.new(ring_cap)
+		ring_capacity = GameConfig.get_int("domains.world_state", "agent_telemetry_stream/ring_buffer_capacity", 32)
+	_trajectory_ring = AgentTrajectoryRingBuffer.new(ring_capacity)
 
-	var queue_cap: int = 128
+	var queue_capacity: int = 128
 	if GameConfig.has_table("domains.world_state"):
-		queue_cap = GameConfig.get_int("domains.world_state", "agent_telemetry_stream/async_queue_capacity", 128)
-	_async_dispatcher = AgentAsyncDispatcher.new(queue_cap)
+		queue_capacity = GameConfig.get_int("domains.world_state", "agent_telemetry_stream/async_queue_capacity", 128)
+	_async_dispatcher = AgentAsyncDispatcher.new(queue_capacity)
 
 ## 绑定当前上下文字典
-func set_context(ctx: Dictionary) -> void:
-	_context = ctx
+func set_context(context: Dictionary) -> void:
+	_context = context
 
 ## 获取当前绑定上下文
 func get_context() -> Dictionary:
@@ -75,7 +75,7 @@ func step_and_publish(cause: String = "") -> AgentHudTelemetryPacketDTO:
 
 	var packet := AgentHudSliceSolver.assemble_telemetry_packet(
 		snapshot,
-		_prev_slice,
+		_previous_slice,
 		_sequence_index,
 		cause,
 		_human_interacting,
@@ -84,13 +84,13 @@ func step_and_publish(cause: String = "") -> AgentHudTelemetryPacketDTO:
 
 	# 合并并转移待分发的外部 UI 通知
 	if not _pending_ui_notices.is_empty():
-		for n in _pending_ui_notices:
-			if n != null and packet.observation != null:
-				packet.observation.ui_notices.append(n)
+		for notice in _pending_ui_notices:
+			if notice != null and packet.observation != null:
+				packet.observation.ui_notices.append(notice)
 		_pending_ui_notices.clear()
 
 	# 滚动更新前序切片副本
-	_prev_slice = packet.observation
+	_previous_slice = packet.observation
 
 	# 1. 记录进定长环形轨迹缓冲器
 	if _trajectory_ring != null:
@@ -129,7 +129,7 @@ func get_trajectory_ring_buffer() -> AgentTrajectoryRingBuffer:
 func reset_state() -> void:
 	super.reset_state()
 	_context.clear()
-	_prev_slice = null
+	_previous_slice = null
 	_sequence_index = 0
 	_pending_ui_notices.clear()
 	_human_interacting = false

@@ -23,7 +23,7 @@ const HudCausalDeltaSolver = preload("res://backend/domains/world_state/solvers/
 ## 一站式原子装箱流水线：生成直接交付 LLM 的标准数据包（支持原位复用）
 static func assemble_telemetry_packet(
 	snapshot: AuthoritativeHudSnapshotDTO,
-	prev_slice: AgentHudContextSliceDTO = null,
+	previous_slice: AgentHudContextSliceDTO = null,
 	sequence_index: int = 1,
 	cause: String = "",
 	human_interacting: bool = false,
@@ -52,8 +52,8 @@ static func assemble_telemetry_packet(
 	solve_slice(snapshot, packet.observation)
 
 	# 3. 组装因果差分 (Causal Deltas with Initiator Provenance - 原位注入)
-	if prev_slice != null:
-		HudCausalDeltaSolver.compute_deltas_into(prev_slice, packet.observation, packet.causal_deltas, cause, initiator)
+	if previous_slice != null:
+		HudCausalDeltaSolver.compute_deltas_into(previous_slice, packet.observation, packet.causal_deltas, cause, initiator)
 	else:
 		packet.causal_deltas.clear()
 
@@ -81,7 +81,7 @@ static func solve_slice(
 	slice.race_id = snapshot.race_id
 	slice.level = snapshot.level
 
-	# 生理比率安全计算 (下限防零 maxf(1.0, ...) 与 clampf(..., 0.0, 1.0) 闭环)
+	# 生理比率安全计算 (下限防零 maxf(1.0, ...) 与 clampf(..., 0.0, 1.0) 完整区间保护)
 	slice.hp_current = snapshot.hp_current
 	slice.hp_max = snapshot.hp_max
 	slice.hp_ratio = clampf(snapshot.hp_current / maxf(1.0, snapshot.hp_max), 0.0, 1.0)
@@ -102,8 +102,8 @@ static func solve_slice(
 
 	# 原位复制基础属性，杜绝 duplicate(true) 产生新字典
 	slice.attribute_values.clear()
-	for k in snapshot.attribute_values.keys():
-		slice.attribute_values[k] = snapshot.attribute_values[k]
+	for attribute_key in snapshot.attribute_values.keys():
+		slice.attribute_values[attribute_key] = snapshot.attribute_values[attribute_key]
 	slice.title_rank_key = snapshot.title_rank_key
 
 	# 环境历法
@@ -122,11 +122,11 @@ static func solve_slice(
 
 	# 运行模式与社交
 	if snapshot.mode_features != null:
-		var mf: Variant = snapshot.mode_features
-		var is_mp: bool = (int(mf.get("game_mode", 0)) == 1 or int(mf.get("game_mode", 0)) == 2) if mf is Dictionary else (int(mf.game_mode) == 1 or int(mf.game_mode) == 2 or bool(mf.show_matchmaking))
-		slice.game_mode = "MULTIPLAYER" if is_mp else "SINGLE_PLAYER"
-		var party_ready: bool = bool(mf.get("party_matchmaking_enabled", mf.get("show_matchmaking", false))) if mf is Dictionary else (bool(mf.party_matchmaking_enabled) if "party_matchmaking_enabled" in mf else bool(mf.show_matchmaking))
-		slice.is_multiplayer_ready = is_mp or party_ready
+		var mode_features_value: Variant = snapshot.mode_features
+		var is_multiplayer: bool = (int(mode_features_value.get("game_mode", 0)) == 1 or int(mode_features_value.get("game_mode", 0)) == 2) if mode_features_value is Dictionary else (int(mode_features_value.game_mode) == 1 or int(mode_features_value.game_mode) == 2 or bool(mode_features_value.show_matchmaking))
+		slice.game_mode = "MULTIPLAYER" if is_multiplayer else "SINGLE_PLAYER"
+		var party_ready: bool = bool(mode_features_value.get("party_matchmaking_enabled", mode_features_value.get("show_matchmaking", false))) if mode_features_value is Dictionary else (bool(mode_features_value.party_matchmaking_enabled) if "party_matchmaking_enabled" in mode_features_value else bool(mode_features_value.show_matchmaking))
+		slice.is_multiplayer_ready = is_multiplayer or party_ready
 	slice.unread_mail_count = snapshot.unread_mail_count
 
 	# UI 公告与活动引导去表现化提取 (Inv-UI-FEED-STRUCTURAL-PURITY-9)

@@ -4,7 +4,7 @@
 # 架构定位: Value Object DTO / Data Transport Model
 # 依赖与触发: 上游: HudCausalDeltaSolver | 下游: AgentHudTelemetryPacketDTO | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
 # 职责说明: 单步状态演化因果差分传输对象，携带突变类别、目标字段、旧值、新值、增量值与因果发起者溯源标签。
-# 退出语义与设计依据: 主页HUD面向Agent结构化切片流与行动空间双轨适配引擎施工细则 (Inv-CAUSAL-INITIATOR-PROVENANCE-11)
+# 退出语义与设计依据: 主页HUD面向Agent结构化切片流与行动空间双通道适配引擎设计规范 (Inv-CAUSAL-INITIATOR-PROVENANCE-11)
 # ==============================================================================
 
 ## HudCausalDeltaDTO：Value Object DTO / Data Transport Model
@@ -49,13 +49,13 @@ func to_dto() -> Dictionary:
 
 ## 从输入字典反序列化还原传输对象
 static func from_dto(data: Dictionary) -> HudCausalDeltaDTO:
-	var dto := HudCausalDeltaDTO.new()
-	dto.delta_category = str(data.get("delta_category", ""))
-	dto.target_field = str(data.get("target_field", ""))
-	dto.previous_value = data.get("previous_value", null)
-	dto.current_value = data.get("current_value", null)
-	dto.delta_amount = float(data.get("delta_amount", 0.0))
-	dto.cause_identifier = str(data.get("cause_identifier", ""))
-	dto.initiator = str(data.get("initiator", "SYSTEM_TICK_SIMULATION"))
-	dto.reason = str(data.get("reason", ""))
-	return dto
+	var delta := HudCausalDeltaDTO.new()
+	delta.delta_category = str(data.get("delta_category", ""))
+	delta.target_field = str(data.get("target_field", ""))
+	delta.previous_value = data.get("previous_value", null)
+	delta.current_value = data.get("current_value", null)
+	delta.delta_amount = float(data.get("delta_amount", 0.0))
+	delta.cause_identifier = str(data.get("cause_identifier", ""))
+	delta.initiator = str(data.get("initiator", "SYSTEM_TICK_SIMULATION"))
+	delta.reason = str(data.get("reason", ""))
+	return delta

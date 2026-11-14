@@ -29,16 +29,16 @@ func to_dto() -> Dictionary:
 
 ## 从输入字典反序列化还原传输对象
 static func from_dto(data: Dictionary) -> ActiveQuestTrackerDTO:
-	var dto := ActiveQuestTrackerDTO.new()
-	var mq: Variant = data.get("main_quest", {})
-	if mq is Dictionary:
-		dto.main_quest = mq.duplicate()
-	var sq: Variant = data.get("side_quest", {})
-	if sq is Dictionary:
-		dto.side_quest = sq.duplicate()
-	var dq: Variant = data.get("daily_quest", {})
-	if dq is Dictionary:
-		dto.daily_quest = dq.duplicate()
-	dto.tracked_quest_id = str(data.get("tracked_quest_id", ""))
-	dto.is_completable = bool(data.get("is_completable", false))
-	return dto
+	var tracker := ActiveQuestTrackerDTO.new()
+	var main_quest_data: Variant = data.get("main_quest", {})
+	if main_quest_data is Dictionary:
+		tracker.main_quest = main_quest_data.duplicate()
+	var side_quest_data: Variant = data.get("side_quest", {})
+	if side_quest_data is Dictionary:
+		tracker.side_quest = side_quest_data.duplicate()
+	var daily_quest_data: Variant = data.get("daily_quest", {})
+	if daily_quest_data is Dictionary:
+		tracker.daily_quest = daily_quest_data.duplicate()
+	tracker.tracked_quest_id = str(data.get("tracked_quest_id", ""))
+	tracker.is_completable = bool(data.get("is_completable", false))
+	return tracker

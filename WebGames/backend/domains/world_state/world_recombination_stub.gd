@@ -22,12 +22,12 @@ static func generate_new_world(default_template: Dictionary, history_worlds: Arr
 		return {"success": true, "world": template.duplicate(), "mode": MODE_DEFAULT_ONLY}
 	EventBusCore.get_instance().emit_log("warn", "WorldRecombinationStub: multi-world recombination algorithm not fully deployed; outputting fallback template synthesis.")
 	var fragments: Array = []
-	for w in history_worlds:
-		if not w is Dictionary:
+	for history_world in history_worlds:
+		if not history_world is Dictionary:
 			continue
-		var raw_frags: Variant = w.get("history_fragments")
-		if raw_frags is Array:
-			fragments.append_array(raw_frags as Array)
+		var raw_fragments: Variant = history_world.get("history_fragments")
+		if raw_fragments is Array:
+			fragments.append_array(raw_fragments as Array)
 	var composed: Dictionary = template.duplicate()
 	composed["recombined_fragments_count"] = fragments.size()
 	composed["sources"] = ["default", "history"]

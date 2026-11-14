@@ -7,7 +7,7 @@
 # 退出语义与设计依据: 纯数据模型无退出码；设计依据: 卡拉尔客户端统一协议信封规范与零堆分配对象池契约 (Inv-UNIFIED-ENVELOPE-1, Inv-ZERO-HEAP-POOL-3)
 # ==============================================================================
 
-## 客户端统一请求信封 DTO：封装客户端请求元数据与业务参数
+## ClientRequestEnvelopeDTO：客户端统一请求信封 DTO，封装客户端请求元数据与业务参数
 class_name ClientRequestEnvelopeDTO
 extends PoolableDtoBase
 
@@ -58,16 +58,16 @@ func to_dto() -> Dictionary:
 
 ## 从输入字典反序列化还原传输对象
 static func from_dto(data: Dictionary) -> ClientRequestEnvelopeDTO:
-	var req := ClientRequestEnvelopeDTO.new()
-	req.request_id = str(data.get("request_id", ""))
-	req.session_token = str(data.get("session_token", ""))
-	req.account_id = str(data.get("account_id", ""))
-	req.character_id = str(data.get("character_id", ""))
-	req.actor_type = str(data.get("actor_type", ACTOR_HUMAN_UI))
-	req.domain = str(data.get("domain", ""))
-	req.action_type = str(data.get("action_type", ""))
-	var raw_p: Variant = data.get("payload", {})
-	req.payload = (raw_p as Dictionary).duplicate(true) if raw_p is Dictionary else {}
-	req.lease_nonce = int(data.get("lease_nonce", 0))
-	req.client_timestamp_ms = int(data.get("client_timestamp_ms", 0))
-	return req
+	var envelope := ClientRequestEnvelopeDTO.new()
+	envelope.request_id = str(data.get("request_id", ""))
+	envelope.session_token = str(data.get("session_token", ""))
+	envelope.account_id = str(data.get("account_id", ""))
+	envelope.character_id = str(data.get("character_id", ""))
+	envelope.actor_type = str(data.get("actor_type", ACTOR_HUMAN_UI))
+	envelope.domain = str(data.get("domain", ""))
+	envelope.action_type = str(data.get("action_type", ""))
+	var raw_payload: Variant = data.get("payload", {})
+	envelope.payload = (raw_payload as Dictionary).duplicate(true) if raw_payload is Dictionary else {}
+	envelope.lease_nonce = int(data.get("lease_nonce", 0))
+	envelope.client_timestamp_ms = int(data.get("client_timestamp_ms", 0))
+	return envelope

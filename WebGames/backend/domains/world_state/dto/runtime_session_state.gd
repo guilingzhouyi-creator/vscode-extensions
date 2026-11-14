@@ -15,6 +15,7 @@ extends RefCounted
 const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
 
 var account_id: String = ""
+var is_authenticated: bool = false
 var session_token_hash: String = ""
 var gateway_fsm: Variant = null
 var world_id: String = ""
@@ -58,10 +59,12 @@ var world_active: bool = false
 var in_combat: bool = false
 var in_cutscene: bool = false
 var is_dead: bool = false
+var is_paused: bool = false
 var hud_dirty: bool = false
 var world_dirty: bool = false
 var last_hud_sync_ms: int = 0
 
+## 重置当前世界实例与运行时 HUD 关联字段
 func reset_world_fields() -> void:
 	world_id = ""
 	slot_id = ""
@@ -104,16 +107,20 @@ func reset_world_fields() -> void:
 	in_combat = false
 	in_cutscene = false
 	is_dead = false
+	is_paused = false
 	hud_dirty = false
 	world_dirty = false
 	last_hud_sync_ms = 0
 
+## 重置账号会话与当前世界运行时状态
 func reset_all() -> void:
 	account_id = ""
+	is_authenticated = false
 	session_token_hash = ""
 	gateway_fsm = null
 	reset_world_fields()
 
+## 导出用于多域存盘的会话状态快照
 func to_save_snapshot() -> Dictionary:
 	return {
 		"account_id": account_id,

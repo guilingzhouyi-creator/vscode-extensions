@@ -31,11 +31,11 @@ func to_dto() -> Dictionary:
 
 ## 从输入字典反序列化还原传输对象
 static func from_dto(data: Dictionary) -> WorldCalendarEnvironmentDTO:
-	var dto := WorldCalendarEnvironmentDTO.new()
-	dto.calendar_years = maxi(0, int(data.get("calendar_years", 0)))
-	dto.calendar_months = maxi(1, int(data.get("calendar_months", 1)))
-	dto.calendar_days = maxi(1, int(data.get("calendar_days", 1)))
-	dto.travel_hours = maxi(0, int(data.get("travel_hours", 0)))
-	dto.day_phase_key = String(data.get("day_phase_key", "MIDNIGHT"))
-	dto.mana_density_tier = maxi(1, int(data.get("mana_density_tier", 1)))
-	return dto
+	var environment := WorldCalendarEnvironmentDTO.new()
+	environment.calendar_years = maxi(0, int(data.get("calendar_years", 0)))
+	environment.calendar_months = maxi(1, int(data.get("calendar_months", 1)))
+	environment.calendar_days = maxi(1, int(data.get("calendar_days", 1)))
+	environment.travel_hours = maxi(0, int(data.get("travel_hours", 0)))
+	environment.day_phase_key = String(data.get("day_phase_key", "MIDNIGHT"))
+	environment.mana_density_tier = maxi(1, int(data.get("mana_density_tier", 1)))
+	return environment

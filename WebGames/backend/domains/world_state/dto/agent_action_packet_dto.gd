@@ -4,7 +4,7 @@
 # 架构定位: Value Object DTO / Data Transport Model
 # 依赖与触发: 上游: LLM / 决策客户端 | 下游: AgentActionChannel, AgentActionExecutionSolver | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
 # 职责说明: 面向专属逻辑动作通道的上行标准动作包契约，携带目标指令与强类型参数，实现零硬件争抢直投领域用例。
-# 退出语义与设计依据: 主页HUD面向Agent结构化切片流与行动空间双轨适配引擎施工细则 (Inv-SEPARATE-INPUT-CHANNEL-8)
+# 退出语义与设计依据: 主页HUD面向Agent结构化切片流与行动空间双通道适配引擎设计规范 (Inv-SEPARATE-INPUT-CHANNEL-8)
 # ==============================================================================
 
 ## AgentActionPacketDTO：Value Object DTO / Data Transport Model
@@ -54,14 +54,14 @@ func to_dto() -> Dictionary:
 
 ## 从输入字典反序列化还原传输对象
 static func from_dto(data: Dictionary) -> AgentActionPacketDTO:
-	var pkt := AgentActionPacketDTO.new()
-	pkt.session_id = str(data.get("session_id", ""))
-	pkt.sequence_index = int(data.get("sequence_index", 0))
-	pkt.directive_id = str(data.get("directive_id", data.get("action_id", "")))
-	pkt.action_id = pkt.directive_id
-	pkt.params = data.get("params", data.get("parameters", {})).duplicate(true)
-	pkt.parameters = pkt.params.duplicate(true)
-	pkt.origin_packet_id = str(data.get("origin_packet_id", ""))
-	pkt.agent_signature = str(data.get("agent_signature", ""))
-	pkt.client_timestamp_ms = int(data.get("client_timestamp_ms", 0))
-	return pkt
+	var packet := AgentActionPacketDTO.new()
+	packet.session_id = str(data.get("session_id", ""))
+	packet.sequence_index = int(data.get("sequence_index", 0))
+	packet.directive_id = str(data.get("directive_id", data.get("action_id", "")))
+	packet.action_id = packet.directive_id
+	packet.params = data.get("params", data.get("parameters", {})).duplicate(true)
+	packet.parameters = packet.params.duplicate(true)
+	packet.origin_packet_id = str(data.get("origin_packet_id", ""))
+	packet.agent_signature = str(data.get("agent_signature", ""))
+	packet.client_timestamp_ms = int(data.get("client_timestamp_ms", 0))
+	return packet

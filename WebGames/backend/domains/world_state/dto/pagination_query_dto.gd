@@ -20,11 +20,12 @@ var page_size: int = DEFAULT_PAGE_SIZE
 var cursor_token: String = ""
 var filter_tag: String = ""
 
-func _init(p_page_index: int = 0, p_page_size: int = DEFAULT_PAGE_SIZE, p_cursor: String = "", p_filter: String = "") -> void:
-	page_index = maxi(0, p_page_index)
-	page_size = clampi(p_page_size, MIN_PAGE_SIZE, MAX_PAGE_SIZE)
-	cursor_token = p_cursor
-	filter_tag = p_filter
+## 构造分页查询请求传输对象
+func _init(initial_page_index: int = 0, initial_page_size: int = DEFAULT_PAGE_SIZE, initial_cursor_token: String = "", initial_filter_tag: String = "") -> void:
+	page_index = maxi(0, initial_page_index)
+	page_size = clampi(initial_page_size, MIN_PAGE_SIZE, MAX_PAGE_SIZE)
+	cursor_token = initial_cursor_token
+	filter_tag = initial_filter_tag
 
 ## 序列化当前对象为通用字典传输结构
 func to_dto() -> Dictionary:
