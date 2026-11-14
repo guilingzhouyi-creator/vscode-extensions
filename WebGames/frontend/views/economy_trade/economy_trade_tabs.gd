@@ -1,10 +1,14 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端第5卷: 经济与交易 Tab 子面板控制器
+# 模块归属: 前端表现层 (Frontend · 第5卷 经济与交易 Tab 子面板控制器)
 # 文件路径: res://frontend/views/economy_trade/economy_trade_tabs.gd
-# 职责: 承接静态文案/Tab标题/拍卖行/商队物流/物价走势/货币兑换/资源水池的初始化与事件处理
-#       由 EconomyTradeView 持有，经 setup(view) 绑定视图引用后委托调用
-#       节点引用与状态均经 _view 访问（单一数据源），保证行为与拆分前完全一致
+# 架构定位: Presentation Sub-Panel Delegate
+# 依赖与触发: 上游: EconomyTradeView
+#           下游: KTabBar, KPageHeaderClass, KCurrencyBarClass, UIIntermediary
+# 职责说明: 承接拍卖行、商队物流、物价走势、货币兑换与资源水池的文案初始化及交互；
+#           节点引用与状态均经 _view 访问，保持单一数据源。
+# 退出语义与设计依据: 表现层多页签委托解耦与进度条行节点池化复用契约
 # ==============================================================================
+## EconomyTradeTabs：第5卷经济与交易多子面板初始化与交互委托
 class_name EconomyTradeTabs
 extends BaseScreen
 
@@ -22,23 +26,28 @@ var search_bar: KSearchBar = null
 var _view: Variant = null
 var _filtered_auction_indices: Array[int] = []
 
+## 绑定所属经济与交易主视图控制器
 func setup(view: BaseScreen) -> void:
 	_view = view
 
+## 构建或复用页面标准标题栏
 func create_page_header(title_key: String) -> KPageHeader:
 	page_header = _ensure_page_header(page_header, KPageHeaderClass, title_key, _view) as KPageHeader
 	return page_header
 
+## 构建或复用顶部通用货币栏
 func create_currency_bar() -> KCurrencyBar:
 	currency_bar = _ensure_currency_bar(currency_bar, KCurrencyBarClass) as KCurrencyBar
 	return currency_bar
 
+## 构建或复用左右分栏容器
 func create_split_panel(ratio: float = 0.35) -> KSplitPanel:
 	split_panel = _ensure_split_panel(split_panel, KSplitPanelClass, ratio) as KSplitPanel
 	return split_panel
 
-func create_search_bar(ph_key: String = "") -> KSearchBar:
-	search_bar = _ensure_search_bar(search_bar, KSearchBarClass, ph_key) as KSearchBar
+## 构建或复用搜索输入框组件
+func create_search_bar(placeholder_key: String = "") -> KSearchBar:
+	search_bar = _ensure_search_bar(search_bar, KSearchBarClass, placeholder_key) as KSearchBar
 	return search_bar
 
 # ==============================================================================
@@ -61,58 +70,58 @@ func _init_static_text() -> void:
 	var title_label: Label = _view.get_node_or_null("MainLayout/HeaderPanel/HeaderHBox/TitleLabel")
 	if title_label != null:
 		UIIntermediary.resolve(title_label, "ui.fe05.header.title")
-	UIIntermediary.resolve(_view._btn_back, "ui.fe05.header.back")
+	UIIntermediary.resolve(_view._back_button, "ui.fe05.header.back")
 
 	# --- Tab 0: WALLET ---
-	var tab0: Node = _view._tab_container.get_child(0)
-	if tab0 != null:
-		UIIntermediary.resolve(tab0.get_node("SectionLabel"), "ui.fe05.wallet.section")
-		UIIntermediary.resolve(tab0.get_node("DetailLabel"), "ui.fe05.wallet.detail_label")
-		for c in ["Gold", "Silver", "Copper", "Crystal"]:
-			UIIntermediary.resolve(tab0.get_node("CurrencyGrid/%sCard/%sVBox/%sName" % [c, c, c]), "ui.fe05.wallet.%s_name" % c.to_lower())
+	var wallet_tab: Node = _view._tab_container.get_child(0)
+	if wallet_tab != null:
+		UIIntermediary.resolve(wallet_tab.get_node("SectionLabel"), "ui.fe05.wallet.section")
+		UIIntermediary.resolve(wallet_tab.get_node("DetailLabel"), "ui.fe05.wallet.detail_label")
+		for currency_key in ["Gold", "Silver", "Copper", "Crystal"]:
+			UIIntermediary.resolve(wallet_tab.get_node("CurrencyGrid/%sCard/%sVBox/%sName" % [currency_key, currency_key, currency_key]), "ui.fe05.wallet.%s_name" % currency_key.to_lower())
 
 	# --- Tab 1: SHOP ---
-	var tab1: Node = _view._tab_container.get_child(1)
-	if tab1 != null:
-		UIIntermediary.resolve(tab1.get_node("ShopModeRow/BtnModeBuy"), "ui.fe05.shop.mode_buy")
-		UIIntermediary.resolve(tab1.get_node("ShopModeRow/BtnModeSell"), "ui.fe05.shop.mode_sell")
-		UIIntermediary.resolve(tab1.get_node("ShopBottomPanel/ShopBottomHBox/QtyLabel"), "ui.fe05.shop.quantity")
+	var shop_tab: Node = _view._tab_container.get_child(1)
+	if shop_tab != null:
+		UIIntermediary.resolve(shop_tab.get_node("ShopModeRow/BtnModeBuy"), "ui.fe05.shop.mode_buy")
+		UIIntermediary.resolve(shop_tab.get_node("ShopModeRow/BtnModeSell"), "ui.fe05.shop.mode_sell")
+		UIIntermediary.resolve(shop_tab.get_node("ShopBottomPanel/ShopBottomHBox/QtyLabel"), "ui.fe05.shop.quantity")
 
 	# --- Tab 2: AUCTION ---
-	var tab2: Node = _view._tab_container.get_child(2)
-	if tab2 != null:
+	var auction_tab: Node = _view._tab_container.get_child(2)
+	if auction_tab != null:
 		UIIntermediary.resolve_placeholder(_view._line_auction_search, "ui.fe05.auction.search_ph")
 		for pair in [["SectionLabel", "ui.fe05.auction.section"], ["ActionRow/BtnAuctionBid", "ui.fe05.auction.bid"], ["ActionRow/BtnAuctionBuyout", "ui.fe05.auction.buyout"], ["MyListingsLabel", "ui.fe05.auction.my_listings"]]:
-			UIIntermediary.resolve(tab2.get_node(pair[0]), pair[1])
+			UIIntermediary.resolve(auction_tab.get_node(pair[0]), pair[1])
 
 	# --- Tab 3: LOGISTICS ---
-	var tab3: Node = _view._tab_container.get_child(3)
-	if tab3 != null:
-		UIIntermediary.resolve(tab3.get_node("SectionLabel"), "ui.fe05.logistics.section")
+	var logistics_tab: Node = _view._tab_container.get_child(3)
+	if logistics_tab != null:
+		UIIntermediary.resolve(logistics_tab.get_node("SectionLabel"), "ui.fe05.logistics.section")
 
 	# --- Tab 4: PRICE_TREND ---
-	var tab4: Node = _view._tab_container.get_child(4)
-	if tab4 != null:
+	var price_trend_tab: Node = _view._tab_container.get_child(4)
+	if price_trend_tab != null:
 		for pair in [["SectionLabel", "ui.fe05.price.section"], ["CommodityRow/Label", "ui.fe05.price.commodity_label"], ["TrendHintLabel", "ui.fe05.price.hint"]]:
-			UIIntermediary.resolve(tab4.get_node(pair[0]), pair[1])
+			UIIntermediary.resolve(price_trend_tab.get_node(pair[0]), pair[1])
 
 	# --- Tab 5: EXCHANGE ---
-	var tab5: Node = _view._tab_container.get_child(5)
-	if tab5 != null:
+	var exchange_tab: Node = _view._tab_container.get_child(5)
+	if exchange_tab != null:
 		for pair in [["SectionLabel", "ui.fe05.exchange.section"], ["ExchangePanel/ExchangeVBox/SourceRow/SourceLabel", "ui.fe05.exchange.source"], ["ExchangePanel/ExchangeVBox/TargetRow/TargetLabel", "ui.fe05.exchange.target"], ["ExchangePanel/ExchangeVBox/AmountRow/AmountLabel", "ui.fe05.exchange.amount"]]:
-			UIIntermediary.resolve(tab5.get_node(pair[0]), pair[1])
-		UIIntermediary.resolve(_view._btn_exchange_confirm, "ui.fe05.exchange.confirm")
+			UIIntermediary.resolve(exchange_tab.get_node(pair[0]), pair[1])
+		UIIntermediary.resolve(_view._exchange_confirm_button, "ui.fe05.exchange.confirm")
 
 	# --- Tab 6: RESOURCE_POOL ---
-	var tab6: Node = _view._tab_container.get_child(6)
-	if tab6 != null:
-		UIIntermediary.resolve(tab6.get_node("SectionLabel"), "ui.fe05.resource.section")
+	var resource_pool_tab: Node = _view._tab_container.get_child(6)
+	if resource_pool_tab != null:
+		UIIntermediary.resolve(resource_pool_tab.get_node("SectionLabel"), "ui.fe05.resource.section")
 
 # ==============================================================================
 # Tab 3: 拍卖行 (AUCTION) 初始化与信号
 # ==============================================================================
 
-## 初始化拍卖行 Tab：分类选项/拍品列表/我的上架（Mock 兜底）
+## 初始化拍卖行 Tab：分类选项/拍品列表/我的上架（Mock 初始清单）
 func _init_auction_tab() -> void:
 	if _view == null or _view._option_auction_category == null:
 		return
@@ -140,40 +149,40 @@ func _populate_auction_list() -> void:
 	_view._auction_item_list.clear()
 	_filtered_auction_indices.clear()
 	var keyword: String = _view._line_auction_search.text.strip_edges().to_lower()
-	var cat_index: int = _view._option_auction_category.selected
-	var cat_filter: String = ""
-	if cat_index > 0 and cat_index < _view._auction_category_keys.size():
-		cat_filter = _view._auction_category_keys[cat_index]
-	var item_params: Dictionary = {"name": "", "bid": "", "buyout": "", "seller": ""}
-	for idx in range(_view._auction_items.size()):
-		var item: Dictionary = _view._auction_items[idx]
-		var item_name: String = UIIntermediary.text(str(item.get("name", "ui.fe05.unknown")))
+	var category_index: int = _view._option_auction_category.selected
+	var category_filter: String = ""
+	if category_index > 0 and category_index < _view._auction_category_keys.size():
+		category_filter = _view._auction_category_keys[category_index]
+	var item_parameters: Dictionary = {"name": "", "bid": "", "buyout": "", "seller": ""}
+	for auction_index in range(_view._auction_items.size()):
+		var auction_item: Dictionary = _view._auction_items[auction_index]
+		var item_name: String = UIIntermediary.text(str(auction_item.get("name", "ui.fe05.unknown")))
 		if not keyword.is_empty() and not item_name.to_lower().contains(keyword):
 			continue
-		if not cat_filter.is_empty() and str(item.get("category", "")) != cat_filter:
+		if not category_filter.is_empty() and str(auction_item.get("category", "")) != category_filter:
 			continue
-		var seller: String = UIIntermediary.text(str(item.get("seller", "ui.fe05.unknown")))
-		item_params["name"] = item_name
-		item_params["bid"] = _view._format_currency(int(item.get("current_bid", 0)))
-		item_params["buyout"] = _view._format_currency(int(item.get("buyout", 0)))
-		item_params["seller"] = seller
-		var display: String = UIIntermediary.text("ui.fe05.auction.item_display", item_params)
-		_filtered_auction_indices.append(idx)
-		_view._auction_item_list.add_item(display)
+		var seller: String = UIIntermediary.text(str(auction_item.get("seller", "ui.fe05.unknown")))
+		item_parameters["name"] = item_name
+		item_parameters["bid"] = _view._format_currency(int(auction_item.get("current_bid", 0)))
+		item_parameters["buyout"] = _view._format_currency(int(auction_item.get("buyout", 0)))
+		item_parameters["seller"] = seller
+		var display_text: String = UIIntermediary.text("ui.fe05.auction.item_display", item_parameters)
+		_filtered_auction_indices.append(auction_index)
+		_view._auction_item_list.add_item(display_text)
 
 ## 填充我的上架列表（名称/一口价/状态/期限）
 func _populate_auction_my_list() -> void:
 	if _view == null or _view._auction_my_list == null:
 		return
 	_view._auction_my_list.clear()
-	var listing_params: Dictionary = {"name": "", "ask": "", "status": "", "expires": ""}
+	var listing_parameters: Dictionary = {"name": "", "ask": "", "status": "", "expires": ""}
 	for listing in _view._auction_my_listings:
-		listing_params["name"] = UIIntermediary.text(str(listing.get("name", "ui.fe05.unknown")))
-		listing_params["ask"] = _view._format_currency(int(listing.get("ask_price", 0)))
-		listing_params["status"] = UIIntermediary.text(str(listing.get("status", "ui.fe05.unknown")))
-		listing_params["expires"] = UIIntermediary.text(str(listing.get("expires", "ui.fe05.unknown")))
-		var display: String = UIIntermediary.text("ui.fe05.auction.listing_display", listing_params)
-		_view._auction_my_list.add_item(display)
+		listing_parameters["name"] = UIIntermediary.text(str(listing.get("name", "ui.fe05.unknown")))
+		listing_parameters["ask"] = _view._format_currency(int(listing.get("ask_price", 0)))
+		listing_parameters["status"] = UIIntermediary.text(str(listing.get("status", "ui.fe05.unknown")))
+		listing_parameters["expires"] = UIIntermediary.text(str(listing.get("expires", "ui.fe05.unknown")))
+		var display_text: String = UIIntermediary.text("ui.fe05.auction.listing_display", listing_parameters)
+		_view._auction_my_list.add_item(display_text)
 
 func _on_auction_search_changed(_text: String) -> void: _populate_auction_list()
 func _on_auction_category_selected(_index: int) -> void: _populate_auction_list()
@@ -185,8 +194,8 @@ func _on_auction_action_pressed(toast_key: String) -> void:
 	if _view == null: return
 	var selected: Array = _view._auction_item_list.get_selected_items()
 	if not selected.is_empty() and selected[0] >= 0 and selected[0] < _filtered_auction_indices.size():
-		var orig_idx: int = _filtered_auction_indices[selected[0]]
-		var item_name: String = UIIntermediary.text(str(_view._auction_items[orig_idx].get("name", "ui.fe05.unknown")))
+		var original_index: int = _filtered_auction_indices[selected[0]]
+		var item_name: String = UIIntermediary.text(str(_view._auction_items[original_index].get("name", "ui.fe05.unknown")))
 		NavManager.get_instance().show_toast(UIIntermediary.text(toast_key, {"name": item_name}), NavTypes.ToastLevel.INFO)
 
 # ==============================================================================
@@ -208,14 +217,14 @@ func _populate_caravan_list() -> void:
 	if _view == null or _view._caravan_list == null:
 		return
 	_view._caravan_list.clear()
-	var caravan_params: Dictionary = {"name": "", "route": "", "status": "", "cargo": ""}
+	var caravan_parameters: Dictionary = {"name": "", "route": "", "status": "", "cargo": ""}
 	for caravan in _view._caravan_entries:
-		caravan_params["name"] = UIIntermediary.text(str(caravan.get("name", "ui.fe05.unknown")))
-		caravan_params["route"] = UIIntermediary.text(str(caravan.get("route", "ui.fe05.unknown")))
-		caravan_params["status"] = UIIntermediary.text(str(caravan.get("status", "ui.fe05.unknown")))
-		caravan_params["cargo"] = UIIntermediary.text(str(caravan.get("cargo", "ui.fe05.unknown")))
-		var display: String = UIIntermediary.text("ui.fe05.logistics.caravan_display", caravan_params)
-		_view._caravan_list.add_item(display)
+		caravan_parameters["name"] = UIIntermediary.text(str(caravan.get("name", "ui.fe05.unknown")))
+		caravan_parameters["route"] = UIIntermediary.text(str(caravan.get("route", "ui.fe05.unknown")))
+		caravan_parameters["status"] = UIIntermediary.text(str(caravan.get("status", "ui.fe05.unknown")))
+		caravan_parameters["cargo"] = UIIntermediary.text(str(caravan.get("cargo", "ui.fe05.unknown")))
+		var display_text: String = UIIntermediary.text("ui.fe05.logistics.caravan_display", caravan_parameters)
+		_view._caravan_list.add_item(display_text)
 	if _view._caravan_list.get_item_count() > 0:
 		_view._caravan_list.select(0)
 		_update_logistics_status(0)
@@ -269,35 +278,35 @@ func _init_price_trend_tab() -> void:
 
 ## 刷新物价走势柱状图：池化复用 ProgressBar 行节点（树内守卫）
 func _refresh_price_trend_display() -> void:
-	if _view == null or not _view.is_inside_tree() or _view._price_bars_vbox == null:
+	if _view == null or not _view.is_inside_tree() or _view._price_bars_box == null:
 		return
 	var commodity_key: String = ""
-	var selected_idx: int = _view._option_price_commodity.selected
-	if selected_idx >= 0 and selected_idx < _view._commodity_keys.size():
-		commodity_key = _view._commodity_keys[selected_idx]
+	var selected_index: int = _view._option_price_commodity.selected
+	if selected_index >= 0 and selected_index < _view._commodity_keys.size():
+		commodity_key = _view._commodity_keys[selected_index]
 	if commodity_key.is_empty() or not _view._commodity_prices.has(commodity_key):
-		for child in _view._price_bars_vbox.get_children():
+		for child in _view._price_bars_box.get_children():
 			child.visible = false
 		return
 
 	var prices: Array = _view._commodity_prices[commodity_key]
 	var max_price: int = 1
-	for p in prices:
-		max_price = maxi(max_price, int(p))
-	var day_params: Dictionary = {"day": 0}
-	var value_params: Dictionary = {"value": 0}
-	for i in range(prices.size()):
-		var row := _acquire_bar_row(_view._price_bars_vbox, i, [50, 80], 1.0)
-		row.visible = true
-		day_params["day"] = i + 1
-		(row.get_child(0) as Label).text = UIIntermediary.text("ui.fe05.price.day", day_params)
-		var bar := row.get_child(1) as ProgressBar
-		bar.max_value = float(max_price)
-		bar.value = float(prices[i])
-		value_params["value"] = int(prices[i])
-		(row.get_child(2) as Label).text = UIIntermediary.text("ui.fe05.price.value", value_params)
-	for i in range(prices.size(), _view._price_bars_vbox.get_child_count()):
-		_view._price_bars_vbox.get_child(i).visible = false
+	for price_point in prices:
+		max_price = maxi(max_price, int(price_point))
+	var day_parameters: Dictionary = {"day": 0}
+	var value_parameters: Dictionary = {"value": 0}
+	for day_index in range(prices.size()):
+		var bar_row := _acquire_bar_row(_view._price_bars_box, day_index, [50, 80], 1.0)
+		bar_row.visible = true
+		day_parameters["day"] = day_index + 1
+		(bar_row.get_child(0) as Label).text = UIIntermediary.text("ui.fe05.price.day", day_parameters)
+		var progress_bar := bar_row.get_child(1) as ProgressBar
+		progress_bar.max_value = float(max_price)
+		progress_bar.value = float(prices[day_index])
+		value_parameters["value"] = int(prices[day_index])
+		(bar_row.get_child(2) as Label).text = UIIntermediary.text("ui.fe05.price.value", value_parameters)
+	for extra_index in range(prices.size(), _view._price_bars_box.get_child_count()):
+		_view._price_bars_box.get_child(extra_index).visible = false
 
 func _on_price_commodity_selected(_index: int) -> void:
 	_refresh_price_trend_display()
@@ -329,42 +338,42 @@ func _get_currency_copper_value(index: int) -> int:
 func _read_exchange_selection() -> Dictionary:
 	if _view == null or _view._option_exchange_source == null:
 		return {}
-	var src_idx: int = _view._option_exchange_source.selected
-	var tgt_idx: int = _view._option_exchange_target.selected
-	if src_idx < 0 or tgt_idx < 0:
+	var source_index: int = _view._option_exchange_source.selected
+	var target_index: int = _view._option_exchange_target.selected
+	if source_index < 0 or target_index < 0:
 		return {}
 	return {
-		"src_idx": src_idx,
-		"tgt_idx": tgt_idx,
-		"src_name": _view._option_exchange_source.get_item_text(src_idx),
-		"tgt_name": _view._option_exchange_target.get_item_text(tgt_idx),
+		"src_idx": source_index,
+		"tgt_idx": target_index,
+		"src_name": _view._option_exchange_source.get_item_text(source_index),
+		"tgt_name": _view._option_exchange_target.get_item_text(target_index),
 		"amount": int(_view._spin_exchange_amount.value)
 	}
 
 ## 刷新兑换显示：汇率与结果换算（源/目标铜币比值）
 func _refresh_exchange_display() -> void:
-	var sel := _read_exchange_selection()
-	if sel.is_empty():
+	var selection_summary := _read_exchange_selection()
+	if selection_summary.is_empty():
 		return
-	var src_copper: int = _get_currency_copper_value(int(sel["src_idx"]))
-	var tgt_copper: int = _get_currency_copper_value(int(sel["tgt_idx"]))
+	var source_copper: int = _get_currency_copper_value(int(selection_summary["src_idx"]))
+	var target_copper: int = _get_currency_copper_value(int(selection_summary["tgt_idx"]))
 	var economy := MockServiceContainer.get_instance().economy()
-	var rate: float = economy.calculate_exchange_rate(src_copper, tgt_copper)
-	var amount: int = int(sel["amount"])
-	var result: float = economy.calculate_exchange_result(amount, rate)
-	UIIntermediary.resolve(_view._label_exchange_rate, "ui.fe05.exchange.rate", {"source": sel["src_name"], "rate": "%.4f" % rate, "target": sel["tgt_name"]})
-	UIIntermediary.resolve(_view._label_exchange_result, "ui.fe05.exchange.result", {"amount": amount, "source": sel["src_name"], "result": "%.2f" % result, "target": sel["tgt_name"]})
+	var rate: float = economy.calculate_exchange_rate(source_copper, target_copper)
+	var amount: int = int(selection_summary["amount"])
+	var converted_amount: float = economy.calculate_exchange_result(amount, rate)
+	UIIntermediary.resolve(_view._label_exchange_rate, "ui.fe05.exchange.rate", {"source": selection_summary["src_name"], "rate": "%.4f" % rate, "target": selection_summary["tgt_name"]})
+	UIIntermediary.resolve(_view._label_exchange_result, "ui.fe05.exchange.result", {"amount": amount, "source": selection_summary["src_name"], "result": "%.2f" % converted_amount, "target": selection_summary["tgt_name"]})
 
 func _on_exchange_source_selected(_index: int) -> void: _refresh_exchange_display()
 func _on_exchange_target_selected(_index: int) -> void: _refresh_exchange_display()
-func _on_exchange_amount_changed(_value: float) -> void: _refresh_exchange_display()
+func _on_exchange_amount_changed(_amount_value: float) -> void: _refresh_exchange_display()
 
 func _on_exchange_confirm_pressed() -> void:
-	var sel := _read_exchange_selection()
-	if sel.is_empty():
+	var selection_summary := _read_exchange_selection()
+	if selection_summary.is_empty():
 		return
 	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe05.exchange.confirm_toast", {
-		"amount": sel["amount"], "source": sel["src_name"], "target": sel["tgt_name"]
+		"amount": selection_summary["amount"], "source": selection_summary["src_name"], "target": selection_summary["tgt_name"]
 	}), NavTypes.ToastLevel.INFO)
 
 # ==============================================================================
@@ -383,44 +392,44 @@ func _init_resource_pool_tab() -> void:
 
 ## 填充资源池行（名称/存量条/存量/速率，池化复用已有行节点）
 func _populate_resource_pools() -> void:
-	if _view == null or _view._resource_pool_vbox == null:
+	if _view == null or _view._resource_pool_box == null:
 		return
-	for i in range(_view._resource_pools.size()):
-		var pool: Dictionary = _view._resource_pools[i]
-		var row := _acquire_bar_row(_view._resource_pool_vbox, i, [140, 90, 70], 100.0, true)
-		row.visible = true
-		(row.get_child(0) as Label).text = UIIntermediary.text(str(pool.get("name", "ui.fe05.unknown")))
-		var bar := row.get_child(1) as ProgressBar
-		bar.max_value = float(pool.get("max", 100))
-		bar.value = float(pool.get("current", 0))
-		(row.get_child(2) as Label).text = UIIntermediary.text("ui.fe05.resource.stock", {"current": int(pool.get("current", 0)), "max": int(pool.get("max", 0))})
-		(row.get_child(3) as Label).text = UIIntermediary.text("ui.fe05.resource.rate", {"rate": int(pool.get("rate", 0))})
-	for i in range(_view._resource_pools.size(), _view._resource_pool_vbox.get_child_count()):
-		_view._resource_pool_vbox.get_child(i).visible = false
+	for pool_index in range(_view._resource_pools.size()):
+		var pool: Dictionary = _view._resource_pools[pool_index]
+		var bar_row := _acquire_bar_row(_view._resource_pool_box, pool_index, [140, 90, 70], 100.0, true)
+		bar_row.visible = true
+		(bar_row.get_child(0) as Label).text = UIIntermediary.text(str(pool.get("name", "ui.fe05.unknown")))
+		var progress_bar := bar_row.get_child(1) as ProgressBar
+		progress_bar.max_value = float(pool.get("max", 100))
+		progress_bar.value = float(pool.get("current", 0))
+		(bar_row.get_child(2) as Label).text = UIIntermediary.text("ui.fe05.resource.stock", {"current": int(pool.get("current", 0)), "max": int(pool.get("max", 0))})
+		(bar_row.get_child(3) as Label).text = UIIntermediary.text("ui.fe05.resource.rate", {"rate": int(pool.get("rate", 0))})
+	for extra_index in range(_view._resource_pools.size(), _view._resource_pool_box.get_child_count()):
+		_view._resource_pool_box.get_child(extra_index).visible = false
 
 ## 获取或创建带进度条的池化行节点（物价走势与资源池共享行构建器，循环外分配）
-func _acquire_bar_row(vbox: VBoxContainer, index: int, col_widths: Array, default_max: float, expand_row: bool = false) -> HBoxContainer:
-	if index < vbox.get_child_count():
-		return vbox.get_child(index) as HBoxContainer
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_BEGIN
+func _acquire_bar_row(container_box: VBoxContainer, index: int, column_widths: Array, default_max: float, expand_row: bool = false) -> HBoxContainer:
+	if index < container_box.get_child_count():
+		return container_box.get_child(index) as HBoxContainer
+	var bar_row := HBoxContainer.new()
+	bar_row.alignment = BoxContainer.ALIGNMENT_BEGIN
 	if expand_row:
-		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bar_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var first_label := Label.new()
-	first_label.custom_minimum_size = Vector2(int(col_widths[0]), 0)
-	row.add_child(first_label)
-	var bar: ProgressBar = KStatusBarClass.create_bar(0.0, default_max, Vector2(200, 24))
-	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(bar)
-	for w_idx in range(1, col_widths.size()):
-		_add_row_label(row, int(col_widths[w_idx]))
-	vbox.add_child(row)
-	return row
+	first_label.custom_minimum_size = Vector2(int(column_widths[0]), 0)
+	bar_row.add_child(first_label)
+	var progress_bar: ProgressBar = KStatusBarClass.create_bar(0.0, default_max, Vector2(200, 24))
+	progress_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar_row.add_child(progress_bar)
+	for column_index in range(1, column_widths.size()):
+		_add_row_label(bar_row, int(column_widths[column_index]))
+	container_box.add_child(bar_row)
+	return bar_row
 
-func _add_row_label(row: HBoxContainer, min_width: int) -> void:
-	var lbl := Label.new()
-	lbl.custom_minimum_size = Vector2(min_width, 0)
-	row.add_child(lbl)
+func _add_row_label(row_container: HBoxContainer, min_width: int) -> void:
+	var label_node := Label.new()
+	label_node.custom_minimum_size = Vector2(min_width, 0)
+	row_container.add_child(label_node)
 
 # ==============================================================================
 # 信号绑定
@@ -433,11 +442,11 @@ func _connect_signals() -> void:
 	connect_managed(_view._line_auction_search.text_changed, _on_auction_search_changed)
 	connect_managed(_view._option_auction_category.item_selected, _on_auction_category_selected)
 	connect_managed(_view._auction_item_list.item_selected, _on_auction_item_selected)
-	connect_managed(_view._btn_auction_bid.pressed, _on_auction_action_pressed.bind("ui.fe05.auction.bid_toast"))
-	connect_managed(_view._btn_auction_buyout.pressed, _on_auction_action_pressed.bind("ui.fe05.auction.buyout_toast"))
+	connect_managed(_view._auction_bid_button.pressed, _on_auction_action_pressed.bind("ui.fe05.auction.bid_toast"))
+	connect_managed(_view._auction_buyout_button.pressed, _on_auction_action_pressed.bind("ui.fe05.auction.buyout_toast"))
 	connect_managed(_view._caravan_list.item_selected, _on_caravan_selected)
 	connect_managed(_view._option_price_commodity.item_selected, _on_price_commodity_selected)
 	connect_managed(_view._option_exchange_source.item_selected, _on_exchange_source_selected)
 	connect_managed(_view._option_exchange_target.item_selected, _on_exchange_target_selected)
 	connect_managed(_view._spin_exchange_amount.value_changed, _on_exchange_amount_changed)
-	connect_managed(_view._btn_exchange_confirm.pressed, _on_exchange_confirm_pressed)
+	connect_managed(_view._exchange_confirm_button.pressed, _on_exchange_confirm_pressed)

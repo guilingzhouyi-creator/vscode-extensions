@@ -179,12 +179,12 @@ func _setup_skip_ui() -> void:
 # ==============================================================================
 
 ## 启动播放指定的视频流或文字演出播映
-func play_stream(stream: Resource, req: Variant = null) -> void:
+func play_stream(stream: Resource, request_payload: Variant = null) -> void:
 	_ensure_assembled()
-	if req is Dictionary:
-		_current_request = (req as Dictionary).duplicate()
-	elif req != null and req.has_method("to_dict"):
-		_current_request = req.to_dict()
+	if request_payload is Dictionary:
+		_current_request = (request_payload as Dictionary).duplicate()
+	elif request_payload != null and request_payload.has_method("to_dict"):
+		_current_request = request_payload.to_dict()
 	else:
 		_current_request = {}
 
@@ -200,8 +200,8 @@ func play_stream(stream: Resource, req: Variant = null) -> void:
 
 	var audio_bus: String = str(_current_request.get("audio_bus", "BGM"))
 	var volume_linear: float = float(_current_request.get("volume_linear", 1.0))
-	var fade_in_sec: float = float(_current_request.get("fade_in_sec", 0.5))
-	var duration_val: float = float(_current_request.get("duration_sec", 3.0))
+	var fade_in_seconds: float = float(_current_request.get("fade_in_sec", 0.5))
+	var placeholder_duration_seconds: float = float(_current_request.get("duration_sec", 3.0))
 
 	if stream != null and stream is VideoStream:
 		_is_placeholder_mode = false
@@ -216,7 +216,7 @@ func play_stream(stream: Resource, req: Variant = null) -> void:
 		# 无物理视频艺术资源或启用纯文字演出标记：激活文字演出模式
 		_is_placeholder_mode = true
 		_placeholder_elapsed = 0.0
-		_placeholder_duration = duration_val if duration_val > 0.0 else 3.0
+		_placeholder_duration = placeholder_duration_seconds if placeholder_duration_seconds > 0.0 else 3.0
 		_last_placeholder_tenths = 0
 		_video_player.visible = false
 		_placeholder_container.visible = true
@@ -229,12 +229,12 @@ func play_stream(stream: Resource, req: Variant = null) -> void:
 		_placeholder_progress_bar.value = 0.0
 
 	visible = true
-	_fade_in(fade_in_sec)
+	_fade_in(fade_in_seconds)
 
 ## 停止播放并淡出退出
-func stop_and_dismiss(fade_out_sec: float = 0.5) -> void:
+func stop_and_dismiss(fade_out_seconds: float = 0.5) -> void:
 	_is_placeholder_mode = false
-	_fade_out(fade_out_sec, func():
+	_fade_out(fade_out_seconds, func():
 		if _video_player != null and _video_player.is_playing():
 			_video_player.stop()
 		visible = false
@@ -277,8 +277,8 @@ func apply_snapshot(state: Variant) -> void:
 		return
 	var subtitle_text := ""
 	if state is Dictionary:
-		var state_dict := state as Dictionary
-		subtitle_text = str(state_dict.get("active_subtitle_text", state_dict.get("subtitle", "")))
+		var state_payload := state as Dictionary
+		subtitle_text = str(state_payload.get("active_subtitle_text", state_payload.get("subtitle", "")))
 	elif "active_subtitle_text" in state:
 		subtitle_text = str(state.active_subtitle_text)
 	elif "subtitle" in state:

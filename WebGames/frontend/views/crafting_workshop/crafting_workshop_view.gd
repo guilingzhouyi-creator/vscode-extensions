@@ -1,15 +1,14 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端第12卷: 制造与工坊系统视图控制器
+# 模块归属: 前端表现层 (Frontend · 第12卷 制造与工坊系统视图控制器)
 # 文件路径: res://frontend/views/crafting_workshop/crafting_workshop_view.gd
-# 职责: 锻造强化预览(+1~+15)、配方图鉴习得检索、装备分解材料返还清单、
-#       材料仓库分类浏览与获取途径
-#       四 Tab 界面：
-#       - FORGE 锻造（主视图承载）
-#       - RECIPES 配方图鉴（委托 CraftingWorkshopTabs）
-#       - DISMANTLE 分解（主视图承载）
-#       - MATERIALS 材料仓库（委托 CraftingWorkshopTabs）
-# 骨架阶段：零接线、不接 EventBus，仅本地 Mock 数据驱动 + 按钮点击反馈。
+# 架构定位: Presentation View Controller / Snapshot-Driven Screen
+# 依赖与触发: 上游: NavManager, MockServiceContainer, FrontendSnapshot
+#           下游: CraftingWorkshopTabs, UIIntermediary, KTabBar, ThemeManager
+# 职责说明: 锻造强化预览、配方图鉴习得检索、装备分解返还清单与材料仓库浏览；
+#           其中配方图鉴与材料仓库子面板交互委托 CraftingWorkshopTabs 驱动。
+# 退出语义与设计依据: 表现层快照单向绑定与网格对象池零堆分配规约 (ADV-PRF-002)
 # ==============================================================================
+## CraftingWorkshopView：第12卷制造与工坊四页签视图控制器
 class_name CraftingWorkshopView
 extends BaseScreen
 
@@ -63,7 +62,7 @@ var _tabs: Variant = null
 
 # --- 全局 ---
 @onready var _tab_container: TabContainer = %TabContainer
-@onready var _btn_back: Button = %BtnBack
+@onready var _back_button: Button = %BtnBack
 @onready var _title_label: Label = %TitleLabel
 
 # --- Tab 1: 锻造 (FORGE) ---
@@ -76,7 +75,7 @@ var _tabs: Variant = null
 @onready var _label_forge_success_rate: Label = %LabelForgeSuccessRate
 @onready var _spin_forge_quantity: SpinBox = %SpinForgeQuantity
 @onready var _label_forge_result: Label = %LabelForgeResult
-@onready var _btn_forge_craft: Button = %BtnForgeCraft
+@onready var _forge_craft_button: Button = %BtnForgeCraft
 
 # --- Tab 2: 配方图鉴 (RECIPES) ---
 @onready var _label_recipe_progress: Label = %LabelRecipeProgress
@@ -94,11 +93,11 @@ var _tabs: Variant = null
 @onready var _label_dismantle_item_name: Label = %LabelDismantleItemName
 @onready var _dismantle_preview_list: ItemList = %DismantlePreviewList
 @onready var _spin_dismantle_quantity: SpinBox = %SpinDismantleQuantity
-@onready var _btn_dismantle_confirm: Button = %BtnDismantleConfirm
+@onready var _dismantle_confirm_button: Button = %BtnDismantleConfirm
 @onready var _dismantle_history_list: ItemList = %DismantleHistoryList
 
 # --- Tab 4: 材料仓库 (MATERIALS) ---
-@onready var _material_category_hbox: HBoxContainer = %MaterialCategoryHBox
+@onready var _material_category_box: HBoxContainer = %MaterialCategoryHBox
 @onready var _material_grid: GridContainer = %MaterialGrid
 @onready var _label_material_name: Label = %LabelMaterialName
 @onready var _label_material_rarity: Label = %LabelMaterialRarity
@@ -117,21 +116,21 @@ func _get_tabs():
 	return _tabs
 
 # ==============================================================================
-# 公开交互方法（白模测试契约）
+# 公开交互方法（供上层与测试调用）
 # ==============================================================================
 
-## 白模测试契约桩：选中锻造配方并预测强化成功率
-func select_forge_item(item_data: Dictionary) -> void:
-	selected_forge_item = item_data.duplicate()
-	enhancement_target_level = int(item_data.get("enhancement_level", 0)) + 1
-	var preview: Dictionary = MockServiceContainer.get_instance().crafting().preview_enhance_rate(enhancement_target_level)
-	if bool(preview.get("success", false)):
-		predicted_success_rate = float(preview.get("rate", predicted_success_rate))
+## 选中锻造配方并预测强化成功率
+func select_forge_item(item_payload: Dictionary) -> void:
+	selected_forge_item = item_payload.duplicate()
+	enhancement_target_level = int(item_payload.get("enhancement_level", 0)) + 1
+	var rate_preview: Dictionary = MockServiceContainer.get_instance().crafting().preview_enhance_rate(enhancement_target_level)
+	if bool(rate_preview.get("success", false)):
+		predicted_success_rate = float(rate_preview.get("rate", predicted_success_rate))
 	_refresh_forge_detail()
 
-## 白模测试契约桩：选中分解物品并注入预计产出材料清单
-func select_salvage_item(item_data: Dictionary, mock_yield: Array) -> void:
-	selected_salvage_item = item_data.duplicate()
+## 选中分解物品并注入预计产出材料清单
+func select_salvage_item(item_payload: Dictionary, mock_yield: Array) -> void:
+	selected_salvage_item = item_payload.duplicate()
 	estimated_salvage_materials = mock_yield.duplicate()
 	_refresh_dismantle_detail()
 
@@ -154,9 +153,9 @@ func _ready() -> void:
 	UIIntermediary.adapt_view(self)
 
 func _apply_theme() -> void:
-	var tm := ThemeManager.get_instance()
-	if tm.theme != null:
-		theme = tm.theme
+	var theme_manager := ThemeManager.get_instance()
+	if theme_manager.theme != null:
+		theme = theme_manager.theme
 
 # ==============================================================================
 # Mock 数据加载
@@ -197,7 +196,7 @@ func _render_from_snapshot() -> void:
 
 func _init_header_text() -> void:
 	UIIntermediary.resolve(_title_label, "ui.fe12.header.title")
-	UIIntermediary.resolve(_btn_back, "ui.fe12.header.back")
+	UIIntermediary.resolve(_back_button, "ui.fe12.header.back")
 
 func _init_tab_titles() -> void:
 	KTabBar.init_titles(_tab_container, PackedStringArray([
@@ -205,28 +204,28 @@ func _init_tab_titles() -> void:
 	]))
 
 func _connect_signals() -> void:
-	connect_managed(_btn_back.pressed, _on_back_pressed)
+	connect_managed(_back_button.pressed, _on_back_pressed)
 	connect_managed(_tab_container.tab_changed, _on_tab_changed)
 	connect_managed(_option_forge_category.item_selected, _on_forge_category_selected)
 	connect_managed(_line_forge_search.text_changed, _on_forge_search_changed)
 	connect_managed(_forge_recipe_list.item_selected, _on_forge_recipe_selected)
 	connect_managed(_spin_forge_quantity.value_changed, _on_forge_quantity_changed)
-	connect_managed(_btn_forge_craft.pressed, _on_forge_craft_pressed)
+	connect_managed(_forge_craft_button.pressed, _on_forge_craft_pressed)
 	connect_managed(_option_dismantle_filter.item_selected, _on_dismantle_filter_selected)
 	connect_managed(_dismantle_item_list.item_selected, _on_dismantle_item_selected)
 	connect_managed(_spin_dismantle_quantity.value_changed, _on_dismantle_quantity_changed)
-	connect_managed(_btn_dismantle_confirm.pressed, _on_dismantle_confirm_pressed)
+	connect_managed(_dismantle_confirm_button.pressed, _on_dismantle_confirm_pressed)
 
 # ==============================================================================
 # Tab 1: 锻造 (FORGE)
 # ==============================================================================
 
-func _populate_category_option(option_btn: OptionButton) -> void:
-	option_btn.clear()
-	option_btn.add_item(UIIntermediary.text("ui.fe12.category.all"))
-	for cat in _recipe_categories:
-		option_btn.add_item(UIIntermediary.text("ui.fe12.category." + str(cat)))
-	option_btn.select(0)
+func _populate_category_option(option_button: OptionButton) -> void:
+	option_button.clear()
+	option_button.add_item(UIIntermediary.text("ui.fe12.category.all"))
+	for category_key in _recipe_categories:
+		option_button.add_item(UIIntermediary.text("ui.fe12.category." + str(category_key)))
+	option_button.select(0)
 
 func _init_forge_tab() -> void:
 	var forge_tab: Control = _tab_container.get_child(0)
@@ -237,21 +236,21 @@ func _init_forge_tab() -> void:
 	UIIntermediary.resolve_placeholder(_line_forge_search, "ui.fe12.forge.search_ph")
 	_populate_category_option(_option_forge_category)
 	_spin_forge_quantity.value = 1
-	UIIntermediary.resolve(_btn_forge_craft, "ui.fe12.forge.craft_btn")
-	_btn_forge_craft.disabled = true
+	UIIntermediary.resolve(_forge_craft_button, "ui.fe12.forge.craft_btn")
+	_forge_craft_button.disabled = true
 	UIIntermediary.resolve(_label_forge_result, "ui.fe12.forge.no_recipe")
 	_populate_forge_recipe_list()
 
 func _populate_forge_recipe_list() -> void:
 	_forge_recipe_list.clear()
 	for recipe in _get_filtered_forge_recipes():
-		var name_str: String = UIIntermediary.text(str(recipe.get("name", "")))
+		var recipe_name: String = UIIntermediary.text(str(recipe.get("name", "")))
 		var learned_tag := "✓" if bool(recipe.get("learned", false)) else "✗"
-		UIIntermediary.resolve_item(_forge_recipe_list, "ui.fe12.forge.recipe_display", {"tag": learned_tag, "name": name_str, "rarity": str(recipe.get("rarity", ""))})
+		UIIntermediary.resolve_item(_forge_recipe_list, "ui.fe12.forge.recipe_display", {"tag": learned_tag, "name": recipe_name, "rarity": str(recipe.get("rarity", ""))})
 	if _tabs != null:
 		_tabs.sync_recipe_virtual_list(_forge_recipes.size())
 	_forge_selected_index = -1
-	_btn_forge_craft.disabled = true
+	_forge_craft_button.disabled = true
 
 func _refresh_forge_detail() -> void:
 	if selected_forge_item.is_empty():
@@ -259,7 +258,7 @@ func _refresh_forge_detail() -> void:
 		UIIntermediary.resolve(_label_forge_rarity, "ui.fe12.forge.rarity_none")
 		UIIntermediary.resolve(_label_forge_success_rate, "ui.fe12.forge.success_none")
 		UIIntermediary.resolve(_label_forge_result, "ui.fe12.forge.no_recipe")
-		_btn_forge_craft.disabled = true
+		_forge_craft_button.disabled = true
 		return
 	UIIntermediary.resolve(_label_forge_item_name, str(selected_forge_item.get("name", "")))
 	UIIntermediary.resolve(_label_forge_rarity, "ui.fe12.forge.rarity", {"rarity": str(selected_forge_item.get("rarity", "--"))})
@@ -267,12 +266,12 @@ func _refresh_forge_detail() -> void:
 	if _forge_material_list:
 		_forge_material_list.clear()
 		var materials: Array = selected_forge_item.get("materials", [])
-		for mat in materials:
+		for material_entry in materials:
 			UIIntermediary.resolve_item(_forge_material_list, "ui.fe12.forge.material", {
-				"name": UIIntermediary.text(str(mat.get("name", ""))), "count": int(mat.get("qty", 0))
+				"name": UIIntermediary.text(str(material_entry.get("name", ""))), "count": int(material_entry.get("qty", 0))
 			})
-	if _btn_forge_craft:
-		_btn_forge_craft.disabled = not bool(selected_forge_item.get("learned", false))
+	if _forge_craft_button:
+		_forge_craft_button.disabled = not bool(selected_forge_item.get("learned", false))
 	if bool(selected_forge_item.get("learned", false)):
 		UIIntermediary.resolve(_label_forge_result, "ui.fe12.forge.ready", {"level": enhancement_target_level})
 	else:
@@ -293,33 +292,33 @@ func _on_forge_recipe_selected(index: int) -> void:
 		selected_forge_item.clear()
 		_refresh_forge_detail()
 
-func _on_forge_quantity_changed(_value: float) -> void:
+func _on_forge_quantity_changed(_quantity_value: float) -> void:
 	if not selected_forge_item.is_empty():
 		UIIntermediary.resolve(_label_forge_result, "ui.fe12.forge.ready_qty", {"level": enhancement_target_level, "count": int(_spin_forge_quantity.value)})
 
 func _on_forge_craft_pressed() -> void:
 	if selected_forge_item.is_empty() or not bool(selected_forge_item.get("learned", false)):
 		return
-	var qty: int = int(_spin_forge_quantity.value)
+	var craft_quantity: int = int(_spin_forge_quantity.value)
 	var crafted_text: String = UIIntermediary.resolve(_label_forge_result, "ui.fe12.forge.craft_success", {
 		"name": UIIntermediary.text(str(selected_forge_item.get("name", ""))),
 		"level": enhancement_target_level,
-		"count": qty,
+		"count": craft_quantity,
 	})
 	NavManager.get_instance().show_toast(crafted_text, NavTypes.ToastLevel.SUCCESS)
 
 func _get_filtered_forge_recipes() -> Array:
 	var filtered: Array = []
 	var keyword: String = _line_forge_search.text.strip_edges().to_lower()
-	var cat_index: int = _option_forge_category.selected
-	var cat_filter: String = ""
-	if cat_index > 0:
-		cat_filter = str(_recipe_categories[cat_index - 1])
+	var category_index: int = _option_forge_category.selected
+	var category_filter: String = ""
+	if category_index > 0:
+		category_filter = str(_recipe_categories[category_index - 1])
 	for recipe in _forge_recipes:
-		var name_str: String = UIIntermediary.text(str(recipe.get("name", "")))
-		if not keyword.is_empty() and not name_str.to_lower().contains(keyword):
+		var recipe_name: String = UIIntermediary.text(str(recipe.get("name", "")))
+		if not keyword.is_empty() and not recipe_name.to_lower().contains(keyword):
 			continue
-		if not cat_filter.is_empty() and str(recipe.get("category", "")) != cat_filter:
+		if not category_filter.is_empty() and str(recipe.get("category", "")) != category_filter:
 			continue
 		filtered.append(recipe)
 	return filtered
@@ -330,9 +329,9 @@ func _get_filtered_forge_recipes() -> Array:
 
 func _init_dismantle_tab() -> void:
 	var dismantle_tab: Control = _tab_container.get_child(2)
-	for item in [["LeftPanel/SectionLabel", "ui.fe12.dismantle.section_list"], ["RightPanel/DetailSectionLabel", "ui.fe12.dismantle.section_preview"], ["RightPanel/PreviewLabel", "ui.fe12.dismantle.section_output"], ["RightPanel/QuantityRow/QtyLabel", "ui.fe12.dismantle.quantity"], ["RightPanel/HistoryLabel", "ui.fe12.dismantle.section_history"]]:
-		UIIntermediary.resolve(dismantle_tab.get_node(str(item[0])), str(item[1]))
-	UIIntermediary.resolve(_btn_dismantle_confirm, "ui.fe12.dismantle.confirm_btn")
+	for label_binding in [["LeftPanel/SectionLabel", "ui.fe12.dismantle.section_list"], ["RightPanel/DetailSectionLabel", "ui.fe12.dismantle.section_preview"], ["RightPanel/PreviewLabel", "ui.fe12.dismantle.section_output"], ["RightPanel/QuantityRow/QtyLabel", "ui.fe12.dismantle.quantity"], ["RightPanel/HistoryLabel", "ui.fe12.dismantle.section_history"]]:
+		UIIntermediary.resolve(dismantle_tab.get_node(str(label_binding[0])), str(label_binding[1]))
+	UIIntermediary.resolve(_dismantle_confirm_button, "ui.fe12.dismantle.confirm_btn")
 	_populate_category_option(_option_dismantle_filter)
 	_spin_dismantle_quantity.value = 1
 	_populate_dismantle_list()
@@ -342,11 +341,11 @@ func _init_dismantle_tab() -> void:
 
 func _populate_dismantle_list() -> void:
 	_dismantle_item_list.clear()
-	for item in _get_filtered_dismantle_items():
+	for dismantle_entry in _get_filtered_dismantle_items():
 		UIIntermediary.resolve_item(_dismantle_item_list, "ui.fe12.dismantle.item_display", {
-			"name": UIIntermediary.text(str(item.get("name", ""))),
-			"rarity": str(item.get("rarity", "")),
-			"count": int(item.get("qty", 0))
+			"name": UIIntermediary.text(str(dismantle_entry.get("name", ""))),
+			"rarity": str(dismantle_entry.get("rarity", "")),
+			"count": int(dismantle_entry.get("qty", 0))
 		})
 	_dismantle_selected_index = -1
 
@@ -359,11 +358,11 @@ func _refresh_dismantle_detail() -> void:
 	UIIntermediary.resolve(_label_dismantle_item_name, str(selected_salvage_item.get("name", "")))
 	if _dismantle_preview_list:
 		_dismantle_preview_list.clear()
-		var mult: int = int(_spin_dismantle_quantity.value) if _spin_dismantle_quantity else 1
-		for mat in estimated_salvage_materials:
-			var qty: int = int(mat.get("qty", 0)) * mult
+		var quantity_multiplier: int = int(_spin_dismantle_quantity.value) if _spin_dismantle_quantity else 1
+		for material_entry in estimated_salvage_materials:
+			var output_quantity: int = int(material_entry.get("qty", 0)) * quantity_multiplier
 			UIIntermediary.resolve_item(_dismantle_preview_list, "ui.fe12.disassemble.output", {
-				"name": UIIntermediary.text(str(mat.get("name", ""))), "count": qty
+				"name": UIIntermediary.text(str(material_entry.get("name", ""))), "count": output_quantity
 			})
 
 func _on_dismantle_filter_selected(_index: int) -> void:
@@ -373,14 +372,14 @@ func _on_dismantle_item_selected(index: int) -> void:
 	_dismantle_selected_index = index
 	var filtered: Array = _get_filtered_dismantle_items()
 	if index >= 0 and index < filtered.size():
-		var item: Dictionary = filtered[index]
-		select_salvage_item(item, item.get("yield", []))
+		var selected_entry: Dictionary = filtered[index]
+		select_salvage_item(selected_entry, selected_entry.get("yield", []))
 	else:
 		selected_salvage_item.clear()
 		estimated_salvage_materials.clear()
 		_refresh_dismantle_detail()
 
-func _on_dismantle_quantity_changed(_value: float) -> void:
+func _on_dismantle_quantity_changed(_quantity_value: float) -> void:
 	_refresh_dismantle_detail()
 
 func _on_dismantle_confirm_pressed() -> void:
@@ -390,9 +389,9 @@ func _on_dismantle_confirm_pressed() -> void:
 			NavTypes.ToastLevel.WARNING
 		)
 		return
-	var qty: int = int(_spin_dismantle_quantity.value)
+	var dismantle_quantity: int = int(_spin_dismantle_quantity.value)
 	var item_name: String = UIIntermediary.text(str(selected_salvage_item.get("name", "")))
-	_dismantle_history.append({"name": item_name, "qty": qty, "time": UIIntermediary.text("ui.fe12.dismantle.just_now")})
+	_dismantle_history.append({"name": item_name, "qty": dismantle_quantity, "time": UIIntermediary.text("ui.fe12.dismantle.just_now")})
 	_dismantle_history_list.clear()
 	var recent: Array = _dismantle_history.duplicate()
 	recent.reverse()
@@ -403,20 +402,20 @@ func _on_dismantle_confirm_pressed() -> void:
 			"time": str(entry.get("time", ""))
 		})
 	NavManager.get_instance().show_toast(
-		UIIntermediary.text("ui.fe12.dismantle.success_toast", {"name": item_name, "count": qty}),
+		UIIntermediary.text("ui.fe12.dismantle.success_toast", {"name": item_name, "count": dismantle_quantity}),
 		NavTypes.ToastLevel.SUCCESS
 	)
 
 func _get_filtered_dismantle_items() -> Array:
 	var filtered: Array = []
-	var cat_index: int = _option_dismantle_filter.selected
-	var cat_filter: String = ""
-	if cat_index > 0:
-		cat_filter = str(_recipe_categories[cat_index - 1])
-	for item in _dismantle_items:
-		if not cat_filter.is_empty() and str(item.get("category", "")) != cat_filter:
+	var category_index: int = _option_dismantle_filter.selected
+	var category_filter: String = ""
+	if category_index > 0:
+		category_filter = str(_recipe_categories[category_index - 1])
+	for dismantle_entry in _dismantle_items:
+		if not category_filter.is_empty() and str(dismantle_entry.get("category", "")) != category_filter:
 			continue
-		filtered.append(item)
+		filtered.append(dismantle_entry)
 	return filtered
 
 # ==============================================================================
