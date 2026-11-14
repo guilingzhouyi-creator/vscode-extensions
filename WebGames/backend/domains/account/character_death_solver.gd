@@ -14,12 +14,12 @@ class_name CharacterDeathSolver extends RefCounted
 # 一、角色死亡清理
 # ==============================================================================
 
-## 角色死亡清理（精确子集）：dto 为槽位封面（含角色本体档案），world 可空
+## 角色死亡清理（精确子集）：slot_summary 为槽位封面（含角色本体档案），world 可空
 ## 边界：重复死亡幂等（ALREADY_FALLEN）；死亡后槽位标记可重挂（slot_reusable）
-static func handle_character_death(account: AccountProfileAggregate, slot_id: String, world: WorldInstance) -> Dictionary:
+static func handle_character_death(account: AccountProfile, slot_id: String, world: WorldInstance) -> Dictionary:
 	if account == null or slot_id.is_empty():
 		return {"success": false, "error_code": "INVALID_SLOT"}
-	var slot_summary: SaveSlotSummaryDTO = account.get_summary_by_slot(slot_id)
+	var slot_summary: SaveSlotDTO = account.get_summary_by_slot(slot_id)
 	if slot_summary == null:
 		return {"success": false, "error_code": "SLOT_EMPTY"}
 	if slot_summary.is_fallen:
@@ -27,10 +27,10 @@ static func handle_character_death(account: AccountProfileAggregate, slot_id: St
 
 	# 1. 精确清理角色本体子集（白名单，禁删全档）
 	var cleared: Array[String] = []
-	for k in CharacterProfile.CHARACTER_OWNED_KEYS:
-		if slot_summary.has_character_payload(k):
-			slot_summary.clear_character_payload(k)
-			cleared.append(k)
+	for owned_key in CharacterProfile.CHARACTER_OWNED_KEYS:
+		if slot_summary.has_character_payload(owned_key):
+			slot_summary.clear_character_payload(owned_key)
+			cleared.append(owned_key)
 	slot_summary.is_fallen = true
 	slot_summary.last_saved_time_utc = int(Time.get_unix_time_from_system())
 

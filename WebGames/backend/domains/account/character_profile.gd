@@ -54,8 +54,8 @@ func clear_payload(key: String) -> void:
 
 ## 新角色判定：白名单内全部本体子集均为空
 func is_fresh() -> bool:
-	for k in CHARACTER_OWNED_KEYS:
-		if not _payload(k).is_empty():
+	for owned_key in CHARACTER_OWNED_KEYS:
+		if not _payload(owned_key).is_empty():
 			return false
 	return true
 
@@ -83,16 +83,16 @@ func serialize() -> Dictionary:
 	}
 
 ## 从字典反序列化角色档案（缺省字段回退空字典）
-static func deserialize(d: Dictionary) -> CharacterProfile:
+static func deserialize(data: Dictionary) -> CharacterProfile:
 	var profile := CharacterProfile.new()
-	profile.character_id = d.get("character_id", "")
-	profile.character_name = d.get("character_name", "")
-	profile.attributes = d.get("attributes", {})
-	profile.growth_state = d.get("growth_state", {})
-	profile.inventory = d.get("inventory", {})
-	profile.equipment = d.get("equipment", {})
-	profile.personal_resources = d.get("personal_resources", {})
-	profile.personal_quest_progress = d.get("personal_quest_progress", {})
-	profile.relationship_state = d.get("relationship_state", {})
-	profile.character_exclusive_progress = d.get("character_exclusive_progress", {})
+	profile.character_id = data.get("character_id", "")
+	profile.character_name = data.get("character_name", "")
+	profile.attributes = data.get("attributes", {})
+	profile.growth_state = data.get("growth_state", {})
+	profile.inventory = data.get("inventory", {})
+	profile.equipment = data.get("equipment", {})
+	profile.personal_resources = data.get("personal_resources", {})
+	profile.personal_quest_progress = data.get("personal_quest_progress", {})
+	profile.relationship_state = data.get("relationship_state", {})
+	profile.character_exclusive_progress = data.get("character_exclusive_progress", {})
 	return profile

@@ -7,8 +7,8 @@
 # 退出语义与设计依据: 业务域第一性原理 / 账号与槽位生命周期契约
 # ==============================================================================
 
-## AccountProfileAggregate：Domain Logic Component
-class_name AccountProfileAggregate extends RefCounted
+## AccountProfile：Domain Logic Component
+class_name AccountProfile extends RefCounted
 
 const DOMAIN_ACCOUNT_CONFIG: String = "domains.account"
 const WORLD_DEFAULT_SP_01: String = "WORLD_DEFAULT_SP_01"
@@ -22,7 +22,7 @@ const RESERVED_PLACEHOLDER: String = "RESERVED_PLACEHOLDER"
 var account_id: String = ""
 var username: String = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/default_username", "Adventurer")
 var password_hash_sha256: String = ""
-## 口令盐版本：1=按配置盐哈希（标准单轨）
+## 口令盐版本：1=按配置盐哈希（标准单盐模式）
 var salt_version: int = 1
 var created_timestamp_utc: int = 0
 var last_login_timestamp_utc: int = 0
@@ -34,7 +34,7 @@ var is_guest_mode: bool = false
 # 二、多角色存档插槽映射
 # ==============================================================================
 
-# 多角色存档插槽映射 (slot_id -> SaveSlotSummaryDTO)
+# 多角色存档插槽映射 (slot_id -> SaveSlotDTO)
 var save_slot_summaries: Dictionary = {}
 var active_slot_id: String = ""
 # 多世界存档插槽映射与占位符元数据 (world_id -> slot_id)
@@ -61,34 +61,34 @@ var unlocked_heritage_traits: Array = []
 # ==============================================================================
 
 ## 按槽位取档位摘要（未绑定返回 null）
-func get_summary_by_slot(slot_id: String) -> SaveSlotSummaryDTO:
+func get_summary_by_slot(slot_id: String) -> SaveSlotDTO:
 	if slot_id.is_empty():
 		return null
 	return save_slot_summaries.get(slot_id, null)
 
 ## 登记/覆盖槽位摘要（入参为空静默跳过）
-func add_slot_summary(dto: SaveSlotSummaryDTO) -> void:
-	if dto == null or dto.slot_id.is_empty():
+func add_slot_summary(slot_summary: SaveSlotDTO) -> void:
+	if slot_summary == null or slot_summary.slot_id.is_empty():
 		return
-	save_slot_summaries[dto.slot_id] = dto
+	save_slot_summaries[slot_summary.slot_id] = slot_summary
 
 ## 创建角色第一步：账号→槽位绑定（幂等，active_slot 切换，文字版鼠标/快捷键触发）
-func bind_character_to_slot(slot_id: String, dto: SaveSlotSummaryDTO) -> Dictionary:
-	if slot_id.is_empty() or dto == null:
+func bind_character_to_slot(slot_id: String, slot_summary: SaveSlotDTO) -> Dictionary:
+	if slot_id.is_empty() or slot_summary == null:
 		return {"success": false, "error_code": "INVALID_SLOT"}
-	if dto.slot_id != slot_id:
-		dto.slot_id = slot_id
-	save_slot_summaries[slot_id] = dto
+	if slot_summary.slot_id != slot_id:
+		slot_summary.slot_id = slot_id
+	save_slot_summaries[slot_id] = slot_summary
 	active_slot_id = slot_id
-	EventBusCore.get_instance().emit_domain_event("account.slot_bound", {"args": [slot_id], "summary": {"character": dto.character_name, "slot_id": slot_id}})
-	return {"success": true, "slot_id": slot_id, "character_name": dto.character_name}
+	EventBusCore.get_instance().emit_domain_event("account.slot_bound", {"args": [slot_id], "summary": {"character": slot_summary.character_name, "slot_id": slot_id}})
+	return {"success": true, "slot_id": slot_id, "character_name": slot_summary.character_name}
 
 ## 取下一个可用槽位 ID（SLOT_%02d 序号递增探测，满员返回空串）
 func get_next_available_slot_id() -> String:
 	var max_slots: int = GameConfig.get_int(DOMAIN_ACCOUNT_CONFIG, "save_slot/max_slots", 3)
 	var prefix: String = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "save_slot/id_prefix", "SLOT_")
-	for i in range(1, max_slots + 1):
-		var candidate: String = "%s%02d" % [prefix, i]
+	for slot_index in range(1, max_slots + 1):
+		var candidate: String = "%s%02d" % [prefix, slot_index]
 		if not save_slot_summaries.has(candidate):
 			return candidate
 	return ""
@@ -115,8 +115,8 @@ func get_active_world_slot() -> String:
 func is_world_slot_placeholder(world_id: String) -> bool:
 	if world_id.is_empty() or not world_slots.has(world_id):
 		return true
-	var val: String = str(world_slots.get(world_id, ""))
-	return val == RESERVED_PLACEHOLDER or val == UNBOUND_WORLD_SLOT
+	var slot_value: String = str(world_slots.get(world_id, ""))
+	return slot_value == RESERVED_PLACEHOLDER or slot_value == UNBOUND_WORLD_SLOT
 
 ## 绑定世界槽位
 func bind_world_slot(world_id: String, slot_id: String) -> bool:
@@ -128,12 +128,12 @@ func bind_world_slot(world_id: String, slot_id: String) -> bool:
 ## 序列化账户聚合为字典（含槽位摘要序列化与权限密封 entitlements_seal）
 func serialize() -> Dictionary:
 	var slots_dict := {}
-	for k in save_slot_summaries:
-		var item: Variant = save_slot_summaries[k]
-		if item is SaveSlotSummaryDTO:
-			slots_dict[k] = item.serialize()
+	for slot_key in save_slot_summaries:
+		var item: Variant = save_slot_summaries[slot_key]
+		if item is SaveSlotDTO:
+			slots_dict[slot_key] = item.serialize()
 		elif item is Dictionary:
-			slots_dict[k] = item
+			slots_dict[slot_key] = item
 	return {
 		"account_id": account_id,
 		"username": username,
@@ -154,46 +154,46 @@ func serialize() -> Dictionary:
 	}
 
 ## 从字典反序列化账户聚合：权限密封校验失败回退空集 + 白名单过滤（fail-safe，防存档自造权限）
-static func deserialize(d: Dictionary) -> AccountProfileAggregate:
-	var acc := AccountProfileAggregate.new()
-	acc.account_id = d.get("account_id", "")
-	acc.username = d.get("username", GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/default_username", "Adventurer"))
-	acc.password_hash_sha256 = d.get("password_hash_sha256", "")
-	acc.salt_version = int(d.get("salt_version", 1))
-	acc.created_timestamp_utc = d.get("created_timestamp_utc", 0)
-	acc.last_login_timestamp_utc = d.get("last_login_timestamp_utc", 0)
-	acc.local_device_fingerprint = d.get("local_device_fingerprint", "")
-	acc.is_guest_mode = d.get("is_guest_mode", false)
-	acc.active_slot_id = d.get("active_slot_id", "")
-	acc.meta_legacy_points = d.get("meta_legacy_points", 0)
-	acc.unlocked_heritage_traits = d.get("unlocked_heritage_traits", [])
-	var raw_ent: Variant = d.get("entitlements", GameConfig.get_array(DOMAIN_ACCOUNT_CONFIG, "entitlements/default", []))
-	if raw_ent is Array:
-		acc.entitlements.assign(raw_ent) # 类型化转换：JSON/配置返回的未类型化 Array → Array[String]（防运行时类型错误）
-	# 密封校验：开启安全存储或环境中存在密封密钥时强制闭环验签（缺封或篡改均清零权限）；否则兼容已附密封的防篡改校验
-	var recorded_seal := str(d.get("entitlements_seal", ""))
+static func deserialize(data: Dictionary) -> AccountProfile:
+	var account := AccountProfile.new()
+	account.account_id = data.get("account_id", "")
+	account.username = data.get("username", GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/default_username", "Adventurer"))
+	account.password_hash_sha256 = data.get("password_hash_sha256", "")
+	account.salt_version = int(data.get("salt_version", 1))
+	account.created_timestamp_utc = data.get("created_timestamp_utc", 0)
+	account.last_login_timestamp_utc = data.get("last_login_timestamp_utc", 0)
+	account.local_device_fingerprint = data.get("local_device_fingerprint", "")
+	account.is_guest_mode = data.get("is_guest_mode", false)
+	account.active_slot_id = data.get("active_slot_id", "")
+	account.meta_legacy_points = data.get("meta_legacy_points", 0)
+	account.unlocked_heritage_traits = data.get("unlocked_heritage_traits", [])
+	var raw_entitlements: Variant = data.get("entitlements", GameConfig.get_array(DOMAIN_ACCOUNT_CONFIG, "entitlements/default", []))
+	if raw_entitlements is Array:
+		account.entitlements.assign(raw_entitlements) # 类型化转换：JSON/配置返回的未类型化 Array → Array[String]（防运行时类型错误）
+	# 密封校验：开启安全存储或环境中存在密封密钥时强制完整验签（缺封或篡改均清零权限）；否则兼容已附密封的防篡改校验
+	var recorded_seal := str(data.get("entitlements_seal", ""))
 	var has_seal_key := not CryptoIntegrityLib.resolve_seal_key_bytes(LogConstants.CFG_ADMIN_TABLE, LogConstants.CFG_PATH_SECURITY_SEAL_ENV).is_empty()
 	var seal_required := EntitlementService.encrypted_storage_enabled() or has_seal_key
 	if seal_required:
-		if recorded_seal.is_empty() or not EntitlementService.verify_seal(acc, recorded_seal):
-			acc.entitlements.clear()
-	elif not recorded_seal.is_empty() and not EntitlementService.verify_seal(acc, recorded_seal):
-		acc.entitlements.clear()
+		if recorded_seal.is_empty() or not EntitlementService.verify_seal(account, recorded_seal):
+			account.entitlements.clear()
+	elif not recorded_seal.is_empty() and not EntitlementService.verify_seal(account, recorded_seal):
+		account.entitlements.clear()
 	# 白名单过滤：allowed 非空时拒绝未列出资格（防存档自造权限；空列表=放行全部）
-	acc.entitlements.assign(EntitlementService.filter_allowed(acc.entitlements))
-	acc.world_state_ref = d.get("world_state_ref", "")
+	account.entitlements.assign(EntitlementService.filter_allowed(account.entitlements))
+	account.world_state_ref = data.get("world_state_ref", "")
 
-	var raw_world_slots: Variant = d.get("world_slots", {})
+	var raw_world_slots: Variant = data.get("world_slots", {})
 	if raw_world_slots is Dictionary and not (raw_world_slots as Dictionary).is_empty():
-		acc.world_slots = (raw_world_slots as Dictionary).duplicate()
+		account.world_slots = (raw_world_slots as Dictionary).duplicate()
 	else:
-		acc.world_slots = {
+		account.world_slots = {
 			WORLD_DEFAULT_SP_01: "SLOT_01"
 		}
 
-	var raw_slots: Variant = d.get("save_slot_summaries", {})
-	for k in raw_slots:
-		var slot_data: Variant = raw_slots[k]
+	var raw_slots: Variant = data.get("save_slot_summaries", {})
+	for slot_key in raw_slots:
+		var slot_data: Variant = raw_slots[slot_key]
 		if slot_data is Dictionary:
-			acc.save_slot_summaries[k] = SaveSlotSummaryDTO.deserialize(slot_data)
-	return acc
+			account.save_slot_summaries[slot_key] = SaveSlotDTO.deserialize(slot_data)
+	return account

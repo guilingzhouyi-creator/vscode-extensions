@@ -2,7 +2,7 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/account/account_repository.gd
 # 架构定位: Domain Repository / Persistence Engine
-# 依赖与触发: 上游: AuthService, GameBootstrap | 下游: FileAccess, DirAccess, AccountProfileAggregate | 配置: config/domains/account.json | 信号: 无
+# 依赖与触发: 上游: AuthService, GameBootstrap | 下游: FileAccess, DirAccess, AccountProfile | 配置: config/domains/account.json | 信号: 无
 # 职责说明: 负责全域账号的物理仓储、双层缓存索引（ID与用户名）与原子持久化落盘。
 # 退出语义与设计依据: 业务域第一性原理 / 账号与槽位生命周期契约 / 事务型存档原子写入规范
 # ==============================================================================
@@ -22,7 +22,7 @@ const DEFAULT_FORMAT_VERSION: String = "1.0.0"
 # 一、内存缓存与双层索引
 # ==============================================================================
 
-## 内存主缓存：account_id -> AccountProfileAggregate
+## 内存主缓存：account_id -> AccountProfile
 var _accounts_cache: Dictionary = {}
 
 ## 内存用户名索引：username_lower -> account_id (用于 O(1) 登录/验重查询)
@@ -82,19 +82,19 @@ func get_account_shard_path(account_id: String) -> String:
 # ==============================================================================
 
 ## 按账号 ID 检索聚合
-func find_by_id(account_id: String) -> AccountProfileAggregate:
+func find_by_id(account_id: String) -> AccountProfile:
 	if account_id.is_empty():
 		return null
 	return _accounts_cache.get(account_id, null)
 
 ## 按用户名检索聚合（大小写不敏感）
-func find_by_username(username: String) -> AccountProfileAggregate:
+func find_by_username(username: String) -> AccountProfile:
 	if username.is_empty():
 		return null
-	var acc_id: String = str(_username_index.get(username.to_lower(), ""))
-	if acc_id.is_empty():
+	var account_id: String = str(_username_index.get(username.to_lower(), ""))
+	if account_id.is_empty():
 		return null
-	return _accounts_cache.get(acc_id, null)
+	return _accounts_cache.get(account_id, null)
 
 ## 检查账号 ID 是否已存在
 func has_account(account_id: String) -> bool:
@@ -117,8 +117,8 @@ func get_account_count() -> int:
 ## 获取所有已登记账号 ID 清单
 func list_account_ids() -> Array[String]:
 	var ids: Array[String] = []
-	for acc_id in _accounts_cache.keys():
-		ids.append(str(acc_id))
+	for cached_account_id in _accounts_cache.keys():
+		ids.append(str(cached_account_id))
 	return ids
 
 ## 获取已缓存的全部账号（浅拷贝字典，供外部只读遍历）
@@ -129,7 +129,7 @@ func get_all_accounts() -> Dictionary:
 # 四、数据装载与防损坏自愈引擎
 # ==============================================================================
 
-## 从物理磁盘读取 registry_file，反序列化还原所有 AccountProfileAggregate 并建双层索引
+## 从物理磁盘读取 registry_file，反序列化还原所有 AccountProfile 并建双层索引
 func load_all() -> Dictionary:
 	_loaded = true
 	_accounts_cache.clear()
@@ -141,9 +141,9 @@ func load_all() -> Dictionary:
 	_cleanup_orphan_tmp_files(accounts_dir)
 
 	if not FileAccess.file_exists(file_path):
-		var bak_path := file_path + _get_backup_suffix()
-		if FileAccess.file_exists(bak_path):
-			var restored := AtomicFileWriter.restore_from_backup(file_path, bak_path)
+		var backup_path := file_path + _get_backup_suffix()
+		if FileAccess.file_exists(backup_path):
+			var restored := AtomicFileWriter.restore_from_backup(file_path, backup_path)
 			if restored:
 				return _load_from_file(file_path)
 		var shard_count := _recover_from_shards(accounts_dir)
@@ -158,14 +158,14 @@ func load_all() -> Dictionary:
 
 	# 正档解析失败，触发防损坏自愈流程
 	if _auto_restore_enabled():
-		var bak_path := file_path + _get_backup_suffix()
-		if FileAccess.file_exists(bak_path):
-			var restored := AtomicFileWriter.restore_from_backup(file_path, bak_path)
+		var backup_path := file_path + _get_backup_suffix()
+		if FileAccess.file_exists(backup_path):
+			var restored := AtomicFileWriter.restore_from_backup(file_path, backup_path)
 			if restored:
-				var retry_res := _load_from_file(file_path)
-				if bool(retry_res.get("success", false)):
-					retry_res["auto_restored"] = true
-					return retry_res
+				var retry_result := _load_from_file(file_path)
+				if bool(retry_result.get("success", false)):
+					retry_result["auto_restored"] = true
+					return retry_result
 		var shard_count := _recover_from_shards(accounts_dir)
 		if shard_count > 0:
 			_save_registry_internal()
@@ -181,8 +181,8 @@ func _load_from_file(file_path: String) -> Dictionary:
 	file.close()
 
 	var json := JSON.new()
-	var parse_err := json.parse(content)
-	if parse_err != OK:
+	var parse_error := json.parse(content)
+	if parse_error != OK:
 		return {"success": false, "count": 0, "error": "JSON_PARSE_ERROR"}
 
 	var parsed: Variant = json.get_data()
@@ -192,45 +192,45 @@ func _load_from_file(file_path: String) -> Dictionary:
 	var root_dict: Dictionary = parsed
 	var raw_accounts: Dictionary = {}
 	if root_dict.has("accounts"):
-		var accounts_val: Variant = root_dict.get("accounts", null)
-		if accounts_val is Dictionary:
-			raw_accounts = accounts_val
+		var accounts_value: Variant = root_dict.get("accounts", null)
+		if accounts_value is Dictionary:
+			raw_accounts = accounts_value
 	else:
 		raw_accounts = root_dict
 
 	_accounts_cache.clear()
 	_username_index.clear()
 
-	for k in raw_accounts.keys():
-		_register_raw_account(raw_accounts[k])
+	for account_key in raw_accounts.keys():
+		_register_raw_account(raw_accounts[account_key])
 
 	return {"success": true, "count": _accounts_cache.size(), "error": ""}
 
 func _register_raw_account(raw_item: Variant) -> void:
 	if not raw_item is Dictionary:
 		return
-	var acc: AccountProfileAggregate = AccountProfileAggregate.deserialize(raw_item)
-	if acc == null or acc.account_id.is_empty():
+	var account: AccountProfile = AccountProfile.deserialize(raw_item)
+	if account == null or account.account_id.is_empty():
 		return
-	_accounts_cache[acc.account_id] = acc
-	if not acc.username.is_empty():
-		_username_index[acc.username.to_lower()] = acc.account_id
+	_accounts_cache[account.account_id] = account
+	if not account.username.is_empty():
+		_username_index[account.username.to_lower()] = account.account_id
 
 func _recover_from_shards(accounts_dir: String) -> int:
-	var dir := DirAccess.open(accounts_dir)
-	if dir == null:
+	var dir_access := DirAccess.open(accounts_dir)
+	if dir_access == null:
 		return 0
 
 	var recovered := 0
-	dir.list_dir_begin()
-	var fname := dir.get_next()
-	while not fname.is_empty():
-		if not dir.current_is_dir() and fname.ends_with(".json") and not fname.begins_with("account_registry"):
-			var shard_file_path := accounts_dir + ("/" if not accounts_dir.ends_with("/") else "") + fname
+	dir_access.list_dir_begin()
+	var entry_name := dir_access.get_next()
+	while not entry_name.is_empty():
+		if not dir_access.current_is_dir() and entry_name.ends_with(".json") and not entry_name.begins_with("account_registry"):
+			var shard_file_path := accounts_dir + ("/" if not accounts_dir.ends_with("/") else "") + entry_name
 			if _load_and_register_single_shard(shard_file_path):
 				recovered += 1
-		fname = dir.get_next()
-	dir.list_dir_end()
+		entry_name = dir_access.get_next()
+	dir_access.list_dir_end()
 	return recovered
 
 func _load_and_register_single_shard(shard_file_path: String) -> bool:
@@ -247,12 +247,12 @@ func _load_and_register_single_shard(shard_file_path: String) -> bool:
 	var data: Variant = json.get_data()
 	if not data is Dictionary:
 		return false
-	var acc: AccountProfileAggregate = AccountProfileAggregate.deserialize(data)
-	if acc == null or acc.account_id.is_empty():
+	var account: AccountProfile = AccountProfile.deserialize(data)
+	if account == null or account.account_id.is_empty():
 		return false
-	_accounts_cache[acc.account_id] = acc
-	if not acc.username.is_empty():
-		_username_index[acc.username.to_lower()] = acc.account_id
+	_accounts_cache[account.account_id] = account
+	if not account.username.is_empty():
+		_username_index[account.username.to_lower()] = account.account_id
 	return true
 
 # ==============================================================================
@@ -260,7 +260,7 @@ func _load_and_register_single_shard(shard_file_path: String) -> bool:
 # ==============================================================================
 
 ## 原子刷盘单个账号与全局索引表（tmp->bak->rename 事务原子写）
-func save_account(account: AccountProfileAggregate) -> Dictionary:
+func save_account(account: AccountProfile) -> Dictionary:
 	if account == null:
 		return {"success": false, "error": "ACCOUNT_IS_NULL"}
 	if account.account_id.is_empty():
@@ -269,17 +269,17 @@ func save_account(account: AccountProfileAggregate) -> Dictionary:
 		return {"success": false, "error": "EMPTY_USERNAME"}
 
 	# 若用户名发生变更，先从反向索引中移除旧名称
-	var old_acc: AccountProfileAggregate = _accounts_cache.get(account.account_id, null)
-	if old_acc != null and old_acc.username != account.username:
-		_username_index.erase(old_acc.username.to_lower())
+	var previous_account: AccountProfile = _accounts_cache.get(account.account_id, null)
+	if previous_account != null and previous_account.username != account.username:
+		_username_index.erase(previous_account.username.to_lower())
 
 	# 更新内存缓存与双层索引
 	_accounts_cache[account.account_id] = account
 	_username_index[account.username.to_lower()] = account.account_id
 
 	# 确保存档目录物理存在
-	var reg_path := get_registry_file_path()
-	var accounts_dir := reg_path.get_base_dir()
+	var registry_path := get_registry_file_path()
+	var accounts_dir := registry_path.get_base_dir()
 	AtomicFileWriter.ensure_directory(accounts_dir)
 
 	# 1. 独立单账号分片原子落盘（若启用）
@@ -287,14 +287,14 @@ func save_account(account: AccountProfileAggregate) -> Dictionary:
 		var shard_path := get_account_shard_path(account.account_id)
 		var shard_dict := account.serialize()
 		var shard_json := JSON.stringify(shard_dict, "\t")
-		var shard_write_res := _atomic_write_file(shard_path, shard_json)
-		if not bool(shard_write_res.get("success", false)):
-			return {"success": false, "error": "SHARD_WRITE_FAILED", "detail": shard_write_res.get("error", "")}
+		var shard_write_result := _atomic_write_file(shard_path, shard_json)
+		if not bool(shard_write_result.get("success", false)):
+			return {"success": false, "error": "SHARD_WRITE_FAILED", "detail": shard_write_result.get("error", "")}
 
 	# 2. 全局注册表原子落盘
-	var reg_write_res := _save_registry_internal()
-	if not bool(reg_write_res.get("success", false)):
-		return {"success": false, "error": "REGISTRY_WRITE_FAILED", "detail": reg_write_res.get("error", "")}
+	var registry_write_result := _save_registry_internal()
+	if not bool(registry_write_result.get("success", false)):
+		return {"success": false, "error": "REGISTRY_WRITE_FAILED", "detail": registry_write_result.get("error", "")}
 
 	return {
 		"success": true,
@@ -310,33 +310,33 @@ func delete_account(account_id: String) -> bool:
 	if not _accounts_cache.has(account_id):
 		return false
 
-	var acc: AccountProfileAggregate = _accounts_cache[account_id]
-	if acc != null and not acc.username.is_empty():
-		_username_index.erase(acc.username.to_lower())
+	var account: AccountProfile = _accounts_cache[account_id]
+	if account != null and not account.username.is_empty():
+		_username_index.erase(account.username.to_lower())
 	_accounts_cache.erase(account_id)
 
 	# 清理独立分片数据（若存在）
 	var shard_path := get_account_shard_path(account_id)
 	if FileAccess.file_exists(shard_path):
 		DirAccess.remove_absolute(shard_path)
-	var shard_bak := shard_path + _get_backup_suffix()
-	if FileAccess.file_exists(shard_bak):
-		DirAccess.remove_absolute(shard_bak)
+	var shard_backup_path := shard_path + _get_backup_suffix()
+	if FileAccess.file_exists(shard_backup_path):
+		DirAccess.remove_absolute(shard_backup_path)
 
 	# 原子更新全局注册表
-	var save_res := _save_registry_internal()
-	return bool(save_res.get("success", false))
+	var save_result := _save_registry_internal()
+	return bool(save_result.get("success", false))
 
 func _save_registry_internal() -> Dictionary:
-	var reg_path := get_registry_file_path()
-	var accounts_dir := reg_path.get_base_dir()
+	var registry_path := get_registry_file_path()
+	var accounts_dir := registry_path.get_base_dir()
 	AtomicFileWriter.ensure_directory(accounts_dir)
 
 	var accounts_dict := {}
-	for acc_id in _accounts_cache.keys():
-		var acc: AccountProfileAggregate = _accounts_cache[acc_id]
-		if acc != null:
-			accounts_dict[acc_id] = acc.serialize()
+	for cached_account_id in _accounts_cache.keys():
+		var account: AccountProfile = _accounts_cache[cached_account_id]
+		if account != null:
+			accounts_dict[cached_account_id] = account.serialize()
 
 	var envelope := {
 		"format_version": GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "storage/format_version", DEFAULT_FORMAT_VERSION),
@@ -346,8 +346,8 @@ func _save_registry_internal() -> Dictionary:
 		"accounts": accounts_dict
 	}
 
-	var json_str := JSON.stringify(envelope, "\t")
-	return _atomic_write_file(reg_path, json_str)
+	var json_text := JSON.stringify(envelope, "\t")
+	return _atomic_write_file(registry_path, json_text)
 
 # ==============================================================================
 # 六、底层事务原子写与文件操作
@@ -357,7 +357,7 @@ func _atomic_write_file(file_path: String, content: String) -> Dictionary:
 	var atomic_enabled: bool = _atomic_write_enabled()
 	var policy: String = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "storage/backup_fail_policy", "abort")
 	var retention: int = GameConfig.get_int(DOMAIN_ACCOUNT_CONFIG, "storage/backup_retention", DEFAULT_BACKUP_RETENTION)
-	var write_res: Dictionary = AtomicFileWriter.write_text_atomic(file_path, content, {
+	var write_result: Dictionary = AtomicFileWriter.write_text_atomic(file_path, content, {
 		"atomic_enabled": atomic_enabled,
 		"tmp_suffix": _get_tmp_suffix(),
 		"create_backup": true,
@@ -365,17 +365,17 @@ func _atomic_write_file(file_path: String, content: String) -> Dictionary:
 		"backup_retention": retention,
 		"backup_fail_policy": policy
 	})
-	if bool(write_res.get("success", false)):
+	if bool(write_result.get("success", false)):
 		return {"success": true, "error": ""}
-	var stage: String = str(write_res.get("error_stage", ""))
-	var err_code: int = int(write_res.get("error_code", ERR_FILE_CANT_WRITE))
+	var stage: String = str(write_result.get("error_stage", ""))
+	var error_code: int = int(write_result.get("error_code", ERR_FILE_CANT_WRITE))
 	if not atomic_enabled:
 		return {"success": false, "error": "DIRECT_WRITE_OPEN_FAILED"}
 	if stage == "tmp_open":
-		return {"success": false, "error": TemplateFormatter.format("TMP_OPEN_FAILED: {error}", {"error": str(err_code)})}
+		return {"success": false, "error": TemplateFormatter.format("TMP_OPEN_FAILED: {error}", {"error": str(error_code)})}
 	if stage == "backup":
-		return {"success": false, "error": TemplateFormatter.format("BACKUP_FAILED: {error}", {"error": err_code})}
-	return {"success": false, "error": TemplateFormatter.format("RENAME_FAILED: {error}", {"error": err_code})}
+		return {"success": false, "error": TemplateFormatter.format("BACKUP_FAILED: {error}", {"error": error_code})}
+	return {"success": false, "error": TemplateFormatter.format("RENAME_FAILED: {error}", {"error": error_code})}
 
 func _cleanup_orphan_tmp_files(accounts_dir: String) -> void:
 	if not GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "storage/orphan_tmp_cleanup", true):
