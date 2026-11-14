@@ -1,10 +1,12 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端第14卷: 通知与公告系统视图控制器
+# 模块归属: 前端通知视图域 (fe14 通知与公告系统)
 # 文件路径: res://frontend/views/notification_bulletin/notification_bulletin_view.gd
-# 职责: 气泡Toast堆叠调度、二次确认Modal弹窗、全服跑马灯与红点树角标同步；
-#       3 个 Tab 子界面由 MainTabContainer 承载，右下角返回按钮调 BaseScreen.back()。
-# 骨架阶段: 零接线、不接 EventBus，仅本地 Mock 数据驱动 + 按钮点击反馈。
+# 架构定位: BaseScreen 视图控制器；承载通知中心、公告板与红点树及 Toast/Modal 测试台
+# 依赖与触发: 依赖 ThemeManager、UIIntermediary、RedDotTreeManager 与 Tabs 委托
+# 职责说明: 维护通知分类筛选、已读状态与红点快照同步，公告与红点树委派 Tabs 管理
+# 退出语义与设计依据: 返回操作调用 self.back()；公开测试接口经 apply_snapshot 驱动
 # ==============================================================================
+## 通知与公告系统主视图控制器，协调消息筛选、公告板展示与红点角标测试台。
 class_name NotificationBulletinView
 extends BaseScreen
 
@@ -12,7 +14,7 @@ const NotificationBulletinTabsClass = preload("res://frontend/views/notification
 const RedDotTreeManagerClass = preload("res://frontend/ui_infrastructure/red_dot_tree_manager.gd")
 
 ## i18n 所属卷（第14卷：通知与公告系统）
-const FE := "fe14"
+const FRONTEND_VOLUME_CODE := "fe14"
 
 # ==============================================================================
 # 枚举
@@ -32,22 +34,22 @@ enum BulletinPriority {NORMAL, IMPORTANT, URGENT, CRITICAL}
 # ==============================================================================
 
 # --- 顶部标题栏 ---
-@onready var _btn_back: Button = $%BtnBack
+@onready var _back_button: Button = $%BtnBack
 
 # --- 主 TabContainer ---
 @onready var _main_tab_container: TabContainer = $%MainTabContainer
 
 # --- Tab 1: 通知中心 ---
-@onready var _notif_category_list: ItemList = $%NotifCategoryList
-@onready var _label_notif_unread_count: Label = $%LabelNotifUnreadCount
-@onready var _notif_item_list: ItemList = $%NotifItemList
-@onready var _label_notif_detail_title: Label = $%LabelNotifDetailTitle
-@onready var _label_notif_detail_category: Label = $%LabelNotifDetailCategory
-@onready var _label_notif_detail_time: Label = $%LabelNotifDetailTime
-@onready var _rich_text_notif_detail: RichTextLabel = $%RichTextNotifDetail
-@onready var _btn_jump_target: Button = $%BtnJumpTarget
-@onready var _btn_mark_all_read: Button = $%BtnMarkAllRead
-@onready var _btn_clear_notif: Button = $%BtnClearNotif
+@onready var _notification_category_list: ItemList = $%NotifCategoryList
+@onready var _label_notification_unread_count: Label = $%LabelNotifUnreadCount
+@onready var _notification_item_list: ItemList = $%NotifItemList
+@onready var _label_notification_detail_title: Label = $%LabelNotifDetailTitle
+@onready var _label_notification_detail_category: Label = $%LabelNotifDetailCategory
+@onready var _label_notification_detail_time: Label = $%LabelNotifDetailTime
+@onready var _rich_text_notification_detail: RichTextLabel = $%RichTextNotifDetail
+@onready var _jump_target_button: Button = $%BtnJumpTarget
+@onready var _mark_all_read_button: Button = $%BtnMarkAllRead
+@onready var _clear_notifications_button: Button = $%BtnClearNotif
 
 # --- Tab 2: 公告板 ---
 @onready var _bulletin_tab_bar: TabBar = $%BulletinTabBar
@@ -59,15 +61,15 @@ enum BulletinPriority {NORMAL, IMPORTANT, URGENT, CRITICAL}
 
 # --- Tab 3: 红点树管理 ---
 @onready var _label_red_dot_total: Label = $%LabelRedDotTotal
-@onready var _btn_clear_all_red_dots: Button = $%BtnClearAllRedDots
+@onready var _clear_all_red_dots_button: Button = $%BtnClearAllRedDots
 @onready var _red_dot_tree: Tree = $%RedDotTree
-@onready var _btn_toast_info: Button = $%BtnToastInfo
-@onready var _btn_toast_success: Button = $%BtnToastSuccess
-@onready var _btn_toast_warning: Button = $%BtnToastWarning
-@onready var _btn_toast_error: Button = $%BtnToastError
-@onready var _btn_modal_confirm: Button = $%BtnModalConfirm
-@onready var _btn_modal_yes_no: Button = $%BtnModalYesNo
-@onready var _btn_modal_input: Button = $%BtnModalInput
+@onready var _toast_info_button: Button = $%BtnToastInfo
+@onready var _toast_success_button: Button = $%BtnToastSuccess
+@onready var _toast_warning_button: Button = $%BtnToastWarning
+@onready var _toast_error_button: Button = $%BtnToastError
+@onready var _modal_confirm_button: Button = $%BtnModalConfirm
+@onready var _modal_yes_no_button: Button = $%BtnModalYesNo
+@onready var _modal_input_button: Button = $%BtnModalInput
 @onready var _label_test_status: Label = $%LabelTestStatus
 
 # ==============================================================================
@@ -75,7 +77,7 @@ enum BulletinPriority {NORMAL, IMPORTANT, URGENT, CRITICAL}
 # ==============================================================================
 
 ## 通知分类 i18n key（与 NotifCategory 枚举顺序一致）
-const NOTIF_CATEGORY_KEYS := [
+const NOTIFICATION_CATEGORY_KEYS := [
 	"ui.fe14.notification.category.system",
 	"ui.fe14.notification.category.combat",
 	"ui.fe14.notification.category.social",
@@ -102,21 +104,21 @@ const BULLETIN_PRIORITY_KEYS := [
 # 状态数据
 # ==============================================================================
 
-## 通知列表 Mock 数据
-var _notif_data: Array = []
+## 通知列表预设数据
+var _notification_entries: Array = []
 ## 当前选中的通知索引
-var _selected_notif_idx: int = -1
+var _selected_notification_index: int = -1
 ## 当前选中的通知分类筛选（-1 = 全部）
-var _notif_category_filter: int = -1
+var _notification_category_filter: int = -1
 
-## 公告列表 Mock 数据
-var _bulletin_data: Array = []
+## 公告列表预设数据
+var _bulletin_entries: Array = []
 ## 当前选中的公告索引
-var _selected_bulletin_idx: int = -1
+var _selected_bulletin_index: int = -1
 ## 当前选中的公告分类筛选（TabBar 索引）
-var _bulletin_filter_idx: int = 0
+var _bulletin_filter_index: int = 0
 
-## 红点树 Mock 数据
+## 红点树根节点引用
 var _red_dot_root: TreeItem = null
 ## Toast 队列
 var toast_queue: Array = []
@@ -130,13 +132,13 @@ var _tabs: Variant = null
 # 生命周期
 # ==============================================================================
 
-## 生命周期初始化：主题/文案/三 Tab 装配/信号绑定/视觉适配（骨架零接线）
 func _get_tabs():
 	if _tabs == null:
 		_tabs = _register_owned_subcontroller(NotificationBulletinTabsClass.new())
 		_tabs.setup(self)
 	return _tabs
 
+## 生命周期初始化：应用主题、注入静态文案、装配三页签数据并绑定交互信号。
 func _ready() -> void:
 	# 1. 应用主题
 	_apply_theme()
@@ -153,7 +155,7 @@ func _ready() -> void:
 	# 5. 初始化红点树
 	_init_red_dot_tree()
 
-	# 6. 绑定信号（零接线：仅本地 UI 交互反馈）
+	# 6. 绑定信号（仅本地 UI 交互反馈）
 	_connect_signals()
 
 	# 7. 视图加载后批量视觉适配
@@ -165,9 +167,9 @@ func _ready() -> void:
 
 ## 应用 ThemeManager 单例主题（null 安全）
 func _apply_theme() -> void:
-	var tm := ThemeManager.get_instance()
-	if tm.theme != null:
-		theme = tm.theme
+	var theme_manager := ThemeManager.get_instance()
+	if theme_manager.theme != null:
+		theme = theme_manager.theme
 
 # ==============================================================================
 # 静态文案初始化（i18n 注入）
@@ -179,17 +181,17 @@ func _init_static_text() -> void:
 
 # ==============================================================================
 
-## 初始化通知中心：分类列表 + 6 条 Mock 通知 + 列表/未读计数首刷
+## 初始化通知中心：分类列表 + 6 条预设通知 + 列表/未读计数首刷
 func _init_notification_center() -> void:
 	# 填充分类列表（使用 i18n key，显示时翻译）
-	_notif_category_list.clear()
-	UIIntermediary.resolve_item(_notif_category_list, "ui.fe14.notification.category_all")
-	for cat_key in NOTIF_CATEGORY_KEYS:
-		UIIntermediary.resolve_item(_notif_category_list, cat_key)
-	_notif_category_list.select(0)
+	_notification_category_list.clear()
+	UIIntermediary.resolve_item(_notification_category_list, "ui.fe14.notification.category_all")
+	for category_key in NOTIFICATION_CATEGORY_KEYS:
+		UIIntermediary.resolve_item(_notification_category_list, category_key)
+	_notification_category_list.select(0)
 
-	# Mock 通知数据（标题和内容使用 i18n key）
-	_notif_data = [
+	# 预设通知数据（标题和内容使用 i18n key）
+	_notification_entries = [
 		{"id": "N001", "category": 0, "title_key": "ui.fe14.notification.mock.n001.title", "content_key": "ui.fe14.notification.mock.n001.content", "time": "09-01 10:00", "read": false, "jump_target": ""},
 		{"id": "N002", "category": 1, "title_key": "ui.fe14.notification.mock.n002.title", "content_key": "ui.fe14.notification.mock.n002.content", "time": "09-01 09:32", "read": false, "jump_target": "world_map"},
 		{"id": "N003", "category": 2, "title_key": "ui.fe14.notification.mock.n003.title", "content_key": "ui.fe14.notification.mock.n003.content", "time": "09-01 08:15", "read": false, "jump_target": "guild_social"},
@@ -202,49 +204,49 @@ func _init_notification_center() -> void:
 
 ## 刷新通知列表（按分类筛选）
 func _refresh_notif_list() -> void:
-	_notif_item_list.clear()
-	for i in _notif_data.size():
-		var item: Dictionary = _notif_data[i]
+	_notification_item_list.clear()
+	for notification_index in _notification_entries.size():
+		var notification_entry: Dictionary = _notification_entries[notification_index]
 		# 分类筛选：-1 = 全部
-		if _notif_category_filter >= 0 and int(item.get("category", 0)) != _notif_category_filter:
+		if _notification_category_filter >= 0 and int(notification_entry.get("category", 0)) != _notification_category_filter:
 			continue
-		var read_marker := "" if item.get("read", false) else UIIntermediary.text("ui.fe14.notification.new_marker")
-		var title_text: String = UIIntermediary.text(item.get("title_key", ""))
-		var idx: int = _notif_item_list.add_item("%s%s" % [read_marker, title_text])
+		var read_marker := "" if notification_entry.get("read", false) else UIIntermediary.text("ui.fe14.notification.new_marker")
+		var title_text: String = UIIntermediary.text(notification_entry.get("title_key", ""))
+		var item_index: int = _notification_item_list.add_item("%s%s" % [read_marker, title_text])
 		# 未读项加粗标记
-		if not item.get("read", false):
-			_notif_item_list.set_item_custom_fg_color(idx, DesignTokens.COLOR_ACCENT_DEFAULT)
+		if not notification_entry.get("read", false):
+			_notification_item_list.set_item_custom_fg_color(item_index, DesignTokens.COLOR_ACCENT_DEFAULT)
 
 ## 刷新未读计数
 func _refresh_notif_unread_count() -> void:
-	var unread := 0
-	var total := 0
-	for item in _notif_data:
-		total += 1
-		if not item.get("read", false):
-			unread += 1
-	UIIntermediary.resolve(_label_notif_unread_count, "ui.fe14.notification.unread_count", {"unread": unread, "total": total})
+	var unread_count := 0
+	var total_count := 0
+	for notification_entry in _notification_entries:
+		total_count += 1
+		if not notification_entry.get("read", false):
+			unread_count += 1
+	UIIntermediary.resolve(_label_notification_unread_count, "ui.fe14.notification.unread_count", {"unread": unread_count, "total": total_count})
 
 ## 选中通知后刷新详情面板
 func _refresh_notif_detail() -> void:
-	if _selected_notif_idx < 0 or _selected_notif_idx >= _notif_data.size():
-		UIIntermediary.resolve(_label_notif_detail_title, "ui.fe14.notification.select_hint")
-		UIIntermediary.resolve(_label_notif_detail_category, "ui.fe14.notification.category_label", {"name": "-"})
-		UIIntermediary.resolve(_label_notif_detail_time, "ui.fe14.notification.time_label", {"time": "-"})
-		_rich_text_notif_detail.text = ""
-		_btn_jump_target.disabled = true
+	if _selected_notification_index < 0 or _selected_notification_index >= _notification_entries.size():
+		UIIntermediary.resolve(_label_notification_detail_title, "ui.fe14.notification.select_hint")
+		UIIntermediary.resolve(_label_notification_detail_category, "ui.fe14.notification.category_label", {"name": "-"})
+		UIIntermediary.resolve(_label_notification_detail_time, "ui.fe14.notification.time_label", {"time": "-"})
+		_rich_text_notification_detail.text = ""
+		_jump_target_button.disabled = true
 		return
-	var item: Dictionary = _notif_data[_selected_notif_idx]
-	var cat_idx: int = int(item.get("category", 0))
-	var cat_key: String = NOTIF_CATEGORY_KEYS[cat_idx] if cat_idx < NOTIF_CATEGORY_KEYS.size() else "ui.fe14.common.unknown"
-	var cat_name: String = UIIntermediary.text(cat_key)
-	_label_notif_detail_title.text = UIIntermediary.text(item.get("title_key", ""))
-	UIIntermediary.resolve(_label_notif_detail_category, "ui.fe14.notification.category_label", {"name": cat_name})
-	UIIntermediary.resolve(_label_notif_detail_time, "ui.fe14.notification.time_label", {"time": item.get("time", "-")})
-	_rich_text_notif_detail.text = UIIntermediary.text(item.get("content_key", ""))
+	var notification_entry: Dictionary = _notification_entries[_selected_notification_index]
+	var category_index: int = int(notification_entry.get("category", 0))
+	var category_key: String = NOTIFICATION_CATEGORY_KEYS[category_index] if category_index < NOTIFICATION_CATEGORY_KEYS.size() else "ui.fe14.common.unknown"
+	var category_name: String = UIIntermediary.text(category_key)
+	_label_notification_detail_title.text = UIIntermediary.text(notification_entry.get("title_key", ""))
+	UIIntermediary.resolve(_label_notification_detail_category, "ui.fe14.notification.category_label", {"name": category_name})
+	UIIntermediary.resolve(_label_notification_detail_time, "ui.fe14.notification.time_label", {"time": notification_entry.get("time", "-")})
+	_rich_text_notification_detail.text = UIIntermediary.text(notification_entry.get("content_key", ""))
 	# 如果有跳转目标则启用按钮
-	var jump: String = item.get("jump_target", "")
-	_btn_jump_target.disabled = jump.is_empty()
+	var jump_target: String = notification_entry.get("jump_target", "")
+	_jump_target_button.disabled = jump_target.is_empty()
 
 # ==============================================================================
 # Tab 2: 公告板
@@ -261,8 +263,8 @@ func _refresh_bulletin_list() -> void:
 func _refresh_bulletin_detail() -> void:
 	_get_tabs().refresh_bulletin_detail()
 
-func _priority_name(prio: int) -> String:
-	return _get_tabs().priority_name(prio)
+func _priority_name(priority_value: int) -> String:
+	return _get_tabs().priority_name(priority_value)
 
 func _init_red_dot_tree() -> void:
 	_get_tabs().init_red_dot_tree()
@@ -270,47 +272,47 @@ func _init_red_dot_tree() -> void:
 func _refresh_red_dot_total() -> void:
 	_get_tabs().refresh_red_dot_total()
 
-func _show_toast(type: String, message: String) -> void:
-	_get_tabs().show_toast(type, message)
+func _show_toast(toast_type: String, message: String) -> void:
+	_get_tabs().show_toast(toast_type, message)
 
-func _show_modal(type: String, message: String) -> void:
-	_get_tabs().show_modal(type, message)
+func _show_modal(modal_type: String, message: String) -> void:
+	_get_tabs().show_modal(modal_type, message)
 
 # ==============================================================================
 
-## 绑定本地 UI 交互信号（零接线：通知/公告/红点树/Toast·Modal 测试台本地闭环）
+## 绑定本地 UI 交互信号（通知/公告/红点树/Toast·Modal 测试台本地闭环）
 func _connect_signals() -> void:
 	# 返回按钮
-	connect_managed(_btn_back.pressed, _on_back_btn_pressed)
+	connect_managed(_back_button.pressed, _on_back_btn_pressed)
 
 	# Tab 切换
 	connect_managed(_main_tab_container.tab_changed, _on_tab_changed)
 
 	# 通知中心
-	connect_managed(_notif_category_list.item_selected, _on_notif_category_selected)
-	connect_managed(_notif_item_list.item_selected, _on_notif_item_selected)
-	connect_managed(_btn_jump_target.pressed, _on_jump_target_pressed)
-	connect_managed(_btn_mark_all_read.pressed, _on_mark_all_read_pressed)
-	connect_managed(_btn_clear_notif.pressed, _on_clear_notif_pressed)
+	connect_managed(_notification_category_list.item_selected, _on_notif_category_selected)
+	connect_managed(_notification_item_list.item_selected, _on_notif_item_selected)
+	connect_managed(_jump_target_button.pressed, _on_jump_target_pressed)
+	connect_managed(_mark_all_read_button.pressed, _on_mark_all_read_pressed)
+	connect_managed(_clear_notifications_button.pressed, _on_clear_notif_pressed)
 
 	# 公告板
 	connect_managed(_bulletin_tab_bar.tab_changed, _on_bulletin_tab_changed)
 	connect_managed(_bulletin_item_list.item_selected, _on_bulletin_item_selected)
 
 	# 红点树
-	connect_managed(_btn_clear_all_red_dots.pressed, _on_clear_all_red_dots_pressed)
+	connect_managed(_clear_all_red_dots_button.pressed, _on_clear_all_red_dots_pressed)
 	connect_managed(_red_dot_tree.item_activated, _on_red_dot_item_activated)
 
 	# Toast 测试
-	connect_managed(_btn_toast_info.pressed, func(): _show_toast("INFO", UIIntermediary.text("ui.fe14.toast.test.info")))
-	connect_managed(_btn_toast_success.pressed, func(): _show_toast("SUCCESS", UIIntermediary.text("ui.fe14.toast.test.success")))
-	connect_managed(_btn_toast_warning.pressed, func(): _show_toast("WARNING", UIIntermediary.text("ui.fe14.toast.test.warning")))
-	connect_managed(_btn_toast_error.pressed, func(): _show_toast("ERROR", UIIntermediary.text("ui.fe14.toast.test.error")))
+	connect_managed(_toast_info_button.pressed, func(): _show_toast("INFO", UIIntermediary.text("ui.fe14.toast.test.info")))
+	connect_managed(_toast_success_button.pressed, func(): _show_toast("SUCCESS", UIIntermediary.text("ui.fe14.toast.test.success")))
+	connect_managed(_toast_warning_button.pressed, func(): _show_toast("WARNING", UIIntermediary.text("ui.fe14.toast.test.warning")))
+	connect_managed(_toast_error_button.pressed, func(): _show_toast("ERROR", UIIntermediary.text("ui.fe14.toast.test.error")))
 
 	# Modal 测试
-	connect_managed(_btn_modal_confirm.pressed, func(): _show_modal("CONFIRM", UIIntermediary.text("ui.fe14.modal.test.confirm")))
-	connect_managed(_btn_modal_yes_no.pressed, func(): _show_modal("YES_NO", UIIntermediary.text("ui.fe14.modal.test.yes_no")))
-	connect_managed(_btn_modal_input.pressed, func(): _show_modal("INPUT", UIIntermediary.text("ui.fe14.modal.test.input")))
+	connect_managed(_modal_confirm_button.pressed, func(): _show_modal("CONFIRM", UIIntermediary.text("ui.fe14.modal.test.confirm")))
+	connect_managed(_modal_yes_no_button.pressed, func(): _show_modal("YES_NO", UIIntermediary.text("ui.fe14.modal.test.yes_no")))
+	connect_managed(_modal_input_button.pressed, func(): _show_modal("INPUT", UIIntermediary.text("ui.fe14.modal.test.input")))
 
 # ==============================================================================
 # 信号回调
@@ -321,56 +323,56 @@ func _on_back_btn_pressed() -> void:
 	self.back()
 
 ## 主 Tab 切换：表现层无额外副作用
-func _on_tab_changed(_tab_idx: int) -> void:
+func _on_tab_changed(_tab_index: int) -> void:
 	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe14.toast.tab_switched"), NavTypes.ToastLevel.INFO, 1.0)
 
 # --- 通知中心 ---
 
 ## 通知分类选中：更新筛选（0=全部→-1）并刷新列表与详情
-func _on_notif_category_selected(idx: int) -> void:
-	_notif_category_filter = idx - 1 # 0 = 全部(-1)，1~6 = 各分类
-	_selected_notif_idx = -1
+func _on_notif_category_selected(category_index: int) -> void:
+	_notification_category_filter = category_index - 1 # 0 = 全部(-1)，1~6 = 各分类
+	_selected_notification_index = -1
 	_refresh_notif_list()
 	_refresh_notif_detail()
 
 ## 通知条目选中：过滤后反查实际索引、标记已读并刷新列表/未读/详情
-func _on_notif_item_selected(idx: int) -> void:
-	# 将 ItemList 索引映射回 _notif_data 的实际索引
-	var filtered_idx := 0
-	for i in _notif_data.size():
-		var item: Dictionary = _notif_data[i]
-		if _notif_category_filter >= 0 and int(item.get("category", 0)) != _notif_category_filter:
+func _on_notif_item_selected(item_index: int) -> void:
+	# 将 ItemList 索引映射回 _notification_entries 的实际索引
+	var filtered_index := 0
+	for notification_index in _notification_entries.size():
+		var notification_entry: Dictionary = _notification_entries[notification_index]
+		if _notification_category_filter >= 0 and int(notification_entry.get("category", 0)) != _notification_category_filter:
 			continue
-		if filtered_idx == idx:
-			_selected_notif_idx = i
+		if filtered_index == item_index:
+			_selected_notification_index = notification_index
 			# 标记为已读
-			item["read"] = true
+			notification_entry["read"] = true
 			_refresh_notif_list()
 			_refresh_notif_unread_count()
 			_refresh_notif_detail()
 			return
-		filtered_idx += 1
+		filtered_index += 1
 
 ## 跳转目标按钮：非空跳转目标经 NavManager 推入目标视图
 func _on_jump_target_pressed() -> void:
-	if _selected_notif_idx < 0 or _selected_notif_idx >= _notif_data.size():
+	if _selected_notification_index < 0 or _selected_notification_index >= _notification_entries.size():
 		return
-	var jump: String = _notif_data[_selected_notif_idx].get("jump_target", "")
-	if not jump.is_empty():
-		NavManager.get_instance().push_screen(jump)
+	var jump_target: String = _notification_entries[_selected_notification_index].get("jump_target", "")
+	if not jump_target.is_empty():
+		NavManager.get_instance().push_screen(jump_target)
 
 ## 全部已读按钮：批量标记并刷新列表/未读计数与状态文案
 func _on_mark_all_read_pressed() -> void:
-	for item in _notif_data:
-		item["read"] = true
+	for notification_entry in _notification_entries:
+		notification_entry["read"] = true
 	_refresh_notif_list()
 	_refresh_notif_unread_count()
 	UIIntermediary.resolve(_label_test_status, "ui.fe14.notification.mark_all_read_status")
 
 ## 清除已读按钮：过滤保留未读通知并刷新列表/未读/详情与状态文案
 func _on_clear_notif_pressed() -> void:
-	_notif_data = _notif_data.filter(func(item): return not item.get("read", false))
-	_selected_notif_idx = -1
+	_notification_entries = _notification_entries.filter(func(notification_entry): return not notification_entry.get("read", false))
+	_selected_notification_index = -1
 	_refresh_notif_list()
 	_refresh_notif_unread_count()
 	_refresh_notif_detail()
@@ -378,42 +380,46 @@ func _on_clear_notif_pressed() -> void:
 
 # --- 公告板与红点树（委托给 NotificationBulletinTabs）---
 
-func _on_bulletin_tab_changed(idx: int) -> void:
-	_get_tabs().on_bulletin_tab_changed(idx)
+func _on_bulletin_tab_changed(tab_index: int) -> void:
+	_get_tabs().on_bulletin_tab_changed(tab_index)
 
-func _on_bulletin_item_selected(idx: int) -> void:
-	_get_tabs().on_bulletin_item_selected(idx)
+func _on_bulletin_item_selected(item_index: int) -> void:
+	_get_tabs().on_bulletin_item_selected(item_index)
 
 func _on_clear_all_red_dots_pressed() -> void:
 	_get_tabs().on_clear_all_red_dots_pressed()
 
-func _clear_red_dot_recursive(item: TreeItem) -> void:
-	_get_tabs().clear_red_dot_recursive(item)
+func _clear_red_dot_recursive(tree_item: TreeItem) -> void:
+	_get_tabs().clear_red_dot_recursive(tree_item)
 
 func _on_red_dot_item_activated() -> void:
 	_get_tabs().on_red_dot_item_activated()
 
 # ==============================================================================
-# 外部 API（保留数据桩接口供测试与未来接线）
+# 外部接口（供测试与上层消息驱动）
 # ==============================================================================
 
+## 将一条提示消息压入测试队列并返回入队结果。
 func push_toast(text: String, duration: float) -> Dictionary:
-	var item: Dictionary = {"text": text, "duration": duration}
-	toast_queue.append(item)
-	return {"success": true, "toast": item}
+	var toast_entry: Dictionary = {"text": text, "duration": duration}
+	toast_queue.append(toast_entry)
+	return {"success": true, "toast": toast_entry}
 
+## 打开并记录当前活跃的模态确认对话框状态。
 func show_modal_dialog(title: String, content: String, on_confirm_tag: String) -> void:
 	active_modal_dialog = {"title": title, "content": content, "confirm_tag": on_confirm_tag}
 
+## 清空并关闭当前活跃的模态对话框状态。
 func close_modal_dialog() -> void:
 	active_modal_dialog.clear()
 
+## 通过快照入口设置指定节点路径的红点角标计数。
 func set_red_dot_badge(node_path: String, count: int) -> void:
 	apply_snapshot({"red_dot_path": node_path, "red_dot_count": count})
 
 func _render_from_snapshot() -> void:
 	if snapshot.has("red_dot_path"):
-		var path := str(snapshot.get("red_dot_path", ""))
-		var count := int(snapshot.get("red_dot_count", 0))
-		red_dot_badges[path] = count
-		RedDotTreeManagerClass.get_instance().set_count(path, count)
+		var node_path_text := str(snapshot.get("red_dot_path", ""))
+		var badge_count := int(snapshot.get("red_dot_count", 0))
+		red_dot_badges[node_path_text] = badge_count
+		RedDotTreeManagerClass.get_instance().set_count(node_path_text, badge_count)
