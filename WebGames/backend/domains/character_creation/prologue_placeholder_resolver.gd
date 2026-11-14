@@ -40,29 +40,47 @@ static func extract_placeholders(
 	placeholders["RACE_ID"] = prologue_context.race_id
 	placeholders["GENDER"] = prologue_context.gender
 
-	# 起始地点展示名（查后端剧情 i18n 地理表；缺失回退地点 ID）
-	placeholders["START_LOCATION"] = GameConfig.get_string(
-		"narratives.prologue_i18n", "locations/" + prologue_context.assigned_start_location_id, prologue_context.assigned_start_location_id
-	)
+	# 起始地点展示名（优先查已适配 MOD i18n，再查运行期 prologue_i18n，缺失回退地点 ID）
+	var custom_i18n: Dictionary = adapted_mod_manifest.get("custom_i18n", {})
+	var location_key: String = "locations/" + prologue_context.assigned_start_location_id
+	if custom_i18n.has(location_key):
+		placeholders["START_LOCATION"] = str(custom_i18n[location_key])
+	else:
+		placeholders["START_LOCATION"] = GameConfig.get_string(
+			"narratives.prologue_i18n", location_key, prologue_context.assigned_start_location_id
+		)
 
-	# 初始装备展示名
+	# 初始装备展示名（优先查 MOD 清单 starter_kits 与 custom_i18n）
+	var mod_kits: Dictionary = adapted_mod_manifest.get("starter_kits", adapted_mod_manifest.get("custom_starter_kits", {}))
 	var kit_id := prologue_context.assigned_starter_kit_id
 	if kit_id.is_empty():
-		kit_id = GameConfig.get_string("domains.starter_loadout", "race_kit_map/" + prologue_context.race_id, "")
-	var kit_config: Dictionary = GameConfig.get_dict("domains.starter_loadout", "starter_kits/" + kit_id, {})
+		var mod_race_kits: Dictionary = adapted_mod_manifest.get("race_kit_map", {})
+		kit_id = str(mod_race_kits.get(prologue_context.race_id, ""))
+		if kit_id.is_empty():
+			kit_id = GameConfig.get_string("domains.starter_loadout", "race_kit_map/" + prologue_context.race_id, "")
+	var kit_config: Dictionary = mod_kits.get(kit_id, {}) if mod_kits.has(kit_id) else GameConfig.get_dict("domains.starter_loadout", "starter_kits/" + kit_id, {})
 	var weapon_canonical: String = str(kit_config.get("display_weapon", ""))
 	if not weapon_canonical.is_empty():
 		var weapon_key := weapon_canonical.replace(":", "_")
-		placeholders["INITIAL_EQUIPMENT"] = GameConfig.get_string(
-			"narratives.prologue_i18n", "items/" + weapon_key,
-			GameConfig.get_string("narratives.prologue_i18n", "items/" + weapon_canonical, weapon_canonical)
-		)
+		var item_i18n_key := "items/" + weapon_key
+		if custom_i18n.has(item_i18n_key):
+			placeholders["INITIAL_EQUIPMENT"] = str(custom_i18n[item_i18n_key])
+		elif custom_i18n.has("items/" + weapon_canonical):
+			placeholders["INITIAL_EQUIPMENT"] = str(custom_i18n["items/" + weapon_canonical])
+		else:
+			placeholders["INITIAL_EQUIPMENT"] = GameConfig.get_string(
+				"narratives.prologue_i18n", item_i18n_key,
+				GameConfig.get_string("narratives.prologue_i18n", "items/" + weapon_canonical, weapon_canonical)
+			)
 	else:
 		placeholders["INITIAL_EQUIPMENT"] = ""
 
-	# 序章接引人
-	var npc_target: String = GameConfig.get_string("narratives.prologue_i18n", "npcs/default_guide", "FORTRESS_GUARD")
-	placeholders["NPC_TARGET"] = GameConfig.get_string("narratives.prologue_i18n", "npcs/" + npc_target, npc_target)
+	# 序章接引人（由 MOD i18n 或已加载叙事表决定，严禁硬编码 Kalar NPC）
+	var npc_target: String = str(custom_i18n.get("npcs/default_guide", GameConfig.get_string("narratives.prologue_i18n", "npcs/default_guide", "")))
+	if not npc_target.is_empty():
+		placeholders["NPC_TARGET"] = str(custom_i18n.get("npcs/" + npc_target, GameConfig.get_string("narratives.prologue_i18n", "npcs/" + npc_target, npc_target)))
+	else:
+		placeholders["NPC_TARGET"] = ""
 	placeholders["EVENT_RESULT"] = "SUCCESS"
 
 	# 身世、区域、套件与金币等衍生占位符
@@ -93,7 +111,7 @@ static func _populate_extended_placeholders(
 	placeholders["ORIGIN_NAME"] = str(origin_config.get("name", origin_id))
 
 	var birth_region_map: Dictionary = manifest.get("birth_region_map", {})
-	placeholders["BIRTH_REGION"] = str(birth_region_map.get(origin_id, str(origin_config.get("birth_region_id", "CENTRAL_CONTINENT"))))
+	placeholders["BIRTH_REGION"] = str(birth_region_map.get(origin_id, str(origin_config.get("birth_region_id", prologue_context.assigned_start_location_id))))
 
 	placeholders["TRAIT_SUMMARY"] = str(prologue_context.runtime_placeholders.get("TRAIT_SUMMARY", prologue_context.runtime_placeholders.get("trait_summary", "")))
 
@@ -101,13 +119,13 @@ static func _populate_extended_placeholders(
 	var kit_name: String = str(mod_kits.get(kit_id, {}).get("name", kit_id))
 	placeholders["STARTER_KIT_NAME"] = kit_name
 
-	var gold_value: int = 50
+	var gold_value: int = 0
 	if profile != null:
 		if profile is CharacterProfile:
-			gold_value = int((profile as CharacterProfile).personal_resources.get("gold", 50))
+			gold_value = int((profile as CharacterProfile).personal_resources.get("gold", 0))
 		elif profile is Dictionary:
 			var personal_resources: Dictionary = (profile as Dictionary).get("personal_resources", (profile as Dictionary).get("wallet", {}))
-			gold_value = int(personal_resources.get("gold", 50))
+			gold_value = int(personal_resources.get("gold", 0))
 	elif prologue_context.runtime_placeholders.has("INITIAL_GOLD"):
 		gold_value = int(prologue_context.runtime_placeholders["INITIAL_GOLD"])
 	elif prologue_context.runtime_placeholders.has("STARTER_GOLD"):

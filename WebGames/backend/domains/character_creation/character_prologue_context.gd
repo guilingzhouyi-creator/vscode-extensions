@@ -18,8 +18,9 @@ extends RefCounted
 var account_id: String = ""      # 归属账号 ID
 var character_id: String = ""    # 角色唯一 ID（序章上下文主键）
 var character_name: String = ""  # 角色展示名（文案占位符来源）
-var race_id: String = "HUMAN"    # 种族 ID（影响 DAG 图谱与套件映射）
-var gender: String = "OTHER"     # 性别
+var race_id: String = ""         # 种族 ID（由激活模组/创角结果写入）
+var gender: String = ""          # 性别
+var origin_id: String = ""       # 身世 ID
 
 # ==============================================================================
 # 二、运行时动态上下文（配置与创建参数确定，严禁代码硬编码）
@@ -27,17 +28,23 @@ var gender: String = "OTHER"     # 性别
 
 var assigned_start_location_id: String = ""   # 起始地点 ID（开场事件流注入）
 var assigned_opening_quest_id: String = ""    # 开局主线引导 ID
-var assigned_starter_kit_id: String = ""      # 新手套件 ID（未指派按种族默认回退映射）
+var assigned_starter_kit_id: String = ""      # 新手套件 ID（由活跃 MOD 套件映射决定）
 
 # ==============================================================================
-# 三、序章单向阶段流转
+# 三、序章单向阶段流转与 DAG 会话绑定
 # ==============================================================================
 
-var current_stage: int = 0   # 当前序章阶段（1~4 单向递增）
+var current_stage: int = 0   # 当前序章步骤序号（向后兼容展示计数）
 var step_index: int = 0      # 阶段内步骤索引
 var is_active: bool = false  # 活跃标记（推进中）
 var is_completed: bool = false # 完结标记（终态）
 var created_timestamp_utc: int = 0 # 上下文创建时间戳（Unix UTC 秒）
+var current_dag_id: String = "" # 当前绑定的序章 DAG 图元标识符
+var current_node_id: String = "" # 当前激活的 DAG 节点标识符
+## 运行期激活的 NarrativeDagExecutionEngine（不持久化入裸字典，重入时按 DAG ID 恢复）
+var active_dag_session: RefCounted = null
+## 绑定于本序章上下文的已适配 MOD 清单引用（供步进/结算/状态查询使用）
+var active_mod_manifest: Dictionary = {}
 
 # ==============================================================================
 # 四、占位符运行时缓存
@@ -57,6 +64,7 @@ func serialize() -> Dictionary:
 		"character_name": character_name,
 		"race_id": race_id,
 		"gender": gender,
+		"origin_id": origin_id,
 		"assigned_start_location_id": assigned_start_location_id,
 		"assigned_opening_quest_id": assigned_opening_quest_id,
 		"assigned_starter_kit_id": assigned_starter_kit_id,
@@ -65,10 +73,12 @@ func serialize() -> Dictionary:
 		"is_active": is_active,
 		"is_completed": is_completed,
 		"created_timestamp_utc": created_timestamp_utc,
+		"current_dag_id": current_dag_id,
+		"current_node_id": current_node_id,
 		"runtime_placeholders": runtime_placeholders.duplicate(true)
 	}
 
-## 从字典反序列化序章执行上下文（缺省字段回退默认值，占位符深拷贝）。
+## 从字典反序列化序章执行上下文（缺省字段回退空默认值，占位符深拷贝）。
 ## 契约：空字典返回全新空上下文；未知键安全忽略（旧档兼容）。
 static func deserialize(serialized_context: Dictionary) -> CharacterPrologueContext:
 	var prologue_context := CharacterPrologueContext.new()
@@ -77,8 +87,9 @@ static func deserialize(serialized_context: Dictionary) -> CharacterPrologueCont
 	prologue_context.account_id = str(serialized_context.get("account_id", ""))
 	prologue_context.character_id = str(serialized_context.get("character_id", ""))
 	prologue_context.character_name = str(serialized_context.get("character_name", ""))
-	prologue_context.race_id = str(serialized_context.get("race_id", "HUMAN"))
-	prologue_context.gender = str(serialized_context.get("gender", "OTHER"))
+	prologue_context.race_id = str(serialized_context.get("race_id", ""))
+	prologue_context.gender = str(serialized_context.get("gender", ""))
+	prologue_context.origin_id = str(serialized_context.get("origin_id", ""))
 	prologue_context.assigned_start_location_id = str(serialized_context.get("assigned_start_location_id", ""))
 	prologue_context.assigned_opening_quest_id = str(serialized_context.get("assigned_opening_quest_id", ""))
 	prologue_context.assigned_starter_kit_id = str(serialized_context.get("assigned_starter_kit_id", ""))
@@ -87,5 +98,7 @@ static func deserialize(serialized_context: Dictionary) -> CharacterPrologueCont
 	prologue_context.is_active = bool(serialized_context.get("is_active", false))
 	prologue_context.is_completed = bool(serialized_context.get("is_completed", false))
 	prologue_context.created_timestamp_utc = int(serialized_context.get("created_timestamp_utc", 0))
+	prologue_context.current_dag_id = str(serialized_context.get("current_dag_id", ""))
+	prologue_context.current_node_id = str(serialized_context.get("current_node_id", ""))
 	prologue_context.runtime_placeholders = (serialized_context.get("runtime_placeholders", {}) as Dictionary).duplicate(true)
 	return prologue_context

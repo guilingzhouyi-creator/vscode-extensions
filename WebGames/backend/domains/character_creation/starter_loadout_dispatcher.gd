@@ -31,23 +31,34 @@ static func dispatch_starter_kit(
             "message": "该角色已领取过新手装备，触发幂等跳过"
         }
 
-    # 2. 读取配置或 MOD 清单决定套件 ID
+    # 2. 读取配置或 MOD 清单决定套件 ID（禁止硬编码 Kalar 套件默认回退）
     var manifest: Dictionary = DestinyModManifestDTO.unwrap_adapted_manifest(adapted_mod_manifest)
     var kit_id := prologue_context.assigned_starter_kit_id
     if kit_id.is_empty():
-        kit_id = GameConfig.get_string("domains.starter_loadout", "race_kit_map/" + prologue_context.race_id, "")
+        var mod_race_kits: Dictionary = manifest.get("race_kit_map", {})
+        if mod_race_kits.has(prologue_context.race_id):
+            kit_id = str(mod_race_kits.get(prologue_context.race_id, "")).strip_edges()
         if kit_id.is_empty():
-            kit_id = GameConfig.get_string("domains.starter_loadout", "defaults/fallback_kit", "KIT_HUMAN_DEFAULT")
+            kit_id = GameConfig.get_string("domains.starter_loadout", "race_kit_map/" + prologue_context.race_id, "")
+        if kit_id.is_empty():
+            var creation_rules: Dictionary = manifest.get("creation_rules", {})
+            kit_id = str(creation_rules.get("fallback_kit", GameConfig.get_string("domains.starter_loadout", "defaults/fallback_kit", ""))).strip_edges()
         prologue_context.assigned_starter_kit_id = kit_id
 
     var kit_config: Dictionary = _lookup_kit_config_by_id(kit_id, manifest)
+    if kit_config.is_empty() and manifest.is_empty() and GameConfig.get_dict("domains.starter_loadout", "starter_kits", {}).is_empty():
+        return {
+            "success": false,
+            "error_code": "ERR_NO_BASE_CONTENT_MOD",
+            "message": "No active content MOD or starter kit catalog mounted."
+        }
     if kit_config.is_empty():
         kit_config = {
-            "initial_gold": GameConfig.get_int("domains.starter_loadout", "defaults/initial_gold", 50),
+            "initial_gold": GameConfig.get_int("domains.starter_loadout", "defaults/initial_gold", 0),
             "initial_items": []
         }
 
-    var gold: int = int(kit_config.get("initial_gold", 50))
+    var gold: int = int(kit_config.get("initial_gold", 0))
     var items: Array = kit_config.get("initial_items", [])
 
     # 3. 标记已发放
@@ -76,13 +87,15 @@ static func hydrate_starter_loadout_into_profile(
     if profile == null:
         return { "success": false, "error_code": "INVALID_PROFILE", "message": "角色档案对象不可为空" }
 
-    # 1. 优先按 origin_id 查找 adapted_mod_manifest 中的 origin_kit_map 或身世绑定的 starter_kit_id，未命中回退按 race_id 解析
+    # 1. 优先按 origin_id 查找 adapted_mod_manifest 中的 origin_kit_map 或身世绑定的 starter_kit_id，未命中按 race_id 解析
     var resolved: Dictionary = _resolve_effective_kit(race_id, origin_id, adapted_mod_manifest)
+    if resolved.has("error_code") and not String(resolved.get("error_code", "")).is_empty():
+        return resolved
     var kit_id: String = str(resolved.get("kit_id", ""))
     var kit_config: Dictionary = resolved.get("kit_cfg", {})
 
     # 2. 初始货币入账
-    var gold: int = int(kit_config.get("initial_gold", 50))
+    var gold: int = int(kit_config.get("initial_gold", 0))
     if not profile.personal_resources.has("gold"):
         profile.personal_resources["gold"] = gold
     else:
@@ -152,14 +165,26 @@ static func _resolve_effective_kit(
         kit_config = _lookup_kit_config_by_id(kit_id, manifest)
 
     if kit_config.is_empty():
-        kit_id = GameConfig.get_string("domains.starter_loadout", "race_kit_map/" + race_id, "")
+        var mod_race_kits: Dictionary = manifest.get("race_kit_map", {})
+        if mod_race_kits.has(race_id):
+            kit_id = str(mod_race_kits.get(race_id, "")).strip_edges()
         if kit_id.is_empty():
-            kit_id = GameConfig.get_string("domains.starter_loadout", "defaults/fallback_kit", "KIT_HUMAN_DEFAULT")
+            kit_id = GameConfig.get_string("domains.starter_loadout", "race_kit_map/" + race_id, "")
+        if kit_id.is_empty():
+            var creation_rules: Dictionary = manifest.get("creation_rules", {})
+            kit_id = str(creation_rules.get("fallback_kit", GameConfig.get_string("domains.starter_loadout", "defaults/fallback_kit", ""))).strip_edges()
         kit_config = _lookup_kit_config_by_id(kit_id, manifest)
+
+    if kit_config.is_empty() and manifest.is_empty() and GameConfig.get_dict("domains.starter_loadout", "starter_kits", {}).is_empty():
+        return {
+            "success": false,
+            "error_code": "ERR_NO_BASE_CONTENT_MOD",
+            "message": "No active content MOD or starter kit catalog mounted."
+        }
 
     if kit_config.is_empty():
         kit_config = {
-            "initial_gold": GameConfig.get_int("domains.starter_loadout", "defaults/initial_gold", 50),
+            "initial_gold": GameConfig.get_int("domains.starter_loadout", "defaults/initial_gold", 0),
             "initial_items": []
         }
 
@@ -213,14 +238,24 @@ static func _lookup_kit_config_by_id(kit_id: String, manifest: Dictionary) -> Di
     return GameConfig.get_dict("domains.starter_loadout", "starter_kits/" + kit_id, {})
 
 static func _build_items_spec_lookup() -> Dictionary:
-    var all_items: Array = GameConfig.get_array("items.core", "items", [])
     var item_specification_map: Dictionary = {}
-    for item_entry in all_items:
-        if item_entry is Dictionary:
-            var entry_canonical_id: String = str(item_entry.get("canonical_id", ""))
-            if not entry_canonical_id.is_empty():
-                item_specification_map[entry_canonical_id] = item_entry
+    var empty_table_fallback: Dictionary = {}
+    for table_name_variant in GameConfig.get_table_names():
+        var item_table_name := str(table_name_variant)
+        if not item_table_name.begins_with("items."):
+            continue
+        var table_payload: Variant = GameConfig.get_table(item_table_name, empty_table_fallback)
+        if table_payload is Dictionary and (table_payload as Dictionary).get("items") is Array:
+            _merge_items_array_into_lookup((table_payload as Dictionary).get("items") as Array, item_specification_map)
     return item_specification_map
+
+
+static func _merge_items_array_into_lookup(items_array: Array, target_lookup: Dictionary) -> void:
+    for item_entry in items_array:
+        if item_entry is Dictionary:
+            var entry_canonical_id: String = str((item_entry as Dictionary).get("canonical_id", "")).strip_edges()
+            if not entry_canonical_id.is_empty():
+                target_lookup[entry_canonical_id] = item_entry
 
 static func _equip_item_batch(
     inventory_aggregate: WearableInventoryAggregate,
@@ -307,19 +342,19 @@ static func _resolve_item_category(canonical_id: String, item_specification: Dic
     return ItemEntity.CATEGORY_QUEST_MISC
 
 static func _resolve_item_name(canonical_id: String, item_specification: Dictionary) -> String:
+    var display_name: String = str(item_specification.get("display_name", item_specification.get("name", ""))).strip_edges()
+    if not display_name.is_empty():
+        return display_name
     var aliases: Array = item_specification.get("search_aliases", [])
     if not aliases.is_empty():
         return str(aliases[0])
-    var english_name: String = str(item_specification.get("english_name", ""))
+    var english_name: String = str(item_specification.get("english_name", "")).strip_edges()
     if not english_name.is_empty():
         return english_name
-    match canonical_id:
-        "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD":
-            return "铁剑"
-        "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD":
-            return "秘银长剑"
-        "KALAR:CONSUM:ALCHEMY:POTION_MANA":
-            return "法力药水"
-        _:
-            var parts: PackedStringArray = canonical_id.split(":")
-            return parts[parts.size() - 1] if parts.size() > 0 else canonical_id
+    var name_key: String = str(item_specification.get("canonical_name_key", "")).strip_edges()
+    if not name_key.is_empty():
+        var localized_name: String = LocalizationSolver.resolve_name_key(LocalizationRegistryCatalog.get_shared(), name_key)
+        if not localized_name.is_empty() and localized_name != "[%s]" % name_key:
+            return localized_name
+    var parts: PackedStringArray = canonical_id.split(":")
+    return parts[parts.size() - 1] if parts.size() > 0 else canonical_id

@@ -7,34 +7,40 @@
 ## ReincarnationOriginEngine：Domain Logic Component
 class_name ReincarnationOriginEngine extends RefCounted
 
-## 读取身世常数表（config/domains/character_creation.json origins 段，配置驱动）
-static func _origins() -> Dictionary:
+## 读取身世常数表（MOD 清单优先，其次读取运行期覆盖后的 domains.character_creation）
+static func _origins(adapted_mod_manifest: Dictionary = {}) -> Dictionary:
+	var manifest: Dictionary = DestinyModManifestDTO.unwrap_adapted_manifest(adapted_mod_manifest)
+	var mod_origins: Variant = manifest.get("origins_catalog", manifest.get("origins", {}))
+	if mod_origins is Dictionary and not (mod_origins as Dictionary).is_empty():
+		return mod_origins as Dictionary
 	return GameConfig.get_dict("domains.character_creation", "origins", {})
 
-## 读取地缘出生点表（birth_regions 段，配置驱动）
-static func _regions() -> Dictionary:
+## 读取地缘出生点表（birth_regions / world regions，配置/MOD 驱动）
+static func _regions(adapted_mod_manifest: Dictionary = {}) -> Dictionary:
+	var manifest: Dictionary = DestinyModManifestDTO.unwrap_adapted_manifest(adapted_mod_manifest)
+	var mod_regions: Variant = manifest.get("birth_region_map", {})
+	if mod_regions is Dictionary and not (mod_regions as Dictionary).is_empty():
+		return mod_regions as Dictionary
 	return GameConfig.get_dict("domains.character_creation", "birth_regions", {})
 
-## 按身世 ID 取身世数据（未命中回退 defaults/fallback_origin 默认身世，杜绝空字典）
-static func get_origin(origin_id: String) -> Dictionary:
-	var origins := _origins()
+## 按身世 ID 取身世数据（未命中回退 MOD 规则配置或空字典，严禁硬编码 Kalar 身世）
+static func get_origin(origin_id: String, adapted_mod_manifest: Dictionary = {}) -> Dictionary:
+	var origins := _origins(adapted_mod_manifest)
 	if origins.has(origin_id):
 		return origins[origin_id]
-	var fallback := GameConfig.get_string(
-		"domains.character_creation",
-		"defaults/fallback_origin",
-		"IMPERIAL_NOBLE"
-	)
+	var fallback := GameConfig.get_string("domains.character_creation", "defaults/fallback_origin", "")
+	if fallback.is_empty():
+		return {}
 	return origins.get(fallback, {})
 
-## 按区域 ID 取出生点数据（未命中回退 defaults/fallback_region 默认区域，杜绝空字典）
-static func get_birth_region(region_id: String) -> Dictionary:
-	var regions := _regions()
+## 按区域 ID 取出生点数据（未命中回退 MOD 规则配置或空字典，严禁硬编码 Kalar 区域）
+static func get_birth_region(region_id: String, adapted_mod_manifest: Dictionary = {}) -> Dictionary:
+	var regions := _regions(adapted_mod_manifest)
 	if regions.has(region_id):
-		return regions[region_id]
-	var fallback := GameConfig.get_string(
-		"domains.character_creation",
-		"defaults/fallback_region",
-		"CENTRAL_CONTINENT"
-	)
-	return regions.get(fallback, {})
+		var raw_region: Variant = regions[region_id]
+		return raw_region if raw_region is Dictionary else {"birth_region_id": str(raw_region)}
+	var fallback := GameConfig.get_string("domains.character_creation", "defaults/fallback_region", "")
+	if fallback.is_empty():
+		return {}
+	var fallback_entry: Variant = regions.get(fallback, {})
+	return fallback_entry if fallback_entry is Dictionary else {"birth_region_id": str(fallback_entry)}
