@@ -1,9 +1,12 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端第9卷: 社交与公会系统视图控制器
+# 模块归属: 前端社交视图域 (fe09 社交与公会系统)
 # 文件路径: res://frontend/views/guild_social/guild_social_view.gd
-# 职责: 公会管理(信息/成员RBAC/资金)、频道聊天、好友列表与NPC对话分支、玩家交易
-# 骨架阶段：纯 UI 交互，Mock 数据驱动，不接 EventBus，所有逻辑本地闭环
+# 架构定位: BaseScreen 视图控制器；承载公会信息、成员、聊天、好友、NPC 对话与交易
+# 依赖与触发: 依赖 ThemeManager、UIIntermediary、MockServiceContainer 与 GuildSocialTabs
+# 职责说明: 初始化六大社交页签视图，同步公会快照、成员名册详情与社交按钮事件
+# 退出语义与设计依据: 返回操作调用 self.back() 弹出页面；公共子控件由 Tabs 委托管理
 # ==============================================================================
+## 公会与社交主视图控制器，协调公会信息、成员管理及多社交页签展示。
 class_name GuildSocialView
 extends BaseScreen
 
@@ -13,7 +16,7 @@ const KButtonClass = preload("res://frontend/components/k_button.gd")
 var _tabs: Variant = null
 
 # ------------------------------------------------------------------------------
-# 配置默认值（骨架阶段视图内常量兜底，业务数值经 apply_snapshot 注入，不直读 GameConfig）
+# 配置默认值（视图内常量默认配置，业务数值经 apply_snapshot 注入，不直读 GameConfig）
 # ------------------------------------------------------------------------------
 var _max_guild_members: int = 50
 var _max_chat_lines: int = 200
@@ -23,9 +26,9 @@ var guild_name: String = ""
 var guild_level: int = 1
 var guild_leader: String = ""
 var guild_funds: int = 0
-var vault_gold: int = 0 # 白模测试契约字段（TC-FE09-01 断言金库余额）
-var member_roster: Array = [] # 白模测试契约字段（TC-FE09-01 断言成员清单）
-var tech_nodes: Array = [] # 白模测试契约字段（TC-FE09-03 断言公会科技树）
+var vault_gold: int = 0 # 测试契约公开字段（TC-FE09-01 断言金库余额）
+var member_roster: Array = [] # 测试契约公开字段（TC-FE09-01 断言成员清单）
+var tech_nodes: Array = [] # 测试契约公开字段（TC-FE09-03 断言公会科技树）
 var guild_announcement: String = ""
 var guild_member_count: int = 0
 
@@ -63,7 +66,7 @@ var _trade_confirmed: bool = false
 # ------------------------------------------------------------------------------
 
 # --- 全局 ---
-@onready var _btn_back: Button = %BtnBack
+@onready var _back_button: Button = %BtnBack
 @onready var _tab_container: TabContainer = %TabContainer
 
 # --- Tab 1: 公会信息 (GUILD_INFO) ---
@@ -72,9 +75,9 @@ var _trade_confirmed: bool = false
 @onready var _label_guild_leader: Label = %LabelGuildLeader
 @onready var _label_guild_members: Label = %LabelGuildMembers
 @onready var _label_guild_funds: Label = %LabelGuildFunds
-@onready var _richtext_announcement: RichTextLabel = %RichtextAnnouncement
-@onready var _btn_leave_guild: Button = %BtnLeaveGuild
-@onready var _btn_guild_manage: Button = %BtnGuildManage
+@onready var _rich_text_announcement: RichTextLabel = %RichtextAnnouncement
+@onready var _leave_guild_button: Button = %BtnLeaveGuild
+@onready var _guild_manage_button: Button = %BtnGuildManage
 
 # --- Tab 2: 成员列表 (GUILD_MEMBERS) ---
 @onready var _guild_member_list: ItemList = %GuildMemberList
@@ -83,16 +86,16 @@ var _trade_confirmed: bool = false
 @onready var _label_member_detail_level: Label = %LabelMemberDetailLevel
 @onready var _label_member_detail_role: Label = %LabelMemberDetailRole
 @onready var _label_member_detail_online: Label = %LabelMemberDetailOnline
-@onready var _btn_manage_roles: Button = %BtnManageRoles
-@onready var _btn_invite_member: Button = %BtnInviteMember
-@onready var _btn_kick_member: Button = %BtnKickMember
+@onready var _manage_roles_button: Button = %BtnManageRoles
+@onready var _invite_member_button: Button = %BtnInviteMember
+@onready var _kick_member_button: Button = %BtnKickMember
 
 # --- Tab 3: 聊天频道 (CHAT_CHANNELS) ---
 @onready var _channel_list: ItemList = %ChannelList
-@onready var _btn_channel_settings: Button = %BtnChannelSettings
-@onready var _richtext_chat_messages: RichTextLabel = %RichtextChatMessages
+@onready var _channel_settings_button: Button = %BtnChannelSettings
+@onready var _rich_text_chat_messages: RichTextLabel = %RichtextChatMessages
 @onready var _line_chat_input: LineEdit = %LineChatInput
-@onready var _btn_chat_send: Button = %BtnChatSend
+@onready var _chat_send_button: Button = %BtnChatSend
 
 # --- Tab 4: 好友系统 (FRIENDS) ---
 @onready var _line_friend_search: LineEdit = %LineFriendSearch
@@ -101,27 +104,27 @@ var _trade_confirmed: bool = false
 @onready var _label_friend_detail_name: Label = %LabelFriendDetailName
 @onready var _label_friend_detail_location: Label = %LabelFriendDetailLocation
 @onready var _label_friend_detail_online: Label = %LabelFriendDetailOnline
-@onready var _btn_add_friend: Button = %BtnAddFriend
-@onready var _btn_delete_friend: Button = %BtnDeleteFriend
-@onready var _btn_whisper_friend: Button = %BtnWhisperFriend
+@onready var _add_friend_button: Button = %BtnAddFriend
+@onready var _delete_friend_button: Button = %BtnDeleteFriend
+@onready var _whisper_friend_button: Button = %BtnWhisperFriend
 
 # --- Tab 5: NPC对话 (NPC_DIALOG) ---
 @onready var _label_npc_name: Label = %LabelNpcName
-@onready var _richtext_npc_dialog: RichTextLabel = %RichtextNpcDialog
-@onready var _vbox_dialog_options: VBoxContainer = %VBoxDialogOptions
-@onready var _btn_npc_quest: Button = %BtnNpcQuest
-@onready var _btn_npc_shop: Button = %BtnNpcShop
-@onready var _btn_npc_leave: Button = %BtnNpcLeave
+@onready var _rich_text_npc_dialog: RichTextLabel = %RichtextNpcDialog
+@onready var _dialog_options_box: VBoxContainer = %VBoxDialogOptions
+@onready var _npc_quest_button: Button = %BtnNpcQuest
+@onready var _npc_shop_button: Button = %BtnNpcShop
+@onready var _npc_leave_button: Button = %BtnNpcLeave
 
 # --- Tab 6: 玩家交易 (PLAYER_TRADE) ---
 @onready var _label_trade_partner: Label = %LabelTradePartner
 @onready var _my_inventory_list: ItemList = %MyInventoryList
 @onready var _my_trade_list: ItemList = %MyTradeList
-@onready var _spin_my_trade_gold: SpinBox = %SpinMyTradeGold
+@onready var _my_trade_gold_spin_box: SpinBox = %SpinMyTradeGold
 @onready var _label_trade_status: Label = %LabelTradeStatus
-@onready var _btn_trade_lock: Button = %BtnTradeLock
-@onready var _btn_trade_confirm: Button = %BtnTradeConfirm
-@onready var _btn_trade_cancel: Button = %BtnTradeCancel
+@onready var _trade_lock_button: Button = %BtnTradeLock
+@onready var _trade_confirm_button: Button = %BtnTradeConfirm
+@onready var _trade_cancel_button: Button = %BtnTradeCancel
 @onready var _partner_trade_list: ItemList = %PartnerTradeList
 @onready var _label_partner_gold: Label = %LabelPartnerGold
 
@@ -138,23 +141,23 @@ var _trade_confirmed: bool = false
 @onready var _npc_title_label: Label = %NpcTitleLabel
 @onready var _dialog_label: Label = %DialogLabel
 @onready var _options_label: Label = %OptionsLabel
-@onready var _my_inv_label: Label = %MyInvLabel
+@onready var _my_inventory_label: Label = %MyInvLabel
 @onready var _my_trade_label: Label = %MyTradeLabel
 @onready var _my_gold_label: Label = %MyGoldLabel
-@onready var _partner_inv_label: Label = %PartnerInvLabel
+@onready var _partner_inventory_label: Label = %PartnerInvLabel
 
 # ==============================================================================
-# 公开交互方法（白模测试契约）
+# 公开交互方法（外部视图契约）
 # ==============================================================================
 
-## 白模测试契约桩：注入公会快照（经统一快照入口，映射契约字段）
-func set_guild_snapshot(p_name: String, lvl: int, gold: int, members: Array, techs: Array) -> void:
+## 兼容测试快照注入：经统一快照入口更新公会名称、等级、资金、成员与科技列表。
+func set_guild_snapshot(guild_name_text: String, level_value: int, gold_amount: int, member_entries: Array, tech_entries: Array) -> void:
 	apply_snapshot({
-		"guild_name": p_name,
-		"guild_level": lvl,
-		"guild_funds": gold,
-		"members": members,
-		"techs": techs,
+		"guild_name": guild_name_text,
+		"guild_level": level_value,
+		"guild_funds": gold_amount,
+		"members": member_entries,
+		"techs": tech_entries,
 	})
 
 ## 统一快照渲染映射：公会信息/成员/科技树 → 视图状态
@@ -181,7 +184,6 @@ func can_manage_members(user_role: String) -> bool:
 # 生命周期
 # ==============================================================================
 
-## 生命周期初始化：主题/Mock 快照/六 Tab 装配/信号绑定/视觉适配（骨架零接线）
 func _get_tabs():
 	if _tabs == null:
 		_tabs = _register_owned_subcontroller(GuildSocialTabsScript.new())
@@ -208,15 +210,15 @@ func _init_chat_and_social_tabs() -> void:
 
 ## 应用 ThemeManager 单例主题（null 安全）
 func _apply_theme() -> void:
-	var tm := ThemeManager.get_instance()
-	if tm.theme != null:
-		theme = tm.theme
+	var theme_manager := ThemeManager.get_instance()
+	if theme_manager.theme != null:
+		theme = theme_manager.theme
 
 # ==============================================================================
 # Mock 数据加载（经 domain_boundary 快照服务读取，不接后端）
 # ==============================================================================
 
-## 加载骨架 Mock 快照：公会信息/成员/好友/NPC 对话/交易库存/聊天预填
+## 加载初始预览快照：公会信息/成员/好友/NPC 对话/交易库存/聊天预填
 func _load_mock_snapshot() -> void:
 	# 公会基础信息
 	guild_name = "ui.fe09.mock.guild_name"
@@ -243,46 +245,46 @@ func _init_tab_titles() -> void:
 ## 初始化全部静态文案（16 个非唯一标签 + 各 Tab 按钮/输入提示，i18n 全驱动）
 func _init_static_text() -> void:
 	var bindings := [
-		[_header_title_label, "ui.fe09.header.title"], [_btn_back, "ui.fe09.header.back"],
-		[_announcement_label, "ui.fe09.guild.announcement_label"], [_btn_leave_guild, "ui.fe09.guild.btn_leave"],
-		[_btn_guild_manage, "ui.fe09.guild.btn_manage"], [_member_list_label, "ui.fe09.members.list_label"],
-		[_member_detail_label, "ui.fe09.members.detail_label"], [_btn_manage_roles, "ui.fe09.members.btn_manage_roles"],
-		[_btn_invite_member, "ui.fe09.members.btn_invite"], [_btn_kick_member, "ui.fe09.members.btn_kick"],
-		[_channel_list_label, "ui.fe09.chat.channel_list_label"], [_btn_channel_settings, "ui.fe09.chat.btn_settings"],
-		[_chat_messages_label, "ui.fe09.chat.messages_label"], [_btn_chat_send, "ui.fe09.chat.btn_send"],
+		[_header_title_label, "ui.fe09.header.title"], [_back_button, "ui.fe09.header.back"],
+		[_announcement_label, "ui.fe09.guild.announcement_label"], [_leave_guild_button, "ui.fe09.guild.btn_leave"],
+		[_guild_manage_button, "ui.fe09.guild.btn_manage"], [_member_list_label, "ui.fe09.members.list_label"],
+		[_member_detail_label, "ui.fe09.members.detail_label"], [_manage_roles_button, "ui.fe09.members.btn_manage_roles"],
+		[_invite_member_button, "ui.fe09.members.btn_invite"], [_kick_member_button, "ui.fe09.members.btn_kick"],
+		[_channel_list_label, "ui.fe09.chat.channel_list_label"], [_channel_settings_button, "ui.fe09.chat.btn_settings"],
+		[_chat_messages_label, "ui.fe09.chat.messages_label"], [_chat_send_button, "ui.fe09.chat.btn_send"],
 		[_search_label, "ui.fe09.friend.search_label"], [_friend_list_label, "ui.fe09.friend.list_label"],
-		[_friend_detail_title_label, "ui.fe09.friend.detail_label"], [_btn_add_friend, "ui.fe09.friend.btn_add"],
-		[_btn_delete_friend, "ui.fe09.friend.btn_delete"], [_btn_whisper_friend, "ui.fe09.friend.btn_whisper"],
+		[_friend_detail_title_label, "ui.fe09.friend.detail_label"], [_add_friend_button, "ui.fe09.friend.btn_add"],
+		[_delete_friend_button, "ui.fe09.friend.btn_delete"], [_whisper_friend_button, "ui.fe09.friend.btn_whisper"],
 		[_dialog_label, "ui.fe09.npc.dialog_label"], [_options_label, "ui.fe09.npc.options_label"],
-		[_btn_npc_quest, "ui.fe09.npc.btn_quest"], [_btn_npc_shop, "ui.fe09.npc.btn_shop"],
-		[_btn_npc_leave, "ui.fe09.npc.btn_leave"], [_my_inv_label, "ui.fe09.trade.my_inventory_label"],
+		[_npc_quest_button, "ui.fe09.npc.btn_quest"], [_npc_shop_button, "ui.fe09.npc.btn_shop"],
+		[_npc_leave_button, "ui.fe09.npc.btn_leave"], [_my_inventory_label, "ui.fe09.trade.my_inventory_label"],
 		[_my_trade_label, "ui.fe09.trade.my_trade_label"], [_my_gold_label, "ui.fe09.trade.gold_label"],
-		[_btn_trade_confirm, "ui.fe09.trade.btn_confirm"], [_btn_trade_cancel, "ui.fe09.trade.btn_cancel"],
-		[_partner_inv_label, "ui.fe09.trade.partner_trade_label"]
+		[_trade_confirm_button, "ui.fe09.trade.btn_confirm"], [_trade_cancel_button, "ui.fe09.trade.btn_cancel"],
+		[_partner_inventory_label, "ui.fe09.trade.partner_trade_label"]
 	]
-	for b in bindings:
-		if b[0] != null: UIIntermediary.resolve(b[0], b[1])
+	for binding_entry in bindings:
+		if binding_entry[0] != null: UIIntermediary.resolve(binding_entry[0], binding_entry[1])
 	UIIntermediary.resolve_placeholder(_line_chat_input, "ui.fe09.chat.input_placeholder")
 	UIIntermediary.resolve_placeholder(_line_friend_search, "ui.fe09.friend.search_placeholder")
 
 # ==============================================================================
 
-## 绑定本地 UI 交互信号（零接线：六 Tab 全部控件在本地脚本闭环）
+## 绑定本地 UI 交互信号（六 Tab 全部控件在本地脚本闭环）
 func _connect_signals() -> void:
 	# 返回按钮
-	connect_managed(_btn_back.pressed, _on_back_pressed)
+	connect_managed(_back_button.pressed, _on_back_pressed)
 	# Tab 切换
 	connect_managed(_tab_container.tab_changed, _on_tab_changed)
 
 	# Tab 1: 公会信息
-	connect_managed(_btn_leave_guild.pressed, _on_leave_guild_pressed)
-	connect_managed(_btn_guild_manage.pressed, _on_guild_manage_pressed)
+	connect_managed(_leave_guild_button.pressed, _on_leave_guild_pressed)
+	connect_managed(_guild_manage_button.pressed, _on_guild_manage_pressed)
 
 	# Tab 2: 成员列表
 	connect_managed(_guild_member_list.item_selected, _on_member_selected)
-	connect_managed(_btn_manage_roles.pressed, _on_member_action_pressed.bind("ui.fe09.members.manage_roles_toast"))
-	connect_managed(_btn_invite_member.pressed, _on_invite_member_pressed)
-	connect_managed(_btn_kick_member.pressed, _on_member_action_pressed.bind("ui.fe09.members.kick_toast"))
+	connect_managed(_manage_roles_button.pressed, _on_member_action_pressed.bind("ui.fe09.members.manage_roles_toast"))
+	connect_managed(_invite_member_button.pressed, _on_invite_member_pressed)
+	connect_managed(_kick_member_button.pressed, _on_member_action_pressed.bind("ui.fe09.members.kick_toast"))
 
 	# Tab 3, 4, 5, 6 信号委托
 	_get_tabs().connect_signals()
@@ -306,9 +308,9 @@ func _refresh_guild_info_display() -> void:
 	UIIntermediary.resolve(_label_guild_leader, "ui.fe09.guild.leader", {"name": UIIntermediary.text(guild_leader)})
 	UIIntermediary.resolve(_label_guild_members, "ui.fe09.guild.member_count", {"cur": guild_member_count, "max": _max_guild_members})
 	UIIntermediary.resolve(_label_guild_funds, "ui.fe09.guild.funds", {"amount": guild_funds})
-	_richtext_announcement.clear()
+	_rich_text_announcement.clear()
 	var announcement_text := UIIntermediary.text(guild_announcement, {"guild_name": guild_name_display})
-	_richtext_announcement.append_text(announcement_text)
+	_rich_text_announcement.append_text(announcement_text)
 
 # ==============================================================================
 # Tab 2: 成员列表 (GUILD_MEMBERS) 初始化
@@ -327,14 +329,14 @@ func _populate_member_list() -> void:
 		var member_class := UIIntermediary.text(str(member.get("class", "")))
 		var role := UIIntermediary.text(str(member.get("role", "")))
 		var level := int(member.get("level", 0))
-		var display := UIIntermediary.text("ui.fe09.members.list_item", {
+		var member_row_text := UIIntermediary.text("ui.fe09.members.list_item", {
 			"icon": status_icon,
 			"name": member_name,
 			"level": level,
 			"class": member_class,
 			"role": role,
 		})
-		_guild_member_list.add_item(display)
+		_guild_member_list.add_item(member_row_text)
 
 ## 刷新成员详情：未选中空态或完整字段（名称/职业/等级/职位/在线态）
 func _refresh_member_detail(index: int) -> void:
@@ -345,12 +347,12 @@ func _refresh_member_detail(index: int) -> void:
 		UIIntermediary.resolve(_label_member_detail_role, "ui.fe09.members.role_none")
 		UIIntermediary.resolve(_label_member_detail_online, "ui.fe09.members.status_none")
 		return
-	var m: Dictionary = _guild_members[index]
-	_label_member_detail_name.text = UIIntermediary.text(str(m.get("name", "")))
-	UIIntermediary.resolve(_label_member_detail_class, "ui.fe09.members.class_label", {"name": UIIntermediary.text(str(m.get("class", "")))})
-	UIIntermediary.resolve(_label_member_detail_level, "ui.fe09.members.level_label", {"level": int(m.get("level", 0))})
-	UIIntermediary.resolve(_label_member_detail_role, "ui.fe09.members.role_label", {"name": UIIntermediary.text(str(m.get("role", "")))})
-	var status_key := "ui.fe09.common.status_online" if bool(m.get("online", false)) else "ui.fe09.common.status_offline"
+	var member_entry: Dictionary = _guild_members[index]
+	_label_member_detail_name.text = UIIntermediary.text(str(member_entry.get("name", "")))
+	UIIntermediary.resolve(_label_member_detail_class, "ui.fe09.members.class_label", {"name": UIIntermediary.text(str(member_entry.get("class", "")))})
+	UIIntermediary.resolve(_label_member_detail_level, "ui.fe09.members.level_label", {"level": int(member_entry.get("level", 0))})
+	UIIntermediary.resolve(_label_member_detail_role, "ui.fe09.members.role_label", {"name": UIIntermediary.text(str(member_entry.get("role", "")))})
+	var status_key := "ui.fe09.common.status_online" if bool(member_entry.get("online", false)) else "ui.fe09.common.status_offline"
 	UIIntermediary.resolve(_label_member_detail_online, "ui.fe09.members.status_label", {"status": UIIntermediary.text(status_key)})
 
 # ==============================================================================
