@@ -18,7 +18,7 @@ extends RefCounted
 ## 未填充参数告警计数（遥测/审计只读，禁业务分支）
 static var missing_params_count: int = 0
 
-static var _param_regex: RegEx = RegEx.create_from_string(r"\{([a-z_][a-z0-9_]*)\}")
+static var _placeholder_regex: RegEx = RegEx.create_from_string(r"\{([a-z_][a-z0-9_]*)\}")
 
 # ==============================================================================
 # 二、统一文案解析入口
@@ -30,7 +30,7 @@ static var _param_regex: RegEx = RegEx.create_from_string(r"\{([a-z_][a-z0-9_]*)
 ## - 纯模板：无条件/分支时直接填充（公告/概率文案）。
 static func resolve(
 	copy_key: String,
-	params: Dictionary = {},
+	parameters: Dictionary = {},
 	outcome: String = "",
 	locale_override: String = ""
 ) -> Dictionary:
@@ -51,31 +51,31 @@ static func resolve(
 		else:
 			entry = base_entry
 
-	var template := _select_template(entry, params, outcome) if not entry.is_empty() else ""
+	var template := _select_template(entry, parameters, outcome) if not entry.is_empty() else ""
 	if not effective_locale.is_empty():
-		var locale_dict: Dictionary = LocalizationRegistryCatalog.get_shared()._locale_dictionaries.get(effective_locale, {})
-		if locale_dict.has(copy_key):
-			template = str(locale_dict[copy_key])
+		var locale_map: Dictionary = LocalizationRegistryCatalog.get_shared()._locale_dictionaries.get(effective_locale, {})
+		if locale_map.has(copy_key):
+			template = str(locale_map[copy_key])
 	if entry.is_empty() and template.is_empty():
 		return {"success": false, "code": "COPY_ENTRY_MISSING", "copy_key": copy_key}
 	if template.is_empty():
 		return {"success": false, "code": "COPY_TEMPLATE_MISSING", "copy_key": copy_key}
 
-	var missing := _missing_params(template, params)
+	var missing := _missing_params(template, parameters)
 	if not missing.is_empty():
 		missing_params_count += missing.size()
 		return {"success": false, "code": "MISSING_PARAMS", "copy_key": copy_key, "missing": missing}
 
 	# 文案键登记名称注册表（跨域唯一；同域幂等）
 	LocalizationRegistryCatalog.get_shared().register_name_key(copy_key, domain, copy_key)
-	return {"success": true, "copy_key": copy_key, "text": TemplateFormatter.format(template, params)}
+	return {"success": true, "copy_key": copy_key, "text": TemplateFormatter.format(template, parameters)}
 
 # ==============================================================================
 # 三、内部实现（模板选择 / 状态匹配 / 填充）
 # ==============================================================================
 
 ## 模板选择：outcome 结果分支（缺省 base）+ conditions 状态条件段拼接
-static func _select_template(entry: Dictionary, params: Dictionary, outcome: String) -> String:
+static func _select_template(entry: Dictionary, parameters: Dictionary, outcome: String) -> String:
 	var text := ""
 	if not outcome.is_empty():
 		text = str(entry.get(outcome, entry.get("base", "")))
@@ -83,18 +83,18 @@ static func _select_template(entry: Dictionary, params: Dictionary, outcome: Str
 		text = str(entry.get("base", str(entry.get("text", ""))))
 	var conditions: Array = entry.get("conditions", [])
 	var empty_when: Dictionary = {}
-	for cond in conditions:
-		if _state_match(cond.get("when", empty_when), params):
-			text += str(cond.get("text", ""))
+	for condition_entry in conditions:
+		if _state_match(condition_entry.get("when", empty_when), parameters):
+			text += str(condition_entry.get("text", ""))
 	return text
 
 ## 状态条件匹配（参数值比较：数值取下限语义，其余等值）
-static func _state_match(when: Dictionary, params: Dictionary) -> bool:
+static func _state_match(when: Dictionary, parameters: Dictionary) -> bool:
 	for key in when.keys():
-		if not params.has(key):
+		if not parameters.has(key):
 			return false
 		var expected_value: Variant = when[key]
-		var actual_value: Variant = params[key]
+		var actual_value: Variant = parameters[key]
 		if expected_value is float or expected_value is int:
 			if float(actual_value) < float(expected_value):
 				return false
@@ -103,10 +103,10 @@ static func _state_match(when: Dictionary, params: Dictionary) -> bool:
 	return true
 
 ## 占位符未填充扫描（一处实现，域解析器共用）
-static func _missing_params(template: String, params: Dictionary) -> Array:
+static func _missing_params(template: String, parameters: Dictionary) -> Array:
 	var missing: Array = []
-	for regex_match in _param_regex.search_all(template):
-		var param_name := regex_match.get_string(1)
-		if not params.has(param_name):
-			missing.append(param_name)
+	for regex_match in _placeholder_regex.search_all(template):
+		var placeholder_name := regex_match.get_string(1)
+		if not parameters.has(placeholder_name):
+			missing.append(placeholder_name)
 	return missing

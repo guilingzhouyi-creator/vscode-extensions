@@ -23,30 +23,30 @@ static func _next_temporary_id() -> int:
     return _temporary_sequence_number
 
 ## 确保目标目录存在（幂等递归创建）
-static func ensure_directory(dir_path: String) -> bool:
-    if dir_path.is_empty():
+static func ensure_directory(directory_path: String) -> bool:
+    if directory_path.is_empty():
         return false
-    if DirAccess.dir_exists_absolute(dir_path):
+    if DirAccess.dir_exists_absolute(directory_path):
         return true
-    return DirAccess.make_dir_recursive_absolute(dir_path) == OK
+    return DirAccess.make_dir_recursive_absolute(directory_path) == OK
 
 ## 清理目录内遗留的孤儿临时文件，返回实际删除数量
-static func cleanup_orphan_tmp_files(dir_path: String, temporary_suffix: String = DEFAULT_TMP_SUFFIX) -> int:
-    if dir_path.is_empty() or temporary_suffix.is_empty():
+static func cleanup_orphan_tmp_files(directory_path: String, temporary_suffix: String = DEFAULT_TMP_SUFFIX) -> int:
+    if directory_path.is_empty() or temporary_suffix.is_empty():
         return 0
-    var dir_access := DirAccess.open(dir_path)
-    if dir_access == null:
+    var directory_access := DirAccess.open(directory_path)
+    if directory_access == null:
         return 0
-    var base_dir: String = dir_path if dir_path.ends_with("/") else dir_path + "/"
+    var base_directory: String = directory_path if directory_path.ends_with("/") else directory_path + "/"
     var removed_count: int = 0
-    dir_access.list_dir_begin()
-    var file_name: String = dir_access.get_next()
+    directory_access.list_dir_begin()
+    var file_name: String = directory_access.get_next()
     while not file_name.is_empty():
-        if not dir_access.current_is_dir() and file_name.ends_with(temporary_suffix):
-            if DirAccess.remove_absolute(base_dir + file_name) == OK:
+        if not directory_access.current_is_dir() and file_name.ends_with(temporary_suffix):
+            if DirAccess.remove_absolute(base_directory + file_name) == OK:
                 removed_count += 1
-        file_name = dir_access.get_next()
-    dir_access.list_dir_end()
+        file_name = directory_access.get_next()
+    directory_access.list_dir_end()
     return removed_count
 
 ## 从指定备份路径经临时文件原子替换恢复目标正档
@@ -117,8 +117,8 @@ static func write_text_atomic(
     if file_path.is_empty():
         return {"success": false, "error_stage": "open_write", "error_code": ERR_INVALID_PARAMETER, "backup_error": OK}
 
-    var atomic_enabled: bool = bool(options.get("atomic_enabled", true))
-    if not atomic_enabled:
+    var is_atomic_enabled: bool = bool(options.get("atomic_enabled", true))
+    if not is_atomic_enabled:
         return write_text_direct(file_path, content)
 
     ensure_directory(file_path.get_base_dir())
@@ -198,13 +198,13 @@ static func _shift_backup_version(file_path: String, backup_suffix: String, vers
         return
     # 先把既有目标备份移至暂存名，防止 rename 失败时原备份丢失
     var staged_old := "%s.shifting_%d" % [destination_path, _next_temporary_id()]
-    var had_destination := FileAccess.file_exists(destination_path)
-    if had_destination:
+    var has_existing_destination := FileAccess.file_exists(destination_path)
+    if has_existing_destination:
         if DirAccess.rename_absolute(destination_path, staged_old) != OK:
             return
     var rename_error := DirAccess.rename_absolute(source_path, destination_path)
     if rename_error != OK:
-        if had_destination and FileAccess.file_exists(staged_old):
+        if has_existing_destination and FileAccess.file_exists(staged_old):
             DirAccess.rename_absolute(staged_old, destination_path)
-    elif had_destination and FileAccess.file_exists(staged_old):
+    elif has_existing_destination and FileAccess.file_exists(staged_old):
         DirAccess.remove_absolute(staged_old)

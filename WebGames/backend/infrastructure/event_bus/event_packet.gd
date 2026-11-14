@@ -51,17 +51,17 @@ func reset_state() -> void:
 	is_borrowed = false
 
 ## 设置 3D 空间几何标头
-func set_spatial_header(pos: Vector3, radius: float) -> EventPacket:
+func set_spatial_header(spatial_position: Vector3, radius: float) -> EventPacket:
 	is_spatial = true
-	world_position = pos
+	world_position = spatial_position
 	effect_radius = maxf(0.0, radius)
 	return self
 
 ## 设置 2D/2.5D 平面几何标头（无缝降维映射到 3D 无头坐标系）
-func set_spatial_header_2d(pos_2d: Vector2, radius: float, is_isometric_xz: bool = false) -> EventPacket:
+func set_spatial_header_2d(position_2d: Vector2, radius: float, is_isometric_xz: bool = false) -> EventPacket:
 	is_spatial = true
 	effect_radius = maxf(0.0, radius)
-	world_position = Vector3(pos_2d.x, 0.0, pos_2d.y) if is_isometric_xz else Vector3(pos_2d.x, pos_2d.y, 0.0)
+	world_position = Vector3(position_2d.x, 0.0, position_2d.y) if is_isometric_xz else Vector3(position_2d.x, position_2d.y, 0.0)
 	return self
 
 ## 绑定强类型 DTO 与标准化字典双向载荷（兼容仅读取 payload_data 或仅读取 payload_dto 的消费端）
@@ -76,24 +76,24 @@ static func bind_dual_payload(
 	packet.payload_dto = payload_model
 	if payload_model == null:
 		return
-	var payload_dict: Dictionary = {}
+	var payload_map: Dictionary = {}
 	if payload_model.has_method("to_dto"):
 		var raw_payload: Variant = payload_model.call("to_dto")
 		if raw_payload is Dictionary:
-			payload_dict = (raw_payload as Dictionary).duplicate()
+			payload_map = (raw_payload as Dictionary).duplicate()
 	if not compat_fields.is_empty():
 		for key in compat_fields.keys():
-			payload_dict[key] = compat_fields[key]
+			payload_map[key] = compat_fields[key]
 	if channel_label.is_empty():
-		packet.payload_data = payload_dict
+		packet.payload_data = payload_map
 		return
 	var envelope: Dictionary = {
 		"channel": channel_label,
-		"payload": payload_dict
+		"payload": payload_map
 	}
-	for key in payload_dict.keys():
+	for key in payload_map.keys():
 		if key != "channel" and key != "payload":
-			envelope[key] = payload_dict[key]
+			envelope[key] = payload_map[key]
 	packet.payload_data = envelope
 
 ## 从事件包无差别提取字典载荷（优先强类型 DTO.to_dto()，其次展开 payload_data 信封）
@@ -105,8 +105,8 @@ static func extract_payload_dict(packet: EventPacket) -> Dictionary:
 		if raw_payload is Dictionary:
 			return raw_payload as Dictionary
 	if packet.payload_data is Dictionary:
-		var raw_data: Dictionary = packet.payload_data as Dictionary
-		if raw_data.has("payload") and raw_data.get("payload") is Dictionary:
-			return raw_data.get("payload") as Dictionary
-		return raw_data
+		var payload_map: Dictionary = packet.payload_data as Dictionary
+		if payload_map.has("payload") and payload_map.get("payload") is Dictionary:
+			return payload_map.get("payload") as Dictionary
+		return payload_map
 	return {}

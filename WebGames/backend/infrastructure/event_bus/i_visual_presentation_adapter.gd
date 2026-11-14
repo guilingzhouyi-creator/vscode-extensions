@@ -11,15 +11,15 @@ extends RefCounted
 ## 实体生成表现回调
 func on_entity_spawned(
 	_entity_id: String,
-	_initial_pos: Vector3
+	_initial_position: Vector3
 ) -> void:
 	pass
 
 ## 实体位移表现回调
 func on_entity_moved(
 	_entity_id: String,
-	_new_pos: Vector3,
-	_facing_rad: float
+	_new_position: Vector3,
+	_facing_radians: float
 ) -> void:
 	pass
 

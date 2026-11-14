@@ -16,7 +16,7 @@ var _capacity: int = 4096
 var _borrowed: int = 0
 var _peak_borrowed: int = 0
 var _is_reporting: bool = false
-var _overflow_warned: bool = false
+var _has_overflow_warned: bool = false
 
 func _init(capacity: int = 4096) -> void:
 	_capacity = maxi(1, capacity)
@@ -25,10 +25,10 @@ func _init(capacity: int = 4096) -> void:
 func borrow() -> EventPacket:
 	var packet: EventPacket = _free.pop_back() if not _free.is_empty() else null
 	if packet == null:
-		if _borrowed >= _capacity and not _overflow_warned and not _is_reporting:
+		if _borrowed >= _capacity and not _has_overflow_warned and not _is_reporting:
 			# 通过边沿状态位与重入守卫避免池溢出告警经 ErrorReporter 递归写回造成日志风暴
 			_is_reporting = true
-			_overflow_warned = true
+			_has_overflow_warned = true
 			_push_pool_overflow_hint()
 			_is_reporting = false
 		packet = EventPacket.new()
@@ -44,8 +44,8 @@ func recycle(packet: EventPacket) -> bool:
 		return false
 	packet.reset_state() # reset_state 已重置 is_borrowed = false，避免重复赋值
 	_borrowed = maxi(0, _borrowed - 1)
-	if _overflow_warned and _borrowed < _capacity:
-		_overflow_warned = false
+	if _has_overflow_warned and _borrowed < _capacity:
+		_has_overflow_warned = false
 	if _free.size() < _capacity:
 		_free.append(packet)
 	return true
@@ -76,7 +76,7 @@ func clear() -> void:
 	_borrowed = 0
 	_peak_borrowed = 0
 	_is_reporting = false
-	_overflow_warned = false
+	_has_overflow_warned = false
 
 func _push_pool_overflow_hint() -> void:
 	# 池满新建属池外分配，经 ErrorReporter 统一通道遥测告警

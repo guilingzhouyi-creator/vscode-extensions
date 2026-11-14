@@ -208,15 +208,15 @@ static func _decode_tlv_value(stream: StreamPeerBuffer, pool: Array[String]) -> 
 			decoded_dictionary[entry_key] = entry_value
 		return decoded_dictionary
 	if tag == TAG_BINARY_BLOB:
-		var data_length: int = stream.get_u32()
+		var blob_byte_length: int = stream.get_u32()
 		var mime_length: int = stream.get_u16()
 		var mime_type: String = stream.get_utf8_string(mime_length)
-		var blob_data: PackedByteArray = stream.data_array.slice(stream.get_position(), stream.get_position() + data_length)
-		stream.seek(stream.get_position() + data_length)
+		var blob_bytes: PackedByteArray = stream.data_array.slice(stream.get_position(), stream.get_position() + blob_byte_length)
+		stream.seek(stream.get_position() + blob_byte_length)
 		return {
 			"__type": "binary_blob",
 			"mime_type": mime_type,
-			"data": blob_data
+			"data": blob_bytes
 		}
 	return null
 
@@ -226,18 +226,18 @@ static func _decode_tlv_value(stream: StreamPeerBuffer, pool: Array[String]) -> 
 
 ## 从全库单包 config.kdat 解码全量配置表字典 { "domains.combat.mechanics": Dictionary, ... }
 static func load_monolithic_bundle(file_path: String) -> Dictionary:
-	var raw_data: Variant = load_kdat_file(file_path)
-	if raw_data == null or not (raw_data is Dictionary):
+	var decoded_bundle: Variant = load_kdat_file(file_path)
+	if decoded_bundle == null or not (decoded_bundle is Dictionary):
 		return {}
 
-	var toc_list: Variant = raw_data.get("toc", null)
-	var payload_bytes: Variant = raw_data.get("payload", null)
+	var toc_list: Variant = decoded_bundle.get("toc", null)
+	var payload_bytes: Variant = decoded_bundle.get("payload", null)
 	if payload_bytes is Dictionary and (payload_bytes as Dictionary).has("data"):
 		payload_bytes = (payload_bytes as Dictionary)["data"]
 	if not (toc_list is Array) or not (payload_bytes is PackedByteArray):
 		return {}
 
-	var result: Dictionary = {}
+	var decoded_tables: Dictionary = {}
 	var payload: PackedByteArray = payload_bytes
 	for entry in (toc_list as Array):
 		if not (entry is Dictionary):
@@ -249,8 +249,8 @@ static func load_monolithic_bundle(file_path: String) -> Dictionary:
 			continue
 
 		var table_slice := payload.slice(offset, offset + length)
-		var table_data: Variant = _decode_payload_stream(table_slice)
-		if table_data != null and (table_data is Dictionary):
-			result[table_name] = table_data
+		var table_payload: Variant = _decode_payload_stream(table_slice)
+		if table_payload != null and (table_payload is Dictionary):
+			decoded_tables[table_name] = table_payload
 
-	return result
+	return decoded_tables

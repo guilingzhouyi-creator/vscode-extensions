@@ -11,7 +11,7 @@
 class_name EventBusSubscriptionToken
 extends RefCounted
 
-var _bus_ref: WeakRef = null
+var _event_bus_weak_reference: WeakRef = null
 var channel_id: int = 0
 var category_mask: int = 0
 var callback: Callable = Callable()
@@ -21,28 +21,28 @@ var is_active: bool = false
 
 var bus: Variant:
 	get:
-		return _bus_ref.get_ref() if _bus_ref != null else null
-	set(value):
-		if value == null:
-			_bus_ref = null
+		return _event_bus_weak_reference.get_ref() if _event_bus_weak_reference != null else null
+	set(new_bus):
+		if new_bus == null:
+			_event_bus_weak_reference = null
 		else:
-			_bus_ref = weakref(value)
+			_event_bus_weak_reference = weakref(new_bus)
 
 func _init(
 	event_bus: EventBusCore,
 	initial_channel_id: int,
 	initial_category_mask: int,
 	initial_callback: Callable,
-	spatial_listener: bool,
+	is_spatial_listener: bool,
 	initial_token_id: int = 0
 ) -> void:
 	if event_bus != null:
 		# 使用 WeakRef 持有总线，避免令牌被外部保留时阻止 EventBusCore 释放
-		_bus_ref = weakref(event_bus)
+		_event_bus_weak_reference = weakref(event_bus)
 	channel_id = initial_channel_id
 	category_mask = initial_category_mask
 	callback = initial_callback
-	is_spatial = spatial_listener
+	is_spatial = is_spatial_listener
 	token_id = initial_token_id
 	is_active = true
 
@@ -51,8 +51,8 @@ func unbind() -> bool:
 	if not is_active:
 		return false
 	is_active = false
-	if _bus_ref != null:
-		var active_bus: Variant = _bus_ref.get_ref()
+	if _event_bus_weak_reference != null:
+		var active_bus: Variant = _event_bus_weak_reference.get_ref()
 		if active_bus != null and active_bus.has_method("_unregister_token"):
 			active_bus._unregister_token(self)
 	return true

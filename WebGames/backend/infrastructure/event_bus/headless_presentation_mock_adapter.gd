@@ -15,13 +15,13 @@ var spawned_entities: Dictionary = {}
 var recorded_cues: Array[Dictionary] = []
 
 ## 响应实体生成事件，初始化其空间表现层对象
-func on_entity_spawned(entity_id: String, initial_pos: Vector3) -> void:
-	spawned_entities[entity_id] = initial_pos
+func on_entity_spawned(entity_id: String, initial_position: Vector3) -> void:
+	spawned_entities[entity_id] = initial_position
 
 ## 响应实体移动事件，更新其空间坐标与朝向角
-func on_entity_moved(entity_id: String, new_pos: Vector3, _facing_rad: float) -> void:
+func on_entity_moved(entity_id: String, new_position: Vector3, _facing_radians: float) -> void:
 	if spawned_entities.has(entity_id):
-		spawned_entities[entity_id] = new_pos
+		spawned_entities[entity_id] = new_position
 
 ## 响应视觉线索事件，在宿主实体处播放指定特效
 func on_visual_cue(entity_id: String, cue: VisualCueDTO) -> void:

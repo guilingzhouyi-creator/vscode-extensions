@@ -13,7 +13,7 @@ extends RefCounted
 
 var _primary_buffer: Array[EventPacket] = []
 var _secondary_buffer: Array[EventPacket] = []
-var _writing_to_primary: bool = true
+var _is_writing_to_primary: bool = true
 var _capacity: int = 4096
 
 func _init(capacity: int = 4096) -> void:
@@ -23,7 +23,7 @@ func _init(capacity: int = 4096) -> void:
 func enqueue(packet: EventPacket) -> bool:
 	if packet == null:
 		return false
-	if _writing_to_primary:
+	if _is_writing_to_primary:
 		if _primary_buffer.size() >= _capacity:
 			return false
 		_primary_buffer.append(packet)
@@ -36,8 +36,8 @@ func enqueue(packet: EventPacket) -> bool:
 ## 帧末批量清算：交换读写缓冲 → 逐包回调 → 清空（零拷贝，无 duplicate）
 func flush_frame(callback: Callable) -> int:
 	# 在触发回调前先翻转写入端，确保回调内部新入队的事件写入另一缓冲而不污染本帧遍历
-	var read_array: Array[EventPacket] = _primary_buffer if _writing_to_primary else _secondary_buffer
-	_writing_to_primary = not _writing_to_primary
+	var read_array: Array[EventPacket] = _primary_buffer if _is_writing_to_primary else _secondary_buffer
+	_is_writing_to_primary = not _is_writing_to_primary
 	var count: int = read_array.size()
 	for packet in read_array:
 		if callback.is_valid():
@@ -55,10 +55,10 @@ func capacity() -> int:
 
 ## 获取当前正在写入的活跃缓冲区积压数量
 func get_active_buffer_size() -> int:
-	return _primary_buffer.size() if _writing_to_primary else _secondary_buffer.size()
+	return _primary_buffer.size() if _is_writing_to_primary else _secondary_buffer.size()
 
 ## 清空双缓冲区（供测试隔离与重置）
 func clear() -> void:
 	_primary_buffer.clear()
 	_secondary_buffer.clear()
-	_writing_to_primary = true
+	_is_writing_to_primary = true

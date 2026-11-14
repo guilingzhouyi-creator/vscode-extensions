@@ -48,13 +48,13 @@ func to_dict() -> Dictionary:
 	}
 
 ## 从字典安全反序列化（使用 RefCounted 动态实例化，防御未注册类缓存）
-static func from_dict(data: Dictionary) -> RefCounted:
+static func from_dict(route_payload: Dictionary) -> RefCounted:
 	var route: RefCounted = new()
-	route.set("root_layer", str(data.get("root_layer", "")))
-	route.set("domain_id", str(data.get("domain_id", "")))
-	route.set("sub_table_id", str(data.get("sub_table_id", "")))
-	route.set("requested_table", str(data.get("requested_table", "")))
-	route.set("resolved_table", str(data.get("resolved_table", "")))
-	route.set("resolved_path", str(data.get("resolved_path", "")))
-	route.set("resolution_mode", int(data.get("resolution_mode", RouteResolutionMode.DIRECT_PASSTHROUGH)))
+	route.set("root_layer", str(route_payload.get("root_layer", "")))
+	route.set("domain_id", str(route_payload.get("domain_id", "")))
+	route.set("sub_table_id", str(route_payload.get("sub_table_id", "")))
+	route.set("requested_table", str(route_payload.get("requested_table", "")))
+	route.set("resolved_table", str(route_payload.get("resolved_table", "")))
+	route.set("resolved_path", str(route_payload.get("resolved_path", "")))
+	route.set("resolution_mode", int(route_payload.get("resolution_mode", RouteResolutionMode.DIRECT_PASSTHROUGH)))
 	return route

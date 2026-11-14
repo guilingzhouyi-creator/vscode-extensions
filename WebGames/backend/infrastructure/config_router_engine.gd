@@ -45,8 +45,8 @@ static var _prefix_table_cache: Dictionary = {}
 static var _subtables_cache: Dictionary = {}
 
 ## 构造规范的点分子表名
-static func build_subtable_key(root_layer: String, domain_id: String, sub_table: String) -> String:
-	return "%s.%s.%s" % [root_layer, domain_id, sub_table]
+static func build_subtable_key(root_layer: String, domain_id: String, subtable_name: String) -> String:
+	return "%s.%s.%s" % [root_layer, domain_id, subtable_name]
 
 ## 判断给定表名是否为多表子域的子表
 static func is_subtable(table_name: String) -> bool:
@@ -59,15 +59,15 @@ static func get_subtables_for_domain(domain_name: String) -> Array:
 		return _domain_subtables[domain_name]
 	if _subtables_cache.has(domain_name):
 		return _subtables_cache[domain_name]
-	var out: Array = []
+	var matching_subtables: Array = []
 	if _primary_aliases.has(domain_name):
-		out = [_primary_aliases[domain_name]]
+		matching_subtables = [_primary_aliases[domain_name]]
 	elif domain_name.begins_with("domains."):
-		var dot_pos: int = domain_name.find(".", 8)
-		if dot_pos == -1:
-			out = [domain_name + ".core"]
-	_subtables_cache[domain_name] = out
-	return out
+		var dot_index: int = domain_name.find(".", 8)
+		if dot_index == -1:
+			matching_subtables = [domain_name + ".core"]
+	_subtables_cache[domain_name] = matching_subtables
+	return matching_subtables
 
 ## 基础别名解析（单一表名）
 static func resolve_table_name(requested_table: String) -> String:
@@ -77,8 +77,8 @@ static func resolve_table_name(requested_table: String) -> String:
 		return _table_only_cache[requested_table]
 	var resolved: String = requested_table
 	if requested_table.begins_with("domains."):
-		var dot_pos: int = requested_table.find(".", 8)
-		if dot_pos == -1:
+		var dot_index: int = requested_table.find(".", 8)
+		if dot_index == -1:
 			resolved = requested_table + ".core"
 	_table_only_cache[requested_table] = resolved
 	return resolved
@@ -87,19 +87,19 @@ static func resolve_table_name(requested_table: String) -> String:
 static func resolve_target_table(requested_table: String, path: String = "") -> String:
 	if not _prefix_routes.has(requested_table):
 		return resolve_table_name(requested_table)
-	var slash_pos: int = path.find("/")
-	var first_seg: String = path.substr(0, slash_pos) if slash_pos >= 0 else path
-	if not first_seg.is_empty():
-		var cached_sub: Variant = _prefix_table_cache.get(requested_table, null)
-		if cached_sub is Dictionary and (cached_sub as Dictionary).has(first_seg):
-			return String((cached_sub as Dictionary)[first_seg])
+	var slash_index: int = path.find("/")
+	var first_segment: String = path.substr(0, slash_index) if slash_index >= 0 else path
+	if not first_segment.is_empty():
+		var cached_prefix_map: Variant = _prefix_table_cache.get(requested_table, null)
+		if cached_prefix_map is Dictionary and (cached_prefix_map as Dictionary).has(first_segment):
+			return String((cached_prefix_map as Dictionary)[first_segment])
 		var prefix_map: Dictionary = _prefix_routes[requested_table]
-		var target_sub: String = prefix_map.get(first_seg, "")
-		if not target_sub.is_empty():
+		var target_subtable: String = prefix_map.get(first_segment, "")
+		if not target_subtable.is_empty():
 			if not _prefix_table_cache.has(requested_table):
 				_prefix_table_cache[requested_table] = {}
-			_prefix_table_cache[requested_table][first_seg] = target_sub
-			return target_sub
+			_prefix_table_cache[requested_table][first_segment] = target_subtable
+			return target_subtable
 	return resolve_table_name(requested_table)
 
 ## 全要素智能路由解析（表名 + 键路径 -> ConfigRouteDTO）
@@ -116,14 +116,14 @@ static func resolve_route(requested_table: String, path: String = "") -> ConfigR
 
 	# 检查是否为多表子域别名，并基于键前缀分流
 	if _prefix_routes.has(requested_table) and not path.is_empty():
-		var first_seg := path.split("/")[0]
-		var subtable_target: String = _prefix_routes[requested_table].get(first_seg, "")
+		var first_segment := path.split("/")[0]
+		var subtable_target: String = _prefix_routes[requested_table].get(first_segment, "")
 		if not subtable_target.is_empty():
 			route.resolved_table = subtable_target
 			route.resolution_mode = ConfigRouteDTO.RouteResolutionMode.SUBTABLE_FALLBACK
-			var sub_parts := subtable_target.split(".")
-			if sub_parts.size() >= 3:
-				route.sub_table_id = sub_parts[2]
+			var subtable_parts := subtable_target.split(".")
+			if subtable_parts.size() >= 3:
+				route.sub_table_id = subtable_parts[2]
 			return route
 
 	# 回退至主表别名

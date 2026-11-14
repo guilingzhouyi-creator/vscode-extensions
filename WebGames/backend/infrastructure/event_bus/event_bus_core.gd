@@ -32,14 +32,14 @@ var _seen_scratch: Array = [] # 按递归深度索引的通配去重池（O(n) �
 var _dead_tokens_scratch: Array = [] # 失效订阅令牌回收暂存池（复用免热路径堆分配）
 
 # ---- 遥测指标 (Metrics & Profiling) ----
-var _enable_profiling: bool = true
-var _high_freq_threshold: int = 10000
+var _is_profiling_enabled: bool = true
+var _high_frequency_threshold: int = 10000
 var _dispatched_count: int = 0
 var _enqueued_count: int = 0
 var _dropped_count: int = 0
 var _peak_dispatch_depth: int = 0
-var _current_window_ops: int = 0
-var _is_warning_high_freq: bool = false
+var _current_window_operations: int = 0
+var _is_warning_high_frequency: bool = false
 
 # ---- 叙事表缓存（自旧总线迁正：域 id → 文案表名，按配置重载版本失效） ----
 static var _record_sequence_number: int = 0
@@ -51,8 +51,8 @@ func _init() -> void:
 	_ring_buffer = PingPongRingBuffer.new(4096)
 	_pool = EventPool.new(4096)
 	_max_depth = 16
-	_enable_profiling = true
-	_high_freq_threshold = 10000
+	_is_profiling_enabled = true
+	_high_frequency_threshold = 10000
 	_ensure_channel_registry_loaded()
 
 ## 应用级单例（生产模式与 GameBootstrap 统一入口；单元测试建议 EventBusCore.new() 独立实例）
@@ -78,10 +78,10 @@ func _ensure_channel_registry_loaded() -> void:
 	_legacy_channel_to_id["account.login_succeeded"] = EventChannelDefinition.AUTH_LOGIN_SUCCEEDED
 
 	var channel_registry: Array = GameConfig.get_array("infrastructure.event_bus_config", "channel_registry", [])
-	for item in channel_registry:
-		if not (item is Dictionary):
+	for raw_entry in channel_registry:
+		if not (raw_entry is Dictionary):
 			continue
-		var entry: Dictionary = item as Dictionary
+		var entry: Dictionary = raw_entry as Dictionary
 		var channel_id: int = int(entry.get("id", 0))
 		var channel_name: String = str(entry.get("name", ""))
 		var legacy: String = str(entry.get("legacy", ""))
@@ -97,11 +97,11 @@ func _ensure_channel_registry_loaded() -> void:
 	_channel_cache_version = current_version
 
 ## 将信道名称、别名或整型常量解析为标准整型信道常量
-func resolve_channel_id(channel_spec: Variant) -> int:
-	if channel_spec is int:
-		return int(channel_spec)
-	if channel_spec is String:
-		var channel_name: String = channel_spec as String
+func resolve_channel_id(channel_descriptor: Variant) -> int:
+	if channel_descriptor is int:
+		return int(channel_descriptor)
+	if channel_descriptor is String:
+		var channel_name: String = channel_descriptor as String
 		_ensure_channel_registry_loaded()
 		if _legacy_channel_to_id.has(channel_name):
 			return int(_legacy_channel_to_id[channel_name])
@@ -121,8 +121,8 @@ func initialize_from_config() -> void:
 	var pool_capacity: int = GameConfig.get_int("infrastructure.event_bus_config", "pool/capacity", 4096)
 	_pool = EventPool.new(maxi(1, pool_capacity))
 	_max_depth = maxi(1, GameConfig.get_int("infrastructure.event_bus_config", "circuit_breaker/max_dispatch_depth", 16))
-	_enable_profiling = GameConfig.get_bool("infrastructure.event_bus_config", "metrics/enable_profiling_hooks", true)
-	_high_freq_threshold = maxi(100, GameConfig.get_int("infrastructure.event_bus_config", "metrics/high_frequency_warning_threshold_ops", 10000))
+	_is_profiling_enabled = GameConfig.get_bool("infrastructure.event_bus_config", "metrics/enable_profiling_hooks", true)
+	_high_frequency_threshold = maxi(100, GameConfig.get_int("infrastructure.event_bus_config", "metrics/high_frequency_warning_threshold_ops", 10000))
 	_ensure_channel_registry_loaded()
 
 ## 测试隔离：清空路由与状态
@@ -183,17 +183,17 @@ func on(channel_id: int, callback: Callable) -> EventBusSubscriptionToken:
 
 ## 空间兴趣区订阅：AoI 内监听者会收到该范围内全部空间事件（不按 channel/mask 过滤，
 ## 业务回调内按需自行过滤——契约见 Inv-EB2-2 精确裁剪语义）
-func on_spatial(pos: Vector3, radius: float, callback: Callable) -> EventBusSubscriptionToken:
+func on_spatial(listener_position: Vector3, radius: float, callback: Callable) -> EventBusSubscriptionToken:
 	_sequence_counter += 1
 	var token_id: int = _sequence_counter
-	_spatial_grid.register_listener(token_id, pos, radius, callback)
+	_spatial_grid.register_listener(token_id, listener_position, radius, callback)
 	return EventBusSubscriptionToken.new(self, 0, 0, callback, true, token_id)
 
 ## 订阅二维空间局部范围事件通知
-func on_spatial_2d(pos_2d: Vector2, radius: float, callback: Callable, is_isometric_xz: bool = false) -> EventBusSubscriptionToken:
+func on_spatial_2d(position_2d: Vector2, radius: float, callback: Callable, is_isometric_xz: bool = false) -> EventBusSubscriptionToken:
 	_sequence_counter += 1
 	var token_id: int = _sequence_counter
-	_spatial_grid.register_listener_2d(token_id, pos_2d, radius, callback, is_isometric_xz)
+	_spatial_grid.register_listener_2d(token_id, position_2d, radius, callback, is_isometric_xz)
 	return EventBusSubscriptionToken.new(self, 0, 0, callback, true, token_id)
 
 func _unregister_token(token: EventBusSubscriptionToken) -> void:
@@ -223,13 +223,13 @@ func _prepare_dispatch_scratch(depth: int) -> void:
 func _collect_channel_subscribers(channel_id: int, packet: EventPacket, seen: Dictionary, targets: Array) -> void:
 	if not _channel_routes.has(channel_id):
 		return
-	var subs: Array = _channel_routes[channel_id]
-	for item in subs:
-		var token: EventBusSubscriptionToken = item as EventBusSubscriptionToken
+	var subscribers: Array = _channel_routes[channel_id]
+	for subscriber_entry in subscribers:
+		var token: EventBusSubscriptionToken = subscriber_entry as EventBusSubscriptionToken
 		if token == null or not token.is_active:
 			continue
-		var mask_match: bool = ((token.category_mask & packet.category_mask) != 0) or token.category_mask == 0
-		if mask_match and not seen.has(token):
+		var is_mask_matched: bool = ((token.category_mask & packet.category_mask) != 0) or token.category_mask == 0
+		if is_mask_matched and not seen.has(token):
 			seen[token] = true
 			targets.append(token)
 
@@ -245,10 +245,10 @@ func dispatch_now(packet: EventPacket) -> void:
 	if _dispatch_depth > _peak_dispatch_depth:
 		_peak_dispatch_depth = _dispatch_depth
 	_dispatched_count += 1
-	_current_window_ops += 1
-	if _enable_profiling and _current_window_ops >= _high_freq_threshold and not _is_warning_high_freq:
-		_is_warning_high_freq = true
-		ErrorReporter.emit("event_bus2_high_frequency_warning", {"ops": _current_window_ops, "threshold": _high_freq_threshold})
+	_current_window_operations += 1
+	if _is_profiling_enabled and _current_window_operations >= _high_frequency_threshold and not _is_warning_high_frequency:
+		_is_warning_high_frequency = true
+		ErrorReporter.emit("event_bus2_high_frequency_warning", {"ops": _current_window_operations, "threshold": _high_frequency_threshold})
 
 	_prepare_dispatch_scratch(depth)
 	var targets: Array = _target_scratch[depth]
@@ -298,13 +298,13 @@ func enqueue_frame(packet: EventPacket) -> bool:
 	_sequence_counter += 1
 	packet.event_id = _sequence_counter
 	_enqueued_count += 1
-	var enqueued: bool = _ring_buffer.enqueue(packet)
-	if not enqueued:
+	var is_enqueued: bool = _ring_buffer.enqueue(packet)
+	if not is_enqueued:
 		_dropped_count += 1
 		# 溢出安全回退：入队失败的包由总线统一回收（否则调用方遗漏 recycle 时包永久滞留池外）
 		ErrorReporter.emit("event_bus2_frame_queue_overflow", {"channel_id": packet.channel_id, "dropped_total": _dropped_count})
 		recycle_packet(packet)
-	return enqueued
+	return is_enqueued
 
 ## 刷新并分发当前帧所有缓冲队列事件包
 func flush_frame_events() -> int:
@@ -375,35 +375,35 @@ static func get_category_name(category_key: String) -> String:
 	return category_key.to_upper()
 
 ## 按模板键渲染叙事文案：键形如 "<领域>/<名称>"，查表 "narratives.<领域>"
-static func render_narrative(template_key: String, args: Variant = []) -> String:
+static func render_narrative(template_key: String, format_arguments: Variant = []) -> String:
 	var parts := template_key.split("/")
 	if parts.is_empty():
 		return template_key
 	var table_name := "narratives." + parts[0]
 	var path := "/".join(parts.slice(1))
 	var template := GameConfig.get_string(table_name, path, template_key)
-	return _format_template_safely(template, args)
+	return _format_template_safely(template, format_arguments)
 
 ## 辅助函数：安全格式化文案模板，优先匹配 {param} 命名占位符并注入参数
-static func _format_template_safely(template: String, raw_args: Variant) -> String:
+static func _format_template_safely(template: String, raw_arguments: Variant) -> String:
 	if template.is_empty():
 		return ""
-	if raw_args == null:
+	if raw_arguments == null:
 		return template
-	if raw_args is Dictionary:
-		return TemplateFormatter.format(template, raw_args as Dictionary)
-	if raw_args is Array:
-		var args_array := raw_args as Array
-		if args_array.is_empty():
+	if raw_arguments is Dictionary:
+		return TemplateFormatter.format(template, raw_arguments as Dictionary)
+	if raw_arguments is Array:
+		var arguments_array := raw_arguments as Array
+		if arguments_array.is_empty():
 			return template
-		var param_keys := TemplateFormatter.extract_param_keys(template)
-		if not param_keys.is_empty():
-			var dict_params: Dictionary = {}
-			for arg_index in range(mini(param_keys.size(), args_array.size())):
-				dict_params[param_keys[arg_index]] = args_array[arg_index]
-			return TemplateFormatter.format(template, dict_params)
+		var placeholder_keys := TemplateFormatter.extract_param_keys(template)
+		if not placeholder_keys.is_empty():
+			var parameter_map: Dictionary = {}
+			for argument_index in range(mini(placeholder_keys.size(), arguments_array.size())):
+				parameter_map[placeholder_keys[argument_index]] = arguments_array[argument_index]
+			return TemplateFormatter.format(template, parameter_map)
 		if "%" in template:
-			return template % args_array
+			return template % arguments_array
 		return template
 	return template
 
@@ -439,28 +439,28 @@ static func render_domain_event_text(channel: String, payload: Dictionary = {}) 
 			return String(payload.get("text", ""))
 		var template := GameConfig.get_string(resolve_narrative_table(domain), full_event_name, "")
 		if not template.is_empty():
-			var args: Variant = payload.get("args", [])
-			return _format_template_safely(template, args)
+			var narrative_arguments: Variant = payload.get("args", [])
+			return _format_template_safely(template, narrative_arguments)
 	return String(payload.get("text", ""))
 
 ## 广播结构化叙事事件：文案走 NARRATIVE_TEXT 掩码派发（旧总线叙事信号替代）
-func emit_narrative(text: String, category_key: String = "combat", meta: Dictionary = {}) -> void:
+func emit_narrative(text: String, category_key: String = "combat", metadata: Dictionary = {}) -> void:
 	var category := get_category_name(category_key)
-	var packet := borrow_packet(EventChannelDefinition.NARRATIVE_EVENT_TEXT, EventCategoryMask.NARRATIVE_TEXT, meta)
-	packet.payload_data = {"timestamp": Time.get_ticks_msec(), "category": category, "text": text, "meta": meta}
+	var packet := borrow_packet(EventChannelDefinition.NARRATIVE_EVENT_TEXT, EventCategoryMask.NARRATIVE_TEXT, metadata)
+	packet.payload_data = {"timestamp": Time.get_ticks_msec(), "category": category, "text": text, "meta": metadata}
 	packet.narrative_key = text
 	dispatch_now(packet)
 	recycle_packet(packet)
 
 ## 一站式推荐入口：按模板键渲染文案并广播
-func emit_narrative_by_key(template_key: String, category_key: String, args: Variant = [], meta: Dictionary = {}) -> void:
-	emit_narrative(render_narrative(template_key, args), category_key, meta)
+func emit_narrative_by_key(template_key: String, category_key: String, format_arguments: Variant = [], metadata: Dictionary = {}) -> void:
+	emit_narrative(render_narrative(template_key, format_arguments), category_key, metadata)
 
 ## 广播泛化领域事件：配置驱动信道对齐；结构化 payload 经对应信道派发；
 ## 能解析出文案时追加叙事派发（与旧总线两步语义一致）
 func emit_domain_event(channel: String, payload: Dictionary = {}) -> void:
-	var channel_def: int = resolve_channel_id(channel)
-	var packet := borrow_packet(channel_def, EventCategoryMask.NARRATIVE_TEXT, payload)
+	var resolved_channel_id: int = resolve_channel_id(channel)
+	var packet := borrow_packet(resolved_channel_id, EventCategoryMask.NARRATIVE_TEXT, payload)
 	var packet_payload: Dictionary
 	if payload.has("channel") and payload.has("payload"):
 		packet_payload = payload
@@ -514,7 +514,7 @@ func emit_log_record(record: LogRecordDTO) -> void:
 	_dispatch_console_log(record)
 
 static var _console_config_version: int = -1
-static var _console_enabled_cached: bool = true
+static var _is_console_enabled_cached: bool = true
 static var _console_min_rank_cached: int = 2
 
 static func _ensure_console_log_cache() -> void:
@@ -523,7 +523,7 @@ static func _ensure_console_log_cache() -> void:
 	if _console_config_version == config_version:
 		return
 	var console_config: Dictionary = GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_CONSOLE, {})
-	_console_enabled_cached = bool(console_config.get("enabled", true))
+	_is_console_enabled_cached = bool(console_config.get("enabled", true))
 	var min_level: String = str(console_config.get("min_level", LogConstants.LEVEL_LOWER_WARN)).to_lower()
 	_console_min_rank_cached = LogConstants.level_rank(min_level)
 	_console_config_version = config_version
@@ -535,7 +535,7 @@ func _dispatch_console_log(record: LogRecordDTO) -> void:
 	if bool(record.context.get(LogConstants.KEY_MUTE_CONSOLE, false)):
 		return
 	_ensure_console_log_cache()
-	if not _console_enabled_cached:
+	if not _is_console_enabled_cached:
 		return
 	if LogConstants.level_rank(record.level) < _console_min_rank_cached:
 		return
@@ -555,9 +555,9 @@ func emit_log(level_key: String, message: String, channel: String = LogConstants
 	emit_log_record(record)
 
 ## 时钟推进广播（旧 world_clock_advanced 信号替代，CORE_STATE 强一致内联）
-func emit_world_clock_advanced(clock_type: String, current_tick: int, timestamp_str: String) -> void:
+func emit_world_clock_advanced(clock_type: String, current_tick: int, timestamp_text: String) -> void:
 	var packet := borrow_packet(EventChannelDefinition.WORLD_CLOCK_ADVANCED, EventCategoryMask.CORE_STATE)
-	packet.payload_data = {"clock_type": clock_type, "current_tick": current_tick, "timestamp": timestamp_str}
+	packet.payload_data = {"clock_type": clock_type, "current_tick": current_tick, "timestamp": timestamp_text}
 	packet.source_entity_id = "world_clock"
 	dispatch_now(packet)
 	recycle_packet(packet)
@@ -587,7 +587,7 @@ func get_metrics_snapshot() -> Dictionary:
 		"enqueued_count": _enqueued_count,
 		"dropped_count": _dropped_count,
 		"peak_dispatch_depth": _peak_dispatch_depth,
-		"current_window_ops": _current_window_ops,
+		"current_window_ops": _current_window_operations,
 		"pool_borrowed": _pool.get_borrowed_count() if _pool != null else 0,
 		"pool_free": _pool.get_free_count() if _pool != null else 0,
 		"pool_peak": _pool.get_peak_borrowed_count() if _pool != null else 0,
@@ -601,7 +601,7 @@ func reset_metrics() -> void:
 	_enqueued_count = 0
 	_dropped_count = 0
 	_peak_dispatch_depth = 0
-	_current_window_ops = 0
-	_is_warning_high_freq = false
+	_current_window_operations = 0
+	_is_warning_high_frequency = false
 	if _pool != null:
 		_pool.reset_metrics()

@@ -80,8 +80,8 @@ func register_listener(token_id: int, center: Vector3, radius: float, callback: 
 
 ## 在空间哈希网格中注册二维局部侦听器
 func register_listener_2d(token_id: int, center_2d: Vector2, radius: float, callback: Callable, is_isometric_xz: bool = false) -> void:
-	var pos_3d: Vector3 = Vector3(center_2d.x, 0.0, center_2d.y) if is_isometric_xz else Vector3(center_2d.x, center_2d.y, 0.0)
-	register_listener(token_id, pos_3d, radius, callback)
+	var position_3d: Vector3 = Vector3(center_2d.x, 0.0, center_2d.y) if is_isometric_xz else Vector3(center_2d.x, center_2d.y, 0.0)
+	register_listener(token_id, position_3d, radius, callback)
 
 ## 更新侦听器在空间网格中的空间坐标位置
 func update_listener_position(token_id: int, new_center: Vector3, radius: float, callback: Callable) -> void:
@@ -166,25 +166,25 @@ func _invoke_spatial_targets(targets: Array, packet: EventPacket) -> int:
 	return dispatched
 
 ## 空间事件派发：单元格粗裁剪 → 欧氏距离平方精确过滤（Inv-EB2-2）→ token_id 去重与死亡自愈
-func dispatch_spatial(pos: Vector3, radius: float, packet: EventPacket) -> int:
+func dispatch_spatial(spatial_position: Vector3, radius: float, packet: EventPacket) -> int:
 	# 半径钳制：防御性上限，防止异常半径触发 (2r/cell+1)^3 立方遍历冻结总线
 	var clamped_radius: float = minf(maxf(0.0, radius), _max_dispatch_radius)
-	var min_cell: Vector3i = _compute_cell_bound(pos, -clamped_radius)
-	var max_cell: Vector3i = _compute_cell_bound(pos, clamped_radius)
+	var min_cell: Vector3i = _compute_cell_bound(spatial_position, -clamped_radius)
+	var max_cell: Vector3i = _compute_cell_bound(spatial_position, clamped_radius)
 
 	var previous_reentrancy: int = _spatial_reentrancy
 	_spatial_reentrancy += 1
 	# 仅最外层派发复用成员暂存区；回调内部重入派发回退至独立局部容器，防止覆盖外层迭代状态
-	var use_scratch: bool = (_spatial_reentrancy == 1)
-	var called_tokens: Dictionary = _called_scratch if use_scratch else {}
-	var targets: Array = _targets_scratch if use_scratch else []
-	var dead_tokens: Array = _dead_tokens_scratch if use_scratch else []
+	var should_use_scratch: bool = (_spatial_reentrancy == 1)
+	var called_tokens: Dictionary = _called_scratch if should_use_scratch else {}
+	var targets: Array = _targets_scratch if should_use_scratch else []
+	var dead_tokens: Array = _dead_tokens_scratch if should_use_scratch else []
 	called_tokens.clear()
 	targets.clear()
 	dead_tokens.clear()
 
-	var query_context: Dictionary = _dispatch_query_scratch if use_scratch else {}
-	query_context["pos"] = pos
+	var query_context: Dictionary = _dispatch_query_scratch if should_use_scratch else {}
+	query_context["pos"] = spatial_position
 	query_context["radius"] = clamped_radius
 	query_context["called"] = called_tokens
 	query_context["targets"] = targets
@@ -201,7 +201,7 @@ func dispatch_spatial(pos: Vector3, radius: float, packet: EventPacket) -> int:
 		for dead_id in dead_tokens:
 			unregister_listener(dead_id)
 
-	if use_scratch:
+	if should_use_scratch:
 		called_tokens.clear()
 		targets.clear()
 		dead_tokens.clear()

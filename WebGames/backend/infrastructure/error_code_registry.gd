@@ -41,10 +41,10 @@ static func _ensure_loaded() -> void:
 		return
 	_registry.clear()
 	var catalog: Dictionary = GameConfig.get_dict(LogConstants.CFG_ERRORS_CATALOG, "errors", {})
-	for code_str in catalog.keys():
-		var raw_entry: Variant = catalog[code_str]
+	for code_text in catalog.keys():
+		var raw_entry: Variant = catalog[code_text]
 		if raw_entry is Dictionary:
-			var entry := _create_entry(String(code_str), raw_entry)
+			var entry := _create_entry(String(code_text), raw_entry)
 			_registry[entry.code] = entry
 	_config_version = GameConfig.config_reload_version()
 
@@ -89,9 +89,9 @@ static func missing_codes(used_codes: Array) -> Array:
 	_ensure_loaded()
 	var missing: Array = []
 	for raw_code in used_codes:
-		var code_str := String(raw_code)
-		if not _registry.has(code_str):
-			missing.append(code_str)
+		var code_text := String(raw_code)
+		if not _registry.has(code_text):
+			missing.append(code_text)
 	return missing
 
 ## 测试隔离与状态复位

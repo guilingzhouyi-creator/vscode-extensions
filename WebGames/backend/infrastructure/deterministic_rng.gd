@@ -29,9 +29,9 @@ func _init(seed_value: int = 1) -> void:
 
 ## 以显式种子构造独立实例（同种子必然产生同序列）
 static func from_seed(seed_value: int) -> DeterministicRNG:
-	var rng := DeterministicRNG.new()
-	rng.set_seed(seed_value)
-	return rng
+	var generator := DeterministicRNG.new()
+	generator.set_seed(seed_value)
+	return generator
 
 ## 共享实例：业务代码默认入口，可通过 reseed_global 实现整局复现
 static func global() -> DeterministicRNG:
@@ -123,8 +123,8 @@ func pick_weighted(pool: Array, weight_key: String = "weight") -> Variant:
 	var total_weight := 0.0
 	var last_positive: Variant = null
 	for entry in pool:
-		var entry_dict: Dictionary = entry
-		var entry_weight := float(entry_dict.get(weight_key, 1.0))
+		var entry_map: Dictionary = entry
+		var entry_weight := float(entry_map.get(weight_key, 1.0))
 		if entry_weight > 0.0:
 			total_weight += entry_weight
 			last_positive = entry
@@ -133,8 +133,8 @@ func pick_weighted(pool: Array, weight_key: String = "weight") -> Variant:
 	var roll := self.randf() * total_weight
 	var accumulated_weight := 0.0
 	for entry in pool:
-		var entry_dict: Dictionary = entry
-		var entry_weight := float(entry_dict.get(weight_key, 1.0))
+		var entry_map: Dictionary = entry
+		var entry_weight := float(entry_map.get(weight_key, 1.0))
 		if entry_weight <= 0.0:
 			continue
 		accumulated_weight += entry_weight

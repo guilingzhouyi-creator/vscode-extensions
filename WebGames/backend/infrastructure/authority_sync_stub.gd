@@ -42,15 +42,15 @@ func verify_authority(payload: Dictionary) -> Dictionary:
 func diff_snapshot(old_state: Dictionary, new_state: Dictionary) -> Dictionary:
 	if old_state.is_empty() or new_state.is_empty():
 		return {"success": false, "error_code": "EMPTY_SNAPSHOT"}
-	var diff: Dictionary = {}
+	var snapshot_differences: Dictionary = {}
 	for state_key in new_state:
 		if old_state.get(state_key) != new_state.get(state_key):
-			diff[state_key] = new_state[state_key]
-	return {"success": true, "diff": diff, "has_diff": not diff.is_empty()}
+			snapshot_differences[state_key] = new_state[state_key]
+	return {"success": true, "diff": snapshot_differences, "has_diff": not snapshot_differences.is_empty()}
 
 ## 配置驱动：同步模式经 infrastructure.admin 预留（统一读取 sync/mode 配置路径）
 static func current_sync_mode() -> SyncMode:
-	var mode_str: String = GameConfig.get_string("infrastructure.admin", "sync/mode", "offline_text")
-	if mode_str == "online_authority" or mode_str == "online":
+	var mode_text: String = GameConfig.get_string("infrastructure.admin", "sync/mode", "offline_text")
+	if mode_text == "online_authority" or mode_text == "online":
 		return SyncMode.ONLINE_AUTHORITY
 	return SyncMode.OFFLINE_TEXT
