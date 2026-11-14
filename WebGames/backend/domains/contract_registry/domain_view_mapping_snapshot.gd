@@ -29,28 +29,28 @@ enum CoverageStatus {
 
 ## 序列化快照为字典（覆盖状态枚举转字符串 + 三数组副本）
 func to_dto() -> Dictionary:
-	var status_str := "MISSING"
+	var status_label := "MISSING"
 	match coverage_status:
-		CoverageStatus.FULL: status_str = "FULL"
-		CoverageStatus.PARTIAL: status_str = "PARTIAL"
-		CoverageStatus.MISSING: status_str = "MISSING"
-		CoverageStatus.INFRA: status_str = "INFRA"
+		CoverageStatus.FULL: status_label = "FULL"
+		CoverageStatus.PARTIAL: status_label = "PARTIAL"
+		CoverageStatus.MISSING: status_label = "MISSING"
+		CoverageStatus.INFRA: status_label = "INFRA"
 
 	var views_copy: Array[String] = []
-	for v in frontend_view_names:
-		views_copy.append(v)
+	for view_name in frontend_view_names:
+		views_copy.append(view_name)
 
 	var tabs_copy: Array[String] = []
-	for t in frontend_tab_names:
-		tabs_copy.append(t)
+	for tab_name in frontend_tab_names:
+		tabs_copy.append(tab_name)
 
 	var ids_copy: Array[String] = []
-	for cid in contract_ids:
-		ids_copy.append(cid)
+	for contract_id in contract_ids:
+		ids_copy.append(contract_id)
 
 	return {
 		"domain_name": domain_name,
-		"coverage_status": status_str,
+		"coverage_status": status_label,
 		"backend_file_count": backend_file_count,
 		"backend_static_method_count": backend_static_method_count,
 		"frontend_view_names": views_copy,
@@ -62,51 +62,51 @@ func to_dto() -> Dictionary:
 ## 从字典重建快照（覆盖状态单形态 String 契约，数组逐元素转型）
 ## 单形态契约：int 形态已退役——生产端恒产 String；非 String 一律 DtoShapeViolation 审计拒绝
 static func from_dto(dict: Dictionary) -> Resource:
-	var snap := new()
+	var snapshot := new()
 	if dict == null or dict.is_empty():
-		return snap
+		return snapshot
 
-	snap.domain_name = String(dict.get("domain_name", ""))
-	var st: Variant = dict.get("coverage_status", "MISSING")
-	if st is String:
-		match String(st).to_upper():
-			"FULL": snap.coverage_status = CoverageStatus.FULL
-			"PARTIAL": snap.coverage_status = CoverageStatus.PARTIAL
-			"MISSING": snap.coverage_status = CoverageStatus.MISSING
-			"INFRA": snap.coverage_status = CoverageStatus.INFRA
-			_: snap.coverage_status = CoverageStatus.MISSING
+	snapshot.domain_name = String(dict.get("domain_name", ""))
+	var raw_status: Variant = dict.get("coverage_status", "MISSING")
+	if raw_status is String:
+		match String(raw_status).to_upper():
+			"FULL": snapshot.coverage_status = CoverageStatus.FULL
+			"PARTIAL": snapshot.coverage_status = CoverageStatus.PARTIAL
+			"MISSING": snapshot.coverage_status = CoverageStatus.MISSING
+			"INFRA": snapshot.coverage_status = CoverageStatus.INFRA
+			_: snapshot.coverage_status = CoverageStatus.MISSING
 	else:
-		EventBusCore.get_instance().emit_log("warn", TemplateFormatter.format("DtoShapeViolation: coverage_status is not String ({type}), rejected as MISSING", {"type": str(st)}))
-		snap.coverage_status = CoverageStatus.MISSING
+		EventBusCore.get_instance().emit_log("warn", TemplateFormatter.format("DtoShapeViolation: coverage_status is not String ({type}), rejected as MISSING", {"type": str(raw_status)}))
+		snapshot.coverage_status = CoverageStatus.MISSING
 
-	snap.backend_file_count = int(dict.get("backend_file_count", 0))
-	snap.backend_static_method_count = int(dict.get("backend_static_method_count", 0))
+	snapshot.backend_file_count = int(dict.get("backend_file_count", 0))
+	snapshot.backend_static_method_count = int(dict.get("backend_static_method_count", 0))
 
-	var raw_v: Variant = dict.get("frontend_view_names", [])
-	if raw_v is Array:
-		var arr_v: Array[String] = []
-		for item in raw_v:
-			arr_v.append(String(item))
-		snap.frontend_view_names = arr_v
+	var raw_views: Variant = dict.get("frontend_view_names", [])
+	if raw_views is Array:
+		var parsed_views: Array[String] = []
+		for item in raw_views:
+			parsed_views.append(String(item))
+		snapshot.frontend_view_names = parsed_views
 	else:
-		snap.frontend_view_names = []
+		snapshot.frontend_view_names = []
 
-	var raw_t: Variant = dict.get("frontend_tab_names", [])
-	if raw_t is Array:
-		var arr_t: Array[String] = []
-		for item in raw_t:
-			arr_t.append(String(item))
-		snap.frontend_tab_names = arr_t
+	var raw_tabs: Variant = dict.get("frontend_tab_names", [])
+	if raw_tabs is Array:
+		var parsed_tabs: Array[String] = []
+		for item in raw_tabs:
+			parsed_tabs.append(String(item))
+		snapshot.frontend_tab_names = parsed_tabs
 	else:
-		snap.frontend_tab_names = []
+		snapshot.frontend_tab_names = []
 
-	var raw_c: Variant = dict.get("contract_ids", [])
-	if raw_c is Array:
-		var arr_c: Array[String] = []
-		for item in raw_c:
-			arr_c.append(String(item))
-		snap.contract_ids = arr_c
+	var raw_contracts: Variant = dict.get("contract_ids", [])
+	if raw_contracts is Array:
+		var parsed_contracts: Array[String] = []
+		for item in raw_contracts:
+			parsed_contracts.append(String(item))
+		snapshot.contract_ids = parsed_contracts
 	else:
-		snap.contract_ids = []
+		snapshot.contract_ids = []
 
-	return snap
+	return snapshot
