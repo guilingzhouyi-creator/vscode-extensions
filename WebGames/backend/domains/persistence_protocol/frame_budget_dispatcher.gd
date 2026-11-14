@@ -38,10 +38,10 @@ func enqueue_submission(action: Callable, priority: int = 1) -> void:
 		"enqueued_at": Time.get_ticks_usec()
 	}
 	# 按优先级升序（数值小优先）插入
-	var idx := 0
-	while idx < _submission_queue.size() and _submission_queue[idx]["priority"] <= priority:
-		idx += 1
-	_submission_queue.insert(idx, item)
+	var insert_index := 0
+	while insert_index < _submission_queue.size() and _submission_queue[insert_index]["priority"] <= priority:
+		insert_index += 1
+	_submission_queue.insert(insert_index, item)
 
 ## 获取当前待执行任务总数
 func get_pending_count() -> int:
@@ -50,46 +50,46 @@ func get_pending_count() -> int:
 	return _submission_queue.size()
 
 var _clear_epoch: int = 0
-static var _budget_cfg_cached: float = 2.0
-static var _budget_cfg_ver: int = -1
+static var _budget_config_cached: float = 2.0
+static var _budget_config_version: int = -1
 
 ## 单帧预算切片执行
 func pump_slice(budget_override_ms: float = -1.0) -> Dictionary:
 	var max_budget: float = budget_override_ms
 	if max_budget <= 0.0:
-		var ver: int = GameConfig.config_reload_version()
-		if _budget_cfg_ver != ver:
-			_budget_cfg_cached = GameConfig.get_float("infrastructure.storage", "auxiliary/frame_budget/max_ms_per_frame", 2.0)
-			_budget_cfg_ver = ver
-		max_budget = _budget_cfg_cached
+		var config_version: int = GameConfig.config_reload_version()
+		if _budget_config_version != config_version:
+			_budget_config_cached = GameConfig.get_float("infrastructure.storage", "auxiliary/frame_budget/max_ms_per_frame", 2.0)
+			_budget_config_version = config_version
+		max_budget = _budget_config_cached
 	
 	var budget_usec := int(max_budget * MS_TO_USEC)
 	var start_ticks := Time.get_ticks_usec()
 	var executed := 0
 	var budget_exhausted := false
 	var start_epoch: int = _clear_epoch
-	var exec_idx: int = 0
+	var execution_index: int = 0
 	var initial_count: int = _submission_queue.size()
 
-	while exec_idx < initial_count and exec_idx < _submission_queue.size() and _clear_epoch == start_epoch:
+	while execution_index < initial_count and execution_index < _submission_queue.size() and _clear_epoch == start_epoch:
 		var now := Time.get_ticks_usec()
 		var elapsed := now - start_ticks
 		if elapsed >= budget_usec:
 			budget_exhausted = true
 			break
 
-		var item: Dictionary = _submission_queue[exec_idx]
-		exec_idx += 1
+		var item: Dictionary = _submission_queue[execution_index]
+		execution_index += 1
 		var action: Callable = item["action"]
 		if action.is_valid():
 			action.call()
 			executed += 1
 
-	if _clear_epoch == start_epoch and exec_idx > 0:
-		if exec_idx >= _submission_queue.size():
+	if _clear_epoch == start_epoch and execution_index > 0:
+		if execution_index >= _submission_queue.size():
 			_submission_queue.clear()
 		else:
-			_submission_queue = _submission_queue.slice(exec_idx)
+			_submission_queue = _submission_queue.slice(execution_index)
 
 	var total_elapsed_ms := float(Time.get_ticks_usec() - start_ticks) / USEC_TO_MS
 

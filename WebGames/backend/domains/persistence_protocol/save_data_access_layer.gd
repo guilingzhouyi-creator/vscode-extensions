@@ -31,22 +31,22 @@ static func _ensure_contracts_fresh() -> void:
 	# 保留旧契约中已注册的 provider 与 consumer
 	var old_providers: Dictionary = {}
 	var old_consumers: Dictionary = {}
-	for d_id in _domain_contracts.keys():
-		var old_c: Variant = _domain_contracts[d_id]
-		if old_c != null and old_c.is_provider_registered():
-			old_providers[d_id] = old_c.get_provider_aggregate()
-		if old_c != null and old_c.is_consumer_registered():
-			old_consumers[d_id] = old_c.get_consumer_callable()
+	for domain_id in _domain_contracts.keys():
+		var old_contract: Variant = _domain_contracts[domain_id]
+		if old_contract != null and old_contract.is_provider_registered():
+			old_providers[domain_id] = old_contract.get_provider_aggregate()
+		if old_contract != null and old_contract.is_consumer_registered():
+			old_consumers[domain_id] = old_contract.get_consumer_callable()
 
 	_domain_contracts.clear()
 	var all_entries: Array = GameConfig.get_array("infrastructure.domains", "domains", [])
-	var empty_cfg: Dictionary = {}
+	var empty_config: Dictionary = {}
 	for entry in all_entries:
 		var id := String(entry.get("id", ""))
-		var save_cfg: Dictionary = entry.get("save", empty_cfg)
-		if not bool(save_cfg.get("enabled", false)):
+		var save_config: Dictionary = entry.get("save", empty_config)
+		if not bool(save_config.get("enabled", false)):
 			continue
-		var contract: Variant = SaveDomainContract.from_config(id, save_cfg)
+		var contract: Variant = SaveDomainContract.from_config(id, save_config)
 		if old_providers.has(id):
 			contract.register_provider(old_providers[id])
 		if old_consumers.has(id):
@@ -59,7 +59,7 @@ static func register_provider(domain_id: String, instance: Variant) -> void:
 	if _domain_contracts.has(domain_id):
 		(_domain_contracts[domain_id] as Variant).register_provider(instance)
 	else:
-		# 动态临时契约（未在 domains.json 显式声明 save 时兜底）
+		# 动态临时契约（未在 domains.json 显式声明 save 时安全回退）
 		var contract := SaveDomainContract.new()
 		contract.domain_id = domain_id
 		contract.enabled = true
@@ -97,8 +97,8 @@ static func get_contract(domain_id: String) -> Variant:
 static func get_registered_domains() -> Array[String]:
 	_ensure_contracts_fresh()
 	var list: Array[String] = []
-	for k in _domain_contracts.keys():
-		list.append(String(k))
+	for domain_id in _domain_contracts.keys():
+		list.append(String(domain_id))
 	return list
 
 ## 标记高频域为脏数据（Inv-SV-10）
@@ -120,8 +120,8 @@ static func clear_dirty(domain_id: String = "") -> void:
 ## 获取当前所有脏域清单
 static func get_dirty_domains() -> Array[String]:
 	var list: Array[String] = []
-	for k in _dirty_domains.keys():
-		list.append(String(k))
+	for domain_id in _dirty_domains.keys():
+		list.append(String(domain_id))
 	return list
 
 ## 统一写入装配入口：按域契约调度 serialize，装配进统一 payload（Inv-SV-6）
@@ -129,31 +129,31 @@ static func build_save_payload(domain_ids: Array = []) -> Dictionary:
 	_ensure_contracts_fresh()
 	var providers: Dictionary = {}
 	var targets: Array = domain_ids if not domain_ids.is_empty() else _domain_contracts.keys()
-	for d_id in targets:
-		var contract: Variant = _domain_contracts.get(d_id, null)
+	for domain_id in targets:
+		var contract: Variant = _domain_contracts.get(domain_id, null)
 		if contract == null or not contract.is_provider_registered():
 			continue
-		var agg: Variant = contract.get_provider_aggregate()
-		if agg == null:
+		var provider_aggregate: Variant = contract.get_provider_aggregate()
+		if provider_aggregate == null:
 			continue
-		providers[d_id] = agg
+		providers[domain_id] = provider_aggregate
 	return GameSaveAssembler.build_save_payload(providers)
 
-## 统一反序列化分发入口：反向流回灌数据（Inv-SV-6）
+## 统一反序列化分发入口：反向流回写数据（Inv-SV-6）
 static func apply_save_data(data: Dictionary, consumer_domain_ids: Array = []) -> Dictionary:
 	_ensure_contracts_fresh()
 	var consumers: Dictionary = {}
 	var targets: Array = consumer_domain_ids if not consumer_domain_ids.is_empty() else data.keys()
-	for d_id in targets:
-		var contract: Variant = _domain_contracts.get(d_id, null)
+	for domain_id in targets:
+		var contract: Variant = _domain_contracts.get(domain_id, null)
 		if contract == null or not contract.is_consumer_registered():
 			continue
-		consumers[d_id] = contract.get_consumer_callable()
+		consumers[domain_id] = contract.get_consumer_callable()
 	return GameSaveAssembler.apply_save_data(data, consumers)
 
 ## 统一存档写盘门面：四层隔离判定 + 空壳档阻断 + 原子写
 static func save_game(slot_name: String, payload: Dictionary = {}) -> Dictionary:
-	# 0. 模拟环境阻断守卫（支持测试桩拦截）
+	# 0. 模拟环境阻断守卫（支持测试模拟服务拦截）
 	if _mock_busy_for_test:
 		return { "success": false, "error_code": "ERR_SAVE_GUARD_BLOCKED", "save_status": "BLOCKED" }
 
@@ -178,10 +178,10 @@ static func save_game(slot_name: String, payload: Dictionary = {}) -> Dictionary
 		return { "success": false, "error_code": "EMPTY_SAVE_BLOCKED" }
 
 	# 4. 委托底层 SaveManager 实施 SHA-256 签名与 tmp->bak->rename 原子替换
-	var res := SaveManager.save_game(slot_name, target_payload)
-	if bool(res.get("success", false)):
-		res["save_status"] = "SUCCESS"
-	return res
+	var save_result := SaveManager.save_game(slot_name, target_payload)
+	if bool(save_result.get("success", false)):
+		save_result["save_status"] = "SUCCESS"
+	return save_result
 
 ## 统一存档读取门面：四层隔离判定 + 介质读取 + 版本感知
 static func load_game(slot_name: String) -> Dictionary:
@@ -210,8 +210,8 @@ static func flush_dirty(slot_name: String = "quicksave_dirty") -> Dictionary:
 	var existing := SaveManager.load_game(slot_name)
 	if bool(existing.get("success", false)) and existing.get("data", null) is Dictionary:
 		merged_data = (existing["data"] as Dictionary).duplicate(true)
-		for d_id in dirty_data.keys():
-			merged_data[d_id] = dirty_data[d_id]
+		for domain_id in dirty_data.keys():
+			merged_data[domain_id] = dirty_data[domain_id]
 
 	var result := save_game(slot_name, { "data": merged_data })
 	result["written"] = dirty_ids.size()

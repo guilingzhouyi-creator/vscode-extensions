@@ -89,21 +89,21 @@ func _extract_minimal_state(slot_id: String, data: Dictionary, meta: Dictionary)
 	var char_name: String = String(char_data.get("name", slot_id))
 	var world_mode: String = String(data.get("world_mode", DEFAULT_WORLD_MODE))
 
-	var dto := MinimumWorldStateDTO.new(account_id, slot_id, char_name, world_mode)
-	dto.level = int(char_data.get("level", 1))
-	dto.current_hp = float(life_data.get("hp", DEFAULT_MAX_HP))
-	dto.max_hp = float(life_data.get("max_hp", DEFAULT_MAX_HP))
-	dto.play_time_seconds = int(meta.get("play_time_seconds", 0))
-	dto.prologue_completed = bool(data.get("prologue_completed", false))
-	dto.currency_summary = {
+	var world_state := MinimumWorldStateDTO.new(account_id, slot_id, char_name, world_mode)
+	world_state.level = int(char_data.get("level", 1))
+	world_state.current_hp = float(life_data.get("hp", DEFAULT_MAX_HP))
+	world_state.max_hp = float(life_data.get("max_hp", DEFAULT_MAX_HP))
+	world_state.play_time_seconds = int(meta.get("play_time_seconds", 0))
+	world_state.prologue_completed = bool(data.get("prologue_completed", false))
+	world_state.currency_summary = {
 		"gold": int(wallet_data.get("gold", 0)),
 		"crystals": int(wallet_data.get("crystals", 0))
 	}
-	dto.metadata = {
+	world_state.metadata = {
 		"signature_sha256": meta.get("signature_sha256", ""),
 		"created_timestamp": meta.get("created_timestamp", 0)
 	}
-	return dto
+	return world_state
 
 ## 保存主要世界数据（强一致性原子写入）
 func save_primary_data(slot_id: String, payload: Dictionary) -> Dictionary:
@@ -113,40 +113,40 @@ func save_primary_data(slot_id: String, payload: Dictionary) -> Dictionary:
 	if payload.is_empty():
 		return {"success": false, "error_code": ERR_EMPTY_PAYLOAD}
 	var save_envelope: Dictionary = payload if payload.has("data") else {"data": payload}
-	var res: Dictionary = SaveManager.save_game(clean_slot, save_envelope)
-	if not bool(res.get("success", false)):
-		EventBusCore.get_instance().emit_log(LOG_LEVEL_ERROR, TemplateFormatter.format(LOG_SAVE_FAIL, {"slot": clean_slot, "error": res.get("error_code", "UNKNOWN")}))
-	return res
+	var save_result: Dictionary = SaveManager.save_game(clean_slot, save_envelope)
+	if not bool(save_result.get("success", false)):
+		EventBusCore.get_instance().emit_log(LOG_LEVEL_ERROR, TemplateFormatter.format(LOG_SAVE_FAIL, {"slot": clean_slot, "error": save_result.get("error_code", "UNKNOWN")}))
+	return save_result
 
 ## 完整加载主要世界数据
 func load_primary_data(slot_id: String) -> Dictionary:
 	var clean_slot := slot_id.strip_edges()
 	if clean_slot.is_empty():
 		return {"success": false, "error_code": ERR_EMPTY_SLOT_ID, "data": {}}
-	var res: Dictionary = SaveManager.load_game(clean_slot)
-	if not bool(res.get("success", false)):
-		EventBusCore.get_instance().emit_log(LOG_LEVEL_WARN, TemplateFormatter.format(LOG_LOAD_FAIL, {"slot": clean_slot, "error": res.get("error_code", "UNKNOWN")}))
-	return res
+	var load_result: Dictionary = SaveManager.load_game(clean_slot)
+	if not bool(load_result.get("success", false)):
+		EventBusCore.get_instance().emit_log(LOG_LEVEL_WARN, TemplateFormatter.format(LOG_LOAD_FAIL, {"slot": clean_slot, "error": load_result.get("error_code", "UNKNOWN")}))
+	return load_result
 
 ## 从备份恢复存档
 func restore_backup(slot_id: String) -> Dictionary:
 	var clean_slot := slot_id.strip_edges()
 	if clean_slot.is_empty():
 		return {"success": false, "error_code": ERR_EMPTY_SLOT_ID}
-	var res: Dictionary = SaveManager.restore_backup(clean_slot)
-	if bool(res.get("success", false)):
+	var restore_result: Dictionary = SaveManager.restore_backup(clean_slot)
+	if bool(restore_result.get("success", false)):
 		EventBusCore.get_instance().emit_log(LOG_LEVEL_INFO, TemplateFormatter.format(LOG_RESTORE_SUCCESS, {"slot": clean_slot}))
 	else:
-		EventBusCore.get_instance().emit_log(LOG_LEVEL_ERROR, TemplateFormatter.format(LOG_RESTORE_FAIL, {"slot": clean_slot, "error": res.get("error_code", "UNKNOWN")}))
-	return res
+		EventBusCore.get_instance().emit_log(LOG_LEVEL_ERROR, TemplateFormatter.format(LOG_RESTORE_FAIL, {"slot": clean_slot, "error": restore_result.get("error_code", "UNKNOWN")}))
+	return restore_result
 
-## 校验存档完整性与防伪签名
+## 校验存档完整性与防篡改签名
 func verify_integrity(slot_id: String) -> bool:
 	var clean_slot := slot_id.strip_edges()
 	if clean_slot.is_empty():
 		return false
-	var res: Dictionary = SaveManager.load_game(clean_slot)
-	return bool(res.get("success", false)) and bool(res.get("verified", false))
+	var verify_result: Dictionary = SaveManager.load_game(clean_slot)
+	return bool(verify_result.get("success", false)) and bool(verify_result.get("verified", false))
 
 ## 测试重置
 static func reset_for_tests() -> void:

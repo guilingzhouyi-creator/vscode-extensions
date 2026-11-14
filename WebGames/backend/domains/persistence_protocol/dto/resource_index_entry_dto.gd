@@ -37,16 +37,17 @@ var dependencies: Array[String] = []
 ## 扩展元数据 (如所属领域、版本标识等)
 var metadata: Dictionary = {}
 
+## 初始化资源索引条目传输对象。
 func _init(
-	p_id: String = "",
-	p_path: String = "",
-	p_category: String = DEFAULT_CATEGORY,
-	p_priority: int = DEFAULT_PRIORITY
+	initial_resource_id: String = "",
+	initial_physical_path: String = "",
+	initial_category: String = DEFAULT_CATEGORY,
+	initial_priority: int = DEFAULT_PRIORITY
 ) -> void:
-	resource_id = p_id
-	physical_path = p_path
-	category = p_category
-	priority = p_priority
+	resource_id = initial_resource_id
+	physical_path = initial_physical_path
+	category = initial_category
+	priority = initial_priority
 	estimated_bytes = 0
 	dependencies = []
 	metadata = {}
@@ -76,17 +77,17 @@ func to_dict() -> Dictionary:
 
 ## 反序列化为 DTO 实例
 static func from_dict(data: Dictionary) -> RefCounted:
-	var dto: RefCounted = new()
-	var instance := dto as ResourceIndexEntryDTO
-	if instance != null:
-		instance.resource_id = String(data.get("resource_id", ""))
-		instance.physical_path = String(data.get("physical_path", ""))
-		instance.category = String(data.get("category", DEFAULT_CATEGORY))
-		instance.priority = int(data.get("priority", DEFAULT_PRIORITY))
-		instance.estimated_bytes = int(data.get("estimated_bytes", 0))
-		var deps: Array = data.get("dependencies", [])
-		instance.dependencies.clear()
-		for d in deps:
-			instance.dependencies.append(String(d))
-		instance.metadata = Dictionary(data.get("metadata", {})).duplicate(true)
-	return dto
+	var entry_instance: RefCounted = new()
+	var typed_entry := entry_instance as ResourceIndexEntryDTO
+	if typed_entry != null:
+		typed_entry.resource_id = String(data.get("resource_id", ""))
+		typed_entry.physical_path = String(data.get("physical_path", ""))
+		typed_entry.category = String(data.get("category", DEFAULT_CATEGORY))
+		typed_entry.priority = int(data.get("priority", DEFAULT_PRIORITY))
+		typed_entry.estimated_bytes = int(data.get("estimated_bytes", 0))
+		var raw_dependencies: Array = data.get("dependencies", [])
+		typed_entry.dependencies.clear()
+		for dependency_id in raw_dependencies:
+			typed_entry.dependencies.append(String(dependency_id))
+		typed_entry.metadata = Dictionary(data.get("metadata", {})).duplicate(true)
+	return entry_instance

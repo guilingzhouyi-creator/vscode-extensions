@@ -81,37 +81,37 @@ func record_main_thread_wait(duration_ms: float) -> void:
 
 ## 生成九维观测指标快照
 func get_metrics_snapshot() -> StorageMetricsDTO:
-	var dto := StorageMetricsDTO.new()
-	dto.primary_recovery_time_ms = _last_primary_recovery_ms
-	dto.time_to_first_interactive_ms = _last_ttfi_ms
+	var metrics_snapshot := StorageMetricsDTO.new()
+	metrics_snapshot.primary_recovery_time_ms = _last_primary_recovery_ms
+	metrics_snapshot.time_to_first_interactive_ms = _last_ttfi_ms
 
 	# 吞吐量 MB/s = (bytes / BYTES_TO_MB) / (elapsed_ms / MS_TO_SEC)
 	if _total_aux_elapsed_ms > 0.0:
 		var total_mb := float(_total_aux_bytes) / BYTES_TO_MB
-		var total_sec := _total_aux_elapsed_ms / MS_TO_SEC
-		dto.auxiliary_throughput_mb_per_sec = total_mb / total_sec
+		var total_seconds := _total_aux_elapsed_ms / MS_TO_SEC
+		metrics_snapshot.auxiliary_throughput_mb_per_sec = total_mb / total_seconds
 	else:
-		dto.auxiliary_throughput_mb_per_sec = 0.0
+		metrics_snapshot.auxiliary_throughput_mb_per_sec = 0.0
 
-	dto.main_thread_io_wait_ms = _main_thread_io_wait_ms
-	dto.queue_length = AuxiliaryWorkerPool.get_instance().get_queue_size()
+	metrics_snapshot.main_thread_io_wait_ms = _main_thread_io_wait_ms
+	metrics_snapshot.queue_length = AuxiliaryWorkerPool.get_instance().get_queue_size()
 
 	if _total_requests > 0:
-		dto.cache_hit_rate = float(_cache_hits) / float(_total_requests)
-		dto.failure_retry_rate = float(_failed_requests) / float(_total_requests)
+		metrics_snapshot.cache_hit_rate = float(_cache_hits) / float(_total_requests)
+		metrics_snapshot.failure_retry_rate = float(_failed_requests) / float(_total_requests)
 	else:
-		dto.cache_hit_rate = 0.0
-		dto.failure_retry_rate = 0.0
+		metrics_snapshot.cache_hit_rate = 0.0
+		metrics_snapshot.failure_retry_rate = 0.0
 
-	var mem := OS.get_static_memory_usage()
-	if mem > _peak_memory_bytes:
-		_peak_memory_bytes = mem
-	dto.peak_memory_mb = float(_peak_memory_bytes) / BYTES_TO_MB
+	var static_memory_bytes := OS.get_static_memory_usage()
+	if static_memory_bytes > _peak_memory_bytes:
+		_peak_memory_bytes = static_memory_bytes
+	metrics_snapshot.peak_memory_mb = float(_peak_memory_bytes) / BYTES_TO_MB
 
 	var configured_budget := GameConfig.get_float("infrastructure.storage", "auxiliary/frame_budget/max_ms_per_frame", 2.0)
-	dto.frame_submission_budget_ms = configured_budget
+	metrics_snapshot.frame_submission_budget_ms = configured_budget
 
-	return dto
+	return metrics_snapshot
 
 ## 测试重置
 static func reset_for_tests() -> void:

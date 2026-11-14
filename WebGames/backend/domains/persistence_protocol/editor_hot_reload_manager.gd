@@ -24,27 +24,27 @@ static func _ensure_scope_loaded() -> void:
 	var all_entries: Array = GameConfig.get_array("infrastructure.domains", "domains", [])
 	for entry in all_entries:
 		var domain_key := String(entry.get("id", ""))
-		var cfg_table := String(entry.get("config", ""))
+		var config_table := String(entry.get("config", ""))
 		var save_raw: Variant = entry.get("save")
 		var allow_reload := false
 		var needs_rebuild := false
 		if save_raw is Dictionary:
-			var hr_raw: Variant = (save_raw as Dictionary).get("hot_reload")
-			if hr_raw is Dictionary:
-				var hr_dict := hr_raw as Dictionary
-				allow_reload = bool(hr_dict.get("allow", false))
-				needs_rebuild = bool(hr_dict.get("requires_rebuild", false))
+			var hot_reload_raw: Variant = (save_raw as Dictionary).get("hot_reload")
+			if hot_reload_raw is Dictionary:
+				var hot_reload_dict := hot_reload_raw as Dictionary
+				allow_reload = bool(hot_reload_dict.get("allow", false))
+				needs_rebuild = bool(hot_reload_dict.get("requires_rebuild", false))
 		_hot_reload_scope[domain_key] = {
 			"allow": allow_reload,
 			"requires_rebuild": needs_rebuild
 		}
-		if not cfg_table.is_empty():
-			_table_to_domain_map[cfg_table] = domain_key
+		if not config_table.is_empty():
+			_table_to_domain_map[config_table] = domain_key
 
 ## 配置表内容 SHA-256 哈希计算（纯值类型与确定性序列化，Inv-SV-9）
 static func _compute_table_hash(table_name: String) -> String:
-	var tbl_data: Variant = GameConfig.get_table(table_name, {})
-	return JSON.stringify(tbl_data).sha256_text()
+	var table_data: Variant = GameConfig.get_table(table_name, {})
+	return JSON.stringify(table_data).sha256_text()
 
 ## 记录配置表初始哈希基线
 static func register_table_baseline(table_name: String) -> void:
@@ -59,13 +59,13 @@ static func detect_changes() -> Dictionary:
 	if monitored_tables.is_empty():
 		monitored_tables = _table_to_domain_map.keys()
 
-	for tbl in monitored_tables:
-		var current := _compute_table_hash(tbl)
-		if _last_hashes.has(tbl):
-			if _last_hashes[tbl] != current:
-				changed[tbl] = current
+	for table_name in monitored_tables:
+		var current := _compute_table_hash(table_name)
+		if _last_hashes.has(table_name):
+			if _last_hashes[table_name] != current:
+				changed[table_name] = current
 		else:
-			_last_hashes[tbl] = current
+			_last_hashes[table_name] = current
 	return changed
 
 ## 领域级热更新调度：单机门禁 -> 白名单过滤 -> 广播通知 -> 更新基线（Inv-SV-8/9）
@@ -78,12 +78,12 @@ static func apply_hot_reload(changed_tables: Dictionary) -> Dictionary:
 	var results: Dictionary = {}
 	var reloaded_tables: Array[String] = []
 
-	for tbl in changed_tables.keys():
-		var domain_id: String = _table_to_domain_map.get(tbl, "")
+	for table_name in changed_tables.keys():
+		var domain_id: String = _table_to_domain_map.get(table_name, "")
 		if domain_id.is_empty():
 			# 允许直接以 domain_id 作为键调用
-			if _hot_reload_scope.has(tbl):
-				domain_id = tbl
+			if _hot_reload_scope.has(table_name):
+				domain_id = table_name
 
 		var scope_raw: Variant = _hot_reload_scope.get(domain_id)
 		var allow: bool = false
@@ -95,7 +95,7 @@ static func apply_hot_reload(changed_tables: Dictionary) -> Dictionary:
 
 		# 2. 白名单拒绝判定（Inv-SV-14）
 		if not allow:
-			results[domain_id if not domain_id.is_empty() else tbl] = {
+			results[domain_id if not domain_id.is_empty() else table_name] = {
 				"status": "skipped",
 				"reason": "HOT_RELOAD_DENIED"
 			}
@@ -103,7 +103,7 @@ static func apply_hot_reload(changed_tables: Dictionary) -> Dictionary:
 
 		# 3. 确定性红线与运行时重建约束（战斗/经济等状态不可热更）
 		if requires_rebuild:
-			results[domain_id if not domain_id.is_empty() else tbl] = {
+			results[domain_id if not domain_id.is_empty() else table_name] = {
 				"status": "skipped",
 				"reason": "REQUIRES_RUNTIME_REBUILD"
 			}
@@ -112,18 +112,18 @@ static func apply_hot_reload(changed_tables: Dictionary) -> Dictionary:
 		# 4. 允许热更领域：执行领域级重载并广播业务系统刷新
 		var reload_info := {
 			"status": "reloaded",
-			"table": tbl,
+			"table": table_name,
 			"domain_id": domain_id,
-			"hash": changed_tables[tbl]
+			"hash": changed_tables[table_name]
 		}
 		EventBusCore.get_instance().emit_domain_event("persistence.domain_hot_reloaded", reload_info)
 		results[domain_id] = reload_info
-		reloaded_tables.append(tbl)
+		reloaded_tables.append(table_name)
 
 	# 5. 失败安全（Inv-SV-9）：仅成功重载的域推进基线哈希；
 	#    被白名单/重建约束拒绝的域保持旧哈希，供后续 detect_changes 持续报告与重试
-	for tbl in reloaded_tables:
-		_last_hashes[tbl] = changed_tables[tbl]
+	for table_name in reloaded_tables:
+		_last_hashes[table_name] = changed_tables[table_name]
 
 	return { "success": true, "results": results }
 
