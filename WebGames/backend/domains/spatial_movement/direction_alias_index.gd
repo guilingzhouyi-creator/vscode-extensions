@@ -31,9 +31,9 @@ func has_alias(key: String) -> bool:
 ## 序列化当前对象为通用字典传输结构
 func to_dto() -> Dictionary:
 	var serialized_map := {}
-	for k in alias_to_vector_map.keys():
-		var v: Vector2 = alias_to_vector_map[k]
-		serialized_map[k] = [v.x, v.y]
+	for alias_key in alias_to_vector_map.keys():
+		var alias_vector: Vector2 = alias_to_vector_map[alias_key]
+		serialized_map[alias_key] = [alias_vector.x, alias_vector.y]
 	return {
 		"alias_count": alias_to_vector_map.size(),
 		"last_updated_utc": last_updated_utc,

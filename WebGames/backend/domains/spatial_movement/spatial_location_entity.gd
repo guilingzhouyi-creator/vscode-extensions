@@ -27,18 +27,18 @@ var current_velocity: Vector2 = Vector2.ZERO     # 当前实时速度向量
 
 ## 传空串视为「未指定」，回落配置缺省值（GDScript 默认参数必须是常量，故用空串哨兵）
 func _init(
-	p_continent: String = "",
-	p_region: String = "",
-	p_subgraph: String = "",
-	p_coords: Vector2 = Vector2.ZERO
+	initial_continent_id: String = "",
+	initial_region_node_id: String = "",
+	initial_interior_subgraph_id: String = "",
+	initial_coordinates: Vector2 = Vector2.ZERO
 ) -> void:
-	if not p_continent.is_empty():
-		continent_id = p_continent
-	if not p_region.is_empty():
-		region_node_id = p_region
-	if not p_subgraph.is_empty():
-		interior_subgraph_id = p_subgraph
-	local_coordinates = p_coords
+	if not initial_continent_id.is_empty():
+		continent_id = initial_continent_id
+	if not initial_region_node_id.is_empty():
+		region_node_id = initial_region_node_id
+	if not initial_interior_subgraph_id.is_empty():
+		interior_subgraph_id = initial_interior_subgraph_id
+	local_coordinates = initial_coordinates
 
 ## 计算全域空间实体坐标哈希指纹
 func get_global_spatial_fingerprint() -> String:

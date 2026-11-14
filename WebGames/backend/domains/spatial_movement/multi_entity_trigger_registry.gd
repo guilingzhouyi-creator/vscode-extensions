@@ -17,43 +17,43 @@ var _total_count: int = 0
 
 ## 获取当前状态机或实体的当前状态值
 func get_state(trigger_id: String, entity_id: String) -> int:
-	var sub_dict: Variant = _matrix.get(trigger_id, null)
-	if sub_dict == null or not (sub_dict is Dictionary):
+	var entity_state_map: Variant = _matrix.get(trigger_id, null)
+	if entity_state_map == null or not (entity_state_map is Dictionary):
 		return SpatialTriggerFSM.TriggerState.OUTSIDE
-	return (sub_dict as Dictionary).get(entity_id, SpatialTriggerFSM.TriggerState.OUTSIDE)
+	return (entity_state_map as Dictionary).get(entity_id, SpatialTriggerFSM.TriggerState.OUTSIDE)
 
 ## 更新实体在空间触发区域内的当前交互状态
 func update_state(trigger_id: String, entity_id: String, new_state: int) -> int:
-	var sub_dict: Dictionary
+	var entity_state_map: Dictionary
 	if not _matrix.has(trigger_id):
-		sub_dict = {}
-		_matrix[trigger_id] = sub_dict
+		entity_state_map = {}
+		_matrix[trigger_id] = entity_state_map
 	else:
-		sub_dict = _matrix[trigger_id]
+		entity_state_map = _matrix[trigger_id]
 
-	var prev: int = sub_dict.get(entity_id, SpatialTriggerFSM.TriggerState.OUTSIDE)
-	if not sub_dict.has(entity_id):
+	var previous_state: int = entity_state_map.get(entity_id, SpatialTriggerFSM.TriggerState.OUTSIDE)
+	if not entity_state_map.has(entity_id):
 		_total_count += 1
-	sub_dict[entity_id] = new_state
-	return prev
+	entity_state_map[entity_id] = new_state
+	return previous_state
 
 ## 从多实体触发注册表中移除指定实体的状态记录
 func remove_entity(entity_id: String) -> void:
 	var empty_triggers: Array[String] = []
-	for trig_id in _matrix:
-		var sub: Dictionary = _matrix[trig_id]
-		if sub.erase(entity_id):
+	for trigger_id in _matrix:
+		var entity_state_map: Dictionary = _matrix[trigger_id]
+		if entity_state_map.erase(entity_id):
 			_total_count = maxi(0, _total_count - 1)
-			if sub.is_empty():
-				empty_triggers.append(trig_id)
-	for trig_id in empty_triggers:
-		_matrix.erase(trig_id)
+			if entity_state_map.is_empty():
+				empty_triggers.append(trigger_id)
+	for trigger_id in empty_triggers:
+		_matrix.erase(trigger_id)
 
 ## 从多实体触发注册表中注销指定触发区域
 func remove_trigger(trigger_id: String) -> void:
 	if _matrix.has(trigger_id):
-		var sub: Dictionary = _matrix[trigger_id]
-		_total_count = maxi(0, _total_count - sub.size())
+		var entity_state_map: Dictionary = _matrix[trigger_id]
+		_total_count = maxi(0, _total_count - entity_state_map.size())
 		_matrix.erase(trigger_id)
 
 ## 清空当前容器或管理器内的所有记录与缓存

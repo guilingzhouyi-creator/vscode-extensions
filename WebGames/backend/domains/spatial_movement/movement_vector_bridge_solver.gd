@@ -36,11 +36,11 @@ static func _ensure_cache_fresh() -> void:
 static func init_or_rebuild_cache() -> void:
 	var aliases: Dictionary = GameConfig.get_dict("domains.spatial_movement", "movement/direction_aliases", {})
 	var table: Dictionary = {}
-	for dir_key in aliases:
-		var raw_alias: Variant = aliases[dir_key]
+	for direction_key in aliases:
+		var raw_alias: Variant = aliases[direction_key]
 		if raw_alias is Array:
-			var dir_vec := _map_dir_key_to_vector(str(dir_key))
-			_register_aliases_for_vector(table, raw_alias as Array, dir_vec)
+			var direction_vector := _map_direction_key_to_vector(str(direction_key))
+			_register_aliases_for_vector(table, raw_alias as Array, direction_vector)
 
 	# 默认方向回退保障（配置缺失时零退化）
 	var fallback_map := {
@@ -53,32 +53,32 @@ static func init_or_rebuild_cache() -> void:
 		"SOUTHEAST": Vector2(1, 1).normalized(), "SE": Vector2(1, 1).normalized(), "东南": Vector2(1, 1).normalized(),
 		"SOUTHWEST": Vector2(-1, 1).normalized(), "SW": Vector2(-1, 1).normalized(), "西南": Vector2(-1, 1).normalized()
 	}
-	for k in fallback_map:
-		if not table.has(k):
-			table[k] = fallback_map[k]
+	for fallback_key in fallback_map:
+		if not table.has(fallback_key):
+			table[fallback_key] = fallback_map[fallback_key]
 
 	_alias_table = table
 
-	var p := MovementParams.new()
-	p.agi_ref = GameConfig.get_float("domains.spatial_movement", "movement/agi_reference_stat", 10.0)
-	p.agi_factor_per = GameConfig.get_float("domains.spatial_movement", "movement/agi_factor_per_point", 0.005)
-	p.agi_min = GameConfig.get_float("domains.spatial_movement", "movement/agi_factor_min", 0.5)
-	p.load_threshold = GameConfig.get_float("domains.spatial_movement", "movement/load_threshold_kg", 30.0)
-	p.load_divisor = GameConfig.get_float("domains.spatial_movement", "movement/load_excess_divisor", 100.0)
-	p.load_min = GameConfig.get_float("domains.spatial_movement", "movement/load_penalty_min", 0.2)
-	p.impedance_floor = GameConfig.get_float("domains.spatial_movement", "movement/impedance_floor", 0.1)
-	p.facing_thresh_sq = GameConfig.get_float("domains.spatial_movement", "movement/facing_threshold_sq", 0.0001)
-	_params_cache = p
+	var params := MovementParams.new()
+	params.agi_ref = GameConfig.get_float("domains.spatial_movement", "movement/agi_reference_stat", 10.0)
+	params.agi_factor_per = GameConfig.get_float("domains.spatial_movement", "movement/agi_factor_per_point", 0.005)
+	params.agi_min = GameConfig.get_float("domains.spatial_movement", "movement/agi_factor_min", 0.5)
+	params.load_threshold = GameConfig.get_float("domains.spatial_movement", "movement/load_threshold_kg", 30.0)
+	params.load_divisor = GameConfig.get_float("domains.spatial_movement", "movement/load_excess_divisor", 100.0)
+	params.load_min = GameConfig.get_float("domains.spatial_movement", "movement/load_penalty_min", 0.2)
+	params.impedance_floor = GameConfig.get_float("domains.spatial_movement", "movement/impedance_floor", 0.1)
+	params.facing_thresh_sq = GameConfig.get_float("domains.spatial_movement", "movement/facing_threshold_sq", 0.0001)
+	_params_cache = params
 	_cached_config_version = GameConfig.config_reload_version()
 
-static func _register_aliases_for_vector(table: Dictionary, raw_aliases: Array, dir_vec: Vector2) -> void:
+static func _register_aliases_for_vector(table: Dictionary, raw_aliases: Array, direction_vector: Vector2) -> void:
 	for alias in raw_aliases:
 		var key := str(alias).strip_edges().to_upper()
-		table[key] = dir_vec
+		table[key] = direction_vector
 
 ## 方向键到向量映射
-static func _map_dir_key_to_vector(dir_key: String) -> Vector2:
-	match dir_key.to_lower():
+static func _map_direction_key_to_vector(direction_key: String) -> Vector2:
+	match direction_key.to_lower():
 		"north": return Vector2(0, -1)
 		"south": return Vector2(0, 1)
 		"east": return Vector2(1, 0)
@@ -93,29 +93,29 @@ static func _map_dir_key_to_vector(dir_key: String) -> Vector2:
 static func translate_text_step_to_vector(verb_direction: String, distance_meters: float) -> Vector2:
 	_ensure_cache_fresh()
 	var key := verb_direction.strip_edges().to_upper()
-	var dir: Vector2 = _alias_table.get(key, Vector2.ZERO)
-	return dir * distance_meters
+	var direction_vector: Vector2 = _alias_table.get(key, Vector2.ZERO)
+	return direction_vector * distance_meters
 
 ## 有效速度：敏捷因子（下限钳制）× 负重衰减（超阈线性下降）× 地形阻抗（下限地板）
 ## 经结构化参数缓存读取，无重复配置字典查寻
 static func calculate_effective_speed(
 	base_speed: float,
-	agi_stat: float,
+	agility_stat: float,
 	total_load_kg: float,
 	terrain_impedance_multiplier: float = 1.0
 ) -> float:
 	_ensure_cache_fresh()
-	var p := _params_cache
-	var agi_factor := 1.0 + (agi_stat - p.agi_ref) * p.agi_factor_per
-	agi_factor = maxf(p.agi_min, agi_factor)
+	var cached_params := _params_cache
+	var agility_factor := 1.0 + (agility_stat - cached_params.agi_ref) * cached_params.agi_factor_per
+	agility_factor = maxf(cached_params.agi_min, agility_factor)
 
 	var load_penalty := 1.0
-	if total_load_kg > p.load_threshold:
-		var excess := total_load_kg - p.load_threshold
-		load_penalty = maxf(p.load_min, 1.0 - (excess / p.load_divisor))
+	if total_load_kg > cached_params.load_threshold:
+		var excess := total_load_kg - cached_params.load_threshold
+		load_penalty = maxf(cached_params.load_min, 1.0 - (excess / cached_params.load_divisor))
 
-	var safe_impedance := maxf(p.impedance_floor, terrain_impedance_multiplier)
-	return (base_speed * agi_factor * load_penalty) / safe_impedance
+	var safe_impedance := maxf(cached_params.impedance_floor, terrain_impedance_multiplier)
+	return (base_speed * agility_factor * load_penalty) / safe_impedance
 
 ## 位移应用：累加坐标并越过阈值时更新朝向
 static func apply_displacement(

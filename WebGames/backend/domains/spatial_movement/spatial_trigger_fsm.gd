@@ -17,52 +17,52 @@ const POOL_SPATIAL_TRIGGERS: String = "spatial_triggers"
 const MAX_LOCAL_TRIGGER_POOL: int = 256
 
 static var _cached_default_radius: float = 5.0
-static var _radius_cfg_version: int = -1
+static var _radius_config_version: int = -1
 static var _trigger_pools_bound: bool = false
-static var _pool_ensure_cb: Callable = Callable()
-static var _pool_acquire_cb: Callable = Callable()
-static var _pool_release_cb: Callable = Callable()
+static var _pool_ensure_callback: Callable = Callable()
+static var _pool_acquire_callback: Callable = Callable()
+static var _pool_release_callback: Callable = Callable()
 static var _local_trigger_pool: Array = []
 
 static func _get_cached_default_radius() -> float:
-	var cfg_ver: int = GameConfig.config_reload_version()
-	if _radius_cfg_version != cfg_ver:
+	var config_version: int = GameConfig.config_reload_version()
+	if _radius_config_version != config_version:
 		_cached_default_radius = GameConfig.get_float("domains.spatial_movement", "trigger/default_radius", 5.0)
-		_radius_cfg_version = cfg_ver
+		_radius_config_version = config_version
 	return _cached_default_radius
 
 ## 依赖倒置对象池端口绑定（与 infrastructure.ObjectPoolManager 解耦对接 spatial_triggers 池）
-static func bind_trigger_pool_backend(ensure_cb: Callable, acquire_cb: Callable, release_cb: Callable) -> void:
-	_pool_ensure_cb = ensure_cb
-	_pool_acquire_cb = acquire_cb
-	_pool_release_cb = release_cb
+static func bind_trigger_pool_backend(ensure_callback: Callable, acquire_callback: Callable, release_callback: Callable) -> void:
+	_pool_ensure_callback = ensure_callback
+	_pool_acquire_callback = acquire_callback
+	_pool_release_callback = release_callback
 	_trigger_pools_bound = false
 
 static func _ensure_trigger_pool() -> void:
 	if _trigger_pools_bound:
 		return
-	if _pool_ensure_cb.is_valid():
-		_pool_ensure_cb.call(POOL_SPATIAL_TRIGGERS, func() -> RefCounted:
+	if _pool_ensure_callback.is_valid():
+		_pool_ensure_callback.call(POOL_SPATIAL_TRIGGERS, func() -> RefCounted:
 			return SpatialTriggerArea.new()
 		)
 	_trigger_pools_bound = true
 
 ## 从对象池借出可复用空间触发区域实例
-static func borrow_trigger_area(p_id: String = "", p_center: Vector2 = Vector2.ZERO, p_radius: float = -1.0) -> SpatialTriggerArea:
+static func borrow_trigger_area(initial_trigger_id: String = "", initial_center: Vector2 = Vector2.ZERO, initial_radius: float = -1.0) -> SpatialTriggerArea:
 	_ensure_trigger_pool()
 	var area: SpatialTriggerArea = null
-	if _pool_acquire_cb.is_valid():
-		area = _pool_acquire_cb.call(POOL_SPATIAL_TRIGGERS) as SpatialTriggerArea
+	if _pool_acquire_callback.is_valid():
+		area = _pool_acquire_callback.call(POOL_SPATIAL_TRIGGERS) as SpatialTriggerArea
 	elif not _local_trigger_pool.is_empty():
 		area = _local_trigger_pool.pop_back() as SpatialTriggerArea
 		if area != null:
 			area.reset_state()
 	if area == null:
 		area = SpatialTriggerArea.new()
-	area.trigger_id = p_id
+	area.trigger_id = initial_trigger_id
 	area.shape = TriggerShape.CIRCLE_RADIUS
-	area.center_pos = p_center
-	area.radius = p_radius if p_radius >= 0.0 else _get_cached_default_radius()
+	area.center_pos = initial_center
+	area.radius = initial_radius if initial_radius >= 0.0 else _get_cached_default_radius()
 	area.current_state = TriggerState.OUTSIDE
 	return area
 
@@ -71,8 +71,8 @@ static func recycle_trigger_area(area: SpatialTriggerArea) -> void:
 	if area == null:
 		return
 	_ensure_trigger_pool()
-	if _pool_release_cb.is_valid():
-		_pool_release_cb.call(POOL_SPATIAL_TRIGGERS, area)
+	if _pool_release_callback.is_valid():
+		_pool_release_callback.call(POOL_SPATIAL_TRIGGERS, area)
 		return
 	if _local_trigger_pool.size() < MAX_LOCAL_TRIGGER_POOL:
 		area.reset_state()
@@ -82,7 +82,7 @@ static func recycle_trigger_area(area: SpatialTriggerArea) -> void:
 static func reset_pool_for_tests() -> void:
 	_trigger_pools_bound = false
 	_local_trigger_pool.clear()
-	_radius_cfg_version = -1
+	_radius_config_version = -1
 
 enum TriggerShape {
 	CIRCLE_RADIUS,
@@ -106,12 +106,13 @@ class SpatialTriggerArea extends PoolableDtoBase:
 	var current_state: TriggerState = TriggerState.OUTSIDE
 
 	## 触发区构造（ID/圆心/半径，圆形默认形状）
-	func _init(p_id: String = "", p_center: Vector2 = Vector2.ZERO, p_radius: float = -1.0) -> void:
-		trigger_id = p_id
+	func _init(initial_trigger_id: String = "", initial_center: Vector2 = Vector2.ZERO, initial_radius: float = -1.0) -> void:
+		trigger_id = initial_trigger_id
 		shape = TriggerShape.CIRCLE_RADIUS
-		center_pos = p_center
-		radius = p_radius if p_radius >= 0.0 else SpatialTriggerFSM._get_cached_default_radius()
+		center_pos = initial_center
+		radius = initial_radius if initial_radius >= 0.0 else SpatialTriggerFSM._get_cached_default_radius()
 
+	## 重置空间触发区域状态，供对象池无堆分配复用
 	func reset_state() -> void:
 		super.reset_state()
 		trigger_id = ""
@@ -129,14 +130,14 @@ static func evaluate_trigger_state(trigger: SpatialTriggerArea, entity_pos: Vect
 	elif trigger.shape == TriggerShape.AABB_RECTANGLE:
 		is_contained = trigger.rect_extents.has_point(entity_pos)
 
-	var prev_state: Variant = trigger.current_state
+	var previous_state: Variant = trigger.current_state
 	if is_contained:
-		if prev_state == TriggerState.OUTSIDE or prev_state == TriggerState.EXITED:
+		if previous_state == TriggerState.OUTSIDE or previous_state == TriggerState.EXITED:
 			trigger.current_state = TriggerState.ENTERED
 		else:
 			trigger.current_state = TriggerState.INSIDE
 	else:
-		if prev_state == TriggerState.INSIDE or prev_state == TriggerState.ENTERED:
+		if previous_state == TriggerState.INSIDE or previous_state == TriggerState.ENTERED:
 			trigger.current_state = TriggerState.EXITED
 		else:
 			trigger.current_state = TriggerState.OUTSIDE
@@ -156,16 +157,16 @@ static func evaluate_entity_trigger_state(
 	elif trigger.shape == TriggerShape.AABB_RECTANGLE:
 		is_contained = trigger.rect_extents.has_point(entity_pos)
 
-	var prev_state: int = registry.get_state(trigger.trigger_id, entity_id) if registry else TriggerState.OUTSIDE
-	var new_state: TriggerState = prev_state
+	var previous_state: int = registry.get_state(trigger.trigger_id, entity_id) if registry else TriggerState.OUTSIDE
+	var new_state: TriggerState = previous_state
 
 	if is_contained:
-		if prev_state == TriggerState.OUTSIDE or prev_state == TriggerState.EXITED:
+		if previous_state == TriggerState.OUTSIDE or previous_state == TriggerState.EXITED:
 			new_state = TriggerState.ENTERED
 		else:
 			new_state = TriggerState.INSIDE
 	else:
-		if prev_state == TriggerState.INSIDE or prev_state == TriggerState.ENTERED:
+		if previous_state == TriggerState.INSIDE or previous_state == TriggerState.ENTERED:
 			new_state = TriggerState.EXITED
 		else:
 			new_state = TriggerState.OUTSIDE
