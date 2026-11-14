@@ -16,13 +16,3 @@ var target_state_key: String = ""
 var required_value: Variant = null
 var is_completed: bool = false
 var prerequisite_nodes: Array = []
-
-## QuestCausalityAggregate：任务因果聚合根实体模型
-class QuestCausalityAggregate extends RefCounted:
-	var quest_id: String = ""
-	var quest_title: String = GameConfig.get_string("domains.quest", "quest_defaults/quest_title", "净化古老遗迹")
-	var objective_nodes: Dictionary = {} # node_id -> QuestObjectiveNode
-	var solution_paths: Array = [] # [[node1, node2], [node3]] 代表多手段完成分支
-	var faction_reputation_rewards: Dictionary = GameConfig.get_dict("domains.quest", "quest_defaults/faction_reputation_rewards", { "EMPIRE": 50, "REBELS": -25 })
-	var gold_reward: int = GameConfig.get_int("domains.quest", "quest_defaults/gold_reward", 500)
-	var is_quest_finished: bool = false

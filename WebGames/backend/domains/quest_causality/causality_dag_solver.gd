@@ -12,14 +12,14 @@ class_name CausalityDAGSolver extends RefCounted
 
 ## 评估任务完成条件与阶段性因果状态
 static func evaluate_quest_completion(
-	quest: QuestObjectiveNode.QuestCausalityAggregate,
+	quest: QuestCausalityAggregate,
 	world_state_facts: Dictionary
 ) -> Dictionary:
 	# 0. 图结构校验：空路径/重复节点/未知节点引用 → QUEST_GRAPH_INVALID，
 	#    非法图不改变任务完成标记（不得通过空路径或残留 is_completed 直接完成任务）
-	var graph_err := _validate_graph(quest)
-	if not graph_err.is_empty():
-		return {"is_completed": quest.is_quest_finished, "solution_type": "", "code": graph_err}
+	var graph_error_code := _validate_graph(quest)
+	if not graph_error_code.is_empty():
+		return {"is_completed": quest.is_quest_finished, "solution_type": "", "code": graph_error_code}
 
 	# 1. 评估各个因果节点是否达成
 	_evaluate_objective_nodes(quest.objective_nodes, world_state_facts)
@@ -43,8 +43,8 @@ static func _evaluate_objective_nodes(objective_nodes: Dictionary, world_state_f
 	for node_id in objective_nodes:
 		var node: QuestObjectiveNode = objective_nodes[node_id]
 		if world_state_facts.has(node.target_state_key):
-			var cur_val: Variant = world_state_facts[node.target_state_key]
-			if cur_val == node.required_value:
+			var current_value: Variant = world_state_facts[node.target_state_key]
+			if current_value == node.required_value:
 				node.is_completed = true
 
 static func _evaluate_solution_path(path: Array, objective_nodes: Dictionary) -> Dictionary:
@@ -57,7 +57,7 @@ static func _evaluate_solution_path(path: Array, objective_nodes: Dictionary) ->
 
 ## 任务图结构校验：solution_paths 每条路径非空、节点全部已登记且无重复节点。
 ## 返回空串表示通过；否则返回错误码（QUEST_GRAPH_INVALID 等）。
-static func _validate_graph(quest: QuestObjectiveNode.QuestCausalityAggregate) -> String:
+static func _validate_graph(quest: QuestCausalityAggregate) -> String:
 	for path in quest.solution_paths:
 		if not _validate_single_path(path, quest.objective_nodes):
 			return "QUEST_GRAPH_INVALID"
