@@ -1,0 +1,41 @@
+# ==============================================================================
+# 模块归属: 业务领域层 (Domains · 剧情、任务与社交集群 (Narrative & Social))
+# 文件路径: res://backend/domains/npc_simulation/npc_ai_and_evolution_solver.gd
+# 架构定位: Headless Discrete Solver / Numerical Calculator
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/npc.json | 信号: EventBus 领域广播
+# 职责说明: 基于五维性格矩阵与等效寿命的目标导向行动规划 (GOAP)。 阈值/权重/目标标识由 config/npc.json 的 goap 段驱动。
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# ==============================================================================
+
+## NPCAIAndEvolutionSolver：Headless Discrete Solver / Numerical Calculator
+class_name NPCAIAndEvolutionSolver extends RefCounted
+
+## 目标导向行动规划器 (GOAP Action Planner)
+static func plan_npc_next_goal(npc: AutonomousNPCEntity) -> String:
+	var personality: Variant = npc.personality
+	var scale_floor := GameConfig.get_float("domains.npc", "goap/scale_floor", 0.1)
+	var legacy_threshold := GameConfig.get_float("domains.npc", "goap/legacy_age_threshold", 80.0)
+	var default_trait := GameConfig.get_float("domains.npc", "goap/default_personality", 0.5)
+
+	var effective_age: Variant = npc.physiology.raw_chronological_age / max(scale_floor, npc.physiology.lifespan_scale)
+
+	# 寿元将尽大限前夕: 强制优先著书立说留传衣钵
+	if effective_age >= legacy_threshold:
+		return GameConfig.get_string("domains.npc", "goap/goals/legacy", "WRITE_LEGACY_BOOK")
+
+	var trade_greed_weight := GameConfig.get_float("domains.npc", "goap/weights/trade_greed", 1.5)
+	var explore_courage_weight := GameConfig.get_float("domains.npc", "goap/weights/explore_courage", 1.2)
+	var explore_rationality_penalty_weight := GameConfig.get_float("domains.npc", "goap/weights/explore_rationality_penalty", 0.4)
+	var cultivate_rationality_weight := GameConfig.get_float("domains.npc", "goap/weights/cultivate_rationality", 1.3)
+	var cultivate_piety_weight := GameConfig.get_float("domains.npc", "goap/weights/cultivate_piety", 0.5)
+
+	var score_trade: Variant = personality.get("greed", default_trait) * trade_greed_weight
+	var score_explore: Variant = personality.get("courage", default_trait) * (explore_courage_weight - personality.get("rationality", default_trait) * explore_rationality_penalty_weight)
+	var score_cultivate: Variant = personality.get("rationality", default_trait) * cultivate_rationality_weight + personality.get("piety", default_trait) * cultivate_piety_weight
+
+	if score_trade > score_explore and score_trade > score_cultivate:
+		return GameConfig.get_string("domains.npc", "goap/goals/trade", "TRADE_COMMODITY")
+	elif score_explore > score_cultivate:
+		return GameConfig.get_string("domains.npc", "goap/goals/explore", "EXPLORE_DUNGEON")
+	else:
+		return GameConfig.get_string("domains.npc", "goap/goals/cultivate", "CULTIVATE_MAGIC")
