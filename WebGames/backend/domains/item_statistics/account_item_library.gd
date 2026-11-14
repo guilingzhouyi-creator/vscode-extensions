@@ -7,8 +7,8 @@
 # 退出语义与设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
-## AccountItemLibraryAggregate：Domain Logic Component
-class_name AccountItemLibraryAggregate
+## AccountItemLibrary：Domain Logic Component
+class_name AccountItemLibrary
 extends RefCounted
 
 const NODE_ROOT: String = "root"
@@ -36,8 +36,9 @@ var root_node: Dictionary = {}
 ## 反序列化/restore 后由 _ensure_index 懒重建。
 var _canonical_index: Dictionary = {}
 
-func _init(p_account_id: String = "") -> void:
-	account_id = p_account_id
+## 初始化账号物品库聚合根。
+func _init(initial_account_id: String = "") -> void:
+	account_id = initial_account_id
 	root_node = {"type": NODE_ROOT, "children": {}}
 
 ## 递归挂载物品：沿 category_major → category_minor → canonical_id 建路径（幂等）
@@ -76,13 +77,13 @@ func apply_item_delta(canonical_id: String, event_stat_key: String, quantity: in
 		return {"success": false, "reason": "item not mounted"}
 	var stats: Dictionary = found["node"]["stats"]
 	var consumes_current := event_stat_key != STAT_GAINED and event_stat_key != STAT_FORGED
-	var prev_current: int = int(stats.get(STAT_CURRENT, 0))
+	var previous_current: int = int(stats.get(STAT_CURRENT, 0))
 	stats[event_stat_key] = int(stats.get(event_stat_key, 0)) + quantity
 	var actual_delta := quantity
 	if consumes_current:
-		actual_delta = mini(quantity, prev_current) # 下限 0：当前持有不可减成负数
+		actual_delta = mini(quantity, previous_current) # 下限 0：当前持有不可减成负数
 	var current_delta := quantity if not consumes_current else -actual_delta
-	stats[STAT_CURRENT] = prev_current + current_delta
+	stats[STAT_CURRENT] = previous_current + current_delta
 	_apply_delta_upwards(root_node, [found["path"][0], found["path"][1]], event_stat_key, Vector2i(quantity, current_delta))
 	return {
 		"success": true, "canonical_id": canonical_id,
@@ -90,13 +91,13 @@ func apply_item_delta(canonical_id: String, event_stat_key: String, quantity: in
 	}
 
 ## 递归定位叶节点（返回 {"node": ..., "path": [major, minor]}，未挂载返回空）
-## 经 _canonical_index O(1) 定位（懒重建兜底），语义与线性扫等价
+## 经 _canonical_index O(1) 定位（懒重建安全回退），语义与线性扫等价
 func find_item_node(canonical_id: String) -> Dictionary:
 	_ensure_index()
 	if _canonical_index.has(canonical_id):
-		var loc: Array = _canonical_index[canonical_id]
-		var major_key: String = str(loc[0])
-		var minor_key: String = str(loc[1])
+		var item_location: Array = _canonical_index[canonical_id]
+		var major_key: String = str(item_location[0])
+		var minor_key: String = str(item_location[1])
 		var major: Dictionary = root_node["children"].get(major_key, {})
 		if major.is_empty():
 			return {}
@@ -158,26 +159,26 @@ func serialize() -> Dictionary:
 # ==============================================================================
 
 static func _zero_stats() -> Dictionary:
-	var s := {}
-	for k in STAT_KEYS:
-		s[k] = 0
-	return s
+	var stats_map := {}
+	for stat_key in STAT_KEYS:
+		stats_map[stat_key] = 0
+	return stats_map
 
-static func _accumulate_stats(agg: Dictionary, sub: Dictionary) -> void:
-	for k in STAT_KEYS:
-		agg[k] = int(agg[k]) + int(sub[k])
+static func _accumulate_stats(aggregated_stats: Dictionary, child_stats: Dictionary) -> void:
+	for stat_key in STAT_KEYS:
+		aggregated_stats[stat_key] = int(aggregated_stats[stat_key]) + int(child_stats[stat_key])
 
 ## 递归聚合节点（分类节点 = 子树之和；叶节点 = 自身统计）
 static func _aggregate_recursive(node: Dictionary) -> Dictionary:
-	var agg := _zero_stats()
+	var aggregated_stats := _zero_stats()
 	if node.get("type") == NODE_ITEM:
-		for k in STAT_KEYS:
-			agg[k] = int(node["stats"].get(k, 0))
-		return agg
+		for stat_key in STAT_KEYS:
+			aggregated_stats[stat_key] = int(node["stats"].get(stat_key, 0))
+		return aggregated_stats
 	for child in node["children"].values():
-		var sub := _aggregate_recursive(child)
-		_accumulate_stats(agg, sub)
-	return agg
+		var child_stats := _aggregate_recursive(child)
+		_accumulate_stats(aggregated_stats, child_stats)
+	return aggregated_stats
 
 ## 递归收集物品叶节点
 static func _collect_items_recursive(node: Dictionary, out: Array) -> void:
