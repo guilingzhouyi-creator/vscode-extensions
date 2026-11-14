@@ -1,6 +1,6 @@
 # ==============================================================================
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
-# 文件路径: res://backend/domains/chat_command/gm_command_index.gd
+# 文件路径: res://backend/domains/chat_command/gm_command_index_solver.gd
 # 架构定位: Domain Logic Component
 # 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/chat_command.json | 信号: EventBus 领域广播
 # 职责说明: 维护 GM 命令最近使用索引（MRU 窗口，默认仅最近 20 条）、分页滚动 （页缓冲池回收复用，内存有界）与「最近适配补全」解析 参数由 config/domains/chat_command.json 的 gm_index 段驱动。
@@ -27,7 +27,7 @@ static func _page_size() -> int:
 static func _max_pages() -> int:
 	return GameConfig.get_int("domains.chat_command", "gm_index/max_pages", 4)
 
-## 默认命令目录（gm_index/default_commands 配置，窗口为空时兜底）
+## 默认命令目录（gm_index/default_commands 配置，窗口为空时默认回退）
 static func _default_commands() -> Array:
 	return GameConfig.get_array("domains.chat_command", "gm_index/default_commands", ["give", "gold", "god", "time"])
 
@@ -69,21 +69,21 @@ func page_pool_size() -> int:
 func query(prefix: String) -> Dictionary:
 	var matched := _filtered(prefix)
 	var total: int = min(matched.size(), _window_size())
-	var page_sz := maxi(1, _page_size())
-	var total_pages := ceili(float(total) / float(page_sz)) if total > 0 else 0
+	var page_size := maxi(1, _page_size())
+	var total_pages := ceili(float(total) / float(page_size)) if total > 0 else 0
 	_cursor_page = clampi(_cursor_page, 0, maxi(0, total_pages - 1))
 	var entries := _take_page_buffer()
 	if total_pages > 0:
-		var start := _cursor_page * page_sz
-		for i in range(start, min(start + page_sz, total)):
-			entries.append(matched[i])
+		var start := _cursor_page * page_size
+		for entry_index in range(start, min(start + page_size, total)):
+			entries.append(matched[entry_index])
 	return {
 		"success": true,
 		"entries": entries,
 		"total": total,
 		"page_index": _cursor_page,
 		"total_pages": total_pages,
-		"page_size": page_sz
+		"page_size": page_size
 	}
 
 ## 滚动到下一页 / 上一页（复用页缓冲池，游标有界）
@@ -111,8 +111,8 @@ func apply_recent_completion(prefix: String) -> Dictionary:
 # 内部实现
 # ==============================================================================
 
-static func _normalize(cmd: String) -> String:
-	var name := cmd.strip_edges().to_lower()
+static func _normalize(raw_command: String) -> String:
+	var name := raw_command.strip_edges().to_lower()
 	if name.begins_with("/"):
 		name = name.substr(1)
 	return name
@@ -131,11 +131,11 @@ func _filtered(prefix: String) -> Array:
 	var catalog := _catalog()
 	if key.is_empty():
 		return catalog
-	var out: Array = []
-	for cmd in catalog:
-		if str(cmd).begins_with(key):
-			out.append(cmd)
-	return out
+	var filtered_commands: Array = []
+	for command_entry in catalog:
+		if str(command_entry).begins_with(key):
+			filtered_commands.append(command_entry)
+	return filtered_commands
 
 ## 从页缓冲池取页：池未满则新建（容量上限 max_pages），满则轮转复用最旧页
 func _take_page_buffer() -> Array:

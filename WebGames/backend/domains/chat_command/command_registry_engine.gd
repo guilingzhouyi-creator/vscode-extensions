@@ -18,13 +18,13 @@ static var registered_commands: Dictionary = {}
 
 ## 注册指令（小写归一键；必须传具名静态函数，禁 lambda 防悬垂 Callable）
 static func register_command(
-	cmd_name: String,
+	command_name: String,
 	handler: Callable,
 	min_admin_level: int = 0,
 	description: String = "",
 	usage_hint: String = ""
 ) -> void:
-	registered_commands[cmd_name.to_lower()] = {
+	registered_commands[command_name.to_lower()] = {
 		"handler": handler,
 		"min_level": min_admin_level,
 		"desc": description,
@@ -32,8 +32,8 @@ static func register_command(
 	}
 
 ## 注销单条指令（测试隔离与热重载场景必须调用）
-static func unregister_command(cmd_name: String) -> bool:
-	return registered_commands.erase(cmd_name.to_lower())
+static func unregister_command(command_name: String) -> bool:
+	return registered_commands.erase(command_name.to_lower())
 
 ## 清空全部注册（facade: 测试隔离与引擎重置统一收口）
 static func clear_registry() -> void:
@@ -41,8 +41,8 @@ static func clear_registry() -> void:
 		registered_commands.clear()
 
 ## 指令是否已注册（小写匹配）
-static func has_command(cmd_name: String) -> bool:
-	return registered_commands.has(cmd_name.to_lower())
+static func has_command(command_name: String) -> bool:
+	return registered_commands.has(command_name.to_lower())
 
 ## 已注册指令总数（facade: 供测试断言与状态自检读取）
 static func registered_count() -> int:
@@ -51,19 +51,19 @@ static func registered_count() -> int:
 ## 指令分发：非指令/未知/权限不足逐级拦截后调用处理器
 static func dispatch_command(ast: ChatCommandParser.CommandAST, admin: AdminPermissionAggregate, context: Dictionary) -> Dictionary:
 	if not ast.is_command:
-		var msg := GameConfig.get_string("narratives.chat_command", "not_a_command", "Not a command")
-		return {"success": false, "reason": msg}
+		var error_reason := GameConfig.get_string("narratives.chat_command", "not_a_command", "Not a command")
+		return {"success": false, "reason": error_reason}
 
-	var cmd: Variant = registered_commands.get(ast.command_name, null)
-	if cmd == null:
+	var command_entry: Variant = registered_commands.get(ast.command_name, null)
+	if command_entry == null:
 		var template := GameConfig.get_string("narratives.chat_command", "unknown_chat_command", "Unknown command: /%s")
 		return {"success": false, "reason": template % ast.command_name}
 
-	if not admin.has_permission(cmd.min_level):
-		var tmpl2 := GameConfig.get_string("narratives.chat_command", "permission_denied", "Permission denied for command: /%s")
-		return {"success": false, "reason": tmpl2 % ast.command_name}
+	if not admin.has_permission(command_entry.min_level):
+		var permission_template := GameConfig.get_string("narratives.chat_command", "permission_denied", "Permission denied for command: /%s")
+		return {"success": false, "reason": permission_template % ast.command_name}
 
-	var handler: Callable = cmd.handler
+	var handler: Callable = command_entry.handler
 	return handler.call(ast, context)
 
 ## 前缀自动补全建议（去 / 前缀 + 小写化，返回 /cmd 形式数组）
@@ -71,7 +71,7 @@ static func get_autocomplete_suggestions(prefix: String) -> Array[String]:
 	var clean: String = prefix.strip_edges().to_lower()
 	if clean.begins_with("/"): clean = clean.substr(1)
 	var matches: Array[String] = []
-	for k in registered_commands:
-		if k.begins_with(clean):
-			matches.append("/" + k)
+	for registered_key in registered_commands:
+		if registered_key.begins_with(clean):
+			matches.append("/" + registered_key)
 	return matches

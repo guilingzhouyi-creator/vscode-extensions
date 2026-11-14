@@ -34,18 +34,18 @@ static func parse_input_line(input_text: String) -> CommandAST:
 		return ast
 
 	ast.command_name = tokens[0].to_lower()
-	for i in range(1, tokens.size()):
-		var token: Variant = tokens[i]
+	for token_index in range(1, tokens.size()):
+		var token: Variant = tokens[token_index]
 		if token.contains("="):
-			var kv: PackedStringArray = token.split("=", false, 1)
-			if kv.size() == 2:
-				ast.named_arguments[kv[0]] = _infer_token_type(kv[1])
+			var key_value_parts: PackedStringArray = token.split("=", false, 1)
+			if key_value_parts.size() == 2:
+				ast.named_arguments[key_value_parts[0]] = _infer_token_type(key_value_parts[1])
 		else:
 			ast.raw_arguments.append(_infer_token_type(token))
 
 	return ast
 
-## 参数类型推导：int/float/bool 逐级试探，兜底字符串
+## 参数类型推导：int/float/bool 逐级试探，默认回退字符串
 static func _infer_token_type(token: String) -> Variant:
 	if token.is_valid_int():
 		return token.to_int()

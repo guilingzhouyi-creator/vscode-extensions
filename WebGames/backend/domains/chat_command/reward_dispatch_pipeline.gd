@@ -3,7 +3,7 @@
 # 文件路径: res://backend/domains/chat_command/reward_dispatch_pipeline.gd
 # 架构定位: Business Pipeline / Transaction Safe Orchestrator
 # 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/chat_command.json | 信号: EventBus 领域广播
-# 职责说明: CDKey 兑换码格式校验、防重放核销与全服/个人邮件道具发放 兑换表由 config/domains/chat_command.json 的 cdkeys 驱动，文案由 config/narratives/chat_command.json 驱动，礼包兜底名取自本域表。 发放走物品注册表三元组（item_id 必填为已登记 canonical_id，原型属性为 单一事实源，无效配置严格拒绝，无兼容临时物件路径）。 契约: 表内键值与下方各取值器的兜底默认值逐字一致——改表即改行为， TC-CMD-03（KALAR666 -> gold 500）守此契约，改表后该断言立即变红。
+# 职责说明: CDKey 兑换码格式校验、防重放核销与全服/个人邮件道具发放 兑换表由 config/domains/chat_command.json 的 cdkeys 驱动，文案由 config/narratives/chat_command.json 驱动，礼包默认名取自本域表。 发放走物品注册表三元组（item_id 必填为已登记 canonical_id，原型属性为 单一事实源，无效配置严格拒绝，无兼容临时物件路径）。 契约: 表内键值与下方各取值器的安全回退默认值逐字一致——改表即改行为， TC-CMD-03（KALAR666 -> gold 500）守此契约，改表后该断言立即变红。
 # 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
@@ -23,38 +23,38 @@ static func redeem_cdkey(
 	wallet: CharacterWalletEntity,
 	inventory: WearableInventoryAggregate,
 	catalog: ItemRegistryCatalog,
-	library: AccountItemLibraryAggregate = null
+	library: AccountItemLibrary = null
 ) -> Dictionary:
 	var clean_key: String = cdkey.strip_edges().to_upper()
 	var valid := _valid_cdkeys()
 	if not valid.has(clean_key):
-		var msg := GameConfig.get_string("narratives.chat_command", "cdkey_invalid", "Invalid or expired CDKey: %s") % clean_key
-		return {"success": false, "reason": msg}
+		var invalid_message := GameConfig.get_string("narratives.chat_command", "cdkey_invalid", "Invalid or expired CDKey: %s") % clean_key
+		return {"success": false, "reason": invalid_message}
 
 	var user_redeemed: Variant = redeemed_keys.get(account_id, [])
 	if clean_key in user_redeemed:
-		var msg2 := GameConfig.get_string("narratives.chat_command", "cdkey_redeemed", "CDKey already redeemed by this account.")
-		return {"success": false, "reason": msg2}
+		var redeemed_message := GameConfig.get_string("narratives.chat_command", "cdkey_redeemed", "CDKey already redeemed by this account.")
+		return {"success": false, "reason": redeemed_message}
 
 	var reward: Dictionary = valid[clean_key] as Dictionary
 	# 注册表三元组发放：item_id 必填且须为已登记 canonical_id
 	var item_id := str(reward.get("item_id", ""))
 	if item_id.is_empty():
-		var msg3 := GameConfig.get_string("narratives.chat_command", "cdkey_item_id_missing", "Reward item_id missing for CDKey: %s") % clean_key
-		return {"success": false, "reason": msg3}
-	var proto: Variant = catalog.get_prototype(item_id)
-	if proto == null:
-		var msg4 := GameConfig.get_string("narratives.chat_command", "cdkey_item_not_found", "Reward item not registered: %s") % item_id
-		return {"success": false, "reason": msg4}
+		var missing_item_message := GameConfig.get_string("narratives.chat_command", "cdkey_item_id_missing", "Reward item_id missing for CDKey: %s") % clean_key
+		return {"success": false, "reason": missing_item_message}
+	var prototype: Variant = catalog.get_prototype(item_id)
+	if prototype == null:
+		var not_found_message := GameConfig.get_string("narratives.chat_command", "cdkey_item_not_found", "Reward item not registered: %s") % item_id
+		return {"success": false, "reason": not_found_message}
 
 	var fallback := GameConfig.get_string("domains.chat_command", "item_defaults/custom_name", "神秘礼包")
 	var display_name := str(reward.get("item_name", fallback))
-	var item := ItemInstanceFactory.build_instance(proto, display_name, "CDK_", GameConfig.get_string("domains.chat_command", "reward/item_id_prefix", "CDKEY_REWARD_"))
+	var item := ItemInstanceFactory.build_instance(prototype, display_name, "CDK_", GameConfig.get_string("domains.chat_command", "reward/item_id_prefix", "CDKEY_REWARD_"))
 	# 原子性：先落物品，成功后才入账货币并核销兑换码——任一步失败整体回滚（货币未动、码未消耗），
 	# 杜绝「背包满 → 反复重试刷取金币」漏洞
 	if not inventory.add_item(item):
-		var msg5 := GameConfig.get_string("narratives.chat_command", "cdkey_inventory_full", "Inventory full, reward not granted: %s") % clean_key
-		return {"success": false, "reason": msg5}
+		var inventory_full_message := GameConfig.get_string("narratives.chat_command", "cdkey_inventory_full", "Inventory full, reward not granted: %s") % clean_key
+		return {"success": false, "reason": inventory_full_message}
 
 	if library != null:
 		ItemStatisticsSolver.record_item_event(library, ItemStatisticsSolver.EVENT_ITEM_GRANTED, item_id, 1, catalog, null, {
