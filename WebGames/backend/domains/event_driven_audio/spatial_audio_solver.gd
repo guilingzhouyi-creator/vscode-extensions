@@ -17,43 +17,43 @@ extends RefCounted
 
 ## 空间声学求值：线性距离衰减 + 左右声相 Pan + 超半径禁播（防爆音截断）
 ## 契约：非空间音直接可播（volume = volume_scale * master_volume，pan = 0）；
-##       dist >= max_audible_distance → play=false（禁播）；否则 eff_vol > 0.001 才可播。
+##       distance >= max_audible_distance → play=false（禁播）；否则 effective_volume > 0.001 才可播。
 ## 性能：常量级求值，无循环与瞬态分配。
 static func evaluate_spatial_audio(
-	cmd: AudioDispatchCommandDTO,
-	listener_pos: Vector2,
+	command: AudioDispatchCommandDTO,
+	listener_position: Vector2,
 	master_volume: float
 ) -> Dictionary:
-	if not cmd.is_spatial:
+	if not command.is_spatial:
 		return {
 			"play": true,
-			"effective_volume": cmd.volume_scale * master_volume,
+			"effective_volume": command.volume_scale * master_volume,
 			"pan": 0.0,
-			"pitch": cmd.pitch_scale
+			"pitch": command.pitch_scale
 		}
 
-	var dist: float = listener_pos.distance_to(cmd.source_pos)
-	if dist >= cmd.max_audible_distance:
+	var distance: float = listener_position.distance_to(command.source_pos)
+	if distance >= command.max_audible_distance:
 		return {
 			"play": false,
 			"effective_volume": 0.0,
 			"pan": 0.0,
-			"pitch": cmd.pitch_scale
+			"pitch": command.pitch_scale
 		}
 
 	# 线性几何声学距离衰减：1.0（贴脸）→ 0.0（可听半径边缘）
-	var dist_factor := clampf(1.0 - (dist / cmd.max_audible_distance), 0.0, 1.0)
-	var eff_vol: Variant = cmd.volume_scale * dist_factor * master_volume
+	var distance_factor := clampf(1.0 - (distance / command.max_audible_distance), 0.0, 1.0)
+	var effective_volume: Variant = command.volume_scale * distance_factor * master_volume
 
 	# 左右声道水平声相 (Pan: -1.0 左, +1.0 右)
-	var delta_x: Variant = cmd.source_pos.x - listener_pos.x
-	var pan := clampf(delta_x / cmd.max_audible_distance, -1.0, 1.0)
+	var delta_x: Variant = command.source_pos.x - listener_position.x
+	var pan := clampf(delta_x / command.max_audible_distance, -1.0, 1.0)
 
 	return {
-		"play": eff_vol > 0.001,
-		"effective_volume": eff_vol,
+		"play": effective_volume > 0.001,
+		"effective_volume": effective_volume,
 		"pan": pan,
-		"pitch": cmd.pitch_scale
+		"pitch": command.pitch_scale
 	}
 
 # ==============================================================================
@@ -61,9 +61,9 @@ static func evaluate_spatial_audio(
 # ==============================================================================
 
 ## 空间声学事件广播：经 EventBusCore 对象池与空间哈希网格派发
-static func dispatch_spatial_audio_event(source_pos: Vector3, audio_cmd: RefCounted, max_dist: float) -> void:
+static func dispatch_spatial_audio_event(source_position: Vector3, audio_command: RefCounted, max_distance: float) -> void:
 	var bus := EventBusCore.get_instance()
 	var packet := bus.borrow_packet(EventChannelDefinition.SPATIAL_AUDIO_PLAY, EventCategoryMask.SPATIAL_AUDIO)
-	packet.payload_dto = audio_cmd
-	bus.dispatch_spatial(packet, source_pos, max_dist)
+	packet.payload_dto = audio_command
+	bus.dispatch_spatial(packet, source_position, max_distance)
 	bus.recycle_packet(packet)

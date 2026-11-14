@@ -15,7 +15,7 @@ extends RefCounted
 # 一、默认常量与总线轨枚举
 # ==============================================================================
 
-## 默认最大可听半径（米；command_defaults/max_audible_distance 缺省兜底）
+## 默认最大可听半径（米；command_defaults/max_audible_distance 缺省回退）
 const DEFAULT_MAX_AUDIBLE_DISTANCE: float = 20.0
 ## 默认音量缩放（1.0 = 原音量）
 const DEFAULT_VOLUME_SCALE: float = 1.0
@@ -54,18 +54,18 @@ var fade_duration_seconds: float = GameConfig.get_float("domains.event_driven_au
 
 ## 音频调度命令构造（ID/总线轨/音量/音高/空间坐标/可听半径）
 func _init(
-	p_id: String = "",
-	p_track: AudioBusTrack = AudioBusTrack.SE,
-	p_vol: float = DEFAULT_VOLUME_SCALE,
-	p_pitch: float = DEFAULT_PITCH_SCALE,
-	p_spatial: bool = false,
-	p_pos: Vector2 = Vector2.ZERO,
-	p_max_dist: float = DEFAULT_MAX_AUDIBLE_DISTANCE
+	initial_sound_id: String = "",
+	initial_bus_track: AudioBusTrack = AudioBusTrack.SE,
+	initial_volume_scale: float = DEFAULT_VOLUME_SCALE,
+	initial_pitch_scale: float = DEFAULT_PITCH_SCALE,
+	initial_is_spatial: bool = false,
+	initial_source_position: Vector2 = Vector2.ZERO,
+	initial_max_audible_distance: float = DEFAULT_MAX_AUDIBLE_DISTANCE
 ) -> void:
-	sound_id = p_id
-	bus_track = p_track
-	volume_scale = p_vol
-	pitch_scale = p_pitch
-	is_spatial = p_spatial
-	source_pos = p_pos
-	max_audible_distance = p_max_dist
+	sound_id = initial_sound_id
+	bus_track = initial_bus_track
+	volume_scale = initial_volume_scale
+	pitch_scale = initial_pitch_scale
+	is_spatial = initial_is_spatial
+	source_pos = initial_source_position
+	max_audible_distance = initial_max_audible_distance
