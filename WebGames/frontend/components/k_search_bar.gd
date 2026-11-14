@@ -20,7 +20,7 @@ signal search_cleared()
 @export var debounce_sec: float = 0.3
 @export var min_query_length: int = 0
 
-var _hbox: HBoxContainer
+var _search_row: HBoxContainer
 var _line_edit: LineEdit
 var _clear_button: Button
 
@@ -31,10 +31,10 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	mouse_filter = MOUSE_FILTER_IGNORE
 
-	_hbox = HBoxContainer.new()
-	_hbox.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
-	_hbox.add_theme_constant_override("separation", DesignTokens.SPACING_XS)
-	add_child(_hbox)
+	_search_row = HBoxContainer.new()
+	_search_row.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	_search_row.add_theme_constant_override("separation", DesignTokens.SPACING_XS)
+	add_child(_search_row)
 
 	_line_edit = LineEdit.new()
 	_line_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -44,7 +44,7 @@ func _ready() -> void:
 	_line_edit.add_theme_color_override("font_uneditable_color", DesignTokens.COLOR_TEXT_DISABLED)
 	_line_edit.add_theme_color_override("font_placeholder_color", DesignTokens.COLOR_TEXT_MUTED)
 	_apply_input_style()
-	_hbox.add_child(_line_edit)
+	_search_row.add_child(_line_edit)
 
 	_clear_button = Button.new()
 	_clear_button.text = "x"
@@ -53,7 +53,7 @@ func _ready() -> void:
 	_clear_button.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_SECONDARY)
 	_clear_button.add_theme_color_override("font_hover_color", DesignTokens.COLOR_TEXT_PRIMARY)
 	_clear_button.visible = false
-	_hbox.add_child(_clear_button)
+	_search_row.add_child(_clear_button)
 
 	UIIntermediary.resolve_placeholder(_line_edit, placeholder_key)
 	_line_edit.text_changed.connect(_on_text_changed)
@@ -64,14 +64,14 @@ static var _shared_input_style: StyleBoxFlat = null
 
 func _apply_input_style() -> void:
 	if _shared_input_style == null:
-		var style := StyleBoxFlat.new()
-		style.bg_color = DesignTokens.COLOR_SURFACE_CARD
-		style.set_border_width_all(1)
-		style.border_color = DesignTokens.COLOR_BORDER_DEFAULT
-		style.set_corner_radius_all(3)
-		style.content_margin_left = DesignTokens.SPACING_SM
-		style.content_margin_right = DesignTokens.SPACING_SM
-		_shared_input_style = style
+		var input_style := StyleBoxFlat.new()
+		input_style.bg_color = DesignTokens.COLOR_SURFACE_CARD
+		input_style.set_border_width_all(1)
+		input_style.border_color = DesignTokens.COLOR_BORDER_DEFAULT
+		input_style.set_corner_radius_all(3)
+		input_style.content_margin_left = DesignTokens.SPACING_SM
+		input_style.content_margin_right = DesignTokens.SPACING_SM
+		_shared_input_style = input_style
 	_line_edit.add_theme_stylebox_override("normal", _shared_input_style)
 	_line_edit.add_theme_stylebox_override("focus", _shared_input_style)
 
@@ -108,10 +108,10 @@ func get_query() -> String:
 	return _line_edit.text.strip_edges().to_lower()
 
 ## 更新输入框占位文本的 i18n 键并立即解析刷新
-func set_placeholder(key: String) -> void:
-	placeholder_key = key
+func set_placeholder(i18n_key: String) -> void:
+	placeholder_key = i18n_key
 	if _line_edit != null:
-		UIIntermediary.resolve_placeholder(_line_edit, key)
+		UIIntermediary.resolve_placeholder(_line_edit, i18n_key)
 
 ## 清空输入文本与待触发去抖计时器，并发出清空信号
 func clear() -> void:

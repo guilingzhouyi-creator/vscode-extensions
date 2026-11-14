@@ -67,8 +67,8 @@ func _apply_style_variant() -> void:
 	var style_pressed := StyleBoxFlat.new()
 	var style_disabled := StyleBoxFlat.new()
 
-	for style in [style_normal, style_hover, style_pressed, style_disabled]:
-		style.set_corner_radius_all(4)
+	for variant_style in [style_normal, style_hover, style_pressed, style_disabled]:
+		variant_style.set_corner_radius_all(4)
 
 	match variant:
 		StyleVariant.PRIMARY:

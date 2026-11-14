@@ -122,8 +122,8 @@ func reset() -> void:
 	_context = {}
 
 ## 状态名称格式化工具
-func get_state_name(state: AppState) -> String:
-	match state:
+func get_state_name(app_state: AppState) -> String:
+	match app_state:
 		AppState.BOOT: return "BOOT"
 		AppState.INITIALIZING: return "INITIALIZING"
 		AppState.AUTHENTICATING: return "AUTHENTICATING"

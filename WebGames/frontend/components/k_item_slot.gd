@@ -44,7 +44,7 @@ signal slot_right_clicked(item_id: String)
 var _border_panel: PanelContainer
 var _count_label: Label
 var _caption_label: Label
-var _icon_rect: TextureRect
+var _icon_texture_rect: TextureRect
 
 func _ready() -> void:
 	if custom_minimum_size == Vector2.ZERO:
@@ -74,12 +74,12 @@ func _setup_ui() -> void:
 	_border_panel.mouse_filter = MOUSE_FILTER_IGNORE
 	add_child(_border_panel)
 
-	_icon_rect = TextureRect.new()
-	_icon_rect.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
-	_icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_icon_rect.mouse_filter = MOUSE_FILTER_IGNORE
-	add_child(_icon_rect)
+	_icon_texture_rect = TextureRect.new()
+	_icon_texture_rect.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	_icon_texture_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_icon_texture_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_icon_texture_rect.mouse_filter = MOUSE_FILTER_IGNORE
+	add_child(_icon_texture_rect)
 
 	_count_label = Label.new()
 	_count_label.set_anchors_and_offsets_preset(PRESET_TOP_RIGHT)
@@ -102,29 +102,29 @@ func _setup_ui() -> void:
 static var _cached_panel_styles: Dictionary = {}
 
 static func _get_slot_style(rarity: int, is_locked: bool, is_selected: bool) -> StyleBoxFlat:
-	var norm_rarity: int = rarity if (rarity >= 1 and rarity <= 5) else 1
+	var normalized_rarity: int = rarity if (rarity >= 1 and rarity <= 5) else 1
 	# 位掩码合并 rarity(1..5)、锁定态(bit3)与选中态(bit4)，复用静态 StyleBoxFlat 实例
-	var cache_key: int = norm_rarity | (8 if is_locked else 0) | (16 if is_selected else 0)
+	var cache_key: int = normalized_rarity | (8 if is_locked else 0) | (16 if is_selected else 0)
 	if _cached_panel_styles.has(cache_key):
 		return _cached_panel_styles[cache_key] as StyleBoxFlat
-	var style := StyleBoxFlat.new()
-	style.bg_color = DesignTokens.COLOR_SURFACE_CARD
-	style.set_corner_radius_all(4)
-	style.set_border_width_all(3 if is_selected else 2)
+	var slot_style := StyleBoxFlat.new()
+	slot_style.bg_color = DesignTokens.COLOR_SURFACE_CARD
+	slot_style.set_corner_radius_all(4)
+	slot_style.set_border_width_all(3 if is_selected else 2)
 	if is_selected:
-		style.border_color = DesignTokens.COLOR_ACCENT_GOLD
+		slot_style.border_color = DesignTokens.COLOR_ACCENT_GOLD
 	elif is_locked:
-		style.border_color = DesignTokens.COLOR_TEXT_DISABLED
+		slot_style.border_color = DesignTokens.COLOR_TEXT_DISABLED
 	else:
-		match norm_rarity:
-			1: style.border_color = DesignTokens.COLOR_QUALITY_COMMON
-			2: style.border_color = DesignTokens.COLOR_QUALITY_UNCOMMON
-			3: style.border_color = DesignTokens.COLOR_QUALITY_RARE
-			4: style.border_color = DesignTokens.COLOR_QUALITY_EPIC
-			5: style.border_color = DesignTokens.COLOR_QUALITY_LEGENDARY
-			_: style.border_color = DesignTokens.COLOR_QUALITY_COMMON
-	_cached_panel_styles[cache_key] = style
-	return style
+		match normalized_rarity:
+			1: slot_style.border_color = DesignTokens.COLOR_QUALITY_COMMON
+			2: slot_style.border_color = DesignTokens.COLOR_QUALITY_UNCOMMON
+			3: slot_style.border_color = DesignTokens.COLOR_QUALITY_RARE
+			4: slot_style.border_color = DesignTokens.COLOR_QUALITY_EPIC
+			5: slot_style.border_color = DesignTokens.COLOR_QUALITY_LEGENDARY
+			_: slot_style.border_color = DesignTokens.COLOR_QUALITY_COMMON
+	_cached_panel_styles[cache_key] = slot_style
+	return slot_style
 
 func _update_visuals() -> void:
 	if _border_panel == null:
@@ -152,8 +152,8 @@ func reset_state() -> void:
 	locked = false
 	tooltip_text = ""
 	modulate = Color.WHITE
-	if _icon_rect != null and is_instance_valid(_icon_rect):
-		_icon_rect.texture = null
+	if _icon_texture_rect != null and is_instance_valid(_icon_texture_rect):
+		_icon_texture_rect.texture = null
 	_update_visuals()
 
 ## 批量注入物品展示数据并刷新边框与数量视觉表现
@@ -195,11 +195,11 @@ func _on_mouse_exited() -> void:
 	TooltipManager.get_instance().hide_tooltip()
 	modulate = DesignTokens.COLOR_LOCKED_MODULATE if locked else Color.WHITE
 
-func _on_gui_input(event: InputEvent) -> void:
+func _on_gui_input(input_event: InputEvent) -> void:
 	if locked:
 		return
-	if event is InputEventMouseButton and event.pressed:
-		if event.button_index == MOUSE_BUTTON_LEFT:
+	if input_event is InputEventMouseButton and input_event.pressed:
+		if input_event.button_index == MOUSE_BUTTON_LEFT:
 			slot_clicked.emit(item_id)
-		elif event.button_index == MOUSE_BUTTON_RIGHT:
+		elif input_event.button_index == MOUSE_BUTTON_RIGHT:
 			slot_right_clicked.emit(item_id)

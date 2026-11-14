@@ -24,7 +24,7 @@ signal count_changed(count: int)
 @export var show_count: bool = true
 @export var severity_level: int = 0 # 0: ERROR 红, 1: WARNING 黄, 2: INFO 蓝
 
-var _panel: PanelContainer
+var _badge_panel: PanelContainer
 var _count_label: Label
 
 func _ready() -> void:
@@ -40,15 +40,15 @@ func _exit_tree() -> void:
 		RedDotTreeManager.get_instance().red_dot_changed.disconnect(_on_red_dot_changed)
 
 func _setup_ui() -> void:
-	_panel = PanelContainer.new()
-	_panel.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
-	_panel.mouse_filter = MOUSE_FILTER_IGNORE
+	_badge_panel = PanelContainer.new()
+	_badge_panel.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	_badge_panel.mouse_filter = MOUSE_FILTER_IGNORE
 
-	var style := StyleBoxFlat.new()
-	style.bg_color = _get_severity_color()
-	style.set_corner_radius_all(8)
-	_panel.add_theme_stylebox_override("panel", style)
-	add_child(_panel)
+	var badge_style := StyleBoxFlat.new()
+	badge_style.bg_color = _get_severity_color()
+	badge_style.set_corner_radius_all(8)
+	_badge_panel.add_theme_stylebox_override("panel", badge_style)
+	add_child(_badge_panel)
 
 	_count_label = Label.new()
 	_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -56,7 +56,7 @@ func _setup_ui() -> void:
 	_count_label.add_theme_font_size_override("font_size", DesignTokens.FONT_SIZE_CAPTION)
 	_count_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_PRIMARY)
 	_count_label.mouse_filter = MOUSE_FILTER_IGNORE
-	_panel.add_child(_count_label)
+	_badge_panel.add_child(_count_label)
 
 func _get_severity_color() -> Color:
 	match severity_level:

@@ -24,7 +24,7 @@ const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
 @export var copper_icon: Texture2D = null
 @export var crystals_icon: Texture2D = null
 
-var _hbox: HBoxContainer
+var _currency_row: HBoxContainer
 var _gold_label: Label
 var _silver_label: Label
 var _copper_label: Label
@@ -33,10 +33,10 @@ var _crystals_label: Label
 func _ready() -> void:
 	mouse_filter = MOUSE_FILTER_IGNORE
 
-	_hbox = HBoxContainer.new()
-	_hbox.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
-	_hbox.add_theme_constant_override("separation", DesignTokens.SPACING_SM)
-	add_child(_hbox)
+	_currency_row = HBoxContainer.new()
+	_currency_row.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	_currency_row.add_theme_constant_override("separation", DesignTokens.SPACING_SM)
+	add_child(_currency_row)
 
 	if show_gold:
 		_gold_label = _build_currency_group(gold_icon, DesignTokens.COLOR_ACCENT_GOLD)
@@ -48,22 +48,22 @@ func _ready() -> void:
 		_crystals_label = _build_currency_group(crystals_icon, DesignTokens.COLOR_INFO)
 
 func _build_currency_group(icon: Texture2D, text_color: Color) -> Label:
-	var icon_rect := TextureRect.new()
-	icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon_rect.custom_minimum_size = Vector2(icon_size, icon_size)
-	icon_rect.texture = icon
-	icon_rect.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	icon_rect.mouse_filter = MOUSE_FILTER_IGNORE
-	_hbox.add_child(icon_rect)
+	var icon_texture_rect := TextureRect.new()
+	icon_texture_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon_texture_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon_texture_rect.custom_minimum_size = Vector2(icon_size, icon_size)
+	icon_texture_rect.texture = icon
+	icon_texture_rect.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon_texture_rect.mouse_filter = MOUSE_FILTER_IGNORE
+	_currency_row.add_child(icon_texture_rect)
 
-	var label := Label.new()
-	label.add_theme_font_size_override("font_size", DesignTokens.FONT_SIZE_BODY)
-	label.add_theme_color_override("font_color", text_color)
-	label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	label.mouse_filter = MOUSE_FILTER_IGNORE
-	_hbox.add_child(label)
-	return label
+	var currency_label := Label.new()
+	currency_label.add_theme_font_size_override("font_size", DesignTokens.FONT_SIZE_BODY)
+	currency_label.add_theme_color_override("font_color", text_color)
+	currency_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	currency_label.mouse_filter = MOUSE_FILTER_IGNORE
+	_currency_row.add_child(currency_label)
+	return currency_label
 
 ## 批量刷新金/银/铜/水晶四种货币显示数值
 func set_currency(gold: int, silver: int, copper: int, crystals: int = 0) -> void:

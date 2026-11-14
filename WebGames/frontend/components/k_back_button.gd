@@ -31,10 +31,10 @@ func _ready() -> void:
 	mouse_entered.connect(_on_mouse_entered)
 
 func _apply_style() -> void:
-	var style := StyleBoxFlat.new()
-	style.bg_color = DesignTokens.COLOR_SURFACE_CARD
-	style.set_corner_radius_all(4)
-	add_theme_stylebox_override("normal", style)
+	var button_style := StyleBoxFlat.new()
+	button_style.bg_color = DesignTokens.COLOR_SURFACE_CARD
+	button_style.set_corner_radius_all(4)
+	add_theme_stylebox_override("normal", button_style)
 	add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_SECONDARY)
 
 func _on_mouse_entered() -> void:

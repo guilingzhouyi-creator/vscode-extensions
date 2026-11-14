@@ -20,8 +20,8 @@ signal retry_requested()
 @export var empty_icon: Texture2D = null
 @export var error_icon: Texture2D = null
 
-var _vbox: VBoxContainer
-var _icon_rect: TextureRect
+var _vertical_container: VBoxContainer
+var _icon_texture_rect: TextureRect
 var _title_label: Label
 var _description_label: Label
 var _retry_button: Button
@@ -35,26 +35,26 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	mouse_filter = MOUSE_FILTER_IGNORE
 
-	var bg := PanelContainer.new()
-	bg.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
-	var style := StyleBoxFlat.new()
-	style.bg_color = DesignTokens.COLOR_SURFACE_PANEL
-	bg.add_theme_stylebox_override("panel", style)
-	add_child(bg)
+	var background_panel := PanelContainer.new()
+	background_panel.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	var background_style := StyleBoxFlat.new()
+	background_style.bg_color = DesignTokens.COLOR_SURFACE_PANEL
+	background_panel.add_theme_stylebox_override("panel", background_style)
+	add_child(background_panel)
 
-	_vbox = VBoxContainer.new()
-	_vbox.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
-	_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	_vbox.add_theme_constant_override("separation", DesignTokens.SPACING_SM)
-	bg.add_child(_vbox)
+	_vertical_container = VBoxContainer.new()
+	_vertical_container.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
+	_vertical_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	_vertical_container.add_theme_constant_override("separation", DesignTokens.SPACING_SM)
+	background_panel.add_child(_vertical_container)
 
-	_icon_rect = TextureRect.new()
-	_icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_icon_rect.custom_minimum_size = Vector2(48, 48)
-	_icon_rect.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	_icon_rect.mouse_filter = MOUSE_FILTER_IGNORE
-	_vbox.add_child(_icon_rect)
+	_icon_texture_rect = TextureRect.new()
+	_icon_texture_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_icon_texture_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_icon_texture_rect.custom_minimum_size = Vector2(48, 48)
+	_icon_texture_rect.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_icon_texture_rect.mouse_filter = MOUSE_FILTER_IGNORE
+	_vertical_container.add_child(_icon_texture_rect)
 
 	_title_label = Label.new()
 	_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -62,7 +62,7 @@ func _ready() -> void:
 	_title_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_SECONDARY)
 	_title_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_title_label.mouse_filter = MOUSE_FILTER_IGNORE
-	_vbox.add_child(_title_label)
+	_vertical_container.add_child(_title_label)
 
 	_description_label = Label.new()
 	_description_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -70,7 +70,7 @@ func _ready() -> void:
 	_description_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_MUTED)
 	_description_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_description_label.mouse_filter = MOUSE_FILTER_IGNORE
-	_vbox.add_child(_description_label)
+	_vertical_container.add_child(_description_label)
 
 	_retry_button = Button.new()
 	_retry_button.text = UIIntermediary.text("ui.common.retry")
@@ -79,7 +79,7 @@ func _ready() -> void:
 	_retry_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_retry_button.visible = false
 	_retry_button.pressed.connect(_on_retry_pressed)
-	_vbox.add_child(_retry_button)
+	_vertical_container.add_child(_retry_button)
 
 	set_state(State.READY)
 
@@ -87,25 +87,25 @@ func _on_retry_pressed() -> void:
 	retry_requested.emit()
 
 ## 切换当前状态面板枚举态并同步更新图标、文案与重试按钮可见性
-func set_state(state: int) -> void:
-	_current_state = state
-	match state:
+func set_state(next_state: int) -> void:
+	_current_state = next_state
+	match next_state:
 		State.LOADING:
-			_icon_rect.visible = false
+			_icon_texture_rect.visible = false
 			_title_label.text = UIIntermediary.text(_loading_key)
 			_description_label.visible = false
 			_retry_button.visible = false
 			visible = true
 		State.EMPTY:
-			_icon_rect.texture = empty_icon
-			_icon_rect.visible = empty_icon != null
+			_icon_texture_rect.texture = empty_icon
+			_icon_texture_rect.visible = empty_icon != null
 			_title_label.text = UIIntermediary.text(_empty_key)
 			_description_label.visible = false
 			_retry_button.visible = false
 			visible = true
 		State.ERROR:
-			_icon_rect.texture = error_icon
-			_icon_rect.visible = error_icon != null
+			_icon_texture_rect.texture = error_icon
+			_icon_texture_rect.visible = error_icon != null
 			_title_label.text = UIIntermediary.text(_error_key)
 			_description_label.visible = false
 			_retry_button.visible = true
@@ -114,23 +114,23 @@ func set_state(state: int) -> void:
 			visible = false
 
 ## 设置空态提示文案的 i18n 键（当前处于空态时立即刷新显示）
-func set_empty_text(key: String) -> void:
-	_empty_key = key
+func set_empty_text(i18n_key: String) -> void:
+	_empty_key = i18n_key
 	if _current_state == State.EMPTY and _title_label != null:
-		_title_label.text = UIIntermediary.text(key)
+		_title_label.text = UIIntermediary.text(i18n_key)
 
 ## 设置错误态提示文案的 i18n 键（当前处于错误态时立即刷新显示）
-func set_error_text(key: String) -> void:
-	_error_key = key
+func set_error_text(i18n_key: String) -> void:
+	_error_key = i18n_key
 	if _current_state == State.ERROR and _title_label != null:
-		_title_label.text = UIIntermediary.text(key)
+		_title_label.text = UIIntermediary.text(i18n_key)
 
 ## 设置加载态提示文案的 i18n 键（当前处于加载态时立即刷新显示）
-func set_loading_text(key: String) -> void:
-	_loading_key = key
+func set_loading_text(i18n_key: String) -> void:
+	_loading_key = i18n_key
 	if _current_state == State.LOADING and _title_label != null:
-		_title_label.text = UIIntermediary.text(key)
+		_title_label.text = UIIntermediary.text(i18n_key)
 
 ## 绑定重试按钮点击后的外部回调
-func bind_retry(callback: Callable) -> void:
-	retry_requested.connect(callback)
+func bind_retry(retry_callback: Callable) -> void:
+	retry_requested.connect(retry_callback)

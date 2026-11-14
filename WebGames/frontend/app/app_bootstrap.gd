@@ -22,13 +22,13 @@ const AppLifecycleFSM = preload("res://frontend/app/app_lifecycle_fsm.gd")
 const ServiceLocator = preload("res://frontend/domain_boundary/service_locator.gd")
 
 ## 引导幂等守卫：重复引导时跳过生命周期推进与默认入口压栈，避免状态机重入
-static var _bootstrapped: bool = false
+static var _is_bootstrapped: bool = false
 
 ## 应用骨架装配（幂等：重复调用仅幂等重绑导航根与 UI 基础设施，不重跑生命周期/入口压栈）
 static func bootstrap(app_root: AppRoot) -> void:
 	# 1. 绑定分层导航器（幂等重绑）
-	var nav_manager := NavManager.get_instance()
-	nav_manager.bind_root(app_root)
+	var navigation_manager := NavManager.get_instance()
+	navigation_manager.bind_root(app_root)
 
 	# 2. 初始化 UI 基础设施管理器（幂等重绑）
 	if app_root != null:
@@ -43,9 +43,9 @@ static func bootstrap(app_root: AppRoot) -> void:
 	UIAudioBridge.get_instance()
 
 	# 已完成首次引导则保留上述幂等重绑，跳过后续生命周期驱动与默认入口压栈
-	if _bootstrapped:
+	if _is_bootstrapped:
 		return
-	_bootstrapped = true
+	_is_bootstrapped = true
 
 	# 3. 初始化服务容器并驱动应用生命周期状态机（版本握手 → 鉴权入口）
 	var services := ServiceLocator.get_instance()
@@ -57,7 +57,7 @@ static func bootstrap(app_root: AppRoot) -> void:
 		app_root.theme = theme_manager.theme
 
 	# 5. 推入默认入口视图（账号入口）
-	nav_manager.push_screen("account_entry")
+	navigation_manager.push_screen("account_entry")
 
 ## 启动态推进：BOOT → INITIALIZING →（版本握手）→ AUTHENTICATING
 static func _drive_lifecycle_boot(services: ServiceContainer) -> void:
@@ -67,8 +67,8 @@ static func _drive_lifecycle_boot(services: ServiceContainer) -> void:
 	if version_service == null:
 		lifecycle.transition_to(AppLifecycleFSM.AppState.ERROR)
 		return
-	version_service.check_version_async(func(result: Dictionary) -> void:
-		if bool(result.get("compatible", false)):
+	version_service.check_version_async(func(version_response: Dictionary) -> void:
+		if bool(version_response.get("compatible", false)):
 			lifecycle.transition_to(AppLifecycleFSM.AppState.AUTHENTICATING)
 		else:
 			lifecycle.transition_to(AppLifecycleFSM.AppState.ERROR)
