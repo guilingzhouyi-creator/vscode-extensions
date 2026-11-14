@@ -22,11 +22,11 @@ const ERR_UNKNOWN_GAME_MODE_STORAGE: String = "ERR_UNKNOWN_GAME_MODE_STORAGE"
 
 ## 校验当前游戏世界状态是否允许执行安全保存或退网关
 static func evaluate_save_readiness(
-	in_combat: bool,
-	in_critical_narrative: bool,
+	is_in_combat: bool,
+	is_in_critical_narrative: bool,
 	is_world_quarantined: bool = false
 ) -> Dictionary:
-	if in_combat:
+	if is_in_combat:
 		return {
 			"allowed": false,
 			"is_ready": false,
@@ -36,7 +36,7 @@ static func evaluate_save_readiness(
 			"error_code": ERR_CANNOT_SAVE_IN_COMBAT,
 			"reason_narrative_key": "errors.save_blocked_combat"
 		}
-	if in_critical_narrative:
+	if is_in_critical_narrative:
 		return {
 			"allowed": false,
 			"is_ready": false,

@@ -136,26 +136,26 @@ static func encode_to_bytes(packet: AgentHudTelemetryPacketDTO) -> PackedByteArr
 	var delta_count: int = mini(255, packet.causal_deltas.size())
 	stream_buffer.put_u8(delta_count)
 	for delta_index in range(delta_count):
-		var delta_item: HudCausalDeltaDTO = packet.causal_deltas[delta_index]
-		var field_code: int = int(FIELD_TO_CODE.get(delta_item.target_field, 0))
+		var delta_entry: HudCausalDeltaDTO = packet.causal_deltas[delta_index]
+		var field_code: int = int(FIELD_TO_CODE.get(delta_entry.target_field, 0))
 		stream_buffer.put_u8(field_code)
-		stream_buffer.put_float(delta_item.delta_amount)
+		stream_buffer.put_float(delta_entry.delta_amount)
 
 	# 4. 动态行动空间指令集
 	var action_count: int = mini(255, packet.action_space.size())
 	stream_buffer.put_u8(action_count)
 	for action_index in range(action_count):
-		var directive_item: AgentActionDirectiveDTO = packet.action_space[action_index]
-		var directive_code: int = int(DIR_TO_CODE.get(directive_item.directive_id, 0))
+		var directive_entry: AgentActionDirectiveDTO = packet.action_space[action_index]
+		var directive_code: int = int(DIR_TO_CODE.get(directive_entry.directive_id, 0))
 		stream_buffer.put_u8(directive_code)
-		stream_buffer.put_u8(1 if directive_item.is_executable else 0)
+		stream_buffer.put_u8(1 if directive_entry.is_executable else 0)
 
 	return stream_buffer.data_array
 
 ## 从 PackedByteArray 字节流反解为 AgentHudTelemetryPacketDTO (支持原位槽位复用)
 static func decode_from_bytes(
 	bytes: PackedByteArray,
-	out_packet: AgentHudTelemetryPacketDTO = null
+	target_packet: AgentHudTelemetryPacketDTO = null
 ) -> AgentHudTelemetryPacketDTO:
 	if bytes.size() < 16:
 		return null
@@ -170,7 +170,7 @@ static func decode_from_bytes(
 	if protocol_version != PROTOCOL_VER:
 		return null
 
-	var packet: AgentHudTelemetryPacketDTO = out_packet if out_packet != null else AgentHudTelemetryPacketDTO.new()
+	var packet: AgentHudTelemetryPacketDTO = target_packet if target_packet != null else AgentHudTelemetryPacketDTO.new()
 	packet.reset_state()
 	packet.protocol_version = "1.0.0"
 
@@ -231,8 +231,8 @@ static func _decode_causal_delta_entry(stream_buffer: StreamPeerBuffer) -> HudCa
 
 static func _decode_action_directive_entry(stream_buffer: StreamPeerBuffer) -> AgentActionDirectiveDTO:
 	var directive_code: int = stream_buffer.get_u8()
-	var executable_flag: int = stream_buffer.get_u8()
+	var executable_marker: int = stream_buffer.get_u8()
 	var directive := AgentActionDirectiveDTO.new()
 	directive.directive_id = str(CODE_TO_DIR.get(directive_code, "UNKNOWN_DIRECTIVE"))
-	directive.is_executable = (executable_flag == 1)
+	directive.is_executable = (executable_marker == 1)
 	return directive

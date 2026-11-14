@@ -24,7 +24,7 @@ const POOL_DELTA: String = "hud_causal_delta"
 const MAX_LOCAL_POOL_CAPACITY: int = 256
 const METHOD_RESET_STATE: String = "reset_state"
 
-static var _pools_registered: bool = false
+static var _are_pools_registered: bool = false
 static var _backend_ensure_callback: Callable = Callable()
 static var _backend_acquire_callback: Callable = Callable()
 static var _backend_release_callback: Callable = Callable()
@@ -35,7 +35,7 @@ static func bind_pool_backend(ensure_callback: Callable, acquire_callback: Calla
 	_backend_ensure_callback = ensure_callback
 	_backend_acquire_callback = acquire_callback
 	_backend_release_callback = release_callback
-	_pools_registered = false
+	_are_pools_registered = false
 
 static func _ensure_pool(pool_name: String, factory: Callable) -> void:
 	if _backend_ensure_callback.is_valid():
@@ -69,7 +69,7 @@ static func _release_to_pool(pool_name: String, pooled_object: RefCounted) -> vo
 
 ## 确保所有 Agent 专用池均已在池后端登记
 static func ensure_pools_registered() -> void:
-	if _pools_registered:
+	if _are_pools_registered:
 		return
 	_ensure_pool(POOL_PACKET, func() -> RefCounted:
 		return AgentHudTelemetryPacketDTO.new()
@@ -83,7 +83,7 @@ static func ensure_pools_registered() -> void:
 	_ensure_pool(POOL_DELTA, func() -> RefCounted:
 		return HudCausalDeltaDTO.new()
 	)
-	_pools_registered = true
+	_are_pools_registered = true
 
 ## 借出遥测数据包外壳
 static func borrow_packet() -> AgentHudTelemetryPacketDTO:
@@ -170,5 +170,5 @@ static func recycle_delta(delta: HudCausalDeltaDTO) -> void:
 
 ## 测试隔离专用：重置注册标记与领域本地缓存栈
 static func reset_for_tests() -> void:
-	_pools_registered = false
+	_are_pools_registered = false
 	_local_pools.clear()

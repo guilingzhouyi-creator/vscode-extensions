@@ -28,7 +28,7 @@ var _context: Dictionary = {}
 var _previous_slice: AgentHudContextSliceDTO = null
 var _sequence_index: int = 0
 var _pending_ui_notices: Array[HudUiNoticeDTO] = []
-var _human_interacting: bool = false
+var _is_human_interacting: bool = false
 
 var _trajectory_ring: AgentTrajectoryRingBuffer = null
 var _async_dispatcher: AgentAsyncDispatcher = null
@@ -58,27 +58,27 @@ func inject_ui_notice(notice: HudUiNoticeDTO) -> void:
 		_pending_ui_notices.append(notice)
 
 ## 设定前台人类操作独占租约状态
-func set_human_interacting(active: bool) -> void:
-	_human_interacting = active
-	AuthoritativeHudSyncService.set_human_interacting_for_tests(active)
+func set_human_interacting(is_active: bool) -> void:
+	_is_human_interacting = is_active
+	AuthoritativeHudSyncService.set_human_interacting_for_tests(is_active)
 
 ## 获取人类操作租约状态
 func is_human_interacting() -> bool:
-	return _human_interacting
+	return _is_human_interacting
 
 ## 执行单步推演与原子装箱分发（装箱 -> 轨迹入环 -> 异步流控派发 -> 伴侣总线广播）
 func step_and_publish(cause: String = "") -> AgentHudTelemetryPacketDTO:
 	_sequence_index += 1
 
 	var snapshot := AuthoritativeHudSyncService.get_authoritative_snapshot(_context)
-	var initiator: String = "HUMAN_UI_INTERACTION" if _human_interacting else ("AGENT_ACTION_CHANNEL" if not cause.is_empty() else "SYSTEM_TICK_SIMULATION")
+	var initiator: String = "HUMAN_UI_INTERACTION" if _is_human_interacting else ("AGENT_ACTION_CHANNEL" if not cause.is_empty() else "SYSTEM_TICK_SIMULATION")
 
 	var packet := AgentHudSliceSolver.assemble_telemetry_packet(
 		snapshot,
 		_previous_slice,
 		_sequence_index,
 		cause,
-		_human_interacting,
+		_is_human_interacting,
 		initiator
 	)
 
@@ -132,7 +132,7 @@ func reset_state() -> void:
 	_previous_slice = null
 	_sequence_index = 0
 	_pending_ui_notices.clear()
-	_human_interacting = false
+	_is_human_interacting = false
 	if _trajectory_ring != null:
 		_trajectory_ring.clear()
 	if _async_dispatcher != null:

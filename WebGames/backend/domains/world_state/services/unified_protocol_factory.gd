@@ -96,14 +96,14 @@ static func wrap_agent_action(
 	request.actor_type = ClientRequestEnvelopeDTO.ACTOR_AGENT
 	request.domain = "world_state"
 	var target_directive: String = ""
-	var target_params: Dictionary = {}
+	var target_parameters: Dictionary = {}
 	if agent_packet != null:
 		target_directive = agent_packet.directive_id if not agent_packet.directive_id.is_empty() else agent_packet.action_id
-		target_params = agent_packet.params if not agent_packet.params.is_empty() else agent_packet.parameters
+		target_parameters = agent_packet.params if not agent_packet.params.is_empty() else agent_packet.parameters
 		request.character_id = agent_packet.session_id
 		request.client_timestamp_ms = agent_packet.client_timestamp_ms
 	request.action_type = target_directive
-	request.payload = target_params.duplicate(true)
+	request.payload = target_parameters.duplicate(true)
 	request.session_token = session_token
 	request.account_id = account_id
 	request.lease_nonce = 0  # Agent 不具备人类租约，租约序号归零
@@ -156,18 +156,18 @@ static func _build_request_envelope(
 ## 创建标准服务端响应信封
 static func create_response(
 	request_id: String,
-	success: bool,
-	data: Dictionary = {},
+	is_succeeded: bool,
+	response_payload: Dictionary = {},
 	error_code: String = "",
 	error_message: String = "",
 	causal_delta: Dictionary = {}
 ) -> UnifiedResponseEnvelopeDTO:
 	var response := UnifiedResponseEnvelopeDTO.new()
 	response.request_id = request_id
-	response.success = success
+	response.success = is_succeeded
 	response.error_code = error_code
 	response.error_message = error_message
-	response.data = data.duplicate(true)
+	response.data = response_payload.duplicate(true)
 	response.causal_delta = causal_delta.duplicate(true)
 	response.server_timestamp_ms = Time.get_ticks_msec()
 	return response

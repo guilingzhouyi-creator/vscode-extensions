@@ -24,10 +24,10 @@ static func dispatch_action(action_packet: AgentActionPacketDTO, context: Dictio
 		}
 
 	# 1. 探针检查人类操作抢占租约锁 (Inv-HUMAN-LEASE-TIME-WINDOW-6)
-	var human_active: bool = AuthoritativeHudSyncService.is_human_interacting()
+	var is_human_active: bool = AuthoritativeHudSyncService.is_human_interacting()
 
 	var snapshot: AuthoritativeHudSnapshotDTO = AuthoritativeHudSyncService.get_authoritative_snapshot(context)
-	var execution_result: Dictionary = AgentActionExecutionSolver.validate_and_execute(action_packet, snapshot, human_active)
+	var execution_result: Dictionary = AgentActionExecutionSolver.validate_and_execute(action_packet, snapshot, is_human_active)
 
 	if not bool(execution_result.get("success", false)):
 		return {

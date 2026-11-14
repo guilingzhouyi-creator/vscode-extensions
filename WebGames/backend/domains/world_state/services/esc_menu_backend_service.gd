@@ -60,24 +60,24 @@ static func handle_esc_action(request: ClientRequestEnvelopeDTO, gateway: WorldG
 
 static func _handle_esc_get_menu_state(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
 	var runtime_state := WorldSessionRuntimeService.get_esc_menu_state()
-	var in_combat: bool = bool(request.payload.get("in_combat", runtime_state.get("in_combat", false)))
-	var in_cutscene: bool = bool(request.payload.get("in_cutscene", runtime_state.get("in_cutscene", false)))
+	var is_in_combat: bool = bool(request.payload.get("in_combat", runtime_state.get("in_combat", false)))
+	var is_in_cutscene: bool = bool(request.payload.get("in_cutscene", runtime_state.get("in_cutscene", false)))
 	var is_dead: bool = bool(request.payload.get("is_dead", runtime_state.get("is_dead", false)))
-	var readiness := SaveReadinessGuard.evaluate_save_readiness(in_combat, in_cutscene, is_dead)
-	var menu_state_data := runtime_state.duplicate(true)
-	menu_state_data["readiness"] = readiness
-	menu_state_data["can_save"] = bool(readiness.get("is_ready", false))
-	menu_state_data["effective_slot_id"] = _resolve_effective_slot_id(request, gateway)
+	var readiness := SaveReadinessGuard.evaluate_save_readiness(is_in_combat, is_in_cutscene, is_dead)
+	var menu_state_payload := runtime_state.duplicate(true)
+	menu_state_payload["readiness"] = readiness
+	menu_state_payload["can_save"] = bool(readiness.get("is_ready", false))
+	menu_state_payload["effective_slot_id"] = _resolve_effective_slot_id(request, gateway)
 	return UnifiedProtocolFactory.create_response(
-		request.request_id, true, menu_state_data, "", "Authoritative ESC menu state queried successfully."
+		request.request_id, true, menu_state_payload, "", "Authoritative ESC menu state queried successfully."
 	)
 
 static func _handle_esc_query_readiness(request: ClientRequestEnvelopeDTO) -> UnifiedResponseEnvelopeDTO:
 	var runtime_state := WorldSessionRuntimeService.get_esc_menu_state()
-	var in_combat: bool = bool(request.payload.get("in_combat", runtime_state.get("in_combat", false)))
-	var in_cutscene: bool = bool(request.payload.get("in_cutscene", runtime_state.get("in_cutscene", false)))
+	var is_in_combat: bool = bool(request.payload.get("in_combat", runtime_state.get("in_combat", false)))
+	var is_in_cutscene: bool = bool(request.payload.get("in_cutscene", runtime_state.get("in_cutscene", false)))
 	var is_dead: bool = bool(request.payload.get("is_dead", runtime_state.get("is_dead", false)))
-	var readiness := SaveReadinessGuard.evaluate_save_readiness(in_combat, in_cutscene, is_dead)
+	var readiness := SaveReadinessGuard.evaluate_save_readiness(is_in_combat, is_in_cutscene, is_dead)
 	return UnifiedProtocolFactory.create_response(
 		request.request_id, true, readiness, "", "Save readiness state evaluated successfully."
 	)
@@ -86,13 +86,13 @@ static func _validate_save_path_safety(
 	request: ClientRequestEnvelopeDTO,
 	gateway: WorldGatewayFSM,
 	slot_id: String,
-	use_request_mode: bool
+	should_use_request_mode: bool
 ) -> UnifiedResponseEnvelopeDTO:
 	var has_gateway_mode: bool = (gateway != null and gateway.context != null and gateway.context.selected_mode != WorldGatewayModel.GameMode.UNSELECTED)
 	var gateway_mode: int = int(gateway.context.selected_mode) if has_gateway_mode else WorldGatewayModel.GameMode.SINGLE_PLAYER
-	var mode: int = int(request.payload.get("game_mode", gateway_mode)) if use_request_mode else gateway_mode
+	var game_mode: int = int(request.payload.get("game_mode", gateway_mode)) if should_use_request_mode else gateway_mode
 	var vault_prefix := GameConfig.get_string(DOMAIN_WORLD_STATE_CONFIG, "storage/offline_vault_prefix", "user://offline_vault/")
-	var path_safety := SaveReadinessGuard.evaluate_storage_path_safety("%s%s.sav" % [vault_prefix, slot_id.to_lower()], mode)
+	var path_safety := SaveReadinessGuard.evaluate_storage_path_safety("%s%s.sav" % [vault_prefix, slot_id.to_lower()], game_mode)
 	if not bool(path_safety.get("safe", path_safety.get("is_safe", false))):
 		return UnifiedProtocolFactory.create_response(
 			request.request_id, false, path_safety, "ERR_STORAGE_UNSAFE", "Storage path violates runtime mode isolation policy."
@@ -101,10 +101,10 @@ static func _validate_save_path_safety(
 
 static func _handle_esc_save_game(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
 	var runtime_state := WorldSessionRuntimeService.get_esc_menu_state()
-	var in_combat: bool = bool(request.payload.get("in_combat", runtime_state.get("in_combat", false)))
-	var in_cutscene: bool = bool(request.payload.get("in_cutscene", runtime_state.get("in_cutscene", false)))
+	var is_in_combat: bool = bool(request.payload.get("in_combat", runtime_state.get("in_combat", false)))
+	var is_in_cutscene: bool = bool(request.payload.get("in_cutscene", runtime_state.get("in_cutscene", false)))
 	var is_dead: bool = bool(request.payload.get("is_dead", runtime_state.get("is_dead", false)))
-	var readiness := SaveReadinessGuard.evaluate_save_readiness(in_combat, in_cutscene, is_dead)
+	var readiness := SaveReadinessGuard.evaluate_save_readiness(is_in_combat, is_in_cutscene, is_dead)
 	if not bool(readiness.get("is_ready", false)):
 		return UnifiedProtocolFactory.create_response(
 			request.request_id, false, readiness, "ERR_SAVE_GUARD_BLOCKED", "Save operation is blocked by readiness guard."
@@ -120,25 +120,25 @@ static func _handle_esc_save_game(request: ClientRequestEnvelopeDTO, gateway: Wo
 	if unsafe_response != null:
 		return unsafe_response
 
-	var game_data := _resolve_save_payload(request)
-	if game_data.is_empty():
+	var save_payload := _resolve_save_payload(request)
+	if save_payload.is_empty():
 		var incomplete_save_error_code := GameConfig.get_string(DOMAIN_WORLD_STATE_CONFIG, "esc_menu/errors/incomplete_save_blocked", "ERR_INCOMPLETE_SAVE_BLOCKED")
 		if bool(request.payload.get("strict_full_save", false)) or _has_existing_full_domain_save(slot_id):
 			return UnifiedProtocolFactory.create_response(
 				request.request_id, false, {"slot_id": slot_id}, incomplete_save_error_code, "Overwriting existing world save with incomplete payload shell is strictly forbidden."
 			)
-		game_data = {
+		save_payload = {
 			"slot_id": slot_id,
 			"saved_at": int(Time.get_unix_time_from_system())
 		}
 
-	var save_result := SaveDataAccessLayer.save_game(slot_id, game_data)
-	var is_save_success := bool(save_result.get("success", false))
+	var save_outcome := SaveDataAccessLayer.save_game(slot_id, save_payload)
+	var is_save_success := bool(save_outcome.get("success", false))
 	if is_save_success:
 		WorldSessionRuntimeService.clear_world_dirty()
 	return UnifiedProtocolFactory.create_response(
-		request.request_id, is_save_success, save_result,
-		"" if is_save_success else str(save_result.get("error_code", "ERR_SAVE_FAILED")),
+		request.request_id, is_save_success, save_outcome,
+		"" if is_save_success else str(save_outcome.get("error_code", "ERR_SAVE_FAILED")),
 		"Game save persisted successfully." if is_save_success else "Failed to persist game save."
 	)
 
@@ -149,13 +149,13 @@ static func _handle_esc_exit_to_gateway(request: ClientRequestEnvelopeDTO, gatew
 		)
 
 	var slot_id := _resolve_effective_slot_id(request, gateway)
-	var auto_save_requested := bool(request.payload.get("auto_save", true))
-	var strict_auto_save := bool(request.payload.get("strict_auto_save", false)) or not slot_id.is_empty()
-	var skip_unbound := false
-	var save_result: Dictionary = {}
+	var is_auto_save_requested := bool(request.payload.get("auto_save", true))
+	var is_strict_auto_save := bool(request.payload.get("strict_auto_save", false)) or not slot_id.is_empty()
+	var should_skip_unbound := false
+	var save_outcome: Dictionary = {}
 
-	if auto_save_requested:
-		if strict_auto_save:
+	if is_auto_save_requested:
+		if is_strict_auto_save:
 			var incomplete_save_error_code := GameConfig.get_string(DOMAIN_WORLD_STATE_CONFIG, "esc_menu/errors/incomplete_save_blocked", "ERR_INCOMPLETE_SAVE_BLOCKED")
 			if slot_id.is_empty():
 				return UnifiedProtocolFactory.create_response(
@@ -164,37 +164,37 @@ static func _handle_esc_exit_to_gateway(request: ClientRequestEnvelopeDTO, gatew
 			var unsafe_response := _validate_save_path_safety(request, gateway, slot_id, false)
 			if unsafe_response != null:
 				return unsafe_response
-			var auto_payload := _resolve_save_payload(request)
-			if auto_payload.is_empty():
+			var auto_save_payload := _resolve_save_payload(request)
+			if auto_save_payload.is_empty():
 				if not bool(request.payload.get("allow_skip_unsaved_exit", false)):
 					return UnifiedProtocolFactory.create_response(
 						request.request_id, false, {"slot_id": slot_id}, incomplete_save_error_code, "Multi-domain save data is incomplete; saving partial shell is strictly forbidden."
 					)
-				skip_unbound = true
+				should_skip_unbound = true
 			else:
-				save_result = SaveDataAccessLayer.save_game(slot_id, auto_payload)
-				if not bool(save_result.get("success", false)):
+				save_outcome = SaveDataAccessLayer.save_game(slot_id, auto_save_payload)
+				if not bool(save_outcome.get("success", false)):
 					var flush_error_code := GameConfig.get_string(DOMAIN_WORLD_STATE_CONFIG, "esc_menu/errors/save_flush_failed", "ERR_SAVE_FLUSH_FAILED")
 					return UnifiedProtocolFactory.create_response(
-						request.request_id, false, save_result, String(save_result.get("error_code", flush_error_code)), "Pre-exit multi-domain save failed; runtime state preserved without scrubbing."
+						request.request_id, false, save_outcome, String(save_outcome.get("error_code", flush_error_code)), "Pre-exit multi-domain save failed; runtime state preserved without scrubbing."
 					)
 				WorldSessionRuntimeService.clear_world_dirty()
 		else:
-			skip_unbound = true
+			should_skip_unbound = true
 
-	var scrub_result := gateway.exit_to_gateway()
-	var scrub_ok := bool(scrub_result.get("success", false))
-	if scrub_ok:
+	var scrub_outcome := gateway.exit_to_gateway()
+	var is_scrub_succeeded := bool(scrub_outcome.get("success", false))
+	if is_scrub_succeeded:
 		WorldSessionRuntimeService.deactivate_world_session()
 		HumanControlLeaseManager.release_lease()
-	if skip_unbound:
-		scrub_result["auto_save_skipped_unbound_slot"] = true
-	if not save_result.is_empty():
-		scrub_result["save_result"] = save_result
-	var scrub_error_code := "" if scrub_ok else String(scrub_result.get("error_code", "ERR_EXIT_GATEWAY_FAILED"))
-	var scrub_message := "Successfully exited world session and scrubbed gateway memory." if scrub_ok else String(scrub_result.get("message", "Failed to exit world session cleanly."))
+	if should_skip_unbound:
+		scrub_outcome["auto_save_skipped_unbound_slot"] = true
+	if not save_outcome.is_empty():
+		scrub_outcome["save_result"] = save_outcome
+	var scrub_error_code := "" if is_scrub_succeeded else String(scrub_outcome.get("error_code", "ERR_EXIT_GATEWAY_FAILED"))
+	var scrub_message := "Successfully exited world session and scrubbed gateway memory." if is_scrub_succeeded else String(scrub_outcome.get("message", "Failed to exit world session cleanly."))
 	return UnifiedProtocolFactory.create_response(
-		request.request_id, scrub_ok, scrub_result, scrub_error_code, scrub_message
+		request.request_id, is_scrub_succeeded, scrub_outcome, scrub_error_code, scrub_message
 	)
 
 static func _handle_esc_quit_game(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
@@ -218,49 +218,49 @@ static func _handle_esc_quit_game(request: ClientRequestEnvelopeDTO, gateway: Wo
 		request.request_id, is_shutdown_success, shutdown_payload, error_code, status_message
 	)
 
-static func _handle_esc_pause_resume(request: ClientRequestEnvelopeDTO, paused: bool) -> UnifiedResponseEnvelopeDTO:
-	WorldSessionRuntimeService.set_paused(paused)
+static func _handle_esc_pause_resume(request: ClientRequestEnvelopeDTO, is_paused: bool) -> UnifiedResponseEnvelopeDTO:
+	WorldSessionRuntimeService.set_paused(is_paused)
 	var lifecycle_fsm: Variant = GameLifecycleManager.get_instance()
-	var target_phase := GameLifecycleModel.LifecyclePhase.PAUSED if paused else GameLifecycleModel.LifecyclePhase.RUNNING
-	var transitioned := false
+	var target_phase := GameLifecycleModel.LifecyclePhase.PAUSED if is_paused else GameLifecycleModel.LifecyclePhase.RUNNING
+	var has_transitioned := false
 	if lifecycle_fsm != null:
 		var current_phase: int = int(lifecycle_fsm.get_current_phase())
-		if current_phase == GameLifecycleModel.LifecyclePhase.UNINITIALIZED and paused:
+		if current_phase == GameLifecycleModel.LifecyclePhase.UNINITIALIZED and is_paused:
 			lifecycle_fsm.transition_to(GameLifecycleModel.LifecyclePhase.BOOT_INITIALIZING)
 			lifecycle_fsm.transition_to(GameLifecycleModel.LifecyclePhase.RUNNING)
-		transitioned = (int(lifecycle_fsm.get_current_phase()) == target_phase) or bool(lifecycle_fsm.transition_to(target_phase))
-	var event_name := "lifecycle.game_paused" if paused else "lifecycle.game_resumed"
+		has_transitioned = (int(lifecycle_fsm.get_current_phase()) == target_phase) or bool(lifecycle_fsm.transition_to(target_phase))
+	var event_name := "lifecycle.game_paused" if is_paused else "lifecycle.game_resumed"
 	EventBusCore.get_instance().emit_domain_event(event_name, {
-		"is_paused": paused,
+		"is_paused": is_paused,
 		"account_id": WorldSessionRuntimeService.get_active_account_id(),
 		"character_id": WorldSessionRuntimeService.get_active_character_id()
 	})
 	return UnifiedProtocolFactory.create_response(
 		request.request_id, true,
 		{
-			"is_paused": paused,
-			"lifecycle_transitioned": transitioned,
+			"is_paused": is_paused,
+			"lifecycle_transitioned": has_transitioned,
 			"current_phase": int(lifecycle_fsm.get_current_phase()) if lifecycle_fsm != null else -1
 		},
 		"",
-		"Game paused by ESC menu." if paused else "Game resumed from pause."
+		"Game paused by ESC menu." if is_paused else "Game resumed from pause."
 	)
 
 static func _resolve_effective_slot_id(request: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> String:
-	var explicit := str(request.payload.get("slot_id", request.payload.get("target_save_slot", "")))
-	if not explicit.is_empty():
-		return explicit
+	var explicit_slot_id := str(request.payload.get("slot_id", request.payload.get("target_save_slot", "")))
+	if not explicit_slot_id.is_empty():
+		return explicit_slot_id
 	if gateway != null and gateway.context != null and not gateway.context.selected_slot_id.is_empty():
 		return gateway.context.selected_slot_id
 	return WorldSessionRuntimeService.get_active_slot_id()
 
 static func _resolve_save_payload(request: ClientRequestEnvelopeDTO) -> Dictionary:
-	var raw_game_data: Variant = request.payload.get("game_data", null)
-	if raw_game_data is Dictionary and not (raw_game_data as Dictionary).is_empty():
-		return (raw_game_data as Dictionary).duplicate(true)
-	var built := SaveDataAccessLayer.build_save_payload()
-	if built.get("data", {}) is Dictionary and not (built["data"] as Dictionary).is_empty():
-		return built
+	var raw_game_payload: Variant = request.payload.get("game_data", null)
+	if raw_game_payload is Dictionary and not (raw_game_payload as Dictionary).is_empty():
+		return (raw_game_payload as Dictionary).duplicate(true)
+	var built_payload := SaveDataAccessLayer.build_save_payload()
+	if built_payload.get("data", {}) is Dictionary and not (built_payload["data"] as Dictionary).is_empty():
+		return built_payload
 	if WorldSessionRuntimeService.has_active_world():
 		var runtime_save_payload := WorldSessionRuntimeService.assemble_runtime_save_payload()
 		if runtime_save_payload.get("data", {}) is Dictionary and not (runtime_save_payload["data"] as Dictionary).is_empty():
@@ -270,14 +270,14 @@ static func _resolve_save_payload(request: ClientRequestEnvelopeDTO) -> Dictiona
 static func _has_existing_full_domain_save(slot_id: String) -> bool:
 	if slot_id.is_empty():
 		return false
-	var existing := SaveDataAccessLayer.load_game(slot_id)
-	if not bool(existing.get("success", false)):
+	var load_outcome := SaveDataAccessLayer.load_game(slot_id)
+	if not bool(load_outcome.get("success", false)):
 		return false
-	var raw_data: Variant = existing.get("data", null)
-	if not raw_data is Dictionary:
+	var raw_payload: Variant = load_outcome.get("data", null)
+	if not raw_payload is Dictionary:
 		return false
-	var save_dict: Dictionary = raw_data as Dictionary
-	for domain_key in save_dict.keys():
+	var save_dictionary: Dictionary = raw_payload as Dictionary
+	for domain_key in save_dictionary.keys():
 		if domain_key != "slot_id" and domain_key != "saved_at" and domain_key != "account_id":
 			return true
 	return false

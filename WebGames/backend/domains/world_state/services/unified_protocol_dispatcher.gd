@@ -83,9 +83,9 @@ static func dispatch_request(request: ClientRequestEnvelopeDTO, gateway: WorldGa
 
 	# 3. 优先检查外部动态注册的领域处理器 (OCP 扩展点)
 	if _custom_handlers.has(request.domain):
-		var custom_fn: Callable = _custom_handlers[request.domain]
-		if custom_fn.is_valid():
-			return custom_fn.call(request, gateway)
+		var custom_handler: Callable = _custom_handlers[request.domain]
+		if custom_handler.is_valid():
+			return custom_handler.call(request, gateway)
 
 	var effective_gateway: WorldGatewayFSM = gateway if gateway != null else (WorldSessionRuntimeService.get_gateway() as WorldGatewayFSM)
 
@@ -136,11 +136,11 @@ static func _enforce_auth_guard(request: ClientRequestEnvelopeDTO) -> UnifiedRes
 	if is_anonymous_action:
 		return null
 
-	var require_auth := GameConfig.get_bool(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/require_session_auth", true)
-	if not require_auth:
+	var is_auth_required := GameConfig.get_bool(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/require_session_auth", true)
+	if not is_auth_required:
 		return null
 
-	var allow_compat := GameConfig.get_bool(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/allow_stateless_compat_for_unregistered_tokens", true)
+	var should_allow_compatibility := GameConfig.get_bool(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/allow_stateless_compat_for_unregistered_tokens", true)
 	var is_esc_or_lifecycle_protected := (
 		WorldSessionRuntimeService.has_authenticated_session()
 		and WorldSessionRuntimeService.has_session_token()
@@ -161,7 +161,7 @@ static func _enforce_auth_guard(request: ClientRequestEnvelopeDTO) -> UnifiedRes
 		or is_esc_or_lifecycle_protected
 	)
 
-	if not is_protected_action and allow_compat:
+	if not is_protected_action and should_allow_compatibility:
 		return null
 
 	var validation_result := AuthService.validate_token(request.session_token, request.account_id)
@@ -191,10 +191,10 @@ static func _dispatch_world_state_action(request: ClientRequestEnvelopeDTO, gate
 			}, "", "Home HUD authoritative snapshot retrieved successfully"
 		)
 	if request.action_type == "TICK_WORLD_CLOCK":
-		var payload_dict: Dictionary = request.payload if request.payload is Dictionary else {}
-		var updated := WorldSessionRuntimeService.apply_mutation_and_sync(payload_dict, int(payload_dict.get("now_ms", -1)), bool(payload_dict.get("force_push", true)))
+		var request_payload: Dictionary = request.payload if request.payload is Dictionary else {}
+		var updated_snapshot := WorldSessionRuntimeService.apply_mutation_and_sync(request_payload, int(request_payload.get("now_ms", -1)), bool(request_payload.get("force_push", true)))
 		return UnifiedProtocolFactory.create_response(
-			request.request_id, true, {"hud_snapshot": updated.to_dto()}, "", "World clock and resident HUD synchronized successfully"
+			request.request_id, true, {"hud_snapshot": updated_snapshot.to_dto()}, "", "World clock and resident HUD synchronized successfully"
 		)
 	return _dispatch_agent_action_compat(request)
 
@@ -216,10 +216,10 @@ static func _dispatch_agent_action_compat(request: ClientRequestEnvelopeDTO) -> 
 			hud_context[payload_key] = request.payload[payload_key]
 
 	if not is_active_world and GameConfig.get_bool(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/allow_stateless_compat_for_unregistered_tokens", true):
-		var compat_defaults: Dictionary = GameConfig.get_dict(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/stateless_compat_defaults", {})
-		for default_key in compat_defaults.keys():
+		var compatibility_defaults: Dictionary = GameConfig.get_dict(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/stateless_compat_defaults", {})
+		for default_key in compatibility_defaults.keys():
 			if not hud_context.has(default_key):
-				hud_context[default_key] = compat_defaults[default_key]
+				hud_context[default_key] = compatibility_defaults[default_key]
 
 	var hud_snapshot := AuthoritativeHudSyncService.get_authoritative_snapshot(hud_context)
 	var is_human_active: bool = false if request.actor_type == ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI else HumanControlLeaseManager.is_lease_active()

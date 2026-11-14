@@ -22,7 +22,7 @@ enum Strategy {
 
 var _capacity: int = 128
 var _strategy: int = Strategy.DROP_OLDEST
-var _deterministic_mode: bool = true
+var _is_deterministic_mode: bool = true
 var _ring: Array[AgentHudTelemetryPacketDTO] = []
 var _queue_head: int = 0
 var _queue_tail: int = 0
@@ -34,12 +34,12 @@ var _total_dispatched: int = 0
 var _total_dropped: int = 0
 var _mutex: Mutex = null
 var _task_id: int = -1
-var _worker_running: bool = false
+var _is_worker_running: bool = false
 
 func _init(capacity: int = 128, strategy: int = Strategy.DROP_OLDEST) -> void:
 	_capacity = maxi(1, capacity)
 	_strategy = strategy
-	_deterministic_mode = true
+	_is_deterministic_mode = true
 	_ring.clear()
 	_ring.resize(_capacity)
 	_queue_head = 0
@@ -51,7 +51,7 @@ func _init(capacity: int = 128, strategy: int = Strategy.DROP_OLDEST) -> void:
 	_total_dropped = 0
 	_mutex = Mutex.new()
 	_task_id = -1
-	_worker_running = false
+	_is_worker_running = false
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
@@ -81,19 +81,19 @@ func unregister_sink(sink_id: String) -> void:
 	_mutex.unlock()
 
 ## 设置确定性同步模式（测试时强制单线程同步）
-func set_deterministic_mode(enabled: bool) -> void:
-	_deterministic_mode = enabled
+func set_deterministic_mode(is_enabled: bool) -> void:
+	_is_deterministic_mode = is_enabled
 
 ## 是否处于确定性模式
 func is_deterministic_mode() -> bool:
-	return _deterministic_mode
+	return _is_deterministic_mode
 
 ## 派发遥测包（主线程耗时 <= 50 微秒，受背压策略流控）
 func dispatch_telemetry(packet: AgentHudTelemetryPacketDTO) -> bool:
 	if packet == null:
 		return false
 
-	if _deterministic_mode:
+	if _is_deterministic_mode:
 		_notify_all_sinks(packet)
 		_total_dispatched += 1
 		return true
@@ -127,13 +127,13 @@ func dispatch_telemetry(packet: AgentHudTelemetryPacketDTO) -> bool:
 
 func _schedule_async_worker() -> void:
 	_mutex.lock()
-	if _worker_running:
+	if _is_worker_running:
 		_mutex.unlock()
 		return
 	if _task_id != -1 and not WorkerThreadPool.is_task_completed(_task_id):
 		_mutex.unlock()
 		return
-	_worker_running = true
+	_is_worker_running = true
 	_task_id = WorkerThreadPool.add_task(Callable(self, "_process_worker_queue"), false, "AgentTelemetryDispatch")
 	_mutex.unlock()
 
@@ -147,7 +147,7 @@ func _process_worker_queue() -> void:
 			_queue_head = (_queue_head + 1) % _capacity
 			_queue_count -= 1
 		else:
-			_worker_running = false
+			_is_worker_running = false
 			_mutex.unlock()
 			break
 		_mutex.unlock()
@@ -234,7 +234,7 @@ func clear() -> void:
 	_queue_count = 0
 	_total_dispatched = 0
 	_total_dropped = 0
-	_worker_running = false
+	_is_worker_running = false
 	_mutex.unlock()
 	if pending_task_id != -1 and not WorkerThreadPool.is_task_completed(pending_task_id):
 		WorkerThreadPool.wait_for_task_completion(pending_task_id)

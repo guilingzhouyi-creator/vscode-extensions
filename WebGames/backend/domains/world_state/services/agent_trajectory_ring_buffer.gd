@@ -66,10 +66,10 @@ func get_trajectory_window(steps: int = 8) -> Array[AgentHudTelemetryPacketDTO]:
 		window_packets[offset_index] = _slots[slot_index]
 	return window_packets
 
-static func _append_packet_deltas(packet: AgentHudTelemetryPacketDTO, out_deltas: Array[HudCausalDeltaDTO]) -> void:
-	for delta_item in packet.causal_deltas:
-		if delta_item != null:
-			out_deltas.append(delta_item)
+static func _append_packet_deltas(packet: AgentHudTelemetryPacketDTO, target_deltas: Array[HudCausalDeltaDTO]) -> void:
+	for delta_entry in packet.causal_deltas:
+		if delta_entry != null:
+			target_deltas.append(delta_entry)
 
 
 ## 获取自指定序列号（大于等于 from_seq）以来的累积因果突变（直读环形槽位，零临时窗口数组分配）
@@ -140,18 +140,18 @@ static func _sync_packet_data(
 
 static func _sync_causal_deltas(source_packet: AgentHudTelemetryPacketDTO, target_packet: AgentHudTelemetryPacketDTO, delta_pool: Array) -> void:
 	var active_count: int = 0
-	for delta_item in source_packet.causal_deltas:
-		if delta_item == null:
+	for delta_entry in source_packet.causal_deltas:
+		if delta_entry == null:
 			continue
 		var clone_delta := _acquire_delta_slot(delta_pool, active_count)
-		clone_delta.delta_category = delta_item.delta_category
-		clone_delta.target_field = delta_item.target_field
-		clone_delta.previous_value = delta_item.previous_value
-		clone_delta.current_value = delta_item.current_value
-		clone_delta.delta_amount = delta_item.delta_amount
-		clone_delta.cause_identifier = delta_item.cause_identifier
-		clone_delta.initiator = delta_item.initiator
-		clone_delta.reason = delta_item.reason
+		clone_delta.delta_category = delta_entry.delta_category
+		clone_delta.target_field = delta_entry.target_field
+		clone_delta.previous_value = delta_entry.previous_value
+		clone_delta.current_value = delta_entry.current_value
+		clone_delta.delta_amount = delta_entry.delta_amount
+		clone_delta.cause_identifier = delta_entry.cause_identifier
+		clone_delta.initiator = delta_entry.initiator
+		clone_delta.reason = delta_entry.reason
 		active_count += 1
 	target_packet.causal_deltas.resize(active_count)
 	for delta_index in range(active_count):
@@ -169,18 +169,18 @@ static func _acquire_delta_slot(pool: Array, slot_index: int) -> HudCausalDeltaD
 
 static func _sync_action_space(source_packet: AgentHudTelemetryPacketDTO, target_packet: AgentHudTelemetryPacketDTO, action_pool: Array) -> void:
 	var active_count: int = 0
-	for directive_item in source_packet.action_space:
-		if directive_item == null:
+	for directive_entry in source_packet.action_space:
+		if directive_entry == null:
 			continue
 		var cloned_directive := _acquire_action_slot(action_pool, active_count)
-		cloned_directive.directive_id = directive_item.directive_id
-		cloned_directive.domain = directive_item.domain
-		cloned_directive.description = directive_item.description
-		cloned_directive.cost_payload = directive_item.cost_payload
-		cloned_directive.preconditions = directive_item.preconditions
-		cloned_directive.allowed_parameters = directive_item.allowed_parameters
-		cloned_directive.is_executable = directive_item.is_executable
-		cloned_directive.blocked_reason = directive_item.blocked_reason
+		cloned_directive.directive_id = directive_entry.directive_id
+		cloned_directive.domain = directive_entry.domain
+		cloned_directive.description = directive_entry.description
+		cloned_directive.cost_payload = directive_entry.cost_payload
+		cloned_directive.preconditions = directive_entry.preconditions
+		cloned_directive.allowed_parameters = directive_entry.allowed_parameters
+		cloned_directive.is_executable = directive_entry.is_executable
+		cloned_directive.blocked_reason = directive_entry.blocked_reason
 		active_count += 1
 	target_packet.action_space.resize(active_count)
 	for action_index in range(active_count):
@@ -232,6 +232,6 @@ static func _sync_observation(source_slice: AgentHudContextSliceDTO, target_slic
 	target_slice.is_multiplayer_ready = source_slice.is_multiplayer_ready
 	target_slice.unread_mail_count = source_slice.unread_mail_count
 	target_slice.ui_notices.clear()
-	for notice_item in source_slice.ui_notices:
-		if notice_item != null:
-			target_slice.ui_notices.append(notice_item)
+	for notice_entry in source_slice.ui_notices:
+		if notice_entry != null:
+			target_slice.ui_notices.append(notice_entry)

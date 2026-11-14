@@ -30,12 +30,12 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从输入字典反序列化还原传输对象
-static func from_dto(data: Dictionary) -> WorldCalendarEnvironmentDTO:
+static func from_dto(serialized_payload: Dictionary) -> WorldCalendarEnvironmentDTO:
 	var environment := WorldCalendarEnvironmentDTO.new()
-	environment.calendar_years = maxi(0, int(data.get("calendar_years", 0)))
-	environment.calendar_months = maxi(1, int(data.get("calendar_months", 1)))
-	environment.calendar_days = maxi(1, int(data.get("calendar_days", 1)))
-	environment.travel_hours = maxi(0, int(data.get("travel_hours", 0)))
-	environment.day_phase_key = String(data.get("day_phase_key", "MIDNIGHT"))
-	environment.mana_density_tier = maxi(1, int(data.get("mana_density_tier", 1)))
+	environment.calendar_years = maxi(0, int(serialized_payload.get("calendar_years", 0)))
+	environment.calendar_months = maxi(1, int(serialized_payload.get("calendar_months", 1)))
+	environment.calendar_days = maxi(1, int(serialized_payload.get("calendar_days", 1)))
+	environment.travel_hours = maxi(0, int(serialized_payload.get("travel_hours", 0)))
+	environment.day_phase_key = String(serialized_payload.get("day_phase_key", "MIDNIGHT"))
+	environment.mana_density_tier = maxi(1, int(serialized_payload.get("mana_density_tier", 1)))
 	return environment

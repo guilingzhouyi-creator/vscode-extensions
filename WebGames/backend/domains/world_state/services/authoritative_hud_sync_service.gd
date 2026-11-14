@@ -56,8 +56,8 @@ static func trigger_initial_sync(context: Dictionary) -> AuthoritativeHudSnapsho
 static func publish_stat_mutation(
 	character_id: String,
 	stat_name: String,
-	old_value: float,
-	new_value: float,
+	previous_stat_value: float,
+	updated_stat_value: float,
 	cause: String = ""
 ) -> void:
 	var bus := EventBusCore.get_instance()
@@ -66,17 +66,17 @@ static func publish_stat_mutation(
 	var stat_mutation := HudMutationEventsDTO.StatMutation.new()
 	stat_mutation.character_id = character_id
 	stat_mutation.stat_name = stat_name
-	stat_mutation.old_value = old_value
-	stat_mutation.new_value = new_value
-	stat_mutation.delta = new_value - old_value
+	stat_mutation.old_value = previous_stat_value
+	stat_mutation.new_value = updated_stat_value
+	stat_mutation.delta = updated_stat_value - previous_stat_value
 	stat_mutation.cause_event = cause
 	var channel_label := GameConfig.get_string("domains.world_state", "hud/channels/stat_mutated", "world_state.stat_mutated")
 	EventPacket.bind_dual_payload(packet, stat_mutation, channel_label, {
 		"category_key": "hud",
-		"args": [stat_name, old_value, new_value]
+		"args": [stat_name, previous_stat_value, updated_stat_value]
 	})
 	packet.narrative_key = "stat_mutated"
-	packet.narrative_args = [stat_name, old_value, new_value]
+	packet.narrative_args = [stat_name, previous_stat_value, updated_stat_value]
 	bus.dispatch_now(packet)
 	bus.recycle_packet(packet)
 
@@ -114,36 +114,36 @@ static func publish_wallet_mutation(
 	bus.recycle_packet(packet)
 
 ## 6. 历法时钟推进事件广播（池化借还守恒，双载荷兼容）
-static func publish_clock_tick(calendar_env: WorldCalendarEnvironmentDTO) -> void:
-	if calendar_env == null:
+static func publish_clock_tick(calendar_environment: WorldCalendarEnvironmentDTO) -> void:
+	if calendar_environment == null:
 		return
 	var bus := EventBusCore.get_instance()
 	var packet := bus.borrow_packet(EventChannelDefinition.WORLD_CLOCK_ADVANCED, EventCategoryMask.CORE_STATE)
 	var channel_label := GameConfig.get_string("domains.world_state", "hud/channels/clock_ticked", "world_state.clock_phase_ticked")
-	EventPacket.bind_dual_payload(packet, calendar_env, channel_label)
+	EventPacket.bind_dual_payload(packet, calendar_environment, channel_label)
 	packet.source_entity_id = "world_calendar"
 	packet.narrative_key = "clock_phase_ticked"
-	packet.narrative_args = [calendar_env.calendar_years, calendar_env.calendar_months, calendar_env.calendar_days, calendar_env.day_phase_key]
+	packet.narrative_args = [calendar_environment.calendar_years, calendar_environment.calendar_months, calendar_environment.calendar_days, calendar_environment.day_phase_key]
 	bus.dispatch_now(packet)
 	bus.recycle_packet(packet)
 
-static var _human_interacting_override: bool = false
+static var _is_human_interacting_override: bool = false
 static var _has_human_override: bool = false
 
 ## 测试隔离专用：强制设定前台人类操作租约状态
-static func set_human_interacting_for_tests(active: bool) -> void:
-	_human_interacting_override = active
+static func set_human_interacting_for_tests(is_active: bool) -> void:
+	_is_human_interacting_override = is_active
 	_has_human_override = true
 
 ## 测试隔离专用：重置前台人类操作租约覆盖
 static func clear_human_interacting_override() -> void:
-	_human_interacting_override = false
+	_is_human_interacting_override = false
 	_has_human_override = false
 
 ## 7. 人类操作租约探针：判断前台是否处于人类交互独占态 (Inv-HUMAN-LEASE-TIME-WINDOW-6)
 static func is_human_interacting() -> bool:
 	if _has_human_override:
-		return _human_interacting_override
+		return _is_human_interacting_override
 	return HumanControlLeaseManager.is_lease_active()
 
 ## 7.1 HUD 领域事件信道订阅门面（精准子信道分流与通用域事件隔离，兼容既有 4 参调用）
@@ -210,10 +210,10 @@ static func get_agent_telemetry_packet(
 	cause: String = ""
 ) -> AgentHudTelemetryPacketDTO:
 	var snapshot := get_authoritative_snapshot(context)
-	var human_active := is_human_interacting()
-	var initiator := "HUMAN_UI_INTERACTION" if human_active else ("AGENT_ACTION_CHANNEL" if not cause.is_empty() else "SYSTEM_TICK_SIMULATION")
+	var is_human_active := is_human_interacting()
+	var initiator := "HUMAN_UI_INTERACTION" if is_human_active else ("AGENT_ACTION_CHANNEL" if not cause.is_empty() else "SYSTEM_TICK_SIMULATION")
 	return AgentHudSliceSolver.assemble_telemetry_packet(
-		snapshot, previous_slice, sequence_index, cause, human_active, initiator
+		snapshot, previous_slice, sequence_index, cause, is_human_active, initiator
 	)
 
 ## 9. Agent 专用推流：向伴侣总线广播标准原子遥测数据包
@@ -252,9 +252,9 @@ static func _resolve_identity(context: Dictionary, snapshot: AuthoritativeHudSna
 	if raw_race.is_empty() and physiology != null and "race_id" in physiology:
 		raw_race = String(physiology.race_id)
 
-	var allow_default_fallback: bool = bool(context.get("allow_default_fallback", true))
+	var should_allow_default_fallback: bool = bool(context.get("allow_default_fallback", true))
 	if raw_race.is_empty() or raw_race == "UNBOUND":
-		snapshot.race_id = "HUMAN" if allow_default_fallback else "UNBOUND"
+		snapshot.race_id = "HUMAN" if should_allow_default_fallback else "UNBOUND"
 	else:
 		snapshot.race_id = raw_race
 
@@ -274,12 +274,12 @@ static func _resolve_physiology(context: Dictionary, snapshot: AuthoritativeHudS
 	if raw_attribute_levels is Dictionary and not raw_attribute_levels.is_empty():
 		snapshot.attribute_levels = raw_attribute_levels.duplicate()
 
-	var default_hp := GameConfig.get_float("domains.combat", "participant_defaults/max_hp", 100.0)
-	var default_ap := GameConfig.get_float("domains.world_state", "hud_defaults/ap_max", 10.0)
+	var default_max_health_points := GameConfig.get_float("domains.combat", "participant_defaults/max_hp", 100.0)
+	var default_max_action_points := GameConfig.get_float("domains.world_state", "hud_defaults/ap_max", 10.0)
 
-	snapshot.hp_max = maxf(1.0, float(context.get("hp_max", default_hp)))
+	snapshot.hp_max = maxf(1.0, float(context.get("hp_max", default_max_health_points)))
 	snapshot.mp_max = maxf(1.0, float(context.get("mp_max", 100.0)))
-	snapshot.ap_max = maxf(1.0, float(context.get("ap_max", default_ap)))
+	snapshot.ap_max = maxf(1.0, float(context.get("ap_max", default_max_action_points)))
 
 	snapshot.hp_current = maxf(0.0, float(context.get("hp_current", snapshot.hp_max)))
 	snapshot.mp_current = maxf(0.0, float(context.get("mp_current", snapshot.mp_max)))
@@ -303,11 +303,11 @@ static func _resolve_wallet_and_progression(context: Dictionary, snapshot: Autho
 	snapshot.title_rank_key = String(context.get("title_rank_key", ""))
 
 static func _resolve_calendar_and_retention(context: Dictionary, snapshot: AuthoritativeHudSnapshotDTO) -> void:
-	var raw_calendar: Variant = context.get("calendar_env", null)
-	if raw_calendar is WorldCalendarEnvironmentDTO:
-		snapshot.calendar_env = raw_calendar
-	elif raw_calendar is Dictionary and not raw_calendar.is_empty():
-		snapshot.calendar_env = WorldCalendarEnvironmentDTO.from_dto(raw_calendar)
+	var raw_calendar_environment: Variant = context.get("calendar_env", null)
+	if raw_calendar_environment is WorldCalendarEnvironmentDTO:
+		snapshot.calendar_env = raw_calendar_environment
+	elif raw_calendar_environment is Dictionary and not raw_calendar_environment.is_empty():
+		snapshot.calendar_env = WorldCalendarEnvironmentDTO.from_dto(raw_calendar_environment)
 	elif context.has("travel_hours") or context.has("calendar_years"):
 		var calendar_years := int(context.get("calendar_years", 1))
 		var calendar_months := int(context.get("calendar_months", 1))
@@ -318,9 +318,9 @@ static func _resolve_calendar_and_retention(context: Dictionary, snapshot: Autho
 	else:
 		snapshot.calendar_env = WorldCalendarEnvironmentDTO.new()
 
-	var raw_ops: Variant = context.get("ops_bulletin_brief", {})
-	if raw_ops is Dictionary:
-		snapshot.ops_bulletin_brief = (raw_ops as Dictionary).duplicate()
+	var raw_bulletin_brief: Variant = context.get("ops_bulletin_brief", {})
+	if raw_bulletin_brief is Dictionary:
+		snapshot.ops_bulletin_brief = (raw_bulletin_brief as Dictionary).duplicate()
 
 	snapshot.unread_mail_count = maxi(0, int(context.get("unread_mail_count", 0)))
 	snapshot.gacha_pity_counter = maxi(0, int(context.get("gacha_pity_counter", 0)))
@@ -328,28 +328,28 @@ static func _resolve_calendar_and_retention(context: Dictionary, snapshot: Autho
 static func _resolve_features_and_social(context: Dictionary, snapshot: AuthoritativeHudSnapshotDTO) -> void:
 	snapshot.guild_faction_id = String(context.get("guild_faction_id", ""))
 
-	var raw_dots: Variant = context.get("active_red_dot_paths", [])
-	if raw_dots is Array:
-		for dot in (raw_dots as Array):
-			snapshot.active_red_dot_paths.append(str(dot))
+	var raw_red_dot_paths: Variant = context.get("active_red_dot_paths", [])
+	if raw_red_dot_paths is Array:
+		for dot_path in (raw_red_dot_paths as Array):
+			snapshot.active_red_dot_paths.append(str(dot_path))
 
 	snapshot.quest_tracker = _resolve_quest_tracker(context)
 	snapshot.mode_features = _resolve_mode_features(context)
 
 static func _resolve_quest_tracker(context: Dictionary) -> ActiveQuestTrackerDTO:
-	var raw_quest: Variant = context.get("quest_tracker", null)
-	if raw_quest is ActiveQuestTrackerDTO:
-		return raw_quest as ActiveQuestTrackerDTO
-	if raw_quest is Dictionary and not (raw_quest as Dictionary).is_empty():
-		return ActiveQuestTrackerDTO.from_dto(raw_quest as Dictionary)
+	var raw_quest_tracker: Variant = context.get("quest_tracker", null)
+	if raw_quest_tracker is ActiveQuestTrackerDTO:
+		return raw_quest_tracker as ActiveQuestTrackerDTO
+	if raw_quest_tracker is Dictionary and not (raw_quest_tracker as Dictionary).is_empty():
+		return ActiveQuestTrackerDTO.from_dto(raw_quest_tracker as Dictionary)
 	return ActiveQuestTrackerDTO.new()
 
 static func _resolve_mode_features(context: Dictionary) -> ModeFeatureManifestDTO:
-	var raw_mode: Variant = context.get("mode_features", null)
-	if raw_mode is ModeFeatureManifestDTO:
-		return raw_mode as ModeFeatureManifestDTO
-	if raw_mode is Dictionary and not (raw_mode as Dictionary).is_empty():
-		return ModeFeatureManifestDTO.from_dto(raw_mode as Dictionary)
+	var raw_mode_features: Variant = context.get("mode_features", null)
+	if raw_mode_features is ModeFeatureManifestDTO:
+		return raw_mode_features as ModeFeatureManifestDTO
+	if raw_mode_features is Dictionary and not (raw_mode_features as Dictionary).is_empty():
+		return ModeFeatureManifestDTO.from_dto(raw_mode_features as Dictionary)
 	if context.has("game_mode"):
 		return GameModeFeatureSolver.resolve_features(int(context.get("game_mode")))
 	return GameModeFeatureSolver.resolve_features(GameModeFeatureSolver.MODE_SINGLE_PLAYER)
