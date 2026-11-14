@@ -29,10 +29,10 @@ func _init(capacity: int = 32) -> void:
 	_slots.resize(_capacity)
 	_slot_delta_pools.resize(_capacity)
 	_slot_action_pools.resize(_capacity)
-	for i in range(_capacity):
-		_slots[i] = _create_empty_packet_slot()
-		_slot_delta_pools[i] = []
-		_slot_action_pools[i] = []
+	for slot_index in range(_capacity):
+		_slots[slot_index] = _create_empty_packet_slot()
+		_slot_delta_pools[slot_index] = []
+		_slot_action_pools[slot_index] = []
 	_head = 0
 	_count = 0
 
@@ -54,22 +54,22 @@ func append_packet(packet: AgentHudTelemetryPacketDTO) -> void:
 
 ## 导出最近 k 步保序时序窗口（按 sequence_index 与时间顺序正向排列）
 func get_trajectory_window(steps: int = 8) -> Array[AgentHudTelemetryPacketDTO]:
-	var out: Array[AgentHudTelemetryPacketDTO] = []
-	var k: int = mini(steps, _count)
-	if k <= 0:
-		return out
+	var window_packets: Array[AgentHudTelemetryPacketDTO] = []
+	var window_count: int = mini(steps, _count)
+	if window_count <= 0:
+		return window_packets
 
-	out.resize(k)
-	var start_idx: int = (_head - k + _capacity) % _capacity
-	for i in range(k):
-		var slot_idx: int = (start_idx + i) % _capacity
-		out[i] = _slots[slot_idx]
-	return out
+	window_packets.resize(window_count)
+	var start_index: int = (_head - window_count + _capacity) % _capacity
+	for offset_index in range(window_count):
+		var slot_index: int = (start_index + offset_index) % _capacity
+		window_packets[offset_index] = _slots[slot_index]
+	return window_packets
 
-static func _append_packet_deltas(pkt: AgentHudTelemetryPacketDTO, out_deltas: Array[HudCausalDeltaDTO]) -> void:
-	for d in pkt.causal_deltas:
-		if d != null:
-			out_deltas.append(d)
+static func _append_packet_deltas(packet: AgentHudTelemetryPacketDTO, out_deltas: Array[HudCausalDeltaDTO]) -> void:
+	for delta_item in packet.causal_deltas:
+		if delta_item != null:
+			out_deltas.append(delta_item)
 
 
 ## 获取自指定序列号（大于等于 from_seq）以来的累积因果突变（直读环形槽位，零临时窗口数组分配）
@@ -78,20 +78,20 @@ func get_cumulative_deltas(from_sequence: int = 0) -> Array[HudCausalDeltaDTO]:
 	if _count <= 0:
 		return deltas
 
-	var start_idx: int = (_head - _count + _capacity) % _capacity
-	for i in range(_count):
-		var pkt: AgentHudTelemetryPacketDTO = _slots[(start_idx + i) % _capacity]
-		if pkt == null or pkt.sequence_index < from_sequence:
+	var start_index: int = (_head - _count + _capacity) % _capacity
+	for offset_index in range(_count):
+		var packet: AgentHudTelemetryPacketDTO = _slots[(start_index + offset_index) % _capacity]
+		if packet == null or packet.sequence_index < from_sequence:
 			continue
-		_append_packet_deltas(pkt, deltas)
+		_append_packet_deltas(packet, deltas)
 	return deltas
 
 ## 获取当前最新的遥测数据包
 func get_latest_packet() -> AgentHudTelemetryPacketDTO:
 	if _count <= 0:
 		return null
-	var latest_idx: int = (_head - 1 + _capacity) % _capacity
-	return _slots[latest_idx]
+	var latest_index: int = (_head - 1 + _capacity) % _capacity
+	return _slots[latest_index]
 
 ## 获取当前缓冲项数
 func get_count() -> int:
@@ -110,128 +110,128 @@ func clear() -> void:
 	_count = 0
 
 static func _sync_packet_data(
-	src: AgentHudTelemetryPacketDTO,
-	dst: AgentHudTelemetryPacketDTO,
+	source_packet: AgentHudTelemetryPacketDTO,
+	target_packet: AgentHudTelemetryPacketDTO,
 	delta_pool: Array,
 	action_pool: Array
 ) -> void:
-	dst.reset_state()
-	dst.protocol_version = src.protocol_version
-	dst.packet_id = src.packet_id
-	dst.sequence_index = src.sequence_index
-	dst.timestamp_ms = src.timestamp_ms
-	dst.domain = src.domain
-	dst.is_terminal = src.is_terminal
-	dst.human_interaction_state = src.human_interaction_state
-	dst.agent_control_mode = src.agent_control_mode
-	dst.active_operator = src.active_operator
-	dst.is_writable = src.is_writable
-	dst.preempted_by_human = src.preempted_by_human
+	target_packet.reset_state()
+	target_packet.protocol_version = source_packet.protocol_version
+	target_packet.packet_id = source_packet.packet_id
+	target_packet.sequence_index = source_packet.sequence_index
+	target_packet.timestamp_ms = source_packet.timestamp_ms
+	target_packet.domain = source_packet.domain
+	target_packet.is_terminal = source_packet.is_terminal
+	target_packet.human_interaction_state = source_packet.human_interaction_state
+	target_packet.agent_control_mode = source_packet.agent_control_mode
+	target_packet.active_operator = source_packet.active_operator
+	target_packet.is_writable = source_packet.is_writable
+	target_packet.preempted_by_human = source_packet.preempted_by_human
 
-	if src.observation != null:
-		if dst.observation == null:
-			dst.observation = AgentHudContextSliceDTO.new()
-		_sync_observation(src.observation, dst.observation)
+	if source_packet.observation != null:
+		if target_packet.observation == null:
+			target_packet.observation = AgentHudContextSliceDTO.new()
+		_sync_observation(source_packet.observation, target_packet.observation)
 
 	# 差分原位同步（依托槽位长驻对象池，零事件帧不销毁已分配实例）
-	_sync_causal_deltas(src, dst, delta_pool)
+	_sync_causal_deltas(source_packet, target_packet, delta_pool)
 	# 行动空间原位同步
-	_sync_action_space(src, dst, action_pool)
+	_sync_action_space(source_packet, target_packet, action_pool)
 
-static func _sync_causal_deltas(src: AgentHudTelemetryPacketDTO, dst: AgentHudTelemetryPacketDTO, delta_pool: Array) -> void:
+static func _sync_causal_deltas(source_packet: AgentHudTelemetryPacketDTO, target_packet: AgentHudTelemetryPacketDTO, delta_pool: Array) -> void:
 	var active_count: int = 0
-	for d in src.causal_deltas:
-		if d == null:
+	for delta_item in source_packet.causal_deltas:
+		if delta_item == null:
 			continue
 		var clone_delta := _acquire_delta_slot(delta_pool, active_count)
-		clone_delta.delta_category = d.delta_category
-		clone_delta.target_field = d.target_field
-		clone_delta.previous_value = d.previous_value
-		clone_delta.current_value = d.current_value
-		clone_delta.delta_amount = d.delta_amount
-		clone_delta.cause_identifier = d.cause_identifier
-		clone_delta.initiator = d.initiator
-		clone_delta.reason = d.reason
+		clone_delta.delta_category = delta_item.delta_category
+		clone_delta.target_field = delta_item.target_field
+		clone_delta.previous_value = delta_item.previous_value
+		clone_delta.current_value = delta_item.current_value
+		clone_delta.delta_amount = delta_item.delta_amount
+		clone_delta.cause_identifier = delta_item.cause_identifier
+		clone_delta.initiator = delta_item.initiator
+		clone_delta.reason = delta_item.reason
 		active_count += 1
-	dst.causal_deltas.resize(active_count)
-	for idx in range(active_count):
-		dst.causal_deltas[idx] = delta_pool[idx]
+	target_packet.causal_deltas.resize(active_count)
+	for delta_index in range(active_count):
+		target_packet.causal_deltas[delta_index] = delta_pool[delta_index]
 
-static func _acquire_delta_slot(pool: Array, idx: int) -> HudCausalDeltaDTO:
-	if idx < pool.size() and pool[idx] != null:
-		return pool[idx] as HudCausalDeltaDTO
+static func _acquire_delta_slot(pool: Array, slot_index: int) -> HudCausalDeltaDTO:
+	if slot_index < pool.size() and pool[slot_index] != null:
+		return pool[slot_index] as HudCausalDeltaDTO
 	var created := HudCausalDeltaDTO.new()
-	if idx < pool.size():
-		pool[idx] = created
+	if slot_index < pool.size():
+		pool[slot_index] = created
 	else:
 		pool.append(created)
 	return created
 
-static func _sync_action_space(src: AgentHudTelemetryPacketDTO, dst: AgentHudTelemetryPacketDTO, action_pool: Array) -> void:
+static func _sync_action_space(source_packet: AgentHudTelemetryPacketDTO, target_packet: AgentHudTelemetryPacketDTO, action_pool: Array) -> void:
 	var active_count: int = 0
-	for a in src.action_space:
-		if a == null:
+	for directive_item in source_packet.action_space:
+		if directive_item == null:
 			continue
-		var clone_act := _acquire_action_slot(action_pool, active_count)
-		clone_act.directive_id = a.directive_id
-		clone_act.domain = a.domain
-		clone_act.description = a.description
-		clone_act.cost_payload = a.cost_payload
-		clone_act.preconditions = a.preconditions
-		clone_act.allowed_parameters = a.allowed_parameters
-		clone_act.is_executable = a.is_executable
-		clone_act.blocked_reason = a.blocked_reason
+		var cloned_directive := _acquire_action_slot(action_pool, active_count)
+		cloned_directive.directive_id = directive_item.directive_id
+		cloned_directive.domain = directive_item.domain
+		cloned_directive.description = directive_item.description
+		cloned_directive.cost_payload = directive_item.cost_payload
+		cloned_directive.preconditions = directive_item.preconditions
+		cloned_directive.allowed_parameters = directive_item.allowed_parameters
+		cloned_directive.is_executable = directive_item.is_executable
+		cloned_directive.blocked_reason = directive_item.blocked_reason
 		active_count += 1
-	dst.action_space.resize(active_count)
-	for idx in range(active_count):
-		dst.action_space[idx] = action_pool[idx]
+	target_packet.action_space.resize(active_count)
+	for action_index in range(active_count):
+		target_packet.action_space[action_index] = action_pool[action_index]
 
-static func _acquire_action_slot(pool: Array, idx: int) -> AgentActionDirectiveDTO:
-	if idx < pool.size() and pool[idx] != null:
-		return pool[idx] as AgentActionDirectiveDTO
+static func _acquire_action_slot(pool: Array, slot_index: int) -> AgentActionDirectiveDTO:
+	if slot_index < pool.size() and pool[slot_index] != null:
+		return pool[slot_index] as AgentActionDirectiveDTO
 	var created := AgentActionDirectiveDTO.new()
-	if idx < pool.size():
-		pool[idx] = created
+	if slot_index < pool.size():
+		pool[slot_index] = created
 	else:
 		pool.append(created)
 	return created
 
-static func _sync_observation(src: AgentHudContextSliceDTO, dst: AgentHudContextSliceDTO) -> void:
-	dst.reset_state()
-	dst.account_id = src.account_id
-	dst.character_id = src.character_id
-	dst.character_name = src.character_name
-	dst.race_id = src.race_id
-	dst.level = src.level
-	dst.hp_current = src.hp_current
-	dst.hp_max = src.hp_max
-	dst.hp_ratio = src.hp_ratio
-	dst.mp_current = src.mp_current
-	dst.mp_max = src.mp_max
-	dst.mp_ratio = src.mp_ratio
-	dst.ap_current = src.ap_current
-	dst.ap_max = src.ap_max
-	dst.ap_ratio = src.ap_ratio
-	dst.wallet_gold = src.wallet_gold
-	dst.wallet_mana_monocrystals = src.wallet_mana_monocrystals
-	dst.ledger_nonce = src.ledger_nonce
-	dst.unallocated_potential_points = src.unallocated_potential_points
-	dst.attribute_values.clear()
-	for k in src.attribute_values.keys():
-		dst.attribute_values[k] = src.attribute_values[k]
-	dst.title_rank_key = src.title_rank_key
-	dst.calendar_year = src.calendar_year
-	dst.calendar_month = src.calendar_month
-	dst.calendar_day = src.calendar_day
-	dst.day_phase_key = src.day_phase_key
-	dst.active_quest_id = src.active_quest_id
-	dst.active_quest_target_count = src.active_quest_target_count
-	dst.active_quest_current_count = src.active_quest_current_count
-	dst.is_quest_completable = src.is_quest_completable
-	dst.game_mode = src.game_mode
-	dst.is_multiplayer_ready = src.is_multiplayer_ready
-	dst.unread_mail_count = src.unread_mail_count
-	dst.ui_notices.clear()
-	for n in src.ui_notices:
-		if n != null:
-			dst.ui_notices.append(n)
+static func _sync_observation(source_slice: AgentHudContextSliceDTO, target_slice: AgentHudContextSliceDTO) -> void:
+	target_slice.reset_state()
+	target_slice.account_id = source_slice.account_id
+	target_slice.character_id = source_slice.character_id
+	target_slice.character_name = source_slice.character_name
+	target_slice.race_id = source_slice.race_id
+	target_slice.level = source_slice.level
+	target_slice.hp_current = source_slice.hp_current
+	target_slice.hp_max = source_slice.hp_max
+	target_slice.hp_ratio = source_slice.hp_ratio
+	target_slice.mp_current = source_slice.mp_current
+	target_slice.mp_max = source_slice.mp_max
+	target_slice.mp_ratio = source_slice.mp_ratio
+	target_slice.ap_current = source_slice.ap_current
+	target_slice.ap_max = source_slice.ap_max
+	target_slice.ap_ratio = source_slice.ap_ratio
+	target_slice.wallet_gold = source_slice.wallet_gold
+	target_slice.wallet_mana_monocrystals = source_slice.wallet_mana_monocrystals
+	target_slice.ledger_nonce = source_slice.ledger_nonce
+	target_slice.unallocated_potential_points = source_slice.unallocated_potential_points
+	target_slice.attribute_values.clear()
+	for attribute_key in source_slice.attribute_values.keys():
+		target_slice.attribute_values[attribute_key] = source_slice.attribute_values[attribute_key]
+	target_slice.title_rank_key = source_slice.title_rank_key
+	target_slice.calendar_year = source_slice.calendar_year
+	target_slice.calendar_month = source_slice.calendar_month
+	target_slice.calendar_day = source_slice.calendar_day
+	target_slice.day_phase_key = source_slice.day_phase_key
+	target_slice.active_quest_id = source_slice.active_quest_id
+	target_slice.active_quest_target_count = source_slice.active_quest_target_count
+	target_slice.active_quest_current_count = source_slice.active_quest_current_count
+	target_slice.is_quest_completable = source_slice.is_quest_completable
+	target_slice.game_mode = source_slice.game_mode
+	target_slice.is_multiplayer_ready = source_slice.is_multiplayer_ready
+	target_slice.unread_mail_count = source_slice.unread_mail_count
+	target_slice.ui_notices.clear()
+	for notice_item in source_slice.ui_notices:
+		if notice_item != null:
+			target_slice.ui_notices.append(notice_item)
