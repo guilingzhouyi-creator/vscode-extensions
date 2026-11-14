@@ -88,8 +88,8 @@ static func get_unregistered_overflow() -> int:
 static func missing_codes(used_codes: Array) -> Array:
 	_ensure_loaded()
 	var missing: Array = []
-	for c in used_codes:
-		var code_str := String(c)
+	for raw_code in used_codes:
+		var code_str := String(raw_code)
 		if not _registry.has(code_str):
 			missing.append(code_str)
 	return missing

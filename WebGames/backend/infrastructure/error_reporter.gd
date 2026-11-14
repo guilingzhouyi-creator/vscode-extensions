@@ -87,8 +87,8 @@ static func _resolve_message_key(message_key: String) -> String:
 	return GameConfig.get_string(LogConstants.CFG_NARRATIVES_ERRORS, message_key, "")
 
 ## 存量 push_error / push_warning 零阻断收敛包装：保持原调用点失败关闭语义，仅收敛通道
-static func migrate_push_error(channel: String, msg: String) -> void:
-	emit_error(channel, LogConstants.ERR_CODE_UNKNOWN, msg, {})
+static func migrate_push_error(channel: String, message: String) -> void:
+	emit_error(channel, LogConstants.ERR_CODE_UNKNOWN, message, {})
 
 ## 便捷错误/告警广播入口（默认通道 infrastructure）
 static func emit(error_code: String, context: Dictionary = {}, message: String = "") -> void:

@@ -29,20 +29,21 @@ var bus: Variant:
 			_bus_ref = weakref(value)
 
 func _init(
-	p_bus: EventBusCore,
-	p_channel: int,
-	p_mask: int,
-	p_cb: Callable,
-	p_spatial: bool,
-	p_tid: int = 0
+	event_bus: EventBusCore,
+	initial_channel_id: int,
+	initial_category_mask: int,
+	initial_callback: Callable,
+	spatial_listener: bool,
+	initial_token_id: int = 0
 ) -> void:
-	if p_bus != null:
-		_bus_ref = weakref(p_bus)
-	channel_id = p_channel
-	category_mask = p_mask
-	callback = p_cb
-	is_spatial = p_spatial
-	token_id = p_tid
+	if event_bus != null:
+		# 使用 WeakRef 持有总线，避免令牌被外部保留时阻止 EventBusCore 释放
+		_bus_ref = weakref(event_bus)
+	channel_id = initial_channel_id
+	category_mask = initial_category_mask
+	callback = initial_callback
+	is_spatial = spatial_listener
+	token_id = initial_token_id
 	is_active = true
 
 ## 幂等注销（首次调用注销成功返回 true，重复调用返回 false）

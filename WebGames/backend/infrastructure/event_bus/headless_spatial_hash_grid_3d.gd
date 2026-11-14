@@ -91,14 +91,14 @@ func update_listener_position(token_id: int, new_center: Vector3, radius: float,
 func _remove_token_from_cell(cell_hash: int, token_id: int) -> void:
 	if not _grid.has(cell_hash):
 		return
-	var cell_arr: Array = _grid[cell_hash]
-	for idx in range(cell_arr.size() - 1, -1, -1):
-		if cell_arr[idx]["token_id"] == token_id:
-			cell_arr.remove_at(idx)
-	if cell_arr.is_empty():
+	var cell_entries: Array = _grid[cell_hash]
+	for entry_index in range(cell_entries.size() - 1, -1, -1):
+		if cell_entries[entry_index]["token_id"] == token_id:
+			cell_entries.remove_at(entry_index)
+	if cell_entries.is_empty():
 		_grid.erase(cell_hash)
 		if _free_cell_buckets.size() < MAX_POOLED_CELL_BUCKETS:
-			_free_cell_buckets.append(cell_arr)
+			_free_cell_buckets.append(cell_entries)
 
 func _remove_token_z_column(cell_x: int, cell_y: int, z_bounds: Vector2i, token_id: int) -> void:
 	for cell_z in range(z_bounds.x, z_bounds.y + 1):
@@ -122,14 +122,14 @@ func unregister_listener(token_id: int) -> void:
 	for cell_x in range(min_cell.x, max_cell.x + 1):
 		_remove_token_y_column(cell_x, min_cell, max_cell, token_id)
 
-func _collect_cell_targets(cell_hash: int, query_ctx: Dictionary) -> void:
+func _collect_cell_targets(cell_hash: int, query_context: Dictionary) -> void:
 	if not _grid.has(cell_hash):
 		return
-	var origin: Vector3 = query_ctx["pos"]
-	var query_radius: float = query_ctx["radius"]
-	var called_tokens: Dictionary = query_ctx["called"]
-	var targets: Array = query_ctx["targets"]
-	var dead_tokens: Array = query_ctx["dead_tokens"]
+	var origin: Vector3 = query_context["pos"]
+	var query_radius: float = query_context["radius"]
+	var called_tokens: Dictionary = query_context["called"]
+	var targets: Array = query_context["targets"]
+	var dead_tokens: Array = query_context["dead_tokens"]
 	var entries: Array = _grid[cell_hash]
 	for entry in entries:
 		var token_id: int = entry["token_id"]
@@ -143,18 +143,18 @@ func _collect_cell_targets(cell_hash: int, query_ctx: Dictionary) -> void:
 		var listener_record: Dictionary = _listeners[token_id]
 		var center: Vector3 = listener_record["center"]
 		var listener_radius: float = listener_record["radius"]
-		var total_r: float = query_radius + listener_radius
-		if origin.distance_squared_to(center) <= total_r * total_r:
+		var combined_radius: float = query_radius + listener_radius
+		if origin.distance_squared_to(center) <= combined_radius * combined_radius:
 			targets.append(callback)
 
-func _collect_z_column_targets(cell_x: int, cell_y: int, z_bounds: Vector2i, query_ctx: Dictionary) -> void:
+func _collect_z_column_targets(cell_x: int, cell_y: int, z_bounds: Vector2i, query_context: Dictionary) -> void:
 	for cell_z in range(z_bounds.x, z_bounds.y + 1):
-		_collect_cell_targets(_hash_cell_indices(cell_x, cell_y, cell_z), query_ctx)
+		_collect_cell_targets(_hash_cell_indices(cell_x, cell_y, cell_z), query_context)
 
-func _collect_y_column_targets(cell_x: int, min_cell: Vector3i, max_cell: Vector3i, query_ctx: Dictionary) -> void:
+func _collect_y_column_targets(cell_x: int, min_cell: Vector3i, max_cell: Vector3i, query_context: Dictionary) -> void:
 	var z_bounds := Vector2i(min_cell.z, max_cell.z)
 	for cell_y in range(min_cell.y, max_cell.y + 1):
-		_collect_z_column_targets(cell_x, cell_y, z_bounds, query_ctx)
+		_collect_z_column_targets(cell_x, cell_y, z_bounds, query_context)
 
 func _invoke_spatial_targets(targets: Array, packet: EventPacket) -> int:
 	var dispatched: int = 0
@@ -172,8 +172,9 @@ func dispatch_spatial(pos: Vector3, radius: float, packet: EventPacket) -> int:
 	var min_cell: Vector3i = _compute_cell_bound(pos, -clamped_radius)
 	var max_cell: Vector3i = _compute_cell_bound(pos, clamped_radius)
 
-	var prev_reentrancy: int = _spatial_reentrancy
+	var previous_reentrancy: int = _spatial_reentrancy
 	_spatial_reentrancy += 1
+	# 仅最外层派发复用成员暂存区；回调内部重入派发回退至独立局部容器，防止覆盖外层迭代状态
 	var use_scratch: bool = (_spatial_reentrancy == 1)
 	var called_tokens: Dictionary = _called_scratch if use_scratch else {}
 	var targets: Array = _targets_scratch if use_scratch else []
@@ -182,15 +183,15 @@ func dispatch_spatial(pos: Vector3, radius: float, packet: EventPacket) -> int:
 	targets.clear()
 	dead_tokens.clear()
 
-	var query_ctx: Dictionary = _dispatch_query_scratch if use_scratch else {}
-	query_ctx["pos"] = pos
-	query_ctx["radius"] = clamped_radius
-	query_ctx["called"] = called_tokens
-	query_ctx["targets"] = targets
-	query_ctx["dead_tokens"] = dead_tokens
+	var query_context: Dictionary = _dispatch_query_scratch if use_scratch else {}
+	query_context["pos"] = pos
+	query_context["radius"] = clamped_radius
+	query_context["called"] = called_tokens
+	query_context["targets"] = targets
+	query_context["dead_tokens"] = dead_tokens
 
 	for cell_x in range(min_cell.x, max_cell.x + 1):
-		_collect_y_column_targets(cell_x, min_cell, max_cell, query_ctx)
+		_collect_y_column_targets(cell_x, min_cell, max_cell, query_context)
 
 	# 派发快照已在独立 targets 中，回调内增删订阅不影响本轮遍历（Inv-EB2-7 契约对齐）
 	var dispatched: int = _invoke_spatial_targets(targets, packet)
@@ -204,8 +205,8 @@ func dispatch_spatial(pos: Vector3, radius: float, packet: EventPacket) -> int:
 		called_tokens.clear()
 		targets.clear()
 		dead_tokens.clear()
-		query_ctx.clear()
-	_spatial_reentrancy = prev_reentrancy
+		query_context.clear()
+	_spatial_reentrancy = previous_reentrancy
 	return dispatched
 
 ## 便捷入口：按事件包自身空间头派发

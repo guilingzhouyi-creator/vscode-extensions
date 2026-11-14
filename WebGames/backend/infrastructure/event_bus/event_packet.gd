@@ -23,7 +23,7 @@ var is_spatial: bool = false
 var world_position: Vector3 = Vector3.ZERO
 var effect_radius: float = 0.0
 
-# ---- 三、多态载荷（双通道：强类型 DTO 优先，轻量载荷兜底，二选一） ----
+# ---- 三、多态载荷（双通道：强类型 DTO 优先，轻量载荷回退，二选一） ----
 var payload_dto: RefCounted = null # 强类型业务 DTO（如 VisualCueDTO / 领域 DTO）
 var payload_data: Variant = null # 轻量载荷（Dictionary/Array），与 payload_dto 互斥使用
 
@@ -67,33 +67,33 @@ func set_spatial_header_2d(pos_2d: Vector2, radius: float, is_isometric_xz: bool
 ## 绑定强类型 DTO 与标准化字典双向载荷（兼容仅读取 payload_data 或仅读取 payload_dto 的消费端）
 static func bind_dual_payload(
 	packet: EventPacket,
-	dto: RefCounted,
+	payload_model: RefCounted,
 	channel_label: String = "",
 	compat_fields: Dictionary = {}
 ) -> void:
 	if packet == null:
 		return
-	packet.payload_dto = dto
-	if dto == null:
+	packet.payload_dto = payload_model
+	if payload_model == null:
 		return
-	var dto_dict: Dictionary = {}
-	if dto.has_method("to_dto"):
-		var raw_dto: Variant = dto.call("to_dto")
-		if raw_dto is Dictionary:
-			dto_dict = (raw_dto as Dictionary).duplicate()
+	var payload_dict: Dictionary = {}
+	if payload_model.has_method("to_dto"):
+		var raw_payload: Variant = payload_model.call("to_dto")
+		if raw_payload is Dictionary:
+			payload_dict = (raw_payload as Dictionary).duplicate()
 	if not compat_fields.is_empty():
 		for key in compat_fields.keys():
-			dto_dict[key] = compat_fields[key]
+			payload_dict[key] = compat_fields[key]
 	if channel_label.is_empty():
-		packet.payload_data = dto_dict
+		packet.payload_data = payload_dict
 		return
 	var envelope: Dictionary = {
 		"channel": channel_label,
-		"payload": dto_dict
+		"payload": payload_dict
 	}
-	for key in dto_dict.keys():
+	for key in payload_dict.keys():
 		if key != "channel" and key != "payload":
-			envelope[key] = dto_dict[key]
+			envelope[key] = payload_dict[key]
 	packet.payload_data = envelope
 
 ## 从事件包无差别提取字典载荷（优先强类型 DTO.to_dto()，其次展开 payload_data 信封）
@@ -101,9 +101,9 @@ static func extract_payload_dict(packet: EventPacket) -> Dictionary:
 	if packet == null:
 		return {}
 	if packet.payload_dto != null and packet.payload_dto.has_method("to_dto"):
-		var raw_dto: Variant = packet.payload_dto.call("to_dto")
-		if raw_dto is Dictionary:
-			return raw_dto as Dictionary
+		var raw_payload: Variant = packet.payload_dto.call("to_dto")
+		if raw_payload is Dictionary:
+			return raw_payload as Dictionary
 	if packet.payload_data is Dictionary:
 		var raw_data: Dictionary = packet.payload_data as Dictionary
 		if raw_data.has("payload") and raw_data.get("payload") is Dictionary:

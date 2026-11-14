@@ -24,7 +24,7 @@ var _channel_cache_version: int = -1
 var _spatial_grid: HeadlessSpatialHashGrid3D = null
 var _ring_buffer: PingPongRingBuffer = null
 var _pool: EventPool = null
-var _seq_counter: int = 0
+var _sequence_counter: int = 0
 var _dispatch_depth: int = 0
 var _max_depth: int = 16
 var _target_scratch: Array = [] # 按递归深度索引的目标暂存池（复用免热路径堆分配）
@@ -42,7 +42,7 @@ var _current_window_ops: int = 0
 var _is_warning_high_freq: bool = false
 
 # ---- 叙事表缓存（自旧总线迁正：域 id → 文案表名，按配置重载版本失效） ----
-static var _record_seq: int = 0
+static var _record_sequence_number: int = 0
 static var _narrative_table_cache: Dictionary = {}
 static var _narrative_cache_version: int = -1
 
@@ -63,8 +63,8 @@ static func get_instance() -> EventBusCore:
 
 ## 确保频道配置与整型信道映射表加载对齐
 func _ensure_channel_registry_loaded() -> void:
-	var cur_ver: int = GameConfig.config_reload_version()
-	if _channel_cache_version == cur_ver and not _legacy_channel_to_id.is_empty():
+	var current_version: int = GameConfig.config_reload_version()
+	if _channel_cache_version == current_version and not _legacy_channel_to_id.is_empty():
 		return
 	_legacy_channel_to_id.clear()
 	_id_to_legacy_channel.clear()
@@ -77,49 +77,49 @@ func _ensure_channel_registry_loaded() -> void:
 	_legacy_channel_to_id["account.registered"] = EventChannelDefinition.AUTH_REGISTERED
 	_legacy_channel_to_id["account.login_succeeded"] = EventChannelDefinition.AUTH_LOGIN_SUCCEEDED
 
-	var reg: Array = GameConfig.get_array("infrastructure.event_bus_config", "channel_registry", [])
-	for item in reg:
+	var channel_registry: Array = GameConfig.get_array("infrastructure.event_bus_config", "channel_registry", [])
+	for item in channel_registry:
 		if not (item is Dictionary):
 			continue
 		var entry: Dictionary = item as Dictionary
-		var ch_id: int = int(entry.get("id", 0))
-		var ch_name: String = str(entry.get("name", ""))
+		var channel_id: int = int(entry.get("id", 0))
+		var channel_name: String = str(entry.get("name", ""))
 		var legacy: String = str(entry.get("legacy", ""))
-		if ch_id <= 0:
+		if channel_id <= 0:
 			continue
-		if not ch_name.is_empty():
-			_legacy_channel_to_id[ch_name] = ch_id
-			_legacy_channel_to_id[ch_name.to_lower()] = ch_id
+		if not channel_name.is_empty():
+			_legacy_channel_to_id[channel_name] = channel_id
+			_legacy_channel_to_id[channel_name.to_lower()] = channel_id
 		if not legacy.is_empty():
-			_legacy_channel_to_id[legacy] = ch_id
-			_legacy_channel_to_id[legacy.to_lower()] = ch_id
-		_id_to_legacy_channel[ch_id] = legacy if not legacy.is_empty() else ch_name
-	_channel_cache_version = cur_ver
+			_legacy_channel_to_id[legacy] = channel_id
+			_legacy_channel_to_id[legacy.to_lower()] = channel_id
+		_id_to_legacy_channel[channel_id] = legacy if not legacy.is_empty() else channel_name
+	_channel_cache_version = current_version
 
 ## 将信道名称、别名或整型常量解析为标准整型信道常量
 func resolve_channel_id(channel_spec: Variant) -> int:
 	if channel_spec is int:
 		return int(channel_spec)
 	if channel_spec is String:
-		var s: String = channel_spec as String
+		var channel_name: String = channel_spec as String
 		_ensure_channel_registry_loaded()
-		if _legacy_channel_to_id.has(s):
-			return int(_legacy_channel_to_id[s])
-		var s_lower: String = s.to_lower()
-		if _legacy_channel_to_id.has(s_lower):
-			return int(_legacy_channel_to_id[s_lower])
+		if _legacy_channel_to_id.has(channel_name):
+			return int(_legacy_channel_to_id[channel_name])
+		var channel_name_lower: String = channel_name.to_lower()
+		if _legacy_channel_to_id.has(channel_name_lower):
+			return int(_legacy_channel_to_id[channel_name_lower])
 		return EventChannelDefinition.DOMAIN_EVENT_GENERIC
 	return EventChannelDefinition.DOMAIN_EVENT_GENERIC
 
 ## 从 event_bus_config.json 驱动装配参数（单元尺寸/缓冲容量/池容量/熔断深度/遥测钩子）
 func initialize_from_config() -> void:
-	var cell: float = GameConfig.get_float("infrastructure.event_bus_config", "spatial_routing/cell_size_meters", 16.0)
-	var max_r: float = GameConfig.get_float("infrastructure.event_bus_config", "spatial_routing/max_dispatch_radius_meters", 256.0)
-	_spatial_grid = HeadlessSpatialHashGrid3D.new(maxf(1.0, cell), maxf(1.0, max_r))
-	var ring_cap: int = GameConfig.get_int("infrastructure.event_bus_config", "frame_batching/ring_buffer_capacity", 4096)
-	_ring_buffer = PingPongRingBuffer.new(maxi(1, ring_cap))
-	var pool_cap: int = GameConfig.get_int("infrastructure.event_bus_config", "pool/capacity", 4096)
-	_pool = EventPool.new(maxi(1, pool_cap))
+	var cell_size: float = GameConfig.get_float("infrastructure.event_bus_config", "spatial_routing/cell_size_meters", 16.0)
+	var max_dispatch_radius: float = GameConfig.get_float("infrastructure.event_bus_config", "spatial_routing/max_dispatch_radius_meters", 256.0)
+	_spatial_grid = HeadlessSpatialHashGrid3D.new(maxf(1.0, cell_size), maxf(1.0, max_dispatch_radius))
+	var ring_capacity: int = GameConfig.get_int("infrastructure.event_bus_config", "frame_batching/ring_buffer_capacity", 4096)
+	_ring_buffer = PingPongRingBuffer.new(maxi(1, ring_capacity))
+	var pool_capacity: int = GameConfig.get_int("infrastructure.event_bus_config", "pool/capacity", 4096)
+	_pool = EventPool.new(maxi(1, pool_capacity))
 	_max_depth = maxi(1, GameConfig.get_int("infrastructure.event_bus_config", "circuit_breaker/max_dispatch_depth", 16))
 	_enable_profiling = GameConfig.get_bool("infrastructure.event_bus_config", "metrics/enable_profiling_hooks", true)
 	_high_freq_threshold = maxi(100, GameConfig.get_int("infrastructure.event_bus_config", "metrics/high_frequency_warning_threshold_ops", 10000))
@@ -143,7 +143,7 @@ func clear_for_tests() -> void:
 		_pool.clear()
 	else:
 		_pool = EventPool.new(4096)
-	_seq_counter = 0
+	_sequence_counter = 0
 	_dispatch_depth = 0
 	_dead_tokens_scratch.clear()
 	reset_metrics()
@@ -184,15 +184,15 @@ func on(channel_id: int, callback: Callable) -> EventBusSubscriptionToken:
 ## 空间兴趣区订阅：AoI 内监听者会收到该范围内全部空间事件（不按 channel/mask 过滤，
 ## 业务回调内按需自行过滤——契约见 Inv-EB2-2 精确裁剪语义）
 func on_spatial(pos: Vector3, radius: float, callback: Callable) -> EventBusSubscriptionToken:
-	_seq_counter += 1
-	var token_id: int = _seq_counter
+	_sequence_counter += 1
+	var token_id: int = _sequence_counter
 	_spatial_grid.register_listener(token_id, pos, radius, callback)
 	return EventBusSubscriptionToken.new(self, 0, 0, callback, true, token_id)
 
 ## 订阅二维空间局部范围事件通知
 func on_spatial_2d(pos_2d: Vector2, radius: float, callback: Callable, is_isometric_xz: bool = false) -> EventBusSubscriptionToken:
-	_seq_counter += 1
-	var token_id: int = _seq_counter
+	_sequence_counter += 1
+	var token_id: int = _sequence_counter
 	_spatial_grid.register_listener_2d(token_id, pos_2d, radius, callback, is_isometric_xz)
 	return EventBusSubscriptionToken.new(self, 0, 0, callback, true, token_id)
 
@@ -201,9 +201,9 @@ func _unregister_token(token: EventBusSubscriptionToken) -> void:
 		_spatial_grid.unregister_listener(token.token_id)
 	else:
 		if _channel_routes.has(token.channel_id):
-			var arr: Array = _channel_routes[token.channel_id]
-			arr.erase(token)
-			if arr.is_empty():
+			var route_tokens: Array = _channel_routes[token.channel_id]
+			route_tokens.erase(token)
+			if route_tokens.is_empty():
 				_channel_routes.erase(token.channel_id)
 
 # ==============================================================================
@@ -225,13 +225,13 @@ func _collect_channel_subscribers(channel_id: int, packet: EventPacket, seen: Di
 		return
 	var subs: Array = _channel_routes[channel_id]
 	for item in subs:
-		var tok: EventBusSubscriptionToken = item as EventBusSubscriptionToken
-		if tok == null or not tok.is_active:
+		var token: EventBusSubscriptionToken = item as EventBusSubscriptionToken
+		if token == null or not token.is_active:
 			continue
-		var mask_match: bool = ((tok.category_mask & packet.category_mask) != 0) or tok.category_mask == 0
-		if mask_match and not seen.has(tok):
-			seen[tok] = true
-			targets.append(tok)
+		var mask_match: bool = ((token.category_mask & packet.category_mask) != 0) or token.category_mask == 0
+		if mask_match and not seen.has(token):
+			seen[token] = true
+			targets.append(token)
 
 ## 即时同步分发因果事件，执行递归熔断与死循环拦截
 func dispatch_now(packet: EventPacket) -> void:
@@ -255,8 +255,8 @@ func dispatch_now(packet: EventPacket) -> void:
 	var seen: Dictionary = _seen_scratch[depth]
 	targets.clear()
 	seen.clear()
-	_seq_counter += 1
-	packet.event_id = _seq_counter
+	_sequence_counter += 1
+	packet.event_id = _sequence_counter
 
 	_collect_channel_subscribers(packet.channel_id, packet, seen, targets)
 	if packet.channel_id != 0:
@@ -267,17 +267,17 @@ func dispatch_now(packet: EventPacket) -> void:
 
 	# 派发快照已在独立 targets 中，回调内增删订阅不影响本轮遍历（Inv-EB2-7）
 	_dead_tokens_scratch.clear()
-	for tok in targets:
-		if not tok.is_active:
+	for token in targets:
+		if not token.is_active:
 			continue
-		if tok.callback.is_valid():
-			tok.callback.call(packet)
+		if token.callback.is_valid():
+			token.callback.call(packet)
 		else:
-			_dead_tokens_scratch.append(tok)
+			_dead_tokens_scratch.append(token)
 
-	for dead_tok in _dead_tokens_scratch:
-		dead_tok.is_active = false
-		_unregister_token(dead_tok)
+	for dead_token in _dead_tokens_scratch:
+		dead_token.is_active = false
+		_unregister_token(dead_token)
 	_dead_tokens_scratch.clear()
 
 	targets.clear()
@@ -287,22 +287,24 @@ func dispatch_now(packet: EventPacket) -> void:
 # ==============================================================================
 # 原语 ②：enqueue_frame + flush_frame_events（帧级双缓冲合批）
 # ==============================================================================
+
+## 将事件包入帧缓冲队列（CORE_STATE 类别禁止延后入队，溢出时由总线统一回收）
 func enqueue_frame(packet: EventPacket) -> bool:
 	if packet == null:
 		return false
 	if (packet.category_mask & EventCategoryMask.CORE_STATE) != 0:
 		ErrorReporter.emit("event_bus2_core_state_in_frame_queue", {"channel_id": packet.channel_id})
 		return false
-	_seq_counter += 1
-	packet.event_id = _seq_counter
+	_sequence_counter += 1
+	packet.event_id = _sequence_counter
 	_enqueued_count += 1
-	var ok: bool = _ring_buffer.enqueue(packet)
-	if not ok:
+	var enqueued: bool = _ring_buffer.enqueue(packet)
+	if not enqueued:
 		_dropped_count += 1
-		# 溢出兜底：入队失败的包由总线统一回收（否则调用方遗漏 recycle 时包永久滞留池外）
+		# 溢出安全回退：入队失败的包由总线统一回收（否则调用方遗漏 recycle 时包永久滞留池外）
 		ErrorReporter.emit("event_bus2_frame_queue_overflow", {"channel_id": packet.channel_id, "dropped_total": _dropped_count})
 		recycle_packet(packet)
-	return ok
+	return enqueued
 
 ## 刷新并分发当前帧所有缓冲队列事件包
 func flush_frame_events() -> int:
@@ -314,11 +316,13 @@ func flush_frame_events() -> int:
 # ==============================================================================
 # 原语 ③：dispatch_spatial / dispatch_spatial_2d（空间AoI定向裁剪）
 # ==============================================================================
+
+## 按三维空间坐标与影响半径向 AoI 内侦听器定向派发事件
 func dispatch_spatial(packet: EventPacket, origin: Vector3, radius: float) -> int:
 	if packet == null:
 		return 0
-	_seq_counter += 1
-	packet.event_id = _seq_counter
+	_sequence_counter += 1
+	packet.event_id = _sequence_counter
 	packet.set_spatial_header(origin, radius)
 	return _spatial_grid.dispatch_packet(packet)
 
@@ -326,8 +330,8 @@ func dispatch_spatial(packet: EventPacket, origin: Vector3, radius: float) -> in
 func dispatch_spatial_2d(packet: EventPacket, origin_2d: Vector2, radius: float, is_isometric_xz: bool = false) -> int:
 	if packet == null:
 		return 0
-	_seq_counter += 1
-	packet.event_id = _seq_counter
+	_sequence_counter += 1
+	packet.event_id = _sequence_counter
 	packet.set_spatial_header_2d(origin_2d, radius, is_isometric_xz)
 	return _spatial_grid.dispatch_packet(packet)
 
@@ -357,7 +361,7 @@ func get_pool() -> EventPool:
 
 ## 测试专用重置：清零记录序号并清空叙事表缓存（避免跨用例状态残留）
 static func reset_sequence_for_test() -> void:
-	_record_seq = 0
+	_record_sequence_number = 0
 	_narrative_table_cache.clear()
 	_narrative_cache_version = -1
 
@@ -389,17 +393,17 @@ static func _format_template_safely(template: String, raw_args: Variant) -> Stri
 	if raw_args is Dictionary:
 		return TemplateFormatter.format(template, raw_args as Dictionary)
 	if raw_args is Array:
-		var arr := raw_args as Array
-		if arr.is_empty():
+		var args_array := raw_args as Array
+		if args_array.is_empty():
 			return template
 		var param_keys := TemplateFormatter.extract_param_keys(template)
 		if not param_keys.is_empty():
 			var dict_params: Dictionary = {}
-			for i in range(mini(param_keys.size(), arr.size())):
-				dict_params[param_keys[i]] = arr[i]
+			for arg_index in range(mini(param_keys.size(), args_array.size())):
+				dict_params[param_keys[arg_index]] = args_array[arg_index]
 			return TemplateFormatter.format(template, dict_params)
 		if "%" in template:
-			return template % arr
+			return template % args_array
 		return template
 	return template
 
@@ -452,20 +456,18 @@ func emit_narrative(text: String, category_key: String = "combat", meta: Diction
 func emit_narrative_by_key(template_key: String, category_key: String, args: Variant = [], meta: Dictionary = {}) -> void:
 	emit_narrative(render_narrative(template_key, args), category_key, meta)
 
-## 广播泛化领域事件：结构化 payload 经 DOMAIN_EVENT_GENERIC 信道派发；
-## 能解析出文案时追加叙事派发（与旧总线两步语义一致）
 ## 广播泛化领域事件：配置驱动信道对齐；结构化 payload 经对应信道派发；
 ## 能解析出文案时追加叙事派发（与旧总线两步语义一致）
 func emit_domain_event(channel: String, payload: Dictionary = {}) -> void:
 	var channel_def: int = resolve_channel_id(channel)
 	var packet := borrow_packet(channel_def, EventCategoryMask.NARRATIVE_TEXT, payload)
-	var pdata: Dictionary
+	var packet_payload: Dictionary
 	if payload.has("channel") and payload.has("payload"):
-		pdata = payload
+		packet_payload = payload
 	else:
-		pdata = {"channel": channel, "payload": payload}
-		pdata.merge(payload)
-	packet.payload_data = pdata
+		packet_payload = {"channel": channel, "payload": payload}
+		packet_payload.merge(payload)
+	packet.payload_data = packet_payload
 	packet.narrative_key = channel
 	dispatch_now(packet)
 	recycle_packet(packet)
@@ -477,8 +479,8 @@ func emit_domain_event(channel: String, payload: Dictionary = {}) -> void:
 func emit_log_record(record: LogRecordDTO) -> void:
 	if record == null:
 		return
-	_record_seq += 1
-	record.sequence = _record_seq
+	_record_sequence_number += 1
+	record.sequence = _record_sequence_number
 	if record.timestamp_utc <= 0:
 		record.timestamp_utc = int(Time.get_unix_time_from_system())
 	if record.channel.is_empty():
@@ -486,44 +488,45 @@ func emit_log_record(record: LogRecordDTO) -> void:
 	if not record.message.is_empty():
 		record.message = StatisticsMathLib.scrub_inline_secrets(record.message)
 
-	var srec: StructuredLogRecord
+	var structured_record: StructuredLogRecord
 	if record is StructuredLogRecord:
-		srec = record
+		structured_record = record
 	else:
-		srec = StructuredLogRecord.from_dto(record.to_dto())
-	if srec.trace_id.is_empty():
+		structured_record = StructuredLogRecord.from_dto(record.to_dto())
+	if structured_record.trace_id.is_empty():
 		var active_trace := LogCollector.get_active_trace_id()
 		if not active_trace.is_empty():
-			srec.trace_id = active_trace
+			structured_record.trace_id = active_trace
 		else:
-			srec.trace_id = "%s_%s_%d" % [LogConstants.TRACE_PREFIX_DEFAULT, srec.channel, _record_seq]
+			structured_record.trace_id = "%s_%s_%d" % [LogConstants.TRACE_PREFIX_DEFAULT, structured_record.channel, _record_sequence_number]
 
 	var has_log_listeners: bool = _channel_routes.has(EventChannelDefinition.LOG_RECORD_POSTED) or _channel_routes.has(0) or _channel_routes.has(EventChannelDefinition.DOMAIN_EVENT_GENERIC)
 	var packet := borrow_packet(EventChannelDefinition.LOG_RECORD_POSTED, EventCategoryMask.SYSTEM_TELEMETRY)
-	packet.payload_dto = srec
+	packet.payload_dto = structured_record
 	if has_log_listeners:
-		packet.payload_data = srec.to_dto()
-	packet.narrative_key = srec.message
+		packet.payload_data = structured_record.to_dto()
+	packet.narrative_key = structured_record.message
 	dispatch_now(packet)
 	recycle_packet(packet)
-	LogFileExporter.consume(srec)
-	LogRingBuffer.append(srec)
-	TelemetryAggregate.consume(srec)
+	LogFileExporter.consume(structured_record)
+	LogRingBuffer.append(structured_record)
+	TelemetryAggregate.consume(structured_record)
 	_dispatch_console_log(record)
 
-static var _console_cfg_version: int = -1
+static var _console_config_version: int = -1
 static var _console_enabled_cached: bool = true
 static var _console_min_rank_cached: int = 2
 
 static func _ensure_console_log_cache() -> void:
-	var cfg_ver: int = GameConfig.config_reload_version()
-	if _console_cfg_version == cfg_ver:
+	# 按配置重载版本缓存控制台阈值，避免每次发射日志均穿透读取 GameConfig 字典
+	var config_version: int = GameConfig.config_reload_version()
+	if _console_config_version == config_version:
 		return
-	var console_cfg: Dictionary = GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_CONSOLE, {})
-	_console_enabled_cached = bool(console_cfg.get("enabled", true))
-	var min_level: String = str(console_cfg.get("min_level", LogConstants.LEVEL_LOWER_WARN)).to_lower()
+	var console_config: Dictionary = GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_CONSOLE, {})
+	_console_enabled_cached = bool(console_config.get("enabled", true))
+	var min_level: String = str(console_config.get("min_level", LogConstants.LEVEL_LOWER_WARN)).to_lower()
 	_console_min_rank_cached = LogConstants.level_rank(min_level)
-	_console_cfg_version = cfg_ver
+	_console_config_version = config_version
 
 ## 控制台标准输出穿透分发（受 log.json/console 配置驱动，保障构建与排查端可见性）
 func _dispatch_console_log(record: LogRecordDTO) -> void:
@@ -544,11 +547,11 @@ func _dispatch_console_log(record: LogRecordDTO) -> void:
 		print_rich(formatted)
 
 ## 便捷日志入口：按 level_key + 原文直构 StructuredLogRecord，免除中间 DTO 二次深拷贝
-func emit_log(level_key: String, msg: String, ch: String = LogConstants.CHANNEL_SYSTEM) -> void:
+func emit_log(level_key: String, message: String, channel: String = LogConstants.CHANNEL_SYSTEM) -> void:
 	var record := StructuredLogRecord.new()
 	record.level = level_key
-	record.message = msg
-	record.channel = ch
+	record.message = message
+	record.channel = channel
 	emit_log_record(record)
 
 ## 时钟推进广播（旧 world_clock_advanced 信号替代，CORE_STATE 强一致内联）

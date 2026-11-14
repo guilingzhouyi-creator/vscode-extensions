@@ -12,7 +12,7 @@ class_name GameBootstrap
 extends RefCounted
 
 const ActivationTokenDTO = preload("res://backend/domains/version_governance/activation_token_dto.gd")
-const VersionedRuntimeContext = preload("res://backend/domains/version_governance/version_runtime_context.gd")
+const VersionedRuntimeContext = preload("res://backend/domains/version_governance/versioned_runtime_context.gd")
 const VersionActivationGate = preload("res://backend/domains/version_governance/version_activation_gate.gd")
 const AgentTelemetryPoolRegistry = preload("res://backend/domains/world_state/services/agent_telemetry_pool_registry.gd")
 const CombatPipelineFSM = preload("res://backend/domains/physics_thermodynamics/combat_pipeline_fsm.gd")
@@ -41,10 +41,10 @@ static func _acquire_telemetry_pool(pool_name: String) -> RefCounted:
 	var pool := ObjectPoolManager.get_pool(pool_name)
 	return pool.acquire() if pool != null else null
 
-static func _release_telemetry_pool(pool_name: String, obj: RefCounted) -> void:
+static func _release_telemetry_pool(pool_name: String, pooled_object: RefCounted) -> void:
 	var pool := ObjectPoolManager.get_pool(pool_name)
 	if pool != null:
-		pool.release(obj)
+		pool.release(pooled_object)
 
 # ==============================================================================
 # 一、装配状态与单例引用
@@ -124,7 +124,7 @@ static func assemble() -> Dictionary:
 		"registered_commands": CommandRegistryEngine.registered_count()
 	}
 
-## : 版本化装配入口 (前置版本门禁拦截)
+## 版本化装配入口（前置版本门禁拦截）
 static func assemble_versioned(target_version: String, token: ActivationTokenDTO) -> Dictionary:
 	# 1. 基础配置预加载
 	GameConfig.ensure_loaded()
@@ -145,12 +145,12 @@ static func assemble_versioned(target_version: String, token: ActivationTokenDTO
 
 	# 4. 创建并装配新版本运行时上下文
 	if _active_context == null:
-		var v_code := 10000
+		var version_code := 10000
 		if GameConfig.has("infrastructure.version_manifest", "releases/" + target_version + "/version_code"):
-			v_code = GameConfig.get_int("infrastructure.version_manifest", "releases/" + target_version + "/version_code", 10000)
-		_active_context = VersionedRuntimeContext.new(target_version, v_code, token)
-		var ok := _active_context.assemble_context()
-		if not ok:
+			version_code = GameConfig.get_int("infrastructure.version_manifest", "releases/" + target_version + "/version_code", 10000)
+		_active_context = VersionedRuntimeContext.new(target_version, version_code, token)
+		var context_assembled := _active_context.assemble_context()
+		if not context_assembled:
 			return {"success": false, "error_code": "CONTEXT_ASSEMBLY_FAILED"}
 
 	_catalog = _active_context.catalog
@@ -165,7 +165,7 @@ static func assemble_versioned(target_version: String, token: ActivationTokenDTO
 		"item_count": _catalog._canonical_registry.size() if _catalog != null else 0
 	}
 
-## : 获取当前活跃的版本运行时上下文
+## 获取当前活跃的版本运行时上下文
 static func get_active_context() -> VersionedRuntimeContext:
 	return _active_context
 
@@ -203,7 +203,7 @@ static func ground_loot_listener() -> GroundLootEventListener:
 
 ## 访问装配后的品质登记注册表单例（懒装配 + 幂等，装配失败不阻断）。
 ## ItemInstanceFactory 发放热路径经此取单例，杜绝「每实例 new()+reload_configuration()」
-## 整表重建（原 item_instance_factory.gd:17-23 反模式）；就绪失败返回 null 由调用方兜底。
+## 整表重建（原 item_instance_factory.gd 反模式）；就绪失败返回 null 由调用方安全回退。
 static func quality_tier_registry() -> QualityTierRegistry:
 	if _quality_registry != null:
 		return _quality_registry
@@ -239,10 +239,11 @@ static func teardown() -> Dictionary:
 			"object_pool_manager"
 		]
 	for step_name in order:
-		var key := String(step_name)
-		_teardown_single_subsystem(key)
-		teared_down.append(key)
+		var subsystem_key := String(step_name)
+		_teardown_single_subsystem(subsystem_key)
+		teared_down.append(subsystem_key)
 
+	# 必须在全部子系统按序销毁后再重置模式门禁与过场端口，防止销毁期回调读取到失效钩子
 	RuntimeModeGate.reset_for_tests()
 	PrologueCutscenePort.reset_for_tests()
 
@@ -309,15 +310,15 @@ static func _run_prologue_cutscene_hook(cutscene_id: String, skip_requested: boo
 	var orchestrator := CutsceneOrchestrator.get_instance()
 	if orchestrator == null:
 		return {"success": false, "error_code": "CUTSCENE_ORCHESTRATOR_UNAVAILABLE"}
-	var play_res := orchestrator.play_by_id(cutscene_id, {"headless": true})
+	var play_result := orchestrator.play_by_id(cutscene_id, {"headless": true})
 	var skipped := false
 	if skip_requested:
 		skipped = orchestrator.skip_cutscene()
 	if not skipped and orchestrator.is_playing():
 		orchestrator.finish_cutscene()
 	return {
-		"success": bool(play_res.get("success", false)),
+		"success": bool(play_result.get("success", false)),
 		"cutscene_id": cutscene_id,
 		"skipped": skipped,
-		"is_placeholder": bool(play_res.get("is_placeholder", false))
+		"is_placeholder": bool(play_result.get("is_placeholder", false))
 	}

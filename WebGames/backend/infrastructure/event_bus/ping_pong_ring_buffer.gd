@@ -11,9 +11,9 @@
 class_name PingPongRingBuffer
 extends RefCounted
 
-var _buffer_a: Array[EventPacket] = []
-var _buffer_b: Array[EventPacket] = []
-var _write_to_a: bool = true
+var _primary_buffer: Array[EventPacket] = []
+var _secondary_buffer: Array[EventPacket] = []
+var _writing_to_primary: bool = true
 var _capacity: int = 4096
 
 func _init(capacity: int = 4096) -> void:
@@ -23,20 +23,21 @@ func _init(capacity: int = 4096) -> void:
 func enqueue(packet: EventPacket) -> bool:
 	if packet == null:
 		return false
-	if _write_to_a:
-		if _buffer_a.size() >= _capacity:
+	if _writing_to_primary:
+		if _primary_buffer.size() >= _capacity:
 			return false
-		_buffer_a.append(packet)
+		_primary_buffer.append(packet)
 	else:
-		if _buffer_b.size() >= _capacity:
+		if _secondary_buffer.size() >= _capacity:
 			return false
-		_buffer_b.append(packet)
+		_secondary_buffer.append(packet)
 	return true
 
 ## 帧末批量清算：交换读写缓冲 → 逐包回调 → 清空（零拷贝，无 duplicate）
 func flush_frame(callback: Callable) -> int:
-	var read_array: Array[EventPacket] = _buffer_a if _write_to_a else _buffer_b
-	_write_to_a = not _write_to_a
+	# 在触发回调前先翻转写入端，确保回调内部新入队的事件写入另一缓冲而不污染本帧遍历
+	var read_array: Array[EventPacket] = _primary_buffer if _writing_to_primary else _secondary_buffer
+	_writing_to_primary = not _writing_to_primary
 	var count: int = read_array.size()
 	for packet in read_array:
 		if callback.is_valid():
@@ -46,7 +47,7 @@ func flush_frame(callback: Callable) -> int:
 
 ## 获取当前缓冲区内存储的有效元素数量
 func size() -> int:
-	return _buffer_a.size() + _buffer_b.size()
+	return _primary_buffer.size() + _secondary_buffer.size()
 
 ## 获取当前环形缓冲区的物理最大容量
 func capacity() -> int:
@@ -54,10 +55,10 @@ func capacity() -> int:
 
 ## 获取当前正在写入的活跃缓冲区积压数量
 func get_active_buffer_size() -> int:
-	return _buffer_a.size() if _write_to_a else _buffer_b.size()
+	return _primary_buffer.size() if _writing_to_primary else _secondary_buffer.size()
 
 ## 清空双缓冲区（供测试隔离与重置）
 func clear() -> void:
-	_buffer_a.clear()
-	_buffer_b.clear()
-	_write_to_a = true
+	_primary_buffer.clear()
+	_secondary_buffer.clear()
+	_writing_to_primary = true

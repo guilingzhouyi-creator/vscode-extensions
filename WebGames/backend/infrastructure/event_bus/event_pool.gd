@@ -23,25 +23,26 @@ func _init(capacity: int = 4096) -> void:
 
 ## 借出事件包：优先复用空闲包，池空且达容量上限时按边沿告警并分配池外包
 func borrow() -> EventPacket:
-	var pkt: EventPacket = _free.pop_back() if not _free.is_empty() else null
-	if pkt == null:
+	var packet: EventPacket = _free.pop_back() if not _free.is_empty() else null
+	if packet == null:
 		if _borrowed >= _capacity and not _overflow_warned and not _is_reporting:
+			# 通过边沿状态位与重入守卫避免池溢出告警经 ErrorReporter 递归写回造成日志风暴
 			_is_reporting = true
 			_overflow_warned = true
 			_push_pool_overflow_hint()
 			_is_reporting = false
-		pkt = EventPacket.new()
-	pkt.is_borrowed = true
+		packet = EventPacket.new()
+	packet.is_borrowed = true
 	_borrowed += 1
 	if _borrowed > _peak_borrowed:
 		_peak_borrowed = _borrowed
-	return pkt
+	return packet
 
 ## 归还事件包：防双重归还（is_borrowed 守卫），复位后入池
 func recycle(packet: EventPacket) -> bool:
 	if packet == null or not packet.is_borrowed:
 		return false
-	packet.reset_state() # 复位已含 is_borrowed=false（M4：不再重复赋值）
+	packet.reset_state() # reset_state 已重置 is_borrowed = false，避免重复赋值
 	_borrowed = maxi(0, _borrowed - 1)
 	if _overflow_warned and _borrowed < _capacity:
 		_overflow_warned = false

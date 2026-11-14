@@ -32,9 +32,9 @@ const BATCH_ID_CONFIG_BULK: String = "config_bulk_async"
 ## 获取统一资源目录实例（动态解耦，杜绝跨层静态强引用）
 static func get_catalog() -> Variant:
 	if ResourceLoader.exists(PATH_STORAGE_CATALOG_SCRIPT):
-		var s: Variant = load(PATH_STORAGE_CATALOG_SCRIPT)
-		if s != null and s.has_method(METHOD_GET_INSTANCE):
-			return s.get_instance()
+		var catalog_script: Variant = load(PATH_STORAGE_CATALOG_SCRIPT)
+		if catalog_script != null and catalog_script.has_method(METHOD_GET_INSTANCE):
+			return catalog_script.get_instance()
 	return null
 
 
@@ -43,8 +43,8 @@ static func load_all_tables_into(out_tables: Dictionary, scan_failures: Array, s
 	if FileAccess.file_exists(PATH_CONFIG_BUNDLE):
 		var bundle_data: Dictionary = BinaryConfigReader.load_monolithic_bundle(PATH_CONFIG_BUNDLE)
 		if not bundle_data.is_empty():
-			for t_name in bundle_data:
-				out_tables[t_name] = bundle_data[t_name]
+			for table_name in bundle_data:
+				out_tables[table_name] = bundle_data[table_name]
 			return
 	scan_dir_into(CONFIG_DIR, "", out_tables, scan_failures, scan_warnings)
 
@@ -85,9 +85,9 @@ static func load_l0_entries_into(tables: Dictionary, scan_failures: Array, scan_
 	var loaded_count: int = 0
 	if catalog != null and catalog.has_method(METHOD_GET_CRITICAL_BOOT_ENTRIES):
 		for entry in catalog.get_critical_boot_entries():
-			var t_name: String = str(entry.metadata.get("table_name", ""))
-			if not t_name.is_empty() and not tables.has(t_name):
-				load_single_table_into(entry.physical_path, t_name, tables, scan_failures, scan_warnings)
+			var table_name: String = str(entry.metadata.get("table_name", ""))
+			if not table_name.is_empty() and not tables.has(table_name):
+				load_single_table_into(entry.physical_path, table_name, tables, scan_failures, scan_warnings)
 				loaded_count += 1
 	return loaded_count
 
@@ -108,15 +108,15 @@ static func try_enqueue_async_config_batch(
 	if pool == null or batch_script == null:
 		return false
 
-	var batch_req: Variant = batch_script.new(BATCH_ID_CONFIG_BULK)
+	var batch_request: Variant = batch_script.new(BATCH_ID_CONFIG_BULK)
 	for entry in catalog.get_entries_by_category(CAT_CONFIG):
-		var t_name: String = str(entry.metadata.get("table_name", ""))
-		if not t_name.is_empty() and not tables.has(t_name):
-			batch_req.add_entry(entry)
+		var table_name: String = str(entry.metadata.get("table_name", ""))
+		if not table_name.is_empty() and not tables.has(table_name):
+			batch_request.add_entry(entry)
 
-	batch_req.on_item_loaded = on_item_loaded
-	batch_req.on_batch_completed = on_batch_completed
-	pool.enqueue_batch(batch_req)
+	batch_request.on_item_loaded = on_item_loaded
+	batch_request.on_batch_completed = on_batch_completed
+	pool.enqueue_batch(batch_request)
 	return true
 
 
@@ -151,15 +151,15 @@ static func collect_missing_required(tables: Dictionary, required_tables: Array)
 static func diff_table_snapshots(old_tables: Dictionary, built_tables: Dictionary) -> Dictionary:
 	var added: Array = []
 	var changed: Array = []
-	for k in built_tables:
-		if not old_tables.has(k):
-			added.append(k)
-		elif old_tables[k] != built_tables[k]:
-			changed.append(k)
+	for table_key in built_tables:
+		if not old_tables.has(table_key):
+			added.append(table_key)
+		elif old_tables[table_key] != built_tables[table_key]:
+			changed.append(table_key)
 	var removed: Array = []
-	for k in old_tables:
-		if not built_tables.has(k):
-			removed.append(k)
+	for table_key in old_tables:
+		if not built_tables.has(table_key):
+			removed.append(table_key)
 	return {"added": added, "changed": changed, "removed": removed}
 
 
@@ -214,8 +214,8 @@ static func load_single_table_into(
 
 	var json := JSON.new()
 	var text: String = FileAccess.get_file_as_string(file_path)
-	var err: Error = json.parse(text)
-	if err != OK:
+	var parse_error: Error = json.parse(text)
+	if parse_error != OK:
 		scan_failures.append(SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_JSON_FAIL, {"path": file_path, "line": json.get_error_line()}))
 		scan_warnings.append(SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_JSON_WARN, {
 			"path": file_path, "error": json.get_error_message(), "line": json.get_error_line()
