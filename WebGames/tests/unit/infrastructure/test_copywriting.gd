@@ -9,6 +9,9 @@ class_name TestCopywritingDomain
 extends RefCounted
 
 static func run_all_tests() -> Dictionary:
+	var had_overlay := GameConfig.has_active_mod_overlay()
+	if not had_overlay:
+		TestCase.mount_official_kalar_for_test()
 	var results: Array[Dictionary] = []
 	var domain_name = "统一文案配置系统"
 
@@ -25,6 +28,8 @@ static func run_all_tests() -> Dictionary:
 		if r.get("passed", false):
 			passed_cnt += 1
 
+	if not had_overlay:
+		TestCase.unmount_mod_overlay_for_test()
 	return {
 		"domain": domain_name,
 		"passed_count": passed_cnt,

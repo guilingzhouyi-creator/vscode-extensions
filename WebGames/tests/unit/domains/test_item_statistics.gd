@@ -6,6 +6,9 @@ class_name TestItemStatisticsDomain
 extends RefCounted
 
 static func run_all_tests() -> Dictionary:
+	var had_overlay := GameConfig.has_active_mod_overlay()
+	if not had_overlay:
+		TestCase.mount_official_kalar_for_test()
 	var results: Array[Dictionary] = []
 	results.append(test_event_intake_and_tree_update())
 	results.append(test_recursive_subtree_aggregation())
@@ -20,6 +23,8 @@ static func run_all_tests() -> Dictionary:
 		if r.get("passed", false):
 			passed_cnt += 1
 
+	if not had_overlay:
+		TestCase.unmount_mod_overlay_for_test()
 	return {
 		"domain": "Domain 43: 账号UID物品ID库统计（递归挂载聚合）",
 		"passed_count": passed_cnt,

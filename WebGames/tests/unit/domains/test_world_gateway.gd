@@ -7,6 +7,9 @@ class_name TestWorldGatewayAndModeIsolation
 extends RefCounted
 
 static func run_all_tests() -> Dictionary:
+	var had_overlay := GameConfig.has_active_mod_overlay()
+	if not had_overlay:
+		TestCase.mount_official_kalar_for_test()
 	var results: Array = []
 	results.append(test_gateway_unified_entrance())
 	results.append(test_mode_state_isolation_guard())
@@ -24,6 +27,8 @@ static func run_all_tests() -> Dictionary:
 		else:
 			all_passed = false
 
+	if not had_overlay:
+		TestCase.unmount_mod_overlay_for_test()
 	return {
 		"domain": "World Gateway & Mode Isolation",
 		"all_passed": all_passed,

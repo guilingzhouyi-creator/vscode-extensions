@@ -8,10 +8,13 @@ extends RefCounted
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	var domain_name = "FE Vol 01: 账号与入口系统（登录/注册/选服/创角）"
+	ServiceLocator.reset()
+	ServiceLocator.set_mode("mock")
 
 	results.append(_test_login_register_form_flow())
 	results.append(_test_character_slot_selection())
 	results.append(_test_server_list_selection())
+	ServiceLocator.reset()
 
 	var passed_cnt = 0
 	for r in results:

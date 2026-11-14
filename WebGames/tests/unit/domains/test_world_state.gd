@@ -5,6 +5,9 @@
 class_name TestWorldStateDomain extends RefCounted
 
 static func run_all_tests() -> Dictionary:
+	var had_overlay := GameConfig.has_active_mod_overlay()
+	if not had_overlay:
+		TestCase.mount_official_kalar_for_test()
 	var results: Array[Dictionary] = []
 	results.append(test_death_clears_character_only())
 	results.append(test_world_continues_after_death())
@@ -26,6 +29,8 @@ static func run_all_tests() -> Dictionary:
 		if not r.get("passed", false):
 			all_passed = false
 			break
+	if not had_overlay:
+		TestCase.unmount_mod_overlay_for_test()
 	return {"domain": "角色死亡与世界连续性及权限体系", "all_passed": all_passed, "results": results}
 
 static func test_death_clears_character_only() -> Dictionary:

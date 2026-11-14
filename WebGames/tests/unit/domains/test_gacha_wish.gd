@@ -5,6 +5,9 @@
 class_name TestGachaDomain extends RefCounted
 
 static func run_all_tests() -> Dictionary:
+	var had_overlay := GameConfig.has_active_mod_overlay()
+	if not had_overlay:
+		TestCase.mount_official_kalar_for_test()
 	var results := []
 	results.append(test_pity_rate_escalation())
 	results.append(test_hard_pity_guarantee())
@@ -17,6 +20,8 @@ static func run_all_tests() -> Dictionary:
 		if not r.get("passed", false):
 			all_passed = false
 			break
+	if not had_overlay:
+		TestCase.unmount_mod_overlay_for_test()
 	return { "domain": "Domain 17: 货币抽奖与保底伪随机", "all_passed": all_passed, "results": results }
 
 static func test_pity_rate_escalation() -> Dictionary:

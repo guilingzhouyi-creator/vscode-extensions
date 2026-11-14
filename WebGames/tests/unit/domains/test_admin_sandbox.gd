@@ -5,6 +5,9 @@
 class_name TestAdminSandboxDomain extends RefCounted
 
 static func run_all_tests() -> Dictionary:
+	var had_overlay := GameConfig.has_active_mod_overlay()
+	if not had_overlay:
+		TestCase.mount_official_kalar_for_test()
 	var results := []
 	results.append(test_rbac_elevation())
 	results.append(test_god_mode_execution())
@@ -21,6 +24,8 @@ static func run_all_tests() -> Dictionary:
 		if not r.get("passed", false):
 			all_passed = false
 			break
+	if not had_overlay:
+		TestCase.unmount_mod_overlay_for_test()
 	return { "domain": "Domain 20: 管理员权限与沙盒作弊", "all_passed": all_passed, "results": results }
 
 static func test_rbac_elevation() -> Dictionary:

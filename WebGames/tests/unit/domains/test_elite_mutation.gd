@@ -36,6 +36,9 @@ static func test_pick_weighted_zero_safe() -> Dictionary:
 	return {"test": "TC-GAP-S2-06/TC-FINAL-AFFIX-06: pick_weighted 零权重排除/退化/空池安全", "passed": passed}
 
 static func run_all_tests() -> Dictionary:
+	var had_overlay := GameConfig.has_active_mod_overlay()
+	if not had_overlay:
+		TestCase.mount_official_kalar_for_test()
 	var results := []
 	results.append(test_elite_affix_application())
 	results.append(test_generic_berserk_trigger())
@@ -47,6 +50,8 @@ static func run_all_tests() -> Dictionary:
 		if not r.get("passed", false):
 			all_passed = false
 			break
+	if not had_overlay:
+		TestCase.unmount_mod_overlay_for_test()
 	return { "domain": "Domain 22: 精英变异与地牢狂暴", "all_passed": all_passed, "results": results }
 
 static func test_elite_affix_application() -> Dictionary:

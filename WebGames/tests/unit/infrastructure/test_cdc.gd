@@ -7,6 +7,9 @@
 class_name TestCdcDomain extends RefCounted
 
 static func run_all_tests() -> Dictionary:
+	var had_overlay := GameConfig.has_active_mod_overlay()
+	if not had_overlay:
+		TestCase.mount_official_kalar_for_test()
 	var results: Array = []
 	results.append(test_default_minor_category_configuration())
 	results.append(test_gacha_rates_zero_regression())
@@ -20,6 +23,8 @@ static func run_all_tests() -> Dictionary:
 		if not r.get("passed", false):
 			all_passed = false
 			break
+	if not had_overlay:
+		TestCase.unmount_mod_overlay_for_test()
 	return { "domain": "配置驱动收口与单一真源", "all_passed": all_passed, "results": results }
 
 ## TC-CDC-01: 默认次分类从 GameConfig 读取且缺失时回退默认值

@@ -5,6 +5,9 @@
 class_name TestCharacterCreationDomain extends RefCounted
 
 static func run_all_tests() -> Dictionary:
+	var had_overlay := GameConfig.has_active_mod_overlay()
+	if not had_overlay:
+		TestCase.mount_official_kalar_for_test()
 	var results := []
 	results.append(test_dice_and_point_buy())
 	results.append(test_trait_karma_balance())
@@ -20,6 +23,8 @@ static func run_all_tests() -> Dictionary:
 	var authoritative_res := TestAuthoritativeCharacterCreationPipeline.run_all_tests()
 	results.append_array(authoritative_res.get("results", []))
 
+	if not had_overlay:
+		TestCase.unmount_mod_overlay_for_test()
 	var all_passed := true
 	for r in results:
 		if not r.get("passed", false):

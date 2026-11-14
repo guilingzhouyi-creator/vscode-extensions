@@ -6,6 +6,9 @@ class_name TestNarrativeOrchestrationDomain
 extends RefCounted
 
 static func run_all_tests() -> Dictionary:
+	var had_overlay := GameConfig.has_active_mod_overlay()
+	if not had_overlay:
+		TestCase.mount_official_kalar_for_test()
 	var results: Array[Dictionary] = []
 	var domain_name = "Domain 35: 全域因果剧情流与编年史引擎"
 
@@ -17,6 +20,8 @@ static func run_all_tests() -> Dictionary:
 	var dag_pipeline_res := TestNarrativeDagOrchestrationPipeline.run_all_tests()
 	results.append_array(dag_pipeline_res.get("results", []))
 
+	if not had_overlay:
+		TestCase.unmount_mod_overlay_for_test()
 	var passed_cnt := 0
 	for r in results:
 		if r.get("passed", false):
