@@ -151,7 +151,7 @@ def _test_case_sensitive_res_and_esc_drift() -> list[str]:
 
 
 def _test_gd_strict_style_evasion() -> list[str]:
-    """对抗样本 5：验证后端与非视图前端六字段路径、类与文件对齐、文档注释、黑话及缩写声明必被拦截。"""
+    """对抗样本 5：验证全量前后端严格六字段路径、类对齐、文档注释、黑话及 Lambda/缩写声明必被拦截。"""
     failures: list[str] = []
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
@@ -161,10 +161,16 @@ def _test_gd_strict_style_evasion() -> list[str]:
         bad_gd.write_text(
             "# 模块归属: Test\n"
             "# 文件路径: res://backend/domains/probe/stale_name.gd\n"
-            "# 职责说明: R-18 临时兜底测试\n"
+            "# 职责说明: R-18 临时语义测试\n"
             "class_name WrongClassName extends RefCounted\n"
+            "class CacheHelper:\n"
+            "\tvar min_lv: int = 1\n"
             "func do_work(req: Dictionary) -> void:\n"
             "\tvar res: int = 0\n"
+            "\tvar ch: String = \"a\"\n"
+            "\tvar data: Dictionary = {}\n"
+            "\tvar dir: String = \"north\"\n"
+            "\tvar filtered: Array = [].filter(func(a, ok): return str(a) != ok)\n"
             "\tfor k in req.keys():\n"
             "\t\tres += int(k)\n",
             encoding="utf-8",
@@ -175,6 +181,26 @@ def _test_gd_strict_style_evasion() -> list[str]:
         for tag in ("STYLE-HDR-001", "STYLE-CLS-001", "STYLE-DOC-001", "STYLE-JRG-001", "STYLE-NAM-002"):
             if tag not in joined:
                 failures.append(f"gd/style_rules 对抗样本未拦截 {tag} (实得: {violations})")
+        for cryptic in ("min_lv", "「ch」", "「data」", "「dir」", "「a」", "「ok」"):
+            if cryptic not in joined:
+                failures.append(f"gd/style_rules 未拦截隐蔽命名 {cryptic} (实得: {violations})")
+
+        view_dir = root / "frontend" / "views" / "probe_view"
+        view_dir.mkdir(parents=True, exist_ok=True)
+        bad_view = view_dir / "probe_view.gd"
+        bad_view.write_text(
+            "# 文件路径: res://frontend/views/probe_view/probe_view.gd\n"
+            "class_name ProbeView extends Control\n"
+            "func bind_items(items_dict: Dictionary) -> void:\n"
+            "\tpass\n",
+            encoding="utf-8",
+        )
+        view_violations: list[str] = []
+        style_rules.audit_file(bad_view, view_violations, base_root=root)
+        view_joined = "\n".join(view_violations)
+        for tag in ("STYLE-HDR-001", "STYLE-DOC-001", "STYLE-NAM-002"):
+            if tag not in view_joined:
+                failures.append(f"frontend/views 严格治理未拦截 {tag} (实得: {view_violations})")
     return failures
 
 

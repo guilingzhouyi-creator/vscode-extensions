@@ -35,20 +35,83 @@ REQUIRED_MANIFEST_FIELDS: tuple[str, ...] = (
     "pack_id", "pack_name", "version", "author", "engine_api_version",
     "priority", "dependencies", "incompatible_packs", "semantic_tags", "is_active",
 )
-VALID_ATTRIBUTE_KEYS: frozenset[str] = frozenset({"STR", "CON", "INT", "AGI", "SPR", "VIT"})
-VALID_UI_SELECTION_MODES: frozenset[str] = frozenset({"INHERIT", "ALLOW_MANUAL", "FORCE_RANDOM"})
-BUILTIN_DAG_IDS: frozenset[str] = frozenset({
+
+DEFAULT_ATTRIBUTE_KEYS: frozenset[str] = frozenset({"STR", "CON", "INT", "AGI", "SPR", "VIT"})
+DEFAULT_UI_SELECTION_MODES: frozenset[str] = frozenset({"INHERIT", "ALLOW_MANUAL", "FORCE_RANDOM"})
+DEFAULT_BUILTIN_DAG_IDS: frozenset[str] = frozenset({
     "DAG_PROLOGUE_ELF_SANCTUARY",
     "DAG_PROLOGUE_HUMAN_CAPITAL",
 })
-BUILTIN_STARTER_KITS: frozenset[str] = frozenset({
+DEFAULT_BUILTIN_STARTER_KITS: frozenset[str] = frozenset({
     "KIT_ELF_DEFAULT",
     "KIT_HUMAN_DEFAULT",
 })
-BUILTIN_TRAIT_COSTS: dict[str, int] = {
+DEFAULT_BUILTIN_TRAIT_COSTS: dict[str, int] = {
     "PRIMORDIAL_RESONANCE": 3, "GIANT_MIGHT": 2, "IRON_WILL": 1,
     "HEART_CORE_FISSURE": -3, "MANA_INSULATED": -2,
 }
+
+
+def load_capabilities_json() -> dict[str, Any]:
+    """从 mod_sdk/capabilities.json 单一真源读取引擎能力声明，缺失时返回空字典。"""
+    cap_path = Path(__file__).resolve().parent.parent / "capabilities.json"
+    if not cap_path.is_file():
+        return {}
+    try:
+        parsed = json.loads(cap_path.read_text(encoding="utf-8"))
+        return parsed if isinstance(parsed, dict) else {}
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _load_frozenset_capability(cap_data: dict[str, Any], key: str, fallback: frozenset[str]) -> frozenset[str]:
+    """从 destiny_mod_capabilities 提取字符串集合，若缺失或为空则回退安全默认值。"""
+    destiny_caps = cap_data.get("destiny_mod_capabilities", {})
+    if isinstance(destiny_caps, dict):
+        raw_list = destiny_caps.get(key)
+        if isinstance(raw_list, list) and raw_list:
+            cleaned = {str(entry).strip() for entry in raw_list if str(entry).strip()}
+            if cleaned:
+                return frozenset(cleaned)
+    return fallback
+
+
+def _load_trait_costs(cap_data: dict[str, Any]) -> dict[str, int]:
+    """结合 capabilities.json 与角色创建配置加载内置天赋因果花费映射表。"""
+    cost_map = dict(DEFAULT_BUILTIN_TRAIT_COSTS)
+    webgames_root = Path(__file__).resolve().parent.parent.parent
+    cc_core = webgames_root / "config" / "domains" / "character_creation" / "core.json"
+    if cc_core.is_file():
+        try:
+            cc_data = json.loads(cc_core.read_text(encoding="utf-8"))
+            traits_cfg = cc_data.get("traits", {}) if isinstance(cc_data, dict) else {}
+            if isinstance(traits_cfg, dict):
+                for trait_id, trait_meta in traits_cfg.items():
+                    if isinstance(trait_meta, dict) and isinstance(trait_meta.get("cost"), int):
+                        cost_map[str(trait_id)] = int(trait_meta["cost"])
+        except (json.JSONDecodeError, OSError):
+            pass
+    return cost_map
+
+
+_CAPABILITIES_CACHE: dict[str, Any] = load_capabilities_json()
+VALID_ATTRIBUTE_KEYS: frozenset[str] = _load_frozenset_capability(
+    _CAPABILITIES_CACHE, "attribute_keys", DEFAULT_ATTRIBUTE_KEYS
+)
+VALID_UI_SELECTION_MODES: frozenset[str] = DEFAULT_UI_SELECTION_MODES
+_ui_modes_raw = _CAPABILITIES_CACHE.get("destiny_mod_capabilities", {}).get("ui_capability_modes", {})
+if isinstance(_ui_modes_raw, dict) and isinstance(_ui_modes_raw.get("origin_selection_mode"), list):
+    _parsed_modes = {str(m).strip() for m in _ui_modes_raw["origin_selection_mode"] if str(m).strip()}
+    if _parsed_modes:
+        VALID_UI_SELECTION_MODES = frozenset(_parsed_modes)
+
+BUILTIN_DAG_IDS: frozenset[str] = _load_frozenset_capability(
+    _CAPABILITIES_CACHE, "builtin_dag_ids", DEFAULT_BUILTIN_DAG_IDS
+)
+BUILTIN_STARTER_KITS: frozenset[str] = _load_frozenset_capability(
+    _CAPABILITIES_CACHE, "builtin_starter_kits", DEFAULT_BUILTIN_STARTER_KITS
+)
+BUILTIN_TRAIT_COSTS: dict[str, int] = _load_trait_costs(_CAPABILITIES_CACHE)
 
 
 def ensure_utf8_stdout() -> None:

@@ -214,9 +214,16 @@ def _resolve_target_dag(
             if matched:
                 return matched, "custom_routing_rules"
 
-    # Level 2: prologue_dag_id in origin
+    # Level 2: prologue_dag_id in origin (仅当身世出自 MOD custom_origins 时优先于 routing_rules.json)
+    custom_origin_ids: set[str] = set()
+    if isinstance(destinies_data, dict):
+        for custom_orig in _normalize_list_items(destinies_data.get("custom_origins"), "origin_id"):
+            cid = str(custom_orig.get("origin_id") or custom_orig.get("id") or "").strip()
+            if cid:
+                custom_origin_ids.add(cid)
+
     origin_dag = selected_origin.get("prologue_dag_id")
-    if isinstance(origin_dag, str) and origin_dag.strip():
+    if origin_id in custom_origin_ids and isinstance(origin_dag, str) and origin_dag.strip():
         return origin_dag.strip(), "origin_prologue_dag_id"
 
     # Level 3: routing_rules.json
@@ -225,6 +232,10 @@ def _resolve_target_dag(
         matched = _match_rule_target(rules, race_id, origin_id)
         if matched:
             return matched, "routing_rules.json"
+
+    # Level 3.5: 回退至内建默认身世声明的序章 DAG
+    if isinstance(origin_dag, str) and origin_dag.strip():
+        return origin_dag.strip(), "origin_prologue_dag_id"
 
     # Level 4: 内置默认
     fallback = "DAG_PROLOGUE_ELF_SANCTUARY" if race_id.upper() == "ELF" else "DAG_PROLOGUE_HUMAN_CAPITAL"

@@ -46,21 +46,21 @@ __all__ = [
 ]
 
 STANDARD_PLACEHOLDER_DOCS: dict[str, str] = {
-    "{PLAYER_NAME}": "当前玩家角色的自定义名称（支持大小写双轨：{player_name} 与 {PLAYER_NAME}）",
-    "{CHARACTER_NAME}": "当前角色的名称标识，同 {PLAYER_NAME}（支持大小写双轨：{character_name} 与 {CHARACTER_NAME}）",
-    "{CHARACTER_ID}": "角色实例全局唯一标识符（支持大小写双轨：{character_id} 与 {CHARACTER_ID}）",
-    "{RACE_ID}": "角色所属种族唯一标识符，如 HUMAN（支持大小写双轨：{race_id} 与 {RACE_ID}）",
-    "{GENDER}": "角色性别标识，如 FEMALE / MALE（支持大小写双轨：{gender} 与 {GENDER}）",
-    "{START_LOCATION}": "角色出生与初始降临的地理场景标识或本地化名称（支持大小写双轨：{start_location} 与 {START_LOCATION}）",
-    "{INITIAL_EQUIPMENT}": "角色获得的初始佩剑或基础装备道具名称（支持大小写双轨：{initial_equipment} 与 {INITIAL_EQUIPMENT}）",
-    "{NPC_TARGET}": "对话交互或剧情引导的目标 NPC 实体名称（支持大小写双轨：{npc_target} 与 {NPC_TARGET}）",
-    "{EVENT_RESULT}": "前序节点或剧情事件的判定结果摘要（支持大小写双轨：{event_result} 与 {EVENT_RESULT}）",
-    "{ORIGIN_ID}": "角色选定或随机抽取的出身背景唯一标识符（支持大小写双轨：{origin_id} 与 {ORIGIN_ID}）",
-    "{ORIGIN_NAME}": "角色出身背景的人类可读显示名称（支持大小写双轨：{origin_name} 与 {ORIGIN_NAME}）",
-    "{BIRTH_REGION}": "角色出身关联的降临地域标识符（支持大小写双轨：{birth_region} 与 {BIRTH_REGION}）",
-    "{TRAIT_SUMMARY}": "角色装配的正负因果天赋组合摘要文本（支持大小写双轨：{trait_summary} 与 {TRAIT_SUMMARY}）",
-    "{STARTER_KIT_NAME}": "角色装配的初始装备行囊名称（支持大小写双轨：{starter_kit_name} 与 {STARTER_KIT_NAME}）",
-    "{INITIAL_GOLD}": "角色创角结算后的初始金币数量（支持大小写双轨：{initial_gold} 与 {INITIAL_GOLD}）",
+    "{PLAYER_NAME}": "当前玩家角色的自定义名称（支持大小写双式：{player_name} 与 {PLAYER_NAME}）",
+    "{CHARACTER_NAME}": "当前角色的名称标识，同 {PLAYER_NAME}（支持大小写双式：{character_name} 与 {CHARACTER_NAME}）",
+    "{CHARACTER_ID}": "角色实例全局唯一标识符（支持大小写双式：{character_id} 与 {CHARACTER_ID}）",
+    "{RACE_ID}": "角色所属种族唯一标识符，如 HUMAN（支持大小写双式：{race_id} 与 {RACE_ID}）",
+    "{GENDER}": "角色性别标识，如 FEMALE / MALE（支持大小写双式：{gender} 与 {GENDER}）",
+    "{START_LOCATION}": "角色出生与初始降临的地理场景标识或本地化名称（支持大小写双式：{start_location} 与 {START_LOCATION}）",
+    "{INITIAL_EQUIPMENT}": "角色获得的初始佩剑或基础装备道具名称（支持大小写双式：{initial_equipment} 与 {INITIAL_EQUIPMENT}）",
+    "{NPC_TARGET}": "对话交互或剧情引导的目标 NPC 实体名称（支持大小写双式：{npc_target} 与 {NPC_TARGET}）",
+    "{EVENT_RESULT}": "前序节点或剧情事件的判定结果摘要（支持大小写双式：{event_result} 与 {EVENT_RESULT}）",
+    "{ORIGIN_ID}": "角色选定或随机抽取的出身背景唯一标识符（支持大小写双式：{origin_id} 与 {ORIGIN_ID}）",
+    "{ORIGIN_NAME}": "角色出身背景的人类可读显示名称（支持大小写双式：{origin_name} 与 {ORIGIN_NAME}）",
+    "{BIRTH_REGION}": "角色出身关联的降临地域标识符（支持大小写双式：{birth_region} 与 {BIRTH_REGION}）",
+    "{TRAIT_SUMMARY}": "角色装配的正负因果天赋组合摘要文本（支持大小写双式：{trait_summary} 与 {TRAIT_SUMMARY}）",
+    "{STARTER_KIT_NAME}": "角色装配的初始装备行囊名称（支持大小写双式：{starter_kit_name} 与 {STARTER_KIT_NAME}）",
+    "{INITIAL_GOLD}": "角色创角结算后的初始金币数量（支持大小写双式：{initial_gold} 与 {INITIAL_GOLD}）",
 }
 
 SUPPORTED_ERROR_CODES: list[str] = [
@@ -173,7 +173,7 @@ def collect_placeholders_from_obj(obj: Any, pattern: re.Pattern[str]) -> list[st
 
 
 def build_dual_track_placeholder_list(upper_keys: list[str]) -> list[str]:
-    """构建包含大写与小写双轨形式的占位符列表。"""
+    """构建包含大写与小写双式形式的占位符列表。"""
     result: list[str] = []
     for ph in upper_keys:
         if ph not in result:
@@ -417,7 +417,7 @@ def extract_capabilities(webgames_root: Path) -> dict[str, Any]:
         if ph not in available_placeholders:
             clean_name = ph.strip("{}")
             available_placeholders[ph] = (
-                f"剧情本地化占位符: {clean_name}（支持大小写双轨：{{{clean_name.lower()}}} 与 {ph}）"
+                f"剧情本地化占位符: {clean_name}（支持大小写双式：{{{clean_name.lower()}}} 与 {ph}）"
             )
 
     supported_placeholders = build_dual_track_placeholder_list(

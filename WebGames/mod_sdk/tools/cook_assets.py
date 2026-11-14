@@ -25,7 +25,7 @@ import sys
 # ==============================================================================
 # 一、资产白名单与体积预算常量 (Asset Whitelist & Budgets)
 # ==============================================================================
-# 单图 <= 15MB, 单音 <= 30MB, 字体/着色器 <= 10MB
+# 单图 <= 15MB, 单音 <= 30MB, 字体/着色器 <= 10MB, 模型 <= 30MB, 过场视频 <= 50MB
 ASSET_WHITELIST: dict[str, tuple[str, int]] = {
     ".png": ("image", 15 * 1024 * 1024),
     ".webp": ("image", 15 * 1024 * 1024),
@@ -36,12 +36,30 @@ ASSET_WHITELIST: dict[str, tuple[str, int]] = {
     ".gdshader": ("shader", 10 * 1024 * 1024),
     ".gltf": ("model", 30 * 1024 * 1024),
     ".glb": ("model", 30 * 1024 * 1024),
+    ".ogv": ("video", 50 * 1024 * 1024),
 }
+
+IGNORED_METADATA_SUFFIXES: frozenset[str] = frozenset({
+    ".import", ".uid", ".tmp",
+})
+
+IGNORED_METADATA_NAMES: frozenset[str] = frozenset({
+    ".DS_Store", "Thumbs.db", ".gitkeep", "manifest.json",
+})
 
 FORBIDDEN_EXTENSIONS: frozenset[str] = frozenset({
     ".exe", ".bat", ".cmd", ".sh", ".py", ".pyc", ".pyd", ".dll", ".so",
     ".dylib", ".bin", ".com", ".vbs", ".js", ".msi", ".ps1", ".scr", ".elf",
 })
+
+
+def is_ignored_metadata_file(file_path: Path, manifest_file: Path) -> bool:
+    """判断文件是否为引擎自动生成的元数据伴生文件或清单元数据文件。"""
+    if file_path.resolve() == manifest_file.resolve():
+        return True
+    if file_path.name in IGNORED_METADATA_NAMES:
+        return True
+    return file_path.suffix.lower() in IGNORED_METADATA_SUFFIXES
 
 
 def _ensure_utf8_stdout() -> None:
@@ -102,11 +120,12 @@ def _audit_single_asset_file(
         return None
 
     if ext not in ASSET_WHITELIST:
+        supported_exts = ", ".join(ASSET_WHITELIST.keys())
         diags.append(DiagnosticItem(
             code="ERR_ASSET_DISALLOWED_TYPE",
             file_path=disp_path,
             detail=f"资产文件格式非法: '{file_path.name}' (扩展名: '{ext}')，不属于受信任白名单",
-            fix_suggestion="仅支持格式: .png, .webp, .ogg, .wav, .ttf, .otf, .gdshader；请转码或移出",
+            fix_suggestion=f"仅支持格式: {supported_exts}；请转码或移出",
         ))
         return None
 
@@ -238,10 +257,10 @@ def cook_assets(
     manifest_file = assets_dir / "manifest.json"
     asset_records: list[dict[str, Any]] = []
 
-    # 递归扫描 assets 目录下所有文件
+    # 递归扫描 assets 目录下所有文件（跳过 .import / .uid 等引擎元数据伴生文件）
     all_files = sorted([p for p in assets_dir.rglob("*") if p.is_file()])
     for f in all_files:
-        if f.resolve() == manifest_file.resolve():
+        if is_ignored_metadata_file(f, manifest_file):
             continue
         rec = _audit_single_asset_file(f, assets_dir, diags)
         if rec is not None:

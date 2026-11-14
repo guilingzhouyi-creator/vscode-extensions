@@ -45,7 +45,14 @@ def _normalize_dag_id(pack_id: str) -> str:
     return clean_id
 
 
-def _build_manifest_dict(pack_id: str, pack_name: str) -> dict[str, Any]:
+TIER_ENUM_MAP: dict[int, str] = {
+    1: "TIER_1_LOGIC",
+    2: "TIER_2_AUDIOVISUAL",
+    3: "TIER_3_OVERHAUL",
+}
+
+
+def _build_manifest_dict(pack_id: str, pack_name: str, effective_tier: int = 2) -> dict[str, Any]:
     """构建 pack.json 强类型清单结构。"""
     return {
         "pack_id": pack_id,
@@ -53,6 +60,7 @@ def _build_manifest_dict(pack_id: str, pack_name: str) -> dict[str, Any]:
         "version": "1.0.0",
         "author": "Kalar Modder",
         "engine_api_version": "1.0.0",
+        "tier": TIER_ENUM_MAP.get(effective_tier, "TIER_2_AUDIOVISUAL"),
         "priority": 100,
         "dependencies": [],
         "incompatible_packs": [],
@@ -319,7 +327,7 @@ def scaffold_mod(
         with_content = False
 
     dag_id = _normalize_dag_id(pack_id)
-    manifest_data = _build_manifest_dict(pack_id, pack_name)
+    manifest_data = _build_manifest_dict(pack_id, pack_name, effective_tier)
     routing_data = _build_routing_dict(race_id, dag_id)
     dag_data = _build_dag_dict(dag_id, pack_id, inline_text=inline_text, pack_name=pack_name, with_assets=with_assets)
     i18n_data = _build_i18n_dict(pack_id, pack_name)
