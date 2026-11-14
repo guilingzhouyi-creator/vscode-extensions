@@ -28,26 +28,26 @@ static var _completed: Dictionary = {}
 # 二、构造与幂等提交
 # ==============================================================================
 
-## S3-03 有界保留：幂等提交记录超容量时按插入序裁剪最旧记录（内存有界，防无限增长）
+## 有界保留：幂等提交记录超容量时按插入序裁剪最旧记录（内存有界，防无限增长）
 static func prune_completed(max_records: int = -1) -> void:
 	if max_records < 0:
 		max_records = GameConfig.get_int("infrastructure.admin", "idempotency/max_records", 1000)
 	if max_records <= 0:
 		return
 	var keys := _completed.keys()
-	var idx := 0
-	while _completed.size() > max_records and idx < keys.size():
-		_completed.erase(keys[idx])
-		idx += 1
+	var record_index := 0
+	while _completed.size() > max_records and record_index < keys.size():
+		_completed.erase(keys[record_index])
+		record_index += 1
 
 ## 事务构造：快照变更前状态（库存深快照 + 钱包值），供回滚还原
 func _init(
-	p_transaction_id: String = "",
+	initial_transaction_id: String = "",
 	inventory: WearableInventoryAggregate = null,
 	wallet: CharacterWalletEntity = null,
 	catalog: ItemRegistryCatalog = null
 ) -> void:
-	transaction_id = p_transaction_id
+	transaction_id = initial_transaction_id
 	_inventory = inventory
 	_wallet = wallet
 	_catalog = catalog

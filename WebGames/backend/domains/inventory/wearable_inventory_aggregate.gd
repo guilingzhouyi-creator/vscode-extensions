@@ -199,3 +199,120 @@ func remove_item(item: ItemEntity) -> bool:
 	return true
 
 ## 从背包或已装备槽位统一移除指定物品，返回移除来源枚举（供销毁/追缴/分解等管线统一复用）
+func remove_owned_item(item: ItemEntity) -> RemovalOutcome:
+	if item == null:
+		return RemovalOutcome.NOT_FOUND
+	if remove_item(item):
+		return RemovalOutcome.REMOVED_STORAGE
+	for slot in equipped_slots:
+		if equipped_slots[slot] == item:
+			unequip_item(slot)
+			return RemovalOutcome.UNEQUIPPED_SLOT
+	return RemovalOutcome.NOT_FOUND
+
+## 装备：槽位存在/槽空/UID 未占用校验，置 EQUIPPED 态并归属（增量累加负重）
+func equip_item(slot: String, item: ItemEntity) -> bool:
+	if not equipped_slots.has(slot) or item == null:
+		return false
+	if item.item_uid.is_empty():
+		item.item_uid = ItemUIDGenerator.generate_uid("SRV_")
+	if equipped_slots[slot] != null or _contains_uid(item.item_uid):
+		return false
+	equipped_slots[slot] = item
+	item.container_state = "EQUIPPED"
+	if not owner_account_id.is_empty():
+		item.owner_account_id = owner_account_id
+	if not _is_metric_dirty:
+		_cached_total_weight += item.mass_kg
+		if not item.item_uid.is_empty():
+			_uid_index[item.item_uid] = item
+	return true
+
+## 卸装：清槽并返回物品（置 UNOWNED 态，增量扣减负重）
+func unequip_item(slot: String) -> ItemEntity:
+	if not equipped_slots.has(slot):
+		return null
+	var item: Variant = equipped_slots[slot]
+	equipped_slots[slot] = null
+	if item is ItemEntity:
+		item.container_state = "UNOWNED"
+		if not _is_metric_dirty:
+			_cached_total_weight -= item.mass_kg
+			if _cached_total_weight < 0.0:
+				_cached_total_weight = 0.0
+			if not item.item_uid.is_empty():
+				_uid_index.erase(item.item_uid)
+	return item
+
+# ==============================================================================
+# 四、快照 / 恢复 / 统一序列化
+# ==============================================================================
+
+## UID 占用判定（O(1) 哈希索引查重，空 UID 恒 false）
+func _contains_uid(item_uid: String) -> bool:
+	if item_uid.is_empty():
+		return false
+	if _is_metric_dirty:
+		refresh_cached_metrics()
+	return _uid_index.has(item_uid)
+
+## 深快照：物品级序列化往返（serialize/deserialize 重建），快照与运行实例完全解耦。
+## 回滚可完整恢复装备槽、所有权、锁定与词缀/符文/耐久等深层字段，而非仅恢复数组结构
+## （深快照设计：就地深层字段支持完整回滚，浅拷贝对物品深层字段的就地变更无法回滚）。
+func snapshot() -> Dictionary:
+	var storage_payloads: Array = []
+	for item in storage_items:
+		if item is ItemEntity:
+			storage_payloads.append(item.serialize())
+	var equipped_payloads := {}
+	for slot_key in equipped_slots:
+		var slot_item: Variant = equipped_slots[slot_key]
+		equipped_payloads[slot_key] = slot_item.serialize() if slot_item is ItemEntity else null
+	return {
+		"storage_payloads": storage_payloads,
+		"equipped_payloads": equipped_payloads,
+		"owner_account_id": owner_account_id
+	}
+
+## 快照恢复：唯一入口仅接受 snapshot() 深载荷（storage_payloads/equipped_payloads），
+## 按载荷重建全新实例（含 item_uid，保持实例可追溯性）；旧引用快照浅拷贝路径已退役
+func restore(snapshot_data: Dictionary) -> void:
+	if snapshot_data == null:
+		return
+	owner_account_id = str(snapshot_data.get("owner_account_id", owner_account_id))
+	if snapshot_data.has("storage_payloads"):
+		# 深快照路径：按载荷重建全新实例（含 item_uid，保持实例可追溯性）
+		var rebuilt_storage: Array = []
+		for raw_payload in snapshot_data.get("storage_payloads", []):
+			if raw_payload is Dictionary:
+				rebuilt_storage.append(ItemEntity.deserialize(raw_payload))
+		storage_items = rebuilt_storage
+		var rebuilt_slots := {}
+		var raw_slots: Dictionary = snapshot_data.get("equipped_payloads", {})
+		for slot_key in raw_slots:
+			var raw_payload: Variant = raw_slots[slot_key]
+			rebuilt_slots[slot_key] = ItemEntity.deserialize(raw_payload) if raw_payload is Dictionary else null
+		equipped_slots = rebuilt_slots
+	else:
+		# 无深载荷：空容器恢复 + 审计警告（不静默吞掉畸形快照；旧引用路径已退役）
+		ErrorReporter.emit_warning("wearable_inventory", "RESTORE_PAYLOAD_MISSING", "Wearable inventory snapshot missing storage_payloads; recovered as empty container.")
+		storage_items = []
+		equipped_slots = {}
+	for item in storage_items:
+		if item is ItemEntity:
+			item.container_state = "INVENTORY"
+	for item in equipped_slots.values():
+		if item is ItemEntity:
+			item.container_state = "EQUIPPED"
+	_is_metric_dirty = true
+	refresh_cached_metrics()
+
+## 统一数据标准序列化（Inv-SV-2）：接入 SaveDomainContract 统一接口（adapter: 契约规范对齐 snapshot）
+func serialize() -> Dictionary:
+	return snapshot()
+
+## 统一数据标准反序列化（Inv-SV-2）：静态工厂方法重构聚合
+static func deserialize(data: Dictionary) -> WearableInventoryAggregate:
+	var inventory := WearableInventoryAggregate.new()
+	inventory.restore(data)
+	return inventory

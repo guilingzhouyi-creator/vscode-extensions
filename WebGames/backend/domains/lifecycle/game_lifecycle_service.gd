@@ -420,3 +420,75 @@ static func _flush_domain_saves(target_slot: String, providers: Dictionary = {},
 	return result
 
 ## 暂停/恢复主循环状态切换（与 GameLifecycleManager RUNNING <-> PAUSED 同步）
+static func set_paused_state(paused: bool) -> Dictionary:
+	var fsm: Variant = GameLifecycleManager.get_instance()
+	var target := GameLifecycleModel.LifecyclePhase.PAUSED if paused else GameLifecycleModel.LifecyclePhase.RUNNING
+	var current_phase := int(fsm.get_current_phase())
+	if current_phase == GameLifecycleModel.LifecyclePhase.UNINITIALIZED and paused:
+		fsm.transition_to(GameLifecycleModel.LifecyclePhase.BOOT_INITIALIZING)
+		fsm.transition_to(GameLifecycleModel.LifecyclePhase.RUNNING)
+		current_phase = int(fsm.get_current_phase())
+	var ok := (current_phase == target) or bool(fsm.transition_to(target))
+	return {
+		"success": ok,
+		"is_paused": paused,
+		"current_phase": int(fsm.get_current_phase()),
+		"error_code": "" if ok else "ERR_INVALID_PAUSE_TRANSITION"
+	}
+
+## 非破坏性退回账号首页（保留引擎装配，仅落盘/注销令牌与会话上下文）
+static func execute_logout_to_menu(request: GameShutdownDTO.Request, providers: Dictionary = {}) -> GameShutdownDTO.Response:
+	var response := GameShutdownDTO.Response.new()
+	var fsm: Variant = GameLifecycleManager.get_instance()
+	if request != null and request.save_before_quit and not request.target_save_slot.is_empty():
+		var save_result := _flush_domain_saves(request.target_save_slot, providers, false)
+		response.is_save_completed = bool(save_result.get("success", false))
+		response.save_sha256 = String(save_result.get("sha256", ""))
+		if not response.is_save_completed and request.require_save_success:
+			response.success = false
+			response.failed_stage = "flush_saves"
+			response.error_code = String(save_result.get("error_code", "SAVE_FLUSH_FAILED"))
+			response.current_phase = int(fsm.get_current_phase())
+			return response
+	if request != null and not request.session_token.is_empty():
+		AuthService.revoke_token(request.session_token)
+	if int(fsm.get_current_phase()) == GameLifecycleModel.LifecyclePhase.PAUSED:
+		fsm.transition_to(GameLifecycleModel.LifecyclePhase.RUNNING)
+	response.success = true
+	response.error_code = "OK"
+	response.current_phase = int(fsm.get_current_phase())
+	var bus := EventBusCore.get_instance()
+	if bus != null:
+		bus.emit_domain_event("lifecycle.logout_to_menu_completed", {
+			"account_id": request.account_id if request != null else "",
+			"is_save_completed": response.is_save_completed,
+			"current_phase": response.current_phase
+		})
+	return response
+
+## STOP_FAILED 强制清理恢复管线（STOP_FAILED -> FORCE_STOPPING -> STOPPED）
+static func execute_force_shutdown(request: GameShutdownDTO.Request = null) -> GameShutdownDTO.Response:
+	var fsm: Variant = GameLifecycleManager.get_instance()
+	var response := GameShutdownDTO.Response.new()
+	var current_phase := int(fsm.get_current_phase())
+	if current_phase == GameLifecycleModel.LifecyclePhase.STOPPED:
+		response.success = true
+		response.error_code = "ALREADY_STOPPED"
+		response.current_phase = current_phase
+		return response
+	if current_phase != GameLifecycleModel.LifecyclePhase.STOP_FAILED and current_phase != GameLifecycleModel.LifecyclePhase.STOPPING:
+		if current_phase == GameLifecycleModel.LifecyclePhase.UNINITIALIZED:
+			fsm.transition_to(GameLifecycleModel.LifecyclePhase.BOOT_INITIALIZING)
+			fsm.transition_to(GameLifecycleModel.LifecyclePhase.RUNNING)
+		if int(fsm.get_current_phase()) == GameLifecycleModel.LifecyclePhase.PAUSED or int(fsm.get_current_phase()) == GameLifecycleModel.LifecyclePhase.RUNNING:
+			fsm.transition_to(GameLifecycleModel.LifecyclePhase.STOPPING)
+	fsm.transition_to(GameLifecycleModel.LifecyclePhase.FORCE_STOPPING)
+	_shutdown_resources.clear()
+	_shutdown_execution_active = false
+	if request != null and not request.session_token.is_empty():
+		AuthService.revoke_token(request.session_token)
+	var teardown_result := GameBootstrap.teardown()
+	response.success = bool(teardown_result.get("success", false)) and bool(fsm.transition_to(GameLifecycleModel.LifecyclePhase.STOPPED))
+	response.error_code = "OK" if response.success else "ERR_FORCE_SHUTDOWN_FAILED"
+	response.current_phase = int(fsm.get_current_phase())
+	return response

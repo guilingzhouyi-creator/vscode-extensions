@@ -16,7 +16,7 @@ static func verify_mount_integrity(mount: ItemAttributeMountInstance) -> bool:
 	if mount == null:
 		return false
 
-	# 非特殊词缀无需校验防伪签名
+	# 非特殊词缀无需校验防篡改签名
 	if mount.category != ItemAttributeDefinition.AttributeCategory.SPECIAL_AFFIX:
 		return true
 
@@ -29,14 +29,14 @@ static func verify_mount_integrity(mount: ItemAttributeMountInstance) -> bool:
 	if not bool(audit.get("is_appraised", false)):
 		return false
 
-	var ts := int(audit.get("appraised_timestamp", 0))
-	var actor := str(audit.get("appraiser_actor_id", ""))
-	var sig := str(audit.get("audit_signature", ""))
+	var appraised_timestamp := int(audit.get("appraised_timestamp", 0))
+	var appraiser_actor_id := str(audit.get("appraiser_actor_id", ""))
+	var audit_signature := str(audit.get("audit_signature", ""))
 
-	if sig.is_empty() or ts <= 0:
+	if audit_signature.is_empty() or appraised_timestamp <= 0:
 		return false
 
 	var expected := ItemAttributeAppraisalSolver._generate_audit_signature(
-		mount.item_uid, mount.attribute_uid, ts, actor
+		mount.item_uid, mount.attribute_uid, appraised_timestamp, appraiser_actor_id
 	)
-	return (sig == expected)
+	return (audit_signature == expected)

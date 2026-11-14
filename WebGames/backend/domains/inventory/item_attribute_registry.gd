@@ -29,20 +29,20 @@ static func get_shared() -> ItemAttributeRegistry:
 ## 重载属性定义：解析 item_attributes.json，倒置区间（Inv-VD-3）拒绝登记并告警
 func reload_configuration() -> void:
 	_definitions.clear()
-	var raw_attrs: Dictionary = GameConfig.get_dict("domains.item_attributes", "attributes", {})
-	for attr_uid in raw_attrs.keys():
-		var raw_item: Variant = raw_attrs[attr_uid]
+	var raw_attributes: Dictionary = GameConfig.get_dict("domains.item_attributes", "attributes", {})
+	for attribute_uid_key in raw_attributes.keys():
+		var raw_item: Variant = raw_attributes[attribute_uid_key]
 		if not (raw_item is Dictionary):
 			continue
-		var def := ItemAttributeDefinition.from_dto(raw_item as Dictionary)
-		if def.attribute_uid.is_empty():
-			def.attribute_uid = str(attr_uid)
-		# L11: clamp 区间有序不变量（Inv-VD-3）——value_min > value_max 的倒置定义
+		var definition := ItemAttributeDefinition.from_dto(raw_item as Dictionary)
+		if definition.attribute_uid.is_empty():
+			definition.attribute_uid = str(attribute_uid_key)
+		# clamp 区间有序不变量（Inv-VD-3）——value_min > value_max 的倒置定义
 		# 拒绝登记并告警（旧实现静默登记 → 求值 clampf 恒返 value_max 的静默数值错误）
-		if def.value_min > def.value_max:
-			ErrorReporter.emit_warning("inventory", "INVALID_RANGE", TemplateFormatter.format("item_attributes: inverted range defined for {attr_uid}: value_min({min}) > value_max({max}); registration rejected.", {"attr_uid": str(attr_uid), "min": def.value_min, "max": def.value_max}))
+		if definition.value_min > definition.value_max:
+			ErrorReporter.emit_warning("inventory", "INVALID_RANGE", TemplateFormatter.format("item_attributes: inverted range defined for {attr_uid}: value_min({min}) > value_max({max}); registration rejected.", {"attr_uid": str(attribute_uid_key), "min": definition.value_min, "max": definition.value_max}))
 			continue
-		_definitions[str(attr_uid)] = def
+		_definitions[str(attribute_uid_key)] = definition
 
 # ==============================================================================
 # 二、查询接口
