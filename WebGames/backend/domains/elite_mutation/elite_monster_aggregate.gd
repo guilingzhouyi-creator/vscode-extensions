@@ -1,6 +1,6 @@
 # ==============================================================================
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
-# 文件路径: res://backend/domains/elite_mutation/elite_monster_entity.gd
+# 文件路径: res://backend/domains/elite_mutation/elite_monster_aggregate.gd
 # 架构定位: Domain Entity / Aggregate Root
 # 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/elite.json | 信号: EventBus 领域广播
 # 职责说明: 继承 MonsterAggregateEntity 微观生理底座，动态注入精英词缀与狂暴/召唤 状态字段；精英等级/词缀/血线阈值/小怪数量默认值由 config/domains/elite.json 的 entity_defaults 段驱动（代码零硬编码）。
@@ -41,12 +41,6 @@ var minion_count: int = GameConfig.get_int("domains.elite", "entity_defaults/min
 # 三、精英词缀注入（角色归位）
 # ==============================================================================
 
-## 精英词缀注入：L2 系数乘性修正（STR/CON/AGI/SPR）后重算体魄。
-## 角色归位依据（《后端逻辑处理标准 v1》）：本方法原地改写**自身**生理系数，属
-## 「entity / aggregate 承载自身状态变更」；原实现位于 GenericAffixSolver，
-## 违反「solver 禁 mutator（禁止 -> void 改写入参状态）」，故迁入实体自身。
-## 词缀定义读取仍由 GenericAffixSolver.get_affix（纯函数）承担，权重池由 domains.elite 段驱动。
-## 契约：未登记词缀安全跳过；注入后经 calculate_somatic_function 重算（等级不变、底层实际值联动）。
 const _ELITE_STAT_MOD_KEYS: Array[Array] = [
 	["str", "STR"],
 	["con", "CON"],
@@ -54,24 +48,30 @@ const _ELITE_STAT_MOD_KEYS: Array[Array] = [
 	["spr", "SPR"],
 ]
 
+## 精英词缀注入：L2 系数乘性修正（STR/CON/AGI/SPR）后重算体魄。
+## 角色归位依据（《后端逻辑处理标准 v1》）：本方法原地改写**自身**生理系数，属
+## 「entity / aggregate 承载自身状态变更」；原实现位于 GenericAffixSolver，
+## 违反「solver 禁 mutator（禁止 -> void 改写入参状态）」，故迁入实体自身。
+## 词缀定义读取仍由 GenericAffixSolver.get_affix（纯函数）承担，权重池由 domains.elite 段驱动。
+## 契约：未登记词缀安全跳过；注入后经 calculate_somatic_function 重算（等级不变、底层实际值联动）。
 func apply_affixes(affix_ids: Array) -> void:
 	elite_affix_ids = affix_ids
 	if physiology == null:
 		return
-	for aff_id in affix_ids:
-		_apply_single_affix(str(aff_id))
-	LifeCycleAndPhysiologySolver.calculate_somatic_function(physiology)
+	for affix_id in affix_ids:
+		_apply_single_affix(str(affix_id))
+	LifecycleAndPhysiologySolver.calculate_somatic_function(physiology)
 
-func _apply_single_affix(aff_id: String) -> void:
-	var aff: Dictionary = GenericAffixSolver.get_affix(aff_id)
-	if aff.is_empty():
+func _apply_single_affix(affix_id: String) -> void:
+	var affix_definition: Dictionary = GenericAffixSolver.get_affix(affix_id)
+	if affix_definition.is_empty():
 		return
-	var mods: Variant = aff.get("stat_mods")
-	if not (mods is Dictionary):
+	var stat_modifiers: Variant = affix_definition.get("stat_mods")
+	if not (stat_modifiers is Dictionary):
 		return
-	var mods_dict: Dictionary = mods as Dictionary
+	var modifiers_dict: Dictionary = stat_modifiers as Dictionary
 	for pair in _ELITE_STAT_MOD_KEYS:
 		var raw_key: String = pair[0]
 		var stat_key: String = pair[1]
-		if mods_dict.has(raw_key):
-			physiology.base_coefficients[stat_key] = float(physiology.base_coefficients.get(stat_key, 1.0)) * float(mods_dict[raw_key])
+		if modifiers_dict.has(raw_key):
+			physiology.base_coefficients[stat_key] = float(physiology.base_coefficients.get(stat_key, 1.0)) * float(modifiers_dict[raw_key])

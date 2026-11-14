@@ -19,10 +19,10 @@ static func _affixes() -> Dictionary:
 	return GameConfig.get_dict("domains.elite", "affixes", {})
 
 ## 按词缀 ID 取定义（未登记返回空字典）
-static func get_affix(aff_id: String) -> Dictionary:
-	var m := _affixes()
-	if m.has(aff_id):
-		return m[aff_id]
+static func get_affix(affix_id: String) -> Dictionary:
+	var affix_table := _affixes()
+	if affix_table.has(affix_id):
+		return affix_table[affix_id]
 	return {}
 
 # ==============================================================================
@@ -51,7 +51,7 @@ static func roll_random_affixes(
 	var affix_rng := DeterministicRNG.resolve(rng)
 	var selected: Array[String] = []
 	var safe_count := mini(count, pool.size())
-	for i in range(safe_count):
+	for roll_index in range(safe_count):
 		var entry: Variant = affix_rng.pick_weighted(pool, "weight")
 		if entry is Dictionary and entry.has("aff_id"):
 			selected.append(str(entry["aff_id"]))
