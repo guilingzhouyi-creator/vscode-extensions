@@ -11,6 +11,9 @@ class_name TestWorldArchiveAndAntiBridgePipeline
 extends RefCounted
 
 static func run_all_tests() -> Dictionary:
+	var had_overlay := GameConfig.has_active_mod_overlay()
+	if not had_overlay:
+		TestCase.mount_official_kalar_for_test()
 	var results: Array = []
 	results.append(test_world_archive_multi_instance_and_recovery())
 	results.append(test_character_demise_and_chronicle_monotonicity())
@@ -20,6 +23,8 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_anti_bridge_network_mute_violation())
 	results.append(test_gateway_memory_scrubbing_and_session_reset())
 
+	if not had_overlay:
+		TestCase.unmount_mod_overlay_for_test()
 	var all_passed := true
 	var passed_cnt := 0
 	for r in results:
@@ -195,6 +200,8 @@ static func test_anti_bridge_hot_swap_blocking() -> Dictionary:
 		and str(direct_guard.get("error_code", "")) == AntiBridgeGuard.SECURITY_ERR_CROSS_MODE_HOT_SWAP
 
 	var passed: bool = sp_ok and hot_swap_blocked and direct_blocked
+	fsm.exit_to_gateway()
+	RuntimeModeGate.reset_for_tests()
 	return {
 		"test": "TC-WAB-04: 防越权守卫拦截跨模式热切换 (Anti-Hot-Swap)",
 		"passed": passed

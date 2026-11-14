@@ -10,6 +10,9 @@ class_name TestPrologueCoreAndPlaceholderPipeline
 extends RefCounted
 
 static func run_all_tests() -> Dictionary:
+	var had_overlay := GameConfig.has_active_mod_overlay()
+	if not had_overlay:
+		TestCase.mount_official_kalar_for_test()
 	var results: Array[Dictionary] = []
 	results.append(_test_character_context_isolation())
 	results.append(_test_placeholder_full_resolution())
@@ -20,6 +23,8 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_four_stage_progression_lifecycle())
 	results.append(_test_phase_50_dag_session_bridge())
 
+	if not had_overlay:
+		TestCase.unmount_mod_overlay_for_test()
 	var all_passed := true
 	var passed_cnt := 0
 	for r in results:

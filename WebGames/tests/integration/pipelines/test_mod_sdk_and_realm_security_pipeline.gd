@@ -24,6 +24,9 @@ static func run_all_tests() -> Dictionary:
 
 ## TC-MSS-01: 单机模式下全量加载第三方 MOD 正常放行
 static func test_single_player_third_party_mods_allowed() -> Dictionary:
+	var had_overlay := GameConfig.has_active_mod_overlay()
+	if not had_overlay:
+		TestCase.mount_official_kalar_for_test()
 	var mods: Array = [
 		{"pack_id": "custom_expansion_story", "is_vanilla": false, "version": "1.0.0"},
 		{"pack_id": "overpowered_relics", "is_vanilla": false, "version": "2.0.0"}
@@ -49,6 +52,8 @@ static func test_single_player_third_party_mods_allowed() -> Dictionary:
 
 	# 对称重置
 	fsm.exit_to_gateway()
+	if not had_overlay:
+		TestCase.unmount_mod_overlay_for_test()
 
 	var passed: bool = guard_allowed and fsm_ok
 	return make_result("TC-MSS-01: 单机模式下全量加载第三方 MOD 正常放行", passed, {
@@ -137,30 +142,31 @@ static func test_multiplayer_purge_and_fallback_to_vanilla() -> Dictionary:
 	fsm.enter_gateway()
 
 	var mixed_mods: Array = [
-		{"pack_id": "vanilla_base", "is_vanilla": true},
+		{"pack_id": "official_kalar", "is_official": true, "trust_tier": "OFFICIAL", "pack_profile": "OFFICIAL_BASE"},
 		{"pack_id": "third_party_addon", "is_vanilla": false},
-		"official_core_content"
+		"official_core_content",
+		{"pack_id": "official_core_expansion", "is_official": true, "trust_tier": "OFFICIAL", "pack_profile": "OFFICIAL_BASE"}
 	]
 	fsm.set_active_mods(mixed_mods)
 
-	# 执行联机强制净化
+	# 执行联机强制净化（剥离未认证字符串、未安装伪官方字典与第三方附加包，保留磁盘核验官方基础包）
 	fsm.purge_and_fallback_to_vanilla()
 	var retained := fsm.get_active_mods()
 
-	var count_ok: bool = retained.size() == 2
-	var has_vanilla_base: bool = false
-	var has_official_core: bool = false
+	var count_ok: bool = retained.size() == 1
+	var has_official_base: bool = false
 	var has_third_party: bool = false
+	var has_spoofed_string: bool = false
 
 	for m in retained:
-		if m is Dictionary and str((m as Dictionary).get("pack_id", "")) == "vanilla_base":
-			has_vanilla_base = true
-		elif m is String and (m as String) == "official_core_content":
-			has_official_core = true
+		if m is Dictionary and str((m as Dictionary).get("pack_id", "")) == "official_kalar":
+			has_official_base = true
 		elif m is Dictionary and str((m as Dictionary).get("pack_id", "")) == "third_party_addon":
 			has_third_party = true
+		elif m is String and (m as String) == "official_core_content":
+			has_spoofed_string = true
 
-	var purge_ok: bool = count_ok and has_vanilla_base and has_official_core and not has_third_party
+	var purge_ok: bool = count_ok and has_official_base and not has_third_party and not has_spoofed_string
 
 	# 净化后符合联机安全纪律
 	var check_after := AntiBridgeGuard.validate_mod_realm_discipline(
@@ -170,6 +176,7 @@ static func test_multiplayer_purge_and_fallback_to_vanilla() -> Dictionary:
 	var discipline_pass: bool = bool(check_after.get("allowed", false))
 
 	fsm.exit_to_gateway()
+	TestCase.unmount_mod_overlay_for_test()
 
 	var passed: bool = purge_ok and discipline_pass
 	return make_result("TC-MSS-04: 联机模式切入时本地 MOD 强制净化卸载与内存洗脱", passed, {
@@ -177,13 +184,11 @@ static func test_multiplayer_purge_and_fallback_to_vanilla() -> Dictionary:
 		"discipline_pass": discipline_pass
 	})
 
-## TC-MSS-05: 官方 Vanilla 原生包在联机模式下的安全放行
+## TC-MSS-05: 官方原生基础包结构化契约在联机模式下的安全放行与伪造前缀拦截
 static func test_multiplayer_official_vanilla_allowed() -> Dictionary:
 	var vanilla_mods: Array = [
-		{"pack_id": "vanilla_core", "is_vanilla": true},
-		{"pack_id": "official_expansion", "is_official": true},
-		"vanilla_assets",
-		"core_vanilla"
+		{"pack_id": "official_kalar", "is_official": true, "trust_tier": "OFFICIAL", "pack_profile": "OFFICIAL_BASE"},
+		{"pack_id": "official_expansion", "is_official": true, "trust_tier": "OFFICIAL", "pack_profile": "OFFICIAL_BASE"}
 	]
 
 	# 1. 整体校验放行
@@ -194,14 +199,24 @@ static func test_multiplayer_official_vanilla_allowed() -> Dictionary:
 	var discipline_ok: bool = bool(discipline_res.get("allowed", false)) \
 		and str(discipline_res.get("error_code", "")).is_empty()
 
-	# 2. 单项判别器断言
-	var v1_ok: bool = AntiBridgeGuard.is_vanilla_pack("vanilla")
-	var v2_ok: bool = AntiBridgeGuard.is_vanilla_pack("vanilla_combat")
-	var v3_ok: bool = AntiBridgeGuard.is_vanilla_pack("official_lore")
-	var v4_ok: bool = AntiBridgeGuard.is_vanilla_pack({"pack_id": "vanilla_mesh"})
+	# 2. 单项判别器断言（拒绝裸字符串伪造前缀，仅信任结构化官方签名）
+	var s1_blocked: bool = not AntiBridgeGuard.is_vanilla_pack("vanilla")
+	var s2_blocked: bool = not AntiBridgeGuard.is_vanilla_pack("official_lore")
+	var v_dict_ok: bool = AntiBridgeGuard.is_vanilla_pack({
+		"pack_id": "official_kalar",
+		"is_official": true,
+		"trust_tier": "OFFICIAL",
+		"pack_profile": "OFFICIAL_BASE"
+	})
+	var v_addon_blocked: bool = not AntiBridgeGuard.is_vanilla_pack({
+		"pack_id": "official_spoof_addon",
+		"is_official": true,
+		"trust_tier": "COMMUNITY",
+		"pack_profile": "CONTENT_ADDON"
+	})
 	var inv_ok: bool = not AntiBridgeGuard.is_vanilla_pack("unauthorized_cheat_mod")
 
-	var classifier_ok: bool = v1_ok and v2_ok and v3_ok and v4_ok and inv_ok
+	var classifier_ok: bool = s1_blocked and s2_blocked and v_dict_ok and v_addon_blocked and inv_ok
 
 	var passed: bool = discipline_ok and classifier_ok
 	return make_result("TC-MSS-05: 官方 Vanilla 原生包在联机模式下的安全放行", passed, {
@@ -211,9 +226,11 @@ static func test_multiplayer_official_vanilla_allowed() -> Dictionary:
 
 ## TC-MSS-06: 网关退出后模式重置与状态对称释放
 static func test_gateway_exit_symmetric_cleanup() -> Dictionary:
+	var had_overlay := GameConfig.has_active_mod_overlay()
+	var kalar_mount := TestCase.mount_official_kalar_for_test()
 	var fsm := WorldGatewayFSM.new("ACC_MSS_EXIT_01")
 	fsm.enter_gateway()
-	fsm.set_active_mods([{"pack_id": "temp_mod", "is_vanilla": false}])
+	fsm.set_active_mods([kalar_mount.get("package", {}), {"pack_id": "temp_mod", "is_vanilla": false}])
 
 	# 选择单机模式并模拟状态填充
 	fsm.select_mode(WorldGatewayModel.GameMode.SINGLE_PLAYER, {}, [])
@@ -226,6 +243,8 @@ static func test_gateway_exit_symmetric_cleanup() -> Dictionary:
 
 	# 执行退出与内存洗脱
 	var exit_res := fsm.exit_to_gateway()
+	if not had_overlay:
+		TestCase.unmount_mod_overlay_for_test()
 	var exit_ok: bool = bool(exit_res.get("success", false))
 
 	var mode_reset: bool = fsm.context.selected_mode == WorldGatewayModel.GameMode.UNSELECTED

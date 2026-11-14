@@ -10,6 +10,9 @@ class_name TestCharacterCreationAndOpeningPipeline
 extends RefCounted
 
 static func run_all_tests() -> Dictionary:
+	var had_overlay := GameConfig.has_active_mod_overlay()
+	if not had_overlay:
+		TestCase.mount_official_kalar_for_test()
 	var results: Array[Dictionary] = []
 	results.append(_test_basic_name_and_display_name_unification())
 	results.append(_test_race_extensibility_and_non_hardcoded_validation())
@@ -18,6 +21,8 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_race_expansion_canary_gating())
 	results.append(_test_full_lifecycle_gateway_to_opening_narrative())
 
+	if not had_overlay:
+		TestCase.unmount_mod_overlay_for_test()
 	var all_passed := true
 	var passed_cnt := 0
 	for r in results:

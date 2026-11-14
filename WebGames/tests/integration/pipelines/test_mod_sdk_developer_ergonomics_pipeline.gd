@@ -322,6 +322,7 @@ static func test_tc_mde_09_mod_topological_sort_and_dependencies() -> Dictionary
 	var pack_a := DestinyModManifestDTO.new()
 	pack_a.pack_id = "PACK_ALPHA"
 	pack_a.pack_name = "基础核心包"
+	pack_a.pack_profile = "TOTAL_CONVERSION"
 
 	var pack_b := DestinyModManifestDTO.new()
 	pack_b.pack_id = "PACK_BETA"

@@ -7,6 +7,9 @@ class_name TestNarrativeDagOrchestrationPipeline
 extends RefCounted
 
 static func run_all_tests() -> Dictionary:
+	var had_overlay := GameConfig.has_active_mod_overlay()
+	if not had_overlay:
+		TestCase.mount_official_kalar_for_test()
 	var results: Array[Dictionary] = []
 	results.append(_test_dag_topological_sort_validity())
 	results.append(_test_dag_cycle_detection_guard())
@@ -19,6 +22,8 @@ static func run_all_tests() -> Dictionary:
 	# 审查修复闭环：R3 全字段装配 + R4 路由单源 + O1 校验守卫
 	results.append(_test_registry_full_assembly_and_validator_guards())
 
+	if not had_overlay:
+		TestCase.unmount_mod_overlay_for_test()
 	var passed_count := 0
 	for r in results:
 		if bool(r.get("passed", false)):

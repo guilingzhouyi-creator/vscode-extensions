@@ -23,6 +23,9 @@ const GameShutdownDTO = preload("res://backend/domains/lifecycle/dto/game_shutdo
 const GameBootstrap = preload("res://backend/infrastructure/game_bootstrap.gd")
 
 static func run_all_tests() -> Dictionary:
+	var had_overlay := GameConfig.has_active_mod_overlay()
+	if not had_overlay:
+		TestCase.mount_official_kalar_for_test()
 	var results: Array[Dictionary] = []
 	results.append(test_composite_auth_auto_registration_and_login())
 	results.append(test_multi_world_slot_placeholder_defense())
@@ -32,10 +35,15 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_esc_menu_and_graceful_shutdown_teardown())
 	results.append(test_dto_serialization_and_reset_state())
 
+	if not had_overlay:
+		TestCase.unmount_mod_overlay_for_test()
 	return TestCase.pack_results("存档二次载入与复合鉴权双轨分流全链路流水线", results)
 
 static func _make_test_account_store() -> Dictionary:
-	return {}
+	# Non-empty sentinel keeps AuthService strictly in-memory so test accounts never touch user://accounts.
+	var sentinel := AccountProfile.new()
+	sentinel.account_id = "__TEST_ISOLATED_SENTINEL__"
+	return {"__sentinel": sentinel}
 
 # ---- TC-SLD-01: 复合鉴权自动注册与登录双模流转 ----
 static func test_composite_auth_auto_registration_and_login() -> Dictionary:

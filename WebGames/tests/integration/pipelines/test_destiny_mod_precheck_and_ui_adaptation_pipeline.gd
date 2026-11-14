@@ -147,7 +147,19 @@ static func _make_compliant_mod_a() -> Dictionary:
                 "match_condition": {"origin_id": "ASTRO_SCHOLAR"},
                 "target_dag_id": "DAG_PROLOGUE_ASTRO_01"
             }
-        ]
+        ],
+        "dag_graphs": {
+            "DAG_PROLOGUE_ASTRO_01": {
+                "dag_id": "DAG_PROLOGUE_ASTRO_01",
+                "entry_node_id": "NODE_ASTRO_START",
+                "terminal_node_id": "NODE_ASTRO_END",
+                "nodes": {
+                    "NODE_ASTRO_START": {"node_type": "START_ENTRY", "narrative_key": "narrative.prologue.awakening"},
+                    "NODE_ASTRO_END": {"node_type": "TERMINAL_EXIT", "narrative_key": "narrative.prologue.completed", "required_prerequisites": ["NODE_ASTRO_START"]}
+                },
+                "edges": [{"from": "NODE_ASTRO_START", "to": "NODE_ASTRO_END"}]
+            }
+        }
     }
 
 ## 构造合规命途扩展包 B（符文锻造师 + 符文之心/魔力过载 + 铁剑套件）
@@ -206,6 +218,18 @@ static func _make_compliant_mod_b() -> Dictionary:
                     {"canonical_id": "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD", "count": 1}
                 ]
             }
+        },
+        "dag_graphs": {
+            "DAG_PROLOGUE_RUNE_01": {
+                "dag_id": "DAG_PROLOGUE_RUNE_01",
+                "entry_node_id": "NODE_RUNE_START",
+                "terminal_node_id": "NODE_RUNE_END",
+                "nodes": {
+                    "NODE_RUNE_START": {"node_type": "START_ENTRY", "narrative_key": "narrative.prologue.awakening"},
+                    "NODE_RUNE_END": {"node_type": "TERMINAL_EXIT", "narrative_key": "narrative.prologue.completed", "required_prerequisites": ["NODE_RUNE_START"]}
+                },
+                "edges": [{"from": "NODE_RUNE_START", "to": "NODE_RUNE_END"}]
+            }
         }
     }
 
@@ -260,14 +284,16 @@ static func test_single_mod_compliance_precheck_and_interception() -> Dictionary
 
 ## TC-DMP-02: 多 MOD 列表清单式协同合并适配（Vanilla + MOD A + MOD B 全量保留）
 static func test_multi_mod_collaborative_list_merging() -> Dictionary:
+    var had_overlay := GameConfig.has_active_mod_overlay()
+    var official_pkg: Dictionary = ModPackageDiscoverySolver.load_full_mod_package_from_dir("res://mods/official_kalar")
     var mod_a: Dictionary = _make_compliant_mod_a()
     var mod_b: Dictionary = _make_compliant_mod_b()
 
     var gw := WorldGatewayFSM.new(TEST_ACCOUNT_ID)
     gw.context.selected_mode = WorldGatewayModel.GameMode.SINGLE_PLAYER
     var res: Dictionary = gw.precheck_and_configure_single_player_mods(
-        [mod_a, mod_b],
-        ["mod_astro_scholar", "mod_rune_forger"]
+        [official_pkg, mod_a, mod_b],
+        ["official_kalar", "mod_astro_scholar", "mod_rune_forger"]
     )
     var ok_success: bool = bool(res.get("success", false))
 
@@ -285,6 +311,9 @@ static func test_multi_mod_collaborative_list_merging() -> Dictionary:
     var ui_traits: Array = ui_snap.get("available_trait_pairs", [])
     var ok_ui_lists: bool = ui_origins.size() >= 3 and ui_traits.size() >= 3
 
+    gw.exit_to_gateway()
+    if not had_overlay:
+        TestCase.unmount_mod_overlay_for_test()
     var passed: bool = ok_success and has_vanilla_origin and has_mod_a_origin and has_mod_b_origin and has_both_kits and ok_ui_lists
     return {
         "test": "TC-DMP-02: 多 MOD 列表清单式协同合并适配",
@@ -343,7 +372,9 @@ static func test_frontend_snapshot_controlled_ui_unlock_and_lock() -> Dictionary
     var locked_extra_empty: bool = (locked_payload.get("extra_custom_fields", {}) as Dictionary).is_empty()
 
     # 2. 注入合规多MOD预检生成的 creation_ui_snapshot
+    var official_pkg: Dictionary = ModPackageDiscoverySolver.load_full_mod_package_from_dir("res://mods/official_kalar")
     var adapt_res: Dictionary = ModPrecheckAndAdaptationSolver.precheck_and_adapt_mod_list([
+        official_pkg,
         _make_compliant_mod_a(),
         _make_compliant_mod_b()
     ])
@@ -373,6 +404,8 @@ static func test_frontend_snapshot_controlled_ui_unlock_and_lock() -> Dictionary
 ## TC-DMP-05: 后端受控权威创角、专属初始装备入包、专属序章路由与 world_mod_lock.json 前置锁定全链路闭环
 static func test_backend_authoritative_creation_and_world_lock_closed_loop() -> Dictionary:
     _setup_environment()
+    var kalar_mount: Dictionary = TestCase.mount_official_kalar_for_test()
+    var official_pkg: Dictionary = kalar_mount.get("package", {})
 
     var gw := WorldGatewayFSM.new(TEST_ACCOUNT_ID)
     gw.enter_gateway()
@@ -381,6 +414,7 @@ static func test_backend_authoritative_creation_and_world_lock_closed_loop() -> 
     gw.select_mode_for_account(WorldGatewayModel.GameMode.SINGLE_PLAYER, acc, {}, TEST_WORLD_ID, "SLOT_01")
 
     var precheck_res: Dictionary = gw.precheck_and_configure_single_player_mods([
+        official_pkg,
         _make_compliant_mod_a(),
         _make_compliant_mod_b()
     ])
@@ -418,9 +452,10 @@ static func test_backend_authoritative_creation_and_world_lock_closed_loop() -> 
 
     var lock_data: Dictionary = WorldModAffinityManager.new().load_world_mod_lock(TEST_WORLD_ID)
     var ok_lock: bool = bool(lock_data.get("exists", false)) \
-        and (lock_data.get("locked_packs", []) as Array).size() == 2
+        and (lock_data.get("locked_packs", []) as Array).size() == 3
 
     # 验证未启用自选时后端零信任剥离伪造自选字段
+    TestCase.mount_official_kalar_for_test()
     var req_unauth := AuthoritativeCharacterCreationRequestDTO.new()
     req_unauth.account_id = TEST_ACCOUNT_ID
     req_unauth.world_id = TEST_WORLD_ID
@@ -436,6 +471,7 @@ static func test_backend_authoritative_creation_and_world_lock_closed_loop() -> 
     var ok_zero_trust: bool = unauth_profile != null \
         and str(unauth_profile.growth_state.get("origin_id", "")) != "ASTRO_SCHOLAR"
 
+    TestCase.unmount_mod_overlay_for_test()
     _teardown_environment()
 
     var passed: bool = ok_precheck and ok_created and ok_origin_and_trait and ok_equip and ok_dag and ok_lock and ok_zero_trust
@@ -446,6 +482,7 @@ static func test_backend_authoritative_creation_and_world_lock_closed_loop() -> 
 
 ## TC-DMP-06: 工程方 SnapshotInjectionSolver 内存虚拟 MOD 一键注入水化与 teardown 对称清理验证
 static func test_harness_virtual_mod_injection_and_teardown() -> Dictionary:
+    var official_pkg: Dictionary = ModPackageDiscoverySolver.load_full_mod_package_from_dir("res://mods/official_kalar")
     var snap_payload: Dictionary = {
         "snapshot_id": "SNAP_VIRTUAL_DESTINY_MODS_01",
         "account_id": "ACC_HARNESS_DMP_01",
@@ -456,10 +493,11 @@ static func test_harness_virtual_mod_injection_and_teardown() -> Dictionary:
         "world_id": "WORLD_DEFAULT_SP_01",
         "slot_id": "SLOT_01",
         "virtual_destiny_mods": [
+            official_pkg,
             _make_compliant_mod_a(),
             _make_compliant_mod_b()
         ],
-        "enabled_mod_ids": ["mod_astro_scholar", "mod_rune_forger"]
+        "enabled_mod_ids": ["official_kalar", "mod_astro_scholar", "mod_rune_forger"]
     }
 
     var inject_res: Dictionary = SnapshotInjectionSolver.inject_and_hydrate(snap_payload)
@@ -472,6 +510,7 @@ static func test_harness_virtual_mod_injection_and_teardown() -> Dictionary:
 
     var ctx = inject_res.get("session_context", null)
     SnapshotInjectionSolver.teardown_snapshot(ctx)
+    TestCase.unmount_mod_overlay_for_test()
     var ok_teardown_clean: bool = SnapshotInjectionSolver.get_injected_mod_adaptation().is_empty()
 
     var passed: bool = ok_inject and ok_adapted and ok_teardown_clean

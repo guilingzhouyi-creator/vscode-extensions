@@ -52,11 +52,13 @@ static func run_all_tests() -> Dictionary:
 
 static func _reset_env() -> void:
 	SaveDataAccessLayer.reset_for_tests()
+	AccountRepository.reset_for_tests()
 	GameLifecycleManager.reset_for_test()
 	HumanControlLeaseManager.reset_for_tests()
 	UnifiedProtocolFactory.reset_for_tests()
 	HudEventBridge.reset_for_tests()
 	UnifiedProtocolDispatcher.reset_custom_handlers_for_tests()
+	TestCase.unmount_mod_overlay_for_test()
 	ServiceLocator.reset()
 
 ## -----------------------------------------------------------------------------
@@ -291,7 +293,12 @@ static func test_tc_flc_09_account_logout_and_secret_vault_clearing() -> Diction
 ## TC-FLC-10: 账号首页（表单状态复位与网关上下文清空）
 ## -----------------------------------------------------------------------------
 static func test_tc_flc_10_account_landing_view_state_reset() -> Dictionary:
+	var had_overlay := GameConfig.has_active_mod_overlay()
+	AccountRepository.reset_for_tests()
+	if not had_overlay:
+		TestCase.mount_official_kalar_for_test()
 	var view := AccountEntryView.new()
+	view.submit_register("landing_hero", "pwd123")
 	var login_res := view.submit_login("landing_hero", "pwd123")
 	var login_ok: bool = bool(login_res.get("success", false))
 
@@ -311,6 +318,9 @@ static func test_tc_flc_10_account_landing_view_state_reset() -> Dictionary:
 	var gw_cleared: bool = (ServiceLocator.get_active_gateway() == null)
 
 	view.free()
+	AccountRepository.reset_for_tests()
+	if not had_overlay:
+		TestCase.unmount_mod_overlay_for_test()
 
 	var passed: bool = login_ok and has_gw_before and in_world_ok and logout_ok and state_reset and id_reset and gw_cleared
 	return make_result("TC-FLC-10: 账号首页表单状态复位与网关上下文清空", passed, {

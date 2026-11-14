@@ -232,7 +232,7 @@ static func test_narrative_template_args_contract() -> Dictionary:
 		["account.registered", "【鉴权】开拓者 %s 成功在卡拉尔世界建立身份档案。", 1],
 		["account.login_succeeded", "【鉴权】欢迎归来，开拓者 %s！", 1],
 		["account.session_revoked", "【鉴权】开拓者 %s 的会话已安全注销。", 1],
-		["world_state.snapshot_published", "【世界】开拓者 %s 已进入卡拉尔世界。", 1],
+		["world_state.snapshot_published", "【世界】开拓者 %s 已进入当前世界。", 1],
 		["world_state.stat_mutated", "【状态】角色属性 %s 发生变动（%+f → %+f）。", 3],
 		["world_state.wallet_mutated", "【财务】%s 变动 %+d。", 2]
 	]
@@ -354,6 +354,9 @@ static func _simulate_shutdown(account_id: String, slot_id: String, token: Strin
 
 # ---- TC-HDS-09：十阶段全链路端到端无头串联与自定义 Hook 导通 ----
 static func test_ten_stage_custom_hook_conduction_pipeline() -> Dictionary:
+	var had_overlay := GameConfig.has_active_mod_overlay()
+	if not had_overlay:
+		TestCase.mount_official_kalar_for_test()
 	var hooks_called: Array = []
 	_register_ten_stage_hooks(hooks_called)
 	var ctx := SessionFlowContextDTO.acquire()
@@ -453,6 +456,8 @@ static func test_ten_stage_custom_hook_conduction_pipeline() -> Dictionary:
 
 	LifecycleStageHookRegistry.clear_hooks()
 	SessionFlowContextDTO.release(ctx)
+	if not had_overlay:
+		TestCase.unmount_mod_overlay_for_test()
 
 	var passed: bool = reg.success and pro_ok and stages_ok and hooks_ok and shutdown_ok
 	return {"test": "TC-HDS-09: 十阶段全链路端到端无头串联与自定义Hook导通", "passed": passed}

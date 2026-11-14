@@ -53,7 +53,7 @@ static func create_tier3_merge_package(pack_directory: String) -> Dictionary:
 	var manifest := {
 		"pack_id": "mod_t3_merge_sample", "pack_name": "Tier3 Merge Sample",
 		"version": "1.0.0", "author": "Tester", "engine_api_version": "1.0.0",
-		"tier": "TIER_3_OVERHAUL", "priority": 300,
+		"tier": "TIER_3_OVERHAUL", "pack_profile": "TOTAL_CONVERSION", "priority": 300,
 		"dependencies": [], "incompatible_packs": [],
 		"semantic_tags": ["total_conversion"], "is_active": true, "root_path": pack_directory
 	}
@@ -136,7 +136,8 @@ static func run_tc_t3mod_05_total_purge() -> Dictionary:
 		"verbs": {"ARCANE_STRIKE": {"name": "灵击", "k_mom": 1.6, "k_edge": 1.6, "base_ap": -2}}
 	})
 
-	Tier3ContentOverrideLoader.apply_enabled_packages([manifest], catalog)
+	var official_pkg: Dictionary = ModPackageDiscoverySolver.load_full_mod_package_from_dir("res://mods/official_kalar")
+	Tier3ContentOverrideLoader.apply_enabled_packages([official_pkg, manifest], catalog)
 	var solo_present := catalog.get_prototype("KALAR:EQUIP:WEAPON_BLADE:SOLO_BLADE") != null
 	var vanilla_item_purged := catalog.get_prototype("KALAR:CONSUM:ALCHEMY:POTION_MANA") == null
 	var verbs_table := GameConfig.get_dict("domains.combat", "verbs", {})
@@ -145,9 +146,11 @@ static func run_tc_t3mod_05_total_purge() -> Dictionary:
 	var fallback_kept := verbs_table.has("_fallback")
 
 	Tier3ContentOverrideLoader.revert_all_overrides(catalog)
-	var reverted_ok := catalog.get_prototype("KALAR:CONSUM:ALCHEMY:POTION_MANA") != null \
+	var base_reverted := not GameConfig.has_active_mod_overlay() \
 		and catalog.get_prototype("KALAR:EQUIP:WEAPON_BLADE:SOLO_BLADE") == null \
 		and GameConfig.get_dict("domains.combat", "verbs", {}).has("STAB")
+	Tier3ContentOverrideLoader.apply_enabled_packages([official_pkg], catalog)
+	var reverted_ok := base_reverted and catalog.get_prototype("KALAR:CONSUM:ALCHEMY:POTION_MANA") != null
 
 	reset_mod_runtime_state()
 	var passed := solo_present and vanilla_item_purged and mod_verb_present and vanilla_verb_purged and fallback_kept and reverted_ok

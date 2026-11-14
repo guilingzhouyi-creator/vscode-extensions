@@ -20,6 +20,9 @@ const TEST_ACCOUNT_ID: String = "ACC_ACC_TEST_01"
 
 ## 执行全量流水线测试
 static func run_all_tests() -> Dictionary:
+	var had_overlay := GameConfig.has_active_mod_overlay()
+	if not had_overlay:
+		TestCase.mount_official_kalar_for_test()
 	var results: Array = []
 	results.append(test_authoritative_creation_pure_name())
 	results.append(test_client_tamper_defense())
@@ -28,6 +31,8 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_world_clock_and_history_monotonicity())
 	results.append(test_disk_persistence_and_gateway_handoff())
 
+	if not had_overlay:
+		TestCase.unmount_mod_overlay_for_test()
 	var all_passed := true
 	var passed_cnt := 0
 	for r in results:

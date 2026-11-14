@@ -127,10 +127,11 @@ static func test_tc_t3mod_02_unified_mods_discovery_priority() -> Dictionary:
 static func test_tc_t3mod_03_tier3_merge_and_template_aliases() -> Dictionary:
 	Helper.reset_mod_runtime_state()
 	var catalog: ItemRegistryCatalog = ItemLoaderPipeline.build_catalog_from_config()
+	var official_pkg: Dictionary = ModPackageDiscoverySolver.load_full_mod_package_from_dir("res://mods/official_kalar")
 	var pack_directory := Helper.TEST_SANDBOX_ROOT + "mod_t3_merge"
 	var manifest := Helper.create_tier3_merge_package(pack_directory)
 
-	var apply_summary: Dictionary = Tier3ContentOverrideLoader.apply_enabled_packages([manifest], catalog)
+	var apply_summary: Dictionary = Tier3ContentOverrideLoader.apply_enabled_packages([official_pkg, manifest], catalog)
 	var energy_coef_ok := is_equal_approx(GameConfig.get_float("domains.combat", "kinetic/energy_coef", 0.0), 0.75)
 	var velocity_floor_preserved := is_equal_approx(GameConfig.get_float("domains.combat", "kinetic/velocity_floor", 0.0), 0.1)
 	var swamp_ok := is_equal_approx(GameConfig.get_float("domains.world", "terrain_impedance/SWAMP", 0.0), 4.2)
