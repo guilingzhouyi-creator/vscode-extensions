@@ -1,8 +1,12 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端第8卷: 邮件系统子面板委托
+# 模块归属: 前端邮件视图域 (fe08 邮件系统子面板委托)
 # 文件路径: res://frontend/views/mail_system/mail_system_tabs.gd
-# 职责: 承担 MailSystemView 的分类Tab配置、静态文案初始化、写邮件Tab与Mock数据
+# 架构定位: BaseScreen 附属委托控制器；管理邮件分类页签、静态文案、写信与虚拟列表
+# 依赖与触发: 依赖 MailSystemView、UIIntermediary、KVirtualList 与基础通用组件
+# 职责说明: 初始化分类与提示文案，提供回复、添加附件、发送与虚拟列表行绑定复用
+# 退出语义与设计依据: 随 MailSystemView 生命周期由 _register_owned_subcontroller 统一清理
 # ==============================================================================
+## 邮件系统子面板委托控制器，负责分类页签、写信面板与邮件虚拟列表绑定。
 class_name MailSystemTabs
 extends BaseScreen
 
@@ -84,53 +88,57 @@ var mock_mails: Array = [
 	}
 ]
 
-func setup(view: BaseScreen) -> void:
-	_view = view
+## 绑定宿主邮件视图实例。
+func setup(host_view: BaseScreen) -> void:
+	_view = host_view
 
+## 初始化邮件系统主副面板全部静态文案与输入提示。
 func init_static_text() -> void:
-	var view: MailSystemView = _view
+	var mail_view: MailSystemView = _view
 	var bindings := [
-		[view.get_node_or_null("MainLayout/HeaderPanel/HeaderHBox/TitleLabel"), "ui.fe08.header.title"],
-		[view._btn_back, "ui.fe08.header.back"],
-		[view._btn_select_all, "ui.fe08.btn.select_all"],
-		[view._btn_batch_delete, "ui.fe08.btn.batch_delete"],
-		[view._btn_claim_all, "ui.fe08.btn.claim_all"],
-		[view.get_node_or_null("MainLayout/ContentSplit/RightPanel/RightTabContainer/邮件详情/AttachmentSection/LabelAttachmentTitle"), "ui.fe08.detail.attachment_title"],
-		[view._btn_claim_attachment, "ui.fe08.btn.claim_attachment"],
-		[view._btn_reply, "ui.fe08.btn.reply"],
-		[view._btn_delete_mail, "ui.fe08.btn.delete"],
-		[view.get_node_or_null("MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件/ComposeTitle"), "ui.fe08.compose.title"],
-		[view.get_node_or_null("MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件/RecipientRow/Label"), "ui.fe08.compose.recipient_label"],
-		[view.get_node_or_null("MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件/SubjectRow/Label"), "ui.fe08.compose.subject_label"],
-		[view.get_node_or_null("MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件/BodyLabel"), "ui.fe08.compose.body_label"],
-		[view._btn_add_attachment, "ui.fe08.btn.add_attachment"],
-		[view._btn_send, "ui.fe08.btn.send"],
-		[view._btn_save_draft, "ui.fe08.btn.save_draft"]
+		[mail_view.get_node_or_null("MainLayout/HeaderPanel/HeaderHBox/TitleLabel"), "ui.fe08.header.title"],
+		[mail_view._back_button, "ui.fe08.header.back"],
+		[mail_view._select_all_button, "ui.fe08.btn.select_all"],
+		[mail_view._batch_delete_button, "ui.fe08.btn.batch_delete"],
+		[mail_view._claim_all_button, "ui.fe08.btn.claim_all"],
+		[mail_view.get_node_or_null("MainLayout/ContentSplit/RightPanel/RightTabContainer/邮件详情/AttachmentSection/LabelAttachmentTitle"), "ui.fe08.detail.attachment_title"],
+		[mail_view._claim_attachment_button, "ui.fe08.btn.claim_attachment"],
+		[mail_view._reply_button, "ui.fe08.btn.reply"],
+		[mail_view._delete_mail_button, "ui.fe08.btn.delete"],
+		[mail_view.get_node_or_null("MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件/ComposeTitle"), "ui.fe08.compose.title"],
+		[mail_view.get_node_or_null("MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件/RecipientRow/Label"), "ui.fe08.compose.recipient_label"],
+		[mail_view.get_node_or_null("MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件/SubjectRow/Label"), "ui.fe08.compose.subject_label"],
+		[mail_view.get_node_or_null("MainLayout/ContentSplit/RightPanel/RightTabContainer/写邮件/BodyLabel"), "ui.fe08.compose.body_label"],
+		[mail_view._add_attachment_button, "ui.fe08.btn.add_attachment"],
+		[mail_view._send_button, "ui.fe08.btn.send"],
+		[mail_view._save_draft_button, "ui.fe08.btn.save_draft"]
 	]
-	for b in bindings:
-		if b[0] != null:
-			UIIntermediary.resolve(b[0], b[1])
+	for binding_entry in bindings:
+		if binding_entry[0] != null:
+			UIIntermediary.resolve(binding_entry[0], binding_entry[1])
 
-	if view._search_edit != null:
-		UIIntermediary.resolve_placeholder(view._search_edit, "ui.fe08.search.placeholder")
-	KTabBar.init_titles(view._right_tab_container, PackedStringArray(["ui.fe08.tab.detail", "ui.fe08.tab.compose"]))
-	if view._line_edit_recipient != null:
-		UIIntermediary.resolve_placeholder(view._line_edit_recipient, "ui.fe08.compose.recipient_ph")
-	if view._line_edit_subject != null:
-		UIIntermediary.resolve_placeholder(view._line_edit_subject, "ui.fe08.compose.subject_ph")
-	if view._text_edit_body != null:
-		view._text_edit_body.placeholder_text = UIIntermediary.text("ui.fe08.compose.body_ph")
+	if mail_view._search_edit != null:
+		UIIntermediary.resolve_placeholder(mail_view._search_edit, "ui.fe08.search.placeholder")
+	KTabBar.init_titles(mail_view._right_tab_container, PackedStringArray(["ui.fe08.tab.detail", "ui.fe08.tab.compose"]))
+	if mail_view._line_edit_recipient != null:
+		UIIntermediary.resolve_placeholder(mail_view._line_edit_recipient, "ui.fe08.compose.recipient_ph")
+	if mail_view._line_edit_subject != null:
+		UIIntermediary.resolve_placeholder(mail_view._line_edit_subject, "ui.fe08.compose.subject_ph")
+	if mail_view._text_edit_body != null:
+		mail_view._text_edit_body.placeholder_text = UIIntermediary.text("ui.fe08.compose.body_ph")
 
+## 初始化邮件分类页签栏（全部/系统/奖励/公会/玩家）。
 func setup_category_tabs() -> void:
-	var view: MailSystemView = _view
-	view._category_tab_bar.clear_tabs()
-	view._category_tab_bar.add_tab(UIIntermediary.text("ui.fe08.category.all"))
-	view._category_tab_bar.add_tab(UIIntermediary.text("ui.fe08.category.system"))
-	view._category_tab_bar.add_tab(UIIntermediary.text("ui.fe08.category.reward"))
-	view._category_tab_bar.add_tab(UIIntermediary.text("ui.fe08.category.guild"))
-	view._category_tab_bar.add_tab(UIIntermediary.text("ui.fe08.category.player"))
-	view._category_tab_bar.current_tab = 0
+	var mail_view: MailSystemView = _view
+	mail_view._category_tab_bar.clear_tabs()
+	mail_view._category_tab_bar.add_tab(UIIntermediary.text("ui.fe08.category.all"))
+	mail_view._category_tab_bar.add_tab(UIIntermediary.text("ui.fe08.category.system"))
+	mail_view._category_tab_bar.add_tab(UIIntermediary.text("ui.fe08.category.reward"))
+	mail_view._category_tab_bar.add_tab(UIIntermediary.text("ui.fe08.category.guild"))
+	mail_view._category_tab_bar.add_tab(UIIntermediary.text("ui.fe08.category.player"))
+	mail_view._category_tab_bar.current_tab = 0
 
+## 将分类页签索引映射为邮件分类编码字符串。
 func category_code(tab_index: int) -> String:
 	match tab_index:
 		1: return "SYSTEM"
@@ -139,44 +147,50 @@ func category_code(tab_index: int) -> String:
 		4: return "PLAYER"
 		_: return ""
 
+## 清空写信表单与待发送附件列表。
 func init_mail_compose() -> void:
-	var view: MailSystemView = _view
-	view._line_edit_recipient.text = ""
-	view._line_edit_subject.text = ""
-	view._text_edit_body.text = ""
-	clear_container_children(view._compose_attachment_list)
+	var mail_view: MailSystemView = _view
+	mail_view._line_edit_recipient.text = ""
+	mail_view._line_edit_subject.text = ""
+	mail_view._text_edit_body.text = ""
+	clear_container_children(mail_view._compose_attachment_list)
 
+## 释放指定容器节点的全部子控件。
 func clear_container_children(container: Node) -> void:
 	if container == null:
 		return
 	for child in container.get_children():
 		child.queue_free()
 
+## 处理回复按钮：根据当前选中邮件填充收件人与主题并切至写信页签。
 func on_reply() -> void:
-	var view: MailSystemView = _view
-	var filtered: Array = view._get_filtered_mails()
-	var idx: PackedInt32Array = view._mail_item_list.get_selected_items()
-	if idx.size() > 0 and idx[0] < filtered.size():
-		var mail: Dictionary = filtered[idx[0]]
-		view._line_edit_recipient.text = UIIntermediary.text(str(mail.get("sender_key", "")))
-		view._line_edit_subject.text = UIIntermediary.text("ui.fe08.reply.subject_prefix", {"subject": UIIntermediary.text(str(mail.get("subject_key", "")))})
-		view._right_tab_container.current_tab = 1
+	var mail_view: MailSystemView = _view
+	var filtered_mails: Array = mail_view._get_filtered_mails()
+	var selected_indices: PackedInt32Array = mail_view._mail_item_list.get_selected_items()
+	if selected_indices.size() > 0 and selected_indices[0] < filtered_mails.size():
+		var mail_entry: Dictionary = filtered_mails[selected_indices[0]]
+		mail_view._line_edit_recipient.text = UIIntermediary.text(str(mail_entry.get("sender_key", "")))
+		mail_view._line_edit_subject.text = UIIntermediary.text("ui.fe08.reply.subject_prefix", {"subject": UIIntermediary.text(str(mail_entry.get("subject_key", "")))})
+		mail_view._right_tab_container.current_tab = 1
 
+## 处理添加附件按钮：向写信附件区追加展示标签。
 func on_add_attachment() -> void:
-	var view: MailSystemView = _view
-	var lbl := Label.new()
-	lbl.text = UIIntermediary.text("ui.fe08.compose.attachment_item", {"count": view._compose_attachment_list.get_child_count() + 1})
-	view._compose_attachment_list.add_child(lbl)
+	var mail_view: MailSystemView = _view
+	var attachment_label := Label.new()
+	attachment_label.text = UIIntermediary.text("ui.fe08.compose.attachment_item", {"count": mail_view._compose_attachment_list.get_child_count() + 1})
+	mail_view._compose_attachment_list.add_child(attachment_label)
 
+## 处理发送按钮：校验非空收件人与主题后重置写信面板并切回详情页。
 func on_send() -> void:
-	var view: MailSystemView = _view
-	var recipient: String = view._line_edit_recipient.text.strip_edges()
-	var subject: String = view._line_edit_subject.text.strip_edges()
+	var mail_view: MailSystemView = _view
+	var recipient: String = mail_view._line_edit_recipient.text.strip_edges()
+	var subject: String = mail_view._line_edit_subject.text.strip_edges()
 	if recipient.is_empty() or subject.is_empty():
 		return
 	init_mail_compose()
-	view._right_tab_container.current_tab = 0
+	mail_view._right_tab_container.current_tab = 0
 
+## 响应保存草稿按钮点击事件。
 func on_save_draft() -> void:
 	pass
 
@@ -193,23 +207,23 @@ func init_virtual_list(container: Control = null) -> KVirtualList:
 	return virtual_list
 
 ## 刷新虚拟列表总数
-func sync_virtual_list(count: int) -> void:
+func sync_virtual_list(total_count: int) -> void:
 	if virtual_list == null:
 		init_virtual_list()
-	virtual_list.set_total_count(count)
+	virtual_list.set_total_count(total_count)
 
-func _on_virtual_range_changed(start_idx: int, end_idx: int) -> void:
-	if _view == null or virtual_list == null or start_idx < 0:
+func _on_virtual_range_changed(start_index: int, end_index: int) -> void:
+	if _view == null or virtual_list == null or start_index < 0:
 		return
-	var filtered: Array = _view._get_filtered_mails()
-	for i in range(start_idx, end_idx + 1):
-		if i < filtered.size():
-			var row: Control = virtual_list.acquire_row_for_index(i)
-			var mail: Dictionary = filtered[i]
+	var filtered_mails: Array = _view._get_filtered_mails()
+	for mail_index in range(start_index, end_index + 1):
+		if mail_index < filtered_mails.size():
+			var row: Control = virtual_list.acquire_row_for_index(mail_index)
+			var mail_entry: Dictionary = filtered_mails[mail_index]
 			if row is KVirtualList.KVirtualRow:
-				var vrow := row as KVirtualList.KVirtualRow
-				vrow.bound_key = str(mail.get("mail_id", ""))
-				vrow.bound_data = mail
+				var virtual_row := row as KVirtualList.KVirtualRow
+				virtual_row.bound_key = str(mail_entry.get("mail_id", ""))
+				virtual_row.bound_data = mail_entry
 
 ## 统一页面标题栏构建
 func create_page_header(title_key: String) -> KPageHeader:
@@ -217,8 +231,8 @@ func create_page_header(title_key: String) -> KPageHeader:
 	return page_header
 
 ## 统一分栏面板构建
-func create_split_panel(ratio: float = 0.4) -> KSplitPanel:
-	split_panel = _ensure_split_panel(split_panel, KSplitPanelClass, ratio) as KSplitPanel
+func create_split_panel(split_ratio: float = 0.4) -> KSplitPanel:
+	split_panel = _ensure_split_panel(split_panel, KSplitPanelClass, split_ratio) as KSplitPanel
 	return split_panel
 
 ## 统一定制搜索框构建 (300ms 防抖)
