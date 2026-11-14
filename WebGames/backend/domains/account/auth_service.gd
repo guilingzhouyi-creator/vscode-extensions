@@ -188,18 +188,18 @@ static func authenticate_local(username: String, password_plain: String, account
 		return {"success": false, "code": fingerprint_mismatch_code, "token": ""}
 	# 口令校验：默认按配置盐哈希；若历史账号为无盐版本 (salt_version == 0) 则平滑迁移重铸
 	var input_hash := hash_password(password_plain)
-	var rehashed := false
+	var is_rehashed := false
 	if account.username == username and not account.is_guest_mode and account.salt_version == 0:
 		if CryptoIntegrityLib.constant_time_equals(account.password_hash_sha256, password_plain.sha256_text()):
 			account.password_hash_sha256 = input_hash
 			account.salt_version = 1
-			rehashed = true
+			is_rehashed = true
 			var repository := AccountRepository.get_instance()
 			if repository.has_account(account.account_id):
 				repository.save_account(account)
 
-	var matched := account.username == username and (account.is_guest_mode or CryptoIntegrityLib.constant_time_equals(account.password_hash_sha256, input_hash))
-	if matched:
+	var is_matched := account.username == username and (account.is_guest_mode or CryptoIntegrityLib.constant_time_equals(account.password_hash_sha256, input_hash))
+	if is_matched:
 		account.last_login_timestamp_utc = int(Time.get_unix_time_from_system())
 		if not device_fingerprint.is_empty():
 			account.local_device_fingerprint = device_fingerprint
@@ -210,9 +210,9 @@ static func authenticate_local(username: String, password_plain: String, account
 		var token := (token_prefix + account.account_id + "_" + str(Time.get_ticks_usec())).sha256_text()
 		var issued_at := account.last_login_timestamp_utc
 		var session_ttl_seconds := maxi(1, GameConfig.get_int("infrastructure.admin", "session/ttl_seconds", GameConfig.get_int(DOMAIN_ACCOUNT_CONFIG, "auth/session/ttl_seconds", 86400)))
-		var mask_enabled := GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "auth/session/mask_in_memory_tokens", true)
+		var is_mask_enabled := GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "auth/session/mask_in_memory_tokens", true)
 		var mask_seed := ClientSecretVault.derive_key_seed(account.account_id)
-		var masked_bytes: PackedByteArray = ClientSecretVault.mask_in_memory_token(token, mask_seed) if mask_enabled else PackedByteArray()
+		var masked_bytes: PackedByteArray = ClientSecretVault.mask_in_memory_token(token, mask_seed) if is_mask_enabled else PackedByteArray()
 		var prefix_length := maxi(4, GameConfig.get_int(DOMAIN_ACCOUNT_CONFIG, "auth/home_view/mask_visible_prefix_len", 8))
 		_sessions[token.sha256_text()] = {
 			"account_id": account.account_id,
@@ -224,9 +224,9 @@ static func authenticate_local(username: String, password_plain: String, account
 			"token_prefix": token.substr(0, mini(prefix_length, token.length())),
 			"revoked": false
 		}
-		var ok_code := GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/ok", "OK")
+		var success_code := GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/ok", "OK")
 		_prune_sessions(issued_at) # 签发后收敛会话容器（过期优先清理）
-		var auto_enter := GameConfig.get_bool("domains.world_gateway", "gateway_policy/auto_enter_gateway_on_login", true)
+		var should_auto_enter := GameConfig.get_bool("domains.world_gateway", "gateway_policy/auto_enter_gateway_on_login", true)
 		var post_login_hooks: Array = GameConfig.get_array(DOMAIN_ACCOUNT_CONFIG, "auth/hooks/post_login", [])
 
 		# 统一 EventBus 广播鉴权登录成功（token_prefix 脱敏 Inv-HDS-4）
@@ -236,14 +236,14 @@ static func authenticate_local(username: String, password_plain: String, account
 			"token_prefix": token.substr(0, mini(8, token.length())),
 			"issued_at": issued_at,
 			"expires_at": issued_at + session_ttl_seconds,
-			"auto_enter_gateway": auto_enter,
+			"auto_enter_gateway": should_auto_enter,
 			"configured_hooks": post_login_hooks,
 			"category_key": "auth",
 			"args": [account.username]
 		})
-		_dispatch_auth_hooks("post_login", {"account_id": account.account_id, "username": account.username, "token": token, "auto_enter_gateway": auto_enter})
+		_dispatch_auth_hooks("post_login", {"account_id": account.account_id, "username": account.username, "token": token, "auto_enter_gateway": should_auto_enter})
 
-		return {"success": true, "code": ok_code, "token": token, "account_id": account.account_id, "username": account.username, "issued_at": issued_at, "expires_at": issued_at + session_ttl_seconds, "rehashed": rehashed, "auto_enter_gateway": auto_enter}
+		return {"success": true, "code": success_code, "token": token, "account_id": account.account_id, "username": account.username, "issued_at": issued_at, "expires_at": issued_at + session_ttl_seconds, "rehashed": is_rehashed, "auto_enter_gateway": should_auto_enter}
 	var invalid_credentials_code := GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/invalid_credentials", "ERR_INVALID_CREDENTIALS")
 	return {"success": false, "code": invalid_credentials_code, "token": ""}
 
@@ -342,8 +342,8 @@ static func validate_token(token: String, account_id: String = "", device_finger
 		return {"success": false, "error_code": "TOKEN_EXPIRED"}
 	if not account_id.is_empty() and account_id != str(session.get("account_id", "")):
 		return {"success": false, "error_code": "TOKEN_ACCOUNT_MISMATCH"}
-	var bind_device := GameConfig.get_bool("infrastructure.admin", "session/bind_device", GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "auth/session/bind_device", true))
-	if bind_device and not device_fingerprint.is_empty() and device_fingerprint != str(session.get("device_fingerprint", "")):
+	var should_bind_device := GameConfig.get_bool("infrastructure.admin", "session/bind_device", GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "auth/session/bind_device", true))
+	if should_bind_device and not device_fingerprint.is_empty() and device_fingerprint != str(session.get("device_fingerprint", "")):
 		return {"success": false, "error_code": "DEVICE_MISMATCH"}
 	return {"success": true, "account_id": session.get("account_id", ""), "issued_at": session.get("issued_at", 0), "expires_at": session.get("expires_at", 0), "state": "ACTIVE"}
 
@@ -360,12 +360,12 @@ static func revoke_token(token: String) -> bool:
 	session["revoked"] = true
 	session["token_masked"] = PackedByteArray()
 	_sessions[key] = session
-	var user_ident: String = String(session.get("username", session.get("account_id", "")))
+	var user_identifier: String = String(session.get("username", session.get("account_id", "")))
 	EventBusCore.get_instance().emit_domain_event(HudEventContract.channel_auth_session_revoked(), {
 		"account_id": session.get("account_id", ""),
 		"username": session.get("username", ""),
 		"category_key": "auth",
-		"args": [user_ident]
+		"args": [user_identifier]
 	})
 	return true
 
@@ -383,7 +383,7 @@ static func get_session_masked_metadata(token: String) -> Dictionary:
 		return {}
 	var session: Dictionary = _sessions[token.sha256_text()]
 	var masked: Variant = session.get("token_masked", PackedByteArray())
-	var has_masked: bool = (masked is PackedByteArray and not (masked as PackedByteArray).is_empty())
+	var has_masked_token: bool = (masked is PackedByteArray and not (masked as PackedByteArray).is_empty())
 	return {
 		"account_id": String(session.get("account_id", "")),
 		"username": String(session.get("username", "")),
@@ -391,7 +391,7 @@ static func get_session_masked_metadata(token: String) -> Dictionary:
 		"issued_at": int(session.get("issued_at", 0)),
 		"expires_at": int(session.get("expires_at", 0)),
 		"revoked": bool(session.get("revoked", false)),
-		"has_masked_token": has_masked
+		"has_masked_token": has_masked_token
 	}
 
 ## 标准注销会话（校验账号归属并撤销凭据）
@@ -403,16 +403,16 @@ static func logout_session(token: String, account_id: String = "") -> Dictionary
 		return {"success": false, "error_code": String(token_validation.get("error_code", GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/session_revoked", "ERR_SESSION_REVOKED"))), "account_id": String(token_validation.get("account_id", ""))}
 	var resolved_account := String(token_validation.get("account_id", ""))
 	var session_metadata := get_session_masked_metadata(token)
-	var revoked := revoke_token(token)
+	var is_revoked := revoke_token(token)
 	return {
-		"success": revoked,
-		"error_code": GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/ok", "OK") if revoked else GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/session_revoked", "ERR_SESSION_REVOKED"),
+		"success": is_revoked,
+		"error_code": GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/ok", "OK") if is_revoked else GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/session_revoked", "ERR_SESSION_REVOKED"),
 		"account_id": resolved_account,
 		"token_prefix": String(session_metadata.get("token_prefix", ""))
 	}
 
 ## 注册并按需自动建立受保护登录会话
-static func register_and_login(request: AccountRegistrationDTO.Request, auto_login: bool = true, account_store: Dictionary = {}) -> Dictionary:
+static func register_and_login(request: AccountRegistrationDTO.Request, should_auto_login: bool = true, account_store: Dictionary = {}) -> Dictionary:
 	var register_response := register_account(request, account_store)
 	if not register_response.success:
 		return {
@@ -422,7 +422,7 @@ static func register_and_login(request: AccountRegistrationDTO.Request, auto_log
 			"username": "",
 			"session_token": ""
 		}
-	var should_login := auto_login or GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "auth/session/auto_login_on_register", false)
+	var should_login := should_auto_login or GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "auth/session/auto_login_on_register", false)
 	if not should_login:
 		return {
 			"success": true,

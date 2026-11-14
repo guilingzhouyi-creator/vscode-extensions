@@ -45,10 +45,10 @@ class Request extends BaseRegistrationDTO.Request:
 		return payload
 
 	## 从输入字典反序列化还原传输对象
-	static func from_dto(data: Dictionary) -> Request:
+	static func from_dto(serialized_payload: Dictionary) -> Request:
 		var request := Request.new()
-		BaseRegistrationDTO.Request.populate_from_dict(request, data)
-		request.action_mode = str(data.get("action_mode", MODE_AUTO))
+		BaseRegistrationDTO.Request.populate_from_dict(request, serialized_payload)
+		request.action_mode = str(serialized_payload.get("action_mode", MODE_AUTO))
 		return request
 
 ## 复合鉴权响应载荷（继承基础注册响应字段，扩展会话与世界槽位摘要）
@@ -70,33 +70,33 @@ class Response extends BaseRegistrationDTO.Response:
 
 	## 序列化当前对象为通用字典传输结构
 	func to_dto() -> Dictionary:
-		var slot_dicts: Dictionary = {}
+		var serialized_slots: Dictionary = {}
 		for slot_key in save_slot_summaries.keys():
-			var item: Variant = save_slot_summaries[slot_key]
-			if item is SaveSlotDTO:
-				slot_dicts[slot_key] = (item as SaveSlotDTO).serialize()
-			elif item is Dictionary:
-				slot_dicts[slot_key] = item
+			var slot_entry: Variant = save_slot_summaries[slot_key]
+			if slot_entry is SaveSlotDTO:
+				serialized_slots[slot_key] = (slot_entry as SaveSlotDTO).serialize()
+			elif slot_entry is Dictionary:
+				serialized_slots[slot_key] = slot_entry
 		var payload: Dictionary = super.to_dto()
 		payload["session_token"] = session_token
 		payload["is_new_registration"] = is_new_registration
 		payload["last_login_timestamp_utc"] = last_login_timestamp_utc
-		payload["save_slot_summaries"] = slot_dicts
+		payload["save_slot_summaries"] = serialized_slots
 		payload["world_state_ref"] = world_state_ref
 		return payload
 
 	## 从输入字典反序列化还原传输对象
-	static func from_dto(data: Dictionary) -> Response:
+	static func from_dto(serialized_payload: Dictionary) -> Response:
 		var response := Response.new()
-		BaseRegistrationDTO.Response.populate_from_dict(response, data)
-		response.session_token = str(data.get("session_token", ""))
-		response.is_new_registration = bool(data.get("is_new_registration", false))
-		response.last_login_timestamp_utc = int(data.get("last_login_timestamp_utc", 0))
-		response.world_state_ref = str(data.get("world_state_ref", ""))
-		var raw_slots: Variant = data.get("save_slot_summaries", {})
+		BaseRegistrationDTO.Response.populate_from_dict(response, serialized_payload)
+		response.session_token = str(serialized_payload.get("session_token", ""))
+		response.is_new_registration = bool(serialized_payload.get("is_new_registration", false))
+		response.last_login_timestamp_utc = int(serialized_payload.get("last_login_timestamp_utc", 0))
+		response.world_state_ref = str(serialized_payload.get("world_state_ref", ""))
+		var raw_slots: Variant = serialized_payload.get("save_slot_summaries", {})
 		if raw_slots is Dictionary:
 			for slot_key in (raw_slots as Dictionary).keys():
-				var slot_data: Variant = (raw_slots as Dictionary)[slot_key]
-				if slot_data is Dictionary:
-					response.save_slot_summaries[slot_key] = SaveSlotDTO.deserialize(slot_data)
+				var slot_payload: Variant = (raw_slots as Dictionary)[slot_key]
+				if slot_payload is Dictionary:
+					response.save_slot_summaries[slot_key] = SaveSlotDTO.deserialize(slot_payload)
 		return response

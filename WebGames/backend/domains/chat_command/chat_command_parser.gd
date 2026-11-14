@@ -20,30 +20,30 @@ class CommandAST extends RefCounted:
 
 ## 指令行解析：斜杠前缀判定 → 分词 → 位置/命名参数类型推导（CommandAST）
 static func parse_input_line(input_text: String) -> CommandAST:
-	var ast := CommandAST.new()
-	ast.raw_text = input_text
+	var command_ast := CommandAST.new()
+	command_ast.raw_text = input_text
 	var trimmed: String = input_text.strip_edges()
 
 	if not trimmed.begins_with("/"):
-		ast.is_command = false
-		return ast
+		command_ast.is_command = false
+		return command_ast
 
-	ast.is_command = true
+	command_ast.is_command = true
 	var tokens: PackedStringArray = trimmed.substr(1).split(" ", false)
 	if tokens.is_empty():
-		return ast
+		return command_ast
 
-	ast.command_name = tokens[0].to_lower()
+	command_ast.command_name = tokens[0].to_lower()
 	for token_index in range(1, tokens.size()):
 		var token: Variant = tokens[token_index]
 		if token.contains("="):
 			var key_value_parts: PackedStringArray = token.split("=", false, 1)
 			if key_value_parts.size() == 2:
-				ast.named_arguments[key_value_parts[0]] = _infer_token_type(key_value_parts[1])
+				command_ast.named_arguments[key_value_parts[0]] = _infer_token_type(key_value_parts[1])
 		else:
-			ast.raw_arguments.append(_infer_token_type(token))
+			command_ast.raw_arguments.append(_infer_token_type(token))
 
-	return ast
+	return command_ast
 
 ## 参数类型推导：int/float/bool 逐级试探，默认回退字符串
 static func _infer_token_type(token: String) -> Variant:

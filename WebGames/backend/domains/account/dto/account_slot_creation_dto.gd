@@ -20,14 +20,14 @@ var allow_default_fallback: bool = true
 var provision_disk: bool = false
 var race: String = ""
 
-func _init(init_params: Dictionary = {}) -> void:
-	if init_params.is_empty():
+func _init(initial_parameters: Dictionary = {}) -> void:
+	if initial_parameters.is_empty():
 		return
-	account = init_params.get("account", null)
-	slot_id = str(init_params.get("slot_id", ""))
-	character_name = str(init_params.get("character_name", ""))
-	title_prefix = str(init_params.get("title_prefix", ""))
-	is_permadeath = bool(init_params.get("is_permadeath", false))
-	allow_default_fallback = bool(init_params.get("allow_default_fallback", true))
-	provision_disk = bool(init_params.get("provision_disk", false))
-	race = str(init_params.get("race", ""))
+	account = initial_parameters.get("account", null)
+	slot_id = str(initial_parameters.get("slot_id", ""))
+	character_name = str(initial_parameters.get("character_name", ""))
+	title_prefix = str(initial_parameters.get("title_prefix", ""))
+	is_permadeath = bool(initial_parameters.get("is_permadeath", false))
+	allow_default_fallback = bool(initial_parameters.get("allow_default_fallback", true))
+	provision_disk = bool(initial_parameters.get("provision_disk", false))
+	race = str(initial_parameters.get("race", ""))

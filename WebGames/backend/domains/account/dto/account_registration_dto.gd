@@ -37,21 +37,21 @@ class Request extends PoolableDtoBase:
 		}
 
 	## 从输入字典填充注册请求基础字段（供子类复用，避免重复解析逻辑）
-	static func populate_from_dict(request: Request, data: Dictionary) -> void:
+	static func populate_from_dict(request: Request, serialized_payload: Dictionary) -> void:
 		if request == null:
 			return
-		request.username = str(data.get("username", "")).strip_edges()
-		request.password_plain = str(data.get("password_plain", ""))
-		request.device_fingerprint = str(data.get("device_fingerprint", ""))
-		var raw_entitlements: Variant = data.get("initial_entitlements", [])
+		request.username = str(serialized_payload.get("username", "")).strip_edges()
+		request.password_plain = str(serialized_payload.get("password_plain", ""))
+		request.device_fingerprint = str(serialized_payload.get("device_fingerprint", ""))
+		var raw_entitlements: Variant = serialized_payload.get("initial_entitlements", [])
 		if raw_entitlements is Array:
-			for item in (raw_entitlements as Array):
-				request.initial_entitlements.append(str(item))
+			for entitlement_entry in (raw_entitlements as Array):
+				request.initial_entitlements.append(str(entitlement_entry))
 
 	## 从输入字典反序列化还原传输对象
-	static func from_dto(data: Dictionary) -> Request:
+	static func from_dto(serialized_payload: Dictionary) -> Request:
 		var request := Request.new()
-		populate_from_dict(request, data)
+		populate_from_dict(request, serialized_payload)
 		return request
 
 ## 注册响应载荷（仅身份信息，无任何口令/哈希痕迹）
@@ -88,17 +88,17 @@ class Response extends PoolableDtoBase:
 		}
 
 	## 从输入字典填充响应基础字段（供子类复用，避免重复反序列化）
-	static func populate_from_dict(response: Response, data: Dictionary) -> void:
+	static func populate_from_dict(response: Response, serialized_payload: Dictionary) -> void:
 		if response == null:
 			return
-		response.success = bool(data.get("success", false))
-		response.error_code = str(data.get("error_code", "OK"))
-		response.account_id = str(data.get("account_id", ""))
-		response.username = str(data.get("username", ""))
-		response.created_timestamp_utc = int(data.get("created_timestamp_utc", 0))
+		response.success = bool(serialized_payload.get("success", false))
+		response.error_code = str(serialized_payload.get("error_code", "OK"))
+		response.account_id = str(serialized_payload.get("account_id", ""))
+		response.username = str(serialized_payload.get("username", ""))
+		response.created_timestamp_utc = int(serialized_payload.get("created_timestamp_utc", 0))
 
 	## 从输入字典反序列化还原传输对象
-	static func from_dto(data: Dictionary) -> Response:
+	static func from_dto(serialized_payload: Dictionary) -> Response:
 		var response := Response.new()
-		populate_from_dict(response, data)
+		populate_from_dict(response, serialized_payload)
 		return response

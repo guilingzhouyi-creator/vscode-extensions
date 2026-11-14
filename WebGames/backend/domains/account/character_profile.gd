@@ -83,16 +83,16 @@ func serialize() -> Dictionary:
 	}
 
 ## 从字典反序列化角色档案（缺省字段回退空字典）
-static func deserialize(data: Dictionary) -> CharacterProfile:
+static func deserialize(serialized_payload: Dictionary) -> CharacterProfile:
 	var profile := CharacterProfile.new()
-	profile.character_id = data.get("character_id", "")
-	profile.character_name = data.get("character_name", "")
-	profile.attributes = data.get("attributes", {})
-	profile.growth_state = data.get("growth_state", {})
-	profile.inventory = data.get("inventory", {})
-	profile.equipment = data.get("equipment", {})
-	profile.personal_resources = data.get("personal_resources", {})
-	profile.personal_quest_progress = data.get("personal_quest_progress", {})
-	profile.relationship_state = data.get("relationship_state", {})
-	profile.character_exclusive_progress = data.get("character_exclusive_progress", {})
+	profile.character_id = serialized_payload.get("character_id", "")
+	profile.character_name = serialized_payload.get("character_name", "")
+	profile.attributes = serialized_payload.get("attributes", {})
+	profile.growth_state = serialized_payload.get("growth_state", {})
+	profile.inventory = serialized_payload.get("inventory", {})
+	profile.equipment = serialized_payload.get("equipment", {})
+	profile.personal_resources = serialized_payload.get("personal_resources", {})
+	profile.personal_quest_progress = serialized_payload.get("personal_quest_progress", {})
+	profile.relationship_state = serialized_payload.get("relationship_state", {})
+	profile.character_exclusive_progress = serialized_payload.get("character_exclusive_progress", {})
 	return profile

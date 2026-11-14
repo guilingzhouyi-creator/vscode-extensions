@@ -26,11 +26,11 @@ static func handle_character_death(account: AccountProfile, slot_id: String, wor
 		return {"success": false, "error_code": "ALREADY_FALLEN", "slot_id": slot_id}
 
 	# 1. 精确清理角色本体子集（白名单，禁删全档）
-	var cleared: Array[String] = []
+	var cleared_keys: Array[String] = []
 	for owned_key in CharacterProfile.CHARACTER_OWNED_KEYS:
 		if slot_summary.has_character_payload(owned_key):
 			slot_summary.clear_character_payload(owned_key)
-			cleared.append(owned_key)
+			cleared_keys.append(owned_key)
 	slot_summary.is_fallen = true
 	slot_summary.last_saved_time_utc = int(Time.get_unix_time_from_system())
 
@@ -41,8 +41,8 @@ static func handle_character_death(account: AccountProfile, slot_id: String, wor
 		world.append_history_fragment({"source": slot_summary.character_name, "slot_id": slot_id, "event": "character_death"})
 		world_time_after = world.world_time.duplicate()
 
-	EventBusCore.get_instance().emit_domain_event("character.death", {"args": [slot_id], "summary": {"cleared_keys": cleared, "world_tick": world_time_after.get("tick", 0)}})
-	return {"success": true, "cleared_keys": cleared, "is_fallen": true, "slot_reusable": true, "world_time": world_time_after}
+	EventBusCore.get_instance().emit_domain_event("character.death", {"args": [slot_id], "summary": {"cleared_keys": cleared_keys, "world_tick": world_time_after.get("tick", 0)}})
+	return {"success": true, "cleared_keys": cleared_keys, "is_fallen": true, "slot_reusable": true, "world_time": world_time_after}
 
 # ==============================================================================
 # 二、新角色重挂载

@@ -42,12 +42,12 @@ static func build_account_home_view_model(session_token: String = "", locale: St
 			"world_state_ref": account.world_state_ref,
 			"slot_count": account.save_slot_summaries.size()
 		})
-	var session_active := false
+	var is_session_active := false
 	var current_summary: Dictionary = {}
 	if not session_token.is_empty():
 		var token_validation := AuthService.validate_token(session_token)
 		if bool(token_validation.get("success", false)):
-			session_active = true
+			is_session_active = true
 			var active_id := String(token_validation.get("account_id", ""))
 			var active_account := repository.find_by_id(active_id)
 			var session_metadata := AuthService.get_session_masked_metadata(session_token)
@@ -59,10 +59,10 @@ static func build_account_home_view_model(session_token: String = "", locale: St
 				"slot_count": active_account.save_slot_summaries.size() if active_account != null else 0
 			}
 	return {
-		"session_active": session_active,
+		"session_active": is_session_active,
 		"current_account_summary": current_summary,
 		"known_accounts": known_accounts,
 		"known_account_count": known_accounts.size(),
-		"gateway_ready": session_active,
+		"gateway_ready": is_session_active,
 		"locale": effective_locale
 	}

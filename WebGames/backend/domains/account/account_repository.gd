@@ -72,10 +72,10 @@ func get_registry_file_path() -> String:
 
 ## 获取分片文件物理路径
 func get_account_shard_path(account_id: String) -> String:
-	var base_dir: String = get_registry_file_path().get_base_dir()
-	if not base_dir.ends_with("/"):
-		base_dir += "/"
-	return base_dir + account_id + ".json"
+	var base_directory: String = get_registry_file_path().get_base_dir()
+	if not base_directory.ends_with("/"):
+		base_directory += "/"
+	return base_directory + account_id + ".json"
 
 # ==============================================================================
 # 三、查询与索引检索契约
@@ -136,17 +136,17 @@ func load_all() -> Dictionary:
 	_username_index.clear()
 
 	var file_path := get_registry_file_path()
-	var accounts_dir := file_path.get_base_dir()
-	AtomicFileWriter.ensure_directory(accounts_dir)
-	_cleanup_orphan_tmp_files(accounts_dir)
+	var accounts_directory := file_path.get_base_dir()
+	AtomicFileWriter.ensure_directory(accounts_directory)
+	_cleanup_orphan_tmp_files(accounts_directory)
 
 	if not FileAccess.file_exists(file_path):
 		var backup_path := file_path + _get_backup_suffix()
 		if FileAccess.file_exists(backup_path):
-			var restored := AtomicFileWriter.restore_from_backup(file_path, backup_path)
-			if restored:
+			var is_restored := AtomicFileWriter.restore_from_backup(file_path, backup_path)
+			if is_restored:
 				return _load_from_file(file_path)
-		var shard_count := _recover_from_shards(accounts_dir)
+		var shard_count := _recover_from_shards(accounts_directory)
 		if shard_count > 0:
 			_save_registry_internal()
 			return {"success": true, "count": shard_count, "error": "", "recovered_from": "shards"}
@@ -160,13 +160,13 @@ func load_all() -> Dictionary:
 	if _auto_restore_enabled():
 		var backup_path := file_path + _get_backup_suffix()
 		if FileAccess.file_exists(backup_path):
-			var restored := AtomicFileWriter.restore_from_backup(file_path, backup_path)
-			if restored:
+			var is_restored := AtomicFileWriter.restore_from_backup(file_path, backup_path)
+			if is_restored:
 				var retry_result := _load_from_file(file_path)
 				if bool(retry_result.get("success", false)):
 					retry_result["auto_restored"] = true
 					return retry_result
-		var shard_count := _recover_from_shards(accounts_dir)
+		var shard_count := _recover_from_shards(accounts_directory)
 		if shard_count > 0:
 			_save_registry_internal()
 			return {"success": true, "count": shard_count, "error": "", "recovered_from": "shards"}
@@ -189,14 +189,14 @@ func _load_from_file(file_path: String) -> Dictionary:
 	if not parsed is Dictionary:
 		return {"success": false, "count": 0, "error": "INVALID_ROOT_CONTAINER"}
 
-	var root_dict: Dictionary = parsed
+	var root_dictionary: Dictionary = parsed
 	var raw_accounts: Dictionary = {}
-	if root_dict.has("accounts"):
-		var accounts_value: Variant = root_dict.get("accounts", null)
-		if accounts_value is Dictionary:
-			raw_accounts = accounts_value
+	if root_dictionary.has("accounts"):
+		var accounts_section: Variant = root_dictionary.get("accounts", null)
+		if accounts_section is Dictionary:
+			raw_accounts = accounts_section
 	else:
-		raw_accounts = root_dict
+		raw_accounts = root_dictionary
 
 	_accounts_cache.clear()
 	_username_index.clear()
@@ -206,31 +206,31 @@ func _load_from_file(file_path: String) -> Dictionary:
 
 	return {"success": true, "count": _accounts_cache.size(), "error": ""}
 
-func _register_raw_account(raw_item: Variant) -> void:
-	if not raw_item is Dictionary:
+func _register_raw_account(raw_account_payload: Variant) -> void:
+	if not raw_account_payload is Dictionary:
 		return
-	var account: AccountProfile = AccountProfile.deserialize(raw_item)
+	var account: AccountProfile = AccountProfile.deserialize(raw_account_payload)
 	if account == null or account.account_id.is_empty():
 		return
 	_accounts_cache[account.account_id] = account
 	if not account.username.is_empty():
 		_username_index[account.username.to_lower()] = account.account_id
 
-func _recover_from_shards(accounts_dir: String) -> int:
-	var dir_access := DirAccess.open(accounts_dir)
-	if dir_access == null:
+func _recover_from_shards(accounts_directory: String) -> int:
+	var directory_access := DirAccess.open(accounts_directory)
+	if directory_access == null:
 		return 0
 
 	var recovered := 0
-	dir_access.list_dir_begin()
-	var entry_name := dir_access.get_next()
+	directory_access.list_dir_begin()
+	var entry_name := directory_access.get_next()
 	while not entry_name.is_empty():
-		if not dir_access.current_is_dir() and entry_name.ends_with(".json") and not entry_name.begins_with("account_registry"):
-			var shard_file_path := accounts_dir + ("/" if not accounts_dir.ends_with("/") else "") + entry_name
+		if not directory_access.current_is_dir() and entry_name.ends_with(".json") and not entry_name.begins_with("account_registry"):
+			var shard_file_path := accounts_directory + ("/" if not accounts_directory.ends_with("/") else "") + entry_name
 			if _load_and_register_single_shard(shard_file_path):
 				recovered += 1
-		entry_name = dir_access.get_next()
-	dir_access.list_dir_end()
+		entry_name = directory_access.get_next()
+	directory_access.list_dir_end()
 	return recovered
 
 func _load_and_register_single_shard(shard_file_path: String) -> bool:
@@ -244,10 +244,10 @@ func _load_and_register_single_shard(shard_file_path: String) -> bool:
 	var json := JSON.new()
 	if json.parse(text) != OK:
 		return false
-	var data: Variant = json.get_data()
-	if not data is Dictionary:
+	var parsed_payload: Variant = json.get_data()
+	if not parsed_payload is Dictionary:
 		return false
-	var account: AccountProfile = AccountProfile.deserialize(data)
+	var account: AccountProfile = AccountProfile.deserialize(parsed_payload)
 	if account == null or account.account_id.is_empty():
 		return false
 	_accounts_cache[account.account_id] = account
@@ -279,14 +279,14 @@ func save_account(account: AccountProfile) -> Dictionary:
 
 	# 确保存档目录物理存在
 	var registry_path := get_registry_file_path()
-	var accounts_dir := registry_path.get_base_dir()
-	AtomicFileWriter.ensure_directory(accounts_dir)
+	var accounts_directory := registry_path.get_base_dir()
+	AtomicFileWriter.ensure_directory(accounts_directory)
 
 	# 1. 独立单账号分片原子落盘（若启用）
 	if _save_individual_shards_enabled():
 		var shard_path := get_account_shard_path(account.account_id)
-		var shard_dict := account.serialize()
-		var shard_json := JSON.stringify(shard_dict, "\t")
+		var shard_payload := account.serialize()
+		var shard_json := JSON.stringify(shard_payload, "\t")
 		var shard_write_result := _atomic_write_file(shard_path, shard_json)
 		if not bool(shard_write_result.get("success", false)):
 			return {"success": false, "error": "SHARD_WRITE_FAILED", "detail": shard_write_result.get("error", "")}
@@ -329,21 +329,21 @@ func delete_account(account_id: String) -> bool:
 
 func _save_registry_internal() -> Dictionary:
 	var registry_path := get_registry_file_path()
-	var accounts_dir := registry_path.get_base_dir()
-	AtomicFileWriter.ensure_directory(accounts_dir)
+	var accounts_directory := registry_path.get_base_dir()
+	AtomicFileWriter.ensure_directory(accounts_directory)
 
-	var accounts_dict := {}
+	var serialized_accounts := {}
 	for cached_account_id in _accounts_cache.keys():
 		var account: AccountProfile = _accounts_cache[cached_account_id]
 		if account != null:
-			accounts_dict[cached_account_id] = account.serialize()
+			serialized_accounts[cached_account_id] = account.serialize()
 
 	var envelope := {
 		"format_version": GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "storage/format_version", DEFAULT_FORMAT_VERSION),
 		"engine": "KalarWorldEngine_Godot4",
 		"updated_timestamp_utc": int(Time.get_unix_time_from_system()),
 		"account_count": _accounts_cache.size(),
-		"accounts": accounts_dict
+		"accounts": serialized_accounts
 	}
 
 	var json_text := JSON.stringify(envelope, "\t")
@@ -354,11 +354,11 @@ func _save_registry_internal() -> Dictionary:
 # ==============================================================================
 
 func _atomic_write_file(file_path: String, content: String) -> Dictionary:
-	var atomic_enabled: bool = _atomic_write_enabled()
+	var is_atomic_enabled: bool = _atomic_write_enabled()
 	var policy: String = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "storage/backup_fail_policy", "abort")
 	var retention: int = GameConfig.get_int(DOMAIN_ACCOUNT_CONFIG, "storage/backup_retention", DEFAULT_BACKUP_RETENTION)
 	var write_result: Dictionary = AtomicFileWriter.write_text_atomic(file_path, content, {
-		"atomic_enabled": atomic_enabled,
+		"atomic_enabled": is_atomic_enabled,
 		"tmp_suffix": _get_tmp_suffix(),
 		"create_backup": true,
 		"backup_suffix": _get_backup_suffix(),
@@ -369,7 +369,7 @@ func _atomic_write_file(file_path: String, content: String) -> Dictionary:
 		return {"success": true, "error": ""}
 	var stage: String = str(write_result.get("error_stage", ""))
 	var error_code: int = int(write_result.get("error_code", ERR_FILE_CANT_WRITE))
-	if not atomic_enabled:
+	if not is_atomic_enabled:
 		return {"success": false, "error": "DIRECT_WRITE_OPEN_FAILED"}
 	if stage == "tmp_open":
 		return {"success": false, "error": TemplateFormatter.format("TMP_OPEN_FAILED: {error}", {"error": str(error_code)})}
@@ -377,10 +377,10 @@ func _atomic_write_file(file_path: String, content: String) -> Dictionary:
 		return {"success": false, "error": TemplateFormatter.format("BACKUP_FAILED: {error}", {"error": error_code})}
 	return {"success": false, "error": TemplateFormatter.format("RENAME_FAILED: {error}", {"error": error_code})}
 
-func _cleanup_orphan_tmp_files(accounts_dir: String) -> void:
+func _cleanup_orphan_tmp_files(accounts_directory: String) -> void:
 	if not GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "storage/orphan_tmp_cleanup", true):
 		return
-	AtomicFileWriter.cleanup_orphan_tmp_files(accounts_dir, _get_tmp_suffix())
+	AtomicFileWriter.cleanup_orphan_tmp_files(accounts_directory, _get_tmp_suffix())
 
 func _atomic_write_enabled() -> bool:
 	return GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "storage/atomic_write", true)

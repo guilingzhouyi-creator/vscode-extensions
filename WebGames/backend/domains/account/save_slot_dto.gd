@@ -72,26 +72,26 @@ func serialize() -> Dictionary:
 	}
 
 ## 反序列化：缺键一律沿用字段初值（即 save_slot/defaults 配置缺省），默认值单点化于此
-static func deserialize(slot_dict: Dictionary) -> SaveSlotDTO:
-	var slot_dto := SaveSlotDTO.new()
-	slot_dto.slot_id = slot_dict.get("slot_id", slot_dto.slot_id)
-	slot_dto.character_name = slot_dict.get("character_name", slot_dto.character_name)
-	slot_dto.title_prefix = slot_dict.get("title_prefix", slot_dto.title_prefix)
-	slot_dto.profession_tier_name = slot_dict.get("profession_tier_name", slot_dto.profession_tier_name)
-	slot_dto.apparent_age = slot_dict.get("apparent_age", slot_dto.apparent_age)
-	slot_dto.current_location_name = slot_dict.get("current_location_name", slot_dto.current_location_name)
-	slot_dto.play_time_seconds = slot_dict.get("play_time_seconds", slot_dto.play_time_seconds)
-	slot_dto.is_permadeath_mode = slot_dict.get("is_permadeath_mode", slot_dto.is_permadeath_mode)
-	slot_dto.is_fallen = slot_dict.get("is_fallen", slot_dto.is_fallen)
-	slot_dto.last_saved_time_utc = slot_dict.get("last_saved_time_utc", slot_dto.last_saved_time_utc)
-	slot_dto.save_file_sha256 = slot_dict.get("save_file_sha256", slot_dto.save_file_sha256)
-	slot_dto.prologue_completed = bool(slot_dict.get("prologue_completed", slot_dto.prologue_completed))
-	slot_dto.world_slot_status = String(slot_dict.get("world_slot_status", slot_dto.world_slot_status))
-	slot_dto.world_id = String(slot_dict.get("world_id", slot_dto.world_id))
-	var raw_profile: Variant = slot_dict.get("character_profile", {})
+static func deserialize(slot_payload: Dictionary) -> SaveSlotDTO:
+	var slot_summary := SaveSlotDTO.new()
+	slot_summary.slot_id = slot_payload.get("slot_id", slot_summary.slot_id)
+	slot_summary.character_name = slot_payload.get("character_name", slot_summary.character_name)
+	slot_summary.title_prefix = slot_payload.get("title_prefix", slot_summary.title_prefix)
+	slot_summary.profession_tier_name = slot_payload.get("profession_tier_name", slot_summary.profession_tier_name)
+	slot_summary.apparent_age = slot_payload.get("apparent_age", slot_summary.apparent_age)
+	slot_summary.current_location_name = slot_payload.get("current_location_name", slot_summary.current_location_name)
+	slot_summary.play_time_seconds = slot_payload.get("play_time_seconds", slot_summary.play_time_seconds)
+	slot_summary.is_permadeath_mode = slot_payload.get("is_permadeath_mode", slot_summary.is_permadeath_mode)
+	slot_summary.is_fallen = slot_payload.get("is_fallen", slot_summary.is_fallen)
+	slot_summary.last_saved_time_utc = slot_payload.get("last_saved_time_utc", slot_summary.last_saved_time_utc)
+	slot_summary.save_file_sha256 = slot_payload.get("save_file_sha256", slot_summary.save_file_sha256)
+	slot_summary.prologue_completed = bool(slot_payload.get("prologue_completed", slot_summary.prologue_completed))
+	slot_summary.world_slot_status = String(slot_payload.get("world_slot_status", slot_summary.world_slot_status))
+	slot_summary.world_id = String(slot_payload.get("world_id", slot_summary.world_id))
+	var raw_profile: Variant = slot_payload.get("character_profile", {})
 	if raw_profile is Dictionary and not (raw_profile as Dictionary).is_empty():
-		slot_dto.character_profile = CharacterProfile.deserialize(raw_profile as Dictionary)
-	return slot_dto
+		slot_summary.character_profile = CharacterProfile.deserialize(raw_profile as Dictionary)
+	return slot_summary
 
 ## 对象池生命周期重置
 func reset_state() -> void:

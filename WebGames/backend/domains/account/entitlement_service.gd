@@ -24,17 +24,17 @@ static func has_entitlement(account: AccountProfile, entitlement: String) -> boo
 static func is_valid_entitlement(entitlement: String) -> bool:
 	if entitlement.is_empty():
 		return false
-	var allowed: Array = GameConfig.get_array("domains.account", "entitlements/allowed", [])
-	return allowed.is_empty() or allowed.has(entitlement)
+	var allowed_entitlements: Array = GameConfig.get_array("domains.account", "entitlements/allowed", [])
+	return allowed_entitlements.is_empty() or allowed_entitlements.has(entitlement)
 
 ## 白名单过滤：allowed 非空时仅保留已列出资格（空列表=放行全部，语义同 is_valid_entitlement）
 static func filter_allowed(entitlements: Array) -> Array:
-	var allowed: Array = GameConfig.get_array("domains.account", "entitlements/allowed", [])
-	if allowed.is_empty():
+	var allowed_entitlements: Array = GameConfig.get_array("domains.account", "entitlements/allowed", [])
+	if allowed_entitlements.is_empty():
 		return entitlements
 	var filtered_entitlements: Array = []
 	for entitlement in entitlements:
-		if allowed.has(entitlement):
+		if allowed_entitlements.has(entitlement):
 			filtered_entitlements.append(entitlement)
 	filtered_entitlements.sort()
 	return filtered_entitlements
@@ -81,8 +81,8 @@ static func seal_entitlements(account: AccountProfile) -> String:
 		ErrorReporter.emit_error(LogConstants.CHANNEL_ENTITLEMENT, "SEAL_KEY_MISSING", SystemBaseMessages.MSG_SEAL_KEY_MISSING)
 		return ""
 	var payload := _canonical_payload(account)
-	var mac_hex := CryptoIntegrityLib.hmac_sha256_hex(key, payload.to_utf8_buffer())
-	return "v2:%s:%s" % [_seal_key_id(), mac_hex]
+	var hmac_hex := CryptoIntegrityLib.hmac_sha256_hex(key, payload.to_utf8_buffer())
+	return "v2:%s:%s" % [_seal_key_id(), hmac_hex]
 
 ## 校验权限指纹是否被篡改（常量时间比对，防御时序侧信道攻击）
 static func verify_seal(account: AccountProfile, recorded_seal: String) -> bool:

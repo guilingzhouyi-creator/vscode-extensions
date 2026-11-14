@@ -37,8 +37,8 @@ static func create_character_in_slot(
 	character_name: String,
 	title_prefix: String = "",
 	is_permadeath: bool = false,
-	allow_default_fallback: bool = true,
-	provision_disk: bool = false
+	should_allow_default_fallback: bool = true,
+	should_provision_disk: bool = false
 ) -> Dictionary:
 	var creation_context := AccountSlotCreationDTO.new({
 		"account": account,
@@ -46,8 +46,8 @@ static func create_character_in_slot(
 		"character_name": character_name,
 		"title_prefix": title_prefix,
 		"is_permadeath": is_permadeath,
-		"allow_default_fallback": allow_default_fallback,
-		"provision_disk": provision_disk
+		"allow_default_fallback": should_allow_default_fallback,
+		"provision_disk": should_provision_disk
 	})
 	return _create_character_in_slot_internal(creation_context)
 
@@ -106,10 +106,10 @@ static func _can_bind_slot(account: AccountProfile, slot_id: String) -> bool:
 	# fallen 槽位可重挂：外层以全新 DTO 整体替换（零继承；不就地重置旧 DTO，无死代码）
 	return existing != null and existing.is_fallen
 
-static func _resolve_character_name(slot_id: String, raw_name: String, allow_default_fallback: bool) -> Dictionary:
-	var require_explicit_name := GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "save_slot/unwired_policy/require_explicit_character_name", false)
+static func _resolve_character_name(slot_id: String, raw_name: String, should_allow_default_fallback: bool) -> Dictionary:
+	var is_explicit_name_required := GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "save_slot/unwired_policy/require_explicit_character_name", false)
 	if raw_name.strip_edges().is_empty():
-		if not allow_default_fallback or require_explicit_name:
+		if not should_allow_default_fallback or is_explicit_name_required:
 			return {
 				"success": false,
 				"error_code": "PENDING_CHARACTER_NAME",
@@ -136,13 +136,13 @@ static func _provision_slot_disk_if_needed(
 	slot_id: String,
 	character_name: String,
 	slot_summary: SaveSlotDTO,
-	provision_disk: bool
+	should_provision_disk: bool
 ) -> Dictionary:
-	var should_provision := provision_disk or GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "save_slot/auto_provision_disk", false)
+	var should_provision := should_provision_disk or GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "save_slot/auto_provision_disk", false)
 	if not should_provision:
 		return {}
 	var template: Dictionary = GameConfig.get_dict(DOMAIN_ACCOUNT_CONFIG, "save_slot/provision_template", {"level": 1, "gold": 0})
-	var init_payload := {
+	var initial_payload := {
 		"version": 1,
 		"data": {
 			"character_info": {
@@ -154,7 +154,7 @@ static func _provision_slot_disk_if_needed(
 			}
 		}
 	}
-	var provision_result: Dictionary = SaveDataAccessLayer.save_game(slot_id, init_payload)
+	var provision_result: Dictionary = SaveDataAccessLayer.save_game(slot_id, initial_payload)
 	if bool(provision_result.get("success", false)):
 		slot_summary.save_file_sha256 = str(provision_result.get("sha256", ""))
 	return provision_result
@@ -164,28 +164,28 @@ static func _provision_slot_disk_if_needed(
 # ==============================================================================
 
 ## 快捷创建：优先重挂 fallen 槽位，无 fallen 再自动选空槽（鼠标点击空槽热区触发）
-static func quick_create_in_next_slot(account: AccountProfile, character_name: String, allow_default_fallback: bool = true, provision_disk: bool = false) -> Dictionary:
+static func quick_create_in_next_slot(account: AccountProfile, character_name: String, should_allow_default_fallback: bool = true, should_provision_disk: bool = false) -> Dictionary:
 	if account == null:
 		return {"success": false, "error_code": "INVALID_ACCOUNT"}
 	for slot_id in account.save_slot_summaries:
 		var slot_summary: SaveSlotDTO = account.save_slot_summaries[slot_id]
 		if slot_summary != null and slot_summary.is_fallen:
-			return create_character_in_slot(account, str(slot_id), character_name, "", false, allow_default_fallback, provision_disk)
+			return create_character_in_slot(account, str(slot_id), character_name, "", false, should_allow_default_fallback, should_provision_disk)
 	var next_id := account.get_next_available_slot_id()
 	if next_id.is_empty():
 		return {"success": false, "error_code": "NO_AVAILABLE_SLOT"}
-	return create_character_in_slot(account, next_id, character_name, "", false, allow_default_fallback, provision_disk)
+	return create_character_in_slot(account, next_id, character_name, "", false, should_allow_default_fallback, should_provision_disk)
 
 ## 账号世界引用沿用：未接线严格模式下显式保留 UNBOUND 哨兵，不静默绑定默认世界
-static func ensure_account_world_ref(account: AccountProfile, allow_default_fallback: bool = true) -> String:
+static func ensure_account_world_ref(account: AccountProfile, should_allow_default_fallback: bool = true) -> String:
 	if account == null:
 		return ""
-	var require_explicit_world := GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "save_slot/unwired_policy/require_explicit_world_ref", false)
+	var is_explicit_world_required := GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "save_slot/unwired_policy/require_explicit_world_ref", false)
 	var unbound_sentinel: String = GameConfig.get_string("infrastructure.lifecycle", "shutdown_hooks/unwired_slot_sentinel", "")
 	if unbound_sentinel.is_empty():
 		return ""
 	if account.world_state_ref.is_empty() or account.world_state_ref == unbound_sentinel:
-		if not allow_default_fallback or require_explicit_world:
+		if not should_allow_default_fallback or is_explicit_world_required:
 			account.world_state_ref = unbound_sentinel
 			return account.world_state_ref
 		var template: Dictionary = GameConfig.get_dict("domains.world", "default_template", {"world_id": "WORLD_DEFAULT"})
@@ -253,26 +253,26 @@ static func _to_frontend_slot_dict(slot_id: String, summary: SaveSlotDTO, is_occ
 			"town": "",
 			"empty": true
 		}
-	var race_value: String = "HUMAN"
-	var level_value: int = 1
+	var resolved_race: String = "HUMAN"
+	var resolved_level: int = 1
 	if summary.character_profile != null:
 		if summary.character_profile.growth_state.has("level"):
-			level_value = int(summary.character_profile.growth_state.get("level", 1))
+			resolved_level = int(summary.character_profile.growth_state.get("level", 1))
 		elif "level" in summary.character_profile:
-			level_value = int(summary.character_profile.get("level"))
+			resolved_level = int(summary.character_profile.get("level"))
 		if summary.character_profile.character_exclusive_progress.has("race"):
-			race_value = str(summary.character_profile.character_exclusive_progress.get("race"))
+			resolved_race = str(summary.character_profile.character_exclusive_progress.get("race"))
 		elif "race" in summary.character_profile:
-			race_value = str(summary.character_profile.get("race"))
-	var class_value: String = summary.profession_tier_name if not summary.profession_tier_name.is_empty() else "WARRIOR"
-	var town_value: String = summary.current_location_name if not summary.current_location_name.is_empty() else "TOWN_START"
+			resolved_race = str(summary.character_profile.get("race"))
+	var resolved_class: String = summary.profession_tier_name if not summary.profession_tier_name.is_empty() else "WARRIOR"
+	var resolved_town: String = summary.current_location_name if not summary.current_location_name.is_empty() else "TOWN_START"
 	return {
 		"slot_id": slot_id,
 		"name": summary.character_name,
-		"race": race_value,
-		"class": class_value,
-		"level": level_value,
-		"town": town_value,
+		"race": resolved_race,
+		"class": resolved_class,
+		"level": resolved_level,
+		"town": resolved_town,
 		"empty": false
 	}
 

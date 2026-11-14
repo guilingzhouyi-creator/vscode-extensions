@@ -100,10 +100,10 @@ func is_slot_occupied(slot_id: String) -> bool:
 	return save_slot_summaries.has(slot_id)
 
 ## 获取全量世界槽位状态
-func get_world_slots(deep_copy: bool = true) -> Dictionary:
+func get_world_slots(should_deep_copy: bool = true) -> Dictionary:
 	if world_slots.is_empty():
 		return {}
-	return world_slots.duplicate(deep_copy)
+	return world_slots.duplicate(should_deep_copy)
 
 ## 获取当前活跃世界槽位
 func get_active_world_slot() -> String:
@@ -115,8 +115,8 @@ func get_active_world_slot() -> String:
 func is_world_slot_placeholder(world_id: String) -> bool:
 	if world_id.is_empty() or not world_slots.has(world_id):
 		return true
-	var slot_value: String = str(world_slots.get(world_id, ""))
-	return slot_value == RESERVED_PLACEHOLDER or slot_value == UNBOUND_WORLD_SLOT
+	var slot_binding_state: String = str(world_slots.get(world_id, ""))
+	return slot_binding_state == RESERVED_PLACEHOLDER or slot_binding_state == UNBOUND_WORLD_SLOT
 
 ## 绑定世界槽位
 func bind_world_slot(world_id: String, slot_id: String) -> bool:
@@ -127,13 +127,13 @@ func bind_world_slot(world_id: String, slot_id: String) -> bool:
 
 ## 序列化账户聚合为字典（含槽位摘要序列化与权限密封 entitlements_seal）
 func serialize() -> Dictionary:
-	var slots_dict := {}
+	var serialized_slots := {}
 	for slot_key in save_slot_summaries:
-		var item: Variant = save_slot_summaries[slot_key]
-		if item is SaveSlotDTO:
-			slots_dict[slot_key] = item.serialize()
-		elif item is Dictionary:
-			slots_dict[slot_key] = item
+		var slot_entry: Variant = save_slot_summaries[slot_key]
+		if slot_entry is SaveSlotDTO:
+			serialized_slots[slot_key] = slot_entry.serialize()
+		elif slot_entry is Dictionary:
+			serialized_slots[slot_key] = slot_entry
 	return {
 		"account_id": account_id,
 		"username": username,
@@ -143,7 +143,7 @@ func serialize() -> Dictionary:
 		"last_login_timestamp_utc": last_login_timestamp_utc,
 		"local_device_fingerprint": local_device_fingerprint,
 		"is_guest_mode": is_guest_mode,
-		"save_slot_summaries": slots_dict,
+		"save_slot_summaries": serialized_slots,
 		"active_slot_id": active_slot_id,
 		"meta_legacy_points": meta_legacy_points,
 		"unlocked_heritage_traits": unlocked_heritage_traits,
@@ -154,36 +154,36 @@ func serialize() -> Dictionary:
 	}
 
 ## 从字典反序列化账户聚合：权限密封校验失败回退空集 + 白名单过滤（fail-safe，防存档自造权限）
-static func deserialize(data: Dictionary) -> AccountProfile:
+static func deserialize(serialized_payload: Dictionary) -> AccountProfile:
 	var account := AccountProfile.new()
-	account.account_id = data.get("account_id", "")
-	account.username = data.get("username", GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/default_username", "Adventurer"))
-	account.password_hash_sha256 = data.get("password_hash_sha256", "")
-	account.salt_version = int(data.get("salt_version", 1))
-	account.created_timestamp_utc = data.get("created_timestamp_utc", 0)
-	account.last_login_timestamp_utc = data.get("last_login_timestamp_utc", 0)
-	account.local_device_fingerprint = data.get("local_device_fingerprint", "")
-	account.is_guest_mode = data.get("is_guest_mode", false)
-	account.active_slot_id = data.get("active_slot_id", "")
-	account.meta_legacy_points = data.get("meta_legacy_points", 0)
-	account.unlocked_heritage_traits = data.get("unlocked_heritage_traits", [])
-	var raw_entitlements: Variant = data.get("entitlements", GameConfig.get_array(DOMAIN_ACCOUNT_CONFIG, "entitlements/default", []))
+	account.account_id = serialized_payload.get("account_id", "")
+	account.username = serialized_payload.get("username", GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/default_username", "Adventurer"))
+	account.password_hash_sha256 = serialized_payload.get("password_hash_sha256", "")
+	account.salt_version = int(serialized_payload.get("salt_version", 1))
+	account.created_timestamp_utc = serialized_payload.get("created_timestamp_utc", 0)
+	account.last_login_timestamp_utc = serialized_payload.get("last_login_timestamp_utc", 0)
+	account.local_device_fingerprint = serialized_payload.get("local_device_fingerprint", "")
+	account.is_guest_mode = serialized_payload.get("is_guest_mode", false)
+	account.active_slot_id = serialized_payload.get("active_slot_id", "")
+	account.meta_legacy_points = serialized_payload.get("meta_legacy_points", 0)
+	account.unlocked_heritage_traits = serialized_payload.get("unlocked_heritage_traits", [])
+	var raw_entitlements: Variant = serialized_payload.get("entitlements", GameConfig.get_array(DOMAIN_ACCOUNT_CONFIG, "entitlements/default", []))
 	if raw_entitlements is Array:
 		account.entitlements.assign(raw_entitlements) # 类型化转换：JSON/配置返回的未类型化 Array → Array[String]（防运行时类型错误）
 	# 密封校验：开启安全存储或环境中存在密封密钥时强制完整验签（缺封或篡改均清零权限）；否则兼容已附密封的防篡改校验
-	var recorded_seal := str(data.get("entitlements_seal", ""))
+	var recorded_seal := str(serialized_payload.get("entitlements_seal", ""))
 	var has_seal_key := not CryptoIntegrityLib.resolve_seal_key_bytes(LogConstants.CFG_ADMIN_TABLE, LogConstants.CFG_PATH_SECURITY_SEAL_ENV).is_empty()
-	var seal_required := EntitlementService.encrypted_storage_enabled() or has_seal_key
-	if seal_required:
+	var is_seal_required := EntitlementService.encrypted_storage_enabled() or has_seal_key
+	if is_seal_required:
 		if recorded_seal.is_empty() or not EntitlementService.verify_seal(account, recorded_seal):
 			account.entitlements.clear()
 	elif not recorded_seal.is_empty() and not EntitlementService.verify_seal(account, recorded_seal):
 		account.entitlements.clear()
 	# 白名单过滤：allowed 非空时拒绝未列出资格（防存档自造权限；空列表=放行全部）
 	account.entitlements.assign(EntitlementService.filter_allowed(account.entitlements))
-	account.world_state_ref = data.get("world_state_ref", "")
+	account.world_state_ref = serialized_payload.get("world_state_ref", "")
 
-	var raw_world_slots: Variant = data.get("world_slots", {})
+	var raw_world_slots: Variant = serialized_payload.get("world_slots", {})
 	if raw_world_slots is Dictionary and not (raw_world_slots as Dictionary).is_empty():
 		account.world_slots = (raw_world_slots as Dictionary).duplicate()
 	else:
@@ -191,9 +191,9 @@ static func deserialize(data: Dictionary) -> AccountProfile:
 			WORLD_DEFAULT_SP_01: "SLOT_01"
 		}
 
-	var raw_slots: Variant = data.get("save_slot_summaries", {})
+	var raw_slots: Variant = serialized_payload.get("save_slot_summaries", {})
 	for slot_key in raw_slots:
-		var slot_data: Variant = raw_slots[slot_key]
-		if slot_data is Dictionary:
-			account.save_slot_summaries[slot_key] = SaveSlotDTO.deserialize(slot_data)
+		var slot_payload: Variant = raw_slots[slot_key]
+		if slot_payload is Dictionary:
+			account.save_slot_summaries[slot_key] = SaveSlotDTO.deserialize(slot_payload)
 	return account
