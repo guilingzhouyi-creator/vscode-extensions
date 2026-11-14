@@ -77,7 +77,7 @@ def _load_frozenset_capability(cap_data: dict[str, Any], key: str, fallback: fro
 
 
 def _load_trait_costs(cap_data: dict[str, Any]) -> dict[str, int]:
-    """结合 capabilities.json 与角色创建配置加载内置天赋因果花费映射表。"""
+    """结合 capabilities.json、角色创建配置与官方基础模组包加载内置天赋因果花费映射表。"""
     cost_map = dict(DEFAULT_BUILTIN_TRAIT_COSTS)
     webgames_root = Path(__file__).resolve().parent.parent.parent
     cc_core = webgames_root / "config" / "domains" / "character_creation" / "core.json"
@@ -89,6 +89,17 @@ def _load_trait_costs(cap_data: dict[str, Any]) -> dict[str, int]:
                 for trait_id, trait_meta in traits_cfg.items():
                     if isinstance(trait_meta, dict) and isinstance(trait_meta.get("cost"), int):
                         cost_map[str(trait_id)] = int(trait_meta["cost"])
+        except (json.JSONDecodeError, OSError):
+            pass
+    official_destinies = webgames_root / "mods" / "official_kalar" / "destinies.json"
+    if official_destinies.is_file():
+        try:
+            dest_data = json.loads(official_destinies.read_text(encoding="utf-8"))
+            for trait_meta in dest_data.get("custom_traits", []):
+                if isinstance(trait_meta, dict) and isinstance(trait_meta.get("cost"), int):
+                    tid = str(trait_meta.get("trait_id") or trait_meta.get("id") or "")
+                    if tid:
+                        cost_map[tid] = int(trait_meta["cost"])
         except (json.JSONDecodeError, OSError):
             pass
     return cost_map

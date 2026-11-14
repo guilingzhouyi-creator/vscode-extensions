@@ -26,14 +26,23 @@ CONFIG = ROOT / "config"
 
 
 def load_registered_canonical_ids() -> set:
-    """加载 config/items/*.json 全量已注册 canonical_id 集合"""
+    """加载 config/items/*.json 与官方基础模组包全量已注册 canonical_id 集合"""
     registered = set()
-    items_dir = CONFIG / "items"
-    if items_dir.exists():
-        for f in items_dir.glob("*.json"):
+    item_dirs = [
+        CONFIG / "items",
+        ROOT / "mods" / "official_kalar" / "content" / "items",
+    ]
+    for items_dir in item_dirs:
+        if not items_dir.exists():
+            continue
+        for f in sorted(items_dir.glob("*.json")):
             try:
                 data = json.loads(f.read_text(encoding="utf-8"))
-                for item in data.get("items", []):
+                raw_items = data.get("items", [])
+                items_iter = raw_items.values() if isinstance(raw_items, dict) else raw_items
+                for item in items_iter:
+                    if not isinstance(item, dict):
+                        continue
                     cid = item.get("canonical_id")
                     if cid:
                         registered.add(cid)

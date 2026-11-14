@@ -103,9 +103,16 @@ def _check_manifest(mod_dir: Path, diags: list[DiagnosticItem]) -> dict[str, Any
     return data
 
 
-def _check_routing_rules(mod_dir: Path, declared_dag_ids: set[str], diags: list[DiagnosticItem]) -> None:
+def _check_routing_rules(
+    mod_dir: Path,
+    declared_dag_ids: set[str],
+    diags: list[DiagnosticItem],
+    has_prologue_dag: bool = True,
+) -> None:
     """校验 routing_rules.json。"""
     routing_path = mod_dir / "routing_rules.json"
+    if not routing_path.is_file() and not has_prologue_dag:
+        return
     data = _safe_load_json(routing_path, "routing_rules.json", diags)
     if data is None:
         return
@@ -280,6 +287,32 @@ def _check_dangling_asset_refs(mod_dir: Path, diags: list[DiagnosticItem]) -> No
                 pass
 
 
+def _validate_content_domain_payload(
+    rel_str: str,
+    cdata: dict[str, Any] | list[Any],
+    diags: list[DiagnosticItem],
+) -> None:
+    """校验 content/ 子目录中各域扩展数据的顶层结构与契约键值。"""
+    parts = rel_str.split("/")
+    domain_dir = parts[1] if len(parts) >= 3 else ""
+    if domain_dir in ("entities", "world", "events", "narratives", "copywriting") and not isinstance(cdata, dict):
+        diags.append(DiagnosticItem(
+            code="ERR_CONTENT_DOMAIN_SCHEMA",
+            file_path=rel_str,
+            detail=f"{rel_str} 属于 {domain_dir} 域，顶层必须为 JSON 对象 {{}}",
+            fix_suggestion=f"请将 {rel_str} 根结构调整为符合 {domain_dir} Schema 的 JSON 对象",
+        ))
+    elif domain_dir == "quests" and isinstance(cdata, dict) and not any(
+        isinstance(cdata.get(k), (list, dict)) for k in ("quests", "bounties", "chains", "templates")
+    ) and not cdata:
+        diags.append(DiagnosticItem(
+            code="ERR_CONTENT_DOMAIN_SCHEMA",
+            file_path=rel_str,
+            detail=f"{rel_str} 任务包对象不可为空",
+            fix_suggestion="请在 quests 定义中声明 quests / bounties / chains 等非空任务映射",
+        ))
+
+
 def _check_content_directory(mod_dir: Path, diags: list[DiagnosticItem]) -> None:
     """校验 content/ 大魔改数据目录及其 JSON 实体定义的合法性。"""
     content_dir = mod_dir / "content"
@@ -325,6 +358,8 @@ def _check_content_directory(mod_dir: Path, diags: list[DiagnosticItem]) -> None
                     detail=f"{rel_str} 顶层必须为 JSON 对象或列表",
                     fix_suggestion="请将该文件的根结构调整为 {} 或 []",
                 ))
+            else:
+                _validate_content_domain_payload(rel_str, cdata, diags)
         except (json.JSONDecodeError, OSError) as exc:
             diags.append(DiagnosticItem(
                 code="ERR_CONTENT_JSON_INVALID",
@@ -346,22 +381,25 @@ def validate_mod(mod_dir: Path) -> tuple[bool, list[DiagnosticItem]]:
         ))
         return False, diags
 
-    _check_manifest(mod_dir, diags)
+    manifest = _check_manifest(mod_dir, diags)
+    pack_profile = str((manifest or {}).get("pack_profile", "CONTENT_ADDON")).strip().upper() or "CONTENT_ADDON"
+    has_prologue_dag = bool((manifest or {}).get("has_prologue_dag", True))
 
     dag_dir = mod_dir / "dag_graphs"
     declared_dag_ids: set[str] = set()
     required_keys: set[str] = set()
 
     if not dag_dir.is_dir():
-        diags.append(DiagnosticItem(
-            code="ERR_DAG_DIR_MISSING",
-            file_path="dag_graphs",
-            detail="缺少 dag_graphs 目录",
-            fix_suggestion="创建 dag_graphs 目录并在其中放置因果 DAG 图元 JSON",
-        ))
+        if has_prologue_dag:
+            diags.append(DiagnosticItem(
+                code="ERR_DAG_DIR_MISSING",
+                file_path="dag_graphs",
+                detail="缺少 dag_graphs 目录",
+                fix_suggestion="创建 dag_graphs 目录并在其中放置因果 DAG 图元 JSON",
+            ))
     else:
         dag_files = sorted(dag_dir.glob("*.json"))
-        if not dag_files:
+        if not dag_files and has_prologue_dag:
             diags.append(DiagnosticItem(
                 code="ERR_DAG_NO_FILES",
                 file_path="dag_graphs",
@@ -373,9 +411,9 @@ def validate_mod(mod_dir: Path) -> tuple[bool, list[DiagnosticItem]]:
             declared_dag_ids.add(dag_stem)
             _check_dag_file(df, f"dag_graphs/{df.name}", required_keys, declared_dag_ids, diags)
 
-    _check_routing_rules(mod_dir, declared_dag_ids, diags)
+    _check_routing_rules(mod_dir, declared_dag_ids, diags, has_prologue_dag=has_prologue_dag)
     _check_i18n(mod_dir, required_keys, diags)
-    check_destinies_file(mod_dir, diags, declared_dag_ids=declared_dag_ids)
+    check_destinies_file(mod_dir, diags, declared_dag_ids=declared_dag_ids, pack_profile=pack_profile)
     _check_asset_safety_and_manifest(mod_dir, diags)
     _check_dangling_asset_refs(mod_dir, diags)
     _check_content_directory(mod_dir, diags)

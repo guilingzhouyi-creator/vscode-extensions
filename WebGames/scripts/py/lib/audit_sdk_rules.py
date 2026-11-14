@@ -188,6 +188,15 @@ def check_schemas_integrity(mod_sdk_dir: Path, findings: list[AuditFinding]) -> 
         ("workbench_config.schema.json", "开发者集成工作台配置 Schema"),
         ("kdat_manifest.schema.json", "二进制数据流打包编译清单元数据契约"),
         ("cutscene_manifest.schema.json", "CG视频资产与剧情Hook扩展契约"),
+        ("quests.schema.json", "任务悬赏与奖励规则覆盖契约"),
+        ("entities.schema.json", "NPC怪物与世界首领实体原型覆盖契约"),
+        ("world_topology.schema.json", "世界档案大区与地图地标拓扑契约"),
+        ("event_probability.schema.json", "世界因果事件与概率规则覆盖契约"),
+        ("races_catalog.schema.json", "种族与基础属性系数目录契约"),
+        ("narratives_overlay.schema.json", "领域叙事文本覆盖契约"),
+        ("copywriting_overlay.schema.json", "条件文案覆盖契约"),
+        ("routing_rules.schema.json", "创角至序章路由矩阵契约"),
+        ("realm_mod_manifest.schema.json", "联机权威MOD清单摘要鉴权契约"),
     ]
 
     for s_name, s_desc in expected_schemas:

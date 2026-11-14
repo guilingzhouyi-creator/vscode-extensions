@@ -143,17 +143,23 @@ def check_single_origin_budget(
     diags: list[DiagnosticItem],
     valid_dags: set[str],
     valid_kits: set[str],
+    enforce_addon_caps: bool = True,
 ) -> None:
     """校验单个自定义身世的六维加成预算、初始金币上限与序章 DAG/套件引用。"""
     origin_id = str(origin.get("origin_id") or origin.get("id") or f"index_{index}")
     gold = origin.get("initial_gold", 0)
-    if not is_valid_number(gold) or not (GOLD_CAP_MIN <= gold <= GOLD_CAP_MAX):
+    if not is_valid_number(gold) or gold < GOLD_CAP_MIN or (enforce_addon_caps and gold > GOLD_CAP_MAX):
+        detail = (
+            f"自定义身世 '{origin_id}' 初始金币 {gold} 超出合法区间 [0, 1000]"
+            if enforce_addon_caps
+            else f"自定义身世 '{origin_id}' 初始金币 {gold} 必须为非负数值"
+        )
         add_diag(
             diags,
             "ERR_DESTINY_GOLD_CAP_EXCEEDED",
             rel_name,
-            f"自定义身世 '{origin_id}' 初始金币 {gold} 超出合法区间 [0, 1000]",
-            "请将 custom_origins 中的 initial_gold 调整至 0 到 1000 之间",
+            detail,
+            "请调整 custom_origins 中的 initial_gold 取值",
         )
 
     bonuses = origin.get("attribute_bonus", {})
@@ -165,7 +171,7 @@ def check_single_origin_budget(
             f"自定义身世 '{origin_id}' 的 attribute_bonus 必须为对象",
             "请将 attribute_bonus 声明为六维属性键值对字典",
         )
-    else:
+    elif enforce_addon_caps:
         check_origin_stat_bonuses(origin_id, bonuses, rel_name, diags)
 
     prologue_dag_id = origin.get("prologue_dag_id")
@@ -197,11 +203,20 @@ def check_destiny_origins(
     diags: list[DiagnosticItem],
     valid_dags: set[str],
     valid_kits: set[str],
+    enforce_addon_caps: bool = True,
 ) -> None:
     """校验 custom_origins 列表中的所有自定义身世。"""
     origins = normalize_named_items(destiny_data.get("custom_origins"), "origin_id")
     for index, origin in enumerate(origins):
-        check_single_origin_budget(origin, index, rel_name, diags, valid_dags, valid_kits)
+        check_single_origin_budget(
+            origin,
+            index,
+            rel_name,
+            diags,
+            valid_dags,
+            valid_kits,
+            enforce_addon_caps=enforce_addon_caps,
+        )
 
 
 def extract_trait_cost_map(
@@ -353,17 +368,23 @@ def check_single_starter_kit(
     index: int,
     rel_name: str,
     diags: list[DiagnosticItem],
+    enforce_addon_caps: bool = True,
 ) -> None:
     """校验单个自定义初始装备套件。"""
     kit_id = str(kit.get("kit_id") or kit.get("id") or f"kit_{index}")
     gold = kit.get("initial_gold", 0)
-    if not is_valid_number(gold) or not (GOLD_CAP_MIN <= gold <= GOLD_CAP_MAX):
+    if not is_valid_number(gold) or gold < GOLD_CAP_MIN or (enforce_addon_caps and gold > GOLD_CAP_MAX):
+        detail = (
+            f"自定义套件 '{kit_id}' 的 initial_gold ({gold}) 超出 [0, 1000] 上限"
+            if enforce_addon_caps
+            else f"自定义套件 '{kit_id}' 的 initial_gold ({gold}) 必须为非负数值"
+        )
         add_diag(
             diags,
             "ERR_DESTINY_GOLD_CAP_EXCEEDED",
             rel_name,
-            f"自定义套件 '{kit_id}' 的 initial_gold ({gold}) 超出 [0, 1000] 上限",
-            "请将套件的 initial_gold 调整至 0 到 1000 范围内",
+            detail,
+            "请调整套件的 initial_gold 取值",
         )
 
     items = kit.get("initial_items") if "initial_items" in kit else kit.get("items")
@@ -381,7 +402,7 @@ def check_single_starter_kit(
         validate_kit_item_entry(kit_id, item_index, item, rel_name, diags)
         for item_index, item in enumerate(items)
     )
-    if total_count > KIT_ITEM_LIMIT or len(items) > KIT_ITEM_LIMIT:
+    if enforce_addon_caps and (total_count > KIT_ITEM_LIMIT or len(items) > KIT_ITEM_LIMIT):
         add_diag(
             diags,
             "ERR_DESTINY_KIT_INVALID",
@@ -395,11 +416,12 @@ def check_destiny_starter_kits(
     destiny_data: dict[str, Any],
     rel_name: str,
     diags: list[DiagnosticItem],
+    enforce_addon_caps: bool = True,
 ) -> None:
     """校验 custom_starter_kits 列表中的所有自定义套件。"""
     kits = normalize_named_items(destiny_data.get("custom_starter_kits"), "kit_id")
     for index, kit in enumerate(kits):
-        check_single_starter_kit(kit, index, rel_name, diags)
+        check_single_starter_kit(kit, index, rel_name, diags, enforce_addon_caps=enforce_addon_caps)
 
 
 def check_destiny_custom_routing_rules(
@@ -443,8 +465,9 @@ def check_destinies_file(
     diags: list[DiagnosticItem],
     rel_prefix: str = "",
     declared_dag_ids: set[str] | None = None,
+    pack_profile: str = "CONTENT_ADDON",
 ) -> dict[str, Any] | None:
-    """若存在 destinies.json，则校验其 UI 策略、六维预算、正负因果与初始套件。"""
+    """若存在 destinies.json，则校验其 UI 策略、身世/套件契约与正负因果守恒。"""
     destiny_path = mod_dir / "destinies.json"
     if not destiny_path.is_file():
         return None
@@ -462,12 +485,22 @@ def check_destinies_file(
             )
         return None
 
+    normalized_profile = pack_profile.strip().upper() or "CONTENT_ADDON"
+    enforce_addon_caps = normalized_profile not in ("OFFICIAL_BASE", "TOTAL_CONVERSION")
     valid_dags = (declared_dag_ids or set()) | BUILTIN_DAG_IDS
     valid_kits = collect_declared_kit_ids(data) | BUILTIN_STARTER_KITS
 
     check_destiny_ui_capabilities(data, rel_name, diags)
-    check_destiny_origins(data, rel_name, diags, valid_dags, valid_kits)
-    check_destiny_causality_traits(data, rel_name, diags)
-    check_destiny_starter_kits(data, rel_name, diags)
+    check_destiny_origins(
+        data,
+        rel_name,
+        diags,
+        valid_dags,
+        valid_kits,
+        enforce_addon_caps=enforce_addon_caps,
+    )
+    if enforce_addon_caps or data.get("paired_presets") is not None:
+        check_destiny_causality_traits(data, rel_name, diags)
+    check_destiny_starter_kits(data, rel_name, diags, enforce_addon_caps=enforce_addon_caps)
     check_destiny_custom_routing_rules(data, rel_name, valid_dags, diags)
     return data

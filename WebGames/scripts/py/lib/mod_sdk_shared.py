@@ -205,24 +205,75 @@ def _collect_dag_id_from_value(value: Any, found_ids: set[str]) -> None:
         _collect_dag_id_from_list(value, found_ids)
 
 
+def _load_official_kalar_destinies(webgames_root: Path) -> dict[str, Any]:
+    """加载官方基础内容包 mods/official_kalar/destinies.json。"""
+    return load_json_file(webgames_root / "mods" / "official_kalar" / "destinies.json")
+
+
+def _extract_item_ids_from_dir(items_dir: Path) -> set[str]:
+    """从物品目录抽取全部 canonical_id。"""
+    found: set[str] = set()
+    if not items_dir.is_dir():
+        return found
+    for item_file in sorted(items_dir.glob("*.json")):
+        payload = load_json_file(item_file)
+        raw_items = payload.get("items", []) if isinstance(payload, dict) else []
+        items_iter = raw_items.values() if isinstance(raw_items, dict) else raw_items
+        for entry in items_iter:
+            if isinstance(entry, dict):
+                cid = entry.get("canonical_id")
+                if isinstance(cid, str) and cid:
+                    found.add(cid)
+    return found
+
+
+def _collect_named_list_ids(raw_items: Any, id_keys: tuple[str, ...]) -> set[str]:
+    """从对象列表或字典中统一抽取主键标识符集合。"""
+    ids: set[str] = set()
+    if isinstance(raw_items, dict):
+        for k in raw_items.keys():
+            if isinstance(k, str) and k:
+                ids.add(k)
+        return ids
+    if isinstance(raw_items, list):
+        for entry in raw_items:
+            if not isinstance(entry, dict):
+                continue
+            for key in id_keys:
+                val = entry.get(key)
+                if isinstance(val, str) and val:
+                    ids.add(val)
+                    break
+    return ids
+
+
 def extract_builtin_dag_ids(config_dir: Path) -> list[str]:
-    """从 config/narratives/prologue_dag_catalog.json 提取内置序章 DAG 标识符列表。"""
+    """从引擎骨架与官方基础模组包萃取内置序章 DAG 标识符列表。"""
+    found_ids: set[str] = set()
     dag_catalog_path = config_dir / "narratives" / "prologue_dag_catalog.json"
     dag_catalog_data = load_json_file(dag_catalog_path)
-    found_ids: set[str] = set()
     if isinstance(dag_catalog_data, dict):
         for k, v in dag_catalog_data.items():
             if isinstance(k, str) and k.startswith("DAG_"):
                 found_ids.add(k)
             else:
                 _collect_dag_id_from_value(v, found_ids)
-    if not found_ids:
-        return ["DAG_PROLOGUE_ELF_SANCTUARY", "DAG_PROLOGUE_HUMAN_CAPITAL"]
+    official_dag_dir = config_dir.parent / "mods" / "official_kalar" / "dag_graphs"
+    if official_dag_dir.is_dir():
+        for dag_file in sorted(official_dag_dir.glob("*.json")):
+            if dag_file.stem.startswith("DAG_"):
+                found_ids.add(dag_file.stem)
     return sorted(found_ids)
 
 
 def extract_destiny_capabilities(config_dir: Path, core_data: dict[str, Any]) -> dict[str, Any]:
-    """从角色创建、初始行囊与物品真源提取命途扩展能力契约。"""
+    """从角色创建、初始行囊与物品真源（含 official_kalar 官方基础包）提取命途扩展能力契约。"""
+    webgames_root = config_dir.parent
+    destinies_data = _load_official_kalar_destinies(webgames_root)
+    kalar_rules_data = load_json_file(
+        webgames_root / "mods" / "official_kalar" / "content" / "rules" / "kalar_rules.json"
+    )
+
     attr_gen = core_data.get("authoritative_reincarnation", {}).get(
         "attribute_generation", {}
     )
@@ -237,25 +288,25 @@ def extract_destiny_capabilities(config_dir: Path, core_data: dict[str, Any]) ->
         "total_points": int(attr_gen.get("total_points", 21)),
     }
 
-    builtin_traits = sorted(list(core_data.get("traits", {}).keys()))
+    trait_ids = _collect_named_list_ids(core_data.get("traits", {}), ("trait_id", "id"))
+    trait_ids |= _collect_named_list_ids(destinies_data.get("custom_traits", []), ("trait_id", "id"))
+    builtin_traits = sorted(trait_ids)
 
     loadout_path = config_dir / "domains" / "starter_loadout" / "core.json"
     loadout_data = load_json_file(loadout_path)
-    builtin_starter_kits = sorted(list(loadout_data.get("starter_kits", {}).keys()))
+    kit_ids = _collect_named_list_ids(loadout_data.get("starter_kits", {}), ("kit_id", "id"))
+    kit_ids |= _collect_named_list_ids(
+        kalar_rules_data.get("starter_loadout", {}).get("starter_kits", {}), ("kit_id", "id")
+    )
+    kit_ids |= _collect_named_list_ids(destinies_data.get("custom_starter_kits", []), ("kit_id", "id"))
+    builtin_starter_kits = sorted(kit_ids)
     builtin_dag_ids = extract_builtin_dag_ids(config_dir)
 
-    items_path = config_dir / "items" / "core.json"
-    items_data = load_json_file(items_path)
-    raw_items = items_data.get("items", [])
-    canonical_item_ids = sorted(
-        [
-            item["canonical_id"]
-            for item in raw_items
-            if isinstance(item, dict)
-            and isinstance(item.get("canonical_id"), str)
-            and item.get("canonical_id")
-        ]
+    item_ids = _extract_item_ids_from_dir(config_dir / "items")
+    item_ids |= _extract_item_ids_from_dir(
+        webgames_root / "mods" / "official_kalar" / "content" / "items"
     )
+    canonical_item_ids = sorted(item_ids)
 
     upper_placeholders = list(STANDARD_PLACEHOLDER_DOCS.keys())
     dual_placeholders = build_dual_track_placeholder_list(upper_placeholders)
@@ -383,31 +434,70 @@ def extract_unified_protocol_capabilities(config_dir: Path) -> dict[str, Any]:
     }
 
 
-def extract_capabilities(webgames_root: Path) -> dict[str, Any]:
-    """执行核心能力静态萃取流水线。"""
-    config_dir = webgames_root / "config"
+def _collect_composed_races(core_data: dict[str, Any], destinies_data: dict[str, Any]) -> list[str]:
+    """组合引擎骨架与 official_kalar 的已启用种族集合。"""
+    enabled_races: set[str] = set()
+    for race_id, race_info in core_data.get("races_catalog", {}).items():
+        if isinstance(race_info, dict) and race_info.get("is_enabled", False):
+            enabled_races.add(str(race_id))
+    for race_info in destinies_data.get("custom_races", []):
+        if isinstance(race_info, dict) and race_info.get("is_enabled", False):
+            rid = str(race_info.get("race_id") or race_info.get("id") or "")
+            if rid:
+                enabled_races.add(rid)
+    return sorted(enabled_races)
 
-    # 1. 提取 character_creation core.json
+
+def _merge_i18n_sources(config_dir: Path, webgames_root: Path) -> dict[str, Any]:
+    """合并引擎序章 i18n 骨架与 official_kalar 基础包 i18n。"""
+    merged: dict[str, Any] = {
+        "narrative": {},
+        "locations": {},
+        "items": {},
+        "npcs": {},
+    }
+    sources = [
+        config_dir / "narratives" / "prologue_i18n.json",
+        webgames_root / "mods" / "official_kalar" / "i18n" / "zh-CN.json",
+        webgames_root / "mods" / "official_kalar" / "i18n" / "en-US.json",
+    ]
+    for src in sources:
+        data = load_json_file(src)
+        if not isinstance(data, dict):
+            continue
+        for section in ("narrative", "locations", "items", "npcs"):
+            sec_val = data.get(section, {})
+            if isinstance(sec_val, dict):
+                merged[section].update(sec_val)
+    return merged
+
+
+def extract_capabilities(webgames_root: Path) -> dict[str, Any]:
+    """执行核心能力静态萃取流水线（组合 config/ 引擎骨架与 mods/official_kalar/ 官方基础包）。"""
+    config_dir = webgames_root / "config"
+    destinies_data = _load_official_kalar_destinies(webgames_root)
+    kalar_world_data = load_json_file(
+        webgames_root / "mods" / "official_kalar" / "content" / "world" / "kalar_world.json"
+    )
+
+    # 1. 提取 character_creation core.json + official_kalar destinies
     core_path = config_dir / "domains" / "character_creation" / "core.json"
     core_data = load_json_file(core_path)
+    supported_races = _collect_composed_races(core_data, destinies_data)
 
-    races_catalog = core_data.get("races_catalog", {})
-    supported_races = sorted(
-        [
-            r_id
-            for r_id, r_info in races_catalog.items()
-            if isinstance(r_info, dict) and r_info.get("is_enabled", False)
-        ]
+    origins_set = _collect_named_list_ids(core_data.get("origins", {}), ("origin_id", "id"))
+    origins_set |= _collect_named_list_ids(destinies_data.get("custom_origins", []), ("origin_id", "id"))
+    origins = sorted(origins_set)
+
+    regions_set = _collect_named_list_ids(core_data.get("birth_regions", {}), ("region_id", "id"))
+    regions_set |= _collect_named_list_ids(
+        destinies_data.get("creation_rule_overrides", {}).get("birth_regions", {}), ("region_id", "id")
     )
-    if not supported_races:
-        supported_races = ["HUMAN"]
+    regions_set |= _collect_named_list_ids(kalar_world_data.get("birth_regions", {}), ("region_id", "id"))
+    birth_regions = sorted(regions_set)
 
-    origins = sorted(list(core_data.get("origins", {}).keys()))
-    birth_regions = sorted(list(core_data.get("birth_regions", {}).keys()))
-
-    # 2. 提取 prologue_i18n.json
-    i18n_path = config_dir / "narratives" / "prologue_i18n.json"
-    i18n_data = load_json_file(i18n_path)
+    # 2. 提取 prologue_i18n.json + official_kalar i18n
+    i18n_data = _merge_i18n_sources(config_dir, webgames_root)
 
     placeholder_pattern = re.compile(r"\{[A-Z0-9_]+\}")
     found_placeholders = collect_placeholders_from_obj(i18n_data, placeholder_pattern)

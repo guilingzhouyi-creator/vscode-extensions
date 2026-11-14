@@ -74,10 +74,13 @@ def _extract_item_loc_keys(file_path: Path) -> list[str]:
 
 
 def collect_item_keys() -> list[str]:
-    """收集物品域名称键：config/items/*.json 的 loc_name_key。"""
+    """收集物品域名称键：config/items/*.json 与官方基础模组包物品的 loc_name_key。"""
     keys: list[str] = []
-    for f in sorted((CONFIG / "items").glob("*.json")):
-        keys.extend(_extract_item_loc_keys(f))
+    for base_dir in (CONFIG / "items", ROOT / "mods" / "official_kalar" / "content" / "items"):
+        if not base_dir.exists():
+            continue
+        for f in sorted(base_dir.glob("*.json")):
+            keys.extend(_extract_item_loc_keys(f))
     return keys
 
 

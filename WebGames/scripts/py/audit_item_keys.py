@@ -23,23 +23,30 @@ ensure_utf8_stdout()
 ROOT = resolve_repo_root()
 CONFIG_DIR = ROOT / "config"
 ITEMS_DIR = CONFIG_DIR / "items"
+OFFICIAL_MOD_ITEMS_DIR = ROOT / "mods" / "official_kalar" / "content" / "items"
 ITEM_KEY_RE = re.compile(r'"KALAR:[A-Z0-9_:-]+"')
 
 
-def collect_registered() -> set[str]:
-    """items/*.json 登记清单（canonical_id）。"""
+def collect_registered() -> tuple[set[str], list[str]]:
+    """收集 config/items/*.json 与官方基础模组包物品登记清单（canonical_id）。"""
     registered: set[str] = set()
     duplicates: list[str] = []
-    for f in sorted(ITEMS_DIR.rglob("*.json")):
-        data = json.loads(f.read_text(encoding="utf-8"))
-        items = data.get("items", []) if isinstance(data, dict) else []
-        for entry in items:
-            cid = entry.get("canonical_id", "")
-            if not cid:
-                continue
-            if cid in registered:
-                duplicates.append(f"{f.relative_to(ROOT)}: {cid}")
-            registered.add(cid)
+    for base_dir in (ITEMS_DIR, OFFICIAL_MOD_ITEMS_DIR):
+        if not base_dir.exists():
+            continue
+        for f in sorted(base_dir.rglob("*.json")):
+            data = json.loads(f.read_text(encoding="utf-8"))
+            raw_items = data.get("items", []) if isinstance(data, dict) else []
+            items_iter = raw_items.values() if isinstance(raw_items, dict) else raw_items
+            for entry in items_iter:
+                if not isinstance(entry, dict):
+                    continue
+                cid = entry.get("canonical_id", "")
+                if not cid:
+                    continue
+                if cid in registered:
+                    duplicates.append(f"{f.relative_to(ROOT)}: {cid}")
+                registered.add(cid)
     return registered, duplicates
 
 
