@@ -46,8 +46,6 @@ static func ensure_loaded() -> void:
 	_instance._load_from_config()
 
 
-## 从 contracts.json 装载契约条目：主配置路径、JSON 解析、schema 版本校验、
-## infra_domains 与 entries 装配；任一步失败 emit_error 并置 _loaded 防重复装载
 ## 读取契约配置文件文本（固化单一真源 CONTRACT_CONFIG_PATH_PRIMARY）
 func _read_config_file_text() -> String:
 	var path := CONTRACT_CONFIG_PATH_PRIMARY
@@ -67,8 +65,8 @@ func _read_config_file_text() -> String:
 ## 解析 JSON 字符串并断言字典根节点
 func _parse_json_dict(text: String) -> Dictionary:
 	var json := JSON.new()
-	var err := json.parse(text)
-	if err != OK:
+	var parse_error := json.parse(text)
+	if parse_error != OK:
 		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_JSON_PARSE_FAIL", SystemBaseMessages.format(SystemBaseMessages.MSG_CONTRACT_JSON_PARSE_FAIL, {"error": json.get_error_message()}))
 		return {}
 
@@ -91,10 +89,10 @@ func _unpack_registry_sections(dict: Dictionary) -> bool:
 		for item in raw_infra:
 			_infra_domains.append(String(item))
 
-	var vres := validate_config(dict)
-	if not bool(vres.get("valid", false)):
-		var errs: Array = vres.get("errors", [])
-		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_VALIDATION_FAILED", SystemBaseMessages.format(SystemBaseMessages.MSG_CONTRACT_VALIDATION_FAILED, {"errors": "; ".join(errs)}))
+	var validation_result := validate_config(dict)
+	if not bool(validation_result.get("valid", false)):
+		var validation_errors: Array = validation_result.get("errors", [])
+		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_VALIDATION_FAILED", SystemBaseMessages.format(SystemBaseMessages.MSG_CONTRACT_VALIDATION_FAILED, {"errors": "; ".join(validation_errors)}))
 		return false
 
 	var raw_entries: Variant = dict.get("entries", [])
@@ -108,8 +106,8 @@ func _unpack_registry_sections(dict: Dictionary) -> bool:
 	if raw_orphans is Array:
 		for item in raw_orphans:
 			if item is Dictionary:
-				var d: Dictionary = item as Dictionary
-				_reverse_orphans.append(d)
+				var orphan_dict: Dictionary = item as Dictionary
+				_reverse_orphans.append(orphan_dict)
 
 	_rebuild_indexes()
 	return true
@@ -155,19 +153,19 @@ static func validate_config(data: Dictionary) -> Dictionary:
 		if not item is Dictionary:
 			errors.append("ENTRY_NOT_DICTIONARY")
 			continue
-		var cid := String(item.get("contract_id", ""))
-		var dname := String(item.get("domain_name", ""))
-		var vname := String(item.get("view_name", ""))
-		if cid.is_empty() or dname.is_empty() or vname.is_empty():
-			errors.append("MISSING_REQUIRED_FIELD:" + cid)
-		if seen_ids.has(cid):
-			errors.append("DUPLICATE_CONTRACT_ID:" + cid)
-		seen_ids[cid] = true
-		var exempt := bool(item.get("infra_exempt", false))
-		if exempt and not infra_list.has(dname):
-			errors.append("INFRA_EXEMPT_VIOLATION:" + cid)
-		elif not exempt and infra_list.has(dname):
-			errors.append("INFRA_EXEMPT_INCONSISTENT:" + cid)
+		var contract_id := String(item.get("contract_id", ""))
+		var domain_name := String(item.get("domain_name", ""))
+		var view_name := String(item.get("view_name", ""))
+		if contract_id.is_empty() or domain_name.is_empty() or view_name.is_empty():
+			errors.append("MISSING_REQUIRED_FIELD:" + contract_id)
+		if seen_ids.has(contract_id):
+			errors.append("DUPLICATE_CONTRACT_ID:" + contract_id)
+		seen_ids[contract_id] = true
+		var is_infra_exempt := bool(item.get("infra_exempt", false))
+		if is_infra_exempt and not infra_list.has(domain_name):
+			errors.append("INFRA_EXEMPT_VIOLATION:" + contract_id)
+		elif not is_infra_exempt and infra_list.has(domain_name):
+			errors.append("INFRA_EXEMPT_INCONSISTENT:" + contract_id)
 
 	return {"valid": errors.is_empty(), "errors": errors}
 
@@ -210,19 +208,19 @@ static func get_schema_version() -> int:
 ## 返回 INFRA 后台服务域清单（副本数组，防外部突变内部 _infra_domains）
 static func get_infra_domains() -> Array[String]:
 	ensure_loaded()
-	var arr: Array[String] = []
-	for d in _infra_domains:
-		arr.append(d)
-	return arr
+	var infra_domains_copy: Array[String] = []
+	for domain_id in _infra_domains:
+		infra_domains_copy.append(domain_id)
+	return infra_domains_copy
 
 
 ## 返回配置登记的 reverse_orphan 清单（副本，防外部突变；I1 审计数据化）
 static func get_reverse_orphans() -> Array[Dictionary]:
 	ensure_loaded()
-	var out: Array[Dictionary] = []
-	for o in _reverse_orphans:
-		out.append(o)
-	return out
+	var orphans_copy: Array[Dictionary] = []
+	for orphan_entry in _reverse_orphans:
+		orphans_copy.append(orphan_entry)
+	return orphans_copy
 
 
 ## 全量契约条目（懒装载后返回全部 entries 副本数组）
@@ -273,15 +271,15 @@ static func audit_completeness() -> Dictionary:
 	var missing_dto: Array[String] = []
 	var missing_event: Array[String] = []
 	var missing_command: Array[String] = []
-	for e in _entries:
-		if e.coverage_marker == "MISSING":
-			var dn: String = String(e.domain_name)
-			if not missing_dto.has(dn):
-				missing_dto.append(dn)
-			if not missing_event.has(dn):
-				missing_event.append(dn)
-			if not missing_command.has(dn):
-				missing_command.append(dn)
+	for entry in _entries:
+		if entry.coverage_marker == "MISSING":
+			var domain_name: String = String(entry.domain_name)
+			if not missing_dto.has(domain_name):
+				missing_dto.append(domain_name)
+			if not missing_event.has(domain_name):
+				missing_event.append(domain_name)
+			if not missing_command.has(domain_name):
+				missing_command.append(domain_name)
 
 	return {
 		"missing_dto": missing_dto,

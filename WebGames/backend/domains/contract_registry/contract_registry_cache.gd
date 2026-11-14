@@ -36,9 +36,9 @@ static func get_cached(domain: String, view: String, kind: int) -> Resource:
 	# 未命中：从索引加载
 	var entries: Array = IndexClass.find_by_domain_view(domain, view)
 	var found: Variant = null
-	for e in entries:
-		if int(e.endpoint_kind) == kind:
-			found = e
+	for entry in entries:
+		if int(entry.endpoint_kind) == kind:
+			found = entry
 			break
 
 	if found != null:
@@ -63,13 +63,13 @@ static func invalidate_cache() -> void:
 static func invalidate_domain(domain: String) -> void:
 	var prefix := domain + ":"
 	var keys_to_remove: Array[String] = []
-	for k in _lru_map.keys():
-		if String(k).begins_with(prefix):
-			keys_to_remove.append(String(k))
+	for cache_key in _lru_map.keys():
+		if String(cache_key).begins_with(prefix):
+			keys_to_remove.append(String(cache_key))
 
-	for k in keys_to_remove:
-		_lru_map.erase(k)
-		_access_order.erase(k)
+	for cache_key in keys_to_remove:
+		_lru_map.erase(cache_key)
+		_access_order.erase(cache_key)
 
 
 ## 配置热重载
@@ -87,15 +87,15 @@ static func reload_from_config() -> void:
 
 
 ## 版本兼容性检查
-static func check_compatibility(prev_version: int, new_version: int) -> Dictionary:
+static func check_compatibility(previous_version: int, new_version: int) -> Dictionary:
 	var breaking_changes: Array[Dictionary] = []
-	if new_version > prev_version:
+	if new_version > previous_version:
 		var all_entries: Array = IndexClass.find_all()
-		for e in all_entries:
-			if e.contract_version == new_version and not e.breaking_change_note.is_empty():
+		for entry in all_entries:
+			if entry.contract_version == new_version and not entry.breaking_change_note.is_empty():
 				breaking_changes.append({
-					"contract_id": e.contract_id,
-					"note": e.breaking_change_note
+					"contract_id": entry.contract_id,
+					"note": entry.breaking_change_note
 				})
 
 	return {

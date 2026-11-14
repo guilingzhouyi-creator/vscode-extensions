@@ -17,10 +17,10 @@ const IndexClass = preload("res://backend/domains/contract_registry/contract_reg
 static var _dispatched_events: Dictionary = {}
 # 幂等事件表有界上限（超出逐出最旧，防长会话无界增长；Dictionary 保持插入序）
 const DISPATCH_MEMO_MAX: int = 4096
-static var _dispatch_seq: int = 0
+static var _dispatch_sequence: int = 0
 
 
-## DTO 字段映射解析（Inv-CP-1 类型安全守卫，未知字段丢弃，缺失字段兜底）
+## DTO 字段映射解析（Inv-CP-1 类型安全守卫，未知字段丢弃，缺失字段安全回退）
 static func resolve_dto_mapping(backend_dto: Dictionary, entry: Variant) -> Dictionary:
 	if entry == null:
 		return {"error": "CT_ERR_UNKNOWN_CONTRACT"}
@@ -30,22 +30,22 @@ static func resolve_dto_mapping(backend_dto: Dictionary, entry: Variant) -> Dict
 		return {}
 
 	var result: Dictionary = {}
-	var empty_cfg: Dictionary = {}
-	for fm in entry.field_mapping:
-		if not fm is Dictionary:
+	var empty_config: Dictionary = {}
+	for mapping_rule in entry.field_mapping:
+		if not mapping_rule is Dictionary:
 			continue
-		var src_field: String = String(fm.get("backend_field", ""))
-		var tgt_field: String = String(fm.get("view_field", src_field))
-		var trans_kind: String = String(fm.get("transform_kind", "identity"))
-		var raw_cfg: Variant = fm.get("transform_config")
-		var trans_cfg: Dictionary = raw_cfg if raw_cfg is Dictionary else empty_cfg
+		var source_field: String = String(mapping_rule.get("backend_field", ""))
+		var target_field: String = String(mapping_rule.get("view_field", source_field))
+		var transform_kind: String = String(mapping_rule.get("transform_kind", "identity"))
+		var raw_config: Variant = mapping_rule.get("transform_config")
+		var transform_config: Dictionary = raw_config if raw_config is Dictionary else empty_config
 
 		# 按点分或直接取值
-		var raw_val: Variant = _get_nested_field(backend_dto, src_field)
+		var raw_value: Variant = _get_nested_field(backend_dto, source_field)
 
 		# 类型转换与安全守卫
-		var transformed_val: Variant = _apply_transform(raw_val, trans_kind, trans_cfg)
-		result[tgt_field] = transformed_val
+		var transformed_value: Variant = _apply_transform(raw_value, transform_kind, transform_config)
+		result[target_field] = transformed_value
 
 	return result
 
@@ -55,56 +55,56 @@ static func _get_nested_field(dict: Dictionary, path: String) -> Variant:
 	if path.is_empty():
 		return null
 	var parts: PackedStringArray = path.split(".")
-	var cur: Variant = dict
-	for p in parts:
-		if cur is Dictionary and cur.has(p):
-			cur = cur[p]
+	var current_node: Variant = dict
+	for segment in parts:
+		if current_node is Dictionary and current_node.has(segment):
+			current_node = current_node[segment]
 		else:
 			return null
-	return cur
+	return current_node
 
 
-static func _cast_int_with_clamp(val: Variant, cfg: Dictionary) -> Variant:
-	if val is String and not val.is_valid_int():
+static func _cast_int_with_clamp(raw_value: Variant, transform_config: Dictionary) -> Variant:
+	if raw_value is String and not raw_value.is_valid_int():
 		return null
-	var num: int = int(val)
-	if cfg.has("clamp_min") and num < int(cfg["clamp_min"]):
-		num = int(cfg["clamp_min"])
-	if cfg.has("clamp_max") and num > int(cfg["clamp_max"]):
-		num = int(cfg["clamp_max"])
-	return num
+	var parsed_int: int = int(raw_value)
+	if transform_config.has("clamp_min") and parsed_int < int(transform_config["clamp_min"]):
+		parsed_int = int(transform_config["clamp_min"])
+	if transform_config.has("clamp_max") and parsed_int > int(transform_config["clamp_max"]):
+		parsed_int = int(transform_config["clamp_max"])
+	return parsed_int
 
 
-static func _apply_cast_transform(val: Variant, cfg: Dictionary) -> Variant:
-	var target_type: String = String(cfg.get("to", "string")).to_lower()
+static func _apply_cast_transform(raw_value: Variant, transform_config: Dictionary) -> Variant:
+	var target_type: String = String(transform_config.get("to", "string")).to_lower()
 	match target_type:
 		"int":
-			return _cast_int_with_clamp(val, cfg)
+			return _cast_int_with_clamp(raw_value, transform_config)
 		"float":
-			if val is String and not val.is_valid_float():
+			if raw_value is String and not raw_value.is_valid_float():
 				return null
-			return float(val)
+			return float(raw_value)
 		"string":
-			return String(val)
+			return String(raw_value)
 		"bool":
-			return bool(val)
+			return bool(raw_value)
 		_:
-			return val
+			return raw_value
 
 
 ## 应用 transform
-static func _apply_transform(val: Variant, kind: String, cfg: Dictionary) -> Variant:
-	if val == null or kind == "identity":
-		return val
+static func _apply_transform(raw_value: Variant, kind: String, transform_config: Dictionary) -> Variant:
+	if raw_value == null or kind == "identity":
+		return raw_value
 	if kind == "cast":
-		return _apply_cast_transform(val, cfg)
-	return val
+		return _apply_cast_transform(raw_value, transform_config)
+	return raw_value
 
 
 ## 校验事件载荷是否满足前置过滤器条件
 static func _matches_event_filter(filter: Dictionary, payload: Dictionary) -> bool:
-	for k in filter.keys():
-		if payload.get(k) != filter[k]:
+	for filter_key in filter.keys():
+		if payload.get(filter_key) != filter[filter_key]:
 			return false
 	return true
 
@@ -129,8 +129,8 @@ static func route_domain_event(event: Dictionary) -> Dictionary:
 
 	var event_id: String = String(event.get("event_id", ""))
 	if event_id.is_empty():
-		_dispatch_seq += 1
-		event_id = "%s:%d:%d" % [String(event.get("channel", "")), Time.get_ticks_msec(), _dispatch_seq]
+		_dispatch_sequence += 1
+		event_id = "%s:%d:%d" % [String(event.get("channel", "")), Time.get_ticks_msec(), _dispatch_sequence]
 
 	if _dispatched_events.has(event_id):
 		return {"already_dispatched": true, "matched_contract_ids": [], "signals_to_emit": []}
@@ -142,12 +142,12 @@ static func route_domain_event(event: Dictionary) -> Dictionary:
 	var matched_ids: Array[String] = []
 	var signals_to_emit: Array[Dictionary] = []
 
-	for e in IndexClass.find_all():
-		if _is_channel_matching(channel, e.event_name) and _matches_event_filter(e.event_filter, payload):
-			matched_ids.append(e.contract_id)
+	for entry in IndexClass.find_all():
+		if _is_channel_matching(channel, entry.event_name) and _matches_event_filter(entry.event_filter, payload):
+			matched_ids.append(entry.contract_id)
 			signals_to_emit.append({
-				"view_name": e.view_name,
-				"signal_name": e.signal_name,
+				"view_name": entry.view_name,
+				"signal_name": entry.signal_name,
 				"payload": payload
 			})
 
@@ -185,9 +185,9 @@ static func dispatch_ui_command(command: Dictionary) -> Dictionary:
 ## 解析 UI 命令目标条目（优先视图索引，回退全局索引）
 static func _resolve_command_entry(view_name: String, command_id: String) -> Variant:
 	var entries: Array = IndexClass.find_by_view(view_name)
-	for e in entries:
-		if e.endpoint_kind == EntryClass.EndpointKind.COMMAND and (e.contract_id == command_id or e.method_name == command_id):
-			return e
+	for entry in entries:
+		if entry.endpoint_kind == EntryClass.EndpointKind.COMMAND and (entry.contract_id == command_id or entry.method_name == command_id):
+			return entry
 	var direct: Variant = IndexClass.get_contract(command_id)
 	if direct != null and direct.endpoint_kind == EntryClass.EndpointKind.COMMAND:
 		return direct
@@ -204,26 +204,26 @@ static func _validate_params_schema(schema: Array, params: Dictionary) -> bool:
 
 ## 校验单参数字段规则
 static func _validate_single_param_rule(rule: Dictionary, params: Dictionary) -> bool:
-	var f_name: String = String(rule.get("name", ""))
-	var f_required: bool = bool(rule.get("required", false))
-	var f_type: String = String(rule.get("type", ""))
+	var field_name: String = String(rule.get("name", ""))
+	var field_required: bool = bool(rule.get("required", false))
+	var field_type: String = String(rule.get("type", ""))
 
-	if f_required and not params.has(f_name):
+	if field_required and not params.has(field_name):
 		return false
-	if params.has(f_name) and not f_type.is_empty():
-		return _validate_field_type(params[f_name], f_type)
+	if params.has(field_name) and not field_type.is_empty():
+		return _validate_field_type(params[field_name], field_type)
 	return true
 
 ## 校验单字段类型匹配
-static func _validate_field_type(val: Variant, expected_type: String) -> bool:
+static func _validate_field_type(field_value: Variant, expected_type: String) -> bool:
 	match expected_type:
 		"int":
-			return val is int
+			return field_value is int
 		"float":
-			return val is float
+			return field_value is float
 		"bool":
-			return val is bool
+			return field_value is bool
 		"string":
-			return val is String
+			return field_value is String
 		_:
 			return false

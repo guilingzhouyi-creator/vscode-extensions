@@ -32,11 +32,11 @@ static func alert_breaking_change_pending(contracts: Array) -> void:
 		return
 
 	var clean_contracts: Array = []
-	for c in contracts:
-		if c is Dictionary:
-			clean_contracts.append(c)
-		elif c != null and c.has_method("to_dto"):
-			clean_contracts.append(c.to_dto())
+	for contract_item in contracts:
+		if contract_item is Dictionary:
+			clean_contracts.append(contract_item)
+		elif contract_item != null and contract_item.has_method("to_dto"):
+			clean_contracts.append(contract_item.to_dto())
 
 	EventBusCore.get_instance().emit_domain_event("contract_registry.breaking_change_pending", {
 		"contracts": clean_contracts,

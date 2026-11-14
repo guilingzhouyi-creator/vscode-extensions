@@ -56,29 +56,29 @@ enum EndpointKind {
 
 ## 对偶序列化：转换为字典 DTO
 func to_dto() -> Dictionary:
-	var kind_str: String = "DTO"
+	var kind_label: String = "DTO"
 	match endpoint_kind:
-		EndpointKind.DTO: kind_str = "DTO"
-		EndpointKind.EVENT: kind_str = "EVENT"
-		EndpointKind.COMMAND: kind_str = "COMMAND"
-		EndpointKind.GM_READONLY: kind_str = "GM_READONLY"
+		EndpointKind.DTO: kind_label = "DTO"
+		EndpointKind.EVENT: kind_label = "EVENT"
+		EndpointKind.COMMAND: kind_label = "COMMAND"
+		EndpointKind.GM_READONLY: kind_label = "GM_READONLY"
 
 	var clean_field_mapping: Array[Dictionary] = []
-	for fm in field_mapping:
-		if fm is Dictionary:
-			clean_field_mapping.append(fm)
+	for mapping_item in field_mapping:
+		if mapping_item is Dictionary:
+			clean_field_mapping.append(mapping_item)
 
 	var clean_params_schema: Array[Dictionary] = []
-	for ps in params_schema:
-		if ps is Dictionary:
-			clean_params_schema.append(ps)
+	for schema_item in params_schema:
+		if schema_item is Dictionary:
+			clean_params_schema.append(schema_item)
 
 	return {
 		"contract_id": contract_id,
 		"contract_version": contract_version,
 		"domain_name": domain_name,
 		"view_name": view_name,
-		"endpoint_kind": kind_str,
+		"endpoint_kind": kind_label,
 		"source_path": source_path,
 		"target_path": target_path,
 		"field_mapping": clean_field_mapping,
@@ -100,11 +100,11 @@ func to_dto() -> Dictionary:
 	}
 
 
-static func _parse_endpoint_kind(kind_val: Variant) -> EndpointKind:
-	if kind_val is int:
-		return kind_val as EndpointKind
-	if kind_val is String:
-		match String(kind_val).to_upper():
+static func _parse_endpoint_kind(kind_value: Variant) -> EndpointKind:
+	if kind_value is int:
+		return kind_value as EndpointKind
+	if kind_value is String:
+		match String(kind_value).to_upper():
 			"DTO": return EndpointKind.DTO
 			"EVENT": return EndpointKind.EVENT
 			"COMMAND": return EndpointKind.COMMAND
@@ -140,8 +140,8 @@ static func from_dto(dict: Dictionary) -> Resource:
 	entry.event_name = String(dict.get("event_name", ""))
 	entry.signal_name = String(dict.get("signal_name", ""))
 
-	var raw_ef: Variant = dict.get("event_filter", {})
-	entry.event_filter = (raw_ef as Dictionary).duplicate(true) if raw_ef is Dictionary else {}
+	var raw_event_filter: Variant = dict.get("event_filter", {})
+	entry.event_filter = (raw_event_filter as Dictionary).duplicate(true) if raw_event_filter is Dictionary else {}
 
 	entry.service_path = String(dict.get("service_path", ""))
 	entry.method_name = String(dict.get("method_name", ""))
