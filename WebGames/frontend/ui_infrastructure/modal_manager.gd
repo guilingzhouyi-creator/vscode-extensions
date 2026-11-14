@@ -102,14 +102,14 @@ func close_modal(modal: Control = null) -> void:
 	if _modal_stack.is_empty():
 		return
 
-	var target: Control = modal if modal != null else _modal_stack.back()
-	var modal_index := _modal_stack.find(target)
+	var target_modal: Control = modal if modal != null else _modal_stack.back()
+	var modal_index := _modal_stack.find(target_modal)
 	if modal_index >= 0:
 		_modal_stack.remove_at(modal_index)
 		_dismiss_flags.remove_at(modal_index)
-		target.visible = false
-		modal_closed.emit(target)
-		target.queue_free()
+		target_modal.visible = false
+		modal_closed.emit(target_modal)
+		target_modal.queue_free()
 
 	_update_backdrop()
 
@@ -138,7 +138,7 @@ func _update_backdrop() -> void:
 		if top_modal != null and top_modal.get_parent() == _modal_container:
 			_modal_container.move_child(_backdrop, max(0, top_modal.get_index() - 1))
 
-func _on_backdrop_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+func _on_backdrop_input(input_event: InputEvent) -> void:
+	if input_event is InputEventMouseButton and input_event.pressed and input_event.button_index == MOUSE_BUTTON_LEFT:
 		if not _dismiss_flags.is_empty() and _dismiss_flags.back():
 			close_modal()

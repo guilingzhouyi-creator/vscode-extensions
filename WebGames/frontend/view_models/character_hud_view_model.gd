@@ -49,24 +49,24 @@ class CharacterDomainModel extends RefCounted:
 		return clampf(ap_current / safe_max, 0.0, 1.0)
 
 	## 转换自 DTO
-	static func from_dto(transport_data: CharacterTransportDTO) -> CharacterDomainModel:
-		var model := CharacterDomainModel.new()
-		model.id = transport_data.character_id
-		model.name = transport_data.nickname
-		model.level = maxi(1, transport_data.level_raw)
-		model.current_hp = transport_data.hp_current
-		model.max_hp = maxf(1.0, transport_data.hp_maximum)
-		model.ap_current = transport_data.ap_current
-		model.ap_max = maxf(1.0, transport_data.ap_maximum)
-		model.monocrystals = maxi(0, transport_data.mana_monocrystals)
+	static func from_dto(transport_payload: CharacterTransportDTO) -> CharacterDomainModel:
+		var domain_model := CharacterDomainModel.new()
+		domain_model.id = transport_payload.character_id
+		domain_model.name = transport_payload.nickname
+		domain_model.level = maxi(1, transport_payload.level_raw)
+		domain_model.current_hp = transport_payload.hp_current
+		domain_model.max_hp = maxf(1.0, transport_payload.hp_maximum)
+		domain_model.ap_current = transport_payload.ap_current
+		domain_model.ap_max = maxf(1.0, transport_payload.ap_maximum)
+		domain_model.monocrystals = maxi(0, transport_payload.mana_monocrystals)
 
 		# 铜币折算为金/银/铜三元组
-		var total_copper: int = maxi(0, transport_data.coins_copper_total)
-		model.gold = total_copper / 10000
+		var total_copper: int = maxi(0, transport_payload.coins_copper_total)
+		domain_model.gold = total_copper / 10000
 		var remainder_copper: int = total_copper % 10000
-		model.silver = remainder_copper / 100
-		model.copper = remainder_copper % 100
-		return model
+		domain_model.silver = remainder_copper / 100
+		domain_model.copper = remainder_copper % 100
+		return domain_model
 
 ## 3. 视图模型 (面向 UI 渲染的呈现包装)
 class CharacterHUDViewModel extends RefCounted:

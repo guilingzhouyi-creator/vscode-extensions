@@ -26,7 +26,7 @@ static func get_instance() -> DialogManager:
 	return _instance
 
 func _add_modal_button(
-	panel: Control,
+	dialog_panel: Control,
 	button_box: HBoxContainer,
 	text_key: String,
 	min_width: float,
@@ -36,7 +36,7 @@ func _add_modal_button(
 	action_button.text = UIIntermediary.text(text_key)
 	action_button.custom_minimum_size = Vector2(min_width, 32)
 	action_button.pressed.connect(func():
-		ModalManager.get_instance().close_modal(panel)
+		ModalManager.get_instance().close_modal(dialog_panel)
 		if on_pressed.is_valid():
 			on_pressed.call()
 	)
@@ -45,79 +45,79 @@ func _add_modal_button(
 
 ## 弹出二次确认对话框 (确认 / 取消)
 func show_confirm(title: String, message: String, on_confirm: Callable, on_cancel: Callable = Callable()) -> Control:
-	var panel := _create_base_panel(title, message)
-	var button_box: HBoxContainer = panel.get_node("Content/ButtonBox")
-	_add_modal_button(panel, button_box, "ui.common.dialog.cancel", BTN_WIDTH_STANDARD, on_cancel)
-	_add_modal_button(panel, button_box, "ui.common.dialog.confirm", BTN_WIDTH_STANDARD, on_confirm)
-	ModalManager.get_instance().open_modal(panel, false)
-	return panel
+	var dialog_panel := _create_base_panel(title, message)
+	var button_box: HBoxContainer = dialog_panel.get_node("Content/ButtonBox")
+	_add_modal_button(dialog_panel, button_box, "ui.common.dialog.cancel", BTN_WIDTH_STANDARD, on_cancel)
+	_add_modal_button(dialog_panel, button_box, "ui.common.dialog.confirm", BTN_WIDTH_STANDARD, on_confirm)
+	ModalManager.get_instance().open_modal(dialog_panel, false)
+	return dialog_panel
 
 ## 弹出退出选择对话框 (退出到世界档案 / 直接退出游戏 / 取消)
 func show_exit_choice(title: String, message: String, on_exit_to_archive: Callable, on_quit_game: Callable, on_cancel: Callable = Callable()) -> Control:
-	var panel := _create_base_panel(title, message)
-	var button_box: HBoxContainer = panel.get_node("Content/ButtonBox")
-	_add_modal_button(panel, button_box, "ui.common.dialog.cancel", BTN_WIDTH_STANDARD, on_cancel)
-	_add_modal_button(panel, button_box, "ui.fe02.menu.exit_to_archive", BTN_WIDTH_EXIT, on_exit_to_archive)
-	_add_modal_button(panel, button_box, "ui.fe02.menu.exit", BTN_WIDTH_WIDE, on_quit_game)
-	ModalManager.get_instance().open_modal(panel, false)
-	return panel
+	var dialog_panel := _create_base_panel(title, message)
+	var button_box: HBoxContainer = dialog_panel.get_node("Content/ButtonBox")
+	_add_modal_button(dialog_panel, button_box, "ui.common.dialog.cancel", BTN_WIDTH_STANDARD, on_cancel)
+	_add_modal_button(dialog_panel, button_box, "ui.fe02.menu.exit_to_archive", BTN_WIDTH_EXIT, on_exit_to_archive)
+	_add_modal_button(dialog_panel, button_box, "ui.fe02.menu.exit", BTN_WIDTH_WIDE, on_quit_game)
+	ModalManager.get_instance().open_modal(dialog_panel, false)
+	return dialog_panel
 
 ## 弹出单按钮警告提示框
 func show_alert(title: String, message: String, on_acknowledged: Callable = Callable()) -> Control:
-	var panel := _create_base_panel(title, message)
-	var button_box: HBoxContainer = panel.get_node("Content/ButtonBox")
-	_add_modal_button(panel, button_box, "ui.common.dialog.ok", BTN_WIDTH_WIDE, on_acknowledged)
-	ModalManager.get_instance().open_modal(panel, false)
-	return panel
+	var dialog_panel := _create_base_panel(title, message)
+	var button_box: HBoxContainer = dialog_panel.get_node("Content/ButtonBox")
+	_add_modal_button(dialog_panel, button_box, "ui.common.dialog.ok", BTN_WIDTH_WIDE, on_acknowledged)
+	ModalManager.get_instance().open_modal(dialog_panel, false)
+	return dialog_panel
 
 ## 弹出带单行文本输入的对话框
 func show_prompt(title: String, placeholder: String, on_submit: Callable) -> Control:
-	var panel := _create_base_panel(title, "")
-	var content: VBoxContainer = panel.get_node("Content")
-	var button_box: HBoxContainer = panel.get_node("Content/ButtonBox")
+	var dialog_panel := _create_base_panel(title, "")
+	var content_column: VBoxContainer = dialog_panel.get_node("Content")
+	var button_box: HBoxContainer = dialog_panel.get_node("Content/ButtonBox")
 
 	var line_edit := LineEdit.new()
 	line_edit.placeholder_text = placeholder
 	line_edit.custom_minimum_size = Vector2(260, 36)
-	content.add_child(line_edit)
-	content.move_child(line_edit, 1) # 插入到标题下方、按钮上方
+	content_column.add_child(line_edit)
+	content_column.move_child(line_edit, 1) # 插入到标题下方、按钮上方
 
-	_add_modal_button(panel, button_box, "ui.common.dialog.cancel", BTN_WIDTH_STANDARD)
-	_add_modal_button(panel, button_box, "ui.common.dialog.submit", BTN_WIDTH_STANDARD, func():
+	_add_modal_button(dialog_panel, button_box, "ui.common.dialog.cancel", BTN_WIDTH_STANDARD)
+	_add_modal_button(dialog_panel, button_box, "ui.common.dialog.submit", BTN_WIDTH_STANDARD, func():
 		if on_submit.is_valid():
 			on_submit.call(line_edit.text)
 	)
 
-	ModalManager.get_instance().open_modal(panel, false)
-	return panel
+	ModalManager.get_instance().open_modal(dialog_panel, false)
+	return dialog_panel
 
 static var _shared_panel_style: StyleBoxFlat = null
 
 ## 创建基础弹窗面板骨架
 func _create_base_panel(title_text: String, message_text: String) -> PanelContainer:
-	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(340, 160)
+	var dialog_panel := PanelContainer.new()
+	dialog_panel.custom_minimum_size = Vector2(340, 160)
 
 	if _shared_panel_style == null:
-		var bg_style := StyleBoxFlat.new()
-		bg_style.bg_color = DesignTokens.COLOR_SURFACE_PANEL
-		bg_style.set_corner_radius_all(8)
-		bg_style.set_border_width_all(2)
-		bg_style.border_color = DesignTokens.COLOR_PRIMARY
-		_shared_panel_style = bg_style
-	panel.add_theme_stylebox_override("panel", _shared_panel_style)
+		var background_style := StyleBoxFlat.new()
+		background_style.bg_color = DesignTokens.COLOR_SURFACE_PANEL
+		background_style.set_corner_radius_all(8)
+		background_style.set_border_width_all(2)
+		background_style.border_color = DesignTokens.COLOR_PRIMARY
+		_shared_panel_style = background_style
+	dialog_panel.add_theme_stylebox_override("panel", _shared_panel_style)
 
-	var content := VBoxContainer.new()
-	content.name = "Content"
-	content.add_theme_constant_override("separation", DesignTokens.SPACING_MD)
-	panel.add_child(content)
+	var content_column := VBoxContainer.new()
+	content_column.name = "Content"
+	content_column.add_theme_constant_override("separation", DesignTokens.SPACING_MD)
+	dialog_panel.add_child(content_column)
 
 	var title_label := Label.new()
 	title_label.text = title_text
 	title_label.add_theme_font_size_override("font_size", DesignTokens.FONT_SIZE_TITLE_SM)
 	title_label.add_theme_color_override("font_color", DesignTokens.COLOR_ACCENT_GOLD)
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	content.add_child(title_label)
+	content_column.add_child(title_label)
 
 	if not message_text.is_empty():
 		var message_label := Label.new()
@@ -125,12 +125,12 @@ func _create_base_panel(title_text: String, message_text: String) -> PanelContai
 		message_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		message_label.add_theme_font_size_override("font_size", DesignTokens.FONT_SIZE_BODY)
 		message_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_SECONDARY)
-		content.add_child(message_label)
+		content_column.add_child(message_label)
 
 	var button_box := HBoxContainer.new()
 	button_box.name = "ButtonBox"
 	button_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	button_box.add_theme_constant_override("separation", DesignTokens.SPACING_MD)
-	content.add_child(button_box)
+	content_column.add_child(button_box)
 
-	return panel
+	return dialog_panel

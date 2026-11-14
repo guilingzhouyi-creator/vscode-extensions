@@ -56,14 +56,14 @@ func pop_focus_trap() -> void:
 func get_trap_depth() -> int:
 	return _active_traps.size()
 
-func _find_first_focusable(node: Node) -> Control:
-	if node is Control:
-		var control_node: Control = node
+func _find_first_focusable(search_node: Node) -> Control:
+	if search_node is Control:
+		var control_node: Control = search_node
 		if control_node.focus_mode != Control.FOCUS_NONE and control_node.visible:
 			return control_node
 
-	for child in node.get_children():
-		var found := _find_first_focusable(child)
-		if found != null:
-			return found
+	for child_node in search_node.get_children():
+		var focusable_control := _find_first_focusable(child_node)
+		if focusable_control != null:
+			return focusable_control
 	return null

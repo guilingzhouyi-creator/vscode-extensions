@@ -23,58 +23,58 @@ static func get_instance() -> TooltipManager:
 		_instance.name = "TooltipManager"
 	return _instance
 
-var _layer: CanvasLayer
-var _container: Control
+var _target_layer: CanvasLayer
+var _tooltip_container: Control
 var _bubble_panel: PanelContainer
 var _text_label: Label
 var _is_visible: bool = false
 
 ## 绑定气泡宿主的 CanvasLayer 与容器节点并预构建气泡面板
-func bind_layer(layer: CanvasLayer, container: Control = null) -> void:
-	_layer = layer
-	_container = container if container != null else ModalManager.ensure_fallback_container(layer, "TooltipManagerFallbackContainer")
+func bind_layer(target_layer: CanvasLayer, target_container: Control = null) -> void:
+	_target_layer = target_layer
+	_tooltip_container = target_container if target_container != null else ModalManager.ensure_fallback_container(target_layer, "TooltipManagerFallbackContainer")
 	_ensure_bubble()
 
 func _ensure_bubble() -> void:
-	if _bubble_panel != null or _container == null:
+	if _bubble_panel != null or _tooltip_container == null:
 		return
 	_bubble_panel = PanelContainer.new()
 	_bubble_panel.name = "TooltipBubble"
 	_bubble_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_bubble_panel.visible = false
 
-	var style := StyleBoxFlat.new()
-	style.bg_color = DesignTokens.COLOR_SURFACE_CARD
-	style.set_corner_radius_all(6)
-	style.border_width_bottom = 1
-	style.border_width_left = 1
-	style.border_width_right = 1
-	style.border_width_top = 1
-	style.border_color = DesignTokens.COLOR_PRIMARY
-	_bubble_panel.add_theme_stylebox_override("panel", style)
+	var bubble_style := StyleBoxFlat.new()
+	bubble_style.bg_color = DesignTokens.COLOR_SURFACE_CARD
+	bubble_style.set_corner_radius_all(6)
+	bubble_style.border_width_bottom = 1
+	bubble_style.border_width_left = 1
+	bubble_style.border_width_right = 1
+	bubble_style.border_width_top = 1
+	bubble_style.border_color = DesignTokens.COLOR_PRIMARY
+	_bubble_panel.add_theme_stylebox_override("panel", bubble_style)
 
 	_text_label = Label.new()
 	_text_label.add_theme_font_size_override("font_size", DesignTokens.FONT_SIZE_BODY)
 	_text_label.add_theme_color_override("font_color", DesignTokens.COLOR_TEXT_PRIMARY)
 	_bubble_panel.add_child(_text_label)
 
-	_container.add_child(_bubble_panel)
+	_tooltip_container.add_child(_bubble_panel)
 
 ## 核心防碰撞翻转坐标算法
-static func calculate_tooltip_pos(target_rect: Rect2, tooltip_size: Vector2, viewport_size: Vector2) -> Vector2:
-	var gap: float = 8.0
+static func calculate_tooltip_pos(target_bounds: Rect2, tooltip_size: Vector2, viewport_size: Vector2) -> Vector2:
+	var margin_gap: float = 8.0
 	var tooltip_position := Vector2.ZERO
 
 	# 水平轴：优先右侧，右侧放不下则翻转到左侧
-	if target_rect.position.x + target_rect.size.x + gap + tooltip_size.x <= viewport_size.x:
-		tooltip_position.x = target_rect.position.x + target_rect.size.x + gap
+	if target_bounds.position.x + target_bounds.size.x + margin_gap + tooltip_size.x <= viewport_size.x:
+		tooltip_position.x = target_bounds.position.x + target_bounds.size.x + margin_gap
 	else:
-		tooltip_position.x = target_rect.position.x - tooltip_size.x - gap
+		tooltip_position.x = target_bounds.position.x - tooltip_size.x - margin_gap
 
 	# 垂直轴：优先对齐顶端，底部溢出则向上修正
-	tooltip_position.y = target_rect.position.y
+	tooltip_position.y = target_bounds.position.y
 	if tooltip_position.y + tooltip_size.y > viewport_size.y:
-		tooltip_position.y = maxf(0.0, viewport_size.y - tooltip_size.y - gap)
+		tooltip_position.y = maxf(0.0, viewport_size.y - tooltip_size.y - margin_gap)
 
 	# 安全回退钳制在可视区内
 	tooltip_position.x = clampf(tooltip_position.x, 0.0, maxf(0.0, viewport_size.x - tooltip_size.x))
@@ -82,26 +82,26 @@ static func calculate_tooltip_pos(target_rect: Rect2, tooltip_size: Vector2, vie
 	return tooltip_position
 
 ## 显示悬浮提示
-func show_tooltip(target_rect: Rect2, text: String, _extra_data: Dictionary = {}) -> void:
-	if _container == null:
+func show_tooltip(target_bounds: Rect2, tooltip_text_content: String, _extra_metadata: Dictionary = {}) -> void:
+	if _tooltip_container == null:
 		_ensure_bubble()
 	if _bubble_panel == null or _text_label == null:
 		return
 
-	_text_label.text = text
+	_text_label.text = tooltip_text_content
 	_bubble_panel.visible = true
 	_is_visible = true
 
-	var viewport_size: Vector2 = _container.get_viewport_rect().size if _container.is_inside_tree() else Vector2(1920, 1080)
+	var viewport_size: Vector2 = _tooltip_container.get_viewport_rect().size if _tooltip_container.is_inside_tree() else Vector2(1920, 1080)
 	var tooltip_size: Vector2 = _bubble_panel.get_combined_minimum_size()
 	if tooltip_size.x <= 0:
 		tooltip_size = Vector2(180, 48)
 
-	var calculated_position := calculate_tooltip_pos(target_rect, tooltip_size, viewport_size)
+	var calculated_position := calculate_tooltip_pos(target_bounds, tooltip_size, viewport_size)
 	# 目标矩形为画布全局坐标，转换为容器本地坐标后赋值，兼容非全屏偏移容器
-	_bubble_panel.position = _container.get_global_transform().affine_inverse() * calculated_position
+	_bubble_panel.position = _tooltip_container.get_global_transform().affine_inverse() * calculated_position
 
-	tooltip_shown.emit(text)
+	tooltip_shown.emit(tooltip_text_content)
 
 ## 隐藏悬浮提示
 func hide_tooltip() -> void:

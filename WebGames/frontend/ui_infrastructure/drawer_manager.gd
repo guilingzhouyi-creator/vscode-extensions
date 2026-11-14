@@ -30,16 +30,16 @@ static func get_instance() -> DrawerManager:
 		_instance.name = "DrawerManager"
 	return _instance
 
-var _layer: CanvasLayer
-var _container: Control
+var _target_layer: CanvasLayer
+var _drawer_container: Control
 var _active_drawer: Control
 var _backdrop: ColorRect
 
 ## 绑定抽屉挂载的 CanvasLayer 与承载容器
-func bind_layer(layer: CanvasLayer, container: Control = null) -> void:
-	_layer = layer
-	_container = container if container != null else ModalManager.ensure_fallback_container(layer, "DrawerManagerFallbackContainer")
-	_backdrop = ModalManager.ensure_backdrop_for_container(_container, _backdrop, "DrawerBackdrop", _on_backdrop_input)
+func bind_layer(target_layer: CanvasLayer, target_container: Control = null) -> void:
+	_target_layer = target_layer
+	_drawer_container = target_container if target_container != null else ModalManager.ensure_fallback_container(target_layer, "DrawerManagerFallbackContainer")
+	_backdrop = ModalManager.ensure_backdrop_for_container(_drawer_container, _backdrop, "DrawerBackdrop", _on_backdrop_input)
 
 ## 打开抽屉
 func open_drawer(drawer: Control, side: EdgeSide = EdgeSide.RIGHT) -> bool:
@@ -49,8 +49,8 @@ func open_drawer(drawer: Control, side: EdgeSide = EdgeSide.RIGHT) -> bool:
 	if _active_drawer != null and _active_drawer != drawer:
 		close_drawer(_active_drawer)
 
-	if _container != null and drawer.get_parent() != _container:
-		_container.add_child(drawer)
+	if _drawer_container != null and drawer.get_parent() != _drawer_container:
+		_drawer_container.add_child(drawer)
 
 	_active_drawer = drawer
 	drawer.visible = true
@@ -68,26 +68,26 @@ func open_drawer(drawer: Control, side: EdgeSide = EdgeSide.RIGHT) -> bool:
 
 	if _backdrop != null:
 		_backdrop.visible = true
-		if drawer.get_parent() == _container:
-			_container.move_child(_backdrop, max(0, drawer.get_index() - 1))
+		if drawer.get_parent() == _drawer_container:
+			_drawer_container.move_child(_backdrop, max(0, drawer.get_index() - 1))
 
 	drawer_opened.emit(drawer, side)
 	return true
 
 ## 关闭当前抽屉
 func close_drawer(drawer: Control = null) -> void:
-	var target: Control = drawer if drawer != null else _active_drawer
-	if target == null:
+	var target_drawer: Control = drawer if drawer != null else _active_drawer
+	if target_drawer == null:
 		return
 
-	if target == _active_drawer:
+	if target_drawer == _active_drawer:
 		_active_drawer = null
 
-	target.visible = false
+	target_drawer.visible = false
 	if _backdrop != null:
 		_backdrop.visible = false
 
-	drawer_closed.emit(target)
+	drawer_closed.emit(target_drawer)
 
 ## 获取当前处于打开状态的抽屉控件
 func get_active_drawer() -> Control:
@@ -97,6 +97,6 @@ func get_active_drawer() -> Control:
 func is_drawer_open() -> bool:
 	return _active_drawer != null
 
-func _on_backdrop_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+func _on_backdrop_input(input_event: InputEvent) -> void:
+	if input_event is InputEventMouseButton and input_event.pressed and input_event.button_index == MOUSE_BUTTON_LEFT:
 		close_drawer()

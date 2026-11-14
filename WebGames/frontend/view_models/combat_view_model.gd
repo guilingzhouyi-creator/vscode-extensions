@@ -51,10 +51,10 @@ func update_from_snapshot(snapshot: Dictionary) -> void:
 
 	data_changed.emit()
 
-## 非有限值（NaN/INF）经守卫回退 fallback，防止 int(NAN) 等异常整数转换
-static func _safe_float(value: Variant, fallback: float = 0.0) -> float:
-	var numeric_value := float(value)
-	return numeric_value if is_finite(numeric_value) else fallback
+## 非有限值（NaN/INF）经守卫回退 fallback_value，防止 int(NAN) 等异常整数转换
+static func _safe_float(raw_value: Variant, fallback_value: float = 0.0) -> float:
+	var numeric_value := float(raw_value)
+	return numeric_value if is_finite(numeric_value) else fallback_value
 
 ## 追加战斗日志（超上限时裁剪最旧，保持有界）
 func append_log(category: String, message: String) -> void:
@@ -68,5 +68,5 @@ func append_log(category: String, message: String) -> void:
 	data_changed.emit()
 
 ## 请求飘字
-func request_floating_text(text: String, is_crit: bool, is_heal: bool, target_position: Vector2) -> void:
-	floating_text_requested.emit(text, is_crit, is_heal, target_position)
+func request_floating_text(display_text: String, is_critical: bool, is_heal: bool, target_position: Vector2) -> void:
+	floating_text_requested.emit(display_text, is_critical, is_heal, target_position)
