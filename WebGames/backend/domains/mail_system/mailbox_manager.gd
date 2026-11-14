@@ -35,36 +35,36 @@ func _max_capacity() -> int:
 	return maxi(1, GameConfig.get_int("domains.mail_system", "mailbox/max_capacity", MAX_MAILBOX_CAPACITY))
 
 ## 按邮件 ID 检索（未命中返回 null）
-func get_mail_by_id(p_mail_id: String) -> MailItemAggregate:
-	for m in stored_mails:
-		if m.mail_id == p_mail_id:
-			return m
+func get_mail_by_id(target_mail_id: String) -> MailItemAggregate:
+	for mail_item in stored_mails:
+		if mail_item.mail_id == target_mail_id:
+			return mail_item
 	return null
 
 ## 未读邮件计数
 func get_unread_count() -> int:
-	var cnt := 0
-	for m in stored_mails:
-		if m.status == MailItemAggregate.MailStatus.UNREAD:
-			cnt += 1
-	return cnt
+	var unread_count := 0
+	for mail_item in stored_mails:
+		if mail_item.status == MailItemAggregate.MailStatus.UNREAD:
+			unread_count += 1
+	return unread_count
 
 ## 过期失效：按过期时间戳批量置 EXPIRED（返回失效数）
 func update_expiry(current_time_utc: int) -> int:
 	var expired_count := 0
-	for m in stored_mails:
-		if m.expire_timestamp_utc > 0 and current_time_utc >= m.expire_timestamp_utc:
-			if m.status != MailItemAggregate.MailStatus.EXPIRED:
-				m.status = MailItemAggregate.MailStatus.EXPIRED
+	for mail_item in stored_mails:
+		if mail_item.expire_timestamp_utc > 0 and current_time_utc >= mail_item.expire_timestamp_utc:
+			if mail_item.status != MailItemAggregate.MailStatus.EXPIRED:
+				mail_item.status = MailItemAggregate.MailStatus.EXPIRED
 				expired_count += 1
 	return expired_count
 
 ## GC 清理：从后向前回收已读已提取/已读无附件且非置顶邮件至容量达标
 func _purge_old_read_mails() -> void:
 	# 从后向前扫描已读且已提取附件（或已读且无附件）、且非置顶锁定的邮件
-	var i: Variant = stored_mails.size() - 1
-	while i >= 0 and stored_mails.size() >= _max_capacity():
-		var m: Variant = stored_mails[i]
-		if (not m.is_pinned) and (m.status == MailItemAggregate.MailStatus.READ_CLAIMED or (m.status == MailItemAggregate.MailStatus.READ_UNCLAIMED and not m.has_attachment)):
-			stored_mails.remove_at(i)
-		i -= 1
+	var scan_index: Variant = stored_mails.size() - 1
+	while scan_index >= 0 and stored_mails.size() >= _max_capacity():
+		var mail_item: Variant = stored_mails[scan_index]
+		if (not mail_item.is_pinned) and (mail_item.status == MailItemAggregate.MailStatus.READ_CLAIMED or (mail_item.status == MailItemAggregate.MailStatus.READ_UNCLAIMED and not mail_item.has_attachment)):
+			stored_mails.remove_at(scan_index)
+		scan_index -= 1

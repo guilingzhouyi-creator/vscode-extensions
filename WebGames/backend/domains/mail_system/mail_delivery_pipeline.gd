@@ -24,7 +24,7 @@ static func claim_single_mail(
 	wallet: CharacterWalletEntity,
 	inventory: WearableInventoryAggregate,
 	catalog: ItemRegistryCatalog,
-	library: AccountItemLibraryAggregate = null
+	library: AccountItemLibrary = null
 ) -> Dictionary:
 	if mail == null or wallet == null or inventory == null or catalog == null or mail.mail_id.is_empty():
 		return {"success": false, "error_code": "MISSING_CONTEXT"}
@@ -60,12 +60,12 @@ static func claim_single_mail(
 			inventory.restore(inventory_snapshot)
 			mail.attachment_items = mail_items_snapshot
 			return {"success": false, "error_code": "INVALID_ATTACHMENT_COUNT"}
-		var proto: Variant = catalog.get_prototype(item_id)
-		if proto == null:
+		var prototype: Variant = catalog.get_prototype(item_id)
+		if prototype == null:
 			remaining_items.append(item_dict)
 			continue
 		var display_name := str(item_dict.get("name", _msg("attachment_item")))
-		var delivered := _deliver_items(proto, display_name, item_id, item_count, mail.mail_id, inventory, library, catalog)
+		var delivered := _deliver_items(prototype, display_name, item_id, item_count, mail.mail_id, inventory, library, catalog)
 		claimed_items_count += delivered
 		if delivered < item_count:
 			var remaining: Dictionary = {
@@ -117,7 +117,7 @@ static func claim_all_mails(
 	wallet: CharacterWalletEntity,
 	inventory: WearableInventoryAggregate,
 	catalog: ItemRegistryCatalog,
-	library: AccountItemLibraryAggregate = null
+	library: AccountItemLibrary = null
 ) -> Dictionary:
 	var total_gold := 0
 	var total_crystals := 0
@@ -126,11 +126,11 @@ static func claim_all_mails(
 
 	for mail in mailbox.stored_mails:
 		if mail.has_unclaimed_attachment():
-			var res := claim_single_mail(mail, wallet, inventory, catalog, library)
-			if res.success:
-				total_gold += res.claimed_gold
-				total_crystals += res.claimed_crystals
-				total_items += res.claimed_items_count
+			var claim_result := claim_single_mail(mail, wallet, inventory, catalog, library)
+			if claim_result.success:
+				total_gold += claim_result.claimed_gold
+				total_crystals += claim_result.claimed_crystals
+				total_items += claim_result.claimed_items_count
 				mails_processed += 1
 
 	return {
@@ -142,18 +142,18 @@ static func claim_all_mails(
 	}
 
 static func _deliver_items(
-	proto: ItemRegistryCatalog.ItemPrototypeTemplate,
+	prototype: ItemRegistryCatalog.ItemPrototypeTemplate,
 	display_name: String,
 	item_id: String,
 	item_count: int,
 	mail_id: String,
 	inventory: WearableInventoryAggregate,
-	library: AccountItemLibraryAggregate,
+	library: AccountItemLibrary,
 	catalog: ItemRegistryCatalog
 ) -> int:
 	var delivered := 0
-	for i in range(item_count):
-		var item := ItemInstanceFactory.build_instance(proto, display_name, "MAIL_")
+	for item_index in range(item_count):
+		var item := ItemInstanceFactory.build_instance(prototype, display_name, "MAIL_")
 		if not inventory.add_item(item):
 			break
 		delivered += 1

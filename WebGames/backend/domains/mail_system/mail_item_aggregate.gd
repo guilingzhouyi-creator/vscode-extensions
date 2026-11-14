@@ -39,17 +39,17 @@ var attachment_items: Array = []                 # [{"template_id": "WEAPON_LEGE
 
 ## 邮件聚合构造（ID/收件人/标题/正文/发件人）
 func _init(
-	p_id: String = "",
-	p_recipient: String = "",
-	p_title: String = "",
-	p_content: String = "",
-	p_sender: String = "GM_SYSTEM"
+	initial_mail_id: String = "",
+	initial_recipient_account_id: String = "",
+	initial_title: String = "",
+	initial_text_content: String = "",
+	initial_sender_name: String = "GM_SYSTEM"
 ) -> void:
-	mail_id = p_id
-	recipient_account_id = p_recipient
-	title = p_title
-	text_content = p_content
-	sender_name = p_sender
+	mail_id = initial_mail_id
+	recipient_account_id = initial_recipient_account_id
+	title = initial_title
+	text_content = initial_text_content
+	sender_name = initial_sender_name
 
 ## 标记已读：按有无附件分派 READ_UNCLAIMED / READ_CLAIMED
 func mark_read() -> void:
