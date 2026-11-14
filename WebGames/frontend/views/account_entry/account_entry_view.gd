@@ -2,10 +2,13 @@
 # 模块归属: 前端表现层 (Frontend · 第1卷 账号与入口系统视图控制器)
 # 文件路径: res://frontend/views/account_entry/account_entry_view.gd
 # 架构定位: Presentation View Controller / Snapshot-Driven Screen
-# 跨域依赖: 上游: NavManager, MockServiceContainer, FrontendSnapshot | 下游: AccountEntryTabs, UIIntermediary, DesignTokens | 配置: config/frontend/views.json | 信号: 本地控件交互信号
-# 职责说明: 登录/注册/选服/创角/角色选择界面交互状态机、单机MOD创角UI受控适配与表单数据驱动 (零业务逻辑表现宿主)
-# 设计依据: 业务领域第一性原理与前端表现层边界解耦契约
+# 依赖与触发: 上游: NavManager, MockServiceContainer, FrontendSnapshot
+#           下游: AccountEntryTabs, UIIntermediary, DesignTokens | 配置: views.json
+# 职责说明: 登录/注册/选服/创角/角色选择界面交互状态机、单机MOD创角UI受控适配
+#           与表单数据驱动 (零业务逻辑表现宿主)。
+# 退出语义与设计依据: 业务领域第一性原理与前端表现层边界解耦契约
 # ==============================================================================
+## AccountEntryView：第1卷账号登录、注册、选服、选角与创角视图宿主
 class_name AccountEntryView
 extends BaseScreen
 
@@ -57,7 +60,7 @@ var form_selected_positive_trait: String = ""
 var form_reroll_nonce: int = 0
 
 # 资质骰点缓存
-var _rolled_attrs: Dictionary = {}
+var _rolled_attributes: Dictionary = {}
 
 # --- 界面容器 ---
 @onready var splash_panel: Control = %SplashPanel
@@ -125,9 +128,9 @@ func _init() -> void:
     _load_mock_snapshot()
 
 func _ready() -> void:
-    var theme_mgr := ThemeManager.get_instance()
-    if theme_mgr.theme != null:
-        theme = theme_mgr.theme
+    var theme_manager := ThemeManager.get_instance()
+    if theme_manager.theme != null:
+        theme = theme_manager.theme
 
     var tabs: AccountEntryTabs = _get_tabs()
     tabs.init_all_text()
@@ -140,10 +143,11 @@ func _ready() -> void:
     UIIntermediary.adapt_view(self)
 
 func _load_mock_snapshot() -> void:
-    var account_data: Dictionary = MockServiceContainer.get_instance().snapshot_data().load_snapshot("account")
-    if not account_data.is_empty():
-        apply_snapshot(account_data)
+    var account_payload: Dictionary = MockServiceContainer.get_instance().snapshot_data().load_snapshot("account")
+    if not account_payload.is_empty():
+        apply_snapshot(account_payload)
 
+## 切换账号入口页面的当前显示状态面板
 func switch_state(new_state: EntryState) -> void:
     current_state = new_state
     var panel_states: Array = [
@@ -161,13 +165,14 @@ func _set_panel_visibility(panel: Control, is_visible: bool) -> void:
     if panel != null:
         panel.visible = is_visible
 
+## 提交账号登录表单并切换至选角状态
 func submit_login(username: String, password_plain: String) -> Dictionary:
     form_username = username.strip_edges()
     form_password = password_plain
     if form_username.is_empty():
         return {"success": false, "error_code": "ERR_EMPTY_USERNAME", "message": "ui.fe01.login.error_empty", "error_data": {}}
-    var mode := ServiceLocator.get_mode()
-    if mode == "backend" or mode == "real":
+    var service_mode := ServiceLocator.get_mode()
+    if service_mode == "backend" or service_mode == "real":
         return _get_tabs().login_backend_flow(form_username, form_password)
 
     current_account_id = "ACC_" + form_username.to_upper()
@@ -175,14 +180,15 @@ func submit_login(username: String, password_plain: String) -> Dictionary:
     switch_state(EntryState.CHARACTER_SELECT)
     return {"success": true, "account_id": current_account_id, "token": current_session_token}
 
+## 提交账号注册表单校验并切换至创角状态
 func submit_register(username: String, password_plain: String) -> Dictionary:
     form_username = username.strip_edges()
     form_password = password_plain
-    var min_len: int = GameConfig.get_int("frontend.views", "fe01_account_entry/min_username_len", 3)
-    if form_username.length() < min_len:
-        return {"success": false, "error_code": "ERR_USERNAME_TOO_SHORT", "message": "ui.fe01.register.error_short", "error_data": {"min": min_len}}
-    var mode := ServiceLocator.get_mode()
-    if mode == "backend" or mode == "real":
+    var minimum_username_length: int = GameConfig.get_int("frontend.views", "fe01_account_entry/min_username_len", 3)
+    if form_username.length() < minimum_username_length:
+        return {"success": false, "error_code": "ERR_USERNAME_TOO_SHORT", "message": "ui.fe01.register.error_short", "error_data": {"min": minimum_username_length}}
+    var service_mode := ServiceLocator.get_mode()
+    if service_mode == "backend" or service_mode == "real":
         return _get_tabs().register_backend_flow(form_username, form_password)
 
     current_account_id = "ACC_" + form_username.to_upper()
@@ -190,34 +196,38 @@ func submit_register(username: String, password_plain: String) -> Dictionary:
     switch_state(EntryState.CHARACTER_CREATE)
     return {"success": true, "account_id": current_account_id, "token": current_session_token}
 
+## 选定目标区服并激活对应网关连接上下文
 func select_server(server_id: String) -> Dictionary:
     current_server_id = server_id
     if not current_account_id.is_empty():
-        var active_gw: RefCounted = ServiceLocator.get_active_gateway()
-        if active_gw == null:
+        var active_gateway: RefCounted = ServiceLocator.get_active_gateway()
+        if active_gateway == null:
             ServiceLocator.create_and_activate_gateway(current_account_id)
-        elif active_gw.has_method("enter_gateway"):
-            active_gw.call("enter_gateway")
+        elif active_gateway.has_method("enter_gateway"):
+            active_gateway.call("enter_gateway")
     return {"success": true, "selected_server": server_id}
 
 ## 退出当前账号，注销凭证并复位到登录页
 func logout_account() -> Dictionary:
     if not current_session_token.is_empty():
-        var auth_svc: Variant = ServiceLocator.get_instance().auth()
-        if auth_svc != null and auth_svc.has_method("revoke_token"):
-            auth_svc.call("revoke_token", current_session_token)
+        var auth_service: Variant = ServiceLocator.get_instance().auth()
+        if auth_service != null and auth_service.has_method("revoke_token"):
+            auth_service.call("revoke_token", current_session_token)
     current_session_token = ""
     current_account_id = ""
     selected_character_slot = ""
     form_username = ""
     form_password = ""
     character_slots.clear()
-    if login_username_edit != null: login_username_edit.text = ""
-    if login_password_edit != null: login_password_edit.text = ""
+    if login_username_edit != null:
+        login_username_edit.text = ""
+    if login_password_edit != null:
+        login_password_edit.text = ""
     ServiceLocator.clear_active_gateway()
     switch_state(EntryState.LOGIN)
     return {"success": true, "message": UIIntermediary.text("ui.fe01.logout.success")}
 
+## 注入角色槽位列表快照
 func set_character_slots_snapshot(slots: Array) -> void:
     apply_snapshot({"character_slots": slots})
 
@@ -229,47 +239,52 @@ func _render_from_snapshot() -> void:
     if _has_mod_creation_snapshot_keys(snapshot):
         _get_tabs().sync_mod_creation_snapshot(snapshot)
 
-func _has_mod_creation_snapshot_keys(snap: Dictionary) -> bool:
-    return snap.has("creation_ui_snapshot") or snap.has("mod_precheck_checklist") or snap.has("precheck_checklist") or snap.has("ui_controls") or snap.has("creation_ui_controls") or snap.has("available_origins_list") or snap.has("available_origins") or snap.has("available_traits_list") or snap.has("available_trait_pairs")
+func _has_mod_creation_snapshot_keys(snapshot_payload: Dictionary) -> bool:
+    return snapshot_payload.has("creation_ui_snapshot") or snapshot_payload.has("mod_precheck_checklist") or snapshot_payload.has("precheck_checklist") or snapshot_payload.has("ui_controls") or snapshot_payload.has("creation_ui_controls") or snapshot_payload.has("available_origins_list") or snapshot_payload.has("available_origins") or snapshot_payload.has("available_traits_list") or snapshot_payload.has("available_trait_pairs")
 
-func select_custom_origin_by_index(idx: int) -> bool:
-    if not bool(creation_ui_controls.get("allow_manual_origin_select", false)) or idx < 0 or idx >= available_origins_list.size():
+## 在受控权限允许时按索引选中自定义出身
+func select_custom_origin_by_index(origin_index: int) -> bool:
+    if not bool(creation_ui_controls.get("allow_manual_origin_select", false)) or origin_index < 0 or origin_index >= available_origins_list.size():
         return false
-    var origin_id: String = TabsClass.extract_origin_id(available_origins_list[idx])
+    var origin_id: String = TabsClass.extract_origin_id(available_origins_list[origin_index])
     if origin_id.is_empty():
         return false
     form_selected_origin_id = origin_id
-    if char_origin_option != null and idx < char_origin_option.item_count:
-        char_origin_option.select(idx)
+    if char_origin_option != null and origin_index < char_origin_option.item_count:
+        char_origin_option.select(origin_index)
     return true
 
+## 在受控权限允许时按出身标识选中自定义出身
 func select_custom_origin(origin_id: String) -> bool:
     if not bool(creation_ui_controls.get("allow_manual_origin_select", false)) or origin_id.is_empty():
         return false
-    for i in range(available_origins_list.size()):
-        if TabsClass.extract_origin_id(available_origins_list[i]) == origin_id:
-            return select_custom_origin_by_index(i)
+    for origin_index in range(available_origins_list.size()):
+        if TabsClass.extract_origin_id(available_origins_list[origin_index]) == origin_id:
+            return select_custom_origin_by_index(origin_index)
     return false
 
-func select_custom_trait_by_index(idx: int) -> bool:
-    if not bool(creation_ui_controls.get("allow_manual_trait_select", false)) or idx < 0 or idx >= available_traits_list.size():
+## 在受控权限允许时按索引选中自定义正向特质
+func select_custom_trait_by_index(trait_index: int) -> bool:
+    if not bool(creation_ui_controls.get("allow_manual_trait_select", false)) or trait_index < 0 or trait_index >= available_traits_list.size():
         return false
-    var trait_id: String = TabsClass.extract_positive_trait_id(available_traits_list[idx])
+    var trait_id: String = TabsClass.extract_positive_trait_id(available_traits_list[trait_index])
     if trait_id.is_empty():
         return false
     form_selected_positive_trait = trait_id
-    if char_talent_list != null and idx < char_talent_list.item_count:
-        char_talent_list.select(idx)
+    if char_talent_list != null and trait_index < char_talent_list.item_count:
+        char_talent_list.select(trait_index)
     return true
 
-func select_custom_trait(pos_trait_id: String) -> bool:
-    if not bool(creation_ui_controls.get("allow_manual_trait_select", false)) or pos_trait_id.is_empty():
+## 在受控权限允许时按特质标识选中自定义正向特质
+func select_custom_trait(positive_trait_id: String) -> bool:
+    if not bool(creation_ui_controls.get("allow_manual_trait_select", false)) or positive_trait_id.is_empty():
         return false
-    for i in range(available_traits_list.size()):
-        if TabsClass.extract_positive_trait_id(available_traits_list[i]) == pos_trait_id:
-            return select_custom_trait_by_index(i)
+    for trait_index in range(available_traits_list.size()):
+        if TabsClass.extract_positive_trait_id(available_traits_list[trait_index]) == positive_trait_id:
+            return select_custom_trait_by_index(trait_index)
     return false
 
+## 触发单机MOD创角属性重随并递增随机序号
 func trigger_mod_attribute_reroll() -> bool:
     if not bool(creation_ui_controls.get("allow_attribute_reroll", false)):
         return false
@@ -277,19 +292,21 @@ func trigger_mod_attribute_reroll() -> bool:
     _get_tabs().roll_attributes()
     return true
 
+## 组装提交给后端创角接口的自定义附加参数载荷
 func build_creation_request_payload() -> Dictionary:
-    var extra: Dictionary = {}
+    var extra_fields: Dictionary = {}
     if bool(creation_ui_controls.get("allow_manual_origin_select", false)) and not form_selected_origin_id.is_empty():
-        extra["selected_origin_id"] = form_selected_origin_id
+        extra_fields["selected_origin_id"] = form_selected_origin_id
     if bool(creation_ui_controls.get("allow_manual_trait_select", false)) and not form_selected_positive_trait.is_empty():
-        extra["selected_positive_trait"] = form_selected_positive_trait
+        extra_fields["selected_positive_trait"] = form_selected_positive_trait
     if bool(creation_ui_controls.get("allow_attribute_reroll", false)) and form_reroll_nonce > 0:
-        extra["reroll_nonce"] = form_reroll_nonce
+        extra_fields["reroll_nonce"] = form_reroll_nonce
     return {
         "character_name": form_character_name,
-        "extra_custom_fields": extra
+        "extra_custom_fields": extra_fields
     }
 
+## 记录当前选中的角色槽位标识
 func select_character_slot(slot_id: String) -> Dictionary:
     selected_character_slot = slot_id
     return {"success": true, "selected_slot": slot_id}
@@ -320,10 +337,10 @@ func _on_splash_enter_pressed() -> void:
 
 func _on_login_submit_pressed() -> void:
     var username: String = login_username_edit.text
-    var passwd: String = login_password_edit.text
-    var result: Dictionary = submit_login(username, passwd)
-    if not result.get("success", false):
-        UIIntermediary.resolve(login_error_label, str(result.get("message", "")), result.get("error_data", {}))
+    var password_text: String = login_password_edit.text
+    var login_reply: Dictionary = submit_login(username, password_text)
+    if not login_reply.get("success", false):
+        UIIntermediary.resolve(login_error_label, str(login_reply.get("message", "")), login_reply.get("error_data", {}))
         login_error_label.modulate = DesignTokens.COLOR_DANGER_DEFAULT
     else:
         login_error_label.text = ""
@@ -337,10 +354,10 @@ func _on_login_forgot_pressed() -> void:
 
 func _on_register_submit_pressed() -> void:
     var username: String = register_username_edit.text
-    var passwd: String = register_password_edit.text
+    var password_text: String = register_password_edit.text
     var confirm: String = register_confirm_edit.text
 
-    if passwd != confirm:
+    if password_text != confirm:
         UIIntermediary.resolve(register_error_label, "ui.fe01.register.error_mismatch")
         register_error_label.modulate = DesignTokens.COLOR_DANGER_DEFAULT
         return
@@ -349,9 +366,9 @@ func _on_register_submit_pressed() -> void:
         register_error_label.modulate = DesignTokens.COLOR_DANGER_DEFAULT
         return
 
-    var result: Dictionary = submit_register(username, passwd)
-    if not result.get("success", false):
-        UIIntermediary.resolve(register_error_label, str(result.get("message", "")), result.get("error_data", {}))
+    var register_reply: Dictionary = submit_register(username, password_text)
+    if not register_reply.get("success", false):
+        UIIntermediary.resolve(register_error_label, str(register_reply.get("message", "")), register_reply.get("error_data", {}))
         register_error_label.modulate = DesignTokens.COLOR_DANGER_DEFAULT
     else:
         register_error_label.text = ""
@@ -388,29 +405,30 @@ func _on_char_delete_pressed() -> void:
 func _on_char_back_pressed() -> void:
     switch_state(EntryState.SERVER_SELECT)
 
-func create_character(char_name: String, race: String = "HUMAN") -> Dictionary:
-    form_character_name = char_name.strip_edges()
+## 提交角色创建请求并写入槽位列表
+func create_character(character_name: String, race: String = "HUMAN") -> Dictionary:
+    form_character_name = character_name.strip_edges()
     form_selected_race = race
     if form_character_name.is_empty():
         return {"success": false, "error_code": "ERR_NAME_EMPTY"}
-    var mode := ServiceLocator.get_mode()
-    if (mode == "backend" or mode == "real") and not current_account_id.is_empty():
-        var backend_res: Dictionary = _get_tabs().create_character_backend_flow(form_character_name, form_selected_race)
-        if bool(backend_res.get("_handled", false)):
-            return backend_res.get("result", {}) as Dictionary
+    var service_mode := ServiceLocator.get_mode()
+    if (service_mode == "backend" or service_mode == "real") and not current_account_id.is_empty():
+        var backend_reply: Dictionary = _get_tabs().create_character_backend_flow(form_character_name, form_selected_race)
+        if bool(backend_reply.get("_handled", false)):
+            return backend_reply.get("result", {}) as Dictionary
 
-    var new_slot := {"slot_id": "SLOT_NEW", "name": form_character_name, "race": form_selected_race, "class": "Novice", "level": 1, "town": "VALAN_CAPITAL", "empty": false}
-    for i in range(character_slots.size()):
-        if character_slots[i].get("empty", false) or str(character_slots[i].get("name", "")) == "":
-            character_slots[i] = new_slot
+    var created_slot := {"slot_id": "SLOT_NEW", "name": form_character_name, "race": form_selected_race, "class": "Novice", "level": 1, "town": "VALAN_CAPITAL", "empty": false}
+    for slot_index in range(character_slots.size()):
+        if character_slots[slot_index].get("empty", false) or str(character_slots[slot_index].get("name", "")) == "":
+            character_slots[slot_index] = created_slot
             break
     _get_tabs().populate_character_slots()
     switch_state(EntryState.CHARACTER_SELECT)
-    return {"success": true, "character": new_slot}
+    return {"success": true, "character": created_slot}
 
 func _on_char_create_confirm_pressed() -> void:
-    var char_name := char_name_edit.text.strip_edges() if char_name_edit != null else form_character_name
-    create_character(char_name, form_selected_race)
+    var character_name_text := char_name_edit.text.strip_edges() if char_name_edit != null else form_character_name
+    create_character(character_name_text, form_selected_race)
 
 func _on_char_create_back_pressed() -> void:
     switch_state(EntryState.CHARACTER_SELECT)
