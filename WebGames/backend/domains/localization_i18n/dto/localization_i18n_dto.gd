@@ -33,12 +33,12 @@ func to_dto() -> Dictionary:
 
 ## 从字典数据重建 DTO 对象
 static func from_dto(data: Dictionary) -> LocalizationI18nDTO:
-    var dto := LocalizationI18nDTO.new()
-    dto.current_locale = String(data.get("current_locale", "zh_CN"))
-    dto.fallback_locale = String(data.get("fallback_locale", "en_US"))
-    dto.supported_locales = Array(data.get("supported_locales", ["zh_CN", "en_US", "ja_JP", "zh_TW"]))
-    dto.loaded_locales = Array(data.get("loaded_locales", []))
-    dto.total_keys_count = int(data.get("total_keys_count", 0))
-    dto.missing_name_keys_count = int(data.get("missing_name_keys_count", 0))
-    dto.is_cjk = bool(data.get("is_cjk", true))
-    return dto
+    var i18n_snapshot := LocalizationI18nDTO.new()
+    i18n_snapshot.current_locale = String(data.get("current_locale", "zh_CN"))
+    i18n_snapshot.fallback_locale = String(data.get("fallback_locale", "en_US"))
+    i18n_snapshot.supported_locales = Array(data.get("supported_locales", ["zh_CN", "en_US", "ja_JP", "zh_TW"]))
+    i18n_snapshot.loaded_locales = Array(data.get("loaded_locales", []))
+    i18n_snapshot.total_keys_count = int(data.get("total_keys_count", 0))
+    i18n_snapshot.missing_name_keys_count = int(data.get("missing_name_keys_count", 0))
+    i18n_snapshot.is_cjk = bool(data.get("is_cjk", true))
+    return i18n_snapshot

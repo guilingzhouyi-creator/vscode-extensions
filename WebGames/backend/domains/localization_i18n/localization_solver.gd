@@ -46,7 +46,7 @@ static func translate(
         if fallback_dict.has(loc_key):
             raw_template = str(fallback_dict[loc_key])
         else:
-            # 最终兜底返回原始 key
+            # 最终安全回退返回原始 key
             return "[%s]" % loc_key
 
     # 空参数短路返回，消除无谓字符串拷贝
@@ -88,18 +88,18 @@ static func translate_batch(
 ) -> Dictionary:
     var result: Dictionary = {}
     if catalog == null:
-        for k in loc_keys:
-            var key_str := String(k)
+        for loc_key in loc_keys:
+            var key_str := String(loc_key)
             result[key_str] = "[%s]" % key_str
         return result
 
-    for k in loc_keys:
-        var key_str := String(k)
+    for loc_key in loc_keys:
+        var key_str := String(loc_key)
         result[key_str] = translate(catalog, key_str, params, locale_override)
     return result
 
 ## 统一名称解析（全局名称注册表出口）：locale 查表 → fallback_locale 回退 →
-## 英文兜底(en_US) → 未登记返回 [key] 原样并告警计数 +1（不抛 Fatal）。
+## 英文回退(en_US) → 未登记返回 [key] 原样并告警计数 +1（不抛 Fatal）。
 ## 名称键本体一律英文（机器可读唯一底座），显示文本不得作为逻辑判断依据。
 static func resolve_name_key(
     catalog: LocalizationRegistryCatalog,

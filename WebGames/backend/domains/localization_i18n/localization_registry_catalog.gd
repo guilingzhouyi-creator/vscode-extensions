@@ -75,14 +75,14 @@ func is_cjk_locale(locale: String = "") -> bool:
 ## 获取当前已载入有效词典的语言代码清单
 func get_loaded_locales() -> Array:
     var locales: Array = []
-    for loc in _locale_dictionaries:
-        locales.append(str(loc))
+    for locale_code in _locale_dictionaries:
+        locales.append(str(locale_code))
     return locales
 
 ## 获取指定语言的只读词典副本
 func get_dict(locale: String) -> Dictionary:
-    var d: Dictionary = _locale_dictionaries.get(locale, {})
-    return d.duplicate()
+    var locale_dict: Dictionary = _locale_dictionaries.get(locale, {})
+    return locale_dict.duplicate()
 
 ## 登记单条翻译模板（locale → loc_key → template）
 func register_translation(locale: String, loc_key: String, template_str: String) -> void:
@@ -126,15 +126,15 @@ func merge_mod_translations(
 
     for loc_key in translations:
         var key_str := str(loc_key)
-        var template_val := str(translations[loc_key])
+        var template_text := str(translations[loc_key])
 
         if _locale_dictionaries[locale].has(key_str):
             if allow_override:
                 _mod_original_templates[mod_id][locale][key_str] = _locale_dictionaries[locale][key_str]
-                _locale_dictionaries[locale][key_str] = template_val
+                _locale_dictionaries[locale][key_str] = template_text
                 overridden_count += 1
         else:
-            _locale_dictionaries[locale][key_str] = template_val
+            _locale_dictionaries[locale][key_str] = template_text
             added_count += 1
 
         mod_key_set[key_str] = true
@@ -147,12 +147,12 @@ func merge_mod_translations(
         "overridden_count": overridden_count
     }
 
-func _restore_locale_mod_keys(locale: Variant, keys: Array, orig_map: Dictionary) -> int:
+func _restore_locale_mod_keys(locale: Variant, keys: Array, original_map: Dictionary) -> int:
     var restored_count := 0
     for loc_key in keys:
         var key_str := str(loc_key)
-        if orig_map.has(key_str):
-            _locale_dictionaries[locale][key_str] = orig_map[key_str]
+        if original_map.has(key_str):
+            _locale_dictionaries[locale][key_str] = original_map[key_str]
         else:
             _locale_dictionaries[locale].erase(key_str)
         restored_count += 1
@@ -166,12 +166,12 @@ func unload_mod_translations(mod_id: String) -> int:
 
     var cleaned_count := 0
     var mod_locales: Dictionary = _mod_translations[mod_id]
-    var mod_orig: Dictionary = _mod_original_templates.get(mod_id, EMPTY_DICT)
+    var mod_originals: Dictionary = _mod_original_templates.get(mod_id, EMPTY_DICT)
 
     for locale in mod_locales:
         var keys_map: Dictionary = mod_locales[locale]
-        var orig_map: Dictionary = mod_orig.get(locale, EMPTY_DICT)
-        cleaned_count += _restore_locale_mod_keys(locale, keys_map.keys(), orig_map)
+        var original_map: Dictionary = mod_originals.get(locale, EMPTY_DICT)
+        cleaned_count += _restore_locale_mod_keys(locale, keys_map.keys(), original_map)
 
     _mod_translations.erase(mod_id)
     _mod_original_templates.erase(mod_id)
@@ -211,18 +211,18 @@ func get_name_keys_count() -> int:
 
 ## 导出为多语言状态快照 DTO
 func export_state_dto() -> LocalizationI18nDTO:
-    var dto := LocalizationI18nDTO.new()
-    dto.current_locale = current_locale
-    dto.fallback_locale = fallback_locale
-    dto.supported_locales = supported_locales.duplicate()
-    dto.loaded_locales = get_loaded_locales()
+    var state_snapshot := LocalizationI18nDTO.new()
+    state_snapshot.current_locale = current_locale
+    state_snapshot.fallback_locale = fallback_locale
+    state_snapshot.supported_locales = supported_locales.duplicate()
+    state_snapshot.loaded_locales = get_loaded_locales()
 
     var total_keys := 0
-    for loc in _locale_dictionaries:
-        var d: Dictionary = _locale_dictionaries[loc]
-        total_keys += d.size()
+    for locale_code in _locale_dictionaries:
+        var locale_dict: Dictionary = _locale_dictionaries[locale_code]
+        total_keys += locale_dict.size()
 
-    dto.total_keys_count = total_keys
-    dto.missing_name_keys_count = LocalizationSolver.missing_name_keys
-    dto.is_cjk = is_cjk_locale()
-    return dto
+    state_snapshot.total_keys_count = total_keys
+    state_snapshot.missing_name_keys_count = LocalizationSolver.missing_name_keys
+    state_snapshot.is_cjk = is_cjk_locale()
+    return state_snapshot
