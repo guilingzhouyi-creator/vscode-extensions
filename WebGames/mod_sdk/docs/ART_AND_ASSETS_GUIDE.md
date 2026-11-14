@@ -12,10 +12,10 @@
 
 ```text
 my_mod/
-├── assets_manifest.json        # 资产清单与 SHA-256 完整性哈希清单
 └── assets/
+    ├── manifest.json           # 资产清单与 SHA-256 完整性哈希清单
     ├── media/                  # 动画与视频流媒体
-    │   └── cutscenes/          # 剧情过场 CG 视频 (.ogv, .webm, .mp4)
+    │   └── cutscenes/          # 剧情过场 CG 视频 (.ogv；cook_assets.py 仅白名单放行 .ogv)
     ├── textures/               # 纹理、UI 贴图与角色立绘
     │   ├── ui/                 # 界面元素、边框、图标与徽标
     │   ├── portraits/          # 角色身世与 NPC 对话立绘
@@ -58,11 +58,13 @@ pie title 典型 Tier 2 模组资产容量配额分布建议 (总包预算 <= 10
 ```
 
 1. **单项文件体积上限**：
-   - 纹理贴图：单张文件绝对禁止超过 **15 MB**；
-   - 背景音频：单个音频切片绝对禁止超过 **30 MB**；
-   - 纯文本着色器：单文件代码体积不得超过 **256 KB**。
+   - 纹理贴图（`.png`, `.webp`）：单张文件不得超过 **15 MB**；
+   - 背景音频（`.ogg`, `.wav`）：单个音频切片不得超过 **30 MB**；
+   - 视频过场（`.ogv`）：单文件不得超过 **50 MB**；
+   - 纯文本着色器（`.gdshader`）：Schema 与资产白名单上限 **10 MB**（建议单着色器源码精简在 256 KB 以内）；
+   - 排版字体（`.ttf`, `.otf`）上限 **10 MB**，3D 模型（`.gltf`, `.glb`）上限 **30 MB**。
 2. **总包体积预算 (Package Budget)**：
-   - 单个 Tier 2 视听包解压后总体积建议控制在 **100 MB** 以内，绝对上限不得超过 **250 MB**；
+   - 单个 Tier 2 视听包解压后总体积建议控制在 **100 MB** 以内，硬上限为 **250 MB**；
    - 静态检查工具在预检时若发现单文件或总包超出预算，将提示预警或直接阻断装配。
 
 ---
@@ -97,7 +99,7 @@ flowchart TD
     InSandbox -- 是 --> AllowRead["授权读取流式资产数据"]
 ```
 
-- **路径遍历注入防御**：绝对禁止在 URI 中包含 `..`、`./`、`\`、Windows 盘符（如 `C:`）或根目录斜杠（如 `/etc/`）。一旦捕获此类特征，解析器立即熔断抛出安全异常；
+- **路径遍历注入防御**：禁止在 URI 中包含 `..`、`./`、`\`、Windows 盘符（如 `C:`）或根目录斜杠（如 `/etc/`）。一旦捕获此类特征，解析器立即拦截并返回安全错误码；
 - **沙箱锁定**：解析后得到的规范化绝对路径必须严格以模组物理根目录下的 `assets/` 为前缀，防止利用符号链接（Symlink）穿透至宿主系统关键目录。
 
 ---
@@ -122,9 +124,9 @@ flowchart TD
 
 ---
 
-## 六、 资产清单契约 (`assets_manifest.json`)
+## 六、 资产清单契约 (`assets/manifest.json`)
 
-为了保障网络传输完整性、防止资源篡改并加速客户端只读缓存，Tier 2 与 Tier 3 模组必须在根目录下生成 `assets_manifest.json`：
+为了保障分发完整性、校验资源篡改并支持只读缓存索引，Tier 2 与 Tier 3 模组在包含 `assets/` 资源时须在 `assets/` 目录下由 `kalar_mod.py cook` 生成 `assets/manifest.json`（Schema 位于 `mod_sdk/schemas/assets_manifest.schema.json`）：
 
 ```json
 {
@@ -170,9 +172,9 @@ flowchart TD
 
 ---
 
-## 七、 官方资产 vs MOD 资产寻址与环境双轨规约 (Asset Topology & Dual Environments)
+## 七、 官方资产 vs MOD 资产寻址与环境差异规约 (Asset Topology & Environments)
 
-为了建立确定性的工程标准并彻底消除路径硬编码，引擎通过 `AssetPathResolver` 统一治理全域多媒体资产的存放位置与访问边界。
+为建立确定性的工程路径规范并消除路径硬编码，引擎通过 `AssetPathResolver` 统一管理多媒体资产的存放位置与访问边界。
 
 ### 1. 官方艺术资产目录拓扑 (`res://assets/`)
 
@@ -180,15 +182,15 @@ flowchart TD
 
 | 资产大类 | 官方物理标准路径 | 典型文件格式 | 说明 |
 | :--- | :--- | :--- | :--- |
-| **全屏过场 CG** | `res://assets/media/cutscenes/` | `.ogv`, `.webm`, `.mp4` | 剧情关键节点过场、序章揭幕与战役高潮全屏动画 |
+| **全屏过场 CG** | `res://assets/media/cutscenes/` | `.ogv`（MOD 资产白名单仅放行 `.ogv`） | 剧情关键节点过场、序章揭幕与战役高潮全屏动画 |
 | **背景音乐** | `res://assets/audio/bgm/` | `.ogg` | 各大城镇、野外大地图与战斗背景回圈音乐 |
 | **音效采样** | `res://assets/audio/sfx/` | `.wav`, `.ogg` | UI 点击、技能释放、武器挥击与受击反馈 |
 | **剧情配音** | `res://assets/audio/voice/` | `.ogg` | 主线剧情语音与战斗台词 |
 | **UI 界面贴图** | `res://assets/textures/ui/` | `.webp`, `.png` | 界面组件、边框、卡牌底板与交互图标 |
 | **角色立绘与头像** | `res://assets/textures/characters/` | `.webp`, `.png` | 角色立绘、NPC 头像与身世插画 |
 | **物品道具图标** | `res://assets/textures/items/` | `.webp`, `.png` | 装备、消耗品、符文与任务道具图标 |
-| **3D 模型与场景** | `res://assets/models/` | `.gltf`, `.glb`, `.tscn` | 场景道具、几何碰撞体与网格模型 |
-| **排版字体** | `res://assets/fonts/` | `.ttf`, `.woff2` | 多语言排版字体与标题位图字体 |
+| **3D 模型与场景** | `res://assets/models/` | `.gltf`, `.glb`（官方工程内部可使用 `.tscn`） | 场景道具、几何碰撞体与网格模型 |
+| **排版字体** | `res://assets/fonts/` | `.ttf`, `.otf`（MOD 白名单放行 `.ttf`/`.otf`，不含 `.woff2`） | 多语言排版字体与标题位图字体 |
 
 ### 2. MOD 艺术资产三级发现级联 (3-Tier Discovery Cascade)
 
@@ -214,8 +216,8 @@ flowchart TD
 | 评估维度 | 工程开发版 (Engineering Dev Build) | 正式发行版 (Release Production Build) |
 | :--- | :--- | :--- |
 | **环境判定特征** | `OS.has_feature("editor") or OS.has_feature("test")` | `OS.has_feature("standalone") or OS.has_feature("release")` |
-| **数据源格式** | 宽松支持明文 `.json`、松散文件、未烘焙原始切片 | 强制单源单文件高纯度二进制包 `config.kdat` (CRC32/DEFLATE) |
+| **数据源格式** | 支持明文 `.json`、松散文件与未打包原始切片 | 单文件紧凑二进制包 `config.kdat` (CRC32/DEFLATE) |
 | **官方资产承载** | 项目工程松散文件直接寻址 | 预打包入主程序或独立 `.pck` 封包 (如 `assets.pck`) |
-| **MOD 准入范围** | 扫描 Tier 0 (`res://mods/`)、Tier 1 与 Tier 2 | 刚性剔除 Tier 0，严格限制于 Tier 1 与 Tier 2 沙盒 |
-| **物理资产缺失处理** | 100% 自动降级为文字占位演播，确保自动化无头测试不阻塞 | 记录安全日志，静默跳过或触发合规占位，绝对禁止泄露宿主绝对路径 |
+| **MOD 准入范围** | 扫描开发期与运行期多级 `mods/` 根目录 | 仅限打包外挂目录与 `user://mods/` 受控沙盒 |
+| **物理资产缺失处理** | 自动降级为文字占位演播，确保自动化无头测试不阻塞 | 记录安全日志，静默跳过或触发合规占位，禁止在错误提示中暴露宿主路径 |
 | **路径安全护栏** | 开启防路径穿越清洗与警告堆栈跟踪 | 开启防路径穿越刚性熔断，过滤非法盘符与向上一级符号 (`..`) |

@@ -1,7 +1,7 @@
 # 卡拉尔世界引擎 · 模组开发者套件 (Kalar World Engine Modding SDK)
 
 > [!NOTE]
-> **【核心定位】**：本套件是卡拉尔世界引擎（Kalar World Engine）面向人类开发者与自主推演 Agent 的官方软件开发套件（Modding SDK）。基于数据驱动与因果图元解耦架构，提供三层模组分级体系（Tier 1/2/3）、统一命令行门面（`kalar-mod`）、全量强类型 JSON Schema 契约矩阵、权威真源萃取及持续集成门禁防漂移体系，为模组全生命周期构建坚不可摧的工程底座。
+> **【核心定位】**：本套件是卡拉尔世界引擎（Kalar World Engine）面向人类开发者与自主推演 Agent 的官方软件开发套件（Modding SDK）。基于数据驱动与因果图元解耦架构，提供三层模组分级体系（Tier 1/2/3）、统一命令行门面（`kalar-mod`）、全量强类型 JSON Schema 契约矩阵、真源萃取同步及持续集成门禁防漂移检查，为模组生命周期提供结构化工程支撑。
 
 ---
 
@@ -16,8 +16,8 @@ graph TD
     classDef t3 fill:#22543d,stroke:#38a169,stroke-width:2px,color:#fff;
 
     T1["Tier 1: 纯逻辑与剧情命途包 (Logic & Narrative Pack)<br/>• 核心五件套: pack.json / routing_rules.json / destinies.json / dag_graphs / i18n<br/>• 纯静态 JSON 声明，体积极小 (<100KB)，零外置多媒体依赖"]:::t1
-    T2["Tier 2: 视听与艺术资产增强包 (Audiovisual & Assets Pack)<br/>• 包含 Tier 1 全部逻辑能力<br/>• assets/ (WebP/PNG 纹理, OGG/WAV 音频, TTF 字体, GDShader 着色器)<br/>• assets_manifest.json (SHA-256 哈希指纹清单与体积配额约束)"]:::t2
-    T3["Tier 3: 全局大魔改规则包 (Total Conversion & Overhaul Pack)<br/>• 包含 Tier 1 与 Tier 2 全部能力<br/>• content/ (world, items, skills, entities, rules)<br/>• 世界地图阻抗、物品卡牌、战斗动力学公式覆写与差分合并"]:::t3
+    T2["Tier 2: 视听与艺术资产增强包 (Audiovisual & Assets Pack)<br/>• 包含 Tier 1 全部逻辑能力<br/>• assets/ (PNG/WebP 纹理, OGG/WAV 音频, OGV 视频, TTF/OTF 字体, GDShader, GLTF/GLB 模型)<br/>• assets/manifest.json (SHA-256 哈希指纹清单与体积配额约束)"]:::t2
+    T3["Tier 3: 全局大魔改规则包 (Total Conversion & Overhaul Pack)<br/>• 包含 Tier 1 与 Tier 2 全部能力<br/>• content/ (items, skills, rules, world; entities 为 Schema 预留目录)<br/>• 运行时由 Tier3ContentOverrideLoader 执行 MERGE / REPLACE_ENTRY / TOTAL_PURGE 差分覆写"]:::t3
 
     T1 --> T2
     T2 --> T3
@@ -29,8 +29,8 @@ graph TD
 - **核心特性**：纯静态声明式 JSON，零多媒体外链，支持引擎极速热重载与无头推演会话高频验证。
 
 ### 2. Tier 2: 视听与艺术资产增强包 (Audiovisual & Assets Pack)
-- **定位**：在剧情逻辑之上注入高沉浸感的多媒体艺术资产（立绘、场景插画、UI 音效、环境背景乐、自定义字体与纯文本着色器）。
-- **物理组成**：Tier 1 五件套 + `assets_manifest.json` + `assets/` 物理资源目录。
+- **定位**：在剧情逻辑之上注入自定义多媒体艺术资产（立绘、场景插画、UI 音效、背景音乐、`.ogv` 过场视频、字体与纯文本 `.gdshader` 着色器）。
+- **物理组成**：Tier 1 五件套 + `assets/manifest.json` + `assets/` 物理资源目录。
 - **核心特性**：受物理沙箱保护，通过受控虚拟协议 `mod://<pack_id>/assets/...` 寻址；经 `cook` 工具校验格式白名单与体积配额并生成 SHA-256 完整性指纹，严禁包含任何可执行二进制。
 
 ### 3. Tier 3: 全局大魔改规则包 (Total Conversion & Overhaul Pack)
@@ -106,23 +106,24 @@ python WebGames/mod_sdk/tools/kalar_mod.py --help
 
 ```bash
 # 初始化 Tier 1 纯逻辑剧情模组
-python WebGames/mod_sdk/tools/kalar_mod.py init --id my_prologue --name "苍白边境要塞" --tier TIER_1_LOGIC --output-dir ./mods/my_prologue
+python WebGames/mod_sdk/tools/kalar_mod.py init --id my_prologue --name "苍白边境要塞" --tier 1 --output-dir ./mods/my_prologue
 
 # 初始化 Tier 2 视听艺术增强模组
-python WebGames/mod_sdk/tools/kalar_mod.py init --id my_audiovisual --name "北地风暴视听包" --tier TIER_2_AUDIOVISUAL --output-dir ./mods/my_audiovisual
+python WebGames/mod_sdk/tools/kalar_mod.py init --id my_audiovisual --name "北地风暴视听包" --tier 2 --output-dir ./mods/my_audiovisual
 
 # 初始化 Tier 3 全局大魔改规则模组
-python WebGames/mod_sdk/tools/kalar_mod.py init --id my_overhaul --name "极夜重构大魔改" --tier TIER_3_OVERHAUL --output-dir ./mods/my_overhaul
+python WebGames/mod_sdk/tools/kalar_mod.py init --id my_overhaul --name "极夜重构大魔改" --tier 3 --output-dir ./mods/my_overhaul
 ```
 
 | 参数选项 | 类型 | 默认值 | 说明与语义 |
 | :--- | :---: | :---: | :--- |
-| `--id` | String | 必需 | 模组全局唯一 ID（全小写字母、数字与下划线） |
-| `--name` | String | 同 ID | 模组人类可读显示名称 |
-| `--tier` | String | `TIER_1_LOGIC` | 模组分级：`TIER_1_LOGIC`, `TIER_2_AUDIOVISUAL`, `TIER_3_OVERHAUL` |
-| `--race-id` | String | `HUMAN` | 绑定的基础种族 ID |
-| `--output-dir` | Path | 当前目录下与 ID 同名 | 目标输出目录路径 |
-| `--with-destiny` | Flag | `True` | 是否包含命途扩展骨架 (`destinies.json`) |
+| `--id` | String | 必需 | 模组全局唯一 ID（小写字母、数字与下划线） |
+| `--name` | String | 必需 | 模组人类可读显示名称 |
+| `--tier` | Integer | `1` | 模组分级：`1`（`TIER_1_LOGIC`）、`2`（`TIER_2_AUDIOVISUAL`）、`3`（`TIER_3_OVERHAUL`） |
+| `--race` | String | `HUMAN` | 绑定的基础种族 ID |
+| `--output-dir` | Path | 当前目录下 `<id>` | 目标输出目录路径 |
+| `--with-destiny` / `--no-destiny` | Flag | `--with-destiny` | 是否包含命途扩展骨架 (`destinies.json`) |
+| `--inline-text` | Flag | `False` | 在 DAG 节点内嵌示例文案（保留 i18n 回退能力） |
 
 ### 2. `check` —— 纯静态自愈诊断门禁
 
@@ -133,7 +134,7 @@ python WebGames/mod_sdk/tools/kalar_mod.py init --id my_overhaul --name "极夜�
 python WebGames/mod_sdk/tools/kalar_mod.py check ./mods/my_prologue
 
 # 多模组联合冲突诊断（检测跨包 origin_id/trait_id 撞车与 UI 策略冲突）
-python WebGames/mod_sdk/tools/kalar_mod.py check ./mods/my_prologue --multi-dirs ./mods/another_mod
+python WebGames/mod_sdk/tools/kalar_mod.py check ./mods/my_prologue --check-multi ./mods/another_mod
 
 # 输出机器可读结构化 JSON 诊断报告（面向 CI 流水线或 Agent 自愈）
 python WebGames/mod_sdk/tools/kalar_mod.py check ./mods/my_prologue --json
@@ -141,10 +142,10 @@ python WebGames/mod_sdk/tools/kalar_mod.py check ./mods/my_prologue --json
 
 ### 3. `cook` —— 视听资产预编译与审计
 
-递归扫描 `assets/` 目录，校验格式扩展名白名单、拦截可执行恶意文件、验证单文件体积与总包体积配额，并自动计算 SHA-256 哈希值写入 `assets_manifest.json`。
+递归扫描 `assets/` 目录，校验格式扩展名白名单、拦截可执行文件、验证单文件体积与总包体积配额，并自动计算 SHA-256 哈希值写入 `assets/manifest.json`。
 
 ```bash
-# 编译并生成/更新 assets_manifest.json
+# 编译并生成/更新 assets/manifest.json
 python WebGames/mod_sdk/tools/kalar_mod.py cook ./mods/my_audiovisual
 
 # 仅执行审计检查（不修改磁盘清单，适用于 CI 门禁断言）
@@ -156,14 +157,14 @@ python WebGames/mod_sdk/tools/kalar_mod.py cook ./mods/my_audiovisual --check --
 
 ### 4. `preview` —— 剧情拓扑演习推演
 
-在无头环境下静态解析剧情 DAG，输出拓扑层级摘要；支持 `--simulate` 模拟玩家随机步进推进，验证占位符文案水化结果。
+在无头环境下静态解析剧情 DAG，输出拓扑层级摘要；支持 `--simulate` 模拟玩家随机步进推进，验证占位符文案插值结果。
 
 ```bash
 # 打印剧情图元概览与分支结构
 python WebGames/mod_sdk/tools/kalar_mod.py preview ./mods/my_prologue
 
-# 无头模拟剧情流转演练并打印水化台词
-python WebGames/mod_sdk/tools/kalar_mod.py preview ./mods/my_prologue --simulate --player-name "林克" --race-id HUMAN
+# 无头模拟剧情流转演练并打印插值台词
+python WebGames/mod_sdk/tools/kalar_mod.py preview ./mods/my_prologue --simulate --name "林克" --race HUMAN
 ```
 
 ### 5. `play` —— 无头试玩推演与 Agent 交互
@@ -206,9 +207,35 @@ python WebGames/mod_sdk/tools/kalar_mod.py workbench --self-test
 python WebGames/mod_sdk/tools/kalar_mod.py workbench --verify ./dist/my_prologue.kmod
 ```
 
+### 8. `dispatch` —— 全域统一协议离线派发
+
+构造标准 `ClientRequestEnvelopeDTO` 并执行强类型信封与动作载荷校验（支持 `HUMAN_UI` 与 `AGENT` 两类操作发起方）：
+
+```bash
+# 离线验证 ESC 菜单就绪度查询请求信封
+python WebGames/mod_sdk/tools/kalar_mod.py dispatch --actor HUMAN_UI --domain ESC_MENU --action ESC_QUERY_READINESS --json
+```
+
+### 9. `bake` —— 配置二进制包烘焙 (`.kdat`)
+
+将明文 JSON 配置表或配置目录编译为带 CRC32 校验与可选 DEFLATE 压缩的 `.kdat` 二进制数据流：
+
+```bash
+# 将指定配置目录编译为单包 config.kdat
+python WebGames/mod_sdk/tools/kalar_mod.py bake ./mods/my_overhaul/content --monolithic -o ./dist/config.kdat
+```
+
+### 运行时接入与 Tier 1~3 能力边界
+
+- **统一目录发现**：引擎运行时（`ModPackageDiscoverySolver.get_discovery_roots()`）按优先级扫描 `res://config/narratives/packs/`、`res://mods/`、`res://mods/narratives/`（发布态对应 `<exe>/mods/` 与 `<exe>/mods/narratives/`）以及 `user://mods/`、`user://mods/narratives/`，同时兼容目录形式与 `.kmod` 归档包。
+- **分级支持矩阵**：
+  - **Tier 1 (`pack.json` / `routing_rules.json` / `destinies.json` / `dag_graphs/` / `i18n/`)**：CLI 全项检查，Godot 运行时全链路装载与执行。
+  - **Tier 2 (`assets/` + `assets/manifest.json`)**：`cook` 校验格式白名单（`.png`, `.webp`, `.ogg`, `.wav`, `.ogv`, `.ttf`, `.otf`, `.gdshader`, `.gltf`, `.glb`）与 SHA-256 指纹，运行时经受控虚拟路径解析加载。
+  - **Tier 3 (`content/{items,skills,rules,world}/`)**：Godot 单机网关由 `Tier3ContentOverrideLoader` 在 `GameConfig` 与 `ItemLoaderPipeline` 上实施非破坏性运行时差分覆写（支持 `MERGE` / `REPLACE_ENTRY` / `TOTAL_PURGE`），并在退出或切回原版时原子清除；`content/entities/` 当前为 Schema 与目录规范预留目录，运行时暂未接入载入。
+
 ---
 
-## 🔄 四、 创作者标准开发工作流
+## 四、 创作者标准开发工作流
 
 ```mermaid
 flowchart LR
@@ -224,11 +251,11 @@ flowchart LR
 
 ---
 
-## 🛡️ 五、 权威真源与防漂移门禁系统
+## 五、 真源萃取与防漂移门禁系统
 
-为确保开发者套件契约与引擎核心运行时数据保持绝对同步，本工程部署了全自动真源静态萃取与门禁审计工具：
+为确保开发者套件契约与引擎核心运行时数据保持一致，本工程部署了真源静态萃取与门禁审计工具：
 
-1. **权威真源萃取 (`WebGames/scripts/py/sync_mod_sdk.py`)**：
+1. **真源萃取 (`WebGames/scripts/py/sync_mod_sdk.py`)**：
    - 静态提取引擎启用的种族清单、合法 DAG 节点类型、文本占位符字典及状态突变事件；
    - 幂等更新 `mod_sdk/capabilities.json` 与 `mod_sdk/MOD_SPEC.md` 中的动态能力标记区块；
    - 支持 `--check-only` 模式，在持续集成中比对磁盘现状与内存真源，检测到非预期漂移立即阻断。
@@ -236,7 +263,7 @@ flowchart LR
 2. **门禁自动化审计 (`WebGames/scripts/py/audit_sdk_sync.py`)**：
    - 验证 SDK 根目录元数据、`docs/` 文档库、`schemas/` 强类型字典、`tools/kalar_mod.py` 工具链的物理完整性与非空状态；
    - 校验能力清单枚举结构的语义正确性；
-   - 执行 0 漂移严格断言，保障全链路交付质量。
+   - 执行零漂移断言，核验工具链定义与契约声明一致。
 
 ```bash
 # 门禁自检命令：校验真源对齐（0 漂移）

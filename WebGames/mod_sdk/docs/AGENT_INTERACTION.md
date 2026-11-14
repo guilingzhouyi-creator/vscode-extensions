@@ -24,11 +24,11 @@ python mod_sdk/tools/play_mod.py <mod_dir_1> [mod_dir_2 ...] --interactive [--js
 - `--json`：强制要求全程输出纯净 NDJSON 数据包，抑制所有人类可读彩色控制台格式化字符；
 - `--race <RACE_ID>`：（可选）指定创角种族（如 `HUMAN`, `ELF`，缺省自动解析或继承）；
 - `--origin <ORIGIN_ID>`：（可选）指定创角身世标识符；
-- `--seed <STRING>`：（可选）设置确定性伪随机数种子，保障同参探索 100% 可重现。
+- `--seed <STRING>`：（可选）设置确定性伪随机数种子，保证同参探索在相同输入下可重现。
 
 ### 2. 编码与防死锁缓冲公理 (I/O & Flush Invariants)
 
-1. **UTF-8 全程保证**：通道两端的所有字符传输必须统一采用 UTF-8 编码，彻底杜绝 Windows GBK 环境下的转义损毁；
+1. **UTF-8 全程保证**：通道两端的所有字符传输统一采用 UTF-8 编码，避免 Windows GBK 环境下的转义损坏；
 2. **行定界 JSON (NDJSON)**：每个发往 `stdin` 的行动包（Action）与每个由 `stdout` 吐出的观察包（Observation）必须占用且仅占用单行文本，以换行符 `\n` 作为完整包定界符；
 3. **即时清空刷新 (Immediate Flush)**：推演引擎与 Agent 在写入每个完整 JSON 行后，必须立即显式调用流刷新操作（如 Python 的 `sys.stdout.flush()`）。严禁因管道行缓冲机制导致会话死锁挂起。
 
@@ -56,7 +56,7 @@ sequenceDiagram
         alt 分支合法
             Engine->>Engine: 2. 因果突变结算 (mutations_on_complete)
             Engine->>Engine: 3. 当前状态生成快照，压入历史回溯栈
-            Engine->>Engine: 4. 推进至下一节点，水化本地化文案
+            Engine->>Engine: 4. 推进至下一节点，填充本地化文案
             Engine-->>Agent: 【最新观察包】(Step N Observation, is_terminal=false)
         else 分支非法或不存在
             Engine-->>Agent: 【纠偏观察包】(Step N Observation, error_code="ERR_INVALID_CHOICE")
@@ -220,7 +220,7 @@ Agent 经由 `stdin` 下发的决策包，支持三种核心指令：
 
 从引擎 Phase 118~120 演进起，外部评测 Agent 与自主推演模型不仅支持序章 DAG 推进，更全面接入**主页 HUD 去表现化结构化切片流与专属逻辑输入通道**。
 
-### 1. 交互流转时序与双轨通信架构
+### 1. 交互流转时序与人机隔离通信架构
 
 ```mermaid
 sequenceDiagram
@@ -304,7 +304,7 @@ sequenceDiagram
 
 ### 3. 专属逻辑动作通道指令包 (`kalar.mod_sdk.agent_action.v1`)
 
-Agent 经由专属逻辑动作通道（`AgentActionChannel`）提交上行决策，彻底杜绝与人类键鼠发生硬件争抢。详见 `mod_sdk/schemas/agent_action_packet.schema.json`：
+Agent 经由专属逻辑动作通道（`AgentActionChannel`）提交上行决策，与人类键鼠输入路径物理隔离，避免输入争抢。详见 `mod_sdk/schemas/agent_action_packet.schema.json`：
 
 ```json
 {

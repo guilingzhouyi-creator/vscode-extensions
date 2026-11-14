@@ -13,20 +13,21 @@
 ```text
 my_overhaul_mod/
 ├── pack.json                   # 清单中声明 "tier": "TIER_3_OVERHAUL"
-├── assets_manifest.json        # 资产校验清单
 ├── assets/                     # 视听媒体资产
+│   ├── manifest.json           # 资产校验清单
+│   └── ...
 ├── content/                    # 【核心】领域数据模块化重构目录
-│   ├── world/                  # 地理空间、地形摩擦、A*寻路常数与城镇模板
+│   ├── world/                  # 地理空间、地形摩擦、A*寻路常数与城镇模板（运行时经 Tier3ContentOverrideLoader 载入）
 │   │   └── default.json
-│   ├── items/                  # 装备分类、权威物品库与属性修正
+│   ├── items/                  # 装备分类、权威物品库与属性修正（运行时同步刷新 ItemLoaderPipeline）
 │   │   └── weapons.json
-│   ├── skills/                 # 战斗动作动词、战技卡牌原型与消耗
+│   ├── skills/                 # 战斗动作动词、战技卡牌原型与消耗（运行时载入 GameConfig 覆写层）
 │   │   └── combat_skills.json
-│   ├── entities/               # 怪物模板、NPC 数值与遭遇战构成
-│   │   └── bestiary.json
-│   └── rules/                  # 底层动力学公式、相变系数与防御乘数
-│       ├── combat_constants.json
-│       └── mechanics.json
+│   ├── rules/                  # 底层动力学公式、相变系数与防御乘数（运行时载入 GameConfig 覆写层）
+│   │   ├── combat_constants.json
+│   │   └── mechanics.json
+│   └── entities/               # Schema/工具链预留扩展目录（怪物/NPC 实体目录，当前运行时加载器暂未接入该子目录）
+│       └── bestiary.json
 ```
 
 ---
@@ -136,7 +137,7 @@ $$\text{Loss}_{total} = \text{Loss}_{step1}(\text{incantation}) + \text{Loss}_{s
 
 1. **单大魔改独占建议**：
    - 通常情况下，同一个游戏存档仅允许激活一个声明了 `TOTAL_PURGE` 的 Tier 3 大魔改模组；若检测到多个 `TOTAL_PURGE` 模组同时启用，装配引擎将抛出 `ERR_MOD_INCOMPATIBLE_CONFLICT` 强制要求用户裁决；
-2. **缺失键原版兜底 (Vanilla Fallback)**：
-   - 在 `MERGE` 模式下，若模组未声明某项关键游戏常数（如 `damage_formulas.json` 遗漏了 `phase_transition`），引擎自动回退使用 `config/domains/combat/` 中的官方基线数值，杜绝运行时空指针异常；
-3. **安全自愈隔离**：
-   - 若大魔改数据在解析时出现非法类型或数值越界，引擎将在装配日志中记录结构化诊断，并针对受损单项重置为默认基线值，保障游戏主循环平稳运行。
+2. **缺失键原版回退 (Vanilla Fallback)**：
+   - 在 `MERGE`（或兼容别名 `APPEND_MERGE`）模式下，若模组未声明某项关键游戏常数（如 `damage_formulas.json` 遗漏了 `phase_transition`），引擎保留基础表原有键或回退 `config/domains/` 基线数值；当网关卸载模组或回退原版模式时，由 `Tier3ContentOverrideLoader.revert_all_overrides()` 将 `GameConfig` 原子还原至基础快照并清理覆盖层：
+3. **安全自愈与静态检查边界**：
+   - `kalar_mod.py check` 与 JSON Schema 负责静态结构与数值区间预检；`Tier3ContentOverrideLoader` 在运行时仅覆盖允许的配置表与物品库原型，`content/rules/` 与 `content/skills/` 覆写的参数会被消费 `GameConfig` 的求解器读取，不执行任意脚本求值。

@@ -148,7 +148,7 @@ DeterministicRNG.reseed_global(seed)           # 整局复现开关
 - **空集合语义**：显式跳过并在结果中携带计数，禁止 null 透传。
 - **序列化协议**：可存档领域实现 `serialize()` / `deserialize()`；deserialize 缺键一律回落
   字段初值（即配置缺省），刻意差异的兜底键（如 `deserialize_name` / `fallback_title`）须注释保留；
-  组装/回灌/版本迁移一律走 `GameSaveAssembler`（清单序保证 SHA 字节稳定，迁移链注册制）。
+  组装/写回/版本迁移一律走 `GameSaveAssembler`（清单序保证 SHA 字节稳定，迁移链注册制）。
 - **并存契约**：`chat_command.redeem_cdkey` 是 GM 表驱动直发（TC-CMD-03 契约），
   `cdkey_voucher` 是完整核销管线（频控/时效/门槛/唯一码）——两者语义不同、刻意并存，禁止互吞。
 - **类型纪律**：全强类型基线；确需 `Variant` 处须行内注释豁免理由。
@@ -180,7 +180,7 @@ DeterministicRNG.reseed_global(seed)           # 整局复现开关
 3. **统一协议派发与强类型请求/响应信封**：
    所有穿透后端的非广播交互均通过 `UnifiedProtocolFactory.create_human_request` 组装为 `ClientRequestEnvelopeDTO`，统一派发至 `UnifiedProtocolDispatcher`，返回强类型 `UnifiedResponseEnvelopeDTO`，严格根据 `success`、`error_code` 与 `message` 执行诚实回执判定。
 4. **会话单源协同与依赖倒置原则 (DIP)**：
-   全局账号 ID、会话令牌与网关实例由 `WorldSessionRuntimeService` 唯一托管，`ServiceLocator` 的网关生命周期全面委托至该运行时中枢；安全混淆能力遵循依赖倒置原则由基础设施层装配注入，领域层绝对零逆向依赖基础设施。
+   全局账号 ID、会话令牌与网关实例由 `WorldSessionRuntimeService` 唯一托管，`ServiceLocator` 的网关生命周期全面委托至该运行时中枢；安全混淆能力遵循依赖倒置原则由基础设施层装配注入，领域层不得逆向依赖基础设施。
 5. **HUD 全信道桥接与主动拉取**：
    `HudEventBridge` 订阅权威快照、钱包资产、序章推进、世界进入、属性突变与历法时钟全部 6 大核心事件信道，并提供 `pull_hud_snapshot_async()` 供视图在场景恢复时主动拉取权威状态，消除首帧时序残留。
 
@@ -213,12 +213,12 @@ DeterministicRNG.reseed_global(seed)           # 整局复现开关
 
 | 指标 | 数值 |
 |---|---|
-| backend .gd / 行数 | 302 / 约 26,759 行（全域 .gd 513 / 约 62,603 行，随新卷增长） |
+| backend .gd / 行数 | 446 / 51,476 行（全域 .gd 753 / 105,220 行） |
 | 领域数 | 47 |
-| 测试项 | 770（CLI 与 UI 共用同一注册表，<!-- METRICS:BEGIN wg-test-suite-count -->**139 套**<!-- METRICS:END wg-test-suite-count -->注册测试套件 / 覆盖 47 领域；实时以 `tests/reports/test_latest.json` 为准） |
-| 配置表 | 123（含 65 张必需表，`audit_config.py` 口径） |
-| 配置调用点 | 862（`backend/` + `frontend/` 内 `GameConfig.get_*` 与 `GameConfig.msg`；表缺失 0；`GameConfig.get_value` 违禁调用 0） |
-| 函数 / 参数类型注解 | 100% / 100% |
+| 测试项 | 1040（CLI 与 UI 共用同一注册表，<!-- METRICS:BEGIN wg-test-suite-count -->**140 套**<!-- METRICS:END wg-test-suite-count -->注册测试套件 / 覆盖 47 领域；实时以 `tests/reports/test_latest.json` 为准） |
+| 配置表 | 131（含 70 张必需表，`audit_config.py` 口径） |
+| 配置调用点 | 1040（`backend/` + `frontend/` 内非注释 `GameConfig.get_*` 与 `GameConfig.msg`；`GameConfig.get_value` 违禁调用 0） |
+| 函数 / 参数类型注解 | 全强类型注解（`audit_gd.py --strict` 校验 595 份源码 0 违规） |
 
 实时数据以审查产物为准：`bash scripts/sh/test-run.sh`（单测 JSON 汇总写入 `tests/reports/test_latest.json`）
 与 `bash scripts/sh/audit-all.sh`（23 项静态门禁含文档四域棘轮门禁，见 `docs/README.md` 契约）。

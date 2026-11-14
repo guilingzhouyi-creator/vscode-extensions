@@ -8,7 +8,7 @@
 
 | 范例工程目录 | 分层定级 (Mod Tier) | 核心职责与演示内容 |
 | :--- | :---: | :--- |
-| [`custom_hud_theme/`](file:///c:/CODE_game-development/vscode-extensions/WebGames/mod_sdk/examples/custom_hud_theme/) | `AUDIO_VISUAL` (Tier 2) | 黑曜石暗黑主题 HUD 界面定制，包含九宫格主框架、状态条、交互按钮皮肤及 UI 音效虚拟资产映射 |
+| [`custom_hud_theme/`](./custom_hud_theme/) | `TIER_2_AUDIOVISUAL` (Tier 2) | 黑曜石暗黑主题 HUD 界面定制，包含九宫格主框架、状态条、交互按钮皮肤及 UI 音效虚拟资产映射 |
 
 ---
 
@@ -18,9 +18,9 @@
 
 ```mermaid
 flowchart TD
-    Tier1["Tier 1: 故事剧情与命途扩展 (STORY_NARRATIVE)<br/>- 拓扑 DAG 剧情图<br/>- 出身背景、因果天赋、初始行囊<br/>- 多语言文案字典"]
-    Tier2["Tier 2: 视听与界面主题增强 (AUDIO_VISUAL)<br/>- 立绘、场景背景图与特效<br/>- BGM、环境音与界面音效<br/>- HUD 皮肤与样式表覆写"]
-    Tier3["Tier 3: 全量规则重构与魔改 (TOTAL_CONVERSION)<br/>- 数值上限与常量覆写 (game_constants)<br/>- 核心属性换算公式重构 (attribute_formulas)<br/>- 自定义装备与世界大地图拓扑扩展"]
+    Tier1["Tier 1: 故事剧情与命途扩展 (TIER_1_LOGIC)<br/>- 拓扑 DAG 剧情图<br/>- 出身背景、因果天赋、初始行囊<br/>- 多语言文案字典"]
+    Tier2["Tier 2: 视听与界面主题增强 (TIER_2_AUDIOVISUAL)<br/>- 立绘、场景背景图与特效<br/>- BGM、环境音与界面音效<br/>- HUD 皮肤与样式表覆写"]
+    Tier3["Tier 3: 全量规则重构与魔改 (TIER_3_OVERHAUL)<br/>- 数值上限与常量覆写 (game_constants)<br/>- 核心属性换算公式重构 (attribute_formulas)<br/>- 自定义装备与世界大地图拓扑扩展"]
 
     Tier1 --> Tier2
     Tier2 --> Tier3
@@ -28,17 +28,17 @@ flowchart TD
 
 ### 1. Tier 1: 故事剧情与命途扩展 (`STORY_NARRATIVE`)
 - **关注点**：剧情有向无环图（DAG）、角色身世起源（Origins）、正负因果天赋对（Causality Traits）、初始装备包（Starter Kits）及多语言本地化（i18n）。
-- **参考模板**：[`templates/starter_story/`](file:///c:/CODE_game-development/vscode-extensions/WebGames/mod_sdk/templates/starter_story/)。
+- **参考模板**：[`templates/starter_story/`](../templates/starter_story/)。
 
-### 2. Tier 2: 视听与界面主题增强 (`AUDIO_VISUAL`)
+### 2. Tier 2: 视听与界面主题增强 (`TIER_2_AUDIOVISUAL`)
 - **关注点**：多媒体资源包与视觉交互覆写。通过声明式资产清单将立绘、背景插画、BGM、音效以及 HUD UI 控件贴图挂载至引擎运行时。
 - **参考模板与范例**：
-  - 模板：[`templates/audio_visual_pack/`](file:///c:/CODE_game-development/vscode-extensions/WebGames/mod_sdk/templates/audio_visual_pack/)
-  - 范例：[`examples/custom_hud_theme/`](file:///c:/CODE_game-development/vscode-extensions/WebGames/mod_sdk/examples/custom_hud_theme/)
+  - 模板：[`templates/audio_visual_pack/`](../templates/audio_visual_pack/)
+  - 范例：[`examples/custom_hud_theme/`](./custom_hud_theme/)
 
-### 3. Tier 3: 全量规则重构与魔改 (`TOTAL_CONVERSION`)
-- **关注点**：玩法机制、战斗公式、经济系统、物品空间与世界拓扑的大规模替换。通过 `override_mode: "FULL_OVERRIDE"` 覆写游戏基线逻辑。
-- **参考模板**：[`templates/total_conversion_sample/`](file:///c:/CODE_game-development/vscode-extensions/WebGames/mod_sdk/templates/total_conversion_sample/)。
+### 3. Tier 3: 全量规则重构与魔改 (`TIER_3_OVERHAUL`)
+- **关注点**：玩法机制、战斗公式、经济系统、物品空间与世界拓扑的差异化覆盖与重构。通过 `content/{items,skills,rules,world}/` 与 `override_mode`（`MERGE`、`REPLACE_ENTRY`、`TOTAL_PURGE`，兼容别名 `FULL_OVERRIDE`）在运行时覆盖基线配置。
+- **参考模板**：[`templates/total_conversion_sample/`](../templates/total_conversion_sample/)。
 
 ---
 
@@ -67,13 +67,18 @@ mod://<asset_domain>/<sub_category>/<asset_name>.<extension>
 
 ```text
 custom_hud_theme/
-├── pack.json                   # 清单元数据，声明 mod_tier 为 AUDIO_VISUAL
+├── pack.json                   # 清单元数据，声明 tier 为 "TIER_2_AUDIOVISUAL"
+├── routing_rules.json          # HUD 预览路由绑定至 DAG_HUD_PREVIEW
+├── dag_graphs/
+│   └── DAG_HUD_PREVIEW.json    # HUD 皮肤预览演示序章图
 └── assets/
-    └── manifest.json           # 声明 HUD 边框、状态条、按钮与 UI 音效规范
+    ├── manifest.json           # SHA-256 资产清单 (由 cook 生成并校验)
+    ├── audio/sfx/ui/btn_click.ogg
+    └── ui/hud/{bars,buttons,frames}/*.png
 ```
 
 ### 接入指引
-1. 将扩展包放置于引擎的 `mods/narratives/` 或 `user://mods/narratives/` 目录下；
+1. 将扩展包放置于引擎的 `mods/<pack_id>/`、`mods/narratives/<pack_id>/`、`user://mods/<pack_id>/` 或 `user://mods/narratives/<pack_id>/` 目录下；
 2. 确保 `pack.json` 中配置合规的 `pack_id` 与 `priority`；
 3. 启动引擎后，单机与演习推演模块将根据依赖与优先级自动装载生效。
 

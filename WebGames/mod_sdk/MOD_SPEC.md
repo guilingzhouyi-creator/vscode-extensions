@@ -1,7 +1,7 @@
 # 卡拉尔世界引擎 · 模组创作者数据契约速查指南 (MOD Quick-Reference Spec v1.2)
 
 > [!NOTE]
-> **【规范定位】**：本手册是面向模组开发者与自主推演 Agent 的根目录官方契约速查指南与真源索引总枢。所有动态能力清单均由底层单一真源自动化静态萃取同步，确保数据契约与引擎运行时保持 100% 绝对一致。
+> **【规范定位】**：本手册是面向模组开发者与自主推演 Agent 的根目录官方契约速查指南与真源索引总枢。所有动态能力清单均由底层单一真源自动化静态萃取同步，确保数据契约与引擎运行时保持一致。
 > 完整深入的架构设计、算法公式与协议明细，请直接查阅 [`docs/`](docs/) 对应权威规范卷。
 > **引擎接口版本**：`1.0.0`
 
@@ -30,10 +30,10 @@
    - 纯静态声明式 JSON，体积极小（< 100KB），零多媒体依赖，热重载极速响应。
 2. **Tier 2: 视听与艺术资产增强包 (Audiovisual & Assets Pack)**
    - 在 Tier 1 逻辑之上注入受控多媒体资产（立绘、场景纹理、UI 音效、背景音乐、字体与纯文本着色器）；
-   - 包含 `assets/` 物理目录与 `assets_manifest.json`，受虚拟协议 `mod://<pack_id>/assets/...` 与严格体积配额保护。
+   - 包含 `assets/` 物理目录与 `assets/manifest.json`，受虚拟协议 `mod://<pack_id>/assets/...` 与体积配额保护。
 3. **Tier 3: 全局大魔改规则包 (Total Conversion & Overhaul Pack)**
    - 包含 Tier 1 & Tier 2 完整能力，深度重构底层游戏世界观、地理空间阻抗、物品装备原型与战斗动力学常数；
-   - 包含 `content/` 模块化目录，支持 `MERGE`、`REPLACE_ENTRY` 与 `TOTAL_PURGE` 声明式差分覆写。
+   - 包含 `content/` 模块化目录（运行时差分载入覆盖 `content/{items,skills,rules,world}/*.json` 与根目录对应 JSON），支持 `MERGE`、`REPLACE_ENTRY` 与 `TOTAL_PURGE` 声明式差分覆写。
 
 ---
 
@@ -50,8 +50,8 @@
 │   └── DAG_<NAME>.json         # 因果剧情图（单 START_ENTRY，至少 1 个 TERMINAL_EXIT）
 ├── i18n/                       # 【必需】剧情多语言本地化文案字典
 │   └── zh-CN.json              # 包含白名单占位符的剧情文本
-├── assets_manifest.json        # 【Tier 2/3 必需】多媒体资产清单与 SHA-256 校验指纹
 ├── assets/                     # 【Tier 2/3 可选】受控视听资源存储目录
+│   ├── manifest.json           # 【Tier 2/3 必需】多媒体资产清单与 SHA-256 校验指纹
 │   ├── textures/               # 纹理与插画 (WebP / PNG)
 │   ├── audio/                  # 音频与音效 (OGG / WAV)
 │   ├── fonts/                  # 自定义字体 (TTF / WOFF2)
@@ -117,21 +117,21 @@ MOD 创作者角色与序章节点路由仅允许绑定下列已启用种族：
 
 | 占位符宏 (Placeholder) | 解析源与说明 |
 | :--- | :--- |
-| `{PLAYER_NAME}` | 当前玩家角色的自定义名称（支持大小写双轨：{player_name} 与 {PLAYER_NAME}） |
-| `{CHARACTER_NAME}` | 当前角色的名称标识，同 {PLAYER_NAME}（支持大小写双轨：{character_name} 与 {CHARACTER_NAME}） |
-| `{CHARACTER_ID}` | 角色实例全局唯一标识符（支持大小写双轨：{character_id} 与 {CHARACTER_ID}） |
-| `{RACE_ID}` | 角色所属种族唯一标识符，如 HUMAN（支持大小写双轨：{race_id} 与 {RACE_ID}） |
-| `{GENDER}` | 角色性别标识，如 FEMALE / MALE（支持大小写双轨：{gender} 与 {GENDER}） |
-| `{START_LOCATION}` | 角色出生与初始降临的地理场景标识或本地化名称（支持大小写双轨：{start_location} 与 {START_LOCATION}） |
-| `{INITIAL_EQUIPMENT}` | 角色获得的初始佩剑或基础装备道具名称（支持大小写双轨：{initial_equipment} 与 {INITIAL_EQUIPMENT}） |
-| `{NPC_TARGET}` | 对话交互或剧情引导的目标 NPC 实体名称（支持大小写双轨：{npc_target} 与 {NPC_TARGET}） |
-| `{EVENT_RESULT}` | 前序节点或剧情事件的判定结果摘要（支持大小写双轨：{event_result} 与 {EVENT_RESULT}） |
-| `{ORIGIN_ID}` | 角色选定或随机抽取的出身背景唯一标识符（支持大小写双轨：{origin_id} 与 {ORIGIN_ID}） |
-| `{ORIGIN_NAME}` | 角色出身背景的人类可读显示名称（支持大小写双轨：{origin_name} 与 {ORIGIN_NAME}） |
-| `{BIRTH_REGION}` | 角色出身关联的降临地域标识符（支持大小写双轨：{birth_region} 与 {BIRTH_REGION}） |
-| `{TRAIT_SUMMARY}` | 角色装配的正负因果天赋组合摘要文本（支持大小写双轨：{trait_summary} 与 {TRAIT_SUMMARY}） |
-| `{STARTER_KIT_NAME}` | 角色装配的初始装备行囊名称（支持大小写双轨：{starter_kit_name} 与 {STARTER_KIT_NAME}） |
-| `{INITIAL_GOLD}` | 角色创角结算后的初始金币数量（支持大小写双轨：{initial_gold} 与 {INITIAL_GOLD}） |
+| `{PLAYER_NAME}` | 当前玩家角色的自定义名称（支持大小写双式：{player_name} 与 {PLAYER_NAME}） |
+| `{CHARACTER_NAME}` | 当前角色的名称标识，同 {PLAYER_NAME}（支持大小写双式：{character_name} 与 {CHARACTER_NAME}） |
+| `{CHARACTER_ID}` | 角色实例全局唯一标识符（支持大小写双式：{character_id} 与 {CHARACTER_ID}） |
+| `{RACE_ID}` | 角色所属种族唯一标识符，如 HUMAN（支持大小写双式：{race_id} 与 {RACE_ID}） |
+| `{GENDER}` | 角色性别标识，如 FEMALE / MALE（支持大小写双式：{gender} 与 {GENDER}） |
+| `{START_LOCATION}` | 角色出生与初始降临的地理场景标识或本地化名称（支持大小写双式：{start_location} 与 {START_LOCATION}） |
+| `{INITIAL_EQUIPMENT}` | 角色获得的初始佩剑或基础装备道具名称（支持大小写双式：{initial_equipment} 与 {INITIAL_EQUIPMENT}） |
+| `{NPC_TARGET}` | 对话交互或剧情引导的目标 NPC 实体名称（支持大小写双式：{npc_target} 与 {NPC_TARGET}） |
+| `{EVENT_RESULT}` | 前序节点或剧情事件的判定结果摘要（支持大小写双式：{event_result} 与 {EVENT_RESULT}） |
+| `{ORIGIN_ID}` | 角色选定或随机抽取的出身背景唯一标识符（支持大小写双式：{origin_id} 与 {ORIGIN_ID}） |
+| `{ORIGIN_NAME}` | 角色出身背景的人类可读显示名称（支持大小写双式：{origin_name} 与 {ORIGIN_NAME}） |
+| `{BIRTH_REGION}` | 角色出身关联的降临地域标识符（支持大小写双式：{birth_region} 与 {BIRTH_REGION}） |
+| `{TRAIT_SUMMARY}` | 角色装配的正负因果天赋组合摘要文本（支持大小写双式：{trait_summary} 与 {TRAIT_SUMMARY}） |
+| `{STARTER_KIT_NAME}` | 角色装配的初始装备行囊名称（支持大小写双式：{starter_kit_name} 与 {STARTER_KIT_NAME}） |
+| `{INITIAL_GOLD}` | 角色创角结算后的初始金币数量（支持大小写双式：{initial_gold} 与 {INITIAL_GOLD}） |
 
 ### 4. 状态突变事件规范 (Valid Mutation Events)
 
@@ -343,7 +343,7 @@ MOD 可通过根目录下的 `destinies.json` 以**列表式结构**扩展创角
 }
 ```
 
-### 2. Tier 2 视听资产增强包清单样例 (`assets_manifest.json`)
+### 2. Tier 2 视听资产增强包清单样例 (`assets/manifest.json`)
 
 ```json
 {
@@ -393,9 +393,9 @@ MOD 可通过根目录下的 `destinies.json` 以**列表式结构**扩展创角
 | **脚手架创建** | `python mod_sdk/tools/kalar_mod.py init --id <id> --name <name> --tier <tier>` | 基于官方模板生成初始骨架 |
 | **静态诊断** | `python mod_sdk/tools/kalar_mod.py check <mod_dir> [--json]` | 纯静态检测格式、DAG连通性与多包冲突 |
 | **资产烹饪** | `python mod_sdk/tools/kalar_mod.py cook <mod_dir> [--check]` | 校验格式与体积配额并生成 SHA-256 清单 |
-| **剧情演习** | `python mod_sdk/tools/kalar_mod.py preview <mod_dir> [--simulate]` | 打印 DAG 拓扑概览并模拟剧情推进水化 |
+| **剧情演习** | `python mod_sdk/tools/kalar_mod.py preview <mod_dir> [--simulate]` | 打印 DAG 拓扑概览并模拟剧情推进与文本插值 |
 | **无头试玩** | `python mod_sdk/tools/kalar_mod.py play <mod_dir> [--interactive] [--with-hud]` | 执行批量验收推演、Agent STDIO 交互或主页 HUD 贯通 |
-| **协议派发** | `python mod_sdk/tools/kalar_mod.py dispatch <mod_dir> [--action <type>] [--json]` | 离线派发全域统一协议请求并执行强类型信封校验 |
+| **协议派发** | `python mod_sdk/tools/kalar_mod.py dispatch [--actor HUMAN_UI\|AGENT] [--domain <id>] [--action <type>] [--payload <json>] [--json]` | 离线派发全域统一协议请求并执行强类型信封校验 |
 | **打包归档** | `python mod_sdk/tools/kalar_mod.py pack <mod_dir> [-o <out.kmod>] [--format kmod]` | 前置门禁校验并压缩打包为防篡改 `.kmod` 生产分发包 |
 | **集成工作台** | `python mod_sdk/tools/kalar_mod.py workbench [--self-test] [--verify <kmod>]` | 开发者一站式集成工作台、离线指纹校验与自动化自检 |
 

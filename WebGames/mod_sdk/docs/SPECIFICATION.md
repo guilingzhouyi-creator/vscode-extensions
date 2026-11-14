@@ -17,8 +17,8 @@ graph TD
     classDef t3 fill:#22543d,stroke:#38a169,stroke-width:2px,color:#fff;
 
     T1["Tier 1: 纯逻辑与剧情命途包 (Logic & Narrative Pack)<br/>• pack.json / destinies.json / routing_rules.json<br/>• dag_graphs/ (因果剧情图元) / i18n/ (本地化文案)"]:::t1
-    T2["Tier 2: 视听与艺术资产增强包 (Audiovisual & Assets Pack)<br/>• 包含 Tier 1 全部逻辑能力<br/>• assets/ (WebP, OGG, WAV, TTF, GDShader)<br/>• assets_manifest.json (SHA-256 哈希清单与配额约束)"]:::t2
-    T3["Tier 3: 全局大魔改规则包 (Total Conversion & Overhaul Pack)<br/>• 包含 Tier 1 & Tier 2 全部能力<br/>• content/ (world, items, skills, entities, rules)<br/>• 核心物理动力学常数、战斗伤害公式与空间阻抗覆写"]:::t3
+    T2["Tier 2: 视听与艺术资产增强包 (Audiovisual & Assets Pack)<br/>• 包含 Tier 1 全部逻辑能力<br/>• assets/ (PNG, WebP, OGG, WAV, OGV, TTF, OTF, GDShader, GLTF, GLB)<br/>• assets/manifest.json (SHA-256 哈希清单与配额约束)"]:::t2
+    T3["Tier 3: 全局大魔改规则包 (Total Conversion & Overhaul Pack)<br/>• 包含 Tier 1 & Tier 2 全部能力<br/>• content/ (items, skills, rules, world; entities 为 Schema 预留目录)<br/>• 核心物理动力学常数、战斗伤害公式与空间阻抗差分覆写"]:::t3
 
     T1 --> T2
     T2 --> T3
@@ -30,13 +30,13 @@ graph TD
 - **分发特性**：体积极小（通常 < 100KB），支持热重载与无头推演快速验证。
 
 ### 2. Tier 2: 视听与艺术资产增强包 (Audiovisual & Assets Pack)
-- **定位**：在剧情逻辑之上注入自定义视听资源（立绘、场景贴图、界面音效、背景音乐、自定义字体与纯文本着色器）。
-- **物理结构**：五件套 + `assets/` 物理目录 + `assets_manifest.json` 资产清单文件。
-- **安全约束**：受严格物理沙箱保护，仅支持 `mod://<pack_id>/assets/...` 虚拟协议寻址，严禁包含任何可执行二进制。
+- **定位**：在剧情逻辑之上注入自定义视听资源（立绘、场景贴图、界面音效、背景音乐、`.ogv` 过场视频、自定义字体与纯文本 `.gdshader` 着色器）。
+- **物理结构**：五件套 + `assets/` 物理目录 + `assets/manifest.json` 资产清单文件。
+- **安全约束**：受物理沙箱路径解析保护，仅支持 `mod://<pack_id>/assets/...` 虚拟协议寻址，拒绝可执行二进制扩展名。
 
 ### 3. Tier 3: 全局大魔改规则包 (Total Conversion & Overhaul Pack)
-- **定位**：深度重构游戏底层世界观、空间拓扑、物品库、动作卡牌与战斗数值物理公式。
-- **物理结构**：完整架构体系 + `content/` 模块化目录（包含 `world/`, `items/`, `skills/`, `entities/`, `rules/`）。
+- **定位**：重构游戏底层世界观、空间拓扑、物品库、动作卡牌与战斗数值物理公式。
+- **物理结构**：完整架构体系 + `content/` 模块化目录（运行时经 `Tier3ContentOverrideLoader` 加载 `content/{items,skills,rules,world}/*.json` 与根目录对应文件；`content/entities/` 为 Schema 预留扩展目录）。
 - **合并语义**：具备声明式差分覆写模式（`MERGE`, `REPLACE_ENTRY`, `TOTAL_PURGE`），由引擎生命周期底座统一调度。
 
 ---
@@ -55,8 +55,8 @@ graph TD
 ├── i18n/                       # 【必需】本地化多语言文案字典
 │   └── zh-CN.json              # 语言键值映射，含白名单占位符模板
 │
-├── assets_manifest.json        # 【Tier 2/3 必需】多媒体资产清单与 SHA-256 校验指纹
 ├── assets/                     # 【Tier 2/3 可选】受控媒体资产存储根目录
+│   ├── manifest.json           # 【Tier 2/3 必需】多媒体资产清单与 SHA-256 校验指纹
 │   ├── textures/               # 纹理与图片（WebP / PNG，单图 <= 15MB）
 │   ├── audio/                  # 音频（OGG / WAV，单文件 <= 30MB）
 │   ├── fonts/                  # 字体（TTF / WOFF2）
@@ -199,11 +199,11 @@ flowchart TD
 在联合加载多个扩展包时，引擎门禁与装配调度器执行五项严格的冲突裁决不变量：
 
 ### 1. 唯一标识符撞车拦截 (`ERR_MOD_DUPLICATE_ID_CONFLICT`)
-跨包联合装配时，下列主键必须具备全局全局唯一性，严禁跨包同名撞车：
-- `pack_id`：模组标识符绝对唯一；
-- `origin_id`：身世背景标识符绝对唯一；
-- `trait_id`：因果天赋标识符绝对唯一；
-- `kit_id`：初始行囊套件标识符绝对唯一。
+跨包联合装配时，下列主键必须具备全局唯一性，避免跨包同名撞车：
+- `pack_id`：模组标识符全局唯一；
+- `origin_id`：身世背景标识符全局唯一；
+- `trait_id`：因果天赋标识符全局唯一；
+- `kit_id`：初始行囊套件标识符全局唯一。
 若检测到不同 MOD 声明了相同主键，门禁立即阻断装配，并提示为实体 ID 追加模组前缀（如 `MOD_VALAN_SCOUT`）。
 
 ### 2. 声明式互斥冲突阻断 (`ERR_MOD_INCOMPATIBLE_CONFLICT`)
@@ -257,3 +257,9 @@ flowchart TD
 | `ERR_DESTINY_KIT_INVALID` | 命途数值 | 行囊物品总件数 `> 10` 或权威 ID 为空 | 精简行囊配置并填写真实物品 ID |
 | `ERR_DESTINY_UNKNOWN_DAG_REF`| 命途数值 | 身世引用的序章图不存在 | 修正引用的 DAG ID |
 | `ERR_DESTINY_UNKNOWN_KIT_REF`| 命途数值 | 身世引用的行囊套件不存在 | 修正引用的套件 ID |
+| `ERR_DESTINY_UNKNOWN_ATTRIBUTE_KEY`| 命途数值 | `attribute_bonus` 包含非 `VALID_ATTRIBUTE_KEYS` 属性键 | 仅使用合法六维键 (`STR`/`AGI`/`CON`/`INT`/`SPR`/`VIT`) |
+| `ERR_DESTINY_DUPLICATE_ORIGIN_ID`| 命途数值 | 同包内 `custom_origins` 存在重复 `origin_id` | 为每个自定义身世分配唯一 `origin_id` |
+
+> **结构化诊断载荷 (`diagnostics`)**：`ModManifestValidator.precheck_single_mod()` 除返回兼容字符串数组 `"errors"` 与 `"error_details"` 外，还提供结构化 `"diagnostics"` 列表，每项包含 `code`、`error_code`、`message`、`field_path`、`entity_id` 与 `fix_suggestion`，供 CLI 与 IDE/Agent 精确定位字段。
+>
+> **运行时多级发现路径 (`ModPackageDiscoverySolver.get_discovery_roots()`)**：按优先级扫描 `res://config/narratives/packs/`、`res://mods/`、`res://mods/narratives/`（发布态对应 `<exe>/mods/` 与 `<exe>/mods/narratives/`）、`user://mods/` 与 `user://mods/narratives/`，兼容散装目录与 `.kmod` 归档包。
