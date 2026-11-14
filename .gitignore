@@ -14,6 +14,7 @@ coverage/
 *.vsix
 *.tgz
 .vscode-test/
+**/.vitest/
 
 # 2. Rust & Cargo 编译产物
 target/
