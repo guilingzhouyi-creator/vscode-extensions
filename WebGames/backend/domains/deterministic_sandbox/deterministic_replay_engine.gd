@@ -23,27 +23,27 @@ static func simulate_replay(
 	initial_ap: int,
 	inputs: Array
 ) -> Dictionary:
-	# 0. 输入预扫描（）：tick 严格递增非负、action 必须在 PhysicalVerbRegistry
+	# 0. 输入预扫描：tick 严格递增非负、action 必须在 PhysicalVerbRegistry
 	#    登记——非法整批拒绝（REPLAY_INPUT_INVALID），不产生部分指纹。
-	for i in range(inputs.size()):
-		var snapshot: Variant = inputs[i]
+	for step_index in range(inputs.size()):
+		var snapshot: Variant = inputs[step_index]
 		var tick: int = int(snapshot.tick)
 		if tick < 0:
 			return {"success": false, "code": "REPLAY_INPUT_INVALID", "reason": "tick", "step_count": inputs.size()}
-		if i > 0 and tick <= int(inputs[i - 1].tick):
+		if step_index > 0 and tick <= int(inputs[step_index - 1].tick):
 			return {"success": false, "code": "REPLAY_INPUT_INVALID", "reason": "tick_not_monotonic", "step_count": inputs.size()}
 		if not PhysicalVerbRegistry._verbs().has(snapshot.action_command):
 			return {"success": false, "code": "REPLAY_INPUT_INVALID", "reason": "action_not_registered", "action_command": snapshot.action_command, "step_count": inputs.size()}
 
-	var lcg_mult: int = GameConfig.get_int("domains.deterministic", "lcg/multiplier", 1103515245)
-	var lcg_inc: int = GameConfig.get_int("domains.deterministic", "lcg/increment", 12345)
+	var lcg_multiplier: int = GameConfig.get_int("domains.deterministic", "lcg/multiplier", 1103515245)
+	var lcg_increment: int = GameConfig.get_int("domains.deterministic", "lcg/increment", 12345)
 	var lcg_mask: int = GameConfig.get_int("domains.deterministic", "lcg/mask", 2147483647)
 	# 钳制下界：modulus 为 0 会让下面的 % 与 / 直接崩溃，而它可被热重载改写
 	var lcg_modulus: int = maxi(1, GameConfig.get_int("domains.deterministic", "lcg/modulus", 1000))
 	var base_damage: float = GameConfig.get_float("domains.deterministic", "combat/base_damage", 25.0)
 	var random_coefficient: float = GameConfig.get_float("domains.deterministic", "combat/random_coefficient", 0.2)
-	var fp_format := GameConfig.get_string("domains.deterministic", "fingerprint/format", "T%d:HP%.1f:AP%d:D%.1f")
-	var summary_sep := GameConfig.get_string("domains.deterministic", "fingerprint/summary_separator", ";")
+	var fingerprint_format := GameConfig.get_string("domains.deterministic", "fingerprint/format", "T%d:HP%.1f:AP%d:D%.1f")
+	var summary_separator := GameConfig.get_string("domains.deterministic", "fingerprint/summary_separator", ";")
 
 	var hp := initial_hp
 	var ap := initial_ap
@@ -52,22 +52,22 @@ static func simulate_replay(
 
 	for snapshot in inputs:
 		# 确定性伪随机发生器 (LCG)：线性同余式与掩码位与，跨平台位运算一致
-		var lcg_val: int = (int(snapshot.rng_seed) * lcg_mult + lcg_inc) & lcg_mask
-		var roll: float = float(lcg_val % lcg_modulus) / float(lcg_modulus)
+		var lcg_value: int = (int(snapshot.rng_seed) * lcg_multiplier + lcg_increment) & lcg_mask
+		var roll: float = float(lcg_value % lcg_modulus) / float(lcg_modulus)
 
 		var verb: Dictionary = PhysicalVerbRegistry.get_verb(snapshot.action_command)
 		var base_ap: int = int(verb.get("base_ap", -2))
 		ap += base_ap
 
-		var dmg: float = base_damage * float(verb.get("k_mom", 1.0)) * (1.0 + random_coefficient * roll)
-		total_damage_dealt += dmg
-		hp = maxf(0.0, hp - dmg)
+		var step_damage: float = base_damage * float(verb.get("k_mom", 1.0)) * (1.0 + random_coefficient * roll)
+		total_damage_dealt += step_damage
+		hp = maxf(0.0, hp - step_damage)
 
-		var fp: Variant = fp_format % [snapshot.tick, hp, ap, dmg]
-		state_fingerprints.append(fp)
+		var step_fingerprint: Variant = fingerprint_format % [snapshot.tick, hp, ap, step_damage]
+		state_fingerprints.append(step_fingerprint)
 
-	var summary_str: String = summary_sep.join(state_fingerprints)
-	var final_hash: String = summary_str.sha256_text()
+	var summary_text: String = summary_separator.join(state_fingerprints)
+	var final_hash: String = summary_text.sha256_text()
 
 	return {
 		"final_hp": hp,
