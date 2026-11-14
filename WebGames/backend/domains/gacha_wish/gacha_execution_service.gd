@@ -20,7 +20,7 @@ static func execute_multi_pull(
 	pull_count: int = 10,
 	catalog: ItemRegistryCatalog = null,
 	rng: DeterministicRNG = null,
-	library: AccountItemLibraryAggregate = null,
+	library: AccountItemLibrary = null,
 	tx_id: String = ""
 ) -> Dictionary:
 	if banner == null or wallet == null or inventory == null or catalog == null:
@@ -38,8 +38,8 @@ static func execute_multi_pull(
 	var needed_copper: int = total_gold_cost * gold_rate
 
 	if total_copper_value < needed_copper:
-		var msg := GameConfig.get_string("narratives.gacha", "insufficient_funds", "Insufficient funds for %d pulls.")
-		return {"success": false, "reason": msg % pull_count}
+		var error_message := GameConfig.get_string("narratives.gacha", "insufficient_funds", "Insufficient funds for %d pulls.")
+		return {"success": false, "reason": error_message % pull_count}
 
 	var wallet_snapshot := wallet.to_dictionary()
 	var inventory_snapshot := inventory.snapshot()
@@ -52,23 +52,23 @@ static func execute_multi_pull(
 	var granted_count := 0
 	var grant_failed_count := 0
 
-	for i in range(pull_count):
-		var res: Variant = GachaProbabilitySolver.roll_single_draw(banner, pull_rng)
-		drop_results.append(res)
-		if res.rarity > highest_rarity:
-			highest_rarity = res.rarity
+	for pull_index in range(pull_count):
+		var draw_result: Variant = GachaProbabilitySolver.roll_single_draw(banner, pull_rng)
+		drop_results.append(draw_result)
+		if draw_result.rarity > highest_rarity:
+			highest_rarity = draw_result.rarity
 
 		# 注册表三元组发放：掉落 id 为 canonical_id，原型属性单一事实源；
 		# 未登记掉落或背包容量不足严格计入失败（不造临时物件）
-		var proto: Variant = catalog.get_prototype(str(res.item_id))
-		if proto == null:
+		var prototype: Variant = catalog.get_prototype(str(draw_result.item_id))
+		if prototype == null:
 			grant_failed_count += 1
 			continue
-		var item := ItemInstanceFactory.build_instance(proto, proto.english_name, "GAC_", proto.english_name + "_")
+		var item := ItemInstanceFactory.build_instance(prototype, prototype.english_name, "GAC_", prototype.english_name + "_")
 		if inventory.add_item(item):
 			granted_count += 1
 			if library != null:
-				ItemStatisticsSolver.record_item_event(library, ItemStatisticsSolver.EVENT_ITEM_GRANTED, str(res.item_id), 1, catalog, null, {
+				ItemStatisticsSolver.record_item_event(library, ItemStatisticsSolver.EVENT_ITEM_GRANTED, str(draw_result.item_id), 1, catalog, null, {
 					"uid": item.item_uid,
 					"transaction_id": tx_id,
 					"rule_id": "rule_gacha_pull"
@@ -85,7 +85,7 @@ static func execute_multi_pull(
 		"gacha/multi_pull_result", "gacha", [banner.banner_title, pull_count, highest_rarity], {"drops": drop_results}
 	)
 
-	# 补发（）：纯结构化通道——narratives.gacha 无 pull_resolved 文案键，
+	# 纯结构化通道补发：narratives.gacha 无 pull_resolved 文案键，
 	# EventBus 解析不出文案即只广播 domain_event，不与 multi_pull_result 叙事重复落战报
 	EventBusCore.get_instance().emit_domain_event("gacha_wish.pull_resolved", {
 		"args": [operation_id, pull_count],

@@ -60,10 +60,10 @@ static func roll_single_draw(banner: GachaBannerAggregate, rng_or_seed: Variant 
 	banner.total_lifetime_pulls += 1
 	banner.current_pity_count += 1
 
-	var rate_5 := calculate_current_5star_rate(banner.current_pity_count)
+	var five_star_rate := calculate_current_5star_rate(banner.current_pity_count)
 	var roll := rng.randf()
 
-	if roll < rate_5:
+	if roll < five_star_rate:
 		var is_up := false
 		if banner.is_next_guaranteed_up or rng.randf() < _up_rate():
 			is_up = true
@@ -89,11 +89,11 @@ static func roll_single_draw(banner: GachaBannerAggregate, rng_or_seed: Variant 
 			"item_id": reward_item_id,
 			"pity_count_used": pity_used
 		}
-	elif roll < (rate_5 + _base_4star_rate()):
-		var picked_4: Variant = rng.pick(banner.standard_4star_item_ids)
-		var item_4 := "" if picked_4 == null else str(picked_4)
-		return { "rarity": 4, "is_up": false, "item_id": item_4, "pity_count_used": banner.current_pity_count }
+	elif roll < (five_star_rate + _base_4star_rate()):
+		var picked_four_star: Variant = rng.pick(banner.standard_4star_item_ids)
+		var four_star_item_id := "" if picked_four_star == null else str(picked_four_star)
+		return { "rarity": 4, "is_up": false, "item_id": four_star_item_id, "pity_count_used": banner.current_pity_count }
 	else:
-		var picked_3: Variant = rng.pick(banner.standard_3star_item_ids)
-		var item_3 := "" if picked_3 == null else str(picked_3)
-		return { "rarity": 3, "is_up": false, "item_id": item_3, "pity_count_used": banner.current_pity_count }
+		var picked_three_star: Variant = rng.pick(banner.standard_3star_item_ids)
+		var three_star_item_id := "" if picked_three_star == null else str(picked_three_star)
+		return { "rarity": 3, "is_up": false, "item_id": three_star_item_id, "pity_count_used": banner.current_pity_count }
