@@ -1,8 +1,12 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端数据桩: 模拟系统存档服务
+# 模块归属: 前端领域边界层 (Frontend · Domain Boundary Mocks)
 # 文件路径: res://frontend/domain_boundary/mocks/mock_save_service.gd
-# 职责: 回放帧/倍率/进度规则与存档槽位写清（视图只做状态同步与渲染）
+# 架构定位: Domain Boundary Mock / Simulated Save & Replay Service
+# 依赖与触发: 上游: MockServiceContainer, 存档与回放视图 | 下游: 无（纯逻辑模拟）
+# 职责说明: 提供模拟回放帧推进、倍率切换、进度比例映射与存档槽位写入/清空逻辑。
+# 退出语义与设计依据: 表现层零存档写逻辑与不可变槽位副本返回契约
 # ==============================================================================
+
 class_name MockSaveService
 extends ISaveService
 
@@ -15,10 +19,10 @@ func advance_replay(current: int, total: int, step: int) -> int:
 	return clampi(current + step, 0, maxi(0, total))
 
 func change_replay_speed(current: float, direction: int) -> float:
-	var idx := REPLAY_SPEEDS.find(current)
-	if idx < 0:
+	var current_index := REPLAY_SPEEDS.find(current)
+	if current_index < 0:
 		return current
-	return REPLAY_SPEEDS[clampi(idx + direction, 0, REPLAY_SPEEDS.size() - 1)]
+	return REPLAY_SPEEDS[clampi(current_index + direction, 0, REPLAY_SPEEDS.size() - 1)]
 
 func frame_from_ratio(ratio: float, total: int) -> int:
 	return int(clampf(ratio, 0.0, 1.0) * float(maxi(0, total)))

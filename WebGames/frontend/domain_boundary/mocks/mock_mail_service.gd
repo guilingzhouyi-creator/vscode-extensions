@@ -1,17 +1,24 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端数据桩: 模拟邮件服务
+# 模块归属: 前端领域边界层 (Frontend · Domain Boundary Mocks)
 # 文件路径: res://frontend/domain_boundary/mocks/mock_mail_service.gd
-# 职责: 邮箱容量、已读/领取状态跃迁与批量删除（视图只做列表渲染）
+# 架构定位: Domain Boundary Mock / Simulated Mail Service
+# 依赖与触发: 上游: MockServiceContainer, 邮箱界面 | 下游: GameConfig
+# 职责说明: 提供模拟邮箱容量查询、已读/附件领取状态跃迁与批量删除，返回新副本不原地篡改入参。
+# 退出语义与设计依据: 配置驱动容量上限与不可变状态副本返回契约
 # ==============================================================================
+
+## MockMailService：玩家邮箱容量与附件领取模拟服务
 class_name MockMailService
 extends IMailService
 
 const RULES_SECTION := "frontend.views"
 const RULES_KEY := "fe08_mail_system"
 
+## 从 GameConfig 读取邮箱容量上限配置
 func get_max_capacity() -> int:
 	return GameConfig.get_int(RULES_SECTION, RULES_KEY + "/max_mailbox_capacity", 100)
 
+## 将指定 ID 的邮件标记为已读并返回深拷贝后的邮件列表
 func mark_read(mails: Array, mail_id: String) -> Array:
 	var updated: Array = mails.duplicate(true)
 	for mail in updated:

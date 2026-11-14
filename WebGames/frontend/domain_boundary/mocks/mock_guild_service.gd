@@ -1,8 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端数据桩: 模拟公会社交服务
+# 模块归属: 前端领域边界层 (Frontend · Domain Boundary Mocks)
 # 文件路径: res://frontend/domain_boundary/mocks/mock_guild_service.gd
-# 职责: 成员生成规则、RBAC 白名单读取与交易锁定/确认状态机
+# 架构定位: Domain Boundary Mock / Simulated Guild & Trade Service
+# 依赖与触发: 上游: MockServiceContainer, 公会社交视图 | 下游: GameConfig
+# 职责说明: 提供模拟公会社交服务，负责成员名单生成、权限白名单判定与交易状态机跃迁。
+# 退出语义与设计依据: 配置驱动权限白名单与交易状态跃迁守卫契约
 # ==============================================================================
+
+## MockGuildService：公会名册、权限判定与交易状态流转模拟服务
 class_name MockGuildService
 extends IGuildService
 
@@ -30,16 +35,17 @@ const ROLE_KEYS := [
 	"ui.fe09.mock.role.member", "ui.fe09.mock.role.member", "ui.fe09.mock.role.member",
 ]
 
+## 确定性生成指定数量的模拟公会成员名单列表
 func generate_roster(count: int) -> Array:
 	var members: Array = []
-	for i in range(maxi(0, count)):
+	for member_index in range(maxi(0, count)):
 		members.append({
-			"name": MEMBER_NAME_KEYS[i % MEMBER_NAME_KEYS.size()],
-			"class": CLASS_KEYS[i % CLASS_KEYS.size()],
-			"level": 20 + (i * 3) % 30,
-			"role": ROLE_KEYS[i % ROLE_KEYS.size()],
-			"online": i % 3 != 2,
-			"contribution": 500 + i * 320,
+			"name": MEMBER_NAME_KEYS[member_index % MEMBER_NAME_KEYS.size()],
+			"class": CLASS_KEYS[member_index % CLASS_KEYS.size()],
+			"level": 20 + (member_index * 3) % 30,
+			"role": ROLE_KEYS[member_index % ROLE_KEYS.size()],
+			"online": member_index % 3 != 2,
+			"contribution": 500 + member_index * 320,
 		})
 	return members
 

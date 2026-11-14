@@ -1,13 +1,19 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端数据桩: 模拟边缘杂项服务
+# 模块归属: 前端领域边界层 (Frontend · Domain Boundary Mocks)
 # 文件路径: res://frontend/domain_boundary/mocks/mock_misc_edge_service.gd
-# 职责: 突变槽位/去重/替换规则、掉落拾取与命名费用表（视图只消费结果）
+# 架构定位: Domain Boundary Mock / Simulated Miscellaneous Gameplay Service
+# 依赖与触发: 上游: MockServiceContainer, 边缘系统视图 | 下游: 无（纯规则模拟）
+# 职责说明: 提供突变槽位激活、去重、末位替换、掉落拾取与命名类型计费模拟服务。
+# 退出语义与设计依据: 表现层零杂项状态突变与不可变副本返回契约
 # ==============================================================================
+
+## MockMiscEdgeService：突变激活、拾取与命名计费模拟服务
 class_name MockMiscEdgeService
 extends IMiscEdgeService
 
 const NAME_TYPE_FEES: Array[int] = [100, 50, 1000, 200]
 
+## 校验槽位上限与重复状态并激活指定突变，返回更新后的突变列表副本
 func activate_mutation(active: Array, item: Dictionary, max_slots: int) -> Dictionary:
 	if active.size() >= max_slots:
 		return {"success": false, "reason": "SLOTS_FULL", "mutations": active.duplicate(true)}
@@ -23,6 +29,7 @@ func activate_mutation(active: Array, item: Dictionary, max_slots: int) -> Dicti
 	updated.append(item.duplicate(true))
 	return {"success": true, "mutations": updated}
 
+## 弹出末尾已激活突变并替换为新突变，返回更新后的列表副本
 func replace_last_mutation(active: Array, item: Dictionary) -> Dictionary:
 	if active.is_empty():
 		return {"success": false, "reason": "NO_ACTIVE_MUTATION", "mutations": active.duplicate(true)}
