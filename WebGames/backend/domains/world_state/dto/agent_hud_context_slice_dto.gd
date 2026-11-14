@@ -4,7 +4,7 @@
 # 架构定位: Value Object DTO / Data Transport Model
 # 依赖与触发: 上游: AuthoritativeHudSnapshotDTO, AgentHudSliceSolver | 下游: AgentHudTelemetryPacketDTO | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
 # 职责说明: 面向 Agent 的主页 HUD 纯净状态观测切片，100% 剥离表现层渲染杂质，提供强类型标量与去表现化通知列表。
-# 退出语义与设计依据: 主页HUD面向Agent结构化切片流与行动空间双轨适配引擎施工细则 (Inv-AGENT-SLICE-PURITY-3)
+# 退出语义与设计依据: 主页HUD面向Agent结构化切片流与行动空间双通道适配引擎设计规范 (Inv-AGENT-SLICE-PURITY-3)
 # ==============================================================================
 
 ## AgentHudContextSliceDTO：Value Object DTO / Data Transport Model
@@ -111,10 +111,10 @@ func reset_state() -> void:
 
 ## 序列化当前对象为通用字典传输结构
 func to_dto() -> Dictionary:
-	var notices_arr: Array[Dictionary] = []
-	for n in ui_notices:
-		if n != null:
-			notices_arr.append(n.to_dto())
+	var notice_entries: Array[Dictionary] = []
+	for notice_item in ui_notices:
+		if notice_item != null:
+			notice_entries.append(notice_item.to_dto())
 
 	return {
 		"account_id": account_id,
@@ -150,55 +150,55 @@ func to_dto() -> Dictionary:
 		"game_mode": game_mode,
 		"is_multiplayer_ready": is_multiplayer_ready,
 		"unread_mail_count": unread_mail_count,
-		"ui_notices": notices_arr
+		"ui_notices": notice_entries
 	}
 
 ## 从输入字典反序列化还原传输对象
 static func from_dto(data: Dictionary) -> AgentHudContextSliceDTO:
-	var dto := AgentHudContextSliceDTO.new()
-	dto.account_id = str(data.get("account_id", ""))
-	dto.character_id = str(data.get("character_id", ""))
-	dto.character_name = str(data.get("character_name", ""))
-	dto.race_id = str(data.get("race_id", "HUMAN"))
-	dto.level = int(data.get("level", 1))
+	var slice := AgentHudContextSliceDTO.new()
+	slice.account_id = str(data.get("account_id", ""))
+	slice.character_id = str(data.get("character_id", ""))
+	slice.character_name = str(data.get("character_name", ""))
+	slice.race_id = str(data.get("race_id", "HUMAN"))
+	slice.level = int(data.get("level", 1))
 
-	dto.hp_current = float(data.get("hp_current", 100.0))
-	dto.hp_max = float(data.get("hp_max", 100.0))
-	dto.hp_ratio = float(data.get("hp_ratio", 1.0))
-	dto.mp_current = float(data.get("mp_current", 100.0))
-	dto.mp_max = float(data.get("mp_max", 100.0))
-	dto.mp_ratio = float(data.get("mp_ratio", 1.0))
-	dto.ap_current = float(data.get("ap_current", 10.0))
-	dto.ap_max = float(data.get("ap_max", 10.0))
-	dto.ap_ratio = float(data.get("ap_ratio", 1.0))
+	slice.hp_current = float(data.get("hp_current", 100.0))
+	slice.hp_max = float(data.get("hp_max", 100.0))
+	slice.hp_ratio = float(data.get("hp_ratio", 1.0))
+	slice.mp_current = float(data.get("mp_current", 100.0))
+	slice.mp_max = float(data.get("mp_max", 100.0))
+	slice.mp_ratio = float(data.get("mp_ratio", 1.0))
+	slice.ap_current = float(data.get("ap_current", 10.0))
+	slice.ap_max = float(data.get("ap_max", 10.0))
+	slice.ap_ratio = float(data.get("ap_ratio", 1.0))
 
-	dto.wallet_gold = int(data.get("wallet_gold", 0))
-	dto.wallet_mana_monocrystals = int(data.get("wallet_mana_monocrystals", 0))
-	dto.ledger_nonce = int(data.get("ledger_nonce", 0))
-	dto.unallocated_potential_points = int(data.get("unallocated_potential_points", 0))
-	dto.attribute_values = data.get("attribute_values", {}).duplicate(true)
-	dto.title_rank_key = str(data.get("title_rank_key", ""))
+	slice.wallet_gold = int(data.get("wallet_gold", 0))
+	slice.wallet_mana_monocrystals = int(data.get("wallet_mana_monocrystals", 0))
+	slice.ledger_nonce = int(data.get("ledger_nonce", 0))
+	slice.unallocated_potential_points = int(data.get("unallocated_potential_points", 0))
+	slice.attribute_values = data.get("attribute_values", {}).duplicate(true)
+	slice.title_rank_key = str(data.get("title_rank_key", ""))
 
-	dto.calendar_year = int(data.get("calendar_year", 1))
-	dto.calendar_month = int(data.get("calendar_month", 1))
-	dto.calendar_day = int(data.get("calendar_day", 1))
-	dto.day_phase_key = str(data.get("day_phase_key", "DAWN"))
-	dto.season_key = str(data.get("season_key", "SPRING"))
-	dto.weather_key = str(data.get("weather_key", "CLEAR"))
+	slice.calendar_year = int(data.get("calendar_year", 1))
+	slice.calendar_month = int(data.get("calendar_month", 1))
+	slice.calendar_day = int(data.get("calendar_day", 1))
+	slice.day_phase_key = str(data.get("day_phase_key", "DAWN"))
+	slice.season_key = str(data.get("season_key", "SPRING"))
+	slice.weather_key = str(data.get("weather_key", "CLEAR"))
 
-	dto.active_quest_id = str(data.get("active_quest_id", ""))
-	dto.active_quest_target_count = int(data.get("active_quest_target_count", 0))
-	dto.active_quest_current_count = int(data.get("active_quest_current_count", 0))
-	dto.is_quest_completable = bool(data.get("is_quest_completable", false))
+	slice.active_quest_id = str(data.get("active_quest_id", ""))
+	slice.active_quest_target_count = int(data.get("active_quest_target_count", 0))
+	slice.active_quest_current_count = int(data.get("active_quest_current_count", 0))
+	slice.is_quest_completable = bool(data.get("is_quest_completable", false))
 
-	dto.game_mode = str(data.get("game_mode", "SINGLE_PLAYER"))
-	dto.is_multiplayer_ready = bool(data.get("is_multiplayer_ready", false))
-	dto.unread_mail_count = int(data.get("unread_mail_count", 0))
+	slice.game_mode = str(data.get("game_mode", "SINGLE_PLAYER"))
+	slice.is_multiplayer_ready = bool(data.get("is_multiplayer_ready", false))
+	slice.unread_mail_count = int(data.get("unread_mail_count", 0))
 
-	dto.ui_notices.clear()
+	slice.ui_notices.clear()
 	var raw_notices: Array = data.get("ui_notices", [])
-	for item in raw_notices:
-		if item is Dictionary:
-			dto.ui_notices.append(HudUiNoticeDTO.from_dto(item))
+	for notice_item in raw_notices:
+		if notice_item is Dictionary:
+			slice.ui_notices.append(HudUiNoticeDTO.from_dto(notice_item))
 
-	return dto
+	return slice

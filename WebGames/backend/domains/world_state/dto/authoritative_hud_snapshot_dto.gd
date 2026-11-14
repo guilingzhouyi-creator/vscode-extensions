@@ -82,71 +82,71 @@ func to_dto() -> Dictionary:
 
 ## 从输入字典反序列化还原传输对象
 static func from_dto(data: Dictionary) -> AuthoritativeHudSnapshotDTO:
-	var dto := AuthoritativeHudSnapshotDTO.new()
-	_hydrate_identity(data, dto)
-	_hydrate_physiology_and_wallet(data, dto)
-	_hydrate_calendar_and_ops(data, dto)
-	_hydrate_social_and_features(data, dto)
-	return dto
+	var snapshot := AuthoritativeHudSnapshotDTO.new()
+	_populate_identity(data, snapshot)
+	_populate_physiology_and_wallet(data, snapshot)
+	_populate_calendar_and_ops(data, snapshot)
+	_populate_social_and_features(data, snapshot)
+	return snapshot
 
-static func _hydrate_identity(data: Dictionary, dto: AuthoritativeHudSnapshotDTO) -> void:
-	dto.account_id = String(data.get("account_id", ""))
-	dto.character_id = String(data.get("character_id", ""))
-	dto.character_name = String(data.get("character_name", ""))
-	dto.race_id = String(data.get("race_id", "HUMAN"))
-	dto.current_location_id = String(data.get("current_location_id", data.get("current_location", "")))
-	dto.level = maxi(1, int(data.get("level", 1)))
+static func _populate_identity(data: Dictionary, snapshot: AuthoritativeHudSnapshotDTO) -> void:
+	snapshot.account_id = String(data.get("account_id", ""))
+	snapshot.character_id = String(data.get("character_id", ""))
+	snapshot.character_name = String(data.get("character_name", ""))
+	snapshot.race_id = String(data.get("race_id", "HUMAN"))
+	snapshot.current_location_id = String(data.get("current_location_id", data.get("current_location", "")))
+	snapshot.level = maxi(1, int(data.get("level", 1)))
 
-static func _hydrate_physiology_and_wallet(data: Dictionary, dto: AuthoritativeHudSnapshotDTO) -> void:
+static func _populate_physiology_and_wallet(data: Dictionary, snapshot: AuthoritativeHudSnapshotDTO) -> void:
 	# 生理上限守卫强保证 >= 1.0
-	dto.hp_current = maxf(0.0, float(data.get("hp_current", 0.0)))
-	dto.hp_max = maxf(1.0, float(data.get("hp_max", 100.0)))
-	dto.mp_current = maxf(0.0, float(data.get("mp_current", 0.0)))
-	dto.mp_max = maxf(1.0, float(data.get("mp_max", 100.0)))
-	dto.ap_current = maxf(0.0, float(data.get("ap_current", 0.0)))
-	dto.ap_max = maxf(1.0, float(data.get("ap_max", 10.0)))
+	snapshot.hp_current = maxf(0.0, float(data.get("hp_current", 0.0)))
+	snapshot.hp_max = maxf(1.0, float(data.get("hp_max", 100.0)))
+	snapshot.mp_current = maxf(0.0, float(data.get("mp_current", 0.0)))
+	snapshot.mp_max = maxf(1.0, float(data.get("mp_max", 100.0)))
+	snapshot.ap_current = maxf(0.0, float(data.get("ap_current", 0.0)))
+	snapshot.ap_max = maxf(1.0, float(data.get("ap_max", 10.0)))
 
-	dto.wallet_gold = int(data.get("wallet_gold", 0))
-	dto.wallet_mana_monocrystals = int(data.get("wallet_mana_monocrystals", 0))
-	dto.ledger_nonce = int(data.get("ledger_nonce", 0))
+	snapshot.wallet_gold = int(data.get("wallet_gold", 0))
+	snapshot.wallet_mana_monocrystals = int(data.get("wallet_mana_monocrystals", 0))
+	snapshot.ledger_nonce = int(data.get("ledger_nonce", 0))
 
-	var attr_values: Variant = data.get("attribute_values", {})
-	if attr_values is Dictionary:
-		dto.attribute_values = attr_values.duplicate()
-	var attr_levels: Variant = data.get("attribute_levels", {})
-	if attr_levels is Dictionary:
-		dto.attribute_levels = attr_levels.duplicate()
+	var attribute_values_data: Variant = data.get("attribute_values", {})
+	if attribute_values_data is Dictionary:
+		snapshot.attribute_values = attribute_values_data.duplicate()
+	var attribute_levels_data: Variant = data.get("attribute_levels", {})
+	if attribute_levels_data is Dictionary:
+		snapshot.attribute_levels = attribute_levels_data.duplicate()
 
-	dto.unallocated_potential_points = maxi(0, int(data.get("unallocated_potential_points", 0)))
-	dto.title_rank_key = String(data.get("title_rank_key", ""))
+	snapshot.unallocated_potential_points = maxi(0, int(data.get("unallocated_potential_points", 0)))
+	snapshot.title_rank_key = String(data.get("title_rank_key", ""))
 
-static func _hydrate_calendar_and_ops(data: Dictionary, dto: AuthoritativeHudSnapshotDTO) -> void:
+static func _populate_calendar_and_ops(data: Dictionary, snapshot: AuthoritativeHudSnapshotDTO) -> void:
 	var calendar_env_data: Variant = data.get("calendar_env", null)
 	if calendar_env_data is Dictionary and not calendar_env_data.is_empty():
-		dto.calendar_env = WorldCalendarEnvironmentDTO.from_dto(calendar_env_data)
+		snapshot.calendar_env = WorldCalendarEnvironmentDTO.from_dto(calendar_env_data)
 
 	var ops_bulletin: Variant = data.get("ops_bulletin_brief", {})
 	if ops_bulletin is Dictionary:
-		dto.ops_bulletin_brief = ops_bulletin.duplicate()
+		snapshot.ops_bulletin_brief = ops_bulletin.duplicate()
 
-	dto.unread_mail_count = maxi(0, int(data.get("unread_mail_count", 0)))
-	dto.gacha_pity_counter = maxi(0, int(data.get("gacha_pity_counter", 0)))
+	snapshot.unread_mail_count = maxi(0, int(data.get("unread_mail_count", 0)))
+	snapshot.gacha_pity_counter = maxi(0, int(data.get("gacha_pity_counter", 0)))
 
-static func _hydrate_social_and_features(data: Dictionary, dto: AuthoritativeHudSnapshotDTO) -> void:
-	dto.guild_faction_id = String(data.get("guild_faction_id", ""))
+static func _populate_social_and_features(data: Dictionary, snapshot: AuthoritativeHudSnapshotDTO) -> void:
+	snapshot.guild_faction_id = String(data.get("guild_faction_id", ""))
 
 	var raw_dots: Variant = data.get("active_red_dot_paths", [])
 	if raw_dots is Array:
-		for dot in raw_dots:
-			dto.active_red_dot_paths.append(str(dot))
+		for red_dot_path in raw_dots:
+			snapshot.active_red_dot_paths.append(str(red_dot_path))
 
-	var q_track: Variant = data.get("quest_tracker", null)
-	if q_track is Dictionary and not q_track.is_empty():
-		dto.quest_tracker = ActiveQuestTrackerDTO.from_dto(q_track)
+	var quest_tracker_data: Variant = data.get("quest_tracker", null)
+	if quest_tracker_data is Dictionary and not quest_tracker_data.is_empty():
+		snapshot.quest_tracker = ActiveQuestTrackerDTO.from_dto(quest_tracker_data)
 
-	var m_feat: Variant = data.get("mode_features", null)
-	if m_feat is Dictionary and not m_feat.is_empty():
-		dto.mode_features = ModeFeatureManifestDTO.from_dto(m_feat)
+	var mode_features_data: Variant = data.get("mode_features", null)
+	if mode_features_data is Dictionary and not mode_features_data.is_empty():
+		snapshot.mode_features = ModeFeatureManifestDTO.from_dto(mode_features_data)
 
 ## 兼容层：降级转换为精简版老快照 HudStatusSnapshotDTO（零字段断裂）
 func to_legacy_snapshot() -> HudStatusSnapshotDTO:

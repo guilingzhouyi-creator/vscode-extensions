@@ -12,6 +12,8 @@
 class_name AuthoritativeHudSyncService
 extends RefCounted
 
+const HumanControlLeaseManager = preload("res://backend/domains/world_state/services/human_control_lease_manager.gd")
+
 ## 1. 拉轨（Pull Facade）：聚合生成权威 HUD 快照（纯计算无副作用，轻资产 <= 4KB）
 static func get_authoritative_snapshot(context: Dictionary) -> AuthoritativeHudSnapshotDTO:
 	var snapshot := AuthoritativeHudSnapshotDTO.new()
@@ -61,15 +63,15 @@ static func publish_stat_mutation(
 	var bus := EventBusCore.get_instance()
 	var packet := bus.borrow_packet(EventChannelDefinition.HUD_STAT_MUTATED, EventCategoryMask.CORE_STATE)
 	packet.source_entity_id = character_id
-	var mut := HudMutationEventsDTO.StatMutation.new()
-	mut.character_id = character_id
-	mut.stat_name = stat_name
-	mut.old_value = old_value
-	mut.new_value = new_value
-	mut.delta = new_value - old_value
-	mut.cause_event = cause
+	var stat_mutation := HudMutationEventsDTO.StatMutation.new()
+	stat_mutation.character_id = character_id
+	stat_mutation.stat_name = stat_name
+	stat_mutation.old_value = old_value
+	stat_mutation.new_value = new_value
+	stat_mutation.delta = new_value - old_value
+	stat_mutation.cause_event = cause
 	var channel_label := GameConfig.get_string("domains.world_state", "hud/channels/stat_mutated", "world_state.stat_mutated")
-	EventPacket.bind_dual_payload(packet, mut, channel_label, {
+	EventPacket.bind_dual_payload(packet, stat_mutation, channel_label, {
 		"category_key": "hud",
 		"args": [stat_name, old_value, new_value]
 	})
@@ -82,32 +84,32 @@ static func publish_stat_mutation(
 static func publish_wallet_mutation(
 	account_id: String,
 	currency_type: String,
-	old_amt: int,
-	new_amt: int,
+	old_amount: int,
+	new_amount: int,
 	reason: String = ""
 ) -> void:
 	var bus := EventBusCore.get_instance()
 	var packet := bus.borrow_packet(EventChannelDefinition.HUD_WALLET_MUTATED, EventCategoryMask.CORE_STATE)
 	packet.source_entity_id = account_id
-	var mut := HudMutationEventsDTO.WalletMutation.new()
-	mut.account_id = account_id
-	mut.currency_type = currency_type
-	mut.old_amount = old_amt
-	mut.new_amount = new_amt
-	mut.delta = new_amt - old_amt
-	mut.reason_key = reason
-	var compat: Dictionary = {
+	var wallet_mutation := HudMutationEventsDTO.WalletMutation.new()
+	wallet_mutation.account_id = account_id
+	wallet_mutation.currency_type = currency_type
+	wallet_mutation.old_amount = old_amount
+	wallet_mutation.new_amount = new_amount
+	wallet_mutation.delta = new_amount - old_amount
+	wallet_mutation.reason_key = reason
+	var compatibility_payload: Dictionary = {
 		"category_key": "hud",
-		"args": [currency_type, new_amt - old_amt]
+		"args": [currency_type, new_amount - old_amount]
 	}
 	if currency_type == "gold":
-		compat["current_gold"] = new_amt
+		compatibility_payload["current_gold"] = new_amount
 	elif currency_type == "mana_monocrystals":
-		compat["current_crystals"] = new_amt
+		compatibility_payload["current_crystals"] = new_amount
 	var channel_label := GameConfig.get_string("domains.world_state", "hud/channels/wallet_mutated", "world_state.wallet_mutated")
-	EventPacket.bind_dual_payload(packet, mut, channel_label, compat)
+	EventPacket.bind_dual_payload(packet, wallet_mutation, channel_label, compatibility_payload)
 	packet.narrative_key = "wallet_mutated"
-	packet.narrative_args = [currency_type, new_amt - old_amt]
+	packet.narrative_args = [currency_type, new_amount - old_amount]
 	bus.dispatch_now(packet)
 	bus.recycle_packet(packet)
 
@@ -142,7 +144,7 @@ static func clear_human_interacting_override() -> void:
 static func is_human_interacting() -> bool:
 	if _has_human_override:
 		return _human_interacting_override
-	return false
+	return HumanControlLeaseManager.is_lease_active()
 
 ## 7.1 HUD 领域事件信道订阅门面（精准子信道分流与通用域事件隔离，兼容既有 4 参调用）
 static func subscribe_hud_channels(
@@ -166,16 +168,16 @@ static func subscribe_hud_channels(
 	if on_clock_advanced.is_valid():
 		tokens.append(bus.on_channel(EventChannelDefinition.WORLD_CLOCK_ADVANCED, on_clock_advanced))
 	if on_prologue.is_valid():
-		tokens.append(bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, func(pkt: Variant) -> void:
-			var channel_name := _extract_event_channel_name(pkt)
+		tokens.append(bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, func(event_packet: Variant) -> void:
+			var channel_name := _extract_event_channel_name(event_packet)
 			if channel_name.begins_with("prologue.") or channel_name == "world_gateway.prologue_handed_off":
-				on_prologue.call(pkt)
+				on_prologue.call(event_packet)
 		))
 	if on_world_entered.is_valid():
-		tokens.append(bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, func(pkt: Variant) -> void:
-			var channel_name := _extract_event_channel_name(pkt)
+		tokens.append(bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, func(event_packet: Variant) -> void:
+			var channel_name := _extract_event_channel_name(event_packet)
 			if channel_name == "world_gateway.world_entered" or channel_name == "world_gateway.prologue_handed_off" or channel_name == "world.entered":
-				on_world_entered.call(pkt)
+				on_world_entered.call(event_packet)
 		))
 	return tokens
 
@@ -183,27 +185,27 @@ static func subscribe_hud_channels(
 static func unsubscribe_hud_channels(tokens: Array) -> void:
 	if tokens == null:
 		return
-	for tok in tokens:
-		if tok != null and tok.has_method("unbind"):
-			tok.call("unbind")
+	for subscription_token in tokens:
+		if subscription_token != null and subscription_token.has_method("unbind"):
+			subscription_token.call("unbind")
 
-static func _extract_event_channel_name(pkt: Variant) -> String:
-	if pkt == null:
+static func _extract_event_channel_name(event_packet: Variant) -> String:
+	if event_packet == null:
 		return ""
-	if pkt is Dictionary:
-		return String((pkt as Dictionary).get("channel", ""))
-	if pkt.get("payload_data") is Dictionary:
-		var channel_name := String((pkt.payload_data as Dictionary).get("channel", ""))
+	if event_packet is Dictionary:
+		return String((event_packet as Dictionary).get("channel", ""))
+	if event_packet.get("payload_data") is Dictionary:
+		var channel_name := String((event_packet.payload_data as Dictionary).get("channel", ""))
 		if not channel_name.is_empty():
 			return channel_name
-	if "narrative_key" in pkt:
-		return String(pkt.narrative_key)
+	if "narrative_key" in event_packet:
+		return String(event_packet.narrative_key)
 	return ""
 
 ## 8. Agent 专用拉轨：从上下文快速派生标准遥测数据包
 static func get_agent_telemetry_packet(
 	context: Dictionary,
-	prev_slice: AgentHudContextSliceDTO = null,
+	previous_slice: AgentHudContextSliceDTO = null,
 	sequence_index: int = 1,
 	cause: String = ""
 ) -> AgentHudTelemetryPacketDTO:
@@ -211,7 +213,7 @@ static func get_agent_telemetry_packet(
 	var human_active := is_human_interacting()
 	var initiator := "HUMAN_UI_INTERACTION" if human_active else ("AGENT_ACTION_CHANNEL" if not cause.is_empty() else "SYSTEM_TICK_SIMULATION")
 	return AgentHudSliceSolver.assemble_telemetry_packet(
-		snapshot, prev_slice, sequence_index, cause, human_active, initiator
+		snapshot, previous_slice, sequence_index, cause, human_active, initiator
 	)
 
 ## 9. Agent 专用推流：向伴侣总线广播标准原子遥测数据包
@@ -264,13 +266,13 @@ static func _resolve_physiology(context: Dictionary, snapshot: AuthoritativeHudS
 		if physiology.has_method("get_all_levels"):
 			snapshot.attribute_levels = physiology.get_all_levels().duplicate()
 
-	var raw_attr_vals: Variant = context.get("attribute_values", null)
-	if raw_attr_vals is Dictionary and not raw_attr_vals.is_empty():
-		snapshot.attribute_values = raw_attr_vals.duplicate()
+	var raw_attribute_values: Variant = context.get("attribute_values", null)
+	if raw_attribute_values is Dictionary and not raw_attribute_values.is_empty():
+		snapshot.attribute_values = raw_attribute_values.duplicate()
 
-	var raw_attr_levels: Variant = context.get("attribute_levels", null)
-	if raw_attr_levels is Dictionary and not raw_attr_levels.is_empty():
-		snapshot.attribute_levels = raw_attr_levels.duplicate()
+	var raw_attribute_levels: Variant = context.get("attribute_levels", null)
+	if raw_attribute_levels is Dictionary and not raw_attribute_levels.is_empty():
+		snapshot.attribute_levels = raw_attribute_levels.duplicate()
 
 	var default_hp := GameConfig.get_float("domains.combat", "participant_defaults/max_hp", 100.0)
 	var default_ap := GameConfig.get_float("domains.world_state", "hud_defaults/ap_max", 10.0)
@@ -301,18 +303,18 @@ static func _resolve_wallet_and_progression(context: Dictionary, snapshot: Autho
 	snapshot.title_rank_key = String(context.get("title_rank_key", ""))
 
 static func _resolve_calendar_and_retention(context: Dictionary, snapshot: AuthoritativeHudSnapshotDTO) -> void:
-	var raw_cal: Variant = context.get("calendar_env", null)
-	if raw_cal is WorldCalendarEnvironmentDTO:
-		snapshot.calendar_env = raw_cal
-	elif raw_cal is Dictionary and not raw_cal.is_empty():
-		snapshot.calendar_env = WorldCalendarEnvironmentDTO.from_dto(raw_cal)
+	var raw_calendar: Variant = context.get("calendar_env", null)
+	if raw_calendar is WorldCalendarEnvironmentDTO:
+		snapshot.calendar_env = raw_calendar
+	elif raw_calendar is Dictionary and not raw_calendar.is_empty():
+		snapshot.calendar_env = WorldCalendarEnvironmentDTO.from_dto(raw_calendar)
 	elif context.has("travel_hours") or context.has("calendar_years"):
-		var c_years := int(context.get("calendar_years", 1))
-		var c_months := int(context.get("calendar_months", 1))
-		var c_days := int(context.get("calendar_days", 1))
-		var c_hours := int(context.get("travel_hours", 0))
-		var c_mana := int(context.get("mana_density_tier", 1))
-		snapshot.calendar_env = WorldCalendarEnvironmentResolver.resolve_environment(c_years, c_months, c_days, c_hours, c_mana)
+		var calendar_years := int(context.get("calendar_years", 1))
+		var calendar_months := int(context.get("calendar_months", 1))
+		var calendar_days := int(context.get("calendar_days", 1))
+		var travel_hours := int(context.get("travel_hours", 0))
+		var mana_density_tier := int(context.get("mana_density_tier", 1))
+		snapshot.calendar_env = WorldCalendarEnvironmentResolver.resolve_environment(calendar_years, calendar_months, calendar_days, travel_hours, mana_density_tier)
 	else:
 		snapshot.calendar_env = WorldCalendarEnvironmentDTO.new()
 

@@ -4,7 +4,7 @@
 # 架构定位: Domain Service / Async Dispatcher & Backpressure Queue
 # 依赖与触发: 上游: AgentHudSliceBridge | 下游: WorkerThreadPool, CompanionObserverBus | 配置: config/domains/world_state/core.json
 # 职责说明: 面向 Agent 遥测流的异步背压派发器。
-#           管理有界派发队列，实施 DROP_OLDEST / DROP_NEWEST 弹性削峰填谷，提供 WorkerThreadPool 异步派发与无头确定性测试双轨调度。
+#           管理有界派发队列，实施 DROP_OLDEST / DROP_NEWEST 弹性削峰填谷，提供 WorkerThreadPool 异步派发与无头确定性测试双通道调度。
 # 退出语义与设计依据: 异步流控与背压防雪崩规范 (Inv-ASYNC-BACKPRESSURE-SAFETY-4, Inv-DETERMINISTIC-TEST-MODE-5)
 # ==============================================================================
 
@@ -24,9 +24,9 @@ var _capacity: int = 128
 var _strategy: int = Strategy.DROP_OLDEST
 var _deterministic_mode: bool = true
 var _ring: Array[AgentHudTelemetryPacketDTO] = []
-var _q_head: int = 0
-var _q_tail: int = 0
-var _q_count: int = 0
+var _queue_head: int = 0
+var _queue_tail: int = 0
+var _queue_count: int = 0
 var _sinks: Dictionary = {} # sink_id -> Callable
 var _sink_callables: Array[Callable] = []
 
@@ -42,9 +42,9 @@ func _init(capacity: int = 128, strategy: int = Strategy.DROP_OLDEST) -> void:
 	_deterministic_mode = true
 	_ring.clear()
 	_ring.resize(_capacity)
-	_q_head = 0
-	_q_tail = 0
-	_q_count = 0
+	_queue_head = 0
+	_queue_tail = 0
+	_queue_count = 0
 	_sinks.clear()
 	_sink_callables.clear()
 	_total_dispatched = 0
@@ -61,8 +61,8 @@ func _notification(what: int) -> void:
 
 func _rebuild_sink_callables_unlocked() -> void:
 	_sink_callables.clear()
-	for v in _sinks.values():
-		_sink_callables.append(v as Callable)
+	for sink_callable in _sinks.values():
+		_sink_callables.append(sink_callable as Callable)
 
 ## 注册遥测消费下沉端点 (Callable 接收 packet: AgentHudTelemetryPacketDTO)
 func register_sink(sink_id: String, consumer: Callable) -> void:
@@ -100,21 +100,21 @@ func dispatch_telemetry(packet: AgentHudTelemetryPacketDTO) -> bool:
 
 	# 非确定性后台队列调度（O(1) 定容环形队列）
 	_mutex.lock()
-	if _q_count >= _capacity:
+	if _queue_count >= _capacity:
 		match _strategy:
 			Strategy.DROP_OLDEST:
-				_ring[_q_head] = packet
-				_q_head = (_q_head + 1) % _capacity
-				_q_tail = _q_head
+				_ring[_queue_head] = packet
+				_queue_head = (_queue_head + 1) % _capacity
+				_queue_tail = _queue_head
 				_total_dropped += 1
 			Strategy.DROP_NEWEST, Strategy.WARN_BLOCK:
 				_total_dropped += 1
 				_mutex.unlock()
 				return false
 	else:
-		_ring[_q_tail] = packet
-		_q_tail = (_q_tail + 1) % _capacity
-		_q_count += 1
+		_ring[_queue_tail] = packet
+		_queue_tail = (_queue_tail + 1) % _capacity
+		_queue_count += 1
 
 	_total_dispatched += 1
 	var has_sinks: bool = not _sink_callables.is_empty()
@@ -139,66 +139,66 @@ func _schedule_async_worker() -> void:
 
 func _process_worker_queue() -> void:
 	while true:
-		var pkt: AgentHudTelemetryPacketDTO = null
+		var packet: AgentHudTelemetryPacketDTO = null
 		_mutex.lock()
-		if _q_count > 0:
-			pkt = _ring[_q_head]
-			_ring[_q_head] = null
-			_q_head = (_q_head + 1) % _capacity
-			_q_count -= 1
+		if _queue_count > 0:
+			packet = _ring[_queue_head]
+			_ring[_queue_head] = null
+			_queue_head = (_queue_head + 1) % _capacity
+			_queue_count -= 1
 		else:
 			_worker_running = false
 			_mutex.unlock()
 			break
 		_mutex.unlock()
 
-		if pkt != null:
-			_notify_all_sinks(pkt)
+		if packet != null:
+			_notify_all_sinks(packet)
 
 func _notify_all_sinks(packet: AgentHudTelemetryPacketDTO) -> void:
 	_mutex.lock()
 	var sink_callables: Array[Callable] = _sink_callables.duplicate()
 	_mutex.unlock()
-	for sink_cb in sink_callables:
-		if sink_cb.is_valid():
-			sink_cb.call(packet)
+	for sink_callable in sink_callables:
+		if sink_callable.is_valid():
+			sink_callable.call(packet)
 
 ## 同步排空当前队列到所有下沉端点
 func pump() -> int:
 	var pending: Array[AgentHudTelemetryPacketDTO] = []
 	_mutex.lock()
-	if _q_count > 0:
-		pending.resize(_q_count)
-		for i in range(_q_count):
-			var idx: int = (_q_head + i) % _capacity
-			pending[i] = _ring[idx]
-			_ring[idx] = null
-		_q_head = 0
-		_q_tail = 0
-		_q_count = 0
+	if _queue_count > 0:
+		pending.resize(_queue_count)
+		for offset_index in range(_queue_count):
+			var slot_index: int = (_queue_head + offset_index) % _capacity
+			pending[offset_index] = _ring[slot_index]
+			_ring[slot_index] = null
+		_queue_head = 0
+		_queue_tail = 0
+		_queue_count = 0
 	_mutex.unlock()
 
-	for pkt in pending:
-		if pkt != null:
-			_notify_all_sinks(pkt)
+	for packet in pending:
+		if packet != null:
+			_notify_all_sinks(packet)
 	return pending.size()
 
 ## 同步等待后台任务完成并冲刷剩余队列
 func flush() -> void:
-	var tid: int = -1
+	var pending_task_id: int = -1
 	_mutex.lock()
 	if _task_id != -1:
-		tid = _task_id
+		pending_task_id = _task_id
 		_task_id = -1
 	_mutex.unlock()
-	if tid != -1 and not WorkerThreadPool.is_task_completed(tid):
-		WorkerThreadPool.wait_for_task_completion(tid)
+	if pending_task_id != -1 and not WorkerThreadPool.is_task_completed(pending_task_id):
+		WorkerThreadPool.wait_for_task_completion(pending_task_id)
 	pump()
 
 ## 获取当前排队深度
 func get_queue_depth() -> int:
 	_mutex.lock()
-	var depth := _q_count
+	var depth := _queue_count
 	_mutex.unlock()
 	return depth
 
@@ -222,19 +222,19 @@ func get_capacity() -> int:
 
 ## 清空队列与状态，同步收拢运行中任务
 func clear() -> void:
-	var tid: int = -1
+	var pending_task_id: int = -1
 	_mutex.lock()
 	if _task_id != -1:
-		tid = _task_id
+		pending_task_id = _task_id
 		_task_id = -1
-	for i in range(_ring.size()):
-		_ring[i] = null
-	_q_head = 0
-	_q_tail = 0
-	_q_count = 0
+	for slot_index in range(_ring.size()):
+		_ring[slot_index] = null
+	_queue_head = 0
+	_queue_tail = 0
+	_queue_count = 0
 	_total_dispatched = 0
 	_total_dropped = 0
 	_worker_running = false
 	_mutex.unlock()
-	if tid != -1 and not WorkerThreadPool.is_task_completed(tid):
-		WorkerThreadPool.wait_for_task_completion(tid)
+	if pending_task_id != -1 and not WorkerThreadPool.is_task_completed(pending_task_id):
+		WorkerThreadPool.wait_for_task_completion(pending_task_id)
