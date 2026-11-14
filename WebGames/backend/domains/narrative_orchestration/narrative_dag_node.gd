@@ -33,15 +33,15 @@ var mutations_on_complete: Array[Dictionary] = []
 var is_optional: bool = false
 
 ## 构造节点（ID/类型/叙事键默认装配）
-func _init(p_id: String = "", p_type: int = NodeType.STANDARD_STEP, p_narrative_key: String = "") -> void:
-	node_id = p_id
-	node_type = p_type
-	narrative_key = p_narrative_key
+func _init(initial_node_id: String = "", initial_node_type: int = NodeType.STANDARD_STEP, initial_narrative_key: String = "") -> void:
+	node_id = initial_node_id
+	node_type = initial_node_type
+	narrative_key = initial_narrative_key
 
 
-## 将配置字符串节点类型解析为枚举（R3 修复：registry 改全字段 from_dto 装配的配套）
-static func parse_node_type(type_str: String) -> int:
-	match type_str:
+## 将配置字符串节点类型解析为枚举（配合全字段 from_dto 装配）
+static func parse_node_type(type_name: String) -> int:
+	match type_name:
 		"START_ENTRY":
 			return NodeType.START_ENTRY
 		"BRANCH_CHOICE":
@@ -70,38 +70,38 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从字典重建节点（node_type 支持字符串枚举或整型，空字典回退默认）
-static func from_dto(d: Dictionary) -> NarrativeDAGNode:
+static func from_dto(data: Dictionary) -> NarrativeDAGNode:
 	var node := NarrativeDAGNode.new()
-	if d.is_empty():
+	if data.is_empty():
 		return node
-	node.node_id = str(d.get("node_id", ""))
-	var raw_type: Variant = d.get("node_type", NodeType.STANDARD_STEP)
+	node.node_id = str(data.get("node_id", ""))
+	var raw_type: Variant = data.get("node_type", NodeType.STANDARD_STEP)
 	node.node_type = parse_node_type(str(raw_type)) if raw_type is String else int(raw_type)
-	node.narrative_key = str(d.get("narrative_key", ""))
+	node.narrative_key = str(data.get("narrative_key", ""))
 
-	var raw_inline: Variant = d.get("inline_text", "")
+	var raw_inline: Variant = data.get("inline_text", "")
 	if raw_inline is Dictionary:
-		var d_inline: Dictionary = raw_inline
-		node.inline_text = str(d_inline.get("zh_CN", d_inline.get("zh-CN", "")))
-		if node.inline_text.is_empty() and not d_inline.is_empty():
-			node.inline_text = str(d_inline.values()[0])
+		var inline_dict: Dictionary = raw_inline
+		node.inline_text = str(inline_dict.get("zh_CN", inline_dict.get("zh-CN", "")))
+		if node.inline_text.is_empty() and not inline_dict.is_empty():
+			node.inline_text = str(inline_dict.values()[0])
 	else:
 		node.inline_text = str(raw_inline)
 
 	node.choices.clear()
-	for c in (d.get("choices", []) as Array):
-		if c is Dictionary:
-			_append_choice_clone(node, c as Dictionary)
+	for choice_entry in (data.get("choices", []) as Array):
+		if choice_entry is Dictionary:
+			_append_choice_clone(node, choice_entry as Dictionary)
 
 	node.required_prerequisites.clear()
-	for pre in (d.get("required_prerequisites", []) as Array):
-		node.required_prerequisites.append(str(pre))
-	node.completion_condition_ast = (d.get("completion_condition_ast", {}) as Dictionary).duplicate(true)
+	for prerequisite_id in (data.get("required_prerequisites", []) as Array):
+		node.required_prerequisites.append(str(prerequisite_id))
+	node.completion_condition_ast = (data.get("completion_condition_ast", {}) as Dictionary).duplicate(true)
 	node.mutations_on_complete.clear()
-	for m in (d.get("mutations_on_complete", []) as Array):
-		if m is Dictionary:
-			node.mutations_on_complete.append(m as Dictionary)
-	node.is_optional = bool(d.get("is_optional", false))
+	for mutation_entry in (data.get("mutations_on_complete", []) as Array):
+		if mutation_entry is Dictionary:
+			node.mutations_on_complete.append(mutation_entry as Dictionary)
+	node.is_optional = bool(data.get("is_optional", false))
 	return node
 
 static func _append_choice_clone(node: NarrativeDAGNode, choice: Dictionary) -> void:

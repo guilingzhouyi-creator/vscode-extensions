@@ -19,9 +19,9 @@ var nodes: Dictionary = {}  # node_id -> NarrativeDAGNode
 var edges: Array[NarrativeDAGEdge] = []
 
 ## 图 DTO 构造（图 ID 装配）
-func _init(p_id: String = "") -> void:
-	graph_id = p_id
-	dag_id = p_id
+func _init(initial_graph_id: String = "") -> void:
+	graph_id = initial_graph_id
+	dag_id = initial_graph_id
 
 ## 加入节点（非空且 ID 非空时按 ID 索引）
 func add_node(node: NarrativeDAGNode) -> void:
@@ -36,41 +36,41 @@ func add_edge(edge: NarrativeDAGEdge) -> void:
 ## 序列化为字典（节点/边递归 DTO）
 func to_dto() -> Dictionary:
 	var nodes_dict: Dictionary = {}
-	for nid in nodes.keys():
-		var n: NarrativeDAGNode = nodes[nid]
-		nodes_dict[nid] = n.to_dto()
+	for node_id in nodes.keys():
+		var node: NarrativeDAGNode = nodes[node_id]
+		nodes_dict[node_id] = node.to_dto()
 
-	var edges_arr: Array[Dictionary] = []
-	for e in edges:
-		edges_arr.append(e.to_dto())
+	var serialized_edges: Array[Dictionary] = []
+	for edge in edges:
+		serialized_edges.append(edge.to_dto())
 
-	var gid := graph_id if not graph_id.is_empty() else dag_id
+	var resolved_graph_id := graph_id if not graph_id.is_empty() else dag_id
 	return {
-		"graph_id": gid,
-		"dag_id": gid,
+		"graph_id": resolved_graph_id,
+		"dag_id": resolved_graph_id,
 		"entry_node_id": entry_node_id,
 		"terminal_node_id": terminal_node_id,
 		"nodes": nodes_dict,
-		"edges": edges_arr
+		"edges": serialized_edges
 	}
 
 ## 从字典重建图（节点/边逐条反序列化）
-static func from_dto(d: Dictionary) -> NarrativeDAGGraphDTO:
-	var gid := str(d.get("dag_id", d.get("graph_id", "")))
-	var graph := NarrativeDAGGraphDTO.new(gid)
-	graph.dag_id = gid
-	graph.graph_id = gid
-	graph.entry_node_id = str(d.get("entry_node_id", ""))
-	graph.terminal_node_id = str(d.get("terminal_node_id", ""))
+static func from_dto(data: Dictionary) -> NarrativeDAGGraphDTO:
+	var resolved_graph_id := str(data.get("dag_id", data.get("graph_id", "")))
+	var graph := NarrativeDAGGraphDTO.new(resolved_graph_id)
+	graph.dag_id = resolved_graph_id
+	graph.graph_id = resolved_graph_id
+	graph.entry_node_id = str(data.get("entry_node_id", ""))
+	graph.terminal_node_id = str(data.get("terminal_node_id", ""))
 
-	var raw_nodes: Dictionary = d.get("nodes", {})
-	for nid in raw_nodes.keys():
-		var node := NarrativeDAGNode.from_dto(raw_nodes[nid] as Dictionary)
+	var raw_nodes: Dictionary = data.get("nodes", {})
+	for node_id in raw_nodes.keys():
+		var node := NarrativeDAGNode.from_dto(raw_nodes[node_id] as Dictionary)
 		graph.add_node(node)
 
-	var raw_edges: Array = d.get("edges", [])
-	for ed in raw_edges:
-		var edge := NarrativeDAGEdge.from_dto(ed as Dictionary)
+	var raw_edges: Array = data.get("edges", [])
+	for raw_edge in raw_edges:
+		var edge := NarrativeDAGEdge.from_dto(raw_edge as Dictionary)
 		graph.add_edge(edge)
 
 	return graph

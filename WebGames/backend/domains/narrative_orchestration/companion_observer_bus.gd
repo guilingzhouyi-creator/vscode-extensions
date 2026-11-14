@@ -54,16 +54,16 @@ func _init() -> void:
 # ==============================================================================
 
 ## 注册非侵入式观察回调 (Callable 接收 event_type: String, payload: Dictionary)
-func register_observer(cb: Callable) -> void:
-	if not cb.is_valid():
+func register_observer(observer_callback: Callable) -> void:
+	if not observer_callback.is_valid():
 		return
-	if not _observers.has(cb):
-		_observers.append(cb)
+	if not _observers.has(observer_callback):
+		_observers.append(observer_callback)
 
 ## 注销指定观察回调
-func unregister_observer(cb: Callable) -> void:
-	if _observers.has(cb):
-		_observers.erase(cb)
+func unregister_observer(observer_callback: Callable) -> void:
+	if _observers.has(observer_callback):
+		_observers.erase(observer_callback)
 
 # ==============================================================================
 # 三、非侵入式只读事件广播与历史追溯 (O(1) 滚动覆盖)
@@ -83,9 +83,9 @@ func broadcast_event(event_type: String, payload: Dictionary) -> void:
 
 	if not _observers.is_empty():
 		var read_only_payload: Dictionary = payload.duplicate(true)
-		for obs in _observers:
-			if obs.is_valid():
-				obs.call(event_type, read_only_payload)
+		for observer_callback in _observers:
+			if observer_callback.is_valid():
+				observer_callback.call(event_type, read_only_payload)
 
 ## 获取最近事件尾部切片（默认截取最近 8 条，严格按时间序保序排列）
 func get_recent_events(limit: int = 8) -> Array[Dictionary]:
@@ -95,16 +95,16 @@ func get_recent_events(limit: int = 8) -> Array[Dictionary]:
 
 	var out: Array[Dictionary] = []
 	out.resize(effective_limit)
-	var start_idx: int = (_head - effective_limit + MAX_CAPACITY) % MAX_CAPACITY
-	for i in range(effective_limit):
-		var slot_idx: int = (start_idx + i) % MAX_CAPACITY
-		out[i] = _slots[slot_idx]
+	var start_index: int = (_head - effective_limit + MAX_CAPACITY) % MAX_CAPACITY
+	for offset in range(effective_limit):
+		var slot_index: int = (start_index + offset) % MAX_CAPACITY
+		out[offset] = _slots[slot_index]
 	return out
 
 ## 清空环形队列历史记录（原位复用槽位字典，循环零分配）
 func clear_history() -> void:
-	for i in range(MAX_CAPACITY):
-		if _slots[i] is Dictionary:
-			(_slots[i] as Dictionary).clear()
+	for slot_index in range(MAX_CAPACITY):
+		if _slots[slot_index] is Dictionary:
+			(_slots[slot_index] as Dictionary).clear()
 	_head = 0
 	_count = 0

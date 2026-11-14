@@ -35,21 +35,21 @@ static func evaluate_ast_condition(ast_node: Dictionary, world_context: Dictiona
 
 	# 叶子节点判定
 	var kind: Variant = ast_node.get("kind", "")
-	var target_val: Variant = ast_node.get("val", null)
+	var target_value: Variant = ast_node.get("val", null)
 	match kind:
 		"TOWN_EQUALS":
-			return world_context.get("town_id", "") == target_val
+			return world_context.get("town_id", "") == target_value
 		"MIN_LEVEL":
-			return world_context.get("character_level", 1) >= int(target_val)
+			return world_context.get("character_level", 1) >= int(target_value)
 		"HOUR_BETWEEN":
-			var h: Variant = world_context.get("world_hour", 12)
-			var min_h: Variant = ast_node.get("min", 0)
-			var max_h: Variant = ast_node.get("max", 24)
-			return h >= min_h and h <= max_h
+			var current_hour: Variant = world_context.get("world_hour", 12)
+			var min_hour: Variant = ast_node.get("min", 0)
+			var max_hour: Variant = ast_node.get("max", 24)
+			return current_hour >= min_hour and current_hour <= max_hour
 		"REPUTATION_GREATER":
 			var faction: Variant = ast_node.get("faction", "")
-			var reps: Dictionary = world_context.get("reputations", {})
-			return reps.get(faction, 0) >= int(target_val)
+			var reputations: Dictionary = world_context.get("reputations", {})
+			return reputations.get(faction, 0) >= int(target_value)
 	return false
 
 ## 事件仲裁触发：非重复且条件满足者入候选 → 优先级降序排序 → 批量置 has_triggered 并回写时间戳
@@ -59,19 +59,19 @@ static func arbitrate_and_trigger(
 	current_time_utc: int
 ) -> Array[NarrativeEventAggregate]:
 	var eligible_events: Array[NarrativeEventAggregate] = []
-	for evt in events:
-		if not evt.is_repeatable and evt.has_triggered:
+	for event_item in events:
+		if not event_item.is_repeatable and event_item.has_triggered:
 			continue
-		if evaluate_ast_condition(evt.trigger_conditions_ast, world_context):
-			eligible_events.append(evt)
+		if evaluate_ast_condition(event_item.trigger_conditions_ast, world_context):
+			eligible_events.append(event_item)
 
 	# 按优先级降序排序 (权重高者优先)
-	eligible_events.sort_custom(func(a: NarrativeEventAggregate, b: NarrativeEventAggregate):
-		return a.priority_weight > b.priority_weight
+	eligible_events.sort_custom(func(first_event: NarrativeEventAggregate, second_event: NarrativeEventAggregate):
+		return first_event.priority_weight > second_event.priority_weight
 	)
 
-	for evt in eligible_events:
-		evt.has_triggered = true
-		evt.triggered_timestamp_utc = current_time_utc
+	for event_item in eligible_events:
+		event_item.has_triggered = true
+		event_item.triggered_timestamp_utc = current_time_utc
 
 	return eligible_events

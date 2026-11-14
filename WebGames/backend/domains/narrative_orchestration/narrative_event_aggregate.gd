@@ -39,12 +39,12 @@ var triggered_timestamp_utc: int = 0
 
 ## 因果事件聚合构造（ID/标题/作用域/优先级）
 func _init(
-	p_id: String = "",
-	p_title: String = "",
-	p_scope: EventScopeTier = EventScopeTier.REGIONAL_TOWN,
-	p_priority: int = 100
+	initial_event_id: String = "",
+	initial_event_title: String = "",
+	initial_event_scope: EventScopeTier = EventScopeTier.REGIONAL_TOWN,
+	initial_priority_weight: int = 100
 ) -> void:
-	event_id = p_id
-	event_title = p_title
-	event_scope = p_scope
-	priority_weight = p_priority
+	event_id = initial_event_id
+	event_title = initial_event_title
+	event_scope = initial_event_scope
+	priority_weight = initial_priority_weight

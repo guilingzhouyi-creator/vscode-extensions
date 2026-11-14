@@ -18,8 +18,8 @@ var runtime_context: Dictionary = {}
 var is_terminated: bool = false
 var snapshot_timestamp_utc: int = 0
 
-func _init(p_graph_id: String = "") -> void:
-	graph_id = p_graph_id
+func _init(initial_graph_id: String = "") -> void:
+	graph_id = initial_graph_id
 	active_node_ids = []
 	completed_node_ids = []
 	runtime_context = {}
@@ -39,13 +39,13 @@ func to_dto() -> Dictionary:
 
 ## 从输入字典反序列化还原传输对象
 static func from_dto(data: Dictionary) -> RefCounted:
-	var dto: NarrativeDagSessionDTO = NarrativeDagSessionDTO.new()
+	var session: NarrativeDagSessionDTO = NarrativeDagSessionDTO.new()
 	if data.is_empty():
-		return dto
-	dto.graph_id = str(data.get("graph_id", ""))
-	dto.active_node_ids.assign(data.get("active_node_ids", []))
-	dto.completed_node_ids.assign(data.get("completed_node_ids", []))
-	dto.runtime_context = (data.get("runtime_context", {}) as Dictionary).duplicate(true)
-	dto.is_terminated = bool(data.get("is_terminated", false))
-	dto.snapshot_timestamp_utc = int(data.get("snapshot_timestamp_utc", 0))
-	return dto
+		return session
+	session.graph_id = str(data.get("graph_id", ""))
+	session.active_node_ids.assign(data.get("active_node_ids", []))
+	session.completed_node_ids.assign(data.get("completed_node_ids", []))
+	session.runtime_context = (data.get("runtime_context", {}) as Dictionary).duplicate(true)
+	session.is_terminated = bool(data.get("is_terminated", false))
+	session.snapshot_timestamp_utc = int(data.get("snapshot_timestamp_utc", 0))
+	return session

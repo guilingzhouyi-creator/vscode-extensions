@@ -42,11 +42,11 @@ func reset_state() -> void:
 
 ## 序列化为传输字典
 func to_dto() -> Dictionary:
-    var deps_copy: Array[String] = []
-    deps_copy.assign(dependencies.duplicate())
+    var dependencies_copy: Array[String] = []
+    dependencies_copy.assign(dependencies.duplicate())
 
-    var incomp_copy: Array[String] = []
-    incomp_copy.assign(incompatible_packs.duplicate())
+    var incompatible_copy: Array[String] = []
+    incompatible_copy.assign(incompatible_packs.duplicate())
 
     var tags_copy: Array[String] = []
     tags_copy.assign(semantic_tags.duplicate())
@@ -58,41 +58,41 @@ func to_dto() -> Dictionary:
         "author": author,
         "engine_api_version": engine_api_version,
         "priority": priority,
-        "dependencies": deps_copy,
-        "incompatible_packs": incomp_copy,
+        "dependencies": dependencies_copy,
+        "incompatible_packs": incompatible_copy,
         "semantic_tags": tags_copy,
         "root_path": root_path,
         "is_active": is_active
     }
 
 ## 从字典安全反序列化为 NarrativePackManifestDTO 实例
-static func from_dto(d: Dictionary) -> NarrativePackManifestDTO:
-    var dto := NarrativePackManifestDTO.new()
-    if d == null or d.is_empty():
-        return dto
+static func from_dto(data: Dictionary) -> NarrativePackManifestDTO:
+    var manifest := NarrativePackManifestDTO.new()
+    if data == null or data.is_empty():
+        return manifest
 
-    dto.pack_id = String(d.get("pack_id", ""))
-    dto.pack_name = String(d.get("pack_name", ""))
-    dto.version = String(d.get("version", ""))
-    dto.author = String(d.get("author", ""))
-    dto.engine_api_version = String(d.get("engine_api_version", ""))
-    dto.priority = int(d.get("priority", 100))
-    dto.root_path = String(d.get("root_path", ""))
-    dto.is_active = bool(d.get("is_active", true))
+    manifest.pack_id = String(data.get("pack_id", ""))
+    manifest.pack_name = String(data.get("pack_name", ""))
+    manifest.version = String(data.get("version", ""))
+    manifest.author = String(data.get("author", ""))
+    manifest.engine_api_version = String(data.get("engine_api_version", ""))
+    manifest.priority = int(data.get("priority", 100))
+    manifest.root_path = String(data.get("root_path", ""))
+    manifest.is_active = bool(data.get("is_active", true))
 
-    var raw_deps: Variant = d.get("dependencies", [])
-    if raw_deps is Array:
-        for dep in raw_deps:
-            dto.dependencies.append(String(dep))
+    var raw_dependencies: Variant = data.get("dependencies", [])
+    if raw_dependencies is Array:
+        for dependency_id in raw_dependencies:
+            manifest.dependencies.append(String(dependency_id))
 
-    var raw_incomp: Variant = d.get("incompatible_packs", [])
-    if raw_incomp is Array:
-        for incomp in raw_incomp:
-            dto.incompatible_packs.append(String(incomp))
+    var raw_incompatible: Variant = data.get("incompatible_packs", [])
+    if raw_incompatible is Array:
+        for incompatible_id in raw_incompatible:
+            manifest.incompatible_packs.append(String(incompatible_id))
 
-    var raw_tags: Variant = d.get("semantic_tags", [])
+    var raw_tags: Variant = data.get("semantic_tags", [])
     if raw_tags is Array:
         for tag in raw_tags:
-            dto.semantic_tags.append(String(tag))
+            manifest.semantic_tags.append(String(tag))
 
-    return dto
+    return manifest

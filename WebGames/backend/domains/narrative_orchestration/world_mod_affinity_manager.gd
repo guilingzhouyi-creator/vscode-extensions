@@ -18,9 +18,9 @@ const DEFAULT_FORMAT_VERSION: String = "1.0.0"
 func get_lock_file_path(world_id: String) -> String:
 	if world_id.is_empty():
 		return ""
-	var repo := WorldArchiveRepository.get_instance()
-	if repo != null:
-		return repo.get_world_dir(world_id) + LOCK_FILENAME
+	var archive_repository := WorldArchiveRepository.get_instance()
+	if archive_repository != null:
+		return archive_repository.get_world_dir(world_id) + LOCK_FILENAME
 	return "user://worlds/sp/%s/%s" % [world_id, LOCK_FILENAME]
 
 ## 读取指定单机世界的锁文件数据
@@ -45,8 +45,8 @@ func load_world_mod_lock(world_id: String) -> Dictionary:
 	var content := file.get_as_text()
 	file.close()
 
-	var parsed_val: Variant = JSON.parse_string(content)
-	if not (parsed_val is Dictionary):
+	var parsed_value: Variant = JSON.parse_string(content)
+	if not (parsed_value is Dictionary):
 		return {
 			"exists": false,
 			"error": "ERR_LOCK_FILE_CORRUPTED",
@@ -54,7 +54,7 @@ func load_world_mod_lock(world_id: String) -> Dictionary:
 			"locked_packs": []
 		}
 
-	var result := (parsed_val as Dictionary).duplicate()
+	var result := (parsed_value as Dictionary).duplicate()
 	result["exists"] = true
 	result["world_id"] = world_id
 	if not result.has("locked_packs"):
@@ -74,13 +74,13 @@ func _serialize_pack_entry(item: Variant) -> Dictionary:
 	if item != null and item.has_method("to_dto"):
 		return item.to_dto()
 	if item != null and "pack_id" in item:
-		var pid: String = String(item.pack_id)
-		var ver: String = String(item.version) if "version" in item else "1.0.0"
-		var prio: int = int(item.priority) if "priority" in item else 100
+		var pack_id: String = String(item.pack_id)
+		var pack_version: String = String(item.version) if "version" in item else "1.0.0"
+		var pack_priority: int = int(item.priority) if "priority" in item else 100
 		return {
-			"pack_id": pid,
-			"version": ver,
-			"priority": prio
+			"pack_id": pack_id,
+			"version": pack_version,
+			"priority": pack_priority
 		}
 	return {}
 
@@ -92,8 +92,8 @@ func save_world_mod_lock(world_id: String, active_packs: Array) -> Dictionary:
 	var target_path := get_lock_file_path(world_id)
 
 	var serialized_packs: Array[Dictionary] = []
-	for p in active_packs:
-		var entry := _serialize_pack_entry(p)
+	for pack_entry in active_packs:
+		var entry := _serialize_pack_entry(pack_entry)
 		if not entry.is_empty():
 			serialized_packs.append(entry)
 
@@ -104,13 +104,13 @@ func save_world_mod_lock(world_id: String, active_packs: Array) -> Dictionary:
 		"locked_packs": serialized_packs
 	}
 
-	var json_str := JSON.stringify(envelope, "  ")
-	var write_res: Dictionary = AtomicFileWriter.write_text_atomic(target_path, json_str)
-	if not bool(write_res.get("success", false)):
-		var stage: String = str(write_res.get("error_stage", ""))
+	var json_text := JSON.stringify(envelope, "  ")
+	var write_result: Dictionary = AtomicFileWriter.write_text_atomic(target_path, json_text)
+	if not bool(write_result.get("success", false)):
+		var stage: String = str(write_result.get("error_stage", ""))
 		if stage == "tmp_open":
 			return {"success": false, "error": "ERR_TMP_FILE_CREATE_FAILED"}
-		return {"success": false, "error": "ERR_RENAME_FAILED", "code": int(write_res.get("error_code", ERR_FILE_CANT_WRITE))}
+		return {"success": false, "error": "ERR_RENAME_FAILED", "code": int(write_result.get("error_code", ERR_FILE_CANT_WRITE))}
 
 	return {
 		"success": true,
@@ -138,8 +138,8 @@ func verify_and_bind_world_mods(world_id: String, installed_packs: Array, allow_
 
 	# 1. 若初次进入且无锁文件，自动以当前 active_packs 固化创建锁文件
 	if not lock_exists:
-		var save_res := save_world_mod_lock(world_id, installed_packs)
-		if not bool(save_res.get("success", false)):
+		var save_result := save_world_mod_lock(world_id, installed_packs)
+		if not bool(save_result.get("success", false)):
 			return {"success": false, "error": "ERR_LOCK_INITIALIZE_FAILED"}
 		return {
 			"success": true,
@@ -150,17 +150,17 @@ func verify_and_bind_world_mods(world_id: String, installed_packs: Array, allow_
 
 	# 2. 已有锁文件，收集已安装与已锁定标识集合
 	var installed_set: Dictionary = {}
-	for inst_p in installed_packs:
-		var inst_id := _extract_id_from_entry(inst_p)
-		if not inst_id.is_empty():
-			installed_set[inst_id] = true
+	for installed_pack in installed_packs:
+		var installed_pack_id := _extract_id_from_entry(installed_pack)
+		if not installed_pack_id.is_empty():
+			installed_set[installed_pack_id] = true
 
 	var locked_list: Array = lock_data.get("locked_packs", [])
 	var missing_packs: Array[String] = []
-	for lock_p in locked_list:
-		var lock_id := _extract_id_from_entry(lock_p)
-		if not lock_id.is_empty() and not installed_set.has(lock_id):
-			missing_packs.append(lock_id)
+	for locked_pack in locked_list:
+		var locked_pack_id := _extract_id_from_entry(locked_pack)
+		if not locked_pack_id.is_empty() and not installed_set.has(locked_pack_id):
+			missing_packs.append(locked_pack_id)
 
 	# 3. 校验通过：无缺失 MOD
 	if missing_packs.is_empty():
@@ -190,10 +190,10 @@ func verify_and_bind_world_mods(world_id: String, installed_packs: Array, allow_
 
 ## 记录脱落片段至目标单机世界（独立函数以降低圈复杂度与保持单一职责）
 func _append_detached_fragment_to_world(world_id: String, missing_packs: Array[String]) -> void:
-	var repo := WorldArchiveRepository.get_instance()
-	if repo == null:
+	var archive_repository := WorldArchiveRepository.get_instance()
+	if archive_repository == null:
 		return
-	var world_instance: WorldInstance = repo.load_world(world_id)
+	var world_instance: WorldInstance = archive_repository.load_world(world_id)
 	if world_instance == null:
 		return
 
@@ -208,4 +208,4 @@ func _append_detached_fragment_to_world(world_id: String, missing_packs: Array[S
 		"reason": "SAFE_DEGRADE"
 	}
 	world_instance.append_history_fragment(fragment)
-	repo.save_world(world_instance)
+	archive_repository.save_world(world_instance)

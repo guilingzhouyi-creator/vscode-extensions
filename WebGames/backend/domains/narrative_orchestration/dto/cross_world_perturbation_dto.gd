@@ -57,27 +57,27 @@ func to_dto() -> Dictionary:
     }
 
 ## 从字典安全反序列化为 CrossWorldPerturbationDTO 实例
-static func from_dto(d: Dictionary) -> CrossWorldPerturbationDTO:
-    var dto := CrossWorldPerturbationDTO.new()
-    if d == null or d.is_empty():
-        return dto
+static func from_dto(data: Dictionary) -> CrossWorldPerturbationDTO:
+    var perturbation := CrossWorldPerturbationDTO.new()
+    if data == null or data.is_empty():
+        return perturbation
 
-    dto.perturbation_id = String(d.get("perturbation_id", ""))
-    dto.origin_world_id = String(d.get("origin_world_id", ""))
-    dto.emitted_timestamp_utc = int(d.get("emitted_timestamp_utc", 0))
-    dto.resonance_intensity = float(d.get("resonance_intensity", 1.0))
-    dto.decay_half_life_seconds = int(d.get("decay_half_life_seconds", 86400))
-    dto.flavor_i18n_key = String(d.get("flavor_i18n_key", ""))
-    dto.perturbation_seed = int(d.get("perturbation_seed", 0))
+    perturbation.perturbation_id = String(data.get("perturbation_id", ""))
+    perturbation.origin_world_id = String(data.get("origin_world_id", ""))
+    perturbation.emitted_timestamp_utc = int(data.get("emitted_timestamp_utc", 0))
+    perturbation.resonance_intensity = float(data.get("resonance_intensity", 1.0))
+    perturbation.decay_half_life_seconds = int(data.get("decay_half_life_seconds", 86400))
+    perturbation.flavor_i18n_key = String(data.get("flavor_i18n_key", ""))
+    perturbation.perturbation_seed = int(data.get("perturbation_seed", 0))
 
-    var raw_tags: Variant = d.get("semantic_tags", [])
+    var raw_tags: Variant = data.get("semantic_tags", [])
     if raw_tags is Array:
         for tag in raw_tags:
-            dto.semantic_tags.append(String(tag))
+            perturbation.semantic_tags.append(String(tag))
 
-    var raw_visited: Variant = d.get("visited_world_ids", [])
+    var raw_visited: Variant = data.get("visited_world_ids", [])
     if raw_visited is Array:
-        for vw in raw_visited:
-            dto.visited_world_ids.append(String(vw))
+        for visited_world_id in raw_visited:
+            perturbation.visited_world_ids.append(String(visited_world_id))
 
-    return dto
+    return perturbation

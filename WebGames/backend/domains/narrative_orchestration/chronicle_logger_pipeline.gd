@@ -20,12 +20,18 @@ class ChronicleEntryDTO extends RefCounted:
 	var causal_summary: String
 
 	## 编年史条目构造（哈希/事件/时间/因果摘要）
-	func _init(p_hash: String, p_id: String, p_title: String, p_time: int, p_summary: String) -> void:
-		entry_hash = p_hash
-		event_id = p_id
-		event_title = p_title
-		timestamp_utc = p_time
-		causal_summary = p_summary
+	func _init(
+		initial_entry_hash: String,
+		initial_event_id: String,
+		initial_event_title: String,
+		initial_timestamp_utc: int,
+		initial_causal_summary: String
+	) -> void:
+		entry_hash = initial_entry_hash
+		event_id = initial_event_id
+		event_title = initial_event_title
+		timestamp_utc = initial_timestamp_utc
+		causal_summary = initial_causal_summary
 
 ## 记录重大因果事件：确定性指纹哈希（SHA-256 前 16 位大写）入不可逆编年史
 static func log_chronicle_event(

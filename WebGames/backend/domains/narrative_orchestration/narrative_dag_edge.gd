@@ -17,11 +17,16 @@ var branch_condition: Dictionary = {}
 var priority_weight: int = 100
 
 ## 边构造（起止节点/分支条件/仲裁权重）
-func _init(p_from: String = "", p_to: String = "", p_cond: Dictionary = {}, p_prio: int = 100) -> void:
-	from_node_id = p_from
-	to_node_id = p_to
-	branch_condition = p_cond
-	priority_weight = p_prio
+func _init(
+	initial_from_node_id: String = "",
+	initial_to_node_id: String = "",
+	initial_branch_condition: Dictionary = {},
+	initial_priority_weight: int = 100
+) -> void:
+	from_node_id = initial_from_node_id
+	to_node_id = initial_to_node_id
+	branch_condition = initial_branch_condition
+	priority_weight = initial_priority_weight
 
 ## 序列化边为字典（条件深拷贝）
 func to_dto() -> Dictionary:
@@ -33,12 +38,12 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从字典重建边（空字典回退默认权重 100）
-static func from_dto(d: Dictionary) -> NarrativeDAGEdge:
+static func from_dto(data: Dictionary) -> NarrativeDAGEdge:
 	var edge := NarrativeDAGEdge.new()
-	if d.is_empty():
+	if data.is_empty():
 		return edge
-	edge.from_node_id = str(d.get("from_node_id", d.get("from", "")))
-	edge.to_node_id = str(d.get("to_node_id", d.get("to", "")))
-	edge.branch_condition = (d.get("branch_condition", {}) as Dictionary).duplicate(true)
-	edge.priority_weight = int(d.get("priority_weight", 100))
+	edge.from_node_id = str(data.get("from_node_id", data.get("from", "")))
+	edge.to_node_id = str(data.get("to_node_id", data.get("to", "")))
+	edge.branch_condition = (data.get("branch_condition", {}) as Dictionary).duplicate(true)
+	edge.priority_weight = int(data.get("priority_weight", 100))
 	return edge
