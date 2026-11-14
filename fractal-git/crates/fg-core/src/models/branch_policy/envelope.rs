@@ -52,7 +52,8 @@ fn parse_envelope_header(envelope: &[u8]) -> FractalResult<EnvelopeHeader> {
     nonce.copy_from_slice(&envelope[40..56]);
     let mut rev_bytes = [0u8; 8];
     rev_bytes.copy_from_slice(&envelope[56..64]);
-    let cipher_len_u32 = u32::from_le_bytes([envelope[64], envelope[65], envelope[66], envelope[67]]);
+    let cipher_len_u32 =
+        u32::from_le_bytes([envelope[64], envelope[65], envelope[66], envelope[67]]);
     let cipher_len = usize::try_from(cipher_len_u32).map_err(|_| {
         FractalError::PolicyViolation("policy cipher length exceeds addressable size".to_owned())
     })?;
@@ -71,7 +72,13 @@ fn parse_envelope_header(envelope: &[u8]) -> FractalResult<EnvelopeHeader> {
             envelope.len()
         )));
     }
-    Ok(EnvelopeHeader { repo_id, salt, nonce, revision: u64::from_le_bytes(rev_bytes), cipher_len })
+    Ok(EnvelopeHeader {
+        repo_id,
+        salt,
+        nonce,
+        revision: u64::from_le_bytes(rev_bytes),
+        cipher_len,
+    })
 }
 
 /// Seals `payload` into an encrypted, HMAC-SM3 authenticated `TXPF` binary envelope.

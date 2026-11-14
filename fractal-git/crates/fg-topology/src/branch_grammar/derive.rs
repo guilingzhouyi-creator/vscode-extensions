@@ -45,12 +45,18 @@ impl FractalRef {
         match self {
             Self::SystemTrunk { .. } => derive_from_system_trunk(&parent_display, slug),
             Self::Trunk => derive_from_integration(slug, policy),
-            Self::CellMain { cell_id } => derive_from_cell_main(&parent_display, cell_id, slug, facade_type, policy),
-            Self::CardWorktree { cell_id, card_id } => derive_from_card(&parent_display, cell_id, card_id, slug, policy),
+            Self::CellMain { cell_id } => {
+                derive_from_cell_main(&parent_display, cell_id, slug, facade_type, policy)
+            }
+            Self::CardWorktree { cell_id, card_id } => {
+                derive_from_card(&parent_display, cell_id, card_id, slug, policy)
+            }
             Self::SubAgentWorktree { .. } => Err(FractalError::TopologyBreach {
                 source_ref: parent_display,
                 target_ref: slug.to_owned(),
-                reason: "Tier 4 subagent branch is a leaf coordinate and cannot derive child branches".to_owned(),
+                reason:
+                    "Tier 4 subagent branch is a leaf coordinate and cannot derive child branches"
+                        .to_owned(),
             }),
             _ => Err(FractalError::TopologyBreach {
                 source_ref: parent_display,
@@ -61,22 +67,31 @@ impl FractalRef {
     }
 }
 
-fn derive_from_system_trunk(parent_display: &str, slug: &str) -> FractalResult<(FractalRef, String)> {
+fn derive_from_system_trunk(
+    parent_display: &str,
+    slug: &str,
+) -> FractalResult<(FractalRef, String)> {
     if slug != "integration" {
         return Err(FractalError::TopologyBreach {
             source_ref: parent_display.to_owned(),
             target_ref: slug.to_owned(),
-            reason: "SystemTrunk ('main'/'master') can only cascade-derive 'integration' (Tier 1)".to_owned(),
+            reason: "SystemTrunk ('main'/'master') can only cascade-derive 'integration' (Tier 1)"
+                .to_owned(),
         });
     }
     Ok((FractalRef::Trunk, "integration".to_owned()))
 }
 
-fn derive_from_integration(slug: &str, policy: &BranchPolicySpec) -> FractalResult<(FractalRef, String)> {
+fn derive_from_integration(
+    slug: &str,
+    policy: &BranchPolicySpec,
+) -> FractalResult<(FractalRef, String)> {
     let normalized_cell = policy.normalize_cell(slug);
     validate_strict_cell(slug, normalized_cell, policy)?;
     Ok((
-        FractalRef::CellMain { cell_id: normalized_cell.to_owned() },
+        FractalRef::CellMain {
+            cell_id: normalized_cell.to_owned(),
+        },
         format!("cell/{normalized_cell}/main"),
     ))
 }
@@ -102,12 +117,18 @@ fn derive_from_cell_main(
             });
         }
         return Ok((
-            FractalRef::CardWorktree { cell_id: cell_id.to_owned(), card_id: format!("{kind}-{slug}") },
+            FractalRef::CardWorktree {
+                cell_id: cell_id.to_owned(),
+                card_id: format!("{kind}-{slug}"),
+            },
             format!("{kind}/{cell_id}/{slug}"),
         ));
     }
     Ok((
-        FractalRef::CardWorktree { cell_id: cell_id.to_owned(), card_id: slug.to_owned() },
+        FractalRef::CardWorktree {
+            cell_id: cell_id.to_owned(),
+            card_id: slug.to_owned(),
+        },
         format!("cell/{cell_id}/card/{slug}/{}", policy.card_canonical_leaf),
     ))
 }

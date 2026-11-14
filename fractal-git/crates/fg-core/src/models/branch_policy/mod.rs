@@ -50,15 +50,21 @@ pub fn verify_seal_record(record: &[u8]) -> FractalResult<[u8; POLICY_REPO_ID_LE
         )));
     }
     if record[..4] != POLICY_SEAL_MAGIC {
-        return Err(FractalError::PolicyViolation("invalid policy seal magic header".to_owned()));
+        return Err(FractalError::PolicyViolation(
+            "invalid policy seal magic header".to_owned(),
+        ));
     }
     let version = u16::from_le_bytes([record[4], record[5]]);
     if version != 1 {
-        return Err(FractalError::PolicyViolation(format!("unsupported policy seal version {version}")));
+        return Err(FractalError::PolicyViolation(format!(
+            "unsupported policy seal version {version}"
+        )));
     }
     let expected_tag = hmac_sm3(&derive_seal_key(), &record[..24]);
     if !ct_eq_bytes(&expected_tag, &record[24..POLICY_SEAL_RECORD_LEN]) {
-        return Err(FractalError::AuthProofInvalid("policy seal authentication failed (HMAC-SM3 mismatch)".to_owned()));
+        return Err(FractalError::AuthProofInvalid(
+            "policy seal authentication failed (HMAC-SM3 mismatch)".to_owned(),
+        ));
     }
     let mut repo_id = [0u8; POLICY_REPO_ID_LEN];
     repo_id.copy_from_slice(&record[8..24]);
@@ -66,8 +72,14 @@ pub fn verify_seal_record(record: &[u8]) -> FractalResult<[u8; POLICY_REPO_ID_LE
 }
 
 fn kernel_root_material() -> [u8; 32] {
-    const PART_A: [u8; 16] = [0x4B, 0x91, 0xE2, 0x07, 0x3A, 0xC4, 0x6F, 0x18, 0x8D, 0x52, 0xB0, 0xE7, 0x11, 0x76, 0x29, 0xAF];
-    const PART_B: [u8; 16] = [0xD4, 0x38, 0x61, 0xBE, 0x95, 0x0C, 0x7A, 0xE3, 0x22, 0xF1, 0x4E, 0x89, 0x57, 0xA6, 0xC0, 0x1D];
+    const PART_A: [u8; 16] = [
+        0x4B, 0x91, 0xE2, 0x07, 0x3A, 0xC4, 0x6F, 0x18, 0x8D, 0x52, 0xB0, 0xE7, 0x11, 0x76, 0x29,
+        0xAF,
+    ];
+    const PART_B: [u8; 16] = [
+        0xD4, 0x38, 0x61, 0xBE, 0x95, 0x0C, 0x7A, 0xE3, 0x22, 0xF1, 0x4E, 0x89, 0x57, 0xA6, 0xC0,
+        0x1D,
+    ];
     let mut hasher = Sm3Hasher::new();
     hasher.update(b"taxis-txpf-kernel-seal-v1:");
     hasher.update(&PART_A);
@@ -75,21 +87,31 @@ fn kernel_root_material() -> [u8; 32] {
     hasher.finalize()
 }
 
-pub(super) fn derive_vault_keys(repo_id: &[u8; POLICY_REPO_ID_LEN], salt: &[u8; POLICY_REPO_ID_LEN]) -> ([u8; 32], [u8; 32]) {
+pub(super) fn derive_vault_keys(
+    repo_id: &[u8; POLICY_REPO_ID_LEN],
+    salt: &[u8; POLICY_REPO_ID_LEN],
+) -> ([u8; 32], [u8; 32]) {
     let root = kernel_root_material();
     let mut prk_seed = [0u8; 44];
     prk_seed[..16].copy_from_slice(repo_id);
     prk_seed[16..32].copy_from_slice(salt);
     prk_seed[32..44].copy_from_slice(b"txpf-v1-keys");
     let prk = hmac_sm3(&root, &prk_seed);
-    (hmac_sm3(&prk, b"txpf-v1-sm3-ctr-enc-key"), hmac_sm3(&prk, b"txpf-v1-hmac-sm3-mac-key"))
+    (
+        hmac_sm3(&prk, b"txpf-v1-sm3-ctr-enc-key"),
+        hmac_sm3(&prk, b"txpf-v1-hmac-sm3-mac-key"),
+    )
 }
 
 fn derive_seal_key() -> [u8; 32] {
     sm3_hash(&hmac_sm3(&kernel_root_material(), b"txsl-v1-seal-mac-key"))
 }
 
-pub(super) fn sm3_ctr_transform(enc_key: &[u8; 32], nonce: &[u8; 16], input_bytes: &[u8]) -> Vec<u8> {
+pub(super) fn sm3_ctr_transform(
+    enc_key: &[u8; 32],
+    nonce: &[u8; 16],
+    input_bytes: &[u8],
+) -> Vec<u8> {
     let mut output = vec![0u8; input_bytes.len()];
     let mut ctr_block = [0u8; 32];
     ctr_block[..12].copy_from_slice(b"txpf-v1-ctr!");

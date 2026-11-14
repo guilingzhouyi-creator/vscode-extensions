@@ -57,7 +57,9 @@ fn take_bytes<'a>(buf: &'a [u8], cursor: &mut usize, width: usize) -> FractalRes
         .checked_add(width)
         .ok_or_else(|| FractalError::CorruptStore("lineage offset overflow".to_owned()))?;
     if end > buf.len() {
-        return Err(FractalError::CorruptStore("truncated lineage receipt frame".to_owned()));
+        return Err(FractalError::CorruptStore(
+            "truncated lineage receipt frame".to_owned(),
+        ));
     }
     let slice = &buf[*cursor..end];
     *cursor = end;
@@ -80,7 +82,9 @@ pub(super) fn decode_and_verify_frame(
 ) -> FractalResult<FractalLineageReceipt> {
     let magic = take_bytes(buf, cursor, 4)?;
     if magic != LINEAGE_MAGIC {
-        return Err(FractalError::CorruptStore("invalid TXLN lineage frame magic".to_owned()));
+        return Err(FractalError::CorruptStore(
+            "invalid TXLN lineage frame magic".to_owned(),
+        ));
     }
     let ver_bytes = take_bytes(buf, cursor, 2)?;
     let version = u16::from_le_bytes([ver_bytes[0], ver_bytes[1]]);

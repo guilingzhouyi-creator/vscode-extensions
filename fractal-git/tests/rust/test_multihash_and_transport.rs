@@ -53,7 +53,11 @@ fn test_smart_v2_request_parsing_and_binary_sideband() {
     let req = ProtocolV2Handler::parse_request(&ls_refs_buf).expect("parse ls-refs");
     assert_eq!(req.agent.as_deref(), Some("taxis/0.1.0"));
     match req.command {
-        SmartV2Command::LsRefs { symrefs, prefixes, peel } => {
+        SmartV2Command::LsRefs {
+            symrefs,
+            prefixes,
+            peel,
+        } => {
             assert!(symrefs && !peel);
             assert_eq!(prefixes, vec!["refs/heads/"]);
         }
@@ -64,14 +68,20 @@ fn test_smart_v2_request_parsing_and_binary_sideband() {
     let mut fetch_buf = Vec::new();
     fetch_buf.extend_from_slice(&PacketLine::encode_line("command=fetch\n"));
     fetch_buf.extend_from_slice(&PacketLine::delim());
-    fetch_buf.extend_from_slice(&PacketLine::encode_line("want 1111111111111111111111111111111111111111\n"));
-    fetch_buf.extend_from_slice(&PacketLine::encode_line("have 2222222222222222222222222222222222222222\n"));
+    fetch_buf.extend_from_slice(&PacketLine::encode_line(
+        "want 1111111111111111111111111111111111111111\n",
+    ));
+    fetch_buf.extend_from_slice(&PacketLine::encode_line(
+        "have 2222222222222222222222222222222222222222\n",
+    ));
     fetch_buf.extend_from_slice(&PacketLine::encode_line("done\n"));
     fetch_buf.extend_from_slice(&PacketLine::flush());
 
     let fetch_req = ProtocolV2Handler::parse_request(&fetch_buf).expect("parse fetch");
     match fetch_req.command {
-        SmartV2Command::Fetch { wants, haves, done, .. } => {
+        SmartV2Command::Fetch {
+            wants, haves, done, ..
+        } => {
             assert_eq!(wants.len(), 1);
             assert_eq!(haves.len(), 1);
             assert!(done);
@@ -102,7 +112,14 @@ fn test_transport_remote_mock_and_bounds() {
     assert_eq!(refs.len(), 1);
     assert_eq!(refs[0].name, "refs/heads/main");
 
-    let push_res = mock.push(&[("refs/heads/main".to_string(), Oid::from_bytes([0x22; 20]), None)], None);
+    let push_res = mock.push(
+        &[(
+            "refs/heads/main".to_string(),
+            Oid::from_bytes([0x22; 20]),
+            None,
+        )],
+        None,
+    );
     assert!(push_res.is_ok());
     assert_eq!(mock.recorded_pushes.len(), 1);
 
@@ -118,7 +135,9 @@ fn test_transport_remote_mock_and_bounds() {
 
 #[test]
 fn test_ipc_serialization_roundtrip() {
-    let msg = IpcMessage::Ping { timestamp_ms: 123456789 };
+    let msg = IpcMessage::Ping {
+        timestamp_ms: 123456789,
+    };
     let json = serde_json::to_string(&msg).expect("serialize ipc ping");
     let parsed: IpcMessage = serde_json::from_str(&json).expect("deserialize ipc ping");
     assert_eq!(parsed, msg);
@@ -137,6 +156,7 @@ fn test_ipc_serialization_roundtrip() {
         detail: "pong".into(),
     };
     let receipt_json = serde_json::to_string(&receipt).expect("serialize receipt");
-    let parsed_receipt: IpcDaemonReceipt = serde_json::from_str(&receipt_json).expect("deserialize receipt");
+    let parsed_receipt: IpcDaemonReceipt =
+        serde_json::from_str(&receipt_json).expect("deserialize receipt");
     assert_eq!(parsed_receipt, receipt);
 }

@@ -65,6 +65,7 @@ pub enum PackBuffer {
 }
 
 impl PackBuffer {
+    /// Returns the total byte length of the backing pack buffer.
     pub fn len(&self) -> usize {
         match self {
             Self::Memory(bytes) => bytes.len(),
@@ -72,10 +73,12 @@ impl PackBuffer {
         }
     }
 
+    /// Returns `true` when the pack buffer contains zero bytes.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    /// Reads `len` bytes starting at byte `offset` from memory or sliding window storage.
     pub fn read_slice(&self, offset: usize, len: usize) -> FractalResult<Vec<u8>> {
         match self {
             Self::Memory(bytes) => {
@@ -91,12 +94,12 @@ impl PackBuffer {
         }
     }
 
+    /// Reads a single byte at `offset` from the backing pack buffer.
     pub fn get_byte(&self, offset: usize) -> FractalResult<u8> {
         match self {
-            Self::Memory(bytes) => bytes
-                .get(offset)
-                .copied()
-                .ok_or_else(|| FractalError::CorruptStore(format!("Offset out of bounds: {offset}"))),
+            Self::Memory(bytes) => bytes.get(offset).copied().ok_or_else(|| {
+                FractalError::CorruptStore(format!("Offset out of bounds: {offset}"))
+            }),
             Self::Windowed(reader) => reader.read_byte_at(offset as u64),
         }
     }
@@ -793,12 +796,20 @@ mod tests {
         assert!(pack_win.is_windowed());
         assert_eq!(pack_win.object_count(), pack_mem.object_count());
 
-        let base_obj_mem = pack_mem.read_at(base_offset, &NoBase).expect("read mem base");
-        let base_obj_win = pack_win.read_at(base_offset, &NoBase).expect("read win base");
+        let base_obj_mem = pack_mem
+            .read_at(base_offset, &NoBase)
+            .expect("read mem base");
+        let base_obj_win = pack_win
+            .read_at(base_offset, &NoBase)
+            .expect("read win base");
         assert_eq!(base_obj_win, base_obj_mem);
 
-        let delta_obj_mem = pack_mem.read_at(delta_offset, &NoBase).expect("read mem delta");
-        let delta_obj_win = pack_win.read_at(delta_offset, &NoBase).expect("read win delta");
+        let delta_obj_mem = pack_mem
+            .read_at(delta_offset, &NoBase)
+            .expect("read mem delta");
+        let delta_obj_win = pack_win
+            .read_at(delta_offset, &NoBase)
+            .expect("read win delta");
         assert_eq!(delta_obj_win, delta_obj_mem);
     }
 

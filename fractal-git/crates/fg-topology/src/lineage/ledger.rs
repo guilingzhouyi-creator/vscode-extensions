@@ -35,7 +35,11 @@ impl LineageLedger {
         let common_dir = PolicyVaultStore::resolve_common_repo_dir(repo_or_git_dir);
         let ledger_path = common_dir.join(LINEAGE_REL_PATH);
         let mac_key = derive_lineage_mac_key(&common_dir);
-        Self { common_dir, ledger_path, mac_key }
+        Self {
+            common_dir,
+            ledger_path,
+            mac_key,
+        }
     }
 
     /// Returns the on-disk binary lineage ledger path.

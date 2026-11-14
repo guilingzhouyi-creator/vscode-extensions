@@ -81,9 +81,10 @@ impl PackWindowReader {
 
         // Fast path: check cached window
         {
-            let guard = self.cached_window.lock().map_err(|_| {
-                FractalError::CorruptStore("Pack window lock poisoned".to_owned())
-            })?;
+            let guard = self
+                .cached_window
+                .lock()
+                .map_err(|_| FractalError::CorruptStore("Pack window lock poisoned".to_owned()))?;
             if let Some(ref window) = *guard {
                 if offset >= window.offset {
                     let rel_start = (offset - window.offset) as usize;
@@ -95,21 +96,25 @@ impl PackWindowReader {
         }
 
         // Slow path: populate window
-        let fetch_size = len.max(self.window_size).min((self.total_len - offset) as usize);
+        let fetch_size = len
+            .max(self.window_size)
+            .min((self.total_len - offset) as usize);
         let mut buffer = vec![0u8; fetch_size];
         {
-            let mut file = self.file.lock().map_err(|_| {
-                FractalError::CorruptStore("Pack file lock poisoned".to_owned())
-            })?;
+            let mut file = self
+                .file
+                .lock()
+                .map_err(|_| FractalError::CorruptStore("Pack file lock poisoned".to_owned()))?;
             file.seek(SeekFrom::Start(offset))?;
             file.read_exact(&mut buffer)?;
         }
 
         let result = buffer[..len].to_vec();
         {
-            let mut guard = self.cached_window.lock().map_err(|_| {
-                FractalError::CorruptStore("Pack window lock poisoned".to_owned())
-            })?;
+            let mut guard = self
+                .cached_window
+                .lock()
+                .map_err(|_| FractalError::CorruptStore("Pack window lock poisoned".to_owned()))?;
             *guard = Some(WindowSlot {
                 offset,
                 data: buffer,
@@ -133,6 +138,7 @@ pub struct PackWindowStream<'a> {
 }
 
 impl<'a> PackWindowStream<'a> {
+    /// Creates a bounded streaming view spanning `[start, end)` over `reader`.
     pub fn new(reader: &'a PackWindowReader, start: u64, end: u64) -> Self {
         Self {
             reader,

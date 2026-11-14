@@ -46,7 +46,9 @@ impl FractalRef {
             });
         }
         if bare == "main" || bare == "master" {
-            return Ok(Self::SystemTrunk { branch: bare.to_owned() });
+            return Ok(Self::SystemTrunk {
+                branch: bare.to_owned(),
+            });
         }
         if bare == "integration" || bare == "trunk" {
             return Ok(Self::Trunk);
@@ -58,7 +60,12 @@ impl FractalRef {
                 reason: format!("branch '{bare}' exceeds maximum hierarchical segment depth"),
             });
         };
-        parse_structured_segments(bare, &parts_buf[..parts_len], policy, allow_four_segment_card)
+        parse_structured_segments(
+            bare,
+            &parts_buf[..parts_len],
+            policy,
+            allow_four_segment_card,
+        )
     }
 }
 
@@ -70,18 +77,30 @@ fn parse_structured_segments(
 ) -> FractalResult<FractalRef> {
     if parts.len() == 3 && parts[0] == "cell" && parts[2] == "main" {
         validate_strict_cell(bare, parts[1], policy)?;
-        return Ok(FractalRef::CellMain { cell_id: parts[1].to_owned() });
+        return Ok(FractalRef::CellMain {
+            cell_id: parts[1].to_owned(),
+        });
     }
-    if parts.len() == 5 && parts[0] == "cell" && parts[2] == "card" && parts[4] == policy.card_canonical_leaf {
+    if parts.len() == 5
+        && parts[0] == "cell"
+        && parts[2] == "card"
+        && parts[4] == policy.card_canonical_leaf
+    {
         validate_strict_cell(bare, parts[1], policy)?;
         validate_strict_segment(bare, "card", parts[3], policy)?;
-        return Ok(FractalRef::CardWorktree { cell_id: parts[1].to_owned(), card_id: parts[3].to_owned() });
+        return Ok(FractalRef::CardWorktree {
+            cell_id: parts[1].to_owned(),
+            card_id: parts[3].to_owned(),
+        });
     }
     if parts.len() == 4 && parts[0] == "cell" && parts[2] == "card" {
         validate_strict_cell(bare, parts[1], policy)?;
         validate_strict_segment(bare, "card", parts[3], policy)?;
         if allow_four_segment_card && policy.allow_legacy_card_read {
-            return Ok(FractalRef::CardWorktree { cell_id: parts[1].to_owned(), card_id: parts[3].to_owned() });
+            return Ok(FractalRef::CardWorktree {
+                cell_id: parts[1].to_owned(),
+                card_id: parts[3].to_owned(),
+            });
         }
         return Err(FractalError::TopologyBreach {
             source_ref: bare.to_owned(),

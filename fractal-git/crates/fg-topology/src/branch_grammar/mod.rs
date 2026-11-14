@@ -23,12 +23,19 @@ pub(super) fn validate_strict_cell(
             reason: seg_err.to_string(),
         });
     }
-    if policy.recognized_cells.iter().any(|allowed| allowed == raw_cell) {
+    if policy
+        .recognized_cells
+        .iter()
+        .any(|allowed| allowed == raw_cell)
+    {
         return Ok(());
     }
     let normalized = policy.normalize_cell(raw_cell);
     let hint = if normalized != raw_cell
-        && policy.recognized_cells.iter().any(|allowed| allowed == normalized)
+        && policy
+            .recognized_cells
+            .iter()
+            .any(|allowed| allowed == normalized)
     {
         format!("use canonical cell '{normalized}' instead of alias '{raw_cell}'")
     } else {
@@ -50,9 +57,11 @@ pub(super) fn validate_strict_segment(
     segment: &str,
     policy: &BranchPolicySpec,
 ) -> FractalResult<()> {
-    policy.validate_segment(role, segment).map_err(|seg_err| FractalError::TopologyBreach {
-        source_ref: full_branch.to_owned(),
-        target_ref: format!("canonical-{role}"),
-        reason: seg_err.to_string(),
-    })
+    policy
+        .validate_segment(role, segment)
+        .map_err(|seg_err| FractalError::TopologyBreach {
+            source_ref: full_branch.to_owned(),
+            target_ref: format!("canonical-{role}"),
+            reason: seg_err.to_string(),
+        })
 }

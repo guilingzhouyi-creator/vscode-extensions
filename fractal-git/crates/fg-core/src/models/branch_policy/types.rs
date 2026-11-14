@@ -123,12 +123,18 @@ impl BranchPolicySpec {
             require_kebab_case: true,
             max_segment_len: u16::try_from(MAX_BRANCH_SEGMENT_LEN).unwrap_or(63),
             enforce_dynamic_leases: true,
-            recognized_cells: RECOGNIZED_CELLS.iter().map(|entry| (*entry).to_owned()).collect(),
+            recognized_cells: RECOGNIZED_CELLS
+                .iter()
+                .map(|entry| (*entry).to_owned())
+                .collect(),
             cell_aliases: CELL_ALIASES
                 .iter()
                 .map(|(alias, canonical)| ((*alias).to_owned(), (*canonical).to_owned()))
                 .collect(),
-            facade_types: FACADE_TYPES.iter().map(|entry| (*entry).to_owned()).collect(),
+            facade_types: FACADE_TYPES
+                .iter()
+                .map(|entry| (*entry).to_owned())
+                .collect(),
             forbidden_prefixes: FORBIDDEN_BRANCH_PREFIXES
                 .iter()
                 .map(|entry| (*entry).to_owned())
@@ -151,13 +157,17 @@ impl BranchPolicySpec {
     #[must_use]
     pub fn is_recognized_cell(&self, raw_cell: &str) -> bool {
         let normalized = self.normalize_cell(raw_cell);
-        self.recognized_cells.iter().any(|cell| cell.as_str() == normalized)
+        self.recognized_cells
+            .iter()
+            .any(|cell| cell.as_str() == normalized)
     }
 
     /// Returns `true` when `facade_kind` is permitted in `<type>/<cell-id>/<desc>` facades.
     #[must_use]
     pub fn is_allowed_facade(&self, facade_kind: &str) -> bool {
-        self.facade_types.iter().any(|allowed| allowed.as_str() == facade_kind)
+        self.facade_types
+            .iter()
+            .any(|allowed| allowed.as_str() == facade_kind)
     }
 
     /// Returns `true` when `segment` matches a configured or built-in forbidden prefix.

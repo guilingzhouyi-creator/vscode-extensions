@@ -3,10 +3,10 @@
 //! Architecture Role: Consolidates CLI read/write, plumbing parity, Git differential,
 //!   and hook pipeline integration tests into a single compiled binary harness.
 
-#[path = "rust/support/cli_harness.rs"]
-pub mod cli_harness;
 #[path = "rust/support/branch_test_fixtures.rs"]
 pub mod branch_test_fixtures;
+#[path = "rust/support/cli_harness.rs"]
+pub mod cli_harness;
 
 #[path = "rust/test_cli_contract_parity.rs"]
 mod test_cli_contract_parity;

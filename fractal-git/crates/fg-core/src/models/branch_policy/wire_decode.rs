@@ -44,7 +44,11 @@ fn take_slice<'a>(
     Ok(slice)
 }
 
-pub(super) fn read_u8(payload: &[u8], cursor: &mut usize, field: &'static str) -> FractalResult<u8> {
+pub(super) fn read_u8(
+    payload: &[u8],
+    cursor: &mut usize,
+    field: &'static str,
+) -> FractalResult<u8> {
     Ok(take_slice(payload, cursor, 1, field)?[0])
 }
 

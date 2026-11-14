@@ -7,8 +7,8 @@
 //!
 //! Domain Governance Rules: FGT-TRN-001 (smart wire protocol), FGT-COR-001.
 
-use fg_core::error::{FractalError, FractalResult};
 use crate::packetline::PacketLine;
+use fg_core::error::{FractalError, FractalResult};
 
 /// Parsed Git Smart Protocol v2 client command.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -102,9 +102,9 @@ pub fn validate_loose_header_bounds(raw: &[u8]) -> FractalResult<(ObjectKind, us
         }
     };
 
-    let payload_size = size_str.parse::<usize>().map_err(|_| {
-        FractalError::ObjectCodec(format!("invalid loose object size: {size_str}"))
-    })?;
+    let payload_size = size_str
+        .parse::<usize>()
+        .map_err(|_| FractalError::ObjectCodec(format!("invalid loose object size: {size_str}")))?;
 
     Ok((kind, payload_size, nul_pos + 1))
 }
