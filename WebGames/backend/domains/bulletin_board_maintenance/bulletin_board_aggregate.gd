@@ -24,17 +24,17 @@ class BulletinCardDTO extends RefCounted:
 
 	## 公告卡片构造（ID/权重/标题/正文/标签）
 	func _init(
-		p_id: String = "",
-		p_prio: int = 100,
-		p_title: String = "",
-		p_content: String = "",
-		p_tag: String = "UPDATE"
+		initial_card_id: String = "",
+		initial_priority: int = 100,
+		initial_title: String = "",
+		initial_content: String = "",
+		initial_tag: String = "UPDATE"
 	) -> void:
-		card_id = p_id
-		priority = p_prio
-		title = p_title
-		content_body = p_content
-		tag_label = p_tag
+		card_id = initial_card_id
+		priority = initial_priority
+		title = initial_title
+		content_body = initial_content
+		tag_label = initial_tag
 
 var server_maintenance_mode: bool = false
 var maintenance_end_timestamp_utc: int = 0
@@ -45,6 +45,6 @@ var announcement_cards: Array = []
 func add_card(card: BulletinCardDTO) -> void:
 	announcement_cards.append(card)
 	# 按权重降序排序
-	announcement_cards.sort_custom(func(a: BulletinCardDTO, b: BulletinCardDTO):
-		return a.priority > b.priority
+	announcement_cards.sort_custom(func(card_left: BulletinCardDTO, card_right: BulletinCardDTO) -> bool:
+		return card_left.priority > card_right.priority
 	)

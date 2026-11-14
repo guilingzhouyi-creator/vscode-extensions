@@ -23,10 +23,10 @@ class AliasProfile extends RefCounted:
 	var is_compromised: bool = false        # 该假名是否已当场败露
 
 	## 假名档案构造（ID/展示名/伪装精密度）
-	func _init(p_id: String, p_name: String, p_quality: float = DEFAULT_DISGUISE_QUALITY) -> void:
-		alias_id = p_id
-		display_name = p_name
-		disguise_quality_score = p_quality
+	func _init(initial_alias_id: String, initial_display_name: String, initial_quality: float = DEFAULT_DISGUISE_QUALITY) -> void:
+		alias_id = initial_alias_id
+		display_name = initial_display_name
+		disguise_quality_score = initial_quality
 
 var character_uuid: String = ""                 # 角色不可变唯一底层 UUID
 var true_canonical_name: String = ""            # 本源真实姓名 (允许重名)
@@ -40,9 +40,9 @@ var base_true_infamy_bounty: int = 0
 var alias_slots: Dictionary = {}
 
 ## 角色身份聚合构造（不可变 UUID + 本源真名）
-func _init(p_uuid: String = "", p_true_name: String = "") -> void:
-	character_uuid = p_uuid
-	true_canonical_name = p_true_name
+func _init(initial_uuid: String = "", initial_true_name: String = "") -> void:
+	character_uuid = initial_uuid
+	true_canonical_name = initial_true_name
 
 ## 对外展示名：穿戴未败露假名则显示假名，否则回退真名
 func get_current_public_display_name() -> String:
@@ -62,8 +62,8 @@ func equip_alias(alias_id: String) -> bool:
 		active_alias_id = ""
 		return true
 	if alias_slots.has(alias_id):
-		var p: AliasProfile = alias_slots[alias_id]
-		if not p.is_compromised:
+		var alias_profile: AliasProfile = alias_slots[alias_id]
+		if not alias_profile.is_compromised:
 			active_alias_id = alias_id
 			return true
 	return false

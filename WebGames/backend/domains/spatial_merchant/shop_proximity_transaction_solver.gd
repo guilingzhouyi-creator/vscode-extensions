@@ -26,7 +26,7 @@ static func buy_item(
 	buy_count: int,
 	wallet: CharacterWalletEntity,
 	inventory: WearableInventoryAggregate,
-	library: AccountItemLibraryAggregate = null
+	library: AccountItemLibrary = null
 ) -> Dictionary:
 	if shop == null or wallet == null:
 		return {"success": false, "error_code": "MISSING_CONTEXT"}

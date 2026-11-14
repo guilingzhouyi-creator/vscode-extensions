@@ -53,17 +53,17 @@ var is_decayed: bool = false                     # 衰变完成标记（触发 G
 ## 契约：按 decay_category 覆盖 total_lifespan_seconds（有机 30 分钟 / 标准 2 小时 / 传奇永不，
 ##       config/domains/ground_loot.json lifespan.* 驱动）；实例不在此处注册，由监听器统一入列。
 func _init(
-	p_id: String = "",
-	p_item: ItemEntity = null,
-	p_pos: Vector2 = Vector2.ZERO,
-	p_killer: String = "",
-	p_decay_cat: LootDecayCategory = LootDecayCategory.STANDARD_MINERAL_EQUIP
+	initial_drop_id: String = "",
+	initial_item_entity: ItemEntity = null,
+	initial_position: Vector2 = Vector2.ZERO,
+	initial_killer_account_id: String = "",
+	initial_decay_category: LootDecayCategory = LootDecayCategory.STANDARD_MINERAL_EQUIP
 ) -> void:
-	drop_id = p_id
-	item_entity = p_item
-	local_coordinates = p_pos
-	killer_account_id = p_killer
-	decay_category = p_decay_cat
+	drop_id = initial_drop_id
+	item_entity = initial_item_entity
+	local_coordinates = initial_position
+	killer_account_id = initial_killer_account_id
+	decay_category = initial_decay_category
 
 	if decay_category == LootDecayCategory.ORGANIC_PERISHABLE:
 		total_lifespan_seconds = GameConfig.get_float("domains.ground_loot", "lifespan/organic_perishable_seconds", 1800.0) # 30 分钟
@@ -81,8 +81,8 @@ static func create_from_declaration(canonical_id: String, catalog: ItemRegistryC
 		return {"success": false, "error_code": "EMPTY_ITEM_KEY"}
 	if catalog == null:
 		return {"success": false, "error_code": "NO_CATALOG"}
-	var proto: Variant = catalog.get_prototype(canonical_id)
-	if proto == null:
+	var prototype: Variant = catalog.get_prototype(canonical_id)
+	if prototype == null:
 		return {"success": false, "error_code": "ITEM_NOT_REGISTERED", "canonical_id": canonical_id}
-	var item := ItemInstanceFactory.build_instance(proto, display_name if not display_name.is_empty() else proto.english_name, "DRP_")
+	var item := ItemInstanceFactory.build_instance(prototype, display_name if not display_name.is_empty() else prototype.english_name, "DRP_")
 	return {"success": true, "item_entity": item, "canonical_id": canonical_id}

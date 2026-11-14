@@ -27,7 +27,7 @@ static func attempt_pickup(
 	player_pos: Vector2,
 	drop: GroundDroppedItemAggregate,
 	inventory: WearableInventoryAggregate,
-	library: AccountItemLibraryAggregate = null # GAP-01 统计库可空注入（测试确定性）
+	library: AccountItemLibrary = null # GAP-01 统计库可空注入（测试确定性）
 ) -> Dictionary:
 	# 1. 衰变失效检定
 	if drop.is_decayed or drop.item_entity == null:

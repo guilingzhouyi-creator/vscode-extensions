@@ -43,10 +43,10 @@ class OrgMemberDTO extends RefCounted:
 	var contribution_points: int = 0
 
 	## 成员 DTO 构造（账户/名/职位）
-	func _init(p_acc: String, p_name: String, p_role: GuildRole = GuildRole.NOVICE) -> void:
-		account_id = p_acc
-		character_name = p_name
-		role = p_role
+	func _init(initial_account_id: String, initial_character_name: String, initial_role: GuildRole = GuildRole.NOVICE) -> void:
+		account_id = initial_account_id
+		character_name = initial_character_name
+		role = initial_role
 
 var org_id: String = ""                         # 组织全局唯一 ID
 var localized_name: String = ""                 # 组织名称
@@ -70,17 +70,17 @@ var member_roster: Dictionary = {}
 var diplomatic_relations: Dictionary = {}
 
 ## 组织聚合构造（ID/名称/类型）
-func _init(p_id: String = "", p_name: String = "", p_type: OrganizationType = OrganizationType.PLAYER_CREATED_CUSTOM) -> void:
-	org_id = p_id
-	localized_name = p_name
-	org_type = p_type
+func _init(initial_org_id: String = "", initial_name: String = "", initial_org_type: OrganizationType = OrganizationType.PLAYER_CREATED_CUSTOM) -> void:
+	org_id = initial_org_id
+	localized_name = initial_name
+	org_type = initial_org_type
 
 ## 登记成员入花名册（默认见习）
-func add_member(acc_id: String, char_name: String, role: GuildRole = GuildRole.NOVICE) -> void:
-	member_roster[acc_id] = OrgMemberDTO.new(acc_id, char_name, role)
+func add_member(member_account_id: String, member_character_name: String, role: GuildRole = GuildRole.NOVICE) -> void:
+	member_roster[member_account_id] = OrgMemberDTO.new(member_account_id, member_character_name, role)
 
 ## 成员职位查询（未登记回退 NOVICE）
-func get_member_role(acc_id: String) -> GuildRole:
-	if member_roster.has(acc_id):
-		return member_roster[acc_id].role
+func get_member_role(member_account_id: String) -> GuildRole:
+	if member_roster.has(member_account_id):
+		return member_roster[member_account_id].role
 	return GuildRole.NOVICE

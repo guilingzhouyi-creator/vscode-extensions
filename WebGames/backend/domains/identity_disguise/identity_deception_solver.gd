@@ -18,11 +18,11 @@ static func evaluate_insight_check(
 	disguise_quality: float,
 	actor_agi: float
 ) -> bool:
-	var int_w := GameConfig.get_float("domains.identity_disguise", "insight_formula/int_weight", 1.5)
-	var perc_w := GameConfig.get_float("domains.identity_disguise", "insight_formula/perception_bonus_weight", 1.0)
-	var qual_w := GameConfig.get_float("domains.identity_disguise", "insight_formula/deception_quality_weight", 1.0)
-	var agi_w := GameConfig.get_float("domains.identity_disguise", "insight_formula/agi_weight", 0.5)
+	var intelligence_weight := GameConfig.get_float("domains.identity_disguise", "insight_formula/int_weight", 1.5)
+	var perception_weight := GameConfig.get_float("domains.identity_disguise", "insight_formula/perception_bonus_weight", 1.0)
+	var quality_weight := GameConfig.get_float("domains.identity_disguise", "insight_formula/deception_quality_weight", 1.0)
+	var agility_weight := GameConfig.get_float("domains.identity_disguise", "insight_formula/agi_weight", 0.5)
 	var threshold := GameConfig.get_float("domains.identity_disguise", "insight_formula/reveal_threshold", 15.0)
-	var insight_power := observer_int * int_w + observer_perception_bonus * perc_w
-	var deception_power := disguise_quality * qual_w + actor_agi * agi_w
+	var insight_power := observer_int * intelligence_weight + observer_perception_bonus * perception_weight
+	var deception_power := disguise_quality * quality_weight + actor_agi * agility_weight
 	return insight_power > (deception_power + threshold)

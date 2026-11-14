@@ -65,7 +65,7 @@ func _instantiate_drop_from_decl(decl: Dictionary) -> GroundDroppedItemAggregate
 	if not result.get("success", false):
 		return null
 	return GroundDroppedItemAggregate.new(
-		UniqueIdGenerator.next_id("DRP_"),
+		IdGenerator.next_id("DRP_"),
 		result["item_entity"],
 		Vector2(float(decl.get("x", 0.0)), float(decl.get("y", 0.0))),
 		str(decl.get("killer_id", "")),
@@ -129,7 +129,7 @@ func attempt_pickup_from_ground(
 	player_pos: Vector2,
 	drop_id: String,
 	inventory: WearableInventoryAggregate,
-	library: AccountItemLibraryAggregate = null
+	library: AccountItemLibrary = null
 ) -> Dictionary:
 	var drop := find_active_drop(drop_id)
 	if drop == null:

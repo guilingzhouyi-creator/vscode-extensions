@@ -17,12 +17,12 @@ static func set_maintenance(
 	enable_maintenance: bool,
 	duration_seconds: int = 3600,
 	current_utc: int = 0,
-	custom_msg: String = ""
+	custom_message: String = ""
 ) -> Dictionary:
 	board.server_maintenance_mode = enable_maintenance
 	board.maintenance_end_timestamp_utc = current_utc + duration_seconds if enable_maintenance else 0
 	# 未显式指定时回退到配置文案，避免同一句公告在代码里多处重复
-	board.maintenance_notice_msg = custom_msg if custom_msg != "" else _notice_msg()
+	board.maintenance_notice_msg = custom_message if custom_message != "" else _notice_message()
 
 	return {
 		"success": true,
@@ -34,7 +34,7 @@ static func set_maintenance(
 # 配置读取
 # ==============================================================================
 
-static func _notice_msg() -> String:
+static func _notice_message() -> String:
 	return GameConfig.get_string(
 		"narratives.bulletin_board_maintenance", "maintenance_notice",
 		"服务器正在进行例行维护，请稍后重试。"

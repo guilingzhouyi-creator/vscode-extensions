@@ -36,10 +36,14 @@ var despawn_timestamp_utc: int = 0               # 撤摊转移时间戳
 var shelf_inventory: Array[Dictionary] = []
 
 ## 商铺聚合构造（ID/招牌名/类型）
-func _init(p_id: String = "", p_name: String = "", p_type: ShopType = ShopType.TOWN_FIXED_STORE) -> void:
-	shop_id = p_id
-	localized_name = p_name
-	shop_type = p_type
+func _init(
+	initial_shop_id: String = "",
+	initial_localized_name: String = "",
+	initial_shop_type: ShopType = ShopType.TOWN_FIXED_STORE
+) -> void:
+	shop_id = initial_shop_id
+	localized_name = initial_localized_name
+	shop_type = initial_shop_type
 
 ## 上架货架商品（模板 ID/库存/金/银定价）
 func add_shelf_item(template_id: String, count: int, price_gold: int, price_silver: int = 0) -> void:

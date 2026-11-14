@@ -29,15 +29,15 @@ class FeatureFlagEntry extends RefCounted:
 
 	## 特性开关条目构造（键/策略/百分比/白名单）
 	func _init(
-		p_key: String = "",
-		p_strat: RolloutStrategy = RolloutStrategy.GLOBAL_DISABLED,
-		p_pct: int = 0,
-		p_whitelist: Array = []
+		initial_key: String = "",
+		initial_strategy: RolloutStrategy = RolloutStrategy.GLOBAL_DISABLED,
+		initial_percentage: int = 0,
+		initial_whitelist: Array = []
 	) -> void:
-		feature_key = p_key
-		strategy = p_strat
-		rollout_percentage = p_pct
-		whitelist_account_ids = p_whitelist
+		feature_key = initial_key
+		strategy = initial_strategy
+		rollout_percentage = initial_percentage
+		whitelist_account_ids = initial_whitelist
 
 # feature_key -> FeatureFlagEntry
 var flags_registry: Dictionary = {}
