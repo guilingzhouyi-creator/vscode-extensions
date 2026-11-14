@@ -19,8 +19,8 @@ func _ready() -> void:
 	alignment = BoxContainer.ALIGNMENT_CENTER
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE:
+func _notification(notification_type: int) -> void:
+	if notification_type == NOTIFICATION_PREDELETE:
 		for toast_item in _toast_pool:
 			if toast_item != null and is_instance_valid(toast_item):
 				toast_item.free()
@@ -31,29 +31,29 @@ func _acquire_toast_panel() -> PanelContainer:
 		var reused: PanelContainer = _toast_pool.pop_back()
 		if reused != null and is_instance_valid(reused):
 			return reused
-	var panel := PanelContainer.new()
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var toast_panel := PanelContainer.new()
+	toast_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var toast_label := Label.new()
 	toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	panel.add_child(toast_label)
-	return panel
+	toast_panel.add_child(toast_label)
+	return toast_panel
 
-func _recycle_toast_panel(panel: PanelContainer) -> void:
-	if panel == null or not is_instance_valid(panel):
+func _recycle_toast_panel(toast_panel: PanelContainer) -> void:
+	if toast_panel == null or not is_instance_valid(toast_panel):
 		return
-	var old_tween: Variant = panel.get_meta("_toast_tween", null)
+	var old_tween: Variant = toast_panel.get_meta("_toast_tween", null)
 	if old_tween is Tween and (old_tween as Tween).is_valid():
 		(old_tween as Tween).kill()
-	panel.set_meta("_toast_tween", null)
-	if panel.get_parent() == self:
-		remove_child(panel)
+	toast_panel.set_meta("_toast_tween", null)
+	if toast_panel.get_parent() == self:
+		remove_child(toast_panel)
 	if _toast_pool.size() < MAX_TOASTS:
-		_toast_pool.append(panel)
+		_toast_pool.append(toast_panel)
 	else:
-		panel.free()
+		toast_panel.free()
 
 ## 显示单条 Toast
-func show_toast(message: String, level: int = NavTypes.ToastLevel.INFO, duration_sec: float = 2.0) -> void:
+func show_toast(message: String, level: int = NavTypes.ToastLevel.INFO, duration_seconds: float = 2.0) -> void:
 	# 堆叠上限：超出时淘汰并池化回收最旧面板
 	while get_child_count() >= MAX_TOASTS:
 		var oldest := get_child(0) as PanelContainer
@@ -61,8 +61,8 @@ func show_toast(message: String, level: int = NavTypes.ToastLevel.INFO, duration
 			break
 		_recycle_toast_panel(oldest)
 
-	var panel := _acquire_toast_panel()
-	var toast_label := panel.get_child(0) as Label
+	var toast_panel := _acquire_toast_panel()
+	var toast_label := toast_panel.get_child(0) as Label
 	toast_label.text = message
 
 	var text_color := DesignTokens.COLOR_TEXT_DEFAULT
@@ -75,13 +75,13 @@ func show_toast(message: String, level: int = NavTypes.ToastLevel.INFO, duration
 			text_color = DesignTokens.COLOR_DANGER_DEFAULT
 
 	toast_label.add_theme_color_override("font_color", text_color)
-	panel.modulate.a = 0.0
-	add_child(panel)
+	toast_panel.modulate.a = 0.0
+	add_child(toast_panel)
 
 	# 淡入淡出 Tween
 	var tween := create_tween()
-	panel.set_meta("_toast_tween", tween)
-	tween.tween_property(panel, "modulate:a", 1.0, 0.15)
-	tween.tween_interval(duration_sec)
-	tween.tween_property(panel, "modulate:a", 0.0, 0.3)
-	tween.tween_callback(_recycle_toast_panel.bind(panel))
+	toast_panel.set_meta("_toast_tween", tween)
+	tween.tween_property(toast_panel, "modulate:a", 1.0, 0.15)
+	tween.tween_interval(duration_seconds)
+	tween.tween_property(toast_panel, "modulate:a", 0.0, 0.3)
+	tween.tween_callback(_recycle_toast_panel.bind(toast_panel))

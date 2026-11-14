@@ -90,17 +90,17 @@ func set_state(new_state: State) -> void:
 
 ## 绑定用户自定义业务展示节点为 READY 节点
 ## 归属校验：节点必须位于本容器子树（非同树节点无法受 visible 控制），否则自动收养
-func set_ready_view(node: Control) -> void:
-	if node == null or node == self:
+func set_ready_view(ready_control: Control) -> void:
+	if ready_control == null or ready_control == self:
 		return
-	if not is_ancestor_of(node):
-		add_child(node)
-	ready_node = node
+	if not is_ancestor_of(ready_control):
+		add_child(ready_control)
+	ready_node = ready_control
 	set_state(_current_state)
 
 ## 绑定错误重试回调
-func bind_retry_callback(callback: Callable) -> void:
-	retry_callback = callback
+func bind_retry_callback(on_retry_callback: Callable) -> void:
+	retry_callback = on_retry_callback
 
 ## 自定义错误文案
 func set_error_message(message: String) -> void:
@@ -112,11 +112,11 @@ func _on_retry_pressed() -> void:
 	if retry_callback.is_valid():
 		retry_callback.call()
 
-func _create_placeholder_view(text: String, text_color: Color) -> Control:
-	var box := CenterContainer.new()
-	box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+func _create_placeholder_view(placeholder_text: String, text_color: Color) -> Control:
+	var center_container := CenterContainer.new()
+	center_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var placeholder_label := Label.new()
-	placeholder_label.text = text
+	placeholder_label.text = placeholder_text
 	placeholder_label.add_theme_color_override("font_color", text_color)
-	box.add_child(placeholder_label)
-	return box
+	center_container.add_child(placeholder_label)
+	return center_container

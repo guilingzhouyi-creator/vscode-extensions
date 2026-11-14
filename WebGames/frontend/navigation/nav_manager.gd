@@ -92,17 +92,17 @@ func has_screen(screen_id: String) -> bool:
 	return _screen_registry.has(screen_id)
 
 ## 压入新 Screen (保留历史栈)
-func push_screen(screen_id: String, params: Dictionary = {}, transition_type: int = NavTypes.TransitionType.NONE) -> Control:
-	return _navigate_to(screen_id, params, true, transition_type)
+func push_screen(screen_id: String, navigation_parameters: Dictionary = {}, transition_type: int = NavTypes.TransitionType.NONE) -> Control:
+	return _navigate_to(screen_id, navigation_parameters, true, transition_type)
 
 ## 替换当前 Screen (不追加历史深度)
-func replace_screen(screen_id: String, params: Dictionary = {}, transition_type: int = NavTypes.TransitionType.NONE) -> Control:
+func replace_screen(screen_id: String, navigation_parameters: Dictionary = {}, transition_type: int = NavTypes.TransitionType.NONE) -> Control:
 	var previous_depth := _screen_stack.size()
-	var result := _navigate_to(screen_id, params, true, transition_type)
+	var mounted_screen := _navigate_to(screen_id, navigation_parameters, true, transition_type)
 	# 仅跳转成功且存在被替换项时才抹去旧栈顶，确保失败路径栈长度不变
-	if result != null and previous_depth > 0:
+	if mounted_screen != null and previous_depth > 0:
 		_screen_stack.remove_at(previous_depth - 1)
-	return result
+	return mounted_screen
 
 ## 弹出并返回上一 Screen（默认 SLIDE_RIGHT 回退动效）
 func pop_screen(transition_type: int = NavTypes.TransitionType.SLIDE_RIGHT) -> Control:
@@ -110,16 +110,16 @@ func pop_screen(transition_type: int = NavTypes.TransitionType.SLIDE_RIGHT) -> C
 		EventBusCore.get_instance().emit_log(LOG_LEVEL_WARN, "NavManager: already at stack bottom, cannot pop")
 		return null
 	var previous_screen_id: String = _screen_stack[_screen_stack.size() - 2]
-	var result := _navigate_to(previous_screen_id, {}, false, transition_type)
+	var mounted_screen := _navigate_to(previous_screen_id, {}, false, transition_type)
 	# 目标解析与跳转成功后才真正出栈，避免失败时误回退栈深
-	if result != null:
+	if mounted_screen != null:
 		_screen_stack.pop_back()
-	return result
+	return mounted_screen
 
 ## 重置导航历史栈并跳转至指定根界面（用于退回账号首页/世界网关清栈）
-func pop_to_root(root_screen_id: String = "account_entry", params: Dictionary = {}, transition_type: int = NavTypes.TransitionType.NONE) -> Control:
+func pop_to_root(root_screen_id: String = "account_entry", navigation_parameters: Dictionary = {}, transition_type: int = NavTypes.TransitionType.NONE) -> Control:
 	_screen_stack.clear()
-	return _navigate_to(root_screen_id, params, true, transition_type)
+	return _navigate_to(root_screen_id, navigation_parameters, true, transition_type)
 
 ## 清理当前已压栈的屏幕与历史栈（用于停机销毁对称回收）
 func clear_stack() -> void:
@@ -146,7 +146,7 @@ static func get_reserved_chain_routes() -> Dictionary:
 ## 核心跳转与生命周期驱动
 ## 顺序契约：先加载/实例化成功，再校验可挂载，最后销毁旧屏——失败路径不破坏栈/屏一致性
 ## 转场动效：transition_type != NONE 时旧屏在动效结束后才 queue_free，保证视觉连续性
-func _navigate_to(screen_id: String, params: Dictionary, record_history: bool, transition_type: int = NavTypes.TransitionType.NONE) -> Control:
+func _navigate_to(screen_id: String, navigation_parameters: Dictionary, should_record_history: bool, transition_type: int = NavTypes.TransitionType.NONE) -> Control:
 	if not _screen_registry.has(screen_id):
 		EventBusCore.get_instance().emit_log(
 			LOG_LEVEL_WARN,
@@ -197,11 +197,11 @@ func _navigate_to(screen_id: String, params: Dictionary, record_history: bool, t
 		_play_transition(old_screen, screen_instance, transition_type)
 
 	# 4. 挂载成功后才写栈，保证栈与场景树恒自洽
-	if record_history:
+	if should_record_history:
 		_screen_stack.append(screen_id)
 
 	if screen_instance.has_method("on_screen_enter"):
-		screen_instance.call("on_screen_enter", params)
+		screen_instance.call("on_screen_enter", navigation_parameters)
 
 	return screen_instance
 
@@ -248,10 +248,10 @@ func _play_fade_transition(old_screen: Control, new_screen: Control) -> void:
 		_exit_and_free_screen(old_screen)
 	)
 
-## 滑动转场：旧屏滑出 + 新屏滑入（方向由 slide_left 控制）
-func _play_slide_transition(old_screen: Control, new_screen: Control, slide_left: bool) -> void:
+## 滑动转场：旧屏滑出 + 新屏滑入（方向由 is_sliding_left 控制）
+func _play_slide_transition(old_screen: Control, new_screen: Control, is_sliding_left: bool) -> void:
 	var container_size := _app_root.screen_container.size
-	var direction := 1.0 if slide_left else -1.0
+	var direction := 1.0 if is_sliding_left else -1.0
 	new_screen.position.x = container_size.x * direction
 	_active_transition.set_parallel(true)
 	_active_transition.tween_property(old_screen, "position:x", -container_size.x * direction, TRANSITION_DURATION)
@@ -276,9 +276,9 @@ func _cache_scene(screen_id: String, scene: PackedScene) -> void:
 	_scene_cache[screen_id] = scene
 
 ## 派发全局 Toast 轻提示
-func show_toast(message: String, level: int = NavTypes.ToastLevel.INFO, duration_sec: float = 2.0) -> void:
+func show_toast(message: String, level: int = NavTypes.ToastLevel.INFO, duration_seconds: float = 2.0) -> void:
 	if _app_root != null and _app_root.toast_layer != null:
-		_app_root.toast_layer.show_toast(message, level, duration_sec)
+		_app_root.toast_layer.show_toast(message, level, duration_seconds)
 	else:
 		EventBusCore.get_instance().emit_log(
 			"info",
@@ -286,9 +286,9 @@ func show_toast(message: String, level: int = NavTypes.ToastLevel.INFO, duration
 		)
 
 ## 显示全屏 Loading 遮罩
-func show_loading(hint: String = "") -> void:
+func show_loading(hint_text: String = "") -> void:
 	if _app_root != null and _app_root.loading_overlay != null:
-		var effective_hint: String = hint if not hint.is_empty() else UIIntermediary.text("ui.common.loading")
+		var effective_hint: String = hint_text if not hint_text.is_empty() else UIIntermediary.text("ui.common.loading")
 		_app_root.loading_overlay.show_loading(effective_hint)
 
 ## 隐藏全屏 Loading 遮罩

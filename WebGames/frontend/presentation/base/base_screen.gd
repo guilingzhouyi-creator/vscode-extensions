@@ -20,52 +20,52 @@ var snapshot: Dictionary = {}
 var ui_state_container: Control = null
 var _owned_subcontroller: Node = null
 var _managed_connections: Array[Dictionary] = []
-var _action_cooldowns_ms: Dictionary = {}
+var _action_cooldown_milliseconds: Dictionary = {}
 
 ## 注册受 BaseScreen 生命周期托管的信号连接（幂等防重连，节点销毁时自动对称断开）
-func connect_managed(target_signal: Signal, target: Callable, flags: int = 0) -> void:
+func connect_managed(target_signal: Signal, target_callable: Callable, flags: int = 0) -> void:
 	var source_object: Object = target_signal.get_object()
 	if source_object == null or not is_instance_valid(source_object):
 		return
-	if target_signal.is_connected(target):
+	if target_signal.is_connected(target_callable):
 		return
-	target_signal.connect(target, flags)
+	target_signal.connect(target_callable, flags)
 	_managed_connections.append({
 		"signal_name": target_signal.get_name(),
 		"source_ref": weakref(source_object),
-		"target": target
+		"target": target_callable
 	})
 
 ## 判定指定动作键是否处于冷却防抖窗口内（默认窗口 0ms 不拦截；非零可用于高频提交防连击）
-func try_consume_action_cooldown(action_key: String, cooldown_ms: int = 180) -> bool:
-	if cooldown_ms <= 0 or action_key.is_empty():
+func try_consume_action_cooldown(action_key: String, cooldown_milliseconds: int = 180) -> bool:
+	if cooldown_milliseconds <= 0 or action_key.is_empty():
 		return true
-	var now_ms: int = Time.get_ticks_msec()
-	var previous_ms: int = int(_action_cooldowns_ms.get(action_key, -cooldown_ms))
-	if now_ms - previous_ms < cooldown_ms:
+	var current_milliseconds: int = Time.get_ticks_msec()
+	var previous_milliseconds: int = int(_action_cooldown_milliseconds.get(action_key, -cooldown_milliseconds))
+	if current_milliseconds - previous_milliseconds < cooldown_milliseconds:
 		return false
-	_action_cooldowns_ms[action_key] = now_ms
+	_action_cooldown_milliseconds[action_key] = current_milliseconds
 	return true
 
 ## 安全断开由本视图登记的全部托管信号连接（幂等、防已释放对象悬空）
 func disconnect_managed_signals() -> void:
-	for entry in _managed_connections:
-		var source_ref: Variant = entry.get("source_ref")
-		if not (source_ref is WeakRef):
+	for connection_entry in _managed_connections:
+		var source_weak_reference: Variant = connection_entry.get("source_ref")
+		if not (source_weak_reference is WeakRef):
 			continue
-		var source_object: Variant = (source_ref as WeakRef).get_ref()
+		var source_object: Variant = (source_weak_reference as WeakRef).get_ref()
 		if source_object == null or not is_instance_valid(source_object):
 			continue
-		var signal_name: StringName = entry.get("signal_name", &"")
-		var target_callable: Callable = entry.get("target", Callable())
+		var signal_name: StringName = connection_entry.get("signal_name", &"")
+		var target_callable: Callable = connection_entry.get("target", Callable())
 		if target_callable.is_valid() and (source_object as Object).is_connected(signal_name, target_callable):
 			(source_object as Object).disconnect(signal_name, target_callable)
 	_managed_connections.clear()
-	_action_cooldowns_ms.clear()
+	_action_cooldown_milliseconds.clear()
 
 ## 页面被推入激活时调用
-func on_screen_enter(params: Dictionary = {}) -> void:
-	navigation_params = params.duplicate()
+func on_screen_enter(screen_parameters: Dictionary = {}) -> void:
+	navigation_params = screen_parameters.duplicate()
 
 ## 页面被弹出或销毁时调用（默认清理本视图 i18n 绑定，防悬挂引用）
 func on_screen_exit() -> void:
@@ -84,8 +84,8 @@ func on_screen_resume() -> void:
 	pass
 
 ## 统一业务数据入口：所有业务数据必须经此注入（视图严禁自读业务 mock 与后端配置）
-func apply_snapshot(payload: Dictionary) -> void:
-	snapshot = payload.duplicate(true)
+func apply_snapshot(snapshot_payload: Dictionary) -> void:
+	snapshot = snapshot_payload.duplicate(true)
 	_render_from_snapshot()
 
 ## 子类渲染映射钩子：只允许将快照字段映射到节点，禁止业务计算与随机判定
@@ -102,8 +102,8 @@ func _on_predelete_cleanup() -> void:
 	pass
 
 ## 根节点销毁时自动清理视图动态绑定与非树上子控制器
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE:
+func _notification(notification_type: int) -> void:
+	if notification_type == NOTIFICATION_PREDELETE:
 		_on_predelete_cleanup()
 		disconnect_managed_signals()
 		UIIntermediary.clear_view_bindings(self)
@@ -158,10 +158,10 @@ func _ensure_page_header(current: Control, header_script: Script, title_key: Str
 		current.connect("back_pressed", Callable(target_host, "back"))
 	return current
 
-func _ensure_split_panel(current: Control, split_script: Script, ratio: float = 0.35) -> Control:
+func _ensure_split_panel(current: Control, split_script: Script, split_ratio: float = 0.35) -> Control:
 	if current == null:
 		current = split_script.new() as Control
-		current.set("left_ratio", ratio)
+		current.set("left_ratio", split_ratio)
 	return current
 
 func _ensure_currency_bar(current: Control, bar_script: Script, show_gold: bool = false, show_crystals: bool = false) -> Control:

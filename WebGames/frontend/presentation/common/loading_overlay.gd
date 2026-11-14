@@ -10,30 +10,30 @@
 class_name LoadingOverlay
 extends Control
 
-var _label: Label
+var _hint_label: Label
 
 func _ready() -> void:
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_STOP # 阻断下层点击
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
-	var bg := ColorRect.new()
-	bg.color = DesignTokens.COLOR_OVERLAY_DIM
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(bg)
+	var background_panel := ColorRect.new()
+	background_panel.color = DesignTokens.COLOR_OVERLAY_DIM
+	background_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(background_panel)
 
-	var center := CenterContainer.new()
-	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_label = Label.new()
-	_label.text = UIIntermediary.text("ui.common.loading")
-	_label.add_theme_font_size_override("font_size", 20)
-	center.add_child(_label)
-	add_child(center)
+	var center_container := CenterContainer.new()
+	center_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_hint_label = Label.new()
+	_hint_label.text = UIIntermediary.text("ui.common.loading")
+	_hint_label.add_theme_font_size_override("font_size", 20)
+	center_container.add_child(_hint_label)
+	add_child(center_container)
 
 ## 显示全屏加载遮罩与提示文本
-func show_loading(hint: String = "") -> void:
-	if _label != null:
-		_label.text = hint if not hint.is_empty() else UIIntermediary.text("ui.common.loading")
+func show_loading(hint_text: String = "") -> void:
+	if _hint_label != null:
+		_hint_label.text = hint_text if not hint_text.is_empty() else UIIntermediary.text("ui.common.loading")
 	visible = true
 
 ## 隐藏全屏加载遮罩

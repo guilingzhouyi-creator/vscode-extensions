@@ -17,12 +17,12 @@ var close_callback: Callable
 var snapshot: Dictionary = {}
 
 ## 打开模态弹窗
-func on_modal_open(params: Dictionary = {}, callback: Callable = Callable()) -> void:
-	close_callback = callback
+func on_modal_open(_modal_parameters: Dictionary = {}, on_close_callback: Callable = Callable()) -> void:
+	close_callback = on_close_callback
 
 ## 统一业务数据入口：模态同样只做显示，严禁内嵌业务计算
-func apply_snapshot(payload: Dictionary) -> void:
-	snapshot = payload.duplicate(true)
+func apply_snapshot(snapshot_payload: Dictionary) -> void:
+	snapshot = snapshot_payload.duplicate(true)
 	_render_from_snapshot()
 
 ## 子类渲染映射钩子：只允许将快照字段映射到节点
@@ -30,8 +30,8 @@ func _render_from_snapshot() -> void:
 	pass
 
 ## 请求关闭模态弹窗
-func close_modal(result: Dictionary = {}) -> void:
+func close_modal(modal_result: Dictionary = {}) -> void:
 	if close_callback.is_valid():
-		close_callback.call(result)
-	modal_closed.emit(result)
+		close_callback.call(modal_result)
+	modal_closed.emit(modal_result)
 	queue_free()
