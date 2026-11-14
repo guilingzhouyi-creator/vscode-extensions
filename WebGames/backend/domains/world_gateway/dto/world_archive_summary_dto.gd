@@ -78,18 +78,18 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从字典还原构建 DTO 实例
-static func from_dto(data: Dictionary) -> WorldArchiveSummaryDTO:
-	if data.is_empty():
+static func from_dto(serialized_payload: Dictionary) -> WorldArchiveSummaryDTO:
+	if serialized_payload.is_empty():
 		return WorldArchiveSummaryDTO.new()
 	var summary := WorldArchiveSummaryDTO.new()
-	summary.world_id = String(data.get("world_id", ""))
-	summary.world_name = String(data.get("world_name", ""))
-	summary.mode = int(data.get("mode", 1))
-	summary.seed_value = int(data.get("seed_value", 0))
-	summary.current_tick = int(data.get("current_tick", 0))
-	summary.current_day = int(data.get("current_day", 1))
-	summary.character_count = int(data.get("character_count", 0))
-	summary.created_timestamp_utc = int(data.get("created_timestamp_utc", 0))
-	summary.last_played_timestamp_utc = int(data.get("last_played_timestamp_utc", 0))
-	summary.is_active = bool(data.get("is_active", true))
+	summary.world_id = String(serialized_payload.get("world_id", ""))
+	summary.world_name = String(serialized_payload.get("world_name", ""))
+	summary.mode = int(serialized_payload.get("mode", 1))
+	summary.seed_value = int(serialized_payload.get("seed_value", 0))
+	summary.current_tick = int(serialized_payload.get("current_tick", 0))
+	summary.current_day = int(serialized_payload.get("current_day", 1))
+	summary.character_count = int(serialized_payload.get("character_count", 0))
+	summary.created_timestamp_utc = int(serialized_payload.get("created_timestamp_utc", 0))
+	summary.last_played_timestamp_utc = int(serialized_payload.get("last_played_timestamp_utc", 0))
+	summary.is_active = bool(serialized_payload.get("is_active", true))
 	return summary

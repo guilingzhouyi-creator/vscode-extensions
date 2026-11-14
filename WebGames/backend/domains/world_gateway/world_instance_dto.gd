@@ -34,19 +34,19 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从字典重建世界实例（空字典回退 fallback_world_id）
-static func from_dto(data: Dictionary, fallback_world_id: String = "") -> WorldInstanceDTO:
+static func from_dto(serialized_payload: Dictionary, fallback_world_id: String = "") -> WorldInstanceDTO:
 	var world_instance := WorldInstanceDTO.new()
-	if data.is_empty():
+	if serialized_payload.is_empty():
 		world_instance.world_id = fallback_world_id
 		return world_instance
-	world_instance.world_id = str(data.get("world_id", fallback_world_id))
+	world_instance.world_id = str(serialized_payload.get("world_id", fallback_world_id))
 	if world_instance.world_id.is_empty():
 		world_instance.world_id = fallback_world_id
-	world_instance.world_name = str(data.get("world_name", ""))
-	world_instance.mode = int(data.get("mode", WorldGatewayModel.GameMode.SINGLE_PLAYER))
-	world_instance.seed_value = int(data.get("seed_value", 0))
-	world_instance.world_version = str(data.get("world_version", "1.0.0"))
-	world_instance.is_active = bool(data.get("is_active", true))
-	world_instance.max_concurrent_players = int(data.get("max_concurrent_players", 1))
-	world_instance.canary_feature_tag = str(data.get("canary_feature_tag", ""))
+	world_instance.world_name = str(serialized_payload.get("world_name", ""))
+	world_instance.mode = int(serialized_payload.get("mode", WorldGatewayModel.GameMode.SINGLE_PLAYER))
+	world_instance.seed_value = int(serialized_payload.get("seed_value", 0))
+	world_instance.world_version = str(serialized_payload.get("world_version", "1.0.0"))
+	world_instance.is_active = bool(serialized_payload.get("is_active", true))
+	world_instance.max_concurrent_players = int(serialized_payload.get("max_concurrent_players", 1))
+	world_instance.canary_feature_tag = str(serialized_payload.get("canary_feature_tag", ""))
 	return world_instance

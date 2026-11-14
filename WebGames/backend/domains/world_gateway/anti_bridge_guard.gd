@@ -143,26 +143,26 @@ static func _is_vanilla_pack(mod_entry: Variant) -> bool:
 		return mod_name == "vanilla" or mod_name.begins_with("vanilla_") or mod_name.begins_with("official_") or mod_name == "core_vanilla"
 
 	var pack_id: String = ""
-	var is_vanilla_flag: bool = false
+	var is_vanilla_package: bool = false
 	var author: String = ""
 
 	if mod_entry is Dictionary:
-		var mod_dict: Dictionary = mod_entry as Dictionary
-		is_vanilla_flag = bool(mod_dict.get("is_vanilla", false)) or bool(mod_dict.get("is_official", false))
-		pack_id = str(mod_dict.get("pack_id", mod_dict.get("id", "")))
-		author = str(mod_dict.get("author", ""))
+		var mod_payload: Dictionary = mod_entry as Dictionary
+		is_vanilla_package = bool(mod_payload.get("is_vanilla", false)) or bool(mod_payload.get("is_official", false))
+		pack_id = str(mod_payload.get("pack_id", mod_payload.get("id", "")))
+		author = str(mod_payload.get("author", ""))
 	elif mod_entry is Object:
 		var mod_object: Object = mod_entry as Object
 		if "is_vanilla" in mod_object:
-			is_vanilla_flag = bool(mod_object.get("is_vanilla"))
-		if not is_vanilla_flag and "is_official" in mod_object:
-			is_vanilla_flag = bool(mod_object.get("is_official"))
+			is_vanilla_package = bool(mod_object.get("is_vanilla"))
+		if not is_vanilla_package and "is_official" in mod_object:
+			is_vanilla_package = bool(mod_object.get("is_official"))
 		if "pack_id" in mod_object:
 			pack_id = str(mod_object.get("pack_id"))
 		if "author" in mod_object:
 			author = str(mod_object.get("author"))
 
-	if is_vanilla_flag:
+	if is_vanilla_package:
 		return true
 
 	var pack_id_lower := pack_id.to_lower()

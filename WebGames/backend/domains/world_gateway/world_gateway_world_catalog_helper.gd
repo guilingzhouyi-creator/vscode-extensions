@@ -66,12 +66,12 @@ static func validate_mode_entry_guards(
 static func convert_account_slots(account_slots: Array) -> Dictionary:
     var converted: Array[SaveSlotStateDTO] = []
     var seen_slots: Dictionary = {}
-    for item in account_slots:
+    for raw_slot_entry in account_slots:
         var slot: SaveSlotStateDTO = null
-        if item is SaveSlotStateDTO:
-            slot = item
-        elif item is Dictionary:
-            slot = SaveSlotStateDTO.from_dto(item as Dictionary)
+        if raw_slot_entry is SaveSlotStateDTO:
+            slot = raw_slot_entry
+        elif raw_slot_entry is Dictionary:
+            slot = SaveSlotStateDTO.from_dto(raw_slot_entry as Dictionary)
         else:
             return {"success": false, "error_code": "INVALID_ACCOUNT_SLOT_TYPE"}
         if slot.slot_id.is_empty() or seen_slots.has(slot.slot_id):
@@ -84,9 +84,9 @@ static func convert_account_slots(account_slots: Array) -> Dictionary:
 ## 从候选槽位集合中匹配指定槽位（空 ID 回退首槽）
 static func pick_target_slot(slots: Array, target_slot_id: String) -> SaveSlotStateDTO:
     if not target_slot_id.is_empty():
-        for item in slots:
-            if item is SaveSlotStateDTO and item.slot_id == target_slot_id:
-                return item
+        for slot_entry in slots:
+            if slot_entry is SaveSlotStateDTO and slot_entry.slot_id == target_slot_id:
+                return slot_entry
         return null
     if slots.is_empty():
         return null

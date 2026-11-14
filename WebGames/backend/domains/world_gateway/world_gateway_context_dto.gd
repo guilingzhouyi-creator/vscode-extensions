@@ -35,16 +35,16 @@ func to_dto() -> Dictionary:
 
 
 ## 从字典重建网关上下文（缺省回退 AUTHENTICATED/UNSELECTED 初态）
-static func from_dto(data: Dictionary) -> WorldGatewayContextDTO:
+static func from_dto(serialized_payload: Dictionary) -> WorldGatewayContextDTO:
 	var gateway_context := WorldGatewayContextDTO.new()
-	if data.is_empty():
+	if serialized_payload.is_empty():
 		return gateway_context
-	gateway_context.account_id = str(data.get("account_id", ""))
-	gateway_context.current_phase = int(data.get("current_phase", WorldGatewayModel.GatewayPhase.AUTHENTICATED))
-	gateway_context.selected_mode = int(data.get("selected_mode", WorldGatewayModel.GameMode.UNSELECTED))
-	gateway_context.selected_slot_id = str(data.get("selected_slot_id", ""))
-	gateway_context.selected_world_id = str(data.get("selected_world_id", ""))
-	gateway_context.active_character_id = str(data.get("active_character_id", ""))
-	gateway_context.is_first_time_creation = bool(data.get("is_first_time_creation", false))
-	gateway_context.active_canary_features = (data.get("active_canary_features", []) as Array).duplicate()
+	gateway_context.account_id = str(serialized_payload.get("account_id", ""))
+	gateway_context.current_phase = int(serialized_payload.get("current_phase", WorldGatewayModel.GatewayPhase.AUTHENTICATED))
+	gateway_context.selected_mode = int(serialized_payload.get("selected_mode", WorldGatewayModel.GameMode.UNSELECTED))
+	gateway_context.selected_slot_id = str(serialized_payload.get("selected_slot_id", ""))
+	gateway_context.selected_world_id = str(serialized_payload.get("selected_world_id", ""))
+	gateway_context.active_character_id = str(serialized_payload.get("active_character_id", ""))
+	gateway_context.is_first_time_creation = bool(serialized_payload.get("is_first_time_creation", false))
+	gateway_context.active_canary_features = (serialized_payload.get("active_canary_features", []) as Array).duplicate()
 	return gateway_context

@@ -29,25 +29,25 @@ static func probe_single_player_environment() -> ModeReadinessReportDTO:
 		report.capabilities = ["local_storage", "offline_continuity"]
 		return report
 
-	var root_dir: String = GameConfig.get_string(DOMAIN_WORLD_GATEWAY_CONFIG, "local_archive/root_dir", DEFAULT_SP_ROOT_DIR)
-	if not root_dir.ends_with("/"):
-		root_dir += "/"
+	var root_directory: String = GameConfig.get_string(DOMAIN_WORLD_GATEWAY_CONFIG, "local_archive/root_dir", DEFAULT_SP_ROOT_DIR)
+	if not root_directory.ends_with("/"):
+		root_directory += "/"
 
-	var mkdir_error := DirAccess.make_dir_recursive_absolute(root_dir)
+	var mkdir_error := DirAccess.make_dir_recursive_absolute(root_directory)
 	if mkdir_error != OK and mkdir_error != ERR_ALREADY_EXISTS:
 		report.is_ready = false
 		report.status_code = "DIR_UNWRITABLE"
-		report.message = TemplateFormatter.format("Failed to create local archive directory: {dir}", {"dir": root_dir})
+		report.message = TemplateFormatter.format("Failed to create local archive directory: {dir}", {"dir": root_directory})
 		report.latency_ms = 0
 		report.capabilities = []
 		return report
 
-	var test_probe_path := root_dir + ".probe_write_test.tmp"
+	var test_probe_path := root_directory + ".probe_write_test.tmp"
 	var file_handle := FileAccess.open(test_probe_path, FileAccess.WRITE)
 	if file_handle == null:
 		report.is_ready = false
 		report.status_code = "DIR_UNWRITABLE"
-		report.message = TemplateFormatter.format("Local archive directory not writable or insufficient permissions: {dir}", {"dir": root_dir})
+		report.message = TemplateFormatter.format("Local archive directory not writable or insufficient permissions: {dir}", {"dir": root_directory})
 		report.latency_ms = 0
 		report.capabilities = []
 		return report
@@ -68,8 +68,8 @@ static func probe_single_player_environment() -> ModeReadinessReportDTO:
 static func probe_multiplayer_environment(account_id: String) -> ModeReadinessReportDTO:
 	var report := ModeReadinessReportDTO.new()
 	report.mode = WorldGatewayModel.GameMode.MULTIPLAYER
-	var ping_ms: int = GameConfig.get_int(DOMAIN_WORLD_GATEWAY_CONFIG, "probe_policy/mp_simulated_ping_ms", DEFAULT_SIMULATED_PING_MS)
-	report.latency_ms = ping_ms
+	var ping_milliseconds: int = GameConfig.get_int(DOMAIN_WORLD_GATEWAY_CONFIG, "probe_policy/mp_simulated_ping_ms", DEFAULT_SIMULATED_PING_MS)
+	report.latency_ms = ping_milliseconds
 
 	var is_maintenance: bool = GameConfig.get_bool(DOMAIN_WORLD_GATEWAY_CONFIG, "probe_policy/maintenance_mode", false)
 	if is_maintenance:
@@ -87,10 +87,10 @@ static func probe_multiplayer_environment(account_id: String) -> ModeReadinessRe
 		return report
 
 	var flags: Dictionary = GameModeRoutingSolver.load_default_canary_flags()
-	var multiplayer_flag: Variant = flags.get("FEATURE_MULTIPLAYER_GATEWAY", null)
+	var multiplayer_feature: Variant = flags.get("FEATURE_MULTIPLAYER_GATEWAY", null)
 	var is_enabled: bool = false
-	if multiplayer_flag != null and CanaryRolloutSolver != null:
-		is_enabled = CanaryRolloutSolver.is_feature_enabled_for_account(multiplayer_flag, account_id)
+	if multiplayer_feature != null and CanaryRolloutSolver != null:
+		is_enabled = CanaryRolloutSolver.is_feature_enabled_for_account(multiplayer_feature, account_id)
 
 	if not is_enabled:
 		report.is_ready = false

@@ -35,15 +35,15 @@ static func evaluate_entry_path(slot: SaveSlotDTO) -> int:
 	return ENTRY_PATH_DIRECT_RESTORE
 
 ## 世界槽位与占位符防御校验
-static func validate_world_slot(account: AccountProfile, world_id: String, allow_default_fallback: bool = true) -> Dictionary:
+static func validate_world_slot(account: AccountProfile, world_id: String, should_allow_default_fallback: bool = true) -> Dictionary:
 	var target_id := world_id
 	if target_id.is_empty():
-		if not allow_default_fallback:
+		if not should_allow_default_fallback:
 			return {"success": false, "error_code": "UNBOUND_WORLD_ID", "message": "Target world slot not specified"}
 		target_id = AccountProfile.WORLD_DEFAULT_SP_01
 
 	if account != null and account.is_world_slot_placeholder(target_id):
-		if not allow_default_fallback:
+		if not should_allow_default_fallback:
 			return {"success": false, "error_code": "UNBOUND_WORLD_SLOT", "message": "Target world slot is unbound or in placeholder state"}
 		target_id = AccountProfile.WORLD_DEFAULT_SP_01
 
@@ -54,20 +54,20 @@ static func _execute_prologue_replay_branch(
 	account: AccountProfile,
 	slot: SaveSlotDTO,
 	context: Dictionary,
-	allow_default_fallback: bool
+	should_allow_default_fallback: bool
 ) -> Dictionary:
 	slot.prologue_completed = false
-	var opening: OpeningEventStreamDTO = context.get("opening_stream", null)
-	if opening == null:
-		opening = OpeningEventStreamDTO.new()
-		opening.account_id = account.account_id
-		opening.character_id = slot.character_name.sha256_text().substr(0, 16)
-		opening.character_name = slot.character_name
-		opening.starting_location_id = "loc_city_kalar_01"
-		opening.opening_quest_line_id = "quest_prologue_01"
-		opening.race_id = "HUMAN"
+	var opening_stream: OpeningEventStreamDTO = context.get("opening_stream", null)
+	if opening_stream == null:
+		opening_stream = OpeningEventStreamDTO.new()
+		opening_stream.account_id = account.account_id
+		opening_stream.character_id = slot.character_name.sha256_text().substr(0, 16)
+		opening_stream.character_name = slot.character_name
+		opening_stream.starting_location_id = "loc_city_kalar_01"
+		opening_stream.opening_quest_line_id = "quest_prologue_01"
+		opening_stream.race_id = "HUMAN"
 
-	var boot_result := PrologueExecutionKernel.boot_character_prologue(opening, opening.race_id, allow_default_fallback)
+	var boot_result := PrologueExecutionKernel.boot_character_prologue(opening_stream, opening_stream.race_id, should_allow_default_fallback)
 	if not bool(boot_result.get("success", false)):
 		return boot_result
 
@@ -105,23 +105,23 @@ static func execute_secondary_load(context: Dictionary) -> Dictionary:
 	var account: AccountProfile = context.get("account", null)
 	var slot: SaveSlotDTO = context.get("slot", null)
 	var target_world_id: String = String(context.get("target_world_id", ""))
-	var allow_default_fallback: bool = bool(context.get("allow_default_fallback", true))
+	var should_allow_default_fallback: bool = bool(context.get("allow_default_fallback", true))
 
 	if account == null:
 		return {"success": false, "error_code": "ERR_ACCOUNT_MISSING", "message": "Account aggregate root missing"}
 	if slot == null:
 		return {"success": false, "error_code": "ERR_SLOT_MISSING", "message": "Target save slot summary missing"}
 
-	var world_validation := validate_world_slot(account, target_world_id, allow_default_fallback)
+	var world_validation := validate_world_slot(account, target_world_id, should_allow_default_fallback)
 	if not bool(world_validation.get("success", false)):
 		return world_validation
 	var effective_world_id: String = world_validation["world_id"]
 
-	var path: int = evaluate_entry_path(slot)
+	var entry_path_type: int = evaluate_entry_path(slot)
 	var load_result: Dictionary = {}
 
-	if path == ENTRY_PATH_PROLOGUE_REPLAY:
-		load_result = _execute_prologue_replay_branch(account, slot, context, allow_default_fallback)
+	if entry_path_type == ENTRY_PATH_PROLOGUE_REPLAY:
+		load_result = _execute_prologue_replay_branch(account, slot, context, should_allow_default_fallback)
 	else:
 		load_result = _execute_direct_restore_branch(slot)
 
@@ -165,10 +165,10 @@ static func get_esc_menu_options() -> Array[Dictionary]:
 static func execute_esc_exit(
 	slot_id: String,
 	providers: Dictionary = {},
-	allow_default_fallback: bool = true
+	should_allow_default_fallback: bool = true
 ) -> GameShutdownDTO.Response:
 	var shutdown_request := GameShutdownDTO.Request.new()
 	shutdown_request.exit_reason = GameLifecycleModel.ExitReason.USER_DESKTOP_QUIT
 	shutdown_request.target_save_slot = slot_id
 	shutdown_request.idempotency_key = "ESC_EXIT_" + slot_id + "_" + str(Time.get_ticks_usec())
-	return GameLifecycleService.execute_graceful_shutdown(shutdown_request, providers, allow_default_fallback)
+	return GameLifecycleService.execute_graceful_shutdown(shutdown_request, providers, should_allow_default_fallback)

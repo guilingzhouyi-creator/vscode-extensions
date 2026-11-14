@@ -20,21 +20,21 @@ static func list_realms(account_id: String = "") -> Array[Dictionary]:
 	var results: Array[Dictionary] = []
 	var raw_catalog: Dictionary = GameConfig.get_dict("domains.world_gateway", "worlds_catalog", {})
 
-	for wid in raw_catalog.keys():
-		var raw: Dictionary = raw_catalog[wid]
-		if int(raw.get("mode", 0)) != WorldGatewayModel.GameMode.MULTIPLAYER:
+	for world_id in raw_catalog.keys():
+		var raw_world_config: Dictionary = raw_catalog[world_id]
+		if int(raw_world_config.get("mode", 0)) != WorldGatewayModel.GameMode.MULTIPLAYER:
 			continue
 
-		var is_active: bool = bool(raw.get("is_active", false))
-		var canary_tag: String = str(raw.get("canary_feature_tag", ""))
-		var card := {
-			"realm_id": str(wid),
-			"realm_name": str(raw.get("world_name", wid)),
+		var is_active: bool = bool(raw_world_config.get("is_active", false))
+		var canary_tag: String = str(raw_world_config.get("canary_feature_tag", ""))
+		var realm_card := {
+			"realm_id": str(world_id),
+			"realm_name": str(raw_world_config.get("world_name", world_id)),
 			"ping_ms": DEFAULT_REALM_PING_MS,
 			"status": "ONLINE" if is_active else "MAINTENANCE",
 			"is_canary": not canary_tag.is_empty()
 		}
-		results.append(card)
+		results.append(realm_card)
 
 	if results.is_empty():
 		results = _create_fallback_realms()

@@ -58,16 +58,16 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从字典还原构建 DTO 实例
-static func from_dto(data: Dictionary) -> ModeReadinessReportDTO:
-	if data.is_empty():
+static func from_dto(serialized_payload: Dictionary) -> ModeReadinessReportDTO:
+	if serialized_payload.is_empty():
 		return ModeReadinessReportDTO.new()
 	var report := ModeReadinessReportDTO.new()
-	report.mode = int(data.get("mode", 0))
-	report.is_ready = bool(data.get("is_ready", false))
-	report.status_code = String(data.get("status_code", ""))
-	report.message = String(data.get("message", ""))
-	report.latency_ms = int(data.get("latency_ms", 0))
-	var raw_capabilities: Variant = data.get("capabilities", [])
+	report.mode = int(serialized_payload.get("mode", 0))
+	report.is_ready = bool(serialized_payload.get("is_ready", false))
+	report.status_code = String(serialized_payload.get("status_code", ""))
+	report.message = String(serialized_payload.get("message", ""))
+	report.latency_ms = int(serialized_payload.get("latency_ms", 0))
+	var raw_capabilities: Variant = serialized_payload.get("capabilities", [])
 	if raw_capabilities is Array:
 		report.capabilities = (raw_capabilities as Array).duplicate()
 	else:

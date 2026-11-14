@@ -34,16 +34,16 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从字典重建档位状态（空字典回退默认开档态）
-static func from_dto(data: Dictionary) -> SaveSlotStateDTO:
+static func from_dto(serialized_payload: Dictionary) -> SaveSlotStateDTO:
 	var slot_state := SaveSlotStateDTO.new()
-	if data.is_empty():
+	if serialized_payload.is_empty():
 		return slot_state
-	slot_state.slot_id = str(data.get("slot_id", ""))
-	slot_state.account_id = str(data.get("account_id", ""))
-	slot_state.bound_world_id = str(data.get("bound_world_id", ""))
-	slot_state.bound_character_id = str(data.get("bound_character_id", ""))
-	slot_state.is_occupied = bool(data.get("is_occupied", false))
-	slot_state.is_first_creation = bool(data.get("is_first_creation", true))
-	slot_state.created_timestamp_utc = int(data.get("created_timestamp_utc", 0))
-	slot_state.last_played_timestamp_utc = int(data.get("last_played_timestamp_utc", 0))
+	slot_state.slot_id = str(serialized_payload.get("slot_id", ""))
+	slot_state.account_id = str(serialized_payload.get("account_id", ""))
+	slot_state.bound_world_id = str(serialized_payload.get("bound_world_id", ""))
+	slot_state.bound_character_id = str(serialized_payload.get("bound_character_id", ""))
+	slot_state.is_occupied = bool(serialized_payload.get("is_occupied", false))
+	slot_state.is_first_creation = bool(serialized_payload.get("is_first_creation", true))
+	slot_state.created_timestamp_utc = int(serialized_payload.get("created_timestamp_utc", 0))
+	slot_state.last_played_timestamp_utc = int(serialized_payload.get("last_played_timestamp_utc", 0))
 	return slot_state

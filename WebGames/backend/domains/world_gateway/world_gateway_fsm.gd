@@ -14,6 +14,7 @@ extends RefCounted
 const AccountSlotBindingSolver = preload("res://backend/domains/account/account_slot_binding_solver.gd")
 const WorldModAffinityManager = preload("res://backend/domains/narrative_orchestration/world_mod_affinity_manager.gd")
 const ModPackageDiscoverySolver = preload("res://backend/domains/narrative_orchestration/mod_package_discovery_solver.gd")
+const Tier3ContentOverrideLoader = preload("res://backend/domains/narrative_orchestration/tier3_content_override_loader.gd")
 const RuntimeModeGate = preload("res://backend/domains/persistence_protocol/runtime_mode_gate.gd")
 const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
 const WorldGatewayWorldCatalogHelper = preload("res://backend/domains/world_gateway/world_gateway_world_catalog_helper.gd")
@@ -62,29 +63,47 @@ func precheck_and_configure_single_player_mods(candidate_packs: Array, enabled_p
         adapted_mod_manifest.clear()
         creation_ui_snapshot.clear()
         var error_code: String = str(precheck_result.get("error_code", precheck_result.get("error", "ERR_MOD_PRECHECK_FAILED")))
-        var fail_dict: Dictionary = precheck_result.duplicate(true)
-        fail_dict["success"] = false
-        fail_dict["error_code"] = error_code
-        fail_dict["error"] = error_code
-        if not fail_dict.has("precheck_checklist"):
-            fail_dict["precheck_checklist"] = []
-        if not fail_dict.has("conflicts"):
-            fail_dict["conflicts"] = []
-        return fail_dict
+        var failure_payload: Dictionary = precheck_result.duplicate(true)
+        failure_payload["success"] = false
+        failure_payload["error_code"] = error_code
+        failure_payload["error"] = error_code
+        if not failure_payload.has("precheck_checklist"):
+            failure_payload["precheck_checklist"] = []
+        if not failure_payload.has("conflicts"):
+            failure_payload["conflicts"] = []
+        return failure_payload
 
     var raw_manifest: Variant = precheck_result.get("adapted_manifest", {})
     adapted_mod_manifest = (raw_manifest as Dictionary).duplicate(true) if raw_manifest is Dictionary else {}
-    var raw_ui_snapshot: Variant = precheck_result.get("creation_ui_snapshot", {})
-    creation_ui_snapshot = (raw_ui_snapshot as Dictionary).duplicate(true) if raw_ui_snapshot is Dictionary else {}
+    var raw_creation_ui_snapshot: Variant = precheck_result.get("creation_ui_snapshot", {})
+    creation_ui_snapshot = (raw_creation_ui_snapshot as Dictionary).duplicate(true) if raw_creation_ui_snapshot is Dictionary else {}
     var raw_enabled: Variant = precheck_result.get("enabled_pack_ids", [])
     active_mods = (raw_enabled as Array).duplicate(true) if raw_enabled is Array else []
+
+    var enabled_packages := _collect_enabled_candidate_packages(candidate_packs, active_mods)
+    var tier3_summary: Dictionary = Tier3ContentOverrideLoader.apply_enabled_packages(enabled_packages)
+    var enriched_result: Dictionary = precheck_result.duplicate(true)
+    enriched_result["tier3_overlay_summary"] = tier3_summary
 
     _notify_event("world_gateway.mods_prechecked", {
         "account_id": context.account_id,
         "enabled_pack_ids": active_mods,
-        "precheck_checklist": precheck_result.get("precheck_checklist", [])
+        "precheck_checklist": precheck_result.get("precheck_checklist", []),
+        "tier3_overlay_summary": tier3_summary
     })
-    return precheck_result
+    return enriched_result
+
+static func _collect_enabled_candidate_packages(candidate_packs: Array, enabled_pack_identifiers: Array) -> Array:
+    var enabled_packages: Array = []
+    for raw_pack in candidate_packs:
+        var pack_identifier: String = ""
+        if raw_pack is Dictionary:
+            pack_identifier = String((raw_pack as Dictionary).get("pack_id", "")).strip_edges()
+        elif raw_pack is Object and raw_pack.get("pack_id") != null:
+            pack_identifier = String(raw_pack.get("pack_id")).strip_edges()
+        if not pack_identifier.is_empty() and enabled_pack_identifiers.has(pack_identifier):
+            enabled_packages.append(raw_pack)
+    return enabled_packages
 
 ## 扫描并配置单机模式显性 MOD（三级级联全包扫描与预检适配）
 func discover_and_configure_single_player_mods(custom_roots: Array = [], enabled_pack_ids: Array = ["*"]) -> Dictionary:
@@ -96,8 +115,9 @@ func discover_and_configure_single_player_mods(custom_roots: Array = [], enabled
     var candidates: Array[Dictionary] = ModPackageDiscoverySolver.scan_installed_full_mod_packages(custom_roots)
     return precheck_and_configure_single_player_mods(candidates, enabled_pack_ids)
 
-## 强制净化卸载本地第三方模组并回退 Vanilla 原生核心及重置清理内存
+## 强制卸载本地第三方模组并恢复 Vanilla 基础核心及清理运行时覆盖层
 func purge_and_fallback_to_vanilla() -> void:
+    Tier3ContentOverrideLoader.revert_all_overrides()
     var cleaned_mods: Array = []
     for mod_entry in active_mods:
         if AntiBridgeGuard.is_vanilla_pack(mod_entry):
@@ -268,9 +288,9 @@ func attach_ready_character(character_id: String) -> Dictionary:
     return {"success": true, "phase": context.current_phase, "context": context.to_dto()}
 
 ## 4. 正式进入具体游戏世界（校验 MOD 锁文件并同化虚空扰动）
-func enter_world(target_world_id: String = "", allow_safe_degrade: bool = false) -> Dictionary:
-    var allow_bypass: bool = GameConfig.get_bool("domains.world_gateway", "gateway_policy/allow_direct_world_bypass", false)
-    if not allow_bypass and context.current_phase != WorldGatewayModel.GatewayPhase.WORLD_ENTRY_PERMITTED:
+func enter_world(target_world_id: String = "", should_allow_safe_degrade: bool = false) -> Dictionary:
+    var is_bypass_allowed: bool = GameConfig.get_bool("domains.world_gateway", "gateway_policy/allow_direct_world_bypass", false)
+    if not is_bypass_allowed and context.current_phase != WorldGatewayModel.GatewayPhase.WORLD_ENTRY_PERMITTED:
         return _fail(
             "DIRECT_WORLD_BYPASS_BLOCKED",
             "Direct world entry without gateway initialization is blocked; current phase: {current_phase}.",
@@ -293,7 +313,7 @@ func enter_world(target_world_id: String = "", allow_safe_degrade: bool = false)
         if context.selected_mode == WorldGatewayModel.GameMode.SINGLE_PLAYER or context.selected_mode == WorldGatewayModel.GameMode.UNSELECTED:
             var installed_packs: Array = ModPackageDiscoverySolver.scan_installed_packs()
             var affinity_manager := WorldModAffinityManager.new()
-            var verify_result := affinity_manager.verify_and_bind_world_mods(effective_world_id, installed_packs, allow_safe_degrade)
+            var verify_result := affinity_manager.verify_and_bind_world_mods(effective_world_id, installed_packs, should_allow_safe_degrade)
             if not bool(verify_result.get("success", false)):
                 return _fail(
                     str(verify_result.get("error", "ERR_MISSING_CRITICAL_MOD")),
@@ -338,13 +358,13 @@ func _populate_existing_character_context(hud_context: Dictionary) -> void:
     _populate_account_slot_context(hud_context)
 
 
-func _populate_world_instance_context(hud_context: Dictionary, ensure_loaded: bool) -> void:
+func _populate_world_instance_context(hud_context: Dictionary, should_ensure_loaded: bool) -> void:
     if context.selected_world_id.is_empty():
         return
     var world_repository := WorldArchiveRepository.get_instance()
     if world_repository == null:
         return
-    if ensure_loaded and not world_repository.is_loaded():
+    if should_ensure_loaded and not world_repository.is_loaded():
         world_repository.load_all()
     var world_instance := world_repository.load_world(context.selected_world_id)
     if world_instance != null:
@@ -567,7 +587,7 @@ func switch_gateway_mode(target_mode: int, canary_flags: Dictionary = {}, accoun
 ## 7. 查询当前可用的世界档案与目录摘要列表
 func list_world_archives() -> Array[Dictionary]:
     var worlds_catalog := WorldGatewayWorldCatalogHelper.load_worlds_catalog()
-    var result: Array[Dictionary] = []
+    var archive_entries: Array[Dictionary] = []
     var registered_world_ids: Dictionary = {}
     var archive_repository := WorldArchiveRepository.get_instance()
     if archive_repository != null:
@@ -575,32 +595,32 @@ func list_world_archives() -> Array[Dictionary]:
             archive_repository.load_all()
         var empty_summary: Dictionary = {}
         for archive_summary in archive_repository.list_worlds():
-            var archive_summary_dict: Dictionary = archive_summary.to_dto() if (archive_summary != null and archive_summary.has_method("to_dto")) else empty_summary
-            var archive_world_id := String(archive_summary_dict.get("world_id", ""))
+            var archive_summary_payload: Dictionary = archive_summary.to_dto() if (archive_summary != null and archive_summary.has_method("to_dto")) else empty_summary
+            var archive_world_id := String(archive_summary_payload.get("world_id", ""))
             if archive_world_id.is_empty():
                 continue
             registered_world_ids[archive_world_id] = true
-            result.append(archive_summary_dict)
+            archive_entries.append(archive_summary_payload)
     for world_id in worlds_catalog.keys():
         if registered_world_ids.has(world_id):
             continue
         var world_entry: Variant = worlds_catalog[world_id]
-        result.append(_format_catalog_archive_entry(world_id, world_entry))
-    return result
+        archive_entries.append(_format_catalog_archive_entry(world_id, world_entry))
+    return archive_entries
 
-func _format_catalog_archive_entry(world_id: Variant, world_instance_dto: Variant) -> Dictionary:
-    if world_instance_dto != null and world_instance_dto.has_method("to_dto"):
-        return world_instance_dto.to_dto()
+func _format_catalog_archive_entry(world_id: Variant, world_instance: Variant) -> Dictionary:
+    if world_instance != null and world_instance.has_method("to_dto"):
+        return world_instance.to_dto()
     return {"world_id": world_id}
 
 func _notify_event(channel: String, payload: Dictionary) -> void:
     EventBusCore.get_instance().emit_domain_event(channel, payload)
 
-func _fail(error_code: String, template_message: String, format_params: Dictionary = {}) -> Dictionary:
-    var formatted_message: String = TemplateFormatter.format(template_message, format_params) if not format_params.is_empty() else template_message
+func _fail(error_code: String, template_message: String, format_parameters: Dictionary = {}) -> Dictionary:
+    var formatted_message: String = TemplateFormatter.format(template_message, format_parameters) if not format_parameters.is_empty() else template_message
     var error_context: Dictionary = context.to_dto()
-    for key in format_params:
-        error_context[str(key)] = format_params[key]
+    for key in format_parameters:
+        error_context[str(key)] = format_parameters[key]
     ErrorReporter.emit_error("world_gateway", error_code, formatted_message, error_context)
     return {
         "success": false,

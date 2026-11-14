@@ -91,21 +91,21 @@ static func resolve_mode_entry(
 
 
 static func _check_slot_affinity_for_multiplayer(account_slots: Array, target_slot_id: String, target_mode: int) -> Dictionary:
-	for item in account_slots:
-		if item is SaveSlotStateDTO and item.slot_id == target_slot_id:
-			var is_sp_slot: bool = item.slot_id.begins_with("SLOT_SP_") \
-				or item.bound_world_id.begins_with("WORLD_DEFAULT_SP_") \
-				or item.bound_world_id.begins_with("WORLD_SP_")
-			var slot_mode: int = WorldGatewayModel.GameMode.SINGLE_PLAYER if is_sp_slot else WorldGatewayModel.GameMode.MULTIPLAYER
+	for slot_entry in account_slots:
+		if slot_entry is SaveSlotStateDTO and slot_entry.slot_id == target_slot_id:
+			var is_single_player_slot: bool = slot_entry.slot_id.begins_with("SLOT_SP_") \
+				or slot_entry.bound_world_id.begins_with("WORLD_DEFAULT_SP_") \
+				or slot_entry.bound_world_id.begins_with("WORLD_SP_")
+			var slot_mode: int = WorldGatewayModel.GameMode.SINGLE_PLAYER if is_single_player_slot else WorldGatewayModel.GameMode.MULTIPLAYER
 			return AntiBridgeGuard.validate_slot_mode_affinity(slot_mode, target_mode)
 	return {"allowed": true, "error_code": "", "message": ""}
 
 
 static func _resolve_multiplayer_entry(account_id: String, canary_flags: Dictionary, routing_result: RoutingResultDTO) -> RoutingResultDTO:
-	var multiplayer_flag: Variant = canary_flags.get("FEATURE_MULTIPLAYER_GATEWAY", null)
+	var multiplayer_feature: Variant = canary_flags.get("FEATURE_MULTIPLAYER_GATEWAY", null)
 	var is_enabled := false
-	if multiplayer_flag != null and CanaryRolloutSolver != null:
-		is_enabled = CanaryRolloutSolver.is_feature_enabled_for_account(multiplayer_flag, account_id)
+	if multiplayer_feature != null and CanaryRolloutSolver != null:
+		is_enabled = CanaryRolloutSolver.is_feature_enabled_for_account(multiplayer_feature, account_id)
 	if not is_enabled:
 		routing_result.error_code = "GATEWAY_ERR_MULTIPLAYER_DISABLED"
 		routing_result.message = TemplateFormatter.format(
@@ -148,18 +148,18 @@ static func _resolve_single_player_entry(
 		return routing_result
 
 	var effective_world_id := target_world_id if not target_world_id.is_empty() else GameConfig.get_string("domains.world_gateway", "single_player/default_world_id", "WORLD_DEFAULT_SP_01")
-	var world_dto: WorldInstanceDTO = all_worlds.get(effective_world_id, null)
+	var world_instance: WorldInstanceDTO = all_worlds.get(effective_world_id, null)
 
 	# 动态持久化世界档案解析：若静态配置表中未显式登记，动态查询 WorldArchiveRepository
-	if world_dto == null:
-		world_dto = _resolve_world_from_repository(effective_world_id)
+	if world_instance == null:
+		world_instance = _resolve_world_from_repository(effective_world_id)
 
-	if world_dto == null:
+	if world_instance == null:
 		routing_result.error_code = "GATEWAY_ERR_DEFAULT_WORLD_NOT_FOUND"
 		routing_result.message = GameConfig.msg_fmt("world_gateway", "world_data_missing", {"world_id": effective_world_id})
 		return routing_result
 
-	routing_result.resolved_world = world_dto
+	routing_result.resolved_world = world_instance
 	var effective_slots := _resolve_effective_slots(account_id, effective_world_id, account_slots, canary_flags, target_slot_id, routing_result)
 	if effective_slots.is_empty():
 		return routing_result
@@ -181,13 +181,13 @@ static func _resolve_world_from_repository(world_id: String) -> WorldInstanceDTO
 	if summary == null:
 		return null
 
-	var instance_dto := WorldInstanceDTO.new()
-	instance_dto.world_id = summary.world_id
-	instance_dto.world_name = summary.world_name
-	instance_dto.mode = summary.mode
-	instance_dto.seed_value = summary.seed_value
-	instance_dto.is_active = summary.is_active
-	return instance_dto
+	var world_instance := WorldInstanceDTO.new()
+	world_instance.world_id = summary.world_id
+	world_instance.world_name = summary.world_name
+	world_instance.mode = summary.mode
+	world_instance.seed_value = summary.seed_value
+	world_instance.is_active = summary.is_active
+	return world_instance
 
 
 static func _resolve_effective_slots(
@@ -210,15 +210,15 @@ static func _resolve_effective_slots(
 		default_slot.created_timestamp_utc = int(Time.get_unix_time_from_system())
 		return [default_slot]
 
-	var multislot_flag: Variant = canary_flags.get("FEATURE_MULTI_SLOT", null)
+	var multislot_feature: Variant = canary_flags.get("FEATURE_MULTI_SLOT", null)
 	var can_multislot := false
-	if multislot_flag != null and CanaryRolloutSolver != null:
-		can_multislot = CanaryRolloutSolver.is_feature_enabled_for_account(multislot_flag, account_id)
+	if multislot_feature != null and CanaryRolloutSolver != null:
+		can_multislot = CanaryRolloutSolver.is_feature_enabled_for_account(multislot_feature, account_id)
 
 	if not target_slot_id.is_empty():
-		for item in account_slots:
-			if item is SaveSlotStateDTO and item.slot_id == target_slot_id:
-				return [item]
+		for slot_entry in account_slots:
+			if slot_entry is SaveSlotStateDTO and slot_entry.slot_id == target_slot_id:
+				return [slot_entry]
 		routing_result.error_code = "GATEWAY_ERR_SLOT_NOT_FOUND"
 		routing_result.message = GameConfig.msg_fmt("world_gateway", "slot_not_found", {"slot_id": target_slot_id})
 		return []
