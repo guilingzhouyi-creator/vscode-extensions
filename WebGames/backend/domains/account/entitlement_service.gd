@@ -15,7 +15,7 @@ class_name EntitlementService extends RefCounted
 # ==============================================================================
 
 ## 统一鉴权入口：账号是否具备某模式/版本/授权（可扩展，不固化商业划分）
-static func has_entitlement(account: AccountProfileAggregate, entitlement: String) -> bool:
+static func has_entitlement(account: AccountProfile, entitlement: String) -> bool:
 	if account == null or entitlement.is_empty():
 		return false
 	return account.entitlements.has(entitlement)
@@ -32,15 +32,15 @@ static func filter_allowed(entitlements: Array) -> Array:
 	var allowed: Array = GameConfig.get_array("domains.account", "entitlements/allowed", [])
 	if allowed.is_empty():
 		return entitlements
-	var out: Array = []
-	for e in entitlements:
-		if allowed.has(e):
-			out.append(e)
-	out.sort()
-	return out
+	var filtered_entitlements: Array = []
+	for entitlement in entitlements:
+		if allowed.has(entitlement):
+			filtered_entitlements.append(entitlement)
+	filtered_entitlements.sort()
+	return filtered_entitlements
 
 ## 追加资格（白名单校验通过且未持有才追加；非法资格拒绝）
-static func add_entitlement(account: AccountProfileAggregate, entitlement: String) -> bool:
+static func add_entitlement(account: AccountProfile, entitlement: String) -> bool:
 	if account == null or not is_valid_entitlement(entitlement):
 		return false
 	if not has_entitlement(account, entitlement):
@@ -48,7 +48,7 @@ static func add_entitlement(account: AccountProfileAggregate, entitlement: Strin
 	return true
 
 ## 移除资格（幂等；空列表或未持有返回 true 无操作语义——erase 天然幂等）
-static func remove_entitlement(account: AccountProfileAggregate, entitlement: String) -> bool:
+static func remove_entitlement(account: AccountProfile, entitlement: String) -> bool:
 	if account == null or account.entitlements.is_empty():
 		return false
 	account.entitlements.erase(entitlement)
@@ -67,13 +67,13 @@ static func _seal_key_id() -> String:
 	return GameConfig.get_string(LogConstants.CFG_ADMIN_TABLE, LogConstants.CFG_PATH_SECURITY_SEAL_ID, "")
 
 ## 规范化载荷：账号 ID + 白名单过滤后排序权限列表（顺序无关，防误报篡改）
-static func _canonical_payload(account: AccountProfileAggregate) -> String:
+static func _canonical_payload(account: AccountProfile) -> String:
 	var sorted_list: Array = filter_allowed(account.entitlements.duplicate())
 	sorted_list.sort()
 	return account.account_id + ":" + ",".join(sorted_list)
 
 ## 生成权限指纹（安全存储）：HMAC-SHA256 摘要 + 密钥 ID 版本前缀（v2:）
-static func seal_entitlements(account: AccountProfileAggregate) -> String:
+static func seal_entitlements(account: AccountProfile) -> String:
 	if account == null:
 		return ""
 	var key := CryptoIntegrityLib.resolve_seal_key_bytes(LogConstants.CFG_ADMIN_TABLE, LogConstants.CFG_PATH_SECURITY_SEAL_ENV)
@@ -85,7 +85,7 @@ static func seal_entitlements(account: AccountProfileAggregate) -> String:
 	return "v2:%s:%s" % [_seal_key_id(), mac_hex]
 
 ## 校验权限指纹是否被篡改（常量时间比对，防御时序侧信道攻击）
-static func verify_seal(account: AccountProfileAggregate, recorded_seal: String) -> bool:
+static func verify_seal(account: AccountProfile, recorded_seal: String) -> bool:
 	if account == null or recorded_seal.is_empty():
 		return false
 	return CryptoIntegrityLib.constant_time_equals(seal_entitlements(account), recorded_seal)

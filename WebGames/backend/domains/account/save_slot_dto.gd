@@ -7,8 +7,8 @@
 # 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
-## SaveSlotSummaryDTO：Value Object DTO / Data Transport Model
-class_name SaveSlotSummaryDTO extends PoolableDtoBase
+## SaveSlotDTO：Value Object DTO / Data Transport Model
+class_name SaveSlotDTO extends PoolableDtoBase
 
 const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
 
@@ -72,8 +72,8 @@ func serialize() -> Dictionary:
 	}
 
 ## 反序列化：缺键一律沿用字段初值（即 save_slot/defaults 配置缺省），默认值单点化于此
-static func deserialize(slot_dict: Dictionary) -> SaveSlotSummaryDTO:
-	var slot_dto := SaveSlotSummaryDTO.new()
+static func deserialize(slot_dict: Dictionary) -> SaveSlotDTO:
+	var slot_dto := SaveSlotDTO.new()
 	slot_dto.slot_id = slot_dict.get("slot_id", slot_dto.slot_id)
 	slot_dto.character_name = slot_dict.get("character_name", slot_dto.character_name)
 	slot_dto.title_prefix = slot_dict.get("title_prefix", slot_dto.title_prefix)

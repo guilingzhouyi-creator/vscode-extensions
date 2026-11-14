@@ -37,22 +37,22 @@ class Request extends PoolableDtoBase:
 		}
 
 	## 从输入字典填充注册请求基础字段（供子类复用，避免重复解析逻辑）
-	static func populate_from_dict(req: Request, data: Dictionary) -> void:
-		if req == null:
+	static func populate_from_dict(request: Request, data: Dictionary) -> void:
+		if request == null:
 			return
-		req.username = str(data.get("username", "")).strip_edges()
-		req.password_plain = str(data.get("password_plain", ""))
-		req.device_fingerprint = str(data.get("device_fingerprint", ""))
-		var raw_ent: Variant = data.get("initial_entitlements", [])
-		if raw_ent is Array:
-			for item in (raw_ent as Array):
-				req.initial_entitlements.append(str(item))
+		request.username = str(data.get("username", "")).strip_edges()
+		request.password_plain = str(data.get("password_plain", ""))
+		request.device_fingerprint = str(data.get("device_fingerprint", ""))
+		var raw_entitlements: Variant = data.get("initial_entitlements", [])
+		if raw_entitlements is Array:
+			for item in (raw_entitlements as Array):
+				request.initial_entitlements.append(str(item))
 
 	## 从输入字典反序列化还原传输对象
 	static func from_dto(data: Dictionary) -> Request:
-		var req := Request.new()
-		populate_from_dict(req, data)
-		return req
+		var request := Request.new()
+		populate_from_dict(request, data)
+		return request
 
 ## 注册响应载荷（仅身份信息，无任何口令/哈希痕迹）
 class Response extends PoolableDtoBase:
@@ -60,8 +60,8 @@ class Response extends PoolableDtoBase:
 	var is_success: bool:
 		get:
 			return success
-		set(val):
-			success = val
+		set(value):
+			success = value
 	var error_code: String = "OK"
 	var account_id: String = ""
 	var username: String = ""
@@ -88,17 +88,17 @@ class Response extends PoolableDtoBase:
 		}
 
 	## 从输入字典填充响应基础字段（供子类复用，避免重复反序列化）
-	static func populate_from_dict(resp: Response, data: Dictionary) -> void:
-		if resp == null:
+	static func populate_from_dict(response: Response, data: Dictionary) -> void:
+		if response == null:
 			return
-		resp.success = bool(data.get("success", false))
-		resp.error_code = str(data.get("error_code", "OK"))
-		resp.account_id = str(data.get("account_id", ""))
-		resp.username = str(data.get("username", ""))
-		resp.created_timestamp_utc = int(data.get("created_timestamp_utc", 0))
+		response.success = bool(data.get("success", false))
+		response.error_code = str(data.get("error_code", "OK"))
+		response.account_id = str(data.get("account_id", ""))
+		response.username = str(data.get("username", ""))
+		response.created_timestamp_utc = int(data.get("created_timestamp_utc", 0))
 
 	## 从输入字典反序列化还原传输对象
 	static func from_dto(data: Dictionary) -> Response:
-		var resp := Response.new()
-		populate_from_dict(resp, data)
-		return resp
+		var response := Response.new()
+		populate_from_dict(response, data)
+		return response

@@ -11,7 +11,7 @@
 class_name AccountSlotCreationDTO
 extends RefCounted
 
-var account: AccountProfileAggregate = null
+var account: AccountProfile = null
 var slot_id: String = ""
 var character_name: String = ""
 var title_prefix: String = ""
