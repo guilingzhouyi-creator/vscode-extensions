@@ -68,16 +68,19 @@ function acquireDaemonPidLock(repoRoot) {
 }
 
 function renderAsyncAuditMarkdown(envelope) {
+  const { renderEloc5dMarkdown } = require('./workspace-eloc-rollup');
   const td = envelope.tenDimensions || {};
   const qm = envelope.quantMetrics || {};
   const dimRows = TEN_DIM_ORDER.map((key) => `| ${key} | ${formatScore(td[key])} |`);
+  const evalLabel = Number.isInteger(td.evaluatedDimensions) ? `${td.evaluatedDimensions}/10` : '10/10';
+  const elocLines = renderEloc5dMarkdown(envelope.eloc5dSummary);
   return [
     '# Async Auto-Audit Snapshot',
     '',
     `- **Timestamp**: ${envelope.timestamp}`,
     `- **Mode**: ${envelope.mode}`,
     `- **HEAD**: \`${envelope.headOid || 'unborn'}\``,
-    `- **Composite Score**: **${formatScore(td.compositeScore)}** (Grade: **${td.grade || 'N/A'}**)`,
+    `- **Composite Score**: **${formatScore(td.compositeScore)}** (Grade: **${td.grade || 'N/A'}**, Evaluated: ${evalLabel})`,
     `- **Workspace Health**: ${formatScore(qm.workspaceHealthScore)} | **Polyglot**: ${formatScore(qm.polyglotIndex)} | **Autonomy (CAI)**: ${formatScore((qm.autonomyRate ?? 0) * PERCENT_MULTIPLIER)}%`,
     `- **SQALE Debt**: ${formatScore(qm.sqaleMinutes)} min (TDR: ${formatScore(qm.tdr)}%)`,
     `- **Auto-Commit**: ${envelope.autoCommitStatus?.action || 'skipped'} (${envelope.autoCommitStatus?.reason || 'none'})`,
@@ -92,6 +95,7 @@ function renderAsyncAuditMarkdown(envelope) {
     '',
     `- \`RCR\`: ${formatScore(qm.rcr)} | \`ERQ\`: ${formatScore(qm.erq)} | \`DDR\`: ${formatScore(qm.ddr)} | \`EDB95\`: ${formatScore(qm.edb95)}`,
     `- \`PTD\`: ${formatScore(qm.ptd)} | \`DSI\`: ${formatScore(qm.dsi)} | \`RCD\`: ${formatScore(qm.rcd)} | \`EHL\`: ${formatScore(qm.ehl)}`,
+    ...elocLines,
   ].join('\n') + '\n';
 }
 
@@ -104,6 +108,7 @@ function appendBoundedHistory(logDir, envelope, maxHistory) {
     fingerprint: envelope.fingerprint,
     tenDimensions: envelope.tenDimensions,
     quantMetrics: envelope.quantMetrics,
+    eloc5dDiff: envelope.eloc5dSummary?.currentDiff || null,
     autoCommitStatus: envelope.autoCommitStatus,
   });
   const lines = fs.existsSync(historyPath)

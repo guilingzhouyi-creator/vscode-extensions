@@ -114,8 +114,25 @@ async function runTests() {
     fs.writeFileSync(trackedGov, sentinelGov, 'utf8');
     const completed = await runAsyncAuditCycle(repo, { noAutoCommit: true });
     check('async cycle completes cleanly', completed.status === 'completed');
+    check(
+      'async cycle evaluates all 10 raw dimensions cleanly',
+      completed.envelope?.rawTenDimensions?.evaluatedDimensions === 10 &&
+        typeof completed.envelope?.tenDimensions?.compositeScore === 'number',
+      JSON.stringify(completed.envelope?.tenDimensions),
+    );
+    check(
+      'async cycle attaches live 5D ELOC cumulative summary',
+      Boolean(completed.envelope?.eloc5dSummary?.available) &&
+        Number(completed.envelope?.eloc5dSummary?.liveCodebase?.eloc || 0) > 0,
+      JSON.stringify(completed.envelope?.eloc5dSummary?.currentDiff),
+    );
     check('latest json written to .audit-logs', fs.existsSync(path.join(logDir, FILE_LATEST_JSON)));
-    check('latest markdown written to .audit-logs', fs.existsSync(path.join(logDir, FILE_LATEST_MD)));
+    const latestMdPath = path.join(logDir, FILE_LATEST_MD);
+    check('latest markdown written to .audit-logs', fs.existsSync(latestMdPath));
+    check(
+      'latest markdown includes 5D ELOC cumulative report section',
+      fs.readFileSync(latestMdPath, 'utf8').includes('5D ELOC'),
+    );
     check(
       'tracked governance-supervisor.json untouched',
       fs.readFileSync(trackedGov, 'utf8') === sentinelGov,

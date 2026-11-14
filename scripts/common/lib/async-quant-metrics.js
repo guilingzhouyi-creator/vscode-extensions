@@ -52,26 +52,34 @@ function firstFinite(candidates, fallback = 0) {
  */
 function extractTenDimensions(report) {
   const qs = report && report.qualityScore ? report.qualityScore : {};
-  const idx = qs.indices || {};
+  const idx = report?.governance?.tenDimensions || qs.indices || {};
   const dims = {};
+  let evaluatedCount = 0;
   for (const key of TEN_DIM_KEYS) {
+    if (idx[key] !== undefined && idx[key] !== null && Number.isFinite(Number(idx[key]))) {
+      evaluatedCount += 1;
+    }
     dims[key] = firstFinite([idx[key]], DEFAULT_DIMENSION_SCORE);
   }
-  dims.compositeScore = firstFinite([qs.compositeScore], DEFAULT_DIMENSION_SCORE);
-  dims.grade = String(qs.grade || 'A+');
+  dims.compositeScore = firstFinite(
+    [report?.governance?.hierarchicalCompositeScore, qs.compositeScore],
+    DEFAULT_DIMENSION_SCORE,
+  );
+  dims.grade = String(report?.governance?.grade || qs.grade || 'A+');
+  dims.evaluatedDimensions = evaluatedCount;
   return dims;
 }
 
-function readOptionalQuantSources(repoRoot) {
+async function readOptionalQuantSources(repoRoot) {
   let wsQuant = null;
   let polyglot = null;
   try {
-    wsQuant = evaluateWorkspaceQuant({ root: repoRoot });
+    wsQuant = evaluateWorkspaceQuant(repoRoot);
   } catch (err) {
     wsQuant = { error: err instanceof Error ? err.message : String(err) };
   }
   try {
-    polyglot = evaluateWorkspacePolyglotBalance({ root: repoRoot });
+    polyglot = await evaluateWorkspacePolyglotBalance({ fast: true });
   } catch (err) {
     polyglot = { error: err instanceof Error ? err.message : String(err) };
   }
@@ -96,18 +104,18 @@ function computeAutonomyRate(report) {
  * @param {string} repoRoot - Repository root directory.
  * @param {object} report - ScanReport from snapshot scan.
  * @param {object} tenDimensions - Extracted 10D breakdown.
- * @returns {object} Closed QuantMetrics payload matching `quality-evidence.schema.json`.
+ * @returns {Promise<object>} Closed QuantMetrics payload matching `quality-evidence.schema.json`.
  */
-function buildQuantMetrics(repoRoot, report, tenDimensions) {
+async function buildQuantMetrics(repoRoot, report, tenDimensions) {
   const qs = report && report.qualityScore ? report.qualityScore : {};
   const debt = qs.technicalDebt || {};
   const reportQuant = qs.quant || {};
-  const { wsQuant, polyglot } = readOptionalQuantSources(repoRoot);
+  const { wsQuant, polyglot } = await readOptionalQuantSources(repoRoot);
 
-  const fin = wsQuant?.financial || reportQuant.financial || {};
-  const risk = wsQuant?.riskRatios || reportQuant.riskRatios || {};
-  const ineq = wsQuant?.inequality || reportQuant.inequality || {};
-  const stoch = wsQuant?.stochastic || reportQuant.stochastic || {};
+  const fin = reportQuant.financial || {};
+  const risk = reportQuant.riskRatios || {};
+  const ineq = reportQuant.inequality || {};
+  const stoch = reportQuant.stochastic || {};
 
   const deficitMins = Number.isFinite(Number(fin.deficitStockHours))
     ? Number(fin.deficitStockHours) * MINUTES_PER_HOUR
@@ -115,20 +123,20 @@ function buildQuantMetrics(repoRoot, report, tenDimensions) {
   const sqaleMinutes = firstFinite([debt.totalRemediationMinutes, deficitMins], 0);
   const tdr = firstFinite([debt.technicalDebtRatio], 0);
   const polyglotIndex = firstFinite(
-    [qs.polyglotGeneralization?.index, polyglot?.index, tenDimensions.compositeScore],
+    [qs.polyglotGeneralization?.index, polyglot?.polyglotIndex, polyglot?.index, tenDimensions.compositeScore],
     tenDimensions.compositeScore,
   );
   const autonomyRate = computeAutonomyRate(report);
 
   return {
-    rcr: firstFinite([fin.rcr, fin.interestCoverageRatio], 0.0),
-    erq: firstFinite([risk.erq, risk.qsr], 0),
-    ddr: firstFinite([risk.ddr, risk.sortino], 0),
-    edb95: firstFinite([risk.edb95, risk.var95], 0),
-    ptd: firstFinite([risk.ptd, risk.mdd], 0),
-    dsi: firstFinite([ineq.dsi, ineq.debtGini], 0),
-    rcd: firstFinite([ineq.rcd, ineq.defectEntropy], 0),
-    ehl: firstFinite([stoch.ehl, stoch.halfLifeCommits], 0),
+    rcr: firstFinite([wsQuant?.rcr, fin.rcr, fin.interestCoverageRatio], 0.0),
+    erq: firstFinite([wsQuant?.erq, risk.erq, risk.qsr], 0),
+    ddr: firstFinite([wsQuant?.ddr, risk.ddr, risk.sortino], 0),
+    edb95: firstFinite([wsQuant?.edb95, risk.edb95, risk.var95], 0),
+    ptd: firstFinite([wsQuant?.ptd, risk.ptd, risk.mdd], 0),
+    dsi: firstFinite([wsQuant?.dsi, ineq.dsi, ineq.debtGini], 0),
+    rcd: firstFinite([wsQuant?.rcd, ineq.rcd, ineq.defectEntropy], 0),
+    ehl: firstFinite([wsQuant?.ehl, stoch.ehl, stoch.halfLifeCommits], 0),
     workspaceHealthScore: Number(tenDimensions.compositeScore),
     autonomyRate: Number(autonomyRate.toFixed(4)),
     polyglotIndex: Number(polyglotIndex.toFixed(2)),

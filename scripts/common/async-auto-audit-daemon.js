@@ -24,6 +24,7 @@ const {
 } = require('./lib/async-audit-snapshot');
 const { extractTenDimensions, buildQuantMetrics } = require('./lib/async-quant-metrics');
 const { evaluateAndRunAutoCommit } = require('./lib/async-auto-commit');
+const { buildEloc5dSummary } = require('./lib/workspace-eloc-rollup');
 const cli = require('./lib/async-audit-cli');
 
 const DEFAULT_REPO_ROOT = path.resolve(__dirname, '../..');
@@ -38,10 +39,37 @@ function loadAutoRefactorDaemonModule(repoRoot) {
   return null;
 }
 
+function resolveFullAnalyzerMap(repoRoot) {
+  const roots = [path.resolve(repoRoot), DEFAULT_REPO_ROOT];
+  for (const baseRoot of roots) {
+    const cfgPath = path.join(baseRoot, 'auto-refactor', 'dist', 'core', 'config', 'config.js');
+    if (!fs.existsSync(cfgPath)) continue;
+    try {
+      const { BUILTIN_ANALYZERS } = require(cfgPath);
+      if (Array.isArray(BUILTIN_ANALYZERS) && BUILTIN_ANALYZERS.length > 0) {
+        const map = {};
+        for (const name of BUILTIN_ANALYZERS) map[name] = { enabled: true };
+        return map;
+      }
+    } catch {
+      // Fallback to daemon default analyzer selection when dist config cannot be required.
+    }
+  }
+  return undefined;
+}
+
 async function executeSnapshotReview(repoRoot, entries, options) {
   const daemonMod = loadAutoRefactorDaemonModule(repoRoot);
   if (!daemonMod || entries.length === 0) return null;
-  const scanConfig = { root: repoRoot, archetype: options.archetype || 'library', logLevel: 'silent' };
+  const fullAnalyzers = resolveFullAnalyzerMap(repoRoot);
+  const scanConfig = {
+    root: repoRoot,
+    archetype: options.archetype || 'library',
+    logLevel: 'silent',
+    cacheEnabled: false,
+    persistGovernanceSnapshot: false,
+    ...(fullAnalyzers ? { analyzers: fullAnalyzers } : {}),
+  };
   const warmResult = await daemonMod.trySnapshotScan({ root: repoRoot, config: scanConfig, entries });
   return warmResult || daemonMod.handleSnapshotScan(scanConfig, entries);
 }
@@ -72,7 +100,8 @@ async function runAsyncAuditCycle(repoRoot, options = {}) {
     issues: [],
   };
   const tenDimensions = extractTenDimensions(report);
-  const quantMetrics = buildQuantMetrics(repoRoot, report, tenDimensions);
+  const quantMetrics = await buildQuantMetrics(repoRoot, report, tenDimensions);
+  const eloc5dSummary = buildEloc5dSummary(repoRoot);
   const errorCount = Number(report?.summary?.bySeverity?.error ?? 0);
   const healthy = errorCount === 0 && tenDimensions.compositeScore >= MIN_HEALTHY_SCORE;
 
@@ -95,7 +124,9 @@ async function runAsyncAuditCycle(repoRoot, options = {}) {
     filesCaptured: entries.length,
     issuesSummary: report.summary || { issuesTotal: 0 },
     tenDimensions,
+    rawTenDimensions: { ...tenDimensions },
     quantMetrics,
+    eloc5dSummary,
     aasReport: scanResult?.stats?.aas || null,
     autoCommitStatus,
   };
