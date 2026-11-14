@@ -13,18 +13,18 @@ class_name UniversalContributionSolver extends RefCounted
 ## 贡献榜计算：伤害/承伤/治疗加权得分并降序排序（权重配置驱动）
 static func calculate_leaderboard(boss: WorldBossAggregate) -> Array[Dictionary]:
 	var board: Array[Dictionary] = []
-	var w_dmg := GameConfig.get_float("domains.world_boss", "contribution/weights/damage", 1.0)
-	var w_tank := GameConfig.get_float("domains.world_boss", "contribution/weights/tanking", 0.5)
-	var w_heal := GameConfig.get_float("domains.world_boss", "contribution/weights/heal", 0.8)
-	for p_id in boss.battle_contribution_ledger:
-		var data: Dictionary = boss.battle_contribution_ledger[p_id]
-		var dmg: float = float(data.get("damage", 0.0))
-		var tank: float = float(data.get("tanking", 0.0))
-		var heal: float = float(data.get("heal", 0.0))
-		var score: float = dmg * w_dmg + tank * w_tank + heal * w_heal
-		board.append({"participant_id": p_id, "score": score, "damage": dmg})
+	var damage_weight := GameConfig.get_float("domains.world_boss", "contribution/weights/damage", 1.0)
+	var tanking_weight := GameConfig.get_float("domains.world_boss", "contribution/weights/tanking", 0.5)
+	var heal_weight := GameConfig.get_float("domains.world_boss", "contribution/weights/heal", 0.8)
+	for participant_id in boss.battle_contribution_ledger:
+		var data: Dictionary = boss.battle_contribution_ledger[participant_id]
+		var damage_amount: float = float(data.get("damage", 0.0))
+		var tanking_amount: float = float(data.get("tanking", 0.0))
+		var heal_amount: float = float(data.get("heal", 0.0))
+		var score: float = damage_amount * damage_weight + tanking_amount * tanking_weight + heal_amount * heal_weight
+		board.append({"participant_id": participant_id, "score": score, "damage": damage_amount})
 
-	board.sort_custom(func(a, b): return a["score"] > b["score"])
+	board.sort_custom(func(left_entry: Dictionary, right_entry: Dictionary) -> bool: return left_entry["score"] > right_entry["score"])
 	return board
 
 ## BOSS 掉落分配：MVP 评定 + 广播贡献 MVP 叙事
