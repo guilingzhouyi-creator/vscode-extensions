@@ -45,12 +45,15 @@ const COLOR_QUALITY_RARE: Color = Color(0.20, 0.50, 1.0, 1.0)
 const COLOR_QUALITY_EPIC: Color = Color(0.65, 0.25, 0.95, 1.0)
 const COLOR_QUALITY_LEGENDARY: Color = Color(1.0, 0.55, 0.0, 1.0)
 
+# ── 主题默认回退色板（单一真源）─────────────────────────────────────────────
 # ThemeManager 的 DEFAULT_* 与 views 的展示语义色一律引用本组，杜绝各自复写；
+# 取值与收敛前逐位一致，保证可见性等价对照零差异。
 const COLOR_BG_DEFAULT: Color = Color(0.06, 0.08, 0.12, 1.0) # 根背景默认回退
 const COLOR_SURFACE_DEFAULT: Color = Color(0.10, 0.14, 0.20, 1.0) # 面板/卡片默认回退
 const COLOR_BORDER_DEFAULT: Color = Color(0.18, 0.25, 0.35, 1.0) # 描边默认回退
 const COLOR_BUTTON_PRESSED: Color = Color(0.20, 0.30, 0.45, 1.0) # 按钮按下态
 
+# ── 视图展示语义色板（全部消费方引用本组）────────────────────────────────────
 const COLOR_TEXT_DEFAULT: Color = Color(0.88, 0.91, 0.95, 1.0) # 主文本
 const COLOR_TEXT_MUTED_DEFAULT: Color = Color(0.56, 0.62, 0.72, 1.0) # 次要文本
 const COLOR_ACCENT_DEFAULT: Color = Color(0.38, 0.75, 0.98, 1.0) # 交互高亮
@@ -58,6 +61,7 @@ const COLOR_SUCCESS_DEFAULT: Color = Color(0.20, 0.83, 0.60, 1.0) # 成功反馈
 const COLOR_WARNING_DEFAULT: Color = Color(0.95, 0.78, 0.26, 1.0) # 警告反馈
 const COLOR_DANGER_DEFAULT: Color = Color(0.97, 0.53, 0.53, 1.0) # 危险反馈
 
+# ── 半透明遮罩 / 描边 / 灰化 ────────────────────────────────────────────────
 const COLOR_OVERLAY_DIM: Color = Color(0.0, 0.0, 0.0, 0.4) # Loading 半透明遮罩
 const COLOR_TEXT_OUTLINE: Color = Color(0.0, 0.0, 0.0, 0.8) # 飘字描边
 const COLOR_DISABLED_DIM: Color = Color(0.5, 0.5, 0.5, 0.6) # 破损/禁用灰化
@@ -109,11 +113,13 @@ const SCENE_CACHE_MAX: int = 32 # 场景实例缓存条目上限（FIFO 逐出�
 const BATTLE_LOG_MAX: int = 200 # 战报日志条目上限（超出裁最旧）
 
 # ==============================================================================
+# 六、视口 CanvasLayer Z-Index 严格规约（唯一真源）
 # ──────────────────────────────────────────────────────────────────────────────
 # 本组为层级唯一权威定义：nav_types.LayerLevel 与 app_root.tscn 六层数值均与之一致
 # （BACKGROUND=-10 / SCREEN=0 / HUD=10 / MODAL=50 / OVERLAY=80 / DEBUG=100）。
 # 收敛前 design_tokens 另声明 OVERLAY=100 / DEBUG=120 且 DRAWER=30 / POPOVER=70 /
 # TOAST=85——与场景实际层位冲突且 DRAWER/POPOVER/TOAST 无对应真实层，属幽灵常量，
+# 已按六层级数值三方一致与零幽灵常量规范一并删除。
 # ==============================================================================
 
 const Z_INDEX_BACKGROUND: int = -10 # 动态星空 / 城镇背景

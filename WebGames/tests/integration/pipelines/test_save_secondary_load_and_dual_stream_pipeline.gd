@@ -10,15 +10,15 @@ extends TestCase
 
 const AccountCompositeAuthDTO = preload("res://backend/domains/account/dto/account_composite_auth_dto.gd")
 const AuthService = preload("res://backend/domains/account/auth_service.gd")
-const AccountProfileAggregate = preload("res://backend/domains/account/account_profile.gd")
-const SaveSlotSummaryDTO = preload("res://backend/domains/account/save_slot_dto.gd")
+const AccountProfile = preload("res://backend/domains/account/account_profile.gd")
+const SaveSlotDTO = preload("res://backend/domains/account/save_slot_dto.gd")
 const SaveLoadRoutingSolver = preload("res://backend/domains/world_gateway/save_load_routing_solver.gd")
 const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
-const CharacterPhysiologySheet = preload("res://backend/domains/lifecycle_physiology/physiology_entities.gd")
-const CharacterWalletEntity = preload("res://backend/domains/currency_economy/currency_entities.gd")
+const CharacterPhysiologySheet = preload("res://backend/domains/lifecycle_physiology/character_physiology_sheet.gd")
+const CharacterWalletEntity = preload("res://backend/domains/currency_economy/character_wallet_entity.gd")
 const HudStatusSnapshotDTO = preload("res://backend/domains/world_state/dto/hud_status_snapshot_dto.gd")
 const GameLifecycleManager = preload("res://backend/domains/lifecycle/game_lifecycle_manager.gd")
-const GameLifecycleModel = preload("res://backend/domains/lifecycle/lifecycle_model.gd")
+const GameLifecycleModel = preload("res://backend/domains/lifecycle/game_lifecycle_model.gd")
 const GameShutdownDTO = preload("res://backend/domains/lifecycle/dto/game_shutdown_dto.gd")
 const GameBootstrap = preload("res://backend/infrastructure/game_bootstrap.gd")
 
@@ -77,12 +77,12 @@ static func test_composite_auth_auto_registration_and_login() -> Dictionary:
 
 # ---- TC-SLD-02: 多世界槽位占位符防御校验 ----
 static func test_multi_world_slot_placeholder_defense() -> Dictionary:
-	var account := AccountProfileAggregate.new()
+	var account := AccountProfile.new()
 	account.account_id = "ACC_TEST_WORLD_01"
 	var ok := true
 
 	# 默认单人世界槽位
-	ok = assert_eq(account.get_active_world_slot(), AccountProfileAggregate.WORLD_DEFAULT_SP_01, "TC-SLD-02A: 默认活跃世界应为 WORLD_DEFAULT_SP_01") and ok
+	ok = assert_eq(account.get_active_world_slot(), AccountProfile.WORLD_DEFAULT_SP_01, "TC-SLD-02A: 默认活跃世界应为 WORLD_DEFAULT_SP_01") and ok
 
 	# 未绑定世界槽位判定
 	ok = assert_true(account.is_world_slot_placeholder("WORLD_RESERVED_SP_02"), "TC-SLD-02B: 预留槽位应判定为占位符") and ok
@@ -95,27 +95,27 @@ static func test_multi_world_slot_placeholder_defense() -> Dictionary:
 
 	var fallback_val := SaveLoadRoutingSolver.validate_world_slot(account, "WORLD_RESERVED_SP_02", true)
 	ok = assert_true(fallback_val.success, "TC-SLD-02F: 启用回退时应安全降级至默认世界") and ok
-	ok = assert_eq(fallback_val.world_id, AccountProfileAggregate.WORLD_DEFAULT_SP_01, "TC-SLD-02G: 降级目标应为默认世界") and ok
+	ok = assert_eq(fallback_val.world_id, AccountProfile.WORLD_DEFAULT_SP_01, "TC-SLD-02G: 降级目标应为默认世界") and ok
 
 	return make_result("TC-SLD-02: 多世界槽位占位符防御校验", ok)
 
-static func _run_default_secondary_load(account: AccountProfileAggregate, slot: SaveSlotSummaryDTO) -> Dictionary:
+static func _run_default_secondary_load(account: AccountProfile, slot: SaveSlotDTO) -> Dictionary:
 	var ctx := {
 		"account": account,
 		"slot": slot,
-		"target_world_id": AccountProfileAggregate.WORLD_DEFAULT_SP_01,
+		"target_world_id": AccountProfile.WORLD_DEFAULT_SP_01,
 		"allow_default_fallback": true
 	}
 	return SaveLoadRoutingSolver.execute_secondary_load(ctx)
 
 # ---- TC-SLD-03: 边界 A 判定与序章重放重初始化流 ----
 static func test_boundary_a_prologue_replay_stream() -> Dictionary:
-	var account := AccountProfileAggregate.new()
+	var account := AccountProfile.new()
 	account.account_id = "ACC_BOUNDARY_A"
 	var ok := true
 
 	# 首次建档后直接退出（未完成序章，play_time == 0）
-	var slot := SaveSlotSummaryDTO.new()
+	var slot := SaveSlotDTO.new()
 	slot.slot_id = "SLOT_01"
 	slot.character_name = "NoviceRunner"
 	slot.prologue_completed = false
@@ -140,12 +140,12 @@ static func test_boundary_a_prologue_replay_stream() -> Dictionary:
 
 # ---- TC-SLD-04: 边界 B 判定与成熟物理存档反装配直载流 ----
 static func test_boundary_b_mature_save_direct_restore() -> Dictionary:
-	var account := AccountProfileAggregate.new()
+	var account := AccountProfile.new()
 	account.account_id = "ACC_BOUNDARY_B"
 	var ok := true
 
 	# 已玩一段时间的成熟存档（序章已完成，play_time > 0）
-	var slot := SaveSlotSummaryDTO.new()
+	var slot := SaveSlotDTO.new()
 	slot.slot_id = "SLOT_TEST_MATURE_01"
 	slot.character_name = "VeteranHero"
 	slot.prologue_completed = true
@@ -178,11 +178,11 @@ static func test_boundary_b_mature_save_direct_restore() -> Dictionary:
 
 # ---- TC-SLD-05: 汇聚进入主页 HUD 状态快照同步 ----
 static func test_converged_hud_state_synchronization() -> Dictionary:
-	var account := AccountProfileAggregate.new()
+	var account := AccountProfile.new()
 	account.account_id = "ACC_HUD_SYNC"
 	var ok := true
 
-	var slot := SaveSlotSummaryDTO.new()
+	var slot := SaveSlotDTO.new()
 	slot.slot_id = "SLOT_HUD_01"
 	slot.character_name = "SyncChampion"
 	slot.current_location_name = "中洲·圣城大殿"
@@ -257,8 +257,8 @@ static func test_dto_serialization_and_reset_state() -> Dictionary:
 	resp.reset_state()
 	ok = assert_false(resp.success, "TC-SLD-07E: reset_state 后 success 应重置为 false") and ok
 
-	# 3. SaveSlotSummaryDTO 往返与复位
-	var slot := SaveSlotSummaryDTO.new()
+	# 3. SaveSlotDTO 往返与复位
+	var slot := SaveSlotDTO.new()
 	slot.slot_id = "SLOT_DTO_01"
 	slot.character_name = "SlotTraveler"
 	slot.prologue_completed = true
@@ -266,7 +266,7 @@ static func test_dto_serialization_and_reset_state() -> Dictionary:
 	slot.world_id = "WORLD_DEFAULT_SP_01"
 
 	var slot_dict := slot.serialize()
-	var restored_slot := SaveSlotSummaryDTO.deserialize(slot_dict)
+	var restored_slot := SaveSlotDTO.deserialize(slot_dict)
 	ok = assert_true(restored_slot.prologue_completed, "TC-SLD-07F: prologue_completed 序列化往返应无损") and ok
 	ok = assert_eq(restored_slot.world_slot_status, "OCCUPIED", "TC-SLD-07G: world_slot_status 应无损") and ok
 	ok = assert_eq(restored_slot.world_id, "WORLD_DEFAULT_SP_01", "TC-SLD-07H: world_id 应无损") and ok

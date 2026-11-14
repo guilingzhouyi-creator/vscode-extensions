@@ -13,6 +13,7 @@ extends RefCounted
 signal data_changed()
 signal floating_text_requested(text: String, is_crit: bool, is_heal: bool, target_position: Vector2)
 
+## 战报日志条数上限（防无界增长；超出时裁剪最旧，严禁魔法数字）
 const MAX_BATTLE_LOGS: int = 100
 
 var boss_name: String = ""
@@ -31,10 +32,12 @@ var player_ap_max: float = 1.0
 var battle_logs: Array[Dictionary] = []
 
 ## 按快照字典增量更新战斗数据
+## 数值经有限性守卫与区间夹紧、部位改防御读取；缺失键保持既有值以确保契约兼容
 func update_from_snapshot(snapshot: Dictionary) -> void:
 	boss_name = str(snapshot.get("boss_name", boss_name))
 	boss_hp_max = maxf(1.0, _safe_float(snapshot.get("boss_max_hp", boss_hp_max), boss_hp_max))
 	boss_hp_current = clampf(_safe_float(snapshot.get("boss_hp", boss_hp_current), boss_hp_current), 0.0, boss_hp_max)
+	# 非 Array（含 null）经防御读取返回 []，避免直接强转后调用 duplicate 触发空引用崩溃
 	if snapshot.has("boss_parts"):
 		boss_parts = FrontendSnapshot.read_array(snapshot, "boss_parts")
 
@@ -48,10 +51,12 @@ func update_from_snapshot(snapshot: Dictionary) -> void:
 
 	data_changed.emit()
 
+## 非有限值（NaN/INF）经守卫回退 fallback，防止 int(NAN) 等异常整数转换
 static func _safe_float(value: Variant, fallback: float = 0.0) -> float:
 	var numeric_value := float(value)
 	return numeric_value if is_finite(numeric_value) else fallback
 
+## 追加战斗日志（超上限时裁剪最旧，保持有界）
 func append_log(category: String, message: String) -> void:
 	while battle_logs.size() >= MAX_BATTLE_LOGS:
 		battle_logs.remove_at(0)

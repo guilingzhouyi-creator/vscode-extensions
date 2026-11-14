@@ -14,12 +14,12 @@ const SnapshotCatalog = preload("res://dev_harness/snapshot_mode/snapshot_catalo
 const TestSnapshotBuilder = preload("res://dev_harness/snapshot_mode/test_snapshot_builder.gd")
 const SnapshotInjectionSolver = preload("res://dev_harness/snapshot_mode/snapshot_injection_solver.gd")
 const SnapshotCaptureTool = preload("res://dev_harness/snapshot_mode/snapshot_capture_tool.gd")
-const GameLifecycleModel = preload("res://backend/domains/lifecycle/lifecycle_model.gd")
+const GameLifecycleModel = preload("res://backend/domains/lifecycle/game_lifecycle_model.gd")
 const GameLifecycleManager = preload("res://backend/domains/lifecycle/game_lifecycle_manager.gd")
-const CharacterPhysiologySheet = preload("res://backend/domains/lifecycle_physiology/physiology_entities.gd")
-const CharacterWalletEntity = preload("res://backend/domains/currency_economy/currency_entities.gd")
+const CharacterPhysiologySheet = preload("res://backend/domains/lifecycle_physiology/character_physiology_sheet.gd")
+const CharacterWalletEntity = preload("res://backend/domains/currency_economy/character_wallet_entity.gd")
 const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
-const AccountProfileAggregate = preload("res://backend/domains/account/account_profile.gd")
+const AccountProfile = preload("res://backend/domains/account/account_profile.gd")
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
@@ -163,12 +163,12 @@ static func test_snapshot_injection_hydration_and_hud_sync() -> Dictionary:
 
 	var repo := AccountRepository.get_instance()
 	ok = assert_true(repo.has_account(snap.account_id), "TC-SEH-05K: AccountRepository 应已登记快照账号") and ok
-	var hydrated_acc: AccountProfileAggregate = repo.find_by_id(snap.account_id)
+	var hydrated_acc: AccountProfile = repo.find_by_id(snap.account_id)
 	ok = assert_not_null(hydrated_acc, "TC-SEH-05L: 快照水化账号聚合不应为空") and ok
 	if hydrated_acc != null:
 		ok = assert_eq(hydrated_acc.username, snap.username, "TC-SEH-05M: 账号用户名应与快照一致") and ok
 		ok = assert_eq(hydrated_acc.active_slot_id, snap.slot_id, "TC-SEH-05N: 活跃槽位应正确注入") and ok
-	var acc_by_name: AccountProfileAggregate = repo.find_by_username(snap.username)
+	var acc_by_name: AccountProfile = repo.find_by_username(snap.username)
 	ok = assert_not_null(acc_by_name, "TC-SEH-05O: 用户名大小写不敏感索引应命中") and ok
 
 	SnapshotInjectionSolver.teardown_snapshot(ctx)

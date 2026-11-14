@@ -61,7 +61,7 @@ static func _setup_environment() -> void:
     acc_repo.set_custom_registry_path(TEST_SANDBOX_DIR + "accounts/account_registry.json")
     acc_repo.load_all()
 
-    var acc := AccountProfileAggregate.new()
+    var acc := AccountProfile.new()
     acc.account_id = TEST_ACCOUNT_ID
     acc.username = "DestinyModTester"
     acc_repo.save_account(acc)
@@ -377,7 +377,7 @@ static func test_backend_authoritative_creation_and_world_lock_closed_loop() -> 
     var gw := WorldGatewayFSM.new(TEST_ACCOUNT_ID)
     gw.enter_gateway()
     var acc_repo := AccountRepository.get_instance()
-    var acc: AccountProfileAggregate = acc_repo.find_by_id(TEST_ACCOUNT_ID)
+    var acc: AccountProfile = acc_repo.find_by_id(TEST_ACCOUNT_ID)
     gw.select_mode_for_account(WorldGatewayModel.GameMode.SINGLE_PLAYER, acc, {}, TEST_WORLD_ID, "SLOT_01")
 
     var precheck_res: Dictionary = gw.precheck_and_configure_single_player_mods([

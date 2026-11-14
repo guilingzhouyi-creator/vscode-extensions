@@ -47,7 +47,7 @@ static func _setup_environment() -> void:
 	acc_repo.set_custom_registry_path(TEST_SANDBOX_DIR + "accounts/account_registry.json")
 	acc_repo.load_all()
 
-	var acc := AccountProfileAggregate.new()
+	var acc := AccountProfile.new()
 	acc.account_id = TEST_ACCOUNT_ID
 	acc.username = "FmpPipelineTester"
 	acc_repo.save_account(acc)

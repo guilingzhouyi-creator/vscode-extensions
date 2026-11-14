@@ -14,7 +14,7 @@ const DynamicPackMountManager = preload("res://backend/domains/version_governanc
 const PatchIntegrityVerifier = preload("res://backend/domains/version_governance/patch_integrity_verifier.gd")
 const VersionActivationGate = preload("res://backend/domains/version_governance/version_activation_gate.gd")
 const VersionStateMachine = preload("res://backend/domains/version_governance/version_state_machine.gd")
-const VersionedRuntimeContext = preload("res://backend/domains/version_governance/version_runtime_context.gd")
+const VersionedRuntimeContext = preload("res://backend/domains/version_governance/versioned_runtime_context.gd")
 
 # ==============================================================================
 # 测试运行总入口 (10 项第一性原理严格断言)

@@ -30,6 +30,7 @@ func calculate_total_copper(gold: int, silver: int, copper: int) -> int:
 	var per_silver := int(get_rules().get("copper_per_silver", 100))
 	return gold * per_gold + silver * per_silver + copper
 
+## 将铜币总值拆分为金/银/铜三元结构字典
 func split_copper(total: int) -> Dictionary:
 	var per_gold := int(get_rules().get("copper_per_gold", 10000))
 	var per_silver := int(get_rules().get("copper_per_silver", 100))
@@ -41,6 +42,7 @@ func split_copper(total: int) -> Dictionary:
 		"copper": remainder % per_silver,
 	}
 
+## 按货币索引（0=金, 1=银, 2=铜, 3=魔单晶）返回单位铜值
 func get_currency_copper(index: int) -> int:
 	match index:
 		0:
@@ -52,20 +54,24 @@ func get_currency_copper(index: int) -> int:
 		_:
 			return 1
 
+## 计算商店买入或按回购折扣折算的卖出总价
 func calculate_shop_total(base_price: int, quantity: int, is_sell: bool) -> int:
 	var total := base_price * quantity
 	if is_sell:
 		return int(float(total) * float(get_rules().get("sell_back_ratio", 0.7)))
 	return total
 
+## 根据源/目标货币铜值计算兑换比率（目标铜值非正时安全返回 0.0）
 func calculate_exchange_rate(source_copper: int, target_copper: int) -> float:
 	if target_copper <= 0:
 		return 0.0
 	return float(source_copper) / float(target_copper)
 
+## 按输入金额与汇率计算兑换目标金额
 func calculate_exchange_result(amount: int, rate: float) -> float:
 	return float(amount) * rate
 
+## 确定性生成指定商品的 7 日历史模拟物价走势序列
 func generate_price_series(commodity_key: String) -> Array:
 	var base := 50
 	match commodity_key:

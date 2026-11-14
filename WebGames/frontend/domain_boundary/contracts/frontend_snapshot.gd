@@ -22,19 +22,24 @@ func to_dictionary() -> Dictionary:
 static func read_string(data: Dictionary, key: String, fallback: String = "") -> String:
 	return str(data.get(key, fallback))
 
+## 安全读取整型字段，缺失时返回指定默认回退值
 static func read_int(data: Dictionary, key: String, fallback: int = 0) -> int:
 	return int(data.get(key, fallback))
 
+## 安全读取浮点字段，缺失时返回指定默认回退值
 static func read_float(data: Dictionary, key: String, fallback: float = 0.0) -> float:
 	return float(data.get(key, fallback))
 
+## 安全读取布尔字段，缺失时返回指定默认回退值
 static func read_bool(data: Dictionary, key: String, fallback: bool = false) -> bool:
 	return bool(data.get(key, fallback))
 
+## 安全读取数组字段并执行深拷贝，非数组类型时返回空数组以隔离外部引用篡改
 static func read_array(data: Dictionary, key: String) -> Array:
 	var value: Variant = data.get(key, [])
 	return value.duplicate(true) if value is Array else []
 
+## 安全读取字典字段并执行深拷贝，非字典类型时返回空字典以隔离外部引用篡改
 static func read_dict(data: Dictionary, key: String) -> Dictionary:
 	var value: Variant = data.get(key, {})
 	return value.duplicate(true) if value is Dictionary else {}

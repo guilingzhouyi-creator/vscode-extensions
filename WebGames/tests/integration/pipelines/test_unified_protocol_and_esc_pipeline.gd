@@ -20,6 +20,7 @@ const WorldGatewayFSM = preload("res://backend/domains/world_gateway/world_gatew
 const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
 const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
 const GameLifecycleManager = preload("res://backend/domains/lifecycle/game_lifecycle_manager.gd")
+const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
 const GameBootstrap = preload("res://backend/infrastructure/game_bootstrap.gd")
 const HudEventBridge = preload("res://frontend/systems/hud_event_bridge.gd")
 const EventBusCore = preload("res://backend/infrastructure/event_bus/event_bus_core.gd")
@@ -39,6 +40,7 @@ static func run_all_tests() -> Dictionary:
 	return TestCase.pack_results("统一协议工厂与ESC系统菜单后端联动全链路流水线", results)
 
 static func _reset_env() -> void:
+	WorldSessionRuntimeService.reset_for_tests()
 	SaveDataAccessLayer.reset_for_tests()
 	GameLifecycleManager.reset_for_test()
 	HumanControlLeaseManager.reset_for_tests()

@@ -10,7 +10,7 @@ extends TestCase
 
 const AccountRegistrationDTO = preload("res://backend/domains/account/dto/account_registration_dto.gd")
 const AuthService = preload("res://backend/domains/account/auth_service.gd")
-const AccountProfileAggregate = preload("res://backend/domains/account/account_profile.gd")
+const AccountProfile = preload("res://backend/domains/account/account_profile.gd")
 const HudStatusSnapshotDTO = preload("res://backend/domains/world_state/dto/hud_status_snapshot_dto.gd")
 const HudMutationEventsDTO = preload("res://backend/domains/world_state/dto/hud_mutation_events_dto.gd")
 const HudEventContract = preload("res://backend/domains/world_state/hud_event_contract.gd")
@@ -24,8 +24,8 @@ const OpeningEventStreamDTO = preload("res://backend/domains/character_creation/
 const PrologueExecutionKernel = preload("res://backend/domains/character_creation/prologue_execution_kernel.gd")
 const CharacterPrologueContext = preload("res://backend/domains/character_creation/character_prologue_context.gd")
 const InputDeviceStateAggregate = preload("res://backend/domains/hardware_input/input_device_state_aggregate.gd")
-const GameLoopStateStack = preload("res://backend/infrastructure/game_loop_fsm.gd")
-const GameLifecycleModel = preload("res://backend/domains/lifecycle/lifecycle_model.gd")
+const GameLoopFSM = preload("res://backend/infrastructure/game_loop_fsm.gd")
+const GameLifecycleModel = preload("res://backend/domains/lifecycle/game_lifecycle_model.gd")
 const GameShutdownDTO = preload("res://backend/domains/lifecycle/dto/game_shutdown_dto.gd")
 const GameLifecycleService = preload("res://backend/domains/lifecycle/game_lifecycle_service.gd")
 const GameLifecycleManager = preload("res://backend/domains/lifecycle/game_lifecycle_manager.gd")
@@ -96,7 +96,7 @@ static func test_auth_eventbus_lifecycle_broadcast() -> Dictionary:
 	var detach := _capture_channel_records(captured)
 
 	_register_user(store, "BroadcastSession", "Pass1234")
-	var acc := AccountProfileAggregate.new()
+	var acc := AccountProfile.new()
 	acc.account_id = "ACC_BROADCAST"
 	acc.username = "BroadcastSession"
 	acc.password_hash_sha256 = AuthService.hash_password("Pass1234")
@@ -193,7 +193,7 @@ static func test_full_headless_lifecycle_pipeline() -> Dictionary:
 	var captured: Array = []
 	var detach := _capture_channel_records(captured)
 	var reg := _register_user(store, "LifeSession", "Pass7890")
-	var acc := AccountProfileAggregate.new()
+	var acc := AccountProfile.new()
 	acc.account_id = reg.account_id
 	acc.username = reg.username
 	acc.password_hash_sha256 = AuthService.hash_password("Pass7890")
@@ -254,7 +254,7 @@ static func test_narrative_template_args_contract() -> Dictionary:
 static func test_session_bounded_and_no_residual_subscription() -> Dictionary:
 	AuthService.clear_sessions()
 	var store := _make_account_store()
-	var acc := AccountProfileAggregate.new()
+	var acc := AccountProfile.new()
 	acc.account_id = "ACC_BOUND"
 	acc.username = "BoundSession"
 	acc.password_hash_sha256 = AuthService.hash_password("Pass0000")
@@ -362,7 +362,7 @@ static func test_ten_stage_custom_hook_conduction_pipeline() -> Dictionary:
 	var username := "HeroExplorer"
 	var account_pass := "Pass12345"
 	var reg := _register_user(store, username, account_pass)
-	var acc := AccountProfileAggregate.new()
+	var acc := AccountProfile.new()
 	acc.account_id = reg.account_id
 	acc.username = username
 	acc.password_hash_sha256 = AuthService.hash_password(account_pass)
@@ -466,7 +466,7 @@ static func test_unwired_slots_explicit_reservation_no_default_binding() -> Dict
 		and String(missing_res.get("error_code", "")).begins_with("UNBOUND_") \
 		and ctx.unwired_slots.has("username")
 
-	var raw_account := AccountProfileAggregate.new()
+	var raw_account := AccountProfile.new()
 	raw_account.account_id = "ACC_UNBOUND_TEST"
 	var bind_res := AccountSlotBindingSolver.create_character_in_slot(raw_account, "SLOT_01", "", "", false, false)
 	var name_guarded: bool = not bool(bind_res.get("success", true)) \

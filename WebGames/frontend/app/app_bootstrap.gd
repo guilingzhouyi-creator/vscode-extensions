@@ -7,6 +7,7 @@
 # 退出语义与设计依据: 单例惰性装配与重复引导幂等保护契约
 # ==============================================================================
 
+## AppBootstrap：前端应用骨架与基础设施装配器
 class_name AppBootstrap
 extends RefCounted
 
@@ -20,6 +21,7 @@ const UIAudioBridge = preload("res://frontend/ui_infrastructure/ui_audio_bridge.
 const AppLifecycleFSM = preload("res://frontend/app/app_lifecycle_fsm.gd")
 const ServiceLocator = preload("res://frontend/domain_boundary/service_locator.gd")
 
+## 引导幂等守卫：重复引导时跳过生命周期推进与默认入口压栈，避免状态机重入
 static var _bootstrapped: bool = false
 
 ## 应用骨架装配（幂等：重复调用仅幂等重绑导航根与 UI 基础设施，不重跑生命周期/入口压栈）
@@ -40,6 +42,7 @@ static func bootstrap(app_root: AppRoot) -> void:
 	FocusInputManager.get_instance()
 	UIAudioBridge.get_instance()
 
+	# 已完成首次引导则保留上述幂等重绑，跳过后续生命周期驱动与默认入口压栈
 	if _bootstrapped:
 		return
 	_bootstrapped = true

@@ -14,7 +14,7 @@ const PingPongRingBuffer = preload("res://backend/infrastructure/event_bus/ping_
 const EventPool = preload("res://backend/infrastructure/event_bus/event_pool.gd")
 const HeadlessSpatialHashGrid3D = preload("res://backend/infrastructure/event_bus/headless_spatial_hash_grid_3d.gd")
 const EventBusSubscriptionToken = preload("res://backend/infrastructure/event_bus/event_bus_subscription_token.gd")
-const IVisualPresentationAdapter = preload("res://backend/infrastructure/event_bus/visual_presentation_adapter.gd")
+const IVisualPresentationAdapter = preload("res://backend/infrastructure/event_bus/i_visual_presentation_adapter.gd")
 const HeadlessPresentationMockAdapter = preload("res://backend/infrastructure/event_bus/headless_presentation_mock_adapter.gd")
 const EventBusCore = preload("res://backend/infrastructure/event_bus/event_bus_core.gd")
 

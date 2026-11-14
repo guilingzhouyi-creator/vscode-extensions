@@ -441,18 +441,18 @@ static func test_account_slot_binding_solver_no_infra_path() -> Dictionary:
 
 
 # ------------------------------------------------------------------------------
-# TC-ARCH-08B: 业务领域解耦护栏：账号槽位解算器严禁引用 GameLoopStateStack
+# TC-ARCH-08B: 业务领域解耦护栏：账号槽位解算器严禁引用 GameLoopFSM
 # ------------------------------------------------------------------------------
 static func test_account_slot_binding_solver_no_gameloop_stack() -> Dictionary:
 	var violations: Array[String] = []
 	var solver_path := "res://backend/domains/account/account_slot_binding_solver.gd"
 	if not FileAccess.file_exists(solver_path):
 		violations.append("目标文件不存在: " + solver_path)
-		return _result("TC-ARCH-08B: 账号槽位解算器严禁引用 GameLoopStateStack", violations)
+		return _result("TC-ARCH-08B: 账号槽位解算器严禁引用 GameLoopFSM", violations)
 	var content := _strip_comments(FileAccess.get_file_as_string(solver_path))
-	if _contains_symbol(content, "GameLoopStateStack"):
-		violations.append("account_slot_binding_solver.gd 严禁引用 GameLoopStateStack 符号")
-	return _result("TC-ARCH-08B: 账号槽位解算器严禁引用 GameLoopStateStack", violations)
+	if _contains_symbol(content, "GameLoopFSM"):
+		violations.append("account_slot_binding_solver.gd 严禁引用 GameLoopFSM 符号")
+	return _result("TC-ARCH-08B: 账号槽位解算器严禁引用 GameLoopFSM", violations)
 
 
 # ------------------------------------------------------------------------------

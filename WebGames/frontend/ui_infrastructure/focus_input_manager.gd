@@ -11,6 +11,7 @@ class_name FocusInputManager
 extends RefCounted
 
 static var _instance: FocusInputManager
+## 获取焦点输入管理器全局单例
 static func get_instance() -> FocusInputManager:
 	if _instance == null:
 		_instance = FocusInputManager.new()
@@ -51,6 +52,7 @@ func pop_focus_trap() -> void:
 		if previous_focus != null and is_instance_valid(previous_focus) and previous_focus.is_inside_tree():
 			previous_focus.grab_focus()
 
+## 获取当前激活的焦点陷阱嵌套深度
 func get_trap_depth() -> int:
 	return _active_traps.size()
 

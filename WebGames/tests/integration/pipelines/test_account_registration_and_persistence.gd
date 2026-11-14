@@ -2,7 +2,7 @@
 # 模块归属: 测试框架层 (Tests · 集成测试流水线 (Integration Pipelines))
 # 文件路径: res://tests/integration/pipelines/test_account_registration_and_persistence.gd
 # 架构定位: Integration Pipeline Test Suite
-# 跨域依赖: 上游: AuthService, AccountRepository | 下游: TestCase, AccountProfileAggregate
+# 跨域依赖: 上游: AuthService, AccountRepository | 下游: TestCase, AccountProfile
 # 职责说明: 覆盖账号标准注册物理落盘、冷启动恢复自愈、大小写不敏感查重拦截、复合鉴权自动注册并持久化、历史空盐重铸在持久化仓储中的原子更新以及账号删除与双层索引清理全生命周期断言。
 # 设计依据: 业务域第一性原理 / 账号物理仓储与持久化落盘引擎规范
 # ==============================================================================
@@ -220,7 +220,7 @@ static func test_tc_arp_05_legacy_salt_rehash_atomic_persistence() -> Dictionary
 	if existing != null:
 		repo.delete_account(legacy_id)
 
-	var legacy_acc := AccountProfileAggregate.new()
+	var legacy_acc := AccountProfile.new()
 	legacy_acc.account_id = legacy_id
 	legacy_acc.username = legacy_uname
 	legacy_acc.password_hash_sha256 = legacy_pass.sha256_text()

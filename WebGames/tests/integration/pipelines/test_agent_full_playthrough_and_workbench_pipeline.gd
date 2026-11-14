@@ -118,7 +118,7 @@ static func test_tc_afw_02_prologue_handoff_dto_and_gateway_transition() -> Dict
 static func test_tc_afw_03_account_slot_context_and_binding_solver() -> Dictionary:
 	_setup_environment()
 
-	var acc := AccountProfileAggregate.new()
+	var acc := AccountProfile.new()
 	acc.account_id = "ACC_AFW_BIND"
 	acc.username = "afw_user"
 	var ctx := AccountSlotCreationDTO.new({
@@ -201,7 +201,7 @@ static func test_tc_afw_04_agent_playthrough_to_world_exploration_e2e() -> Dicti
 static func test_tc_afw_05_composite_event_extractor_zero_heap_benchmark() -> Dictionary:
 	_setup_environment()
 
-	var lib := AccountItemLibraryAggregate.new("ACC_BENCH_AFW")
+	var lib := AccountItemLibrary.new("ACC_BENCH_AFW")
 	var catalog := ItemLoaderPipeline.build_catalog_from_config()
 	var batch := [
 		{

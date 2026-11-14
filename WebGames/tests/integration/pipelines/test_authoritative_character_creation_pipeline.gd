@@ -61,7 +61,7 @@ static func _setup_environment() -> void:
 	acc_repo.set_custom_registry_path(TEST_SANDBOX_DIR + "accounts/account_registry.json")
 	acc_repo.load_all()
 
-	var acc := AccountProfileAggregate.new()
+	var acc := AccountProfile.new()
 	acc.account_id = TEST_ACCOUNT_ID
 	acc.username = "PipelineTester"
 	acc_repo.save_account(acc)
@@ -302,7 +302,7 @@ static func test_disk_persistence_and_gateway_handoff() -> Dictionary:
 	gateway.enter_gateway()
 
 	var acc_repo := AccountRepository.get_instance()
-	var acc: AccountProfileAggregate = acc_repo.find_by_id(TEST_ACCOUNT_ID)
+	var acc: AccountProfile = acc_repo.find_by_id(TEST_ACCOUNT_ID)
 	gateway.select_mode_for_account(WorldGatewayModel.GameMode.SINGLE_PLAYER, acc, {}, TEST_WORLD_ID, "SLOT_01")
 	var phase_before: int = gateway.context.current_phase
 	var ok_phase_before: bool = (phase_before == WorldGatewayModel.GatewayPhase.CHARACTER_PENDING)
@@ -324,9 +324,9 @@ static func test_disk_persistence_and_gateway_handoff() -> Dictionary:
 	var ok_dal_name: bool = (loaded_name == "网关漫步者")
 
 	# 2. 验证 AccountRepository 账号槽位封面绑定
-	var refreshed_acc: AccountProfileAggregate = acc_repo.find_by_id(TEST_ACCOUNT_ID)
+	var refreshed_acc: AccountProfile = acc_repo.find_by_id(TEST_ACCOUNT_ID)
 	var ok_acc_has_slot: bool = refreshed_acc != null and refreshed_acc.save_slot_summaries.has("SLOT_01")
-	var slot_summary: SaveSlotSummaryDTO = refreshed_acc.save_slot_summaries.get("SLOT_01", null) if ok_acc_has_slot else null
+	var slot_summary: SaveSlotDTO = refreshed_acc.save_slot_summaries.get("SLOT_01", null) if ok_acc_has_slot else null
 	var ok_slot_name: bool = slot_summary != null and slot_summary.character_name == "网关漫步者"
 
 	# 3. 验证 WorldGatewayFSM 自动回挂并跃迁

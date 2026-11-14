@@ -40,31 +40,31 @@ static func run_all_tests() -> Dictionary:
 
 ## TC-PF-01: 物品统计树自底向上 O(1) 增量累加与全量遍历等价性断言
 static func _test_item_statistics_incremental_equivalence() -> Dictionary:
-	var library := AccountItemLibraryAggregate.new("acc_perf_test_01")
+	var library := AccountItemLibrary.new("acc_perf_test_01")
 
 	# 1. 批量挂载物品并施加增量（触发 O(1) _apply_delta_upwards 回溯）
 	for i in range(20):
 		var item_id := "ITEM_HERB_%02d" % i
 		library.mount_item(item_id, "MATERIAL", "HERB")
-		library.apply_item_delta(item_id, AccountItemLibraryAggregate.STAT_GAINED, 1)
+		library.apply_item_delta(item_id, AccountItemLibrary.STAT_GAINED, 1)
 
 	for i in range(10):
 		var ore_id := "ITEM_ORE_%02d" % i
 		library.mount_item(ore_id, "MATERIAL", "ORE")
-		library.apply_item_delta(ore_id, AccountItemLibraryAggregate.STAT_GAINED, 2)
+		library.apply_item_delta(ore_id, AccountItemLibrary.STAT_GAINED, 2)
 
 	var stats_herb = library.find_item_node("ITEM_HERB_00")
 	var herb_ok: bool = (not stats_herb.is_empty()) and (stats_herb["node"]["stats"]["current_quantity"] == 1)
 
 	# 2. 消耗一个物品验证增量扣减与下限保护
-	var consume_res = library.apply_item_delta("ITEM_ORE_00", AccountItemLibraryAggregate.STAT_CONSUMED, 1)
+	var consume_res = library.apply_item_delta("ITEM_ORE_00", AccountItemLibrary.STAT_CONSUMED, 1)
 	var post_ore = library.find_item_node("ITEM_ORE_00")
 	var ore_ok: bool = (not post_ore.is_empty()) and (post_ore["node"]["stats"]["current_quantity"] == 1)
 
 	# 3. 校验大类父级汇总（自底向上增量求和正确性）
 	var major_stats = library.root_node["children"]["MATERIAL"]["stats"]
-	var total_gained_ok: bool = (major_stats[AccountItemLibraryAggregate.STAT_GAINED] == 40) # 20*1 + 10*2 = 40
-	var current_qty_ok: bool = (major_stats[AccountItemLibraryAggregate.STAT_CURRENT] == 39) # 40 - 1 = 39
+	var total_gained_ok: bool = (major_stats[AccountItemLibrary.STAT_GAINED] == 40) # 20*1 + 10*2 = 40
+	var current_qty_ok: bool = (major_stats[AccountItemLibrary.STAT_CURRENT] == 39) # 40 - 1 = 39
 
 	var passed: bool = (
 		herb_ok and ore_ok and total_gained_ok and current_qty_ok and

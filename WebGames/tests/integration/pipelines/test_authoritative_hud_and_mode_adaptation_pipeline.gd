@@ -182,7 +182,7 @@ static func test_full_lifecycle_with_mode_switch_and_exit() -> Dictionary:
 	if not reg_resp.success:
 		return TestCase.make_result("TC-HMA-07: 全生命周期主干链路端到端闭环断言", false)
 
-	var acc := AccountProfileAggregate.new()
+	var acc := AccountProfile.new()
 	acc.account_id = reg_resp.account_id
 	acc.username = username
 	acc.password_hash_sha256 = AuthService.hash_password(password)

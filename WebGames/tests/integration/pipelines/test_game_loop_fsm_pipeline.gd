@@ -1,5 +1,5 @@
 # ==============================================================================
-# 单元测试：游戏主循环与状态栈 (GameLoopStateStack Tests)
+# 单元测试：游戏主循环与状态栈 (GameLoopFSM Tests)
 # 文件路径: res://tests/integration/pipelines/test_game_loop_fsm_pipeline.gd
 # ==============================================================================
 class_name TestGameLoopFSMPipeline extends RefCounted
@@ -20,48 +20,48 @@ static func run_all_tests() -> Dictionary:
 	return {"domain": "游戏主循环状态栈", "all_passed": all_passed, "results": results}
 
 static func test_push_pop_single_active() -> Dictionary:
-	var stack := GameLoopStateStack.new()
-	stack.push_state(GameLoopStateStack.EngineState.LOGIN_AUTH)
-	stack.push_state(GameLoopStateStack.EngineState.WORLD_EXPLORATION)
-	var passed: bool = stack.current_state == GameLoopStateStack.EngineState.WORLD_EXPLORATION and stack.stack_depth() == 3
+	var stack := GameLoopFSM.new()
+	stack.push_state(GameLoopFSM.EngineState.LOGIN_AUTH)
+	stack.push_state(GameLoopFSM.EngineState.WORLD_EXPLORATION)
+	var passed: bool = stack.current_state == GameLoopFSM.EngineState.WORLD_EXPLORATION and stack.stack_depth() == 3
 	stack.pop_state()
-	passed = passed and stack.current_state == GameLoopStateStack.EngineState.LOGIN_AUTH
+	passed = passed and stack.current_state == GameLoopFSM.EngineState.LOGIN_AUTH
 	return {"test": "TC-FSM-01: 压栈/弹栈单活与深度", "passed": passed}
 
 static func test_switch_to_clears_stack() -> Dictionary:
-	var stack := GameLoopStateStack.new()
-	stack.push_state(GameLoopStateStack.EngineState.WORLD_EXPLORATION, {"map": "town"})
-	stack.switch_to(GameLoopStateStack.EngineState.COMBAT_ENCOUNTER, {"enemy": "orc"})
-	var passed: bool = stack.stack_depth() == 1 and stack.current_state == GameLoopStateStack.EngineState.COMBAT_ENCOUNTER and stack.global_context.get("enemy") == "orc"
+	var stack := GameLoopFSM.new()
+	stack.push_state(GameLoopFSM.EngineState.WORLD_EXPLORATION, {"map": "town"})
+	stack.switch_to(GameLoopFSM.EngineState.COMBAT_ENCOUNTER, {"enemy": "orc"})
+	var passed: bool = stack.stack_depth() == 1 and stack.current_state == GameLoopFSM.EngineState.COMBAT_ENCOUNTER and stack.global_context.get("enemy") == "orc"
 	return {"test": "TC-FSM-02: switch_to 清栈与上下文", "passed": passed}
 
 static func test_pop_guard_at_depth_one() -> Dictionary:
-	var stack := GameLoopStateStack.new()
+	var stack := GameLoopFSM.new()
 	var before: int = stack.stack_depth()
 	var after: int = stack.pop_state()
-	var passed: bool = before == 1 and stack.stack_depth() == 1 and after == GameLoopStateStack.EngineState.BOOT_INIT
+	var passed: bool = before == 1 and stack.stack_depth() == 1 and after == GameLoopFSM.EngineState.BOOT_INIT
 	return {"test": "TC-FSM-03: 栈深1时 pop 拒绝", "passed": passed}
 
 static func test_context_merge_and_serialize() -> Dictionary:
-	var stack := GameLoopStateStack.new()
-	stack.push_state(GameLoopStateStack.EngineState.CHARACTER_SELECT, {"slot": 1})
+	var stack := GameLoopFSM.new()
+	stack.push_state(GameLoopFSM.EngineState.CHARACTER_SELECT, {"slot": 1})
 	var data: Dictionary = stack.serialize()
-	var restored := GameLoopStateStack.new()
+	var restored := GameLoopFSM.new()
 	restored.deserialize(data)
 	var passed: bool = restored.current_state == stack.current_state and restored.global_context.get("slot") == 1
 	return {"test": "TC-FSM-04: 上下文合并与序列化", "passed": passed}
 
 static func test_same_state_push_idempotent() -> Dictionary:
 	# L7：同状态带 context 重复 push 只刷新上下文、不追加重复栈帧
-	var stack := GameLoopStateStack.new()
-	stack.push_state(GameLoopStateStack.EngineState.LOGIN_AUTH)
-	stack.push_state(GameLoopStateStack.EngineState.CHARACTER_SELECT)
+	var stack := GameLoopFSM.new()
+	stack.push_state(GameLoopFSM.EngineState.LOGIN_AUTH)
+	stack.push_state(GameLoopFSM.EngineState.CHARACTER_SELECT)
 	var depth_before := stack.stack_depth()
-	stack.push_state(GameLoopStateStack.EngineState.CHARACTER_SELECT, {"slot": 1})
-	stack.push_state(GameLoopStateStack.EngineState.CHARACTER_SELECT, {"slot": 2})
+	stack.push_state(GameLoopFSM.EngineState.CHARACTER_SELECT, {"slot": 1})
+	stack.push_state(GameLoopFSM.EngineState.CHARACTER_SELECT, {"slot": 2})
 	var same_ok = stack.stack_depth() == depth_before and stack.global_context.get("slot") == 2
 	# 不同状态仍正常压栈
-	stack.push_state(GameLoopStateStack.EngineState.WORLD_EXPLORATION)
+	stack.push_state(GameLoopFSM.EngineState.WORLD_EXPLORATION)
 	var grow_ok = stack.stack_depth() == depth_before + 1
-	var passed = same_ok and grow_ok and stack.current_state == GameLoopStateStack.EngineState.WORLD_EXPLORATION
+	var passed = same_ok and grow_ok and stack.current_state == GameLoopFSM.EngineState.WORLD_EXPLORATION
 	return {"test": "TC-FSM-05: 同状态幂等压栈（不追加重复栈帧、仅刷新上下文）", "passed": passed}

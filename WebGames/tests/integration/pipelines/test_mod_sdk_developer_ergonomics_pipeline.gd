@@ -10,6 +10,8 @@
 class_name TestModSdkDeveloperErgonomicsPipeline
 extends TestCase
 
+const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
+
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
@@ -25,12 +27,14 @@ static func run_all_tests() -> Dictionary:
 	return TestCase.pack_results("MOD开发者便利套件协议同步与全链路调试推演流水线", results)
 
 static func _setup_env() -> void:
+	WorldSessionRuntimeService.reset_for_tests()
 	SaveDataAccessLayer.reset_for_tests()
 	GameLifecycleManager.reset_for_test()
 	HumanControlLeaseManager.reset_for_tests()
 	UnifiedProtocolFactory.reset_for_tests()
 
 static func _teardown_env() -> void:
+	WorldSessionRuntimeService.reset_for_tests()
 	SaveDataAccessLayer.reset_for_tests()
 	GameLifecycleManager.reset_for_test()
 	HumanControlLeaseManager.reset_for_tests()

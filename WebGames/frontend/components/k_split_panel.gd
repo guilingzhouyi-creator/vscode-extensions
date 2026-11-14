@@ -71,11 +71,13 @@ func get_left_panel() -> Control:
 func get_right_panel() -> Control:
 	return _right_panel
 
+## 替换左侧分栏内挂载的子节点内容（先移除既有子节点，不释放外部所有权）
 func set_left_content(node: Control) -> void:
 	for child in _left_panel.get_children():
 		_left_panel.remove_child(child)
 	_left_panel.add_child(node)
 
+## 替换右侧分栏内挂载的子节点内容（先移除既有子节点，不释放外部所有权）
 func set_right_content(node: Control) -> void:
 	for child in _right_panel.get_children():
 		_right_panel.remove_child(child)

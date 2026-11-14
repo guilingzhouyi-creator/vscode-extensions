@@ -27,6 +27,7 @@ func mark_read(mails: Array, mail_id: String) -> Array:
 			break
 	return updated
 
+## 按给定邮件 ID 列表过滤删除邮件并返回保留列表
 func delete_by_ids(mails: Array, ids: Array) -> Array:
 	var kept: Array = []
 	for mail in mails:
@@ -34,6 +35,7 @@ func delete_by_ids(mails: Array, ids: Array) -> Array:
 			kept.append(mail)
 	return kept
 
+## 一键领取所有未领附件邮件并返回更新后的列表与领取计数
 func claim_all(mails: Array) -> Dictionary:
 	var updated: Array = mails.duplicate(true)
 	var claimed := 0
@@ -43,6 +45,7 @@ func claim_all(mails: Array) -> Dictionary:
 			claimed += 1
 	return {"success": true, "mails": updated, "claimed_count": claimed}
 
+## 领取单封指定邮件的附件并返回操作结果
 func claim_one(mails: Array, mail_id: String) -> Dictionary:
 	var updated: Array = mails.duplicate(true)
 	for mail in updated:

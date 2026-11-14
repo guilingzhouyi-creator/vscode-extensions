@@ -30,6 +30,9 @@ const WorldSessionRuntimeService = preload("res://backend/domains/world_state/se
 const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
 const UnifiedProtocolDispatcher = preload("res://backend/domains/world_state/services/unified_protocol_dispatcher.gd")
 const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
+const GameSettingsProtocolHandler = preload("res://backend/domains/game_settings/game_settings_protocol_handler.gd")
+const TestClientProtocolExtendedHelper = preload("res://tests/integration/pipelines/test_client_protocol_extended_helper.gd")
+const AppLifecycleFSM = preload("res://frontend/app/app_lifecycle_fsm.gd")
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
@@ -43,11 +46,17 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_proto_08_hud_event_bridge_six_channels_and_pull_snapshot())
 	results.append(test_proto_09_exit_world_to_gateway_and_mode_switch())
 	results.append(test_proto_10_real_service_container_wiring_and_isolation())
+	results.append(TestClientProtocolExtendedHelper.test_proto_11_full_eleven_link_reserved_interfaces_chain(Callable(TestClientProtocolSpaceAndBoundaryPipeline, "_setup_env"), Callable(TestClientProtocolSpaceAndBoundaryPipeline, "_teardown_env")))
+	results.append(TestClientProtocolExtendedHelper.test_proto_12_hud_event_bridge_stat_and_clock_unwrap(Callable(TestClientProtocolSpaceAndBoundaryPipeline, "_setup_env"), Callable(TestClientProtocolSpaceAndBoundaryPipeline, "_teardown_env"), Callable(TestClientProtocolSpaceAndBoundaryPipeline, "_bootstrap_in_world_character")))
+	results.append(test_proto_13_game_settings_protocol_and_honest_failures())
+	results.append(test_proto_14_mock_service_container_reserved_interfaces_parity())
 	_teardown_env()
 	return TestCase.pack_results("Phase 128 客户端交互协议空间标准化与边界适配器验收流水线", results)
 
 static func _setup_env() -> void:
 	TestFullChainBackendHelper.setup_env()
+	GameSettingsProtocolHandler.reset_for_tests()
+	AppLifecycleFSM.get_instance().reset()
 	ServiceLocator.set_mode("backend")
 	RealServiceContainer.reset_instance()
 	MockServiceContainer.reset_instance()
@@ -59,6 +68,13 @@ static func _teardown_env() -> void:
 	ServiceLocator.set_mode("mock")
 	RealServiceContainer.reset_instance()
 	MockServiceContainer.reset_instance()
+	GameSettingsProtocolHandler.reset_for_tests()
+	AppLifecycleFSM.get_instance().reset()
+	for slot_key in ["slot_01", "slot_98"]:
+		for ext in [".kalar_save", ".bak", ".tmp", ".sav"]:
+			var vault_file := "user://offline_vault/%s%s" % [slot_key, ext]
+			if FileAccess.file_exists(vault_file):
+				DirAccess.remove_absolute(vault_file)
 	TestFullChainBackendHelper.teardown_env()
 
 ## TC-PROTO-01: RealAuthService 异步注册/登录全生命周期与后端全链路会话真源同步激活验证
@@ -398,4 +414,68 @@ static func test_proto_10_real_service_container_wiring_and_isolation() -> Dicti
 	var passed: bool = ok_container and ok_types and ok_mock and ok_mock_auth
 	return TestCase.make_result("TC-PROTO-10: RealServiceContainer真实依赖注入容器装配与模式隔离验证", passed, {
 		"ok_container": ok_container, "ok_types": ok_types, "ok_mock": ok_mock, "ok_mock_auth": ok_mock_auth
+	})
+
+## TC-PROTO-13: GameSettings 协议闭环与游客/清槽及异常诚实失败验证
+static func test_proto_13_game_settings_protocol_and_honest_failures() -> Dictionary:
+	_setup_env()
+	var container := ServiceLocator.get_instance()
+	var unauth_pro := {}
+	container.prologue().complete_prologue_async("", "", "", false, func(r: Dictionary): unauth_pro.merge(r))
+	var ok_unauth_fail := not bool(unauth_pro.get("success", true)) and str(unauth_pro.get("error_code", "")) == "ERR_UNAUTHORIZED"
+
+	var guest := {}
+	container.auth().login_guest_async("DEV_P128_13", func(r: Dictionary): guest.merge(r))
+	var g_acc := String(guest.get("account_id", ""))
+	var g_tok := String(guest.get("token", ""))
+	var ok_guest := bool(guest.get("success", false)) and not g_tok.is_empty()
+
+	var no_pro := {}
+	container.prologue().complete_prologue_async(g_acc, g_tok, "", false, func(r: Dictionary): no_pro.merge(r))
+	var ok_honest_fail := not bool(no_pro.get("success", true)) and str(no_pro.get("error_code", "")) == "ERR_NO_PROLOGUE_CONTEXT"
+
+	var applied := {}
+	var confirmed := {}
+	var reset_res := {}
+	container.game_settings().apply_settings_async(g_acc, g_tok, {"render": {"resolution_width": 1280, "resolution_height": 720}}, func(r: Dictionary): applied.merge(r))
+	container.game_settings().confirm_resolution_async(g_acc, g_tok, func(r: Dictionary): confirmed.merge(r))
+	container.game_settings().reset_defaults_async(g_acc, g_tok, func(r: Dictionary): reset_res.merge(r))
+	var ok_pending := bool((applied.get("data", {}) as Dictionary).get("is_pending_confirm", false))
+	var ok_confirmed := bool(confirmed.get("success", false)) and not bool((confirmed.get("data", {}) as Dictionary).get("is_pending_confirm", true))
+	var ok_reset := bool(reset_res.get("success", false))
+
+	_teardown_env()
+	var passed := ok_unauth_fail and ok_honest_fail and ok_guest and ok_pending and ok_confirmed and ok_reset
+	return TestCase.make_result("TC-PROTO-13: GameSettings协议闭环与游客及失败诚实反馈验证", passed, {
+		"ok_unauth_fail": ok_unauth_fail, "ok_honest_fail": ok_honest_fail, "ok_guest": ok_guest, "ok_pending": ok_pending, "ok_confirmed": ok_confirmed, "ok_reset": ok_reset
+	})
+
+## TC-PROTO-14: MockServiceContainer 四新接口与 ESC 暂停/设置同构契约验证
+static func test_proto_14_mock_service_container_reserved_interfaces_parity() -> Dictionary:
+	_setup_env()
+	ServiceLocator.set_mode("mock")
+	var mock_c := ServiceLocator.get_instance()
+	var pro: Object = mock_c.prologue()
+	var hud: Object = mock_c.hud_sync()
+	var lc: Object = mock_c.lifecycle()
+	var cfg: Object = mock_c.game_settings()
+	var esc: Object = mock_c.esc_menu()
+	for svc in [pro, hud, lc, cfg, esc]:
+		if svc != null:
+			svc.set("simulate_delay_ms", 0)
+
+	var p_res := {}
+	var h_res := {}
+	var l_res := {}
+	var g_res := {}
+	var e_res := {}
+	mock_c.prologue().start_prologue_async("ACC_M", "TOK_M", {}, func(r: Dictionary): p_res.merge(r))
+	mock_c.hud_sync().pull_authoritative_snapshot_async("ACC_M", "TOK_M", "CHAR_M", func(r: Dictionary): h_res.merge(r))
+	mock_c.lifecycle().pause_game_async("ACC_M", "TOK_M", "ESC_MENU", func(r: Dictionary): l_res.merge(r))
+	mock_c.game_settings().get_settings_async("ACC_M", "TOK_M", func(r: Dictionary): g_res.merge(r))
+	mock_c.esc_menu().pause_game_async(func(r: Dictionary): e_res.merge(r))
+	_teardown_env()
+	var passed := bool(p_res.get("success", false)) and bool(h_res.get("success", false)) and bool(l_res.get("success", false)) and bool(g_res.get("success", false)) and bool(e_res.get("success", false))
+	return TestCase.make_result("TC-PROTO-14: MockServiceContainer保留交互接口同构契约验证", passed, {
+		"pro": bool(p_res.get("success", false)), "hud": bool(h_res.get("success", false)), "lc": bool(l_res.get("success", false)), "cfg": bool(g_res.get("success", false)), "esc": bool(e_res.get("success", false))
 	})

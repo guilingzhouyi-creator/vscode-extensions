@@ -13,7 +13,7 @@ const ErrorCodeRegistryClass = preload("res://backend/infrastructure/error_code_
 const LogFileExporterClass = preload("res://backend/infrastructure/log_file_exporter.gd")
 const ErrorReporterClass = preload("res://backend/infrastructure/error_reporter.gd")
 const ContractRegistryIndexClass = preload("res://backend/domains/contract_registry/contract_registry_index.gd")
-const GMArbitrationAuditServiceClass = preload("res://backend/domains/admin_sandbox/gm_audit_service.gd")
+const GMArbitrationAuditServiceClass = preload("res://backend/domains/admin_sandbox/gm_arbitration_audit_service.gd")
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
