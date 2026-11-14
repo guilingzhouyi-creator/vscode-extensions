@@ -43,9 +43,9 @@ var tab_double_tap: TabDoubleTapDetector = TabDoubleTapDetector.new()
 
 static func _merge_joypad_keys(raw_keys: Array, existing: Array) -> Array:
 	var merged: Array = raw_keys.duplicate()
-	for item in existing:
-		if str(item).begins_with("Joypad_") and not (item in merged):
-			merged.append(item)
+	for binding_key in existing:
+		if str(binding_key).begins_with("Joypad_") and not (binding_key in merged):
+			merged.append(binding_key)
 	return merged
 
 const EMPTY_KEY_ARRAY: Array = []

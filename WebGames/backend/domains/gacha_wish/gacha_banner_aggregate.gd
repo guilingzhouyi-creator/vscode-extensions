@@ -38,17 +38,17 @@ func serialize() -> Dictionary:
 
 ## 反序列化：缺键一律沿用字段初值（即 banner_defaults 配置缺省），默认值单点化于此。
 ## banner_title 刻意保留独立的 fallback_title 键（损坏存档回落「限时祈愿」短题）。
-static func deserialize(data: Dictionary) -> GachaBannerAggregate:
+static func deserialize(serialized_payload: Dictionary) -> GachaBannerAggregate:
 	var banner := GachaBannerAggregate.new()
-	if data == null or data.is_empty():
+	if serialized_payload == null or serialized_payload.is_empty():
 		return banner
-	banner.banner_id = String(data.get("banner_id", banner.banner_id))
-	banner.banner_title = String(data.get("banner_title", GameConfig.get_string("domains.gacha", "banner_defaults/fallback_title", "限时祈愿")))
-	banner.cost_per_pull_gold = maxi(0, int(data.get("cost_per_pull_gold", banner.cost_per_pull_gold)))
-	banner.cost_per_pull_crystals = maxi(0, int(data.get("cost_per_pull_crystals", banner.cost_per_pull_crystals)))
-	banner.current_pity_count = maxi(0, int(data.get("current_pity_count", banner.current_pity_count)))
-	banner.is_next_guaranteed_up = bool(data.get("is_next_guaranteed_up", banner.is_next_guaranteed_up))
-	banner.total_lifetime_pulls = maxi(0, int(data.get("total_lifetime_pulls", banner.total_lifetime_pulls)))
+	banner.banner_id = String(serialized_payload.get("banner_id", banner.banner_id))
+	banner.banner_title = String(serialized_payload.get("banner_title", GameConfig.get_string("domains.gacha", "banner_defaults/fallback_title", "限时祈愿")))
+	banner.cost_per_pull_gold = maxi(0, int(serialized_payload.get("cost_per_pull_gold", banner.cost_per_pull_gold)))
+	banner.cost_per_pull_crystals = maxi(0, int(serialized_payload.get("cost_per_pull_crystals", banner.cost_per_pull_crystals)))
+	banner.current_pity_count = maxi(0, int(serialized_payload.get("current_pity_count", banner.current_pity_count)))
+	banner.is_next_guaranteed_up = bool(serialized_payload.get("is_next_guaranteed_up", banner.is_next_guaranteed_up))
+	banner.total_lifetime_pulls = maxi(0, int(serialized_payload.get("total_lifetime_pulls", banner.total_lifetime_pulls)))
 	return banner
 
 ## 事务进度快照（SURFACE_COUNTER）：保底三字段整体采集，附带 banner_id 防跨池串扰。

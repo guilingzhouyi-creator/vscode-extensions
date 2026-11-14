@@ -16,30 +16,30 @@ static func apply_debug_command(
 	toggle_manager: FeatureToggleAggregate,
 	command: String,
 	feature_key: String,
-	param_value: Variant = null
+	parameter_value: Variant = null
 ) -> Dictionary:
-	var flag: Variant = toggle_manager.get_flag(feature_key)
-	if flag == null:
-		flag = FeatureToggleAggregate.FeatureFlagEntry.new(feature_key)
-		toggle_manager.register_flag(flag)
+	var feature_flag: Variant = toggle_manager.get_flag(feature_key)
+	if feature_flag == null:
+		feature_flag = FeatureToggleAggregate.FeatureFlagEntry.new(feature_key)
+		toggle_manager.register_flag(feature_flag)
 
 	match command:
 		"ENABLE_GLOBAL":
-			flag.strategy = FeatureToggleAggregate.RolloutStrategy.GLOBAL_ENABLED
-			flag.is_circuit_broken = false
+			feature_flag.strategy = FeatureToggleAggregate.RolloutStrategy.GLOBAL_ENABLED
+			feature_flag.is_circuit_broken = false
 			return { "success": true, "feature_key": feature_key, "strategy": "GLOBAL_ENABLED" }
 		"DISABLE_GLOBAL":
-			flag.strategy = FeatureToggleAggregate.RolloutStrategy.GLOBAL_DISABLED
+			feature_flag.strategy = FeatureToggleAggregate.RolloutStrategy.GLOBAL_DISABLED
 			return { "success": true, "feature_key": feature_key, "strategy": "GLOBAL_DISABLED" }
 		"SET_PERCENTAGE":
-			var pct := clampi(int(param_value), 0, 100)
-			flag.strategy = FeatureToggleAggregate.RolloutStrategy.PERCENTAGE_CANARY
-			flag.rollout_percentage = pct
-			flag.is_circuit_broken = false
-			return { "success": true, "feature_key": feature_key, "percentage": pct }
+			var threshold_percent := clampi(int(parameter_value), 0, 100)
+			feature_flag.strategy = FeatureToggleAggregate.RolloutStrategy.PERCENTAGE_CANARY
+			feature_flag.rollout_percentage = threshold_percent
+			feature_flag.is_circuit_broken = false
+			return { "success": true, "feature_key": feature_key, "percentage": threshold_percent }
 		"RESET_CIRCUIT_BREAKER":
-			flag.is_circuit_broken = false
-			flag.failure_count = 0
+			feature_flag.is_circuit_broken = false
+			feature_flag.failure_count = 0
 			return { "success": true, "feature_key": feature_key, "status": "RESET_OK" }
 
 	return { "success": false, "error_code": "UNKNOWN_COMMAND" }

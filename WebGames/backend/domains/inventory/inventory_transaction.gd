@@ -20,7 +20,7 @@ var _wallet: CharacterWalletEntity = null
 var _catalog: ItemRegistryCatalog = null
 var _inventory_snapshot: Dictionary = {}
 var _wallet_values: Dictionary = {}
-var _committed: bool = false
+var _is_committed: bool = false
 
 static var _completed: Dictionary = {}
 
@@ -65,15 +65,15 @@ func is_duplicate() -> bool:
 	return not transaction_id.is_empty() and _completed.has(transaction_id)
 
 ## 提交：记录幂等结果（有界表），重复提交返回首次结果
-func commit(result: Dictionary = {}) -> Dictionary:
+func commit(transaction_outcome: Dictionary = {}) -> Dictionary:
 	if transaction_id.is_empty():
-		_committed = true
-		return result
+		_is_committed = true
+		return transaction_outcome
 	if _completed.has(transaction_id):
 		return _completed[transaction_id]
-	_committed = true
-	_completed[transaction_id] = result.duplicate(true)
-	return result
+	_is_committed = true
+	_completed[transaction_id] = transaction_outcome.duplicate(true)
+	return transaction_outcome
 
 # ==============================================================================
 # 三、回滚与重置

@@ -28,12 +28,12 @@ static func evaluate_experience_rank(
 	var delta := GameConfig.get_float("domains.inventory", "formula/delta_mastery", 0.05)
 	var age_normalize := GameConfig.get_float("domains.inventory", "formula/age_normalize", 100.0)
 
-	var safe_rep: float = maxf(0.0, reputation)
-	var rep_term: float = alpha * log(1.0 + safe_rep)
+	var safe_reputation: float = maxf(0.0, reputation)
+	var reputation_term: float = alpha * log(1.0 + safe_reputation)
 	var age_ratio: float = clampf(normalized_age / age_normalize, 0.0, 1.0)
 	var growth_term: float = beta * pow(age_ratio, gamma) * maxf(0.0, exploration_index)
 	var mastery_term: float = delta * maxf(0.0, skill_mastery_sum)
-	return int(floor(rep_term + growth_term + mastery_term))
+	return int(floor(reputation_term + growth_term + mastery_term))
 
 # ==============================================================================
 # 二、记忆半衰期遗忘模型
@@ -42,11 +42,11 @@ static func evaluate_experience_rank(
 ## 神经记忆与动作熟练度半衰期遗忘模型
 ## lambda_decay = forget_base / max(1.0, INT * int_coefficient)
 ## M(t) = M0 * exp(-lambda_decay * elapsed_days)
-static func calculate_memory_decay(initial_mastery: float, elapsed_days: float, int_stat: float) -> float:
+static func calculate_memory_decay(initial_mastery: float, elapsed_days: float, intelligence_stat: float) -> float:
 	var forget_base := GameConfig.get_float("domains.inventory", "formula/forget_base_rate", 0.05)
-	var int_coef := GameConfig.get_float("domains.inventory", "formula/int_coefficient", 0.1)
+	var intelligence_coefficient := GameConfig.get_float("domains.inventory", "formula/int_coefficient", 0.1)
 
-	var safe_int: float = maxf(1.0, int_stat * int_coef)
-	var lambda_decay: float = forget_base / safe_int
+	var safe_intelligence: float = maxf(1.0, intelligence_stat * intelligence_coefficient)
+	var lambda_decay: float = forget_base / safe_intelligence
 	var safe_days: float = maxf(0.0, elapsed_days)
 	return maxf(0.0, initial_mastery * exp(-lambda_decay * safe_days))

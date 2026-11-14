@@ -13,16 +13,16 @@ extends RefCounted
 
 ## 看穿检定：洞察力（INT×权重+感知加成）vs 伪装力（精密度×权重+AGI×权重）超阈值即识破
 static func evaluate_insight_check(
-	observer_int: float,
+	observer_intelligence: float,
 	observer_perception_bonus: float,
 	disguise_quality: float,
-	actor_agi: float
+	actor_agility: float
 ) -> bool:
 	var intelligence_weight := GameConfig.get_float("domains.identity_disguise", "insight_formula/int_weight", 1.5)
 	var perception_weight := GameConfig.get_float("domains.identity_disguise", "insight_formula/perception_bonus_weight", 1.0)
 	var quality_weight := GameConfig.get_float("domains.identity_disguise", "insight_formula/deception_quality_weight", 1.0)
 	var agility_weight := GameConfig.get_float("domains.identity_disguise", "insight_formula/agi_weight", 0.5)
 	var threshold := GameConfig.get_float("domains.identity_disguise", "insight_formula/reveal_threshold", 15.0)
-	var insight_power := observer_int * intelligence_weight + observer_perception_bonus * perception_weight
-	var deception_power := disguise_quality * quality_weight + actor_agi * agility_weight
+	var insight_power := observer_intelligence * intelligence_weight + observer_perception_bonus * perception_weight
+	var deception_power := disguise_quality * quality_weight + actor_agility * agility_weight
 	return insight_power > (deception_power + threshold)

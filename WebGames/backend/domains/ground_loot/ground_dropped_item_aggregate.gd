@@ -84,5 +84,5 @@ static func create_from_declaration(canonical_id: String, catalog: ItemRegistryC
 	var prototype: Variant = catalog.get_prototype(canonical_id)
 	if prototype == null:
 		return {"success": false, "error_code": "ITEM_NOT_REGISTERED", "canonical_id": canonical_id}
-	var item := ItemInstanceFactory.build_instance(prototype, display_name if not display_name.is_empty() else prototype.english_name, "DRP_")
-	return {"success": true, "item_entity": item, "canonical_id": canonical_id}
+	var dropped_item := ItemInstanceFactory.build_instance(prototype, display_name if not display_name.is_empty() else prototype.english_name, "DRP_")
+	return {"success": true, "item_entity": dropped_item, "canonical_id": canonical_id}

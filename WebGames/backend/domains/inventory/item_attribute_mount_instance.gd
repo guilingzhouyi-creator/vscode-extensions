@@ -41,16 +41,16 @@ var appraisal_audit: Dictionary = {
 # ==============================================================================
 
 ## 从字典重建挂载实例（分类/可见性双形态解析 + 防篡改审计载荷深拷贝）
-static func from_dto(data: Dictionary) -> ItemAttributeMountInstance:
+static func from_dto(serialized_mount: Dictionary) -> ItemAttributeMountInstance:
 	var instance := ItemAttributeMountInstance.new()
-	if data == null:
+	if serialized_mount == null:
 		return instance
 
-	instance.mount_id = str(data.get("mount_id", ""))
-	instance.item_uid = str(data.get("item_uid", ""))
-	instance.attribute_uid = str(data.get("attribute_uid", ""))
+	instance.mount_id = str(serialized_mount.get("mount_id", ""))
+	instance.item_uid = str(serialized_mount.get("item_uid", ""))
+	instance.attribute_uid = str(serialized_mount.get("attribute_uid", ""))
 
-	var category_text := str(data.get("category", "INCREMENT")).to_upper()
+	var category_text := str(serialized_mount.get("category", "INCREMENT")).to_upper()
 	match category_text:
 		"DECREMENT":
 			instance.category = ItemAttributeDefinition.AttributeCategory.DECREMENT
@@ -59,9 +59,9 @@ static func from_dto(data: Dictionary) -> ItemAttributeMountInstance:
 		_:
 			instance.category = ItemAttributeDefinition.AttributeCategory.INCREMENT
 
-	instance.current_value = float(data.get("current_value", 0.0))
+	instance.current_value = float(serialized_mount.get("current_value", 0.0))
 
-	var visibility_text := str(data.get("visibility", "VISIBLE")).to_upper()
+	var visibility_text := str(serialized_mount.get("visibility", "VISIBLE")).to_upper()
 	match visibility_text:
 		"HIDDEN":
 			instance.visibility = VisibilityState.HIDDEN
@@ -70,8 +70,8 @@ static func from_dto(data: Dictionary) -> ItemAttributeMountInstance:
 		_:
 			instance.visibility = VisibilityState.VISIBLE
 
-	instance.is_active = bool(data.get("is_active", true))
-	instance.appraisal_audit = (data.get("appraisal_audit", {}) as Dictionary).duplicate(true)
+	instance.is_active = bool(serialized_mount.get("is_active", true))
+	instance.appraisal_audit = (serialized_mount.get("appraisal_audit", {}) as Dictionary).duplicate(true)
 
 	return instance
 

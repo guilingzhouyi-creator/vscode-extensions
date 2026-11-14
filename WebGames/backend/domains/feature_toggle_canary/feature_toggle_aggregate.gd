@@ -43,8 +43,8 @@ class FeatureFlagEntry extends RefCounted:
 var flags_registry: Dictionary = {}
 
 ## 登记特性开关条目（按 feature_key 索引）
-func register_flag(flag: FeatureFlagEntry) -> void:
-	flags_registry[flag.feature_key] = flag
+func register_flag(feature_flag: FeatureFlagEntry) -> void:
+	flags_registry[feature_flag.feature_key] = feature_flag
 
 ## 按键取开关条目（未登记返回 null）
 func get_flag(feature_key: String) -> FeatureFlagEntry:

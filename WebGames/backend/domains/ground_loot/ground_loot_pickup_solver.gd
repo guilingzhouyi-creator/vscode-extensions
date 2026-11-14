@@ -24,7 +24,7 @@ extends RefCounted
 ##   - 返回 { success, drop_id, picked_item }。
 static func attempt_pickup(
 	player_account_id: String,
-	player_pos: Vector2,
+	player_position: Vector2,
 	drop: GroundDroppedItemAggregate,
 	inventory: WearableInventoryAggregate,
 	library: AccountItemLibrary = null # GAP-01 统计库可空注入（测试确定性）
@@ -38,7 +38,7 @@ static func attempt_pickup(
 		}
 
 	# 2. 空间物理距离检定（欧氏距离 ≤ 拾取半径）
-	if not SpatialProximitySolver.is_within_radius_2d(player_pos, drop.local_coordinates, drop.pickup_radius_meters):
+	if not SpatialProximitySolver.is_within_radius_2d(player_position, drop.local_coordinates, drop.pickup_radius_meters):
 		return {
 			"success": false,
 			"error_code": "OUT_OF_PICKUP_RANGE",

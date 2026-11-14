@@ -21,14 +21,14 @@ static func execute_multi_pull(
 	catalog: ItemRegistryCatalog = null,
 	rng: DeterministicRNG = null,
 	library: AccountItemLibrary = null,
-	tx_id: String = ""
+	transaction_id: String = ""
 ) -> Dictionary:
 	if banner == null or wallet == null or inventory == null or catalog == null:
 		return {"success": false, "error_code": "MISSING_CONTEXT"}
 	var max_pulls := maxi(1, GameConfig.get_int("domains.gacha", "transaction/max_pull_count", 10))
 	if pull_count <= 0 or pull_count > max_pulls:
 		return {"success": false, "error_code": "INVALID_PULL_COUNT"}
-	var operation_id := tx_id if not tx_id.is_empty() else "GACHA_%s_%s" % [banner.banner_id, str(Time.get_ticks_usec())]
+	var operation_id := transaction_id if not transaction_id.is_empty() else "GACHA_%s_%s" % [banner.banner_id, str(Time.get_ticks_usec())]
 	if _completed_transactions.has(operation_id):
 		return _completed_transactions[operation_id]
 	var pull_rng := DeterministicRNG.resolve(rng)
@@ -64,13 +64,13 @@ static func execute_multi_pull(
 		if prototype == null:
 			grant_failed_count += 1
 			continue
-		var item := ItemInstanceFactory.build_instance(prototype, prototype.english_name, "GAC_", prototype.english_name + "_")
-		if inventory.add_item(item):
+		var granted_item := ItemInstanceFactory.build_instance(prototype, prototype.english_name, "GAC_", prototype.english_name + "_")
+		if inventory.add_item(granted_item):
 			granted_count += 1
 			if library != null:
 				ItemStatisticsSolver.record_item_event(library, ItemStatisticsSolver.EVENT_ITEM_GRANTED, str(draw_result.item_id), 1, catalog, null, {
-					"uid": item.item_uid,
-					"transaction_id": tx_id,
+					"uid": granted_item.item_uid,
+					"transaction_id": transaction_id,
 					"rule_id": "rule_gacha_pull"
 				})
 		else:
@@ -98,7 +98,7 @@ static func execute_multi_pull(
 		"category_key": "gacha"
 	})
 
-	var result := {
+	var execution_result := {
 		"success": true,
 		"drops": drop_results,
 		"highest_rarity": highest_rarity,
@@ -106,7 +106,7 @@ static func execute_multi_pull(
 		"grant_failed_count": grant_failed_count,
 		"transaction_id": operation_id
 	}
-	_completed_transactions[operation_id] = result.duplicate(true)
+	_completed_transactions[operation_id] = execution_result.duplicate(true)
 	# 有界保留：超容量按插入序裁剪最旧记录（内存有界，防无限增长；单次快照裁剪）
 	FifoBudget.trim_oldest(_completed_transactions, GameConfig.get_int("infrastructure.admin", "idempotency/max_records", 1000))
-	return result
+	return execution_result

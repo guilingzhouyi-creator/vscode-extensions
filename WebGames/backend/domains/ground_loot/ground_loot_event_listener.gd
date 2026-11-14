@@ -16,7 +16,7 @@ class_name GroundLootEventListener extends RefCounted
 
 var _catalog: ItemRegistryCatalog = null # 物品注册表（声明登记校验用）
 var _active_drops: Array[GroundDroppedItemAggregate] = [] # 活跃掉落物清单（拾取/衰变回收消费）
-var _sub_token: EventBusSubscriptionToken = null # 新总线订阅令牌（幂等解绑）
+var _subscription_token: EventBusSubscriptionToken = null # 新总线订阅令牌（幂等解绑）
 
 # ==============================================================================
 # 二、生命周期（构造订阅 / 销毁解绑）
@@ -25,14 +25,14 @@ var _sub_token: EventBusSubscriptionToken = null # 新总线订阅令牌（幂�
 ## 构造即订阅事件总线（注入 catalog 用于声明登记校验，未登记 canonical_id 拒绝生成）
 func _init(catalog: ItemRegistryCatalog) -> void:
 	_catalog = catalog
-	_sub_token = EventBusCore.get_instance().on_channel(
+	_subscription_token = EventBusCore.get_instance().on_channel(
 		EventChannelDefinition.DOMAIN_EVENT_GENERIC, _on_domain_packet)
 
 ## 资源释放与事件解绑（宿主销毁前调用，杜绝闭包泄漏）
 func dispose() -> void:
-	if _sub_token != null:
-		_sub_token.unbind()
-		_sub_token = null
+	if _subscription_token != null:
+		_subscription_token.unbind()
+		_subscription_token = null
 	_active_drops.clear()
 	_catalog = null
 
@@ -47,29 +47,29 @@ func _on_domain_packet(packet: EventPacket) -> void:
 		return
 	var payload: Dictionary = wrapper.get("payload", {}) if wrapper.get("payload", {}) is Dictionary else {}
 	var declarations: Array = payload.get("drop_declarations", [])
-	for decl in declarations:
-		if not decl is Dictionary:
+	for drop_declaration in declarations:
+		if not drop_declaration is Dictionary:
 			continue
-		var drop := _instantiate_drop_from_decl(decl)
+		var drop := _instantiate_drop_from_decl(drop_declaration)
 		if drop != null:
 			_active_drops.append(drop)
 
 ## 从掉落声明单项构建掉落物聚合实体
-func _instantiate_drop_from_decl(decl: Dictionary) -> GroundDroppedItemAggregate:
-	var canonical_id := str(decl.get("canonical_id", ""))
+func _instantiate_drop_from_decl(drop_declaration: Dictionary) -> GroundDroppedItemAggregate:
+	var canonical_id := str(drop_declaration.get("canonical_id", ""))
 	if canonical_id.is_empty():
 		return null
-	var result := GroundDroppedItemAggregate.create_from_declaration(
-		canonical_id, _catalog, str(decl.get("display_name", ""))
+	var declaration_result := GroundDroppedItemAggregate.create_from_declaration(
+		canonical_id, _catalog, str(drop_declaration.get("display_name", ""))
 	)
-	if not result.get("success", false):
+	if not declaration_result.get("success", false):
 		return null
 	return GroundDroppedItemAggregate.new(
 		IdGenerator.next_id("DRP_"),
-		result["item_entity"],
-		Vector2(float(decl.get("x", 0.0)), float(decl.get("y", 0.0))),
-		str(decl.get("killer_id", "")),
-		int(decl.get("decay_cat", GroundDroppedItemAggregate.LootDecayCategory.STANDARD_MINERAL_EQUIP))
+		declaration_result["item_entity"],
+		Vector2(float(drop_declaration.get("x", 0.0)), float(drop_declaration.get("y", 0.0))),
+		str(drop_declaration.get("killer_id", "")),
+		int(drop_declaration.get("decay_cat", GroundDroppedItemAggregate.LootDecayCategory.STANDARD_MINERAL_EQUIP))
 	)
 
 # ==============================================================================
@@ -117,16 +117,16 @@ func claim_drop(drop_id: String) -> GroundDroppedItemAggregate:
 func _claim_drop_instance(drop: GroundDroppedItemAggregate) -> bool:
 	if drop == null:
 		return false
-	var had := _active_drops.has(drop)
+	var has_drop := _active_drops.has(drop)
 	_active_drops.erase(drop)
-	return had
+	return has_drop
 
 ## N2：拾取便捷入口——查找 → GroundLootPickupSolver.attempt_pickup →
 ## 成功后出队，拾取链与监听器活跃掉落状态闭环（TC-/）。
 ## 优化：复用已查 drop 实例直接出队，避免 claim_drop 二次查找
 func attempt_pickup_from_ground(
 	player_account_id: String,
-	player_pos: Vector2,
+	player_position: Vector2,
 	drop_id: String,
 	inventory: WearableInventoryAggregate,
 	library: AccountItemLibrary = null
@@ -134,8 +134,8 @@ func attempt_pickup_from_ground(
 	var drop := find_active_drop(drop_id)
 	if drop == null:
 		return {"success": false, "error_code": "DROP_NOT_FOUND", "drop_id": drop_id}
-	var result := GroundLootPickupSolver.attempt_pickup(player_account_id, player_pos, drop, inventory, library)
-	if not result.get("success", false):
-		return result
+	var pickup_result := GroundLootPickupSolver.attempt_pickup(player_account_id, player_position, drop, inventory, library)
+	if not pickup_result.get("success", false):
+		return pickup_result
 	_claim_drop_instance(drop)
-	return result
+	return pickup_result

@@ -59,15 +59,15 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从字典反序列化（缺省字段回退默认；空字典返回全默认快照）
-static func from_dto(data: Dictionary) -> RefCounted:
+static func from_dto(serialized_snapshot: Dictionary) -> RefCounted:
 	var snapshot: InventoryMetricSnapshot = InventoryMetricSnapshot.new()
-	if data.is_empty():
+	if serialized_snapshot.is_empty():
 		return snapshot
-	snapshot.total_capacity_slots = int(data.get("total_capacity_slots", 0))
-	snapshot.used_volume_slots = int(data.get("used_volume_slots", 0))
-	snapshot.total_mass_kg = float(data.get("total_mass_kg", 0.0))
-	snapshot.max_carry_weight_kg = float(data.get("max_carry_weight_kg", get_default_max_carry_weight_kg()))
-	snapshot.item_count = int(data.get("item_count", 0))
-	snapshot.is_overweight = bool(data.get("is_overweight", false))
-	snapshot.is_full = bool(data.get("is_full", false))
+	snapshot.total_capacity_slots = int(serialized_snapshot.get("total_capacity_slots", 0))
+	snapshot.used_volume_slots = int(serialized_snapshot.get("used_volume_slots", 0))
+	snapshot.total_mass_kg = float(serialized_snapshot.get("total_mass_kg", 0.0))
+	snapshot.max_carry_weight_kg = float(serialized_snapshot.get("max_carry_weight_kg", get_default_max_carry_weight_kg()))
+	snapshot.item_count = int(serialized_snapshot.get("item_count", 0))
+	snapshot.is_overweight = bool(serialized_snapshot.get("is_overweight", false))
+	snapshot.is_full = bool(serialized_snapshot.get("is_full", false))
 	return snapshot

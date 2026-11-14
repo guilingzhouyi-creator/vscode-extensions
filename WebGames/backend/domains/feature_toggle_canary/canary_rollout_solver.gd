@@ -13,49 +13,49 @@ extends RefCounted
 
 ## 特性开关判定：熔断/全局禁用/白名单/百分比灰度的确定性哈希分桶
 static func is_feature_enabled_for_account(
-	flag: FeatureToggleAggregate.FeatureFlagEntry,
+	feature_flag: FeatureToggleAggregate.FeatureFlagEntry,
 	account_id: String
 ) -> bool:
-	if flag == null or flag.is_circuit_broken:
+	if feature_flag == null or feature_flag.is_circuit_broken:
 		return false
 
-	match flag.strategy:
+	match feature_flag.strategy:
 		FeatureToggleAggregate.RolloutStrategy.GLOBAL_DISABLED:
 			return false
 		FeatureToggleAggregate.RolloutStrategy.GLOBAL_ENABLED:
 			return true
 		FeatureToggleAggregate.RolloutStrategy.WHITELIST_ONLY:
-			return flag.whitelist_account_ids.has(account_id)
+			return feature_flag.whitelist_account_ids.has(account_id)
 		FeatureToggleAggregate.RolloutStrategy.PERCENTAGE_CANARY:
-			if flag.whitelist_account_ids.has(account_id):
+			if feature_flag.whitelist_account_ids.has(account_id):
 				return true
 			# 确定性哈希散列
-			var seed_str := account_id + ":" + flag.feature_key
-			var bucket := int(abs(seed_str.hash())) % _bucket_size()
-			return bucket < flag.rollout_percentage
+			var seed_text := account_id + ":" + feature_flag.feature_key
+			var bucket := int(abs(seed_text.hash())) % _bucket_size()
+			return bucket < feature_flag.rollout_percentage
 
 	return false
 
 ## 失败上报与熔断：计数达阈值置熔断并告警
 static func report_feature_failure(
-	flag: FeatureToggleAggregate.FeatureFlagEntry,
+	feature_flag: FeatureToggleAggregate.FeatureFlagEntry,
 	max_tolerable_failures: int = -1   # <0 表示取配置默认值 circuit_breaker/max_tolerable_failures
 ) -> Dictionary:
-	if flag == null:
+	if feature_flag == null:
 		return { "circuit_broken": false, "current_failures": 0 }
 
 	if max_tolerable_failures < 0:
 		max_tolerable_failures = _max_tolerable_failures()
 
-	flag.failure_count += 1
-	if flag.failure_count >= max_tolerable_failures:
-		flag.is_circuit_broken = true
+	feature_flag.failure_count += 1
+	if feature_flag.failure_count >= max_tolerable_failures:
+		feature_flag.is_circuit_broken = true
 		return {
 			"circuit_broken": true,
-			"feature_key": flag.feature_key,
-			"message": _msg("circuit_breaker_tripped") % [flag.feature_key, flag.failure_count]
+			"feature_key": feature_flag.feature_key,
+			"message": _msg("circuit_breaker_tripped") % [feature_flag.feature_key, feature_flag.failure_count]
 		}
-	return { "circuit_broken": false, "current_failures": flag.failure_count }
+	return { "circuit_broken": false, "current_failures": feature_flag.failure_count }
 
 # ==============================================================================
 # 配置读取

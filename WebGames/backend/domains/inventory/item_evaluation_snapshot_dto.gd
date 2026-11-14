@@ -48,20 +48,20 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从字典重建结算快照（缺省回退默认值 + 逐容器转型）
-static func from_dto(data: Dictionary) -> ItemEvaluationSnapshotDTO:
+static func from_dto(serialized_snapshot: Dictionary) -> ItemEvaluationSnapshotDTO:
 	var snapshot := ItemEvaluationSnapshotDTO.new()
-	if data == null:
+	if serialized_snapshot == null:
 		return snapshot
 
-	snapshot.item_uid = str(data.get("item_uid", ""))
-	snapshot.original_tier_rank = int(data.get("original_tier_rank", 1))
-	snapshot.effective_tier_rank = int(data.get("effective_tier_rank", 1))
-	snapshot.is_tier_promoted = bool(data.get("is_tier_promoted", false))
-	snapshot.total_affix_score = float(data.get("total_affix_score", 0.0))
-	snapshot.active_stats = (data.get("active_stats", {}) as Dictionary).duplicate(true)
-	snapshot.raw_increment_stats = (data.get("raw_increment_stats", {}) as Dictionary).duplicate(true)
-	snapshot.raw_decrement_stats = (data.get("raw_decrement_stats", {}) as Dictionary).duplicate(true)
-	snapshot.active_affix_uids = (data.get("active_affix_uids", []) as Array).duplicate(true)
-	snapshot.suppressed_affix_uids = (data.get("suppressed_affix_uids", []) as Array).duplicate(true)
+	snapshot.item_uid = str(serialized_snapshot.get("item_uid", ""))
+	snapshot.original_tier_rank = int(serialized_snapshot.get("original_tier_rank", 1))
+	snapshot.effective_tier_rank = int(serialized_snapshot.get("effective_tier_rank", 1))
+	snapshot.is_tier_promoted = bool(serialized_snapshot.get("is_tier_promoted", false))
+	snapshot.total_affix_score = float(serialized_snapshot.get("total_affix_score", 0.0))
+	snapshot.active_stats = (serialized_snapshot.get("active_stats", {}) as Dictionary).duplicate(true)
+	snapshot.raw_increment_stats = (serialized_snapshot.get("raw_increment_stats", {}) as Dictionary).duplicate(true)
+	snapshot.raw_decrement_stats = (serialized_snapshot.get("raw_decrement_stats", {}) as Dictionary).duplicate(true)
+	snapshot.active_affix_uids = (serialized_snapshot.get("active_affix_uids", []) as Array).duplicate(true)
+	snapshot.suppressed_affix_uids = (serialized_snapshot.get("suppressed_affix_uids", []) as Array).duplicate(true)
 
 	return snapshot

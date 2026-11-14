@@ -52,15 +52,15 @@ var synergy_tags: Array = []
 # ==============================================================================
 
 ## 从字典重建属性定义（ABC 分类/计算类型双形态解析，value_min 非负钳制）
-static func from_dto(data: Dictionary) -> ItemAttributeDefinition:
+static func from_dto(serialized_definition: Dictionary) -> ItemAttributeDefinition:
 	var definition := ItemAttributeDefinition.new()
-	if data == null:
+	if serialized_definition == null:
 		return definition
 
-	definition.attribute_uid = str(data.get("attribute_uid", ""))
-	definition.canonical_id = str(data.get("canonical_id", ""))
+	definition.attribute_uid = str(serialized_definition.get("attribute_uid", ""))
+	definition.canonical_id = str(serialized_definition.get("canonical_id", ""))
 
-	var category_text := str(data.get("category", "INCREMENT")).to_upper()
+	var category_text := str(serialized_definition.get("category", "INCREMENT")).to_upper()
 	match category_text:
 		"DECREMENT":
 			definition.category = AttributeCategory.DECREMENT
@@ -69,9 +69,9 @@ static func from_dto(data: Dictionary) -> ItemAttributeDefinition:
 		_:
 			definition.category = AttributeCategory.INCREMENT
 
-	definition.target_stat = str(data.get("target_stat", ""))
+	definition.target_stat = str(serialized_definition.get("target_stat", ""))
 
-	var calculation_text := str(data.get("calculation_type", "FLAT_ADD")).to_upper()
+	var calculation_text := str(serialized_definition.get("calculation_type", "FLAT_ADD")).to_upper()
 	match calculation_text:
 		"PERCENT_ADD":
 			definition.calculation_type = CalculationType.PERCENT_ADD
@@ -82,13 +82,13 @@ static func from_dto(data: Dictionary) -> ItemAttributeDefinition:
 		_:
 			definition.calculation_type = CalculationType.FLAT_ADD
 
-	definition.base_value = float(data.get("base_value", 0.0))
-	definition.value_min = maxf(0.0, float(data.get("value_min", 0.0)))
-	definition.value_max = float(data.get("value_max", 99999.0))
-	definition.affix_score = maxf(0.0, float(data.get("affix_score", 0.0)))
-	definition.appraisal_requirement = (data.get("appraisal_requirement", {}) as Dictionary).duplicate(true)
-	definition.conflict_tags = (data.get("conflict_tags", []) as Array).duplicate(true)
-	definition.synergy_tags = (data.get("synergy_tags", []) as Array).duplicate(true)
+	definition.base_value = float(serialized_definition.get("base_value", 0.0))
+	definition.value_min = maxf(0.0, float(serialized_definition.get("value_min", 0.0)))
+	definition.value_max = float(serialized_definition.get("value_max", 99999.0))
+	definition.affix_score = maxf(0.0, float(serialized_definition.get("affix_score", 0.0)))
+	definition.appraisal_requirement = (serialized_definition.get("appraisal_requirement", {}) as Dictionary).duplicate(true)
+	definition.conflict_tags = (serialized_definition.get("conflict_tags", []) as Array).duplicate(true)
+	definition.synergy_tags = (serialized_definition.get("synergy_tags", []) as Array).duplicate(true)
 
 	return definition
 

@@ -35,8 +35,8 @@ static func dispatch_shortcut(action_name: String, state: InputDeviceStateAggreg
 static func handle_hardware_event(state: InputDeviceStateAggregate, event_type: String, timestamp_ms: int) -> Dictionary:
 	if state == null or event_type.is_empty():
 		return {"success": false, "error_code": "INVALID_EVENT"}
-	var switched: bool = AdaptiveInputFilterSolver.handle_device_input_event(state, event_type, timestamp_ms)
-	return {"success": true, "switched": switched, "device": state.current_device}
+	var has_switched: bool = AdaptiveInputFilterSolver.handle_device_input_event(state, event_type, timestamp_ms)
+	return {"success": true, "switched": has_switched, "device": state.current_device}
 
 ## 文案：取快捷键提示（配置驱动，未命中回退键名）
 static func shortcut_prompt(action_name: String, state: InputDeviceStateAggregate) -> String:

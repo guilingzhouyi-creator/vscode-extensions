@@ -164,40 +164,40 @@ func mount_attribute(mount: ItemAttributeMountInstance) -> void:
 ## 两处刻意保留的差异默认回退：custom_name 走独立的 deserialize_name 键（损坏存档回落
 ## 「未知物品」而非「未命名物品」）；combat_metrics / affix_sockets 缺键回落空字典
 ## （非配置富缺省，与既有存档兼容语义一致）。
-static func deserialize(data: Dictionary, _instance_discriminator: String = "") -> ItemEntity:
-	var item := ItemEntity.new()
-	if data == null:
-		return item
-	item.item_id = str(data.get("item_id", item.item_id))
-	item.item_uid = data.get("item_uid", "")
-	item.template_id = str(data.get("template_id", item.template_id))
+static func deserialize(serialized_item: Dictionary, _instance_discriminator: String = "") -> ItemEntity:
+	var item_entity := ItemEntity.new()
+	if serialized_item == null:
+		return item_entity
+	item_entity.item_id = str(serialized_item.get("item_id", item_entity.item_id))
+	item_entity.item_uid = serialized_item.get("item_uid", "")
+	item_entity.template_id = str(serialized_item.get("template_id", item_entity.template_id))
 	# 缺省 UID 重设默认值：自动分配新架构标准服务端发放 UID（权威/可追溯/合规）
-	if item.item_uid.is_empty():
+	if item_entity.item_uid.is_empty():
 		var generated_uid := ItemUIDGenerator.generate_uid("SRV_")
 		if generated_uid.is_empty():
 			generated_uid = "SRV_00000001" + "SRV_1".sha256_text().substr(0, 2)
-		item.item_uid = generated_uid
-	item.custom_name = data.get("custom_name", _ensure_defaults().deserialize_name)
-	item.category = data.get("category", item.category)
-	item.mass_kg = maxf(0.0, float(data.get("mass_kg", item.mass_kg)))
-	item.volume_slots = maxi(0, int(data.get("volume_slots", item.volume_slots)))
-	item.durability_current = clampf(float(data.get("durability_current", item.durability_current)), 0.0, maxf(0.0, float(data.get("durability_max", item.durability_max))))
-	item.durability_max = maxf(0.0, float(data.get("durability_max", item.durability_max)))
-	item.material_hardness = maxf(0.0, float(data.get("material_hardness", item.material_hardness)))
-	item.combat_metrics = (data.get("combat_metrics", {}) as Dictionary).duplicate(true) if data.get("combat_metrics", {}) is Dictionary else {}
-	item.affix_sockets = (data.get("affix_sockets", {}) as Dictionary).duplicate(true) if data.get("affix_sockets", {}) is Dictionary else {}
-	item.market_base_price = maxi(0, int(data.get("market_base_price", item.market_base_price)))
-	item.quality_snapshot = (data.get("quality_snapshot", {}) as Dictionary).duplicate(true) if data.get("quality_snapshot", {}) is Dictionary else {}
-	item.container_state = str(data.get("container_state", item.container_state))
-	item.owner_account_id = str(data.get("owner_account_id", item.owner_account_id))
+		item_entity.item_uid = generated_uid
+	item_entity.custom_name = serialized_item.get("custom_name", _ensure_defaults().deserialize_name)
+	item_entity.category = serialized_item.get("category", item_entity.category)
+	item_entity.mass_kg = maxf(0.0, float(serialized_item.get("mass_kg", item_entity.mass_kg)))
+	item_entity.volume_slots = maxi(0, int(serialized_item.get("volume_slots", item_entity.volume_slots)))
+	item_entity.durability_current = clampf(float(serialized_item.get("durability_current", item_entity.durability_current)), 0.0, maxf(0.0, float(serialized_item.get("durability_max", item_entity.durability_max))))
+	item_entity.durability_max = maxf(0.0, float(serialized_item.get("durability_max", item_entity.durability_max)))
+	item_entity.material_hardness = maxf(0.0, float(serialized_item.get("material_hardness", item_entity.material_hardness)))
+	item_entity.combat_metrics = (serialized_item.get("combat_metrics", {}) as Dictionary).duplicate(true) if serialized_item.get("combat_metrics", {}) is Dictionary else {}
+	item_entity.affix_sockets = (serialized_item.get("affix_sockets", {}) as Dictionary).duplicate(true) if serialized_item.get("affix_sockets", {}) is Dictionary else {}
+	item_entity.market_base_price = maxi(0, int(serialized_item.get("market_base_price", item_entity.market_base_price)))
+	item_entity.quality_snapshot = (serialized_item.get("quality_snapshot", {}) as Dictionary).duplicate(true) if serialized_item.get("quality_snapshot", {}) is Dictionary else {}
+	item_entity.container_state = str(serialized_item.get("container_state", item_entity.container_state))
+	item_entity.owner_account_id = str(serialized_item.get("owner_account_id", item_entity.owner_account_id))
 
-	var raw_mounts: Variant = data.get("attribute_mounts", [])
+	var raw_mounts: Variant = serialized_item.get("attribute_mounts", [])
 	if raw_mounts is Array:
-		for mount_data in raw_mounts:
-			if mount_data is Dictionary:
-				item.attribute_mounts.append(ItemAttributeMountInstance.from_dto(mount_data))
+		for mount_entry in raw_mounts:
+			if mount_entry is Dictionary:
+				item_entity.attribute_mounts.append(ItemAttributeMountInstance.from_dto(mount_entry))
 
-	return item
+	return item_entity
 
 ## 物品载荷统一工厂：跨域 payload 字典 -> ItemEntity，杜绝各管线手工逐字段赋值漂移。
 ## 键名契约（canonical，括号内为兼容别名，检索顺序 canonical 优先）：
@@ -213,37 +213,37 @@ static func from_payload(
 	fallback_mass_kg: float = -1.0,
 	fallback_volume_slots: int = 0
 ) -> ItemEntity:
-	var item := ItemEntity.new()
+	var item_entity := ItemEntity.new()
 	var resolved_template_id := ""
 	if payload.has("item_id"):
-		item.item_id = str(payload["item_id"])
-		resolved_template_id = str(payload.get("template_id", item.item_id))
+		item_entity.item_id = str(payload["item_id"])
+		resolved_template_id = str(payload.get("template_id", item_entity.item_id))
 	elif payload.has("template_id"):
 		resolved_template_id = str(payload["template_id"])
-		item.item_id = resolved_template_id
+		item_entity.item_id = resolved_template_id
 	elif payload.has("item_template_id"):
 		resolved_template_id = str(payload["item_template_id"])
-		item.item_id = resolved_template_id
+		item_entity.item_id = resolved_template_id
 	else:
 		resolved_template_id = fallback_template_id
-		item.item_id = resolved_template_id
-	item.template_id = resolved_template_id
+		item_entity.item_id = resolved_template_id
+	item_entity.template_id = resolved_template_id
 	if payload.has("name"):
-		item.custom_name = str(payload["name"])
+		item_entity.custom_name = str(payload["name"])
 	elif payload.has("custom_name"):
-		item.custom_name = str(payload["custom_name"])
+		item_entity.custom_name = str(payload["custom_name"])
 	elif payload.has("item_name"):
-		item.custom_name = str(payload["item_name"])
+		item_entity.custom_name = str(payload["item_name"])
 	elif not fallback_name.is_empty():
-		item.custom_name = fallback_name
+		item_entity.custom_name = fallback_name
 	if payload.has("mass_kg"):
-		item.mass_kg = float(payload["mass_kg"])
+		item_entity.mass_kg = float(payload["mass_kg"])
 	elif fallback_mass_kg >= 0.0:
-		item.mass_kg = fallback_mass_kg
+		item_entity.mass_kg = fallback_mass_kg
 	if payload.has("volume_slots"):
-		item.volume_slots = int(payload["volume_slots"])
+		item_entity.volume_slots = int(payload["volume_slots"])
 	elif fallback_volume_slots > 0:
-		item.volume_slots = fallback_volume_slots
+		item_entity.volume_slots = fallback_volume_slots
 	if payload.has("item_uid"):
-		item.item_uid = str(payload["item_uid"])
-	return item
+		item_entity.item_uid = str(payload["item_uid"])
+	return item_entity

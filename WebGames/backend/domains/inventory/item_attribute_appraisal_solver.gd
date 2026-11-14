@@ -45,49 +45,49 @@ static func appraise_mount_attribute(
 	definition: ItemAttributeDefinition,
 	appraisal_context: Dictionary
 ) -> AppraisalResultDTO:
-	var result := AppraisalResultDTO.new()
+	var appraisal_result := AppraisalResultDTO.new()
 	if mount == null or definition == null:
-		result.success = false
-		result.error_code = "INVALID_MOUNT_OR_DEF"
-		result.message = "挂载实例或属性定义为空"
-		return result
+		appraisal_result.success = false
+		appraisal_result.error_code = "INVALID_MOUNT_OR_DEF"
+		appraisal_result.message = "挂载实例或属性定义为空"
+		return appraisal_result
 
-	result.previous_state = mount.visibility
+	appraisal_result.previous_state = mount.visibility
 
 	# 非特殊词缀无需鉴定
 	if mount.category != ItemAttributeDefinition.AttributeCategory.SPECIAL_AFFIX:
-		result.success = true
-		result.message = "非隐藏属性，无需鉴定"
-		result.new_state = mount.visibility
-		return result
+		appraisal_result.success = true
+		appraisal_result.message = "非隐藏属性，无需鉴定"
+		appraisal_result.new_state = mount.visibility
+		return appraisal_result
 
 	# 已经处于鉴定态
 	if mount.visibility == ItemAttributeMountInstance.VisibilityState.APPRAISED:
-		result.success = true
-		result.message = "该属性此前已完成鉴定"
-		result.new_state = mount.visibility
-		return result
+		appraisal_result.success = true
+		appraisal_result.message = "该属性此前已完成鉴定"
+		appraisal_result.new_state = mount.visibility
+		return appraisal_result
 
 	# 校验鉴定技能等级要求
 	var required_skill_level: int = int(definition.appraisal_requirement.get("min_skill_level", 1))
 	var player_skill: int = int(appraisal_context.get("appraisal_skill_level", 0))
 	if player_skill < required_skill_level:
-		result.success = false
-		result.error_code = "SKILL_LEVEL_INSUFFICIENT"
-		result.message = "鉴定技能等级不足 (需要: %d, 当前: %d)" % [required_skill_level, player_skill]
-		result.new_state = mount.visibility
-		return result
+		appraisal_result.success = false
+		appraisal_result.error_code = "SKILL_LEVEL_INSUFFICIENT"
+		appraisal_result.message = "鉴定技能等级不足 (需要: %d, 当前: %d)" % [required_skill_level, player_skill]
+		appraisal_result.new_state = mount.visibility
+		return appraisal_result
 
 	# 校验专属知识体系要求 (unlocked_lores)
 	var required_lore: String = str(definition.appraisal_requirement.get("required_lore", ""))
 	if not required_lore.is_empty():
 		var lores: Array = appraisal_context.get("unlocked_lores", [])
 		if not lores.has(required_lore):
-			result.success = false
-			result.error_code = "REQUIRED_LORE_MISSING"
-			result.message = "缺少必要的专业知识体系: %s" % required_lore
-			result.new_state = mount.visibility
-			return result
+			appraisal_result.success = false
+			appraisal_result.error_code = "REQUIRED_LORE_MISSING"
+			appraisal_result.message = "缺少必要的专业知识体系: %s" % required_lore
+			appraisal_result.new_state = mount.visibility
+			return appraisal_result
 
 	# 条件全部满足：执行服务端权威状态跃迁
 	mount.visibility = ItemAttributeMountInstance.VisibilityState.APPRAISED
@@ -104,13 +104,13 @@ static func appraise_mount_attribute(
 		"audit_signature": audit_signature
 	}
 
-	result.success = true
-	result.error_code = ""
-	result.message = "词缀鉴定成功，特殊机制已激活"
-	result.audit_token = audit_signature
-	result.new_state = ItemAttributeMountInstance.VisibilityState.APPRAISED
+	appraisal_result.success = true
+	appraisal_result.error_code = ""
+	appraisal_result.message = "词缀鉴定成功，特殊机制已激活"
+	appraisal_result.audit_token = audit_signature
+	appraisal_result.new_state = ItemAttributeMountInstance.VisibilityState.APPRAISED
 
-	return result
+	return appraisal_result
 
 # ==============================================================================
 # 三、防篡改签名生成

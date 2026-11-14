@@ -65,17 +65,17 @@ static func dispatch(request: ClientRequestEnvelopeDTO) -> UnifiedResponseEnvelo
 	return UnifiedProtocolFactory.create_unhandled_action_response(request.request_id, request.action_type)
 
 static func _handle_get_settings(request: ClientRequestEnvelopeDTO) -> UnifiedResponseEnvelopeDTO:
-	var loaded_from_disk := false
+	var is_loaded_from_disk := false
 	if FileAccess.file_exists(SettingsPersistenceService.DEFAULT_SETTINGS_PATH):
 		var load_result := SettingsPersistenceService.load_from_file(_active_settings)
-		loaded_from_disk = bool(load_result.get("success", false))
+		is_loaded_from_disk = bool(load_result.get("success", false))
 	return UnifiedProtocolFactory.create_response(
 		request.request_id,
 		true,
 		{
 			"settings": _active_settings.serialize(),
 			"is_pending_confirm": _apply_driver.is_pending_confirm,
-			"loaded_from_disk": loaded_from_disk
+			"loaded_from_disk": is_loaded_from_disk
 		},
 		"",
 		"Game settings retrieved successfully"
@@ -86,10 +86,10 @@ static func _handle_apply_settings(request: ClientRequestEnvelopeDTO, payload: D
 	if not patch.is_empty():
 		var render_raw: Variant = patch.get("render", null)
 		if render_raw is Dictionary and ((render_raw as Dictionary).has("resolution_width") or (render_raw as Dictionary).has("resolution_height")):
-			var render_dict := render_raw as Dictionary
-			var current_width := int(render_dict.get("resolution_width", _active_settings.render_settings.get("resolution_width", 1920)))
-			var current_height := int(render_dict.get("resolution_height", _active_settings.render_settings.get("resolution_height", 1080)))
-			var window_mode := str(render_dict.get("window_mode", _active_settings.render_settings.get("window_mode", "EXCLUSIVE_FULLSCREEN")))
+			var render_settings_dictionary := render_raw as Dictionary
+			var current_width := int(render_settings_dictionary.get("resolution_width", _active_settings.render_settings.get("resolution_width", 1920)))
+			var current_height := int(render_settings_dictionary.get("resolution_height", _active_settings.render_settings.get("resolution_height", 1080)))
+			var window_mode := str(render_settings_dictionary.get("window_mode", _active_settings.render_settings.get("window_mode", "EXCLUSIVE_FULLSCREEN")))
 			_apply_driver.apply_resolution_with_revert_guard(_active_settings, current_width, current_height, window_mode)
 		_active_settings.deserialize(patch)
 		_apply_driver.validate_and_sanitize(_active_settings)

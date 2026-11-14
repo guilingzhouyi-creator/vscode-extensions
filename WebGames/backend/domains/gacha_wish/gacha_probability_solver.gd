@@ -43,9 +43,9 @@ static func calculate_current_5star_rate(pity_count: int) -> float:
 	if pity_count < soft:
 		return _base_5star_rate()
 	var excess := pity_count - soft + 1
-	var base := _base_5star_rate()
-	var inc := _soft_increment()
-	return clamp(base + float(excess) * inc, base, 1.0)
+	var base_rate := _base_5star_rate()
+	var soft_increment := _soft_increment()
+	return clamp(base_rate + float(excess) * soft_increment, base_rate, 1.0)
 
 ## 执行单次抽奖判定
 ##
