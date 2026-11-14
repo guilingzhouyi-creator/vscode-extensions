@@ -53,7 +53,7 @@ func serialize() -> Dictionary:
 
 ## 反序列化：子段类型守卫（Inv-DF-3）逐段安全合并（损坏段回退默认并告警）
 func deserialize(data: Dictionary) -> void:
-	# L5（）：子段类型守卫（Inv-DF-3）——损坏文件（audio 等非 Dictionary）
+	# 子段类型守卫（Inv-DF-3）：损坏文件（audio 等非 Dictionary）
 	# 不再 typed 赋值崩溃，回退当前默认段并告警；合法段逐键覆盖
 	_merge_section(data.get("audio"), audio_settings, "audio")
 	_merge_section(data.get("ui_visual"), ui_visual_settings, "ui_visual")
@@ -62,7 +62,7 @@ func deserialize(data: Dictionary) -> void:
 ## 单段安全合并：raw 为 Dictionary 则逐键覆盖目标；为 null（缺键）忽略；其余类型告警回退
 func _merge_section(raw: Variant, target: Dictionary, section: String) -> void:
 	if raw is Dictionary:
-		for k in raw:
-			target[k] = raw[k]
+		for key in raw:
+			target[key] = raw[key]
 	elif raw != null:
 		EventBusCore.get_instance().emit_log("warn", TemplateFormatter.format("game_settings: section '{section}' corrupted (expected Dictionary, got {type}); default values preserved.", {"section": section, "type": type_string(typeof(raw))}))

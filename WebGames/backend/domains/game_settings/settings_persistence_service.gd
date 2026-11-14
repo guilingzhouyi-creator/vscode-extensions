@@ -18,32 +18,32 @@ static func save_to_memory_string(settings: GameSettingsAggregate) -> String:
 	return JSON.stringify(settings.serialize(), "\t")
 
 ## 从内存 JSON 字符串反序列化加载设置配置
-static func load_from_memory_string(settings: GameSettingsAggregate, json_str: String) -> bool:
-	var parsed: Variant = JSON.parse_string(json_str)
+static func load_from_memory_string(settings: GameSettingsAggregate, json_text: String) -> bool:
+	var parsed: Variant = JSON.parse_string(json_text)
 	if typeof(parsed) == TYPE_DICTIONARY:
 		settings.deserialize(parsed)
 		return true
 	return false
 
-## 真实文件落盘（）：固定路径 user://settings.kalar_cfg，写后 flush/close。
+## 真实文件落盘：固定路径 user://settings.kalar_cfg，写后 flush/close。
 ## 返回 { "success": bool, "path": String [, "error_code"] }
 static func save_to_file(settings: GameSettingsAggregate) -> Dictionary:
-	var write_res: Dictionary = AtomicFileWriter.write_text_atomic(DEFAULT_SETTINGS_PATH, save_to_memory_string(settings), {
+	var write_result: Dictionary = AtomicFileWriter.write_text_atomic(DEFAULT_SETTINGS_PATH, save_to_memory_string(settings), {
 		"create_backup": false
 	})
-	if bool(write_res.get("success", false)):
+	if bool(write_result.get("success", false)):
 		return { "success": true, "path": DEFAULT_SETTINGS_PATH }
-	var err_code: String = "ATOMIC_REPLACE_FAIL" if str(write_res.get("error_stage", "")) == "rename" else "OPEN_WRITE_FAIL"
-	return { "success": false, "error_code": err_code, "path": DEFAULT_SETTINGS_PATH }
+	var error_code: String = "ATOMIC_REPLACE_FAIL" if str(write_result.get("error_stage", "")) == "rename" else "OPEN_WRITE_FAIL"
+	return { "success": false, "error_code": error_code, "path": DEFAULT_SETTINGS_PATH }
 
-## 真实文件读取并应用（）：缺失/解析失败返回受控错误码，不抛 Fatal。
+## 真实文件读取并应用：缺失/解析失败返回受控错误码，不抛 Fatal。
 static func load_from_file(settings: GameSettingsAggregate) -> Dictionary:
 	if not FileAccess.file_exists(DEFAULT_SETTINGS_PATH):
 		return { "success": false, "error_code": "FILE_NOT_EXIST", "path": DEFAULT_SETTINGS_PATH }
 	var file := FileAccess.open(DEFAULT_SETTINGS_PATH, FileAccess.READ)
 	if not file:
 		return { "success": false, "error_code": "OPEN_READ_FAIL", "path": DEFAULT_SETTINGS_PATH }
-	var json_str := file.get_as_text()
+	var json_text := file.get_as_text()
 	file.close()
-	var ok := load_from_memory_string(settings, json_str)
-	return { "success": ok, "error_code": "" if ok else "PARSE_FAIL", "path": DEFAULT_SETTINGS_PATH }
+	var is_loaded := load_from_memory_string(settings, json_text)
+	return { "success": is_loaded, "error_code": "" if is_loaded else "PARSE_FAIL", "path": DEFAULT_SETTINGS_PATH }

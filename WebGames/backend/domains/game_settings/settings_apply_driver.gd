@@ -18,9 +18,9 @@ var backup_settings_snapshot: Dictionary = {}
 ## 合法性校验与清洗：音量/UI 缩放钳制 + 分辨率低于下限回退安全分辨率
 func validate_and_sanitize(settings: GameSettingsAggregate) -> bool:
 	# 1. 音量限制（边界由 config/domains/game_settings.json 的 audio.* 驱动）
-	for k in settings.audio_settings:
-		if k != "is_master_muted":
-			settings.audio_settings[k] = clampf(settings.audio_settings[k], _audio_min(), _audio_max())
+	for audio_key in settings.audio_settings:
+		if audio_key != "is_master_muted":
+			settings.audio_settings[audio_key] = clampf(settings.audio_settings[audio_key], _audio_min(), _audio_max())
 
 	# 2. UI 缩放限制（边界由 ui.min_scale / ui.max_scale 驱动）
 	settings.ui_visual_settings["ui_scale"] = clampf(
@@ -28,9 +28,9 @@ func validate_and_sanitize(settings: GameSettingsAggregate) -> bool:
 	)
 
 	# 3. 分辨率合法性：低于下限则回退到安全分辨率
-	var w: Variant = settings.render_settings.get("resolution_width", _default_width())
-	var h: Variant = settings.render_settings.get("resolution_height", _default_height())
-	if w < _min_width() or h < _min_height():
+	var resolution_width: Variant = settings.render_settings.get("resolution_width", _default_width())
+	var resolution_height: Variant = settings.render_settings.get("resolution_height", _default_height())
+	if resolution_width < _min_width() or resolution_height < _min_height():
 		settings.render_settings["resolution_width"] = _fallback_width()
 		settings.render_settings["resolution_height"] = _fallback_height()
 
@@ -39,13 +39,13 @@ func validate_and_sanitize(settings: GameSettingsAggregate) -> bool:
 ## 应用分辨率并启动回滚守护：备份快照 + 置待确认态与超时计时
 func apply_resolution_with_revert_guard(
 	settings: GameSettingsAggregate,
-	new_w: int,
-	new_h: int,
+	new_width: int,
+	new_height: int,
 	new_mode: String
 ) -> void:
 	backup_settings_snapshot = settings.serialize()
-	settings.render_settings["resolution_width"] = new_w
-	settings.render_settings["resolution_height"] = new_h
+	settings.render_settings["resolution_width"] = new_width
+	settings.render_settings["resolution_height"] = new_height
 	settings.render_settings["window_mode"] = new_mode
 
 	is_pending_confirm = true
@@ -61,7 +61,7 @@ func tick_revert_timer(delta: float, settings: GameSettingsAggregate) -> bool:
 	if not is_pending_confirm:
 		return false
 
-	# 契约（）：回滚计时器只接受非负 delta（负 delta 拒绝，防时间倒退拖延回滚）
+	# 契约：回滚计时器只接受非负 delta（负 delta 拒绝，防时间倒退拖延回滚）
 	if delta < 0.0:
 		return false
 	pending_revert_timer -= delta
