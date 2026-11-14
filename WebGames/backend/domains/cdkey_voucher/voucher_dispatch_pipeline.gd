@@ -35,9 +35,9 @@ static func dispatch_rewards_via_mail(
 		return { "success": false, "error_code": "MAIL_DISPATCH_INVALID", "mail_id": mail_id }
 
 	var mail := MailItemAggregate.new(
-		# M3（）：默认 mail_id 走唯一 ID 生成器（同毫秒防碰撞序号），
+		# 默认 mail_id 走唯一 ID 生成器（同毫秒防碰撞序号），
 		# 替代秒级时间戳裸拼——杜绝同秒跨账户/同账户同秒投递 id 碰撞
-		mail_id if not mail_id.is_empty() else UniqueIdGenerator.next_id("CDK"),
+		mail_id if not mail_id.is_empty() else IdGenerator.next_id("CDK"),
 		recipient_account_id,
 		_mail_title(),
 		_mail_body()
@@ -59,7 +59,7 @@ static func dispatch_rewards_via_mail(
 	}
 
 # ==============================================================================
-# 配置读取（兜底显示名由 config/narratives/cdkey_voucher.json 驱动）
+# 配置读取（默认回退显示名由 config/narratives/cdkey_voucher.json 驱动）
 # ==============================================================================
 
 static func _default_item_name() -> String:

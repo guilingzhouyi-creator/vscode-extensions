@@ -20,20 +20,21 @@ class Request extends RefCounted:
 	var signature: String = ""
 	var context: Dictionary = {}
 
+	## 构造兑换请求 DTO
 	func _init(
-		p_code: String = "",
-		p_user_id: String = "",
-		p_batch_id: String = "",
-		p_channel_tag: String = "",
-		p_signature: String = "",
-		p_context: Dictionary = {}
+		initial_code: String = "",
+		initial_user_id: String = "",
+		initial_batch_id: String = "",
+		initial_channel_tag: String = "",
+		initial_signature: String = "",
+		initial_context: Dictionary = {}
 	) -> void:
-		code = p_code
-		user_id = p_user_id
-		batch_id = p_batch_id
-		channel_tag = p_channel_tag
-		signature = p_signature
-		context = p_context
+		code = initial_code
+		user_id = initial_user_id
+		batch_id = initial_batch_id
+		channel_tag = initial_channel_tag
+		signature = initial_signature
+		context = initial_context
 
 ## RollbackRequest：回滚请求数据传输模型
 class RollbackRequest extends RefCounted:
@@ -42,13 +43,14 @@ class RollbackRequest extends RefCounted:
 	var reason: String = ""
 	var rollback_token: String = ""
 
+	## 构造回滚请求 DTO
 	func _init(
-		p_code: String = "",
-		p_user_id: String = "",
-		p_reason: String = "",
-		p_rollback_token: String = ""
+		initial_code: String = "",
+		initial_user_id: String = "",
+		initial_reason: String = "",
+		initial_rollback_token: String = ""
 	) -> void:
-		code = p_code
-		user_id = p_user_id
-		reason = p_reason
-		rollback_token = p_rollback_token
+		code = initial_code
+		user_id = initial_user_id
+		reason = initial_reason
+		rollback_token = initial_rollback_token

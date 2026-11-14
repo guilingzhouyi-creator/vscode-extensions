@@ -29,7 +29,7 @@ var current_global_redemptions: int = GameConfig.get_int("domains.cdkey_voucher"
 var required_character_level: int = GameConfig.get_int("domains.cdkey_voucher", "defaults/required_character_level", 1)
 var is_active: bool = GameConfig.get_bool("domains.cdkey_voucher", "defaults/is_active", true)
 
-# 兑换码级复合门槛规则（）：按 rule_id 覆盖全局 eligibility_rules；
+# 兑换码级复合门槛规则：按 rule_id 覆盖全局 eligibility_rules；
 # 空字典 = 无兑换码级规则（仅全局生效）
 var eligibility_rules: Dictionary = {}
 
@@ -44,7 +44,11 @@ var reward_payload: Dictionary = {
 }
 
 ## CDK 凭证构造（兑换码标准化大写 + 类型/标题）
-func _init(p_code: String = "", p_type: VoucherType = VoucherType.UNIVERSAL_PER_ACCOUNT, p_title: String = "") -> void:
-	voucher_code = p_code.strip_edges().to_upper()
-	voucher_type = p_type
-	localized_title = p_title
+func _init(
+	initial_code: String = "",
+	initial_type: VoucherType = VoucherType.UNIVERSAL_PER_ACCOUNT,
+	initial_title: String = ""
+) -> void:
+	voucher_code = initial_code.strip_edges().to_upper()
+	voucher_type = initial_type
+	localized_title = initial_title
