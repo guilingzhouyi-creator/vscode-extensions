@@ -20,6 +20,9 @@ const GameLifecycleModel = preload("res://backend/domains/lifecycle/game_lifecyc
 const GameShutdownDTO = preload("res://backend/domains/lifecycle/dto/game_shutdown_dto.gd")
 const CharacterPhysiologySheet = preload("res://backend/domains/lifecycle_physiology/character_physiology_sheet.gd")
 const CharacterWalletEntity = preload("res://backend/domains/currency_economy/character_wallet_entity.gd")
+const WorldModAffinityManager = preload("res://backend/domains/narrative_orchestration/world_mod_affinity_manager.gd")
+const ModPackageDiscoverySolver = preload("res://backend/domains/narrative_orchestration/mod_package_discovery_solver.gd")
+const Tier3ContentOverrideLoader = preload("res://backend/domains/narrative_orchestration/tier3_content_override_loader.gd")
 
 const ENTRY_PATH_PROLOGUE_REPLAY: int = 1
 const ENTRY_PATH_DIRECT_RESTORE: int = 2
@@ -49,25 +52,29 @@ static func validate_world_slot(account: AccountProfile, world_id: String, shoul
 
 	return {"success": true, "world_id": target_id}
 
-## 执行边界 A：序章重放与初始生理/货币重新派发
+## 执行边界 A：序章重放与初始生理/货币重新派发（严格走活跃 MOD 因果 DAG，无 Kalar 默认回退）
 static func _execute_prologue_replay_branch(
 	account: AccountProfile,
 	slot: SaveSlotDTO,
 	context: Dictionary,
-	should_allow_default_fallback: bool
+	should_allow_default_fallback: bool,
+	adapted_mod_manifest: Dictionary = {}
 ) -> Dictionary:
 	slot.prologue_completed = false
+	var manifest: Dictionary = adapted_mod_manifest
+	if manifest.is_empty() and context.get("adapted_mod_manifest") is Dictionary:
+		manifest = (context.get("adapted_mod_manifest") as Dictionary)
 	var opening_stream: OpeningEventStreamDTO = context.get("opening_stream", null)
 	if opening_stream == null:
 		opening_stream = OpeningEventStreamDTO.new()
 		opening_stream.account_id = account.account_id
 		opening_stream.character_id = slot.character_name.sha256_text().substr(0, 16)
 		opening_stream.character_name = slot.character_name
-		opening_stream.starting_location_id = "loc_city_kalar_01"
-		opening_stream.opening_quest_line_id = "quest_prologue_01"
-		opening_stream.race_id = "HUMAN"
+		opening_stream.starting_location_id = slot.current_location_name if not slot.current_location_name.is_empty() else str(context.get("starting_location_id", ""))
+		opening_stream.opening_quest_line_id = str(context.get("opening_quest_line_id", ""))
+		opening_stream.race_id = str(context.get("race_id", _infer_first_manifest_race(manifest)))
 
-	var boot_result := PrologueExecutionKernel.boot_character_prologue(opening_stream, opening_stream.race_id, should_allow_default_fallback)
+	var boot_result := PrologueExecutionKernel.boot_character_prologue(opening_stream, opening_stream.race_id, should_allow_default_fallback, manifest)
 	if not bool(boot_result.get("success", false)):
 		return boot_result
 
@@ -78,8 +85,22 @@ static func _execute_prologue_replay_branch(
 		"slot_id": slot.slot_id,
 		"prologue_context": boot_result.get("context", null),
 		"event_packet": boot_result.get("packet", null),
+		"dag_session": boot_result.get("dag_session", null),
 		"starter_kit": boot_result.get("kit", {})
 	}
+
+
+static func _infer_first_manifest_race(manifest: Dictionary) -> String:
+	var races: Variant = manifest.get("races_catalog", {})
+	if races is Dictionary and not (races as Dictionary).is_empty():
+		return str((races as Dictionary).keys()[0])
+	var origins: Variant = manifest.get("origins_catalog", {})
+	if origins is Dictionary and not (origins as Dictionary).is_empty():
+		var first_origin: Variant = (origins as Dictionary).values()[0]
+		if first_origin is Dictionary:
+			return str((first_origin as Dictionary).get("race_id", (first_origin as Dictionary).get("race", "")))
+	return ""
+
 
 ## 执行边界 B：成熟物理存档反装配与各业务域状态恢复
 static func _execute_direct_restore_branch(slot: SaveSlotDTO) -> Dictionary:
@@ -100,12 +121,49 @@ static func _execute_direct_restore_branch(slot: SaveSlotDTO) -> Dictionary:
 		"applied_domains": applied_domains
 	}
 
+
+## 按世界 MOD 锁还原运行时覆盖层与适配清单（Fail-Closed 防缺包/坏档）
+static func _restore_world_mod_context(world_id: String, context: Dictionary) -> Dictionary:
+	if context.get("adapted_mod_manifest") is Dictionary and not (context.get("adapted_mod_manifest") as Dictionary).is_empty():
+		return {"success": true, "adapted_manifest": context.get("adapted_mod_manifest")}
+
+	var installed_packages := ModPackageDiscoverySolver.scan_installed_full_mod_packages()
+	if installed_packages.is_empty():
+		return {"success": false, "error_code": "ERR_NO_BASE_CONTENT_MOD", "message": "No content MODs installed for secondary world load."}
+
+	var affinity_manager := WorldModAffinityManager.new()
+	var diagnostic := affinity_manager.diagnose_world_mods(world_id, installed_packages)
+	var target_pack_ids: Array = ["*"]
+	if bool(diagnostic.get("has_lock_file", false)):
+		if not (diagnostic.get("missing_packs", []) as Array).is_empty():
+			return {"success": false, "error_code": "ERR_MISSING_CRITICAL_MOD", "missing_packs": diagnostic.get("missing_packs", [])}
+		var locked_ids: Array = (diagnostic.get("locked_pack_ids", []) as Array).duplicate()
+		if not locked_ids.is_empty():
+			target_pack_ids = locked_ids
+
+	var adapted_result := ModPrecheckAndAdaptationSolver.precheck_and_adapt_mod_list(installed_packages, target_pack_ids)
+	if not bool(adapted_result.get("success", false)):
+		return adapted_result
+
+	var enabled_packages := _filter_enabled_packages(installed_packages, adapted_result.get("enabled_pack_ids", []))
+	Tier3ContentOverrideLoader.apply_enabled_packages(enabled_packages)
+	return adapted_result
+
+
+static func _filter_enabled_packages(installed_packages: Array, enabled_ids: Array) -> Array:
+	var enabled_packages: Array = []
+	for pkg in installed_packages:
+		if pkg is Dictionary and enabled_ids.has(str((pkg as Dictionary).get("pack_id", ""))):
+			enabled_packages.append(pkg)
+	return enabled_packages
+
+
 ## 二次载入总调度引擎
 static func execute_secondary_load(context: Dictionary) -> Dictionary:
 	var account: AccountProfile = context.get("account", null)
 	var slot: SaveSlotDTO = context.get("slot", null)
 	var target_world_id: String = String(context.get("target_world_id", ""))
-	var should_allow_default_fallback: bool = bool(context.get("allow_default_fallback", true))
+	var should_allow_default_fallback: bool = bool(context.get("allow_default_fallback", false))
 
 	if account == null:
 		return {"success": false, "error_code": "ERR_ACCOUNT_MISSING", "message": "Account aggregate root missing"}
@@ -117,15 +175,21 @@ static func execute_secondary_load(context: Dictionary) -> Dictionary:
 		return world_validation
 	var effective_world_id: String = world_validation["world_id"]
 
+	var mod_restore_result := _restore_world_mod_context(effective_world_id, context)
+	if not bool(mod_restore_result.get("success", false)):
+		return mod_restore_result
+	var adapted_mod_manifest: Dictionary = mod_restore_result.get("adapted_manifest", {})
+
 	var entry_path_type: int = evaluate_entry_path(slot)
 	var load_result: Dictionary = {}
 
 	if entry_path_type == ENTRY_PATH_PROLOGUE_REPLAY:
-		load_result = _execute_prologue_replay_branch(account, slot, context, should_allow_default_fallback)
+		load_result = _execute_prologue_replay_branch(account, slot, context, should_allow_default_fallback, adapted_mod_manifest)
 	else:
 		load_result = _execute_direct_restore_branch(slot)
 
 	load_result["effective_world_id"] = effective_world_id
+	load_result["adapted_mod_manifest"] = adapted_mod_manifest
 	return load_result
 
 ## HUD 汇聚同步：无论是序章重放还是成熟直载，统一生成并广播主页快照

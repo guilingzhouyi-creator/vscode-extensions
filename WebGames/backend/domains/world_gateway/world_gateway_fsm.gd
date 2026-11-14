@@ -18,12 +18,17 @@ const Tier3ContentOverrideLoader = preload("res://backend/domains/narrative_orch
 const RuntimeModeGate = preload("res://backend/domains/persistence_protocol/runtime_mode_gate.gd")
 const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
 const WorldGatewayWorldCatalogHelper = preload("res://backend/domains/world_gateway/world_gateway_world_catalog_helper.gd")
+const WorldGatewayModHelper = preload("res://backend/domains/world_gateway/world_gateway_mod_helper.gd")
+const WorldGatewayRealmLockHelper = preload("res://backend/domains/world_gateway/world_gateway_realm_lock_helper.gd")
 
 var context: WorldGatewayContextDTO = null
 var _last_probe_reports: Dictionary = {}
 var active_mods: Array = []
 var adapted_mod_manifest: Dictionary = {}
 var creation_ui_snapshot: Dictionary = {}
+var _selected_mod_pack_ids: Array[String] = []
+var _has_explicit_mod_selection: bool = false
+var _realm_manifest: Array = []
 
 func _init(account_id: String) -> void:
     context = WorldGatewayContextDTO.new()
@@ -33,6 +38,9 @@ func _init(account_id: String) -> void:
     active_mods = []
     adapted_mod_manifest = {}
     creation_ui_snapshot = {}
+    _selected_mod_pack_ids = []
+    _has_explicit_mod_selection = false
+    _realm_manifest = []
 
 ## 设置当前网关激活的模组清单
 func set_active_mods(mods: Array) -> void:
@@ -73,37 +81,14 @@ func precheck_and_configure_single_player_mods(candidate_packs: Array, enabled_p
             failure_payload["conflicts"] = []
         return failure_payload
 
-    var raw_manifest: Variant = precheck_result.get("adapted_manifest", {})
-    adapted_mod_manifest = (raw_manifest as Dictionary).duplicate(true) if raw_manifest is Dictionary else {}
-    var raw_creation_ui_snapshot: Variant = precheck_result.get("creation_ui_snapshot", {})
-    creation_ui_snapshot = (raw_creation_ui_snapshot as Dictionary).duplicate(true) if raw_creation_ui_snapshot is Dictionary else {}
-    var raw_enabled: Variant = precheck_result.get("enabled_pack_ids", [])
-    active_mods = (raw_enabled as Array).duplicate(true) if raw_enabled is Array else []
-
-    var enabled_packages := _collect_enabled_candidate_packages(candidate_packs, active_mods)
-    var tier3_summary: Dictionary = Tier3ContentOverrideLoader.apply_enabled_packages(enabled_packages)
-    var enriched_result: Dictionary = precheck_result.duplicate(true)
-    enriched_result["tier3_overlay_summary"] = tier3_summary
-
+    var enriched_result := WorldGatewayModHelper.apply_precheck_adaptation_result(self, candidate_packs, precheck_result)
     _notify_event("world_gateway.mods_prechecked", {
         "account_id": context.account_id,
         "enabled_pack_ids": active_mods,
         "precheck_checklist": precheck_result.get("precheck_checklist", []),
-        "tier3_overlay_summary": tier3_summary
+        "tier3_overlay_summary": enriched_result.get("tier3_overlay_summary", {})
     })
     return enriched_result
-
-static func _collect_enabled_candidate_packages(candidate_packs: Array, enabled_pack_identifiers: Array) -> Array:
-    var enabled_packages: Array = []
-    for raw_pack in candidate_packs:
-        var pack_identifier: String = ""
-        if raw_pack is Dictionary:
-            pack_identifier = String((raw_pack as Dictionary).get("pack_id", "")).strip_edges()
-        elif raw_pack is Object and raw_pack.get("pack_id") != null:
-            pack_identifier = String(raw_pack.get("pack_id")).strip_edges()
-        if not pack_identifier.is_empty() and enabled_pack_identifiers.has(pack_identifier):
-            enabled_packages.append(raw_pack)
-    return enabled_packages
 
 ## 扫描并配置单机模式显性 MOD（三级级联全包扫描与预检适配）
 func discover_and_configure_single_player_mods(custom_roots: Array = [], enabled_pack_ids: Array = ["*"]) -> Dictionary:
@@ -112,19 +97,78 @@ func discover_and_configure_single_player_mods(custom_roots: Array = [], enabled
             AntiBridgeGuard.SECURITY_ERR_MULTIPLAYER_MOD_POISONING,
             "Multiplayer mode strictly forbids custom narrative paths and UI extension mods."
         )
+    if enabled_pack_ids.is_empty():
+        WorldGatewayModHelper.clear_fsm_mod_overlays(self)
+        return WorldGatewayModHelper.build_no_base_mod_failure()
     var candidates: Array[Dictionary] = ModPackageDiscoverySolver.scan_installed_full_mod_packages(custom_roots)
+    if candidates.is_empty():
+        return WorldGatewayModHelper.build_no_base_mod_failure()
     return precheck_and_configure_single_player_mods(candidates, enabled_pack_ids)
 
-## 强制卸载本地第三方模组并恢复 Vanilla 基础核心及清理运行时覆盖层
+
+## 枚举本地已安装 MOD 列表与诊断信息（供网关与 Mod Workbench UI 消费）
+func list_installed_mods(custom_roots: Array = []) -> Dictionary:
+    var scan_result: Dictionary = ModPackageDiscoverySolver.scan_installed_packs_with_diagnostics(custom_roots)
+    var report := WorldGatewayModHelper.format_installed_mods_report(
+        scan_result,
+        _selected_mod_pack_ids,
+        _has_explicit_mod_selection,
+        active_mods
+    )
+    report["diagnostics"] = scan_result.get("diagnostics", [])
+    report["active_pack_ids"] = active_mods.duplicate()
+    return report
+
+
+## 更新用户选中的 MOD 组合并触发单机预检与 Tier 3 覆写应用
+func set_mod_selection(selected_pack_ids: Array, custom_roots: Array = []) -> Dictionary:
+    _selected_mod_pack_ids.clear()
+    for raw_pack_id in selected_pack_ids:
+        var clean_id := str(raw_pack_id).strip_edges()
+        if not clean_id.is_empty() and not _selected_mod_pack_ids.has(clean_id):
+            _selected_mod_pack_ids.append(clean_id)
+    _has_explicit_mod_selection = true
+    return discover_and_configure_single_player_mods(custom_roots, _selected_mod_pack_ids)
+
+
+## 只读查询指定世界档案的 MOD 锁与漂移诊断报告
+func get_world_mod_diagnostics(world_id: String, custom_roots: Array = []) -> Dictionary:
+    var scan_result := ModPackageDiscoverySolver.scan_installed_packs_with_diagnostics(custom_roots)
+    var packages: Array = scan_result.get("packages", []) if scan_result.get("packages") is Array else []
+    var diagnostic := WorldModAffinityManager.new().diagnose_world_mods(world_id, packages)
+    diagnostic["success"] = true
+    return diagnostic
+
+
+## 联机模式验证服务器 realm_mod_manifest SHA-256 并选择性卸载未授权第三方附加 MOD
+func verify_and_reconcile_realm_manifest(realm_manifest: Array, custom_roots: Array = []) -> Dictionary:
+    var installed_packages: Array[Dictionary] = ModPackageDiscoverySolver.scan_installed_full_mod_packages(custom_roots)
+    var verification := AntiBridgeGuard.verify_realm_mod_manifest(installed_packages, realm_manifest)
+    if not bool(verification.get("allowed", false)):
+        Tier3ContentOverrideLoader.revert_all_overrides()
+        GameConfig.clear_mod_overlay_tables()
+        return _fail(
+            str(verification.get("error_code", "MOD_ERR_REALM_DIGEST_MISMATCH")),
+            str(verification.get("message", "Realm MOD manifest verification failed."))
+        )
+    _realm_manifest = realm_manifest.duplicate(true)
+    var authorized_ids: Array = verification.get("authorized_pack_ids", [])
+    WorldGatewayRealmLockHelper.mount_authorized_realm_packages(self, installed_packages, authorized_ids)
+    return {
+        "success": true,
+        "authorized_pack_ids": authorized_ids,
+        "unloaded_pack_ids": verification.get("unauthorized_local_pack_ids", []),
+        "adapted_mod_manifest": adapted_mod_manifest
+    }
+
+
+## 选择性卸载本地非官方第三方模组；仅保留经核验的官方基础包及其运行时覆盖层（不再回退空 Vanilla）
 func purge_and_fallback_to_vanilla() -> void:
-    Tier3ContentOverrideLoader.revert_all_overrides()
-    var cleaned_mods: Array = []
-    for mod_entry in active_mods:
-        if AntiBridgeGuard.is_vanilla_pack(mod_entry):
-            cleaned_mods.append(mod_entry)
-    active_mods = cleaned_mods
-    adapted_mod_manifest.clear()
-    creation_ui_snapshot.clear()
+    if not _realm_manifest.is_empty():
+        verify_and_reconcile_realm_manifest(_realm_manifest)
+        return
+
+    WorldGatewayRealmLockHelper.purge_unofficial_mods_and_remount(self)
     _notify_event("world_gateway.mods_purged", {
         "account_id": context.account_id,
         "retained_mods": active_mods
@@ -195,6 +239,14 @@ func select_mode(
             String(slot_conversion.get("error_code", "INVALID_ACCOUNT_SLOTS")),
             "Account slot configuration is invalid."
         )
+
+    if mode == WorldGatewayModel.GameMode.SINGLE_PLAYER and adapted_mod_manifest.is_empty():
+        if _has_explicit_mod_selection:
+            discover_and_configure_single_player_mods([], _selected_mod_pack_ids)
+        elif not custom_mods.is_empty() and _all_entries_are_strings(custom_mods):
+            discover_and_configure_single_player_mods([], custom_mods)
+        elif active_mods.is_empty():
+            discover_and_configure_single_player_mods([], ["*"])
 
     var worlds_catalog := WorldGatewayWorldCatalogHelper.load_worlds_catalog()
     var route_result := GameModeRoutingSolver.resolve_mode_entry(
@@ -309,20 +361,11 @@ func enter_world(target_world_id: String = "", should_allow_safe_degrade: bool =
 
     var effective_world_id: String = target_world_id if not target_world_id.is_empty() else context.selected_world_id
     if not effective_world_id.is_empty():
-        # 1. MOD 锁文件防坏档守卫核验（单机沙盒模式）
+        # 1. MOD 锁文件防坏档守卫核验与覆盖层重放（单机沙盒模式按已选 active_mods 而非全盘盲扫）
         if context.selected_mode == WorldGatewayModel.GameMode.SINGLE_PLAYER or context.selected_mode == WorldGatewayModel.GameMode.UNSELECTED:
-            var installed_packs: Array = ModPackageDiscoverySolver.scan_installed_packs()
-            var affinity_manager := WorldModAffinityManager.new()
-            var verify_result := affinity_manager.verify_and_bind_world_mods(effective_world_id, installed_packs, should_allow_safe_degrade)
-            if not bool(verify_result.get("success", false)):
-                return _fail(
-                    str(verify_result.get("error", "ERR_MISSING_CRITICAL_MOD")),
-                    "Mod lockfile verification failed when entering world '{world_id}': missing critical packs {missing_packs}.",
-                    {
-                        "world_id": effective_world_id,
-                        "missing_packs": verify_result.get("missing_packs", [])
-                    }
-                )
+            var sp_sync_result := _ensure_single_player_world_mods_ready(effective_world_id, should_allow_safe_degrade)
+            if not bool(sp_sync_result.get("success", false)):
+                return sp_sync_result
 
             # 2. 外部虚空因果扰动同化
             WorldGatewayWorldCatalogHelper.assimilate_perturbations(effective_world_id)
@@ -335,7 +378,9 @@ func enter_world(target_world_id: String = "", should_allow_safe_degrade: bool =
         "world_id": context.selected_world_id,
         "slot_id": context.selected_slot_id,
         "character_id": context.active_character_id,
-        "game_mode": context.selected_mode
+        "game_mode": context.selected_mode,
+        "active_mods": active_mods.duplicate(true),
+        "adapted_mod_manifest": adapted_mod_manifest.duplicate(true)
     }
     _populate_existing_character_context(hud_context)
     WorldSessionRuntimeService.activate_world_session(hud_context, false)
@@ -417,7 +462,27 @@ func _apply_character_profile_to_hud_context(hud_context: Dictionary, character_
         hud_context["wallet_gold"] = int(character_profile.personal_resources.get("gold", 0))
     if character_profile.growth_state is Dictionary:
         hud_context["level"] = maxi(1, int(character_profile.growth_state.get("level", 1)))
-        hud_context["race_id"] = str(character_profile.growth_state.get("race_id", "HUMAN"))
+        hud_context["race_id"] = str(character_profile.growth_state.get("race_id", ""))
+
+
+func _all_entries_are_strings(entries: Array) -> bool:
+    for entry in entries:
+        if not (entry is String):
+            return false
+    return true
+
+
+func _ensure_single_player_world_mods_ready(effective_world_id: String, should_allow_safe_degrade: bool) -> Dictionary:
+    var sync_result := WorldGatewayRealmLockHelper.ensure_single_player_world_mods_ready(
+        self, effective_world_id, should_allow_safe_degrade, _selected_mod_pack_ids, _has_explicit_mod_selection
+    )
+    if not bool(sync_result.get("success", false)):
+        return _fail(
+            str(sync_result.get("error_code", "ERR_MISSING_CRITICAL_MOD")),
+            str(sync_result.get("template_message", "Mod lockfile verification failed.")),
+            sync_result.get("params", {}) as Dictionary
+        )
+    return {"success": true}
 
 ## 5. 序章向大地图探索无缝交接（状态装配创角终态，驱动 FSM 跃迁至 WORLD_EXPLORATION 并触发 HUD 初始同步）
 func handoff_prologue_to_world_exploration(handoff: PrologueHandoffDTO) -> Dictionary:
@@ -507,9 +572,12 @@ func exit_to_gateway() -> Dictionary:
     context.active_character_id = ""
     context.is_first_time_creation = false
     context.current_phase = WorldGatewayModel.GatewayPhase.GATEWAY_ENTERED
+    Tier3ContentOverrideLoader.revert_all_overrides()
+    GameConfig.clear_mod_overlay_tables()
     active_mods.clear()
     adapted_mod_manifest.clear()
     creation_ui_snapshot.clear()
+    WorldSessionRuntimeService.set_active_mod_context([], {})
 
     if GameConfig.get_bool("domains.world_gateway", "gateway_policy/require_probe_refresh_on_exit", true):
         _last_probe_reports = ModeReadinessProbe.probe_all_modes(context.account_id)
@@ -542,9 +610,15 @@ func logout() -> Dictionary:
     context.is_first_time_creation = false
     context.account_id = ""
     context.current_phase = WorldGatewayModel.GatewayPhase.AUTHENTICATED
+    Tier3ContentOverrideLoader.revert_all_overrides()
+    GameConfig.clear_mod_overlay_tables()
     active_mods.clear()
     adapted_mod_manifest.clear()
     creation_ui_snapshot.clear()
+    _selected_mod_pack_ids.clear()
+    _has_explicit_mod_selection = false
+    _realm_manifest.clear()
+    WorldSessionRuntimeService.set_active_mod_context([], {})
     _last_probe_reports.clear()
     _notify_event("world_gateway.account_logged_out", {
         "account_id": exited_account_id,

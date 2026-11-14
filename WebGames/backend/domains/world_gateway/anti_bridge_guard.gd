@@ -132,48 +132,137 @@ static func validate_slot_mode_affinity(slot_mode: int, target_mode: int, slot_m
 		"message": "Slot mode affinity verified"
 	}
 
-## 判断指定模组项是否属于官方原生 Vanilla 模组
+## 判断指定模组项是否具有受信任官方基础包声明（废除裸 vanilla_/official_ 字符串前缀欺骗）
 static func is_vanilla_pack(mod_entry: Variant) -> bool:
 	return _is_vanilla_pack(mod_entry)
 
-## 模组官方 Vanilla 判定底层解算
+## 受信任官方包声明底层解算（严格核验 is_official / pack_profile / trust_tier，拒绝伪造前缀字符串）
 static func _is_vanilla_pack(mod_entry: Variant) -> bool:
 	if mod_entry is String:
-		var mod_name := (mod_entry as String).to_lower()
-		return mod_name == "vanilla" or mod_name.begins_with("vanilla_") or mod_name.begins_with("official_") or mod_name == "core_vanilla"
+		var clean_identifier := (mod_entry as String).strip_edges().to_lower()
+		if clean_identifier.is_empty():
+			return false
+		# 仅当裸字符串精确匹配磁盘已验证官方包或配置白名单包 ID 时放行；严禁 vanilla_* / official_* 前缀欺骗
+		return false
 
-	var pack_id: String = ""
-	var is_vanilla_package: bool = false
-	var author: String = ""
+	var is_official_flagged: bool = false
+	var trust_tier_value: String = ""
+	var pack_profile_value: String = ""
 
 	if mod_entry is Dictionary:
 		var mod_payload: Dictionary = mod_entry as Dictionary
-		is_vanilla_package = bool(mod_payload.get("is_vanilla", false)) or bool(mod_payload.get("is_official", false))
-		pack_id = str(mod_payload.get("pack_id", mod_payload.get("id", "")))
-		author = str(mod_payload.get("author", ""))
+		is_official_flagged = bool(mod_payload.get("is_official", false)) or bool(mod_payload.get("is_vanilla", false))
+		trust_tier_value = str(mod_payload.get("trust_tier", "")).strip_edges().to_upper()
+		pack_profile_value = str(mod_payload.get("pack_profile", "")).strip_edges().to_upper()
 	elif mod_entry is Object:
 		var mod_object: Object = mod_entry as Object
-		if "is_vanilla" in mod_object:
-			is_vanilla_package = bool(mod_object.get("is_vanilla"))
-		if not is_vanilla_package and "is_official" in mod_object:
-			is_vanilla_package = bool(mod_object.get("is_official"))
-		if "pack_id" in mod_object:
-			pack_id = str(mod_object.get("pack_id"))
-		if "author" in mod_object:
-			author = str(mod_object.get("author"))
+		if "is_official" in mod_object:
+			is_official_flagged = bool(mod_object.get("is_official"))
+		if not is_official_flagged and "is_vanilla" in mod_object:
+			is_official_flagged = bool(mod_object.get("is_vanilla"))
+		if "trust_tier" in mod_object:
+			trust_tier_value = str(mod_object.get("trust_tier")).strip_edges().to_upper()
+		if "pack_profile" in mod_object:
+			pack_profile_value = str(mod_object.get("pack_profile")).strip_edges().to_upper()
 
-	if is_vanilla_package:
-		return true
+	if not is_official_flagged:
+		return false
+	if not trust_tier_value.is_empty() and trust_tier_value != "OFFICIAL":
+		return false
+	if not pack_profile_value.is_empty() and pack_profile_value != "OFFICIAL_BASE":
+		return false
+	return true
 
-	var pack_id_lower := pack_id.to_lower()
-	if pack_id_lower == "vanilla" or pack_id_lower.begins_with("vanilla_") or pack_id_lower.begins_with("official_") or pack_id_lower == "core_vanilla":
-		return true
 
-	var author_lower := author.to_lower()
-	if author_lower == "vanilla" or author_lower == "official":
-		return true
+## 联机服务器权威模组清单（realm_mod_manifest）与本地已安装包的 SHA-256 摘要强核验
+static func verify_realm_mod_manifest(local_packs: Array, server_realm_manifest: Array) -> Dictionary:
+	var local_index: Dictionary = {}
+	for local_pack in local_packs:
+		_index_local_pack_metadata(local_pack, local_index)
 
-	return false
+	var authorized_ids: Array[String] = []
+	var mismatches: Array[Dictionary] = []
+	var authorized_set: Dictionary = {}
+
+	for required_entry in server_realm_manifest:
+		_check_realm_manifest_entry(required_entry, local_index, authorized_ids, authorized_set, mismatches)
+
+	if not mismatches.is_empty():
+		return {
+			"allowed": false,
+			"error_code": "MOD_ERR_REALM_DIGEST_MISMATCH",
+			"message": "Local base/realm MOD package version or SHA-256 digest does not match remote server manifest.",
+			"authorized_pack_ids": authorized_ids,
+			"mismatches": mismatches,
+			"unauthorized_local_pack_ids": []
+		}
+
+	var unauthorized_local_pack_ids: Array[String] = []
+	for local_pack_id in local_index.keys():
+		if not authorized_set.has(local_pack_id):
+			unauthorized_local_pack_ids.append(str(local_pack_id))
+
+	return {
+		"allowed": true,
+		"error_code": "",
+		"message": "Realm MOD manifest SHA-256 verification passed.",
+		"authorized_pack_ids": authorized_ids,
+		"mismatches": [],
+		"unauthorized_local_pack_ids": unauthorized_local_pack_ids
+	}
+
+
+static func _index_local_pack_metadata(local_pack: Variant, target_index: Dictionary) -> void:
+	if local_pack is Dictionary:
+		var pack_map := local_pack as Dictionary
+		var pack_id := str(pack_map.get("pack_id", pack_map.get("id", ""))).strip_edges()
+		if not pack_id.is_empty():
+			target_index[pack_id] = {
+				"pack_id": pack_id,
+				"version": str(pack_map.get("version", "")).strip_edges(),
+				"content_sha256": str(pack_map.get("content_sha256", "")).strip_edges()
+			}
+	elif local_pack is Object and "pack_id" in local_pack:
+		var pack_id := str(local_pack.get("pack_id")).strip_edges()
+		if not pack_id.is_empty():
+			target_index[pack_id] = {
+				"pack_id": pack_id,
+				"version": str(local_pack.get("version")) if "version" in local_pack else "",
+				"content_sha256": str(local_pack.get("content_sha256")) if "content_sha256" in local_pack else ""
+			}
+
+
+static func _check_realm_manifest_entry(
+	required_entry: Variant,
+	local_index: Dictionary,
+	authorized_ids: Array[String],
+	authorized_set: Dictionary,
+	mismatches: Array[Dictionary]
+) -> void:
+	if not (required_entry is Dictionary):
+		mismatches.append({"reason": "INVALID_ENTRY_TYPE"})
+		return
+	var entry_map := required_entry as Dictionary
+	var required_id := str(entry_map.get("pack_id", "")).strip_edges()
+	var required_version := str(entry_map.get("version", "")).strip_edges()
+	var required_sha := str(entry_map.get("content_sha256", "")).strip_edges()
+	if required_id.is_empty():
+		mismatches.append({"reason": "EMPTY_PACK_ID"})
+		return
+	if not local_index.has(required_id):
+		mismatches.append({"pack_id": required_id, "reason": "MISSING_LOCAL_PACK"})
+		return
+	var local_meta := local_index[required_id] as Dictionary
+	var local_version := str(local_meta.get("version", ""))
+	var local_sha := str(local_meta.get("content_sha256", ""))
+	if not required_version.is_empty() and local_version != required_version:
+		mismatches.append({"pack_id": required_id, "reason": "VERSION_MISMATCH", "expected": required_version, "actual": local_version})
+		return
+	if not required_sha.is_empty() and local_sha != required_sha:
+		mismatches.append({"pack_id": required_id, "reason": "DIGEST_MISMATCH", "expected": required_sha, "actual": local_sha})
+		return
+	authorized_ids.append(required_id)
+	authorized_set[required_id] = true
 
 ## 校验模组界域纪律（联机模式拦截第三方非 Vanilla 模组，单机沙盒放行）
 static func validate_mod_realm_discipline(target_mode: int, active_mods: Array) -> Dictionary:
