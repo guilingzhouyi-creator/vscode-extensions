@@ -16,8 +16,8 @@ var _ring_head: int = 0
 var _ring_count: int = 0
 var max_buffer_capacity: int = GameConfig.get_int("domains.telemetry_account_lifecycle", "buffer/max_capacity", 1000)
 
-static var _salt_mod_cached: int = 10000
-static var _salt_cfg_ver: int = -1
+static var _salt_modulus_cached: int = 10000
+static var _salt_config_version: int = -1
 
 ## 记录埋点事件：确定性事件 ID（账号+UTC+盐模）+ 环形缓冲入队（溢出丢最旧）
 func record_event(
@@ -28,44 +28,44 @@ func record_event(
 	session_duration: float = 0.0
 ) -> TelemetryEventDTO:
 	var salt := int(abs(("%s:%d:%s" % [account_id, current_utc, event_name]).hash())) % _salt_modulus()
-	var evt_id := "%s_%d_%d" % [account_id, current_utc, salt]
-	var evt := TelemetryEventDTO.new(evt_id, event_name, account_id, current_utc, session_duration, payload)
+	var event_id := "%s_%d_%d" % [account_id, current_utc, salt]
+	var telemetry_event := TelemetryEventDTO.new(event_id, event_name, account_id, current_utc, session_duration, payload)
 
-	var cap: int = maxi(0, max_buffer_capacity)
-	if cap == 0:
+	var buffer_capacity: int = maxi(0, max_buffer_capacity)
+	if buffer_capacity == 0:
 		_event_ring_buffer.clear()
 		_ring_head = 0
 		_ring_count = 0
-		return evt
-	if _event_ring_buffer.size() > cap:
+		return telemetry_event
+	if _event_ring_buffer.size() > buffer_capacity:
 		var trimmed: Array = flush_events_batch()
-		var keep_start: int = maxi(0, trimmed.size() - cap)
-		for idx in range(keep_start, trimmed.size()):
-			_event_ring_buffer.append(trimmed[idx])
+		var keep_start: int = maxi(0, trimmed.size() - buffer_capacity)
+		for keep_index in range(keep_start, trimmed.size()):
+			_event_ring_buffer.append(trimmed[keep_index])
 		_ring_head = 0
 		_ring_count = _event_ring_buffer.size()
-	if _ring_count < cap:
-		if _event_ring_buffer.size() < cap and _ring_head == 0:
-			_event_ring_buffer.append(evt)
+	if _ring_count < buffer_capacity:
+		if _event_ring_buffer.size() < buffer_capacity and _ring_head == 0:
+			_event_ring_buffer.append(telemetry_event)
 		else:
-			if _event_ring_buffer.size() < cap:
-				_event_ring_buffer.resize(cap)
-			_event_ring_buffer[(_ring_head + _ring_count) % cap] = evt
+			if _event_ring_buffer.size() < buffer_capacity:
+				_event_ring_buffer.resize(buffer_capacity)
+			_event_ring_buffer[(_ring_head + _ring_count) % buffer_capacity] = telemetry_event
 		_ring_count += 1
 	else:
-		_event_ring_buffer[_ring_head] = evt
-		_ring_head = (_ring_head + 1) % cap
+		_event_ring_buffer[_ring_head] = telemetry_event
+		_ring_head = (_ring_head + 1) % buffer_capacity
 
-	return evt
+	return telemetry_event
 
 ## 批量提取：整批复制后清空缓冲（刷盘供上游消费）
 func flush_events_batch() -> Array:
 	var batch: Array = []
-	var buf_size: int = _event_ring_buffer.size()
-	if _ring_count > 0 and buf_size > 0:
+	var buffer_size: int = _event_ring_buffer.size()
+	if _ring_count > 0 and buffer_size > 0:
 		batch.resize(_ring_count)
-		for i in range(_ring_count):
-			batch[i] = _event_ring_buffer[(_ring_head + i) % buf_size]
+		for batch_index in range(_ring_count):
+			batch[batch_index] = _event_ring_buffer[(_ring_head + batch_index) % buffer_size]
 	_event_ring_buffer.clear()
 	_ring_head = 0
 	_ring_count = 0
@@ -80,9 +80,9 @@ func get_buffer_count() -> int:
 # ==============================================================================
 
 static func _salt_modulus() -> int:
-	var ver: int = GameConfig.config_reload_version()
-	if _salt_cfg_ver != ver:
-		# L1（）：取模除数下限守卫（Inv-VD-1）——配置 0 时 % 除零崩溃
-		_salt_mod_cached = maxi(1, GameConfig.get_int("domains.telemetry_account_lifecycle", "event_id/salt_modulus", 10000))
-		_salt_cfg_ver = ver
-	return _salt_mod_cached
+	var config_version: int = GameConfig.config_reload_version()
+	if _salt_config_version != config_version:
+		# 下限守卫（Inv-VD-1）：配置为 0 时避免取模除零崩溃
+		_salt_modulus_cached = maxi(1, GameConfig.get_int("domains.telemetry_account_lifecycle", "event_id/salt_modulus", 10000))
+		_salt_config_version = config_version
+	return _salt_modulus_cached

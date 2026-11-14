@@ -21,16 +21,16 @@ var payload_attributes: Dictionary = {}          # 自定义多维指标 (客户
 
 ## 遥测事件 DTO 构造（ID/名称/账户/时间/时长/多维属性）
 func _init(
-	p_id: String = "",
-	p_name: String = "",
-	p_account: String = "",
-	p_time: int = 0,
-	p_duration: float = 0.0,
-	p_payload: Dictionary = {}
+	initial_event_id: String = "",
+	initial_event_name: String = "",
+	initial_account_id: String = "",
+	initial_timestamp_utc: int = 0,
+	initial_duration_seconds: float = 0.0,
+	initial_payload: Dictionary = {}
 ) -> void:
-	event_id = p_id
-	event_name = p_name
-	account_id = p_account
-	timestamp_utc = p_time
-	session_duration_seconds = p_duration
-	payload_attributes = p_payload
+	event_id = initial_event_id
+	event_name = initial_event_name
+	account_id = initial_account_id
+	timestamp_utc = initial_timestamp_utc
+	session_duration_seconds = initial_duration_seconds
+	payload_attributes = initial_payload
