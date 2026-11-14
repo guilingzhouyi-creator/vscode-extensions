@@ -26,11 +26,11 @@ static func assemble_telemetry_packet(
 	previous_slice: AgentHudContextSliceDTO = null,
 	sequence_index: int = 1,
 	cause: String = "",
-	human_interacting: bool = false,
+	is_human_interacting: bool = false,
 	initiator: String = "SYSTEM_TICK_SIMULATION",
-	out_packet: AgentHudTelemetryPacketDTO = null
+	target_packet: AgentHudTelemetryPacketDTO = null
 ) -> AgentHudTelemetryPacketDTO:
-	var packet: AgentHudTelemetryPacketDTO = out_packet if out_packet != null else AgentTelemetryPoolRegistry.borrow_packet()
+	var packet: AgentHudTelemetryPacketDTO = target_packet if target_packet != null else AgentTelemetryPoolRegistry.borrow_packet()
 	packet.reset_state()
 
 	# 1. 组装信封 (Envelope) 及控制租约 (Control Lease)
@@ -40,11 +40,11 @@ static func assemble_telemetry_packet(
 	packet.packet_id = "pkt_home_%d_%04d" % [int(packet.timestamp_ms / 1000), sequence_index]
 	packet.domain = "HOME_HUD"
 	packet.is_terminal = false
-	packet.human_interaction_state = "ACTIVE" if human_interacting else "IDLE"
-	packet.agent_control_mode = "READ_ONLY_OBSERVER" if human_interacting else "READ_WRITE"
-	packet.active_operator = "HUMAN_PLAYER" if human_interacting else "AGENT"
-	packet.is_writable = not human_interacting
-	packet.preempted_by_human = human_interacting
+	packet.human_interaction_state = "ACTIVE" if is_human_interacting else "IDLE"
+	packet.agent_control_mode = "READ_ONLY_OBSERVER" if is_human_interacting else "READ_WRITE"
+	packet.active_operator = "HUMAN_PLAYER" if is_human_interacting else "AGENT"
+	packet.is_writable = not is_human_interacting
+	packet.preempted_by_human = is_human_interacting
 
 	# 2. 组装纯净观测切片 (Observation)
 	if packet.observation == null:
@@ -58,17 +58,17 @@ static func assemble_telemetry_packet(
 		packet.causal_deltas.clear()
 
 	# 4. 组装动态行动空间 (Action Space Directives with Human Preemption Pruning - 原位注入)
-	HomeActionSpaceSolver.resolve_action_space_into(snapshot, packet.action_space, human_interacting)
+	HomeActionSpaceSolver.resolve_action_space_into(snapshot, packet.action_space, is_human_interacting)
 
 	return packet
 
 ## 纯切片求解方法（避免字典 duplicate 瞬态堆分配）
 static func solve_slice(
 	snapshot: AuthoritativeHudSnapshotDTO,
-	out_slice: AgentHudContextSliceDTO = null,
+	target_slice: AgentHudContextSliceDTO = null,
 	injected_notices: Array[HudUiNoticeDTO] = []
 ) -> AgentHudContextSliceDTO:
-	var slice: AgentHudContextSliceDTO = out_slice if out_slice != null else AgentTelemetryPoolRegistry.borrow_slice()
+	var slice: AgentHudContextSliceDTO = target_slice if target_slice != null else AgentTelemetryPoolRegistry.borrow_slice()
 	slice.reset_state()
 
 	if snapshot == null:
@@ -125,8 +125,8 @@ static func solve_slice(
 		var mode_features_value: Variant = snapshot.mode_features
 		var is_multiplayer: bool = (int(mode_features_value.get("game_mode", 0)) == 1 or int(mode_features_value.get("game_mode", 0)) == 2) if mode_features_value is Dictionary else (int(mode_features_value.game_mode) == 1 or int(mode_features_value.game_mode) == 2 or bool(mode_features_value.show_matchmaking))
 		slice.game_mode = "MULTIPLAYER" if is_multiplayer else "SINGLE_PLAYER"
-		var party_ready: bool = bool(mode_features_value.get("party_matchmaking_enabled", mode_features_value.get("show_matchmaking", false))) if mode_features_value is Dictionary else (bool(mode_features_value.party_matchmaking_enabled) if "party_matchmaking_enabled" in mode_features_value else bool(mode_features_value.show_matchmaking))
-		slice.is_multiplayer_ready = is_multiplayer or party_ready
+		var is_party_ready: bool = bool(mode_features_value.get("party_matchmaking_enabled", mode_features_value.get("show_matchmaking", false))) if mode_features_value is Dictionary else (bool(mode_features_value.party_matchmaking_enabled) if "party_matchmaking_enabled" in mode_features_value else bool(mode_features_value.show_matchmaking))
+		slice.is_multiplayer_ready = is_multiplayer or is_party_ready
 	slice.unread_mail_count = snapshot.unread_mail_count
 
 	# UI 公告与活动引导去表现化提取 (Inv-UI-FEED-STRUCTURAL-PURITY-9)

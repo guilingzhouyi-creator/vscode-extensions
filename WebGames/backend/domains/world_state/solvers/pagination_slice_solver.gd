@@ -14,7 +14,7 @@ extends RefCounted
 ## 对源数组进行分页切片并返回标准 PagedResultDTO 载荷
 ## 守卫边界：防 null、防负数索引、尺寸钳制 1..50、防止切片超界
 static func slice_array(source_array: Array, query: PaginationQueryDTO) -> PagedResultDTO:
-	var result := PagedResultDTO.new()
+	var paged_result := PagedResultDTO.new()
 	var effective_query := query
 	if effective_query == null:
 		effective_query = PaginationQueryDTO.make_default()
@@ -22,34 +22,34 @@ static func slice_array(source_array: Array, query: PaginationQueryDTO) -> Paged
 	var page_size: int = clampi(effective_query.page_size, PaginationQueryDTO.MIN_PAGE_SIZE, PaginationQueryDTO.MAX_PAGE_SIZE)
 	var page_index: int = maxi(0, effective_query.page_index)
 
-	result.page_index = page_index
-	result.page_size = page_size
+	paged_result.page_index = page_index
+	paged_result.page_size = page_size
 
 	if source_array == null or source_array.is_empty():
-		result.total_count = 0
-		result.total_pages = 0
-		result.has_next = false
-		result.has_prev = false
-		result.next_cursor = ""
-		result.items = []
-		return result
+		paged_result.total_count = 0
+		paged_result.total_pages = 0
+		paged_result.has_next = false
+		paged_result.has_prev = false
+		paged_result.next_cursor = ""
+		paged_result.items = []
+		return paged_result
 
 	var total_count: int = source_array.size()
-	result.total_count = total_count
-	result.total_pages = ceili(float(total_count) / float(page_size))
+	paged_result.total_count = total_count
+	paged_result.total_pages = ceili(float(total_count) / float(page_size))
 
 	var start_index: int = page_index * page_size
 	if start_index >= total_count:
-		result.has_next = false
-		result.has_prev = page_index > 0
-		result.next_cursor = ""
-		result.items = []
-		return result
+		paged_result.has_next = false
+		paged_result.has_prev = page_index > 0
+		paged_result.next_cursor = ""
+		paged_result.items = []
+		return paged_result
 
 	var end_index: int = mini(start_index + page_size, total_count)
-	result.items = source_array.slice(start_index, end_index)
-	result.has_next = end_index < total_count
-	result.has_prev = page_index > 0
-	result.next_cursor = str(page_index + 1) if result.has_next else ""
+	paged_result.items = source_array.slice(start_index, end_index)
+	paged_result.has_next = end_index < total_count
+	paged_result.has_prev = page_index > 0
+	paged_result.next_cursor = str(page_index + 1) if paged_result.has_next else ""
 
-	return result
+	return paged_result

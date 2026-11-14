@@ -20,40 +20,40 @@ const AgentHudContextSliceDTO = preload("res://backend/domains/world_state/dto/a
 static func compute_deltas_into(
 	previous_slice: AgentHudContextSliceDTO,
 	next_slice: AgentHudContextSliceDTO,
-	out_deltas: Array[HudCausalDeltaDTO],
+	target_deltas: Array[HudCausalDeltaDTO],
 	cause: String = "",
 	initiator: String = "SYSTEM_TICK_SIMULATION",
 	reason: String = ""
 ) -> void:
 	var write_index: int = 0
 	if previous_slice == null or next_slice == null:
-		_trim_and_recycle(out_deltas, 0)
+		_trim_and_recycle(target_deltas, 0)
 		return
 
 	# 1. 生理体能差分 (HP & AP)
 	if not is_equal_approx(previous_slice.hp_current, next_slice.hp_current):
-		_populate_delta(out_deltas, write_index, "PHYSIOLOGY", "hp_current", previous_slice.hp_current, next_slice.hp_current, cause, initiator, reason)
+		_populate_delta(target_deltas, write_index, "PHYSIOLOGY", "hp_current", previous_slice.hp_current, next_slice.hp_current, cause, initiator, reason)
 		write_index += 1
 
 	if not is_equal_approx(previous_slice.ap_current, next_slice.ap_current):
-		_populate_delta(out_deltas, write_index, "PHYSIOLOGY", "ap_current", previous_slice.ap_current, next_slice.ap_current, cause, initiator, reason)
+		_populate_delta(target_deltas, write_index, "PHYSIOLOGY", "ap_current", previous_slice.ap_current, next_slice.ap_current, cause, initiator, reason)
 		write_index += 1
 
 	# 2. 资产与潜能成长差分
 	if previous_slice.wallet_gold != next_slice.wallet_gold:
-		_populate_delta(out_deltas, write_index, "WALLET", "wallet_gold", previous_slice.wallet_gold, next_slice.wallet_gold, cause, initiator, reason)
+		_populate_delta(target_deltas, write_index, "WALLET", "wallet_gold", previous_slice.wallet_gold, next_slice.wallet_gold, cause, initiator, reason)
 		write_index += 1
 
 	if previous_slice.unallocated_potential_points != next_slice.unallocated_potential_points:
-		_populate_delta(out_deltas, write_index, "ASSET", "unallocated_points", previous_slice.unallocated_potential_points, next_slice.unallocated_potential_points, cause, initiator, reason)
+		_populate_delta(target_deltas, write_index, "ASSET", "unallocated_points", previous_slice.unallocated_potential_points, next_slice.unallocated_potential_points, cause, initiator, reason)
 		write_index += 1
 
 	# 3. 历法时钟时相差分
 	if previous_slice.day_phase_key != next_slice.day_phase_key:
-		_populate_delta(out_deltas, write_index, "CALENDAR", "day_phase_key", previous_slice.day_phase_key, next_slice.day_phase_key, cause, initiator, reason)
+		_populate_delta(target_deltas, write_index, "CALENDAR", "day_phase_key", previous_slice.day_phase_key, next_slice.day_phase_key, cause, initiator, reason)
 		write_index += 1
 
-	_trim_and_recycle(out_deltas, write_index)
+	_trim_and_recycle(target_deltas, write_index)
 
 ## 计算前后观测切片的结构化因果差分（兼容旧接口）
 static func compute_deltas(

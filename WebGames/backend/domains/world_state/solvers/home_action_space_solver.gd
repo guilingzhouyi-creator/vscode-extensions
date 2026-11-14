@@ -69,74 +69,74 @@ const STATIC_DIR_SPECS: Array[Dictionary] = [
 ## 原位填充动态行动空间（借还守恒，零堆分配）
 static func resolve_action_space_into(
 	snapshot: AuthoritativeHudSnapshotDTO,
-	out_actions: Array[AgentActionDirectiveDTO],
-	human_interacting: bool = false
+	target_actions: Array[AgentActionDirectiveDTO],
+	is_human_interacting: bool = false
 ) -> void:
 	if snapshot == null:
-		out_actions.clear()
+		target_actions.clear()
 		return
 
 	# 保证槽位数正好与静态指令数对齐
-	while out_actions.size() < STATIC_DIR_SPECS.size():
-		out_actions.append(AgentTelemetryPoolRegistry.borrow_directive())
-	while out_actions.size() > STATIC_DIR_SPECS.size():
-		var extra: AgentActionDirectiveDTO = out_actions.pop_back()
+	while target_actions.size() < STATIC_DIR_SPECS.size():
+		target_actions.append(AgentTelemetryPoolRegistry.borrow_directive())
+	while target_actions.size() > STATIC_DIR_SPECS.size():
+		var extra: AgentActionDirectiveDTO = target_actions.pop_back()
 		AgentTelemetryPoolRegistry.recycle_directive(extra)
 
 	# 1. 潜能加点判定
-	var can_alloc: bool = snapshot.unallocated_potential_points > 0
-	_populate_directive(out_actions[0], STATIC_DIR_SPECS[0], can_alloc, "" if can_alloc else "ERR_NO_POTENTIAL_POINTS", human_interacting)
+	var can_allocate: bool = snapshot.unallocated_potential_points > 0
+	_populate_directive(target_actions[0], STATIC_DIR_SPECS[0], can_allocate, "" if can_allocate else "ERR_NO_POTENTIAL_POINTS", is_human_interacting)
 
 	# 2. 宿屋休息判定
-	var has_ap: bool = snapshot.ap_current >= 2.0
-	_populate_directive(out_actions[1], STATIC_DIR_SPECS[1], has_ap, "" if has_ap else "ERR_INSUFFICIENT_AP", human_interacting)
+	var has_sufficient_action_points: bool = snapshot.ap_current >= 2.0
+	_populate_directive(target_actions[1], STATIC_DIR_SPECS[1], has_sufficient_action_points, "" if has_sufficient_action_points else "ERR_INSUFFICIENT_AP", is_human_interacting)
 
 	# 3. 交付任务判定
 	var can_claim: bool = snapshot.quest_tracker != null and snapshot.quest_tracker.is_completable
-	_populate_directive(out_actions[2], STATIC_DIR_SPECS[2], can_claim, "" if can_claim else "ERR_QUEST_NOT_READY", human_interacting)
+	_populate_directive(target_actions[2], STATIC_DIR_SPECS[2], can_claim, "" if can_claim else "ERR_QUEST_NOT_READY", is_human_interacting)
 	if can_claim:
-		out_actions[2].allowed_parameters = {"quest_id": [snapshot.quest_tracker.tracked_quest_id]}
+		target_actions[2].allowed_parameters = {"quest_id": [snapshot.quest_tracker.tracked_quest_id]}
 	else:
-		out_actions[2].allowed_parameters = {"quest_id": []}
+		target_actions[2].allowed_parameters = {"quest_id": []}
 
 	# 4. 查验背包槽位判定
-	_populate_directive(out_actions[3], STATIC_DIR_SPECS[3], true, "", human_interacting)
+	_populate_directive(target_actions[3], STATIC_DIR_SPECS[3], true, "", is_human_interacting)
 
 	# 5. 模式自适应判定
-	_populate_directive(out_actions[4], STATIC_DIR_SPECS[4], true, "", human_interacting)
+	_populate_directive(target_actions[4], STATIC_DIR_SPECS[4], true, "", is_human_interacting)
 
 	# 6. 读取未读邮件判定
 	var has_mail: bool = snapshot.unread_mail_count > 0
-	_populate_directive(out_actions[5], STATIC_DIR_SPECS[5], has_mail, "" if has_mail else "ERR_NO_UNREAD_MAIL", human_interacting)
+	_populate_directive(target_actions[5], STATIC_DIR_SPECS[5], has_mail, "" if has_mail else "ERR_NO_UNREAD_MAIL", is_human_interacting)
 
 ## 动态裁决当前权威快照下对 Agent 暴露的合法行动空间清单（兼容旧接口）
 static func resolve_action_space(
 	snapshot: AuthoritativeHudSnapshotDTO,
-	human_interacting: bool = false
+	is_human_interacting: bool = false
 ) -> Array[AgentActionDirectiveDTO]:
 	var actions: Array[AgentActionDirectiveDTO] = []
 	if snapshot == null:
 		return actions
-	resolve_action_space_into(snapshot, actions, human_interacting)
+	resolve_action_space_into(snapshot, actions, is_human_interacting)
 	return actions
 
 static func _populate_directive(
 	target: AgentActionDirectiveDTO,
-	spec: Dictionary,
-	executable: bool,
+	action_specification: Dictionary,
+	is_executable: bool,
 	blocked_reason: String,
-	human_interacting: bool
+	is_human_interacting: bool
 ) -> void:
-	target.directive_id = str(spec.get("id", ""))
-	target.domain = str(spec.get("domain", ""))
-	target.description = str(spec.get("desc", ""))
-	target.cost_payload = spec.get("cost", {})
-	target.preconditions = spec.get("pre", {})
-	target.allowed_parameters = spec.get("params", {})
+	target.directive_id = str(action_specification.get("id", ""))
+	target.domain = str(action_specification.get("domain", ""))
+	target.description = str(action_specification.get("desc", ""))
+	target.cost_payload = action_specification.get("cost", {})
+	target.preconditions = action_specification.get("pre", {})
+	target.allowed_parameters = action_specification.get("params", {})
 
-	if human_interacting:
+	if is_human_interacting:
 		target.is_executable = false
 		target.blocked_reason = "ERR_PREEMPTED_BY_HUMAN"
 	else:
-		target.is_executable = executable
+		target.is_executable = is_executable
 		target.blocked_reason = blocked_reason

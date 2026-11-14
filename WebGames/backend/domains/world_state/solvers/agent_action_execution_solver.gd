@@ -100,12 +100,12 @@ static func _dispatch_domain_execution(
 	action_packet: AgentActionPacketDTO,
 	snapshot: AuthoritativeHudSnapshotDTO
 ) -> Dictionary:
-	var params := _extract_params(action_packet)
+	var action_parameters := _extract_params(action_packet)
 
 	match directive_id:
 		"ALLOCATE_POTENTIAL_STAT", "ALLOCATE_POTENTIAL":
-			var target_stat: String = str(params.get("stat_target", params.get("stat", params.get("attribute", "STR"))))
-			var points: int = int(params.get("points", params.get("amount", 1)))
+			var target_stat: String = str(action_parameters.get("stat_target", action_parameters.get("stat", action_parameters.get("attribute", "STR"))))
+			var points: int = int(action_parameters.get("points", action_parameters.get("amount", 1)))
 			if target_stat.is_empty() or points <= 0 or snapshot.unallocated_potential_points < points:
 				return {
 					"success": false,
@@ -165,7 +165,7 @@ static func _dispatch_domain_execution(
 			}
 
 		"DISMISS_UI_NOTICE", "DISMISS_NOTICE":
-			var notice_id: String = str(params.get("notice_id", "default_notice"))
+			var notice_id: String = str(action_parameters.get("notice_id", "default_notice"))
 			return {
 				"success": true,
 				"error_code": "",
