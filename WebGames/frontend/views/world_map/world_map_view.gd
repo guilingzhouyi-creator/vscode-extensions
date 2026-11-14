@@ -1,10 +1,12 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端第10卷: 世界与地图系统视图控制器
+# 模块归属: frontend.views.world_map
 # 文件路径: res://frontend/views/world_map/world_map_view.gd
-# 职责: 七大洲宏观地图缩放、城镇地标锚点、行军探索路线与主权势力范围呈现；
-#       6 个子界面 Tab：大地图/城镇/行军/主权/领地/寻路。
-# 骨架阶段: 零接线、不接 EventBus，仅本地 Mock 数据驱动 + 按钮点击反馈。
+# 架构定位: 世界与地图视图主控脚本，统领大地图缩放、城镇地标、行军探索与领地寻路呈现
+# 依赖与触发: 依赖 BaseScreen / WorldMapTabs / KButton / MockServiceContainer / GameConfig
+# 职责说明: 管理大地图和城镇分页展示与公共状态属性，并将行军主权领地与寻路委托给子控制器
+# 退出语义与设计依据: 点击返回调用 back() 退出界面；地标及行军快照经统一接口注入后重绘
 # ==============================================================================
+## 世界地图主视图控制器，承担大地图探索、城镇详情与子分页调度
 class_name WorldMapView
 extends BaseScreen
 
@@ -20,13 +22,13 @@ const KButtonClass = preload("res://frontend/components/k_button.gd")
 @onready var _main_tab_container: TabContainer = $%MainTabContainer
 
 # --- Tab 0: WORLD_MAP 大地图探索 ---
-@onready var _wmap_panel: PanelContainer = $%WmapPanel
-@onready var _wmap_landmark_container: Control = $%WmapLandmarkContainer
-@onready var _wmap_zoom_out_btn: Button = $%WmapZoomOutBtn
-@onready var _wmap_zoom_label: Label = $%WmapZoomLabel
-@onready var _wmap_zoom_in_btn: Button = $%WmapZoomInBtn
-@onready var _wmap_coord_label: Label = $%WmapCoordLabel
-@onready var _wmap_legend_list: ItemList = $%WmapLegendList
+@onready var _world_map_panel: PanelContainer = $%WmapPanel
+@onready var _world_map_landmark_container: Control = $%WmapLandmarkContainer
+@onready var _world_map_zoom_out_button: Button = $%WmapZoomOutBtn
+@onready var _world_map_zoom_label: Label = $%WmapZoomLabel
+@onready var _world_map_zoom_in_button: Button = $%WmapZoomInBtn
+@onready var _world_map_coordinate_label: Label = $%WmapCoordLabel
+@onready var _world_map_legend_list: ItemList = $%WmapLegendList
 
 # --- Tab 1: TOWN_VIEW 城镇详情 ---
 @onready var _town_name_label: Label = $%TownNameLabel
@@ -41,43 +43,43 @@ const KButtonClass = preload("res://frontend/components/k_button.gd")
 @onready var _march_route_preview_label: Label = $%MarchRoutePreviewLabel
 @onready var _march_eta_label: Label = $%MarchEtaLabel
 @onready var _march_terrain_label: Label = $%MarchTerrainLabel
-@onready var _march_start_btn: Button = $%MarchStartBtn
-@onready var _march_stop_btn: Button = $%MarchStopBtn
+@onready var _march_start_button: Button = $%MarchStartBtn
+@onready var _march_stop_button: Button = $%MarchStopBtn
 @onready var _march_party_status_label: Label = $%MarchPartyStatusLabel
 
 # --- Tab 3: SOVEREIGNTY 主权建国 ---
-@onready var _sov_territory_list: ItemList = $%SovTerritoryList
-@onready var _sov_nation_name_label: Label = $%SovNationNameLabel
-@onready var _sov_monarch_label: Label = $%SovMonarchLabel
-@onready var _sov_population_label: Label = $%SovPopulationLabel
-@onready var _sov_territory_count_label: Label = $%SovTerritoryCountLabel
-@onready var _sov_level_label: Label = $%SovLevelLabel
-@onready var _sov_establish_btn: Button = $%SovEstablishBtn
+@onready var _sovereignty_territory_list: ItemList = $%SovTerritoryList
+@onready var _sovereignty_nation_name_label: Label = $%SovNationNameLabel
+@onready var _sovereignty_monarch_label: Label = $%SovMonarchLabel
+@onready var _sovereignty_population_label: Label = $%SovPopulationLabel
+@onready var _sovereignty_territory_count_label: Label = $%SovTerritoryCountLabel
+@onready var _sovereignty_level_label: Label = $%SovLevelLabel
+@onready var _sovereignty_establish_button: Button = $%SovEstablishBtn
 
 # --- Tab 4: TERRITORY 领地管理 ---
 @onready var _territory_list: ItemList = $%TerritoryList
-@onready var _terr_resource_label: Label = $%TerrResourceLabel
-@onready var _terr_construction_bar: ProgressBar = $%TerrConstructionBar
-@onready var _terr_garrison_label: Label = $%TerrGarrisonLabel
-@onready var _terr_upgrade_btn: Button = $%TerrUpgradeBtn
+@onready var _territory_resource_label: Label = $%TerrResourceLabel
+@onready var _territory_construction_bar: ProgressBar = $%TerrConstructionBar
+@onready var _territory_garrison_label: Label = $%TerrGarrisonLabel
+@onready var _territory_upgrade_button: Button = $%TerrUpgradeBtn
 
 # --- Tab 5: PATHFINDING 寻路规划 ---
-@onready var _pf_start_option: OptionButton = $%PfStartOption
-@onready var _pf_end_option: OptionButton = $%PfEndOption
-@onready var _pf_calc_btn: Button = $%PfCalcBtn
-@onready var _pf_route_list: ItemList = $%PfRouteList
-@onready var _pf_route_detail_label: Label = $%PfRouteDetailLabel
-@onready var _pf_auto_btn: Button = $%PfAutoBtn
+@onready var _pathfinding_start_option: OptionButton = $%PfStartOption
+@onready var _pathfinding_end_option: OptionButton = $%PfEndOption
+@onready var _pathfinding_calculate_button: Button = $%PfCalcBtn
+@onready var _pathfinding_route_list: ItemList = $%PfRouteList
+@onready var _pathfinding_route_detail_label: Label = $%PfRouteDetailLabel
+@onready var _pathfinding_auto_button: Button = $%PfAutoBtn
 
 # --- 底部操作栏 ---
-@onready var _back_btn: Button = $%BackBtn
+@onready var _back_button: Button = $%BackBtn
 
 # --- 非唯一静态标签（i18n 迁移新增，共 22 个） ---
 @onready var _title_label: Label = $%TitleLabel
-@onready var _title_sub_label: Label = $%TitleSubLabel
-@onready var _wmap_placeholder_label: Label = $%WmapPlaceholderLabel
-@onready var _wmap_zoom_section_label: Label = $%WmapZoomSectionLabel
-@onready var _wmap_legend_label: Label = $%WmapLegendLabel
+@onready var _title_subtitle_label: Label = $%TitleSubLabel
+@onready var _world_map_placeholder_label: Label = $%WmapPlaceholderLabel
+@onready var _world_map_zoom_section_label: Label = $%WmapZoomSectionLabel
+@onready var _world_map_legend_label: Label = $%WmapLegendLabel
 @onready var _town_facility_section_label: Label = $%TownFacilitySectionLabel
 @onready var _town_npc_section_label: Label = $%TownNpcSectionLabel
 @onready var _town_detail_section_label: Label = $%TownDetailSectionLabel
@@ -87,14 +89,14 @@ const KButtonClass = preload("res://frontend/components/k_button.gd")
 @onready var _march_section_label_2: Label = $%MarchSectionLabel2
 @onready var _march_section_label_3: Label = $%MarchSectionLabel3
 @onready var _march_section_label_4: Label = $%MarchSectionLabel4
-@onready var _sov_territory_section_label: Label = $%SovTerritorySectionLabel
-@onready var _sov_nation_section_label: Label = $%SovNationSectionLabel
-@onready var _terr_list_section_label: Label = $%TerrListSectionLabel
-@onready var _terr_detail_section_label: Label = $%TerrDetailSectionLabel
-@onready var _terr_construction_label: Label = $%TerrConstructionLabel
-@onready var _pf_start_label: Label = $%PfStartLabel
-@onready var _pf_end_label: Label = $%PfEndLabel
-@onready var _pf_routes_section_label: Label = $%PfRoutesSectionLabel
+@onready var _sovereignty_territory_section_label: Label = $%SovTerritorySectionLabel
+@onready var _sovereignty_nation_section_label: Label = $%SovNationSectionLabel
+@onready var _territory_list_section_label: Label = $%TerrListSectionLabel
+@onready var _territory_detail_section_label: Label = $%TerrDetailSectionLabel
+@onready var _territory_construction_label: Label = $%TerrConstructionLabel
+@onready var _pathfinding_start_label: Label = $%PfStartLabel
+@onready var _pathfinding_end_label: Label = $%PfEndLabel
+@onready var _pathfinding_routes_section_label: Label = $%PfRoutesSectionLabel
 
 # ==============================================================================
 # 地图状态与 Mock 数据快照
@@ -107,7 +109,7 @@ const MAP_MAX_ZOOM := 3.0
 var town_landmarks: Array = []
 var marching_routes: Array = []
 var selected_landmark_id: String = ""
-var selected_town_id: String = "" # 白模测试契约字段（TC-FE10-02 断言）
+var selected_town_id: String = "" # 当前选中城镇标识
 
 # 城镇设施、NPC、领地与主权数据（单一真源收敛于 MockDataCatalog）
 var _mock_town_facilities: Array = []
@@ -115,30 +117,35 @@ var _mock_town_npcs: Array = []
 var _mock_territories: Array = []
 var _mock_sovereignty: Dictionary = {}
 
-# 行军队伍状态（骨架阶段本地模拟）
+# 行军队伍状态（本地交互模拟）
 var _marching_active: bool = false
 
 # 地标 ID → i18n key 映射
-const _LANDMARK_NAME_KEYS := {"VALAN_CAPITAL": "ui.fe10.mock.landmark.valan_capital", "SILVER_GROVE": "ui.fe10.mock.landmark.silver_grove", "IRON_FORTRESS": "ui.fe10.mock.landmark.iron_fortress", "DRAGON_PEAK": "ui.fe10.mock.landmark.dragon_peak"}
+const LANDMARK_NAME_KEYS := {"VALAN_CAPITAL": "ui.fe10.mock.landmark.valan_capital", "SILVER_GROVE": "ui.fe10.mock.landmark.silver_grove", "IRON_FORTRESS": "ui.fe10.mock.landmark.iron_fortress", "DRAGON_PEAK": "ui.fe10.mock.landmark.dragon_peak"}
 
 # ==============================================================================
-# 生命周期
+# 外部交互与快照入口
 # ==============================================================================
 
-# ==============================================================================
-# 白模测试契约兼容桩（映射到新状态，不触碰 @onready 节点）
-# ==============================================================================
+## 调整当前大地图缩放倍率并限制在合法范围
+func adjust_zoom(delta: float) -> void:
+	map_zoom_level = clampf(map_zoom_level + delta, MAP_MIN_ZOOM, MAP_MAX_ZOOM)
 
-func adjust_zoom(delta: float) -> void: map_zoom_level = clampf(map_zoom_level + delta, MAP_MIN_ZOOM, MAP_MAX_ZOOM)
-func select_town(town_id: String) -> Dictionary: selected_town_id = town_id; return {"success": true, "town_id": town_id}
-func set_marching_route_snapshot(routes: Array) -> void: apply_snapshot({"marching_routes": routes})
+## 选中指定城镇并记录目标标识
+func select_town(town_id: String) -> Dictionary:
+	selected_town_id = town_id
+	return {"success": true, "town_id": town_id}
+
+## 注入行军路线列表快照并触发视图刷新
+func set_marching_route_snapshot(routes: Array) -> void:
+	apply_snapshot({"marching_routes": routes})
 
 ## 统一快照渲染映射：行军路线 → 视图状态
 func _render_from_snapshot() -> void:
 	if snapshot.has("marching_routes"):
 		marching_routes = FrontendSnapshot.read_array(snapshot, "marching_routes")
 
-## 生命周期初始化：主题/快照/六 Tab 标题与文案/各子界面装配/信号绑定（骨架零接线）
+## 生命周期初始化：主题/快照/六 Tab 标题与文案/各子界面装配/信号绑定（本地交互初始化）
 var _tabs: Variant = null
 
 func _get_tabs():
@@ -148,11 +155,11 @@ func _get_tabs():
 	return _tabs
 
 func _ready() -> void:
-	# 1. 应用主题（骨架阶段直接用 ThemeManager 单例的默认主题）
-	var tm := ThemeManager.get_instance()
-	theme = tm.theme
+	# 1. 应用主题（直接读取 ThemeManager 单例主题）
+	var theme_manager := ThemeManager.get_instance()
+	theme = theme_manager.theme
 
-	# 2. 加载 Mock 快照数据
+	# 2. 加载快照数据
 	_load_mock_snapshot()
 
 	# 3. 设置 Tab 标题
@@ -169,7 +176,7 @@ func _ready() -> void:
 	_init_territory_tab()
 	_init_pathfinding_tab()
 
-	# 6. 绑定信号（零接线：仅本地 UI 交互反馈）
+	# 6. 绑定信号（本地 UI 交互绑定）
 	_connect_signals()
 
 	# 7. 视图加载后批量视觉适配
@@ -186,11 +193,11 @@ func _load_mock_snapshot() -> void:
 		return
 	if world_map.has("landmarks"):
 		town_landmarks = FrontendSnapshot.read_array(world_map, "landmarks")
-		# 将地标中文名替换为 i18n key
-		for lm in town_landmarks:
-			var lid: String = lm.get("id", "")
-			if _LANDMARK_NAME_KEYS.has(lid):
-				lm["name"] = _LANDMARK_NAME_KEYS[lid]
+		# 将地标名称替换为 i18n key
+		for landmark_entry in town_landmarks:
+			var landmark_id: String = landmark_entry.get("id", "")
+			if LANDMARK_NAME_KEYS.has(landmark_id):
+				landmark_entry["name"] = LANDMARK_NAME_KEYS[landmark_id]
 	if world_map.has("marching_routes"):
 		marching_routes = FrontendSnapshot.read_array(world_map, "marching_routes")
 	if world_map.has("town_facilities"):
@@ -216,8 +223,8 @@ func _setup_tab_titles() -> void:
 		"ui.fe10.tab.territory",
 		"ui.fe10.tab.pathfinding",
 	]
-	for i in tab_keys.size():
-		UIIntermediary.resolve_tab(_main_tab_container, i, tab_keys[i])
+	for tab_index in tab_keys.size():
+		UIIntermediary.resolve_tab(_main_tab_container, tab_index, tab_keys[tab_index])
 
 # ==============================================================================
 # 静态文案初始化（非动态数据节点，i18n 绑定）
@@ -227,13 +234,13 @@ func _setup_tab_titles() -> void:
 func _init_static_text() -> void:
 	# 顶部标题栏
 	UIIntermediary.resolve(_title_label, "ui.fe10.header.title")
-	UIIntermediary.resolve(_title_sub_label, "ui.fe10.header.title_sub")
-	UIIntermediary.resolve(_back_btn, "ui.fe10.header.back")
+	UIIntermediary.resolve(_title_subtitle_label, "ui.fe10.header.title_sub")
+	UIIntermediary.resolve(_back_button, "ui.fe10.header.back")
 
 	# Tab 0: 大地图
-	UIIntermediary.resolve(_wmap_placeholder_label, "ui.fe10.wmap.placeholder")
-	UIIntermediary.resolve(_wmap_zoom_section_label, "ui.fe10.wmap.zoom_section")
-	UIIntermediary.resolve(_wmap_legend_label, "ui.fe10.wmap.legend")
+	UIIntermediary.resolve(_world_map_placeholder_label, "ui.fe10.wmap.placeholder")
+	UIIntermediary.resolve(_world_map_zoom_section_label, "ui.fe10.wmap.zoom_section")
+	UIIntermediary.resolve(_world_map_legend_label, "ui.fe10.wmap.legend")
 
 	# Tab 1: 城镇
 	UIIntermediary.resolve(_town_facility_section_label, "ui.fe10.town.facility_section")
@@ -251,61 +258,61 @@ func _init_world_map_tab() -> void:
 	# 动态生成地标按钮
 	_spawn_landmark_buttons()
 	# 填充图例列表
-	_wmap_legend_list.clear()
-	for landmark in town_landmarks:
-		var name := UIIntermediary.text(landmark.get("name", ""))
-		var type := UIIntermediary.text(_landmark_type_key(landmark.get("type", "")))
-		UIIntermediary.resolve_item(_wmap_legend_list, "ui.fe10.wmap.legend_item", {"name": name, "type": type})
+	_world_map_legend_list.clear()
+	for landmark_entry in town_landmarks:
+		var landmark_name := UIIntermediary.text(landmark_entry.get("name", ""))
+		var landmark_type_name := UIIntermediary.text(_landmark_type_key(landmark_entry.get("type", "")))
+		UIIntermediary.resolve_item(_world_map_legend_list, "ui.fe10.wmap.legend_item", {"name": landmark_name, "type": landmark_type_name})
 	# 初始缩放与坐标显示
 	_refresh_wmap_zoom()
 	_refresh_wmap_coord()
 
-## 刷新地标按钮：按 Mock 坐标复用节点池定位，点击回调切城镇详情
+## 刷新地标按钮：按快照坐标复用节点池定位，点击回调切城镇详情
 func _spawn_landmark_buttons() -> void:
-	for i in range(town_landmarks.size()):
-		var landmark: Dictionary = town_landmarks[i]
-		var btn: Button = _acquire_landmark_button(i)
-		btn.visible = true
-		btn.name = "Landmark_%s" % landmark.get("id", "")
-		btn.text = UIIntermediary.text(landmark.get("name", ""))
-		btn.position = Vector2(landmark.get("x", 0) - 60, landmark.get("y", 0) - 16)
-		btn.set_meta("landmark_id", str(landmark.get("id", "")))
-	for i in range(town_landmarks.size(), _wmap_landmark_container.get_child_count()):
-		_wmap_landmark_container.get_child(i).visible = false
+	for landmark_index in range(town_landmarks.size()):
+		var landmark_entry: Dictionary = town_landmarks[landmark_index]
+		var landmark_button: Button = _acquire_landmark_button(landmark_index)
+		landmark_button.visible = true
+		landmark_button.name = "Landmark_%s" % landmark_entry.get("id", "")
+		landmark_button.text = UIIntermediary.text(landmark_entry.get("name", ""))
+		landmark_button.position = Vector2(landmark_entry.get("x", 0) - 60, landmark_entry.get("y", 0) - 16)
+		landmark_button.set_meta("landmark_id", str(landmark_entry.get("id", "")))
+	for child_index in range(town_landmarks.size(), _world_map_landmark_container.get_child_count()):
+		_world_map_landmark_container.get_child(child_index).visible = false
 
 ## 获取或创建地标按钮（循环外分配，按元数据动态分派）
-func _acquire_landmark_button(index: int) -> Button:
-	if index < _wmap_landmark_container.get_child_count():
-		return _wmap_landmark_container.get_child(index) as Button
-	var btn := KButtonClass.new()
-	btn.variant = KButtonClass.StyleVariant.SECONDARY
-	btn.size = Vector2(120, 32)
-	connect_managed(btn.pressed, func():
-		var lid: String = str(btn.get_meta("landmark_id", ""))
-		if not lid.is_empty():
-			_on_landmark_pressed(lid)
+func _acquire_landmark_button(button_index: int) -> Button:
+	if button_index < _world_map_landmark_container.get_child_count():
+		return _world_map_landmark_container.get_child(button_index) as Button
+	var landmark_button := KButtonClass.new()
+	landmark_button.variant = KButtonClass.StyleVariant.SECONDARY
+	landmark_button.size = Vector2(120, 32)
+	connect_managed(landmark_button.pressed, func():
+		var landmark_id: String = str(landmark_button.get_meta("landmark_id", ""))
+		if not landmark_id.is_empty():
+			_on_landmark_pressed(landmark_id)
 	)
-	_wmap_landmark_container.add_child(btn)
-	return btn
+	_world_map_landmark_container.add_child(landmark_button)
+	return landmark_button
 
-func _landmark_type_key(code: String) -> String:
-	var m := {"CAPITAL": "ui.fe10.landmark.type.capital", "TOWN": "ui.fe10.landmark.type.town", "FORTRESS": "ui.fe10.landmark.type.fortress", "DUNGEON": "ui.fe10.landmark.type.dungeon"}
-	return m.get(code, code)
+func _landmark_type_key(type_code: String) -> String:
+	var type_key_map := {"CAPITAL": "ui.fe10.landmark.type.capital", "TOWN": "ui.fe10.landmark.type.town", "FORTRESS": "ui.fe10.landmark.type.fortress", "DUNGEON": "ui.fe10.landmark.type.dungeon"}
+	return type_key_map.get(type_code, type_code)
 
 ## 刷新缩放百分比标签
 func _refresh_wmap_zoom() -> void:
-	if _wmap_zoom_label:
-		UIIntermediary.resolve(_wmap_zoom_label, "ui.fe10.wmap.zoom", {"percent": int(map_zoom_level * 100)})
+	if _world_map_zoom_label:
+		UIIntermediary.resolve(_world_map_zoom_label, "ui.fe10.wmap.zoom", {"percent": int(map_zoom_level * 100)})
 
 ## 刷新坐标标签：未选中地标显示默认文案，选中则按地标坐标渲染
 func _refresh_wmap_coord() -> void:
-	if _wmap_coord_label:
+	if _world_map_coordinate_label:
 		if selected_landmark_id.is_empty():
-			UIIntermediary.resolve(_wmap_coord_label, "ui.fe10.wmap.coord_default")
+			UIIntermediary.resolve(_world_map_coordinate_label, "ui.fe10.wmap.coord_default")
 		else:
-			for lm in town_landmarks:
-				if lm.get("id", "") == selected_landmark_id:
-					UIIntermediary.resolve(_wmap_coord_label, "ui.fe10.wmap.coord", {"x": lm.get("x", 0), "y": lm.get("y", 0)})
+			for landmark_entry in town_landmarks:
+				if landmark_entry.get("id", "") == selected_landmark_id:
+					UIIntermediary.resolve(_world_map_coordinate_label, "ui.fe10.wmap.coord", {"x": landmark_entry.get("x", 0), "y": landmark_entry.get("y", 0)})
 					break
 
 # ==============================================================================
@@ -316,22 +323,22 @@ func _refresh_wmap_coord() -> void:
 func _init_town_view_tab() -> void:
 	# 填充设施列表
 	_town_facility_list.clear()
-	for fac in _mock_town_facilities:
-		_town_facility_list.add_item(UIIntermediary.text(fac.get("name", "")))
+	for facility_entry in _mock_town_facilities:
+		_town_facility_list.add_item(UIIntermediary.text(facility_entry.get("name", "")))
 	# 填充 NPC 列表
 	_town_npc_list.clear()
-	for npc in _mock_town_npcs:
-		_town_npc_list.add_item(UIIntermediary.text(npc.get("name", "")))
+	for resident_entry in _mock_town_npcs:
+		_town_npc_list.add_item(UIIntermediary.text(resident_entry.get("name", "")))
 	# 默认选中第一个地标
 	if town_landmarks.size() > 0:
 		_show_town(town_landmarks[0])
 
 ## 展示城镇详情：名称/类型/设施详情初始展示
-func _show_town(landmark: Dictionary) -> void:
+func _show_town(landmark_entry: Dictionary) -> void:
 	if _town_name_label:
-		_town_name_label.text = UIIntermediary.text(landmark.get("name", "ui.fe10.town.name_default"))
+		_town_name_label.text = UIIntermediary.text(landmark_entry.get("name", "ui.fe10.town.name_default"))
 	if _town_type_label:
-		var type_name := UIIntermediary.text(_landmark_type_key(landmark.get("type", "")))
+		var type_name := UIIntermediary.text(_landmark_type_key(landmark_entry.get("type", "")))
 		UIIntermediary.resolve(_town_type_label, "ui.fe10.town.type_label", {"type": type_name})
 	if _town_facility_detail_label:
 		UIIntermediary.resolve(_town_facility_detail_label, "ui.fe10.town.detail_placeholder")
@@ -342,28 +349,28 @@ func _show_town(landmark: Dictionary) -> void:
 
 func _init_marching_tab() -> void: _get_tabs().init_marching_tab()
 func _refresh_march_preview() -> void: _get_tabs().refresh_march_preview()
-func _terrain_key(code: String) -> String: return _get_tabs()._terrain_key(code)
+func _terrain_key(terrain_code: String) -> String: return _get_tabs()._terrain_key(terrain_code)
 func _refresh_march_party_status() -> void: _get_tabs().refresh_march_party_status()
 func _init_sovereignty_tab() -> void: _get_tabs().init_sovereignty_tab()
 func _refresh_sovereignty_info() -> void: _get_tabs().refresh_sovereignty_info()
 func _init_territory_tab() -> void: _get_tabs().init_territory_tab()
-func _show_territory_detail(terr: Dictionary) -> void: _get_tabs().show_territory_detail(terr)
+func _show_territory_detail(territory_entry: Dictionary) -> void: _get_tabs().show_territory_detail(territory_entry)
 func _init_pathfinding_tab() -> void: _get_tabs().init_pathfinding_tab()
 
 # ==============================================================================
-# 信号绑定（零接线：所有信号在本地脚本闭环，不接 EventBus）
+# 信号绑定（本地 UI 交互绑定）
 # ==============================================================================
 
-## 绑定本地 UI 交互信号（零接线：六 Tab 控件在本地脚本闭环）
+## 绑定本地 UI 交互信号（六标签页控件在本地脚本闭环）
 func _connect_signals() -> void:
 	# 返回按钮
-	connect_managed(_back_btn.pressed, _on_back_pressed)
+	connect_managed(_back_button.pressed, _on_back_pressed)
 
 	# 大地图缩放
-	connect_managed(_wmap_zoom_in_btn.pressed, _on_wmap_zoom_in)
-	connect_managed(_wmap_zoom_out_btn.pressed, _on_wmap_zoom_out)
+	connect_managed(_world_map_zoom_in_button.pressed, _on_wmap_zoom_in)
+	connect_managed(_world_map_zoom_out_button.pressed, _on_wmap_zoom_out)
 	# 图例点击切换地标
-	connect_managed(_wmap_legend_list.item_selected, _on_legend_selected)
+	connect_managed(_world_map_legend_list.item_selected, _on_legend_selected)
 
 	# 城镇设施 / NPC 选择
 	connect_managed(_town_facility_list.item_selected, _on_town_facility_selected)
@@ -386,16 +393,16 @@ func _on_landmark_pressed(landmark_id: String) -> void:
 	selected_landmark_id = landmark_id
 	_refresh_wmap_coord()
 	# 查找对应地标并切换到城镇 Tab
-	for landmark in town_landmarks:
-		if landmark.get("id", "") == landmark_id:
-			_show_town(landmark)
+	for landmark_entry in town_landmarks:
+		if landmark_entry.get("id", "") == landmark_id:
+			_show_town(landmark_entry)
 			_main_tab_container.current_tab = 1
 			break
 
 ## 图例条目选中：委托地标点击逻辑
-func _on_legend_selected(index: int) -> void:
-	if index >= 0 and index < town_landmarks.size():
-		_on_landmark_pressed(town_landmarks[index].get("id", ""))
+func _on_legend_selected(legend_index: int) -> void:
+	if legend_index >= 0 and legend_index < town_landmarks.size():
+		_on_landmark_pressed(town_landmarks[legend_index].get("id", ""))
 
 func _on_wmap_zoom_in() -> void: map_zoom_level = minf(map_zoom_level + 0.25, MAP_MAX_ZOOM); _refresh_wmap_zoom()
 func _on_wmap_zoom_out() -> void: map_zoom_level = maxf(map_zoom_level - 0.25, MAP_MIN_ZOOM); _refresh_wmap_zoom()
@@ -405,33 +412,33 @@ func _on_wmap_zoom_out() -> void: map_zoom_level = maxf(map_zoom_level - 0.25, M
 # ==============================================================================
 
 ## 设施条目选中：渲染设施名称与描述详情
-func _on_town_facility_selected(index: int) -> void:
-	if index >= 0 and index < _mock_town_facilities.size():
-		var fac: Dictionary = _mock_town_facilities[index]
+func _on_town_facility_selected(facility_index: int) -> void:
+	if facility_index >= 0 and facility_index < _mock_town_facilities.size():
+		var facility_entry: Dictionary = _mock_town_facilities[facility_index]
 		if _town_facility_detail_label:
-			var name := UIIntermediary.text(fac.get("name", ""))
-			var desc := UIIntermediary.text(fac.get("desc", ""))
-			UIIntermediary.resolve(_town_facility_detail_label, "ui.fe10.town.facility_detail", {"name": name, "desc": desc})
+			var facility_name := UIIntermediary.text(facility_entry.get("name", ""))
+			var facility_description := UIIntermediary.text(facility_entry.get("desc", ""))
+			UIIntermediary.resolve(_town_facility_detail_label, "ui.fe10.town.facility_detail", {"name": facility_name, "desc": facility_description})
 
 ## NPC 条目选中：渲染 NPC 名称与描述详情
-func _on_town_npc_selected(index: int) -> void:
-	if index >= 0 and index < _mock_town_npcs.size():
-		var npc: Dictionary = _mock_town_npcs[index]
+func _on_town_npc_selected(resident_index: int) -> void:
+	if resident_index >= 0 and resident_index < _mock_town_npcs.size():
+		var resident_entry: Dictionary = _mock_town_npcs[resident_index]
 		if _town_facility_detail_label:
-			var name := UIIntermediary.text(npc.get("name", ""))
-			var desc := UIIntermediary.text(npc.get("desc", ""))
-			UIIntermediary.resolve(_town_facility_detail_label, "ui.fe10.town.npc_detail", {"name": name, "desc": desc})
+			var resident_name := UIIntermediary.text(resident_entry.get("name", ""))
+			var resident_description := UIIntermediary.text(resident_entry.get("desc", ""))
+			UIIntermediary.resolve(_town_facility_detail_label, "ui.fe10.town.npc_detail", {"name": resident_name, "desc": resident_description})
 
 # ==============================================================================
 # Tab 2~5 回调委托
 # ==============================================================================
 
-func _on_march_option_changed(idx: int) -> void: _get_tabs()._on_march_option_changed(idx)
+func _on_march_option_changed(option_index: int) -> void: _get_tabs()._on_march_option_changed(option_index)
 func _on_march_start() -> void: _get_tabs()._on_march_start()
 func _on_march_stop() -> void: _get_tabs()._on_march_stop()
 func _on_sov_establish() -> void: _get_tabs()._on_sov_establish()
-func _on_territory_selected(idx: int) -> void: _get_tabs()._on_territory_selected(idx)
+func _on_territory_selected(territory_index: int) -> void: _get_tabs()._on_territory_selected(territory_index)
 func _on_terr_upgrade() -> void: _get_tabs()._on_terr_upgrade()
 func _on_pf_calc() -> void: _get_tabs()._on_pf_calc()
-func _on_pf_route_selected(idx: int) -> void: _get_tabs()._on_pf_route_selected(idx)
+func _on_pf_route_selected(route_index: int) -> void: _get_tabs()._on_pf_route_selected(route_index)
 func _on_pf_auto() -> void: _get_tabs()._on_pf_auto()
