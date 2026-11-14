@@ -25,7 +25,7 @@ var _worlds_cache: Dictionary = {}
 var _loaded: bool = false
 
 ## 自定义物理根目录（测试隔离沙箱专用）
-var _custom_root_dir: String = ""
+var _custom_root_directory: String = ""
 
 ## 自定义目录索引文件路径（测试隔离沙箱专用）
 var _custom_catalog_path: String = ""
@@ -47,7 +47,7 @@ static func get_instance() -> WorldArchiveRepository:
 static func reset_for_tests() -> void:
 	if _instance != null:
 		_instance._worlds_cache.clear()
-		_instance._custom_root_dir = ""
+		_instance._custom_root_directory = ""
 		_instance._custom_catalog_path = ""
 		_instance._loaded = false
 	_instance = null
@@ -58,7 +58,7 @@ func is_loaded() -> bool:
 
 ## 设置自定义物理根目录（支持测试沙箱物理隔离）
 func set_custom_root_dir(path: String) -> void:
-	_custom_root_dir = path
+	_custom_root_directory = path
 
 ## 设置自定义目录索引文件路径（支持测试沙箱物理隔离）
 func set_custom_catalog_path(path: String) -> void:
@@ -66,18 +66,18 @@ func set_custom_catalog_path(path: String) -> void:
 
 ## 获取物理根目录路径
 func get_root_dir() -> String:
-	if not _custom_root_dir.is_empty():
-		return _custom_root_dir if _custom_root_dir.ends_with("/") else _custom_root_dir + "/"
-	var dir: String = GameConfig.get_string(DOMAIN_WORLD_GATEWAY_CONFIG, "local_archive/root_dir", DEFAULT_SP_ROOT_DIR)
-	return dir if dir.ends_with("/") else dir + "/"
+	if not _custom_root_directory.is_empty():
+		return _custom_root_directory if _custom_root_directory.ends_with("/") else _custom_root_directory + "/"
+	var configured_directory: String = GameConfig.get_string(DOMAIN_WORLD_GATEWAY_CONFIG, "local_archive/root_dir", DEFAULT_SP_ROOT_DIR)
+	return configured_directory if configured_directory.ends_with("/") else configured_directory + "/"
 
 ## 获取目录索引文件物理路径
 func get_catalog_file_path() -> String:
 	if not _custom_catalog_path.is_empty():
 		return _custom_catalog_path
-	var root := get_root_dir()
+	var root_directory := get_root_dir()
 	var filename: String = GameConfig.get_string(DOMAIN_WORLD_GATEWAY_CONFIG, "local_archive/catalog_file", DEFAULT_CATALOG_FILE)
-	return root + filename
+	return root_directory + filename
 
 ## 获取世界独立存储子目录
 func get_world_dir(world_id: String) -> String:
@@ -93,8 +93,8 @@ func load_all() -> Dictionary:
 	_worlds_cache.clear()
 
 	var catalog_path := get_catalog_file_path()
-	var root_dir := catalog_path.get_base_dir()
-	AtomicFileWriter.ensure_directory(root_dir)
+	var catalog_directory := catalog_path.get_base_dir()
+	AtomicFileWriter.ensure_directory(catalog_directory)
 
 	if not FileAccess.file_exists(catalog_path):
 		return {"success": true, "count": 0, "error": ""}
@@ -113,12 +113,12 @@ func load_all() -> Dictionary:
 	if not parsed is Dictionary:
 		return {"success": false, "count": 0, "error": "INVALID_CATALOG_ROOT"}
 
-	var root_dict: Dictionary = parsed
-	var raw_worlds: Dictionary = root_dict.get("worlds", {})
+	var root_dictionary: Dictionary = parsed
+	var raw_worlds: Dictionary = root_dictionary.get("worlds", {})
 	for world_key in raw_worlds.keys():
-		var raw_item: Variant = raw_worlds[world_key]
-		if raw_item is Dictionary:
-			var archive_summary := WorldArchiveSummaryDTO.from_dto(raw_item as Dictionary)
+		var raw_world_entry: Variant = raw_worlds[world_key]
+		if raw_world_entry is Dictionary:
+			var archive_summary := WorldArchiveSummaryDTO.from_dto(raw_world_entry as Dictionary)
 			if archive_summary != null and not archive_summary.world_id.is_empty():
 				_worlds_cache[archive_summary.world_id] = archive_summary
 
@@ -130,21 +130,21 @@ func _ensure_catalog_loaded() -> void:
 
 func _save_catalog_internal() -> Dictionary:
 	var catalog_path := get_catalog_file_path()
-	var root_dir := catalog_path.get_base_dir()
-	AtomicFileWriter.ensure_directory(root_dir)
+	var catalog_directory := catalog_path.get_base_dir()
+	AtomicFileWriter.ensure_directory(catalog_directory)
 
-	var worlds_dict: Dictionary = {}
+	var serialized_worlds: Dictionary = {}
 	for world_key in _worlds_cache.keys():
 		var summary: WorldArchiveSummaryDTO = _worlds_cache[world_key]
 		if summary != null:
-			worlds_dict[world_key] = summary.to_dto()
+			serialized_worlds[world_key] = summary.to_dto()
 
 	var envelope: Dictionary = {
 		"format_version": DEFAULT_FORMAT_VERSION,
 		"engine": "KalarWorldEngine_Godot4",
 		"updated_timestamp_utc": int(Time.get_unix_time_from_system()),
 		"world_count": _worlds_cache.size(),
-		"worlds": worlds_dict
+		"worlds": serialized_worlds
 	}
 
 	var json_text := JSON.stringify(envelope, "\t")
@@ -157,15 +157,15 @@ func _save_catalog_internal() -> Dictionary:
 ## 枚举所有已登记世界档案（按最后游玩时间倒序排列）
 func list_worlds() -> Array[WorldArchiveSummaryDTO]:
 	_ensure_catalog_loaded()
-	var list: Array[WorldArchiveSummaryDTO] = []
+	var world_summaries: Array[WorldArchiveSummaryDTO] = []
 	for world_key in _worlds_cache.keys():
 		var summary: WorldArchiveSummaryDTO = _worlds_cache[world_key]
 		if summary != null:
-			list.append(summary)
-	list.sort_custom(func(left_summary: WorldArchiveSummaryDTO, right_summary: WorldArchiveSummaryDTO) -> bool:
+			world_summaries.append(summary)
+	world_summaries.sort_custom(func(left_summary: WorldArchiveSummaryDTO, right_summary: WorldArchiveSummaryDTO) -> bool:
 		return left_summary.last_played_timestamp_utc > right_summary.last_played_timestamp_utc
 	)
-	return list
+	return world_summaries
 
 ## 获取指定世界档案摘要
 func get_world_summary(world_id: String) -> WorldArchiveSummaryDTO:
@@ -204,33 +204,33 @@ func create_world(
 	if _worlds_cache.has(world_id):
 		return {"success": false, "error": "WORLD_ALREADY_EXISTS"}
 
-	var world_dir := get_world_dir(world_id)
-	AtomicFileWriter.ensure_directory(world_dir)
+	var world_directory := get_world_dir(world_id)
+	AtomicFileWriter.ensure_directory(world_directory)
 
-	var now := int(Time.get_unix_time_from_system())
+	var current_timestamp := int(Time.get_unix_time_from_system())
 
 	# 1. 创建初始 world_meta.json
-	var meta_dict := {
+	var metadata_payload := {
 		"world_id": world_id,
 		"world_name": world_name,
 		"template_id": template_id,
 		"seed_value": seed_value,
-		"created_timestamp_utc": now,
-		"last_played_timestamp_utc": now,
+		"created_timestamp_utc": current_timestamp,
+		"last_played_timestamp_utc": current_timestamp,
 		"is_active": true
 	}
-	var meta_result := _atomic_write_file(world_dir + "world_meta.json", JSON.stringify(meta_dict, "\t"))
-	if not bool(meta_result.get("success", false)):
-		return {"success": false, "error": "WORLD_META_WRITE_FAILED", "detail": meta_result.get("error", "")}
+	var metadata_write_outcome := _atomic_write_file(world_directory + "world_meta.json", JSON.stringify(metadata_payload, "\t"))
+	if not bool(metadata_write_outcome.get("success", false)):
+		return {"success": false, "error": "WORLD_META_WRITE_FAILED", "detail": metadata_write_outcome.get("error", "")}
 
 	# 2. 创建初始 world_state.json (WorldInstance 实体序列化)
-	var instance := WorldInstance.new(world_id)
-	instance.world_time = {"tick": 0, "day": 1, "month": 1, "year": 1}
-	instance.world_state = {"template_id": template_id, "seed_value": seed_value}
-	var state_dict := instance.serialize()
-	var state_result := _atomic_write_file(world_dir + "world_state.json", JSON.stringify(state_dict, "\t"))
-	if not bool(state_result.get("success", false)):
-		return {"success": false, "error": "WORLD_STATE_WRITE_FAILED", "detail": state_result.get("error", "")}
+	var world_instance := WorldInstance.new(world_id)
+	world_instance.world_time = {"tick": 0, "day": 1, "month": 1, "year": 1}
+	world_instance.world_state = {"template_id": template_id, "seed_value": seed_value}
+	var serialized_state := world_instance.serialize()
+	var state_write_outcome := _atomic_write_file(world_directory + "world_state.json", JSON.stringify(serialized_state, "\t"))
+	if not bool(state_write_outcome.get("success", false)):
+		return {"success": false, "error": "WORLD_STATE_WRITE_FAILED", "detail": state_write_outcome.get("error", "")}
 
 	# 3. 构建摘要条目登记至索引并原子更新 world_catalog.json
 	var summary := WorldArchiveSummaryDTO.new(
@@ -241,14 +241,14 @@ func create_world(
 		0,
 		1,
 		0,
-		now,
-		now,
+		current_timestamp,
+		current_timestamp,
 		true
 	)
 	_worlds_cache[world_id] = summary
-	var catalog_result := _save_catalog_internal()
-	if not bool(catalog_result.get("success", false)):
-		return {"success": false, "error": "CATALOG_WRITE_FAILED", "detail": catalog_result.get("error", "")}
+	var catalog_write_outcome := _save_catalog_internal()
+	if not bool(catalog_write_outcome.get("success", false)):
+		return {"success": false, "error": "CATALOG_WRITE_FAILED", "detail": catalog_write_outcome.get("error", "")}
 
 	return {
 		"success": true,
@@ -265,8 +265,8 @@ func load_world(world_id: String) -> WorldInstance:
 	if not _worlds_cache.has(world_id):
 		return null
 
-	var world_dir := get_world_dir(world_id)
-	var state_path := world_dir + "world_state.json"
+	var world_directory := get_world_dir(world_id)
+	var state_path := world_directory + "world_state.json"
 	if not FileAccess.file_exists(state_path):
 		var backup_path := state_path + DEFAULT_BACKUP_SUFFIX
 		if not AtomicFileWriter.restore_from_backup(state_path, backup_path):
@@ -289,21 +289,21 @@ func load_world(world_id: String) -> WorldInstance:
 	return WorldInstance.deserialize(parsed as Dictionary)
 
 ## 原子写落盘更新目标世界的 world_state.json 与总索引表中的最后游玩时间
-func save_world(instance: WorldInstance) -> Dictionary:
-	if instance == null or instance.world_id.is_empty():
+func save_world(world_instance: WorldInstance) -> Dictionary:
+	if world_instance == null or world_instance.world_id.is_empty():
 		return {"success": false, "error": "INVALID_INSTANCE"}
 
 	_ensure_catalog_loaded()
-	var resolved_world_id := instance.world_id
-	var world_dir := get_world_dir(resolved_world_id)
-	AtomicFileWriter.ensure_directory(world_dir)
+	var resolved_world_id := world_instance.world_id
+	var world_directory := get_world_dir(resolved_world_id)
+	AtomicFileWriter.ensure_directory(world_directory)
 
-	var state_dict := instance.serialize()
-	var state_result := _atomic_write_file(world_dir + "world_state.json", JSON.stringify(state_dict, "\t"))
-	if not bool(state_result.get("success", false)):
-		return {"success": false, "error": "WORLD_STATE_WRITE_FAILED", "detail": state_result.get("error", "")}
+	var serialized_state := world_instance.serialize()
+	var state_write_outcome := _atomic_write_file(world_directory + "world_state.json", JSON.stringify(serialized_state, "\t"))
+	if not bool(state_write_outcome.get("success", false)):
+		return {"success": false, "error": "WORLD_STATE_WRITE_FAILED", "detail": state_write_outcome.get("error", "")}
 
-	var now := int(Time.get_unix_time_from_system())
+	var current_timestamp := int(Time.get_unix_time_from_system())
 	var summary: WorldArchiveSummaryDTO = _worlds_cache.get(resolved_world_id, null)
 	if summary == null:
 		summary = WorldArchiveSummaryDTO.new(
@@ -311,22 +311,22 @@ func save_world(instance: WorldInstance) -> Dictionary:
 			resolved_world_id,
 			WorldGatewayModel.GameMode.SINGLE_PLAYER,
 			0,
-			int(instance.world_time.get("tick", 0)),
-			int(instance.world_time.get("day", 1)),
+			int(world_instance.world_time.get("tick", 0)),
+			int(world_instance.world_time.get("day", 1)),
 			0,
-			now,
-			now,
+			current_timestamp,
+			current_timestamp,
 			true
 		)
 		_worlds_cache[resolved_world_id] = summary
 	else:
-		summary.last_played_timestamp_utc = now
-		summary.current_tick = int(instance.world_time.get("tick", 0))
-		summary.current_day = int(instance.world_time.get("day", 1))
+		summary.last_played_timestamp_utc = current_timestamp
+		summary.current_tick = int(world_instance.world_time.get("tick", 0))
+		summary.current_day = int(world_instance.world_time.get("day", 1))
 
-	var catalog_result := _save_catalog_internal()
-	if not bool(catalog_result.get("success", false)):
-		return {"success": false, "error": "CATALOG_WRITE_FAILED", "detail": catalog_result.get("error", "")}
+	var catalog_write_outcome := _save_catalog_internal()
+	if not bool(catalog_write_outcome.get("success", false)):
+		return {"success": false, "error": "CATALOG_WRITE_FAILED", "detail": catalog_write_outcome.get("error", "")}
 
 	return {"success": true, "world_id": resolved_world_id}
 
@@ -341,38 +341,38 @@ func delete_world(world_id: String) -> bool:
 
 	_worlds_cache.erase(world_id)
 
-	var world_dir := get_world_dir(world_id)
-	_remove_directory_recursive(world_dir)
+	var world_directory := get_world_dir(world_id)
+	_remove_directory_recursive(world_directory)
 
-	var catalog_result := _save_catalog_internal()
-	return bool(catalog_result.get("success", false))
+	var catalog_write_outcome := _save_catalog_internal()
+	return bool(catalog_write_outcome.get("success", false))
 
 # ==============================================================================
 # 五、底层原子写与目录操作
 # ==============================================================================
 
 func _atomic_write_file(file_path: String, content: String) -> Dictionary:
-	var write_result: Dictionary = AtomicFileWriter.write_text_atomic(file_path, content)
-	if bool(write_result.get("success", false)):
+	var write_outcome: Dictionary = AtomicFileWriter.write_text_atomic(file_path, content)
+	if bool(write_outcome.get("success", false)):
 		return {"success": true, "error": ""}
-	var stage: String = str(write_result.get("error_stage", ""))
-	var error_code: int = int(write_result.get("error_code", ERR_FILE_CANT_WRITE))
+	var stage: String = str(write_outcome.get("error_stage", ""))
+	var error_code: int = int(write_outcome.get("error_code", ERR_FILE_CANT_WRITE))
 	if stage == "tmp_open":
 		return {"success": false, "error": TemplateFormatter.format("TMP_OPEN_FAILED: {error}", {"error": str(error_code)})}
 	return {"success": false, "error": TemplateFormatter.format("RENAME_FAILED: {error}", {"error": error_code})}
 
-func _remove_directory_recursive(dir_path: String) -> void:
-	if not DirAccess.dir_exists_absolute(dir_path):
+func _remove_directory_recursive(directory_path: String) -> void:
+	if not DirAccess.dir_exists_absolute(directory_path):
 		return
-	var dir_access := DirAccess.open(dir_path)
-	if dir_access == null:
+	var directory_access := DirAccess.open(directory_path)
+	if directory_access == null:
 		return
-	dir_access.list_dir_begin()
-	var entry_name := dir_access.get_next()
+	directory_access.list_dir_begin()
+	var entry_name := directory_access.get_next()
 	while not entry_name.is_empty():
-		if not dir_access.current_is_dir():
-			var file_path := dir_path + ("/" if not dir_path.ends_with("/") else "") + entry_name
+		if not directory_access.current_is_dir():
+			var file_path := directory_path + ("/" if not directory_path.ends_with("/") else "") + entry_name
 			DirAccess.remove_absolute(file_path)
-		entry_name = dir_access.get_next()
-	dir_access.list_dir_end()
-	DirAccess.remove_absolute(dir_path)
+		entry_name = directory_access.get_next()
+	directory_access.list_dir_end()
+	DirAccess.remove_absolute(directory_path)

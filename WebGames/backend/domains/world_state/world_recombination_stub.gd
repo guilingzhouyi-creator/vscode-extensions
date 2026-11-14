@@ -16,9 +16,9 @@ const MODE_RECOMBINED_STUB: String = "RECOMBINED_STUB"
 ## 生成新世界：config.enabled 可覆盖配置开关（可测试性）；关闭 → 默认模板；开启 → 组合历史片段并记录缺省警告
 ## 边界：default_template 为空回退配置表；world_id 按片段数派生（防多世界 id 冲突，确定性）
 static func generate_new_world(default_template: Dictionary, history_worlds: Array[Dictionary], config: Dictionary = {}) -> Dictionary:
-	var enabled: bool = bool(config.get("enabled", GameConfig.get_bool("domains.world", "continuity/enabled", false)))
+	var is_continuity_enabled: bool = bool(config.get("enabled", GameConfig.get_bool("domains.world", "continuity/enabled", false)))
 	var template: Dictionary = _resolve_template(default_template)
-	if not enabled:
+	if not is_continuity_enabled:
 		return {"success": true, "world": template.duplicate(), "mode": MODE_DEFAULT_ONLY}
 	EventBusCore.get_instance().emit_log("warn", "WorldRecombinationStub: multi-world recombination algorithm not fully deployed; outputting fallback template synthesis.")
 	var fragments: Array = []

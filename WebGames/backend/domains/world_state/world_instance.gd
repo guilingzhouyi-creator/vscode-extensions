@@ -56,14 +56,14 @@ func serialize() -> Dictionary:
 	return {"world_id": world_id, "world_time": world_time.duplicate(), "world_state": world_state.duplicate(), "history_fragments": history_fragments.duplicate()}
 
 ## 从字典结构反序列化恢复实体或对象状态
-static func deserialize(data: Dictionary) -> WorldInstance:
-	var instance := WorldInstance.new(String(data.get("world_id", "")))
-	instance.world_time = data.get("world_time", instance.world_time)
-	instance.world_state = data.get("world_state", {})
+static func deserialize(serialized_payload: Dictionary) -> WorldInstance:
+	var instance := WorldInstance.new(String(serialized_payload.get("world_id", "")))
+	instance.world_time = serialized_payload.get("world_time", instance.world_time)
+	instance.world_state = serialized_payload.get("world_state", {})
 	instance.history_fragments.clear()
-	var raw_fragments: Variant = data.get("history_fragments", [])
+	var raw_fragments: Variant = serialized_payload.get("history_fragments", [])
 	if raw_fragments is Array:
-		for fragment_item in raw_fragments:
-			if fragment_item is Dictionary:
-				instance.history_fragments.append(fragment_item)
+		for fragment_entry in raw_fragments:
+			if fragment_entry is Dictionary:
+				instance.history_fragments.append(fragment_entry)
 	return instance
