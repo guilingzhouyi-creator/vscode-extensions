@@ -1,19 +1,25 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端数据桩: 模拟角色养成服务
+# 模块归属: 前端领域边界层 (Frontend · Domain Boundary Mocks)
 # 文件路径: res://frontend/domain_boundary/mocks/mock_character_service.gd
-# 职责: 负重求和、装备词缀聚合与潜能加点守卫（视图只消费结果）
+# 架构定位: Domain Boundary Mock / Simulated Character Service
+# 依赖与触发: 上游: MockServiceContainer, 创角与角色养成视图 | 下游: IAuthService, MockBaseService
+# 职责说明: 提供角色养成与创角模拟服务，封装负重、装备词缀聚合、潜能加点与命途预览。
+# 退出语义与设计依据: 无后端联机环境创角流程隔离与确定性预览契约
 # ==============================================================================
+
+## MockCharacterService：角色养成与权威创角模拟服务
 class_name MockCharacterService
 extends ICharacterService
 
 const IAuthService = preload("res://frontend/domain_boundary/interfaces/i_auth_service.gd")
 
-func create_character_async(account_id: String, token: String, req_data: Dictionary, callback: Callable) -> void:
-	var char_name := str(req_data.get("name", "MockHero"))
+## 模拟异步创建角色并返回组装后的角色槽位摘要
+func create_character_async(account_id: String, token: String, request_data: Dictionary, callback: Callable) -> void:
+	var char_name := str(request_data.get("name", "MockHero"))
 	var new_char := {
-		"slot_id": str(req_data.get("slot_id", "SLOT_01")),
+		"slot_id": str(request_data.get("slot_id", "SLOT_01")),
 		"name": char_name,
-		"race": str(req_data.get("race", "HUMAN")),
+		"race": str(request_data.get("race", "HUMAN")),
 		"class": "Novice",
 		"level": 1,
 		"empty": false
@@ -21,6 +27,25 @@ func create_character_async(account_id: String, token: String, req_data: Diction
 	if callback.is_valid():
 		callback.call({"success": true, "character": new_char})
 
+## 模拟异步触发六维预览属性骰点
 func roll_attributes_async(callback: Callable) -> void:
 	if callback.is_valid():
 		callback.call(IAuthService.build_preview_attribute_spread())
+
+## 模拟异步返回创角命途轮盘预览快照
+func roll_destiny_preview_async(_account_id: String, _token: String, _request_data: Dictionary, callback: Callable) -> void:
+	MockBaseService.delayed_call(callback, {
+		"success": true,
+		"data": {
+			"race_id": "HUMAN",
+			"origin_id": "IMPERIAL_NOBLE",
+			"attributes": {"STR": 4, "CON": 3, "INT": 4, "AGI": 3, "SPR": 3, "VIT": 4}
+		}
+	}, MockBaseService.DEFAULT_SIMULATE_DELAY_MS)
+
+## 模拟异步拉取创角界面只读配置快照
+func get_creation_ui_snapshot_async(_account_id: String, _token: String, callback: Callable) -> void:
+	MockBaseService.delayed_call(callback, {
+		"success": true,
+		"data": {"creation_ui_snapshot": {"available_origins": [], "available_trait_pairs": []}}
+	}, MockBaseService.DEFAULT_SIMULATE_DELAY_MS)

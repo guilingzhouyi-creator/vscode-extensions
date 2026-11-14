@@ -1,8 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端领域边界: 抽卡祈愿服务契约
+# 模块归属: 前端领域边界层 (Frontend · Domain Boundary Interfaces)
 # 文件路径: res://frontend/domain_boundary/interfaces/i_gacha_service.gd
-# 职责: 规范抽卡规则查询、掉落结算与扣费接口，隔离底层概率/保底实现
+# 架构定位: Domain Boundary Interface / Gacha Wish Service Contract
+# 依赖与触发: 上游: 抽卡祈愿视图, ServiceContainer | 下游: MockGachaService
+# 职责说明: 规范抽卡规则查询、保底掉落结算与次数购买扣费接口，隔离底层概率与保底实现。
+# 退出语义与设计依据: 表现层零抽卡概率计算与领域边界解耦契约
 # ==============================================================================
+
+## IGachaService：抽卡祈愿规则与保底结算服务抽象接口
 class_name IGachaService
 extends RefCounted
 

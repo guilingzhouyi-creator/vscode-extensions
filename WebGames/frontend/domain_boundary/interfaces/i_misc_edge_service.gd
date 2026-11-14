@@ -1,8 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端领域边界: 边缘杂项服务契约
+# 模块归属: 前端领域边界层 (Frontend · Domain Boundary Interfaces)
 # 文件路径: res://frontend/domain_boundary/interfaces/i_misc_edge_service.gd
-# 职责: 规范突变激活/替换、掉落拾取与命名费用接口，隔离杂项规则
+# 架构定位: Domain Boundary Interface / Miscellaneous Gameplay Service Contract
+# 依赖与触发: 上游: 突变/拾取/命名相关边缘视图, ServiceContainer | 下游: MockMiscEdgeService
+# 职责说明: 规范突变槽位激活与替换、地面掉落拾取与命名类型计费接口，隔离杂项业务规则。
+# 退出语义与设计依据: 表现层零杂项规则演算与领域边界解耦契约
 # ==============================================================================
+
+## IMiscEdgeService：突变激活、拾取与命名费用边界服务抽象接口
 class_name IMiscEdgeService
 extends RefCounted
 

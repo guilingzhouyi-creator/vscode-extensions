@@ -1,8 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端领域边界: 系统存档服务契约
+# 模块归属: 前端领域边界层 (Frontend · Domain Boundary Interfaces)
 # 文件路径: res://frontend/domain_boundary/interfaces/i_save_service.gd
-# 职责: 规范回放帧推进/倍率切换/进度拖动与存档槽位写清接口
+# 架构定位: Domain Boundary Interface / Save & Replay Service Contract
+# 依赖与触发: 上游: 存档管理与确定性回放视图, ServiceContainer | 下游: MockSaveService
+# 职责说明: 规范回放帧推进、倍率切换、进度比例映射及存档槽位写入与清空边界接口。
+# 退出语义与设计依据: 表现层零存档持久化写逻辑与领域边界解耦契约
 # ==============================================================================
+
+## ISaveService：系统存档槽位与回放控制边界服务抽象接口
 class_name ISaveService
 extends RefCounted
 

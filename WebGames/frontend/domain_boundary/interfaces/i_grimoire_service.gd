@@ -1,8 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端领域边界: 魔典著书服务契约
+# 模块归属: 前端领域边界层 (Frontend · Domain Boundary Interfaces)
 # 文件路径: res://frontend/domain_boundary/interfaces/i_grimoire_service.gd
-# 职责: 规范著书估价与版税汇总接口，隔离底层收入公式
+# 架构定位: Domain Boundary Interface / Grimoire Authoring Service Contract
+# 依赖与触发: 上游: 魔典著书与手稿市场视图, ServiceContainer | 下游: MockGrimoireService
+# 职责说明: 规范魔典著书估价区间与版税汇总接口，隔离底层稿酬与版税收益公式。
+# 退出语义与设计依据: 表现层零收益公式计算与领域边界解耦契约
 # ==============================================================================
+
+## IGrimoireService：魔典著书估价与版税结算服务抽象接口
 class_name IGrimoireService
 extends RefCounted
 

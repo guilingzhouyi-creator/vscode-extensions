@@ -1,8 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端领域边界: 制造工坊服务契约
+# 模块归属: 前端领域边界层 (Frontend · Domain Boundary Interfaces)
 # 文件路径: res://frontend/domain_boundary/interfaces/i_crafting_service.gd
-# 职责: 规范强化成功率预测与分解产出接口，隔离底层公式与配置读取
+# 架构定位: Domain Boundary Interface / Crafting Service Contract
+# 依赖与触发: 上游: 制造工坊视图, ServiceContainer | 下游: MockCraftingService
+# 职责说明: 规范强化成功率预测与分解产出计算接口，隔离底层制造公式与配置读取。
+# 退出语义与设计依据: 表现层零制造概率计算与领域边界解耦契约
 # ==============================================================================
+
+## ICraftingService：制造工坊强化与分解服务抽象接口
 class_name ICraftingService
 extends RefCounted
 

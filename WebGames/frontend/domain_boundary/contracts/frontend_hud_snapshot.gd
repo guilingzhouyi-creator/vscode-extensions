@@ -1,9 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端领域边界: 角色 HUD 快照契约
+# 模块归属: 前端领域边界层 (Frontend · Domain Boundary Contracts)
 # 文件路径: res://frontend/domain_boundary/contracts/frontend_hud_snapshot.gd
-# 职责: 承载主 HUD 与角色养成视图的权威快照字段（对齐 HudStatusSnapshotDTO）
-# 边界: 纯数据契约；百分比与格式化属展示派生，不参与业务规则判定
+# 架构定位: HUD & Character Status Snapshot Contract
+# 依赖与触发: 上游: HudEventBridge, RealWorldService, MockWorldService | 下游: HUD 与角色养成视图
+# 职责说明: 承载主 HUD 与角色养成视图的权威快照字段（对齐 HudStatusSnapshotDTO），提供双向可逆序列化。
+# 退出语义与设计依据: 快照序列化对等契约与百分比只读派生契约
 # ==============================================================================
+
+## FrontendHudSnapshot：主 HUD 与角色状态栏权威快照 DTO
 class_name FrontendHudSnapshot
 extends "res://frontend/domain_boundary/contracts/frontend_snapshot.gd"
 
@@ -13,7 +17,7 @@ var character_id: String = ""
 var character_name: String = ""
 var nickname: String:
 	get: return character_name
-	set(v): character_name = v
+	set(value): character_name = value
 var race_name: String = ""
 var location_name: String = ""
 var level: int = 1
@@ -31,8 +35,9 @@ var copper: int = 0
 var mana_monocrystals: int = 0
 var monocrystals: int:
 	get: return mana_monocrystals
-	set(v): mana_monocrystals = v
+	set(value): mana_monocrystals = value
 
+## 将当前 HUD 快照实体序列化为与 from_dictionary 对等的字典结构
 func to_dictionary() -> Dictionary:
 	return {
 		"schema_version": SCHEMA_VERSION,
@@ -53,30 +58,31 @@ func to_dictionary() -> Dictionary:
 		"mana_monocrystals": mana_monocrystals,
 	}
 
+## 从权威快照字典反序列化为强类型 FrontendHudSnapshot，并对缺省/越界字段执行安全钳制
 static func from_dictionary(data: Dictionary) -> FrontendHudSnapshot:
-	var dto := FrontendHudSnapshot.new()
-	dto.character_id = read_string(data, "character_id")
-	var name_val := read_string(data, "character_name", "")
-	if name_val.is_empty():
-		name_val = read_string(data, "nickname", "")
-	dto.character_name = name_val
-	dto.race_name = read_string(data, "race_name")
-	dto.location_name = read_string(data, "location_name")
-	dto.level = maxi(1, read_int(data, "level", 1))
-	dto.hp_max = maxf(1.0, read_float(data, "hp_max", 1.0))
-	dto.hp_current = clampf(read_float(data, "hp_current", 0.0), 0.0, dto.hp_max)
-	dto.mp_max = maxf(1.0, read_float(data, "mp_max", 1.0))
-	dto.mp_current = clampf(read_float(data, "mp_current", 0.0), 0.0, dto.mp_max)
-	dto.ap_max = maxf(1.0, read_float(data, "ap_max", 1.0))
-	dto.ap_current = clampf(read_float(data, "ap_current", 0.0), 0.0, dto.ap_max)
-	dto.gold = maxi(0, read_int(data, "gold", 0))
-	dto.silver = maxi(0, read_int(data, "silver", 0))
-	dto.copper = maxi(0, read_int(data, "copper", 0))
+	var snapshot := FrontendHudSnapshot.new()
+	snapshot.character_id = read_string(data, "character_id")
+	var resolved_name := read_string(data, "character_name", "")
+	if resolved_name.is_empty():
+		resolved_name = read_string(data, "nickname", "")
+	snapshot.character_name = resolved_name
+	snapshot.race_name = read_string(data, "race_name")
+	snapshot.location_name = read_string(data, "location_name")
+	snapshot.level = maxi(1, read_int(data, "level", 1))
+	snapshot.hp_max = maxf(1.0, read_float(data, "hp_max", 1.0))
+	snapshot.hp_current = clampf(read_float(data, "hp_current", 0.0), 0.0, snapshot.hp_max)
+	snapshot.mp_max = maxf(1.0, read_float(data, "mp_max", 1.0))
+	snapshot.mp_current = clampf(read_float(data, "mp_current", 0.0), 0.0, snapshot.mp_max)
+	snapshot.ap_max = maxf(1.0, read_float(data, "ap_max", 1.0))
+	snapshot.ap_current = clampf(read_float(data, "ap_current", 0.0), 0.0, snapshot.ap_max)
+	snapshot.gold = maxi(0, read_int(data, "gold", 0))
+	snapshot.silver = maxi(0, read_int(data, "silver", 0))
+	snapshot.copper = maxi(0, read_int(data, "copper", 0))
 	var crystals := maxi(0, read_int(data, "mana_monocrystals", -1))
 	if crystals < 0:
 		crystals = maxi(0, read_int(data, "monocrystals", 0))
-	dto.mana_monocrystals = crystals
-	return dto
+	snapshot.mana_monocrystals = crystals
+	return snapshot
 
 ## 展示派生：生命值百分比（只读格式化，不参与任何业务规则）
 func get_health_ratio() -> float:

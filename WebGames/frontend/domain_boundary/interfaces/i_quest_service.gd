@@ -1,8 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端领域边界: 任务因果服务契约
+# 模块归属: 前端领域边界层 (Frontend · Domain Boundary Interfaces)
 # 文件路径: res://frontend/domain_boundary/interfaces/i_quest_service.gd
-# 职责: 规范任务状态跃迁接口，隔离底层状态机守卫
+# 架构定位: Domain Boundary Interface / Quest Lifecycle Service Contract
+# 依赖与触发: 上游: 任务日志与因果面板视图, ServiceContainer | 下游: MockQuestService
+# 职责说明: 规范任务接取、放弃与提交状态跃迁接口，隔离底层任务因果状态机守卫。
+# 退出语义与设计依据: 表现层零任务状态机直改与领域边界解耦契约
 # ==============================================================================
+
+## IQuestService：任务状态流转边界服务抽象接口
 class_name IQuestService
 extends RefCounted
 

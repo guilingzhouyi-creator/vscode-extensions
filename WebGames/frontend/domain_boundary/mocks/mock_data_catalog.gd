@@ -1,8 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端数据桩: 全域 Mock 数据集
+# 模块归属: 前端领域边界层 (Frontend · Domain Boundary Mocks)
 # 文件路径: res://frontend/domain_boundary/mocks/mock_data_catalog.gd
-# 职责: 集中提供覆盖 17 个视图的完整 100% Mock 演示数据集，支持无后端独立运转
+# 架构定位: Centralized Mock Data Catalog (Falsifiable Fixture Source)
+# 依赖与触发: 上游: 各 Mock*Service 与无头视图测试 | 下游: 无（静态演示数据真源）
+# 职责说明: 集中提供覆盖各业务域的演示数据集与边界夹具，支持无后端环境独立运转与可证伪测试。
+# 退出语义与设计依据: 模拟数据单一真源与未登记域空态可证伪契约
 # ==============================================================================
+
+## MockDataCatalog：前端模拟数据集与可证伪测试夹具目录
 class_name MockDataCatalog
 extends RefCounted
 
@@ -148,15 +153,13 @@ static func get_domain_data(domain_id: String) -> Dictionary:
 					{ "id": "MAIL_02", "title": "维护补偿", "sender": "运营团队", "date": "2026-09-08", "read": true }
 				]
 			}
-		# R-25：可证伪的空态夹具——「非空」类断言注入本域即被证伪
+		# 可证伪的空态夹具：「非空」类断言注入本域即被证伪
 		"empty_sample":
 			return {}
-		# R-25：极值/边界夹具——0 值、上限 1.0、int64 最大值，供防御与格式化边界用例
+		# 极值/边界夹具：0 值、上限 1.0、int64 最大值，供防御与格式化边界用例验证
 		"extreme_sample":
 			return { "hp_current": 0.0, "hp_max": 1.0, "amount": 9223372036854775807 }
 		_:
-			# R-25：未登记域不再无条件返回非空兜底，使「非空」断言恢复可证伪。
-			# 可诊断性说明：此处不得使用 push_warning（TC-LG-19 全库 push 散落零容忍，
 			# 且前端严禁后端 ErrorReporter 直连），拼写错误的 domain_id 由
 			# 「非空断言被空字典证伪」的契约测试路径暴露。
 			return {}

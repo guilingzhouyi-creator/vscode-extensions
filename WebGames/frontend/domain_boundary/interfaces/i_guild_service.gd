@@ -1,8 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端领域边界: 公会社交服务契约
+# 模块归属: 前端领域边界层 (Frontend · Domain Boundary Interfaces)
 # 文件路径: res://frontend/domain_boundary/interfaces/i_guild_service.gd
-# 职责: 规范公会成员名单生成、管理权限判定与交易状态机接口
+# 架构定位: Domain Boundary Interface / Guild & Trade Service Contract
+# 依赖与触发: 上游: 公会社交与交易视图, ServiceContainer | 下游: MockGuildService
+# 职责说明: 规范公会成员名单生成、管理权限判定与面对面交易状态机跃迁接口。
+# 退出语义与设计依据: 表现层零权限判定与交易状态机领域边界解耦契约
 # ==============================================================================
+
+## IGuildService：公会名册、权限判定与交易状态流转服务抽象接口
 class_name IGuildService
 extends RefCounted
 

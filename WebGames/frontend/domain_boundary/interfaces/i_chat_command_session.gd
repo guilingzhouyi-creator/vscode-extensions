@@ -1,8 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端领域边界: 聊天命令补全会话契约
+# 模块归属: 前端领域边界层 (Frontend · Domain Boundary Interfaces)
 # 文件路径: res://frontend/domain_boundary/interfaces/i_chat_command_session.gd
-# 职责: 规范命令前缀查询、分页、最近使用补全与 Tab 手势判定接口
+# 架构定位: Domain Boundary Interface / Chat Command Session Contract
+# 依赖与触发: 上游: 聊天输入视图 | 下游: ChatCommandSession
+# 职责说明: 规范命令前缀查询、分页游标、最近使用补全与 Tab 手势判定会话接口。
+# 退出语义与设计依据: 视图会话态隔离与前端零命令解析逻辑契约
 # ==============================================================================
+
+## IChatCommandSession：聊天命令自动补全与分页会话抽象接口
 class_name IChatCommandSession
 extends RefCounted
 

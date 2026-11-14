@@ -1,17 +1,22 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端数据桩: Mock 服务共享底座
+# 模块归属: 前端领域边界层 (Frontend · Domain Boundary Mocks)
 # 文件路径: res://frontend/domain_boundary/mocks/mock_base_service.gd
-# 职责: 提供 Mock 服务统一的"模拟网络延迟"异步回调分发；0ms = 同步立即回调（测试注入）
+# 架构定位: Domain Boundary Mock / Shared Async Delay & Envelope Helper
+# 依赖与触发: 上游: 各 Mock*Service 模拟服务 | 下游: SceneTree Timer
+# 职责说明: 提供模拟服务统一的延迟异步回调分发与标准 Result 信封构造；0ms 时同步立即回调。
+# 退出语义与设计依据: 无头环境同步安全回退与悬空回调有效性保护契约
 # ==============================================================================
+
+## MockBaseService：模拟服务共享延迟分发与标准响应构造底座
 class_name MockBaseService
 extends RefCounted
 
-## 模拟网络延迟（毫秒，默认 200ms——与 阶段3 契约一致）
+## 模拟网络往返延迟基线（毫秒，默认 200ms）
 const DEFAULT_SIMULATE_DELAY_MS: int = 200
 
 ## 异步回调分发：
 ## - delay_ms <= 0 或回调无效 → 同步立即回调（测试/离线上下文）
-## - 无 SceneTree 环境（纯脚本上下文）→ 同步立即回调兜底
+## - 无 SceneTree 环境（纯脚本上下文）→ 同步立即安全回退
 ## - 否则经 SceneTree.create_timer 延迟触发，模拟真实网络往返
 static func delayed_call(callback: Callable, result: Dictionary, delay_ms: int = DEFAULT_SIMULATE_DELAY_MS) -> void:
 	if delay_ms <= 0 or not callback.is_valid():
@@ -21,27 +26,27 @@ static func delayed_call(callback: Callable, result: Dictionary, delay_ms: int =
 	if tree == null:
 		callback.call(result)
 		return
-	var cb := func() -> void:
-		# R-10：超时回调触发时复查有效性，杜绝定时器期间回调已失效（悬空回调）而崩溃
+	var callback_wrapper := func() -> void:
+		# 超时回调触发时复查有效性，防止定时器等待期间接收方已释放导致悬空调用崩溃
 		if not callback.is_valid():
 			return
 		callback.call(result)
-	tree.create_timer(float(delay_ms) / 1000.0).timeout.connect(cb)
+	tree.create_timer(float(delay_ms) / 1000.0).timeout.connect(callback_wrapper)
 
 ## 统一构造成功响应字典（浅拷贝注入附加数据，消除各服务重复样板）
 static func reply_success(data: Dictionary = {}) -> Dictionary:
-	var res: Dictionary = { "success": true }
-	for k in data.keys():
-		res[k] = data[k]
-	return res
+	var result: Dictionary = { "success": true }
+	for key in data.keys():
+		result[key] = data[key]
+	return result
 
 ## 统一构造错误响应字典（标准化 error_code 与 message）
-static func reply_error(code: String, msg: String, extra: Dictionary = {}) -> Dictionary:
-	var res: Dictionary = {
+static func reply_error(code: String, message: String, extra: Dictionary = {}) -> Dictionary:
+	var result: Dictionary = {
 		"success": false,
 		"error_code": code,
-		"message": msg
+		"message": message
 	}
-	for k in extra.keys():
-		res[k] = extra[k]
-	return res
+	for key in extra.keys():
+		result[key] = extra[key]
+	return result

@@ -1,8 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端领域边界: 经济交易服务契约
+# 模块归属: 前端领域边界层 (Frontend · Domain Boundary Interfaces)
 # 文件路径: res://frontend/domain_boundary/interfaces/i_economy_service.gd
-# 职责: 规范货币换算、交易合计、物价序列与汇率接口，隔离底层金融规则
+# 架构定位: Domain Boundary Interface / Economy Service Contract
+# 依赖与触发: 上游: 经济交易与商店视图, ServiceContainer | 下游: MockEconomyService
+# 职责说明: 规范货币换算、交易合计、物价序列与汇率计算接口，隔离底层金融规则。
+# 退出语义与设计依据: 表现层零金融汇率运算与领域边界解耦契约
 # ==============================================================================
+
+## IEconomyService：货币换算、商店结算与汇率计算服务抽象接口
 class_name IEconomyService
 extends RefCounted
 
@@ -27,12 +32,12 @@ func get_currency_copper(index: int) -> int:
 	return 1
 
 ## 交易合计（卖出按回购折扣）
-func calculate_shop_total(base_price: int, qty: int, is_sell: bool) -> int:
+func calculate_shop_total(base_price: int, quantity: int, is_sell: bool) -> int:
 	EventBusCore.get_instance().emit_log("error", "IEconomyService.calculate_shop_total: pure virtual method must be implemented by subclass")
 	return 0
 
 ## 兑换率（源/目标铜值比）
-func calculate_exchange_rate(src_copper: int, tgt_copper: int) -> float:
+func calculate_exchange_rate(source_copper: int, target_copper: int) -> float:
 	EventBusCore.get_instance().emit_log("error", "IEconomyService.calculate_exchange_rate: pure virtual method must be implemented by subclass")
 	return 0.0
 

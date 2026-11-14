@@ -1,8 +1,13 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端领域边界: 聊天命令补全服务契约
+# 模块归属: 前端领域边界层 (Frontend · Domain Boundary Interfaces)
 # 文件路径: res://frontend/domain_boundary/interfaces/i_chat_command_service.gd
-# 职责: 规范聊天 GM 命令索引与会话创建接口，隔离底层命令行求解器实现
+# 架构定位: Domain Boundary Interface / Chat Command Service Contract
+# 依赖与触发: 上游: 聊天与控制台视图, ServiceContainer | 下游: MockChatCommandService, 命令行求解器
+# 职责说明: 规范聊天 GM 命令索引与独立会话创建接口，隔离底层命令行求解器实现。
+# 退出语义与设计依据: 跨视图会话状态隔离与领域边界服务解耦契约
 # ==============================================================================
+
+## IChatCommandService：聊天指令补全服务抽象接口
 class_name IChatCommandService
 extends RefCounted
 
