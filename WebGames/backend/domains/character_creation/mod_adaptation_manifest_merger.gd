@@ -22,8 +22,20 @@ static func build_adapted_manifest(
     var is_manual_origin_allowed: bool = false
     var is_manual_trait_allowed: bool = false
     var is_attribute_reroll_allowed: bool = false
+    var has_base_content_mod: bool = false
+    var official_base_pack_id: String = ""
+    var pack_profiles: Dictionary = {}
 
     for manifest_dto in enabled_manifests:
+        var normalized_profile: String = manifest_dto.pack_profile.strip_edges().to_upper()
+        if normalized_profile.is_empty():
+            normalized_profile = "CONTENT_ADDON"
+        pack_profiles[manifest_dto.pack_id] = normalized_profile
+        if normalized_profile in ["OFFICIAL_BASE", "TOTAL_CONVERSION"]:
+            has_base_content_mod = true
+            if normalized_profile == "OFFICIAL_BASE" and official_base_pack_id.is_empty():
+                official_base_pack_id = manifest_dto.pack_id
+
         if str(manifest_dto.ui_capabilities.get("origin_selection_mode", "")) == "ALLOW_MANUAL":
             is_manual_origin_allowed = true
         if str(manifest_dto.ui_capabilities.get("trait_selection_mode", "")) == "ALLOW_MANUAL":
@@ -37,6 +49,9 @@ static func build_adapted_manifest(
     var origins_catalog: Dictionary = accumulator["origins_catalog"]
     return {
         "enabled_pack_ids": enabled_ids.duplicate(),
+        "has_base_content_mod": has_base_content_mod,
+        "official_base_pack_id": official_base_pack_id,
+        "pack_profiles": pack_profiles,
         "ui_controls": {
             "allow_manual_origin_select": is_manual_origin_allowed,
             "allow_manual_trait_select": is_manual_trait_allowed,
@@ -44,6 +59,8 @@ static func build_adapted_manifest(
             "origin_selection_mode": "ALLOW_MANUAL" if is_manual_origin_allowed else "FORCE_RANDOM",
             "trait_selection_mode": "ALLOW_MANUAL" if is_manual_trait_allowed else "FORCE_RANDOM"
         },
+        "races_catalog": accumulator["races_catalog"],
+        "creation_rules": accumulator["creation_rules"],
         "origins_pool": accumulator["origins_pool"],
         "origins_catalog": origins_catalog,
         "origins": origins_catalog,
@@ -73,6 +90,8 @@ static func _create_base_merge_accumulator() -> Dictionary:
 
     var custom_routing_rules: Array[Dictionary] = []
     return {
+        "races_catalog": GameConfig.get_dict("domains.character_creation", "races_catalog", {}).duplicate(true),
+        "creation_rules": {},
         "origins_pool": origins_pool,
         "origins_catalog": GameConfig.get_dict("domains.character_creation", "origins", {}).duplicate(true),
         "origin_race_map": GameConfig.get_dict("domains.character_creation", "authoritative_reincarnation/origin_race_map", {}).duplicate(true),
@@ -90,16 +109,20 @@ static func _create_base_merge_accumulator() -> Dictionary:
 
 
 static func _merge_single_pack_assets(manifest_dto: DestinyModManifestDTO, accumulator: Dictionary) -> void:
-    var origins_pool: Array[Dictionary] = accumulator["origins_pool"]
-    var origins_catalog: Dictionary = accumulator["origins_catalog"]
-    var origin_race_map: Dictionary = accumulator["origin_race_map"]
-    var birth_region_map: Dictionary = accumulator["birth_region_map"]
+    var races_catalog: Dictionary = accumulator["races_catalog"]
+    var creation_rules: Dictionary = accumulator["creation_rules"]
     var traits: Dictionary = accumulator["traits"]
     var paired_presets: Array[Dictionary] = accumulator["paired_presets"]
     var starter_kits: Dictionary = accumulator["starter_kits"]
     var custom_routing_rules: Array[Dictionary] = accumulator["custom_routing_rules"]
     var dag_graphs: Dictionary = accumulator["dag_graphs"]
     var custom_i18n: Dictionary = accumulator["custom_i18n"]
+
+    if not manifest_dto.custom_races.is_empty():
+        races_catalog.merge(manifest_dto.custom_races.duplicate(true), true)
+
+    if not manifest_dto.creation_rule_overrides.is_empty():
+        creation_rules.merge(manifest_dto.creation_rule_overrides.duplicate(true), true)
 
     for origin_entry in manifest_dto.custom_origins:
         _register_custom_origin(origin_entry, manifest_dto.pack_id, accumulator)
@@ -141,25 +164,23 @@ static func _register_custom_origin(origin_entry: Dictionary, pack_id: String, a
         "pack_id": pack_id
     })
 
-    var race_id: String = str(origin_entry.get("race_id", origin_entry.get("race", "HUMAN"))).strip_edges()
-    if race_id.is_empty():
-        race_id = "HUMAN"
-    var region_id: String = str(origin_entry.get("birth_region_id", "CENTRAL_CONTINENT")).strip_edges()
-    if region_id.is_empty():
-        region_id = "CENTRAL_CONTINENT"
+    var race_id: String = str(origin_entry.get("race_id", origin_entry.get("race", ""))).strip_edges()
+    var region_id: String = str(origin_entry.get("birth_region_id", "")).strip_edges()
     var kit_id: String = str(origin_entry.get("starter_kit_id", "")).strip_edges()
     var dag_id: String = str(origin_entry.get("prologue_dag_id", "")).strip_edges()
 
     var catalog_entry: Dictionary = origin_entry.duplicate(true)
     catalog_entry["origin_id"] = origin_id
-    catalog_entry["race"] = race_id
-    catalog_entry["race_id"] = race_id
-    catalog_entry["birth_region_id"] = region_id
+    if not race_id.is_empty():
+        catalog_entry["race"] = race_id
+        catalog_entry["race_id"] = race_id
+        origin_race_map[origin_id] = race_id
+    if not region_id.is_empty():
+        catalog_entry["birth_region_id"] = region_id
+        birth_region_map[origin_id] = region_id
     catalog_entry["pack_id"] = pack_id
     origins_catalog[origin_id] = catalog_entry
 
-    origin_race_map[origin_id] = race_id
-    birth_region_map[origin_id] = region_id
     if not kit_id.is_empty():
         origin_kit_map[origin_id] = kit_id
     if not dag_id.is_empty():

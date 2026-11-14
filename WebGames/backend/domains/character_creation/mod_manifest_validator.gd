@@ -27,6 +27,7 @@ const CAUSALITY_NET_TOLERANCE: int = 1
 static func precheck_single_mod(manifest_input: Variant, base_manifest: Variant = null) -> Dictionary:
 	var manifest_model: DestinyModManifestDTO = _coerce_to_manifest_dto(manifest_input)
 	var diagnostic_entries: Array[Dictionary] = []
+	var enforce_addon_caps: bool = not (manifest_model.pack_profile in ["OFFICIAL_BASE", "TOTAL_CONVERSION"])
 
 	if manifest_model.pack_id.strip_edges().is_empty():
 		ModManifestRuleHelper.append_diagnostic(
@@ -39,11 +40,11 @@ static func precheck_single_mod(manifest_input: Variant, base_manifest: Variant 
 		)
 
 	ModManifestRuleHelper.validate_ui_capabilities(manifest_model.ui_capabilities, diagnostic_entries)
-	_validate_custom_origins(manifest_model.custom_origins, diagnostic_entries)
+	_validate_custom_origins(manifest_model.custom_origins, diagnostic_entries, enforce_addon_caps)
 	ModManifestRuleHelper.validate_origin_references(manifest_model, diagnostic_entries, base_manifest)
 	_validate_custom_traits(manifest_model.custom_traits, diagnostic_entries)
-	_validate_paired_presets(manifest_model.paired_presets, manifest_model.custom_traits, diagnostic_entries)
-	ModManifestRuleHelper.validate_custom_starter_kits(manifest_model.custom_starter_kits, diagnostic_entries)
+	_validate_paired_presets(manifest_model.paired_presets, manifest_model.custom_traits, diagnostic_entries, base_manifest)
+	ModManifestRuleHelper.validate_custom_starter_kits(manifest_model.custom_starter_kits, diagnostic_entries, enforce_addon_caps)
 	ModManifestRuleHelper.validate_dag_graphs(manifest_model.dag_graphs, diagnostic_entries)
 
 	var first_code: String = ""
@@ -75,7 +76,11 @@ static func _coerce_to_manifest_dto(manifest_input: Variant) -> DestinyModManife
 		return DestinyModManifestDTO.from_dto(manifest_input as Dictionary)
 	return DestinyModManifestDTO.new()
 
-static func _validate_custom_origins(custom_origins: Array[Dictionary], diagnostic_entries: Array[Dictionary]) -> void:
+static func _validate_custom_origins(
+	custom_origins: Array[Dictionary],
+	diagnostic_entries: Array[Dictionary],
+	enforce_addon_caps: bool = true
+) -> void:
 	var seen_origin_identifiers: Dictionary = {}
 	var origin_index: int = 0
 	for origin_entry in custom_origins:
@@ -92,13 +97,14 @@ static func _validate_custom_origins(custom_origins: Array[Dictionary], diagnost
 				)
 			else:
 				seen_origin_identifiers[origin_identifier] = true
-		_validate_single_origin_entry(origin_entry, origin_index, diagnostic_entries)
+		_validate_single_origin_entry(origin_entry, origin_index, diagnostic_entries, enforce_addon_caps)
 		origin_index += 1
 
 static func _validate_single_origin_entry(
 	origin_entry: Dictionary,
 	origin_index: int,
-	diagnostic_entries: Array[Dictionary]
+	diagnostic_entries: Array[Dictionary],
+	enforce_addon_caps: bool = true
 ) -> void:
 	var origin_identifier: String = str(origin_entry.get("origin_id", "")).strip_edges()
 	var bonus: Variant = origin_entry.get("attribute_bonus", {})
@@ -120,11 +126,11 @@ static func _validate_single_origin_entry(
 				)
 				continue
 			var bonus_value: int = int(bonus_map[attribute_key_variant])
-			if bonus_value < ATTR_BONUS_MIN or bonus_value > ATTR_BONUS_MAX:
+			if enforce_addon_caps and (bonus_value < ATTR_BONUS_MIN or bonus_value > ATTR_BONUS_MAX):
 				is_stat_exceeded = true
 			net_sum += bonus_value
 
-	if is_stat_exceeded or net_sum < ATTR_NET_SUM_MIN or net_sum > ATTR_NET_SUM_MAX:
+	if enforce_addon_caps and (is_stat_exceeded or net_sum < ATTR_NET_SUM_MIN or net_sum > ATTR_NET_SUM_MAX):
 		ModManifestRuleHelper.append_diagnostic(
 			diagnostic_entries,
 			"ERR_DESTINY_STAT_BUDGET_EXCEEDED",
@@ -135,14 +141,14 @@ static func _validate_single_origin_entry(
 		)
 
 	var gold: int = int(origin_entry.get("initial_gold", 0))
-	if gold < INITIAL_GOLD_MIN or gold > INITIAL_GOLD_MAX:
+	if gold < INITIAL_GOLD_MIN or (enforce_addon_caps and gold > INITIAL_GOLD_MAX):
 		ModManifestRuleHelper.append_diagnostic(
 			diagnostic_entries,
 			"ERR_DESTINY_GOLD_CAP_EXCEEDED",
-			"身世初始金币超出 [0, 1000] 区间: " + origin_identifier,
+			"身世初始金币超出区间: " + origin_identifier,
 			"destinies.custom_origins[%d].initial_gold" % origin_index,
 			origin_identifier,
-			"请将 initial_gold 调整至 0 到 1000 区间"
+			"请将 initial_gold 调整至合规非负区间"
 		)
 
 static func _validate_custom_traits(custom_traits: Dictionary, diagnostic_entries: Array[Dictionary]) -> void:
@@ -179,9 +185,16 @@ static func _validate_custom_traits(custom_traits: Dictionary, diagnostic_entrie
 static func _validate_paired_presets(
 	paired_presets: Array[Dictionary],
 	custom_traits: Dictionary,
-	diagnostic_entries: Array[Dictionary]
+	diagnostic_entries: Array[Dictionary],
+	base_manifest: Variant = null
 ) -> void:
 	var combined_traits: Dictionary = GameConfig.get_dict("domains.character_creation", "traits", {}).duplicate(true)
+	if base_manifest is Dictionary:
+		var base_traits: Variant = (base_manifest as Dictionary).get("traits", (base_manifest as Dictionary).get("custom_traits", {}))
+		if base_traits is Dictionary:
+			combined_traits.merge((base_traits as Dictionary), true)
+	elif base_manifest is DestinyModManifestDTO:
+		combined_traits.merge((base_manifest as DestinyModManifestDTO).custom_traits, true)
 	for trait_identifier in custom_traits.keys():
 		combined_traits[str(trait_identifier)] = custom_traits[trait_identifier]
 

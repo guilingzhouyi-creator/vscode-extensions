@@ -59,14 +59,19 @@ static func validate_ui_capabilities(ui_capabilities: Dictionary, diagnostic_ent
 			)
 
 ## 校验自定义初始行囊套件集合及件数上限
-static func validate_custom_starter_kits(custom_kits: Dictionary, diagnostic_entries: Array[Dictionary]) -> void:
+static func validate_custom_starter_kits(
+	custom_kits: Dictionary,
+	diagnostic_entries: Array[Dictionary],
+	enforce_addon_caps: bool = true
+) -> void:
 	for kit_identifier in custom_kits.keys():
-		_validate_single_starter_kit(str(kit_identifier), custom_kits[kit_identifier], diagnostic_entries)
+		_validate_single_starter_kit(str(kit_identifier), custom_kits[kit_identifier], diagnostic_entries, enforce_addon_caps)
 
 static func _validate_single_starter_kit(
 	kit_identifier: String,
 	raw_kit: Variant,
-	diagnostic_entries: Array[Dictionary]
+	diagnostic_entries: Array[Dictionary],
+	enforce_addon_caps: bool = true
 ) -> void:
 	var kit_field_path: String = "destinies.custom_starter_kits.%s" % kit_identifier
 	if kit_identifier.strip_edges().is_empty() or not (raw_kit is Dictionary):
@@ -109,7 +114,7 @@ static func _validate_single_starter_kit(
 			return
 		total_count += step_count
 
-	if total_count > STARTER_KIT_MAX_ITEMS:
+	if enforce_addon_caps and total_count > STARTER_KIT_MAX_ITEMS:
 		append_diagnostic(
 			diagnostic_entries,
 			"ERR_DESTINY_KIT_INVALID",
@@ -129,36 +134,50 @@ static func _validate_and_count_kit_item(item_entry: Variant) -> int:
 		return -1
 	return count
 
-## 校验身世条目声明的初始套件与序章 DAG 引用有效性
+## 校验身世条目声明的初始套件与序章 DAG 引用有效性（联合配置与基础包引用上下文）
 static func validate_origin_references(
 	manifest_model: DestinyModManifestDTO,
 	diagnostic_entries: Array[Dictionary],
-	_base_manifest: Variant = null
+	base_manifest: Variant = null
 ) -> void:
-	var builtin_kits: Dictionary = GameConfig.get_dict("domains.starter_loadout", "starter_kits", {})
-	var builtin_dags: Dictionary = GameConfig.get_dict("narratives.prologue_dag_catalog", "dag_graphs", {})
+	var combined_kits: Dictionary = GameConfig.get_dict("domains.starter_loadout", "starter_kits", {}).duplicate()
+	var combined_dags: Dictionary = GameConfig.get_dict("narratives.prologue_dag_catalog", "dag_graphs", {}).duplicate()
+	if base_manifest is Dictionary:
+		var base_map: Dictionary = base_manifest as Dictionary
+		var extra_kits: Variant = base_map.get("starter_kits", base_map.get("custom_starter_kits", {}))
+		if extra_kits is Dictionary:
+			combined_kits.merge(extra_kits as Dictionary, true)
+		var extra_dags: Variant = base_map.get("dag_graphs", {})
+		if extra_dags is Dictionary:
+			combined_dags.merge(extra_dags as Dictionary, true)
+	elif base_manifest is DestinyModManifestDTO:
+		var base_dto := base_manifest as DestinyModManifestDTO
+		combined_kits.merge(base_dto.custom_starter_kits, true)
+		combined_dags.merge(base_dto.dag_graphs, true)
+
 	var origin_index: int = 0
 	for origin_entry in manifest_model.custom_origins:
 		var origin_identifier: String = str(origin_entry.get("origin_id", "")).strip_edges()
 		var kit_identifier: String = str(origin_entry.get("starter_kit_id", "")).strip_edges()
-		if not kit_identifier.is_empty() and not manifest_model.custom_starter_kits.has(kit_identifier) and not builtin_kits.has(kit_identifier):
+		if not kit_identifier.is_empty() and not manifest_model.custom_starter_kits.has(kit_identifier) and not combined_kits.has(kit_identifier):
 			append_diagnostic(
 				diagnostic_entries,
 				"ERR_DESTINY_UNKNOWN_KIT_REF",
 				"未定义的套件引用: " + kit_identifier,
 				"destinies.custom_origins[%d].starter_kit_id" % origin_index,
 				origin_identifier,
-				"请改用 custom_starter_kits 已声明套件或内置套件 ID"
+				"请改用 custom_starter_kits 或已启用基础包中声明的套件 ID"
 			)
 		var dag_identifier: String = str(origin_entry.get("prologue_dag_id", "")).strip_edges()
-		if not manifest_model.dag_graphs.is_empty() and not dag_identifier.is_empty() and not manifest_model.dag_graphs.has(dag_identifier) and not builtin_dags.has(dag_identifier):
+		var has_declared_dags: bool = not manifest_model.dag_graphs.is_empty() or not combined_dags.is_empty()
+		if has_declared_dags and not dag_identifier.is_empty() and not manifest_model.dag_graphs.has(dag_identifier) and not combined_dags.has(dag_identifier):
 			append_diagnostic(
 				diagnostic_entries,
 				"ERR_DESTINY_UNKNOWN_DAG_REF",
 				"未定义的剧情DAG引用: " + dag_identifier,
 				"destinies.custom_origins[%d].prologue_dag_id" % origin_index,
 				origin_identifier,
-				"请确认 dag_graphs/ 下存在对应图元文件或引用内置序章 DAG ID"
+				"请确认 dag_graphs/ 或已启用基础包下存在对应图元文件"
 			)
 		origin_index += 1
 

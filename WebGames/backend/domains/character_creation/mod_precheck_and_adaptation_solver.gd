@@ -64,6 +64,7 @@ static func precheck_and_adapt_mod_list(
 ) -> Dictionary:
     var is_all_enabled: bool = enabled_pack_ids.has("*")
     var enabled_set: Dictionary = _build_enabled_lookup(enabled_pack_ids)
+    var base_reference_manifest: Dictionary = _collect_base_reference_manifest(candidate_packs, is_all_enabled, enabled_set)
 
     var precheck_checklist: Array[Dictionary] = []
     var enabled_manifests: Array[DestinyModManifestDTO] = []
@@ -71,7 +72,7 @@ static func precheck_and_adapt_mod_list(
     var has_non_compliant_enabled: bool = false
 
     for raw_pack in candidate_packs:
-        var single_result: Dictionary = precheck_single_mod(raw_pack)
+        var single_result: Dictionary = precheck_single_mod(raw_pack, base_reference_manifest)
         var manifest_dto: DestinyModManifestDTO = single_result.get("manifest")
         var pack_id: String = manifest_dto.pack_id
         var is_enabled: bool = is_all_enabled or (not pack_id.is_empty() and enabled_set.has(pack_id))
@@ -90,6 +91,14 @@ static func precheck_and_adapt_mod_list(
     if has_non_compliant_enabled:
         return _build_adaptation_failure(
             "ERR_MOD_COMPLIANCE_FAILED",
+            collected_enabled_pack_ids,
+            precheck_checklist,
+            []
+        )
+
+    if enabled_manifests.is_empty():
+        return _build_adaptation_failure(
+            "ERR_NO_BASE_CONTENT_MOD",
             collected_enabled_pack_ids,
             precheck_checklist,
             []
@@ -132,6 +141,14 @@ static func precheck_and_adapt_mod_list(
             topology_conflicts
         )
 
+    if not _has_base_content_pack(enabled_manifests):
+        return _build_adaptation_failure(
+            "ERR_NO_BASE_CONTENT_MOD",
+            collected_enabled_pack_ids,
+            precheck_checklist,
+            []
+        )
+
     var adapted_manifest: Dictionary = ModAdaptationManifestMerger.build_adapted_manifest(sorted_manifests, collected_enabled_pack_ids)
     var creation_ui_snapshot: Dictionary = CreationUiSnapshotBuilder.build_creation_ui_snapshot(
         adapted_manifest,
@@ -152,6 +169,58 @@ static func precheck_and_adapt_mod_list(
 # ==============================================================================
 # 三、多包冲突检测辅助方法 (CC <= 15, Depth <= 3)
 # ==============================================================================
+
+static func _collect_base_reference_manifest(
+    candidate_packs: Array,
+    is_all_enabled: bool,
+    enabled_set: Dictionary
+) -> Dictionary:
+    var traits_map: Dictionary = {}
+    var kits_map: Dictionary = {}
+    var dag_map: Dictionary = {}
+    for raw_pack in candidate_packs:
+        var candidate_dto: DestinyModManifestDTO = _extract_manifest_dto_fast(raw_pack)
+        if candidate_dto == null or candidate_dto.pack_id.is_empty():
+            continue
+        if not is_all_enabled and not enabled_set.has(candidate_dto.pack_id):
+            continue
+        if candidate_dto.pack_profile in ["OFFICIAL_BASE", "TOTAL_CONVERSION"]:
+            _merge_base_references_into(candidate_dto, traits_map, kits_map, dag_map)
+    return {
+        "traits": traits_map,
+        "starter_kits": kits_map,
+        "dag_graphs": dag_map
+    }
+
+
+static func _extract_manifest_dto_fast(raw_pack: Variant) -> DestinyModManifestDTO:
+    if raw_pack is DestinyModManifestDTO:
+        return raw_pack as DestinyModManifestDTO
+    if raw_pack is Dictionary:
+        return DestinyModManifestDTO.from_dto(raw_pack as Dictionary)
+    return null
+
+
+static func _merge_base_references_into(
+    candidate_dto: DestinyModManifestDTO,
+    traits_map: Dictionary,
+    kits_map: Dictionary,
+    dag_map: Dictionary
+) -> void:
+    if not candidate_dto.custom_traits.is_empty():
+        traits_map.merge(candidate_dto.custom_traits, true)
+    if not candidate_dto.custom_starter_kits.is_empty():
+        kits_map.merge(candidate_dto.custom_starter_kits, true)
+    if not candidate_dto.dag_graphs.is_empty():
+        dag_map.merge(candidate_dto.dag_graphs, true)
+
+
+static func _has_base_content_pack(enabled_manifests: Array[DestinyModManifestDTO]) -> bool:
+    for manifest_dto in enabled_manifests:
+        if manifest_dto.pack_profile in ["OFFICIAL_BASE", "TOTAL_CONVERSION"]:
+            return true
+    return false
+
 
 static func _build_enabled_lookup(enabled_pack_ids: Array) -> Dictionary:
     var enabled_lookup: Dictionary = {}
@@ -259,17 +328,25 @@ static func _topological_sort_manifests(
     for manifest_dto in manifests:
         _record_dependencies(manifest_dto, manifest_by_pack_id, adjacency_map, in_degree)
 
-    var queue: Array[String] = []
+    var queue: Array[DestinyModManifestDTO] = []
     for pack_id in in_degree.keys():
         if in_degree[pack_id] == 0:
-            queue.append(pack_id)
+            queue.append(manifest_by_pack_id[pack_id])
+    queue.sort_custom(Callable(ModPrecheckAndAdaptationSolver, "_compare_manifest_priority"))
 
     var sorted_manifests_list: Array[DestinyModManifestDTO] = []
+    var empty_dependents: Array = []
+    var newly_unlocked: Array[String] = []
     while not queue.is_empty():
-        var source_pack_id: String = queue.pop_front()
-        sorted_manifests_list.append(manifest_by_pack_id[source_pack_id])
-        var dependents: Array = adjacency_map.get(source_pack_id, _new_list())
-        _decrement_dependents(dependents, in_degree, queue)
+        var source_manifest: DestinyModManifestDTO = queue.pop_front()
+        sorted_manifests_list.append(source_manifest)
+        var dependents: Array = adjacency_map.get(source_manifest.pack_id, empty_dependents)
+        newly_unlocked.clear()
+        _decrement_dependents(dependents, in_degree, newly_unlocked)
+        if not newly_unlocked.is_empty():
+            for unlocked_id in newly_unlocked:
+                queue.append(manifest_by_pack_id[unlocked_id])
+            queue.sort_custom(Callable(ModPrecheckAndAdaptationSolver, "_compare_manifest_priority"))
 
     if sorted_manifests_list.size() < manifests.size():
         _append_conflict(
@@ -282,6 +359,12 @@ static func _topological_sort_manifests(
         return manifests
 
     return sorted_manifests_list
+
+static func _compare_manifest_priority(left: DestinyModManifestDTO, right: DestinyModManifestDTO) -> bool:
+    if left.priority != right.priority:
+        return left.priority > right.priority
+    return left.pack_id < right.pack_id
+
 
 static func _detect_duplicate_id_conflicts(
     enabled_manifests: Array[DestinyModManifestDTO]

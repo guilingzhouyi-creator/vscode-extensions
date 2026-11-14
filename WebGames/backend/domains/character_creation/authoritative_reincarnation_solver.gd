@@ -29,6 +29,12 @@ static func resolve_reincarnation_package(
         return { "success": false, "error_code": "EMPTY_NAME", "message": "角色名称不可为空" }
 
     var manifest: Dictionary = DestinyModManifestDTO.unwrap_adapted_manifest(adapted_mod_manifest)
+    if manifest.is_empty() or not bool(manifest.get("has_base_content_mod", false)):
+        return {
+            "success": false,
+            "error_code": "ERR_NO_BASE_CONTENT_MOD",
+            "message": "No active base or total-conversion content MOD mounted; character creation cannot fall back to built-in lore."
+        }
     var ui_controls: Dictionary = manifest.get("ui_controls", {})
 
     # 1. 种子确定性收敛（当 MOD 显式开启 allow_attribute_reroll 时允许混入 reroll_nonce）
@@ -37,24 +43,32 @@ static func resolve_reincarnation_package(
 
     # 2. 身世抽取与受控自选验签（未开启自选或所选 ID 非法时强制忽略 extra_custom_fields 按权重随机抽取）
     var origin_id: String = _resolve_origin_with_mod(rng, creation_request, manifest, ui_controls)
+    if origin_id.is_empty():
+        return {
+            "success": false,
+            "error_code": "ERR_NO_BASE_CONTENT_MOD",
+            "message": "Active content MOD declares no valid origins_pool entries."
+        }
     var origin_config: Dictionary = _resolve_origin_config(origin_id, manifest)
     var race_id: String = _resolve_race_with_mod(origin_id, origin_config, manifest)
-    var gender: String = _pick_gender(rng)
+    var gender: String = _pick_gender(rng, manifest)
     var birth_region_id: String = _resolve_birth_region_with_mod(origin_id, origin_config, manifest)
 
     # 3. 基础文案与元数据查询
     var origin_name: String = str(origin_config.get("name", origin_id))
     var origin_description: String = str(origin_config.get("desc", ""))
-    var race_name: String = _resolve_race_display_name(race_id)
+    var race_name: String = _resolve_race_display_name(race_id, manifest)
 
     # 4. 权威六维属性解算（点数加权 + 身世加成 + [1, 6] 刚性约束）
-    var attributes: Dictionary = _resolve_attributes(rng, origin_config)
+    var attributes: Dictionary = _resolve_attributes(rng, origin_config, manifest)
 
     # 5. 权威因果平衡天赋对选定（支持受控自选验签或加权抽取）
     var traits_result: Dictionary = _resolve_traits_with_mod(rng, creation_request, manifest, ui_controls)
 
     # 6. 生理概况、钱包与套件/序章路由元数据衍生
-    var default_gold: int = GameConfig.get_int("domains.character_creation", "defaults/initial_gold_fallback", 50)
+    var creation_rules: Dictionary = manifest.get("creation_rules", {})
+    var rules_defaults: Dictionary = creation_rules.get("defaults", {})
+    var default_gold: int = int(rules_defaults.get("initial_gold_fallback", GameConfig.get_int("domains.character_creation", "defaults/initial_gold_fallback", 0)))
     var initial_gold: int = int(origin_config.get("initial_gold", default_gold))
     var initial_reputation: int = int(origin_config.get("initial_reputation", 0))
     var wallet: Dictionary = {
@@ -139,7 +153,7 @@ static func _pick_origin(rng: DeterministicRNG) -> String:
     return _pick_origin_from_pool(rng, pool)
 
 static func _pick_origin_from_pool(rng: DeterministicRNG, pool: Array) -> String:
-    var fallback: String = GameConfig.get_string("domains.character_creation", "authoritative_reincarnation/fallback_origin", "IMPERIAL_NOBLE")
+    var fallback: String = GameConfig.get_string("domains.character_creation", "authoritative_reincarnation/fallback_origin", "")
     if pool.is_empty():
         return fallback
     var picked: Variant = rng.pick_weighted(pool, "weight")
@@ -164,20 +178,27 @@ static func _resolve_origin_config(origin_id: String, manifest: Dictionary) -> D
 static func _resolve_race_with_mod(origin_id: String, origin_config: Dictionary, manifest: Dictionary) -> String:
     var race_map: Dictionary = manifest.get("origin_race_map", {})
     if race_map.has(origin_id):
-        return str(race_map.get(origin_id, "HUMAN"))
+        var mapped_race: String = str(race_map.get(origin_id, "")).strip_edges()
+        if not mapped_race.is_empty():
+            return mapped_race
     var config_race: String = str(origin_config.get("race_id", origin_config.get("race", ""))).strip_edges()
     if not config_race.is_empty():
         return config_race
+    var creation_rules: Dictionary = manifest.get("creation_rules", {})
+    var fallback_race: String = str(creation_rules.get("fallback_race", "")).strip_edges()
+    if not fallback_race.is_empty():
+        return fallback_race
     return _resolve_race(origin_id)
 
 static func _resolve_race(origin_id: String) -> String:
     var race_map: Dictionary = GameConfig.get_dict("domains.character_creation", "authoritative_reincarnation/origin_race_map", {})
-    var fallback: String = GameConfig.get_string("domains.character_creation", "authoritative_reincarnation/fallback_race", "HUMAN")
+    var fallback: String = GameConfig.get_string("domains.character_creation", "authoritative_reincarnation/fallback_race", "")
     return str(race_map.get(origin_id, fallback))
 
-static func _pick_gender(rng: DeterministicRNG) -> String:
-    var pool: Array = GameConfig.get_array("domains.character_creation", "authoritative_reincarnation/genders_pool", [])
-    var fallback: String = GameConfig.get_string("domains.character_creation", "authoritative_reincarnation/fallback_gender", "MALE")
+static func _pick_gender(rng: DeterministicRNG, manifest: Dictionary = {}) -> String:
+    var creation_rules: Dictionary = manifest.get("creation_rules", {})
+    var pool: Array = creation_rules.get("genders_pool", GameConfig.get_array("domains.character_creation", "authoritative_reincarnation/genders_pool", []))
+    var fallback: String = str(creation_rules.get("fallback_gender", GameConfig.get_string("domains.character_creation", "authoritative_reincarnation/fallback_gender", "OTHER")))
     if pool.is_empty():
         return fallback
     var picked: Variant = rng.pick_weighted(pool, "weight")
@@ -188,15 +209,21 @@ static func _pick_gender(rng: DeterministicRNG) -> String:
 static func _resolve_birth_region_with_mod(origin_id: String, origin_config: Dictionary, manifest: Dictionary) -> String:
     var region_map: Dictionary = manifest.get("birth_region_map", {})
     if region_map.has(origin_id):
-        return str(region_map.get(origin_id, "CENTRAL_CONTINENT"))
+        var mapped_region: String = str(region_map.get(origin_id, "")).strip_edges()
+        if not mapped_region.is_empty():
+            return mapped_region
     var config_region: String = str(origin_config.get("birth_region_id", "")).strip_edges()
     if not config_region.is_empty():
         return config_region
+    var creation_rules: Dictionary = manifest.get("creation_rules", {})
+    var fallback_region: String = str(creation_rules.get("fallback_region", "")).strip_edges()
+    if not fallback_region.is_empty():
+        return fallback_region
     return _resolve_birth_region(origin_id)
 
 static func _resolve_birth_region(origin_id: String) -> String:
     var region_map: Dictionary = GameConfig.get_dict("domains.character_creation", "authoritative_reincarnation/birth_region_map", {})
-    var fallback: String = GameConfig.get_string("domains.character_creation", "authoritative_reincarnation/fallback_region", "CENTRAL_CONTINENT")
+    var fallback: String = GameConfig.get_string("domains.character_creation", "authoritative_reincarnation/fallback_region", "")
     return str(region_map.get(origin_id, fallback))
 
 static func _resolve_origin_starter_kit_id(origin_id: String, origin_config: Dictionary, manifest: Dictionary) -> String:
@@ -213,31 +240,32 @@ static func _resolve_origin_prologue_dag_id(origin_id: String, origin_config: Di
     var dag_map: Dictionary = manifest.get("origin_dag_map", {})
     return str(dag_map.get(origin_id, "")).strip_edges()
 
-static func _resolve_race_display_name(race_id: String) -> String:
-    var race_config: Dictionary = GameConfig.get_dict("domains.character_creation", "races_catalog/" + race_id, {})
-    var name_key: String = str(race_config.get("canonical_name_key", ""))
+static func _resolve_race_display_name(race_id: String, manifest: Dictionary = {}) -> String:
+    var races_catalog: Dictionary = manifest.get("races_catalog", {})
+    var race_config: Dictionary = races_catalog.get(race_id, {})
+    if race_config.is_empty():
+        race_config = GameConfig.get_dict("domains.character_creation", "races_catalog/" + race_id, {})
+    var direct_name: String = str(race_config.get("name", race_config.get("display_name", ""))).strip_edges()
+    if not direct_name.is_empty():
+        return direct_name
+    var name_key: String = str(race_config.get("canonical_name_key", "")).strip_edges()
     if not name_key.is_empty():
+        var custom_i18n: Dictionary = manifest.get("custom_i18n", {})
+        if custom_i18n.has(name_key):
+            return str(custom_i18n[name_key])
         var localized_name: String = LocalizationSolver.resolve_name_key(LocalizationRegistryCatalog.get_shared(), name_key)
         if not localized_name.is_empty() and localized_name != "[%s]" % name_key:
             return localized_name
-    match race_id:
-        "HUMAN":
-            return "人类"
-        "ELF", "HIGH_ELF":
-            return "精灵"
-        "MOUNTAIN_DWARF":
-            return "矮人"
-        "TIEFLING_OR_HUMAN":
-            return "异界混血"
-        _:
-            return race_id
+    return race_id
 
 # ==============================================================================
 # 三、六维属性与因果天赋解算 (CC <= 15, Depth <= 3)
 # ==============================================================================
 
-static func _resolve_attributes(rng: DeterministicRNG, origin_config: Dictionary) -> Dictionary:
-    var attribute_config: Dictionary = GameConfig.get_dict("domains.character_creation", "authoritative_reincarnation/attribute_generation", {})
+static func _resolve_attributes(rng: DeterministicRNG, origin_config: Dictionary, manifest: Dictionary = {}) -> Dictionary:
+    var creation_rules: Dictionary = manifest.get("creation_rules", {})
+    var rule_attributes: Variant = creation_rules.get("attribute_generation", null)
+    var attribute_config: Dictionary = rule_attributes if rule_attributes is Dictionary else GameConfig.get_dict("domains.character_creation", "authoritative_reincarnation/attribute_generation", {})
     var keys: Array = attribute_config.get("keys", AttributeConversionEngine.DEFAULT_STAT_LIST)
     var min_value: int = int(attribute_config.get("min_val", 1))
     var max_value: int = int(attribute_config.get("max_val", 6))
@@ -286,8 +314,8 @@ static func _resolve_traits_with_mod(
     if all_traits_config.is_empty():
         all_traits_config = GameConfig.get_dict("domains.character_creation", "traits", {})
 
-    var fallback_positive: String = GameConfig.get_string("domains.character_creation", "authoritative_reincarnation/traits_allocation/fallback_positive", "PRIMORDIAL_RESONANCE")
-    var fallback_negative: String = GameConfig.get_string("domains.character_creation", "authoritative_reincarnation/traits_allocation/fallback_negative", "HEART_CORE_FISSURE")
+    var fallback_positive: String = GameConfig.get_string("domains.character_creation", "authoritative_reincarnation/traits_allocation/fallback_positive", "")
+    var fallback_negative: String = GameConfig.get_string("domains.character_creation", "authoritative_reincarnation/traits_allocation/fallback_negative", "")
 
     var matched_pair: Dictionary = {}
     if bool(ui_controls.get("allow_manual_trait_select", false)):
