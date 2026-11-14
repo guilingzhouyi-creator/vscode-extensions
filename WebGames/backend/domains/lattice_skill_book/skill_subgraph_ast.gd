@@ -30,12 +30,12 @@ func serialize() -> Dictionary:
 	}
 
 ## 从字典重建技能子图（缺省回退默认配置）
-static func deserialize(data: Dictionary) -> SkillSubgraphAST:
-	var ast := SkillSubgraphAST.new()
-	ast.ast_id = data.get("ast_id", "")
-	ast.skill_name = data.get("skill_name", GameConfig.get_string("domains.lattice", "ast_defaults/deserialize_skill_name", "自创式"))
-	ast.signature_hash = data.get("signature_hash", "")
-	ast.sentence_count = data.get("sentence_count", GameConfig.get_int("domains.lattice", "ast_defaults/deserialize_sentence_count", 1))
-	ast.nodes = data.get("nodes", {})
-	ast.edges = data.get("edges", [])
-	return ast
+static func deserialize(serialized_subgraph: Dictionary) -> SkillSubgraphAST:
+	var subgraph_ast := SkillSubgraphAST.new()
+	subgraph_ast.ast_id = serialized_subgraph.get("ast_id", "")
+	subgraph_ast.skill_name = serialized_subgraph.get("skill_name", GameConfig.get_string("domains.lattice", "ast_defaults/deserialize_skill_name", "自创式"))
+	subgraph_ast.signature_hash = serialized_subgraph.get("signature_hash", "")
+	subgraph_ast.sentence_count = serialized_subgraph.get("sentence_count", GameConfig.get_int("domains.lattice", "ast_defaults/deserialize_sentence_count", 1))
+	subgraph_ast.nodes = serialized_subgraph.get("nodes", {})
+	subgraph_ast.edges = serialized_subgraph.get("edges", [])
+	return subgraph_ast

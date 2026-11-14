@@ -13,23 +13,23 @@ class_name LifecycleEvolutionFSM extends RefCounted
 ## 历法年轮推进：机能衰退计算（体魄求解）+ 寿元大限/死亡判定并广播年轮叙事
 static func age_character_years(sheet: CharacterPhysiologySheet, years: float) -> Dictionary:
 	sheet.raw_chronological_age += years
-	var new_sf: float = LifecycleAndPhysiologySolver.calculate_somatic_function(sheet)
+	var new_somatic_function: float = LifecycleAndPhysiologySolver.calculate_somatic_function(sheet)
 
-	var eol_ratio := GameConfig.get_float("domains.lifecycle", "lifecycle/eol_ratio", 90.0)
+	var end_of_life_ratio := GameConfig.get_float("domains.lifecycle", "lifecycle/eol_ratio", 90.0)
 	var death_ratio := GameConfig.get_float("domains.lifecycle", "lifecycle/death_ratio", 100.0)
 
 	var safe_lifespan: float = maxf(0.1, sheet.lifespan_scale)
 	var age_progression: float = sheet.raw_chronological_age / safe_lifespan
-	var is_near_end_of_life := age_progression >= eol_ratio
-	var is_deceased := new_sf <= 0.0 or age_progression >= death_ratio
+	var is_near_end_of_life := age_progression >= end_of_life_ratio
+	var is_deceased := new_somatic_function <= 0.0 or age_progression >= death_ratio
 
 	EventBusCore.get_instance().emit_narrative_by_key(
 		"lifecycle/age_advance", "lifecycle",
-		[years, new_sf, age_progression],
-		{ "sf": new_sf, "near_eol": is_near_end_of_life, "deceased": is_deceased }
+		[years, new_somatic_function, age_progression],
+		{ "sf": new_somatic_function, "near_eol": is_near_end_of_life, "deceased": is_deceased }
 	)
 
-	return { "new_sf": new_sf, "near_eol": is_near_end_of_life, "deceased": is_deceased }
+	return { "new_sf": new_somatic_function, "near_eol": is_near_end_of_life, "deceased": is_deceased }
 
 ## 生机逆龄：年岁回退（下限钳制）+ 心核完整度回升，重算体魄并广播
 static func apply_rejuvenation(sheet: CharacterPhysiologySheet, rejuvenation_years: float) -> float:
@@ -38,9 +38,9 @@ static func apply_rejuvenation(sheet: CharacterPhysiologySheet, rejuvenation_yea
 
 	sheet.raw_chronological_age = max(min_age, sheet.raw_chronological_age - rejuvenation_years)
 	sheet.heart_core_integrity = min(1.0, sheet.heart_core_integrity + heart_core_gain)
-	var new_sf: float = LifecycleAndPhysiologySolver.calculate_somatic_function(sheet)
+	var new_somatic_function: float = LifecycleAndPhysiologySolver.calculate_somatic_function(sheet)
 
 	EventBusCore.get_instance().emit_narrative_by_key(
-		"lifecycle/rejuvenation", "lifecycle", [rejuvenation_years, new_sf]
+		"lifecycle/rejuvenation", "lifecycle", [rejuvenation_years, new_somatic_function]
 	)
-	return new_sf
+	return new_somatic_function

@@ -25,78 +25,78 @@ static func get_missing_keys_count() -> int:
 ## 根据语言包与键路径检索多语言本地化翻译文本（循环零堆分配插值）
 static func translate(
     catalog: LocalizationRegistryCatalog,
-    loc_key: String,
-    params: Dictionary = {},
+    localization_key: String,
+    parameter_map: Dictionary = {},
     locale_override: String = ""
 ) -> String:
-    if loc_key.is_empty():
+    if localization_key.is_empty():
         return ""
     if catalog == null:
-        return "[%s]" % loc_key
+        return "[%s]" % localization_key
 
     var target_locale: String = locale_override if not locale_override.is_empty() else catalog.current_locale
-    var locale_dict: Dictionary = catalog._locale_dictionaries.get(target_locale, {})
+    var locale_dictionary: Dictionary = catalog._locale_dictionaries.get(target_locale, {})
 
     var raw_template: String = ""
-    if locale_dict.has(loc_key):
-        raw_template = str(locale_dict[loc_key])
+    if locale_dictionary.has(localization_key):
+        raw_template = str(locale_dictionary[localization_key])
     else:
         # 回退至备用语言 (fallback_locale)
-        var fallback_dict: Dictionary = catalog._locale_dictionaries.get(catalog.fallback_locale, {})
-        if fallback_dict.has(loc_key):
-            raw_template = str(fallback_dict[loc_key])
+        var fallback_dictionary: Dictionary = catalog._locale_dictionaries.get(catalog.fallback_locale, {})
+        if fallback_dictionary.has(localization_key):
+            raw_template = str(fallback_dictionary[localization_key])
         else:
             # 最终安全回退返回原始 key
-            return "[%s]" % loc_key
+            return "[%s]" % localization_key
 
     # 空参数短路返回，消除无谓字符串拷贝
-    if params.is_empty():
+    if parameter_map.is_empty():
         return raw_template
 
     # 动态参数插值 {param_name}（直接键遍历，零临时数组分配）
     var formatted_text: String = raw_template
-    for param_key in params:
-        var token: String = "{" + str(param_key) + "}"
+    for parameter_key in parameter_map:
+        var token: String = "{" + str(parameter_key) + "}"
         if formatted_text.contains(token):
-            formatted_text = formatted_text.replace(token, str(params[param_key]))
+            formatted_text = formatted_text.replace(token, str(parameter_map[parameter_key]))
 
     return formatted_text
 
 ## 检查指定词条键是否存在于目标语言或回退语言包中
 static func has_translation(
     catalog: LocalizationRegistryCatalog,
-    loc_key: String,
+    localization_key: String,
     locale_override: String = ""
 ) -> bool:
-    if catalog == null or loc_key.is_empty():
+    if catalog == null or localization_key.is_empty():
         return false
 
     var target_locale: String = locale_override if not locale_override.is_empty() else catalog.current_locale
-    var locale_dict: Dictionary = catalog._locale_dictionaries.get(target_locale, {})
-    if locale_dict.has(loc_key):
+    var locale_dictionary: Dictionary = catalog._locale_dictionaries.get(target_locale, {})
+    if locale_dictionary.has(localization_key):
         return true
 
-    var fallback_dict: Dictionary = catalog._locale_dictionaries.get(catalog.fallback_locale, {})
-    return fallback_dict.has(loc_key)
+    var fallback_dictionary: Dictionary = catalog._locale_dictionaries.get(catalog.fallback_locale, {})
+    return fallback_dictionary.has(localization_key)
 
 ## 批量检索多语言词条（返回 key -> formatted_text 映射表）
 static func translate_batch(
     catalog: LocalizationRegistryCatalog,
-    loc_keys: Array,
-    params: Dictionary = {},
+    localization_keys: Array,
+    parameter_map: Dictionary = {},
     locale_override: String = ""
 ) -> Dictionary:
-    var result: Dictionary = {}
+    var translated_map: Dictionary = {}
     if catalog == null:
-        for loc_key in loc_keys:
-            var key_str := String(loc_key)
-            result[key_str] = "[%s]" % key_str
-        return result
+        for localization_key in localization_keys:
+            var key_text := String(localization_key)
+            translated_map[key_text] = "[%s]" % key_text
+        return translated_map
 
-    for loc_key in loc_keys:
-        var key_str := String(loc_key)
-        result[key_str] = translate(catalog, key_str, params, locale_override)
-    return result
+    for localization_key in localization_keys:
+        var key_text := String(localization_key)
+        translated_map[key_text] = translate(catalog, key_text, parameter_map, locale_override)
+    return translated_map
 
 ## 统一名称解析（全局名称注册表出口）：locale 查表 → fallback_locale 回退 →
 ## 英文回退(en_US) → 未登记返回 [key] 原样并告警计数 +1（不抛 Fatal）。
@@ -105,12 +105,12 @@ static func resolve_name_key(
     catalog: LocalizationRegistryCatalog,
     key: String,
     locale_override: String = "",
-    params: Dictionary = {}
+    parameter_map: Dictionary = {}
 ) -> String:
     if catalog == null or key.is_empty():
         missing_name_keys += 1
         return "[%s]" % key
-    var resolved: String = translate(catalog, key, params, locale_override)
+    var resolved: String = translate(catalog, key, parameter_map, locale_override)
     if resolved == "[%s]" % key:
         missing_name_keys += 1
     return resolved

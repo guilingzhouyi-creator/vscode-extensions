@@ -15,33 +15,33 @@ extends RefCounted
 ## context 供 MagicRuleCondition 求值（holder_rank / learned_by_school / variant_flags）。
 static func validate_ascension(
 	ranks: Dictionary,
-	magic_ref: String,
+	magic_reference: String,
 	ascension_config: Dictionary = {},
 	context: Dictionary = {}
 ) -> Dictionary:
-	if magic_ref.is_empty():
+	if magic_reference.is_empty():
 		return {"success": false, "error_code": "MISSING_CONTEXT"}
-	if not ranks.has(magic_ref):
-		return {"success": false, "error_code": "MAGIC_NOT_REGISTERED", "magic_ref": magic_ref}
+	if not ranks.has(magic_reference):
+		return {"success": false, "error_code": "MAGIC_NOT_REGISTERED", "magic_ref": magic_reference}
 	var max_rank := clampi(int(ascension_config.get("max_rank", 11)), 1, 11)
-	var current_rank := int(ranks[magic_ref])
+	var current_rank := int(ranks[magic_reference])
 	if current_rank >= max_rank:
 		return {"success": false, "error_code": "RANK_ALREADY_MAX", "rank": current_rank, "max_rank": max_rank}
 	var conditions: Dictionary = ascension_config.get("conditions", {})
 	if not conditions.is_empty() and not MagicRuleCondition.evaluate(conditions, context):
-		return {"success": false, "error_code": "ASCENSION_CONDITION_FAILED", "magic_ref": magic_ref}
-	return {"success": true, "magic_ref": magic_ref, "current_rank": current_rank, "next_rank": current_rank + 1}
+		return {"success": false, "error_code": "ASCENSION_CONDITION_FAILED", "magic_ref": magic_reference}
+	return {"success": true, "magic_ref": magic_reference, "current_rank": current_rank, "next_rank": current_rank + 1}
 
 ## 执行升格：位阶 +1（仅一步；连续升格由调用方按 max_steps_per_play 循环调用，
 ## 每步仍独立校验）。form 用于 god-form 高阶形态不变量（RANK_10/11 须 SUPERTIER）。
 static func apply_ascension(
 	ranks: Dictionary,
-	magic_ref: String,
+	magic_reference: String,
 	form: int = MagicTierSnapshot.MagicForm.INCANTATION,
 	ascension_config: Dictionary = {},
 	context: Dictionary = {}
 ) -> Dictionary:
-	var check := validate_ascension(ranks, magic_ref, ascension_config, context)
+	var check := validate_ascension(ranks, magic_reference, ascension_config, context)
 	if not check.get("success", false):
 		return check
 	var next_rank := int(check["next_rank"])
@@ -49,10 +49,10 @@ static func apply_ascension(
 	if MagicTierSnapshot.is_god_rank(next_rank) \
 			and not MagicTierSnapshot.is_god_form_pair_valid(next_rank, form):
 		return {"success": false, "error_code": "GOD_FORM_PAIR_VIOLATION", "rank": next_rank, "form": form}
-	ranks[magic_ref] = next_rank
+	ranks[magic_reference] = next_rank
 	return {
 		"success": true,
-		"magic_ref": magic_ref,
+		"magic_ref": magic_reference,
 		"previous_rank": int(check["current_rank"]),
 		"rank": next_rank,
 	}

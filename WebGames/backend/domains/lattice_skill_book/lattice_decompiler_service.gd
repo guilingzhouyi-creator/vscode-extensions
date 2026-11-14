@@ -11,18 +11,18 @@
 class_name LatticeDecompilerService extends RefCounted
 
 ## 三维点阵空间拉线反编译优化求解器
-static func optimize_lattice_path(ast: SkillSubgraphAST, learner_int: float) -> Dictionary:
+static func optimize_lattice_path(subgraph_ast: SkillSubgraphAST, learner_intelligence: float) -> Dictionary:
 	var path_reduction := GameConfig.get_float("domains.lattice", "decompiler/path_reduction", 0.35) # 空间拓扑测地线缩短 35%
 	var loss_coefficient := GameConfig.get_float("domains.lattice", "decompiler/loss_coefficient", 0.40)
 	# 归一化分母下限守卫（Inv-VD-1）——配置 0 时 float 除零产出 inf 污染能量损耗指标
 	var learner_normalize := maxf(1.0, GameConfig.get_float("domains.lattice", "decompiler/learner_normalize", 50.0))
 	var min_sentences := GameConfig.get_int("domains.lattice", "decompiler/min_sentences", 1)
 
-	var original_sentences: int = ast.sentence_count
+	var original_sentences: int = subgraph_ast.sentence_count
 	var optimized_sentences: int = max(min_sentences, int(round(float(original_sentences) * (1.0 - path_reduction))))
-	ast.sentence_count = optimized_sentences
+	subgraph_ast.sentence_count = optimized_sentences
 
-	var loss_bonus: float = path_reduction * loss_coefficient * (max(1.0, learner_int) / learner_normalize)
+	var loss_bonus: float = path_reduction * loss_coefficient * (max(1.0, learner_intelligence) / learner_normalize)
 
 	return {
 		"original_sentences": original_sentences,
@@ -32,14 +32,14 @@ static func optimize_lattice_path(ast: SkillSubgraphAST, learner_int: float) -> 
 	}
 
 ## 检测技能 DAG 图中是否存在死循环/环路 (拓扑合法性校验)
-static func is_acyclic_dag(ast: SkillSubgraphAST) -> bool:
+static func is_acyclic_dag(subgraph_ast: SkillSubgraphAST) -> bool:
 	var in_degree: Dictionary = {}
 	var adjacency: Dictionary = {}
 
-	for node_id in ast.nodes:
+	for node_id in subgraph_ast.nodes:
 		_register_dag_node_bucket(node_id, in_degree, adjacency)
 
-	for edge in ast.edges:
+	for edge in subgraph_ast.edges:
 		var from_node_id: Variant = edge.get("from", "")
 		var to_node_id: Variant = edge.get("to", "")
 		if in_degree.has(to_node_id) and adjacency.has(from_node_id):
@@ -59,7 +59,7 @@ static func is_acyclic_dag(ast: SkillSubgraphAST) -> bool:
 		visited_count += 1
 		_process_topological_neighbors(current_node_id, adjacency, in_degree, queue)
 
-	return visited_count == ast.nodes.size()
+	return visited_count == subgraph_ast.nodes.size()
 
 static func _register_dag_node_bucket(node_id: Variant, in_degree: Dictionary, adjacency: Dictionary) -> void:
 	in_degree[node_id] = 0
@@ -73,20 +73,20 @@ static func _process_topological_neighbors(current_node_id: String, adjacency: D
 			queue.append(next_node_id)
 
 ## 为技能子图 AST 生成唯一拓扑签名
-static func generate_ast_signature(ast: SkillSubgraphAST) -> String:
+static func generate_ast_signature(subgraph_ast: SkillSubgraphAST) -> String:
 	var prefix := GameConfig.get_string("domains.lattice", "decompiler/signature_prefix", "AST:")
 	var title_separator := GameConfig.get_string("domains.lattice", "decompiler/signature_title_sep", ":")
 	var node_format := GameConfig.get_string("domains.lattice", "decompiler/signature_node_format", "%s:%s;")
 
-	var sorted_keys: Array = ast.nodes.keys()
+	var sorted_keys: Array = subgraph_ast.nodes.keys()
 	sorted_keys.sort()
 	var parts := PackedStringArray()
 	parts.resize(sorted_keys.size() + 1)
-	parts[0] = prefix + ast.skill_name + title_separator
+	parts[0] = prefix + subgraph_ast.skill_name + title_separator
 	for node_index in range(sorted_keys.size()):
 		var node_key: Variant = sorted_keys[node_index]
-		var node_data: Dictionary = ast.nodes[node_key]
-		parts[node_index + 1] = node_format % [node_key, node_data.get("symbol", "")]
+		var node_entry: Dictionary = subgraph_ast.nodes[node_key]
+		parts[node_index + 1] = node_format % [node_key, node_entry.get("symbol", "")]
 
-	ast.signature_hash = "".join(parts).sha256_text()
-	return ast.signature_hash
+	subgraph_ast.signature_hash = "".join(parts).sha256_text()
+	return subgraph_ast.signature_hash

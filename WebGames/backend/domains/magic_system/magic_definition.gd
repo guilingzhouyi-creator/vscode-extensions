@@ -32,14 +32,14 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从字典重建魔法定义（base_rank 钳制 1~11）
-static func from_dto(data: Dictionary) -> MagicDefinition:
-	var def := MagicDefinition.new()
-	def.canonical_id = str(data.get("canonical_id", ""))
-	def.magic_form = int(data.get("magic_form", DEFAULT_FORM))
-	def.attribute_id = str(data.get("attribute_id", ""))
-	def.base_rank = clampi(int(data.get("base_rank", RANK_MIN)), RANK_MIN, RANK_MAX)
-	def.effect_profile = str(data.get("effect_profile", ""))
-	return def
+static func from_dto(serialized_definition: Dictionary) -> MagicDefinition:
+	var magic_definition := MagicDefinition.new()
+	magic_definition.canonical_id = str(serialized_definition.get("canonical_id", ""))
+	magic_definition.magic_form = int(serialized_definition.get("magic_form", DEFAULT_FORM))
+	magic_definition.attribute_id = str(serialized_definition.get("attribute_id", ""))
+	magic_definition.base_rank = clampi(int(serialized_definition.get("base_rank", RANK_MIN)), RANK_MIN, RANK_MAX)
+	magic_definition.effect_profile = str(serialized_definition.get("effect_profile", ""))
+	return magic_definition
 
 ## 位阶阶位合法域校验（1~11；越界返回 0 显式哨兵，禁静默伪装）
 func normalize_rank(rank_value: int) -> int:

@@ -36,8 +36,8 @@ func schedule(trigger: MagicRuleTrigger) -> Dictionary:
 			"min_steps": min_steps,
 			"max_steps": max_steps,
 		}
-	var allow_repeat := bool(resolved_config.get("allow_repeat", false))
-	if not allow_repeat and _has_pending_magic(trigger.holder_id, trigger.magic_ref):
+	var can_repeat := bool(resolved_config.get("allow_repeat", false))
+	if not can_repeat and _has_pending_magic(trigger.holder_id, trigger.magic_ref):
 		return {"success": false, "error_code": "ALREADY_DELAYED", "magic_ref": trigger.magic_ref}
 	_pending.append(trigger)
 	return {"success": true, "trigger_id": trigger.trigger_id, "due_in_steps": trigger.remain_steps}
@@ -94,10 +94,10 @@ func release_fail_policy_name(trigger: MagicRuleTrigger) -> String:
 			return "CANCEL_AND_REFUND"
 	return "CANCEL"
 
-func _has_pending_magic(holder_id: String, magic_ref: String) -> bool:
+func _has_pending_magic(holder_id: String, magic_reference: String) -> bool:
 	for trigger in _pending:
 		if trigger is MagicRuleTrigger \
 				and trigger.holder_id == holder_id \
-				and trigger.magic_ref == magic_ref:
+				and trigger.magic_ref == magic_reference:
 			return true
 	return false

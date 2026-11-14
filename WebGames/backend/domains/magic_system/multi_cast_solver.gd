@@ -51,21 +51,21 @@ static func execute_play(
 	if not check.get("success", false):
 		return check
 	var cast_count := int(check["cast_count"])
-	var snapshot_mode := bool(multi_cast_config.get("snapshot_per_play", false))
+	var is_snapshot_mode := bool(multi_cast_config.get("snapshot_per_play", false))
 	var target_mode := String(multi_cast_config.get("target_mode", "SAME"))
 	var target_pool: Array = context.get("target_pool", [])
 	var hit_results: Array = []
 	var hit_context := context.duplicate()
-	if snapshot_mode:
+	if is_snapshot_mode:
 		hit_context["snapshot_locked"] = true
 	# SEQUENTIAL 逐击复用同一上下文就地更新 target_id；SAME/无池共享初始化 target_id
 	# （MagicSettlementSolver.resolve_attack 仅只读 context，已核验无逐击就地写入，循环内零堆分配）
-	var sequential := target_mode == "SEQUENTIAL" and not target_pool.is_empty()
-	if not sequential and target_mode == "SAME":
+	var is_sequential := target_mode == "SEQUENTIAL" and not target_pool.is_empty()
+	if not is_sequential and target_mode == "SAME":
 		if not hit_context.has("target_id"):
 			hit_context["target_id"] = str(context.get("target_id", ""))
 	for cast_index in range(cast_count):
-		if sequential:
+		if is_sequential:
 			hit_context["target_id"] = str(target_pool[cast_index % target_pool.size()])
 		var hit := MagicSettlementSolver.resolve_attack(card, rank, hit_context)
 		if not hit.get("success", false):
@@ -76,7 +76,7 @@ static func execute_play(
 		"consumes_play": CONSUMES_PLAY,
 		"cast_count": cast_count,
 		"attack_count": cast_count,
-		"snapshot_mode": snapshot_mode,
+		"snapshot_mode": is_snapshot_mode,
 		"hits": hit_results,
 		"total_damage": _sum_damage(hit_results),
 	}

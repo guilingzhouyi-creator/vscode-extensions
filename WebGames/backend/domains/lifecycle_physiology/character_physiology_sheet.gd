@@ -91,17 +91,17 @@ func get_actual_value(attribute_name: String) -> float:
 
 ## 获取全部六维属性底层实际能力值字典
 func get_actual_values() -> Dictionary:
-	var out := {}
+	var actual_values_map := {}
 	for stat_key in AttributeConversionEngine.DEFAULT_STAT_LIST:
-		out[stat_key] = get_actual_value(stat_key)
-	return out
+		actual_values_map[stat_key] = get_actual_value(stat_key)
+	return actual_values_map
 
 ## 获取全部六维属性当前离散等级字典
 func get_all_levels() -> Dictionary:
-	var out := {}
+	var attribute_levels_map := {}
 	for stat_key in AttributeConversionEngine.DEFAULT_STAT_LIST:
-		out[stat_key] = get_level(stat_key)
-	return out
+		attribute_levels_map[stat_key] = get_level(stat_key)
+	return attribute_levels_map
 
 ## 生理表副本（装备词缀/临时修正用）：复制 L1/L2/L3 全状态，不共享引用
 func duplicate_physiology() -> CharacterPhysiologySheet:

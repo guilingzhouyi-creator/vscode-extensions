@@ -47,16 +47,16 @@ func get_state() -> LocalizationI18nDTO:
     return get_catalog().export_state_dto()
 
 ## 执行多语言文本翻译与参数插值
-func translate(loc_key: String, params: Dictionary = {}, locale_override: String = "") -> String:
-    return LocalizationSolver.translate(get_catalog(), loc_key, params, locale_override)
+func translate(localization_key: String, parameter_map: Dictionary = {}, locale_override: String = "") -> String:
+    return LocalizationSolver.translate(get_catalog(), localization_key, parameter_map, locale_override)
 
 ## 执行统一名称键解析
-func resolve_name_key(key: String, locale_override: String = "", params: Dictionary = {}) -> String:
-    return LocalizationSolver.resolve_name_key(get_catalog(), key, locale_override, params)
+func resolve_name_key(key: String, locale_override: String = "", parameter_map: Dictionary = {}) -> String:
+    return LocalizationSolver.resolve_name_key(get_catalog(), key, locale_override, parameter_map)
 
 ## 检查指定词条是否存在
-func has_translation(loc_key: String, locale_override: String = "") -> bool:
-    return LocalizationSolver.has_translation(get_catalog(), loc_key, locale_override)
+func has_translation(localization_key: String, locale_override: String = "") -> bool:
+    return LocalizationSolver.has_translation(get_catalog(), localization_key, locale_override)
 
 ## 切换全局运行语言
 func switch_language(new_locale: String) -> Dictionary:
@@ -67,9 +67,9 @@ func merge_mod_translations(
     mod_id: String,
     locale: String,
     translations: Dictionary,
-    allow_override: bool = false
+    can_allow_override: bool = false
 ) -> Dictionary:
-    return get_catalog().merge_mod_translations(mod_id, locale, translations, allow_override)
+    return get_catalog().merge_mod_translations(mod_id, locale, translations, can_allow_override)
 
 ## 卸载 MOD 多语言词条
 func unload_mod_translations(mod_id: String) -> int:

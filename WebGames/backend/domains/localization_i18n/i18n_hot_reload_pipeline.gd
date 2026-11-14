@@ -34,7 +34,7 @@ static func switch_language(
     var old_locale: String = catalog.current_locale
     catalog.current_locale = clean_locale
 
-    var has_dict: bool = catalog._locale_dictionaries.has(clean_locale)
+    var has_dictionary: bool = catalog._locale_dictionaries.has(clean_locale)
     var is_supported: bool = catalog.is_locale_supported(clean_locale)
 
     # 广播全域语言切换领域事件（遵循 ADV-EVT-004：携带 args 与 category_key）
@@ -44,7 +44,7 @@ static func switch_language(
         "summary": {
             "old_locale": old_locale,
             "new_locale": clean_locale,
-            "has_dictionary": has_dict,
+            "has_dictionary": has_dictionary,
             "is_supported": is_supported
         }
     })
@@ -53,6 +53,6 @@ static func switch_language(
         "success": true,
         "old_locale": old_locale,
         "new_locale": clean_locale,
-        "has_dictionary": has_dict,
+        "has_dictionary": has_dictionary,
         "is_supported": is_supported
     }

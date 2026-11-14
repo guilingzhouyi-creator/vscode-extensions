@@ -18,20 +18,20 @@ const SEAL_STATUS_ACTIVE: int = MagicRuleState.StateStatus.ACTIVE
 static func apply_seal(
 	seals: Dictionary,
 	holder_id: String,
-	magic_ref: String,
+	magic_reference: String,
 	source_card_id: String,
 	seal_config: Dictionary = {}
 ) -> Dictionary:
-	if holder_id.is_empty() or magic_ref.is_empty():
+	if holder_id.is_empty() or magic_reference.is_empty():
 		return {"success": false, "error_code": "MISSING_CONTEXT"}
 	var max_seals := int(seal_config.get("max_seals_per_holder", 3))
-	var allow_repeat := bool(seal_config.get("allow_repeat_seal", false))
-	if not allow_repeat:
+	var can_repeat_seal := bool(seal_config.get("allow_repeat_seal", false))
+	if not can_repeat_seal:
 		var holder_map: Dictionary = seals.get(holder_id, {})
-		if holder_map.has(magic_ref):
-			var existing: MagicRuleState = holder_map[magic_ref]
+		if holder_map.has(magic_reference):
+			var existing: MagicRuleState = holder_map[magic_reference]
 			if existing.is_active():
-				return {"success": false, "error_code": "ALREADY_SEALED", "magic_ref": magic_ref}
+				return {"success": false, "error_code": "ALREADY_SEALED", "magic_ref": magic_reference}
 	# 可封印数量上限（仅统计 ACTIVE）
 	var active_count := _active_seal_count(seals, holder_id)
 	if active_count >= max_seals:
@@ -42,45 +42,45 @@ static func apply_seal(
 	state.kind = MagicRuleState.StateKind.SEAL
 	state.status = MagicRuleState.StateStatus.ACTIVE
 	state.holder_id = holder_id
-	state.magic_ref = magic_ref
+	state.magic_ref = magic_reference
 	state.source_card_id = source_card_id
 	state.duration_seconds = int(seal_config.get("default_duration_seconds", 0))
 	state.remain_seconds = state.duration_seconds
-	var holder_map2: Dictionary = seals.get(holder_id, {})
-	holder_map2[magic_ref] = state
-	seals[holder_id] = holder_map2
-	return {"success": true, "state_id": state.state_id, "magic_ref": magic_ref, "holder_id": holder_id}
+	var updated_holder_map: Dictionary = seals.get(holder_id, {})
+	updated_holder_map[magic_reference] = state
+	seals[holder_id] = updated_holder_map
+	return {"success": true, "state_id": state.state_id, "magic_ref": magic_reference, "holder_id": holder_id}
 
 ## 解放：封印状态 → RELEASED（清理）
-static func apply_release(seals: Dictionary, holder_id: String, magic_ref: String) -> Dictionary:
+static func apply_release(seals: Dictionary, holder_id: String, magic_reference: String) -> Dictionary:
 	var holder_map: Dictionary = seals.get(holder_id, {})
-	if not holder_map.has(magic_ref):
-		return {"success": false, "error_code": "NOT_SEALED", "magic_ref": magic_ref}
-	var state: MagicRuleState = holder_map[magic_ref]
+	if not holder_map.has(magic_reference):
+		return {"success": false, "error_code": "NOT_SEALED", "magic_ref": magic_reference}
+	var state: MagicRuleState = holder_map[magic_reference]
 	if not state.is_active():
-		return {"success": false, "error_code": "NOT_SEALED", "magic_ref": magic_ref}
+		return {"success": false, "error_code": "NOT_SEALED", "magic_ref": magic_reference}
 	state.transition_to(MagicRuleState.StateStatus.RELEASED)
-	holder_map.erase(magic_ref)
+	holder_map.erase(magic_reference)
 	if holder_map.is_empty():
 		seals.erase(holder_id)
-	return {"success": true, "released": true, "magic_ref": magic_ref, "holder_id": holder_id}
+	return {"success": true, "released": true, "magic_ref": magic_reference, "holder_id": holder_id}
 
 ## 封印状态查询（未封印返回 false）
-static func is_sealed(seals: Dictionary, holder_id: String, magic_ref: String) -> bool:
+static func is_sealed(seals: Dictionary, holder_id: String, magic_reference: String) -> bool:
 	var holder_map: Dictionary = seals.get(holder_id, {})
-	if not holder_map.has(magic_ref):
+	if not holder_map.has(magic_reference):
 		return false
-	var state: MagicRuleState = holder_map[magic_ref]
+	var state: MagicRuleState = holder_map[magic_reference]
 	return state.is_active()
 
 ## 异常回退：封印打出失败时将本封印状态标记 ROLLED_BACK 并移除（无副作用）
-static func rollback_seal(seals: Dictionary, holder_id: String, magic_ref: String) -> void:
+static func rollback_seal(seals: Dictionary, holder_id: String, magic_reference: String) -> void:
 	var holder_map: Dictionary = seals.get(holder_id, {})
-	if not holder_map.has(magic_ref):
+	if not holder_map.has(magic_reference):
 		return
-	var state: MagicRuleState = holder_map[magic_ref]
+	var state: MagicRuleState = holder_map[magic_reference]
 	state.transition_to(MagicRuleState.StateStatus.ROLLED_BACK)
-	holder_map.erase(magic_ref)
+	holder_map.erase(magic_reference)
 	if holder_map.is_empty():
 		seals.erase(holder_id)
 
@@ -88,13 +88,13 @@ static func rollback_seal(seals: Dictionary, holder_id: String, magic_ref: Strin
 static func cleanup_expired(seals: Dictionary, holder_id: String) -> int:
 	var holder_map: Dictionary = seals.get(holder_id, {})
 	var cleaned := 0
-	for magic_ref in holder_map.keys():
-		var state: MagicRuleState = holder_map[magic_ref]
+	for magic_reference in holder_map.keys():
+		var state: MagicRuleState = holder_map[magic_reference]
 		if state.duration_seconds > 0:
 			state.remain_seconds = maxi(0, state.remain_seconds - 1)
 			if state.remain_seconds == 0:
 				state.transition_to(MagicRuleState.StateStatus.EXPIRED)
-				holder_map.erase(magic_ref)
+				holder_map.erase(magic_reference)
 				cleaned += 1
 	if holder_map.is_empty():
 		seals.erase(holder_id)

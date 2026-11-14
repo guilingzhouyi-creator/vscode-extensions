@@ -55,20 +55,20 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从字典重建持续状态（缺省回退默认枚举）
-static func from_dto(data: Dictionary) -> MagicRuleState:
-	var st := MagicRuleState.new()
-	st.state_id = str(data.get("state_id", ""))
-	st.kind = int(data.get("kind", StateKind.SEAL))
-	st.status = int(data.get("status", StateStatus.ACTIVE))
-	st.holder_id = str(data.get("holder_id", ""))
-	st.magic_ref = str(data.get("magic_ref", ""))
-	st.source_card_id = str(data.get("source_card_id", ""))
-	st.duration_seconds = int(data.get("duration_seconds", 0))
-	st.remain_seconds = int(data.get("remain_seconds", 0))
-	st.remain_steps = int(data.get("remain_steps", 0))
-	st.created_tick = int(data.get("created_tick", 0))
-	st.allow_duplicate = bool(data.get("allow_duplicate", false))
-	return st
+static func from_dto(serialized_state: Dictionary) -> MagicRuleState:
+	var rule_state := MagicRuleState.new()
+	rule_state.state_id = str(serialized_state.get("state_id", ""))
+	rule_state.kind = int(serialized_state.get("kind", StateKind.SEAL))
+	rule_state.status = int(serialized_state.get("status", StateStatus.ACTIVE))
+	rule_state.holder_id = str(serialized_state.get("holder_id", ""))
+	rule_state.magic_ref = str(serialized_state.get("magic_ref", ""))
+	rule_state.source_card_id = str(serialized_state.get("source_card_id", ""))
+	rule_state.duration_seconds = int(serialized_state.get("duration_seconds", 0))
+	rule_state.remain_seconds = int(serialized_state.get("remain_seconds", 0))
+	rule_state.remain_steps = int(serialized_state.get("remain_steps", 0))
+	rule_state.created_tick = int(serialized_state.get("created_tick", 0))
+	rule_state.allow_duplicate = bool(serialized_state.get("allow_duplicate", false))
+	return rule_state
 
 ## 是否生效中（ACTIVE）
 func is_active() -> bool:

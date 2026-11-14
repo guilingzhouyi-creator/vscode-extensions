@@ -14,18 +14,18 @@ class_name LifecycleAndPhysiologySolver extends RefCounted
 static func calculate_somatic_function(sheet: CharacterPhysiologySheet) -> float:
 	var scale_floor: float = GameConfig.get_float("domains.lifecycle", "sf_formula/scale_floor", 0.1)
 	var age_normalize: float = GameConfig.get_float("domains.lifecycle", "sf_formula/age_normalize", 100.0)
-	var sf_max: float = GameConfig.get_float("domains.lifecycle", "sf_formula/sf_max", 100.0)
+	var max_somatic_function: float = GameConfig.get_float("domains.lifecycle", "sf_formula/sf_max", 100.0)
 	var decay_exponent: float = GameConfig.get_float("domains.lifecycle", "sf_formula/decay_exponent", 1.8)
 
 	var safe_scale: float = max(scale_floor, sheet.lifespan_scale)
 	var normalized_age: float = clamp(sheet.raw_chronological_age / safe_scale, 0.0, age_normalize)
 
-	# SF = sf_max * (1 - (NormAge / age_normalize)^decay_exponent) * HeartCore
+	# SF = max_somatic_function * (1 - (NormAge / age_normalize)^decay_exponent) * HeartCore
 	var age_ratio: float = normalized_age / age_normalize
-	var base_sf: float = sf_max * (1.0 - pow(age_ratio, decay_exponent))
-	var effective_sf: float = max(0.0, base_sf * clamp(sheet.heart_core_integrity, 0.0, 1.0))
-	sheet.somatic_function = effective_sf
-	return effective_sf
+	var base_somatic_function: float = max_somatic_function * (1.0 - pow(age_ratio, decay_exponent))
+	var effective_somatic_function: float = max(0.0, base_somatic_function * clamp(sheet.heart_core_integrity, 0.0, 1.0))
+	sheet.somatic_function = effective_somatic_function
+	return effective_somatic_function
 
 ## 魔法资质反噬风险判定
 static func evaluate_mana_backfire_risk(sheet: CharacterPhysiologySheet, spell_tier: int) -> float:

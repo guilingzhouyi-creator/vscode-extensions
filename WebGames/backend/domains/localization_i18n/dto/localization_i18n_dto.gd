@@ -32,13 +32,13 @@ func to_dto() -> Dictionary:
     }
 
 ## 从字典数据重建 DTO 对象
-static func from_dto(data: Dictionary) -> LocalizationI18nDTO:
-    var i18n_snapshot := LocalizationI18nDTO.new()
-    i18n_snapshot.current_locale = String(data.get("current_locale", "zh_CN"))
-    i18n_snapshot.fallback_locale = String(data.get("fallback_locale", "en_US"))
-    i18n_snapshot.supported_locales = Array(data.get("supported_locales", ["zh_CN", "en_US", "ja_JP", "zh_TW"]))
-    i18n_snapshot.loaded_locales = Array(data.get("loaded_locales", []))
-    i18n_snapshot.total_keys_count = int(data.get("total_keys_count", 0))
-    i18n_snapshot.missing_name_keys_count = int(data.get("missing_name_keys_count", 0))
-    i18n_snapshot.is_cjk = bool(data.get("is_cjk", true))
-    return i18n_snapshot
+static func from_dto(dto_payload: Dictionary) -> LocalizationI18nDTO:
+    var localization_snapshot := LocalizationI18nDTO.new()
+    localization_snapshot.current_locale = String(dto_payload.get("current_locale", "zh_CN"))
+    localization_snapshot.fallback_locale = String(dto_payload.get("fallback_locale", "en_US"))
+    localization_snapshot.supported_locales = Array(dto_payload.get("supported_locales", ["zh_CN", "en_US", "ja_JP", "zh_TW"]))
+    localization_snapshot.loaded_locales = Array(dto_payload.get("loaded_locales", []))
+    localization_snapshot.total_keys_count = int(dto_payload.get("total_keys_count", 0))
+    localization_snapshot.missing_name_keys_count = int(dto_payload.get("missing_name_keys_count", 0))
+    localization_snapshot.is_cjk = bool(dto_payload.get("is_cjk", true))
+    return localization_snapshot

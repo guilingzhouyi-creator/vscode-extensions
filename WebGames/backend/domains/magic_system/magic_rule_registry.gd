@@ -144,10 +144,10 @@ func _validate_numerical_bounds() -> bool:
 func _valid_condition_tree(node: Dictionary) -> bool:
 	if node.is_empty():
 		return false
-	var op := String(node.get("op", ""))
-	if op == "LEAF":
+	var operator_name := String(node.get("op", ""))
+	if operator_name == "LEAF":
 		return String(node.get("kind", "")).length() > 0 and (node.get("args", {}) is Dictionary)
-	if op != "AND" and op != "OR" and op != "NOT":
+	if operator_name != "AND" and operator_name != "OR" and operator_name != "NOT":
 		return false
 	var terms: Variant = node.get("terms", [])
 	if not terms is Array:

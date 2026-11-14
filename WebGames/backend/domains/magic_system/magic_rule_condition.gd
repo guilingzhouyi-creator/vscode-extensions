@@ -24,8 +24,8 @@ const OP_LEAF: String = "LEAF"
 static func evaluate(node: Dictionary, context: Dictionary = {}) -> bool:
 	if node.is_empty():
 		return false
-	var op := String(node.get("op", ""))
-	match op:
+	var operator_name := String(node.get("op", ""))
+	match operator_name:
 		OP_AND:
 			return _eval_and(node, context)
 		OP_OR:
@@ -69,17 +69,17 @@ static func _eval_not(node: Dictionary, context: Dictionary) -> bool:
 ## LEAF 求值：按 kind 分派（school_attrs_learned/holder_rank_gte/variant_flag），未知种类受控失败
 static func _eval_leaf(node: Dictionary, context: Dictionary) -> bool:
 	var kind := String(node.get("kind", ""))
-	var args: Dictionary = node.get("args", {})
+	var leaf_arguments: Dictionary = node.get("args", {})
 	match kind:
 		"school_attrs_learned":
 			var learned: Dictionary = context.get("learned_by_school", {})
-			var school := String(args.get("school", ""))
-			var min_count := int(args.get("min_count", 1))
+			var school := String(leaf_arguments.get("school", ""))
+			var min_count := int(leaf_arguments.get("min_count", 1))
 			return int(learned.get(school, 0)) >= min_count
 		"holder_rank_gte":
-			var min_rank := int(args.get("min_rank", 1))
+			var min_rank := int(leaf_arguments.get("min_rank", 1))
 			return int(context.get("holder_rank", 0)) >= min_rank
 		"variant_flag":
 			var flags: Array = context.get("variant_flags", [])
-			return flags.has(String(args.get("variant", "")))
+			return flags.has(String(leaf_arguments.get("variant", "")))
 	return false  # 未知 LEAF 种类：受控失败，不静默放行

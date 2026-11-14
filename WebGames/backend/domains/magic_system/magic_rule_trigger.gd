@@ -56,20 +56,20 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从字典重建触发状态（缺省回退默认策略）
-static func from_dto(data: Dictionary) -> MagicRuleTrigger:
-	var tr := MagicRuleTrigger.new()
-	tr.trigger_id = str(data.get("trigger_id", ""))
-	tr.kind = int(data.get("kind", TriggerKind.DELAYED_CAST))
-	tr.holder_id = str(data.get("holder_id", ""))
-	tr.magic_ref = str(data.get("magic_ref", ""))
-	tr.source_card_id = str(data.get("source_card_id", ""))
-	tr.remain_steps = int(data.get("remain_steps", 0))
-	tr.casts_per_play = int(data.get("casts_per_play", 1))
-	tr.target_policy = int(data.get("target_policy", TargetPolicy.FAIL_ON_MISSING))
-	tr.release_policy = int(data.get("release_policy", ReleasePolicy.CANCEL))
-	tr.snapshot_at_cast = data.get("snapshot_at_cast", {}).duplicate(true)
-	tr.use_snapshot = bool(data.get("use_snapshot", false))
-	return tr
+static func from_dto(serialized_trigger: Dictionary) -> MagicRuleTrigger:
+	var rule_trigger := MagicRuleTrigger.new()
+	rule_trigger.trigger_id = str(serialized_trigger.get("trigger_id", ""))
+	rule_trigger.kind = int(serialized_trigger.get("kind", TriggerKind.DELAYED_CAST))
+	rule_trigger.holder_id = str(serialized_trigger.get("holder_id", ""))
+	rule_trigger.magic_ref = str(serialized_trigger.get("magic_ref", ""))
+	rule_trigger.source_card_id = str(serialized_trigger.get("source_card_id", ""))
+	rule_trigger.remain_steps = int(serialized_trigger.get("remain_steps", 0))
+	rule_trigger.casts_per_play = int(serialized_trigger.get("casts_per_play", 1))
+	rule_trigger.target_policy = int(serialized_trigger.get("target_policy", TargetPolicy.FAIL_ON_MISSING))
+	rule_trigger.release_policy = int(serialized_trigger.get("release_policy", ReleasePolicy.CANCEL))
+	rule_trigger.snapshot_at_cast = serialized_trigger.get("snapshot_at_cast", {}).duplicate(true)
+	rule_trigger.use_snapshot = bool(serialized_trigger.get("use_snapshot", false))
+	return rule_trigger
 
 ## 步进推进（下限 0，防负）
 func advance_steps(steps: int) -> void:
