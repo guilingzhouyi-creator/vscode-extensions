@@ -1,11 +1,14 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端第3卷: 角色与养成系统视图控制器
+# 模块归属: 前端表现层 (Frontend · 第3卷 角色与养成系统视图控制器)
 # 文件路径: res://frontend/views/character_progression/character_progression_view.gd
-# 职责: 角色面板、六维属性加点预览、生命体质指标、技能树浏览、
-#       装备槽位穿脱、背包网格筛选、称号管理、角色传记展示；
-#       8 个 Tab 子界面由 MainTabContainer 承载，右下角返回按钮调 ViewRouter.pop_view()。
-# 架构: 核心业务与属性试算留存本类，Tab 0~7 子界面逻辑与事件委托 CharacterProgressionTabs 驱动。
+# 架构定位: Presentation View Controller / Snapshot-Driven Screen
+# 依赖与触发: 上游: NavManager, MockServiceContainer, FrontendSnapshot
+#           下游: CharacterProgressionTabs, UIIntermediary, ViewRouter
+# 职责说明: 角色属性面板、潜能加点预览、体质指标、技能树、装备槽位、背包、
+#           称号与传记多页签表现协调，子界面交互委托 CharacterProgressionTabs。
+# 退出语义与设计依据: 表现层快照单向绑定与右下角返回 ViewRouter.pop_view() 契约
 # ==============================================================================
+## CharacterProgressionView：第3卷角色养成八页签视图控制器
 class_name CharacterProgressionView
 extends BaseScreen
 
@@ -49,43 +52,43 @@ enum InventoryFilter {ALL, WEAPON, ARMOR, CONSUMABLE, MATERIAL}
 @onready var _main_tab_container: TabContainer = $%MainTabContainer
 
 # --- Tab 0: ATTRIBUTES 属性总览 ---
-@onready var _attr_char_name_label: Label = $%AttrCharNameLabel
-@onready var _attr_title_label: Label = $%AttrTitleLabel
-@onready var _attr_str_label: Label = $%AttrStrLabel
-@onready var _attr_agi_label: Label = $%AttrAgiLabel
-@onready var _attr_con_label: Label = $%AttrConLabel
-@onready var _attr_int_label: Label = $%AttrIntLabel
-@onready var _attr_wis_label: Label = $%AttrWisLabel
-@onready var _attr_cha_label: Label = $%AttrChaLabel
-@onready var _attr_hp_bar: ProgressBar = $%AttrHpBar
-@onready var _attr_mp_bar: ProgressBar = $%AttrMpBar
-@onready var _attr_stamina_bar: ProgressBar = $%AttrStaminaBar
+@onready var _attribute_character_name_label: Label = $%AttrCharNameLabel
+@onready var _attribute_title_label: Label = $%AttrTitleLabel
+@onready var _attribute_strength_label: Label = $%AttrStrLabel
+@onready var _attribute_agility_label: Label = $%AttrAgiLabel
+@onready var _attribute_constitution_label: Label = $%AttrConLabel
+@onready var _attribute_intelligence_label: Label = $%AttrIntLabel
+@onready var _attribute_wisdom_label: Label = $%AttrWisLabel
+@onready var _attribute_charisma_label: Label = $%AttrChaLabel
+@onready var _attribute_health_bar: ProgressBar = $%AttrHpBar
+@onready var _attribute_mana_bar: ProgressBar = $%AttrMpBar
+@onready var _attribute_stamina_bar: ProgressBar = $%AttrStaminaBar
 
 # --- Tab 1: POTENTIAL 潜能加点 ---
-@onready var _pot_points_label: Label = $%PotPointsLabel
-@onready var _pot_mode_option: OptionButton = $%PotModeOption
-@onready var _pot_str_add_btn: Button = $%PotStrAddBtn
-@onready var _pot_str_preview_label: Label = $%PotStrPreviewLabel
-@onready var _pot_agi_add_btn: Button = $%PotAgiAddBtn
-@onready var _pot_agi_preview_label: Label = $%PotAgiPreviewLabel
-@onready var _pot_con_add_btn: Button = $%PotConAddBtn
-@onready var _pot_con_preview_label: Label = $%PotConPreviewLabel
-@onready var _pot_int_add_btn: Button = $%PotIntAddBtn
-@onready var _pot_int_preview_label: Label = $%PotIntPreviewLabel
-@onready var _pot_wis_add_btn: Button = $%PotWisAddBtn
-@onready var _pot_wis_preview_label: Label = $%PotWisPreviewLabel
-@onready var _pot_cha_add_btn: Button = $%PotChaAddBtn
-@onready var _pot_cha_preview_label: Label = $%PotChaPreviewLabel
-@onready var _pot_confirm_btn: Button = $%PotConfirmBtn
-@onready var _pot_reset_btn: Button = $%PotResetBtn
+@onready var _potential_points_label: Label = $%PotPointsLabel
+@onready var _potential_mode_option: OptionButton = $%PotModeOption
+@onready var _potential_strength_add_button: Button = $%PotStrAddBtn
+@onready var _potential_strength_preview_label: Label = $%PotStrPreviewLabel
+@onready var _potential_agility_add_button: Button = $%PotAgiAddBtn
+@onready var _potential_agility_preview_label: Label = $%PotAgiPreviewLabel
+@onready var _potential_constitution_add_button: Button = $%PotConAddBtn
+@onready var _potential_constitution_preview_label: Label = $%PotConPreviewLabel
+@onready var _potential_intelligence_add_button: Button = $%PotIntAddBtn
+@onready var _potential_intelligence_preview_label: Label = $%PotIntPreviewLabel
+@onready var _potential_wisdom_add_button: Button = $%PotWisAddBtn
+@onready var _potential_wisdom_preview_label: Label = $%PotWisPreviewLabel
+@onready var _potential_charisma_add_button: Button = $%PotChaAddBtn
+@onready var _potential_charisma_preview_label: Label = $%PotChaPreviewLabel
+@onready var _potential_confirm_button: Button = $%PotConfirmBtn
+@onready var _potential_reset_button: Button = $%PotResetBtn
 
 # --- Tab 2: VITALITY 生命体质 ---
-@onready var _vit_age_label: Label = $%VitAgeLabel
-@onready var _vit_age_slider: HSlider = $%VitAgeSlider
-@onready var _vit_sf_label: Label = $%VitSfLabel
-@onready var _vit_msf_label: Label = $%VitMsfLabel
-@onready var _vit_hunger_bar: ProgressBar = $%VitHungerBar
-@onready var _vit_energy_bar: ProgressBar = $%VitEnergyBar
+@onready var _vitality_age_label: Label = $%VitAgeLabel
+@onready var _vitality_age_slider: HSlider = $%VitAgeSlider
+@onready var _vitality_somatic_factor_label: Label = $%VitSfLabel
+@onready var _vitality_mental_somatic_factor_label: Label = $%VitMsfLabel
+@onready var _vitality_hunger_bar: ProgressBar = $%VitHungerBar
+@onready var _vitality_energy_bar: ProgressBar = $%VitEnergyBar
 
 # --- Tab 3: SKILL_TREE 技能树 ---
 @onready var _skill_ast_panel: PanelContainer = $%SkillAstPanel
@@ -93,24 +96,24 @@ enum InventoryFilter {ALL, WEAPON, ARMOR, CONSUMABLE, MATERIAL}
 @onready var _skill_detail_label: Label = $%SkillDetailLabel
 
 # --- Tab 4: EQUIPMENT 装备栏 ---
-@onready var _equip_main_hand_btn: Button = $%EquipMainHandBtn
-@onready var _equip_off_hand_btn: Button = $%EquipOffHandBtn
-@onready var _equip_head_btn: Button = $%EquipHeadBtn
-@onready var _equip_chest_btn: Button = $%EquipChestBtn
-@onready var _equip_legs_btn: Button = $%EquipLegsBtn
-@onready var _equip_feet_btn: Button = $%EquipFeetBtn
-@onready var _equip_neck_btn: Button = $%EquipNeckBtn
-@onready var _equip_ring_l_btn: Button = $%EquipRingLBtn
-@onready var _equip_ring_r_btn: Button = $%EquipRingRBtn
-@onready var _equip_detail_name_label: Label = $%EquipDetailNameLabel
-@onready var _equip_detail_rarity_label: Label = $%EquipDetailRarityLabel
-@onready var _equip_affix_label: Label = $%EquipAffixLabel
+@onready var _equipment_main_hand_button: Button = $%EquipMainHandBtn
+@onready var _equipment_off_hand_button: Button = $%EquipOffHandBtn
+@onready var _equipment_head_button: Button = $%EquipHeadBtn
+@onready var _equipment_chest_button: Button = $%EquipChestBtn
+@onready var _equipment_legs_button: Button = $%EquipLegsBtn
+@onready var _equipment_feet_button: Button = $%EquipFeetBtn
+@onready var _equipment_neck_button: Button = $%EquipNeckBtn
+@onready var _equipment_ring_left_button: Button = $%EquipRingLBtn
+@onready var _equipment_ring_right_button: Button = $%EquipRingRBtn
+@onready var _equipment_detail_name_label: Label = $%EquipDetailNameLabel
+@onready var _equipment_detail_rarity_label: Label = $%EquipDetailRarityLabel
+@onready var _equipment_affix_label: Label = $%EquipAffixLabel
 
 # --- Tab 5: INVENTORY 背包 ---
-@onready var _inv_filter_tabs: TabContainer = $%InvFilterTabs
-@onready var _inv_grid_panel: GridContainer = $%InvGridPanel
-@onready var _inv_capacity_label: Label = $%InvCapacityLabel
-@onready var _inv_weight_bar: ProgressBar = $%InvWeightBar
+@onready var _inventory_filter_tabs: TabContainer = $%InvFilterTabs
+@onready var _inventory_grid_panel: GridContainer = $%InvGridPanel
+@onready var _inventory_capacity_label: Label = $%InvCapacityLabel
+@onready var _inventory_weight_bar: ProgressBar = $%InvWeightBar
 
 # --- Tab 6: TITLES 称号 ---
 @onready var _title_equipped_label: Label = $%TitleEquippedLabel
@@ -123,16 +126,16 @@ enum InventoryFilter {ALL, WEAPON, ARMOR, CONSUMABLE, MATERIAL}
 @onready var _lore_achievement_list: ItemList = $%LoreAchievementList
 
 # --- 底部操作栏 ---
-@onready var _back_btn: Button = $%BackBtn
+@onready var _back_button: Button = $%BackBtn
 
 # ==============================================================================
 # 辅助数组与委托控制器
 # ==============================================================================
 
-var _attr_labels: Array[Label] = []
-var _pot_add_btns: Array[Button] = []
-var _pot_preview_labels: Array[Label] = []
-var _equip_slot_btns: Array[Button] = []
+var _attribute_labels: Array[Label] = []
+var _potential_add_buttons: Array[Button] = []
+var _potential_preview_labels: Array[Label] = []
+var _equipment_slot_buttons: Array[Button] = []
 
 var _tabs: CharacterProgressionTabsClass = null
 
@@ -201,7 +204,7 @@ var lore_milestones: Array = []
 var lore_achievements: Array = []
 
 # 当前选中的装备槽索引
-var _selected_equip_slot: int = -1
+var _selected_equipment_slot_index: int = -1
 
 # ==============================================================================
 # 生命周期
@@ -211,10 +214,10 @@ var _selected_equip_slot: int = -1
 func _ready() -> void:
 	_apply_theme()
 
-	_attr_labels = [_attr_str_label, _attr_agi_label, _attr_con_label, _attr_int_label, _attr_wis_label, _attr_cha_label]
-	_pot_add_btns = [_pot_str_add_btn, _pot_agi_add_btn, _pot_con_add_btn, _pot_int_add_btn, _pot_wis_add_btn, _pot_cha_add_btn]
-	_pot_preview_labels = [_pot_str_preview_label, _pot_agi_preview_label, _pot_con_preview_label, _pot_int_preview_label, _pot_wis_preview_label, _pot_cha_preview_label]
-	_equip_slot_btns = [_equip_main_hand_btn, _equip_off_hand_btn, _equip_head_btn, _equip_chest_btn, _equip_legs_btn, _equip_feet_btn, _equip_neck_btn, _equip_ring_l_btn, _equip_ring_r_btn]
+	_attribute_labels = [_attribute_strength_label, _attribute_agility_label, _attribute_constitution_label, _attribute_intelligence_label, _attribute_wisdom_label, _attribute_charisma_label]
+	_potential_add_buttons = [_potential_strength_add_button, _potential_agility_add_button, _potential_constitution_add_button, _potential_intelligence_add_button, _potential_wisdom_add_button, _potential_charisma_add_button]
+	_potential_preview_labels = [_potential_strength_preview_label, _potential_agility_preview_label, _potential_constitution_preview_label, _potential_intelligence_preview_label, _potential_wisdom_preview_label, _potential_charisma_preview_label]
+	_equipment_slot_buttons = [_equipment_main_hand_button, _equipment_off_hand_button, _equipment_head_button, _equipment_chest_button, _equipment_legs_button, _equipment_feet_button, _equipment_neck_button, _equipment_ring_left_button, _equipment_ring_right_button]
 
 	_tabs = _register_owned_subcontroller(_create_tabs_controller()) as CharacterProgressionTabsClass
 	_tabs.setup(self)
@@ -241,53 +244,53 @@ func _ready() -> void:
 
 ## 应用 ThemeManager 单例主题
 func _apply_theme() -> void:
-	var tm := ThemeManager.get_instance()
-	if tm.theme != null:
-		theme = tm.theme
+	var theme_manager := ThemeManager.get_instance()
+	if theme_manager.theme != null:
+		theme = theme_manager.theme
 
 ## 从 domain_boundary 快照服务加载角色快照并补本地 Mock
 func _load_mock_snapshot() -> void:
-	var char_data := MockServiceContainer.get_instance().snapshot_data().load_snapshot("character")
-	if char_data.is_empty():
+	var character_snapshot := MockServiceContainer.get_instance().snapshot_data().load_snapshot("character")
+	if character_snapshot.is_empty():
 		return
 
-	if char_data.has("name"):
-		character_name = char_data["name"]
-	if char_data.has("title"):
-		character_title = char_data["title"]
-	if char_data.has("age_years"):
-		age_years = int(char_data["age_years"])
-	if char_data.has("age_months"):
-		age_months = int(char_data["age_months"])
+	if character_snapshot.has("name"):
+		character_name = character_snapshot["name"]
+	if character_snapshot.has("title"):
+		character_title = character_snapshot["title"]
+	if character_snapshot.has("age_years"):
+		age_years = int(character_snapshot["age_years"])
+	if character_snapshot.has("age_months"):
+		age_months = int(character_snapshot["age_months"])
 
-	if char_data.has("attributes"):
-		var attrs: Dictionary = char_data["attributes"]
-		attributes_base = attrs.duplicate()
-		attributes_preview = attrs.duplicate()
+	if character_snapshot.has("attributes"):
+		var attribute_map: Dictionary = character_snapshot["attributes"]
+		attributes_base = attribute_map.duplicate()
+		attributes_preview = attribute_map.duplicate()
 
-	if char_data.has("potential_points"):
-		available_potential_points = int(char_data["potential_points"])
+	if character_snapshot.has("potential_points"):
+		available_potential_points = int(character_snapshot["potential_points"])
 	unallocated_points_preview = available_potential_points
 
-	if char_data.has("vitality"):
-		var vit: Dictionary = char_data["vitality"]
-		vitality_sf = float(vit.get("sf", 0.72))
-		vitality_msf = float(vit.get("msf", 0.85))
-		vitality_hunger = float(vit.get("hunger", 80.0))
-		vitality_energy = float(vit.get("energy", 65.0))
+	if character_snapshot.has("vitality"):
+		var vitality_map: Dictionary = character_snapshot["vitality"]
+		vitality_sf = float(vitality_map.get("sf", 0.72))
+		vitality_msf = float(vitality_map.get("msf", 0.85))
+		vitality_hunger = float(vitality_map.get("hunger", 80.0))
+		vitality_energy = float(vitality_map.get("energy", 65.0))
 
-	if char_data.has("equipped_slots"):
-		equipped_slots = (char_data["equipped_slots"] as Dictionary).duplicate()
+	if character_snapshot.has("equipped_slots"):
+		equipped_slots = (character_snapshot["equipped_slots"] as Dictionary).duplicate()
 	else:
 		equipped_slots = {
 			"MAIN_HAND": null, "OFF_HAND": null, "HEAD": null, "CHEST": null,
 			"LEGS": null, "FEET": null, "NECK": null, "RING_L": null, "RING_R": null
 		}
 
-	if char_data.has("inventory_count"):
-		inventory_count = int(char_data["inventory_count"])
-	if char_data.has("inventory_max"):
-		inventory_max = int(char_data["inventory_max"])
+	if character_snapshot.has("inventory_count"):
+		inventory_count = int(character_snapshot["inventory_count"])
+	if character_snapshot.has("inventory_max"):
+		inventory_max = int(character_snapshot["inventory_max"])
 
 	if _tabs != null:
 		_tabs._load_mock_supplements()
@@ -336,9 +339,9 @@ func _init_equipment_tab() -> void:
 	if _tabs != null:
 		_tabs._init_equipment_tab()
 
-func _refresh_equipment_detail(slot_idx: int) -> void:
+func _refresh_equipment_detail(slot_index: int) -> void:
 	if _tabs != null:
-		_tabs._refresh_equipment_detail(slot_idx)
+		_tabs._refresh_equipment_detail(slot_index)
 
 func _refresh_equipment_affix() -> void:
 	if _tabs != null:
@@ -371,13 +374,13 @@ func _init_lore_tab() -> void:
 func _connect_signals() -> void:
 	if _tabs != null:
 		_tabs._connect_signals()
-	connect_managed(_back_btn.pressed, _on_back_btn_pressed)
+	connect_managed(_back_button.pressed, _on_back_btn_pressed)
 
 func _on_back_btn_pressed() -> void:
 	self.back()
 
 # ==============================================================================
-# 业务桩方法（保留原 API 供上层与白模单测调用）
+# 兼容公开交互接口（保留原 API 供上层与测试调用）
 # ==============================================================================
 
 ## 切换 Tab
@@ -387,30 +390,30 @@ func switch_tab(tab: TabType) -> void:
 		_main_tab_container.current_tab = int(tab)
 
 ## 设置属性快照（经统一快照入口）
-func set_attributes_snapshot(base_attrs: Dictionary, potential_pts: int) -> void:
-	apply_snapshot({"attributes": base_attrs, "potential_points": potential_pts})
+func set_attributes_snapshot(base_attributes: Dictionary, potential_points: int) -> void:
+	apply_snapshot({"attributes": base_attributes, "potential_points": potential_points})
 
 ## 统一快照渲染映射：基础属性与潜能点 → 视图状态
 func _render_from_snapshot() -> void:
 	if snapshot.has("attributes"):
-		var attrs: Dictionary = FrontendSnapshot.read_dict(snapshot, "attributes")
-		attributes_base = attrs
-		attributes_preview = attrs.duplicate(true)
+		var attribute_map: Dictionary = FrontendSnapshot.read_dict(snapshot, "attributes")
+		attributes_base = attribute_map
+		attributes_preview = attribute_map.duplicate(true)
 	if snapshot.has("potential_points"):
 		available_potential_points = int(snapshot.get("potential_points", available_potential_points))
 		unallocated_points_preview = available_potential_points
 
 ## 潜能加点预览
-func preview_add_point(attr_key: String) -> Dictionary:
-	var result := MockServiceContainer.get_instance().character().preview_add_point(attributes_preview, attr_key, unallocated_points_preview)
-	if not bool(result.get("success", false)):
-		return {"success": false, "reason": str(result.get("reason", "UNKNOWN"))}
-	attributes_preview = result.get("attributes", attributes_preview)
-	unallocated_points_preview = int(result.get("remain", unallocated_points_preview))
+func preview_add_point(attribute_key: String) -> Dictionary:
+	var preview_reply := MockServiceContainer.get_instance().character().preview_add_point(attributes_preview, attribute_key, unallocated_points_preview)
+	if not bool(preview_reply.get("success", false)):
+		return {"success": false, "reason": str(preview_reply.get("reason", "UNKNOWN"))}
+	attributes_preview = preview_reply.get("attributes", attributes_preview)
+	unallocated_points_preview = int(preview_reply.get("remain", unallocated_points_preview))
 	return {
 		"success": true,
-		"attr": str(result.get("attr", attr_key)),
-		"new_val": int(result.get("new_val", 0)),
+		"attr": str(preview_reply.get("attr", attribute_key)),
+		"new_val": int(preview_reply.get("new_val", 0)),
 		"remain": unallocated_points_preview,
 	}
 
@@ -420,7 +423,7 @@ func reset_preview() -> void:
 	unallocated_points_preview = available_potential_points
 
 ## 装备穿脱预览
-func equip_item_preview(slot_name: String, item_data: Dictionary) -> Dictionary:
-	equipped_slots[slot_name] = item_data
+func equip_item_preview(slot_name: String, item_payload: Dictionary) -> Dictionary:
+	equipped_slots[slot_name] = item_payload
 	selected_equip_slot = slot_name
-	return {"success": true, "slot": slot_name, "item": item_data}
+	return {"success": true, "slot": slot_name, "item": item_payload}

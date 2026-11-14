@@ -1,8 +1,14 @@
 # ==============================================================================
-# 卡拉尔世界引擎 (Kalar World Engine) - 前端第4卷: 战斗界面系统子面板与弹窗委托
+# 模块归属: 前端表现层 (Frontend · 第4卷 战斗界面系统子面板与弹窗委托)
 # 文件路径: res://frontend/views/combat_view/combat_subpanels.gd
-# 职责: 承担 CombatView 的首领部位血条、部位破坏详情、结算面板与飘字渲染委托
+# 架构定位: Presentation Sub-Panel & Popup Delegate
+# 依赖与触发: 上游: CombatView
+#           下游: KStatusBarClass, UIIntermediary, DesignTokens | 配置: 无直读
+# 职责说明: 承担 CombatView 的首领部位血条、部位破坏详情、结算面板与飘字标签对象池
+#           渲染委托。
+# 退出语义与设计依据: 表现层弹窗显隐解耦与对象池零堆分配规约 (ADV-PRF-002)
 # ==============================================================================
+## CombatSubpanels：战斗视图首领部位、结算弹窗与飘字对象池子控制器
 class_name CombatSubpanels
 extends BaseScreen
 
@@ -13,13 +19,16 @@ var status_bar: KStatusBar = null
 var _view: Variant = null
 var _floating_label_pool: Array[Label] = []
 
+## 绑定所属战斗主视图控制器
 func setup(view: BaseScreen) -> void:
 	_view = view
 
+## 创建或复用通用状态栏组件
 func create_status_bar(label_key: String = "") -> KStatusBar:
 	status_bar = _ensure_status_bar(status_bar, KStatusBarClass, label_key) as KStatusBar
 	return status_bar
 
+## 初始化战斗子面板与弹窗静态文本
 func init_text() -> void:
 	var view: CombatView = _view
 	var bindings := [
@@ -27,14 +36,15 @@ func init_text() -> void:
 		[view._battle_scene_label, "ui.fe04.battle_scene.placeholder"],
 		[view.get_node_or_null("BossPartsPanel/VBox/PartsTitleLabel"), "ui.fe04.boss.parts_hp_title"],
 		[view.get_node_or_null("SettlementPanel/VBox/RewardsTitle"), "ui.fe04.settlement.rewards_title"],
-		[view._settlement_back_btn, "ui.fe04.settlement.back"],
-		[view._part_break_close_btn, "ui.fe04.part_break.close"],
-		[view._back_btn, "ui.fe04.back"]
+		[view._settlement_back_button, "ui.fe04.settlement.back"],
+		[view._part_break_close_button, "ui.fe04.part_break.close"],
+		[view._back_button, "ui.fe04.back"]
 	]
-	for b in bindings:
-		if b[0] != null:
-			UIIntermediary.resolve(b[0], b[1])
+	for binding_entry in bindings:
+		if binding_entry[0] != null:
+			UIIntermediary.resolve(binding_entry[0], binding_entry[1])
 
+## 按当前首领多部位快照刷新部位血条列表
 func refresh_boss_parts() -> void:
 	var view: CombatView = _view
 	if view._boss_parts_name_label != null:
@@ -48,77 +58,78 @@ func refresh_boss_parts() -> void:
 	var existing_children: Array = view._boss_parts_list.get_children()
 	var parts_count: int = view.boss_parts.size()
 
-	for i in range(parts_count):
-		var part: Variant = view.boss_parts[i]
-		var part_name: String = str(part.get("part_name", "?"))
-		var hp: float = float(part.get("hp", 0.0))
-		var max_hp: float = float(part.get("max_hp", 100.0))
-		var is_broken: bool = bool(part.get("is_broken", false))
+	for part_index in range(parts_count):
+		var part_entry: Variant = view.boss_parts[part_index]
+		var part_name: String = str(part_entry.get("part_name", "?"))
+		var part_health: float = float(part_entry.get("hp", 0.0))
+		var part_max_health: float = float(part_entry.get("max_hp", 100.0))
+		var is_broken: bool = bool(part_entry.get("is_broken", false))
 
-		var row: HBoxContainer
-		if i < existing_children.size():
-			row = existing_children[i] as HBoxContainer
-			row.visible = true
+		var part_row: HBoxContainer
+		if part_index < existing_children.size():
+			part_row = existing_children[part_index] as HBoxContainer
+			part_row.visible = true
 		else:
-			row = _create_boss_part_row()
-			view._boss_parts_list.add_child(row)
+			part_row = _create_boss_part_row()
+			view._boss_parts_list.add_child(part_row)
 
-		_update_boss_part_row(row, part_name, hp, max_hp, is_broken)
+		_update_boss_part_row(part_row, part_name, part_health, part_max_health, is_broken)
 
-	for i in range(parts_count, existing_children.size()):
-		var child := existing_children[i] as CanvasItem
-		if child != null:
-			child.visible = false
+	for extra_index in range(parts_count, existing_children.size()):
+		var extra_row := existing_children[extra_index] as CanvasItem
+		if extra_row != null:
+			extra_row.visible = false
 
 func _create_boss_part_row() -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_BEGIN
-	row.set("theme_override_constants/separation", 6)
+	var part_row := HBoxContainer.new()
+	part_row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	part_row.set("theme_override_constants/separation", 6)
 
-	var name_lbl := Label.new()
-	name_lbl.add_theme_font_size_override("font_size", 11)
-	name_lbl.custom_minimum_size = Vector2(80, 0)
-	row.add_child(name_lbl)
+	var name_label := Label.new()
+	name_label.add_theme_font_size_override("font_size", 11)
+	name_label.custom_minimum_size = Vector2(80, 0)
+	part_row.add_child(name_label)
 
-	var bar: ProgressBar = KStatusBarClass.create_bar(0.0, 100.0)
-	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(bar)
+	var health_bar: ProgressBar = KStatusBarClass.create_bar(0.0, 100.0)
+	health_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	part_row.add_child(health_bar)
 
-	var status_lbl := Label.new()
-	status_lbl.add_theme_font_size_override("font_size", 11)
-	status_lbl.custom_minimum_size = Vector2(24, 0)
-	row.add_child(status_lbl)
+	var status_label := Label.new()
+	status_label.add_theme_font_size_override("font_size", 11)
+	status_label.custom_minimum_size = Vector2(24, 0)
+	part_row.add_child(status_label)
 
-	connect_managed(row.gui_input, _on_boss_part_gui_input.bind(row))
-	return row
+	connect_managed(part_row.gui_input, _on_boss_part_gui_input.bind(part_row))
+	return part_row
 
-func _update_boss_part_row(row: HBoxContainer, part_name: String, hp: float, max_hp: float, is_broken: bool) -> void:
-	row.set_meta("part_name", part_name)
-	row.set_meta("is_broken", is_broken)
+func _update_boss_part_row(part_row: HBoxContainer, part_name: String, part_health: float, part_max_health: float, is_broken: bool) -> void:
+	part_row.set_meta("part_name", part_name)
+	part_row.set_meta("is_broken", is_broken)
 
-	var name_lbl := row.get_child(0) as Label
-	var bar := row.get_child(1) as ProgressBar
-	var status_lbl := row.get_child(2) as Label
+	var name_label := part_row.get_child(0) as Label
+	var health_bar := part_row.get_child(1) as ProgressBar
+	var status_label := part_row.get_child(2) as Label
 
-	if name_lbl != null:
-		name_lbl.text = part_name
-		name_lbl.modulate = DesignTokens.COLOR_DISABLED_DIM if is_broken else Color.WHITE
+	if name_label != null:
+		name_label.text = part_name
+		name_label.modulate = DesignTokens.COLOR_DISABLED_DIM if is_broken else Color.WHITE
 
-	if bar != null:
-		KStatusBarClass.refresh_bar(bar, null, hp, max_hp)
-		bar.modulate = DesignTokens.COLOR_DISABLED_DIM if is_broken else Color.WHITE
+	if health_bar != null:
+		KStatusBarClass.refresh_bar(health_bar, null, part_health, part_max_health)
+		health_bar.modulate = DesignTokens.COLOR_DISABLED_DIM if is_broken else Color.WHITE
 
-	if status_lbl != null:
-		status_lbl.text = UIIntermediary.text("ui.fe04.part.status_broken") if is_broken else UIIntermediary.text("ui.fe04.part.status_intact")
-		status_lbl.add_theme_color_override("font_color",
+	if status_label != null:
+		status_label.text = UIIntermediary.text("ui.fe04.part.status_broken") if is_broken else UIIntermediary.text("ui.fe04.part.status_intact")
+		status_label.add_theme_color_override("font_color",
 			DesignTokens.COLOR_DANGER_DEFAULT if is_broken else DesignTokens.COLOR_SUCCESS_DEFAULT)
 
-func _on_boss_part_gui_input(event: InputEvent, row: HBoxContainer) -> void:
+func _on_boss_part_gui_input(event: InputEvent, part_row: HBoxContainer) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		var part_name: String = str(row.get_meta("part_name", ""))
-		var is_broken: bool = bool(row.get_meta("is_broken", false))
+		var part_name: String = str(part_row.get_meta("part_name", ""))
+		var is_broken: bool = bool(part_row.get_meta("is_broken", false))
 		show_part_break_detail(part_name, is_broken)
 
+## 展示指定首领部位的破坏详情弹窗
 func show_part_break_detail(part_name: String, is_broken: bool) -> void:
 	var view: CombatView = _view
 	if view._part_break_name_label != null:
@@ -141,10 +152,12 @@ func show_part_break_detail(part_name: String, is_broken: bool) -> void:
 	if view._part_break_panel != null:
 		view._part_break_panel.visible = true
 
+## 关闭部位破坏详情弹窗
 func hide_part_break_detail() -> void:
 	if _view._part_break_panel != null:
 		_view._part_break_panel.visible = false
 
+## 展示战斗结算面板并同步胜负、金币、经验、掉落物与MVP
 func show_settlement() -> void:
 	var view: CombatView = _view
 	if view.is_victory:
@@ -166,58 +179,60 @@ func show_settlement() -> void:
 	UIIntermediary.resolve(view._settlement_time_label, "ui.fe04.settlement.time", {"duration": view.battle_duration_sec})
 	view._settlement_panel.visible = true
 
+## 隐藏战斗结算面板
 func hide_settlement() -> void:
 	if _view._settlement_panel != null:
 		_view._settlement_panel.visible = false
 
-func spawn_floating_label(dto: CombatFloatingTextDTO) -> void:
+## 从飘字池取出标签并播放上浮淡出补间动画
+func spawn_floating_label(floating_entry: CombatFloatingTextDTO) -> void:
 	var view: CombatView = _view
 	if not view._floating_text_layer:
 		return
-	var lbl := _acquire_floating_label(view._floating_text_layer)
-	var prev_tw: Variant = lbl.get_meta("_active_tween", null)
-	if prev_tw is Tween and (prev_tw as Tween).is_valid():
-		(prev_tw as Tween).kill()
+	var floating_label := _acquire_floating_label(view._floating_text_layer)
+	var previous_tween: Variant = floating_label.get_meta("_active_tween", null)
+	if previous_tween is Tween and (previous_tween as Tween).is_valid():
+		(previous_tween as Tween).kill()
 
-	var prefix: String = "+" if dto.is_heal else "-"
-	var color: Color = DesignTokens.COLOR_SUCCESS_DEFAULT if dto.is_heal else DesignTokens.COLOR_DANGER_DEFAULT
-	if dto.is_crit:
+	var prefix: String = "+" if floating_entry.is_heal else "-"
+	var color: Color = DesignTokens.COLOR_SUCCESS_DEFAULT if floating_entry.is_heal else DesignTokens.COLOR_DANGER_DEFAULT
+	if floating_entry.is_crit:
 		prefix = UIIntermediary.text("ui.fe04.floating.crit")
 		color = DesignTokens.COLOR_WARNING_DEFAULT
-		lbl.add_theme_font_size_override("font_size", 28)
+		floating_label.add_theme_font_size_override("font_size", 28)
 	else:
-		lbl.add_theme_font_size_override("font_size", 20)
-	lbl.text = "%s%d" % [prefix, int(dto.amount)]
-	lbl.add_theme_color_override("font_color", color)
-	lbl.modulate = Color.WHITE
-	var local_pos: Vector2 = view._floating_text_layer.get_global_transform().affine_inverse() * dto.world_pos
-	lbl.position = local_pos
-	lbl.visible = true
-	var tween: Tween = view.create_tween()
-	lbl.set_meta("_active_tween", tween)
-	tween.set_parallel(true)
-	tween.tween_property(lbl, "position:y", lbl.position.y - 60.0, dto.lifetime)
-	tween.tween_property(lbl, "modulate:a", 0.0, dto.lifetime)
-	tween.chain().tween_callback(_recycle_floating_label.bind(lbl))
+		floating_label.add_theme_font_size_override("font_size", 20)
+	floating_label.text = "%s%d" % [prefix, int(floating_entry.amount)]
+	floating_label.add_theme_color_override("font_color", color)
+	floating_label.modulate = Color.WHITE
+	var local_position: Vector2 = view._floating_text_layer.get_global_transform().affine_inverse() * floating_entry.world_pos
+	floating_label.position = local_position
+	floating_label.visible = true
+	var fade_tween: Tween = view.create_tween()
+	floating_label.set_meta("_active_tween", fade_tween)
+	fade_tween.set_parallel(true)
+	fade_tween.tween_property(floating_label, "position:y", floating_label.position.y - 60.0, floating_entry.lifetime)
+	fade_tween.tween_property(floating_label, "modulate:a", 0.0, floating_entry.lifetime)
+	fade_tween.chain().tween_callback(_recycle_floating_label.bind(floating_label))
 
-func _acquire_floating_label(layer: Control) -> Label:
+func _acquire_floating_label(parent_layer: Control) -> Label:
 	while not _floating_label_pool.is_empty():
-		var reused: Label = _floating_label_pool.pop_back()
-		if reused != null and is_instance_valid(reused):
-			return reused
-	var lbl := Label.new()
-	lbl.add_theme_color_override("font_outline_color", DesignTokens.COLOR_TEXT_OUTLINE)
-	lbl.add_theme_constant_override("outline_size", 3)
-	lbl.z_index = 100
-	layer.add_child(lbl)
-	return lbl
+		var reused_label: Label = _floating_label_pool.pop_back()
+		if reused_label != null and is_instance_valid(reused_label):
+			return reused_label
+	var floating_label := Label.new()
+	floating_label.add_theme_color_override("font_outline_color", DesignTokens.COLOR_TEXT_OUTLINE)
+	floating_label.add_theme_constant_override("outline_size", 3)
+	floating_label.z_index = 100
+	parent_layer.add_child(floating_label)
+	return floating_label
 
-func _recycle_floating_label(lbl: Label) -> void:
-	if lbl == null or not is_instance_valid(lbl):
+func _recycle_floating_label(floating_label: Label) -> void:
+	if floating_label == null or not is_instance_valid(floating_label):
 		return
-	lbl.set_meta("_active_tween", null)
-	lbl.visible = false
+	floating_label.set_meta("_active_tween", null)
+	floating_label.visible = false
 	if _floating_label_pool.size() < MAX_FLOATING_LABEL_POOL:
-		_floating_label_pool.append(lbl)
+		_floating_label_pool.append(floating_label)
 	else:
-		lbl.queue_free()
+		floating_label.queue_free()
