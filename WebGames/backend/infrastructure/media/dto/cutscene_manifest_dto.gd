@@ -35,6 +35,7 @@ var tags: Array[String] = []
 # 二、序列化与装配
 # ==============================================================================
 
+## 序列化为纯字典结构
 func to_dict() -> Dictionary:
 	return {
 		"cutscene_id": cutscene_id,
@@ -52,28 +53,29 @@ func to_dict() -> Dictionary:
 		"tags": tags.duplicate()
 	}
 
-static func from_dict(d: Dictionary) -> CutsceneManifestDTO:
+## 从输入字典安全反序列化并装配过场清单 DTO
+static func from_dict(data: Dictionary) -> CutsceneManifestDTO:
 	var manifest := CutsceneManifestDTO.new()
-	if d.is_empty():
+	if data.is_empty():
 		return manifest
 
-	manifest.cutscene_id = str(d.get("cutscene_id", ""))
-	manifest.mod_id = str(d.get("mod_id", ""))
-	manifest.title_key = str(d.get("title_key", ""))
-	manifest.video_resource_path = str(d.get("video_resource_path", ""))
-	manifest.duration_sec = float(d.get("duration_sec", 3.0))
-	manifest.default_audio_bus = str(d.get("default_audio_bus", "BGM"))
-	manifest.default_volume_linear = float(d.get("default_volume_linear", 1.0))
-	manifest.subtitles_track_id = str(d.get("subtitles_track_id", ""))
-	manifest.default_skippable = bool(d.get("default_skippable", true))
-	manifest.is_placeholder = bool(d.get("is_placeholder", false))
-	manifest.placeholder_title = str(d.get("placeholder_title", ""))
-	manifest.placeholder_text = str(d.get("placeholder_text", ""))
+	manifest.cutscene_id = str(data.get("cutscene_id", ""))
+	manifest.mod_id = str(data.get("mod_id", ""))
+	manifest.title_key = str(data.get("title_key", ""))
+	manifest.video_resource_path = str(data.get("video_resource_path", ""))
+	manifest.duration_sec = float(data.get("duration_sec", 3.0))
+	manifest.default_audio_bus = str(data.get("default_audio_bus", "BGM"))
+	manifest.default_volume_linear = float(data.get("default_volume_linear", 1.0))
+	manifest.subtitles_track_id = str(data.get("subtitles_track_id", ""))
+	manifest.default_skippable = bool(data.get("default_skippable", true))
+	manifest.is_placeholder = bool(data.get("is_placeholder", false))
+	manifest.placeholder_title = str(data.get("placeholder_title", ""))
+	manifest.placeholder_text = str(data.get("placeholder_text", ""))
 
 	manifest.tags.clear()
-	var raw_tags: Variant = d.get("tags", [])
+	var raw_tags: Variant = data.get("tags", [])
 	if raw_tags is Array:
-		for t in (raw_tags as Array):
-			manifest.tags.append(str(t))
+		for raw_tag in (raw_tags as Array):
+			manifest.tags.append(str(raw_tag))
 
 	return manifest

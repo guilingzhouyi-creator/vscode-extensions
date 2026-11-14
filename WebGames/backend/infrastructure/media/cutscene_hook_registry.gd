@@ -41,6 +41,7 @@ var _viewed_records: Dictionary = {} # cutscene_id -> bool
 # 二、单例与初始化
 # ==============================================================================
 
+## 获取过场 Hook 注册表进程级单例
 static func get_instance() -> CutsceneHookRegistry:
 	if _instance == null:
 		_instance = CutsceneHookRegistry.new()
@@ -52,36 +53,36 @@ func initialize_from_config() -> void:
 	_clear_hook_indices()
 
 	# 1. 载入资产清单
-	var reg_data: Dictionary = GameConfig.get_dict("infrastructure.cutscene_registry", "cutscenes", {})
-	for cs_id in reg_data.keys():
-		var item: Dictionary = reg_data[cs_id]
-		_manifests[str(cs_id)] = _build_manifest_dto(str(cs_id), item)
+	var registry_data: Dictionary = GameConfig.get_dict("infrastructure.cutscene_registry", "cutscenes", {})
+	for cutscene_id in registry_data.keys():
+		var item: Dictionary = registry_data[cutscene_id]
+		_manifests[str(cutscene_id)] = _build_manifest_dto(str(cutscene_id), item)
 
 	# 2. 载入 Hook 规则
-	var hooks_arr: Array = GameConfig.get_array("infrastructure.cutscene_hooks", "hooks", [])
-	for h in hooks_arr:
-		if h is Dictionary:
-			_append_and_index_hook(h as Dictionary)
+	var hooks_array: Array = GameConfig.get_array("infrastructure.cutscene_hooks", "hooks", [])
+	for hook_item in hooks_array:
+		if hook_item is Dictionary:
+			_append_and_index_hook(hook_item as Dictionary)
 
-func _build_manifest_dto(cs_id: String, item: Dictionary) -> CutsceneManifestDTO:
-	var m := CutsceneManifestDTOClass.new()
-	m.cutscene_id = cs_id
-	m.title_key = str(item.get("title_key", ""))
-	m.video_resource_path = str(item.get("video_resource_path", ""))
-	m.duration_sec = float(item.get("duration_sec", 3.0))
-	m.default_audio_bus = str(item.get("default_audio_bus", "BGM"))
-	m.default_volume_linear = float(item.get("default_volume_linear", 1.0))
-	m.subtitles_track_id = str(item.get("subtitles_track_id", ""))
-	m.default_skippable = bool(item.get("default_skippable", true))
-	m.is_placeholder = bool(item.get("is_placeholder", false))
-	m.placeholder_title = str(item.get("placeholder_title", ""))
-	m.placeholder_text = str(item.get("placeholder_text", ""))
+func _build_manifest_dto(cutscene_id: String, item: Dictionary) -> CutsceneManifestDTO:
+	var manifest := CutsceneManifestDTOClass.new()
+	manifest.cutscene_id = cutscene_id
+	manifest.title_key = str(item.get("title_key", ""))
+	manifest.video_resource_path = str(item.get("video_resource_path", ""))
+	manifest.duration_sec = float(item.get("duration_sec", 3.0))
+	manifest.default_audio_bus = str(item.get("default_audio_bus", "BGM"))
+	manifest.default_volume_linear = float(item.get("default_volume_linear", 1.0))
+	manifest.subtitles_track_id = str(item.get("subtitles_track_id", ""))
+	manifest.default_skippable = bool(item.get("default_skippable", true))
+	manifest.is_placeholder = bool(item.get("is_placeholder", false))
+	manifest.placeholder_title = str(item.get("placeholder_title", ""))
+	manifest.placeholder_text = str(item.get("placeholder_text", ""))
 
 	var raw_tags: Variant = item.get("tags", [])
 	if raw_tags is Array:
-		for t in (raw_tags as Array):
-			m.tags.append(str(t))
-	return m
+		for raw_tag in (raw_tags as Array):
+			manifest.tags.append(str(raw_tag))
+	return manifest
 
 func _append_and_index_hook(raw_hook: Dictionary) -> void:
 	var copied := raw_hook.duplicate(true)
@@ -92,19 +93,23 @@ func _append_and_index_hook(raw_hook: Dictionary) -> void:
 # 三、动态注册与重载接口 (支持 MOD 开发者热扩展)
 # ==============================================================================
 
+## 动态注册或覆写过场动画静态清单条目
 func register_manifest(manifest: CutsceneManifestDTO) -> void:
 	if manifest != null and not manifest.cutscene_id.is_empty():
 		_manifests[manifest.cutscene_id] = manifest
 
+## 按过场标识查询已注册的静态清单条目
 func get_manifest(cutscene_id: String) -> CutsceneManifestDTO:
 	return _manifests.get(cutscene_id, null)
 
+## 动态注册并索引一条过场触发 Hook 规则
 func register_hook(hook_dict: Dictionary) -> void:
 	if not hook_dict.is_empty():
 		var copied := hook_dict.duplicate(true)
 		_hooks.append(copied)
 		_index_hook(copied)
 
+## 清空静态清单、Hook 索引与已观看记录（供测试隔离重置）
 func clear_for_tests() -> void:
 	_manifests.clear()
 	_clear_hook_indices()
@@ -128,13 +133,13 @@ func _index_hook(hook_dict: Dictionary) -> void:
 			if not _narrative_hooks_index.has(key):
 				_narrative_hooks_index[key] = hook_dict
 		TRIGGER_QUEST_STAGE_REACHED:
-			var q_key := "%s|%s" % [str(filter.get("quest_id", "")), str(filter.get("stage_id", ""))]
-			if not _quest_hooks_index.has(q_key):
-				_quest_hooks_index[q_key] = hook_dict
+			var quest_key := "%s|%s" % [str(filter.get("quest_id", "")), str(filter.get("stage_id", ""))]
+			if not _quest_hooks_index.has(quest_key):
+				_quest_hooks_index[quest_key] = hook_dict
 		TRIGGER_LIFECYCLE_STAGE_ENTERED:
-			var l_key := str(filter.get("stage_id", ""))
-			if not _lifecycle_hooks_index.has(l_key):
-				_lifecycle_hooks_index[l_key] = hook_dict
+			var lifecycle_key := str(filter.get("stage_id", ""))
+			if not _lifecycle_hooks_index.has(lifecycle_key):
+				_lifecycle_hooks_index[lifecycle_key] = hook_dict
 
 # ==============================================================================
 # 四、Hook 规则匹配与参数解算
@@ -144,91 +149,93 @@ func _index_hook(hook_dict: Dictionary) -> void:
 func match_narrative_hook(dag_id: String, node_id: String, is_pre: bool) -> CutsceneRequestDTO:
 	var expected_type: String = TRIGGER_NARRATIVE_NODE_PRE if is_pre else TRIGGER_NARRATIVE_NODE_POST
 	var key := "%s|%s|%s" % [expected_type, dag_id, node_id]
-	var h: Variant = _narrative_hooks_index.get(key, null)
-	return _assemble_request_from_hook(h as Dictionary) if h is Dictionary else null
+	var hook_entry: Variant = _narrative_hooks_index.get(key, null)
+	return _assemble_request_from_hook(hook_entry as Dictionary) if hook_entry is Dictionary else null
 
 ## 匹配任务阶段达成 Hook (O(1) 哈希索引检索)
 func match_quest_hook(quest_id: String, stage_id: String) -> CutsceneRequestDTO:
-	var q_key := "%s|%s" % [quest_id, stage_id]
-	var h: Variant = _quest_hooks_index.get(q_key, null)
-	return _assemble_request_from_hook(h as Dictionary) if h is Dictionary else null
+	var quest_key := "%s|%s" % [quest_id, stage_id]
+	var hook_entry: Variant = _quest_hooks_index.get(quest_key, null)
+	return _assemble_request_from_hook(hook_entry as Dictionary) if hook_entry is Dictionary else null
 
 ## 匹配生命周期阶段 Hook (O(1) 哈希索引检索)
 func match_lifecycle_hook(stage_id: String) -> CutsceneRequestDTO:
-	var h: Variant = _lifecycle_hooks_index.get(stage_id, null)
-	return _assemble_request_from_hook(h as Dictionary) if h is Dictionary else null
+	var hook_entry: Variant = _lifecycle_hooks_index.get(stage_id, null)
+	return _assemble_request_from_hook(hook_entry as Dictionary) if hook_entry is Dictionary else null
 
 ## 基于 cutscene_id 构造参数化调用信封（支持外部显式覆盖参数）
 func resolve_request(cutscene_id: String, override_params: Dictionary = {}) -> CutsceneRequestDTO:
-	var req := CutsceneRequestDTOClass.new()
-	req.cutscene_id = cutscene_id
+	var request_dto := CutsceneRequestDTOClass.new()
+	request_dto.cutscene_id = cutscene_id
 
 	var manifest: CutsceneManifestDTO = _manifests.get(cutscene_id, null)
 	if manifest != null:
-		req.video_path = AssetPathResolverClass.resolve_unified_uri(manifest.video_resource_path, manifest.mod_id)
-		req.subtitles_track_id = manifest.subtitles_track_id
-		req.audio_bus = manifest.default_audio_bus
-		req.volume_linear = manifest.default_volume_linear
-		req.skippable = manifest.default_skippable
-		req.duration_sec = manifest.duration_sec
-		req.is_placeholder = manifest.is_placeholder
-		req.placeholder_title = manifest.placeholder_title if not manifest.placeholder_title.is_empty() else manifest.title_key
-		req.placeholder_text = manifest.placeholder_text
+		request_dto.video_path = AssetPathResolverClass.resolve_unified_uri(manifest.video_resource_path, manifest.mod_id)
+		request_dto.subtitles_track_id = manifest.subtitles_track_id
+		request_dto.audio_bus = manifest.default_audio_bus
+		request_dto.volume_linear = manifest.default_volume_linear
+		request_dto.skippable = manifest.default_skippable
+		request_dto.duration_sec = manifest.duration_sec
+		request_dto.is_placeholder = manifest.is_placeholder
+		request_dto.placeholder_title = manifest.placeholder_title if not manifest.placeholder_title.is_empty() else manifest.title_key
+		request_dto.placeholder_text = manifest.placeholder_text
 
 	# 应用覆盖参数
 	if override_params.has("video_path"):
-		req.video_path = AssetPathResolverClass.resolve_unified_uri(str(override_params["video_path"]))
+		request_dto.video_path = AssetPathResolverClass.resolve_unified_uri(str(override_params["video_path"]))
 	if override_params.has("skippable"):
-		req.skippable = bool(override_params["skippable"])
+		request_dto.skippable = bool(override_params["skippable"])
 	if override_params.has("skip_hold_duration_sec"):
-		req.skip_hold_duration_sec = float(override_params["skip_hold_duration_sec"])
+		request_dto.skip_hold_duration_sec = float(override_params["skip_hold_duration_sec"])
 	if override_params.has("subtitles_track_id"):
-		req.subtitles_track_id = str(override_params["subtitles_track_id"])
+		request_dto.subtitles_track_id = str(override_params["subtitles_track_id"])
 	if override_params.has("audio_bus"):
-		req.audio_bus = str(override_params["audio_bus"])
+		request_dto.audio_bus = str(override_params["audio_bus"])
 	if override_params.has("volume_linear"):
-		req.volume_linear = float(override_params["volume_linear"])
+		request_dto.volume_linear = float(override_params["volume_linear"])
 	if override_params.has("fade_in_sec"):
-		req.fade_in_sec = float(override_params["fade_in_sec"])
+		request_dto.fade_in_sec = float(override_params["fade_in_sec"])
 	if override_params.has("fade_out_sec"):
-		req.fade_out_sec = float(override_params["fade_out_sec"])
+		request_dto.fade_out_sec = float(override_params["fade_out_sec"])
 	if override_params.has("auto_pause_world"):
-		req.auto_pause_world = bool(override_params["auto_pause_world"])
+		request_dto.auto_pause_world = bool(override_params["auto_pause_world"])
 	if override_params.has("hide_hud"):
-		req.hide_hud = bool(override_params["hide_hud"])
+		request_dto.hide_hud = bool(override_params["hide_hud"])
 	if override_params.has("play_once_per_save"):
-		req.play_once_per_save = bool(override_params["play_once_per_save"])
+		request_dto.play_once_per_save = bool(override_params["play_once_per_save"])
 	if override_params.has("duration_sec"):
-		req.duration_sec = float(override_params["duration_sec"])
+		request_dto.duration_sec = float(override_params["duration_sec"])
 	if override_params.has("is_placeholder"):
-		req.is_placeholder = bool(override_params["is_placeholder"])
+		request_dto.is_placeholder = bool(override_params["is_placeholder"])
 	if override_params.has("placeholder_title"):
-		req.placeholder_title = str(override_params["placeholder_title"])
+		request_dto.placeholder_title = str(override_params["placeholder_title"])
 	if override_params.has("placeholder_text"):
-		req.placeholder_text = str(override_params["placeholder_text"])
+		request_dto.placeholder_text = str(override_params["placeholder_text"])
 	if override_params.has("skip_prompt_text"):
-		req.skip_prompt_text = str(override_params["skip_prompt_text"])
+		request_dto.skip_prompt_text = str(override_params["skip_prompt_text"])
 
-	return req
+	return request_dto
 
 func _assemble_request_from_hook(hook_dict: Dictionary) -> CutsceneRequestDTO:
-	var cs_id: String = str(hook_dict.get("cutscene_id", ""))
+	var cutscene_id: String = str(hook_dict.get("cutscene_id", ""))
 	var overrides: Dictionary = hook_dict.get("override_params", {})
 
 	# 防重复播放判定
 	var play_once: bool = bool(overrides.get("play_once_per_save", false))
-	if play_once and is_cutscene_viewed(cs_id):
+	if play_once and is_cutscene_viewed(cutscene_id):
 		return null
 
-	return resolve_request(cs_id, overrides)
+	return resolve_request(cutscene_id, overrides)
 
 # ==============================================================================
 # 五、播放记录与状态守卫
 # ==============================================================================
 
+## 标记指定过场动画在本存档会话内已播放（用于 play_once_per_save 去重）
 func mark_cutscene_viewed(cutscene_id: String) -> void:
 	if not cutscene_id.is_empty():
 		_viewed_records[cutscene_id] = true
 
+## 查询指定过场动画是否已标记为播放过
 func is_cutscene_viewed(cutscene_id: String) -> bool:
 	return _viewed_records.get(cutscene_id, false)

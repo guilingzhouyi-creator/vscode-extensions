@@ -18,6 +18,7 @@ const CutsceneRequestDTOClass = preload("res://backend/infrastructure/media/dto/
 
 static var _instance: CutscenePreloadPredictor = null
 
+## 获取前向拓扑过场预加载预测器进程级单例
 static func get_instance() -> CutscenePreloadPredictor:
 	if _instance == null:
 		_instance = CutscenePreloadPredictor.new()
@@ -34,16 +35,16 @@ func predict_and_preload_downstream(dag_id: String, candidate_next_node_ids: Arr
 
 	for next_node_id in candidate_next_node_ids:
 		# 尝试探测下游节点是否有前置或后置 CG Hook
-		var pre_req: CutsceneRequestDTO = registry.match_narrative_hook(dag_id, next_node_id, true)
-		if pre_req != null and not pre_req.video_path.is_empty():
-			if not loader.is_resource_ready(pre_req.video_path):
-				loader.request_load(pre_req.video_path, pre_req.preload_priority)
+		var pre_hook_request: CutsceneRequestDTO = registry.match_narrative_hook(dag_id, next_node_id, true)
+		if pre_hook_request != null and not pre_hook_request.video_path.is_empty():
+			if not loader.is_resource_ready(pre_hook_request.video_path):
+				loader.request_load(pre_hook_request.video_path, pre_hook_request.preload_priority)
 				preloaded_count += 1
 
-		var post_req: CutsceneRequestDTO = registry.match_narrative_hook(dag_id, next_node_id, false)
-		if post_req != null and not post_req.video_path.is_empty():
-			if not loader.is_resource_ready(post_req.video_path):
-				loader.request_load(post_req.video_path, post_req.preload_priority)
+		var post_hook_request: CutsceneRequestDTO = registry.match_narrative_hook(dag_id, next_node_id, false)
+		if post_hook_request != null and not post_hook_request.video_path.is_empty():
+			if not loader.is_resource_ready(post_hook_request.video_path):
+				loader.request_load(post_hook_request.video_path, post_hook_request.preload_priority)
 				preloaded_count += 1
 
 	return preloaded_count

@@ -30,6 +30,7 @@ var _active_request: CutsceneRequestDTO = null
 # 一、单例与状态初始化
 # ==============================================================================
 
+## 获取过场播放编排器进程级单例
 static func get_instance() -> CutsceneOrchestrator:
 	if _instance == null:
 		_instance = CutsceneOrchestrator.new()
@@ -39,9 +40,11 @@ func _init() -> void:
 	_current_state = CutscenePlaybackStateDTOClass.new()
 	_current_state.state = CutscenePlaybackStateDTOClass.PlaybackState.IDLE
 
+## 获取当前过场播放实时状态快照 DTO
 func get_playback_state() -> CutscenePlaybackStateDTO:
 	return _current_state
 
+## 查询当前是否处于过场缓冲或播放进行中
 func is_playing() -> bool:
 	return _current_state.state == CutscenePlaybackStateDTOClass.PlaybackState.PLAYING \
 		or _current_state.state == CutscenePlaybackStateDTOClass.PlaybackState.BUFFERING
@@ -53,25 +56,26 @@ func is_playing() -> bool:
 ## 通过 CG 语义标识符快速播放（主线程一键调用入口，形参 <= 5）
 func play_by_id(cutscene_id: String, override_params: Dictionary = {}) -> Dictionary:
 	var registry := CutsceneHookRegistryClass.get_instance()
-	var req := registry.resolve_request(cutscene_id, override_params)
-	if req == null:
+	var request := registry.resolve_request(cutscene_id, override_params)
+	if request == null:
 		return {"success": false, "error_code": "RESOLVE_FAILED"}
-	return play_cutscene(req)
+	return play_cutscene(request)
 
 ## 通过通用字典解析并播放（纯通用解析入口，支持 MOD/网络/动态配置派发）
 func parse_and_play(payload: Dictionary) -> Dictionary:
-	var req := CutsceneRequestDTOClass.from_dict(payload)
-	return play_cutscene(req)
+	var request := CutsceneRequestDTOClass.from_dict(payload)
+	return play_cutscene(request)
 
 ## 启动播放流程（支持参数化请求信封与文字演播优雅降级）
-func play_cutscene(req: CutsceneRequestDTO) -> Dictionary:
-	if req == null or req.cutscene_id.is_empty():
+func play_cutscene(request: CutsceneRequestDTO) -> Dictionary:
+	if request == null or request.cutscene_id.is_empty():
 		return {"success": false, "error_code": "INVALID_REQUEST"}
 
 	if is_playing():
 		return {"success": false, "error_code": "CUTSCENE_ALREADY_PLAYING"}
 
-	_active_request = req.duplicate_request()
+	# 拷贝请求信封后再用 manifest 补全，避免修改调用方持有的原始 DTO 实例
+	_active_request = request.duplicate_request()
 
 	_enrich_request_from_manifest(_active_request)
 
@@ -97,67 +101,67 @@ func play_cutscene(req: CutsceneRequestDTO) -> Dictionary:
 		"duration_sec": effective_duration
 	}
 
-func _enrich_request_from_manifest(req: CutsceneRequestDTO) -> void:
+func _enrich_request_from_manifest(request: CutsceneRequestDTO) -> void:
 	var registry := CutsceneHookRegistryClass.get_instance()
-	var manifest: CutsceneManifestDTO = registry.get_manifest(req.cutscene_id)
+	var manifest: CutsceneManifestDTO = registry.get_manifest(request.cutscene_id)
 	if manifest == null:
 		return
 
-	if req.video_path.is_empty() and not manifest.video_resource_path.is_empty():
-		req.video_path = AssetPathResolverClass.resolve_unified_uri(manifest.video_resource_path, manifest.mod_id)
-	if req.placeholder_title.is_empty():
-		req.placeholder_title = manifest.placeholder_title if not manifest.placeholder_title.is_empty() else manifest.title_key
-	if req.placeholder_text.is_empty():
-		req.placeholder_text = manifest.placeholder_text
-	if req.duration_sec <= 0.0 or is_equal_approx(req.duration_sec, 3.0):
+	if request.video_path.is_empty() and not manifest.video_resource_path.is_empty():
+		request.video_path = AssetPathResolverClass.resolve_unified_uri(manifest.video_resource_path, manifest.mod_id)
+	if request.placeholder_title.is_empty():
+		request.placeholder_title = manifest.placeholder_title if not manifest.placeholder_title.is_empty() else manifest.title_key
+	if request.placeholder_text.is_empty():
+		request.placeholder_text = manifest.placeholder_text
+	if request.duration_sec <= 0.0 or is_equal_approx(request.duration_sec, 3.0):
 		if manifest.duration_sec > 0.0:
-			req.duration_sec = manifest.duration_sec
+			request.duration_sec = manifest.duration_sec
 	if manifest.is_placeholder:
-		req.is_placeholder = true
+		request.is_placeholder = true
 
-func _prepare_playback_state(req: CutsceneRequestDTO, duration: float) -> void:
-	_current_state.cutscene_id = req.cutscene_id
+func _prepare_playback_state(request: CutsceneRequestDTO, duration: float) -> void:
+	_current_state.cutscene_id = request.cutscene_id
 	_current_state.current_time_sec = 0.0
 	_current_state.total_duration_sec = duration
 	_current_state.progress_ratio = 0.0
 	_current_state.active_subtitle_text = ""
 	_current_state.error_message = ""
 
-	if req.play_once_per_save:
-		CutsceneHookRegistryClass.get_instance().mark_cutscene_viewed(req.cutscene_id)
+	if request.play_once_per_save:
+		CutsceneHookRegistryClass.get_instance().mark_cutscene_viewed(request.cutscene_id)
 
-func _trigger_resource_buffering(req: CutsceneRequestDTO, physical_exists: bool) -> void:
+func _trigger_resource_buffering(request: CutsceneRequestDTO, physical_exists: bool) -> void:
 	var loader := CutsceneAsyncLoaderClass.get_instance()
-	if physical_exists and not loader.is_resource_ready(req.video_path):
+	if physical_exists and not loader.is_resource_ready(request.video_path):
 		_current_state.state = CutscenePlaybackStateDTOClass.PlaybackState.BUFFERING
-		loader.request_load(req.video_path, req.preload_priority, func(_res: Resource):
+		loader.request_load(request.video_path, request.preload_priority, func(_loaded_resource: Resource):
 			if _current_state.state == CutscenePlaybackStateDTOClass.PlaybackState.BUFFERING:
 				_current_state.state = CutscenePlaybackStateDTOClass.PlaybackState.PLAYING
 		)
 	else:
 		_current_state.state = CutscenePlaybackStateDTOClass.PlaybackState.PLAYING
 
-func _broadcast_playback_started(req: CutsceneRequestDTO, duration: float) -> void:
+func _broadcast_playback_started(request: CutsceneRequestDTO, duration: float) -> void:
 	_notify_event("cutscene.started", {
-		"cutscene_id": req.cutscene_id,
-		"video_path": req.video_path,
-		"is_placeholder": req.is_placeholder,
-		"placeholder_title": req.placeholder_title if not req.placeholder_title.is_empty() else req.cutscene_id,
-		"placeholder_text": req.placeholder_text,
+		"cutscene_id": request.cutscene_id,
+		"video_path": request.video_path,
+		"is_placeholder": request.is_placeholder,
+		"placeholder_title": request.placeholder_title if not request.placeholder_title.is_empty() else request.cutscene_id,
+		"placeholder_text": request.placeholder_text,
 		"duration_sec": duration,
-		"skip_prompt_text": req.skip_prompt_text,
-		"skippable": req.skippable,
-		"skip_hold_duration_sec": req.skip_hold_duration_sec,
-		"audio_bus": req.audio_bus,
-		"volume_linear": req.volume_linear,
-		"fade_in_sec": req.fade_in_sec,
-		"fade_out_sec": req.fade_out_sec,
-		"auto_pause_world": req.auto_pause_world,
-		"hide_hud": req.hide_hud
+		"skip_prompt_text": request.skip_prompt_text,
+		"skippable": request.skippable,
+		"skip_hold_duration_sec": request.skip_hold_duration_sec,
+		"audio_bus": request.audio_bus,
+		"volume_linear": request.volume_linear,
+		"fade_in_sec": request.fade_in_sec,
+		"fade_out_sec": request.fade_out_sec,
+		"auto_pause_world": request.auto_pause_world,
+		"hide_hud": request.hide_hud
 	})
 
 # ==============================================================================
-# 三、进度推进与生命周期闭环
+# 三、进度推进与生命周期结束处理
 # ==============================================================================
 
 ## 推进更新播放进度（由前端表现层或无头测试时钟驱动）
@@ -183,16 +187,16 @@ func finish_cutscene() -> void:
 		return
 
 	_current_state.state = CutscenePlaybackStateDTOClass.PlaybackState.FINISHED
-	var completed_req := _active_request
+	var completed_request := _active_request
 
 	_notify_event("cutscene.finished", {
 		"cutscene_id": _current_state.cutscene_id,
-		"context_payload": completed_req.context_payload if completed_req != null else {}
+		"context_payload": completed_request.context_payload if completed_request != null else {}
 	})
 
 	# 触发业务完成回调
-	if completed_req != null and completed_req.on_completed.is_valid():
-		completed_req.on_completed.call()
+	if completed_request != null and completed_request.on_completed.is_valid():
+		completed_request.on_completed.call()
 
 	_cleanup_active()
 
@@ -205,19 +209,19 @@ func skip_cutscene() -> bool:
 		return false
 
 	_current_state.state = CutscenePlaybackStateDTOClass.PlaybackState.SKIPPED
-	var skipped_req := _active_request
+	var skipped_request := _active_request
 
 	_notify_event("cutscene.skipped", {
 		"cutscene_id": _current_state.cutscene_id,
 		"skip_time": _current_state.current_time_sec,
-		"context_payload": skipped_req.context_payload
+		"context_payload": skipped_request.context_payload
 	})
 
 	# 优先触发专属跳过回调，若无则回退调用 on_completed 保证业务流程不悬挂
-	if skipped_req.on_skipped.is_valid():
-		skipped_req.on_skipped.call()
-	elif skipped_req.on_completed.is_valid():
-		skipped_req.on_completed.call()
+	if skipped_request.on_skipped.is_valid():
+		skipped_request.on_skipped.call()
+	elif skipped_request.on_completed.is_valid():
+		skipped_request.on_completed.call()
 
 	_cleanup_active()
 	return true

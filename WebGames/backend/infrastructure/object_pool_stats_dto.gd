@@ -34,13 +34,13 @@ func to_dto() -> Dictionary:
 
 ## 从输入字典反序列化还原传输对象
 static func from_dto(data: Dictionary) -> RefCounted:
-	var dto: RefCounted = new()
-	dto.pool_name = str(data.get("pool_name", ""))
-	dto.total_allocated = int(data.get("total_allocated", 0))
-	dto.active_in_use = int(data.get("active_in_use", 0))
-	dto.idle_in_pool = int(data.get("idle_in_pool", 0))
-	dto.peak_active = int(data.get("peak_active", 0))
-	dto.total_acquires = int(data.get("total_acquires", 0))
-	dto.total_releases = int(data.get("total_releases", 0))
-	dto.total_overflows = int(data.get("total_overflows", 0))
-	return dto
+	var stats_dto: RefCounted = new()
+	stats_dto.pool_name = str(data.get("pool_name", ""))
+	stats_dto.total_allocated = int(data.get("total_allocated", 0))
+	stats_dto.active_in_use = int(data.get("active_in_use", 0))
+	stats_dto.idle_in_pool = int(data.get("idle_in_pool", 0))
+	stats_dto.peak_active = int(data.get("peak_active", 0))
+	stats_dto.total_acquires = int(data.get("total_acquires", 0))
+	stats_dto.total_releases = int(data.get("total_releases", 0))
+	stats_dto.total_overflows = int(data.get("total_overflows", 0))
+	return stats_dto

@@ -37,8 +37,8 @@ static func initialize() -> void:
 ## 注册指定名称的对象池与生成工厂
 static func register_pool(pool_name: String, factory: Callable, config_override: ObjectPoolConfigDTO = null) -> ObjectPool:
 	initialize()
-	var cfg := config_override if config_override != null else _load_pool_config(pool_name)
-	var pool := ObjectPool.new(factory, cfg)
+	var effective_config := config_override if config_override != null else _load_pool_config(pool_name)
+	var pool := ObjectPool.new(factory, effective_config)
 	_pools[pool_name] = pool
 	return pool
 
@@ -56,13 +56,13 @@ static func teardown() -> void:
 
 static func _load_pool_config(pool_name: String) -> ObjectPoolConfigDTO:
 	var prefix := PREFIX_POOLS + pool_name
-	var dto := ObjectPoolConfigDTO.new()
-	dto.pool_name = pool_name
-	dto.preallocate_size = maxi(0, GameConfig.get_int(CONFIG_TABLE_OBJECT_POOL, prefix + PATH_PREALLOCATE_SIZE, DEFAULT_PREALLOC_SIZE))
-	dto.max_capacity = maxi(dto.preallocate_size, GameConfig.get_int(CONFIG_TABLE_OBJECT_POOL, prefix + PATH_MAX_CAPACITY, DEFAULT_MAX_CAPACITY))
-	dto.allow_overflow_alloc = GameConfig.get_bool(CONFIG_TABLE_OBJECT_POOL, prefix + PATH_ALLOW_OVERFLOW, true)
-	dto.overflow_warning_threshold = maxi(1, GameConfig.get_int(CONFIG_TABLE_OBJECT_POOL, prefix + PATH_OVERFLOW_THRESHOLD, DEFAULT_OVERFLOW_THRESHOLD))
-	return dto
+	var config_dto := ObjectPoolConfigDTO.new()
+	config_dto.pool_name = pool_name
+	config_dto.preallocate_size = maxi(0, GameConfig.get_int(CONFIG_TABLE_OBJECT_POOL, prefix + PATH_PREALLOCATE_SIZE, DEFAULT_PREALLOC_SIZE))
+	config_dto.max_capacity = maxi(config_dto.preallocate_size, GameConfig.get_int(CONFIG_TABLE_OBJECT_POOL, prefix + PATH_MAX_CAPACITY, DEFAULT_MAX_CAPACITY))
+	config_dto.allow_overflow_alloc = GameConfig.get_bool(CONFIG_TABLE_OBJECT_POOL, prefix + PATH_ALLOW_OVERFLOW, true)
+	config_dto.overflow_warning_threshold = maxi(1, GameConfig.get_int(CONFIG_TABLE_OBJECT_POOL, prefix + PATH_OVERFLOW_THRESHOLD, DEFAULT_OVERFLOW_THRESHOLD))
+	return config_dto
 
 ## 获取当前已注册对象池总数
 static func get_pool_count() -> int:
@@ -71,6 +71,6 @@ static func get_pool_count() -> int:
 ## 获取所有已注册对象池的名称清单
 static func get_all_pool_names() -> Array[String]:
 	var names: Array[String] = []
-	for k in _pools.keys():
-		names.append(String(k))
+	for pool_name in _pools.keys():
+		names.append(String(pool_name))
 	return names

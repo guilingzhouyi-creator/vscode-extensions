@@ -53,21 +53,26 @@ var _deterministic_mode: bool = false
 # 二、单例与生命周期管理
 # ==============================================================================
 
+## 获取异步过场媒体加载器进程级单例
 static func get_instance() -> CutsceneAsyncLoader:
 	if _instance == null:
 		_instance = CutsceneAsyncLoader.new()
 	return _instance
 
+## 设置无头确定性仿真加载模式（用于测试隔离与同步完成回调）
 func set_deterministic_mode(enabled: bool) -> void:
 	_deterministic_mode = enabled
 
+## 查询当前是否处于确定性仿真加载模式
 func is_deterministic_mode() -> bool:
 	return _deterministic_mode
 
+## 设置 LRU 资源缓存最大槽位数并立即裁剪超出条目
 func set_cache_capacity(capacity: int) -> void:
 	_max_cache_capacity = maxi(1, capacity)
 	_trim_lru_cache()
 
+## 清空活跃加载任务映射与全部 LRU 缓存（供测试隔离重置）
 func clear_cache_and_tasks() -> void:
 	_active_tasks.clear()
 	_path_to_task_id.clear()
@@ -98,8 +103,8 @@ func _try_serve_cached(path: String, on_loaded: Callable) -> bool:
 	if not _lru_cache.has(path):
 		return false
 	_touch_lru(path)
-	var cached_res: Resource = _lru_cache[path]
-	_invoke_callback(on_loaded, cached_res)
+	var cached_resource: Resource = _lru_cache[path]
+	_invoke_callback(on_loaded, cached_resource)
 	return true
 
 func _try_merge_existing(path: String, on_loaded: Callable) -> int:
@@ -111,11 +116,12 @@ func _try_merge_existing(path: String, on_loaded: Callable) -> int:
 		return -1
 
 	if on_loaded.is_valid():
-		var prev_cb: Callable = task.callback
-		task.callback = func(res: Resource):
-			if prev_cb.is_valid():
-				prev_cb.call(res)
-			on_loaded.call(res)
+		# 合并同路径重复请求时串联旧回调，确保所有等待者均可收到同一次加载完成通知
+		var previous_callback: Callable = task.callback
+		task.callback = func(loaded_resource: Resource):
+			if previous_callback.is_valid():
+				previous_callback.call(loaded_resource)
+			on_loaded.call(loaded_resource)
 	return existing_id
 
 func _create_and_dispatch_task(path: String, priority: int, on_loaded: Callable) -> int:
@@ -140,8 +146,8 @@ func _create_and_dispatch_task(path: String, priority: int, on_loaded: Callable)
 		_fallback_placeholder(new_task, path, on_loaded)
 		return task_id
 
-	var err := ResourceLoader.load_threaded_request(path, "", false)
-	if err != OK:
+	var request_error := ResourceLoader.load_threaded_request(path, "", false)
+	if request_error != OK:
 		_fallback_placeholder(new_task, path, on_loaded)
 
 	return task_id
@@ -160,9 +166,9 @@ func _fallback_placeholder(task: AsyncMediaTask, path: String, on_loaded: Callab
 	_path_to_task_id.erase(path)
 	_invoke_callback(on_loaded, null)
 
-func _invoke_callback(cb: Callable, res: Resource) -> void:
-	if cb.is_valid():
-		cb.call(res)
+func _invoke_callback(callback: Callable, loaded_resource: Resource) -> void:
+	if callback.is_valid():
+		callback.call(loaded_resource)
 
 ## 轮询驱动检查异步加载进度（主线程定时调用或物理帧推进）
 func poll_tasks() -> void:
@@ -170,24 +176,24 @@ func poll_tasks() -> void:
 		return
 
 	var completed_ids: Array[int] = []
-	var progress_arr: Array = []
+	var progress_values: Array = []
 	for task_id in _active_tasks.keys():
 		var task: AsyncMediaTask = _active_tasks[task_id]
 		if task.is_cancelled:
 			completed_ids.append(task_id)
 			continue
 
-		progress_arr.clear()
-		var status := ResourceLoader.load_threaded_get_status(task.resource_path, progress_arr)
-		if not progress_arr.is_empty():
-			task.progress = float(progress_arr[0])
+		progress_values.clear()
+		var status := ResourceLoader.load_threaded_get_status(task.resource_path, progress_values)
+		if not progress_values.is_empty():
+			task.progress = float(progress_values[0])
 
 		if status == ResourceLoader.THREAD_LOAD_LOADED:
-			var res := ResourceLoader.load_threaded_get(task.resource_path)
+			var loaded_resource := ResourceLoader.load_threaded_get(task.resource_path)
 			task.status = STATUS_LOADED
-			task.loaded_resource = res
-			_cache_loaded_resource(task.resource_path, res)
-			_invoke_callback(task.callback, res)
+			task.loaded_resource = loaded_resource
+			_cache_loaded_resource(task.resource_path, loaded_resource)
+			_invoke_callback(task.callback, loaded_resource)
 			completed_ids.append(task_id)
 		elif status == ResourceLoader.THREAD_LOAD_FAILED or status == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
 			task.status = STATUS_LOADED
@@ -195,11 +201,11 @@ func poll_tasks() -> void:
 			_invoke_callback(task.callback, null)
 			completed_ids.append(task_id)
 
-	for cid in completed_ids:
-		var finished_task: AsyncMediaTask = _active_tasks.get(cid, null)
+	for completed_id in completed_ids:
+		var finished_task: AsyncMediaTask = _active_tasks.get(completed_id, null)
 		if finished_task != null:
 			_path_to_task_id.erase(finished_task.resource_path)
-			_active_tasks.erase(cid)
+			_active_tasks.erase(completed_id)
 
 ## 取消正在执行的装载任务
 func cancel_task(task_id: int) -> bool:
@@ -235,10 +241,10 @@ func get_loaded_resource(resource_path: String) -> Resource:
 # 四、定容 LRU 缓存淘汰
 # ==============================================================================
 
-func _cache_loaded_resource(path: String, res: Resource) -> void:
-	if res == null:
+func _cache_loaded_resource(path: String, loaded_resource: Resource) -> void:
+	if loaded_resource == null:
 		return
-	_lru_cache[path] = res
+	_lru_cache[path] = loaded_resource
 	_touch_lru(path)
 	_trim_lru_cache()
 
