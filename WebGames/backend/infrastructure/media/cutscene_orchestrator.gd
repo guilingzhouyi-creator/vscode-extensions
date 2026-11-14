@@ -54,9 +54,9 @@ func is_playing() -> bool:
 # ==============================================================================
 
 ## 通过 CG 语义标识符快速播放（主线程一键调用入口，形参 <= 5）
-func play_by_id(cutscene_id: String, override_params: Dictionary = {}) -> Dictionary:
+func play_by_id(cutscene_id: String, override_parameters: Dictionary = {}) -> Dictionary:
 	var registry := CutsceneHookRegistryClass.get_instance()
-	var request := registry.resolve_request(cutscene_id, override_params)
+	var request := registry.resolve_request(cutscene_id, override_parameters)
 	if request == null:
 		return {"success": false, "error_code": "RESOLVE_FAILED"}
 	return play_cutscene(request)
@@ -82,14 +82,14 @@ func play_cutscene(request: CutsceneRequestDTO) -> Dictionary:
 	if not _active_request.video_path.is_empty():
 		_active_request.video_path = AssetPathResolverClass.resolve_unified_uri(_active_request.video_path)
 
-	var physical_exists: bool = not _active_request.video_path.is_empty() and AssetPathResolverClass.asset_exists(_active_request.video_path)
-	if not physical_exists:
+	var has_physical_asset: bool = not _active_request.video_path.is_empty() and AssetPathResolverClass.asset_exists(_active_request.video_path)
+	if not has_physical_asset:
 		_active_request.is_placeholder = true
 
 	var effective_duration: float = _active_request.duration_sec if _active_request.duration_sec > 0.0 else 3.0
 	_prepare_playback_state(_active_request, effective_duration)
 
-	_trigger_resource_buffering(_active_request, physical_exists)
+	_trigger_resource_buffering(_active_request, has_physical_asset)
 
 	_broadcast_playback_started(_active_request, effective_duration)
 
@@ -130,9 +130,9 @@ func _prepare_playback_state(request: CutsceneRequestDTO, duration: float) -> vo
 	if request.play_once_per_save:
 		CutsceneHookRegistryClass.get_instance().mark_cutscene_viewed(request.cutscene_id)
 
-func _trigger_resource_buffering(request: CutsceneRequestDTO, physical_exists: bool) -> void:
+func _trigger_resource_buffering(request: CutsceneRequestDTO, has_physical_asset: bool) -> void:
 	var loader := CutsceneAsyncLoaderClass.get_instance()
-	if physical_exists and not loader.is_resource_ready(request.video_path):
+	if has_physical_asset and not loader.is_resource_ready(request.video_path):
 		_current_state.state = CutscenePlaybackStateDTOClass.PlaybackState.BUFFERING
 		loader.request_load(request.video_path, request.preload_priority, func(_loaded_resource: Resource):
 			if _current_state.state == CutscenePlaybackStateDTOClass.PlaybackState.BUFFERING:
@@ -227,11 +227,11 @@ func skip_cutscene() -> bool:
 	return true
 
 ## 确定性时间步进仿真（供无头单元测试调度）
-func step_simulation(delta_sec: float) -> void:
+func step_simulation(delta_seconds: float) -> void:
 	if _current_state.state != CutscenePlaybackStateDTOClass.PlaybackState.PLAYING:
 		return
 
-	var new_time: float = _current_state.current_time_sec + delta_sec
+	var new_time: float = _current_state.current_time_sec + delta_seconds
 	var duration: float = maxf(0.1, _current_state.total_duration_sec)
 	if new_time >= duration:
 		finish_cutscene()

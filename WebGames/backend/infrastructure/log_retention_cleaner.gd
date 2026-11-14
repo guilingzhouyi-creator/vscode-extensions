@@ -22,7 +22,7 @@ static var _last_sweep: int = 0
 static func reset_state() -> void:
 	_last_sweep = 0
 
-static func _resolve_cutoff_seconds(now: int, force: bool) -> int:
+static func _resolve_cutoff_seconds(now: int, should_force_cleanup: bool) -> int:
 	var retention_config: Dictionary = GameConfig.get_dict(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_RETENTION, {})
 	if not bool(retention_config.get("enabled", true)):
 		return -1
@@ -30,7 +30,7 @@ static func _resolve_cutoff_seconds(now: int, force: bool) -> int:
 	if max_days <= 0:
 		return -1
 	var interval: int = int(retention_config.get("cleanup_interval_seconds", LogConstants.DEFAULT_CLEANUP_INTERVAL_SEC))
-	if not force and (_last_sweep > 0 and now - _last_sweep < interval):
+	if not should_force_cleanup and (_last_sweep > 0 and now - _last_sweep < interval):
 		return -1
 	_last_sweep = now
 	return max_days * LogConstants.SECONDS_PER_DAY
@@ -42,23 +42,23 @@ static func _is_expired_archive_file(file_name: String, main_file: String, prefi
 	return file_timestamp > 0 and (now - file_timestamp) > cutoff_seconds
 
 ## 执行归档日志清理：删除超过 max_days 的过期轮转归档文件（保留主文件）
-static func sweep(now_utc: int = -1, force: bool = false) -> int:
+static func sweep(now_utc: int = -1, should_force_cleanup: bool = false) -> int:
 	var now: int = now_utc if now_utc >= 0 else int(Time.get_unix_time_from_system())
-	var cutoff_seconds: int = _resolve_cutoff_seconds(now, force)
+	var cutoff_seconds: int = _resolve_cutoff_seconds(now, should_force_cleanup)
 	if cutoff_seconds <= 0:
 		return 0
 
-	var dir_path: String = GameConfig.get_string(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_EXPORT_DIR, LogConstants.DEFAULT_LOG_DIR)
+	var directory_path: String = GameConfig.get_string(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_EXPORT_DIR, LogConstants.DEFAULT_LOG_DIR)
 	var prefix: String = GameConfig.get_string(LogConstants.CFG_LOG_TABLE, LogConstants.CFG_PATH_EXPORT_PREFIX, LogConstants.DEFAULT_LOG_PREFIX)
 	var main_file: String = prefix + LogConstants.LOG_FILE_EXTENSION
-	var dir_access: DirAccess = DirAccess.open(dir_path)
-	if dir_access == null:
+	var directory_access: DirAccess = DirAccess.open(directory_path)
+	if directory_access == null:
 		return 0
 
 	var removed: int = 0
-	for file_name in dir_access.get_files():
+	for file_name in directory_access.get_files():
 		if _is_expired_archive_file(file_name, main_file, prefix, now, cutoff_seconds):
-			var file_full: String = "%s/%s" % [dir_path, file_name]
+			var file_full: String = "%s/%s" % [directory_path, file_name]
 			if DirAccess.remove_absolute(file_full) == OK:
 				removed += 1
 	return removed
@@ -72,11 +72,11 @@ static func _extract_timestamp(filename: String, prefix: String) -> int:
 	# 文件名形态：<prefix>.<timestamp>.log，兼容导出器同秒碰撞名 <prefix>.<timestamp>_<n>.log
 	var without_prefix: String = filename.substr(prefix.length() + 1)
 	if without_prefix.ends_with(LogConstants.LOG_FILE_EXTENSION):
-		var raw_ts: String = without_prefix.left(without_prefix.length() - LogConstants.LOG_FILE_EXTENSION.length())
-		if raw_ts.is_valid_int():
-			return raw_ts.to_int()
-		if "_" in raw_ts:
-			var head: String = str(raw_ts.split("_")[0])
+		var raw_timestamp: String = without_prefix.left(without_prefix.length() - LogConstants.LOG_FILE_EXTENSION.length())
+		if raw_timestamp.is_valid_int():
+			return raw_timestamp.to_int()
+		if "_" in raw_timestamp:
+			var head: String = str(raw_timestamp.split("_")[0])
 			if head.is_valid_int():
 				return head.to_int()
 	return 0

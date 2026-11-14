@@ -68,8 +68,8 @@ static func _rebuild() -> void:
 		# 环绕满环后数组尾部并非时间序最新：先按 sequence 重排取最新 _capacity 条
 		# （Inv-LS-5 只读语义 + 有界收敛：容量收缩仅保留最近窗口）
 		var ordered: Array = _buffer.duplicate()
-		ordered.sort_custom(func(a: Variant, b: Variant) -> bool:
-			return int((a as StructuredLogRecord).sequence) < int((b as StructuredLogRecord).sequence)
+		ordered.sort_custom(func(left_record: Variant, right_record: Variant) -> bool:
+			return int((left_record as StructuredLogRecord).sequence) < int((right_record as StructuredLogRecord).sequence)
 		)
 		_buffer = ordered.slice(ordered.size() - _capacity)
 		_head = 0
@@ -96,7 +96,7 @@ static func query(from_utc: int = 0, levels: Array = [], channels: Array = []) -
 		return matched_records
 	var start: int = _head if buffer_size >= _capacity else 0
 	var last_sequence: int = -1
-	var needs_sort: bool = false
+	var should_sort_records: bool = false
 	for offset in range(buffer_size):
 		var record: StructuredLogRecord = _buffer[(start + offset) % buffer_size] as StructuredLogRecord
 		if record == null:
@@ -108,18 +108,18 @@ static func query(from_utc: int = 0, levels: Array = [], channels: Array = []) -
 		if not channels.is_empty() and not (record.channel in channels):
 			continue
 		if record.sequence < last_sequence:
-			needs_sort = true
+			should_sort_records = true
 		last_sequence = record.sequence
 		matched_records.append(record)
-	if needs_sort:
+	if should_sort_records:
 		matched_records.sort_custom(func(left_record: Variant, right_record: Variant) -> bool:
 			return int((left_record as StructuredLogRecord).sequence) < int((right_record as StructuredLogRecord).sequence)
 		)
 	return matched_records
 
 static func _matches_level(record_level: String, levels: Array) -> bool:
-	for level_item in levels:
-		if record_level.nocasecmp_to(str(level_item)) == 0:
+	for target_level in levels:
+		if record_level.nocasecmp_to(str(target_level)) == 0:
 			return true
 	return false
 

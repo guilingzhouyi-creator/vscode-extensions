@@ -56,16 +56,16 @@ func to_dict() -> Dictionary:
 	}
 
 ## 从输入字典安全反序列化并装配播放状态快照 DTO
-static func from_dict(data: Dictionary) -> CutscenePlaybackStateDTO:
+static func from_dict(snapshot_payload: Dictionary) -> CutscenePlaybackStateDTO:
 	var snapshot := CutscenePlaybackStateDTO.new()
-	if data.is_empty():
+	if snapshot_payload.is_empty():
 		return snapshot
 
-	snapshot.state = int(data.get("state", PlaybackState.IDLE))
-	snapshot.cutscene_id = str(data.get("cutscene_id", ""))
-	snapshot.current_time_sec = float(data.get("current_time_sec", 0.0))
-	snapshot.total_duration_sec = float(data.get("total_duration_sec", 0.0))
-	snapshot.progress_ratio = float(data.get("progress_ratio", 0.0))
-	snapshot.active_subtitle_text = str(data.get("active_subtitle_text", ""))
-	snapshot.error_message = str(data.get("error_message", ""))
+	snapshot.state = int(snapshot_payload.get("state", PlaybackState.IDLE))
+	snapshot.cutscene_id = str(snapshot_payload.get("cutscene_id", ""))
+	snapshot.current_time_sec = float(snapshot_payload.get("current_time_sec", 0.0))
+	snapshot.total_duration_sec = float(snapshot_payload.get("total_duration_sec", 0.0))
+	snapshot.progress_ratio = float(snapshot_payload.get("progress_ratio", 0.0))
+	snapshot.active_subtitle_text = str(snapshot_payload.get("active_subtitle_text", ""))
+	snapshot.error_message = str(snapshot_payload.get("error_message", ""))
 	return snapshot

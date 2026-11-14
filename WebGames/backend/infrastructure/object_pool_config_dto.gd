@@ -27,11 +27,11 @@ func to_dto() -> Dictionary:
 	}
 
 ## 从输入字典反序列化还原传输对象
-static func from_dto(data: Dictionary) -> RefCounted:
+static func from_dto(config_payload: Dictionary) -> RefCounted:
 	var config_dto: RefCounted = new()
-	config_dto.pool_name = str(data.get("pool_name", "generic_pool"))
-	config_dto.preallocate_size = maxi(0, int(data.get("preallocate_size", 32)))
-	config_dto.max_capacity = maxi(config_dto.preallocate_size, int(data.get("max_capacity", 512)))
-	config_dto.allow_overflow_alloc = bool(data.get("allow_overflow_alloc", true))
-	config_dto.overflow_warning_threshold = maxi(1, int(data.get("overflow_warning_threshold", 256)))
+	config_dto.pool_name = str(config_payload.get("pool_name", "generic_pool"))
+	config_dto.preallocate_size = maxi(0, int(config_payload.get("preallocate_size", 32)))
+	config_dto.max_capacity = maxi(config_dto.preallocate_size, int(config_payload.get("max_capacity", 512)))
+	config_dto.allow_overflow_alloc = bool(config_payload.get("allow_overflow_alloc", true))
+	config_dto.overflow_warning_threshold = maxi(1, int(config_payload.get("overflow_warning_threshold", 256)))
 	return config_dto

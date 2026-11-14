@@ -36,7 +36,7 @@ class PerformanceSample extends RefCounted:
 # 二、采样状态与记录
 # ==============================================================================
 
-var _enabled: bool = false
+var _is_enabled: bool = false
 var _samples: Array[PerformanceSample] = []
 var _max_samples: int = 500
 
@@ -45,16 +45,16 @@ func _init(max_samples: int = 500) -> void:
 	_max_samples = maxi(10, max_samples)
 
 ## 开关采样（默认关闭零开销）
-func set_enabled(enabled: bool) -> void:
-	_enabled = enabled
+func set_enabled(is_profiling_enabled: bool) -> void:
+	_is_enabled = is_profiling_enabled
 
 ## 采样是否开启
 func is_enabled() -> bool:
-	return _enabled
+	return _is_enabled
 
 ## 记录一条指标（未开启时零开销跳过；超上限淘汰最旧）
 func record_metric(metric_name: String, category: String, metric_value: float, tags: Dictionary = {}) -> void:
-	if not _enabled:
+	if not _is_enabled:
 		return
 	while _samples.size() >= _max_samples:
 		_samples.pop_front()

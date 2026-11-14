@@ -47,7 +47,7 @@ var _path_to_task_id: Dictionary = {} # resource_path -> task_id
 var _lru_cache: Dictionary = {} # resource_path -> Resource
 var _lru_keys: Array[String] = []
 var _max_cache_capacity: int = DEFAULT_CACHE_CAPACITY
-var _deterministic_mode: bool = false
+var _is_deterministic_mode: bool = false
 
 # ==============================================================================
 # 二、单例与生命周期管理
@@ -60,12 +60,12 @@ static func get_instance() -> CutsceneAsyncLoader:
 	return _instance
 
 ## 设置无头确定性仿真加载模式（用于测试隔离与同步完成回调）
-func set_deterministic_mode(enabled: bool) -> void:
-	_deterministic_mode = enabled
+func set_deterministic_mode(is_enabled: bool) -> void:
+	_is_deterministic_mode = is_enabled
 
 ## 查询当前是否处于确定性仿真加载模式
 func is_deterministic_mode() -> bool:
-	return _deterministic_mode
+	return _is_deterministic_mode
 
 ## 设置 LRU 资源缓存最大槽位数并立即裁剪超出条目
 func set_cache_capacity(capacity: int) -> void:
@@ -138,7 +138,7 @@ func _create_and_dispatch_task(path: String, priority: int, on_loaded: Callable)
 	_active_tasks[task_id] = new_task
 	_path_to_task_id[path] = task_id
 
-	if _deterministic_mode:
+	if _is_deterministic_mode:
 		_complete_deterministic(new_task, path, on_loaded)
 		return task_id
 
@@ -172,7 +172,7 @@ func _invoke_callback(callback: Callable, loaded_resource: Resource) -> void:
 
 ## 轮询驱动检查异步加载进度（主线程定时调用或物理帧推进）
 func poll_tasks() -> void:
-	if _deterministic_mode or _active_tasks.is_empty():
+	if _is_deterministic_mode or _active_tasks.is_empty():
 		return
 
 	var completed_ids: Array[int] = []
@@ -223,7 +223,7 @@ func is_resource_ready(resource_path: String) -> bool:
 	var canonical_path := AssetPathResolverClass.resolve_unified_uri(resource_path)
 	if _lru_cache.has(canonical_path):
 		return true
-	if _deterministic_mode:
+	if _is_deterministic_mode:
 		return false
 	if canonical_path.is_empty() or not AssetPathResolverClass.asset_exists(canonical_path):
 		return true

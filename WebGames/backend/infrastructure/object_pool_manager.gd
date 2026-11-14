@@ -25,14 +25,14 @@ const DEFAULT_MAX_CAPACITY: int = 512
 const DEFAULT_OVERFLOW_THRESHOLD: int = 256
 
 static var _pools: Dictionary = {}
-static var _initialized: bool = false
+static var _is_initialized: bool = false
 
 ## 初始化组件或实体的内部运行状态
 static func initialize() -> void:
-	if _initialized:
+	if _is_initialized:
 		return
 	_pools.clear()
-	_initialized = true
+	_is_initialized = true
 
 ## 注册指定名称的对象池与生成工厂
 static func register_pool(pool_name: String, factory: Callable, config_override: ObjectPoolConfigDTO = null) -> ObjectPool:
@@ -52,7 +52,7 @@ static func teardown() -> void:
 		if pool != null:
 			pool.clear()
 	_pools.clear()
-	_initialized = false
+	_is_initialized = false
 
 static func _load_pool_config(pool_name: String) -> ObjectPoolConfigDTO:
 	var prefix := PREFIX_POOLS + pool_name

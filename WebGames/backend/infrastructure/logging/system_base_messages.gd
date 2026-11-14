@@ -57,22 +57,22 @@ const MSG_LOG_DECRYPT_FAILED: String = "Encrypted log record verification or dec
 # ==============================================================================
 
 ## 使用合规 {param} 命名占位符格式化底座标准英文文本
-static func format(template_str: String, params: Dictionary = {}) -> String:
-	if template_str.is_empty():
+static func format(template_text: String, parameters: Dictionary = {}) -> String:
+	if template_text.is_empty():
 		return ""
-	if params.is_empty():
-		return template_str
-	return TemplateFormatter.format(template_str, params)
+	if parameters.is_empty():
+		return template_text
+	return TemplateFormatter.format(template_text, parameters)
 
 ## 优先从 config/infrastructure/log.json events 读取配置文案模板，缺省回退合规标准英文底座文本
-static func resolve_event_or_base(event_code: String, base_template: String, params: Dictionary = {}) -> String:
+static func resolve_event_or_base(event_code: String, base_template: String, parameters: Dictionary = {}) -> String:
 	var config_template: String = GameConfig.get_string(
 		LogConstants.CFG_LOG_TABLE,
 		"%s/%s" % [LogConstants.CFG_PATH_EVENTS, event_code],
 		""
 	)
 	var chosen := config_template if not config_template.is_empty() else base_template
-	return format(chosen, params)
+	return format(chosen, parameters)
 
 ## 统一格式化标准控制台输出行（消除多处格式串散落拼接）
 static func format_console_line(

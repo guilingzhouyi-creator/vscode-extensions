@@ -64,7 +64,7 @@ var _ring_buffer: Object = null
 ## 性能遥测汇集钩子
 var _metric_sink: Object = null
 ## 静音控制台输出（测试期间可静音，避免控制台刷屏）
-var _mute_console: bool = false
+var _is_console_muted: bool = false
 ## 单机隔离保护状态标记
 var _is_standalone_mode: bool = true
 
@@ -78,8 +78,8 @@ func set_min_severity(severity_level: Severity) -> void:
 	_min_severity = severity_level
 
 ## 设置是否静音屏蔽控制台的标准输出
-func set_mute_console(mute_console: bool) -> void:
-	_mute_console = mute_console
+func set_mute_console(should_mute_console: bool) -> void:
+	_is_console_muted = should_mute_console
 
 ## 设置是否以独立单机模式运行日志管道
 func set_standalone_mode(is_standalone: bool) -> void:
@@ -100,9 +100,9 @@ func get_catalog() -> Dictionary:
 ## 加载配置表模板库
 func load_catalog_from_dict(catalog_config: Dictionary) -> void:
 	if catalog_config.has("events") and catalog_config["events"] is Dictionary:
-		var events_dict: Dictionary = catalog_config["events"]
-		for code in events_dict:
-			_message_catalog[str(code)] = str(events_dict[code])
+		var events_map: Dictionary = catalog_config["events"]
+		for code in events_map:
+			_message_catalog[str(code)] = str(events_map[code])
 
 ## 从 GameConfig.log 统一加载英文事件码模板（配置驱动，Inv-RM-11）
 func load_from_game_config() -> void:
@@ -117,14 +117,14 @@ func log_event(
 	event_code: String,
 	domain_name: String,
 	severity_level: Severity,
-	event_params: Dictionary = {},
+	event_parameters: Dictionary = {},
 	correlation_id: String = ""
 ) -> LogRecord:
 	if severity_level < _min_severity:
 		return null
 
 	var template: String = str(_message_catalog.get(event_code, SystemBaseMessages.MSG_FALLBACK_EVENT))
-	var formatted_message: String = _format_message(template, event_params, event_code, domain_name)
+	var formatted_message: String = _format_message(template, event_parameters, event_code, domain_name)
 
 	var record := LogRecord.new()
 	record.event_code = event_code
@@ -132,7 +132,7 @@ func log_event(
 	record.severity = severity_level
 	record.timestamp = Time.get_unix_time_from_system()
 	record.correlation_id = correlation_id
-	record.context = event_params.duplicate(true)
+	record.context = event_parameters.duplicate(true)
 	record.message = formatted_message
 
 	_dispatch_record(record)
@@ -150,11 +150,11 @@ func try_dispatch_to_network_rpc(log_record: LogRecord) -> bool:
 	return log_record != null
 
 ## 模板占位符格式化（统一委托底层 TemplateFormatter 执行英文占位符动态注入）
-func _format_message(template_str: String, event_params: Dictionary, event_code: String, domain_name: String) -> String:
-	var params: Dictionary = event_params.duplicate(true)
-	params[LogConstants.KEY_CODE] = event_code
-	params[LogConstants.KEY_DOMAIN] = domain_name
-	return TemplateFormatter.format(template_str, params)
+func _format_message(template_text: String, event_parameters: Dictionary, event_code: String, domain_name: String) -> String:
+	var formatted_parameters: Dictionary = event_parameters.duplicate(true)
+	formatted_parameters[LogConstants.KEY_CODE] = event_code
+	formatted_parameters[LogConstants.KEY_DOMAIN] = domain_name
+	return TemplateFormatter.format(template_text, formatted_parameters)
 
 ## 多路分发输出 Sink（先统一构造期脱敏，再收敛至 RingBuffer / EventBusCore 管线，Inv-LS-2 & Inv-LG-3）
 func _dispatch_record(log_record: LogRecord) -> void:
@@ -168,7 +168,7 @@ func _dispatch_record(log_record: LogRecord) -> void:
 		_ring_buffer.call("push_record", structured_record.to_dto())
 	else:
 		# 收敛：委托至 EventBusCore 统一广播中枢（签发单调 sequence 并扇出至 LogRingBuffer、LogFileExporter 与 TelemetryAggregate）
-		if _mute_console:
+		if _is_console_muted:
 			structured_record.context[LogConstants.KEY_MUTE_CONSOLE] = true
 		var event_bus := EventBusCore.get_instance()
 		if event_bus != null:
@@ -187,7 +187,7 @@ func _dispatch_record(log_record: LogRecord) -> void:
 			})
 
 	# 2. 控制台输出格式化（总线为空且未静音时本地穿透，避免漏打）
-	if not _mute_console and EventBusCore.get_instance() == null:
+	if not _is_console_muted and EventBusCore.get_instance() == null:
 		var formatted_line := SystemBaseMessages.format_unified_console_line(
 			_get_severity_name(log_record.severity),
 			log_record.domain,

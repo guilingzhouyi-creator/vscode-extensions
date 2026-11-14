@@ -109,31 +109,31 @@ func to_dict() -> Dictionary:
 	}
 
 ## 从字典还原装配 DTO 实例
-static func from_dict(data: Dictionary) -> CutsceneRequestDTO:
+static func from_dict(request_payload: Dictionary) -> CutsceneRequestDTO:
 	var request_dto := CutsceneRequestDTO.new()
-	if data.is_empty():
+	if request_payload.is_empty():
 		return request_dto
 
-	request_dto.cutscene_id = str(data.get("cutscene_id", ""))
-	request_dto.video_path = str(data.get("video_path", ""))
-	request_dto.is_placeholder = bool(data.get("is_placeholder", false))
-	request_dto.placeholder_title = str(data.get("placeholder_title", ""))
-	request_dto.placeholder_text = str(data.get("placeholder_text", ""))
-	request_dto.duration_sec = float(data.get("duration_sec", 3.0))
-	request_dto.skip_prompt_text = str(data.get("skip_prompt_text", ""))
-	request_dto.skippable = bool(data.get("skippable", true))
-	request_dto.skip_hold_duration_sec = float(data.get("skip_hold_duration_sec", 0.3))
-	request_dto.subtitles_track_id = str(data.get("subtitles_track_id", ""))
-	request_dto.audio_bus = str(data.get("audio_bus", "BGM"))
-	request_dto.volume_linear = float(data.get("volume_linear", 1.0))
-	request_dto.fade_in_sec = float(data.get("fade_in_sec", 0.5))
-	request_dto.fade_out_sec = float(data.get("fade_out_sec", 0.5))
-	request_dto.auto_pause_world = bool(data.get("auto_pause_world", true))
-	request_dto.hide_hud = bool(data.get("hide_hud", true))
-	request_dto.play_once_per_save = bool(data.get("play_once_per_save", false))
-	request_dto.preload_priority = int(data.get("preload_priority", 1))
+	request_dto.cutscene_id = str(request_payload.get("cutscene_id", ""))
+	request_dto.video_path = str(request_payload.get("video_path", ""))
+	request_dto.is_placeholder = bool(request_payload.get("is_placeholder", false))
+	request_dto.placeholder_title = str(request_payload.get("placeholder_title", ""))
+	request_dto.placeholder_text = str(request_payload.get("placeholder_text", ""))
+	request_dto.duration_sec = float(request_payload.get("duration_sec", 3.0))
+	request_dto.skip_prompt_text = str(request_payload.get("skip_prompt_text", ""))
+	request_dto.skippable = bool(request_payload.get("skippable", true))
+	request_dto.skip_hold_duration_sec = float(request_payload.get("skip_hold_duration_sec", 0.3))
+	request_dto.subtitles_track_id = str(request_payload.get("subtitles_track_id", ""))
+	request_dto.audio_bus = str(request_payload.get("audio_bus", "BGM"))
+	request_dto.volume_linear = float(request_payload.get("volume_linear", 1.0))
+	request_dto.fade_in_sec = float(request_payload.get("fade_in_sec", 0.5))
+	request_dto.fade_out_sec = float(request_payload.get("fade_out_sec", 0.5))
+	request_dto.auto_pause_world = bool(request_payload.get("auto_pause_world", true))
+	request_dto.hide_hud = bool(request_payload.get("hide_hud", true))
+	request_dto.play_once_per_save = bool(request_payload.get("play_once_per_save", false))
+	request_dto.preload_priority = int(request_payload.get("preload_priority", 1))
 
-	var raw_context: Variant = data.get("context_payload", {})
+	var raw_context: Variant = request_payload.get("context_payload", {})
 	if raw_context is Dictionary:
 		request_dto.context_payload = (raw_context as Dictionary).duplicate(true)
 
