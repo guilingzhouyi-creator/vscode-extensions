@@ -27,8 +27,8 @@ var _idle_stack: Array = []
 var _acquired_set: Dictionary = {}
 var _stats: ObjectPoolStatsDTO = null
 var _overflow_warned: bool = false
-var _has_reset_cap: int = -1
-var _has_pool_lifecycle_cap: int = -1
+var _has_reset_capability: int = -1
+var _has_pool_lifecycle_capability: int = -1
 
 func _init(factory: Callable, config: ObjectPoolConfigDTO = null) -> void:
 	_factory_func = factory
@@ -38,32 +38,33 @@ func _init(factory: Callable, config: ObjectPoolConfigDTO = null) -> void:
 	_stats.pool_name = _pool_name
 	_preallocate()
 
-func _detect_caps(obj: RefCounted) -> void:
-	if _has_reset_cap == -1:
-		_has_reset_cap = 1 if obj.has_method(METHOD_RESET_STATE) else 0
-	if _has_pool_lifecycle_cap == -1:
-		_has_pool_lifecycle_cap = 1 if (obj.has_method(METHOD_MARK_ACQUIRE) and obj.has_method(METHOD_MARK_RELEASE)) else 0
+func _detect_capabilities(pooled_object: RefCounted) -> void:
+	# 首次接触实例时缓存方法存在标记，避免后续每次 borrow/release 热路径重复执行 has_method 反射
+	if _has_reset_capability == -1:
+		_has_reset_capability = 1 if pooled_object.has_method(METHOD_RESET_STATE) else 0
+	if _has_pool_lifecycle_capability == -1:
+		_has_pool_lifecycle_capability = 1 if (pooled_object.has_method(METHOD_MARK_ACQUIRE) and pooled_object.has_method(METHOD_MARK_RELEASE)) else 0
 
 func _preallocate() -> void:
 	var count := _config.preallocate_size
-	for i in range(count):
-		var obj: RefCounted = _factory_func.call()
-		if obj != null:
-			_detect_caps(obj)
-			_idle_stack.append(obj)
+	for slot_index in range(count):
+		var pooled_object: RefCounted = _factory_func.call()
+		if pooled_object != null:
+			_detect_capabilities(pooled_object)
+			_idle_stack.append(pooled_object)
 			_stats.total_allocated += 1
 	_stats.idle_in_pool = _idle_stack.size()
 
 ## 借出对象 (O(1) LIFO 优先局部性)
 func acquire() -> RefCounted:
 	_stats.total_acquires += 1
-	var obj: RefCounted = null
+	var pooled_object: RefCounted = null
 	var is_reused: bool = false
 	if not _idle_stack.is_empty():
-		obj = _idle_stack.pop_back()
+		pooled_object = _idle_stack.pop_back()
 		is_reused = true
 	elif _config.allow_overflow_alloc:
-		obj = _factory_func.call()
+		pooled_object = _factory_func.call()
 		_stats.total_allocated += 1
 		_stats.total_overflows += 1
 		if _stats.total_allocated >= _config.overflow_warning_threshold and not _overflow_warned:
@@ -77,28 +78,28 @@ func acquire() -> RefCounted:
 		EventBusCore.get_instance().emit_log(LogConstants.LEVEL_LOWER_ERROR, SystemBaseMessages.format(SystemBaseMessages.MSG_POOL_HARD_LIMIT_ERR, {"pool_name": _pool_name}))
 		return null
 
-	if obj != null:
-		_detect_caps(obj)
-		if not is_reused and _has_reset_cap == 1 and _has_pool_lifecycle_cap == 0:
-			obj.call(METHOD_RESET_STATE)
-		if _has_pool_lifecycle_cap == 1:
-			obj.call(METHOD_MARK_ACQUIRE)
-		var obj_id: int = obj.get_instance_id()
-		_acquired_set[obj_id] = true
+	if pooled_object != null:
+		_detect_capabilities(pooled_object)
+		if not is_reused and _has_reset_capability == 1 and _has_pool_lifecycle_capability == 0:
+			pooled_object.call(METHOD_RESET_STATE)
+		if _has_pool_lifecycle_capability == 1:
+			pooled_object.call(METHOD_MARK_ACQUIRE)
+		var object_id: int = pooled_object.get_instance_id()
+		_acquired_set[object_id] = true
 		_stats.active_in_use += 1
 		_stats.idle_in_pool = _idle_stack.size()
 		_stats.peak_active = maxi(_stats.peak_active, _stats.active_in_use)
-	return obj
+	return pooled_object
 
 ## 归还对象 (带双重释放与容量钳制守卫，释放时单次重置减少热路径反射开销)
-func release(obj: RefCounted) -> bool:
-	if obj == null:
+func release(pooled_object: RefCounted) -> bool:
+	if pooled_object == null:
 		return false
-	var obj_id: int = obj.get_instance_id()
-	if not _acquired_set.has(obj_id):
+	var object_id: int = pooled_object.get_instance_id()
+	if not _acquired_set.has(object_id):
 		EventBusCore.get_instance().emit_log(LogConstants.LEVEL_LOWER_WARN, SystemBaseMessages.format(SystemBaseMessages.MSG_POOL_DOUBLE_RELEASE, {"pool_name": _pool_name}))
 		return false
-	_acquired_set.erase(obj_id)
+	_acquired_set.erase(object_id)
 	_stats.total_releases += 1
 	_stats.active_in_use = maxi(0, _stats.active_in_use - 1)
 	if _overflow_warned and _stats.active_in_use < _config.overflow_warning_threshold:
@@ -106,12 +107,12 @@ func release(obj: RefCounted) -> bool:
 
 	# 容量超限时丢弃，由 Godot 引用计数自动回收
 	if _idle_stack.size() < _config.max_capacity:
-		_detect_caps(obj)
-		if _has_pool_lifecycle_cap == 1:
-			obj.call(METHOD_MARK_RELEASE)
-		elif _has_reset_cap == 1:
-			obj.call(METHOD_RESET_STATE)
-		_idle_stack.append(obj)
+		_detect_capabilities(pooled_object)
+		if _has_pool_lifecycle_capability == 1:
+			pooled_object.call(METHOD_MARK_RELEASE)
+		elif _has_reset_capability == 1:
+			pooled_object.call(METHOD_RESET_STATE)
+		_idle_stack.append(pooled_object)
 		_stats.idle_in_pool = _idle_stack.size()
 		return true
 	_stats.total_allocated = maxi(0, _stats.total_allocated - 1)

@@ -36,19 +36,19 @@ var ownership_domain: String = "global"
 
 ## 构造：六要素全量注入（容量下限 1、TTL 下限 0.01 防误配）
 func _init(
-	p_name: String = "default_cache",
-	p_cap: int = 100,
-	p_policy: EvictionPolicy = EvictionPolicy.LRU,
-	p_ttl: float = 300.0,
-	p_hot_reload: bool = true,
-	p_domain: String = "global"
+	initial_cache_name: String = "default_cache",
+	initial_max_capacity: int = 100,
+	initial_eviction_policy: EvictionPolicy = EvictionPolicy.LRU,
+	initial_ttl_seconds: float = 300.0,
+	initial_allow_hot_reload_clear: bool = true,
+	initial_ownership_domain: String = "global"
 ) -> void:
-	cache_name = p_name
-	max_capacity = maxi(1, p_cap)
-	eviction_policy = p_policy
-	ttl_seconds = maxf(0.01, p_ttl)
-	allow_hot_reload_clear = p_hot_reload
-	ownership_domain = p_domain
+	cache_name = initial_cache_name
+	max_capacity = maxi(1, initial_max_capacity)
+	eviction_policy = initial_eviction_policy
+	ttl_seconds = maxf(0.01, initial_ttl_seconds)
+	allow_hot_reload_clear = initial_allow_hot_reload_clear
+	ownership_domain = initial_ownership_domain
 
 ## 序列化为字典（配置持久化/热重载用）
 func to_dict() -> Dictionary:
@@ -62,13 +62,13 @@ func to_dict() -> Dictionary:
 	}
 
 ## 从字典反序列化还原（字段缺省回退默认）
-static func from_dict(p_data: Dictionary) -> RefCounted:
+static func from_dict(raw_data: Dictionary) -> RefCounted:
 	var spec := CachePolicySpec.new(
-		str(p_data.get("cache_name", "default_cache")),
-		int(p_data.get("max_capacity", 100)),
-		int(p_data.get("eviction_policy", EvictionPolicy.LRU)) as EvictionPolicy,
-		float(p_data.get("ttl_seconds", 300.0)),
-		bool(p_data.get("allow_hot_reload_clear", true)),
-		str(p_data.get("ownership_domain", "global"))
+		str(raw_data.get("cache_name", "default_cache")),
+		int(raw_data.get("max_capacity", 100)),
+		int(raw_data.get("eviction_policy", EvictionPolicy.LRU)) as EvictionPolicy,
+		float(raw_data.get("ttl_seconds", 300.0)),
+		bool(raw_data.get("allow_hot_reload_clear", true)),
+		str(raw_data.get("ownership_domain", "global"))
 	)
 	return spec

@@ -41,39 +41,39 @@ var _samples: Array[PerformanceSample] = []
 var _max_samples: int = 500
 
 ## 构造：指定有界缓冲上限（下限 10，防 0 容量误配）
-func _init(p_max_samples: int = 500) -> void:
-	_max_samples = maxi(10, p_max_samples)
+func _init(max_samples: int = 500) -> void:
+	_max_samples = maxi(10, max_samples)
 
 ## 开关采样（默认关闭零开销）
-func set_enabled(p_enabled: bool) -> void:
-	_enabled = p_enabled
+func set_enabled(enabled: bool) -> void:
+	_enabled = enabled
 
 ## 采样是否开启
 func is_enabled() -> bool:
 	return _enabled
 
 ## 记录一条指标（未开启时零开销跳过；超上限淘汰最旧）
-func record_metric(p_name: String, p_category: String, p_val: float, p_tags: Dictionary = {}) -> void:
+func record_metric(metric_name: String, category: String, metric_value: float, tags: Dictionary = {}) -> void:
 	if not _enabled:
 		return
 	while _samples.size() >= _max_samples:
 		_samples.pop_front()
 
 	var sample := PerformanceSample.new()
-	sample.metric_name = p_name
-	sample.category = p_category
-	sample.value = p_val
+	sample.metric_name = metric_name
+	sample.category = category
+	sample.value = metric_value
 	sample.timestamp = Time.get_unix_time_from_system()
-	sample.tags = p_tags.duplicate(true)
+	sample.tags = tags.duplicate(true)
 	_samples.append(sample)
 
 ## 按分类筛选样本（只读）
-func get_samples_by_category(p_cat: String) -> Array[PerformanceSample]:
-	var res: Array[PerformanceSample] = []
-	for s in _samples:
-		if s.category == p_cat:
-			res.append(s)
-	return res
+func get_samples_by_category(category: String) -> Array[PerformanceSample]:
+	var matched_samples: Array[PerformanceSample] = []
+	for sample in _samples:
+		if sample.category == category:
+			matched_samples.append(sample)
+	return matched_samples
 
 ## 当前样本总数
 func sample_count() -> int:

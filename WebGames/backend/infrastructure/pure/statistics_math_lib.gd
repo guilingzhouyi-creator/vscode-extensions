@@ -34,17 +34,17 @@ static var _inline_home_path_re: RegEx = RegEx.create_from_string(
 # ==============================================================================
 
 ## 在已排序升序样本集合中计算指定分位比率位置的值
-static func compute_percentile_from_sorted(sorted_vals: Array[int], ratio: float) -> int:
-	var n := sorted_vals.size()
-	if n <= 0:
+static func compute_percentile_from_sorted(sorted_values: Array[int], ratio: float) -> int:
+	var sample_count := sorted_values.size()
+	if sample_count <= 0:
 		return 0
-	var idx := mini(n - 1, maxi(0, int(n * ratio)))
-	return int(sorted_vals[idx])
+	var percentile_index := mini(sample_count - 1, maxi(0, int(sample_count * ratio)))
+	return int(sorted_values[percentile_index])
 
 ## 计算样本集合的 P50 与 P95 耗时指标字典（按需懒调用）
 static func compute_p50_p95(samples: Array[int]) -> Dictionary:
-	var n := samples.size()
-	if n <= 0:
+	var sample_count := samples.size()
+	if sample_count <= 0:
 		return {"p50_ms": 0, "p95_ms": 0}
 	var scratch: Array[int] = samples.duplicate()
 	scratch.sort()
@@ -55,21 +55,21 @@ static func compute_p50_p95(samples: Array[int]) -> Dictionary:
 
 ## 计算定长环形队列下一个写入游标位置（防除零越界）
 static func ring_next_cursor(cursor: int, capacity: int) -> int:
-	var cap := maxi(1, capacity)
-	return (cursor + 1) % cap
+	var safe_capacity := maxi(1, capacity)
+	return (cursor + 1) % safe_capacity
 
 # ==============================================================================
 # 三、字符串掩码、内联洗净与调用帧解析算子
 # ==============================================================================
 
 ## 对字符串执行前后缀保留掩码（过短整值替换为掩码占位符，防长度泄露）
-static func mask_string(val_str: String, prefix_len: int, suffix_len: int, replace_with: String) -> String:
-	var total_len := val_str.length()
-	if total_len == 0 or total_len <= prefix_len + suffix_len:
+static func mask_string(raw_value: String, prefix_length: int, suffix_length: int, replace_with: String) -> String:
+	var total_length := raw_value.length()
+	if total_length == 0 or total_length <= prefix_length + suffix_length:
 		return replace_with
-	var p := val_str.left(prefix_len)
-	var s := val_str.right(suffix_len) if suffix_len > 0 else ""
-	return p + replace_with + s
+	var prefix_part := raw_value.left(prefix_length)
+	var suffix_part := raw_value.right(suffix_length) if suffix_length > 0 else ""
+	return prefix_part + replace_with + suffix_part
 
 ## 二次内联洗净日志正文文本中的敏感凭据模式（含引号 JSON、URL 查询串、Bearer/Basic、邮箱与系统路径用户名）
 static func scrub_inline_secrets(message: String, mask_token: String = LogConstants.DEFAULT_MASK_REPLACEMENT) -> String:
@@ -81,27 +81,27 @@ static func scrub_inline_secrets(message: String, mask_token: String = LogConsta
 	var has_path := ("Users" in message) or ("/home/" in message)
 	if not has_kv and not has_auth and not has_email and not has_path:
 		return message
-	var out := message
+	var scrubbed_text := message
 	if has_kv and _inline_kv_secret_re != null:
-		out = _inline_kv_secret_re.sub(out, "$1" + mask_token, true)
+		scrubbed_text = _inline_kv_secret_re.sub(scrubbed_text, "$1" + mask_token, true)
 	if has_auth and _inline_bearer_re != null:
-		out = _inline_bearer_re.sub(out, "$1 " + mask_token, true)
+		scrubbed_text = _inline_bearer_re.sub(scrubbed_text, "$1 " + mask_token, true)
 	if has_email and _inline_email_re != null:
-		out = _inline_email_re.sub(out, mask_token, true)
+		scrubbed_text = _inline_email_re.sub(scrubbed_text, mask_token, true)
 	if has_path and _inline_home_path_re != null:
-		out = _inline_home_path_re.sub(out, "$1" + mask_token, true)
-	return out
+		scrubbed_text = _inline_home_path_re.sub(scrubbed_text, "$1" + mask_token, true)
+	return scrubbed_text
 
 ## 从调用栈提取首个非跳过白名单的源文件 basename 与行号（杜绝绝对路径泄漏）
 static func extract_caller_from_stack(stack_frames: Array, skip_basenames: Array[String]) -> Dictionary:
 	if stack_frames.is_empty():
 		return {"source_file": "", "source_line": 0}
 	for frame in stack_frames:
-		var src := str(frame.get("source", ""))
-		var fname := src.get_file()
-		if not fname.is_empty() and not (fname in skip_basenames):
+		var source_path := str(frame.get("source", ""))
+		var file_basename := source_path.get_file()
+		if not file_basename.is_empty() and not (file_basename in skip_basenames):
 			return {
-				"source_file": fname,
+				"source_file": file_basename,
 				"source_line": int(frame.get("line", 0)),
 			}
 	return {"source_file": "", "source_line": 0}

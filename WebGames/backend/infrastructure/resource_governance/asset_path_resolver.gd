@@ -6,7 +6,7 @@
 # 职责说明: 提供全域艺术资源（官方资产与 MOD 资产）的标准目录拓扑寻址与 URI 协议解析；
 #           严格区分工程版（Engineering Dev Build）与正式发行版（Release Build）的读盘策略；
 #           防御外部 MOD 路径穿越攻击（Anti-Path Traversal），为全域加载系统提供单一真源路径。
-# 退出语义与设计依据: 三级级联安全路径隔离与双轨环境规约 (Inv-MOD-RELPATH-1 / Inv-PATH-TRAVERSAL-GUARD)
+# 退出语义与设计依据: 三级级联安全路径隔离与双通道环境规约 (Inv-MOD-RELPATH-1 / Inv-PATH-TRAVERSAL-GUARD)
 # ==============================================================================
 
 ## AssetPathResolver：全域艺术资源标准化寻址与环境裁决中枢
@@ -17,7 +17,7 @@ extends RefCounted
 # 一、环境枚举与标准目录常量定义
 # ==============================================================================
 
-## 运行环境标识：工程开发版（编辑器调试、无头单测、松散文件、备用兜底优先）
+## 运行环境标识：工程开发版（编辑器调试、无头单测、松散文件、备用回退优先）
 const ENV_ENGINEERING: String = "engineering"
 
 ## 运行环境标识：正式发行版（独立二进制、PCK封包、沙盒安全、强校验）
@@ -150,7 +150,7 @@ static func get_mod_discovery_roots() -> Array[String]:
 	var exe_dir := OS.get_executable_path().get_base_dir()
 	roots.append(exe_dir.path_join(ROOT_MODS_TIER1_STANDALONE))
 
-	# 用户安全数据沙盒目录（全环境兜底，支持创意工坊与动态下载）
+	# 用户安全数据沙盒目录（全环境默认回退，支持创意工坊与动态下载）
 	roots.append(ROOT_MODS_TIER2_USER_SANDBOX)
 	return roots
 
@@ -249,14 +249,14 @@ static func sanitize_sandbox_path(raw_path: String) -> String:
 	var segments := clean.split("/")
 	var safe_segments: Array[String] = []
 
-	for seg in segments:
-		var s := seg.strip_edges()
-		if s.is_empty() or s == ".":
+	for segment in segments:
+		var clean_segment := segment.strip_edges()
+		if clean_segment.is_empty() or clean_segment == ".":
 			continue
-		if s == "..":
+		if clean_segment == "..":
 			# 刚性拒绝向上一级跃迁
 			continue
-		safe_segments.append(s)
+		safe_segments.append(clean_segment)
 
 	return prefix + "/".join(safe_segments)
 
@@ -264,7 +264,7 @@ static func sanitize_sandbox_path(raw_path: String) -> String:
 static func sanitize_identifier(raw_id: String) -> String:
 	var clean := raw_id.strip_edges()
 	var regex := RegEx.new()
-	var _err := regex.compile("[^a-zA-Z0-9_\\-]")
+	var _compile_error := regex.compile("[^a-zA-Z0-9_\\-]")
 	return regex.sub(clean, "", true)
 
 ## 资产物理存在性探测（兼容 Godot 虚拟文件系统与外部物理文件）

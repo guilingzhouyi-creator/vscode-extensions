@@ -17,9 +17,9 @@ var _store: Dictionary = {}
 var _access_order_dict: Dictionary = {} # 有序集合（Dictionary 保持插入序）用于 LRU/FIFO 追踪，O(1) 触达/淘汰
 var _timestamps: Dictionary = {} # key -> float (秒)
 
-func _init(p_spec: CachePolicySpec = null) -> void:
-	if p_spec != null:
-		_spec = p_spec
+func _init(policy_spec: CachePolicySpec = null) -> void:
+	if policy_spec != null:
+		_spec = policy_spec
 	else:
 		_spec = CachePolicySpec.new("default_cache", 100)
 
@@ -28,52 +28,52 @@ func get_spec() -> CachePolicySpec:
 	return _spec
 
 ## 放入条目，超出容量时自动触发淘汰
-func put(p_key: String, p_value: Variant) -> void:
-	if p_key.is_empty():
+func put(cache_key: String, cache_value: Variant) -> void:
+	if cache_key.is_empty():
 		return
 
 	# 若已存在，更新值与访问顺序（LRU 需触达，FIFO 保持插入序不变）
-	if _store.has(p_key):
-		_store[p_key] = p_value
-		_timestamps[p_key] = Time.get_unix_time_from_system()
+	if _store.has(cache_key):
+		_store[cache_key] = cache_value
+		_timestamps[cache_key] = Time.get_unix_time_from_system()
 		if _spec.eviction_policy == CachePolicySpec.EvictionPolicy.LRU:
-			_touch(p_key)
+			_touch(cache_key)
 		return
 
 	# 容量已满，执行驱逐
 	while _store.size() >= _spec.max_capacity:
 		_evict_one()
 
-	_store[p_key] = p_value
-	_timestamps[p_key] = Time.get_unix_time_from_system()
-	_access_order_dict[p_key] = true
+	_store[cache_key] = cache_value
+	_timestamps[cache_key] = Time.get_unix_time_from_system()
+	_access_order_dict[cache_key] = true
 
 ## 获取条目，支持 TTL 过期淘汰
-func get_val(p_key: String, p_default: Variant = null) -> Variant:
-	if not _store.has(p_key):
-		return p_default
+func get_val(cache_key: String, default_value: Variant = null) -> Variant:
+	if not _store.has(cache_key):
+		return default_value
 
 	# TTL 过期检查
 	if _spec.eviction_policy == CachePolicySpec.EvictionPolicy.TTL:
-		var created_time: float = float(_timestamps.get(p_key, 0.0))
+		var created_time: float = float(_timestamps.get(cache_key, 0.0))
 		var current_time: float = Time.get_unix_time_from_system()
 		if current_time - created_time > _spec.ttl_seconds:
-			_remove_internal(p_key)
-			return p_default
+			_remove_internal(cache_key)
+			return default_value
 
 	if _spec.eviction_policy == CachePolicySpec.EvictionPolicy.LRU:
-		_touch(p_key)
+		_touch(cache_key)
 
-	return _store[p_key]
+	return _store[cache_key]
 
 ## 判定条目是否存在且未过期
-func has(p_key: String) -> bool:
-	return get_val(p_key, null) != null
+func has(cache_key: String) -> bool:
+	return get_val(cache_key, null) != null
 
 ## 手动删除条目
-func remove(p_key: String) -> bool:
-	if _store.has(p_key):
-		_remove_internal(p_key)
+func remove(cache_key: String) -> bool:
+	if _store.has(cache_key):
+		_remove_internal(cache_key)
 		return true
 	return false
 
@@ -84,30 +84,30 @@ func _evict_one() -> void:
 	# TTL 优先淘汰过期条目，其次按 LRU/FIFO 头部淘汰（直接迭代字典避免 keys() 建临时数组）
 	if _spec.eviction_policy == CachePolicySpec.EvictionPolicy.TTL:
 		var now := Time.get_unix_time_from_system()
-		for k in _access_order_dict:
-			var t_key := String(k)
-			var created := float(_timestamps.get(t_key, 0.0))
+		for entry_key in _access_order_dict:
+			var ttl_key := String(entry_key)
+			var created := float(_timestamps.get(ttl_key, 0.0))
 			if now - created > _spec.ttl_seconds:
-				_remove_internal(t_key)
+				_remove_internal(ttl_key)
 				return
 	# LRU/FIFO/MANUAL 均淘汰有序集合头部（LRU 头部即最久未访，FIFO 头部即最早插入）
 	var victim_key: String = ""
-	for k in _access_order_dict:
-		victim_key = String(k)
+	for entry_key in _access_order_dict:
+		victim_key = String(entry_key)
 		break
 	if not victim_key.is_empty():
 		_remove_internal(victim_key)
 
-func _remove_internal(p_key: String) -> void:
-	_store.erase(p_key)
-	_timestamps.erase(p_key)
-	_access_order_dict.erase(p_key)
+func _remove_internal(cache_key: String) -> void:
+	_store.erase(cache_key)
+	_timestamps.erase(cache_key)
+	_access_order_dict.erase(cache_key)
 
-func _touch(p_key: String) -> void:
+func _touch(cache_key: String) -> void:
 	# O(1) 均摊：先删后插移到尾部，保持 LRU 尾部为最近
-	if _access_order_dict.has(p_key):
-		_access_order_dict.erase(p_key)
-	_access_order_dict[p_key] = true
+	if _access_order_dict.has(cache_key):
+		_access_order_dict.erase(cache_key)
+	_access_order_dict[cache_key] = true
 
 ## 热更/场景重置清理通道
 func clear_on_hot_reload() -> void:
@@ -128,7 +128,7 @@ func size() -> int:
 
 ## 获取缓存中当前所有活跃条目的键名列表
 func keys() -> Array[String]:
-	var res: Array[String] = []
-	for k in _store:
-		res.append(str(k))
-	return res
+	var result_keys: Array[String] = []
+	for entry_key in _store:
+		result_keys.append(str(entry_key))
+	return result_keys

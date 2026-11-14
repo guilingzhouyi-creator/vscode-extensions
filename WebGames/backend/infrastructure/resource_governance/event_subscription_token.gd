@@ -14,10 +14,10 @@ var source_signal: Signal
 var callable_target: Callable
 var is_active: bool = false
 
-func _init(p_sig: Signal = Signal(), p_fn: Callable = Callable()) -> void:
-	source_signal = p_sig
-	callable_target = p_fn
-	is_active = (not p_sig.is_null()) and (not p_fn.is_null())
+func _init(target_signal: Signal = Signal(), target_callable: Callable = Callable()) -> void:
+	source_signal = target_signal
+	callable_target = target_callable
+	is_active = (not target_signal.is_null()) and (not target_callable.is_null())
 
 ## 安全注销订阅，保证幂等性与零崩溃
 func unsubscribe() -> bool:
