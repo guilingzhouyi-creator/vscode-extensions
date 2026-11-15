@@ -347,7 +347,7 @@ def validate_kit_item_entry(
             "ERR_DESTINY_KIT_INVALID",
             rel_name,
             f"自定义套件 '{kit_id}' 第 {item_index} 项物品的 canonical_id 为空或非法",
-            "请填写非空的权威物品标识符（如 KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD）",
+            "请填写非空的权威物品标识符（格式 <NAMESPACE>:<MAJOR>:<MINOR>:<NAME>，如 MOD:EQUIP:WEAPON_BLADE:IRON_SWORD）",
         )
 
     count = item.get("count", 1)

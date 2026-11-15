@@ -209,8 +209,8 @@ def _simulate_steps(
         "visited_nodes": visited,
         "applied_mutations": applied_mutations,
         "gold": context.get("initial_gold", 0),
-        "location": context.get("start_location", "CENTRAL_CONTINENT"),
-        "equipment": [context.get("initial_equipment", "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD")],
+        "location": context.get("start_location", "FRONTIER_REALM"),
+        "equipment": [context.get("initial_equipment", "STARTER_WEAPON")],
     }
     return steps, final_state, reached_term
 
@@ -285,7 +285,7 @@ def play_mod_suite(
             "ap_max": 10.0,
             "gold": char_sheet.get("initial_gold", 0),
             "potential_stat_points": 0,
-            "current_location": bundle.get("context", {}).get("start_location", "CENTRAL_CONTINENT"),
+            "current_location": bundle.get("context", {}).get("start_location", "FRONTIER_REALM"),
             "active_mode": "single_player",
             "active_modals": [],
             "unread_mail_count": 0,

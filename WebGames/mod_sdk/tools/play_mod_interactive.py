@@ -593,10 +593,10 @@ def play_mod_interactive(
         "visited_nodes": visited,
         "applied_mutations": all_applied,
         "gold": s_ctx["current_char"].get("gold", 0),
-        "location": s_ctx["current_char"].get("birth_region", "CENTRAL_CONTINENT"),
+        "location": s_ctx["current_char"].get("birth_region", "FRONTIER_REALM"),
         "equipment": [
             s_ctx["current_char"].get(
-                "initial_equipment", "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD"
+                "initial_equipment", "STARTER_WEAPON"
             )
         ],
     }

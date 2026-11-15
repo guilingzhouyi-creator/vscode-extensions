@@ -58,7 +58,7 @@ def _build_manifest_dict(pack_id: str, pack_name: str, effective_tier: int = 2) 
         "pack_id": pack_id,
         "pack_name": pack_name,
         "version": "1.0.0",
-        "author": "Kalar Modder",
+        "author": "MOD Author",
         "engine_api_version": "1.0.0",
         "tier": TIER_ENUM_MAP.get(effective_tier, "TIER_2_AUDIOVISUAL"),
         "priority": 100,
@@ -154,7 +154,7 @@ def _build_dag_dict(
     if inline_text:
         nodes[entry_nid]["inline_text"] = f"在《{label}》的初始启蒙点，{{player_name}} 缓缓苏醒。"
         nodes[step_nid]["inline_text"] = f"四周微光浮动，{{player_name}} 握紧武器迈出坚实步伐。"
-        nodes[exit_nid]["inline_text"] = f"完成试炼，{{player_name}} 准备启程探索卡拉尔广袤天地。"
+        nodes[exit_nid]["inline_text"] = f"完成试炼，{{player_name}} 准备启程探索《{label}》广袤天地。"
 
     return {
         "dag_id": dag_id,
@@ -183,7 +183,7 @@ def _build_i18n_dict(pack_id: str, pack_name: str) -> dict[str, str]:
     return {
         f"narrative.{pack_id}.start": f"在《{pack_name}》的初始启蒙点，{{player_name}} 缓缓苏醒。",
         f"narrative.{pack_id}.step": f"四周微光浮动，{{player_name}} 握紧武器迈出坚实步伐。",
-        f"narrative.{pack_id}.exit": f"完成试炼，{{player_name}} 准备启程探索卡拉尔广袤天地。",
+        f"narrative.{pack_id}.exit": f"完成试炼，{{player_name}} 准备启程探索《{pack_name}》广袤天地。",
     }
 
 
@@ -212,7 +212,7 @@ def _build_destinies_dict(
                 "origin_id": origin_id,
                 "name": f"{pack_name}·秘传学徒",
                 "race": race_id.upper(),
-                "birth_region": "CENTRAL_CONTINENT",
+                "birth_region": "FRONTIER_REALM",
                 "weight": 25,
                 "initial_gold": 150,
                 "initial_reputation": 30,
@@ -263,14 +263,14 @@ def _build_destinies_dict(
                 "kit_id": kit_id,
                 "name": f"{pack_name}·初始行囊",
                 "initial_gold": 80,
-                "display_weapon": "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD",
+                "display_weapon": f"{clean_stem}:EQUIP:WEAPON_BLADE:IRON_SWORD",
                 "initial_items": [
                     {
-                        "canonical_id": "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD",
+                        "canonical_id": f"{clean_stem}:EQUIP:WEAPON_BLADE:IRON_SWORD",
                         "count": 1,
                     },
                     {
-                        "canonical_id": "KALAR:CONSUM:ALCHEMY:POTION_MANA",
+                        "canonical_id": f"{clean_stem}:CONSUM:ALCHEMY:POTION_MANA",
                         "count": 2,
                     },
                 ],

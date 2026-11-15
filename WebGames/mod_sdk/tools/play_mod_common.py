@@ -299,7 +299,14 @@ def load_and_merge_assets(mod_paths: list[Path]) -> dict[str, Any]:
         "ui_trait_mode": "INHERIT",
         "ui_reroll": False,
     }
+    has_total_conversion = False
     for mod_dir in mod_paths:
+        pack_data = safe_load_json(mod_dir / "pack.json")
+        if isinstance(pack_data, dict):
+            profile = str(pack_data.get("pack_profile", "")).strip().upper()
+            mod_tier = str(pack_data.get("mod_tier", "")).strip().upper()
+            if profile == "TOTAL_CONVERSION" or mod_tier == "TOTAL_CONVERSION":
+                has_total_conversion = True
         dest_data = safe_load_json(mod_dir / "destinies.json")
         if isinstance(dest_data, dict):
             merge_destinies_from_mod(dest_data, state)
@@ -308,10 +315,11 @@ def load_and_merge_assets(mod_paths: list[Path]) -> dict[str, Any]:
             state["routing_rules"].extend(extract_rules(rout_data))
         merge_dag_and_i18n(mod_dir, state["dag_graphs"], state["i18n_catalog"])
 
-    all_origins = state["custom_origins"] + BUILTIN_ORIGINS
-    all_traits = state["custom_traits"] + BUILTIN_TRAITS
-    all_presets = state["paired_presets"] + BUILTIN_PAIRED_PRESETS
-    all_kits = state["custom_kits"] + BUILTIN_STARTER_KITS
+    use_builtin_defaults = not (has_total_conversion and state["custom_origins"])
+    all_origins = state["custom_origins"] + (BUILTIN_ORIGINS if use_builtin_defaults else [])
+    all_traits = state["custom_traits"] + (BUILTIN_TRAITS if not (has_total_conversion and state["custom_traits"]) else [])
+    all_presets = state["paired_presets"] + (BUILTIN_PAIRED_PRESETS if not (has_total_conversion and state["paired_presets"]) else [])
+    all_kits = state["custom_kits"] + (BUILTIN_STARTER_KITS if not (has_total_conversion and state["custom_kits"]) else [])
 
     creation_ui_snapshot = {
         "origin_selection_mode": state["ui_origin_mode"],

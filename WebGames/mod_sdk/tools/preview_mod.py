@@ -431,6 +431,12 @@ def _select_origin(
     if isinstance(destinies_data, dict):
         custom_origins = _normalize_list_items(destinies_data.get("custom_origins"), "origin_id")
 
+    if custom_origins and not preferred_origin_id:
+        for orig in custom_origins:
+            if str(orig.get("race", "")).upper() == race_id.upper():
+                return orig
+        return custom_origins[0]
+
     all_origins = custom_origins + BUILTIN_ORIGINS
 
     if preferred_origin_id:
@@ -469,12 +475,12 @@ def _build_simulation_context(
     Returns:
         包含全套双轨 (小写+大写) 占位符变量的水化上下文字典。
     """
-    oid = str(selected_origin.get("origin_id") or "IMPERIAL_NOBLE")
+    oid = str(selected_origin.get("origin_id") or "ORIGIN_DEFAULT")
     oname = str(selected_origin.get("name") or oid)
-    region = str(selected_origin.get("birth_region") or "CENTRAL_CONTINENT")
+    region = str(selected_origin.get("birth_region") or "FRONTIER_REALM")
     cid = f"CHAR_{oid}_{player_name}"
-    kname = str(selected_kit.get("name") if selected_kit else "默认新兵行囊")
-    weap = str(selected_kit.get("display_weapon") if selected_kit else "铁剑")
+    kname = str(selected_kit.get("name") if selected_kit else "默认初始行囊")
+    weap = str(selected_kit.get("display_weapon") if selected_kit else "STARTER_WEAPON")
 
     ctx: dict[str, Any] = {
         "player_name": player_name,
@@ -485,10 +491,10 @@ def _build_simulation_context(
         "gender": "FEMALE",
         "level": 1,
         "world_id": "WORLD_SIMULATE_01",
-        "town": "卡拉尔圣城",
+        "town": region,
         "start_location": region,
         "initial_equipment": weap,
-        "npc_target": "堡垒守卫阿列克",
+        "npc_target": "据点向导",
         "event_result": "完成初始启蒙试炼",
         "origin_id": oid,
         "origin_name": oname,

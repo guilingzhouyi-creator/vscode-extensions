@@ -311,9 +311,9 @@ def resolve_character_sheet(
 
     base_attrs = generate_base_attributes(opts.seed, opts.reroll_nonce)
     selected_origin = pick_origin(opts.all_origins, opts.origin_id_param)
-    origin_id = str(selected_origin.get("origin_id") or "IMPERIAL_NOBLE")
+    origin_id = str(selected_origin.get("origin_id") or "ORIGIN_DEFAULT")
     origin_name = str(selected_origin.get("name") or origin_id)
-    birth_region = str(selected_origin.get("birth_region") or "CENTRAL_CONTINENT")
+    birth_region = str(selected_origin.get("birth_region") or "FRONTIER_REALM")
     origin_bonus = selected_origin.get("attribute_bonus") if isinstance(selected_origin.get("attribute_bonus"), dict) else {}
 
     final_attrs = {
@@ -341,8 +341,8 @@ def resolve_character_sheet(
     orig_gold = int(selected_origin.get("initial_gold", 0))
     kit_gold = int(selected_kit.get("initial_gold", 0))
     initial_gold = orig_gold if orig_gold > 0 else max(kit_gold, 50)
-    kit_name = str(selected_kit.get("name") or selected_kit.get("kit_id") or "标准新兵行囊")
-    initial_equip = str(selected_kit.get("display_weapon") or "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD")
+    kit_name = str(selected_kit.get("name") or selected_kit.get("kit_id") or "标准行囊")
+    initial_equip = str(selected_kit.get("display_weapon") or selected_origin.get("display_weapon") or "STARTER_WEAPON")
     initial_items = list(selected_kit.get("initial_items", []))
 
     return {
@@ -396,12 +396,12 @@ def build_character_context(char: dict[str, Any]) -> dict[str, Any]:
         "race_id": char["race_id"],
         "gender": char["gender"],
         "level": 1,
-        "world_id": "WORLD_KALAR_STAGE_01",
-        "town": "卡拉尔圣城",
+        "world_id": str(char.get("world_id") or "WORLD_STAGE_01"),
+        "town": str(char.get("birth_region") or "边境据点"),
         "start_location": char["birth_region"],
         "initial_equipment": char["initial_equipment"],
-        "npc_target": "圣城指引司铎",
-        "event_result": "初始天命启蒙试炼顺利通关",
+        "npc_target": "据点向导",
+        "event_result": "完成初始启蒙试炼",
         "origin_id": char["origin_id"],
         "origin_name": char["origin_name"],
         "birth_region": char["birth_region"],

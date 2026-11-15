@@ -59,6 +59,7 @@ from check_mod_multi import (
     check_multi_ui_policy_conflicts as _check_multi_ui_policy_conflicts,
     validate_multi_mods,
 )
+from check_mod_schema import validate_mod_schemas
 
 
 # ==============================================================================
@@ -240,51 +241,56 @@ def _collect_mod_uri_strings(obj: Any) -> list[str]:
     return found
 
 
-def _resolve_mod_uri_path(mod_dir: Path, uri: str) -> bool:
+def _resolve_mod_uri_path(mod_dir: Path, uri: str, pack_id: str = "") -> bool:
     """判断 mod:// 资产 URI 是否在模组内物理存在。"""
     clean_target = uri[6:].strip("/")
     if not clean_target:
         return False
-    if (mod_dir / clean_target).is_file():
-        return True
-    if (mod_dir / "assets" / clean_target).is_file():
-        return True
+    candidates = [clean_target]
+    if pack_id and clean_target.startswith(pack_id + "/"):
+        candidates.append(clean_target[len(pack_id) + 1:])
+    for rel in candidates:
+        if (mod_dir / rel).is_file():
+            return True
+        if (mod_dir / "assets" / rel).is_file():
+            return True
     return False
 
 
-def _check_dangling_asset_refs(mod_dir: Path, diags: list[DiagnosticItem]) -> None:
-    """校验 destinies.json 与因果 DAG 图元中引用的 mod:// 资产是否存在于 assets/。"""
-    destiny_path = mod_dir / "destinies.json"
-    if destiny_path.is_file():
-        try:
-            d_data = json.loads(destiny_path.read_text(encoding="utf-8"))
-            for uri in _collect_mod_uri_strings(d_data):
-                if not _resolve_mod_uri_path(mod_dir, uri):
-                    diags.append(DiagnosticItem(
-                        code="ERR_ASSET_DANGLING_REF",
-                        file_path="destinies.json",
-                        detail=f"destinies.json 引用了不存在的资产: '{uri}'",
-                        fix_suggestion=f"请确保资产文件已放置于 assets/ 对应路径，并运行 'kalar-mod cook' 生成清单",
-                    ))
-        except (json.JSONDecodeError, OSError):
-            pass
+def _scan_json_refs(json_file: Path, rel_label: str, mod_dir: Path, pack_id: str, diags: list[DiagnosticItem]) -> None:
+    if not json_file.is_file():
+        return
+    try:
+        payload = json.loads(json_file.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return
+    for uri in _collect_mod_uri_strings(payload):
+        if not _resolve_mod_uri_path(mod_dir, uri, pack_id):
+            diags.append(DiagnosticItem(
+                code="ERR_ASSET_DANGLING_REF",
+                file_path=rel_label,
+                detail=f"{rel_label} 引用了不存在的资产: '{uri}'",
+                fix_suggestion="请确保资产文件已放置于 assets/ 对应路径，并运行 'kalar-mod cook' 生成清单",
+            ))
+
+
+def _check_dangling_asset_refs(mod_dir: Path, diags: list[DiagnosticItem], pack_id: str = "") -> None:
+    """校验 destinies.json、因果 DAG 与 content/ 中引用的 mod:// 资产是否存在于 assets/。"""
+    _scan_json_refs(mod_dir / "destinies.json", "destinies.json", mod_dir, pack_id, diags)
 
     dag_dir = mod_dir / "dag_graphs"
     if dag_dir.is_dir():
         for df in sorted(dag_dir.glob("*.json")):
-            try:
-                g_data = json.loads(df.read_text(encoding="utf-8"))
-                rel_file = f"dag_graphs/{df.name}"
-                for uri in _collect_mod_uri_strings(g_data):
-                    if not _resolve_mod_uri_path(mod_dir, uri):
-                        diags.append(DiagnosticItem(
-                            code="ERR_ASSET_DANGLING_REF",
-                            file_path=rel_file,
-                            detail=f"{rel_file} 节点中引用了不存在的资产: '{uri}'",
-                            fix_suggestion=f"请确保资产文件已放置于 assets/ 对应路径，或修正节点中的资源 URI",
-                        ))
-            except (json.JSONDecodeError, OSError):
-                pass
+            _scan_json_refs(df, f"dag_graphs/{df.name}", mod_dir, pack_id, diags)
+
+    content_dir = mod_dir / "content"
+    if content_dir.is_dir():
+        for cf in sorted(content_dir.rglob("*.json")):
+            _scan_json_refs(cf, f"content/{cf.relative_to(content_dir).as_posix()}", mod_dir, pack_id, diags)
+
+    if (mod_dir / "assets").is_dir() and (mod_dir / "cutscenes").is_dir():
+        for cs_file in sorted((mod_dir / "cutscenes").glob("*.json")):
+            _scan_json_refs(cs_file, f"cutscenes/{cs_file.name}", mod_dir, pack_id, diags)
 
 
 def _validate_content_domain_payload(
@@ -415,8 +421,10 @@ def validate_mod(mod_dir: Path) -> tuple[bool, list[DiagnosticItem]]:
     _check_i18n(mod_dir, required_keys, diags)
     check_destinies_file(mod_dir, diags, declared_dag_ids=declared_dag_ids, pack_profile=pack_profile)
     _check_asset_safety_and_manifest(mod_dir, diags)
-    _check_dangling_asset_refs(mod_dir, diags)
+    pack_id = str((manifest or {}).get("pack_id", "")).strip()
+    _check_dangling_asset_refs(mod_dir, diags, pack_id=pack_id)
     _check_content_directory(mod_dir, diags)
+    validate_mod_schemas(mod_dir, diags)
 
     valid = len(diags) == 0
     return valid, diags
