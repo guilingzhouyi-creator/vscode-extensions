@@ -16,6 +16,7 @@ const WorldGatewayRenderHelper = preload("res://frontend/views/world_gateway/wor
 var _view: BaseScreen = null
 var _gateway_entered_dispatched: bool = false
 var _prepared_world_id: String = ""
+var _prepared_slot_id: String = ""
 
 ## 绑定所属世界网关主视图实例
 func setup(host_view: BaseScreen) -> void:
@@ -28,43 +29,71 @@ func refresh_gateway_state() -> void:
 	var world_service: IWorldService = ServiceLocator.get_instance().world()
 	if world_service == null:
 		return
-	var merged_snapshot: Dictionary = {}
 	if not _gateway_entered_dispatched:
 		_gateway_entered_dispatched = true
 		world_service.enter_gateway_async(
 			_view.current_account_id,
 			_view.current_session_token,
 			func(response_payload: Dictionary) -> void:
-				WorldGatewayRenderHelper.collect_probe_snapshot(response_payload, merged_snapshot)
+				var probe_patch: Dictionary = {}
+				WorldGatewayRenderHelper.collect_probe_snapshot(response_payload, probe_patch)
+				if _view != null and is_instance_valid(_view) and not probe_patch.is_empty():
+					_view.apply_snapshot(probe_patch)
 		)
 	world_service.probe_modes_async(
 		_view.current_account_id,
 		_view.current_session_token,
 		func(response_payload: Dictionary) -> void:
-			WorldGatewayRenderHelper.collect_probe_snapshot(response_payload, merged_snapshot)
+			var probe_patch: Dictionary = {}
+			WorldGatewayRenderHelper.collect_probe_snapshot(response_payload, probe_patch)
+			if _view != null and is_instance_valid(_view) and not probe_patch.is_empty():
+				_view.apply_snapshot(probe_patch)
 	)
 	world_service.list_installed_mods_async(
 		_view.current_account_id,
 		_view.current_session_token,
 		[],
 		func(response_payload: Dictionary) -> void:
-			WorldGatewayRenderHelper.collect_installed_mods_snapshot(response_payload, merged_snapshot)
+			var mods_patch: Dictionary = {}
+			WorldGatewayRenderHelper.collect_installed_mods_snapshot(response_payload, mods_patch)
+			if _view != null and is_instance_valid(_view) and not mods_patch.is_empty():
+				_view.apply_snapshot(mods_patch)
 	)
 	world_service.list_worlds_async(
 		_view.current_account_id,
 		_view.current_session_token,
 		func(response_payload: Dictionary) -> void:
 			var data_map: Dictionary = response_payload.get("data", response_payload) as Dictionary
-			merged_snapshot["worlds"] = data_map.get("worlds", [])
+			if _view != null and is_instance_valid(_view):
+				_view.apply_snapshot({"worlds": data_map.get("worlds", [])})
+				if not _view.selected_world_id.is_empty():
+					refresh_selected_world_diagnostics(_view.selected_world_id)
 	)
 	world_service.list_remote_realms_async(
 		_view.current_account_id,
 		_view.current_session_token,
 		func(response_payload: Dictionary) -> void:
 			var data_map: Dictionary = response_payload.get("data", response_payload) as Dictionary
-			merged_snapshot["realms"] = data_map.get("realms", response_payload.get("realms", []))
+			if _view != null and is_instance_valid(_view):
+				_view.apply_snapshot({"realms": data_map.get("realms", response_payload.get("realms", []))})
 	)
-	_view.apply_snapshot(merged_snapshot)
+
+## 按世界 ID 刷新只读 MOD 锁诊断快照
+func refresh_selected_world_diagnostics(world_id: String) -> void:
+	if _view == null or world_id.is_empty():
+		return
+	var world_service: IWorldService = ServiceLocator.get_instance().world()
+	if world_service == null:
+		return
+	world_service.get_world_mod_diagnostics_async(
+		_view.current_account_id,
+		_view.current_session_token,
+		world_id,
+		func(response_payload: Dictionary) -> void:
+			var data_map: Dictionary = response_payload.get("data", response_payload) as Dictionary
+			_view.last_world_diagnostics = data_map
+			WorldGatewayRenderHelper.render_world_diagnostics(_view)
+	)
 
 ## 按列表索引选中单机世界档案并拉取其只读 MOD 诊断
 func select_world_by_index(item_index: int) -> void:
@@ -73,35 +102,28 @@ func select_world_by_index(item_index: int) -> void:
 	var entry: Variant = _view.saved_worlds[item_index]
 	if entry is Dictionary:
 		_view.selected_world_id = str((entry as Dictionary).get("world_id", ""))
-	var world_service: IWorldService = ServiceLocator.get_instance().world()
-	if world_service != null and not _view.selected_world_id.is_empty():
-		world_service.get_world_mod_diagnostics_async(
-			_view.current_account_id,
-			_view.current_session_token,
-			_view.selected_world_id,
-			func(response_payload: Dictionary) -> void:
-				var data_map: Dictionary = response_payload.get("data", response_payload) as Dictionary
-				_view.last_world_diagnostics = data_map
-				WorldGatewayRenderHelper.render_world_diagnostics(_view)
-		)
+	if not _view.selected_world_id.is_empty():
+		refresh_selected_world_diagnostics(_view.selected_world_id)
 	else:
 		WorldGatewayRenderHelper.render_world_diagnostics(_view)
 
 ## 重置预选世界状态（切换模式后强制重新对齐选档上下文）
 func reset_prepared_world_id() -> void:
 	_prepared_world_id = ""
+	_prepared_slot_id = ""
 
 ## 注销返回账号页时重置网关入站状态标记
 func reset_session_flags() -> void:
 	_gateway_entered_dispatched = false
 	_prepared_world_id = ""
+	_prepared_slot_id = ""
 
 ## 创建或选定单机世界档案
-func create_and_select_world(target_world_id: String) -> Dictionary:
+func create_and_select_world(target_world_id: String, on_completed: Callable = Callable()) -> Dictionary:
 	var resolved_world_id := target_world_id if not target_world_id.is_empty() else "world_sp_%d" % Time.get_ticks_msec()
 	var world_service: IWorldService = ServiceLocator.get_instance().world()
 	if world_service == null:
-		return {"success": false, "error_code": "ERR_SERVICE_UNAVAILABLE"}
+		return ServiceLocator.reply_service_unavailable(on_completed)
 	var action_reply: Dictionary = {}
 	world_service.select_or_create_world_async(
 		_view.current_account_id,
@@ -110,18 +132,27 @@ func create_and_select_world(target_world_id: String) -> Dictionary:
 		1,
 		func(response_payload: Dictionary) -> void:
 			action_reply.merge(response_payload, true)
+			if not bool(response_payload.get("success", false)):
+				var error_code := str(response_payload.get("error_code", "ERR_NO_BASE_CONTENT_MOD"))
+				if _view != null and is_instance_valid(_view):
+					_view.last_error_code = error_code
+				NavManager.get_instance().show_toast(error_code, NavTypes.ToastLevel.ERROR)
+				if on_completed.is_valid():
+					on_completed.call(response_payload)
+				return
+			var data_map: Dictionary = response_payload.get("data", response_payload) as Dictionary
+			var context_map: Variant = data_map.get("context", {})
+			_prepared_slot_id = str((context_map as Dictionary).get("selected_slot_id", "SLOT_01")) if context_map is Dictionary else "SLOT_01"
+			if _view != null and is_instance_valid(_view):
+				_view.selected_world_id = resolved_world_id
+			_prepared_world_id = resolved_world_id
+			refresh_gateway_state()
+			if on_completed.is_valid():
+				on_completed.call(response_payload)
 	)
-	if not bool(action_reply.get("success", false)):
-		var error_code := str(action_reply.get("error_code", "ERR_NO_BASE_CONTENT_MOD"))
-		_view.last_error_code = error_code
-		NavManager.get_instance().show_toast(error_code, NavTypes.ToastLevel.ERROR)
-		return action_reply
-	_view.selected_world_id = resolved_world_id
-	_prepared_world_id = resolved_world_id
-	refresh_gateway_state()
 	return action_reply
 
-## 选定并在网关层正式进入当前世界档案，按序章完成状态分流到 prologue 或 main_hud
+
 func enter_selected_world() -> Dictionary:
 	if _view == null or _view.selected_world_id.is_empty():
 		NavManager.get_instance().show_toast(UIIntermediary.text("ui.wg.sp.no_world_selected"), NavTypes.ToastLevel.WARNING)

@@ -70,10 +70,14 @@ func _ready() -> void:
 	_connect_signals()
 	UIIntermediary.adapt_view(self)
 
-## 进入世界网关视图时同步会话凭证并刷新档位列表
+## 进入世界网关视图时同步会话凭证、模式页签与选中世界并刷新状态
 func on_screen_enter(screen_parameters: Dictionary = {}) -> void:
 	super.on_screen_enter(screen_parameters)
-	_sync_navigation_context_properties(screen_parameters)
+	_sync_navigation_context_properties(screen_parameters, {
+		"world_id": "selected_world_id",
+		"gateway_mode": "current_gateway_mode"
+	})
+	_sync_mode_tab_selection()
 	refresh_gateway_state()
 
 ## 从 MOD 工坊返回后恢复刷新世界网关就绪态
@@ -92,6 +96,7 @@ func _render_from_snapshot() -> void:
 		current_session_token = FrontendSnapshot.read_string(snapshot, "token", current_session_token)
 	if snapshot.has("gateway_mode"):
 		current_gateway_mode = FrontendSnapshot.read_int(snapshot, "gateway_mode", current_gateway_mode)
+		_sync_mode_tab_selection()
 	if snapshot.has("base_content_mod_ready"):
 		base_content_mod_ready = FrontendSnapshot.read_bool(snapshot, "base_content_mod_ready", base_content_mod_ready)
 	if snapshot.has("active_base_pack_id"):
@@ -109,6 +114,8 @@ func _render_from_snapshot() -> void:
 	WorldGatewayRenderHelper.render_all(self, Callable(_get_tabs(), "select_world_by_index"))
 
 func _connect_signals() -> void:
+	if mode_tab_container != null:
+		connect_managed(mode_tab_container.tab_changed, _on_mode_tab_changed)
 	if switch_mode_btn != null:
 		connect_managed(switch_mode_btn.pressed, _on_switch_mode_debounced)
 	if open_mod_workbench_btn != null:
@@ -133,6 +140,19 @@ func _connect_signals() -> void:
 		connect_managed(verify_realm_btn.pressed, _on_verify_realm_debounced)
 	if refresh_realms_btn != null:
 		connect_managed(refresh_realms_btn.pressed, _on_refresh_realms_debounced)
+
+func _sync_mode_tab_selection() -> void:
+	if mode_tab_container == null:
+		return
+	var target_tab := 1 if current_gateway_mode == 2 else 0
+	if mode_tab_container.current_tab != target_tab:
+		mode_tab_container.current_tab = target_tab
+
+func _on_mode_tab_changed(tab_index: int) -> void:
+	var target_mode := 2 if tab_index == 1 else 1
+	if target_mode == current_gateway_mode:
+		return
+	WorldGatewayRealmSessionHelper.switch_gateway_mode(self, _get_tabs(), target_mode)
 
 func _on_switch_mode_debounced() -> void:
 	if try_consume_action_cooldown("wg_switch_mode", 200):
@@ -182,7 +202,7 @@ func _on_realm_item_selected(item_index: int) -> void:
 
 func _on_verify_realm_debounced() -> void:
 	if try_consume_action_cooldown("wg_verify_realm", 250):
-		WorldGatewayRealmSessionHelper.verify_and_enter_selected_realm(self)
+		WorldGatewayRealmSessionHelper.verify_and_enter_selected_realm(self, _get_tabs())
 
 func _on_refresh_realms_debounced() -> void:
 	if try_consume_action_cooldown("wg_refresh_realms", 200):
