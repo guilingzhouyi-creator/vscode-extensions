@@ -146,11 +146,54 @@ func _create_and_dispatch_task(path: String, priority: int, on_loaded: Callable)
 		_fallback_placeholder(new_task, path, on_loaded)
 		return task_id
 
+	if _is_external_binary_image_path(path):
+		_load_external_image_from_bytes(new_task, path, on_loaded)
+		return task_id
+
 	var request_error := ResourceLoader.load_threaded_request(path, "", false)
 	if request_error != OK:
 		_fallback_placeholder(new_task, path, on_loaded)
 
 	return task_id
+
+func _is_external_binary_image_path(path: String) -> bool:
+	var lower := path.to_lower()
+	var is_image := lower.ends_with(".png") or lower.ends_with(".webp") or lower.ends_with(".jpg") or lower.ends_with(".jpeg") or lower.ends_with(".bmp") or lower.ends_with(".tga")
+	if not is_image:
+		return false
+	return path.contains(".kmod!/") or path.begins_with("user://") or not ResourceLoader.exists(path)
+
+func _load_external_image_from_bytes(task: AsyncMediaTask, path: String, on_loaded: Callable) -> void:
+	var raw_bytes := AssetPathResolverClass.read_mod_asset_bytes(path)
+	if raw_bytes.is_empty():
+		_active_tasks.erase(task.task_id)
+		_fallback_placeholder(task, path, on_loaded)
+		return
+	var image := Image.new()
+	var lower := path.to_lower()
+	var load_status := ERR_FILE_UNRECOGNIZED
+	if lower.ends_with(".png"):
+		load_status = image.load_png_from_buffer(raw_bytes)
+	elif lower.ends_with(".webp"):
+		load_status = image.load_webp_from_buffer(raw_bytes)
+	elif lower.ends_with(".jpg") or lower.ends_with(".jpeg"):
+		load_status = image.load_jpg_from_buffer(raw_bytes)
+	elif lower.ends_with(".bmp"):
+		load_status = image.load_bmp_from_buffer(raw_bytes)
+	elif lower.ends_with(".tga"):
+		load_status = image.load_tga_from_buffer(raw_bytes)
+	if load_status != OK or image.is_empty():
+		_active_tasks.erase(task.task_id)
+		_fallback_placeholder(task, path, on_loaded)
+		return
+	var texture := ImageTexture.create_from_image(image)
+	task.status = STATUS_LOADED
+	task.progress = 1.0
+	task.loaded_resource = texture
+	_active_tasks.erase(task.task_id)
+	_path_to_task_id.erase(path)
+	_cache_loaded_resource(path, texture)
+	_invoke_callback(on_loaded, texture)
 
 func _complete_deterministic(task: AsyncMediaTask, path: String, on_loaded: Callable) -> void:
 	task.status = STATUS_LOADED

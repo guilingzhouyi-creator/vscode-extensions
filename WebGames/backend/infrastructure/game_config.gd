@@ -26,6 +26,8 @@ static var _base_tables: Dictionary = {}
 static var _active_mod_overlays: Array[String] = []
 static var _active_mod_layers: Array[Dictionary] = []
 static var _purged_prefixes: Array[String] = []
+static var _mod_i18n_by_locale: Dictionary = {}
+static var _mod_i18n_version: int = 0
 static var _loaded: bool = false
 static var _tables_mutex: Mutex = Mutex.new()
 
@@ -147,6 +149,8 @@ static func ensure_loaded() -> void:
 	_active_mod_overlays.clear()
 	_active_mod_layers.clear()
 	_purged_prefixes.clear()
+	_mod_i18n_by_locale.clear()
+	_mod_i18n_version = 0
 	var warnings: Array = []
 	GameConfigLoader.load_all_tables_into(_tables, _scan_failures, warnings)
 	_flush_loader_warnings(warnings)
@@ -503,6 +507,8 @@ static func clear_mod_overlay_tables() -> Dictionary:
 	_active_mod_layers.clear()
 	_purged_prefixes.clear()
 	_reload_counter += 1
+	_mod_i18n_by_locale.clear()
+	_mod_i18n_version += 1
 	_path_cache.clear()
 
 	EventBusCore.get_instance().emit_domain_event("config.mod_overlay_cleared", {
@@ -538,6 +544,37 @@ static func reload_subtable(subtable_name: String) -> Dictionary:
 		"subtable": resolved,
 		"version": _reload_counter
 	}
+
+## 写入当前启用模组包的合并多语言词条层（按标准化 locale 分桶隔离存储，与基础表解耦）
+static func set_mod_i18n_dictionaries(by_locale: Dictionary) -> void:
+	_mod_i18n_by_locale.clear()
+	for raw_locale in by_locale.keys():
+		_register_mod_i18n_locale(raw_locale, by_locale[raw_locale])
+	_mod_i18n_version += 1
+
+static func _register_mod_i18n_locale(raw_locale: Variant, entries: Variant) -> void:
+	var locale_key := String(raw_locale).strip_edges()
+	if locale_key.is_empty() or not (entries is Dictionary):
+		return
+	var locale_table := entries as Dictionary
+	if not locale_table.is_empty():
+		_mod_i18n_by_locale[locale_key] = locale_table.duplicate(true)
+
+## 清空模组多语言词条覆盖层并返回是否确实清除了非空词典
+static func clear_mod_i18n_dictionaries() -> bool:
+	var had_entries := not _mod_i18n_by_locale.is_empty()
+	_mod_i18n_by_locale.clear()
+	if had_entries:
+		_mod_i18n_version += 1
+	return had_entries
+
+## 只读获取当前激活的模组多语言分桶字典（深拷贝防调用方污染）
+static func get_mod_i18n_dictionaries() -> Dictionary:
+	return _mod_i18n_by_locale.duplicate(true)
+
+## 获取模组多语言覆盖层单调递增版本号（供 UITextResolver 执行 O(1) 脏检查同步）
+static func get_mod_i18n_version() -> int:
+	return _mod_i18n_version
 
 # ==============================================================================
 # 四、泛用取值与类型化取值

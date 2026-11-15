@@ -177,6 +177,14 @@ func unload_mod_translations(mod_id: String) -> int:
     _mod_original_templates.erase(mod_id)
     return cleaned_count
 
+
+## 卸载当前所有已注入 MOD 的多语言覆盖词条并完整还原基础语言词库
+func unload_all_mod_translations() -> int:
+    var cleaned_total := 0
+    for mod_key in _mod_translations.keys():
+        cleaned_total += unload_mod_translations(str(mod_key))
+    return cleaned_total
+
 ## 全局名称键登记（跨域唯一性 + 英文唯一 fallback 必达）：
 ## - 同 key **不同域** → NAME_KEY_COLLISION，不覆盖原所有者；
 ## - 同 key **同域幂等重登记**（配置热重载/多实例 reload）→ 仅刷新词典值，不重复入清单；

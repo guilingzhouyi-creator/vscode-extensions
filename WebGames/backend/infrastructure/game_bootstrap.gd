@@ -113,6 +113,7 @@ static func assemble() -> Dictionary:
 	# 掉落事件监听器装配（注入注册表 catalog，订阅 monster.killed → 地面掉落声明）
 	_ground_loot_listener = GroundLootEventListener.new(_catalog)
 	PrologueCutscenePort.register_runner(Callable(GameBootstrap, "_run_prologue_cutscene_hook"))
+	PrologueCutscenePort.register_hook_interceptor(Callable(GameBootstrap, "_intercept_prologue_dag_hook"))
 	WorldSessionRuntimeService.register_token_protection_handlers(
 		Callable(ClientSecretVault, "mask_in_memory_token"),
 		Callable(ClientSecretVault, "reveal_in_memory_token")
@@ -352,4 +353,27 @@ static func _run_prologue_cutscene_hook(cutscene_id: String, is_skip_requested: 
 		"cutscene_id": cutscene_id,
 		"skipped": is_skipped,
 		"is_placeholder": bool(play_result.get("is_placeholder", false))
+	}
+
+## 清空过场 Hook 的单档已播记录（由 Tier3ContentOverrideLoader.revert_all_overrides 与生命周期退回调用）
+static func clear_cutscene_viewed_records() -> void:
+	CutsceneHookRegistry.get_instance().clear_viewed_records()
+
+## 依赖倒置剧情节点 Hook 匹配适配器：在 DAG 节点激活前/完成后匹配并触发 cutscene_hooks 声明
+static func _intercept_prologue_dag_hook(dag_id: String, node_id: String, is_pre: bool) -> Dictionary:
+	var registry := CutsceneHookRegistry.get_instance()
+	if registry == null:
+		return {"matched": false}
+	var hook_request: CutsceneRequestDTO = registry.match_narrative_hook(dag_id, node_id, is_pre)
+	if hook_request == null:
+		return {"matched": false}
+	var receipt := PrologueCutscenePort.dispatch_cutscene(hook_request.cutscene_id, false)
+	if bool(receipt.get("success", false)) and hook_request.play_once_per_save:
+		registry.mark_cutscene_viewed(hook_request.cutscene_id)
+	return {
+		"matched": true,
+		"cutscene_id": hook_request.cutscene_id,
+		"play_once_per_save": hook_request.play_once_per_save,
+		"auto_pause_world": hook_request.auto_pause_world,
+		"receipt": receipt
 	}

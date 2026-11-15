@@ -15,15 +15,29 @@ extends RefCounted
 # 一、ID 格式校验与注册
 # ==============================================================================
 
-## canonical_id 格式校验：KALAR:<域>:<类>:<名> 四段以上，各段非空
+## canonical_id 格式校验：<NAMESPACE>:<域>:<类>:<名> 四段以上，命名空间为大写字母数字下划线标识且各段非空
 static func validate_canonical_id_format(canonical_id: String) -> bool:
 	var parts: PackedStringArray = canonical_id.split(":")
 	if parts.size() < 4:
 		return false
-	if parts[0] != "KALAR":
+	if not _is_valid_namespace_segment(parts[0]):
 		return false
 	for part in parts:
-		if part.is_empty():
+		if part.is_empty() or part != part.strip_edges():
+			return false
+	return true
+
+static func _is_valid_namespace_segment(namespace_token: String) -> bool:
+	if namespace_token.is_empty():
+		return false
+	for byte_index in range(namespace_token.length()):
+		var unicode_value := namespace_token.unicode_at(byte_index)
+		var is_upper := unicode_value >= 65 and unicode_value <= 90
+		var is_digit := unicode_value >= 48 and unicode_value <= 57
+		var is_underscore := unicode_value == 95
+		if byte_index == 0 and not is_upper:
+			return false
+		if not (is_upper or is_digit or is_underscore):
 			return false
 	return true
 

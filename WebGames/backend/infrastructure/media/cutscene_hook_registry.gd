@@ -36,6 +36,7 @@ var _narrative_hooks_index: Dictionary = {} # "pre/post|dag_id|node_id" -> hook_
 var _quest_hooks_index: Dictionary = {} # "quest_id|stage_id" -> hook_dict
 var _lifecycle_hooks_index: Dictionary = {} # stage_id -> hook_dict
 var _viewed_records: Dictionary = {} # cutscene_id -> bool
+var _synced_config_version: int = -1
 
 # ==============================================================================
 # 二、单例与初始化
@@ -63,6 +64,7 @@ func initialize_from_config() -> void:
 	for hook_entry in hooks_array:
 		if hook_entry is Dictionary:
 			_append_and_index_hook(hook_entry as Dictionary)
+	_synced_config_version = GameConfig.config_reload_version()
 
 func _build_manifest_dto(cutscene_id: String, manifest_entry: Dictionary) -> CutsceneManifestDTO:
 	var manifest := CutsceneManifestDTOClass.new()
@@ -100,6 +102,7 @@ func register_manifest(manifest: CutsceneManifestDTO) -> void:
 
 ## 按过场标识查询已注册的静态清单条目
 func get_manifest(cutscene_id: String) -> CutsceneManifestDTO:
+	_sync_hooks_if_config_changed()
 	return _manifests.get(cutscene_id, null)
 
 ## 动态注册并索引一条过场触发 Hook 规则
@@ -113,6 +116,11 @@ func register_hook(hook_entry: Dictionary) -> void:
 func clear_for_tests() -> void:
 	_manifests.clear()
 	_clear_hook_indices()
+	_viewed_records.clear()
+	_synced_config_version = -1
+
+## 仅清空已观看防重放记录（供切换 MOD/退出返回网关/重载世界时释放）
+func clear_viewed_records() -> void:
 	_viewed_records.clear()
 
 func _clear_hook_indices() -> void:
@@ -145,8 +153,13 @@ func _index_hook(hook_entry: Dictionary) -> void:
 # 四、Hook 规则匹配与参数解算
 # ==============================================================================
 
+func _sync_hooks_if_config_changed() -> void:
+	if _synced_config_version >= 0 and _synced_config_version != GameConfig.config_reload_version():
+		initialize_from_config()
+
 ## 匹配剧情 DAG 节点前置/后置 Hook (O(1) 哈希索引检索)
 func match_narrative_hook(dag_id: String, node_id: String, is_pre: bool) -> CutsceneRequestDTO:
+	_sync_hooks_if_config_changed()
 	var expected_type: String = TRIGGER_NARRATIVE_NODE_PRE if is_pre else TRIGGER_NARRATIVE_NODE_POST
 	var narrative_key := "%s|%s|%s" % [expected_type, dag_id, node_id]
 	var hook_entry: Variant = _narrative_hooks_index.get(narrative_key, null)
@@ -154,17 +167,20 @@ func match_narrative_hook(dag_id: String, node_id: String, is_pre: bool) -> Cuts
 
 ## 匹配任务阶段达成 Hook (O(1) 哈希索引检索)
 func match_quest_hook(quest_id: String, stage_id: String) -> CutsceneRequestDTO:
+	_sync_hooks_if_config_changed()
 	var quest_key := "%s|%s" % [quest_id, stage_id]
 	var hook_entry: Variant = _quest_hooks_index.get(quest_key, null)
 	return _assemble_request_from_hook(hook_entry as Dictionary) if hook_entry is Dictionary else null
 
 ## 匹配生命周期阶段 Hook (O(1) 哈希索引检索)
 func match_lifecycle_hook(stage_id: String) -> CutsceneRequestDTO:
+	_sync_hooks_if_config_changed()
 	var hook_entry: Variant = _lifecycle_hooks_index.get(stage_id, null)
 	return _assemble_request_from_hook(hook_entry as Dictionary) if hook_entry is Dictionary else null
 
 ## 基于 cutscene_id 构造参数化调用信封（支持外部显式覆盖参数）
 func resolve_request(cutscene_id: String, override_parameters: Dictionary = {}) -> CutsceneRequestDTO:
+	_sync_hooks_if_config_changed()
 	var request_dto := CutsceneRequestDTOClass.new()
 	request_dto.cutscene_id = cutscene_id
 
