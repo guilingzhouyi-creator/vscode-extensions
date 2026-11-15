@@ -78,6 +78,7 @@ const ARG_SHOW_TOPLEVEL = '--show-toplevel';
 const ARG_LOG = 'log';
 const ARG_NAME_ONLY = '--name-only';
 const ARG_DOUBLE_DASH = '--';
+const ARG_CURRENT_DIR = '.';
 const FORMAT_BATCH_STR = '%x1e%H%x1f%an%x1f%ct%x1f%s';
 const FORMAT_SINGLE_STR = '%H%x1f%an%x1f%ct%x1f%s%x1e';
 
@@ -235,6 +236,7 @@ export class GitHistoryMiner {
         this.batchCache = null;
         this.batchCacheCwd = null;
         this.batchCacheCommitLimit = null;
+        this.batchCacheHead = null;
         this.batchGitAvailable = false;
     }
     /** Get the Git repository top level directory. */
@@ -368,6 +370,8 @@ export class GitHistoryMiner {
                     `--max-count=${commitLimit}`,
                     `--format=${FORMAT_BATCH_STR}`,
                     ARG_NAME_ONLY,
+                    ARG_DOUBLE_DASH,
+                    ARG_CURRENT_DIR,
                 ],
                 {
                     cwd,
@@ -471,19 +475,41 @@ export class GitHistoryMiner {
             if (cached) {
                 return cached;
             }
-            return {
-                filePath: targetFilePath,
-                isGitAvailable: this.batchGitAvailable,
-                totalCommits: 0,
-                bugFixCommits: 0,
-                authorCommitCounts: {},
-                uniqueAuthorsCount: 0,
-                firstSeenTimestamp: null,
-                lastModifiedTimestamp: null,
-                recentCommits: [],
-            };
+            const resolvedTarget = normalizePathSeparators(path.resolve(cwd, targetFilePath));
+            const resolvedBatchRoot = this.batchCacheCwd
+                ? normalizePathSeparators(path.resolve(this.batchCacheCwd))
+                : '';
+            const relFromBatch = resolvedBatchRoot
+                ? normalizePathSeparators(path.relative(resolvedBatchRoot, resolvedTarget))
+                : '';
+            const outsideBatchScope = Boolean(
+                resolvedBatchRoot &&
+                (relFromBatch.startsWith('..') || path.isAbsolute(relFromBatch)),
+            );
+            if (!outsideBatchScope) {
+                return {
+                    filePath: targetFilePath,
+                    isGitAvailable: this.batchGitAvailable,
+                    totalCommits: 0,
+                    bugFixCommits: 0,
+                    authorCommitCounts: {},
+                    uniqueAuthorsCount: 0,
+                    firstSeenTimestamp: null,
+                    lastModifiedTimestamp: null,
+                    recentCommits: [],
+                };
+            }
+            return this.mineSingleFileFallback(resolvedTarget, targetFilePath, cwd);
         }
 
+        return this.mineSingleFileFallback(targetFilePath, targetFilePath, cwd);
+    }
+
+    private mineSingleFileFallback(
+        profilePath: string,
+        targetFilePath: string,
+        cwd: string,
+    ): GitFileHistoryProfile {
         const fallbackProfile: GitFileHistoryProfile = {
             filePath: targetFilePath,
             isGitAvailable: false,
@@ -527,7 +553,7 @@ export class GitHistoryMiner {
             }
 
             const rawCommits = this.parseGitLogOutput(res.stdout);
-            const profile = this.aggregateCommitRecords(targetFilePath, rawCommits);
+            const profile = this.aggregateCommitRecords(profilePath, rawCommits);
             profile.isGitAvailable = true;
             return profile;
         } catch {

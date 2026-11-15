@@ -15,7 +15,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { GitCommitRecord, GitFileHistoryProfile } from './git-history-miner';
 /** Bump when the persisted profile shape changes, so old payloads simply miss. */
-export const GIT_HISTORY_CACHE_VERSION = 1;
+export const GIT_HISTORY_CACHE_VERSION = 2;
 /** Directory name under the scan root that holds derived caches. */
 const CACHE_DIR_NAME = '.auto-refactor-cache';
 /** File name of the mined git history payload. */
