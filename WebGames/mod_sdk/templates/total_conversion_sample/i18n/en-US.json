@@ -1,0 +1,20 @@
+{
+  "narrative": {
+    "tc": {
+      "prologue": {
+        "start": "Across the rift-torn surface of the new era, {player_name} awakens amid the ruins.",
+        "exit": "Grasping the salvaged weapon, {player_name} sets out to forge a new order."
+      }
+    }
+  },
+  "locations": {
+    "ABYSS_CITADEL": "Abyss Citadel Ruins",
+    "VOID_SWAMP": "Void Swamp",
+    "ASTRAL_SPIRE": "Astral Spire"
+  },
+  "items": {
+    "abyss_greatsword": "Abyss Greatsword",
+    "astral_catalyst": "Astral Catalyst",
+    "void_composite_bow": "Void Composite Bow"
+  }
+}

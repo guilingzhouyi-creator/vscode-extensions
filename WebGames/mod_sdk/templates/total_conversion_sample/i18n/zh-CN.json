@@ -1,0 +1,20 @@
+{
+  "narrative": {
+    "tc": {
+      "prologue": {
+        "start": "在被混沌裂隙撕裂的新纪元地表，{player_name} 从废墟残骸中苏醒。",
+        "exit": "拾起残存的武器，{player_name} 踏上了重塑世界秩序的征途。"
+      }
+    }
+  },
+  "locations": {
+    "ABYSS_CITADEL": "深渊堡垒废墟",
+    "VOID_SWAMP": "虚空沼泽",
+    "ASTRAL_SPIRE": "星界高塔"
+  },
+  "items": {
+    "abyss_greatsword": "深渊巨剑",
+    "astral_catalyst": "星界催化权杖",
+    "void_composite_bow": "虚空复合长弓"
+  }
+}

@@ -1,0 +1,101 @@
+{
+  "ui_capabilities": {
+    "origin_selection_mode": "ALLOW_MANUAL",
+    "trait_selection_mode": "ALLOW_MANUAL",
+    "allow_attribute_reroll": true
+  },
+  "custom_races": [
+    {
+      "race_id": "HUMAN",
+      "display_name": "幸存人类",
+      "allowed_genders": ["MALE", "FEMALE"],
+      "innate_traits": ["SURVIVOR_GRIT"],
+      "attribute_coefficients": {
+        "STR": 1.0,
+        "AGI": 1.0,
+        "INT": 1.0,
+        "SPR": 1.0,
+        "CON": 1.0,
+        "VIT": 1.0
+      },
+      "default_kit_id": "KIT_TC_ABYSS_VANGUARD"
+    }
+  ],
+  "creation_rule_overrides": {
+    "birth_regions": {
+      "ABYSS_CITADEL": {
+        "name": "深渊堡垒废墟",
+        "climate": "RUINED_CITADEL",
+        "mana_density": 1.6
+      },
+      "VOID_SWAMP": {
+        "name": "虚空沼泽",
+        "climate": "MIASMA_SWAMP",
+        "mana_density": 2.2
+      }
+    }
+  },
+  "custom_origins": [
+    {
+      "origin_id": "ORIGIN_TC_ABYSS_VANGUARD",
+      "name": "废墟战术先遣官",
+      "race": "HUMAN",
+      "birth_region": "ABYSS_CITADEL",
+      "weight": 30,
+      "initial_gold": 120,
+      "initial_reputation": 25,
+      "prologue_dag_id": "DAG_TC_PROLOGUE",
+      "starter_kit_id": "KIT_TC_ABYSS_VANGUARD",
+      "attribute_bonus": {
+        "STR": 1,
+        "INT": 2,
+        "CON": -1
+      }
+    }
+  ],
+  "custom_traits": [
+    {
+      "trait_id": "TRAIT_TC_VOID_INSIGHT",
+      "name": "虚空洞察",
+      "cost": 2,
+      "type": "POSITIVE",
+      "modifiers": {
+        "INT": 2,
+        "SPR": 1
+      }
+    },
+    {
+      "trait_id": "TRAIT_TC_RIFT_SCAR",
+      "name": "裂隙旧伤",
+      "cost": -2,
+      "type": "NEGATIVE",
+      "modifiers": {
+        "CON": -1
+      }
+    }
+  ],
+  "paired_presets": [
+    {
+      "preset_id": "PAIR_TC_RIFT_SCHOLAR",
+      "positive": "TRAIT_TC_VOID_INSIGHT",
+      "negative": "TRAIT_TC_RIFT_SCAR",
+      "positive_cost": 2,
+      "negative_cost": -2,
+      "weight": 50
+    }
+  ],
+  "custom_starter_kits": [
+    {
+      "kit_id": "KIT_TC_ABYSS_VANGUARD",
+      "name": "深渊先遣标准武器行囊",
+      "initial_gold": 120,
+      "display_weapon": "KALAR:EQUIP:WEAPON_BLADE:ABYSS_GREATSWORD",
+      "initial_items": [
+        {
+          "canonical_id": "KALAR:EQUIP:WEAPON_BLADE:ABYSS_GREATSWORD",
+          "count": 1
+        }
+      ]
+    }
+  ]
+}

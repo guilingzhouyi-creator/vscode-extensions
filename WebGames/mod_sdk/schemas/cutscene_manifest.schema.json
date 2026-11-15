@@ -10,70 +10,96 @@
       "description": "契约版本 (1.0.0)"
     },
     "cutscenes": {
-      "type": "array",
-      "description": "声明的 CG 视频资产清单",
-      "items": {
-        "type": "object",
-        "required": [
-          "cutscene_id",
-          "video_resource_path"
-        ],
-        "properties": {
-          "cutscene_id": {
-            "type": "string",
-            "description": "全局唯一 CG 语义标识符"
-          },
-          "title_key": {
-            "type": "string",
-            "description": "多语言标题文案键"
-          },
-          "video_resource_path": {
-            "type": "string",
-            "description": "视频文件物理相对或 res:// 路径"
-          },
-          "duration_sec": {
-            "type": "number",
-            "minimum": 0,
-            "description": "视频播放总时长（秒）"
-          },
-          "default_audio_bus": {
-            "type": "string",
-            "description": "输出音频总线名称 (Master/BGM/Cutscene)"
-          },
-          "default_volume_linear": {
-            "type": "number",
-            "minimum": 0.0,
-            "maximum": 1.0,
-            "description": "默认线性音量比例"
-          },
-          "subtitles_track_id": {
-            "type": "string",
-            "description": "绑定的字幕轨语言键"
-          },
-          "default_skippable": {
-            "type": "boolean",
-            "description": "是否允许跳过"
-          },
-          "is_placeholder": {
-            "type": "boolean",
-            "description": "是否为文字占位模式（早期无视频艺术资源时启用）"
-          },
-          "placeholder_title": {
-            "type": "string",
-            "description": "文字占位演出标题"
-          },
-          "placeholder_text": {
-            "type": "string",
-            "description": "文字占位演播剧本文案"
-          },
-          "tags": {
-            "type": "array",
-            "items": {
-              "type": "string"
+      "description": "声明的 CG 视频资产清单（支持数组列表或按 cutscene_id 索引的字典映射）",
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "cutscene_id",
+              "video_resource_path"
+            ],
+            "properties": {
+              "cutscene_id": {
+                "type": "string",
+                "description": "全局唯一 CG 语义标识符"
+              },
+              "title_key": {
+                "type": "string",
+                "description": "多语言标题文案键"
+              },
+              "video_resource_path": {
+                "type": "string",
+                "description": "视频文件物理相对或 res:// 路径"
+              },
+              "duration_sec": {
+                "type": "number",
+                "minimum": 0,
+                "description": "视频播放总时长（秒）"
+              },
+              "default_audio_bus": {
+                "type": "string",
+                "description": "输出音频总线名称 (Master/BGM/Cutscene)"
+              },
+              "default_volume_linear": {
+                "type": "number",
+                "minimum": 0.0,
+                "maximum": 1.0,
+                "description": "默认线性音量比例"
+              },
+              "subtitles_track_id": {
+                "type": "string",
+                "description": "绑定的字幕轨语言键"
+              },
+              "default_skippable": {
+                "type": "boolean",
+                "description": "是否允许跳过"
+              },
+              "is_placeholder": {
+                "type": "boolean",
+                "description": "是否为文字占位模式（早期无视频艺术资源时启用）"
+              },
+              "placeholder_title": {
+                "type": "string",
+                "description": "文字占位演出标题"
+              },
+              "placeholder_text": {
+                "type": "string",
+                "description": "文字占位演播剧本文案"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "video_resource_path"
+            ],
+            "properties": {
+              "title_key": { "type": "string" },
+              "video_resource_path": { "type": "string" },
+              "duration_sec": { "type": "number", "minimum": 0 },
+              "default_audio_bus": { "type": "string" },
+              "default_volume_linear": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+              "subtitles_track_id": { "type": "string" },
+              "default_skippable": { "type": "boolean" },
+              "is_placeholder": { "type": "boolean" },
+              "placeholder_title": { "type": "string" },
+              "placeholder_text": { "type": "string" },
+              "tags": { "type": "array", "items": { "type": "string" } }
             }
           }
         }
-      }
+      ]
     },
     "hooks": {
       "type": "array",

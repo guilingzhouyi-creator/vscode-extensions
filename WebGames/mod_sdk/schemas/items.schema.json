@@ -7,9 +7,9 @@
   "properties": {
     "override_mode": {
       "type": "string",
-      "enum": ["MERGE", "REPLACE_ENTRY", "TOTAL_PURGE"],
+      "enum": ["MERGE", "APPEND_MERGE", "REPLACE_ENTRY", "TOTAL_PURGE", "REPLACE_EXISTING", "FULL_OVERRIDE"],
       "default": "MERGE",
-      "description": "大魔改覆盖策略：MERGE(增量合并新条目并递归补丁现有条目), REPLACE_ENTRY(按 canonical_id 全量替换条目), TOTAL_PURGE(全量清洗原生物品库，仅使用本文件定义的条目)"
+      "description": "大魔改覆盖策略：MERGE/APPEND_MERGE(增量合并新条目并递归补丁现有条目), REPLACE_ENTRY(按 canonical_id 全量替换条目), TOTAL_PURGE/REPLACE_EXISTING/FULL_OVERRIDE(全量清洗原生物品库)"
     },
     "items": {
       "type": "array",
@@ -97,8 +97,24 @@
         ],
         "additionalProperties": true
       }
+    },
+    "weapons": {
+      "type": "array",
+      "description": "武器专题快捷列表（兼容 Tier3 物品加载器与 items 数组互斥/并存）",
+      "items": {
+        "type": "object",
+        "required": [
+          "canonical_id",
+          "category_major",
+          "tier_rank"
+        ],
+        "additionalProperties": true
+      }
     }
   },
-  "required": ["items"],
-  "additionalProperties": false
+  "anyOf": [
+    { "required": ["items"] },
+    { "required": ["weapons"] }
+  ],
+  "additionalProperties": true
 }

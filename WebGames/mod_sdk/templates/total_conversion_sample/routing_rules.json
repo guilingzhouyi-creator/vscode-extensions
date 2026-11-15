@@ -2,7 +2,7 @@
   "routing_rules": [
     {
       "race": "HUMAN",
-      "origin": "ORIGIN_VALAN_TACTICIAN",
+      "origin": "ORIGIN_TC_ABYSS_VANGUARD",
       "target_dag_id": "DAG_TC_PROLOGUE"
     }
   ]
