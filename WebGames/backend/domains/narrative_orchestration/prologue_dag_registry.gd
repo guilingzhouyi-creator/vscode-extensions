@@ -56,15 +56,24 @@ static func _resolve_mod_prologue_dag_id(
 
     if manifest.is_empty():
         if not clean_origin.is_empty():
+            var catalog_rules: Array = _collect_sorted_routing_rules([
+                GameConfig.get_array("narratives.prologue_dag_catalog", "prologue_routing_rules", [])
+            ])
+            var by_catalog_rule: String = _match_rules_by_origin(catalog_rules, clean_origin, clean_race)
+            if not by_catalog_rule.is_empty():
+                return by_catalog_rule
             var builtin_origin: Dictionary = GameConfig.get_dict("domains.character_creation", "origins/" + clean_origin, {})
             return str(builtin_origin.get("prologue_dag_id", "")).strip_edges()
         return ""
 
-    var custom_rules: Array = manifest.get("custom_routing_rules", [])
+    var merged_rules: Array = _collect_sorted_routing_rules([
+        manifest.get("custom_routing_rules", []),
+        manifest.get("prologue_routing_rules", [])
+    ])
 
-    # 1. 优先匹配 custom_routing_rules 中的 origin_id 精确规则
+    # 1. 优先匹配 routing_rules 中的 origin_id 精确规则（按 priority 降序）
     if not clean_origin.is_empty():
-        var by_rule_origin: String = _match_rules_by_origin(custom_rules, clean_origin, clean_race)
+        var by_rule_origin: String = _match_rules_by_origin(merged_rules, clean_origin, clean_race)
         if not by_rule_origin.is_empty():
             return by_rule_origin
 
@@ -73,33 +82,75 @@ static func _resolve_mod_prologue_dag_id(
         if not by_origin_config.is_empty():
             return by_origin_config
 
-    # 3. 再次匹配 custom_routing_rules 中的 race_id 规则或默认规则
-    var by_rule_race: String = _match_rules_by_race_or_default(custom_rules, clean_race)
-    return by_rule_race
+    # 3. 再次匹配 routing_rules 中的 race_id 规则或默认规则（按 priority 降序）
+    return _match_rules_by_race_or_default(merged_rules, clean_race)
+
+static func _collect_sorted_routing_rules(raw_sources: Array) -> Array:
+    var indexed_rules: Array = []
+    var sort_order: int = 0
+    for source_variant in raw_sources:
+        if not (source_variant is Array):
+            continue
+        for rule_variant in source_variant as Array:
+            if not (rule_variant is Dictionary):
+                continue
+            var rule := rule_variant as Dictionary
+            indexed_rules.append({
+                "priority": int(rule.get("priority", 0)),
+                "order": sort_order,
+                "rule": rule
+            })
+            sort_order += 1
+    indexed_rules.sort_custom(func(left_entry: Dictionary, right_entry: Dictionary) -> bool:
+        var left_priority: int = int(left_entry.get("priority", 0))
+        var right_priority: int = int(right_entry.get("priority", 0))
+        if left_priority != right_priority:
+            return left_priority > right_priority
+        return int(left_entry.get("order", 0)) < int(right_entry.get("order", 0))
+    )
+    var sorted_rules: Array = []
+    for entry in indexed_rules:
+        sorted_rules.append(entry["rule"])
+    return sorted_rules
+
+static func _normalize_routing_rule_fields(rule: Dictionary) -> Dictionary:
+    var raw_condition: Variant = rule.get("match_condition", {})
+    var condition: Dictionary = (raw_condition as Dictionary) if raw_condition is Dictionary else {}
+    var target: String = str(rule.get("target_dag_id", rule.get("dag_id", ""))).strip_edges()
+    var origin_text: String = str(condition.get("origin_id", condition.get("origin", rule.get("origin_id", rule.get("origin", ""))))).strip_edges()
+    var race_text: String = str(condition.get("race_id", condition.get("race", rule.get("race_id", rule.get("race", ""))))).strip_edges()
+    var is_default_rule: bool = bool(condition.get("is_default", rule.get("is_default", false)))
+    return {
+        "target": target,
+        "origin_id": origin_text,
+        "has_origin": not origin_text.is_empty(),
+        "race_id": race_text,
+        "has_race": not race_text.is_empty(),
+        "is_default": is_default_rule
+    }
 
 static func _evaluate_routing_rule(
     raw_rule: Variant,
-    empty_condition: Dictionary,
+    _empty_condition: Dictionary,
     origin_id: String,
     race_id: String,
     should_match_origin_only: bool
 ) -> Dictionary:
     if not (raw_rule is Dictionary):
         return {}
-    var rule: Dictionary = raw_rule
-    var condition: Dictionary = rule.get("match_condition", empty_condition)
-    var target: String = str(rule.get("target_dag_id", "")).strip_edges()
+    var normalized: Dictionary = _normalize_routing_rule_fields(raw_rule as Dictionary)
+    var target: String = str(normalized["target"])
     if target.is_empty():
         return {}
     if should_match_origin_only:
-        var is_origin_matched: bool = condition.has("origin_id") and str(condition.get("origin_id", "")).strip_edges() == origin_id
-        var is_race_matched: bool = not condition.has("race_id") or str(condition.get("race_id", "")).strip_edges() == race_id
+        var is_origin_matched: bool = bool(normalized["has_origin"]) and str(normalized["origin_id"]) == origin_id
+        var is_race_matched: bool = not bool(normalized["has_race"]) or str(normalized["race_id"]) == race_id
         return {"kind": "ORIGIN", "target": target} if (is_origin_matched and is_race_matched) else {}
-    if condition.has("origin_id"):
+    if bool(normalized["has_origin"]):
         return {}
-    if condition.has("race_id") and str(condition.get("race_id", "")).strip_edges() == race_id:
+    if bool(normalized["has_race"]) and str(normalized["race_id"]) == race_id:
         return {"kind": "RACE", "target": target}
-    if bool(condition.get("is_default", false)):
+    if bool(normalized["is_default"]):
         return {"kind": "DEFAULT", "target": target}
     return {}
 
@@ -152,25 +203,16 @@ static func _match_rules_by_race_or_default(rules: Array, race_id: String) -> St
     return default_dag_id
 
 static func _resolve_builtin_routing_dag_id(race_id: String, origin_id: String) -> String:
-    var routing_rules: Array = GameConfig.get_array("narratives.prologue_dag_catalog", "prologue_routing_rules", [])
-    var selected_dag_id: String = ""
-    var empty_condition: Dictionary = {}
-
-    for rule_entry in routing_rules:
-        if not (rule_entry is Dictionary):
-            continue
-        var rule: Dictionary = rule_entry
-        var condition: Dictionary = rule.get("match_condition", empty_condition)
-        if not origin_id.is_empty() and condition.has("origin_id") and str(condition["origin_id"]) == origin_id:
-            return str(rule.get("target_dag_id", ""))
-        if bool(condition.get("is_default", false)):
-            if selected_dag_id.is_empty():
-                selected_dag_id = str(rule.get("target_dag_id", ""))
-        elif condition.has("race_id") and str(condition["race_id"]) == race_id:
-            selected_dag_id = str(rule.get("target_dag_id", ""))
-            break
-
-    return selected_dag_id
+    var routing_rules: Array = _collect_sorted_routing_rules([
+        GameConfig.get_array("narratives.prologue_dag_catalog", "prologue_routing_rules", [])
+    ])
+    var clean_origin: String = origin_id.strip_edges()
+    var clean_race: String = race_id.strip_edges()
+    if not clean_origin.is_empty():
+        var by_origin: String = _match_rules_by_origin(routing_rules, clean_origin, clean_race)
+        if not by_origin.is_empty():
+            return by_origin
+    return _match_rules_by_race_or_default(routing_rules, clean_race)
 
 static func _resolve_declared_dag_graph(
     dag_id: String,

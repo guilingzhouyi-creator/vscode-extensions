@@ -63,7 +63,7 @@ static func apply_races_override(
     return changed
 
 
-## 将 OFFICIAL_BASE / TOTAL_CONVERSION 包的 destinies/routing_rules/dag_graphs 同步投射到工作配置表层（按包独立隔离）
+## 将基础内容包或扩展包的 destinies/routing_rules/dag_graphs 同步投射到工作配置表层（按包独立隔离）
 static func apply_base_package_destinies_projection(
     package_entry: Dictionary,
     working_tables: Dictionary,
@@ -71,7 +71,10 @@ static func apply_base_package_destinies_projection(
 ) -> bool:
     var profile := String(package_entry.get("pack_profile", "")).strip_edges().to_upper()
     var has_races := package_entry.has("custom_races") or package_entry.has("creation_rule_overrides")
-    if profile != "OFFICIAL_BASE" and profile != "TOTAL_CONVERSION" and not has_races:
+    var has_destiny_or_dag := package_entry.has("custom_origins") or package_entry.has("custom_traits") \
+        or package_entry.has("custom_starter_kits") or package_entry.has("dag_graphs") \
+        or package_entry.has("prologue_routing_rules") or package_entry.has("custom_routing_rules")
+    if profile != "OFFICIAL_BASE" and profile != "TOTAL_CONVERSION" and not has_races and not has_destiny_or_dag:
         return false
     var mode := Tier3ContentRecordParser.MODE_TOTAL_PURGE if profile == "TOTAL_CONVERSION" else Tier3ContentRecordParser.MODE_MERGE
     var changed := false
@@ -108,28 +111,34 @@ static func _collect_keyed_records(raw_entries: Variant, key_field: String) -> D
     var collected_table: Dictionary = {}
     if raw_entries is Array:
         for candidate_entry in (raw_entries as Array):
-            if candidate_entry is Dictionary:
-                var record := candidate_entry as Dictionary
-                var record_key := String(record.get(key_field, "")).strip_edges()
-                if not record_key.is_empty():
-                    collected_table[record_key] = record.duplicate(true)
+            _insert_keyed_record(collected_table, candidate_entry, key_field)
     return collected_table
+
+static func _insert_keyed_record(collected_table: Dictionary, candidate_entry: Variant, key_field: String) -> void:
+    if not (candidate_entry is Dictionary):
+        return
+    var record := candidate_entry as Dictionary
+    var record_key := String(record.get(key_field, "")).strip_edges()
+    if not record_key.is_empty():
+        collected_table[record_key] = record.duplicate(true)
 
 
 static func _normalize_routing_rule_entry(raw_rule: Variant) -> Dictionary:
     if not (raw_rule is Dictionary):
         return {}
     var source_rule := raw_rule as Dictionary
-    var target_dag_id := String(source_rule.get("target_dag_id", "")).strip_edges()
+    var target_dag_id := String(source_rule.get("target_dag_id", source_rule.get("dag_id", ""))).strip_edges()
     if target_dag_id.is_empty():
         return {}
     if source_rule.get("match_condition") is Dictionary:
-        return source_rule.duplicate(true)
+        var matched_rule := source_rule.duplicate(true)
+        matched_rule["target_dag_id"] = target_dag_id
+        return matched_rule
     var match_condition: Dictionary = {}
     var rule_race := String(source_rule.get("race_id", source_rule.get("race", ""))).strip_edges()
     if not rule_race.is_empty():
         match_condition["race_id"] = rule_race
-    var rule_origin := String(source_rule.get("origin_id", "")).strip_edges()
+    var rule_origin := String(source_rule.get("origin_id", source_rule.get("origin", ""))).strip_edges()
     if not rule_origin.is_empty():
         match_condition["origin_id"] = rule_origin
     if bool(source_rule.get("is_default", false)):
@@ -137,6 +146,7 @@ static func _normalize_routing_rule_entry(raw_rule: Variant) -> Dictionary:
     if match_condition.is_empty():
         return {}
     var normalized := source_rule.duplicate(true)
+    normalized["target_dag_id"] = target_dag_id
     normalized["match_condition"] = match_condition
     return normalized
 
@@ -184,6 +194,13 @@ static func _project_destiny_kits_and_dags(
             if not normalized_rule.is_empty():
                 routing_rules.append(normalized_rule)
     if not routing_rules.is_empty():
-        if Tier3DomainContentOverrideApplier.merge_dict_payload_into_table({"prologue_routing_rules": routing_rules}, "narratives.prologue_dag_catalog", mode, working_tables, touched_tables):
+        var combined_rules: Array = []
+        if mode == Tier3ContentRecordParser.MODE_MERGE:
+            var catalog_table := Tier3ContentRecordParser.ensure_working_table(working_tables, touched_tables, "narratives.prologue_dag_catalog")
+            var existing_rules: Variant = catalog_table.get("prologue_routing_rules", [])
+            if existing_rules is Array:
+                combined_rules.append_array((existing_rules as Array).duplicate(true))
+        combined_rules.append_array(routing_rules)
+        if Tier3DomainContentOverrideApplier.merge_dict_payload_into_table({"prologue_routing_rules": combined_rules}, "narratives.prologue_dag_catalog", mode, working_tables, touched_tables):
             changed = true
     return changed

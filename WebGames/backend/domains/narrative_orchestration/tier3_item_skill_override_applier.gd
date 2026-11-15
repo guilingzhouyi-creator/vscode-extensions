@@ -33,8 +33,7 @@ static func apply_items_override(
 		var purged_table := Tier3ContentRecordParser.ensure_working_table(working_tables, touched_tables, TABLE_ITEMS_OVERRIDES)
 		var collected_items: Array = []
 		for incoming_entry in incoming_items:
-			if incoming_entry is Dictionary:
-				collected_items.append((incoming_entry as Dictionary).duplicate(true))
+			_append_dict_copy(collected_items, incoming_entry)
 		purged_table["items"] = collected_items
 		return true
 
@@ -44,18 +43,31 @@ static func apply_items_override(
 	var append_target_list: Array = mod_items_table["items"]
 
 	for raw_item in incoming_items:
-		if not (raw_item is Dictionary):
-			continue
-		var item_dictionary: Dictionary = raw_item
-		var canonical_identifier := String(item_dictionary.get("canonical_id", "")).strip_edges()
-		if canonical_identifier.is_empty():
-			continue
-		var existing_location := _find_existing_item_location(working_tables, canonical_identifier)
-		if bool(existing_location.get("found", false)):
-			_replace_or_merge_item_at_location(working_tables, touched_tables, existing_location, item_dictionary, override_mode)
-		else:
-			append_target_list.append(item_dictionary.duplicate(true))
+		_merge_single_incoming_item(raw_item, working_tables, touched_tables, append_target_list, override_mode)
 	return true
+
+static func _append_dict_copy(target_list: Array, candidate: Variant) -> void:
+	if candidate is Dictionary:
+		target_list.append((candidate as Dictionary).duplicate(true))
+
+static func _merge_single_incoming_item(
+	raw_item: Variant,
+	working_tables: Dictionary,
+	touched_tables: Dictionary,
+	append_target_list: Array,
+	override_mode: String
+) -> void:
+	if not (raw_item is Dictionary):
+		return
+	var item_dictionary: Dictionary = raw_item
+	var canonical_identifier := String(item_dictionary.get("canonical_id", "")).strip_edges()
+	if canonical_identifier.is_empty():
+		return
+	var existing_location := _find_existing_item_location(working_tables, canonical_identifier)
+	if bool(existing_location.get("found", false)):
+		_replace_or_merge_item_at_location(working_tables, touched_tables, existing_location, item_dictionary, override_mode)
+	else:
+		append_target_list.append(item_dictionary.duplicate(true))
 
 ## 应用单份技能动作与卡牌差分载荷至 domains.combat.mechanics
 static func apply_skills_override(
@@ -168,27 +180,35 @@ static func _apply_verbs_section(
 	if override_mode == Tier3ContentRecordParser.MODE_REPLACE_ENTRY:
 		var target_verbs_map: Dictionary = mechanics_table["verbs"]
 		for verb_key in incoming_verbs.keys():
-			var incoming_verb_value: Variant = incoming_verbs[verb_key]
-			if incoming_verb_value is Dictionary:
-				target_verbs_map[verb_key] = (incoming_verb_value as Dictionary).duplicate(true)
-			else:
-				target_verbs_map[verb_key] = incoming_verb_value
+			_assign_verb_entry(target_verbs_map, verb_key, incoming_verbs[verb_key])
 		return
 	Tier3ContentRecordParser.deep_merge_dictionary(mechanics_table["verbs"] as Dictionary, incoming_verbs)
+
+static func _assign_verb_entry(target_verbs_map: Dictionary, verb_key: Variant, incoming_verb_value: Variant) -> void:
+	if incoming_verb_value is Dictionary:
+		target_verbs_map[verb_key] = (incoming_verb_value as Dictionary).duplicate(true)
+	else:
+		target_verbs_map[verb_key] = incoming_verb_value
 
 static func _upsert_skill_card(cards_array: Array, card_dictionary: Dictionary, replace_whole: bool) -> void:
 	var target_card_identifier := String(card_dictionary.get("card_id", "")).strip_edges()
 	if target_card_identifier.is_empty():
 		return
+	var matched_index: int = _find_card_index(cards_array, target_card_identifier)
+	if matched_index >= 0:
+		if replace_whole:
+			cards_array[matched_index] = card_dictionary.duplicate(true)
+		else:
+			var merged_card: Dictionary = (cards_array[matched_index] as Dictionary).duplicate(true)
+			Tier3ContentRecordParser.deep_merge_dictionary(merged_card, card_dictionary)
+			cards_array[matched_index] = merged_card
+		return
+	cards_array.append(card_dictionary.duplicate(true))
+
+static func _find_card_index(cards_array: Array, target_card_identifier: String) -> int:
 	var card_index: int = 0
 	for existing_card in cards_array:
 		if existing_card is Dictionary and String((existing_card as Dictionary).get("card_id", "")) == target_card_identifier:
-			if replace_whole:
-				cards_array[card_index] = card_dictionary.duplicate(true)
-			else:
-				var merged_card: Dictionary = (existing_card as Dictionary).duplicate(true)
-				Tier3ContentRecordParser.deep_merge_dictionary(merged_card, card_dictionary)
-				cards_array[card_index] = merged_card
-			return
+			return card_index
 		card_index += 1
-	cards_array.append(card_dictionary.duplicate(true))
+	return -1

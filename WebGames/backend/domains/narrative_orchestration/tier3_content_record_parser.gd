@@ -176,13 +176,15 @@ static func _assign_section_value(target_table: Dictionary, section_key: String,
 ## 对嵌套字典执行原地深合并并在末端执行深拷贝
 static func deep_merge_dictionary(target_table: Dictionary, patch_table: Dictionary) -> void:
 	for raw_key in patch_table.keys():
-		var patch_value: Variant = patch_table[raw_key]
-		if patch_value is Dictionary:
-			if target_table.get(raw_key) is Dictionary:
-				deep_merge_dictionary(target_table[raw_key] as Dictionary, patch_value as Dictionary)
-			else:
-				target_table[raw_key] = (patch_value as Dictionary).duplicate(true)
-		elif patch_value is Array:
-			target_table[raw_key] = (patch_value as Array).duplicate(true)
+		_merge_single_patch_entry(target_table, raw_key, patch_table[raw_key])
+
+static func _merge_single_patch_entry(target_table: Dictionary, raw_key: Variant, patch_value: Variant) -> void:
+	if patch_value is Dictionary:
+		if target_table.get(raw_key) is Dictionary:
+			deep_merge_dictionary(target_table[raw_key] as Dictionary, patch_value as Dictionary)
 		else:
-			target_table[raw_key] = patch_value
+			target_table[raw_key] = (patch_value as Dictionary).duplicate(true)
+	elif patch_value is Array:
+		target_table[raw_key] = (patch_value as Array).duplicate(true)
+	else:
+		target_table[raw_key] = patch_value
