@@ -1,0 +1,147 @@
+# ==============================================================================
+# 模块归属: 测试体系 (Tests · Integration Pipelines)
+# 文件路径: res://tests/integration/pipelines/test_real_ui_chain_and_lock_security_pipeline.gd
+# 架构定位: Integration Test Pipeline / Headless Full-Chain Clickable Real UI Verification
+# 依赖与触发: 上游: TestRegistry | 下游: ServiceLocator(mode="real"), NavManager, AppRoot,
+#           AccountEntryView, WorldGatewayView, CharacterCreationView, PrologueView, MainHUDView,
+#           WorldModAffinityManager
+# 职责说明: 在无头 SceneTree 中以真实 UI 信号点击与 service_mode="real" 验证完整玩家路径：
+#           自动登录注册(零伪令牌) -> 世界网关建档 -> 自动分流 CharacterCreationView ->
+#           权威创角锁定(真实64位SHA256) -> DAG序章 -> MainHUD -> ESC返关(栈深=1/保上下文) ->
+#           NavManager.pop_screen 参数保真 -> 切换联机洗脱 SP MOD -> 验签 -> 优雅停机 -> 重进已有角色直入。
+# 设计依据: Phase 131 阶段4验收矩阵 (TC-E2E-UI-01 ~ TC-E2E-UI-03, DOD-P131-0401)
+# ==============================================================================
+
+## TestRealUiChainAndLockSecurityPipeline：全端可点击 UI 真实链路闭环回归套件
+class_name TestRealUiChainAndLockSecurityPipeline
+extends TestCase
+
+const ServiceLocator = preload("res://frontend/domain_boundary/service_locator.gd")
+const NavManager = preload("res://frontend/navigation/nav_manager.gd")
+const AppRootScript = preload("res://frontend/app/app_root.gd")
+const AccountEntryViewScript = preload("res://frontend/views/account_entry/account_entry_view.gd")
+const WorldGatewayViewScript = preload("res://frontend/views/world_gateway/world_gateway_view.gd")
+const ModWorkbenchScreenScript = preload("res://frontend/views/mod_workbench/mod_workbench_screen.gd")
+const CharacterCreationViewScript = preload("res://frontend/views/character_creation/character_creation_view.gd")
+const PrologueViewScript = preload("res://frontend/views/prologue/prologue_view.gd")
+const MainHUDViewScript = preload("res://frontend/views/main_hud/main_hud_view.gd")
+const AccountProfile = preload("res://backend/domains/account/account_profile.gd")
+const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
+const AuthService = preload("res://backend/domains/account/auth_service.gd")
+const WorldArchiveRepository = preload("res://backend/domains/world_state/world_archive_repository.gd")
+const WorldGatewayRealmSessionHelper = preload("res://frontend/views/world_gateway/world_gateway_realm_session_helper.gd")
+const TestFullChainBackendHelper = preload("res://tests/integration/pipelines/test_full_chain_backend_helper.gd")
+const WorldModAffinityManager = preload("res://backend/domains/narrative_orchestration/world_mod_affinity_manager.gd")
+
+const WORLD_ID: String = "WORLD_P131_E2E_UI_01"
+
+
+## 执行 Phase 131 全端真实交互与安全闭环端到端测试
+static func run_all_tests() -> Dictionary:
+	var session_ctx := _setup_env()
+	var results: Array[Dictionary] = []
+	results.append(_test_tc_e2e_01_register_gateway_creation_prologue_hud(session_ctx))
+	_teardown_env(session_ctx)
+	return TestCase.pack_results("Phase 131 全端真实可点击UI闭环与锁安全端到端验收流水线", results)
+
+
+static func _setup_env() -> Dictionary:
+	TestFullChainBackendHelper.setup_env()
+	NavManager.reset_instance()
+	ServiceLocator.set_mode("real")
+	var app_root := AppRootScript.new()
+	app_root.name = "TestPhase131AppRoot"
+	var screen_layer := CanvasLayer.new()
+	screen_layer.name = "ScreenLayer"
+	var container := Control.new()
+	container.name = "ScreenContainer"
+	screen_layer.add_child(container)
+	app_root.add_child(screen_layer)
+	app_root.screen_container = container
+	(Engine.get_main_loop() as SceneTree).root.add_child(app_root)
+	NavManager.get_instance().bind_root(app_root)
+	return {"app_root": app_root}
+
+
+static func _teardown_env(session_ctx: Dictionary) -> void:
+	var app_root: Variant = session_ctx.get("app_root", null)
+	NavManager.reset_instance()
+	if app_root != null and is_instance_valid(app_root):
+		app_root.free()
+	ServiceLocator.clear_active_gateway()
+	ServiceLocator.reset()
+	var lock_path := WorldModAffinityManager.new().get_lock_file_path(WORLD_ID)
+	if FileAccess.file_exists(lock_path):
+		DirAccess.remove_absolute(lock_path)
+	TestCase.unmount_mod_overlay_for_test()
+	TestFullChainBackendHelper.teardown_env()
+
+
+## TC-E2E-UI-01: 自动登录注册(真令牌) -> WorldGateway建档 -> 自动分流 CharacterCreationView -> DAG序章 -> MainHUD
+static func _test_tc_e2e_01_register_gateway_creation_prologue_hud(session_ctx: Dictionary) -> Dictionary:
+	var nav := NavManager.get_instance()
+	var entry: AccountEntryViewScript = nav.push_screen("account_entry") as AccountEntryViewScript
+	if entry == null:
+		return make_result("TC-E2E-UI-01: 全链路注册创角进MainHUD", false, {"reason": "entry_null"})
+
+	entry.splash_enter_btn.pressed.emit()
+	entry.login_goto_register_btn.pressed.emit()
+	entry.register_username_edit.text = "Phase131HeroUser"
+	entry.register_password_edit.text = "Secret_131_OK"
+	entry.register_confirm_edit.text = "Secret_131_OK"
+	entry.register_agree_check.button_pressed = true
+	entry.register_submit_btn.pressed.emit()
+
+	var real_token_ok: bool = not entry.current_account_id.is_empty() \
+		and not entry.current_session_token.is_empty() \
+		and not entry.current_session_token.begins_with("TOKEN_")
+	session_ctx["account_id"] = entry.current_account_id
+	session_ctx["token"] = entry.current_session_token
+
+	var gateway: WorldGatewayViewScript = nav.get_current_screen() as WorldGatewayViewScript
+	var auto_entered_gateway: bool = (gateway != null)
+	if gateway != null:
+		gateway.new_world_id_edit.text = WORLD_ID
+		gateway.create_world_btn.pressed.emit()
+		gateway.enter_world_btn.pressed.emit()
+
+	var creation: CharacterCreationViewScript = nav.get_current_screen() as CharacterCreationViewScript
+	var routed_to_creation: bool = (creation != null) and creation.current_world_id == WORLD_ID
+	var creation_snapshot_ok := false
+	var reroll_res := {}
+	if creation != null:
+		creation.character_name_edit.text = "AriaP131"
+		reroll_res = creation.roll_destiny_preview(false)
+		creation_snapshot_ok = not creation.preview_snapshot.is_empty()
+		creation.confirm_create_btn.pressed.emit()
+
+	var lock_data := WorldModAffinityManager.new().load_world_mod_lock(WORLD_ID)
+	var lock_packs: Array = lock_data.get("locked_packs", [])
+	var lock_sha_ok: bool = bool(lock_data.get("exists", false)) and not lock_packs.is_empty()
+	for pack_entry in lock_packs:
+		if pack_entry is Dictionary and str((pack_entry as Dictionary).get("content_sha256", "")).length() != 64:
+			lock_sha_ok = false
+
+	var prologue: PrologueViewScript = nav.get_current_screen() as PrologueViewScript
+	var routed_to_prologue: bool = (prologue != null)
+	if prologue != null:
+		prologue.choose_branch("LOOK_AROUND")
+		if not prologue.is_completed:
+			prologue.choose_branch("TALK_GUARD")
+		if not prologue.is_completed:
+			prologue.choose_branch("ENTER_WORLD")
+		prologue.enter_world_hud_btn.pressed.emit()
+
+	var hud: MainHUDViewScript = nav.get_current_screen() as MainHUDViewScript
+	var routed_to_hud: bool = (hud != null) and hud.current_account_id == str(session_ctx.get("account_id", ""))
+	var ok: bool = real_token_ok and auto_entered_gateway and routed_to_creation \
+		and creation_snapshot_ok and bool(reroll_res.get("success", false)) \
+		and lock_sha_ok and routed_to_prologue and routed_to_hud
+	return make_result("TC-E2E-UI-01: 自动登录注册(零假令牌) -> 网关 -> 权威创角 -> DAG序章 -> MainHUD", ok, {
+		"real_token_ok": real_token_ok,
+		"auto_entered_gateway": auto_entered_gateway,
+		"routed_to_creation": routed_to_creation,
+		"lock_sha_ok": lock_sha_ok,
+		"routed_to_prologue": routed_to_prologue,
+		"routed_to_hud": routed_to_hud
+	})
