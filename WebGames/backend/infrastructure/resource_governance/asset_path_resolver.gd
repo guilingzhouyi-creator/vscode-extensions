@@ -53,6 +53,9 @@ const SCHEME_RES: String = "res://"
 const SCHEME_USER: String = "user://"
 const DIR_ASSETS: String = "assets"
 const PREFIX_ASSETS: String = "assets/"
+const ASSET_CATEGORY_SEGMENTS: Array[String] = [
+	"textures", "media", "audio", "models", "fonts", "subtitles", "shaders", "icons", "ui", "cutscenes"
+]
 
 static var _instance: AssetPathResolver = null
 static var _override_environment_for_test: String = ""
@@ -148,50 +151,119 @@ static func resolve_official_audio_path(audio_category: String, audio_filename: 
 # 四、MOD 艺术资产三级级联与沙盒寻址
 # ==============================================================================
 
-## 获取当前运行环境下有效的 MOD 发现根目录列表（有序级联：Tier 0 -> Tier 1 -> Tier 2）
+## 统一读取多级 MOD 发现根路径（严格对齐 domains.narrative_orchestration#mod_discovery 配置与工程/发行模式隔离）
 static func get_mod_discovery_roots() -> Array[String]:
 	if not _override_roots_for_test.is_empty():
 		return _override_roots_for_test.duplicate()
 
+	var discovery_table: Dictionary = GameConfig.get_dict("domains.narrative_orchestration", "mod_discovery", {})
+	var packages_root := String(discovery_table.get("packages_root", ROOT_MODS_TIER0_DEV)).strip_edges()
+	if packages_root.is_empty():
+		packages_root = ROOT_MODS_TIER0_DEV
+	var install_rel := String(discovery_table.get("mods_install_rel", ROOT_MODS_TIER1_STANDALONE)).strip_edges()
+	if install_rel.is_empty():
+		install_rel = ROOT_MODS_TIER1_STANDALONE
+	var user_sandbox := String(discovery_table.get("mods_user_sandbox", ROOT_MODS_TIER2_USER_SANDBOX)).strip_edges()
+	if user_sandbox.is_empty():
+		user_sandbox = ROOT_MODS_TIER2_USER_SANDBOX
+
 	var roots: Array[String] = []
-
 	if is_engineering_build():
-		# 工程版：优先检索工程内开发/测试模组目录
-		roots.append(ROOT_MODS_TIER0_DEV)
+		# 工程版：开发/测试模组目录
+		roots.append(packages_root)
 
-	# 发行版或独立运行：检索可执行文件同级 mods/
+	# 发行版或独立运行：可执行文件同级 mods/
 	var executable_directory := OS.get_executable_path().get_base_dir()
-	roots.append(executable_directory.path_join(ROOT_MODS_TIER1_STANDALONE))
+	var install_root := install_rel if (install_rel.begins_with(SCHEME_RES) or install_rel.begins_with(SCHEME_USER)) else executable_directory.path_join(install_rel)
+	roots.append(install_root)
 
-	# 用户安全数据沙盒目录（全环境默认回退，支持创意工坊与动态下载）
-	roots.append(ROOT_MODS_TIER2_USER_SANDBOX)
+	# 用户安全数据沙盒目录（最高运行时覆盖优先级，支持创意工坊与动态下载）
+	roots.append(user_sandbox)
 	return roots
 
-## 解析指定 MOD 内部艺术资源的物理路径（支持三级级联探测与防路径穿越）
+## 解析指定 MOD 内部艺术资源的物理路径（user > install > dev 高覆盖优先 + .kmod 版本匹配 + 严格防穿越）
 static func resolve_mod_asset_path(mod_id: String, relative_asset_path: String) -> String:
 	var clean_mod_id := sanitize_identifier(mod_id)
-	var safe_relative_path := sanitize_sandbox_path(relative_asset_path)
-
-	if clean_mod_id.is_empty() or safe_relative_path.is_empty():
+	var safe_relative_path := sanitize_sandbox_path_strict(relative_asset_path)
+	if clean_mod_id.is_empty() or clean_mod_id != mod_id.strip_edges() or safe_relative_path.is_empty():
+		return ""
+	if safe_relative_path.begins_with(PREFIX_ASSETS):
+		safe_relative_path = safe_relative_path.trim_prefix(PREFIX_ASSETS)
+	if safe_relative_path.is_empty():
 		return ""
 
+	var inner_asset_rel := DIR_ASSETS.path_join(safe_relative_path)
 	var candidate_roots := get_mod_discovery_roots()
-	for root_directory in candidate_roots:
-		var target_path := root_directory.path_join(clean_mod_id).path_join(DIR_ASSETS).path_join(safe_relative_path)
-		if asset_exists(target_path):
+	# 按 user -> install -> dev 倒序检索，确保用户沙盒与安装目录高优先级覆盖开发基准包
+	for root_cursor in range(candidate_roots.size() - 1, -1, -1):
+		var root_directory := candidate_roots[root_cursor]
+		var target_path := root_directory.path_join(clean_mod_id).path_join(inner_asset_rel)
+		if ResourceLoader.exists(target_path) or FileAccess.file_exists(target_path):
 			return target_path
-		# 兼容剧情模组专用子目录 (mods/narratives/<mod_id>/assets/...)
-		var narrative_path := root_directory.path_join("narratives").path_join(clean_mod_id).path_join(DIR_ASSETS).path_join(safe_relative_path)
-		if asset_exists(narrative_path):
+		var narrative_path := root_directory.path_join("narratives").path_join(clean_mod_id).path_join(inner_asset_rel)
+		if ResourceLoader.exists(narrative_path) or FileAccess.file_exists(narrative_path):
 			return narrative_path
-		var kmod_path := root_directory.path_join(clean_mod_id + ".kmod")
-		if FileAccess.file_exists(kmod_path) and _kmod_has_asset(kmod_path, DIR_ASSETS.path_join(safe_relative_path)):
-			return kmod_path + "!/" + DIR_ASSETS.path_join(safe_relative_path)
+		var matched_kmod := _find_matching_kmod_in_root(root_directory, clean_mod_id, inner_asset_rel)
+		if not matched_kmod.is_empty():
+			return matched_kmod + "!/" + inner_asset_rel
 
 	# 若三级级联均未探测到物理文件，返回首选沙盒物理路径（供资源探测或新建装配）
 	if is_engineering_build():
-		return ROOT_MODS_TIER0_DEV.path_join(clean_mod_id).path_join(DIR_ASSETS).path_join(safe_relative_path)
-	return ROOT_MODS_TIER2_USER_SANDBOX.path_join(clean_mod_id).path_join(DIR_ASSETS).path_join(safe_relative_path)
+		return ROOT_MODS_TIER0_DEV.path_join(clean_mod_id).path_join(inner_asset_rel)
+	return ROOT_MODS_TIER2_USER_SANDBOX.path_join(clean_mod_id).path_join(inner_asset_rel)
+
+static func _find_matching_kmod_in_root(root_directory: String, clean_mod_id: String, inner_asset_rel: String) -> String:
+	var exact_kmod := root_directory.path_join(clean_mod_id + ".kmod")
+	if FileAccess.file_exists(exact_kmod) and _kmod_has_asset(exact_kmod, inner_asset_rel):
+		return exact_kmod
+	var scan_handle := DirAccess.open(root_directory)
+	if scan_handle == null:
+		return ""
+	var candidates: Array[String] = []
+	scan_handle.list_dir_begin()
+	var entry := scan_handle.get_next()
+	while not entry.is_empty():
+		if not scan_handle.current_is_dir() and entry.ends_with(".kmod"):
+			if entry.begins_with(clean_mod_id + "_") or entry == clean_mod_id + ".kmod":
+				candidates.append(root_directory.path_join(entry))
+			elif _kmod_declares_pack_id(root_directory.path_join(entry), clean_mod_id):
+				candidates.append(root_directory.path_join(entry))
+		entry = scan_handle.get_next()
+	scan_handle.list_dir_end()
+	candidates.sort()
+	for candidate_cursor in range(candidates.size() - 1, -1, -1):
+		var archive_path := candidates[candidate_cursor]
+		if _kmod_has_asset(archive_path, inner_asset_rel):
+			return archive_path
+	return ""
+
+static func _kmod_declares_pack_id(kmod_path: String, expected_pack_id: String) -> bool:
+	var reader := ZIPReader.new()
+	if reader.open(kmod_path) != OK:
+		return false
+	var declared_id := ""
+	for manifest_name in ["pack.json", "manifest.json"]:
+		if reader.file_exists(manifest_name):
+			var parsed: Variant = JSON.parse_string(reader.read_file(manifest_name).get_string_from_utf8())
+			if parsed is Dictionary:
+				var manifest := parsed as Dictionary
+				declared_id = String(manifest.get("pack_id", manifest.get("bundle_id", ""))).strip_edges()
+				break
+	reader.close()
+	return declared_id == expected_pack_id
+
+static func _has_installed_mod_named(mod_id_candidate: String) -> bool:
+	var clean_id := sanitize_identifier(mod_id_candidate)
+	if clean_id.is_empty() or clean_id != mod_id_candidate.strip_edges():
+		return false
+	for root_folder in get_mod_discovery_roots():
+		if DirAccess.open(root_folder.path_join(clean_id)) != null:
+			return true
+		if FileAccess.file_exists(root_folder.path_join(clean_id + ".kmod")):
+			return true
+		if not _find_matching_kmod_in_root(root_folder, clean_id, "pack.json").is_empty():
+			return true
+	return false
 
 static func _kmod_has_asset(kmod_path: String, inner_rel_path: String) -> bool:
 	var reader := ZIPReader.new()
@@ -203,13 +275,20 @@ static func _kmod_has_asset(kmod_path: String, inner_rel_path: String) -> bool:
 
 ## 从松散目录或 .kmod!/assets/... 虚路径流式读取二进制资产字节流
 static func read_mod_asset_bytes(uri_or_path: String, fallback_mod_id: String = "") -> PackedByteArray:
-	var resolved := resolve_unified_uri(uri_or_path, fallback_mod_id)
+	var kmod_direct_sep := uri_or_path.find(".kmod!/")
+	var resolved := ""
+	if kmod_direct_sep != -1 and (uri_or_path.begins_with(SCHEME_RES) or uri_or_path.begins_with(SCHEME_USER)):
+		resolved = sanitize_sandbox_path_strict(uri_or_path)
+	else:
+		resolved = resolve_unified_uri(uri_or_path, fallback_mod_id)
 	if resolved.is_empty():
 		return PackedByteArray()
 	var kmod_sep := resolved.find(".kmod!/")
 	if kmod_sep != -1:
 		var kmod_file := resolved.substr(0, kmod_sep + 5)
 		var inner_path := resolved.substr(kmod_sep + 7)
+		if sanitize_sandbox_path_strict(inner_path).is_empty():
+			return PackedByteArray()
 		var reader := ZIPReader.new()
 		if reader.open(kmod_file) != OK:
 			return PackedByteArray()
@@ -224,7 +303,7 @@ static func read_mod_asset_bytes(uri_or_path: String, fallback_mod_id: String = 
 # 五、通用 URI 协议解析引擎 (Unified URI Scheme)
 # ==============================================================================
 
-## 解析任意格式的统一资源定位符（支持 official://, mod://, res://, user://）
+## 解析任意格式的统一资源定位符（支持 official://, mod://, res://, user://；对越界向量 Fail-Closed 返回空串）
 static func resolve_unified_uri(uri_or_path: String, fallback_mod_id: String = "") -> String:
 	var trimmed := uri_or_path.strip_edges()
 	if trimmed.is_empty():
@@ -232,36 +311,45 @@ static func resolve_unified_uri(uri_or_path: String, fallback_mod_id: String = "
 
 	# 1. 官方资产协议：official://... 优先查已激活官方 MOD 包，否则映射 res://assets/...
 	if trimmed.begins_with(SCHEME_OFFICIAL):
-		var relative_subpath := sanitize_sandbox_path(trimmed.trim_prefix(SCHEME_OFFICIAL))
+		var relative_subpath := sanitize_sandbox_path_strict(trimmed.trim_prefix(SCHEME_OFFICIAL))
+		if relative_subpath.is_empty():
+			return ""
 		return resolve_official_asset_path("", relative_subpath)
 
-	# 2. 模组资产协议：mod://my_mod/assets/video.ogv 或 mod://assets/video.ogv (需 fallback_mod_id)
+	# 2. 模组资产协议：mod://my_mod/assets/video.ogv 或 mod://assets/video.ogv 或 mod://textures/a.png (需 fallback_mod_id)
 	if trimmed.begins_with(SCHEME_MOD):
 		return _resolve_mod_scheme_uri(trimmed, fallback_mod_id)
 
-	# 3. Godot 虚拟文件系统原生路径：res:// 或 user:// 直接返回安全清洗结果
+	# 3. Godot 虚拟文件系统原生路径：res:// 或 user:// 执行严格穿越与空字节检测
 	if trimmed.begins_with(SCHEME_RES) or trimmed.begins_with(SCHEME_USER):
-		return sanitize_sandbox_path(trimmed)
+		return sanitize_sandbox_path_strict(trimmed)
 
 	# 4. 无协议纯相对路径：若提供了 fallback_mod_id 则解析为 MOD 资产，否则作为官方资产相对路径
 	if not fallback_mod_id.is_empty():
 		return resolve_mod_asset_path(fallback_mod_id, trimmed)
-	var clean_relative_path := sanitize_sandbox_path(trimmed)
+	var clean_relative_path := sanitize_sandbox_path_strict(trimmed)
+	if clean_relative_path.is_empty():
+		return ""
 	if clean_relative_path.begins_with(PREFIX_ASSETS):
 		clean_relative_path = clean_relative_path.trim_prefix(PREFIX_ASSETS)
 	return ROOT_OFFICIAL_ASSETS.path_join(clean_relative_path)
 
 static func _resolve_mod_scheme_uri(uri: String, fallback_mod_id: String) -> String:
-	var raw_path := uri.trim_prefix(SCHEME_MOD).trim_prefix("/")
+	var after_scheme := uri.trim_prefix(SCHEME_MOD)
+	if after_scheme.begins_with("//") or after_scheme.begins_with("\\\\"):
+		return ""
+	var raw_path := sanitize_sandbox_path_strict(after_scheme.trim_prefix("/"))
+	if raw_path.is_empty():
+		return ""
 	var slash_index := raw_path.find("/")
 
 	if slash_index > 0:
 		var first_segment := raw_path.substr(0, slash_index)
 		var rest_path := raw_path.substr(slash_index + 1)
-		# 若第一段是 assets，说明格式为 mod://assets/path，借用 fallback_mod_id
 		if first_segment == DIR_ASSETS and not fallback_mod_id.is_empty():
 			return resolve_mod_asset_path(fallback_mod_id, rest_path)
-		# 否则格式为 mod://<mod_id>/assets/path
+		if ASSET_CATEGORY_SEGMENTS.has(first_segment) and not fallback_mod_id.is_empty() and not _has_installed_mod_named(first_segment):
+			return resolve_mod_asset_path(fallback_mod_id, raw_path)
 		if rest_path.begins_with(PREFIX_ASSETS):
 			rest_path = rest_path.trim_prefix(PREFIX_ASSETS)
 		return resolve_mod_asset_path(first_segment, rest_path)
@@ -394,9 +482,18 @@ static func sanitize_identifier(raw_id: String) -> String:
 	var _compile_error := regex.compile("[^a-zA-Z0-9_\\-]")
 	return regex.sub(clean, "", true)
 
-## 资产物理存在性探测（兼容 Godot 虚拟文件系统与外部物理文件）
+## 资产物理存在性探测（兼容 Godot 虚拟文件系统、外部物理文件与 .kmod!/ 归档内嵌资产）
 static func asset_exists(canonical_path: String) -> bool:
 	if canonical_path.is_empty():
+		return false
+	var kmod_sep := canonical_path.find(".kmod!/")
+	if kmod_sep != -1:
+		var kmod_file := canonical_path.substr(0, kmod_sep + 5)
+		var inner_path := canonical_path.substr(kmod_sep + 7)
+		if sanitize_sandbox_path_strict(inner_path).is_empty():
+			return false
+		if FileAccess.file_exists(kmod_file):
+			return _kmod_has_asset(kmod_file, inner_path)
 		return false
 	if ResourceLoader.exists(canonical_path):
 		return true
