@@ -1,0 +1,154 @@
+[gd_scene load_steps=2 format=3 uid="uid://c8charcreate01"]
+
+[ext_resource type="Script" path="res://frontend/views/character_creation/character_creation_view.gd" id="1_char_create_view"]
+
+[node name="CharacterCreationView" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_char_create_view")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.06, 0.08, 0.12, 1)
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 32
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 32
+theme_override_constants/margin_bottom = 24
+
+[node name="MainVBox" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="HeaderPanel" type="PanelContainer" parent="Margin/MainVBox"]
+layout_mode = 2
+
+[node name="HeaderHBox" type="HBoxContainer" parent="Margin/MainVBox/HeaderPanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="Margin/MainVBox/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 24
+text = "CHARACTER CREATION"
+
+[node name="WorldSlotBadgeLabel" type="Label" parent="Margin/MainVBox/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "WORLD / SLOT"
+
+[node name="BackBtn" type="Button" parent="Margin/MainVBox/HeaderPanel/HeaderHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "BACK"
+
+[node name="StatusBannerLabel" type="Label" parent="Margin/MainVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 2
+text = ""
+
+[node name="ContentSplit" type="HBoxContainer" parent="Margin/MainVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 16
+
+[node name="LeftOptionsPanel" type="PanelContainer" parent="Margin/MainVBox/ContentSplit"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="LeftVBox" type="VBoxContainer" parent="Margin/MainVBox/ContentSplit/LeftOptionsPanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="NameHeaderLabel" type="Label" parent="Margin/MainVBox/ContentSplit/LeftOptionsPanel/LeftVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "NAME"
+
+[node name="CharacterNameEdit" type="LineEdit" parent="Margin/MainVBox/ContentSplit/LeftOptionsPanel/LeftVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="OriginHeaderLabel" type="Label" parent="Margin/MainVBox/ContentSplit/LeftOptionsPanel/LeftVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "ORIGIN"
+
+[node name="OriginOptionButton" type="OptionButton" parent="Margin/MainVBox/ContentSplit/LeftOptionsPanel/LeftVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="TraitHeaderLabel" type="Label" parent="Margin/MainVBox/ContentSplit/LeftOptionsPanel/LeftVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "TRAIT"
+
+[node name="TraitOptionButton" type="OptionButton" parent="Margin/MainVBox/ContentSplit/LeftOptionsPanel/LeftVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="ControlHintsLabel" type="Label" parent="Margin/MainVBox/ContentSplit/LeftOptionsPanel/LeftVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 2
+text = ""
+
+[node name="RightPreviewPanel" type="PanelContainer" parent="Margin/MainVBox/ContentSplit"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RightVBox" type="VBoxContainer" parent="Margin/MainVBox/ContentSplit/RightPreviewPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="PreviewHeaderLabel" type="Label" parent="Margin/MainVBox/ContentSplit/RightPreviewPanel/RightVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "DESTINY PREVIEW"
+
+[node name="DestinyPreviewRichLabel" type="RichTextLabel" parent="Margin/MainVBox/ContentSplit/RightPreviewPanel/RightVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = true
+text = ""
+
+[node name="ErrorStatusLabel" type="Label" parent="Margin/MainVBox/ContentSplit/RightPreviewPanel/RightVBox"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 2
+text = ""
+
+[node name="FooterHBox" type="HBoxContainer" parent="Margin/MainVBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+alignment = 2
+
+[node name="RerollBtn" type="Button" parent="Margin/MainVBox/FooterHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "REROLL"
+
+[node name="ConfirmCreateBtn" type="Button" parent="Margin/MainVBox/FooterHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "CONFIRM"
