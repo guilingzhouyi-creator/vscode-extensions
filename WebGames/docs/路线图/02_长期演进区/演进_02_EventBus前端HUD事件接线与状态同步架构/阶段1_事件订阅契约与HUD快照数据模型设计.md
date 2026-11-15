@@ -5,6 +5,8 @@
 > **【授权依据】**：**已获项目负责人/用户明确授权 (Explicit Authorization)**——授权进入 `02_长期演进区` 立项本工程。
 > **【需求溯源】**：前后端契约审查结论（docs/audit/AUDIT_REPORT_前端可视化.md：前端 17 视图零后端接线、事件总线完全断开）+ 序章生命周期调查（EventBusCore 双通道可达前端进程，`main_dashboard.gd` 已验证消费；`main_hud_view.gd` 零订阅、`update_status_snapshot` 仅测试调用）。
 > **施工开始日期**: 2026-09-05（中午时段）
+> **状态**: 已验收 (演进_02 Completed)
+> **落地路径对齐说明**: `HudEventBridge` 已落地于 [hud_event_bridge.gd](../../../../frontend/systems/hud_event_bridge.gd)，`HudStatusSnapshotDTO` / `AuthoritativeHudSnapshotDTO` 已落地于 [hud_status_snapshot_dto.gd](../../../../backend/domains/world_state/dto/hud_status_snapshot_dto.gd) 与 [authoritative_hud_snapshot_dto.gd](../../../../backend/domains/world_state/dto/authoritative_hud_snapshot_dto.gd)，`HudEventContract` 已落地于 [hud_event_contract.gd](../../../../backend/domains/world_state/hud_event_contract.gd)，通道路由配置已归口至 [config/domains/world_state/core.json](../../../../config/domains/world_state/core.json) 与 [config/domains/account/core.json](../../../../config/domains/account/core.json)。
 
 ---
 
@@ -104,10 +106,10 @@ class_name HudEventContract extends RefCounted:
 
 ## 二、 命令式施工执行清单 (Agent Execution Checklist)
 
-- [ ] **Step 1.1: HUD 状态域拆解与事件源梳理** - 枚举顶栏/聊天/战报/任务追踪四区的事件来源通道，明确输入→状态→输出边界
-- [ ] **Step 1.2: 严格类型化快照 DTO 定义** - 声明 `HudStatusSnapshotDTO` 全字段类型、默认值与除数下限（`hp_max/mp_max/ap_max >= 1`）
-- [ ] **Step 1.3: 订阅契约与白名单建立** - 定义 `HudEventContract` 四信号枚举与通道常量，声明单源订阅不变量
-- [ ] **Step 1.4: 数据合法性校验与防御性兜底** - 空 payload / 缺字段 / 负值注入一律回退安全默认值，杜绝 HUD 状态脏写
+- [x] **Step 1.1: HUD 状态域拆解与事件源梳理** - 枚举顶栏/聊天/战报/任务追踪四区的事件来源通道，明确输入→状态→输出边界
+- [x] **Step 1.2: 严格类型化快照 DTO 定义** - 声明 `HudStatusSnapshotDTO` 全字段类型、默认值与除数下限（`hp_max/mp_max/ap_max >= 1`）
+- [x] **Step 1.3: 订阅契约与白名单建立** - 定义 `HudEventContract` 四信号枚举与通道常量，声明单源订阅不变量
+- [x] **Step 1.4: 数据合法性校验与防御性兜底** - 空 payload / 缺字段 / 负值注入一律回退安全默认值，杜绝 HUD 状态脏写
 
 ---
 

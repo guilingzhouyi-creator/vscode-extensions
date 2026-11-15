@@ -1,7 +1,7 @@
 # 施工细则：全域非阻塞CG视频播放与剧情通用Hook引擎 —— 阶段1：视频与CG媒体数据契约参数化DTO与Hook配置标准规范
 
 > 施工开始日期: 2026-11-08
-> 状态: 进行中
+> 状态: 已验收 (Phase 126 Completed)
 
 > [!NOTE]
 > 【施工目标】
@@ -29,11 +29,11 @@
 
 ## 二、 命令式施工执行清单 (Agent Execution Checklist)
 
-- [ ] Step 1.1: 创建参数化请求模型 `CutsceneRequestDTO`（支持跳过、音轨、字幕、音量、黑屏过渡与上下文）。
-- [ ] Step 1.2: 创建播放状态追踪模型 `CutscenePlaybackStateDTO` 与资产清单模型 `CutsceneManifestDTO`。
-- [ ] Step 1.3: 建立全域资产注册表 `config/domains/media_cutscene/cutscene_registry.json`。
-- [ ] Step 1.4: 建立全域 Hook 路由拦截表 `config/domains/media_cutscene/cutscene_hooks.json`。
-- [ ] Step 1.5: 在 MOD SDK 下发布 `cutscene_schema.json` 供扩展模组使用。
+- [x] Step 1.1: 创建参数化请求模型 `CutsceneRequestDTO`（支持跳过、音轨、字幕、音量、黑屏过渡与上下文）。
+- [x] Step 1.2: 创建播放状态追踪模型 `CutscenePlaybackStateDTO` 与资产清单模型 `CutsceneManifestDTO`。
+- [x] Step 1.3: 建立全域资产注册表 `config/infrastructure/cutscene_registry.json`。
+- [x] Step 1.4: 建立全域 Hook 路由拦截表 `config/infrastructure/cutscene_hooks.json`。
+- [x] Step 1.5: 在 MOD SDK 下发布 `mod_sdk/schemas/cutscene_manifest.schema.json` 供扩展模组使用。
 
 ---
 

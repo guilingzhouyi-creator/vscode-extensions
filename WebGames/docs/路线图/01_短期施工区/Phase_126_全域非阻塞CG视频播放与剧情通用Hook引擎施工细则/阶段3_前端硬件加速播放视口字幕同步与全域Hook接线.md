@@ -1,7 +1,7 @@
 # 施工细则：全域非阻塞CG视频播放与剧情通用Hook引擎 —— 阶段3：前端硬件加速播放视口字幕同步与全域Hook接线
 
 > 施工开始日期: 2026-11-08
-> 状态: 进行中
+> 状态: 已验收 (Phase 126 Completed)
 
 > [!NOTE]
 > 【施工目标】
@@ -29,11 +29,11 @@
 
 ## 二、 命令式施工执行清单 (Agent Execution Checklist)
 
-- [ ] Step 3.1: 编写 `CutscenePlayerView`，集成 `VideoStreamPlayer`、淡入淡出遮罩与全屏适配。
-- [ ] Step 3.2: 编写字幕同步组件 `CutsceneSubtitleLayer`，支持多语言动态高亮。
-- [ ] Step 3.3: 编写跳过交互守卫 `CutsceneSkipIndicator`，支持长按进度反馈。
-- [ ] Step 3.4: 编写 `CutscenePresenter`，完成与领域事件总线及 UI 基础设施的接线。
-- [ ] Step 3.5: 在 `NarrativeDagExecutionEngine` 植入标准 Hook 拦截器，实现剧情自动挂起与恢复。
+- [x] Step 3.1: 编写 `CutscenePlayerView`，集成 `VideoStreamPlayer`、淡入淡出遮罩与全屏适配。
+- [x] Step 3.2: 在 `CutscenePlayerView` 内置 `_subtitle_label` 多语言动态高亮字幕层。
+- [x] Step 3.3: 在 `CutscenePlayerView` 内置 `_setup_skip_ui` 长按跳过交互守卫与进度反馈。
+- [x] Step 3.4: 编写 `CutscenePresenter`（`frontend/presentation/common/cutscene_presenter.gd`）与 `CutsceneEventBridge`（`frontend/systems/cutscene_event_bridge.gd`），完成与领域事件总线及 UI 基础设施的接线。
+- [x] Step 3.5: 通过 `PrologueCutscenePort` 与 `PrologueExecutionKernel` 在 `PrologueDagExecutionEngine` 植入标准 Hook 拦截器，实现剧情自动挂起与恢复。
 
 ---
 

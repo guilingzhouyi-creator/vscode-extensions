@@ -215,7 +215,7 @@ DeterministicRNG.reseed_global(seed)           # 整局复现开关
 |---|---|
 | backend .gd / 行数 | 446 / 51,476 行（全域 .gd 753 / 105,220 行） |
 | 领域数 | 47 |
-| 测试项 | 1040（CLI 与 UI 共用同一注册表，<!-- METRICS:BEGIN wg-test-suite-count -->**144 套**<!-- METRICS:END wg-test-suite-count -->注册测试套件 / 覆盖 47 领域；实时以 `tests/reports/test_latest.json` 为准） |
+| 测试项 | 1040（CLI 与 UI 共用同一注册表，<!-- METRICS:BEGIN wg-test-suite-count -->**147 套**<!-- METRICS:END wg-test-suite-count -->注册测试套件 / 覆盖 47 领域；实时以 `tests/reports/test_latest.json` 为准） |
 | 配置表 | 131（含 70 张必需表，`audit_config.py` 口径） |
 | 配置调用点 | 1040（`backend/` + `frontend/` 内非注释 `GameConfig.get_*` 与 `GameConfig.msg`；`GameConfig.get_value` 违禁调用 0） |
 | 函数 / 参数类型注解 | 全强类型注解（`audit_gd.py --strict` 校验 595 份源码 0 违规） |
