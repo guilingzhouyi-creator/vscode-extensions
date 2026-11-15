@@ -731,7 +731,8 @@ function acceptGovernanceSnapshot(candidate: unknown): GovernanceLedgerSnapshot 
     const weights = snapshot.learnedWeights;
     if (typeof weights !== 'object' || weights === null) return null;
     const normalized = normalizeSupervisorWeights(weights as Partial<FusionWeights>);
-    return normalized ? ({ ...snapshot, learnedWeights: normalized } as GovernanceLedgerSnapshot) : null;
+    if (!normalized) return null;
+    return { ...snapshot, learnedWeights: normalized } as GovernanceLedgerSnapshot;
 }
 
 /**

@@ -25,7 +25,11 @@ import type { TrajectoryRecipeExtractor } from '../trajectory/recipeExtractor';
 import { defaultTrajectoryRecipeExtractor } from '../trajectory/recipeExtractor';
 import type { RegressionTrajectoryDetector } from '../trajectory/regressionTrajectoryDetector';
 import { defaultRegressionTrajectoryDetector } from '../trajectory/regressionTrajectoryDetector';
-import { calculateRecipeGeneralizationIndex, calculateTrajectoryQualityVelocity, scoreDelta } from '../scoring/scorer-formulas';
+import {
+    calculateRecipeGeneralizationIndex,
+    calculateTrajectoryQualityVelocity,
+    scoreDelta,
+} from '../scoring/scorer-formulas';
 import { numberMeasurement, type Measurement } from '../review/review-contracts';
 
 const DEFAULT_TRAJECTORY_DIR = '.refactor-trajectory';
@@ -153,7 +157,8 @@ export class PraxisTrajectoryLearningService implements IPraxisTrajectoryLearnin
     } {
         const delta =
             input.beforeScore && input.afterScore
-                ? (scoreDelta(input.beforeScore.compositeScore, input.afterScore.compositeScore) ?? NaN)
+                ? (scoreDelta(input.beforeScore.compositeScore, input.afterScore.compositeScore) ??
+                  NaN)
                 : null;
         const provenance = {
             source: 'trajectory-comparison' as const,
@@ -182,7 +187,8 @@ export class PraxisTrajectoryLearningService implements IPraxisTrajectoryLearnin
         input: PraxisTrajectoryLearningInput,
     ): Promise<PraxisTrajectoryVerdict> {
         const startTime = Date.now();
-        const { deltaMeasurement, velocityMeasurement } = this.measureTrajectoryDeltaAndVelocity(input);
+        const measured = this.measureTrajectoryDeltaAndVelocity(input);
+        const { deltaMeasurement, velocityMeasurement } = measured;
         const qualityDelta = deltaMeasurement.status === 'measured' ? deltaMeasurement.value : null;
         const qualityVelocity =
             velocityMeasurement.status === 'measured' ? velocityMeasurement.value : null;
@@ -193,7 +199,8 @@ export class PraxisTrajectoryLearningService implements IPraxisTrajectoryLearnin
         if (extractedRecipe) this.registerRecipe(extractedRecipe);
 
         const genMeasurement = this.evaluateHoldoutGeneralization(input, extractedRecipe);
-        const generalizationIndex = genMeasurement.status === 'measured' ? genMeasurement.value : null;
+        const generalizationIndex =
+            genMeasurement.status === 'measured' ? genMeasurement.value : null;
         if (qualityDelta !== null && Number.isFinite(qualityDelta)) {
             this.recordHistoricalSample({
                 trajectoryId: input.trajectoryId,
@@ -209,8 +216,10 @@ export class PraxisTrajectoryLearningService implements IPraxisTrajectoryLearnin
         }
 
         const recommendations = this.matchRecipes(input.beforeContent, input.language);
+        const hasImproved =
+            qualityDelta !== null && qualityDelta > 0 && extractedRecipe !== undefined;
         return {
-            hasBadToGoodImprovement: qualityDelta !== null && qualityDelta > 0 && extractedRecipe !== undefined,
+            hasBadToGoodImprovement: hasImproved,
             qualityDelta,
             qualityVelocity,
             generalizationIndex,
@@ -239,18 +248,26 @@ export class PraxisTrajectoryLearningService implements IPraxisTrajectoryLearnin
         let deltaSum = 0;
         for (const sample of holdout) {
             sampleIds.push(sample.trajectoryId);
-            const matched = recipe
-                ? this.extractor.matchesRecipe(recipe, sample.beforeContent, sample.language) || sample.category === recipe.category
+            const hasRecipeMatch = recipe
+                ? this.extractor.matchesRecipe(recipe, sample.beforeContent, sample.language) ||
+                  sample.category === recipe.category
                 : sample.qualityDelta > 0;
-            if (sample.qualityDelta > 0 && matched) {
+            if (sample.qualityDelta > 0 && hasRecipeMatch) {
                 deltaSum += sample.qualityDelta;
                 positiveDeltas.push(sample.qualityDelta);
             }
         }
         const supportCount = positiveDeltas.length;
         const meanImpact = supportCount > 0 ? deltaSum / supportCount : 0;
-        const genIndex = calculateRecipeGeneralizationIndex(supportCount, holdout.length, computeHoldoutDispersion(positiveDeltas, meanImpact), meanImpact);
-        return numberMeasurement(genIndex, { source: 'holdout-validation', sampleIds }, 'missing-holdout-validation');
+        const dispersion = computeHoldoutDispersion(positiveDeltas, meanImpact);
+        const genIndex = calculateRecipeGeneralizationIndex(
+            supportCount,
+            holdout.length,
+            dispersion,
+            meanImpact,
+        );
+        const genProvenance = { source: 'holdout-validation' as const, sampleIds };
+        return numberMeasurement(genIndex, genProvenance, 'missing-holdout-validation');
     }
 
     public recordHistoricalSample(sample: HistoricalTrajectorySample): void {
@@ -279,21 +296,27 @@ export class PraxisTrajectoryLearningService implements IPraxisTrajectoryLearnin
             if (recipe && typeof recipe.recipeId === 'string') this.registerRecipe(recipe);
         }
         for (const sample of parsed.history ?? []) {
-            if (sample && typeof sample.trajectoryId === 'string') this.recordHistoricalSample(sample);
+            if (sample && typeof sample.trajectoryId === 'string')
+                this.recordHistoricalSample(sample);
         }
     }
 
-    public async loadRecipesFromDisk(rootOrFilePath?: string): Promise<readonly RefactoringRecipe[]> {
+    public async loadRecipesFromDisk(
+        rootOrFilePath?: string,
+    ): Promise<readonly RefactoringRecipe[]> {
         const targetFile = resolveRecipesFilePath(rootOrFilePath, this.persistenceRoot);
         try {
-            const parsed = JSON.parse(await fs.promises.readFile(targetFile, ENCODING_UTF8)) as Partial<PersistedRecipesEnvelope>;
+            const rawText = await fs.promises.readFile(targetFile, ENCODING_UTF8);
+            const parsed = JSON.parse(rawText) as Partial<PersistedRecipesEnvelope>;
             this.ingestPersistedRecipesEnvelope(parsed);
         } catch (err: unknown) {
             // Absent persistence file is expected on cold start; warn on read or JSON failure.
             const errno = (err as NodeJS.ErrnoException)?.code;
             if (errno !== 'ENOENT') {
                 const detail = err instanceof Error ? err.message : String(err);
-                process.stderr.write(`[trajectory-learning] failed to load recipes from ${targetFile}: ${detail}\n`);
+                process.stderr.write(
+                    `[trajectory-learning] failed to load recipes from ${targetFile}: ${detail}\n`,
+                );
             }
         }
         return this.getLearnedRecipes();
@@ -347,6 +370,7 @@ export const defaultPraxisTrajectoryLearningService = new PraxisTrajectoryLearni
  *
  * @param extractor - Optional custom recipe extractor instance.
  * @param detector - Optional custom regression detector instance.
+ * @param persistenceRoot - Optional workspace root directory for recipe persistence.
  * @returns Configured IPraxisTrajectoryLearningService instance.
  */
 export function createTrajectoryLearningService(

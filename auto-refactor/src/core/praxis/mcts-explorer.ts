@@ -36,11 +36,7 @@ export type {
     SliceEvaluationOptions,
 };
 
-export {
-    MctsExplorer,
-    evaluateCandidateStrategy,
-    evaluateIncrementalSlice,
-};
+export { MctsExplorer, evaluateCandidateStrategy, evaluateIncrementalSlice };
 
 /**
  * Creates and initializes a new MctsExplorer instance with root default options.

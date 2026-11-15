@@ -14,7 +14,12 @@ import type { ASTSliceNode } from '../router/sliceTypes';
 export * from '../router/sliceExtractor';
 export * from '../router/sliceTypes';
 
-/** Extracts AST diff slices between old and new file contents using the default extractor. */
+/** Extracts AST diff slices between old and new file contents using the default extractor.
+ * @param filePath - Path of the source file being analyzed.
+ * @param oldContent - Baseline file text before modification.
+ * @param newContent - Modified file text to diff against baseline.
+ * @param changedLines - Optional line numbers touched in the modification.
+ * @returns Extracted semantic AST slices spanning the diff. */
 export function extractASTSlices(
     filePath: string,
     oldContent: string,
@@ -24,12 +29,16 @@ export function extractASTSlices(
     return defaultASTSliceExtractor.extractSlices(filePath, oldContent, newContent, changedLines);
 }
 
-/** Instantiates a fresh AST slice extractor instance. */
+/** Instantiates a fresh AST slice extractor instance.
+ * @returns Newly allocated ASTSliceExtractor instance. */
 export function createASTSliceExtractor(): ASTSliceExtractor {
     return new ASTSliceExtractor();
 }
 
-/** Filters AST slice nodes by their primary mutation classification. */
+/** Filters AST slice nodes by their primary mutation classification.
+ * @param slices - Input collection of extracted AST slice nodes.
+ * @param kind - Target primary mutation kind identifier.
+ * @returns Filtered subset matching the requested mutation kind. */
 export function filterSlicesByMutationKind(
     slices: readonly ASTSliceNode[],
     kind: string,
@@ -37,25 +46,34 @@ export function filterSlicesByMutationKind(
     return slices.filter((slice) => slice.primaryKind === kind);
 }
 
-/** Summarizes slice mutation counts across signature, control flow, I/O, async, and type axes. */
-export function summarizeSliceVectors(
-    slices: readonly ASTSliceNode[],
-): Record<string, number> {
-    const counts: Record<string, number> = {
-        total: slices.length,
-        signature: 0,
-        controlFlow: 0,
-        io: 0,
-        async: 0,
-        type: 0,
-    };
-    for (let i = 0; i < slices.length; i++) {
-        const slice = slices[i];
-        if (slice.featureVector.hasSignatureMutation) counts.signature++;
-        if (slice.featureVector.hasControlFlowMutation) counts.controlFlow++;
-        if (slice.featureVector.hasIoMutation) counts.io++;
-        if (slice.featureVector.hasAsyncMutation) counts.async++;
-        if (slice.featureVector.hasTypeMutation) counts.type++;
+const SLICE_AXIS_MAP: ReadonlyArray<readonly [keyof ASTSliceNode['featureVector'], string]> = [
+    ['hasSignatureMutation', 'signature'],
+    ['hasControlFlowMutation', 'controlFlow'],
+    ['hasIoMutation', 'io'],
+    ['hasAsyncMutation', 'async'],
+    ['hasTypeMutation', 'type'],
+];
+
+function createEmptyVectorCounts(total: number): Record<string, number> {
+    const counts: Record<string, number> = { total };
+    for (const [, axisKey] of SLICE_AXIS_MAP) {
+        counts[axisKey] = 0;
+    }
+    return counts;
+}
+
+/** Summarizes slice mutation counts across signature, control flow, I/O, async, and type axes.
+ * @param slices - Extracted AST slice nodes to summarize.
+ * @returns Counts aggregated per structural mutation axis. */
+export function summarizeSliceVectors(slices: readonly ASTSliceNode[]): Record<string, number> {
+    const counts = createEmptyVectorCounts(slices.length);
+    for (const slice of slices) {
+        const vector = slice.featureVector;
+        for (const [flagKey, axisKey] of SLICE_AXIS_MAP) {
+            if (vector[flagKey]) {
+                counts[axisKey]++;
+            }
+        }
     }
     return counts;
 }

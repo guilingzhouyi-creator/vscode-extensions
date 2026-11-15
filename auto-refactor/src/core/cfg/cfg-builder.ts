@@ -458,13 +458,7 @@ export class CfgBuilder {
         }
 
         const stmt = CfgBuilder.parseStatement(trimmed, lineNum, `s_${stmtCounter}`);
-        const nextBlock = this.processStatement(
-            stmt,
-            trimmed,
-            currentBlock,
-            exit,
-            branchStack,
-        );
+        const nextBlock = this.processStatement(stmt, trimmed, currentBlock, exit, branchStack);
         return { nextBlock, nextCounter: stmtCounter + 1 };
     }
 

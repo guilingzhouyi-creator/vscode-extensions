@@ -925,6 +925,8 @@ let loadedRawBinding: RawNativeBinding | null = null;
 /**
  * Exposes the raw underlying compiled native binding for differential parity testing and diagnosis.
  * Returns null when the compiled addon is not loaded.
+ *
+ * @returns Raw native binding module handle, or null when unavailable.
  */
 export function getRawNativeBinding(): RawNativeBinding | null {
     return loadedRawBinding;

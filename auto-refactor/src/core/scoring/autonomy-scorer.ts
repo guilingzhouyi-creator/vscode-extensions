@@ -121,8 +121,8 @@ function computeBayesianAutonomyConfidence(
         totalRuleObservations > 0
             ? totalRuleObservations
             : totalScopedCalls > 0
-                ? totalScopedCalls
-                : Math.min(totalFiles, 100),
+              ? totalScopedCalls
+              : Math.min(totalFiles, 100),
     );
     const pObserved = Math.max(0.0, Math.min(1.0, compositeScore / PERCENT_FACTOR));
 

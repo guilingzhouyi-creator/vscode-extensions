@@ -281,8 +281,9 @@ function buildUnifiedDiagnosticCatalog(): Record<string, DiagnosticTemplate> {
 }
 
 /** Registry of structured diagnostic templates for all registered auto-refactor rules. */
-export const DIAGNOSTIC_CATALOG: Readonly<Record<string, DiagnosticTemplate>> =
-    Object.freeze(buildUnifiedDiagnosticCatalog());
+export const DIAGNOSTIC_CATALOG: Readonly<Record<string, DiagnosticTemplate>> = Object.freeze(
+    buildUnifiedDiagnosticCatalog(),
+);
 
 /**
  * Returns coverage metrics of DIAGNOSTIC_CATALOG against RULE_REGISTRY.
@@ -297,9 +298,7 @@ export function getDiagnosticCatalogCoverage(): {
     const coveredRules = Object.keys(DIAGNOSTIC_CATALOG).length;
     const totalAutoRules = RULE_REGISTRY.length;
     const coveragePercent =
-        totalAutoRules > 0
-            ? Math.round((coveredRules / totalAutoRules) * 1000) / 10
-            : 0;
+        totalAutoRules > 0 ? Math.round((coveredRules / totalAutoRules) * 1000) / 10 : 0;
     return { coveredRules, totalAutoRules, coveragePercent };
 }
 

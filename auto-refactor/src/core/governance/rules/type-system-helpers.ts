@@ -29,31 +29,6 @@ const MSG_EXPLICIT_TYPING =
     'Variable uses implicit loose assignment (`var =`). Use explicit declaration or static inference (`:=`).';
 const SUGG_EXPLICIT_TYPING = 'Change to `var name := ...` or provide an explicit type annotation.';
 
-const EXPORT_KEYWORD = 'export';
-const EXPORT_KEYWORD_LEN = EXPORT_KEYWORD.length;
-const KEYWORD_FUNCTION = 'function';
-const KEYWORD_CONST = 'const';
-const KEYWORD_ANY = 'any';
-
-const CHAR_CODE_UPPER_A = 65;
-const CHAR_CODE_UPPER_Z = 90;
-const CHAR_CODE_LOWER_A = 97;
-const CHAR_CODE_LOWER_Z = 122;
-const CHAR_CODE_DIGIT_ZERO = 48;
-const CHAR_CODE_DIGIT_NINE = 57;
-const CHAR_CODE_UNDERSCORE = 95;
-const CHAR_CODE_DOLLAR = 36;
-
-function isIdentCharCode(code: number): boolean {
-    return (
-        (code >= CHAR_CODE_UPPER_A && code <= CHAR_CODE_UPPER_Z) ||
-        (code >= CHAR_CODE_LOWER_A && code <= CHAR_CODE_LOWER_Z) ||
-        (code >= CHAR_CODE_DIGIT_ZERO && code <= CHAR_CODE_DIGIT_NINE) ||
-        code === CHAR_CODE_UNDERSCORE ||
-        code === CHAR_CODE_DOLLAR
-    );
-}
-
 /**
  * Evaluates whether a string contains an opening parenthesis character.
  */

@@ -122,7 +122,9 @@ function resolveCoreHealthFields(
 ): Pick<AasHealth, 'score' | 'grade' | 'density' | 'tensorSummary' | 'pillars'> {
     const governance = report.governance;
     const source = governance ?? report.qualityScore;
-    const rawScore = governance ? governance.hierarchicalCompositeScore : report.qualityScore?.compositeScore;
+    const rawScore = governance
+        ? governance.hierarchicalCompositeScore
+        : report.qualityScore?.compositeScore;
     const candidateScore = override?.score ?? rawScore ?? null;
     return {
         score: roundMetric(candidateScore) ?? null,

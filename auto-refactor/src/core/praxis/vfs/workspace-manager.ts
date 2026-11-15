@@ -221,11 +221,7 @@ export class WorkspaceManager {
             records.push(rec);
         }
 
-        await fs.promises.writeFile(
-            registryPath,
-            JSON.stringify({ records }, null, 2),
-            'utf8',
-        );
+        await fs.promises.writeFile(registryPath, JSON.stringify({ records }, null, 2), 'utf8');
     }
 
     /**

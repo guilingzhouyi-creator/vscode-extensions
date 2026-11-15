@@ -101,7 +101,10 @@ export function combineStrategies(chain: readonly CandidateStrategy[]): Candidat
     return {
         strategyId: chain.map((s) => s.strategyId).join('+'),
         label: chain.map((s) => s.label).join(' + '),
-        description: chain.map((s) => s.description).filter(Boolean).join('; '),
+        description: chain
+            .map((s) => s.description)
+            .filter(Boolean)
+            .join('; '),
         fileModifications,
     };
 }

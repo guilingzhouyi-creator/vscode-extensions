@@ -452,10 +452,8 @@ export function computeSecurityCeiling(
 ): number {
     const expSymbols = metric?.exportedSymbols ?? 0;
     const lines = metric?.nonBlankLines ?? scaleFactor * config.baselineLines;
-    const expTerm =
-        config.exportWeight * Math.tanh(Math.max(0, expSymbols) / config.exportLimit);
-    const locTerm =
-        config.locWeight * Math.tanh(Math.max(0, lines) / config.locLimit);
+    const expTerm = config.exportWeight * Math.tanh(Math.max(0, expSymbols) / config.exportLimit);
+    const locTerm = config.locWeight * Math.tanh(Math.max(0, lines) / config.locLimit);
     const reserve = Math.max(MIN_EPISTEMIC_GAP, config.epistemicBaseReserve);
     const discount = reserve + config.maxDiscount * (expTerm + locTerm);
     return Math.min(

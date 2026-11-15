@@ -504,8 +504,8 @@ export function computeEnvelopeBounds(
 
     const hasRefactorWitness = Boolean(
         params.hasEquivalentExtraction ||
-            params.isFormalRetirement ||
-            usefulDeletedLines > REFACTOR_WITNESS_MIN_DEL_ELOC,
+        params.isFormalRetirement ||
+        usefulDeletedLines > REFACTOR_WITNESS_MIN_DEL_ELOC,
     );
     const addCommitCeiling = hasRefactorWitness
         ? MAX_COMMIT_FILE_ADD_REFACTOR_5D_ELOC
@@ -526,7 +526,9 @@ export function computeEnvelopeBounds(
 
     // 3. Deletion envelope bounds (clamped to witnessed refactor or plain single-file ceiling)
     const deletionLowerBound = 0;
-    const isWitnessedDeletion = Boolean(params.hasEquivalentExtraction || params.isFormalRetirement);
+    const isWitnessedDeletion = Boolean(
+        params.hasEquivalentExtraction || params.isFormalRetirement,
+    );
     const deletionUpperBound = isNewFile
         ? 0
         : isWitnessedDeletion

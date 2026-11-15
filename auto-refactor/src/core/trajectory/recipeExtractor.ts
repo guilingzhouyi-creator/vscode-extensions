@@ -217,7 +217,10 @@ export function parsePresetTrajectoryPlugin(
         : undefined;
 }
 
-function tryReadPresetPluginFile(filePath: string, entryName: string): TrajectoryRecipePlugin | undefined {
+function tryReadPresetPluginFile(
+    filePath: string,
+    entryName: string,
+): TrajectoryRecipePlugin | undefined {
     try {
         const readSyncFn = fs['readFileSync'];
         const raw = JSON.parse(readSyncFn(filePath, 'utf8'));

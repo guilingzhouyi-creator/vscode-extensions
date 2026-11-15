@@ -61,8 +61,14 @@ const ARROW_WRAPPER_PATTERN =
     /^(export\s+)?(const|let)\s+([a-zA-Z0-9_$]+)\s*=\s*\(([^)]*)\)\s*(?::\s*[^=]+)?=>\s*([a-zA-Z0-9_$]+)\(([^)]*)\);?$/;
 
 function matchesForwardingArguments(paramsRaw: string, argsRaw: string): boolean {
-    const params = paramsRaw.split(',').map((p) => p.split(':')[0].trim()).filter(Boolean);
-    const args = argsRaw.split(',').map((a) => a.trim()).filter(Boolean);
+    const params = paramsRaw
+        .split(',')
+        .map((p) => p.split(':')[0].trim())
+        .filter(Boolean);
+    const args = argsRaw
+        .split(',')
+        .map((a) => a.trim())
+        .filter(Boolean);
     if (params.length !== args.length) return false;
     return params.every((p, idx) => p === args[idx]);
 }

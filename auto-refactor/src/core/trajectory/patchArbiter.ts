@@ -189,30 +189,84 @@ function createPatchIssue(
 /** Dynamic code-execution token constructed without triggering static literal scanners. */
 const DYNAMIC_EXEC_TOKEN = ['ev', 'al('].join('');
 
-function inspectSinglePatchLine(filePath: string, trimmed: string, lineNum: number, out: Issue[]): void {
-    if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) return;
-    if (trimmed.includes(': any') || trimmed.includes('as any') || trimmed.includes('<any>')) {
-        out.push(createPatchIssue(filePath, lineNum, { rule: 'GOV-TYP-003', analyzer: 'governance', severity: 'warning', message: 'Type safety escape hatch (any) detected in candidate patch.' }));
-    }
-    if (trimmed.includes(DYNAMIC_EXEC_TOKEN)) {
-        out.push(createPatchIssue(filePath, lineNum, { rule: 'SEC-VUL-001', analyzer: 'security', severity: 'error', message: 'Arbitrary code execution pattern (dynamic exec) detected in candidate patch.' }));
-    }
-    if (trimmed.includes('console.log(') || trimmed.includes('console.debug(')) {
-        out.push(createPatchIssue(filePath, lineNum, { rule: 'SEC-LEAK-001', analyzer: 'production-hygiene', severity: 'warning', message: 'Unfiltered console debug logging detected in candidate patch.' }));
+const PATCH_LINE_CHECKS: ReadonlyArray<{
+    readonly tokens: readonly string[];
+    readonly rule: string;
+    readonly analyzer: string;
+    readonly severity: 'error' | 'warning';
+    readonly message: string;
+}> = [
+    {
+        tokens: [': any', 'as any', '<any>'],
+        rule: 'GOV-TYP-003',
+        analyzer: 'governance',
+        severity: 'warning',
+        message: 'Type safety escape hatch (any) detected in candidate patch.',
+    },
+    {
+        tokens: [DYNAMIC_EXEC_TOKEN],
+        rule: 'SEC-VUL-001',
+        analyzer: 'security',
+        severity: 'error',
+        message: 'Arbitrary code execution pattern (dynamic exec) detected in candidate patch.',
+    },
+    {
+        tokens: ['console.log(', 'console.debug('],
+        rule: 'SEC-LEAK-001',
+        analyzer: 'production-hygiene',
+        severity: 'warning',
+        message: 'Unfiltered console debug logging detected in candidate patch.',
+    },
+];
+
+function isCommentOnlyLine(trimmed: string): boolean {
+    if (!trimmed) return true;
+    return trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*');
+}
+
+function inspectSinglePatchLine(
+    filePath: string,
+    trimmed: string,
+    lineNum: number,
+    out: Issue[],
+): void {
+    if (isCommentOnlyLine(trimmed)) return;
+    for (const check of PATCH_LINE_CHECKS) {
+        if (check.tokens.some((token) => trimmed.includes(token))) {
+            out.push(createPatchIssue(filePath, lineNum, check));
+        }
     }
 }
 
-function appendRuleHitIssueIfMissing(collected: Issue[], filePath: string, rawHit: string, lineNum: number): void {
+function appendRuleHitIssueIfMissing(
+    collected: Issue[],
+    filePath: string,
+    rawHit: string,
+    lineNum: number,
+): void {
     const colonPos = rawHit.indexOf(':');
     const ruleCode = colonPos > 0 ? rawHit.slice(0, colonPos) : rawHit;
     for (const existing of collected) {
         if (existing.rule === ruleCode && existing.location.start.line === lineNum) return;
     }
-    collected.push(createPatchIssue(filePath, lineNum, { rule: ruleCode, analyzer: 'governance', severity: 'warning', message: `Rule violation ${rawHit} reported on candidate patch.` }));
+    collected.push(
+        createPatchIssue(filePath, lineNum, {
+            rule: ruleCode,
+            analyzer: 'governance',
+            severity: 'warning',
+            message: `Rule violation ${rawHit} reported on candidate patch.`,
+        }),
+    );
 }
 
 /**
  * Collects real or synthesized issues for a candidate snapshot via scanner and rules.
+ *
+ * @param filePath - Relative or absolute path of the target file.
+ * @param content - Candidate snapshot file contents to inspect.
+ * @param ruleHitIds - Optional explicit rule identifiers to attach if absent.
+ * @param customScanner - Optional custom scanner callback overriding static line checks.
+ * @returns Collected static and synthesized issues for the snapshot.
  */
 export function inspectPatchContentIssues(
     filePath: string,

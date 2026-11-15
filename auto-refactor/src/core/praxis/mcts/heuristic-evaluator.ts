@@ -142,8 +142,8 @@ function computeScoreBreakdown(
         originalViolationCount > 0
             ? (originalViolationCount - violationCount) / originalViolationCount
             : violationCount === 0
-                ? 1.0
-                : -0.5;
+              ? 1.0
+              : -0.5;
 
     const rulePenalty = Math.min(MAX_RULE_WEIGHT, violationCount * VIOLATION_PENALTY_MULTIPLIER);
     const ruleWeight =
@@ -235,9 +235,8 @@ export async function evaluateIncrementalSlice(
         const currentCpx = estimateComplexity(currentStr);
 
         const origStr = options.originalFiles?.get(filePath);
-        const origViolations = origStr !== undefined
-            ? countCodeDefects(origStr)
-            : currentViolations;
+        const origViolations =
+            origStr !== undefined ? countCodeDefects(origStr) : currentViolations;
         const origCpx = origStr !== undefined ? estimateComplexity(origStr) : currentCpx;
 
         sliceComplexityDelta += currentCpx - origCpx;
