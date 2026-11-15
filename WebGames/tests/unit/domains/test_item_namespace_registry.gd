@@ -45,19 +45,21 @@ static func run_all_tests() -> Dictionary:
 	}
 
 static func _test_canonical_id_namespace_validation() -> Dictionary:
-	var valid_id = "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD"
+	var valid_kalar_id = "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD"
+	var valid_custom_namespace_id = "OTHER:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD"
 	var invalid_id_short = "MITHRIL_LONGSWORD"
-	var invalid_id_domain = "OTHER:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD"
+	var invalid_id_lowercase_namespace = "other:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD"
 	var invalid_id_empty_segment = "KALAR:EQUIP::MITHRIL_LONGSWORD"
 
-	var ok1 = ItemRegistrySolver.validate_canonical_id_format(valid_id)
-	var ok2 = ItemRegistrySolver.validate_canonical_id_format(invalid_id_short)
-	var ok3 = ItemRegistrySolver.validate_canonical_id_format(invalid_id_domain)
-	var ok4 = ItemRegistrySolver.validate_canonical_id_format(invalid_id_empty_segment)
+	var ok1 = ItemRegistrySolver.validate_canonical_id_format(valid_kalar_id)
+	var ok2 = ItemRegistrySolver.validate_canonical_id_format(valid_custom_namespace_id)
+	var ok3 = ItemRegistrySolver.validate_canonical_id_format(invalid_id_short)
+	var ok4 = ItemRegistrySolver.validate_canonical_id_format(invalid_id_lowercase_namespace)
+	var ok5 = ItemRegistrySolver.validate_canonical_id_format(invalid_id_empty_segment)
 
-	var passed = ok1 and (not ok2) and (not ok3) and (not ok4)
+	var passed = ok1 and ok2 and (not ok3) and (not ok4) and (not ok5)
 	return {
-		"test": "TC-ITEM-REG-01: 物品 Canonical ID 分级命名空间格式校验（含空段拦截）",
+		"test": "TC-ITEM-REG-01: 物品 Canonical ID 多命名空间分级格式校验（含空段与小写前缀拦截）",
 		"passed": passed
 	}
 

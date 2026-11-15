@@ -9,6 +9,7 @@ extends TestCase
 
 const FRONTEND_DIR := "res://frontend"
 const VIEWS_DIR := "res://frontend/views"
+const SYSTEMS_DIR := "res://frontend/systems"
 const DESIGN_TOKENS_FILE := "design_tokens.gd"
 const SELF_FILE := "test_frontend_boundary_guard.gd"
 
@@ -27,6 +28,8 @@ const CONFIG_SEMANTIC_WHITELIST: Array[String] = [
 const FORBIDDEN_TOKENS: Array[String] = [
 	"res://backend",
 	"skeleton_mock.json",
+	"MockServiceContainer",
+	"MockDataCatalog",
 	"DeterministicRNG",
 	"EventBusCore",
 	"EventPacket",
@@ -72,6 +75,8 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_ui_binding_registry_weakref_compliance())
 	results.append(_test_presentation_no_dto_in_place_mutation())
 	results.append(_test_views_responsive_layout_discipline())
+	results.append(_test_systems_zero_mock_container_coupling())
+	results.append(_test_real_service_mode_and_container_complete())
 	return TestCase.pack_results("frontend_boundary_guard", results)
 
 # ==============================================================================
@@ -412,3 +417,40 @@ static func _test_views_responsive_layout_discipline() -> Dictionary:
 			offenders.append(path)
 	var ok := TestCase.assert_eq(offenders.size(), 0, "视图禁止硬编码全屏固定像素尺寸 Vector2(1920, 1080): %s" % str(offenders))
 	return TestCase.make_result("views_responsive_layout_discipline", ok, {"offenders": offenders})
+
+## 19. frontend/systems 与视图零模拟容器耦合断言
+static func _test_systems_zero_mock_container_coupling() -> Dictionary:
+	var system_files: Array[String] = []
+	_collect(SYSTEMS_DIR, system_files, [".gd"])
+	system_files.sort()
+	var offenders: Array[String] = []
+	for path in system_files:
+		var text := FileAccess.get_file_as_string(path)
+		if text.contains("MockServiceContainer") or text.contains("MockDataCatalog"):
+			offenders.append(path)
+	var ok := TestCase.assert_eq(offenders.size(), 0, "frontend/systems 禁止耦合模拟容器或模拟数据目录: %s" % str(offenders))
+	return TestCase.make_result("systems_zero_mock_container_coupling", ok, {"offenders": offenders})
+
+## 20. 默认服务模式为 real 且 RealServiceContainer 全域 21 项服务零模拟回退
+static func _test_real_service_mode_and_container_complete() -> Dictionary:
+	var configured_mode := GameConfig.get_string("frontend.ui", "service_mode", "")
+	var ok := TestCase.assert_eq(configured_mode, "real", "config/frontend/ui.json 的 service_mode 必须为 real")
+	var required_keys := [
+		"auth", "world", "character", "esc_menu", "prologue", "hud_sync", "lifecycle", "game_settings",
+		"version", "combat", "chat_command", "crafting", "economy", "gacha", "grimoire",
+		"guild", "mail", "misc_edge", "quest", "save", "snapshot_data"
+	]
+	var container := RealServiceContainer.get_instance()
+	var missing_or_mock: Array[String] = []
+	for service_key in required_keys:
+		var service_instance: Variant = container.get_service(service_key)
+		if service_instance == null:
+			missing_or_mock.append("%s:null" % service_key)
+			continue
+		var script_res: Script = service_instance.get_script() as Script
+		var script_path := script_res.resource_path if script_res != null else ""
+		if script_path.is_empty() or script_path.contains("/mocks/"):
+			missing_or_mock.append("%s:%s" % [service_key, script_path])
+	ok = ok and TestCase.assert_eq(missing_or_mock.size(), 0, "RealServiceContainer 不得缺失服务或回退至 mocks: %s" % str(missing_or_mock))
+	RealServiceContainer.reset_instance()
+	return TestCase.make_result("real_service_mode_and_container_complete", ok, {"missing_or_mock": missing_or_mock})

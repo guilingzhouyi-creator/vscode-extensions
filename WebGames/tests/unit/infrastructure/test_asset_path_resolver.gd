@@ -26,6 +26,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_mod_asset_three_tier_cascade())
 	results.append(test_unified_uri_scheme_parsing())
 	results.append(test_sandbox_security_and_anti_traversal())
+	results.append(test_versioned_kmod_precedence_and_strict_traversal())
 
 	var all_passed: bool = true
 	for r in results:
@@ -207,3 +208,74 @@ static func test_sandbox_security_and_anti_traversal() -> Dictionary:
 		"passed": passed,
 		"detail": "traversal_ok=%s, res_ok=%s, win_ok=%s, bs_ok=%s, id_ok=%s" % [traversal_ok, res_ok, win_ok, bs_ok, id_ok]
 	}
+
+
+## TC-APR-06: 版本化 .kmod 寻址、user > install 优先覆盖及严格编码穿越拦截
+static func test_versioned_kmod_precedence_and_strict_traversal() -> Dictionary:
+	var install_root := "user://test_apr06_install"
+	var user_root := "user://test_apr06_user"
+	_apr06_cleanup_dir(install_root)
+	_apr06_cleanup_dir(user_root)
+	_apr06_write_kmod(install_root.path_join("mod_p132_pack_1.0.0.kmod"), "mod_p132_pack", "1.0.0", "assets/textures/banner.txt", "INSTALL_V1".to_utf8_buffer())
+	_apr06_write_kmod(user_root.path_join("mod_p132_pack_2.0.0.kmod"), "mod_p132_pack", "2.0.0", "assets/textures/banner.txt", "USER_V2".to_utf8_buffer())
+
+	AssetPathResolver.set_test_roots_override([install_root, user_root])
+	var resolved_kmod := AssetPathResolver.resolve_mod_asset_path("mod_p132_pack", "textures/banner.txt")
+	var exists_ok := AssetPathResolver.asset_exists(resolved_kmod) and not AssetPathResolver.asset_exists(user_root.path_join("mod_p132_pack_2.0.0.kmod!/assets/textures/missing.txt"))
+	var payload_ok := AssetPathResolver.read_mod_asset_bytes("mod://textures/banner.txt", "mod_p132_pack").get_string_from_utf8() == "USER_V2"
+	var precedence_ok := resolved_kmod.begins_with(user_root)
+
+	var pct_dot := AssetPathResolver.resolve_unified_uri("mod://mod_p132_pack/%2e%2e/secret.txt")
+	var double_pct := AssetPathResolver.sanitize_sandbox_path_strict("textures/%252e%252e/secret.txt")
+	var nul_block := AssetPathResolver.resolve_mod_asset_path("mod_p132_pack", "textures/a%00.png")
+	var strict_guard_ok := pct_dot.is_empty() and double_pct.is_empty() and nul_block.is_empty()
+
+	AssetPathResolver.reset_for_tests()
+	_apr06_cleanup_dir(install_root)
+	_apr06_cleanup_dir(user_root)
+
+	var passed := precedence_ok and exists_ok and payload_ok and strict_guard_ok
+	return {
+		"test": "TC-APR-06: 版本化 .kmod 优先覆写、归档存在性与编码穿越严格阻断",
+		"passed": passed,
+		"detail": "precedence_ok=%s, exists_ok=%s, payload_ok=%s, strict_guard_ok=%s, pct='%s', double='%s', nul='%s'" % [
+			precedence_ok, exists_ok, payload_ok, strict_guard_ok, pct_dot, double_pct, nul_block
+		]
+	}
+
+
+static func _apr06_write_kmod(kmod_path: String, pack_id: String, ver: String, asset_entry: String, asset_bytes: PackedByteArray) -> void:
+	DirAccess.make_dir_recursive_absolute(kmod_path.get_base_dir())
+	var packer := ZIPPacker.new()
+	if packer.open(kmod_path) != OK:
+		return
+	packer.start_file("pack.json")
+	packer.write_file(JSON.stringify({"pack_id": pack_id, "version": ver}).to_utf8_buffer())
+	packer.close_file()
+	packer.start_file(asset_entry)
+	packer.write_file(asset_bytes)
+	packer.close_file()
+	packer.close()
+
+
+static func _apr06_cleanup_dir(dir_path: String) -> void:
+	if not DirAccess.dir_exists_absolute(dir_path):
+		return
+	var dir := DirAccess.open(dir_path)
+	if dir == null:
+		return
+	dir.list_dir_begin()
+	var item := dir.get_next()
+	while not item.is_empty():
+		var current := item
+		var is_subdir := dir.current_is_dir()
+		item = dir.get_next()
+		if current == "." or current == "..":
+			continue
+		var sub_path := dir_path.path_join(current)
+		if is_subdir:
+			_apr06_cleanup_dir(sub_path)
+		else:
+			DirAccess.remove_absolute(sub_path)
+	dir.list_dir_end()
+	DirAccess.remove_absolute(dir_path)

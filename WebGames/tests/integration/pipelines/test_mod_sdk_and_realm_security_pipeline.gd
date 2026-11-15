@@ -19,6 +19,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_multiplayer_purge_and_fallback_to_vanilla())
 	results.append(test_multiplayer_official_vanilla_allowed())
 	results.append(test_gateway_exit_symmetric_cleanup())
+	results.append(test_phase131_switch_clean_purge_and_realm_fail_rollback())
 
 	return pack_results("MOD SDK & Realm Security Pipeline", results)
 
@@ -263,4 +264,56 @@ static func test_gateway_exit_symmetric_cleanup() -> Dictionary:
 		"mode_reset": mode_reset,
 		"mods_cleared": mods_cleared,
 		"phase_reset": phase_reset
+	})
+
+
+## TC-MSS-07 (Phase 131 P0): 单机→联机切模自动洗脱本地扩展、显式传毒拦截、验签失败回滚与 exit 清零选择态
+static func test_phase131_switch_clean_purge_and_realm_fail_rollback() -> Dictionary:
+	var had_overlay := GameConfig.has_active_mod_overlay()
+	var kalar_mount := TestCase.mount_official_kalar_for_test()
+	var fsm := WorldGatewayFSM.new("MP_TESTER_01")
+	fsm.enter_gateway()
+	fsm.set_mod_selection(["official_kalar", "sp_story_addon"])
+	fsm.set_active_mods([kalar_mount.get("package", {}), {"pack_id": "sp_story_addon", "is_vanilla": false}])
+	fsm.select_mode(WorldGatewayModel.GameMode.SINGLE_PLAYER, {}, [])
+
+	# 1. 显式传入非官方 custom_mods 切联机仍必须拦截
+	var poison_switch := fsm.switch_gateway_mode(
+		WorldGatewayModel.GameMode.MULTIPLAYER, {}, [], "", "",
+		[{"pack_id": "cheat_mp_addon", "is_official": false}]
+	)
+	var poison_blocked: bool = not bool(poison_switch.get("success", true)) \
+		and str(poison_switch.get("error_code", "")) == AntiBridgeGuard.SECURITY_ERR_MULTIPLAYER_MOD_POISONING
+
+	# 2. 不传 custom_mods 的纯模式切换应自动洗脱本地 SP 扩展并清零显性选包
+	var clean_switch := fsm.switch_gateway_mode(WorldGatewayModel.GameMode.MULTIPLAYER, {}, [])
+	var clean_switch_ok: bool = bool(clean_switch.get("success", false)) \
+		and fsm.context.selected_mode == WorldGatewayModel.GameMode.MULTIPLAYER \
+		and fsm.get_active_mods().size() <= 1 \
+		and not bool(fsm.get("_has_explicit_mod_selection")) \
+		and fsm.get_selected_mod_pack_ids().is_empty()
+
+	# 3. 联机权威清单验签失败须清空 active_mods、adapted_mod_manifest 与 _realm_manifest
+	var fail_verify := fsm.verify_and_reconcile_realm_manifest([
+		{"pack_id": "official_kalar", "version": "9.9.9", "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000"}
+	])
+	var fail_cleared_ok: bool = not bool(fail_verify.get("success", true)) \
+		and fsm.get_active_mods().is_empty() \
+		and fsm.adapted_mod_manifest.is_empty()
+
+	# 4. exit_to_gateway 必须清零选包集合与显性选择标志
+	fsm.set_mod_selection(["official_kalar"])
+	fsm.exit_to_gateway()
+	var exit_selection_cleared: bool = not bool(fsm.get("_has_explicit_mod_selection")) \
+		and fsm.get_selected_mod_pack_ids().is_empty()
+
+	if not had_overlay:
+		TestCase.unmount_mod_overlay_for_test()
+
+	var passed: bool = poison_blocked and clean_switch_ok and fail_cleared_ok and exit_selection_cleared
+	return make_result("TC-MSS-07: 切联机净场洗脱、传毒拦截、验签回滚与退出选包清零", passed, {
+		"poison_blocked": poison_blocked,
+		"clean_switch_ok": clean_switch_ok,
+		"fail_cleared_ok": fail_cleared_ok,
+		"exit_selection_cleared": exit_selection_cleared
 	})

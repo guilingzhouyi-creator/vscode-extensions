@@ -42,6 +42,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_missing_critical_locked_mod_blocked())
 	results.append(test_digest_and_version_drift_detected_and_blocked())
 	results.append(test_safe_degrade_records_fragment_and_ui_diagnostics())
+	results.append(test_phase131_lock_sha256_fail_closed_and_strict_reconcile())
 	WorldModLockTestHelper.cleanup_world_lock_sandbox()
 	TestFullChainBackendHelper.teardown_env()
 	return TestCase.pack_results("Phase 130 世界档案 MOD 锁重入复原与漂移阻断验收流水线", results)
@@ -204,4 +205,79 @@ static func test_safe_degrade_records_fragment_and_ui_diagnostics() -> Dictionar
 		"degrade_ok": degrade_res.get("success", false),
 		"has_detached_fragment": has_detached_fragment,
 		"ui_diag_ok": ui_diag_ok
+	})
+
+
+## TC-WLD-05 (Phase 131 P0): 真实 SHA-256 固化、摘要漂移无条件禁降级 Fail-Closed 与有锁严格收敛
+static func test_phase131_lock_sha256_fail_closed_and_strict_reconcile() -> Dictionary:
+	WorldModLockTestHelper.cleanup_world_lock_sandbox()
+	var seeded := WorldModLockTestHelper.seed_locked_world_and_character()
+	var lock_mgr := WorldModAffinityManager.new()
+	var saved_lock := lock_mgr.load_world_mod_lock(LOCKED_WORLD_ID)
+	var locked_packs: Array = saved_lock.get("locked_packs", [])
+	var sha_ok: bool = not locked_packs.is_empty()
+	for entry in locked_packs:
+		if entry is Dictionary:
+			var digest := str((entry as Dictionary).get("content_sha256", "")).strip_edges()
+			if digest.length() != 64:
+				sha_ok = false
+
+	# 1. 带锁世界先污染 adapted_mod_manifest 为额外 addon 后重入，仍须严格收敛回 locked_pack_ids
+	var reconcile_fsm := WorldGatewayFSM.new("ACC_WLD_LOCK")
+	reconcile_fsm.enter_gateway()
+	var char_id := str(seeded.get("character_id", ""))
+	var slot_stub := [{"slot_id": "SLOT_01", "is_first_creation": false, "bound_character_id": char_id}]
+	reconcile_fsm.select_mode(WorldGatewayModel.GameMode.SINGLE_PLAYER, {}, slot_stub, LOCKED_WORLD_ID, "SLOT_01")
+	reconcile_fsm.adapted_mod_manifest = {"enabled_pack_ids": ["official_kalar", "rogue_unapproved_addon"]}
+	reconcile_fsm.set_active_mods([
+		{"pack_id": "official_kalar"},
+		{"pack_id": "rogue_unapproved_addon"}
+	])
+	reconcile_fsm.attach_ready_character(char_id)
+	var reconcile_enter := reconcile_fsm.enter_world("", false)
+	var mounted_ids: Array = reconcile_fsm.adapted_mod_manifest.get("enabled_pack_ids", []) if reconcile_fsm.adapted_mod_manifest is Dictionary else []
+	var strict_reconciled: bool = bool(reconcile_enter.get("success", false)) and mounted_ids == ["official_kalar"]
+	reconcile_fsm.logout()
+
+	# 2. 摘要漂移下即使传入 allow_safe_degrade = true 或走二次读档，均须无条件 Fail-Closed
+	lock_mgr.save_world_mod_lock(LOCKED_WORLD_ID, [
+		{"pack_id": "official_kalar", "version": "1.0.0", "content_sha256": "deadbeef00000000000000000000000000000000000000000000000000000000"}
+	])
+	var installed := ModPackageDiscoverySolver.scan_installed_full_mod_packages()
+	var bind_degrade := lock_mgr.verify_and_bind_world_mods(LOCKED_WORLD_ID, installed, true)
+	var bind_blocked: bool = not bool(bind_degrade.get("success", true)) \
+		and str(bind_degrade.get("error", "")) == "MOD_ERR_REALM_DIGEST_MISMATCH"
+
+	var drift_fsm := WorldGatewayFSM.new("ACC_WLD_DRIFT_FC")
+	drift_fsm.enter_gateway()
+	drift_fsm.select_mode(WorldGatewayModel.GameMode.SINGLE_PLAYER, {}, slot_stub, LOCKED_WORLD_ID, "SLOT_01")
+	drift_fsm.attach_ready_character(char_id)
+	var enter_degrade := drift_fsm.enter_world("", true)
+	var enter_blocked: bool = not bool(enter_degrade.get("success", true)) \
+		and str(enter_degrade.get("error_code", "")) == "MOD_ERR_REALM_DIGEST_MISMATCH"
+	drift_fsm.logout()
+
+	var acc := AccountProfile.new()
+	acc.account_id = "ACC_WLD_DRIFT_FC"
+	acc.bind_world_slot(LOCKED_WORLD_ID, "SLOT_01")
+	var dto := SaveSlotDTO.new()
+	dto.slot_id = "SLOT_01"
+	dto.world_id = LOCKED_WORLD_ID
+	dto.character_name = "LocksmithHero"
+	var sec_res := SaveLoadRoutingSolver.execute_secondary_load({
+		"account": acc,
+		"slot": dto,
+		"target_world_id": LOCKED_WORLD_ID
+	})
+	var sec_blocked: bool = not bool(sec_res.get("success", true)) \
+		and str(sec_res.get("error_code", "")) == "MOD_ERR_REALM_DIGEST_MISMATCH"
+
+	var ok: bool = bool(seeded.get("created", false)) and sha_ok and strict_reconciled \
+		and bind_blocked and enter_blocked and sec_blocked
+	return make_result("TC-WLD-05: 锁文件64位SHA-256固化、摘要篡改禁降级 Fail-Closed 与有锁严格重校", ok, {
+		"sha_ok": sha_ok,
+		"strict_reconciled": strict_reconciled,
+		"bind_blocked": bind_blocked,
+		"enter_blocked": enter_blocked,
+		"sec_blocked": sec_blocked
 	})
