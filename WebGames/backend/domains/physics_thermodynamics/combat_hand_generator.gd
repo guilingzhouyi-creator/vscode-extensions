@@ -88,12 +88,37 @@ static func _sample_discrete_distribution(weights: Dictionary, rng: Deterministi
 			return int(count_key)
 	return default_count
 
-## 动态卡池实体实例化
+## 动态卡池实体实例化（优先消费 MOD/配置中的 skill_cards，缺失时按 domains.combat#verbs 动态抽取）
 static func _instantiate_card_from_pool(rng: DeterministicRNG) -> PhysicalVerbRegistry.CombatActionCardEntity:
 	var card := PhysicalVerbRegistryClass.CombatActionCardEntity.new()
-	var verbs: Array = ["STAB", "SLASH", "UPPER", "PARRY", "BLOCK"]
+	var skill_cards: Array = GameConfig.get_array("domains.combat.mechanics", "skill_cards", [])
+	if not skill_cards.is_empty():
+		var card_pick: int = rng.randi_range(0, skill_cards.size() - 1) if rng else 0
+		var raw_card: Variant = skill_cards[card_pick]
+		if raw_card is Dictionary:
+			var card_spec := raw_card as Dictionary
+			var verb_code := String(card_spec.get("verb", card_spec.get("verb_type", "SLASH"))).strip_edges().to_upper()
+			if verb_code.is_empty():
+				verb_code = "SLASH"
+			card.verb_type = verb_code
+			var display_name := String(card_spec.get("name", card_spec.get("card_name", card_spec.get("card_id", "")))).strip_edges()
+			card.card_name = display_name if not display_name.is_empty() else "招式牌·%s" % card.verb_type
+			var fallback_ap: int = GameConfig.get_int("domains.combat", "verbs/%s/base_ap" % card.verb_type, -2)
+			var fallback_potency: float = GameConfig.get_float("domains.combat", "card_defaults/base_potency", 20.0)
+			card.ap_cost = int(card_spec.get("ap_cost", fallback_ap))
+			card.base_potency = float(card_spec.get("base_potency", card_spec.get("potency", fallback_potency)))
+			return card
+
+	var verbs_table: Dictionary = GameConfig.get_dict("domains.combat", "verbs", {})
+	var verbs: Array = []
+	for verb_key_variant in verbs_table.keys():
+		var verb_key := String(verb_key_variant)
+		if verb_key != "_fallback" and not verb_key.is_empty():
+			verbs.append(verb_key)
+	if verbs.is_empty():
+		verbs = ["STAB", "SLASH", "UPPER", "PARRY", "BLOCK"]
 	var pick := rng.randi_range(0, verbs.size() - 1) if rng else 0
-	card.verb_type = verbs[pick]
+	card.verb_type = String(verbs[pick])
 	card.card_name = "招式牌·%s" % card.verb_type
 	card.ap_cost = GameConfig.get_int("domains.combat", "verbs/%s/base_ap" % card.verb_type, -2)
 	card.base_potency = GameConfig.get_float("domains.combat", "card_defaults/base_potency", 20.0)

@@ -120,48 +120,21 @@ static func _enforce_auth_guard(request: ClientRequestEnvelopeDTO) -> UnifiedRes
 	var anonymous_actions: Array = GameConfig.get_array(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/anonymous_allowed_actions", [])
 	var is_anonymous_action := anonymous_actions.has(request.action_type)
 
-	# 已被显式吊销或过期的真实令牌，在任何非匿名请求上均予以拦截
-	if not request.session_token.is_empty() and AuthService.is_token_revoked_or_expired(request.session_token):
-		if not is_anonymous_action:
-			return UnifiedProtocolFactory.create_response(
-				request.request_id, false, {"revoked": true}, unauthorized_error_code, "Session token revoked or expired, access denied"
-			)
+	if _is_revoked_non_anonymous_request(request, is_anonymous_action):
+		return UnifiedProtocolFactory.create_response(
+			request.request_id, false, {"revoked": true}, unauthorized_error_code, "Session token revoked or expired, access denied"
+		)
 
-	if request.actor_type == ClientRequestEnvelopeDTO.ACTOR_AGENT:
-		if request.domain == "account" or request.domain == "lifecycle" or request.domain == "character_creation" or request.domain == "prologue" or request.domain == "game_settings" or PROTECTED_GATEWAY_ACTIONS.has(request.action_type):
-			return UnifiedProtocolFactory.create_response(
-				request.request_id, false, {}, "ERR_AGENT_PRIVILEGE_BLOCKED", "Agent actor is prohibited from executing account or gateway mutation directives"
-			)
+	if _is_agent_blocked_request(request):
+		return UnifiedProtocolFactory.create_response(
+			request.request_id, false, {}, "ERR_AGENT_PRIVILEGE_BLOCKED", "Agent actor is prohibited from executing account or gateway mutation directives"
+		)
 
-	if is_anonymous_action:
-		return null
-
-	var is_auth_required := GameConfig.get_bool(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/require_session_auth", true)
-	if not is_auth_required:
+	if is_anonymous_action or not GameConfig.get_bool(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/require_session_auth", true):
 		return null
 
 	var should_allow_compatibility := GameConfig.get_bool(DOMAIN_WORLD_STATE_CONFIG, "dispatcher/allow_stateless_compat_for_unregistered_tokens", true)
-	var is_esc_or_lifecycle_protected := (
-		WorldSessionRuntimeService.has_authenticated_session()
-		and WorldSessionRuntimeService.has_session_token()
-		and (
-			request.action_type.begins_with("ESC_")
-			or request.domain == "lifecycle"
-			or request.domain == "game_settings"
-		)
-	)
-	var is_protected_action := (
-		request.domain == "character_creation"
-		or request.domain == "prologue"
-		or PROTECTED_GATEWAY_ACTIONS.has(request.action_type)
-		or (request.domain == "account" and (request.action_type == "LOGOUT_ACCOUNT" or request.action_type == "CLEAR_SLOT" or request.action_type == "LIST_CHARACTERS"))
-		or request.action_type == "PULL_HUD_SNAPSHOT"
-		or request.action_type == "TICK_WORLD_CLOCK"
-		or request.action_type == "ESC_GET_MENU_STATE"
-		or is_esc_or_lifecycle_protected
-	)
-
-	if not is_protected_action and should_allow_compatibility:
+	if not _is_protected_request(request) and should_allow_compatibility:
 		return null
 
 	var validation_result := AuthService.validate_token(request.session_token, request.account_id)
@@ -172,6 +145,34 @@ static func _enforce_auth_guard(request: ClientRequestEnvelopeDTO) -> UnifiedRes
 	if request.account_id.is_empty():
 		request.account_id = String(validation_result.get("account_id", ""))
 	return null
+
+static func _is_revoked_non_anonymous_request(request: ClientRequestEnvelopeDTO, is_anonymous_action: bool) -> bool:
+	if is_anonymous_action or request.session_token.is_empty():
+		return false
+	return AuthService.is_token_revoked_or_expired(request.session_token)
+
+static func _is_agent_blocked_request(request: ClientRequestEnvelopeDTO) -> bool:
+	if request.actor_type != ClientRequestEnvelopeDTO.ACTOR_AGENT:
+		return false
+	if PROTECTED_GATEWAY_ACTIONS.has(request.action_type):
+		return true
+	return request.domain in ["account", "lifecycle", "character_creation", "prologue", "game_settings"]
+
+static func _is_protected_request(request: ClientRequestEnvelopeDTO) -> bool:
+	if request.domain in ["character_creation", "prologue"]:
+		return true
+	if PROTECTED_GATEWAY_ACTIONS.has(request.action_type):
+		return true
+	if request.domain == "account" and request.action_type in ["LOGOUT_ACCOUNT", "CLEAR_SLOT", "LIST_CHARACTERS"]:
+		return true
+	if request.action_type in ["PULL_HUD_SNAPSHOT", "TICK_WORLD_CLOCK", "ESC_GET_MENU_STATE"]:
+		return true
+	return _is_authenticated_esc_or_lifecycle_request(request)
+
+static func _is_authenticated_esc_or_lifecycle_request(request: ClientRequestEnvelopeDTO) -> bool:
+	if not WorldSessionRuntimeService.has_authenticated_session() or not WorldSessionRuntimeService.has_session_token():
+		return false
+	return request.action_type.begins_with("ESC_") or request.domain in ["lifecycle", "game_settings"]
 
 # ==============================================================================
 # 各领域路由分派实现 (Link 1 ~ Link 11)

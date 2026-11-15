@@ -137,3 +137,77 @@ static func evaluate_beast_swarm_risk(mana_density: float, public_order: float) 
 	var mana_factor: float = maxf(0.0, mana_density - mana_baseline) * mana_coefficient
 	var order_factor: float = (1.0 - clampf(public_order / order_normalize, 0.0, 1.0)) * order_coefficient
 	return clampf(mana_factor + order_factor, 0.0, 1.0)
+
+## 获取当前活跃世界地标列表（实时读取 domains.world#landmarks，受 Tier 3 MOD 覆写控制）
+static func get_active_landmarks() -> Array:
+	return GameConfig.get_array("domains.world", "landmarks", [])
+
+## 从当前配置表的 mod_world_topology 与 landmarks 构建 A* 寻路消费节点图
+static func build_topology_nodes_from_config() -> Dictionary:
+	var topology: Dictionary = GameConfig.get_dict("domains.world", "mod_world_topology", {})
+	var nodes_map: Dictionary = {}
+	_ingest_topology_nodes(nodes_map, topology.get("nodes", []))
+	_ingest_landmark_nodes(nodes_map, get_active_landmarks())
+	_wire_topology_edges(nodes_map, topology.get("edges", []))
+	return nodes_map
+
+static func _ingest_topology_nodes(nodes_map: Dictionary, raw_nodes: Variant) -> void:
+	if raw_nodes is Dictionary:
+		var node_table := raw_nodes as Dictionary
+		for raw_id in node_table.keys():
+			_upsert_graph_node(nodes_map, String(raw_id), node_table[raw_id])
+		return
+	if raw_nodes is Array:
+		for raw_entry in raw_nodes as Array:
+			if raw_entry is Dictionary:
+				var entry := raw_entry as Dictionary
+				_upsert_graph_node(nodes_map, String(entry.get("node_id", entry.get("id", ""))), entry)
+
+static func _ingest_landmark_nodes(nodes_map: Dictionary, landmarks: Array) -> void:
+	for raw_landmark in landmarks:
+		if not (raw_landmark is Dictionary):
+			continue
+		var landmark_entry := raw_landmark as Dictionary
+		var landmark_id := String(landmark_entry.get("id", landmark_entry.get("node_id", ""))).strip_edges()
+		if not landmark_id.is_empty() and not nodes_map.has(landmark_id):
+			_upsert_graph_node(nodes_map, landmark_id, landmark_entry)
+
+static func _upsert_graph_node(nodes_map: Dictionary, node_id: String, raw_entry: Variant) -> void:
+	var clean_id := node_id.strip_edges()
+	if clean_id.is_empty() or not (raw_entry is Dictionary):
+		return
+	var entry := raw_entry as Dictionary
+	var graph_node := WorldMapGraphNode.new()
+	graph_node.node_id = clean_id
+	graph_node.node_name = String(entry.get("name", entry.get("node_name", clean_id)))
+	if entry.has("continent_id"):
+		graph_node.continent_id = String(entry.get("continent_id", ""))
+	if entry.has("terrain_type"):
+		graph_node.terrain_type = String(entry.get("terrain_type", "PLAINS"))
+	if entry.has("regional_mana_density"):
+		graph_node.regional_mana_density = float(entry.get("regional_mana_density", 1.0))
+	graph_node.coordinates = Vector2(float(entry.get("x", 0.0)), float(entry.get("y", 0.0)))
+	if entry.get("outgoing_edges") is Array:
+		graph_node.outgoing_edges = (entry.get("outgoing_edges") as Array).duplicate(true)
+	nodes_map[clean_id] = graph_node
+
+static func _wire_topology_edges(nodes_map: Dictionary, raw_edges: Variant) -> void:
+	if not (raw_edges is Array):
+		return
+	var default_distance: float = GameConfig.get_float("domains.world", "astar/default_distance", 10.0)
+	for raw_edge in raw_edges as Array:
+		if not (raw_edge is Dictionary):
+			continue
+		var edge := raw_edge as Dictionary
+		var from_id := String(edge.get("from", edge.get("from_node_id", ""))).strip_edges()
+		var to_id := String(edge.get("to", edge.get("target_node_id", ""))).strip_edges()
+		if from_id.is_empty() or to_id.is_empty():
+			continue
+		if not nodes_map.has(from_id) or not nodes_map.has(to_id):
+			continue
+		var edge_distance := float(edge.get("distance", default_distance))
+		var from_node := nodes_map[from_id] as WorldMapGraphNode
+		from_node.outgoing_edges.append({"target_node_id": to_id, "distance": edge_distance})
+		if bool(edge.get("bidirectional", true)):
+			var to_node := nodes_map[to_id] as WorldMapGraphNode
+			to_node.outgoing_edges.append({"target_node_id": from_id, "distance": edge_distance})
