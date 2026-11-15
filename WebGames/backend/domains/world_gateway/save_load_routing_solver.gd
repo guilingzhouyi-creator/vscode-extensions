@@ -124,19 +124,33 @@ static func _execute_direct_restore_branch(slot: SaveSlotDTO) -> Dictionary:
 
 ## 按世界 MOD 锁还原运行时覆盖层与适配清单（Fail-Closed 防缺包/坏档）
 static func _restore_world_mod_context(world_id: String, context: Dictionary) -> Dictionary:
-	if context.get("adapted_mod_manifest") is Dictionary and not (context.get("adapted_mod_manifest") as Dictionary).is_empty():
-		return {"success": true, "adapted_manifest": context.get("adapted_mod_manifest")}
-
 	var installed_packages := ModPackageDiscoverySolver.scan_installed_full_mod_packages()
+	var affinity_manager := WorldModAffinityManager.new()
+	var diagnostic := affinity_manager.diagnose_world_mods(world_id, installed_packages)
+	var has_lock_file := bool(diagnostic.get("has_lock_file", false))
+	var context_manifest: Variant = context.get("adapted_mod_manifest")
+
+	if has_lock_file:
+		var digest_drifts: Array = diagnostic.get("digest_drifts", [])
+		if not digest_drifts.is_empty():
+			return {
+				"success": false,
+				"error_code": "MOD_ERR_REALM_DIGEST_MISMATCH",
+				"digest_drifts": digest_drifts,
+				"message": "World MOD content digest mismatch detected during secondary world load."
+			}
+		var missing_packs: Array = diagnostic.get("missing_packs", [])
+		if not missing_packs.is_empty():
+			return {"success": false, "error_code": "ERR_MISSING_CRITICAL_MOD", "missing_packs": missing_packs}
+
+	if context_manifest is Dictionary and not (context_manifest as Dictionary).is_empty():
+		return {"success": true, "adapted_manifest": context_manifest}
+
 	if installed_packages.is_empty():
 		return {"success": false, "error_code": "ERR_NO_BASE_CONTENT_MOD", "message": "No content MODs installed for secondary world load."}
 
-	var affinity_manager := WorldModAffinityManager.new()
-	var diagnostic := affinity_manager.diagnose_world_mods(world_id, installed_packages)
 	var target_pack_ids: Array = ["*"]
-	if bool(diagnostic.get("has_lock_file", false)):
-		if not (diagnostic.get("missing_packs", []) as Array).is_empty():
-			return {"success": false, "error_code": "ERR_MISSING_CRITICAL_MOD", "missing_packs": diagnostic.get("missing_packs", [])}
+	if has_lock_file:
 		var locked_ids: Array = (diagnostic.get("locked_pack_ids", []) as Array).duplicate()
 		if not locked_ids.is_empty():
 			target_pack_ids = locked_ids
@@ -146,8 +160,28 @@ static func _restore_world_mod_context(world_id: String, context: Dictionary) ->
 		return adapted_result
 
 	var enabled_packages := _filter_enabled_packages(installed_packages, adapted_result.get("enabled_pack_ids", []))
+	var integrity_failure := _find_enabled_package_integrity_failure(enabled_packages)
+	if not integrity_failure.is_empty():
+		return integrity_failure
 	Tier3ContentOverrideLoader.apply_enabled_packages(enabled_packages)
 	return adapted_result
+
+
+static func _find_enabled_package_integrity_failure(enabled_packages: Array) -> Dictionary:
+	for package_entry in enabled_packages:
+		var integrity_outcome := ModPackageDiscoverySolver.verify_package_content_integrity(package_entry)
+		if not bool(integrity_outcome.get("valid", true)):
+			return {
+				"success": false,
+				"error_code": "MOD_ERR_REALM_DIGEST_MISMATCH",
+				"digest_drifts": [{
+					"pack_id": String(integrity_outcome.get("pack_id", "")),
+					"locked": String(integrity_outcome.get("declared_content_sha256", "")),
+					"installed": String(integrity_outcome.get("computed_content_sha256", ""))
+				}],
+				"message": "Enabled MOD package failed content digest integrity check."
+			}
+	return {}
 
 
 static func _filter_enabled_packages(installed_packages: Array, enabled_ids: Array) -> Array:

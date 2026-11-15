@@ -76,6 +76,7 @@ static func handle_select_or_create_world(
         var fallback_slot := target_slot_id if not target_slot_id.is_empty() else "SLOT_01"
         var slots: Array = [{"slot_id": fallback_slot, "is_first_creation": true, "bound_world_id": target_world_id}]
         selection_result = active_gateway.select_mode(target_mode, request_payload.get("canary_flags", {}), slots, target_world_id, fallback_slot, custom_mods)
+    _attach_character_selection_metadata(selection_result, active_gateway)
     return UnifiedProtocolFactory.create_response(
         request.request_id, bool(selection_result.get("success", false)), selection_result,
         "" if bool(selection_result.get("success", false)) else String(selection_result.get("error_code", "ERR_SELECT_MODE")),
@@ -169,11 +170,24 @@ static func handle_switch_gateway_mode(
         new_mode, request_payload.get("canary_flags", {}), slots_argument,
         str(request_payload.get("world_id", "")), str(request_payload.get("slot_id", "")), switch_mods
     )
+    _attach_character_selection_metadata(switch_result, active_gateway)
     return UnifiedProtocolFactory.create_response(
         request.request_id, bool(switch_result.get("success", false)), switch_result,
         "" if bool(switch_result.get("success", false)) else String(switch_result.get("error_code", "ERR_SWITCH_GATEWAY")),
         String(switch_result.get("message", "Gateway mode switch completed successfully"))
     )
+
+
+static func _attach_character_selection_metadata(response_payload: Dictionary, active_gateway: WorldGatewayFSM) -> void:
+    if not bool(response_payload.get("success", false)) or active_gateway == null or active_gateway.context == null:
+        return
+    var requires_creation := bool(active_gateway.context.is_first_time_creation)
+    if not response_payload.has("requires_character_creation"):
+        response_payload["requires_character_creation"] = requires_creation
+    if not response_payload.has("active_character_id"):
+        response_payload["active_character_id"] = String(active_gateway.context.active_character_id)
+    if not response_payload.has("character_status"):
+        response_payload["character_status"] = "CHARACTER_PENDING" if requires_creation else "SLOT_WORLD_RESOLVED"
 
 
 ## 解析当前活跃或已安装的底座内容 MOD pack_id

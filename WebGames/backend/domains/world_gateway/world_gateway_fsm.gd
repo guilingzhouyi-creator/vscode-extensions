@@ -58,6 +58,10 @@ func get_adapted_mod_manifest() -> Dictionary:
 func get_creation_ui_snapshot() -> Dictionary:
     return creation_ui_snapshot
 
+## 获取当前显性选择的 MOD 包标识列表副本
+func get_selected_mod_pack_ids() -> Array[String]:
+    return _selected_mod_pack_ids.duplicate()
+
 ## 单机模式显性MOD预检与多包列表合并配置
 func precheck_and_configure_single_player_mods(candidate_packs: Array, enabled_pack_ids: Array = ["*"]) -> Dictionary:
     if context.selected_mode == WorldGatewayModel.GameMode.MULTIPLAYER:
@@ -145,14 +149,22 @@ func verify_and_reconcile_realm_manifest(realm_manifest: Array, custom_roots: Ar
     var installed_packages: Array[Dictionary] = ModPackageDiscoverySolver.scan_installed_full_mod_packages(custom_roots)
     var verification := AntiBridgeGuard.verify_realm_mod_manifest(installed_packages, realm_manifest)
     if not bool(verification.get("allowed", false)):
-        Tier3ContentOverrideLoader.revert_all_overrides()
-        GameConfig.clear_mod_overlay_tables()
+        _realm_manifest.clear()
+        WorldGatewayModHelper.clear_fsm_mod_overlays(self)
         return _fail(
             str(verification.get("error_code", "MOD_ERR_REALM_DIGEST_MISMATCH")),
             str(verification.get("message", "Realm MOD manifest verification failed."))
         )
-    _realm_manifest = realm_manifest.duplicate(true)
     var authorized_ids: Array = verification.get("authorized_pack_ids", [])
+    var integrity_failure := _find_realm_integrity_failure(installed_packages, authorized_ids)
+    if not integrity_failure.is_empty():
+        _realm_manifest.clear()
+        WorldGatewayModHelper.clear_fsm_mod_overlays(self)
+        return _fail(
+            str(integrity_failure.get("error_code", "MOD_ERR_REALM_DIGEST_MISMATCH")),
+            "Authorized realm MOD package failed local content integrity verification."
+        )
+    _realm_manifest = realm_manifest.duplicate(true)
     WorldGatewayRealmLockHelper.mount_authorized_realm_packages(self, installed_packages, authorized_ids)
     return {
         "success": true,
@@ -160,6 +172,20 @@ func verify_and_reconcile_realm_manifest(realm_manifest: Array, custom_roots: Ar
         "unloaded_pack_ids": verification.get("unauthorized_local_pack_ids", []),
         "adapted_mod_manifest": adapted_mod_manifest
     }
+
+
+func _find_realm_integrity_failure(installed_packages: Array[Dictionary], authorized_ids: Array) -> Dictionary:
+    var authorized_set: Dictionary = {}
+    for authorized_entry in authorized_ids:
+        authorized_set[str(authorized_entry).strip_edges()] = true
+    for package_entry in installed_packages:
+        var package_id := str(package_entry.get("pack_id", "")).strip_edges()
+        if not authorized_set.has(package_id):
+            continue
+        var outcome := ModPackageDiscoverySolver.verify_package_content_integrity(package_entry)
+        if not bool(outcome.get("valid", true)):
+            return outcome
+    return {}
 
 
 ## 选择性卸载本地非官方第三方模组；仅保留经核验的官方基础包及其运行时覆盖层（不再回退空 Vanilla）
@@ -275,11 +301,13 @@ func select_mode(
 
     # 若为新开档或角色未就绪，流转至待创角/选角阶段
     if context.is_first_time_creation:
+        context.active_character_id = ""
         context.current_phase = WorldGatewayModel.GatewayPhase.CHARACTER_PENDING
     else:
         context.active_character_id = target_slot.bound_character_id
         context.current_phase = WorldGatewayModel.GatewayPhase.SLOT_WORLD_RESOLVED
 
+    var character_status := "CHARACTER_PENDING" if context.is_first_time_creation else "SLOT_WORLD_RESOLVED"
     var gateway_hooks_map: Dictionary = GameConfig.get_dict("domains.world_gateway", "gateway_hooks", {})
     _notify_event("world_gateway.mode_selected", {
         "account_id": context.account_id,
@@ -291,7 +319,14 @@ func select_mode(
         "phase": context.current_phase
     })
 
-    return {"success": true, "context": context.to_dto(), "route_result": route_result}
+    return {
+        "success": true,
+        "context": context.to_dto(),
+        "route_result": route_result,
+        "character_status": character_status,
+        "active_character_id": context.active_character_id,
+        "requires_character_creation": context.is_first_time_creation
+    }
 
 ## 根据账户属性与配置决策适配的游戏入口模式
 func select_mode_for_account(
@@ -577,6 +612,9 @@ func exit_to_gateway() -> Dictionary:
     active_mods.clear()
     adapted_mod_manifest.clear()
     creation_ui_snapshot.clear()
+    _selected_mod_pack_ids.clear()
+    _has_explicit_mod_selection = false
+    _realm_manifest.clear()
     WorldSessionRuntimeService.set_active_mod_context([], {})
 
     if GameConfig.get_bool("domains.world_gateway", "gateway_policy/require_probe_refresh_on_exit", true):
@@ -630,7 +668,7 @@ func logout() -> Dictionary:
         "context": context.to_dto()
     }
 
-## 6. 切换运行网关模式（仅允许已重置清理的 GATEWAY_ENTERED 状态；活跃世界内强拦截热切换）
+## 6. 切换运行网关模式（仅允许非活跃世界内的网关阶段切换；活跃世界内强拦截热切换）
 func switch_gateway_mode(target_mode: int, canary_flags: Dictionary = {}, account_slots: Array = [],
         target_world_id: String = "", target_slot_id: String = "", custom_mods: Array = []) -> Dictionary:
     var is_hot_swap_blocked := GameConfig.get_bool("domains.world_gateway", "gateway_policy/block_hot_swap_while_world_active", true)
@@ -640,15 +678,34 @@ func switch_gateway_mode(target_mode: int, canary_flags: Dictionary = {}, accoun
             hot_swap_error_code,
             "Hot switching gateway mode is blocked while active world is running."
         )
-    if context.current_phase != WorldGatewayModel.GatewayPhase.GATEWAY_ENTERED:
+    if context.current_phase == WorldGatewayModel.GatewayPhase.AUTHENTICATED:
         return _fail(
-            hot_swap_error_code,
-            "Gateway mode switch requires prior state scrubbing via exit_to_gateway; current phase: {current_phase}.",
+            "INVALID_TRANSITION",
+            "Cannot switch gateway mode before entering gateway; current phase: {current_phase}.",
             {"current_phase": context.current_phase}
         )
 
+    if target_mode == WorldGatewayModel.GameMode.MULTIPLAYER:
+        if not custom_mods.is_empty() and _has_unofficial_custom_mod(custom_mods):
+            return _fail(
+                AntiBridgeGuard.SECURITY_ERR_MULTIPLAYER_MOD_POISONING,
+                "Multiplayer mode strictly forbids non-official custom mods during gateway mode switch."
+            )
+        _selected_mod_pack_ids.clear()
+        _has_explicit_mod_selection = false
+        _realm_manifest.clear()
+        purge_and_fallback_to_vanilla()
+    else:
+        _selected_mod_pack_ids.clear()
+        _has_explicit_mod_selection = false
+        _realm_manifest.clear()
+        WorldGatewayModHelper.clear_fsm_mod_overlays(self)
+
+    _reset_gateway_selection_before_switch()
     _last_probe_reports = ModeReadinessProbe.probe_all_modes(context.account_id)
     var selection_result := select_mode(target_mode, canary_flags, account_slots, target_world_id, target_slot_id, custom_mods)
+    if not bool(selection_result.get("success", false)) and target_mode == WorldGatewayModel.GameMode.MULTIPLAYER and target_world_id.is_empty():
+        selection_result = _finalize_multiplayer_lobby_switch(target_mode, selection_result)
     if bool(selection_result.get("success", false)):
         _notify_event("world_gateway.mode_switched", {
             "account_id": context.account_id,
@@ -657,6 +714,41 @@ func switch_gateway_mode(target_mode: int, canary_flags: Dictionary = {}, accoun
             "slot_id": context.selected_slot_id
         })
     return selection_result
+
+
+func _finalize_multiplayer_lobby_switch(target_mode: int, selection_result: Dictionary) -> Dictionary:
+    if str(selection_result.get("error_code", "")) != "GATEWAY_ERR_MULTIPLAYER_PENDING":
+        return selection_result
+    context.selected_mode = target_mode
+    context.current_phase = WorldGatewayModel.GatewayPhase.MODE_SELECTED
+    context.selected_world_id = ""
+    context.selected_slot_id = ""
+    return {
+        "success": true,
+        "context": context.to_dto(),
+        "mode": target_mode,
+        "probe_reports": _last_probe_reports,
+        "active_mods": get_active_mods(),
+        "awaiting_realm_verification": true
+    }
+
+
+func _has_unofficial_custom_mod(custom_mods: Array) -> bool:
+    for mod_entry in custom_mods:
+        if not AntiBridgeGuard.is_vanilla_pack(mod_entry):
+            return true
+    return false
+
+
+func _reset_gateway_selection_before_switch() -> void:
+    WorldSessionRuntimeService.deactivate_world_session()
+    RuntimeModeGate.set_mode(RuntimeModeGate.Mode.SINGLE_PLAYER)
+    context.selected_mode = WorldGatewayModel.GameMode.UNSELECTED
+    context.selected_slot_id = ""
+    context.selected_world_id = ""
+    context.active_character_id = ""
+    context.is_first_time_creation = false
+    context.current_phase = WorldGatewayModel.GatewayPhase.GATEWAY_ENTERED
 
 ## 7. 查询当前可用的世界档案与目录摘要列表
 func list_world_archives() -> Array[Dictionary]:
