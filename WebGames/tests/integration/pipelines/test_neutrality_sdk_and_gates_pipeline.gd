@@ -49,6 +49,8 @@ static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(test_dod_p133_01_real_service_container_coverage())
 	results.append(test_dod_p133_02_base_neutrality_and_multi_namespace())
+	results.append(test_dod_p133_03_sdk_samples_and_official_digest())
+	results.append(test_dod_p133_04_singleton_teardown_zero_leaks())
 	_reset_phase_state()
 	return TestCase.pack_results("Phase 133 全领域真实服务、去卡拉尔中性化与门禁闭环流水线", results)
 
@@ -163,6 +165,61 @@ static func _servers_neutral(servers_list: Array) -> bool:
 			if not _contains_none_forbidden(server_name):
 				return false
 	return true
+
+
+## DOD-P133-03: total_conversion_sample 全包发现预检通过，且 official_kalar 内容哈希自洽
+static func test_dod_p133_03_sdk_samples_and_official_digest() -> Dictionary:
+	_reset_phase_state()
+	var sample_payload := ModPackageDiscoverySolver.load_full_mod_package_from_dir("res://mod_sdk/templates/total_conversion_sample")
+	var sample_precheck := ModPrecheckAndAdaptationSolver.precheck_single_mod(sample_payload)
+	var sample_dag_graphs: Dictionary = sample_payload.get("dag_graphs", {}) as Dictionary
+	var sample_ok := str(sample_payload.get("pack_id", "")) == "sample_total_conversion" \
+		and sample_dag_graphs.has("DAG_TC_PROLOGUE") \
+		and bool(sample_precheck.get("valid", false)) \
+		and bool(sample_precheck.get("is_compliant", false))
+
+	var official_payload := ModPackageDiscoverySolver.load_full_mod_package_from_dir("res://mods/official_kalar")
+	var declared_digest := str(official_payload.get("declared_content_sha256", "")).strip_edges().to_lower()
+	var computed_digest := ModPackageDiscoverySolver.compute_package_content_sha256("res://mods/official_kalar").strip_edges().to_lower()
+	var official_ok := str(official_payload.get("pack_id", "")) == "official_kalar" \
+		and declared_digest.length() == 64 \
+		and declared_digest == computed_digest
+
+	var passed := sample_ok and official_ok
+	return TestCase.make_result("DOD-P133-03: total_conversion_sample 预检通过与 official_kalar 哈希自洽", passed, {
+		"sample_ok": sample_ok,
+		"official_ok": official_ok,
+		"declared_digest": declared_digest,
+		"computed_digest": computed_digest
+	})
+
+
+## DOD-P133-04: 实例化并复位前端 11 个单例及服务边界后，孤立节点增量为 0
+static func test_dod_p133_04_singleton_teardown_zero_leaks() -> Dictionary:
+	_reset_phase_state()
+	var orphan_before := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+	var modal_mgr := ModalManager.get_instance()
+	var dialog_mgr := DialogManager.get_instance()
+	var drawer_mgr := DrawerManager.get_instance()
+	var context_mgr := ContextMenuManager.get_instance()
+	var tooltip_mgr := TooltipManager.get_instance()
+	var focus_mgr := FocusInputManager.get_instance()
+	var reddot_mgr := RedDotTreeManager.get_instance()
+	var audio_bridge := UIAudioBridge.get_instance()
+	var theme_mgr := ThemeManager.get_instance()
+	var lifecycle_fsm := AppLifecycleFSM.get_instance()
+	var instantiated_all := modal_mgr != null and dialog_mgr != null and drawer_mgr != null \
+		and context_mgr != null and tooltip_mgr != null and focus_mgr != null \
+		and reddot_mgr != null and audio_bridge != null and theme_mgr != null \
+		and lifecycle_fsm != null
+
+	_reset_phase_state()
+	var orphan_delta := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)) - orphan_before
+	var passed := instantiated_all and orphan_delta == 0
+	return TestCase.make_result("DOD-P133-04: 前端 11 项 UI 单例 teardown 彻底复位且孤立节点增量为 0", passed, {
+		"instantiated_all": instantiated_all,
+		"orphan_delta": orphan_delta
+	})
 
 
 static func _reset_phase_state() -> void:
