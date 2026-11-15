@@ -172,6 +172,7 @@ static func run_all_tests() -> Dictionary:
 	_reset_all_state()
 	var results: Array[Dictionary] = []
 	results.append(test_tc_p132_01_bilingual_i18n_hot_reload_and_restore())
+	results.append(test_tc_p132_02_prologue_dag_hook_and_routing_priority())
 	_reset_all_state()
 	return TestCase.pack_results("Phase 132 MOD运行时全消费与真异步及资产闭环流水线", results)
 
@@ -213,6 +214,107 @@ static func test_tc_p132_01_bilingual_i18n_hot_reload_and_restore() -> Dictionar
 
 
 ## TC-P132-02: 官方序章 DAG Hook 触发、重放清除及高优先级 MOD 路由覆盖
+static func test_tc_p132_02_prologue_dag_hook_and_routing_priority() -> Dictionary:
+	_reset_all_state()
+	TestFullChainBackendHelper.setup_env()
+	var official_pkg := ModPackageDiscoverySolver.load_full_mod_package_from_dir("res://mods/official_kalar")
+	Tier3ContentOverrideLoader.apply_enabled_packages([official_pkg])
+
+	var ctx := CharacterPrologueContext.new()
+	ctx.account_id = "ACC_P132_02"
+	ctx.character_id = "CHAR_P132_02"
+	ctx.character_name = "曜石旅人"
+	ctx.race_id = "HUMAN"
+	ctx.origin_id = "BORDER_CITIZEN"
+
+	var eng := PrologueExecutionKernel.create_dag_session(ctx, "BORDER_CITIZEN", {})
+	var receipt := PrologueCutscenePort.get_last_hook_receipt()
+	var official_hook_ok := eng != null and eng.graph != null and eng.graph.graph_id == "DAG_PROLOGUE_HUMAN_CAPITAL" \
+		and PrologueCutscenePort.has_hook_interceptor() and bool(receipt.get("matched", false)) \
+		and str(receipt.get("cutscene_id", "")) == "cs_prologue_awakening" \
+		and CutsceneHookRegistry.get_instance().is_cutscene_viewed("cs_prologue_awakening")
+
+	var route_pkg := _build_custom_routing_mod_package()
+	Tier3ContentOverrideLoader.apply_enabled_packages([official_pkg, route_pkg])
+	var routed_eng := PrologueExecutionKernel.create_dag_session(ctx, "BORDER_CITIZEN", {})
+	var priority_route_ok := routed_eng != null and routed_eng.graph != null and routed_eng.graph.graph_id == "DAG_P132_ALT"
+
+	Tier3ContentOverrideLoader.revert_all_overrides()
+	var cleared_viewed := not CutsceneHookRegistry.get_instance().is_cutscene_viewed("cs_prologue_awakening")
+	_reset_all_state()
+
+	return make_result("TC-P132-02: 序章 DAG Hook 实触发、清除复位与高优先级路由统一解析", official_hook_ok and priority_route_ok and cleared_viewed, {
+		"detail": "official_hook_ok=%s, priority_route_ok=%s, cleared_viewed=%s, graph='%s', receipt=%s" % [
+			official_hook_ok, priority_route_ok, cleared_viewed,
+			str(routed_eng.graph.graph_id) if (routed_eng != null and routed_eng.graph != null) else "null",
+			str(receipt)
+		]
+	})
+
+
+static func _build_custom_routing_mod_package() -> Dictionary:
+	var route_dir := SANDBOX_ROOT.path_join("mod_p132_route")
+	var rules := [{"rule_id": "R_P132_HIGH", "priority": 999, "origin_id": "BORDER_CITIZEN", "dag_id": "DAG_P132_ALT"}]
+	TestTier3ContentOverrideHelper.write_json_file(route_dir.path_join("pack.json"), {
+		"pack_id": "mod_p132_route", "pack_name": "P132 Route", "version": "1.0.0",
+		"pack_profile": "CONTENT_ADDON", "mod_tier": "EXPANSION", "priority": 350, "is_active": true,
+		"prologue_routing_rules": rules
+	})
+	TestTier3ContentOverrideHelper.write_json_file(route_dir.path_join("routing_rules.json"), {
+		"prologue_routing_rules": rules
+	})
+	TestTier3ContentOverrideHelper.write_json_file(route_dir.path_join("dag_graphs/DAG_P132_ALT.json"), {
+		"dag_id": "DAG_P132_ALT", "entry_node_id": "N_ALT_0", "terminal_node_id": "N_ALT_1",
+		"nodes": {
+			"N_ALT_0": {"node_type": "START_ENTRY", "narrative_key": "narrative.p132.alt0"},
+			"N_ALT_1": {"node_type": "TERMINAL_EXIT", "narrative_key": "narrative.p132.alt1", "required_prerequisites": ["N_ALT_0"]}
+		},
+		"edges": [{"from": "N_ALT_0", "to": "N_ALT_1"}]
+	})
+	return ModPackageDiscoverySolver.load_full_mod_package_from_dir(route_dir)
+
+
+static func _write_domain_tables_kmod(kmod_path: String) -> String:
+	DirAccess.make_dir_recursive_absolute(kmod_path.get_base_dir())
+	var packer := ZIPPacker.new()
+	if packer.open(kmod_path) != OK:
+		return kmod_path
+	_pack_json_entry(packer, "pack.json", {
+		"pack_id": "mod_p132_domains", "pack_name": "P132 Domains", "version": "1.0.0",
+		"pack_profile": "TOTAL_CONVERSION", "mod_tier": "TOTAL_CONVERSION", "priority": 280, "is_active": true
+	})
+	_pack_json_entry(packer, "content/items/p132_items.json", {
+		"override_mode": "MERGE",
+		"items": [{
+			"canonical_id": "KALAR:EQUIP:WEAPON_BLADE:P132_STAR_ORB", "english_name": "p132_star_orb",
+			"loc_name_key": "item.p132_star_orb.name", "category_major": "EQUIPMENT",
+			"category_minor": "WEAPON_BLADE", "tier_rank": 3, "default_mass_kg": 1.0,
+			"default_volume_slots": 1, "base_market_value": 300
+		}]
+	})
+	_pack_json_entry(packer, "content/skills/p132_skills.json", {
+		"override_mode": "MERGE",
+		"verbs": {"LUNGE": {"name": "突刺", "k_mom": 1.2, "k_edge": 1.1, "base_ap": -2}},
+		"skill_cards": [{"card_id": "CARD_P132_ASTRAL", "verb_type": "LUNGE", "name": "星芒突刺", "ap_cost": -1, "base_potency": 42.0}]
+	})
+	_pack_json_entry(packer, "content/rules/p132_rules.json", {
+		"override_mode": "MERGE",
+		"cdkeys": {"P132FREE": {"gold": 777, "crystals": 5, "item_id": "KALAR:EQUIP:WEAPON_BLADE:P132_STAR_ORB", "item_name": "星辰宝珠"}}
+	})
+	_pack_json_entry(packer, "content/world/p132_world.json", {
+		"override_mode": "MERGE", "map_id": "MAP_P132", "map_name": "星辉裂隙", "default_entry_node": "NODE_GATE",
+		"nodes": [{"node_id": "NODE_GATE", "name": "星门", "terrain_type": "PLAINS", "x": 0.0, "y": 0.0}],
+		"edges": [{"from": "NODE_GATE", "to": "LM_SANCTUM", "distance": 6.5, "bidirectional": true}],
+		"landmarks": [{"id": "LM_SANCTUM", "name": "苍穹圣所", "terrain_type": "PLAINS", "x": 10.0, "y": 0.0}]
+	})
+	packer.close()
+	return kmod_path
+
+
+static func _pack_json_entry(packer: ZIPPacker, entry_path: String, payload: Variant) -> void:
+	packer.start_file(entry_path)
+	packer.write_file(JSON.stringify(payload).to_utf8_buffer())
+	packer.close_file()
 
 
 static func _reset_all_state() -> void:
