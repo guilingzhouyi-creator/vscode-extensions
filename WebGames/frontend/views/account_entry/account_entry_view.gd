@@ -2,7 +2,7 @@
 # 模块归属: 前端表现层 (Frontend · 第1卷 账号与入口系统视图控制器)
 # 文件路径: res://frontend/views/account_entry/account_entry_view.gd
 # 架构定位: Presentation View Controller / Snapshot-Driven Screen
-# 依赖与触发: 上游: NavManager, MockServiceContainer, FrontendSnapshot
+# 依赖与触发: 上游: NavManager, ServiceLocator, FrontendSnapshot
 #           下游: AccountEntryTabs, UIIntermediary, DesignTokens | 配置: views.json
 # 职责说明: 登录/注册/选服/创角/角色选择界面交互状态机、单机MOD创角UI受控适配
 #           与表单数据驱动 (零业务逻辑表现宿主)。
@@ -13,6 +13,7 @@ class_name AccountEntryView
 extends BaseScreen
 
 const TabsClass = preload("res://frontend/views/account_entry/account_entry_tabs.gd")
+const BackendHelper = preload("res://frontend/views/account_entry/account_entry_backend_helper.gd")
 
 var _tabs: AccountEntryTabs = null
 func _get_tabs() -> AccountEntryTabs:
@@ -21,14 +22,7 @@ func _get_tabs() -> AccountEntryTabs:
         _tabs.setup(self)
     return _tabs
 
-enum EntryState {
-    SPLASH, # 启动加载页
-    LOGIN, # 登录页
-    REGISTER, # 注册页
-    SERVER_SELECT, # 服务器选择页
-    CHARACTER_SELECT, # 角色选择页
-    CHARACTER_CREATE # 角色创建页
-}
+enum EntryState {SPLASH, LOGIN, REGISTER, SERVER_SELECT, CHARACTER_SELECT, CHARACTER_CREATE}
 
 var current_state: EntryState = EntryState.SPLASH
 var current_account_id: String = ""
@@ -48,11 +42,7 @@ var character_slots: Array = []
 
 # 单机命途MOD显性预检清单与创角UI受控适配状态
 var mod_precheck_checklist: Array = []
-var creation_ui_controls: Dictionary = {
-    "allow_manual_origin_select": false,
-    "allow_manual_trait_select": false,
-    "allow_attribute_reroll": false
-}
+var creation_ui_controls: Dictionary = {"allow_manual_origin_select": false, "allow_manual_trait_select": false, "allow_attribute_reroll": false}
 var available_origins_list: Array = []
 var available_traits_list: Array = []
 var form_selected_origin_id: String = ""
@@ -144,58 +134,66 @@ func _ready() -> void:
     UIIntermediary.adapt_view(self)
 
 func _load_mock_snapshot() -> void:
-    var account_payload: Dictionary = MockServiceContainer.get_instance().snapshot_data().load_snapshot("account")
+    var account_payload: Dictionary = ServiceLocator.get_instance().snapshot_data().load_snapshot("account")
     if not account_payload.is_empty():
         apply_snapshot(account_payload)
 
 ## 切换账号入口页面的当前显示状态面板
 func switch_state(new_state: EntryState) -> void:
     current_state = new_state
-    var panel_states: Array = [
-        [splash_panel, EntryState.SPLASH],
-        [login_panel, EntryState.LOGIN],
-        [register_panel, EntryState.REGISTER],
-        [server_select_panel, EntryState.SERVER_SELECT],
-        [character_select_panel, EntryState.CHARACTER_SELECT],
-        [character_create_panel, EntryState.CHARACTER_CREATE],
-    ]
-    for entry in panel_states:
-        _set_panel_visibility(entry[0] as Control, current_state == int(entry[1]))
+    _set_panel_visibility(splash_panel, current_state == EntryState.SPLASH)
+    _set_panel_visibility(login_panel, current_state == EntryState.LOGIN)
+    _set_panel_visibility(register_panel, current_state == EntryState.REGISTER)
+    _set_panel_visibility(server_select_panel, current_state == EntryState.SERVER_SELECT)
+    _set_panel_visibility(character_select_panel, current_state == EntryState.CHARACTER_SELECT)
+    _set_panel_visibility(character_create_panel, current_state == EntryState.CHARACTER_CREATE)
 
 func _set_panel_visibility(panel: Control, is_visible: bool) -> void:
     if panel != null:
         panel.visible = is_visible
 
 ## 提交账号登录表单并切换至选角状态
-func submit_login(username: String, password_plain: String) -> Dictionary:
+func submit_login(username: String, password_plain: String, on_completed: Callable = Callable()) -> Dictionary:
     form_username = username.strip_edges()
     form_password = password_plain
     if form_username.is_empty():
-        return {"success": false, "error_code": "ERR_EMPTY_USERNAME", "message": "ui.fe01.login.error_empty", "error_data": {}}
+        var empty_reply := {"success": false, "error_code": "ERR_EMPTY_USERNAME", "message": "ui.fe01.login.error_empty", "error_data": {}}
+        if on_completed.is_valid():
+            on_completed.call(empty_reply)
+        return empty_reply
     var service_mode := ServiceLocator.get_mode()
     if service_mode == "backend" or service_mode == "real":
-        return _get_tabs().login_backend_flow(form_username, form_password)
+        return BackendHelper.login_backend_flow(self, form_username, form_password, on_completed)
 
     current_account_id = "ACC_" + form_username.to_upper()
     current_session_token = "TOKEN_" + current_account_id
     switch_state(EntryState.CHARACTER_SELECT)
-    return {"success": true, "account_id": current_account_id, "token": current_session_token}
+    var success_reply := {"success": true, "account_id": current_account_id, "token": current_session_token}
+    if on_completed.is_valid():
+        on_completed.call(success_reply)
+    return success_reply
 
 ## 提交账号注册表单校验并切换至创角状态
-func submit_register(username: String, password_plain: String) -> Dictionary:
+func submit_register(username: String, password_plain: String, on_completed: Callable = Callable()) -> Dictionary:
     form_username = username.strip_edges()
     form_password = password_plain
     var minimum_username_length: int = GameConfig.get_int("frontend.views", "fe01_account_entry/min_username_len", 3)
     if form_username.length() < minimum_username_length:
-        return {"success": false, "error_code": "ERR_USERNAME_TOO_SHORT", "message": "ui.fe01.register.error_short", "error_data": {"min": minimum_username_length}}
+        var short_reply := {"success": false, "error_code": "ERR_USERNAME_TOO_SHORT", "message": "ui.fe01.register.error_short", "error_data": {"min": minimum_username_length}}
+        if on_completed.is_valid():
+            on_completed.call(short_reply)
+        return short_reply
     var service_mode := ServiceLocator.get_mode()
     if service_mode == "backend" or service_mode == "real":
-        return _get_tabs().register_backend_flow(form_username, form_password)
+        return BackendHelper.register_backend_flow(self, form_username, form_password, on_completed)
 
     current_account_id = "ACC_" + form_username.to_upper()
     current_session_token = "TOKEN_" + current_account_id
     switch_state(EntryState.CHARACTER_CREATE)
-    return {"success": true, "account_id": current_account_id, "token": current_session_token}
+    var success_reply := {"success": true, "account_id": current_account_id, "token": current_session_token}
+    if on_completed.is_valid():
+        on_completed.call(success_reply)
+    return success_reply
 
 ## 选定目标区服并激活对应网关连接上下文
 func select_server(server_id: String) -> Dictionary:
@@ -313,7 +311,6 @@ func select_character_slot(slot_id: String) -> Dictionary:
     return {"success": true, "selected_slot": slot_id}
 
 func _connect_signals() -> void:
-    var tabs: AccountEntryTabs = _get_tabs()
     connect_managed(splash_enter_btn.pressed, _on_splash_enter_pressed)
     connect_managed(login_submit_btn.pressed, _on_login_submit_pressed)
     connect_managed(login_goto_register_btn.pressed, _on_login_goto_register_pressed)
@@ -322,38 +319,37 @@ func _connect_signals() -> void:
     connect_managed(register_back_btn.pressed, _on_register_back_pressed)
     connect_managed(server_confirm_btn.pressed, _on_server_confirm_pressed)
     connect_managed(server_back_btn.pressed, _on_server_back_pressed)
-    connect_managed(char_slot_0_btn.pressed, func(): tabs.on_char_slot_pressed(0))
-    connect_managed(char_slot_1_btn.pressed, func(): tabs.on_char_slot_pressed(1))
-    connect_managed(char_slot_2_btn.pressed, func(): tabs.on_char_slot_pressed(2))
+    connect_managed(char_slot_0_btn.pressed, _on_char_slot_0_pressed)
+    connect_managed(char_slot_1_btn.pressed, _on_char_slot_1_pressed)
+    connect_managed(char_slot_2_btn.pressed, _on_char_slot_2_pressed)
     connect_managed(char_enter_btn.pressed, _on_char_enter_pressed)
     connect_managed(char_create_btn.pressed, _on_char_create_pressed)
     connect_managed(char_delete_btn.pressed, _on_char_delete_pressed)
     connect_managed(char_back_btn.pressed, _on_char_back_pressed)
-    connect_managed(char_reroll_btn.pressed, tabs.roll_attributes)
+    connect_managed(char_reroll_btn.pressed, _on_char_reroll_pressed)
     connect_managed(char_create_confirm_btn.pressed, _on_char_create_confirm_pressed)
     connect_managed(char_create_back_btn.pressed, _on_char_create_back_pressed)
 
 func _on_splash_enter_pressed() -> void:
     switch_state(EntryState.LOGIN)
 
+func _push_screen_if_mounted(target_screen: String, navigation_parameters: Dictionary) -> void:
+    if is_mounted_in_tree():
+        NavManager.get_instance().push_screen(target_screen, navigation_parameters)
+
 func _on_login_submit_pressed() -> void:
     var username: String = login_username_edit.text
     var password_text: String = login_password_edit.text
-    var login_reply: Dictionary = submit_login(username, password_text)
-    if not login_reply.get("success", false):
-        UIIntermediary.resolve(login_error_label, str(login_reply.get("message", "")), login_reply.get("error_data", {}))
-        login_error_label.modulate = DesignTokens.COLOR_DANGER_DEFAULT
-    else:
-        login_error_label.text = ""
-        if is_inside_tree():
-            NavManager.get_instance().push_screen("world_gateway", {
-                "account_id": current_account_id,
-                "token": current_session_token
-            })
+    submit_login(username, password_text, func(login_reply: Dictionary) -> void:
+        if not bool(login_reply.get("success", false)):
+            UIIntermediary.resolve(login_error_label, str(login_reply.get("message", "")), login_reply.get("error_data", {}))
+            login_error_label.modulate = DesignTokens.COLOR_DANGER_DEFAULT
+        else:
+            login_error_label.text = ""
+            _push_screen_if_mounted("world_gateway", {"account_id": current_account_id, "token": current_session_token})
+    )
 
-func _on_login_goto_register_pressed() -> void:
-    switch_state(EntryState.REGISTER)
-
+func _on_login_goto_register_pressed() -> void: switch_state(EntryState.REGISTER)
 func _on_login_forgot_pressed() -> void:
     UIIntermediary.resolve(login_error_label, "ui.fe01.login.forgot_placeholder")
     login_error_label.modulate = DesignTokens.COLOR_WARNING_DEFAULT
@@ -362,7 +358,6 @@ func _on_register_submit_pressed() -> void:
     var username: String = register_username_edit.text
     var password_text: String = register_password_edit.text
     var confirm: String = register_confirm_edit.text
-
     if password_text != confirm:
         UIIntermediary.resolve(register_error_label, "ui.fe01.register.error_mismatch")
         register_error_label.modulate = DesignTokens.COLOR_DANGER_DEFAULT
@@ -371,16 +366,16 @@ func _on_register_submit_pressed() -> void:
         UIIntermediary.resolve(register_error_label, "ui.fe01.register.error_not_agreed")
         register_error_label.modulate = DesignTokens.COLOR_DANGER_DEFAULT
         return
+    submit_register(username, password_text, func(register_reply: Dictionary) -> void:
+        if not bool(register_reply.get("success", false)):
+            UIIntermediary.resolve(register_error_label, str(register_reply.get("message", "")), register_reply.get("error_data", {}))
+            register_error_label.modulate = DesignTokens.COLOR_DANGER_DEFAULT
+        else:
+            register_error_label.text = ""
+            _push_screen_if_mounted("world_gateway", {"account_id": current_account_id, "token": current_session_token})
+    )
 
-    var register_reply: Dictionary = submit_register(username, password_text)
-    if not register_reply.get("success", false):
-        UIIntermediary.resolve(register_error_label, str(register_reply.get("message", "")), register_reply.get("error_data", {}))
-        register_error_label.modulate = DesignTokens.COLOR_DANGER_DEFAULT
-    else:
-        register_error_label.text = ""
-
-func _on_register_back_pressed() -> void:
-    switch_state(EntryState.LOGIN)
+func _on_register_back_pressed() -> void: switch_state(EntryState.LOGIN)
 
 func _on_server_confirm_pressed() -> void:
     var selected: PackedInt32Array = server_list_item.get_selected_items()
@@ -389,20 +384,24 @@ func _on_server_confirm_pressed() -> void:
         select_server(str(server_entry.get("id", "")))
     switch_state(EntryState.CHARACTER_SELECT)
 
-func _on_server_back_pressed() -> void:
-    logout_account()
+func _on_server_back_pressed() -> void: logout_account()
+## 响应角色槽位 0 按钮点击（与场景信号声明对齐）
+func _on_char_slot_0_pressed() -> void: _get_tabs().on_char_slot_pressed(0)
+## 响应角色槽位 1 按钮点击（与场景信号声明对齐）
+func _on_char_slot_1_pressed() -> void: _get_tabs().on_char_slot_pressed(1)
+## 响应角色槽位 2 按钮点击（与场景信号声明对齐）
+func _on_char_slot_2_pressed() -> void: _get_tabs().on_char_slot_pressed(2)
+## 响应角色资质重骰按钮点击（与场景信号声明对齐）
+func _on_char_reroll_pressed() -> void: _get_tabs().roll_attributes()
 
 func _on_char_enter_pressed() -> void:
     if selected_character_slot.is_empty():
         NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe01.toast.select_character"), NavTypes.ToastLevel.WARNING)
         return
-    _get_tabs().advance_gateway_to_world()
-    NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe01.toast.entering_world"), NavTypes.ToastLevel.SUCCESS)
-    NavManager.get_instance().push_screen("prologue", {
-        "account_id": current_account_id,
-        "token": current_session_token,
-        "slot": selected_character_slot
-    })
+    BackendHelper.advance_gateway_to_world(self, func(_reply: Dictionary) -> void:
+        NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe01.toast.entering_world"), NavTypes.ToastLevel.SUCCESS)
+        _push_screen_if_mounted("prologue", {"account_id": current_account_id, "token": current_session_token, "slot": selected_character_slot})
+    )
 
 func _on_char_create_pressed() -> void:
     switch_state(EntryState.CHARACTER_CREATE)
@@ -413,8 +412,7 @@ func _on_char_delete_pressed() -> void:
         return
     NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe01.toast.slot_reset", {"slot": selected_character_slot}), NavTypes.ToastLevel.INFO)
 
-func _on_char_back_pressed() -> void:
-    switch_state(EntryState.SERVER_SELECT)
+func _on_char_back_pressed() -> void: switch_state(EntryState.SERVER_SELECT)
 
 ## 提交角色创建请求并写入槽位列表
 func create_character(character_name: String, race: String = "") -> Dictionary:
@@ -424,7 +422,7 @@ func create_character(character_name: String, race: String = "") -> Dictionary:
         return {"success": false, "error_code": "ERR_NAME_EMPTY"}
     var service_mode := ServiceLocator.get_mode()
     if (service_mode == "backend" or service_mode == "real") and not current_account_id.is_empty():
-        var backend_reply: Dictionary = _get_tabs().create_character_backend_flow(form_character_name, form_selected_race)
+        var backend_reply: Dictionary = BackendHelper.create_character_backend_flow(self, _get_tabs(), form_character_name, form_selected_race)
         if bool(backend_reply.get("_handled", false)):
             return backend_reply.get("result", {}) as Dictionary
 
