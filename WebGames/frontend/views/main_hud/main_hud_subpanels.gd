@@ -282,27 +282,50 @@ func on_menu_exit_pressed() -> void:
 		Callable(self, "on_menu_quit_game_pressed")
 	)
 
-## 执行退回账号入口网关：派发退出请求、解绑 HUD 并切换页面。
-func on_menu_exit_to_gateway_pressed(gateway: RefCounted = null) -> void:
+## 执行退回世界网关：经 IEscMenuService 异步保存/归档后，仅当成功时解绑 HUD 并切换页面。
+func on_menu_exit_to_gateway_pressed(_gateway: RefCounted = null) -> void:
 	append_battle_log("SYSTEM", UIIntermediary.text("ui.fe02.battle_log.exiting_to_archive"))
-	var active_gateway: RefCounted = gateway if gateway != null else ServiceLocator.get_active_gateway()
-	var request: ClientRequestEnvelopeDTO = UnifiedProtocolFactory.create_human_request(
-		"world_gateway", "ESC_EXIT_TO_GATEWAY", {"auto_save": true}
+	var account_id: String = _view.current_account_id if _view != null else ""
+	var session_token: String = _view.current_session_token if _view != null else ""
+	var esc_service: IEscMenuService = ServiceLocator.get_instance().esc_menu()
+	if esc_service == null:
+		NavManager.get_instance().show_toast("ERR_SERVICE_UNAVAILABLE", NavTypes.ToastLevel.ERROR)
+		return
+	esc_service.exit_to_gateway_async(
+		func(reply_payload: Dictionary) -> void:
+			if bool(reply_payload.get("success", false)):
+				HudEventBridge.get_instance().detach_hud()
+				NavManager.get_instance().pop_to_root("world_gateway", {
+					"account_id": account_id,
+					"token": session_token
+				})
+			else:
+				var error_message := str(reply_payload.get("message", reply_payload.get("error_code", "ERR_EXIT_GATEWAY_FAILED")))
+				NavManager.get_instance().show_toast(error_message, NavTypes.ToastLevel.ERROR),
+		true,
+		false
 	)
-	var _response: Variant = UnifiedProtocolDispatcher.dispatch_request(request, active_gateway)
-	HudEventBridge.get_instance().detach_hud()
-	NavManager.get_instance().replace_screen("world_gateway")
 
-## 执行保存并退出游戏：派发退出请求、解绑 HUD 并关闭场景树。
+## 执行保存并退出游戏：经 IEscMenuService 提交停机请求，仅成功且非无头环境时退出场景树。
 func on_menu_quit_game_pressed() -> void:
 	append_battle_log("SYSTEM", UIIntermediary.text("ui.fe02.battle_log.saving_and_quitting"))
-	var request: ClientRequestEnvelopeDTO = UnifiedProtocolFactory.create_human_request(
-		"lifecycle", "ESC_QUIT_GAME", {"auto_save": true, "exit_reason": "USER_QUIT"}
+	var esc_service: IEscMenuService = ServiceLocator.get_instance().esc_menu()
+	if esc_service == null:
+		NavManager.get_instance().show_toast("ERR_SERVICE_UNAVAILABLE", NavTypes.ToastLevel.ERROR)
+		return
+	esc_service.quit_game_async(
+		func(reply_payload: Dictionary) -> void:
+			if bool(reply_payload.get("success", false)):
+				HudEventBridge.get_instance().detach_hud()
+				if _view != null and is_instance_valid(_view) and _view.get_tree() != null and DisplayServer.get_name() != "headless":
+					_view.get_tree().quit()
+			else:
+				var error_message := str(reply_payload.get("message", reply_payload.get("error_code", "ERR_QUIT_GAME_FAILED")))
+				NavManager.get_instance().show_toast(error_message, NavTypes.ToastLevel.ERROR),
+		true,
+		false,
+		false
 	)
-	var _response: Variant = UnifiedProtocolDispatcher.dispatch_request(request, null)
-	HudEventBridge.get_instance().detach_hud()
-	if _view != null and _view.get_tree() != null:
-		_view.get_tree().quit()
 
 # ==============================================================================
 # 补全面板 UI 辅助

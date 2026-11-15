@@ -2,7 +2,7 @@
 # 模块归属: 前端表现层 (Frontend · 第6卷 抽卡祈愿系统视图控制器)
 # 文件路径: res://frontend/views/gacha_wish/gacha_wish_view.gd
 # 架构定位: Presentation View Controller / Snapshot-Driven Screen
-# 依赖与触发: 上游: NavManager, MockServiceContainer, FrontendSnapshot
+# 依赖与触发: 上游: NavManager, ServiceLocator, FrontendSnapshot
 #           下游: GachaWishTabs, UIIntermediary, KButtonClass, KRarityTag
 # 职责说明: 祈愿卡池切换、单抽与十连抽动画状态机、保底进度条与历史记录展示；
 #           概率计算与抽卡结算经域边界服务只读获取，子面板交互委托 GachaWishTabs。
@@ -24,7 +24,7 @@ const KRarityTag = preload("res://frontend/components/k_rarity_tag.gd")
 var _pull_rules: Dictionary = {}
 
 func _gacha_service() -> IGachaService:
-	return MockServiceContainer.get_instance().gacha()
+	return ServiceLocator.get_instance().gacha()
 
 func _rule_int(key: String, fallback: int) -> int:
 	return int(_pull_rules.get(key, fallback))

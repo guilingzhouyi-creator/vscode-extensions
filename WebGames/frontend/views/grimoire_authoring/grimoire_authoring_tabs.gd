@@ -3,7 +3,7 @@
 # 文件路径: res://frontend/views/grimoire_authoring/grimoire_authoring_tabs.gd
 # 架构定位: Presentation Sub-Panel Delegate
 # 依赖与触发: 上游: GrimoireAuthoringView
-#           下游: KStatusBarClass, UIIntermediary, MockServiceContainer, NavManager
+#           下游: KStatusBarClass, UIIntermediary, ServiceLocator, NavManager
 # 职责说明: 承担 GrimoireAuthoringView 的著书出版、版税结算与逆向反编译子页面初始化
 #           与交互响应逻辑，统一经 _view 访问共享节点与状态。
 # 退出语义与设计依据: 表现层多页签委托解耦与图表行节点池化复用契约
@@ -105,7 +105,7 @@ func init_authoring_tab() -> void:
 func refresh_authoring_estimate() -> void:
 	var view: GrimoireAuthoringView = _view
 	var royalty_index: int = view._authoring_royalty_mode_option.selected
-	var estimate: Dictionary = MockServiceContainer.get_instance().grimoire().estimate_authoring_income(royalty_index)
+	var estimate: Dictionary = ServiceLocator.get_instance().grimoire().estimate_authoring_income(royalty_index)
 	if not bool(estimate.get("success", false)):
 		return
 	UIIntermediary.resolve(view._authoring_estimate_label, "ui.fe13.authoring.estimate", {
@@ -158,7 +158,7 @@ func refresh_royalty_detail() -> void:
 ## 汇总全部著作待领取版税总额并刷新领取按钮文案
 func refresh_royalty_summary() -> void:
 	var view: GrimoireAuthoringView = _view
-	var summary: Dictionary = MockServiceContainer.get_instance().grimoire().sum_royalties(royalty_books)
+	var summary: Dictionary = ServiceLocator.get_instance().grimoire().sum_royalties(royalty_books)
 	var total_income: int = int(summary.get("total", 0))
 	UIIntermediary.resolve(view._royalty_total_income_label, "ui.fe13.royalty.total_income", {"amount": total_income})
 	UIIntermediary.resolve(view._royalty_period_label, "ui.fe13.royalty.period")

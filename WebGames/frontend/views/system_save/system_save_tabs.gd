@@ -2,7 +2,7 @@
 # 模块归属: frontend.views.system_save
 # 文件路径: res://frontend/views/system_save/system_save_tabs.gd
 # 架构定位: 系统与存档标签页子控制器，承接回放审计、开发指令沙盒与兑换码子面板交互
-# 依赖与触发: 依赖 BaseScreen / UIIntermediary / ThemeManager / MockServiceContainer
+# 依赖与触发: 依赖 BaseScreen / UIIntermediary / ThemeManager / ServiceLocator
 # 职责说明: 管理确定性回放、GM 指令台与 CDK 兑换三大分页的初始化、列表刷新与按钮回调
 # 退出语义与设计依据: 随宿主视图同步释放；分页状态变更经宿主字段保存并同步更新界面提示
 # ==============================================================================
@@ -158,7 +158,7 @@ func _on_play_replay_pressed() -> void:
 	if _view == null or _view._selected_replay_index < 0:
 		return
 	_view._replay_playing = true
-	_view._replay_current_frame = MockServiceContainer.get_instance().save().advance_replay(_view._replay_current_frame, _view._replay_total_frames, 60)
+	_view._replay_current_frame = ServiceLocator.get_instance().save().advance_replay(_view._replay_current_frame, _view._replay_total_frames, 60)
 	refresh_replay_progress()
 
 func _on_pause_replay_pressed() -> void:
@@ -174,31 +174,31 @@ func _on_stop_replay_pressed() -> void:
 func _on_frame_prev_pressed() -> void:
 	if _view == null:
 		return
-	_view._replay_current_frame = MockServiceContainer.get_instance().save().advance_replay(_view._replay_current_frame, _view._replay_total_frames, -1)
+	_view._replay_current_frame = ServiceLocator.get_instance().save().advance_replay(_view._replay_current_frame, _view._replay_total_frames, -1)
 	refresh_replay_progress()
 
 func _on_frame_next_pressed() -> void:
 	if _view == null:
 		return
-	_view._replay_current_frame = MockServiceContainer.get_instance().save().advance_replay(_view._replay_current_frame, _view._replay_total_frames, 1)
+	_view._replay_current_frame = ServiceLocator.get_instance().save().advance_replay(_view._replay_current_frame, _view._replay_total_frames, 1)
 	refresh_replay_progress()
 
 func _on_speed_down_pressed() -> void:
 	if _view == null:
 		return
-	_view._replay_speed = MockServiceContainer.get_instance().save().change_replay_speed(_view._replay_speed, -1)
+	_view._replay_speed = ServiceLocator.get_instance().save().change_replay_speed(_view._replay_speed, -1)
 	_view._label_speed_value.text = "%.2fx" % _view._replay_speed
 
 func _on_speed_up_pressed() -> void:
 	if _view == null:
 		return
-	_view._replay_speed = MockServiceContainer.get_instance().save().change_replay_speed(_view._replay_speed, 1)
+	_view._replay_speed = ServiceLocator.get_instance().save().change_replay_speed(_view._replay_speed, 1)
 	_view._label_speed_value.text = "%.2fx" % _view._replay_speed
 
 func _on_replay_slider_changed(progress_ratio: float) -> void:
 	if _view == null:
 		return
-	_view._replay_current_frame = MockServiceContainer.get_instance().save().frame_from_ratio(progress_ratio, _view._replay_total_frames)
+	_view._replay_current_frame = ServiceLocator.get_instance().save().frame_from_ratio(progress_ratio, _view._replay_total_frames)
 	UIIntermediary.resolve(_view._label_frame_summary, "ui.fe16.replay.frame_info", {"cur": _view._replay_current_frame, "total": _view._replay_total_frames})
 
 # ==============================================================================

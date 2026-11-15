@@ -2,7 +2,7 @@
 # 模块归属: 前端社交视图域 (fe09 社交与公会系统)
 # 文件路径: res://frontend/views/guild_social/guild_social_view.gd
 # 架构定位: BaseScreen 视图控制器；承载公会信息、成员、聊天、好友、NPC 对话与交易
-# 依赖与触发: 依赖 ThemeManager、UIIntermediary、MockServiceContainer 与 GuildSocialTabs
+# 依赖与触发: 依赖 ThemeManager、UIIntermediary、ServiceLocator 与 GuildSocialTabs
 # 职责说明: 初始化六大社交页签视图，同步公会快照、成员名册详情与社交按钮事件
 # 退出语义与设计依据: 返回操作调用 self.back() 弹出页面；公共子控件由 Tabs 委托管理
 # ==============================================================================
@@ -178,7 +178,7 @@ func _render_from_snapshot() -> void:
 
 ## 成员管理权限判定：委托 domain_boundary 服务（角色白名单配置在服务层）
 func can_manage_members(user_role: String) -> bool:
-	return MockServiceContainer.get_instance().guild().can_manage(user_role)
+	return ServiceLocator.get_instance().guild().can_manage(user_role)
 
 # ==============================================================================
 # 生命周期
@@ -228,7 +228,7 @@ func _load_mock_snapshot() -> void:
 	guild_announcement = "ui.fe09.mock.guild_announcement"
 
 	# 15 名公会成员
-	_guild_members = MockServiceContainer.get_instance().guild().generate_roster(15)
+	_guild_members = ServiceLocator.get_instance().guild().generate_roster(15)
 
 	# 好友/NPC/交易/聊天委托 Tabs 初始化
 	_get_tabs().init_mock_data()

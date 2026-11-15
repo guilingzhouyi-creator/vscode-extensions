@@ -3,7 +3,7 @@
 # 文件路径: res://frontend/views/character_progression/character_progression_tabs.gd
 # 架构定位: Presentation Sub-Panel Delegate
 # 依赖与触发: 上游: CharacterProgressionView
-#           下游: KItemSlotClass, KTabBar, UIIntermediary, MockServiceContainer
+#           下游: KItemSlotClass, KTabBar, UIIntermediary, ServiceLocator
 # 职责说明: 承接属性/潜能/体质/技能树/装备栏/背包/称号/传记子面板的初始化与事件；
 #           节点引用与状态均经 _view 访问，保持单一数据源。
 # 退出语义与设计依据: 表现层视图与多页签委托解耦契约
@@ -255,7 +255,7 @@ func _refresh_equipment_detail(slot_index: int) -> void:
 func _refresh_equipment_affix() -> void:
 	if _view == null or _view._equipment_affix_label == null:
 		return
-	var aggregate_modifiers: Dictionary = MockServiceContainer.get_instance().character().aggregate_equipment_modifiers(_view.equipped_slots)
+	var aggregate_modifiers: Dictionary = ServiceLocator.get_instance().character().aggregate_equipment_modifiers(_view.equipped_slots)
 	UIIntermediary.resolve(_view._equipment_affix_label, "ui.fe03.equip.affix", {
 		"atk": int(aggregate_modifiers.get("atk", 0)),
 		"def": int(aggregate_modifiers.get("def", 0)),
@@ -425,7 +425,7 @@ func _load_mock_supplements() -> void:
 		_make_item("ITEM_HERB_ANTIDOTE", "ui.fe03.mock.item.herb_antidote", "CONSUMABLE", 2, 0.1), _make_item("ITEM_ORE_MITHRIL", "ui.fe03.mock.item.ore_mithril", "MATERIAL", 3, 1.0),
 		_make_item("ITEM_SCALE_DRAGON", "ui.fe03.mock.item.scale_dragon", "MATERIAL", 1, 0.8), _make_item("ITEM_HERB_MAGIC", "ui.fe03.mock.item.herb_magic", "MATERIAL", 4, 0.2),
 	]
-	_view.inventory_weight = MockServiceContainer.get_instance().character().calculate_inventory_weight(_view.inventory_items)
+	_view.inventory_weight = ServiceLocator.get_instance().character().calculate_inventory_weight(_view.inventory_items)
 
 ## 绑定各子界面 UI 交互信号
 func _connect_signals() -> void:

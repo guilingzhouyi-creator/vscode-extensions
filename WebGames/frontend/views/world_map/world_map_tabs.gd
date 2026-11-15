@@ -2,7 +2,7 @@
 # 模块归属: frontend.views.world_map
 # 文件路径: res://frontend/views/world_map/world_map_tabs.gd
 # 架构定位: 世界地图标签页子控制器，承接行军探索、主权建国、领地管理与寻路规划交互
-# 依赖与触发: 依赖 BaseScreen / UIIntermediary / MockServiceContainer / WorldMapView
+# 依赖与触发: 依赖 BaseScreen / UIIntermediary / ServiceLocator / WorldMapView
 # 职责说明: 管理行军、主权、领地和寻路四个分页的静态文案、列表刷新及控件回调
 # 退出语义与设计依据: 随宿主视图同步释放；行军与领地状态变更写回宿主并刷新界面反馈
 # ==============================================================================
@@ -226,7 +226,7 @@ func _on_terr_upgrade() -> void:
 		return
 	var selected_indices := _view._territory_list.get_selected_items()
 	if selected_indices.size() > 0 and selected_indices[0] < _view._mock_territories.size():
-		var upgrade_outcome := MockServiceContainer.get_instance().world().upgrade_territory(_view._mock_territories[selected_indices[0]])
+		var upgrade_outcome := ServiceLocator.get_instance().world().upgrade_territory(_view._mock_territories[selected_indices[0]])
 		if bool(upgrade_outcome.get("success", false)):
 			_view._mock_territories[selected_indices[0]] = upgrade_outcome.get("territory", _view._mock_territories[selected_indices[0]])
 			show_territory_detail(_view._mock_territories[selected_indices[0]])
@@ -254,7 +254,7 @@ func _on_pf_calc() -> void:
 		return
 	var start_index := _view._pathfinding_start_option.selected
 	var destination_index := _view._pathfinding_end_option.selected
-	var planned_routes := MockServiceContainer.get_instance().world().plan_routes(start_index, destination_index)
+	var planned_routes := ServiceLocator.get_instance().world().plan_routes(start_index, destination_index)
 	if planned_routes.is_empty():
 		if _view._pathfinding_route_detail_label:
 			UIIntermediary.resolve(_view._pathfinding_route_detail_label, "ui.fe10.pf.same_start_end")

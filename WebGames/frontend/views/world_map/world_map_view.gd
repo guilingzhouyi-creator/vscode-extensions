@@ -2,7 +2,7 @@
 # 模块归属: frontend.views.world_map
 # 文件路径: res://frontend/views/world_map/world_map_view.gd
 # 架构定位: 世界与地图视图主控脚本，统领大地图缩放、城镇地标、行军探索与领地寻路呈现
-# 依赖与触发: 依赖 BaseScreen / WorldMapTabs / KButton / MockServiceContainer / GameConfig
+# 依赖与触发: 依赖 BaseScreen / WorldMapTabs / KButton / ServiceLocator / GameConfig
 # 职责说明: 管理大地图和城镇分页展示与公共状态属性，并将行军主权领地与寻路委托给子控制器
 # 退出语义与设计依据: 点击返回调用 back() 退出界面；地标及行军快照经统一接口注入后重绘
 # ==============================================================================
@@ -111,7 +111,7 @@ var marching_routes: Array = []
 var selected_landmark_id: String = ""
 var selected_town_id: String = "" # 当前选中城镇标识
 
-# 城镇设施、NPC、领地与主权数据（单一真源收敛于 MockDataCatalog）
+# 城镇设施、NPC、领地与主权数据（经 ServiceLocator 领域边界服务按需加载）
 var _mock_town_facilities: Array = []
 var _mock_town_npcs: Array = []
 var _mock_territories: Array = []
@@ -187,7 +187,7 @@ func _ready() -> void:
 
 ## 从 domain_boundary 快照服务加载世界地图域快照（地标 i18n 键替换/行军路线）
 func _load_mock_snapshot() -> void:
-	var world_map := MockServiceContainer.get_instance().snapshot_data().load_snapshot("world_map")
+	var world_map := ServiceLocator.get_instance().snapshot_data().load_snapshot("world_map")
 	if world_map.is_empty():
 		return
 	if world_map.has("landmarks"):

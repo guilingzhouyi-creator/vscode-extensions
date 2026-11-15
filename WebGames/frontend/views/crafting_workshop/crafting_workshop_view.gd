@@ -2,7 +2,7 @@
 # 模块归属: 前端表现层 (Frontend · 第12卷 制造与工坊系统视图控制器)
 # 文件路径: res://frontend/views/crafting_workshop/crafting_workshop_view.gd
 # 架构定位: Presentation View Controller / Snapshot-Driven Screen
-# 依赖与触发: 上游: NavManager, MockServiceContainer, FrontendSnapshot
+# 依赖与触发: 上游: NavManager, ServiceLocator, FrontendSnapshot
 #           下游: CraftingWorkshopTabs, UIIntermediary, KTabBar, ThemeManager
 # 职责说明: 锻造强化预览、配方图鉴习得检索、装备分解返还清单与材料仓库浏览；
 #           其中配方图鉴与材料仓库子面板交互委托 CraftingWorkshopTabs 驱动。
@@ -123,7 +123,7 @@ func _get_tabs():
 func select_forge_item(item_payload: Dictionary) -> void:
 	selected_forge_item = item_payload.duplicate()
 	enhancement_target_level = int(item_payload.get("enhancement_level", 0)) + 1
-	var rate_preview: Dictionary = MockServiceContainer.get_instance().crafting().preview_enhance_rate(enhancement_target_level)
+	var rate_preview: Dictionary = ServiceLocator.get_instance().crafting().preview_enhance_rate(enhancement_target_level)
 	if bool(rate_preview.get("success", false)):
 		predicted_success_rate = float(rate_preview.get("rate", predicted_success_rate))
 	_refresh_forge_detail()

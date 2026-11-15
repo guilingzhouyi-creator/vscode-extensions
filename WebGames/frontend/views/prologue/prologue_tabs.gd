@@ -28,38 +28,47 @@ func init_static_text() -> void:
 	UIIntermediary.resolve(_view.enter_world_hud_btn, "ui.prologue.btn.enter_hud")
 
 ## 查询或初始化当前序章 DAG 节点状态
-func load_or_start_prologue(request_payload: Dictionary = {}) -> Dictionary:
+func load_or_start_prologue(request_payload: Dictionary = {}, on_completed: Callable = Callable()) -> Dictionary:
 	var prologue_service: IPrologueService = ServiceLocator.get_instance().prologue()
 	if prologue_service == null:
-		return {"success": false, "error_code": "ERR_SERVICE_UNAVAILABLE"}
-	var state_reply: Dictionary = _query_or_boot_prologue(prologue_service, request_payload)
-	var resolved_data: Dictionary = state_reply.get("data", state_reply) as Dictionary
-	if bool(state_reply.get("success", false)) and not resolved_data.is_empty():
-		_view.apply_snapshot(resolved_data)
-	elif not bool(state_reply.get("success", false)):
-		var error_code := str(state_reply.get("error_code", "MOD_ERR_MISSING_PROLOGUE_DAG"))
-		if _view.status_hint_label != null:
-			_view.status_hint_label.text = error_code
-			_view.status_hint_label.modulate = DesignTokens.COLOR_DANGER_DEFAULT
-	return state_reply
-
-func _query_or_boot_prologue(prologue_service: IPrologueService, request_payload: Dictionary) -> Dictionary:
-	var query_reply: Dictionary = {}
-	var collect_reply := func(response_payload: Dictionary) -> void:
-		query_reply.merge(response_payload, true)
-	prologue_service.get_prologue_state_async(_view.current_account_id, _view.current_session_token, collect_reply)
-	var state_data: Dictionary = query_reply.get("data", query_reply) as Dictionary
-	if bool(query_reply.get("success", false)) and not str(state_data.get("node_id", "")).is_empty():
-		return query_reply
-	query_reply.clear()
-	prologue_service.start_prologue_async(_view.current_account_id, _view.current_session_token, request_payload, collect_reply)
-	return query_reply
+		return ServiceLocator.reply_service_unavailable(on_completed)
+	var result_holder: Dictionary = {}
+	var apply_resolved_state := func(state_reply: Dictionary) -> void:
+		result_holder.merge(state_reply, true)
+		var resolved_data: Dictionary = state_reply.get("data", state_reply) as Dictionary
+		if _view != null and is_instance_valid(_view):
+			if bool(state_reply.get("success", false)) and not resolved_data.is_empty():
+				_view.apply_snapshot(resolved_data)
+			elif not bool(state_reply.get("success", false)):
+				var error_code := str(state_reply.get("error_code", "MOD_ERR_MISSING_PROLOGUE_DAG"))
+				if _view.status_hint_label != null:
+					_view.status_hint_label.text = error_code
+					_view.status_hint_label.modulate = DesignTokens.COLOR_DANGER_DEFAULT
+		if on_completed.is_valid():
+			on_completed.call(state_reply)
+	prologue_service.get_prologue_state_async(
+		_view.current_account_id,
+		_view.current_session_token,
+		func(query_reply: Dictionary) -> void:
+			var state_data: Dictionary = query_reply.get("data", query_reply) as Dictionary
+			if bool(query_reply.get("success", false)) and not str(state_data.get("node_id", "")).is_empty():
+				apply_resolved_state.call(query_reply)
+				return
+			prologue_service.start_prologue_async(
+				_view.current_account_id,
+				_view.current_session_token,
+				request_payload,
+				func(start_reply: Dictionary) -> void:
+					apply_resolved_state.call(start_reply)
+			)
+	)
+	return result_holder
 
 ## 推进指定序章 DAG 分支选择
-func advance_choice(choice_id: String) -> Dictionary:
+func advance_choice(choice_id: String, on_completed: Callable = Callable()) -> Dictionary:
 	var prologue_service: IPrologueService = ServiceLocator.get_instance().prologue()
 	if prologue_service == null:
-		return {"success": false, "error_code": "ERR_SERVICE_UNAVAILABLE"}
+		return ServiceLocator.reply_service_unavailable(on_completed)
 	var advance_reply: Dictionary = {}
 	prologue_service.advance_prologue_async(
 		_view.current_account_id,
@@ -68,19 +77,22 @@ func advance_choice(choice_id: String) -> Dictionary:
 		{"world_id": _view.current_world_id},
 		func(response_payload: Dictionary) -> void:
 			advance_reply.merge(response_payload, true)
+			var advance_data: Dictionary = response_payload.get("data", response_payload) as Dictionary
+			if bool(response_payload.get("success", false)) and not advance_data.is_empty():
+				if _view != null and is_instance_valid(_view):
+					_view.apply_snapshot(advance_data)
+			else:
+				NavManager.get_instance().show_toast(str(response_payload.get("error_code", "ERR_PROLOGUE_ADVANCE_FAILED")), NavTypes.ToastLevel.ERROR)
+			if on_completed.is_valid():
+				on_completed.call(response_payload)
 	)
-	var advance_data: Dictionary = advance_reply.get("data", advance_reply) as Dictionary
-	if bool(advance_reply.get("success", false)) and not advance_data.is_empty():
-		_view.apply_snapshot(advance_data)
-	else:
-		NavManager.get_instance().show_toast(str(advance_reply.get("error_code", "ERR_PROLOGUE_ADVANCE_FAILED")), NavTypes.ToastLevel.ERROR)
 	return advance_reply
 
 ## 完结或跳过序章并跳转至主页 HUD
-func complete_and_enter_hud(should_skip: bool = false) -> Dictionary:
+func complete_and_enter_hud(should_skip: bool = false, on_completed: Callable = Callable()) -> Dictionary:
 	var prologue_service: IPrologueService = ServiceLocator.get_instance().prologue()
 	if prologue_service == null:
-		return {"success": false, "error_code": "ERR_SERVICE_UNAVAILABLE"}
+		return ServiceLocator.reply_service_unavailable(on_completed)
 	var complete_reply: Dictionary = {}
 	prologue_service.complete_prologue_async(
 		_view.current_account_id,
@@ -89,32 +101,44 @@ func complete_and_enter_hud(should_skip: bool = false) -> Dictionary:
 		should_skip,
 		func(response_payload: Dictionary) -> void:
 			complete_reply.merge(response_payload, true)
+			if bool(response_payload.get("success", false)):
+				var complete_data: Dictionary = response_payload.get("data", {}) as Dictionary
+				if _view != null and is_instance_valid(_view) and _view.is_mounted_in_tree():
+					NavManager.get_instance().replace_screen("main_hud", {
+						"account_id": _view.current_account_id,
+						"token": _view.current_session_token,
+						"initial_hud_snapshot": complete_data.get("initial_hud_snapshot", {})
+					})
+			else:
+				NavManager.get_instance().show_toast(str(response_payload.get("error_code", "ERR_PROLOGUE_COMPLETE_FAILED")), NavTypes.ToastLevel.ERROR)
+			if on_completed.is_valid():
+				on_completed.call(response_payload)
 	)
-	if bool(complete_reply.get("success", false)):
-		var complete_data: Dictionary = complete_reply.get("data", {}) as Dictionary
-		if _view.is_inside_tree() or _view.get_parent() != null:
-			NavManager.get_instance().replace_screen("main_hud", {
-				"account_id": _view.current_account_id,
-				"token": _view.current_session_token,
-				"initial_hud_snapshot": complete_data.get("initial_hud_snapshot", {})
-			})
 	return complete_reply
 
 ## 退回世界网关
-func exit_to_world_gateway() -> void:
+func exit_to_world_gateway(on_completed: Callable = Callable()) -> void:
 	var world_service: IWorldService = ServiceLocator.get_instance().world()
+	var navigate_back := func() -> void:
+		if _view != null and is_instance_valid(_view) and _view.is_mounted_in_tree():
+			NavManager.get_instance().replace_screen("world_gateway", {
+				"account_id": _view.current_account_id,
+				"token": _view.current_session_token
+			})
 	if world_service != null:
 		world_service.exit_world_to_gateway_async(
 			_view.current_account_id,
 			_view.current_session_token,
-			func(_reply: Dictionary) -> void: pass,
+			func(reply: Dictionary) -> void:
+				navigate_back.call()
+				if on_completed.is_valid():
+					on_completed.call(reply),
 			{"auto_save": true}
 		)
-	if _view.is_inside_tree() or _view.get_parent() != null:
-		NavManager.get_instance().replace_screen("world_gateway", {
-			"account_id": _view.current_account_id,
-			"token": _view.current_session_token
-		})
+	else:
+		navigate_back.call()
+		if on_completed.is_valid():
+			on_completed.call({"success": true})
 
 ## 渲染序章正文、节点角标、过场提示及动态分支选项
 func render_all() -> void:

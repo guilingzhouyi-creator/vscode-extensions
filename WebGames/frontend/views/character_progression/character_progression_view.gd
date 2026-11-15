@@ -2,7 +2,7 @@
 # 模块归属: 前端表现层 (Frontend · 第3卷 角色与养成系统视图控制器)
 # 文件路径: res://frontend/views/character_progression/character_progression_view.gd
 # 架构定位: Presentation View Controller / Snapshot-Driven Screen
-# 依赖与触发: 上游: NavManager, MockServiceContainer, FrontendSnapshot
+# 依赖与触发: 上游: NavManager, ServiceLocator, FrontendSnapshot
 #           下游: CharacterProgressionTabs, UIIntermediary, ViewRouter
 # 职责说明: 角色属性面板、潜能加点预览、体质指标、技能树、装备槽位、背包、
 #           称号与传记多页签表现协调，子界面交互委托 CharacterProgressionTabs。
@@ -250,7 +250,7 @@ func _apply_theme() -> void:
 
 ## 从 domain_boundary 快照服务加载角色快照并补本地 Mock
 func _load_mock_snapshot() -> void:
-	var character_snapshot := MockServiceContainer.get_instance().snapshot_data().load_snapshot("character")
+	var character_snapshot := ServiceLocator.get_instance().snapshot_data().load_snapshot("character")
 	if character_snapshot.is_empty():
 		return
 
@@ -405,7 +405,7 @@ func _render_from_snapshot() -> void:
 
 ## 潜能加点预览
 func preview_add_point(attribute_key: String) -> Dictionary:
-	var preview_reply := MockServiceContainer.get_instance().character().preview_add_point(attributes_preview, attribute_key, unallocated_points_preview)
+	var preview_reply := ServiceLocator.get_instance().character().preview_add_point(attributes_preview, attribute_key, unallocated_points_preview)
 	if not bool(preview_reply.get("success", false)):
 		return {"success": false, "reason": str(preview_reply.get("reason", "UNKNOWN"))}
 	attributes_preview = preview_reply.get("attributes", attributes_preview)

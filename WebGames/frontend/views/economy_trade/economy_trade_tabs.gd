@@ -29,22 +29,18 @@ var _filtered_auction_indices: Array[int] = []
 ## 绑定所属经济与交易主视图控制器
 func setup(view: BaseScreen) -> void:
 	_view = view
-
 ## 构建或复用页面标准标题栏
 func create_page_header(title_key: String) -> KPageHeader:
 	page_header = _ensure_page_header(page_header, KPageHeaderClass, title_key, _view) as KPageHeader
 	return page_header
-
 ## 构建或复用顶部通用货币栏
 func create_currency_bar() -> KCurrencyBar:
 	currency_bar = _ensure_currency_bar(currency_bar, KCurrencyBarClass) as KCurrencyBar
 	return currency_bar
-
 ## 构建或复用左右分栏容器
 func create_split_panel(ratio: float = 0.35) -> KSplitPanel:
 	split_panel = _ensure_split_panel(split_panel, KSplitPanelClass, ratio) as KSplitPanel
 	return split_panel
-
 ## 构建或复用搜索输入框组件
 func create_search_bar(placeholder_key: String = "") -> KSearchBar:
 	search_bar = _ensure_search_bar(search_bar, KSearchBarClass, placeholder_key) as KSearchBar
@@ -270,7 +266,7 @@ func _init_price_trend_tab() -> void:
 
 	for key in _view._commodity_keys:
 		if not _view._commodity_prices.has(key) or (_view._commodity_prices[key] as Array).is_empty():
-			_view._commodity_prices[key] = MockServiceContainer.get_instance().economy().generate_price_series(key)
+			_view._commodity_prices[key] = ServiceLocator.get_instance().economy().generate_price_series(key)
 
 	if _view._option_price_commodity.item_count > 0:
 		_view._option_price_commodity.select(0)
@@ -333,7 +329,7 @@ func _init_exchange_tab() -> void:
 
 ## 货币索引 → 铜币基准值（0 金币/1 银币/2 铜币/3 魔单晶，越界回退 1）
 func _get_currency_copper_value(index: int) -> int:
-	return MockServiceContainer.get_instance().economy().get_currency_copper(index)
+	return ServiceLocator.get_instance().economy().get_currency_copper(index)
 
 func _read_exchange_selection() -> Dictionary:
 	if _view == null or _view._option_exchange_source == null:
@@ -357,7 +353,7 @@ func _refresh_exchange_display() -> void:
 		return
 	var source_copper: int = _get_currency_copper_value(int(selection_summary["src_idx"]))
 	var target_copper: int = _get_currency_copper_value(int(selection_summary["tgt_idx"]))
-	var economy := MockServiceContainer.get_instance().economy()
+	var economy := ServiceLocator.get_instance().economy()
 	var rate: float = economy.calculate_exchange_rate(source_copper, target_copper)
 	var amount: int = int(selection_summary["amount"])
 	var converted_amount: float = economy.calculate_exchange_result(amount, rate)
@@ -431,10 +427,7 @@ func _add_row_label(row_container: HBoxContainer, min_width: int) -> void:
 	label_node.custom_minimum_size = Vector2(min_width, 0)
 	row_container.add_child(label_node)
 
-# ==============================================================================
-# 信号绑定
-# ==============================================================================
-
+# --- 信号绑定 ---
 ## 绑定子界面 UI 交互信号
 func _connect_signals() -> void:
 	if _view == null:

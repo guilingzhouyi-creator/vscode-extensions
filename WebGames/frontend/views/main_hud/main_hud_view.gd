@@ -2,7 +2,7 @@
 # 模块归属: 前端主界面视图域 (fe02 主界面 HUD)
 # 文件路径: res://frontend/views/main_hud/main_hud_view.gd
 # 架构定位: BaseScreen 主界 HUD 视图控制器；统筹状态栏、动作栏、聊天与补全面板
-# 依赖与触发: 依赖 ThemeManager、HudEventBridge、MockServiceContainer 与 MainHUDSubpanels
+# 依赖与触发: 依赖 ThemeManager、HudEventBridge、ServiceLocator 与 MainHUDSubpanels
 # 职责说明: 维护 HUD 生理货币快照、消息终端有界缓冲、Tab 命令补全与子面板协同
 # 退出语义与设计依据: 销毁前经 _on_predelete_cleanup 解绑 HudEventBridge；菜单委派 Subpanels
 # ==============================================================================
@@ -17,9 +17,7 @@ const KBadgeClass = preload("res://frontend/components/k_badge.gd")
 const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
 const HudEventBridge = preload("res://frontend/systems/hud_event_bridge.gd")
 
-# ==============================================================================
-# 节点引用（场景树中以 unique_name_in_owner 标记）
-# ==============================================================================
+# --- 节点引用（场景树中以 unique_name_in_owner 标记） ---
 
 @onready var _character_name_label: Label = $%CharNameLabel
 @onready var _health_bar: ProgressBar = $%HPBar
@@ -59,9 +57,7 @@ const HudEventBridge = preload("res://frontend/systems/hud_event_bridge.gd")
 @onready var _menu_settings_button: Button = $%MenuBtnSettings
 @onready var _menu_exit_button: Button = $%MenuBtnExit
 
-# ==============================================================================
-# 顶栏生理与货币指标快照
-# ==============================================================================
+# --- 顶栏生理与货币指标快照 ---
 
 var stat_hp_current: float = 100.0
 var stat_hp_max: float = 100.0
@@ -78,18 +74,16 @@ var minimap_zoom: float = 1.0
 const MINIMAP_MIN_ZOOM := 0.5
 const MINIMAP_MAX_ZOOM := 2.0
 
-# 角色名（来自 Mock）
+# 角色名（来自 Mock 或权威快照）与会话上下文凭据
 var character_name: String = ""
+var current_account_id: String = ""
+var current_session_token: String = ""
 
-# ==============================================================================
-# 快捷栏动作槽位 (1~8)
-# ==============================================================================
+# --- 快捷栏动作槽位 (1~8) ---
 
 var action_bar_slots: Array = [ {"slot": 1, "skill_id": "SKILL_SLOT_1", "cd_remain": 0.0, "icon": "res://icon.svg"}, {"slot": 2, "skill_id": "SKILL_SLOT_2", "cd_remain": 3.5, "icon": "res://icon.svg"}]
 
-# ==============================================================================
-# 聊天频道与战报终端消息流（聊天滚动区：有界回收，超出即从头部弹出）
-# ==============================================================================
+# --- 聊天频道与战报终端消息流（聊天滚动区：有界回收，超出即从头部弹出） ---
 
 enum ChatChannel {WORLD, GUILD, PARTY, SYSTEM, COMBAT}
 var current_channel: ChatChannel = ChatChannel.WORLD
@@ -111,18 +105,11 @@ var _chat_session_reference: IChatCommandSession = null
 ## 懒加载命令补全会话（每视图独立状态，避免跨视图串扰）
 func _chat_session() -> IChatCommandSession:
 	if _chat_session_reference == null:
-		_chat_session_reference = MockServiceContainer.get_instance().chat_command().create_session()
+		_chat_session_reference = ServiceLocator.get_instance().chat_command().create_session()
 	return _chat_session_reference
 
-# ==============================================================================
-# 主菜单显示状态
-# ==============================================================================
-
+# --- 主菜单显示状态与生命周期 ---
 var main_menu_visible: bool = false
-
-# ==============================================================================
-# 生命周期
-# ==============================================================================
 
 var _subpanels: MainHUDSubpanels = null
 
@@ -131,6 +118,14 @@ func _get_subpanels() -> MainHUDSubpanels:
 		_subpanels = _register_owned_subcontroller(MainHUDSubpanelsClass.new()) as MainHUDSubpanels
 		_subpanels.setup(self)
 	return _subpanels
+
+## 进入主界面 HUD 时同步账号与会话凭据，并按需应用初始权威快照。
+func on_screen_enter(screen_parameters: Dictionary = {}) -> void:
+	super.on_screen_enter(screen_parameters)
+	_sync_navigation_context_properties(screen_parameters)
+	var initial_snapshot: Variant = screen_parameters.get("initial_hud_snapshot", null)
+	if initial_snapshot is Dictionary and not (initial_snapshot as Dictionary).is_empty():
+		apply_snapshot(initial_snapshot as Dictionary)
 
 ## 生命周期初始化：装配主题、文案、状态栏、小地图、动作条、聊天与主菜单。
 func _ready() -> void:
@@ -171,10 +166,7 @@ func _on_predelete_cleanup() -> void:
 	HudEventBridge.get_instance().detach_hud()
 	_subpanels = null
 
-# ==============================================================================
-# 信号绑定
-# ==============================================================================
-
+# --- 信号绑定与静态文案初始化（i18n） ---
 ## 绑定本地 UI 交互信号（小地图/动作条/聊天/菜单在本地脚本闭环）
 func _connect_signals() -> void:
 	connect_managed(_chat_tabs.tab_changed, _on_chat_tab_changed)
@@ -184,10 +176,6 @@ func _connect_signals() -> void:
 	connect_managed(_chat_input.focus_exited, _on_chat_input_focus_exited)
 	_get_subpanels().connect_signals()
 
-# ==============================================================================
-# 静态文案初始化（i18n）
-# ==============================================================================
-
 ## 初始化 HUD 全部静态文案（i18n 全驱动）
 func _init_hud_text() -> void:
 	KTabBar.init_titles(_chat_tabs, PackedStringArray([
@@ -195,9 +183,7 @@ func _init_hud_text() -> void:
 	]))
 	_get_subpanels().init_subpanels_text()
 
-# ==============================================================================
-# 键盘事件（ESC 呼出主菜单、Tab 聊天补全）
-# ==============================================================================
+# --- 键盘事件（ESC 呼出主菜单、Tab 聊天补全） ---
 
 ## 全局输入钩子：输入法专用键透传与聊天聚焦态处理
 func _input(event: InputEvent) -> void:
@@ -220,29 +206,14 @@ func _input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 
-# ==============================================================================
-# 顶栏状态更新
-# ==============================================================================
-
+# --- 顶栏状态更新 ---
 ## 外部状态快照注入接口：刷新生命、法力、行动力与货币余额。
-func update_status_snapshot(
-	health_points: float,
-	health_points_max: float,
-	mana_points: float,
-	mana_points_max: float,
-	action_points: float,
-	action_points_max: float,
-	gold_amount: int,
-	crystal_amount: int,
-) -> void:
-	stat_hp_current = health_points
-	stat_hp_max = health_points_max
-	stat_mp_current = mana_points
-	stat_mp_max = mana_points_max
-	stat_ap_current = action_points
-	stat_ap_max = action_points_max
-	wallet_gold = gold_amount
-	wallet_mana_crystals = crystal_amount
+func update_status_snapshot(health_points: float, health_points_max: float, mana_points: float, mana_points_max: float,
+		action_points: float, action_points_max: float, gold_amount: int, crystal_amount: int) -> void:
+	stat_hp_current = health_points; stat_hp_max = health_points_max
+	stat_mp_current = mana_points; stat_mp_max = mana_points_max
+	stat_ap_current = action_points; stat_ap_max = action_points_max
+	wallet_gold = gold_amount; wallet_mana_crystals = crystal_amount
 	_refresh_status_bars()
 	_refresh_wallet()
 
@@ -281,9 +252,7 @@ func _refresh_clock() -> void:
 func _refresh_character_name() -> void:
 	if _character_name_label: _character_name_label.text = character_name
 
-# ==============================================================================
-# 小地图与快捷栏（委托给 MainHUDSubpanels）
-# ==============================================================================
+# --- 小地图与快捷栏（委托给 MainHUDSubpanels） ---
 
 func _refresh_minimap_coords() -> void: _get_subpanels().refresh_minimap_coords()
 func _on_minimap_zoom_in_pressed() -> void: _get_subpanels().on_minimap_zoom_in_pressed()
@@ -302,10 +271,7 @@ func trigger_action_slot(slot_index: int) -> Dictionary:
 			return {"success": true, "slot": slot_index, "skill_id": slot_entry.skill_id}
 	return {"success": false, "reason": "EMPTY_SLOT"}
 
-# ==============================================================================
-# 聊天频道切换
-# ==============================================================================
-
+# --- 聊天频道切换与滚动区消息流 ---
 ## 外部控制接口：切换当前激活的聊天频道。
 func switch_chat_channel(channel: ChatChannel) -> void: current_channel = channel
 
@@ -314,17 +280,7 @@ func _on_chat_tab_changed(tab_index: int) -> void:
 	if tab_index >= 0 and tab_index < channels.size(): current_channel = channels[tab_index]
 	_refresh_chat_view()
 
-# ==============================================================================
-# 聊天滚动区消息流
-# ==============================================================================
-
-const CHANNEL_TAGS: Dictionary = {
-	ChatChannel.WORLD: "WORLD",
-	ChatChannel.GUILD: "GUILD",
-	ChatChannel.PARTY: "PARTY",
-	ChatChannel.SYSTEM: "SYSTEM",
-	ChatChannel.COMBAT: "COMBAT",
-}
+const CHANNEL_TAGS: Dictionary = {ChatChannel.WORLD: "WORLD", ChatChannel.GUILD: "GUILD", ChatChannel.PARTY: "PARTY", ChatChannel.SYSTEM: "SYSTEM", ChatChannel.COMBAT: "COMBAT"}
 
 ## 终端行追加（tag 分类 + 文字，增量追加至 RichTextLabel 避免全量重建）
 func append_terminal_log(tag: String, text: String) -> void:
@@ -349,9 +305,7 @@ func _refresh_chat_view() -> void:
 		var color_tag := theme_manager.get_bbcode_color_tag(tag)
 		_chat_rich_text_label.append_text("%s[%s] %s[/color]\n" % [color_tag, tag, text])
 
-# ==============================================================================
-# 聊天输入框与 Tab 智能补全联动
-# ==============================================================================
+# --- 聊天输入框与 Tab 智能补全联动 ---
 
 ## 标记聊天输入框获得焦点并重置 Tab 手势状态。
 func focus_chat_input() -> void: chat_input_focused = true; _chat_session().reset_gesture()
@@ -451,9 +405,7 @@ static func _command_prefix(input_text: String) -> String:
 	var space_index := text.find(" ")
 	return text.substr(0, space_index) if space_index >= 0 else text
 
-# ==============================================================================
-# 战报、任务追踪、主菜单（委托给 MainHUDSubpanels）
-# ==============================================================================
+# --- 战报、任务追踪、主菜单（委托给 MainHUDSubpanels） ---
 
 ## 按分类向战报日志终端追加一条战报消息。
 func append_battle_log(category: String, text: String) -> void: _get_subpanels().append_battle_log(category, text)

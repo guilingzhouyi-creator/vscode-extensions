@@ -2,7 +2,7 @@
 # 模块归属: 前端表现层 (Frontend · 第5卷 经济与交易系统视图控制器)
 # 文件路径: res://frontend/views/economy_trade/economy_trade_view.gd
 # 架构定位: Presentation View Controller / Snapshot-Driven Screen
-# 依赖与触发: 上游: NavManager, MockServiceContainer, FrontendSnapshot, GameConfig
+# 依赖与触发: 上游: NavManager, ServiceLocator, FrontendSnapshot, GameConfig
 #           下游: EconomyTradeTabs, UIIntermediary, KTabBar, ThemeManager
 # 职责说明: 钱包四级货币展示、商铺货架浏览、拍卖行、物流运费、物价走势、
 #           货币兑换所与资源水池展示，部分页签交互委托 EconomyTradeTabs 驱动。
@@ -167,7 +167,7 @@ func _render_from_snapshot() -> void:
 
 ## 钱包总价值换算为铜币基准（换算规则经 domain_boundary 服务）
 func calculate_total_copper_value() -> int:
-	return MockServiceContainer.get_instance().economy().calculate_total_copper(wallet_gold, wallet_silver, wallet_copper)
+	return ServiceLocator.get_instance().economy().calculate_total_copper(wallet_gold, wallet_silver, wallet_copper)
 
 # ==============================================================================
 # 生命周期
@@ -203,7 +203,7 @@ func _apply_theme() -> void:
 
 ## 从 domain_boundary 快照服务加载经济域快照（钱包/商铺/走势）
 func _load_mock_snapshot() -> void:
-	var economy_snapshot := MockServiceContainer.get_instance().snapshot_data().load_snapshot("economy")
+	var economy_snapshot := ServiceLocator.get_instance().snapshot_data().load_snapshot("economy")
 	if economy_snapshot.is_empty():
 		return
 	var wallet: Dictionary = economy_snapshot.get("wallet", {})
@@ -233,7 +233,7 @@ func _refresh_wallet_display() -> void:
 	_label_copper_value.text = str(wallet_copper)
 	_label_crystal_value.text = str(wallet_mana_monocrystals)
 	var total_copper := calculate_total_copper_value()
-	var currency_parts := MockServiceContainer.get_instance().economy().split_copper(total_copper)
+	var currency_parts := ServiceLocator.get_instance().economy().split_copper(total_copper)
 	var gold_part := int(currency_parts.get("gold", 0))
 	var silver_part := int(currency_parts.get("silver", 0))
 	var copper_part := int(currency_parts.get("copper", 0))
@@ -311,8 +311,8 @@ func _refresh_shop_total() -> void:
 	var base_price := int(shelf_entry.get("price_copper", 0))
 	var quantity := int(_spin_shop_quantity.value)
 	var is_sell := _shop_mode == ShopMode.SELL
-	var total_copper := MockServiceContainer.get_instance().economy().calculate_shop_total(base_price, quantity, is_sell)
-	var sell_ratio_percent := int(float(MockServiceContainer.get_instance().economy().get_rules().get("sell_back_ratio", 0.7)) * 100.0)
+	var total_copper := ServiceLocator.get_instance().economy().calculate_shop_total(base_price, quantity, is_sell)
+	var sell_ratio_percent := int(float(ServiceLocator.get_instance().economy().get_rules().get("sell_back_ratio", 0.7)) * 100.0)
 	if is_sell:
 		UIIntermediary.resolve(_label_shop_total, "ui.fe05.shop.sell_total", {
 			"price": _format_currency(total_copper), "ratio": sell_ratio_percent
@@ -405,7 +405,7 @@ func _on_back_pressed() -> void:
 
 ## 将铜币数量格式化为可读字符串（拆分规则经服务）
 func _format_currency(copper_amount: int) -> String:
-	var currency_parts := MockServiceContainer.get_instance().economy().split_copper(copper_amount)
+	var currency_parts := ServiceLocator.get_instance().economy().split_copper(copper_amount)
 	var gold := int(currency_parts.get("gold", 0))
 	var silver := int(currency_parts.get("silver", 0))
 	var copper := int(currency_parts.get("copper", 0))

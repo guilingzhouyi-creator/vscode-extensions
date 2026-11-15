@@ -184,25 +184,29 @@ func move_focused_pack(direction_offset: int) -> void:
 	render_all()
 
 ## 提交已勾选 MOD 清单到世界网关会话并运行 DAG/兼容预检
-func commit_selection_and_precheck() -> Dictionary:
+func commit_selection_and_precheck(on_completed: Callable = Callable()) -> Dictionary:
 	var world_service: IWorldService = ServiceLocator.get_instance().world()
 	if world_service == null:
-		return {"success": false, "error_code": "ERR_SERVICE_UNAVAILABLE"}
+		return ServiceLocator.reply_service_unavailable(on_completed)
 	var selection_reply: Dictionary = {}
+	var precheck_reply: Dictionary = {}
+	var selected_ids: Array = (_view.selected_pack_ids as Array).duplicate() if (_view != null and _view.selected_pack_ids is Array) else []
 	world_service.set_mod_selection_async(
 		_view.current_account_id,
 		_view.current_session_token,
-		_view.selected_pack_ids,
+		selected_ids,
 		func(response_payload: Dictionary) -> void:
 			selection_reply.merge(response_payload, true)
+			world_service.precheck_mod_stack_async(
+				_view.current_account_id,
+				_view.current_session_token,
+				selected_ids,
+				func(precheck_payload: Dictionary) -> void:
+					precheck_reply.merge(precheck_payload, true)
+					if _view != null and is_instance_valid(_view):
+						_view.apply_snapshot({"precheck_report": precheck_payload})
+					if on_completed.is_valid():
+						on_completed.call(precheck_payload)
+			)
 	)
-	var precheck_reply: Dictionary = {}
-	world_service.precheck_mod_stack_async(
-		_view.current_account_id,
-		_view.current_session_token,
-		_view.selected_pack_ids,
-		func(response_payload: Dictionary) -> void:
-			precheck_reply.merge(response_payload, true)
-	)
-	_view.apply_snapshot({"precheck_report": precheck_reply})
 	return precheck_reply

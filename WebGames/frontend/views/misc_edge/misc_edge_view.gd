@@ -2,7 +2,7 @@
 # 模块归属: 前端边缘系统视图域 (fe17 边缘与杂项系统)
 # 文件路径: res://frontend/views/misc_edge/misc_edge_view.gd
 # 架构定位: BaseScreen 视图控制器；承载身份伪装、精英突变、地面拾取与规范命名
-# 依赖与触发: 依赖 ThemeManager、UIIntermediary、MockServiceContainer 与 MiscEdgeTabs
+# 依赖与触发: 依赖 ThemeManager、UIIntermediary、ServiceLocator 与 MiscEdgeTabs
 # 职责说明: 管理身份伪装面具与地面掉落拾取交互，并委托页签子控制器处理突变与命名
 # 退出语义与设计依据: 返回操作调用 self.back()；突变与命名页签委托 MiscEdgeTabs
 # ==============================================================================
@@ -397,7 +397,7 @@ func _on_loot_selected(loot_index: int) -> void:
 
 ## 拾取按钮：拾取规则经服务（索引守卫 + 移除），成功后回写并刷新
 func _on_pickup_pressed() -> void:
-	var pickup_result := MockServiceContainer.get_instance().misc_edge().pickup_loot(ground_nearby_loot, _selected_loot_index)
+	var pickup_result := ServiceLocator.get_instance().misc_edge().pickup_loot(ground_nearby_loot, _selected_loot_index)
 	if not bool(pickup_result.get("success", false)):
 		return
 	ground_nearby_loot = pickup_result.get("loot", ground_nearby_loot)

@@ -2,7 +2,7 @@
 # 模块归属: 前端邮件视图域 (fe08 邮件系统)
 # 文件路径: res://frontend/views/mail_system/mail_system_view.gd
 # 架构定位: BaseScreen 视图控制器；承载收件箱列表、容量显示、详情阅读与写信页签
-# 依赖与触发: 依赖 ThemeManager、UIIntermediary、MockServiceContainer 与 MailSystemTabs
+# 依赖与触发: 依赖 ThemeManager、UIIntermediary、ServiceLocator 与 MailSystemTabs
 # 职责说明: 渲染邮件三态分类与容量状态，驱动附件提取、单删批删及写信切换交互
 # 退出语义与设计依据: 返回操作调用 self.back()；虚拟列表与写信面板委托给 Tabs 管理
 # ==============================================================================
@@ -62,7 +62,7 @@ var current_category: int = MailCategory.ALL
 var stored_mails: Array = []
 var selected_mail_id: String = ""
 var search_keyword: String = ""
-var max_mailbox_capacity: int = MockServiceContainer.get_instance().mail().get_max_capacity()
+var max_mailbox_capacity: int = ServiceLocator.get_instance().mail().get_max_capacity()
 var _tabs: Variant = null
 
 # ==============================================================================
@@ -84,7 +84,7 @@ func _render_from_snapshot() -> void:
 ## 按邮件编号选中邮件并标记为已读，返回选中状态与邮件详情。
 func select_mail(mail_id: String) -> Dictionary:
 	selected_mail_id = mail_id
-	stored_mails = MockServiceContainer.get_instance().mail().mark_read(stored_mails, mail_id)
+	stored_mails = ServiceLocator.get_instance().mail().mark_read(stored_mails, mail_id)
 	for mail_entry in stored_mails:
 		if str(mail_entry.get("mail_id", "")) == mail_id:
 			return {"success": true, "mail": mail_entry}
@@ -92,7 +92,7 @@ func select_mail(mail_id: String) -> Dictionary:
 
 ## 预览一键领取全部未领取附件，返回操作成功状态与已领取邮件数量。
 func claim_all_attachments_preview() -> Dictionary:
-	var claim_result: Dictionary = MockServiceContainer.get_instance().mail().claim_all(stored_mails)
+	var claim_result: Dictionary = ServiceLocator.get_instance().mail().claim_all(stored_mails)
 	stored_mails = claim_result.get("mails", stored_mails)
 	return {"success": true, "claimed_mails_count": int(claim_result.get("claimed_count", 0))}
 
@@ -122,7 +122,7 @@ func _ready() -> void:
 func _load_mock_data() -> void:
 	if _tabs != null:
 		apply_snapshot({
-			"capacity": MockServiceContainer.get_instance().mail().get_max_capacity(),
+			"capacity": ServiceLocator.get_instance().mail().get_max_capacity(),
 			"mails": _tabs.mock_mails,
 		})
 
@@ -198,7 +198,7 @@ func _show_mail_detail(mail_entry: Dictionary) -> void:
 	_reply_button.disabled = false
 	_delete_mail_button.disabled = false
 
-	stored_mails = MockServiceContainer.get_instance().mail().mark_read(stored_mails, str(mail_entry.get("mail_id", "")))
+	stored_mails = ServiceLocator.get_instance().mail().mark_read(stored_mails, str(mail_entry.get("mail_id", "")))
 	_refresh_mail_list()
 
 ## 获取或创建邮件附件按钮（循环外分配，池化复用）
@@ -275,13 +275,13 @@ func _on_batch_delete() -> void:
 	for selected_index in selected_indices:
 		if selected_index < filtered_mails.size():
 			mail_ids_to_remove.append(filtered_mails[selected_index].get("mail_id", ""))
-	stored_mails = MockServiceContainer.get_instance().mail().delete_by_ids(stored_mails, mail_ids_to_remove)
+	stored_mails = ServiceLocator.get_instance().mail().delete_by_ids(stored_mails, mail_ids_to_remove)
 	_refresh_mail_list()
 	_refresh_capacity()
 	_init_mail_detail()
 
 func _on_claim_all() -> void:
-	var claim_result: Dictionary = MockServiceContainer.get_instance().mail().claim_all(stored_mails)
+	var claim_result: Dictionary = ServiceLocator.get_instance().mail().claim_all(stored_mails)
 	stored_mails = claim_result.get("mails", stored_mails)
 	var claimed_count := int(claim_result.get("claimed_count", 0))
 	if claimed_count > 0:
@@ -293,7 +293,7 @@ func _on_claim_all() -> void:
 					break
 
 func _on_claim_attachment() -> void:
-	var claim_result: Dictionary = MockServiceContainer.get_instance().mail().claim_one(stored_mails, selected_mail_id)
+	var claim_result: Dictionary = ServiceLocator.get_instance().mail().claim_one(stored_mails, selected_mail_id)
 	if not bool(claim_result.get("success", false)):
 		return
 	stored_mails = claim_result.get("mails", stored_mails)
@@ -304,7 +304,7 @@ func _on_claim_attachment() -> void:
 			break
 
 func _on_delete_mail() -> void:
-	stored_mails = MockServiceContainer.get_instance().mail().delete_by_ids(stored_mails, [selected_mail_id])
+	stored_mails = ServiceLocator.get_instance().mail().delete_by_ids(stored_mails, [selected_mail_id])
 	selected_mail_id = ""
 	_refresh_mail_list()
 	_refresh_capacity()

@@ -2,7 +2,7 @@
 # 模块归属: 前端表现层 (Frontend · 第13卷 魔典与著书系统视图控制器)
 # 文件路径: res://frontend/views/grimoire_authoring/grimoire_authoring_view.gd
 # 架构定位: Presentation View Controller / Snapshot-Driven Screen
-# 依赖与触发: 上游: NavManager, MockServiceContainer, FrontendSnapshot
+# 依赖与触发: 上游: NavManager, ServiceLocator, FrontendSnapshot
 #           下游: GrimoireAuthoringTabs, KTabBar, UIIntermediary, ThemeManager
 # 职责说明: 典籍书库浏览、三维点阵AST招式节点编辑、著书定价与版税结算展示；
 #           其中著书、版税与反编译交互委托 GrimoireAuthoringTabs 驱动。

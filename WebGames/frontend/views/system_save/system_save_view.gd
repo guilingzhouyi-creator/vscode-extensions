@@ -2,7 +2,7 @@
 # 模块归属: frontend.views.system_save
 # 文件路径: res://frontend/views/system_save/system_save_view.gd
 # 架构定位: 系统与存档视图主控脚本，统筹存档槽位管理、确定性回放、开发者调试与兑换功能
-# 依赖与触发: 依赖 BaseScreen / KTabBar / SystemSaveTabs / MockServiceContainer / GameConfig
+# 依赖与触发: 依赖 BaseScreen / KTabBar / SystemSaveTabs / ServiceLocator / GameConfig
 # 职责说明: 维护存档视图控件引用与公共状态字段，并将回放、沙盒与兑换交互委托给子控制器
 # 退出语义与设计依据: 点击返回调用 back() 退出界面；存档与快照状态经统一接口更新后重绘界面
 # ==============================================================================
@@ -350,7 +350,7 @@ func _on_save_slot_selected(slot_index: int) -> void:
 func _on_save_to_slot_pressed() -> void:
 	if _selected_slot_index < 0:
 		return
-	var save_service := MockServiceContainer.get_instance().save()
+	var save_service := ServiceLocator.get_instance().save()
 	save_slots[_selected_slot_index] = save_service.write_slot(save_slots[_selected_slot_index], {})
 	_refresh_save_slot_list()
 	_item_list_save_slots.select(_selected_slot_index)
@@ -369,7 +369,7 @@ func _on_load_from_slot_pressed() -> void:
 func _on_delete_slot_pressed() -> void:
 	if _selected_slot_index < 0:
 		return
-	var save_service := MockServiceContainer.get_instance().save()
+	var save_service := ServiceLocator.get_instance().save()
 	save_slots[_selected_slot_index] = save_service.clear_slot(save_slots[_selected_slot_index])
 	_refresh_save_slot_list()
 	_item_list_save_slots.select(_selected_slot_index)

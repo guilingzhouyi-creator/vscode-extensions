@@ -2,7 +2,7 @@
 # 模块归属: 前端任务视图域 (fe07 任务与因果系统)
 # 文件路径: res://frontend/views/quest_causality/quest_causality_view.gd
 # 架构定位: BaseScreen 视图控制器；承载任务列表、详情状态流转、因果环与悬赏通缉
-# 依赖与触发: 依赖 ThemeManager、UIIntermediary、MockServiceContainer 与 Tabs 委托
+# 依赖与触发: 依赖 ThemeManager、UIIntermediary、ServiceLocator 与 Tabs 委托
 # 职责说明: 维护任务列表筛选与详情池化展示，委托因果环 DAG 与悬赏页签给 Tabs 管理
 # 退出语义与设计依据: 返回操作调用 self.back()；任务与 DAG 快照由 apply_snapshot 同步
 # ==============================================================================
@@ -405,7 +405,7 @@ func _on_quest_submit() -> void:
 func _transition_quest_status(action: String) -> void:
 	if active_quest_detail.is_empty():
 		return
-	var transition_result := MockServiceContainer.get_instance().quest().transition_status(active_quest_detail, action)
+	var transition_result := ServiceLocator.get_instance().quest().transition_status(active_quest_detail, action)
 	if not bool(transition_result.get("success", false)):
 		return
 	active_quest_detail = transition_result.get("quest", active_quest_detail)

@@ -2,7 +2,7 @@
 # 模块归属: 前端社交视图域 (fe09 公会社交页签委托)
 # 文件路径: res://frontend/views/guild_social/guild_social_tabs.gd
 # 架构定位: BaseScreen 附属页签委托控制器；承接聊天、好友、NPC 对话与玩家交易页签
-# 依赖与触发: 依赖 GuildSocialView、ThemeManager、UIIntermediary 与 MockServiceContainer
+# 依赖与触发: 依赖 GuildSocialView、ThemeManager、UIIntermediary 与 ServiceLocator
 # 职责说明: 初始化社交页签预设数据、列表填充、动态对话按钮池及交易状态流转
 # 退出语义与设计依据: 随 GuildSocialView 生命周期由 _register_owned_subcontroller 统一清理
 # ==============================================================================
@@ -408,7 +408,7 @@ func _on_trade_cancel_pressed() -> void:
 	_refresh_trade_status()
 
 func _apply_trade_transition(action: String) -> void:
-	var transition_result := MockServiceContainer.get_instance().guild().trade_transition({
+	var transition_result := ServiceLocator.get_instance().guild().trade_transition({
 		"locked": _view._trade_locked,
 		"confirmed": _view._trade_confirmed,
 	}, action)

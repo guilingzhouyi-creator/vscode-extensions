@@ -2,7 +2,7 @@
 # 模块归属: 前端边缘系统视图域 (fe17 边缘系统页签委托)
 # 文件路径: res://frontend/views/misc_edge/misc_edge_tabs.gd
 # 架构定位: BaseScreen 附属页签委托控制器；承接精英突变词条与规范命名注册页签
-# 依赖与触发: 依赖 MiscEdgeView、UIIntermediary、KTabBar 与 MockServiceContainer
+# 依赖与触发: 依赖 MiscEdgeView、UIIntermediary、KTabBar 与 ServiceLocator
 # 职责说明: 初始化突变与命名页签静态文案、列表筛选填充、组合预览及命名校验注册
 # 退出语义与设计依据: 随 MiscEdgeView 生命周期由 _register_owned_subcontroller 统一清理
 # ==============================================================================
@@ -158,7 +158,7 @@ func _on_mutation_selected(mutation_index: int) -> void:
 func _on_mutation_activate_pressed() -> void:
 	if _view == null or _view._selected_mutation_index < 0 or _view._selected_mutation_index >= _view._mutation_entries.size():
 		return
-	var activation_result := MockServiceContainer.get_instance().misc_edge().activate_mutation(
+	var activation_result := ServiceLocator.get_instance().misc_edge().activate_mutation(
 		_view._active_mutations, _view._mutation_entries[_view._selected_mutation_index], 3)
 	if not bool(activation_result.get("success", false)):
 		return
@@ -168,7 +168,7 @@ func _on_mutation_activate_pressed() -> void:
 func _on_mutation_replace_pressed() -> void:
 	if _view == null or _view._selected_mutation_index < 0 or _view._selected_mutation_index >= _view._mutation_entries.size():
 		return
-	var replacement_result := MockServiceContainer.get_instance().misc_edge().replace_last_mutation(
+	var replacement_result := ServiceLocator.get_instance().misc_edge().replace_last_mutation(
 		_view._active_mutations, _view._mutation_entries[_view._selected_mutation_index])
 	if not bool(replacement_result.get("success", false)):
 		return
@@ -200,7 +200,7 @@ func refresh_name_fee() -> void:
 	if _view == null:
 		return
 	var name_type_index := _view._name_type_option.selected
-	var registration_fee := MockServiceContainer.get_instance().misc_edge().get_name_type_fee(name_type_index)
+	var registration_fee := ServiceLocator.get_instance().misc_edge().get_name_type_fee(name_type_index)
 	UIIntermediary.resolve(_view._name_fee_label, "ui.fe17.name_registry.fee_label", {"fee": registration_fee})
 
 ## 重新渲染命名注册历史记录列表。
