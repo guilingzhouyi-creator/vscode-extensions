@@ -239,15 +239,17 @@ static func _lookup_kit_config_by_id(kit_id: String, manifest: Dictionary) -> Di
 
 static func _build_items_spec_lookup() -> Dictionary:
     var item_specification_map: Dictionary = {}
-    var empty_table_fallback: Dictionary = {}
-    for table_name_variant in GameConfig.get_table_names():
+    var table_names: Array = GameConfig.get_table_names()
+    for table_name_variant in table_names:
         var item_table_name := str(table_name_variant)
-        if not item_table_name.begins_with("items."):
-            continue
-        var table_payload: Variant = GameConfig.get_table(item_table_name, empty_table_fallback)
-        if table_payload is Dictionary and (table_payload as Dictionary).get("items") is Array:
-            _merge_items_array_into_lookup((table_payload as Dictionary).get("items") as Array, item_specification_map)
+        if item_table_name.begins_with("items."):
+            _merge_named_item_table(item_table_name, item_specification_map)
     return item_specification_map
+
+static func _merge_named_item_table(item_table_name: String, item_specification_map: Dictionary) -> void:
+    var table_payload: Variant = GameConfig.get_table(item_table_name, {})
+    if table_payload is Dictionary and (table_payload as Dictionary).get("items") is Array:
+        _merge_items_array_into_lookup((table_payload as Dictionary).get("items") as Array, item_specification_map)
 
 
 static func _merge_items_array_into_lookup(items_array: Array, target_lookup: Dictionary) -> void:

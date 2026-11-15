@@ -209,6 +209,7 @@ static func create_dag_session(
 	if dag == null:
 		return null
 	var engine := NarrativeDagExecutionEngine.new()
+	engine.set_hook_interceptor(Callable(PrologueCutscenePort, "intercept_narrative_hook"))
 	engine.initialize_with_graph(dag, prologue_context.runtime_placeholders)
 	return engine
 

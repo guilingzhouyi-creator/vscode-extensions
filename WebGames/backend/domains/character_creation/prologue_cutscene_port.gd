@@ -13,20 +13,45 @@ class_name PrologueCutscenePort
 extends RefCounted
 
 static var _runner: Callable = Callable()
+static var _hook_interceptor: Callable = Callable()
 static var _last_dispatch_receipt: Dictionary = {}
+static var _last_hook_receipt: Dictionary = {}
 
 ## 由基础设施装配层注入无头/主线程过场执行器适配器 (argv: (cutscene_id: String, skip: bool) -> Dictionary)
 static func register_runner(runner: Callable) -> void:
 	_runner = runner
 
-## 清空已注入的过场执行器与执行回执（由 GameBootstrap.teardown 与测试重置调用）
+## 由基础设施装配层注入剧情节点过场 Hook 匹配拦截器 (argv: (dag_id: String, node_id: String, is_pre: bool) -> Dictionary)
+static func register_hook_interceptor(interceptor: Callable) -> void:
+	_hook_interceptor = interceptor
+
+## 清空已注入的过场执行器、Hook 拦截器与执行回执（由 GameBootstrap.teardown 与测试重置调用）
 static func reset_for_tests() -> void:
 	_runner = Callable()
+	_hook_interceptor = Callable()
 	_last_dispatch_receipt.clear()
+	_last_hook_receipt.clear()
 
 ## 校验是否已装配过场执行器
 static func has_runner() -> bool:
 	return _runner.is_valid()
+
+## 校验是否已装配剧情节点 Hook 拦截器
+static func has_hook_interceptor() -> bool:
+	return _hook_interceptor.is_valid()
+
+## 由 DAG 执行引擎节点前置/后置阶段触发：委派外层 Hook 注册表匹配并自动派发过场
+static func intercept_narrative_hook(dag_id: String, node_id: String, is_pre: bool) -> Dictionary:
+	if not _hook_interceptor.is_valid():
+		return {"matched": false, "dag_id": dag_id, "node_id": node_id, "is_pre": is_pre}
+	var raw_result: Variant = _hook_interceptor.call(dag_id, node_id, is_pre)
+	var receipt: Dictionary = (raw_result as Dictionary).duplicate(true) if raw_result is Dictionary else {"matched": false}
+	receipt["dag_id"] = dag_id
+	receipt["node_id"] = node_id
+	receipt["is_pre"] = is_pre
+	if bool(receipt.get("matched", false)):
+		_last_hook_receipt = receipt.duplicate(true)
+	return receipt
 
 ## 通过抽象端口调度指定 ID 过场动画（未注入执行器时安全无副作用降级）
 static func dispatch_cutscene(cutscene_id: String, is_skip_requested: bool = false) -> Dictionary:
@@ -52,3 +77,7 @@ static func dispatch_cutscene(cutscene_id: String, is_skip_requested: bool = fal
 ## 获取最近一次过场调度回执（供审计与测试验证）
 static func get_last_receipt() -> Dictionary:
 	return _last_dispatch_receipt.duplicate(true)
+
+## 获取最近一次 DAG Hook 自动匹配回执（供序章过场 Hook 集成断言）
+static func get_last_hook_receipt() -> Dictionary:
+	return _last_hook_receipt.duplicate(true)

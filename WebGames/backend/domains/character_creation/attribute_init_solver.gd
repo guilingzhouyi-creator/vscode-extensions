@@ -80,17 +80,24 @@ static func validate_point_buy_allocation(allocated_stats: Dictionary, max_point
 	var min_level := AttributeConversionEngine.min_level()
 	var max_level := AttributeConversionEngine.max_level()
 	var total_spent := 0
-	var out_of_range_template := GameConfig.get_string("narratives.character_creation", "point_buy_out_of_range", "Attribute %s out of range [%d, %d]: %d")
+	var out_of_range_template := GameConfig.get_string("narratives.character_creation", "point_buy_out_of_range", "Attribute {attr} out of range [{min}, {max}]: {val}")
 
 	for stat_key in required_keys:
 		var stat_value: int = int(allocated_stats.get(stat_key, min_level))
 		if stat_value < min_level or stat_value > max_level:
-			var out_of_range_message := out_of_range_template % [stat_key, min_level, max_level, stat_value]
+			var range_payload := {
+				"attr": stat_key,
+				"min": min_level,
+				"max": max_level,
+				"val": stat_value
+			}
+			var out_of_range_message := out_of_range_template.format(range_payload) if out_of_range_template.contains("{") else (out_of_range_template % [stat_key, min_level, max_level, stat_value])
 			return { "valid": false, "reason": out_of_range_message }
 		total_spent += stat_value
 
 	if total_spent > total_limit:
-		var exceed_message := GameConfig.get_string("narratives.character_creation", "point_buy_exceed", "Total points spent %d exceeds limit %d") % [total_spent, total_limit]
+		var exceed_template := GameConfig.get_string("narratives.character_creation", "point_buy_exceed", "Total points spent {spent} exceeds limit {limit}")
+		var exceed_message := exceed_template.format({"spent": total_spent, "limit": total_limit}) if exceed_template.contains("{") else (exceed_template % [total_spent, total_limit])
 		return { "valid": false, "reason": exceed_message }
 
 	return { "valid": true, "total_spent": total_spent, "remaining_points": total_limit - total_spent }

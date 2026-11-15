@@ -80,26 +80,31 @@ static func build_adapted_manifest(
 
 
 static func _create_base_merge_accumulator() -> Dictionary:
+    var base_cc: Dictionary = GameConfig.get_base_table_copy("domains.character_creation")
+    var base_loadout: Dictionary = GameConfig.get_base_table_copy("domains.starter_loadout")
+    var reincarnation_table: Dictionary = (base_cc.get("authoritative_reincarnation", {}) as Dictionary) if (base_cc.get("authoritative_reincarnation") is Dictionary) else {}
+    var traits_allocation: Dictionary = (reincarnation_table.get("traits_allocation", {}) as Dictionary) if (reincarnation_table.get("traits_allocation") is Dictionary) else {}
+
     var origins_pool: Array[Dictionary] = []
-    var raw_base_pool: Array = GameConfig.get_array("domains.character_creation", "authoritative_reincarnation/origins_pool", [])
+    var raw_base_pool: Array = (reincarnation_table.get("origins_pool", []) as Array) if (reincarnation_table.get("origins_pool") is Array) else []
     origins_pool.assign(raw_base_pool.duplicate(true))
 
     var paired_presets: Array[Dictionary] = []
-    var raw_base_pairs: Array = GameConfig.get_array("domains.character_creation", "authoritative_reincarnation/traits_allocation/paired_presets", [])
+    var raw_base_pairs: Array = (traits_allocation.get("paired_presets", []) as Array) if (traits_allocation.get("paired_presets") is Array) else []
     paired_presets.assign(raw_base_pairs.duplicate(true))
 
     var custom_routing_rules: Array[Dictionary] = []
     return {
-        "races_catalog": GameConfig.get_dict("domains.character_creation", "races_catalog", {}).duplicate(true),
+        "races_catalog": ((base_cc.get("races_catalog", {}) as Dictionary) if (base_cc.get("races_catalog") is Dictionary) else {}).duplicate(true),
         "creation_rules": {},
         "origins_pool": origins_pool,
-        "origins_catalog": GameConfig.get_dict("domains.character_creation", "origins", {}).duplicate(true),
-        "origin_race_map": GameConfig.get_dict("domains.character_creation", "authoritative_reincarnation/origin_race_map", {}).duplicate(true),
-        "birth_region_map": GameConfig.get_dict("domains.character_creation", "authoritative_reincarnation/birth_region_map", {}).duplicate(true),
-        "traits": GameConfig.get_dict("domains.character_creation", "traits", {}).duplicate(true),
+        "origins_catalog": ((base_cc.get("origins", {}) as Dictionary) if (base_cc.get("origins") is Dictionary) else {}).duplicate(true),
+        "origin_race_map": ((reincarnation_table.get("origin_race_map", {}) as Dictionary) if (reincarnation_table.get("origin_race_map") is Dictionary) else {}).duplicate(true),
+        "birth_region_map": ((reincarnation_table.get("birth_region_map", {}) as Dictionary) if (reincarnation_table.get("birth_region_map") is Dictionary) else {}).duplicate(true),
+        "traits": ((base_cc.get("traits", {}) as Dictionary) if (base_cc.get("traits") is Dictionary) else {}).duplicate(true),
         "paired_presets": paired_presets,
-        "starter_kits": GameConfig.get_dict("domains.starter_loadout", "starter_kits", {}).duplicate(true),
-        "race_kit_map": GameConfig.get_dict("domains.starter_loadout", "race_kit_map", {}).duplicate(true),
+        "starter_kits": ((base_loadout.get("starter_kits", {}) as Dictionary) if (base_loadout.get("starter_kits") is Dictionary) else {}).duplicate(true),
+        "race_kit_map": ((base_loadout.get("race_kit_map", {}) as Dictionary) if (base_loadout.get("race_kit_map") is Dictionary) else {}).duplicate(true),
         "origin_kit_map": {},
         "origin_dag_map": {},
         "custom_routing_rules": custom_routing_rules,

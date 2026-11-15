@@ -11,6 +11,8 @@
 class_name WorldCharacterCreationOrchestrator
 extends RefCounted
 
+const WorldModLockMetadataHelper = preload("res://backend/domains/narrative_orchestration/world_mod_lock_metadata_helper.gd")
+
 ## 非法字符黑名单（防止文件注入与控制符号破坏）
 const FORBIDDEN_CHARS: Array[String] = [
     "/", "\\", ":", "*", "?", "\"", "<", ">", "|", "\n", "\r", "\t"
@@ -303,7 +305,10 @@ static func _anchor_world_continuity(
         return {"success": false, "error_code": "WORLD_SAVE_FAILED", "message": "保存世界时空连续性失败"}
 
     var lock_packs: Array = lock_source_packs if not lock_source_packs.is_empty() else effective_manifest.get("enabled_pack_ids", [])
-    WorldModAffinityManager.new().save_world_mod_lock(world_id, lock_packs)
+    if lock_packs.is_empty() and effective_manifest.get("applied_packs") is Array:
+        lock_packs = effective_manifest.get("applied_packs", [])
+    var resolved_lock_packs: Array[Dictionary] = WorldModLockMetadataHelper.resolve_lock_pack_entries(lock_packs, effective_manifest)
+    WorldModAffinityManager.new().save_world_mod_lock(world_id, resolved_lock_packs)
 
     return {"success": true, "world_instance": world_instance}
 
