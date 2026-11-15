@@ -274,9 +274,93 @@ static func _resolve_mod_scheme_uri(uri: String, fallback_mod_id: String) -> Str
 # 六、沙盒安全护栏（防路径穿越与非法字符）
 # ==============================================================================
 
-## 安全清洗子路径，严格剥离 ".."、驱动器盘符等路径穿越模式
+static func _hex_nibble_value(byte_code: int) -> int:
+	if byte_code >= 48 and byte_code <= 57:
+		return byte_code - 48
+	if byte_code >= 65 and byte_code <= 70:
+		return byte_code - 55
+	if byte_code >= 97 and byte_code <= 102:
+		return byte_code - 87
+	return -1
+
+static func _percent_decode_once_checked(raw_text: String) -> Dictionary:
+	var source_bytes := raw_text.to_utf8_buffer()
+	var decoded_bytes := PackedByteArray()
+	var total_bytes := source_bytes.size()
+	var byte_cursor := 0
+	while byte_cursor < total_bytes:
+		var current_byte := source_bytes[byte_cursor]
+		if current_byte == 0:
+			return {"unsafe": true, "decoded": ""}
+		if current_byte == 37 and byte_cursor + 2 < total_bytes:
+			var high_nibble := _hex_nibble_value(source_bytes[byte_cursor + 1])
+			var low_nibble := _hex_nibble_value(source_bytes[byte_cursor + 2])
+			if high_nibble >= 0 and low_nibble >= 0:
+				var decoded_byte := (high_nibble << 4) | low_nibble
+				if decoded_byte == 0:
+					return {"unsafe": true, "decoded": ""}
+				decoded_bytes.append(decoded_byte)
+				byte_cursor += 3
+				continue
+		decoded_bytes.append(current_byte)
+		byte_cursor += 1
+	return {"unsafe": false, "decoded": decoded_bytes.get_string_from_utf8()}
+
+static func _decode_and_check_unsafe_payload(raw_path: String) -> Dictionary:
+	var candidate := raw_path
+	for _pass in range(3):
+		var lower := candidate.to_lower()
+		if candidate.to_utf8_buffer().has(0) or lower.contains("%00"):
+			return {"unsafe": true, "decoded": ""}
+		for forbidden_control in ["\r", "\n", "\t"]:
+			if candidate.contains(forbidden_control):
+				return {"unsafe": true, "decoded": ""}
+		var step_output := _percent_decode_once_checked(candidate)
+		if bool(step_output.get("unsafe", false)):
+			return {"unsafe": true, "decoded": ""}
+		var next_decoded := String(step_output.get("decoded", ""))
+		if next_decoded == candidate:
+			break
+		candidate = next_decoded
+	var normalized := candidate.replace("\\", "/").strip_edges()
+	return {"unsafe": false, "decoded": normalized}
+
+## 严格沙盒路径防线 (Fail-Closed)：任意穿越(..)、编码穿越(%2e%2e)、空字节(%00/0x00)、盘符注入或 UNC 前缀一律返回空串 ""
+static func sanitize_sandbox_path_strict(raw_path: String) -> String:
+	var decoded_info := _decode_and_check_unsafe_payload(raw_path)
+	if bool(decoded_info.get("unsafe", true)):
+		return ""
+	var clean := String(decoded_info.get("decoded", ""))
+	if clean.is_empty() or clean.begins_with("//"):
+		return ""
+	var prefix := ""
+	if clean.begins_with(SCHEME_RES):
+		prefix = SCHEME_RES
+		clean = clean.substr(SCHEME_RES.length())
+	elif clean.begins_with(SCHEME_USER):
+		prefix = SCHEME_USER
+		clean = clean.substr(SCHEME_USER.length())
+	if clean.contains(":"):
+		return ""
+	var segments := clean.split("/")
+	var safe_segments: Array[String] = []
+	for segment in segments:
+		var clean_segment := segment.strip_edges()
+		if clean_segment.is_empty():
+			continue
+		if clean_segment == "." or clean_segment == "..":
+			return ""
+		safe_segments.append(clean_segment)
+	if safe_segments.is_empty():
+		return ""
+	return prefix + "/".join(safe_segments)
+
+## 安全清洗子路径，先剥离空字节与解码编码载体再过滤 ".."、驱动器盘符等路径穿越模式
 static func sanitize_sandbox_path(raw_path: String) -> String:
-	var clean := raw_path.replace("\\", "/").strip_edges()
+	var decoded_info := _decode_and_check_unsafe_payload(raw_path)
+	if bool(decoded_info.get("unsafe", false)):
+		return ""
+	var clean := String(decoded_info.get("decoded", ""))
 	var prefix := ""
 
 	# 若原路径为 res:// 或 user://，分离协议头；否则拦截冒号（针对非 res:// 或 user:// 的绝对物理盘符如 C:/）
