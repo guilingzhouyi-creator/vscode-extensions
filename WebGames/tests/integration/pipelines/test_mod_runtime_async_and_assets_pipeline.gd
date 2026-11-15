@@ -175,6 +175,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_tc_p132_02_prologue_dag_hook_and_routing_priority())
 	results.append(test_tc_p132_03_kmod_domain_tables_consumption())
 	results.append(test_tc_p132_04_true_async_ui_deferred_chaining())
+	results.append(test_tc_p132_05_kmod_png_image_texture_and_anti_traversal())
 	_reset_all_state()
 	return TestCase.pack_results("Phase 132 MOD运行时全消费与真异步及资产闭环流水线", results)
 
@@ -342,6 +343,39 @@ static func test_tc_p132_04_true_async_ui_deferred_chaining() -> Dictionary:
 	})
 
 
+## TC-P132-05: .kmod 内嵌 PNG 解码为 ImageTexture 及编码路径穿越严格拦截
+static func test_tc_p132_05_kmod_png_image_texture_and_anti_traversal() -> Dictionary:
+	_reset_all_state()
+	var assets_root := SANDBOX_ROOT.path_join("art_mods")
+	var kmod_path := assets_root.path_join("mod_p132_art_1.2.0.kmod")
+	var img := Image.create(2, 2, false, Image.FORMAT_RGBA8)
+	img.fill(Color.CRIMSON)
+	_write_single_file_kmod(kmod_path, "mod_p132_art", "1.2.0", "assets/cutscenes/awakening.png", img.save_png_to_buffer())
+
+	AssetPathResolver.set_test_roots_override([assets_root])
+	var uri := AssetPathResolver.resolve_unified_uri("mod://cutscenes/awakening.png", "mod_p132_art")
+	var uri_ok := uri.ends_with(".kmod!/assets/cutscenes/awakening.png") and AssetPathResolver.asset_exists(uri)
+
+	var loader := CutsceneAsyncLoader.get_instance()
+	loader.set_deterministic_mode(false)
+	loader.clear_cache_and_tasks()
+	var holder: Dictionary = {"tex": null}
+	loader.request_load(uri, 1, func(res: Resource) -> void:
+		holder["tex"] = res
+	)
+	var tex: Variant = holder.get("tex", null)
+	var tex_ok := tex is ImageTexture and (tex as ImageTexture).get_width() == 2
+
+	var traversal_ok := AssetPathResolver.resolve_unified_uri("mod://mod_p132_art/%2e%2e/secret.png").is_empty() \
+		and AssetPathResolver.resolve_mod_asset_path("mod_p132_art", "cutscenes/null%00.png").is_empty()
+
+	loader.clear_cache_and_tasks()
+	_reset_all_state()
+	return make_result("TC-P132-05: .kmod PNG 解码为 ImageTexture 与编码路径穿越严格阻断", uri_ok and tex_ok and traversal_ok, {
+		"detail": "uri_ok=%s('%s'), tex_ok=%s, traversal_ok=%s" % [uri_ok, uri, tex_ok, traversal_ok]
+	})
+
+
 static func _build_custom_routing_mod_package() -> Dictionary:
 	var route_dir := SANDBOX_ROOT.path_join("mod_p132_route")
 	var rules := [{"rule_id": "R_P132_HIGH", "priority": 999, "origin_id": "BORDER_CITIZEN", "dag_id": "DAG_P132_ALT"}]
@@ -399,6 +433,18 @@ static func _write_domain_tables_kmod(kmod_path: String) -> String:
 	})
 	packer.close()
 	return kmod_path
+
+
+static func _write_single_file_kmod(kmod_path: String, pack_id: String, ver: String, entry_path: String, raw_bytes: PackedByteArray) -> void:
+	DirAccess.make_dir_recursive_absolute(kmod_path.get_base_dir())
+	var packer := ZIPPacker.new()
+	if packer.open(kmod_path) != OK:
+		return
+	_pack_json_entry(packer, "pack.json", {"pack_id": pack_id, "version": ver})
+	packer.start_file(entry_path)
+	packer.write_file(raw_bytes)
+	packer.close_file()
+	packer.close()
 
 
 static func _pack_json_entry(packer: ZIPPacker, entry_path: String, payload: Variant) -> void:
