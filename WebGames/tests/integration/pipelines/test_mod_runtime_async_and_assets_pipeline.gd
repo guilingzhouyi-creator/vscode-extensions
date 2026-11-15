@@ -173,6 +173,8 @@ static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(test_tc_p132_01_bilingual_i18n_hot_reload_and_restore())
 	results.append(test_tc_p132_02_prologue_dag_hook_and_routing_priority())
+	results.append(test_tc_p132_03_kmod_domain_tables_consumption())
+	results.append(test_tc_p132_04_true_async_ui_deferred_chaining())
 	_reset_all_state()
 	return TestCase.pack_results("Phase 132 MOD运行时全消费与真异步及资产闭环流水线", results)
 
@@ -252,6 +254,94 @@ static func test_tc_p132_02_prologue_dag_hook_and_routing_priority() -> Dictiona
 	})
 
 
+## TC-P132-03: .kmod 打包内 skill_cards / cdkeys / mod_world_topology 运行时全消费
+static func test_tc_p132_03_kmod_domain_tables_consumption() -> Dictionary:
+	_reset_all_state()
+	TestFullChainBackendHelper.setup_env()
+	var kmod_path := _write_domain_tables_kmod(SANDBOX_ROOT.path_join("mod_p132_domains_1.0.0.kmod"))
+	var pkg := ModPackageDiscoverySolver.load_full_mod_package_from_dir(kmod_path)
+	var apply_res := Tier3ContentOverrideLoader.apply_enabled_packages([pkg])
+
+	var hand_spec := CombatHandDrawDTO.HandDrawSpecDTO.new()
+	hand_spec.is_first_encounter = true
+	var hand_res := CombatHandGenerator.draw_cards_for_turn(hand_spec, DeterministicRNG.new(42))
+	var card_ok := not hand_res.actual_cards.is_empty() \
+		and str(hand_res.actual_cards[0].card_name) == "星芒突刺" \
+		and str(hand_res.actual_cards[0].verb_type) == "LUNGE"
+
+	var wallet := CharacterWalletEntity.new()
+	var inv := WearableInventoryAggregate.new()
+	inv.baseline_capacity = 10
+	var catalog := ItemLoaderPipeline.build_catalog_from_config()
+	var cdk_res := RewardDispatchPipeline.redeem_cdkey("P132FREE", "ACC_P132_CDK", wallet, inv, catalog)
+	var cdkey_ok := bool(cdk_res.get("success", false)) and wallet.gold == 777 and inv.storage_items.size() == 1 \
+		and str(inv.storage_items[0].template_id) == "KALAR:EQUIP:WEAPON_BLADE:P132_STAR_ORB"
+
+	var nodes_map := MapAndEcologySolver.build_topology_nodes_from_config()
+	var path_res := MapAndEcologySolver.solve_shortest_impedance_path("NODE_GATE", "LM_SANCTUM", nodes_map)
+	var landmarks := MapAndEcologySolver.get_active_landmarks()
+	var world_ok := not landmarks.is_empty() and bool(path_res.get("success", false)) \
+		and (path_res.get("path", []) as Array) == ["NODE_GATE", "LM_SANCTUM"]
+
+	_reset_all_state()
+	var ok := bool(apply_res.get("success", false)) and card_ok and cdkey_ok and world_ok
+	return make_result("TC-P132-03: .kmod 手牌池(skill_cards)、兑换码(cdkeys)与世界拓扑(mod_world_topology)运行时消费", ok, {
+		"card_ok": card_ok, "cdkey_ok": cdkey_ok, "world_ok": world_ok
+	})
+
+
+## TC-P132-04: 真异步延迟队列下网关、MOD 工坊及序章链式时序断言（零过早空读）
+static func test_tc_p132_04_true_async_ui_deferred_chaining() -> Dictionary:
+	_reset_all_state()
+	ServiceLocator.set_mode("mock")
+	var delayed_world := DelayedAsyncWorldService.new()
+	var delayed_prologue := DelayedAsyncPrologueService.new()
+	ServiceLocator.get_instance().register_service("world", delayed_world)
+	ServiceLocator.get_instance().register_service("prologue", delayed_prologue)
+
+	var app_root := _create_headless_app_root()
+	var nav := NavManager.get_instance()
+	var gateway := nav.push_screen("world_gateway", {"account_id": "ACC_ASYNC", "session_token": "TOK_ASYNC"}) as WorldGatewayViewScript
+	var gw_pre_ok := gateway != null and gateway.saved_worlds.is_empty() and delayed_world.pending_count() > 0
+	delayed_world.flush_one_batch()
+	var gw_mid_ok := gateway != null and gateway.saved_worlds.size() == 1 and gateway.last_world_diagnostics.is_empty()
+	delayed_world.flush_one_batch()
+	var gw_post_ok := gateway != null and str(gateway.last_world_diagnostics.get("status", "")) == "MATCHED"
+
+	var workbench := nav.push_screen("mod_workbench", {"account_id": "ACC_ASYNC", "session_token": "TOK_ASYNC"}) as ModWorkbenchScreenScript
+	var mw_pre_ok := workbench != null and workbench.installed_packs.is_empty()
+	delayed_world.flush_one_batch()
+	var mw_list_ok := workbench != null and workbench.installed_packs.size() == 1
+	workbench._get_tabs().commit_selection_and_precheck()
+	var mw_chain_pre := delayed_world.last_op == "set_mod_selection" and workbench.precheck_report.is_empty()
+	delayed_world.flush_one_batch()
+	var mw_chain_mid := delayed_world.last_op == "precheck_mod_stack" and workbench.precheck_report.is_empty()
+	delayed_world.flush_one_batch()
+	var precheck_data: Dictionary = workbench.precheck_report.get("data", workbench.precheck_report) as Dictionary
+	var mw_post_ok := bool(precheck_data.get("has_base_content_mod", false))
+
+	var prologue := nav.push_screen("prologue", {"account_id": "ACC_ASYNC", "session_token": "TOK_ASYNC", "world_id": "W_P132_ASYNC"}) as PrologueViewScript
+	var pro_pre_ok := prologue != null and prologue.current_node_id.is_empty() and delayed_prologue.last_op == "get_prologue_state"
+	delayed_prologue.flush_one_batch()
+	var pro_mid_ok := delayed_prologue.last_op == "start_prologue" and prologue.current_node_id.is_empty()
+	delayed_prologue.flush_one_batch()
+	var pro_post_ok := prologue.current_node_id == "NODE_ASYNC_01" and prologue.current_dag_id == "DAG_ASYNC_01"
+
+	NavManager.reset_instance()
+	app_root.free()
+	_reset_all_state()
+
+	var ok := gw_pre_ok and gw_mid_ok and gw_post_ok and mw_pre_ok and mw_list_ok \
+		and mw_chain_pre and mw_chain_mid and mw_post_ok and pro_pre_ok and pro_mid_ok and pro_post_ok
+	return make_result("TC-P132-04: 真异步延迟队列下网关/工坊/序章前不空读、回调后准确链式落盘", ok, {
+		"detail": "gw=%s/%s/%s, mw=%s/%s/%s/%s/%s, pro=%s/%s/%s" % [
+			gw_pre_ok, gw_mid_ok, gw_post_ok,
+			mw_pre_ok, mw_list_ok, mw_chain_pre, mw_chain_mid, mw_post_ok,
+			pro_pre_ok, pro_mid_ok, pro_post_ok
+		]
+	})
+
+
 static func _build_custom_routing_mod_package() -> Dictionary:
 	var route_dir := SANDBOX_ROOT.path_join("mod_p132_route")
 	var rules := [{"rule_id": "R_P132_HIGH", "priority": 999, "origin_id": "BORDER_CITIZEN", "dag_id": "DAG_P132_ALT"}]
@@ -315,6 +405,22 @@ static func _pack_json_entry(packer: ZIPPacker, entry_path: String, payload: Var
 	packer.start_file(entry_path)
 	packer.write_file(JSON.stringify(payload).to_utf8_buffer())
 	packer.close_file()
+
+
+static func _create_headless_app_root() -> Node:
+	NavManager.reset_instance()
+	var app_root := AppRootScript.new()
+	app_root.name = "TestPhase132AppRoot"
+	var screen_layer := CanvasLayer.new()
+	screen_layer.name = "ScreenLayer"
+	var container := Control.new()
+	container.name = "ScreenContainer"
+	screen_layer.add_child(container)
+	app_root.add_child(screen_layer)
+	app_root.screen_container = container
+	(Engine.get_main_loop() as SceneTree).root.add_child(app_root)
+	NavManager.get_instance().bind_root(app_root)
+	return app_root
 
 
 static func _reset_all_state() -> void:
