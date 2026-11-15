@@ -690,10 +690,10 @@ jobs:
           if [[ -z "$BEFORE" || "$BEFORE" == 0000000000000000000000000000000000000000 ]]; then
             BEFORE=$(git rev-parse HEAD~1 2>/dev/null || echo "$GITHUB_SHA")
           fi
-          if git diff --name-only "$BEFORE" "$GITHUB_SHA" | grep -q '^auto-refactor/'; then
+          if git diff --name-only "$BEFORE" "$GITHUB_SHA" | grep -Eq '^(auto-refactor/|scripts/|\.agents/|\.github/workflows/)'; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::notice::auto-refactor/ 无变更 → 门禁空跑跳过。"
+            echo "::notice::auto-refactor/ 与共享治理脚本均无变更 → 门禁空跑跳过。"
             echo "run=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -747,10 +747,10 @@ jobs:
           if [[ -z "$BEFORE" || "$BEFORE" == 0000000000000000000000000000000000000000 ]]; then
             BEFORE=$(git rev-parse HEAD~1 2>/dev/null || echo "$GITHUB_SHA")
           fi
-          if git diff --name-only "$BEFORE" "$GITHUB_SHA" | grep -q '^fractal-git/'; then
+          if git diff --name-only "$BEFORE" "$GITHUB_SHA" | grep -Eq '^(fractal-git/|scripts/|\.agents/|\.github/workflows/)'; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::notice::fractal-git/ 无变更 → 门禁空跑跳过。"
+            echo "::notice::fractal-git/ 与共享治理脚本均无变更 → 门禁空跑跳过。"
             echo "run=false" >> "$GITHUB_OUTPUT"
           fi
 
