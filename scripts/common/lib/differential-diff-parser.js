@@ -65,27 +65,37 @@ function isMechanicalTrampoline(trimmed) {
 }
 
 /**
- * Updates block-comment tracker for trailing `/*` tokens outside quotes or `//` comments.
+ * Returns true if character begins a single, double, or template quote literal.
+ *
+ * @param {string} ch - Single source character.
+ * @returns {boolean} True when character is a quote delimiter.
+ */
+function isStringDelimiter(ch) {
+  return ch === '"' || ch === "'" || ch === '`';
+}
+
+/**
+ * Updates block-comment tracker for trailing block-open tokens outside quotes or line comments.
  *
  * @param {string} codeSlice - Trimmed code segment.
  * @param {{ inBlockComment: boolean, inDocComment: boolean }} state - Mutable block state.
  */
 function scanTrailingBlockComment(codeSlice, state) {
   let index = 0;
-  let inDoubleQuote = false;
+  let activeQuote = '';
   while (index < codeSlice.length) {
     const ch = codeSlice[index];
-    if (inDoubleQuote) {
+    if (activeQuote) {
       if (ch === '\\' && index + 1 < codeSlice.length) {
         index += 2;
         continue;
       }
-      if (ch === '"') inDoubleQuote = false;
+      if (ch === activeQuote) activeQuote = '';
       index += 1;
       continue;
     }
-    if (ch === '"') {
-      inDoubleQuote = true;
+    if (isStringDelimiter(ch)) {
+      activeQuote = ch;
       index += 1;
       continue;
     }
