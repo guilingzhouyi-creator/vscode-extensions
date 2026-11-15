@@ -102,7 +102,10 @@ const CROSS_CUTTING_SUITES: Array[String] = [
 	"res://tests/integration/pipelines/test_zero_mod_fail_closed_pipeline.gd",
 	"res://tests/integration/pipelines/test_plugin_mod_composition_and_isolation.gd",
 	"res://tests/integration/pipelines/test_real_frontend_gateway_workbench_prologue.gd",
-	"res://tests/integration/pipelines/test_world_mod_lock_reentry_and_drift.gd"
+	"res://tests/integration/pipelines/test_world_mod_lock_reentry_and_drift.gd",
+	"res://tests/integration/pipelines/test_real_ui_chain_and_lock_security_pipeline.gd",
+	"res://tests/integration/pipelines/test_mod_runtime_async_and_assets_pipeline.gd",
+	"res://tests/integration/pipelines/test_neutrality_sdk_and_gates_pipeline.gd"
 ]
 
 const ConfigRouterEngine = preload("res://backend/infrastructure/config_router_engine.gd")

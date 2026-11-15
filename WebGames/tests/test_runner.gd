@@ -90,7 +90,14 @@ func _run_suite_and_report(test_cls: Variant, failure_reports: Array[Dictionary]
 	return { "is_ok": all_ok, "passed": p_cnt, "total": t_cnt }
 
 ## 输出最终验收报告
-func _print_final_summary(passed_domains: int, total_domains: int, passed_assertions: int, total_assertions: int, failure_reports: Array[Dictionary]) -> void:
+func _print_final_summary(
+	passed_domains: int,
+	total_domains: int,
+	passed_assertions: int,
+	total_assertions: int,
+	failure_reports: Array[Dictionary],
+	initial_orphan_count: int = 0
+) -> void:
 	print("==============================================================================")
 	print("  📊 测试验收汇总报告 (DoD Verification Summary)")
 	print("==============================================================================")
@@ -103,17 +110,46 @@ func _print_final_summary(passed_domains: int, total_domains: int, passed_assert
 
 	NavManager.reset_instance()
 	UIBindingRegistry.reset_instance()
+	_reset_all_runtime_singletons()
+	var orphan_delta: int = maxi(0, int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)) - initial_orphan_count)
+	if orphan_delta > 0:
+		failure_reports.append({
+			"domain": "Runtime Leak Guard",
+			"test": "ObjectDB / Orphan Node 泄漏检测 (delta=%d)" % orphan_delta
+		})
 
 	if failure_reports.is_empty() and passed_domains == total_domains:
-		print("  🎉 恭喜！卡拉尔世界引擎全域 %d 套测试套件全量单元测试 100%% 验收通过！" % total_domains)
+		print("  🎉 恭喜！卡拉尔世界引擎全域 %d 套测试套件全量单元测试 100%% 验收通过！（孤立节点增量: %d）" % [total_domains, orphan_delta])
 		print("==============================================================================\n")
 		quit(0)
 	else:
-		print("  ⚠️  存在未通过测试项（共 %d 项未通过，失败套件数: %d）：" % [failure_reports.size(), total_domains - passed_domains])
+		print("  ⚠️  存在未通过测试项（共 %d 项未通过，失败套件数: %d，孤立节点增量: %d）：" % [failure_reports.size(), total_domains - passed_domains, orphan_delta])
 		for rep: Dictionary in failure_reports:
 			print("    ❌ [%s] %s" % [rep.get("domain", ""), rep.get("test", "")])
 		print("==============================================================================\n")
 		quit(1)
+
+## 对称释放全部前端与基础设施单例，避免 headless 退出期产生 ObjectDB / Node / RID 泄漏
+func _reset_all_runtime_singletons() -> void:
+	DialogManager.reset_instance()
+	DrawerManager.reset_instance()
+	ContextMenuManager.reset_instance()
+	TooltipManager.reset_instance()
+	ModalManager.reset_instance()
+	FocusInputManager.reset_instance()
+	RedDotTreeManager.reset_instance()
+	UIAudioBridge.reset_instance()
+	ThemeManager.reset_instance()
+	AppLifecycleFSM.reset_instance()
+	ServiceLocator.clear_active_gateway()
+	ServiceLocator.reset()
+	RealServiceContainer.reset_instance()
+	MockServiceContainer.reset_instance()
+	UIIntermediary.teardown_for_tests()
+	UITextResolver.reset_instance()
+	HudEventBridge.reset_for_tests()
+	CutsceneEventBridge.reset_for_tests()
+	GameBootstrap.teardown()
 
 ## 注意：必须重写 _initialize() 而非 _init()。
 ## _init() 是构造期，此时 SceneTree 尚未就绪，在其中调用 quit() 会导致进程
@@ -122,6 +158,7 @@ func _initialize() -> void:
 	# 全域启动装配（幂等）：GameConfig 就绪 + 物品注册表 + 内置 GM 命令，
 	# 测试运行器作为 CLI 运行时入口覆盖真实装配路径
 	GameBootstrap.assemble()
+	var initial_orphan_count: int = int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
 	var test_classes: Array = TestRegistryClass.get_all_engine_test_classes()
 	if test_classes == null or test_classes.is_empty():
 		printerr("❌ 致命错误：TestRegistry 未返回任何有效测试套件")
@@ -151,4 +188,4 @@ func _initialize() -> void:
 		passed_assertions += int(suite_stat.get("passed", 0))
 		total_assertions += int(suite_stat.get("total", 0))
 
-	_print_final_summary(passed_domains, total_domains, passed_assertions, total_assertions, failure_reports)
+	_print_final_summary(passed_domains, total_domains, passed_assertions, total_assertions, failure_reports, initial_orphan_count)

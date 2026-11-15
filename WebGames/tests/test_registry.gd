@@ -175,6 +175,12 @@ const TestPluginModCompositionAndIsolation = preload("res://tests/integration/pi
 const TestRealFrontendGatewayWorkbenchPrologue = preload("res://tests/integration/pipelines/test_real_frontend_gateway_workbench_prologue.gd")
 # Phase 130 世界档案 MOD 锁重入复原与漂移阻断验收流水线
 const TestWorldModLockReentryAndDrift = preload("res://tests/integration/pipelines/test_world_mod_lock_reentry_and_drift.gd")
+# Phase 131 全端真实可点击UI闭环与锁安全端到端验收流水线
+const TestRealUiChainAndLockSecurityPipeline = preload("res://tests/integration/pipelines/test_real_ui_chain_and_lock_security_pipeline.gd")
+# Phase 132 MOD运行时全消费链路、真异步 UI 与 .kmod 资产安全闭环验收流水线
+const TestModRuntimeAsyncAndAssetsPipeline = preload("res://tests/integration/pipelines/test_mod_runtime_async_and_assets_pipeline.gd")
+# Phase 133 全领域真实服务、基座去卡拉尔中性化、SDK强校验与门禁收口验收流水线
+const TestNeutralitySdkAndGatesPipeline = preload("res://tests/integration/pipelines/test_neutrality_sdk_and_gates_pipeline.gd")
 
 # 前端 17 大系统白模与表现层测试套件
 const TestFE01AccountEntry = preload("res://tests/unit/frontend/test_fe_01_account_entry.gd")
@@ -283,10 +289,13 @@ static func get_all_test_classes() -> Array:
 		TestZeroModFailClosedPipeline,
 		TestPluginModCompositionAndIsolation,
 		TestRealFrontendGatewayWorkbenchPrologue,
-		TestWorldModLockReentryAndDrift
+		TestWorldModLockReentryAndDrift,
+		TestRealUiChainAndLockSecurityPipeline,
+		TestModRuntimeAsyncAndAssetsPipeline,
+		TestNeutralitySdkAndGatesPipeline
 	]
 
-## 前端测试套件（17 大系统 + 6 前端基建与边界套件 = 23；全域 121 后端与横切 + 23 前端 = 144 套件）
+## 前端测试套件（17 大系统 + 6 前端基建与边界套件 = 23；全域 124 后端与横切 + 23 前端 = 147 套件）
 static func get_frontend_test_classes() -> Array:
 	return [
 		TestFE01AccountEntry, TestFE02MainHUD, TestFE03CharacterProgression,
@@ -300,7 +309,7 @@ static func get_frontend_test_classes() -> Array:
 		TestFrontendRobustness, TestFrontendErrorDomain
 	]
 
-## 全域测试套件（后端业务域 + 横切基础设施 + 前端 23 = 全域共 144 套件）
+## 全域测试套件（后端业务域 + 横切基础设施 + 前端 23 = 全域共 147 套件）
 static func get_all_engine_test_classes() -> Array:
 	var list := get_all_test_classes()
 	list.append_array(get_frontend_test_classes())
