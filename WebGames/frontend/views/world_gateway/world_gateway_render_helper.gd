@@ -130,7 +130,7 @@ static func render_worlds_list(host_view: Variant, select_world_callback: Callab
         var item_index: int = host_view.world_archive_list.add_item(line_text)
         host_view.world_archive_list.set_item_metadata(item_index, world_id)
         if world_id == host_view.selected_world_id:
-            host_view.world_archive_list.select(world_index)
+            host_view.world_archive_list.select(item_index)
     if host_view.saved_worlds.size() > 0 and host_view.selected_world_id.is_empty() and select_world_callback.is_valid():
         select_world_callback.call(0)
 
@@ -146,13 +146,13 @@ static func render_world_diagnostics(host_view: Variant) -> void:
     var locked_mods: Variant = host_view.last_world_diagnostics.get("locked_mods", [])
     var missing_mods: Variant = host_view.last_world_diagnostics.get("missing_mods", [])
     var mismatch_mods: Variant = host_view.last_world_diagnostics.get("digest_mismatches", [])
-    host_view.world_detail_rich_label.text = "World ID: %s\nLock Status: %s\nLocked Packs: %d | Missing: %d | Digest Mismatch: %d" % [
-        host_view.selected_world_id,
-        status_code,
-        locked_mods.size() if locked_mods is Array else 0,
-        missing_mods.size() if missing_mods is Array else 0,
-        mismatch_mods.size() if mismatch_mods is Array else 0,
-    ]
+    host_view.world_detail_rich_label.text = UIIntermediary.text("ui.wg.sp.diagnostics_summary", {
+        "world_id": host_view.selected_world_id,
+        "status": status_code,
+        "locked": locked_mods.size() if locked_mods is Array else 0,
+        "missing": missing_mods.size() if missing_mods is Array else 0,
+        "mismatch": mismatch_mods.size() if mismatch_mods is Array else 0
+    })
 
 
 ## 刷新联机界域列表控件条目
@@ -167,7 +167,10 @@ static func render_realms_list(host_view: Variant) -> void:
         var realm_name := str(realm_map.get("realm_name", realm_map.get("realm_id", "Realm")))
         var manifest: Variant = realm_map.get("realm_mod_manifest", [])
         var pack_count: int = manifest.size() if manifest is Array else 0
-        host_view.remote_realm_list.add_item("%s [MOD Packs: %d]" % [realm_name, pack_count])
+        host_view.remote_realm_list.add_item(UIIntermediary.text("ui.wg.mp.realm_entry_format", {
+            "name": realm_name,
+            "count": pack_count
+        }))
 
 
 ## 更新联机界域摘要校验证状态标签
