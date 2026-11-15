@@ -315,6 +315,7 @@ function validateCommitRange(range) {
       cwd: root,
       env,
       encoding: ENCODING_UTF8,
+      maxBuffer: 64 * 1024 * 1024,
       stdio: [STDIO_IGNORE, STDIO_PIPE, STDIO_IGNORE],
     });
   } catch (err) {
@@ -518,11 +519,114 @@ function reportCommitMsgFailure(res, target, isAgentMode) {
   process.exit(1);
 }
 
+/**
+ * Emit output and ledger updates when a commit passes under the corridor with style findings.
+ * @param {object} res - Validation result returned by validateSingleCommitMessage.
+ * @param {object} ctx - Output context containing targetFile, targetVerification, and isAgentMode.
+ */
+function reportCommitWithFindings(res, ctx) {
+  const { targetFile, targetVerification, isAgentMode } = ctx;
+  const { updateDebtLedger } = require(MODULE_DEBT_CORRIDOR);
+  const highIssues = res.styleFindings.filter((f) => f.isHighDebt);
+  updateDebtLedger({ newHighIssues: highIssues });
+
+  if (isAgentMode) {
+    // The summary must state which tier the findings occupy: medium-tier findings are permitted
+    // without ledger entry, so reporting them as high-risk debt would misdirect remediation.
+    const summaryText = highIssues.length > 0
+      ? `Commit message permitted under elastic corridor with ${highIssues.length} high-risk style debt items.`
+      : `Commit message permitted with ${res.styleFindings.length} medium-tier style findings; no debt recorded.`;
+    console.log(
+      JSON.stringify(
+        {
+          protocolVersion: PROTOCOL_VERSION,
+          status: STATUS_PASS,
+          warning: STATUS_WARN,
+          gate: GATE_COMMIT_MSG_RULES,
+          summary: summaryText,
+          debtCorridor: res.debtVerdict,
+          agentDirectives: {
+            ...(res.debtVerdict?.agentDirectives || {}),
+            targetFiles: targetFile ? [targetFile] : [],
+            verificationCommand: `pwsh -File scripts/ps1/commit-msg-gate.ps1 ${targetVerification}`,
+            fastRecheckCommand: `node scripts/common/validate-commit-msg.js ${targetVerification}`,
+          },
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+
+  if (highIssues.length > 0) {
+    console.log('  ⚠️ [DEBT-CORRIDOR] 提交信息包含弹性高危风格技术债 (已在弹性走廊配额内放行，已记入账本，后续提交请优先清偿):');
+    for (const h of highIssues) {
+      console.log(`     • [${h.ruleId}] 第 ${h.lineNum} 行: ${h.term} -> 推荐: ${h.guidance}`);
+    }
+    return;
+  }
+
+  // Medium-tier findings still permit the commit, but they are not corridor debt: the ledger
+  // records nothing and no paydown is owed.
+  console.log('  ⚠️ [STYLE-NOTICE] 提交信息命中中危风格项 (不记入技术债账本，无需清偿):');
+  for (const f of res.styleFindings) {
+    console.log(`     • [${f.ruleId}] 第 ${f.lineNum} 行: ${f.term} -> 推荐: ${f.guidance}`);
+  }
+}
+
+/**
+ * Emit output and optional debt settlement when a commit message has zero violations.
+ * @param {object} res - Validation result returned by validateSingleCommitMessage.
+ * @param {object} ctx - Output context containing targetFile, targetVerification, and isAgentMode.
+ */
+function reportCleanCommitPass(res, ctx) {
+  const { targetFile, targetVerification, isAgentMode } = ctx;
+  const commitType = res.guardrail?.parsedStructure?.type || '';
+  if (commitType === 'refactor' || commitType === 'fix') {
+    const { updateDebtLedger } = require(MODULE_DEBT_CORRIDOR);
+    updateDebtLedger({ isCleanCommit: true });
+  }
+
+  if (!isAgentMode) {
+    return;
+  }
+
+  console.log(
+    JSON.stringify(
+      {
+        protocolVersion: PROTOCOL_VERSION,
+        status: STATUS_PASS,
+        gate: GATE_COMMIT_MSG_RULES,
+        summary: SUMMARY_RULES_PASS,
+        debtCorridor: res.debtVerdict,
+        agentDirectives: {
+          targetFiles: targetFile ? [targetFile] : [],
+          remediationPriority: [],
+          verificationCommand: `pwsh -File scripts/ps1/commit-msg-gate.ps1 ${targetVerification}`,
+          fastRecheckCommand: `node scripts/common/validate-commit-msg.js ${targetVerification}`,
+          creditEnvelope: {
+            mode: 'NORMAL',
+            maxCredit: 2,
+            currentHighDebt: 0,
+            accumulatedHighDebt: 0,
+            remainingCredit: 2,
+            isFeatLocked: false,
+          },
+          actionableRemediations: [],
+          paydownInstructions: [],
+        },
+      },
+      null,
+      2
+    )
+  );
+}
+
 function handleSingleCommitValidation(target, content, isAgentMode, options = {}) {
   const targetFile = target && target !== STDIN_TOKEN ? target : '';
   const targetVerification = targetFile || '.git/COMMIT_EDITMSG';
   const res = validateSingleCommitMessage(content, { ...options, targetFile });
-  const commitType = res.guardrail?.parsedStructure?.type || '';
 
   // 1. Blocked: Critical failure or debt ceiling exhausted
   if (!res.isPermittedUnderCorridor) {
@@ -530,96 +634,16 @@ function handleSingleCommitValidation(target, content, isAgentMode, options = {}
     return;
   }
 
-  // 2. Permitted with findings: the ledger writer itself ignores empty batches, so medium-tier
-  //    findings cannot fabricate debt. Only high-tier findings are reported as corridor debt.
-  if (!res.valid) {
-    const { updateDebtLedger } = require(MODULE_DEBT_CORRIDOR);
-    const highIssues = res.styleFindings.filter((f) => f.isHighDebt);
-    updateDebtLedger({ newHighIssues: highIssues });
+  const outputCtx = { targetFile, targetVerification, isAgentMode };
 
-    if (isAgentMode) {
-      // The summary must state which tier the findings occupy: medium-tier findings are permitted
-      // without ledger entry, so reporting them as high-risk debt would misdirect remediation.
-      const summaryText = highIssues.length > 0
-        ? `Commit message permitted under elastic corridor with ${highIssues.length} high-risk style debt items.`
-        : `Commit message permitted with ${res.styleFindings.length} medium-tier style findings; no debt recorded.`;
-      console.log(
-        JSON.stringify(
-          {
-            protocolVersion: PROTOCOL_VERSION,
-            status: STATUS_PASS,
-            warning: STATUS_WARN,
-            gate: GATE_COMMIT_MSG_RULES,
-            summary: summaryText,
-            debtCorridor: res.debtVerdict,
-            agentDirectives: {
-              ...(res.debtVerdict?.agentDirectives || {}),
-              targetFiles: targetFile ? [targetFile] : [],
-              verificationCommand: `pwsh -File scripts/ps1/commit-msg-gate.ps1 ${targetVerification}`,
-              fastRecheckCommand: `node scripts/common/validate-commit-msg.js ${targetVerification}`,
-            },
-          },
-          null,
-          2
-        )
-      );
-    } else if (highIssues.length > 0) {
-      console.log('  ⚠️ [DEBT-CORRIDOR] 提交信息包含弹性高危风格技术债 (已在弹性走廊配额内放行，已记入账本，后续提交请优先清偿):');
-      for (const h of highIssues) {
-        console.log(`     • [${h.ruleId}] 第 ${h.lineNum} 行: ${h.term} -> 推荐: ${h.guidance}`);
-      }
-    } else {
-      // Medium-tier findings still permit the commit, but they are not corridor debt: the ledger
-      // records nothing and no paydown is owed. Rendering the high-debt banner here produced an
-      // empty bullet list that claimed debt while the ledger stayed empty.
-      console.log('  ⚠️ [STYLE-NOTICE] 提交信息命中中危风格项 (不记入技术债账本，无需清偿):');
-      for (const f of res.styleFindings) {
-        console.log(`     • [${f.ruleId}] 第 ${f.lineNum} 行: ${f.term} -> 推荐: ${f.guidance}`);
-      }
-    }
+  // 2. Permitted with findings (high debt logged, medium findings notice only)
+  if (!res.valid) {
+    reportCommitWithFindings(res, outputCtx);
     process.exit(0);
   }
 
-  // 3. Fully Clean Pass: Zero violations. If refactor/fix, settle previous debt!
-  if (commitType === 'refactor' || commitType === 'fix') {
-    const { updateDebtLedger } = require(MODULE_DEBT_CORRIDOR);
-    updateDebtLedger({ isCleanCommit: true });
-  }
-
-  if (isAgentMode) {
-    console.log(
-      JSON.stringify(
-        {
-          protocolVersion: PROTOCOL_VERSION,
-          status: STATUS_PASS,
-          gate: GATE_COMMIT_MSG_RULES,
-          summary: SUMMARY_RULES_PASS,
-          debtCorridor: res.debtVerdict,
-          agentDirectives: {
-            targetFiles: targetFile ? [targetFile] : [],
-            remediationPriority: [],
-            verificationCommand: `pwsh -File scripts/ps1/commit-msg-gate.ps1 ${targetVerification}`,
-            fastRecheckCommand: `node scripts/common/validate-commit-msg.js ${targetVerification}`,
-            creditEnvelope: {
-              mode: 'NORMAL',
-              maxCredit: 2,
-              currentHighDebt: 0,
-              accumulatedHighDebt: 0,
-              remainingCredit: 2,
-              isFeatLocked: false,
-            },
-            actionableRemediations: [],
-            paydownInstructions: [],
-          },
-        },
-        null,
-        2
-      )
-    );
-  } else {
-    
-    
-  }
+  // 3. Fully Clean Pass: Zero violations
+  reportCleanCommitPass(res, outputCtx);
   process.exit(0);
 }
 

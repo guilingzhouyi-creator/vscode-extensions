@@ -64,6 +64,7 @@ function runGit(args, cwd) {
   const result = spawnSync(GIT_COMMAND, args, {
     cwd,
     encoding: ENCODING_UTF8,
+    maxBuffer: 64 * 1024 * 1024,
     stdio: STDIO_CAPTURED,
     windowsHide: true,
   });

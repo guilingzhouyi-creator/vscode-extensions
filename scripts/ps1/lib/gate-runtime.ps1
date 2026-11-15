@@ -32,6 +32,7 @@ $script:GateStepIndex = @{}
 $script:GateStepTotal = @{}
 $script:GateStartTime = [System.Diagnostics.Stopwatch]::StartNew()
 $script:GateStepOutcomes = [System.Collections.Generic.List[hashtable]]::new()
+$script:GateFailures = [System.Collections.Generic.List[hashtable]]::new()
 
 # Agent 与 JSON 模式承诺在标准输出给出单一机器可读文档，
 # 任何人类可读行都会破坏该文档，故宿主输出统一受此开关抑制。
@@ -211,6 +212,40 @@ function Write-StepBanner {
     Write-GateHost "▶ [$($meta.Ordinal)/$(Get-StepTotal -EntryId $EntryId)] $($meta.Id)  $($meta.Title)" -ForegroundColor Gray
 }
 
+function Register-GateFailure {
+    [CmdletBinding()]
+    param(
+        [string]$EntryId = $script:GateEntryId,
+        [Parameter(Mandatory = $true)][string]$StepId,
+        [string]$Command = "",
+        [int]$ExitCode = 1,
+        [string]$Summary = "",
+        [string[]]$TargetFiles = @()
+    )
+    $meta = Resolve-StepMeta -EntryId $EntryId -StepId $StepId
+    $resolvedSummary = if ($Summary) { $Summary } else { "Step $($meta.Id) ($($meta.Title)) failed with exit code $ExitCode" }
+    $record = @{
+        stepId = $meta.Id
+        stepName = $meta.Title
+        ruleId = $meta.Rule
+        exitCode = $ExitCode
+        command = $Command
+        verificationCommand = $Command
+        summary = $resolvedSummary
+        targetFiles = @($TargetFiles)
+    }
+    if ($null -eq $script:GateFailures) {
+        $script:GateFailures = [System.Collections.Generic.List[hashtable]]::new()
+    }
+    for ($i = 0; $i -lt $script:GateFailures.Count; $i++) {
+        if ($script:GateFailures[$i].stepId -eq $meta.Id) {
+            $script:GateFailures[$i] = $record
+            return
+        }
+    }
+    $script:GateFailures.Add($record)
+}
+
 function Write-StepVerdict {
     [CmdletBinding()]
     param(
@@ -227,6 +262,20 @@ function Write-StepVerdict {
             RuleId = $meta.Rule
             Detail = $Detail
         })
+    }
+    if ($Status -eq 'BLOCK') {
+        $alreadyRegistered = $false
+        if ($null -ne $script:GateFailures) {
+            foreach ($f in $script:GateFailures) {
+                if ($f.stepId -eq $meta.Id) {
+                    $alreadyRegistered = $true
+                    break
+                }
+            }
+        }
+        if (-not $alreadyRegistered) {
+            Register-GateFailure -EntryId $EntryId -StepId $StepId -Summary $Detail -ExitCode 1
+        }
     }
     # 四态投影（一体两面）：协议层状态词恒为 PASS/BLOCK/SKIP/WARN，调用点入参不得改写；
     # 呈现层只在 PASS 时隐去大写词，因为绿色勾号已完整表达「通过」，
@@ -371,6 +420,14 @@ function Complete-GateTelemetry {
             }
         }
 
+        $resolvedFailures = if ($Failures -and $Failures.Count -gt 0) {
+            @($Failures)
+        } elseif ($null -ne $script:GateFailures -and $script:GateFailures.Count -gt 0) {
+            @($script:GateFailures.ToArray())
+        } else {
+            @()
+        }
+
         $payload = [ordered]@{
             gate = $Gate
             status = $Status
@@ -382,7 +439,7 @@ function Complete-GateTelemetry {
                 failed = @($failed)
                 skipped = @($skipped)
             }
-            failures = @($Failures)
+            failures = $resolvedFailures
             rawLogOutput = $RawLogOutput
         }
 

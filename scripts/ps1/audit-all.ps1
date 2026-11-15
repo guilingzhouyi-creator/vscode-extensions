@@ -92,6 +92,7 @@ $logChainsOut = Join-Path $transientDir "audit-check-chainsout-$randSuffix.out.l
 $logCountsOut = Join-Path $transientDir "audit-check-countsout-$randSuffix.out.log"
 $logParityOut = Join-Path $transientDir "audit-check-parityout-$randSuffix.out.log"
 $logGateProofOut = Join-Path $transientDir "audit-check-gateproof-$randSuffix.out.log"
+$logGateProofErr = Join-Path $transientDir "audit-check-gateproof-$randSuffix.err.log"
 $logDocMetricsOut = Join-Path $transientDir "audit-check-docmetrics-$randSuffix.out.log"
 $logCatalogOut = Join-Path $transientDir "audit-check-catalogout-$randSuffix.out.log"
 
@@ -154,7 +155,13 @@ $resChains = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/vali
 $resCounts = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-hardcoded-counts.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logCountsOut -NoNewWindow -PassThru -Wait
 $resParity = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-shell-parity.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logParityOut -NoNewWindow -PassThru -Wait
 # 守卫自证：全量审查若从不运行反向探针，「36 个守卫全部 PASS」与「36 个守卫全是死代码」不可区分。
-$resGateProof = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/test-gate-guards.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logGateProofOut -NoNewWindow -PassThru -Wait
+# 探针会主动构造非法权重样本触发 stderr 告警，必须重定向标准错误避免污染审查终端输出。
+$resGateProof = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/test-gate-guards.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logGateProofOut -RedirectStandardError $logGateProofErr -NoNewWindow -PassThru -Wait
+if ($resGateProof.ExitCode -ne 0 -and (Test-Path $logGateProofErr)) {
+    $gateProofErr = Get-Content -Path $logGateProofErr -Raw -ErrorAction SilentlyContinue
+    if ($gateProofErr) { Add-Content -Path $logGateProofOut -Value "`n$gateProofErr" -ErrorAction SilentlyContinue }
+}
+Remove-Item -Path $logGateProofErr -Force -ErrorAction SilentlyContinue
 # 文档数字：审查必须自己校验 METRICS 区域，否则数字漂移只能靠推送门禁兜底。
 $resDocMetrics = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/sync-doc-metrics.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logDocMetricsOut -NoNewWindow -PassThru -Wait
 $codeCatalog = $res.ExitCode
@@ -880,6 +887,7 @@ try {
 } catch {
     # 留痕失败不阻断门禁主流程
 }
+
 
 
 

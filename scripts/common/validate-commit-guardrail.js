@@ -291,10 +291,15 @@ function testZeroPOVGuardrail() {
   assert.ok(enFindings.length >= 1, 'Must detect English first-person pronoun');
   assert.strictEqual(enFindings[0].ruleId, 'CMG-STY-008');
 
-  // 3. Inline code masking should prevent false positives on code variables (e.g. `let i = 0`, `us`)
-  const codeLine = '循环索引变量 `i` 在计数器中递增，单位 `us` 表示微秒。';
-  const codeFindings = checkZeroPOV(codeLine, 15);
-  assert.strictEqual(codeFindings.length, 0, 'Tokens inside code backticks must not trigger zero-POV violation');
+  // 3. Inline backticks must NOT mask first-person pronouns so evasion via `we`/`us` is blocked (CMG-STY-008)
+  const evasionLine = '在行内代码中包裹 `we` 与 `us` 不能逃避客观视角检查，但自我与自举仍受词素豁免。';
+  const evasionFindings = checkZeroPOV(evasionLine, 15);
+  assert.ok(evasionFindings.length >= 1, 'First-person pronouns inside inline backticks must still trigger CMG-STY-008');
+  assert.strictEqual(evasionFindings[0].ruleId, 'CMG-STY-008');
+
+  const objectiveLine = '循环索引变量 idx 在计数器中递增，单位微秒用于度量延迟。';
+  const objectiveFindings = checkZeroPOV(objectiveLine, 16);
+  assert.strictEqual(objectiveFindings.length, 0, 'Objective technical phrasing must not trigger zero-POV violation');
 }
 
 /**

@@ -133,6 +133,27 @@ function runTests() {
     assert('last-failure.json matches AgentFailureEnvelope contract', failureDoc.gate === 'pre-push' && failureDoc.status === 'BLOCK');
     assert('Failure envelope records correct rule and remediation', failureDoc.violations[0].ruleId === 'GUARD-SSOT-001');
 
+    // Test 2b: Fallback stepId derivation when failures array is empty
+    const sparseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-telemetry-sparse-'));
+    try {
+      const sparseBlockPayload = {
+        gate: 'pre-push',
+        status: 'BLOCK',
+        durationMs: 120,
+        filesCount: 1,
+        stepsSummary: { total: 1, passed: [], failed: ['COMMIT-CONTRACT-20'], skipped: [] },
+        failures: [],
+      };
+      assert('recordGateTelemetry succeeds for sparse BLOCK payload', recordGateTelemetry(sparseBlockPayload, sparseDir) === true);
+      const sparseFailureDoc = JSON.parse(fs.readFileSync(path.join(sparseDir, 'last-failure.json'), 'utf8'));
+      assert(
+        'Sparse failure envelope uses failed step id instead of unknown-step',
+        sparseFailureDoc.stepId === 'COMMIT-CONTRACT-20' && sparseFailureDoc.step === 'COMMIT-CONTRACT-20',
+      );
+    } finally {
+      cleanTempDir(sparseDir);
+    }
+
     // Test 3: History ledger entries and reading
     const preCommitHistory = readGateHistoryLedger('pre-commit', tempDir);
     assert('readGateHistoryLedger returns recorded pre-commit run', preCommitHistory.length === 1 && preCommitHistory[0].gate === 'pre-commit');

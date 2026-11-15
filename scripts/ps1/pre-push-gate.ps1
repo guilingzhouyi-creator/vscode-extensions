@@ -131,6 +131,10 @@ function Invoke-GateStep {
                 }
             }
         }
+        $cmdStr = "$FilePath $($ArgumentList -join ' ')"
+        Register-GateFailure -StepId $StepId -Command $cmdStr -ExitCode $p.ExitCode `
+            -Summary "Step $($meta.Id) ($($meta.Title)) failed with exit code $($p.ExitCode)" `
+            -TargetFiles @($WorkingDirectory)
         Write-StepVerdict -StepId $StepId -Status "BLOCK" -Detail "退出码 $($p.ExitCode)"
         # 保留现场快照与 Agent-Native Envelope
         try {
@@ -138,7 +142,6 @@ function Invoke-GateStep {
             Copy-Item -Path $stepLog -Destination $lastLog -Force -ErrorAction SilentlyContinue
             Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/log-rotator.js", "--truncate", $lastLog -WorkingDirectory $repoRoot -NoNewWindow -Wait -ErrorAction SilentlyContinue
 
-            $cmdStr = "$FilePath $($ArgumentList -join ' ')"
             $violation = [ordered]@{
                 ruleId = $meta.Rule
                 severity = "BLOCK"
@@ -332,6 +335,7 @@ if ($isStaggered) {
     Write-StepVerdict -StepId "ENGINE-COMMENTS-44" -Status "SKIP" -Detail "错峰历史推进跳过工作区注释契约"
     Write-StepVerdict -StepId "ENGINE-REDUNDANCY-45" -Status "SKIP" -Detail "错峰历史推进跳过工作区冗余治理"
 } else {
+
 if ($runAll) {
     Write-GateHost "ℹ️  检测到跨项目/共享治理改动或全量基准，执行全量门禁回归" -ForegroundColor Yellow
 } else {
@@ -626,6 +630,9 @@ if ($runAr) {
 $changedCount = if ($changedFiles) { $changedFiles.Count } else { 0 }
 if ($Agent) {
     if ($failed) {
+        $failLog = Join-Path $repoRoot ".audit-logs/last-pre-push.log"
+        $rawLog = if (Test-Path $failLog) { Get-Content -Path $failLog -Raw -ErrorAction SilentlyContinue } else { "" }
+        Complete-GateTelemetry -Gate "pre-push" -Status "BLOCK" -FilesCount $changedCount -RawLogOutput $rawLog
         $lastFailurePath = Join-Path $repoRoot ".audit-logs/last-failure.json"
         if (Test-Path $lastFailurePath) {
             Get-Content $lastFailurePath -Raw

@@ -200,10 +200,11 @@ function buildGateDiagnosticLog(payload) {
 function buildAgentFailureEnvelope(payload) {
   const gate = payload.gate;
   const primaryFailure = (payload.failures && payload.failures[0]) || {};
-  const stepId = primaryFailure.stepId || `${gate}-unknown-step`;
+  const fallbackStepId = (payload.failedSteps && payload.failedSteps[0]) || `${gate}-unknown-step`;
+  const stepId = primaryFailure.stepId || fallbackStepId;
   const ruleId = primaryFailure.ruleId || 'GUARD-SYS-001';
   const failedCommand = primaryFailure.command || primaryFailure.verificationCommand || '';
-  const summary = primaryFailure.summary || `${gate} gate check encountered violations.`;
+  const summary = primaryFailure.summary || `${gate} gate check encountered violations (${stepId}).`;
   const exitCode = Number.isInteger(primaryFailure.exitCode) ? primaryFailure.exitCode : 1;
   const targetFiles = Array.isArray(primaryFailure.targetFiles) ? primaryFailure.targetFiles : [];
 

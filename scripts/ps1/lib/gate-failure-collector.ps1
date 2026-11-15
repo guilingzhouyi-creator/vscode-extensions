@@ -74,9 +74,12 @@ function Save-AuditStepFailure {
     $lines = @($rawSplit | Where-Object { $_.Trim().Length -gt 0 })
     $meaningfulLines = @($lines | Where-Object {
         $t = $_.Trim()
-        $t -ne "}" -and $t -ne "{" -and $t -ne "]" -and $t -ne "[" -and $t -ne "}," -and $t -ne "],"
+        $t -ne "}" -and $t -ne "{" -and $t -ne "]" -and $t -ne "[" -and $t -ne "}," -and $t -ne "]," -and ($t -notmatch '^Node\.js v\d+')
     })
-    $errorSummary = if ($meaningfulLines.Count -gt 0) { $meaningfulLines[-1].Trim() } elseif ($lines.Count -gt 0) { $lines[-1].Trim() } else { "命令执行返回非零退出码 ($ExitCode)" }
+    $diagnosticLines = @($meaningfulLines | Where-Object {
+        $_.Trim() -match '(^|[ \t])(✖|❌|AssertionError|Error:|FAIL|FAILED|BLOCK\b|mismatch)'
+    })
+    $errorSummary = if ($diagnosticLines.Count -gt 0) { $diagnosticLines[-1].Trim() } elseif ($meaningfulLines.Count -gt 0) { $meaningfulLines[-1].Trim() } elseif ($lines.Count -gt 0) { $lines[-1].Trim() } else { "命令执行返回非零退出码 ($ExitCode)" }
     $tailLines = if ($lines.Count -gt 30) { @($lines[-30..-1]) } else { $lines }
     $stackSnippet = ($tailLines -join "`n")
 

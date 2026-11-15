@@ -944,6 +944,16 @@ if ($touchedAuditable.Count -gt 0) {
 }
 
 if ($Agent) {
+    if ($failed) {
+        $failLog = Join-Path $repoRoot ".audit-logs/last-pre-commit.log"
+        $rawLog = if (Test-Path $failLog) { Get-Content -Path $failLog -Raw -ErrorAction SilentlyContinue } else { "" }
+        Complete-GateTelemetry -Gate "pre-commit" -Status "BLOCK" -FilesCount $stagedFiles.Count -RawLogOutput $rawLog
+        $lastFailurePath = Join-Path $repoRoot ".audit-logs/last-failure.json"
+        if (Test-Path $lastFailurePath) {
+            Get-Content $lastFailurePath -Raw
+        }
+        exit 1
+    }
     Complete-GateTelemetry -Gate "pre-commit" -Status "PASS" -FilesCount $stagedFiles.Count
     Write-Output '{"protocolVersion":"1.0.0","status":"PASS","gate":"pre-commit","summary":"All pre-commit hygiene and quality gates passed."}'
     exit 0

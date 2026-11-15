@@ -118,7 +118,7 @@ function extractDebtDeltas(historyPath, windowSize = DEFAULT_SLIDING_WINDOW) {
         }
     }
     if (transitionCount === 0) {
-        return { yieldMinutes: undefined, accrualMinutes: undefined };
+        return { yieldMinutes: 0, accrualMinutes: 0 };
     }
     return { yieldMinutes: totalYield, accrualMinutes: totalAccrual };
 }
