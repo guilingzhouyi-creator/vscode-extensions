@@ -47,20 +47,15 @@ static func bootstrap(app_root: AppRoot) -> void:
 		return
 	_is_bootstrapped = true
 
-	# 3. 初始化服务容器并驱动应用生命周期状态机（版本握手 → 鉴权入口）
+	# 3. 初始化服务容器并驱动应用生命周期状态机（版本握手确认后再推入鉴权入口）
 	var services := ServiceLocator.get_instance()
-	_drive_lifecycle_boot(services)
-
-	# 4. 应用全局主题
 	var theme_manager := ThemeManager.get_instance()
 	if app_root != null:
 		app_root.theme = theme_manager.theme
+	_drive_lifecycle_boot(services, navigation_manager)
 
-	# 5. 推入默认入口视图（账号入口）
-	navigation_manager.push_screen("account_entry")
-
-## 启动态推进：BOOT → INITIALIZING →（版本握手）→ AUTHENTICATING
-static func _drive_lifecycle_boot(services: ServiceContainer) -> void:
+## 启动态推进：BOOT → INITIALIZING →（版本握手回调确认）→ AUTHENTICATING + 推入默认入口视图
+static func _drive_lifecycle_boot(services: ServiceContainer, navigation_manager: NavManager = null) -> void:
 	var lifecycle := AppLifecycleFSM.get_instance()
 	lifecycle.transition_to(AppLifecycleFSM.AppState.INITIALIZING)
 	var version_service: Variant = services.version()
@@ -70,6 +65,8 @@ static func _drive_lifecycle_boot(services: ServiceContainer) -> void:
 	version_service.check_version_async(func(version_response: Dictionary) -> void:
 		if bool(version_response.get("compatible", false)):
 			lifecycle.transition_to(AppLifecycleFSM.AppState.AUTHENTICATING)
+			if navigation_manager != null:
+				navigation_manager.push_screen("account_entry")
 		else:
 			lifecycle.transition_to(AppLifecycleFSM.AppState.ERROR)
 	)

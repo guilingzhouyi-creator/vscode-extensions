@@ -19,6 +19,13 @@ static func get_instance() -> RedDotTreeManager:
 		_instance = RedDotTreeManager.new()
 	return _instance
 
+## 重置树状红点管理器静态单例并清空节点计数字典
+static func reset_instance() -> void:
+	if _instance != null:
+		_instance._leaf_counts.clear()
+		_instance._counts.clear()
+	_instance = null
+
 # 存储各节点的计数值: path -> int
 var _counts: Dictionary = {}
 # 存储叶子节点的计数值: leaf_path -> int

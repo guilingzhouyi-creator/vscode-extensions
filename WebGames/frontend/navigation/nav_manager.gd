@@ -33,6 +33,8 @@ static func reset_instance() -> void:
 		_instance._current_screen = null
 		_instance._scene_cache.clear()
 		_instance._screen_stack.clear()
+		_instance._screen_parameter_stack.clear()
+		_instance._current_screen_parameters.clear()
 		_instance._screen_registry.clear()
 		_instance._app_root = null
 		_instance.free()
@@ -40,6 +42,8 @@ static func reset_instance() -> void:
 
 var _app_root: AppRoot
 var _screen_stack: Array[String] = []
+var _screen_parameter_stack: Array[Dictionary] = []
+var _current_screen_parameters: Dictionary = {}
 var _current_screen: Control = null
 var _screen_registry: Dictionary = {}
 var _scene_cache: Dictionary = {}
@@ -57,11 +61,12 @@ const TRANSITION_DURATION: float = 0.25
 const LOG_LEVEL_WARN: String = "warn"
 const METHOD_ON_SCREEN_EXIT: String = "on_screen_exit"
 
-## 默认注册 20 个功能视图（注释计数与实现对齐）
+## 默认注册 21 个功能视图（注释计数与实现对齐）
 func _init_default_registry() -> void:
 	register_screen("account_entry", "res://frontend/views/account_entry/account_entry_view.tscn")
 	register_screen("world_gateway", "res://frontend/views/world_gateway/world_gateway_view.tscn")
 	register_screen("mod_workbench", "res://frontend/views/mod_workbench/mod_workbench_screen.tscn")
+	register_screen("character_creation", "res://frontend/views/character_creation/character_creation_view.tscn")
 	register_screen("prologue", "res://frontend/views/prologue/prologue_view.tscn")
 	register_screen("main_hud", "res://frontend/views/main_hud/main_hud_view.tscn")
 	register_screen("character_progression", "res://frontend/views/character_progression/character_progression_view.tscn")
@@ -105,23 +110,31 @@ func replace_screen(screen_id: String, navigation_parameters: Dictionary = {}, t
 	# 仅跳转成功且存在被替换项时才抹去旧栈顶，确保失败路径栈长度不变
 	if mounted_screen != null and previous_depth > 0:
 		_screen_stack.remove_at(previous_depth - 1)
+		if previous_depth - 1 < _screen_parameter_stack.size():
+			_screen_parameter_stack.remove_at(previous_depth - 1)
 	return mounted_screen
 
-## 弹出并返回上一 Screen（默认 SLIDE_RIGHT 回退动效）
+## 弹出并返回上一 Screen（默认 SLIDE_RIGHT 回退动效，携带历史入栈上下文参数）
 func pop_screen(transition_type: int = NavTypes.TransitionType.SLIDE_RIGHT) -> Control:
 	if _screen_stack.size() <= 1:
 		EventBusCore.get_instance().emit_log(LOG_LEVEL_WARN, "NavManager: already at stack bottom, cannot pop")
 		return null
-	var previous_screen_id: String = _screen_stack[_screen_stack.size() - 2]
-	var mounted_screen := _navigate_to(previous_screen_id, {}, false, transition_type)
+	var previous_index := _screen_stack.size() - 2
+	var previous_screen_id: String = _screen_stack[previous_index]
+	var previous_parameters: Dictionary = _screen_parameter_stack[previous_index].duplicate(true) if previous_index < _screen_parameter_stack.size() else {}
+	var mounted_screen := _navigate_to(previous_screen_id, previous_parameters, false, transition_type)
 	# 目标解析与跳转成功后才真正出栈，避免失败时误回退栈深
 	if mounted_screen != null:
 		_screen_stack.pop_back()
+		if _screen_parameter_stack.size() > _screen_stack.size():
+			_screen_parameter_stack.pop_back()
 	return mounted_screen
 
 ## 重置导航历史栈并跳转至指定根界面（用于退回账号首页/世界网关清栈）
 func pop_to_root(root_screen_id: String = "account_entry", navigation_parameters: Dictionary = {}, transition_type: int = NavTypes.TransitionType.NONE) -> Control:
 	_screen_stack.clear()
+	_screen_parameter_stack.clear()
+	_current_screen_parameters.clear()
 	return _navigate_to(root_screen_id, navigation_parameters, true, transition_type)
 
 ## 清理当前已压栈的屏幕与历史栈（用于停机销毁对称回收）
@@ -134,14 +147,16 @@ func clear_stack() -> void:
 	_exit_and_free_screen(_current_screen)
 	_current_screen = null
 	_screen_stack.clear()
+	_screen_parameter_stack.clear()
+	_current_screen_parameters.clear()
 
-## 查询全链路前端视图路由键表（已注册 world_gateway/prologue/mod_workbench 并保留兼容键）
+## 查询全链路前端视图路由键表（已注册 world_gateway/prologue/mod_workbench/character_creation 并保留兼容键）
 static func get_reserved_chain_routes() -> Dictionary:
 	return {
 		"account_home": "account_entry",
 		"world_gateway": "res://frontend/views/world_gateway/world_gateway_view.tscn",
 		"mod_workbench": "res://frontend/views/mod_workbench/mod_workbench_screen.tscn",
-		"character_creation": "account_entry",
+		"character_creation": "res://frontend/views/character_creation/character_creation_view.tscn",
 		"prologue_story": "res://frontend/views/prologue/prologue_view.tscn",
 		"main_hud": "account_entry -> world_gateway -> prologue -> main_hud",
 		"esc_menu": "reserved:esc_menu_modal"
@@ -189,6 +204,8 @@ func _navigate_to(screen_id: String, navigation_parameters: Dictionary, should_r
 		return null
 
 	var old_screen := _current_screen
+	if should_record_history and old_screen != null and not _screen_parameter_stack.is_empty():
+		_screen_parameter_stack[_screen_parameter_stack.size() - 1] = _merge_live_screen_context(_screen_parameter_stack[_screen_parameter_stack.size() - 1], old_screen)
 
 	# 3. 挂载新屏（旧屏暂保留，转场结束后释放；无头同步初始化期显式触发 NOTIFICATION_READY 绑定 @onready）
 	_current_screen = screen_instance
@@ -202,14 +219,38 @@ func _navigate_to(screen_id: String, navigation_parameters: Dictionary, should_r
 	else:
 		_play_transition(old_screen, screen_instance, transition_type)
 
-	# 4. 挂载成功后才写栈，保证栈与场景树恒自洽
+	# 4. 挂载成功后才写栈与参数快照，保证栈与场景树恒自洽
+	_current_screen_parameters = navigation_parameters.duplicate(true)
 	if should_record_history:
 		_screen_stack.append(screen_id)
+		_screen_parameter_stack.append(navigation_parameters.duplicate(true))
 
 	if screen_instance.has_method("on_screen_enter"):
 		screen_instance.call("on_screen_enter", navigation_parameters)
 
 	return screen_instance
+
+## 从即将退栈保留历史节点的当前视图捕获实时上下文（如账号凭证与选中的世界档案）
+func _merge_live_screen_context(base_parameters: Dictionary, screen_node: Control) -> Dictionary:
+	var merged: Dictionary = base_parameters.duplicate(true)
+	if screen_node == null or not is_instance_valid(screen_node):
+		return merged
+	var property_bindings: Dictionary = {
+		"current_account_id": "account_id",
+		"current_session_token": "token",
+		"selected_world_id": "world_id",
+		"current_world_id": "world_id",
+		"current_slot_id": "slot_id",
+		"selected_character_slot": "slot_id",
+		"current_gateway_mode": "gateway_mode"
+	}
+	for prop_name in property_bindings.keys():
+		if prop_name in screen_node:
+			var property_value: Variant = screen_node.get(prop_name)
+			if property_value is String and (property_value as String).is_empty():
+				continue
+			merged[property_bindings[prop_name]] = property_value
+	return merged
 
 ## 统一触发屏幕退出钩子并安全释放
 func _exit_and_free_screen(screen: Control) -> void:

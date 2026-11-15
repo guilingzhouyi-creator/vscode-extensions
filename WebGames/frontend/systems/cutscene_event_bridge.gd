@@ -130,11 +130,12 @@ func _disconnect_active_view() -> void:
 			player_view.skip_requested.disconnect(_on_view_skip_requested)
 
 func _cleanup_dynamic_view() -> void:
-	if _dynamic_view != null:
-		if _dynamic_view.get_parent() != null:
-			_dynamic_view.get_parent().remove_child(_dynamic_view)
-		_dynamic_view.queue_free()
-		_dynamic_view = null
+	if _dynamic_view != null and is_instance_valid(_dynamic_view):
+		var parent_node := _dynamic_view.get_parent()
+		if parent_node != null:
+			parent_node.remove_child(_dynamic_view)
+		_dynamic_view.free()
+	_dynamic_view = null
 
 # ==============================================================================
 # 三、EventBus 订阅与事件分发消费

@@ -23,6 +23,18 @@ static func get_instance() -> TooltipManager:
 		_instance.name = "TooltipManager"
 	return _instance
 
+## 重置悬浮提示管理器静态单例并同步释放气泡面板节点
+static func reset_instance() -> void:
+	if _instance != null and is_instance_valid(_instance):
+		ModalManager.detach_and_free_node(_instance._bubble_panel)
+		_instance._bubble_panel = null
+		_instance._text_label = null
+		_instance._tooltip_container = null
+		_instance._target_layer = null
+		_instance._is_visible = false
+		ModalManager.detach_and_free_node(_instance)
+	_instance = null
+
 var _target_layer: CanvasLayer
 var _tooltip_container: Control
 var _bubble_panel: PanelContainer

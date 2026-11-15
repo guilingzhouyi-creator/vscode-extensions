@@ -25,6 +25,12 @@ static func get_instance() -> DialogManager:
 		_instance.name = "DialogManager"
 	return _instance
 
+## 重置系统对话框管理器静态单例并释放共享面板样式缓存
+static func reset_instance() -> void:
+	_shared_panel_style = null
+	ModalManager.detach_and_free_node(_instance)
+	_instance = null
+
 func _add_modal_button(
 	dialog_panel: Control,
 	button_box: HBoxContainer,

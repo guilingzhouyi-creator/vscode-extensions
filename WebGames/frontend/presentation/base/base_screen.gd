@@ -47,6 +47,10 @@ func try_consume_action_cooldown(action_key: String, cooldown_milliseconds: int 
 	_action_cooldown_milliseconds[action_key] = current_milliseconds
 	return true
 
+## 检查当前视图节点是否已挂载至场景树或父级导航宿主容器内
+func is_mounted_in_tree() -> bool:
+	return is_inside_tree() or get_parent() != null
+
 ## 安全断开由本视图登记的全部托管信号连接（幂等、防已释放对象悬空）
 func disconnect_managed_signals() -> void:
 	for connection_entry in _managed_connections:

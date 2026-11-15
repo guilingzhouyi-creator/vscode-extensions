@@ -23,6 +23,20 @@ static func get_instance() -> ContextMenuManager:
 		_instance.name = "ContextMenuManager"
 	return _instance
 
+## 重置上下文菜单管理器静态单例并释放共享样式与缓存节点
+static func reset_instance() -> void:
+	_shared_menu_style = null
+	if _instance != null and is_instance_valid(_instance):
+		ModalManager.detach_and_free_node(_instance._menu_panel)
+		ModalManager.detach_and_free_node(_instance._dismiss_catcher)
+		_instance._menu_panel = null
+		_instance._menu_list = null
+		_instance._dismiss_catcher = null
+		_instance._menu_container = null
+		_instance._target_layer = null
+		ModalManager.detach_and_free_node(_instance)
+	_instance = null
+
 var _target_layer: CanvasLayer
 var _menu_container: Control
 var _menu_panel: PanelContainer

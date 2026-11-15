@@ -17,6 +17,13 @@ static func get_instance() -> FocusInputManager:
 		_instance = FocusInputManager.new()
 	return _instance
 
+## 重置焦点输入管理器静态单例并清空历史焦点栈
+static func reset_instance() -> void:
+	if _instance != null:
+		_instance._focus_history.clear()
+		_instance._active_traps.clear()
+	_instance = null
+
 var _focus_history: Array[Control] = []
 var _active_traps: Array[Control] = []
 

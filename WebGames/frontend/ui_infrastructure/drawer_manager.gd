@@ -30,6 +30,18 @@ static func get_instance() -> DrawerManager:
 		_instance.name = "DrawerManager"
 	return _instance
 
+## 重置抽屉管理器静态单例并同步释放持有的抽屉与遮罩节点
+static func reset_instance() -> void:
+	if _instance != null and is_instance_valid(_instance):
+		ModalManager.detach_and_free_node(_instance._active_drawer)
+		_instance._active_drawer = null
+		ModalManager.detach_and_free_node(_instance._backdrop)
+		_instance._backdrop = null
+		_instance._drawer_container = null
+		_instance._target_layer = null
+		ModalManager.detach_and_free_node(_instance)
+	_instance = null
+
 var _target_layer: CanvasLayer
 var _drawer_container: Control
 var _active_drawer: Control

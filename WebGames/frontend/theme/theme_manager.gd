@@ -20,6 +20,13 @@ static func get_instance() -> ThemeManager:
 		_instance._init_theme()
 	return _instance
 
+## 重置主题管理器静态单例并释放 Theme 及样式资源引用
+static func reset_instance() -> void:
+	if _instance != null:
+		_instance.theme = null
+		_instance.category_colors.clear()
+	_instance = null
+
 var theme: Theme
 
 ## 配色令牌（从 event_categories.json 动态注入）

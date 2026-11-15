@@ -29,6 +29,10 @@ static func get_instance() -> UIAudioBridge:
 		_instance = UIAudioBridge.new()
 	return _instance
 
+## 重置全局 UI 音效桥接器静态单例
+static func reset_instance() -> void:
+	_instance = null
+
 ## 触发悬停音效信号
 func play_hover(volume_db: float = 0.0) -> void:
 	play_sfx.emit(UISfxType.HOVER, volume_db)

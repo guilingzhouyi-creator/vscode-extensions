@@ -23,6 +23,29 @@ static func get_instance() -> ModalManager:
 		_instance.name = "ModalManager"
 	return _instance
 
+## 安全剥离并同步释放模态或UI基础设施托管节点（共享供各 UI 管理器 teardown 复用）
+static func detach_and_free_node(target_node: Node) -> void:
+	if target_node == null or not is_instance_valid(target_node):
+		return
+	var parent_node := target_node.get_parent()
+	if parent_node != null:
+		parent_node.remove_child(target_node)
+	target_node.free()
+
+## 重置模态弹窗管理器静态单例并同步释放残留弹窗与遮罩节点
+static func reset_instance() -> void:
+	if _instance != null and is_instance_valid(_instance):
+		for modal_node in _instance._modal_stack:
+			detach_and_free_node(modal_node)
+		_instance._modal_stack.clear()
+		_instance._dismiss_flags.clear()
+		detach_and_free_node(_instance._backdrop)
+		_instance._backdrop = null
+		_instance._modal_container = null
+		_instance._modal_layer = null
+		detach_and_free_node(_instance)
+	_instance = null
+
 var _modal_layer: CanvasLayer
 var _modal_container: Control
 var _modal_stack: Array[Control] = []

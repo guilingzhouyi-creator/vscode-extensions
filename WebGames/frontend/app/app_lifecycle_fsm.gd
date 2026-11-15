@@ -42,6 +42,12 @@ static func get_instance() -> AppLifecycleFSM:
 		_instance = AppLifecycleFSM.new()
 	return _instance
 
+## 重置应用生命周期状态机静态单例并清空状态上下文
+static func reset_instance() -> void:
+	if _instance != null:
+		_instance.reset()
+	_instance = null
+
 var _current_state: AppState = AppState.BOOT
 var _previous_state: AppState = AppState.BOOT
 var _context: Dictionary = {}

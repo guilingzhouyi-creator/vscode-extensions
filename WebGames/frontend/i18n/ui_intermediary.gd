@@ -13,11 +13,40 @@ extends RefCounted
 
 ## 单例
 static var _instance: UIIntermediary
+static var _mod_i18n_bus_token: EventBusSubscriptionToken = null
 ## 获取 UI 中间体门面全局单例
 static func get_instance() -> UIIntermediary:
 	if _instance == null:
 		_instance = UIIntermediary.new()
 	return _instance
+
+## 懒注册领域事件监听：在后端应用/卸载 MOD 多语言包时实时刷新活跃 UI 绑定
+static func ensure_mod_i18n_subscription() -> void:
+	if _mod_i18n_bus_token != null:
+		return
+	var bus := EventBusCore.get_instance()
+	if bus == null:
+		return
+	_mod_i18n_bus_token = bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, _on_mod_i18n_domain_packet)
+
+## 显式解绑静态事件总线监听并清理单例缓存（供测试生命周期无泄漏退出调用）
+static func teardown_for_tests() -> void:
+	if _mod_i18n_bus_token != null:
+		_mod_i18n_bus_token.unbind()
+		_mod_i18n_bus_token = null
+	_instance = null
+
+static func _on_mod_i18n_domain_packet(domain_packet: Variant) -> void:
+	var wrapper: Dictionary = domain_packet.payload_data if domain_packet != null and domain_packet.get("payload_data") is Dictionary else {}
+	var channel := String(wrapper.get("channel", ""))
+	if channel == "engine.teardown_completed":
+		UITextResolver.get_instance().clear_mod_translations()
+		teardown_for_tests()
+		return
+	if channel != "localization_i18n.updated" and channel != "config.mod_overlay_applied" and channel != "config.mod_overlay_cleared":
+		return
+	UITextResolver.get_instance().sync_mod_dictionaries_from_config()
+	refresh_active_bindings()
 
 ## ==============================================================================
 ## 核心入口: resolve
@@ -30,6 +59,7 @@ static func get_instance() -> UIIntermediary:
 ## template_payload: 业务数据字典 (如 {"amount": 5000, "name": "阿尔托莉雅"})
 ## 返回: 填充后的最终文本
 static func resolve(target_node: Node, i18n_key: String, template_payload: Dictionary = {}) -> String:
+	ensure_mod_i18n_subscription()
 	# 1-2. i18n 翻译 + 占位符填充（UITextResolver.resolve 已内置单引擎 PlaceholderFiller 填充）
 	var rendered_text := UITextResolver.resolve(i18n_key, template_payload)
 
@@ -54,6 +84,7 @@ static func resolve_batch(bindings: Array) -> void:
 
 ## 仅翻译+填充, 不注入节点（用于动态生成文本, 如 ItemList 项）
 static func text(i18n_key: String, template_payload: Dictionary = {}) -> String:
+	ensure_mod_i18n_subscription()
 	# resolve 已内置占位符填充，无需二次调用 PlaceholderFiller.fill
 	return UITextResolver.resolve(i18n_key, template_payload)
 
@@ -93,7 +124,12 @@ static func resolve_placeholder(line_edit: LineEdit, i18n_key: String, template_
 ## 语言切换入口
 static func switch_locale(new_locale: String) -> void:
 	UITextResolver.set_locale(new_locale)
-	UIBindingRegistry.get_instance().refresh_all()
+	refresh_active_bindings()
+
+## 当活跃绑定注册表已实例化时原地刷新全部 UI 节点文本（不触发惰性单例重建）
+static func refresh_active_bindings() -> void:
+	if UIBindingRegistry.has_active_instance():
+		UIBindingRegistry.get_instance().refresh_all()
 
 ## 视图加载后批量适配（在 _ready() 最后调用）
 static func adapt_view(view_node: Control) -> void:

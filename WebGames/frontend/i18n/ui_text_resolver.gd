@@ -19,13 +19,47 @@ static func get_instance() -> UITextResolver:
 		_instance = UITextResolver.new()
 	return _instance
 
+## 重置多语言文本解析器静态单例并清空词库缓存
+static func reset_instance() -> void:
+	if _instance != null:
+		_instance._dictionaries.clear()
+		_instance._mod_dictionaries.clear()
+	_instance = null
+
 var current_locale: String = "zh_CN"
 var fallback_locale: String = "en_US"
 var _dictionaries: Dictionary = {} # locale -> { key -> text }
+var _mod_dictionaries: Dictionary = {} # locale -> { key -> text }
+var _synced_mod_i18n_version: int = -1
 
 func _init() -> void:
 	_load_locale_dict("zh_CN", "res://config/i18n/zh_CN.json")
 	_load_locale_dict("en_US", "res://config/i18n/en_US.json")
+	sync_mod_dictionaries_from_config()
+
+## 从 GameConfig 模组本地化覆盖层全量同步各语言字典（不污染静态基座词典）
+func sync_mod_dictionaries_from_config() -> void:
+	_mod_dictionaries = GameConfig.get_mod_i18n_dictionaries()
+	_synced_mod_i18n_version = GameConfig.get_mod_i18n_version()
+
+func _sync_mod_dictionaries_if_stale() -> void:
+	var latest_version := GameConfig.get_mod_i18n_version()
+	if _synced_mod_i18n_version != latest_version:
+		sync_mod_dictionaries_from_config()
+
+## 注入 MOD 分语言本地化词条覆盖（按 locale 分桶，不污染磁盘原始基座词库）
+func apply_mod_translations(locale: String, translations: Dictionary) -> void:
+	if locale.is_empty() or translations.is_empty():
+		return
+	if not _mod_dictionaries.has(locale):
+		_mod_dictionaries[locale] = {}
+	var bucket: Dictionary = _mod_dictionaries[locale]
+	for raw_key in translations.keys():
+		bucket[str(raw_key)] = str(translations[raw_key])
+
+## 清空全部 MOD 前端运行时多语言覆写并复原基础词库解析
+func clear_mod_translations() -> void:
+	_mod_dictionaries.clear()
 
 ## 加载本地化 JSON 文件
 func _load_locale_dict(locale: String, path: String) -> void:
@@ -59,11 +93,20 @@ static func resolve(i18n_key: String, template_payload: Dictionary = {}) -> Stri
 
 	return PlaceholderFiller.fill(template_text, template_payload)
 
-## 原始文案检索 (当前语言 ➔ 回退语言)
+## 原始文案检索 (当前语言 MOD -> 基础 -> 回退语言 MOD -> 基础)
 func _get_raw_text(i18n_key: String) -> String:
+	_sync_mod_dictionaries_if_stale()
+	var mod_locale_table: Dictionary = _mod_dictionaries.get(current_locale, {})
+	if mod_locale_table.has(i18n_key):
+		return str(mod_locale_table[i18n_key])
+
 	var locale_dictionary: Dictionary = _dictionaries.get(current_locale, {})
 	if locale_dictionary.has(i18n_key):
 		return str(locale_dictionary[i18n_key])
+
+	var mod_fallback_table: Dictionary = _mod_dictionaries.get(fallback_locale, {})
+	if mod_fallback_table.has(i18n_key):
+		return str(mod_fallback_table[i18n_key])
 
 	var fallback_dictionary: Dictionary = _dictionaries.get(fallback_locale, {})
 	if fallback_dictionary.has(i18n_key):
