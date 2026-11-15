@@ -1,8 +1,8 @@
 {
   "service_mode": "real",
   "player": {
-    "name": "阿尔托莉雅",
-    "display_name": "阿尔托莉雅 (玩家同构体)",
+    "name": "冒险者",
+    "display_name": "冒险者 (主控实例)",
     "title": "Dynamic Title Ranks: [Sword Master / Holy Archmage / Spellblade] (Dual)",
     "wallet": {
       "gold": 50,
@@ -31,7 +31,7 @@
   "march_demo": {
     "hours": 6,
     "node_id": "TOWN_ROCK",
-    "node_name": "铁岩要塞",
+    "node_name": "边境哨站",
     "terrain": "PLAINS",
     "speed": 30.0
   },
@@ -71,9 +71,9 @@
     "wallet": "金币: %d | 银币: %d | 铜币: %d | 魔单晶: %d (负重: %.2f kg)"
   },
   "ui": {
-    "banner_title": "[color=#38bdf8][b]>>> KALAR WORLD ENGINE 1.0 (卡拉尔世界引擎·无头母机宿主) 已就绪 <<<[/b][/color]\n",
+    "banner_title": "[color=#38bdf8][b]>>> OPEN WORLD ENGINE 1.0 (通用开放世界引擎·无头母机宿主) 已就绪 <<<[/b][/color]\n",
     "banner_body": "[color=#94a3b8]• 表现层 (Frontend) 与后端无头母机 (Backend) 100%% 物理与逻辑解耦\n• 实时推流结构化文字战报与因果律状态事件\n• 全域 %d 套测试套件数学方程与状态机就绪[/color]\n\n",
-    "test_start": "[color=#38bdf8][b]正在执行卡拉尔世界引擎全域 %d 套单元测试套件...[/b][/color]\n\n",
+    "test_start": "[color=#38bdf8][b]正在执行通用开放世界引擎全域 %d 套单元测试套件...[/b][/color]\n\n",
     "test_summary": "测试验收通过率: %d / %d (%.1f%%) — 全域 %d 套测试套件 100%% 通过！",
     "badge_pass": "[color=#34d399][PASS][/color]",
     "badge_fail": "[color=#f87171][FAIL][/color]",

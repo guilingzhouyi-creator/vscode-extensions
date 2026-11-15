@@ -8,7 +8,7 @@
   "pack_profile": "OFFICIAL_BASE",
   "is_official": true,
   "trust_tier": "OFFICIAL",
-  "content_sha256": "fae3535438bf714fa9eb7cf49bb5d44ef3c562be2369657cbf3f5c580f828f55",
+  "content_sha256": "903ce665e7110a35de3ac9c5c04b3fc1e57064b74b394eb6fb654c170bebb8dc",
   "priority": 1000,
   "dependencies": [],
   "incompatible_packs": [],

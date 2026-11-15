@@ -49,5 +49,7 @@
     "starting_tick": 0,
     "starting_day": 1,
     "region_mana_density": 1.0
-  }
+  },
+  "landmarks": [],
+  "mod_world_topology": {}
 }

@@ -1,5 +1,5 @@
 {
-  "invalid_id_format": "物品 ID 未遵循 KALAR:[MAJOR]:[MINOR]:[TAG] 命名空间规范",
+  "invalid_id_format": "物品 ID 未遵循 <NAMESPACE>:[MAJOR]:[MINOR]:[TAG] 命名空间规范",
   "id_collision": "物品 ID 冲突: {canonical_id} 已存在",
   "numeric_id_collision": "物品数字 ID 冲突: {numeric_id} 已被占用",
   "name_key_collision": "物品展示名键冲突: {loc_name_key} 已被占用",

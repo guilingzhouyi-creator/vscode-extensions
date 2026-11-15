@@ -6,13 +6,13 @@
     "default_servers": [
       {
         "id": "LOCAL_OFFLINE",
-        "name": "单机离线·瓦尔兰大陆",
+        "name": "单机离线·本地世界",
         "status": "ONLINE",
         "ping_ms": 0
       },
       {
         "id": "SERVER_01",
-        "name": "启蒙之森 [电信]",
+        "name": "公共示范区 [电信]",
         "status": "ONLINE",
         "ping_ms": 18
       }
@@ -667,5 +667,38 @@
     "epic": "史诗",
     "legendary": "传说",
     "unknown": "未知"
+  },
+  "character_creation": {
+    "split_separation": 16,
+    "panel_margin_horizontal": 32,
+    "panel_margin_vertical": 24,
+    "default_slot_fallback": "SLOT_01",
+    "reroll_cooldown_ms": 200,
+    "confirm_cooldown_ms": 300
+  },
+  "world_gateway": {
+    "default_gateway_mode": 1,
+    "switch_mode_cooldown_ms": 200,
+    "open_workbench_cooldown_ms": 200,
+    "logout_cooldown_ms": 250,
+    "quit_cooldown_ms": 250,
+    "create_world_cooldown_ms": 250,
+    "enter_world_cooldown_ms": 250,
+    "delete_world_cooldown_ms": 250,
+    "refresh_cooldown_ms": 200,
+    "verify_realm_cooldown_ms": 250
+  },
+  "mod_workbench": {
+    "back_cooldown_ms": 200,
+    "save_precheck_cooldown_ms": 250,
+    "rescan_cooldown_ms": 250,
+    "toggle_pack_cooldown_ms": 120,
+    "move_order_cooldown_ms": 120
+  },
+  "prologue": {
+    "choice_cooldown_ms": 150,
+    "skip_cooldown_ms": 250,
+    "exit_gateway_cooldown_ms": 250,
+    "enter_hud_cooldown_ms": 250
   }
 }

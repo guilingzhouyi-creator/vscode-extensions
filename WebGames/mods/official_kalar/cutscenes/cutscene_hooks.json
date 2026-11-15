@@ -8,8 +8,25 @@
       "hook_id": "hook_prologue_awakening_pre",
       "trigger_type": "NARRATIVE_NODE_PRE",
       "target_filter": {
-        "dag_id": "dag_prologue",
-        "node_id": "node_prologue_awakening"
+        "dag_id": "DAG_PROLOGUE_HUMAN_CAPITAL",
+        "node_id": "NODE_AWAKEN_PLAZA"
+      },
+      "cutscene_id": "cs_prologue_awakening",
+      "override_params": {
+        "skippable": true,
+        "skip_hold_duration_sec": 0.3,
+        "fade_in_sec": 0.5,
+        "fade_out_sec": 0.5,
+        "auto_pause_world": true,
+        "play_once_per_save": true
+      }
+    },
+    {
+      "hook_id": "hook_prologue_elf_awakening_pre",
+      "trigger_type": "NARRATIVE_NODE_PRE",
+      "target_filter": {
+        "dag_id": "DAG_PROLOGUE_ELF_SANCTUARY",
+        "node_id": "NODE_AWAKEN_GROVE"
       },
       "cutscene_id": "cs_prologue_awakening",
       "override_params": {
