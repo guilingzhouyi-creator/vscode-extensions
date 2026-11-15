@@ -88,6 +88,13 @@ static func get_mode() -> String:
 		return _custom_mode
 	return GameConfig.get_string("frontend.ui", "service_mode", "real")
 
+## 构建并可选回调通知服务不可用失败回执（统一跨视图门面边界守卫）
+static func reply_service_unavailable(on_completed: Callable = Callable()) -> Dictionary:
+	var unavailable_reply := {"success": false, "error_code": "ERR_SERVICE_UNAVAILABLE"}
+	if on_completed.is_valid():
+		on_completed.call(unavailable_reply)
+	return unavailable_reply
+
 ## 重置定位器单例（测试隔离 / teardown 用）——清空已解析的容器引用与激活网关
 static func reset() -> void:
 	_instance = null

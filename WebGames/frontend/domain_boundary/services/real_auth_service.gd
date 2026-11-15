@@ -62,24 +62,41 @@ func login_async(username: String, password_plain: String, result_callback: Call
             "world_state_ref": str(service_response.data.get("world_state_ref", ""))
         })
 
-## 异步注册契约实现（经统一协议分发）
-func register_async(username: String, password_plain: String, result_callback: Callable) -> void:
+## 异步注册契约实现（经统一协议分发，支持可选自动登录并返回会话令牌）
+func register_async(username: String, password_plain: String, result_callback: Callable, auto_login: bool = false) -> void:
     var trimmed_username: String = username.strip_edges()
     var service_response := RealProtocolBridge.dispatch_human("account", "REGISTER_ACCOUNT", {
         "username": trimmed_username,
-        "password_plain": password_plain
+        "password_plain": password_plain,
+        "auto_login": auto_login
     }, "", "")
     if not service_response.success:
         _emit_error_callback(result_callback, service_response.error_code)
         return
 
+    var reply_payload: Dictionary = {
+        "success": true,
+        "account_id": str(service_response.data.get("account_id", "")),
+        "username": str(service_response.data.get("username", trimmed_username)),
+        "created_timestamp_utc": int(service_response.data.get("created_timestamp_utc", 0))
+    }
+    var session_token := str(service_response.data.get("session_token", service_response.data.get("token", "")))
+    if auto_login or not session_token.is_empty():
+        var account_id := str(reply_payload.get("account_id", ""))
+        var repository := AccountRepository.get_instance()
+        if not repository.is_loaded():
+            repository.load_all()
+        var account_profile: AccountProfile = repository.find_by_id(account_id)
+        var slots: Array = AccountSlotBindingSolver.to_frontend_character_slots(account_profile) if account_profile != null else []
+        var world_reference := str(service_response.data.get("world_state_ref", ""))
+        if world_reference.is_empty() and account_profile != null and "world_state_ref" in account_profile:
+            world_reference = str(account_profile.world_state_ref)
+        reply_payload["token"] = session_token
+        reply_payload["character_slots"] = slots
+        reply_payload["world_state_ref"] = world_reference
+
     if result_callback.is_valid():
-        result_callback.call({
-            "success": true,
-            "account_id": str(service_response.data.get("account_id", "")),
-            "username": str(service_response.data.get("username", trimmed_username)),
-            "created_timestamp_utc": int(service_response.data.get("created_timestamp_utc", 0))
-        })
+        result_callback.call(reply_payload)
 
 ## 异步游客免密快捷登录契约实现（对齐 LOGIN_GUEST）
 func login_guest_async(device_fingerprint: String = "", result_callback: Callable = Callable()) -> void:

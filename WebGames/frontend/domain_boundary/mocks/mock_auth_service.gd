@@ -41,16 +41,20 @@ func login_async(username: String, password_plain: String, result_callback: Call
 		"token": "MOCK_TOKEN_eyJhbGciOiJIUzI1NiJ9"
 	}, simulate_delay_ms)
 
-## 模拟异步新账号注册请求
-func register_async(username: String, password_plain: String, result_callback: Callable) -> void:
+## 模拟异步新账号注册请求（支持可选自动登录并签发模拟令牌）
+func register_async(username: String, password_plain: String, result_callback: Callable, auto_login: bool = false) -> void:
 	if username.is_empty() or password_plain.is_empty():
 		MockBaseService.delayed_call(result_callback, { "success": false, "error_code": "ERR_PARAM_INVALID", "message": "账号或密码不能为空" }, simulate_delay_ms)
 		return
-	MockBaseService.delayed_call(result_callback, {
+	var response_payload: Dictionary = {
 		"success": true,
 		"account_id": "ACC_MOCK_NEW",
 		"username": username
-	}, simulate_delay_ms)
+	}
+	if auto_login:
+		response_payload["token"] = "MOCK_TOKEN_eyJhbGciOiJIUzI1NiJ9"
+		response_payload["character_slots"] = _mock_characters.duplicate(true)
+	MockBaseService.delayed_call(result_callback, response_payload, simulate_delay_ms)
 
 ## 模拟异步拉取区服列表快照
 func get_servers_async(result_callback: Callable) -> void:

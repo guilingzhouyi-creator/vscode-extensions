@@ -30,8 +30,8 @@ static func build_preview_attribute_spread() -> Dictionary:
 func login_async(username: String, password_plain: String, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IAuthService.login_async: pure virtual method must be implemented by subclass")
 
-## 异步注册契约 (对齐 AccountRegistrationDTO)
-func register_async(username: String, password_plain: String, result_callback: Callable) -> void:
+## 异步注册契约 (对齐 AccountRegistrationDTO，可选注册后自动签发会话令牌)
+func register_async(username: String, password_plain: String, result_callback: Callable, _auto_login: bool = false) -> void:
 	EventBusCore.get_instance().emit_log("error", "IAuthService.register_async: pure virtual method must be implemented by subclass")
 
 ## 获取服务器列表契约
