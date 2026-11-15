@@ -41,6 +41,8 @@ static func run_all_tests() -> Dictionary:
 	var session_ctx := _setup_env()
 	var results: Array[Dictionary] = []
 	results.append(_test_tc_e2e_01_register_gateway_creation_prologue_hud(session_ctx))
+	results.append(_test_tc_e2e_02_esc_exit_nav_pop_mode_switch_quit(session_ctx))
+	results.append(_test_tc_e2e_03_reentry_existing_char_and_entry_signals(session_ctx))
 	_teardown_env(session_ctx)
 	return TestCase.pack_results("Phase 131 全端真实可点击UI闭环与锁安全端到端验收流水线", results)
 
@@ -144,4 +146,124 @@ static func _test_tc_e2e_01_register_gateway_creation_prologue_hud(session_ctx: 
 		"lock_sha_ok": lock_sha_ok,
 		"routed_to_prologue": routed_to_prologue,
 		"routed_to_hud": routed_to_hud
+	})
+
+
+## TC-E2E-UI-02: HUD ESC 返关(免ERR_UNAUTHORIZED) -> NavManager.pop_screen 参数保真 -> Tab切联机清污 -> 网关停机
+static func _test_tc_e2e_02_esc_exit_nav_pop_mode_switch_quit(session_ctx: Dictionary) -> Dictionary:
+	var nav := NavManager.get_instance()
+	var hud: MainHUDViewScript = nav.get_current_screen() as MainHUDViewScript
+	if hud == null:
+		return make_result("TC-E2E-UI-02: ESC返关与导航栈参数保真与停机", false, {"reason": "hud_null"})
+
+	hud._get_subpanels().on_menu_exit_to_gateway_pressed()
+	var gateway: WorldGatewayViewScript = nav.get_current_screen() as WorldGatewayViewScript
+	var returned_to_gateway: bool = gateway != null \
+		and nav.get_stack_depth() == 1 \
+		and gateway.current_account_id == str(session_ctx.get("account_id", "")) \
+		and gateway.current_session_token == str(session_ctx.get("token", "")) \
+		and ServiceLocator.get_active_gateway().context.current_phase != WorldGatewayModel.GatewayPhase.IN_WORLD
+
+	var pop_context_preserved := false
+	if gateway != null:
+		gateway.selected_world_id = WORLD_ID
+		gateway.open_mod_workbench_btn.pressed.emit()
+		var workbench: ModWorkbenchScreenScript = nav.get_current_screen() as ModWorkbenchScreenScript
+		if workbench != null and workbench.back_btn != null:
+			workbench.back_btn.pressed.emit()
+		var resumed_gateway: WorldGatewayViewScript = nav.get_current_screen() as WorldGatewayViewScript
+		pop_context_preserved = resumed_gateway != null \
+			and resumed_gateway.current_account_id == str(session_ctx.get("account_id", "")) \
+			and resumed_gateway.current_session_token == str(session_ctx.get("token", "")) \
+			and resumed_gateway.selected_world_id == WORLD_ID
+		gateway = resumed_gateway
+
+	var tab_switched_to_mp := false
+	var realm_verified_ok := false
+	var shutdown_ok := false
+	if gateway != null:
+		# 注销当前 SP 会话并真实登录联机白名单账号 MP_TESTER_01，验证 ModeTabContainer -> Multiplayer 洗脱与验签闭环
+		var mp_account := AccountProfile.new()
+		mp_account.account_id = "MP_TESTER_01"
+		mp_account.username = "MP_TESTER_01"
+		mp_account.password_hash_sha256 = AuthService.hash_password("Secret_MP_131")
+		AccountRepository.get_instance().save_account(mp_account)
+		WorldGatewayRealmSessionHelper.logout_to_account_entry(gateway, gateway._get_tabs())
+		var mp_token := ""
+		ServiceLocator.get_instance().auth().login_async("MP_TESTER_01", "Secret_MP_131", func(login_reply: Dictionary) -> void:
+			mp_token = str(login_reply.get("token", ""))
+		)
+		var mp_gw: WorldGatewayViewScript = nav.replace_screen("world_gateway", {
+			"account_id": "MP_TESTER_01",
+			"token": mp_token
+		}) as WorldGatewayViewScript
+		if mp_gw != null:
+			mp_gw._on_mode_tab_changed(1)
+			var active_gw = ServiceLocator.get_active_gateway()
+			tab_switched_to_mp = mp_gw.current_gateway_mode == 2 \
+				and active_gw != null \
+				and active_gw.context.selected_mode == WorldGatewayModel.GameMode.MULTIPLAYER \
+				and active_gw.get_active_mods().size() <= 1
+			if not mp_gw.remote_realms.is_empty():
+				mp_gw.selected_realm_index = 0
+				var verify_res := WorldGatewayRealmSessionHelper.verify_and_enter_selected_realm(mp_gw, mp_gw._get_tabs())
+				realm_verified_ok = bool(verify_res.get("success", false)) or bool(mp_gw.last_realm_verification.get("verified", false))
+			else:
+				realm_verified_ok = true
+			var quit_res := WorldGatewayRealmSessionHelper.quit_desktop_application(mp_gw)
+			shutdown_ok = bool(quit_res.get("success", false))
+
+	var ok: bool = returned_to_gateway and pop_context_preserved and tab_switched_to_mp and realm_verified_ok and shutdown_ok
+	return make_result("TC-E2E-UI-02: ESC认证返关、pop_screen上下文保真、Tab切联机清污与停机", ok, {
+		"returned_to_gateway": returned_to_gateway,
+		"pop_context_preserved": pop_context_preserved,
+		"tab_switched_to_mp": tab_switched_to_mp,
+		"realm_verified_ok": realm_verified_ok,
+		"shutdown_ok": shutdown_ok
+	})
+
+
+## TC-E2E-UI-03: 停机重启后 AccountEntryView 槽位/重骰信号无报错 + 有角色世界直接进入 MainHUD
+static func _test_tc_e2e_03_reentry_existing_char_and_entry_signals(session_ctx: Dictionary) -> Dictionary:
+	GameConfig.ensure_loaded()
+	GameBootstrap.assemble()
+	AccountRepository.get_instance().set_custom_registry_path(TestFullChainBackendHelper.TEST_ACCOUNTS_PATH)
+	AccountRepository.get_instance().load_all()
+	WorldArchiveRepository.get_instance().set_custom_root_dir(TestFullChainBackendHelper.TEST_WORLDS_ROOT)
+	ServiceLocator.clear_active_gateway()
+	ServiceLocator.set_mode("real")
+	var nav := NavManager.get_instance()
+	nav.pop_to_root("account_entry")
+	var entry: AccountEntryViewScript = nav.get_current_screen() as AccountEntryViewScript
+	var signals_ok := false
+	if entry != null:
+		entry.set_character_slots_snapshot([{"slot_id": "SLOT_01", "name": "SignalHero"}])
+		entry._on_char_slot_0_pressed()
+		var slot_picked := entry.selected_character_slot == "SLOT_01"
+		entry._on_char_slot_1_pressed()
+		entry._on_char_slot_2_pressed()
+		entry._on_char_reroll_pressed()
+		signals_ok = slot_picked and not entry._rolled_attributes.is_empty()
+
+	var login_res: Dictionary = entry.submit_login("Phase131HeroUser", "Secret_131_OK") if entry != null else {}
+	var login_acc := str(login_res.get("account_id", session_ctx.get("account_id", "")))
+	var login_tok := str(login_res.get("token", session_ctx.get("token", "")))
+	var gateway: WorldGatewayViewScript = nav.push_screen("world_gateway", {
+		"account_id": login_acc,
+		"token": login_tok
+	}) as WorldGatewayViewScript
+	if gateway != null:
+		gateway.selected_world_id = WORLD_ID
+		gateway.enter_world_btn.pressed.emit()
+
+	var direct_hud: MainHUDViewScript = nav.get_current_screen() as MainHUDViewScript
+	var direct_entered_hud: bool = direct_hud != null
+	if direct_hud != null:
+		direct_hud._get_subpanels().on_menu_exit_to_gateway_pressed()
+
+	var ok: bool = signals_ok and bool(login_res.get("success", false)) and direct_entered_hud
+	return make_result("TC-E2E-UI-03: 入口槽位重骰信号闭环与已创角世界复进入MainHUD", ok, {
+		"signals_ok": signals_ok,
+		"login_ok": bool(login_res.get("success", false)),
+		"direct_entered_hud": direct_entered_hud
 	})
