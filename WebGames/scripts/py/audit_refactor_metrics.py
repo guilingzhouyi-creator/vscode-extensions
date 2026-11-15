@@ -376,8 +376,17 @@ def _render_audit_console_report(report: dict[str, Any], opts: RefactorAuditOpti
     _render_all_issue_categories(issues)
 
     errors = by_sev.get("error", 0)
+    arbitration = summary.get("arbitration", {}) if isinstance(summary, dict) else {}
+    governance = report.get("governance") or {}
+    gate_verdict = str(
+        arbitration.get("gateVerdict", governance.get("gateVerdict", ""))
+    ).strip().lower()
     if opts.strict and errors > 0:
         print(f"【审查结论】--strict 模式未通过（存在 {errors} 处 error 级发现）")
+        return 1
+    if opts.strict and gate_verdict == "blocked":
+        blocking_count = arbitration.get("blockingCount", governance.get("blockingCount", 0))
+        print(f"【审查结论】--strict 模式未通过（arbitration gateVerdict=blocked, blockingCount={blocking_count}）")
         return 1
 
     print("【审查结论】通过（auto-refactor 静态度量与多维重构建议就绪）")

@@ -70,7 +70,7 @@ AUDIT_TASKS: list[AuditTask] = [
         task_id="gd",
         name="GDScript 质量治理统一审查（Style+Advanced+Simplification）",
         script_name="audit_gd.py",
-        default_args=[],
+        default_args=["--strict"],
         scopes={"gd"},
     ),
     AuditTask(
@@ -91,7 +91,7 @@ AUDIT_TASKS: list[AuditTask] = [
         task_id="coverage",
         name="测试套件覆盖率基线",
         script_name="audit_test_coverage.py",
-        default_args=[],
+        default_args=["--strict"],
         scopes={"gd", "test"},
     ),
     AuditTask(

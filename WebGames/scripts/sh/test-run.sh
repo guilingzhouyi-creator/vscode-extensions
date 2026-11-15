@@ -47,7 +47,7 @@ echo "【test-run】开始运行单元测试（godot=$GODOT_BIN）..."
 # 显式捕获 Godot 真实退出码（禁止 if ! 取反吞码），失败日志保留至验收完成
 # 增加 180s 运行守护兜底，防死锁/阻塞挂起导致 CI 或终端永久卡死
 if command -v timeout >/dev/null 2>&1; then
-  timeout 180s "$GODOT_BIN" --headless --path "$ROOT_DIR" -s res://tests/test_runner.gd >"$LOG" 2>&1
+  timeout 180s "$GODOT_BIN" --headless --verbose --path "$ROOT_DIR" -s res://tests/test_runner.gd >"$LOG" 2>&1
   CODE=$?
   if [[ "$CODE" -eq 124 ]]; then
     echo "【test-run】测试执行超时（超过 180s 未退出，判定为异常阻塞挂起），进程已被终止，最后输出："
@@ -55,12 +55,12 @@ if command -v timeout >/dev/null 2>&1; then
     exit 1
   fi
 else
-  "$GODOT_BIN" --headless --path "$ROOT_DIR" -s res://tests/test_runner.gd >"$LOG" 2>&1
+  "$GODOT_BIN" --headless --verbose --path "$ROOT_DIR" -s res://tests/test_runner.gd >"$LOG" 2>&1
   CODE=$?
 fi
 if [[ "$CODE" -ne 0 ]]; then
   echo "【test-run】Godot 运行异常（真实退出码=$CODE），测试失败项与脚本错误清单："
-  grep -E "(\[ FAIL \]|❌|FAILED|SCRIPT ERROR|Parse Error|Compile Error)" "$LOG" | head -150 || true
+  grep -E "(\[ FAIL \]|❌|FAILED|SCRIPT ERROR|Parse Error|Compile Error|ObjectDB instances (were )?leaked|RIDs of type .* were leaked|resources still in use at exit)" "$LOG" | head -150 || true
   echo "--- 最近输出 ---"
   tail -60 "$LOG"
   echo "--- 错误与警告明细 ---"
@@ -75,14 +75,21 @@ LINE="$(grep -oE '断言通过率: [0-9]+ / [0-9]+' "$LOG" | head -1)"
 TOTAL="$(echo "$LINE" | grep -oE '[0-9]+' | tail -1)"
 PASSED="$(echo "$LINE" | grep -oE '[0-9]+' | head -1)"
 FAILED=$(( ${TOTAL:-0} - ${PASSED:-0} ))
+LEAK_LINES="$(grep -E '(ObjectDB instances (were )?leaked|RIDs of type .* were leaked|resources still in use at exit|\[ FAIL \] ObjectDB / Orphan Node 泄漏检测)' "$LOG" | head -20 || true)"
+LEAK_BOOL="false"
+if [[ -n "$LEAK_LINES" ]]; then LEAK_BOOL="true"; fi
 GODOT_VER="$("$GODOT_BIN" --version 2>/dev/null | head -1)"
 OK_BOOL="false"
-if [[ "${TOTAL:-0}" -gt 0 ]] && [[ "$FAILED" = "0" ]]; then OK_BOOL="true"; fi
+if [[ "${TOTAL:-0}" -gt 0 ]] && [[ "$FAILED" = "0" ]] && [[ "$LEAK_BOOL" = "false" ]]; then OK_BOOL="true"; fi
 
-printf '{\n  "tool": "test_runner.gd",\n  "godot_version": "%s",\n  "timestamp": "%s",\n  "passed": %s,\n  "total": %s,\n  "failed": %s,\n  "ok": %s\n}\n' \
-  "$GODOT_VER" "$(date +%Y-%m-%dT%H:%M:%S)" "${PASSED:-0}" "${TOTAL:-0}" "$FAILED" "$OK_BOOL" > "$REPORT"
+printf '{\n  "tool": "test_runner.gd",\n  "godot_version": "%s",\n  "timestamp": "%s",\n  "passed": %s,\n  "total": %s,\n  "failed": %s,\n  "leak_detected": %s,\n  "ok": %s\n}\n' \
+  "$GODOT_VER" "$(date +%Y-%m-%dT%H:%M:%S)" "${PASSED:-0}" "${TOTAL:-0}" "$FAILED" "$LEAK_BOOL" "$OK_BOOL" > "$REPORT"
 cp "$REPORT" "$LATEST"
-rm -f "$LOG"
+if [[ "$LEAK_BOOL" = "false" ]]; then
+  rm -f "$LOG"
+else
+  LOG_KEEP=1
+fi
 
 # 滚动淘汰留痕：保留最近 10 份历史快照，清理更早的历史文件。
 # 注意：xargs -r 为 GNU 扩展（BSD/macOS 非法），改用 POSIX 空集守卫写法。
@@ -92,9 +99,13 @@ if [[ -n "$OLD_FILES" ]]; then
 fi
 
 if [[ "$OK_BOOL" = "true" ]]; then
-  echo "【test-run】通过: $PASSED / $TOTAL 项断言全部通过"
+  echo "【test-run】通过: $PASSED / $TOTAL 项断言全部通过（0 ObjectDB/RID 泄漏）"
   echo "【test-run】完成: $REPORT"
   exit 0
+fi
+if [[ "$LEAK_BOOL" = "true" ]]; then
+  echo "【test-run】失败: 检测到 ObjectDB/RID/Orphan 泄漏："
+  printf '%s\n' "$LEAK_LINES"
 fi
 echo "【test-run】失败: $FAILED / ${TOTAL:-0} 项断言未通过（详见 $LOG 输出与 $REPORT）"
 grep -E "\[ FAIL \]" "$LATEST" 2>/dev/null | head -10

@@ -612,12 +612,13 @@ def _generate_audit_report(
         "warnings": ctx.warnings,
     }
 
-    report_dest = Path(ctx.report_path) if ctx.report_path else (ROOT / "reports" / "audit-latest.json")
-    try:
-        report_dest.parent.mkdir(parents=True, exist_ok=True)
-        report_dest.write_text(json.dumps(report_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
-    except OSError as exc:
-        print(f"  ⚠ 报告落盘失败 ({report_dest}): {exc}")
+    if ctx.report_path:
+        report_dest = Path(ctx.report_path)
+        try:
+            report_dest.parent.mkdir(parents=True, exist_ok=True)
+            report_dest.write_text(json.dumps(report_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
+        except OSError as exc:
+            print(f"  ⚠ 报告落盘失败 ({report_dest}): {exc}")
 
     return is_passed
 

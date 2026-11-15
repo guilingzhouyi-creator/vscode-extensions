@@ -355,6 +355,64 @@ class AdvancedCodeAuditor:
                     )
                 )
 
+    def _check_pool_lifecycle_contract(
+        self, text: str, lines: list[str], rel: Path, rel_posix: str
+    ) -> None:
+        """ADV-POOL-001: 校验可池化 DTO 与对象池契约类均实现完整 reset_state() 与超类复位。"""
+        rule_cfg = self.rules_config.get("ADV-POOL-001", {})
+        if self.is_exempt("ADV-POOL-001", rel_posix):
+            return
+        is_pool_subclass = bool(re.search(r"^\s*extends\s+PoolableDtoBase\b", text, re.MULTILINE))
+        defines_pool_hooks = (
+            "func mark_pooled_acquire(" in text or "func mark_pooled_release(" in text
+        )
+        if not is_pool_subclass and not defines_pool_hooks:
+            return
+        has_reset_method = "func reset_state(" in text
+        has_instance_vars = any(
+            ln.lstrip() == ln and VAR_DECL_RE.match(ln) and not ln.lstrip().startswith("static ")
+            for ln in lines
+        )
+        if defines_pool_hooks and not has_reset_method:
+            self.findings.append(
+                Finding(
+                    rule_id="ADV-POOL-001",
+                    level=rule_cfg.get("level", "ERROR"),
+                    file_path=rel,
+                    line_number=1,
+                    message="声明了对象池生命周期钩子的类必须实现 reset_state() 状态重置接口",
+                    fix_suggestion=rule_cfg.get("fix_suggestion", "为可池化对象实现 reset_state() -> void 方法以确保状态彻底复位"),
+                )
+            )
+            return
+        if is_pool_subclass and has_instance_vars and not has_reset_method:
+            self.findings.append(
+                Finding(
+                    rule_id="ADV-POOL-001",
+                    level=rule_cfg.get("level", "ERROR"),
+                    file_path=rel,
+                    line_number=1,
+                    message="继承 PoolableDtoBase 且含实例字段的类必须重写 reset_state() 彻底复位字段",
+                    fix_suggestion=rule_cfg.get("fix_suggestion", "重写 func reset_state() -> void 并在首行调用 super.reset_state()"),
+                )
+            )
+            return
+        if is_pool_subclass and has_reset_method and "super.reset_state()" not in text:
+            reset_line = next(
+                (idx for idx, ln in enumerate(lines, 1) if "func reset_state(" in ln),
+                1,
+            )
+            self.findings.append(
+                Finding(
+                    rule_id="ADV-POOL-001",
+                    level=rule_cfg.get("level", "ERROR"),
+                    file_path=rel,
+                    line_number=reset_line,
+                    message="PoolableDtoBase 子类重写 reset_state() 时必须调用 super.reset_state() 以维持复用代数校验",
+                    fix_suggestion=rule_cfg.get("fix_suggestion", "在 reset_state() 中调用 super.reset_state()"),
+                )
+            )
+
     def _check_line_patterns(
         self, code_line: str, i: int, rel: Path, rel_posix: str, loop_stack: list[int]
     ) -> None:
@@ -384,6 +442,7 @@ class AdvancedCodeAuditor:
             return
 
         self._check_domain_corruption(text, rel, rel_posix)
+        self._check_pool_lifecycle_contract(text, lines, rel, rel_posix)
 
         loop_stack: list[int] = []
         for i, ln in enumerate(lines, 1):

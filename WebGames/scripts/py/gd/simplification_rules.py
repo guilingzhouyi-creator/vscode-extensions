@@ -239,6 +239,51 @@ class SimplificationAuditor:
             nesting_depth = max(0, indent_level - 1)
         return True, nesting_depth, max_nesting
 
+    def _check_vacuous_wrapper_class(
+        self, lines: list[str], rel: Path, rel_posix: str
+    ) -> None:
+        """SIM-WRP-001: 拦截无状态、无数据转换的纯单行透传空包装类（豁免接口与容器适配器）。"""
+        rule_cfg = self.rules_config.get("SIM-WRP-001", {})
+        if self.is_exempt("SIM-WRP-001", rel_posix) or "/interfaces/" in rel_posix:
+            return
+        ext_matches = [EXTENDS_RE.match(ln) for ln in lines]
+        ext_bases = [m.group(1) for m in ext_matches if m]
+        if any(base not in {"RefCounted", "Object", "Node", "Resource", "Control"} for base in ext_bases):
+            return
+        if not any(CLS_DECL_RE.match(ln) for ln in lines):
+            return
+        has_state_or_signal = any(
+            ln.lstrip() == ln and (ln.startswith("signal ") or ln.startswith("var "))
+            for ln in lines
+        )
+        if has_state_or_signal:
+            return
+        func_indices = [
+            idx for idx, ln in enumerate(lines)
+            if ln.lstrip() == ln and FUNC_DEF_RE.match(ln)
+        ]
+        if not (1 <= len(func_indices) <= 2):
+            return
+        for pos, func_idx in enumerate(func_indices):
+            end_idx = func_indices[pos + 1] if pos + 1 < len(func_indices) else len(lines)
+            body_lines = [
+                ln.split("#")[0].strip()
+                for ln in lines[func_idx + 1 : end_idx]
+                if ln.split("#")[0].strip()
+            ]
+            if len(body_lines) != 1 or not re.match(r"^return\s+[A-Za-z0-9_]+\.[A-Za-z0-9_]+\([^)]*\)$", body_lines[0]):
+                return
+        self.findings.append(
+            SimplificationFinding(
+                rule_id="SIM-WRP-001",
+                level=rule_cfg.get("level", "WARN"),
+                file_path=rel,
+                line_number=func_indices[0] + 1,
+                message="检测到无状态且仅含 1-2 个纯单行透传方法的空包装类",
+                fix_suggestion=rule_cfg.get("fix_suggestion", "直接使用底层领域服务或将无意义中间包装类内联简化"),
+            )
+        )
+
     def audit_file_content(self, path: Path) -> None:
         """审查单个文件内部的控制流复杂度与简化异味。"""
         rel = path.relative_to(ROOT)
@@ -248,6 +293,8 @@ class SimplificationAuditor:
             _, lines = GDFileCache.get(path)
         except Exception:
             return
+
+        self._check_vacuous_wrapper_class(lines, rel, rel_posix)
 
         in_func = False
         func_start_line = 0

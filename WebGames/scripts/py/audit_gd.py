@@ -48,13 +48,17 @@ __all__ = [
     "verify_rule_config_coverage",
 ]
 
-RULE_GET_CALL_RE = re.compile(r'\.get\("((?:ADV|SIM)-[A-Z0-9-]+)"')
+RULE_GET_CALL_RE = re.compile(r'(?:\.get\(|"rule_id":\s*)"((?:ADV|SIM)-[A-Z0-9-]+)"')
 
 
 def _collect_consumed_rules(gd_dir: Path) -> set[str]:
-    """扫描 GD 审查模块源码中通过 get() 消费的规则 ID 集合。"""
+    """扫描 GD 与事件信道审查模块源码中实际消费的规则 ID 集合。"""
     consumed: set[str] = set()
-    for py_file in [Path(__file__).resolve(), *gd_dir.glob("*.py")]:
+    event_audit_file = Path(__file__).resolve().parent / "audit_event_channels.py"
+    scan_targets = [Path(__file__).resolve(), *gd_dir.glob("*.py")]
+    if event_audit_file.exists():
+        scan_targets.append(event_audit_file)
+    for py_file in scan_targets:
         try:
             src = py_file.read_text(encoding="utf-8")
             consumed.update(m.group(1) for m in RULE_GET_CALL_RE.finditer(src))

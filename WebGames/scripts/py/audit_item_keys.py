@@ -24,14 +24,15 @@ ROOT = resolve_repo_root()
 CONFIG_DIR = ROOT / "config"
 ITEMS_DIR = CONFIG_DIR / "items"
 OFFICIAL_MOD_ITEMS_DIR = ROOT / "mods" / "official_kalar" / "content" / "items"
-ITEM_KEY_RE = re.compile(r'"KALAR:[A-Z0-9_:-]+"')
+SAMPLE_TC_ITEMS_DIR = ROOT / "mod_sdk" / "templates" / "total_conversion_sample" / "content" / "items"
+ITEM_KEY_RE = re.compile(r'"[A-Z][A-Z0-9_]*:[A-Z0-9_]+:[A-Z0-9_]+:[A-Z0-9_:-]+"')
 
 
 def collect_registered() -> tuple[set[str], list[str]]:
-    """收集 config/items/*.json 与官方基础模组包物品登记清单（canonical_id）。"""
+    """收集 config/items/*.json 与官方/示范模组包物品登记清单（canonical_id）。"""
     registered: set[str] = set()
     duplicates: list[str] = []
-    for base_dir in (ITEMS_DIR, OFFICIAL_MOD_ITEMS_DIR):
+    for base_dir in (ITEMS_DIR, OFFICIAL_MOD_ITEMS_DIR, SAMPLE_TC_ITEMS_DIR):
         if not base_dir.exists():
             continue
         for f in sorted(base_dir.rglob("*.json")):

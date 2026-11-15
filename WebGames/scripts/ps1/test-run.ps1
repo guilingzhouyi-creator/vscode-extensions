@@ -47,20 +47,24 @@ Write-Host "【test-run】开始运行单元测试（godot=$GodotBin）..."
 $prevEAP = $ErrorActionPreference
 $ErrorActionPreference = 'Continue'
 try {
-  & $GodotBin --headless --path $RootDir -s res://tests/test_runner.gd 2>&1 | Tee-Object -FilePath $LogPath
+  & $GodotBin --headless --verbose --path $RootDir -s res://tests/test_runner.gd 2>&1 |
+    Tee-Object -FilePath $LogPath |
+    Where-Object { $_ -notmatch '^(WorkerThreadPool:|TextServer:|Using |CORE API HASH:|EDITOR API HASH:|Loading resource:|Completed load for:|SceneTreeFTI:|Loaded system CA|XR: )' }
   $code = $LASTEXITCODE
 } finally {
   $ErrorActionPreference = $prevEAP
 }
 if ($code -ne 0) {
   Write-Host "【test-run】Godot 运行异常（exit=$code），测试失败项清单："
-  Select-String -Path $LogPath -Pattern '\[ FAIL \]|❌|FAILED' | Select-Object -First 100 | ForEach-Object { Write-Host $_.Line }
+  Select-String -Path $LogPath -Pattern '\[ FAIL \]|❌|FAILED|ObjectDB instances (?:were )?leaked|RIDs of type .* were leaked|resources still in use at exit' | Select-Object -First 100 | ForEach-Object { Write-Host $_.Line }
   Write-Host "--- 最近输出 ---"
   Get-Content $LogPath -Tail 40 | ForEach-Object { Write-Host $_ }
   exit 1
 }
 
 $content = Get-Content $LogPath -Raw
+$leakMatches = @(Select-String -Path $LogPath -Pattern 'ObjectDB instances (?:were )?leaked|RIDs of type .* were leaked|resources still in use at exit|\[ FAIL \] ObjectDB / Orphan Node 泄漏检测')
+$hasLeaks = ($leakMatches.Count -gt 0)
 $passed = 0; $total = 0
 if ($content -match '断言通过率:\s*(\d+)\s*/\s*(\d+)') {
   $passed = [int]$Matches[1]
@@ -68,16 +72,17 @@ if ($content -match '断言通过率:\s*(\d+)\s*/\s*(\d+)') {
 }
 $failed = $total - $passed
 $ver = (& $GodotBin --version 2>$null | Select-Object -First 1)
-$ok = ($total -gt 0 -and $failed -eq 0)
+$ok = ($total -gt 0 -and $failed -eq 0 -and -not $hasLeaks)
 
 $summary = [ordered]@{
-  tool         = "test_runner.gd"
+  tool          = "test_runner.gd"
   godot_version = "$ver"
-  timestamp    = (Get-Date -Format "yyyy-MM-ddTHH:mm:ss")
-  passed       = $passed
-  total        = $total
-  failed       = $failed
-  ok           = $ok
+  timestamp     = (Get-Date -Format "yyyy-MM-ddTHH:mm:ss")
+  passed        = $passed
+  total         = $total
+  failed        = $failed
+  leak_detected = $hasLeaks
+  ok            = $ok
 }
 $summaryJson = (($summary | ConvertTo-Json) -replace "`r`n", "`n").TrimEnd("`n") + "`n"
 [System.IO.File]::WriteAllText($Report, $summaryJson, [System.Text.UTF8Encoding]::new($false))
@@ -92,9 +97,13 @@ Get-ChildItem -Path (Join-Path $OutDir "test_*.json") |
   Remove-Item -Force -ErrorAction SilentlyContinue
 
 if ($ok) {
-  Write-Host "【test-run】通过: $passed / $total 项断言全部通过"
+  Write-Host "【test-run】通过: $passed / $total 项断言全部通过（0 ObjectDB/RID 泄漏）"
   Write-Host "【test-run】完成: $Report"
   exit 0
+}
+if ($hasLeaks) {
+  Write-Host "【test-run】失败: 检测到 ObjectDB/RID/Orphan 泄漏："
+  $leakMatches | Select-Object -First 20 | ForEach-Object { Write-Host "  $($_.Line)" }
 }
 Write-Host "【test-run】失败: $failed / $total 项断言未通过（详见 $Report）"
 Select-String -Path $Latest -Pattern '\[ FAIL \]' | Select-Object -First 10 | ForEach-Object { Write-Host $_.Line }
