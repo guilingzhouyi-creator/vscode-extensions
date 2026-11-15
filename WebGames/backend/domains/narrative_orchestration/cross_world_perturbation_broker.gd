@@ -136,9 +136,10 @@ func _load_ledger_from_disk() -> void:
 ## 原子刷盘物理账本（按扰动条目增量缓存字典序列化结果，避免每条触发全量重转）
 func _flush_ledger_to_disk() -> bool:
     var serialized_items: Array[Dictionary] = []
+    var empty_cached_record: Dictionary = {}
     for perturbation in _perturbations:
         var perturbation_id := perturbation.perturbation_id
-        var serialized_entry: Dictionary = _serialized_by_id.get(perturbation_id, {})
+        var serialized_entry: Dictionary = _serialized_by_id.get(perturbation_id, empty_cached_record)
         if serialized_entry.is_empty():
             serialized_entry = _dto_to_dict(perturbation)
             if not serialized_entry.is_empty():

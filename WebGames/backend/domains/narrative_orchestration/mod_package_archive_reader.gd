@@ -36,12 +36,57 @@ static func _read_kmod_json_dict(reader: ZIPReader, entry_path: String) -> Dicti
     return (raw as Dictionary) if (raw is Dictionary) else {}
 
 
+## 将语言文件名主干标准化为引擎语言标签（如 zh-CN -> zh_CN）
+static func normalize_locale_code(raw_locale: String) -> String:
+    var clean := raw_locale.strip_edges().replace("-", "_")
+    if clean.is_empty():
+        return "zh_CN"
+    return clean
+
+
+## 将单个语言 JSON 字典按 locale 分桶合并至 custom_i18n_by_locale 与兼容扁平 custom_i18n
+static func merge_i18n_payload_for_locale(
+    locale_data: Dictionary,
+    raw_locale_stem: String,
+    custom_i18n: Dictionary,
+    i18n_by_locale: Dictionary,
+    preferred_locale: String = "zh_CN"
+) -> void:
+    if locale_data.is_empty():
+        return
+    var locale_code := normalize_locale_code(raw_locale_stem)
+    if not i18n_by_locale.has(locale_code):
+        i18n_by_locale[locale_code] = {}
+    var bucket: Dictionary = i18n_by_locale[locale_code]
+    flatten_i18n_dict(locale_data, "", bucket)
+    var should_overwrite_flat := custom_i18n.is_empty() or locale_code == normalize_locale_code(preferred_locale)
+    if should_overwrite_flat:
+        flatten_i18n_dict(locale_data, "", custom_i18n)
+    else:
+        for flat_key in bucket.keys():
+            if not custom_i18n.has(flat_key):
+                custom_i18n[flat_key] = bucket[flat_key]
+
+
+static func _merge_routing_payload(routing_data: Dictionary, package_payload: Dictionary) -> void:
+    if routing_data.get("prologue_routing_rules") is Array:
+        var existing_prologue: Array = package_payload.get("prologue_routing_rules", [])
+        existing_prologue.append_array(routing_data["prologue_routing_rules"] as Array)
+        package_payload["prologue_routing_rules"] = existing_prologue
+    var raw_rules: Variant = routing_data.get("custom_routing_rules", routing_data.get("routing_rules", []))
+    if raw_rules is Array:
+        var existing_custom: Array = package_payload.get("custom_routing_rules", [])
+        existing_custom.append_array(raw_rules as Array)
+        package_payload["custom_routing_rules"] = existing_custom
+
+
 static func _apply_kmod_entry(
     reader: ZIPReader,
     entry_path: String,
     package_payload: Dictionary,
     dag_graphs: Dictionary,
-    custom_i18n: Dictionary
+    custom_i18n: Dictionary,
+    i18n_by_locale: Dictionary
 ) -> void:
     if entry_path.begins_with("dag_graphs/") and entry_path.ends_with(".json"):
         var graph_data := _read_kmod_json_dict(reader, entry_path)
@@ -52,24 +97,20 @@ static func _apply_kmod_entry(
         dag_graphs[dag_id] = graph_data
     elif entry_path.begins_with("i18n/") and entry_path.ends_with(".json"):
         var locale_data := _read_kmod_json_dict(reader, entry_path)
-        if not locale_data.is_empty():
-            flatten_i18n_dict(locale_data, "", custom_i18n)
+        var locale_stem := entry_path.get_file().get_basename()
+        merge_i18n_payload_for_locale(locale_data, locale_stem, custom_i18n, i18n_by_locale)
     elif entry_path == "destinies.json":
         var destinies_data := _read_kmod_json_dict(reader, entry_path)
         for config_key in [
             "ui_capabilities", "custom_races", "creation_rule_overrides",
             "custom_origins", "custom_traits", "paired_presets",
-            "custom_starter_kits", "custom_routing_rules"
+            "custom_starter_kits", "custom_routing_rules", "prologue_routing_rules"
         ]:
             if destinies_data.has(config_key):
                 package_payload[config_key] = destinies_data[config_key]
     elif entry_path == "routing_rules.json":
         var routing_data := _read_kmod_json_dict(reader, entry_path)
-        var raw_rules: Variant = routing_data.get("custom_routing_rules", routing_data.get("routing_rules", []))
-        if raw_rules is Array:
-            var existing: Array = package_payload.get("custom_routing_rules", [])
-            existing.append_array(raw_rules as Array)
-            package_payload["custom_routing_rules"] = existing
+        _merge_routing_payload(routing_data, package_payload)
 
 
 ## 从 .kmod 归档包完整读取并组装 MOD 数据字典
@@ -95,11 +136,13 @@ static func load_full_package_from_kmod(kmod_path: String) -> Dictionary:
     var package_payload: Dictionary = manifest_payload.duplicate(true)
     var dag_graphs: Dictionary = package_payload.get("dag_graphs", {})
     var custom_i18n: Dictionary = package_payload.get("custom_i18n", {})
+    var i18n_by_locale: Dictionary = package_payload.get("custom_i18n_by_locale", {})
     for entry_path in files:
-        _apply_kmod_entry(reader, entry_path, package_payload, dag_graphs, custom_i18n)
+        _apply_kmod_entry(reader, entry_path, package_payload, dag_graphs, custom_i18n, i18n_by_locale)
     reader.close()
     package_payload["dag_graphs"] = dag_graphs
     package_payload["custom_i18n"] = custom_i18n
+    package_payload["custom_i18n_by_locale"] = i18n_by_locale
     package_payload["root_path"] = kmod_path
     return package_payload
 

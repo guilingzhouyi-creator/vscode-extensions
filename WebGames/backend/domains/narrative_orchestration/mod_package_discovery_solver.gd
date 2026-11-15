@@ -83,6 +83,7 @@ static func _parse_manifest_at_path(manifest_path: String, fallback_pack_id: Str
         manifest.pack_id = fallback_pack_id
     if manifest.root_path.is_empty():
         manifest.root_path = manifest_path.get_base_dir()
+    _enrich_manifest_content_digest(manifest, manifest.root_path)
 
     return manifest
 
@@ -111,6 +112,7 @@ static func _parse_manifest_from_kmod(kmod_path: String, fallback_pack_id: Strin
         manifest.pack_id = fallback_pack_id
     if manifest.root_path.is_empty():
         manifest.root_path = kmod_path
+    _enrich_manifest_content_digest(manifest, manifest.root_path)
     return manifest
 
 ## 读取目录下非隐藏子目录与文件名清单（供包扫描与内容覆写复用，避免重复目录遍历逻辑）
@@ -418,12 +420,15 @@ static func _scan_mod_dag_graphs(mod_directory: String, target_graphs: Dictionar
             var dag_id := str((raw_json as Dictionary).get("dag_id", (raw_json as Dictionary).get("graph_id", stem)))
             target_graphs[dag_id] = raw_json
 
-## 扫描 mod_directory/i18n 目录下的多语言本地化配置
-static func _scan_mod_i18n(mod_directory: String, target_i18n: Dictionary) -> void:
+## 扫描 mod_directory/i18n 目录下的多语言本地化配置（按语言分桶并兼容扁平回退）
+static func _scan_mod_i18n(mod_directory: String, target_i18n: Dictionary, target_by_locale: Dictionary = {}) -> void:
     for file_path in _list_json_files(mod_directory.path_join("i18n")):
         var raw_json: Variant = _read_json_file(file_path)
         if raw_json is Dictionary:
-            ModPackageArchiveReader.flatten_i18n_dict(raw_json as Dictionary, "", target_i18n)
+            var locale_stem := file_path.get_file().get_basename()
+            ModPackageArchiveReader.merge_i18n_payload_for_locale(
+                raw_json as Dictionary, locale_stem, target_i18n, target_by_locale
+            )
 
 ## 加载 destinies.json 与 routing_rules.json 并合并入 MOD 包字典
 static func _load_destinies_and_routing(mod_directory: String, package_payload: Dictionary) -> void:
@@ -462,7 +467,10 @@ static func _load_destinies_and_routing(mod_directory: String, package_payload: 
 ## 从指定目录完整读取并组装单包数据字典
 static func load_full_mod_package_from_dir(mod_directory: String) -> Dictionary:
     if mod_directory.ends_with(".kmod"):
-        return ModPackageArchiveReader.load_full_package_from_kmod(mod_directory)
+        var kmod_payload: Dictionary = ModPackageArchiveReader.load_full_package_from_kmod(mod_directory)
+        if not kmod_payload.is_empty():
+            _enrich_package_payload_digest(kmod_payload, mod_directory)
+        return kmod_payload
 
     var manifest_path := mod_directory.path_join(MANIFEST_FILENAME)
     var pack_raw: Variant = _read_json_file(manifest_path)
@@ -477,11 +485,99 @@ static func load_full_mod_package_from_dir(mod_directory: String) -> Dictionary:
     package_payload["dag_graphs"] = dag_graphs
 
     var custom_i18n: Dictionary = package_payload.get("custom_i18n", {})
-    _scan_mod_i18n(mod_directory, custom_i18n)
+    var i18n_by_locale: Dictionary = package_payload.get("custom_i18n_by_locale", {})
+    _scan_mod_i18n(mod_directory, custom_i18n, i18n_by_locale)
     package_payload["custom_i18n"] = custom_i18n
+    package_payload["custom_i18n_by_locale"] = i18n_by_locale
 
     package_payload["root_path"] = mod_directory
+    _enrich_package_payload_digest(package_payload, mod_directory)
     return package_payload
+
+
+static func _enrich_manifest_content_digest(manifest: NarrativePackManifestDTO, package_root: String) -> void:
+    if manifest == null or package_root.is_empty():
+        return
+    var computed_digest := compute_package_content_sha256(package_root).strip_edges().to_lower()
+    if not computed_digest.is_empty():
+        manifest.content_sha256 = computed_digest
+
+
+static func _enrich_package_payload_digest(package_payload: Dictionary, package_root: String) -> void:
+    if package_payload.is_empty() or package_root.is_empty():
+        return
+    var declared_digest := String(package_payload.get("content_sha256", "")).strip_edges().to_lower()
+    if not declared_digest.is_empty():
+        package_payload["declared_content_sha256"] = declared_digest
+    var computed_digest := compute_package_content_sha256(package_root).strip_edges().to_lower()
+    if not computed_digest.is_empty():
+        package_payload["content_sha256"] = computed_digest
+
+
+static func _read_declared_content_sha256(package_root: String) -> String:
+    if package_root.is_empty():
+        return ""
+    if package_root.ends_with(".kmod"):
+        var archive_reader := ZIPReader.new()
+        if archive_reader.open(package_root) != OK:
+            return ""
+        var manifest_text := ""
+        if archive_reader.file_exists("pack.json"):
+            manifest_text = archive_reader.read_file("pack.json").get_string_from_utf8()
+        elif archive_reader.file_exists("manifest.json"):
+            manifest_text = archive_reader.read_file("manifest.json").get_string_from_utf8()
+        archive_reader.close()
+        if manifest_text.is_empty():
+            return ""
+        var parsed_archive: Variant = JSON.parse_string(manifest_text)
+        if parsed_archive is Dictionary:
+            return String((parsed_archive as Dictionary).get("content_sha256", "")).strip_edges().to_lower()
+        return ""
+    var manifest_path := package_root.path_join(MANIFEST_FILENAME)
+    if not FileAccess.file_exists(manifest_path):
+        return ""
+    var parsed_disk: Variant = _read_json_file(manifest_path)
+    if parsed_disk is Dictionary:
+        return String((parsed_disk as Dictionary).get("content_sha256", "")).strip_edges().to_lower()
+    return ""
+
+
+## 校验包目录声明摘要与实际内容哈希是否一致（未声明 content_sha256 的开发夹具放行）
+static func verify_package_content_integrity(package_entry: Variant) -> Dictionary:
+    var package_id := ""
+    var package_root := ""
+    var inline_declared := ""
+    if package_entry is Dictionary:
+        var entry_table := package_entry as Dictionary
+        package_id = String(entry_table.get("pack_id", entry_table.get("id", ""))).strip_edges()
+        package_root = String(entry_table.get("root_path", "")).strip_edges()
+        inline_declared = String(entry_table.get("declared_content_sha256", "")).strip_edges().to_lower()
+    elif package_entry != null and "root_path" in package_entry:
+        package_id = String(package_entry.pack_id).strip_edges() if "pack_id" in package_entry else ""
+        package_root = String(package_entry.root_path).strip_edges()
+
+    if package_root.is_empty():
+        return {"valid": true, "pack_id": package_id, "declared_content_sha256": inline_declared, "computed_content_sha256": ""}
+
+    var has_package_source := FileAccess.file_exists(package_root) if package_root.ends_with(".kmod") else DirAccess.dir_exists_absolute(package_root)
+    if not has_package_source:
+        return {"valid": true, "pack_id": package_id, "declared_content_sha256": inline_declared, "computed_content_sha256": ""}
+
+    var disk_declared := _read_declared_content_sha256(package_root)
+    var effective_declared := disk_declared if not disk_declared.is_empty() else inline_declared
+    var computed_digest := compute_package_content_sha256(package_root).strip_edges().to_lower()
+    if effective_declared.is_empty():
+        return {"valid": true, "pack_id": package_id, "declared_content_sha256": "", "computed_content_sha256": computed_digest}
+
+    if computed_digest.is_empty() or effective_declared != computed_digest:
+        return {
+            "valid": false,
+            "error_code": "MOD_ERR_REALM_DIGEST_MISMATCH",
+            "pack_id": package_id,
+            "declared_content_sha256": effective_declared,
+            "computed_content_sha256": computed_digest
+        }
+    return {"valid": true, "pack_id": package_id, "declared_content_sha256": effective_declared, "computed_content_sha256": computed_digest}
 
 
 ## 收集目录下可稳定参与 SHA-256 内容哈希计算的文件相对路径
