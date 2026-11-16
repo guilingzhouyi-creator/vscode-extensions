@@ -12,7 +12,6 @@
 class_name EconomyTradeView
 extends BaseScreen
 
-const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
 const EconomyTradeTabsClass = preload("res://frontend/views/economy_trade/economy_trade_tabs.gd")
 
 # ------------------------------------------------------------------------------
@@ -35,21 +34,21 @@ var _shop_mode: ShopMode = ShopMode.BUY
 var _shop_selected_index: int = -1
 
 # 拍卖行快照
-var _auction_items: Array = []
-var _auction_my_listings: Array = []
-var _auction_selected_index: int = -1
+var auction_items: Array = []
+var auction_my_listings: Array = []
+var auction_selected_index: int = -1
 
 # 商队物流快照
-var _caravan_entries: Array = []
-var _caravan_selected_index: int = -1
+var caravan_entries: Array = []
+var caravan_selected_index: int = -1
 
 # 物价走势图数据 (7天历史均价)
 var price_trend_history: Array = []
-var _commodity_prices: Dictionary = {}
-var _commodity_keys: Array = []
+var commodity_prices: Dictionary = {}
+var commodity_keys: Array = []
 
 # 货币兑换所
-var _exchange_currency_keys: Array = [
+var exchange_currency_keys: Array = [
 	"ui.fe05.wallet.gold_name",
 	"ui.fe05.wallet.silver_name",
 	"ui.fe05.wallet.copper_name",
@@ -57,10 +56,10 @@ var _exchange_currency_keys: Array = [
 ]
 
 # 拍卖分类 i18n key 列表
-var _auction_category_keys: Array = []
+var auction_category_keys: Array = []
 
 # 资源水池快照
-var _resource_pools: Array = []
+var resource_pools: Array = []
 
 # 子面板委托控制器
 var _tabs: Variant = null
@@ -91,32 +90,32 @@ var _tabs: Variant = null
 @onready var _shop_confirm_button: Button = %BtnShopConfirm
 
 # --- Tab 3: 拍卖行 (AUCTION) ---
-@onready var _line_auction_search: LineEdit = %LineAuctionSearch
-@onready var _option_auction_category: OptionButton = %OptionAuctionCategory
-@onready var _auction_item_list: ItemList = %AuctionItemList
-@onready var _auction_bid_button: Button = %BtnAuctionBid
-@onready var _auction_buyout_button: Button = %BtnAuctionBuyout
-@onready var _auction_my_list: ItemList = %AuctionMyList
+@onready var line_auction_search: LineEdit = %LineAuctionSearch
+@onready var option_auction_category: OptionButton = %OptionAuctionCategory
+@onready var auction_item_list: ItemList = %AuctionItemList
+@onready var auction_bid_button: Button = %BtnAuctionBid
+@onready var auction_buyout_button: Button = %BtnAuctionBuyout
+@onready var auction_my_list: ItemList = %AuctionMyList
 
 # --- Tab 4: 商队物流 (LOGISTICS) ---
-@onready var _caravan_list: ItemList = %CaravanList
-@onready var _label_escort_status: Label = %LabelEscortStatus
-@onready var _label_freight_estimate: Label = %LabelFreightEstimate
+@onready var caravan_list: ItemList = %CaravanList
+@onready var label_escort_status: Label = %LabelEscortStatus
+@onready var label_freight_estimate: Label = %LabelFreightEstimate
 
 # --- Tab 5: 物价波动 (PRICE_TREND) ---
-@onready var _option_price_commodity: OptionButton = %OptionPriceCommodity
-@onready var _price_bars_box: VBoxContainer = %PriceBarsVBox
+@onready var option_price_commodity: OptionButton = %OptionPriceCommodity
+@onready var price_bars_box: VBoxContainer = %PriceBarsVBox
 
 # --- Tab 6: 货币兑换 (EXCHANGE) ---
-@onready var _option_exchange_source: OptionButton = %OptionExchangeSource
-@onready var _option_exchange_target: OptionButton = %OptionExchangeTarget
-@onready var _spin_exchange_amount: SpinBox = %SpinExchangeAmount
-@onready var _label_exchange_rate: Label = %LabelExchangeRate
-@onready var _label_exchange_result: Label = %LabelExchangeResult
-@onready var _exchange_confirm_button: Button = %BtnExchangeConfirm
+@onready var option_exchange_source: OptionButton = %OptionExchangeSource
+@onready var option_exchange_target: OptionButton = %OptionExchangeTarget
+@onready var spin_exchange_amount: SpinBox = %SpinExchangeAmount
+@onready var label_exchange_rate: Label = %LabelExchangeRate
+@onready var label_exchange_result: Label = %LabelExchangeResult
+@onready var exchange_confirm_button: Button = %BtnExchangeConfirm
 
 # --- Tab 7: 资源水池 (RESOURCE_POOL) ---
-@onready var _resource_pool_box: VBoxContainer = %ResourcePoolVBox
+@onready var resource_pool_box: VBoxContainer = %ResourcePoolVBox
 
 # ==============================================================================
 # 子面板委托与初始化
@@ -279,12 +278,12 @@ func _refresh_shop_mode() -> void:
 	else:
 		UIIntermediary.resolve(_shop_confirm_button, "ui.fe05.shop.confirm_sell")
 
-## 填充商店货架列表（无 Mock 数据时使用默认货架清单）
+## 填充商店货架列表（Mock 模式回退默认货架清单，实网模式保持快照驱动）
 func _populate_shop_list() -> void:
 	if _shop_item_list == null:
 		return
 	_shop_item_list.clear()
-	if shop_shelves.is_empty():
+	if shop_shelves.is_empty() and ServiceLocator.get_mode() == "mock":
 		shop_shelves = [
 			{"id": "IRON_SWORD", "name": "ui.fe05.mock.shop.iron_sword", "price_copper": 5000, "stock": 12},
 			{"id": "HEALTH_POTION", "name": "ui.fe05.mock.shop.health_potion", "price_copper": 800, "stock": 45},
@@ -360,7 +359,7 @@ func _on_shop_item_selected(_index: int) -> void:
 func _on_shop_quantity_changed(_quantity_value: float) -> void:
 	_refresh_shop_total()
 
-## 商店确认按钮：未选拦截，经 Toast 反馈交易确认
+## 商店确认按钮：未选拦截，经经济服务结算并刷新钱包
 func _on_shop_confirm_pressed() -> void:
 	var selected := _shop_item_list.get_selected_items()
 	if selected.is_empty():
@@ -370,8 +369,22 @@ func _on_shop_confirm_pressed() -> void:
 		)
 		return
 	var shelf_entry: Dictionary = shop_shelves[selected[0]]
-	var quantity := int(_spin_shop_quantity.value)
-	var action_label := UIIntermediary.text("ui.fe05.shop.mode_buy") if _shop_mode == ShopMode.BUY else UIIntermediary.text("ui.fe05.shop.mode_sell")
+	var quantity := maxi(1, int(_spin_shop_quantity.value))
+	var action_code := "SHOP_SELL" if _shop_mode == ShopMode.SELL else "SHOP_BUY"
+	var action_label := UIIntermediary.text("ui.fe05.shop.mode_sell") if _shop_mode == ShopMode.SELL else UIIntermediary.text("ui.fe05.shop.mode_buy")
+	var transaction_reply := ServiceLocator.get_instance().economy().dispatch_economy_action(action_code, {
+		"item_id": str(shelf_entry.get("id", "")),
+		"unit_price": int(shelf_entry.get("price_copper", 0)),
+		"quantity": quantity,
+		"wallet_gold": wallet_gold,
+	})
+	if not bool(transaction_reply.get("success", true)):
+		NavManager.get_instance().show_toast(str(transaction_reply.get("message", "ui.fe05.shop.no_item_selected")), NavTypes.ToastLevel.WARNING)
+		return
+	var transaction_payload: Dictionary = transaction_reply.get("data", transaction_reply) as Dictionary
+	if transaction_payload.has("wallet_gold"):
+		wallet_gold = int(transaction_payload.get("wallet_gold", wallet_gold))
+		_refresh_wallet_display()
 	NavManager.get_instance().show_toast(
 		UIIntermediary.text("ui.fe05.shop.confirm_toast", {
 			"action": action_label,
@@ -395,9 +408,14 @@ func _connect_signals() -> void:
 	connect_managed(_spin_shop_quantity.value_changed, _on_shop_quantity_changed)
 	connect_managed(_shop_confirm_button.pressed, _on_shop_confirm_pressed)
 
-## 主 Tab 切换：表现层无额外副作用
-func _on_tab_changed(_tab_index: int) -> void:
-	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe05.toast.tab_switched"), NavTypes.ToastLevel.INFO, 1.0)
+## 主 Tab 切换：同步刷新对应经济子视图显示
+func _on_tab_changed(tab_index: int) -> void:
+	if tab_index == 0:
+		_refresh_wallet_display()
+	elif tab_index == 1:
+		_refresh_shop_display()
+	elif tab_index == 4:
+		_refresh_price_trend_display()
 
 ## 返回按钮：经 ViewRouter 弹出视图回退上一级
 func _on_back_pressed() -> void:
