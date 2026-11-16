@@ -17,11 +17,11 @@ var body_parts: Dictionary = {} # part_id -> MonsterBodyPart
 var devoured_genes: Array = []
 var rage_level: float = 0.0 # 0.0 ~ 100.0
 
-## 怪物聚合构造：统一六维底座（物种默认等级配置驱动）+ 生理模型装配
+## 怪物聚合构造：统一六维属性体系（物种默认等级配置驱动）+ 生理模型装配
 func _init() -> void:
 	physiology = CharacterPhysiologySheet.new()
 	physiology.race_id = "MONSTER"
-	# 统一六维底座：物种默认等级（1~6，配置驱动；底层实际值经换算引擎得出）
+	# 统一六维属性体系：物种默认等级（1~6，配置驱动；底层实际值经换算引擎得出）
 	physiology.set_level("STR", GameConfig.get_int("domains.monster", "species_defaults/str_level", 3))
 	physiology.set_level("CON", GameConfig.get_int("domains.monster", "species_defaults/con_level", 2))
 	physiology.set_level("VIT", GameConfig.get_int("domains.monster", "species_defaults/vit_level", 4))

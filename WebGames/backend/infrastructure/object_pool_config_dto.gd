@@ -4,7 +4,7 @@
 # 架构定位: Object Pool Configuration Data Transfer Object
 # 依赖与触发: 上游: ObjectPoolManager, ObjectPool | 下游: GameConfig | 配置: config/infrastructure/object_pool.json | 信号: 无
 # 职责说明: 对象池配置传输模型：封装单池预分配容量、上限水位、溢出策略与告警阈值参数。
-# 退出语义与设计依据: 演进 03 高承压对象池与数据导向无头处理器架构规范
+# 退出语义与设计依据: 高承压对象池与数据导向无头处理器架构规范
 # ==============================================================================
 
 ## ObjectPoolConfigDTO：Object Pool Configuration Data Transfer Object

@@ -3,7 +3,7 @@
 # 文件路径: res://backend/infrastructure/game_config.gd
 # 架构定位: Central Configuration Center
 # 依赖与触发: 上游: 全域业务域、UI表现层快照提供者 | 下游: JSON 文件系统 | 配置: config/**/*.json (66 张配置表) | 信号: 配置重载广播
-# 职责说明: 全域配置文件的泛用加载与读取层。上层业务（42 领域 / 基础设施 / 前端） 通过本底座以「表名 + 多级路径 + 默认值回退」的方式获取一切数值、文案、 标识与分类定义，实现「零硬编码、全配置驱动」，并支持运行时热重载。  配置表布局（res://config/）: config/<name>.json            -> 表名 "<name>"           （顶层） config/<sub>/<name>.json      -> 表名 "<sub>.<name>"     （嵌套目录，递归加载）  路径语法: 以 "/" 分隔多级键，如 "rates/silver"；支持数组下标 "list/0"。 用法示例: GameConfig.get_int("domains.currency", "rates/silver", 100) GameConfig.get_float("domains.combat", "participant_defaults/hp", 100.0) GameConfig.get_string("narratives.currency", "sink_transaction", "") GameConfig.get_dict("infrastructure.event_categories", "combat", {}) GameConfig.reload_config()   # 热重载：先构建新快照并校验，成功后原子交换（勿命名 reload——被 GDScript 内建遮蔽）
+# 职责说明: 全域配置文件的泛用加载与读取层。上层业务（42 领域 / 基础设施 / 前端） 通过本配置中心以「表名 + 多级路径 + 默认值回退」的方式获取一切数值、文案、 标识与分类定义，实现「零硬编码、全配置驱动」，并支持运行时热重载。  配置表布局（res://config/）: config/<name>.json            -> 表名 "<name>"           （顶层） config/<sub>/<name>.json      -> 表名 "<sub>.<name>"     （嵌套目录，递归加载）  路径语法: 以 "/" 分隔多级键，如 "rates/silver"；支持数组下标 "list/0"。 用法示例: GameConfig.get_int("domains.currency", "rates/silver", 100) GameConfig.get_float("domains.combat", "participant_defaults/hp", 100.0) GameConfig.get_string("narratives.currency", "sink_transaction", "") GameConfig.get_dict("infrastructure.event_categories", "combat", {}) GameConfig.reload_config()   # 热重载：先构建新快照并校验，成功后原子交换（勿命名 reload——被 GDScript 内建遮蔽）
 # 退出语义与设计依据: WebGames 零硬编码配置驱动总则
 # ==============================================================================
 
@@ -66,7 +66,7 @@ const BATCH_ID_CONFIG_BULK: String = "config_bulk_async"
 ##   config/narratives/<name>.json     -> 表名 "narratives.<name>"
 ##   config/items/<name>.json          -> 表名 "items.<name>"（物品定义，装配入口自动发现）
 ##
-## 维护约定（顺序铁律）：必须先确认表文件已存在，再登记到此清单；
+## 维护约定（顺序约束）：必须先确认表文件已存在，再登记到此清单；
 ## 登记不存在的表会让 TC-CFG-04（必需配置表零缺失）立即变红。
 ## 领域与配置表的归属映射见 config/infrastructure/domains.json（唯一事实来源）。
 static var _required_tables: Array = [
@@ -171,7 +171,7 @@ static func _validate_required_tables() -> void:
 	if not missing.is_empty():
 		ErrorReporter.emit_error(LogConstants.CHANNEL_GAME_CONFIG, "REQUIRED_TABLE_MISSING", SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_REQUIRED_MISSING, {"tables": ", ".join(missing)}))
 
-## 同步极速加载 L0 核心底座配置表（耗时 <= 5.0ms，建立最小可运行世界状态）
+## 同步极速加载 L0 核心基础配置表（耗时 <= 5.0ms，建立最小可运行世界状态）
 static func ensure_l0_loaded_sync() -> int:
 	var warnings: Array = []
 	var loaded_count: int = GameConfigLoader.load_l0_entries_into(_tables, _scan_failures, warnings)

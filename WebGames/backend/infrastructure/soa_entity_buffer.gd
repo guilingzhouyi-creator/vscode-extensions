@@ -5,7 +5,7 @@
 # 依赖与触发: 上游: HeadlessBatchPipeline, 物理/移动批处理器 | 下游: PackedArrays | 配置: config/infrastructure/object_pool.json | 信号: 无
 # 职责说明: 数据导向 SoA 连续内存缓冲区：基于强类型平铺数组存储实体状态，
 #           消除字典与对象引用间接寻址，保障 CPU 缓存局部性与单帧零堆分配推演。
-# 退出语义与设计依据: 演进 03 高承压对象池与数据导向无头处理器架构规范
+# 退出语义与设计依据: 高承压对象池与数据导向无头处理器架构规范
 # ==============================================================================
 
 ## SoAEntityBuffer：Struct of Arrays (SoA) Dense Entity Buffer

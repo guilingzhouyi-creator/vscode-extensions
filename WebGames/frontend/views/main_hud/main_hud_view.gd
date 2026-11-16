@@ -185,7 +185,7 @@ func _on_predelete_cleanup() -> void:
 	_subpanels = null
 
 # --- 信号绑定与静态文案初始化（i18n） ---
-## 绑定本地 UI 交互信号（小地图/动作条/聊天/菜单在本地脚本闭环）
+## 绑定本地 UI 交互信号（小地图/动作条/聊天/菜单的本地交互事件）
 func _connect_signals() -> void:
 	connect_managed(_chat_tabs.tab_changed, _on_chat_tab_changed)
 	connect_managed(_chat_input.text_changed, _on_chat_input_text_changed)

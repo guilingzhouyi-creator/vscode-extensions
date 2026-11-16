@@ -2,7 +2,7 @@
 # 测试领域：核心战斗逻辑与第三时间轴动态博弈体系
 # 文件路径: res://tests/integration/pipelines/test_combat_tertiary_timeline_pipeline.gd
 # 职责: 验证综合先手评估求解器、第三时间轴推演引擎、待发栏满载溢出缓冲、
-#       小回合生命周期无缝继承、确定性重放审计与配置热更兜底。
+#       小回合生命周期无缝继承、确定性重放审计与配置热更回退。
 # 需求源: 核心战斗验收矩阵
 # ==============================================================================
 class_name TestCombatTertiaryTimelinePipeline
@@ -62,7 +62,7 @@ static func _test_initiative_calculation() -> Dictionary:
 	if res1.initial_ap_diff <= 0:
 		return {"test": "TC-COMBAT-TIME-01: 初始先手 AP 优势", "passed": false, "error": "AP lead bonus missing"}
 
-	# 2. 评分相同、纯敏捷不同：二级敏捷兜底决胜
+	# 2. 评分相同、纯敏捷不同：二级敏捷回退决胜
 	var p_spec2 := CombatInitiativeSolver.ParticipantInitiativeSpec.new()
 	p_spec2.participant_id = "PLAYER_02"
 	p_spec2.base_agility = 20.0
@@ -75,7 +75,7 @@ static func _test_initiative_calculation() -> Dictionary:
 	e_spec2.base_perception = 22.5 # 配平基础分数
 	e_spec2.level = 1
 
-	# 构造零抖动 RNG 验证兜底比对
+	# 构造零抖动 RNG 验证次级比对
 	var zero_rng := DeterministicRNG.from_seed(9999)
 	var res2 := CombatInitiativeSolver.evaluate_initiative(p_spec2, e_spec2, zero_rng)
 	if res2.first_mover_id != "PLAYER_02" and res2.first_mover_id != "ENEMY_02":
@@ -195,11 +195,11 @@ static func _test_subround_interlocking_continuity() -> Dictionary:
 	coordinator.initialize(engine, p_bar, e_bar, rng)
 
 	var p_part := CombatPipelineFSM.CombatParticipant.new()
-	p_part.participant_id = "P1"
+	p_part.participant_id = "PLAYER_01"
 	p_part.current_ap = 5
 
 	var e_part := CombatPipelineFSM.CombatParticipant.new()
-	e_part.participant_id = "E1"
+	e_part.participant_id = "ENEMY_01"
 	e_part.current_ap = 5
 
 	# 步进 5000ms：回合仍在进行中
@@ -265,12 +265,12 @@ static func _test_config_sanity_and_fallback() -> Dictionary:
 	if cap != 5:
 		return {"test": "TC-COMBAT-TIME-06: staging_bar/max_capacity读取", "passed": false, "error": "max_capacity != 5"}
 
-	# 验证缺省键降级默认值兜底
+	# 验证缺省键降级默认值回退
 	var fallback_val := GameConfig.get_int("domains.combat", "non_existent_section/missing_key", 999)
 	if fallback_val != 999:
-		return {"test": "TC-COMBAT-TIME-06: 缺省安全兜底", "passed": false, "error": "Fallback value ignored"}
+		return {"test": "TC-COMBAT-TIME-06: 缺省安全回退", "passed": false, "error": "Fallback value ignored"}
 
-	return {"test": "TC-COMBAT-TIME-06: 配置热更与安全兜底", "passed": true}
+	return {"test": "TC-COMBAT-TIME-06: 配置热更与安全回退", "passed": true}
 
 ## 两阶段排期——重排期不断供（不丢失）+ 事件表单调向未来
 ## 红证：旧实现边遍历边 append，重排期被 67 行整体替换丢弃（后期断供）/ interval=0 同趟再触发

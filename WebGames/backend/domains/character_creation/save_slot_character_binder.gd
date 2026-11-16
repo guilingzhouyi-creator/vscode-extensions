@@ -40,7 +40,7 @@ static func commit_creation_and_bind_slot(
 	# 1. 派生唯一角色 ID（档位维度稳定；账号下 slot 唯一 → 角色 ID 唯一）
 	var new_character_id := "CHAR_%s_%s" % [account_id, slot_id]
 
-	# 2. 后端权威生成属性等级（L1 层；L2 系数/L3 实值由既有生理底座承接）
+	# 2. 后端权威生成属性等级（L1 层；L2 系数/L3 实值由既有生理表模型承接）
 	var baseline_stats := CharacterBaselineAttributeSolver.generate_baseline_attributes(race_definition)
 	var attribute_levels: Dictionary = baseline_stats.get("attribute_levels", {})
 

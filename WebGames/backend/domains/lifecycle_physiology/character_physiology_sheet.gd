@@ -3,7 +3,7 @@
 # 文件路径: res://backend/domains/lifecycle_physiology/character_physiology_sheet.gd
 # 架构定位: Domain Logic Component
 # 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/lifecycle.json | 信号: EventBus 领域广播
-# 职责说明: 统一六维属性底座（三层模型）+ 三大综合生理指标 + 寿命年轮 + 体质/资质。 - L1 等级层：attribute_levels（统一 1~6 级）+ attribute_progress（区间内连续值）； - L2 中间系数结构层（阅历修饰层）：experience_reshape，心核洗点重置，预留阅历联动； - L3 底层实际值域：dynamic_adjustments（随机动态加点永久实际值偏移，洗点不逆转）； - 实际值统一经 AttributeConversionEngine 换算（等级/系数/规则全配置驱动）。 生理初值由 config/lifecycle.json 的 physiology_defaults 段驱动。
+# 职责说明: 统一六维属性模型（三层结构）+ 三大综合生理指标 + 寿命年轮 + 体质/资质。 - L1 等级层：attribute_levels（统一 1~6 级）+ attribute_progress（区间内连续值）； - L2 中间系数结构层（阅历修饰层）：experience_reshape，心核洗点重置，预留阅历联动； - L3 底层实际值域：dynamic_adjustments（随机动态加点永久实际值偏移，洗点不逆转）； - 实际值统一经 AttributeConversionEngine 换算（等级/系数/规则全配置驱动）。 生理初值由 config/lifecycle.json 的 physiology_defaults 段驱动。
 # 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
@@ -24,7 +24,7 @@ enum ManaAptitude {
 	HEAVEN_RULER  # 天权者 (位阶压制)
 }
 
-## ===== 统一六维属性底座（三层模型，唯一换算入口 AttributeConversionEngine）=====
+## ===== 统一六维属性模型（三层结构，唯一换算入口 AttributeConversionEngine）=====
 
 ## L1 等级层：统一 1~6 级（离散整数）+ 区间内连续值 [0,1)
 var attribute_levels: Dictionary = {}   # attr(STR/CON/INT/AGI/SPR/VIT) -> int 1..6

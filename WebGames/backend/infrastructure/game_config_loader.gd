@@ -75,7 +75,7 @@ static func ensure_table_loaded_jit(
 		load_single_table_into(base_path + EXT_JSON, target_name, tables, scan_failures, scan_warnings)
 
 
-## 同步极速加载 L0 核心底座配置表
+## 同步极速加载 L0 核心基础配置表
 static func load_l0_entries_into(tables: Dictionary, scan_failures: Array, scan_warnings: Array = []) -> int:
 	var catalog: Variant = get_catalog()
 	var loaded_count: int = 0

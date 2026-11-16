@@ -54,7 +54,7 @@ static func _process_single_reward_entry(
 		return {"success": false, "error_code": "INVENTORY_FULL", "granted": 0, "canonical_id": canonical_id, "transaction_id": effective_transaction_id, "rolled_back": true}
 	return {"success": true, "granted": added}
 
-## 物品奖励发放全链路：entry 须含已登记 canonical_id；中段背包满整体失败（已发数可追溯）
+## 物品奖励完整发放流程：entry 须含已登记 canonical_id；中段背包满整体失败（已发数可追溯）
 static func dispatch_item_rewards(reward_items: Array, catalog: ItemRegistryCatalog, inventory: WearableInventoryAggregate, library: AccountItemLibrary = null, transaction_id: String = "") -> Dictionary:
 	if catalog == null or inventory == null:
 		return {"success": false, "error_code": "MISSING_CONTEXT"}

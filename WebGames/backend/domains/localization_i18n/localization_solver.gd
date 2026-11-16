@@ -100,7 +100,7 @@ static func translate_batch(
 
 ## 统一名称解析（全局名称注册表出口）：locale 查表 → fallback_locale 回退 →
 ## 英文回退(en_US) → 未登记返回 [key] 原样并告警计数 +1（不抛 Fatal）。
-## 名称键本体一律英文（机器可读唯一底座），显示文本不得作为逻辑判断依据。
+## 名称键本体一律英文（机器可读唯一键源），显示文本不得作为逻辑判断依据。
 static func resolve_name_key(
     catalog: LocalizationRegistryCatalog,
     key: String,

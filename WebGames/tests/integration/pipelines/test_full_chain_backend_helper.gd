@@ -3,16 +3,16 @@
 # 文件路径: res://tests/integration/pipelines/test_full_chain_backend_helper.gd
 # 架构定位: Integration Test Harness Helper
 # 依赖与触发: 由 TestFullChainBackendProtocolAndLifecyclePipeline 消费
-# 职责说明: 提供全链路无头集成测试环境装配、沙箱目录擦除与统一请求派发辅助方法。
-# 退出语义与设计依据: 全链路无头验收规约与物理资源安全回收
+# 职责说明: 提供全流程无头集成测试环境装配、沙箱目录擦除与统一请求派发辅助方法。
+# 退出语义与设计依据: 全流程无头验收规约与物理资源安全回收
 # ==============================================================================
 
-## TestFullChainBackendHelper：全链路无头集成测试装配辅助类
+## TestFullChainBackendHelper：全流程无头集成测试装配辅助类
 class_name TestFullChainBackendHelper
 extends RefCounted
 
-const TEST_ACCOUNTS_PATH: String = "user://test_p127_accounts/account_registry.json"
-const TEST_WORLDS_ROOT: String = "user://test_p127_worlds/"
+const TEST_ACCOUNTS_PATH: String = "user://test_chain_accounts/account_registry.json"
+const TEST_WORLDS_ROOT: String = "user://test_chain_worlds/"
 
 static func setup_env() -> void:
 	teardown_env()
@@ -34,9 +34,9 @@ static func teardown_env() -> void:
 	WorldArchiveRepository.reset_for_tests()
 	GameLifecycleManager.reset_for_test()
 	GameBootstrap.teardown()
-	remove_test_dir_recursive("user://test_p127_accounts")
-	remove_test_dir_recursive("user://test_p127_worlds")
-	for test_slot_id in ["slot_99", "slot_p127_guard_05", "slot_empty_strict", "slot_empty_force"]:
+	remove_test_dir_recursive("user://test_chain_accounts")
+	remove_test_dir_recursive("user://test_chain_worlds")
+	for test_slot_id in ["slot_99", "slot_guard_05", "slot_empty_strict", "slot_empty_force"]:
 		for ext in [".kalar_save", ".bak", ".tmp", ".sav"]:
 			var vault_file_path := "user://offline_vault/%s%s" % [test_slot_id, ext]
 			if FileAccess.file_exists(vault_file_path):

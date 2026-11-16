@@ -31,7 +31,7 @@ static func load_from_dict_list(catalog: ItemRegistryCatalog, items_payload: Arr
 		var register_result: Variant = ItemRegistrySolver.register_prototype(catalog, prototype)
 		if register_result.success:
 			loaded_count += 1
-			# 统一名称注册表接线：物品名称键登记（域所有者 = item，en_US 英文底座必达）
+			# 统一名称注册表接线：物品名称键登记（域所有者 = item，en_US 英文基础词条必达）
 			var localized_name_key: String = str(item_entry.get("loc_name_key", ""))
 			if not localized_name_key.is_empty():
 				LocalizationRegistryCatalog.get_shared().register_name_key(

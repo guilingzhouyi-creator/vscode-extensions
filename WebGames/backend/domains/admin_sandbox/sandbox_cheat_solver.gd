@@ -26,7 +26,7 @@ static func execute_cheat_command(
 			var sheet: CharacterPhysiologySheet = context.get("sheet", null)
 			if sheet:
 				sheet.heart_core_integrity = 1.0
-				# 统一六维底座：全属性提升至 6 级满级（等级域经统一规则校验）
+				# 统一六维属性体系：全属性提升至 6 级满级（等级域经统一规则校验）
 				for attribute_key in AttributeConversionEngine.DEFAULT_STAT_LIST:
 					sheet.set_level(attribute_key, AttributeConversionEngine.max_level())
 					sheet.set_progress(attribute_key, 1.0)

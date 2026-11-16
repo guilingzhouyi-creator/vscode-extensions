@@ -5,7 +5,7 @@
 # 依赖与触发: 上游: ObjectPoolManager, 业务系统 | 下游: ObjectPoolConfigDTO, ObjectPoolStatsDTO | 配置: config/infrastructure/object_pool.json | 信号: 溢出告警
 # 职责说明: 泛化引用计数对象池核心实现：提供 O(1) LIFO 借还管理、借出彻底重置（reset_state）、
 #           防双重释放安全拦截与基于容量上限的自动丢弃策略，阻断瞬态堆内存碎片。
-# 退出语义与设计依据: 演进 03 高承压对象池与数据导向无头处理器架构规范
+# 退出语义与设计依据: 高承压对象池与数据导向无头处理器架构规范
 # ==============================================================================
 
 ## ObjectPool：Generic RefCounted Object Pool

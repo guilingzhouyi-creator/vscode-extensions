@@ -44,7 +44,7 @@ static func test_death_clears_character_only() -> Dictionary:
 	profile.personal_quest_progress = {"q1": 50}
 	dto.attach_character_profile(profile)
 	acc.bind_character_to_slot("SLOT_01", dto)
-	var world := WorldInstance.new("W1")
+	var world := WorldInstance.new("WORLD_01")
 	world.world_state = {"resource": 5}
 	var res := CharacterDeathSolver.handle_character_death(acc, "SLOT_01", world)
 	var passed: bool = res.success and res.cleared_keys.size() == 3 and profile.is_fresh() and dto.is_fallen
@@ -59,7 +59,7 @@ static func test_world_continues_after_death() -> Dictionary:
 	profile.inventory = {"dagger": 1}
 	dto.attach_character_profile(profile)
 	acc.bind_character_to_slot("SLOT_01", dto)
-	var world := WorldInstance.new("W1")
+	var world := WorldInstance.new("WORLD_01")
 	world.world_time = {"tick": 10}
 	world.world_state = {"resource": 5}
 	var tick_before: int = int(world.world_time["tick"])
@@ -119,7 +119,7 @@ static func test_death_idempotent() -> Dictionary:
 	profile.inventory = {"x": 1}
 	dto.attach_character_profile(profile)
 	acc.bind_character_to_slot("SLOT_01", dto)
-	var world := WorldInstance.new("W1")
+	var world := WorldInstance.new("WORLD_01")
 	var first := CharacterDeathSolver.handle_character_death(acc, "SLOT_01", world)
 	var second := CharacterDeathSolver.handle_character_death(acc, "SLOT_01", world)
 	var passed: bool = first.success and second.error_code == "ALREADY_FALLEN" and world.history_fragments.size() == 1

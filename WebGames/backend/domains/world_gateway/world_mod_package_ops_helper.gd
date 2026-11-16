@@ -4,7 +4,7 @@
 # 架构定位: Domain Support Helper / In-Game MOD Skeleton Creation & Path Primitives
 # 依赖与触发: 上游: WorldGatewayProtocolHandler, WorldModArchiveOpsHelper | 下游: ModPrecheckAndAdaptationSolver, ModPackageDiscoverySolver
 # 职责说明: 为游戏内 MOD 工坊与统一协议提供安全的包标识校验、目录/JSON 原语及合规 MOD 骨架目录创建能力。
-# 退出语义与设计依据: 路径穿越防御、SHA-256 清单验签与纯真本地闭环规范
+# 退出语义与设计依据: 路径穿越防御、SHA-256 清单验签与本地校验规范
 # ==============================================================================
 
 ## WorldModPackageOpsHelper：游戏内 MOD 标识校验与骨架创建助手

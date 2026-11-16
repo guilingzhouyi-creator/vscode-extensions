@@ -4,10 +4,10 @@
 # 架构定位: Domain Dispatcher / Entry Router
 # 依赖与触发: 上游: 前端视图, 伴侣通道 | 下游: AuthService, WorldGatewayFSM, EscMenuBackendService, WorldSessionRuntimeService, GameLifecycleService
 # 职责说明: 接收 ClientRequestEnvelopeDTO，统一实施会话令牌守卫、人类租约仲裁与全 7 域 11 环路由分发。
-# 退出语义与设计依据: 调度中心类；设计依据: 卡拉尔统一协议分发路由与全链路交互契约 (Inv-LEASE-PREEMPTION-1, Inv-FE-BE-CONTRACT-1)
+# 退出语义与设计依据: 调度中心类；设计依据: 卡拉尔统一协议分发路由与端到端交互契约 (Inv-LEASE-PREEMPTION-1, Inv-FE-BE-CONTRACT-1)
 # ==============================================================================
 
-## UnifiedProtocolDispatcher：集中解包客户端请求信封，执行令牌与租约裁决并路由至全链路业务处理器
+## UnifiedProtocolDispatcher：集中解包客户端请求信封，执行令牌与租约裁决并路由至对应业务处理器
 class_name UnifiedProtocolDispatcher
 extends RefCounted
 

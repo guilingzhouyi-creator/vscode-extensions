@@ -3,7 +3,7 @@
 # 架构定位: Domain Boundary Adapter / Real Prologue Service Bridge
 # 依赖与触发: 上游: ServiceContainer, ServiceLocator | 下游: RealProtocolBridge
 # 职责说明: 实现 IPrologueService 接口，通过统一协议调度序章启动、查询、推进与完结交接大世界。
-# 退出语义与设计依据: 表现层零计算纪律与全链路契约校验
+# 退出语义与设计依据: 表现层零计算纪律与端到端契约校验
 ## RealPrologueService：直连后端序章调度协议的真实边界服务实现
 class_name RealPrologueService
 extends "res://frontend/domain_boundary/interfaces/i_prologue_service.gd"

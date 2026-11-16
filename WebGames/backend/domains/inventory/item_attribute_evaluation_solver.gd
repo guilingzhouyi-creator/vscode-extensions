@@ -85,7 +85,7 @@ static func evaluate_effective_stats(
 				elif definition.calculation_type == ItemAttributeDefinition.CalculationType.PERCENT_ADD:
 					final_stats[stat_name] = float(final_stats.get(stat_name, 0.0)) + effective_value
 
-	# 阶段三：合并计算与非负下界硬性截断 (铁律：所有属性不得低于 0.0)
+	# 阶段三：合并计算与非负下界硬性截断 (强制约束：所有属性不得低于 0.0)
 	var all_stat_keys := {}
 	for stat_key in final_stats.keys():
 		all_stat_keys[stat_key] = true

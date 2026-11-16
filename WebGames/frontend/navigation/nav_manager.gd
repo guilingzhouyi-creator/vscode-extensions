@@ -151,7 +151,7 @@ func clear_stack() -> void:
 	_screen_parameter_stack.clear()
 	_current_screen_parameters.clear()
 
-## 查询全链路前端视图路由键表（已注册 world_gateway/prologue/mod_workbench/character_creation 并保留兼容键）
+## 查询全流程前端视图路由键表（已注册 world_gateway/prologue/mod_workbench/character_creation 并保留兼容键）
 static func get_reserved_chain_routes() -> Dictionary:
 	return {
 		"account_home": "account_entry",

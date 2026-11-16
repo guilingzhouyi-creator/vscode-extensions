@@ -272,7 +272,7 @@ func _show_modal(modal_type: String, message: String) -> void:
 
 # ==============================================================================
 
-## 绑定本地 UI 交互信号（通知/公告/红点树/Toast·Modal 测试台本地闭环）
+## 绑定本地 UI 交互信号（通知/公告/红点树/Toast·Modal 测试台的本地响应）
 func _connect_signals() -> void:
 	# 返回按钮
 	connect_managed(_back_button.pressed, _on_back_btn_pressed)

@@ -268,7 +268,7 @@ func _refresh_bounty_targets(tier: int) -> void:
 
 # ==============================================================================
 
-## 绑定本地 UI 交互信号（四 Tab 全部控件在本地脚本闭环）
+## 绑定本地 UI 交互信号（四 Tab 全部控件的本地交互事件）
 func _connect_signals() -> void:
 	# 返回按钮
 	connect_managed(_back_button.pressed, _on_back_pressed)

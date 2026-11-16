@@ -3,7 +3,7 @@
 # 文件路径: res://frontend/views/world_gateway/world_gateway_render_helper.gd
 # 架构定位: Presentation Helper / World Gateway Stateless Widget Renderer
 # 依赖与触发: 上游: WorldGatewayView, WorldGatewayTabs | 下游: UIIntermediary, DesignTokens | 配置: config/frontend/ui.json | 信号: 无
-# 职责说明: 无状态渲染世界网关页面的静态多语言标签、底座内容包状态横幅、单机档案列表与诊断详情。
+# 职责说明: 无状态渲染世界网关页面的静态多语言标签、基础内容包状态横幅、单机档案列表与诊断详情。
 # 退出语义与设计依据: 表现层零计算与只读快照映射契约
 # ==============================================================================
 
@@ -98,7 +98,7 @@ static func collect_probe_snapshot(response_payload: Dictionary, target_snapshot
         target_snapshot["active_base_pack_id"] = base_pack_id
 
 
-## 渲染当前运行模式标签、底座 MOD 激活状态横幅及创世按钮可用态
+## 渲染当前运行模式标签、基础 MOD 激活状态横幅及创世按钮可用态
 static func render_header_and_banner(host_view: Variant) -> void:
     if host_view.mode_status_label != null:
         var mode_key := "ui.wg.mode.multiplayer" if host_view.current_gateway_mode == 2 else "ui.wg.mode.single_player"

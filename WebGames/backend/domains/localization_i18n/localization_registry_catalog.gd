@@ -13,7 +13,7 @@ extends RefCounted
 
 const EMPTY_DICT: Dictionary = {}
 
-## 全局共享词库实例（懒加载）：启动即灌入 config/i18n 双词典（英文唯一底座 + 中文展示层）
+## 全局共享词库实例（懒加载）：启动即灌入 config/i18n 双词典（英文基准词典 + 中文展示层）
 static var _shared: LocalizationRegistryCatalog = null
 
 ## 获取共享的通用单例或数据引用
@@ -187,7 +187,7 @@ func unload_all_mod_translations() -> int:
 ## 全局名称键登记（跨域唯一性 + 英文唯一 fallback 必达）：
 ## - 同 key **不同域** → NAME_KEY_COLLISION，不覆盖原所有者；
 ## - 同 key **同域幂等重登记**（配置热重载/多实例 reload）→ 仅刷新词典值，不重复入清单；
-## - en_US 词典必写（英文 = 机器可读唯一底座）；zh_CN 可缺省（缺失时显示层回退英文）。
+## - en_US 词典必写（英文 = 机器可读唯一键源）；zh_CN 可缺省（缺失时显示层回退英文）。
 func register_name_key(key: String, domain: String, english_name: String, chinese_name: String = "") -> Dictionary:
     if _name_key_owners.has(key):
         if str(_name_key_owners[key]) == domain:

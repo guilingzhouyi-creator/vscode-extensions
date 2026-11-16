@@ -57,7 +57,7 @@ func set_spatial_header(spatial_position: Vector3, radius: float) -> EventPacket
 	effect_radius = maxf(0.0, radius)
 	return self
 
-## 设置 2D/2.5D 平面几何标头（无缝降维映射到 3D 无头坐标系）
+## 设置 2D/2.5D 平面几何标头（平面投影映射至 3D 无头坐标系）
 func set_spatial_header_2d(position_2d: Vector2, radius: float, is_isometric_xz: bool = false) -> EventPacket:
 	is_spatial = true
 	effect_radius = maxf(0.0, radius)

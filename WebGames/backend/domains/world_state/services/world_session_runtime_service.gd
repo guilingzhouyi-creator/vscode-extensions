@@ -4,7 +4,7 @@
 # 架构定位: Domain Runtime State Service / Session & HUD Resident Coordinator
 # 依赖与触发: 上游: AuthService, WorldGatewayFSM, UnifiedProtocolDispatcher | 下游: AuthoritativeHudSyncService, SaveDataAccessLayer | 配置: config/domains/world_state/core.json
 # 职责说明: 托管后端全 11 环会话运行时真源，维持主页 HUD 常驻状态拉取、脏标节流事件推送、真实多域存盘提供者挂载与退出对称回收。
-# 退出语义与设计依据: 卡拉尔后端全链路运行规约 (Inv-SESSION-VAULT-3, Inv-ADV-PRF-002, Inv-SYMMETRIC-TEARDOWN-4)
+# 退出语义与设计依据: 卡拉尔后端端到端运行规约 (Inv-SESSION-VAULT-3, Inv-ADV-PRF-002, Inv-SYMMETRIC-TEARDOWN-4)
 # ==============================================================================
 
 ## WorldSessionRuntimeService：后端全链运行时会话与常驻 HUD 托管服务

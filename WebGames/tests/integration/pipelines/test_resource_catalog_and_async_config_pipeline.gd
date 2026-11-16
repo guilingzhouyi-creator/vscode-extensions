@@ -2,7 +2,7 @@
 # 单元测试：统一资源索引中心与配置系统异步流式加载全链路流水线
 # 文件路径: res://tests/integration/pipelines/test_resource_catalog_and_async_config_pipeline.gd
 # 职责: 覆盖资源索引注册中心解析、多态解码器分发、GameConfig L0 极速启动预算、
-#       辅助资源工作池批量载入栅栏、JIT 按需实时兜底加载、批任务取消令牌阻断、
+#       辅助资源工作池批量载入栅栏、JIT 按需实时回退加载、批任务取消令牌阻断、
 #       DTO 序列化自洽性与测试单例隔离复位。
 # ==============================================================================
 class_name TestResourceCatalogAndAsyncConfigPipeline
@@ -140,7 +140,7 @@ static func test_worker_pool_batch_load_barrier() -> Dictionary:
 	AuxiliaryWorkerPool.reset_for_tests()
 	return make_result("TC-RIC-04: 辅助资源工作池批量载入栅栏与进度回调", ok)
 
-# ---- TC-RIC-05: JIT 按需实时兜底加载未预热配置表 ----
+# ---- TC-RIC-05: JIT 按需实时回退加载未预热配置表 ----
 static func test_game_config_jit_fallback() -> Dictionary:
 	var ok := true
 	var quest_cfg: Dictionary = GameConfig.get_dict("domains.quest", "")
@@ -150,9 +150,9 @@ static func test_game_config_jit_fallback() -> Dictionary:
 	ok = assert_gt(item_cfg.size(), 0, "TC-RIC-05B: JIT 动态加载 items.core 表应成功") and ok
 
 	var has_quest: bool = GameConfig.has("domains.quest", "quest_defaults")
-	ok = assert_true(has_quest, "TC-RIC-05C: has 接口应成功驱动 JIT 兜底") and ok
+	ok = assert_true(has_quest, "TC-RIC-05C: has 接口应成功驱动 JIT 回退加载") and ok
 
-	return make_result("TC-RIC-05: JIT 按需实时兜底加载未预热配置表", ok)
+	return make_result("TC-RIC-05: JIT 按需实时回退加载未预热配置表", ok)
 
 # ---- TC-RIC-06: 批量载入取消令牌即时阻断 ----
 static func test_batch_load_cancellation() -> Dictionary:
@@ -201,7 +201,7 @@ static func test_dto_serialization_and_reset() -> Dictionary:
 	ok = assert_eq(entry.resource_id, "", "TC-RIC-07F: 复位后 resource_id 应为空") and ok
 	ok = assert_eq(entry.estimated_bytes, 0, "TC-RIC-07G: 复位后 estimated_bytes 应为 0") and ok
 
-	var batch := BatchLoadRequestDTO.new("batch_99")
+	var batch := BatchLoadRequestDTO.new("batch_async_main")
 	batch.add_entry(restored_entry)
 	ok = assert_eq(batch.total_count, 1, "TC-RIC-07H: 批处理总数计算应正确") and ok
 

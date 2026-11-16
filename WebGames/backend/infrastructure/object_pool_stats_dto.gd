@@ -4,7 +4,7 @@
 # 架构定位: Object Pool Telemetry Snapshot Data Transfer Object
 # 依赖与触发: 上游: ObjectPool, ObjectPoolManager | 下游: EventBusCore | 配置: config/infrastructure/object_pool.json | 信号: 无
 # 职责说明: 对象池运行指标快照模型：记录累计分配数、活跃在用数、池内空闲数、峰值占用与溢出计数。
-# 退出语义与设计依据: 演进 03 高承压对象池与数据导向无头处理器架构规范
+# 退出语义与设计依据: 高承压对象池与数据导向无头处理器架构规范
 # ==============================================================================
 
 ## ObjectPoolStatsDTO：Object Pool Telemetry Snapshot Data Transfer Object

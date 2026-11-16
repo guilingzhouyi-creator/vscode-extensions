@@ -4,10 +4,10 @@
 # 架构定位: Integration Test Pipeline / Full-Chain Acceptance Harness
 # 依赖与触发: 上游: TestRegistry | 下游: account, world_gateway, character_creation,
 #           world_state, lifecycle, persistence_protocol
-# 职责说明: 全 11 环前后端交互协议数据流与后端闭环改造无头集成验收流水线，
-#           涵盖端到端正向闭环、EventBus双载荷与分流、序章交接精度、HUD常驻与节流、
+# 职责说明: 全 11 环前后端交互协议数据流与后端流转无头集成验收流水线，
+#           涵盖端到端正向流转、EventBus双载荷与分流、序章交接精度、HUD常驻与节流、
 #           ESC防残缺覆盖、活跃世界禁切网关、令牌脱敏注销、诚实停机失败及对称解体守恒。
-# 退出语义与设计依据: 全链路数据流交互契约规约 (TC-CHAIN-01 ~ TC-CHAIN-10, ADV-PRF-002)
+# 退出语义与设计依据: 全流程数据流交互契约规约 (TC-CHAIN-01 ~ TC-CHAIN-10, ADV-PRF-002)
 # ==============================================================================
 
 class_name TestFullChainBackendProtocolAndLifecyclePipeline
@@ -15,18 +15,18 @@ extends TestCase
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
-	results.append(test_p127_01_full_eleven_link_backend_protocol_e2e())
-	results.append(test_p127_02_event_packet_dual_payload_and_channel_isolation())
-	results.append(test_p127_03_prologue_handoff_l3_attrs_and_location_continuity())
-	results.append(test_p127_04_resident_hud_dirty_throttling_and_source_parity())
-	results.append(test_p127_05_esc_exit_blocks_three_field_stub_overwrite())
-	results.append(test_p127_06_active_world_blocks_hot_swap_and_exit_refreshes_probe())
-	results.append(test_p127_07_session_token_vault_masking_and_logout_revocation())
-	results.append(test_p127_08_honest_shutdown_failure_vs_force_quit_degradation())
-	results.append(test_p127_09_double_cycle_bootstrap_teardown_symmetry())
-	results.append(test_p127_10_protocol_pool_and_deterministic_high_freq_conservation())
+	results.append(test_chain_01_full_eleven_link_backend_protocol_e2e())
+	results.append(test_chain_02_event_packet_dual_payload_and_channel_isolation())
+	results.append(test_chain_03_prologue_handoff_l3_attrs_and_location_continuity())
+	results.append(test_chain_04_resident_hud_dirty_throttling_and_source_parity())
+	results.append(test_chain_05_esc_exit_blocks_three_field_stub_overwrite())
+	results.append(test_chain_06_active_world_blocks_hot_swap_and_exit_refreshes_probe())
+	results.append(test_chain_07_session_token_vault_masking_and_logout_revocation())
+	results.append(test_chain_08_honest_shutdown_failure_vs_force_quit_degradation())
+	results.append(test_chain_09_double_cycle_bootstrap_teardown_symmetry())
+	results.append(test_chain_10_protocol_pool_and_deterministic_high_freq_conservation())
 	_teardown_env()
-	return TestCase.pack_results("全链路前后端交互协议与后端闭环验收流水线", results)
+	return TestCase.pack_results("全流程前后端交互协议与后端联调验收流水线", results)
 
 static func _setup_env() -> void:
 	TestFullChainBackendHelper.setup_env()
@@ -37,15 +37,15 @@ static func _teardown_env() -> void:
 static func _dispatch(domain: String, action_type: String, payload: Dictionary = {}, token: String = "", account_id: String = "", character_id: String = "") -> UnifiedResponseEnvelopeDTO:
 	return TestFullChainBackendHelper.dispatch(domain, action_type, payload, token, account_id, character_id)
 
-## TC-P127-01: 全 11 环纯协议端到端闭环（无需前端视图即可独立跑通）
-static func test_p127_01_full_eleven_link_backend_protocol_e2e() -> Dictionary:
+## TC-CHAIN-01: 全 11 环纯协议端到端流转（无需前端视图即可独立跑通）
+static func test_chain_01_full_eleven_link_backend_protocol_e2e() -> Dictionary:
 	_setup_env()
 
 	# 1. 注册并自动登录
 	var r_reg := _dispatch("account", "REGISTER_ACCOUNT", {
-		"username": "p127_hero_e2e",
+		"username": "chain_hero_e2e",
 		"password_plain": "SecretPass999",
-		"device_fingerprint": "FP_P127_01",
+		"device_fingerprint": "FP_CHAIN_01",
 		"auto_login": true
 	})
 	var acc_id := String(r_reg.data.get("account_id", ""))
@@ -56,8 +56,8 @@ static func test_p127_01_full_eleven_link_backend_protocol_e2e() -> Dictionary:
 	var r_gw := _dispatch("world_gateway", "ENTER_GATEWAY", {}, token, acc_id)
 	var r_sel := _dispatch("world_gateway", "SELECT_OR_CREATE_WORLD", {
 		"target_mode": WorldGatewayModel.GameMode.SINGLE_PLAYER,
-		"world_id": "WORLD_P127_E2E",
-		"world_name": "Kalar_P127_World",
+		"world_id": "WORLD_CHAIN_E2E",
+		"world_name": "Kalar_Chain_World",
 		"slot_id": "SLOT_99",
 		"create_if_missing": true
 	}, token, acc_id)
@@ -65,10 +65,10 @@ static func test_p127_01_full_eleven_link_backend_protocol_e2e() -> Dictionary:
 
 	# 3. 权威创角（自动派生属性与开局事件流，启动序章）
 	var r_char := _dispatch("character_creation", "CREATE_AUTHORITATIVE_CHARACTER", {
-		"world_id": "WORLD_P127_E2E",
+		"world_id": "WORLD_CHAIN_E2E",
 		"slot_id": "SLOT_99",
 		"slot_index": 99,
-		"character_name": "ValenP127",
+		"character_name": "ValenChain",
 		"request_seed": 778899
 	}, token, acc_id)
 	var char_id := String(r_char.data.get("character_id", ""))
@@ -102,7 +102,7 @@ static func test_p127_01_full_eleven_link_backend_protocol_e2e() -> Dictionary:
 	# 8. 退出世界后合规切换运行网关模式
 	var r_switch := _dispatch("world_gateway", "SWITCH_GATEWAY_MODE", {
 		"target_mode": WorldGatewayModel.GameMode.SINGLE_PLAYER,
-		"world_id": "WORLD_P127_E2E",
+		"world_id": "WORLD_CHAIN_E2E",
 		"slot_id": "SLOT_99"
 	}, token, acc_id)
 	var ok_8: bool = r_switch.success
@@ -119,13 +119,13 @@ static func test_p127_01_full_eleven_link_backend_protocol_e2e() -> Dictionary:
 
 	_teardown_env()
 	var passed: bool = ok_1 and ok_2 and ok_3 and ok_4 and ok_5 and ok_6_7 and ok_8 and ok_9_10 and ok_11
-	return TestCase.make_result("TC-P127-01: 全 11 环纯协议端到端闭环", passed, {
+	return TestCase.make_result("TC-CHAIN-01: 全 11 环纯协议端到端流转", passed, {
 		"ok_1": ok_1, "ok_2": ok_2, "ok_3": ok_3, "ok_4": ok_4,
 		"ok_5": ok_5, "ok_6_7": ok_6_7, "ok_8": ok_8, "ok_9_10": ok_9_10, "ok_11": ok_11
 	})
 
-## TC-P127-02: EventPacket 双载荷兼容 + 专用信道分流隔离 + 零残留注销
-static func test_p127_02_event_packet_dual_payload_and_channel_isolation() -> Dictionary:
+## TC-CHAIN-02: EventPacket 双载荷兼容 + 专用信道分流隔离 + 零残留注销
+static func test_chain_02_event_packet_dual_payload_and_channel_isolation() -> Dictionary:
 	_setup_env()
 
 	var snap_hits: Array[Dictionary] = []
@@ -166,7 +166,7 @@ static func test_p127_02_event_packet_dual_payload_and_channel_isolation() -> Di
 	# 广播无关通用事件（不应误触发 on_prologue 与 on_world_entered）
 	EventBusCore.get_instance().emit_domain_event("account.login_succeeded", {"account_id": "ACC_SIG"})
 	EventBusCore.get_instance().emit_domain_event("prologue.step_advanced", {"step": 1})
-	EventBusCore.get_instance().emit_domain_event("world_gateway.world_entered", {"world_id": "W1"})
+	EventBusCore.get_instance().emit_domain_event("world_gateway.world_entered", {"world_id": "WORLD_01"})
 
 	AuthoritativeHudSyncService.unsubscribe_hud_channels(tokens)
 	# 注销后不再接收后续推送
@@ -177,10 +177,10 @@ static func test_p127_02_event_packet_dual_payload_and_channel_isolation() -> Di
 	var split_ok: bool = stat_hits.size() == 1 and clock_hits.size() == 1 and prologue_hits[0] == 1 and world_hits[0] == 1
 
 	_teardown_env()
-	return TestCase.make_result("TC-P127-02: EventPacket双载荷兼容与四信道精准分流隔离", dual_ok and wallet_ok and split_ok)
+	return TestCase.make_result("TC-CHAIN-02: EventPacket双载荷兼容与四信道精准分流隔离", dual_ok and wallet_ok and split_ok)
 
-## TC-P127-03: 序章交接 L3 属性与出生点无损透传至探索态 HUD
-static func test_p127_03_prologue_handoff_l3_attrs_and_location_continuity() -> Dictionary:
+## TC-CHAIN-03: 序章交接 L3 属性与出生点无损透传至探索态 HUD
+static func test_chain_03_prologue_handoff_l3_attrs_and_location_continuity() -> Dictionary:
 	_setup_env()
 
 	var gateway := WorldGatewayFSM.new("ACC_HANDOFF_01")
@@ -206,10 +206,10 @@ static func test_p127_03_prologue_handoff_l3_attrs_and_location_continuity() -> 
 	var gold_ok: bool = snap != null and snap.wallet_gold == 320 and pulled.wallet_gold == 320
 
 	_teardown_env()
-	return TestCase.make_result("TC-P127-03: 序章交接L3属性与出生点无损透传至探索态HUD", attrs_ok and loc_ok and gold_ok)
+	return TestCase.make_result("TC-CHAIN-03: 序章交接L3属性与出生点无损透传至探索态HUD", attrs_ok and loc_ok and gold_ok)
 
-## TC-P127-04: 主页 HUD 常驻后端服务真实溯源与脏标节流推送
-static func test_p127_04_resident_hud_dirty_throttling_and_source_parity() -> Dictionary:
+## TC-CHAIN-04: 主页 HUD 常驻后端服务真实溯源与脏标节流推送
+static func test_chain_04_resident_hud_dirty_throttling_and_source_parity() -> Dictionary:
 	_setup_env()
 
 	var captured_snaps: Array[int] = [0]
@@ -245,13 +245,13 @@ static func test_p127_04_resident_hud_dirty_throttling_and_source_parity() -> Di
 
 	tok.unbind()
 	_teardown_env()
-	return TestCase.make_result("TC-P127-04: 主页HUD常驻服务真实溯源与脏标节流", parity_ok and throttle_ok)
+	return TestCase.make_result("TC-CHAIN-04: 主页HUD常驻服务真实溯源与脏标节流", parity_ok and throttle_ok)
 
-## TC-P127-05: ESC 退回网关严禁以 3 字段空壳覆盖既有真实存档
-static func test_p127_05_esc_exit_blocks_three_field_stub_overwrite() -> Dictionary:
+## TC-CHAIN-05: ESC 退回网关严禁以 3 字段空壳覆盖既有真实存档
+static func test_chain_05_esc_exit_blocks_three_field_stub_overwrite() -> Dictionary:
 	_setup_env()
 
-	var slot_id := "SLOT_P127_GUARD_05"
+	var slot_id := "SLOT_GUARD_05"
 	var real_save_data := {
 		"account": {"account_id": "ACC_GUARD_05", "character": "Arthur"},
 		"world_navigation": {"world_id": "W_GUARD", "day": 12},
@@ -280,14 +280,14 @@ static func test_p127_05_esc_exit_blocks_three_field_stub_overwrite() -> Diction
 	var intact_ok: bool = bool(reload.get("success", false)) and reloaded_data.has("inventory") and reloaded_data.has("account")
 
 	_teardown_env()
-	return TestCase.make_result("TC-P127-05: ESC退回网关严禁3字段空壳覆盖真实存档", init_ok and stub_blocked and intact_ok)
+	return TestCase.make_result("TC-CHAIN-05: ESC退回网关严禁3字段空壳覆盖真实存档", init_ok and stub_blocked and intact_ok)
 
-## TC-P127-06: 活跃世界严禁热切换网关模式，退出世界后同步模式闸门并刷新探针
-static func test_p127_06_active_world_blocks_hot_swap_and_exit_refreshes_probe() -> Dictionary:
+## TC-CHAIN-06: 活跃世界严禁热切换网关模式，退出世界后同步模式闸门并刷新探针
+static func test_chain_06_active_world_blocks_hot_swap_and_exit_refreshes_probe() -> Dictionary:
 	_setup_env()
 
 	var r_reg := _dispatch("account", "REGISTER_ACCOUNT", {
-		"username": "p127_switch_user",
+		"username": "chain_switch_user",
 		"password_plain": "SwitchPass123",
 		"device_fingerprint": "FP_SW",
 		"auto_login": true
@@ -297,7 +297,7 @@ static func test_p127_06_active_world_blocks_hot_swap_and_exit_refreshes_probe()
 	_dispatch("world_gateway", "ENTER_GATEWAY", {}, token, acc_id)
 	_dispatch("world_gateway", "SELECT_OR_CREATE_WORLD", {
 		"target_mode": WorldGatewayModel.GameMode.SINGLE_PLAYER,
-		"world_id": "WORLD_P127_SW",
+		"world_id": "WORLD_CHAIN_SW",
 		"slot_id": "SLOT_SW_01"
 	}, token, acc_id)
 
@@ -320,19 +320,19 @@ static func test_p127_06_active_world_blocks_hot_swap_and_exit_refreshes_probe()
 	# 退出后合规重选单机网关模式
 	var sw_resp := _dispatch("world_gateway", "SWITCH_GATEWAY_MODE", {
 		"target_mode": WorldGatewayModel.GameMode.SINGLE_PLAYER,
-		"world_id": "WORLD_P127_SW",
+		"world_id": "WORLD_CHAIN_SW",
 		"slot_id": "SLOT_SW_01"
 	}, token, acc_id)
 
 	_teardown_env()
-	return TestCase.make_result("TC-P127-06: 活跃态禁切网关与退世界模式闸门及探针刷新", hot_blocked and exit_resp.success and probe_refreshed and gate_reset and sw_resp.success)
+	return TestCase.make_result("TC-CHAIN-06: 活跃态禁切网关与退世界模式闸门及探针刷新", hot_blocked and exit_resp.success and probe_refreshed and gate_reset and sw_resp.success)
 
-## TC-P127-07: 会话令牌内存掩码托管、LOGOUT_ACCOUNT 吊销拦截与首页脱敏模型
-static func test_p127_07_session_token_vault_masking_and_logout_revocation() -> Dictionary:
+## TC-CHAIN-07: 会话令牌内存掩码托管、LOGOUT_ACCOUNT 吊销拦截与首页脱敏模型
+static func test_chain_07_session_token_vault_masking_and_logout_revocation() -> Dictionary:
 	_setup_env()
 
 	var r_reg := _dispatch("account", "REGISTER_ACCOUNT", {
-		"username": "p127_vault_user",
+		"username": "chain_vault_user",
 		"password_plain": "VaultPass123",
 		"device_fingerprint": "FP_VAULT",
 		"auto_login": true
@@ -356,10 +356,10 @@ static func test_p127_07_session_token_vault_masking_and_logout_revocation() -> 
 	var leak_free: bool = not known.is_empty() and not (known[0] as Dictionary).has("password_hash_sha256") and not (known[0] as Dictionary).has("token_masked")
 
 	_teardown_env()
-	return TestCase.make_result("TC-P127-07: 令牌内存脱敏与注销拦截防复发", masked_ok and r_logout.success and wiped_ok and blocked_ok and leak_free)
+	return TestCase.make_result("TC-CHAIN-07: 令牌内存脱敏与注销拦截防复发", masked_ok and r_logout.success and wiped_ok and blocked_ok and leak_free)
 
-## TC-P127-08: 生命周期诚实停机失败（require_save_success=true）vs force_quit 降级
-static func test_p127_08_honest_shutdown_failure_vs_force_quit_degradation() -> Dictionary:
+## TC-CHAIN-08: 生命周期诚实停机失败（require_save_success=true）vs force_quit 降级
+static func test_chain_08_honest_shutdown_failure_vs_force_quit_degradation() -> Dictionary:
 	_setup_env()
 
 	# 1. 要求存档必成且非强退，在无提供者的无效空档下请求停机 -> 必须失败并进入 STOP_FAILED
@@ -390,15 +390,15 @@ static func test_p127_08_honest_shutdown_failure_vs_force_quit_degradation() -> 
 		and (not GameBootstrap.is_assembled())
 
 	_teardown_env()
-	return TestCase.make_result("TC-P127-08: 生命周期诚实停机失败与强退降级契约", strict_failed_honestly and force_degraded_ok)
+	return TestCase.make_result("TC-CHAIN-08: 生命周期诚实停机失败与强退降级契约", strict_failed_honestly and force_degraded_ok)
 
-## TC-P127-09: 双轮启动-会话-解体全系统对称零污染校验
-static func test_p127_09_double_cycle_bootstrap_teardown_symmetry() -> Dictionary:
+## TC-CHAIN-09: 双轮启动-会话-解体全系统对称零污染校验
+static func test_chain_09_double_cycle_bootstrap_teardown_symmetry() -> Dictionary:
 	_setup_env()
 
 	# 第一轮运行并产生会话与世界状态
 	WorldSessionRuntimeService.activate_world_session({
-		"account_id": "ACC_CYCLE_1", "world_id": "W1", "slot_id": "SLOT_C1",
+		"account_id": "ACC_CYCLE_1", "world_id": "WORLD_01", "slot_id": "SLOT_C1",
 		"character_id": "CHAR_C1", "character_name": "CycleOne", "wallet_gold": 999
 	}, false)
 	HumanControlLeaseManager.renew_human_lease("ACC_CYCLE_1", 7)
@@ -421,10 +421,10 @@ static func test_p127_09_double_cycle_bootstrap_teardown_symmetry() -> Dictionar
 		and PrologueCutscenePort.has_runner()
 
 	_teardown_env()
-	return TestCase.make_result("TC-P127-09: 双轮启动与对称解体零残余污染校验", clean_after_td and second_cycle_clean)
+	return TestCase.make_result("TC-CHAIN-09: 双轮启动与对称解体零残余污染校验", clean_after_td and second_cycle_clean)
 
-## TC-P127-10: 高频信封池化 ADV-PRF-002 借还严格守恒与确定性压测
-static func test_p127_10_protocol_pool_and_deterministic_high_freq_conservation() -> Dictionary:
+## TC-CHAIN-10: 高频信封池化 ADV-PRF-002 借还严格守恒与确定性压测
+static func test_chain_10_protocol_pool_and_deterministic_high_freq_conservation() -> Dictionary:
 	_setup_env()
 
 	var rng := DeterministicRNG.new(20261110)
@@ -448,4 +448,4 @@ static func test_p127_10_protocol_pool_and_deterministic_high_freq_conservation(
 		and int(stats.get("resp_pooled", 0)) > 0
 
 	_teardown_env()
-	return TestCase.make_result("TC-P127-10: 高频信封池化ADV-PRF-002借还守恒与确定性压测", conserved, stats)
+	return TestCase.make_result("TC-CHAIN-10: 高频信封池化ADV-PRF-002借还守恒与确定性压测", conserved, stats)

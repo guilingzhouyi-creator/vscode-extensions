@@ -399,7 +399,7 @@ func _on_shop_confirm_pressed() -> void:
 # 信号绑定与工具方法
 # ==============================================================================
 
-## 绑定本地 UI 交互信号（七 Tab 控件本地交互闭环）
+## 绑定本地 UI 交互信号（七 Tab 控件本地交互事件）
 func _connect_signals() -> void:
 	connect_managed(_back_button.pressed, _on_back_pressed)
 	connect_managed(_tab_container.tab_changed, _on_tab_changed)

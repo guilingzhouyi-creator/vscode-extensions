@@ -122,7 +122,7 @@ func _claim_drop_instance(drop: GroundDroppedItemAggregate) -> bool:
 	return has_drop
 
 ## N2：拾取便捷入口——查找 → GroundLootPickupSolver.attempt_pickup →
-## 成功后出队，拾取链与监听器活跃掉落状态闭环（TC-/）。
+## 成功后出队，维持拾取链与监听器活跃掉落状态同步。
 ## 优化：复用已查 drop 实例直接出队，避免 claim_drop 二次查找
 func attempt_pickup_from_ground(
 	player_account_id: String,

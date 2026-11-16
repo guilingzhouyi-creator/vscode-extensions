@@ -4,7 +4,7 @@
 # 架构定位: Generalized Configuration Router Engine
 # 依赖与触发: 触发方: GameConfig.get_* 全局调用 | 上游: ConfigRouteDTO | 下游: 各领域子配置表
 # 职责说明: 提供多配置表点分命名空间解析、兼容别名重定向与键路径智能分派。
-# 退出语义与设计依据: 演进 01 超大型子域多配置表目录拆分与泛化路由架构
+# 退出语义与设计依据: 超大型子域多配置表目录拆分与泛化路由架构
 # ==============================================================================
 
 ## ConfigRouterEngine：Generalized Configuration Router Engine

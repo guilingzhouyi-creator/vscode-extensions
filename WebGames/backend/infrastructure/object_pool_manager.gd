@@ -5,7 +5,7 @@
 # 依赖与触发: 上游: GameBootstrap, 各业务域工厂 | 下游: ObjectPool, GameConfig, EventBusCore | 配置: config/infrastructure/object_pool.json | 信号: 对象池装配/清空事件
 # 职责说明: 全域对象池集中管理中枢：提供单例池注册、配置装配驱动、对称反装配
 #           与集中生命周期追踪，消除散落无序的对象池实例化与内存泄漏。
-# 退出语义与设计依据: 演进 03 高承压对象池与数据导向无头处理器架构规范
+# 退出语义与设计依据: 高承压对象池与数据导向无头处理器架构规范
 # ==============================================================================
 
 ## ObjectPoolManager：Object Pool Central Orchestrator & Registry

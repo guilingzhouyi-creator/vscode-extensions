@@ -3,7 +3,7 @@
 # 文件路径: res://backend/domains/item_namespace_registry/item_instance_factory.gd
 # 架构定位: Domain Factory / Entity Assembler
 # 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_namespace_registry.json | 信号: EventBus 领域广播
-# 职责说明: 全链路发放统一入口：注册表原型 → 实例 + 权威 UID（发放来源前缀隔离）。 GM give / CDKey / 邮件礼物 / 抽卡 / 服务器发放一律经本工厂， 杜绝各链路自造实例 ID 漂移；item_id 兼容保留（item_id_prefix 非空时沿用）。
+# 职责说明: 统一发放入口：注册表原型 → 实例 + 权威 UID（发放来源前缀隔离）。 GM give / CDKey / 邮件礼物 / 抽卡 / 服务器发放一律经本工厂， 杜绝各调用路径自造实例 ID 漂移；item_id 兼容保留（item_id_prefix 非空时沿用）。
 # 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 

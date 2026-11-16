@@ -4,7 +4,7 @@
 # 架构定位: Domain Support Helper / MOD Deletion & Manifest Lifecycle Mutations
 # 依赖与触发: 上游: WorldGatewayProtocolHandler | 下游: WorldModPackageOpsHelper, CausalityDagValidator, ModPrecheckAndAdaptationSolver, ModPackageDiscoverySolver
 # 职责说明: 为游戏内 MOD 工坊与统一协议提供受保护的 MOD 包安全卸载删除、pack.json 清单元数据更新与 DAG 图元落盘能力。
-# 退出语义与设计依据: 路径穿越防御、核心包保护、SHA-256 清单重算与拓扑闭环验证契约
+# 退出语义与设计依据: 路径穿越防御、核心包保护、SHA-256 清单重算与拓扑完整性验证契约
 # ==============================================================================
 
 ## WorldModLifecycleHelper：游戏内 MOD 删除卸载与清单元数据编辑助手

@@ -4,7 +4,7 @@
 # 架构定位: Domain Support Helper / In-Game MOD Archive (.kmod) Pack & Install Operations
 # 依赖与触发: 上游: WorldGatewayProtocolHandler | 下游: WorldModPackageOpsHelper, ModPackageDiscoverySolver
 # 职责说明: 为游戏内 MOD 工坊与统一协议提供打包 .kmod 归档包与安全安装 .kmod/文件夹至 user://mods/ 的全流程能力。
-# 退出语义与设计依据: 路径穿越防御、SHA-256 清单验签与纯真本地闭环规范
+# 退出语义与设计依据: 路径穿越防御、SHA-256 清单验签与本地校验规范
 # ==============================================================================
 
 ## WorldModArchiveOpsHelper：游戏内 MOD 打包 (.kmod) 与安全安装助手

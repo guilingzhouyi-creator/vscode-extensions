@@ -3,8 +3,8 @@
 # 文件路径: res://backend/infrastructure/logging/system_base_messages.gd
 # 架构定位: Compliant Standard English Base Text Library
 # 依赖与触发: 上游: GameBootstrap, GameConfig, ObjectPool, LogFileExporter, ContractRegistryIndex | 下游: TemplateFormatter, GameConfig | 配置: config/infrastructure/log.json | 信号: 无
-# 职责说明: 集中收口底层内核与基础设施合规标准英文底座诊断文本库（均以 {param} 命名占位符格式化），与配置驱动前端/业务多语言文案严格解耦。
-# 退出语义与设计依据: 英文底座文本纯洁性契约 (TC-ARCH-12) / 动态占位符统一注入规范
+# 职责说明: 集中收口底层内核与基础设施合规标准英文基础诊断文本库（均以 {param} 命名占位符格式化），与配置驱动前端/业务多语言文案严格解耦。
+# 退出语义与设计依据: 英文基础文本纯洁性契约 (TC-ARCH-12) / 动态占位符统一注入规范
 # ==============================================================================
 
 ## SystemBaseMessages：Compliant Standard English Base Text Library
@@ -51,10 +51,10 @@ const MSG_LOG_ENCRYPTION_UNAVAILABLE: String = "Log encryption enabled without s
 const MSG_LOG_DECRYPT_FAILED: String = "Encrypted log record verification or decryption failed at line {line}: {reason}"
 
 # ==============================================================================
-# 二、底座英文文本库格式化算子
+# 二、基础英文文本库格式化算子
 # ==============================================================================
 
-## 使用合规 {param} 命名占位符格式化底座标准英文文本
+## 使用合规 {param} 命名占位符格式化标准英文文本
 static func format(template_text: String, parameters: Dictionary = {}) -> String:
 	if template_text.is_empty():
 		return ""
@@ -62,7 +62,7 @@ static func format(template_text: String, parameters: Dictionary = {}) -> String
 		return template_text
 	return TemplateFormatter.format(template_text, parameters)
 
-## 优先从 config/infrastructure/log.json events 读取配置文案模板，缺省回退合规标准英文底座文本
+## 优先从 config/infrastructure/log.json events 读取配置文案模板，缺省回退合规标准英文文本
 static func resolve_event_or_base(event_code: String, base_template: String, parameters: Dictionary = {}) -> String:
 	var config_template: String = GameConfig.get_string(
 		LogConstants.CFG_LOG_TABLE,

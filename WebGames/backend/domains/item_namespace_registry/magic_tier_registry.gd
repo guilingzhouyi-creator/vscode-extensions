@@ -281,7 +281,7 @@ func _register_one(shared: LocalizationRegistryCatalog, entry: Dictionary, colli
 	var key: String = str(entry.get("name_key", ""))
 	if key.is_empty():
 		return
-	# 英文底座优先取词典文件值（config/i18n/en_US.json），未登记时默认回退键本体
+	# 英文基础词条优先取词典文件值（config/i18n/en_US.json），未登记时默认回退键本体
 	var english_name: String = str(shared._locale_dictionaries.get("en_US", {}).get(key, key))
 	var register_result := shared.register_name_key(key, "magic", english_name)
 	if not register_result.success:

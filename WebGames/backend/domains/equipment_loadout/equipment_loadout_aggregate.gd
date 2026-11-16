@@ -114,7 +114,7 @@ func snapshot_slots() -> Dictionary:
 			slot_snapshot[slot_name] = slot_item.item_uid
 	return slot_snapshot
 
-## 依 item_uid 从 inventory 反查重建实例回挂；调用时序铁律：先 inventory.restore() 再本方法。
+## 依 item_uid 从 inventory 反查重建实例回挂；调用时序约束：先 inventory.restore() 再本方法。
 ## 幂等：先清空全部槽位（命中实例置 UNOWNED），再按快照逐槽回挂（未找到的 uid 槽位保持空）。
 func restore_slots(slot_snapshot: Dictionary, inventory: WearableInventoryAggregate = null) -> void:
 	if slot_snapshot == null:

@@ -86,7 +86,7 @@ static func resolve(i18n_key: String, template_payload: Dictionary = {}) -> Stri
 		var fallback_views := GameConfig.get_string("frontend.views", i18n_key, "")
 		if not fallback_views.is_empty():
 			return PlaceholderFiller.fill(fallback_views, template_payload)
-		# 若 key 自身已是包含空格或大括号的英文底座模板/人读消息，直接填充参数输出，避免被包装成 [key]
+		# 若 key 自身已是包含空格或大括号的英文模板/人读消息，直接填充参数输出，避免被包装成 [key]
 		if i18n_key.contains(" ") or i18n_key.contains("{"):
 			return PlaceholderFiller.fill(i18n_key, template_payload)
 		return "[" + i18n_key + "]"

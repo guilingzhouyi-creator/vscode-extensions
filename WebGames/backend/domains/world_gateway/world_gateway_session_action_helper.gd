@@ -12,7 +12,7 @@ class_name WorldGatewaySessionActionHelper
 extends RefCounted
 
 
-## 处理 ENTER_GATEWAY：初始化网关并附带底座内容包就绪探针结果
+## 处理 ENTER_GATEWAY：初始化网关并附带基础内容包就绪探针结果
 static func handle_enter_gateway(
     request: ClientRequestEnvelopeDTO,
     active_gateway: WorldGatewayFSM
@@ -180,7 +180,7 @@ static func _attach_character_selection_metadata(response_payload: Dictionary, a
         response_payload["character_status"] = "CHARACTER_PENDING" if requires_creation else "SLOT_WORLD_RESOLVED"
 
 
-## 解析当前活跃或已安装的底座内容 MOD pack_id
+## 解析当前活跃或已安装的基础内容 MOD pack_id
 static func resolve_active_base_pack_id(installed_summary: Dictionary, active_mod_list: Array) -> String:
     for entry in active_mod_list:
         if entry is Dictionary and (entry as Dictionary).get("pack_profile", "") in ["OFFICIAL_BASE", "TOTAL_CONVERSION"]:

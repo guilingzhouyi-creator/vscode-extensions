@@ -278,7 +278,7 @@ func _refresh_cdkey_history() -> void:
 # 信号绑定
 # ==============================================================================
 
-## 绑定本地 UI 交互信号（四标签页控件在本地脚本闭环）
+## 绑定本地 UI 交互信号（四标签页控件的本地交互事件）
 func _connect_signals() -> void:
 	# 返回按钮
 	connect_managed(_back_button.pressed, _on_back_btn_pressed)

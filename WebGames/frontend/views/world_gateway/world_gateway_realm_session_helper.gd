@@ -200,7 +200,7 @@ static func logout_to_account_entry(host_view: Variant, tabs_controller: Variant
         on_completed.call({"success": true})
 
 
-## 触发五阶段安全优雅停机退出游戏（headless 运行时仅验证协议闭环而不中断测试进程）
+## 触发五阶段安全优雅停机退出游戏（headless 运行时仅验证完整停机流程而不中断测试进程）
 static func quit_desktop_application(host_view: Variant, on_completed: Callable = Callable()) -> Dictionary:
     var account_id := str(host_view.current_account_id) if host_view != null and "current_account_id" in host_view else ""
     var session_token := str(host_view.current_session_token) if host_view != null and "current_session_token" in host_view else ""

@@ -320,7 +320,7 @@ func _refresh_name_history() -> void: _get_tabs().refresh_name_history()
 # 信号绑定
 # ==============================================================================
 
-## 绑定本地 UI 交互信号（四 Tab 控件在本地脚本闭环）
+## 绑定本地 UI 交互信号（四 Tab 控件的本地交互事件）
 func _connect_signals() -> void:
 	connect_managed(_back_button.pressed, _on_back_btn_pressed)
 	connect_managed(_main_tab_container.tab_changed, _on_tab_changed)
