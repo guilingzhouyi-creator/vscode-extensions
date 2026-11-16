@@ -98,16 +98,16 @@ func render_pack_detail() -> void:
 	var entry_map := pack_entry as Dictionary
 	var dependencies_value: Variant = entry_map.get("dependencies", [])
 	_view.pack_detail_rich_label.append_text(
-		"Pack ID: %s\nName: %s\nVersion: %s\nProfile: %s\nOfficial: %s\nHas Prologue DAG: %s\nSHA-256: %s\nDependencies: %s" % [
-			str(entry_map.get("pack_id", "")),
-			str(entry_map.get("display_name", "")),
-			str(entry_map.get("version", "")),
-			str(entry_map.get("pack_profile", "")),
-			str(bool(entry_map.get("is_official", false))),
-			str(bool(entry_map.get("has_prologue_dag", false))),
-			str(entry_map.get("content_sha256", "")),
-			str(dependencies_value),
-		]
+		UIIntermediary.text("ui.mw.detail.template", {
+			"pack_id": str(entry_map.get("pack_id", "")),
+			"display_name": str(entry_map.get("display_name", "")),
+			"version": str(entry_map.get("version", "")),
+			"pack_profile": str(entry_map.get("pack_profile", "")),
+			"is_official": str(bool(entry_map.get("is_official", false))),
+			"has_prologue_dag": str(bool(entry_map.get("has_prologue_dag", false))),
+			"content_sha256": str(entry_map.get("content_sha256", "")),
+			"dependencies": str(dependencies_value),
+		})
 	)
 
 ## 渲染预检与拓扑排序诊断摘要
@@ -124,19 +124,22 @@ func render_precheck_report() -> void:
 	var has_base := bool(data_map.get("has_base_content_mod", false))
 	var load_order: Variant = data_map.get("enabled_pack_ids", _view.selected_pack_ids)
 	_view.precheck_rich_label.append_text(
-		"Precheck Valid: %s\nBase Content Pack Mounted: %s\nError Code: %s\nLoad Order: %s" % [
-			str(precheck_passed),
-			str(has_base),
-			error_code if not error_code.is_empty() else "NONE",
-			str(load_order)
-		]
+		UIIntermediary.text("ui.mw.precheck.report_template", {
+			"passed": str(precheck_passed),
+			"has_base": str(has_base),
+			"error_code": error_code if not error_code.is_empty() else "NONE",
+			"load_order": str(load_order),
+		})
 	)
 
 func _render_summary_badge() -> void:
 	if _view.summary_badge_label == null:
 		return
 	var has_base := _detect_selected_base_pack()
-	_view.summary_badge_label.text = "Enabled: %d | Base: %s" % [_view.selected_pack_ids.size(), "OK" if has_base else "MISSING"]
+	_view.summary_badge_label.text = UIIntermediary.text("ui.mw.badge.summary", {
+		"enabled": _view.selected_pack_ids.size(),
+		"base_status": "OK" if has_base else "MISSING",
+	})
 	_view.summary_badge_label.modulate = DesignTokens.COLOR_SUCCESS_DEFAULT if has_base else DesignTokens.COLOR_WARNING_DEFAULT
 
 func _detect_selected_base_pack() -> bool:
@@ -183,7 +186,7 @@ func move_focused_pack(direction_offset: int) -> void:
 	_view.selected_pack_ids.insert(target_order, pack_id)
 	render_all()
 
-## 提交已勾选 MOD 清单到世界网关会话并运行 DAG/兼容预检
+## 提交已勾选 MOD 清单到世界网关会话并运行 DAG/兼容预检（透传自定义扫描目录）
 func commit_selection_and_precheck(on_completed: Callable = Callable()) -> Dictionary:
 	var world_service: IWorldService = ServiceLocator.get_instance().world()
 	if world_service == null:
@@ -191,6 +194,7 @@ func commit_selection_and_precheck(on_completed: Callable = Callable()) -> Dicti
 	var selection_reply: Dictionary = {}
 	var precheck_reply: Dictionary = {}
 	var selected_ids: Array = (_view.selected_pack_ids as Array).duplicate() if (_view != null and _view.selected_pack_ids is Array) else []
+	var custom_roots: Array = (_view.custom_scan_roots as Array).duplicate() if (_view != null and _view.custom_scan_roots is Array) else []
 	world_service.set_mod_selection_async(
 		_view.current_account_id,
 		_view.current_session_token,
@@ -206,7 +210,88 @@ func commit_selection_and_precheck(on_completed: Callable = Callable()) -> Dicti
 					if _view != null and is_instance_valid(_view):
 						_view.apply_snapshot({"precheck_report": precheck_payload})
 					if on_completed.is_valid():
-						on_completed.call(precheck_payload)
-			)
+						on_completed.call(precheck_payload),
+				custom_roots
+			),
+		custom_roots
 	)
 	return precheck_reply
+
+## 在自定义目录或沙盒根目录创建合规 MOD 骨架并刷新列表
+func create_mod_pack(pack_spec: Dictionary = {}, on_completed: Callable = Callable()) -> Dictionary:
+	var world_service: IWorldService = ServiceLocator.get_instance().world()
+	if world_service == null:
+		return ServiceLocator.reply_service_unavailable(on_completed)
+	var resolved_spec := pack_spec.duplicate(true)
+	if not resolved_spec.has("pack_id") and _view != null and _view.pack_id_edit != null:
+		resolved_spec["pack_id"] = _view.pack_id_edit.text.strip_edges()
+	if not resolved_spec.has("target_root") and _view != null and not _view.custom_scan_roots.is_empty():
+		resolved_spec["target_root"] = str(_view.custom_scan_roots[0])
+	var create_reply: Dictionary = {}
+	world_service.create_mod_pack_async(
+		_view.current_account_id if _view != null else "",
+		_view.current_session_token if _view != null else "",
+		resolved_spec,
+		func(response_payload: Dictionary) -> void:
+			create_reply.merge(response_payload, true)
+			if bool(response_payload.get("success", false)) and _view != null and is_instance_valid(_view):
+				var target_root := str((response_payload.get("data", {}) as Dictionary).get("target_root", ""))
+				if not target_root.is_empty() and not (target_root in _view.custom_scan_roots):
+					_view.custom_scan_roots.append(target_root)
+				refresh_installed_packs()
+			if on_completed.is_valid():
+				on_completed.call(response_payload)
+	)
+	return create_reply
+
+## 将当前聚焦 MOD 包或指定目录打包为 .kmod 归档文件
+func pack_focused_mod_kmod(source_override: String = "", output_override: String = "", on_completed: Callable = Callable()) -> Dictionary:
+	var world_service: IWorldService = ServiceLocator.get_instance().world()
+	if world_service == null:
+		return ServiceLocator.reply_service_unavailable(on_completed)
+	var source_directory := source_override.strip_edges()
+	if source_directory.is_empty() and _view != null and _view.focused_pack_index >= 0 and _view.focused_pack_index < _view.installed_packs.size():
+		var entry: Variant = _view.installed_packs[_view.focused_pack_index]
+		if entry is Dictionary:
+			source_directory = str((entry as Dictionary).get("root_path", ""))
+	if source_directory.is_empty() and _view != null and _view.custom_root_edit != null:
+		source_directory = _view.custom_root_edit.text.strip_edges()
+	var pack_reply: Dictionary = {}
+	world_service.pack_mod_kmod_async(
+		_view.current_account_id if _view != null else "",
+		_view.current_session_token if _view != null else "",
+		source_directory,
+		output_override,
+		func(response_payload: Dictionary) -> void:
+			pack_reply.merge(response_payload, true)
+			if bool(response_payload.get("success", false)) and _view != null and is_instance_valid(_view):
+				refresh_installed_packs()
+			if on_completed.is_valid():
+				on_completed.call(response_payload)
+	)
+	return pack_reply
+
+## 将输入的 .kmod 归档或 MOD 目录安装至本地 mods 目录并刷新列表
+func install_mod_from_input(source_override: String = "", target_root: String = "user://mods/", on_completed: Callable = Callable()) -> Dictionary:
+	var world_service: IWorldService = ServiceLocator.get_instance().world()
+	if world_service == null:
+		return ServiceLocator.reply_service_unavailable(on_completed)
+	var source_path := source_override.strip_edges()
+	if source_path.is_empty() and _view != null and _view.custom_root_edit != null:
+		source_path = _view.custom_root_edit.text.strip_edges()
+	var install_reply: Dictionary = {}
+	world_service.install_mod_pack_async(
+		_view.current_account_id if _view != null else "",
+		_view.current_session_token if _view != null else "",
+		source_path,
+		target_root,
+		func(response_payload: Dictionary) -> void:
+			install_reply.merge(response_payload, true)
+			if bool(response_payload.get("success", false)) and _view != null and is_instance_valid(_view):
+				if not (target_root in _view.custom_scan_roots) and target_root != "user://mods/":
+					_view.custom_scan_roots.append(target_root)
+				refresh_installed_packs()
+			if on_completed.is_valid():
+				on_completed.call(response_payload)
+	)
+	return install_reply

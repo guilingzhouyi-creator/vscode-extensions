@@ -30,6 +30,10 @@ var _tabs: TabsClass = null
 @onready var back_btn: Button = %BackBtn
 @onready var custom_root_edit: LineEdit = %CustomRootEdit
 @onready var rescan_packs_btn: Button = %RescanPacksBtn
+@onready var pack_id_edit: LineEdit = %PackIdEdit
+@onready var create_mod_btn: Button = %CreateModBtn
+@onready var pack_kmod_btn: Button = %PackKmodBtn
+@onready var install_mod_btn: Button = %InstallModBtn
 @onready var installed_header_label: Label = %InstalledHeaderLabel
 @onready var installed_pack_list: ItemList = %InstalledPackList
 @onready var toggle_pack_btn: Button = %TogglePackBtn
@@ -88,6 +92,12 @@ func _connect_signals() -> void:
 		connect_managed(move_up_btn.pressed, _on_move_up_debounced)
 	if move_down_btn != null:
 		connect_managed(move_down_btn.pressed, _on_move_down_debounced)
+	if create_mod_btn != null:
+		connect_managed(create_mod_btn.pressed, _on_create_mod_debounced)
+	if pack_kmod_btn != null:
+		connect_managed(pack_kmod_btn.pressed, _on_pack_kmod_debounced)
+	if install_mod_btn != null:
+		connect_managed(install_mod_btn.pressed, _on_install_mod_debounced)
 
 func _on_back_debounced() -> void:
 	if try_consume_action_cooldown("mw_back", 200):
@@ -119,3 +129,15 @@ func _on_move_up_debounced() -> void:
 func _on_move_down_debounced() -> void:
 	if try_consume_action_cooldown("mw_move_down", 120):
 		_get_tabs().move_focused_pack(1)
+
+func _on_create_mod_debounced() -> void:
+	if try_consume_action_cooldown("mw_create_mod", 200):
+		_get_tabs().create_mod_pack()
+
+func _on_pack_kmod_debounced() -> void:
+	if try_consume_action_cooldown("mw_pack_kmod", 200):
+		_get_tabs().pack_focused_mod_kmod()
+
+func _on_install_mod_debounced() -> void:
+	if try_consume_action_cooldown("mw_install_mod", 200):
+		_get_tabs().install_mod_from_input()

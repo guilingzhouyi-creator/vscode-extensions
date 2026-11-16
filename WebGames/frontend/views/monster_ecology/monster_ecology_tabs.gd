@@ -11,7 +11,6 @@ class_name MonsterEcologyTabs
 extends BaseScreen
 
 const KButtonClass = preload("res://frontend/components/k_button.gd")
-const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
 const KPageHeaderClass = preload("res://frontend/components/k_page_header.gd")
 const KSplitPanelClass = preload("res://frontend/components/k_split_panel.gd")
 
@@ -106,9 +105,9 @@ func setup(host_view: BaseScreen) -> void:
 
 ## 初始化 Tab 标题
 func _init_tab_titles() -> void:
-	if _view == null or _view._tab_container == null:
+	if _view == null or _view.tab_container == null:
 		return
-	KTabBar.init_titles(_view._tab_container, PackedStringArray([
+	KTabBar.init_titles(_view.tab_container, PackedStringArray([
 		"ui.fe11.bestiary.tab_title",
 		"ui.fe11.world_boss.tab_title",
 		"ui.fe11.beast_tide.tab_title",
@@ -129,7 +128,7 @@ func _init_subpanel_text() -> void:
 	var boss_rewards_label: Label = _view.get_node_or_null("MainLayout/TabContainer/世界BOSS/RightPanel/RewardsLabel")
 	if boss_rewards_label != null:
 		UIIntermediary.resolve(boss_rewards_label, "ui.fe11.world_boss.detail.rewards_label")
-	UIIntermediary.resolve(_view._boss_challenge_button, "ui.fe11.world_boss.detail.challenge_btn")
+	UIIntermediary.resolve(_view.boss_challenge_button, "ui.fe11.world_boss.detail.challenge_btn")
 
 	# --- Tab 2: BEAST_TIDE 兽潮 ---
 	var tide_defense_label: Label = _view.get_node_or_null("MainLayout/TabContainer/兽潮调度/StatusPanel/StatusVBox/DefenseRow/DefenseLabel")
@@ -144,7 +143,7 @@ func _init_subpanel_text() -> void:
 	if rewards_section_label != null:
 		UIIntermediary.resolve(rewards_section_label, "ui.fe11.beast_tide.rewards_section_title")
 
-	UIIntermediary.resolve(_view._tide_join_button, "ui.fe11.beast_tide.join_btn")
+	UIIntermediary.resolve(_view.tide_join_button, "ui.fe11.beast_tide.join_btn")
 	UIIntermediary.resolve(_view._tide_leave_button, "ui.fe11.beast_tide.leave_btn")
 
 	_refresh_boss_detail()
@@ -155,7 +154,7 @@ func _init_subpanel_text() -> void:
 
 ## 刷新世界头目卡片列表（池化复用卡片按钮，循环零堆分配）
 func _populate_boss_cards() -> void:
-	if _view == null or _view._boss_card_list == null:
+	if _view == null or _view.boss_card_list == null:
 		return
 	for boss_index in _world_bosses.size():
 		var boss_entry: Dictionary = _world_bosses[boss_index]
@@ -168,18 +167,18 @@ func _populate_boss_cards() -> void:
 			"level": int(boss_entry.get("level", 0)),
 			"status": boss_status,
 		})
-	for child_index in range(_world_bosses.size(), _view._boss_card_list.get_child_count()):
-		_view._boss_card_list.get_child(child_index).visible = false
+	for child_index in range(_world_bosses.size(), _view.boss_card_list.get_child_count()):
+		_view.boss_card_list.get_child(child_index).visible = false
 
 ## 获取或创建世界头目卡片按钮（循环外分配）
 func _acquire_boss_card_button(boss_index: int) -> Button:
-	if boss_index < _view._boss_card_list.get_child_count():
-		return _view._boss_card_list.get_child(boss_index) as Button
+	if boss_index < _view.boss_card_list.get_child_count():
+		return _view.boss_card_list.get_child(boss_index) as Button
 	var card_button := KButtonClass.new()
 	card_button.variant = KButtonClass.StyleVariant.SECONDARY
 	card_button.custom_minimum_size = Vector2(0, 60)
 	connect_managed(card_button.pressed, func(): _on_boss_card_pressed(boss_index))
-	_view._boss_card_list.add_child(card_button)
+	_view.boss_card_list.add_child(card_button)
 	return card_button
 
 ## 头目卡片点击：记录选中索引并刷新详情
@@ -192,37 +191,37 @@ func _refresh_boss_detail() -> void:
 	if _view == null:
 		return
 	if _selected_boss_index < 0 or _selected_boss_index >= _world_bosses.size():
-		UIIntermediary.resolve(_view._label_boss_name, "ui.fe11.world_boss.detail.prompt_select")
-		UIIntermediary.resolve(_view._label_boss_level, "ui.fe11.world_boss.detail.level", {"level": "--"})
-		UIIntermediary.resolve(_view._label_boss_status, "ui.fe11.world_boss.detail.status", {"status": "--"})
-		UIIntermediary.resolve(_view._label_boss_respawn_time, "ui.fe11.world_boss.detail.respawn_time", {"time": "--"})
-		UIIntermediary.resolve(_view._label_boss_map, "ui.fe11.world_boss.detail.map", {"map": "--"})
-		UIIntermediary.resolve(_view._label_boss_countdown, "ui.fe11.world_boss.detail.countdown", {"time": "--:--:--"})
-		_view._boss_reward_list.clear()
-		UIIntermediary.resolve(_view._label_boss_participants, "ui.fe11.world_boss.detail.participants", {"count": 0})
+		UIIntermediary.resolve(_view.label_boss_name, "ui.fe11.world_boss.detail.prompt_select")
+		UIIntermediary.resolve(_view.label_boss_level, "ui.fe11.world_boss.detail.level", {"level": "--"})
+		UIIntermediary.resolve(_view.label_boss_status, "ui.fe11.world_boss.detail.status", {"status": "--"})
+		UIIntermediary.resolve(_view.label_boss_respawn_time, "ui.fe11.world_boss.detail.respawn_time", {"time": "--"})
+		UIIntermediary.resolve(_view.label_boss_map, "ui.fe11.world_boss.detail.map", {"map": "--"})
+		UIIntermediary.resolve(_view.label_boss_countdown, "ui.fe11.world_boss.detail.countdown", {"time": "--:--:--"})
+		_view.boss_reward_list.clear()
+		UIIntermediary.resolve(_view.label_boss_participants, "ui.fe11.world_boss.detail.participants", {"count": 0})
 		return
 	var boss_entry: Dictionary = _world_bosses[_selected_boss_index]
-	UIIntermediary.resolve(_view._label_boss_name, str(boss_entry.get("name_key", "")))
-	UIIntermediary.resolve(_view._label_boss_level, "ui.fe11.world_boss.detail.level", {
+	UIIntermediary.resolve(_view.label_boss_name, str(boss_entry.get("name_key", "")))
+	UIIntermediary.resolve(_view.label_boss_level, "ui.fe11.world_boss.detail.level", {
 		"level": int(boss_entry.get("level", 0)),
 	})
 	var status_text: String = UIIntermediary.text(str(boss_entry.get("status_key", "-")))
-	UIIntermediary.resolve(_view._label_boss_status, "ui.fe11.world_boss.detail.status", {"status": status_text})
+	UIIntermediary.resolve(_view.label_boss_status, "ui.fe11.world_boss.detail.status", {"status": status_text})
 	var respawn_text: String = UIIntermediary.text(str(boss_entry.get("respawn_key", "-")))
-	UIIntermediary.resolve(_view._label_boss_respawn_time, "ui.fe11.world_boss.detail.respawn_time", {"time": respawn_text})
+	UIIntermediary.resolve(_view.label_boss_respawn_time, "ui.fe11.world_boss.detail.respawn_time", {"time": respawn_text})
 	var map_text: String = UIIntermediary.text(str(boss_entry.get("map_key", "-")))
-	UIIntermediary.resolve(_view._label_boss_map, "ui.fe11.world_boss.detail.map", {"map": map_text})
-	UIIntermediary.resolve(_view._label_boss_countdown, "ui.fe11.world_boss.detail.countdown", {
+	UIIntermediary.resolve(_view.label_boss_map, "ui.fe11.world_boss.detail.map", {"map": map_text})
+	UIIntermediary.resolve(_view.label_boss_countdown, "ui.fe11.world_boss.detail.countdown", {
 		"time": _format_countdown(int(boss_entry.get("countdown_sec", 0))),
 	})
-	_view._boss_reward_list.clear()
+	_view.boss_reward_list.clear()
 	for reward_key in boss_entry.get("reward_keys", []):
-		UIIntermediary.resolve_item(_view._boss_reward_list, str(reward_key))
-	UIIntermediary.resolve(_view._label_boss_participants, "ui.fe11.world_boss.detail.participants", {
+		UIIntermediary.resolve_item(_view.boss_reward_list, str(reward_key))
+	UIIntermediary.resolve(_view.label_boss_participants, "ui.fe11.world_boss.detail.participants", {
 		"count": int(boss_entry.get("participants", 0)),
 	})
 
-## 挑战按钮回调：经 Toast 反馈跳转意图
+## 挑战按钮回调：派发世界头目挑战协议动作并反馈提示
 func _on_boss_challenge_pressed() -> void:
 	if _selected_boss_index < 0:
 		NavManager.get_instance().show_toast(
@@ -232,6 +231,7 @@ func _on_boss_challenge_pressed() -> void:
 		return
 	var boss_entry: Dictionary = _world_bosses[_selected_boss_index]
 	var boss_name := UIIntermediary.text(str(boss_entry.get("name_key", "")))
+	ServiceLocator.get_instance().world().dispatch_world_directive("monster_ecology", "CHALLENGE_WORLD_BOSS", {"boss_name": boss_name})
 	NavManager.get_instance().show_toast(
 		UIIntermediary.text("ui.fe11.world_boss.challenge_toast", {"name": boss_name}),
 		NavTypes.ToastLevel.INFO
@@ -246,24 +246,24 @@ func _refresh_beast_tide_status() -> void:
 	if _view == null:
 		return
 	if _beast_tide_waves.is_empty():
-		UIIntermediary.resolve(_view._label_tide_status, "ui.fe11.beast_tide.status_label", {"status": "--"})
-		UIIntermediary.resolve(_view._label_tide_countdown, "ui.fe11.beast_tide.countdown_label", {"time": "--:--:--"})
-		_view._tide_defense_bar.value = 0.0
-		UIIntermediary.resolve(_view._label_tide_defense, "ui.fe11.beast_tide.defense_pct", {"pct": "0.0"})
+		UIIntermediary.resolve(_view.label_tide_status, "ui.fe11.beast_tide.status_label", {"status": "--"})
+		UIIntermediary.resolve(_view.label_tide_countdown, "ui.fe11.beast_tide.countdown_label", {"time": "--:--:--"})
+		_view.tide_defense_bar.value = 0.0
+		UIIntermediary.resolve(_view.label_tide_defense, "ui.fe11.beast_tide.defense_pct", {"pct": "0.0"})
 		return
 	var wave_entry: Dictionary = _beast_tide_waves[0]
 	var status_text: String = UIIntermediary.text(str(wave_entry.get("status_key", "-")))
-	UIIntermediary.resolve(_view._label_tide_status, "ui.fe11.beast_tide.status_label", {"status": status_text})
-	UIIntermediary.resolve(_view._label_tide_countdown, "ui.fe11.beast_tide.countdown_label", {
+	UIIntermediary.resolve(_view.label_tide_status, "ui.fe11.beast_tide.status_label", {"status": status_text})
+	UIIntermediary.resolve(_view.label_tide_countdown, "ui.fe11.beast_tide.countdown_label", {
 		"time": _format_countdown(int(wave_entry.get("countdown_sec", 0))),
 	})
 	var defense_percentage: float = float(wave_entry.get("defense_pct", 0.0))
-	_view._tide_defense_bar.value = defense_percentage
-	UIIntermediary.resolve(_view._label_tide_defense, "ui.fe11.beast_tide.defense_pct", {"pct": "%.1f" % defense_percentage})
+	_view.tide_defense_bar.value = defense_percentage
+	UIIntermediary.resolve(_view.label_tide_defense, "ui.fe11.beast_tide.defense_pct", {"pct": "%.1f" % defense_percentage})
 
 ## 刷新兽潮波次列表（池化复用 PanelContainer，循环零堆分配）
 func _populate_wave_list() -> void:
-	if _view == null or _view._tide_wave_list == null:
+	if _view == null or _view.tide_wave_list == null:
 		return
 	for wave_index in range(_beast_tide_waves.size()):
 		var wave_entry: Dictionary = _beast_tide_waves[wave_index]
@@ -281,13 +281,13 @@ func _populate_wave_list() -> void:
 			"countdown": _format_countdown(int(wave_entry.get("countdown_sec", 0))),
 			"pct": "%.1f" % float(wave_entry.get("defense_pct", 0.0)),
 		})
-	for child_index in range(_beast_tide_waves.size(), _view._tide_wave_list.get_child_count()):
-		_view._tide_wave_list.get_child(child_index).visible = false
+	for child_index in range(_beast_tide_waves.size(), _view.tide_wave_list.get_child_count()):
+		_view.tide_wave_list.get_child(child_index).visible = false
 
 ## 获取或创建兽潮波次面板节点（循环外分配）
 func _acquire_wave_panel(index: int) -> PanelContainer:
-	if index < _view._tide_wave_list.get_child_count():
-		return _view._tide_wave_list.get_child(index) as PanelContainer
+	if index < _view.tide_wave_list.get_child_count():
+		return _view.tide_wave_list.get_child(index) as PanelContainer
 	var wave_panel := PanelContainer.new()
 	var content_box := VBoxContainer.new()
 	content_box.set("theme_override_constants/separation", 4)
@@ -297,35 +297,40 @@ func _acquire_wave_panel(index: int) -> PanelContainer:
 	detail_label.set("theme_override_colors/font_color", DesignTokens.COLOR_TEXT_MUTED_DEFAULT)
 	content_box.add_child(detail_label)
 	wave_panel.add_child(content_box)
-	_view._tide_wave_list.add_child(wave_panel)
+	_view.tide_wave_list.add_child(wave_panel)
 	return wave_panel
 
 ## 刷新兽潮奖励列表（第一波奖励）
 func _refresh_tide_rewards() -> void:
-	if _view == null or _view._tide_reward_list == null:
+	if _view == null or _view.tide_reward_list == null:
 		return
-	_view._tide_reward_list.clear()
+	_view.tide_reward_list.clear()
 	if _beast_tide_waves.is_empty():
 		return
 	var wave_entry: Dictionary = _beast_tide_waves[0]
 	for reward_key in wave_entry.get("reward_keys", []):
-		UIIntermediary.resolve_item(_view._tide_reward_list, str(reward_key))
+		UIIntermediary.resolve_item(_view.tide_reward_list, str(reward_key))
 
-## 报名兽潮防守：切换加入/撤离按钮显隐并经 Toast 反馈
+## 报名兽潮防守：切换加入/撤离按钮显隐并派发协议通知
 func _on_tide_join_pressed() -> void:
 	_tide_joined = true
-	_view._tide_join_button.visible = false
+	_view.tide_join_button.visible = false
 	_view._tide_leave_button.visible = true
+	var reply := ServiceLocator.get_instance().world().dispatch_world_directive("monster_ecology", "JOIN_BEAST_TIDE", {})
+	var reply_table: Dictionary = reply.get("data", reply) as Dictionary
+	if reply_table.has("swarm_risk"):
+		_view.update_beast_tide_risk(float(reply_table.get("swarm_risk", 0.0)))
 	NavManager.get_instance().show_toast(
 		UIIntermediary.text("ui.fe11.beast_tide.joined_toast"),
 		NavTypes.ToastLevel.SUCCESS
 	)
 
-## 撤离兽潮战场：切换加入/撤离按钮显隐并经 Toast 反馈
+## 撤离兽潮战场：切换加入/撤离按钮显隐并派发协议通知
 func _on_tide_leave_pressed() -> void:
 	_tide_joined = false
-	_view._tide_join_button.visible = true
+	_view.tide_join_button.visible = true
 	_view._tide_leave_button.visible = false
+	ServiceLocator.get_instance().world().dispatch_world_directive("monster_ecology", "LEAVE_BEAST_TIDE", {})
 	NavManager.get_instance().show_toast(
 		UIIntermediary.text("ui.fe11.beast_tide.left_toast"),
 		NavTypes.ToastLevel.INFO
@@ -339,13 +344,15 @@ func _on_tide_leave_pressed() -> void:
 func _connect_signals() -> void:
 	if _view == null:
 		return
-	connect_managed(_view._boss_challenge_button.pressed, _on_boss_challenge_pressed)
-	connect_managed(_view._tide_join_button.pressed, _on_tide_join_pressed)
+	connect_managed(_view.boss_challenge_button.pressed, _on_boss_challenge_pressed)
+	connect_managed(_view.tide_join_button.pressed, _on_tide_join_pressed)
 	connect_managed(_view._tide_leave_button.pressed, _on_tide_leave_pressed)
 
 ## 秒数格式化：HH:MM:SS（倒计时展示）
 func _format_countdown(seconds: int) -> String:
+	@warning_ignore("integer_division")
 	var hours_value: int = seconds / 3600
+	@warning_ignore("integer_division")
 	var minutes_value: int = (seconds % 3600) / 60
 	var seconds_value: int = seconds % 60
 	return "%02d:%02d:%02d" % [hours_value, minutes_value, seconds_value]

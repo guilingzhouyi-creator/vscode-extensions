@@ -10,7 +10,6 @@
 class_name NotificationBulletinTabs
 extends BaseScreen
 
-const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
 const KPageHeaderClass = preload("res://frontend/components/k_page_header.gd")
 
 var page_header: KPageHeader = null
@@ -52,7 +51,7 @@ func init_static_text() -> void:
 		[host_view._jump_target_button, "ui.fe14.notification.jump_btn"],
 		[host_view._mark_all_read_button, "ui.fe14.notification.mark_all_read_btn"],
 		[host_view._clear_notifications_button, "ui.fe14.notification.clear_read_btn"],
-		[host_view._label_bulletin_detail_title, "ui.fe14.bulletin.select_hint"],
+		[host_view.label_bulletin_detail_title, "ui.fe14.bulletin.select_hint"],
 		[host_view.get_node_or_null("MainLayout/MainTabContainer/红点树管理/RedDotHeaderRow/LabelRedDotTitle"), "ui.fe14.red_dot.tab_title"],
 		[host_view._clear_all_red_dots_button, "ui.fe14.red_dot.clear_all_btn"],
 		[host_view.get_node_or_null("MainLayout/MainTabContainer/红点树管理/RulesPanel/LabelRules"), "ui.fe14.red_dot.rules"],
@@ -82,12 +81,12 @@ func init_static_text() -> void:
 		UIIntermediary.resolve(host_view._label_notification_detail_category, "ui.fe14.notification.category_label", {"name": "-"})
 	if host_view._label_notification_detail_time != null:
 		UIIntermediary.resolve(host_view._label_notification_detail_time, "ui.fe14.notification.time_label", {"time": "-"})
-	if host_view._label_bulletin_detail_priority != null:
-		UIIntermediary.resolve(host_view._label_bulletin_detail_priority, "ui.fe14.bulletin.priority_label", {"name": "-"})
-	if host_view._label_bulletin_detail_time != null:
-		UIIntermediary.resolve(host_view._label_bulletin_detail_time, "ui.fe14.bulletin.time_label", {"time": "-"})
-	if host_view._label_red_dot_total != null:
-		UIIntermediary.resolve(host_view._label_red_dot_total, "ui.fe14.red_dot.total_label", {"total": 0})
+	if host_view.label_bulletin_detail_priority != null:
+		UIIntermediary.resolve(host_view.label_bulletin_detail_priority, "ui.fe14.bulletin.priority_label", {"name": "-"})
+	if host_view.label_bulletin_detail_time != null:
+		UIIntermediary.resolve(host_view.label_bulletin_detail_time, "ui.fe14.bulletin.time_label", {"time": "-"})
+	if host_view.label_red_dot_total != null:
+		UIIntermediary.resolve(host_view.label_red_dot_total, "ui.fe14.red_dot.total_label", {"total": 0})
 
 ## 初始化公告板分类页签、预设公告列表并首刷展示。
 func init_bulletin_board() -> void:
@@ -117,18 +116,18 @@ func refresh_bulletin_list() -> void:
 func refresh_bulletin_detail() -> void:
 	var host_view: NotificationBulletinView = _view
 	if selected_bulletin_index < 0 or selected_bulletin_index >= bulletin_data.size():
-		UIIntermediary.resolve(host_view._label_bulletin_detail_title, "ui.fe14.bulletin.select_hint")
-		UIIntermediary.resolve(host_view._label_bulletin_detail_priority, "ui.fe14.bulletin.priority_label", {"name": "-"})
-		UIIntermediary.resolve(host_view._label_bulletin_detail_time, "ui.fe14.bulletin.time_label", {"time": "-"})
-		host_view._rich_text_bulletin_detail.text = ""
+		UIIntermediary.resolve(host_view.label_bulletin_detail_title, "ui.fe14.bulletin.select_hint")
+		UIIntermediary.resolve(host_view.label_bulletin_detail_priority, "ui.fe14.bulletin.priority_label", {"name": "-"})
+		UIIntermediary.resolve(host_view.label_bulletin_detail_time, "ui.fe14.bulletin.time_label", {"time": "-"})
+		host_view.rich_text_bulletin_detail.text = ""
 		return
 	var bulletin_entry: Dictionary = bulletin_data[selected_bulletin_index]
 	var priority_index: int = int(bulletin_entry.get("priority", 0))
 	var priority_label_text: String = priority_name(priority_index)
-	host_view._label_bulletin_detail_title.text = UIIntermediary.text(str(bulletin_entry.get("title_key", "")))
-	UIIntermediary.resolve(host_view._label_bulletin_detail_priority, "ui.fe14.bulletin.priority_label", {"name": priority_label_text})
-	UIIntermediary.resolve(host_view._label_bulletin_detail_time, "ui.fe14.bulletin.time_label", {"time": str(bulletin_entry.get("time", "-"))})
-	host_view._rich_text_bulletin_detail.text = UIIntermediary.text(str(bulletin_entry.get("content_key", "")))
+	host_view.label_bulletin_detail_title.text = UIIntermediary.text(str(bulletin_entry.get("title_key", "")))
+	UIIntermediary.resolve(host_view.label_bulletin_detail_priority, "ui.fe14.bulletin.priority_label", {"name": priority_label_text})
+	UIIntermediary.resolve(host_view.label_bulletin_detail_time, "ui.fe14.bulletin.time_label", {"time": str(bulletin_entry.get("time", "-"))})
+	host_view.rich_text_bulletin_detail.text = UIIntermediary.text(str(bulletin_entry.get("content_key", "")))
 
 ## 将公告优先级枚举索引解析为本地化名称。
 func priority_name(priority_value: int) -> String:
@@ -199,8 +198,8 @@ func refresh_red_dot_total() -> void:
 	var total_count: int = 0
 	if red_dot_root != null:
 		total_count = int(red_dot_root.get_text(1))
-	if host_view._label_red_dot_total != null:
-		UIIntermediary.resolve(host_view._label_red_dot_total, "ui.fe14.red_dot.total_label", {"total": total_count})
+	if host_view.label_red_dot_total != null:
+		UIIntermediary.resolve(host_view.label_red_dot_total, "ui.fe14.red_dot.total_label", {"total": total_count})
 
 ## 向 Toast 测试队列追加提示记录并更新状态反馈文本。
 func show_toast(toast_type: String, message: String) -> void:

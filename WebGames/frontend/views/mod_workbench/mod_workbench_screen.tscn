@@ -80,6 +80,31 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "RESCAN MODS"
 
+[node name="WorkbenchOpsHBox" type="HBoxContainer" parent="Margin/MainVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PackIdEdit" type="LineEdit" parent="Margin/MainVBox/WorkbenchOpsHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "new_mod_pack"
+
+[node name="CreateModBtn" type="Button" parent="Margin/MainVBox/WorkbenchOpsHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "CREATE MOD"
+
+[node name="PackKmodBtn" type="Button" parent="Margin/MainVBox/WorkbenchOpsHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "PACK .KMOD"
+
+[node name="InstallModBtn" type="Button" parent="Margin/MainVBox/WorkbenchOpsHBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "INSTALL MOD"
+
 [node name="SplitHBox" type="HBoxContainer" parent="Margin/MainVBox"]
 layout_mode = 2
 size_flags_vertical = 3

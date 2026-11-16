@@ -11,7 +11,6 @@ class_name MonsterEcologyView
 extends BaseScreen
 
 const KButtonClass = preload("res://frontend/components/k_button.gd")
-const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
 const MonsterEcologyTabsClass = preload("res://frontend/views/monster_ecology/monster_ecology_tabs.gd")
 
 # ==============================================================================
@@ -45,13 +44,12 @@ const CATEGORY_KEYS := [
 @onready var _back_button: Button = $%BtnBack
 
 # --- 主 Tab 容器 ---
-@onready var _tab_container: TabContainer = $%TabContainer
+@onready var tab_container: TabContainer = $%TabContainer
 
 # --- Tab 0: BESTIARY 怪物图鉴 ---
 @onready var _bestiary_category_box: HBoxContainer = $%BestiaryCategoryHBox
 @onready var _line_bestiary_search: LineEdit = $%LineBestiarySearch
 @onready var _label_bestiary_progress: Label = $%LabelBestiaryProgress
-@onready var _bestiary_scroll: ScrollContainer = $%BestiaryScroll
 @onready var _bestiary_grid: GridContainer = $%BestiaryGrid
 @onready var _label_monster_name: Label = $%LabelMonsterName
 @onready var _label_monster_level: Label = $%LabelMonsterLevel
@@ -62,25 +60,25 @@ const CATEGORY_KEYS := [
 @onready var _bestiary_weakness_list: ItemList = $%BestiaryWeaknessList
 
 # --- Tab 1: WORLD_BOSS 世界BOSS ---
-@onready var _boss_card_list: VBoxContainer = $%BossCardList
-@onready var _label_boss_name: Label = $%LabelBossName
-@onready var _label_boss_level: Label = $%LabelBossLevel
-@onready var _label_boss_status: Label = $%LabelBossStatus
-@onready var _label_boss_respawn_time: Label = $%LabelBossRespawnTime
-@onready var _label_boss_map: Label = $%LabelBossMap
-@onready var _label_boss_countdown: Label = $%LabelBossCountdown
-@onready var _boss_reward_list: ItemList = $%BossRewardList
-@onready var _label_boss_participants: Label = $%LabelBossParticipants
-@onready var _boss_challenge_button: Button = $%BtnBossChallenge
+@onready var boss_card_list: VBoxContainer = $%BossCardList
+@onready var label_boss_name: Label = $%LabelBossName
+@onready var label_boss_level: Label = $%LabelBossLevel
+@onready var label_boss_status: Label = $%LabelBossStatus
+@onready var label_boss_respawn_time: Label = $%LabelBossRespawnTime
+@onready var label_boss_map: Label = $%LabelBossMap
+@onready var label_boss_countdown: Label = $%LabelBossCountdown
+@onready var boss_reward_list: ItemList = $%BossRewardList
+@onready var label_boss_participants: Label = $%LabelBossParticipants
+@onready var boss_challenge_button: Button = $%BtnBossChallenge
 
 # --- Tab 2: BEAST_TIDE 兽潮 ---
-@onready var _label_tide_status: Label = $%LabelTideStatus
-@onready var _label_tide_countdown: Label = $%LabelTideCountdown
-@onready var _tide_defense_bar: ProgressBar = $%TideDefenseBar
-@onready var _label_tide_defense: Label = $%LabelTideDefense
-@onready var _tide_wave_list: VBoxContainer = $%TideWaveList
-@onready var _tide_reward_list: ItemList = $%TideRewardList
-@onready var _tide_join_button: Button = $%BtnTideJoin
+@onready var label_tide_status: Label = $%LabelTideStatus
+@onready var label_tide_countdown: Label = $%LabelTideCountdown
+@onready var tide_defense_bar: ProgressBar = $%TideDefenseBar
+@onready var label_tide_defense: Label = $%LabelTideDefense
+@onready var tide_wave_list: VBoxContainer = $%TideWaveList
+@onready var tide_reward_list: ItemList = $%TideRewardList
+@onready var tide_join_button: Button = $%BtnTideJoin
 @onready var _tide_leave_button: Button = $%BtnTideLeave
 
 # 子面板委托控制器
@@ -153,12 +151,16 @@ func select_monster_entry(monster_id: String) -> Dictionary:
 func update_beast_tide_risk(risk_percentage: float) -> void:
 	apply_snapshot({"beast_tide_risk": risk_percentage})
 
-## 统一快照渲染映射
+## 统一快照渲染映射并触发图鉴与兽潮 UI 刷新
 func _render_from_snapshot() -> void:
 	if snapshot.has("bestiary"):
 		bestiary_entries = FrontendSnapshot.read_array(snapshot, "bestiary")
+		_monsters = bestiary_entries.duplicate(true)
 	if snapshot.has("beast_tide_risk"):
 		beast_tide_risk_percentage = clampf(float(snapshot.get("beast_tide_risk", 0.0)), 0.0, 100.0)
+	if is_inside_tree():
+		_populate_bestiary_grid()
+		_refresh_bestiary_progress()
 
 # ==============================================================================
 # 生命周期
@@ -169,6 +171,9 @@ func _ready() -> void:
 	var tabs: Variant = _get_tabs()
 	var theme_manager := ThemeManager.get_instance()
 	theme = theme_manager.theme
+	if ServiceLocator.get_mode() != "mock":
+		_monsters = []
+		ServiceLocator.get_instance().world().dispatch_world_directive("monster_ecology", "GET_ECOLOGY_STATUS", {})
 
 	_populate_category_buttons()
 	_populate_bestiary_grid()

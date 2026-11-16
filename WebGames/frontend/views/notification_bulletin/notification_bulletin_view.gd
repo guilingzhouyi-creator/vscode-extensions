@@ -54,13 +54,13 @@ enum BulletinPriority {NORMAL, IMPORTANT, URGENT, CRITICAL}
 # --- Tab 2: 公告板 ---
 @onready var _bulletin_tab_bar: TabBar = $%BulletinTabBar
 @onready var _bulletin_item_list: ItemList = $%BulletinItemList
-@onready var _label_bulletin_detail_title: Label = $%LabelBulletinDetailTitle
-@onready var _label_bulletin_detail_priority: Label = $%LabelBulletinDetailPriority
-@onready var _label_bulletin_detail_time: Label = $%LabelBulletinDetailTime
-@onready var _rich_text_bulletin_detail: RichTextLabel = $%RichTextBulletinDetail
+@onready var label_bulletin_detail_title: Label = $%LabelBulletinDetailTitle
+@onready var label_bulletin_detail_priority: Label = $%LabelBulletinDetailPriority
+@onready var label_bulletin_detail_time: Label = $%LabelBulletinDetailTime
+@onready var rich_text_bulletin_detail: RichTextLabel = $%RichTextBulletinDetail
 
 # --- Tab 3: 红点树管理 ---
-@onready var _label_red_dot_total: Label = $%LabelRedDotTotal
+@onready var label_red_dot_total: Label = $%LabelRedDotTotal
 @onready var _clear_all_red_dots_button: Button = $%BtnClearAllRedDots
 @onready var _red_dot_tree: Tree = $%RedDotTree
 @onready var _toast_info_button: Button = $%BtnToastInfo
@@ -111,15 +111,7 @@ var _selected_notification_index: int = -1
 ## 当前选中的通知分类筛选（-1 = 全部）
 var _notification_category_filter: int = -1
 
-## 公告列表预设数据
-var _bulletin_entries: Array = []
-## 当前选中的公告索引
-var _selected_bulletin_index: int = -1
-## 当前选中的公告分类筛选（TabBar 索引）
-var _bulletin_filter_index: int = 0
 
-## 红点树根节点引用
-var _red_dot_root: TreeItem = null
 ## Toast 队列
 var toast_queue: Array = []
 ## 活跃的 Modal 对话框
@@ -255,7 +247,7 @@ func _refresh_notif_detail() -> void:
 # ==============================================================================
 
 func _init_bulletin_board() -> void:
-	_get_tabs().init_bulletin_tab()
+	_get_tabs().init_bulletin_board()
 
 func _refresh_bulletin_list() -> void:
 	_get_tabs().refresh_bulletin_list()
@@ -322,9 +314,12 @@ func _connect_signals() -> void:
 func _on_back_btn_pressed() -> void:
 	self.back()
 
-## 主 Tab 切换：表现层无额外副作用
-func _on_tab_changed(_tab_index: int) -> void:
-	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe14.toast.tab_switched"), NavTypes.ToastLevel.INFO, 1.0)
+## 主 Tab 切换：切换至公告或红点树时同步刷新对应统计展示
+func _on_tab_changed(tab_index: int) -> void:
+	if tab_index == 0:
+		_refresh_notif_list()
+	elif tab_index == 2 and _tabs != null:
+		_tabs.refresh_red_dot_total()
 
 # --- 通知中心 ---
 
@@ -399,10 +394,12 @@ func _on_red_dot_item_activated() -> void:
 # 外部接口（供测试与上层消息驱动）
 # ==============================================================================
 
-## 将一条提示消息压入测试队列并返回入队结果。
+## 将一条提示消息压入测试队列并在树内挂载时透传全局 Toast。
 func push_toast(text: String, duration: float) -> Dictionary:
 	var toast_entry: Dictionary = {"text": text, "duration": duration}
 	toast_queue.append(toast_entry)
+	if is_inside_tree():
+		NavManager.get_instance().show_toast(text, NavTypes.ToastLevel.INFO, duration)
 	return {"success": true, "toast": toast_entry}
 
 ## 打开并记录当前活跃的模态确认对话框状态。

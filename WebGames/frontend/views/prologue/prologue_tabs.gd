@@ -11,8 +11,10 @@ class_name PrologueTabs
 extends BaseScreen
 
 const KButtonClass = preload("res://frontend/components/k_button.gd")
+const CutsceneEventBridgeClass = preload("res://frontend/systems/cutscene_event_bridge.gd")
 
 var _view: BaseScreen = null
+var _last_cutscene_trigger: String = ""
 
 ## 绑定所属序章主视图实例
 func setup(host_view: BaseScreen) -> void:
@@ -149,8 +151,13 @@ func render_all() -> void:
 	if _view.cutscene_banner_label != null:
 		_view.cutscene_banner_label.visible = not _view.current_cutscene_trigger.is_empty()
 		if _view.cutscene_banner_label.visible:
-			_view.cutscene_banner_label.text = "Cutscene Hook: %s" % _view.current_cutscene_trigger
+			_view.cutscene_banner_label.text = "%s: %s" % [UIIntermediary.text("ui.prologue.header.title"), _view.current_cutscene_trigger]
 			_view.cutscene_banner_label.modulate = DesignTokens.COLOR_WARNING_DEFAULT
+			if _view.current_cutscene_trigger != _last_cutscene_trigger:
+				_last_cutscene_trigger = _view.current_cutscene_trigger
+				CutsceneEventBridgeClass.get_instance().trigger_cutscene_preview(_view.current_cutscene_trigger)
+		else:
+			_last_cutscene_trigger = ""
 	if _view.narrative_rich_label != null:
 		_view.narrative_rich_label.clear()
 		for line_entry in _view.narrative_history:
