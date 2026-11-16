@@ -11,7 +11,6 @@ class_name QuestCausalityView
 extends BaseScreen
 
 const QuestCausalityTabsClass = preload("res://frontend/views/quest_causality/quest_causality_tabs.gd")
-const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
 
 # ==============================================================================
 # 节点引用（场景树中以 unique_name_in_owner 标记）
@@ -41,37 +40,36 @@ const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
 @onready var _quest_submit_button: Button = $%BtnQuestSubmit
 
 # --- Tab 2: 因果环 DAG ---
-@onready var _dag_visual_panel: PanelContainer = $%DagVisualPanel
 @onready var _show_completed_check_box: CheckBox = $%ChkShowCompleted
 @onready var _dag_node_list: ItemList = $%DagNodeList
-@onready var _label_dag_node_name: Label = $%LabelDagNodeName
-@onready var _label_dag_node_status: Label = $%LabelDagNodeStatus
-@onready var _label_dag_chain_description: Label = $%LabelDagChainDesc
+@onready var label_dag_node_name: Label = $%LabelDagNodeName
+@onready var label_dag_node_status: Label = $%LabelDagNodeStatus
+@onready var label_dag_chain_description: Label = $%LabelDagChainDesc
 
 # --- Tab 3: 悬赏通缉 ---
 @onready var _bounty_tier_tab: TabContainer = $%BountyTierTab
 @onready var _bounty_target_list: ItemList = $%BountyTargetList
-@onready var _label_bounty_target: Label = $%LabelBountyTarget
-@onready var _label_bounty_reward: Label = $%LabelBountyReward
-@onready var _label_bounty_time: Label = $%LabelBountyTime
+@onready var label_bounty_target: Label = $%LabelBountyTarget
+@onready var label_bounty_reward: Label = $%LabelBountyReward
+@onready var label_bounty_time: Label = $%LabelBountyTime
 @onready var _bounty_accept_button: Button = $%BtnBountyAccept
 
 # --- 非唯一静态标签（i18n 迁移新增，共 15 个） ---
-@onready var _header_title_label: Label = %HeaderTitleLabel
-@onready var _quest_list_section_label: Label = %QuestListSectionLabel
-@onready var _quest_filter_label: Label = %QuestFilterLabel
-@onready var _objectives_label: Label = %ObjectivesLabel
-@onready var _rewards_label: Label = %RewardsLabel
-@onready var _dag_section_label: Label = %DagSectionLabel
-@onready var _dag_placeholder_label: Label = %DagPlaceholderLabel
-@onready var _dag_node_list_label: Label = %DagNodeListLabel
-@onready var _bounty_section_label: Label = %BountySectionLabel
-@onready var _tier1_description_label: Label = %Tier1Desc
-@onready var _tier2_description_label: Label = %Tier2Desc
-@onready var _tier3_description_label: Label = %Tier3Desc
-@onready var _tier4_description_label: Label = %Tier4Desc
-@onready var _tier5_description_label: Label = %Tier5Desc
-@onready var _bounty_target_list_label: Label = %BountyTargetListLabel
+@onready var header_title_label: Label = %HeaderTitleLabel
+@onready var quest_list_section_label: Label = %QuestListSectionLabel
+@onready var quest_filter_label: Label = %FilterLabel
+@onready var objectives_label: Label = %ObjectivesLabel
+@onready var rewards_label: Label = %RewardsLabel
+@onready var dag_section_label: Label = %DagSectionLabel
+@onready var dag_placeholder_label: Label = %DagPlaceholderLabel
+@onready var dag_node_list_label: Label = %NodeListLabel
+@onready var bounty_section_label: Label = %BountySectionLabel
+@onready var tier1_description_label: Label = %Tier1Desc
+@onready var tier2_description_label: Label = %Tier2Desc
+@onready var tier3_description_label: Label = %Tier3Desc
+@onready var tier4_description_label: Label = %Tier4Desc
+@onready var tier5_description_label: Label = %Tier5Desc
+@onready var bounty_target_list_label: Label = %BountyTargetListLabel
 
 # ==============================================================================
 # 状态与预设数据
@@ -201,13 +199,17 @@ func _init_quest_list_tab() -> void:
 	# 填充任务列表
 	_refresh_quest_list()
 
-## 刷新任务列表：按状态筛选过滤并渲染条目与计数
+var current_category_filter: String = ""
+
+## 刷新任务列表：按状态与分类双重筛选过滤并渲染条目与计数
 func _refresh_quest_list() -> void:
 	_quest_item_list.clear()
 	var visible_count := 0
 	for quest_entry in quest_list:
 		var quest_status: String = quest_entry.get("status", "")
 		if not _match_filter(quest_status):
+			continue
+		if not current_category_filter.is_empty() and str(quest_entry.get("category", "")) != current_category_filter:
 			continue
 		var category_name := _category_name(quest_entry.get("category", ""))
 		var quest_title: String = quest_entry.get("title", "")
@@ -369,8 +371,14 @@ func _on_quest_filter_changed(index: int) -> void:
 	current_filter = index
 	_refresh_quest_list()
 
-## 任务分类选择：当前仅刷新任务列表展示
-func _on_quest_category_selected(_index: int) -> void:
+## 任务分类选择：按 MAIN/SIDE/COMMISSION 更新分类筛选并刷新列表
+func _on_quest_category_selected(category_index: int) -> void:
+	var category_codes := ["MAIN", "SIDE", "COMMISSION"]
+	if category_index >= 0 and category_index < category_codes.size():
+		var next_code: String = category_codes[category_index]
+		current_category_filter = "" if current_category_filter == next_code else next_code
+	else:
+		current_category_filter = ""
 	_refresh_quest_list()
 
 ## 任务条目选中：定位筛选后任务并展示详情，切换到详情 Tab
@@ -378,7 +386,7 @@ func _on_quest_item_selected(index: int) -> void:
 	# 查找当前筛选后对应的任务
 	var filtered_quests: Array = []
 	for quest_entry in quest_list:
-		if _match_filter(quest_entry.get("status", "")):
+		if _match_filter(quest_entry.get("status", "")) and (current_category_filter.is_empty() or str(quest_entry.get("category", "")) == current_category_filter):
 			filtered_quests.append(quest_entry)
 	if index >= 0 and index < filtered_quests.size():
 		_show_quest_detail(filtered_quests[index])

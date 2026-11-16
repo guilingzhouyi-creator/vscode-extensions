@@ -10,7 +10,6 @@
 class_name QuestCausalityTabs
 extends BaseScreen
 
-const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
 const KVirtualListClass = preload("res://frontend/components/k_virtual_list.gd")
 const KPageHeaderClass = preload("res://frontend/components/k_page_header.gd")
 const KSplitPanelClass = preload("res://frontend/components/k_split_panel.gd")
@@ -94,9 +93,14 @@ func setup(host_view: BaseScreen) -> void:
 
 ## 将预设任务、因果环节点与悬赏目标列表深拷贝加载至宿主视图状态。
 func load_mock_data() -> void:
-	_view.quest_list = mock_quests.duplicate(true)
-	_view.causality_dag_nodes = mock_dag_nodes.duplicate(true)
-	_view.bounty_targets = mock_bounty_targets.duplicate(true)
+	if ServiceLocator.get_mode() == "mock":
+		_view.quest_list = mock_quests.duplicate(true)
+		_view.causality_dag_nodes = mock_dag_nodes.duplicate(true)
+		_view.bounty_targets = mock_bounty_targets.duplicate(true)
+		return
+	_view.quest_list = []
+	_view.causality_dag_nodes = []
+	_view.bounty_targets = []
 
 ## 初始化任务视图主 Tab 栏标题文案。
 func init_tab_titles() -> void:
@@ -111,34 +115,34 @@ func init_tab_titles() -> void:
 func init_static_text() -> void:
 	var host_view: QuestCausalityView = _view
 	var bindings := [
-		[host_view._header_title_label, "ui.fe07.header.title"],
+		[host_view.header_title_label, "ui.fe07.header.title"],
 		[host_view._back_button, "ui.fe07.header.back"],
-		[host_view._quest_list_section_label, "ui.fe07.quest_list.section"],
-		[host_view._quest_filter_label, "ui.fe07.quest_list.filter_label"],
+		[host_view.quest_list_section_label, "ui.fe07.quest_list.section"],
+		[host_view.quest_filter_label, "ui.fe07.quest_list.filter_label"],
 		[host_view._label_quest_title, "ui.fe07.quest_detail.title_default"],
 		[host_view._label_quest_description, "ui.fe07.quest_detail.desc_default"],
-		[host_view._objectives_label, "ui.fe07.quest_detail.objectives_label"],
-		[host_view._rewards_label, "ui.fe07.quest_detail.rewards_label"],
+		[host_view.objectives_label, "ui.fe07.quest_detail.objectives_label"],
+		[host_view.rewards_label, "ui.fe07.quest_detail.rewards_label"],
 		[host_view._quest_accept_button, "ui.fe07.quest_detail.btn_accept"],
 		[host_view._quest_abandon_button, "ui.fe07.quest_detail.btn_abandon"],
 		[host_view._quest_submit_button, "ui.fe07.quest_detail.btn_submit"],
-		[host_view._dag_section_label, "ui.fe07.dag.section"],
-		[host_view._dag_placeholder_label, "ui.fe07.dag.placeholder"],
+		[host_view.dag_section_label, "ui.fe07.dag.section"],
+		[host_view.dag_placeholder_label, "ui.fe07.dag.placeholder"],
 		[host_view._show_completed_check_box, "ui.fe07.dag.show_completed"],
-		[host_view._dag_node_list_label, "ui.fe07.dag.node_list_label"],
-		[host_view._label_dag_node_name, "ui.fe07.dag.node_name_default"],
-		[host_view._label_dag_node_status, "ui.fe07.dag.node_status_none"],
-		[host_view._label_dag_chain_description, "ui.fe07.dag.chain_desc_default"],
-		[host_view._bounty_section_label, "ui.fe07.bounty.section"],
-		[host_view._tier1_description_label, "ui.fe07.bounty.tier1_desc"],
-		[host_view._tier2_description_label, "ui.fe07.bounty.tier2_desc"],
-		[host_view._tier3_description_label, "ui.fe07.bounty.tier3_desc"],
-		[host_view._tier4_description_label, "ui.fe07.bounty.tier4_desc"],
-		[host_view._tier5_description_label, "ui.fe07.bounty.tier5_desc"],
-		[host_view._bounty_target_list_label, "ui.fe07.bounty.target_list_label"],
-		[host_view._label_bounty_target, "ui.fe07.bounty.target_default"],
-		[host_view._label_bounty_reward, "ui.fe07.bounty.reward_none"],
-		[host_view._label_bounty_time, "ui.fe07.bounty.time_none"],
+		[host_view.dag_node_list_label, "ui.fe07.dag.node_list_label"],
+		[host_view.label_dag_node_name, "ui.fe07.dag.node_name_default"],
+		[host_view.label_dag_node_status, "ui.fe07.dag.node_status_none"],
+		[host_view.label_dag_chain_description, "ui.fe07.dag.chain_desc_default"],
+		[host_view.bounty_section_label, "ui.fe07.bounty.section"],
+		[host_view.tier1_description_label, "ui.fe07.bounty.tier1_desc"],
+		[host_view.tier2_description_label, "ui.fe07.bounty.tier2_desc"],
+		[host_view.tier3_description_label, "ui.fe07.bounty.tier3_desc"],
+		[host_view.tier4_description_label, "ui.fe07.bounty.tier4_desc"],
+		[host_view.tier5_description_label, "ui.fe07.bounty.tier5_desc"],
+		[host_view.bounty_target_list_label, "ui.fe07.bounty.target_list_label"],
+		[host_view.label_bounty_target, "ui.fe07.bounty.target_default"],
+		[host_view.label_bounty_reward, "ui.fe07.bounty.reward_none"],
+		[host_view.label_bounty_time, "ui.fe07.bounty.time_none"],
 		[host_view._bounty_accept_button, "ui.fe07.bounty.btn_accept"]
 	]
 	for binding_entry in bindings:
@@ -194,12 +198,12 @@ func on_dag_node_selected(node_index: int) -> void:
 		visible_nodes.append(dag_node)
 	if node_index >= 0 and node_index < visible_nodes.size():
 		var selected_node: Dictionary = visible_nodes[node_index]
-		if host_view._label_dag_node_name != null:
-			host_view._label_dag_node_name.text = UIIntermediary.text(str(selected_node.get("name", "")))
-		if host_view._label_dag_node_status != null:
-			UIIntermediary.resolve(host_view._label_dag_node_status, "ui.fe07.dag.node_status", {"status": dag_status_name(str(selected_node.get("status", "")))})
-		if host_view._label_dag_chain_description != null:
-			host_view._label_dag_chain_description.text = UIIntermediary.text(str(selected_node.get("chain_desc", "")))
+		if host_view.label_dag_node_name != null:
+			host_view.label_dag_node_name.text = UIIntermediary.text(str(selected_node.get("name", "")))
+		if host_view.label_dag_node_status != null:
+			UIIntermediary.resolve(host_view.label_dag_node_status, "ui.fe07.dag.node_status", {"status": dag_status_name(str(selected_node.get("status", "")))})
+		if host_view.label_dag_chain_description != null:
+			host_view.label_dag_chain_description.text = UIIntermediary.text(str(selected_node.get("chain_desc", "")))
 
 ## 初始化五档悬赏星级页签并默认加载一星悬赏目标列表。
 func init_bounty_tab() -> void:
@@ -215,12 +219,12 @@ func refresh_bounty_targets(tier: int) -> void:
 	for target_entry in host_view.bounty_targets:
 		if int(target_entry.get("tier", 0)) == tier:
 			host_view._bounty_target_list.add_item(UIIntermediary.text(str(target_entry.get("name", ""))))
-	if host_view._label_bounty_target != null:
-		UIIntermediary.resolve(host_view._label_bounty_target, "ui.fe07.bounty.target_default")
-	if host_view._label_bounty_reward != null:
-		UIIntermediary.resolve(host_view._label_bounty_reward, "ui.fe07.bounty.reward_none")
-	if host_view._label_bounty_time != null:
-		UIIntermediary.resolve(host_view._label_bounty_time, "ui.fe07.bounty.time_none")
+	if host_view.label_bounty_target != null:
+		UIIntermediary.resolve(host_view.label_bounty_target, "ui.fe07.bounty.target_default")
+	if host_view.label_bounty_reward != null:
+		UIIntermediary.resolve(host_view.label_bounty_reward, "ui.fe07.bounty.reward_none")
+	if host_view.label_bounty_time != null:
+		UIIntermediary.resolve(host_view.label_bounty_time, "ui.fe07.bounty.time_none")
 	host_view._bounty_accept_button.disabled = true
 
 ## 处理悬赏星级页签切换并刷新对应目标列表。
@@ -228,6 +232,8 @@ func on_bounty_tier_changed(_tab_index: int) -> void:
 	var host_view: QuestCausalityView = _view
 	var tier: int = host_view._bounty_tier_tab.current_tab + 1
 	refresh_bounty_targets(tier)
+
+var _selected_bounty_target: Dictionary = {}
 
 ## 处理悬赏目标选中事件并展示目标奖励、剩余时间与启用接取按钮。
 func on_bounty_target_selected(target_index: int) -> void:
@@ -239,17 +245,23 @@ func on_bounty_target_selected(target_index: int) -> void:
 			filtered_targets.append(target_entry)
 	if target_index >= 0 and target_index < filtered_targets.size():
 		var selected_target: Dictionary = filtered_targets[target_index]
-		if host_view._label_bounty_target != null:
-			host_view._label_bounty_target.text = UIIntermediary.text(str(selected_target.get("name", "")))
-		if host_view._label_bounty_reward != null:
-			UIIntermediary.resolve(host_view._label_bounty_reward, "ui.fe07.bounty.reward", {"gold": selected_target.get("reward_gold", 0)})
-		if host_view._label_bounty_time != null:
-			UIIntermediary.resolve(host_view._label_bounty_time, "ui.fe07.bounty.time", {"time": UIIntermediary.text(str(selected_target.get("time_remain", "-")))})
+		_selected_bounty_target = selected_target
+		if host_view.label_bounty_target != null:
+			host_view.label_bounty_target.text = UIIntermediary.text(str(selected_target.get("name", "")))
+		if host_view.label_bounty_reward != null:
+			UIIntermediary.resolve(host_view.label_bounty_reward, "ui.fe07.bounty.reward", {"gold": selected_target.get("reward_gold", 0)})
+		if host_view.label_bounty_time != null:
+			UIIntermediary.resolve(host_view.label_bounty_time, "ui.fe07.bounty.time", {"time": UIIntermediary.text(str(selected_target.get("time_remain", "-")))})
 		host_view._bounty_accept_button.disabled = false
 
 ## 处理悬赏接取按钮点击并更新按钮已接取态。
 func on_bounty_accept() -> void:
 	var host_view: QuestCausalityView = _view
+	var bounty_id := str(_selected_bounty_target.get("target_id", "BOUNTY_SELECTED"))
+	var reward_gold := int(_selected_bounty_target.get("reward_gold", 0))
+	var accept_reply := ServiceLocator.get_instance().quest().accept_bounty(bounty_id, reward_gold)
+	if not bool(accept_reply.get("success", true)):
+		return
 	UIIntermediary.resolve(host_view._bounty_accept_button, "ui.fe07.bounty.accepted")
 	host_view._bounty_accept_button.disabled = true
 
@@ -263,6 +275,9 @@ func init_quest_virtual_list(container: Control = null) -> KVirtualList:
 		connect_managed(quest_virtual_list.range_changed, _on_quest_range_changed)
 		if container != null:
 			container.add_child(quest_virtual_list)
+		else:
+			quest_virtual_list.visible = false
+			add_child(quest_virtual_list)
 	return quest_virtual_list
 
 ## 刷新任务虚拟列表总数
