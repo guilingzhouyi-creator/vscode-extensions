@@ -8,13 +8,14 @@
 # ------------------------------------------------------------------------------
 # 用法示例:
 #   .\scripts\ps1\package-webgames.ps1
-#   .\scripts\ps1\package-webgames.ps1 -Target Windows -ExportRelease
+#   .\scripts\ps1\package-webgames.ps1 -Target Windows -ExportRelease -IncludeModSDK
 # ==============================================================================
 [CmdletBinding()]
 param(
   [string]$OutDir,
   [string]$Target = "Windows",
   [switch]$ExportRelease,
+  [switch]$IncludeModSDK,
   [string]$GodotBin = $env:GODOT_BIN
 )
 Set-StrictMode -Version Latest
@@ -136,6 +137,41 @@ if ($code -eq 0 -and (Test-Path $artifactPath)) {
     }
   }
 
+  $sdkBundled = $false
+  if ($IncludeModSDK) {
+    $syncSdkPy = Join-Path $RootDir "scripts\py\sync_mod_sdk.py"
+    $buildSdkBinPy = Join-Path $RootDir "scripts\py\build_kalar_mod_binary.py"
+    $sdkSrcDir = Join-Path $RootDir "mod_sdk"
+    $sdkOutDir = Join-Path $OutDir "mod_sdk"
+    if ($pyCmd) {
+      & $pyCmd.Source -X utf8 $syncSdkPy --check-only | Out-Null
+      if ($LASTEXITCODE -ne 0) {
+        Write-Host "【package-webgames】MOD SDK 契约存在漂移，拒绝携带分发！"
+        exit 1
+      }
+      & $pyCmd.Source -X utf8 $buildSdkBinPy --check | Out-Null
+      if ($LASTEXITCODE -ne 0) {
+        Write-Host "【package-webgames】kalar-mod CLI 构建前置校验未通过！"
+        exit 1
+      }
+    }
+    if (Test-Path $sdkOutDir) { Remove-Item -Recurse -Force $sdkOutDir }
+    Copy-Item -Path $sdkSrcDir -Destination $sdkOutDir -Recurse -Force
+    Get-ChildItem -Path $sdkOutDir -Recurse -Directory -Filter "__pycache__" | Remove-Item -Recurse -Force
+    $sdkBundled = $true
+  }
+
+  $auditReleasePy = Join-Path $RootDir "scripts\py\audit_release_bundle.py"
+  if ($pyCmd -and (Test-Path $auditReleasePy)) {
+    $auditArgs = @("-X", "utf8", $auditReleasePy, "--dir", $OutDir)
+    if ($IncludeModSDK) { $auditArgs += "--require-sdk" }
+    & $pyCmd.Source @auditArgs | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+      Write-Host "【package-webgames】发行产物净度或 SDK 捆绑门禁未通过！"
+      exit 1
+    }
+  }
+
   # 追加式构建元数据指纹留痕（统一 UTC Z 时区与目标元数据）
   $env:GIT_CONFIG_GLOBAL = "NUL"
   $gitCommit = (& git rev-parse --short HEAD 2>$null)
@@ -151,11 +187,12 @@ if ($code -eq 0 -and (Test-Path $artifactPath)) {
     size_bytes          = $item.Length
     sha256              = "$hash"
     mods_bundled        = $modsBundled
+    mod_sdk_included    = $sdkBundled
     config_kdat_present = (Test-Path $kdatPath)
     status              = "SUCCESS"
   } | ConvertTo-Json -Compress
   Add-Content -Path $manifestPath -Value $manifestEntry -Encoding UTF8
-  Write-Host "  • 外部资产捆绑: config.kdat=$(Test-Path $kdatPath), mods=$modsBundled"
+  Write-Host "  • 外部资产捆绑: config.kdat=$(Test-Path $kdatPath), mods=$modsBundled, mod_sdk=$sdkBundled"
   Write-Host "  • 构建元数据指纹已留痕: $manifestPath"
   exit 0
 } else {

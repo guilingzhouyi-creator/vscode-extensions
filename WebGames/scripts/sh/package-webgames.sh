@@ -9,7 +9,7 @@
 # ------------------------------------------------------------------------------
 # 用法示例:
 #   bash scripts/sh/package-webgames.sh
-#   bash scripts/sh/package-webgames.sh --target Windows --export-release
+#   bash scripts/sh/package-webgames.sh --target Windows --export-release --include-mod-sdk
 # ==============================================================================
 set -uo pipefail
 
@@ -21,12 +21,14 @@ GODOT_BIN="${GODOT_BIN:-godot}"
 OUT_DIR="$ROOT_DIR/dist"
 TARGET="Windows"
 EXPORT_RELEASE=0
+INCLUDE_MOD_SDK=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --out) OUT_DIR="${2:?--out 需要参数}"; shift 2 ;;
     --target) TARGET="${2:?--target 需要参数}"; shift 2 ;;
     --export-release) EXPORT_RELEASE=1; shift 1 ;;
+    --include-mod-sdk) INCLUDE_MOD_SDK=1; shift 1 ;;
     -h|--help) sed -n '2,10p' "$0"; exit 0 ;;
     *) echo "【用法错误】未知参数: $1"; exit 2 ;;
   esac
@@ -47,6 +49,49 @@ case "$TARGET" in
   Web) PRESET_NAME="Web" ;;
   *) PRESET_NAME="$TARGET" ;;
 esac
+
+find_python_bin() {
+  if command -v python3 >/dev/null 2>&1; then
+    echo "python3"
+  elif command -v python >/dev/null 2>&1; then
+    echo "python"
+  fi
+}
+
+bundle_mod_sdk_assets() {
+  local py_bin="$1"
+  local sync_sdk_py="$ROOT_DIR/scripts/py/sync_mod_sdk.py"
+  local build_sdk_bin_py="$ROOT_DIR/scripts/py/build_kalar_mod_binary.py"
+  if [[ -n "$py_bin" ]]; then
+    "$py_bin" -X utf8 "$sync_sdk_py" --check-only >/dev/null || {
+      echo "【package-webgames】MOD SDK 契约存在漂移，拒绝携带分发！"
+      exit 1
+    }
+    "$py_bin" -X utf8 "$build_sdk_bin_py" --check >/dev/null || {
+      echo "【package-webgames】kalar-mod CLI 构建前置校验未通过！"
+      exit 1
+    }
+  fi
+  rm -rf "$OUT_DIR/mod_sdk"
+  cp -R "$ROOT_DIR/mod_sdk" "$OUT_DIR/mod_sdk"
+  find "$OUT_DIR/mod_sdk" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+}
+
+run_release_bundle_audit() {
+  local py_bin="$1"
+  local audit_release_py="$ROOT_DIR/scripts/py/audit_release_bundle.py"
+  if [[ -z "$py_bin" ]] || [[ ! -f "$audit_release_py" ]]; then
+    return 0
+  fi
+  local audit_flags=(--dir "$OUT_DIR")
+  if [[ $INCLUDE_MOD_SDK -eq 1 ]]; then
+    audit_flags+=(--require-sdk)
+  fi
+  "$py_bin" -X utf8 "$audit_release_py" "${audit_flags[@]}" >/dev/null || {
+    echo "【package-webgames】发行产物净度或 SDK 捆绑门禁未通过！"
+    exit 1
+  }
+}
 
 if [[ $EXPORT_RELEASE -eq 1 ]]; then
   EXPORT_MODE="--export-release"
@@ -141,12 +186,19 @@ if [[ $code -eq 0 ]] && [[ -f "$ARTIFACT_PATH" ]]; then
     KDAT_PRESENT="true"
   fi
 
+  MOD_SDK_INCLUDED="false"
+  if [[ $INCLUDE_MOD_SDK -eq 1 ]]; then
+    bundle_mod_sdk_assets "${PY_BIN:-$(find_python_bin)}"
+    MOD_SDK_INCLUDED="true"
+  fi
+  run_release_bundle_audit "${PY_BIN:-$(find_python_bin)}"
+
   # 追加式构建元数据指纹留痕（统一 UTC Z 时区与目标元数据）
   GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
   MANIFEST_PATH="$OUT_DIR/build_manifest.jsonl"
   TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date +"%Y-%m-%dT%H:%M:%SZ")
-  echo "{\"timestamp\":\"$TIMESTAMP\",\"git_commit\":\"$GIT_COMMIT\",\"target\":\"$PRESET_NAME\",\"export_mode\":\"$EXPORT_LABEL\",\"artifact_name\":\"$ARTIFACT_NAME\",\"size_bytes\":$FILE_SIZE,\"sha256\":\"$SHA\",\"mods_bundled\":$MODS_BUNDLED,\"config_kdat_present\":$KDAT_PRESENT,\"status\":\"SUCCESS\"}" >> "$MANIFEST_PATH"
-  echo "  • 外部资产捆绑: config.kdat=$KDAT_PRESENT, mods=$MODS_BUNDLED"
+  echo "{\"timestamp\":\"$TIMESTAMP\",\"git_commit\":\"$GIT_COMMIT\",\"target\":\"$PRESET_NAME\",\"export_mode\":\"$EXPORT_LABEL\",\"artifact_name\":\"$ARTIFACT_NAME\",\"size_bytes\":$FILE_SIZE,\"sha256\":\"$SHA\",\"mods_bundled\":$MODS_BUNDLED,\"mod_sdk_included\":$MOD_SDK_INCLUDED,\"config_kdat_present\":$KDAT_PRESENT,\"status\":\"SUCCESS\"}" >> "$MANIFEST_PATH"
+  echo "  • 外部资产捆绑: config.kdat=$KDAT_PRESENT, mods=$MODS_BUNDLED, mod_sdk=$MOD_SDK_INCLUDED"
   echo "  • 构建元数据指纹已留痕: $MANIFEST_PATH"
   exit 0
 else

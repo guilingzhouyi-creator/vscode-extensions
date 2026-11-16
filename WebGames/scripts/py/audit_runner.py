@@ -248,6 +248,13 @@ AUDIT_TASKS: list[AuditTask] = [
         default_args=[],
         scopes={"scripts"},
     ),
+    AuditTask(
+        task_id="release_bundle",
+        name="发行构建包物理净度与 SDK 捆绑门禁",
+        script_name="audit_release_bundle.py",
+        default_args=["--check-self"],
+        scopes={"scripts", "docs"},
+    ),
 ]
 
 __all__ = [
