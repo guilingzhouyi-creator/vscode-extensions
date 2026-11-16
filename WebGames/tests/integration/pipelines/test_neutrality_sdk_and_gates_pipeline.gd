@@ -8,10 +8,10 @@
 # 职责说明: 端到端验证全领域 21 项真实服务无模拟回退、多命名空间物品格式、
 #           基座配置去卡拉尔中性化与 views.json 视图段完整性、total_conversion_sample
 #           与 official_kalar 哈希自洽、以及前端单例 teardown 零孤立节点泄漏。
-# 设计依据: 阶段验收矩阵 (DOD-P133-01 ~ DOD-P133-04)
+# 设计依据: 阶段验收矩阵 (TC-NEUT-01 ~ TC-NEUT-04)
 # ==============================================================================
 
-## TestNeutralitySdkAndGatesPipeline：全领域真实服务、基座中性化与门禁闭环流水线
+## TestNeutralitySdkAndGatesPipeline：全领域真实服务、基础中性化与门禁校验流水线
 class_name TestNeutralitySdkAndGatesPipeline
 extends TestCase
 
@@ -23,20 +23,20 @@ const EXPECTED_SERVICE_KEYS: Array[String] = [
 ]
 
 
-## 执行全领域真实服务与基座中性化全链路回归流水线
+## 执行全领域真实服务与基础中性化全流程回归流水线
 static func run_all_tests() -> Dictionary:
 	_reset_phase_state()
 	var results: Array[Dictionary] = []
-	results.append(test_dod_p133_01_real_service_container_coverage())
-	results.append(test_dod_p133_02_base_neutrality_and_multi_namespace())
-	results.append(test_dod_p133_03_sdk_samples_and_official_digest())
-	results.append(test_dod_p133_04_singleton_teardown_zero_leaks())
+	results.append(test_tc_neut_01_real_service_container_coverage())
+	results.append(test_tc_neut_02_base_neutrality_and_multi_namespace())
+	results.append(test_tc_neut_03_sdk_samples_and_official_digest())
+	results.append(test_tc_neut_04_singleton_teardown_zero_leaks())
 	_reset_phase_state()
-	return TestCase.pack_results("全领域真实服务、去卡拉尔中性化与门禁闭环流水线", results)
+	return TestCase.pack_results("全领域真实服务、去卡拉尔中性化与门禁校验流水线", results)
 
 
-## DOD-P133-01: ServiceLocator real 模式全 21 项域服务无模拟回退并可执行真实调用
-static func test_dod_p133_01_real_service_container_coverage() -> Dictionary:
+## TC-NEUT-01: ServiceLocator real 模式全 21 项域服务无模拟回退并可执行真实调用
+static func test_tc_neut_01_real_service_container_coverage() -> Dictionary:
 	_reset_phase_state()
 	ServiceLocator.set_mode("real")
 	var service_container := ServiceLocator.get_instance()
@@ -57,7 +57,7 @@ static func test_dod_p133_01_real_service_container_coverage() -> Dictionary:
 		and non_mock_failures.is_empty() \
 		and sample_calls_passed
 	_reset_phase_state()
-	return TestCase.make_result("DOD-P133-01: real 模式全 21 项域服务零 Mock 回退与真实调用贯通", passed, {
+	return TestCase.make_result("TC-NEUT-01: real 模式全 21 项域服务零 Mock 回退与真实调用贯通", passed, {
 		"non_mock_failures": non_mock_failures,
 		"sample_calls_passed": sample_calls_passed
 	})
@@ -70,7 +70,7 @@ static func _exercise_real_domain_services(service_container: ServiceContainer) 
 		version_holder.merge(reply_payload, true)
 	)
 	var combat_holder: Dictionary = {}
-	service_container.combat().get_combat_snapshot_async("BOSS_P133_PROBE", func(reply_payload: Dictionary) -> void:
+	service_container.combat().get_combat_snapshot_async("BOSS_COMBAT_PROBE", func(reply_payload: Dictionary) -> void:
 		combat_holder.merge(reply_payload, true)
 	)
 	var craft_preview := service_container.crafting().preview_enhance_rate(5)
@@ -100,8 +100,8 @@ static func _exercise_real_domain_services(service_container: ServiceContainer) 
 		and world_map_snapshot.has("landmarks")
 
 
-## DOD-P133-02: 无 MOD 基座去卡拉尔专有名词检查、views.json 补齐与多命名空间物品格式
-static func test_dod_p133_02_base_neutrality_and_multi_namespace() -> Dictionary:
+## TC-NEUT-02: 无 MOD 基座去卡拉尔专有名词检查、views.json 补齐与多命名空间物品格式
+static func test_tc_neut_02_base_neutrality_and_multi_namespace() -> Dictionary:
 	_reset_phase_state()
 	var service_mode := GameConfig.get_string("frontend.ui", "service_mode", "")
 	var player_name := GameConfig.get_string("frontend.ui", "player/name", "")
@@ -123,7 +123,7 @@ static func test_dod_p133_02_base_neutrality_and_multi_namespace() -> Dictionary
 		and not ItemRegistrySolver.validate_canonical_id_format(" NEXUS:ITEM:CORE:RELIC_01")
 
 	var passed := service_mode == "real" and base_neutral and views_complete and namespace_checks
-	return TestCase.make_result("DOD-P133-02: 基座配置去卡拉尔中性化、views.json 契约段与多命名空间校验", passed, {
+	return TestCase.make_result("TC-NEUT-02: 基座配置去卡拉尔中性化、views.json 契约段与多命名空间校验", passed, {
 		"service_mode": service_mode,
 		"base_neutral": base_neutral,
 		"static_neutrality_issues": static_neutrality_issues,
@@ -203,8 +203,8 @@ static func _servers_neutral(servers_list: Array) -> bool:
 	return true
 
 
-## DOD-P133-03: total_conversion_sample 全包发现预检通过，且 official_kalar 内容哈希自洽
-static func test_dod_p133_03_sdk_samples_and_official_digest() -> Dictionary:
+## TC-NEUT-03: total_conversion_sample 全包发现预检通过，且 official_kalar 内容哈希自洽
+static func test_tc_neut_03_sdk_samples_and_official_digest() -> Dictionary:
 	_reset_phase_state()
 	var sample_payload := ModPackageDiscoverySolver.load_full_mod_package_from_dir("res://mod_sdk/templates/total_conversion_sample")
 	var sample_precheck := ModPrecheckAndAdaptationSolver.precheck_single_mod(sample_payload)
@@ -222,7 +222,7 @@ static func test_dod_p133_03_sdk_samples_and_official_digest() -> Dictionary:
 		and declared_digest == computed_digest
 
 	var passed := sample_ok and official_ok
-	return TestCase.make_result("DOD-P133-03: total_conversion_sample 预检通过与 official_kalar 哈希自洽", passed, {
+	return TestCase.make_result("TC-NEUT-03: total_conversion_sample 预检通过与 official_kalar 哈希自洽", passed, {
 		"sample_ok": sample_ok,
 		"official_ok": official_ok,
 		"declared_digest": declared_digest,
@@ -230,8 +230,8 @@ static func test_dod_p133_03_sdk_samples_and_official_digest() -> Dictionary:
 	})
 
 
-## DOD-P133-04: 实例化并复位前端 11 个单例及服务边界后，孤立节点增量为 0
-static func test_dod_p133_04_singleton_teardown_zero_leaks() -> Dictionary:
+## TC-NEUT-04: 实例化并复位前端 11 个单例及服务边界后，孤立节点增量为 0
+static func test_tc_neut_04_singleton_teardown_zero_leaks() -> Dictionary:
 	_reset_phase_state()
 	var orphan_before := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
 	var modal_mgr := ModalManager.get_instance()
@@ -252,7 +252,7 @@ static func test_dod_p133_04_singleton_teardown_zero_leaks() -> Dictionary:
 	_reset_phase_state()
 	var orphan_delta := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)) - orphan_before
 	var passed := instantiated_all and orphan_delta == 0
-	return TestCase.make_result("DOD-P133-04: 前端 11 项 UI 单例 teardown 彻底复位且孤立节点增量为 0", passed, {
+	return TestCase.make_result("TC-NEUT-04: 前端 11 项 UI 单例 teardown 彻底复位且孤立节点增量为 0", passed, {
 		"instantiated_all": instantiated_all,
 		"orphan_delta": orphan_delta
 	})

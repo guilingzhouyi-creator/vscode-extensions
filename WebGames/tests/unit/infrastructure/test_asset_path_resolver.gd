@@ -7,7 +7,7 @@
 #           验证统一 URI 协议解析（official://, mod://, res://, user://）；
 #           验证工程版与发行版运行环境判定与测试隔离覆写机制；
 #           验证防路径穿越（Anti-Path Traversal）与标识符清洗等刚性安全防线。
-# 退出语义与设计依据: 工业级三级级联安全路径隔离与双轨环境规约 (Inv-MOD-RELPATH-1 / Inv-PATH-TRAVERSAL-GUARD)
+# 退出语义与设计依据: 工业级三级级联安全路径隔离与双模式环境规约 (Inv-MOD-RELPATH-1 / Inv-PATH-TRAVERSAL-GUARD)
 # ==============================================================================
 
 class_name TestAssetPathResolver
@@ -214,18 +214,18 @@ static func test_versioned_kmod_precedence_and_strict_traversal() -> Dictionary:
 	var user_root := "user://test_apr06_user"
 	_apr06_cleanup_dir(install_root)
 	_apr06_cleanup_dir(user_root)
-	_apr06_write_kmod(install_root.path_join("mod_p132_pack_1.0.0.kmod"), "mod_p132_pack", "1.0.0", "assets/textures/banner.txt", "INSTALL_V1".to_utf8_buffer())
-	_apr06_write_kmod(user_root.path_join("mod_p132_pack_2.0.0.kmod"), "mod_p132_pack", "2.0.0", "assets/textures/banner.txt", "USER_V2".to_utf8_buffer())
+	_apr06_write_kmod(install_root.path_join("mod_versioned_sample_1.0.0.kmod"), "mod_versioned_sample", "1.0.0", "assets/textures/banner.txt", "INSTALL_V1".to_utf8_buffer())
+	_apr06_write_kmod(user_root.path_join("mod_versioned_sample_2.0.0.kmod"), "mod_versioned_sample", "2.0.0", "assets/textures/banner.txt", "USER_V2".to_utf8_buffer())
 
 	AssetPathResolver.set_test_roots_override([install_root, user_root])
-	var resolved_kmod := AssetPathResolver.resolve_mod_asset_path("mod_p132_pack", "textures/banner.txt")
-	var exists_ok := AssetPathResolver.asset_exists(resolved_kmod) and not AssetPathResolver.asset_exists(user_root.path_join("mod_p132_pack_2.0.0.kmod!/assets/textures/missing.txt"))
-	var payload_ok := AssetPathResolver.read_mod_asset_bytes("mod://textures/banner.txt", "mod_p132_pack").get_string_from_utf8() == "USER_V2"
+	var resolved_kmod := AssetPathResolver.resolve_mod_asset_path("mod_versioned_sample", "textures/banner.txt")
+	var exists_ok := AssetPathResolver.asset_exists(resolved_kmod) and not AssetPathResolver.asset_exists(user_root.path_join("mod_versioned_sample_2.0.0.kmod!/assets/textures/missing.txt"))
+	var payload_ok := AssetPathResolver.read_mod_asset_bytes("mod://textures/banner.txt", "mod_versioned_sample").get_string_from_utf8() == "USER_V2"
 	var precedence_ok := resolved_kmod.begins_with(user_root)
 
-	var pct_dot := AssetPathResolver.resolve_unified_uri("mod://mod_p132_pack/%2e%2e/secret.txt")
+	var pct_dot := AssetPathResolver.resolve_unified_uri("mod://mod_versioned_sample/%2e%2e/secret.txt")
 	var double_pct := AssetPathResolver.sanitize_sandbox_path_strict("textures/%252e%252e/secret.txt")
-	var nul_block := AssetPathResolver.resolve_mod_asset_path("mod_p132_pack", "textures/a%00.png")
+	var nul_block := AssetPathResolver.resolve_mod_asset_path("mod_versioned_sample", "textures/a%00.png")
 	var strict_guard_ok := pct_dot.is_empty() and double_pct.is_empty() and nul_block.is_empty()
 
 	AssetPathResolver.reset_for_tests()

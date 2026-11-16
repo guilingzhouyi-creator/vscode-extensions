@@ -4,16 +4,17 @@
 # 架构定位: Integration Test Pipeline / Real Auth & Slot Reload Harness
 # 依赖与触发: 上游: TestRegistry | 下游: AccountEntryView, RealAuthService,
 #           AccountRepository, AccountSlotBindingSolver
-# 职责说明: 注册页后端校验、原子持久化落盘与二次重载插槽回灌全链路验收流水线。
+# 职责说明: 注册页后端校验、原子持久化落盘与二次重载插槽恢复全流程验收流水线。
 #           覆盖注册表单边界校验、磁盘文件落盘与哈希脱敏、大小写不敏感重名拦截、
-#           登出后二次重载插槽快照回灌以及引擎冷启动物理重载一致性断言。
-# 退出语义与设计依据: 注册与持久化回灌规约与卡拉尔世界引擎前后端解耦规范
+#           登出后二次重载插槽快照恢复以及引擎冷启动物理重载一致性断言。
+# 退出语义与设计依据: 注册与持久化恢复规约与卡拉尔世界引擎前后端解耦规范
 # ==============================================================================
 
 class_name TestAccountRegistrationAndRealReloadPipeline
 extends TestCase
 
-const TEST_ACCOUNTS_PATH: String = "user://test_p131_accounts/account_registry.json"
+const TEST_ACCOUNTS_DIR: String = "user://test_reload_accounts"
+const TEST_ACCOUNTS_PATH: String = TEST_ACCOUNTS_DIR + "/account_registry.json"
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
@@ -37,7 +38,7 @@ static func _teardown_env() -> void:
 	ServiceLocator.reset()
 	AuthService.clear_sessions()
 	AccountRepository.reset_for_tests()
-	_remove_test_dir_recursive("user://test_p131_accounts")
+	_remove_test_dir_recursive(TEST_ACCOUNTS_DIR)
 
 static func _remove_test_dir_recursive(dir_path: String) -> void:
 	if not DirAccess.dir_exists_absolute(dir_path):
@@ -112,7 +113,7 @@ static func test_arr_02_registration_physical_persistence_on_disk() -> Dictionar
 	var acc_id := str(res.get("account_id", ""))
 
 	var reg_path := TEST_ACCOUNTS_PATH
-	var shard_path := "user://test_p131_accounts/%s.json" % acc_id
+	var shard_path := TEST_ACCOUNTS_DIR.path_join("%s.json" % acc_id)
 
 	var reg_exists: bool = FileAccess.file_exists(reg_path)
 	var shard_exists: bool = FileAccess.file_exists(shard_path)
@@ -176,7 +177,7 @@ static func test_arr_03_case_insensitive_duplicate_rejection() -> Dictionary:
 		"ok_upper": ok_upper
 	})
 
-## TC-ARR-04: 二次重载与角色槽位快照回灌
+## TC-ARR-04: 二次重载与角色槽位快照恢复
 static func test_arr_04_secondary_reload_and_slot_snapshot_reinjection() -> Dictionary:
 	_setup_env()
 	var view := AccountEntryView.new()
@@ -200,12 +201,12 @@ static func test_arr_04_secondary_reload_and_slot_snapshot_reinjection() -> Dict
 		and view.character_slots.is_empty() \
 		and view.current_state == AccountEntryView.EntryState.LOGIN
 
-	# 4. 二次登录（验证二次重载槽位回灌）
+	# 4. 二次登录（验证二次重载槽位恢复）
 	var login_res: Dictionary = view.submit_login("ReloadHero", "secret123")
 	var ok_login: bool = bool(login_res.get("success", false)) \
 		and view.current_state == AccountEntryView.EntryState.CHARACTER_SELECT
 
-	# 5. 断言回灌的槽位快照
+	# 5. 断言恢复的槽位快照
 	var slots := view.character_slots
 	var ok_slots: bool = slots.size() >= 3
 	var ok_slot_0: bool = false
@@ -226,7 +227,7 @@ static func test_arr_04_secondary_reload_and_slot_snapshot_reinjection() -> Dict
 	_teardown_env()
 
 	var passed: bool = ok_reg and ok_create and ok_logout and ok_login and ok_slots and ok_slot_0 and ok_slot_1_empty and ok_slot_2_empty
-	return TestCase.make_result("TC-ARR-04: 二次重载与角色槽位快照自动回灌", passed, {
+	return TestCase.make_result("TC-ARR-04: 二次重载与角色槽位快照自动恢复", passed, {
 		"ok_reg": ok_reg,
 		"ok_create": ok_create,
 		"ok_logout": ok_logout,
