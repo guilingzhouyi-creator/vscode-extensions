@@ -6,16 +6,6 @@
 class_name TestVersionGovernancePipeline
 extends RefCounted
 
-const VersionManifestDTO = preload("res://backend/domains/version_governance/version_manifest_dto.gd")
-const GrayPolicyDTO = preload("res://backend/domains/version_governance/gray_policy_dto.gd")
-const ActivationTokenDTO = preload("res://backend/domains/version_governance/activation_token_dto.gd")
-const GrayTargetingEngine = preload("res://backend/domains/version_governance/gray_targeting_engine.gd")
-const DynamicPackMountManager = preload("res://backend/domains/version_governance/dynamic_pack_mount_manager.gd")
-const PatchIntegrityVerifier = preload("res://backend/domains/version_governance/patch_integrity_verifier.gd")
-const VersionActivationGate = preload("res://backend/domains/version_governance/version_activation_gate.gd")
-const VersionStateMachine = preload("res://backend/domains/version_governance/version_state_machine.gd")
-const VersionedRuntimeContext = preload("res://backend/domains/version_governance/versioned_runtime_context.gd")
-
 # ==============================================================================
 # 测试运行总入口 (10 项第一性原理严格断言)
 # ==============================================================================
@@ -238,6 +228,7 @@ static func _test_gray_hash_bucket_uniform_distribution() -> Dictionary:
 	# 模拟 1,000 个顺序用户 ID
 	for i in range(1000):
 		var uid := "USER_%06d" % i
+		@warning_ignore("integer_division")
 		var b := GrayTargetingEngine.compute_user_hash_bucket(uid) / 10 # 映射到 10 个十分位区间
 		buckets[b] += 1
 

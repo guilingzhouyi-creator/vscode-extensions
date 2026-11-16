@@ -16,8 +16,6 @@
 class_name TestRealUiChainAndLockSecurityPipeline
 extends TestCase
 
-const ServiceLocator = preload("res://frontend/domain_boundary/service_locator.gd")
-const NavManager = preload("res://frontend/navigation/nav_manager.gd")
 const AppRootScript = preload("res://frontend/app/app_root.gd")
 const AccountEntryViewScript = preload("res://frontend/views/account_entry/account_entry_view.gd")
 const WorldGatewayViewScript = preload("res://frontend/views/world_gateway/world_gateway_view.gd")
@@ -25,13 +23,6 @@ const ModWorkbenchScreenScript = preload("res://frontend/views/mod_workbench/mod
 const CharacterCreationViewScript = preload("res://frontend/views/character_creation/character_creation_view.gd")
 const PrologueViewScript = preload("res://frontend/views/prologue/prologue_view.gd")
 const MainHUDViewScript = preload("res://frontend/views/main_hud/main_hud_view.gd")
-const AccountProfile = preload("res://backend/domains/account/account_profile.gd")
-const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
-const AuthService = preload("res://backend/domains/account/auth_service.gd")
-const WorldArchiveRepository = preload("res://backend/domains/world_state/world_archive_repository.gd")
-const WorldGatewayRealmSessionHelper = preload("res://frontend/views/world_gateway/world_gateway_realm_session_helper.gd")
-const TestFullChainBackendHelper = preload("res://tests/integration/pipelines/test_full_chain_backend_helper.gd")
-const WorldModAffinityManager = preload("res://backend/domains/narrative_orchestration/world_mod_affinity_manager.gd")
 
 const WORLD_ID: String = "WORLD_P131_E2E_UI_01"
 
@@ -189,13 +180,13 @@ static func _test_tc_e2e_02_esc_exit_nav_pop_mode_switch_quit(session_ctx: Dicti
 		mp_account.password_hash_sha256 = AuthService.hash_password("Secret_MP_131")
 		AccountRepository.get_instance().save_account(mp_account)
 		WorldGatewayRealmSessionHelper.logout_to_account_entry(gateway, gateway._get_tabs())
-		var mp_token := ""
+		var mp_auth := {"token": ""}
 		ServiceLocator.get_instance().auth().login_async("MP_TESTER_01", "Secret_MP_131", func(login_reply: Dictionary) -> void:
-			mp_token = str(login_reply.get("token", ""))
+			mp_auth["token"] = str(login_reply.get("token", ""))
 		)
 		var mp_gw: WorldGatewayViewScript = nav.replace_screen("world_gateway", {
 			"account_id": "MP_TESTER_01",
-			"token": mp_token
+			"token": str(mp_auth["token"])
 		}) as WorldGatewayViewScript
 		if mp_gw != null:
 			mp_gw._on_mode_tab_changed(1)
@@ -243,7 +234,7 @@ static func _test_tc_e2e_03_reentry_existing_char_and_entry_signals(session_ctx:
 		entry._on_char_slot_1_pressed()
 		entry._on_char_slot_2_pressed()
 		entry._on_char_reroll_pressed()
-		signals_ok = slot_picked and not entry._rolled_attributes.is_empty()
+		signals_ok = slot_picked and not entry.rolled_attributes.is_empty()
 
 	var login_res: Dictionary = entry.submit_login("Phase131HeroUser", "Secret_131_OK") if entry != null else {}
 	var login_acc := str(login_res.get("account_id", session_ctx.get("account_id", "")))

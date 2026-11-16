@@ -10,22 +10,6 @@
 class_name TestUnifiedProtocolAndEscPipeline
 extends TestCase
 
-const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
-const UnifiedProtocolDispatcher = preload("res://backend/domains/world_state/services/unified_protocol_dispatcher.gd")
-const HumanControlLeaseManager = preload("res://backend/domains/world_state/services/human_control_lease_manager.gd")
-const ClientRequestEnvelopeDTO = preload("res://backend/domains/world_state/dto/client_request_envelope_dto.gd")
-const UnifiedResponseEnvelopeDTO = preload("res://backend/domains/world_state/dto/unified_response_envelope_dto.gd")
-const AgentActionPacketDTO = preload("res://backend/domains/world_state/dto/agent_action_packet_dto.gd")
-const WorldGatewayFSM = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
-const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
-const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
-const GameLifecycleManager = preload("res://backend/domains/lifecycle/game_lifecycle_manager.gd")
-const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
-const GameBootstrap = preload("res://backend/infrastructure/game_bootstrap.gd")
-const HudEventBridge = preload("res://frontend/systems/hud_event_bridge.gd")
-const EventBusCore = preload("res://backend/infrastructure/event_bus/event_bus_core.gd")
-const MainHUDView = preload("res://frontend/views/main_hud/main_hud_view.gd")
-
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(test_tc_upe_01_protocol_factory_packing_roundtrip())
@@ -114,7 +98,7 @@ static func test_tc_upe_02_human_lease_preemption_and_agent_blocking() -> Dictio
 	var req_h := UnifiedProtocolFactory.create_human_request(
 		"world_state", "ESC_QUERY_READINESS", {}, "TOKEN_LEASE", account_id, "CHAR_01"
 	)
-	var resp_h := UnifiedProtocolDispatcher.dispatch_request(req_h)
+	var _resp_h := UnifiedProtocolDispatcher.dispatch_request(req_h)
 	var lease_active_after_human: bool = HumanControlLeaseManager.is_lease_active(account_id)
 
 	# 3. 租约保护期内，Agent 发送动作，必须被 ERR_PREEMPTED_BY_HUMAN 阻断
@@ -380,12 +364,12 @@ static func test_tc_upe_09_custom_domain_handler_scalability() -> Dictionary:
 	var custom_called_box := [false]
 	var custom_action := "BUY_COMMODITY"
 
-	UnifiedProtocolDispatcher.register_domain_handler(custom_domain, func(req: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
+	UnifiedProtocolDispatcher.register_domain_handler(custom_domain, func(handler_req: ClientRequestEnvelopeDTO, _gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
 		custom_called_box[0] = true
 		return UnifiedProtocolFactory.create_response(
-			req.request_id,
+			handler_req.request_id,
 			true,
-			{"item_id": "MITHRIL_ORE", "qty": int(req.payload.get("qty", 1))},
+			{"item_id": "MITHRIL_ORE", "qty": int(handler_req.payload.get("qty", 1))},
 			"",
 			"交易解算完成"
 		)

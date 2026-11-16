@@ -8,19 +8,6 @@
 class_name TestSnapshotEngineeringHarnessPipeline
 extends TestCase
 
-const TestSnapshotBundleDTO = preload("res://dev_harness/snapshot_mode/dto/test_snapshot_bundle_dto.gd")
-const SnapshotEnvironmentGuard = preload("res://dev_harness/snapshot_mode/snapshot_environment_guard.gd")
-const SnapshotCatalog = preload("res://dev_harness/snapshot_mode/snapshot_catalog.gd")
-const TestSnapshotBuilder = preload("res://dev_harness/snapshot_mode/test_snapshot_builder.gd")
-const SnapshotInjectionSolver = preload("res://dev_harness/snapshot_mode/snapshot_injection_solver.gd")
-const SnapshotCaptureTool = preload("res://dev_harness/snapshot_mode/snapshot_capture_tool.gd")
-const GameLifecycleModel = preload("res://backend/domains/lifecycle/game_lifecycle_model.gd")
-const GameLifecycleManager = preload("res://backend/domains/lifecycle/game_lifecycle_manager.gd")
-const CharacterPhysiologySheet = preload("res://backend/domains/lifecycle_physiology/character_physiology_sheet.gd")
-const CharacterWalletEntity = preload("res://backend/domains/currency_economy/character_wallet_entity.gd")
-const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
-const AccountProfile = preload("res://backend/domains/account/account_profile.gd")
-
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(test_snapshot_dto_round_trip_and_reset())

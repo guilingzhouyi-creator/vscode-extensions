@@ -10,8 +10,6 @@ extends RefCounted
 
 
 
-const StructuredLogPrintScanner = preload("res://tests/support/structured_log_print_scanner.gd")
-
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	var domain_name := "后端全域系统日志改造升级全量验收流水线"
@@ -746,11 +744,13 @@ static func _test_ls_21_log_retention_cleaner_expiration_and_protection() -> Dic
 	var exp_sec: Dictionary = log_tbl.get("export", {}) if log_tbl.get("export", {}) is Dictionary else {}
 	var prev_dir: Variant = exp_sec.get("directory", null)
 	exp_sec["directory"] = test_dir
+	GameConfig._clear_lookup_caches()
 	var removed_count := LogRetentionCleaner.sweep(now, true)
 	if prev_dir != null:
 		exp_sec["directory"] = prev_dir
 	else:
 		exp_sec.erase("directory")
+	GameConfig._clear_lookup_caches()
 
 	var expired_path := "%s/%s.%d.log" % [test_dir, prefix, expired_ts]
 	var fresh_path := "%s/%s.%d.log" % [test_dir, prefix, fresh_ts]

@@ -260,6 +260,7 @@ static func _test_branch_arbitration_and_hanging_detection() -> Dictionary:
 	var s1 := engine2.execute_node_action("START")
 	var s2 := engine2.execute_node_action("CH_DEAD")
 	var hanging_ok: bool = bool(init2.get("success", false)) \
+		and bool(s1.get("success", false)) \
 		and (not s2.get("success", true)) \
 		and s2.get("error_code", "") == "HANGING_NO_EXIT"
 

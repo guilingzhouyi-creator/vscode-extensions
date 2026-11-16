@@ -8,14 +8,6 @@
 class_name TestResourceCatalogAndAsyncConfigPipeline
 extends TestCase
 
-const StorageContractInterfaces = preload("res://backend/domains/persistence_protocol/storage_contract_interfaces.gd")
-const ResourceIndexEntryDTO = preload("res://backend/domains/persistence_protocol/dto/resource_index_entry_dto.gd")
-const BatchLoadRequestDTO = preload("res://backend/domains/persistence_protocol/dto/batch_load_request_dto.gd")
-const ResourceDecoderRegistry = preload("res://backend/domains/persistence_protocol/resource_decoder_registry.gd")
-const StorageResourceCatalog = preload("res://backend/domains/persistence_protocol/storage_resource_catalog.gd")
-const AuxiliaryWorkerPool = preload("res://backend/domains/persistence_protocol/auxiliary_worker_pool.gd")
-const CancellationToken = preload("res://backend/domains/persistence_protocol/cancellation_token.gd")
-
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(test_catalog_resolution_and_indexing())

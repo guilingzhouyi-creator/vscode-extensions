@@ -10,8 +10,6 @@
 class_name TestModSdkDeveloperErgonomicsPipeline
 extends TestCase
 
-const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
-
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []

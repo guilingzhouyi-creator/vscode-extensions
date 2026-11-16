@@ -15,26 +15,6 @@
 class_name TestNeutralitySdkAndGatesPipeline
 extends TestCase
 
-const AppLifecycleFSM = preload("res://frontend/app/app_lifecycle_fsm.gd")
-const ContextMenuManager = preload("res://frontend/ui_infrastructure/context_menu_manager.gd")
-const DialogManager = preload("res://frontend/ui_infrastructure/dialog_manager.gd")
-const DrawerManager = preload("res://frontend/ui_infrastructure/drawer_manager.gd")
-const FocusInputManager = preload("res://frontend/ui_infrastructure/focus_input_manager.gd")
-const ItemRegistrySolver = preload("res://backend/domains/item_namespace_registry/item_registry_solver.gd")
-const ModalManager = preload("res://frontend/ui_infrastructure/modal_manager.gd")
-const ModPackageDiscoverySolver = preload("res://backend/domains/narrative_orchestration/mod_package_discovery_solver.gd")
-const ModPrecheckAndAdaptationSolver = preload("res://backend/domains/character_creation/mod_precheck_and_adaptation_solver.gd")
-const NavManager = preload("res://frontend/navigation/nav_manager.gd")
-const RealServiceContainer = preload("res://frontend/domain_boundary/services/real_service_container.gd")
-const RedDotTreeManager = preload("res://frontend/ui_infrastructure/red_dot_tree_manager.gd")
-const ServiceLocator = preload("res://frontend/domain_boundary/service_locator.gd")
-const TestFullChainBackendHelper = preload("res://tests/integration/pipelines/test_full_chain_backend_helper.gd")
-const ThemeManager = preload("res://frontend/theme/theme_manager.gd")
-const TooltipManager = preload("res://frontend/ui_infrastructure/tooltip_manager.gd")
-const UIAudioBridge = preload("res://frontend/ui_infrastructure/ui_audio_bridge.gd")
-const UIIntermediary = preload("res://frontend/i18n/ui_intermediary.gd")
-const UITextResolver = preload("res://frontend/i18n/ui_text_resolver.gd")
-
 const FORBIDDEN_LORE_TOKENS: Array[String] = ["瓦尔兰", "阿尔托莉雅", "卡拉尔"]
 const EXPECTED_SERVICE_KEYS: Array[String] = [
 	"auth", "world", "character", "esc_menu", "prologue", "hud_sync", "lifecycle", "game_settings",

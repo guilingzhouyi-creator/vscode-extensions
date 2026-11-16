@@ -16,26 +16,8 @@ class_name TestModRuntimeAsyncAndAssetsPipeline
 extends TestCase
 
 const AppRootScript = preload("res://frontend/app/app_root.gd")
-const AssetPathResolver = preload("res://backend/infrastructure/resource_governance/asset_path_resolver.gd")
-const CharacterPrologueContext = preload("res://backend/domains/character_creation/character_prologue_context.gd")
-const CombatHandDrawDTO = preload("res://backend/domains/physics_thermodynamics/combat_hand_draw_dto.gd")
-const CombatHandGenerator = preload("res://backend/domains/physics_thermodynamics/combat_hand_generator.gd")
-const CutsceneAsyncLoader = preload("res://backend/infrastructure/media/cutscene_async_loader.gd")
-const CutsceneHookRegistry = preload("res://backend/infrastructure/media/cutscene_hook_registry.gd")
-const DeterministicRNG = preload("res://backend/infrastructure/deterministic_rng.gd")
-const ItemLoaderPipeline = preload("res://backend/domains/item_namespace_registry/item_loader_pipeline.gd")
-const MapAndEcologySolver = preload("res://backend/domains/world_navigation/map_and_ecology_solver.gd")
 const ModWorkbenchScreenScript = preload("res://frontend/views/mod_workbench/mod_workbench_screen.gd")
-const NavManager = preload("res://frontend/navigation/nav_manager.gd")
-const PrologueCutscenePort = preload("res://backend/domains/character_creation/prologue_cutscene_port.gd")
-const PrologueExecutionKernel = preload("res://backend/domains/character_creation/prologue_execution_kernel.gd")
 const PrologueViewScript = preload("res://frontend/views/prologue/prologue_view.gd")
-const RewardDispatchPipeline = preload("res://backend/domains/chat_command/reward_dispatch_pipeline.gd")
-const ServiceLocator = preload("res://frontend/domain_boundary/service_locator.gd")
-const TestFullChainBackendHelper = preload("res://tests/integration/pipelines/test_full_chain_backend_helper.gd")
-const TestTier3ContentOverrideHelper = preload("res://tests/integration/pipelines/test_tier3_content_override_helper.gd")
-const UIIntermediary = preload("res://frontend/i18n/ui_intermediary.gd")
-const UITextResolver = preload("res://frontend/i18n/ui_text_resolver.gd")
 const WorldGatewayViewScript = preload("res://frontend/views/world_gateway/world_gateway_view.gd")
 
 const SANDBOX_ROOT: String = "user://test_p132_sandbox/"
@@ -107,10 +89,10 @@ class DelayedAsyncWorldService extends "res://frontend/domain_boundary/interface
 			}
 		})
 
-	func set_mod_selection_async(_account_id: String, _token: String, selected_pack_ids: Array, result_callback: Callable) -> void:
+	func set_mod_selection_async(_account_id: String, _token: String, selected_pack_ids: Array, result_callback: Callable, _custom_roots: Array = []) -> void:
 		_enqueue("set_mod_selection", result_callback, {"success": true, "data": {"selected_pack_ids": selected_pack_ids.duplicate()}})
 
-	func precheck_mod_stack_async(_account_id: String, _token: String, enabled_pack_ids: Array, result_callback: Callable) -> void:
+	func precheck_mod_stack_async(_account_id: String, _token: String, enabled_pack_ids: Array, result_callback: Callable, _custom_roots: Array = []) -> void:
 		_enqueue("precheck_mod_stack", result_callback, {
 			"success": true,
 			"data": {

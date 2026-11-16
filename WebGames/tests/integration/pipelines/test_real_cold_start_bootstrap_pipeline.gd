@@ -14,26 +14,7 @@ class_name TestRealColdStartBootstrapPipeline
 extends TestCase
 
 const AppBootstrapScript = preload("res://frontend/app/app_bootstrap.gd")
-const AppLifecycleFSM = preload("res://frontend/app/app_lifecycle_fsm.gd")
 const AppRootScene = preload("res://frontend/app/app_root.tscn")
-const ContextMenuManager = preload("res://frontend/ui_infrastructure/context_menu_manager.gd")
-const DialogManager = preload("res://frontend/ui_infrastructure/dialog_manager.gd")
-const DrawerManager = preload("res://frontend/ui_infrastructure/drawer_manager.gd")
-const FocusInputManager = preload("res://frontend/ui_infrastructure/focus_input_manager.gd")
-const ModalManager = preload("res://frontend/ui_infrastructure/modal_manager.gd")
-const NavManager = preload("res://frontend/navigation/nav_manager.gd")
-const RealAuthService = preload("res://frontend/domain_boundary/services/real_auth_service.gd")
-const RealProtocolBridge = preload("res://frontend/domain_boundary/services/real_protocol_bridge.gd")
-const RealServiceContainer = preload("res://frontend/domain_boundary/services/real_service_container.gd")
-const RedDotTreeManager = preload("res://frontend/ui_infrastructure/red_dot_tree_manager.gd")
-const ServiceLocator = preload("res://frontend/domain_boundary/service_locator.gd")
-const TestFullChainBackendHelper = preload("res://tests/integration/pipelines/test_full_chain_backend_helper.gd")
-const ThemeManager = preload("res://frontend/theme/theme_manager.gd")
-const TooltipManager = preload("res://frontend/ui_infrastructure/tooltip_manager.gd")
-const UIAudioBridge = preload("res://frontend/ui_infrastructure/ui_audio_bridge.gd")
-const UIBindingRegistry = preload("res://frontend/i18n/ui_binding_registry.gd")
-const UIIntermediary = preload("res://frontend/i18n/ui_intermediary.gd")
-const UITextResolver = preload("res://frontend/i18n/ui_text_resolver.gd")
 
 
 ## 执行全真冷启动与协议健壮性集成测试矩阵

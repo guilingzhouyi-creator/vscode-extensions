@@ -12,7 +12,6 @@ class_name TestTier3ContentOverridePipeline
 extends TestCase
 
 const Helper = preload("res://tests/integration/pipelines/test_tier3_content_override_helper.gd")
-const Tier3ContentOverrideLoader = preload("res://backend/domains/narrative_orchestration/tier3_content_override_loader.gd")
 const TEST_ACCOUNT_ID: String = "ACC_T3MOD_TEST_01"
 
 ## 执行全量 Tier 3 MOD 差分覆盖与诊断流水线测试 (TC-T3MOD-01 ~ TC-T3MOD-06)

@@ -8,31 +8,6 @@
 class_name TestSessionLifecycleAndHudSyncPipeline
 extends TestCase
 
-const AccountRegistrationDTO = preload("res://backend/domains/account/dto/account_registration_dto.gd")
-const AuthService = preload("res://backend/domains/account/auth_service.gd")
-const AccountProfile = preload("res://backend/domains/account/account_profile.gd")
-const HudStatusSnapshotDTO = preload("res://backend/domains/world_state/dto/hud_status_snapshot_dto.gd")
-const HudMutationEventsDTO = preload("res://backend/domains/world_state/dto/hud_mutation_events_dto.gd")
-const HudEventContract = preload("res://backend/domains/world_state/hud_event_contract.gd")
-const AuthoritativeHudSyncService = preload("res://backend/domains/world_state/services/authoritative_hud_sync_service.gd")
-const AccountSlotBindingSolver = preload("res://backend/domains/account/account_slot_binding_solver.gd")
-const WorldGatewayFSM = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
-const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
-const CharacterCreationRequestDTO = preload("res://backend/domains/character_creation/character_creation_request_dto.gd")
-const CharacterCreationService = preload("res://backend/domains/character_creation/character_creation_service.gd")
-const OpeningEventStreamDTO = preload("res://backend/domains/character_creation/opening_event_stream_dto.gd")
-const PrologueExecutionKernel = preload("res://backend/domains/character_creation/prologue_execution_kernel.gd")
-const CharacterPrologueContext = preload("res://backend/domains/character_creation/character_prologue_context.gd")
-const InputDeviceStateAggregate = preload("res://backend/domains/hardware_input/input_device_state_aggregate.gd")
-const GameLoopFSM = preload("res://backend/infrastructure/game_loop_fsm.gd")
-const GameLifecycleModel = preload("res://backend/domains/lifecycle/game_lifecycle_model.gd")
-const GameShutdownDTO = preload("res://backend/domains/lifecycle/dto/game_shutdown_dto.gd")
-const GameLifecycleService = preload("res://backend/domains/lifecycle/game_lifecycle_service.gd")
-const GameLifecycleManager = preload("res://backend/domains/lifecycle/game_lifecycle_manager.gd")
-const GameBootstrap = preload("res://backend/infrastructure/game_bootstrap.gd")
-const LifecycleStageHookRegistry = preload("res://backend/domains/lifecycle/lifecycle_stage_hook_registry.gd")
-const SessionFlowContextDTO = preload("res://backend/domains/lifecycle/dto/session_flow_context_dto.gd")
-
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(test_registration_validation_and_duplicate())
@@ -132,9 +107,9 @@ static func test_hud_snapshot_dto_and_divider_guards() -> Dictionary:
 		"wallet_gold": 7
 	}
 	var dto := HudStatusSnapshotDTO.from_dto(data)
-	var round := HudStatusSnapshotDTO.from_dto(dto.to_dto())
+	var roundtrip := HudStatusSnapshotDTO.from_dto(dto.to_dto())
 	var passed := dto.hp_max >= 1.0 and dto.ap_max >= 1.0 and dto.hp_current >= 0.0 \
-		and round.hp_max == dto.hp_max and round.wallet_gold == 7
+		and roundtrip.hp_max == dto.hp_max and roundtrip.wallet_gold == 7
 	return {"test": "TC-HDS-03: 快照序列化与除数下限守卫", "passed": passed}
 
 # ---- TC-HDS-04：快照真实溯源与防臆造白名单 ----
@@ -253,7 +228,7 @@ static func test_narrative_template_args_contract() -> Dictionary:
 # ---- TC-HDS-08：会话有界与广播零残留订阅 ----
 static func test_session_bounded_and_no_residual_subscription() -> Dictionary:
 	AuthService.clear_sessions()
-	var store := _make_account_store()
+	var _store := _make_account_store()
 	var acc := AccountProfile.new()
 	acc.account_id = "ACC_BOUND"
 	acc.username = "BoundSession"

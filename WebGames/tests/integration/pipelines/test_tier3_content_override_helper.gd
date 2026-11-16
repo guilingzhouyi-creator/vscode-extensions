@@ -11,7 +11,6 @@
 class_name TestTier3ContentOverrideHelper
 extends RefCounted
 
-const Tier3ContentOverrideLoader = preload("res://backend/domains/narrative_orchestration/tier3_content_override_loader.gd")
 const TEST_SANDBOX_ROOT: String = "user://test_sandbox_tier3_mod/"
 
 ## 递归删除沙箱临时目录

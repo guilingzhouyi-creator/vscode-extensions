@@ -76,7 +76,7 @@ static func _test_character_context_isolation() -> Dictionary:
 		and ctx_b.race_id == "ELF" and ctx_b.assigned_starter_kit_id == "KIT_ELF_DEFAULT"
 
 	var passed := ok_a and ok_b
-	return { "test": "TC-PRO-01: 角色专属序章上下文初始化（种族/地点/套件配置动态映射）", "passed": passed }
+	return {"test": "TC-PRO-01: 角色专属序章上下文初始化（种族/地点/套件配置动态映射）", "passed": passed}
 
 
 ## TC-PRO-02: 占位符全量动态解析与安全注入（零漏替换残留）
@@ -97,7 +97,7 @@ static func _test_placeholder_full_resolution() -> Dictionary:
 		and not str(ctx.runtime_placeholders.get("START_LOCATION", "")).is_empty()
 
 	var passed := no_leftover and has_name and has_race and placeholders_ok
-	return { "test": "TC-PRO-02: 占位符全量动态解析（玩家名/种族/地点/装备零漏替换）", "passed": passed }
+	return {"test": "TC-PRO-02: 占位符全量动态解析（玩家名/种族/地点/装备零漏替换）", "passed": passed}
 
 
 ## TC-PRO-03: 缺失与非法占位符安全降级防御（不抛异常 + missing 清单）
@@ -112,7 +112,7 @@ static func _test_missing_placeholder_fallback() -> Dictionary:
 	var name_ok: bool = str(res.get("text", "")).contains("你好 ")
 
 	var passed := missing_ok and degraded_ok and name_ok
-	return { "test": "TC-PRO-03: 缺失/非法占位符安全降级（missing 清单 + UNKNOWN 标记不崩溃）", "passed": passed }
+	return {"test": "TC-PRO-03: 缺失/非法占位符安全降级（missing 清单 + UNKNOWN 标记不崩溃）", "passed": passed}
 
 
 ## TC-PRO-04: 新手装备发放与防重发幂等保护（KIT_DISPATCHED / ALREADY_GRANTED）
@@ -121,7 +121,7 @@ static func _test_starter_kit_idempotency() -> Dictionary:
 	var res := PrologueExecutionKernel.boot_character_prologue(opening, "HUMAN")
 	var ctx: CharacterPrologueContext = res.get("context", null)
 	if ctx == null:
-		return { "test": "TC-PRO-04: 新手装备发放幂等保护", "passed": false }
+		return {"test": "TC-PRO-04: 新手装备发放幂等保护", "passed": false}
 
 	# 直接二次调用 Dispatcher（boot 已发放一次 → 二发必为幂等跳过）
 	var second := StarterLoadoutDispatcher.dispatch_starter_kit(ctx)
@@ -135,7 +135,7 @@ static func _test_starter_kit_idempotency() -> Dictionary:
 	var gold_ok: bool = int(ctx.runtime_placeholders.get("STARTER_GOLD", 0)) > 0
 
 	var passed := first_granted and second_idempotent and marker_ok and gold_ok
-	return { "test": "TC-PRO-04: 新手装备发放幂等（KIT_DISPATCHED → ALREADY_GRANTED 零重复）", "passed": passed }
+	return {"test": "TC-PRO-04: 新手装备发放幂等（KIT_DISPATCHED → ALREADY_GRANTED 零重复）", "passed": passed}
 
 
 ## TC-PRO-05: 后端剧情 i18n 与前端 UI i18n 隔离性断言
@@ -147,8 +147,8 @@ static func _test_backend_i18n_isolation() -> Dictionary:
 	var backend_table_ok: bool = not awakening.is_empty() and awakening.contains("{PLAYER_NAME}")
 
 	# 2. 后端文案表确实与前端 UI 表分离（不同表名）
-	var ui_table: String = GameConfig.get_string("frontend.ui", "_meta/version", "")
-	var separate_ok: bool = true  # 表文件路径本就分离（narratives/ vs frontend/）
+	var _ui_table: String = GameConfig.get_string("frontend.ui", "_meta/version", "")
+	var separate_ok: bool = true # 表文件路径本就分离（narratives/ vs frontend/）
 
 	# 3. 事件广播载荷应包含 narrative_key 与 i18n_params（key+params 驱动前端自渲染）
 	var opening := _make_opening("ACC_PRO_05", "CHAR_PRO_E", "流云行者")
@@ -158,11 +158,11 @@ static func _test_backend_i18n_isolation() -> Dictionary:
 	if packet != null:
 		payload = packet.to_dto()
 		payload["narrative_key"] = "narrative/prologue/awakening"
-		payload["i18n_params"] = { "PLAYER_NAME": "流云行者" }
+		payload["i18n_params"] = {"PLAYER_NAME": "流云行者"}
 	var payload_ok: bool = payload.has("narrative_key") and payload.has("i18n_params")
 
 	var passed := backend_table_ok and separate_ok and payload_ok
-	return { "test": "TC-PRO-05: 后端剧情 i18n 独立且事件载荷携带 key+params（前后端解耦）", "passed": passed }
+	return {"test": "TC-PRO-05: 后端剧情 i18n 独立且事件载荷携带 key+params（前后端解耦）", "passed": passed}
 
 
 ## TC-PRO-06: 结构化事件流输出与状态解耦验证（EventBus 广播捕获）
@@ -171,7 +171,7 @@ static func _test_event_state_decoupling() -> Dictionary:
 	var res := PrologueExecutionKernel.boot_character_prologue(opening, "ELF")
 	var packet: PrologueEventPacketDTO = res.get("packet", null)
 	if packet == null:
-		return { "test": "TC-PRO-06: 结构化事件流输出与状态解耦", "passed": false }
+		return {"test": "TC-PRO-06: 结构化事件流输出与状态解耦", "passed": false}
 
 	# 突变载荷应为结构化事件类型（不携带任何前端页面指令）
 	var mutations: Array = packet.reserved_payload.get("mutations", [])
@@ -189,12 +189,12 @@ static func _test_event_state_decoupling() -> Dictionary:
 		var w: Dictionary = pkt.payload_data if pkt.payload_data is Dictionary else {}
 		seen_channels.append(str(w.get("channel", "")))
 	var tok := bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, cb)
-	PrologueExecutionKernel.broadcast_step(packet, "narrative/prologue/awakening", { "PLAYER_NAME": packet.character_name })
+	PrologueExecutionKernel.broadcast_step(packet, "narrative/prologue/awakening", {"PLAYER_NAME": packet.character_name})
 	tok.unbind()
 	var broadcast_ok: bool = seen_channels.has("prologue.step_advanced")
 
 	var passed := mutation_ok and broadcast_ok
-	return { "test": "TC-PRO-06: 结构化事件流输出与状态解耦（突变标记 + 广播可达）", "passed": passed }
+	return {"test": "TC-PRO-06: 结构化事件流输出与状态解耦（突变标记 + 广播可达）", "passed": passed}
 
 
 ## TC-PRO-07: 四阶段单向不可逆状态跃迁与终态闭环
@@ -203,7 +203,7 @@ static func _test_four_stage_progression_lifecycle() -> Dictionary:
 	var boot_res := PrologueExecutionKernel.boot_character_prologue(opening, "HUMAN")
 	var ctx: CharacterPrologueContext = boot_res.get("context", null)
 	if ctx == null:
-		return { "test": "TC-PRO-07: 四阶段单向不可逆状态跃迁与终态闭环", "passed": false }
+		return {"test": "TC-PRO-07: 四阶段单向不可逆状态跃迁与终态闭环", "passed": false}
 
 	# 初始处于阶段 1
 	var stage1_ok: bool = (ctx.current_stage == 1) and ctx.is_active and not ctx.is_completed
@@ -233,7 +233,7 @@ static func _test_four_stage_progression_lifecycle() -> Dictionary:
 		and (s5.get("error_code", "") == "PROLOGUE_ALREADY_COMPLETED")
 
 	var passed: bool = stage1_ok and stage2_ok and stage3_ok and stage4_ok and guard_ok
-	return { "test": "TC-PRO-07: 四阶段单向不可逆状态跃迁与终态闭环", "passed": passed }
+	return {"test": "TC-PRO-07: 四阶段单向不可逆状态跃迁与终态闭环", "passed": passed}
 
 
 ## TC-PRO-08: 角色专属上下文与 通用因果 DAG 引擎会话桥接
@@ -242,7 +242,7 @@ static func _test_phase_50_dag_session_bridge() -> Dictionary:
 	var boot_res := PrologueExecutionKernel.boot_character_prologue(opening, "ELF")
 	var ctx: CharacterPrologueContext = boot_res.get("context", null)
 	if ctx == null:
-		return { "test": "TC-PRO-08: 角色专属上下文与 通用因果 DAG 引擎会话桥接", "passed": false }
+		return {"test": "TC-PRO-08: 角色专属上下文与 通用因果 DAG 引擎会话桥接", "passed": false}
 
 	var dag_engine := PrologueExecutionKernel.create_dag_session(ctx)
 	var engine_ok: bool = (dag_engine != null) and (dag_engine.graph != null) \
@@ -250,4 +250,4 @@ static func _test_phase_50_dag_session_bridge() -> Dictionary:
 		and (dag_engine.active_node_ids.has("NODE_AWAKEN_GROVE")) \
 		and (dag_engine.runtime_context.get("PLAYER_NAME", "") == "精灵使者")
 
-	return { "test": "TC-PRO-08: 角色专属上下文与 通用因果 DAG 引擎会话桥接", "passed": engine_ok }
+	return {"test": "TC-PRO-08: 角色专属上下文与 通用因果 DAG 引擎会话桥接", "passed": engine_ok}

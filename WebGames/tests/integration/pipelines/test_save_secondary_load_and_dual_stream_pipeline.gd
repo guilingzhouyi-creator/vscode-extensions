@@ -8,20 +8,6 @@
 class_name TestSaveSecondaryLoadAndDualStreamPipeline
 extends TestCase
 
-const AccountCompositeAuthDTO = preload("res://backend/domains/account/dto/account_composite_auth_dto.gd")
-const AuthService = preload("res://backend/domains/account/auth_service.gd")
-const AccountProfile = preload("res://backend/domains/account/account_profile.gd")
-const SaveSlotDTO = preload("res://backend/domains/account/save_slot_dto.gd")
-const SaveLoadRoutingSolver = preload("res://backend/domains/world_gateway/save_load_routing_solver.gd")
-const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
-const CharacterPhysiologySheet = preload("res://backend/domains/lifecycle_physiology/character_physiology_sheet.gd")
-const CharacterWalletEntity = preload("res://backend/domains/currency_economy/character_wallet_entity.gd")
-const HudStatusSnapshotDTO = preload("res://backend/domains/world_state/dto/hud_status_snapshot_dto.gd")
-const GameLifecycleManager = preload("res://backend/domains/lifecycle/game_lifecycle_manager.gd")
-const GameLifecycleModel = preload("res://backend/domains/lifecycle/game_lifecycle_model.gd")
-const GameShutdownDTO = preload("res://backend/domains/lifecycle/dto/game_shutdown_dto.gd")
-const GameBootstrap = preload("res://backend/infrastructure/game_bootstrap.gd")
-
 static func run_all_tests() -> Dictionary:
 	var had_overlay := GameConfig.has_active_mod_overlay()
 	if not had_overlay:

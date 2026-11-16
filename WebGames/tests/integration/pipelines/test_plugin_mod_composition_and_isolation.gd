@@ -14,14 +14,6 @@
 class_name TestPluginModCompositionAndIsolation
 extends TestCase
 
-const AssetPathResolver = preload("res://backend/infrastructure/resource_governance/asset_path_resolver.gd")
-const AntiBridgeGuard = preload("res://backend/domains/world_gateway/anti_bridge_guard.gd")
-const WorldGatewayFSM = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
-const CharacterPrologueContext = preload("res://backend/domains/character_creation/character_prologue_context.gd")
-const OpeningEventStreamDTO = preload("res://backend/domains/character_creation/opening_event_stream_dto.gd")
-const PrologueExecutionKernel = preload("res://backend/domains/character_creation/prologue_execution_kernel.gd")
-const SyntheticChronoModFixture = preload("res://tests/support/synthetic_chrono_mod_fixture.gd")
-
 const SANDBOX_MODS_ROOT: String = SyntheticChronoModFixture.SANDBOX_MODS_ROOT
 
 ## 执行非卡拉尔合成 MOD 组合与隔离回归测试

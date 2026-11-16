@@ -14,16 +14,12 @@
 class_name TestRealFrontendGatewayWorkbenchPrologue
 extends TestCase
 
-const ServiceLocator = preload("res://frontend/domain_boundary/service_locator.gd")
-const NavManager = preload("res://frontend/navigation/nav_manager.gd")
 const AppRootScript = preload("res://frontend/app/app_root.gd")
 const AccountEntryViewScript = preload("res://frontend/views/account_entry/account_entry_view.gd")
 const WorldGatewayViewScript = preload("res://frontend/views/world_gateway/world_gateway_view.gd")
 const ModWorkbenchScreenScript = preload("res://frontend/views/mod_workbench/mod_workbench_screen.gd")
 const PrologueViewScript = preload("res://frontend/views/prologue/prologue_view.gd")
 const MainHUDViewScript = preload("res://frontend/views/main_hud/main_hud_view.gd")
-const TestFullChainBackendHelper = preload("res://tests/integration/pipelines/test_full_chain_backend_helper.gd")
-const WorldModAffinityManager = preload("res://backend/domains/narrative_orchestration/world_mod_affinity_manager.gd")
 
 const WORLD_ID: String = "WORLD_P130_FE_REAL_01"
 
