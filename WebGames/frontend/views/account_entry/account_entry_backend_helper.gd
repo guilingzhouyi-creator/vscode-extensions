@@ -175,3 +175,59 @@ static func advance_gateway_to_world(view: AccountEntryView, on_completed: Calla
                 return
             enter_target_world.call(selected_world_id)
     )
+
+
+## 注销当前会话凭证并复位账号入口表单状态
+static func logout_and_reset_flow(view: AccountEntryView) -> Dictionary:
+    if not view.current_session_token.is_empty():
+        var auth_service: Variant = ServiceLocator.get_instance().auth()
+        if auth_service != null and auth_service.has_method("revoke_token"):
+            auth_service.call("revoke_token", view.current_session_token)
+    view.current_session_token = ""
+    view.current_account_id = ""
+    view.selected_character_slot = ""
+    view.form_username = ""
+    view.form_password = ""
+    view.character_slots.clear()
+    if view.login_username_edit != null:
+        view.login_username_edit.text = ""
+    if view.login_password_edit != null:
+        view.login_password_edit.text = ""
+    ServiceLocator.clear_active_gateway()
+    view.switch_state(AccountEntryView.EntryState.LOGIN)
+    return {"success": true, "message": UIIntermediary.text("ui.fe01.logout.success")}
+
+
+## 处理登录/注册异步响应并统一渲染错误或跳转世界网关
+static func handle_auth_submit_reply(view: AccountEntryView, auth_reply: Dictionary, error_label: Label) -> void:
+    if view == null or not is_instance_valid(view):
+        return
+    if not bool(auth_reply.get("success", false)):
+        UIIntermediary.resolve(error_label, str(auth_reply.get("message", "")), auth_reply.get("error_data", {}))
+        error_label.modulate = DesignTokens.COLOR_DANGER_DEFAULT
+        return
+    error_label.text = ""
+    if view.is_mounted_in_tree():
+        NavManager.get_instance().push_screen("world_gateway", {"account_id": view.current_account_id, "token": view.current_session_token})
+
+
+## 执行清空选中角色槽位异步请求并刷新界面列表
+static func clear_character_slot_flow(view: AccountEntryView, tabs_delegate: AccountEntryTabs) -> void:
+    if view == null or view.selected_character_slot.is_empty():
+        return
+    var slot_to_clear := view.selected_character_slot
+    var auth_service: IAuthService = ServiceLocator.get_instance().auth()
+    auth_service.clear_slot_async(view.current_account_id, view.current_session_token, slot_to_clear, func(clear_reply: Dictionary) -> void:
+        if ServiceLocator.get_mode() != "mock" and not bool(clear_reply.get("success", false)):
+            NavManager.get_instance().show_toast(str(clear_reply.get("message", "ui.fe01.toast.slot_reset")), NavTypes.ToastLevel.WARNING)
+            return
+        if view == null or not is_instance_valid(view):
+            return
+        for slot_index in range(view.character_slots.size()):
+            if str(view.character_slots[slot_index].get("slot_id", "")) == slot_to_clear:
+                view.character_slots[slot_index] = {"slot_id": slot_to_clear, "empty": true, "name": "", "class": "", "level": 0}
+                break
+        if tabs_delegate != null:
+            tabs_delegate.populate_character_slots()
+        NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe01.toast.slot_reset", {"slot": slot_to_clear}), NavTypes.ToastLevel.INFO)
+    )

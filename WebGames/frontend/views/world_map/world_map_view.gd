@@ -382,10 +382,6 @@ func _connect_signals() -> void:
 	# 图例点击切换地标
 	connect_managed(_world_map_legend_list.item_selected, _on_legend_selected)
 
-	# 城镇设施 / NPC 选择
-	connect_managed(_town_facility_list.item_selected, _on_town_facility_selected)
-	connect_managed(_town_npc_list.item_selected, _on_town_npc_selected)
-
 	_get_tabs().connect_signals()
 
 # ==============================================================================
@@ -416,39 +412,3 @@ func _on_legend_selected(legend_index: int) -> void:
 
 func _on_wmap_zoom_in() -> void: map_zoom_level = minf(map_zoom_level + 0.25, MAP_MAX_ZOOM); _refresh_wmap_zoom()
 func _on_wmap_zoom_out() -> void: map_zoom_level = maxf(map_zoom_level - 0.25, MAP_MIN_ZOOM); _refresh_wmap_zoom()
-
-# ==============================================================================
-# 城镇交互
-# ==============================================================================
-
-## 设施条目选中：渲染设施名称与描述详情
-func _on_town_facility_selected(facility_index: int) -> void:
-	if facility_index >= 0 and facility_index < _mock_town_facilities.size():
-		var facility_entry: Dictionary = _mock_town_facilities[facility_index]
-		if _town_facility_detail_label:
-			var facility_name := UIIntermediary.text(facility_entry.get("name", ""))
-			var facility_description := UIIntermediary.text(facility_entry.get("desc", ""))
-			UIIntermediary.resolve(_town_facility_detail_label, "ui.fe10.town.facility_detail", {"name": facility_name, "desc": facility_description})
-
-## NPC 条目选中：渲染 NPC 名称与描述详情
-func _on_town_npc_selected(resident_index: int) -> void:
-	if resident_index >= 0 and resident_index < _mock_town_npcs.size():
-		var resident_entry: Dictionary = _mock_town_npcs[resident_index]
-		if _town_facility_detail_label:
-			var resident_name := UIIntermediary.text(resident_entry.get("name", ""))
-			var resident_description := UIIntermediary.text(resident_entry.get("desc", ""))
-			UIIntermediary.resolve(_town_facility_detail_label, "ui.fe10.town.npc_detail", {"name": resident_name, "desc": resident_description})
-
-# ==============================================================================
-# Tab 2~5 回调委托
-# ==============================================================================
-
-func _on_march_option_changed(option_index: int) -> void: _get_tabs()._on_march_option_changed(option_index)
-func _on_march_start() -> void: _get_tabs()._on_march_start()
-func _on_march_stop() -> void: _get_tabs()._on_march_stop()
-func _on_sov_establish() -> void: _get_tabs()._on_sov_establish()
-func _on_territory_selected(territory_index: int) -> void: _get_tabs()._on_territory_selected(territory_index)
-func _on_terr_upgrade() -> void: _get_tabs()._on_terr_upgrade()
-func _on_pf_calc() -> void: _get_tabs()._on_pf_calc()
-func _on_pf_route_selected(route_index: int) -> void: _get_tabs()._on_pf_route_selected(route_index)
-func _on_pf_auto() -> void: _get_tabs()._on_pf_auto()

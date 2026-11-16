@@ -208,23 +208,7 @@ func select_server(server_id: String) -> Dictionary:
 
 ## 退出当前账号，注销凭证并复位到登录页
 func logout_account() -> Dictionary:
-    if not current_session_token.is_empty():
-        var auth_service: Variant = ServiceLocator.get_instance().auth()
-        if auth_service != null and auth_service.has_method("revoke_token"):
-            auth_service.call("revoke_token", current_session_token)
-    current_session_token = ""
-    current_account_id = ""
-    selected_character_slot = ""
-    form_username = ""
-    form_password = ""
-    character_slots.clear()
-    if login_username_edit != null:
-        login_username_edit.text = ""
-    if login_password_edit != null:
-        login_password_edit.text = ""
-    ServiceLocator.clear_active_gateway()
-    switch_state(EntryState.LOGIN)
-    return {"success": true, "message": UIIntermediary.text("ui.fe01.logout.success")}
+    return BackendHelper.logout_and_reset_flow(self)
 
 ## 注入角色槽位列表快照
 func set_character_slots_snapshot(slots: Array) -> void:
@@ -338,15 +322,8 @@ func _push_screen_if_mounted(target_screen: String, navigation_parameters: Dicti
         NavManager.get_instance().push_screen(target_screen, navigation_parameters)
 
 func _on_login_submit_pressed() -> void:
-    var username: String = login_username_edit.text
-    var password_text: String = login_password_edit.text
-    submit_login(username, password_text, func(login_reply: Dictionary) -> void:
-        if not bool(login_reply.get("success", false)):
-            UIIntermediary.resolve(login_error_label, str(login_reply.get("message", "")), login_reply.get("error_data", {}))
-            login_error_label.modulate = DesignTokens.COLOR_DANGER_DEFAULT
-        else:
-            login_error_label.text = ""
-            _push_screen_if_mounted("world_gateway", {"account_id": current_account_id, "token": current_session_token})
+    submit_login(login_username_edit.text, login_password_edit.text, func(login_reply: Dictionary) -> void:
+        BackendHelper.handle_auth_submit_reply(self, login_reply, login_error_label)
     )
 
 func _on_login_goto_register_pressed() -> void: switch_state(EntryState.REGISTER)
@@ -370,12 +347,7 @@ func _on_register_submit_pressed() -> void:
         register_error_label.modulate = DesignTokens.COLOR_DANGER_DEFAULT
         return
     submit_register(username, password_text, func(register_reply: Dictionary) -> void:
-        if not bool(register_reply.get("success", false)):
-            UIIntermediary.resolve(register_error_label, str(register_reply.get("message", "")), register_reply.get("error_data", {}))
-            register_error_label.modulate = DesignTokens.COLOR_DANGER_DEFAULT
-        else:
-            register_error_label.text = ""
-            _push_screen_if_mounted("world_gateway", {"account_id": current_account_id, "token": current_session_token})
+        BackendHelper.handle_auth_submit_reply(self, register_reply, register_error_label)
     )
 
 func _on_register_back_pressed() -> void: switch_state(EntryState.LOGIN)
@@ -411,21 +383,7 @@ func _on_char_create_pressed() -> void:
     _get_tabs().refresh_creation_ui_snapshot()
 
 func _on_char_delete_pressed() -> void:
-    if selected_character_slot.is_empty():
-        return
-    var slot_to_clear := selected_character_slot
-    var auth_service: IAuthService = ServiceLocator.get_instance().auth()
-    auth_service.clear_slot_async(current_account_id, current_session_token, slot_to_clear, func(clear_reply: Dictionary) -> void:
-        if ServiceLocator.get_mode() != "mock" and not bool(clear_reply.get("success", false)):
-            NavManager.get_instance().show_toast(str(clear_reply.get("message", "ui.fe01.toast.slot_reset")), NavTypes.ToastLevel.WARNING)
-            return
-        for slot_index in range(character_slots.size()):
-            if str(character_slots[slot_index].get("slot_id", "")) == slot_to_clear:
-                character_slots[slot_index] = {"slot_id": slot_to_clear, "empty": true, "name": "", "class": "", "level": 0}
-                break
-        _get_tabs().populate_character_slots()
-        NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe01.toast.slot_reset", {"slot": slot_to_clear}), NavTypes.ToastLevel.INFO)
-    )
+    BackendHelper.clear_character_slot_flow(self, _get_tabs())
 
 func _on_char_back_pressed() -> void: switch_state(EntryState.SERVER_SELECT)
 

@@ -299,6 +299,63 @@ func _on_quest_range_changed(start_index: int, end_index: int) -> void:
 				virtual_row.bound_key = str(quest_entry.get("quest_id", ""))
 				virtual_row.bound_data = quest_entry
 
+## 初始化任务详情 Tab：默认展示首个任务，空列表置空态并禁用操作按钮
+func init_quest_detail_tab() -> void:
+	var host_view: QuestCausalityView = _view
+	if host_view == null:
+		return
+	if host_view.quest_list.size() > 0:
+		show_quest_detail(host_view.quest_list[0])
+		return
+	UIIntermediary.resolve(host_view.label_quest_title, "ui.fe07.quest_detail.no_quest")
+	host_view._quest_accept_button.disabled = true
+	host_view._quest_abandon_button.disabled = true
+	host_view._quest_submit_button.disabled = true
+
+## 展示任务详情：标题/发布者/等级/描述/目标列表/奖励列表，按状态启停接取/放弃/提交按钮
+func show_quest_detail(quest_entry: Dictionary) -> void:
+	var host_view: QuestCausalityView = _view
+	if host_view == null:
+		return
+	host_view.active_quest_detail = quest_entry
+	if host_view.label_quest_title:
+		host_view.label_quest_title.text = UIIntermediary.text(quest_entry.get("title", "ui.fe07.quest_detail.title_default"))
+	if host_view.label_quest_giver:
+		UIIntermediary.resolve(host_view.label_quest_giver, "ui.fe07.quest.giver", {"name": UIIntermediary.text(quest_entry.get("giver", "-"))})
+	if host_view.label_quest_level:
+		UIIntermediary.resolve(host_view.label_quest_level, "ui.fe07.quest.level", {"level": quest_entry.get("level_req", 0)})
+	if host_view.label_quest_description:
+		host_view.label_quest_description.text = UIIntermediary.text(quest_entry.get("desc", ""))
+	var objectives: Array = quest_entry.get("objectives", [])
+	for objective_index in range(objectives.size()):
+		var objective_label: Label = _acquire_detail_label(host_view.objectives_box, objective_index)
+		objective_label.visible = true
+		objective_label.text = UIIntermediary.text("ui.fe07.quest_detail.objective_item", {"text": UIIntermediary.text(str(objectives[objective_index]))})
+	_hide_trailing_children(host_view.objectives_box, objectives.size())
+	var rewards: Array = quest_entry.get("rewards", [])
+	for reward_index in range(rewards.size()):
+		var reward_label: Label = _acquire_detail_label(host_view.rewards_box, reward_index)
+		reward_label.visible = true
+		reward_label.text = UIIntermediary.text("ui.fe07.quest_detail.reward_item", {"text": UIIntermediary.text(str(rewards[reward_index]))})
+	_hide_trailing_children(host_view.rewards_box, rewards.size())
+	var quest_status: String = quest_entry.get("status", "")
+	host_view._quest_accept_button.disabled = (quest_status != "AVAILABLE")
+	host_view._quest_abandon_button.disabled = (quest_status != "ACTIVE")
+	host_view._quest_submit_button.disabled = (quest_status != "ACTIVE")
+
+func _acquire_detail_label(container: Node, index: int) -> Label:
+	if index < container.get_child_count():
+		return container.get_child(index) as Label
+	var detail_label := Label.new()
+	container.add_child(detail_label)
+	return detail_label
+
+func _hide_trailing_children(container: Node, active_count: int) -> void:
+	for child_index in range(active_count, container.get_child_count()):
+		var child := container.get_child(child_index)
+		if child is CanvasItem:
+			(child as CanvasItem).visible = false
+
 ## 统一页面标题栏构建
 func create_page_header(title_key: String) -> KPageHeader:
 	page_header = _ensure_page_header(page_header, KPageHeaderClass, title_key, _view) as KPageHeader

@@ -134,7 +134,7 @@ func refresh_replay_detail() -> void:
 	UIIntermediary.resolve(_view.label_replay_title, "ui.fe16.replay.title_label", {"title": replay_title})
 	UIIntermediary.resolve(_view.label_replay_scene, "ui.fe16.replay.scene_label", {"scene": replay_entry.get("scene", "--")})
 	UIIntermediary.resolve(_view.label_replay_level, "ui.fe16.replay.level_label", {"level": replay_entry.get("level", 0)})
-	UIIntermediary.resolve(_view.label_replay_duration, "ui.fe16.replay.duration_label", {"duration": _view._format_playtime(replay_entry.get("duration_sec", 0))})
+	UIIntermediary.resolve(_view.label_replay_duration, "ui.fe16.replay.duration_label", {"duration": format_playtime(replay_entry.get("duration_sec", 0))})
 	UIIntermediary.resolve(_view.label_replay_date, "ui.fe16.replay.date_label", {"date": replay_entry.get("date", "--")})
 	_view.replay_total_frames = replay_entry.get("frames", 0)
 	_view.replay_current_frame = 0
@@ -326,3 +326,35 @@ func create_page_header(title_key: String) -> KPageHeader:
 func create_state_panel() -> KStatePanel:
 	state_panel = _ensure_state_panel(state_panel, KStatePanelClass) as KStatePanel
 	return state_panel
+
+## 刷新存档槽位详情：未选中/空槽/非空槽三态（角色名/等级/游玩时长/存档日期）
+func refresh_slot_detail() -> void:
+	if _view == null or _view.label_slot_character_name == null or _view.label_slot_level == null:
+		return
+	if _view._selected_slot_index < 0 or _view._selected_slot_index >= _view.save_slots.size():
+		UIIntermediary.resolve(_view.label_slot_character_name, "ui.fe16.save_slot.char_name_default")
+		UIIntermediary.resolve(_view.label_slot_level, "ui.fe16.save_slot.level_default")
+		UIIntermediary.resolve(_view.label_slot_playtime, "ui.fe16.save_slot.playtime_default")
+		UIIntermediary.resolve(_view._label_slot_save_date, "ui.fe16.save_slot.save_date_default")
+		return
+	var slot_entry: Dictionary = _view.save_slots[_view._selected_slot_index]
+	if slot_entry.get("empty", true):
+		UIIntermediary.resolve(_view.label_slot_character_name, "ui.fe16.save_slot.empty_slot")
+		UIIntermediary.resolve(_view.label_slot_level, "ui.fe16.save_slot.level_default")
+		UIIntermediary.resolve(_view.label_slot_playtime, "ui.fe16.save_slot.playtime_default")
+		UIIntermediary.resolve(_view._label_slot_save_date, "ui.fe16.save_slot.save_date_default")
+		return
+	var character_name := UIIntermediary.text(slot_entry.get("char_name_key", ""))
+	UIIntermediary.resolve(_view.label_slot_character_name, "ui.fe16.save_slot.char_name", {"name": character_name})
+	UIIntermediary.resolve(_view.label_slot_level, "ui.fe16.save_slot.level_label", {"level": slot_entry.get("level", 0)})
+	UIIntermediary.resolve(_view.label_slot_playtime, "ui.fe16.save_slot.playtime_label", {"time": format_playtime(slot_entry.get("playtime_sec", 0))})
+	UIIntermediary.resolve(_view._label_slot_save_date, "ui.fe16.save_slot.save_date_label", {"date": slot_entry.get("save_date", "--")})
+
+## 秒数格式化：HH:MM:SS（游玩时长/回放时长展示）
+func format_playtime(seconds: int) -> String:
+	@warning_ignore("integer_division")
+	var hours_value := seconds / 3600
+	@warning_ignore("integer_division")
+	var minutes_value := (seconds % 3600) / 60
+	var seconds_value := seconds % 60
+	return "%02d:%02d:%02d" % [hours_value, minutes_value, seconds_value]

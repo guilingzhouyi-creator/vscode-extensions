@@ -34,9 +34,9 @@ enum GMPermissionLevel {NONE, MODERATOR, ADMIN, DEVELOPER}
 
 # --- Tab 1: 存档槽位 ---
 @onready var _item_list_save_slots: ItemList = $%ItemListSaveSlots
-@onready var _label_slot_character_name: Label = $%LabelSlotCharName
-@onready var _label_slot_level: Label = $%LabelSlotLevel
-@onready var _label_slot_playtime: Label = $%LabelSlotPlaytime
+@onready var label_slot_character_name: Label = $%LabelSlotCharName
+@onready var label_slot_level: Label = $%LabelSlotLevel
+@onready var label_slot_playtime: Label = $%LabelSlotPlaytime
 @onready var _label_slot_save_date: Label = $%LabelSlotSaveDate
 @onready var _save_to_slot_button: Button = $%BtnSaveToSlot
 @onready var _load_from_slot_button: Button = $%BtnLoadFromSlot
@@ -223,7 +223,7 @@ func _init_save_slots() -> void:
 		for slot_number in range(1, 7):
 			save_slots.append({"slot_id": "SLOT_%02d" % slot_number, "char_name_key": "", "level": 0, "playtime_sec": 0, "save_date": "", "empty": true})
 	_refresh_save_slot_list()
-	_refresh_slot_detail()
+	_get_tabs().refresh_slot_detail()
 
 ## 刷新存档槽位列表：空槽默认展示/非空槽角色名+等级组合行
 func _refresh_save_slot_list() -> void:
@@ -239,38 +239,6 @@ func _refresh_save_slot_list() -> void:
 			var character_name := UIIntermediary.text(slot_entry.get("char_name_key", ""))
 			var slot_text := UIIntermediary.text("ui.fe16.save_slot.list_item", {"index": slot_index + 1, "name": character_name, "level": slot_entry.get("level", 0)})
 			_item_list_save_slots.add_item(slot_text)
-
-## 刷新槽位详情：未选中/空槽/非空槽三态（角色名/等级/游玩时长/存档日期）
-func _refresh_slot_detail() -> void:
-	if _label_slot_character_name == null or _label_slot_level == null:
-		return
-	if _selected_slot_index < 0 or _selected_slot_index >= save_slots.size():
-		UIIntermediary.resolve(_label_slot_character_name, "ui.fe16.save_slot.char_name_default")
-		UIIntermediary.resolve(_label_slot_level, "ui.fe16.save_slot.level_default")
-		UIIntermediary.resolve(_label_slot_playtime, "ui.fe16.save_slot.playtime_default")
-		UIIntermediary.resolve(_label_slot_save_date, "ui.fe16.save_slot.save_date_default")
-		return
-	var slot_entry: Dictionary = save_slots[_selected_slot_index]
-	if slot_entry.get("empty", true):
-		UIIntermediary.resolve(_label_slot_character_name, "ui.fe16.save_slot.empty_slot")
-		UIIntermediary.resolve(_label_slot_level, "ui.fe16.save_slot.level_default")
-		UIIntermediary.resolve(_label_slot_playtime, "ui.fe16.save_slot.playtime_default")
-		UIIntermediary.resolve(_label_slot_save_date, "ui.fe16.save_slot.save_date_default")
-	else:
-		var character_name := UIIntermediary.text(slot_entry.get("char_name_key", ""))
-		UIIntermediary.resolve(_label_slot_character_name, "ui.fe16.save_slot.char_name", {"name": character_name})
-		UIIntermediary.resolve(_label_slot_level, "ui.fe16.save_slot.level_label", {"level": slot_entry.get("level", 0)})
-		UIIntermediary.resolve(_label_slot_playtime, "ui.fe16.save_slot.playtime_label", {"time": _format_playtime(slot_entry.get("playtime_sec", 0))})
-		UIIntermediary.resolve(_label_slot_save_date, "ui.fe16.save_slot.save_date_label", {"date": slot_entry.get("save_date", "--")})
-
-## 秒数格式化：HH:MM:SS（游玩时长/回放时长展示）
-func _format_playtime(seconds: int) -> String:
-	@warning_ignore("integer_division")
-	var hours_value := seconds / 3600
-	@warning_ignore("integer_division")
-	var minutes_value := (seconds % 3600) / 60
-	var seconds_value := seconds % 60
-	return "%02d:%02d:%02d" % [hours_value, minutes_value, seconds_value]
 
 # ==============================================================================
 # Tab 1~3 委托给 SystemSaveTabs
@@ -347,7 +315,7 @@ func _on_tab_changed(tab_index: int) -> void:
 ## 存档槽位选中：记录索引并刷新详情
 func _on_save_slot_selected(slot_index: int) -> void:
 	_selected_slot_index = slot_index
-	_refresh_slot_detail()
+	_get_tabs().refresh_slot_detail()
 
 ## 保存到槽位：槽位写入经服务并同步持久化至世界档案仓库，刷新列表与详情
 func _on_save_to_slot_pressed() -> void:
@@ -358,7 +326,7 @@ func _on_save_to_slot_pressed() -> void:
 	save_service.dispatch_save_action("SAVE_SLOT", {"slot_id": str(save_slots[_selected_slot_index].get("slot_id", ""))})
 	_refresh_save_slot_list()
 	_item_list_save_slots.select(_selected_slot_index)
-	_refresh_slot_detail()
+	_get_tabs().refresh_slot_detail()
 
 ## 读取槽位：非空槽经存档服务加载并回显存档日期
 func _on_load_from_slot_pressed() -> void:
@@ -380,7 +348,7 @@ func _on_delete_slot_pressed() -> void:
 	save_service.dispatch_save_action("CLEAR_SLOT", {"slot_id": target_slot_id})
 	_refresh_save_slot_list()
 	_item_list_save_slots.select(_selected_slot_index)
-	_refresh_slot_detail()
+	_get_tabs().refresh_slot_detail()
 
 ## 导出当前选中槽位快照至 user://saves 导出路径
 func _on_export_slot_pressed() -> void:
@@ -404,23 +372,6 @@ func _on_cloud_sync_pressed() -> void:
 	ServiceLocator.get_instance().save().dispatch_save_action("CLOUD_SYNC", {"world_id": "ACTIVE"})
 	UIIntermediary.resolve(_label_cloud_status, "ui.fe16.save_slot.cloud_synced")
 
-# --- 确定性回放 / GM 沙盒 / CDK 兑换 回调委托 ---
-
-func _on_replay_selected(replay_index: int) -> void: _get_tabs()._on_replay_selected(replay_index)
-func _on_play_replay_pressed() -> void: _get_tabs()._on_play_replay_pressed()
-func _on_pause_replay_pressed() -> void: _get_tabs()._on_pause_replay_pressed()
-func _on_stop_replay_pressed() -> void: _get_tabs()._on_stop_replay_pressed()
-func _on_frame_prev_pressed() -> void: _get_tabs()._on_frame_prev_pressed()
-func _on_frame_next_pressed() -> void: _get_tabs()._on_frame_next_pressed()
-func _on_speed_down_pressed() -> void: _get_tabs()._on_speed_down_pressed()
-func _on_speed_up_pressed() -> void: _get_tabs()._on_speed_up_pressed()
-func _on_replay_slider_changed(progress_ratio: float) -> void: _get_tabs()._on_replay_slider_changed(progress_ratio)
-func _on_gm_execute_pressed() -> void: _get_tabs()._on_gm_execute_pressed()
-func _on_gm_input_submitted(submitted_text: String) -> void: _get_tabs()._on_gm_input_submitted(submitted_text)
-func _on_cdkey_redeem_pressed() -> void: _get_tabs()._on_cdkey_redeem_pressed()
-func _on_cdkey_input_submitted(submitted_text: String) -> void: _get_tabs()._on_cdkey_input_submitted(submitted_text)
-func _redeem_cdkey() -> void: _get_tabs().redeem_cdkey()
-
 # ==============================================================================
 # 外部交互接口
 # ==============================================================================
@@ -440,7 +391,7 @@ func select_slot(slot_id: String) -> Dictionary:
 	for slot_index in save_slots.size():
 		if save_slots[slot_index].get("slot_id", "") == slot_id:
 			_selected_slot_index = slot_index
-			_refresh_slot_detail()
+			_get_tabs().refresh_slot_detail()
 			return {"success": true, "selected_slot": slot_id}
 	return {"success": false, "reason": "SLOT_NOT_FOUND"}
 

@@ -29,12 +29,12 @@ const QuestCausalityTabsClass = preload("res://frontend/views/quest_causality/qu
 @onready var _quest_item_list: ItemList = $%QuestItemList
 
 # --- Tab 1: 任务详情 ---
-@onready var _label_quest_title: Label = $%LabelQuestTitle
-@onready var _label_quest_giver: Label = $%LabelQuestGiver
-@onready var _label_quest_level: Label = $%LabelQuestLevel
-@onready var _label_quest_description: Label = $%LabelQuestDesc
-@onready var _objectives_box: VBoxContainer = $%ObjectivesVBox
-@onready var _rewards_box: VBoxContainer = $%RewardsVBox
+@onready var label_quest_title: Label = $%LabelQuestTitle
+@onready var label_quest_giver: Label = $%LabelQuestGiver
+@onready var label_quest_level: Label = $%LabelQuestLevel
+@onready var label_quest_description: Label = $%LabelQuestDesc
+@onready var objectives_box: VBoxContainer = $%ObjectivesVBox
+@onready var rewards_box: VBoxContainer = $%RewardsVBox
 @onready var _quest_accept_button: Button = $%BtnQuestAccept
 @onready var _quest_abandon_button: Button = $%BtnQuestAbandon
 @onready var _quest_submit_button: Button = $%BtnQuestSubmit
@@ -134,7 +134,7 @@ func _ready() -> void:
 
 	# 5. 初始化各子界面
 	_init_quest_list_tab()
-	_init_quest_detail_tab()
+	_get_tabs().init_quest_detail_tab()
 	_init_causality_dag_tab()
 	_init_bounty_tab()
 
@@ -247,70 +247,8 @@ func _status_name(status_code: String) -> String:
 		_: return status_code
 
 # ==============================================================================
-# Tab 1: 任务详情 - 初始化
 # ==============================================================================
-
-## 初始化任务详情 Tab：默认展示首个任务，空列表置空态并禁用操作按钮
-func _init_quest_detail_tab() -> void:
-	# 默认显示第一个任务
-	if quest_list.size() > 0:
-		_show_quest_detail(quest_list[0])
-	else:
-		UIIntermediary.resolve(_label_quest_title, "ui.fe07.quest_detail.no_quest")
-		_quest_accept_button.disabled = true
-		_quest_abandon_button.disabled = true
-		_quest_submit_button.disabled = true
-
-## 展示任务详情：标题/发布者/等级/描述/目标列表/奖励列表，按状态启停接取/放弃/提交按钮
-func _show_quest_detail(quest_entry: Dictionary) -> void:
-	active_quest_detail = quest_entry
-	if _label_quest_title:
-		_label_quest_title.text = UIIntermediary.text(quest_entry.get("title", "ui.fe07.quest_detail.title_default"))
-	if _label_quest_giver:
-		UIIntermediary.resolve(_label_quest_giver, "ui.fe07.quest.giver", {"name": UIIntermediary.text(quest_entry.get("giver", "-"))})
-	if _label_quest_level:
-		UIIntermediary.resolve(_label_quest_level, "ui.fe07.quest.level", {"level": quest_entry.get("level_req", 0)})
-	if _label_quest_description:
-		_label_quest_description.text = UIIntermediary.text(quest_entry.get("desc", ""))
-	# 填充目标列表（池化复用 Label 节点）
-	var objectives: Array = quest_entry.get("objectives", [])
-	for objective_index in range(objectives.size()):
-		var objective_label: Label = _acquire_detail_label(_objectives_box, objective_index)
-		objective_label.visible = true
-		objective_label.text = UIIntermediary.text("ui.fe07.quest_detail.objective_item", {"text": UIIntermediary.text(str(objectives[objective_index]))})
-	_hide_trailing_children(_objectives_box, objectives.size())
-	# 填充奖励列表（池化复用 Label 节点）
-	var rewards: Array = quest_entry.get("rewards", [])
-	for reward_index in range(rewards.size()):
-		var reward_label: Label = _acquire_detail_label(_rewards_box, reward_index)
-		reward_label.visible = true
-		reward_label.text = UIIntermediary.text("ui.fe07.quest_detail.reward_item", {"text": UIIntermediary.text(str(rewards[reward_index]))})
-	_hide_trailing_children(_rewards_box, rewards.size())
-	# 根据状态设置按钮可用性
-	var quest_status: String = quest_entry.get("status", "")
-	_quest_accept_button.disabled = (quest_status != "AVAILABLE")
-	_quest_abandon_button.disabled = (quest_status != "ACTIVE")
-	_quest_submit_button.disabled = (quest_status != "ACTIVE")
-
-## 获取或创建目标/奖励列表项标签（循环外分配）
-func _acquire_detail_label(container: Node, index: int) -> Label:
-	if index < container.get_child_count():
-		return container.get_child(index) as Label
-	var detail_label := Label.new()
-	container.add_child(detail_label)
-	return detail_label
-
-## 隐藏池中未使用的尾部节点
-func _hide_trailing_children(container: Node, active_count: int) -> void:
-	for child_index in range(active_count, container.get_child_count()):
-		var child := container.get_child(child_index)
-		if child is CanvasItem:
-			(child as CanvasItem).visible = false
-
-# ==============================================================================
-# Tab 2: 因果环 DAG - 初始化
-# ==============================================================================
-# Tab 2 & 3 委托给 QuestCausalityTabs
+# Tab 1~3 委托给 QuestCausalityTabs
 # ==============================================================================
 
 func _init_causality_dag_tab() -> void:
@@ -389,7 +327,7 @@ func _on_quest_item_selected(index: int) -> void:
 		if _match_filter(quest_entry.get("status", "")) and (current_category_filter.is_empty() or str(quest_entry.get("category", "")) == current_category_filter):
 			filtered_quests.append(quest_entry)
 	if index >= 0 and index < filtered_quests.size():
-		_show_quest_detail(filtered_quests[index])
+		_get_tabs().show_quest_detail(filtered_quests[index])
 		# 切换到详情 Tab
 		_tab_container.current_tab = 1
 
@@ -419,7 +357,7 @@ func _transition_quest_status(action: String) -> void:
 	active_quest_detail = transition_result.get("quest", active_quest_detail)
 	# 同步回主列表
 	_sync_quest_status(active_quest_detail)
-	_show_quest_detail(active_quest_detail)
+	_get_tabs().show_quest_detail(active_quest_detail)
 
 ## 任务状态变更同步回主列表（按 quest_id 匹配并在循环外深拷贝写入）
 func _sync_quest_status(quest_entry: Dictionary) -> void:

@@ -53,6 +53,8 @@ func init_static_text() -> void:
 func connect_signals() -> void:
 	if _view == null:
 		return
+	connect_managed(_view._town_facility_list.item_selected, on_town_facility_selected)
+	connect_managed(_view._town_npc_list.item_selected, on_town_npc_selected)
 	connect_managed(_view.march_from_option.item_selected, _on_march_option_changed)
 	connect_managed(_view.march_to_option.item_selected, _on_march_option_changed)
 	connect_managed(_view.march_start_button.pressed, _on_march_start)
@@ -289,3 +291,21 @@ func _on_pf_auto() -> void:
 		_on_pf_calc()
 	if _view.pathfinding_route_detail_label:
 		UIIntermediary.resolve(_view.pathfinding_route_detail_label, "ui.fe10.pf.auto_started")
+
+## 设施条目选中：渲染设施名称与描述详情
+func on_town_facility_selected(facility_index: int) -> void:
+	if _view and facility_index >= 0 and facility_index < _view._mock_town_facilities.size():
+		var facility_entry: Dictionary = _view._mock_town_facilities[facility_index]
+		if _view._town_facility_detail_label:
+			var facility_name := UIIntermediary.text(facility_entry.get("name", ""))
+			var facility_description := UIIntermediary.text(facility_entry.get("desc", ""))
+			UIIntermediary.resolve(_view._town_facility_detail_label, "ui.fe10.town.facility_detail", {"name": facility_name, "desc": facility_description})
+
+## NPC 条目选中：渲染 NPC 名称与描述详情
+func on_town_npc_selected(resident_index: int) -> void:
+	if _view and resident_index >= 0 and resident_index < _view._mock_town_npcs.size():
+		var resident_entry: Dictionary = _view._mock_town_npcs[resident_index]
+		if _view._town_facility_detail_label:
+			var resident_name := UIIntermediary.text(resident_entry.get("name", ""))
+			var resident_description := UIIntermediary.text(resident_entry.get("desc", ""))
+			UIIntermediary.resolve(_view._town_facility_detail_label, "ui.fe10.town.npc_detail", {"name": resident_name, "desc": resident_description})
