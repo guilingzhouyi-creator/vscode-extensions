@@ -91,6 +91,7 @@ func render_pack_detail() -> void:
 	_view.pack_detail_rich_label.clear()
 	if _view.focused_pack_index < 0 or _view.focused_pack_index >= _view.installed_packs.size():
 		_view.pack_detail_rich_label.append_text(UIIntermediary.text("ui.mw.detail.empty"))
+		_sync_studio_focused_pack({})
 		return
 	var pack_entry: Variant = _view.installed_packs[_view.focused_pack_index]
 	if not (pack_entry is Dictionary):
@@ -109,6 +110,7 @@ func render_pack_detail() -> void:
 			"dependencies": str(dependencies_value),
 		})
 	)
+	_sync_studio_focused_pack(entry_map)
 
 ## 渲染预检与拓扑排序诊断摘要
 func render_precheck_report() -> void:
@@ -295,3 +297,73 @@ func install_mod_from_input(source_override: String = "", target_root: String = 
 				on_completed.call(response_payload)
 	)
 	return install_reply
+
+## 更新当前聚焦 MOD 的 pack.json 清单元数据（如有 DAG 编辑一并回写）并刷新列表
+func update_focused_mod_manifest(update_specification: Dictionary, on_completed: Callable = Callable()) -> Dictionary:
+	var world_service: IWorldService = ServiceLocator.get_instance().world()
+	if world_service == null:
+		return ServiceLocator.reply_service_unavailable(on_completed)
+	var request_specification: Dictionary = update_specification.duplicate(true)
+	var studio_view: Control = _view.get_studio_view() if (_view != null and _view.has_method("get_studio_view")) else null
+	if studio_view != null and studio_view.has_method("has_dag_edits") and bool(studio_view.call("has_dag_edits")):
+		request_specification["dag_graph"] = studio_view.call("export_dag_dto")
+	var update_reply: Dictionary = {}
+	world_service.update_mod_manifest_async(
+		_view.current_account_id if _view != null else "",
+		_view.current_session_token if _view != null else "",
+		request_specification,
+		func(response_payload: Dictionary) -> void:
+			update_reply.merge(response_payload, true)
+			var succeeded: bool = bool(response_payload.get("success", false))
+			if studio_view != null and is_instance_valid(studio_view) and studio_view.has_method("show_manifest_feedback"):
+				var feedback_text: String = UIIntermediary.text("ui.mw.manifest.saved") if succeeded else str(response_payload.get("message", "ERR_MOD_MANIFEST_UPDATE"))
+				studio_view.call("show_manifest_feedback", feedback_text, not succeeded)
+			if succeeded and _view != null and is_instance_valid(_view):
+				refresh_installed_packs()
+			if on_completed.is_valid():
+				on_completed.call(response_payload)
+	)
+	return update_reply
+
+## 删除或卸载当前聚焦的非官方本地 MOD 包或归档并从启用列表中剔除
+func delete_focused_mod(pack_id_override: String = "", root_path_override: String = "", target_root: String = "user://mods/", on_completed: Callable = Callable()) -> Dictionary:
+	var world_service: IWorldService = ServiceLocator.get_instance().world()
+	if world_service == null:
+		return ServiceLocator.reply_service_unavailable(on_completed)
+	var target_pack_id: String = pack_id_override.strip_edges()
+	var target_pack_root: String = root_path_override.strip_edges()
+	if target_pack_id.is_empty() and _view != null and _view.focused_pack_index >= 0 and _view.focused_pack_index < _view.installed_packs.size():
+		var focused_entry: Variant = _view.installed_packs[_view.focused_pack_index]
+		if focused_entry is Dictionary:
+			target_pack_id = str((focused_entry as Dictionary).get("pack_id", ""))
+			target_pack_root = str((focused_entry as Dictionary).get("root_path", ""))
+	var delete_specification: Dictionary = {"pack_id": target_pack_id, "target_root": target_root}
+	if not target_pack_root.is_empty():
+		delete_specification["root_path"] = target_pack_root
+	var delete_reply: Dictionary = {}
+	world_service.delete_mod_pack_async(
+		_view.current_account_id if _view != null else "",
+		_view.current_session_token if _view != null else "",
+		delete_specification,
+		func(response_payload: Dictionary) -> void:
+			delete_reply.merge(response_payload, true)
+			var succeeded: bool = bool(response_payload.get("success", false))
+			if succeeded and _view != null and is_instance_valid(_view):
+				_view.selected_pack_ids.erase(target_pack_id)
+				_view.focused_pack_index = -1
+				refresh_installed_packs()
+			var studio_view: Control = _view.get_studio_view() if (_view != null and _view.has_method("get_studio_view")) else null
+			if studio_view != null and is_instance_valid(studio_view) and studio_view.has_method("show_manifest_feedback"):
+				var feedback_text: String = UIIntermediary.text("ui.mw.manifest.deleted") if succeeded else str(response_payload.get("message", "ERR_MOD_DELETE"))
+				studio_view.call("show_manifest_feedback", feedback_text, not succeeded)
+			if on_completed.is_valid():
+				on_completed.call(response_payload)
+	)
+	return delete_reply
+
+func _sync_studio_focused_pack(pack_entry: Dictionary) -> void:
+	if _view == null or not _view.has_method("get_studio_view"):
+		return
+	var studio_view: Control = _view.get_studio_view()
+	if studio_view != null and studio_view.has_method("sync_focused_pack"):
+		studio_view.call("sync_focused_pack", pack_entry)

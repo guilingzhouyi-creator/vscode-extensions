@@ -12,6 +12,7 @@ class_name ModWorkbenchScreen
 extends BaseScreen
 
 const TabsClass = preload("res://frontend/views/mod_workbench/mod_workbench_screen_tabs.gd")
+const StudioViewClass = preload("res://frontend/systems/mod_workbench/mod_workbench_view.gd")
 
 var current_account_id: String = ""
 var current_session_token: String = ""
@@ -23,6 +24,7 @@ var focused_pack_index: int = -1
 var precheck_report: Dictionary = {}
 
 var _tabs: TabsClass = null
+var _studio_view: Control = null
 
 @onready var title_label: Label = %TitleLabel
 @onready var summary_badge_label: Label = %SummaryBadgeLabel
@@ -53,9 +55,36 @@ func _ready() -> void:
 	var theme_manager := ThemeManager.get_instance()
 	if theme_manager.theme != null:
 		theme = theme_manager.theme
+	_ensure_studio_view_mounted()
 	_get_tabs().init_static_text()
 	_connect_signals()
 	UIIntermediary.adapt_view(self)
+
+## 退出 MOD 工坊屏时对称卸载工作室子视图观察连接
+func on_screen_exit() -> void:
+	if _studio_view != null and _studio_view.has_method("teardown"):
+		_studio_view.call("teardown")
+	super.on_screen_exit()
+
+## 获取内嵌的全功能创作者工作室视图实例
+func get_studio_view() -> Control:
+	return _ensure_studio_view_mounted()
+
+func _ensure_studio_view_mounted() -> Control:
+	if _studio_view != null:
+		return _studio_view
+	_studio_view = StudioViewClass.new()
+	var detail_parent: Node = get_node_or_null("Margin/MainVBox/SplitHBox/RightDetailVBox")
+	if detail_parent is Container:
+		detail_parent.add_child(_studio_view)
+	else:
+		add_child(_studio_view)
+	_studio_view.call("ensure_studio_panels_mounted")
+	var manifest_panel: Node = _studio_view.call("get_manifest_panel") as Node
+	if manifest_panel != null:
+		connect_managed(Signal(manifest_panel, &"save_manifest_requested"), _on_save_manifest_debounced)
+		connect_managed(Signal(manifest_panel, &"delete_mod_requested"), _on_delete_mod_debounced)
+	return _studio_view
 
 ## 进入 MOD 工坊屏时绑定世界与账号上下文并刷新包扫描列表
 func on_screen_enter(screen_parameters: Dictionary = {}) -> void:
@@ -141,3 +170,11 @@ func _on_pack_kmod_debounced() -> void:
 func _on_install_mod_debounced() -> void:
 	if try_consume_action_cooldown("mw_install_mod", 200):
 		_get_tabs().install_mod_from_input()
+
+func _on_save_manifest_debounced(update_specification: Dictionary) -> void:
+	if try_consume_action_cooldown("mw_save_manifest", 200):
+		_get_tabs().update_focused_mod_manifest(update_specification)
+
+func _on_delete_mod_debounced(pack_id: String, root_path: String) -> void:
+	if try_consume_action_cooldown("mw_delete_mod", 200):
+		_get_tabs().delete_focused_mod(pack_id, root_path)
