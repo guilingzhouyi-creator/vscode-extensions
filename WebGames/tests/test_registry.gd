@@ -213,6 +213,7 @@ const TestFrontendInfrastructureDomain = preload("res://tests/unit/frontend/test
 const TestFrontendBoundaryDomain = preload("res://tests/unit/frontend/test_frontend_boundary.gd")
 const SuiteFrontendRobustness = preload("res://tests/unit/frontend/test_frontend_robustness.gd")
 const SuiteFrontendErrorDomain = preload("res://tests/unit/frontend/test_frontend_error_domain.gd")
+const SuiteFEModWorkbenchStudio = preload("res://tests/unit/frontend/test_fe_mod_workbench_studio.gd")
 
 ## 后端 54 大业务测试套件（46 领域 + 品质 + 魔法 + 名称注册表 + 物品描述 + 事件概率 + 事件描述 + 统一文案 + 配置驱动收口）+ 横切护栏测试套件（架构/配置/前端边界护栏）
 static func get_all_test_classes() -> Array:
@@ -315,7 +316,8 @@ static func get_frontend_test_classes() -> Array:
 		TestFE16SystemSave, TestFE17MiscEdge,
 		TestFrontendArchitectureAndBootstrapDomain, TestFrontendUIStateAndMock,
 		TestFrontendInfrastructureDomain, TestFrontendBoundaryDomain,
-		TestFrontendRobustness, TestFrontendErrorDomain
+		TestFrontendRobustness, TestFrontendErrorDomain,
+		SuiteFEModWorkbenchStudio
 	]
 
 ## 全域测试套件（后端业务域 + 横切基础设施 + 前端 23 = 全域共 147 套件）

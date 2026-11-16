@@ -47,6 +47,7 @@ func _execute_fe_suites() -> void:
 		preload("res://tests/unit/frontend/test_fe_15_settings_center.gd"),
 		preload("res://tests/unit/frontend/test_fe_16_system_save.gd"),
 		preload("res://tests/unit/frontend/test_fe_17_misc_edge.gd"),
+		preload("res://tests/unit/frontend/test_fe_mod_workbench_studio.gd"),
 	]
 
 	var initial_orphan_count := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
