@@ -44,6 +44,6 @@ flowchart LR
 
 ## 二、 施工执行清单 (Milestone 80% 触发)
 
-- [ ] Step 3.1: 编写 `backend/infrastructure/companion_ipc_server.gd` 本地安全管道服务
-- [ ] Step 3.2: 编写基于文件修改时间的原子热重载调度器 `mod_hot_reload_solver.gd`
-- [ ] Step 3.3: 编写配套的 Node/Python 客户端 SDK 示例与 VS Code 扩展联动调试器
+- [x] Step 3.1: 编写 `backend/infrastructure/companion_ipc_server.gd` 与 `companion_ipc_router.gd` 本地回环 JSON-RPC 服务 (`127.0.0.1`)
+- [x] Step 3.2: 编写基于文件修改时间与 SHA-256 指纹的原子热重载调度器 `mod_hot_reload_solver.gd` 与扫描器 `mod_file_watcher_scanner.gd`
+- [x] Step 3.3: 编写零依赖 Python 与 Node.js 跨进程伴侣 IPC 客户端 SDK 示例 (`mod_sdk/examples/companion_ipc/`) 并完成与无头 Godot 回环服务联调
