@@ -22,7 +22,6 @@ const KButtonClass = preload("res://frontend/components/k_button.gd")
 @onready var _main_tab_container: TabContainer = $%MainTabContainer
 
 # --- Tab 0: WORLD_MAP 大地图探索 ---
-@onready var _world_map_panel: PanelContainer = $%WmapPanel
 @onready var _world_map_landmark_container: Control = $%WmapLandmarkContainer
 @onready var _world_map_zoom_out_button: Button = $%WmapZoomOutBtn
 @onready var _world_map_zoom_label: Label = $%WmapZoomLabel
@@ -38,38 +37,38 @@ const KButtonClass = preload("res://frontend/components/k_button.gd")
 @onready var _town_facility_detail_label: Label = $%TownFacilityDetailLabel
 
 # --- Tab 2: MARCHING 行军探索 ---
-@onready var _march_from_option: OptionButton = $%MarchFromOption
-@onready var _march_to_option: OptionButton = $%MarchToOption
-@onready var _march_route_preview_label: Label = $%MarchRoutePreviewLabel
-@onready var _march_eta_label: Label = $%MarchEtaLabel
-@onready var _march_terrain_label: Label = $%MarchTerrainLabel
-@onready var _march_start_button: Button = $%MarchStartBtn
-@onready var _march_stop_button: Button = $%MarchStopBtn
-@onready var _march_party_status_label: Label = $%MarchPartyStatusLabel
+@onready var march_from_option: OptionButton = $%MarchFromOption
+@onready var march_to_option: OptionButton = $%MarchToOption
+@onready var march_route_preview_label: Label = $%MarchRoutePreviewLabel
+@onready var march_eta_label: Label = $%MarchEtaLabel
+@onready var march_terrain_label: Label = $%MarchTerrainLabel
+@onready var march_start_button: Button = $%MarchStartBtn
+@onready var march_stop_button: Button = $%MarchStopBtn
+@onready var march_party_status_label: Label = $%MarchPartyStatusLabel
 
 # --- Tab 3: SOVEREIGNTY 主权建国 ---
-@onready var _sovereignty_territory_list: ItemList = $%SovTerritoryList
-@onready var _sovereignty_nation_name_label: Label = $%SovNationNameLabel
-@onready var _sovereignty_monarch_label: Label = $%SovMonarchLabel
-@onready var _sovereignty_population_label: Label = $%SovPopulationLabel
-@onready var _sovereignty_territory_count_label: Label = $%SovTerritoryCountLabel
-@onready var _sovereignty_level_label: Label = $%SovLevelLabel
-@onready var _sovereignty_establish_button: Button = $%SovEstablishBtn
+@onready var sovereignty_territory_list: ItemList = $%SovTerritoryList
+@onready var sovereignty_nation_name_label: Label = $%SovNationNameLabel
+@onready var sovereignty_monarch_label: Label = $%SovMonarchLabel
+@onready var sovereignty_population_label: Label = $%SovPopulationLabel
+@onready var sovereignty_territory_count_label: Label = $%SovTerritoryCountLabel
+@onready var sovereignty_level_label: Label = $%SovLevelLabel
+@onready var sovereignty_establish_button: Button = $%SovEstablishBtn
 
 # --- Tab 4: TERRITORY 领地管理 ---
-@onready var _territory_list: ItemList = $%TerritoryList
-@onready var _territory_resource_label: Label = $%TerrResourceLabel
-@onready var _territory_construction_bar: ProgressBar = $%TerrConstructionBar
-@onready var _territory_garrison_label: Label = $%TerrGarrisonLabel
-@onready var _territory_upgrade_button: Button = $%TerrUpgradeBtn
+@onready var territory_list: ItemList = $%TerritoryList
+@onready var territory_resource_label: Label = $%TerrResourceLabel
+@onready var territory_construction_bar: ProgressBar = $%TerrConstructionBar
+@onready var territory_garrison_label: Label = $%TerrGarrisonLabel
+@onready var territory_upgrade_button: Button = $%TerrUpgradeBtn
 
 # --- Tab 5: PATHFINDING 寻路规划 ---
-@onready var _pathfinding_start_option: OptionButton = $%PfStartOption
-@onready var _pathfinding_end_option: OptionButton = $%PfEndOption
-@onready var _pathfinding_calculate_button: Button = $%PfCalcBtn
-@onready var _pathfinding_route_list: ItemList = $%PfRouteList
-@onready var _pathfinding_route_detail_label: Label = $%PfRouteDetailLabel
-@onready var _pathfinding_auto_button: Button = $%PfAutoBtn
+@onready var pathfinding_start_option: OptionButton = $%PfStartOption
+@onready var pathfinding_end_option: OptionButton = $%PfEndOption
+@onready var pathfinding_calculate_button: Button = $%PfCalcBtn
+@onready var pathfinding_route_list: ItemList = $%PfRouteList
+@onready var pathfinding_route_detail_label: Label = $%PfRouteDetailLabel
+@onready var pathfinding_auto_button: Button = $%PfAutoBtn
 
 # --- 底部操作栏 ---
 @onready var _back_button: Button = $%BackBtn
@@ -83,20 +82,20 @@ const KButtonClass = preload("res://frontend/components/k_button.gd")
 @onready var _town_facility_section_label: Label = $%TownFacilitySectionLabel
 @onready var _town_npc_section_label: Label = $%TownNpcSectionLabel
 @onready var _town_detail_section_label: Label = $%TownDetailSectionLabel
-@onready var _march_section_label_1: Label = $%MarchSectionLabel1
-@onready var _march_from_label: Label = $%MarchFromLabel
-@onready var _march_to_label: Label = $%MarchToLabel
-@onready var _march_section_label_2: Label = $%MarchSectionLabel2
-@onready var _march_section_label_3: Label = $%MarchSectionLabel3
-@onready var _march_section_label_4: Label = $%MarchSectionLabel4
-@onready var _sovereignty_territory_section_label: Label = $%SovTerritorySectionLabel
-@onready var _sovereignty_nation_section_label: Label = $%SovNationSectionLabel
-@onready var _territory_list_section_label: Label = $%TerrListSectionLabel
-@onready var _territory_detail_section_label: Label = $%TerrDetailSectionLabel
-@onready var _territory_construction_label: Label = $%TerrConstructionLabel
-@onready var _pathfinding_start_label: Label = $%PfStartLabel
-@onready var _pathfinding_end_label: Label = $%PfEndLabel
-@onready var _pathfinding_routes_section_label: Label = $%PfRoutesSectionLabel
+@onready var march_section_label_1: Label = $%MarchSectionLabel1
+@onready var march_from_label: Label = $%MarchFromLabel
+@onready var march_to_label: Label = $%MarchToLabel
+@onready var march_section_label_2: Label = $%MarchSectionLabel2
+@onready var march_section_label_3: Label = $%MarchSectionLabel3
+@onready var march_section_label_4: Label = $%MarchSectionLabel4
+@onready var sovereignty_territory_section_label: Label = $%SovTerritorySectionLabel
+@onready var sovereignty_nation_section_label: Label = $%SovNationSectionLabel
+@onready var territory_list_section_label: Label = $%TerrListSectionLabel
+@onready var territory_detail_section_label: Label = $%TerrDetailSectionLabel
+@onready var territory_construction_label: Label = $%TerrConstructionLabel
+@onready var pathfinding_start_label: Label = $%PfStartLabel
+@onready var pathfinding_end_label: Label = $%PfEndLabel
+@onready var pathfinding_routes_section_label: Label = $%PfRoutesSectionLabel
 
 # ==============================================================================
 # 地图状态与 Mock 数据快照
@@ -118,7 +117,7 @@ var _mock_territories: Array = []
 var _mock_sovereignty: Dictionary = {}
 
 # 行军队伍状态（本地交互模拟）
-var _marching_active: bool = false
+var marching_active: bool = false
 
 # 地标名称仅由快照 name / name_key 动态提供，视图层零硬编码地标映射表
 
@@ -139,10 +138,19 @@ func select_town(town_id: String) -> Dictionary:
 func set_marching_route_snapshot(routes: Array) -> void:
 	apply_snapshot({"marching_routes": routes})
 
-## 统一快照渲染映射：行军路线 → 视图状态
+## 统一快照渲染映射：行军路线与拓扑快照 → 视图状态并刷新控件
 func _render_from_snapshot() -> void:
 	if snapshot.has("marching_routes"):
 		marching_routes = FrontendSnapshot.read_array(snapshot, "marching_routes")
+	if snapshot.has("landmarks"):
+		town_landmarks = FrontendSnapshot.read_array(snapshot, "landmarks")
+	if snapshot.has("territories"):
+		_mock_territories = FrontendSnapshot.read_array(snapshot, "territories")
+	if snapshot.has("sovereignty") and snapshot.get("sovereignty") is Dictionary:
+		_mock_sovereignty = (snapshot.get("sovereignty") as Dictionary).duplicate(true)
+	if is_inside_tree() and _tabs != null:
+		_tabs.refresh_march_preview()
+		_tabs.refresh_sovereignty_info()
 
 ## 生命周期初始化：主题/快照/六 Tab 标题与文案/各子界面装配/信号绑定（本地交互初始化）
 var _tabs: Variant = null
