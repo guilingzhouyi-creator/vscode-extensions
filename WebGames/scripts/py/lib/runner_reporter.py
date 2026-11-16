@@ -317,7 +317,7 @@ def render_console_summary(summary: PipelineExecutionSummary) -> int:
 
 
 def _read_latest_refactor_score(reports_dir: Path) -> float | None:
-    """读取 auto-refactor-latest.json 中的真实静态/三平面综合得分，缺失时返回 None（禁止伪造兜底分）。"""
+    """读取 auto-refactor-latest.json 中的真实静态/三平面综合得分，缺失时返回 None（禁止伪造默认分数）。"""
     refactor_report_path = reports_dir / "auto-refactor-latest.json"
     if not refactor_report_path.exists():
         return None

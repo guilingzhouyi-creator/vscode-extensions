@@ -10,7 +10,7 @@
 # 用法示例:
 #   from lib.arch_guard_rules import check_tc_arch_09, check_tc_arch_10, check_tc_arch_11
 # ==============================================================================
-"""架构护栏原生静态扩展规则：错误码闭环、持久化对称性与日志收敛静态断言。"""
+"""架构护栏原生静态扩展规则：错误码一致性、持久化对称性与日志收敛静态断言。"""
 
 from __future__ import annotations
 from pathlib import Path
@@ -25,13 +25,13 @@ ALLOWED_PUSH_FILES: frozenset[str] = frozenset({
   "backend/infrastructure/game_config.gd",
 })
 
-# 全库底层应急 stderr 回退 白名单（仅允许在日志基础设施底座双汇点内部使用 printerr）
+# 全库底层应急 stderr 回退白名单（仅允许在日志基础设施双汇点内部使用 printerr）
 ALLOWED_PRINTERR_FILES: frozenset[str] = frozenset({
   "backend/infrastructure/event_bus/event_bus_core.gd",
   "backend/infrastructure/logging/unified_logger_service.gd",
 })
 
-# 存量旧模块错误消息硬编码中文与裸格式符渐进演进白名单（已全部清零完成英文底座改造）
+# 存量旧模块错误消息硬编码中文与裸格式符渐进演进白名单（已全部清零完成英文模板改造）
 LEGACY_ERROR_MESSAGE_WHITELIST: frozenset[str] = frozenset()
 
 _STRING_TOKEN_RE = re.compile(r'("(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\')')
@@ -79,14 +79,14 @@ CORE_PERSISTENCE_CLASSES: tuple[tuple[str, str], ...] = (
 
 
 def check_tc_arch_09(ctx: Any, make_result: Callable[[str, list[str]], dict[str, Any]]) -> dict[str, Any]:
-  """TC-ARCH-09: 统一错误上报错误码全域登记与 i18n 键闭环断言。"""
+  """TC-ARCH-09: 统一错误上报错误码全域登记与 i18n 键一致性断言。"""
   violations: list[str] = []
   catalog_file: Path = ctx.root / "config" / "infrastructure" / "errors_catalog.json"
   narr_file: Path = ctx.root / "config" / "narratives" / "errors.json"
 
   if not catalog_file.exists():
     violations.append("缺失全域错误码目录真源: res://config/infrastructure/errors_catalog.json")
-    return make_result("TC-ARCH-09: 统一错误上报错误码全域登记与 i18n 键闭环断言", violations)
+    return make_result("TC-ARCH-09: 统一错误上报错误码全域登记与 i18n 键一致性断言", violations)
 
   catalog_errors: dict[str, Any] = {}
   try:
@@ -94,7 +94,7 @@ def check_tc_arch_09(ctx: Any, make_result: Callable[[str, list[str]], dict[str,
     catalog_errors = c_data.get("errors", {})
   except Exception as exc:
     violations.append(f"解析 errors_catalog.json 异常: {exc}")
-    return make_result("TC-ARCH-09: 统一错误上报错误码全域登记与 i18n 键闭环断言", violations)
+    return make_result("TC-ARCH-09: 统一错误上报错误码全域登记与 i18n 键一致性断言", violations)
 
   narr_errors: dict[str, Any] = {}
   if narr_file.exists():
@@ -130,7 +130,7 @@ def check_tc_arch_09(ctx: Any, make_result: Callable[[str, list[str]], dict[str,
           line_num = code[:m.start()].count("\n") + 1
           violations.append(f"{rel}:{line_num}: 错误码 「{err_code}」未在 errors_catalog.json 中登记")
 
-  return make_result("TC-ARCH-09: 统一错误上报错误码全域登记与 i18n 键闭环断言", violations)
+  return make_result("TC-ARCH-09: 统一错误上报错误码全域登记与 i18n 键一致性断言", violations)
 
 
 def check_tc_arch_10(
@@ -138,7 +138,7 @@ def check_tc_arch_10(
     make_result: Callable[[str, list[str]], dict[str, Any]],
     strip_comments: Callable[[str], str],
 ) -> dict[str, Any]:
-  """TC-ARCH-10: 持久化核心实体序列化与反序列化双向契约闭环断言。"""
+  """TC-ARCH-10: 持久化核心实体序列化与反序列化双向契约一致性断言。"""
   violations: list[str] = []
   ser_fn_re = re.compile(r"^\s*(?:static\s+)?func\s+serialize\s*\(", re.MULTILINE)
   deser_fn_re = re.compile(r"^\s*(?:static\s+)?func\s+deserialize\s*\(", re.MULTILINE)
@@ -160,7 +160,7 @@ def check_tc_arch_10(
     if not deser_fn_re.search(code):
       violations.append(f"{rel_res}: 持久化类 {cls_name} 缺失 static func deserialize() 实现")
 
-  return make_result("TC-ARCH-10: 持久化核心实体序列化与反序列化双向契约闭环断言", violations)
+  return make_result("TC-ARCH-10: 持久化核心实体序列化与反序列化双向契约一致性断言", violations)
 
 
 def check_tc_arch_11(
@@ -187,7 +187,7 @@ def check_tc_arch_11(
       if bare_print_re.search(line):
         violations_print.append(f"{rel_res}:{line_idx}: 严禁裸调用 print()，请改用 EventBusCore.emit_log 或 NavManager.show_toast")
       if not allow_printerr and bare_printerr_re.search(line):
-        violations_print.append(f"{rel_res}:{line_idx}: 严禁在日志底座双汇点外裸调用 printerr()，请改用 ErrorReporter 或 EventBusCore.emit_log")
+        violations_print.append(f"{rel_res}:{line_idx}: 严禁在日志汇点外裸调用 printerr()，请改用 ErrorReporter 或 EventBusCore.emit_log")
       if not allow_push:
         m = push_call_re.search(line)
         if m:
@@ -206,7 +206,7 @@ def check_tc_arch_12(
     make_result: Callable[[str, list[str]], dict[str, Any]],
     strip_comments: Callable[[str], str],
 ) -> dict[str, Any]:
-  """TC-ARCH-12: 全库英文底座日志、错误上报与前端提示动态占位符注入规范静态断言。"""
+  """TC-ARCH-12: 全库英文日志、错误上报与前端提示动态占位符注入规范静态断言。"""
   violations: list[str] = []
   channel_patterns: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("错误上报", re.compile(r'ErrorReporter\.emit_(?:error|warning|fatal)\s*\(\s*[^,()]+\s*,\s*[^,()]+\s*,\s*"([^"\n]*)"')),
@@ -230,7 +230,7 @@ def check_tc_arch_12(
         msg = m.group(1)
         line_idx = code[:m.start()].count("\n") + 1
         if chinese_re.search(msg):
-          target_hint = " UIIntermediary.text" if label == "界面轻提示" else "英文底座并经动态占位符注入"
+          target_hint = " UIIntermediary.text" if label == "界面轻提示" else "英文模板并经动态占位符注入"
           violations.append(
             f"{rel_res}:{line_idx}: {label}包含硬编码中文「{msg}」，须使用{target_hint}"
           )
@@ -254,7 +254,7 @@ def check_tc_arch_12(
     except Exception:
       pass
 
-  # 校验合规标准英文底座文本库：MSG_* 严禁混入中文或裸 %s/%d/{0} 占位符
+  # 校验合规标准英文文本库：MSG_* 严禁混入中文或裸 %s/%d/{0} 占位符
   base_msg_file: Path = ctx.root / "backend" / "infrastructure" / "logging" / "system_base_messages.gd"
   if base_msg_file.exists():
     b_raw = base_msg_file.read_text(encoding="utf-8")
@@ -263,7 +263,7 @@ def check_tc_arch_12(
       const_name, tmpl_val = m_const.group(1), m_const.group(2)
       if chinese_re.search(tmpl_val) or c_fmt_re.search(tmpl_val):
         violations.append(
-          f"res://backend/infrastructure/logging/system_base_messages.gd: {const_name} 违反英文 {{param}} 底座纯洁性契约"
+          f"res://backend/infrastructure/logging/system_base_messages.gd: {const_name} 违反英文 {{param}} 模板纯洁性契约"
         )
 
   # 校验 log.json 事件模板全部使用 {param} 命名占位符（防 %s/%d/{0} 回流）
@@ -282,7 +282,7 @@ def check_tc_arch_12(
     except (OSError, ValueError):
       pass
 
-  return make_result("TC-ARCH-12: 英文底座日志与错误动态占位符注入规范断言", violations)
+  return make_result("TC-ARCH-12: 英文日志与错误动态占位符注入规范断言", violations)
 
 
 ALLOWED_CRYPTO_FILES: frozenset[str] = frozenset({

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ==============================================================================
-# 模块归属: 工程效能与质量门禁 (Tooling · GDScript 审查共享底座)
+# 模块归属: 工程效能与质量门禁 (Tooling · GDScript 审查共享工具库)
 # 文件路径: WebGames/scripts/py/gd/gd_common.py
 # 架构定位: GDScript 源码单趟文件缓存与规则配置共享底盘 (GDScript File & Rules Cache)
 # 依赖与触发: 触发方: gd/*.py | 上游: backend/**/*.gd | 下游: 规则检测器 | 运行时: Python 3.10+

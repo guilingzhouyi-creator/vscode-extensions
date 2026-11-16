@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# 模块归属: 跨平台构建工具链 (Test · 自动化测试底座)
+# 模块归属: 跨平台构建工具链 (Test · 自动化测试工具)
 # 文件路径: WebGames/scripts/sh/test-run.sh
 # 架构定位: 单元与集成测试 Runner (Linux Bash)
 # 依赖与触发: 触发方: CI 流水线 / 本地验收 | 上游: Godot CLI / test_runner.gd | 下游: 控制台测试报告 | 运行时: Bash 4+
@@ -45,7 +45,7 @@ trap 'if [[ "${LOG_KEEP:-0}" -eq 0 ]]; then rm -f "$LOG"; fi' EXIT INT TERM
 
 echo "【test-run】开始运行单元测试（godot=$GODOT_BIN）..."
 # 显式捕获 Godot 真实退出码（禁止 if ! 取反吞码），失败日志保留至验收完成
-# 增加 180s 运行守护兜底，防死锁/阻塞挂起导致 CI 或终端永久卡死
+# 增加 180s 运行超时守护，防死锁/阻塞挂起导致 CI 或终端永久卡死
 if command -v timeout >/dev/null 2>&1; then
   timeout 180s "$GODOT_BIN" --headless --verbose --path "$ROOT_DIR" -s res://tests/test_runner.gd >"$LOG" 2>&1
   CODE=$?

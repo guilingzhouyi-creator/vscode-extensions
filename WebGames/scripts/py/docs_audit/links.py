@@ -5,7 +5,7 @@
 # 架构定位: 链接与锚点完整性审计器 (Link & Anchor Integrity Auditor)
 # 依赖与触发: 触发方: DocsAuditor.check()/fix() | 上游: Doc.lines | 下游: Finding 发现项与相对路径重写 | 运行时: Python 3.10+
 # 职责说明: Markdown 相对路径死链、锚点有效性与 file:/// 绝对路径重写
-# 退出语义与设计依据: 退出码: 纯检查与链接重写函数无独立退出码 | 设计依据: AGENTS.md 施工细则与文档门禁契约
+# 退出语义与设计依据: 退出码: 纯检查与链接重写函数无独立退出码 | 设计依据: AGENTS.md 文档质量与目录门禁契约
 # ------------------------------------------------------------------------------
 # 用法示例:
 #   check_links(doc, docs_map, add_fn, get_doc_fn, abs_target_fn, rel_fn)

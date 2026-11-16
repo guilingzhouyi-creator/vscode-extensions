@@ -97,7 +97,7 @@ def _assert_dry_run_fix(aud: DocsAuditor, docs: Path, fails: list[str]) -> None:
 
 
 def _assert_real_fix(aud: DocsAuditor, docs: Path, fails: list[str]) -> list[Any]:
-    """验证真实落盘修复与规则闭环。"""
+    """验证真实落盘修复与规则有效性。"""
     _, residual = aud.fix(dry_run=False)
     residual_rules = {f.rule for f in residual}
     for r in ("MERMAID-SPECIAL-CHARS", "LINK-ABS-FILE-URI", "LAYOUT-TABLE-GAP"):
@@ -133,7 +133,7 @@ def _assert_baseline_ratchet(
     residual: list[Any],
     fails: list[str],
 ) -> None:
-    """验证基线棘轮机制：接受存量、阻断新增与更新基线闭环。"""
+    """验证基线棘轮机制：接受存量、阻断新增与更新基线流程。"""
     base_path = tmp / "baseline.json"
     write_baseline(str(base_path), residual)
     base = load_baseline(str(base_path))

@@ -5,7 +5,7 @@
 # 架构定位: Markdown 布局与表格结构检查器 (Markdown Layout & Table Inspector)
 # 依赖与触发: 触发方: DocsAuditor.check() | 上游: Doc.lines | 下游: Finding 发现项 | 运行时: Python 3.10+
 # 职责说明: Markdown 标题规范、代码围栏闭合、后端需求表标准章节与表格排版门禁审查
-# 退出语义与设计依据: 退出码: 纯检查函数无独立退出码 | 设计依据: AGENTS.md 施工细则与文档门禁契约
+# 退出语义与设计依据: 退出码: 纯检查函数无独立退出码 | 设计依据: AGENTS.md 文档质量与目录门禁契约
 # ------------------------------------------------------------------------------
 # 用法示例:
 #   check_layout(doc, decode_errors, add_fn)

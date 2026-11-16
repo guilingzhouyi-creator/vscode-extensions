@@ -18,7 +18,7 @@
 1. 后端六字段标准与非空校验（模块归属/文件路径/架构定位/依赖与触发/职责说明/退出语义与设计依据）；
 2. 文件路径真实性对齐断言（声明路径与仓库相对物理路径 100% 一致）；
 3. 78 字符等宽集中分隔线；
-4. 未决标记（TODO/FIXME/XXX/HACK）与施工批次黑话（pXX/phaseXX/stXX/wip）零容忍；
+4. 未决标记（TODO/FIXME/XXX/HACK）与开发批次黑话（pXX/phaseXX/stXX/wip 及过程口语）零容忍；
 5. PowerShell 标头三件套（[CmdletBinding()]、Set-StrictMode -Version Latest、$ErrorActionPreference）；
 6. Bash 安全 Shebang（#!/usr/bin/env bash）与安全选项（set -uo pipefail，禁用盲目 set -e）；
 7. Python 100% 强类型注解覆盖、零裸 except 违规与 AST 注解引用名字绑定完备性。
@@ -55,6 +55,10 @@ HEADER_MUST = (
 
 PENDING_RE = re.compile(r"\b(TODO|FIXME|XXX|HACK)\b")
 JARGON_RE = re.compile(r"\b(p[0-9]+|phase[\s_]*[0-9]+|st[\s_]*[0-9]+|wip)\b", re.IGNORECASE)
+WG_EXTENDED_JARGON_RE = re.compile(
+    r"(?:\bR-\d+\b|兜底|数据桩|双轨|洗脱|防投毒|速通|防伪|水化|脱水|回灌|铁律|降维)"
+)
+PERCENTILE_ALLOW_RE = re.compile(r"^p(?:50|95|99|12)$", re.IGNORECASE)
 SEP_RE = re.compile(r"^#\s*(=+|-+)\s*$")
 JS_SEP_RE = re.compile(r"^//\s*(=+|-+)\s*$")
 PS1_EA_RE = re.compile(r"\$ErrorActionPreference\s*=\s*['\"](Stop|Continue)['\"]")
@@ -163,14 +167,17 @@ def _check_separator_lines(
     return violations, fixed
 
 
-def _check_comment_markers(all_lines: list[str], path_str: str) -> list[dict[str, Any]]:
-    """检测未决标记（全文件扫描，防头注释后躲藏）与头注释批次黑话禁止词。"""
+def _check_comment_markers(
+    all_lines: list[str], path_str: str, check_extended: bool = False
+) -> list[dict[str, Any]]:
+    """检测未决标记与开发批次黑话（全文件扫描，防头注释后躲藏）。"""
     violations: list[dict[str, Any]] = []
+    ignore_tokens = ("PENDING_RE", "JARGON_RE", "FORBIDDEN_JARGON_RE", "COMMENT-", "RULE", "反例测试用例", "Phase_", "ST07")
     for i, line in enumerate(all_lines):
         stripped = line.strip()
         if not (stripped.startswith("#") or stripped.startswith("//")):
             continue
-        if any(ignore in line for ignore in ("PENDING_RE", "JARGON_RE", "COMMENT-", "RULE", "反例测试用例")):
+        if any(ignore in line for ignore in ignore_tokens):
             continue
         if PENDING_RE.search(line):
             violations.append({
@@ -178,7 +185,10 @@ def _check_comment_markers(all_lines: list[str], path_str: str) -> list[dict[str
                 "rule": "COMMENT-PENDING-MARKER",
                 "detail": f"L{i+1} 注释含未决标记：{line.strip()[:60]}"
             })
-        if i < 35 and JARGON_RE.search(line):
+        jargon_hits = [m.group(0) for m in JARGON_RE.finditer(line) if not PERCENTILE_ALLOW_RE.match(m.group(0))]
+        if not jargon_hits and check_extended:
+            jargon_hits = [m.group(0) for m in WG_EXTENDED_JARGON_RE.finditer(line)]
+        if jargon_hits:
             violations.append({
                 "file": path_str,
                 "rule": "COMMENT-JARGON",
@@ -225,7 +235,8 @@ def audit_file(path: Path, fix: bool = False) -> list[dict[str, Any]]:
     if fix and fixed:
         _save_fixed_header(path, new_lines)
 
-    violations.extend(_check_comment_markers(lines, path_str))
+    in_wg_scripts = path.is_relative_to((ROOT / "scripts").resolve())
+    violations.extend(_check_comment_markers(lines, path_str, check_extended=in_wg_scripts))
 
     non_comment_text = "\n".join(
         ln for ln in lines if not ln.lstrip().startswith("#")
@@ -478,7 +489,7 @@ def main() -> int:
         print(f"【审查结论】未通过（发现 {len(all_violations)} 项工程化规范违规）")
         return 1
 
-    print("【审查结论】通过（全域脚本 100% 对齐六字段、路径真实性、78 等宽线、零黑话、PS1/Bash/Python 严格约束）")
+    print("【审查结论】通过（全域脚本 100% 符合六字段、路径真实性、78 等宽线、零黑话、PS1/Bash/Python 严格约束）")
     return 0
 
 

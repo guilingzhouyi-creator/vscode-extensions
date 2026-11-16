@@ -82,7 +82,7 @@ def _audit_domain_entry(domain: str, entry_key: str, entry: dict[str, Any], viol
 
 
 def _audit_backend_inlines(violations: list[str]) -> None:
-    """审查后端 GDScript 中是否存在硬编码文案模板字面量及底座英文文本纯洁性。"""
+    """审查后端 GDScript 中是否存在硬编码文案模板字面量及基础英文文本纯洁性。"""
     for gd in BACKEND.rglob("*.gd"):
         if gd.name in RESOLVER_FILES:
             continue
@@ -100,9 +100,9 @@ def _audit_backend_inlines(violations: list[str]) -> None:
             if not re.match(r"\s*const\s+MSG_", code_part):
                 continue
             if CJK_RE.search(code_part):
-                violations.append(f"[底座混杂] {base_msg_path.relative_to(ROOT)}:{idx} 英文底座文本严禁含中文")
+                violations.append(f"[英文模板混杂] {base_msg_path.relative_to(ROOT)}:{idx} 基础英文文本严禁含中文")
             if LEGACY_PLACEHOLDER_RE.search(code_part) or re.search(r"\{\d+\}", code_part):
-                violations.append(f"[底座占位符] {base_msg_path.relative_to(ROOT)}:{idx} 须使用 {{param}} 命名占位符")
+                violations.append(f"[英文模板占位符] {base_msg_path.relative_to(ROOT)}:{idx} 须使用 {{param}} 命名占位符")
 
 
 def _load_copywriting_domains(cw_dir: Path) -> dict[str, dict[str, Any]]:

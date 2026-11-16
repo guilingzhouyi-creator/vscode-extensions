@@ -5,7 +5,7 @@
 # 架构定位: 文档目录与文件命名规范检查器 (Naming Discipline Gate)
 # 依赖与触发: 触发方: DocsAuditor.check() | 上游: dir_index 与 naming_rules | 下游: Finding 发现项 | 运行时: Python 3.10+
 # 职责说明: docs/ 目录与文件命名模式匹配、序号递增与多编号混用检查
-# 退出语义与设计依据: 退出码: 纯检查函数无独立退出码 | 设计依据: AGENTS.md 施工细则与文档门禁契约
+# 退出语义与设计依据: 退出码: 纯检查函数无独立退出码 | 设计依据: AGENTS.md 文档质量与目录门禁契约
 # ------------------------------------------------------------------------------
 # 用法示例:
 #   check_naming(docs_dir, dir_index, naming, docs_map, rel_fn, out)

@@ -4,7 +4,7 @@
 # 架构定位: 静态检查 Runner (Windows PowerShell)
 # 依赖与触发: 触发方: audit-all / 本地 CLI | 上游: Godot CLI | 下游: 控制台输出 | 运行时: PowerShell 7+
 # 职责说明: 执行 GDScript 批量语法分析与类型检查，警告视同错误严格阻断
-# 退出语义与设计依据: 退出码: 0=语法无告警, 1=存在语法错误或警告, 2=配置或前置真源缺失 | 设计依据: AGENTS.md 警告即错误铁律
+# 退出语义与设计依据: 退出码: 0=语法无告警, 1=存在语法错误或警告, 2=配置或前置真源缺失 | 设计依据: AGENTS.md 严格告警阻断规范
 # ------------------------------------------------------------------------------
 # 用法示例:
 #   .\scripts\ps1\check-gdscript.ps1
@@ -32,8 +32,8 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RootDir = Split-Path -Parent (Split-Path -Parent $ScriptDir)
 
 # ==============================================================================
-# G3 审查收敛：.gd 扫描目录清单 —— 唯一事实源为 tests/batch_syntax_checker.gd 顶部
-# SCAN_DIRS（主路径单进程批处理与逐文件兜底模式共用同一清单，禁止手工维护第二份）。
+# 目录清单收敛：.gd 扫描目录清单 —— 唯一事实源为 tests/batch_syntax_checker.gd 顶部
+# SCAN_DIRS（主路径单进程批处理与逐文件回退模式共用同一清单，禁止手工维护第二份）。
 # 新增含 .gd 的顶层目录仅需在 batch_syntax_checker.gd 登记一处，两路径自动同口径。
 # ==============================================================================
 $batchScriptPath = Join-Path $RootDir "tests/batch_syntax_checker.gd"

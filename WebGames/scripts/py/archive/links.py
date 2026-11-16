@@ -82,7 +82,7 @@ def rebase_markdown_links(content: str, src_dir: Path, dst_dir: Path, rename_reg
                 if matched_in_dst:
                     return f"{prefix}{label}]({matched_in_dst[0].name}{anchor_part})"
             else:
-                # 附件类文件兜底探测：仅当目标名确为 ATT/附件 语义时才改写，
+                # 附件类文件备选探测：仅当目标名确为 ATT/附件 语义时才改写，
                 # 避免图片/普通同卷资源链接被误写成共享附件
                 if "ATT" in target_name or "附件" in target_name:
                     att_matched = sorted([p for p in _get_dir_files(dst_dir) if "ATT" in p.name and "附件" in p.name and p.name.endswith(".md")])
@@ -101,7 +101,7 @@ def rebase_markdown_links(content: str, src_dir: Path, dst_dir: Path, rename_reg
                     if cross_matched:
                         return f"{prefix}{label}]({m_cross_phase.group(1)}{m_cross_phase.group(2)}/{cross_matched[0].name}{anchor_part})"
                 else:
-                    # 附件类文件跨卷兜底探测（同样仅限 ATT/附件 语义目标）
+                    # 附件类文件跨卷备选探测（同样仅限 ATT/附件 语义目标）
                     target_cross_name = Path(target_file_name).name
                     if "ATT" in target_cross_name or "附件" in target_cross_name:
                         att_cross = sorted([p for p in _get_dir_files(target_phase_dir) if "ATT" in p.name and "附件" in p.name and p.name.endswith(".md")])

@@ -1,7 +1,7 @@
 {
   "$schema": "scripts/config/value_domain_rules.schema.json",
   "schema_version": 1,
-  "description": "卡拉尔世界引擎全域配置表值域与拓扑完整性声明式规则库（Phase 63 自动化脚本库泛化治理）",
+  "description": "卡拉尔世界引擎全域配置表值域与拓扑完整性声明式规则库",
   "primitive_types": [
     "required_sections",
     "positive_num",

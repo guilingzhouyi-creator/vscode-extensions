@@ -13,7 +13,7 @@
 |------|--------|------|------|
 | `bench-*` | bench | 性能基准 / 数据吞吐量测量（单次，或 N 次 sweep 取中位数消抖） | `bench-run.sh`、`bench-sweep.sh` |
 | `test-*` | test | 单元测试一键运行（封装 test_runner.gd，解析断言计数输出 JSON 汇总） | `test-run.sh` |
-| `audit-*` | audit | 自动化审查（声明式配置值域与完整性 / 架构护栏与领域清单自洽 / 命名风格 / 高级规范质量治理 / 简化与防过度工程化 / 硬编码 / 热路径 / 测试覆盖 / 死配置 / 密钥泄露扫描 / 物品三元组 / 上下界 / 命名键 / 文案 / 魔法维度 / 事件概率 / CDC / 信道审计 / 重构度量与十维质量健康度 / 头注释契约 / 文档四域审查 / 异步并行与切片调度） | `audit_config.py`（由 `scripts/config/value_domain_rules.json` 声明式规则驱动，彻底解耦业务表）、`audit_gd.py`（基于 `scripts/config/code_governance_rules.json` v1.1.0 审查 GDScript 4 架构规范）、`audit_script_comment.py`（Phase 75 三语言头注释七字段契约，task_id=`script_comment`）、`audit_event_channels.py`（EventBusCore 信道注册一致性，task_id=`event_channels`）、`audit_runner.py`（AUDIT_TASKS 为审计任务唯一事实源）、`audit-all.sh`+`audit-all.ps1`（一键全量门禁）、`audit-arch.sh`+`audit-arch.ps1`（桥接 `tests/arch_runner.gd` 无头 Godot 架构护栏，缺 Godot 即跳过）、`audit-refactor-metrics.sh`+`audit-refactor-metrics.ps1`（桥接 auto-refactor 静态圈复杂度、十维代码质量分与多维重构建议） |
+| `audit-*` | audit | 自动化审查（声明式配置值域与完整性 / 架构护栏与领域清单自洽 / 命名风格 / 高级规范质量治理 / 简化与防过度工程化 / 硬编码 / 热路径 / 测试覆盖 / 死配置 / 密钥泄露扫描 / 物品三元组 / 上下界 / 命名键 / 文案 / 魔法维度 / 事件概率 / CDC / 信道审计 / 重构度量与十维质量健康度 / 头注释契约 / 文档四域审查 / 异步并行与切片调度） | `audit_config.py`（由 `scripts/config/value_domain_rules.json` 声明式规则驱动，彻底解耦业务表）、`audit_gd.py`（基于 `scripts/config/code_governance_rules.json` v1.1.0 审查 GDScript 4 架构规范）、`audit_script_comment.py`（三语言头注释七字段契约，task_id=`script_comment`）、`audit_event_channels.py`（EventBusCore 信道注册一致性，task_id=`event_channels`）、`audit_runner.py`（AUDIT_TASKS 为审计任务唯一事实源）、`audit-all.sh`+`audit-all.ps1`（一键全量门禁）、`audit-arch.sh`+`audit-arch.ps1`（桥接 `tests/arch_runner.gd` 无头 Godot 架构护栏，缺 Godot 即跳过）、`audit-refactor-metrics.sh`+`audit-refactor-metrics.ps1`（桥接 auto-refactor 静态圈复杂度、十维代码质量分与多维重构建议） |
 | `check-*` | check | 前置校验（环境依赖 / Godot 全量 513 个 .gd（随新卷增长）语法单进程极速批处理门禁 / mermaid 真解析校验·可选） | `check-env.sh`、`check-gdscript.sh`、`check-mermaid.sh` |
 | `package-*` | package | 无头打包与产物导出（自动化导出 PCK 资源包并计算 SHA-256 校验和） | `package-webgames.sh`、`package-webgames.ps1` |
 | `report-*` | report/audit | 基线聚合 / 历史趋势 / sweep 中位数 + 回归门禁（`--gate`）/ 晋升（`--promote`） | `report_aggregate.py`、`report_sweep.py` |
@@ -30,7 +30,7 @@
    （`baseline.json` / `baseline.md`）入库，时间戳快照与临时/测试产物按
    `WebGames/.gitignore` 忽略。
 
-## 二、脚本头注释模板（新脚本必须遵守 · Phase 75 契约）
+## 二、脚本头注释模板（新脚本必须遵守）
 
 > 三语言统一七字段全集：**MUST**（文件路径 / 职责）＋ **SHOULD**（职能域 / 触发方 / 用法 / 依赖 / 退出码）；
 > 头块上下分隔线等宽 **78 字符**；生产注释禁止未决标记（待办/修复/存疑/临时整词）。
@@ -124,14 +124,14 @@ bash scripts/sh/audit-docs.sh --self-test     # 引擎夹具自测（临时目�
 3. 遵循第三节健壮性规范（幂等 + 退出码语义）
 4. 更新本文件「前缀分类矩阵」表
 5. 基准/审查脚本的产出物与 `benchmarks/reports/` 目录约定保持一致
-6. **审查引擎必须登记任务**（P3.1 完备性自检，2026-09-04）：`py/` 下新增 `audit-*` / `report-*` / `archive-*` 引擎文件时，须同步在 `audit_runner.py` 的 `AUDIT_TASKS` 追加一行声明式注册：
+6. **审查引擎必须登记任务**（完备性自检，2026-09-04）：`py/` 下新增 `audit-*` / `report-*` / `archive-*` 引擎文件时，须同步在 `audit_runner.py` 的 `AUDIT_TASKS` 追加一行声明式注册：
 
    ```python
    AuditTask(task_id="<kebab-id>", name="<一句话职责>", script_name="<引擎文件名>.py",
              default_args=[...], scopes={"gd", "config"}, group="audit")
    ```
 
-   未登记即触发 `registry_issues` 完备性阻断（豁免仅 driver `audit_runner.py` 与共享底座 `audit_common.py`）；
+   未登记即触发 `registry_issues` 完备性阻断（豁免仅 driver `audit_runner.py` 与共享模块 `audit_common.py`）；
    用户面 CLI 若提供 `sh/` 包装，须成对提交 `ps1/` 同构实现（`pair_parity` 门禁校验参数面）。
 
 ### 设计注记：check/test/package 族刻意不进 audit-all

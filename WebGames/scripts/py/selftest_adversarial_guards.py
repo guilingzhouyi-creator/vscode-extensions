@@ -56,12 +56,13 @@ def _test_script_comment_evasion() -> list[str]:
             header_ps1
             + "[CmdletBinding()]\n# Set-StrictMode -Version Latest\n# $ErrorActionPreference = 'Stop'\n"
             + body_pad
-            + "# TO" + "DO: hidden after line 35\n",
+            + "# TO" + "DO: hidden after line 35\n"
+            + "# phase" + "99: hidden jargon after line 35\n",
             encoding="utf-8",
         )
         viols = audit_script_comment.audit_file(ps1_evade, fix=False)
         rules = {v["rule"] for v in viols}
-        for req in ("PS1-SET-STRICTMODE", "PS1-ERROR-ACTION", "COMMENT-PENDING-MARKER"):
+        for req in ("PS1-SET-STRICTMODE", "PS1-ERROR-ACTION", "COMMENT-PENDING-MARKER", "COMMENT-JARGON"):
             if req not in rules:
                 failures.append(f"PS1 对抗逃逸未拦截: 缺失 {req} (实得 {sorted(rules)})")
 

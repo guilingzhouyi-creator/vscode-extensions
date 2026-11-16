@@ -232,7 +232,7 @@ def _detect_exact_function_clones(functions: list[NormalizedFunction]) -> list[F
         findings.append(_make_clone_finding(
             "CLN-FUNC-001", anchor.rel_path, anchor.start_line,
             f"函数 {anchor.name} ({anchor.eloc} ELOC) 与跨文件实现完全同构: {peers}",
-            "将共享逻辑下沉至所属域公共底座、接口基类或共享工具模块。",
+            "将共享逻辑下沉至所属域公共基类、接口层或共享工具模块。",
             {"peer_count": len(group) - 1, "norm_lines": len(norm_body)},
         ))
     return findings

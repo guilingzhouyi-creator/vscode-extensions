@@ -209,7 +209,7 @@ def extract_stage_keywords(file_path: Path, vol_dir_name: str, stage_num: int, s
         for seg in re.split(r"[与和与及、]", clean_stage_title):
             add_cand(seg)
 
-    # 7. 兜底
+    # 7. 默认回退
     clean_vol = re.sub(r"^Phase_\d+_", "", vol_dir_name).replace("_", " ")
     if not candidates:
         candidates = [clean_vol, clean_stage_title]

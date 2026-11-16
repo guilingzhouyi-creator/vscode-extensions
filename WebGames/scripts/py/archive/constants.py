@@ -2,7 +2,7 @@
 # ==============================================================================
 # 模块归属: 全宗档案治理系统 (Archive · 档案元数据常量)
 # 文件路径: WebGames/scripts/py/archive/constants.py
-# 架构定位: 档案配置与路径常量底座 (Archive Constants Base)
+# 架构定位: 档案配置与路径常量模块 (Archive Constants)
 # 依赖与触发: 触发方: archive 模块全域 | 上游: 标准库 | 下游: 归档调度器 | 运行时: Python 3.10+
 # 职责说明: 定义归档库物理根路径、案卷卷号格式化模板、历史案卷区间映射与国家标准元数据字典
 # 退出语义与设计依据: 退出码: 常量模块无退出码 | 设计依据: 档案管理唯一事实源契约
@@ -57,7 +57,7 @@ ARCHIVE_CATEGORIES = {
     }
 }
 
-# --- 归档治理配置（Phase 79 配置化提纯：硬编码收敛单一真源） ---
+# --- 归档治理配置（配置化收敛：硬编码统一单一真源） ---
 
 @dataclass(frozen=True)
 class ArchiveHeaderTemplate:
@@ -78,7 +78,7 @@ RESPONSIBLE_SHORT_MAP = {
 }
 RESPONSIBLE_SHORT_DEFAULT = "架构组"
 
-# --- 关键词提取治理配置（Phase 79 配置化提纯：keywords.py 停用词/样板词单一真源） ---
+# --- 关键词提取治理配置（配置化收敛：keywords.py 停用词/样板词单一真源） ---
 
 BOILERPLATE_BLACK_LIST = {
     "数据结构设计与代码契约", "数据结构设计与契约模型", "数据结构验收矩阵",
@@ -112,7 +112,7 @@ NOISE_WORDS = {
     "base", "parent", "child", "node", "archive_volume", "audit_common"
 }
 
-# --- 案卷特化校验治理配置（Phase 79 配置化提纯：verify.py 拦截模式单一真源） ---
+# --- 分卷特化校验治理配置（配置化收敛：verify.py 拦截模式单一真源） ---
 
 # 未特化模板占位符拦截模式
 TEMPLATE_PLACEHOLDER_RE = (

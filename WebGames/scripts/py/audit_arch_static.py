@@ -4,7 +4,7 @@
 # 文件路径: WebGames/scripts/py/audit_arch_static.py
 # 架构定位: 原生静态分析架构护栏 (Native Static Architecture Guard)
 # 依赖与触发: 触发方: audit_runner / 本地 CLI | 上游: config/ 与 backend/ | 下游: 门禁报告 | 运行时: Python 3.10+
-# 职责说明: 纯原生静态审计领域架构合规性，断言领域目录、配置表落地、测试注册、确定性随机、文档计数、配置键存在性、退役契约、边界隔离、错误码登记闭环、持久化契约对称性与全库日志收敛白名单
+# 职责说明: 纯原生静态审计领域架构合规性，断言领域目录、配置表落地、测试注册、确定性随机、文档计数、配置键存在性、退役契约、边界隔离、错误码登记一致性、持久化契约对称性与全库日志收敛白名单
 # 退出语义与设计依据: 退出码: 0=合规, 1=阻断违规 | 设计依据: test_architecture_guard.gd 原生等价实现与全域代码规范
 # ------------------------------------------------------------------------------
 # 用法示例:
@@ -106,7 +106,7 @@ def make_result(test_name: str, violations: list[str]) -> dict[str, Any]:
 
 
 class ArchitectureAuditContext:
-  """架构审计静态提取上下文与高效单趟缓存底座。"""
+  """架构审计静态提取上下文与单趟缓存容器。"""
 
   def __init__(self, root: Path) -> None:
     self.root = root

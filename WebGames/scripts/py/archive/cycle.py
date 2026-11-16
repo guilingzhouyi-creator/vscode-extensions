@@ -52,7 +52,7 @@ def _phase_num_of(vol_dir: Path) -> int:
     """从案卷目录名解析真实 Phase 号（Phase_NN_ 约定，失败即阻断）。
 
     模块级助手：供 archive_short_term_cycle 与 sync_metadata_after_cycle 共用，
-    避免后者引用兄弟函数局部变量导致的 NameError（P1 修复）。
+    避免后者引用兄弟函数局部变量导致的 NameError。
     """
     m = re.match(r"Phase_(\d+)_", vol_dir.name)
     if not m:
