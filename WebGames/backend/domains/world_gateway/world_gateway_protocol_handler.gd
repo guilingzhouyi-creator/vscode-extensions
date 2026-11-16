@@ -153,6 +153,10 @@ static func _dispatch_mod_and_realm_action(
 			return _wrap_mod_operation_response(request.request_id, WorldModArchiveOpsHelper.pack_mod_kmod(request_payload), ".kmod archive built")
 		"INSTALL_MOD_PACK":
 			return _wrap_mod_operation_response(request.request_id, WorldModArchiveOpsHelper.install_mod_pack(request_payload), "MOD package installed")
+		"DELETE_MOD_PACK":
+			return _wrap_mod_operation_response(request.request_id, WorldModLifecycleHelper.delete_mod_pack(request_payload), "MOD package deleted")
+		"UPDATE_MOD_MANIFEST":
+			return _wrap_mod_operation_response(request.request_id, WorldModLifecycleHelper.update_mod_manifest(request_payload), "MOD manifest updated")
 	return null
 
 

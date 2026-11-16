@@ -312,6 +312,32 @@ func install_mod_pack_async(
 		simulate_delay_ms
 	)
 
+## 模拟异步删除本地非内置 MOD 包
+func delete_mod_pack_async(
+	_account_id: String,
+	_token: String,
+	delete_spec: Dictionary,
+	result_callback: Callable
+) -> void:
+	MockBaseService.delayed_call(
+		result_callback,
+		{"success": true, "data": {"pack_id": str(delete_spec.get("pack_id", "")), "deleted": true}},
+		simulate_delay_ms
+	)
+
+## 模拟异步更新本地 MOD 清单与 DAG 数据
+func update_mod_manifest_async(
+	_account_id: String,
+	_token: String,
+	update_spec: Dictionary,
+	result_callback: Callable
+) -> void:
+	MockBaseService.delayed_call(
+		result_callback,
+		{"success": true, "data": {"pack_id": str(update_spec.get("pack_id", "")), "updated": true}},
+		simulate_delay_ms
+	)
+
 ## 模拟异步查询世界存档 MOD 只读诊断
 func get_world_mod_diagnostics_async(
 	_account_id: String,

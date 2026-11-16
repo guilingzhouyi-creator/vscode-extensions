@@ -213,6 +213,14 @@ func pack_mod_kmod_async(account_id: String, token: String, source_directory: St
 func install_mod_pack_async(account_id: String, token: String, source_path: String, target_root: String, result_callback: Callable) -> void:
 	_dispatch_gateway_action("INSTALL_MOD_PACK", account_id, token, {"source_path": source_path, "target_root": target_root}, result_callback)
 
+## 异步删除本地非内置 MOD 包或归档契约实现
+func delete_mod_pack_async(account_id: String, token: String, delete_spec: Dictionary, result_callback: Callable) -> void:
+	_dispatch_gateway_action("DELETE_MOD_PACK", account_id, token, delete_spec, result_callback)
+
+## 异步更新本地 MOD 清单与 DAG 数据契约实现
+func update_mod_manifest_async(account_id: String, token: String, update_spec: Dictionary, result_callback: Callable) -> void:
+	_dispatch_gateway_action("UPDATE_MOD_MANIFEST", account_id, token, update_spec, result_callback)
+
 ## 异步查询指定世界存档只读 MOD 锁定诊断契约实现
 func get_world_mod_diagnostics_async(account_id: String, token: String, world_id: String, result_callback: Callable) -> void:
 	_dispatch_gateway_action("GET_WORLD_MOD_DIAGNOSTICS", account_id, token, {"world_id": world_id}, result_callback)

@@ -132,6 +132,18 @@ func install_mod_pack_async(_account_id: String, _token: String, _source_path: S
 	if result_callback.is_valid():
 		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
 
+## 异步卸载或删除本地非内置 MOD 包契约 (对齐 DELETE_MOD_PACK)
+func delete_mod_pack_async(_account_id: String, _token: String, _delete_spec: Dictionary, result_callback: Callable) -> void:
+	EventBusCore.get_instance().emit_log("error", "IWorldService.delete_mod_pack_async: pure virtual method must be implemented by subclass")
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+
+## 异步更新本地 MOD 清单与 DAG 数据契约 (对齐 UPDATE_MOD_MANIFEST)
+func update_mod_manifest_async(_account_id: String, _token: String, _update_spec: Dictionary, result_callback: Callable) -> void:
+	EventBusCore.get_instance().emit_log("error", "IWorldService.update_mod_manifest_async: pure virtual method must be implemented by subclass")
+	if result_callback.is_valid():
+		result_callback.call({"success": false, "error_code": "NOT_IMPLEMENTED"})
+
 ## 异步查询指定世界存档的只读 MOD 锁定诊断契约 (对齐 GET_WORLD_MOD_DIAGNOSTICS)
 func get_world_mod_diagnostics_async(_account_id: String, _token: String, _world_id: String, result_callback: Callable) -> void:
 	EventBusCore.get_instance().emit_log("error", "IWorldService.get_world_mod_diagnostics_async: pure virtual method must be implemented by subclass")
