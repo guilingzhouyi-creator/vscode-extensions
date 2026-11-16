@@ -150,7 +150,9 @@ export function resolveValidatedSnapshotConfig(
         signal,
     };
     if (!resolved.archetype || !VALID_ARCHETYPES.has(resolved.archetype)) {
-        throw new Error('MISSING_ARCHETYPE: scan_snapshot requires explicit or configured archetype');
+        throw new Error(
+            'MISSING_ARCHETYPE: scan_snapshot requires explicit or configured archetype',
+        );
     }
     return resolved;
 }

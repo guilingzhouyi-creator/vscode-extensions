@@ -240,15 +240,17 @@ export async function handleAsymmetricScan(
     durationMs: number;
 }> {
     const startTimeMs = Date.now();
-    const hasExplicitCfg = Boolean(config && typeof config.concurrency === 'number' && config.analyzers);
+    const hasExplicitCfg = Boolean(
+        config && typeof config.concurrency === 'number' && config.analyzers,
+    );
     const cfg = hasExplicitCfg
         ? { ...config }
         : resolveConfig({
-            root: config?.root || process.cwd(),
-            archetype: config?.archetype,
-            cache: false,
-            logLevel: config?.logLevel || 'silent',
-        });
+              root: config?.root || process.cwd(),
+              archetype: config?.archetype,
+              cache: false,
+              logLevel: config?.logLevel || 'silent',
+          });
     const logger = new Logger(cfg.logLevel || 'silent', cfg.logFile);
     try {
         const scanner = new Scanner(cfg, logger);

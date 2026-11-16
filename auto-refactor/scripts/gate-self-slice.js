@@ -170,7 +170,9 @@ function getGitChangedFiles() {
     }
     return Array.from(changed).filter(
       (filePath) =>
-        (filePath.startsWith('src/') || filePath.startsWith('scripts/') || filePath.startsWith('crates/')) &&
+        (filePath.startsWith('src/') ||
+          filePath.startsWith('scripts/') ||
+          filePath.startsWith('crates/')) &&
         /\.(ts|js|rs|py|gd)$/.test(filePath),
     );
   } catch {

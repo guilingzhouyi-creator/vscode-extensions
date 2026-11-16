@@ -94,7 +94,7 @@ function harvestOutcomes() {
     },
     rules,
     notes: [
-      'An empty rules array is a valid, honest state: every confidence then equals the analyzer\'s own score, exactly as before calibration existed.',
+      "An empty rules array is a valid, honest state: every confidence then equals the analyzer's own score, exactly as before calibration existed.",
       'Populate an entry only from recorded outcomes, never from an estimate of how accurate a rule feels.',
       'scripts/validate-confidence-calibration.js asserts the health of this file and the ECE/Brier monotonic ratchet over the labelled evaluation set.',
     ],
@@ -102,7 +102,9 @@ function harvestOutcomes() {
 
   fs.mkdirSync(path.dirname(OUTPUT_PATH), { recursive: true });
   fs.writeFileSync(OUTPUT_PATH, JSON.stringify(document, null, 2) + '\n', 'utf8');
-  console.log(`Successfully harvested ${rules.length} rule calibration outcomes into ${OUTPUT_PATH}`);
+  console.log(
+    `Successfully harvested ${rules.length} rule calibration outcomes into ${OUTPUT_PATH}`,
+  );
 }
 
 harvestOutcomes();

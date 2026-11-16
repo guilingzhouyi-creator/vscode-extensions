@@ -79,13 +79,17 @@ async function loadRevisionHistoryMap(rootDir: string): Promise<Record<string, F
     const revFile = path.join(rootDir, TRAJECTORY_DIR_NAME, FILE_REVISIONS_FILENAME);
     try {
         if (!(await pathExistsAsync(revFile))) return {};
-        return JSON.parse(await fs.promises.readFile(revFile, ENCODING_UTF8)) as Record<string, FileRevision[]>;
+        const rawText = await fs.promises.readFile(revFile, ENCODING_UTF8);
+        return JSON.parse(rawText) as Record<string, FileRevision[]>;
     } catch {
         return {};
     }
 }
 
-async function saveRevisionHistoryMap(rootDir: string, historyMap: Record<string, FileRevision[]>): Promise<void> {
+async function saveRevisionHistoryMap(
+    rootDir: string,
+    historyMap: Record<string, FileRevision[]>,
+): Promise<void> {
     const trajectoryDir = path.join(rootDir, TRAJECTORY_DIR_NAME);
     if (!(await pathExistsAsync(trajectoryDir))) return;
     const revFile = path.join(trajectoryDir, FILE_REVISIONS_FILENAME);
@@ -329,7 +333,10 @@ async function appendSnapshotRevisionsAndDetect(
         agentUid: agentName,
         compositeScore: scores.before,
     });
-    if (fileHistory.length === 0 || fileHistory[fileHistory.length - 1].fileHash !== preRev.fileHash) {
+    if (
+        fileHistory.length === 0 ||
+        fileHistory[fileHistory.length - 1].fileHash !== preRev.fileHash
+    ) {
         fileHistory.push(preRev);
     }
     const postRev = RegressionTrajectoryDetector.createContentRevision({
@@ -361,12 +368,24 @@ async function verifyAndRollbackIfRegressed(
     };
 
     for (const snap of snapshots) {
-        const trjIssues = await appendSnapshotRevisionsAndDetect(snap, agentName, scores, revisionHistory);
+        const trjIssues = await appendSnapshotRevisionsAndDetect(
+            snap,
+            agentName,
+            scores,
+            revisionHistory,
+        );
         if (trjIssues.length > 0) {
             for (const rollbackSnap of snapshots) {
-                await fs.promises.writeFile(rollbackSnap.fullPath, rollbackSnap.content, ENCODING_UTF8);
+                await fs.promises.writeFile(
+                    rollbackSnap.fullPath,
+                    rollbackSnap.content,
+                    ENCODING_UTF8,
+                );
             }
-            process.stderr.write(`[auto-refactor] [${trjIssues[0].rule}] ${trjIssues[0].message}; rolled back ${snapshots.length} file(s).\n`);
+            const firstIssue = trjIssues[0];
+            process.stderr.write(
+                `[auto-refactor] [${firstIssue.rule}] ${firstIssue.message}; rolled back ${snapshots.length} file(s).\n`,
+            );
             return { postReport, rolledBack: true };
         }
     }
