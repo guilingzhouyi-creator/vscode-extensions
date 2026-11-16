@@ -112,8 +112,6 @@ const CROSS_CUTTING_SUITES: Array[String] = [
 	"res://tests/integration/pipelines/test_kmod_audio_media_and_tier3_pipeline.gd"
 ]
 
-const ConfigRouterEngine = preload("res://backend/infrastructure/config_router_engine.gd")
-
 ## 唯一允许出现全局随机字面调用的实现文件（内部为配置驱动的 LCG）
 const RNG_IMPL_FILE: String = "deterministic_rng.gd"
 

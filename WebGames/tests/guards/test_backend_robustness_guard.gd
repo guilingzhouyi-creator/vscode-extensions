@@ -5,8 +5,6 @@
 # ==============================================================================
 class_name TestBackendRobustnessGuard extends RefCounted
 
-const BackendRobustnessGuard = preload("res://backend/infrastructure/robustness/backend_robustness_guard.gd")
-
 static func run_all_tests() -> Dictionary:
 	var results: Array = []
 	results.append(test_sanitize_int_negative())
