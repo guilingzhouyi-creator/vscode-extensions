@@ -17,6 +17,7 @@ const KCurrencyBarClass = preload("res://frontend/components/k_currency_bar.gd")
 const KSplitPanelClass = preload("res://frontend/components/k_split_panel.gd")
 const KSearchBarClass = preload("res://frontend/components/k_search_bar.gd")
 const KStatusBarClass = preload("res://frontend/components/k_status_bar.gd")
+const EconomyTradeExchangePanelClass = preload("res://frontend/views/economy_trade/economy_trade_exchange_panel.gd")
 
 var page_header: KPageHeader = null
 var currency_bar: KCurrencyBar = null
@@ -24,10 +25,19 @@ var split_panel: KSplitPanel = null
 var search_bar: KSearchBar = null
 var _view: Variant = null
 var _filtered_auction_indices: Array[int] = []
+var _exchange_panel: EconomyTradeExchangePanelClass = null
+
+func _get_exchange_panel() -> EconomyTradeExchangePanelClass:
+	if _exchange_panel == null:
+		_exchange_panel = _register_owned_subcontroller(EconomyTradeExchangePanelClass.new()) as EconomyTradeExchangePanelClass
+		_exchange_panel.setup(_view)
+	return _exchange_panel
 
 ## 绑定所属经济与交易主视图控制器
 func setup(view: BaseScreen) -> void:
 	_view = view
+	if _exchange_panel != null:
+		_exchange_panel.setup(view)
 ## 构建或复用页面标准标题栏
 func create_page_header(title_key: String) -> KPageHeader:
 	page_header = _ensure_page_header(page_header, KPageHeaderClass, title_key, _view) as KPageHeader
@@ -312,7 +322,7 @@ func _refresh_price_trend_display() -> void:
 	var day_parameters: Dictionary = {"day": 0}
 	var value_parameters: Dictionary = {"value": 0}
 	for day_index in range(prices.size()):
-		var bar_row := _acquire_bar_row(_view.price_bars_box, day_index, [50, 80], 1.0)
+		var bar_row := EconomyTradeExchangePanelClass.acquire_bar_row(_view.price_bars_box, day_index, [50, 80], 1.0)
 		bar_row.visible = true
 		day_parameters["day"] = day_index + 1
 		(bar_row.get_child(0) as Label).text = UIIntermediary.text("ui.fe05.price.day", day_parameters)
@@ -327,148 +337,12 @@ func _refresh_price_trend_display() -> void:
 func _on_price_commodity_selected(_index: int) -> void:
 	_refresh_price_trend_display()
 
-# ==============================================================================
-# Tab 6: 货币兑换 (EXCHANGE) 初始化与信号
-# ==============================================================================
-
-## 初始化货币兑换 Tab：源/目标选项 + 默认金币→银币 + 汇率显示首刷
-func _init_exchange_tab() -> void:
-	if _view == null or _view.option_exchange_source == null:
-		return
-	_view.option_exchange_source.clear()
-	_view.option_exchange_target.clear()
-	for key in _view.exchange_currency_keys:
-		_view.option_exchange_source.add_item(UIIntermediary.text(key))
-		_view.option_exchange_target.add_item(UIIntermediary.text(key))
-	if _view.option_exchange_source.item_count > 0:
-		_view.option_exchange_source.select(0)
-	if _view.option_exchange_target.item_count > 1:
-		_view.option_exchange_target.select(1)
-	_view.spin_exchange_amount.value = 1
-	_refresh_exchange_display()
-
-## 货币索引 → 铜币基准值（0 金币/1 银币/2 铜币/3 魔单晶，越界回退 1）
-func _get_currency_copper_value(index: int) -> int:
-	return ServiceLocator.get_instance().economy().get_currency_copper(index)
-
-func _read_exchange_selection() -> Dictionary:
-	if _view == null or _view.option_exchange_source == null:
-		return {}
-	var source_index: int = _view.option_exchange_source.selected
-	var target_index: int = _view.option_exchange_target.selected
-	if source_index < 0 or target_index < 0:
-		return {}
-	return {
-		"src_idx": source_index,
-		"tgt_idx": target_index,
-		"src_name": _view.option_exchange_source.get_item_text(source_index),
-		"tgt_name": _view.option_exchange_target.get_item_text(target_index),
-		"amount": int(_view.spin_exchange_amount.value)
-	}
-
-## 刷新兑换显示：汇率与结果换算（源/目标铜币比值）
-func _refresh_exchange_display() -> void:
-	var selection_summary := _read_exchange_selection()
-	if selection_summary.is_empty():
-		return
-	var source_copper: int = _get_currency_copper_value(int(selection_summary["src_idx"]))
-	var target_copper: int = _get_currency_copper_value(int(selection_summary["tgt_idx"]))
-	var economy := ServiceLocator.get_instance().economy()
-	var rate: float = economy.calculate_exchange_rate(source_copper, target_copper)
-	var amount: int = int(selection_summary["amount"])
-	var converted_amount: float = economy.calculate_exchange_result(amount, rate)
-	UIIntermediary.resolve(_view.label_exchange_rate, "ui.fe05.exchange.rate", {"source": selection_summary["src_name"], "rate": "%.4f" % rate, "target": selection_summary["tgt_name"]})
-	UIIntermediary.resolve(_view.label_exchange_result, "ui.fe05.exchange.result", {"amount": amount, "source": selection_summary["src_name"], "result": "%.2f" % converted_amount, "target": selection_summary["tgt_name"]})
-
-func _on_exchange_source_selected(_index: int) -> void: _refresh_exchange_display()
-func _on_exchange_target_selected(_index: int) -> void: _refresh_exchange_display()
-func _on_exchange_amount_changed(_amount_value: float) -> void: _refresh_exchange_display()
-
-func _on_exchange_confirm_pressed() -> void:
-	var selection_summary := _read_exchange_selection()
-	if selection_summary.is_empty():
-		return
-	var source_index := int(selection_summary.get("src_idx", 0))
-	var target_index := int(selection_summary.get("tgt_idx", 0))
-	var amount := int(selection_summary.get("amount", 0))
-	var economy := ServiceLocator.get_instance().economy()
-	var rate := economy.calculate_exchange_rate(_get_currency_copper_value(source_index), _get_currency_copper_value(target_index))
-	var converted := int(round(economy.calculate_exchange_result(amount, rate)))
-	var exchange_payload := {"delta_gold": (-amount if source_index == 0 else (converted if target_index == 0 else 0)), "delta_crystals": (-amount if source_index == 3 else (converted if target_index == 3 else 0)), "wallet_gold": _view.wallet_gold}
-	var transaction_reply := economy.dispatch_economy_action("EXCHANGE_CURRENCY", exchange_payload)
-	var transaction_table: Dictionary = transaction_reply.get("data", transaction_reply) as Dictionary
-	if transaction_table.has("wallet_gold"):
-		_view.wallet_gold = int(transaction_table.get("wallet_gold", _view.wallet_gold))
-	if transaction_table.has("wallet_mana_monocrystals"):
-		_view.wallet_mana_monocrystals = int(transaction_table.get("wallet_mana_monocrystals", _view.wallet_mana_monocrystals))
-	_view._refresh_wallet_display()
-	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe05.exchange.confirm_toast", {
-		"amount": selection_summary["amount"], "source": selection_summary["src_name"], "target": selection_summary["tgt_name"]
-	}), NavTypes.ToastLevel.INFO)
-
-# ==============================================================================
-# Tab 7: 资源水池 (RESOURCE_POOL) 初始化
-# ==============================================================================
-
-## 初始化资源水池 Tab：Mock 模式填充示例资源池，实网模式保持空态等待快照
-func _init_resource_pool_tab() -> void:
-	if _view == null:
-		return
-	if ServiceLocator.get_mode() == "mock":
-		_view.resource_pools = [
-			{"name": "ui.fe05.commodity.wood", "current": 1200, "max": 2000, "rate": 15}, {"name": "ui.fe05.commodity.iron_ore", "current": 800, "max": 1500, "rate": 8},
-			{"name": "ui.fe05.commodity.mana_crystal", "current": 45, "max": 100, "rate": 2}, {"name": "ui.fe05.commodity.herbs", "current": 320, "max": 500, "rate": 5}
-		]
-	else:
-		_view.resource_pools = []
-	_populate_resource_pools()
-
-## 填充资源池行（名称/存量条/存量/速率，池化复用已有行节点）
-func _populate_resource_pools() -> void:
-	if _view == null or _view.resource_pool_box == null:
-		return
-	for pool_index in range(_view.resource_pools.size()):
-		var pool: Dictionary = _view.resource_pools[pool_index]
-		var bar_row := _acquire_bar_row(_view.resource_pool_box, pool_index, [140, 90, 70], 100.0, true)
-		bar_row.visible = true
-		(bar_row.get_child(0) as Label).text = UIIntermediary.text(str(pool.get("name", "ui.fe05.unknown")))
-		var progress_bar := bar_row.get_child(1) as ProgressBar
-		progress_bar.max_value = float(pool.get("max", 100))
-		progress_bar.value = float(pool.get("current", 0))
-		(bar_row.get_child(2) as Label).text = UIIntermediary.text("ui.fe05.resource.stock", {"current": int(pool.get("current", 0)), "max": int(pool.get("max", 0))})
-		(bar_row.get_child(3) as Label).text = UIIntermediary.text("ui.fe05.resource.rate", {"rate": int(pool.get("rate", 0))})
-	for extra_index in range(_view.resource_pools.size(), _view.resource_pool_box.get_child_count()):
-		_view.resource_pool_box.get_child(extra_index).visible = false
-
-## 获取或创建带进度条的池化行节点（物价走势与资源池共享行构建器，循环外分配）
-func _acquire_bar_row(container_box: VBoxContainer, index: int, column_widths: Array, default_max: float, expand_row: bool = false) -> HBoxContainer:
-	if index < container_box.get_child_count():
-		return container_box.get_child(index) as HBoxContainer
-	var bar_row := HBoxContainer.new()
-	bar_row.alignment = BoxContainer.ALIGNMENT_BEGIN
-	if expand_row:
-		bar_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var first_label := Label.new()
-	first_label.custom_minimum_size = Vector2(int(column_widths[0]), 0)
-	bar_row.add_child(first_label)
-	var progress_bar: ProgressBar = KStatusBarClass.create_bar(0.0, default_max, Vector2(200, 24))
-	progress_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bar_row.add_child(progress_bar)
-	for column_index in range(1, column_widths.size()):
-		_add_row_label(bar_row, int(column_widths[column_index]))
-	container_box.add_child(bar_row)
-	return bar_row
-
-func _add_row_label(row_container: HBoxContainer, min_width: int) -> void:
-	var label_node := Label.new()
-	label_node.custom_minimum_size = Vector2(min_width, 0)
-	row_container.add_child(label_node)
-
 # --- 信号绑定 ---
 ## 绑定子界面 UI 交互信号
 func _connect_signals() -> void:
 	if _view == null:
 		return
+	var exchange_panel := _get_exchange_panel()
 	connect_managed(_view.line_auction_search.text_changed, _on_auction_search_changed)
 	connect_managed(_view.option_auction_category.item_selected, _on_auction_category_selected)
 	connect_managed(_view.auction_item_list.item_selected, _on_auction_item_selected)
@@ -476,7 +350,7 @@ func _connect_signals() -> void:
 	connect_managed(_view.auction_buyout_button.pressed, _on_auction_action_pressed.bind("ui.fe05.auction.buyout_toast"))
 	connect_managed(_view.caravan_list.item_selected, _on_caravan_selected)
 	connect_managed(_view.option_price_commodity.item_selected, _on_price_commodity_selected)
-	connect_managed(_view.option_exchange_source.item_selected, _on_exchange_source_selected)
-	connect_managed(_view.option_exchange_target.item_selected, _on_exchange_target_selected)
-	connect_managed(_view.spin_exchange_amount.value_changed, _on_exchange_amount_changed)
-	connect_managed(_view.exchange_confirm_button.pressed, _on_exchange_confirm_pressed)
+	connect_managed(_view.option_exchange_source.item_selected, exchange_panel.on_exchange_source_selected)
+	connect_managed(_view.option_exchange_target.item_selected, exchange_panel.on_exchange_target_selected)
+	connect_managed(_view.spin_exchange_amount.value_changed, exchange_panel.on_exchange_amount_changed)
+	connect_managed(_view.exchange_confirm_button.pressed, exchange_panel.on_exchange_confirm_pressed)

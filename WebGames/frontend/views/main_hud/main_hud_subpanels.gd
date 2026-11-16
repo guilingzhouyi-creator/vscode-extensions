@@ -377,3 +377,23 @@ func refresh_completion_panel() -> void:
 ## 返回无匹配补全命令时的提示文本。
 func completion_no_match_text() -> String:
 	return UIIntermediary.text("ui.fe02.chat.completion_no_match")
+
+## 同步命令补全页快照到主 HUD 视图状态（循环外浅拷贝分页条目）。
+func apply_completion_page(page_result: Dictionary) -> void:
+	if _view == null:
+		return
+	_view.completion_entries = page_result.entries.duplicate()
+	_view.completion_page_index = page_result.page_index
+	_view.completion_total_pages = page_result.total_pages
+
+## 全量重绘聊天终端消息列表（初始化与频道切换时触发）。
+func refresh_chat_view() -> void:
+	if _view == null or not _view._chat_rich_text_label:
+		return
+	_view._chat_rich_text_label.clear()
+	var theme_manager := ThemeManager.get_instance()
+	for message_entry in _view.message_terminal_buffer:
+		var tag: String = message_entry.get("tag", "SYSTEM")
+		var text: String = message_entry.get("text", "")
+		var color_tag := theme_manager.get_bbcode_color_tag(tag)
+		_view._chat_rich_text_label.append_text("%s[%s] %s[/color]\n" % [color_tag, tag, text])

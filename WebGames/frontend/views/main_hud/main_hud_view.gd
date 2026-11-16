@@ -145,10 +145,10 @@ func _ready() -> void:
 		minimap_coords = Vector2i.ZERO
 	_init_hud_text()
 	_refresh_status_bars(); _refresh_wallet(); _refresh_clock(); _refresh_character_name()
-	_refresh_minimap_coords()
-	_init_action_bar()
+	_get_subpanels().refresh_minimap_coords()
+	_get_subpanels().init_action_bar()
 	UIIntermediary.resolve_placeholder(_chat_input, "ui.fe02.chat.input_placeholder")
-	_refresh_chat_view()
+	_get_subpanels().refresh_chat_view()
 	if is_mock_mode:
 		append_terminal_log("SYSTEM", UIIntermediary.text("ui.fe02.chat.mock.welcome"))
 		append_terminal_log("WORLD", UIIntermediary.text("ui.fe02.chat.mock.world_msg", {"name": character_name}))
@@ -169,11 +169,11 @@ func _ready() -> void:
 			if bool(sync_reply.get("success", false)) and not snapshot_table.is_empty():
 				apply_snapshot(snapshot_table)
 		)
-	_refresh_quest_tracker()
+	_get_subpanels().refresh_quest_tracker()
 	completion_visible = false; _completion_panel.visible = false
 	main_menu_visible = false; _main_menu_panel.visible = false
 	_connect_signals()
-	_attach_mail_red_dot_badge()
+	_get_subpanels().attach_mail_red_dot_badge()
 	HudEventBridge.get_instance().attach_hud(self)
 	UIIntermediary.adapt_view(self)
 
@@ -208,7 +208,7 @@ func _input(event: InputEvent) -> void:
 	# ESC 切换主菜单
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ESCAPE:
-			_toggle_main_menu()
+			_get_subpanels().toggle_main_menu()
 			get_viewport().set_input_as_handled()
 			return
 
@@ -220,7 +220,7 @@ func _input(event: InputEvent) -> void:
 			var key_press_result := feed_chat_key_press("Key_Tab", timestamp_msec)
 			if key_press_result.is_double_tap or key_press_result.is_single_tap:
 				# 更新补全面板显示
-				_refresh_completion_panel()
+				_get_subpanels().refresh_completion_panel()
 				get_viewport().set_input_as_handled()
 				return
 
@@ -252,13 +252,13 @@ func _render_from_snapshot() -> void:
 		hud_clock_display = str(snapshot.get("clock_display", ""))
 	if snapshot.has("coord_x") or snapshot.has("coord_y"):
 		minimap_coords = Vector2i(int(snapshot.get("coord_x", minimap_coords.x)), int(snapshot.get("coord_y", minimap_coords.y)))
-		_refresh_minimap_coords()
+		_get_subpanels().refresh_minimap_coords()
 	if snapshot.get("quests") is Array:
 		hud_quests = (snapshot.get("quests") as Array).duplicate(true)
-		_refresh_quest_tracker()
+		_get_subpanels().refresh_quest_tracker()
 	if snapshot.get("action_bar_slots") is Array:
 		action_bar_slots = (snapshot.get("action_bar_slots") as Array).duplicate(true)
-		_init_action_bar()
+		_get_subpanels().init_action_bar()
 	_refresh_status_bars()
 	_refresh_wallet()
 	_refresh_clock()
@@ -284,16 +284,6 @@ func _refresh_clock() -> void:
 func _refresh_character_name() -> void:
 	if _character_name_label: _character_name_label.text = character_name
 
-# --- 小地图与快捷栏（委托给 MainHUDSubpanels） ---
-
-func _refresh_minimap_coords() -> void: _get_subpanels().refresh_minimap_coords()
-func _on_minimap_zoom_in_pressed() -> void: _get_subpanels().on_minimap_zoom_in_pressed()
-func _on_minimap_zoom_out_pressed() -> void: _get_subpanels().on_minimap_zoom_out_pressed()
-
-func _init_action_bar() -> void: _get_subpanels().init_action_bar()
-func _refresh_action_bar() -> void: _get_subpanels().refresh_action_bar()
-func _on_action_slot_pressed(slot_index: int) -> void: _get_subpanels().on_action_slot_pressed(slot_index)
-
 ## 触发指定动作槽位并返回包含槽位与冷却判定结果的字典。
 func trigger_action_slot(slot_index: int) -> Dictionary:
 	for slot_entry in action_bar_slots:
@@ -315,7 +305,7 @@ func switch_chat_channel(channel: ChatChannel) -> void: current_channel = channe
 func _on_chat_tab_changed(tab_index: int) -> void:
 	var channels := [ChatChannel.WORLD, ChatChannel.GUILD, ChatChannel.PARTY, ChatChannel.SYSTEM, ChatChannel.COMBAT]
 	if tab_index >= 0 and tab_index < channels.size(): current_channel = channels[tab_index]
-	_refresh_chat_view()
+	_get_subpanels().refresh_chat_view()
 
 const CHANNEL_TAGS: Dictionary = {ChatChannel.WORLD: "WORLD", ChatChannel.GUILD: "GUILD", ChatChannel.PARTY: "PARTY", ChatChannel.SYSTEM: "SYSTEM", ChatChannel.COMBAT: "COMBAT"}
 
@@ -329,18 +319,6 @@ func append_terminal_log(tag: String, text: String) -> void:
 		_chat_rich_text_label.append_text("%s[%s] %s[/color]\n" % [color_tag, tag, text])
 		while _chat_rich_text_label.get_paragraph_count() > max_terminal_lines:
 			_chat_rich_text_label.remove_paragraph(0)
-
-## 刷新聊天显示：全量重载（仅初始化/切换频道时触发）
-func _refresh_chat_view() -> void:
-	if not _chat_rich_text_label:
-		return
-	_chat_rich_text_label.clear()
-	var theme_manager := ThemeManager.get_instance()
-	for message_entry in message_terminal_buffer:
-		var tag: String = message_entry.get("tag", "SYSTEM")
-		var text: String = message_entry.get("text", "")
-		var color_tag := theme_manager.get_bbcode_color_tag(tag)
-		_chat_rich_text_label.append_text("%s[%s] %s[/color]\n" % [color_tag, tag, text])
 
 # --- 聊天输入框与 Tab 智能补全联动 ---
 
@@ -359,7 +337,8 @@ func _on_chat_input_text_changed(new_text: String) -> void:
 	chat_input_text = new_text; _chat_session().reset_cursor()
 	if completion_visible:
 		var query_result := _chat_session().query(_command_prefix(chat_input_text))
-		_apply_page(query_result); _refresh_completion_panel()
+		var subpanels := _get_subpanels()
+		subpanels.apply_completion_page(query_result); subpanels.refresh_completion_panel()
 
 func _on_chat_input_submitted(_new_text: String) -> void:
 	var text := chat_input_text.strip_edges()
@@ -396,19 +375,25 @@ func feed_chat_key_press(key_code: String, timestamp_msec: int) -> Dictionary:
 ## 打开命令补全面板并加载匹配的首屏候选条目。
 func open_completion_panel() -> Dictionary:
 	completion_visible = true; _chat_session().reset_cursor()
-	var query_result := _chat_session().query(_command_prefix(chat_input_text)); _apply_page(query_result); _refresh_completion_panel()
+	var query_result := _chat_session().query(_command_prefix(chat_input_text))
+	var subpanels := _get_subpanels()
+	subpanels.apply_completion_page(query_result); subpanels.refresh_completion_panel()
 	return {"success": true, "visible": true, "total": query_result.total, "page_index": completion_page_index, "total_pages": completion_total_pages, "entries": completion_entries.duplicate()}
 
 ## 翻至命令补全面板下一页并刷新显示。
 func next_completion_page() -> Dictionary:
 	if not completion_visible: return {"success": false, "reason": "COMPLETION_NOT_VISIBLE"}
-	var query_result := _chat_session().next_page(_command_prefix(chat_input_text)); _apply_page(query_result); _refresh_completion_panel()
+	var query_result := _chat_session().next_page(_command_prefix(chat_input_text))
+	var subpanels := _get_subpanels()
+	subpanels.apply_completion_page(query_result); subpanels.refresh_completion_panel()
 	return {"success": true, "page_index": completion_page_index, "total_pages": completion_total_pages}
 
 ## 翻至命令补全面板上一页并刷新显示。
 func prev_completion_page() -> Dictionary:
 	if not completion_visible: return {"success": false, "reason": "COMPLETION_NOT_VISIBLE"}
-	var query_result := _chat_session().prev_page(_command_prefix(chat_input_text)); _apply_page(query_result); _refresh_completion_panel()
+	var query_result := _chat_session().prev_page(_command_prefix(chat_input_text))
+	var subpanels := _get_subpanels()
+	subpanels.apply_completion_page(query_result); subpanels.refresh_completion_panel()
 	return {"success": true, "page_index": completion_page_index, "total_pages": completion_total_pages}
 
 ## 将最近匹配的补全命令填入聊天输入框并同步光标位置。
@@ -419,8 +404,6 @@ func apply_chat_completion() -> Dictionary:
 		chat_input_text = completion_result.command
 		if _chat_input: _chat_input.text = chat_input_text; _chat_input.caret_column = chat_input_text.length()
 	return completion_result
-
-func _refresh_completion_panel() -> void: _get_subpanels().refresh_completion_panel()
 
 ## 返回本地化聊天输入框默认提示文本。
 func chat_input_placeholder() -> String: return UIIntermediary.text("ui.fe02.chat.input_placeholder")
@@ -433,12 +416,6 @@ func completion_page_hint() -> String: return UIIntermediary.text("ui.fe02.chat.
 
 ## ---------- 内部实现 ----------
 
-func _apply_page(page_result: Dictionary) -> void:
-	# 页缓冲池会被后续查询复用：视图侧复制快照，防止回收页污染展示数据
-	completion_entries = page_result.entries.duplicate()
-	completion_page_index = page_result.page_index
-	completion_total_pages = page_result.total_pages
-
 func _channel_tag_name(channel: ChatChannel) -> String:
 	return str(CHANNEL_TAGS.get(channel, "SYSTEM"))
 
@@ -448,19 +425,5 @@ static func _command_prefix(input_text: String) -> String:
 	var space_index := text.find(" ")
 	return text.substr(0, space_index) if space_index >= 0 else text
 
-# --- 战报、任务追踪、主菜单（委托给 MainHUDSubpanels） ---
-
 ## 按分类向战报日志终端追加一条战报消息。
 func append_battle_log(category: String, text: String) -> void: _get_subpanels().append_battle_log(category, text)
-func _refresh_quest_tracker() -> void: _get_subpanels().refresh_quest_tracker()
-func _set_quest_entry(quest_entry: VBoxContainer, title_key: String, description_key: String, progress_ratio: float) -> void: _get_subpanels().set_quest_entry(quest_entry, title_key, description_key, progress_ratio)
-func _toggle_main_menu() -> void: _get_subpanels().toggle_main_menu()
-func _attach_mail_red_dot_badge() -> void: _get_subpanels().attach_mail_red_dot_badge()
-func _on_menu_character_pressed() -> void: _get_subpanels().on_menu_character_pressed()
-func _on_menu_inventory_pressed() -> void: _get_subpanels().on_menu_inventory_pressed()
-func _on_menu_skills_pressed() -> void: _get_subpanels().on_menu_skills_pressed()
-func _on_menu_map_pressed() -> void: _get_subpanels().on_menu_map_pressed()
-func _on_menu_quests_pressed() -> void: _get_subpanels().on_menu_quests_pressed()
-func _on_menu_mail_pressed() -> void: _get_subpanels().on_menu_mail_pressed()
-func _on_menu_settings_pressed() -> void: _get_subpanels().on_menu_settings_pressed()
-func _on_menu_exit_pressed() -> void: _get_subpanels().on_menu_exit_pressed()
