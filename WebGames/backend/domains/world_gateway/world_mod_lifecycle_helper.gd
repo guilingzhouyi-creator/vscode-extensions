@@ -12,12 +12,12 @@ class_name WorldModLifecycleHelper
 extends RefCounted
 
 
-## 安全卸载或删除用户自建或本地非内置 MOD 包（目录或 .kmod 归档，保护 official_kalar 与非模组目录）
+## 安全卸载或删除用户自建或本地非内置 MOD 包（目录或 .kmod 归档，保护官方核心基座包与非模组目录）
 static func delete_mod_pack(request_payload: Dictionary) -> Dictionary:
 	var pack_id := str(request_payload.get("pack_id", "")).strip_edges()
 	if not WorldModPackageOpsHelper.is_safe_pack_identifier(pack_id):
 		return {"success": false, "error_code": "ERR_INVALID_PACK_ID", "message": "Invalid pack_id"}
-	if pack_id == "official_kalar":
+	if _is_protected_official_payload(request_payload):
 		return {"success": false, "error_code": "ERR_PROTECTED_BASE_MOD", "message": "Official core pack cannot be deleted"}
 
 	var target_root := WorldModPackageOpsHelper.resolve_target_root(request_payload)
@@ -32,6 +32,10 @@ static func delete_mod_pack(request_payload: Dictionary) -> Dictionary:
 		var candidate_directory := _globalize_if_virtual(raw_root_path.rstrip("/\\"))
 		if candidate_directory.get_file() == pack_id:
 			pack_directory = candidate_directory
+
+	var disk_manifest := WorldModPackageOpsHelper.read_json_file(pack_directory.path_join("pack.json"))
+	if not disk_manifest.is_empty() and _is_protected_official_payload(disk_manifest):
+		return {"success": false, "error_code": "ERR_PROTECTED_BASE_MOD", "message": "Official core pack cannot be deleted"}
 
 	var removed_paths: Array[String] = []
 	var folder_outcome := _remove_mod_folder_if_present(pack_directory, removed_paths)
@@ -89,6 +93,10 @@ static func update_mod_manifest(request_payload: Dictionary) -> Dictionary:
 		"precheck_valid": bool(precheck_outcome.get("valid", false)),
 		"precheck_errors": precheck_outcome.get("errors", []),
 	}
+
+
+static func _is_protected_official_payload(payload_map: Dictionary) -> bool:
+	return bool(payload_map.get("is_official", false)) or str(payload_map.get("pack_profile", "")) == "OFFICIAL_BASE"
 
 
 static func _remove_mod_folder_if_present(pack_directory: String, removed_paths: Array[String]) -> Dictionary:

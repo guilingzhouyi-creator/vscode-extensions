@@ -38,7 +38,7 @@ func _init() -> void:
 func load_pack_entry(pack_entry: Dictionary) -> void:
 	_focused_pack_id = str(pack_entry.get("pack_id", "")).strip_edges()
 	_focused_root_path = str(pack_entry.get("root_path", "")).strip_edges()
-	_is_official_pack = bool(pack_entry.get("is_official", false)) or (_focused_pack_id == "official_kalar")
+	_is_official_pack = bool(pack_entry.get("is_official", false)) or str(pack_entry.get("pack_profile", "")) == "OFFICIAL_BASE"
 
 	if _display_name_input != null:
 		_display_name_input.text = str(pack_entry.get("display_name", _focused_pack_id))

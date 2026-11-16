@@ -42,7 +42,7 @@ func bind_event_source(event_source_callback: Callable) -> void:
 
 ## 在 127.0.0.1 回环地址启动局部 IPC 监听（端口为 0 时由系统分配空闲端口）
 func start(listen_port: int = DEFAULT_PORT, session_passphrase: String = "") -> Dictionary:
-	teardown()
+	_stop_network_only()
 	if listen_port < 0 or listen_port > 65535:
 		return {"success": false, "error_code": "ERR_IPC_INVALID_PORT", "port": listen_port}
 	var tcp_server := TCPServer.new()
@@ -105,6 +105,11 @@ func poll(max_messages: int = 32) -> int:
 
 ## 对称关闭回环监听端口与全部活动客户端句柄，清空绑定引用防止退出泄漏
 func teardown() -> void:
+	_stop_network_only()
+	_router.reset_bindings()
+
+
+func _stop_network_only() -> void:
 	for peer_slot in _peers:
 		_close_peer_slot(peer_slot)
 	_peers.clear()
@@ -113,7 +118,6 @@ func teardown() -> void:
 		_server = null
 	_bound_port = 0
 	_session_passphrase = ""
-	_router.reset_bindings()
 
 
 func _accept_pending_connections() -> void:
