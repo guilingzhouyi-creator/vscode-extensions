@@ -5,6 +5,8 @@
 class_name TestFE01AccountEntry
 extends RefCounted
 
+const FeMountHelper = preload("res://tests/unit/frontend/fe_mount_test_helper.gd")
+
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	var domain_name = "FE Vol 01: 账号与入口系统（登录/注册/选服/创角）"
@@ -14,6 +16,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_login_register_form_flow())
 	results.append(_test_character_slot_selection())
 	results.append(_test_server_list_selection())
+	results.append(_test_mounted_real_account_entry())
 	ServiceLocator.reset()
 
 	var passed_cnt = 0
@@ -69,4 +72,38 @@ static func _test_server_list_selection() -> Dictionary:
 	return {
 		"test": "TC-FE01-03: 服务器列表多节点切换与选中状态保持",
 		"passed": passed
+	}
+
+static func _test_mounted_real_account_entry() -> Dictionary:
+	var had_binding_registry := UIBindingRegistry.has_active_instance()
+	var orphan_before := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+	var mount_handle := FeMountHelper.mount_scene("res://frontend/views/account_entry/account_entry_view.tscn", "real")
+	var passed := bool(mount_handle.get("ok", false))
+	var mounted_view: AccountEntryView = mount_handle.get("view", null) as AccountEntryView
+	var details := ""
+	if mounted_view != null:
+		var empty_reply := mounted_view.submit_login("", "")
+		var guest_reply: Array[Dictionary] = []
+		ServiceLocator.get_instance().auth().login_guest_async("fe01_e2e_device", func(auth_outcome: Dictionary) -> void:
+			guest_reply.append(auth_outcome)
+		)
+		mounted_view.switch_state(AccountEntryView.EntryState.SERVER_SELECT)
+		mounted_view.switch_state(AccountEntryView.EntryState.CHARACTER_SELECT)
+		mounted_view._on_login_forgot_pressed()
+		var guest_ok := (not guest_reply.is_empty()) and bool(guest_reply[0].get("success", false))
+		details = "mounted=%s children=%d empty=%s guest=%s" % [str(mounted_view.is_mounted_in_tree()), mounted_view.get_child_count(), str(empty_reply), str(guest_reply)]
+		passed = passed and mounted_view.is_mounted_in_tree() and mounted_view.get_child_count() > 0 and (not bool(empty_reply.get("success", true))) and guest_ok
+	FeMountHelper.unmount_scene(mount_handle)
+	NavManager.reset_instance()
+	if not had_binding_registry:
+		UIBindingRegistry.reset_instance()
+	var orphan_after := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+	var orphan_delta := orphan_after - orphan_before
+	var all_ok := passed and (orphan_after <= orphan_before)
+	if not all_ok:
+		push_warning("TC-FE01-04 fail: passed=%s orphan_delta=%d %s" % [str(passed), orphan_delta, details])
+	return {
+		"test": "TC-FE01-04: 真场景挂载 account_entry_view.tscn（real 模式鉴权状态机与零残留）",
+		"passed": all_ok,
+		"details": details + " orphan_delta=%d" % orphan_delta
 	}

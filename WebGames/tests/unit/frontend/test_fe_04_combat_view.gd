@@ -5,6 +5,8 @@
 class_name TestFE04CombatView
 extends RefCounted
 
+const FeMountHelper = preload("res://tests/unit/frontend/fe_mount_test_helper.gd")
+
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	var domain_name = "FE Vol 04: 战斗界面系统（飘字/BOSS部位血条/战报回放/结算）"
@@ -12,6 +14,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_floating_damage_text())
 	results.append(_test_boss_segmented_hp_bar())
 	results.append(_test_combat_settlement_overlay())
+	results.append(_test_mounted_real_combat_view())
 
 	var passed_cnt = 0
 	for r in results:
@@ -60,4 +63,19 @@ static func _test_combat_settlement_overlay() -> Dictionary:
 	return {
 		"test": "TC-FE04-03: 讨伐结算面板胜利状态与战利品MVP呈现",
 		"passed": passed
+	}
+
+static func _test_mounted_real_combat_view() -> Dictionary:
+	var orphan_before := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+	var mount_handle := FeMountHelper.mount_scene("res://frontend/views/combat_view/combat_view.tscn", "real")
+	var passed := bool(mount_handle.get("ok", false))
+	var mounted_view: CombatView = mount_handle.get("view", null) as CombatView
+	if mounted_view != null:
+		mounted_view._on_skill_pressed(1)
+		passed = passed and mounted_view.is_mounted_in_tree() and mounted_view.get_child_count() > 0 and mounted_view.floating_texts.size() >= 1
+	FeMountHelper.unmount_scene(mount_handle)
+	var orphan_after := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+	return {
+		"test": "TC-FE04-04: 真场景挂载 combat_view.tscn（real 模式技能施放/权威飘字与零残留）",
+		"passed": passed and (orphan_after <= orphan_before)
 	}

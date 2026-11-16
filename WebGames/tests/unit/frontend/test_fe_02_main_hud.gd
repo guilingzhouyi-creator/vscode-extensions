@@ -5,6 +5,8 @@
 class_name TestFE02MainHUD
 extends RefCounted
 
+const FeMountHelper = preload("res://tests/unit/frontend/fe_mount_test_helper.gd")
+
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	var domain_name = "FE Vol 02: 主界面 HUD（顶栏状态/小地图/操作栏/聊天/战报）"
@@ -13,6 +15,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_action_bar_trigger_and_cd())
 	results.append(_test_chat_channel_and_terminal_buffer())
 	results.append(_test_chat_input_completion())
+	results.append(_test_mounted_real_main_hud())
 
 	var passed_cnt = 0
 	for r in results:
@@ -97,4 +100,21 @@ static func _test_chat_input_completion() -> Dictionary:
 	return {
 		"test": "TC-FE02-04: 聊天输入框与滚动区隔离 + Tab 双击补全/单击最近适配",
 		"passed": passed
+	}
+
+static func _test_mounted_real_main_hud() -> Dictionary:
+	var orphan_before := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+	var mount_handle := FeMountHelper.mount_scene("res://frontend/views/main_hud/main_hud_view.tscn", "real")
+	var passed := bool(mount_handle.get("ok", false))
+	var mounted_hud: MainHUDView = mount_handle.get("view", null) as MainHUDView
+	if mounted_hud != null:
+		mounted_hud.update_status_snapshot(90.0, 100.0, 40.0, 50.0, 9.0, 10.0, 320, 18)
+		var slot_reply := mounted_hud.trigger_action_slot(1)
+		mounted_hud._on_chat_input_submitted("/help")
+		passed = passed and mounted_hud.is_mounted_in_tree() and mounted_hud.get_child_count() > 0 and bool(slot_reply.get("success", false)) and mounted_hud.wallet_gold == 320
+	FeMountHelper.unmount_scene(mount_handle)
+	var orphan_after := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+	return {
+		"test": "TC-FE02-05: 真场景挂载 main_hud_view.tscn（real 模式权威快照/技能槽/指令与零残留）",
+		"passed": passed and (orphan_after <= orphan_before)
 	}

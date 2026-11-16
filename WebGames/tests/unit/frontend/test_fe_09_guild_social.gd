@@ -5,6 +5,8 @@
 class_name TestFE09GuildSocial
 extends RefCounted
 
+const FeMountHelper = preload("res://tests/unit/frontend/fe_mount_test_helper.gd")
+
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	var domain_name = "FE Vol 09: 社交与公会系统（公会管理/RBAC职位/科技）"
@@ -12,6 +14,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_guild_snapshot_loading())
 	results.append(_test_rbac_management_permissions())
 	results.append(_test_guild_tech_tree_rendering())
+	results.append(_test_mounted_real_guild_social())
 
 	var passed_cnt = 0
 	for r in results:
@@ -64,4 +67,23 @@ static func _test_guild_tech_tree_rendering() -> Dictionary:
 	return {
 		"test": "TC-FE09-03: 驻地科技树等级与被动光环数据装载",
 		"passed": passed
+	}
+
+static func _test_mounted_real_guild_social() -> Dictionary:
+	var orphan_before := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+	var mount_handle := FeMountHelper.mount_scene("res://frontend/views/guild_social/guild_social_view.tscn", "real")
+	var passed := bool(mount_handle.get("ok", false))
+	var mounted_view: GuildSocialView = mount_handle.get("view", null) as GuildSocialView
+	if mounted_view != null:
+		mounted_view.set_guild_snapshot("DawnWing", 3, 50000, [
+			{ "account_id": "ACC_LEADER", "role": "LEADER", "contribution": 12000 }
+		], [])
+		mounted_view._on_guild_manage_pressed()
+		mounted_view._on_tab_changed(1)
+		passed = passed and mounted_view.is_mounted_in_tree() and mounted_view.get_child_count() > 0 and mounted_view.can_manage_members("LEADER")
+	FeMountHelper.unmount_scene(mount_handle)
+	var orphan_after := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+	return {
+		"test": "TC-FE09-04: 真场景挂载 guild_social_view.tscn（real 模式公会管理与零残留）",
+		"passed": passed and (orphan_after <= orphan_before)
 	}

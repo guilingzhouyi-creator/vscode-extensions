@@ -5,6 +5,8 @@
 class_name TestFE06GachaWish
 extends RefCounted
 
+const FeMountHelper = preload("res://tests/unit/frontend/fe_mount_test_helper.gd")
+
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	var domain_name = "FE Vol 06: 抽卡祈愿系统（卡池/结果展示/保底记录）"
@@ -12,6 +14,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_banner_switch())
 	results.append(_test_ten_pull_reveal_flow())
 	results.append(_test_pity_counter_accumulation())
+	results.append(_test_mounted_real_gacha_wish())
 
 	var passed_cnt = 0
 	for r in results:
@@ -59,4 +62,22 @@ static func _test_pity_counter_accumulation() -> Dictionary:
 	return {
 		"test": "TC-FE06-03: 抽卡历史记录累加与保底进度步进",
 		"passed": passed
+	}
+
+static func _test_mounted_real_gacha_wish() -> Dictionary:
+	var orphan_before := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+	var mount_handle := FeMountHelper.mount_scene("res://frontend/views/gacha_wish/gacha_wish_view.tscn", "real")
+	var passed := bool(mount_handle.get("ok", false))
+	var mounted_view: GachaWishView = mount_handle.get("view", null) as GachaWishView
+	if mounted_view != null:
+		mounted_view._on_banner_switch_pressed("BANNER_STANDARD_WEAPON")
+		mounted_view._on_toggle_history_pressed()
+		mounted_view._on_history_close_pressed()
+		var pull_outcome := mounted_view.execute_pull_preview(1, [])
+		passed = passed and mounted_view.is_mounted_in_tree() and mounted_view.get_child_count() > 0 and bool(pull_outcome.get("success", false)) and mounted_view.current_banner_id == "BANNER_STANDARD_WEAPON"
+	FeMountHelper.unmount_scene(mount_handle)
+	var orphan_after := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+	return {
+		"test": "TC-FE06-04: 真场景挂载 gacha_wish_view.tscn（real 模式卡池切换/历史弹窗与零残留）",
+		"passed": passed and (orphan_after <= orphan_before)
 	}

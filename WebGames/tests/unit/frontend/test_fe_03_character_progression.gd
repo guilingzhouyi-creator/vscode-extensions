@@ -5,6 +5,8 @@
 class_name TestFE03CharacterProgression
 extends RefCounted
 
+const FeMountHelper = preload("res://tests/unit/frontend/fe_mount_test_helper.gd")
+
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	var domain_name = "FE Vol 03: 角色与养成系统（面板/潜能加点/技能树/装备/背包）"
@@ -12,6 +14,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_potential_allocation_preview())
 	results.append(_test_equipment_slot_mount())
 	results.append(_test_tab_navigation())
+	results.append(_test_mounted_real_character_progression())
 
 	var passed_cnt = 0
 	for r in results:
@@ -63,4 +66,23 @@ static func _test_tab_navigation() -> Dictionary:
 	return {
 		"test": "TC-FE03-03: 角色养成子页签切换与导航路由自洽",
 		"passed": passed
+	}
+
+static func _test_mounted_real_character_progression() -> Dictionary:
+	var orphan_before := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+	var mount_handle := FeMountHelper.mount_scene("res://frontend/views/character_progression/character_progression_view.tscn", "real")
+	var passed := bool(mount_handle.get("ok", false))
+	var mounted_view: CharacterProgressionView = mount_handle.get("view", null) as CharacterProgressionView
+	if mounted_view != null:
+		mounted_view.set_attributes_snapshot({ "STR": 14, "AGI": 11, "CON": 12, "INT": 9, "WIS": 10, "CHA": 10 }, 2)
+		var alloc_reply := mounted_view.preview_add_point("STR")
+		mounted_view._tabs._on_pot_confirm_pressed()
+		mounted_view.switch_tab(CharacterProgressionView.TabType.EQUIPMENT)
+		mounted_view.switch_tab(CharacterProgressionView.TabType.ATTRIBUTES)
+		passed = passed and mounted_view.is_mounted_in_tree() and mounted_view.get_child_count() > 0 and bool(alloc_reply.get("success", false)) and mounted_view.attributes_preview["STR"] == 15
+	FeMountHelper.unmount_scene(mount_handle)
+	var orphan_after := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+	return {
+		"test": "TC-FE03-04: 真场景挂载 character_progression_view.tscn（real 模式潜能确认与零残留）",
+		"passed": passed and (orphan_after <= orphan_before)
 	}
