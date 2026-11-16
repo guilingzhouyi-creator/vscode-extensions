@@ -2,7 +2,7 @@
 # 单元测试：配置驱动收口与单一真源验收
 # 文件路径: res://tests/unit/infrastructure/test_cdc.gd
 # 职责: 验证默认次分类配置驱动、Gacha 概率与保底零回归、代码 ID 引用一致性、
-#       AST Kind 单一真源判定、收口审计通过性及与 P24 边界隔离
+#       AST Kind 单一真源判定、收口审计通过性及跨期边界隔离
 # ==============================================================================
 class_name TestCdcDomain extends RefCounted
 

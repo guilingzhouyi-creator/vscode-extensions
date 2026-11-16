@@ -105,7 +105,7 @@ func _emit_debounced() -> void:
 func get_query() -> String:
 	return _line_edit.text.strip_edges().to_lower()
 
-## 更新输入框占位文本的 i18n 键并立即解析刷新
+## 更新输入框提示文本的 i18n 键并立即解析刷新
 func set_placeholder(i18n_key: String) -> void:
 	placeholder_key = i18n_key
 	if _line_edit != null:

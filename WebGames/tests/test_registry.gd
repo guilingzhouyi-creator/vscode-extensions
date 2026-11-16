@@ -167,19 +167,19 @@ const SuiteAccountRegistrationAndRealReloadPipeline = preload("res://tests/integ
 const SuiteClientProtocolSpaceAndBoundaryPipeline = preload("res://tests/integration/pipelines/test_client_protocol_space_and_boundary_pipeline.gd")
 # Tier 3 MOD 运行时差分加载、统一磁盘发现与结构化诊断验收流水线
 const SuiteTier3ContentOverridePipeline = preload("res://tests/integration/pipelines/test_tier3_content_override_pipeline.gd")
-# Phase 130 零 MOD Fail-Closed 全链路验证流水线
+# 零 MOD Fail-Closed 全链路验证流水线
 const SuiteZeroModFailClosedPipeline = preload("res://tests/integration/pipelines/test_zero_mod_fail_closed_pipeline.gd")
-# Phase 130 纯插件化异世界 MOD 组合叠加与零泄漏隔离流水线
+# 纯插件化异世界 MOD 组合叠加与零泄漏隔离流水线
 const SuitePluginModCompositionAndIsolation = preload("res://tests/integration/pipelines/test_plugin_mod_composition_and_isolation.gd")
-# Phase 130 真实前端场景与 RealServiceContainer 全链路无头推演流水线
+# 真实前端场景与 RealServiceContainer 全链路无头推演流水线
 const SuiteRealFrontendGatewayWorkbenchPrologue = preload("res://tests/integration/pipelines/test_real_frontend_gateway_workbench_prologue.gd")
-# Phase 130 世界档案 MOD 锁重入复原与漂移阻断验收流水线
+# 世界档案 MOD 锁重入复原与漂移阻断验收流水线
 const SuiteWorldModLockReentryAndDrift = preload("res://tests/integration/pipelines/test_world_mod_lock_reentry_and_drift.gd")
-# Phase 131 全端真实可点击UI闭环与锁安全端到端验收流水线
+# 全端真实可点击UI闭环与锁安全端到端验收流水线
 const SuiteRealUiChainAndLockSecurityPipeline = preload("res://tests/integration/pipelines/test_real_ui_chain_and_lock_security_pipeline.gd")
-# Phase 132 MOD运行时全消费链路、真异步 UI 与 .kmod 资产安全闭环验收流水线
+# MOD运行时全消费链路、真异步 UI 与 .kmod 资产安全闭环验收流水线
 const SuiteModRuntimeAsyncAndAssetsPipeline = preload("res://tests/integration/pipelines/test_mod_runtime_async_and_assets_pipeline.gd")
-# Phase 133 全领域真实服务、基座去卡拉尔中性化、SDK强校验与门禁收口验收流水线
+# 全领域真实服务、基座去卡拉尔中性化、SDK强校验与门禁收口验收流水线
 const SuiteNeutralitySdkAndGatesPipeline = preload("res://tests/integration/pipelines/test_neutrality_sdk_and_gates_pipeline.gd")
 # 全真冷启动 app_root.tscn 与边界协议健壮性集成流水线
 const SuiteRealColdStartBootstrapPipeline = preload("res://tests/integration/pipelines/test_real_cold_start_bootstrap_pipeline.gd")

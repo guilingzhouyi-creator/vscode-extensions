@@ -371,10 +371,10 @@ static func test_atomic_writer_backup_rotation_and_restore() -> Dictionary:
 	var bak2: String = target_path + ".bak.2"
 	var opts: Dictionary = {"create_backup": true, "backup_retention": 3, "backup_fail_policy": "abort"}
 
-	var w1: Dictionary = AtomicFileWriter.write_text_atomic(target_path, "{\"v\":1}", opts)
-	var w2: Dictionary = AtomicFileWriter.write_text_atomic(target_path, "{\"v\":2}", opts)
-	var w3: Dictionary = AtomicFileWriter.write_text_atomic(target_path, "{\"v\":3}", opts)
-	var writes_ok: bool = bool(w1.get("success", false)) and bool(w2.get("success", false)) and bool(w3.get("success", false))
+	var first_write: Dictionary = AtomicFileWriter.write_text_atomic(target_path, "{\"v\":1}", opts)
+	var second_write: Dictionary = AtomicFileWriter.write_text_atomic(target_path, "{\"v\":2}", opts)
+	var third_write: Dictionary = AtomicFileWriter.write_text_atomic(target_path, "{\"v\":3}", opts)
+	var writes_ok: bool = bool(first_write.get("success", false)) and bool(second_write.get("success", false)) and bool(third_write.get("success", false))
 
 	var primary_txt: String = _read_text_or_empty(target_path)
 	var bak0_txt: String = _read_text_or_empty(bak0)

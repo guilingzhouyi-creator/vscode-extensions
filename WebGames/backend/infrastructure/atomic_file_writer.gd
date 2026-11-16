@@ -196,7 +196,7 @@ static func _shift_backup_version(file_path: String, backup_suffix: String, vers
     var destination_path: String = file_path + backup_suffix + "." + str(version_index)
     if not FileAccess.file_exists(source_path):
         return
-    # 先把既有目标备份移至暂存名，防止 rename 失败时原备份丢失
+    # 先把既有目标备份移至中转路径，防止 rename 失败时原备份丢失
     var staged_old := "%s.shifting_%d" % [destination_path, _next_temporary_id()]
     var has_existing_destination := FileAccess.file_exists(destination_path)
     if has_existing_destination:

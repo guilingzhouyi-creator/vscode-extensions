@@ -426,7 +426,7 @@ static func _test_ls_12_telemetry_aggregate_consume_and_counts() -> Dictionary:
 		"details": "combat_slot=%s, inv_slot=%s" % [str(combat_slot), str(inv_slot)]
 	}
 
-## TC-LS-13: TelemetryAggregate p50 与 p95 分位计算断言
+## TC-LS-13: TelemetryAggregate 中位与第95百分位计算断言
 static func _test_ls_13_telemetry_aggregate_p50_p95_percentiles() -> Dictionary:
 	TelemetryAggregate.reset_state()
 	# 注入 10 条耗时：10, 20, 30, 40, 50, 60, 70, 80, 90, 100
@@ -440,16 +440,16 @@ static func _test_ls_13_telemetry_aggregate_p50_p95_percentiles() -> Dictionary:
 	var snap := TelemetryAggregate.snapshot()
 	var slot: Dictionary = snap["slots"].get("test_domain|heavy_task", {})
 
-	var p50: int = slot.get("p50_ms", 0)
-	var p95: int = slot.get("p95_ms", 0)
+	var median_ms: int = slot.get("p50_ms", 0)
+	var percentile_95_ms: int = slot.get("p95_ms", 0)
 
-	# 10 个元素索引：p50 = idx 5 -> 60；p95 = idx 9 -> 100
-	var ok: bool = (p50 >= 50 and p50 <= 60 and p95 >= 90 and p95 <= 100)
+	# 10 个元素索引：中位 = idx 5 -> 60；第95百分位 = idx 9 -> 100
+	var ok: bool = (median_ms >= 50 and median_ms <= 60 and percentile_95_ms >= 90 and percentile_95_ms <= 100)
 
 	return {
-		"test": "TC-LS-13: TelemetryAggregate p50 与 p95 分位计算断言",
+		"test": "TC-LS-13: TelemetryAggregate 中位与第95百分位计算断言",
 		"passed": ok,
-		"details": "p50=%d, p95=%d" % [p50, p95]
+		"details": "median=%d, percentile_95=%d" % [median_ms, percentile_95_ms]
 	}
 
 ## TC-LS-14: TelemetryAggregate 滑动窗口超时重置槽位断言 (Inv-LS-4)

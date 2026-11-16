@@ -54,13 +54,17 @@ static func _cache_compiled_template(template_text: String, regex_matches: Array
 	compiled_entry.literals.append(template_text.substr(cursor_offset))
 	compiled_entry.slot_count = compiled_entry.keys.size()
 	compiled_entry.unique_indices.resize(compiled_entry.slot_count)
+	var key_to_unique_index: Dictionary = {}
 	for slot_index in range(compiled_entry.slot_count):
 		var slot_key: String = compiled_entry.keys[slot_index]
-		var found_index: int = compiled_entry.unique_keys.find(slot_key)
-		if found_index < 0:
-			found_index = compiled_entry.unique_keys.size()
+		var found_index: Variant = key_to_unique_index.get(slot_key)
+		if found_index == null:
+			var next_index: int = compiled_entry.unique_keys.size()
 			compiled_entry.unique_keys.append(slot_key)
-		compiled_entry.unique_indices[slot_index] = found_index
+			key_to_unique_index[slot_key] = next_index
+			compiled_entry.unique_indices[slot_index] = next_index
+		else:
+			compiled_entry.unique_indices[slot_index] = int(found_index)
 	_compiled_template_cache[template_text] = compiled_entry
 	return compiled_entry
 

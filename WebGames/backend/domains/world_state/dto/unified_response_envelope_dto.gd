@@ -19,7 +19,7 @@ var is_success: bool:                    # 兼容别名属性 (对齐 Mod SDK �
 	set(value):
 		success = value
 var error_code: String = ""              # 错误码 (无错误为空)
-var error_message: String = ""           # 本地化展示文案 Key 或调试信息
+var error_message: String = ""           # Localized display message key or diagnostic text
 var data: Dictionary = {}                # 业务返回实体数据
 var payload: Dictionary:                 # 兼容别名属性 (对齐 Mod SDK 载荷契约)
 	get:

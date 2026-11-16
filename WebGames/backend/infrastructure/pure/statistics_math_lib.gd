@@ -3,7 +3,7 @@
 # 文件路径: res://backend/infrastructure/pure/statistics_math_lib.gd
 # 架构定位: Pure Statistical, Masking & Text Scrubbing Calculation Library
 # 依赖与触发: 上游: TelemetryAggregate, RedactionRule, LogCollector, EventBusCore | 下游: LogConstants | 配置: 无 | 信号: 无
-# 职责说明: 集中收口纯计算统计分位（P50/P95）、环形索引步进、字符串掩码裁剪、消息内联敏感凭据清洗与调用栈文件名提取算子。
+# 职责说明: 集中收口纯计算统计分位（中位数与第95百分位）、环形索引步进、字符串掩码裁剪、消息内联敏感凭据清洗与调用栈文件名提取算子。
 # 退出语义与设计依据: 纯计算域库化集中治理规范 / 热路径零副作用规约
 # ==============================================================================
 
@@ -39,7 +39,7 @@ static func compute_percentile_from_sorted(sorted_values: Array[int], ratio: flo
 	var percentile_index := mini(sample_count - 1, maxi(0, int(sample_count * ratio)))
 	return int(sorted_values[percentile_index])
 
-## 计算样本集合的 P50 与 P95 耗时指标字典（按需懒调用）
+## 计算样本集合的中位数与第95百分位耗时指标字典（按需懒调用）
 static func compute_p50_p95(samples: Array[int]) -> Dictionary:
 	var sample_count := samples.size()
 	if sample_count <= 0:

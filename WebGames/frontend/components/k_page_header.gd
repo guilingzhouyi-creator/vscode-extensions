@@ -2,7 +2,7 @@
 # 模块归属: 前端通用组件层 (Frontend · Reusable UI Components)
 # 文件路径: res://frontend/components/k_page_header.gd
 # 架构定位: Reusable Atomic Component (KPageHeader)
-# 依赖与触发: 上游: 顶级页面视图控制器 | 下游: DesignTokens, KBackButton, UIIntermediary
+# 依赖与触发: 上游: 业务功能页面视图控制器 | 下游: DesignTokens, KBackButton, UIIntermediary
 # 职责说明: 统一渲染页面顶部标题栏（返回按钮、图标与 i18n 驱动的主/副标题），由宿主控制导航回退。
 # 退出语义与设计依据: 表现层通用页眉组件化与信号透传解耦契约
 # ==============================================================================
