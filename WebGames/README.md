@@ -47,7 +47,7 @@ WebGames/
 
 ## 配置驱动约定
 
-所有数值、文案、标识均来自 `config/`，代码内只保留**兜底默认值**。
+所有数值、文案、标识均来自 `config/`，代码内只保留**回退默认值**。
 
 | 目录 | 表名规则 | 用途 |
 |---|---|---|
@@ -147,7 +147,7 @@ DeterministicRNG.reseed_global(seed)           # 整局复现开关
   `{valid, reason}` 两派允许并存，触碰时渐进归位；error_code 命名 `<域>_<大写蛇形>`。
 - **空集合语义**：显式跳过并在结果中携带计数，禁止 null 透传。
 - **序列化协议**：可存档领域实现 `serialize()` / `deserialize()`；deserialize 缺键一律回落
-  字段初值（即配置缺省），刻意差异的兜底键（如 `deserialize_name` / `fallback_title`）须注释保留；
+  字段初值（即配置缺省），刻意差异的回退键（如 `deserialize_name` / `fallback_title`）须注释保留；
   组装/写回/版本迁移一律走 `GameSaveAssembler`（清单序保证 SHA 字节稳定，迁移链注册制）。
 - **并存契约**：`chat_command.redeem_cdkey` 是 GM 表驱动直发（TC-CMD-03 契约），
   `cdkey_voucher` 是完整核销管线（频控/时效/门槛/唯一码）——两者语义不同、刻意并存，禁止互吞。

@@ -2,7 +2,7 @@
   "_meta": {
     "version": 1,
     "domain": "prologue_i18n",
-    "description": "后端剧情 i18n 文案库（P10.4：与前端 UI i18n 彻底解耦，纯占位符模板）"
+    "description": "后端剧情 i18n 文案库（与前端 UI i18n 彻底解耦，纯占位符模板）"
   },
   "narrative": {
     "prologue": {}

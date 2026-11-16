@@ -12,7 +12,7 @@
       "depends_on": "配置表借用关系：本域代码直接读取了哪个他域的 config 表（不含本域自有表与基础设施层表），必须是本清单中已登记的 id",
       "config_exempt": "为 true 时表示本域属基础设施层，复用 infrastructure.* 表为合法设计，不做 domains.* 归属要求",
       "exempt_reason": "豁免理由（config_exempt 为 true 时必填）",
-      "shared_tables": "跨域共享数值表豁免契约（P2-1）：domains.attribute / domains.economy / domains.event_probability / domains.item_attributes / domains.magic_tiers / domains.quality_tiers / domains.starter_loadout 为无单一属主域的共享数值表，借用方无需声明 depends_on；该豁免与基础设施层 infrastructure.* 豁免同构",
+      "shared_tables": "跨域共享数值表豁免契约：domains.attribute / domains.economy / domains.event_probability / domains.item_attributes / domains.magic_tiers / domains.quality_tiers / domains.starter_loadout 为无单一属主域的共享数值表，借用方无需声明 depends_on；该豁免与基础设施层 infrastructure.* 豁免同构",
       "sub_tables": "超大型多表子域专属清单：显式声明该领域拆分包含的所有细分子表全路径表名（如 domains.combat.mechanics），供架构护栏进行物理文件、代码引用与资源目录三向一致性校验"
     },
     "naming_aliases": "目录名与表名允许不同（历史演进产物）。已知别名：physics_thermodynamics->combat、world_navigation->world、gacha_wish->gacha、currency_economy->currency、elite_mutation->elite、equipment_loadout->equipment、lattice_skill_book->lattice、lifecycle_physiology->lifecycle、monster_ecology->monster、npc_simulation->npc、potential_growth->potential、quest_causality->quest、sovereignty_realm->sovereignty、trading_logistics->trading、workshop_forge->workshop、deterministic_sandbox->deterministic",

@@ -117,7 +117,7 @@
     },
     "STAGE_06_HUD_SYNC": {
       "stage_index": 6,
-      "description": "游戏主界面HUD状态快照与双轨同步",
+      "description": "游戏主界面HUD状态快照与状态同步",
       "aliases": [
         "STAGE_06",
         "HUD_SYNC",

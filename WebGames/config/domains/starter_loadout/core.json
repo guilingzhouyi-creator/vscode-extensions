@@ -2,7 +2,7 @@
   "_meta": {
     "version": 1,
     "domain": "starter_loadout",
-    "description": "新手装备与初始资源配置（P10.5：配置驱动发放，严禁代码写死）"
+    "description": "新手装备与初始资源配置（配置驱动发放，严禁代码写死）"
   },
   "race_kit_map": {},
   "starter_kits": {},

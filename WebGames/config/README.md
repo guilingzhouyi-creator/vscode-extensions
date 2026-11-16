@@ -86,7 +86,7 @@ GameConfig.msg("matter_disposal", "slag_ash_name")                          # �
 - 领域内 `_msg(key)` 私有文案助手一律**一行委托** `GameConfig.msg("<域>", key)`
   （表固定 `narratives.<域>`、未命中回退键名本身；键名为运行期变量属动态键，不参与 TC-ARCH-06 静态键校验）
 - 叙事文案统一经 `EventBusCore.emit_narrative_by_key("<域>/<模板键>", "<分类键>", [args])`
-  渲染，模板存于 `config/narratives/<域>.json`（Phase 72 后旧 `EventBus` 已全域退役，调用点统一为 `EventBusCore`）
+  渲染，模板存于 `config/narratives/<域>.json`（旧 `EventBus` 已全域退役，调用点统一为 `EventBusCore`）
 
 **取值优先级（可覆盖链）**：运行时赋值 > 配置文件 > 代码默认值（防御性回退）。
 
@@ -101,7 +101,7 @@ GameConfig.msg("matter_disposal", "slag_ash_name")                          # �
 1. 新建 `config/<层>/<name>.json`，顶层必须为 JSON 对象
 2. 业务侧用类型化取值器读取（表名 = `<层>.<name>`，自动生效）
 3. 若为必需表（引擎启动就依赖），追加到 `game_config.gd` 的 `_required_tables`
-   ——**顺序铁律：先确认表文件已存在，再登记**，否则 TC-CFG-04 立即变红
+   ——**顺序约定：先确认表文件已存在，再登记**，否则 TC-CFG-04 立即变红
 4. 数值/文案改动**只改 JSON**，运行时 `GameConfig.reload_config()` 即热生效，无需重编译（不可命名 `reload()`——GDScript 内建遮蔽，见 game_config.gd）
 
 ## 六、校验与运维

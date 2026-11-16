@@ -1,7 +1,7 @@
 {
   "_meta": {
     "domain": "world_state",
-    "extensions_note": "Phase 118 六大业务支柱聚合、网关模式自适应与四大领域通信存储分流配置单源"
+    "extensions_note": "六大业务支柱聚合、网关模式自适应与四大领域通信存储分流配置单源"
   },
   "channels": {
     "action_stream": "action.stream",

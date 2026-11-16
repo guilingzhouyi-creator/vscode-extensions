@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "description": "ErrorReporter统一爆错通道错误码登记源（经EventBus结构化日志底座遥测；i18n键见message_key）。业务return-dict错误码由各域契约自行治理，不在此登记；新增reporter通道码必须先登记再使用",
+  "description": "ErrorReporter统一爆错通道错误码登记源（经EventBus结构化日志管道遥测；i18n键见message_key）。业务return-dict错误码由各域契约自行治理，不在此登记；新增reporter通道码必须先登记再使用",
   "errors": {
     "ERR_UNKNOWN": {
       "severity": "error",
