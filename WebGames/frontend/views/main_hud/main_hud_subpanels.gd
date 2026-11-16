@@ -167,6 +167,8 @@ func refresh_action_bar() -> void:
 func on_action_slot_pressed(slot_index: int) -> void:
 	if _view == null:
 		return
+	if not _view.try_consume_action_cooldown("hud_slot_%d" % slot_index, int(DesignTokens.DEBOUNCE_DELAY * 1000.0)):
+		return
 	var trigger_result := _view.trigger_action_slot(slot_index)
 	if bool(trigger_result.get("success", false)):
 		var skill_name := UIIntermediary.text("ui.fe02.skill." + str(trigger_result.get("skill_id", "")))
@@ -255,7 +257,7 @@ func attach_mail_red_dot_badge() -> void:
 	var badge := KBadgeClass.new()
 	badge.name = "MailRedDotBadge"
 	badge.red_dot_path = "menu.mail"
-	badge.custom_minimum_size = Vector2(16, 16)
+	badge.custom_minimum_size = Vector2(DesignTokens.SPACING_MD, DesignTokens.SPACING_MD)
 	badge.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	_view.menu_mail_button.add_child(badge)
 

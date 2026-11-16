@@ -112,6 +112,26 @@ static func _test_modal_and_dialog_manager() -> Dictionary:
 	if modal_mgr.get_modal_count() != 0:
 		err = "Modal 关闭后计数未清零"
 
+	# 验证 DialogManager 确认弹窗按钮去抖与防重入连击保护
+	var global_modal_mgr := ModalManager.get_instance()
+	global_modal_mgr.bind_layer(layer, container)
+	var dialog_mgr := DialogManager.get_instance()
+	var fire_counter := [0]
+	var confirm_panel := dialog_mgr.show_confirm("Confirm", "Double click guard", func(): fire_counter[0] += 1)
+	var button_box := confirm_panel.get_node_or_null("Content/ButtonBox") as HBoxContainer
+	if button_box == null or button_box.get_child_count() < 2:
+		err = "DialogManager 未生成确认/取消按钮"
+	else:
+		var ok_button := button_box.get_child(1) as Button
+		ok_button.pressed.emit()
+		ok_button.pressed.emit()
+		if fire_counter[0] != 1:
+			err = "DialogManager 防连击失败，回调触发次数=%d" % fire_counter[0]
+		elif not bool(confirm_panel.get_meta("_dialog_action_handled", false)):
+			err = "DialogManager 首次点击后未锁定动作消耗标志"
+	ModalManager.reset_instance()
+	DialogManager.reset_instance()
+
 	layer.free()
 	modal_mgr.free()
 

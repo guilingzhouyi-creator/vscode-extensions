@@ -13,6 +13,7 @@ extends BaseScreen
 const KButtonClass = preload("res://frontend/components/k_button.gd")
 const KPageHeaderClass = preload("res://frontend/components/k_page_header.gd")
 const KSplitPanelClass = preload("res://frontend/components/k_split_panel.gd")
+const BOSS_CARD_MIN_EXTENTS := Vector2(DesignTokens.SPACING_ZERO, 60)
 
 var page_header: KPageHeader = null
 var split_panel: KSplitPanel = null
@@ -176,7 +177,7 @@ func _acquire_boss_card_button(boss_index: int) -> Button:
 		return _view.boss_card_list.get_child(boss_index) as Button
 	var card_button := KButtonClass.new()
 	card_button.variant = KButtonClass.StyleVariant.SECONDARY
-	card_button.custom_minimum_size = Vector2(0, 60)
+	card_button.custom_minimum_size = BOSS_CARD_MIN_EXTENTS
 	connect_managed(card_button.pressed, func(): _on_boss_card_pressed(boss_index))
 	_view.boss_card_list.add_child(card_button)
 	return card_button

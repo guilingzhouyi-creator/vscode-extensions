@@ -13,6 +13,8 @@ class_name GrimoireAuthoringTabs
 extends BaseScreen
 
 const KStatusBarClass = preload("res://frontend/components/k_status_bar.gd")
+const ROYALTY_NAME_MIN_EXTENTS := Vector2(120, DesignTokens.SPACING_ZERO)
+const ROYALTY_VALUE_MIN_EXTENTS := Vector2(100, DesignTokens.SPACING_ZERO)
 
 var _view: Variant = null
 
@@ -194,13 +196,13 @@ func _acquire_royalty_chart_row(index: int) -> HBoxContainer:
 	var chart_row := HBoxContainer.new()
 	chart_row.set("theme_override_constants/separation", 8)
 	var name_label := Label.new()
-	name_label.custom_minimum_size = Vector2(120, 0)
+	name_label.custom_minimum_size = ROYALTY_NAME_MIN_EXTENTS
 	chart_row.add_child(name_label)
 	var income_bar: ProgressBar = KStatusBarClass.create_bar(0.0, 1.0)
 	income_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	chart_row.add_child(income_bar)
 	var value_label := Label.new()
-	value_label.custom_minimum_size = Vector2(100, 0)
+	value_label.custom_minimum_size = ROYALTY_VALUE_MIN_EXTENTS
 	chart_row.add_child(value_label)
 	view.royalty_chart_container.add_child(chart_row)
 	return chart_row

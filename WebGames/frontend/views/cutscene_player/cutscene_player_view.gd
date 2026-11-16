@@ -17,6 +17,7 @@ const KStatusBarClass = preload("res://frontend/components/k_status_bar.gd")
 
 const THEME_FONT_SIZE: String = "font_size"
 const THEME_FONT_COLOR: String = "font_color"
+const PLACEHOLDER_PANEL_EXTENTS := Vector2(600, 240)
 
 signal playback_finished()
 signal skip_requested()
@@ -109,7 +110,7 @@ func _setup_placeholder_ui() -> void:
 	_placeholder_container.name = "PlaceholderContainer"
 	_placeholder_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	_placeholder_container.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	_placeholder_container.custom_minimum_size = Vector2(600, 240)
+	_placeholder_container.custom_minimum_size = PLACEHOLDER_PANEL_EXTENTS
 	_placeholder_container.visible = false
 
 	_placeholder_badge = Label.new()

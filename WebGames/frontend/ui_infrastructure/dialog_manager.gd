@@ -35,16 +35,29 @@ func _add_modal_button(
 	min_width: float,
 	on_pressed: Callable = Callable()
 ) -> Button:
-	var action_button := Button.new()
-	action_button.text = UIIntermediary.text(text_key)
-	action_button.custom_minimum_size = Vector2(min_width, 32)
-	action_button.pressed.connect(func():
-		ModalManager.get_instance().close_modal(dialog_panel)
-		if on_pressed.is_valid():
-			on_pressed.call()
-	)
-	button_box.add_child(action_button)
-	return action_button
+	var modal_button := Button.new()
+	modal_button.text = UIIntermediary.text(text_key)
+	modal_button.custom_minimum_size = Vector2(min_width, DesignTokens.SPACING_XL)
+	modal_button.pressed.connect(_on_dialog_button_pressed.bind(dialog_panel, modal_button, on_pressed))
+	button_box.add_child(modal_button)
+	return modal_button
+
+func _on_dialog_button_pressed(dialog_panel: Control, modal_button: Button, on_pressed: Callable) -> void:
+	if dialog_panel == null or not is_instance_valid(dialog_panel):
+		return
+	if bool(dialog_panel.get_meta("_dialog_action_handled", false)):
+		return
+	var now_msec := Time.get_ticks_msec()
+	var last_msec: int = int(dialog_panel.get_meta("_dialog_action_last_msec", -1000))
+	if now_msec - last_msec < int(DesignTokens.DEBOUNCE_DELAY * 1000.0):
+		return
+	dialog_panel.set_meta("_dialog_action_last_msec", now_msec)
+	dialog_panel.set_meta("_dialog_action_handled", true)
+	if modal_button != null and is_instance_valid(modal_button):
+		modal_button.disabled = true
+	ModalManager.get_instance().close_modal(dialog_panel)
+	if on_pressed.is_valid():
+		on_pressed.call()
 
 ## 弹出二次确认对话框 (确认 / 取消)
 func show_confirm(title: String, message: String, on_confirm: Callable, on_cancel: Callable = Callable()) -> Control:

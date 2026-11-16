@@ -165,8 +165,8 @@ static func render_realms_list(host_view: Variant) -> void:
             continue
         var realm_map := realm_entry as Dictionary
         var realm_name := str(realm_map.get("realm_name", realm_map.get("realm_id", "Realm")))
-        var manifest: Variant = realm_map.get("realm_mod_manifest", [])
-        var pack_count: int = manifest.size() if manifest is Array else 0
+        var manifest: Variant = realm_map.get("realm_mod_manifest")
+        var pack_count: int = (manifest as Array).size() if (manifest is Array) else 0
         host_view.remote_realm_list.add_item(UIIntermediary.text("ui.wg.mp.realm_entry_format", {
             "name": realm_name,
             "count": pack_count

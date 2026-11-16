@@ -13,6 +13,7 @@ class_name CharacterProgressionInventoryPanel
 extends BaseScreen
 
 const KItemSlotClass = preload("res://frontend/components/k_item_slot.gd")
+const INVENTORY_SLOT_MIN_EXTENTS := Vector2(90, 60)
 
 var _view: Variant = null
 
@@ -125,7 +126,7 @@ func _acquire_inventory_slot(slot_index: int) -> KItemSlotClass:
 	if slot_index < _view.inventory_grid_panel.get_child_count():
 		return _view.inventory_grid_panel.get_child(slot_index) as KItemSlotClass
 	var slot_control := KItemSlotClass.new()
-	slot_control.custom_minimum_size = Vector2(90, 60)
+	slot_control.custom_minimum_size = INVENTORY_SLOT_MIN_EXTENTS
 	_view.inventory_grid_panel.add_child(slot_control)
 	return slot_control
 

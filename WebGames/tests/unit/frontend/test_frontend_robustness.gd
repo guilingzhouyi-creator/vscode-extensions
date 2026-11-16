@@ -41,6 +41,10 @@ static func _test_i18n_counter_examples() -> Dictionary:
 static func _test_i18n_formatters_reachable() -> Dictionary:
 	var s := UITextResolver.resolve("ui.fe05.wallet.gold", {"amount": 5000})
 	var ok := TestCase.assert_true(s.contains("5,000"), "resolve 路径触达千分位格式化: %s" % s)
+	var gem_text := UITextResolver.resolve("ui.fe12.mat_category.gem")
+	var relic_text := UITextResolver.resolve("ui.fe12.mat_category.relic")
+	ok = ok and TestCase.assert_true(gem_text != "ui.fe12.mat_category.gem" and not gem_text.is_empty(), "gem 材料分类词条已装配: %s" % gem_text)
+	ok = ok and TestCase.assert_true(relic_text != "ui.fe12.mat_category.relic" and not relic_text.is_empty(), "relic 材料分类词条已装配: %s" % relic_text)
 	return TestCase.make_result("i18n_formatters_reachable", ok)
 
 ## R-03/R-09/R-29：视图模型空值 / 非有限 / 越界防御读取零崩溃，日志有界

@@ -18,6 +18,7 @@ const MonsterEcologyTabsClass = preload("res://frontend/views/monster_ecology/mo
 # ==============================================================================
 
 const FRONTEND_VOLUME_CODE := "fe11"
+const BESTIARY_CARD_MIN_EXTENTS := Vector2(100, 80)
 
 const ELEMENT_FIRE: String = "ui.fe11.bestiary.element.fire"
 const ELEMENT_ICE: String = "ui.fe11.bestiary.element.ice"
@@ -246,7 +247,7 @@ func _acquire_category_button(category_index: int) -> Button:
 	var category_button := KButtonClass.new()
 	category_button.variant = KButtonClass.StyleVariant.SECONDARY
 	category_button.toggle_mode = true
-	category_button.custom_minimum_size = Vector2(0, 32)
+	category_button.custom_minimum_size = Vector2(DesignTokens.SPACING_ZERO, DesignTokens.SPACING_XL)
 	category_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	connect_managed(category_button.pressed, func(): _on_category_pressed(category_index))
 	_bestiary_category_box.add_child(category_button)
@@ -286,7 +287,7 @@ func _acquire_bestiary_card_button(monster_index: int) -> Button:
 		return _bestiary_grid.get_child(monster_index) as Button
 	var monster_button := KButtonClass.new()
 	monster_button.variant = KButtonClass.StyleVariant.SECONDARY
-	monster_button.custom_minimum_size = Vector2(100, 80)
+	monster_button.custom_minimum_size = BESTIARY_CARD_MIN_EXTENTS
 	connect_managed(monster_button.pressed, func(): _on_monster_card_pressed(monster_index))
 	_bestiary_grid.add_child(monster_button)
 	return monster_button

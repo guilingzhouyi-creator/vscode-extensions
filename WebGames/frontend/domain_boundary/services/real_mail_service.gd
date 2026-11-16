@@ -45,7 +45,9 @@ func _transform_mails(mails: Array, mode: String, filter_set: Dictionary) -> Dic
 		if bool(step_outcome.get("changed", false)):
 			changed_count += 1
 		if not bool(step_outcome.get("skip", false)):
-			next_mails.append(step_outcome.get("entry", {}))
+			var processed_entry: Variant = step_outcome.get("entry")
+			if processed_entry is Dictionary:
+				next_mails.append(processed_entry)
 	return {"mails": next_mails, "changed_count": changed_count}
 
 ## 读取配置的邮箱容量上限

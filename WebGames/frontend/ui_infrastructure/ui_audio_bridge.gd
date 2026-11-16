@@ -10,9 +10,7 @@
 class_name UIAudioBridge
 extends RefCounted
 
-const CutsceneAsyncLoaderClass = preload("res://backend/infrastructure/media/cutscene_async_loader.gd")
 const AudioBusPipelineClass = preload("res://backend/domains/event_driven_audio/audio_bus_pipeline.gd")
-const AssetPathResolverClass = preload("res://backend/infrastructure/resource_governance/asset_path_resolver.gd")
 
 enum UISfxType {
 	HOVER,
@@ -45,15 +43,13 @@ func play_mod_audio_async(
 	bus_name: String = "SE",
 	volume_db: float = 0.0
 ) -> int:
-	var resolved_uri := AssetPathResolverClass.resolve_unified_uri(
-		AudioBusPipelineClass.resolve_mod_audio_uri(sound_id, resource_path)
-	)
-	if resolved_uri.is_empty():
-		return 0
-	var loader := CutsceneAsyncLoaderClass.get_instance()
-	return loader.request_load(resolved_uri, 1, func(loaded_resource: Resource) -> void:
-		if loaded_resource is AudioStream:
-			play_stream.emit(sound_id, loaded_resource as AudioStream, bus_name, volume_db)
+	return AudioBusPipelineClass.request_mod_audio_stream_async(
+		sound_id,
+		resource_path,
+		func(loaded_resource: Resource) -> void:
+			if loaded_resource is AudioStream:
+				play_stream.emit(sound_id, loaded_resource as AudioStream, bus_name, volume_db),
+		1
 	)
 
 ## 触发悬停音效信号

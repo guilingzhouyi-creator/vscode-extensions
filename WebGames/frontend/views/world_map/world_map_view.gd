@@ -13,6 +13,7 @@ extends BaseScreen
 const WorldMapTabsClass = preload("res://frontend/views/world_map/world_map_tabs.gd")
 
 const KButtonClass = preload("res://frontend/components/k_button.gd")
+const LANDMARK_BUTTON_EXTENTS := Vector2(120, DesignTokens.SPACING_XL)
 
 # ==============================================================================
 # 节点引用（场景树中以 unique_name_in_owner 标记）
@@ -296,7 +297,8 @@ func _acquire_landmark_button(button_index: int) -> Button:
 		return _world_map_landmark_container.get_child(button_index) as Button
 	var landmark_button := KButtonClass.new()
 	landmark_button.variant = KButtonClass.StyleVariant.SECONDARY
-	landmark_button.size = Vector2(120, 32)
+	landmark_button.custom_minimum_size = LANDMARK_BUTTON_EXTENTS
+	landmark_button.size = landmark_button.custom_minimum_size
 	connect_managed(landmark_button.pressed, func():
 		var landmark_id: String = str(landmark_button.get_meta("landmark_id", ""))
 		if not landmark_id.is_empty():

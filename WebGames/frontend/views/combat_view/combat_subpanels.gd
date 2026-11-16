@@ -14,6 +14,7 @@ extends BaseScreen
 
 const KStatusBarClass = preload("res://frontend/components/k_status_bar.gd")
 const MAX_FLOATING_LABEL_POOL: int = 32
+const BOSS_PART_NAME_MIN_WIDTH: int = 80
 
 var status_bar: KStatusBar = null
 var _view: Variant = null
@@ -87,7 +88,7 @@ func _create_boss_part_row() -> HBoxContainer:
 
 	var name_label := Label.new()
 	name_label.add_theme_font_size_override("font_size", 11)
-	name_label.custom_minimum_size = Vector2(80, 0)
+	name_label.custom_minimum_size = Vector2(BOSS_PART_NAME_MIN_WIDTH, DesignTokens.SPACING_ZERO)
 	part_row.add_child(name_label)
 
 	var health_bar: ProgressBar = KStatusBarClass.create_bar(0.0, 100.0)
@@ -96,7 +97,7 @@ func _create_boss_part_row() -> HBoxContainer:
 
 	var status_label := Label.new()
 	status_label.add_theme_font_size_override("font_size", 11)
-	status_label.custom_minimum_size = Vector2(24, 0)
+	status_label.custom_minimum_size = Vector2(DesignTokens.SPACING_LG, DesignTokens.SPACING_ZERO)
 	part_row.add_child(status_label)
 
 	connect_managed(part_row.gui_input, _on_boss_part_gui_input.bind(part_row))

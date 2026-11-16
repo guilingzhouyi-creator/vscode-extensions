@@ -15,6 +15,7 @@ extends BaseScreen
 const KButtonClass = preload("res://frontend/components/k_button.gd")
 const KVirtualListClass = preload("res://frontend/components/k_virtual_list.gd")
 const KPageHeaderClass = preload("res://frontend/components/k_page_header.gd")
+const CATEGORY_BUTTON_MIN_EXTENTS := Vector2(72, DesignTokens.SPACING_ZERO)
 
 var recipe_virtual_list: KVirtualList = null
 var page_header: KPageHeader = null
@@ -245,7 +246,7 @@ func _acquire_material_category_button(category_index: int) -> Button:
 	var category_button := KButtonClass.new()
 	category_button.variant = KButtonClass.StyleVariant.SECONDARY
 	category_button.toggle_mode = true
-	category_button.custom_minimum_size = Vector2(72, 0)
+	category_button.custom_minimum_size = CATEGORY_BUTTON_MIN_EXTENTS
 	connect_managed(category_button.pressed, func(): _on_material_category_pressed(category_index))
 	_view.material_category_box.add_child(category_button)
 	return category_button

@@ -15,6 +15,9 @@ extends BaseScreen
 const KButtonClass = preload("res://frontend/components/k_button.gd")
 const KPageHeaderClass = preload("res://frontend/components/k_page_header.gd")
 const KCurrencyBarClass = preload("res://frontend/components/k_currency_bar.gd")
+const BANNER_TAB_MIN_EXTENTS := Vector2(140, DesignTokens.SPACING_ZERO)
+const UP_CELL_MIN_EXTENTS := Vector2(140, 80)
+const RESULT_CELL_MIN_EXTENTS := Vector2(96, 110)
 
 var page_header: KPageHeader = null
 var currency_bar: KCurrencyBar = null
@@ -82,7 +85,7 @@ func _acquire_banner_switch_button(button_index: int) -> Button:
 	var switch_button := KButtonClass.new()
 	switch_button.variant = KButtonClass.StyleVariant.SECONDARY
 	switch_button.toggle_mode = true
-	switch_button.custom_minimum_size = Vector2(140, 0)
+	switch_button.custom_minimum_size = BANNER_TAB_MIN_EXTENTS
 	connect_managed(switch_button.pressed, func():
 		var banner_identifier: String = str(switch_button.get_meta("banner_id", ""))
 		if not banner_identifier.is_empty():
@@ -150,7 +153,7 @@ func _acquire_up_item_cell(grid: Container, cell_index: int) -> PanelContainer:
 		existing.visible = true
 		return existing
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(140, 80)
+	panel.custom_minimum_size = UP_CELL_MIN_EXTENTS
 	var card_box := VBoxContainer.new()
 	card_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	card_box.add_child(_make_card_label("", 12, Color.WHITE))
@@ -276,7 +279,7 @@ func _acquire_result_cell(grid: Container, cell_index: int) -> PanelContainer:
 		existing.visible = true
 		return existing
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(96, 110)
+	panel.custom_minimum_size = RESULT_CELL_MIN_EXTENTS
 	var style := StyleBoxFlat.new()
 	style.bg_color = DesignTokens.COLOR_SURFACE_DEFAULT
 	style.set_border_width_all(2)
