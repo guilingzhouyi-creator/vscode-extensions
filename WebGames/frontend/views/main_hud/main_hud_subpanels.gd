@@ -43,9 +43,9 @@ func refresh_status_bars(
 ) -> void:
 	if _view == null:
 		return
-	KStatusBarClass.refresh_bar(_view._health_bar, null, health_points, health_points_max)
-	KStatusBarClass.refresh_bar(_view._mana_bar, null, mana_points, mana_points_max)
-	KStatusBarClass.refresh_bar(_view._action_points_bar, null, action_points, action_points_max)
+	KStatusBarClass.refresh_bar(_view.health_bar, null, health_points, health_points_max)
+	KStatusBarClass.refresh_bar(_view.mana_bar, null, mana_points, mana_points_max)
+	KStatusBarClass.refresh_bar(_view.action_points_bar, null, action_points, action_points_max)
 
 # ==============================================================================
 # 静态文案初始化
@@ -59,19 +59,19 @@ func init_subpanels_text() -> void:
 		UIIntermediary.resolve(_view.get_node("MiniMapPanel/VBox/MiniMapTitle"), "ui.fe02.minimap.title")
 	if _view.has_node("BattleLogPanel/VBox/BattleLogTitle"):
 		UIIntermediary.resolve(_view.get_node("BattleLogPanel/VBox/BattleLogTitle"), "ui.fe02.battle_log.title")
-	UIIntermediary.resolve(_view._quest_title_label, "ui.fe02.quest.title")
+	UIIntermediary.resolve(_view.quest_title_label, "ui.fe02.quest.title")
 	if _view.has_node("MainMenuPanel/VBox/MenuTitle"):
 		UIIntermediary.resolve(_view.get_node("MainMenuPanel/VBox/MenuTitle"), "ui.fe02.menu.title")
 
 	var menu_bindings: Array = [
-		[_view._menu_character_button, "ui.fe02.menu.character"],
-		[_view._menu_inventory_button, "ui.fe02.menu.inventory"],
-		[_view._menu_skills_button, "ui.fe02.menu.skills"],
-		[_view._menu_map_button, "ui.fe02.menu.map"],
-		[_view._menu_quests_button, "ui.fe02.menu.quests"],
-		[_view._menu_mail_button, "ui.fe02.menu.mail"],
-		[_view._menu_settings_button, "ui.fe02.menu.settings"],
-		[_view._menu_exit_button, "ui.fe02.menu.exit"]
+		[_view.menu_character_button, "ui.fe02.menu.character"],
+		[_view.menu_inventory_button, "ui.fe02.menu.inventory"],
+		[_view.menu_skills_button, "ui.fe02.menu.skills"],
+		[_view.menu_map_button, "ui.fe02.menu.map"],
+		[_view.menu_quests_button, "ui.fe02.menu.quests"],
+		[_view.menu_mail_button, "ui.fe02.menu.mail"],
+		[_view.menu_settings_button, "ui.fe02.menu.settings"],
+		[_view.menu_exit_button, "ui.fe02.menu.exit"]
 	]
 	for binding_entry in menu_bindings:
 		UIIntermediary.resolve(binding_entry[0], str(binding_entry[1]))
@@ -84,22 +84,22 @@ func init_subpanels_text() -> void:
 func connect_signals() -> void:
 	if _view == null:
 		return
-	connect_managed(_view._minimap_zoom_in_button.pressed, on_minimap_zoom_in_pressed)
-	connect_managed(_view._minimap_zoom_out_button.pressed, on_minimap_zoom_out_pressed)
+	connect_managed(_view.minimap_zoom_in_button.pressed, on_minimap_zoom_in_pressed)
+	connect_managed(_view.minimap_zoom_out_button.pressed, on_minimap_zoom_out_pressed)
 
-	for button_index in _view._action_slot_buttons.size():
-		var slot_button: Button = _view._action_slot_buttons[button_index]
+	for button_index in _view.action_slot_buttons.size():
+		var slot_button: Button = _view.action_slot_buttons[button_index]
 		var slot_index: int = button_index + 1
 		connect_managed(slot_button.pressed, func(): on_action_slot_pressed(slot_index))
 
-	connect_managed(_view._menu_character_button.pressed, on_menu_character_pressed)
-	connect_managed(_view._menu_inventory_button.pressed, on_menu_inventory_pressed)
-	connect_managed(_view._menu_skills_button.pressed, on_menu_skills_pressed)
-	connect_managed(_view._menu_map_button.pressed, on_menu_map_pressed)
-	connect_managed(_view._menu_quests_button.pressed, on_menu_quests_pressed)
-	connect_managed(_view._menu_mail_button.pressed, on_menu_mail_pressed)
-	connect_managed(_view._menu_settings_button.pressed, on_menu_settings_pressed)
-	connect_managed(_view._menu_exit_button.pressed, on_menu_exit_pressed)
+	connect_managed(_view.menu_character_button.pressed, on_menu_character_pressed)
+	connect_managed(_view.menu_inventory_button.pressed, on_menu_inventory_pressed)
+	connect_managed(_view.menu_skills_button.pressed, on_menu_skills_pressed)
+	connect_managed(_view.menu_map_button.pressed, on_menu_map_pressed)
+	connect_managed(_view.menu_quests_button.pressed, on_menu_quests_pressed)
+	connect_managed(_view.menu_mail_button.pressed, on_menu_mail_pressed)
+	connect_managed(_view.menu_settings_button.pressed, on_menu_settings_pressed)
+	connect_managed(_view.menu_exit_button.pressed, on_menu_exit_pressed)
 
 # ==============================================================================
 # 小地图
@@ -107,9 +107,9 @@ func connect_signals() -> void:
 
 ## 刷新小地图坐标与当前缩放倍率展示。
 func refresh_minimap_coords() -> void:
-	if _view and _view._minimap_coordinates_label:
-		UIIntermediary.resolve(_view._minimap_coordinates_label, "ui.fe02.minimap.coords", {
-			"x": 320, "y": 180, "zoom": "%.1f" % _view.minimap_zoom
+	if _view and _view.minimap_coordinates_label:
+		UIIntermediary.resolve(_view.minimap_coordinates_label, "ui.fe02.minimap.coords", {
+			"x": _view.minimap_coords.x, "y": _view.minimap_coords.y, "zoom": "%.1f" % _view.minimap_zoom
 		})
 
 ## 放大地图缩放比例并刷新坐标显示。
@@ -147,8 +147,8 @@ func init_action_bar() -> void:
 func refresh_action_bar() -> void:
 	if _view == null:
 		return
-	for slot_index in _view._action_slot_buttons.size():
-		var slot_button: Button = _view._action_slot_buttons[slot_index]
+	for slot_index in _view.action_slot_buttons.size():
+		var slot_button: Button = _view.action_slot_buttons[slot_index]
 		var slot_entry: Dictionary = _view.action_bar_slots[slot_index]
 		var skill_id: String = str(slot_entry.get("skill_id", ""))
 		var cooldown_remaining: float = float(slot_entry.get("cd_remain", 0.0))
@@ -180,11 +180,11 @@ func on_action_slot_pressed(slot_index: int) -> void:
 
 ## 按分类着色并向战报终端追加一条格式化日志。
 func append_battle_log(category: String, text: String) -> void:
-	if _view == null or _view._battle_log_rich_text == null:
+	if _view == null or _view.battle_log_rich_text == null:
 		return
 	var theme_manager := ThemeManager.get_instance()
 	var color_tag := theme_manager.get_bbcode_color_tag(category)
-	_view._battle_log_rich_text.append_text("%s[%s] %s[/color]\n" % [color_tag, category, text])
+	_view.battle_log_rich_text.append_text("%s[%s] %s[/color]\n" % [color_tag, category, text])
 
 # ==============================================================================
 # 任务追踪栏
@@ -194,9 +194,32 @@ func append_battle_log(category: String, text: String) -> void:
 func refresh_quest_tracker() -> void:
 	if _view == null:
 		return
-	set_quest_entry(_view._quest_entry_1, "ui.fe02.quest.main_title", "ui.fe02.quest.main_desc", 0.15)
-	set_quest_entry(_view._quest_entry_2, "ui.fe02.quest.side_title", "ui.fe02.quest.side_desc", 0.30)
-	set_quest_entry(_view._quest_entry_3, "ui.fe02.quest.daily_title", "ui.fe02.quest.daily_desc", 1.0)
+	var quest_slots := [_view.quest_entry_1, _view.quest_entry_2, _view.quest_entry_3]
+	if not _view.hud_quests.is_empty():
+		for slot_index in range(quest_slots.size()):
+			var slot_container: VBoxContainer = quest_slots[slot_index]
+			if slot_container == null:
+				continue
+			if slot_index < _view.hud_quests.size() and _view.hud_quests[slot_index] is Dictionary:
+				var quest_map := _view.hud_quests[slot_index] as Dictionary
+				slot_container.visible = true
+				set_quest_entry(
+					slot_container,
+					str(quest_map.get("title", "ui.fe02.quest.title")),
+					str(quest_map.get("desc", "")),
+					float(quest_map.get("progress", 0.0))
+				)
+			else:
+				slot_container.visible = false
+		return
+	if ServiceLocator.get_mode() == "mock":
+		set_quest_entry(_view.quest_entry_1, "ui.fe02.quest.main_title", "ui.fe02.quest.main_desc", 0.15)
+		set_quest_entry(_view.quest_entry_2, "ui.fe02.quest.side_title", "ui.fe02.quest.side_desc", 0.30)
+		set_quest_entry(_view.quest_entry_3, "ui.fe02.quest.daily_title", "ui.fe02.quest.daily_desc", 1.0)
+	else:
+		for slot_container in quest_slots:
+			if slot_container != null:
+				slot_container.visible = false
 
 ## 更新单个任务追踪条目的标题、描述及进度条。
 func set_quest_entry(quest_entry: VBoxContainer, title_key: String, description_key: String, progress: float) -> void:
@@ -227,14 +250,14 @@ func toggle_main_menu() -> void:
 
 ## 向邮件菜单按钮右上角挂载层级红点徽章。
 func attach_mail_red_dot_badge() -> void:
-	if _view == null or _view._menu_mail_button == null:
+	if _view == null or _view.menu_mail_button == null:
 		return
 	var badge := KBadgeClass.new()
 	badge.name = "MailRedDotBadge"
 	badge.red_dot_path = "menu.mail"
 	badge.custom_minimum_size = Vector2(16, 16)
 	badge.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	_view._menu_mail_button.add_child(badge)
+	_view.menu_mail_button.add_child(badge)
 
 ## 导航打开角色成长界面。
 func on_menu_character_pressed() -> void:
@@ -333,21 +356,21 @@ func on_menu_quit_game_pressed() -> void:
 
 ## 刷新命令补全面板可见性、候选命令条目与页码提示。
 func refresh_completion_panel() -> void:
-	if _view == null or not _view._completion_panel or not _view._completion_rich_text_label:
+	if _view == null or not _view._completion_panel or not _view.completion_rich_text_label:
 		return
 	_view._completion_panel.visible = _view.completion_visible
 	if not _view.completion_visible:
 		return
-	_view._completion_rich_text_label.clear()
+	_view.completion_rich_text_label.clear()
 	if _view.completion_entries.is_empty():
-		_view._completion_rich_text_label.append_text(completion_no_match_text())
+		_view.completion_rich_text_label.append_text(completion_no_match_text())
 	else:
 		var theme_manager := ThemeManager.get_instance()
 		var color_tag := theme_manager.get_bbcode_color_tag("SYSTEM")
 		for entry in _view.completion_entries:
-			_view._completion_rich_text_label.append_text("%s/%s[/color]\n" % [color_tag, str(entry)])
-	if _view._completion_page_label and _view.completion_total_pages > 0:
-		UIIntermediary.resolve(_view._completion_page_label, "ui.fe02.chat.completion_page_hint", {
+			_view.completion_rich_text_label.append_text("%s/%s[/color]\n" % [color_tag, str(entry)])
+	if _view.completion_page_label and _view.completion_total_pages > 0:
+		UIIntermediary.resolve(_view.completion_page_label, "ui.fe02.chat.completion_page_hint", {
 			"cur": _view.completion_page_index + 1, "total": _view.completion_total_pages
 		})
 

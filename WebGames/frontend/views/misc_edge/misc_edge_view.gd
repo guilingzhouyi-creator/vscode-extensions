@@ -61,15 +61,15 @@ enum NameType {CHARACTER, PET, GUILD, TITLE}
 @onready var _disguise_switch_button: Button = $%DisguiseSwitchBtn
 
 # --- Tab 1: MUTATION 精英突变 ---
-@onready var _mutation_filter_tabs: TabContainer = $%MutationFilterTabs
-@onready var _mutation_list: ItemList = $%MutationList
-@onready var _mutation_detail_name_label: Label = $%MutationDetailNameLabel
-@onready var _mutation_detail_quality_label: Label = $%MutationDetailQualityLabel
-@onready var _mutation_detail_effect_label: Label = $%MutationDetailEffectLabel
-@onready var _mutation_detail_source_label: Label = $%MutationDetailSourceLabel
-@onready var _mutation_combo_preview_label: Label = $%MutationComboPreviewLabel
-@onready var _mutation_replace_button: Button = $%MutationReplaceBtn
-@onready var _mutation_activate_button: Button = $%MutationActivateBtn
+@onready var mutation_filter_tabs: TabContainer = $%MutationFilterTabs
+@onready var mutation_list: ItemList = $%MutationList
+@onready var mutation_detail_name_label: Label = $%MutationDetailNameLabel
+@onready var mutation_detail_quality_label: Label = $%MutationDetailQualityLabel
+@onready var mutation_detail_effect_label: Label = $%MutationDetailEffectLabel
+@onready var mutation_detail_source_label: Label = $%MutationDetailSourceLabel
+@onready var mutation_combo_preview_label: Label = $%MutationComboPreviewLabel
+@onready var mutation_replace_button: Button = $%MutationReplaceBtn
+@onready var mutation_activate_button: Button = $%MutationActivateBtn
 
 # --- Tab 2: GROUND_DROP 地面掉落 ---
 @onready var _ground_filter_tabs: TabContainer = $%GroundFilterTabs
@@ -80,13 +80,13 @@ enum NameType {CHARACTER, PET, GUILD, TITLE}
 @onready var _ground_pickup_button: Button = $%GroundPickupBtn
 
 # --- Tab 3: NAME_REGISTRY 命名注册 ---
-@onready var _name_type_option: OptionButton = $%NameTypeOption
-@onready var _name_input: LineEdit = $%NameInput
-@onready var _name_check_button: Button = $%NameCheckBtn
-@onready var _name_check_result_label: Label = $%NameCheckResultLabel
-@onready var _name_fee_label: Label = $%NameFeeLabel
-@onready var _name_register_button: Button = $%NameRegisterBtn
-@onready var _name_history_list: ItemList = $%NameHistoryList
+@onready var name_type_option: OptionButton = $%NameTypeOption
+@onready var name_input: LineEdit = $%NameInput
+@onready var name_check_button: Button = $%NameCheckBtn
+@onready var name_check_result_label: Label = $%NameCheckResultLabel
+@onready var name_fee_label: Label = $%NameFeeLabel
+@onready var name_register_button: Button = $%NameRegisterBtn
+@onready var name_history_list: ItemList = $%NameHistoryList
 
 # --- 底部操作栏 ---
 @onready var _back_button: Button = $%BackBtn
@@ -113,19 +113,15 @@ var displayed_character_name: String = ""
 var _disguise_masks: Array = []
 ## 当前选中的伪装索引
 var _selected_disguise_index: int = -1
-## 伪装持续时间（秒，0 = 未启用）
-var _disguise_duration: float = 0.0
-## 识破风险（0.0~1.0）
-var _disguise_detect_risk: float = 0.0
 
 ## 突变词条 Mock 数据
-var _mutation_entries: Array = []
+var mutation_entries: Array = []
 ## 当前选中的突变索引
-var _selected_mutation_index: int = -1
+var selected_mutation_index: int = -1
 ## 已激活的突变词条列表（最多 3 个）
-var _active_mutations: Array = []
+var active_mutations: Array = []
 ## 当前突变筛选
-var _mutation_filter: MutationFilter = MutationFilter.AVAILABLE
+var mutation_filter: MutationFilter = MutationFilter.AVAILABLE
 
 ## 地面掉落 Mock 数据
 var ground_nearby_loot: Array = []
@@ -139,7 +135,7 @@ var _pickup_range: float = 5.0
 ## 命名检索关键词
 var search_query_keyword: String = ""
 ## 命名历史记录
-var _name_history: Array = []
+var name_history: Array = []
 
 # ==============================================================================
 # 生命周期
@@ -300,6 +296,7 @@ func _refresh_ground_loot_list() -> void:
 		if _ground_filter != GroundFilter.ALL and item_type != _ground_filter:
 			continue
 		var remain_seconds: int = int(loot_entry.get("remain_sec", 0))
+		@warning_ignore("integer_division")
 		var remain_text := "%02d:%02d" % [remain_seconds / 60, remain_seconds % 60]
 		var item_name := UIIntermediary.text(loot_entry.get("name_key", ""))
 		var loot_item_text := UIIntermediary.text("ui.fe17.ground_drop.list_item", {"name": item_name, "time": remain_text})
@@ -366,7 +363,11 @@ func _on_disguise_switch_pressed() -> void:
 	if _selected_disguise_index < 0 or _selected_disguise_index >= _disguise_masks.size():
 		return
 	var mask_entry: Dictionary = _disguise_masks[_selected_disguise_index]
-	apply_disguise_mask(mask_entry.get("id", ""), mask_entry.get("name", ""))
+	var mask_label := str(mask_entry.get("name", ""))
+	if mask_label.is_empty():
+		var name_key := str(mask_entry.get("name_key", ""))
+		mask_label = UIIntermediary.text(name_key) if not name_key.is_empty() else str(mask_entry.get("id", ""))
+	apply_disguise_mask(str(mask_entry.get("id", "")), mask_label)
 	_refresh_disguise_current()
 
 ## 取消伪装按钮：清除面具 ID、恢复真实名并刷新展示
@@ -405,8 +406,9 @@ func _on_pickup_pressed() -> void:
 	_refresh_ground_loot_list()
 	_refresh_ground_status()
 
-## 全部拾取按钮：清空附近掉落物并刷新列表与状态展示。
+## 全部拾取按钮：清空附近掉落物并派发清理指令刷新状态展示。
 func _on_pickup_all_pressed() -> void:
+	ServiceLocator.get_instance().misc_edge().dispatch_misc_action("PICKUP_ALL", {"count": ground_nearby_loot.size()})
 	ground_nearby_loot.clear()
 	_selected_loot_index = -1
 	_refresh_ground_loot_list()
@@ -418,11 +420,12 @@ func _on_name_check_pressed() -> void: _get_tabs()._on_name_check_pressed()
 func _on_name_register_pressed() -> void: _get_tabs()._on_name_register_pressed()
 func _on_name_input_submitted(text: String) -> void: _get_tabs()._on_name_input_submitted(text)
 
-## 应用指定伪装面具编码与假名展示。
+## 应用指定伪装面具编码与假名展示并同步伪装协议状态。
 func apply_disguise_mask(mask_id: String, fake_name: String) -> void:
 	current_disguise_mask_id = mask_id
 	var default_name: String = UIIntermediary.text("ui.fe17.mock.char.real_name")
 	displayed_character_name = fake_name if mask_id != "" else default_name
+	ServiceLocator.get_instance().misc_edge().dispatch_misc_action("APPLY_DISGUISE", {"mask_id": mask_id, "fake_name": fake_name})
 
 ## 兼容快照注入入口：更新地面邻近掉落物列表。
 func set_ground_nearby_loot_snapshot(loot_items: Array) -> void:
@@ -436,7 +439,9 @@ func _render_from_snapshot() -> void:
 	if _ground_range_label != null and _ground_item_count_label != null:
 		_refresh_ground_status()
 
-## 记录并归一化命名空间检索关键词，返回查询载荷。
+## 记录并归一化命名空间检索关键词，经服务检索注册表条目。
 func search_item_namespace(keyword: String) -> Dictionary:
 	search_query_keyword = keyword.strip_edges()
-	return {"success": true, "query": search_query_keyword}
+	var search_reply := ServiceLocator.get_instance().misc_edge().dispatch_misc_action("SEARCH_ITEMS", {"query": search_query_keyword})
+	var search_table: Dictionary = search_reply.get("data", search_reply) as Dictionary
+	return {"success": bool(search_reply.get("success", true)), "query": search_query_keyword, "matches": search_table.get("matches", [])}

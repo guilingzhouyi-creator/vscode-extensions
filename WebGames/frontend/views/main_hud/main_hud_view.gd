@@ -12,50 +12,46 @@ extends BaseScreen
 
 const MainHUDSubpanelsClass = preload("res://frontend/views/main_hud/main_hud_subpanels.gd")
 
-const FrontendHudSnapshot = preload("res://frontend/domain_boundary/contracts/frontend_hud_snapshot.gd")
 const KBadgeClass = preload("res://frontend/components/k_badge.gd")
-const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
-const HudEventBridge = preload("res://frontend/systems/hud_event_bridge.gd")
 
 # --- 节点引用（场景树中以 unique_name_in_owner 标记） ---
 
 @onready var _character_name_label: Label = $%CharNameLabel
-@onready var _health_bar: ProgressBar = $%HPBar
-@onready var _mana_bar: ProgressBar = $%MPBar
-@onready var _action_points_bar: ProgressBar = $%APBar
+@onready var health_bar: ProgressBar = $%HPBar
+@onready var mana_bar: ProgressBar = $%MPBar
+@onready var action_points_bar: ProgressBar = $%APBar
 @onready var _gold_label: Label = $%GoldLabel
 @onready var _clock_label: Label = $%ClockLabel
 
-@onready var _minimap_panel: PanelContainer = $%MiniMapPanel
-@onready var _minimap_coordinates_label: Label = $%MiniMapCoordsLabel
-@onready var _minimap_zoom_in_button: Button = $%MiniMapZoomInBtn
-@onready var _minimap_zoom_out_button: Button = $%MiniMapZoomOutBtn
+@onready var minimap_coordinates_label: Label = $%MiniMapCoordsLabel
+@onready var minimap_zoom_in_button: Button = $%MiniMapZoomInBtn
+@onready var minimap_zoom_out_button: Button = $%MiniMapZoomOutBtn
 
-@onready var _action_slot_buttons: Array[Button] = [$%ActionBar/Slot1Btn, $%ActionBar/Slot2Btn, $%ActionBar/Slot3Btn, $%ActionBar/Slot4Btn, $%ActionBar/Slot5Btn, $%ActionBar/Slot6Btn, $%ActionBar/Slot7Btn, $%ActionBar/Slot8Btn]
+@onready var action_slot_buttons: Array[Button] = [$%ActionBar/Slot1Btn, $%ActionBar/Slot2Btn, $%ActionBar/Slot3Btn, $%ActionBar/Slot4Btn, $%ActionBar/Slot5Btn, $%ActionBar/Slot6Btn, $%ActionBar/Slot7Btn, $%ActionBar/Slot8Btn]
 
 @onready var _chat_tabs: TabContainer = $%ChatTabs
 @onready var _chat_rich_text_label: RichTextLabel = $%ChatRichLabel
 @onready var _chat_input: LineEdit = $%ChatInput
 @onready var _completion_panel: PanelContainer = $%CompletionPanel
-@onready var _completion_rich_text_label: RichTextLabel = $%CompletionRichLabel
-@onready var _completion_page_label: Label = $%CompletionPageLabel
+@onready var completion_rich_text_label: RichTextLabel = $%CompletionRichLabel
+@onready var completion_page_label: Label = $%CompletionPageLabel
 
-@onready var _battle_log_rich_text: RichTextLabel = $%BattleLogRich
+@onready var battle_log_rich_text: RichTextLabel = $%BattleLogRich
 
-@onready var _quest_title_label: Label = $%QuestTitleLabel
-@onready var _quest_entry_1: VBoxContainer = $%QuestEntry1
-@onready var _quest_entry_2: VBoxContainer = $%QuestEntry2
-@onready var _quest_entry_3: VBoxContainer = $%QuestEntry3
+@onready var quest_title_label: Label = $%QuestTitleLabel
+@onready var quest_entry_1: VBoxContainer = $%QuestEntry1
+@onready var quest_entry_2: VBoxContainer = $%QuestEntry2
+@onready var quest_entry_3: VBoxContainer = $%QuestEntry3
 
 @onready var _main_menu_panel: PanelContainer = $%MainMenuPanel
-@onready var _menu_character_button: Button = $%MenuBtnCharacter
-@onready var _menu_inventory_button: Button = $%MenuBtnInventory
-@onready var _menu_skills_button: Button = $%MenuBtnSkills
-@onready var _menu_map_button: Button = $%MenuBtnMap
-@onready var _menu_quests_button: Button = $%MenuBtnQuests
-@onready var _menu_mail_button: Button = $%MenuBtnMail
-@onready var _menu_settings_button: Button = $%MenuBtnSettings
-@onready var _menu_exit_button: Button = $%MenuBtnExit
+@onready var menu_character_button: Button = $%MenuBtnCharacter
+@onready var menu_inventory_button: Button = $%MenuBtnInventory
+@onready var menu_skills_button: Button = $%MenuBtnSkills
+@onready var menu_map_button: Button = $%MenuBtnMap
+@onready var menu_quests_button: Button = $%MenuBtnQuests
+@onready var menu_mail_button: Button = $%MenuBtnMail
+@onready var menu_settings_button: Button = $%MenuBtnSettings
+@onready var menu_exit_button: Button = $%MenuBtnExit
 
 # --- 顶栏生理与货币指标快照 ---
 
@@ -78,6 +74,10 @@ const MINIMAP_MAX_ZOOM := 2.0
 var character_name: String = ""
 var current_account_id: String = ""
 var current_session_token: String = ""
+var hud_clock_display: String = ""
+var minimap_coords: Vector2i = Vector2i.ZERO
+var hud_quests: Array = []
+var _hud_channel_tokens: Array = []
 
 # --- 快捷栏动作槽位 (1~8) ---
 
@@ -138,22 +138,37 @@ func _ready() -> void:
 	if is_mock_mode:
 		wallet_gold = 12580; wallet_mana_crystals = 5
 		character_name = UIIntermediary.text("ui.fe02.mock.char_name")
+		minimap_coords = Vector2i(320, 180)
 	else:
 		wallet_gold = 0; wallet_mana_crystals = 0
 		character_name = ""
+		minimap_coords = Vector2i.ZERO
 	_init_hud_text()
 	_refresh_status_bars(); _refresh_wallet(); _refresh_clock(); _refresh_character_name()
 	_refresh_minimap_coords()
 	_init_action_bar()
 	UIIntermediary.resolve_placeholder(_chat_input, "ui.fe02.chat.input_placeholder")
 	_refresh_chat_view()
-	append_terminal_log("SYSTEM", UIIntermediary.text("ui.fe02.chat.mock.welcome"))
 	if is_mock_mode:
+		append_terminal_log("SYSTEM", UIIntermediary.text("ui.fe02.chat.mock.welcome"))
 		append_terminal_log("WORLD", UIIntermediary.text("ui.fe02.chat.mock.world_msg", {"name": character_name}))
 		append_terminal_log("GUILD", UIIntermediary.text("ui.fe02.chat.mock.guild_msg", {"name": UIIntermediary.text("ui.fe02.mock.name_meryl")}))
 		append_battle_log("COMBAT", UIIntermediary.text("ui.fe02.battle_log.mock.combat_hit", {"damage": 128}))
 		append_battle_log("COMBAT", UIIntermediary.text("ui.fe02.battle_log.mock.combat_hit_back", {"damage": 15}))
 		append_battle_log("LOOT", UIIntermediary.text("ui.fe02.battle_log.mock.loot"))
+	else:
+		var hud_service := ServiceLocator.get_instance().hud_sync()
+		_hud_channel_tokens = hud_service.subscribe_hud_channels({
+			"on_snapshot": func(payload: Dictionary) -> void: apply_snapshot(payload),
+			"on_wallet": func(payload: Dictionary) -> void: apply_snapshot(payload),
+			"on_stat_mutated": func(payload: Dictionary) -> void: apply_snapshot(payload),
+			"on_clock_advanced": func(payload: Dictionary) -> void: apply_snapshot(payload),
+		})
+		hud_service.pull_authoritative_snapshot_async(current_account_id, current_session_token, "", func(sync_reply: Dictionary) -> void:
+			var snapshot_table: Dictionary = sync_reply.get("data", sync_reply) as Dictionary
+			if bool(sync_reply.get("success", false)) and not snapshot_table.is_empty():
+				apply_snapshot(snapshot_table)
+		)
 	_refresh_quest_tracker()
 	completion_visible = false; _completion_panel.visible = false
 	main_menu_visible = false; _main_menu_panel.visible = false
@@ -163,6 +178,9 @@ func _ready() -> void:
 	UIIntermediary.adapt_view(self)
 
 func _on_predelete_cleanup() -> void:
+	if not _hud_channel_tokens.is_empty():
+		ServiceLocator.get_instance().hud_sync().unsubscribe_hud_channels(_hud_channel_tokens)
+		_hud_channel_tokens.clear()
 	HudEventBridge.get_instance().detach_hud()
 	_subpanels = null
 
@@ -230,11 +248,20 @@ func _render_from_snapshot() -> void:
 	wallet_mana_crystals = hud_snapshot.mana_monocrystals
 	if snapshot.has("character_name") or snapshot.has("nickname"):
 		character_name = hud_snapshot.character_name
+	if snapshot.has("clock_display"):
+		hud_clock_display = str(snapshot.get("clock_display", ""))
+	if snapshot.has("coord_x") or snapshot.has("coord_y"):
+		minimap_coords = Vector2i(int(snapshot.get("coord_x", minimap_coords.x)), int(snapshot.get("coord_y", minimap_coords.y)))
+		_refresh_minimap_coords()
+	if snapshot.get("quests") is Array:
+		hud_quests = (snapshot.get("quests") as Array).duplicate(true)
+		_refresh_quest_tracker()
 	if snapshot.get("action_bar_slots") is Array:
 		action_bar_slots = (snapshot.get("action_bar_slots") as Array).duplicate(true)
 		_init_action_bar()
 	_refresh_status_bars()
 	_refresh_wallet()
+	_refresh_clock()
 	_refresh_character_name()
 	# 快照渲染完成 → 五态容器切换就绪态
 	show_ready_state()
@@ -247,7 +274,12 @@ func _refresh_wallet() -> void:
 	if _gold_label: UIIntermediary.resolve(_gold_label, "ui.fe02.status_bar.gold", {"gold": wallet_gold, "crystals": wallet_mana_crystals})
 
 func _refresh_clock() -> void:
-	if _clock_label: UIIntermediary.resolve(_clock_label, "ui.fe02.status_bar.clock")
+	if not _clock_label:
+		return
+	if not hud_clock_display.is_empty():
+		_clock_label.text = hud_clock_display
+	else:
+		UIIntermediary.resolve(_clock_label, "ui.fe02.status_bar.clock")
 
 func _refresh_character_name() -> void:
 	if _character_name_label: _character_name_label.text = character_name
@@ -268,7 +300,12 @@ func trigger_action_slot(slot_index: int) -> Dictionary:
 		if slot_entry.slot == slot_index:
 			if slot_entry.cd_remain > 0.0:
 				return {"success": false, "reason": "COOLDOWN_ACTIVE", "remain": slot_entry.cd_remain}
-			return {"success": true, "slot": slot_index, "skill_id": slot_entry.skill_id}
+			var skill_identifier := str(slot_entry.get("skill_id", ""))
+			if ServiceLocator.get_mode() != "mock" and not skill_identifier.is_empty():
+				ServiceLocator.get_instance().combat().cast_skill_async(skill_identifier, "ACTIVE_TARGET", func(_cast_reply: Dictionary) -> void:
+					pass
+				)
+			return {"success": true, "slot": slot_index, "skill_id": skill_identifier}
 	return {"success": false, "reason": "EMPTY_SLOT"}
 
 # --- 聊天频道切换与滚动区消息流 ---
@@ -327,8 +364,14 @@ func _on_chat_input_text_changed(new_text: String) -> void:
 func _on_chat_input_submitted(_new_text: String) -> void:
 	var text := chat_input_text.strip_edges()
 	if text.is_empty(): return
-	append_terminal_log(_channel_tag_name(current_channel), "%s: %s" % [character_name, text])
-	if text.begins_with("/"): _chat_session().record_usage(_command_prefix(text))
+	var sender_name := character_name if not character_name.is_empty() else "Player"
+	append_terminal_log(_channel_tag_name(current_channel), "%s: %s" % [sender_name, text])
+	if text.begins_with("/"):
+		_chat_session().record_usage(_command_prefix(text))
+		var command_reply := ServiceLocator.get_instance().chat_command().execute_command(text)
+		var command_note := str(command_reply.get("message", command_reply.get("token", "")))
+		if not command_note.is_empty():
+			append_terminal_log("SYSTEM", command_note)
 	_chat_input.clear(); chat_input_text = ""; completion_visible = false; _completion_panel.visible = false
 
 func _on_chat_input_focus_entered() -> void: focus_chat_input()
