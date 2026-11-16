@@ -12,8 +12,6 @@
 class_name CharacterCreationView
 extends BaseScreen
 
-const CharacterCreationRenderHelper = preload("res://frontend/views/character_creation/character_creation_render_helper.gd")
-
 @onready var title_label: Label = %TitleLabel
 @onready var world_slot_badge_label: Label = %WorldSlotBadgeLabel
 @onready var back_btn: Button = %BackBtn

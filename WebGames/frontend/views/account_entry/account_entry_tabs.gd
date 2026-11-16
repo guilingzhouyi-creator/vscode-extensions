@@ -225,7 +225,7 @@ func roll_attributes() -> void:
     if not bool(roll_reply.get("success", false)):
         return
     var rolled_attributes: Dictionary = roll_reply.get("attrs", {})
-    view._rolled_attributes = {
+    view.rolled_attributes = {
         "STR": int(rolled_attributes.get("STR", 10)),
         "AGI": int(rolled_attributes.get("AGI", 10)),
         "CON": int(rolled_attributes.get("CON", 10)),
@@ -240,12 +240,12 @@ func update_attr_labels() -> void:
     var view: AccountEntryView = _view
     if view.char_attr_str_label == null:
         return
-    UIIntermediary.resolve(view.char_attr_str_label, "ui.fe01.char_create.attr_str", {"value": view._rolled_attributes.get("STR", 10)})
-    UIIntermediary.resolve(view.char_attr_agi_label, "ui.fe01.char_create.attr_agi", {"value": view._rolled_attributes.get("AGI", 10)})
-    UIIntermediary.resolve(view.char_attr_con_label, "ui.fe01.char_create.attr_con", {"value": view._rolled_attributes.get("CON", 10)})
-    UIIntermediary.resolve(view.char_attr_int_label, "ui.fe01.char_create.attr_int", {"value": view._rolled_attributes.get("INT", 10)})
-    UIIntermediary.resolve(view.char_attr_wis_label, "ui.fe01.char_create.attr_wis", {"value": view._rolled_attributes.get("WIS", 10)})
-    UIIntermediary.resolve(view.char_attr_cha_label, "ui.fe01.char_create.attr_cha", {"value": view._rolled_attributes.get("CHA", 10)})
+    UIIntermediary.resolve(view.char_attr_str_label, "ui.fe01.char_create.attr_str", {"value": view.rolled_attributes.get("STR", 10)})
+    UIIntermediary.resolve(view.char_attr_agi_label, "ui.fe01.char_create.attr_agi", {"value": view.rolled_attributes.get("AGI", 10)})
+    UIIntermediary.resolve(view.char_attr_con_label, "ui.fe01.char_create.attr_con", {"value": view.rolled_attributes.get("CON", 10)})
+    UIIntermediary.resolve(view.char_attr_int_label, "ui.fe01.char_create.attr_int", {"value": view.rolled_attributes.get("INT", 10)})
+    UIIntermediary.resolve(view.char_attr_wis_label, "ui.fe01.char_create.attr_wis", {"value": view.rolled_attributes.get("WIS", 10)})
+    UIIntermediary.resolve(view.char_attr_cha_label, "ui.fe01.char_create.attr_cha", {"value": view.rolled_attributes.get("CHA", 10)})
 
 ## 响应角色槽位按钮点击并刷新角色详情与操作按钮状态
 func on_char_slot_pressed(slot_index: int) -> void:

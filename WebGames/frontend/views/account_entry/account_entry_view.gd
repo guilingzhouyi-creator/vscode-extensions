@@ -50,7 +50,7 @@ var form_selected_positive_trait: String = ""
 var form_reroll_nonce: int = 0
 
 # 资质骰点缓存
-var _rolled_attributes: Dictionary = {}
+var rolled_attributes: Dictionary = {}
 
 # --- 界面容器 ---
 @onready var splash_panel: Control = %SplashPanel
@@ -148,9 +148,9 @@ func switch_state(new_state: EntryState) -> void:
     _set_panel_visibility(character_select_panel, current_state == EntryState.CHARACTER_SELECT)
     _set_panel_visibility(character_create_panel, current_state == EntryState.CHARACTER_CREATE)
 
-func _set_panel_visibility(panel: Control, is_visible: bool) -> void:
+func _set_panel_visibility(panel: Control, panel_visible: bool) -> void:
     if panel != null:
-        panel.visible = is_visible
+        panel.visible = panel_visible
 
 ## 提交账号登录表单并切换至选角状态
 func submit_login(username: String, password_plain: String, on_completed: Callable = Callable()) -> Dictionary:
@@ -351,8 +351,11 @@ func _on_login_submit_pressed() -> void:
 
 func _on_login_goto_register_pressed() -> void: switch_state(EntryState.REGISTER)
 func _on_login_forgot_pressed() -> void:
+    if login_password_edit != null:
+        login_password_edit.clear()
     UIIntermediary.resolve(login_error_label, "ui.fe01.login.forgot_placeholder")
     login_error_label.modulate = DesignTokens.COLOR_WARNING_DEFAULT
+    NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe01.login.forgot_placeholder"), NavTypes.ToastLevel.INFO)
 
 func _on_register_submit_pressed() -> void:
     var username: String = register_username_edit.text
@@ -410,7 +413,19 @@ func _on_char_create_pressed() -> void:
 func _on_char_delete_pressed() -> void:
     if selected_character_slot.is_empty():
         return
-    NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe01.toast.slot_reset", {"slot": selected_character_slot}), NavTypes.ToastLevel.INFO)
+    var slot_to_clear := selected_character_slot
+    var auth_service: IAuthService = ServiceLocator.get_instance().auth()
+    auth_service.clear_slot_async(current_account_id, current_session_token, slot_to_clear, func(clear_reply: Dictionary) -> void:
+        if ServiceLocator.get_mode() != "mock" and not bool(clear_reply.get("success", false)):
+            NavManager.get_instance().show_toast(str(clear_reply.get("message", "ui.fe01.toast.slot_reset")), NavTypes.ToastLevel.WARNING)
+            return
+        for slot_index in range(character_slots.size()):
+            if str(character_slots[slot_index].get("slot_id", "")) == slot_to_clear:
+                character_slots[slot_index] = {"slot_id": slot_to_clear, "empty": true, "name": "", "class": "", "level": 0}
+                break
+        _get_tabs().populate_character_slots()
+        NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe01.toast.slot_reset", {"slot": slot_to_clear}), NavTypes.ToastLevel.INFO)
+    )
 
 func _on_char_back_pressed() -> void: switch_state(EntryState.SERVER_SELECT)
 
@@ -421,10 +436,13 @@ func create_character(character_name: String, race: String = "") -> Dictionary:
     if form_character_name.is_empty():
         return {"success": false, "error_code": "ERR_NAME_EMPTY"}
     var service_mode := ServiceLocator.get_mode()
-    if (service_mode == "backend" or service_mode == "real") and not current_account_id.is_empty():
+    if service_mode != "mock":
+        if current_account_id.is_empty():
+            return {"success": false, "error_code": "ERR_AUTH_REQUIRED"}
         var backend_reply: Dictionary = BackendHelper.create_character_backend_flow(self, _get_tabs(), form_character_name, form_selected_race)
         if bool(backend_reply.get("_handled", false)):
             return backend_reply.get("result", {}) as Dictionary
+        return {"success": false, "error_code": "ERR_SERVICE_UNAVAILABLE"}
 
     var created_slot := {"slot_id": "SLOT_NEW", "name": form_character_name, "race": form_selected_race, "class": "Novice", "level": 1, "town": "", "empty": false}
     for slot_index in range(character_slots.size()):

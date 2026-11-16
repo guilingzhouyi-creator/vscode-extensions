@@ -14,7 +14,6 @@ extends BaseScreen
 
 const KButtonClass = preload("res://frontend/components/k_button.gd")
 const KItemSlotClass = preload("res://frontend/components/k_item_slot.gd")
-const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
 const CharacterProgressionTabsClass = preload("res://frontend/views/character_progression/character_progression_tabs.gd")
 
 # ==============================================================================
@@ -52,21 +51,21 @@ enum InventoryFilter {ALL, WEAPON, ARMOR, CONSUMABLE, MATERIAL}
 @onready var _main_tab_container: TabContainer = $%MainTabContainer
 
 # --- Tab 0: ATTRIBUTES 属性总览 ---
-@onready var _attribute_character_name_label: Label = $%AttrCharNameLabel
-@onready var _attribute_title_label: Label = $%AttrTitleLabel
+@onready var attribute_character_name_label: Label = $%AttrCharNameLabel
+@onready var attribute_title_label: Label = $%AttrTitleLabel
 @onready var _attribute_strength_label: Label = $%AttrStrLabel
 @onready var _attribute_agility_label: Label = $%AttrAgiLabel
 @onready var _attribute_constitution_label: Label = $%AttrConLabel
 @onready var _attribute_intelligence_label: Label = $%AttrIntLabel
 @onready var _attribute_wisdom_label: Label = $%AttrWisLabel
 @onready var _attribute_charisma_label: Label = $%AttrChaLabel
-@onready var _attribute_health_bar: ProgressBar = $%AttrHpBar
-@onready var _attribute_mana_bar: ProgressBar = $%AttrMpBar
-@onready var _attribute_stamina_bar: ProgressBar = $%AttrStaminaBar
+@onready var attribute_health_bar: ProgressBar = $%AttrHpBar
+@onready var attribute_mana_bar: ProgressBar = $%AttrMpBar
+@onready var attribute_stamina_bar: ProgressBar = $%AttrStaminaBar
 
 # --- Tab 1: POTENTIAL 潜能加点 ---
-@onready var _potential_points_label: Label = $%PotPointsLabel
-@onready var _potential_mode_option: OptionButton = $%PotModeOption
+@onready var potential_points_label: Label = $%PotPointsLabel
+@onready var potential_mode_option: OptionButton = $%PotModeOption
 @onready var _potential_strength_add_button: Button = $%PotStrAddBtn
 @onready var _potential_strength_preview_label: Label = $%PotStrPreviewLabel
 @onready var _potential_agility_add_button: Button = $%PotAgiAddBtn
@@ -79,21 +78,20 @@ enum InventoryFilter {ALL, WEAPON, ARMOR, CONSUMABLE, MATERIAL}
 @onready var _potential_wisdom_preview_label: Label = $%PotWisPreviewLabel
 @onready var _potential_charisma_add_button: Button = $%PotChaAddBtn
 @onready var _potential_charisma_preview_label: Label = $%PotChaPreviewLabel
-@onready var _potential_confirm_button: Button = $%PotConfirmBtn
-@onready var _potential_reset_button: Button = $%PotResetBtn
+@onready var potential_confirm_button: Button = $%PotConfirmBtn
+@onready var potential_reset_button: Button = $%PotResetBtn
 
 # --- Tab 2: VITALITY 生命体质 ---
-@onready var _vitality_age_label: Label = $%VitAgeLabel
-@onready var _vitality_age_slider: HSlider = $%VitAgeSlider
-@onready var _vitality_somatic_factor_label: Label = $%VitSfLabel
-@onready var _vitality_mental_somatic_factor_label: Label = $%VitMsfLabel
-@onready var _vitality_hunger_bar: ProgressBar = $%VitHungerBar
-@onready var _vitality_energy_bar: ProgressBar = $%VitEnergyBar
+@onready var vitality_age_label: Label = $%VitAgeLabel
+@onready var vitality_age_slider: HSlider = $%VitAgeSlider
+@onready var vitality_somatic_factor_label: Label = $%VitSfLabel
+@onready var vitality_mental_somatic_factor_label: Label = $%VitMsfLabel
+@onready var vitality_hunger_bar: ProgressBar = $%VitHungerBar
+@onready var vitality_energy_bar: ProgressBar = $%VitEnergyBar
 
 # --- Tab 3: SKILL_TREE 技能树 ---
-@onready var _skill_ast_panel: PanelContainer = $%SkillAstPanel
-@onready var _skill_node_list: ItemList = $%SkillNodeList
-@onready var _skill_detail_label: Label = $%SkillDetailLabel
+@onready var skill_node_list: ItemList = $%SkillNodeList
+@onready var skill_detail_label: Label = $%SkillDetailLabel
 
 # --- Tab 4: EQUIPMENT 装备栏 ---
 @onready var _equipment_main_hand_button: Button = $%EquipMainHandBtn
@@ -105,25 +103,25 @@ enum InventoryFilter {ALL, WEAPON, ARMOR, CONSUMABLE, MATERIAL}
 @onready var _equipment_neck_button: Button = $%EquipNeckBtn
 @onready var _equipment_ring_left_button: Button = $%EquipRingLBtn
 @onready var _equipment_ring_right_button: Button = $%EquipRingRBtn
-@onready var _equipment_detail_name_label: Label = $%EquipDetailNameLabel
-@onready var _equipment_detail_rarity_label: Label = $%EquipDetailRarityLabel
-@onready var _equipment_affix_label: Label = $%EquipAffixLabel
+@onready var equipment_detail_name_label: Label = $%EquipDetailNameLabel
+@onready var equipment_detail_rarity_label: Label = $%EquipDetailRarityLabel
+@onready var equipment_affix_label: Label = $%EquipAffixLabel
 
 # --- Tab 5: INVENTORY 背包 ---
-@onready var _inventory_filter_tabs: TabContainer = $%InvFilterTabs
-@onready var _inventory_grid_panel: GridContainer = $%InvGridPanel
-@onready var _inventory_capacity_label: Label = $%InvCapacityLabel
-@onready var _inventory_weight_bar: ProgressBar = $%InvWeightBar
+@onready var inventory_filter_tabs: TabContainer = $%InvFilterTabs
+@onready var inventory_grid_panel: GridContainer = $%InvGridPanel
+@onready var inventory_capacity_label: Label = $%InvCapacityLabel
+@onready var inventory_weight_bar: ProgressBar = $%InvWeightBar
 
 # --- Tab 6: TITLES 称号 ---
-@onready var _title_equipped_label: Label = $%TitleEquippedLabel
-@onready var _title_rank_label: Label = $%TitleRankLabel
-@onready var _title_list: ItemList = $%TitleList
+@onready var title_equipped_label: Label = $%TitleEquippedLabel
+@onready var title_rank_label: Label = $%TitleRankLabel
+@onready var title_list: ItemList = $%TitleList
 
 # --- Tab 7: LORE 传记 ---
-@onready var _lore_background_label: Label = $%LoreBackgroundLabel
-@onready var _lore_milestone_list: ItemList = $%LoreMilestoneList
-@onready var _lore_achievement_list: ItemList = $%LoreAchievementList
+@onready var lore_background_label: Label = $%LoreBackgroundLabel
+@onready var lore_milestone_list: ItemList = $%LoreMilestoneList
+@onready var lore_achievement_list: ItemList = $%LoreAchievementList
 
 # --- 底部操作栏 ---
 @onready var _back_button: Button = $%BackBtn
@@ -204,7 +202,7 @@ var lore_milestones: Array = []
 var lore_achievements: Array = []
 
 # 当前选中的装备槽索引
-var _selected_equipment_slot_index: int = -1
+var selected_equipment_slot_index: int = -1
 
 # ==============================================================================
 # 生命周期
@@ -250,49 +248,51 @@ func _apply_theme() -> void:
 
 ## 从 domain_boundary 快照服务加载角色快照并补本地 Mock
 func _load_mock_snapshot() -> void:
+	var is_mock_mode := (ServiceLocator.get_mode() == "mock")
+	if not is_mock_mode:
+		age_years = 18
+		age_months = 0
+		available_potential_points = 0
+		unallocated_points_preview = 0
+		vitality_sf = 1.0
+		vitality_msf = 1.0
+		vitality_hunger = 100.0
+		vitality_energy = 100.0
 	var character_snapshot := ServiceLocator.get_instance().snapshot_data().load_snapshot("character")
-	if character_snapshot.is_empty():
-		return
-
-	if character_snapshot.has("name"):
-		character_name = character_snapshot["name"]
-	if character_snapshot.has("title"):
-		character_title = character_snapshot["title"]
-	if character_snapshot.has("age_years"):
-		age_years = int(character_snapshot["age_years"])
-	if character_snapshot.has("age_months"):
-		age_months = int(character_snapshot["age_months"])
-
-	if character_snapshot.has("attributes"):
-		var attribute_map: Dictionary = character_snapshot["attributes"]
-		attributes_base = attribute_map.duplicate()
-		attributes_preview = attribute_map.duplicate()
-
-	if character_snapshot.has("potential_points"):
-		available_potential_points = int(character_snapshot["potential_points"])
-	unallocated_points_preview = available_potential_points
-
-	if character_snapshot.has("vitality"):
-		var vitality_map: Dictionary = character_snapshot["vitality"]
-		vitality_sf = float(vitality_map.get("sf", 0.72))
-		vitality_msf = float(vitality_map.get("msf", 0.85))
-		vitality_hunger = float(vitality_map.get("hunger", 80.0))
-		vitality_energy = float(vitality_map.get("energy", 65.0))
-
-	if character_snapshot.has("equipped_slots"):
-		equipped_slots = (character_snapshot["equipped_slots"] as Dictionary).duplicate()
-	else:
+	if not character_snapshot.is_empty():
+		if character_snapshot.has("name"):
+			character_name = character_snapshot["name"]
+		if character_snapshot.has("title"):
+			character_title = character_snapshot["title"]
+		if character_snapshot.has("age_years"):
+			age_years = int(character_snapshot["age_years"])
+		if character_snapshot.has("age_months"):
+			age_months = int(character_snapshot["age_months"])
+		if character_snapshot.has("attributes"):
+			var attribute_map: Dictionary = character_snapshot["attributes"]
+			attributes_base = attribute_map.duplicate()
+			attributes_preview = attribute_map.duplicate()
+		if character_snapshot.has("potential_points"):
+			available_potential_points = int(character_snapshot["potential_points"])
+		unallocated_points_preview = available_potential_points
+		if character_snapshot.has("vitality"):
+			var vitality_map: Dictionary = character_snapshot["vitality"]
+			vitality_sf = float(vitality_map.get("sf", vitality_sf))
+			vitality_msf = float(vitality_map.get("msf", vitality_msf))
+			vitality_hunger = float(vitality_map.get("hunger", vitality_hunger))
+			vitality_energy = float(vitality_map.get("energy", vitality_energy))
+		if character_snapshot.has("equipped_slots"):
+			equipped_slots = (character_snapshot["equipped_slots"] as Dictionary).duplicate()
+		if character_snapshot.has("inventory_count"):
+			inventory_count = int(character_snapshot["inventory_count"])
+		if character_snapshot.has("inventory_max"):
+			inventory_max = int(character_snapshot["inventory_max"])
+	if equipped_slots.is_empty():
 		equipped_slots = {
 			"MAIN_HAND": null, "OFF_HAND": null, "HEAD": null, "CHEST": null,
 			"LEGS": null, "FEET": null, "NECK": null, "RING_L": null, "RING_R": null
 		}
-
-	if character_snapshot.has("inventory_count"):
-		inventory_count = int(character_snapshot["inventory_count"])
-	if character_snapshot.has("inventory_max"):
-		inventory_max = int(character_snapshot["inventory_max"])
-
-	if _tabs != null:
+	if _tabs != null and is_mock_mode:
 		_tabs._load_mock_supplements()
 
 # ==============================================================================
