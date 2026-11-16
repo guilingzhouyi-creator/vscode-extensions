@@ -10,6 +10,7 @@
 # 用法示例:
 #   bash scripts/sh/check-gdscript.sh
 #   bash scripts/sh/check-gdscript.sh --scope all
+#   bash scripts/sh/check-gdscript.sh --per-file
 # ==============================================================================
 set -uo pipefail
 
@@ -31,23 +32,47 @@ PER_FILE=0
 # SCAN_DIRS（主路径单进程批处理与逐文件兜底模式共用同一清单，禁止手工维护第二份）。
 # 新增含 .gd 的顶层目录仅需在 batch_syntax_checker.gd 登记一处，两路径自动同口径。
 # ==============================================================================
-SCAN_DIRS_RAW="$(grep -A8 '^const SCAN_DIRS' "$ROOT_DIR/tests/batch_syntax_checker.gd" \
-  | grep -oE 'res://[A-Za-z0-9_]+' | sed 's|res://||')"
+BATCH_CHECKER="$ROOT_DIR/tests/batch_syntax_checker.gd"
+if [[ ! -f "$BATCH_CHECKER" ]]; then
+  echo "【check-gdscript】无法找到 batch_syntax_checker.gd（单一真源缺失，请先登记）"
+  exit 2
+fi
+SCAN_DIRS_RAW="$(awk '/^const[ \t]+SCAN_DIRS/{in_blk=1; next} in_blk{print; if(/\]/) exit}' "$BATCH_CHECKER" \
+  | grep -oE 'res://[A-Za-z0-9_]+' | sed 's|res://||' || true)"
 if [[ -z "$SCAN_DIRS_RAW" ]]; then
   echo "【check-gdscript】无法从 batch_syntax_checker.gd 提取 SCAN_DIRS（单一真源缺失，请先登记）"
   exit 2
 fi
-DIRS=($SCAN_DIRS_RAW)
+DIRS=()
+while IFS= read -r dir_item; do
+  [[ -n "$dir_item" ]] && DIRS+=("$dir_item")
+done <<< "$SCAN_DIRS_RAW"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --scope) SCOPE="${2:?--scope 需要参数}"; shift 2 ;;
     --per-file) PER_FILE=1; shift ;;
-    -h|--help) sed -n '2,11p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
     *) echo "【用法错误】未知参数: $1"; exit 2 ;;
   esac
 done
-case "$SCOPE" in all|backend|frontend|dev_harness|tests|benchmarks) ;; *) echo "【用法错误】--scope 取值: all|backend|frontend|dev_harness|tests|benchmarks"; exit 2 ;; esac
+
+VALID_SCOPE=0
+if [[ "$SCOPE" == "all" ]]; then
+  VALID_SCOPE=1
+else
+  for d in "${DIRS[@]}"; do
+    if [[ "$SCOPE" == "$d" ]]; then
+      VALID_SCOPE=1
+      break
+    fi
+  done
+fi
+if [[ "$VALID_SCOPE" -ne 1 ]]; then
+  SCOPES_JOINED="$(IFS='|'; echo "${DIRS[*]}")"
+  echo "【用法错误】--scope 取值: all|${SCOPES_JOINED}"
+  exit 2
+fi
 
 if ! command -v "$GODOT_BIN" >/dev/null 2>&1; then
   if command -v "${GODOT_BIN}.exe" >/dev/null 2>&1; then
@@ -58,28 +83,80 @@ if ! command -v "$GODOT_BIN" >/dev/null 2>&1; then
   fi
 fi
 
+if ! "$GODOT_BIN" --headless --version </dev/null >/dev/null 2>&1; then
+  echo "【check-gdscript】godot 探测失败（无法执行 --headless --version）"
+  exit 1
+fi
+
+extract_godot_user_diagnostics() {
+  local log_file="$1"
+  awk '
+    { lines[NR] = $0 }
+    END {
+      for (i = 1; i <= NR; i++) {
+        line = lines[i]
+        if (line ~ /^(SCRIPT ERROR:|Parse Error:|ERROR:[[:space:]]+Failed to load script)/) {
+          loc = ""
+          for (j = i + 1; j <= i + 3 && j <= NR; j++) {
+            if (lines[j] ~ /at:.*res:\/\//) {
+              loc = lines[j]
+              sub(/^[[:space:]]+/, "", loc)
+              break
+            }
+          }
+          msg = (loc != "" ? line " [" loc "]" : line)
+          if (!(msg in seen)) { seen[msg] = 1; print msg }
+          continue
+        }
+        if (line ~ /^WARNING:/) {
+          is_user = (line ~ /res:\/\/|\.gd([:[:space:]]|$)|GDScript/)
+          loc = ""
+          for (j = i + 1; j <= i + 3 && j <= NR; j++) {
+            if (lines[j] ~ /at:.*(res:\/\/|\.gd([:[:space:]]|$)|GDScript::)/) {
+              is_user = 1
+              loc = lines[j]
+              sub(/^[[:space:]]+/, "", loc)
+              break
+            }
+          }
+          if (is_user) {
+            msg = (loc != "" ? line " [" loc "]" : line)
+            if (!(msg in seen)) { seen[msg] = 1; print msg }
+          }
+        }
+      }
+    }
+  ' "$log_file"
+}
+
 cd "$ROOT_DIR" || exit 1
 
 if [[ "$PER_FILE" -eq 0 ]]; then
-  # 批处理收敛：--scope 单域同样走单进程批处理（batch_syntax_checker.gd 支持
-  # 命令行用户参数指定扫描目录），消除单域检查的逐文件冷启动；--per-file 显式
-  # 逐文件模式不受影响（故障定位手段）。
   echo "【check-gdscript】执行单进程极速批处理语法检查（scope=$SCOPE）..."
+  BATCH_CODE=0
   if [[ "$SCOPE" != "all" ]]; then
-    "$GODOT_BIN" --headless -s "res://tests/batch_syntax_checker.gd" -- "res://$SCOPE" >"$LOG" 2>&1
+    "$GODOT_BIN" --headless --debug --ignore-error-breaks --path "$ROOT_DIR" -s "res://tests/batch_syntax_checker.gd" -- "res://$SCOPE" </dev/null >"$LOG" 2>&1 || BATCH_CODE=$?
   else
-    "$GODOT_BIN" --headless -s "res://tests/batch_syntax_checker.gd" >"$LOG" 2>&1
+    "$GODOT_BIN" --headless --debug --ignore-error-breaks --path "$ROOT_DIR" -s "res://tests/batch_syntax_checker.gd" </dev/null >"$LOG" 2>&1 || BATCH_CODE=$?
   fi
-  if [[ $? -eq 0 ]]; then
+  BATCH_DIAGS="$(extract_godot_user_diagnostics "$LOG")"
+  if [[ "$BATCH_CODE" -eq 0 && -z "$BATCH_DIAGS" ]]; then
     rm -f "$LOG"
     echo "【check-gdscript】通过"
     exit 0
   fi
-  # 性能优化（审查完善）：批处理已输出失败明细（✗ res://…）且退出码 1 →
-  # 仅对失败文件清单逐个冷启动复验（通常 <10 个），消除对全量数百个 .gd
-  # 逐个冷启动的性能浪费；仅当批处理异常退出且无失败明细时才回落全量定位。
-  cat "$LOG"
-  FAILED_FILES="$(grep -E '^✗ res://' "$LOG" | sed -E 's/^✗ (res:\/\/[^ ]+).*/\1/' | sort -u)"
+
+  grep -E '^(✗|【batch-syntax-check】|SCRIPT ERROR:|Parse Error:|ERROR:[[:space:]]+Failed to load script)' "$LOG" || true
+  DIAG_COUNT=0
+  if [[ -n "$BATCH_DIAGS" ]]; then
+    DIAG_COUNT="$(printf '%s\n' "$BATCH_DIAGS" | grep -c .)"
+    echo "【check-gdscript】检测到 Godot 编译器错误/告警 ${DIAG_COUNT} 项:"
+    while IFS= read -r diag_line; do
+      [[ -n "$diag_line" ]] && echo "  ! $diag_line"
+    done <<< "$BATCH_DIAGS"
+  fi
+
+  FAILED_FILES="$(grep -E '^✗ res://' "$LOG" | sed -E 's/^✗ (res:\/\/[^ ]+).*/\1/' | sort -u || true)"
   if [[ -n "$FAILED_FILES" ]]; then
     FAILED_COUNT="$(printf '%s\n' "$FAILED_FILES" | grep -c .)"
     echo "【check-gdscript】批处理失败明细 ${FAILED_COUNT} 项，对失败清单逐个复验定位..."
@@ -89,28 +166,35 @@ if [[ "$PER_FILE" -eq 0 ]]; then
       [[ -z "$res_path" ]] && continue
       rel="${res_path#res://}"
       CHECKED=$((CHECKED + 1))
-      # 显式捕获真实退出码（禁止 if ! 取反吞码），失败日志保留至验收完成
-      "$GODOT_BIN" --headless --quiet --check-only -s "$res_path" >"$LOG" 2>&1
-      CODE=$?
-      if [[ "$CODE" -ne 0 ]]; then
+      CODE=0
+      "$GODOT_BIN" --headless --debug --ignore-error-breaks --quiet --path "$ROOT_DIR" --check-only -s "$res_path" </dev/null >"$LOG" 2>&1 || CODE=$?
+      RECHECK_DIAGS="$(extract_godot_user_diagnostics "$LOG")"
+      if [[ "$CODE" -ne 0 || -n "$RECHECK_DIAGS" ]]; then
         FAILS=$((FAILS + 1))
         echo "✗ $rel (exit=$CODE)"
-        grep -E "SCRIPT ERROR|Parse Error|ERROR" "$LOG" | head -3
+        printf '%s\n' "$RECHECK_DIAGS" | head -5 | sed 's/^/    /'
       else
         echo "✓ $rel (批处理误报，复验通过)"
       fi
     done <<< "$FAILED_FILES"
-    if [[ "$FAILS" -ne 0 ]]; then
+    if [[ "$FAILS" -ne 0 || "$DIAG_COUNT" -ne 0 ]]; then
       LOG_KEEP=1
       echo "【check-gdscript】失败日志已保留: $LOG"
-      echo "【check-gdscript】检查 $CHECKED 个失败文件，复验失败 $FAILS 个"
-      echo "【check-gdscript】未通过：存在解析错误，请先修复"
+      echo "【check-gdscript】检查 $CHECKED 个失败文件，复验失败 $FAILS 个，编译器告警/错误 ${DIAG_COUNT} 项"
+      echo "【check-gdscript】未通过：存在解析错误或编译器告警，请先修复"
       exit 1
     fi
     rm -f "$LOG"
     echo "【check-gdscript】失败清单复验 $CHECKED 个全部通过（批处理误报已澄清）"
     echo "【check-gdscript】通过"
     exit 0
+  fi
+
+  if [[ "$DIAG_COUNT" -ne 0 ]]; then
+    LOG_KEEP=1
+    echo "【check-gdscript】失败日志已保留: $LOG"
+    echo "【check-gdscript】未通过：存在 ${DIAG_COUNT} 项编译器告警或错误，请先修复"
+    exit 1
   fi
   echo "【check-gdscript】批处理异常退出且无失败明细，切入全量逐文件定位模式..."
 fi
@@ -131,13 +215,13 @@ while IFS= read -r f; do
   rel="${f#"$ROOT_DIR"/}"
   rel_res="res://${rel//\\//}"
   CHECKED=$((CHECKED + 1))
-  # 显式捕获真实退出码（禁止 if ! 取反吞码），失败日志保留至验收完成
-  "$GODOT_BIN" --headless --quiet --check-only -s "$rel_res" >"$LOG" 2>&1
-  CODE=$?
-  if [[ "$CODE" -ne 0 ]]; then
+  CODE=0
+  "$GODOT_BIN" --headless --debug --ignore-error-breaks --quiet --path "$ROOT_DIR" --check-only -s "$rel_res" </dev/null >"$LOG" 2>&1 || CODE=$?
+  FILE_DIAGS="$(extract_godot_user_diagnostics "$LOG")"
+  if [[ "$CODE" -ne 0 || -n "$FILE_DIAGS" ]]; then
     FAILS=$((FAILS + 1))
     echo "✗ $rel (exit=$CODE)"
-    grep -E "SCRIPT ERROR|Parse Error|ERROR" "$LOG" | head -3
+    printf '%s\n' "$FILE_DIAGS" | head -5 | sed 's/^/    /'
   fi
 done <<< "$FILES"
 
@@ -145,7 +229,7 @@ if [[ "$FAILS" -ne 0 ]]; then
   LOG_KEEP=1
   echo "【check-gdscript】失败日志已保留: $LOG"
   echo "【check-gdscript】检查 $CHECKED 个 .gd，失败 $FAILS 个（scope=$SCOPE）"
-  echo "【check-gdscript】未通过：存在解析错误，请先修复"
+  echo "【check-gdscript】未通过：存在解析错误或编译器告警，请先修复"
   exit 1
 fi
 rm -f "$LOG"

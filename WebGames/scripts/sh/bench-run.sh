@@ -19,14 +19,21 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && { pwd -W 2>/dev/null || pwd; })"
 GODOT_BIN="${GODOT_BIN:-godot}"
 OUT_DIR="$ROOT_DIR/benchmarks/reports"
+ITERATIONS=1
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --out) OUT_DIR="${2:?--out 需要目录参数}"; shift 2 ;;
-    -h|--help) sed -n '2,10p' "$0"; exit 0 ;;
+    --iterations) ITERATIONS="${2:?--iterations 需要整数参数}"; shift 2 ;;
+    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
     *) echo "【用法错误】未知参数: $1"; exit 2 ;;
   esac
 done
+
+if ! [[ "$ITERATIONS" =~ ^[0-9]+$ ]] || [[ "$ITERATIONS" -lt 1 ]]; then
+  echo "【用法错误】--iterations 必须为 >= 1 的整数"
+  exit 2
+fi
 
 if ! command -v "$GODOT_BIN" >/dev/null 2>&1; then
   echo "【bench-run】godot 不可用（可用 GODOT_BIN 环境变量指定路径）"
@@ -38,14 +45,16 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 REPORT="$OUT_DIR/bench_${STAMP}.json"
 LATEST="$OUT_DIR/bench_latest.json"
 
-echo "【bench-run】开始运行基准（godot=$GODOT_BIN）..."
+echo "【bench-run】开始运行基准（godot=$GODOT_BIN, iterations=$ITERATIONS）..."
 # 显式捕获真实退出码（禁止 if ! 取反吞码）
-"$GODOT_BIN" --headless --path "$ROOT_DIR" -s res://benchmarks/bench_runner.gd -- "$REPORT"
-CODE=$?
-if [[ "$CODE" -ne 0 ]]; then
-  echo "【bench-run】基准运行失败（真实退出码=$CODE）"
-  exit "$CODE"
-fi
+for ((run_index = 1; run_index <= ITERATIONS; run_index++)); do
+  CODE=0
+  "$GODOT_BIN" --headless --path "$ROOT_DIR" -s res://benchmarks/bench_runner.gd -- "$REPORT" </dev/null || CODE=$?
+  if [[ "$CODE" -ne 0 ]]; then
+    echo "【bench-run】基准运行失败（round=${run_index}/${ITERATIONS}, 真实退出码=$CODE）"
+    exit "$CODE"
+  fi
+done
 cp "$REPORT" "$LATEST"
 echo "【bench-run】完成: $REPORT"
 echo "【bench-run】最新快照: $LATEST"
