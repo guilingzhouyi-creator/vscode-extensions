@@ -8,14 +8,6 @@
 # ==============================================================================
 extends SceneTree
 
-const BenchHarness := preload("res://benchmarks/bench_harness.gd")
-const BenchInfrastructure := preload("res://benchmarks/bench_infrastructure.gd")
-const BenchPersistence := preload("res://benchmarks/bench_persistence.gd")
-const BenchDomains := preload("res://benchmarks/bench_domains.gd")
-const BenchCurrency := preload("res://benchmarks/bench_currency.gd")
-const BenchLogging := preload("res://benchmarks/bench_logging.gd")
-const BenchBus := preload("res://benchmarks/bench_bus.gd")
-
 func _init() -> void:
 	var report_path := _resolve_report_path()
 	print("\n" + "=".repeat(78))

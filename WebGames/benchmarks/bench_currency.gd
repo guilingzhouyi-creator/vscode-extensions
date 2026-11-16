@@ -10,8 +10,6 @@
 # ==============================================================================
 class_name BenchCurrency extends RefCounted
 
-const BenchHarness := preload("res://benchmarks/bench_harness.gd")
-
 static func run_benchmarks() -> Dictionary:
 	var metrics: Array = []
 	GameConfig.ensure_loaded()

@@ -11,8 +11,6 @@
 # ==============================================================================
 class_name BenchBus extends RefCounted
 
-const BenchHarness := preload("res://benchmarks/bench_harness.gd")
-
 ## 总线测量接收方计数（信号连接数）
 static var _receiver_count: int = 0
 
@@ -68,9 +66,9 @@ static func run_benchmarks() -> Dictionary:
 	return { "category": "事件总线吞吐 (EventBus Throughput)", "metrics": metrics }
 
 ## 叙事接收方（计数回调，模拟前端战报面板订阅；EventPacket 解包）
-static func _on_narrative(packet: EventPacket) -> void:
+static func _on_narrative(_packet: EventPacket) -> void:
 	_receiver_count += 1
 
 ## 领域事件接收方（计数回调，模拟结构化消费者订阅；EventPacket 解包）
-static func _on_domain(packet: EventPacket) -> void:
+static func _on_domain(_packet: EventPacket) -> void:
 	_receiver_count += 1

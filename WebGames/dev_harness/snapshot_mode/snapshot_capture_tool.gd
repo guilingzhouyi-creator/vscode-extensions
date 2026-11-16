@@ -9,11 +9,6 @@
 class_name SnapshotCaptureTool
 extends RefCounted
 
-const TestSnapshotBundleDTO = preload("res://dev_harness/snapshot_mode/dto/test_snapshot_bundle_dto.gd")
-const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
-const SnapshotEnvironmentGuard = preload("res://dev_harness/snapshot_mode/snapshot_environment_guard.gd")
-const SnapshotInjectionSolver = preload("res://dev_harness/snapshot_mode/snapshot_injection_solver.gd")
-
 ## 抓取当前全域状态为快照 DTO（非 Debug/Test 环境强行熔断返回空对象）
 static func capture_current_state(snapshot_id: String, description: String = "", custom_ctx: RefCounted = null) -> TestSnapshotBundleDTO:
 	if not SnapshotEnvironmentGuard.is_injection_permitted():

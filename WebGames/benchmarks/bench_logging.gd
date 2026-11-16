@@ -10,8 +10,6 @@
 # ==============================================================================
 class_name BenchLogging extends RefCounted
 
-const BenchHarness := preload("res://benchmarks/bench_harness.gd")
-
 static func run_benchmarks() -> Dictionary:
 	var metrics: Array = []
 	GameConfig.ensure_loaded()
@@ -70,7 +68,7 @@ static func run_benchmarks() -> Dictionary:
 	var raw_lines := "line:001 message=基准采样 round=3 hp=87.5\n"
 	metrics.append(BenchHarness.measure(
 		"Log.primitive.string_concat 字符串规整", 500_000,
-		func(): "[INFO] " + raw_lines.strip_edges()
+		func(): return "[INFO] " + raw_lines.strip_edges()
 	))
 
 	return { "category": "日志链路与去重压缩原语 (Log Pipeline & Primitives)", "metrics": metrics }

@@ -9,8 +9,6 @@
 class_name SnapshotCatalog
 extends RefCounted
 
-const TestSnapshotBundleDTO = preload("res://dev_harness/snapshot_mode/dto/test_snapshot_bundle_dto.gd")
-
 ## 1. 初生态快照（序章刚结束，白板新手装备，基础货币）
 static func fixture_novice_spawned() -> TestSnapshotBundleDTO:
 	var snap := TestSnapshotBundleDTO.new()

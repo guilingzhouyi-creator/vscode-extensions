@@ -9,8 +9,6 @@
 class_name TestSnapshotBuilder
 extends RefCounted
 
-const TestSnapshotBundleDTO = preload("res://dev_harness/snapshot_mode/dto/test_snapshot_bundle_dto.gd")
-
 var _dto: TestSnapshotBundleDTO = null
 
 func _init(snapshot_id: String = "BUILDER_SNAPSHOT") -> void:

@@ -6,8 +6,6 @@
 # ==============================================================================
 class_name BenchInfrastructure extends RefCounted
 
-const BenchHarness := preload("res://benchmarks/bench_harness.gd")
-
 static func run_benchmarks() -> Dictionary:
 	var metrics: Array = []
 	GameConfig.ensure_loaded()
@@ -46,7 +44,7 @@ static func run_benchmarks() -> Dictionary:
 		func(): bus.emit_narrative_by_key("currency/sink_transaction", "economy", [1, "BENCH"])
 	))
 	metrics.append(BenchHarness.measure(
-		"EventBusCore.render_narrative 模板渲染", 100_000,
+		"EventBus.render_narrative 模板渲染", 100_000,
 		func(): EventBusCore.render_narrative("currency/sink_transaction", [1, "BENCH"])
 	))
 	metrics.append(BenchHarness.measure(
@@ -69,5 +67,5 @@ static func run_benchmarks() -> Dictionary:
 	return { "category": "基础设施 (Infrastructure)", "metrics": metrics }
 
 ## EventBusCore 叙事事件订阅者（命名静态方法，规避闭包 teardown 段错误；EventPacket 解包）
-static func _on_narrative_event(packet: EventPacket) -> void:
+static func _on_narrative_event(_packet: EventPacket) -> void:
 	pass

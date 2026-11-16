@@ -9,21 +9,6 @@
 class_name SnapshotInjectionSolver
 extends RefCounted
 
-const TestSnapshotBundleDTO = preload("res://dev_harness/snapshot_mode/dto/test_snapshot_bundle_dto.gd")
-const SnapshotEnvironmentGuard = preload("res://dev_harness/snapshot_mode/snapshot_environment_guard.gd")
-const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
-const SessionFlowContextDTO = preload("res://backend/domains/lifecycle/dto/session_flow_context_dto.gd")
-const GameLifecycleManager = preload("res://backend/domains/lifecycle/game_lifecycle_manager.gd")
-const GameLifecycleModel = preload("res://backend/domains/lifecycle/game_lifecycle_model.gd")
-const AuthoritativeHudSyncService = preload("res://backend/domains/world_state/services/authoritative_hud_sync_service.gd")
-const HudStatusSnapshotDTO = preload("res://backend/domains/world_state/dto/hud_status_snapshot_dto.gd")
-const CharacterPhysiologySheet = preload("res://backend/domains/lifecycle_physiology/character_physiology_sheet.gd")
-const CharacterWalletEntity = preload("res://backend/domains/currency_economy/character_wallet_entity.gd")
-const AuthService = preload("res://backend/domains/account/auth_service.gd")
-const RuntimeModeGate = preload("res://backend/domains/persistence_protocol/runtime_mode_gate.gd")
-const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
-const AccountProfile = preload("res://backend/domains/account/account_profile.gd")
-
 const STAGE_INDEX_HUD_SYNC: int = 6
 const STAGE_INDEX_FULL_EXIT: int = 10
 

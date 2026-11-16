@@ -6,7 +6,6 @@
 # ==============================================================================
 class_name BenchPersistence extends RefCounted
 
-const BenchHarness := preload("res://benchmarks/bench_harness.gd")
 const BENCH_SAVE_NAME: String = "bench_throughput_probe"
 
 ## 往返结果回写区（bind 按值捕获字典副本，无法回写外层局部变量，故用静态区）
