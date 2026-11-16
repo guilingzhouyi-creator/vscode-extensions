@@ -5,6 +5,8 @@
 class_name TestFE15SettingsCenter
 extends RefCounted
 
+const FeMountHelper = preload("res://tests/unit/frontend/fe_mount_test_helper.gd")
+
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	var domain_name = "FE Vol 15: 设置中心系统（音画/多语言/15秒回滚）"
@@ -12,6 +14,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_audio_volume_sliders())
 	results.append(_test_resolution_15s_rollback_prompt())
 	results.append(_test_locale_switch())
+	results.append(_test_mounted_real_settings_center())
 
 	var passed_cnt = 0
 	for r in results:
@@ -65,4 +68,22 @@ static func _test_locale_switch() -> Dictionary:
 	return {
 		"test": "TC-FE15-03: 国际化多语言即时热切状态保持与节点文本响应",
 		"passed": passed
+	}
+
+static func _test_mounted_real_settings_center() -> Dictionary:
+	var orphan_before := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+	var mount_handle := FeMountHelper.mount_scene("res://frontend/views/settings_center/settings_center_view.tscn", "real")
+	var passed := bool(mount_handle.get("ok", false))
+	var mounted_view: SettingsCenterView = mount_handle.get("view", null) as SettingsCenterView
+	if mounted_view != null:
+		var locale_count: int = mounted_view.option_language.item_count if mounted_view.option_language != null else 0
+		mounted_view._tabs.on_master_volume_changed(0.65)
+		mounted_view.switch_locale("en_US")
+		mounted_view.switch_locale("zh_CN")
+		passed = passed and mounted_view.is_mounted_in_tree() and mounted_view.get_child_count() > 0 and (locale_count == 2)
+	FeMountHelper.unmount_scene(mount_handle)
+	var orphan_after := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+	return {
+		"test": "TC-FE15-04: 真场景挂载 settings_center_view.tscn（real 模式双语集齐与零残留）",
+		"passed": passed and (orphan_after <= orphan_before)
 	}

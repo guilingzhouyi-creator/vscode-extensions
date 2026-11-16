@@ -5,6 +5,8 @@
 class_name TestFE16SystemSave
 extends RefCounted
 
+const FeMountHelper = preload("res://tests/unit/frontend/fe_mount_test_helper.gd")
+
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	var domain_name = "FE Vol 16: 系统与存档系统（存档管理/回放审计/GM作弊/CDKey）"
@@ -12,6 +14,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_save_slots_hardcore_badge())
 	results.append(_test_gm_console_toggle())
 	results.append(_test_cdkey_input_submission())
+	results.append(_test_mounted_real_system_save())
 
 	var passed_cnt = 0
 	for r in results:
@@ -61,4 +64,24 @@ static func _test_cdkey_input_submission() -> Dictionary:
 	return {
 		"test": "TC-FE16-03: 礼包兑换码输入格式化大写与提交校验",
 		"passed": passed
+	}
+
+static func _test_mounted_real_system_save() -> Dictionary:
+	var orphan_before := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+	var mount_handle := FeMountHelper.mount_scene("res://frontend/views/system_save/system_save_view.tscn", "real")
+	var passed := bool(mount_handle.get("ok", false))
+	var mounted_view: SystemSaveView = mount_handle.get("view", null) as SystemSaveView
+	if mounted_view != null:
+		mounted_view.set_save_slots_snapshot([
+			{ "slot_id": "SLOT_01", "char_name": "铁壁守卫", "is_hardcore": false }
+		])
+		mounted_view._get_tabs().execute_gm_command("/help")
+		var cdkey_outcome := mounted_view.submit_cdkey_input("KALAR-REAL-TEST")
+		mounted_view._get_tabs().redeem_cdkey()
+		passed = passed and mounted_view.is_mounted_in_tree() and mounted_view.get_child_count() > 0 and bool(cdkey_outcome.get("success", false))
+	FeMountHelper.unmount_scene(mount_handle)
+	var orphan_after := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+	return {
+		"test": "TC-FE16-04: 真场景挂载 system_save_view.tscn（real 模式存档/GM/CDKey与零残留）",
+		"passed": passed and (orphan_after <= orphan_before)
 	}

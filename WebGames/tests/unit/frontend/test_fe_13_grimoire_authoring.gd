@@ -5,6 +5,8 @@
 class_name TestFE13GrimoireAuthoring
 extends RefCounted
 
+const FeMountHelper = preload("res://tests/unit/frontend/fe_mount_test_helper.gd")
+
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	var domain_name = "FE Vol 13: 魔典与著书系统（书库/AST编辑器/著书/版税）"
@@ -12,6 +14,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_authored_books_loading())
 	results.append(_test_ast_editor_node_drag_connect())
 	results.append(_test_royalty_settlement_view())
+	results.append(_test_mounted_real_grimoire_authoring())
 
 	var passed_cnt = 0
 	for r in results:
@@ -63,4 +66,22 @@ static func _test_royalty_settlement_view() -> Dictionary:
 	return {
 		"test": "TC-FE13-03: 藏经阁典籍借阅与版税预估收益看板",
 		"passed": passed
+	}
+
+static func _test_mounted_real_grimoire_authoring() -> Dictionary:
+	var orphan_before := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+	var mount_handle := FeMountHelper.mount_scene("res://frontend/views/grimoire_authoring/grimoire_authoring_view.tscn", "real")
+	var passed := bool(mount_handle.get("ok", false))
+	var mounted_view: GrimoireAuthoringView = mount_handle.get("view", null) as GrimoireAuthoringView
+	if mounted_view != null:
+		var node_outcome := mounted_view.add_editor_node("N_REAL_1", "SLASH", Vector2(40, 40))
+		mounted_view._on_ast_save_pressed()
+		mounted_view._on_ast_compile_pressed()
+		mounted_view._get_tabs().on_auth_submit_pressed()
+		passed = passed and mounted_view.is_mounted_in_tree() and mounted_view.get_child_count() > 0 and bool(node_outcome.get("success", false))
+	FeMountHelper.unmount_scene(mount_handle)
+	var orphan_after := int(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+	return {
+		"test": "TC-FE13-04: 真场景挂载 grimoire_authoring_view.tscn（real 模式编纂编译与零残留）",
+		"passed": passed and (orphan_after <= orphan_before)
 	}

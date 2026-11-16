@@ -6,10 +6,8 @@
 class_name TestFrontendBoundary
 extends TestCase
 
-const FrontendHudSnapshot = preload("res://frontend/domain_boundary/contracts/frontend_hud_snapshot.gd")
 const BaseScreenClass = preload("res://frontend/presentation/base/base_screen.gd")
 const UIStateContainerClass = preload("res://frontend/presentation/common/ui_state_container.gd")
-const MainHUDView = preload("res://frontend/views/main_hud/main_hud_view.gd")
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
