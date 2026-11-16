@@ -7,7 +7,7 @@
 #           PrologueExecutionKernel, AssetPathResolver, AntiBridgeGuard
 # 职责说明: 使用与卡拉尔完全无关的纯合成异世界内容 MOD，验证可组合叠层注入、
 #           DAG 序章推演、环依赖拒载、.kmod 二进制寻址隔离、联机摘要核验与退回归零。
-# 设计依据: Phase 130 阶段4验收矩阵 (TC-PMC-01 ~ TC-PMC-05, DOD-P130-0401)
+# 设计依据: 阶段验收矩阵 (TC-PMC-01 ~ TC-PMC-05, DOD-P130-0401)
 # ==============================================================================
 
 ## TestPluginModCompositionAndIsolation：纯插件化非卡拉尔 MOD 组合、资产隔离与叠层归零测试套件
@@ -27,7 +27,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_kmod_zip_asset_resolution_and_traversal_guard())
 	results.append(test_realm_digest_composition_and_exit_clean_isolation())
 	SyntheticChronoModFixture.cleanup_sandbox()
-	return TestCase.pack_results("Phase 130 纯插件化异世界 MOD 组合叠加与零泄漏隔离流水线", results)
+	return TestCase.pack_results("纯插件化异世界 MOD 组合叠加与零泄漏隔离流水线", results)
 
 ## TC-PMC-01: 非卡拉尔 TotalConversion + ContentAddon 磁盘发现、拓扑编排与 Tier3 注入
 static func test_non_kalar_base_plus_addon_composition() -> Dictionary:

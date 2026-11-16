@@ -33,7 +33,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_proto_13_game_settings_protocol_and_honest_failures())
 	results.append(test_proto_14_mock_service_container_reserved_interfaces_parity())
 	_teardown_env()
-	return TestCase.pack_results("Phase 128 客户端交互协议空间标准化与边界适配器验收流水线", results)
+	return TestCase.pack_results("客户端交互协议空间标准化与边界适配器验收流水线", results)
 
 static func _setup_env() -> void:
 	TestFullChainBackendHelper.setup_env()

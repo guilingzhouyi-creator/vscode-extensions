@@ -1,14 +1,14 @@
 # ==============================================================================
 # 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_neutrality_sdk_and_gates_pipeline.gd
-# 架构定位: Integration Test Pipeline / Phase 133 Neutrality, Real Services & Gates Pipeline
+# 架构定位: Integration Test Pipeline / Neutrality, Real Services & Gates Pipeline
 # 依赖与触发: 上游: TestRegistry | 下游: ServiceLocator, RealServiceContainer,
 #           ItemRegistrySolver, ModPackageDiscoverySolver, ModPrecheckAndAdaptationSolver,
 #           GameConfig, NavManager, UIIntermediary
-# 职责说明: 端到端验证 Phase 133 全领域 21 项真实服务无模拟回退、多命名空间物品格式、
+# 职责说明: 端到端验证全领域 21 项真实服务无模拟回退、多命名空间物品格式、
 #           基座配置去卡拉尔中性化与 views.json 视图段完整性、total_conversion_sample
 #           与 official_kalar 哈希自洽、以及前端单例 teardown 零孤立节点泄漏。
-# 设计依据: Phase 133 阶段4验收矩阵 (DOD-P133-01 ~ DOD-P133-04)
+# 设计依据: 阶段验收矩阵 (DOD-P133-01 ~ DOD-P133-04)
 # ==============================================================================
 
 ## TestNeutralitySdkAndGatesPipeline：全领域真实服务、基座中性化与门禁闭环流水线
@@ -23,7 +23,7 @@ const EXPECTED_SERVICE_KEYS: Array[String] = [
 ]
 
 
-## 执行 Phase 133 全链路回归流水线
+## 执行全领域真实服务与基座中性化全链路回归流水线
 static func run_all_tests() -> Dictionary:
 	_reset_phase_state()
 	var results: Array[Dictionary] = []
@@ -32,7 +32,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_dod_p133_03_sdk_samples_and_official_digest())
 	results.append(test_dod_p133_04_singleton_teardown_zero_leaks())
 	_reset_phase_state()
-	return TestCase.pack_results("Phase 133 全领域真实服务、去卡拉尔中性化与门禁闭环流水线", results)
+	return TestCase.pack_results("全领域真实服务、去卡拉尔中性化与门禁闭环流水线", results)
 
 
 ## DOD-P133-01: ServiceLocator real 模式全 21 项域服务无模拟回退并可执行真实调用

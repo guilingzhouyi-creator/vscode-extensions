@@ -9,7 +9,7 @@
 #           自动登录注册(零伪令牌) -> 世界网关建档 -> 自动分流 CharacterCreationView ->
 #           权威创角锁定(真实64位SHA256) -> DAG序章 -> MainHUD -> ESC返关(栈深=1/保上下文) ->
 #           NavManager.pop_screen 参数保真 -> 切换联机洗脱 SP MOD -> 验签 -> 优雅停机 -> 重进已有角色直入。
-# 设计依据: Phase 131 阶段4验收矩阵 (TC-E2E-UI-01 ~ TC-E2E-UI-03, DOD-P131-0401)
+# 设计依据: 阶段验收矩阵 (TC-E2E-UI-01 ~ TC-E2E-UI-03, DOD-P131-0401)
 # ==============================================================================
 
 ## TestRealUiChainAndLockSecurityPipeline：全端可点击 UI 真实链路闭环回归套件
@@ -27,7 +27,7 @@ const MainHUDViewScript = preload("res://frontend/views/main_hud/main_hud_view.g
 const WORLD_ID: String = "WORLD_P131_E2E_UI_01"
 
 
-## 执行 Phase 131 全端真实交互与安全闭环端到端测试
+## 执行全端真实交互与安全闭环端到端测试
 static func run_all_tests() -> Dictionary:
 	var session_ctx := _setup_env()
 	var results: Array[Dictionary] = []
@@ -35,7 +35,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_tc_e2e_02_esc_exit_nav_pop_mode_switch_quit(session_ctx))
 	results.append(_test_tc_e2e_03_reentry_existing_char_and_entry_signals(session_ctx))
 	_teardown_env(session_ctx)
-	return TestCase.pack_results("Phase 131 全端真实可点击UI闭环与锁安全端到端验收流水线", results)
+	return TestCase.pack_results("全端真实可点击UI闭环与锁安全端到端验收流水线", results)
 
 
 static func _setup_env() -> Dictionary:

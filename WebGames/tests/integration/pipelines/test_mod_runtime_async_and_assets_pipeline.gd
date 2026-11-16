@@ -1,14 +1,14 @@
 # ==============================================================================
 # 模块归属: 测试体系 (Tests · Integration Pipelines)
 # 文件路径: res://tests/integration/pipelines/test_mod_runtime_async_and_assets_pipeline.gd
-# 架构定位: Integration Test Pipeline / Phase 132 End-to-End Runtime, Async UI & KMOD Pipeline
+# 架构定位: Integration Test Pipeline / End-to-End Runtime, Async UI & KMOD Pipeline
 # 依赖与触发: 上游: TestRegistry | 下游: Tier3ContentOverrideLoader, UIIntermediary,
 #           PrologueExecutionKernel, CombatHandGenerator, MapAndEcologySolver,
 #           RewardDispatchPipeline, AssetPathResolver, CutsceneAsyncLoader
-# 职责说明: 端到端验证 Phase 132 MOD 多语言分桶热切换还原、序章 DAG Hook 与路由优先级、
+# 职责说明: 端到端验证 MOD 多语言分桶热切换还原、序章 DAG Hook 与路由优先级、
 #           .kmod 内嵌 skill_cards/cdkeys/mod_world_topology 运行时消费、真异步延迟回调时序、
 #           以及 .kmod PNG ImageTexture 异步加载与防编码穿越阻断。
-# 设计依据: Phase 132 阶段4验收矩阵 (DOD-P132-01 ~ DOD-P132-05)
+# 设计依据: 阶段验收矩阵 (DOD-P132-01 ~ DOD-P132-05)
 # ==============================================================================
 
 ## TestModRuntimeAsyncAndAssetsPipeline：MOD 运行时全消费、真异步 UI 与 .kmod 资产验收流水线
@@ -149,7 +149,7 @@ class DelayedAsyncPrologueService extends "res://frontend/domain_boundary/interf
 		})
 
 
-## 执行 Phase 132 全链路回归流水线
+## 执行 MOD 运行时与异步资产全链路回归流水线
 static func run_all_tests() -> Dictionary:
 	_reset_all_state()
 	var results: Array[Dictionary] = []
@@ -159,7 +159,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_tc_p132_04_true_async_ui_deferred_chaining())
 	results.append(test_tc_p132_05_kmod_png_image_texture_and_anti_traversal())
 	_reset_all_state()
-	return TestCase.pack_results("Phase 132 MOD运行时全消费与真异步及资产闭环流水线", results)
+	return TestCase.pack_results("MOD运行时全消费与真异步及资产闭环流水线", results)
 
 
 ## TC-P132-01: 双语 i18n MOD 分语言注入、热切换刷新与卸载还原

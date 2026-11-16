@@ -3,9 +3,9 @@
 # 文件路径: res://tests/integration/pipelines/test_authoritative_hud_and_mode_adaptation_pipeline.gd
 # 架构定位: Integration Test Pipeline / Acceptance Harness
 # 跨域依赖: 上游: TestRegistry | 下游: world_state, world_gateway, account, lifecycle | 配置: config/domains/world_state/core.json
-# 职责说明: Phase 118 全链路主页 HUD 六大业务支柱聚合与单机联机模式自适应无头集成测试流水线。
+# 职责说明: 全链路主页 HUD 六大业务支柱聚合与单机联机模式自适应无头集成测试流水线。
 #           覆盖 TC-HMA-01 ~ TC-HMA-12，验证轻重资产纯度 (<= 4KB)、存储隔离与全生命周期闭环。
-# 设计依据: Phase 118 阶段4验收测试矩阵规约与卡拉尔架构解耦契约
+# 设计依据: 阶段验收测试矩阵规约与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name TestAuthoritativeHudAndModeAdaptationPipeline

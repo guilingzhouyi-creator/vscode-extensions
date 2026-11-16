@@ -26,7 +26,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_p127_09_double_cycle_bootstrap_teardown_symmetry())
 	results.append(test_p127_10_protocol_pool_and_deterministic_high_freq_conservation())
 	_teardown_env()
-	return TestCase.pack_results("Phase 127 全链路前后端交互协议与后端闭环验收流水线", results)
+	return TestCase.pack_results("全链路前后端交互协议与后端闭环验收流水线", results)
 
 static func _setup_env() -> void:
 	TestFullChainBackendHelper.setup_env()

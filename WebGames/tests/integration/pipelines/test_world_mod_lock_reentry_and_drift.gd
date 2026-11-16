@@ -8,7 +8,7 @@
 # 职责说明: 验证单机世界建档固化 world_mod_lock.json 后卸载叠层重进自动恢复、
 #           缺失关键 MOD 阻断、摘要/版本漂移检测拦截、安全降级记录 MOD_DETACHED 与
 #           网关档案诊断面板渲染。
-# 设计依据: Phase 130 阶段4验收矩阵 (TC-WLD-01 ~ TC-WLD-04, DOD-P130-0402)
+# 设计依据: 阶段验收矩阵 (TC-WLD-01 ~ TC-WLD-04, DOD-P130-0402)
 # ==============================================================================
 
 ## TestWorldModLockReentryAndDrift：世界档案 MOD 锁重入复原、缺失漂移拦截与安全降级测试套件
@@ -32,7 +32,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_phase131_lock_sha256_fail_closed_and_strict_reconcile())
 	WorldModLockTestHelper.cleanup_world_lock_sandbox()
 	TestFullChainBackendHelper.teardown_env()
-	return TestCase.pack_results("Phase 130 世界档案 MOD 锁重入复原与漂移阻断验收流水线", results)
+	return TestCase.pack_results("世界档案 MOD 锁重入复原与漂移阻断验收流水线", results)
 
 ## TC-WLD-01: 创角前置固化锁后完全卸载叠层，重入网关与二次载入自动复原 Tier3 与清单
 static func test_world_mod_lock_reentry_restores_overlay() -> Dictionary:
@@ -195,7 +195,7 @@ static func test_safe_degrade_records_fragment_and_ui_diagnostics() -> Dictionar
 	})
 
 
-## TC-WLD-05 (Phase 131 P0): 真实 SHA-256 固化、摘要漂移无条件禁降级 Fail-Closed 与有锁严格收敛
+## TC-WLD-05 (P0 安全基线): 真实 SHA-256 固化、摘要漂移无条件禁降级 Fail-Closed 与有锁严格收敛
 static func test_phase131_lock_sha256_fail_closed_and_strict_reconcile() -> Dictionary:
 	WorldModLockTestHelper.cleanup_world_lock_sandbox()
 	var seeded := WorldModLockTestHelper.seed_locked_world_and_character()

@@ -83,7 +83,7 @@ static func _test_furnace_disposal_and_residue_generation() -> Dictionary:
 	}
 
 static func _test_locked_container_state_rejection() -> Dictionary:
-	# P39 清单4：container_state == LOCKED 的锁定物品严禁销毁（与分解/追缴同语义）
+	# 安全闭环：container_state == LOCKED 的锁定物品严禁销毁（与分解/追缴同语义）
 	var locked_item := ItemEntity.new()
 	locked_item.item_id = "LOCKED_RELIC"
 	locked_item.custom_name = "已锁定圣遗物"

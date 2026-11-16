@@ -95,7 +95,7 @@ static func test_entitlement_gate() -> Dictionary:
 	return {"test": "TC-WS-06: 权限字段可扩展且统一鉴权入口分责", "passed": passed}
 
 static func test_entitlement_seal() -> Dictionary:
-	# P39 清单 6：密封密钥经环境供给（生产缺失即失败关闭）——测试显式注入受控测试密钥
+	# 安全规范：密封密钥经环境供给（生产缺失即失败关闭）——测试显式注入受控测试密钥
 	OS.set_environment("KALAR_ENTITLEMENT_KEY", "test-seal-key-v1")
 	var acc := AccountProfile.new()
 	acc.account_id = "ACC_SEAL"

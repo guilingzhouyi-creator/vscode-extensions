@@ -3,8 +3,8 @@
 # 文件路径: res://tests/integration/pipelines/test_agent_full_playthrough_and_workbench_pipeline.gd
 # 架构定位: Integration Test Suite / End-to-End Pipeline Harness
 # 跨域依赖: 上游: TestRegistry | 下游: ModManifestValidator, WorldGatewayFSM, PrologueHandoffDTO, AccountSlotCreationDTO, AgentPlaythroughSession, CompositeEventExtractor
-# 职责说明: Phase 124 开发者集成工作台、.kmod 清单审计、创角参数收敛、序章大地图跃迁与循环零瞬态堆分配全链路回归套件
-# 设计依据: Phase 124 阶段4验收测试矩阵规约与卡拉尔架构解耦契约
+# 职责说明: 开发者集成工作台、.kmod 清单审计、创角参数收敛、序章大地图跃迁与循环零瞬态堆分配全链路回归套件
+# 设计依据: 阶段验收测试矩阵规约与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name TestAgentFullPlaythroughAndWorkbenchPipeline

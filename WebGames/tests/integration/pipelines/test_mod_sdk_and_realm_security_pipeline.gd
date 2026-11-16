@@ -267,7 +267,7 @@ static func test_gateway_exit_symmetric_cleanup() -> Dictionary:
 	})
 
 
-## TC-MSS-07 (Phase 131 P0): 单机→联机切模自动洗脱本地扩展、显式传毒拦截、验签失败回滚与 exit 清零选择态
+## TC-MSS-07 (P0 安全基线): 单机→联机切模自动洗脱本地扩展、显式传毒拦截、验签失败回滚与 exit 清零选择态
 static func test_phase131_switch_clean_purge_and_realm_fail_rollback() -> Dictionary:
 	var had_overlay := GameConfig.has_active_mod_overlay()
 	var kalar_mount := TestCase.mount_official_kalar_for_test()

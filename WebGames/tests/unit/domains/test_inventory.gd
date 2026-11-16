@@ -16,7 +16,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_unequip_item_ref_helper())
 	# F-1（TC-INV-11）：restore 深载荷唯一入口
 	results.append(test_restore_deep_payload_only())
-	# Phase 106（TC-INV-12）：自动签发 SRV_ 前缀合法 UID
+	# 安全基线（TC-INV-12）：自动签发 SRV_ 前缀合法 UID
 	results.append(test_auto_generated_srv_uid_validity())
 	# 物品属性双 UID 联动与隐藏特殊词缀体系
 	var affix_res := TestItemAttributeAffixSystemPipeline.run_all_tests()
@@ -78,7 +78,7 @@ static func test_multi_profession_clustering() -> Dictionary:
 	return { "test": "TC-INV-05: 魔武双修动态聚类极效魔剑士", "passed": passed, "count": professions.size() }
 
 static func test_deep_snapshot_rollback() -> Dictionary:
-	# P39 清单2：snapshot/restore 为 item 级深拷贝（serialize/deserialize 重建）。
+	# 序列化规范：snapshot/restore 为 item 级深拷贝（serialize/deserialize 重建）。
 	# 深快照后对运行实例的深层字段就地变更（词缀/耐久/锁定），restore 须完整恢复。
 	var inv := WearableInventoryAggregate.new()
 	inv.baseline_capacity = 1

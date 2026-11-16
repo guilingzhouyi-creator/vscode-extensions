@@ -206,11 +206,11 @@ static func test_gm_command_catalog_dispatch() -> Dictionary:
 	}
 
 static func test_clawback_service() -> Dictionary:
-	# P39 清单 6：审计签名密钥经环境供给——测试显式注入（缺钥即失败关闭，签名不可用）
+	# 审计清单 6：审计签名密钥经环境供给——测试显式注入（缺钥即失败关闭，签名不可用）
 	OS.set_environment("KALAR_ENTITLEMENT_KEY", "test-seal-key-v1")
 	var gm := AdminPermissionAggregate.new()
 	gm.current_level = AdminPermissionAggregate.AdminLevel.LEVEL_GAME_MASTER
-	gm.granted_permissions = ["CLAWBACK"]  # P39 清单 5：GM 追缴需显式授权权限（空权限集合不放行）
+	gm.granted_permissions = ["CLAWBACK"]  # GM 追缴需显式授权权限（空权限集合不放行）
 	var player := AdminPermissionAggregate.new() # LEVEL_PLAYER
 	var online := ClawbackService.RUN_MODE_ONLINE
 	var standalone := ClawbackService.RUN_MODE_STANDALONE
@@ -227,7 +227,7 @@ static func test_clawback_service() -> Dictionary:
 	)
 	var perm_ok = (not r_perm.success) and r_perm.error_code == "CLAWBACK_PERMISSION_DENIED"
 
-	# 边界 2b（P39 清单 5）：空权限集合的 GM 不能仅凭等级放行（权限集合为权威）
+	# 边界 2b：空权限集合的 GM 不能仅凭等级放行（权限集合为权威）
 	var gm_empty := AdminPermissionAggregate.new()
 	gm_empty.current_level = AdminPermissionAggregate.AdminLevel.LEVEL_GAME_MASTER
 	var r_empty_perm = ClawbackService.clawback_currency(

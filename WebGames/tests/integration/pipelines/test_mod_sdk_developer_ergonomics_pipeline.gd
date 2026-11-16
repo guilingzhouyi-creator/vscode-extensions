@@ -3,8 +3,8 @@
 # 文件路径: res://tests/integration/pipelines/test_mod_sdk_developer_ergonomics_pipeline.gd
 # 架构定位: Integration Test Pipeline / Mod SDK Developer Ergonomics Harness
 # 跨域依赖: 上游: TestRegistry | 下游: world_state, world_gateway, persistence_protocol, lifecycle
-# 职责说明: Phase 123 MOD 开发者便利套件协议同步与全链路调试推演端到端流水线 (TC-MDE-01 ~ TC-MDE-08)
-# 设计依据: Phase 123 阶段4验收测试矩阵规约与卡拉尔架构解耦契约
+# 职责说明: MOD 开发者便利套件协议同步与全链路调试推演端到端流水线 (TC-MDE-01 ~ TC-MDE-08)
+# 设计依据: 阶段验收测试矩阵规约与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name TestModSdkDeveloperErgonomicsPipeline

@@ -3,8 +3,8 @@
 # 文件路径: res://tests/integration/test_binary_config_and_kdat_pipeline.gd
 # 架构定位: Integration Test Suite / End-to-End Pipeline Harness
 # 跨域依赖: 上游: TestRegistry | 下游: BinaryConfigReader, KDataHeaderDTO, KDataTOCEntryDTO, GameConfig
-# 职责说明: Phase 125 .kdat 容器规范、魔数拦截、CRC32 防篡改、TLV 往返等价、双轨加载与单包融合验收测试套件
-# 设计依据: Phase 125 阶段4验收测试矩阵规约与卡拉尔架构解耦契约
+# 职责说明: .kdat 容器规范、魔数拦截、CRC32 防篡改、TLV 往返等价、双轨加载与单包融合验收测试套件
+# 设计依据: 阶段验收测试矩阵规约与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name TestBinaryConfigAndKdatPipeline

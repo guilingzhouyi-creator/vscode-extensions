@@ -58,7 +58,7 @@ static func test_salvage_equipment() -> Dictionary:
 	return {"test": "TC-FORGE-03: 装备分解材料与熔铸货币返还", "passed": passed}
 
 static func test_reforge_lock_cost_closure() -> Dictionary:
-	# P39 清单4 闭环：lock_count > 0 时保护符/魔单晶消耗在同一事务内扣除；
+	# 事务闭环：lock_count > 0 时保护符/魔单晶消耗在同一事务内扣除；
 	# 余额不足拒绝且不改动物品（词缀保持原样、钱包不扣）
 	var item := ItemEntity.new()
 	item.custom_name = "实验法杖"

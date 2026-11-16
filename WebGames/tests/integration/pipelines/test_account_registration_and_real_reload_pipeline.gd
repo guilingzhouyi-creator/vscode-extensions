@@ -24,7 +24,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_arr_05_cold_boot_physical_restoration_from_disk())
 	results.append(test_arr_06_creation_response_matches_slot_export())
 	_teardown_env()
-	return TestCase.pack_results("Phase 131 注册后端校验、持久化与二次重载流水线", results)
+	return TestCase.pack_results("注册后端校验、持久化与二次重载流水线", results)
 
 static func _setup_env() -> void:
 	_teardown_env()

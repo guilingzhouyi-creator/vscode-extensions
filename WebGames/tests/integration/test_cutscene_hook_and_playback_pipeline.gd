@@ -3,10 +3,10 @@
 # 文件路径: res://tests/integration/test_cutscene_hook_and_playback_pipeline.gd
 # 架构定位: Integration Test Suite / End-to-End Pipeline Harness
 # 依赖与触发: 上游: TestRegistry | 下游: CutsceneRequestDTO, CutsceneAsyncLoader, CutsceneHookRegistry, CutsceneOrchestrator, CutscenePlayerView, NarrativeDagExecutionEngine
-# 职责说明: Phase 126 全域非阻塞 CG 视频播放与剧情通用 Hook 引擎全链路验收集成测试套件；
+# 职责说明: 全域非阻塞 CG 视频播放与剧情通用 Hook 引擎全链路验收集成测试套件；
 #           全面断言参数化 DTO、非阻塞流式装载、LRU 缓存、Hook 路由拦截、长按跳过互锁、
 #           无艺术资产时的文字占位演播（Text Placeholder）与主线程纯通用调用闭环。
-# 设计依据: Phase 126 阶段4验收测试矩阵规约与卡拉尔架构解耦契约
+# 设计依据: 阶段验收测试矩阵规约与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name TestCutsceneHookAndPlaybackPipeline

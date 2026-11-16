@@ -3,8 +3,8 @@
 # 文件路径: res://tests/integration/pipelines/test_unified_protocol_and_esc_pipeline.gd
 # 架构定位: Integration Test Pipeline / Acceptance Harness
 # 跨域依赖: 上游: TestRegistry | 下游: world_state, world_gateway, lifecycle, frontend/systems
-# 职责说明: Phase 122 统一协议工厂、双轨租约抢占、HUD 事件桥接与 ESC 菜单全链路无头验收套件
-# 设计依据: Phase 122 阶段4验收测试矩阵规约与卡拉尔架构解耦契约
+# 职责说明: 统一协议工厂、双轨租约抢占、HUD 事件桥接与 ESC 菜单全链路无头验收套件
+# 设计依据: 阶段验收测试矩阵规约与卡拉尔架构解耦契约
 # ==============================================================================
 
 class_name TestUnifiedProtocolAndEscPipeline

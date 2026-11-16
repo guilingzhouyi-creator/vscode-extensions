@@ -7,7 +7,7 @@
 # 职责说明: 在真实无头 SceneTree 中实例化全套前端视图场景并开启 service_mode = "real"，
 #           端到端驱动 注册/登录 ➔ 世界网关刷新 ➔ MOD 工坊启停预检 ➔ 建档创角 ➔
 #           交互式 DAG 序章分支推演 ➔ 主页 HUD 交接 ➔ ESC 洗脱注销与全节点回收。
-# 设计依据: Phase 130 阶段4验收矩阵 (TC-FGP-01 ~ TC-FGP-05, DOD-P130-0402)
+# 设计依据: 阶段验收矩阵 (TC-FGP-01 ~ TC-FGP-05, DOD-P130-0402)
 # ==============================================================================
 
 ## TestRealFrontendGatewayWorkbenchPrologue：真实前端视图 + service_mode="real" 全链无头推演测试套件
@@ -34,7 +34,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_tc_fgp_04_world_creation_and_authoritative_char(session_ctx))
 	results.append(_test_tc_fgp_05_prologue_dag_view_to_hud_and_teardown(session_ctx))
 	_teardown_frontend_real_env(session_ctx)
-	return TestCase.pack_results("Phase 130 真实前端场景与 RealServiceContainer 全链路无头推演流水线", results)
+	return TestCase.pack_results("真实前端场景与 RealServiceContainer 全链路无头推演流水线", results)
 
 static func _setup_frontend_real_env() -> void:
 	TestFullChainBackendHelper.setup_env()
