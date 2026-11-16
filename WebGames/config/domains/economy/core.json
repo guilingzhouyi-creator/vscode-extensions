@@ -1,4 +1,7 @@
 {
+  "shop": {
+    "sell_back_ratio": 0.5
+  },
   "dynamic_market": {
     "enabled": true,
     "time_cycle_ticks": 20,

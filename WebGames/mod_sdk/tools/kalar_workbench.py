@@ -7,7 +7,7 @@
 # 职责说明: 提供一站式脚手架初始化、离线静态检查、.kmod 标准包构建与 Agent 自动化推演
 # 退出语义与设计依据: 退出码: 0=成功, 1=校验或打包失败, 2=参数异常 | 设计依据: Phase 124 开发者集成工作台规范
 # ==============================================================================
-"""卡拉尔世界引擎 MOD 开发者集成工作台与 .kmod 打包引擎。"""
+"""纯净世界引擎 MOD 开发者集成工作台与 .kmod 打包引擎。"""
 
 from __future__ import annotations
 from dataclasses import dataclass
@@ -71,7 +71,7 @@ def run_workbench_self_test() -> int:
     """运行工作台打包与解包完整性自测试夹具。"""
     ensure_utf8_stdout()
     print("=======================================================================")
-    print("🛠️ 卡拉尔世界引擎 MOD 工作台与 .kmod 归档打包器自测试")
+    print("🛠️ 纯净世界引擎 MOD 工作台与 .kmod 归档打包器自测试")
     print("=======================================================================")
 
     template_dir = MOD_SDK_DIR / "templates" / "starter_story"
@@ -207,7 +207,7 @@ def main() -> int:
     """工作台 CLI 入口点。"""
     ensure_utf8_stdout()
     parser = argparse.ArgumentParser(
-        description="卡拉尔世界引擎模组开发者工作台与 .kmod 打包工具"
+        description="纯净世界引擎模组开发者工作台与 .kmod 打包工具"
     )
     subparsers = parser.add_subparsers(dest="subcommand", help="子命令")
 

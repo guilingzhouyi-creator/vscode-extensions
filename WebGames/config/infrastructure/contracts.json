@@ -1,6 +1,6 @@
 {
   "$schema_version": 1,
-  "$schema_description": "卡拉尔世界引擎契约注册表 schema v1",
+  "$schema_description": "纯净世界引擎契约注册表 schema v1",
   "$schema_supported_since": "Phase 57",
   "entry_count_expected": 49,
   "infra_domains": [

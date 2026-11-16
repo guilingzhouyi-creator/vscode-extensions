@@ -75,7 +75,7 @@ class ModBundleManifest:
 def scan_and_build_files_manifest(mod_dir: Path) -> dict[str, dict[str, Any]]:
     """递归扫描模组目录下除临时文件外的所有资产，生成相对路径与哈希指纹字典。"""
     manifest: dict[str, dict[str, Any]] = {}
-    ignored_names = {".git", ".DS_Store", "__pycache__", "manifest.json"}
+    ignored_names = {".git", ".DS_Store", "__pycache__"}
     ignored_suffixes = {".tmp", ".swp", ".kmod"}
 
     for p in sorted(mod_dir.rglob("*")):
@@ -84,6 +84,8 @@ def scan_and_build_files_manifest(mod_dir: Path) -> dict[str, dict[str, Any]]:
         if p.suffix in ignored_suffixes:
             continue
         rel_path = p.relative_to(mod_dir).as_posix()
+        if rel_path == "manifest.json":
+            continue
         manifest[rel_path] = {
             "sha256": calculate_file_sha256(p),
             "size_bytes": p.stat().st_size,
@@ -133,7 +135,7 @@ def build_kmod_package(
     )
 
     if output_path is None:
-        target_file = mod_dir.parent / f"{bundle_id}_{version}.kmod"
+        target_file = mod_dir.parent / f"{bundle_id}_v{version}.kmod"
     else:
         target_file = Path(output_path).resolve()
 

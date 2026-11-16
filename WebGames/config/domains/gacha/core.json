@@ -11,15 +11,16 @@
   "pity": {
     "soft_threshold": 70,
     "hard_threshold": 90,
+    "four_star_threshold": 10,
     "soft_increment_per_pull": 0.05,
     "hard_guaranteed_rate": 1.0
   },
   "banner_defaults": {
-    "banner_id": "",
-    "banner_title": "",
+    "banner_id": "BANNER_STANDARD_DEFAULT",
+    "banner_title": "【常驻祈愿池】",
     "cost_per_pull_gold": 100,
     "cost_per_pull_crystals": 1,
-    "fallback_title": "",
+    "fallback_title": "限时祈愿",
     "up_5star_item_ids": [],
     "standard_5star_item_ids": [],
     "standard_4star_item_ids": [],

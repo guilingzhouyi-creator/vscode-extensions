@@ -15,5 +15,6 @@
   },
   "concurrency": {
     "max_per_sound": 4
-  }
+  },
+  "sound_registry": {}
 }

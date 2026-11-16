@@ -25,16 +25,67 @@ ensure_utf8_stdout()
 ROOT = resolve_repo_root()
 
 MIN_MAGIC_INTEGER_DIGITS = 4
-MIN_BUSINESS_STRING_LENGTH = 8
+MIN_BUSINESS_STRING_LENGTH = 4
 TOP_N = 10
+
+FORBIDDEN_LORE_TOKENS: tuple[str, ...] = (
+    "卡拉尔",
+    "瓦尔兰",
+    "阿尔托莉雅",
+    "official_kalar",
+)
+
+_CJK_RE = re.compile(r"[\u4e00-\u9fff]")
+_TECH_PREFIXES: tuple[str, ...] = (
+    "res://",
+    "user://",
+    "mod://",
+    "godot://",
+    "http://",
+    "https://",
+    "ui.",
+    "domains.",
+    "infrastructure.",
+    "narratives.",
+    "frontend.",
+    "backend.",
+    "mods.",
+    "config.",
+)
+_HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{3,8}$")
+_LOWER_KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+_UPPER_CONST_RE = re.compile(r"^[A-Z0-9_]+$")
+_DOTTED_OR_PATH_RE = re.compile(r"^[A-Za-z0-9_.\-/]+$")
 
 NUM_RE = re.compile(
     rf"(?<![0-9a-zA-Z_.])(\d{{{MIN_MAGIC_INTEGER_DIGITS},}})(?![0-9a-zA-Z_])"
 )
 DEC_RE = re.compile(r"(?<![0-9a-zA-Z_.])(\d+\.\d+)(?![0-9a-zA-Z_])")
-STRING_RE = re.compile(rf'"[^"\n]{{{MIN_BUSINESS_STRING_LENGTH},}}"')
+STRING_RE = re.compile(rf'"([^"\n]{{{MIN_BUSINESS_STRING_LENGTH},}})"')
+ALL_STRING_RE = re.compile(r'"([^"\n]*)"')
 DEBUG_RE = re.compile(r"\bprint\s*\(")
 TODO_RE = re.compile(r"\b(TODO|FIXME|HACK)\b")
+
+
+def is_benign_technical_string(inner: str) -> bool:
+    """判定字符串是否为路径、配置键、i18n 键、协议常量等非业务文案技术标识。"""
+    if not inner:
+        return True
+    if any(tok in inner for tok in FORBIDDEN_LORE_TOKENS):
+        return False
+    if _CJK_RE.search(inner):
+        return False
+    if inner.startswith(_TECH_PREFIXES) or _HEX_COLOR_RE.match(inner):
+        return True
+    if any(ch.isspace() for ch in inner):
+        stripped_fmt = re.sub(r"[%{}0-9sfd.,:;\-_/|()\[\]\s]", "", inner)
+        return stripped_fmt == ""
+    if _LOWER_KEY_RE.match(inner) or _UPPER_CONST_RE.match(inner):
+        return True
+    if ("/" in inner or "." in inner or "_" in inner) and _DOTTED_OR_PATH_RE.match(inner):
+        return True
+    stripped_sym = re.sub(r"[%{}0-9.,:;\-_/|()\[\]+*=<>&!@#$^~`?\\]", "", inner)
+    return len(stripped_sym) <= 1
 
 
 def strip_comment(line: str) -> str:
@@ -86,52 +137,60 @@ def _check_debug_and_todo(code: str, ln: str, i: int, counts: list[int], example
 def _scan_code_line(
     ln: str, i: int, counts: list[int], examples: list[str]
 ) -> None:
-    """扫描单行代码中的数值、字符串、调试与 TODO 残留。"""
+    """扫描单行代码中的数值、业务字符串、禁忌词元、调试与 TODO 残留。"""
     code = strip_comment(ln)
     if not code:
         return
     _check_digits(code, i, counts, examples)
     if '"' in code:
-        sm = STRING_RE.search(code)
-        if sm:
-            counts[2] += 1
-            if counts[2] <= 2:
-                examples.append(f"L{i} 字符串 {sm.group(0)[:28]}")
+        for sm in ALL_STRING_RE.finditer(code):
+            inner = sm.group(1)
+            if any(tok in inner for tok in FORBIDDEN_LORE_TOKENS):
+                counts[5] += 1
+                if counts[5] <= 3:
+                    examples.append(f"L{i} 禁忌词 \"{inner[:28]}\"")
+                continue
+            if len(inner) >= MIN_BUSINESS_STRING_LENGTH and not is_benign_technical_string(inner):
+                counts[2] += 1
+                if counts[2] <= 2:
+                    examples.append(f"L{i} 字符串 \"{inner[:28]}\"")
     _check_debug_and_todo(code, ln, i, counts, examples)
 
 
-def _scan_gd_file(f: Path) -> tuple[int, str, str | None] | None:
-    """扫描单个 GDScript 文件的字面量与残留，返回 (file_total, rel_path, summary_line)。"""
+def _scan_gd_file(f: Path) -> tuple[int, int, str, str | None] | None:
+    """扫描单个 GDScript 文件的字面量与残留，返回 (file_total, strict_total, rel_path, summary_line)。"""
     rel = f.relative_to(ROOT)
     try:
         content = f.read_text(encoding="utf-8")
     except (UnicodeDecodeError, OSError):
         return None
 
-    counts = [0, 0, 0, 0, 0]  # ints, decimals, strs, dbg, todo
+    counts = [0, 0, 0, 0, 0, 0]  # ints, decimals, strs, dbg, todo, lore
     examples: list[str] = []
     for i, ln in enumerate(content.splitlines(), 1):
         _scan_code_line(ln, i, counts, examples)
 
     file_total = sum(counts)
+    strict_total = counts[3] + counts[4] + counts[5] + counts[2]
     if not file_total:
-        return 0, str(rel), None
+        return 0, 0, str(rel), None
 
-    ints, decimals, strs, dbg, todo = counts
+    ints, decimals, strs, dbg, todo, lore = counts
     detail = "  例: " + "; ".join(examples[:4]) if examples else ""
-    summary = f"{rel}: 数值 {ints} / 小数 {decimals} / 字符串 {strs} / print {dbg} / TODO {todo}{detail}"
-    return file_total, str(rel), summary
+    summary = f"{rel}: 数值 {ints} / 小数 {decimals} / 业务串 {strs} / print {dbg} / TODO {todo} / 禁忌 {lore}{detail}"
+    return file_total, strict_total, str(rel), summary
 
 
 def main() -> int:
     """CLI 入口。"""
     ap = argparse.ArgumentParser(description="业务源码字面量与调试残留扫描器")
-    ap.add_argument("--strict", action="store_true", help="有发现即返回 1")
+    ap.add_argument("--strict", action="store_true", help="存在 print/TODO/禁忌词或业务硬编码串时返回 1")
     args = ap.parse_args()
 
     findings: list[str] = []
     per_file: list[tuple[int, str]] = []
     total = 0
+    strict_total = 0
     scan_roots = [ROOT / "backend", ROOT / "frontend"]
 
     for f in sorted(p for r in scan_roots for p in r.rglob("*.gd")):
@@ -140,14 +199,15 @@ def main() -> int:
         res = _scan_gd_file(f)
         if res is None:
             continue
-        file_total, rel_str, summary = res
+        file_total, file_strict, rel_str, summary = res
         total += file_total
+        strict_total += file_strict
         per_file.append((file_total, rel_str))
         if summary:
             findings.append(summary)
 
     print(
-        f"【audit-hardcode】扫描 backend+frontend 共 {total} 处候选（提示级，需人工复核）"
+        f"【audit-hardcode】扫描 backend+frontend 共 {total} 处候选（严格项 {strict_total}，提示级需人工复核）"
     )
     for fd in findings:
         print(f"  · {fd}")

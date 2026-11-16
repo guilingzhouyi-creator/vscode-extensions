@@ -75,12 +75,19 @@ def _test_script_comment_evasion() -> list[str]:
 
 
 def _test_quote_masking_hardcode() -> list[str]:
-    """对抗样本 2：验证字符串字面量内的 `#` 无法遮蔽同行后续魔法数字与 print 调用。"""
+    """对抗样本 2：验证字符串字面量内的 `#` 无法遮蔽同行后续魔法数字与 print 调用，且技术前缀无法遮蔽同行后续业务/禁忌词。"""
     failures: list[str] = []
     masked_line = 'var color: String = "#FF0000"; var magic: int = 98765; print("bypass")'
     stripped = audit_hardcode.strip_comment(masked_line)
     if "98765" not in stripped or "print(" not in stripped:
         failures.append(f"引号内 # 错误截断后续代码: '{stripped}'")
+
+    probe_counts = [0, 0, 0, 0, 0, 0]
+    probe_examples: list[str] = []
+    smuggled_line = 'var p := "res://ok/path"; var text := "秘密硬编码"; var mod_id := "official_kalar"'
+    audit_hardcode._scan_code_line(smuggled_line, 1, probe_counts, probe_examples)
+    if probe_counts[2] < 1 or probe_counts[5] < 1:
+        failures.append(f"技术白名单遮蔽或短字符串漏报: counts={probe_counts}")
     return failures
 
 

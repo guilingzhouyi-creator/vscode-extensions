@@ -1,12 +1,12 @@
 {
   "body_part_defaults": {
     "part_id": "HEAD",
-    "part_name": "",
+    "part_name": "核心部位",
     "durability": 100.0,
     "ap_penalty_on_break": 2
   },
   "species_defaults": {
-    "species_name": "",
+    "species_name": "未知生物",
     "str_level": 3,
     "con_level": 2,
     "vit_level": 4

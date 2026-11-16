@@ -7,7 +7,7 @@
 # 职责说明: 构造统一请求信封、执行离线 Schema 校验、提供人类租约与领域状态机模拟、输出标准响应
 # 退出语义与设计依据: 退出码: 0=派发成功, 1=信封无效/租约阻断, 2=参数解析或IO异常 | 设计依据: Phase 122/123 统一通信协议规范
 # ==============================================================================
-"""卡拉尔世界引擎 MOD 开发者轻量统一协议客户端与本地模拟派发引擎。"""
+"""纯净世界引擎 MOD 开发者轻量统一协议客户端与本地模拟派发引擎。"""
 
 from __future__ import annotations
 from dataclasses import dataclass
@@ -169,7 +169,7 @@ class LocalMockDispatcher:
     """本地离线模拟派发器 (Local Mock Dispatcher)。
 
     职责与状态机契约：
-    1. 模拟卡拉尔世界引擎服务端的双轨信封解包与鉴权校验；
+    1. 模拟纯净世界引擎服务端的双轨信封解包与鉴权校验；
     2. 维护高精度人类控制权优先租约保护窗口（默认 3000ms 保持与单一真源对齐）；
     3. 模拟 ESC 菜单与主页 HUD 业务逻辑并产出合法响应；
     4. 零外部网络依赖，支持全链路端到端确定性离线回归测试。
@@ -451,7 +451,7 @@ class LocalMockDispatcher:
 
 
 class KalarProtocolClient:
-    """卡拉尔统一协议客户端 (Kalar Protocol Client)。
+    """纯净世界引擎统一协议客户端 (KalarProtocolClient)。
 
     提供高层语义接口以构建、校验和发射请求信封，并由底层 Dispatcher 或通信管道承载。
     """
@@ -541,7 +541,7 @@ class KalarProtocolClient:
 def main() -> int:
     """CLI 入口。"""
     ensure_utf8_stdout()
-    parser = argparse.ArgumentParser(description="卡拉尔统一协议客户端与离线模拟派发 CLI")
+    parser = argparse.ArgumentParser(description="纯净世界引擎统一协议客户端与离线模拟派发 CLI")
     parser.add_argument("--actor", choices=["HUMAN_UI", "AGENT"], default="HUMAN_UI", help="操作发起方主体类型")
     parser.add_argument("--domain", default="ESC_MENU", help="目标业务领域名称")
     parser.add_argument("--action", default="ESC_QUERY_READINESS", help="具体指令动作类型")

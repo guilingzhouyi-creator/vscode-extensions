@@ -1,8 +1,8 @@
 {
   "entity_defaults": {
     "boss_uid": "BOSS_WORLD_LEVIATHAN_01",
-    "boss_title": "",
-    "species_name": "",
+    "boss_title": "【深渊灾害首领】",
+    "species_name": "深渊灾兽",
     "total_phases": 3,
     "current_phase_index": 1,
     "phase_max_hp": 10000.0,

@@ -2,6 +2,11 @@
   "defaults": {
     "disguise_quality_score": 50.0
   },
+  "registry_fees": [
+    100,
+    500,
+    2000
+  ],
   "insight_formula": {
     "int_weight": 1.5,
     "perception_bonus_weight": 1.0,

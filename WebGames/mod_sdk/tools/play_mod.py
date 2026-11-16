@@ -12,7 +12,7 @@
 #   python mod_sdk/tools/play_mod.py ./mod_a ./mod_b --race ELF --origin ORIGIN_VALAN_SCOUT --json
 #   python mod_sdk/tools/play_mod.py ./my_mod --choice-strategy random --seed MY_SEED --json
 # ==============================================================================
-"""卡拉尔世界引擎 MOD 无头试玩推演引擎与结构化战报发生器。"""
+"""纯净世界引擎 MOD 无头试玩推演引擎与结构化战报发生器。"""
 
 from __future__ import annotations
 from dataclasses import dataclass
@@ -303,7 +303,7 @@ def print_transcript_text(transcript: dict[str, Any]) -> None:
     steps = transcript.get("transcript_steps") or []
 
     print("==============================================================================")
-    print("🎮 卡拉尔 MOD Agent 试玩推演战报 (Playthrough Transcript)")
+    print("🎮 纯净世界引擎 MOD Agent 试玩推演战报 (Playthrough Transcript)")
     print("------------------------------------------------------------------------------")
     print(f"  • 预检结论   : {'PASS (100% 合规)' if precheck.get('valid') else 'FAIL (存在违规)'}")
     print(f"  • 推演结论   : {'🏆 SUCCESS (通关终态)' if transcript.get('is_success') else '⚠️ FAILED (推演未达成)'}")
@@ -331,7 +331,7 @@ def main() -> None:
     """命令行主入口。"""
     ensure_utf8_stdout()
     parser = argparse.ArgumentParser(
-        description="卡拉尔 MOD 全自动端到端试玩推演与战报发生器 (Agent Playtester)",
+        description="纯净世界引擎 MOD 全自动端到端试玩推演与战报发生器 (Agent Playtester)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("mod_dirs", nargs="+", help="参与试玩演习的一个或多个 MOD 根目录路径")
@@ -341,7 +341,7 @@ def main() -> None:
     parser.add_argument("--origin", default=None, dest="origin_id", help="指定演习创角身世 ID")
     parser.add_argument("--trait-pair", default=None, dest="trait_pair", help="指定演习因果天赋配对预设 ID")
     parser.add_argument("--reroll-nonce", type=int, default=0, dest="reroll_nonce", help="六维属性重掷随机数 (默认: 0)")
-    parser.add_argument("--seed", default="KALAR_SEED_DEFAULT", dest="seed", help="确定性创角与推演种子 (默认: KALAR_SEED_DEFAULT)")
+    parser.add_argument("--seed", default="PURE_WORLD_SEED_DEFAULT", dest="seed", help="确定性创角与推演种子 (默认: PURE_WORLD_SEED_DEFAULT)")
     parser.add_argument("--choices", default=None, dest="choices", help="交互分支决策序列 (逗号分隔，如 0,1 或 NODE_ID)")
     parser.add_argument(
         "--choice-strategy",

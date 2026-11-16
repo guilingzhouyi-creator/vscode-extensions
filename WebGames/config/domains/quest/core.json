@@ -3,7 +3,7 @@
     "solution_type": "COMBAT_FORCE"
   },
   "quest_defaults": {
-    "quest_title": "",
+    "quest_title": "未命名委托",
     "faction_reputation_rewards": {},
     "gold_reward": 0,
     "reward_items": []

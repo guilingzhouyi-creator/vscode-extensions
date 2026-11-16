@@ -1,12 +1,12 @@
 {
   "ast_defaults": {
-    "skill_name": "",
-    "deserialize_skill_name": "",
+    "skill_name": "未命名招式",
+    "deserialize_skill_name": "自创式",
     "sentence_count": 4,
     "deserialize_sentence_count": 1
   },
   "manuscript_defaults": {
-    "custom_name": "",
+    "custom_name": "未命名典籍",
     "category": "MANUSCRIPT_GRIMOIRE",
     "royalty_percent": 0.15,
     "market_base_price": 50,

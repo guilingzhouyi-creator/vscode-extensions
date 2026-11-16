@@ -32,7 +32,7 @@
     "town_id": ""
   },
   "town_defaults": {
-    "town_name": "",
+    "town_name": "未名定居点",
     "governing_nation_id": "",
     "population_count": 5000,
     "public_order_percent": 85.0,

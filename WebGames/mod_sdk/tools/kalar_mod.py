@@ -17,7 +17,7 @@
 #   python mod_sdk/tools/kalar_mod.py dispatch --action ESC_QUERY_READINESS
 #   python mod_sdk/tools/kalar_mod.py pack ./my_mod
 # ==============================================================================
-"""卡拉尔世界引擎 MOD 统一开发套件 CLI 门面。"""
+"""纯净世界引擎 MOD 统一开发套件 CLI 门面。"""
 
 from __future__ import annotations
 from pathlib import Path
@@ -459,7 +459,7 @@ def _build_parser() -> argparse.ArgumentParser:
     """构建统一 CLI 参数解析器。"""
     parser = argparse.ArgumentParser(
         prog="kalar-mod",
-        description="卡拉尔世界引擎 MOD 统一开发套件与工具链门面 (Mod SDK CLI Facade)",
+        description="纯净世界引擎 MOD 统一开发套件与工具链门面 (Mod SDK CLI Facade)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("-v", "--version", action="version", version=VERSION_STRING)
@@ -467,7 +467,7 @@ def _build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="subcommand", title="核心子命令", metavar="<command>")
 
     # 1. init
-    p_init = subparsers.add_parser("init", help="初始化生成新的卡拉尔 MOD 项目骨架")
+    p_init = subparsers.add_parser("init", help="初始化生成新的纯净世界引擎 MOD 项目骨架")
     p_init.add_argument("--id", required=True, dest="pack_id", help="MOD 包唯一标识符 (如 mod_elf_story)")
     p_init.add_argument("--name", required=True, dest="pack_name", help="MOD 人类可读名称")
     p_init.add_argument("--race", default="HUMAN", dest="race_id", help="默认绑定的角色种族 (默认: HUMAN)")
@@ -542,7 +542,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_play.add_argument("--origin", default=None, dest="origin_id", help="指定演习创角身世 ID")
     p_play.add_argument("--trait-pair", default=None, dest="trait_pair", help="指定演习因果天赋配对预设 ID")
     p_play.add_argument("--reroll-nonce", type=int, default=0, dest="reroll_nonce", help="六维属性重掷随机数 (默认: 0)")
-    p_play.add_argument("--seed", default="KALAR_SEED_DEFAULT", dest="seed", help="确定性创角与推演种子 (默认: KALAR_SEED_DEFAULT)")
+    p_play.add_argument("--seed", default="PURE_WORLD_SEED_DEFAULT", dest="seed", help="确定性创角与推演种子 (默认: PURE_WORLD_SEED_DEFAULT)")
     p_play.add_argument("--choices", default=None, dest="choices", help="交互分支决策序列 (逗号分隔，如 0,1 或 NODE_ID)")
     p_play.add_argument(
         "--choice-strategy",
@@ -589,7 +589,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_disp.add_argument("--json", action="store_true", dest="as_json", help="输出机器可读的结构化响应 JSON 信封")
 
     # 8. workbench
-    p_wb = subparsers.add_parser("workbench", help="卡拉尔 MOD 开发者集成工作台统一命令台")
+    p_wb = subparsers.add_parser("workbench", help="纯净世界引擎 MOD 开发者集成工作台统一命令台")
     p_wb.add_argument("workbench_args", nargs="*", help="传递给工作台的子命令或参数")
     p_wb.add_argument("--self-test", action="store_true", dest="self_test", help="执行工作台内部集成自测试")
     p_wb.add_argument("--verify", dest="verify_target", default=None, help="校验指定 .kmod 归档包完整性与指纹")

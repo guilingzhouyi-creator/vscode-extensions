@@ -115,6 +115,8 @@ class ArchitectureAuditContext:
     self.primary_aliases: dict[str, str] = {}
     self.domain_subtables: dict[str, list[str]] = {}
     self.backend_files: list[Path] = []
+    self.infra_gd_files: list[Path] = []
+    self.frontend_gd_files: list[Path] = []
     self.gd_sources: dict[Path, tuple[str, str]] = {}
     self.domain_gd_files: dict[str, list[Path]] = {}
     self.table_key_cache: dict[str, dict[str, bool] | None] = {}
@@ -152,6 +154,7 @@ class ArchitectureAuditContext:
 
   def _index_backend_files(self) -> None:
     self.backend_files = sorted(BACKEND_DIR.rglob("*.gd"))
+    infra_dir = BACKEND_DIR / "infrastructure"
     for file_path in self.backend_files:
       raw = file_path.read_text(encoding="utf-8")
       stripped_c = strip_comments(raw)
@@ -162,13 +165,26 @@ class ArchitectureAuditContext:
         if domain_id not in self.domain_gd_files:
           self.domain_gd_files[domain_id] = []
         self.domain_gd_files[domain_id].append(file_path)
+      elif infra_dir in file_path.parents:
+        self.infra_gd_files.append(file_path)
+
+  def _index_frontend_files(self) -> None:
+    frontend_dir = self.root / "frontend"
+    if not frontend_dir.exists():
+      return
+    self.frontend_gd_files = sorted(frontend_dir.rglob("*.gd"))
+    for file_path in self.frontend_gd_files:
+      raw = file_path.read_text(encoding="utf-8")
+      stripped_c = strip_comments(raw)
+      self.gd_sources[file_path] = (raw, stripped_c)
 
   def initialize(self) -> None:
-    """一次性加载清单、路由表、测试套件定义与后端全量脚本缓存。"""
+    """一次性加载清单、路由表、测试套件定义与前后端全量脚本缓存。"""
     self._load_manifest_config()
     self._load_cross_cutting_suites()
     self._load_router_tables()
     self._index_backend_files()
+    self._index_frontend_files()
 
   def get_subtables_for_domain(self, domain_name: str) -> list[str]:
     """获取指定领域下辖的细分子表清单（与 ConfigRouterEngine 一致）。"""
@@ -515,7 +531,7 @@ def _validate_gd_config_calls(
 
 
 def check_tc_arch_06(ctx: ArchitectureAuditContext) -> dict[str, Any]:
-  """TC-ARCH-06: 代码读取的「表 + 键路径」必须在配置表中真实存在。"""
+  """TC-ARCH-06: 代码读取的「表 + 键路径」必须在配置表中真实存在（覆盖领域/基础设施/前端）。"""
   violations: list[str] = []
   checked = 0
 
@@ -524,6 +540,10 @@ def check_tc_arch_06(ctx: ArchitectureAuditContext) -> dict[str, Any]:
     files = ctx.domain_gd_files.get(eid, [])
     for gd_file in files:
       checked += _validate_gd_config_calls(ctx, eid, gd_file, violations)
+  for gd_file in ctx.infra_gd_files:
+    checked += _validate_gd_config_calls(ctx, "infrastructure", gd_file, violations)
+  for gd_file in ctx.frontend_gd_files:
+    checked += _validate_gd_config_calls(ctx, "frontend", gd_file, violations)
 
   if checked == 0:
     violations.append("未扫描到任何静态配置键引用: res://backend/domains")

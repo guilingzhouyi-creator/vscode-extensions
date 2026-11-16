@@ -3,7 +3,7 @@
   "save_extension": ".kalar_save",
   "format_version": "1.0.0",
   "min_supported_version": "1.0.0",
-  "engine": "KalarWorldEngine_Godot4",
+  "engine": "PureWorldEngine_Godot4",
   "hash_preview_len": 8,
   "command_defaults": {
     "command_type": "EXECUTE_COMBAT_ACTION",

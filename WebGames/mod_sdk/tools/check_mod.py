@@ -434,7 +434,7 @@ def validate_mod(mod_dir: Path) -> tuple[bool, list[DiagnosticItem]]:
 def print_cli_report(valid: bool, diags: list[DiagnosticItem], mod_dir: Path) -> None:
     """输出人类可读的控制台审查报告。"""
     print("==============================================================================")
-    print(f"🔍 卡拉尔 MOD 静态诊断报告: {mod_dir.resolve().name}")
+    print(f"🔍 纯净世界引擎 MOD 静态诊断报告: {mod_dir.resolve().name}")
     print("------------------------------------------------------------------------------")
     if valid:
         print("  🎉 诊断结论: 100% 合规通过！")
@@ -478,7 +478,7 @@ def main() -> None:
     """命令行入口。"""
     _ensure_utf8_stdout()
     parser = argparse.ArgumentParser(
-        description="卡拉尔 MOD 纯静态自愈诊断器 (Static Mod Checker)",
+        description="纯净世界引擎 MOD 纯静态自愈诊断器 (Static Mod Checker)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("mod_dir", nargs="?", help="待诊断的 MOD 根目录路径")

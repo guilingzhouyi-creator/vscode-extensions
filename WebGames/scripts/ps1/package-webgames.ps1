@@ -8,11 +8,13 @@
 # ------------------------------------------------------------------------------
 # 用法示例:
 #   .\scripts\ps1\package-webgames.ps1
-#   .\scripts\ps1\package-webgames.ps1 -Target Windows
+#   .\scripts\ps1\package-webgames.ps1 -Target Windows -ExportRelease
 # ==============================================================================
 [CmdletBinding()]
 param(
   [string]$OutDir,
+  [string]$Target = "Windows",
+  [switch]$ExportRelease,
   [string]$GodotBin = $env:GODOT_BIN
 )
 Set-StrictMode -Version Latest
@@ -43,45 +45,117 @@ if (-not $godotCmd) {
   exit 2
 }
 
-$pckPath = Join-Path $OutDir "kalar_world_engine.pck"
-Write-Host "【package-webgames】开始导出 PCK 资源包..."
+$presetName = switch ($Target) {
+  "Windows" { "Windows Desktop" }
+  "Windows Desktop" { "Windows Desktop" }
+  "Linux" { "Linux" }
+  "Web" { "Web" }
+  default { $Target }
+}
+
+$artifactName = if ($ExportRelease) {
+  switch ($presetName) {
+    "Windows Desktop" { "pure_world_engine.exe" }
+    "Linux" { "pure_world_engine.x86_64" }
+    "Web" { "index.html" }
+    default { "pure_world_engine.pck" }
+  }
+} else {
+  "pure_world_engine.pck"
+}
+
+$exportMode = if ($ExportRelease) { "--export-release" } else { "--export-pack" }
+$artifactPath = Join-Path $OutDir $artifactName
+Write-Host "【package-webgames】开始导出产物 (Target=$presetName, Mode=$exportMode)..."
 try { $ver = & $GodotBin --version 2>$null | Select-Object -First 1 } catch { $ver = "未知" }
 Write-Host "  • 引擎: $ver"
-Write-Host "  • 产物路径: $pckPath"
+Write-Host "  • 产物路径: $artifactPath"
 
-$proc = Start-Process -FilePath $GodotBin -ArgumentList "--headless", "--path", "`"$RootDir`"", "--export-pack", "`"Windows Desktop`"", "`"$pckPath`"" -NoNewWindow -PassThru -Wait
+$proc = Start-Process -FilePath $GodotBin -ArgumentList "--headless", "--path", "`"$RootDir`"", $exportMode, "`"$presetName`"", "`"$artifactPath`"" -NoNewWindow -PassThru -Wait
 $code = $proc.ExitCode
 
-if ($code -eq 0 -and (Test-Path $pckPath)) {
-  $item = Get-Item $pckPath
-  $hash = (Get-FileHash -Path $pckPath -Algorithm SHA256).Hash
+if ($code -eq 0 -and (Test-Path $artifactPath)) {
+  $item = Get-Item $artifactPath
+  $hash = (Get-FileHash -Path $artifactPath -Algorithm SHA256).Hash
   Write-Host "【package-webgames】导出成功！"
   Write-Host "  • 文件大小: $($item.Length) 字节"
   Write-Host "  • SHA-256: $hash"
 
-  # 验证 dev_harness 绝对排除 (零测试/调试脚手架污染)
-  $pckBytes = [System.IO.File]::ReadAllBytes($pckPath)
-  $pckString = [System.Text.Encoding]::ASCII.GetString($pckBytes)
-  if ($pckString -match "res://dev_harness/") {
-    Write-Host "【package-webgames】安全门禁拦截：PCK 包含 dev_harness 调试脚手架代码！"
-    exit 1
+  # 验证 dev_harness 与 tests 绝对排除 (零测试/调试脚手架污染)
+  $scanTargets = @($artifactPath)
+  $sidecarPck = [System.IO.Path]::ChangeExtension($artifactPath, ".pck")
+  if ((Test-Path $sidecarPck) -and ($scanTargets -notcontains $sidecarPck)) {
+    $scanTargets += $sidecarPck
+  }
+  foreach ($scanFile in $scanTargets) {
+    $rawBytes = [System.IO.File]::ReadAllBytes($scanFile)
+    $rawText = [System.Text.Encoding]::ASCII.GetString($rawBytes)
+    if ($rawText -match "res://dev_harness/") {
+      Write-Host "【package-webgames】安全门禁拦截：导出产物包含 res://dev_harness/ 调试脚手架代码 ($scanFile)！"
+      exit 1
+    }
   }
   Write-Host "  • 安全门禁: dev_harness 零调试脚手架排除验证通过"
 
-  # 追加式构建元数据指纹留痕（字节级开销，杜绝二进制归档膨胀）
+  # 外部加载 assets 捆绑：config.kdat 与 mods/ (.kmod 归档)
+  $modsOutDir = Join-Path $OutDir "mods"
+  New-Item -ItemType Directory -Path $modsOutDir -Force | Out-Null
+  $pyCmd = Get-Command python3 -ErrorAction SilentlyContinue
+  if (-not $pyCmd) { $pyCmd = Get-Command python -ErrorAction SilentlyContinue }
+  $kalarModPy = Join-Path $RootDir "mod_sdk\tools\kalar_mod.py"
+  $kdatPath = Join-Path $OutDir "config.kdat"
+  $modsSrcDir = Join-Path $RootDir "mods"
+  $modsBundled = 0
+
+  if ($pyCmd -and (Test-Path $kalarModPy)) {
+    & $pyCmd.Source $kalarModPy bake (Join-Path $RootDir "config") --monolithic -o $kdatPath | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+      Write-Host "【package-webgames】config.kdat 烘焙失败！"
+      exit 1
+    }
+    if (Test-Path $modsSrcDir) {
+      Get-ChildItem -Path $modsSrcDir -Directory | ForEach-Object {
+        $packJson = Join-Path $_.FullName "pack.json"
+        if (Test-Path $packJson) {
+          $kmodOut = Join-Path $modsOutDir ("$($_.Name).kmod")
+          & $pyCmd.Source $kalarModPy pack $_.FullName -o $kmodOut | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "【package-webgames】MOD 打包失败: $($_.Name)"
+            exit 1
+          }
+          $modsBundled += 1
+        }
+      }
+    }
+  }
+
+  if (Test-Path $modsSrcDir) {
+    Get-ChildItem -Path $modsSrcDir -Filter "*.kmod" -File | ForEach-Object {
+      Copy-Item -Path $_.FullName -Destination (Join-Path $modsOutDir $_.Name) -Force
+      $modsBundled += 1
+    }
+  }
+
+  # 追加式构建元数据指纹留痕（统一 UTC Z 时区与目标元数据）
   $env:GIT_CONFIG_GLOBAL = "NUL"
   $gitCommit = (& git rev-parse --short HEAD 2>$null)
   if (-not $gitCommit) { $gitCommit = "unknown" }
   $manifestPath = Join-Path $OutDir "build_manifest.jsonl"
+  $utcStamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
   $manifestEntry = [ordered]@{
-    timestamp   = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
-    git_commit  = "$gitCommit"
-    pck_name    = "kalar_world_engine.pck"
-    size_bytes  = $item.Length
-    sha256      = "$hash"
-    status      = "SUCCESS"
+    timestamp           = $utcStamp
+    git_commit          = "$gitCommit"
+    target              = $presetName
+    export_mode         = $(if ($ExportRelease) { "release" } else { "pack" })
+    artifact_name       = $artifactName
+    size_bytes          = $item.Length
+    sha256              = "$hash"
+    mods_bundled        = $modsBundled
+    config_kdat_present = (Test-Path $kdatPath)
+    status              = "SUCCESS"
   } | ConvertTo-Json -Compress
   Add-Content -Path $manifestPath -Value $manifestEntry -Encoding UTF8
+  Write-Host "  • 外部资产捆绑: config.kdat=$(Test-Path $kdatPath), mods=$modsBundled"
   Write-Host "  • 构建元数据指纹已留痕: $manifestPath"
   exit 0
 } else {

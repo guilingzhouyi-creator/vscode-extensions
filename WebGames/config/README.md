@@ -1,4 +1,4 @@
-# 卡拉尔世界引擎 · 配置分层规范 (Config Layering Convention)
+# 纯净世界引擎 · 配置分层规范 (Config Layering Convention)
 
 本目录是引擎全量配置的唯一事实来源（Single Source of Truth）。业务代码**零硬编码**，
 所有数值 / 文案 / 标识 / 分类均由 `backend/infrastructure/game_config.gd` 从本目录加载。

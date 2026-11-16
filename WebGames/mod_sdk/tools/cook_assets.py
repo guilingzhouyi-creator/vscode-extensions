@@ -311,7 +311,7 @@ def print_cook_report(
     """输出格式化资产预编译/审计报告。"""
     print("==============================================================================")
     action_label = "资产审计门禁" if check_only else "资产预编译与审计"
-    print(f"📦 卡拉尔 MOD {action_label}: {mod_dir.resolve().name}")
+    print(f"📦 纯净世界引擎 MOD {action_label}: {mod_dir.resolve().name}")
     print("------------------------------------------------------------------------------")
     if valid:
         print("  🎉 审计结论: 100% 合规通过！")
@@ -337,7 +337,7 @@ def main() -> None:
     """命令行主入口。"""
     _ensure_utf8_stdout()
     parser = argparse.ArgumentParser(
-        description="卡拉尔 MOD 资产预编译与审计工具 (Asset Cooker & Auditor)",
+        description="纯净世界引擎 MOD 资产预编译与审计工具 (Asset Cooker & Auditor)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("mod_dir", nargs="?", default=".", help="待审计/预编译的 MOD 根目录路径 (默认: 当前目录)")

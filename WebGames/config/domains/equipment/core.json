@@ -1,8 +1,8 @@
 {
   "loadout_defaults": {
     "loadout_id": "LOADOUT_SET_01",
-    "loadout_name": "",
-    "fallback_name": "",
+    "loadout_name": "标准战备套",
+    "fallback_name": "备用战备套",
     "fallback_id": "LOADOUT_01"
   },
   "slots": [

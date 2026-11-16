@@ -7,7 +7,13 @@
     "validation_status": "PENDING",
     "max_inputs": 10000,
     "seed_min": 0,
-    "seed_max": 2147483647
+    "seed_max": 2147483647,
+    "speed_presets": [
+      0.5,
+      1.0,
+      2.0,
+      4.0
+    ]
   },
   "lcg": {
     "multiplier": 1103515245,

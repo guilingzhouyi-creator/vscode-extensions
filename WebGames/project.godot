@@ -6,8 +6,8 @@ config_version=5
 
 [application]
 
-config/name="KalarWorldEngine"
-config/description="卡拉尔世界引擎 (Kalar World Engine) - 第一性原理全域确定性母机与解耦宿主"
+config/name="PureWorldEngine"
+config/description="纯净世界引擎 (Pure World Engine) - 第一性原理全域确定性母机与解耦宿主"
 run/main_scene="res://frontend/app/app_root.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"

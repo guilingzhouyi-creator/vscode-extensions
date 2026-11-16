@@ -1,7 +1,7 @@
 {
   "_meta": {
     "version": 1,
-    "description": "卡拉尔世界引擎 · 业务领域清单（唯一事实来源）。新增领域必须在此登记，架构护栏 tests/unit/test_architecture_guard.gd 依据本表校验「目录 / 配置表 / 测试注册 / 确定性约定 / 文档计数」五方一致。",
+    "description": "纯净世界引擎 · 业务领域清单（唯一事实来源）。新增领域必须在此登记，架构护栏 tests/unit/test_architecture_guard.gd 依据本表校验「目录 / 配置表 / 测试注册 / 确定性约定 / 文档计数」五方一致。",
     "field_notes": {
       "id": "必须等于 backend/domains/ 下的目录名（TC-ARCH-01 双向差集校验）",
       "config": "业务数值表名（config/<层>/<名>.json -> <层>.<名>）；允许别名复用他域表",

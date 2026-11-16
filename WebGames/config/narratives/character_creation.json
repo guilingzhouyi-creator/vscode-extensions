@@ -5,7 +5,7 @@
   "point_buy_exceed": "Total points spent {spent} exceeds limit {limit}",
   "name_length_invalid": "角色名长度须在 {min} 至 {max} 字符之间",
   "race_not_found": "目标种族不存在: {race_id}",
-  "welcome_message": "欢迎来到卡拉尔世界，冒险者 {character_name}！",
+  "welcome_message": "欢迎来到本世界，冒险者 {character_name}！",
   "world_not_found": "目标单机世界档案不存在: {world_id}",
   "world_instance_load_failed": "无法加载目标世界时空实例: {world_id}"
 }

@@ -1,6 +1,6 @@
 {
   "defaults": {
-    "personal_name": "",
+    "personal_name": "无名旅人",
     "current_goal": "IDLE",
     "personality": {
       "courage": 0.8,
@@ -29,11 +29,11 @@
     }
   },
   "legacy": {
-    "book_name_suffix": "",
+    "book_name_suffix": "之秘传手记",
     "sentence_count": 3,
     "book_price": 300,
     "royalty_rate": 0.3,
-    "fallback_heir_name": "",
+    "fallback_heir_name": "继承人",
     "idempotency_retention_seconds": 86400.0,
     "max_retry_count": 3,
     "fallback_heir_name_key": "npc.legacy.fallback_heir_name"

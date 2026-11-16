@@ -34,6 +34,7 @@ CONTENT_SUBDIR_SCHEMA_MAP: dict[str, str] = {
     "events": "event_probability",
     "narratives": "narratives_overlay",
     "copywriting": "copywriting_overlay",
+    "races": "races_catalog",
 }
 
 
@@ -109,6 +110,13 @@ def validate_mod_schemas(mod_dir: Path, diags: list[DiagnosticItem]) -> None:
     _validate_file_against_schema(
         mod_dir / "cutscenes" / "cutscene_registry.json",
         "cutscenes/cutscene_registry.json",
+        "cutscene_manifest",
+        schemas,
+        diags,
+    )
+    _validate_file_against_schema(
+        mod_dir / "cutscenes" / "cutscene_hooks.json",
+        "cutscenes/cutscene_hooks.json",
         "cutscene_manifest",
         schemas,
         diags,

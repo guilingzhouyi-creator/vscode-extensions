@@ -184,5 +184,11 @@
     "max_round_duration_ms": 10000,
     "auto_pass_on_ap_exhausted": true,
     "auto_pass_on_hand_empty": true
+  },
+  "player_defaults": {
+    "hp_max": 1000.0
+  },
+  "damage_defaults": {
+    "base_skill_damage": 250.0
   }
 }

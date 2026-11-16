@@ -162,7 +162,7 @@ BUILTIN_DAG_TEMPLATES: dict[str, dict[str, Any]] = {
             "NODE_CAPITAL_EXIT": {
                 "node_type": "TERMINAL_EXIT",
                 "narrative_key": "prologue.capital.exit",
-                "inline_text": "城门徐徐拉起，{PLAYER_NAME} 迈入卡拉尔世界广袤大舞台。",
+                "inline_text": "城门徐徐拉起，{PLAYER_NAME} 迈入广袤世界大舞台。",
                 "required_prerequisites": ["NODE_CAPITAL_GATE"],
                 "mutations_on_complete": [
                     {"type": "PrologueCompleted", "dag_id": "DAG_PROLOGUE_HUMAN_CAPITAL"}

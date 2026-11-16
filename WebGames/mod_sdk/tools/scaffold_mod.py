@@ -404,7 +404,7 @@ def main() -> None:
     """命令行主入口。"""
     _ensure_utf8_stdout()
     parser = argparse.ArgumentParser(
-        description="卡拉尔 MOD 骨架生成器 (Scaffold Tool)",
+        description="纯净世界引擎 MOD 骨架生成器 (Scaffold Tool)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--id", required=True, dest="pack_id", help="MOD 包唯一标识符 (如 mod_elf_story)")

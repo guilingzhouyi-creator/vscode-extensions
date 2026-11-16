@@ -654,7 +654,7 @@ def simulate_mod(
         return 0
 
     print("==============================================================================")
-    print("🎭 卡拉尔 MOD 剧情无头演习推演引擎")
+    print("🎭 纯净世界引擎 MOD 剧情无头演习推演引擎")
     print(f"  • MOD 名称   : {manifest_data.get('pack_name')} ({manifest_data.get('pack_id')})")
     print(f"  • 激活图元   : {target_dag_id} (路由来源: {routing_source})")
     print(f"  • 选定身世   : {selected_origin.get('origin_id')} ({selected_origin.get('name')})")
@@ -775,7 +775,7 @@ def main() -> None:
     """命令行入口。"""
     _ensure_utf8_stdout()
     parser = argparse.ArgumentParser(
-        description="卡拉尔 MOD 剧情演习与预览器 (Mod Narrative Previewer)",
+        description="纯净世界引擎 MOD 剧情演习与预览器 (Mod Narrative Previewer)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("mod_dir", help="待演习的 MOD 根目录路径")
