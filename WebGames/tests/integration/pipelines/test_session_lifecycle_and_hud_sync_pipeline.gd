@@ -229,7 +229,7 @@ static func test_full_headless_lifecycle_pipeline() -> Dictionary:
 # ---- TC-HDS-07：叙事模板-载荷 args 契约一致（%s 占位与 args 对齐） ----
 static func test_narrative_template_args_contract() -> Dictionary:
 	var pairs := [
-		["account.registered", "【鉴权】开拓者 %s 成功在卡拉尔世界建立身份档案。", 1],
+		["account.registered", "【鉴权】开拓者 %s 已在当前世界成功建立身份档案。", 1],
 		["account.login_succeeded", "【鉴权】欢迎归来，开拓者 %s！", 1],
 		["account.session_revoked", "【鉴权】开拓者 %s 的会话已安全注销。", 1],
 		["world_state.snapshot_published", "【世界】开拓者 %s 已进入当前世界。", 1],

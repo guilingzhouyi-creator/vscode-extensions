@@ -129,7 +129,9 @@ static func test_dod_p133_02_base_neutrality_and_multi_namespace() -> Dictionary
 	var gateway_cooldown := GameConfig.get_int("frontend.views", "world_gateway/switch_mode_cooldown_ms", 0)
 	var workbench_cooldown := GameConfig.get_int("frontend.views", "mod_workbench/toggle_pack_cooldown_ms", 0)
 	var prologue_cooldown := GameConfig.get_int("frontend.views", "prologue/choice_cooldown_ms", 0)
-	var base_neutral := _contains_none_forbidden(player_name) and _servers_neutral(servers_list)
+	var server_list_neutral := _servers_neutral(servers_list)
+	var static_neutrality_issues := _scan_base_neutrality_issues()
+	var base_neutral := _contains_none_forbidden(player_name) and server_list_neutral and static_neutrality_issues.is_empty()
 	var views_complete := gateway_cooldown == 200 and workbench_cooldown == 120 and prologue_cooldown == 150
 
 	var namespace_checks := ItemRegistrySolver.validate_canonical_id_format("KALAR:EQUIP:WEAPON_BLADE:SWORD_01") \
@@ -144,9 +146,63 @@ static func test_dod_p133_02_base_neutrality_and_multi_namespace() -> Dictionary
 	return TestCase.make_result("DOD-P133-02: 基座配置去卡拉尔中性化、views.json 契约段与多命名空间校验", passed, {
 		"service_mode": service_mode,
 		"base_neutral": base_neutral,
+		"static_neutrality_issues": static_neutrality_issues,
 		"views_complete": views_complete,
 		"namespace_checks": namespace_checks
 	})
+
+
+## 全量扫描基座 config/narratives/*、项目元数据与 backend/frontend 中不得出现禁忌剧情词与 official_kalar
+static func _scan_base_neutrality_issues() -> Array[String]:
+	var issues: Array[String] = []
+	var config_dirs: Array[String] = ["res://config/narratives", "res://config/infrastructure"]
+	for dir_path in config_dirs:
+		var dir := DirAccess.open(dir_path)
+		if dir == null:
+			continue
+		dir.list_dir_begin()
+		var fname: String = dir.get_next()
+		while not fname.is_empty():
+			if not dir.current_is_dir() and fname.ends_with(".json"):
+				var full_path: String = dir_path.path_join(fname)
+				var raw: String = FileAccess.get_file_as_string(full_path)
+				if not _contains_none_forbidden(raw):
+					issues.append("config_lore:" + full_path)
+			fname = dir.get_next()
+		dir.list_dir_end()
+
+	if FileAccess.file_exists("res://project.godot"):
+		var proj: String = FileAccess.get_file_as_string("res://project.godot")
+		if proj.contains("KalarWorldEngine") or not _contains_none_forbidden(proj):
+			issues.append("project_godot_not_neutral")
+
+	var code_roots: Array[String] = ["res://backend", "res://frontend"]
+	for code_root in code_roots:
+		var files := _collect_gd_files_recursive(code_root)
+		for gd_path in files:
+			var code: String = FileAccess.get_file_as_string(gd_path)
+			if code.contains("\"official_kalar\""):
+				issues.append("hardcoded_official_kalar:" + gd_path)
+	return issues
+
+
+static func _collect_gd_files_recursive(root_dir: String) -> Array[String]:
+	var out: Array[String] = []
+	var dir := DirAccess.open(root_dir)
+	if dir == null:
+		return out
+	dir.list_dir_begin()
+	var item: String = dir.get_next()
+	while not item.is_empty():
+		if not item.begins_with("."):
+			var full: String = root_dir.path_join(item)
+			if dir.current_is_dir():
+				out.append_array(_collect_gd_files_recursive(full))
+			elif item.ends_with(".gd"):
+				out.append(full)
+		item = dir.get_next()
+	dir.list_dir_end()
+	return out
 
 
 static func _contains_none_forbidden(source_text: String) -> bool:

@@ -18,6 +18,8 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_get_many_equivalence())
 	# FifoBudget 最旧先出单次裁剪
 	results.append(test_fifo_budget_trim_oldest())
+	# 中性基座非空展示默认值 + 新补齐前端/基础设施键合法性
+	results.append(test_neutral_display_defaults_and_extended_keys())
 
 	var all_passed := true
 	for r in results:
@@ -148,3 +150,69 @@ static func test_fifo_budget_trim_oldest() -> Dictionary:
 	var unbounded_ok: bool = unbounded_rm == 0 and unbounded.size() == 2
 	var passed: bool = cap_ok and noop_ok and unbounded_ok
 	return {"test": "TC-CFG-07: FifoBudget 最旧先出单次裁剪（溢出裁/未溢出零操作/无界）", "passed": passed}
+
+
+## 中性基座非空展示默认值、零 MOD 失败闭环保留空 ID 与基础设施/前端新键校验
+static func test_neutral_display_defaults_and_extended_keys() -> Dictionary:
+	var violations: Array[String] = []
+	var forbidden := ["卡拉尔", "瓦尔兰", "阿尔托莉雅"]
+	var non_empty_specs := [
+		["domains.gacha", "banner_defaults/banner_id"],
+		["domains.gacha", "banner_defaults/banner_title"],
+		["domains.gacha", "banner_defaults/fallback_title"],
+		["domains.equipment", "loadout_defaults/loadout_name"],
+		["domains.equipment", "loadout_defaults/fallback_name"],
+		["domains.chat_command", "item_defaults/custom_name"],
+		["domains.lattice", "ast_defaults/skill_name"],
+		["domains.lattice", "ast_defaults/deserialize_skill_name"],
+		["domains.lattice", "manuscript_defaults/custom_name"],
+		["domains.monster", "body_part_defaults/part_name"],
+		["domains.monster", "species_defaults/species_name"],
+		["domains.npc", "defaults/personal_name"],
+		["domains.quest", "quest_defaults/quest_title"],
+		["domains.sovereignty", "nation_defaults/canonical_nation_name"],
+		["domains.world", "town_defaults/town_name"],
+		["domains.world_boss", "entity_defaults/boss_title"],
+		["domains.world_boss", "entity_defaults/species_name"],
+		["domains.account", "save_slot/defaults/current_location_name"],
+		["infrastructure.persistence", "engine"],
+	]
+	for spec in non_empty_specs:
+		var val := GameConfig.get_string(spec[0], spec[1], "").strip_edges()
+		if val.is_empty():
+			violations.append("展示默认键不可为空: %s/%s" % [spec[0], spec[1]])
+			continue
+		for tok in forbidden:
+			if val.contains(tok):
+				violations.append("基座展示键含禁用设定词(%s): %s/%s=%s" % [tok, spec[0], spec[1], val])
+
+	if GameConfig.get_float("domains.combat", "player_defaults/hp_max", 0.0) <= 0.0:
+		violations.append("domains.combat/player_defaults/hp_max 必须 > 0")
+	if GameConfig.get_float("domains.combat", "damage_defaults/base_skill_damage", 0.0) <= 0.0:
+		violations.append("domains.combat/damage_defaults/base_skill_damage 必须 > 0")
+	if GameConfig.get_float("domains.economy", "shop/sell_back_ratio", 0.0) <= 0.0:
+		violations.append("domains.economy/shop/sell_back_ratio 必须 > 0")
+	if GameConfig.get_int("domains.gacha", "pity/four_star_threshold", 0) <= 0:
+		violations.append("domains.gacha/pity/four_star_threshold 必须 > 0")
+	var reg_fees := GameConfig.get_array("domains.identity_disguise", "registry_fees", [])
+	if reg_fees.is_empty():
+		violations.append("domains.identity_disguise/registry_fees 不可为空")
+	var replay_speeds := GameConfig.get_array("domains.deterministic", "replay_defaults/speed_presets", [])
+	if replay_speeds.is_empty():
+		violations.append("domains.deterministic/replay_defaults/speed_presets 不可为空")
+
+	# 零 MOD fail-closed 必需保留空字符串的创角与世界路由 ID 不可被虚假填充
+	var fail_closed_empty := [
+		["domains.world", "node_defaults/town_id"],
+		["domains.world_gateway", "single_player/default_world_id"],
+		["domains.character_creation", "defaults/default_race_id"],
+	]
+	for spec in fail_closed_empty:
+		if not GameConfig.get_string(spec[0], spec[1], "__MISSING__").is_empty():
+			violations.append("fail-closed 标识键应保持为空: %s/%s" % [spec[0], spec[1]])
+
+	return {
+		"test": "TC-CFG-08: 中性基座展示默认值与新补齐静态配置键合法性",
+		"passed": violations.is_empty(),
+		"violations": violations,
+	}
