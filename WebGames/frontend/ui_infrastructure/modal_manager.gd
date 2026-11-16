@@ -24,13 +24,16 @@ static func get_instance() -> ModalManager:
 	return _instance
 
 ## 安全剥离并同步释放模态或UI基础设施托管节点（共享供各 UI 管理器 teardown 复用）
-static func detach_and_free_node(target_node: Node) -> void:
+static func detach_and_free_node(target_node: Variant) -> void:
 	if target_node == null or not is_instance_valid(target_node):
 		return
-	var parent_node := target_node.get_parent()
+	if not (target_node is Node):
+		return
+	var node := target_node as Node
+	var parent_node := node.get_parent()
 	if parent_node != null:
-		parent_node.remove_child(target_node)
-	target_node.free()
+		parent_node.remove_child(node)
+	node.free()
 
 ## 重置模态弹窗管理器静态单例并同步释放残留弹窗与遮罩节点
 static func reset_instance() -> void:
@@ -75,16 +78,16 @@ static func ensure_fallback_container(layer: CanvasLayer, fallback_name: String)
 ## 确保容器下全局暗色遮罩存在且对齐容器变化（UI 基础设施层共享，支持幂等重绑）
 static func ensure_backdrop_for_container(
 	container: Control,
-	existing_backdrop: ColorRect,
+	existing_backdrop: Variant,
 	backdrop_name: String,
 	on_input: Callable
 ) -> ColorRect:
-	if container == null:
-		return existing_backdrop
-	if existing_backdrop != null and is_instance_valid(existing_backdrop) and existing_backdrop.get_parent() == container:
+	if container == null or not is_instance_valid(container):
+		return existing_backdrop as ColorRect if (existing_backdrop != null and is_instance_valid(existing_backdrop)) else null
+	if existing_backdrop != null and is_instance_valid(existing_backdrop) and existing_backdrop is ColorRect and existing_backdrop.get_parent() == container:
 		return existing_backdrop
 	if existing_backdrop != null and is_instance_valid(existing_backdrop):
-		existing_backdrop.queue_free()
+		detach_and_free_node(existing_backdrop)
 	var backdrop := ColorRect.new()
 	backdrop.name = backdrop_name
 	backdrop.color = DesignTokens.COLOR_BACKDROP_MASK

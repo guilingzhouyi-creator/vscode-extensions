@@ -48,8 +48,13 @@ func bind_layer(target_layer: CanvasLayer, target_container: Control = null) -> 
 	_ensure_bubble()
 
 func _ensure_bubble() -> void:
-	if _bubble_panel != null or _tooltip_container == null:
+	if _tooltip_container == null or not is_instance_valid(_tooltip_container):
 		return
+	if _bubble_panel != null and is_instance_valid(_bubble_panel) and _bubble_panel.get_parent() == _tooltip_container:
+		return
+	ModalManager.detach_and_free_node(_bubble_panel)
+	_bubble_panel = null
+	_text_label = null
 	_bubble_panel = PanelContainer.new()
 	_bubble_panel.name = "TooltipBubble"
 	_bubble_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE

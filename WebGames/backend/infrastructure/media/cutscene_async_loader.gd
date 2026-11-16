@@ -15,6 +15,8 @@ extends RefCounted
 
 const AssetPathResolverClass = preload("res://backend/infrastructure/resource_governance/asset_path_resolver.gd")
 
+signal load_failed(task_id: int, resource_path: String, error_code: String)
+
 # ==============================================================================
 # 一、状态常量与任务模型
 # ==============================================================================
@@ -24,6 +26,11 @@ const STATUS_LOADING: String = "LOADING"
 const STATUS_LOADED: String = "LOADED"
 const STATUS_FAILED: String = "FAILED"
 const STATUS_CANCELLED: String = "CANCELLED"
+
+const ERR_MEDIA_MISSING: String = "ERR_MEDIA_MISSING"
+const ERR_MEDIA_DECODE_FAILED: String = "ERR_MEDIA_DECODE_FAILED"
+const ERR_UNSUPPORTED_MEDIA_FORMAT: String = "ERR_UNSUPPORTED_MEDIA_FORMAT"
+const ERR_THREAD_LOAD_FAILED: String = "ERR_THREAD_LOAD_FAILED"
 
 const DEFAULT_CACHE_CAPACITY: int = 4
 
@@ -44,6 +51,9 @@ static var _instance: CutsceneAsyncLoader = null
 var _task_counter: int = 0
 var _active_tasks: Dictionary = {} # task_id -> AsyncMediaTask
 var _path_to_task_id: Dictionary = {} # resource_path -> task_id
+var _task_status_history: Dictionary = {} # task_id -> String
+var _task_error_history: Dictionary = {} # task_id -> String
+var _last_errors: Dictionary = {} # resource_path -> String
 var _lru_cache: Dictionary = {} # resource_path -> Resource
 var _lru_keys: Array[String] = []
 var _max_cache_capacity: int = DEFAULT_CACHE_CAPACITY
@@ -76,8 +86,33 @@ func set_cache_capacity(capacity: int) -> void:
 func clear_cache_and_tasks() -> void:
 	_active_tasks.clear()
 	_path_to_task_id.clear()
+	_task_status_history.clear()
+	_task_error_history.clear()
+	_last_errors.clear()
 	_lru_cache.clear()
 	_lru_keys.clear()
+
+
+## 查询异步装载任务最近一次记录的状态（IDLE/LOADING/LOADED/FAILED/CANCELLED）
+func get_task_status(task_id: int) -> String:
+	var task: AsyncMediaTask = _active_tasks.get(task_id, null)
+	if task != null:
+		return task.status
+	return str(_task_status_history.get(task_id, STATUS_IDLE))
+
+
+## 查询异步装载任务失败错误码（成功或未发生失败时返回空串）
+func get_task_error_code(task_id: int) -> String:
+	var task: AsyncMediaTask = _active_tasks.get(task_id, null)
+	if task != null:
+		return task.error_code
+	return str(_task_error_history.get(task_id, ""))
+
+
+## 按资源 URI 查询最近一次失败错误码
+func get_last_error_code(resource_path: String) -> String:
+	var canonical_path := AssetPathResolverClass.resolve_unified_uri(resource_path)
+	return str(_last_errors.get(canonical_path, ""))
 
 # ==============================================================================
 # 三、非阻塞异步装载核心 API
@@ -143,16 +178,24 @@ func _create_and_dispatch_task(path: String, priority: int, on_loaded: Callable)
 		return task_id
 
 	if not AssetPathResolverClass.asset_exists(path):
-		_fallback_placeholder(new_task, path, on_loaded)
+		_fail_media_load(new_task, path, ERR_MEDIA_MISSING, on_loaded)
 		return task_id
 
 	if _is_external_binary_image_path(path):
 		_load_external_image_from_bytes(new_task, path, on_loaded)
 		return task_id
 
+	if _is_external_binary_audio_path(path):
+		_load_external_audio_from_bytes(new_task, path, on_loaded)
+		return task_id
+
+	if _is_external_unsupported_mod_path(path):
+		_fail_media_load(new_task, path, ERR_UNSUPPORTED_MEDIA_FORMAT, on_loaded)
+		return task_id
+
 	var request_error := ResourceLoader.load_threaded_request(path, "", false)
 	if request_error != OK:
-		_fallback_placeholder(new_task, path, on_loaded)
+		_fail_media_load(new_task, path, ERR_THREAD_LOAD_FAILED, on_loaded)
 
 	return task_id
 
@@ -163,11 +206,25 @@ func _is_external_binary_image_path(path: String) -> bool:
 		return false
 	return path.contains(".kmod!/") or path.begins_with("user://") or not ResourceLoader.exists(path)
 
+func _is_external_binary_audio_path(path: String) -> bool:
+	var lower := path.to_lower()
+	var is_audio := lower.ends_with(".ogg") or lower.ends_with(".wav")
+	if not is_audio:
+		return false
+	return path.contains(".kmod!/") or path.begins_with("user://") or not ResourceLoader.exists(path)
+
+func _is_external_unsupported_mod_path(path: String) -> bool:
+	if path.contains(".kmod!/"):
+		return true
+	if not path.begins_with("user://"):
+		return false
+	var file_extension := path.get_extension().to_lower()
+	return not (file_extension in ["tres", "res", "tscn", "scn", "ogv"])
+
 func _load_external_image_from_bytes(task: AsyncMediaTask, path: String, on_loaded: Callable) -> void:
 	var raw_bytes := AssetPathResolverClass.read_mod_asset_bytes(path)
 	if raw_bytes.is_empty():
-		_active_tasks.erase(task.task_id)
-		_fallback_placeholder(task, path, on_loaded)
+		_fail_media_load(task, path, ERR_MEDIA_DECODE_FAILED, on_loaded)
 		return
 	var image := Image.new()
 	var lower := path.to_lower()
@@ -183,30 +240,136 @@ func _load_external_image_from_bytes(task: AsyncMediaTask, path: String, on_load
 	elif lower.ends_with(".tga"):
 		load_status = image.load_tga_from_buffer(raw_bytes)
 	if load_status != OK or image.is_empty():
-		_active_tasks.erase(task.task_id)
-		_fallback_placeholder(task, path, on_loaded)
+		_fail_media_load(task, path, ERR_MEDIA_DECODE_FAILED, on_loaded)
 		return
 	var texture := ImageTexture.create_from_image(image)
-	task.status = STATUS_LOADED
-	task.progress = 1.0
-	task.loaded_resource = texture
-	_active_tasks.erase(task.task_id)
-	_path_to_task_id.erase(path)
-	_cache_loaded_resource(path, texture)
-	_invoke_callback(on_loaded, texture)
+	_mark_task_succeeded(task, path, texture, on_loaded)
+
+func _load_external_audio_from_bytes(task: AsyncMediaTask, path: String, on_loaded: Callable) -> void:
+	var raw_bytes := AssetPathResolverClass.read_mod_asset_bytes(path)
+	if raw_bytes.is_empty():
+		_fail_media_load(task, path, ERR_MEDIA_DECODE_FAILED, on_loaded)
+		return
+	var lower := path.to_lower()
+	var audio_stream: AudioStream = null
+	if lower.ends_with(".ogg"):
+		audio_stream = AudioStreamOggVorbis.load_from_buffer(raw_bytes)
+	elif lower.ends_with(".wav"):
+		audio_stream = _decode_wav_audio_stream(raw_bytes)
+	if audio_stream == null:
+		_fail_media_load(task, path, ERR_MEDIA_DECODE_FAILED, on_loaded)
+		return
+	_mark_task_succeeded(task, path, audio_stream, on_loaded)
+
+func _decode_wav_audio_stream(raw_bytes: PackedByteArray) -> AudioStreamWAV:
+	if raw_bytes.size() < 44:
+		return null
+	if raw_bytes.slice(0, 4).get_string_from_ascii() != "RIFF":
+		return null
+	if raw_bytes.slice(8, 12).get_string_from_ascii() != "WAVE":
+		return null
+	var parsed := _parse_wav_chunks(raw_bytes)
+	if not bool(parsed.get("valid", false)):
+		return null
+	var bits_per_sample: int = int(parsed.get("bits_per_sample", 0))
+	var pcm_data: PackedByteArray = parsed.get("data", PackedByteArray())
+	var converted := _convert_wav_pcm_bytes(pcm_data, bits_per_sample)
+	if converted.is_empty():
+		return null
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_8_BITS if bits_per_sample == 8 else AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = int(parsed.get("sample_rate", 44100))
+	stream.stereo = int(parsed.get("channels", 1)) == 2
+	stream.data = converted
+	return stream
+
+func _parse_wav_chunks(raw_bytes: PackedByteArray) -> Dictionary:
+	var offset: int = 12
+	var total_size: int = raw_bytes.size()
+	var channels: int = 0
+	var sample_rate: int = 0
+	var bits_per_sample: int = 0
+	var audio_format: int = 0
+	var pcm_data := PackedByteArray()
+	var has_format_chunk: bool = false
+	while offset + 8 <= total_size:
+		var chunk_id := raw_bytes.slice(offset, offset + 4).get_string_from_ascii()
+		var chunk_size: int = raw_bytes.decode_u32(offset + 4)
+		var data_start: int = offset + 8
+		if data_start + chunk_size > total_size:
+			break
+		if chunk_id == "fmt " and chunk_size >= 16:
+			audio_format = raw_bytes.decode_u16(data_start)
+			channels = raw_bytes.decode_u16(data_start + 2)
+			sample_rate = raw_bytes.decode_u32(data_start + 4)
+			bits_per_sample = raw_bytes.decode_u16(data_start + 14)
+			has_format_chunk = true
+		elif chunk_id == "data" and chunk_size > 0:
+			pcm_data = raw_bytes.slice(data_start, data_start + chunk_size)
+		offset = data_start + chunk_size + (chunk_size & 1)
+	var is_format_valid: bool = has_format_chunk and audio_format == 1 and (channels == 1 or channels == 2) and sample_rate > 0 and (bits_per_sample == 8 or bits_per_sample == 16)
+	return {
+		"valid": is_format_valid and not pcm_data.is_empty(),
+		"channels": channels,
+		"sample_rate": sample_rate,
+		"bits_per_sample": bits_per_sample,
+		"data": pcm_data
+	}
+
+func _convert_wav_pcm_bytes(pcm_data: PackedByteArray, bits_per_sample: int) -> PackedByteArray:
+	if pcm_data.is_empty():
+		return PackedByteArray()
+	if bits_per_sample == 16:
+		return pcm_data
+	if bits_per_sample != 8:
+		return PackedByteArray()
+	var signed_bytes := PackedByteArray()
+	signed_bytes.resize(pcm_data.size())
+	for sample_index in range(pcm_data.size()):
+		signed_bytes[sample_index] = (pcm_data[sample_index] - 128) & 0xFF
+	return signed_bytes
 
 func _complete_deterministic(task: AsyncMediaTask, path: String, on_loaded: Callable) -> void:
-	task.status = STATUS_LOADED
-	task.progress = 1.0
-	task.loaded_resource = Resource.new()
-	_cache_loaded_resource(path, task.loaded_resource)
-	_invoke_callback(on_loaded, task.loaded_resource)
+	_mark_task_succeeded(task, path, Resource.new(), on_loaded)
 
-func _fallback_placeholder(task: AsyncMediaTask, path: String, on_loaded: Callable) -> void:
+func _mark_task_succeeded(
+	task: AsyncMediaTask,
+	path: String,
+	loaded_resource: Resource,
+	on_loaded: Callable,
+	erase_active: bool = true
+) -> void:
 	task.status = STATUS_LOADED
 	task.progress = 1.0
+	task.loaded_resource = loaded_resource
+	task.error_code = ""
+	_task_status_history[task.task_id] = STATUS_LOADED
+	_task_error_history[task.task_id] = ""
+	_last_errors.erase(path)
+	if erase_active:
+		_active_tasks.erase(task.task_id)
+		_path_to_task_id.erase(path)
+	_cache_loaded_resource(path, loaded_resource)
+	_invoke_callback(on_loaded, loaded_resource)
+
+func _fail_media_load(
+	task: AsyncMediaTask,
+	path: String,
+	failure_code: String,
+	on_loaded: Callable,
+	erase_active: bool = true
+) -> void:
+	task.status = STATUS_FAILED
+	task.progress = 0.0
 	task.loaded_resource = null
-	_path_to_task_id.erase(path)
+	task.error_code = failure_code
+	_task_status_history[task.task_id] = STATUS_FAILED
+	_task_error_history[task.task_id] = failure_code
+	_last_errors[path] = failure_code
+	if erase_active:
+		_active_tasks.erase(task.task_id)
+		_path_to_task_id.erase(path)
+	load_failed.emit(task.task_id, path, failure_code)
 	_invoke_callback(on_loaded, null)
 
 func _invoke_callback(callback: Callable, loaded_resource: Resource) -> void:
@@ -233,15 +396,10 @@ func poll_tasks() -> void:
 
 		if status == ResourceLoader.THREAD_LOAD_LOADED:
 			var loaded_resource := ResourceLoader.load_threaded_get(task.resource_path)
-			task.status = STATUS_LOADED
-			task.loaded_resource = loaded_resource
-			_cache_loaded_resource(task.resource_path, loaded_resource)
-			_invoke_callback(task.callback, loaded_resource)
+			_mark_task_succeeded(task, task.resource_path, loaded_resource, task.callback, false)
 			completed_ids.append(task_id)
 		elif status == ResourceLoader.THREAD_LOAD_FAILED or status == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
-			task.status = STATUS_LOADED
-			task.loaded_resource = null # 优雅降级为文字占位
-			_invoke_callback(task.callback, null)
+			_fail_media_load(task, task.resource_path, ERR_THREAD_LOAD_FAILED, task.callback, false)
 			completed_ids.append(task_id)
 
 	for completed_id in completed_ids:
@@ -257,20 +415,17 @@ func cancel_task(task_id: int) -> bool:
 		return false
 	task.is_cancelled = true
 	task.status = STATUS_CANCELLED
+	_task_status_history[task_id] = STATUS_CANCELLED
 	_path_to_task_id.erase(task.resource_path)
 	_active_tasks.erase(task_id)
 	return true
 
-## 同步快速判定某资源是否已在内存缓存就绪（无物理文件时直接判定就绪以进入模拟回退播放）
+## 同步快速判定某资源是否已在内存缓存就绪（未缓存/缺失均返回 false）
 func is_resource_ready(resource_path: String) -> bool:
 	var canonical_path := AssetPathResolverClass.resolve_unified_uri(resource_path)
-	if _lru_cache.has(canonical_path):
-		return true
-	if _is_deterministic_mode:
+	if canonical_path.is_empty():
 		return false
-	if canonical_path.is_empty() or not AssetPathResolverClass.asset_exists(canonical_path):
-		return true
-	return false
+	return _lru_cache.has(canonical_path)
 
 ## 获取已就绪的媒体资源实体，若未就绪返回 null
 func get_loaded_resource(resource_path: String) -> Resource:

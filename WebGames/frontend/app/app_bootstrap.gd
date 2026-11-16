@@ -24,6 +24,10 @@ const ServiceLocator = preload("res://frontend/domain_boundary/service_locator.g
 ## 引导幂等守卫：重复引导时跳过生命周期推进与默认入口压栈，避免状态机重入
 static var _is_bootstrapped: bool = false
 
+## 测试专用复位：允许无头集成测试重复挂载 app_root.tscn 验证冷启动路径
+static func reset_for_tests() -> void:
+	_is_bootstrapped = false
+
 ## 应用骨架装配（幂等：重复调用仅幂等重绑导航根与 UI 基础设施，不重跑生命周期/入口压栈）
 static func bootstrap(app_root: AppRoot) -> void:
 	# 1. 绑定分层导航器（幂等重绑）

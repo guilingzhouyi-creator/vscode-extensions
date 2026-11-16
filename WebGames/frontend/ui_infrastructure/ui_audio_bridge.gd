@@ -6,9 +6,13 @@
 # 职责说明: 统一解耦 UI 交互动作与底层音频播放器，避免组件侵入式寻找音频节点
 # 退出语义与设计依据: 无状态单例通过信号单向广播音效请求；未绑定音频监听者时静默空发且无副作用
 # ==============================================================================
-## UIAudioBridge：全局 UI 音效路由桥接器，提供标准化的交互音效触发接口
+## UIAudioBridge：全局 UI 音效路由桥接器，提供标准化的交互音效触发与 MOD 音频流异步解码接口
 class_name UIAudioBridge
 extends RefCounted
+
+const CutsceneAsyncLoaderClass = preload("res://backend/infrastructure/media/cutscene_async_loader.gd")
+const AudioBusPipelineClass = preload("res://backend/domains/event_driven_audio/audio_bus_pipeline.gd")
+const AssetPathResolverClass = preload("res://backend/infrastructure/resource_governance/asset_path_resolver.gd")
 
 enum UISfxType {
 	HOVER,
@@ -21,6 +25,7 @@ enum UISfxType {
 }
 
 signal play_sfx(sfx_type: UISfxType, volume_db: float)
+signal play_stream(sound_id: String, stream: AudioStream, bus_name: String, volume_db: float)
 
 static var _instance: UIAudioBridge
 ## 获取全局 UI 音效桥接器单例
@@ -32,6 +37,24 @@ static func get_instance() -> UIAudioBridge:
 ## 重置全局 UI 音效桥接器静态单例
 static func reset_instance() -> void:
 	_instance = null
+
+## 通过 CutsceneAsyncLoader 异步解码 MOD/本地音频流并触发 play_stream 信号
+func play_mod_audio_async(
+	sound_id: String,
+	resource_path: String = "",
+	bus_name: String = "SE",
+	volume_db: float = 0.0
+) -> int:
+	var resolved_uri := AssetPathResolverClass.resolve_unified_uri(
+		AudioBusPipelineClass.resolve_mod_audio_uri(sound_id, resource_path)
+	)
+	if resolved_uri.is_empty():
+		return 0
+	var loader := CutsceneAsyncLoaderClass.get_instance()
+	return loader.request_load(resolved_uri, 1, func(loaded_resource: Resource) -> void:
+		if loaded_resource is AudioStream:
+			play_stream.emit(sound_id, loaded_resource as AudioStream, bus_name, volume_db)
+	)
 
 ## 触发悬停音效信号
 func play_hover(volume_db: float = 0.0) -> void:

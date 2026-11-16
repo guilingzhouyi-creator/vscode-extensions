@@ -28,6 +28,12 @@ const ERROR_CODE_I18N_MAP: Dictionary = {
     "ERR_EMPTY_USERNAME": "ui.fe01.login.error_empty",
     "ERR_NAME_EMPTY": "ui.fe01.char_create.error_empty_name",
     "ERR_BIND_FAILED": "ui.fe01.char_create.error_bind_failed",
+    "SLOT_OCCUPIED": "ui.fe01.char_create.error_slot_occupied",
+    "NO_AVAILABLE_SLOT": "ui.fe01.char_create.error_no_slot",
+    "INVALID_SLOT": "ui.fe01.char_create.error_invalid_slot",
+    "INVALID_ACCOUNT": "ui.fe01.login.error_not_found",
+    "INVALID_CONTEXT": "ui.fe01.char_create.error_bind_failed",
+    "ERR_NO_BASE_CONTENT_MOD": "ui.fe01.char_create.error_no_base_mod",
 }
 
 ## 异步登录契约实现（经统一协议分发并同步激活 Gateway + SessionRuntime）
@@ -175,8 +181,11 @@ func create_character_async(account_id: String, request_payload: Dictionary, res
     var bind_result: Dictionary = AccountSlotBindingSolver.create_character_in_slot_context(creation_context)
 
     if not bool(bind_result.get("success", false)):
-        var bind_error_code: String = str(bind_result.get("error_code", "ERR_BIND_FAILED"))
-        _emit_error_callback(result_callback, bind_error_code, ERROR_CODE_I18N_MAP["ERR_BIND_FAILED"])
+        var bind_error_code: String = str(bind_result.get("error_code", "ERR_BIND_FAILED")).strip_edges()
+        if bind_error_code.is_empty():
+            bind_error_code = "ERR_BIND_FAILED"
+        var mapped_fallback: String = str(ERROR_CODE_I18N_MAP.get(bind_error_code, bind_error_code))
+        _emit_error_callback(result_callback, bind_error_code, mapped_fallback)
         return
 
     var bound_slot_id: String = str(bind_result.get("slot_id", ""))

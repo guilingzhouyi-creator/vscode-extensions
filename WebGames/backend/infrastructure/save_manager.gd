@@ -74,7 +74,7 @@ static func save_game(save_name: String, payload: Dictionary) -> Dictionary:
 
 	var full_envelope := {
 		"format_version": GameConfig.get_string("infrastructure.persistence", "format_version", "1.0.0"),
-		"engine": GameConfig.get_string("infrastructure.persistence", "engine", "KalarWorldEngine_Godot4"),
+		"engine": GameConfig.get_string("infrastructure.persistence", "engine", "PureWorldEngine_Godot4"),
 		"save_name": save_name,
 		"created_timestamp": Time.get_unix_time_from_system(),
 		"signature_sha256": sha256_hash,

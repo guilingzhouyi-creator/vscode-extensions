@@ -43,7 +43,8 @@ static func dispatch_and_reply(
 	fallback_value: Variant = {},
 	character_id: String = ""
 ) -> void:
-	var service_response := dispatch_human(domain, action_type, request_payload, account_id, token, character_id)
+	var safe_payload: Dictionary = request_payload if request_payload != null else {}
+	var service_response := dispatch_human(domain, action_type, safe_payload, account_id, token, character_id)
 	reply_callback(result_callback, service_response, result_key, fallback_value)
 
 ## 自动读取当前活跃会话凭证（Account/Token/Character）分发动作用信封
@@ -57,7 +58,7 @@ static func dispatch_active_session(
 ) -> void:
 	var account_id := WorldSessionRuntimeService.get_active_account_id()
 	var session_payload := {"account_id": account_id}
-	if not extra_payload.is_empty():
+	if extra_payload != null and not extra_payload.is_empty():
 		session_payload.merge(extra_payload, true)
 	var service_response := dispatch_human(domain, action_type, session_payload, account_id, WorldSessionRuntimeService.get_active_session_token())
 	reply_callback(result_callback, service_response, result_key, fallback_value)
@@ -69,14 +70,28 @@ static func reply_callback(
 	result_key: String = "data",
 	fallback_value: Variant = {}
 ) -> void:
-	if not result_callback.is_valid() or service_response == null:
+	if not result_callback.is_valid():
 		return
-	var output_value: Variant = service_response.data
+	if service_response == null:
+		result_callback.call({
+			"success": false,
+			"error_code": "ERR_PROTOCOL_NULL_RESPONSE",
+			"message": "ERR_PROTOCOL_NULL_RESPONSE",
+			result_key: fallback_value
+		})
+		return
+	var output_value: Variant = service_response.data if service_response.data != null else fallback_value
 	if result_key != "data":
 		output_value = service_response.data.get(result_key, fallback_value) if service_response.data is Dictionary else fallback_value
+	var error_code := str(service_response.error_code).strip_edges()
+	if not service_response.success and error_code.is_empty():
+		error_code = "ERR_PROTOCOL_DISPATCH_FAILED"
+	var message_text := str(service_response.error_message)
+	if not service_response.success and message_text.is_empty():
+		message_text = error_code
 	result_callback.call({
 		"success": service_response.success,
-		"error_code": service_response.error_code,
-		"message": service_response.error_message,
+		"error_code": error_code,
+		"message": message_text,
 		result_key: output_value
 	})
