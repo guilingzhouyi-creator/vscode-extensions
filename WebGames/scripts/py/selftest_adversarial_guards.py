@@ -24,6 +24,8 @@ import audit_script_comment
 import audit_secrets
 from lib.arch_guard_rules import check_tc_arch_12, check_tc_arch_13, check_tc_arch_14
 from lib.audit_sdk_protocol_rules import _check_esc_action_enum_parity
+from lib.selftest_audit_purity_guards import run_perf_and_refactor_purity_guards
+from lib.selftest_reporting_guards import run_reporting_and_aggregate_guards
 from gd import style_rules
 
 ensure_utf8_stdout()
@@ -219,6 +221,8 @@ def main() -> int:
     failures.extend(_test_arch_log_and_crypto_evasion())
     failures.extend(_test_case_sensitive_res_and_esc_drift())
     failures.extend(_test_gd_strict_style_evasion())
+    failures.extend(run_reporting_and_aggregate_guards())
+    failures.extend(run_perf_and_refactor_purity_guards())
 
     if failures:
         for item in failures:
