@@ -197,7 +197,10 @@ AUDIT_TASKS: list[AuditTask] = [
         task_id="report_sweep",
         name="bench 报告合并扫描",
         script_name="report_sweep.py",
-        default_args=[],
+        default_args=[
+            "benchmarks/reports/baseline.json",
+            "benchmarks/reports/bench_latest.json",
+        ],
         scopes={"bench"},
         group="bench",
     ),
@@ -440,26 +443,30 @@ def _compute_worker_count(args: argparse.Namespace, task_count: int) -> int:
 
 
 def _handle_registry_warnings(
-    registry_issues: list[str], is_json: bool
+    registry_issues: list[str], is_quiet_mode: bool
 ) -> None:
-    if not is_json and registry_issues:
+    if not is_quiet_mode and registry_issues:
         print(f"{C_RED}【registry】❌ 脚本库注册表完备性自检未通过:{C_RESET}")
         for issue in registry_issues:
             print(f"  - {issue}")
 
 
+def _describe_run_mode(args: argparse.Namespace, task_count: int) -> str:
+    if args.slice:
+        return f"定向切片 (--slice {args.slice})"
+    if args.diff:
+        return "Git 差异定向增量"
+    if args.task:
+        return f"精选任务 ({task_count} 项)"
+    if args.group:
+        return f"全量并行 ({args.group} 组)"
+    return "全量并行"
+
+
 def _print_runner_header(
     args: argparse.Namespace, workers: int, task_count: int
 ) -> None:
-    mode_desc = (
-        f"定向切片 (--slice {args.slice})"
-        if args.slice
-        else (
-            "Git 差异定向增量"
-            if args.diff
-            else f"全量并行 ({args.group} 组)"
-        )
-    )
+    mode_desc = _describe_run_mode(args, task_count)
     print("=" * 75)
     print(
         f"🚀 {C_BOLD}启动卡拉尔世界引擎全域质量门禁调度流水线 (v{AUDIT_RUNNER_VERSION}){C_RESET}"
@@ -481,7 +488,7 @@ def main() -> int:
     registry_issues = check_registry_completeness(
         PY_SCRIPTS_DIR, AUDIT_TASKS, REGISTRY_EXEMPT, ENGINE_PREFIXES
     )
-    _handle_registry_warnings(registry_issues, args.json)
+    _handle_registry_warnings(registry_issues, is_quiet_mode)
 
     workers = _compute_worker_count(args, len(tasks_to_run))
     if not is_quiet_mode:

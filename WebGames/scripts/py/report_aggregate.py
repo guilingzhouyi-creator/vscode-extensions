@@ -17,7 +17,7 @@ import datetime
 import json
 import sys
 
-from audit_common import ensure_utf8_stdout, resolve_repo_root, load_json
+from audit_common import ensure_utf8_stdout, resolve_repo_root
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()
@@ -26,13 +26,29 @@ BASELINE_PATH = REPORTS_DIR / "baseline.json"
 NL = "\n"
 
 
+def _read_report_dict(path: Path) -> tuple[dict | None, str]:
+    """严格读取 JSON 报告文件，返回 (字典, 错误说明)。"""
+    if not path.is_file():
+        return None, f"文件不存在: {path}"
+    try:
+        raw_text = path.read_text(encoding="utf-8")
+        if not raw_text.strip():
+            return None, f"文件为空: {path}"
+        data = json.loads(raw_text)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+        return None, str(exc)
+    if not isinstance(data, dict) or not data:
+        return None, f"JSON 根节点不是非空对象: {path}"
+    return data, ""
+
+
 def load(path: Path) -> dict:
     """安全读取基准测试 JSON 报告文件。"""
-    try:
-        return load_json(path)
-    except Exception as exc:
-        print(f"【report-aggregate】无法读取报告 {path}: {exc}", file=sys.stderr)
+    data, err = _read_report_dict(path)
+    if data is None:
+        print(f"【report-aggregate】无法读取报告 {path}: {err}", file=sys.stderr)
         sys.exit(1)
+    return data
 
 
 def newest_report() -> Path:
@@ -78,24 +94,15 @@ def promote() -> int:
     return 0
 
 
-def run_gate(base_path: Path, cur_path: Path, threshold: float) -> int:
-    """性能回归门禁：cur 相对 base 回退超过阈值(负向百分比)即失败。"""
-    if not base_path.exists():
-        print(f"【性能门禁】无 golden 基线 {base_path.name}，请先 --promote 晋升（本次跳过，不阻断）")
-        return 0
-    base, cur = load(base_path), load(cur_path)
-    bm, cm = metric_map(base), metric_map(cur)
-
-    lines = [
-        f"# 性能回归门禁: {cur_path.name} vs 基线 {base_path.name}（阈值 {threshold:g}%）",
-        "",
-        "| 指标 | 基线 (ops/s) | 当前 (ops/s) | 变化 | 判定 |",
-        "|---|---:|---:|---:|:--:|",
-    ]
+def _evaluate_metric_rows(
+    bm: dict[str, float], cm: dict[str, float], threshold: float
+) -> tuple[list[str], list[tuple]]:
+    """对比基线与当前共享指标并计算回退列表。"""
+    lines: list[str] = []
     regressions: list[tuple] = []
     for name in sorted(set(bm) & set(cm)):
         o, m = bm[name], cm[name]
-        d = (m - o) / o * 100
+        d = ((m - o) / o * 100.0) if o > 0 else 0.0
         if d <= -threshold:
             regressions.append((name, o, m, d))
             verdict = "🔻 回退"
@@ -104,6 +111,39 @@ def run_gate(base_path: Path, cur_path: Path, threshold: float) -> int:
         else:
             verdict = "—"
         lines.append(f"| {name} | {o:,.1f} | {m:,.1f} | {d:+.1f}% | {verdict} |")
+    return lines, regressions
+
+
+def run_gate(
+    base_path: Path, cur_path: Path, threshold: float, strict: bool = False
+) -> int:
+    """性能回归门禁：基线缺失/损坏或回退超阈值即 fail-closed 失败；strict 下移除基线指标亦失败。"""
+    base, base_err = _read_report_dict(base_path)
+    if base is None:
+        print(f"【性能门禁】阻断（fail-closed）：golden 基线不可用 ({base_err})", file=sys.stderr)
+        return 1
+    bm = metric_map(base)
+    if not bm:
+        print(f"【性能门禁】阻断（fail-closed）：golden 基线 {base_path} 不含任何指标", file=sys.stderr)
+        return 1
+
+    cur, cur_err = _read_report_dict(cur_path)
+    if cur is None:
+        print(f"【性能门禁】阻断（fail-closed）：当前报告不可用 ({cur_err})", file=sys.stderr)
+        return 1
+    cm = metric_map(cur)
+    if not cm:
+        print(f"【性能门禁】阻断（fail-closed）：当前报告 {cur_path} 不含任何指标", file=sys.stderr)
+        return 1
+
+    lines = [
+        f"# 性能回归门禁: {cur_path.name} vs 基线 {base_path.name}（阈值 {threshold:g}%）",
+        "",
+        "| 指标 | 基线 (ops/s) | 当前 (ops/s) | 变化 | 判定 |",
+        "|---|---:|---:|---:|:--:|",
+    ]
+    metric_lines, regressions = _evaluate_metric_rows(bm, cm, threshold)
+    lines.extend(metric_lines)
 
     added = sorted(set(cm) - set(bm))
     removed = sorted(set(bm) - set(cm))
@@ -113,10 +153,18 @@ def run_gate(base_path: Path, cur_path: Path, threshold: float) -> int:
         lines.append(f"| {n} | {bm[n]:,.1f} | — | — | 基线独有 |")
 
     print(NL.join(lines))
+    failed = False
     if regressions:
+        failed = True
         print(f"【性能门禁】未通过: {len(regressions)} 项回退超过 {threshold:g}%")
         for name, o, m, d in regressions:
             print(f"  ✗ {name}: {o:,.1f} → {m:,.1f} ({d:+.1f}%)")
+    if strict and removed:
+        failed = True
+        print(f"【性能门禁】--strict 未通过: {len(removed)} 项基线指标缺失或已重命名")
+        for name in removed:
+            print(f"  ✗ 缺失基线指标: {name} (基线 {bm[name]:,.1f})")
+    if failed:
         return 1
     print(f"【性能门禁】通过（共对比 {len(set(bm) & set(cm))} 项指标）")
     return 0
@@ -146,7 +194,8 @@ def _build_compare_markdown(old_path: Path, new_path: Path) -> str:
 
 def _build_latest_markdown() -> str:
     """构建最新基准报告的吞吐量基线 Markdown 文本。"""
-    rep = load(newest_report())
+    latest_path = newest_report()
+    rep = load(latest_path)
     rows: list[tuple] = []
     for cat in rep.get("categories", []):
         for m in cat.get("metrics", []):
@@ -157,7 +206,7 @@ def _build_latest_markdown() -> str:
         "",
         f"- 引擎: {rep.get('engine', '?')}  Godot: {rep.get('godot_version', '?')}",
         f"- 时间: {rep.get('timestamp', '?')}  主机: {rep.get('host', '?')}",
-        f"- 报告: {newest_report().name}",
+        f"- 报告: {latest_path.name}",
         "",
         render_table(rows),
     ]
@@ -173,13 +222,14 @@ def main() -> int:
                     help="性能回归门禁：最新 vs 基线，回退超阈值即退出码 1（默认 10）")
     ap.add_argument("--base", help="门禁对比的 golden 基线路径（默认 benchmarks/reports/baseline.json）")
     ap.add_argument("--promote", action="store_true", help="把最新报告晋升为 golden 基线")
+    ap.add_argument("--strict", action="store_true", help="严格模式：基线指标缺失或重命名也视为失败")
     args = ap.parse_args()
 
     if args.promote:
         return promote()
     if args.gate is not None:
         base = Path(args.base) if args.base else BASELINE_PATH
-        return run_gate(base, newest_report(), args.gate)
+        return run_gate(base, newest_report(), args.gate, strict=args.strict)
 
     if args.compare:
         text = _build_compare_markdown(Path(args.compare[0]), Path(args.compare[1]))

@@ -14,8 +14,9 @@
 """扫描 backend/ GDScript 的静态性能热点（提示级，供人工复核）。"""
 from __future__ import annotations
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 import argparse
+import json
 import re
 import sys
 
@@ -91,28 +92,25 @@ def _process_code_line(
     return 0
 
 
-def _record_hotspot_findings(
-    rel: Path, loop_total: int, counts: dict[str, int], examples: list[str], findings: list[str]
-) -> None:
-    """组装并记录性能热点汇总行。"""
-    total = sum(counts.values())
-    if not (total or loop_total):
-        return
+def _format_hotspot_finding(record: dict[str, Any]) -> str:
+    """将单文件扫描记录格式化为人类可读提示行。"""
+    counts = record["counts"]
+    examples = record["examples"]
     detail = "  例: " + "; ".join(examples) if examples else ""
-    findings.append(
-        f"{rel}: 循环 {loop_total} / 嵌套 {counts['nested']} / 配置读取 {counts['config']} "
+    return (
+        f"{record['file']}: 循环 {record['loops']} / 嵌套 {counts['nested']} / 配置读取 {counts['config']} "
         f"/ 线性查找 {counts['find']} / 字符串构建 {counts['strbuild']} / 调试广播 {counts['debug']} "
         f"/ 瞬态堆分配 {counts['heap_alloc']}{detail}"
     )
 
 
-def audit_file(path: Path, findings: list[str]) -> None:
-    """扫描单个 GDScript 文件中的循环与热点模式。"""
+def scan_file(path: Path) -> dict[str, Any] | None:
+    """扫描单个 GDScript 文件并返回结构化热点记录，无循环与热点时返回 None。"""
     rel = path.relative_to(ROOT)
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except (UnicodeDecodeError, OSError):
-        return
+        return None
 
     counts = {k: 0 for k in CHECKS}
     loop_total = 0
@@ -130,13 +128,41 @@ def audit_file(path: Path, findings: list[str]) -> None:
         if stripped and not stripped.startswith("#"):
             loop_total += _process_code_line(ln, i, stack, note)
 
-    _record_hotspot_findings(rel, loop_total, counts, examples, findings)
+    total_hotspots = sum(counts.values())
+    if not (total_hotspots or loop_total):
+        return None
+    return {
+        "file": str(rel).replace("\\", "/"),
+        "loops": loop_total,
+        "counts": counts,
+        "total_hotspots": total_hotspots,
+        "examples": examples,
+    }
+
+
+def audit_file(path: Path, findings: list[str]) -> None:
+    """扫描单个 GDScript 文件中的循环与热点模式。"""
+    record = scan_file(path)
+    if record is not None:
+        findings.append(_format_hotspot_finding(record))
+
+
+def _build_totals(records: list[dict[str, Any]]) -> dict[str, int]:
+    """聚合所有文件的热点计数。"""
+    totals: dict[str, int] = {"loops": 0, **{k: 0 for k in CHECKS}, "hotspots_total": 0}
+    for rec in records:
+        totals["loops"] += int(rec["loops"])
+        totals["hotspots_total"] += int(rec["total_hotspots"])
+        for k in CHECKS:
+            totals[k] += int(rec["counts"][k])
+    return totals
 
 
 def main() -> int:
     """CLI 入口：扫描 backend/**/*.gd 与 frontend/**/*.gd 循环内热点反模式。"""
     ap = argparse.ArgumentParser()
     ap.add_argument("--strict", action="store_true", help="有发现即返回 1")
+    ap.add_argument("--json", action="store_true", help="输出结构化 JSON 报告")
     args = ap.parse_args()
 
     files = sorted(
@@ -146,15 +172,27 @@ def main() -> int:
         for p in (ROOT / sub).rglob("*.gd")
         if p.is_file()
     )
-    findings: list[str] = []
-    for f in files:
-        audit_file(f, findings)
+    records = [rec for f in files if (rec := scan_file(f)) is not None]
+    with_hotspots = sum(1 for rec in records if rec["total_hotspots"] > 0)
+    failed = bool(args.strict and with_hotspots)
 
-    with_hotspots = sum(1 for fd in findings if "例:" in fd)
+    if args.json:
+        payload = {
+            "tool": "audit_perf_hotspots",
+            "files_scanned": len(files),
+            "files_with_hotspots": with_hotspots,
+            "strict": bool(args.strict),
+            "passed": not failed,
+            "totals": _build_totals(records),
+            "findings": records,
+        }
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 1 if failed else 0
+
     print(f"【audit-perf-hotspots】审查文件: {len(files)} 个 / 含热点候选: {with_hotspots} 个（提示级）")
-    for fd in findings:
-        print(f"  · {fd}")
-    if args.strict and with_hotspots:
+    for rec in records:
+        print(f"  · {_format_hotspot_finding(rec)}")
+    if failed:
         print("【审查结论】--strict 模式未通过")
         return 1
     print("【审查结论】通过（提示级）")
