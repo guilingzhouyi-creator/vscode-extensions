@@ -10,8 +10,6 @@
 ## ScopedEventSubscriber：Memory Governor / Bounded Cache
 class_name ScopedEventSubscriber extends RefCounted
 
-const EventSubscriptionToken = preload("res://backend/infrastructure/resource_governance/event_subscription_token.gd")
-
 var _tokens: Array[EventSubscriptionToken] = []
 var _is_disposed: bool = false
 
@@ -22,7 +20,7 @@ func subscribe(target_signal: Signal, target_callable: Callable) -> bool:
 	if target_signal.is_connected(target_callable):
 		return false # 防重复绑定
 
-	var connect_error: Error = target_signal.connect(target_callable)
+	var connect_error: int = target_signal.connect(target_callable)
 	if connect_error != OK:
 		return false
 

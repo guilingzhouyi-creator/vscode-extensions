@@ -187,7 +187,27 @@ static func level_weight(level: String) -> int:
 			return 1
 
 ## 归一化控制台输出等级分值（10=debug .. 50=critical）
+const _FAST_LEVEL_RANKS: Dictionary = {
+	"trace": 10, "TRACE": 10,
+	"debug": 10, "DEBUG": 10,
+	"info": 20, "INFO": 20,
+	"warn": 30, "WARN": 30,
+	"warning": 30, "WARNING": 30,
+	"error": 40, "ERROR": 40,
+	"fatal": 50, "FATAL": 50,
+	"critical": 50, "CRITICAL": 50
+}
+
+const _FAST_CRITICAL_LEVELS: Dictionary = {
+	"error": true, "ERROR": true,
+	"critical": true, "CRITICAL": true,
+	"fatal": true, "FATAL": true
+}
+
+## 返回日志级别数值权重
 static func level_rank(level: String) -> int:
+	if _FAST_LEVEL_RANKS.has(level):
+		return int(_FAST_LEVEL_RANKS[level])
 	match level.to_lower():
 		"trace", "debug":
 			return 10
@@ -204,6 +224,8 @@ static func level_rank(level: String) -> int:
 
 ## 判断是否为需触发紧急同步落盘的高危严重级别
 static func is_critical_level(level: String) -> bool:
+	if _FAST_CRITICAL_LEVELS.has(level):
+		return true
 	var upper := level.to_upper()
 	return upper == LEVEL_ERROR or upper == LEVEL_CRITICAL or upper == LEVEL_FATAL
 

@@ -10,8 +10,6 @@
 ## BoundedResourceCache：Memory Governor / Bounded Cache
 class_name BoundedResourceCache extends RefCounted
 
-const CachePolicySpec = preload("res://backend/infrastructure/resource_governance/cache_policy_spec.gd")
-
 var _policy_specification: CachePolicySpec
 var _store: Dictionary = {}
 var _access_order_map: Dictionary = {} # 有序集合（Dictionary 保持插入序）用于 LRU/FIFO 追踪，O(1) 触达/淘汰

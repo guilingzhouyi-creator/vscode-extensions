@@ -11,10 +11,6 @@
 class_name GameConfigLoader
 extends RefCounted
 
-const BinaryConfigReader = preload("res://backend/infrastructure/binary_config_reader.gd")
-const ConfigRouterEngine = preload("res://backend/infrastructure/config_router_engine.gd")
-const SystemBaseMessages = preload("res://backend/infrastructure/logging/system_base_messages.gd")
-
 const CONFIG_DIR: String = "res://config/"
 const EXT_JSON: String = ".json"
 const EXT_KDAT: String = ".kdat"
@@ -175,21 +171,24 @@ static func scan_dir_into(
 	if directory_access == null:
 		scan_warnings.append(SystemBaseMessages.format(SystemBaseMessages.MSG_GAME_CONFIG_DIR_MISSING, {"path": directory_path}))
 		return
+	var directory_files := directory_access.get_files()
 	var scanned_tables: Dictionary = {}
-	for file_name in directory_access.get_files():
+	var json_candidates: Array[String] = []
+	for file_name in directory_files:
 		if file_name.ends_with(EXT_KDAT):
 			var table_name: String = file_name.trim_suffix(EXT_KDAT)
 			if not table_prefix.is_empty():
 				table_name = table_prefix + "." + table_name
 			load_single_table_into(directory_path + file_name, table_name, target_tables, scan_failures, scan_warnings)
 			scanned_tables[table_name] = true
-	for file_name in directory_access.get_files():
-		if file_name.ends_with(EXT_JSON):
-			var table_name: String = file_name.trim_suffix(EXT_JSON)
-			if not table_prefix.is_empty():
-				table_name = table_prefix + "." + table_name
-			if not scanned_tables.has(table_name):
-				load_single_table_into(directory_path + file_name, table_name, target_tables, scan_failures, scan_warnings)
+		elif file_name.ends_with(EXT_JSON):
+			json_candidates.append(file_name)
+	for json_file_name in json_candidates:
+		var table_name: String = json_file_name.trim_suffix(EXT_JSON)
+		if not table_prefix.is_empty():
+			table_name = table_prefix + "." + table_name
+		if not scanned_tables.has(table_name):
+			load_single_table_into(directory_path + json_file_name, table_name, target_tables, scan_failures, scan_warnings)
 	for subdirectory in directory_access.get_directories():
 		var subtable_prefix: String = subdirectory if table_prefix.is_empty() else table_prefix + "." + subdirectory
 		scan_dir_into(directory_path + subdirectory + "/", subtable_prefix, target_tables, scan_failures, scan_warnings)

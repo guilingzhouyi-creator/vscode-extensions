@@ -10,9 +10,6 @@
 ## UnifiedLoggerService：Log Collector & Stream Processor
 class_name UnifiedLoggerService extends RefCounted
 
-const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
-const SystemBaseMessages = preload("res://backend/infrastructure/logging/system_base_messages.gd")
-
 # ==============================================================================
 # 一、日志等级与记录实体
 # ==============================================================================

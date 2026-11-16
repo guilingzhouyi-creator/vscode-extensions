@@ -10,9 +10,6 @@
 ## LogFileExporter：Log Collector & Stream Processor
 class_name LogFileExporter extends RefCounted
 
-const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
-const CryptoIntegrityLib = preload("res://backend/infrastructure/pure/crypto_integrity_lib.gd")
-
 # ==============================================================================
 # 一、单例与状态
 # ==============================================================================
@@ -38,6 +35,9 @@ static var _cached_key_environment_name: String = ""
 static var _cached_key_environment_value: String = ""
 static var _cached_derived_key_32: PackedByteArray = PackedByteArray()
 static var _has_cached_derived_key: bool = false
+static var _fast_export_enabled: bool = false
+static var _fast_min_level_weight: int = 1
+static var _fast_has_include_channels: bool = false
 
 ## 单例获取与配置新鲜度守卫
 static func get_instance() -> LogFileExporter:
@@ -60,6 +60,9 @@ static func _ensure_config_fresh() -> void:
 	_config_version = GameConfig.config_reload_version()
 	_cached_file_size = -1
 	_batch_threshold = _config.batch_size
+	_fast_export_enabled = _config.enabled
+	_fast_min_level_weight = LogConstants.level_weight(_config.min_level)
+	_fast_has_include_channels = not _config.include_channels.is_empty()
 
 # ==============================================================================
 # 二、旁路消费入口与过滤
@@ -68,6 +71,8 @@ static func _ensure_config_fresh() -> void:
 ## 旁路消费入口：由 EventBus 广播链路调用，执行过滤与线程安全落盘
 static func consume(record: LogRecordDTO) -> bool:
 	if record == null:
+		return false
+	if _config != null and _config_version == GameConfig.config_reload_version() and not _config.enabled:
 		return false
 	_file_mutex.lock()
 	_ensure_config_fresh()
@@ -304,7 +309,7 @@ static func _archive_sort_key(filename: String, prefix: String) -> Array[int]:
 	return [0, 0]
 
 ## 裁剪旧归档文件：按数值时间戳保留最近 max_files 份轮转文件，超出上限时删除最旧文件
-static func _prune_rotated(base: String) -> void:
+static func _prune_rotated(_base: String) -> void:
 	if _config.max_files <= 0:
 		return
 	var directory_access := DirAccess.open(_config.directory)

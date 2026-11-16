@@ -10,9 +10,6 @@
 ## LogQueryService：Log Collector & Stream Processor
 class_name LogQueryService extends RefCounted
 
-const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
-const CryptoIntegrityLib = preload("res://backend/infrastructure/pure/crypto_integrity_lib.gd")
-
 # ==============================================================================
 # 一、状态与磁盘缓存
 # ==============================================================================

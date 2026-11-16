@@ -35,10 +35,10 @@ static func unmask_stream(payload: PackedByteArray, key_seed: int = DEFAULT_MASK
 		return PackedByteArray()
 
 	var result_bytes: PackedByteArray = payload.duplicate()
-	var seed: int = key_seed & 0xFFFFFFFF
+	var lcg_state: int = key_seed & 0xFFFFFFFF
 	for byte_index in range(payload_size):
-		seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF
-		var mask_byte: int = (seed >> 16) & 0xFF
+		lcg_state = (lcg_state * 1103515245 + 12345) & 0x7FFFFFFF
+		var mask_byte: int = (lcg_state >> 16) & 0xFF
 		result_bytes[byte_index] = result_bytes[byte_index] ^ mask_byte
 	return result_bytes
 

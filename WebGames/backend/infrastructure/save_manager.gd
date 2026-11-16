@@ -10,9 +10,6 @@
 ## SaveManager：Persistence Facade / Save Engine
 class_name SaveManager extends RefCounted
 
-const AtomicFileWriter = preload("res://backend/infrastructure/atomic_file_writer.gd")
-const CryptoIntegrityLib = preload("res://backend/infrastructure/pure/crypto_integrity_lib.gd")
-const SystemBaseMessages = preload("res://backend/infrastructure/logging/system_base_messages.gd")
 const OP_RESTORE: String = "restore"
 
 # ==============================================================================
@@ -218,10 +215,10 @@ static func restore_backup(save_name: String) -> Dictionary:
 	# 2. 写恢复临时文件并原子交换至正档（不先删除正档）
 	var replace_result: Dictionary = AtomicFileWriter.replace_via_tmp(file_path, backup_content, _tmp_suffix())
 	if not bool(replace_result.get("success", false)):
-		var error_string: String = str(replace_result.get("error_code", ERR_FILE_CANT_WRITE))
+		var error_code_text: String = str(replace_result.get("error_code", ERR_FILE_CANT_WRITE))
 		if str(replace_result.get("error_stage", "")) == "tmp_open":
-			return _fail(OP_RESTORE, "OPEN_WRITE_FAIL", _msg("open_write_fail", {"error": error_string}))
-		return _fail(OP_RESTORE, "ATOMIC_REPLACE_FAIL", _msg("atomic_replace_fail", {"error": error_string}))
+			return _fail(OP_RESTORE, "OPEN_WRITE_FAIL", _msg("open_write_fail", {"error": error_code_text}))
+		return _fail(OP_RESTORE, "ATOMIC_REPLACE_FAIL", _msg("atomic_replace_fail", {"error": error_code_text}))
 	return {"success": true, "stage": "RESTORE_COMMIT", "error_code": "", "path": file_path}
 
 # ==============================================================================
@@ -301,12 +298,12 @@ static func _atomic_write(file_path: String, content: String) -> Dictionary:
 	if bool(write_result.get("success", false)):
 		return {}
 	var error_stage: String = str(write_result.get("error_stage", ""))
-	var error_string: String = str(write_result.get("error_code", ERR_FILE_CANT_WRITE))
+	var error_code_text: String = str(write_result.get("error_code", ERR_FILE_CANT_WRITE))
 	if error_stage == "backup":
-		return _fail("BACKUP", "BACKUP_FAILED", _msg("backup_failed", {"error": error_string}))
+		return _fail("BACKUP", "BACKUP_FAILED", _msg("backup_failed", {"error": error_code_text}))
 	if error_stage == "rename":
-		return {"success": false, "error": _msg("atomic_replace_fail", {"error": error_string})}
-	return {"success": false, "error": _msg("open_write_fail", {"error": error_string})}
+		return {"success": false, "error": _msg("atomic_replace_fail", {"error": error_code_text})}
+	return {"success": false, "error": _msg("open_write_fail", {"error": error_code_text})}
 
 ## 存档根目录（infrastructure.persistence save_dir 配置，默认 user://saves/）
 static func _save_dir() -> String:

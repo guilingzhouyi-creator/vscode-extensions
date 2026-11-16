@@ -10,8 +10,6 @@
 ## LogRetentionCleaner：Log Collector & Stream Processor
 class_name LogRetentionCleaner extends RefCounted
 
-const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
-
 # ==============================================================================
 # 一、状态与清理执行
 # ==============================================================================

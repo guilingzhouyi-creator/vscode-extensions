@@ -11,8 +11,6 @@
 ## HeadlessBatchPipeline：SoA Headless Batch Kinematics Pipeline
 class_name HeadlessBatchPipeline extends RefCounted
 
-const SoAEntityBuffer = preload("res://backend/infrastructure/soa_entity_buffer.gd")
-
 const FLAG_MASK_INACTIVE: int = 0x01
 
 ## 批处理一趟推演：就地计算位置变动与阻尼 (纯密集数组线性步进，零堆分配)

@@ -10,8 +10,6 @@
 ## LogExportConfigDTO：Log Collector & Stream Processor
 class_name LogExportConfigDTO extends RefCounted
 
-const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
-
 # ==============================================================================
 # 一、导出策略字段
 # ==============================================================================

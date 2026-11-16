@@ -88,15 +88,3 @@ func reset() -> int:
 ## 获取控制器历史记录队列长度
 func history_size() -> int:
 	return maxi(0, _executed_tokens.size())
-
-## 兼容旧 Array 形态（测试/归档链路可能读 _token_order）
-var _token_order: Array[String]:
-	get:
-		var ordered_tokens: Array[String] = []
-		for token_key in _token_order_map:
-			ordered_tokens.append(String(token_key))
-		return ordered_tokens
-	set(new_token_order):
-		_token_order_map.clear()
-		for token_key in new_token_order:
-			_token_order_map[String(token_key)] = true

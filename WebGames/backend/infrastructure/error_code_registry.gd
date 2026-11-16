@@ -10,8 +10,6 @@
 ## ErrorCodeRegistry：Error Code Registry / Reporter
 class_name ErrorCodeRegistry extends RefCounted
 
-const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
-
 # ==============================================================================
 # 一、错误码条目实体
 # ==============================================================================

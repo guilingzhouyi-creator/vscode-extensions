@@ -10,8 +10,6 @@
 ## ResourceLifecycleManager：Memory Governor / Bounded Cache
 class_name ResourceLifecycleManager extends RefCounted
 
-const ResourceLifecycleDescriptor = preload("res://backend/infrastructure/resource_governance/resource_lifecycle_descriptor.gd")
-
 ## 已注册资源映射表: resource_id -> ResourceLifecycleDescriptor
 var _tracked_resources: Dictionary = {}
 

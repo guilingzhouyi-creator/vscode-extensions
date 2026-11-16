@@ -10,8 +10,6 @@
 ## ConfigRouterEngine：Generalized Configuration Router Engine
 class_name ConfigRouterEngine extends RefCounted
 
-const ConfigRouteDTO = preload("res://backend/infrastructure/config_route_dto.gd")
-
 ## 主表兼容别名映射（请求表名 -> 默认主子表）
 static var _primary_aliases: Dictionary = {
 	"domains.combat": "domains.combat.mechanics"

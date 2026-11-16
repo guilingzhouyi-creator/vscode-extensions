@@ -10,9 +10,6 @@
 ## LogRingBuffer：Log Collector & Stream Processor
 class_name LogRingBuffer extends RefCounted
 
-const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
-const StatisticsMathLib = preload("res://backend/infrastructure/pure/statistics_math_lib.gd")
-
 # ==============================================================================
 # 一、环形缓冲状态
 # ==============================================================================
@@ -78,15 +75,20 @@ static func _rebuild() -> void:
 static func append(record: StructuredLogRecord) -> void:
 	if record == null:
 		return
-	_ensure_capacity_fresh()
-
-	# 深拷贝快照：调用方（LogCollector 返回的 record）入环后改写不污染缓冲（优先零中间字典 clone）
 	var snapshot: StructuredLogRecord = record.clone() if record.has_method("clone") else StructuredLogRecord.from_dto(record.to_dto())
+	append_owned(snapshot)
+
+## 追加已由总线独占构造的结构化日志快照（零重复 clone 分配，仅供基础设施内部消费）
+static func append_owned(snapshot: StructuredLogRecord) -> void:
+	if snapshot == null:
+		return
+	if _capacity_override <= 0 and _cached_version != GameConfig.config_reload_version():
+		_ensure_capacity_fresh()
 	if _buffer.size() < _capacity:
 		_buffer.append(snapshot)
 	else:
 		_buffer[_head] = snapshot
-		_head = StatisticsMathLib.ring_next_cursor(_head, _capacity)
+		_head = (_head + 1) % _capacity
 
 ## 查询当前环形缓冲中的记录（只读）
 static func query(from_utc: int = 0, levels: Array = [], channels: Array = []) -> Array:

@@ -11,11 +11,6 @@
 ## ObjectPool：Generic RefCounted Object Pool
 class_name ObjectPool extends RefCounted
 
-const ObjectPoolConfigDTO = preload("res://backend/infrastructure/object_pool_config_dto.gd")
-const ObjectPoolStatsDTO = preload("res://backend/infrastructure/object_pool_stats_dto.gd")
-const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
-const SystemBaseMessages = preload("res://backend/infrastructure/logging/system_base_messages.gd")
-
 const METHOD_RESET_STATE: String = "reset_state"
 const METHOD_MARK_ACQUIRE: String = "mark_pooled_acquire"
 const METHOD_MARK_RELEASE: String = "mark_pooled_release"

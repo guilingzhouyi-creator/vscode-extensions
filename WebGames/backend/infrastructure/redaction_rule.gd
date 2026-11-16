@@ -10,10 +10,6 @@
 ## RedactionRule：Log Collector & Stream Processor
 class_name RedactionRule extends RefCounted
 
-const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
-const CryptoIntegrityLib = preload("res://backend/infrastructure/pure/crypto_integrity_lib.gd")
-const StatisticsMathLib = preload("res://backend/infrastructure/pure/statistics_math_lib.gd")
-
 const MODE_MASK: String = LogConstants.REDACT_MODE_MASK
 const MODE_DROP: String = LogConstants.REDACT_MODE_DROP
 const MODE_HASH: String = LogConstants.REDACT_MODE_HASH

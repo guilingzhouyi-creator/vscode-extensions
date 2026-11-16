@@ -11,29 +11,6 @@
 class_name GameBootstrap
 extends RefCounted
 
-const ActivationTokenDTO = preload("res://backend/domains/version_governance/activation_token_dto.gd")
-const VersionedRuntimeContext = preload("res://backend/domains/version_governance/versioned_runtime_context.gd")
-const VersionActivationGate = preload("res://backend/domains/version_governance/version_activation_gate.gd")
-const AgentTelemetryPoolRegistry = preload("res://backend/domains/world_state/services/agent_telemetry_pool_registry.gd")
-const CombatPipelineFSM = preload("res://backend/domains/physics_thermodynamics/combat_pipeline_fsm.gd")
-const SpatialTriggerFSM = preload("res://backend/domains/spatial_movement/spatial_trigger_fsm.gd")
-const ObjectPoolManager = preload("res://backend/infrastructure/object_pool_manager.gd")
-const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
-const HumanControlLeaseManager = preload("res://backend/domains/world_state/services/human_control_lease_manager.gd")
-const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
-const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
-const RuntimeModeGate = preload("res://backend/domains/persistence_protocol/runtime_mode_gate.gd")
-const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
-const WorldArchiveRepository = preload("res://backend/domains/world_state/world_archive_repository.gd")
-const AuthService = preload("res://backend/domains/account/auth_service.gd")
-const PrologueCutscenePort = preload("res://backend/domains/character_creation/prologue_cutscene_port.gd")
-const CutsceneOrchestrator = preload("res://backend/infrastructure/media/cutscene_orchestrator.gd")
-const CutsceneHookRegistry = preload("res://backend/infrastructure/media/cutscene_hook_registry.gd")
-const AssetPathResolver = preload("res://backend/infrastructure/resource_governance/asset_path_resolver.gd")
-const ClientSecretVault = preload("res://backend/infrastructure/client_secret_vault.gd")
-const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
-const SystemBaseMessages = preload("res://backend/infrastructure/logging/system_base_messages.gd")
-
 static func _ensure_telemetry_pool(pool_name: String, factory: Callable) -> void:
 	ObjectPoolManager.initialize()
 	if ObjectPoolManager.get_pool(pool_name) == null:

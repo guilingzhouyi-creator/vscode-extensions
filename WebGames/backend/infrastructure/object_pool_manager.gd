@@ -11,9 +11,6 @@
 ## ObjectPoolManager：Object Pool Central Orchestrator & Registry
 class_name ObjectPoolManager extends RefCounted
 
-const ObjectPoolConfigDTO = preload("res://backend/infrastructure/object_pool_config_dto.gd")
-const ObjectPool = preload("res://backend/infrastructure/object_pool.gd")
-
 const CONFIG_TABLE_OBJECT_POOL: String = "infrastructure.object_pool"
 const PREFIX_POOLS: String = "pools/"
 const PATH_PREALLOCATE_SIZE: String = "/preallocate_size"

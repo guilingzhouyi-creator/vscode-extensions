@@ -10,9 +10,6 @@
 ## LogCollector：Log Collector & Stream Processor
 class_name LogCollector extends RefCounted
 
-const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
-const StatisticsMathLib = preload("res://backend/infrastructure/pure/statistics_math_lib.gd")
-
 # ==============================================================================
 # 一、链路追踪状态
 # ==============================================================================

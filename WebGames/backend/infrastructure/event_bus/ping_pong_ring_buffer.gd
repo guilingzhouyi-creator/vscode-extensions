@@ -16,8 +16,8 @@ var _secondary_buffer: Array[EventPacket] = []
 var _is_writing_to_primary: bool = true
 var _capacity: int = 4096
 
-func _init(capacity: int = 4096) -> void:
-	_capacity = maxi(1, capacity)
+func _init(initial_capacity: int = 4096) -> void:
+	_capacity = maxi(1, initial_capacity)
 
 ## 入队当前写入缓冲（满则返回 false，由上层按 drop_on_overflow 策略处理）
 func enqueue(packet: EventPacket) -> bool:

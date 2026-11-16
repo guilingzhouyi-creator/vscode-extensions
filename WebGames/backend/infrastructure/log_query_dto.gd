@@ -10,8 +10,6 @@
 ## LogQueryDTO：Log Collector & Stream Processor
 class_name LogQueryDTO extends RefCounted
 
-const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
-
 # ==============================================================================
 # 一、检索条件（Criteria）
 # ==============================================================================

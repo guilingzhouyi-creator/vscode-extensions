@@ -10,8 +10,6 @@
 ## StatisticsMathLib：Pure Statistical, Masking & Text Scrubbing Calculation Library
 class_name StatisticsMathLib extends RefCounted
 
-const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
-
 # ==============================================================================
 # 一、静态编译内联脱敏正则（全局复用零重复编译）
 # ==============================================================================

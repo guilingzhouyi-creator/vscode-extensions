@@ -11,10 +11,6 @@
 class_name EventBusCore
 extends RefCounted
 
-const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
-const SystemBaseMessages = preload("res://backend/infrastructure/logging/system_base_messages.gd")
-const StatisticsMathLib = preload("res://backend/infrastructure/pure/statistics_math_lib.gd")
-
 static var _instance: EventBusCore = null
 
 var _channel_routes: Dictionary = {} # channel_id(int) -> Array[EventBusSubscriptionToken]（掩码过滤按 token 内联判定）
@@ -233,6 +229,26 @@ func _collect_channel_subscribers(channel_id: int, packet: EventPacket, seen: Di
 			seen[token] = true
 			targets.append(token)
 
+func _try_dispatch_sole_subscriber(packet: EventPacket) -> bool:
+	if _channel_routes.has(0) or _channel_routes.has(EventChannelDefinition.DOMAIN_EVENT_GENERIC):
+		return false
+	var sole_routes_variant: Variant = _channel_routes.get(packet.channel_id, null)
+	if sole_routes_variant == null:
+		return false
+	var sole_routes: Array = sole_routes_variant
+	if sole_routes.size() != 1:
+		return false
+	var sole_token: EventBusSubscriptionToken = sole_routes[0] as EventBusSubscriptionToken
+	if sole_token == null or not sole_token.is_active:
+		return true
+	if ((sole_token.category_mask & packet.category_mask) != 0) or sole_token.category_mask == 0:
+		if sole_token.callback.is_valid():
+			sole_token.callback.call(packet)
+		else:
+			sole_token.is_active = false
+			_unregister_token(sole_token)
+	return true
+
 ## 即时同步分发因果事件，执行递归熔断与死循环拦截
 func dispatch_now(packet: EventPacket) -> void:
 	if packet == null:
@@ -250,13 +266,18 @@ func dispatch_now(packet: EventPacket) -> void:
 		_is_warning_high_frequency = true
 		ErrorReporter.emit("event_bus2_high_frequency_warning", {"ops": _current_window_operations, "threshold": _high_frequency_threshold})
 
+	_sequence_counter += 1
+	packet.event_id = _sequence_counter
+
+	if _try_dispatch_sole_subscriber(packet):
+		_dispatch_depth = depth
+		return
+
 	_prepare_dispatch_scratch(depth)
 	var targets: Array = _target_scratch[depth]
 	var seen: Dictionary = _seen_scratch[depth]
 	targets.clear()
 	seen.clear()
-	_sequence_counter += 1
-	packet.event_id = _sequence_counter
 
 	_collect_channel_subscribers(packet.channel_id, packet, seen, targets)
 	if packet.channel_id != 0:
@@ -359,30 +380,76 @@ func get_pool() -> EventPool:
 # 叙事/领域/日志迁正 API（自旧版 EventBus 同签名迁入，旧类退役后唯一真源）
 # ==============================================================================
 
+const MAX_NARRATIVE_TEMPLATE_CACHE: int = 1024
+static var _narrative_template_cache: Dictionary = {}
+static var _narrative_template_cache_version: int = -1
+static var _category_name_cache: Dictionary = {}
+static var _category_cache_version: int = -1
+
+## 判断指定信道是否有活跃监听器（含全局通配信道 0）
+func has_channel_listeners(channel_id: int) -> bool:
+	return _channel_routes.has(channel_id) or _channel_routes.has(0)
+
+## 判断叙事文本信道（含通配与泛化领域广播）是否存在活跃监听器
+func has_narrative_listeners() -> bool:
+	return _channel_routes.has(EventChannelDefinition.NARRATIVE_EVENT_TEXT) or _channel_routes.has(0) or _channel_routes.has(EventChannelDefinition.DOMAIN_EVENT_GENERIC)
+
 ## 测试专用重置：清零记录序号并清空叙事表缓存（避免跨用例状态残留）
 static func reset_sequence_for_test() -> void:
 	_record_sequence_number = 0
 	_narrative_table_cache.clear()
 	_narrative_cache_version = -1
+	_narrative_template_cache.clear()
+	_narrative_template_cache_version = -1
+	_category_name_cache.clear()
+	_category_cache_version = -1
 
 ## 将分类配置键解析为分类名（读 event_categories.json；未命中回退大写原值）
 static func get_category_name(category_key: String) -> String:
 	if category_key.is_empty():
 		return category_key
+	var config_version := GameConfig.config_reload_version()
+	if _category_cache_version != config_version:
+		_category_name_cache.clear()
+		_category_cache_version = config_version
+	var cached_variant: Variant = _category_name_cache.get(category_key, null)
+	if cached_variant != null:
+		return String(cached_variant)
 	var entry: Dictionary = GameConfig.get_dict("infrastructure.event_categories", category_key, {})
-	if not entry.is_empty():
-		return entry.get("name", category_key.to_upper())
-	return category_key.to_upper()
+	var resolved_name: String = str(entry.get("name", category_key.to_upper())) if not entry.is_empty() else category_key.to_upper()
+	_category_name_cache[category_key] = resolved_name
+	return resolved_name
 
 ## 按模板键渲染叙事文案：键形如 "<领域>/<名称>"，查表 "narratives.<领域>"
 static func render_narrative(template_key: String, format_arguments: Variant = []) -> String:
-	var parts := template_key.split("/")
-	if parts.is_empty():
-		return template_key
-	var table_name := "narratives." + parts[0]
-	var path := "/".join(parts.slice(1))
-	var template := GameConfig.get_string(table_name, path, template_key)
-	return _format_template_safely(template, format_arguments)
+	var config_version := GameConfig.config_reload_version()
+	if _narrative_template_cache_version != config_version:
+		_narrative_template_cache.clear()
+		_narrative_template_cache_version = config_version
+	var compiled_variant: Variant = _narrative_template_cache.get(template_key, null)
+	var compiled: TemplateFormatter.CompiledTemplate
+	if compiled_variant != null:
+		compiled = compiled_variant as TemplateFormatter.CompiledTemplate
+	else:
+		var template: String
+		var slash_index := template_key.find("/")
+		if slash_index < 0:
+			template = GameConfig.get_string("narratives." + template_key, "", template_key)
+		else:
+			var table_name := "narratives." + template_key.substr(0, slash_index)
+			var path := template_key.substr(slash_index + 1)
+			template = GameConfig.get_string(table_name, path, template_key)
+		compiled = TemplateFormatter.compile_cached(template)
+		if _narrative_template_cache.size() >= MAX_NARRATIVE_TEMPLATE_CACHE:
+			_narrative_template_cache.clear()
+		_narrative_template_cache[template_key] = compiled
+	if format_arguments is Array:
+		return TemplateFormatter.format_compiled_indexed(compiled, format_arguments as Array)
+	if format_arguments == null:
+		return compiled.template_text
+	if format_arguments is Dictionary:
+		return TemplateFormatter.format(compiled.template_text, format_arguments as Dictionary)
+	return compiled.template_text
 
 ## 辅助函数：安全格式化文案模板，优先匹配 {param} 命名占位符并注入参数
 static func _format_template_safely(template: String, raw_arguments: Variant) -> String:
@@ -393,18 +460,7 @@ static func _format_template_safely(template: String, raw_arguments: Variant) ->
 	if raw_arguments is Dictionary:
 		return TemplateFormatter.format(template, raw_arguments as Dictionary)
 	if raw_arguments is Array:
-		var arguments_array := raw_arguments as Array
-		if arguments_array.is_empty():
-			return template
-		var placeholder_keys := TemplateFormatter.extract_param_keys(template)
-		if not placeholder_keys.is_empty():
-			var parameter_map: Dictionary = {}
-			for argument_index in range(mini(placeholder_keys.size(), arguments_array.size())):
-				parameter_map[placeholder_keys[argument_index]] = arguments_array[argument_index]
-			return TemplateFormatter.format(template, parameter_map)
-		if "%" in template:
-			return template % arguments_array
-		return template
+		return TemplateFormatter.format_indexed(template, raw_arguments as Array)
 	return template
 
 ## 将领域 id 解析为其文案表名（映射以 domains.json 为准，按重载版本缓存）
@@ -445,6 +501,8 @@ static func render_domain_event_text(channel: String, payload: Dictionary = {}) 
 
 ## 广播结构化叙事事件：文案走 NARRATIVE_TEXT 掩码派发（旧总线叙事信号替代）
 func emit_narrative(text: String, category_key: String = "combat", metadata: Dictionary = {}) -> void:
+	if not has_narrative_listeners():
+		return
 	var category := get_category_name(category_key)
 	var packet := borrow_packet(EventChannelDefinition.NARRATIVE_EVENT_TEXT, EventCategoryMask.NARRATIVE_TEXT, metadata)
 	packet.payload_data = {"timestamp": Time.get_ticks_msec(), "category": category, "text": text, "meta": metadata}
@@ -454,29 +512,40 @@ func emit_narrative(text: String, category_key: String = "combat", metadata: Dic
 
 ## 一站式推荐入口：按模板键渲染文案并广播
 func emit_narrative_by_key(template_key: String, category_key: String, format_arguments: Variant = [], metadata: Dictionary = {}) -> void:
+	if not has_narrative_listeners():
+		return
 	emit_narrative(render_narrative(template_key, format_arguments), category_key, metadata)
 
 ## 广播泛化领域事件：配置驱动信道对齐；结构化 payload 经对应信道派发；
 ## 能解析出文案时追加叙事派发（与旧总线两步语义一致）
 func emit_domain_event(channel: String, payload: Dictionary = {}) -> void:
 	var resolved_channel_id: int = resolve_channel_id(channel)
-	var packet := borrow_packet(resolved_channel_id, EventCategoryMask.NARRATIVE_TEXT, payload)
-	var packet_payload: Dictionary
-	if payload.has("channel") and payload.has("payload"):
-		packet_payload = payload
-	else:
-		packet_payload = {"channel": channel, "payload": payload}
-		packet_payload.merge(payload)
-	packet.payload_data = packet_payload
-	packet.narrative_key = channel
-	dispatch_now(packet)
-	recycle_packet(packet)
-	var text := render_domain_event_text(channel, payload)
-	if not text.is_empty():
-		emit_narrative(text, String(payload.get("category_key", "system")), payload)
+	var has_domain_listeners: bool = has_channel_listeners(resolved_channel_id) or _channel_routes.has(EventChannelDefinition.DOMAIN_EVENT_GENERIC)
+	var has_text_listeners: bool = has_narrative_listeners()
+	if not has_domain_listeners and not has_text_listeners:
+		return
+	if has_domain_listeners:
+		var packet := borrow_packet(resolved_channel_id, EventCategoryMask.NARRATIVE_TEXT, payload)
+		var packet_payload: Dictionary
+		if payload.has("channel") and payload.has("payload"):
+			packet_payload = payload
+		else:
+			packet_payload = {"channel": channel, "payload": payload}
+			packet_payload.merge(payload)
+		packet.payload_data = packet_payload
+		packet.narrative_key = channel
+		dispatch_now(packet)
+		recycle_packet(packet)
+	if has_text_listeners:
+		var text := render_domain_event_text(channel, payload)
+		if not text.is_empty():
+			emit_narrative(text, String(payload.get("category_key", "system")), payload)
 
 ## 广播结构化日志记录：统一入环 + 旁路导出 + 遥测聚合 + 控制台穿透（序号唯一签发，Inv-LG-3）
 func emit_log_record(record: LogRecordDTO) -> void:
+	_emit_log_record_internal(record, false)
+
+func _emit_log_record_internal(record: LogRecordDTO, is_owned_record: bool) -> void:
 	if record == null:
 		return
 	_record_sequence_number += 1
@@ -489,8 +558,10 @@ func emit_log_record(record: LogRecordDTO) -> void:
 		record.message = StatisticsMathLib.scrub_inline_secrets(record.message)
 
 	var structured_record: StructuredLogRecord
-	if record is StructuredLogRecord:
-		structured_record = record
+	if is_owned_record and record is StructuredLogRecord:
+		structured_record = record as StructuredLogRecord
+	elif record is StructuredLogRecord:
+		structured_record = record as StructuredLogRecord
 	else:
 		structured_record = StructuredLogRecord.from_dto(record.to_dto())
 	if structured_record.trace_id.is_empty():
@@ -498,18 +569,21 @@ func emit_log_record(record: LogRecordDTO) -> void:
 		if not active_trace.is_empty():
 			structured_record.trace_id = active_trace
 		else:
-			structured_record.trace_id = "%s_%s_%d" % [LogConstants.TRACE_PREFIX_DEFAULT, structured_record.channel, _record_sequence_number]
+			structured_record.trace_id = LogConstants.TRACE_PREFIX_DEFAULT + "_" + structured_record.channel + "_" + str(_record_sequence_number)
 
 	var has_log_listeners: bool = _channel_routes.has(EventChannelDefinition.LOG_RECORD_POSTED) or _channel_routes.has(0) or _channel_routes.has(EventChannelDefinition.DOMAIN_EVENT_GENERIC)
-	var packet := borrow_packet(EventChannelDefinition.LOG_RECORD_POSTED, EventCategoryMask.SYSTEM_TELEMETRY)
-	packet.payload_dto = structured_record
 	if has_log_listeners:
+		var packet := borrow_packet(EventChannelDefinition.LOG_RECORD_POSTED, EventCategoryMask.SYSTEM_TELEMETRY)
+		packet.payload_dto = structured_record
 		packet.payload_data = structured_record.to_dto()
-	packet.narrative_key = structured_record.message
-	dispatch_now(packet)
-	recycle_packet(packet)
+		packet.narrative_key = structured_record.message
+		dispatch_now(packet)
+		recycle_packet(packet)
 	LogFileExporter.consume(structured_record)
-	LogRingBuffer.append(structured_record)
+	if is_owned_record:
+		LogRingBuffer.append_owned(structured_record)
+	else:
+		LogRingBuffer.append(structured_record)
 	TelemetryAggregate.consume(structured_record)
 	_dispatch_console_log(record)
 
@@ -532,14 +606,17 @@ static func _ensure_console_log_cache() -> void:
 func _dispatch_console_log(record: LogRecordDTO) -> void:
 	if record == null:
 		return
-	if bool(record.context.get(LogConstants.KEY_MUTE_CONSOLE, false)):
+	if not record.context.is_empty() and bool(record.context.get(LogConstants.KEY_MUTE_CONSOLE, false)):
 		return
-	_ensure_console_log_cache()
+	if _console_config_version != GameConfig.config_reload_version():
+		_ensure_console_log_cache()
 	if not _is_console_enabled_cached:
 		return
 	if LogConstants.level_rank(record.level) < _console_min_rank_cached:
 		return
-	var detail := str(record.context.get(LogConstants.KEY_DIAGNOSTIC_DETAIL, "")) if record.context.has(LogConstants.KEY_DIAGNOSTIC_DETAIL) else ""
+	var detail := ""
+	if not record.context.is_empty() and record.context.has(LogConstants.KEY_DIAGNOSTIC_DETAIL):
+		detail = str(record.context.get(LogConstants.KEY_DIAGNOSTIC_DETAIL, ""))
 	var formatted := SystemBaseMessages.format_console_line(record.level, record.channel, record.message, record.error_code, detail)
 	if LogConstants.is_critical_level(record.level):
 		printerr(formatted)
@@ -552,7 +629,7 @@ func emit_log(level_key: String, message: String, channel: String = LogConstants
 	record.level = level_key
 	record.message = message
 	record.channel = channel
-	emit_log_record(record)
+	_emit_log_record_internal(record, true)
 
 ## 时钟推进广播（旧 world_clock_advanced 信号替代，CORE_STATE 强一致内联）
 func emit_world_clock_advanced(clock_type: String, current_tick: int, timestamp_text: String) -> void:

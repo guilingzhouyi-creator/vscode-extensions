@@ -10,8 +10,6 @@
 ## CryptoIntegrityLib：Pure Cryptographic & Tamper-Evident Calculation Library
 class_name CryptoIntegrityLib extends RefCounted
 
-const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
-
 # ==============================================================================
 # 一、哈希摘要、加盐与密钥派生算子 (Pure Functions)
 # ==============================================================================

@@ -10,8 +10,6 @@
 ## SystemBaseMessages：Compliant Standard English Base Text Library
 class_name SystemBaseMessages extends RefCounted
 
-const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
-
 # ==============================================================================
 # 一、事件回退与控制台格式模板（Standard English Base Templates）
 # ==============================================================================
