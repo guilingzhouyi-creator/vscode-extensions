@@ -11,8 +11,6 @@
 class_name ModPackageDiscoverySolver
 extends RefCounted
 
-const ModPackageArchiveReader = preload("res://backend/domains/narrative_orchestration/mod_package_archive_reader.gd")
-
 const TIER0_MODS_DEV_PATH: String = "res://mods/"
 const TIER1_MODS_REL_PATH: String = "mods/narratives/"
 const TIER1_MODS_ROOT_PATH: String = "mods/"

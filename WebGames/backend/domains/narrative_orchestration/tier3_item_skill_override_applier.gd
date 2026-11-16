@@ -11,8 +11,6 @@
 class_name Tier3ItemSkillOverrideApplier
 extends RefCounted
 
-const Tier3ContentRecordParser = preload("res://backend/domains/narrative_orchestration/tier3_content_record_parser.gd")
-
 const TABLE_ITEMS_OVERRIDES: String = "items.mod_overrides"
 const TABLE_COMBAT_MECHANICS: String = "domains.combat.mechanics"
 

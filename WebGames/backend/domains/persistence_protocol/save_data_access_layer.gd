@@ -10,9 +10,6 @@
 ## SaveDataAccessLayer：Domain Entity / Aggregate Root
 class_name SaveDataAccessLayer extends RefCounted
 
-const SaveDomainContract = preload("res://backend/domains/persistence_protocol/save_domain_contract.gd")
-const RuntimeModeGate = preload("res://backend/domains/persistence_protocol/runtime_mode_gate.gd")
-
 static var _domain_contracts: Dictionary = {}   # domain_id -> SaveDomainContract
 static var _dirty_domains: Dictionary = {}      # domain_id -> true
 static var _config_version: int = -1

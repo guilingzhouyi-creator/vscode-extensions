@@ -12,8 +12,6 @@
 ## TargetedHotReloader：Targeted Incremental Hot Reloader
 class_name TargetedHotReloader extends RefCounted
 
-const ResourceDependencyDAG = preload("res://backend/domains/persistence_protocol/resource_dependency_dag.gd")
-
 const ERR_EMPTY_NODE: String = "EMPTY_NODE"
 const LOG_LEVEL_WARN: String = "warn"
 const LOG_LEVEL_INFO: String = "info"

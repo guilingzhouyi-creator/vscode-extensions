@@ -11,8 +11,6 @@
 class_name NarrativePackManifestDTO
 extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 var pack_id: String = ""
 var pack_name: String = ""
 var version: String = ""

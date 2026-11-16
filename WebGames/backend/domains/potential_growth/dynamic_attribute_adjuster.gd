@@ -28,7 +28,7 @@ const EVENT_CHANNEL_ADJUSTED: String = "potential.dynamic_adjusted"
 static func consume_event_channel(
 	sheet: CharacterPhysiologySheet,
 	channel: String,
-	payload: Dictionary = {}
+	_payload: Dictionary = {}
 ) -> Dictionary:
 	var channels: Dictionary = GameConfig.get_dict("domains.potential", "dynamic_adjust/channels", {})
 	if not channels.has(channel):

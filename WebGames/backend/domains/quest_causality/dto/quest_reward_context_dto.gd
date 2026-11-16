@@ -11,8 +11,6 @@
 class_name QuestRewardContextDto
 extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 var quest_id: String = ""
 var recipient_id: String = ""
 var experience_reward: int = 0

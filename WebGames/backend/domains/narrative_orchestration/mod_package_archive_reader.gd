@@ -15,7 +15,6 @@ extends RefCounted
 const LOG_CHANNEL: String = "mod_narrative"
 const MANIFEST_FILENAME: String = "pack.json"
 const ALT_MANIFEST_FILENAME: String = "manifest.json"
-const Tier3ContentRecordParser = preload("res://backend/domains/narrative_orchestration/tier3_content_record_parser.gd")
 
 
 ## 递归展平 i18n 嵌套字典为点分键与斜杠键

@@ -11,8 +11,6 @@
 class_name CrossWorldPerturbationDTO
 extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 var perturbation_id: String = ""
 var origin_world_id: String = ""
 var emitted_timestamp_utc: int = 0

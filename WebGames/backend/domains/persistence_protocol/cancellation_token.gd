@@ -11,8 +11,6 @@
 ## CancellationToken：Concurrency & Task Control Utility
 class_name CancellationToken extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 var _is_cancelled: bool = false
 var _callbacks: Array[Callable] = []
 

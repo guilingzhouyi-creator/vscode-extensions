@@ -11,8 +11,6 @@
 class_name GrayTargetingEngine
 extends RefCounted
 
-const GrayPolicyDTO = preload("res://backend/domains/version_governance/gray_policy_dto.gd")
-
 ## 紧凑质数混叠哈希算法 (将任意字符串映射为 [0, 99] 的稳定散列标量)
 static func compute_user_hash_bucket(user_id: String) -> int:
 	if user_id.is_empty():

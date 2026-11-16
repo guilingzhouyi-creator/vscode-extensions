@@ -11,8 +11,6 @@
 ## MinimumWorldStateDTO：Value Object DTO / Minimum Viable World State Model
 class_name MinimumWorldStateDTO extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 const DEFAULT_MAX_HP: float = 100.0
 const MODE_SINGLE_PLAYER: String = "SINGLE_PLAYER"
 

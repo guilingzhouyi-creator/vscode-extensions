@@ -11,10 +11,6 @@
 ## BatchLoadRequestDTO：Value Object DTO / Batch Resource Loading Request Model
 class_name BatchLoadRequestDTO extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
-const ResourceIndexEntryDTO = preload("res://backend/domains/persistence_protocol/dto/resource_index_entry_dto.gd")
-
 ## 批次请求唯一标识符
 var batch_id: String = ""
 

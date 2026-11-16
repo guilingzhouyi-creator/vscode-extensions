@@ -11,8 +11,6 @@
 class_name Tier3RulesWorldOverrideApplier
 extends RefCounted
 
-const Tier3ContentRecordParser = preload("res://backend/domains/narrative_orchestration/tier3_content_record_parser.gd")
-
 const TABLE_COMBAT_MECHANICS: String = "domains.combat.mechanics"
 const TABLE_COMBAT_FORMULAS: String = "domains.combat.damage_formulas"
 const TABLE_CHAR_CREATION: String = "domains.character_creation.core"

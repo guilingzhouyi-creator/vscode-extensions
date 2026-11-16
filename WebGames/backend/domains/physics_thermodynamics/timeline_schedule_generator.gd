@@ -132,6 +132,7 @@ static func _sample_discrete_timestamps(
 	var current_mark := 500 # 避开回合刚开始的瞬时
 	var step_slot := int(float(usable_window) / float(count))
 	for step_index in range(count):
+		@warning_ignore("integer_division")
 		var jitter: int = int(rng.randi_range(0, step_slot)) if rng else int(step_slot / 2)
 		var candidate_timestamp: int = current_mark + jitter
 		candidate_timestamp = clampi(candidate_timestamp, 100, max_duration_ms - 200)

@@ -12,12 +12,6 @@
 ## StorageObservability：Dual-Domain Storage Observability & Telemetry Collector
 class_name StorageObservability extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
-const StorageMetricsDTO = preload("res://backend/domains/persistence_protocol/dto/storage_metrics_dto.gd")
-const AuxiliaryWorkerPool = preload("res://backend/domains/persistence_protocol/auxiliary_worker_pool.gd")
-const FrameBudgetDispatcher = preload("res://backend/domains/persistence_protocol/frame_budget_dispatcher.gd")
-
 const BYTES_TO_MB: float = 1048576.0
 const MS_TO_SEC: float = 1000.0
 

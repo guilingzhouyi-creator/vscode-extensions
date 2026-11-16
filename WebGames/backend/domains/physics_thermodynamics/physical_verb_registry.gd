@@ -10,8 +10,6 @@
 ## PhysicalVerbRegistry：Domain Registry / Specification Catalog
 class_name PhysicalVerbRegistry extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 static var verbs: Dictionary:
 	get:
 		return GameConfig.get_dict("domains.combat", "verbs", {})

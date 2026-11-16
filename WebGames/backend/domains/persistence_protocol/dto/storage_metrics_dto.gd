@@ -11,8 +11,6 @@
 ## StorageMetricsDTO：Value Object DTO / Dual-Domain Storage Telemetry Metrics Model
 class_name StorageMetricsDTO extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 const DEFAULT_FRAME_BUDGET_MS: float = 2.0
 
 ## 1. 主数据恢复耗时 (ms)

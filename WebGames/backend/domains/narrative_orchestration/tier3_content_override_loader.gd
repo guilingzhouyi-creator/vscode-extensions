@@ -11,14 +11,6 @@
 class_name Tier3ContentOverrideLoader
 extends RefCounted
 
-const Tier3ContentRecordParser = preload("res://backend/domains/narrative_orchestration/tier3_content_record_parser.gd")
-const Tier3ItemSkillOverrideApplier = preload("res://backend/domains/narrative_orchestration/tier3_item_skill_override_applier.gd")
-const Tier3RulesWorldOverrideApplier = preload("res://backend/domains/narrative_orchestration/tier3_rules_world_override_applier.gd")
-const Tier3DomainContentOverrideApplier = preload("res://backend/domains/narrative_orchestration/tier3_domain_content_override_applier.gd")
-const Tier3IdentityDestinyApplier = preload("res://backend/domains/narrative_orchestration/tier3_identity_destiny_applier.gd")
-const LocalizationRegistryCatalog = preload("res://backend/domains/localization_i18n/localization_registry_catalog.gd")
-const ModPackageArchiveReader = preload("res://backend/domains/narrative_orchestration/mod_package_archive_reader.gd")
-
 const MODE_MERGE: String = Tier3ContentRecordParser.MODE_MERGE
 const MODE_REPLACE_ENTRY: String = Tier3ContentRecordParser.MODE_REPLACE_ENTRY
 const MODE_TOTAL_PURGE: String = Tier3ContentRecordParser.MODE_TOTAL_PURGE

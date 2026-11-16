@@ -11,9 +11,6 @@
 class_name Tier3IdentityDestinyApplier
 extends RefCounted
 
-const Tier3ContentRecordParser = preload("res://backend/domains/narrative_orchestration/tier3_content_record_parser.gd")
-const Tier3DomainContentOverrideApplier = preload("res://backend/domains/narrative_orchestration/tier3_domain_content_override_applier.gd")
-
 const TABLE_CHAR_CREATION: String = "domains.character_creation.core"
 const TABLE_ATTRIBUTE_CORE: String = "domains.attribute.core"
 const TABLE_STARTER_LOADOUT_CORE: String = "domains.starter_loadout.core"

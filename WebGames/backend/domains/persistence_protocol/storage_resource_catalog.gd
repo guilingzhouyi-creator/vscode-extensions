@@ -12,10 +12,6 @@
 ## StorageResourceCatalog：Unified Storage Resource Catalog & Index Orchestrator
 class_name StorageResourceCatalog extends RefCounted
 
-const StorageContractInterfaces = preload("res://backend/domains/persistence_protocol/storage_contract_interfaces.gd")
-const ResourceIndexEntryDTO = preload("res://backend/domains/persistence_protocol/dto/resource_index_entry_dto.gd")
-const BatchLoadRequestDTO = preload("res://backend/domains/persistence_protocol/dto/batch_load_request_dto.gd")
-
 const PATH_RESOURCE_CATALOG: String = "res://config/infrastructure/resource_catalog.json"
 const PATH_DOMAINS_JSON: String = "res://config/infrastructure/domains.json"
 const PREFIX_CONFIG_KEY: String = "config."

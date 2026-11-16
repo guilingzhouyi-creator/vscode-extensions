@@ -11,8 +11,6 @@
 class_name Tier3DomainContentOverrideApplier
 extends RefCounted
 
-const Tier3ContentRecordParser = preload("res://backend/domains/narrative_orchestration/tier3_content_record_parser.gd")
-
 const TABLE_NPC_CORE: String = "domains.npc.core"
 const TABLE_MONSTER_CORE: String = "domains.monster.core"
 const TABLE_ELITE_CORE: String = "domains.elite.core"

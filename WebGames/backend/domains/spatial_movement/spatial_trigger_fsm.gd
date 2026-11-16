@@ -11,8 +11,6 @@
 class_name SpatialTriggerFSM
 extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 const POOL_SPATIAL_TRIGGERS: String = "spatial_triggers"
 const MAX_LOCAL_TRIGGER_POOL: int = 256
 
@@ -158,7 +156,7 @@ static func evaluate_entity_trigger_state(
 		is_contained = trigger.rect_extents.has_point(entity_position)
 
 	var previous_state: int = registry.get_state(trigger.trigger_id, entity_id) if registry else TriggerState.OUTSIDE
-	var new_state: TriggerState = previous_state
+	var new_state: TriggerState = previous_state as TriggerState
 
 	if is_contained:
 		if previous_state == TriggerState.OUTSIDE or previous_state == TriggerState.EXITED:

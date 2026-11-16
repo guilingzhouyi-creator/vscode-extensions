@@ -124,7 +124,7 @@ func _record_tension_pulse(processed_events: Array[Dictionary], event_id: String
 func step_coordinator(
 	delta_ms: int,
 	player_participant: CombatPipelineFSM.CombatParticipant,
-	enemy_participant: CombatPipelineFSM.CombatParticipant
+	_enemy_participant: CombatPipelineFSM.CombatParticipant
 ) -> Dictionary:
 	round_elapsed_ms += delta_ms
 	var fired_events: Array = []
@@ -217,7 +217,7 @@ func step_coordinator(
 	}
 
 ## 切轮：回合 +1、计时归零并透传继承当前绝对时间轴（timeline_engine 绝不重初始化）
-func _transition_to_next_round(reason: String) -> void:
+func _transition_to_next_round(_reason: String) -> void:
 	current_round += 1
 	round_elapsed_ms = 0
 	round_start_timeline_ms = timeline_engine.current_timeline_ms

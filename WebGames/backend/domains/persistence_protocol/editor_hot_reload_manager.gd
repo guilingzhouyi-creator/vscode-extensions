@@ -10,9 +10,6 @@
 ## EditorHotReloadManager：Domain Service / State Orchestrator
 class_name EditorHotReloadManager extends RefCounted
 
-const RuntimeModeGate = preload("res://backend/domains/persistence_protocol/runtime_mode_gate.gd")
-const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
-
 static var _last_hashes: Dictionary = {}              # table_name -> content_hash
 static var _hot_reload_scope: Dictionary = {}         # domain_id -> { "allow": bool, "requires_rebuild": bool }
 static var _table_to_domain_map: Dictionary = {}      # table_name -> domain_id

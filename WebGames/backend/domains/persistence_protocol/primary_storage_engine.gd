@@ -12,9 +12,6 @@
 ## PrimaryStorageEngine：Primary Domain Storage Engine
 class_name PrimaryStorageEngine extends RefCounted
 
-const StorageContractInterfaces = preload("res://backend/domains/persistence_protocol/storage_contract_interfaces.gd")
-const MinimumWorldStateDTO = preload("res://backend/domains/persistence_protocol/dto/minimum_world_state_dto.gd")
-
 const USEC_TO_MS: float = 1000.0
 const STAGE_MINIMAL_RESTORE_READY: String = "MINIMAL_RESTORE_READY"
 const LOG_LEVEL_WARN: String = "warn"

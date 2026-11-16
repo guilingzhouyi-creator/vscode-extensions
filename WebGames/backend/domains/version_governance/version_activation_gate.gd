@@ -11,9 +11,6 @@
 class_name VersionActivationGate
 extends RefCounted
 
-const ActivationTokenDTO = preload("res://backend/domains/version_governance/activation_token_dto.gd")
-const GrayPolicyDTO = preload("res://backend/domains/version_governance/gray_policy_dto.gd")
-
 ## 第一道门禁：全域引擎装配启动前置核验 (由 GameBootstrap.assemble_versioned() 调用)
 static func evaluate_startup_eligibility(installed_version: String, token: ActivationTokenDTO) -> Dictionary:
 	# 若为基础初始版本 (1.0.0)，无条件放行

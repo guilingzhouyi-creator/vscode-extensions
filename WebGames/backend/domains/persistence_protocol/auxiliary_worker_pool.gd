@@ -12,11 +12,6 @@
 ## AuxiliaryWorkerPool：Auxiliary Domain Async Worker Pool
 class_name AuxiliaryWorkerPool extends RefCounted
 
-const StorageContractInterfaces = preload("res://backend/domains/persistence_protocol/storage_contract_interfaces.gd")
-const CancellationToken = preload("res://backend/domains/persistence_protocol/cancellation_token.gd")
-const BatchLoadRequestDTO = preload("res://backend/domains/persistence_protocol/dto/batch_load_request_dto.gd")
-const ResourceIndexEntryDTO = preload("res://backend/domains/persistence_protocol/dto/resource_index_entry_dto.gd")
-
 const STATUS_PENDING: String = "PENDING"
 const STATUS_RUNNING: String = "RUNNING"
 const STATUS_COMPLETED: String = "COMPLETED"
@@ -264,10 +259,10 @@ static func _load_resource_payload(resource_path: String) -> Dictionary:
 		if binary_config_payload == null:
 			return {"error": StorageContractInterfaces.ERR_CORRUPT}
 		var file_handle := FileAccess.open(resource_path, FileAccess.READ)
-		var byte_length: int = file_handle.get_length() if file_handle != null else 0
+		var binary_byte_length: int = file_handle.get_length() if file_handle != null else 0
 		if file_handle != null:
 			file_handle.close()
-		return {"data": binary_config_payload, "byte_count": byte_length}
+		return {"data": binary_config_payload, "byte_count": binary_byte_length}
 
 	if not FileAccess.file_exists(resource_path):
 		return {"error": StorageContractInterfaces.ERR_NOT_FOUND}

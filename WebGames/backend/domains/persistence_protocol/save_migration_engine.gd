@@ -10,9 +10,6 @@
 ## SaveMigrationEngine：Domain Logic Component
 class_name SaveMigrationEngine extends RefCounted
 
-const SaveValidationService = preload("res://backend/domains/persistence_protocol/save_validation_service.gd")
-const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
-
 static var _domain_migrations: Dictionary = {} # key = "domain:ver" -> { "to": int, "fn": Callable }
 
 ## 注册域级数据迁移（单域独立演进，Inv-SV-4）

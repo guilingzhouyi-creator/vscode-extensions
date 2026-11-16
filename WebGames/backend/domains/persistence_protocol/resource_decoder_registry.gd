@@ -11,9 +11,6 @@
 ## ResourceDecoderRegistry：Polymorphic Resource Decoder Registry Center
 class_name ResourceDecoderRegistry extends RefCounted
 
-const StorageContractInterfaces = preload("res://backend/domains/persistence_protocol/storage_contract_interfaces.gd")
-const ResourceIndexEntryDTO = preload("res://backend/domains/persistence_protocol/dto/resource_index_entry_dto.gd")
-
 const EXT_JSON: String = ".json"
 const CAT_CONFIG: String = "config"
 const CAT_TEXT: String = "text"

@@ -11,8 +11,6 @@
 class_name VersionedRuntimeContext
 extends RefCounted
 
-const ActivationTokenDTO = preload("res://backend/domains/version_governance/activation_token_dto.gd")
-
 var version_string: String = "1.0.0"
 var version_code: int = 10000
 var activation_token: ActivationTokenDTO = null

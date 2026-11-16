@@ -13,7 +13,6 @@ extends RefCounted
 
 const LOCK_FILENAME: String = "world_mod_lock.json"
 const DEFAULT_FORMAT_VERSION: String = "1.0.0"
-const WorldModLockMetadataHelper = preload("res://backend/domains/narrative_orchestration/world_mod_lock_metadata_helper.gd")
 
 ## 获取单机世界 MOD 锁文件的物理全路径
 func get_lock_file_path(world_id: String) -> String:
