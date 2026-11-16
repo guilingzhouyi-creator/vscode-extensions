@@ -13,6 +13,7 @@
 [CmdletBinding()]
 param(
   [string]$OutDir = "",
+  [int]$Iterations = 1,
   [string]$GodotBin = $env:GODOT_BIN
 )
 Set-StrictMode -Version Latest
@@ -21,6 +22,12 @@ $PSNativeCommandUseErrorActionPreference = $true
 $PSNativeCommandArgumentPassing = 'Standard'
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$global:LASTEXITCODE = 0
+
+if ($Iterations -lt 1) {
+  Write-Host "【用法错误】-Iterations 必须 >= 1"
+  exit 2
+}
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RootDir = Split-Path -Parent (Split-Path -Parent $ScriptDir)
@@ -38,11 +45,26 @@ $Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $Report = Join-Path $OutDir "bench_$Stamp.json"
 $Latest = Join-Path $OutDir "bench_latest.json"
 
-Write-Host "【bench-run】开始运行基准（godot=$GodotBin）..."
-& $GodotBin --headless --path $RootDir -s res://benchmarks/bench_runner.gd -- $Report
-if ($LASTEXITCODE -ne 0) {
-  Write-Host "【bench-run】基准运行失败（exit=$LASTEXITCODE）"
-  exit 1
+Write-Host "【bench-run】开始运行基准（godot=$GodotBin, iterations=$Iterations）..."
+$prevEAP = $ErrorActionPreference
+$prevNativeEAP = $PSNativeCommandUseErrorActionPreference
+$ErrorActionPreference = 'Continue'
+$PSNativeCommandUseErrorActionPreference = $false
+try {
+  for ($runIndex = 1; $runIndex -le $Iterations; $runIndex++) {
+    $global:LASTEXITCODE = 0
+    & $GodotBin --headless --path $RootDir -s res://benchmarks/bench_runner.gd '--' $Report 2>&1 |
+      Where-Object { $_ -notmatch '^\[WARN\]\[system\] 基准采样：' } |
+      Out-Host
+    $runExit = $LASTEXITCODE
+    if ($runExit -ne 0) {
+      Write-Host "【bench-run】基准运行失败（round=$runIndex/$Iterations, exit=$runExit）"
+      exit $runExit
+    }
+  }
+} finally {
+  $ErrorActionPreference = $prevEAP
+  $PSNativeCommandUseErrorActionPreference = $prevNativeEAP
 }
 Copy-Item $Report $Latest -Force
 Write-Host "【bench-run】完成: $Report"

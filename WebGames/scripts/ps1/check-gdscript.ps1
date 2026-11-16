@@ -12,7 +12,6 @@
 # ==============================================================================
 [CmdletBinding()]
 param(
-  [ValidateSet("all", "backend", "frontend", "dev_harness", "tests", "benchmarks")]
   [string]$Scope = "all",
   [string]$GodotBin = $env:GODOT_BIN,
   [switch]$PerFile
@@ -57,6 +56,12 @@ if ($ScanDirs.Count -eq 0) {
   exit 2
 }
 
+$ValidScopes = @("all") + $ScanDirs
+if ($Scope -notin $ValidScopes) {
+  Write-Host "【用法错误】-Scope 取值: $($ValidScopes -join '|')"
+  exit 2
+}
+
 # 探测 Godot 命令行二进制，加固进程验证与严格模式下的退出码访问安全
 if (-not $GodotBin) { $GodotBin = "godot" }
 $godotCmd = Get-Command $GodotBin -ErrorAction SilentlyContinue
@@ -71,11 +76,92 @@ if (-not $godotCmd) {
   exit 1
 }
 
+function Invoke-GodotCaptured {
+  param(
+    [string]$Executable,
+    [System.Management.Automation.CommandInfo]$CmdInfo,
+    [string[]]$GodotArgs
+  )
+  $guid = [System.Guid]::NewGuid().ToString("N")
+  $outFile = Join-Path $env:TEMP ("gd_out_" + $guid + ".log")
+  $errFile = Join-Path $env:TEMP ("gd_err_" + $guid + ".log")
+  $inFile = Join-Path $env:TEMP ("gd_in_" + $guid + ".txt")
+  [System.IO.File]::WriteAllText($inFile, "", [System.Text.UTF8Encoding]::new($false))
+
+  $exitCode = 0
+  $lines = @()
+  $prevEAP = $ErrorActionPreference
+  $prevNativeEAP = $PSNativeCommandUseErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  $PSNativeCommandUseErrorActionPreference = $false
+  try {
+    if ($CmdInfo -and $CmdInfo.CommandType -eq 'Application') {
+      $quotedArgs = @($GodotArgs | ForEach-Object {
+        if ($_ -match '\s') { "`"$_`"" } else { $_ }
+      })
+      $proc = Start-Process -FilePath $Executable -ArgumentList $quotedArgs -NoNewWindow `
+        -RedirectStandardOutput $outFile -RedirectStandardError $errFile -RedirectStandardInput $inFile `
+        -PassThru -Wait
+      $exitCode = $proc.ExitCode
+      if (Test-Path $outFile) { $lines += @(Get-Content $outFile) }
+      if (Test-Path $errFile) { $lines += @(Get-Content $errFile) }
+    } else {
+      $global:LASTEXITCODE = 0
+      $raw = & $Executable @GodotArgs 2>&1
+      $exitCode = if (Test-Path variable:LASTEXITCODE) { $LASTEXITCODE } else { 0 }
+      $lines = @($raw | ForEach-Object { "$_" })
+    }
+  } finally {
+    $ErrorActionPreference = $prevEAP
+    $PSNativeCommandUseErrorActionPreference = $prevNativeEAP
+    Remove-Item $outFile, $errFile, $inFile -Force -ErrorAction SilentlyContinue
+  }
+  return [PSCustomObject]@{
+    ExitCode = $exitCode
+    Lines    = $lines
+  }
+}
+
+function Get-GodotUserDiagnostics {
+  param([string[]]$Lines)
+  $diags = New-Object System.Collections.Generic.List[string]
+  if (-not $Lines) { return @() }
+  for ($i = 0; $i -lt $Lines.Count; $i++) {
+    $line = "$($Lines[$i])"
+    if ($line -match '^(SCRIPT ERROR:|Parse Error:|ERROR:\s+Failed to load script)') {
+      $loc = ""
+      for ($j = $i + 1; $j -le [Math]::Min($i + 3, $Lines.Count - 1); $j++) {
+        if ("$($Lines[$j])" -match 'at:\s*.*?(res://[^\s)]+)') {
+          $loc = "$($Lines[$j])".Trim()
+          break
+        }
+      }
+      $diags.Add($(if ($loc) { "$line [$loc]" } else { $line }))
+      continue
+    }
+    if ($line -match '^WARNING:') {
+      $isUserScript = ($line -match 'res://|\.gd\b|GDScript')
+      $loc = ""
+      for ($j = $i + 1; $j -le [Math]::Min($i + 3, $Lines.Count - 1); $j++) {
+        if ("$($Lines[$j])" -match 'at:\s*.*?(res://[^\s)]+|\.gd\b|GDScript::)') {
+          $isUserScript = $true
+          $loc = "$($Lines[$j])".Trim()
+          break
+        }
+      }
+      if ($isUserScript) {
+        $diags.Add($(if ($loc) { "$line [$loc]" } else { $line }))
+      }
+    }
+  }
+  return @($diags | Select-Object -Unique)
+}
+
 # 显式探测 Godot 进程执行能力，安全捕获异常与进程退出码
 try {
-  $probeProc = Start-Process -FilePath $GodotBin -ArgumentList "--headless", "--version" -NoNewWindow -PassThru -Wait -ErrorAction Stop
-  if ($probeProc.ExitCode -ne 0) {
-    Write-Host "【check-gdscript】godot 探测异常（退出码 $($probeProc.ExitCode)）"
+  $probeRes = Invoke-GodotCaptured -Executable $GodotBin -CmdInfo $godotCmd -GodotArgs @("--headless", "--version")
+  if ($probeRes.ExitCode -ne 0) {
+    Write-Host "【check-gdscript】godot 探测异常（退出码 $($probeRes.ExitCode)）"
     exit 1
   }
 } catch {
@@ -83,61 +169,63 @@ try {
   exit 1
 }
 
-# 默认模式下优先采用单进程批处理校验（极速通过）
+# 默认模式下优先采用单进程批处理校验
 if (-not $PerFile) {
   Write-Host "【check-gdscript】执行单进程极速批处理语法检查（scope=$Scope）..."
-  $guid = [System.Guid]::NewGuid().ToString("N")
-  $batchLogOut = Join-Path $env:TEMP ("gd_batch_out_" + $guid + ".log")
-  $batchLogErr = Join-Path $env:TEMP ("gd_batch_err_" + $guid + ".log")
-  $batchLog = Join-Path $env:TEMP ("gd_batch_" + $guid + ".log")
-
-  $argList = @("--headless", "--path", "`"$RootDir`"", "-s", $batchScriptRes)
+  $argList = @("--headless", "--debug", "--ignore-error-breaks", "--path", $RootDir, "-s", $batchScriptRes)
   if ($Scope -ne "all") {
     $argList += @("--", "res://$Scope")
   }
 
-  $p = Start-Process -FilePath $GodotBin -ArgumentList $argList -NoNewWindow -RedirectStandardOutput $batchLogOut -RedirectStandardError $batchLogErr -PassThru -Wait
-  if (Test-Path $batchLogOut) { Get-Content $batchLogOut | Add-Content $batchLog }
-  if (Test-Path $batchLogErr) { Get-Content $batchLogErr | Add-Content $batchLog }
-  Remove-Item $batchLogOut, $batchLogErr -Force -ErrorAction SilentlyContinue
-  if ($p.ExitCode -eq 0) {
-    Remove-Item $batchLog -Force -ErrorAction SilentlyContinue
+  $batchRes = Invoke-GodotCaptured -Executable $GodotBin -CmdInfo $godotCmd -GodotArgs $argList
+  $batchDiags = @(Get-GodotUserDiagnostics -Lines $batchRes.Lines)
+  if ($batchRes.ExitCode -eq 0 -and $batchDiags.Count -eq 0) {
     Write-Host "【check-gdscript】通过"
     exit 0
   }
-  # 同构同步（对应 sh 性能优化）：批处理已输出失败明细（✗ res://…）且退出码非 0 →
-  # 仅对失败文件清单逐个冷启动复验（通常 <10 个），消除全量逐文件冷启动浪费；
-  # 仅当批处理异常退出且无失败明细时才回落全量定位。
-  Get-Content $batchLog | ForEach-Object { Write-Host $_ }
-  $failedFiles = @(Get-Content $batchLog | Where-Object { $_ -match '^✗ res://' } | ForEach-Object { ($_ -replace '^✗ (res://[^ ]+).*', '$1') } | Sort-Object -Unique)
+
+  foreach ($ln in $batchRes.Lines) {
+    if ($ln -match '^(✗|【batch-syntax-check】|SCRIPT ERROR:|Parse Error:|ERROR:\s+Failed to load script)') {
+      Write-Host $ln
+    }
+  }
+  if ($batchDiags.Count -gt 0) {
+    Write-Host "【check-gdscript】检测到 Godot 编译器错误/告警 $($batchDiags.Count) 项:"
+    foreach ($d in $batchDiags) { Write-Host "  ! $d" }
+  }
+
+  $failedFiles = @($batchRes.Lines | Where-Object { $_ -match '^✗ res://' } | ForEach-Object { ($_ -replace '^✗ (res://[^ ]+).*', '$1') } | Sort-Object -Unique)
   if ($failedFiles.Count -gt 0) {
-    Remove-Item $batchLog -Force -ErrorAction SilentlyContinue
     Write-Host "【check-gdscript】批处理失败明细 $($failedFiles.Count) 项，对失败清单逐个复验定位..."
     $checked = 0
     $fails = 0
     foreach ($resPath in $failedFiles) {
       $rel = $resPath.Substring("res://".Length)
       $checked++
-      $global:LASTEXITCODE = 0
-      & $GodotBin --headless --quiet --path $RootDir --check-only -s $resPath 2>&1 | Out-Null
-      $exitCode = if (Test-Path variable:LASTEXITCODE) { $LASTEXITCODE } else { 0 }
-      if ($exitCode -ne 0) {
+      $recheck = Invoke-GodotCaptured -Executable $GodotBin -CmdInfo $godotCmd -GodotArgs @("--headless", "--debug", "--ignore-error-breaks", "--quiet", "--path", $RootDir, "--check-only", "-s", $resPath)
+      $recheckDiags = @(Get-GodotUserDiagnostics -Lines $recheck.Lines)
+      if ($recheck.ExitCode -ne 0 -or $recheckDiags.Count -gt 0) {
         $fails++
-        Write-Host "✗ $rel"
+        Write-Host "✗ $rel (exit=$($recheck.ExitCode))"
+        foreach ($d in ($recheckDiags | Select-Object -First 5)) { Write-Host "    $d" }
       } else {
         Write-Host "✓ $rel (批处理误报，复验通过)"
       }
     }
-    if ($fails -ne 0) {
-      Write-Host "【check-gdscript】检查 $checked 个失败文件，复验失败 $fails 个"
-      Write-Host "【check-gdscript】未通过：存在解析错误，请先修复"
+    if ($fails -ne 0 -or $batchDiags.Count -gt 0) {
+      Write-Host "【check-gdscript】检查 $checked 个失败文件，复验失败 $fails 个，编译器告警/错误 $($batchDiags.Count) 项"
+      Write-Host "【check-gdscript】未通过：存在解析错误或编译器告警，请先修复"
       exit 1
     }
     Write-Host "【check-gdscript】失败清单复验 $checked 个全部通过（批处理误报已澄清）"
     Write-Host "【check-gdscript】通过"
     exit 0
   }
-  Remove-Item $batchLog -Force -ErrorAction SilentlyContinue
+
+  if ($batchDiags.Count -gt 0) {
+    Write-Host "【check-gdscript】未通过：存在 $($batchDiags.Count) 项编译器告警或错误，请先修复"
+    exit 1
+  }
   Write-Host "【check-gdscript】批处理异常退出且无失败明细，切入全量逐文件定位模式..."
 }
 
@@ -158,18 +246,18 @@ foreach ($f in $files) {
   $rel = $f.FullName.Substring($RootDir.Length + 1).Replace('\', '/')
   $relRes = "res://$rel"
   $checked++
-  $global:LASTEXITCODE = 0
-  & $GodotBin --headless --quiet --path $RootDir --check-only -s $relRes 2>&1 | Out-Null
-  $exitCode = if (Test-Path variable:LASTEXITCODE) { $LASTEXITCODE } else { 0 }
-  if ($exitCode -ne 0) {
+  $fileRes = Invoke-GodotCaptured -Executable $GodotBin -CmdInfo $godotCmd -GodotArgs @("--headless", "--debug", "--ignore-error-breaks", "--quiet", "--path", $RootDir, "--check-only", "-s", $relRes)
+  $fileDiags = @(Get-GodotUserDiagnostics -Lines $fileRes.Lines)
+  if ($fileRes.ExitCode -ne 0 -or $fileDiags.Count -gt 0) {
     $fails++
-    Write-Host "✗ $rel"
+    Write-Host "✗ $rel (exit=$($fileRes.ExitCode))"
+    foreach ($d in ($fileDiags | Select-Object -First 5)) { Write-Host "    $d" }
   }
 }
 
 Write-Host "【check-gdscript】检查 $checked 个 .gd，失败 $fails 个（scope=$Scope）"
 if ($fails -ne 0) {
-  Write-Host "【check-gdscript】未通过：存在解析错误，请先修复"
+  Write-Host "【check-gdscript】未通过：存在解析错误或编译器告警，请先修复"
   exit 1
 }
 Write-Host "【check-gdscript】通过"

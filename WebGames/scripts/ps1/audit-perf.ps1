@@ -8,10 +8,15 @@
 # ------------------------------------------------------------------------------
 # 用法示例:
 #   .\scripts\ps1\audit-perf.ps1
-#   .\scripts\ps1\audit-perf.ps1 -json
+#   .\scripts\ps1\audit-perf.ps1 -Json
+#   .\scripts\ps1\audit-perf.ps1 -Strict
 # ==============================================================================
 [CmdletBinding()]
-param([string]$GateThreshold = "10")
+param(
+  [string]$GateThreshold = "10",
+  [switch]$Json,
+  [switch]$Strict
+)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
@@ -34,17 +39,52 @@ if (-not $pyCmd) {
   exit 1
 }
 
-Write-Host "=== 1/2 静态热点扫描 audit_perf_hotspots.py ==="
+$hotspotArgs = @()
+if ($Json) { $hotspotArgs += "--json" }
+if ($Strict) { $hotspotArgs += "--strict" }
+
+if (-not $Json) {
+  Write-Host "=== 1/2 静态热点扫描 audit_perf_hotspots.py ==="
+}
+$prevEAP = $ErrorActionPreference
+$prevNativeEAP = $PSNativeCommandUseErrorActionPreference
+$ErrorActionPreference = 'Continue'
+$PSNativeCommandUseErrorActionPreference = $false
+$hotspotCode = 0
 Push-Location $RootDir
-& $pyCmd "scripts\py\audit_perf_hotspots.py"
-Pop-Location
+try {
+  & $pyCmd "scripts\py\audit_perf_hotspots.py" @hotspotArgs
+  $hotspotCode = $LASTEXITCODE
+} finally {
+  Pop-Location
+  $ErrorActionPreference = $prevEAP
+  $PSNativeCommandUseErrorActionPreference = $prevNativeEAP
+}
+if ($hotspotCode -ne 0) {
+  Write-Host "【audit-perf】静态热点扫描未通过 (exit=$hotspotCode)"
+  exit $hotspotCode
+}
+if ($Json) {
+  exit 0
+}
+
+$gateArgs = @("--gate", $GateThreshold)
+if ($Strict) { $gateArgs += "--strict" }
 
 Write-Host ""
 Write-Host "=== 2/2 性能回归门禁（阈值 $GateThreshold%）==="
+$ErrorActionPreference = 'Continue'
+$PSNativeCommandUseErrorActionPreference = $false
+$code = 0
 Push-Location $RootDir
-& $pyCmd "scripts\py\report_aggregate.py" --gate $GateThreshold
-$code = $LASTEXITCODE
-Pop-Location
+try {
+  & $pyCmd "scripts\py\report_aggregate.py" @gateArgs
+  $code = $LASTEXITCODE
+} finally {
+  Pop-Location
+  $ErrorActionPreference = $prevEAP
+  $PSNativeCommandUseErrorActionPreference = $prevNativeEAP
+}
 if ($code -ne 0) {
   Write-Host "【audit-perf】性能回归门禁未通过"
   exit $code

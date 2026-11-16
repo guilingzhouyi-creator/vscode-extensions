@@ -38,12 +38,24 @@ if (-not $pyCmd) { Write-Host "【bench-sweep】python 缺失"; exit 1 }
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $RunFiles = @()
-for ($i = 1; $i -le $Runs; $i++) {
-  $Tmp = Join-Path $OutDir ".bench_sweep_run_${Stamp}_${i}.json"
-  Write-Host "【bench-sweep】第 ${i}/${Runs} 次运行基准..."
-  & $GodotBin --headless --path $RootDir -s res://benchmarks/bench_runner.gd -- $Tmp
-  if ($LASTEXITCODE -ne 0) { Write-Host "【bench-sweep】第 ${i} 次基准运行失败"; exit 1 }
-  $RunFiles += $Tmp
+$prevEAP = $ErrorActionPreference
+$prevNativeEAP = $PSNativeCommandUseErrorActionPreference
+$ErrorActionPreference = 'Continue'
+$PSNativeCommandUseErrorActionPreference = $false
+try {
+  for ($i = 1; $i -le $Runs; $i++) {
+    $Tmp = Join-Path $OutDir ".bench_sweep_run_${Stamp}_${i}.json"
+    Write-Host "【bench-sweep】第 ${i}/${Runs} 次运行基准..."
+    $global:LASTEXITCODE = 0
+    & $GodotBin --headless --path $RootDir -s res://benchmarks/bench_runner.gd '--' $Tmp 2>&1 |
+      Where-Object { $_ -notmatch '^\[WARN\]\[system\] 基准采样：' } |
+      Out-Host
+    if ($LASTEXITCODE -ne 0) { Write-Host "【bench-sweep】第 ${i} 次基准运行失败"; exit 1 }
+    $RunFiles += $Tmp
+  }
+} finally {
+  $ErrorActionPreference = $prevEAP
+  $PSNativeCommandUseErrorActionPreference = $prevNativeEAP
 }
 
 $Merged = Join-Path $OutDir "bench_sweep_$Stamp.json"
