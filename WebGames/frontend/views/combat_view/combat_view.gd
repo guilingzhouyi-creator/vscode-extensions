@@ -41,14 +41,12 @@ class FloatingTextDTO extends CombatFloatingTextDTO:
 @onready var _battle_log_rich_text: RichTextLabel = $%BattleLogRich
 
 # --- 子界面 1: 战斗主界面 — 中央战斗场景视图 ---
-@onready var _battle_scene_placeholder: PanelContainer = $%BattleScenePlaceholder
-@onready var _battle_scene_label: Label = $%BattleSceneLabel
+@onready var battle_scene_label: Label = $%BattleSceneLabel
 
 # --- 子界面 3: BOSS 多部位血条面板（右上角） ---
-@onready var _boss_parts_panel: PanelContainer = $%BossPartsPanel
-@onready var _boss_parts_name_label: Label = $%BossPartsNameLabel
-@onready var _boss_parts_total_bar: ProgressBar = $%BossPartsTotalBar
-@onready var _boss_parts_list: VBoxContainer = $%BossPartsList
+@onready var boss_parts_name_label: Label = $%BossPartsNameLabel
+@onready var boss_parts_total_bar: ProgressBar = $%BossPartsTotalBar
+@onready var boss_parts_list: VBoxContainer = $%BossPartsList
 
 # --- 子界面 1: 战斗主界面 — 底部玩家状态栏 ---
 @onready var _player_name_label: Label = $%PlayerNameLabel
@@ -66,20 +64,20 @@ class FloatingTextDTO extends CombatFloatingTextDTO:
 
 # --- 子界面 4: 战斗结算面板 ---
 @onready var _settlement_panel: PanelContainer = $%SettlementPanel
-@onready var _settlement_result_label: Label = $%SettlementResultLabel
-@onready var _settlement_gold_label: Label = $%SettlementGoldLabel
-@onready var _settlement_exp_label: Label = $%SettlementExpLabel
-@onready var _settlement_items_label: Label = $%SettlementItemsLabel
-@onready var _settlement_mvp_label: Label = $%SettlementMvpLabel
-@onready var _settlement_time_label: Label = $%SettlementTimeLabel
+@onready var settlement_result_label: Label = $%SettlementResultLabel
+@onready var settlement_gold_label: Label = $%SettlementGoldLabel
+@onready var settlement_exp_label: Label = $%SettlementExpLabel
+@onready var settlement_items_label: Label = $%SettlementItemsLabel
+@onready var settlement_mvp_label: Label = $%SettlementMvpLabel
+@onready var settlement_time_label: Label = $%SettlementTimeLabel
 @onready var _settlement_back_button: Button = $%SettlementBackBtn
 
 # --- 子界面 5: 部位破坏详情面板 ---
 @onready var _part_break_panel: PanelContainer = $%PartBreakPanel
-@onready var _part_break_name_label: Label = $%PartBreakNameLabel
-@onready var _part_break_status_label: Label = $%PartBreakStatusLabel
-@onready var _part_break_effect_label: Label = $%PartBreakEffectLabel
-@onready var _part_break_weakness_label: Label = $%PartBreakWeaknessLabel
+@onready var part_break_name_label: Label = $%PartBreakNameLabel
+@onready var part_break_status_label: Label = $%PartBreakStatusLabel
+@onready var part_break_effect_label: Label = $%PartBreakEffectLabel
+@onready var part_break_weakness_label: Label = $%PartBreakWeaknessLabel
 @onready var _part_break_close_button: Button = $%PartBreakCloseBtn
 
 # --- 右下角返回按钮 ---
@@ -130,33 +128,46 @@ var battle_duration_sec: float = 0.0
 func _ready() -> void:
 	var theme_manager := ThemeManager.get_instance()
 	theme = theme_manager.theme
-
-	boss_name = UIIntermediary.text("ui.fe04.boss.name")
-	boss_total_hp = 8500.0
-	boss_max_hp = 12000.0
-	boss_parts = [
-		{"part_name": UIIntermediary.text("ui.fe04.mock.part.head"), "hp": 2000.0, "max_hp": 2000.0, "is_broken": false},
-		{"part_name": UIIntermediary.text("ui.fe04.mock.part.wing_left"), "hp": 800.0, "max_hp": 1500.0, "is_broken": false},
-		{"part_name": UIIntermediary.text("ui.fe04.mock.part.wing_right"), "hp": 300.0, "max_hp": 1500.0, "is_broken": true},
-		{"part_name": UIIntermediary.text("ui.fe04.mock.part.tail"), "hp": 1000.0, "max_hp": 1000.0, "is_broken": false},
-	]
+	var is_mock_mode := (ServiceLocator.get_mode() == "mock")
+	if is_mock_mode:
+		boss_name = UIIntermediary.text("ui.fe04.boss.name")
+		boss_total_hp = 8500.0
+		boss_max_hp = 12000.0
+		boss_parts = [
+			{"part_name": UIIntermediary.text("ui.fe04.mock.part.head"), "hp": 2000.0, "max_hp": 2000.0, "is_broken": false},
+			{"part_name": UIIntermediary.text("ui.fe04.mock.part.wing_left"), "hp": 800.0, "max_hp": 1500.0, "is_broken": false},
+			{"part_name": UIIntermediary.text("ui.fe04.mock.part.wing_right"), "hp": 300.0, "max_hp": 1500.0, "is_broken": true},
+			{"part_name": UIIntermediary.text("ui.fe04.mock.part.tail"), "hp": 1000.0, "max_hp": 1000.0, "is_broken": false},
+		]
+		player_name = UIIntermediary.text("ui.fe04.player.name")
+		append_battle_log("COMBAT", UIIntermediary.text("ui.fe04.log.boss_awaken"))
+		append_battle_log("SYSTEM", UIIntermediary.text("ui.fe04.log.battle_start"))
+		append_battle_log("SKILL", UIIntermediary.text("ui.fe04.log.skill_cd", {"skill": UIIntermediary.text("ui.fe04.skill.SKILL_FIREBALL"), "seconds": "2.0"}))
+		append_battle_log("LOOT", UIIntermediary.text("ui.fe04.log.part_broken_loot"))
+	else:
+		player_name = UIIntermediary.text("ui.fe04.player.name")
+		ServiceLocator.get_instance().combat().get_combat_snapshot_async("ACTIVE_ENCOUNTER", func(combat_reply: Dictionary) -> void:
+			var combat_table: Dictionary = combat_reply.get("combat", combat_reply.get("data", combat_reply)) as Dictionary
+			set_boss_status_snapshot(
+				str(combat_table.get("boss_name", UIIntermediary.text("ui.fe04.boss.name"))),
+				float(combat_table.get("boss_hp", 0.0)),
+				maxf(1.0, float(combat_table.get("boss_max_hp", 1.0))),
+				combat_table.get("boss_parts", []) if combat_table.get("boss_parts") is Array else []
+			)
+			update_player_status(
+				float(combat_table.get("player_hp", stat_hp_current)),
+				maxf(1.0, float(combat_table.get("player_max_hp", stat_hp_max))),
+				float(combat_table.get("player_mp", stat_mp_current)),
+				maxf(1.0, float(combat_table.get("player_max_mp", stat_mp_max))),
+				float(combat_table.get("player_ap", stat_ap_current)),
+				maxf(1.0, float(combat_table.get("player_max_ap", stat_ap_max)))
+			)
+		)
+		append_battle_log("SYSTEM", UIIntermediary.text("ui.fe04.log.battle_start"))
 	_refresh_boss_bar()
 	_get_subpanels().refresh_boss_parts()
-
-	player_name = UIIntermediary.text("ui.fe04.player.name")
-	stat_hp_current = 100.0
-	stat_hp_max = 100.0
-	stat_mp_current = 50.0
-	stat_mp_max = 50.0
-	stat_ap_current = 10.0
-	stat_ap_max = 10.0
 	_refresh_player_status()
 	_refresh_skill_bar()
-
-	append_battle_log("COMBAT", UIIntermediary.text("ui.fe04.log.boss_awaken"))
-	append_battle_log("SYSTEM", UIIntermediary.text("ui.fe04.log.battle_start"))
-	append_battle_log("SKILL", UIIntermediary.text("ui.fe04.log.skill_cd", {"skill": UIIntermediary.text("ui.fe04.skill.SKILL_FIREBALL"), "seconds": "2.0"}))
-	append_battle_log("LOOT", UIIntermediary.text("ui.fe04.log.part_broken_loot"))
 
 	_floating_text_layer.visible = true
 	_settlement_panel.visible = false
@@ -233,7 +244,15 @@ func _on_skill_pressed(slot_number: int) -> void:
 		append_battle_log("SKILL", UIIntermediary.text("ui.fe04.log.skill_on_cd", {"skill": skill_name, "seconds": "%.1f" % cooldown_remaining}))
 		return
 	append_battle_log("SKILL", UIIntermediary.text("ui.fe04.log.skill_cast", {"skill": skill_name, "slot": slot_number}))
-	spawn_floating_damage(Vector2(640, 360), 128.0, false, false)
+	ServiceLocator.get_instance().combat().cast_skill_async(skill_id, "ACTIVE_BOSS", func(cast_reply: Dictionary) -> void:
+		var reply_table: Dictionary = cast_reply.get("data", cast_reply) as Dictionary
+		var hit_damage := float(reply_table.get("actual_damage", reply_table.get("damage", 0.0)))
+		var is_critical := bool(reply_table.get("is_crit", false))
+		if reply_table.has("boss_hp"):
+			boss_total_hp = float(reply_table.get("boss_hp", boss_total_hp))
+			_refresh_boss_bar()
+		spawn_floating_damage(Vector2(640, 360), hit_damage, is_critical, false)
+	)
 
 const MAX_FLOATING_TEXT_ENTRIES: int = 64
 const MAX_BATTLE_LOG_PARAGRAPHS: int = 200

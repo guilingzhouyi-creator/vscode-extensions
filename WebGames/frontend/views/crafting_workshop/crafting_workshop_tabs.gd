@@ -13,7 +13,6 @@ class_name CraftingWorkshopTabs
 extends BaseScreen
 
 const KButtonClass = preload("res://frontend/components/k_button.gd")
-const KRarityTag = preload("res://frontend/components/k_rarity_tag.gd")
 const KVirtualListClass = preload("res://frontend/components/k_virtual_list.gd")
 const KPageHeaderClass = preload("res://frontend/components/k_page_header.gd")
 
@@ -43,21 +42,21 @@ func _init_recipes_tab() -> void:
 		if material_label != null:
 			UIIntermediary.resolve(material_label, "ui.fe12.recipes.section_materials")
 
-	if _view._recipe_tab_bar.tab_count > 0:
-		_view._recipe_tab_bar.clear_tab(0)
+	if _view.recipe_tab_bar.tab_count > 0:
+		_view.recipe_tab_bar.clear_tabs()
 	for category_key in _view._recipe_categories:
-		_view._recipe_tab_bar.add_tab(UIIntermediary.text("ui.fe12.category." + str(category_key)))
-	_view._recipe_tab_bar.current_tab = 0
-	_view._recipe_current_category = 0
+		_view.recipe_tab_bar.add_tab(UIIntermediary.text("ui.fe12.category." + str(category_key)))
+	_view.recipe_tab_bar.current_tab = 0
+	_view.recipe_current_category = 0
 	_populate_recipe_grid()
 	_refresh_recipe_progress()
 
 ## 重建配方网格：按分类过滤复用网格细胞（零 queue_free 抖动与零重复信号绑定），重置选中并清详情
 func _populate_recipe_grid() -> void:
-	if _view == null or _view._recipe_grid == null:
+	if _view == null or _view.recipe_grid == null:
 		return
-	var grid: Container = _view._recipe_grid
-	var category: String = _view._recipe_categories[_view._recipe_current_category] if _view._recipe_current_category < _view._recipe_categories.size() else ""
+	var grid: Container = _view.recipe_grid
+	var category: String = _view._recipe_categories[_view.recipe_current_category] if _view.recipe_current_category < _view._recipe_categories.size() else ""
 	var active_cell_index: int = 0
 	for catalog_index in range(_view._recipe_catalog.size()):
 		var recipe: Dictionary = _view._recipe_catalog[catalog_index]
@@ -82,7 +81,7 @@ func _populate_recipe_grid() -> void:
 		active_cell_index += 1
 	for child_index in range(active_cell_index, grid.get_child_count()):
 		(grid.get_child(child_index) as Control).visible = false
-	_view._recipe_selected_index = -1
+	_view.recipe_selected_index = -1
 	_clear_recipe_detail()
 
 func _on_recipe_cell_meta_clicked(panel: PanelContainer) -> void:
@@ -167,51 +166,51 @@ func _make_centered_cell_label(text_value: String, font_size: int, font_color: C
 func _clear_recipe_detail() -> void:
 	if _view == null:
 		return
-	UIIntermediary.resolve(_view._label_recipe_name, "ui.fe12.recipes.select_prompt")
-	UIIntermediary.resolve(_view._label_recipe_rarity, "ui.fe12.recipes.rarity_none")
-	UIIntermediary.resolve(_view._label_recipe_status, "ui.fe12.recipes.status_none")
-	UIIntermediary.resolve(_view._label_recipe_unlock_condition, "ui.fe12.recipes.unlock_none")
-	_view._recipe_material_list.clear()
+	UIIntermediary.resolve(_view.label_recipe_name, "ui.fe12.recipes.select_prompt")
+	UIIntermediary.resolve(_view.label_recipe_rarity, "ui.fe12.recipes.rarity_none")
+	UIIntermediary.resolve(_view.label_recipe_status, "ui.fe12.recipes.status_none")
+	UIIntermediary.resolve(_view.label_recipe_unlock_condition, "ui.fe12.recipes.unlock_none")
+	_view.recipe_material_list.clear()
 
 ## 刷新配方详情：名称/稀有度/习得态/解锁条件/材料清单（越界重置空态）
 func _refresh_recipe_detail() -> void:
 	if _view == null:
 		return
-	if _view._recipe_selected_index < 0 or _view._recipe_selected_index >= _view._recipe_catalog.size():
+	if _view.recipe_selected_index < 0 or _view.recipe_selected_index >= _view._recipe_catalog.size():
 		_clear_recipe_detail()
 		return
-	var recipe: Dictionary = _view._recipe_catalog[_view._recipe_selected_index]
-	UIIntermediary.resolve(_view._label_recipe_name, str(recipe.get("name", "")))
-	UIIntermediary.resolve(_view._label_recipe_rarity, "ui.fe12.recipes.rarity", {"rarity": str(recipe.get("rarity", "--"))})
+	var recipe: Dictionary = _view._recipe_catalog[_view.recipe_selected_index]
+	UIIntermediary.resolve(_view.label_recipe_name, str(recipe.get("name", "")))
+	UIIntermediary.resolve(_view.label_recipe_rarity, "ui.fe12.recipes.rarity", {"rarity": str(recipe.get("rarity", "--"))})
 	var learned: bool = bool(recipe.get("learned", false))
 	var status_text: String = UIIntermediary.text("ui.fe12.recipes.status_learned") if learned else UIIntermediary.text("ui.fe12.recipes.status_not_learned")
-	UIIntermediary.resolve(_view._label_recipe_status, "ui.fe12.recipes.status", {"status": status_text})
+	UIIntermediary.resolve(_view.label_recipe_status, "ui.fe12.recipes.status", {"status": status_text})
 	var condition_raw: String = str(recipe.get("unlock_condition", "ui.fe12.recipes.unlock_default"))
-	UIIntermediary.resolve(_view._label_recipe_unlock_condition, "ui.fe12.recipes.unlock", {"condition": UIIntermediary.text(condition_raw)})
-	_view._recipe_material_list.clear()
+	UIIntermediary.resolve(_view.label_recipe_unlock_condition, "ui.fe12.recipes.unlock", {"condition": UIIntermediary.text(condition_raw)})
+	_view.recipe_material_list.clear()
 	for material_entry in recipe.get("materials", []):
-		UIIntermediary.resolve_item(_view._recipe_material_list, "ui.fe12.recipe.material", {
+		UIIntermediary.resolve_item(_view.recipe_material_list, "ui.fe12.recipe.material", {
 			"name": UIIntermediary.text(str(material_entry.get("name", ""))), "count": int(material_entry.get("qty", 0))
 		})
 
 ## 刷新图鉴习得进度（已习得/总数）
 func _refresh_recipe_progress() -> void:
-	if _view == null or _view._label_recipe_progress == null:
+	if _view == null or _view.label_recipe_progress == null:
 		return
 	var learned_count: int = 0
 	for recipe in _view._recipe_catalog:
 		if bool(recipe.get("learned", false)):
 			learned_count += 1
-	UIIntermediary.resolve(_view._label_recipe_progress, "ui.fe12.recipes.progress", {"learned": learned_count, "total": _view._recipe_catalog.size()})
+	UIIntermediary.resolve(_view.label_recipe_progress, "ui.fe12.recipes.progress", {"learned": learned_count, "total": _view._recipe_catalog.size()})
 
 func _on_recipe_cell_selected(catalog_index: int) -> void:
 	if _view != null:
-		_view._recipe_selected_index = catalog_index
+		_view.recipe_selected_index = catalog_index
 	_refresh_recipe_detail()
 
 func _on_recipe_category_changed(tab_index: int) -> void:
 	if _view != null:
-		_view._recipe_current_category = tab_index
+		_view.recipe_current_category = tab_index
 	_populate_recipe_grid()
 
 # ==============================================================================
@@ -227,44 +226,44 @@ func _init_materials_tab() -> void:
 		var section_label: Label = materials_tab.get_node_or_null("SectionLabel")
 		if section_label != null:
 			UIIntermediary.resolve(section_label, "ui.fe12.materials.section")
-	var active_count: int = _view._material_categories.size()
+	var active_count: int = _view.material_categories.size()
 	for category_index in range(active_count):
 		var category_button: Button = _acquire_material_category_button(category_index)
 		category_button.visible = true
-		category_button.text = UIIntermediary.text("ui.fe12.mat_category." + str(_view._material_categories[category_index]))
-	for extra_index in range(active_count, _view._material_category_box.get_child_count()):
-		_view._material_category_box.get_child(extra_index).visible = false
-	_view._material_current_category = 0
+		category_button.text = UIIntermediary.text("ui.fe12.mat_category." + str(_view.material_categories[category_index]))
+	for extra_index in range(active_count, _view.material_category_box.get_child_count()):
+		_view.material_category_box.get_child(extra_index).visible = false
+	_view.material_current_category = 0
 	_refresh_material_category_buttons()
 	_populate_material_grid()
 	_clear_material_detail()
 
 ## 获取或创建材料分类按钮（池化复用，绑定按索引触发，避免循环内瞬态分配）
 func _acquire_material_category_button(category_index: int) -> Button:
-	if category_index < _view._material_category_box.get_child_count():
-		return _view._material_category_box.get_child(category_index) as Button
+	if category_index < _view.material_category_box.get_child_count():
+		return _view.material_category_box.get_child(category_index) as Button
 	var category_button := KButtonClass.new()
 	category_button.variant = KButtonClass.StyleVariant.SECONDARY
 	category_button.toggle_mode = true
 	category_button.custom_minimum_size = Vector2(72, 0)
 	connect_managed(category_button.pressed, func(): _on_material_category_pressed(category_index))
-	_view._material_category_box.add_child(category_button)
+	_view.material_category_box.add_child(category_button)
 	return category_button
 
 ## 刷新分类按钮选中态（唯一高亮当前分类）
 func _refresh_material_category_buttons() -> void:
-	if _view == null or _view._material_category_box == null:
+	if _view == null or _view.material_category_box == null:
 		return
-	for button_index in _view._material_category_box.get_child_count():
-		var category_button: Button = _view._material_category_box.get_child(button_index)
-		category_button.button_pressed = (button_index == _view._material_current_category)
+	for button_index in _view.material_category_box.get_child_count():
+		var category_button: Button = _view.material_category_box.get_child(button_index)
+		category_button.button_pressed = (button_index == _view.material_current_category)
 
 ## 重建材料网格：按分类过滤复用网格细胞（零 queue_free 抖动与零重复信号绑定），重置选中并清详情
 func _populate_material_grid() -> void:
-	if _view == null or _view._material_grid == null:
+	if _view == null or _view.material_grid == null:
 		return
-	var grid: Container = _view._material_grid
-	var category: String = _view._material_categories[_view._material_current_category] if _view._material_current_category < _view._material_categories.size() else ""
+	var grid: Container = _view.material_grid
+	var category: String = _view.material_categories[_view.material_current_category] if _view.material_current_category < _view.material_categories.size() else ""
 	var active_cell_index: int = 0
 	for material_index in range(_view._materials.size()):
 		var material_entry: Dictionary = _view._materials[material_index]
@@ -286,41 +285,41 @@ func _populate_material_grid() -> void:
 		active_cell_index += 1
 	for child_index in range(active_cell_index, grid.get_child_count()):
 		(grid.get_child(child_index) as Control).visible = false
-	_view._material_selected_index = -1
+	_view.material_selected_index = -1
 	_clear_material_detail()
 
 ## 清空材料详情为空态
 func _clear_material_detail() -> void:
 	if _view == null:
 		return
-	UIIntermediary.resolve(_view._label_material_name, "ui.fe12.materials.select_prompt")
-	UIIntermediary.resolve(_view._label_material_rarity, "ui.fe12.materials.rarity_none")
-	UIIntermediary.resolve(_view._label_material_quantity, "ui.fe12.materials.quantity_none")
-	UIIntermediary.resolve(_view._label_material_description, "ui.fe12.materials.desc_none")
-	UIIntermediary.resolve(_view._label_material_source, "ui.fe12.materials.source_none")
+	UIIntermediary.resolve(_view.label_material_name, "ui.fe12.materials.select_prompt")
+	UIIntermediary.resolve(_view.label_material_rarity, "ui.fe12.materials.rarity_none")
+	UIIntermediary.resolve(_view.label_material_quantity, "ui.fe12.materials.quantity_none")
+	UIIntermediary.resolve(_view.label_material_description, "ui.fe12.materials.desc_none")
+	UIIntermediary.resolve(_view.label_material_source, "ui.fe12.materials.source_none")
 
 ## 刷新材料详情：名称/稀有度/数量/描述/获取途径（越界重置空态）
 func _refresh_material_detail() -> void:
 	if _view == null:
 		return
-	if _view._material_selected_index < 0 or _view._material_selected_index >= _view._materials.size():
+	if _view.material_selected_index < 0 or _view.material_selected_index >= _view._materials.size():
 		_clear_material_detail()
 		return
-	var material_entry: Dictionary = _view._materials[_view._material_selected_index]
-	UIIntermediary.resolve(_view._label_material_name, str(material_entry.get("name", "")))
-	UIIntermediary.resolve(_view._label_material_rarity, "ui.fe12.materials.rarity", {"rarity": str(material_entry.get("rarity", "--"))})
-	UIIntermediary.resolve(_view._label_material_quantity, "ui.fe12.materials.quantity", {"count": int(material_entry.get("qty", 0))})
-	UIIntermediary.resolve(_view._label_material_description, "ui.fe12.materials.desc", {"desc": UIIntermediary.text(str(material_entry.get("desc", "--")))})
-	UIIntermediary.resolve(_view._label_material_source, "ui.fe12.materials.source", {"source": UIIntermediary.text(str(material_entry.get("source", "--")))})
+	var material_entry: Dictionary = _view._materials[_view.material_selected_index]
+	UIIntermediary.resolve(_view.label_material_name, str(material_entry.get("name", "")))
+	UIIntermediary.resolve(_view.label_material_rarity, "ui.fe12.materials.rarity", {"rarity": str(material_entry.get("rarity", "--"))})
+	UIIntermediary.resolve(_view.label_material_quantity, "ui.fe12.materials.quantity", {"count": int(material_entry.get("qty", 0))})
+	UIIntermediary.resolve(_view.label_material_description, "ui.fe12.materials.desc", {"desc": UIIntermediary.text(str(material_entry.get("desc", "--")))})
+	UIIntermediary.resolve(_view.label_material_source, "ui.fe12.materials.source", {"source": UIIntermediary.text(str(material_entry.get("source", "--")))})
 
 func _on_material_cell_selected(list_index: int) -> void:
 	if _view != null:
-		_view._material_selected_index = list_index
+		_view.material_selected_index = list_index
 	_refresh_material_detail()
 
 func _on_material_category_pressed(category_index: int) -> void:
 	if _view != null:
-		_view._material_current_category = category_index
+		_view.material_current_category = category_index
 	_refresh_material_category_buttons()
 	_populate_material_grid()
 
@@ -332,7 +331,7 @@ func _on_material_category_pressed(category_index: int) -> void:
 func _connect_signals() -> void:
 	if _view == null:
 		return
-	connect_managed(_view._recipe_tab_bar.tab_changed, _on_recipe_category_changed)
+	connect_managed(_view.recipe_tab_bar.tab_changed, _on_recipe_category_changed)
 
 ## 稀有度字符串 → KRarityTag 整数等级
 func _rarity_str_to_level(rarity: String) -> int:
@@ -353,6 +352,9 @@ func init_recipe_virtual_list(container: Control = null) -> KVirtualList:
 		connect_managed(recipe_virtual_list.range_changed, _on_recipe_range_changed)
 		if container != null:
 			container.add_child(recipe_virtual_list)
+		else:
+			recipe_virtual_list.visible = false
+			add_child(recipe_virtual_list)
 	return recipe_virtual_list
 
 ## 刷新配方虚拟列表总数
@@ -374,15 +376,27 @@ func _on_recipe_range_changed(start_index: int, end_index: int) -> void:
 				typed_row.bound_key = str(recipe.get("recipe_id", ""))
 				typed_row.bound_data = recipe
 
+## 获取默认材料库存条目（供视图初始化与离线演示使用）
+func get_default_materials() -> Array:
+	return [
+		{"name": "ui.fe12.mock.material.iron_ore", "rarity": "COMMON", "category": "ore", "qty": 12, "desc": "ui.fe12.mock.material.iron_ore", "source": "ui.fe12.mat_category.ore"},
+		{"name": "ui.fe12.mock.material.mithril_ingot", "rarity": "RARE", "category": "ore", "qty": 5, "desc": "ui.fe12.mock.material.mithril_ingot", "source": "ui.fe12.mat_category.ore"},
+		{"name": "ui.fe12.mock.material.leather", "rarity": "COMMON", "category": "leather", "qty": 8, "desc": "ui.fe12.mock.material.leather", "source": "ui.fe12.mat_category.leather"},
+		{"name": "ui.fe12.mock.material.thread", "rarity": "COMMON", "category": "leather", "qty": 10, "desc": "ui.fe12.mock.material.thread", "source": "ui.fe12.mat_category.leather"},
+		{"name": "ui.fe12.mock.material.wood", "rarity": "COMMON", "category": "herb", "qty": 9, "desc": "ui.fe12.mock.material.wood", "source": "ui.fe12.mat_category.herb"},
+		{"name": "ui.fe12.mock.material.mana_shard", "rarity": "EPIC", "category": "gem", "qty": 6, "desc": "ui.fe12.mock.material.mana_shard", "source": "ui.fe12.mat_category.gem"},
+		{"name": "ui.fe12.mock.material.dragon_scale", "rarity": "LEGENDARY", "category": "relic", "qty": 4, "desc": "ui.fe12.mock.material.dragon_scale", "source": "ui.fe12.mat_category.relic"},
+	]
+
 ## 获取当前分类过滤配方
 func _get_filtered_recipes() -> Array:
 	if _view == null:
 		return []
-	var current_category: String = _view._recipe_categories[_view._recipe_current_category]
+	var current_category: String = _view._recipe_categories[_view.recipe_current_category]
 	if current_category == "all":
-		return _view._recipe_book
+		return _view._recipe_catalog
 	var filtered_recipes := []
-	for recipe_entry in _view._recipe_book:
+	for recipe_entry in _view._recipe_catalog:
 		if recipe_entry.get("category", "") == current_category:
 			filtered_recipes.append(recipe_entry)
 	return filtered_recipes

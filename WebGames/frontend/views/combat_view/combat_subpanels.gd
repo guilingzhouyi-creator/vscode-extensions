@@ -33,7 +33,7 @@ func init_text() -> void:
 	var view: CombatView = _view
 	var bindings := [
 		[view.get_node_or_null("BattleLogPanel/VBox/BattleLogTitle"), "ui.fe04.battle_log.title"],
-		[view._battle_scene_label, "ui.fe04.battle_scene.placeholder"],
+		[view.battle_scene_label, "ui.fe04.battle_scene.placeholder"],
 		[view.get_node_or_null("BossPartsPanel/VBox/PartsTitleLabel"), "ui.fe04.boss.parts_hp_title"],
 		[view.get_node_or_null("SettlementPanel/VBox/RewardsTitle"), "ui.fe04.settlement.rewards_title"],
 		[view._settlement_back_button, "ui.fe04.settlement.back"],
@@ -47,15 +47,15 @@ func init_text() -> void:
 ## 按当前首领多部位快照刷新部位血条列表
 func refresh_boss_parts() -> void:
 	var view: CombatView = _view
-	if view._boss_parts_name_label != null:
-		view._boss_parts_name_label.text = UIIntermediary.text("ui.fe04.boss.parts_label", {"name": view.boss_name})
-	if view._boss_parts_total_bar != null:
-		KStatusBarClass.refresh_bar(view._boss_parts_total_bar, null, view.boss_total_hp, view.boss_max_hp)
+	if view.boss_parts_name_label != null:
+		view.boss_parts_name_label.text = UIIntermediary.text("ui.fe04.boss.parts_label", {"name": view.boss_name})
+	if view.boss_parts_total_bar != null:
+		KStatusBarClass.refresh_bar(view.boss_parts_total_bar, null, view.boss_total_hp, view.boss_max_hp)
 
-	if not view._boss_parts_list:
+	if not view.boss_parts_list:
 		return
 
-	var existing_children: Array = view._boss_parts_list.get_children()
+	var existing_children: Array = view.boss_parts_list.get_children()
 	var parts_count: int = view.boss_parts.size()
 
 	for part_index in range(parts_count):
@@ -71,7 +71,7 @@ func refresh_boss_parts() -> void:
 			part_row.visible = true
 		else:
 			part_row = _create_boss_part_row()
-			view._boss_parts_list.add_child(part_row)
+			view.boss_parts_list.add_child(part_row)
 
 		_update_boss_part_row(part_row, part_name, part_health, part_max_health, is_broken)
 
@@ -132,23 +132,23 @@ func _on_boss_part_gui_input(event: InputEvent, part_row: HBoxContainer) -> void
 ## 展示指定首领部位的破坏详情弹窗
 func show_part_break_detail(part_name: String, is_broken: bool) -> void:
 	var view: CombatView = _view
-	if view._part_break_name_label != null:
-		view._part_break_name_label.text = part_name
+	if view.part_break_name_label != null:
+		view.part_break_name_label.text = part_name
 	var status_text: String = UIIntermediary.text("ui.fe04.part_break.status_broken") if is_broken else UIIntermediary.text("ui.fe04.part_break.status_intact")
-	if view._part_break_status_label != null:
-		UIIntermediary.resolve(view._part_break_status_label, "ui.fe04.part_break.status", {"status": status_text})
-		view._part_break_status_label.add_theme_color_override("font_color",
+	if view.part_break_status_label != null:
+		UIIntermediary.resolve(view.part_break_status_label, "ui.fe04.part_break.status", {"status": status_text})
+		view.part_break_status_label.add_theme_color_override("font_color",
 			DesignTokens.COLOR_DANGER_DEFAULT if is_broken else DesignTokens.COLOR_SUCCESS_DEFAULT)
 	if is_broken:
-		if view._part_break_effect_label != null:
-			UIIntermediary.resolve(view._part_break_effect_label, "ui.fe04.part_break.effect_broken")
-		if view._part_break_weakness_label != null:
-			UIIntermediary.resolve(view._part_break_weakness_label, "ui.fe04.part_break.weakness_none")
+		if view.part_break_effect_label != null:
+			UIIntermediary.resolve(view.part_break_effect_label, "ui.fe04.part_break.effect_broken")
+		if view.part_break_weakness_label != null:
+			UIIntermediary.resolve(view.part_break_weakness_label, "ui.fe04.part_break.weakness_none")
 	else:
-		if view._part_break_effect_label != null:
-			UIIntermediary.resolve(view._part_break_effect_label, "ui.fe04.part_break.effect_intact")
-		if view._part_break_weakness_label != null:
-			UIIntermediary.resolve(view._part_break_weakness_label, "ui.fe04.part_break.weakness_slash")
+		if view.part_break_effect_label != null:
+			UIIntermediary.resolve(view.part_break_effect_label, "ui.fe04.part_break.effect_intact")
+		if view.part_break_weakness_label != null:
+			UIIntermediary.resolve(view.part_break_weakness_label, "ui.fe04.part_break.weakness_slash")
 	if view._part_break_panel != null:
 		view._part_break_panel.visible = true
 
@@ -161,22 +161,22 @@ func hide_part_break_detail() -> void:
 func show_settlement() -> void:
 	var view: CombatView = _view
 	if view.is_victory:
-		UIIntermediary.resolve(view._settlement_result_label, "ui.fe04.settlement.victory")
+		UIIntermediary.resolve(view.settlement_result_label, "ui.fe04.settlement.victory")
 	else:
-		UIIntermediary.resolve(view._settlement_result_label, "ui.fe04.settlement.defeat")
-	view._settlement_result_label.add_theme_color_override("font_color",
+		UIIntermediary.resolve(view.settlement_result_label, "ui.fe04.settlement.defeat")
+	view.settlement_result_label.add_theme_color_override("font_color",
 		DesignTokens.COLOR_WARNING_DEFAULT if view.is_victory else DesignTokens.COLOR_DANGER_DEFAULT)
-	UIIntermediary.resolve(view._settlement_gold_label, "ui.fe04.settlement.gold", {"gold": view.reward_gold})
-	UIIntermediary.resolve(view._settlement_exp_label, "ui.fe04.settlement.exp", {"exp": view.reward_exp})
+	UIIntermediary.resolve(view.settlement_gold_label, "ui.fe04.settlement.gold", {"gold": view.reward_gold})
+	UIIntermediary.resolve(view.settlement_exp_label, "ui.fe04.settlement.exp", {"exp": view.reward_exp})
 	if view.reward_items.is_empty():
-		UIIntermediary.resolve(view._settlement_items_label, "ui.fe04.settlement.items_empty")
+		UIIntermediary.resolve(view.settlement_items_label, "ui.fe04.settlement.items_empty")
 	else:
-		UIIntermediary.resolve(view._settlement_items_label, "ui.fe04.settlement.items", {"items": ", ".join(view.reward_items)})
+		UIIntermediary.resolve(view.settlement_items_label, "ui.fe04.settlement.items", {"items": ", ".join(view.reward_items)})
 	if view.mvp_player_name.is_empty():
-		UIIntermediary.resolve(view._settlement_mvp_label, "ui.fe04.settlement.mvp_empty")
+		UIIntermediary.resolve(view.settlement_mvp_label, "ui.fe04.settlement.mvp_empty")
 	else:
-		UIIntermediary.resolve(view._settlement_mvp_label, "ui.fe04.settlement.mvp", {"name": view.mvp_player_name})
-	UIIntermediary.resolve(view._settlement_time_label, "ui.fe04.settlement.time", {"duration": view.battle_duration_sec})
+		UIIntermediary.resolve(view.settlement_mvp_label, "ui.fe04.settlement.mvp", {"name": view.mvp_player_name})
+	UIIntermediary.resolve(view.settlement_time_label, "ui.fe04.settlement.time", {"duration": view.battle_duration_sec})
 	view._settlement_panel.visible = true
 
 ## 隐藏战斗结算面板
@@ -190,7 +190,7 @@ func spawn_floating_label(floating_entry: CombatFloatingTextDTO) -> void:
 	if not view._floating_text_layer:
 		return
 	var floating_label := _acquire_floating_label(view._floating_text_layer)
-	var previous_tween: Variant = floating_label.get_meta("_active_tween", null)
+	var previous_tween: Variant = floating_label.get_meta("_active_tween", null) if floating_label.has_meta("_active_tween") else null
 	if previous_tween is Tween and (previous_tween as Tween).is_valid():
 		(previous_tween as Tween).kill()
 

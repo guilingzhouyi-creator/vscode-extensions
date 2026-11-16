@@ -13,7 +13,6 @@
 class_name CutscenePlayerView
 extends BaseScreen
 
-const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
 const KStatusBarClass = preload("res://frontend/components/k_status_bar.gd")
 
 const THEME_FONT_SIZE: String = "font_size"

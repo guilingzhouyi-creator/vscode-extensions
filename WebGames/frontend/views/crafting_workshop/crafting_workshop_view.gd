@@ -13,8 +13,6 @@ class_name CraftingWorkshopView
 extends BaseScreen
 
 const KButtonClass = preload("res://frontend/components/k_button.gd")
-const KRarityTag = preload("res://frontend/components/k_rarity_tag.gd")
-const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
 const CraftingWorkshopTabsClass = preload("res://frontend/views/crafting_workshop/crafting_workshop_tabs.gd")
 
 const CATEGORY_WEAPON: String = "weapon"
@@ -37,8 +35,8 @@ var _forge_selected_index: int = -1
 # 配方图鉴快照
 var _recipe_categories: Array = ["weapon", "armor", "accessory", "consumable", "material"]
 var _recipe_catalog: Array = []
-var _recipe_current_category: int = 0
-var _recipe_selected_index: int = -1
+var recipe_current_category: int = 0
+var recipe_selected_index: int = -1
 
 # 分解快照
 var selected_salvage_item: Dictionary = {}
@@ -48,10 +46,10 @@ var _dismantle_selected_index: int = -1
 var _dismantle_history: Array = []
 
 # 材料仓库快照
-var _material_categories: Array = ["ore", "herb", "leather", "wood", "crystal", "misc"]
+var material_categories: Array = ["ore", "herb", "leather", "wood", "crystal", "misc"]
 var _materials: Array = []
-var _material_current_category: int = 0
-var _material_selected_index: int = -1
+var material_current_category: int = 0
+var material_selected_index: int = -1
 
 # 子面板委托控制器
 var _tabs: Variant = null
@@ -78,14 +76,14 @@ var _tabs: Variant = null
 @onready var _forge_craft_button: Button = %BtnForgeCraft
 
 # --- Tab 2: 配方图鉴 (RECIPES) ---
-@onready var _label_recipe_progress: Label = %LabelRecipeProgress
-@onready var _recipe_tab_bar: TabBar = %RecipeTabBar
-@onready var _recipe_grid: GridContainer = %RecipeGrid
-@onready var _label_recipe_name: Label = %LabelRecipeName
-@onready var _label_recipe_rarity: Label = %LabelRecipeRarity
-@onready var _label_recipe_status: Label = %LabelRecipeStatus
-@onready var _label_recipe_unlock_condition: Label = %LabelRecipeUnlockCondition
-@onready var _recipe_material_list: ItemList = %RecipeMaterialList
+@onready var label_recipe_progress: Label = %LabelRecipeProgress
+@onready var recipe_tab_bar: TabBar = %RecipeTabBar
+@onready var recipe_grid: GridContainer = %RecipeGrid
+@onready var label_recipe_name: Label = %LabelRecipeName
+@onready var label_recipe_rarity: Label = %LabelRecipeRarity
+@onready var label_recipe_status: Label = %LabelRecipeStatus
+@onready var label_recipe_unlock_condition: Label = %LabelRecipeUnlockCondition
+@onready var recipe_material_list: ItemList = %RecipeMaterialList
 
 # --- Tab 3: 分解 (DISMANTLE) ---
 @onready var _option_dismantle_filter: OptionButton = %OptionDismantleFilter
@@ -97,13 +95,13 @@ var _tabs: Variant = null
 @onready var _dismantle_history_list: ItemList = %DismantleHistoryList
 
 # --- Tab 4: 材料仓库 (MATERIALS) ---
-@onready var _material_category_box: HBoxContainer = %MaterialCategoryHBox
-@onready var _material_grid: GridContainer = %MaterialGrid
-@onready var _label_material_name: Label = %LabelMaterialName
-@onready var _label_material_rarity: Label = %LabelMaterialRarity
-@onready var _label_material_quantity: Label = %LabelMaterialQuantity
-@onready var _label_material_description: Label = %LabelMaterialDescription
-@onready var _label_material_source: Label = %LabelMaterialSource
+@onready var material_category_box: HBoxContainer = %MaterialCategoryHBox
+@onready var material_grid: GridContainer = %MaterialGrid
+@onready var label_material_name: Label = %LabelMaterialName
+@onready var label_material_rarity: Label = %LabelMaterialRarity
+@onready var label_material_quantity: Label = %LabelMaterialQuantity
+@onready var label_material_description: Label = %LabelMaterialDescription
+@onready var label_material_source: Label = %LabelMaterialSource
 
 # ==============================================================================
 # 子面板委托与初始化
@@ -300,6 +298,14 @@ func _on_forge_craft_pressed() -> void:
 	if selected_forge_item.is_empty() or not bool(selected_forge_item.get("learned", false)):
 		return
 	var craft_quantity: int = int(_spin_forge_quantity.value)
+	var craft_reply := ServiceLocator.get_instance().crafting().dispatch_crafting_action("CRAFT_RECIPE", {
+		"recipe_id": str(selected_forge_item.get("id", "")),
+		"target_level": enhancement_target_level,
+		"quantity": craft_quantity,
+	})
+	if not bool(craft_reply.get("success", true)):
+		NavManager.get_instance().show_toast(str(craft_reply.get("message", "ui.fe12.forge.craft_success")), NavTypes.ToastLevel.WARNING)
+		return
 	var crafted_text: String = UIIntermediary.resolve(_label_forge_result, "ui.fe12.forge.craft_success", {
 		"name": UIIntermediary.text(str(selected_forge_item.get("name", ""))),
 		"level": enhancement_target_level,
@@ -390,6 +396,11 @@ func _on_dismantle_confirm_pressed() -> void:
 		)
 		return
 	var dismantle_quantity: int = int(_spin_dismantle_quantity.value)
+	ServiceLocator.get_instance().crafting().dispatch_crafting_action("DISMANTLE_ITEM", {
+		"item_id": str(selected_salvage_item.get("id", selected_salvage_item.get("item_id", ""))),
+		"quantity": dismantle_quantity,
+		"refund_gold": dismantle_quantity * 25,
+	})
 	var item_name: String = UIIntermediary.text(str(selected_salvage_item.get("name", "")))
 	_dismantle_history.append({"name": item_name, "qty": dismantle_quantity, "time": UIIntermediary.text("ui.fe12.dismantle.just_now")})
 	_dismantle_history_list.clear()
@@ -422,8 +433,11 @@ func _get_filtered_dismantle_items() -> Array:
 # 导航与信号响应
 # ==============================================================================
 
-func _on_tab_changed(_tab_index: int) -> void:
-	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe12.toast.tab_switched"), NavTypes.ToastLevel.INFO, 1.0)
+func _on_tab_changed(tab_index: int) -> void:
+	if tab_index == 0:
+		_refresh_forge_detail()
+	elif tab_index == 3:
+		_refresh_dismantle_detail()
 
 func _on_back_pressed() -> void:
 	self.back()
