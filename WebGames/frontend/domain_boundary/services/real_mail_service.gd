@@ -26,7 +26,8 @@ func _clone_and_process_mail(raw_entry: Variant, mode: String, filter_set: Dicti
 		return {"skip": false, "changed": marked_now, "entry": entry_copy}
 	if mode == "claim":
 		var should_claim: bool = filter_set.is_empty() or filter_set.has(entry_id)
-		var attachments: Array = entry_copy.get("attachments", []) as Array
+		var attachments_value: Variant = entry_copy.get("attachment_keys", entry_copy.get("attachments", []))
+		var attachments: Array = attachments_value as Array if attachments_value is Array else []
 		var has_attach: bool = bool(entry_copy.get("has_attachment", false)) or not attachments.is_empty()
 		var already_claimed: bool = bool(entry_copy.get("is_claimed", entry_copy.get("claimed", false)))
 		if should_claim and has_attach and not already_claimed:
@@ -76,9 +77,16 @@ func claim_all(mails: Array) -> Dictionary:
 ## 签收单封指定邮件附件并同步置为已读
 func claim_one(mails: Array, mail_id: String) -> Dictionary:
 	var outcome: Dictionary = _transform_mails(mails, "claim", {mail_id: true})
+	var claimed_count := int(outcome.get("changed_count", 0))
+	if claimed_count > 0:
+		RealProtocolBridge.dispatch_flat("mail", "CLAIM_MAIL", {"mail_id": mail_id, "bonus_gold": 100})
 	return {
-		"success": int(outcome.get("changed_count", 0)) > 0,
+		"success": claimed_count > 0,
 		"mails": outcome.get("mails", []) as Array,
 		"mail_id": mail_id,
-		"claimed_count": int(outcome.get("changed_count", 0)),
+		"claimed_count": claimed_count,
 	}
+
+## 分发发信、存草稿等后端邮箱协议动作
+func dispatch_mail_action(action_type: String, payload_data: Dictionary = {}) -> Dictionary:
+	return RealProtocolBridge.dispatch_flat("mail", action_type, payload_data)

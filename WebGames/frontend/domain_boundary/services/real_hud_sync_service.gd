@@ -11,9 +11,6 @@
 class_name RealHudSyncService
 extends "res://frontend/domain_boundary/interfaces/i_hud_sync_service.gd"
 
-const RealProtocolBridge = preload("res://frontend/domain_boundary/services/real_protocol_bridge.gd")
-const AuthoritativeHudSyncService = preload("res://backend/domains/world_state/services/authoritative_hud_sync_service.gd")
-
 ## 异步向后端拉取当前活跃角色的权威 HUD 快照
 func pull_authoritative_snapshot_async(account_id: String, token: String, character_id: String, result_callback: Callable) -> void:
 	RealProtocolBridge.dispatch_and_reply("world_state", "PULL_HUD_SNAPSHOT", {}, account_id, token, result_callback, "data", {}, character_id)

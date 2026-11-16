@@ -11,8 +11,6 @@
 class_name RealVersionService
 extends "res://frontend/domain_boundary/interfaces/i_version_service.gd"
 
-const VersionActivationGate = preload("res://backend/domains/version_governance/version_activation_gate.gd")
-
 ## 异步检查客户端版本与发布通道状态
 func check_version_async(result_callback: Callable) -> void:
 	var manifest_releases: Dictionary = GameConfig.get_dict("infrastructure.version_manifest", "releases", {})

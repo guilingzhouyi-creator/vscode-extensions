@@ -58,3 +58,7 @@ func get_name_type_fee(type_index: int) -> int:
 	if type_index >= 0 and type_index < configured_fees.size():
 		return maxi(0, int(configured_fees[type_index]))
 	return maxi(0, int(configured_fees[0])) if not configured_fees.is_empty() else 100
+
+## 分发核名、更名、伪装、拾取与突变协议动作至后端域处理器
+func dispatch_misc_action(action_type: String, payload_data: Dictionary = {}) -> Dictionary:
+	return RealProtocolBridge.dispatch_flat("misc_edge", action_type, payload_data)

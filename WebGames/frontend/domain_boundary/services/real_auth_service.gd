@@ -13,12 +13,6 @@
 class_name RealAuthService
 extends IAuthService
 
-const AccountSlotCreationDTO = preload("res://backend/domains/account/dto/account_slot_creation_dto.gd")
-const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
-const AccountSlotBindingSolver = preload("res://backend/domains/account/account_slot_binding_solver.gd")
-const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
-const RealProtocolBridge = preload("res://frontend/domain_boundary/services/real_protocol_bridge.gd")
-
 const ERROR_CODE_I18N_MAP: Dictionary = {
     "ERR_INVALID_CREDENTIALS": "ui.fe01.login.error_invalid",
     "ERR_INVALID_USERNAME_LENGTH": "ui.fe01.register.error_short",
@@ -136,15 +130,17 @@ func get_servers_async(result_callback: Callable) -> void:
             "servers": servers.duplicate(true)
         })
 
-## 获取指定账号的角色槽位列表
+## 获取指定账号的角色槽位列表（优先经统一协议检索）
 func get_characters_async(account_id: String, result_callback: Callable) -> void:
-    var repository := AccountRepository.get_instance()
-    if not repository.is_loaded():
-        repository.load_all()
-    var account_profile: AccountProfile = repository.find_by_id(account_id)
-    var slots: Array = []
-    if account_profile != null:
-        slots = AccountSlotBindingSolver.to_frontend_character_slots(account_profile)
+    var protocol_outcome := RealProtocolBridge.dispatch_flat("account", "LIST_CHARACTERS", {"account_id": account_id})
+    var slots: Array = protocol_outcome.get("characters", []) if protocol_outcome.get("characters") is Array else []
+    if not bool(protocol_outcome.get("success", false)):
+        var repository := AccountRepository.get_instance()
+        if not repository.is_loaded():
+            repository.load_all()
+        var account_profile: AccountProfile = repository.find_by_id(account_id)
+        if account_profile != null:
+            slots = AccountSlotBindingSolver.to_frontend_character_slots(account_profile)
 
     if result_callback.is_valid():
         result_callback.call({

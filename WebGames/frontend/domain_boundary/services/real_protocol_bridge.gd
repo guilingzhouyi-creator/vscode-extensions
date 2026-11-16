@@ -11,11 +11,6 @@
 class_name RealProtocolBridge
 extends RefCounted
 
-const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
-const UnifiedProtocolDispatcher = preload("res://backend/domains/world_state/services/unified_protocol_dispatcher.gd")
-const UnifiedResponseEnvelopeDTO = preload("res://backend/domains/world_state/dto/unified_response_envelope_dto.gd")
-const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
-
 ## 构造人类 UI 请求信封并分发至后端统一协议调度器
 static func dispatch_human(
 	domain: String,
@@ -95,3 +90,14 @@ static func reply_callback(
 		"message": message_text,
 		result_key: output_value
 	})
+
+## 同步分发协议并返回扁平化结果字典（保留响应 data 的顶层字段及 success/error_code）
+static func dispatch_flat(domain: String, action_type: String, request_payload: Dictionary = {}) -> Dictionary:
+	var service_response := dispatch_human(domain, action_type, request_payload, "", "", "")
+	if service_response == null:
+		return {"success": false, "error_code": "ERR_PROTOCOL_NULL_RESPONSE"}
+	var flattened: Dictionary = service_response.data.duplicate(true) if service_response.data is Dictionary else {}
+	flattened["success"] = service_response.success
+	flattened["error_code"] = str(service_response.error_code)
+	flattened["message"] = str(service_response.error_message)
+	return flattened

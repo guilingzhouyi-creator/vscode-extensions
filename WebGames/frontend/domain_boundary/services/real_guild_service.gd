@@ -11,9 +11,6 @@
 class_name RealGuildService
 extends "res://frontend/domain_boundary/interfaces/i_guild_service.gd"
 
-const OrganizationAggregate = preload("res://backend/domains/organization_guild/organization_aggregate.gd")
-const OrganizationGovernanceSolver = preload("res://backend/domains/organization_guild/organization_governance_solver.gd")
-
 func _map_role_token(role_label: String) -> OrganizationAggregate.GuildRole:
 	var normalized_role: String = role_label.strip_edges().to_upper()
 	if normalized_role in ["LEADER", "GUILD_MASTER", "MASTER"]:
@@ -69,3 +66,7 @@ func trade_transition(trade_state: Dictionary, trade_action: String) -> Dictiona
 			return {"success": true, "locked": false, "confirmed": false}
 		_:
 			return {"success": false, "locked": is_locked, "confirmed": is_confirmed, "error_code": "UNKNOWN_TRADE_ACTION"}
+
+## 分发公会管理、好友互动、聊天与交易协议动作至后端域处理器
+func dispatch_guild_action(action_type: String, payload_data: Dictionary = {}) -> Dictionary:
+	return RealProtocolBridge.dispatch_flat("guild", action_type, payload_data)

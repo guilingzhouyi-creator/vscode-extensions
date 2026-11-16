@@ -8,8 +8,6 @@
 class_name RealGameSettingsService
 extends "res://frontend/domain_boundary/interfaces/i_game_settings_service.gd"
 
-const RealProtocolBridge = preload("res://frontend/domain_boundary/services/real_protocol_bridge.gd")
-
 ## 异步拉取权威游戏设置快照
 func get_settings_async(account_id: String, token: String, result_callback: Callable) -> void:
 	RealProtocolBridge.dispatch_and_reply(

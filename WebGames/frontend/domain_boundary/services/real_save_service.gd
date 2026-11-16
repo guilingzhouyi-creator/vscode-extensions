@@ -57,3 +57,7 @@ func clear_slot(slot_record: Dictionary) -> Dictionary:
 	cleared_record["playtime"] = ""
 	cleared_record["location"] = ""
 	return cleared_record
+
+## 分发存档写入、导出、云同步与兑换码核销协议动作
+func dispatch_save_action(action_type: String, payload_data: Dictionary = {}) -> Dictionary:
+	return RealProtocolBridge.dispatch_flat("system_save", action_type, payload_data)

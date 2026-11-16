@@ -2,20 +2,20 @@
 # 模块归属: 前端领域边界层 (Frontend · Domain Boundary Services)
 # 文件路径: res://frontend/domain_boundary/services/real_grimoire_service.gd
 # 架构定位: Domain Boundary Adapter / Real Grimoire Authoring Service Bridge
-# 依赖与触发: 上游: GrimoireAuthoringView, ServiceContainer, ServiceLocator | 下游: GrimoireAuthoringPipeline, GameConfig
-# 职责说明: 实现 IGrimoireService 接口，依据典籍手稿默认定价与版税配置估算著书收益及汇总分润。
+# 依赖与触发: 上游: GrimoireAuthoringView, ServiceContainer, ServiceLocator | 下游: RealProtocolBridge, GameConfig
+# 职责说明: 实现 IGrimoireService 接口，依据典籍手稿默认定价与 3 档版税模式估算收益并经统一协议持久化出版/领款动作。
 # 退出语义与设计依据: 表现层零收益公式计算与配置驱动出版核算契约
 # ==============================================================================
 
-## RealGrimoireService：直连手稿出版配置与版税核算逻辑的真实魔典服务
+## RealGrimoireService：直连手稿出版配置、版税核算与统一协议持久化的真实魔典服务
 class_name RealGrimoireService
 extends "res://frontend/domain_boundary/interfaces/i_grimoire_service.gd"
 
-## 依据版税档位索引估算单部典籍稿酬预期区间
+## 依据 3 档版税模式索引 (lump_sum / royalty_30 / buyout_10) 估算单部典籍稿酬预期区间
 func estimate_authoring_income(royalty_mode_index: int) -> Dictionary:
 	var base_price: float = float(maxi(10, GameConfig.get_int("domains.lattice", "manuscript_defaults/default_price", 100)))
 	var base_royalty: float = clampf(GameConfig.get_float("domains.lattice", "manuscript_defaults/default_royalty_rate", 0.20), 0.05, 0.90)
-	var mode_multipliers: Array[float] = [0.85, 1.0, 1.35, 1.75]
+	var mode_multipliers: Array[float] = [1.0, 1.35, 1.75]
 	var bounded_index: int = clampi(royalty_mode_index, 0, mode_multipliers.size() - 1)
 	var tier_multiplier: float = mode_multipliers[bounded_index]
 	var baseline_payout: float = base_price * base_royalty * tier_multiplier
@@ -43,3 +43,7 @@ func sum_royalties(books: Array) -> Dictionary:
 		"success": true,
 		"total": accumulated_gold,
 	}
+
+## 分发魔典编纂、AST 编译与版税领取协议动作至后端域处理器
+func dispatch_grimoire_action(action_type: String, payload_data: Dictionary = {}) -> Dictionary:
+	return RealProtocolBridge.dispatch_flat("grimoire", action_type, payload_data)

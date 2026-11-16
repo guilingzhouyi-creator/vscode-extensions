@@ -11,25 +11,37 @@
 class_name RealGachaService
 extends "res://frontend/domain_boundary/interfaces/i_gacha_service.gd"
 
-const GachaProbabilitySolver = preload("res://backend/domains/gacha_wish/gacha_probability_solver.gd")
-
 func _build_drop_entry(rarity: int, serial_number: int) -> Dictionary:
 	return {
 		"item_id": "WISH_DROP_R%d_%02d" % [rarity, serial_number],
 		"rarity": rarity,
-		"name": "%d★ 祈愿奖励 #%d" % [rarity, serial_number],
+		"name": "%d★ #%d" % [rarity, serial_number],
 	}
 
-## 获取配置驱动的祈愿基础概率、保底阈值与单抽消耗规则
+## 获取配置驱动的祈愿基础概率、保底阈值与单抽消耗规则（同时对齐服务与视图键名）
 func get_rules() -> Dictionary:
+	var rate_5star := GameConfig.get_float("domains.gacha", "rates/base_5star", 0.006)
+	var rate_4star := GameConfig.get_float("domains.gacha", "rates/base_4star", 0.051)
+	var rate_3star := maxf(0.0, 1.0 - rate_5star - rate_4star)
+	var soft_pity := GameConfig.get_int("domains.gacha", "pity/soft_threshold", 70)
+	var hard_pity := GameConfig.get_int("domains.gacha", "pity/hard_threshold", 90)
+	var four_star_pity := GameConfig.get_int("domains.gacha", "pity/four_star_threshold", 10)
+	var cost_single := maxi(1, GameConfig.get_int("domains.gacha", "banner_defaults/cost_per_pull_gold", 160))
 	return {
-		"base_5star_rate": GameConfig.get_float("domains.gacha", "rates/base_5star", 0.006),
-		"base_4star_rate": GameConfig.get_float("domains.gacha", "rates/base_4star", 0.051),
+		"base_5star_rate": rate_5star,
+		"base_4star_rate": rate_4star,
+		"base_rate_5star": rate_5star,
+		"base_rate_4star": rate_4star,
+		"base_rate_3star": rate_3star,
 		"up_rate": GameConfig.get_float("domains.gacha", "rates/up_rate", 0.5),
-		"soft_pity": GameConfig.get_int("domains.gacha", "pity/soft_threshold", 70),
-		"hard_pity": GameConfig.get_int("domains.gacha", "pity/hard_threshold", 90),
-		"four_star_pity": GameConfig.get_int("domains.gacha", "pity/four_star_threshold", 10),
-		"cost_per_pull": maxi(1, GameConfig.get_int("domains.gacha", "banner_defaults/cost_per_pull_gold", 160)),
+		"soft_pity": soft_pity,
+		"hard_pity": hard_pity,
+		"four_star_pity": four_star_pity,
+		"pity_5star_hard": hard_pity,
+		"pity_4star_hard": four_star_pity,
+		"cost_per_pull": cost_single,
+		"cost_single": cost_single,
+		"cost_ten": cost_single * 10,
 	}
 
 ## 按软硬保底曲线与确定性随机序列生成掉落数组
@@ -68,24 +80,20 @@ func resolve_pull(gacha_state: Dictionary, pull_count: int, injected_drops: Arra
 		"4": int(existing_counts.get("4", 0)),
 		"3": int(existing_counts.get("3", 0)),
 	}
-	var drop_results: Array = injected_drops.duplicate(true)
-	if not injected_drops.is_empty():
-		for drop_entry in drop_results:
-			var drop_rarity: int = int(drop_entry.get("rarity", 3))
-			if drop_rarity >= 5:
-				current_5star = 0
-				updated_counts["5"] = int(updated_counts["5"]) + 1
-			elif drop_rarity == 4:
-				current_5star += 1
-				current_4star = 0
-				updated_counts["4"] = int(updated_counts["4"]) + 1
-			else:
-				current_5star += 1
-				current_4star += 1
-				updated_counts["3"] = int(updated_counts["3"]) + 1
-	else:
-		current_5star += sanitized_count
-		current_4star += sanitized_count
+	var drop_results: Array = injected_drops.duplicate(true) if not injected_drops.is_empty() else generate_drops(sanitized_count, current_5star, current_4star)
+	for drop_entry in drop_results:
+		var drop_rarity: int = int(drop_entry.get("rarity", 3))
+		if drop_rarity >= 5:
+			current_5star = 0
+			updated_counts["5"] = int(updated_counts["5"]) + 1
+		elif drop_rarity == 4:
+			current_5star += 1
+			current_4star = 0
+			updated_counts["4"] = int(updated_counts["4"]) + 1
+		else:
+			current_5star += 1
+			current_4star += 1
+			updated_counts["3"] = int(updated_counts["3"]) + 1
 	return {
 		"success": true,
 		"results": drop_results,
@@ -96,10 +104,11 @@ func resolve_pull(gacha_state: Dictionary, pull_count: int, injected_drops: Arra
 		"rarity_counts": updated_counts,
 	}
 
-## 校验原石余额并扣减对应抽数消耗
+## 校验原石余额并扣减对应抽数消耗（同步后端钱包会话）
 func purchase(currency_balance: int, pull_count: int) -> Dictionary:
 	var cost_per_pull: int = int(get_rules().get("cost_per_pull", 160))
 	var required_currency: int = maxi(0, pull_count) * cost_per_pull
 	if currency_balance < required_currency:
 		return {"success": false, "error_code": "INSUFFICIENT_CURRENCY", "balance": currency_balance}
+	RealProtocolBridge.dispatch_flat("gacha", "PULL_GACHA", {"pull_count": maxi(0, pull_count)})
 	return {"success": true, "balance": currency_balance - required_currency, "spent": required_currency}

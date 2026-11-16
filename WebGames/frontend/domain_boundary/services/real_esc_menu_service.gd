@@ -13,9 +13,6 @@
 class_name RealEscMenuService
 extends "res://frontend/domain_boundary/interfaces/i_esc_menu_service.gd"
 
-const RealProtocolBridge = preload("res://frontend/domain_boundary/services/real_protocol_bridge.gd")
-const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
-
 func _dispatch_esc_action(action_type: String, extra_payload: Dictionary, result_callback: Callable) -> void:
 	RealProtocolBridge.dispatch_active_session("world_state", action_type, extra_payload, result_callback)
 

@@ -11,8 +11,6 @@
 class_name RealChatCommandService
 extends "res://frontend/domain_boundary/interfaces/i_chat_command_service.gd"
 
-const RealChatCommandSession = preload("res://frontend/domain_boundary/services/real_chat_command_session.gd")
-
 ## 为调用方视图创建独立的命令补全与手势会话
 func create_session() -> IChatCommandSession:
 	var created_session: IChatCommandSession = RealChatCommandSession.new()
@@ -25,3 +23,7 @@ func create_session() -> IChatCommandSession:
 	created_session.reset_cursor()
 	created_session.reset_gesture()
 	return created_session
+
+## 分发执行一条聊天 / GM 控制台指令至后端命令引擎
+func execute_command(command_line: String) -> Dictionary:
+	return RealProtocolBridge.dispatch_flat("gm_command", "EXECUTE_GM_COMMAND", {"command": command_line})

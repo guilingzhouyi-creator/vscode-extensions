@@ -8,8 +8,6 @@
 class_name RealLifecycleService
 extends "res://frontend/domain_boundary/interfaces/i_lifecycle_service.gd"
 
-const RealProtocolBridge = preload("res://frontend/domain_boundary/services/real_protocol_bridge.gd")
-
 ## 异步向后端发送游戏暂停指令并附带暂停原因
 func pause_game_async(
 	account_id: String,

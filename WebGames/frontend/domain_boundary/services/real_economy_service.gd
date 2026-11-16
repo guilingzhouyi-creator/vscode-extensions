@@ -40,8 +40,10 @@ func split_copper(total_copper: int) -> Dictionary:
 	var remaining_copper: int = maxi(0, total_copper)
 	var gold_unit: int = int(rates["gold_to_copper"])
 	var silver_unit: int = int(rates["silver_to_copper"])
+	@warning_ignore("integer_division")
 	var gold_part: int = remaining_copper / gold_unit
 	remaining_copper %= gold_unit
+	@warning_ignore("integer_division")
 	var silver_part: int = remaining_copper / silver_unit
 	var copper_part: int = remaining_copper % silver_unit
 	return {
@@ -92,3 +94,7 @@ func generate_price_series(commodity_key: String) -> Array:
 		var adjusted_price: int = maxi(10, int(round(float(baseline_price) * (1.0 + wave_factor))))
 		price_series.append(adjusted_price)
 	return price_series
+
+## 分发商店买卖、竞拍与货币兑换动作至后端经济协议并同步钱包
+func dispatch_economy_action(action_type: String, payload_data: Dictionary = {}) -> Dictionary:
+	return RealProtocolBridge.dispatch_flat("economy", action_type, payload_data)

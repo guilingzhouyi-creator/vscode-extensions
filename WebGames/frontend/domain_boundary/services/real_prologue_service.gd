@@ -8,8 +8,6 @@
 class_name RealPrologueService
 extends "res://frontend/domain_boundary/interfaces/i_prologue_service.gd"
 
-const RealProtocolBridge = preload("res://frontend/domain_boundary/services/real_protocol_bridge.gd")
-
 ## 异步请求启动当前角色的序章剧情上下文
 func start_prologue_async(
 	account_id: String,

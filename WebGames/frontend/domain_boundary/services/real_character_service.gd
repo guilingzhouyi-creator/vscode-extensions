@@ -12,10 +12,6 @@
 class_name RealCharacterService
 extends "res://frontend/domain_boundary/interfaces/i_character_service.gd"
 
-const IAuthService = preload("res://frontend/domain_boundary/interfaces/i_auth_service.gd")
-const RealProtocolBridge = preload("res://frontend/domain_boundary/services/real_protocol_bridge.gd")
-const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
-
 func _build_creation_payload(request_payload: Dictionary) -> Dictionary:
 	var character_name: String = str(request_payload.get("name", request_payload.get("character_name", ""))).strip_edges()
 	var slot_index: int = int(request_payload.get("slot_index", 0))

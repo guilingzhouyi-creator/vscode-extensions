@@ -12,28 +12,6 @@
 class_name RealServiceContainer
 extends ServiceContainer
 
-const RealAuthService = preload("res://frontend/domain_boundary/services/real_auth_service.gd")
-const RealWorldService = preload("res://frontend/domain_boundary/services/real_world_service.gd")
-const RealCharacterService = preload("res://frontend/domain_boundary/services/real_character_service.gd")
-const RealEscMenuService = preload("res://frontend/domain_boundary/services/real_esc_menu_service.gd")
-const RealPrologueService = preload("res://frontend/domain_boundary/services/real_prologue_service.gd")
-const RealHudSyncService = preload("res://frontend/domain_boundary/services/real_hud_sync_service.gd")
-const RealLifecycleService = preload("res://frontend/domain_boundary/services/real_lifecycle_service.gd")
-const RealGameSettingsService = preload("res://frontend/domain_boundary/services/real_game_settings_service.gd")
-const RealVersionService = preload("res://frontend/domain_boundary/services/real_version_service.gd")
-const RealCombatService = preload("res://frontend/domain_boundary/services/real_combat_service.gd")
-const RealChatCommandService = preload("res://frontend/domain_boundary/services/real_chat_command_service.gd")
-const RealCraftingService = preload("res://frontend/domain_boundary/services/real_crafting_service.gd")
-const RealEconomyService = preload("res://frontend/domain_boundary/services/real_economy_service.gd")
-const RealGachaService = preload("res://frontend/domain_boundary/services/real_gacha_service.gd")
-const RealGrimoireService = preload("res://frontend/domain_boundary/services/real_grimoire_service.gd")
-const RealGuildService = preload("res://frontend/domain_boundary/services/real_guild_service.gd")
-const RealMailService = preload("res://frontend/domain_boundary/services/real_mail_service.gd")
-const RealMiscEdgeService = preload("res://frontend/domain_boundary/services/real_misc_edge_service.gd")
-const RealQuestService = preload("res://frontend/domain_boundary/services/real_quest_service.gd")
-const RealSaveService = preload("res://frontend/domain_boundary/services/real_save_service.gd")
-const RealSnapshotDataService = preload("res://frontend/domain_boundary/services/real_snapshot_data_service.gd")
-
 static var _instance: ServiceContainer = null
 
 ## 获取真实服务容器全局单例
