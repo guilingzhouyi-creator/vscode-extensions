@@ -35,6 +35,12 @@ import sys
 import tempfile
 
 from audit_common import ensure_utf8_stdout, resolve_repo_root
+from lib.refactor_report_formats import (
+    build_badge_payload,
+    build_sarif_report,
+    persist_latest_snapshot,
+    render_markdown_report,
+)
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()
@@ -163,8 +169,11 @@ def _warn_threshold_divergence(config_path: str) -> None:
         opts = (cfg.get("analyzers") or {}).get(analyzer_key, {}).get("options") or {}
         for k, v in opts.items():
             if k in top and top[k] != v:
-                print(f"【WARN】阈值双处声明不一致: thresholds.{k}={top[k]} ≠ "
-                      f"analyzers.{analyzer_key}.options.{k}={v}，引擎以 options 覆盖生效，请同步唯一源。")
+                print(
+                    f"【WARN】阈值双处声明不一致: thresholds.{k}={top[k]} ≠ "
+                    f"analyzers.{analyzer_key}.options.{k}={v}，引擎以 options 覆盖生效，请同步唯一源。",
+                    file=sys.stderr,
+                )
 
 
 def _format_score_bar(score: int, width: int = 20) -> str:
@@ -220,6 +229,23 @@ def _render_quality_score_card(qs: dict[str, Any], show_detailed: bool = False) 
     print(MINUS_CHAR * LINE_WIDTH)
 
 
+def _resolve_output_format(opts: RefactorAuditOptions) -> str:
+    """解析最终面向调用方的输出格式（--json 优先覆盖 --format）。"""
+    if opts.json_output:
+        return "json"
+    return opts.report_format or "text"
+
+
+def _is_machine_output(opts: RefactorAuditOptions) -> bool:
+    """判断当前是否处于机器输出或精简评分模式（须抑制 stdout 横幅与提示语）。"""
+    return opts.json_output or opts.score_only or opts.report_format in (
+        "json",
+        "sarif",
+        "markdown",
+        "badge",
+    )
+
+
 def _resolve_audit_config(opts: RefactorAuditOptions) -> str | None:
     """解析并校验 auto-refactor 配置文件路径。"""
     resolved = opts.config_path or str(ROOT / "auto-refactor.config.json")
@@ -227,7 +253,7 @@ def _resolve_audit_config(opts: RefactorAuditOptions) -> str | None:
         _warn_threshold_divergence(resolved)
         return resolved
     if opts.config_path:
-        print(f"【WARN】指定的 --config 不存在: {opts.config_path}，回退引擎默认阈值。")
+        print(f"【WARN】指定的 --config 不存在: {opts.config_path}，回退引擎默认阈值。", file=sys.stderr)
     return None
 
 
@@ -263,10 +289,17 @@ def _build_refactor_cmd(
         )
     opts = ctx.opts
     resolved_config = _resolve_audit_config(opts)
-    if opts.maturity_tier:
-        print("【提示】--maturity-tier 由项目配置 maturityTier 承载（引擎 CLI 无此开关），本次按配置执行。")
-    if opts.classify_literals:
-        print("【提示】--classify-literals 由项目配置 classifyLiterals 承载（引擎 CLI 无此开关），本次按配置执行。")
+    if not _is_machine_output(opts):
+        if opts.maturity_tier:
+            print(
+                "【提示】--maturity-tier 由项目配置 maturityTier 承载（引擎 CLI 无此开关），本次按配置执行。",
+                file=sys.stderr,
+            )
+        if opts.classify_literals:
+            print(
+                "【提示】--classify-literals 由项目配置 classifyLiterals 承载（引擎 CLI 无此开关），本次按配置执行。",
+                file=sys.stderr,
+            )
 
     cli_target = Path(opts.cli_path).resolve() if opts.cli_path else AUTO_REFACTOR_CLI
     engine_dir = cli_target.parent.parent if opts.cli_path else AUTO_REFACTOR_DIR
@@ -362,10 +395,35 @@ def _render_all_issue_categories(issues: list[dict[str, Any]]) -> None:
     _render_category_issues("🧹 代码卫生与工程整洁度发现", by_an.get("hygiene", []), "hygiene")
 
 
-def _render_audit_console_report(report: dict[str, Any], opts: RefactorAuditOptions) -> int:
+def _evaluate_strict_gate(
+    report: dict[str, Any], opts: RefactorAuditOptions, process_returncode: int = 0
+) -> tuple[bool, str]:
+    """判定 --strict 严格门禁是否阻断（兼顾子进程退出码、error 计数与仲裁结论）。"""
+    if not opts.strict:
+        return False, ""
+    if process_returncode != 0:
+        return True, f"子进程返回非零退出码 {process_returncode}"
+    summary = report.get("summary") or {}
+    by_sev = summary.get("bySeverity") or {}
+    errors = int(by_sev.get("error", 0) or 0)
+    if errors > 0:
+        return True, f"存在 {errors} 处 error 级发现"
+    arbitration = summary.get("arbitration") or {}
+    governance = report.get("governance") or {}
+    gate_verdict = str(
+        arbitration.get("gateVerdict", governance.get("gateVerdict", ""))
+    ).strip().lower()
+    if gate_verdict == "blocked":
+        blocking_count = arbitration.get("blockingCount", governance.get("blockingCount", 0))
+        return True, f"arbitration gateVerdict=blocked, blockingCount={blocking_count}"
+    return False, ""
+
+
+def _render_audit_console_report(
+    report: dict[str, Any], opts: RefactorAuditOptions, process_returncode: int = 0
+) -> int:
     """输出控制台明细与十维质量大盘。"""
     summary = report.get("summary", {})
-    by_sev = summary.get("bySeverity", {})
     quality_score = report.get("qualityScore", {})
 
     _render_summary_stats(summary)
@@ -375,18 +433,9 @@ def _render_audit_console_report(report: dict[str, Any], opts: RefactorAuditOpti
     issues: list[dict[str, Any]] = report.get("issues", [])
     _render_all_issue_categories(issues)
 
-    errors = by_sev.get("error", 0)
-    arbitration = summary.get("arbitration", {}) if isinstance(summary, dict) else {}
-    governance = report.get("governance") or {}
-    gate_verdict = str(
-        arbitration.get("gateVerdict", governance.get("gateVerdict", ""))
-    ).strip().lower()
-    if opts.strict and errors > 0:
-        print(f"【审查结论】--strict 模式未通过（存在 {errors} 处 error 级发现）")
-        return 1
-    if opts.strict and gate_verdict == "blocked":
-        blocking_count = arbitration.get("blockingCount", governance.get("blockingCount", 0))
-        print(f"【审查结论】--strict 模式未通过（arbitration gateVerdict=blocked, blockingCount={blocking_count}）")
+    strict_failed, fail_reason = _evaluate_strict_gate(report, opts, process_returncode)
+    if strict_failed:
+        print(f"【审查结论】--strict 模式未通过（{fail_reason}）")
         return 1
 
     print("【审查结论】通过（auto-refactor 静态度量与多维重构建议就绪）")
@@ -397,16 +446,16 @@ def _resolve_audit_runtime(opts: RefactorAuditOptions | None = None) -> tuple[st
     """验证并定位 Node.js 运行时及通用 runner 路径（缺失即 fail-closed 阻断）。"""
     node_bin = find_node_executable()
     if not node_bin:
-        print("【ERROR】未检测到 Node.js 运行时环境，auto-refactor 门禁阻断（fail-closed）。")
+        print("【ERROR】未检测到 Node.js 运行时环境，auto-refactor 门禁阻断（fail-closed）。", file=sys.stderr)
         return None
     cli_target = Path(opts.cli_path).resolve() if (opts and opts.cli_path) else AUTO_REFACTOR_CLI
     if not cli_target.exists():
-        print(f"【ERROR】auto-refactor CLI 入口不存在 ({cli_target})，门禁阻断（fail-closed）。")
+        print(f"【ERROR】auto-refactor CLI 入口不存在 ({cli_target})，门禁阻断（fail-closed）。", file=sys.stderr)
         return None
     engine_dir = cli_target.parent.parent if (opts and opts.cli_path) else AUTO_REFACTOR_DIR
     runner = engine_dir / "templates" / "consumer" / "run.mjs"
     if not runner.exists():
-        print(f"【ERROR】引擎未提供通用 runner ({runner})，门禁阻断（fail-closed）。")
+        print(f"【ERROR】引擎未提供通用 runner ({runner})，门禁阻断（fail-closed）。", file=sys.stderr)
         return None
     return node_bin, runner
 
@@ -424,7 +473,7 @@ def _execute_refactor_process(cmd: list[str]) -> tuple[int, str, str]:
         )
         return r.returncode, r.stdout, r.stderr
     except Exception as exc:
-        print(f"【ERROR】调用 auto-refactor 执行异常: {exc}，审查阻断（fail-closed）。")
+        print(f"【ERROR】调用 auto-refactor 执行异常: {exc}，审查阻断（fail-closed）。", file=sys.stderr)
         return 2, "", str(exc)
 
 
@@ -435,8 +484,8 @@ def _parse_report_payload(raw_output: str, stderr: str) -> dict[str, Any] | None
     except Exception:
         parsed = _extract_json_object(raw_output or "")
         if parsed is None:
-            print("【ERROR】auto-refactor 输出无法解析为 JSON，审查阻断（fail-closed）：")
-            print((raw_output or stderr or "无输出")[:800])
+            print("【ERROR】auto-refactor 输出无法解析为 JSON，审查阻断（fail-closed）：", file=sys.stderr)
+            print((raw_output or stderr or "无输出")[:800], file=sys.stderr)
         return parsed
 
 
@@ -449,11 +498,8 @@ def _resolve_target_root(slice_name: str | None) -> Path:
 
 
 def _resolve_cli_format(opts: RefactorAuditOptions) -> str:
-    """判定传给底层 runner 的输出格式（run.mjs 仅支持 json/sarif/text/compact）。"""
-    if opts.json_output or opts.score_only:
-        return "json"
-    if opts.report_format == "sarif":
-        return "sarif"
+    """判定传给底层 runner 的输出格式：统一采集 json 以支撑全格式渲染与门禁校验。"""
+    _ = _resolve_output_format(opts)
     return "json"
 
 
@@ -470,45 +516,38 @@ def _read_temp_report(report_path: Path) -> str | None:
             print(f"【WARN】清理临时报告失败: {exc}", file=sys.stderr)
 
 
-def _dispatch_audit_output(report: dict[str, Any], opts: RefactorAuditOptions) -> int:
+def _dispatch_audit_output(
+    report: dict[str, Any], opts: RefactorAuditOptions, process_returncode: int = 0
+) -> int:
     """派发审查报告输出或控制台卡片，并持久化最新质量快照供工作区门禁读取。"""
-    try:
-        latest_dir = ROOT / "reports"
-        latest_dir.mkdir(parents=True, exist_ok=True)
-        latest_path = latest_dir / "auto-refactor-latest.json"
-        latest_path.write_text(
-            json.dumps(
-                {
-                    "tool": report.get("tool", "auto-refactor"),
-                    "version": report.get("version", ""),
-                    "generatedAt": report.get("createdAt", ""),
-                    "summary": report.get("summary", {}),
-                    "qualityScore": report.get("qualityScore", {}),
-                    "triPlaneQuality": report.get("triPlaneQuality", {}),
-                    "governance": report.get("governance"),
-                },
-                ensure_ascii=False,
-                indent=2,
-            )
-            + "\n",
-            encoding="utf-8",
-            newline="\n",
-        )
-    except OSError:
-        pass
-    if opts.json_output:
+    persist_latest_snapshot(report, ROOT)
+    fmt = _resolve_output_format(opts)
+    strict_failed, fail_reason = _evaluate_strict_gate(report, opts, process_returncode)
+    exit_code = 1 if strict_failed else 0
+
+    if fmt == "json":
         print(json.dumps(report, ensure_ascii=False, indent=2))
-        return 0
-    return _render_audit_console_report(report, opts)
+        return exit_code
+    if fmt == "sarif":
+        print(json.dumps(build_sarif_report(report), ensure_ascii=False, indent=2))
+        return exit_code
+    if fmt == "markdown":
+        print(render_markdown_report(report, strict_failed, fail_reason))
+        return exit_code
+    if fmt == "badge":
+        print(json.dumps(build_badge_payload(report, strict_failed), ensure_ascii=False, indent=2))
+        return exit_code
+    return _render_audit_console_report(report, opts, process_returncode=process_returncode)
 
 
 def run_refactor_audit(opts: RefactorAuditOptions | None = None, **kwargs: Any) -> int:
     """执行 auto-refactor 审查流水线。"""
     active_opts = opts if opts is not None else RefactorAuditOptions(**kwargs)
-    mode_tag = "动态增量极速审查 (Dynamic Diff Mode)" if active_opts.diff_mode else "全量静态深度审查 (Full Static Mode)"
-    print("=" * LINE_WIDTH)
-    print(f"🔭 卡拉尔世界引擎：auto-refactor {mode_tag}")
-    print("=" * LINE_WIDTH)
+    if not _is_machine_output(active_opts):
+        mode_tag = "动态增量极速审查 (Dynamic Diff Mode)" if active_opts.diff_mode else "全量静态深度审查 (Full Static Mode)"
+        print("=" * LINE_WIDTH)
+        print(f"🔭 卡拉尔世界引擎：auto-refactor {mode_tag}")
+        print("=" * LINE_WIDTH)
 
     runtime = _resolve_audit_runtime(active_opts)
     if not runtime:
@@ -526,24 +565,23 @@ def run_refactor_audit(opts: RefactorAuditOptions | None = None, **kwargs: Any) 
 
     ret_code, stdout, stderr = _execute_refactor_process(cmd)
     if ret_code not in (0, 1):
-        print(f"【ERROR】auto-refactor 返回非零崩溃码 {ret_code}: {stderr.strip()[:400]}，审查阻断（fail-closed）。")
+        print(
+            f"【ERROR】auto-refactor 返回非零崩溃码 {ret_code}: {stderr.strip()[:400]}，审查阻断（fail-closed）。",
+            file=sys.stderr,
+        )
         return 1
 
     raw_output = _read_temp_report(report_path)
     if raw_output is None:
         diag = (stderr or stdout or "").strip()[:600]
         detail = f"（exit={ret_code}，stderr: {diag}）" if diag else f"（exit={ret_code}）"
-        print(f"【ERROR】auto-refactor 未产出报告文件{detail}，审查阻断（fail-closed）。")
+        print(f"【ERROR】auto-refactor 未产出报告文件{detail}，审查阻断（fail-closed）。", file=sys.stderr)
         return 2
-
-    if cli_format == "sarif":
-        print(raw_output)
-        return 0
 
     report = _parse_report_payload(raw_output, stderr)
     if report is None:
         return 2
-    return _dispatch_audit_output(report, active_opts)
+    return _dispatch_audit_output(report, active_opts, process_returncode=ret_code)
 
 
 def main() -> int:
