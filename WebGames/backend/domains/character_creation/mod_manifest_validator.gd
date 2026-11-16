@@ -11,8 +11,6 @@
 class_name ModManifestValidator
 extends RefCounted
 
-const ModManifestRuleHelper = preload("res://backend/domains/character_creation/mod_manifest_rule_helper.gd")
-
 const VALID_ATTRIBUTE_KEYS: Array[String] = ["STR", "AGI", "CON", "INT", "SPR", "VIT"]
 const VALID_TRAIT_TYPES: Array[String] = ["POSITIVE", "NEGATIVE"]
 const ATTR_BONUS_MIN: int = -2

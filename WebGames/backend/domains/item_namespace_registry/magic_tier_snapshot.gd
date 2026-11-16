@@ -17,18 +17,18 @@ extends RefCounted
 
 # 1. 施法形态（复用既有 MagicForm 语义，英文枚举唯一规范；枚举值 1 起与配置键对齐）
 enum MagicForm {
-	PRIMORDIAL = 1,  # 始源魔法（魔素直接驱动 · 无咏唱直驱）
-	INCANTATION,     # 咒术魔法（魔素按咒词顺序转化 · 有咏唱规范驱动）
-	INTEGRATED,      # 集成魔法（咒术聚合驱动 / 条件触发聚合驱动）
-	SUPERTIER,       # 超位魔法（超越位阶上限 · 类始源极效魔法）
+	PRIMORDIAL = 1, # 始源魔法（魔素直接驱动 · 无咏唱直驱）
+	INCANTATION, # 咒术魔法（魔素按咒词顺序转化 · 有咏唱规范驱动）
+	INTEGRATED, # 集成魔法（咒术聚合驱动 / 条件触发聚合驱动）
+	SUPERTIER, # 超位魔法（超越位阶上限 · 类始源极效魔法）
 }
 
 # 2. 魔法资质（复用既有 ManaAptitude 四档；魔适者为修炼魔法必要门槛；枚举值 1 起与配置键对齐）
 enum ManaAptitude {
-	MANA_ADAPTOR = 1,  # 魔适者（基础微控，修炼门槛 · 每百人至少一人）
-	WORD_SPEAKER,      # 言灵者（共振增幅 · 每万人至少一人）
-	AWAKENED,          # 觉醒者（回路自适应 · 每百万人至少一人）
-	HEAVEN_RULER,      # 天权者（位阶压制 · 稀有度未指定）
+	MANA_ADAPTOR = 1, # 魔适者（基础微控，修炼门槛 · 每百人至少一人）
+	WORD_SPEAKER, # 言灵者（共振增幅 · 每万人至少一人）
+	AWAKENED, # 觉醒者（回路自适应 · 每百万人至少一人）
+	HEAVEN_RULER, # 天权者（位阶压制 · 稀有度未指定）
 }
 
 # 3. 阶位梯度（去嵌套化：连续 1~11 阶纯梯度，无能力分级前缀；
@@ -41,37 +41,37 @@ enum MagicRank {
 # 3b. 能力分级（独立平行维度：描述施法主体/存在总体能力层次与身份范畴；
 #    不直接决定具体魔法的阶位；SUPERTIER 为超位高级位阶）
 enum AbilityTier {
-	ESP = 1,      # 异能
-	HEROIC,       # 英雄
-	DIVINE,       # 神圣
-	GOD,          # 真神
-	SUPERTIER,    # 超位（真神之上/超越位阶上限的特殊存在）
+	ESP = 1, # 异能
+	HEROIC, # 英雄
+	DIVINE, # 神圣
+	GOD, # 真神
+	SUPERTIER, # 超位（真神之上/超越位阶上限的特殊存在）
 }
 
 # 3c. 阶位档次（第三平行维度：按阶位确定性区间分段——低阶 1~3 / 中阶 4~6 /
 #     高阶 7~9 / 超位 10~11 统称；互斥全覆盖，禁嵌套命名（低阶一阶禁止））
 enum MagicRankBand {
-	LOW = 1,        # 低阶魔法（1~3 阶）
-	MID,            # 中阶魔法（4~6 阶）
-	HIGH,           # 高阶魔法（7~9 阶）
-	SUPERTIER,      # 超位魔法（10~11 阶统称）
+	LOW = 1, # 低阶魔法（1~3 阶）
+	MID, # 中阶魔法（4~6 阶）
+	HIGH, # 高阶魔法（7~9 阶）
+	SUPERTIER, # 超位魔法（10~11 阶统称）
 }
 
 # 4. 施法者战斗实力称号（独立维度，13 级单调；前三档为魔术师 = 非魔法范畴；枚举值 1 起与配置键对齐）
 enum ProfessionRank {
-	THIRD_RATE_TRICKSTER = 1,  # 三流魔术师（魔术 ≠ 魔法）
-	SECOND_RATE_TRICKSTER,     # 二流魔术师（魔术 ≠ 魔法）
-	QUASI_MAGIC_USER,          # 准魔法使/师
-	NOVICE_MAGE,               # 初级魔士
-	INTERMEDIATE_MAGE,         # 中级魔士
-	SENIOR_MAGE,               # 高级魔士
-	PLATINUM_MAGE,             # 铂金魔士
-	GOLD_MAGE,                 # 黄金魔士
-	STELLAR_MAGE,              # 星辉魔士
-	LEGION_MAGISTRATE,         # 军魔导士
-	ROYAL_MAGISTRATE,          # 王魔导士
-	HOLY_ARCHMAGE,             # 圣魔导师（对齐既有 ARCHMAGE 职业）
-	PRIMORDIAL_ARCHDEMON,      # 始源魔神（对齐 MagicForm.PRIMORDIAL）
+	THIRD_RATE_TRICKSTER = 1, # 三流魔术师（魔术 ≠ 魔法）
+	SECOND_RATE_TRICKSTER, # 二流魔术师（魔术 ≠ 魔法）
+	QUASI_MAGIC_USER, # 准魔法使/师
+	NOVICE_MAGE, # 初级魔士
+	INTERMEDIATE_MAGE, # 中级魔士
+	SENIOR_MAGE, # 高级魔士
+	PLATINUM_MAGE, # 铂金魔士
+	GOLD_MAGE, # 黄金魔士
+	STELLAR_MAGE, # 星辉魔士
+	LEGION_MAGISTRATE, # 军魔导士
+	ROYAL_MAGISTRATE, # 王魔导士
+	HOLY_ARCHMAGE, # 圣魔导师（对齐既有 ARCHMAGE 职业）
+	PRIMORDIAL_ARCHDEMON, # 始源魔神（对齐 MagicForm.PRIMORDIAL）
 }
 
 # ==============================================================================
@@ -82,16 +82,16 @@ enum ProfessionRank {
 var canonical_id: String = ""
 var magic_form: MagicForm = MagicForm.INCANTATION
 var magic_rank: MagicRank = MagicRank.RANK_1
-var ability_tier: AbilityTier = AbilityTier.ESP   # 能力分级（独立平行维度）
+var ability_tier: AbilityTier = AbilityTier.ESP # 能力分级（独立平行维度）
 # 弱映射候选集合——与 ability_tier 标量分离（候选可有空/多项，顺序稳定排序；禁止隐式类型转换）
 var ability_tier_candidates: Array = []
-var rank_band: MagicRankBand = MagicRankBand.LOW   # 阶位档次（第三平行维度）
+var rank_band: MagicRankBand = MagicRankBand.LOW # 阶位档次（第三平行维度）
 var mana_aptitude: ManaAptitude = ManaAptitude.MANA_ADAPTOR
 var profession_rank: ProfessionRank = ProfessionRank.NOVICE_MAGE
-var strength_weight: float = 1.0       # 位阶强度基线权重（配置驱动）
-var phase_loss_min: float = 0.0        # 形态相变能损下限（配置驱动）
-var phase_loss_max: float = 0.0        # 形态相变能损上限（配置驱动）
-var backfire_threshold: int = 1        # 资质反噬阈值（配置驱动）
+var strength_weight: float = 1.0 # 位阶强度基线权重（配置驱动）
+var phase_loss_min: float = 0.0 # 形态相变能损下限（配置驱动）
+var phase_loss_max: float = 0.0 # 形态相变能损上限（配置驱动）
+var backfire_threshold: int = 1 # 资质反噬阈值（配置驱动）
 
 # ==============================================================================
 # 三、映射与不变量校验
@@ -114,8 +114,8 @@ static func is_god_form_pair_valid(rank: MagicRank, form: MagicForm) -> bool:
 	return form == MagicForm.SUPERTIER
 
 ## 魔术/魔法边界：实力称号是否属于魔法范畴（前三档魔术师 = 非魔法）
-static func is_magic_domain(profession_rank: ProfessionRank) -> bool:
-	return profession_rank > ProfessionRank.SECOND_RATE_TRICKSTER
+static func is_magic_domain(rank_title: ProfessionRank) -> bool:
+	return rank_title > ProfessionRank.SECOND_RATE_TRICKSTER
 
 # ==============================================================================
 # 四、DTO 数据交换契约
@@ -141,12 +141,12 @@ func to_dto() -> Dictionary:
 static func from_dto(serialized_snapshot: Dictionary) -> MagicTierSnapshot:
 	var snapshot := MagicTierSnapshot.new()
 	snapshot.canonical_id = str(serialized_snapshot.get("canonical_id", ""))
-	snapshot.magic_form = int(serialized_snapshot.get("magic_form", MagicForm.INCANTATION))
-	snapshot.magic_rank = int(serialized_snapshot.get("magic_rank", MagicRank.RANK_1))
-	snapshot.ability_tier = int(serialized_snapshot.get("ability_tier", AbilityTier.ESP))
-	snapshot.rank_band = int(serialized_snapshot.get("rank_band", MagicRankBand.LOW))
-	snapshot.mana_aptitude = int(serialized_snapshot.get("mana_aptitude", ManaAptitude.MANA_ADAPTOR))
-	snapshot.profession_rank = int(serialized_snapshot.get("profession_rank", ProfessionRank.NOVICE_MAGE))
+	snapshot.magic_form = int(serialized_snapshot.get("magic_form", MagicForm.INCANTATION)) as MagicForm
+	snapshot.magic_rank = int(serialized_snapshot.get("magic_rank", MagicRank.RANK_1)) as MagicRank
+	snapshot.ability_tier = int(serialized_snapshot.get("ability_tier", AbilityTier.ESP)) as AbilityTier
+	snapshot.rank_band = int(serialized_snapshot.get("rank_band", MagicRankBand.LOW)) as MagicRankBand
+	snapshot.mana_aptitude = int(serialized_snapshot.get("mana_aptitude", ManaAptitude.MANA_ADAPTOR)) as ManaAptitude
+	snapshot.profession_rank = int(serialized_snapshot.get("profession_rank", ProfessionRank.NOVICE_MAGE)) as ProfessionRank
 	snapshot.strength_weight = float(serialized_snapshot.get("strength_weight", 1.0))
 	snapshot.phase_loss_min = float(serialized_snapshot.get("phase_loss_min", 0.0))
 	snapshot.phase_loss_max = float(serialized_snapshot.get("phase_loss_max", 0.0))

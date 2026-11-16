@@ -38,16 +38,42 @@ var max_allowed_desync_ticks: int = GameConfig.get_int("domains.deterministic", 
 
 ## 权威模式跃迁：越界拦截 + 广播模式切换叙事（枚举键名）
 ## 契约：new_mode 越界返回 false 且不产生副作用；成功则广播确定性/网络叙事。
+const AUTHORITY_MODE_NAMES: Array[String] = ["LOCAL_STANDALONE", "CLIENT_PREDICTED", "SERVER_AUTHORITATIVE"]
+
+static var _authority_cache_version: int = -1
+static var _cached_ap_overflow_threshold: int = -10
+static var _cached_max_desync_ticks: int = 5
+static var _cached_status_desync: String = "DESYNC_DETECTED"
+static var _cached_reason_desync: String = "Client/server ticks diverged beyond threshold"
+static var _cached_status_cheat: String = "CHEAT_DETECTED"
+static var _cached_reason_cheat: String = "Action point budget overdraft detected"
+static var _cached_status_valid: String = "VERIFIED_VALID"
+
+static func _ensure_authority_cache() -> void:
+	var config_version: int = GameConfig.config_reload_version()
+	if _authority_cache_version == config_version:
+		return
+	_authority_cache_version = config_version
+	_cached_ap_overflow_threshold = GameConfig.get_int("domains.deterministic", "authority/ap_overflow_threshold", -10)
+	_cached_max_desync_ticks = GameConfig.get_int("domains.deterministic", "authority/max_allowed_desync_ticks", 5)
+	_cached_status_desync = GameConfig.get_string("domains.deterministic", "authority/status/desync", "DESYNC_DETECTED")
+	_cached_reason_desync = GameConfig.get_string("domains.deterministic", "authority/reasons/desync", "Client/server ticks diverged beyond threshold")
+	_cached_status_cheat = GameConfig.get_string("domains.deterministic", "authority/status/cheat", "CHEAT_DETECTED")
+	_cached_reason_cheat = GameConfig.get_string("domains.deterministic", "authority/reasons/cheat", "Action point budget overdraft detected")
+	_cached_status_valid = GameConfig.get_string("domains.deterministic", "authority/status/valid", "VERIFIED_VALID")
+
+## 切换权威模式并在有监听者时广播模式切换叙事
 func transition_mode(new_mode: int) -> bool:
 	if new_mode < AuthorityMode.LOCAL_STANDALONE or new_mode > AuthorityMode.SERVER_AUTHORITATIVE:
 		return false
 	var old_mode := current_mode
 	current_mode = new_mode
-	var keys := AuthorityMode.keys()
-	EventBusCore.get_instance().emit_narrative_by_key(
-		"deterministic/mode_transition", "network",
-		[keys[old_mode], keys[new_mode]]
-	)
+	var event_bus := EventBusCore.get_instance()
+	if event_bus.has_channel_listeners(EventChannelDefinition.NARRATIVE_EVENT_TEXT):
+		event_bus.emit_narrative_by_key(
+			"deterministic/mode_transition", "network",
+			[AUTHORITY_MODE_NAMES[old_mode], AUTHORITY_MODE_NAMES[new_mode]]
+		)
 	return true
 
 ## 输入连续性审计：脱同步超阈 / AP 透支（时序作弊）拦截，合法返回 VERIFIED_VALID
@@ -56,22 +82,22 @@ func transition_mode(new_mode: int) -> bool:
 ##       状态/原因文案键来自 config/deterministic.json 的 authority.status / reasons。
 ## 性能：常量级判定，无循环与瞬态分配。
 func audit_input_continuity(client_tick: int, server_tick: int, command_action_points_cost: int, current_action_points: int) -> Dictionary:
-	var action_points_overflow_threshold: int = GameConfig.get_int("domains.deterministic", "authority/ap_overflow_threshold", -10)
+	_ensure_authority_cache()
 
 	var tick_gap: int = absi(client_tick - server_tick)
 	if tick_gap > max_allowed_desync_ticks:
 		return {
-			"status": GameConfig.get_string("domains.deterministic", "authority/status/desync", "DESYNC_DETECTED"),
+			"status": _cached_status_desync,
 			"valid": false,
-			"reason": GameConfig.get_string("domains.deterministic", "authority/reasons/desync", "Tick gap exceeds maximum threshold")
+			"reason": _cached_reason_desync
 		}
 
 	# 时序作弊拦截：AP 透支严重且无合法势能（单帧消耗远大于存量）
-	if current_action_points + command_action_points_cost < action_points_overflow_threshold:
+	if current_action_points + command_action_points_cost < _cached_ap_overflow_threshold:
 		return {
-			"status": GameConfig.get_string("domains.deterministic", "authority/status/cheat", "CHEAT_DETECTED"),
+			"status": _cached_status_cheat,
 			"valid": false,
-			"reason": GameConfig.get_string("domains.deterministic", "authority/reasons/cheat", "AP exhaustion overflow")
+			"reason": _cached_reason_cheat
 		}
 
-	return {"status": GameConfig.get_string("domains.deterministic", "authority/status/valid", "VERIFIED_VALID"), "valid": true}
+	return {"status": _cached_status_valid, "valid": true}

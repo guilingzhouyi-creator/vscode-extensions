@@ -10,10 +10,6 @@
 ## AccountSlotBindingSolver：Headless Discrete Solver / Numerical Calculator
 class_name AccountSlotBindingSolver extends RefCounted
 
-const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
-const CharacterProfile = preload("res://backend/domains/account/character_profile.gd")
-const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
-const AccountSlotCreationDTO = preload("res://backend/domains/account/dto/account_slot_creation_dto.gd")
 const DOMAIN_ACCOUNT_CONFIG := "domains.account"
 
 # ==============================================================================

@@ -12,31 +12,31 @@ class_name MagicRuleState
 extends RefCounted
 
 enum StateKind {
-	SEAL = 1,     # 魔法封印（解放前不可打出目标魔法）
-	DELAY,        # 延时释放调度（步数制，独立待触发，不阻塞玩家行动）
-	TEMP_BOOST,   # 临时升格（到期回落原阶）
+	SEAL = 1, # 魔法封印（解放前不可打出目标魔法）
+	DELAY, # 延时释放调度（步数制，独立待触发，不阻塞玩家行动）
+	TEMP_BOOST, # 临时升格（到期回落原阶）
 }
 
 enum StateStatus {
-	ACTIVE = 1,    # 生效中
-	RELEASED,      # 解放/结算完成（清理）
-	EXPIRED,       # 超时自动解除（清理）
-	HOLDER_LOST,   # 持有者丢失（死亡/战斗结束按配置处置）
-	ROLLED_BACK,   # 异常中断回退（无副作用）
-	CANCELLED,     # 显式取消
+	ACTIVE = 1, # 生效中
+	RELEASED, # 解放/结算完成（清理）
+	EXPIRED, # 超时自动解除（清理）
+	HOLDER_LOST, # 持有者丢失（死亡/战斗结束按配置处置）
+	ROLLED_BACK, # 异常中断回退（无副作用）
+	CANCELLED, # 显式取消
 }
 
 var state_id: String = ""
 var kind: StateKind = StateKind.SEAL
 var status: StateStatus = StateStatus.ACTIVE
-var holder_id: String = ""            # 持有对象（角色/账户维度）
-var magic_ref: String = ""            # 被关联魔法 canonical
-var source_card_id: String = ""       # 产生本状态的行动卡
-var duration_seconds: int = 0         # 封印/临时升格时长（0 = 场景内常驻）
-var remain_seconds: int = 0           # 剩余秒数
-var remain_steps: int = 0             # 延时剩余步数（步数制主单位）
-var created_tick: int = 0             # 创建时刻（战斗 tick）
-var allow_duplicate: bool = false     # 是否允许同魔法重复进入同类状态（由配置收敛）
+var holder_id: String = "" # 持有对象（角色/账户维度）
+var magic_ref: String = "" # 被关联魔法 canonical
+var source_card_id: String = "" # 产生本状态的行动卡
+var duration_seconds: int = 0 # 封印/临时升格时长（0 = 场景内常驻）
+var remain_seconds: int = 0 # 剩余秒数
+var remain_steps: int = 0 # 延时剩余步数（步数制主单位）
+var created_tick: int = 0 # 创建时刻（战斗 tick）
+var allow_duplicate: bool = false # 是否允许同魔法重复进入同类状态（由配置收敛）
 
 ## 序列化持续状态为字典（枚举转整型）
 func to_dto() -> Dictionary:
@@ -58,8 +58,8 @@ func to_dto() -> Dictionary:
 static func from_dto(serialized_state: Dictionary) -> MagicRuleState:
 	var rule_state := MagicRuleState.new()
 	rule_state.state_id = str(serialized_state.get("state_id", ""))
-	rule_state.kind = int(serialized_state.get("kind", StateKind.SEAL))
-	rule_state.status = int(serialized_state.get("status", StateStatus.ACTIVE))
+	rule_state.kind = int(serialized_state.get("kind", StateKind.SEAL)) as StateKind
+	rule_state.status = int(serialized_state.get("status", StateStatus.ACTIVE)) as StateStatus
 	rule_state.holder_id = str(serialized_state.get("holder_id", ""))
 	rule_state.magic_ref = str(serialized_state.get("magic_ref", ""))
 	rule_state.source_card_id = str(serialized_state.get("source_card_id", ""))

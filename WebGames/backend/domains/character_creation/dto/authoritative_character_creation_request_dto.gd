@@ -11,8 +11,6 @@
 class_name AuthoritativeCharacterCreationRequestDTO
 extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 # ==============================================================================
 # 一、请求契约字段
 # ==============================================================================

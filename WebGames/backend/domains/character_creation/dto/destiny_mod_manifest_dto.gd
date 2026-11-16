@@ -11,8 +11,6 @@
 class_name DestinyModManifestDTO
 extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 # ==============================================================================
 # 一、模组声明清单契约字段
 # ==============================================================================

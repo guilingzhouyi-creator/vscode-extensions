@@ -12,8 +12,6 @@
 class_name PrologueHandoffDTO
 extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 # ==============================================================================
 # 一、核心传输字段
 # ==============================================================================

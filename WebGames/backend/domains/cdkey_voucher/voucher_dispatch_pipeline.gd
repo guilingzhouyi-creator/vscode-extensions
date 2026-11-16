@@ -32,7 +32,7 @@ static func dispatch_rewards_via_mail(
 	var item_templates: Array = payload.get("item_templates", [])
 
 	if mailbox == null or recipient_account_id.is_empty():
-		return { "success": false, "error_code": "MAIL_DISPATCH_INVALID", "mail_id": mail_id }
+		return {"success": false, "error_code": "MAIL_DISPATCH_INVALID", "mail_id": mail_id}
 
 	var mail := MailItemAggregate.new(
 		# 默认 mail_id 走唯一 ID 生成器（同毫秒防碰撞序号），
@@ -48,7 +48,7 @@ static func dispatch_rewards_via_mail(
 	mail.attachment_silver = silver
 	mail.attachment_copper = copper
 	mail.attachment_items = item_templates.duplicate(true)
-	mail.sent_timestamp_utc = Time.get_unix_time_from_system()
+	mail.sent_timestamp_utc = int(Time.get_unix_time_from_system())
 
 	var is_delivered: bool = mailbox.receive_mail(mail)
 	return {

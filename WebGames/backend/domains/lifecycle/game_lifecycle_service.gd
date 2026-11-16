@@ -11,12 +11,6 @@
 class_name GameLifecycleService
 extends RefCounted
 
-const GameLifecycleModel = preload("res://backend/domains/lifecycle/game_lifecycle_model.gd")
-const GameShutdownDTO = preload("res://backend/domains/lifecycle/dto/game_shutdown_dto.gd")
-const GameLifecycleManager = preload("res://backend/domains/lifecycle/game_lifecycle_manager.gd")
-const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
-
-const ShutdownResourceDescriptor = preload("res://backend/domains/lifecycle/shutdown_resource_descriptor.gd")
 const SHUTDOWN_STAGE_KEYS = ["freeze_inputs", "flush_saves", "execute_resource_descriptors", "revoke_session", "teardown_bootstrap"]
 
 static var _shutdown_resources: Array[ShutdownResourceDescriptor] = []
@@ -161,6 +155,7 @@ static func _execute_registered_shutdown_resources(response: GameShutdownDTO.Res
 			continue
 		var started_microseconds: int = Time.get_ticks_usec()
 		var cleanup_result: Dictionary = descriptor.execute_cleanup()
+		@warning_ignore("integer_division")
 		var elapsed_milliseconds: int = int((Time.get_ticks_usec() - started_microseconds) / 1000)
 		var has_timed_out: bool = descriptor.timeout_ms > 0 and elapsed_milliseconds > descriptor.timeout_ms
 		var is_succeeded: bool = bool(cleanup_result.get("success", false))

@@ -11,10 +11,6 @@
 class_name GameSettingsProtocolHandler
 extends RefCounted
 
-const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
-const ClientRequestEnvelopeDTO = preload("res://backend/domains/world_state/dto/client_request_envelope_dto.gd")
-const UnifiedResponseEnvelopeDTO = preload("res://backend/domains/world_state/dto/unified_response_envelope_dto.gd")
-
 static var _active_settings: GameSettingsAggregate = null
 static var _apply_driver: SettingsApplyDriver = null
 

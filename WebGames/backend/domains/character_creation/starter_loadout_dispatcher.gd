@@ -301,7 +301,7 @@ static func _instantiate_and_equip_or_store(
     spawned_item.category = category
     spawned_item.mass_kg = mass_kg
     spawned_item.volume_slots = volume_slots
-    spawned_item.item_uid = WearableInventoryAggregate.ItemUIDGenerator.generate_uid("SRV_")
+    spawned_item.item_uid = ItemUIDGenerator.generate_uid("SRV_")
 
     var equipped_slot: String = ""
     # 若为主手武器且主手空闲，则优先装备

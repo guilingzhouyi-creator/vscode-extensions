@@ -12,7 +12,6 @@ class_name AccountCompositeAuthDTO
 extends RefCounted
 
 const BaseRegistrationDTO = preload("res://backend/domains/account/dto/account_registration_dto.gd")
-const SaveSlotDTO = preload("res://backend/domains/account/save_slot_dto.gd")
 
 const MODE_AUTO: String = "MODE_AUTO"
 const MODE_LOGIN_ONLY: String = "MODE_LOGIN_ONLY"

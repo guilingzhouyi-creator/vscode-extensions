@@ -11,8 +11,6 @@
 class_name SessionFlowContextDTO
 extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 const POOL_CONFIG_TABLE: String = "infrastructure.lifecycle"
 const POOL_CONFIG_PATH: String = "session_context_pool/max_free"
 

@@ -11,7 +11,6 @@
 class_name LocalizationRegistryCatalog
 extends RefCounted
 
-const LocalizationI18nDTO = preload("res://backend/domains/localization_i18n/dto/localization_i18n_dto.gd")
 const EMPTY_DICT: Dictionary = {}
 
 ## 全局共享词库实例（懒加载）：启动即灌入 config/i18n 双词典（英文唯一底座 + 中文展示层）

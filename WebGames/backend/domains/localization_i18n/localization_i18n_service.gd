@@ -11,11 +11,6 @@
 class_name LocalizationI18nService
 extends RefCounted
 
-const LocalizationRegistryCatalog = preload("res://backend/domains/localization_i18n/localization_registry_catalog.gd")
-const LocalizationSolver = preload("res://backend/domains/localization_i18n/localization_solver.gd")
-const I18nHotReloadPipeline = preload("res://backend/domains/localization_i18n/i18n_hot_reload_pipeline.gd")
-const LocalizationI18nDTO = preload("res://backend/domains/localization_i18n/dto/localization_i18n_dto.gd")
-
 static var _instance: LocalizationI18nService = null
 
 ## 获取多语言领域服务全局单例

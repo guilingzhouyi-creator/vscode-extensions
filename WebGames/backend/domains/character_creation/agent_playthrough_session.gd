@@ -11,8 +11,6 @@
 class_name AgentPlaythroughSession
 extends RefCounted
 
-const AgentPlaythroughSessionFactory = preload("res://backend/domains/character_creation/agent_playthrough_session_factory.gd")
-
 # ==============================================================================
 # 一、会话运行时状态字段
 # ==============================================================================
@@ -123,9 +121,9 @@ func step(action: Dictionary) -> Dictionary:
 
 	if action_type == "QUIT" or choice_id.to_upper() == "QUIT":
 		is_terminal = true
-		var bus := CompanionObserverBus.get_instance()
-		if bus != null:
-			bus.broadcast_event("session_quit", {
+		var observer_bus := CompanionObserverBus.get_instance()
+		if observer_bus != null:
+			observer_bus.broadcast_event("session_quit", {
 				"session_id": session_id,
 				"step_index": step_index
 			})

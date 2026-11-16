@@ -42,8 +42,8 @@ func resolve(canonical_id: String, declared_tier: int, declared_interval: int) -
 		interval_baseline = _registry.get_mythic_interval_baseline(declared_interval)
 	var snapshot := ItemQualitySnapshot.new()
 	snapshot.canonical_id = canonical_id
-	snapshot.tier = declared_tier
-	snapshot.mythic_interval = declared_interval
+	snapshot.tier = declared_tier as ItemQualitySnapshot.QualityTier
+	snapshot.mythic_interval = declared_interval as ItemQualitySnapshot.MythicInterval
 	snapshot.tier_level = ItemQualitySnapshot.tier_to_level(declared_tier)
 	snapshot.strength_weight = float(interval_baseline.get("strength_weight", baseline.get("strength_weight", 1.0)))
 	snapshot.rarity_weight = float(interval_baseline.get("rarity_weight", baseline.get("rarity_weight", 1.0)))

@@ -22,12 +22,15 @@ var copy_circulation_count: int = GameConfig.get_int("domains.lattice", "manuscr
 
 ## 序列化手稿实体（内嵌 AST 递归序列化）
 func serialize() -> Dictionary:
+	var serialized_ast: Variant = null
+	if imprinted_ast != null:
+		serialized_ast = imprinted_ast.serialize()
 	return {
 		"item_id": item_id,
 		"custom_name": custom_name,
 		"category": category,
 		"author_character_id": author_character_id,
-		"imprinted_ast": imprinted_ast.serialize() if imprinted_ast else null,
+		"imprinted_ast": serialized_ast,
 		"royalty_percent": royalty_percent,
 		"market_base_price": market_base_price,
 		"copy_circulation_count": copy_circulation_count

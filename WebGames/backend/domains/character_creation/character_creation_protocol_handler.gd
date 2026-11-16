@@ -12,19 +12,6 @@
 class_name CharacterCreationProtocolHandler
 extends RefCounted
 
-const AuthoritativeCharacterCreationRequestDTO = preload("res://backend/domains/character_creation/dto/authoritative_character_creation_request_dto.gd")
-const AuthoritativeReincarnationSolver = preload("res://backend/domains/character_creation/authoritative_reincarnation_solver.gd")
-const WorldArchiveRepository = preload("res://backend/domains/world_state/world_archive_repository.gd")
-const WorldCharacterCreationOrchestrator = preload("res://backend/domains/character_creation/world_character_creation_orchestrator.gd")
-const CharacterPrologueContext = preload("res://backend/domains/character_creation/character_prologue_context.gd")
-const PrologueExecutionKernel = preload("res://backend/domains/character_creation/prologue_execution_kernel.gd")
-const PrologueCutscenePort = preload("res://backend/domains/character_creation/prologue_cutscene_port.gd")
-const PrologueHandoffDTO = preload("res://backend/domains/character_creation/dto/prologue_handoff_dto.gd")
-const CreationUiSnapshotBuilder = preload("res://backend/domains/character_creation/creation_ui_snapshot_builder.gd")
-const PrologueDagStepHelper = preload("res://backend/domains/character_creation/prologue_dag_step_helper.gd")
-const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
-const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
-
 ## 分发角色创建阶段客户端协议动作（UI 快照读取、命途预览摇骰、权威创角）
 static func dispatch_creation(request: ClientRequestEnvelopeDTO, gateway: Variant) -> UnifiedResponseEnvelopeDTO:
 	var payload_map: Dictionary = request.payload if request.payload is Dictionary else {}

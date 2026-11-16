@@ -36,9 +36,6 @@
 class_name ModPrecheckAndAdaptationSolver
 extends RefCounted
 
-const ModAdaptationManifestMerger = preload("res://backend/domains/character_creation/mod_adaptation_manifest_merger.gd")
-const CreationUiSnapshotBuilder = preload("res://backend/domains/character_creation/creation_ui_snapshot_builder.gd")
-
 # ==============================================================================
 # 一、单包显性 MOD 合规性静态预检 (Single-Pack Compliance Precheck)
 # - 输入: DestinyModManifestDTO 实例或原始 Dictionary (支持工程测试夹具零磁盘直传)
@@ -71,7 +68,8 @@ static func precheck_and_adapt_mod_list(
     var collected_enabled_pack_ids: Array[String] = []
     var has_non_compliant_enabled: bool = false
 
-    for raw_pack in candidate_packs:
+    var ordered_packs: Array = _order_candidate_packs(candidate_packs, enabled_pack_ids, is_all_enabled)
+    for raw_pack in ordered_packs:
         var single_result: Dictionary = precheck_single_mod(raw_pack, base_reference_manifest)
         var manifest_dto: DestinyModManifestDTO = single_result.get("manifest")
         var pack_id: String = manifest_dto.pack_id
@@ -132,7 +130,7 @@ static func precheck_and_adapt_mod_list(
         )
 
     var topology_conflicts: Array[Dictionary] = []
-    var sorted_manifests: Array[DestinyModManifestDTO] = _topological_sort_manifests(enabled_manifests, topology_conflicts)
+    var sorted_manifests: Array[DestinyModManifestDTO] = _topological_sort_manifests(enabled_manifests, topology_conflicts, not is_all_enabled)
     if not topology_conflicts.is_empty():
         return _build_adaptation_failure(
             "ERR_MOD_INCOMPATIBLE_CONFLICT",
@@ -140,6 +138,10 @@ static func precheck_and_adapt_mod_list(
             precheck_checklist,
             topology_conflicts
         )
+
+    collected_enabled_pack_ids.clear()
+    for sorted_manifest in sorted_manifests:
+        collected_enabled_pack_ids.append(sorted_manifest.pack_id)
 
     if not _has_base_content_pack(enabled_manifests):
         return _build_adaptation_failure(
@@ -309,9 +311,41 @@ static func _decrement_dependents(dependents: Array, in_degree: Dictionary, queu
         if in_degree[dependent_pack_id] == 0:
             queue.append(dependent_pack_id)
 
+static func _order_candidate_packs(
+    candidate_packs: Array,
+    enabled_pack_ids: Array,
+    is_all_enabled: bool
+) -> Array:
+    if is_all_enabled or enabled_pack_ids.is_empty():
+        return candidate_packs
+    var packs_by_id: Dictionary = {}
+    var remaining_packs: Array = []
+    for raw_pack in candidate_packs:
+        var manifest_dto: DestinyModManifestDTO = _extract_manifest_dto_fast(raw_pack)
+        if manifest_dto != null and not manifest_dto.pack_id.is_empty():
+            packs_by_id[manifest_dto.pack_id] = raw_pack
+        else:
+            remaining_packs.append(raw_pack)
+    var ordered_packs: Array = []
+    var placed_ids: Dictionary = {}
+    for raw_enabled_id in enabled_pack_ids:
+        var clean_enabled_id := str(raw_enabled_id).strip_edges()
+        if packs_by_id.has(clean_enabled_id) and not placed_ids.has(clean_enabled_id):
+            ordered_packs.append(packs_by_id[clean_enabled_id])
+            placed_ids[clean_enabled_id] = true
+    for raw_pack in candidate_packs:
+        var manifest_dto: DestinyModManifestDTO = _extract_manifest_dto_fast(raw_pack)
+        if manifest_dto != null and not manifest_dto.pack_id.is_empty() and not placed_ids.has(manifest_dto.pack_id):
+            ordered_packs.append(raw_pack)
+    for extra_pack in remaining_packs:
+        ordered_packs.append(extra_pack)
+    return ordered_packs
+
+
 static func _topological_sort_manifests(
     manifests: Array[DestinyModManifestDTO],
-    conflicts: Array[Dictionary]
+    conflicts: Array[Dictionary],
+    preserve_input_order: bool = false
 ) -> Array[DestinyModManifestDTO]:
     if manifests.size() <= 1:
         return manifests
@@ -319,9 +353,12 @@ static func _topological_sort_manifests(
     var in_degree: Dictionary = {}
     var adjacency_map: Dictionary = {}
     var manifest_by_pack_id: Dictionary = {}
+    var input_order_map: Dictionary = {}
 
-    for manifest_dto in manifests:
+    for manifest_index in range(manifests.size()):
+        var manifest_dto: DestinyModManifestDTO = manifests[manifest_index]
         manifest_by_pack_id[manifest_dto.pack_id] = manifest_dto
+        input_order_map[manifest_dto.pack_id] = manifest_index
         in_degree[manifest_dto.pack_id] = 0
         adjacency_map[manifest_dto.pack_id] = _new_list()
 
@@ -332,7 +369,8 @@ static func _topological_sort_manifests(
     for pack_id in in_degree.keys():
         if in_degree[pack_id] == 0:
             queue.append(manifest_by_pack_id[pack_id])
-    queue.sort_custom(Callable(ModPrecheckAndAdaptationSolver, "_compare_manifest_priority"))
+    var comparator := Callable(ModPrecheckAndAdaptationSolver, "_compare_manifest_input_order").bind(input_order_map) if preserve_input_order else Callable(ModPrecheckAndAdaptationSolver, "_compare_manifest_priority")
+    queue.sort_custom(comparator)
 
     var sorted_manifests_list: Array[DestinyModManifestDTO] = []
     var empty_dependents: Array = []
@@ -346,7 +384,7 @@ static func _topological_sort_manifests(
         if not newly_unlocked.is_empty():
             for unlocked_id in newly_unlocked:
                 queue.append(manifest_by_pack_id[unlocked_id])
-            queue.sort_custom(Callable(ModPrecheckAndAdaptationSolver, "_compare_manifest_priority"))
+            queue.sort_custom(comparator)
 
     if sorted_manifests_list.size() < manifests.size():
         _append_conflict(
@@ -359,6 +397,9 @@ static func _topological_sort_manifests(
         return manifests
 
     return sorted_manifests_list
+
+static func _compare_manifest_input_order(left: DestinyModManifestDTO, right: DestinyModManifestDTO, input_order_map: Dictionary) -> bool:
+    return int(input_order_map.get(left.pack_id, 999999)) < int(input_order_map.get(right.pack_id, 999999))
 
 static func _compare_manifest_priority(left: DestinyModManifestDTO, right: DestinyModManifestDTO) -> bool:
     if left.priority != right.priority:

@@ -12,14 +12,6 @@
 class_name LifecycleProtocolHandler
 extends RefCounted
 
-const GameLifecycleService = preload("res://backend/domains/lifecycle/game_lifecycle_service.gd")
-const GameLifecycleModel = preload("res://backend/domains/lifecycle/game_lifecycle_model.gd")
-const GameShutdownDTO = preload("res://backend/domains/lifecycle/dto/game_shutdown_dto.gd")
-const EscMenuBackendService = preload("res://backend/domains/world_state/services/esc_menu_backend_service.gd")
-const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
-const HumanControlLeaseManager = preload("res://backend/domains/world_state/services/human_control_lease_manager.gd")
-const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
-
 ## 分发并处理生命周期领域客户端协议动作（暂停/恢复/登出/停机）
 static func dispatch(request: ClientRequestEnvelopeDTO, gateway: Variant) -> UnifiedResponseEnvelopeDTO:
 	if request.action_type.begins_with("ESC_"):

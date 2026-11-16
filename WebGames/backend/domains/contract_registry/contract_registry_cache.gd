@@ -18,7 +18,6 @@ const LRU_MAX_ENTRIES: int = 128
 
 static var _lru_map: Dictionary = {}
 static var _access_order: Array[String] = []
-static var _loaded_version: int = 1
 static var _last_load_at: String = ""
 
 

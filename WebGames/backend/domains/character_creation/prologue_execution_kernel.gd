@@ -13,9 +13,6 @@
 class_name PrologueExecutionKernel
 extends RefCounted
 
-const PrologueHeadlessPlaythroughRunner = preload("res://backend/domains/character_creation/prologue_headless_playthrough_runner.gd")
-const PrologueDagStepHelper = preload("res://backend/domains/character_creation/prologue_dag_step_helper.gd")
-
 # ==============================================================================
 # 一、启动编排（开局事件流 → 序章上下文 + 首步事件包）
 # ==============================================================================

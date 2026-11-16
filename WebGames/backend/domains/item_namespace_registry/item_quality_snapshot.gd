@@ -17,19 +17,19 @@ extends RefCounted
 
 # 1. 主品质等级枚举（六档，等级值严格单调递增，禁止跨级倒置）
 enum QualityTier {
-	COMMON,     # 普通   = 等级 1
-	FINE,       # 精品   = 等级 2
-	EPIC,       # 史诗   = 等级 3
-	LEGENDARY,  # 传奇   = 等级 4
-	MYTHIC,     # 神话   = 等级 5
-	ANCIENT,    # 古代   = 等级 6
+	COMMON, # 普通   = 等级 1
+	FINE, # 精品   = 等级 2
+	EPIC, # 史诗   = 等级 3
+	LEGENDARY, # 传奇   = 等级 4
+	MYTHIC, # 神话   = 等级 5
+	ANCIENT, # 古代   = 等级 6
 }
 
 # 2. 神话级内部区间端点（仅 Mythic 档内生效，非独立主等级）
 enum MythicInterval {
-	NONE,            # 非神话级或未细分
-	QUASI_ARTIFACT,  # 准神器：神话级低端边界
-	TRUE_ARTIFACT,   # 真神器：神话级高端边界
+	NONE, # 非神话级或未细分
+	QUASI_ARTIFACT, # 准神器：神话级低端边界
+	TRUE_ARTIFACT, # 真神器：神话级高端边界
 }
 
 # ==============================================================================
@@ -40,17 +40,17 @@ enum MythicInterval {
 var canonical_id: String = ""
 var tier: QualityTier = QualityTier.COMMON
 var mythic_interval: MythicInterval = MythicInterval.NONE
-var tier_level: int = 1            # 1~6，由 QualityTier 单调映射
-var strength_weight: float = 1.0   # 强度基线权重（由 quality_tiers 配置表驱动）
-var rarity_weight: float = 1.0     # 稀有度/掉落权重（由 quality_tiers 配置表驱动）
+var tier_level: int = 1 # 1~6，由 QualityTier 单调映射
+var strength_weight: float = 1.0 # 强度基线权重（由 quality_tiers 配置表驱动）
+var rarity_weight: float = 1.0 # 稀有度/掉落权重（由 quality_tiers 配置表驱动）
 
 # ==============================================================================
 # 三、等级映射与校验
 # ==============================================================================
 
 ## 等级值单调映射：QualityTier -> 1~6（唯一事实源，禁止跨级倒置）
-static func tier_to_level(tier: QualityTier) -> int:
-	match tier:
+static func tier_to_level(quality_tier: QualityTier) -> int:
+	match quality_tier:
 		QualityTier.COMMON:
 			return 1
 		QualityTier.FINE:
@@ -67,10 +67,10 @@ static func tier_to_level(tier: QualityTier) -> int:
 			return 1
 
 ## 区间端点从属校验：非神话级不得携带区间端点（INV-3）
-static func is_interval_valid_for_tier(interval: MythicInterval, tier: QualityTier) -> bool:
+static func is_interval_valid_for_tier(interval: MythicInterval, quality_tier: QualityTier) -> bool:
 	if interval == MythicInterval.NONE:
 		return true
-	return tier == QualityTier.MYTHIC
+	return quality_tier == QualityTier.MYTHIC
 
 # ==============================================================================
 # 四、DTO 数据交换契约
@@ -91,8 +91,8 @@ func to_dto() -> Dictionary:
 static func from_dto(serialized_snapshot: Dictionary) -> ItemQualitySnapshot:
 	var snapshot := ItemQualitySnapshot.new()
 	snapshot.canonical_id = str(serialized_snapshot.get("canonical_id", ""))
-	snapshot.tier = int(serialized_snapshot.get("tier", QualityTier.COMMON))
-	snapshot.mythic_interval = int(serialized_snapshot.get("mythic_interval", MythicInterval.NONE))
+	snapshot.tier = int(serialized_snapshot.get("tier", QualityTier.COMMON)) as QualityTier
+	snapshot.mythic_interval = int(serialized_snapshot.get("mythic_interval", MythicInterval.NONE)) as MythicInterval
 	snapshot.tier_level = int(serialized_snapshot.get("tier_level", tier_to_level(snapshot.tier)))
 	snapshot.strength_weight = float(serialized_snapshot.get("strength_weight", 1.0))
 	snapshot.rarity_weight = float(serialized_snapshot.get("rarity_weight", 1.0))

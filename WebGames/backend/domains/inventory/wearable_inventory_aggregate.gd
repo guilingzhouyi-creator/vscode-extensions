@@ -11,7 +11,6 @@
 class_name WearableInventoryAggregate extends RefCounted
 
 const InventoryMetricSnapshotClass = preload("res://backend/domains/inventory/inventory_metric_snapshot.gd")
-const ItemUIDGenerator = preload("res://backend/domains/item_namespace_registry/item_uid_generator.gd")
 
 # ==============================================================================
 # 一、仓储状态（含增量度量缓存）

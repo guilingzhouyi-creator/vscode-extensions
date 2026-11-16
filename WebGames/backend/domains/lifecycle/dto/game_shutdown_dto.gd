@@ -11,8 +11,6 @@
 class_name GameShutdownDTO
 extends RefCounted
 
-const GameLifecycleModel = preload("res://backend/domains/lifecycle/game_lifecycle_model.gd")
-
 ## 停机请求 DTO
 class Request extends RefCounted:
 	var session_token: String = ""

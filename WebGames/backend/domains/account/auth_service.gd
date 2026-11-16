@@ -10,11 +10,6 @@
 ## AuthService：Domain Service / State Orchestrator
 class_name AuthService extends RefCounted
 
-const AccountRegistrationDTO = preload("res://backend/domains/account/dto/account_registration_dto.gd")
-const AccountCompositeAuthDTO = preload("res://backend/domains/account/dto/account_composite_auth_dto.gd")
-const HudEventContract = preload("res://backend/domains/world_state/hud_event_contract.gd")
-const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
-
 const DOMAIN_ACCOUNT_CONFIG: String = "domains.account"
 const DEFAULT_GUEST_NAME_RANGE_MIN: int = 1000
 const DEFAULT_GUEST_NAME_RANGE_MAX: int = 9999

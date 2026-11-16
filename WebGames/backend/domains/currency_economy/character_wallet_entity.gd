@@ -190,9 +190,9 @@ func _is_overflow(amount: int, current: int, candidate: int) -> bool:
 
 ## 校验负债上限是否超额
 func _validate_debt_limit(values: Dictionary) -> bool:
-	var max_debt := maxi(0, GameConfig.get_int("domains.currency", "debt/max_debt_copper", 1000000000))
-	var copper_total := int(values.copper) * _rate(COIN_COPPER) + int(values.silver) * _rate(COIN_SILVER) + int(values.gold) * _rate(COIN_GOLD) + int(values.platinum) * _rate(COIN_PLATINUM)
-	return -copper_total <= max_debt
+	var currency_cache := _ensure_currency_cache()
+	var copper_total := int(values.copper) * currency_cache.rate_copper + int(values.silver) * currency_cache.rate_silver + int(values.gold) * currency_cache.rate_gold + int(values.platinum) * currency_cache.rate_platinum
+	return -copper_total <= currency_cache.max_debt_copper
 
 ## 转换当前对象为基础字典数据结构
 func to_dictionary() -> Dictionary:

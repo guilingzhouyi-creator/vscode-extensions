@@ -11,8 +11,6 @@
 class_name ClawbackService
 extends RefCounted
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 const RUN_MODE_ONLINE: String = "online"
 const RUN_MODE_STANDALONE: String = "standalone"
 

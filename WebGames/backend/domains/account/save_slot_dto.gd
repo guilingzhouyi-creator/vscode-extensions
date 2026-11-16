@@ -10,8 +10,6 @@
 ## SaveSlotDTO：Value Object DTO / Data Transport Model
 class_name SaveSlotDTO extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 # ==============================================================================
 # 一、插槽封面元数据（默认值均来自 save_slot/defaults 配置）
 # ==============================================================================

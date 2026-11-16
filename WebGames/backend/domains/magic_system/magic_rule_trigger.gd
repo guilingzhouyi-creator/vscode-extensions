@@ -12,19 +12,19 @@ class_name MagicRuleTrigger
 extends RefCounted
 
 enum TriggerKind {
-	DELAYED_CAST = 1,  # 延时魔法到期强制打出
+	DELAYED_CAST = 1, # 延时魔法到期强制打出
 }
 
 enum ReleasePolicy {
-	KEEP_PENDING = 1,  # 保留状态下轮重试
+	KEEP_PENDING = 1, # 保留状态下轮重试
 	CANCEL_AND_REFUND, # 取消并回退资源
-	CANCEL,            # 取消（默认，不退款）
+	CANCEL, # 取消（默认，不退款）
 }
 
 enum TargetPolicy {
-	FAIL_ON_MISSING = 1,  # 目标缺失 → 受控失败（默认）
-	LOCKED,               # 锁定原目标
-	RETARGET,             # 释放时按规则重选
+	FAIL_ON_MISSING = 1, # 目标缺失 → 受控失败（默认）
+	LOCKED, # 锁定原目标
+	RETARGET, # 释放时按规则重选
 }
 
 var trigger_id: String = ""
@@ -33,11 +33,11 @@ var holder_id: String = ""
 var magic_ref: String = ""
 var source_card_id: String = ""
 var remain_steps: int = 0
-var casts_per_play: int = 1              # 延时 + 几重化组合（释放时按当时配置触发）
+var casts_per_play: int = 1 # 延时 + 几重化组合（释放时按当时配置触发）
 var target_policy: TargetPolicy = TargetPolicy.FAIL_ON_MISSING
 var release_policy: ReleasePolicy = ReleasePolicy.CANCEL
-var snapshot_at_cast: Dictionary = {}    # 创建时属性快照（attribute_snapshot=AT_CAST 时生效）
-var use_snapshot: bool = false           # true=按创建时快照结算；false=释放时实时
+var snapshot_at_cast: Dictionary = {} # 创建时属性快照（attribute_snapshot=AT_CAST 时生效）
+var use_snapshot: bool = false # true=按创建时快照结算；false=释放时实时
 
 ## 序列化触发状态为字典（枚举转整型 + 快照深拷贝）
 func to_dto() -> Dictionary:
@@ -59,14 +59,14 @@ func to_dto() -> Dictionary:
 static func from_dto(serialized_trigger: Dictionary) -> MagicRuleTrigger:
 	var rule_trigger := MagicRuleTrigger.new()
 	rule_trigger.trigger_id = str(serialized_trigger.get("trigger_id", ""))
-	rule_trigger.kind = int(serialized_trigger.get("kind", TriggerKind.DELAYED_CAST))
+	rule_trigger.kind = int(serialized_trigger.get("kind", TriggerKind.DELAYED_CAST)) as TriggerKind
 	rule_trigger.holder_id = str(serialized_trigger.get("holder_id", ""))
 	rule_trigger.magic_ref = str(serialized_trigger.get("magic_ref", ""))
 	rule_trigger.source_card_id = str(serialized_trigger.get("source_card_id", ""))
 	rule_trigger.remain_steps = int(serialized_trigger.get("remain_steps", 0))
 	rule_trigger.casts_per_play = int(serialized_trigger.get("casts_per_play", 1))
-	rule_trigger.target_policy = int(serialized_trigger.get("target_policy", TargetPolicy.FAIL_ON_MISSING))
-	rule_trigger.release_policy = int(serialized_trigger.get("release_policy", ReleasePolicy.CANCEL))
+	rule_trigger.target_policy = int(serialized_trigger.get("target_policy", TargetPolicy.FAIL_ON_MISSING)) as TargetPolicy
+	rule_trigger.release_policy = int(serialized_trigger.get("release_policy", ReleasePolicy.CANCEL)) as ReleasePolicy
 	rule_trigger.snapshot_at_cast = serialized_trigger.get("snapshot_at_cast", {}).duplicate(true)
 	rule_trigger.use_snapshot = bool(serialized_trigger.get("use_snapshot", false))
 	return rule_trigger

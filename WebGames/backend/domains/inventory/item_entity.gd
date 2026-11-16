@@ -10,8 +10,6 @@
 ## ItemEntity：Domain Entity / Aggregate Root
 class_name ItemEntity extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 # ==============================================================================
 # 一、序列化版本与分类常量
 # ==============================================================================

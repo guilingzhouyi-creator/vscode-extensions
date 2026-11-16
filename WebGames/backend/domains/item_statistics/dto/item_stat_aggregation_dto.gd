@@ -11,8 +11,6 @@
 class_name ItemStatAggregationDto
 extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 var total_items_tracked: int = 0
 var total_value_accumulated: int = 0
 var rarity_breakdown: Dictionary = {}

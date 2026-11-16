@@ -11,8 +11,6 @@
 class_name AgentObservationPacketDTO
 extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 # ==============================================================================
 # 一、观测包契约字段
 # ==============================================================================

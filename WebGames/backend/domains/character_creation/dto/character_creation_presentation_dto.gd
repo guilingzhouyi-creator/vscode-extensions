@@ -11,8 +11,6 @@
 class_name CharacterCreationPresentationDTO
 extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 # ==============================================================================
 # 一、表现层契约字段
 # ==============================================================================

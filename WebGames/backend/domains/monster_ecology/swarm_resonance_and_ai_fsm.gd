@@ -26,7 +26,7 @@ static func evaluate_monster_ai_action(monster: MonsterAggregateEntity, current_
 		return GameConfig.get_string("domains.monster", "ai/verbs/SLASH", "SLASH")
 
 ## 兽潮共鸣调度：全体怪物狂暴值递增（上限钳制）并广播共鸣叙事
-static func trigger_swarm_resonance(swarm_entities: Array, lead_signal: String) -> void:
+static func trigger_swarm_resonance(swarm_entities: Array, _lead_signal: String) -> void:
 	var rage_increment := GameConfig.get_float("domains.monster", "swarm/rage_increment", 30.0)
 	var rage_max := GameConfig.get_float("domains.monster", "swarm/rage_max", 100.0)
 	for monster in swarm_entities:

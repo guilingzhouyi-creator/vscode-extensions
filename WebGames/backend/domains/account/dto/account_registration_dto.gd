@@ -11,8 +11,6 @@
 class_name AccountRegistrationDTO
 extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 ## 注册请求载荷（明文口令绝不序列化输出）
 class Request extends PoolableDtoBase:
 	var username: String = ""

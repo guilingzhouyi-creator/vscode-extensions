@@ -27,7 +27,7 @@ static func _register_synergy_tags(synergy_tags: Array, active_tags: Dictionary)
 
 ## 求解物品最终生效面板属性
 static func evaluate_effective_stats(
-	item_uid: String,
+	_item_uid: String,
 	base_stats: Dictionary,
 	mounts: Array,
 	definitions_by_uid: Dictionary

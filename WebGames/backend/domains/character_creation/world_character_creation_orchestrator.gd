@@ -11,8 +11,6 @@
 class_name WorldCharacterCreationOrchestrator
 extends RefCounted
 
-const WorldModLockMetadataHelper = preload("res://backend/domains/narrative_orchestration/world_mod_lock_metadata_helper.gd")
-
 ## 非法字符黑名单（防止文件注入与控制符号破坏）
 const FORBIDDEN_CHARS: Array[String] = [
     "/", "\\", ":", "*", "?", "\"", "<", ">", "|", "\n", "\r", "\t"
