@@ -11,8 +11,6 @@
 class_name WorldGatewayTabs
 extends BaseScreen
 
-const WorldGatewayRenderHelper = preload("res://frontend/views/world_gateway/world_gateway_render_helper.gd")
-
 var _view: BaseScreen = null
 var _gateway_entered_dispatched: bool = false
 var _prepared_world_id: String = ""

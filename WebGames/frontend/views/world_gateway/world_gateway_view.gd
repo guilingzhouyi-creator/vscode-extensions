@@ -12,9 +12,6 @@ class_name WorldGatewayView
 extends BaseScreen
 
 const TabsClass = preload("res://frontend/views/world_gateway/world_gateway_tabs.gd")
-const WorldGatewayRenderHelper = preload("res://frontend/views/world_gateway/world_gateway_render_helper.gd")
-const WorldGatewayRealmSessionHelper = preload("res://frontend/views/world_gateway/world_gateway_realm_session_helper.gd")
-const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
 
 var current_account_id: String = ""
 var current_session_token: String = ""

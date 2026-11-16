@@ -12,8 +12,6 @@ extends BaseScreen
 
 const SystemSaveTabsClass = preload("res://frontend/views/system_save/system_save_tabs.gd")
 
-const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
-
 # ==============================================================================
 # 枚举
 # ==============================================================================
@@ -36,7 +34,6 @@ enum GMPermissionLevel {NONE, MODERATOR, ADMIN, DEVELOPER}
 
 # --- Tab 1: 存档槽位 ---
 @onready var _item_list_save_slots: ItemList = $%ItemListSaveSlots
-@onready var _panel_slot_thumbnail: PanelContainer = $%PanelSlotThumbnail
 @onready var _label_slot_character_name: Label = $%LabelSlotCharName
 @onready var _label_slot_level: Label = $%LabelSlotLevel
 @onready var _label_slot_playtime: Label = $%LabelSlotPlaytime
@@ -50,43 +47,42 @@ enum GMPermissionLevel {NONE, MODERATOR, ADMIN, DEVELOPER}
 @onready var _cloud_sync_button: Button = $%BtnCloudSync
 
 # --- Tab 2: 确定性回放 ---
-@onready var _item_list_replays: ItemList = $%ItemListReplays
-@onready var _label_replay_title: Label = $%LabelReplayTitle
-@onready var _label_replay_scene: Label = $%LabelReplayScene
-@onready var _label_replay_level: Label = $%LabelReplayLevel
-@onready var _label_replay_duration: Label = $%LabelReplayDuration
-@onready var _label_replay_date: Label = $%LabelReplayDate
-@onready var _slider_replay_progress: HSlider = $%SliderReplayProgress
-@onready var _label_frame_summary: Label = $%LabelFrameInfo
-@onready var _play_replay_button: Button = $%BtnPlayReplay
-@onready var _pause_replay_button: Button = $%BtnPauseReplay
-@onready var _stop_replay_button: Button = $%BtnStopReplay
-@onready var _frame_previous_button: Button = $%BtnFramePrev
-@onready var _frame_next_button: Button = $%BtnFrameNext
-@onready var _speed_down_button: Button = $%BtnSpeedDown
-@onready var _label_speed_value: Label = $%LabelSpeedVal
-@onready var _speed_up_button: Button = $%BtnSpeedUp
+@onready var item_list_replays: ItemList = $%ItemListReplays
+@onready var label_replay_title: Label = $%LabelReplayTitle
+@onready var label_replay_scene: Label = $%LabelReplayScene
+@onready var label_replay_level: Label = $%LabelReplayLevel
+@onready var label_replay_duration: Label = $%LabelReplayDuration
+@onready var label_replay_date: Label = $%LabelReplayDate
+@onready var slider_replay_progress: HSlider = $%SliderReplayProgress
+@onready var label_frame_summary: Label = $%LabelFrameInfo
+@onready var play_replay_button: Button = $%BtnPlayReplay
+@onready var pause_replay_button: Button = $%BtnPauseReplay
+@onready var stop_replay_button: Button = $%BtnStopReplay
+@onready var frame_previous_button: Button = $%BtnFramePrev
+@onready var frame_next_button: Button = $%BtnFrameNext
+@onready var speed_down_button: Button = $%BtnSpeedDown
+@onready var label_speed_value: Label = $%LabelSpeedVal
+@onready var speed_up_button: Button = $%BtnSpeedUp
 
 # --- Tab 3: GM 沙盒 ---
-@onready var _label_gm_permission: Label = $%LabelGMPermission
-@onready var _line_edit_gm_input: LineEdit = $%LineEditGMInput
-@onready var _gm_execute_button: Button = $%BtnGMExecute
-@onready var _gm_output_rich_text: RichTextLabel = $%RichGMOutput
-@onready var _item_list_gm_history: ItemList = $%ItemListGMHistory
-@onready var _gm_god_mode_button: Button = $%BtnGMGodMode
-@onready var _gm_give_item_button: Button = $%BtnGMGiveItem
-@onready var _gm_teleport_button: Button = $%BtnGMTeleport
-@onready var _gm_spawn_mob_button: Button = $%BtnGMSpawnMob
-@onready var _gm_set_time_button: Button = $%BtnGMSetTime
+@onready var label_gm_permission: Label = $%LabelGMPermission
+@onready var line_edit_gm_input: LineEdit = $%LineEditGMInput
+@onready var gm_execute_button: Button = $%BtnGMExecute
+@onready var gm_output_rich_text: RichTextLabel = $%RichGMOutput
+@onready var item_list_gm_history: ItemList = $%ItemListGMHistory
+@onready var gm_god_mode_button: Button = $%BtnGMGodMode
+@onready var gm_give_item_button: Button = $%BtnGMGiveItem
+@onready var gm_teleport_button: Button = $%BtnGMTeleport
+@onready var gm_spawn_mob_button: Button = $%BtnGMSpawnMob
+@onready var gm_set_time_button: Button = $%BtnGMSetTime
 
 # --- Tab 4: CDK 兑换 ---
-@onready var _line_edit_cdkey_input: LineEdit = $%LineEditCDKeyInput
-@onready var _cdkey_redeem_button: Button = $%BtnCDKeyRedeem
-@onready var _label_cdkey_result: Label = $%LabelCDKeyResult
-@onready var _panel_reward_preview: PanelContainer = $%PanelRewardPreview
-@onready var _label_reward_title: Label = $%LabelRewardTitle
-@onready var _label_reward_description: Label = $%LabelRewardDesc
-@onready var _item_list_cdkey_history: ItemList = $%ItemListCDKeyHistory
+@onready var line_edit_cdkey_input: LineEdit = $%LineEditCDKeyInput
+@onready var cdkey_redeem_button: Button = $%BtnCDKeyRedeem
+@onready var label_cdkey_result: Label = $%LabelCDKeyResult
+@onready var label_reward_title: Label = $%LabelRewardTitle
+@onready var label_reward_description: Label = $%LabelRewardDesc
+@onready var item_list_cdkey_history: ItemList = $%ItemListCDKeyHistory
 
 # ==============================================================================
 # 状态数据
@@ -100,29 +96,29 @@ var _selected_slot_index: int = -1
 var slot_prefix: String = GameConfig.get_string("frontend.views", "fe16_system_save/default_slot_prefix", "SLOT_")
 
 ## 回放条目列表
-var _replay_entries: Array = []
+var replay_entries: Array = []
 ## 当前选中的回放索引
-var _selected_replay_index: int = -1
+var selected_replay_index: int = -1
 ## 回放是否播放中
-var _replay_playing: bool = false
+var replay_playing: bool = false
 ## 回放当前帧
-var _replay_current_frame: int = 0
+var replay_current_frame: int = 0
 ## 回放总帧数
-var _replay_total_frames: int = 0
+var replay_total_frames: int = 0
 ## 回放速度倍率（档位表经 domain_boundary 服务只读获取）
-var _replay_speed: float = 1.0
+var replay_speed: float = 1.0
 
 ## GM 控制台状态
 var is_gm_console_open: bool = false
 ## GM 权限等级
-var _gm_permission_level: int = GMPermissionLevel.DEVELOPER
+var gm_permission_level: int = GMPermissionLevel.DEVELOPER
 ## GM 指令历史
-var _gm_command_history: Array = []
+var gm_command_history: Array = []
 
 ## CDK 输入文本
 var cdkey_input_text: String = ""
 ## CDK 兑换历史
-var _cdkey_history: Array = []
+var cdkey_history: Array = []
 
 # ==============================================================================
 # 生命周期
@@ -211,17 +207,21 @@ func _init_static_text() -> void:
 # Tab 1: 存档槽位
 # ==============================================================================
 
-## 初始化存档槽位：预设 6 槽数据并首刷列表与详情
+## 初始化存档槽位：Mock 模式预设 6 槽示例数据，实网模式构建空槽等待真实存档读取
 func _init_save_slots() -> void:
-	# 预设 6 个存档槽位（角色名使用 i18n key）
-	save_slots = [
-		{"slot_id": "SLOT_01", "char_name_key": "ui.fe16.mock.char.artoria", "level": 45, "playtime_sec": 86400, "save_date": "2026-08-31 23:15", "empty": false},
-		{"slot_id": "SLOT_02", "char_name_key": "ui.fe16.mock.char.meriel", "level": 32, "playtime_sec": 43200, "save_date": "2026-08-30 18:42", "empty": false},
-		{"slot_id": "SLOT_03", "char_name_key": "", "level": 0, "playtime_sec": 0, "save_date": "", "empty": true},
-		{"slot_id": "SLOT_04", "char_name_key": "", "level": 0, "playtime_sec": 0, "save_date": "", "empty": true},
-		{"slot_id": "SLOT_05", "char_name_key": "", "level": 0, "playtime_sec": 0, "save_date": "", "empty": true},
-		{"slot_id": "SLOT_06", "char_name_key": "", "level": 0, "playtime_sec": 0, "save_date": "", "empty": true},
-	]
+	if ServiceLocator.get_mode() == "mock":
+		save_slots = [
+			{"slot_id": "SLOT_01", "char_name_key": "ui.fe16.mock.char.artoria", "level": 45, "playtime_sec": 86400, "save_date": "2026-08-31 23:15", "empty": false},
+			{"slot_id": "SLOT_02", "char_name_key": "ui.fe16.mock.char.meriel", "level": 32, "playtime_sec": 43200, "save_date": "2026-08-30 18:42", "empty": false},
+			{"slot_id": "SLOT_03", "char_name_key": "", "level": 0, "playtime_sec": 0, "save_date": "", "empty": true},
+			{"slot_id": "SLOT_04", "char_name_key": "", "level": 0, "playtime_sec": 0, "save_date": "", "empty": true},
+			{"slot_id": "SLOT_05", "char_name_key": "", "level": 0, "playtime_sec": 0, "save_date": "", "empty": true},
+			{"slot_id": "SLOT_06", "char_name_key": "", "level": 0, "playtime_sec": 0, "save_date": "", "empty": true},
+		]
+	else:
+		save_slots = []
+		for slot_number in range(1, 7):
+			save_slots.append({"slot_id": "SLOT_%02d" % slot_number, "char_name_key": "", "level": 0, "playtime_sec": 0, "save_date": "", "empty": true})
 	_refresh_save_slot_list()
 	_refresh_slot_detail()
 
@@ -265,7 +265,9 @@ func _refresh_slot_detail() -> void:
 
 ## 秒数格式化：HH:MM:SS（游玩时长/回放时长展示）
 func _format_playtime(seconds: int) -> String:
+	@warning_ignore("integer_division")
 	var hours_value := seconds / 3600
+	@warning_ignore("integer_division")
 	var minutes_value := (seconds % 3600) / 60
 	var seconds_value := seconds % 60
 	return "%02d:%02d:%02d" % [hours_value, minutes_value, seconds_value]
@@ -335,9 +337,10 @@ func _connect_signals() -> void:
 func _on_back_btn_pressed() -> void:
 	self.back()
 
-## 主 Tab 切换：表现层无额外处理（状态由容器托管）
-func _on_tab_changed(_tab_index: int) -> void:
-	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe16.toast.tab_switched"), NavTypes.ToastLevel.INFO, 1.0)
+## 主 Tab 切换：同步刷新槽位与历史显示
+func _on_tab_changed(tab_index: int) -> void:
+	if tab_index == 0:
+		_refresh_save_slot_list()
 
 # --- 存档槽位 ---
 
@@ -346,23 +349,25 @@ func _on_save_slot_selected(slot_index: int) -> void:
 	_selected_slot_index = slot_index
 	_refresh_slot_detail()
 
-## 保存到槽位：槽位写入经服务，刷新列表与详情
+## 保存到槽位：槽位写入经服务并同步持久化至世界档案仓库，刷新列表与详情
 func _on_save_to_slot_pressed() -> void:
 	if _selected_slot_index < 0:
 		return
 	var save_service := ServiceLocator.get_instance().save()
 	save_slots[_selected_slot_index] = save_service.write_slot(save_slots[_selected_slot_index], {})
+	save_service.dispatch_save_action("SAVE_SLOT", {"slot_id": str(save_slots[_selected_slot_index].get("slot_id", ""))})
 	_refresh_save_slot_list()
 	_item_list_save_slots.select(_selected_slot_index)
 	_refresh_slot_detail()
 
-## 读取槽位：非空槽模拟加载并回显存档日期
+## 读取槽位：非空槽经存档服务加载并回显存档日期
 func _on_load_from_slot_pressed() -> void:
 	if _selected_slot_index < 0:
 		return
 	var slot_entry: Dictionary = save_slots[_selected_slot_index]
 	if slot_entry.get("empty", true):
 		return
+	ServiceLocator.get_instance().save().dispatch_save_action("LOAD_SLOT", {"slot_id": str(slot_entry.get("slot_id", ""))})
 	UIIntermediary.resolve(_label_slot_save_date, "ui.fe16.save_slot.save_date_loaded", {"date": slot_entry.get("save_date", "")})
 
 ## 删除槽位：槽位清空经服务，刷新列表与详情
@@ -370,17 +375,33 @@ func _on_delete_slot_pressed() -> void:
 	if _selected_slot_index < 0:
 		return
 	var save_service := ServiceLocator.get_instance().save()
+	var target_slot_id := str(save_slots[_selected_slot_index].get("slot_id", ""))
 	save_slots[_selected_slot_index] = save_service.clear_slot(save_slots[_selected_slot_index])
+	save_service.dispatch_save_action("CLEAR_SLOT", {"slot_id": target_slot_id})
 	_refresh_save_slot_list()
 	_item_list_save_slots.select(_selected_slot_index)
 	_refresh_slot_detail()
 
-func _on_export_slot_pressed() -> void: pass
-func _on_auto_save_toggled(_is_pressed: bool) -> void: pass
+## 导出当前选中槽位快照至 user://saves 导出路径
+func _on_export_slot_pressed() -> void:
+	if _selected_slot_index < 0 or _selected_slot_index >= save_slots.size():
+		return
+	var slot_entry: Dictionary = save_slots[_selected_slot_index]
+	var export_reply := ServiceLocator.get_instance().save().dispatch_save_action("EXPORT_SLOT", {
+		"slot_id": str(slot_entry.get("slot_id", "SLOT_01")),
+		"snapshot": slot_entry,
+	})
+	var export_table: Dictionary = export_reply.get("data", export_reply) as Dictionary
+	NavManager.get_instance().show_toast(str(export_table.get("export_path", "Exported")), NavTypes.ToastLevel.INFO)
 
-## 云同步按钮：更新同步中与同步完成状态文案
+## 切换自动存档策略并同步存档服务配置
+func _on_auto_save_toggled(is_pressed: bool) -> void:
+	ServiceLocator.get_instance().save().dispatch_save_action("TOGGLE_AUTO_SAVE", {"enabled": is_pressed})
+
+## 云同步按钮：调度存档云同步并更新同步完成状态文案
 func _on_cloud_sync_pressed() -> void:
 	UIIntermediary.resolve(_label_cloud_status, "ui.fe16.save_slot.cloud_syncing")
+	ServiceLocator.get_instance().save().dispatch_save_action("CLOUD_SYNC", {"world_id": "ACTIVE"})
 	UIIntermediary.resolve(_label_cloud_status, "ui.fe16.save_slot.cloud_synced")
 
 # --- 确定性回放 / GM 沙盒 / CDK 兑换 回调委托 ---
