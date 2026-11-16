@@ -422,11 +422,28 @@ static func _rebuild_tables_from_active_layers() -> Array[String]:
 	_active_mod_overlays.clear()
 	var overlaid_table_names: Array[String] = []
 	for layer_entry in _active_mod_layers:
-		_apply_layer_purged_prefixes(rebuilt_tables, layer_entry.get("purged_table_prefixes", []))
-		_apply_layer_overlay_tables(rebuilt_tables, layer_entry.get("overlay_tables", {}), overlaid_table_names)
-		_append_layer_pack_ids(layer_entry.get("pack_ids", []))
+		_apply_layer_purged_prefixes(rebuilt_tables, layer_entry.get("purged_table_prefixes"))
+		_apply_layer_overlay_tables(rebuilt_tables, layer_entry.get("overlay_tables"), overlaid_table_names)
+		_append_layer_pack_ids(layer_entry.get("pack_ids"))
 	_tables = rebuilt_tables
 	return overlaid_table_names
+
+static func _normalize_raw_layer_record(raw_layer: Variant) -> Dictionary:
+	if not (raw_layer is Dictionary):
+		return {}
+	var layer_record: Dictionary = raw_layer
+	var raw_packs: Array = []
+	if layer_record.get("pack_ids") is Array:
+		raw_packs = layer_record["pack_ids"] as Array
+	else:
+		var single_pack := String(layer_record.get("pack_id", "")).strip_edges()
+		if not single_pack.is_empty():
+			raw_packs.append(single_pack)
+	var overlay_variant: Variant = layer_record.get("overlay_tables")
+	var purge_variant: Variant = layer_record.get("purged_table_prefixes")
+	var overlay_map: Dictionary = (overlay_variant as Dictionary) if (overlay_variant is Dictionary) else {}
+	var purge_list: Array = (purge_variant as Array) if (purge_variant is Array) else []
+	return _normalize_layer_entry(overlay_map, raw_packs, purge_list)
 
 ## 应用有序模组层栈（每项含 pack_ids/pack_id、overlay_tables、purged_table_prefixes），原子重放构建最终表快照
 static func apply_mod_overlay_stack(layers: Array) -> Dictionary:
@@ -434,17 +451,9 @@ static func apply_mod_overlay_stack(layers: Array) -> Dictionary:
 	_ensure_base_tables_synced()
 	_active_mod_layers.clear()
 	for raw_layer in layers:
-		if not (raw_layer is Dictionary):
-			continue
-		var layer_record: Dictionary = raw_layer
-		var raw_packs: Array = []
-		if layer_record.get("pack_ids") is Array:
-			raw_packs = layer_record["pack_ids"] as Array
-		elif not String(layer_record.get("pack_id", "")).strip_edges().is_empty():
-			raw_packs = [String(layer_record["pack_id"])]
-		var overlay_map: Dictionary = (layer_record.get("overlay_tables", {}) as Dictionary) if (layer_record.get("overlay_tables") is Dictionary) else {}
-		var purge_list: Array = (layer_record.get("purged_table_prefixes", []) as Array) if (layer_record.get("purged_table_prefixes") is Array) else []
-		_active_mod_layers.append(_normalize_layer_entry(overlay_map, raw_packs, purge_list))
+		var normalized_layer := _normalize_raw_layer_record(raw_layer)
+		if not normalized_layer.is_empty():
+			_active_mod_layers.append(normalized_layer)
 	_reload_counter += 1
 	var overlaid_table_names := _rebuild_tables_from_active_layers()
 	_clear_lookup_caches()

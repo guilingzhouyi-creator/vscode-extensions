@@ -14,6 +14,7 @@ class_name CutsceneAsyncLoader
 extends RefCounted
 
 const AssetPathResolverClass = preload("res://backend/infrastructure/resource_governance/asset_path_resolver.gd")
+const AudioBusPipelineClass = preload("res://backend/domains/event_driven_audio/audio_bus_pipeline.gd")
 
 signal load_failed(task_id: int, resource_path: String, error_code: String)
 
@@ -67,7 +68,15 @@ var _is_deterministic_mode: bool = false
 static func get_instance() -> CutsceneAsyncLoader:
 	if _instance == null:
 		_instance = CutsceneAsyncLoader.new()
+	AudioBusPipelineClass.register_mod_audio_stream_loader(Callable(CutsceneAsyncLoader, "_load_mod_audio_stream"))
 	return _instance
+
+## 供领域层 AudioBusPipeline 倒置回调的 MOD 音频流异步装载桥接方法
+static func _load_mod_audio_stream(raw_uri: String, priority: int, on_loaded: Callable) -> int:
+	var canonical_uri := AssetPathResolverClass.resolve_unified_uri(raw_uri)
+	if canonical_uri.is_empty():
+		return 0
+	return get_instance().request_load(canonical_uri, priority, on_loaded)
 
 ## 设置无头确定性仿真加载模式（用于测试隔离与同步完成回调）
 func set_deterministic_mode(is_enabled: bool) -> void:

@@ -83,10 +83,11 @@ static func _collect_directory_content_records(package_root: String) -> Array[Di
 		if FileAccess.file_exists(top_file_path):
 			_append_json_file_record(collected, top_filename, top_file_path)
 
+	var subpaths: Array[String] = []
 	for subdir_name in ["content", "cutscenes"]:
 		var scan_directory := package_root.path_join(subdir_name)
 		if DirAccess.dir_exists_absolute(scan_directory):
-			var subpaths: Array[String] = []
+			subpaths.clear()
 			_scan_json_relative_paths(scan_directory, subdir_name, subpaths)
 			subpaths.sort()
 			for rel_path in subpaths:

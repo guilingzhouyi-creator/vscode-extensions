@@ -15,6 +15,28 @@ extends RefCounted
 # 一、并发水位释放与资源 URI 解析
 # ==============================================================================
 
+static var _mod_audio_stream_loader: Callable = Callable()
+
+## 注册基础设施异步音频流装载委托（由 CutsceneAsyncLoader 初始化时倒置注入，保持领域层零基础设施直连）
+static func register_mod_audio_stream_loader(loader: Callable) -> void:
+	_mod_audio_stream_loader = loader
+
+## 清空已注册的异步音频流装载委托（供测试隔离复位）
+static func reset_mod_audio_stream_loader() -> void:
+	_mod_audio_stream_loader = Callable()
+
+## 通过已注入的流式加载器异步解析并加载 MOD/本地音频资源
+static func request_mod_audio_stream_async(
+	sound_id: String,
+	explicit_uri: String = "",
+	on_loaded: Callable = Callable(),
+	priority: int = 1
+) -> int:
+	var candidate_uri := resolve_mod_audio_uri(sound_id, explicit_uri)
+	if candidate_uri.is_empty() or not _mod_audio_stream_loader.is_valid():
+		return 0
+	return int(_mod_audio_stream_loader.call(candidate_uri, priority, on_loaded))
+
 ## 解析音效资源统一 URI（优先显式路径，其次读取 domains.event_driven_audio/sound_registry）
 static func resolve_mod_audio_uri(sound_id: String, explicit_uri: String = "") -> String:
 	var candidate := explicit_uri.strip_edges()

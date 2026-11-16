@@ -216,7 +216,7 @@ static func _apply_package_records(
 	var applied_count: int = 0
 	for record in content_records:
 		var category_name := String(record.get("category", ""))
-		var payload_variant: Variant = record.get("payload", {})
+		var payload_variant: Variant = record.get("payload")
 		if not (payload_variant is Dictionary):
 			continue
 		var payload_map: Dictionary = payload_variant
@@ -297,7 +297,7 @@ static func _apply_mod_i18n_layers(i18n_layers: Array, applied_packs: Array) -> 
 			continue
 		var layer := layer_variant as Dictionary
 		var pack_id := String(layer.get("pack_id", ""))
-		var by_locale_variant: Variant = layer.get("by_locale", {})
+		var by_locale_variant: Variant = layer.get("by_locale")
 		if not (by_locale_variant is Dictionary):
 			continue
 		var by_locale := by_locale_variant as Dictionary
@@ -305,15 +305,9 @@ static func _apply_mod_i18n_layers(i18n_layers: Array, applied_packs: Array) -> 
 			var locale_entries: Variant = by_locale[raw_locale]
 			if not (locale_entries is Dictionary) or (locale_entries as Dictionary).is_empty():
 				continue
-			var normalized_locale: String = ModPackageArchiveReader.normalize_locale_code(String(raw_locale))
-			var locale_map := locale_entries as Dictionary
-			catalog.merge_mod_translations(pack_id, normalized_locale, locale_map, true)
-			if not merged_by_locale.has(normalized_locale):
-				merged_by_locale[normalized_locale] = {}
-			var bucket := merged_by_locale[normalized_locale] as Dictionary
-			for raw_key in locale_map.keys():
-				bucket[String(raw_key)] = String(locale_map[raw_key])
-			registered_key_count += locale_map.size()
+			registered_key_count += _merge_mod_locale_bucket(
+				catalog, pack_id, String(raw_locale), locale_entries as Dictionary, merged_by_locale
+			)
 	if merged_by_locale.is_empty():
 		GameConfig.clear_mod_i18n_dictionaries()
 	else:
@@ -326,6 +320,28 @@ static func _apply_mod_i18n_layers(i18n_layers: Array, applied_packs: Array) -> 
 		"key_count": registered_key_count
 	})
 	return {"locales": merged_by_locale.keys(), "key_count": registered_key_count}
+
+static func _merge_mod_locale_bucket(
+	catalog: Variant,
+	pack_id: String,
+	raw_locale: String,
+	locale_map: Dictionary,
+	merged_by_locale: Dictionary
+) -> int:
+	var normalized_locale: String = ModPackageArchiveReader.normalize_locale_code(raw_locale)
+	catalog.merge_mod_translations(pack_id, normalized_locale, locale_map, true)
+	var bucket := _ensure_locale_bucket(merged_by_locale, normalized_locale)
+	for raw_key in locale_map.keys():
+		bucket[String(raw_key)] = String(locale_map[raw_key])
+	return locale_map.size()
+
+static func _ensure_locale_bucket(merged_by_locale: Dictionary, normalized_locale: String) -> Dictionary:
+	var existing: Variant = merged_by_locale.get(normalized_locale)
+	if existing is Dictionary:
+		return existing as Dictionary
+	var created: Dictionary = {}
+	merged_by_locale[normalized_locale] = created
+	return created
 
 static func _clear_mod_i18n_layers() -> int:
 	var catalog := LocalizationRegistryCatalog.get_shared()

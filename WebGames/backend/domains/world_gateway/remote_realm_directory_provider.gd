@@ -14,6 +14,7 @@ extends RefCounted
 const DEFAULT_REALM_PING_MS: int = 24
 const FALLBACK_REALM_ALPHA_PING_MS: int = 28
 const FALLBACK_REALM_BETA_PING_MS: int = 45
+const EMPTY_REALM_MANIFEST: Array = []
 
 ## 枚举可用联机界域卡片列表（只读轻量字典数组）
 static func list_realms(_account_id: String = "") -> Array[Dictionary]:
@@ -27,13 +28,14 @@ static func list_realms(_account_id: String = "") -> Array[Dictionary]:
 
 		var is_active: bool = bool(raw_world_config.get("is_active", false))
 		var canary_tag: String = str(raw_world_config.get("canary_feature_tag", ""))
+		var raw_manifest: Variant = raw_world_config.get("realm_mod_manifest")
 		var realm_card := {
 			"realm_id": str(world_id),
 			"realm_name": str(raw_world_config.get("world_name", world_id)),
 			"ping_ms": int(raw_world_config.get("ping_ms", DEFAULT_REALM_PING_MS)),
 			"status": "ONLINE" if is_active else "MAINTENANCE",
 			"is_canary": not canary_tag.is_empty(),
-			"realm_mod_manifest": raw_world_config.get("realm_mod_manifest", [])
+			"realm_mod_manifest": (raw_manifest as Array) if (raw_manifest is Array) else EMPTY_REALM_MANIFEST
 		}
 		results.append(realm_card)
 

@@ -26,13 +26,16 @@ func _init(capacity: int = 32) -> void:
 	_slot_action_pools.resize(_capacity)
 	for slot_index in range(_capacity):
 		_slots[slot_index] = _create_empty_packet_slot()
-		_slot_delta_pools[slot_index] = []
-		_slot_action_pools[slot_index] = []
+		_slot_delta_pools[slot_index] = _create_empty_pool()
+		_slot_action_pools[slot_index] = _create_empty_pool()
 	_head = 0
 	_count = 0
 
 static func _create_empty_packet_slot() -> AgentHudTelemetryPacketDTO:
 	return AgentHudTelemetryPacketDTO.new()
+
+static func _create_empty_pool() -> Array:
+	return []
 
 ## O(1) 取模写入，原位重置槽位并同步数据
 func append_packet(packet: AgentHudTelemetryPacketDTO) -> void:
