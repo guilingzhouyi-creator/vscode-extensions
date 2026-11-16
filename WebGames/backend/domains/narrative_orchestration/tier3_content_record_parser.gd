@@ -26,6 +26,8 @@ static func normalize_override_mode(raw_mode: String) -> String:
 
 ## 从模组条目提取磁盘根路径
 static func extract_package_root(package_entry: Variant) -> String:
+	if package_entry is String:
+		return String(package_entry).strip_edges()
 	if package_entry is Dictionary:
 		return String((package_entry as Dictionary).get("root_path", "")).strip_edges()
 	if package_entry is Object and package_entry.get("root_path") != null:
@@ -46,7 +48,8 @@ static func collect_content_records(package_root: String) -> Array[Dictionary]:
 		return _collect_kmod_content_records(package_root)
 	return _collect_directory_content_records(package_root)
 
-static func _classify_relative_content_path(relative_path: String) -> String:
+## 将模组内相对路径映射为标准化 Tier 3 内容分类域名
+static func classify_relative_content_path(relative_path: String) -> String:
 	var normalized := relative_path.replace("\\", "/").strip_edges().to_lower()
 	if normalized == "items.json" or normalized.begins_with("content/items/"):
 		return "items"
@@ -66,7 +69,7 @@ static func _classify_relative_content_path(relative_path: String) -> String:
 		return "narratives"
 	if normalized.begins_with("content/copywriting/"):
 		return "copywriting"
-	if normalized.begins_with("content/races/"):
+	if normalized == "races_catalog.json" or normalized.begins_with("content/races/"):
 		return "races"
 	if normalized.begins_with("cutscenes/"):
 		return "cutscenes"
@@ -74,7 +77,7 @@ static func _classify_relative_content_path(relative_path: String) -> String:
 
 static func _collect_directory_content_records(package_root: String) -> Array[Dictionary]:
 	var collected: Array[Dictionary] = []
-	var top_level_files: Array[String] = ["items.json", "skills.json", "game_rules.json", "world.json"]
+	var top_level_files: Array[String] = ["items.json", "skills.json", "game_rules.json", "world.json", "races_catalog.json"]
 	for top_filename in top_level_files:
 		var top_file_path := package_root.path_join(top_filename)
 		if FileAccess.file_exists(top_file_path):
@@ -101,7 +104,7 @@ static func _scan_json_relative_paths(directory_path: String, relative_prefix: S
 			collected_paths.append(relative_prefix + "/" + file_name)
 
 static func _append_json_file_record(target_records: Array[Dictionary], relative_path: String, full_path: String) -> void:
-	var category := _classify_relative_content_path(relative_path)
+	var category := classify_relative_content_path(relative_path)
 	if category.is_empty():
 		return
 	var file_handle := FileAccess.open(full_path, FileAccess.READ)
@@ -124,11 +127,11 @@ static func _collect_kmod_content_records(kmod_path: String) -> Array[Dictionary
 	var sorted_paths: Array[String] = []
 	for entry_name in entry_names:
 		var path_text := String(entry_name)
-		if path_text.ends_with(".json") and not _classify_relative_content_path(path_text).is_empty():
+		if path_text.ends_with(".json") and not classify_relative_content_path(path_text).is_empty():
 			sorted_paths.append(path_text)
 	sorted_paths.sort()
 	for sorted_path in sorted_paths:
-		var category := _classify_relative_content_path(sorted_path)
+		var category := classify_relative_content_path(sorted_path)
 		var raw_text := reader.read_file(sorted_path).get_string_from_utf8()
 		var parsed: Variant = JSON.parse_string(raw_text)
 		if parsed is Dictionary:

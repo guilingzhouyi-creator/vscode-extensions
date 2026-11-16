@@ -15,6 +15,7 @@ extends RefCounted
 const LOG_CHANNEL: String = "mod_narrative"
 const MANIFEST_FILENAME: String = "pack.json"
 const ALT_MANIFEST_FILENAME: String = "manifest.json"
+const Tier3ContentRecordParser = preload("res://backend/domains/narrative_orchestration/tier3_content_record_parser.gd")
 
 
 ## 递归展平 i18n 嵌套字典为点分键与斜杠键
@@ -111,6 +112,70 @@ static func _apply_kmod_entry(
     elif entry_path == "routing_rules.json":
         var routing_data := _read_kmod_json_dict(reader, entry_path)
         _merge_routing_payload(routing_data, package_payload)
+    elif entry_path == "assets/manifest.json":
+        package_payload["assets_manifest"] = _read_kmod_json_dict(reader, entry_path)
+    elif entry_path.begins_with("cutscenes/") and entry_path.ends_with(".json"):
+        var cutscene_data := _read_kmod_json_dict(reader, entry_path)
+        if not cutscene_data.is_empty():
+            _merge_kmod_cutscene_entry(entry_path, cutscene_data, package_payload)
+    elif (entry_path.begins_with("content/") and entry_path.ends_with(".json")) or entry_path in ["items.json", "skills.json", "game_rules.json", "world.json", "races_catalog.json"]:
+        var content_data := _read_kmod_json_dict(reader, entry_path)
+        if not content_data.is_empty():
+            _append_kmod_content_record(entry_path, content_data, package_payload)
+
+
+static func _register_kmod_cutscene_item(array_map: Dictionary, cutscene_item: Variant) -> void:
+    if not (cutscene_item is Dictionary):
+        return
+    var cutscene_id := String((cutscene_item as Dictionary).get("cutscene_id", "")).strip_edges()
+    if not cutscene_id.is_empty():
+        array_map[cutscene_id] = (cutscene_item as Dictionary).duplicate(true)
+
+
+static func _merge_kmod_cutscene_entry(
+    entry_path: String,
+    cutscene_data: Dictionary,
+    package_payload: Dictionary
+) -> void:
+    if cutscene_data.get("cutscenes") is Dictionary:
+        var existing_cs: Dictionary = package_payload.get("cutscene_registry", {})
+        existing_cs.merge((cutscene_data["cutscenes"] as Dictionary).duplicate(true), true)
+        package_payload["cutscene_registry"] = existing_cs
+    elif cutscene_data.get("cutscenes") is Array:
+        var array_map: Dictionary = package_payload.get("cutscene_registry", {})
+        for cutscene_item in (cutscene_data["cutscenes"] as Array):
+            _register_kmod_cutscene_item(array_map, cutscene_item)
+        package_payload["cutscene_registry"] = array_map
+    if cutscene_data.get("hooks") is Array:
+        var existing_hooks: Array = package_payload.get("cutscene_hooks", [])
+        existing_hooks.append_array((cutscene_data["hooks"] as Array).duplicate(true))
+        package_payload["cutscene_hooks"] = existing_hooks
+    var records: Array = package_payload.get("content_records", [])
+    records.append({
+        "category": "cutscenes",
+        "domain": "cutscenes",
+        "relative_path": entry_path,
+        "payload": cutscene_data.duplicate(true)
+    })
+    package_payload["content_records"] = records
+
+
+static func _append_kmod_content_record(
+    entry_path: String,
+    content_data: Dictionary,
+    package_payload: Dictionary
+) -> void:
+    var domain := Tier3ContentRecordParser.classify_relative_content_path(entry_path)
+    if domain.is_empty():
+        return
+    var records: Array = package_payload.get("content_records", [])
+    records.append({
+        "category": domain,
+        "domain": domain,
+        "relative_path": entry_path,
+        "payload": content_data.duplicate(true)
+    })
+    package_payload["content_records"] = records
 
 
 ## 从 .kmod 归档包完整读取并组装 MOD 数据字典

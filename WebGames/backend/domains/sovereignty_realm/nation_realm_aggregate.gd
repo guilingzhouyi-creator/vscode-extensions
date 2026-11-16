@@ -12,7 +12,7 @@ class_name NationRealmAggregate
 extends RefCounted
 
 var nation_id: String = ""
-var canonical_nation_name: String = GameConfig.get_string("domains.sovereignty", "nation_defaults/canonical_nation_name", "卡拉尔至高神圣帝国")
+var canonical_nation_name: String = GameConfig.get_string("domains.sovereignty", "nation_defaults/canonical_nation_name", "未命名城邦")
 var sovereign_ruler_id: String = GameConfig.get_string("domains.sovereignty", "nation_defaults/sovereign_ruler_id", "RULER_EMPEROR")
 var territory_town_ids: Array = []
 var national_treasury_gold: int = GameConfig.get_int("domains.sovereignty", "nation_defaults/national_treasury_gold", 100000)

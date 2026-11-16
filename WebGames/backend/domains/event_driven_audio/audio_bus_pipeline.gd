@@ -12,8 +12,21 @@ class_name AudioBusPipeline
 extends RefCounted
 
 # ==============================================================================
-# 一、并发水位释放（计数配对）
+# 一、并发水位释放与资源 URI 解析
 # ==============================================================================
+
+## 解析音效资源统一 URI（优先显式路径，其次读取 domains.event_driven_audio/sound_registry）
+static func resolve_mod_audio_uri(sound_id: String, explicit_uri: String = "") -> String:
+	var candidate := explicit_uri.strip_edges()
+	if candidate.is_empty() and not sound_id.is_empty():
+		var sound_registry: Dictionary = GameConfig.get_dict("domains.event_driven_audio", "sound_registry", {})
+		var registry_entry: Variant = sound_registry.get(sound_id, "")
+		if registry_entry is Dictionary:
+			var sound_entry_mapping := registry_entry as Dictionary
+			candidate = str(sound_entry_mapping.get("uri", sound_entry_mapping.get("path", ""))).strip_edges()
+		elif registry_entry is String:
+			candidate = str(registry_entry).strip_edges()
+	return candidate
 
 ## 并发水位显式释放路径（Inv-ON-4）：与 dispatch 的 +1 计数配对——
 ## 播放宿主在音频自然结束/截停时经生命周期事件回传调用；归零删键（防 0 值堆积）、永不 < 0。

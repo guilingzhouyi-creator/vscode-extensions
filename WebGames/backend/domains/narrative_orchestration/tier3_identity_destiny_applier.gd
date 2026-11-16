@@ -36,6 +36,41 @@ static func _register_single_race_entry(
         coefficients_by_race[race_identifier] = (race_record["attribute_coefficients"] as Dictionary).duplicate(true)
 
 
+static func _register_single_dict_race_item(
+    normalized_race_key: String,
+    race_entry: Variant,
+    races_catalog_map: Dictionary,
+    coefficients_by_race: Dictionary
+) -> void:
+    if race_entry is Dictionary:
+        var race_record := (race_entry as Dictionary).duplicate(true)
+        var resolved_id := String(race_record.get("race_id", normalized_race_key)).strip_edges()
+        if resolved_id.is_empty():
+            resolved_id = normalized_race_key
+        races_catalog_map[resolved_id] = race_record
+        if race_record.get("attribute_coefficients") is Dictionary:
+            coefficients_by_race[resolved_id] = (race_record["attribute_coefficients"] as Dictionary).duplicate(true)
+    else:
+        races_catalog_map[normalized_race_key] = race_entry
+
+
+static func _register_dict_race_entries(
+    raw_race_table: Dictionary,
+    races_catalog_map: Dictionary,
+    coefficients_by_race: Dictionary
+) -> void:
+    for race_key in raw_race_table.keys():
+        var normalized_race_key := String(race_key).strip_edges()
+        if normalized_race_key.is_empty():
+            continue
+        _register_single_dict_race_item(
+            normalized_race_key,
+            raw_race_table[race_key],
+            races_catalog_map,
+            coefficients_by_race
+        )
+
+
 ## 应用种族目录及基础属性修正系数（content/races/*.json 或 destinies.custom_races）
 static func apply_races_override(
     payload_map: Dictionary,
@@ -47,7 +82,7 @@ static func apply_races_override(
     var coefficients_by_race: Dictionary = {}
     var raw_races: Variant = payload_map.get("races_catalog", payload_map.get("custom_races", null))
     if raw_races is Dictionary:
-        races_catalog_map = (raw_races as Dictionary).duplicate(true)
+        _register_dict_race_entries(raw_races as Dictionary, races_catalog_map, coefficients_by_race)
     elif raw_races is Array:
         for race_candidate in (raw_races as Array):
             _register_single_race_entry(race_candidate, races_catalog_map, coefficients_by_race)

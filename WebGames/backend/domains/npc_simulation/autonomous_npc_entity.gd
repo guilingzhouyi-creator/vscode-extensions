@@ -11,7 +11,7 @@
 class_name AutonomousNPCEntity extends RefCounted
 
 var npc_id: String = ""
-var personal_name: String = GameConfig.get_string("domains.npc", "defaults/personal_name", "老剑客艾尔顿")
+var personal_name: String = GameConfig.get_string("domains.npc", "defaults/personal_name", "无名旅人")
 
 # 五维性格特征矩阵 (0.0 ~ 1.0)
 var personality: Dictionary = GameConfig.get_dict("domains.npc", "defaults/personality", {

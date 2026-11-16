@@ -11,7 +11,7 @@
 class_name WorldBossAggregate extends MonsterAggregateEntity
 
 var boss_uid: String = GameConfig.get_string("domains.world_boss", "entity_defaults/boss_uid", "BOSS_WORLD_LEVIATHAN_01")
-var boss_title: String = GameConfig.get_string("domains.world_boss", "entity_defaults/boss_title", "【天灾灭世者 · 灭烬巨龙】")
+var boss_title: String = GameConfig.get_string("domains.world_boss", "entity_defaults/boss_title", "【深渊灾害首领】")
 var total_phases: int = GameConfig.get_int("domains.world_boss", "entity_defaults/total_phases", 3)
 var current_phase_index: int = GameConfig.get_int("domains.world_boss", "entity_defaults/current_phase_index", 1)
 
@@ -25,10 +25,10 @@ var is_defeated: bool = false # L9-b（）击败终态锁存：置位后重复�
 
 var battle_contribution_ledger: Dictionary = {}
 
-## 世界首领聚合构造：统一六维底座（首领等级配置驱动）+ 灭烬巨龙默认种族
+## 世界首领聚合构造：统一六维底座（首领等级配置驱动）+ 默认灾兽种族
 func _init() -> void:
 	super._init()
-	species_name = GameConfig.get_string("domains.world_boss", "entity_defaults/species_name", "灭烬巨龙")
+	species_name = GameConfig.get_string("domains.world_boss", "entity_defaults/species_name", "深渊灾兽")
 	# 统一六维底座：首领默认等级（1~6，配置驱动；底层实际值经换算引擎得出）
 	physiology.race_id = "WORLD_BOSS"
 	physiology.set_level("STR", GameConfig.get_int("domains.world_boss", "entity_defaults/physiology/str_level", 5))

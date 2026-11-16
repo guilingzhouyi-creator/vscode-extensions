@@ -16,8 +16,8 @@ class_name EquipmentLoadoutAggregate extends RefCounted
 
 ## 战备套唯一 ID（loadout_defaults/loadout_id 配置，默认 LOADOUT_SET_01）
 var loadout_id: String = GameConfig.get_string("domains.equipment", "loadout_defaults/loadout_id", "LOADOUT_SET_01")
-## 战备套展示名（loadout_defaults/loadout_name 配置，默认「主战决斗装」）
-var loadout_name: String = GameConfig.get_string("domains.equipment", "loadout_defaults/loadout_name", "主战决斗装")
+## 战备套展示名（loadout_defaults/loadout_name 配置，默认「标准战备套」）
+var loadout_name: String = GameConfig.get_string("domains.equipment", "loadout_defaults/loadout_name", "标准战备套")
 
 # ==============================================================================
 # 二、槽位映射构建

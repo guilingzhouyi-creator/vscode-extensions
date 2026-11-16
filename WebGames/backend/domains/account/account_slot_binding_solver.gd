@@ -72,7 +72,7 @@ static func _create_character_in_slot_internal(creation_context: AccountSlotCrea
 	slot_summary.title_prefix = creation_context.title_prefix if not creation_context.title_prefix.is_empty() else GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "save_slot/defaults/title_prefix", "Apprentice Adventurer")
 	slot_summary.is_permadeath_mode = creation_context.is_permadeath
 	slot_summary.last_saved_time_utc = int(Time.get_unix_time_from_system())
-	slot_summary.current_location_name = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "save_slot/defaults/current_location_name", "Central Continent · Kalar Holy City")
+	slot_summary.current_location_name = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "save_slot/defaults/current_location_name", "Unknown Region")
 	_attach_initial_profile_for_race(slot_summary, character_name, creation_context.race)
 
 	var bind_result := account.bind_character_to_slot(slot_id, slot_summary)

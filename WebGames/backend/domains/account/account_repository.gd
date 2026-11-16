@@ -340,7 +340,7 @@ func _save_registry_internal() -> Dictionary:
 
 	var envelope := {
 		"format_version": GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "storage/format_version", DEFAULT_FORMAT_VERSION),
-		"engine": "KalarWorldEngine_Godot4",
+		"engine": "PureWorldEngine_Godot4",
 		"updated_timestamp_utc": int(Time.get_unix_time_from_system()),
 		"account_count": _accounts_cache.size(),
 		"accounts": serialized_accounts

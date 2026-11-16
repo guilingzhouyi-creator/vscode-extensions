@@ -124,8 +124,10 @@ static func revert_all_overrides(item_catalog: Variant = null) -> Dictionary:
 ## 处理单个启用 MOD 包的 i18n、destinies 投射与 content 差分覆写记录
 static func _process_single_package_override(package_entry: Variant, accumulator: Dictionary) -> void:
 	var package_root := Tier3ContentRecordParser.extract_package_root(package_entry)
-	var pack_identifier := Tier3ContentRecordParser.extract_pack_identifier(package_entry)
 	var package_record: Dictionary = _resolve_package_dictionary(package_entry, package_root)
+	var pack_identifier := Tier3ContentRecordParser.extract_pack_identifier(package_entry)
+	if pack_identifier.is_empty():
+		pack_identifier = Tier3ContentRecordParser.extract_pack_identifier(package_record)
 	_record_official_pack_if_applicable(package_record, pack_identifier, accumulator)
 	_append_package_i18n_and_destiny_overlays(package_record, package_root, pack_identifier, accumulator)
 
@@ -157,7 +159,7 @@ static func _record_official_pack_if_applicable(
 	if pack_identifier.is_empty():
 		return
 	var profile := String(package_record.get("pack_profile", "")).strip_edges().to_upper()
-	if profile == "OFFICIAL_BASE" or profile == "TOTAL_CONVERSION" or bool(package_record.get("is_official", false)):
+	if profile == "OFFICIAL_BASE" or bool(package_record.get("is_official", false)):
 		accumulator["official_pack_id"] = pack_identifier
 
 static func _mark_pack_applied(applied_packs: Array, resolved_pack_id: String) -> void:
@@ -201,9 +203,14 @@ static func _resolve_package_dictionary(package_entry: Variant, package_root: St
 		var record := package_entry as Dictionary
 		if record.has("custom_races") or record.has("custom_starter_kits") or package_root.is_empty():
 			return record
+		if package_root.ends_with(".kmod"):
+			var kmod_loaded := ModPackageArchiveReader.load_full_package_from_kmod(package_root)
+			return kmod_loaded if not kmod_loaded.is_empty() else record
 		var full_loaded := ModPackageDiscoverySolver.load_full_mod_package_from_dir(package_root)
 		return full_loaded if not full_loaded.is_empty() else record
-	if package_entry is Object and not package_root.is_empty():
+	if (package_entry is Object or package_entry is String) and not package_root.is_empty():
+		if package_root.ends_with(".kmod"):
+			return ModPackageArchiveReader.load_full_package_from_kmod(package_root)
 		return ModPackageDiscoverySolver.load_full_mod_package_from_dir(package_root)
 	return {}
 

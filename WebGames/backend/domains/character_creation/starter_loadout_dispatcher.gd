@@ -353,7 +353,9 @@ static func _resolve_item_name(canonical_id: String, item_specification: Diction
     var english_name: String = str(item_specification.get("english_name", "")).strip_edges()
     if not english_name.is_empty():
         return english_name
-    var name_key: String = str(item_specification.get("canonical_name_key", "")).strip_edges()
+    var name_key: String = str(item_specification.get("loc_name_key", "")).strip_edges()
+    if name_key.is_empty():
+        name_key = str(item_specification.get("canonical_name_key", "")).strip_edges()
     if not name_key.is_empty():
         var localized_name: String = LocalizationSolver.resolve_name_key(LocalizationRegistryCatalog.get_shared(), name_key)
         if not localized_name.is_empty() and localized_name != "[%s]" % name_key:

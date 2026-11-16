@@ -10,8 +10,8 @@
 ## GachaBannerAggregate：Domain Entity / Aggregate Root
 class_name GachaBannerAggregate extends RefCounted
 
-var banner_id: String = GameConfig.get_string("domains.gacha", "banner_defaults/banner_id", "BANNER_LEGENDARY_HERO")
-var banner_title: String = GameConfig.get_string("domains.gacha", "banner_defaults/banner_title", "【始源神兵 · 极光湮灭】限时祈愿")
+var banner_id: String = GameConfig.get_string("domains.gacha", "banner_defaults/banner_id", "BANNER_STANDARD_DEFAULT")
+var banner_title: String = GameConfig.get_string("domains.gacha", "banner_defaults/banner_title", "【常驻祈愿池】")
 var cost_per_pull_gold: int = GameConfig.get_int("domains.gacha", "banner_defaults/cost_per_pull_gold", 100)
 var cost_per_pull_crystals: int = GameConfig.get_int("domains.gacha", "banner_defaults/cost_per_pull_crystals", 1)
 

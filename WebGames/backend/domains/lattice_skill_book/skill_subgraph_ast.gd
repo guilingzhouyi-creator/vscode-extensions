@@ -12,7 +12,7 @@ class_name SkillSubgraphAST
 extends RefCounted
 
 var ast_id: String = ""
-var skill_name: String = GameConfig.get_string("domains.lattice", "ast_defaults/skill_name", "破空连斩")
+var skill_name: String = GameConfig.get_string("domains.lattice", "ast_defaults/skill_name", "未命名招式")
 var signature_hash: String = ""
 var sentence_count: int = GameConfig.get_int("domains.lattice", "ast_defaults/sentence_count", 4)
 var nodes: Dictionary = {} # node_id -> { "symbol": "STAB", "pos": Vector3(x,y,z), "ap": -2, "node_type": "PHYSICAL_VERB" }

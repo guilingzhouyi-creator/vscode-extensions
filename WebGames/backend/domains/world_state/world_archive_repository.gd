@@ -141,7 +141,7 @@ func _save_catalog_internal() -> Dictionary:
 
 	var envelope: Dictionary = {
 		"format_version": DEFAULT_FORMAT_VERSION,
-		"engine": "KalarWorldEngine_Godot4",
+		"engine": "PureWorldEngine_Godot4",
 		"updated_timestamp_utc": int(Time.get_unix_time_from_system()),
 		"world_count": _worlds_cache.size(),
 		"worlds": serialized_worlds

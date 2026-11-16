@@ -315,8 +315,6 @@ func _has_critical_missing_pack(missing_packs: Array[String], locked_packs: Arra
 
 	for missing_id in missing_packs:
 		var trimmed_id := missing_id.strip_edges()
-		if trimmed_id == "official_kalar":
-			return true
 		var locked_metadata: Dictionary = locked_profile_map.get(trimmed_id, {})
 		var profile := String(locked_metadata.get("pack_profile", "")).strip_edges()
 		if bool(locked_metadata.get("is_official", false)) or profile == "OFFICIAL_BASE" or profile == "TOTAL_CONVERSION":
