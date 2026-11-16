@@ -11,8 +11,6 @@
 class_name KStatusBar
 extends Control
 
-const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
-
 signal value_changed(current: float, maximum: float)
 
 @export var label_key: String = ""

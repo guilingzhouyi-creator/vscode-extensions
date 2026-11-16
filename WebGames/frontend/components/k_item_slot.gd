@@ -11,10 +11,6 @@
 class_name KItemSlot
 extends Control
 
-const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
-const TooltipManager = preload("res://frontend/ui_infrastructure/tooltip_manager.gd")
-const UIIntermediary = preload("res://frontend/i18n/ui_intermediary.gd")
-
 signal slot_clicked(item_id: String)
 signal slot_right_clicked(item_id: String)
 

@@ -10,8 +10,6 @@
 class_name DrawerManager
 extends Node
 
-const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
-
 enum EdgeSide {
 	LEFT,
 	RIGHT,

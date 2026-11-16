@@ -34,6 +34,23 @@ var _is_placeholder_active: bool = false
 # 一、单例与生命周期管理
 # ==============================================================================
 
+## 触发过场触发点占位/真实演播（供序章视图等表现层安全调用）
+func trigger_cutscene_preview(cutscene_id: String, title_text: String = "", subtitle_text: String = "") -> void:
+	var clean_id := cutscene_id.strip_edges()
+	if clean_id.is_empty() or not is_attached():
+		return
+	var bus: EventBusCore = EventBusCore.get_instance()
+	if bus == null:
+		return
+	bus.emit_domain_event("cutscene.started", {
+		"cutscene_id": clean_id,
+		"is_placeholder": true,
+		"placeholder_title": title_text if not title_text.is_empty() else clean_id,
+		"placeholder_text": subtitle_text,
+		"duration_sec": 2.0,
+		"skippable": true,
+	})
+
 ## 获取全局唯一前端演出事件消费桥接器单例
 static func get_instance() -> CutsceneEventBridge:
 	if _instance == null:

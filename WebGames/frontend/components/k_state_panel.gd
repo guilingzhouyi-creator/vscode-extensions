@@ -11,8 +11,6 @@
 class_name KStatePanel
 extends Control
 
-const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
-
 enum State { LOADING, READY, EMPTY, ERROR }
 
 signal retry_requested()

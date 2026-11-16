@@ -10,8 +10,6 @@
 class_name TooltipManager
 extends Node
 
-const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
-
 signal tooltip_shown(text: String)
 signal tooltip_hidden()
 

@@ -10,8 +10,6 @@
 class_name ContextMenuManager
 extends Node
 
-const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
-
 signal menu_shown(menu_position: Vector2)
 signal menu_hidden()
 

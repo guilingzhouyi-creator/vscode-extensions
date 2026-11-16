@@ -11,8 +11,6 @@
 class_name KCurrencyBar
 extends Control
 
-const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
-
 @export var show_gold: bool = true
 @export var show_silver: bool = true
 @export var show_copper: bool = true

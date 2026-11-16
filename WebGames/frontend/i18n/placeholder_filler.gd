@@ -140,6 +140,7 @@ static func format_thousands(raw_integer: int) -> String:
 ## 时长格式化: 125.0 → "2分05秒"
 static func _format_duration(seconds: float) -> String:
 	var safe_seconds := seconds if is_finite(seconds) else 0.0
+	@warning_ignore("integer_division")
 	var minutes := int(safe_seconds) / 60
 	var remaining_seconds := int(safe_seconds) % 60
 	return "%d分%02d秒" % [minutes, remaining_seconds]

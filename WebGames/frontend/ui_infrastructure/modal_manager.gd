@@ -10,8 +10,6 @@
 class_name ModalManager
 extends Node
 
-const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
-
 signal modal_opened(modal: Control)
 signal modal_closed(modal: Control)
 

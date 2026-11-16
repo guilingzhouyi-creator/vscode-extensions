@@ -11,8 +11,6 @@
 class_name KSearchBar
 extends Control
 
-const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
-
 signal search_changed(query: String)
 signal search_cleared()
 

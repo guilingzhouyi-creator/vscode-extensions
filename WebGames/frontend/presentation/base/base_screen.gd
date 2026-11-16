@@ -11,8 +11,6 @@ class_name BaseScreen
 extends Control
 
 const UIStateContainerClass = preload("res://frontend/presentation/common/ui_state_container.gd")
-const NavTypes = preload("res://frontend/navigation/nav_types.gd")
-const NavManager = preload("res://frontend/navigation/nav_manager.gd")
 
 var screen_id: String = ""
 var navigation_params: Dictionary = {}

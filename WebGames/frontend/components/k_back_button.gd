@@ -11,11 +11,6 @@
 class_name KBackButton
 extends Button
 
-const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
-const UIAudioBridge = preload("res://frontend/ui_infrastructure/ui_audio_bridge.gd")
-const NavTypes = preload("res://frontend/navigation/nav_types.gd")
-const NavManager = preload("res://frontend/navigation/nav_manager.gd")
-
 signal back_pressed()
 
 @export var back_transition: int = NavTypes.TransitionType.SLIDE_RIGHT

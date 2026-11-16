@@ -11,10 +11,6 @@
 class_name KSplitPanel
 extends Control
 
-const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
-
-signal item_selected(index: int)
-
 @export var left_ratio: float = 0.4
 @export var min_left_width: float = 200.0
 @export var separator_visible: bool = true

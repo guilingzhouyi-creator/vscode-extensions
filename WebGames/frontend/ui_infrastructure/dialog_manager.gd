@@ -10,9 +10,6 @@
 class_name DialogManager
 extends Node
 
-const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
-const ModalManager = preload("res://frontend/ui_infrastructure/modal_manager.gd")
-
 const BTN_WIDTH_STANDARD: float = 80.0
 const BTN_WIDTH_WIDE: float = 90.0
 const BTN_WIDTH_EXIT: float = 110.0

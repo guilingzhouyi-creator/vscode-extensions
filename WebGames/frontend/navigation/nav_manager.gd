@@ -61,13 +61,14 @@ const TRANSITION_DURATION: float = 0.25
 const LOG_LEVEL_WARN: String = "warn"
 const METHOD_ON_SCREEN_EXIT: String = "on_screen_exit"
 
-## 默认注册 21 个功能视图（注释计数与实现对齐）
+## 默认注册 22 个功能视图（注释计数与实现对齐）
 func _init_default_registry() -> void:
 	register_screen("account_entry", "res://frontend/views/account_entry/account_entry_view.tscn")
 	register_screen("world_gateway", "res://frontend/views/world_gateway/world_gateway_view.tscn")
 	register_screen("mod_workbench", "res://frontend/views/mod_workbench/mod_workbench_screen.tscn")
 	register_screen("character_creation", "res://frontend/views/character_creation/character_creation_view.tscn")
 	register_screen("prologue", "res://frontend/views/prologue/prologue_view.tscn")
+	register_screen("cutscene_player", "res://frontend/views/cutscene_player/cutscene_player_view.tscn")
 	register_screen("main_hud", "res://frontend/views/main_hud/main_hud_view.tscn")
 	register_screen("character_progression", "res://frontend/views/character_progression/character_progression_view.tscn")
 	register_screen("combat_view", "res://frontend/views/combat_view/combat_view.tscn")

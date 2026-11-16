@@ -11,12 +11,6 @@
 class_name AppRoot
 extends Control
 
-const GameShutdownDTO = preload("res://backend/domains/lifecycle/dto/game_shutdown_dto.gd")
-const GameLifecycleModel = preload("res://backend/domains/lifecycle/game_lifecycle_model.gd")
-const GameLifecycleService = preload("res://backend/domains/lifecycle/game_lifecycle_service.gd")
-const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
-const HumanControlLeaseManager = preload("res://backend/domains/world_state/services/human_control_lease_manager.gd")
-
 @onready var background_layer: CanvasLayer = $BackgroundLayer
 @onready var screen_layer: CanvasLayer = $ScreenLayer
 @onready var hud_layer: CanvasLayer = $HUDLayer

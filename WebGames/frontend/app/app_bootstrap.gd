@@ -11,22 +11,13 @@
 class_name AppBootstrap
 extends RefCounted
 
-const ModalManager = preload("res://frontend/ui_infrastructure/modal_manager.gd")
-const TooltipManager = preload("res://frontend/ui_infrastructure/tooltip_manager.gd")
-const DrawerManager = preload("res://frontend/ui_infrastructure/drawer_manager.gd")
-const ContextMenuManager = preload("res://frontend/ui_infrastructure/context_menu_manager.gd")
-const RedDotTreeManager = preload("res://frontend/ui_infrastructure/red_dot_tree_manager.gd")
-const FocusInputManager = preload("res://frontend/ui_infrastructure/focus_input_manager.gd")
-const UIAudioBridge = preload("res://frontend/ui_infrastructure/ui_audio_bridge.gd")
-const AppLifecycleFSM = preload("res://frontend/app/app_lifecycle_fsm.gd")
-const ServiceLocator = preload("res://frontend/domain_boundary/service_locator.gd")
-
 ## 引导幂等守卫：重复引导时跳过生命周期推进与默认入口压栈，避免状态机重入
 static var _is_bootstrapped: bool = false
 
 ## 测试专用复位：允许无头集成测试重复挂载 app_root.tscn 验证冷启动路径
 static func reset_for_tests() -> void:
 	_is_bootstrapped = false
+	CutsceneEventBridge.reset_for_tests()
 
 ## 应用骨架装配（幂等：重复调用仅幂等重绑导航根与 UI 基础设施，不重跑生命周期/入口压栈）
 static func bootstrap(app_root: AppRoot) -> void:
@@ -40,6 +31,8 @@ static func bootstrap(app_root: AppRoot) -> void:
 		TooltipManager.get_instance().bind_layer(app_root.overlay_layer, app_root.overlay_container)
 		DrawerManager.get_instance().bind_layer(app_root.modal_layer, app_root.modal_container)
 		ContextMenuManager.get_instance().bind_layer(app_root.overlay_layer, app_root.overlay_container)
+		if app_root.overlay_container != null:
+			CutsceneEventBridge.get_instance().attach_host(app_root.overlay_container)
 
 	# 无层级绑定依赖的管理器仅需 get_instance() 惰性初始化（幂等）
 	RedDotTreeManager.get_instance()

@@ -11,9 +11,6 @@
 class_name KPageHeader
 extends Control
 
-const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
-const KBackButton = preload("res://frontend/components/k_back_button.gd")
-
 signal back_pressed()
 
 @export var title_key: String = "":

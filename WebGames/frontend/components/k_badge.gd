@@ -11,9 +11,6 @@
 class_name KBadge
 extends Control
 
-const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
-const RedDotTreeManager = preload("res://frontend/ui_infrastructure/red_dot_tree_manager.gd")
-
 signal count_changed(count: int)
 
 @export var red_dot_path: String = "":

@@ -11,12 +11,6 @@
 class_name HudEventBridge
 extends RefCounted
 
-const MainHUDView = preload("res://frontend/views/main_hud/main_hud_view.gd")
-const AuthoritativeHudSyncService = preload("res://backend/domains/world_state/services/authoritative_hud_sync_service.gd")
-const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
-const UnifiedProtocolDispatcher = preload("res://backend/domains/world_state/services/unified_protocol_dispatcher.gd")
-const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
-
 static var _instance: HudEventBridge = null
 ## 获取全局唯一的主页 HUD 事件桥接单例实例。
 static func get_instance() -> HudEventBridge:

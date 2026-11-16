@@ -11,10 +11,6 @@
 class_name KButton
 extends Button
 
-const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
-const UIAudioBridge = preload("res://frontend/ui_infrastructure/ui_audio_bridge.gd")
-const UIIntermediary = preload("res://frontend/i18n/ui_intermediary.gd")
-
 enum StyleVariant {
 	PRIMARY,
 	SECONDARY,

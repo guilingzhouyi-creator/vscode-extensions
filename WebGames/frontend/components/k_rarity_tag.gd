@@ -11,8 +11,6 @@
 class_name KRarityTag
 extends Control
 
-const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
-
 @export var rarity_level: int = 1
 @export var show_label: bool = true
 @export var compact: bool = false

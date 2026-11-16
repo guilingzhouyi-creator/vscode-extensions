@@ -10,8 +10,6 @@
 class_name CharacterHudViewModel
 extends RefCounted
 
-const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
-
 ## 1. 传输层载荷模型 (严格与传输契约对齐)
 class CharacterTransportDTO extends RefCounted:
 	var character_id: String = ""
@@ -62,8 +60,10 @@ class CharacterDomainModel extends RefCounted:
 
 		# 铜币折算为金/银/铜三元组
 		var total_copper: int = maxi(0, transport_payload.coins_copper_total)
+		@warning_ignore("integer_division")
 		domain_model.gold = total_copper / 10000
 		var remainder_copper: int = total_copper % 10000
+		@warning_ignore("integer_division")
 		domain_model.silver = remainder_copper / 100
 		domain_model.copper = remainder_copper % 100
 		return domain_model

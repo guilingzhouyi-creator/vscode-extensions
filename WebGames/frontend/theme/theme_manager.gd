@@ -10,8 +10,6 @@
 class_name ThemeManager
 extends RefCounted
 
-const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
-
 static var _instance: ThemeManager
 ## 获取主题管理器全局单例并确保默认 Theme 已完成初始化
 static func get_instance() -> ThemeManager:
