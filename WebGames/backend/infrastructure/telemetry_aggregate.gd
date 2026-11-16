@@ -10,9 +10,6 @@
 ## TelemetryAggregate：Telemetry Probe / Metric Collector
 class_name TelemetryAggregate extends RefCounted
 
-const LogConstants = preload("res://backend/infrastructure/logging/log_constants.gd")
-const StatisticsMathLib = preload("res://backend/infrastructure/pure/statistics_math_lib.gd")
-
 # ==============================================================================
 # 一、遥测槽位指标实体
 # ==============================================================================
@@ -64,8 +61,16 @@ static var _is_enabled: bool = true
 static var _cached_version: int = -2
 
 ## 测试复位：清空全部槽位并恢复默认配置（避免跨用例状态残留）
+static var _last_slot_domain: String = ""
+static var _last_slot_category: String = ""
+static var _last_slot: SlotMetric = null
+
+## 测试复位：清空聚合窗口槽位与状态缓存
 static func reset_state() -> void:
 	_slots.clear()
+	_last_slot_domain = ""
+	_last_slot_category = ""
+	_last_slot = null
 	_window_start_utc = 0
 	_sample_size = LogConstants.DEFAULT_TELEMETRY_SAMPLE_SIZE
 	_window_seconds = LogConstants.DEFAULT_TELEMETRY_WINDOW_SEC
@@ -92,51 +97,53 @@ static func _ensure_config() -> void:
 static func consume(record: StructuredLogRecord) -> void:
 	if record == null:
 		return
-	_ensure_config()
+	if _cached_version != GameConfig.config_reload_version():
+		_ensure_config()
 	if not _is_enabled:
 		return
 
-	var now := int(Time.get_unix_time_from_system())
-	_maybe_roll_window(now)
+	var now := record.timestamp_utc if record.timestamp_utc > 0 else int(Time.get_unix_time_from_system())
+	if _window_start_utc == 0:
+		_window_start_utc = now
+	elif now - _window_start_utc >= _window_seconds:
+		_slots.clear()
+		_last_slot_domain = ""
+		_last_slot_category = ""
+		_last_slot = null
+		_window_start_utc = now
 
 	var domain_key := record.channel if not record.channel.is_empty() else LogConstants.CHANNEL_GLOBAL
 	var category_key := record.event_category if not record.event_category.is_empty() else LogConstants.CATEGORY_DEFAULT
-	var slot_key := "%s|%s" % [domain_key, category_key]
 
-	var slot: SlotMetric = _slots.get(slot_key, null)
-	if slot == null:
-		slot = SlotMetric.new()
-		slot.domain = domain_key
-		slot.event_category = category_key
-		_slots[slot_key] = slot
+	var slot: SlotMetric
+	if _last_slot != null and domain_key == _last_slot_domain and category_key == _last_slot_category:
+		slot = _last_slot
+	else:
+		var slot_key := domain_key + "|" + category_key
+		slot = _slots.get(slot_key, null)
+		if slot == null:
+			slot = SlotMetric.new()
+			slot.domain = domain_key
+			slot.event_category = category_key
+			_slots[slot_key] = slot
+		_last_slot_domain = domain_key
+		_last_slot_category = category_key
+		_last_slot = slot
 
 	slot.count += 1
 	slot.total_duration_ms += record.duration_ms
-	slot.last_timestamp_utc = record.timestamp_utc if record.timestamp_utc > 0 else now
+	slot.last_timestamp_utc = now
 
-	if record.duration_ms > 0 or slot.duration_samples.size() == 0:
-		_track_duration(slot, record.duration_ms)
-
-## 追踪耗时样本：O(1) 定长环形覆写窗口（超 sample_size 原位覆盖），标记脏位延迟排序（Lazy Evaluation）
-static func _track_duration(slot: SlotMetric, duration_ms: int) -> void:
-	if slot.duration_samples.size() < _sample_size:
-		slot.duration_samples.append(duration_ms)
-	else:
-		if slot.duration_samples.size() > _sample_size:
-			slot.duration_samples.resize(_sample_size)
-		slot._sample_write_cursor = slot._sample_write_cursor % _sample_size
-		slot.duration_samples[slot._sample_write_cursor] = duration_ms
-		slot._sample_write_cursor = StatisticsMathLib.ring_next_cursor(slot._sample_write_cursor, _sample_size)
-	slot._dirty = true
-
-## 滑动窗口重置：超过 window_seconds 时清空全部槽位（新窗口从当前时刻起算）
-static func _maybe_roll_window(now_utc: int) -> void:
-	if _window_start_utc == 0:
-		_window_start_utc = now_utc
-		return
-	if now_utc - _window_start_utc >= _window_seconds:
-		_slots.clear()
-		_window_start_utc = now_utc
+	if record.duration_ms > 0 or slot.duration_samples.is_empty():
+		if slot.duration_samples.size() < _sample_size:
+			slot.duration_samples.append(record.duration_ms)
+		else:
+			if slot.duration_samples.size() > _sample_size:
+				slot.duration_samples.resize(_sample_size)
+			slot._sample_write_cursor = slot._sample_write_cursor % _sample_size
+			slot.duration_samples[slot._sample_write_cursor] = record.duration_ms
+			slot._sample_write_cursor = (slot._sample_write_cursor + 1) % _sample_size
+		slot._dirty = true
 
 ## 快照导出当前窗口遥测指标（只读供外部查询）
 static func snapshot() -> Dictionary:

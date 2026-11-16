@@ -48,16 +48,19 @@ func _ensure_clock_cache() -> void:
 func tick_combat(delta_ticks: int = 1) -> int:
 	combat_tick += delta_ticks
 	_ensure_clock_cache()
-	EventBusCore.get_instance().emit_world_clock_advanced(
-		_category_combat_cached, combat_tick,
-		EventBusCore.render_narrative("clock/combat_tick", [combat_tick, delta_ticks])
-	)
+	var event_bus := EventBusCore.get_instance()
+	if event_bus.has_channel_listeners(EventChannelDefinition.WORLD_CLOCK_ADVANCED):
+		event_bus.emit_world_clock_advanced(
+			_category_combat_cached, combat_tick,
+			EventBusCore.render_narrative("clock/combat_tick", [combat_tick, delta_ticks])
+		)
 	return combat_tick
 
 ## 行军探索时钟推进（小时累计→按每日小时数进位天数），广播 clock/travel_calendar 叙事
 func advance_travel_hours(hours: int = 1) -> Dictionary:
 	_ensure_clock_cache()
 	travel_hours += hours
+	@warning_ignore("integer_division")
 	var days_passed := travel_hours / _hours_per_day_cached
 	travel_hours = travel_hours % _hours_per_day_cached
 
@@ -65,10 +68,12 @@ func advance_travel_hours(hours: int = 1) -> Dictionary:
 		advance_calendar_days(days_passed)
 
 	var status := get_calendar_time_dict()
-	EventBusCore.get_instance().emit_world_clock_advanced(
-		_category_travel_cached, calendar_days,
-		EventBusCore.render_narrative("clock/travel_calendar", [calendar_years, calendar_months, calendar_days, travel_hours])
-	)
+	var event_bus := EventBusCore.get_instance()
+	if event_bus.has_channel_listeners(EventChannelDefinition.WORLD_CLOCK_ADVANCED):
+		event_bus.emit_world_clock_advanced(
+			_category_travel_cached, calendar_days,
+			EventBusCore.render_narrative("clock/travel_calendar", [calendar_years, calendar_months, calendar_days, travel_hours])
+		)
 	return status
 
 ## 历法天数推进（月/年逐级进位）
@@ -90,10 +95,12 @@ func advance_calendar_months(months: int = 1) -> Dictionary:
 		calendar_months -= _months_per_year_cached
 		calendar_years += 1
 	var status := get_calendar_time_dict()
-	EventBusCore.get_instance().emit_world_clock_advanced(
-		_category_bio_cached, calendar_months,
-		EventBusCore.render_narrative("clock/bio_epoch", [calendar_years, calendar_months])
-	)
+	var event_bus := EventBusCore.get_instance()
+	if event_bus.has_channel_listeners(EventChannelDefinition.WORLD_CLOCK_ADVANCED):
+		event_bus.emit_world_clock_advanced(
+			_category_bio_cached, calendar_months,
+			EventBusCore.render_narrative("clock/bio_epoch", [calendar_years, calendar_months])
+		)
 	return status
 
 ## 当前历法/时钟全量快照（年/月/日/时/战斗刻度）
