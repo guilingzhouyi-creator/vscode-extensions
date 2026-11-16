@@ -12,8 +12,9 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_spatial_distance_attenuation_and_pan())
 	results.append(_test_concurrency_polyphony_limiter())
 	results.append(_test_four_track_bus_routing())
-	# 新增：并发水位显式释放路径
+	# 新增：并发水位显式释放路径与 MOD 音效 URI 解析
 	results.append(_test_sound_count_release_bounded())
+	results.append(test_mod_audio_uri_resolution())
 
 	var passed_cnt := 0
 	for r in results:
@@ -105,5 +106,25 @@ static func _test_sound_count_release_bounded() -> Dictionary:
 	var passed = noop_ok and mid_ok and released_ok and again.dispatched
 	return {
 		"test": "TC-AUDIO-04: 并发水位显式释放（L9-a：归零删键、释放后可再派发）",
+		"passed": passed
+	}
+
+static func test_mod_audio_uri_resolution() -> Dictionary:
+	GameConfig.apply_mod_overlay_tables({
+		"domains.event_driven_audio.core": {
+			"sound_registry": {
+				"sfx_mod_gong": {"uri": "user://custom_audio/gong.wav"}
+			}
+		}
+	}, ["mod_audio_uri_tc"])
+	var from_registry := AudioBusPipeline.resolve_mod_audio_uri("sfx_mod_gong")
+	var from_explicit := AudioBusPipeline.resolve_mod_audio_uri("sfx_mod_gong", "user://direct/override.ogg")
+	var missing_uri := AudioBusPipeline.resolve_mod_audio_uri("nonexistent_sfx")
+	GameConfig.clear_mod_overlay_tables()
+	var passed := from_registry == "user://custom_audio/gong.wav" \
+		and from_explicit == "user://direct/override.ogg" \
+		and missing_uri.is_empty()
+	return {
+		"test": "TC-AUDIO-05: 音效资源 URI 解析（sound_registry 驱动与显式路径优先）",
 		"passed": passed
 	}

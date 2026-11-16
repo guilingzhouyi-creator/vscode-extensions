@@ -181,6 +181,10 @@ const TestRealUiChainAndLockSecurityPipeline = preload("res://tests/integration/
 const TestModRuntimeAsyncAndAssetsPipeline = preload("res://tests/integration/pipelines/test_mod_runtime_async_and_assets_pipeline.gd")
 # Phase 133 全领域真实服务、基座去卡拉尔中性化、SDK强校验与门禁收口验收流水线
 const TestNeutralitySdkAndGatesPipeline = preload("res://tests/integration/pipelines/test_neutrality_sdk_and_gates_pipeline.gd")
+# 全真冷启动 app_root.tscn 与边界协议健壮性集成流水线
+const TestRealColdStartBootstrapPipeline = preload("res://tests/integration/pipelines/test_real_cold_start_bootstrap_pipeline.gd")
+# KMOD 归档多媒体解码与 Tier3 中立隔离集成流水线
+const TestKmodAudioMediaAndTier3Pipeline = preload("res://tests/integration/pipelines/test_kmod_audio_media_and_tier3_pipeline.gd")
 
 # 前端 17 大系统白模与表现层测试套件
 const TestFE01AccountEntry = preload("res://tests/unit/frontend/test_fe_01_account_entry.gd")
@@ -292,7 +296,9 @@ static func get_all_test_classes() -> Array:
 		TestWorldModLockReentryAndDrift,
 		TestRealUiChainAndLockSecurityPipeline,
 		TestModRuntimeAsyncAndAssetsPipeline,
-		TestNeutralitySdkAndGatesPipeline
+		TestNeutralitySdkAndGatesPipeline,
+		TestRealColdStartBootstrapPipeline,
+		TestKmodAudioMediaAndTier3Pipeline
 	]
 
 ## 前端测试套件（17 大系统 + 6 前端基建与边界套件 = 23；全域 124 后端与横切 + 23 前端 = 147 套件）

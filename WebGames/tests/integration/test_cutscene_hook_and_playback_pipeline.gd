@@ -122,11 +122,14 @@ static func test_tc_cs_02_async_loader_nonblocking_and_lru_cache() -> Dictionary
 		fallback_called[0] = true
 		fallback_res[0] = res
 	)
-	var fallback_ok: bool = fallback_called[0] and (fallback_res[0] == null)
+	var fallback_ok: bool = fallback_called[0] and (fallback_res[0] == null) \
+		and loader.get_last_error_code("res://nonexistent/mock_video.ogv") == CutsceneAsyncLoader.ERR_MEDIA_MISSING
 
-	# 4. 任务取消自检
-	var cancel_task_id := loader.request_load("res://assets/video/cancel_me.ogv")
-	var cancel_ok: bool = loader.cancel_task(cancel_task_id)
+	# 4. 任务取消自检（真实 res:// 线程任务处于 LOADING 时可被 cancel_task 终止并清理线程槽位）
+	var cancel_task_id := loader.request_load("res://icon.svg")
+	var cancel_ok: bool = loader.cancel_task(cancel_task_id) \
+		and loader.get_task_status(cancel_task_id) == CutsceneAsyncLoader.STATUS_CANCELLED
+	var _drain_cancelled: Variant = ResourceLoader.load_threaded_get("res://icon.svg")
 
 	loader.clear_cache_and_tasks()
 	var passed: bool = task_ok and ready_ok and lru_ok and fallback_ok and cancel_ok

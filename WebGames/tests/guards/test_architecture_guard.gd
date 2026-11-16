@@ -16,9 +16,11 @@ class_name TestArchitectureGuardDomain extends RefCounted
 const MANIFEST_FILE: String = "res://config/infrastructure/domains.json"
 const MANIFEST_ROOT_KEY: String = "domains"
 
-## 领域源码根目录 / 后端根目录（确定性扫描范围）
+## 领域源码根目录 / 基础设施与前端扫描根目录
 const DOMAINS_DIR: String = "res://backend/domains"
 const BACKEND_DIR: String = "res://backend"
+const INFRA_DIR: String = "res://backend/infrastructure"
+const FRONTEND_DIR: String = "res://frontend"
 
 ## 配置表根目录（表名 <层>.<名> -> res://config/<层>/<名>.json）
 const CONFIG_ROOT: String = "res://config/"
@@ -105,7 +107,9 @@ const CROSS_CUTTING_SUITES: Array[String] = [
 	"res://tests/integration/pipelines/test_world_mod_lock_reentry_and_drift.gd",
 	"res://tests/integration/pipelines/test_real_ui_chain_and_lock_security_pipeline.gd",
 	"res://tests/integration/pipelines/test_mod_runtime_async_and_assets_pipeline.gd",
-	"res://tests/integration/pipelines/test_neutrality_sdk_and_gates_pipeline.gd"
+	"res://tests/integration/pipelines/test_neutrality_sdk_and_gates_pipeline.gd",
+	"res://tests/integration/pipelines/test_real_cold_start_bootstrap_pipeline.gd",
+	"res://tests/integration/pipelines/test_kmod_audio_media_and_tier3_pipeline.gd"
 ]
 
 const ConfigRouterEngine = preload("res://backend/infrastructure/config_router_engine.gd")
@@ -358,34 +362,45 @@ static func test_config_keys_exist(manifest: Array) -> Dictionary:
 
 	var re := RegEx.create_from_string(CONFIG_CALL_RE)
 	var checked := 0
-	var skipped := 0
 	for entry in manifest:
 		var domain_id := _entry_str(entry, "id")
-		for file_path in _collect_gd_files(DOMAINS_DIR.path_join(domain_id)):
-			var source := _strip_comments(FileAccess.get_file_as_string(file_path))
-			for m in re.search_all(source):
-				var table := m.get_string(1)
-				var key := m.get_string(2)
-				if _is_dynamic_key(key):
-					skipped += 1
-					continue
-				checked += 1
-				var line := _line_of_offset(source, m.get_start())
-				var keys: Variant = _table_keys(table)
-				if not keys is Dictionary:
-					_append_unique(violations, "%s: 配置表缺失或解析失败 %s -> %s（引用处 %s:%d）" % [
-						domain_id, table, _table_path(table), file_path, line
-					])
-					continue
-				var key_set := keys as Dictionary
-				if not key_set.has(key):
-					_append_unique(violations, "%s: 表 %s 缺少键 %s（引用处 %s:%d）" % [
-						domain_id, table, key, file_path, line
-					])
+		checked += _scan_config_keys_in_files(domain_id, _collect_gd_files(DOMAINS_DIR.path_join(domain_id)), re, violations)
+	checked += _scan_config_keys_in_files("infrastructure", _collect_gd_files(INFRA_DIR), re, violations)
+	checked += _scan_config_keys_in_files("frontend", _collect_gd_files(FRONTEND_DIR), re, violations)
 	if checked == 0:
 		violations.append("未扫描到任何静态配置键引用: " + DOMAINS_DIR)
 
 	return _result("TC-ARCH-06: 代码读取的配置键在表中真实存在", violations)
+
+
+static func _scan_config_keys_in_files(
+	scope_label: String,
+	files: Array[String],
+	re: RegEx,
+	violations: Array[String],
+) -> int:
+	var checked := 0
+	for file_path in files:
+		var source := _strip_comments(FileAccess.get_file_as_string(file_path))
+		for m in re.search_all(source):
+			var table := m.get_string(1)
+			var key := m.get_string(2)
+			if _is_dynamic_key(key):
+				continue
+			checked += 1
+			var line := _line_of_offset(source, m.get_start())
+			var keys: Variant = _table_keys(table)
+			if not keys is Dictionary:
+				_append_unique(violations, "%s: 配置表缺失或解析失败 %s -> %s（引用处 %s:%d）" % [
+					scope_label, table, _table_path(table), file_path, line
+				])
+				continue
+			var key_set := keys as Dictionary
+			if not key_set.has(key):
+				_append_unique(violations, "%s: 表 %s 缺少键 %s（引用处 %s:%d）" % [
+					scope_label, table, key, file_path, line
+				])
+	return checked
 
 
 # ------------------------------------------------------------------------------
