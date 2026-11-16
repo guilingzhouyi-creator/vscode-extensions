@@ -110,10 +110,10 @@ class_name SoAEntityBuffer extends RefCounted:
 
 ## 二、 命令式施工执行清单 (Agent Execution Checklist)
 
-- [ ] **Step 1.1: 泛化池化标准契约确立** - 定义 `Poolable` 规范、`acquire` / `release` 生命周期契约，明确状态重置与所有权标记。
-- [ ] **Step 1.2: 配置与指标 DTO 定义** - 确立 `ObjectPoolConfigDTO` 与 `ObjectPoolStatsDTO`，涵盖预分配、容量上限与防泄漏安全阈值。
-- [ ] **Step 1.3: SoA 密集内存布局契约** - 基于 `PackedFloat32Array` 与 `PackedInt32Array` 定义实体紧凑平铺结构，替代哈希表。
-- [ ] **Step 1.4: 静态一致性与门禁守护** - 编写数据契约校验用例，确保数据结构不依赖任何 Godot 场景节点，纯 `RefCounted` 实现。
+- [x] **Step 1.1: 泛化池化标准契约确立** - 定义 `Poolable` 规范、`acquire` / `release` 生命周期契约，明确状态重置与所有权标记。
+- [x] **Step 1.2: 配置与指标 DTO 定义** - 确立 `ObjectPoolConfigDTO` 与 `ObjectPoolStatsDTO`，涵盖预分配、容量上限与防泄漏安全阈值。
+- [x] **Step 1.3: SoA 密集内存布局契约** - 基于 `PackedFloat32Array` 与 `PackedInt32Array` 定义实体紧凑平铺结构，替代哈希表。
+- [x] **Step 1.4: 静态一致性与门禁守护** - 编写数据契约校验用例，确保数据结构不依赖任何 Godot 场景节点，纯 `RefCounted` 实现。
 
 ---
 

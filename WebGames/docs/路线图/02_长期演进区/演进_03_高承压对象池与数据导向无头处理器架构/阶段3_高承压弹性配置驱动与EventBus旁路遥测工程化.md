@@ -99,10 +99,10 @@ class_name ObjectPoolManager extends RefCounted:
 
 ## 二、 命令式施工执行清单 (Agent Execution Checklist)
 
-- [ ] **Step 3.1: 配置表建档与治理挂接** - 创建 `config/infrastructure/object_pool.json`，在 `GameConfig._required_tables` 中声明注册。
-- [ ] **Step 3.2: 全局池管理器实现** - 编写 `ObjectPoolManager.gd`，实现池注册、按需懒获取与配置装配。
-- [ ] **Step 3.3: GameBootstrap 幂等集成** - 在 `assemble()` 中完成管理器启动，在 `teardown()` 中完成对称反装配。
-- [ ] **Step 3.4: 门禁基线与旁路遥测集成** - 接入 EventBusCore 状态广播信道，确保 `audit_config_unused.py` 静态审查全绿。
+- [x] **Step 3.1: 配置表建档与治理挂接** - 创建 `config/infrastructure/object_pool.json`，在 `GameConfig._required_tables` 中声明注册。
+- [x] **Step 3.2: 全局池管理器实现** - 编写 `ObjectPoolManager.gd`，实现池注册、按需懒获取与配置装配。
+- [x] **Step 3.3: GameBootstrap 幂等集成** - 在 `assemble()` 中完成管理器启动，在 `teardown()` 中完成对称反装配。
+- [x] **Step 3.4: 门禁基线与旁路遥测集成** - 接入 EventBusCore 状态广播信道，确保 `audit_config_unused.py` 静态审查全绿。
 
 ---
 

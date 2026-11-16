@@ -174,15 +174,15 @@ sequenceDiagram
 
 ## 四、 Agent 执行清单 (Execution Checklist)
 
-- [ ] **前置检查 (Pre-flight)**：
-  - [ ] 确认 Stage 1 产物 `config_route_dto.gd` 与子表文件完备。
-- [ ] **实施编码 (Implementation)**：
-  - [ ] 创建 `res://backend/infrastructure/config_router_engine.gd`。
-  - [ ] 修改 `res://backend/infrastructure/game_config.gd`，在 `get_table`, `has`, `get_value`, `get_many` 接入路由解析。
-  - [ ] 确保 `GameConfig._required_tables` 登记各独立子表。
-- [ ] **后置自检 (Verification)**：
-  - [ ] 跑通 `scripts/py/audit_gd.py`，断言无静态语法与圈复杂度违规。
-  - [ ] 针对 `domains.combat` 与 `domains.combat.mechanics` 运行无头断言，确认解析一致。
+- [x] **前置检查 (Pre-flight)**：
+  - [x] 确认 Stage 1 产物 `config_route_dto.gd` 与子表文件完备。
+- [x] **实施编码 (Implementation)**：
+  - [x] 创建 `res://backend/infrastructure/config_router_engine.gd`。
+  - [x] 修改 `res://backend/infrastructure/game_config.gd`，在 `get_table`, `has`, `get_value`, `get_many` 接入路由解析。
+  - [x] 确保 `GameConfig._required_tables` 登记各独立子表。
+- [x] **后置自检 (Verification)**：
+  - [x] 跑通 `scripts/py/audit_gd.py`，断言无静态语法与圈复杂度违规。
+  - [x] 针对 `domains.combat` 与 `domains.combat.mechanics` 运行无头断言，确认解析一致。
 
 ---
 
