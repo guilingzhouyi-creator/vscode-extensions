@@ -19,7 +19,7 @@ var _tabs: Variant = null
 # 配置默认值（视图内常量默认配置，业务数值经 apply_snapshot 注入，不直读 GameConfig）
 # ------------------------------------------------------------------------------
 var _max_guild_members: int = 50
-var _max_chat_lines: int = 200
+var max_chat_lines: int = 200
 
 # 公会快照
 var guild_name: String = ""
@@ -40,26 +40,26 @@ var _member_selected_index: int = -1
 
 # 聊天频道
 enum ChatChannel {GUILD, OFFICER, WORLD, PARTY, TRADE}
-var _chat_channels: Array = [ {"id": "GUILD", "name": "ui.fe09.chat.channel.guild", "messages": []}, {"id": "OFFICER", "name": "ui.fe09.chat.channel.officer", "messages": []}, {"id": "WORLD", "name": "ui.fe09.chat.channel.world", "messages": []}, {"id": "PARTY", "name": "ui.fe09.chat.channel.party", "messages": []}, {"id": "TRADE", "name": "ui.fe09.chat.channel.trade", "messages": []}]
-var _current_channel_index: int = 0
+var chat_channels: Array = [ {"id": "GUILD", "name": "ui.fe09.chat.channel.guild", "messages": []}, {"id": "OFFICER", "name": "ui.fe09.chat.channel.officer", "messages": []}, {"id": "WORLD", "name": "ui.fe09.chat.channel.world", "messages": []}, {"id": "PARTY", "name": "ui.fe09.chat.channel.party", "messages": []}, {"id": "TRADE", "name": "ui.fe09.chat.channel.trade", "messages": []}]
+var current_channel_index: int = 0
 
 # 好友系统
 enum FriendCategory {FRIEND, BLACKLIST, STRANGER}
-var _friends: Array = []
-var _friend_selected_index: int = -1
-var _current_friend_category: FriendCategory = FriendCategory.FRIEND
+var friends: Array = []
+var friend_selected_index: int = -1
+var current_friend_category: FriendCategory = FriendCategory.FRIEND
 
 # NPC 对话
-var _npc_dialogs: Array = []
-var _current_dialog_index: int = 0
+var npc_dialogs: Array = []
+var current_dialog_index: int = 0
 
 # 玩家交易
-var _trade_partner_name: String = ""
-var _my_inventory: Array = []
-var _my_trade_items: Array = []
-var _partner_trade_items: Array = []
-var _trade_locked: bool = false
-var _trade_confirmed: bool = false
+var trade_partner_name: String = ""
+var my_inventory: Array = []
+var my_trade_items: Array = []
+var partner_trade_items: Array = []
+var trade_locked: bool = false
+var trade_confirmed: bool = false
 
 # ------------------------------------------------------------------------------
 # 节点引用（场景树中以 unique_name_in_owner 标记，共 49 个）
@@ -91,42 +91,42 @@ var _trade_confirmed: bool = false
 @onready var _kick_member_button: Button = %BtnKickMember
 
 # --- Tab 3: 聊天频道 (CHAT_CHANNELS) ---
-@onready var _channel_list: ItemList = %ChannelList
+@onready var channel_list: ItemList = %ChannelList
 @onready var _channel_settings_button: Button = %BtnChannelSettings
-@onready var _rich_text_chat_messages: RichTextLabel = %RichtextChatMessages
+@onready var rich_text_chat_messages: RichTextLabel = %RichtextChatMessages
 @onready var _line_chat_input: LineEdit = %LineChatInput
 @onready var _chat_send_button: Button = %BtnChatSend
 
 # --- Tab 4: 好友系统 (FRIENDS) ---
 @onready var _line_friend_search: LineEdit = %LineFriendSearch
 @onready var _friend_tab_container: TabContainer = %FriendTabContainer
-@onready var _friend_list: ItemList = %FriendList
-@onready var _label_friend_detail_name: Label = %LabelFriendDetailName
-@onready var _label_friend_detail_location: Label = %LabelFriendDetailLocation
-@onready var _label_friend_detail_online: Label = %LabelFriendDetailOnline
+@onready var friend_list: ItemList = %FriendList
+@onready var label_friend_detail_name: Label = %LabelFriendDetailName
+@onready var label_friend_detail_location: Label = %LabelFriendDetailLocation
+@onready var label_friend_detail_online: Label = %LabelFriendDetailOnline
 @onready var _add_friend_button: Button = %BtnAddFriend
 @onready var _delete_friend_button: Button = %BtnDeleteFriend
 @onready var _whisper_friend_button: Button = %BtnWhisperFriend
 
 # --- Tab 5: NPC对话 (NPC_DIALOG) ---
-@onready var _label_npc_name: Label = %LabelNpcName
-@onready var _rich_text_npc_dialog: RichTextLabel = %RichtextNpcDialog
-@onready var _dialog_options_box: VBoxContainer = %VBoxDialogOptions
+@onready var label_npc_name: Label = %LabelNpcName
+@onready var rich_text_npc_dialog: RichTextLabel = %RichtextNpcDialog
+@onready var dialog_options_box: VBoxContainer = %VBoxDialogOptions
 @onready var _npc_quest_button: Button = %BtnNpcQuest
 @onready var _npc_shop_button: Button = %BtnNpcShop
 @onready var _npc_leave_button: Button = %BtnNpcLeave
 
 # --- Tab 6: 玩家交易 (PLAYER_TRADE) ---
-@onready var _label_trade_partner: Label = %LabelTradePartner
-@onready var _my_inventory_list: ItemList = %MyInventoryList
-@onready var _my_trade_list: ItemList = %MyTradeList
-@onready var _my_trade_gold_spin_box: SpinBox = %SpinMyTradeGold
-@onready var _label_trade_status: Label = %LabelTradeStatus
-@onready var _trade_lock_button: Button = %BtnTradeLock
+@onready var label_trade_partner: Label = %LabelTradePartner
+@onready var my_inventory_list: ItemList = %MyInventoryList
+@onready var my_trade_list: ItemList = %MyTradeList
+@onready var my_trade_gold_spin_box: SpinBox = %SpinMyTradeGold
+@onready var label_trade_status: Label = %LabelTradeStatus
+@onready var trade_lock_button: Button = %BtnTradeLock
 @onready var _trade_confirm_button: Button = %BtnTradeConfirm
 @onready var _trade_cancel_button: Button = %BtnTradeCancel
-@onready var _partner_trade_list: ItemList = %PartnerTradeList
-@onready var _label_partner_gold: Label = %LabelPartnerGold
+@onready var partner_trade_list: ItemList = %PartnerTradeList
+@onready var label_partner_gold: Label = %LabelPartnerGold
 
 # --- 非唯一静态标签（i18n 迁移新增，共 16 个） ---
 @onready var _header_title_label: Label = %HeaderTitleLabel
@@ -138,7 +138,7 @@ var _trade_confirmed: bool = false
 @onready var _search_label: Label = %SearchLabel
 @onready var _friend_list_label: Label = %FriendListLabel
 @onready var _friend_detail_title_label: Label = %FriendDetailTitleLabel
-@onready var _npc_title_label: Label = %NpcTitleLabel
+@onready var npc_title_label: Label = %NpcTitleLabel
 @onready var _dialog_label: Label = %DialogLabel
 @onready var _options_label: Label = %OptionsLabel
 @onready var _my_inventory_label: Label = %MyInvLabel
@@ -220,18 +220,27 @@ func _apply_theme() -> void:
 
 ## 加载初始预览快照：公会信息/成员/好友/NPC 对话/交易库存/聊天预填
 func _load_mock_snapshot() -> void:
-	# 公会基础信息
-	guild_name = "ui.fe09.mock.guild_name"
-	guild_level = 7
-	guild_leader = "ui.fe09.mock.guild_leader"
-	guild_funds = 128500
-	guild_announcement = "ui.fe09.mock.guild_announcement"
-
-	# 15 名公会成员
-	_guild_members = ServiceLocator.get_instance().guild().generate_roster(15)
-
-	# 好友/NPC/交易/聊天委托 Tabs 初始化
-	_get_tabs().init_mock_data()
+	if ServiceLocator.get_mode() == "mock":
+		guild_name = "ui.fe09.mock.guild_name"
+		guild_level = 7
+		guild_leader = "ui.fe09.mock.guild_leader"
+		guild_funds = 128500
+		guild_announcement = "ui.fe09.mock.guild_announcement"
+		_guild_members = ServiceLocator.get_instance().guild().generate_roster(15)
+		_get_tabs().init_mock_data()
+	else:
+		guild_name = ""
+		guild_level = 0
+		guild_leader = ""
+		guild_funds = 0
+		guild_announcement = ""
+		_guild_members = []
+		var guild_reply := ServiceLocator.get_instance().guild().dispatch_guild_action("GET_GUILD_STATE", {})
+		var guild_table: Dictionary = guild_reply.get("data", guild_reply) as Dictionary
+		if guild_table.has("guild_name"):
+			guild_name = str(guild_table.get("guild_name", ""))
+		if guild_table.get("members") is Array:
+			_guild_members = (guild_table.get("members") as Array).duplicate(true)
 
 # ==============================================================================
 # Tab 标题初始化
@@ -361,10 +370,16 @@ func _refresh_member_detail(index: int) -> void:
 
 ## 退出公会按钮回调（预设表现层 Toast 反馈）
 func _on_leave_guild_pressed() -> void:
+	ServiceLocator.get_instance().guild().dispatch_guild_action("LEAVE_GUILD", {"guild_name": guild_name})
 	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe09.guild.leave_toast"), NavTypes.ToastLevel.INFO)
 
-## 公会管理按钮回调（预设表现层 Toast 反馈）
+## 公会管理按钮回调（经权限判定后派发管理动作并反馈）
 func _on_guild_manage_pressed() -> void:
+	var guild_service := ServiceLocator.get_instance().guild()
+	if not guild_service.can_manage("LEADER"):
+		NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe09.members.no_member_selected"), NavTypes.ToastLevel.WARNING)
+		return
+	guild_service.dispatch_guild_action("MANAGE_GUILD", {"guild_name": guild_name})
 	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe09.guild.manage_toast"), NavTypes.ToastLevel.INFO)
 
 # ==============================================================================
@@ -376,25 +391,35 @@ func _on_member_selected(index: int) -> void:
 	_member_selected_index = index
 	_refresh_member_detail(index)
 
-## 成员操作按钮回调（职位管理 / 踢出成员）：校验已选成员后展示 Toast 反馈
+## 成员操作按钮回调（职位管理 / 踢出成员）：校验已选成员与权限后派发后端动作
 func _on_member_action_pressed(toast_key: String) -> void:
 	if _member_selected_index < 0:
 		NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe09.members.no_member_selected"), NavTypes.ToastLevel.WARNING)
 		return
 	var member: Dictionary = _guild_members[_member_selected_index]
+	var action_name := "KICK_MEMBER" if toast_key.contains("kick") else "PROMOTE_MEMBER"
+	ServiceLocator.get_instance().guild().dispatch_guild_action("MANAGE_MEMBER", {
+		"operator_role": "LEADER",
+		"permission_action": action_name,
+		"member_name": str(member.get("name", "")),
+	})
 	NavManager.get_instance().show_toast(UIIntermediary.text(toast_key, {"name": UIIntermediary.text(str(member.get("name", "")))}), NavTypes.ToastLevel.INFO)
 
-## 邀请成员按钮回调（预设表现层 Toast 反馈）
+## 邀请成员按钮回调（派发公会邀请协议动作并展示反馈）
 func _on_invite_member_pressed() -> void:
+	ServiceLocator.get_instance().guild().dispatch_guild_action("INVITE_MEMBER", {"guild_name": guild_name})
 	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe09.members.invite_toast"), NavTypes.ToastLevel.INFO)
 
 # ==============================================================================
 # 全局信号处理
 # ==============================================================================
 
-## 主 Tab 切换：表现层扩展预留入口
-func _on_tab_changed(_tab_index: int) -> void:
-	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe09.toast.tab_switched"), NavTypes.ToastLevel.INFO, 1.0)
+## 主 Tab 切换：同步刷新目标社交子面板
+func _on_tab_changed(tab_index: int) -> void:
+	if tab_index == 1:
+		_populate_member_list()
+	elif tab_index == 2 and _tabs != null:
+		_tabs._refresh_chat_display()
 
 ## 返回按钮：经 ViewRouter 弹出视图回退上一级
 func _on_back_pressed() -> void:

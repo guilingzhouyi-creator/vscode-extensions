@@ -10,7 +10,6 @@
 class_name MailSystemView
 extends BaseScreen
 
-const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
 const MailSystemTabsClass = preload("res://frontend/views/mail_system/mail_system_tabs.gd")
 
 # ==============================================================================
@@ -44,11 +43,11 @@ const MailSystemTabsClass = preload("res://frontend/views/mail_system/mail_syste
 @onready var _delete_mail_button: Button = $%BtnDeleteMail
 
 # --- 右侧 Tab 1: 写邮件 ---
-@onready var _line_edit_recipient: LineEdit = $%LineEditRecipient
-@onready var _line_edit_subject: LineEdit = $%LineEditSubject
-@onready var _text_edit_body: TextEdit = $%TextEditBody
+@onready var line_edit_recipient: LineEdit = $%LineEditRecipient
+@onready var line_edit_subject: LineEdit = $%LineEditSubject
+@onready var text_edit_body: TextEdit = $%TextEditBody
 @onready var _add_attachment_button: Button = $%BtnAddAttachment
-@onready var _compose_attachment_list: HBoxContainer = $%ComposeAttachmentList
+@onready var compose_attachment_list: HBoxContainer = $%ComposeAttachmentList
 @onready var _send_button: Button = $%BtnSend
 @onready var _save_draft_button: Button = $%BtnSaveDraft
 
@@ -120,11 +119,11 @@ func _ready() -> void:
 	UIIntermediary.adapt_view(self)
 
 func _load_mock_data() -> void:
-	if _tabs != null:
-		apply_snapshot({
-			"capacity": ServiceLocator.get_instance().mail().get_max_capacity(),
-			"mails": _tabs.mock_mails,
-		})
+	var mail_list: Array = _tabs.mock_mails if (_tabs != null and ServiceLocator.get_mode() == "mock") else []
+	apply_snapshot({
+		"capacity": ServiceLocator.get_instance().mail().get_max_capacity(),
+		"mails": mail_list,
+	})
 
 # ==============================================================================
 # 列表与详情初始化与渲染

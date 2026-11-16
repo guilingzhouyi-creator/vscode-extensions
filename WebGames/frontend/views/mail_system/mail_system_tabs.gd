@@ -10,7 +10,6 @@
 class_name MailSystemTabs
 extends BaseScreen
 
-const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
 const KVirtualListClass = preload("res://frontend/components/k_virtual_list.gd")
 const KPageHeaderClass = preload("res://frontend/components/k_page_header.gd")
 const KSplitPanelClass = preload("res://frontend/components/k_split_panel.gd")
@@ -120,12 +119,12 @@ func init_static_text() -> void:
 	if mail_view._search_edit != null:
 		UIIntermediary.resolve_placeholder(mail_view._search_edit, "ui.fe08.search.placeholder")
 	KTabBar.init_titles(mail_view._right_tab_container, PackedStringArray(["ui.fe08.tab.detail", "ui.fe08.tab.compose"]))
-	if mail_view._line_edit_recipient != null:
-		UIIntermediary.resolve_placeholder(mail_view._line_edit_recipient, "ui.fe08.compose.recipient_ph")
-	if mail_view._line_edit_subject != null:
-		UIIntermediary.resolve_placeholder(mail_view._line_edit_subject, "ui.fe08.compose.subject_ph")
-	if mail_view._text_edit_body != null:
-		mail_view._text_edit_body.placeholder_text = UIIntermediary.text("ui.fe08.compose.body_ph")
+	if mail_view.line_edit_recipient != null:
+		UIIntermediary.resolve_placeholder(mail_view.line_edit_recipient, "ui.fe08.compose.recipient_ph")
+	if mail_view.line_edit_subject != null:
+		UIIntermediary.resolve_placeholder(mail_view.line_edit_subject, "ui.fe08.compose.subject_ph")
+	if mail_view.text_edit_body != null:
+		mail_view.text_edit_body.placeholder_text = UIIntermediary.text("ui.fe08.compose.body_ph")
 
 ## 初始化邮件分类页签栏（全部/系统/奖励/公会/玩家）。
 func setup_category_tabs() -> void:
@@ -150,10 +149,10 @@ func category_code(tab_index: int) -> String:
 ## 清空写信表单与待发送附件列表。
 func init_mail_compose() -> void:
 	var mail_view: MailSystemView = _view
-	mail_view._line_edit_recipient.text = ""
-	mail_view._line_edit_subject.text = ""
-	mail_view._text_edit_body.text = ""
-	clear_container_children(mail_view._compose_attachment_list)
+	mail_view.line_edit_recipient.text = ""
+	mail_view.line_edit_subject.text = ""
+	mail_view.text_edit_body.text = ""
+	clear_container_children(mail_view.compose_attachment_list)
 
 ## 释放指定容器节点的全部子控件。
 func clear_container_children(container: Node) -> void:
@@ -169,30 +168,47 @@ func on_reply() -> void:
 	var selected_indices: PackedInt32Array = mail_view._mail_item_list.get_selected_items()
 	if selected_indices.size() > 0 and selected_indices[0] < filtered_mails.size():
 		var mail_entry: Dictionary = filtered_mails[selected_indices[0]]
-		mail_view._line_edit_recipient.text = UIIntermediary.text(str(mail_entry.get("sender_key", "")))
-		mail_view._line_edit_subject.text = UIIntermediary.text("ui.fe08.reply.subject_prefix", {"subject": UIIntermediary.text(str(mail_entry.get("subject_key", "")))})
+		mail_view.line_edit_recipient.text = UIIntermediary.text(str(mail_entry.get("sender_key", "")))
+		mail_view.line_edit_subject.text = UIIntermediary.text("ui.fe08.reply.subject_prefix", {"subject": UIIntermediary.text(str(mail_entry.get("subject_key", "")))})
 		mail_view._right_tab_container.current_tab = 1
 
 ## 处理添加附件按钮：向写信附件区追加展示标签。
 func on_add_attachment() -> void:
 	var mail_view: MailSystemView = _view
 	var attachment_label := Label.new()
-	attachment_label.text = UIIntermediary.text("ui.fe08.compose.attachment_item", {"count": mail_view._compose_attachment_list.get_child_count() + 1})
-	mail_view._compose_attachment_list.add_child(attachment_label)
+	attachment_label.text = UIIntermediary.text("ui.fe08.compose.attachment_item", {"count": mail_view.compose_attachment_list.get_child_count() + 1})
+	mail_view.compose_attachment_list.add_child(attachment_label)
 
-## 处理发送按钮：校验非空收件人与主题后重置写信面板并切回详情页。
+## 处理发送按钮：校验非空收件人与主题后派发邮件发送协议并重置写信面板
 func on_send() -> void:
 	var mail_view: MailSystemView = _view
-	var recipient: String = mail_view._line_edit_recipient.text.strip_edges()
-	var subject: String = mail_view._line_edit_subject.text.strip_edges()
+	var recipient: String = mail_view.line_edit_recipient.text.strip_edges()
+	var subject: String = mail_view.line_edit_subject.text.strip_edges()
+	var body_text: String = mail_view.text_edit_body.text if mail_view.text_edit_body != null else ""
 	if recipient.is_empty() or subject.is_empty():
+		return
+	var send_reply := ServiceLocator.get_instance().mail().dispatch_mail_action("SEND_MAIL", {
+		"recipient": recipient,
+		"subject": subject,
+		"body": body_text,
+	})
+	if not bool(send_reply.get("success", true)):
 		return
 	init_mail_compose()
 	mail_view._right_tab_container.current_tab = 0
 
-## 响应保存草稿按钮点击事件。
+## 响应保存草稿按钮点击事件：持久化邮件草稿至后端并弹出反馈提示
 func on_save_draft() -> void:
-	pass
+	var mail_view: MailSystemView = _view
+	var recipient: String = mail_view.line_edit_recipient.text.strip_edges()
+	var subject: String = mail_view.line_edit_subject.text.strip_edges()
+	var body_text: String = mail_view.text_edit_body.text if mail_view.text_edit_body != null else ""
+	ServiceLocator.get_instance().mail().dispatch_mail_action("SAVE_DRAFT", {
+		"recipient": recipient,
+		"subject": subject,
+		"body": body_text,
+	})
+	NavManager.get_instance().show_toast(UIIntermediary.text("ui.fe08.btn.save_draft"), NavTypes.ToastLevel.INFO)
 
 ## 初始化虚拟列表并配置对象池 (ADV-POOL-001)
 func init_virtual_list(container: Control = null) -> KVirtualList:
@@ -204,6 +220,9 @@ func init_virtual_list(container: Control = null) -> KVirtualList:
 		connect_managed(virtual_list.range_changed, _on_virtual_range_changed)
 		if container != null:
 			container.add_child(virtual_list)
+		else:
+			virtual_list.visible = false
+			add_child(virtual_list)
 	return virtual_list
 
 ## 刷新虚拟列表总数
