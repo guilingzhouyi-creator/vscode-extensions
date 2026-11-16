@@ -120,7 +120,7 @@ func ensure_studio_panels_mounted() -> void:
 ## 加载 NarrativeDAGGraphDTO 或字典载荷进入 DAG 图画布
 func load_dag_dto(dag_payload: Variant) -> void:
 	ensure_studio_panels_mounted()
-	var serialized: Dictionary = dag_payload.to_dto() if (dag_payload != null and dag_payload.has_method("to_dto")) else (dag_payload as Dictionary if dag_payload is Dictionary else {})
+	var serialized: Dictionary = (dag_payload as Object).call("to_dto") if (dag_payload is Object and (dag_payload as Object).has_method("to_dto")) else (dag_payload as Dictionary if dag_payload is Dictionary else {})
 	_has_dag_edits = false
 	_dag_panel.render_dag_payload(serialized, str(_workbench_state.get("active_node_id", "")))
 

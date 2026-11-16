@@ -119,8 +119,8 @@ func init_static_text() -> void:
 		[host_view._back_button, "ui.fe07.header.back"],
 		[host_view.quest_list_section_label, "ui.fe07.quest_list.section"],
 		[host_view.quest_filter_label, "ui.fe07.quest_list.filter_label"],
-		[host_view._label_quest_title, "ui.fe07.quest_detail.title_default"],
-		[host_view._label_quest_description, "ui.fe07.quest_detail.desc_default"],
+		[host_view.label_quest_title, "ui.fe07.quest_detail.title_default"],
+		[host_view.label_quest_description, "ui.fe07.quest_detail.desc_default"],
 		[host_view.objectives_label, "ui.fe07.quest_detail.objectives_label"],
 		[host_view.rewards_label, "ui.fe07.quest_detail.rewards_label"],
 		[host_view._quest_accept_button, "ui.fe07.quest_detail.btn_accept"],
@@ -149,10 +149,10 @@ func init_static_text() -> void:
 		if binding_entry[0] != null:
 			UIIntermediary.resolve(binding_entry[0], binding_entry[1])
 
-	if host_view._label_quest_giver != null:
-		UIIntermediary.resolve(host_view._label_quest_giver, "ui.fe07.quest.giver", {"name": "-"})
-	if host_view._label_quest_level != null:
-		UIIntermediary.resolve(host_view._label_quest_level, "ui.fe07.quest.level", {"level": 0})
+	if host_view.label_quest_giver != null:
+		UIIntermediary.resolve(host_view.label_quest_giver, "ui.fe07.quest.giver", {"name": "-"})
+	if host_view.label_quest_level != null:
+		UIIntermediary.resolve(host_view.label_quest_level, "ui.fe07.quest.level", {"level": 0})
 
 ## 初始化因果环 DAG 页签勾选框状态并刷新节点列表。
 func init_causality_dag_tab() -> void:
