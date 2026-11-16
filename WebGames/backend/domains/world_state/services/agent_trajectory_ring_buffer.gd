@@ -12,11 +12,6 @@
 class_name AgentTrajectoryRingBuffer
 extends RefCounted
 
-const AgentHudTelemetryPacketDTO = preload("res://backend/domains/world_state/dto/agent_hud_telemetry_packet_dto.gd")
-const AgentHudContextSliceDTO = preload("res://backend/domains/world_state/dto/agent_hud_context_slice_dto.gd")
-const HudCausalDeltaDTO = preload("res://backend/domains/world_state/dto/hud_causal_delta_dto.gd")
-const AgentActionDirectiveDTO = preload("res://backend/domains/world_state/dto/agent_action_directive_dto.gd")
-
 var _capacity: int = 32
 var _slots: Array[AgentHudTelemetryPacketDTO] = []
 var _slot_delta_pools: Array = []

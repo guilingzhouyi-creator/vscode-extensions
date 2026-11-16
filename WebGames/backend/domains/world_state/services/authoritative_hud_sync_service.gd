@@ -12,8 +12,6 @@
 class_name AuthoritativeHudSyncService
 extends RefCounted
 
-const HumanControlLeaseManager = preload("res://backend/domains/world_state/services/human_control_lease_manager.gd")
-
 ## 1. 拉轨（Pull Facade）：聚合生成权威 HUD 快照（纯计算无副作用，轻资产 <= 4KB）
 static func get_authoritative_snapshot(context: Dictionary) -> AuthoritativeHudSnapshotDTO:
 	var snapshot := AuthoritativeHudSnapshotDTO.new()

@@ -11,8 +11,6 @@
 class_name AgentActionPacketDTO
 extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 var session_id: String = ""         # 对应会话 ID
 var sequence_index: int = 0         # 响应的目标遥测包序号
 var directive_id: String = ""       # 选定的合法指令 ID (如 "ALLOCATE_POTENTIAL_STAT")

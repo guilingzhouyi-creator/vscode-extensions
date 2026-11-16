@@ -11,11 +11,6 @@
 class_name WorldSessionRuntimeService
 extends RefCounted
 
-const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
-const AuthoritativeHudSyncService = preload("res://backend/domains/world_state/services/authoritative_hud_sync_service.gd")
-const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
-const RuntimeSessionState = preload("res://backend/domains/world_state/dto/runtime_session_state.gd")
-
 ## 轻量运行时存档提供者适配器（确保 WorldSessionRuntime 激活态可生成非空域快照）
 class RuntimeWorldSaveProvider extends RefCounted:
 	var _state_weak_reference: WeakRef = null
@@ -331,14 +326,17 @@ static func _advance_calendar_hours(delta_hours: int) -> bool:
 	if delta_hours <= 0:
 		return false
 	var total_hours := _state.travel_hours + delta_hours
+	@warning_ignore("integer_division")
 	var add_days := total_hours / 24
 	_state.travel_hours = total_hours % 24
 	if add_days > 0:
 		var day_zero := (_state.calendar_days - 1) + add_days
+		@warning_ignore("integer_division")
 		var add_months := day_zero / 30
 		_state.calendar_days = (day_zero % 30) + 1
 		if add_months > 0:
 			var month_zero := (_state.calendar_months - 1) + add_months
+			@warning_ignore("integer_division")
 			_state.calendar_years += month_zero / 12
 			_state.calendar_months = (month_zero % 12) + 1
 	var environment := WorldCalendarEnvironmentResolver.resolve_environment(

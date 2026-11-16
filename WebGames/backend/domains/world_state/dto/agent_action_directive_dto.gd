@@ -11,8 +11,6 @@
 class_name AgentActionDirectiveDTO
 extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 var directive_id: String = ""       # 操作唯一标识符 (如 "ALLOCATE_POTENTIAL_STAT")
 var domain: String = "ASSET"         # 领域分类 ("ASSET", "RETENTION", "ACTION", "INTERACTION", "META")
 var description: String = ""        # 纯技术事实说明，面向 LLM

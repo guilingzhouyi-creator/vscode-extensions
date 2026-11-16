@@ -11,8 +11,6 @@
 class_name HudMutationContextDto
 extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 var target_hud_element: String = ""
 var mutation_type: String = ""
 var payload: Dictionary = {}

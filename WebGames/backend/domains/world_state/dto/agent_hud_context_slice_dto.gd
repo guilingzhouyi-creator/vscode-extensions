@@ -11,8 +11,6 @@
 class_name AgentHudContextSliceDTO
 extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 const DEFAULT_STAT_POOL: float = 100.0
 
 # 一、基础身份切片

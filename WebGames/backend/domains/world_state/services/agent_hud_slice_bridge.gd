@@ -12,18 +12,6 @@
 class_name AgentHudSliceBridge
 extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
-const AuthoritativeHudSyncService = preload("res://backend/domains/world_state/services/authoritative_hud_sync_service.gd")
-const AgentHudSliceSolver = preload("res://backend/domains/world_state/solvers/agent_hud_slice_solver.gd")
-const AgentTrajectoryRingBuffer = preload("res://backend/domains/world_state/services/agent_trajectory_ring_buffer.gd")
-const AgentAsyncDispatcher = preload("res://backend/domains/world_state/services/agent_async_dispatcher.gd")
-
-const AgentHudTelemetryPacketDTO = preload("res://backend/domains/world_state/dto/agent_hud_telemetry_packet_dto.gd")
-const AgentHudContextSliceDTO = preload("res://backend/domains/world_state/dto/agent_hud_context_slice_dto.gd")
-const HudUiNoticeDTO = preload("res://backend/domains/world_state/dto/hud_ui_notice_dto.gd")
-const HudCausalDeltaDTO = preload("res://backend/domains/world_state/dto/hud_causal_delta_dto.gd")
-
 var _context: Dictionary = {}
 var _previous_slice: AgentHudContextSliceDTO = null
 var _sequence_index: int = 0

@@ -12,8 +12,6 @@
 class_name AgentAsyncDispatcher
 extends RefCounted
 
-const AgentHudTelemetryPacketDTO = preload("res://backend/domains/world_state/dto/agent_hud_telemetry_packet_dto.gd")
-
 enum Strategy {
 	DROP_OLDEST = 0,
 	DROP_NEWEST = 1,

@@ -11,8 +11,6 @@
 class_name ClientRequestEnvelopeDTO
 extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 const ACTOR_HUMAN_UI: String = "HUMAN_UI"
 const ACTOR_AGENT: String = "AGENT"
 

@@ -12,8 +12,6 @@
 class_name AgentActionExecutionSolver
 extends RefCounted
 
-const AgentTelemetryPoolRegistry = preload("res://backend/domains/world_state/services/agent_telemetry_pool_registry.gd")
-
 static func _recycle_action_space(action_space: Array[AgentActionDirectiveDTO]) -> void:
 	for directive in action_space:
 		if directive != null:

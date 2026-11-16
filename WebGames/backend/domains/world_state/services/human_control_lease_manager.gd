@@ -19,7 +19,7 @@ static var _active_lease_nonce: int = 0
 static var _mock_time_offset_milliseconds: int = 0
 
 ## 续订人类前台控制租约
-static func renew_human_lease(account_id: String, lease_nonce: int, window_milliseconds: int = DEFAULT_LEASE_WINDOW_MS) -> void:
+static func renew_human_lease(account_id: String, lease_nonce: int, _window_milliseconds: int = DEFAULT_LEASE_WINDOW_MS) -> void:
 	_last_human_activity_milliseconds = _get_current_time_ms()
 	_current_lease_holder = account_id
 	_active_lease_nonce = lease_nonce

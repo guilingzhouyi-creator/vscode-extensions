@@ -12,14 +12,6 @@
 class_name AgentHudSliceSolver
 extends RefCounted
 
-const AgentTelemetryPoolRegistry = preload("res://backend/domains/world_state/services/agent_telemetry_pool_registry.gd")
-const AgentHudTelemetryPacketDTO = preload("res://backend/domains/world_state/dto/agent_hud_telemetry_packet_dto.gd")
-const AgentHudContextSliceDTO = preload("res://backend/domains/world_state/dto/agent_hud_context_slice_dto.gd")
-const AuthoritativeHudSnapshotDTO = preload("res://backend/domains/world_state/dto/authoritative_hud_snapshot_dto.gd")
-const HudUiNoticeDTO = preload("res://backend/domains/world_state/dto/hud_ui_notice_dto.gd")
-const HomeActionSpaceSolver = preload("res://backend/domains/world_state/solvers/home_action_space_solver.gd")
-const HudCausalDeltaSolver = preload("res://backend/domains/world_state/solvers/hud_causal_delta_solver.gd")
-
 ## 一站式原子装箱流水线：生成直接交付 LLM 的标准数据包（支持原位复用）
 static func assemble_telemetry_packet(
 	snapshot: AuthoritativeHudSnapshotDTO,
@@ -37,6 +29,7 @@ static func assemble_telemetry_packet(
 	packet.protocol_version = "1.0.0"
 	packet.sequence_index = sequence_index
 	packet.timestamp_ms = int(Time.get_unix_time_from_system() * 1000.0)
+	@warning_ignore("integer_division")
 	packet.packet_id = "pkt_home_%d_%04d" % [int(packet.timestamp_ms / 1000), sequence_index]
 	packet.domain = "HOME_HUD"
 	packet.is_terminal = false

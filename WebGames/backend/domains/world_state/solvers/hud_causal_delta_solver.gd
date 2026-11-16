@@ -12,10 +12,6 @@
 class_name HudCausalDeltaSolver
 extends RefCounted
 
-const AgentTelemetryPoolRegistry = preload("res://backend/domains/world_state/services/agent_telemetry_pool_registry.gd")
-const HudCausalDeltaDTO = preload("res://backend/domains/world_state/dto/hud_causal_delta_dto.gd")
-const AgentHudContextSliceDTO = preload("res://backend/domains/world_state/dto/agent_hud_context_slice_dto.gd")
-
 ## 原位注入因果差分数组（借还守恒，零堆分配）
 static func compute_deltas_into(
 	previous_slice: AgentHudContextSliceDTO,

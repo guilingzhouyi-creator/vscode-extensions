@@ -12,8 +12,6 @@
 class_name RuntimeSessionState
 extends RefCounted
 
-const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
-
 var account_id: String = ""
 var is_authenticated: bool = false
 var session_token_hash: String = ""

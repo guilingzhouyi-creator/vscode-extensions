@@ -11,8 +11,6 @@
 class_name AgentHudTelemetryPacketDTO
 extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 # 一、信封元数据与控制权租约
 var protocol_version: String = "1.0.0"
 var packet_id: String = ""

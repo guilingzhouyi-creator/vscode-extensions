@@ -11,23 +11,6 @@
 class_name UnifiedProtocolDispatcher
 extends RefCounted
 
-const EscMenuBackendService = preload("res://backend/domains/world_state/services/esc_menu_backend_service.gd")
-const AgentActionExecutionSolver = preload("res://backend/domains/world_state/solvers/agent_action_execution_solver.gd")
-const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
-const ClientRequestEnvelopeDTO = preload("res://backend/domains/world_state/dto/client_request_envelope_dto.gd")
-const UnifiedResponseEnvelopeDTO = preload("res://backend/domains/world_state/dto/unified_response_envelope_dto.gd")
-const HumanControlLeaseManager = preload("res://backend/domains/world_state/services/human_control_lease_manager.gd")
-const AgentActionPacketDTO = preload("res://backend/domains/world_state/dto/agent_action_packet_dto.gd")
-const AuthoritativeHudSyncService = preload("res://backend/domains/world_state/services/authoritative_hud_sync_service.gd")
-const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
-const WorldGatewayFSM = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
-const AuthService = preload("res://backend/domains/account/auth_service.gd")
-const AccountProtocolHandler = preload("res://backend/domains/account/services/account_protocol_handler.gd")
-const WorldGatewayProtocolHandler = preload("res://backend/domains/world_gateway/world_gateway_protocol_handler.gd")
-const CharacterCreationProtocolHandler = preload("res://backend/domains/character_creation/character_creation_protocol_handler.gd")
-const LifecycleProtocolHandler = preload("res://backend/domains/lifecycle/services/lifecycle_protocol_handler.gd")
-const GameSettingsProtocolHandler = preload("res://backend/domains/game_settings/game_settings_protocol_handler.gd")
-
 const DOMAIN_WORLD_STATE_CONFIG: String = "domains.world_state"
 const PROTECTED_GATEWAY_ACTIONS: Array[String] = [
 	"ENTER_GATEWAY", "PROBE_MODES", "LIST_WORLDS", "SELECT_MODE",
@@ -105,6 +88,10 @@ static func dispatch_request(request: ClientRequestEnvelopeDTO, gateway: WorldGa
 			return LifecycleProtocolHandler.dispatch(request, effective_gateway)
 		"game_settings":
 			return _dispatch_settings_action(request)
+		"combat", "economy", "gacha", "quest", "crafting", "grimoire", "monster_ecology", "world_navigation":
+			return GameplayDomainProtocolHandler.dispatch(request)
+		"mail", "guild", "misc_edge", "system_save", "gm_command":
+			return GameplaySocialProtocolHandler.dispatch(request)
 		_:
 			return UnifiedProtocolFactory.create_response(
 				request.request_id, false, {}, "ERR_UNKNOWN_DOMAIN",

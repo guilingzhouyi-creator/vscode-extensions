@@ -11,8 +11,6 @@
 class_name UnifiedResponseEnvelopeDTO
 extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 var request_id: String = ""              # 关联的原始请求 ID
 var success: bool = false                # 执行是否成功
 var is_success: bool:                    # 兼容别名属性 (对齐 Mod SDK 语义契约)

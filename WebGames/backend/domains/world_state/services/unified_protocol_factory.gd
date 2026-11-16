@@ -11,10 +11,6 @@
 class_name UnifiedProtocolFactory
 extends RefCounted
 
-const ClientRequestEnvelopeDTO = preload("res://backend/domains/world_state/dto/client_request_envelope_dto.gd")
-const UnifiedResponseEnvelopeDTO = preload("res://backend/domains/world_state/dto/unified_response_envelope_dto.gd")
-const AgentActionPacketDTO = preload("res://backend/domains/world_state/dto/agent_action_packet_dto.gd")
-
 const MAX_POOLED_ENVELOPES: int = 32
 
 static var _lease_counter: int = 1

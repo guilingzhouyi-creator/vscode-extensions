@@ -11,21 +11,6 @@
 class_name EscMenuBackendService
 extends RefCounted
 
-const SaveReadinessGuard = preload("res://backend/domains/world_state/guards/save_readiness_guard.gd")
-const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
-const GameLifecycleService = preload("res://backend/domains/lifecycle/game_lifecycle_service.gd")
-const GameShutdownDTO = preload("res://backend/domains/lifecycle/dto/game_shutdown_dto.gd")
-const GameLifecycleModel = preload("res://backend/domains/lifecycle/game_lifecycle_model.gd")
-const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
-const ClientRequestEnvelopeDTO = preload("res://backend/domains/world_state/dto/client_request_envelope_dto.gd")
-const UnifiedResponseEnvelopeDTO = preload("res://backend/domains/world_state/dto/unified_response_envelope_dto.gd")
-const WorldGatewayFSM = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
-const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
-const HumanControlLeaseManager = preload("res://backend/domains/world_state/services/human_control_lease_manager.gd")
-const WorldSessionRuntimeService = preload("res://backend/domains/world_state/services/world_session_runtime_service.gd")
-const GameSettingsProtocolHandler = preload("res://backend/domains/game_settings/game_settings_protocol_handler.gd")
-const GameLifecycleManager = preload("res://backend/domains/lifecycle/game_lifecycle_manager.gd")
-
 const DOMAIN_WORLD_STATE_CONFIG: String = "domains.world_state"
 
 ## 处理用户触发 ESC 快捷菜单时的动作路由

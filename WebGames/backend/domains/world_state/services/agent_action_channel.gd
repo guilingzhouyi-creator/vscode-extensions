@@ -12,8 +12,6 @@
 class_name AgentActionChannel
 extends RefCounted
 
-const AgentTelemetryPoolRegistry = preload("res://backend/domains/world_state/services/agent_telemetry_pool_registry.gd")
-
 ## 接收 AgentActionPacketDTO 并完成动作派发，零硬件冲突直投后端用例
 static func dispatch_action(action_packet: AgentActionPacketDTO, context: Dictionary = {}) -> Dictionary:
 	if action_packet == null:

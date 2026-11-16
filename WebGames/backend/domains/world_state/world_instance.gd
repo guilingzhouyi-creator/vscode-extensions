@@ -27,6 +27,7 @@ func advance_world_time(units: int = 1) -> void:
 	var ticks_per_day: int = maxi(1, GameConfig.get_int("domains.world", "continuity/ticks_per_day", 20))
 	var total_ticks: int = int(world_time.get("tick", 0)) + units
 	world_time["tick"] = total_ticks
+	@warning_ignore("integer_division")
 	var new_days: int = total_ticks / ticks_per_day
 	var old_days: int = int(world_time.get("day", 1)) - 1
 	if new_days > old_days:

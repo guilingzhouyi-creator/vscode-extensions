@@ -12,11 +12,6 @@
 class_name BinaryTelemetryCodec
 extends RefCounted
 
-const AgentHudTelemetryPacketDTO = preload("res://backend/domains/world_state/dto/agent_hud_telemetry_packet_dto.gd")
-const AgentHudContextSliceDTO = preload("res://backend/domains/world_state/dto/agent_hud_context_slice_dto.gd")
-const HudCausalDeltaDTO = preload("res://backend/domains/world_state/dto/hud_causal_delta_dto.gd")
-const AgentActionDirectiveDTO = preload("res://backend/domains/world_state/dto/agent_action_directive_dto.gd")
-
 const MAGIC_HEADER: int = 0x4B414C52 # "KALR"
 const PROTOCOL_VER: int = 1
 const RATIO_BYTE_SCALE: float = 255.0
@@ -182,6 +177,7 @@ static func decode_from_bytes(
 
 	packet.sequence_index = stream_buffer.get_u16()
 	packet.timestamp_ms = stream_buffer.get_64()
+	@warning_ignore("integer_division")
 	packet.packet_id = "pkt_home_%d_%04d" % [int(packet.timestamp_ms / 1000), packet.sequence_index]
 	packet.human_interaction_state = "ACTIVE" if packet.preempted_by_human else "IDLE"
 	packet.agent_control_mode = "READ_ONLY_OBSERVER" if packet.preempted_by_human else "READ_WRITE"

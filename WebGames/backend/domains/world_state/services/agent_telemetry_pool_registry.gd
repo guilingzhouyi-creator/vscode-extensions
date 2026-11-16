@@ -12,11 +12,6 @@
 class_name AgentTelemetryPoolRegistry
 extends RefCounted
 
-const AgentHudTelemetryPacketDTO = preload("res://backend/domains/world_state/dto/agent_hud_telemetry_packet_dto.gd")
-const AgentHudContextSliceDTO = preload("res://backend/domains/world_state/dto/agent_hud_context_slice_dto.gd")
-const AgentActionDirectiveDTO = preload("res://backend/domains/world_state/dto/agent_action_directive_dto.gd")
-const HudCausalDeltaDTO = preload("res://backend/domains/world_state/dto/hud_causal_delta_dto.gd")
-
 const POOL_PACKET: String = "agent_hud_telemetry_packet"
 const POOL_SLICE: String = "agent_hud_context_slice"
 const POOL_DIRECTIVE: String = "agent_action_directive"

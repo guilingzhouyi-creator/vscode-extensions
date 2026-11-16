@@ -11,8 +11,6 @@
 class_name HudUiNoticeDTO
 extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 var notice_id: String = ""         # 唯一提示标识符 (如 "GUIDE_POTENTIAL_ALLOCATION")
 var category: String = "INFO"      # "INFO", "WARNING", "GUIDE", "MODAL"
 var priority: int = 0              # 通知优先级 (数字越大优先级越高)

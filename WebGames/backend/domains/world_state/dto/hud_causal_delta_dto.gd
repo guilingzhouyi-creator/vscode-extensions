@@ -11,8 +11,6 @@
 class_name HudCausalDeltaDTO
 extends PoolableDtoBase
 
-const PoolableDtoBase = preload("res://backend/domains/persistence_protocol/poolable_dto_base.gd")
-
 var delta_category: String = ""   # "PHYSIOLOGY", "WALLET", "ASSET", "CALENDAR", "QUEST"
 var target_field: String = ""     # "hp_current", "wallet_gold", "day_phase_key"
 var previous_value: Variant = null

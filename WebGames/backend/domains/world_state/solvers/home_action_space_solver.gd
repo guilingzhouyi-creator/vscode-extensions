@@ -12,9 +12,6 @@
 class_name HomeActionSpaceSolver
 extends RefCounted
 
-const AgentTelemetryPoolRegistry = preload("res://backend/domains/world_state/services/agent_telemetry_pool_registry.gd")
-const AgentActionDirectiveDTO = preload("res://backend/domains/world_state/dto/agent_action_directive_dto.gd")
-
 const STATIC_DIR_SPECS: Array[Dictionary] = [
 	{
 		"id": "ALLOCATE_POTENTIAL_STAT",
