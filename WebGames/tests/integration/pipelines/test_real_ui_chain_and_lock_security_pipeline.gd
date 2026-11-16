@@ -8,11 +8,11 @@
 # 职责说明: 在无头 SceneTree 中以真实 UI 信号点击与 service_mode="real" 验证完整玩家路径：
 #           自动登录注册(零伪令牌) -> 世界网关建档 -> 自动分流 CharacterCreationView ->
 #           权威创角锁定(真实64位SHA256) -> DAG序章 -> MainHUD -> ESC返关(栈深=1/保上下文) ->
-#           NavManager.pop_screen 参数保真 -> 切换联机洗脱 SP MOD -> 验签 -> 优雅停机 -> 重进已有角色直入。
-# 设计依据: 阶段验收矩阵 (TC-E2E-UI-01 ~ TC-E2E-UI-03, DOD-P131-0401)
+#           NavManager.pop_screen 参数保真 -> 切换联机清除 SP MOD -> 验签 -> 优雅停机 -> 重进已有角色直入。
+# 设计依据: 阶段验收矩阵 (TC-E2E-UI-01 ~ TC-E2E-UI-03)
 # ==============================================================================
 
-## TestRealUiChainAndLockSecurityPipeline：全端可点击 UI 真实链路闭环回归套件
+## TestRealUiChainAndLockSecurityPipeline：全端可点击 UI 真实流程回归套件
 class_name TestRealUiChainAndLockSecurityPipeline
 extends TestCase
 
@@ -24,10 +24,10 @@ const CharacterCreationViewScript = preload("res://frontend/views/character_crea
 const PrologueViewScript = preload("res://frontend/views/prologue/prologue_view.gd")
 const MainHUDViewScript = preload("res://frontend/views/main_hud/main_hud_view.gd")
 
-const WORLD_ID: String = "WORLD_P131_E2E_UI_01"
+const WORLD_ID: String = "WORLD_REAL_E2E_UI_01"
 
 
-## 执行全端真实交互与安全闭环端到端测试
+## 执行全端真实交互与安全端到端测试
 static func run_all_tests() -> Dictionary:
 	var session_ctx := _setup_env()
 	var results: Array[Dictionary] = []
@@ -35,7 +35,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_tc_e2e_02_esc_exit_nav_pop_mode_switch_quit(session_ctx))
 	results.append(_test_tc_e2e_03_reentry_existing_char_and_entry_signals(session_ctx))
 	_teardown_env(session_ctx)
-	return TestCase.pack_results("全端真实可点击UI闭环与锁安全端到端验收流水线", results)
+	return TestCase.pack_results("全端真实可点击UI流转与锁安全端到端验收流水线", results)
 
 
 static func _setup_env() -> Dictionary:
@@ -43,7 +43,7 @@ static func _setup_env() -> Dictionary:
 	NavManager.reset_instance()
 	ServiceLocator.set_mode("real")
 	var app_root := AppRootScript.new()
-	app_root.name = "TestPhase131AppRoot"
+	app_root.name = "TestRealUiChainAppRoot"
 	var screen_layer := CanvasLayer.new()
 	screen_layer.name = "ScreenLayer"
 	var container := Control.new()
@@ -75,13 +75,13 @@ static func _test_tc_e2e_01_register_gateway_creation_prologue_hud(session_ctx: 
 	var nav := NavManager.get_instance()
 	var entry: AccountEntryViewScript = nav.push_screen("account_entry") as AccountEntryViewScript
 	if entry == null:
-		return make_result("TC-E2E-UI-01: 全链路注册创角进MainHUD", false, {"reason": "entry_null"})
+		return make_result("TC-E2E-UI-01: 全流程注册创角进MainHUD", false, {"reason": "entry_null"})
 
 	entry.splash_enter_btn.pressed.emit()
 	entry.login_goto_register_btn.pressed.emit()
-	entry.register_username_edit.text = "Phase131HeroUser"
-	entry.register_password_edit.text = "Secret_131_OK"
-	entry.register_confirm_edit.text = "Secret_131_OK"
+	entry.register_username_edit.text = "RealChainHeroUser"
+	entry.register_password_edit.text = "Secret_UiE2E_OK"
+	entry.register_confirm_edit.text = "Secret_UiE2E_OK"
 	entry.register_agree_check.button_pressed = true
 	entry.register_submit_btn.pressed.emit()
 
@@ -103,7 +103,7 @@ static func _test_tc_e2e_01_register_gateway_creation_prologue_hud(session_ctx: 
 	var creation_snapshot_ok := false
 	var reroll_res := {}
 	if creation != null:
-		creation.character_name_edit.text = "AriaP131"
+		creation.character_name_edit.text = "AriaRealUi"
 		reroll_res = creation.roll_destiny_preview(false)
 		creation_snapshot_ok = not creation.preview_snapshot.is_empty()
 		creation.confirm_create_btn.pressed.emit()
@@ -173,15 +173,15 @@ static func _test_tc_e2e_02_esc_exit_nav_pop_mode_switch_quit(session_ctx: Dicti
 	var realm_verified_ok := false
 	var shutdown_ok := false
 	if gateway != null:
-		# 注销当前 SP 会话并真实登录联机白名单账号 MP_TESTER_01，验证 ModeTabContainer -> Multiplayer 洗脱与验签闭环
+		# 注销当前 SP 会话并真实登录联机白名单账号 MP_TESTER_01，验证 ModeTabContainer -> Multiplayer 清理与验签流程
 		var mp_account := AccountProfile.new()
 		mp_account.account_id = "MP_TESTER_01"
 		mp_account.username = "MP_TESTER_01"
-		mp_account.password_hash_sha256 = AuthService.hash_password("Secret_MP_131")
+		mp_account.password_hash_sha256 = AuthService.hash_password("Secret_MP_Test")
 		AccountRepository.get_instance().save_account(mp_account)
 		WorldGatewayRealmSessionHelper.logout_to_account_entry(gateway, gateway._get_tabs())
 		var mp_auth := {"token": ""}
-		ServiceLocator.get_instance().auth().login_async("MP_TESTER_01", "Secret_MP_131", func(login_reply: Dictionary) -> void:
+		ServiceLocator.get_instance().auth().login_async("MP_TESTER_01", "Secret_MP_Test", func(login_reply: Dictionary) -> void:
 			mp_auth["token"] = str(login_reply.get("token", ""))
 		)
 		var mp_gw: WorldGatewayViewScript = nav.replace_screen("world_gateway", {
@@ -236,7 +236,7 @@ static func _test_tc_e2e_03_reentry_existing_char_and_entry_signals(session_ctx:
 		entry._on_char_reroll_pressed()
 		signals_ok = slot_picked and not entry.rolled_attributes.is_empty()
 
-	var login_res: Dictionary = entry.submit_login("Phase131HeroUser", "Secret_131_OK") if entry != null else {}
+	var login_res: Dictionary = entry.submit_login("RealChainHeroUser", "Secret_UiE2E_OK") if entry != null else {}
 	var login_acc := str(login_res.get("account_id", session_ctx.get("account_id", "")))
 	var login_tok := str(login_res.get("token", session_ctx.get("token", "")))
 	var gateway: WorldGatewayViewScript = nav.push_screen("world_gateway", {
@@ -253,7 +253,7 @@ static func _test_tc_e2e_03_reentry_existing_char_and_entry_signals(session_ctx:
 		direct_hud._get_subpanels().on_menu_exit_to_gateway_pressed()
 
 	var ok: bool = signals_ok and bool(login_res.get("success", false)) and direct_entered_hud
-	return make_result("TC-E2E-UI-03: 入口槽位重骰信号闭环与已创角世界复进入MainHUD", ok, {
+	return make_result("TC-E2E-UI-03: 入口槽位重骰信号流转与已创角世界复进入MainHUD", ok, {
 		"signals_ok": signals_ok,
 		"login_ok": bool(login_res.get("success", false)),
 		"direct_entered_hud": direct_entered_hud

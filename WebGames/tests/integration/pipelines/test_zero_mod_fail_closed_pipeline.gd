@@ -7,7 +7,7 @@
 #           PrologueExecutionKernel, WorldGatewayFSM, WorldGatewayView
 # 职责说明: 验证纯引擎基座在零 MOD 与纯扩展包（无基础/全转化包）状态下的全域
 #           Fail-Closed 拦截契约（ERR_NO_BASE_CONTENT_MOD）及网关 UI 缺包横幅表现。
-# 设计依据: 阶段验收矩阵 (TC-ZMF-01 ~ TC-ZMF-05, DOD-P130-0401)
+# 设计依据: 阶段验收矩阵 (TC-ZMF-01 ~ TC-ZMF-05)
 # ==============================================================================
 
 ## TestZeroModFailClosedPipeline：零 MOD 严格 Fail-Closed 与缺包 UI 防御集成测试套件
@@ -27,9 +27,9 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_zero_mod_creation_and_prologue_fail_closed())
 	results.append(test_zero_mod_gateway_selection_and_ui_banner())
 	TestCase.unmount_mod_overlay_for_test()
-	return TestCase.pack_results("零 MOD 严格 Fail-Closed 全链路验证流水线", results)
+	return TestCase.pack_results("零 MOD 严格 Fail-Closed 全流程验证流水线", results)
 
-## TC-ZMF-01: 纯引擎底座不含任何硬编码卡拉尔剧情、物品或 DAG 图元
+## TC-ZMF-01: 纯引擎基础实现不含任何硬编码卡拉尔剧情、物品或 DAG 图元
 static func test_zero_mod_clean_engine_baseline() -> Dictionary:
 	TestCase.unmount_mod_overlay_for_test()
 	var has_overlay: bool = GameConfig.has_active_mod_overlay()

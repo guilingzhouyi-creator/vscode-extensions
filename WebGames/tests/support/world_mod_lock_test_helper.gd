@@ -11,7 +11,7 @@
 class_name WorldModLockTestHelper
 extends RefCounted
 
-const LOCKED_WORLD_ID: String = "WORLD_P130_LOCK_REENTRY_01"
+const LOCKED_WORLD_ID: String = "WORLD_LOCK_REENTRY_01"
 
 
 ## 清理指定测试世界的 world_mod_lock.json 并卸载激活 MOD 叠层

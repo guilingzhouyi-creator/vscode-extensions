@@ -6,8 +6,8 @@
 #           AppRoot, AccountEntryView, WorldGatewayView, ModWorkbenchScreen, PrologueView
 # 职责说明: 在真实无头 SceneTree 中实例化全套前端视图场景并开启 service_mode = "real"，
 #           端到端驱动 注册/登录 ➔ 世界网关刷新 ➔ MOD 工坊启停预检 ➔ 建档创角 ➔
-#           交互式 DAG 序章分支推演 ➔ 主页 HUD 交接 ➔ ESC 洗脱注销与全节点回收。
-# 设计依据: 阶段验收矩阵 (TC-FGP-01 ~ TC-FGP-05, DOD-P130-0402)
+#           交互式 DAG 序章分支推演 ➔ 主页 HUD 交接 ➔ ESC 清理注销与全节点回收。
+# 设计依据: 阶段验收矩阵 (TC-FGP-01 ~ TC-FGP-05)
 # ==============================================================================
 
 ## TestRealFrontendGatewayWorkbenchPrologue：真实前端视图 + service_mode="real" 全链无头推演测试套件
@@ -21,7 +21,7 @@ const ModWorkbenchScreenScript = preload("res://frontend/views/mod_workbench/mod
 const PrologueViewScript = preload("res://frontend/views/prologue/prologue_view.gd")
 const MainHUDViewScript = preload("res://frontend/views/main_hud/main_hud_view.gd")
 
-const WORLD_ID: String = "WORLD_P130_FE_REAL_01"
+const WORLD_ID: String = "WORLD_FE_REAL_01"
 
 ## 执行真实前端视图全链推演验收测试
 static func run_all_tests() -> Dictionary:
@@ -34,14 +34,14 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_tc_fgp_04_world_creation_and_authoritative_char(session_ctx))
 	results.append(_test_tc_fgp_05_prologue_dag_view_to_hud_and_teardown(session_ctx))
 	_teardown_frontend_real_env(session_ctx)
-	return TestCase.pack_results("真实前端场景与 RealServiceContainer 全链路无头推演流水线", results)
+	return TestCase.pack_results("真实前端场景与 RealServiceContainer 全流程无头推演流水线", results)
 
 static func _setup_frontend_real_env() -> void:
 	TestFullChainBackendHelper.setup_env()
 	NavManager.reset_instance()
 	ServiceLocator.set_mode("real")
 	var app_root := AppRootScript.new()
-	app_root.name = "TestPhase130AppRoot"
+	app_root.name = "TestFrontendRealAppRoot"
 	var screen_layer := CanvasLayer.new()
 	screen_layer.name = "ScreenLayer"
 	var container := Control.new()
@@ -85,7 +85,7 @@ static func _test_tc_fgp_01_real_auth_and_gateway_mount(session_ctx: Dictionary)
 		"account_id": session_ctx.get("account_id", "")
 	})
 
-## TC-FGP-02: WorldGatewayView 实例化并从 RealWorldService 探测官方底座包就绪
+## TC-FGP-02: WorldGatewayView 实例化并从 RealWorldService 探测官方基础包就绪
 static func _test_tc_fgp_02_world_gateway_view_probes_and_banner(session_ctx: Dictionary) -> Dictionary:
 	var nav := NavManager.get_instance()
 	var gateway_screen: WorldGatewayViewScript = nav.push_screen("world_gateway", {
@@ -97,7 +97,7 @@ static func _test_tc_fgp_02_world_gateway_view_probes_and_banner(session_ctx: Di
 		and gateway_screen.active_base_pack_id == "official_kalar" \
 		and gateway_screen.create_world_btn != null \
 		and not gateway_screen.create_world_btn.disabled
-	return make_result("TC-FGP-02: WorldGatewayView 无头挂载与底座探针就绪状态展示", ok, {
+	return make_result("TC-FGP-02: WorldGatewayView 无头挂载与基础包探针就绪状态展示", ok, {
 		"base_pack_id": gateway_screen.active_base_pack_id if gateway_screen != null else ""
 	})
 
@@ -129,7 +129,7 @@ static func _test_tc_fgp_03_mod_workbench_toggle_and_precheck(_session_ctx: Dict
 
 	var back_to_gateway: bool = nav.get_current_screen() is WorldGatewayViewScript
 	var ok: bool = mounted_ok and toggle_off_blocked and restore_on_passed and back_to_gateway
-	return make_result("TC-FGP-03: ModWorkbenchScreen 启停校验与预检诊断交互闭环", ok, {
+	return make_result("TC-FGP-03: ModWorkbenchScreen 启停校验与预检诊断交互流转", ok, {
 		"toggle_off_blocked": toggle_off_blocked,
 		"restore_on_passed": restore_on_passed,
 		"back_to_gateway": back_to_gateway

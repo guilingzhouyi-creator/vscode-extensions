@@ -7,7 +7,7 @@
 #           PrologueExecutionKernel, AssetPathResolver, AntiBridgeGuard
 # 职责说明: 使用与卡拉尔完全无关的纯合成异世界内容 MOD，验证可组合叠层注入、
 #           DAG 序章推演、环依赖拒载、.kmod 二进制寻址隔离、联机摘要核验与退回归零。
-# 设计依据: 阶段验收矩阵 (TC-PMC-01 ~ TC-PMC-05, DOD-P130-0401)
+# 设计依据: 阶段验收矩阵 (TC-PMC-01 ~ TC-PMC-05)
 # ==============================================================================
 
 ## TestPluginModCompositionAndIsolation：纯插件化非卡拉尔 MOD 组合、资产隔离与叠层归零测试套件
@@ -91,7 +91,7 @@ static func test_synthetic_dag_prologue_progression() -> Dictionary:
 	var finish_ok: bool = bool(step_res.get("success", false)) and p_ctx != null and p_ctx.is_completed \
 		and step_packet != null and str(step_packet.narrative_text).contains("发条七号")
 
-	return make_result("TC-PMC-02: 非卡拉尔自定义 DAG 序章占位符水化与终态闭环", boot_ok and finish_ok, {
+	return make_result("TC-PMC-02: 非卡拉尔自定义 DAG 序章占位符解析与终态达成", boot_ok and finish_ok, {
 		"dag_id": p_ctx.current_dag_id if p_ctx != null else "",
 		"completed": p_ctx.is_completed if p_ctx != null else false
 	})
@@ -180,4 +180,4 @@ static func test_realm_digest_composition_and_exit_clean_isolation() -> Dictiona
 		and not SyntheticChronoModFixture.has_override_item("CHRONO:EQUIP:FOCUS:ETHER_LENS") \
 		and PrologueDagRegistry.get_graph_by_id("DAG_CHRONO_AWAKEN") == null
 
-	return make_result("TC-PMC-05: 联机权威摘要鉴权防伪及 exit_to_gateway 叠层全归零", verify_ok and clean_ok)
+	return make_result("TC-PMC-05: 联机权威摘要鉴权校验及 exit_to_gateway 叠层全归零", verify_ok and clean_ok)

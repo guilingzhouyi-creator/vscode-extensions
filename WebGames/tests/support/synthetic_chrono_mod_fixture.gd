@@ -11,7 +11,7 @@
 class_name SyntheticChronoModFixture
 extends RefCounted
 
-const SANDBOX_MODS_ROOT: String = "user://test_sandbox_phase130_composition/"
+const SANDBOX_MODS_ROOT: String = "user://test_sandbox_chrono_composition/"
 
 
 ## 清理临时资产路径映射、卸载已激活 MOD 叠层并移除沙盒目录

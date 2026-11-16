@@ -1,14 +1,16 @@
 # ==============================================================================
-# 模块归属: 集成测试流水线 (Tests · 自动化测试底座)
+# 模块归属: 集成测试流水线 (Tests · 自动化测试基础套件)
 # 文件路径: res://tests/integration/pipelines/test_mod_sdk_and_realm_security_pipeline.gd
 # 架构定位: Integration Test Pipeline / Mod SDK & Realm Security Harness
 # 跨域依赖: 上游: TestRegistry | 下游: AntiBridgeGuard, WorldGatewayFSM, GameModeRoutingSolver | 配置: config/domains/world_gateway/core.json
-# 职责说明: 自动化全链路测试 MOD 开发者 SDK 同步与联机域安全净化、跨模式防毒化与状态对称释放
+# 职责说明: 自动化全流程测试 MOD 开发者 SDK 同步与联机域安全净化、跨模式防污染与状态对称释放
 # 设计依据: 业务领域第一性原理与气密级防越权安全验收契约
 # ==============================================================================
 
 class_name TestModSdkAndRealmSecurityPipeline
 extends TestCase
+
+const OFFICIAL_BASE_PACK_ID: String = "official_kalar"
 
 ## 统一测试套件主入口
 static func run_all_tests() -> Dictionary:
@@ -19,9 +21,9 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_multiplayer_purge_and_fallback_to_vanilla())
 	results.append(test_multiplayer_official_vanilla_allowed())
 	results.append(test_gateway_exit_symmetric_cleanup())
-	results.append(test_phase131_switch_clean_purge_and_realm_fail_rollback())
+	results.append(test_switch_clean_purge_and_realm_fail_rollback())
 
-	return pack_results("MOD SDK & Realm Security Pipeline", results)
+	return TestCase.pack_results("MOD SDK 与联机域安全净化流水线", results)
 
 ## TC-MSS-01: 单机模式下全量加载第三方 MOD 正常放行
 static func test_single_player_third_party_mods_allowed() -> Dictionary:
@@ -137,13 +139,13 @@ static func test_slot_mode_poisoning_blocked() -> Dictionary:
 		"solver_blocked": solver_blocked
 	})
 
-## TC-MSS-04: 联机模式切入时本地 MOD 强制净化卸载与内存洗脱
+## TC-MSS-04: 联机模式切入时本地 MOD 强制净化卸载与内存清理
 static func test_multiplayer_purge_and_fallback_to_vanilla() -> Dictionary:
 	var fsm := WorldGatewayFSM.new("ACC_MSS_PURGE_01")
 	fsm.enter_gateway()
 
 	var mixed_mods: Array = [
-		{"pack_id": "official_kalar", "is_official": true, "trust_tier": "OFFICIAL", "pack_profile": "OFFICIAL_BASE"},
+		{"pack_id": OFFICIAL_BASE_PACK_ID, "is_official": true, "trust_tier": "OFFICIAL", "pack_profile": "OFFICIAL_BASE"},
 		{"pack_id": "third_party_addon", "is_vanilla": false},
 		"official_core_content",
 		{"pack_id": "official_core_expansion", "is_official": true, "trust_tier": "OFFICIAL", "pack_profile": "OFFICIAL_BASE"}
@@ -160,7 +162,7 @@ static func test_multiplayer_purge_and_fallback_to_vanilla() -> Dictionary:
 	var has_spoofed_string: bool = false
 
 	for m in retained:
-		if m is Dictionary and str((m as Dictionary).get("pack_id", "")) == "official_kalar":
+		if m is Dictionary and str((m as Dictionary).get("pack_id", "")) == OFFICIAL_BASE_PACK_ID:
 			has_official_base = true
 		elif m is Dictionary and str((m as Dictionary).get("pack_id", "")) == "third_party_addon":
 			has_third_party = true
@@ -180,7 +182,7 @@ static func test_multiplayer_purge_and_fallback_to_vanilla() -> Dictionary:
 	TestCase.unmount_mod_overlay_for_test()
 
 	var passed: bool = purge_ok and discipline_pass
-	return make_result("TC-MSS-04: 联机模式切入时本地 MOD 强制净化卸载与内存洗脱", passed, {
+	return make_result("TC-MSS-04: 联机模式切入时本地 MOD 强制净化卸载与内存清理", passed, {
 		"purge_ok": purge_ok,
 		"discipline_pass": discipline_pass
 	})
@@ -242,7 +244,7 @@ static func test_gateway_exit_symmetric_cleanup() -> Dictionary:
 	var before_reset: bool = fsm.context.selected_mode == WorldGatewayModel.GameMode.SINGLE_PLAYER \
 		and not fsm.get_active_mods().is_empty()
 
-	# 执行退出与内存洗脱
+	# 执行退出并重置会话状态
 	var exit_res := fsm.exit_to_gateway()
 	if not had_overlay:
 		TestCase.unmount_mod_overlay_for_test()
@@ -267,8 +269,8 @@ static func test_gateway_exit_symmetric_cleanup() -> Dictionary:
 	})
 
 
-## TC-MSS-07 (P0 安全基线): 单机→联机切模自动洗脱本地扩展、显式传毒拦截、验签失败回滚与 exit 清零选择态
-static func test_phase131_switch_clean_purge_and_realm_fail_rollback() -> Dictionary:
+## TC-MSS-07 (核心安全基线): 单机→联机切模自动清理本地扩展、显式传毒拦截、验签失败回滚与 exit 清零选择态
+static func test_switch_clean_purge_and_realm_fail_rollback() -> Dictionary:
 	var had_overlay := GameConfig.has_active_mod_overlay()
 	var kalar_mount := TestCase.mount_official_kalar_for_test()
 	var fsm := WorldGatewayFSM.new("MP_TESTER_01")
@@ -285,7 +287,7 @@ static func test_phase131_switch_clean_purge_and_realm_fail_rollback() -> Dictio
 	var poison_blocked: bool = not bool(poison_switch.get("success", true)) \
 		and str(poison_switch.get("error_code", "")) == AntiBridgeGuard.SECURITY_ERR_MULTIPLAYER_MOD_POISONING
 
-	# 2. 不传 custom_mods 的纯模式切换应自动洗脱本地 SP 扩展并清零显性选包
+	# 2. 不传 custom_mods 的纯模式切换应自动清理本地 SP 扩展并清零显性选包
 	var clean_switch := fsm.switch_gateway_mode(WorldGatewayModel.GameMode.MULTIPLAYER, {}, [])
 	var clean_switch_ok: bool = bool(clean_switch.get("success", false)) \
 		and fsm.context.selected_mode == WorldGatewayModel.GameMode.MULTIPLAYER \
@@ -311,7 +313,7 @@ static func test_phase131_switch_clean_purge_and_realm_fail_rollback() -> Dictio
 		TestCase.unmount_mod_overlay_for_test()
 
 	var passed: bool = poison_blocked and clean_switch_ok and fail_cleared_ok and exit_selection_cleared
-	return make_result("TC-MSS-07: 切联机净场洗脱、传毒拦截、验签回滚与退出选包清零", passed, {
+	return make_result("TC-MSS-07: 切联机净场清理、传毒拦截、验签回滚与退出选包清零", passed, {
 		"poison_blocked": poison_blocked,
 		"clean_switch_ok": clean_switch_ok,
 		"fail_cleared_ok": fail_cleared_ok,
