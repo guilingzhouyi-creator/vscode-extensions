@@ -95,3 +95,13 @@ python WebGames/mod_sdk/tools/check_mod.py WebGames/mod_sdk/templates/starter_st
 # 运行剧情演习推演器（无头模式）
 python WebGames/mod_sdk/tools/preview_mod.py WebGames/mod_sdk/templates/starter_story --simulate
 ```
+
+---
+
+## 六、 跨进程伴侣 IPC 客户端示例
+
+如需从外部 Agent、Python 或 Node.js 工具实时连接引擎内置的 `CompanionIPCServer`（协议 `kalar.companion.ipc.v1`，仅绑定 `127.0.0.1` 回环），请参阅：
+
+- [companion_ipc/README.md](companion_ipc/README.md)：帧格式、鉴权与支持的方法清单；
+- [companion_ipc/companion_ipc_client.py](companion_ipc/companion_ipc_client.py)：纯 Python 标准库客户端实现；
+- [companion_ipc/companion_ipc_client.mjs](companion_ipc/companion_ipc_client.mjs)：纯 Node.js 内置 `node:net` ESM 客户端实现。
